@@ -172,6 +172,7 @@ MachineCheckException(struct pt_regs *regs)
 			printk(KERN_DEBUG "%s bad port %lx at %p\n",
 			       (*nip & 0x100)? "OUT to": "IN from",
 			       regs->gpr[rb] - _IO_BASE, nip);
+			regs->msr |= MSR_RI;
 			regs->nip = fixup;
 			return;
 		}
@@ -223,7 +224,7 @@ SMIException(struct pt_regs *regs)
 void
 UnknownException(struct pt_regs *regs)
 {
-	printk("Bad trap at PC: %lx, SR: %lx, vector=%lx    %s\n",
+	printk("Bad trap at PC: %lx, MSR: %lx, vector=%lx    %s\n",
 	       regs->nip, regs->msr, regs->trap, print_tainted());
 	_exception(SIGTRAP, regs);
 }
@@ -266,6 +267,7 @@ emulate_instruction(struct pt_regs *regs)
 
 	if (!user_mode(regs))
 		return retval;
+	CHECK_FULL_REGS(regs);
 
 	if (get_user(instword, (uint *)(regs->nip)))
 		return -EFAULT;
@@ -366,6 +368,14 @@ StackOverflow(struct pt_regs *regs)
 	panic("kernel stack overflow");
 }
 
+void nonrecoverable_exception(struct pt_regs *regs)
+{
+	printk(KERN_ERR "Non-recoverable exception at PC=%lx MSR=%lx\n",
+	       regs->nip, regs->msr);
+	debugger(regs);
+	die("nonrecoverable exception", regs, SIGKILL);
+}
+
 void
 trace_syscall(struct pt_regs *regs)
 {
@@ -381,6 +391,8 @@ SoftwareEmulation(struct pt_regs *regs)
 	extern int do_mathemu(struct pt_regs *);
 	extern int Soft_emulate_8xx(struct pt_regs *);
 	int errcode;
+
+	CHECK_FULL_REGS(regs);
 
 	if (!user_mode(regs)) {
 		debugger(regs);
@@ -423,7 +435,7 @@ void DebugException(struct pt_regs *regs)
 	} else if (debug_status & DBSR_IC) {	/* instruction completion */
 
 		mtspr(SPRN_DBSR, DBSR_IC);
-		regs->dbcr0 &=  ~DBCR0_IC;
+		mtspr(SPRN_DBCR0, mfspr(SPRN_DBCR0) & ~DBCR0_IC);
 
 		if (!user_mode(regs) && debugger_sstep(regs))
 			return;
@@ -436,7 +448,7 @@ void DebugException(struct pt_regs *regs)
 void
 TAUException(struct pt_regs *regs)
 {
-	printk("TAU trap at PC: %lx, SR: %lx, vector=%lx    %s\n",
+	printk("TAU trap at PC: %lx, MSR: %lx, vector=%lx    %s\n",
 	       regs->nip, regs->msr, regs->trap, print_tainted());
 }
 #endif /* CONFIG_INT_TAU */

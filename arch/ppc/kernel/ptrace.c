@@ -218,14 +218,15 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		ret = -EIO;
 		/* convert to index and check */
 		index = (unsigned long) addr >> 2;
-		if ((addr & 3) || index > PT_FPSCR)
+		if ((addr & 3) || index > PT_FPSCR
+		    || child->thread.regs == NULL)
 			break;
 
+		CHECK_FULL_REGS(child->thread.regs);
 		if (index < PT_FPR0) {
 			tmp = get_reg(child, (int) index);
 		} else {
-			if (child->thread.regs != NULL
-			    && child->thread.regs->msr & MSR_FP)
+			if (child->thread.regs->msr & MSR_FP)
 				giveup_fpu(child);
 			tmp = ((unsigned long *)child->thread.fpr)[index - PT_FPR0];
 		}
@@ -243,23 +244,23 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		break;
 
 	/* write the word at location addr in the USER area */
-	/* XXX this will need fixing for 64-bit */
 	case PTRACE_POKEUSR: {
 		unsigned long index;
 
 		ret = -EIO;
 		/* convert to index and check */
 		index = (unsigned long) addr >> 2;
-		if ((addr & 3) || index > PT_FPSCR)
+		if ((addr & 3) || index > PT_FPSCR
+		    || child->thread.regs == NULL)
 			break;
 
+		CHECK_FULL_REGS(child->thread.regs);
 		if (index == PT_ORIG_R3)
 			break;
 		if (index < PT_FPR0) {
 			ret = put_reg(child, index, data);
 		} else {
-			if (child->thread.regs != NULL
-			    && child->thread.regs->msr & MSR_FP)
+			if (child->thread.regs->msr & MSR_FP)
 				giveup_fpu(child);
 			((unsigned long *)child->thread.fpr)[index - PT_FPR0] = data;
 			ret = 0;

@@ -37,6 +37,7 @@
 #include <asm/mmu_context.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
+#include <asm/tlbflush.h>
 
 #if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
 extern void (*debugger)(struct pt_regs *);
@@ -81,14 +82,14 @@ void do_page_fault(struct pt_regs *regs, unsigned long address,
 	 * bits we are interested in.  But there are some bits which
 	 * indicate errors in DSISR but can validly be set in SRR1.
 	 */
-	if (regs->trap == 0x400)
+	if (TRAP(regs) == 0x400)
 		error_code &= 0x48200000;
 	else
 		is_write = error_code & 0x02000000;
 #endif /* CONFIG_4xx */
 
 #if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
-	if (debugger_fault_handler && regs->trap == 0x300) {
+	if (debugger_fault_handler && TRAP(regs) == 0x300) {
 		debugger_fault_handler(regs);
 		return;
 	}
@@ -140,7 +141,7 @@ good_area:
 			goto bad_area;
 #if defined(CONFIG_4xx)
 	/* an exec  - 4xx allows for per-page execute permission */
-	} else if (regs->trap == 0x400) {
+	} else if (TRAP(regs) == 0x400) {
 		pte_t *ptep;
 
 #if 0
@@ -159,8 +160,8 @@ good_area:
 			struct page *page = pte_page(*ptep);
 
 			if (! test_bit(PG_arch_1, &page->flags)) {
-				__flush_dcache_icache((unsigned long)kmap(page));
-				kunmap(page);
+				unsigned long phys = page_to_pfn(page) << PAGE_SHIFT;
+				__flush_dcache_icache_phys(phys);
 				set_bit(PG_arch_1, &page->flags);
 			}
 			pte_update(ptep, 0, _PAGE_HWEXEC);

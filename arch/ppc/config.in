@@ -165,7 +165,9 @@ bool 'Symmetric multi-processing support' CONFIG_SMP
 if [ "$CONFIG_SMP" = "y" ]; then
    bool '  Distribute interrupts on all CPUs by default' CONFIG_IRQ_ALL_CPUS
 fi
-define_bool CONFIG_PREEMPT n
+if [ "$CONFIG_SMP" != "y" ]; then
+   bool 'Preemptible Kernel' CONFIG_PREEMPT
+fi
 
 if [ "$CONFIG_6xx" = "y" -a "$CONFIG_8260" = "n" ];then
    bool 'AltiVec Support' CONFIG_ALTIVEC

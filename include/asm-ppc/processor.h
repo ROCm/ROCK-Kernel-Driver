@@ -49,12 +49,12 @@
 #define MSR_LE		(1<<0) 		/* Little Endian */
 
 #ifdef CONFIG_APUS_FAST_EXCEPT
-#define MSR_		MSR_ME|MSR_IP|MSR_RI
+#define MSR_		(MSR_ME|MSR_IP|MSR_RI)
 #else
-#define MSR_		MSR_ME|MSR_RI
+#define MSR_		(MSR_ME|MSR_RI)
 #endif
-#define MSR_KERNEL      MSR_|MSR_IR|MSR_DR
-#define MSR_USER	MSR_KERNEL|MSR_PR|MSR_EE
+#define MSR_KERNEL      (MSR_|MSR_IR|MSR_DR)
+#define MSR_USER	(MSR_KERNEL|MSR_PR|MSR_EE)
 
 /* Floating Point Status and Control Register (FPSCR) Fields */
 

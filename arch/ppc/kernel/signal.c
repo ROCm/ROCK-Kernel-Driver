@@ -44,6 +44,8 @@
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 #endif
 
+extern void sigreturn_exit(struct pt_regs *);
+
 #define GP_REGS_SIZE	MIN(sizeof(elf_gregset_t), sizeof(struct pt_regs))
 
 /* 
@@ -111,20 +113,14 @@ sys_sigsuspend(old_sigset_t mask, int p2, int p3, int p4, int p6, int p7,
 	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
-	regs->gpr[3] = -EINTR;
+	regs->result = -EINTR;
+	regs->ccr |= 0x10000000;
+	regs->gpr[3] = EINTR;
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
 		schedule();
 		if (do_signal(&saveset, regs))
-			/*
-			 * If a signal handler needs to be called,
-			 * do_signal() has set R3 to the signal number (the
-			 * first argument of the signal handler), so don't
-			 * overwrite that with EINTR !
-			 * In the other cases, do_signal() doesn't touch 
-			 * R3, so it's still set to -EINTR (see above).
-			 */
-			return regs->gpr[3];
+			sigreturn_exit(regs);
 	}
 }
 
@@ -148,20 +144,22 @@ sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, int p3, int p4, int p6,
 	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
-	regs->gpr[3] = -EINTR;
+	regs->result = -EINTR;
+	regs->ccr |= 0x10000000;
+	regs->gpr[3] = EINTR;
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
 		schedule();
 		if (do_signal(&saveset, regs))
-			return regs->gpr[3];
+			sigreturn_exit(regs);
 	}
 }
 
 
 int
-sys_sigaltstack(const stack_t *uss, stack_t *uoss)
+sys_sigaltstack(const stack_t *uss, stack_t *uoss, int r5, int r6,
+		int r7, int r8, struct pt_regs *regs)
 {
-	struct pt_regs *regs = (struct pt_regs *) &uss;
 	return do_sigaltstack(uss, uoss, regs->gpr[1]);
 }
 
@@ -236,16 +234,15 @@ struct rt_sigframe
  *  Each of these things must be a multiple of 16 bytes in size.
  *
  */
-int sys_rt_sigreturn(struct pt_regs *regs)
+int sys_rt_sigreturn(int r3, int r4, int r5, int r6, int r7, int r8,
+		     struct pt_regs *regs)
 {
 	struct rt_sigframe *rt_sf;
 	struct sigcontext_struct sigctx;
 	struct sigregs *sr;
-	int ret;
 	elf_gregset_t saved_regs;  /* an array of ELF_NGREG unsigned longs */
 	sigset_t set;
 	stack_t st;
-	unsigned long prevsp;
 
 	rt_sf = (struct rt_sigframe *)(regs->gpr[1] + __SIGNAL_FRAMESIZE);
 	if (copy_from_user(&sigctx, &rt_sf->uc.uc_mcontext, sizeof(sigctx))
@@ -260,50 +257,26 @@ int sys_rt_sigreturn(struct pt_regs *regs)
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
 
-	rt_sf++;			/* Look at next rt_sigframe */
-	if (rt_sf == (struct rt_sigframe *)(sigctx.regs)) {
-		/* Last stacked signal - restore registers -
-		 * sigctx is initialized to point to the 
-		 * preamble frame (where registers are stored) 
-		 * see handle_signal()
-		 */
-		sr = (struct sigregs *) sigctx.regs;
-		if (copy_from_user(saved_regs, &sr->gp_regs,
-				   sizeof(sr->gp_regs)))
-			goto badframe;
-		saved_regs[PT_MSR] = (regs->msr & ~MSR_USERCHANGE)
-			| (saved_regs[PT_MSR] & MSR_USERCHANGE);
-		memcpy(regs, saved_regs, GP_REGS_SIZE);
-		if (copy_from_user(current->thread.fpr, &sr->fp_regs,
-				   sizeof(sr->fp_regs)))
-			goto badframe;
-		/* This function sets back the stack flags into
-		   the current task structure.  */
-		sys_sigaltstack(&st, NULL);
+	/* restore registers -
+	 * sigctx is initialized to point to the 
+	 * preamble frame (where registers are stored) 
+	 * see handle_signal()
+	 */
+	sr = (struct sigregs *) sigctx.regs;
+	if (copy_from_user(saved_regs, &sr->gp_regs, sizeof(sr->gp_regs)))
+		goto badframe;
+	saved_regs[PT_MSR] = (regs->msr & ~MSR_USERCHANGE)
+		| (saved_regs[PT_MSR] & MSR_USERCHANGE);
+	memcpy(regs, saved_regs, GP_REGS_SIZE);
+	if (copy_from_user(current->thread.fpr, &sr->fp_regs,
+			   sizeof(sr->fp_regs)))
+		goto badframe;
+	/* This function sets back the stack flags into
+	   the current task structure.  */
+	sys_sigaltstack(&st, NULL, 0, 0, 0, 0, regs);
 
-		ret = regs->result;
-	} else {
-		/* More signals to go */
-		/* Set up registers for next signal handler */
-		regs->gpr[1] = (unsigned long)rt_sf - __SIGNAL_FRAMESIZE;
-		if (copy_from_user(&sigctx, &rt_sf->uc.uc_mcontext, sizeof(sigctx)))
-			goto badframe;
-		sr = (struct sigregs *) sigctx.regs;
-		regs->gpr[3] = ret = sigctx.signal;
-		/* Get the siginfo   */
-		get_user(regs->gpr[4], (unsigned long *)&rt_sf->pinfo);
-		/* Get the ucontext */
-		get_user(regs->gpr[5], (unsigned long *)&rt_sf->puc);
-		regs->gpr[6] = (unsigned long) rt_sf;
-
-		regs->link = (unsigned long) &sr->tramp;
-		regs->nip = sigctx.handler;
-		if (get_user(prevsp, &sr->gp_regs[PT_R1])
-		    || put_user(prevsp, (unsigned long *) regs->gpr[1]))
-			goto badframe;
-		current->thread.fpscr = 0;
-	}
-	return ret;
+	sigreturn_exit(regs);		/* doesn't return here */
+	return 0;
 
 badframe:
 	do_exit(SIGSEGV);
@@ -318,6 +291,7 @@ setup_rt_frame(struct pt_regs *regs, struct sigregs *frame,
 	/* Set up preamble frame */
 	if (verify_area(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto badframe;
+	CHECK_FULL_REGS(regs);
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
 	if (__copy_to_user(&frame->gp_regs, regs, GP_REGS_SIZE)
@@ -327,7 +301,7 @@ setup_rt_frame(struct pt_regs *regs, struct sigregs *frame,
 	   It calls the sc exception at offset 0x9999 
 	   for sys_rt_sigreturn().
 	*/
-	    || __put_user(0x38006666UL, &frame->tramp[0])	/* li r0,0x6666 */
+	    || __put_user(0x38000000UL + __NR_rt_sigreturn, &frame->tramp[0])
 	    || __put_user(0x44000002UL, &frame->tramp[1]))	/* sc */
 		goto badframe;
 	flush_icache_range((unsigned long) &frame->tramp[0],
@@ -362,14 +336,13 @@ badframe:
 /*
  * Do a signal return; undo the signal stack.
  */
-int sys_sigreturn(struct pt_regs *regs)
+int sys_sigreturn(int r3, int r4, int r5, int r6, int r7, int r8,
+		  struct pt_regs *regs)
 {
 	struct sigcontext_struct *sc, sigctx;
 	struct sigregs *sr;
-	int ret;
 	elf_gregset_t saved_regs;  /* an array of ELF_NGREG unsigned longs */
 	sigset_t set;
-	unsigned long prevsp;
 
 	sc = (struct sigcontext_struct *)(regs->gpr[1] + __SIGNAL_FRAMESIZE);
 	if (copy_from_user(&sigctx, sc, sizeof(sigctx)))
@@ -387,40 +360,20 @@ int sys_sigreturn(struct pt_regs *regs)
 	if (regs->msr & MSR_FP )
 		giveup_fpu(current);
 
-	sc++;			/* Look at next sigcontext */
-	if (sc == (struct sigcontext_struct *)(sigctx.regs)) {
-		/* Last stacked signal - restore registers */
-		sr = (struct sigregs *) sigctx.regs;
-		if (copy_from_user(saved_regs, &sr->gp_regs,
-				   sizeof(sr->gp_regs)))
-			goto badframe;
-		saved_regs[PT_MSR] = (regs->msr & ~MSR_USERCHANGE)
-			| (saved_regs[PT_MSR] & MSR_USERCHANGE);
-		memcpy(regs, saved_regs, GP_REGS_SIZE);
+	/* restore registers */
+	sr = (struct sigregs *) sigctx.regs;
+	if (copy_from_user(saved_regs, &sr->gp_regs, sizeof(sr->gp_regs)))
+		goto badframe;
+	saved_regs[PT_MSR] = (regs->msr & ~MSR_USERCHANGE)
+		| (saved_regs[PT_MSR] & MSR_USERCHANGE);
+	memcpy(regs, saved_regs, GP_REGS_SIZE);
 
-		if (copy_from_user(current->thread.fpr, &sr->fp_regs,
-				   sizeof(sr->fp_regs)))
-			goto badframe;
+	if (copy_from_user(current->thread.fpr, &sr->fp_regs,
+			   sizeof(sr->fp_regs)))
+		goto badframe;
 
-		ret = regs->result;
-
-	} else {
-		/* More signals to go */
-		regs->gpr[1] = (unsigned long)sc - __SIGNAL_FRAMESIZE;
-		if (copy_from_user(&sigctx, sc, sizeof(sigctx)))
-			goto badframe;
-		sr = (struct sigregs *) sigctx.regs;
-		regs->gpr[3] = ret = sigctx.signal;
-		regs->gpr[4] = (unsigned long) sc;
-		regs->link = (unsigned long) &sr->tramp;
-		regs->nip = sigctx.handler;
-
-		if (get_user(prevsp, &sr->gp_regs[PT_R1])
-		    || put_user(prevsp, (unsigned long *) regs->gpr[1]))
-			goto badframe;
-		current->thread.fpscr = 0;
-	}
-	return ret;
+	sigreturn_exit(regs);		/* doesn't return here */
+	return 0;
 
 badframe:
 	do_exit(SIGSEGV);
@@ -437,12 +390,13 @@ setup_frame(struct pt_regs *regs, struct sigregs *frame,
 
 	if (verify_area(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto badframe;
+	CHECK_FULL_REGS(regs);
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
 	if (__copy_to_user(&frame->gp_regs, regs, GP_REGS_SIZE)
 	    || __copy_to_user(&frame->fp_regs, current->thread.fpr,
 			      ELF_NFPREG * sizeof(double))
-	    || __put_user(0x38007777UL, &frame->tramp[0])    /* li r0,0x7777 */
+	    || __put_user(0x38000000UL + __NR_sigreturn, &frame->tramp[0])
 	    || __put_user(0x44000002UL, &frame->tramp[1]))   /* sc */
 		goto badframe;
 	flush_icache_range((unsigned long) &frame->tramp[0],
@@ -479,11 +433,14 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
 	struct sigcontext_struct *sc;
 	struct rt_sigframe *rt_sf;
 
-	if (regs->trap == 0x0C00 /* System Call! */
+	if (TRAP(regs) == 0x0C00 /* System Call! */
 	    && ((int)regs->result == -ERESTARTNOHAND ||
 		((int)regs->result == -ERESTARTSYS &&
-		 !(ka->sa.sa_flags & SA_RESTART))))
+		 !(ka->sa.sa_flags & SA_RESTART)))) {
 		regs->result = -EINTR;
+		regs->gpr[3] = EINTR;
+		regs->ccr |= 0x10000000;
+	}
 
 	/* Set up Signal Frame */
 	if (ka->sa.sa_flags & SA_SIGINFO) {
@@ -511,7 +468,7 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
 		    || __put_user(sig, &rt_sf->uc.uc_mcontext.signal))
 			goto badframe;
 	} else {
-		/* Put another sigcontext on the stack */
+		/* Put a sigcontext on the stack */
 		*newspp -= sizeof(*sc);
 		sc = (struct sigcontext_struct *) *newspp;
 		if (verify_area(VERIFY_WRITE, sc, sizeof(*sc)))
@@ -665,7 +622,7 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs)
 		break;
 	}
 
-	if (regs->trap == 0x0C00 /* System Call! */ &&
+	if (TRAP(regs) == 0x0C00 /* System Call! */ &&
 	    ((int)regs->result == -ERESTARTNOHAND ||
 	     (int)regs->result == -ERESTARTSYS ||
 	     (int)regs->result == -ERESTARTNOINTR)) {

@@ -233,55 +233,92 @@ __secondary_hold:
  * task's thread_struct.
  */
 #define EXCEPTION_PROLOG	\
-	mtspr	SPRG0,r20;	\
-	mtspr	SPRG1,r21;	\
-	mfcr	r20;		\
-	mfspr	r21,SPRG2;		/* exception stack to use from */ \
-	cmpwi	0,r21,0;		/* user mode or RTAS */ \
-	bne	1f;		\
-	tophys(r21,r1);			/* use tophys(kernel sp) otherwise */ \
-	subi	r21,r21,INT_FRAME_SIZE;	/* alloc exc. frame */\
-1:	CLR_TOP32(r21);		\
-	stw	r20,_CCR(r21);		/* save registers */ \
-	stw	r22,GPR22(r21);	\
-	stw	r23,GPR23(r21);	\
-	mfspr	r20,SPRG0;	\
-	stw	r20,GPR20(r21);	\
-	mfspr	r22,SPRG1;	\
-	stw	r22,GPR21(r21);	\
-	mflr	r20;		\
-	stw	r20,_LINK(r21);	\
-	mfctr	r22;		\
-	stw	r22,_CTR(r21);	\
-	mfspr	r20,XER;	\
-	stw	r20,_XER(r21);	\
-	mfspr	r22,SRR0;	\
-	mfspr	r23,SRR1;	\
-	stw	r0,GPR0(r21);	\
-	stw	r1,GPR1(r21);	\
-	stw	r2,GPR2(r21);	\
-	stw	r1,0(r21);	\
-	tovirt(r1,r21);			/* set new kernel sp */	\
-	SAVE_4GPRS(3, r21);	\
-	SAVE_GPR(7, r21);
+	mtspr	SPRG0,r10;	\
+	mtspr	SPRG1,r11;	\
+	mfcr	r10;		\
+	EXCEPTION_PROLOG_1;	\
+	EXCEPTION_PROLOG_2
+
+#define EXCEPTION_PROLOG_1	\
+	mfspr	r11,SRR1;		/* check whether user or kernel */ \
+	andi.	r11,r11,MSR_PR;	\
+	tophys(r11,r1);			/* use tophys(r1) if kernel */ \
+	beq	1f;		\
+	mfspr	r11,SPRG3;	\
+	lwz	r11,THREAD_INFO-THREAD(r11);	\
+	addi	r11,r11,THREAD_SIZE;	\
+	tophys(r11,r11);	\
+1:	subi	r11,r11,INT_FRAME_SIZE	/* alloc exc. frame */
+
+
+#define EXCEPTION_PROLOG_2	\
+	CLR_TOP32(r11);		\
+	stw	r10,_CCR(r11);		/* save registers */ \
+	stw	r12,GPR12(r11);	\
+	stw	r9,GPR9(r11);	\
+	mfspr	r10,SPRG0;	\
+	stw	r10,GPR10(r11);	\
+	mfspr	r12,SPRG1;	\
+	stw	r12,GPR11(r11);	\
+	mflr	r10;		\
+	stw	r10,_LINK(r11);	\
+	mfspr	r12,SRR0;	\
+	mfspr	r9,SRR1;	\
+	stw	r1,GPR1(r11);	\
+	stw	r1,0(r11);	\
+	tovirt(r1,r11);			/* set new kernel sp */	\
+	li	r10,MSR_;		/* can now take exceptions again */ \
+	MTMSRD(r10);			/* (except for mach check in rtas) */ \
+	stw	r0,GPR0(r11);	\
+	SAVE_4GPRS(3, r11);	\
+	SAVE_2GPRS(7, r11)
+
 /*
  * Note: code which follows this uses cr0.eq (set if from kernel),
- * r21, r22 (SRR0), and r23 (SRR1).
+ * r11, r12 (SRR0), and r9 (SRR1).
+ *
+ * Note2: once we have set r1 we are in a position to take exceptions
+ * again, and we could thus set MSR:RI at that point.
  */
 
 /*
  * Exception vectors.
  */
-#define STD_EXCEPTION(n, label, hdlr)		\
+#define EXCEPTION(n, label, hdlr, xfer)		\
 	. = n;					\
 label:						\
 	EXCEPTION_PROLOG;			\
 	addi	r3,r1,STACK_FRAME_OVERHEAD;	\
-	li	r20,MSR_KERNEL;			\
-	bl	transfer_to_handler; 		\
-i##n:						\
-	.long	hdlr;				\
-	.long	ret_from_except
+	xfer(n, hdlr)
+
+#define EXC_XFER_TEMPLATE(n, hdlr, trap, copyee, tfer, ret)	\
+	li	r10,trap;					\
+	stw	r10,TRAP(r11);					\
+	li	r10,MSR_KERNEL;					\
+	copyee(r10, r9);					\
+	bl	tfer;						\
+i##n:								\
+	.long	hdlr;						\
+	.long	ret
+
+#define COPY_EE(d, s)		rlwimi d,s,0,16,16
+#define NOCOPY(d, s)
+
+#define EXC_XFER_STD(n, hdlr)		\
+	EXC_XFER_TEMPLATE(n, hdlr, n, NOCOPY, transfer_to_handler_full,	\
+			  ret_from_except_full)
+
+#define EXC_XFER_LITE(n, hdlr)		\
+	EXC_XFER_TEMPLATE(n, hdlr, n+1, NOCOPY, transfer_to_handler, \
+			  ret_from_except)
+
+#define EXC_XFER_EE(n, hdlr)		\
+	EXC_XFER_TEMPLATE(n, hdlr, n, COPY_EE, transfer_to_handler_full, \
+			  ret_from_except_full)
+
+#define EXC_XFER_EE_LITE(n, hdlr)	\
+	EXC_XFER_TEMPLATE(n, hdlr, n+1, COPY_EE, transfer_to_handler, \
+			  ret_from_except)
 
 /* System reset */
 /* core99 pmac starts the seconary here by changing the vector, and
@@ -290,11 +327,43 @@ i##n:						\
 	. = 0x100
 	b	__secondary_start_gemini
 #else
-	STD_EXCEPTION(0x100, Reset, UnknownException)
+	EXCEPTION(0x100, Reset, UnknownException, EXC_XFER_STD)
 #endif
 
 /* Machine check */
-	STD_EXCEPTION(0x200, MachineCheck, MachineCheckException)
+/*
+ * On CHRP, this is complicated by the fact that we could get a
+ * machine check inside RTAS, and we have no guarantee that certain
+ * critical registers will have the values we expect.  The set of
+ * registers that might have bad values includes all the GPRs
+ * and all the BATs.  We indicate that we are in RTAS by putting
+ * a non-zero value, the address of the exception frame to use,
+ * in SPRG2.  The machine check handler checks SPRG2 and uses its
+ * value if it is non-zero.  If we ever needed to free up SPRG2,
+ * we could use a field in the thread_info or thread_struct instead.
+ * (Other exception handlers assume that r1 is a valid kernel stack
+ * pointer when we take an exception from supervisor mode.)
+ *	-- paulus.
+ */
+	. = 0x200
+MachineCheck:
+	mtspr	SPRG0,r10
+	mtspr	SPRG1,r11
+	mfcr	r10
+#ifdef CONFIG_ALL_PPC
+	mfspr	r11,SPRG2
+	cmpwi	0,r11,0
+	bne	7f
+#endif /* CONFIG_ALL_PPC */
+	EXCEPTION_PROLOG_1
+7:	EXCEPTION_PROLOG_2
+	addi	r3,r1,STACK_FRAME_OVERHEAD
+#ifdef CONFIG_ALL_PPC
+	mfspr	r4,SPRG2
+	cmpwi	cr1,r4,0
+	bne	cr1,machine_check_in_rtas
+#endif
+	EXC_XFER_STD(0x200, MachineCheckException)
 
 /* Data access exception. */
 	. = 0x300
@@ -305,37 +374,24 @@ DataAccessCont:
 DataAccess:
 	EXCEPTION_PROLOG
 #endif /* CONFIG_PPC64BRIDGE */
-	mfspr	r20,DSISR
-	andis.	r0,r20,0xa470		/* weird error? */
+	mfspr	r10,DSISR
+	andis.	r0,r10,0xa470		/* weird error? */
 	bne	1f			/* if not, try to put a PTE */
 	mfspr	r4,DAR			/* into the hash table */
-	rlwinm	r3,r20,32-15,21,21	/* DSISR_STORE -> _PAGE_RW */
+	rlwinm	r3,r10,32-15,21,21	/* DSISR_STORE -> _PAGE_RW */
 	bl	hash_page
-1:	stw	r20,_DSISR(r21)
-	mr	r5,r20
+1:	stw	r10,_DSISR(r11)
+	mr	r5,r10
 	mfspr	r4,DAR
-	stw	r4,_DAR(r21)
+	stw	r4,_DAR(r11)
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-	li	r20,MSR_KERNEL
-	rlwimi	r20,r23,0,16,16		/* copy EE bit from saved MSR */
-	bl	transfer_to_handler
-i0x300:
-	.long	do_page_fault
-	.long	ret_from_except
+	andi.	r0,r9,MSR_PR		/* set cr0.eq if from kernel */
+	EXC_XFER_EE_LITE(0x300, do_page_fault)
 
 #ifdef CONFIG_PPC64BRIDGE
 /* SLB fault on data access. */
 	. = 0x380
 	b	DataSegment
-DataSegmentCont:
-	mfspr	r4,DAR
-	stw	r4,_DAR(r21)
-	addi	r3,r1,STACK_FRAME_OVERHEAD
-	li	r20,MSR_KERNEL
-	rlwimi	r20,r23,0,16,16		/* copy EE bit from saved MSR */
-	bl	transfer_to_handler
-	.long	UnknownException
-	.long	ret_from_except
 #endif /* CONFIG_PPC64BRIDGE */
 
 /* Instruction access exception. */
@@ -347,135 +403,79 @@ InstructionAccessCont:
 InstructionAccess:
 	EXCEPTION_PROLOG
 #endif /* CONFIG_PPC64BRIDGE */
-	andis.	r0,r23,0x4000		/* no pte found? */
+	andis.	r0,r9,0x4000		/* no pte found? */
 	beq	1f			/* if so, try to put a PTE */
 	li	r3,0			/* into the hash table */
-	mr	r4,r22			/* SRR0 is fault address */
+	mr	r4,r12			/* SRR0 is fault address */
 	bl	hash_page
 1:	addi	r3,r1,STACK_FRAME_OVERHEAD
-	mr	r4,r22
-	mr	r5,r23
-	li	r20,MSR_KERNEL
-	rlwimi	r20,r23,0,16,16		/* copy EE bit from saved MSR */
-	bl	transfer_to_handler
-i0x400:
-	.long	do_page_fault
-	.long	ret_from_except
+	mr	r4,r12
+	mr	r5,r9
+	andi.	r0,r9,MSR_PR		/* set cr0.eq if from kernel */
+	EXC_XFER_EE_LITE(0x400, do_page_fault)
 
 #ifdef CONFIG_PPC64BRIDGE
 /* SLB fault on instruction access. */
 	. = 0x480
 	b	InstructionSegment
-InstructionSegmentCont:
-	addi	r3,r1,STACK_FRAME_OVERHEAD
-	li	r20,MSR_KERNEL
-	rlwimi	r20,r23,0,16,16		/* copy EE bit from saved MSR */
-	bl	transfer_to_handler
-	.long	UnknownException
-	.long	ret_from_except
 #endif /* CONFIG_PPC64BRIDGE */
 
 /* External interrupt */
-	. = 0x500;
-HardwareInterrupt:
-	EXCEPTION_PROLOG;
-	addi	r3,r1,STACK_FRAME_OVERHEAD
-	li	r20,MSR_KERNEL
-	li	r4,0
-	bl	transfer_to_handler
-	.globl do_IRQ_intercept
-do_IRQ_intercept:
-	.long	do_IRQ;
-	.long	ret_from_intercept
+	EXCEPTION(0x500, HardwareInterrupt, do_IRQ, EXC_XFER_LITE)
 
 /* Alignment exception */
 	. = 0x600
 Alignment:
 	EXCEPTION_PROLOG
 	mfspr	r4,DAR
-	stw	r4,_DAR(r21)
+	stw	r4,_DAR(r11)
 	mfspr	r5,DSISR
-	stw	r5,_DSISR(r21)
+	stw	r5,_DSISR(r11)
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-	li	r20,MSR_KERNEL
-	rlwimi	r20,r23,0,16,16		/* copy EE bit from saved MSR */
-	bl	transfer_to_handler
-i0x600:
-	.long	AlignmentException
-	.long	ret_from_except
+	EXC_XFER_EE(0x600, AlignmentException)
 
 /* Program check exception */
-	. = 0x700
-ProgramCheck:
-	EXCEPTION_PROLOG
-	addi	r3,r1,STACK_FRAME_OVERHEAD
-	li	r20,MSR_KERNEL
-	rlwimi	r20,r23,0,16,16		/* copy EE bit from saved MSR */
-	bl	transfer_to_handler
-i0x700:
-	.long	ProgramCheckException
-	.long	ret_from_except
+	EXCEPTION(0x700, ProgramCheck, ProgramCheckException, EXC_XFER_EE)
 
 /* Floating-point unavailable */
 	. = 0x800
 FPUnavailable:
 	EXCEPTION_PROLOG
 	bne	load_up_fpu		/* if from user, just load it up */
-	li	r20,MSR_KERNEL
-	bl	transfer_to_handler	/* if from kernel, take a trap */
-i0x800:
-	.long	KernelFP
-	.long	ret_from_except
-
-	. = 0x900
-Decrementer:
-	EXCEPTION_PROLOG
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-	li	r20,MSR_KERNEL
-	bl	transfer_to_handler
-	.globl timer_interrupt_intercept
-timer_interrupt_intercept:
-	.long	timer_interrupt
-	.long	ret_from_intercept
+	EXC_XFER_EE_LITE(0x800, KernelFP)
 
-	STD_EXCEPTION(0xa00, Trap_0a, UnknownException)
-	STD_EXCEPTION(0xb00, Trap_0b, UnknownException)
+/* Decrementer */
+	EXCEPTION(0x900, Decrementer, timer_interrupt, EXC_XFER_LITE)
+
+	EXCEPTION(0xa00, Trap_0a, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0xb00, Trap_0b, UnknownException, EXC_XFER_EE)
 
 /* System call */
 	. = 0xc00
 SystemCall:
 	EXCEPTION_PROLOG
-	stw	r3,ORIG_GPR3(r21)
-	li	r20,MSR_KERNEL
-	rlwimi	r20,r23,0,16,16		/* copy EE bit from saved MSR */
-	bl	transfer_to_handler
-	.long	DoSyscall
-	.long	ret_from_except
+	EXC_XFER_EE_LITE(0xc00, DoSyscall)
 
 /* Single step - not used on 601 */
-	STD_EXCEPTION(0xd00, SingleStep, SingleStepException)
-	STD_EXCEPTION(0xe00, Trap_0e, UnknownException)
+	EXCEPTION(0xd00, SingleStep, SingleStepException, EXC_XFER_EE)
+	EXCEPTION(0xe00, Trap_0e, UnknownException, EXC_XFER_EE)
 
 /*
  * The Altivec unavailable trap is at 0x0f20.  Foo.
  * We effectively remap it to 0x3000.
  */
 	. = 0xf00
-	b	Trap_0f
-trap_0f_cont:
-	addi	r3,r1,STACK_FRAME_OVERHEAD
-	li	r20,MSR_KERNEL
-	bl	transfer_to_handler
-	.long	UnknownException
-	.long	ret_from_except
 
-	. = 0xf20
 #ifdef CONFIG_ALTIVEC
+	b	Trap_0f
+	. = 0xf20
 	b	AltiVecUnavailable
-#endif
 Trap_0f:
+#endif
 	EXCEPTION_PROLOG
-	b	trap_0f_cont
+	addi	r3,r1,STACK_FRAME_OVERHEAD
+	EXC_XFER_EE(0xf00, UnknownException)
 
 /*
  * Handle TLB miss for instruction on 603/603e.
@@ -677,35 +677,35 @@ DataStoreTLBMiss:
 	mtcrf	0x80,r3
 	rfi
 
-	STD_EXCEPTION(0x1300, Trap_13, InstructionBreakpoint)
-	STD_EXCEPTION(0x1400, SMI, SMIException)
-	STD_EXCEPTION(0x1500, Trap_15, UnknownException)
-	STD_EXCEPTION(0x1600, Trap_16, UnknownException)
-	STD_EXCEPTION(0x1700, Trap_17, TAUException)
-	STD_EXCEPTION(0x1800, Trap_18, UnknownException)
-	STD_EXCEPTION(0x1900, Trap_19, UnknownException)
-	STD_EXCEPTION(0x1a00, Trap_1a, UnknownException)
-	STD_EXCEPTION(0x1b00, Trap_1b, UnknownException)
-	STD_EXCEPTION(0x1c00, Trap_1c, UnknownException)
-	STD_EXCEPTION(0x1d00, Trap_1d, UnknownException)
-	STD_EXCEPTION(0x1e00, Trap_1e, UnknownException)
-	STD_EXCEPTION(0x1f00, Trap_1f, UnknownException)
-	STD_EXCEPTION(0x2000, RunMode, RunModeException)
-	STD_EXCEPTION(0x2100, Trap_21, UnknownException)
-	STD_EXCEPTION(0x2200, Trap_22, UnknownException)
-	STD_EXCEPTION(0x2300, Trap_23, UnknownException)
-	STD_EXCEPTION(0x2400, Trap_24, UnknownException)
-	STD_EXCEPTION(0x2500, Trap_25, UnknownException)
-	STD_EXCEPTION(0x2600, Trap_26, UnknownException)
-	STD_EXCEPTION(0x2700, Trap_27, UnknownException)
-	STD_EXCEPTION(0x2800, Trap_28, UnknownException)
-	STD_EXCEPTION(0x2900, Trap_29, UnknownException)
-	STD_EXCEPTION(0x2a00, Trap_2a, UnknownException)
-	STD_EXCEPTION(0x2b00, Trap_2b, UnknownException)
-	STD_EXCEPTION(0x2c00, Trap_2c, UnknownException)
-	STD_EXCEPTION(0x2d00, Trap_2d, UnknownException)
-	STD_EXCEPTION(0x2e00, Trap_2e, UnknownException)
-	STD_EXCEPTION(0x2f00, Trap_2f, UnknownException)
+	EXCEPTION(0x1300, Trap_13, InstructionBreakpoint, EXC_XFER_EE)
+	EXCEPTION(0x1400, SMI, SMIException, EXC_XFER_EE)
+	EXCEPTION(0x1500, Trap_15, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x1600, Trap_16, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x1700, Trap_17, TAUException, EXC_XFER_STD)
+	EXCEPTION(0x1800, Trap_18, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x1900, Trap_19, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x1a00, Trap_1a, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x1b00, Trap_1b, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x1c00, Trap_1c, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x1d00, Trap_1d, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x1e00, Trap_1e, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x1f00, Trap_1f, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x2000, RunMode, RunModeException, EXC_XFER_EE)
+	EXCEPTION(0x2100, Trap_21, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x2200, Trap_22, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x2300, Trap_23, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x2400, Trap_24, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x2500, Trap_25, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x2600, Trap_26, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x2700, Trap_27, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x2800, Trap_28, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x2900, Trap_29, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x2a00, Trap_2a, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x2b00, Trap_2b, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x2c00, Trap_2c, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x2d00, Trap_2d, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x2e00, Trap_2e, UnknownException, EXC_XFER_EE)
+	EXCEPTION(0x2f00, Trap_2f, UnknownException, EXC_XFER_EE)
 
 	. = 0x3000
 
@@ -713,25 +713,29 @@ DataStoreTLBMiss:
 AltiVecUnavailable:
 	EXCEPTION_PROLOG
 	bne	load_up_altivec		/* if from user, just load it up */
-	li	r20,MSR_KERNEL
-	bl	transfer_to_handler	/* if from kernel, take a trap */
-	.long	KernelAltiVec
-	.long	ret_from_except
+	EXC_XFER_EE_LITE(0xf20, KernelAltiVec)
 #endif /* CONFIG_ALTIVEC */
 
 #ifdef CONFIG_PPC64BRIDGE
 DataAccess:
 	EXCEPTION_PROLOG
 	b	DataAccessCont
+
 InstructionAccess:
 	EXCEPTION_PROLOG
 	b	InstructionAccessCont
+
 DataSegment:
 	EXCEPTION_PROLOG
-	b	DataSegmentCont
+	addi	r3,r1,STACK_FRAME_OVERHEAD
+	mfspr	r4,DAR
+	stw	r4,_DAR(r11)
+	EXC_XFER_STD(0x380, UnknownException)
+
 InstructionSegment:
 	EXCEPTION_PROLOG
-	b	InstructionSegmentCont
+	addi	r3,r1,STACK_FRAME_OVERHEAD
+	EXC_XFER_STD(0x480, UnknownException)
 #endif /* CONFIG_PPC64BRIDGE */
 
 /*
@@ -769,16 +773,16 @@ load_up_fpu:
 	lwz	r5,PT_REGS(r4)
 	add	r5,r5,r6
 	lwz	r4,_MSR-STACK_FRAME_OVERHEAD(r5)
-	li	r20,MSR_FP|MSR_FE0|MSR_FE1
-	andc	r4,r4,r20		/* disable FP for previous task */
+	li	r10,MSR_FP|MSR_FE0|MSR_FE1
+	andc	r4,r4,r10		/* disable FP for previous task */
 	stw	r4,_MSR-STACK_FRAME_OVERHEAD(r5)
 1:
 #endif /* CONFIG_SMP */
 	/* enable use of FP after return */
 	mfspr	r5,SPRG3		/* current task's THREAD (phys) */
 	lwz	r4,THREAD_FPEXC_MODE(r5)
-	ori	r23,r23,MSR_FP		/* enable FP for current */
-	or	r23,r23,r4
+	ori	r9,r9,MSR_FP		/* enable FP for current */
+	or	r9,r9,r4
 	lfd	fr0,THREAD_FPSCR-4(r5)
 	mtfsf	0xff,fr0
 	REST_32FPRS(0, r5)
@@ -788,20 +792,56 @@ load_up_fpu:
 	stw	r4,last_task_used_math@l(r3)
 #endif /* CONFIG_SMP */
 	/* restore registers and return */
-	lwz	r3,_CCR(r21)
-	lwz	r4,_LINK(r21)
-	mtcrf	0xff,r3
-	mtlr	r4
-	REST_GPR(1, r21)
-	REST_4GPRS(3, r21)
-	/* we haven't used ctr or xer */
-	mtspr	SRR1,r23
-	mtspr	SRR0,r22
-	REST_GPR(20, r21)
-	REST_2GPRS(22, r21)
-	lwz	r21,GPR21(r21)
+	/* we haven't used ctr or xer or lr */
+	/* fall through to fast_exception_return */
+
+	.globl	fast_exception_return
+fast_exception_return:
+	andi.	r10,r9,MSR_RI		/* check for recoverable interrupt */
+	beq	1f			/* if not, we've got problems */
+2:	REST_4GPRS(3, r11)
+	lwz	r10,_CCR(r11)
+	REST_GPR(1, r11)
+	mtcr	r10
+	lwz	r10,_LINK(r11)
+	mtlr	r10
+	REST_GPR(10, r11)
+	mtspr	SRR1,r9
+	mtspr	SRR0,r12
+	REST_GPR(9, r11)
+	REST_GPR(12, r11)
+	lwz	r11,GPR11(r11)
 	SYNC
 	RFI
+
+/* check if the exception happened in a restartable section */
+1:	lis	r3,exc_exit_restart_end@ha
+	addi	r3,r3,exc_exit_restart_end@l
+	cmplw	r12,r3
+	bge	3f
+	lis	r4,exc_exit_restart@ha
+	addi	r4,r4,exc_exit_restart@l
+	cmplw	r12,r4
+	blt	3f
+	lis	r3,fee_restarts@ha
+	tophys(r3,r3)
+	lwz	r5,fee_restarts@l(r3)
+	addi	r5,r5,1
+	stw	r5,fee_restarts@l(r3)
+	mr	r12,r4		/* restart at exc_exit_restart */
+	b	2b
+
+	.comm	fee_restarts,4
+
+/* aargh, a nonrecoverable interrupt, panic */
+/* aargh, we don't know which trap this is */
+3:	li	r10,0
+	stw	r10,TRAP(r11)
+	addi	r3,r1,STACK_FRAME_OVERHEAD
+	li	r10,MSR_KERNEL
+	bl	transfer_to_handler_full
+	.long	nonrecoverable_exception
+	.long	ret_from_except
 
 /*
  * FP unavailable trap from kernel - print a message, but let
@@ -818,7 +858,7 @@ KernelFP:
 	bl	printk
 	b	ret_from_except
 86:	.string	"floating point used in kernel (task=%p, pc=%x)\n"
-	.align	4
+	.align	4,0
 
 #ifdef CONFIG_ALTIVEC
 /* Note that the AltiVec support is closely modeled after the FP
@@ -842,57 +882,40 @@ load_up_altivec:
  * to another.  Instead we call giveup_altivec in switch_to.
  */
 #ifndef CONFIG_SMP
-#ifndef CONFIG_APUS
-	lis	r6,-KERNELBASE@h
-#else
-	lis	r6,CYBERBASEp@h
-	lwz	r6,0(r6)
-#endif
+	tophys(r6,0)
 	addis	r3,r6,last_task_used_altivec@ha
 	lwz	r4,last_task_used_altivec@l(r3)
 	cmpi	0,r4,0
 	beq	1f
 	add	r4,r4,r6
 	addi	r4,r4,THREAD	/* want THREAD of last_task_used_altivec */
-	SAVE_32VR(0,r20,r4)
+	SAVE_32VR(0,r10,r4)
 	MFVSCR(vr0)
-	li	r20,THREAD_VSCR
-	STVX(vr0,r20,r4)
+	li	r10,THREAD_VSCR
+	STVX(vr0,r10,r4)
 	lwz	r5,PT_REGS(r4)
 	add	r5,r5,r6
 	lwz	r4,_MSR-STACK_FRAME_OVERHEAD(r5)
-	lis	r20,MSR_VEC@h
-	andc	r4,r4,r20	/* disable altivec for previous task */
+	lis	r10,MSR_VEC@h
+	andc	r4,r4,r10	/* disable altivec for previous task */
 	stw	r4,_MSR-STACK_FRAME_OVERHEAD(r5)
 1:
 #endif /* CONFIG_SMP */
 	/* enable use of AltiVec after return */
-	oris	r23,r23,MSR_VEC@h
+	oris	r9,r9,MSR_VEC@h
 	mfspr	r5,SPRG3		/* current task's THREAD (phys) */
-	li	r20,THREAD_VSCR
-	LVX(vr0,r20,r5)
+	li	r10,THREAD_VSCR
+	LVX(vr0,r10,r5)
 	MTVSCR(vr0)
-	REST_32VR(0,r20,r5)
+	REST_32VR(0,r10,r5)
 #ifndef CONFIG_SMP
 	subi	r4,r5,THREAD
 	sub	r4,r4,r6
 	stw	r4,last_task_used_altivec@l(r3)
 #endif /* CONFIG_SMP */
 	/* restore registers and return */
-	lwz	r3,_CCR(r21)
-	lwz	r4,_LINK(r21)
-	mtcrf	0xff,r3
-	mtlr	r4
-	REST_GPR(1, r21)
-	REST_4GPRS(3, r21)
-	/* we haven't used ctr or xer */
-	mtspr	SRR1,r23
-	mtspr	SRR0,r22
-	REST_GPR(20, r21)
-	REST_2GPRS(22, r21)
-	lwz	r21,GPR21(r21)
-	SYNC
-	RFI
+	/* we haven't used ctr or xer or lr */
+	b	fast_exception_return
 
 /*
  * AltiVec unavailable trap from kernel - print a message, but let
@@ -909,7 +932,7 @@ KernelAltiVec:
 	bl	printk
 	b	ret_from_except
 87:	.string	"AltiVec used in kernel  (task=%p, pc=%x)  \n"
-	.align	4
+	.align	4,0
 
 /*
  * giveup_altivec(tsk)
@@ -1180,7 +1203,7 @@ __secondary_start:
 	CLR_TOP32(r4)
 	mtspr	SPRG3,r4
 	li	r3,0
-	mtspr	SPRG2,r3	/* 0 => r1 has kernel sp */
+	mtspr	SPRG2,r3	/* 0 => not in RTAS */
 
 	/* enable MMU and jump to start_secondary */
 	li	r4,MSR_KERNEL
@@ -1229,6 +1252,18 @@ _GLOBAL(__setup_cpu_7450)
 	mflr	r4
 	bl	setup_common_caches
 	bl	setup_7450_hid0
+	mtlr	r4
+	blr
+_GLOBAL(__setup_cpu_7450_23)
+	mflr	r4
+	bl	setup_common_caches
+	bl	setup_7450_23_hid0
+	mtlr	r4
+	blr
+_GLOBAL(__setup_cpu_7455)
+	mflr	r4
+	bl	setup_common_caches
+	bl	setup_7455_hid0
 	mtlr	r4
 	blr
 _GLOBAL(__setup_cpu_power3)
@@ -1298,21 +1333,53 @@ setup_750_7400_hid0:
  */
 setup_7450_hid0:
 	/* We check for the presence of an L3 cache setup by
-	 * the firmware. If any, we disable DOZE capability
+	 * the firmware. If any, we disable NAP capability as
+	 * it's known to be bogus on rev 2.1 and earlier
 	 */
 	mfspr	r11,SPRN_L3CR
 	andis.	r11,r11,L3CR_L3E@h
 	beq	1f
-	li	r7,CPU_FTR_CAN_DOZE
+	li	r7,CPU_FTR_CAN_NAP
 	lwz	r6,CPU_SPEC_FEATURES(r5)
 	andc	r6,r6,r7
 	stw	r6,CPU_SPEC_FEATURES(r5)
 1:	
+setup_7450_23_hid0:
 	mfspr	r11,HID0
 
 	/* All of the bits we have to set.....
 	*/
-	ori	r11,r11,HID0_SGE | HID0_FOLD | HID0_BHTE | HID0_BTIC
+	ori	r11,r11,HID0_SGE | HID0_FOLD | HID0_BHTE | HID0_BTIC | HID0_LRSTK
+	oris	r11,r11,HID0_DPM@h	/* enable dynamic power mgmt */
+
+	/* All of the bits we have to clear....
+	*/
+	li	r3,HID0_SPD | HID0_NOPDST | HID0_NOPTI
+	andc	r11,r11,r3		/* clear SPD: enable speculative */
+ 	li	r3,0
+
+ 	mtspr	ICTC,r3			/* Instruction Cache Throttling off */
+	isync
+	mtspr	HID0,r11
+	sync
+	isync
+	blr
+
+/* 7450
+ * Enable Store Gathering (SGE), Branch Folding (FOLD)
+ * Branch History Table (BHTE), Branch Target ICache (BTIC)
+ * Dynamic Power Management (DPM), Speculative (SPD)
+ * Ensure our data cache instructions really operate.
+ * Timebase has to be running or we wouldn't have made it here,
+ * just ensure we don't disable it.
+ * Clear Instruction cache throttling (ICTC)
+ */
+setup_7455_hid0:
+	mfspr	r11,HID0
+
+	/* All of the bits we have to set.....
+	*/
+	ori	r11,r11,HID0_SGE | HID0_FOLD | HID0_BHTE | HID0_BTIC | HID0_LRSTK
 	oris	r11,r11,HID0_DPM@h	/* enable dynamic power mgmt */
 
 	/* All of the bits we have to clear....
@@ -1384,7 +1451,7 @@ start_here:
 	CLR_TOP32(r4)
 	mtspr	SPRG3,r4
 	li	r3,0
-	mtspr	SPRG2,r3	/* 0 => r1 has kernel sp */
+	mtspr	SPRG2,r3	/* 0 => not in RTAS */
 
 	/* stack */
 	lis	r1,init_thread_union@ha
@@ -1481,6 +1548,10 @@ _GLOBAL(set_context)
 	stw	r4, 0x4(r5)
 #endif
 	li	r4,0
+BEGIN_FTR_SECTION
+	dssall	0
+	sync
+END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 3:
 #ifdef CONFIG_PPC64BRIDGE
 	slbie	r4
@@ -1490,7 +1561,7 @@ _GLOBAL(set_context)
 	rlwinm	r3,r3,0,8,3	/* clear out any overflow from VSID field */
 	addis	r4,r4,0x1000	/* address of next segment */
 	bdnz	3b
-	SYNC_601
+	sync
 	isync
 	blr
 
@@ -1503,35 +1574,35 @@ _GLOBAL(set_context)
  *  -- Cort 
  */
 clear_bats:
-	li	r20,0
+	li	r10,0
 	mfspr	r9,PVR
 	rlwinm	r9,r9,16,16,31		/* r9 = 1 for 601, 4 for 604 */
 	cmpwi	r9, 1
 	beq	1f
 
-	mtspr	DBAT0U,r20
-	mtspr	DBAT0L,r20
-	mtspr	DBAT1U,r20
-	mtspr	DBAT1L,r20
-	mtspr	DBAT2U,r20
-	mtspr	DBAT2L,r20
-	mtspr	DBAT3U,r20
-	mtspr	DBAT3L,r20
+	mtspr	DBAT0U,r10
+	mtspr	DBAT0L,r10
+	mtspr	DBAT1U,r10
+	mtspr	DBAT1L,r10
+	mtspr	DBAT2U,r10
+	mtspr	DBAT2L,r10
+	mtspr	DBAT3U,r10
+	mtspr	DBAT3L,r10
 1:
-	mtspr	IBAT0U,r20
-	mtspr	IBAT0L,r20
-	mtspr	IBAT1U,r20
-	mtspr	IBAT1L,r20
-	mtspr	IBAT2U,r20
-	mtspr	IBAT2L,r20
-	mtspr	IBAT3U,r20
-	mtspr	IBAT3L,r20
+	mtspr	IBAT0U,r10
+	mtspr	IBAT0L,r10
+	mtspr	IBAT1U,r10
+	mtspr	IBAT1L,r10
+	mtspr	IBAT2U,r10
+	mtspr	IBAT2L,r10
+	mtspr	IBAT3U,r10
+	mtspr	IBAT3L,r10
 	blr
 
 flush_tlbs:
-	lis	r20, 0x40
-1:	addic.	r20, r20, -0x1000
-	tlbie	r20
+	lis	r10, 0x40
+1:	addic.	r10, r10, -0x1000
+	tlbie	r10
 	blt	1b
 	sync
 	blr

@@ -43,13 +43,13 @@
  * Load a PTE into the hash table, if possible.
  * The address is in r4, and r3 contains an access flag:
  * _PAGE_RW (0x400) if a write.
- * r23 contains the SRR1 value, from which we use the MSR_PR bit.
+ * r9 contains the SRR1 value, from which we use the MSR_PR bit.
  * SPRG3 contains the physical address of the current task's thread.
  *
  * Returns to the caller if the access is illegal or there is no
  * mapping for the address.  Otherwise it places an appropriate PTE
  * in the hash table and returns from the exception.
- * Uses r0, r2 - r7, ctr, lr.
+ * Uses r0, r3 - r8, ctr, lr.
  */
 	.text
 	.globl	hash_page
@@ -62,34 +62,34 @@ hash_page:
 #endif
 	tophys(r7,0)			/* gets -KERNELBASE into r7 */
 #ifdef CONFIG_SMP
-	addis	r2,r7,mmu_hash_lock@h
-	ori	r2,r2,mmu_hash_lock@l
+	addis	r8,r7,mmu_hash_lock@h
+	ori	r8,r8,mmu_hash_lock@l
 	lis	r0,0x0fff
 	b	10f
-11:	lwz	r6,0(r2)
+11:	lwz	r6,0(r8)
 	cmpwi	0,r6,0
 	bne	11b
-10:	lwarx	r6,0,r2
+10:	lwarx	r6,0,r8
 	cmpwi	0,r6,0
 	bne-	11b
-	stwcx.	r0,0,r2
+	stwcx.	r0,0,r8
 	bne-	10b
 	isync
 #endif
 	/* Get PTE (linux-style) and check access */
 	lis	r0,KERNELBASE@h		/* check if kernel address */
 	cmplw	0,r4,r0
-	mfspr	r2,SPRG3		/* current task's THREAD (phys) */
+	mfspr	r8,SPRG3		/* current task's THREAD (phys) */
 	ori	r3,r3,_PAGE_USER|_PAGE_PRESENT /* test low addresses as user */
-	lwz	r5,PGDIR(r2)		/* virt page-table root */
+	lwz	r5,PGDIR(r8)		/* virt page-table root */
 	blt+	112f			/* assume user more likely */
 	lis	r5,swapper_pg_dir@ha	/* if kernel address, use */
 	addi	r5,r5,swapper_pg_dir@l	/* kernel page table */
-	rlwimi	r3,r23,32-12,29,29	/* MSR_PR -> _PAGE_USER */
+	rlwimi	r3,r9,32-12,29,29	/* MSR_PR -> _PAGE_USER */
 112:	add	r5,r5,r7		/* convert to phys addr */
 	rlwimi	r5,r4,12,20,29		/* insert top 10 bits of address */
-	lwz	r2,0(r5)		/* get pmd entry */
-	rlwinm.	r2,r2,0,0,19		/* extract address of pte page */
+	lwz	r8,0(r5)		/* get pmd entry */
+	rlwinm.	r8,r8,0,0,19		/* extract address of pte page */
 #ifdef CONFIG_SMP
 	beq-	hash_page_out		/* return if no mapping */
 #else
@@ -99,7 +99,7 @@ hash_page:
 	   to the address following the rfi. */
 	beqlr-
 #endif
-	rlwimi	r2,r4,22,20,29		/* insert next 10 bits of address */
+	rlwimi	r8,r4,22,20,29		/* insert next 10 bits of address */
 	rlwinm	r0,r3,32-3,24,24	/* _PAGE_RW access -> _PAGE_DIRTY */
 	ori	r0,r0,_PAGE_ACCESSED|_PAGE_HASHPTE
 
@@ -110,7 +110,7 @@ hash_page:
 	 * to update the PTE to set _PAGE_HASHPTE.  -- paulus.
 	 */
 retry:
-	lwarx	r6,0,r2			/* get linux-style pte */
+	lwarx	r6,0,r8			/* get linux-style pte */
 	andc.	r5,r3,r6		/* check access & ~permission */
 #ifdef CONFIG_SMP
 	bne-	hash_page_out		/* return if access not permitted */
@@ -118,13 +118,13 @@ retry:
 	bnelr-
 #endif
 	or	r5,r0,r6		/* set accessed/dirty bits */
-	stwcx.	r5,0,r2			/* attempt to update PTE */
+	stwcx.	r5,0,r8			/* attempt to update PTE */
 	bne-	retry			/* retry if someone got there first */
 
 	mfsrin	r3,r4			/* get segment reg for segment */
-	mr	r2,r8			/* we have saved r2 but not r8 */
+	mfctr	r0
+	stw	r0,_CTR(r11)
 	bl	create_hpte		/* add the hash table entry */
-	mr	r8,r2
 
 /*
  * htab_reloads counts the number of times we have to fault an
@@ -134,48 +134,34 @@ retry:
  * update_mmu_cache gets called to put the HPTE into the hash table
  * and those are counted as preloads rather than reloads.
  */
-	addis	r2,r7,htab_reloads@ha
-	lwz	r3,htab_reloads@l(r2)
+	addis	r8,r7,htab_reloads@ha
+	lwz	r3,htab_reloads@l(r8)
 	addi	r3,r3,1
-	stw	r3,htab_reloads@l(r2)
+	stw	r3,htab_reloads@l(r8)
 
 #ifdef CONFIG_SMP
 	eieio
-	addis	r2,r7,mmu_hash_lock@ha
+	addis	r8,r7,mmu_hash_lock@ha
 	li	r0,0
-	stw	r0,mmu_hash_lock@l(r2)
+	stw	r0,mmu_hash_lock@l(r8)
 #endif
 
 	/* Return from the exception */
-	lwz	r3,_CCR(r21)
-	lwz	r4,_LINK(r21)
-	lwz	r5,_CTR(r21)
-	mtcrf	0xff,r3
+	lwz	r4,_LINK(r11)
+	lwz	r5,_CTR(r11)
 	mtlr	r4
 	mtctr	r5
-	lwz	r0,GPR0(r21)
-	lwz	r1,GPR1(r21)
-	lwz	r2,GPR2(r21)
-	lwz	r3,GPR3(r21)
-	lwz	r4,GPR4(r21)
-	lwz	r5,GPR5(r21)
-	lwz	r6,GPR6(r21)
-	lwz	r7,GPR7(r21)
-	/* we haven't used xer */
-	mtspr	SRR1,r23
-	mtspr	SRR0,r22
-	lwz	r20,GPR20(r21)
-	lwz	r22,GPR22(r21)
-	lwz	r23,GPR23(r21)
-	lwz	r21,GPR21(r21)
-	RFI
+	lwz	r0,GPR0(r11)
+	lwz	r7,GPR7(r11)
+	lwz	r8,GPR8(r11)
+	b	fast_exception_return
 	
 #ifdef CONFIG_SMP
 hash_page_out:
 	eieio
-	addis	r2,r7,mmu_hash_lock@ha
+	addis	r8,r7,mmu_hash_lock@ha
 	li	r0,0
-	stw	r0,mmu_hash_lock@l(r2)
+	stw	r0,mmu_hash_lock@l(r8)
 	blr
 #endif /* CONFIG_SMP */
 
