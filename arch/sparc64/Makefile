@@ -53,7 +53,7 @@ ifeq ($(CONFIG_MCOUNT),y)
   CFLAGS := $(CFLAGS) -pg
 endif
 
-LDFLAGS_vmlinux = -T arch/sparc64/vmlinux.lds
+LDFLAGS_vmlinux = -T arch/sparc64/vmlinux.lds.s
 
 HEAD := arch/sparc64/kernel/head.o arch/sparc64/kernel/init_task.o
 
@@ -76,6 +76,8 @@ CORE_FILES += arch/sparc64/math-emu/math-emu.o
 
 LIBS := $(TOPDIR)/lib/lib.a $(LIBS) $(TOPDIR)/arch/sparc64/prom/promlib.a \
 	$(TOPDIR)/arch/sparc64/lib/lib.a
+
+vmlinux: arch/$(ARCH)/vmlinux.lds.s
 
 vmlinux.aout: vmlinux
 	$(ELFTOAOUT) -o $(TOPDIR)/vmlinux.aout $(TOPDIR)/vmlinux

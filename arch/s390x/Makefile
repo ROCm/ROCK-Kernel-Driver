@@ -15,12 +15,7 @@
 
 LDFLAGS		:= -m elf64_s390
 OBJCOPYFLAGS	:= -O binary
-ifeq ($(CONFIG_SHARED_KERNEL),y)
-  LINKSCRIPT := arch/s390x/vmlinux-shared.lds
-else
-  LINKSCRIPT := arch/s390x/vmlinux.lds
-endif
-LDFLAGS_vmlinux := -T $(LINKSCRIPT) -e start
+LDFLAGS_vmlinux := -T arch/$(ARCH)/vmlinux.lds.s -e start
 MODFLAGS += -fpic
 
 CFLAGS_PIPE := -pipe
@@ -41,7 +36,7 @@ listing: vmlinux
 
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
 
-vmlinux: $(LINKSCRIPT)
+vmlinux: arch/$(ARCH)/vmlinux.lds.s
 
 image: vmlinux 
 	@$(MAKEBOOT) image

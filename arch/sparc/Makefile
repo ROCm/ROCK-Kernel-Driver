@@ -31,7 +31,7 @@ CFLAGS := $(CFLAGS) -m32 -pipe -mno-fpu -fcall-used-g5 -fcall-used-g7
 endif
 
 #LDFLAGS_vmlinux = -N -Ttext 0xf0004000
-LDFLAGS_vmlinux = -T arch/sparc/vmlinux.lds
+LDFLAGS_vmlinux = -T arch/sparc/vmlinux.lds.s
 
 HEAD := arch/sparc/kernel/head.o arch/sparc/kernel/init_task.o
 
@@ -51,6 +51,8 @@ CORE_FILES += arch/sparc/boot/btfix.o
 # Export what is needed by arch/sparc/boot/Makefile
 export	CORE_FILES_NO_BTFIX
 export INIT
+
+vmlinux: arch/$(ARCH)/vmlinux.lds.s
 
 archclean:
 	rm -f $(TOPDIR)/vmlinux.aout
