@@ -311,11 +311,6 @@ static int dummy_inode_getattr (struct vfsmount *mnt, struct dentry *dentry)
 	return 0;
 }
 
-static void dummy_inode_post_lookup (struct inode *ino, struct dentry *d)
-{
-	return;
-}
-
 static void dummy_inode_delete (struct inode *ino)
 {
 	return;
@@ -612,6 +607,12 @@ static int dummy_unregister_security (const char *name, struct security_operatio
 	return -EINVAL;
 }
 
+static void dummy_d_instantiate (struct dentry *dentry, struct inode *inode)
+{
+	return;
+}
+
+
 struct security_operations dummy_security_ops;
 
 #define set_to_dummy_if_null(ops, function)				\
@@ -674,7 +675,6 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, inode_permission_lite);
 	set_to_dummy_if_null(ops, inode_setattr);
 	set_to_dummy_if_null(ops, inode_getattr);
-	set_to_dummy_if_null(ops, inode_post_lookup);
 	set_to_dummy_if_null(ops, inode_delete);
 	set_to_dummy_if_null(ops, inode_setxattr);
 	set_to_dummy_if_null(ops, inode_getxattr);
@@ -731,5 +731,6 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, sem_semop);
 	set_to_dummy_if_null(ops, register_security);
 	set_to_dummy_if_null(ops, unregister_security);
+	set_to_dummy_if_null(ops, d_instantiate);
 }
 
