@@ -28,6 +28,7 @@
 #include <asm/io.h>
 #include <linux/ata.h>
 
+
 /*
  * compile-time options
  */
@@ -171,6 +172,7 @@ enum {
 };
 
 /* forward declarations */
+struct scsi_device;
 struct ata_port_operations;
 struct ata_port;
 struct ata_queued_cmd;
@@ -427,7 +429,9 @@ extern void ata_bmdma_start_pio (struct ata_queued_cmd *qc);
 extern int pci_test_config_bits(struct pci_dev *pdev, struct pci_bits *bits);
 extern void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat, unsigned int done_late);
 extern void ata_eng_timeout(struct ata_port *ap);
-extern int ata_std_bios_param(Disk * disk, kdev_t dev, int *ip);
+extern int ata_std_bios_param(struct scsi_device *sdev,
+			      struct block_device *bdev,
+			      sector_t capacity, int geom[]);
 
 
 static inline unsigned long msecs_to_jiffies(unsigned long msecs)

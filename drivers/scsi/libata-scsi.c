@@ -28,7 +28,6 @@
 #include <scsi/scsi.h>
 #include "scsi.h"
 #include "hosts.h"
-#include "sd.h"
 #include <linux/libata.h>
 
 #include "libata.h"
@@ -45,13 +44,12 @@
  *	RETURNS:
  *
  */
-int ata_std_bios_param(Disk * disk,	/* SCSI disk */
-		       kdev_t dev,	/* Device major, minor */
-		  int *ip /* Heads, sectors, cylinders in that order */ )
+int ata_std_bios_param(struct scsi_device *sdev, struct block_device *bdev,
+		       sector_t capacity, int geom[]) 
 {
-	ip[0] = 255;
-	ip[1] = 63;
-	ip[2] = disk->capacity / (ip[0] * ip[1]);
+	geom[0] = 255;
+	geom[1] = 63;
+	geom[2] = capacity / (geom[0] * geom[1]);
 
 	return 0;
 }
