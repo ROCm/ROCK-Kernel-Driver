@@ -1238,6 +1238,21 @@ static void idefloppy_create_rw_cmd (idefloppy_floppy_t *floppy, idefloppy_pc_t 
 	set_bit(PC_DMA_RECOMMENDED, &pc->flags);
 }
 
+static int
+idefloppy_blockpc_cmd(idefloppy_floppy_t *floppy, idefloppy_pc_t *pc, struct request *rq)
+{
+	/*
+	 * just support eject for now, it would not be hard to make the
+	 * REQ_BLOCK_PC support fully-featured
+	 */
+	if (rq->cmd[0] != IDEFLOPPY_START_STOP_CMD)
+		return 1;
+
+	idefloppy_init_pc(pc);
+	memcpy(pc->c, rq->cmd, sizeof(pc->c));
+	return 0;
+}
+
 /*
  *	idefloppy_do_request is our request handling function.	
  */
@@ -1280,6 +1295,12 @@ static ide_startstop_t idefloppy_do_request (ide_drive_t *drive, struct request 
 		idefloppy_create_rw_cmd(floppy, pc, rq, block);
 	} else if (rq->flags & REQ_SPECIAL) {
 		pc = (idefloppy_pc_t *) rq->buffer;
+	} else if (rq->flags & REQ_BLOCK_PC) {
+		pc = idefloppy_next_pc_storage(drive);
+		if (idefloppy_blockpc_cmd(floppy, pc, rq)) {
+			idefloppy_do_end_request(drive, 0, 0);
+			return ide_stopped;
+		}
 	} else {
 		blk_dump_rq_flags(rq,
 			"ide-floppy: unsupported command in queue");

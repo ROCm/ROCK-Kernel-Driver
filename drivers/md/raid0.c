@@ -168,8 +168,7 @@ static int create_strip_zones (mddev_t *mddev)
  *	@bio: the buffer head that's been built up so far
  *	@biovec: the request that could be merged to it.
  *
- *	Return 1 if the merge is not permitted (because the
- *	result would cross a chunk boundary), 0 otherwise.
+ *	Return amount of bytes we can accept at this offset
  */
 static int raid0_mergeable_bvec(request_queue_t *q, struct bio *bio, struct bio_vec *biovec)
 {
@@ -182,7 +181,7 @@ static int raid0_mergeable_bvec(request_queue_t *q, struct bio *bio, struct bio_
 	block = bio->bi_sector >> 1;
 	bio_sz = (bio->bi_size + biovec->bv_len) >> 10;
 
-	return chunk_size < ((block & (chunk_size - 1)) + bio_sz);
+	return (chunk_size - ((block & (chunk_size - 1)) + bio_sz)) << 10;
 }
 
 static int raid0_run (mddev_t *mddev)

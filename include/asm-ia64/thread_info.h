@@ -37,11 +37,11 @@ struct thread_info {
 
 #define INIT_THREAD_INFO(ti)			\
 {						\
-	exec_domain:	&default_exec_domain,	\
-	flags:		0,			\
-	cpu:		0,			\
-	addr_limit:	KERNEL_DS,		\
-	preempt_count:	0,			\
+	.exec_domain	= &default_exec_domain,	\
+	.flags		= 0,			\
+	.cpu		= 0,			\
+	.addr_limit	= KERNEL_DS,		\
+	.preempt_count	= 0,			\
 }
 
 /* how to get the thread information struct from C */
