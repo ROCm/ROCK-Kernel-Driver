@@ -245,7 +245,7 @@ int device_add(struct device *dev)
  BusError:
 	device_pm_remove(dev);
  PMError:
-	kobject_unregister(&dev->kobj);
+	kobject_del(&dev->kobj);
  Error:
 	if (parent)
 		put_device(parent);
