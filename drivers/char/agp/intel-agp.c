@@ -552,18 +552,10 @@ static int intel_fetch_size(void)
 	return 0;
 }
 
-static int intel_8xx_fetch_size(void)
+static int __intel_8xx_fetch_size(u8 temp)
 {
 	int i;
-	u8 temp;
 	struct aper_size_info_8 *values;
-
-	pci_read_config_byte(agp_bridge->dev, INTEL_APSIZE, &temp);
-
-	/* Intel 815 chipsets have a _weird_ APSIZE register with only
-	 * one non-reserved bit, so mask the others out ... */
-	if (agp_bridge->type == INTEL_I815)
-		temp &= (1 << 3);
 
 	values = A_SIZE_8(agp_bridge->aperture_sizes);
 
@@ -578,6 +570,25 @@ static int intel_8xx_fetch_size(void)
 	return 0;
 }
 
+static int intel_8xx_fetch_size(void)
+{
+	u8 temp;
+
+	pci_read_config_byte(agp_bridge->dev, INTEL_APSIZE, &temp);
+	return __intel_8xx_fetch_size(temp);
+}
+
+static int intel_815_fetch_size(void)
+{
+	u8 temp;
+
+	/* Intel 815 chipsets have a _weird_ APSIZE register with only
+	 * one non-reserved bit, so mask the others out ... */
+	pci_read_config_byte(agp_bridge->dev, INTEL_APSIZE, &temp);
+	temp &= (1 << 3);
+
+	return __intel_8xx_fetch_size(temp);
+}
 
 static void intel_tlbflush(agp_memory * mem)
 {
@@ -1026,13 +1037,13 @@ struct agp_bridge_data intel_810_bridge = {
 
 
 struct agp_bridge_data intel_815_bridge = {
-	.type			= INTEL_I815,
+	.type			= INTEL_GENERIC,
 	.masks			= intel_generic_masks,
 	.aperture_sizes		= (void *)intel_815_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 2,
 	.configure		= intel_815_configure,
-	.fetch_size		= intel_8xx_fetch_size,
+	.fetch_size		= intel_815_fetch_size,
 	.cleanup		= intel_8xx_cleanup,
 	.tlb_flush		= intel_8xx_tlbflush,
 	.mask_memory		= intel_mask_memory,
