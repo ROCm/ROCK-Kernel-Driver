@@ -497,13 +497,19 @@ debug_stack_correct:
 	pushl $do_debug
 	jmp error_code
 
+/*
+ * NMI is doubly nasty. It can happen _while_ we're handling
+ * a debug fault, and the debug fault hasn't yet been able to
+ * clear up the stack. So we first check whether we got  an
+ * NMI on the sysenter entry path, but after that we need to
+ * check whether we got an NMI on the debug path where the debug
+ * fault happened on the sysenter path.
+ */
 ENTRY(nmi)
 	cmpl $sysenter_entry,(%esp)
 	je nmi_stack_fixup
-	cmpl $debug - 1,(%esp)
-	jle nmi_stack_correct
-	cmpl $debug_esp_fix_insn,(%esp)
-	jle nmi_debug_stack_fixup
+	cmpl $sysenter_entry,12(%esp)
+	je nmi_debug_stack_check
 nmi_stack_correct:
 	pushl %eax
 	SAVE_ALL
@@ -517,6 +523,13 @@ nmi_stack_correct:
 nmi_stack_fixup:
 	FIX_STACK(12,nmi_stack_correct, 1)
 	jmp nmi_stack_correct
+nmi_debug_stack_check:
+	cmpw $__KERNEL_CS,16(%esp)
+	jne nmi_stack_correct
+	cmpl $debug - 1,(%esp)
+	jle nmi_stack_correct
+	cmpl $debug_esp_fix_insn,(%esp)
+	jle nmi_debug_stack_fixup
 nmi_debug_stack_fixup:
 	FIX_STACK(24,nmi_stack_correct, 1)
 	jmp nmi_stack_correct
