@@ -58,9 +58,8 @@ extern char _end;
 unsigned long __per_cpu_offset[NR_CPUS];
 #endif
 
-DECLARE_PER_CPU(struct cpuinfo_ia64, cpu_info);
-
-unsigned long ia64_phys_stacked_size_p8;
+DEFINE_PER_CPU(struct cpuinfo_ia64, cpu_info);
+DEFINE_PER_CPU(unsigned long, ia64_phys_stacked_size_p8);
 unsigned long ia64_cycles_per_usec;
 struct ia64_boot_param *ia64_boot_param;
 struct screen_info screen_info;
@@ -564,11 +563,11 @@ cpu_init (void)
 		my_cpu_data = (void *) get_free_page(GFP_KERNEL);
 	memcpy(my_cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
 	__per_cpu_offset[cpu] = (char *) my_cpu_data - __per_cpu_start;
-	my_cpu_info = my_cpu_data + ((char *) &cpu_info - __per_cpu_start);
+	my_cpu_info = my_cpu_data + ((char *) &__get_cpu_var(cpu_info) - __per_cpu_start);
 #else
 	my_cpu_data = __phys_per_cpu_start;
 #endif
-	my_cpu_info = my_cpu_data + ((char *) &cpu_info - __per_cpu_start);
+	my_cpu_info = my_cpu_data + ((char *) &__get_cpu_var(cpu_info) - __per_cpu_start);
 
 	/*
 	 * We can't pass "local_cpu_data" to identify_cpu() because we haven't called
@@ -652,6 +651,6 @@ cpu_init (void)
 		num_phys_stacked = 96;
 	}
 	/* size of physical stacked register partition plus 8 bytes: */
-	ia64_phys_stacked_size_p8 = num_phys_stacked*8 + 8;
+	__get_cpu_var(ia64_phys_stacked_size_p8) = num_phys_stacked*8 + 8;
 	platform_cpu_init();
 }

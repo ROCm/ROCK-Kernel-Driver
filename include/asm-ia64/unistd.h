@@ -227,6 +227,11 @@
 #define __NR_free_large_pages		1235
 #define __NR_share_large_pages		1236
 #define __NR_unshare_large_pages	1237
+#define __NR_io_setup			1238
+#define __NR_io_destroy			1239
+#define __NR_io_getevents		1240
+#define __NR_io_submit			1241
+#define __NR_io_cancel			1242
 
 #if !defined(__ASSEMBLY__) && !defined(ASSEMBLER)
 

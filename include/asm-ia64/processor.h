@@ -15,9 +15,6 @@
 
 #include <linux/config.h>
 
-#include <linux/percpu.h>
-#include <linux/compiler.h>
-
 #include <asm/ptrace.h>
 #include <asm/kregs.h>
 #include <asm/system.h>
@@ -81,8 +78,10 @@
 
 #ifndef __ASSEMBLY__
 
-#include <linux/threads.h>
 #include <linux/cache.h>
+#include <linux/compiler.h>
+#include <linux/percpu.h>
+#include <linux/threads.h>
 
 #include <asm/fpu.h>
 #include <asm/offsets.h>
