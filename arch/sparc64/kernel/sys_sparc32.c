@@ -4160,7 +4160,7 @@ struct __sysctl_args32 {
 	u32 __unused[4];
 };
 
-extern asmlinkage long sys32_sysctl(struct __sysctl_args32 *args)
+asmlinkage long sys32_sysctl(struct __sysctl_args32 *args)
 {
 	struct __sysctl_args32 tmp;
 	int error;
@@ -4196,4 +4196,54 @@ extern asmlinkage long sys32_sysctl(struct __sysctl_args32 *args)
 		copy_to_user(args->__unused, tmp.__unused, sizeof(tmp.__unused));
 	}
 	return error;
+}
+
+extern asmlinkage int sys_sched_setaffinity(pid_t pid, unsigned int len,
+					    unsigned long *user_mask_ptr);
+
+asmlinkage int sys32_sched_setaffinity(__kernel_pid_t32 pid, unsigned int len,
+				       u32 *user_mask_ptr)
+{
+	unsigned long kernel_mask;
+	mm_segment_t old_fs;
+	int ret;
+
+	if (get_user(kernel_mask, user_mask_ptr))
+		return -EFAULT;
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	ret = sys_sched_setaffinity(pid,
+				    /* XXX Nice api... */
+				    sizeof(kernel_mask),
+				    &kernel_mask);
+	set_fs(old_fs);
+
+	return ret;
+}
+
+extern asmlinkage int sys_sched_getaffinity(pid_t pid, unsigned int len,
+					    unsigned long *user_mask_ptr);
+
+asmlinkage int sys32_sched_getaffinity(__kernel_pid_t32 pid, unsigned int len,
+				       u32 *user_mask_ptr)
+{
+	unsigned long kernel_mask;
+	mm_segment_t old_fs;
+	int ret;
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	ret = sys_schet_getaffinity(pid,
+				    /* XXX Nice api... */
+				    sizeof(kernel_mask),
+				    &kernel_mask);
+	set_fs(old_fs);
+
+	if (ret == 0) {
+		if (put_user(kernel_mask, user_mask_ptr))
+			ret = -EFAULT;
+	}
+
+	return ret;
 }

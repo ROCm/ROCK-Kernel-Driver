@@ -175,8 +175,8 @@
 #define __NR_statfs             157 /* Common                                      */
 #define __NR_fstatfs            158 /* Common                                      */
 #define __NR_umount             159 /* Common                                      */
-/* #define __NR_async_daemon    160    SunOS Specific                              */
-/* #define __NR_getfh           161    SunOS Specific                              */
+#define __NR_sched_set_affinity 160 /* Linux specific, async_daemon under SunOS    */
+#define __NR_sched_get_affinity 161 /* Linux specific, getfh under SunOS           */
 #define __NR_getdomainname      162 /* SunOS Specific                              */
 #define __NR_setdomainname      163 /* Common                                      */
 #define __NR_utrap_install	164 /* SYSV ABI/v9 required			   */
