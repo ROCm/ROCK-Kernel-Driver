@@ -516,7 +516,6 @@ static int sixpack_receive_room(struct tty_struct *tty)
 static void sixpack_receive_buf(struct tty_struct *tty, const unsigned char *cp, char *fp, int count)
 {
 	unsigned char buf[512];
-	unsigned long flags;
 	int count1;
 
 	struct sixpack *sp = (struct sixpack *) tty->disc_data;
@@ -525,10 +524,7 @@ static void sixpack_receive_buf(struct tty_struct *tty, const unsigned char *cp,
 	    !netif_running(sp->dev) || !count)
 		return;
 
-	save_flags(flags);
-	cli();
 	memcpy(buf, cp, count<sizeof(buf)? count:sizeof(buf));
-	restore_flags(flags);
 
 	/* Read the characters out of the buffer */
 
