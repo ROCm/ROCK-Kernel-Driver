@@ -123,7 +123,7 @@ int cpqhp_unconfigure_device(struct pci_func* func)
 	dbg("%s: bus/dev/func = %x/%x/%x\n", __FUNCTION__, func->bus, func->device, func->function);
 
 	for (j=0; j<8 ; j++) {
-		struct pci_dev* temp = pci_find_slot(func->bus, (func->device << 3) | j);
+		struct pci_dev* temp = pci_find_slot(func->bus, PCI_DEVFN(func->device, j));
 		if (temp)
 			pci_remove_bus_device(temp);
 	}
@@ -545,10 +545,10 @@ int cpqhp_save_slot_config (struct controller *ctrl, struct pci_func * new_slot)
 		} while (function < max_functions);
 	}			// End of IF (device in slot?)
 	else {
-		return(2);
+		return 2;
 	}
 
-	return(0);
+	return 0;
 }
 
 
@@ -594,9 +594,8 @@ int cpqhp_save_base_addr_length(struct controller *ctrl, struct pci_func * func)
 
 			while (next != NULL) {
 				rc = cpqhp_save_base_addr_length(ctrl, next);
-
 				if (rc)
-					return(rc);
+					return rc;
 
 				next = next->next;
 			}
@@ -979,7 +978,6 @@ int cpqhp_configure_board(struct controller *ctrl, struct pci_func * func)
 
 			while (next != NULL) {
 				rc = cpqhp_configure_board(ctrl, next);
-
 				if (rc)
 					return rc;
 
@@ -1076,9 +1074,8 @@ int cpqhp_valid_replace(struct controller *ctrl, struct pci_func * func)
 
 			while (next != NULL) {
 				rc = cpqhp_valid_replace(ctrl, next);
-
 				if (rc)
-					return(rc);
+					return rc;
 
 				next = next->next;
 			}
@@ -1144,7 +1141,7 @@ int cpqhp_valid_replace(struct controller *ctrl, struct pci_func * func)
 	}
 
 
-	return(0);
+	return 0;
 }
 
 
@@ -1229,9 +1226,8 @@ int cpqhp_find_available_resources (struct controller *ctrl, void *rom_start)
 	i = readb(rom_resource_table + NUMBER_OF_ENTRIES);
 	dbg("number_of_entries = %d\n", i);
 
-	if (!readb(one_slot + SECONDARY_BUS)) {
-		return(1);
-	}
+	if (!readb(one_slot + SECONDARY_BUS))
+		return 1;
 
 	dbg("dev|IO base|length|Mem base|length|Pre base|length|PB SB MB\n");
 
@@ -1391,7 +1387,7 @@ int cpqhp_find_available_resources (struct controller *ctrl, void *rom_start)
 	rc &= cpqhp_resource_sort_and_combine(&(ctrl->io_head));
 	rc &= cpqhp_resource_sort_and_combine(&(ctrl->bus_head));
 
-	return(rc);
+	return rc;
 }
 
 
@@ -1411,7 +1407,7 @@ int cpqhp_return_board_resources(struct pci_func * func, struct resource_lists *
 	dbg("%s\n", __FUNCTION__);
 
 	if (!func)
-		return(1);
+		return 1;
 
 	node = func->io_head;
 	func->io_head = NULL;
@@ -1450,7 +1446,7 @@ int cpqhp_return_board_resources(struct pci_func * func, struct resource_lists *
 	rc |= cpqhp_resource_sort_and_combine(&(resources->io_head));
 	rc |= cpqhp_resource_sort_and_combine(&(resources->bus_head));
 
-	return(rc);
+	return rc;
 }
 
 
