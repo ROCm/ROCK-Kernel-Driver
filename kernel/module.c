@@ -31,6 +31,7 @@
 #include <linux/errno.h>
 #include <linux/err.h>
 #include <linux/vermagic.h>
+#include <linux/notifier.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 #include <asm/pgalloc.h>
@@ -58,6 +59,29 @@ static spinlock_t modlist_lock = SPIN_LOCK_UNLOCKED;
 /* List of modules, protected by module_mutex AND modlist_lock */
 static DECLARE_MUTEX(module_mutex);
 static LIST_HEAD(modules);
+
+static DECLARE_MUTEX(notify_mutex);
+static struct notifier_block * module_notify_list;
+
+int register_module_notifier(struct notifier_block * nb)
+{
+	int err;
+	down(&notify_mutex);
+	err = notifier_chain_register(&module_notify_list, nb);
+	up(&notify_mutex);
+	return err;
+}
+EXPORT_SYMBOL(register_module_notifier);
+
+int unregister_module_notifier(struct notifier_block * nb)
+{
+	int err;
+	down(&notify_mutex);
+	err = notifier_chain_unregister(&module_notify_list, nb);
+	up(&notify_mutex);
+	return err;
+}
+EXPORT_SYMBOL(unregister_module_notifier);
 
 /* We require a truly strong try_module_get() */
 static inline int strong_try_module_get(struct module *mod)
@@ -1372,6 +1396,10 @@ sys_init_module(void *umod,
 
 	/* Drop lock so they can recurse */
 	up(&module_mutex);
+
+	down(&notify_mutex);
+	notifier_call_chain(&module_notify_list, MODULE_STATE_COMING, mod);
+	up(&notify_mutex);
 
 	/* Start the module */
 	ret = mod->init();

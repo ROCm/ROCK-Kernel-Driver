@@ -115,6 +115,8 @@ extern const struct gtype##_id __mod_##gtype##_table		\
 /* Given an address, look for it in the exception tables */
 const struct exception_table_entry *search_exception_tables(unsigned long add);
 
+struct notifier_block;
+
 #ifdef CONFIG_MODULES
 
 /* Get/put a kernel symbol (calls must be symmetric) */
@@ -329,6 +331,9 @@ const char *module_address_lookup(unsigned long addr,
 /* For extable.c to search modules' exception tables. */
 const struct exception_table_entry *search_module_extables(unsigned long addr);
 
+int register_module_notifier(struct notifier_block * nb);
+int unregister_module_notifier(struct notifier_block * nb);
+
 #else /* !CONFIG_MODULES... */
 #define EXPORT_SYMBOL(sym)
 #define EXPORT_SYMBOL_GPL(sym)
@@ -373,6 +378,18 @@ static inline const char *module_address_lookup(unsigned long addr,
 {
 	return NULL;
 }
+
+static inline int register_module_notifier(struct notifier_block * nb)
+{
+	/* no events will happen anyway, so this can always succeed */
+	return 0;
+}
+
+static inline int unregister_module_notifier(struct notifier_block * nb)
+{
+	return 0;
+}
+
 #endif /* CONFIG_MODULES */
 
 #ifdef MODULE

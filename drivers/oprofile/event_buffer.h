@@ -24,12 +24,13 @@ void wake_up_buffer_waiter(void);
  * then one of the following codes, then the
  * relevant data.
  */
-#define ESCAPE_CODE		~0UL
+#define ESCAPE_CODE			~0UL
 #define CTX_SWITCH_CODE 		1
 #define CPU_SWITCH_CODE 		2
 #define COOKIE_SWITCH_CODE 		3
 #define KERNEL_ENTER_SWITCH_CODE	4
 #define KERNEL_EXIT_SWITCH_CODE		5
+#define MODULE_LOADED_CODE		6
  
 /* add data to the event buffer */
 void add_event_entry(unsigned long data);
