@@ -122,7 +122,7 @@ static inline void dn_nsp_send(struct sk_buff *skb)
 	if ((dst = sk->dst_cache) && !dst->obsolete) {
 try_again:
 		skb->dst = dst_clone(dst);
-		dst->output(skb);
+		dst_output(skb);
 		return;
 	}
 

@@ -184,14 +184,6 @@ static void igmp_mod_timer(struct ip_mc_list *im, int max_delay)
 
 #define IGMP_SIZE (sizeof(struct igmphdr)+sizeof(struct iphdr)+4)
 
-/* Don't just hand NF_HOOK skb->dst->output, in case netfilter hook
-   changes route */
-static inline int
-output_maybe_reroute(struct sk_buff *skb)
-{
-	return skb->dst->output(skb);
-}
-
 static int igmp_send_report(struct net_device *dev, u32 group, int type)
 {
 	struct sk_buff *skb;
@@ -255,7 +247,7 @@ static int igmp_send_report(struct net_device *dev, u32 group, int type)
 	ih->csum=ip_compute_csum((void *)ih, sizeof(struct igmphdr));
 
 	return NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
-		       output_maybe_reroute);
+		       dst_output);
 }
 
 
