@@ -164,7 +164,7 @@ static void __init pcibios_allocate_resources(int pass)
 	}
 }
 
-static void __init pcibios_assign_resources(void)
+static int __init pcibios_assign_resources(void)
 {
 	struct pci_dev *dev = NULL;
 	int idx;
@@ -204,6 +204,7 @@ static void __init pcibios_assign_resources(void)
 				pci_assign_resource(dev, PCI_ROM_RESOURCE);
 		}
 	}
+	return 0;
 }
 
 void __init pcibios_resource_survey(void)
@@ -212,8 +213,13 @@ void __init pcibios_resource_survey(void)
 	pcibios_allocate_bus_resources(&pci_root_buses);
 	pcibios_allocate_resources(0);
 	pcibios_allocate_resources(1);
-	pcibios_assign_resources();
 }
+
+/**
+ * called in fs_initcall (one below subsys_initcall),
+ * give a chance for motherboard reserve resources
+ */
+fs_initcall(pcibios_assign_resources);
 
 int pcibios_enable_resources(struct pci_dev *dev, int mask)
 {
