@@ -1322,30 +1322,29 @@ static irqreturn_t wl3501_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *)dev_id;
 	struct wl3501_card *this;
+	int handled = 1;
 
-	if (!dev) {
-		printk(KERN_ERR "%s: irq %d for unknown device.\n",
-		       __FUNCTION__, irq);
-		return IRQ_NONE;
-	}
-
-	this = (struct wl3501_card *)dev->priv;
-
+	if (!dev)
+		goto unknown;
+	this = dev->priv;
+	spin_lock(&this->lock);
 	wl3501_ack_interrupt(this);
 	wl3501_block_interrupt(this);
-
 	wl3501_rx_interrupt(dev);
-
-	/* Clean Zone End */
 	wl3501_unblock_interrupt(this);
-	return IRQ_HANDLED;
+	spin_unlock(&this->lock);
+out:
+	return IRQ_RETVAL(handled);
+unknown:
+	handled = 0;
+	printk(KERN_ERR "%s: irq %d for unknown device.\n", __FUNCTION__, irq);
+	goto out;
 }
 
 static int wl3501_reset_board(struct wl3501_card *this)
 {
-	u8 tmp;
-	u32 i;
-	int rc = 0;
+	u8 tmp = 0;
+	int i, rc = 0;
 
 	/* Coreset */
 	wl3501_outb_p(WL3501_GCR_CORESET, this->base_addr + WL3501_NIC_GCR);
@@ -1353,7 +1352,6 @@ static int wl3501_reset_board(struct wl3501_card *this)
 	wl3501_outb_p(WL3501_GCR_CORESET, this->base_addr + WL3501_NIC_GCR);
 
 	/* Reset SRAM 0x480 to zero */
-	tmp = 0;
 	wl3501_set_to_wla(this, 0x480, &tmp, sizeof(tmp));
 
 	/* Start up */
