@@ -48,14 +48,10 @@
 #endif
 
 extern int sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg);
-extern int sys_sigreturn(struct pt_regs *regs);
 extern int do_signal(sigset_t *, struct pt_regs *);
 extern int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int, unsigned int, unsigned long, struct file *));
 extern int unregister_ioctl32_conversion(unsigned int cmd);
 
-long long __ashrdi3(long long, int);
-long long __ashldi3(long long, int);
-long long __lshrdi3(long long, int);
 int abs(int);
 
 extern struct pci_dev * iSeries_veth_dev;
@@ -63,7 +59,6 @@ extern struct pci_dev * iSeries_vio_dev;
 
 EXPORT_SYMBOL(do_signal);
 EXPORT_SYMBOL(sys_ioctl);
-EXPORT_SYMBOL(sys_sigreturn);
 EXPORT_SYMBOL(enable_irq);
 EXPORT_SYMBOL(disable_irq);
 EXPORT_SYMBOL(disable_irq_nosync);
