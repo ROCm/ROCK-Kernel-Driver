@@ -1340,7 +1340,7 @@ static void hub_port_connect_change(struct usb_hub *hubstate, int port,
 				dev_dbg(&dev->dev, "get status %d ?\n", status);
 				continue;
 			}
-			cpu_to_le16s(&hubstatus);
+			cpu_to_le16s(&devstat);
 			if ((devstat & (1 << USB_DEVICE_SELF_POWERED)) == 0) {
 				dev_err(&dev->dev,
 					"can't connect bus-powered hub "
