@@ -25,7 +25,7 @@ CFLAGS += -pipe -msoft-float
 # prevent gcc from keeping the stack 16 byte aligned
 CFLAGS += $(call cc-option,-mpreferred-stack-boundary=2)
 
-align := $(subst -functions=0,,$(call cc-option,-falign-functions=0,-malign-functions=0))
+align := $(cc-option-align)
 cflags-$(CONFIG_M386)		+= -march=i386
 cflags-$(CONFIG_M486)		+= -march=i486
 cflags-$(CONFIG_M586)		+= -march=i586

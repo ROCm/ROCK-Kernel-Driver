@@ -46,7 +46,7 @@ config DEBUG_SLAB
 	help
 	  Say Y here to have the kernel do limited verification on memory
 	  allocation as well as poisoning memory on free to catch use of freed
-	  memory.
+	  memory. This can make kmalloc/kfree-intensive workloads much slower.
 
 config DEBUG_SPINLOCK
 	bool "Spinlock debugging"
