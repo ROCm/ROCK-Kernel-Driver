@@ -79,6 +79,8 @@ struct unit_directory {
 
 	struct device device;
 
+	struct class_device class_dev;
+
 	struct csr1212_keyval *ud_kv;
 };
 

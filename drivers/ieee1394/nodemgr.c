@@ -120,7 +120,7 @@ struct host_info {
 };
 
 static int nodemgr_bus_match(struct device * dev, struct device_driver * drv);
-static int nodemgr_hotplug(struct device *dev, char **envp, int num_envp,
+static int nodemgr_hotplug(struct class_device *cdev, char **envp, int num_envp,
 			   char *buffer, int buffer_size);
 static void nodemgr_resume_ne(struct node_entry *ne);
 static void nodemgr_remove_ne(struct node_entry *ne);
@@ -129,7 +129,6 @@ static struct node_entry *find_entry_by_guid(u64 guid);
 struct bus_type ieee1394_bus_type = {
 	.name		= "ieee1394",
 	.match		= nodemgr_bus_match,
-	.hotplug	= nodemgr_hotplug,
 };
 
 static void host_cls_release(struct class_device *class_dev)
@@ -152,26 +151,21 @@ struct class nodemgr_ne_class = {
 	.release	= ne_cls_release,
 };
 
-static struct hpsb_highlevel nodemgr_highlevel;
-
-static int nodemgr_platform_data_ud;
-
-static int nodemgr_generic_probe(struct device *dev)
+static void ud_cls_release(struct class_device *class_dev)
 {
-	return -ENODEV;
+	put_device(&container_of((class_dev), struct unit_directory, class_dev)->device);
 }
 
-static struct device_driver nodemgr_driver_ne = {
-	.name	= "ieee1394_node",
-	.bus	= &ieee1394_bus_type,
-	.probe	= nodemgr_generic_probe,
+/* The name here is only so that unit directory hotplug works with old
+ * style hotplug, which only ever did unit directories anyway. */
+struct class nodemgr_ud_class = {
+	.name		= "ieee1394",
+	.release	= ud_cls_release,
+	.hotplug	= nodemgr_hotplug,
 };
 
-static struct device_driver nodemgr_driver_host = {
-	.name	= "ieee1394_host",
-	.bus	= &ieee1394_bus_type,
-	.probe	= nodemgr_generic_probe,
-};
+static struct hpsb_highlevel nodemgr_highlevel;
+
 
 static void nodemgr_release_ud(struct device *dev)
 {
@@ -205,22 +199,22 @@ static void nodemgr_release_host(struct device *dev)
 	kfree(host);
 }
 
+static int nodemgr_ud_platform_data;
+
 static struct device nodemgr_dev_template_ud = {
 	.bus		= &ieee1394_bus_type,
 	.release	= nodemgr_release_ud,
-	.platform_data	= &nodemgr_platform_data_ud,
+	.platform_data	= &nodemgr_ud_platform_data,
 };
 
 static struct device nodemgr_dev_template_ne = {
 	.bus		= &ieee1394_bus_type,
 	.release	= nodemgr_release_ne,
-	.driver		= &nodemgr_driver_ne,
 };
 
 struct device nodemgr_dev_template_host = {
 	.bus		= &ieee1394_bus_type,
 	.release	= nodemgr_release_host,
-	.driver		= &nodemgr_driver_host,
 };
 
 
@@ -631,9 +625,8 @@ static int nodemgr_bus_match(struct device * dev, struct device_driver * drv)
         struct unit_directory *ud;
 	struct ieee1394_device_id *id;
 
-	/* We only match unit directories, and ignore our internal drivers */
-	if (dev->platform_data != &nodemgr_platform_data_ud ||
-	    drv->probe == nodemgr_generic_probe)
+	/* We only match unit directories */
+	if (dev->platform_data != &nodemgr_ud_platform_data)
 		return 0;
 
 	ud = container_of(dev, struct unit_directory, device);
@@ -666,41 +659,19 @@ static int nodemgr_bus_match(struct device * dev, struct device_driver * drv)
 }
 
 
-static void nodemgr_remove_ud(struct unit_directory *ud)
+static void nodemgr_remove_uds(struct node_entry *ne)
 {
-	struct device *dev = &ud->device;
-	struct list_head *lh, *next;
-	int i;
+	struct class_device *cdev, *next;
+	struct unit_directory *ud;
 
-	list_for_each_safe(lh, next, &ud->device.children) {
-		struct unit_directory *ud;
-		ud = container_of(list_to_dev(lh), struct unit_directory, device);
-		nodemgr_remove_ud(ud);
-	}
+	list_for_each_entry_safe(cdev, next, &nodemgr_ud_class.children, node) {
+		ud = container_of(cdev, struct unit_directory, class_dev);
 
-	for (i = 0; i < ARRAY_SIZE(fw_ud_attrs); i++)
-		device_remove_file(dev, fw_ud_attrs[i]);
+		if (ud->ne != ne)
+			continue;
 
-	device_remove_file(dev, &dev_attr_ud_specifier_id);
-	device_remove_file(dev, &dev_attr_ud_version);
-	device_remove_file(dev, &dev_attr_ud_vendor_id);
-	device_remove_file(dev, &dev_attr_ud_vendor_name_kv);
-	device_remove_file(dev, &dev_attr_ud_vendor_oui);
-	device_remove_file(dev, &dev_attr_ud_model_id);
-	device_remove_file(dev, &dev_attr_ud_model_name_kv);
-
-	device_unregister(dev);
-}
-
-
-static void nodemgr_remove_node_uds(struct node_entry *ne)
-{
-	struct list_head *lh, *next;
-
-	list_for_each_safe(lh, next, &ne->device.children) {
-		struct unit_directory *ud;
-		ud = container_of(list_to_dev(lh), struct unit_directory, device);
-		nodemgr_remove_ud(ud);
+		class_device_unregister(&ud->class_dev);
+		device_unregister(&ud->device);
 	}
 }
 
@@ -708,39 +679,29 @@ static void nodemgr_remove_node_uds(struct node_entry *ne)
 static void nodemgr_remove_ne(struct node_entry *ne)
 {
 	struct device *dev = &ne->device;
-	int i;
+
+	dev = get_device(&ne->device);
+	if (!dev)
+		return;
 
 	HPSB_DEBUG("Node removed: ID:BUS[" NODE_BUS_FMT "]  GUID[%016Lx]",
 		   NODE_BUS_ARGS(ne->host, ne->nodeid), (unsigned long long)ne->guid);
 
-	nodemgr_remove_node_uds(ne);
-
-	for (i = 0; i < ARRAY_SIZE(fw_ne_attrs); i++)
-		device_remove_file(dev, fw_ne_attrs[i]);
-
-	device_remove_file(dev, &dev_attr_ne_guid_vendor_oui);
-	device_remove_file(dev, &dev_attr_ne_vendor_name_kv);
-	device_remove_file(dev, &dev_attr_ne_vendor_oui);
-	device_remove_file(dev, &dev_attr_ne_in_limbo);
+	nodemgr_remove_uds(ne);
 
 	class_device_unregister(&ne->class_dev);
 	device_unregister(dev);
+
+	put_device(dev);
 }
 
 
 static void nodemgr_remove_host_dev(struct device *dev)
 {
-	int i;
-	struct list_head *lh, *next;
+	struct device *ne_dev, *next;
 
-	list_for_each_safe(lh, next, &dev->children) {
-		struct node_entry *ne;
-		ne = container_of(list_to_dev(lh), struct node_entry, device);
-		nodemgr_remove_ne(ne);
-	}
-
-	for (i = 0; i < ARRAY_SIZE(fw_host_attrs); i++)
-		device_remove_file(dev, fw_host_attrs[i]);
+	list_for_each_entry_safe(ne_dev, next, &dev->children, node)
+		nodemgr_remove_ne(container_of(ne_dev, struct node_entry, device));
 
 	sysfs_remove_link(&dev->kobj, "irm_id");
 	sysfs_remove_link(&dev->kobj, "busmgr_id");
@@ -1005,7 +966,14 @@ static struct unit_directory *nodemgr_process_unit_directory
 	snprintf(ud->device.bus_id, BUS_ID_SIZE, "%s-%u",
 		 ne->device.bus_id, ud->id);
 
+	ud->class_dev.dev = &ud->device;
+	ud->class_dev.class = &nodemgr_ud_class;
+	snprintf(ud->class_dev.class_id, BUS_ID_SIZE, "%s-%u",
+		 ne->device.bus_id, ud->id);
+
 	device_register(&ud->device);
+	class_device_register(&ud->class_dev);
+	get_device(&ud->device);
 
 	if (ud->vendor_oui)
 		device_create_file(&ud->device, &dev_attr_ud_vendor_oui);
@@ -1071,36 +1039,30 @@ static void nodemgr_process_root_directory(struct host_info *hi, struct node_ent
 
 #ifdef CONFIG_HOTPLUG
 
-static int nodemgr_hotplug(struct device *dev, char **envp, int num_envp,
+static int nodemgr_hotplug(struct class_device *cdev, char **envp, int num_envp,
 			   char *buffer, int buffer_size)
 {
 	struct unit_directory *ud;
-	char *scratch;
 	int i = 0;
 	int length = 0;
 
-	if (!dev)
+	if (!cdev)
 		return -ENODEV;
 
-	if (dev->platform_data != &nodemgr_platform_data_ud)
-		return -ENODEV;
-
-	ud = container_of(dev, struct unit_directory, device);
+	ud = container_of(cdev, struct unit_directory, class_dev);
 
 	if (ud->ne->in_limbo || ud->ignore_driver)
 		return -ENODEV;
 
-	scratch = buffer;
-
 #define PUT_ENVP(fmt,val) 					\
 do {								\
-	envp[i++] = scratch;					\
-	length += snprintf(scratch, buffer_size - length,	\
+	envp[i++] = buffer;					\
+	length += snprintf(buffer, buffer_size - length,	\
 			   fmt, val);				\
 	if ((buffer_size - length <= 0) || (i >= num_envp))	\
 		return -ENOMEM;					\
 	++length;						\
-	scratch = buffer + length;				\
+	buffer += length;					\
 } while (0)
 
 	PUT_ENVP("VENDOR_ID=%06x", ud->vendor_id);
@@ -1118,7 +1080,7 @@ do {								\
 
 #else
 
-static int nodemgr_hotplug(struct device *dev, char **envp, int num_envp,
+static int nodemgr_hotplug(struct class_device *cdev, char **envp, int num_envp,
 			   char *buffer, int buffer_size)
 {
 	return -ENODEV;
@@ -1186,7 +1148,7 @@ static void nodemgr_update_node(struct node_entry *ne, struct csr1212_csr *csr,
 
 		/* If the node's configrom generation has changed, we
 		 * unregister all the unit directories. */
-		nodemgr_remove_node_uds(ne);
+		nodemgr_remove_uds(ne);
 
 		nodemgr_update_bus_options(ne);
 
@@ -1764,9 +1726,8 @@ static struct hpsb_highlevel nodemgr_highlevel = {
 
 void init_ieee1394_nodemgr(void)
 {
-	driver_register(&nodemgr_driver_host);
-	driver_register(&nodemgr_driver_ne);
 	class_register(&nodemgr_ne_class);
+	class_register(&nodemgr_ud_class);
 
 	hpsb_register_highlevel(&nodemgr_highlevel);
 }
@@ -1775,7 +1736,6 @@ void cleanup_ieee1394_nodemgr(void)
 {
         hpsb_unregister_highlevel(&nodemgr_highlevel);
 
+	class_unregister(&nodemgr_ud_class);
 	class_unregister(&nodemgr_ne_class);
-	driver_unregister(&nodemgr_driver_ne);
-	driver_unregister(&nodemgr_driver_host);
 }
