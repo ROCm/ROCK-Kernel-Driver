@@ -186,6 +186,7 @@ static int _guess (int guess, int maxmult)
 	return target;
 }
 
+
 static int guess_fsb(int maxmult)
 {
 	int speed = (cpu_khz/1000);
@@ -201,7 +202,6 @@ static int guess_fsb(int maxmult)
 	}
 	return 0;
 }
-
 
 
 static int __init longhaul_get_ranges (void)
@@ -359,7 +359,7 @@ static int longhaul_target (struct cpufreq_policy *policy,
 	return 0;
 }
 
-static int longhaul_cpu_init (struct cpufreq_policy *policy)
+static int __init longhaul_cpu_init (struct cpufreq_policy *policy)
 {
 	struct cpuinfo_x86 *c = cpu_data;
 	char *cpuname=NULL;
