@@ -364,6 +364,12 @@ struct group_info {
 	gid_t *blocks[0];
 };
 
+/*
+ * get_group_info() must be called with the owning task locked (via task_lock())
+ * when task != current.  The reason being that the vast majority of callers are
+ * looking at current->group_info, which can not be changed except by the
+ * current task.  Changing current->group_info requires the task lock, too.
+ */
 #define get_group_info(group_info) do { \
 	atomic_inc(&(group_info)->usage); \
 } while (0)
@@ -930,7 +936,9 @@ static inline int thread_group_empty(task_t *p)
 extern void unhash_process(struct task_struct *p);
 
 /*
- * Protects ->fs, ->files, ->mm, ->ptrace and synchronises with wait4().
+ * Protects ->fs, ->files, ->mm, ->ptrace, ->group_info and synchronises with
+ * wait4().
+ *
  * Nests both inside and outside of read_lock(&tasklist_lock).
  * It must not be nested with write_lock_irq(&tasklist_lock),
  * neither inside nor outside.
