@@ -13,7 +13,6 @@
 
 #define DEVFS_FL_NONE           0x000 /* This helps to make code more readable
 				       */
-#define DEVFS_FL_REMOVABLE      0x008 /* This is a removable media device    */
 #define DEVFS_FL_WAIT           0x010 /* Wait for devfsd to finish           */
 #define DEVFS_FL_CURRENT_OWNER  0x020 /* Set initial ownership to current    */
 #define DEVFS_FL_DEFAULT        DEVFS_FL_NONE

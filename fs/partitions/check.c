@@ -160,7 +160,6 @@ static void devfs_register_partition(struct gendisk *dev, int part)
 {
 #ifdef CONFIG_DEVFS_FS
 	devfs_handle_t dir;
-	unsigned int devfs_flags = DEVFS_FL_DEFAULT;
 	struct hd_struct *p = dev->part;
 	char devname[16];
 
@@ -169,10 +168,8 @@ static void devfs_register_partition(struct gendisk *dev, int part)
 	dir = dev->de;
 	if (!dir)
 		return;
-	if (dev->flags & GENHD_FL_REMOVABLE)
-		devfs_flags |= DEVFS_FL_REMOVABLE;
 	sprintf(devname, "part%d", part);
-	p[part-1].de = devfs_register (dir, devname, devfs_flags,
+	p[part-1].de = devfs_register (dir, devname, 0,
 				    dev->major, dev->first_minor + part,
 				    S_IFBLK | S_IRUSR | S_IWUSR,
 				    dev->fops, NULL);
@@ -189,11 +186,8 @@ static void devfs_create_partitions(struct gendisk *dev)
 #ifdef CONFIG_DEVFS_FS
 	int pos = 0;
 	devfs_handle_t dir, slave;
-	unsigned int devfs_flags = DEVFS_FL_DEFAULT;
 	char dirname[64], symlink[16];
 
-	if (dev->flags & GENHD_FL_REMOVABLE)
-		devfs_flags |= DEVFS_FL_REMOVABLE;
 	if (dev->flags & GENHD_FL_DEVFS) {
 		dir = dev->de;
 		if (!dir)  /*  Aware driver wants to block disc management  */
@@ -213,7 +207,7 @@ static void devfs_create_partitions(struct gendisk *dev)
 	sprintf(symlink, "discs/disc%d", dev->number);
 	devfs_mk_symlink(NULL, symlink, DEVFS_FL_DEFAULT,
 			  dirname + pos, &slave, NULL);
-	dev->disk_de = devfs_register(dir, "disc", devfs_flags,
+	dev->disk_de = devfs_register(dir, "disc", 0,
 			    dev->major, dev->first_minor,
 			    S_IFBLK | S_IRUSR | S_IWUSR, dev->fops, NULL);
 #endif

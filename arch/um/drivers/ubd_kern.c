@@ -507,7 +507,7 @@ static int ubd_new_disk(int major, u64 size, char *name, int unit,
 	/* /dev/ubd/N style names */
 	sprintf(devfs_name, "%d", unit);
 	*handle_out = devfs_register(dir_handle, devfs_name,
-				     DEVFS_FL_REMOVABLE, major, minor,
+				     0, major, minor,
 				     S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP |
 				     S_IWGRP, &ubd_blops, NULL);
 	disk->private_data = &ubd_dev[unit];
