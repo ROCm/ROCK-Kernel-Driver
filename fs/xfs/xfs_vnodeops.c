@@ -318,6 +318,9 @@ xfs_setattr(
 	vp = BHV_TO_VNODE(bdp);
 	vn_trace_entry(vp, __FUNCTION__, (inst_t *)__return_address);
 
+	if (vp->v_vfsp->vfs_flag & VFS_RDONLY)
+		return XFS_ERROR(EROFS);
+
 	/*
 	 * Cannot set certain attributes.
 	 */
