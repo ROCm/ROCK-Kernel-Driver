@@ -6,6 +6,14 @@ config M68K
 	bool
 	default y
 
+config MMU
+	bool
+	default y
+
+config SWAP
+	bool
+	default y
+
 config UID16
 	bool
 	default y

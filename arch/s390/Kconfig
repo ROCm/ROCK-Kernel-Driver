@@ -2,6 +2,15 @@
 # For a description of the syntax of this configuration file,
 # see Documentation/kbuild/config-language.txt.
 #
+
+config MMU
+	bool
+	default y
+
+config SWAP
+	bool
+	default y
+
 config ISA
 	bool
 	help

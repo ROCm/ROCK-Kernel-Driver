@@ -14,6 +14,14 @@ config X86
 	  486, 586, Pentiums, and various instruction-set-compatible chips by
 	  AMD, Cyrix, and others.
 
+config MMU
+	bool
+	default y
+
+config SWAP
+	bool
+	default y
+
 config SBUS
 	bool
 

@@ -13,6 +13,14 @@ config PARISC
 	  Hewlett-Packard and used in their line of workstations.  The PA-RISC
 	  Linux project has a home page at <www.parisc-linux.org>.
 
+config MMU
+	bool
+	default y
+
+config SWAP
+	bool
+	default y
+
 config UID16
 	bool
 

@@ -2,6 +2,14 @@ config USERMODE
 	bool
 	default y
 
+# XXX: does UM have a mmu/swap?
+config MMU
+	bool
+	default y
+
+config SWAP
+	bool
+	default y
 
 mainmenu "Linux/Usermode Kernel Configuration"
 
