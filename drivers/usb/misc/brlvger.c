@@ -315,14 +315,16 @@ brlvger_probe (struct usb_device *dev, unsigned ifnum,
 
 	down(&reserve_sem);
 
-	for( i = 0; i < MAX_NR_BRLVGER_DEVS; i++ )
-		if( display_table[i] == NULL )
-			break;
+	if (usb_register_dev(&brlvger_driver, 1, &i)) {
+		for( i = 0; i < MAX_NR_BRLVGER_DEVS; i++ )
+			if( display_table[i] == NULL )
+				break;
 
-	if( i == MAX_NR_BRLVGER_DEVS ) {
-		err( "This driver cannot handle more than %d "
-				"braille displays", MAX_NR_BRLVGER_DEVS);
-		goto error;
+		if( i == MAX_NR_BRLVGER_DEVS ) {
+			err( "This driver cannot handle more than %d "
+					"braille displays", MAX_NR_BRLVGER_DEVS);
+			goto error;
+		}
 	}
 
 	if( !(priv = kmalloc (sizeof *priv, GFP_KERNEL)) ){
@@ -423,7 +425,8 @@ brlvger_disconnect(struct usb_device *dev, void *ptr)
 		info("Display %d disconnecting", priv->subminor);
 
 		devfs_unregister(priv->devfs);
-		
+		usb_deregister_dev(&brlvger_driver, 1, priv->subminor);
+
 		down(&disconnect_sem);
 		display_table[priv->subminor] = NULL;
 		up(&disconnect_sem);

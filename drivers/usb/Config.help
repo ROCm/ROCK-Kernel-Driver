@@ -69,3 +69,11 @@ CONFIG_USB_BANDWIDTH
   If you say N here, these conditions will cause warning messages
   about USB bandwidth usage to be logged and some devices or
   drivers may not work correctly.
+
+CONFIG_USB_DYNAMIC_MINORS
+  If you say Y here, the USB subsystem will use dynamic minor
+  allocation for any device that uses the USB major number.
+  This means that you can have more than 16 of a single type
+  of device (like USB printers).
+
+  If you are unsure about this, say N here.

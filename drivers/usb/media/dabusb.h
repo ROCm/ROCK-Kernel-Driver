@@ -6,7 +6,11 @@ typedef struct
 	unsigned int pipe;
 }bulk_transfer_t,*pbulk_transfer_t;
 
+#ifdef CONFIG_USB_DYNAMIC_MINORS
+#define DABUSB_MINOR 0
+#else
 #define DABUSB_MINOR 240		/* some unassigned USB minor */
+#endif
 #define DABUSB_VERSION 0x1000
 #define IOCTL_DAB_BULK              _IOWR('d', 0x30, bulk_transfer_t)
 #define IOCTL_DAB_OVERRUNS	    _IOR('d',  0x15, int)
@@ -31,6 +35,7 @@ typedef struct
 	unsigned int overruns;
 	int readptr;
 	int opened;
+	int devnum;
 	struct list_head free_buff_list;
 	struct list_head rec_buff_list;
 } dabusb_t,*pdabusb_t;
