@@ -216,7 +216,7 @@ static int i8042_acpi_aux_add(struct acpi_device *device)
 
 static struct acpi_driver i8042_acpi_kbd_driver = {
 	.name		= "i8042",
-	.ids		= "PNP0303",
+	.ids		= "PNP0303,PNP030B",
 	.ops		= {
 		.add		= i8042_acpi_kbd_add,
 	},
@@ -224,7 +224,7 @@ static struct acpi_driver i8042_acpi_kbd_driver = {
 
 static struct acpi_driver i8042_acpi_aux_driver = {
 	.name		= "i8042",
-	.ids		= "PNP0F13",
+	.ids		= "PNP0F13,SYN0801",
 	.ops		= {
 		.add		= i8042_acpi_aux_add,
 	},
