@@ -245,17 +245,19 @@ static void sync_sb_inodes(struct super_block *sb, int sync_mode,
 		if ((sync_mode == WB_SYNC_LAST) && (head->prev == head))
 			really_sync = 1;
 
+		BUG_ON(inode->i_state & I_FREEING);
+		__iget(inode);
 		__writeback_single_inode(inode, really_sync, nr_to_write);
-
 		if (sync_mode == WB_SYNC_HOLD) {
 			mapping->dirtied_when = jiffies;
 			list_del(&inode->i_list);
 			list_add(&inode->i_list, &inode->i_sb->s_dirty);
 		}
-
 		if (current_is_pdflush())
 			writeback_release(bdi);
-
+		spin_unlock(&inode_lock);
+		iput(inode);
+		spin_lock(&inode_lock);
 		if (nr_to_write && *nr_to_write <= 0)
 			break;
 	}
