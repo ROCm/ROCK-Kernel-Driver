@@ -1774,7 +1774,7 @@ static struct pci_device_id serial_pci_tbl[] = {
 		pbn_b0_4_115200 },
 	{	PCI_VENDOR_ID_OXSEMI, PCI_DEVICE_ID_OXSEMI_16PCI952,
 		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
-		pbn_b0_2_115200 },
+		pbn_b0_bt_2_921600 },
 
 	/*
 	 * Digitan DS560-558, from jimd@esoft.com
