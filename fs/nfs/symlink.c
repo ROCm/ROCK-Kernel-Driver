@@ -36,7 +36,7 @@
 
 struct nfs_symlink {
 	struct page *page;
-	char body[];
+	char body[0];
 };
 
 static int nfs_symlink_filler(struct inode *inode, struct page *page)
