@@ -481,6 +481,7 @@ qla2x00_start_scsi(srb_t *sp)
 
 	/* Set total data segment count. */
 	cmd_pkt->entry_count = (uint8_t)sp->req_cnt;
+	wmb();
 
 	/* Adjust ring index. */
 	ha->req_ring_index++;
@@ -541,6 +542,7 @@ __qla2x00_marker(scsi_qla_host_t *ha, uint16_t loop_id, uint16_t lun,
 		pkt->lun = cpu_to_le16(lun);
 		SET_TARGET_ID(ha, pkt->target, loop_id);
 	}
+	wmb();
 
 	/* Issue command to ISP */
 	qla2x00_isp_cmd(ha);
