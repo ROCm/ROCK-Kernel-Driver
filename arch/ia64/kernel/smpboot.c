@@ -716,3 +716,4 @@ init_smp_config(void)
 		printk(KERN_ERR "SMP: Can't set SAL AP Boot Rendezvous: %s\n",
 		       ia64_sal_strerror(sal_ret));
 }
+

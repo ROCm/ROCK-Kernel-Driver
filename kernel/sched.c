@@ -1783,10 +1783,8 @@ static void active_load_balance(runqueue_t *busiest, int busiest_cpu)
 	for_each_domain(busiest_cpu, sd)
 		if (cpu_isset(busiest->push_cpu, sd->span))
 			break;
-	if (!sd) {
-		WARN_ON(1);
+	if (!sd)
 		return;
-	}
 
  	group = sd->groups;
 	while (!cpu_isset(busiest_cpu, group->cpumask))
@@ -3656,9 +3654,73 @@ void cpu_attach_domain(struct sched_domain *sd, int cpu)
 	unlock_cpu_hotplug();
 }
 
-#ifdef ARCH_HAS_SCHED_DOMAIN
-extern void __init arch_init_sched_domains(void);
-#else
+#ifdef CONFIG_NUMA
+/**
+ * find_next_best_node - find the next node to include in a sched_domain
+ * @node: node whose sched_domain we're building
+ * @used_nodes: nodes already in the sched_domain
+ *
+ * Find the next node to include in a given scheduling domain.  Simply
+ * finds the closest node not already in the @used_nodes map.
+ *
+ * Should use nodemask_t.
+ */
+static int __init find_next_best_node(int node, unsigned long *used_nodes)
+{
+	int i, n, val, min_val, best_node = 0;
+
+	min_val = INT_MAX;
+
+	for (i = 0; i < numnodes; i++) {
+		/* Start at @node */
+		n = (node + i) % numnodes;
+
+		/* Skip already used nodes */
+		if (test_bit(n, used_nodes))
+			continue;
+
+		/* Simple min distance search */
+		val = node_distance(node, i);
+
+		if (val < min_val) {
+			min_val = val;
+			best_node = n;
+		}
+	}
+
+	set_bit(best_node, used_nodes);
+	return best_node;
+}
+
+/**
+ * sched_domain_node_span - get a cpumask for a node's sched_domain
+ * @node: node whose cpumask we're constructing
+ * @size: number of nodes to include in this span
+ *
+ * Given a node, construct a good cpumask for its sched_domain to span.  It
+ * should be one that prevents unnecessary balancing, but also spreads tasks
+ * out optimally.
+ */
+cpumask_t __init sched_domain_node_span(int node, int size)
+{
+	int i;
+	cpumask_t span;
+	DECLARE_BITMAP(used_nodes, MAX_NUMNODES);
+
+	cpus_clear(span);
+	bitmap_zero(used_nodes, MAX_NUMNODES);
+
+	for (i = 0; i < size; i++) {
+		int next_node = find_next_best_node(node, used_nodes);
+		cpumask_t  nodemask;
+
+		nodemask = node_to_cpumask(next_node);
+		cpus_or(span, span, nodemask);
+	}
+
+	return span;
+}
+#endif /* CONFIG_NUMA */
 
 #ifdef CONFIG_SCHED_SMT
 static DEFINE_PER_CPU(struct sched_domain, cpu_domains);
@@ -3681,6 +3743,10 @@ __init static int cpu_to_phys_group(int cpu)
 }
 
 #ifdef CONFIG_NUMA
+
+/* Number of nearby nodes in a node's scheduling domain */
+#define SD_NODES_PER_DOMAIN 4
+
 static DEFINE_PER_CPU(struct sched_domain, node_domains);
 static struct sched_group sched_group_nodes[MAX_NUMNODES];
 __init static int cpu_to_node_group(int cpu)
@@ -3748,7 +3814,8 @@ __init static void arch_init_sched_domains(void)
 		sd = &per_cpu(node_domains, i);
 		group = cpu_to_node_group(i);
 		*sd = SD_NODE_INIT;
-		sd->span = cpu_possible_map;
+		/* FIXME: should be multilevel, in arch code */
+		sd->span = sched_domain_node_span(i, SD_NODES_PER_DOMAIN);
 		sd->groups = &sched_group_nodes[group];
 #endif
 
@@ -3835,7 +3902,6 @@ __init static void arch_init_sched_domains(void)
 		cpu_attach_domain(sd, i);
 	}
 }
-#endif /* ARCH_HAS_SCHED_DOMAIN */
 
 #define SCHED_DOMAIN_DEBUG
 #ifdef SCHED_DOMAIN_DEBUG
