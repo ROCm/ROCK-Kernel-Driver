@@ -796,9 +796,6 @@ static int u32_dump(struct tcf_proto *tp, unsigned long fh,
 			RTA_PUT(skb, TCA_U32_CLASSID, 4, &n->res.classid);
 		if (n->ht_down)
 			RTA_PUT(skb, TCA_U32_LINK, 4, &n->ht_down->handle);
-#ifdef CONFIG_CLS_U32_PERF2
-		n->sel.rcnt = n->sel.rhit = 0;
-#endif
 #ifdef CONFIG_NET_CLS_ACT
 		/* again for backward compatible mode - we want
 		*  to work with both old and new modes of entering
