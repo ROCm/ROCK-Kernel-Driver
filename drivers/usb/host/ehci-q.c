@@ -73,11 +73,6 @@ qtd_fill (struct ehci_qtd *qtd, dma_addr_t buf, size_t len, int token)
 	qtd->hw_token = cpu_to_le32 ((count << 16) | token);
 	qtd->length = count;
 
-#if 0
-	vdbg ("  qtd_fill %p, token %8x bytes %d dma %x",
-		qtd, le32_to_cpu (qtd->hw_token), count, qtd->hw_buf [0]);
-#endif
-
 	return count;
 }
 
@@ -315,16 +310,6 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh, struct pt_regs *regs)
 		spin_unlock (&urb->lock);
 
 		list_del (&qtd->qtd_list);
-
-#if 0
-		if (urb->status == -EINPROGRESS)
-			vdbg ("  qtd %p ok, urb %p, token %8x, len %d",
-				qtd, urb, token, urb->actual_length);
-		else
-			vdbg ("urb %p status %d, qtd %p, token %8x, len %d",
-				urb, urb->status, qtd, token,
-				urb->actual_length);
-#endif
 	}
 
 	/* last urb's completion might still need calling */
@@ -387,7 +372,6 @@ qh_urb_transaction (
 	qtd = ehci_qtd_alloc (ehci, flags);
 	if (unlikely (!qtd))
 		return 0;
-	qtd_prev = 0;
 	list_add_tail (&qtd->qtd_list, head);
 	qtd->urb = urb;
 
@@ -395,6 +379,8 @@ qh_urb_transaction (
 	token |= (EHCI_TUNE_CERR << 10);
 	/* for split transactions, SplitXState initialized to zero */
 
+	len = urb->transfer_buffer_length;
+	is_input = usb_pipein (urb->pipe);
 	if (usb_pipecontrol (urb->pipe)) {
 		/* SETUP pid */
 		qtd_fill (qtd, urb->setup_dma, sizeof (struct usb_ctrlrequest),
@@ -410,15 +396,14 @@ qh_urb_transaction (
 		qtd_prev->hw_next = QTD_NEXT (qtd->qtd_dma);
 		list_add_tail (&qtd->qtd_list, head);
 
-		if (!(urb->transfer_flags & URB_SHORT_NOT_OK))
+		if (len > 0 && is_input
+				&& !(urb->transfer_flags & URB_SHORT_NOT_OK))
 			status_patch = 1;
 	} 
 
 	/*
 	 * data transfer stage:  buffer setup
 	 */
-	len = urb->transfer_buffer_length;
-	is_input = usb_pipein (urb->pipe);
 	if (likely (len > 0))
 		buf = urb->transfer_dma;
 	else
@@ -595,7 +580,6 @@ ehci_qh_make (
 			if (qh->period < 1) {
 				dbg ("intr period %d uframes, NYET!",
 						urb->interval);
-				qh = 0;
 				goto done;
 			}
 		} else {
@@ -656,7 +640,9 @@ ehci_qh_make (
 		break;
 	default:
  		dbg ("bogus dev %p speed %d", urb->dev, urb->dev->speed);
- 		return 0;
+done:
+		qh_put (ehci, qh);
+		return 0;
 	}
 
 	/* NOTE:  if (PIPE_INTERRUPT) { scheduler sets s-mask } */
@@ -682,8 +668,6 @@ ehci_qh_make (
 
 	/* initialize data toggle state */
 	clear_toggle (urb->dev, usb_pipeendpoint (urb->pipe), !is_input, qh);
-
-done:
 	return qh;
 }
 #undef hb_mult
@@ -714,6 +698,8 @@ static void qh_link_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 			/* posted write need not be known to HC yet ... */
 		}
 	}
+
+	qh->hw_token &= ~__constant_cpu_to_le32 (QTD_STS_HALT);
 
 	/* splice right after start */
 	qh->qh_next = head->qh_next;
@@ -791,8 +777,8 @@ static struct ehci_qh *qh_append_tds (
 			 */
 			token = qtd->hw_token;
 			qtd->hw_token = 0;
+			wmb ();
 			dummy = qh->dummy;
-			// dbg ("swap td %p with dummy %p", qtd, dummy);
 
 			dma = dummy->qtd_dma;
 			*dummy = *qtd;
@@ -805,6 +791,7 @@ static struct ehci_qh *qh_append_tds (
 			qh->dummy = qtd;
 
 			/* hc must see the new dummy at list end */
+			dma = qtd->qtd_dma;
 			qtd = list_entry (qh->qtd_list.prev,
 					struct ehci_qtd, qtd_list);
 			qtd->hw_next = QTD_NEXT (dma);
@@ -839,7 +826,6 @@ static struct ehci_qh *qh_append_tds (
 	} else {
 		/* can't sleep here, we have ehci->lock... */
 		qh = ehci_qh_make (ehci, urb, qtd_list, SLAB_ATOMIC);
-		// if (qh) dbg_qh ("new qh", ehci, qh);
 		*ptr = qh;
 	}
 	if (qh)

@@ -884,7 +884,7 @@ static void ehci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
 			 */
 			while (qh->qh_state == QH_STATE_LINKED
 					&& ehci->reclaim
-					&& ehci->hcd.state != USB_STATE_HALT
+					&& HCD_IS_RUNNING (ehci->hcd.state)
 					) {
 				spin_unlock_irqrestore (&ehci->lock, flags);
 				/* wait_ms() won't spin, we're a thread;
