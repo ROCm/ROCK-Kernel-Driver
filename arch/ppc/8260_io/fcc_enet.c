@@ -158,12 +158,21 @@ static int fcc_enet_set_mac_address(struct net_device *dev, void *addr);
 #define PA1_DIRA0	(PA1_RXDAT | PA1_CRS | PA1_COL | PA1_RXER | PA1_RXDV)
 #define PA1_DIRA1	(PA1_TXDAT | PA1_TXEN | PA1_TXER)
 
+#ifdef CONFIG_SBC82xx
+/* rx is clk9, tx is clk10
+ */
+#define PC_F1RXCLK     ((uint)0x00000100)
+#define PC_F1TXCLK     ((uint)0x00000200)
+#define CMX1_CLK_ROUTE ((uint)0x25000000)
+#define CMX1_CLK_MASK  ((uint)0xff000000)
+#else
 /* CLK12 is receive, CLK11 is transmit.  These are board specific.
 */
 #define PC_F1RXCLK	((uint)0x00000800)
 #define PC_F1TXCLK	((uint)0x00000400)
 #define CMX1_CLK_ROUTE	((uint)0x3e000000)
 #define CMX1_CLK_MASK	((uint)0xff000000)
+#endif /* !CONFIG_SBC82xx */
 
 /* I/O Pin assignment for FCC2.  I don't yet know the best way to do this,
  * but there is little variation among the choices.
@@ -288,6 +297,8 @@ struct fcc_enet_private {
 	ushort	skb_cur;
 	ushort	skb_dirty;
 
+	atomic_t n_pkts;  /* Number of packets in tx ring */
+
 	/* CPM dual port RAM relative addresses.
 	*/
 	cbd_t	*rx_bd_base;		/* Address of Rx and Tx buffers. */
@@ -347,6 +358,7 @@ fcc_enet_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct fcc_enet_private *cep = (struct fcc_enet_private *)dev->priv;
 	volatile cbd_t	*bdp;
+	int idx;
 
 	if (!cep->link) {
 		/* Link is down or autonegotiation is in progress. */
@@ -379,13 +391,24 @@ fcc_enet_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	bdp->cbd_datlen = skb->len;
 	bdp->cbd_bufaddr = __pa(skb->data);
 
+	spin_lock_irq(&cep->lock);
+
 	/* Save skb pointer. */
-	cep->tx_skbuff[cep->skb_cur] = skb;
+	idx = cep->skb_cur & TX_RING_MOD_MASK;
+	if (cep->tx_skbuff[idx]) {
+		/* This should never happen (any more).
+		   Leave the sanity check in for now... */
+		printk(KERN_ERR "EEP. cep->tx_skbuff[%d] is %p not NULL in %s\n", 
+		       idx, cep->tx_skbuff[idx], __func__);
+		printk(KERN_ERR "Expect to lose %d bytes of sock space", 
+		       cep->tx_skbuff[idx]->truesize);
+	}
+	cep->tx_skbuff[idx] = skb;
 
 	cep->stats.tx_bytes += skb->len;
-	cep->skb_cur = (cep->skb_cur+1) & TX_RING_MOD_MASK;
+	cep->skb_cur++;
 
-	spin_lock_irq(&cep->lock);
+	atomic_inc(&cep->n_pkts);
 
 	/* Send it on its way.  Tell CPM its ready, interrupt when done,
 	 * its the last BD of the frame, and to put the CRC on the end.
@@ -404,9 +427,13 @@ fcc_enet_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	else
 		bdp++;
 
-	if (bdp->cbd_sc & BD_ENET_TX_READY) {
-		netif_stop_queue(dev);
+
+	/* If the tx_ring is full, stop the queue */
+	if (atomic_read(&cep->n_pkts) >= (TX_RING_SIZE-1)) {
+	  if (!netif_queue_stopped(dev)) {
+		netif_stop_queue(dev);	  
 		cep->tx_full = 1;
+	  }
 	}
 
 	cep->cur_tx = (cbd_t *)bdp;
@@ -460,6 +487,7 @@ fcc_enet_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 	volatile cbd_t	*bdp;
 	ushort	int_events;
 	int	must_restart;
+	int idx;
 
 	cep = (struct fcc_enet_private *)dev->priv;
 
@@ -522,8 +550,12 @@ fcc_enet_interrupt(int irq, void * dev_id, struct pt_regs * regs)
 			cep->stats.collisions++;
 
 		/* Free the sk buffer associated with this last transmit. */
-		dev_kfree_skb_irq(cep->tx_skbuff[cep->skb_dirty]);
-		cep->skb_dirty = (cep->skb_dirty + 1) & TX_RING_MOD_MASK;
+		idx = cep->skb_dirty & TX_RING_MOD_MASK;
+		dev_kfree_skb_irq(cep->tx_skbuff[idx]);
+		cep->tx_skbuff[idx] = NULL;
+		cep->skb_dirty++;
+
+		atomic_dec(&cep->n_pkts);
 
 		/* Update pointer to next buffer descriptor to be transmitted. */
 		if (bdp->cbd_sc & BD_ENET_TX_WRAP)
@@ -1594,6 +1626,9 @@ init_fcc_param(fcc_info_t *fip, struct net_device *dev,
 	 */
 	eap = (unsigned char *)&(ep->fen_paddrh);
 	for (i=5; i>=0; i--) {
+#ifdef CONFIG_SBC82xx
+		*eap++ = dev->dev_addr[i] = bd->bi_enetaddrs[fip->fc_fccnum+1][i];
+#else
 		if (i == 3) {
 			dev->dev_addr[i] = bd->bi_enetaddr[i];
 			dev->dev_addr[i] |= (1 << (7 - fip->fc_fccnum));
@@ -1602,6 +1637,7 @@ init_fcc_param(fcc_info_t *fip, struct net_device *dev,
 		else {
 			*eap++ = dev->dev_addr[i] = bd->bi_enetaddr[i];
 		}
+#endif
 	}
 
 	ep->fen_taddrh = 0;
@@ -1683,6 +1719,7 @@ init_fcc_param(fcc_info_t *fip, struct net_device *dev,
 	while (cp->cp_cpcr & CPM_CR_FLG);
 
 	cep->skb_cur = cep->skb_dirty = 0;
+	atomic_set(&cep->n_pkts, 0);
 }
 
 /* Let 'er rip.

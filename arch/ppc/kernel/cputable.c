@@ -350,6 +350,14 @@ struct cpu_spec	cpu_specs[] = {
 	32, 32,
 	__setup_cpu_603
     },
+    {	/* 8280 is a G2_LE (603e core, plus some) */
+	0x7fff0000, 0x00820000, "8280",
+	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_CAN_DOZE | CPU_FTR_USE_TB |
+	CPU_FTR_CAN_NAP | CPU_FTR_HAS_HIGH_BATS,
+	COMMON_PPC,
+	32, 32,
+	__setup_cpu_603
+    },
     {	/* default match, we assume split I/D cache & TB (non-601)... */
     	0x00000000, 0x00000000, "(generic PPC)",
 	CPU_FTR_COMMON |
