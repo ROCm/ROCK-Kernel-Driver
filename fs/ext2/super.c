@@ -65,28 +65,6 @@ void ext2_error (struct super_block * sb, const char * function,
 	}
 }
 
-NORET_TYPE void ext2_panic (struct super_block * sb, const char * function,
-			    const char * fmt, ...)
-{
-	va_list args;
-	struct ext2_sb_info *sbi = EXT2_SB(sb);
-
-	if (!(sb->s_flags & MS_RDONLY)) {
-		sbi->s_mount_state |= EXT2_ERROR_FS;
-		sbi->s_es->s_state =
-			cpu_to_le16(le16_to_cpu(sbi->s_es->s_state) | EXT2_ERROR_FS);
-		mark_buffer_dirty(sbi->s_sbh);
-		sb->s_dirt = 1;
-	}
-	va_start(args, fmt);
-	printk(KERN_CRIT "EXT2-fs error (device %s): %s: ",sb->s_id, function);
-	vprintk(fmt, args);
-	printk("\n");
-	va_end(args);
-	sb->s_flags |= MS_RDONLY;
-	panic("EXT2-fs panic forced\n");
-}
-
 void ext2_warning (struct super_block * sb, const char * function,
 		   const char * fmt, ...)
 {
