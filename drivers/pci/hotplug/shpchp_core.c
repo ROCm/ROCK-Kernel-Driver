@@ -70,7 +70,6 @@ static int shpc_start_thread (void);
 static int set_attention_status (struct hotplug_slot *slot, u8 value);
 static int enable_slot		(struct hotplug_slot *slot);
 static int disable_slot		(struct hotplug_slot *slot);
-static int hardware_test	(struct hotplug_slot *slot, u32 value);
 static int get_power_status	(struct hotplug_slot *slot, u8 *value);
 static int get_attention_status	(struct hotplug_slot *slot, u8 *value);
 static int get_latch_status	(struct hotplug_slot *slot, u8 *value);
@@ -83,7 +82,6 @@ static struct hotplug_slot_ops shpchp_hotplug_slot_ops = {
 	.set_attention_status =	set_attention_status,
 	.enable_slot =		enable_slot,
 	.disable_slot =		disable_slot,
-	.hardware_test =	hardware_test,
 	.get_power_status =	get_power_status,
 	.get_attention_status =	get_attention_status,
 	.get_latch_status =		get_latch_status,
@@ -276,13 +274,6 @@ static int disable_slot (struct hotplug_slot *hotplug_slot)
 
 	return shpchp_disable_slot(slot);
 }
-
-
-static int hardware_test (struct hotplug_slot *hotplug_slot, u32 value)
-{
-	return 0;
-}
-
 
 static int get_power_status (struct hotplug_slot *hotplug_slot, u8 *value)
 {
