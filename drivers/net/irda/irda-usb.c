@@ -1258,7 +1258,7 @@ static inline int irda_usb_close(struct irda_usb_cb *self)
  * Most dongle have also an interrupt endpoint, that will be probably
  * documented in the next spec...
  */
-static inline int irda_usb_parse_endpoints(struct irda_usb_cb *self, struct usb_endpoint_descriptor *endpoint, int ennum)
+static inline int irda_usb_parse_endpoints(struct irda_usb_cb *self, struct usb_host_endpoint *endpoint, int ennum)
 {
 	int i;		/* Endpoint index in table */
 		
@@ -1277,10 +1277,10 @@ static inline int irda_usb_parse_endpoints(struct irda_usb_cb *self, struct usb_
 		__u16 psize;	/* Endpoint max packet size in bytes */
 
 		/* Get endpoint address, direction and attribute */
-		ep = endpoint[i].bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
-		dir = endpoint[i].bEndpointAddress & USB_ENDPOINT_DIR_MASK;
-		attr = endpoint[i].bmAttributes;
-		psize = endpoint[i].wMaxPacketSize;
+		ep = endpoint[i].desc.bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
+		dir = endpoint[i].desc.bEndpointAddress & USB_ENDPOINT_DIR_MASK;
+		attr = endpoint[i].desc.bmAttributes;
+		psize = endpoint[i].desc.wMaxPacketSize;
 
 		/* Is it a bulk endpoint ??? */
 		if(attr == USB_ENDPOINT_XFER_BULK) {
@@ -1366,7 +1366,7 @@ static inline struct irda_class_desc *irda_usb_find_class_desc(struct usb_interf
 	ret = usb_control_msg(dev, usb_rcvctrlpipe(dev,0),
 		IU_REQ_GET_CLASS_DESC,
 		USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-		0, intf->altsetting->bInterfaceNumber, desc,
+		0, intf->altsetting->desc.bInterfaceNumber, desc,
 		sizeof(*desc), MSECS_TO_JIFFIES(500));
 	
 	IRDA_DEBUG(1, "%s(), ret=%d\n", __FUNCTION__, ret);
@@ -1407,7 +1407,7 @@ static int irda_usb_probe(struct usb_interface *intf,
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
 	struct irda_usb_cb *self = NULL;
-	struct usb_interface_descriptor *interface;
+	struct usb_host_interface *interface;
 	struct irda_class_desc *irda_desc;
 	int ret;
 	int i;
@@ -1477,7 +1477,7 @@ static int irda_usb_probe(struct usb_interface *intf,
 	}
 
 	/* Is this really necessary? */
-	if (usb_set_configuration (dev, dev->config[0].bConfigurationValue) < 0) {
+	if (usb_set_configuration (dev, dev->config[0].desc.bConfigurationValue) < 0) {
 		err("set_configuration failed");
 		return -EIO;
 	}
@@ -1486,7 +1486,7 @@ static int irda_usb_probe(struct usb_interface *intf,
 	/* Note : some driver do hardcode the interface number, some others
 	 * specify an alternate, but very few driver do like this.
 	 * Jean II */
-	ret = usb_set_interface(dev, intf->altsetting->bInterfaceNumber, 0);
+	ret = usb_set_interface(dev, intf->altsetting->desc.bInterfaceNumber, 0);
 	IRDA_DEBUG(1, "usb-irda: set interface %d result %d\n", intf->altsetting->bInterfaceNumber, ret);
 	switch (ret) {
 		case 0:
@@ -1504,7 +1504,7 @@ static int irda_usb_probe(struct usb_interface *intf,
 	/* Find our endpoints */
 	interface = &intf->altsetting[0];
 	if(!irda_usb_parse_endpoints(self, interface->endpoint,
-				     interface->bNumEndpoints)) {
+				     interface->desc.bNumEndpoints)) {
 		ERROR("%s(), Bogus endpoints...\n", __FUNCTION__);
 		return -EIO;
 	}
