@@ -11,7 +11,3 @@
 
 /* Needed by unix.o */
 EXPORT_SYMBOL(files_stat);
-
-#ifdef CONFIG_NET
-EXPORT_SYMBOL(__kill_fasync);
-#endif  /* CONFIG_NET */
