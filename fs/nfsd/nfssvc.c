@@ -302,7 +302,7 @@ nfsd_dispatch(struct svc_rqst *rqstp, u32 *statp)
 	}
 		
 	if (rqstp->rq_proc != 0)
-		svc_putlong(&rqstp->rq_resbuf, nfserr);
+		svc_putu32(&rqstp->rq_resbuf, nfserr);
 
 	/* Encode result.
 	 * For NFSv2, additional info is never returned in case of an error.

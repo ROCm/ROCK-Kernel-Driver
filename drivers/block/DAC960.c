@@ -2909,10 +2909,8 @@ static void DAC960_RequestFunction(RequestQueue_T *RequestQueue)
 static inline void DAC960_ProcessCompletedBuffer(BufferHeader_T *BufferHeader,
 						 boolean SuccessfulIO)
 {
-  if (SuccessfulIO)
-    set_bit(BIO_UPTODATE, &BufferHeader->bi_flags);
+  bio_endio(BufferHeader, BufferHeader->bi_size, SuccessfulIO ? 0 : -EIO);
   blk_finished_io(bio_sectors(BufferHeader));
-  BufferHeader->bi_end_io(BufferHeader);
 }
 
 static inline int DAC960_PartitionByCommand(DAC960_Command_T *Command)

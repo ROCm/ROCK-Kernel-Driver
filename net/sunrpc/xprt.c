@@ -86,9 +86,11 @@ static void	xprt_request_init(struct rpc_task *, struct rpc_xprt *);
 static void	do_xprt_transmit(struct rpc_task *);
 static inline void	do_xprt_reserve(struct rpc_task *);
 static void	xprt_disconnect(struct rpc_xprt *);
-static void	xprt_reconn_status(struct rpc_task *task);
+static void	xprt_conn_status(struct rpc_task *task);
+static struct rpc_xprt * xprt_setup(int proto, struct sockaddr_in *ap,
+						struct rpc_timeout *to);
 static struct socket *xprt_create_socket(int, struct rpc_timeout *);
-static int	xprt_bind_socket(struct rpc_xprt *, struct socket *);
+static void	xprt_bind_socket(struct rpc_xprt *, struct socket *);
 static int      __xprt_get_cong(struct rpc_xprt *, struct rpc_task *);
 
 #ifdef RPC_DEBUG_DATA
@@ -134,7 +136,7 @@ xprt_from_sock(struct sock *sk)
 /*
  * Serialize write access to sockets, in order to prevent different
  * requests from interfering with each other.
- * Also prevents TCP socket reconnections from colliding with writes.
+ * Also prevents TCP socket connects from colliding with writes.
  */
 static int
 __xprt_lock_write(struct rpc_xprt *xprt, struct rpc_task *task)
@@ -407,106 +409,150 @@ xprt_disconnect(struct rpc_xprt *xprt)
 }
 
 /*
- * Reconnect a broken TCP connection.
+ * Attempt to connect a TCP socket.
  *
- * Note: This cannot collide with the TCP reads, as both run from rpciod
+ * NB: This never collides with TCP reads, as both run from rpciod
  */
 void
-xprt_reconnect(struct rpc_task *task)
+xprt_connect(struct rpc_task *task)
 {
 	struct rpc_xprt	*xprt = task->tk_xprt;
 	struct socket	*sock = xprt->sock;
 	struct sock	*inet;
 	int		status;
 
-	dprintk("RPC: %4d xprt_reconnect %p connected %d\n",
-				task->tk_pid, xprt, xprt_connected(xprt));
-	if (xprt->shutdown)
-		return;
+	dprintk("RPC: %4d xprt_connect xprt %p %s connected\n", task->tk_pid,
+			xprt, (xprt_connected(xprt) ? "is" : "is not"));
 
-	if (!xprt->stream)
+	if (xprt->shutdown) {
+		task->tk_status = -EIO;
 		return;
-
+	}
 	if (!xprt->addr.sin_port) {
 		task->tk_status = -EIO;
 		return;
 	}
-
 	if (!xprt_lock_write(xprt, task))
 		return;
 	if (xprt_connected(xprt))
 		goto out_write;
 
-	if (sock && sock->state != SS_UNCONNECTED)
-		xprt_close(xprt);
-	status = -ENOTCONN;
-	if (!(inet = xprt->inet)) {
-		/* Create an unconnected socket */
-		if (!(sock = xprt_create_socket(xprt->prot, &xprt->timeout)))
-			goto defer;
-		xprt_bind_socket(xprt, sock);
-		inet = sock->sk;
+	/*
+	 * We're here because the xprt was marked disconnected.
+	 * Start by resetting any existing state.
+	 */
+	xprt_close(xprt);
+	if (!(sock = xprt_create_socket(xprt->prot, &xprt->timeout))) {
+		/* couldn't create socket or bind to reserved port;
+		 * this is likely a permanent error, so cause an abort */
+		task->tk_status = -EIO;
+		goto out_write;
 	}
+	xprt_bind_socket(xprt, sock);
+	inet = sock->sk;
 
-	/* Now connect it asynchronously. */
-	dprintk("RPC: %4d connecting new socket\n", task->tk_pid);
+	/*
+	 * Tell the socket layer to start connecting...
+	 */
 	status = sock->ops->connect(sock, (struct sockaddr *) &xprt->addr,
 				sizeof(xprt->addr), O_NONBLOCK);
+	dprintk("RPC: %4d  connect status %d connected %d sock state %d\n",
+		task->tk_pid, -status, xprt_connected(xprt), inet->state);
 
-	if (status < 0) {
-		switch (status) {
-		case -EALREADY:
-		case -EINPROGRESS:
-			status = 0;
-			break;
-		case -EISCONN:
-		case -EPIPE:
-			status = 0;
-			xprt_close(xprt);
-			goto defer;
-		default:
-			printk("RPC: TCP connect error %d!\n", -status);
-			xprt_close(xprt);
-			goto defer;
-		}
-
+	switch (status) {
+	case -EINPROGRESS:
+	case -EALREADY:
 		/* Protect against TCP socket state changes */
 		lock_sock(inet);
-		dprintk("RPC: %4d connect status %d connected %d\n",
-				task->tk_pid, status, xprt_connected(xprt));
-
 		if (inet->state != TCP_ESTABLISHED) {
-			task->tk_timeout = xprt->timeout.to_maxval;
-			/* if the socket is already closing, delay 5 secs */
-			if ((1<<inet->state) & ~(TCPF_SYN_SENT|TCPF_SYN_RECV))
-				task->tk_timeout = 5*HZ;
-			rpc_sleep_on(&xprt->pending, task, xprt_reconn_status, NULL);
+			dprintk("RPC: %4d  waiting for connection\n",
+					task->tk_pid);
+			task->tk_timeout = RPC_CONNECT_TIMEOUT;
+			/* if the socket is already closing, delay briefly */
+			if ((1 << inet->state) & ~(TCPF_SYN_SENT|TCPF_SYN_RECV))
+				task->tk_timeout = RPC_REESTABLISH_TIMEOUT;
+			rpc_sleep_on(&xprt->pending, task, xprt_conn_status,
+									NULL);
 			release_sock(inet);
+			/* task status set when task wakes up again */
 			return;
 		}
 		release_sock(inet);
-	}
-defer:
-	if (status < 0) {
-		rpc_delay(task, 5*HZ);
+		task->tk_status = 0;
+		break;
+
+	case 0:
+	case -EISCONN:	/* not likely, but just in case */
+		/* Half closed state.  No race -- this socket is dead. */
+		if (inet->state != TCP_ESTABLISHED) {
+			xprt_close(xprt);
+			task->tk_status = -EAGAIN;
+			goto out_write;
+		}
+
+		/* Otherwise, the connection is already established. */
+		task->tk_status = 0;
+		break;
+
+	case -EPIPE:
+		xprt_close(xprt);
 		task->tk_status = -ENOTCONN;
+		goto out_write;
+
+	default:
+		/* Report myriad other possible returns.  If this file
+		 * system is soft mounted, just error out, like Solaris.  */
+		xprt_close(xprt);
+		if (task->tk_client->cl_softrtry) {
+			printk(KERN_WARNING
+			"RPC: error %d connecting to server %s, exiting\n",
+					-status, task->tk_client->cl_server);
+			task->tk_status = -EIO;
+		} else {
+			printk(KERN_WARNING
+			"RPC: error %d connecting to server %s\n",
+					-status, task->tk_client->cl_server);
+			rpc_delay(task, RPC_REESTABLISH_TIMEOUT);
+			task->tk_status = status;
+		}
+		break;
 	}
+
  out_write:
 	xprt_release_write(xprt, task);
 }
 
 /*
- * Reconnect timeout. We just mark the transport as not being in the
- * process of reconnecting, and leave the rest to the upper layers.
+ * We arrive here when awoken from waiting on connection establishment.
  */
 static void
-xprt_reconn_status(struct rpc_task *task)
+xprt_conn_status(struct rpc_task *task)
 {
 	struct rpc_xprt	*xprt = task->tk_xprt;
 
-	dprintk("RPC: %4d xprt_reconn_timeout %d\n",
-				task->tk_pid, task->tk_status);
+	switch (task->tk_status) {
+	case 0:
+		dprintk("RPC: %4d xprt_conn_status: connection established\n",
+				task->tk_pid);
+		goto out;
+	case -ETIMEDOUT:
+		dprintk("RPC: %4d xprt_conn_status: timed out\n",
+				task->tk_pid);
+		/* prevent TCP from continuing to retry SYNs */
+		xprt_close(xprt);
+		break;
+	default:
+		printk(KERN_ERR "RPC: error %d connecting to server %s\n",
+				-task->tk_status, task->tk_client->cl_server);
+		xprt_close(xprt);
+		rpc_delay(task, RPC_REESTABLISH_TIMEOUT);
+		break;
+	}
+	/* if soft mounted, cause this RPC to fail */
+	if (task->tk_client->cl_softrtry)
+		task->tk_status = -EIO;
 
+ out:
 	xprt_release_write(xprt, task);
 }
 
@@ -1154,8 +1200,12 @@ do_xprt_transmit(struct rpc_task *task)
 		return;
 	case -ECONNREFUSED:
 	case -ENOTCONN:
-		if (!xprt->stream)
+		if (!xprt->stream) {
+			task->tk_timeout = RPC_REESTABLISH_TIMEOUT;
+			rpc_sleep_on(&xprt->sending, task, NULL, NULL);
 			return;
+		}
+		/* fall through */
 	default:
 		if (xprt->stream)
 			xprt_disconnect(xprt);
@@ -1305,8 +1355,7 @@ xprt_set_timeout(struct rpc_timeout *to, unsigned int retr, unsigned long incr)
  * Initialize an RPC client
  */
 static struct rpc_xprt *
-xprt_setup(struct socket *sock, int proto,
-			struct sockaddr_in *ap, struct rpc_timeout *to)
+xprt_setup(int proto, struct sockaddr_in *ap, struct rpc_timeout *to)
 {
 	struct rpc_xprt	*xprt;
 	struct rpc_rqst	*req;
@@ -1353,7 +1402,6 @@ xprt_setup(struct socket *sock, int proto,
 
 	dprintk("RPC:      created transport %p\n", xprt);
 	
-	xprt_bind_socket(xprt, sock);
 	return xprt;
 }
 
@@ -1381,13 +1429,13 @@ xprt_bindresvport(struct socket *sock)
 	return err;
 }
 
-static int 
+static void
 xprt_bind_socket(struct rpc_xprt *xprt, struct socket *sock)
 {
 	struct sock	*sk = sock->sk;
 
 	if (xprt->inet)
-		return -EBUSY;
+		return;
 
 	sk->user_data = xprt;
 	xprt->old_data_ready = sk->data_ready;
@@ -1413,7 +1461,7 @@ xprt_bind_socket(struct rpc_xprt *xprt, struct socket *sock)
 	if(xprt->stream)
 		rpciod_up();
 
-	return 0;
+	return;
 }
 
 /*
@@ -1438,7 +1486,8 @@ xprt_sock_setbufsize(struct rpc_xprt *xprt)
 }
 
 /*
- * Create a client socket given the protocol and peer address.
+ * Datastream sockets are created here, but xprt_connect will create
+ * and connect stream sockets.
  */
 static struct socket *
 xprt_create_socket(int proto, struct rpc_timeout *to)
@@ -1457,8 +1506,10 @@ xprt_create_socket(int proto, struct rpc_timeout *to)
 	}
 
 	/* If the caller has the capability, bind to a reserved port */
-	if (capable(CAP_NET_BIND_SERVICE) && xprt_bindresvport(sock) < 0)
+	if (capable(CAP_NET_BIND_SERVICE) && xprt_bindresvport(sock) < 0) {
+		printk("RPC: can't bind to reserved port.\n");
 		goto failed;
+	}
 
 	return sock;
 
@@ -1473,17 +1524,32 @@ failed:
 struct rpc_xprt *
 xprt_create_proto(int proto, struct sockaddr_in *sap, struct rpc_timeout *to)
 {
-	struct socket	*sock;
 	struct rpc_xprt	*xprt;
 
-	dprintk("RPC:      xprt_create_proto called\n");
+	xprt = xprt_setup(proto, sap, to);
+	if (!xprt)
+		goto out;
 
-	if (!(sock = xprt_create_socket(proto, to)))
-		return NULL;
+	if (!xprt->stream) {
+		struct socket *sock = xprt_create_socket(proto, to);
+		if (sock)
+			xprt_bind_socket(xprt, sock);
+		else {
+			rpc_free(xprt);
+			xprt = NULL;
+		}
+	} else
+		/*
+		 * Don't allow a TCP service user unless they have
+		 * enough capability to bind a reserved port.
+		 */
+		if (!capable(CAP_NET_BIND_SERVICE)) {
+			rpc_free(xprt);
+			xprt = NULL;
+		}
 
-	if (!(xprt = xprt_setup(sock, proto, sap, to)))
-		sock_release(sock);
-
+ out:
+	dprintk("RPC:      xprt_create_proto created xprt %p\n", xprt);
 	return xprt;
 }
 
@@ -1522,7 +1588,7 @@ xprt_destroy(struct rpc_xprt *xprt)
 	dprintk("RPC:      destroying transport %p\n", xprt);
 	xprt_shutdown(xprt);
 	xprt_close(xprt);
-	kfree(xprt);
+	rpc_free(xprt);
 
 	return 0;
 }

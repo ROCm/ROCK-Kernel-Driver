@@ -82,8 +82,8 @@ struct svc_buf {
 	struct iovec		iov[RPCSVC_MAXIOV];
 	int			nriov;
 };
-#define svc_getlong(argp, val)	{ (val) = *(argp)->buf++; (argp)->len--; }
-#define svc_putlong(resp, val)	{ *(resp)->buf++ = (val); (resp)->len++; }
+#define svc_getu32(argp, val)	{ (val) = *(argp)->buf++; (argp)->len--; }
+#define svc_putu32(resp, val)	{ *(resp)->buf++ = (val); (resp)->len++; }
 
 /*
  * The context of a single thread, including the request currently being
