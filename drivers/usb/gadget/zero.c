@@ -770,6 +770,7 @@ static void loopback_complete (struct usb_ep *ep, struct usb_request *req)
 	case 0: 			/* normal completion? */
 		if (ep == dev->out_ep) {
 			/* loop this OUT packet back IN to the host */
+			req->zero = (req->actual < req->length);
 			req->length = req->actual;
 			status = usb_ep_queue (dev->in_ep, req, GFP_ATOMIC);
 			if (status == 0)
