@@ -2409,7 +2409,7 @@ static int ali_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 		printk("SNDCTL_DSP_GETOPTR %d, %d, %d, %d\n", cinfo.bytes,
 		       cinfo.blocks, cinfo.ptr, dmabuf->count);
 #endif
-		return copy_to_user((void *) arg, &cinfo, sizeof(cinfo));
+		return copy_to_user((void *) arg, &cinfo, sizeof(cinfo))? -EFAULT : 0;
 	case SNDCTL_DSP_GETISPACE:
 		if (!(file->f_mode & FMODE_READ))
 			return -EINVAL;
@@ -2448,7 +2448,7 @@ static int ali_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 		printk("SNDCTL_DSP_GETIPTR %d, %d, %d, %d\n", cinfo.bytes,
 		       cinfo.blocks, cinfo.ptr, dmabuf->count);
 #endif
-		return copy_to_user((void *) arg, &cinfo, sizeof(cinfo));
+		return copy_to_user((void *) arg, &cinfo, sizeof(cinfo))? -EFAULT: 0;
 	case SNDCTL_DSP_NONBLOCK:
 #ifdef DEBUG
 		printk("SNDCTL_DSP_NONBLOCK\n");
