@@ -1680,6 +1680,7 @@ static int initMatrox2(WPMINFO struct board* b){
 	/* after __init time we are like module... no logo */
 	ACCESS_FBINFO(fbcon.flags) = hotplug ? FBINFO_FLAG_MODULE : FBINFO_FLAG_DEFAULT;
 	ACCESS_FBINFO(video.len_usable) &= PAGE_MASK;
+	fb_alloc_cmap(&ACCESS_FBINFO(fbcon.cmap), 256, 1);
 
 #ifndef MODULE
 	/* mode database is marked __init!!! */
