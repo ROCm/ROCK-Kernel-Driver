@@ -2,7 +2,7 @@
  * drivers/base/node.c - basic Node class support
  */
 
-#include <linux/device.h>
+#include <linux/sysdev.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/mm.h>
@@ -14,18 +14,17 @@ static struct sysdev_class node_class = {
 };
 
 
-static ssize_t node_read_cpumap(struct device * dev, char * buf)
+static ssize_t node_read_cpumap(struct sys_device * dev, char * buf)
 {
-	struct node *node_dev = to_node(to_root(dev));
+	struct node *node_dev = to_node(dev);
         return sprintf(buf,"%lx\n",node_dev->cpumap);
 }
 static SYSDEV_ATTR(cpumap,S_IRUGO,node_read_cpumap,NULL);
 
 #define K(x) ((x) << (PAGE_SHIFT - 10))
-static ssize_t node_read_meminfo(struct device * dev, char * buf)
+static ssize_t node_read_meminfo(struct sys_device * dev, char * buf)
 {
-	struct sys_root *node = to_root(dev);
-	int nid = node->id;
+	int nid = dev->id;
 	struct sysinfo i;
 	si_meminfo_node(&i, nid);
 	return sprintf(buf, "\n"
@@ -64,8 +63,8 @@ int __init register_node(struct node *node, int num, struct node *parent)
 	error = sys_device_register(&node->sysdev);
 
 	if (!error){
-		sys_device_create_file(&node->sysroot.dev, &attr_cpumap);
-		sys_device_create_file(&node->sysroot.dev, &attr_meminfo);
+		sysdev_create_file(&node->sysdev, &attr_cpumap);
+		sysdev_create_file(&node->sysdev, &attr_meminfo);
 	}
 	return error;
 }

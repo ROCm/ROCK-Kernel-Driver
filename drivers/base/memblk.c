@@ -13,13 +13,6 @@ static struct sysdev_class memblk_class = {
 	set_kset_name("memblk"),
 };
 
-
-static struct device_driver memblk_driver = {
-	.name		= "memblk",
-	.bus		= &system_bus_type,
-};
-
-
 /*
  * register_memblk - Setup a driverfs device for a MemBlk
  * @num - MemBlk number to use when creating the device.
@@ -37,7 +30,7 @@ int __init register_memblk(struct memblk *memblk, int num, struct node *root)
 	error = sys_device_register(&memblk->sysdev);
 	if (!error) 
 		error = sysfs_create_link(&root->sysdev.kobj,
-					  &memblk->sysdev,kobj,
+					  &memblk->sysdev.kobj,
 					  memblk->sysdev.kobj.name);
 	return error;
 }
