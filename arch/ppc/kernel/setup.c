@@ -452,6 +452,56 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 			}
 		}
 	}
+
+#ifdef CONFIG_SERIAL_CORE_CONSOLE
+	/* Hack -- add console=ttySn,9600 if necessary */
+	if(strstr(cmd_line, "console=") == NULL) {
+		extern char *of_stdout_device;
+		struct device_node *prom_stdout;
+
+		prom_stdout = find_path_device(of_stdout_device);
+		if (prom_stdout) {
+			unsigned char *name;
+			printk(KERN_INFO "of_stdout_device %s\n", of_stdout_device);
+			name = get_property(prom_stdout, "name", NULL);
+			if (name) { 
+				int i;
+#if 1
+				printk(KERN_INFO "name %s\n", name);
+#endif
+				i = -1;
+#ifdef CONFIG_SERIAL_8250_CONSOLE
+				if (strcmp(name, "serial") == 0) {
+					u32 *reg = (u32 *)get_property(prom_stdout, "reg", &i);
+					if (i > 8) {
+						switch (reg[1]) {
+							case 0x3f8: i = 0; break;
+							case 0x2f8: i = 1; break;
+							case 0x898: i = 2; break;
+							case 0x890: i = 3; break;
+						}
+					}
+				}
+#endif
+#ifdef CONFIG_SERIAL_PMACZILOG_CONSOLE
+				if (strcmp(name, "ch-a") == 0) 
+					i = 0;
+				if (strcmp(name, "ch-b") == 0) 
+					i = 1;
+#endif
+				if (i >= 0) {
+					char tmp_cmd_line[512];
+					snprintf(tmp_cmd_line, 512,
+							"AUTOCONSOLE console=ttyS%d %s",
+							i, cmd_line);
+					memcpy(cmd_line, tmp_cmd_line, 512);
+					printk("console= not found, add console=ttyS%d\n", i);
+				}
+			}
+		}
+	}
+#endif
+
 #ifdef CONFIG_ADB
 	if (strstr(cmd_line, "adb_sync")) {
 		extern int __adb_probe_sync;
@@ -532,10 +582,6 @@ void __init
 machine_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	     unsigned long r6, unsigned long r7)
 {
-#ifdef CONFIG_CMDLINE
-	strcpy(cmd_line, CONFIG_CMDLINE);
-#endif /* CONFIG_CMDLINE */
-
 #ifdef CONFIG_6xx
 	ppc_md.power_save = ppc6xx_idle;
 #endif

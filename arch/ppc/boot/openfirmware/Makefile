@@ -104,10 +104,10 @@ quiet_cmd_gen-coff = COFF    $@
 			$(HACKCOFF) $@ && \
 			ln -sf $(notdir $@) $(images)/zImage$(initrd).pmac
 
-$(images)/vmlinux.coff: $(obj)/coffboot
+$(images)/vmlinux.coff: $(obj)/coffboot $(boot)/ld.script
 	$(call cmd,gen-coff)
 
-$(images)/vmlinux.initrd.coff: $(obj)/coffboot.initrd
+$(images)/vmlinux.initrd.coff: $(obj)/coffboot.initrd $(boot)/ld.script
 	$(call cmd,gen-coff)
 
 quiet_cmd_gen-elf-pmac = ELF     $@
@@ -116,19 +116,19 @@ quiet_cmd_gen-elf-pmac = ELF     $@
 			$(OBJCOPY) $@ $@ --add-section=.note=$(obj)/note \
 					 -R .comment $(del-ramdisk-sec)
 
-$(images)/vmlinux.elf-pmac: $(obj)/image.o $(NEWWORLDOBJS) $(LIBS) $(obj)/note
+$(images)/vmlinux.elf-pmac: $(obj)/image.o $(NEWWORLDOBJS) $(LIBS) $(obj)/note $(boot)/ld.script
 	$(call cmd,gen-elf-pmac)
 $(images)/vmlinux.initrd.elf-pmac: $(obj)/image.initrd.o $(NEWWORLDOBJS) \
-				   $(LIBS) $(obj)/note
+				   $(LIBS) $(obj)/note $(boot)/ld.script
 	$(call cmd,gen-elf-pmac)
 
 quiet_cmd_gen-chrp = CHRP    $@
       cmd_gen-chrp = $(LD) $(CHRP_LD_ARGS) -o $@ $^ && \
 			$(OBJCOPY) $@ $@ -R .comment $(del-ramdisk-sec)
 
-$(images)/zImage.chrp: $(CHRPOBJS) $(obj)/image.o $(LIBS)
+$(images)/zImage.chrp: $(CHRPOBJS) $(obj)/image.o $(LIBS) $(boot)/ld.script
 	$(call cmd,gen-chrp)
-$(images)/zImage.initrd.chrp: $(CHRPOBJS) $(obj)/image.initrd.o $(LIBS)
+$(images)/zImage.initrd.chrp: $(CHRPOBJS) $(obj)/image.initrd.o $(LIBS) $(boot)/ld.script
 	$(call cmd,gen-chrp)
 
 quiet_cmd_addnote = ADDNOTE $@

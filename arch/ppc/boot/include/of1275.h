@@ -16,6 +16,7 @@ typedef int (*prom_entry)(void *);
 #define OF_INVALID_HANDLE	((prom_handle)-1UL)
 
 extern prom_entry of_prom_entry;
+extern phandle chosen_handle;
 
 /* function declarations */
 
@@ -25,8 +26,9 @@ void	enter(void);
 void	exit(void);
 phandle	finddevice(const char *name);
 int	getprop(phandle node, const char *name, void *buf, int buflen);
+int	setprop(phandle node, const char *name, void *buf, int buflen);
 void	ofinit(prom_entry entry);
-int	ofstdio(ihandle *stdin, ihandle *stdout, ihandle *stderr);
+int	ofstdio(ihandle *stdin, ihandle *stdout, ihandle *stderr, phandle *chosen_handle);
 int	read(ihandle instance, void *buf, int buflen);
 void	release(void *virt, unsigned int size);
 int	write(ihandle instance, void *buf, int buflen);

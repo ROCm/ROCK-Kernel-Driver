@@ -31,6 +31,9 @@ SECTIONS
     __relocate_start = .;
     *(.relocate_code)
     __relocate_end = .;
+    
+    *(.kernel:cmdline)
+
   }
   _etext = .;
   PROVIDE (etext = .);
@@ -82,6 +85,7 @@ SECTIONS
     *(__ksymtab)
     *(__ksymtab_strings)
     *(__bug_table)
+    *(__kcrctab)
   }
 
 }
