@@ -85,7 +85,7 @@
 static void	xprt_request_init(struct rpc_task *, struct rpc_xprt *);
 static inline void	do_xprt_reserve(struct rpc_task *);
 static void	xprt_disconnect(struct rpc_xprt *);
-static void	xprt_conn_status(struct rpc_task *task);
+static void	xprt_connect_status(struct rpc_task *task);
 static struct rpc_xprt * xprt_setup(int proto, struct sockaddr_in *ap,
 						struct rpc_timeout *to);
 static struct socket *xprt_create_socket(int, struct rpc_timeout *, int);
@@ -406,7 +406,6 @@ xprt_disconnect(struct rpc_xprt *xprt)
 /*
  * Attempt to connect a TCP socket.
  *
- * NB: This never collides with TCP reads, as both run from rpciod
  */
 void
 xprt_connect(struct rpc_task *task)
@@ -454,6 +453,9 @@ xprt_connect(struct rpc_task *task)
 	dprintk("RPC: %4d  connect status %d connected %d sock state %d\n",
 		task->tk_pid, -status, xprt_connected(xprt), inet->state);
 
+	if (status >= 0)
+		return;
+
 	switch (status) {
 	case -EINPROGRESS:
 	case -EALREADY:
@@ -466,53 +468,37 @@ xprt_connect(struct rpc_task *task)
 			/* if the socket is already closing, delay briefly */
 			if ((1 << inet->state) & ~(TCPF_SYN_SENT|TCPF_SYN_RECV))
 				task->tk_timeout = RPC_REESTABLISH_TIMEOUT;
-			rpc_sleep_on(&xprt->pending, task, xprt_conn_status,
+			rpc_sleep_on(&xprt->pending, task, xprt_connect_status,
 									NULL);
-			release_sock(inet);
-			/* task status set when task wakes up again */
-			return;
 		}
 		release_sock(inet);
-		task->tk_status = 0;
 		break;
-
-	case 0:
-	case -EISCONN:	/* not likely, but just in case */
-		/* Half closed state.  No race -- this socket is dead. */
-		if (inet->state != TCP_ESTABLISHED) {
-			xprt_close(xprt);
-			task->tk_status = -EAGAIN;
-			goto out_write;
+	case -ECONNREFUSED:
+	case -ENOTCONN:
+	case -ENETUNREACH:
+		if (!task->tk_client->cl_softrtry) {
+			rpc_delay(task, RPC_REESTABLISH_TIMEOUT);
+			task->tk_status = -ENOTCONN;
+			break;
 		}
-
-		/* Otherwise, the connection is already established. */
-		task->tk_status = 0;
-		break;
-
-	case -EPIPE:
-		xprt_close(xprt);
-		task->tk_status = -ENOTCONN;
-		goto out_write;
-
 	default:
 		/* Report myriad other possible returns.  If this file
 		 * system is soft mounted, just error out, like Solaris.  */
-		xprt_close(xprt);
 		if (task->tk_client->cl_softrtry) {
 			printk(KERN_WARNING
 			"RPC: error %d connecting to server %s, exiting\n",
 					-status, task->tk_client->cl_server);
 			task->tk_status = -EIO;
-		} else {
-			printk(KERN_WARNING
-			"RPC: error %d connecting to server %s\n",
-					-status, task->tk_client->cl_server);
-			rpc_delay(task, RPC_REESTABLISH_TIMEOUT);
-			task->tk_status = status;
+			goto out_write;
 		}
+		printk(KERN_WARNING "RPC: error %d connecting to server %s\n",
+				-status, task->tk_client->cl_server);
+		/* This will prevent anybody else from reconnecting */
+		rpc_delay(task, RPC_REESTABLISH_TIMEOUT);
+		task->tk_status = status;
 		break;
 	}
-
+	return;
  out_write:
 	xprt_release_write(xprt, task);
 }
@@ -521,33 +507,32 @@ xprt_connect(struct rpc_task *task)
  * We arrive here when awoken from waiting on connection establishment.
  */
 static void
-xprt_conn_status(struct rpc_task *task)
+xprt_connect_status(struct rpc_task *task)
 {
 	struct rpc_xprt	*xprt = task->tk_xprt;
 
+	if (task->tk_status >= 0) {
+		dprintk("RPC: %4d xprt_connect_status: connection established\n",
+				task->tk_pid);
+		return;
+	}
+
+	/* if soft mounted, just cause this RPC to fail */
+	if (task->tk_client->cl_softrtry)
+		task->tk_status = -EIO;
+
 	switch (task->tk_status) {
-	case 0:
-		dprintk("RPC: %4d xprt_conn_status: connection established\n",
-				task->tk_pid);
-		goto out;
+	case -ENOTCONN:
+		rpc_delay(task, RPC_REESTABLISH_TIMEOUT);
+		return;
 	case -ETIMEDOUT:
-		dprintk("RPC: %4d xprt_conn_status: timed out\n",
+		dprintk("RPC: %4d xprt_connect_status: timed out\n",
 				task->tk_pid);
-		/* prevent TCP from continuing to retry SYNs */
-		xprt_close(xprt);
 		break;
 	default:
 		printk(KERN_ERR "RPC: error %d connecting to server %s\n",
 				-task->tk_status, task->tk_client->cl_server);
-		xprt_close(xprt);
-		rpc_delay(task, RPC_REESTABLISH_TIMEOUT);
-		break;
 	}
-	/* if soft mounted, cause this RPC to fail */
-	if (task->tk_client->cl_softrtry)
-		task->tk_status = -EIO;
-
- out:
 	xprt_release_write(xprt, task);
 }
 
