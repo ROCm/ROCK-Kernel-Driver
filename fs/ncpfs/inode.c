@@ -460,7 +460,7 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 			break;
 		default:
 			error = -ECHRNG;
-			if (*(__u32*)raw_data == cpu_to_be32(0x76657273)) {
+			if (memcmp(raw_data, "vers", 4) == 0) {
 				error = ncp_parse_options(&data, raw_data);
 			}
 			if (error)
@@ -623,7 +623,7 @@ static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 
 	memset(&finfo, 0, sizeof(finfo));
 	finfo.i.attributes	= aDIR;
-	finfo.i.dataStreamSize	= NCP_BLOCK_SIZE;
+	finfo.i.dataStreamSize	= 0;	/* ignored */
 	finfo.i.dirEntNum	= 0;
 	finfo.i.DosDirNum	= 0;
 #ifdef CONFIG_NCPFS_SMALLDOS

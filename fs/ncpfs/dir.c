@@ -980,7 +980,8 @@ static int ncp_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 
 	error = -EACCES;
 	if (ncp_open_create_file_or_subdir(server, dir, __name,
-					   OC_MODE_CREATE, aDIR, 0xffff,
+					   OC_MODE_CREATE, aDIR,
+					   cpu_to_le16(0xffff),
 					   &finfo) == 0)
 	{
 		if (ncp_is_nfs_extras(server, finfo.volume)) {

@@ -902,7 +902,7 @@ int ncp_search_for_fileset(struct ncp_server *server,
 	ncp_add_byte(server, 0);		/* datastream */
 	ncp_add_word(server, cpu_to_le16(0x8006));
 	ncp_add_dword(server, RIM_ALL);
-	ncp_add_word(server, 32767);		/* max returned items */
+	ncp_add_word(server, cpu_to_le16(32767));	/* max returned items */
 	ncp_add_mem(server, seq, 9);
 #ifdef CONFIG_NCPFS_NFS_NS
 	if (server->name_space[seq->volNumber] == NW_NS_NFS) {
