@@ -80,7 +80,7 @@ typedef struct {
 do {	spin_lock_init(&((__sk)->lock.slock)); \
 	(__sk)->lock.users = 0; \
 	init_waitqueue_head(&((__sk)->lock.wq)); \
-} while(0);
+} while(0)
 
 struct sock {
 	/* Begin of struct sock/struct tcp_tw_bucket shared layout */

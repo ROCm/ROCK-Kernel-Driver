@@ -1107,6 +1107,7 @@ static int dvd_do_auth(struct cdrom_device_info *cdi, dvd_authinfo *ai)
 
 	/* Misc */
 	case DVD_INVALIDATE_AGID:
+		cgc.quiet = 1;
 		cdinfo(CD_DVD, "entering DVD_INVALIDATE_AGID\n"); 
 		setup_report_key(&cgc, ai->lsa.agid, 0x3f);
 		if ((ret = cdo->generic_packet(cdi, &cgc)))

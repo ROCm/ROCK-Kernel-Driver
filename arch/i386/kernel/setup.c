@@ -99,6 +99,8 @@
 #endif
 #include <linux/highmem.h>
 #include <linux/bootmem.h>
+#include <linux/pci.h>
+#include <linux/pci_ids.h>
 #include <linux/seq_file.h>
 #include <linux/console.h>
 #include <asm/processor.h>
@@ -210,6 +212,10 @@ struct resource standard_io_resources[] = {
 	{ "dma2", 0xc0, 0xdf, IORESOURCE_BUSY },
 	{ "fpu", 0xf0, 0xff, IORESOURCE_BUSY }
 };
+#ifdef CONFIG_MELAN
+standard_io_resources[1] = { "pic1", 0x20, 0x21, IORESOURCE_BUSY };
+standard_io_resources[5] = { "pic2", 0xa0, 0xa1, IORESOURCE_BUSY };
+#endif
 
 #define STANDARD_IO_RESOURCES (sizeof(standard_io_resources)/sizeof(struct resource))
 
@@ -1240,7 +1246,7 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 }
 
 /*
- * Read Cyrix DEVID registers (DIR) to get more detailed info. about the CPU
+ * Read NSC/Cyrix DEVID registers (DIR) to get more detailed info. about the CPU
  */
 static void __init do_cyrix_devid(unsigned char *dir0, unsigned char *dir1)
 {
@@ -1315,7 +1321,7 @@ extern void calibrate_delay(void) __init;
 static void __init check_cx686_slop(struct cpuinfo_x86 *c)
 {
 	unsigned long flags;
-	
+
 	if (Cx86_dir0_msb == 3) {
 		unsigned char ccr3, ccr5;
 
@@ -1325,7 +1331,7 @@ static void __init check_cx686_slop(struct cpuinfo_x86 *c)
 		ccr5 = getCx86(CX86_CCR5);
 		if (ccr5 & 2)
 			setCx86(CX86_CCR5, ccr5 & 0xfd);  /* reset SLOP */
-		setCx86(CX86_CCR3, ccr3);                 /* disable MAPEN */
+		setCx86(CX86_CCR3, ccr3);		  /* disable MAPEN */
 		local_irq_restore(flags);
 
 		if (ccr5 & 2) { /* possible wrong calibration done */
@@ -1335,6 +1341,7 @@ static void __init check_cx686_slop(struct cpuinfo_x86 *c)
 		}
 	}
 }
+
 
 static void __init init_cyrix(struct cpuinfo_x86 *c)
 {
@@ -1402,17 +1409,12 @@ static void __init init_cyrix(struct cpuinfo_x86 *c)
 		break;
 
 	case 4: /* MediaGX/GXm */
-		/*
-		 *	Life sometimes gets weiiiiiiiird if we use this
-		 *	on the MediaGX. So we turn it off for now. 
-		 */
-		
 #ifdef CONFIG_PCI
-		/* It isnt really a PCI quirk directly, but the cure is the
+		/* It isn't really a PCI quirk directly, but the cure is the
 		   same. The MediaGX has deep magic SMM stuff that handles the
 		   SB emulation. It thows away the fifo on disable_dma() which
 		   is wrong and ruins the audio. 
-                   
+
 		   Bug2: VSA1 has a wrap bug so that using maximum sized DMA 
 		   causes bad things. According to NatSemi VSA2 has another
 		   bug to do with 'hlt'. I've not seen any boards using VSA2
@@ -1427,15 +1429,26 @@ static void __init init_cyrix(struct cpuinfo_x86 *c)
 
 		/* GXm supports extended cpuid levels 'ala' AMD */
 		if (c->cpuid_level == 2) {
+			/* Enable Natsemi MMX extensions */
+			setCx86(CX86_CCR7, getCx86(CX86_CCR7) | 1);
+
 			get_model_name(c);  /* get CPU marketing name */
-			clear_bit(X86_FEATURE_TSC, c->x86_capability);
+			/*
+			 *  The 5510/5520 companion chips have a funky PIT
+			 *  that breaks the TSC synchronizing, so turn it off
+			 */
+			if(pci_find_device(PCI_VENDOR_ID_CYRIX, PCI_DEVICE_ID_CYRIX_5510, NULL) ||
+				pci_find_device(PCI_VENDOR_ID_CYRIX, PCI_DEVICE_ID_CYRIX_5520, NULL))
+				clear_bit(X86_FEATURE_TSC, c->x86_capability);
 			return;
 		}
 		else {  /* MediaGX */
 			Cx86_cb[2] = (dir0_lsn & 1) ? '3' : '4';
 			p = Cx86_cb+2;
 			c->x86_model = (dir1 & 0x20) ? 1 : 2;
+#ifndef CONFIG_CS5520
 			clear_bit(X86_FEATURE_TSC, &c->x86_capability);
+#endif
 		}
 		break;
 
@@ -1453,7 +1466,7 @@ static void __init init_cyrix(struct cpuinfo_x86 *c)
 		tmp = (!(dir0_lsn & 7) || dir0_lsn & 1) ? 2 : 0;
 		Cx86_cb[tmp] = cyrix_model_mult2[dir0_lsn & 7];
 		p = Cx86_cb+tmp;
-        	if (((dir1 & 0x0f) > 4) || ((dir1 & 0xf0) == 0x20))
+	 	if (((dir1 & 0x0f) > 4) || ((dir1 & 0xf0) == 0x20))
 			(c->x86_model)++;
 		/* Emulate MTRRs using Cyrix's ARRs. */
 		set_bit(X86_FEATURE_CYRIX_ARR, &c->x86_capability);
@@ -2096,7 +2109,7 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 		}
 		if ( l1i || l1d )
 			printk(KERN_INFO "CPU: L1 I cache: %dK, L1 D cache: %dK\n",
-			       l1i, l1d);
+			      l1i, l1d);
 		if ( l2 )
 			printk(KERN_INFO "CPU: L2 cache: %dK\n", l2);
 		if ( l3 )
@@ -2203,6 +2216,8 @@ void __init get_cpu_vendor(struct cpuinfo_x86 *c)
 		c->x86_vendor = X86_VENDOR_AMD;
 	else if (!strcmp(v, "CyrixInstead"))
 		c->x86_vendor = X86_VENDOR_CYRIX;
+	else if (!strcmp(v, "Geode by NSC"))
+		c->x86_vendor = X86_VENDOR_NSC;
 	else if (!strcmp(v, "UMC UMC UMC "))
 		c->x86_vendor = X86_VENDOR_UMC;
 	else if (!strcmp(v, "CentaurHauls"))
@@ -2528,6 +2543,38 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	 * indicate the features this CPU genuinely supports!
 	 */
 	switch ( c->x86_vendor ) {
+	case X86_VENDOR_AMD:
+		init_amd(c);
+		break;
+
+	case X86_VENDOR_CENTAUR:
+		init_centaur(c);
+		break;
+
+	case X86_VENDOR_CYRIX:
+		init_cyrix(c);
+		break;
+
+	case X86_VENDOR_INTEL:
+		init_intel(c);
+		break;
+
+	case X86_VENDOR_NEXGEN:
+		c->x86_cache_size = 256; /* A few had 1 MB... */
+		break;
+
+	case X86_VENDOR_NSC:
+        init_cyrix(c);
+		break;
+
+	case X86_VENDOR_RISE:
+		init_rise(c);
+		break;
+
+	case X86_VENDOR_TRANSMETA:
+		init_transmeta(c);
+		break;
+
 	case X86_VENDOR_UNKNOWN:
 	default:
 		/* Not much we can do here... */
@@ -2542,33 +2589,6 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 		}
 		break;
 
-	case X86_VENDOR_CYRIX:
-		init_cyrix(c);
-		break;
-
-	case X86_VENDOR_AMD:
-		init_amd(c);
-		break;
-
-	case X86_VENDOR_CENTAUR:
-		init_centaur(c);
-		break;
-
-	case X86_VENDOR_INTEL:
-		init_intel(c);
-		break;
-
-	case X86_VENDOR_NEXGEN:
-		c->x86_cache_size = 256; /* A few had 1 MB... */
-		break;
-
-	case X86_VENDOR_TRANSMETA:
-		init_transmeta(c);
-		break;
-
-	case X86_VENDOR_RISE:
-		init_rise(c);
-		break;
 	}
 
 	printk(KERN_DEBUG "CPU: After vendor init, caps: %08x %08x %08x %08x\n",
@@ -2646,14 +2666,15 @@ void __init dodgy_tsc(void)
 {
 	get_cpu_vendor(&boot_cpu_data);
 
-	if ( boot_cpu_data.x86_vendor == X86_VENDOR_CYRIX )
+	if (( boot_cpu_data.x86_vendor == X86_VENDOR_CYRIX ) ||
+	    ( boot_cpu_data.x86_vendor == X86_VENDOR_NSC   ))
 		init_cyrix(&boot_cpu_data);
 }
 
 
 /* These need to match <asm/processor.h> */
 static char *cpu_vendor_names[] __initdata = {
-	"Intel", "Cyrix", "AMD", "UMC", "NexGen", "Centaur", "Rise", "Transmeta" };
+	"Intel", "Cyrix", "AMD", "UMC", "NexGen", "Centaur", "Rise", "Transmeta", "NSC" };
 
 
 void __init print_cpu_info(struct cpuinfo_x86 *c)
@@ -2694,10 +2715,10 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	 */
 	static char *x86_cap_flags[] = {
 		/* Intel-defined */
-	        "fpu", "vme", "de", "pse", "tsc", "msr", "pae", "mce",
-	        "cx8", "apic", NULL, "sep", "mtrr", "pge", "mca", "cmov",
-	        "pat", "pse36", "pn", "clflush", NULL, "dts", "acpi", "mmx",
-	        "fxsr", "sse", "sse2", "ss", "ht", "tm", "ia64", NULL,
+		"fpu", "vme", "de", "pse", "tsc", "msr", "pae", "mce",
+		"cx8", "apic", NULL, "sep", "mtrr", "pge", "mca", "cmov",
+		"pat", "pse36", "pn", "clflush", NULL, "dts", "acpi", "mmx",
+		"fxsr", "sse", "sse2", "ss", "ht", "tm", "ia64", NULL,
 
 		/* AMD-defined */
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,

@@ -123,7 +123,6 @@ EXPORT_SYMBOL(strncat);
 EXPORT_SYMBOL(strchr);
 EXPORT_SYMBOL(strrchr);
 EXPORT_SYMBOL(strpbrk);
-EXPORT_SYMBOL(strtok);
 EXPORT_SYMBOL(strstr);
 EXPORT_SYMBOL(strlen);
 EXPORT_SYMBOL(strnlen);

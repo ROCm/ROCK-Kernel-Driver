@@ -61,7 +61,7 @@ MODULE_LICENSE("GPL");
 #define DEBUGP(format, args...)
 #endif
 
-#define PRINTR(format, args...) do { if (net_ratelimit()) printk(format, ## args); } while (0);
+#define PRINTR(format, args...) do { if (net_ratelimit()) printk(format, ## args); } while (0)
 
 MODULE_AUTHOR("Harald Welte <laforge@gnumonks.org>");
 MODULE_DESCRIPTION("IP tables userspace logging module");

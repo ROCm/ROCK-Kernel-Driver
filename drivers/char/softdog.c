@@ -1,5 +1,5 @@
 /*
- *	SoftDog	0.05:	A Software Watchdog Device
+ *	SoftDog	0.06:	A Software Watchdog Device
  *
  *	(c) Copyright 1996 Alan Cox <alan@redhat.com>, All Rights Reserved.
  *				http://www.redhat.com
@@ -26,6 +26,10 @@
  *
  *  19980911 Alan Cox
  *	Made SMP safe for 2.3.x
+ *
+ *  20011214 Matt Domsch <Matt_Domsch@dell.com>
+ *      Added nowayout module option to override CONFIG_WATCHDOG_NOWAYOUT
+ *      Didn't add timeout option, as soft_margin option already exists.
  */
  
 #include <linux/module.h>
@@ -46,6 +50,15 @@
 static int soft_margin = TIMER_MARGIN;	/* in seconds */
 
 MODULE_PARM(soft_margin,"i");
+
+#ifdef CONFIG_WATCHDOG_NOWAYOUT
+static int nowayout = 1;
+#else
+static int nowayout = 0;
+#endif
+
+MODULE_PARM(nowayout,"i");
+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 MODULE_LICENSE("GPL");
 
 /*
@@ -83,9 +96,9 @@ static int softdog_open(struct inode *inode, struct file *file)
 {
 	if(timer_alive)
 		return -EBUSY;
-#ifdef CONFIG_WATCHDOG_NOWAYOUT	 
-	MOD_INC_USE_COUNT;
-#endif	
+	if (nowayout) {
+		MOD_INC_USE_COUNT;
+	}
 	/*
 	 *	Activate timer
 	 */
@@ -98,11 +111,11 @@ static int softdog_release(struct inode *inode, struct file *file)
 {
 	/*
 	 *	Shut off the timer.
-	 * 	Lock it in if it's a module and we defined ...NOWAYOUT
+	 * 	Lock it in if it's a module and we set nowayout
 	 */
-#ifndef CONFIG_WATCHDOG_NOWAYOUT	 
-	del_timer(&watchdog_ticktock);
-#endif	
+	if(!nowayout) {
+		del_timer(&watchdog_ticktock);
+	}
 	timer_alive=0;
 	return 0;
 }
@@ -159,7 +172,7 @@ static struct miscdevice softdog_miscdev = {
 	fops:		&softdog_fops,
 };
 
-static char banner[] __initdata = KERN_INFO "Software Watchdog Timer: 0.05, timer margin: %d sec\n";
+static char banner[] __initdata = KERN_INFO "Software Watchdog Timer: 0.06, soft_margin: %d sec, nowayout: %d\n";
 
 static int __init watchdog_init(void)
 {
@@ -170,7 +183,7 @@ static int __init watchdog_init(void)
 	if (ret)
 		return ret;
 
-	printk(banner, soft_margin);
+	printk(banner, soft_margin, nowayout);
 
 	return 0;
 }

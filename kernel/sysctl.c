@@ -474,11 +474,11 @@ int do_sysctl_strategy (ctl_table *table,
 }
 
 /**
- * register_sysctl_table - register a sysctl heirarchy
+ * register_sysctl_table - register a sysctl hierarchy
  * @table: the top-level table structure
  * @insert_at_head: whether the entry should be inserted in front or at the end
  *
- * Register a sysctl table heirarchy. @table should be a filled in ctl_table
+ * Register a sysctl table hierarchy. @table should be a filled in ctl_table
  * array. An entry with a ctl_name of 0 terminates the table. 
  *
  * The members of the &ctl_table structure are used as follows:
@@ -562,7 +562,7 @@ struct ctl_table_header *register_sysctl_table(ctl_table * table,
 }
 
 /**
- * unregister_sysctl_table - unregister a sysctl table heirarchy
+ * unregister_sysctl_table - unregister a sysctl table hierarchy
  * @header: the header returned from register_sysctl_table
  *
  * Unregisters the sysctl table and all children. proc entries may not

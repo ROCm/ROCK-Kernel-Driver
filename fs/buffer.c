@@ -795,8 +795,11 @@ static void end_buffer_io_async(struct buffer_head * bh, int uptodate)
 	unlock_buffer(bh);
 	tmp = bh->b_this_page;
 	while (tmp != bh) {
-		if (buffer_async(tmp) && buffer_locked(tmp))
-			goto still_busy;
+		if (buffer_locked(tmp)) {
+			if (buffer_async(tmp))
+				goto still_busy;
+		} else if (!buffer_uptodate(tmp))
+			SetPageError(page);
 		tmp = tmp->b_this_page;
 	}
 
@@ -1716,7 +1719,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 		if (!buffer_mapped(bh)) {
 			if (iblock < lblock) {
 				if (get_block(inode, iblock, bh, 0))
-					continue;
+					SetPageError(page);
 			}
 			if (!buffer_mapped(bh)) {
 				memset(kmap(page) + i*blocksize, 0, blocksize);
@@ -1736,10 +1739,11 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 
 	if (!nr) {
 		/*
-		 * all buffers are uptodate - we can set the page
-		 * uptodate as well.
+		 * All buffers are uptodate - we can set the page uptodate
+		 * as well. But not if get_block() returned an error.
 		 */
-		SetPageUptodate(page);
+		if (!PageError(page))
+			SetPageUptodate(page);
 		UnlockPage(page);
 		return 0;
 	}

@@ -824,6 +824,7 @@
 	0074  56k Voice Modem
 		1033 8014  RCV56ACF 56k Voice Modem
 	009b  Vrc5476
+	00a6  VRC5477 AC97
 	00e0  USB 2.0
 1034  Framatome Connectors USA Inc.
 1035  Comp. & Comm. Research Lab
@@ -1194,11 +1195,21 @@
 	0017  Paddington Mac I/O
 	0018  UniNorth FireWire
 	0019  KeyLargo USB
-	001e  UniNorth PCI
+	001e  UniNorth Internal PCI
 	001f  UniNorth PCI
 	0020  UniNorth AGP
-	0021  UniNorth GMAC
+	0021  UniNorth GMAC (Sun GEM)
 	0022  KeyLargo Mac I/O
+	0024  UniNorth/Pangea GMAC (Sun GEM)
+	0025  KeyLargo/Pangea Mac I/O
+	0026  KeyLargo/Pangea USB
+	0027  UniNorth/Pangea AGP
+	0028  UniNorth/Pangea PCI
+	0029  UniNorth/Pangea Internal PCI
+	002d  UniNorth 1.5 AGP
+	002e  UniNorth 1.5 PCI
+	002f  UniNorth 1.5 Internal PCI
+	0030  UniNorth/Pangea FireWire
 106c  Hyundai Electronics America
 	8801  Dual Pentium ISA/PCI Motherboard
 	8802  PowerPC ISA/PCI Motherboard
@@ -2622,6 +2633,8 @@
 	0005  ATP850UF
 	0006  ATP860 NO-BIOS
 	0007  ATP860
+	0008  ATP865 NO-ROM
+	0009  ATP865
 	8002  AEC6710 SCSI-2 Host Adapter
 	8010  AEC6712UW SCSI
 	8020  AEC6712U SCSI
@@ -3967,7 +3980,7 @@
 	9511  16PCI954 Function 1
 		15ed 2000  Macrolink MCCR Serial p4-7 of 8
 		15ed 2001  Macrolink MCCR Serial p4-15 of 16
-	9521  Oxford Semi OX16PCI952 PCI/dual 16950 UART
+	9521  16PCI952 PCI/dual 16950 UART
 1416  Multiwave Innovation pte Ltd
 1417  Convergenet Technologies Inc
 1418  Kyushu electronics systems Inc

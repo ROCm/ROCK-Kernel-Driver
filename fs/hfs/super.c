@@ -32,6 +32,8 @@
 #include <linux/module.h>
 #include <linux/init.h>
 
+MODULE_LICENSE("GPL");
+
 /*================ Forward declarations ================*/
 
 static void hfs_read_inode(struct inode *);
@@ -237,8 +239,9 @@ static int parse_options(char *options, struct hfs_sb_info *hsb, int *part)
 	if (!options) {
 		goto done;
 	}
-	for (this_char = strtok(options,","); this_char;
-	     this_char = strtok(NULL,",")) {
+	while ((this_char = strsep(&options,",")) != NULL) {
+		if (!*this_char)
+			continue;
 		if ((value = strchr(this_char,'=')) != NULL) {
 			*value++ = 0;
 		}

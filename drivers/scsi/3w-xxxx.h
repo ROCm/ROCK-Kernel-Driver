@@ -92,10 +92,11 @@ static char *tw_aen_string[] = {
 	"Verify failed: Port #",                // 0x02A
 	"Verify complete: Unit #",              // 0x02B
 	"Overwrote bad sector during rebuild: Port #",  //0x2C
-	"Encountered bad sector during rebuild: Port #" //0x2D
+	"Encountered bad sector during rebuild: Port #", //0x2D
+	"Replacement drive is too small: Port #" //0x2E
 };
 
-#define TW_AEN_STRING_MAX                      0x02E
+#define TW_AEN_STRING_MAX                      0x02F
 
 /*
    Sense key lookup table
@@ -134,7 +135,9 @@ static unsigned char tw_sense_table[][4] =
 #define TW_CONTROL_DISABLE_INTERRUPTS	       0x00000040
 #define TW_CONTROL_ISSUE_HOST_INTERRUPT	       0x00000020
 #define TW_CONTROL_CLEAR_PARITY_ERROR          0x00800000
+#define TW_CONTROL_CLEAR_QUEUE_ERROR           0x00400000
 #define TW_CONTROL_CLEAR_PCI_ABORT             0x00100000
+#define TW_CONTROL_CLEAR_SBUF_WRITE_ERROR      0x00000008
 
 /* Status register bit definitions */
 #define TW_STATUS_MAJOR_VERSION_MASK	       0xF0000000
@@ -154,7 +157,9 @@ static unsigned char tw_sense_table[][4] =
 #define TW_STATUS_ALL_INTERRUPTS	       0x000F0000
 #define TW_STATUS_CLEARABLE_BITS	       0x00D00000
 #define TW_STATUS_EXPECTED_BITS		       0x00002000
-#define TW_STATUS_UNEXPECTED_BITS	       0x00F80000
+#define TW_STATUS_UNEXPECTED_BITS	       0x00F00008
+#define TW_STATUS_SBUF_WRITE_ERROR             0x00000008
+#define TW_STATUS_VALID_INTERRUPT              0x00DF0008
 
 /* RESPONSE QUEUE BIT DEFINITIONS */
 #define TW_RESPONSE_ID_MASK		       0x00000FF0
@@ -214,7 +219,7 @@ static unsigned char tw_sense_table[][4] =
 #define TW_MAX_PCI_BUSES		      255
 #define TW_MAX_RESET_TRIES		      3
 #define TW_UNIT_INFORMATION_TABLE_BASE	      0x300
-#define TW_MAX_CMDS_PER_LUN		      (TW_Q_LENGTH-2)/TW_MAX_UNITS
+#define TW_MAX_CMDS_PER_LUN		      255
 #define TW_BLOCK_SIZE			      0x200 /* 512-byte blocks */
 #define TW_IOCTL                              0x80
 #define TW_MAX_AEN_TRIES                      100
@@ -223,6 +228,8 @@ static unsigned char tw_sense_table[][4] =
 #define TW_MAX_SECTORS                        256
 #define TW_AEN_WAIT_TIME                      1000
 #define TW_IOCTL_WAIT_TIME                    (1 * HZ) /* 1 second */
+#define TW_ISR_DONT_COMPLETE                  2
+#define TW_ISR_DONT_RESULT                    3
 
 /* Macros */
 #define TW_STATUS_ERRORS(x) \
@@ -235,7 +242,7 @@ static unsigned char tw_sense_table[][4] =
 #ifdef TW_DEBUG
 #define dprintk(msg...) printk(msg)
 #else
-#define dprintk(msg...) do { } while(0);
+#define dprintk(msg...) do { } while(0)
 #endif
 
 /* Scatter Gather List Entry */
@@ -402,8 +409,9 @@ typedef struct TAG_TW_Device_Extension {
 	unsigned short		aen_queue[TW_Q_LENGTH];
 	unsigned char		aen_head;
 	unsigned char		aen_tail;
-	long			flags; /* long req'd for set_bit --RR */
+	volatile long		flags; /* long req'd for set_bit --RR */
 	char			*ioctl_data[TW_Q_LENGTH];
+	int			reset_print;
 } TW_Device_Extension;
 
 /* Function prototypes */
@@ -413,12 +421,13 @@ int tw_aen_read_queue(TW_Device_Extension *tw_dev, int request_id);
 int tw_allocate_memory(TW_Device_Extension *tw_dev, int size, int which);
 int tw_check_bits(u32 status_reg_value);
 int tw_check_errors(TW_Device_Extension *tw_dev);
+void tw_clear_all_interrupts(TW_Device_Extension *tw_dev);
 void tw_clear_attention_interrupt(TW_Device_Extension *tw_dev);
 void tw_clear_host_interrupt(TW_Device_Extension *tw_dev);
-void tw_decode_bits(TW_Device_Extension *tw_dev, u32 status_reg_value);
-void tw_decode_sense(TW_Device_Extension *tw_dev, int request_id, int fill_sense);
+int tw_decode_bits(TW_Device_Extension *tw_dev, u32 status_reg_value, int print_host);
+int tw_decode_sense(TW_Device_Extension *tw_dev, int request_id, int fill_sense);
 void tw_disable_interrupts(TW_Device_Extension *tw_dev);
-int tw_empty_response_que(TW_Device_Extension *tw_dev);
+void tw_empty_response_que(TW_Device_Extension *tw_dev);
 void tw_enable_interrupts(TW_Device_Extension *tw_dev);
 void tw_enable_and_clear_interrupts(TW_Device_Extension *tw_dev);
 int tw_findcards(Scsi_Host_Template *tw_host);
@@ -478,7 +487,7 @@ void tw_unmask_command_interrupt(TW_Device_Extension *tw_dev);
 	reset : NULL,					\
 	slave_attach : NULL,				\
 	bios_param : tw_scsi_biosparam,			\
-	can_queue : TW_Q_LENGTH,			\
+	can_queue : TW_Q_LENGTH-1,			\
 	this_id: -1,					\
 	sg_tablesize : TW_MAX_SGL_LENGTH,		\
 	cmd_per_lun: TW_MAX_CMDS_PER_LUN,		\

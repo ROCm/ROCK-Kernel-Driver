@@ -518,7 +518,7 @@ static int netlink_send_peer(ip6q_queue_element_t *e)
 	return netlink_unicast(nfnl, skb, nlq6->peer.pid, MSG_DONTWAIT);
 }
 
-#define RCV_SKB_FAIL(err) do { netlink_ack(skb, nlh, (err)); return; } while (0);
+#define RCV_SKB_FAIL(err) do { netlink_ack(skb, nlh, (err)); return; } while (0)
 
 static __inline__ void netlink_receive_user_skb(struct sk_buff *skb)
 {

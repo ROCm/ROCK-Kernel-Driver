@@ -759,12 +759,9 @@ to "Closing".
    Struct scatterlist must contain, at a minimum, the following
    members:
 
-	char *address;
 	struct page *page;
 	unsigned int offset;
 	unsigned int length;
-
-   The "address" member will disappear in 2.5.x
 
    This means that your pci_{map,unmap}_sg() and all other
    interfaces dealing with scatterlists must be able to cope
@@ -774,9 +771,6 @@ to "Closing".
    either specified by "address" or by a "page+offset" pair.
    If "address" is NULL, then "page+offset" is being used.
    If "page" is NULL, then "address" is being used.
-
-   In 2.5.x, all scatterlists will use "page+offset".  But during
-   2.4.x we still have to support the old method.
 
 2) More to come...
 

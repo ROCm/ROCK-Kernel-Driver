@@ -1,5 +1,5 @@
 /*
- *	i810-tco 0.02:	TCO timer driver for i810 chipsets
+ *	i810-tco 0.03:	TCO timer driver for i810 chipsets
  *
  *	(c) Copyright 2000 kernel concepts <nils@kernelconcepts.de>, All Rights Reserved.
  *				http://www.kernelconcepts.de
@@ -28,6 +28,9 @@
  *	Initial Version 0.01
  *  20000728 Nils Faerber
  *      0.02 Fix for SMI_EN->TCO_EN bit, some cleanups
+ *  20011214 Matt Domsch <Matt_Domsch@dell.com>
+ *      0.03 Added nowayout module option to override CONFIG_WATCHDOG_NOWAYOUT
+ *           Didn't add timeout option as i810_margin already exists.
  */
  
 #include <linux/module.h>
@@ -60,6 +63,18 @@ static spinlock_t tco_lock;	/* Guards the hardware */
 static int i810_margin = TIMER_MARGIN;	/* steps of 0.6sec */
 
 MODULE_PARM (i810_margin, "i");
+MODULE_PARM_DESC(i810_margin, "Watchdog timeout in steps of 0.6sec, 2<n<64. Default = 50 (30 seconds)");
+
+
+#ifdef CONFIG_WATCHDOG_NOWAYOUT
+static int nowayout = 1;
+#else
+static int nowayout = 0;
+#endif
+
+MODULE_PARM(nowayout,"i");
+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
+
 
 /*
  *	Timer active flag
@@ -167,6 +182,9 @@ static int i810tco_open (struct inode *inode, struct file *file)
 	if (timer_alive)
 		return -EBUSY;
 
+	if (nowayout) {
+		MOD_INC_USE_COUNT;
+	}
 	/*
 	 *      Reload and activate timer
 	 */
@@ -181,10 +199,10 @@ static int i810tco_release (struct inode *inode, struct file *file)
 	/*
 	 *      Shut off the timer.
 	 */
-#ifdef CONFIG_WATCHDOG_NOWAYOUT
-	tco_timer_stop ();
-	timer_alive = 0;
-#endif	
+	if (nowayout) {
+		tco_timer_stop ();
+		timer_alive = 0;
+	}
 	return 0;
 }
 
@@ -342,8 +360,8 @@ static int __init watchdog_init (void)
 	tco_timer_reload ();
 
 	printk (KERN_INFO
-		"i810 TCO timer: V0.02, timer margin: %d sec (0x%04x)\n",
-		(int) (i810_margin * 6 / 10), TCOBASE);
+		"i810 TCO timer: V0.03, timer margin: %d sec (0x%04x), nowayout: %d\n",
+		(int) (i810_margin * 6 / 10), TCOBASE, nowayout);
 	return 0;
 }
 

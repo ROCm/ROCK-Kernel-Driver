@@ -87,7 +87,6 @@ EXPORT_SYMBOL_NOVERS(__put_user_1);
 EXPORT_SYMBOL_NOVERS(__put_user_2);
 EXPORT_SYMBOL_NOVERS(__put_user_4);
 
-EXPORT_SYMBOL(strtok);
 EXPORT_SYMBOL(strpbrk);
 EXPORT_SYMBOL(strstr);
 

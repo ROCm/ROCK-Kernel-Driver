@@ -20,7 +20,6 @@ EXPORT_SYMBOL(strlen);
 EXPORT_SYMBOL(strncat);
 EXPORT_SYMBOL(strncmp);
 EXPORT_SYMBOL(strncpy);
-EXPORT_SYMBOL(strtok);
 
 #include <linux/pci.h>
 EXPORT_SYMBOL(hppa_dma_ops);

@@ -37,8 +37,6 @@ struct video_device
  	 * video_generic_ioctl() does the userspace copying of the
  	 * ioctl arguments */
  	struct file_operations *fops;
- 	int (*kernel_ioctl)(struct inode *inode, struct file *file,
- 			    unsigned int cmd, void *arg);
 	void *priv;		/* Used to be 'private' but that upsets C++ */
 
 	/* for videodev.c intenal usage -- don't touch */
@@ -60,8 +58,10 @@ extern struct video_device* video_devdata(struct file*);
 
 extern int video_exclusive_open(struct inode *inode, struct file *file);
 extern int video_exclusive_release(struct inode *inode, struct file *file);
-extern int video_generic_ioctl(struct inode *inode, struct file *file,
-			       unsigned int cmd, unsigned long arg);
+extern int video_usercopy(struct inode *inode, struct file *file,
+			  unsigned int cmd, unsigned long arg,
+			  int (*func)(struct inode *inode, struct file *file,
+				      unsigned int cmd, void *arg));
 #endif /* __KERNEL__ */
 
 #define VID_TYPE_CAPTURE	1	/* Can capture */

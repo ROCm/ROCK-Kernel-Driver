@@ -2748,7 +2748,9 @@ static int qic02_get_resources(void)
 	 * the config parameters have been set using MTSETCONFIG.
 	 */
 
-	if (check_region(QIC02_TAPE_PORT, QIC02_TAPE_PORT_RANGE)) {
+	/* Grab the IO region. */
+	if (!request_region(QIC02_TAPE_PORT, QIC02_TAPE_PORT_RANGE,
+			   TPQIC02_NAME)) {
 		printk(TPQIC02_NAME
 		       ": IO space at 0x%x [%d ports] already reserved\n",
 		       QIC02_TAPE_PORT, QIC02_TAPE_PORT_RANGE);
@@ -2762,6 +2764,7 @@ static int qic02_get_resources(void)
 		printk(TPQIC02_NAME
 		       ": can't allocate IRQ%d for QIC-02 tape\n",
 		       QIC02_TAPE_IRQ);
+		release_region(QIC02_TAPE_PORT, QIC02_TAPE_PORT_RANGE);
 		return -EBUSY;
 	}
 
@@ -2771,12 +2774,9 @@ static int qic02_get_resources(void)
 		       ": can't allocate DMA%d for QIC-02 tape\n",
 		       QIC02_TAPE_DMA);
 		free_irq(QIC02_TAPE_IRQ, NULL);
+		release_region(QIC02_TAPE_PORT, QIC02_TAPE_PORT_RANGE);
 		return -EBUSY;
 	}
-
-	/* Grab the IO region. We already made sure it's available. */
-	request_region(QIC02_TAPE_PORT, QIC02_TAPE_PORT_RANGE,
-		       TPQIC02_NAME);
 
 	/* Setup the page-address for the dma transfer. */
 	buffaddr =

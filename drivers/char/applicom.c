@@ -36,7 +36,7 @@
 
 #if LINUX_VERSION_CODE < 0x20300 
 /* These probably want adding to <linux/compatmac.h> */
-#define init_waitqueue_head(x) do { *(x) = NULL; } while (0);
+#define init_waitqueue_head(x) do { *(x) = NULL; } while (0)
 #define PCI_BASE_ADDRESS(dev) (dev->base_address[0])
 #define DECLARE_WAIT_QUEUE_HEAD(x) struct wait_queue *x
 #define __setup(x,y) /* */

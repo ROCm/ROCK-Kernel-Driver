@@ -123,7 +123,7 @@ extern void flush_instruction_tlb(void);
 #define flush_tlb() do { \
         flush_data_tlb(); \
 	flush_instruction_tlb(); \
-} while(0);
+} while(0)
 
 #define flush_tlb_all() 	flush_tlb()	/* XXX p[id]tlb */
 

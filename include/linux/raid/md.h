@@ -18,8 +18,6 @@
 #ifndef _MD_H
 #define _MD_H
 
-#include <linux/mm.h>
-#include <linux/fs.h>
 #include <linux/blkdev.h>
 #include <asm/semaphore.h>
 #include <linux/major.h>
