@@ -2439,6 +2439,8 @@ static struct pci_device_id amb_pci_tbl[] = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE(pci, amb_pci_tbl);
+
 static struct pci_driver amb_driver = {
 	.name =		"amb",
 	.probe =	amb_probe,
