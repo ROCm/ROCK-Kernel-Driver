@@ -365,7 +365,7 @@ ncp_read_super(struct super_block *sb, void *raw_data, int silent)
 	sock_inode = ncp_filp->f_dentry->d_inode;
 	if (!S_ISSOCK(sock_inode->i_mode))
 		goto out_bad_file2;
-	sock = &sock_inode->u.socket_i;
+	sock = SOCKET_I(sock_inode);
 	if (!sock)
 		goto out_bad_file2;
 		

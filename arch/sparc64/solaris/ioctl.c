@@ -308,7 +308,7 @@ static inline int solaris_sockmod(unsigned int fd, unsigned int cmd, u32 arg)
 	case 110: /* SI_GETUDATA */
 	{
 		int etsdusize, servtype;
-		switch (ino->u.socket_i.type) {
+		switch (SOCKET_I(ino)->type) {
 		case SOCK_STREAM:
 			etsdusize = 1;
 			servtype = 2;
@@ -326,16 +326,16 @@ static inline int solaris_sockmod(unsigned int fd, unsigned int cmd, u32 arg)
 		    __put_user(0, &((struct solaris_si_udata *)A(arg))->so_state) ||
 		    __put_user(0, &((struct solaris_si_udata *)A(arg))->so_options) ||
 		    __put_user(16384, &((struct solaris_si_udata *)A(arg))->tsdusize) ||
-		    __put_user(ino->u.socket_i.ops->family, &((struct solaris_si_udata *)A(arg))->sockparams.sp_family) ||
-		    __put_user(ino->u.socket_i.type, &((struct solaris_si_udata *)A(arg))->sockparams.sp_type) ||
-		    __put_user(ino->u.socket_i.ops->family, &((struct solaris_si_udata *)A(arg))->sockparams.sp_protocol))
+		    __put_user(SOCKET_I(ino)->ops->family, &((struct solaris_si_udata *)A(arg))->sockparams.sp_family) ||
+		    __put_user(SOCKET_I(ino)->type, &((struct solaris_si_udata *)A(arg))->sockparams.sp_type) ||
+		    __put_user(SOCKET_I(ino)->ops->family, &((struct solaris_si_udata *)A(arg))->sockparams.sp_protocol))
 			return (EFAULT << 8) | TSYSERR;
 		return 0;
 	}
 	case 101: /* O_SI_GETUDATA */
 	{
 		int etsdusize, servtype;
-		switch (ino->u.socket_i.type) {
+		switch (SOCKET_I(ino)->type) {
 		case SOCK_STREAM:
 			etsdusize = 1;
 			servtype = 2;

@@ -6,6 +6,13 @@
  * Copyright (C) 1995, 1996 Mike Jagdis (jaggy@purplet.demon.co.uk)
  */
 
+/*
+ *  Dave, _please_ give me specifications on this fscking mess so that I
+ * could at least get it into the state when it wouldn't screw the rest of
+ * the kernel over.  socksys.c and timod.c _stink_ and we are not talking
+ * H2S here, it's isopropilmercaptan in concentrations way over LD50. -- AV
+ */
+
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -86,6 +93,9 @@ static int socksys_open(struct inode * inode, struct file * filp)
 		return fd;
 	/*
 	 * N.B. The following operations are not legal!
+	 *
+	 * No shit.  WTF is it supposed to do, anyway?
+	 *
 	 * Try instead:
 	 * d_delete(filp->f_dentry), then d_instantiate with sock inode
 	 */
@@ -93,7 +103,7 @@ static int socksys_open(struct inode * inode, struct file * filp)
 	filp->f_dentry = dget(fcheck(fd)->f_dentry);
 	filp->f_dentry->d_inode->i_rdev = inode->i_rdev;
 	filp->f_dentry->d_inode->i_flock = inode->i_flock;
-	filp->f_dentry->d_inode->u.socket_i.file = filp;
+	SOCKET_I(filp->f_dentry->d_inode)->file = filp;
 	filp->f_op = &socksys_file_ops;
         sock = (struct sol_socket_struct*) 
         	mykmalloc(sizeof(struct sol_socket_struct), GFP_KERNEL);

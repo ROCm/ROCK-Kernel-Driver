@@ -1239,7 +1239,7 @@ static int x25_get_info(char *buffer, char **start, off_t offset, int length)
 			s->protinfo.x25->t23 / HZ,
 			atomic_read(&s->wmem_alloc),
 			atomic_read(&s->rmem_alloc),
-			s->socket != NULL ? s->socket->inode->i_ino : 0L);
+			s->socket != NULL ? SOCK_INODE(s->socket)->i_ino : 0L);
 
 		pos = begin + len;
 

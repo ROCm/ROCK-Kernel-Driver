@@ -23,6 +23,7 @@
 #include <linux/wait.h>
 
 struct poll_table_struct;
+struct inode;
 
 #define NPROTO		32		/* should be enough for now..	*/
 
@@ -68,7 +69,6 @@ struct socket
 
 	unsigned long		flags;
 	struct proto_ops	*ops;
-	struct inode		*inode;
 	struct fasync_struct	*fasync_list;	/* Asynchronous wake up list	*/
 	struct file		*file;		/* File back pointer for gc	*/
 	struct sock		*sk;
@@ -77,8 +77,6 @@ struct socket
 	short			type;
 	unsigned char		passcred;
 };
-
-#define SOCK_INODE(S)	((S)->inode)
 
 struct scm_cookie;
 struct vm_area_struct;

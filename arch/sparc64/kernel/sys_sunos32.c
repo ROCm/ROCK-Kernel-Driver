@@ -612,7 +612,7 @@ sunos_nfs_get_server_fd (int fd, struct sockaddr_in *addr)
 
 	inode = file->f_dentry->d_inode;
 
-	socket = &inode->u.socket_i;
+	socket = SOCKET_I(inode);
 	local.sin_family = AF_INET;
 	local.sin_addr.s_addr = INADDR_ANY;
 

@@ -418,10 +418,13 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 		file = fget(arg);
 		if (file) {
 			inode = file->f_dentry->d_inode;
-			/* N.B. Should verify that it's a socket */
-			lo->file = file;
-			lo->sock = &inode->u.socket_i;
-			error = 0;
+			if (inode->i_sock) {
+				lo->file = file;
+				lo->sock = SOCKET_I(inode);
+				error = 0;
+			} else {
+				fput(file);
+			}
 		}
 		return error;
 	case NBD_SET_BLKSIZE:

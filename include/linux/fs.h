@@ -456,10 +456,24 @@ struct inode {
 		/* struct umsdos_inode_info	umsdos_i; */
 		struct romfs_inode_info		romfs_i;
 		struct proc_inode_info		proc_i;
-		struct socket			socket_i;
 		void				*generic_ip;
 	} u;
 };
+
+struct socket_alloc {
+	struct socket socket;
+	struct inode vfs_inode;
+};
+
+static inline struct socket *SOCKET_I(struct inode *inode)
+{
+	return &list_entry(inode, struct socket_alloc, vfs_inode)->socket;
+}
+
+static inline struct inode *SOCK_INODE(struct socket *socket)
+{
+	return &list_entry(socket, struct socket_alloc, socket)->vfs_inode;
+}
 
 #include <linux/shmem_fs.h>
 /* will die */

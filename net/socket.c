@@ -272,7 +272,47 @@ static int sockfs_statfs(struct super_block *sb, struct statfs *buf)
 	return 0;
 }
 
+static kmem_cache_t * sock_inode_cachep;
+
+static struct inode *sock_alloc_inode(struct super_block *sb)
+{
+	struct socket_alloc *ei;
+	ei = (struct socket_alloc *)kmem_cache_alloc(sock_inode_cachep, SLAB_KERNEL);
+	if (!ei)
+		return NULL;
+	init_waitqueue_head(&ei->socket.wait);
+	return &ei->vfs_inode;
+}
+
+static void sock_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(sock_inode_cachep,
+			list_entry(inode, struct socket_alloc, vfs_inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct socket_alloc *ei = (struct socket_alloc *) foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR)
+		inode_init_once(&ei->vfs_inode);
+}
+ 
+static int init_inodecache(void)
+{
+	sock_inode_cachep = kmem_cache_create("sock_inode_cache",
+					     sizeof(struct socket_alloc),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (sock_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
 static struct super_operations sockfs_ops = {
+	alloc_inode:	sock_alloc_inode,
+	destroy_inode:	sock_destroy_inode,
 	statfs:		sockfs_statfs,
 };
 
@@ -282,7 +322,7 @@ static struct super_block * sockfs_read_super(struct super_block *sb, void *data
 	sb->s_blocksize = 1024;
 	sb->s_blocksize_bits = 10;
 	sb->s_magic = SOCKFS_MAGIC;
-	sb->s_op	= &sockfs_ops;
+	sb->s_op = &sockfs_ops;
 	root = new_inode(sb);
 	if (!root)
 		return NULL;
@@ -347,10 +387,10 @@ static int sock_map_fd(struct socket *sock)
 			goto out;
 		}
 
-		sprintf(name, "[%lu]", sock->inode->i_ino);
+		sprintf(name, "[%lu]", SOCK_INODE(sock)->i_ino);
 		this.name = name;
 		this.len = strlen(name);
-		this.hash = sock->inode->i_ino;
+		this.hash = SOCK_INODE(sock)->i_ino;
 
 		file->f_dentry = d_alloc(sock_mnt->mnt_sb->s_root, &this);
 		if (!file->f_dentry) {
@@ -360,11 +400,11 @@ static int sock_map_fd(struct socket *sock)
 			goto out;
 		}
 		file->f_dentry->d_op = &sockfs_dentry_operations;
-		d_add(file->f_dentry, sock->inode);
+		d_add(file->f_dentry, SOCK_INODE(sock));
 		file->f_vfsmnt = mntget(sock_mnt);
 
 		sock->file = file;
-		file->f_op = sock->inode->i_fop = &socket_file_ops;
+		file->f_op = SOCK_INODE(sock)->i_fop = &socket_file_ops;
 		file->f_mode = 3;
 		file->f_flags = O_RDWR;
 		file->f_pos = 0;
@@ -373,11 +413,6 @@ static int sock_map_fd(struct socket *sock)
 
 out:
 	return fd;
-}
-
-extern __inline__ struct socket *socki_lookup(struct inode *inode)
-{
-	return &inode->u.socket_i;
 }
 
 /**
@@ -406,7 +441,7 @@ struct socket *sockfd_lookup(int fd, int *err)
 	}
 
 	inode = file->f_dentry->d_inode;
-	if (!inode->i_sock || !(sock = socki_lookup(inode)))
+	if (!inode->i_sock || !(sock = SOCKET_I(inode)))
 	{
 		*err = -ENOTSOCK;
 		fput(file);
@@ -443,15 +478,13 @@ struct socket *sock_alloc(void)
 		return NULL;
 
 	inode->i_dev = NODEV;
-	sock = socki_lookup(inode);
+	sock = SOCKET_I(inode);
 
 	inode->i_mode = S_IFSOCK|S_IRWXUGO;
 	inode->i_sock = 1;
 	inode->i_uid = current->fsuid;
 	inode->i_gid = current->fsgid;
 
-	sock->inode = inode;
-	init_waitqueue_head(&sock->wait);
 	sock->fasync_list = NULL;
 	sock->state = SS_UNCONNECTED;
 	sock->flags = 0;
@@ -493,7 +526,7 @@ void sock_release(struct socket *sock)
 
 	sockets_in_use[smp_processor_id()].counter--;
 	if (!sock->file) {
-		iput(sock->inode);
+		iput(SOCK_INODE(sock));
 		return;
 	}
 	sock->file=NULL;
@@ -553,7 +586,7 @@ static ssize_t sock_read(struct file *file, char *ubuf,
 	if (size==0)		/* Match SYS5 behaviour */
 		return 0;
 
-	sock = socki_lookup(file->f_dentry->d_inode); 
+	sock = SOCKET_I(file->f_dentry->d_inode); 
 
 	msg.msg_name=NULL;
 	msg.msg_namelen=0;
@@ -586,7 +619,7 @@ static ssize_t sock_write(struct file *file, const char *ubuf,
 	if(size==0)		/* Match SYS5 behaviour */
 		return 0;
 
-	sock = socki_lookup(file->f_dentry->d_inode); 
+	sock = SOCKET_I(file->f_dentry->d_inode); 
 
 	msg.msg_name=NULL;
 	msg.msg_namelen=0;
@@ -612,7 +645,7 @@ ssize_t sock_sendpage(struct file *file, struct page *page,
 	if (ppos != &file->f_pos)
 		return -ESPIPE;
 
-	sock = socki_lookup(file->f_dentry->d_inode);
+	sock = SOCKET_I(file->f_dentry->d_inode);
 
 	flags = !(file->f_flags & O_NONBLOCK) ? 0 : MSG_DONTWAIT;
 	if (more)
@@ -627,7 +660,7 @@ int sock_readv_writev(int type, struct inode * inode, struct file * file,
 	struct msghdr msg;
 	struct socket *sock;
 
-	sock = socki_lookup(inode);
+	sock = SOCKET_I(inode);
 
 	msg.msg_name = NULL;
 	msg.msg_namelen = 0;
@@ -681,7 +714,7 @@ int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	int err;
 
 	unlock_kernel();
-	sock = socki_lookup(inode);
+	sock = SOCKET_I(inode);
 	err = sock->ops->ioctl(sock, cmd, arg);
 	lock_kernel();
 
@@ -697,13 +730,13 @@ static unsigned int sock_poll(struct file *file, poll_table * wait)
 	/*
 	 *	We can't return errors to poll, so it's either yes or no. 
 	 */
-	sock = socki_lookup(file->f_dentry->d_inode);
+	sock = SOCKET_I(file->f_dentry->d_inode);
 	return sock->ops->poll(file, sock, wait);
 }
 
 static int sock_mmap(struct file * file, struct vm_area_struct * vma)
 {
-	struct socket *sock = socki_lookup(file->f_dentry->d_inode);
+	struct socket *sock = SOCKET_I(file->f_dentry->d_inode);
 
 	return sock->ops->mmap(file, sock, vma);
 }
@@ -721,7 +754,7 @@ int sock_close(struct inode *inode, struct file *filp)
 		return 0;
 	}
 	sock_fasync(-1, filp, 0);
-	sock_release(socki_lookup(inode));
+	sock_release(SOCKET_I(inode));
 	return 0;
 }
 
@@ -754,7 +787,7 @@ static int sock_fasync(int fd, struct file *filp, int on)
 	}
 
 
-	sock = socki_lookup(filp->f_dentry->d_inode);
+	sock = SOCKET_I(filp->f_dentry->d_inode);
 	
 	if ((sk=sock->sk) == NULL)
 		return -EINVAL;
@@ -1521,7 +1554,7 @@ int sock_fcntl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct socket *sock;
 
-	sock = socki_lookup (filp->f_dentry->d_inode);
+	sock = SOCKET_I (filp->f_dentry->d_inode);
 	if (sock && sock->ops)
 		return sock_no_fcntl(sock, cmd, arg);
 	return(-EINVAL);
@@ -1711,6 +1744,7 @@ void __init sock_init(void)
 	 *	Initialize the protocols module. 
 	 */
 
+	init_inodecache();
 	register_filesystem(&sock_fs_type);
 	sock_mnt = kern_mount(&sock_fs_type);
 	/* The real protocol initialization is performed when

@@ -1022,7 +1022,7 @@ static inline int sock_i_uid(struct sock *sk)
 	int uid;
 
 	read_lock(&sk->callback_lock);
-	uid = sk->socket ? sk->socket->inode->i_uid : 0;
+	uid = sk->socket ? SOCK_INODE(sk->socket)->i_uid : 0;
 	read_unlock(&sk->callback_lock);
 	return uid;
 }
@@ -1032,7 +1032,7 @@ static inline unsigned long sock_i_ino(struct sock *sk)
 	unsigned long ino;
 
 	read_lock(&sk->callback_lock);
-	ino = sk->socket ? sk->socket->inode->i_ino : 0;
+	ino = sk->socket ? SOCK_INODE(sk->socket)->i_ino : 0;
 	read_unlock(&sk->callback_lock);
 	return ino;
 }

@@ -101,7 +101,7 @@ extern inline unix_socket *unix_get_socket(struct file *filp)
 	 *	Socket ?
 	 */
 	if (inode->i_sock) {
-		struct socket * sock = &inode->u.socket_i;
+		struct socket * sock = SOCKET_I(inode);
 		struct sock * s = sock->sk;
 
 		/*
