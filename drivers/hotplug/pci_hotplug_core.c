@@ -40,7 +40,6 @@
 #include <linux/namei.h>
 #include <linux/pci.h>
 #include <linux/dnotify.h>
-#include <linux/proc_fs.h>
 #include <asm/uaccess.h>
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
@@ -130,12 +129,6 @@ static char *pci_bus_speed_strings[] = {
 	"100 MHz PCIX 533",	/* 0x12 */
 	"133 MHz PCIX 533",	/* 0x13 */
 };
-
-#ifdef CONFIG_PROC_FS		
-extern struct proc_dir_entry *proc_bus_pci_dir;
-static struct proc_dir_entry *slotdir = NULL;
-static const char *slotdir_name = "slots";
-#endif
 
 #ifdef CONFIG_HOTPLUG_PCI_CPCI
 extern int cpci_hotplug_init(int debug);
@@ -568,11 +561,6 @@ static int __init pci_hotplug_init (void)
 		goto err_subsys;
 	}
 
-#ifdef CONFIG_PROC_FS
-	/* create mount point for pcihpfs */
-	slotdir = proc_mkdir(slotdir_name, proc_bus_pci_dir);
-#endif
-
 	info (DRIVER_DESC " version: " DRIVER_VERSION "\n");
 	goto exit;
 	
@@ -584,11 +572,6 @@ exit:
 
 static void __exit pci_hotplug_exit (void)
 {
-#ifdef CONFIG_PROC_FS
-	if (slotdir)
-		remove_proc_entry(slotdir_name, proc_bus_pci_dir);
-#endif
-
 	cpci_hotplug_exit();
 	subsystem_unregister(&hotplug_slots_subsys);
 }
