@@ -537,7 +537,8 @@ fn_hash_insert(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 		 * information.
 		 */
 		fa_orig = fa;
-		list_for_each_entry(fa, fa_orig->fa_list.prev, fa_list) {
+		fa = list_entry(fa->fa_list.prev, struct fib_alias, fa_list);
+		list_for_each_entry_continue(fa, &f->fn_alias, fa_list) {
 			if (fa->fa_tos != tos)
 				break;
 			if (fa->fa_info->fib_priority != fi->fib_priority)
@@ -611,7 +612,6 @@ fn_hash_delete(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 	struct fn_hash *table = (struct fn_hash*)tb->tb_data;
 	struct fib_node *f;
 	struct fib_alias *fa, *fa_to_delete;
-	struct list_head *fa_head;
 	int z = r->rtm_dst_len;
 	struct fn_zone *fz;
 	u32 key;
@@ -637,8 +637,8 @@ fn_hash_delete(struct fib_table *tb, struct rtmsg *r, struct kern_rta *rta,
 		return -ESRCH;
 
 	fa_to_delete = NULL;
-	fa_head = fa->fa_list.prev;
-	list_for_each_entry(fa, fa_head, fa_list) {
+	fa = list_entry(fa->fa_list.prev, struct fib_alias, fa_list);
+	list_for_each_entry_continue(fa, &f->fn_alias, fa_list) {
 		struct fib_info *fi = fa->fa_info;
 
 		if (fa->fa_tos != tos)
