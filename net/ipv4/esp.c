@@ -567,7 +567,7 @@ static struct inet_protocol esp4_protocol = {
 	.no_policy	=	1,
 };
 
-int __init esp4_init(void)
+static int __init esp4_init(void)
 {
 	struct xfrm_decap_state decap;
 
@@ -578,7 +578,6 @@ int __init esp4_init(void)
 		decap_data_too_small();
 	}
 
-	esp_type.owner = THIS_MODULE;
 	if (xfrm_register_type(&esp_type, AF_INET) < 0) {
 		printk(KERN_INFO "ip esp init: can't add xfrm type\n");
 		return -EAGAIN;
