@@ -143,7 +143,6 @@ void pnpc_remove_card(struct pnp_card *card)
 	list_for_each_safe(pos,temp,&card->devices){
 		struct pnp_dev *dev = card_to_pnp_dev(pos);
 		pnpc_remove_device(dev);
-		__pnp_remove_device(dev);
 	}
 }
 
