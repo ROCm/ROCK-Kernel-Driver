@@ -432,4 +432,36 @@ static inline void sctp_add_cmd_sf(sctp_cmd_seq_t *seq, sctp_verb_t verb, sctp_a
 		BUG();
 }
 
+/* Check VTAG of the packet matches the sender's own tag OR its peer's
+ * tag and the T bit is set in the Chunk Flags.
+ */
+static inline int
+sctp_vtag_verify_either(const sctp_chunk_t *chunk,
+			const sctp_association_t *asoc)
+{
+        /* RFC 2960 Section 8.5.1, sctpimpguide-06 Section 2.13.2
+	 *
+	 * B) The receiver of a ABORT shall accept the packet if the
+	 * Verification Tag field of the packet matches its own tag OR it
+	 * is set to its peer's tag and the T bit is set in the Chunk
+	 * Flags. Otherwise, the receiver MUST silently discard the packet
+	 * and take no further action.
+	 *
+	 * (C) The receiver of a SHUTDOWN COMPLETE shall accept the
+	 * packet if the Verification Tag field of the packet
+	 * matches its own tag OR it is set to its peer's tag and
+	 * the T bit is set in the Chunk Flags.  Otherwise, the
+	 * receiver MUST silently discard the packet and take no
+	 * further action....
+	 *
+	 */
+        if ((ntohl(chunk->sctp_hdr->vtag) == asoc->c.my_vtag) ||
+	    (sctp_test_T_bit(chunk) && (ntohl(chunk->sctp_hdr->vtag)
+	    == asoc->c.peer_vtag))) {
+                return 1;
+	}
+
+	return 0;
+}
+
 #endif /* __sctp_sm_h__ */

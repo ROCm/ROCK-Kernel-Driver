@@ -110,18 +110,7 @@ sctp_disposition_t sctp_sf_do_4_C(const sctp_endpoint_t *ep,
 	if (!chunk->singleton)
 		return SCTP_DISPOSITION_VIOLATION;
 
-	/* RFC 2960 8.5.1 Exceptions in Verification Tag Rules
-	 *
-	 * (C) The receiver of a SHUTDOWN COMPLETE shall accept the
-	 * packet if the Verification Tag field of the packet
-	 * matches its own tag OR it is set to its peer's tag and
-	 * the T bit is set in the Chunk Flags.  Otherwise, the
-	 * receiver MUST silently discard the packet and take no
-	 * further action....
-	 */
-	if ((ntohl(chunk->sctp_hdr->vtag) != asoc->c.my_vtag) &&
-	    !(sctp_test_T_bit(chunk) ||
-	      (ntohl(chunk->sctp_hdr->vtag) != asoc->peer.i.init_tag)))
+	if (!sctp_vtag_verify_either(chunk, asoc))
 		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 
 	/* RFC 2960 10.2 SCTP-to-ULP
@@ -1636,6 +1625,10 @@ sctp_disposition_t sctp_sf_shutdown_pending_abort(const sctp_endpoint_t *ep,
 					void *arg,
 					sctp_cmd_seq_t *commands)
 {
+	sctp_chunk_t *chunk = arg;
+
+	if (!sctp_vtag_verify_either(chunk, asoc))
+		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 
 	/* Stop the T5-shutdown guard timer.  */
 	sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_STOP,
@@ -1655,6 +1648,10 @@ sctp_disposition_t sctp_sf_shutdown_sent_abort(const sctp_endpoint_t *ep,
 					       void *arg,
 					       sctp_cmd_seq_t *commands)
 {
+	sctp_chunk_t *chunk = arg;
+
+	if (!sctp_vtag_verify_either(chunk, asoc))
+		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 
 	/* Stop the T2-shutdown timer. */
 	sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_STOP,
@@ -1826,7 +1823,12 @@ sctp_disposition_t sctp_sf_do_9_1_abort(const sctp_endpoint_t *ep,
 					void *arg,
 					sctp_cmd_seq_t *commands)
 {
-	/* ASSOC_FAILED will DELETE_TCB. */
+	sctp_chunk_t *chunk = arg;
+
+	if (!sctp_vtag_verify_either(chunk, asoc))
+		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
+
+ 	/* ASSOC_FAILED will DELETE_TCB. */
 	sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED, SCTP_NULL());
 
 	/* BUG?  This does not look complete... */
@@ -1844,8 +1846,10 @@ sctp_disposition_t sctp_sf_cookie_wait_abort(const sctp_endpoint_t *ep,
 					     void *arg,
 					     sctp_cmd_seq_t *commands)
 {
-	/* Check the verification tag.  */
-	/* BUG: WRITE ME. */
+	sctp_chunk_t *chunk = arg;
+
+	if (!sctp_vtag_verify_either(chunk, asoc))
+		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 
 	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
 			SCTP_STATE(SCTP_STATE_CLOSED));
@@ -4218,7 +4222,7 @@ sctp_packet_t *sctp_ootb_pkt_new(const sctp_association_t *asoc,
 		/* Special case the INIT as there is no vtag yet. */
 		if (SCTP_CID_INIT == chunk->chunk_hdr->type) {
 			sctp_init_chunk_t *init;
-			init = (sctp_init_chunk_t *)&chunk->chunk_hdr;
+			init = (sctp_init_chunk_t *)chunk->chunk_hdr;
 			vtag = ntohl(init->init_hdr.init_tag);
 		} else {
 			vtag = ntohl(chunk->sctp_hdr->vtag);
