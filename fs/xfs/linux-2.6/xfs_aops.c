@@ -668,13 +668,12 @@ xfs_cluster_write(
 	xfs_iomap_t		*iomapp,
 	struct writeback_control *wbc,
 	int			startio,
-	int			all_bh)
+	int			all_bh,
+	pgoff_t			tlast)
 {
-	pgoff_t			tlast;
 	struct page		*page;
 
-	tlast = (iomapp->iomap_offset + iomapp->iomap_bsize) >> PAGE_CACHE_SHIFT;
-	for (; tindex < tlast; tindex++) {
+	for (; tindex <= tlast; tindex++) {
 		page = xfs_probe_delalloc_page(inode, tindex);
 		if (!page)
 			break;
@@ -712,17 +711,20 @@ xfs_page_state_convert(
 {
 	struct buffer_head	*bh_arr[MAX_BUF_PER_PAGE], *bh, *head;
 	xfs_iomap_t		*iomp, iomap;
-	unsigned long		p_offset = 0;
-	pgoff_t			end_index;
 	loff_t			offset;
-	unsigned long long	end_offset;
+	unsigned long           p_offset = 0;
+	__uint64_t              end_offset;
+	pgoff_t                 end_index, last_index, tlast;
 	int			len, err, i, cnt = 0, uptodate = 1;
 	int			flags = startio ? 0 : BMAPI_TRYLOCK;
 	int			page_dirty = 1;
+	int                     delalloc = 0;
 
 
 	/* Are we off the end of the file ? */
-	end_index = i_size_read(inode) >> PAGE_CACHE_SHIFT;
+	offset = i_size_read(inode);
+	end_index = offset >> PAGE_CACHE_SHIFT;
+	last_index = (offset - 1) >> PAGE_CACHE_SHIFT;
 	if (page->index >= end_index) {
 		if ((page->index >= end_index + 1) ||
 		    !(i_size_read(inode) & (PAGE_CACHE_SIZE - 1))) {
@@ -789,6 +791,7 @@ xfs_page_state_convert(
 		 */
 		} else if (buffer_delay(bh)) {
 			if (!iomp) {
+				delalloc = 1;
 				err = xfs_map_blocks(inode, offset, len, &iomap,
 						BMAPI_ALLOCATE | flags);
 				if (err) {
@@ -863,8 +866,12 @@ xfs_page_state_convert(
 		xfs_submit_page(page, bh_arr, cnt);
 
 	if (iomp) {
+		tlast = (iomp->iomap_offset + iomp->iomap_bsize - 1) >>
+					PAGE_CACHE_SHIFT;
+		if (delalloc && (tlast > last_index))
+			tlast = last_index;
 		xfs_cluster_write(inode, page->index + 1, iomp, wbc,
-				startio, unmapped);
+					startio, unmapped, tlast);
 	}
 
 	return page_dirty;
