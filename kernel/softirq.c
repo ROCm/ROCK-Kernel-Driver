@@ -333,6 +333,37 @@ static int ksoftirqd(void * __bind_cpu)
 	return 0;
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+/*
+ * tasklet_kill_immediate is called to remove a tasklet which can already be
+ * scheduled for execution on @cpu.
+ *
+ * Unlike tasklet_kill, this function removes the tasklet
+ * _immediately_, even if the tasklet is in TASKLET_STATE_SCHED state.
+ *
+ * When this function is called, @cpu must be in the CPU_DEAD state.
+ */
+void tasklet_kill_immediate(struct tasklet_struct *t, unsigned int cpu)
+{
+	struct tasklet_struct **i;
+
+	BUG_ON(cpu_online(cpu));
+	BUG_ON(test_bit(TASKLET_STATE_RUN, &t->state));
+
+	if (!test_bit(TASKLET_STATE_SCHED, &t->state))
+		return;
+
+	/* CPU is dead, so no lock needed. */
+	for (i = &per_cpu(tasklet_vec, cpu).list; *i; i = &(*i)->next) {
+		if (*i == t) {
+			*i = t->next;
+			return;
+		}
+	}
+	BUG();
+}
+#endif /* CONFIG_HOTPLUG_CPU */
+
 static int __devinit cpu_callback(struct notifier_block *nfb,
 				  unsigned long action,
 				  void *hcpu)
