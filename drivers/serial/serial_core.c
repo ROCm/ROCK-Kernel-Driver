@@ -175,8 +175,6 @@ static int uart_startup(struct uart_state *state, int init_hw)
 		uart_circ_clear(&info->xmit);
 	}
 
-	port->mctrl = 0;
-
 	retval = port->ops->startup(port);
 	if (retval == 0) {
 		if (init_hw) {
