@@ -1155,8 +1155,7 @@ static void awacs_nosound(unsigned long xx)
 	spin_unlock_irqrestore(&dmasound.lock, flags);
 }
 
-static struct timer_list beep_timer = {
-	function: awacs_nosound
+static struct timer_list beep_timer = TIMER_INITIALIZER(awacs_nosound, 0, 0);
 };
 
 /* we generate the beep with a single dbdma command that loops a buffer
