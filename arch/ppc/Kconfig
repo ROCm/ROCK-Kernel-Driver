@@ -29,7 +29,6 @@ mainmenu "Linux/PowerPC Kernel Configuration"
 
 source "init/Kconfig"
 
-
 menu "Platform support"
 
 config PPC
@@ -79,10 +78,7 @@ config 8xx
 
 endchoice
 
-config 4xx
-	bool
-	depends on 40x
-	default y
+source arch/ppc/platforms/4xx/Kconfig
 
 config 8260
 	bool "MPC8260 CPM Support"
@@ -212,53 +208,6 @@ config WILLOW_1
 	bool "Willow"
 
 endchoice
-
-choice
-	prompt "Machine Type"
-	depends on 40x
-	default WALNUT
-
-config ASH
-	bool "Ash"
-
-config CEDER
-	bool "Ceder"
-
-config CPCI405
-	bool "CPCI405"
-
-config EP405
-	bool "EP405/EP405PC"
-
-config OAK
-	bool "Oak"
-	help
-	  Select Oak if you have an IBM 403GCX "Oak" Evaluation Board.
-
-	  Select Walnut if you have an IBM 405GP "Walnut" Evaluation Board.
-
-	  More information on these boards is available at:
-	  <http://www.chips.ibm.com/products/powerpc/tools/evk_pn.html#GCX>.
-
-config REDWOOD_4
-	bool "Redwood-4"
-
-config REDWOOD_5
-	bool "Redwood-5"
-
-config TIVO
-	bool "Tivo"
-
-config WALNUT
-	bool "Walnut"
-	help
-	  Select Walnut if you have an IBM 405GP "Walnut" Evaluation Board.
-
-endchoice
-
-config EP405PC
-	bool "EP405PC Support"
-	depends on EP405
 
 config NOT_COHERENT_CACHE
 	bool
@@ -736,87 +685,7 @@ config MATH_EMULATION
 	  here.  Saying Y here will not hurt performance (on any machine) but
 	  will increase the size of the kernel.
 
-# It's often necessary to know the specific 4xx processor type.
-# Fortunately, it is impled (so far) from the board type, so we
-# don't need to ask more redundant questions.
-config NP405H
-	bool
-	depends on ASH
-	default y
-
-config TREEBOOT
-	bool
-	depends on 40x && (WALNUT || REDWOOD_5 || REDWOOD_4 || OAK || TIVO || CEDER || ASH)
-	default y
-
-config IBM405_ERR77
-	bool
-	depends on 40x && (WALNUT || REDWOOD_5 || REDWOOD_4 || EP405 || CPCI405 || CEDER || ASH)
-	default y
-
-config IBM_OCP
-	bool
-	depends on 40x && (WALNUT || REDWOOD_5 || REDWOOD_4 || EP405 || CPCI405 || CEDER || ASH)
-	default y
-
-config NP405L
-	bool
-	depends on CEDER
-	default y
-
-config BIOS_FIXUP
-	bool
-	depends on 40x && (WALNUT || EP405 || CEDER)
-	default y
-
-config 405GP
-	bool
-	depends on 40x && (WALNUT || EP405 || CPCI405)
-	default y
-
-config EMBEDDEDBOOT
-	bool
-	depends on 8xx || 8260 || 40x && EP405
-	default y
-
-config 403GCX
-	bool
-	depends on 40x && (OAK || TIVO)
-	default y
-
-config STB03xxx
-	bool
-	depends on 40x && (REDWOOD_5 || REDWOOD_4)
-	default y
-
-config 405_DMA
-	bool "Blue Logic DMA"
-	depends on 40x
-
-config PM
-	bool "Power Management support (EXPERIMENTAL)"
-	depends on 40x && EXPERIMENTAL
-
-choice
-	prompt "TTYS0 device and default console"
-	depends on 40x
-	default UART0_TTYS0
-
-config UART0_TTYS0
-	bool "UART0"
-
-config UART0_TTYS1
-	bool "UART1"
-
-endchoice
-
-config IBM405_ERR51
-	bool
-	depends on 40x
-	default y
-
 endmenu
-
 
 menu "General setup"
 
@@ -1746,6 +1615,11 @@ config SERIAL_TEXT_DEBUG
 	bool "Support for early boot texts over serial port"
 	depends on 4xx || GT64260 || LOPEC || MCPN765 || PPLUS || PRPMC800 || SANDPOINT || ZX4500
 
+config OCP
+	bool
+	depends on IBM_OCP
+	default y
+	
 endmenu
 
 source "security/Kconfig"

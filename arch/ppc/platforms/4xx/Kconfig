@@ -1,0 +1,150 @@
+config 4xx
+	bool
+	depends on 40x
+	default y
+
+menu "IBM 4xx options"
+
+choice
+	prompt "Machine Type"
+	depends on 40x
+	default WALNUT
+
+config ASH
+	bool "Ash"
+
+config CEDAR
+	bool "Cedar"
+
+config CPCI405
+	bool "CPCI405"
+
+config EP405
+	bool "EP405/EP405PC"
+
+config OAK
+	bool "Oak"
+	help
+	  Select Oak if you have an IBM 403GCX "Oak" Evaluation Board.
+
+	  Select Walnut if you have an IBM 405GP "Walnut" Evaluation Board.
+
+	  More information on these boards is available at:
+	  <http://www.chips.ibm.com/products/powerpc/tools/evk_pn.html#GCX>.
+
+config REDWOOD_4
+	bool "Redwood-4"
+
+config REDWOOD_5
+	bool "Redwood-5"
+
+config TIVO
+	bool "Tivo"
+
+config WALNUT
+	bool "Walnut"
+	help
+	  Select Walnut if you have an IBM 405GP "Walnut" Evaluation Board.
+
+endchoice
+
+config EP405PC
+	bool "EP405PC Support"
+	depends on EP405
+
+
+# It's often necessary to know the specific 4xx processor type.
+# Fortunately, it is impled (so far) from the board type, so we
+# don't need to ask more redundant questions.
+config NP405H
+	bool
+	depends on ASH
+	default y
+
+# All 405-based cores have this errata.  This leaves out the 403GCX
+config IBM405_ERR77
+	bool
+	depends on 40x && !403GCX
+	default y
+
+# All 40x-based cores have this errata.
+config IBM405_ERR51
+	bool
+	depends on 40x
+	default y
+
+config IBM_OCP
+	bool
+	depends on ASH || CEDAR || CPCI405 || EP405 || REDWOOD_4 || REDWOOD_5 || WALNUT
+	default y
+
+config NP405L
+	bool
+	depends on CEDAR
+	default y
+
+config BIOS_FIXUP
+	bool
+	depends on CEDAR || EP405 || WALNUT
+	default y
+
+config 403GCX
+	bool
+	depends OAK || TIVO
+	default y
+
+config 405GP
+	bool
+	depends on CPCI405 || EP405 || WALNUT
+	default y
+
+config STB03xxx
+	bool
+	depends on REDWOOD_5 || REDWOOD_4
+	default y
+
+config EMBEDDEDBOOT
+	bool
+	depends on EP405
+	default y
+
+config IBM_OPENBIOS
+	bool
+	depends on ASH || CEDAR || REDWOOD_4 || REDWOOD_5 || WALNUT
+	default y
+
+config 405_DMA
+	bool "Blue Logic DMA"
+	depends on 40x
+
+config PM
+	bool "Power Management support (EXPERIMENTAL)"
+	depends on 4xx && EXPERIMENTAL
+
+choice
+	prompt "TTYS0 device and default console"
+	depends on 40x
+	default UART0_TTYS0
+
+config UART0_TTYS0
+	bool "UART0"
+
+config UART0_TTYS1
+	bool "UART1"
+
+endchoice
+
+config SERIAL_SICC
+	bool "SICC Serial port support"
+	depends on STB03xxx
+
+config UART1_DFLT_CONSOLE
+	bool
+	depends on SERIAL_SICC && UART0_TTYS1
+	default y
+
+config SERIAL_SICC_CONSOLE
+	bool
+	depends on SERIAL_SICC && UART0_TTYS1
+	default y
+endmenu
