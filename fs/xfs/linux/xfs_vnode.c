@@ -225,8 +225,6 @@ vn_revalidate(struct vnode *vp)
 		inode->i_nlink	    = va.va_nlink;
 		inode->i_uid	    = va.va_uid;
 		inode->i_gid	    = va.va_gid;
-		inode->i_rdev	    = XFS_DEV_TO_KDEVT(va.va_rdev);
-		inode->i_generation = va.va_gencount;
 		inode->i_size	    = va.va_size;
 		inode->i_blocks	    = va.va_nblocks;
 		inode->i_mtime	    = va.va_mtime.tv_sec;
