@@ -979,6 +979,31 @@ config SCSI_SYM53C8XX_IOMAPPED
 	  the card.  This is significantly slower then using memory
 	  mapped IO.  Most people should answer N.
 
+config SCSI_IPR
+	tristate "IBM Power Linux RAID adapter support"
+	depends on PCI && SCSI
+	select FW_LOADER
+	---help---
+	  This driver supports the IBM Power Linux family RAID adapters.
+	  This includes IBM pSeries 5712, 5703, 5709, and 570A, as well
+	  as IBM iSeries 5702, 5703, 5709, and 570A.
+
+config SCSI_IPR_TRACE
+	bool "enable driver internal trace"
+	depends on SCSI_IPR
+	help
+	  If you say Y here, the driver will trace all commands issued
+	  to the adapter. Performance impact is minimal. Trace can be
+	  dumped using /sys/bus/class/scsi_host/hostXX/trace.
+
+config SCSI_IPR_DUMP
+	bool "enable adapter dump support"
+	depends on SCSI_IPR
+	help
+	  If you say Y here, the driver will support adapter crash dump.
+	  If you enable this support, the iprdump daemon can be used
+	  to capture adapter failure analysis information.
+
 config SCSI_ZALON
 	tristate "Zalon SCSI support"
 	depends on GSC && SCSI

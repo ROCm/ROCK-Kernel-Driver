@@ -974,6 +974,11 @@ M:	langa2@kph.uni-mainz.de
 W:	http://www.uni-mainz.de/~langm000/linux.html
 S:	Maintained
 
+IBM Power Linux RAID adapter
+P:	Brian King
+M:	brking@us.ibm.com
+S:	Supported
+
 IBM ServeRAID RAID DRIVER
 P:	Jack Hammer
 P:	Dave Jeffery
