@@ -156,7 +156,7 @@ gss_cred_set_ctx(struct rpc_cred *cred, struct gss_cl_ctx *ctx)
 }
 
 static struct gss_cl_ctx *
-gss_cred_get_ctx(struct rpc_cred *cred)
+gss_cred_get_uptodate_ctx(struct rpc_cred *cred)
 {
 	struct gss_cred *gss_cred = container_of(cred, struct gss_cred, gc_base);
 	struct gss_cl_ctx *ctx = NULL;
@@ -204,6 +204,19 @@ dup_netobj(struct xdr_netobj *source, struct xdr_netobj *dest)
 		return -1;
 	memcpy(dest->data, source->data, dest->len);
 	return 0;
+}
+
+static struct gss_cl_ctx *
+gss_cred_get_ctx(struct rpc_cred *cred)
+{
+	struct gss_cred *gss_cred = container_of(cred, struct gss_cred, gc_base);
+	struct gss_cl_ctx *ctx = NULL;
+
+	read_lock(&gss_ctx_lock);
+	if (gss_cred->gc_ctx)
+		ctx = gss_get_ctx(gss_cred->gc_ctx);
+	read_unlock(&gss_ctx_lock);
+	return ctx;
 }
 
 static int
@@ -637,7 +650,7 @@ gss_refresh(struct rpc_task *task)
 
 	task->tk_timeout = xprt->timeout.to_current;
 	spin_lock(&gss_auth->lock);
-	if (gss_cred_get_ctx(cred))
+	if (gss_cred_get_uptodate_ctx(cred))
 		goto out;
 	err = gss_upcall(clnt, task, cred->cr_uid);
 out:
@@ -648,8 +661,8 @@ out:
 static u32 *
 gss_validate(struct rpc_task *task, u32 *p)
 {
-	struct gss_cred *cred = (struct gss_cred *)task->tk_msg.rpc_cred; 
-	struct gss_cl_ctx	*ctx = cred->gc_ctx;
+	struct rpc_cred *cred = task->tk_msg.rpc_cred;
+	struct gss_cl_ctx *ctx = gss_cred_get_ctx(cred);
 	u32		seq, qop_state;
 	struct xdr_netobj bufin;
 	struct xdr_netobj bufout;
