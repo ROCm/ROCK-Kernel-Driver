@@ -1042,21 +1042,6 @@ found:
 EXPORT_SYMBOL(ide_register_hw);
 
 /*
- * Compatibility function with existing drivers.  If you want
- * something different, use the function above.
- */
-int ide_register (int arg1, int arg2, int irq)
-{
-	hw_regs_t hw;
-	ide_init_hwif_ports(&hw, (unsigned long) arg1, (unsigned long) arg2, NULL);
-	hw.irq = irq;
-	return ide_register_hw(&hw, NULL);
-}
-
-EXPORT_SYMBOL(ide_register);
-
-
-/*
  *	Locks for IDE setting functionality
  */
 
@@ -1654,11 +1639,15 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 
 		case HDIO_SCAN_HWIF:
 		{
+			hw_regs_t hw;
 			int args[3];
 			if (!capable(CAP_SYS_RAWIO)) return -EACCES;
 			if (copy_from_user(args, (void *)arg, 3 * sizeof(int)))
 				return -EFAULT;
-			if (ide_register(args[0], args[1], args[2]) == -1)
+			ide_init_hwif_ports(&hw, (unsigned long) args[0],
+					    (unsigned long) args[1], NULL);
+			hw.irq = args[2];
+			if (ide_register_hw(&hw, NULL) == -1)
 				return -EIO;
 			return 0;
 		}
