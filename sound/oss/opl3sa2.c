@@ -192,35 +192,35 @@ MODULE_AUTHOR("Scott Murray <scott@spiteful.org>");
 MODULE_LICENSE("GPL");
 
 
-MODULE_PARM(io, "i");
+module_param(io, int, 0);
 MODULE_PARM_DESC(io, "Set I/O base of OPL3-SA2 or SA3 card (usually 0x370.  Address must be even and must be from 0x100 to 0xFFE)");
 
-MODULE_PARM(mss_io, "i");
+module_param(mss_io, int, 0);
 MODULE_PARM_DESC(mss_io, "Set MSS (audio) I/O base (0x530, 0xE80, or other. Address must end in 0 or 4 and must be from 0x530 to 0xF48)");
 
-MODULE_PARM(mpu_io, "i");
+module_param(mpu_io, int, 0);
 MODULE_PARM_DESC(mpu_io, "Set MIDI I/O base (0x330 or other. Address must be even and must be from 0x300 to 0x334)");
 
-MODULE_PARM(irq, "i");
+module_param(irq, int, 0);
 MODULE_PARM_DESC(mss_irq, "Set MSS (audio) IRQ (5, 7, 9, 10, 11, 12)");
 
-MODULE_PARM(dma, "i");
+module_param(dma, int, 0);
 MODULE_PARM_DESC(dma, "Set MSS (audio) first DMA channel (0, 1, 3)");
 
-MODULE_PARM(dma2, "i");
+module_param(dma2, int, 0);
 MODULE_PARM_DESC(dma2, "Set MSS (audio) second DMA channel (0, 1, 3)");
 
-MODULE_PARM(ymode, "i");
+module_param(ymode, int, 0);
 MODULE_PARM_DESC(ymode, "Set Yamaha 3D enhancement mode (0 = Desktop/Normal, 1 = Notebook PC (1), 2 = Notebook PC (2), 3 = Hi-Fi)");
 
-MODULE_PARM(loopback, "i");
+module_param(loopback, int, 0);
 MODULE_PARM_DESC(loopback, "Set A/D input source. Useful for echo cancellation (0 = Mic Rch (default), 1 = Mono output loopback)");
 
 #ifdef CONFIG_PNP
-MODULE_PARM(isapnp, "i");
+module_param(isapnp, bool, 0);
 MODULE_PARM_DESC(isapnp, "When set to 0, ISA PnP support will be disabled");
 
-MODULE_PARM(multiple, "i");
+module_param(multiple, bool, 0);
 MODULE_PARM_DESC(multiple, "When set to 0, will not search for multiple cards");
 #endif
 

@@ -2919,10 +2919,10 @@ MODULE_DESCRIPTION("ESS Maestro3/Allegro Driver");
 MODULE_LICENSE("GPL");
 
 #ifdef M_DEBUG
-MODULE_PARM(debug,"i");
+module_param(debug, int, 0);
 #endif
-MODULE_PARM(external_amp,"i");
-MODULE_PARM(gpio_pin, "i");
+module_param(external_amp, int, 0);
+module_param(gpio_pin, int, 0);
 
 static struct pci_driver m3_pci_driver = {
 	.name	  = "ess_m3_audio",

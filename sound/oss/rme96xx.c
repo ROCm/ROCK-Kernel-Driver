@@ -68,7 +68,7 @@ TODO:
 #define NR_DEVICE 2
 
 static int devices = 1;
-MODULE_PARM(devices, "1-" __MODULE_STRING(NR_DEVICE) "i");
+module_param(devices, int, 0);
 MODULE_PARM_DESC(devices, "number of dsp devices allocated by the driver");
 
 

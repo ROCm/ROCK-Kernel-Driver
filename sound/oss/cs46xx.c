@@ -175,24 +175,24 @@
 
 #if CSDEBUG
 static unsigned long cs_debuglevel=1;			/* levels range from 1-9 */
-MODULE_PARM(cs_debuglevel, "i");
+module_param(cs_debuglevel, ulong, 0644);
 static unsigned long cs_debugmask=CS_INIT | CS_ERROR;	/* use CS_DBGOUT with various mask values */
-MODULE_PARM(cs_debugmask, "i");
+module_param(cs_debugmask, ulong, 0644);
 #endif
 static unsigned long hercules_egpio_disable;  /* if non-zero set all EGPIO to 0 */
-MODULE_PARM(hercules_egpio_disable, "i");
+module_param(hercules_egpio_disable, ulong, 0);
 static unsigned long initdelay=700;  /* PM delay in millisecs */
-MODULE_PARM(initdelay, "i");
+module_param(initdelay, ulong, 0);
 static unsigned long powerdown=-1;  /* turn on/off powerdown processing in driver */
-MODULE_PARM(powerdown, "i");
+module_param(powerdown, ulong, 0);
 #define DMABUF_DEFAULTORDER 3
 static unsigned long defaultorder=DMABUF_DEFAULTORDER;
-MODULE_PARM(defaultorder, "i");
+module_param(defaultorder, ulong, 0);
 
 static int external_amp;
-MODULE_PARM(external_amp, "i");
+module_param(external_amp, bool, 0);
 static int thinkpad;
-MODULE_PARM(thinkpad, "i");
+module_param(thinkpad, bool, 0);
 
 /*
 * set the powerdown module parm to 0 to disable all 

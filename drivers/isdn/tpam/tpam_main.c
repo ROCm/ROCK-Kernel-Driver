@@ -39,7 +39,7 @@ MODULE_DESCRIPTION("ISDN4Linux: Driver for TurboPAM ISDN cards");
 MODULE_AUTHOR("Stelian Pop");
 MODULE_LICENSE("GPL");
 MODULE_PARM_DESC(id,"ID-String of the driver");
-MODULE_PARM(id,"s");
+module_param(id, charp, 0);
 
 /*
  * Finds a board by its driver ID.

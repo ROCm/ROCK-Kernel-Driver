@@ -558,7 +558,7 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE(DRIVER_LICENSE);
 
-MODULE_PARM(timeout, "i");
+module_param(timeout, int, 0);
 MODULE_PARM_DESC(timeout, "Timeout (default=1.5 seconds)");
-MODULE_PARM(delay, "i");
+module_param(delay, int, 0);
 MODULE_PARM_DESC(delay, "Inter-bit delay (default=10 microseconds)");

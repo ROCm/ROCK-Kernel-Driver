@@ -1770,8 +1770,8 @@ static struct address_info cfg;
 static int io = -1;
 static int irq = -1;
 
-MODULE_PARM(irq, "i");
-MODULE_PARM(io, "i");
+module_param(irq, int, 0);
+module_param(io, int, 0);
 
 static int __init init_mpu401(void)
 {

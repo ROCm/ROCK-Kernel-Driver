@@ -756,5 +756,5 @@ module_exit(agp_amd64_cleanup);
 #endif
 
 MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>, Andi Kleen");
-MODULE_PARM(agp_try_unsupported, "1i");
+module_param(agp_try_unsupported, bool, 0);
 MODULE_LICENSE("GPL");

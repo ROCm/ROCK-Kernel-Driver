@@ -262,11 +262,11 @@ MODULE_DESCRIPTION("ESS Maestro Driver");
 MODULE_LICENSE("GPL");
 
 #ifdef M_DEBUG
-MODULE_PARM(debug,"i");
+module_param(debug, bool, 0644);
 #endif
-MODULE_PARM(dsps_order,"i");
-MODULE_PARM(use_pm,"i");
-MODULE_PARM(clocking, "i");
+module_param(dsps_order, int, 0);
+module_param(use_pm, int, 0);
+module_param(clocking, int, 0);
 
 /* --------------------------------------------------------------------- */
 #define DRIVER_VERSION "0.15"

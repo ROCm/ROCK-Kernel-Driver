@@ -218,17 +218,17 @@ static int __initdata dma = -1;
 static int __initdata dma16 = -1;	/* Set this for modules that need it */
 static int __initdata type = 0;		/* 1 for PnP */
 
-MODULE_PARM(io, "i");
-MODULE_PARM(irq, "i");
-MODULE_PARM(dma, "i");
-MODULE_PARM(dma16, "i");
-MODULE_PARM(type, "i");
+module_param(io, int, 0);
+module_param(irq, int, 0);
+module_param(dma, int, 0);
+module_param(dma16, int, 0);
+module_param(type, int, 0);
 #ifdef CONFIG_SOUND_GUSMAX
-MODULE_PARM(no_wave_dma, "i");
+module_param(no_wave_dma, int, 0);
 #endif
 #ifdef CONFIG_SOUND_GUS16
-MODULE_PARM(db16, "i");
-MODULE_PARM(gus16, "i");
+module_param(db16, int, 0);
+module_param(gus16, int, 0);
 #endif
 MODULE_LICENSE("GPL");
 

@@ -66,12 +66,12 @@ typedef struct slram_mtd_list {
 
 #ifdef MODULE
 static char *map[SLRAM_MAX_DEVICES_PARAMS];
+
+module_param_array(map, charp, NULL, 0);
+MODULE_PARM_DESC(map, "List of memory regions to map. \"map=<name>, <start>, <length / end>\"");
 #else
 static char *map;
 #endif
-
-MODULE_PARM(map, "3-" __MODULE_STRING(SLRAM_MAX_DEVICES_PARAMS) "s");
-MODULE_PARM_DESC(map, "List of memory regions to map. \"map=<name>, <start>, <length / end>\"");
 
 static slram_mtd_list_t *slram_mtdlist = NULL;
 

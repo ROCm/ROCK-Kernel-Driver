@@ -55,7 +55,7 @@
 #define DPC_BOARD_CAN_DO_VBI(dev)   (dev->revision != 0) 
 
 static int debug = 0;
-MODULE_PARM(debug,"i");
+module_param(debug, int, 0);
 MODULE_PARM_DESC(debug, "debug verbosity");
 
 static int dpc_num = 0;

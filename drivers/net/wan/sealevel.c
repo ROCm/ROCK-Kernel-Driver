@@ -431,15 +431,15 @@ static int rxdma=3;
 static int irq=5;
 static int slow=0;
 
-MODULE_PARM(io,"i");
+module_param(io, int, 0);
 MODULE_PARM_DESC(io, "The I/O base of the Sealevel card");
-MODULE_PARM(txdma,"i");
+module_param(txdma, int, 0);
 MODULE_PARM_DESC(txdma, "Transmit DMA channel");
-MODULE_PARM(rxdma,"i");
+module_param(rxdma, int, 0);
 MODULE_PARM_DESC(rxdma, "Receive DMA channel");
-MODULE_PARM(irq,"i");
+module_param(irq, int, 0);
 MODULE_PARM_DESC(irq, "The interrupt line setting for the SeaLevel card");
-MODULE_PARM(slow,"i");
+module_param(slow, bool, 0);
 MODULE_PARM_DESC(slow, "Set this for an older Sealevel card such as the 4012");
 
 MODULE_AUTHOR("Alan Cox");

@@ -294,7 +294,7 @@ static struct pci_device_id gemtek_pci_id[] =
 
 MODULE_DEVICE_TABLE( pci, gemtek_pci_id );
 
-static u8 mx = 1;
+static int mx = 1;
 
 static struct file_operations gemtek_pci_fops = {
 	.owner		= THIS_MODULE,
@@ -406,9 +406,9 @@ MODULE_AUTHOR( "Vladimir Shebordaev <vshebordaev@mail.ru>" );
 MODULE_DESCRIPTION( "The video4linux driver for the Gemtek PCI Radio Card" );
 MODULE_LICENSE("GPL");
 
-MODULE_PARM( mx, "b" );
+module_param(mx, bool, 0);
 MODULE_PARM_DESC( mx, "single digit: 1 - turn off the turner upon module exit (default), 0 - do not" );
-MODULE_PARM( nr_radio, "i");
+module_param(nr_radio, int, 0);
 MODULE_PARM_DESC( nr_radio, "video4linux device number to use");
 
 module_init( gemtek_pci_init_module );

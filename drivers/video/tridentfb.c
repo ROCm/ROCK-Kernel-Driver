@@ -76,16 +76,16 @@ static int memdiff;
 static int nativex;
 
 
-MODULE_PARM(mode,"s");
-MODULE_PARM(bpp,"i");
-MODULE_PARM(center,"i");
-MODULE_PARM(stretch,"i");
-MODULE_PARM(noaccel,"i");
-MODULE_PARM(memsize,"i");
-MODULE_PARM(memdiff,"i");
-MODULE_PARM(nativex,"i");
-MODULE_PARM(fp,"i");
-MODULE_PARM(crt,"i");
+module_param(mode, charp, 0);
+module_param(bpp, int, 0);
+module_param(center, int, 0);
+module_param(stretch, int, 0);
+module_param(noaccel, int, 0);
+module_param(memsize, int, 0);
+module_param(memdiff, int, 0);
+module_param(nativex, int, 0);
+module_param(fp, int, 0);
+module_param(crt, int, 0);
 
 
 static int chip3D;

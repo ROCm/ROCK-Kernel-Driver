@@ -1706,14 +1706,14 @@ MODULE_AUTHOR("(c) 2000,2002 Ghozlane Toumi <gtoumi@laposte.net>");
 MODULE_DESCRIPTION("FBDev driver for 3dfx Voodoo Graphics and Voodoo2 based video boards");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(mem, "i");
+module_param(mem, int, 0);
 MODULE_PARM_DESC(mem, "Size of frame buffer memory in MB (1, 2, 4 MB, default=autodetect)");
-MODULE_PARM(vgapass, "i");
+module_param(vgapass, bool, 0);
 MODULE_PARM_DESC(vgapass, "Enable VGA PassThrough mode (0 or 1) (default=0)");
-MODULE_PARM(clipping , "i");
+module_param(clipping, bool, 0);
 MODULE_PARM_DESC(clipping, "Enable clipping (slower, safer) (0 or 1) (default=1)");
-MODULE_PARM(gfxclk , "i");
+module_param(gfxclk, int, 0);
 MODULE_PARM_DESC(gfxclk, "Force graphic chip frequency in MHz. DANGEROUS. (default=auto)");
-MODULE_PARM(slowpci, "i");
+module_param(slowpci, bool, 0);
 MODULE_PARM_DESC(slowpci, "Uses slow PCI settings (0 or 1) (default=0)");
 

@@ -388,11 +388,11 @@ static void sv11_shutdown(struct sv11_device *dev)
 static int io=0x200;
 static int irq=9;
 
-MODULE_PARM(io,"i");
+module_param(io, int, 0);
 MODULE_PARM_DESC(io, "The I/O base of the Comtrol Hostess SV11 card");
-MODULE_PARM(dma,"i");
+module_param(dma, int, 0);
 MODULE_PARM_DESC(dma, "Set this to 1 to use DMA1/DMA3 for TX/RX");
-MODULE_PARM(irq,"i");
+module_param(irq, int, 0);
 MODULE_PARM_DESC(irq, "The interrupt line setting for the Comtrol Hostess SV11 card");
 
 MODULE_AUTHOR("Alan Cox");

@@ -305,17 +305,17 @@ MODULE_AUTHOR("Dr. Henrik Seidel");
 MODULE_DESCRIPTION("A driver for the Typhoon radio card (a.k.a. EcoRadio).");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(io, "i");
-MODULE_PARM_DESC(io, "I/O address of the Typhoon card (0x316 or 0x336)");
-MODULE_PARM(mutefreq, "i");
-MODULE_PARM_DESC(mutefreq, "Frequency used when muting the card (in kHz)");
-MODULE_PARM(radio_nr, "i");
-
 static int io = -1;
 static int radio_nr = -1;
 
+module_param(io, int, 0);
+MODULE_PARM_DESC(io, "I/O address of the Typhoon card (0x316 or 0x336)");
+module_param(radio_nr, int, 0);
+
 #ifdef MODULE
 static unsigned long mutefreq = 0;
+module_param(mutefreq, int, 0);
+MODULE_PARM_DESC(mutefreq, "Frequency used when muting the card (in kHz)");
 #endif
 
 static int __init typhoon_init(void)

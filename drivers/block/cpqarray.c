@@ -310,7 +310,7 @@ static int ida_proc_get_info(char *buffer, char **start, off_t offset, int lengt
 }
 #endif /* CONFIG_PROC_FS */
 
-MODULE_PARM(eisa, "1-8i");
+module_param_array(eisa, int, NULL, 0);
 
 /* This is a bit of a hack,
  * necessary to support both eisa and pci

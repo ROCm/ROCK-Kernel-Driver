@@ -111,7 +111,7 @@ static void start_adc(struct cs4281_state *s);
 // rather than 64k as some of the games work more responsively.
 // log base 2( buff sz = 32k).
 static unsigned long defaultorder = 3;
-MODULE_PARM(defaultorder, "i");
+module_param(defaultorder, ulong, 0);
 
 //
 // Turn on/off debugging compilation by commenting out "#define CSDEBUG"
@@ -159,8 +159,8 @@ MODULE_PARM(defaultorder, "i");
 #if CSDEBUG
 static unsigned long cs_debuglevel = 1;	// levels range from 1-9
 static unsigned long cs_debugmask = CS_INIT | CS_ERROR;	// use CS_DBGOUT with various mask values
-MODULE_PARM(cs_debuglevel, "i");
-MODULE_PARM(cs_debugmask, "i");
+module_param(cs_debuglevel, ulong, 0);
+module_param(cs_debugmask, ulong, 0);
 #endif
 #define CS_TRUE 	1
 #define CS_FALSE 	0

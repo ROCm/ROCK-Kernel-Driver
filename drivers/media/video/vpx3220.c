@@ -41,7 +41,7 @@
 #define VPX3220_DEBUG	KERN_DEBUG "vpx3220: "
 
 static int debug = 0;
-MODULE_PARM(debug, "i");
+module_param(debug, int, 0);
 MODULE_PARM_DESC(debug, "Debug level (0-1)");
 
 #define dprintk(num, format, args...) \

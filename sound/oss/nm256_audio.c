@@ -1680,10 +1680,10 @@ struct pci_driver nm256_pci_driver = {
 	.remove		= nm256_remove,
 };
 
-MODULE_PARM (usecache, "i");
-MODULE_PARM (buffertop, "i");
-MODULE_PARM (nm256_debug, "i");
-MODULE_PARM (force_load, "i");
+module_param(usecache, bool, 0);
+module_param(buffertop, int, 0);
+module_param(nm256_debug, bool, 0644);
+module_param(force_load, bool, 0);
 
 static int __init do_init_nm256(void)
 {

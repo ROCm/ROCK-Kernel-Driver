@@ -150,7 +150,7 @@ MODULE_AUTHOR("Richard Hirst");
 MODULE_DESCRIPTION("i82596 driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(i596_debug, "i");
+module_param(i596_debug, int, 0);
 MODULE_PARM_DESC(i596_debug, "i82596 debug mask");
 
 
@@ -1572,13 +1572,13 @@ static void set_multicast_list(struct net_device *dev)
 static struct net_device *dev_82596;
 
 #ifdef ENABLE_APRICOT
-MODULE_PARM(irq, "i");
+module_param(irq, int, 0);
 MODULE_PARM_DESC(irq, "Apricot IRQ number");
 #endif
 
-MODULE_PARM(debug, "i");
-MODULE_PARM_DESC(debug, "i82596 debug mask");
 static int debug = -1;
+module_param(debug, int, 0);
+MODULE_PARM_DESC(debug, "i82596 debug mask");
 
 int init_module(void)
 {

@@ -285,7 +285,7 @@ static int ixjdebug;
 static int hertz = HZ;
 static int samplerate = 100;
 
-MODULE_PARM(ixjdebug, "i");
+module_param(ixjdebug, int, 0);
 
 /************************************************************************
 *
@@ -7612,8 +7612,8 @@ static int xio[IXJMAX + 1] =
 	0,
 };
 
-MODULE_PARM(dspio, "1-" __MODULE_STRING(IXJMAX) "i");
-MODULE_PARM(xio, "1-" __MODULE_STRING(IXJMAX) "i");
+module_param_array(dspio, int, NULL, 0);
+module_param_array(xio, int, NULL, 0);
 MODULE_DESCRIPTION("Quicknet VoIP Telephony card module - www.quicknet.net");
 MODULE_AUTHOR("Ed Okerson <eokerson@quicknet.net>");
 MODULE_LICENSE("GPL");

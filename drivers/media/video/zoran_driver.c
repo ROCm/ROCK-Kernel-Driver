@@ -205,7 +205,7 @@ extern int jpg_bufsize;
 extern int pass_through;
 
 static int lock_norm = 0;	/* 1=Don't change TV standard (norm) */
-MODULE_PARM(lock_norm, "i");
+module_param(lock_norm, int, 0);
 MODULE_PARM_DESC(lock_norm, "Users can't change norm");
 
 #ifdef HAVE_V4L2

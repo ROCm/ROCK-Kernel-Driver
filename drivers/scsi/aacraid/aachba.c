@@ -146,17 +146,17 @@ static char *aac_get_status_string(u32 status);
  *	Non dasd selection is handled entirely in aachba now
  */	
  
-MODULE_PARM(nondasd, "i");
-MODULE_PARM_DESC(nondasd, "Control scanning of hba for nondasd devices. 0=off, 1=on");
-MODULE_PARM(dacmode, "i");
-MODULE_PARM_DESC(dacmode, "Control whether dma addressing is using 64 bit DAC. 0=off, 1=on");
-MODULE_PARM(commit, "i");
-MODULE_PARM_DESC(commit, "Control whether a COMMIT_CONFIG is issued to the adapter for foreign arrays.\nThis is typically needed in systems that do not have a BIOS. 0=off, 1=on");
-
 static int nondasd = -1;
 static int dacmode = -1;
 
 static int commit = -1;
+
+module_param(nondasd, int, 0);
+MODULE_PARM_DESC(nondasd, "Control scanning of hba for nondasd devices. 0=off, 1=on");
+module_param(dacmode, int, 0);
+MODULE_PARM_DESC(dacmode, "Control whether dma addressing is using 64 bit DAC. 0=off, 1=on");
+module_param(commit, int, 0);
+MODULE_PARM_DESC(commit, "Control whether a COMMIT_CONFIG is issued to the adapter for foreign arrays.\nThis is typically needed in systems that do not have a BIOS. 0=off, 1=on");
 
 /**
  *	aac_get_config_status	-	check the adapter configuration

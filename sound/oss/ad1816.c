@@ -1215,16 +1215,16 @@ static int __initdata dma2 = -1;
 /* use isapnp for configuration */
 static int isapnp	= 1;
 static int isapnpjump;
-MODULE_PARM(isapnp, "i");
-MODULE_PARM(isapnpjump, "i");
+module_param(isapnp, bool, 0);
+module_param(isapnpjump, int, 0);
 #endif
 
-MODULE_PARM(io,"i");
-MODULE_PARM(irq,"i");
-MODULE_PARM(dma,"i");
-MODULE_PARM(dma2,"i");
-MODULE_PARM(ad1816_clockfreq,"i");
-MODULE_PARM(options,"i");
+module_param(io, int, 0);
+module_param(irq, int, 0);
+module_param(dma, int, 0);
+module_param(dma2, int, 0);
+module_param(ad1816_clockfreq, int, 0);
+module_param(options, int, 0);
 
 #ifdef __ISAPNP__
 static struct {

@@ -64,9 +64,9 @@ static int irq_list[4] = { -1 };
  * don't have any CIS entry for it. This workaround it... */
 static int ignore_cis_vcc; /* = 0 */
 
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-4i");
-MODULE_PARM(ignore_cis_vcc, "i");
+module_param(irq_mask, int, 0);
+module_param_array(irq_list, int, NULL, 0);
+module_param(ignore_cis_vcc, int, 0);
 
 /********************************************************************/
 /* Magic constants						    */

@@ -82,9 +82,9 @@ static unsigned int maxpoll=250;   /* Maximum busy-loop count for qcam I/O */
 static unsigned int yieldlines=4;  /* Yield after this many during capture */
 static int video_nr = -1;
 
-MODULE_PARM(maxpoll,"i");
-MODULE_PARM(yieldlines,"i");   
-MODULE_PARM(video_nr,"i");
+module_param(maxpoll, int, 0);
+module_param(yieldlines, int, 0);
+module_param(video_nr, int, 0);
 
 static inline int read_lpstatus(struct qcam_device *q)
 {
@@ -946,7 +946,7 @@ static void close_bwqcam(struct qcam_device *qcam)
  *       -- March 14, 1999  Billy Donahue <billy@escape.com> */
 #ifdef MODULE
 static char *parport[MAX_CAMS] = { NULL, };
-MODULE_PARM(parport, "1-" __MODULE_STRING(MAX_CAMS) "s");
+module_param_array(parport, charp, NULL, 0);
 #endif
 
 static int accept_bwqcam(struct parport *port)

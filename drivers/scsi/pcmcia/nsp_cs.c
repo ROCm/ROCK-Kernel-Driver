@@ -73,20 +73,20 @@ MODULE_LICENSE("GPL");
 /* Parameters that can be set with 'insmod' */
 
 static unsigned int irq_mask = 0xffff;
-MODULE_PARM     (irq_mask, "i");
+module_param(irq_mask, int, 0);
 MODULE_PARM_DESC(irq_mask, "IRQ mask bits (default: 0xffff)");
 
 static int       irq_list[4] = { -1 };
-MODULE_PARM     (irq_list, "1-4i");
+module_param_array(irq_list, int, NULL, 0);
 MODULE_PARM_DESC(irq_list, "Use specified IRQ number. (default: auto select)");
 
 static int       nsp_burst_mode = BURST_MEM32;
-MODULE_PARM     (nsp_burst_mode, "i");
+module_param(nsp_burst_mode, int, 0);
 MODULE_PARM_DESC(nsp_burst_mode, "Burst transfer mode (0=io8, 1=io32, 2=mem32(default))");
 
 /* Release IO ports after configuration? */
 static int       free_ports = 0;
-MODULE_PARM     (free_ports, "i");
+module_param(free_ports, bool, 0);
 MODULE_PARM_DESC(free_ports, "Release IO ports after configuration? (default: 0 (=no))");
 
 /* /usr/src/linux/drivers/scsi/hosts.h */

@@ -200,16 +200,16 @@ int osrun_time = 10;       /* time in seconds we wait for the OS to
 			      start running.
 			   */
 
-MODULE_PARM(wf_raw,"i");
-MODULE_PARM(fx_raw,"i");
-MODULE_PARM(debug_default,"i");
-MODULE_PARM(wait_polls,"i");
-MODULE_PARM(sleep_length,"i");
-MODULE_PARM(sleep_tries,"i");
-MODULE_PARM(ospath,"s");
-MODULE_PARM(reset_time,"i");
-MODULE_PARM(ramcheck_time,"i");
-MODULE_PARM(osrun_time,"i");
+module_param(wf_raw, int, 0);
+module_param(fx_raw, int, 0);
+module_param(debug_default, int, 0);
+module_param(wait_polls, int, 0);
+module_param(sleep_length, int, 0);
+module_param(sleep_tries, int, 0);
+module_param(ospath, charp, 0);
+module_param(reset_time, int, 0);
+module_param(ramcheck_time, int, 0);
+module_param(osrun_time, int, 0);
 
 /***************************************************************************/
 
@@ -3490,8 +3490,8 @@ static int irq = -1;
 MODULE_AUTHOR      ("Paul Barton-Davis <pbd@op.net>");
 MODULE_DESCRIPTION ("Turtle Beach WaveFront Linux Driver");
 MODULE_LICENSE("GPL");
-MODULE_PARM        (io,"i");
-MODULE_PARM        (irq,"i");
+module_param       (io, int, 0);
+module_param       (irq, int, 0);
 
 static int __init init_wavfront (void)
 {

@@ -79,8 +79,8 @@ static int	mda_last_vc  = 16;
 
 static struct vc_data	*mda_display_fg = NULL;
 
-MODULE_PARM(mda_first_vc, "1-255i");
-MODULE_PARM(mda_last_vc,  "1-255i");
+module_param(mda_first_vc, int, 0);
+module_param(mda_last_vc, int, 0);
 
 /* MDA register values
  */

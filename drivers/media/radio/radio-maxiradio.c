@@ -57,7 +57,7 @@
 static const int clk = 1, data = 2, wren = 4, mo_st = 8, power = 16 ;
 
 static int radio_nr = -1;
-MODULE_PARM(radio_nr, "i");
+module_param(radio_nr, int, 0);
 
 
 #define FREQ_LO		 50*16000

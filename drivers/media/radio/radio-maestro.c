@@ -62,7 +62,7 @@
 #define BITS2FREQ(x)	((x) * FREQ_STEP - FREQ_IF)
 
 static int radio_nr = -1;
-MODULE_PARM(radio_nr, "i");
+module_param(radio_nr, int, 0);
 
 static int radio_ioctl(struct inode *inode, struct file *file,
 		       unsigned int cmd, unsigned long arg);

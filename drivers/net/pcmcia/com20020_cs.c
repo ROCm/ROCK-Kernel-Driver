@@ -57,7 +57,7 @@
 #ifdef PCMCIA_DEBUG
 
 static int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
+module_param(pc_debug, int, 0);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 
 static void regdump(struct net_device *dev)
@@ -109,18 +109,18 @@ static int backplane;
 static int clockp;
 static int clockm;
 
-MODULE_PARM(node, "i");
-MODULE_PARM(timeout, "i");
-MODULE_PARM(backplane, "i");
-MODULE_PARM(clockp, "i");
-MODULE_PARM(clockm, "i");
+module_param(node, int, 0);
+module_param(timeout, int, 0);
+module_param(backplane, int, 0);
+module_param(clockp, int, 0);
+module_param(clockm, int, 0);
 
 /* Bit map of interrupts to choose from */
 static u_int irq_mask = 0xdeb8;
 static int irq_list[4] = { -1 };
 
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-4i");
+module_param(irq_mask, int, 0);
+module_param_array(irq_list, int, NULL, 0);
 MODULE_LICENSE("GPL");
 
 /*====================================================================*/

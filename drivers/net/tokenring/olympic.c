@@ -150,17 +150,17 @@ MODULE_DESCRIPTION("Olympic PCI/Cardbus Chipset Driver") ;
  */
 
 static int ringspeed[OLYMPIC_MAX_ADAPTERS] = {0,} ;
-MODULE_PARM(ringspeed, "1-" __MODULE_STRING(OLYMPIC_MAX_ADAPTERS) "i");
+module_param_array(ringspeed, int, NULL, 0);
 
 /* Packet buffer size */
 
 static int pkt_buf_sz[OLYMPIC_MAX_ADAPTERS] = {0,} ;
-MODULE_PARM(pkt_buf_sz, "1-" __MODULE_STRING(OLYMPIC_MAX_ADAPTERS) "i") ; 
+module_param_array(pkt_buf_sz, int, NULL, 0) ;
 
 /* Message Level */
 
 static int message_level[OLYMPIC_MAX_ADAPTERS] = {0,} ; 
-MODULE_PARM(message_level, "1-" __MODULE_STRING(OLYMPIC_MAX_ADAPTERS) "i") ; 
+module_param_array(message_level, int, NULL, 0) ;
 
 /* Change network_monitor to receive mac frames through the arb channel.
  * Will also create a /proc/net/olympic_tr%d entry, where %d is the tr
@@ -169,7 +169,7 @@ MODULE_PARM(message_level, "1-" __MODULE_STRING(OLYMPIC_MAX_ADAPTERS) "i") ;
  * i.e. it will give you the source address of beaconers on the ring 
  */
 static int network_monitor[OLYMPIC_MAX_ADAPTERS] = {0,};
-MODULE_PARM(network_monitor, "1-" __MODULE_STRING(OLYMPIC_MAX_ADAPTERS) "i");
+module_param_array(network_monitor, int, NULL, 0);
 
 static struct pci_device_id olympic_pci_tbl[] = {
 	{PCI_VENDOR_ID_IBM,PCI_DEVICE_ID_IBM_TR_WAKE,PCI_ANY_ID,PCI_ANY_ID,},

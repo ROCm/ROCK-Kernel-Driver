@@ -29,19 +29,19 @@ MODULE_LICENSE("GPL");
 /* Set this to one if you want to partition the flash */
 #define PARTITION 1
 
-MODULE_PARM(probe, "i");
-MODULE_PARM_DESC(probe, "Probe for a BIOS mapping");
-MODULE_PARM(size, "i");
-MODULE_PARM_DESC(size, "Size of the flash mapping");
-MODULE_PARM(width, "i");
-MODULE_PARM_DESC(width, "Data width of the flash mapping (8/16)");
-MODULE_PARM(flashtype, "s");
-MODULE_PARM_DESC(flashtype, "Type of MTD probe to do");
-
 static int probe = 0;		/* Don't autoprobe */
 static unsigned size = 0x1000000; /* 16 MiB the whole ISA address space */
 static unsigned width = 8;	/* Default to 8 bits wide */
 static char *flashtype = "cfi_probe";
+
+module_param(probe, int, 0);
+MODULE_PARM_DESC(probe, "Probe for a BIOS mapping");
+module_param(size, int, 0);
+MODULE_PARM_DESC(size, "Size of the flash mapping");
+module_param(width, int, 0);
+MODULE_PARM_DESC(width, "Data width of the flash mapping (8/16)");
+module_param(flashtype, charp, 0);
+MODULE_PARM_DESC(flashtype, "Type of MTD probe to do");
 
 static struct resource docmem = {
 	.flags = IORESOURCE_MEM,
