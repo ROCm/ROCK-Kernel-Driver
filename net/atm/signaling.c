@@ -31,7 +31,9 @@
 
 
 struct atm_vcc *sigd = NULL;
+#ifdef WAIT_FOR_DEMON
 static DECLARE_WAIT_QUEUE_HEAD(sigd_sleep);
+#endif
 
 
 static void sigd_put_skb(struct sk_buff *skb)
@@ -255,6 +257,8 @@ int sigd_attach(struct atm_vcc *vcc)
 	vcc_insert_socket(vcc->sk);
 	set_bit(ATM_VF_META,&vcc->flags);
 	set_bit(ATM_VF_READY,&vcc->flags);
+#ifdef WAIT_FOR_DEMON
 	wake_up(&sigd_sleep);
+#endif
 	return 0;
 }
