@@ -38,6 +38,8 @@
 #define __LC_IO_INT_WORD                0x0C0
 #define __LC_MCCK_CODE                  0x0E8
 
+#define __LC_DIAG44_OPCODE		0x214
+
 #define __LC_SAVE_AREA                  0xC00
 #define __LC_KERNEL_STACK               0xD40
 #define __LC_ASYNC_STACK                0xD48
@@ -146,7 +148,8 @@ struct _lowcore
 	psw_t        io_new_psw;               /* 0x1f0 */
         psw_t        return_psw;               /* 0x200 */
 	__u32        sync_io_word;             /* 0x210 */
-        __u8         pad8[0xc00-0x214];        /* 0x214 */
+	__u32        diag44_opcode;            /* 0x214 */
+        __u8         pad8[0xc00-0x218];        /* 0x218 */
         /* System info area */
 	__u64        save_area[16];            /* 0xc00 */
         __u8         pad9[0xd40-0xc80];        /* 0xc80 */

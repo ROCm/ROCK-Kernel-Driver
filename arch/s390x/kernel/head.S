@@ -555,6 +555,17 @@ startup:basr  %r13,0                     # get base
 	oi     7(%r12),16               # set MVPG flag
 0:
 
+#
+# find out if the diag 0x44 works in 64 bit mode
+#
+	la     %r1,0f-.LPG1(%r13)	# set program check address
+	stg    %r1,__LC_PGM_NEW_PSW+8
+	mvc    __LC_DIAG44_OPCODE(8),.Lnop-.LPG1(%r13)
+	diag   0,0,0x44			# test diag 0x44
+	oi     7(%r12),32		# set diag44 flag
+	mvc    __LC_DIAG44_OPCODE(8),.Ldiag44-.LPG1(%r13)
+0:	
+
         lpswe .Lentry-.LPG1(13)         # jump to _stext in primary-space,
                                         # virtual and never return ...
         .align 16
@@ -578,6 +589,8 @@ startup:basr  %r13,0                     # get base
 .Lpcmsk:.quad  0x0000000180000000
 .L4malign:.quad 0xffffffffffc00000
 .Lscan2g:.quad 0x80000000 + 0x20000 - 8 # 2GB + 128K - 8
+.Lnop:	.long  0x07000700
+.Ldiag44:.long 0x83000044
 
 	.org PARMAREA-64
 .Lduct:	.long 0,0,0,0,0,0,0,0
