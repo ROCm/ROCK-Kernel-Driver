@@ -44,6 +44,19 @@
 #define RPC_MAX_UDP_TIMEOUT	(60*HZ)
 #define RPC_MAX_TCP_TIMEOUT	(600*HZ)
 
+/*
+ * Wait duration for an RPC TCP connection to be established.  Solaris
+ * NFS over TCP uses 60 seconds, for example, which is in line with how
+ * long a server takes to reboot.
+ */
+#define RPC_CONNECT_TIMEOUT	(60*HZ)
+
+/*
+ * Delay an arbitrary number of seconds before attempting to reconnect
+ * after an error.
+ */
+#define RPC_REESTABLISH_TIMEOUT	(15*HZ)
+
 /* RPC call and reply header size as number of 32bit words (verifier
  * size computed separately)
  */

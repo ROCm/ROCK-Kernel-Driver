@@ -565,7 +565,7 @@ call_bind(struct rpc_task *task)
 
 	if (!clnt->cl_port) {
 		task->tk_action = call_reconnect;
-		task->tk_timeout = clnt->cl_timeout.to_maxval;
+		task->tk_timeout = RPC_CONNECT_TIMEOUT;
 		rpc_getport(task, clnt);
 	}
 }
@@ -638,7 +638,6 @@ static void
 call_status(struct rpc_task *task)
 {
 	struct rpc_clnt	*clnt = task->tk_client;
-	struct rpc_xprt *xprt = clnt->cl_xprt;
 	struct rpc_rqst	*req = task->tk_rqstp;
 	int		status;
 
@@ -661,30 +660,23 @@ call_status(struct rpc_task *task)
 		break;
 	case -ECONNREFUSED:
 	case -ENOTCONN:
-		req->rq_bytes_sent = 0;
-		if (clnt->cl_autobind || !clnt->cl_port) {
+		if (clnt->cl_autobind)
 			clnt->cl_port = 0;
-			task->tk_action = call_bind;
-			break;
-		}
-		if (xprt->stream) {
-			task->tk_action = call_reconnect;
-			break;
-		}
-		/*
-		 * Sleep and dream of an open connection
-		 */
-		task->tk_timeout = 5 * HZ;
-		rpc_sleep_on(&xprt->sending, task, NULL, NULL);
-	case -ENOMEM:
+		task->tk_action = call_bind;
+		break;
 	case -EAGAIN:
 		task->tk_action = call_transmit;
+		break;
+	case -EIO:
+		/* shutdown or soft timeout */
+		rpc_exit(task, status);
 		break;
 	default:
 		if (clnt->cl_chatty)
 			printk("%s: RPC call returned error %d\n",
 			       clnt->cl_protname, -status);
 		rpc_exit(task, status);
+		break;
 	}
 }
 
