@@ -2153,8 +2153,6 @@ void vt_console_print(struct console *co, const char *b, unsigned count)
 	if (!printable || test_and_set_bit(0, &printing))
 		return;
 
-	pm_access(pm_con);
-
 	if (kmsg_redirect && vc_cons_allocated(kmsg_redirect - 1))
 		currcons = kmsg_redirect - 1;
 
@@ -2353,7 +2351,6 @@ static int con_write(struct tty_struct *tty, const unsigned char *buf, int count
 {
 	int	retval;
 
-	pm_access(pm_con);
 	retval = do_con_write(tty, buf, count);
 	con_flush_chars(tty);
 
@@ -2364,7 +2361,6 @@ static void con_put_char(struct tty_struct *tty, unsigned char ch)
 {
 	if (in_interrupt())
 		return;	/* n_r3964 calls put_char() from interrupt context */
-	pm_access(pm_con);
 	do_con_write(tty, &ch, 1);
 }
 
@@ -2433,8 +2429,6 @@ static void con_flush_chars(struct tty_struct *tty)
 	if (in_interrupt())	/* from flush_to_ldisc */
 		return;
 
-	pm_access(pm_con);
-	
 	/* if we race with con_close(), vt may be null */
 	acquire_console_sem();
 	vt = tty->driver_data;

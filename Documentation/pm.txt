@@ -36,8 +36,8 @@ system the associated daemon will exit gracefully.
   apmd:   http://worldvisions.ca/~apenwarr/apmd/
   acpid:  http://acpid.sf.net/
 
-Driver Interface
-----------------
+Driver Interface -- OBSOLETE, DO NOT USE!
+----------------*************************
 If you are writing a new driver or maintaining an old driver, it
 should include power management support.  Without power management
 support, a single driver may prevent a system with power management
@@ -262,8 +262,8 @@ Q: Who do I contact for additional information about
 
 ACPI Development mailing list: acpi-devel@lists.sourceforge.net
 
-System Interface
-----------------
+System Interface -- OBSOLETE, DO NOT USE!
+----------------*************************
 If you are providing new power management support to Linux (ie.
 adding support for something like APM or ACPI), you should
 communicate with drivers through the existing generic power
