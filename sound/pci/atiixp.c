@@ -1332,6 +1332,12 @@ static irqreturn_t snd_atiixp_interrupt(int irq, void *dev_id, struct pt_regs *r
  */
 
 static struct ac97_quirk ac97_quirks[] __devinitdata = {
+	{
+		.vendor = 0x103c,
+		.device = 0x006b,
+		.name = "HP Pavilion ZV5030US",
+		.type = AC97_TUNE_MUTE_LED
+	},
 	{ } /* terminator */
 };
 
