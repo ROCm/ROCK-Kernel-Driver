@@ -2940,9 +2940,6 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	dev->set_multicast_list = gem_set_multicast;
 	dev->do_ioctl = gem_ioctl;
 	dev->poll = gem_poll;
-#ifdef CONFIG_NET_POLL_CONTROLLER
-	dev->poll_controller = gem_netpoll;
-#endif
 	dev->weight = 64;
 	dev->ethtool_ops = &gem_ethtool_ops;
 	dev->tx_timeout = gem_tx_timeout;
@@ -2950,6 +2947,9 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	dev->change_mtu = gem_change_mtu;
 	dev->irq = pdev->irq;
 	dev->dma = 0;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = gem_poll_controller;
+#endif
 
 	if (register_netdev(dev)) {
 		printk(KERN_ERR PFX "Cannot register net device, "
