@@ -30,6 +30,7 @@
  *                            use module_param
  *                            made timeout (the emulated heartbeat) a module_param
  *                            made the keepalive ping an internal subroutine
+ *                            made wdt_stop and wdt_start module params
  *                            added MODULE_AUTHOR and MODULE_DESCRIPTION info
  *
  *
@@ -66,8 +67,13 @@
  * You must set these - The driver cannot probe for the settings
  */
 
-#define WDT_STOP 0x45
-#define WDT_START 0x443
+static int wdt_stop = 0x45;
+module_param(wdt_stop, int, 0);
+MODULE_PARM_DESC(wdt_stop, "SBC60xx WDT 'stop' io port (default 0x45)");
+
+static int wdt_start = 0x443;
+module_param(wdt_start, int, 0);
+MODULE_PARM_DESC(wdt_start, "SBC60xx WDT 'start' io port (default 0x443)");
 
 /*
  * The 60xx board can use watchdog timeout values from one second
@@ -117,8 +123,8 @@ static void wdt_timer_ping(unsigned long data)
 	 */
 	if(time_before(jiffies, next_heartbeat))
 	{
-		/* Ping the WDT by reading from WDT_START */
-		inb_p(WDT_START);
+		/* Ping the WDT by reading from wdt_start */
+		inb_p(wdt_start);
 		/* Re-set the timer interval */
 		timer.expires = jiffies + WDT_INTERVAL;
 		add_timer(&timer);
@@ -145,7 +151,7 @@ static void wdt_turnoff(void)
 {
 	/* Stop the timer */
 	del_timer(&timer);
-	inb_p(WDT_STOP);
+	inb_p(wdt_stop);
 	printk(KERN_INFO PFX "Watchdog timer is now disabled...\n");
 }
 
@@ -327,19 +333,24 @@ static void __exit sbc60xxwdt_unload(void)
 	misc_deregister(&wdt_miscdev);
 
 	unregister_reboot_notifier(&wdt_notifier);
-	release_region(WDT_START,1);
-//	release_region(WDT_STOP,1);
+	if ((wdt_stop != 0x45) && (wdt_stop != wdt_start))
+		release_region(wdt_stop,1);
+	release_region(wdt_start,1);
 }
 
 static int __init sbc60xxwdt_init(void)
 {
 	int rc = -EBUSY;
 
-//	We cannot reserve 0x45 - the kernel already has!
-//	if (!request_region(WDT_STOP, 1, "SBC 60XX WDT"))
-//		goto err_out;
-	if (!request_region(WDT_START, 1, "SBC 60XX WDT"))
-		goto err_out_region1;
+	if (!request_region(wdt_start, 1, "SBC 60XX WDT"))
+		goto err_out;
+
+	/* We cannot reserve 0x45 - the kernel already has! */
+	if ((wdt_stop != 0x45) && (wdt_stop != wdt_start))
+	{
+		if (!request_region(wdt_stop, 1, "SBC 60XX WDT"))
+			goto err_out_region1;
+	}
 
 	if(timeout < 1 || timeout > 3600) /* arbitrary upper limit */
 	{
@@ -367,10 +378,11 @@ static int __init sbc60xxwdt_init(void)
 err_out_miscdev:
 	misc_deregister(&wdt_miscdev);
 err_out_region2:
-	release_region(WDT_START,1);
+	if ((wdt_stop != 0x45) && (wdt_stop != wdt_start))
+		release_region(wdt_stop,1);
 err_out_region1:
-	release_region(WDT_STOP,1);
-/* err_out: */
+	release_region(wdt_start,1);
+err_out:
 	return rc;
 }
 
