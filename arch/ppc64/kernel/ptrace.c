@@ -313,10 +313,10 @@ void do_syscall_trace_enter(struct pt_regs *regs)
 		do_syscall_trace();
 }
 
-void do_syscall_trace_leave(void)
+void do_syscall_trace_leave(struct pt_regs *regs)
 {
 	if (unlikely(current->audit_context))
-		audit_syscall_exit(current, 0);	/* FIXME: pass pt_regs */
+		audit_syscall_exit(current, regs->result);
 
 	if ((test_thread_flag(TIF_SYSCALL_TRACE)
 	     || test_thread_flag(TIF_SINGLESTEP))

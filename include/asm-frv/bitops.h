@@ -178,9 +178,9 @@ extern int find_next_bit(const unsigned long *addr, int size, int offset);
 #define find_first_zero_bit(addr, size) \
         find_next_zero_bit((addr), (size), 0)
 
-static inline int find_next_zero_bit (void * addr, int size, int offset)
+static inline int find_next_zero_bit(const void *addr, int size, int offset)
 {
-	unsigned long *p = ((unsigned long *) addr) + (offset >> 5);
+	const unsigned long *p = ((const unsigned long *) addr) + (offset >> 5);
 	unsigned long result = offset & ~31UL;
 	unsigned long tmp;
 
@@ -277,11 +277,11 @@ static inline int ext2_test_bit(int nr, const volatile void * addr)
 #define ext2_find_first_zero_bit(addr, size) \
         ext2_find_next_zero_bit((addr), (size), 0)
 
-static inline unsigned long ext2_find_next_zero_bit(void *addr,
+static inline unsigned long ext2_find_next_zero_bit(const void *addr,
 						    unsigned long size,
 						    unsigned long offset)
 {
-	unsigned long *p = ((unsigned long *) addr) + (offset >> 5);
+	const unsigned long *p = ((const unsigned long *) addr) + (offset >> 5);
 	unsigned long result = offset & ~31UL;
 	unsigned long tmp;
 

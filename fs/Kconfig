@@ -1338,7 +1338,7 @@ config NFS_FS
 	depends on INET
 	select LOCKD
 	select SUNRPC
-	select NFS_ACL_SUPPORT if NFS_ACL
+	select NFS_ACL_SUPPORT if NFSD_ACL
 	help
 	  If you are connected to some other (usually local) Unix computer
 	  (using SLIP, PLIP, PPP or Ethernet) and want to mount files residing
@@ -1380,17 +1380,6 @@ config NFS_V3
 	  3 of the NFS protocol.
 
 	  If unsure, say Y.
-
-config NFS_ACL
-	bool "NFS_ACL protocol extension"
-	depends on NFS_V3
-	select QSORT
-	help
-	  Implement the NFS_ACL protocol extension for manipulating POSIX
-	  Access Control Lists.  The server must also implement the NFS_ACL
-	  protocol extension; see the CONFIG_NFSD_ACL option.
-
-	  If unsure, say N.
 
 config NFS_V4
 	bool "Provide NFSv4 client support (EXPERIMENTAL)"
@@ -1434,7 +1423,8 @@ config NFSD
 	depends on INET
 	select LOCKD
 	select SUNRPC
-	select NFS_ACL_SUPPORT if NFSD_ACL
+	select EXPORTFS
+	select NFS_ACL_SUPPORT if NFS_ACL
 	help
 	  If you want your Linux box to act as an NFS *server*, so that other
 	  computers on your local network which support NFS can access certain
@@ -1477,6 +1467,17 @@ config NFSD_ACL
 
 config NFS_ACL_SUPPORT
 	tristate
+
+config NFS_ACL
+	bool "NFS_ACL protocol extension"
+	depends on NFS_V3
+	select QSORT
+	help
+	  Implement the NFS_ACL protocol extension for manipulating POSIX
+	  Access Control Lists.  The server must also implement the NFS_ACL
+	  protocol extension; see the CONFIG_NFSD_ACL option.
+
+	  If unsure, say N.
 
 config NFSD_V4
 	bool "Provide NFSv4 server support (EXPERIMENTAL)"
@@ -1525,7 +1526,6 @@ config LOCKD_V4
 
 config EXPORTFS
 	tristate
-	default NFSD
 
 config SUNRPC
 	tristate

@@ -1811,7 +1811,8 @@ D: CYPRESS CY82C693 chipset IDE, Digital's PC-Alpha 164SX boards
 
 N: Greg Kroah-Hartman
 E: greg@kroah.com
-W: http://www.kroah.com/linux-usb/
+E: gregkh@suse.de
+W: http://www.kroah.com/linux/
 D: USB Serial Converter driver framework, USB Handspring Visor driver
 D: ConnectTech WHITEHeat USB driver, Generic USB Serial driver
 D: USB I/O Edgeport driver, USB Serial IrDA driver
@@ -1819,6 +1820,7 @@ D: USB Bluetooth driver, USB Skeleton driver
 D: bits and pieces of USB core code.
 D: PCI Hotplug core, PCI Hotplug Compaq driver modifications
 D: portions of the Linux Security Module (LSM) framework
+D: parts of the driver core, debugfs.
 
 N: Russell Kroll
 E: rkroll@exploits.org
@@ -2023,12 +2025,14 @@ D: GCC + libraries hacker
 
 N: Michal Ludvig
 E: michal@logix.cz
+E: michal.ludvig@asterisk.co.nz
 W: http://www.logix.cz/michal
 P: 1024D/C45B2218 1162 6471 D391 76E0 9F99  29DA 0C3A 2509 C45B 2218
 D: VIA PadLock driver
 D: Netfilter pkttype module
-S: Prague 4
-S: Czech Republic
+S: Asterisk Ltd.
+S: Auckland
+S: New Zealand
 
 N: Tuomas J. Lukka
 E: Tuomas.Lukka@Helsinki.FI

@@ -556,7 +556,7 @@ static int mxser_initbrd(int board, struct mxser_hwconf *hwconf)
 	info = &mxvar_table[n];
 	/*if (verbose) */  {
 		printk(KERN_DEBUG "        ttyM%d - ttyM%d ", n, n + hwconf->ports - 1);
-		printk(KERN_DEBUG " max. baud rate = %d bps.\n", hwconf->MaxCanSetBaudRate[0]);
+		printk(" max. baud rate = %d bps.\n", hwconf->MaxCanSetBaudRate[0]);
 	}
 
 	for (i = 0; i < hwconf->ports; i++, n++, info++) {
@@ -609,18 +609,12 @@ static int mxser_initbrd(int board, struct mxser_hwconf *hwconf)
 	n = board * MXSER_PORTS_PER_BOARD;
 	info = &mxvar_table[n];
 
-	spin_lock_irqsave(&info->slock, flags);
 	retval = request_irq(hwconf->irq, mxser_interrupt, IRQ_T(info), "mxser", info);
 	if (retval) {
-		spin_unlock_irqrestore(&info->slock, flags);
 		printk(KERN_ERR "Board %d: %s", board, mxser_brdname[hwconf->board_type - 1]);
 		printk("  Request irq fail,IRQ (%d) may be conflit with another device.\n", info->irq);
 		return retval;
 	}
-
-	spin_unlock_irqrestore(&info->slock, flags);
-
-
 	return 0;
 }
 
@@ -2144,10 +2138,9 @@ intr_old:
 	mxvar_log.rxcnt[info->port] += cnt;
 	info->mon_data.rxcnt += cnt;
 	info->mon_data.up_rxcnt += cnt;
-
-	tty->ldisc.receive_buf(tty, tty->flip.char_buf, tty->flip.flag_buf, count);
 	spin_unlock_irqrestore(&info->slock, flags);
-
+	
+	tty_flip_buffer_push(tty);
 }
 
 static void mxser_transmit_chars(struct mxser_struct *info)

@@ -113,7 +113,7 @@ static inline void release_thread(struct task_struct *dead_task)
 
 extern asmlinkage int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 extern asmlinkage void save_user_regs(struct user_context *target);
-extern asmlinkage void restore_user_regs(const struct user_context *target);
+extern asmlinkage void *restore_user_regs(const struct user_context *target, ...);
 
 #define copy_segments(tsk, mm)		do { } while (0)
 #define release_segments(mm)		do { } while (0)

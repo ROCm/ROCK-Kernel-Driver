@@ -514,6 +514,7 @@ do {									\
 
 unsigned long __copy_to_user_ll(void __user *to, const void *from, unsigned long n)
 {
+	BUG_ON((long) n < 0);
 #ifndef CONFIG_X86_WP_WORKS_OK
 	if (unlikely(boot_cpu_data.wp_works_ok == 0) &&
 			((unsigned long )to) < TASK_SIZE) {
@@ -573,6 +574,7 @@ survive:
 unsigned long
 __copy_from_user_ll(void *to, const void __user *from, unsigned long n)
 {
+	BUG_ON((long)n < 0);
 	if (movsl_is_ok(to, from, n))
 		__copy_user_zeroing(to, from, n);
 	else
@@ -597,6 +599,7 @@ unsigned long
 copy_to_user(void __user *to, const void *from, unsigned long n)
 {
 	might_sleep();
+	BUG_ON((long) n < 0);
 	if (access_ok(VERIFY_WRITE, to, n))
 		n = __copy_to_user(to, from, n);
 	return n;
@@ -623,6 +626,7 @@ unsigned long
 copy_from_user(void *to, const void __user *from, unsigned long n)
 {
 	might_sleep();
+	BUG_ON((long) n < 0);
 	if (access_ok(VERIFY_READ, from, n))
 		n = __copy_from_user(to, from, n);
 	else

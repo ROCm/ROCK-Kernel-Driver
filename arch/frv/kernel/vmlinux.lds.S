@@ -1,4 +1,4 @@
-/* ld script to make FRV Linux kernel -*- c -*-
+/* ld script to make FRV Linux kernel
  * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>;
  */
 OUTPUT_FORMAT("elf32-frv", "elf32-frv", "elf32-frv")
