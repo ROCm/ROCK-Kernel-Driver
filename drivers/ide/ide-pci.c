@@ -284,10 +284,11 @@ static ide_pci_device_t pci_chipsets[] __initdata = {
 	{PCI_VENDOR_ID_CYRIX, PCI_DEVICE_ID_CYRIX_5530_IDE, pci_init_cs5530, NULL, ide_init_cs5530, NULL, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, ON_BOARD, 0, ATA_F_DMA },
 #endif
 #ifdef CONFIG_BLK_DEV_AMD74XX
-	{PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_COBRA_7401, NULL, NULL, NULL, ide_dmacapable_amd74xx, {{0x40,0x01,0x01}, {0x40,0x02,0x02}}, ON_BOARD, 0, 0 },
+	{PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_COBRA_7401, pci_init_amd74xx, ata66_amd74xx, ide_init_amd74xx, ide_dmacapable_amd74xx, {{0x40,0x01,0x01}, {0x40,0x02,0x02}}, ON_BOARD, 0, 0 },
 	{PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_VIPER_7409, pci_init_amd74xx, ata66_amd74xx, ide_init_amd74xx, ide_dmacapable_amd74xx, {{0x40,0x01,0x01}, {0x40,0x02,0x02}}, ON_BOARD, 0, 0 },
 	{PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_VIPER_7411, pci_init_amd74xx, ata66_amd74xx, ide_init_amd74xx, ide_dmacapable_amd74xx, {{0x40,0x01,0x01}, {0x40,0x02,0x02}}, ON_BOARD, 0, 0 },
-	{PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_VIPER_7441, pci_init_amd74xx, ata66_amd74xx, ide_init_amd74xx, ide_dmacapable_amd74xx, {{0x40,0x01,0x01}, {0x40,0x02,0x02}}, ON_BOARD, 0, 0 },
+	{PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_OPUS_7441, pci_init_amd74xx, ata66_amd74xx, ide_init_amd74xx, ide_dmacapable_amd74xx, {{0x40,0x01,0x01}, {0x40,0x02,0x02}}, ON_BOARD, 0, 0 },
+	{PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_8111_IDE, pci_init_amd74xx, ata66_amd74xx, ide_init_amd74xx, ide_dmacapable_amd74xx, {{0x40,0x01,0x01}, {0x40,0x02,0x02}}, ON_BOARD, 0, 0 },
 #endif
 #ifdef CONFIG_BLK_DEV_PDC_ADMA
 	{PCI_VENDOR_ID_PDC, PCI_DEVICE_ID_PDC_1841, pci_init_pdcadma, ata66_pdcadma, ide_init_pdcadma, ide_dmacapable_pdcadma, {{0x00,0x00,0x00}, {0x00,0x00,0x00}}, OFF_BOARD, 0, ATA_F_NODMA },
