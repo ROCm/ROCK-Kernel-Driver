@@ -96,7 +96,7 @@ acpi_hw_write_gpe_enable_reg (
  *
  * PARAMETERS:  gpe_event_info      - Info block for the GPE to be cleared
  *
- * RETURN:      status_status
+ * RETURN:      Status
  *
  * DESCRIPTION: Clear the status bit for a single GPE.
  *

@@ -2520,15 +2520,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 		mp_ioapics[ioapic].mpc_apicid, pin, entry.vector, irq,
 		edge_level, active_high_low);
 
- 	if (use_pci_vector() && !platform_legacy_irq(irq))
-		irq = IO_APIC_VECTOR(irq);
-	if (edge_level) {
-		irq_desc[irq].handler = &ioapic_level_type;
-	} else {
-		irq_desc[irq].handler = &ioapic_edge_type;
-	}
-
-	set_intr_gate(entry.vector, interrupt[irq]);
+	ioapic_register_intr(irq, entry.vector, edge_level);
 
 	if (!ioapic && (irq < 16))
 		disable_8259A_irq(irq);

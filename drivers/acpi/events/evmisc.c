@@ -88,9 +88,10 @@ acpi_ev_is_notify_object (
  *
  * FUNCTION:    acpi_ev_queue_notify_request
  *
- * PARAMETERS:
+ * PARAMETERS:  Node            - NS node for the notified object
+ *              notify_value    - Value from the Notify() request
  *
- * RETURN:      None.
+ * RETURN:      Status
  *
  * DESCRIPTION: Dispatch a device notification event to a previously
  *              installed handler.
@@ -143,9 +144,8 @@ acpi_ev_queue_notify_request (
 				notify_value));
 	}
 
-	/*
-	 * Get the notify object attached to the NS Node
-	 */
+	/* Get the notify object attached to the NS Node */
+
 	obj_desc = acpi_ns_get_attached_object (node);
 	if (obj_desc) {
 		/* We have the notify object, Get the right handler */
@@ -193,8 +193,10 @@ acpi_ev_queue_notify_request (
 	}
 
 	if (!handler_obj) {
-		/* There is no per-device notify handler for this device */
-
+		/*
+		 * There is no per-device notify handler for this device.
+		 * This may or may not be a problem.
+		 */
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
 			"No notify handler for Notify(%4.4s, %X) node %p\n",
 			acpi_ut_get_node_name (node), notify_value, node));
@@ -208,7 +210,7 @@ acpi_ev_queue_notify_request (
  *
  * FUNCTION:    acpi_ev_notify_dispatch
  *
- * PARAMETERS:
+ * PARAMETERS:  Context         - To be passsed to the notify handler
  *
  * RETURN:      None.
  *
@@ -275,6 +277,8 @@ acpi_ev_notify_dispatch (
  *
  * FUNCTION:    acpi_ev_global_lock_thread
  *
+ * PARAMETERS:  Context         - From thread interface, not used
+ *
  * RETURN:      None
  *
  * DESCRIPTION: Invoked by SCI interrupt handler upon acquisition of the
@@ -308,7 +312,9 @@ acpi_ev_global_lock_thread (
  *
  * FUNCTION:    acpi_ev_global_lock_handler
  *
- * RETURN:      Status
+ * PARAMETERS:  Context         - From thread interface, not used
+ *
+ * RETURN:      ACPI_INTERRUPT_HANDLED or ACPI_INTERRUPT_NOT_HANDLED
  *
  * DESCRIPTION: Invoked directly from the SCI handler when a global lock
  *              release interrupt occurs.  Grab the global lock and queue
@@ -355,6 +361,8 @@ acpi_ev_global_lock_handler (
  *
  * FUNCTION:    acpi_ev_init_global_lock_handler
  *
+ * PARAMETERS:  None
+ *
  * RETURN:      Status
  *
  * DESCRIPTION: Install a handler for the global lock release event
@@ -393,6 +401,8 @@ acpi_ev_init_global_lock_handler (void)
 /******************************************************************************
  *
  * FUNCTION:    acpi_ev_acquire_global_lock
+ *
+ * PARAMETERS:  Timeout         - Max time to wait for the lock, in millisec.
  *
  * RETURN:      Status
  *
@@ -460,6 +470,10 @@ acpi_ev_acquire_global_lock (
 /*******************************************************************************
  *
  * FUNCTION:    acpi_ev_release_global_lock
+ *
+ * PARAMETERS:  None
+ *
+ * RETURN:      Status
  *
  * DESCRIPTION: Releases ownership of the Global Lock.
  *
