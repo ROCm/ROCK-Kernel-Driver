@@ -314,7 +314,7 @@ int sun3scsi_release (struct Scsi_Host *shpnt)
 	if (shpnt->irq != IRQ_NONE)
 		free_irq (shpnt->irq, NULL);
 
-	iounmap(sun3_scsi_regp);
+	iounmap((void *)sun3_scsi_regp);
 
 	return 0;
 }
