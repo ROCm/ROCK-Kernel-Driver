@@ -1125,8 +1125,7 @@ kmem_cache_create (const char *name, size_t size, size_t align,
 		in_interrupt() ||
 		(size < BYTES_PER_WORD) ||
 		(size > (1<<MAX_OBJ_ORDER)*PAGE_SIZE) ||
-		(dtor && !ctor) ||
-		(align < 0)) {
+		(dtor && !ctor)) {
 			printk(KERN_ERR "%s: Early error in slab %s\n",
 					__FUNCTION__, name);
 			BUG();
