@@ -1,7 +1,7 @@
 /*
  * $Id: tsdev.c,v 1.15 2002/04/10 16:50:19 jsimmons Exp $
  *
- *  Copyright (c) 2001 "Crazy" james Simmons 
+ *  Copyright (c) 2001 "Crazy" james Simmons
  *
  *  Compaq touchscreen protocol driver. The protocol emulated by this driver
  *  is obsolete; for new programs use the tslib library which can read directly
@@ -177,8 +177,6 @@ static int tsdev_open(struct inode *inode, struct file *file)
 
 static void tsdev_free(struct tsdev *tsdev)
 {
-	devfs_remove("input/ts%d", tsdev->minor);
-	class_simple_device_remove(MKDEV(INPUT_MAJOR, TSDEV_MINOR_BASE + tsdev->minor));
 	tsdev_table[tsdev->minor] = NULL;
 	kfree(tsdev);
 }
@@ -418,7 +416,7 @@ static struct input_handle *tsdev_connect(struct input_handler *handler,
 			S_IFCHR|S_IRUGO|S_IWUSR, "input/ts%d", minor);
 	devfs_mk_cdev(MKDEV(INPUT_MAJOR, TSDEV_MINOR_BASE + minor + TSDEV_MINORS/2),
 			S_IFCHR|S_IRUGO|S_IWUSR, "input/tsraw%d", minor);
-	class_simple_device_add(input_class, 
+	class_simple_device_add(input_class,
 				MKDEV(INPUT_MAJOR, TSDEV_MINOR_BASE + minor),
 				dev->dev, "ts%d", minor);
 
@@ -429,6 +427,9 @@ static void tsdev_disconnect(struct input_handle *handle)
 {
 	struct tsdev *tsdev = handle->private;
 
+	class_simple_device_remove(MKDEV(INPUT_MAJOR, TSDEV_MINOR_BASE + tsdev->minor));
+	devfs_remove("input/ts%d", tsdev->minor);
+	devfs_remove("input/tsraw%d", tsdev->minor);
 	tsdev->exist = 0;
 
 	if (tsdev->open) {
@@ -436,7 +437,6 @@ static void tsdev_disconnect(struct input_handle *handle)
 		wake_up_interruptible(&tsdev->wait);
 	} else
 		tsdev_free(tsdev);
-	devfs_remove("input/tsraw%d", tsdev->minor);
 }
 
 static struct input_device_id tsdev_ids[] = {
