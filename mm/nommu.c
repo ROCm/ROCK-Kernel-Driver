@@ -30,7 +30,7 @@ unsigned long max_mapnr;
 unsigned long num_physpages;
 unsigned long askedalloc, realalloc;
 atomic_t vm_committed_space = ATOMIC_INIT(0);
-int sysctl_overcommit_memory; /* default is heuristic overcommit */
+int sysctl_overcommit_memory = OVERCOMMIT_GUESS; /* heuristic overcommit */
 int sysctl_overcommit_ratio = 50; /* default is 50% */
 
 int sysctl_max_map_count = DEFAULT_MAX_MAP_COUNT;
