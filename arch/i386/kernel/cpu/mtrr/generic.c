@@ -29,7 +29,7 @@ void mtrr_wrmsr(unsigned msr, unsigned a, unsigned b)
 	if (wrmsr_safe(msr, a, b) < 0) 
 		printk(KERN_ERR 
 			"MTRR: CPU %u: Writing MSR %x to %x:%x failed\n",
-			__smp_processor_id(), msr, a, b);
+			smp_processor_id(), msr, a, b);
 } 
 
 /*  Get the MSR pair relating to a var range  */
