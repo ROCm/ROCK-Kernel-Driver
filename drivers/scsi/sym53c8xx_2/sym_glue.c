@@ -2749,14 +2749,6 @@ if (sym53c8xx)
 		/* This one is guaranteed by AC to do nothing :-) */
 		if (pci_enable_device(pcidev))
 			continue;
-		/* Some HW as the HP LH4 may report twice PCI devices */
-		for (i = 0; i < count ; i++) {
-			if (devtbl[i].s.bus       == PciBusNumber(pcidev) && 
-			    devtbl[i].s.device_fn == PciDeviceFn(pcidev))
-				break;
-		}
-		if (i != count)	/* Ignore this device if we already have it */
-			continue;
 		devp = &devtbl[count];
 		devp->host_id = SYM_SETUP_HOST_ID;
 		devp->attach_done = 0;
