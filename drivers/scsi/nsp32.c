@@ -3342,7 +3342,7 @@ static int nsp32_prom_read(nsp32_hw_data *data, int romaddr)
 	return val;
 }
 
-static inline void nsp32_prom_set(nsp32_hw_data *data, int bit, int val)
+static void nsp32_prom_set(nsp32_hw_data *data, int bit, int val)
 {
 	int base = data->BaseAddress;
 	int tmp;
@@ -3360,7 +3360,7 @@ static inline void nsp32_prom_set(nsp32_hw_data *data, int bit, int val)
 	udelay(10);
 }
 
-static inline int nsp32_prom_get(nsp32_hw_data *data, int bit)
+static int nsp32_prom_get(nsp32_hw_data *data, int bit)
 {
 	int base = data->BaseAddress;
 	int tmp, ret;
