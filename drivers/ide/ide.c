@@ -358,137 +358,6 @@ int ide_system_bus_speed (void)
 	return system_bus_speed;
 }
 
-/**
- *	current_capacity	-	drive capacity
- *	@drive: drive to query
- *
- *	Return the current capacity (in sectors) of a drive according to
- *	its current geometry/LBA settings. Empty removables are reported
- *	as size zero.
- */
-
-sector_t current_capacity (ide_drive_t *drive)
-{
-	if (!drive->present)
-		return 0;
-	return DRIVER(drive)->capacity(drive);
-}
-
-EXPORT_SYMBOL(current_capacity);
-
-/**
- *	ide_dump_status		-	translate ATA error
- *	@drive: drive the error occured on
- *	@msg: information string
- *	@stat: status byte
- *
- *	Error reporting, in human readable form (luxurious, but a memory hog).
- *	Combines the drive name, message and status byte to provide a
- *	user understandable explanation of the device error.
- */
-
-u8 ide_dump_status (ide_drive_t *drive, const char *msg, u8 stat)
-{
-	ide_hwif_t *hwif = HWIF(drive);
-	unsigned long flags;
-	u8 err = 0;
-
-	local_irq_set(flags);
-	printk(KERN_WARNING "%s: %s: status=0x%02x", drive->name, msg, stat);
-	printk(" { ");
-	if (stat & BUSY_STAT) {
-		printk("Busy ");
-	} else {
-		if (stat & READY_STAT)	printk("DriveReady ");
-		if (stat & WRERR_STAT)	printk("DeviceFault ");
-		if (stat & SEEK_STAT)	printk("SeekComplete ");
-		if (stat & DRQ_STAT)	printk("DataRequest ");
-		if (stat & ECC_STAT)	printk("CorrectedError ");
-		if (stat & INDEX_STAT)	printk("Index ");
-		if (stat & ERR_STAT)	printk("Error ");
-	}
-	printk("}");
-	printk("\n");
-	if ((stat & (BUSY_STAT|ERR_STAT)) == ERR_STAT) {
-		err = hwif->INB(IDE_ERROR_REG);
-		printk("%s: %s: error=0x%02x", drive->name, msg, err);
-		if (drive->media == ide_disk) {
-			printk(" { ");
-			if (err & ABRT_ERR)	printk("DriveStatusError ");
-			if (err & ICRC_ERR)	printk("Bad%s ", (err & ABRT_ERR) ? "CRC" : "Sector");
-			if (err & ECC_ERR)	printk("UncorrectableError ");
-			if (err & ID_ERR)	printk("SectorIdNotFound ");
-			if (err & TRK0_ERR)	printk("TrackZeroNotFound ");
-			if (err & MARK_ERR)	printk("AddrMarkNotFound ");
-			printk("}");
-			if ((err & (BBD_ERR | ABRT_ERR)) == BBD_ERR || (err & (ECC_ERR|ID_ERR|MARK_ERR))) {
-				if ((drive->id->command_set_2 & 0x0400) &&
-				    (drive->id->cfs_enable_2 & 0x0400) &&
-				    (drive->addressing == 1)) {
-					u64 sectors = 0;
-					u32 high = 0;
-					u32 low = ide_read_24(drive);
-					hwif->OUTB(drive->ctl|0x80, IDE_CONTROL_REG);
-					high = ide_read_24(drive);
-
-					sectors = ((u64)high << 24) | low;
-					printk(", LBAsect=%llu, high=%d, low=%d",
-					       (long long) sectors,
-					       high, low);
-				} else {
-					u8 cur = hwif->INB(IDE_SELECT_REG);
-					if (cur & 0x40) {	/* using LBA? */
-						printk(", LBAsect=%ld", (unsigned long)
-						 ((cur&0xf)<<24)
-						 |(hwif->INB(IDE_HCYL_REG)<<16)
-						 |(hwif->INB(IDE_LCYL_REG)<<8)
-						 | hwif->INB(IDE_SECTOR_REG));
-					} else {
-						printk(", CHS=%d/%d/%d",
-						 (hwif->INB(IDE_HCYL_REG)<<8) +
-						  hwif->INB(IDE_LCYL_REG),
-						  cur & 0xf,
-						  hwif->INB(IDE_SECTOR_REG));
-					}
-				}
-				if (HWGROUP(drive) && HWGROUP(drive)->rq)
-					printk(", sector=%llu", (unsigned long long)HWGROUP(drive)->rq->sector);
-			}
-		}
-		printk("\n");
-	}
-	{
-		struct request *rq;
-		int opcode = 0x100;
-
-		spin_lock(&ide_lock);
-		rq = NULL;
-		if (HWGROUP(drive))
-			rq = HWGROUP(drive)->rq;
-		spin_unlock(&ide_lock);
-		if (!rq)
-			goto out;
-		if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK)) {
-			char *args = rq->buffer;
-			if (args)
-				opcode = args[0];
-		} else if (rq->flags & REQ_DRIVE_TASKFILE) {
-			ide_task_t *args = rq->special;
-			if (args) {
-				task_struct_t *tf = (task_struct_t *) args->tfRegister;
-				opcode = tf->command;
-			}
-		}
-
-		printk("ide: failed opcode was %x\n", opcode);
-	}
-out:
-	local_irq_restore(flags);
-	return err;
-}
-
-EXPORT_SYMBOL(ide_dump_status);
-
 static int ide_open (struct inode * inode, struct file * filp)
 {
 	return -ENXIO;
@@ -1673,8 +1542,9 @@ int generic_ide_ioctl(struct file *file, struct block_device *bdev,
 			 */
 
 			spin_lock_irqsave(&ide_lock, flags);
-			
-			DRIVER(drive)->abort(drive, "drive reset");
+
+			ide_abort(drive, "drive reset");
+
 			if(HWGROUP(drive)->handler)
 				BUG();
 				
@@ -2180,14 +2050,10 @@ static int default_end_request (ide_drive_t *drive, int uptodate, int nr_sects)
 	return ide_end_request(drive, uptodate, nr_sects);
 }
 
-static u8 default_sense (ide_drive_t *drive, const char *msg, u8 stat)
+static ide_startstop_t
+default_error(ide_drive_t *drive, struct request *rq, u8 stat, u8 err)
 {
-	return ide_dump_status(drive, msg, stat);
-}
-
-static ide_startstop_t default_error (ide_drive_t *drive, const char *msg, u8 stat)
-{
-	return ide_error(drive, msg, stat);
+	return __ide_error(drive, rq, stat, err);
 }
 
 static void default_pre_reset (ide_drive_t *drive)
@@ -2216,9 +2082,9 @@ static int default_attach (ide_drive_t *drive)
 	return 0;
 }
 
-static ide_startstop_t default_abort (ide_drive_t *drive, const char *msg)
+static ide_startstop_t default_abort(ide_drive_t *drive, struct request *rq)
 {
-	return ide_abort(drive, msg);
+	return __ide_abort(drive, rq);
 }
 
 static ide_startstop_t default_start_power_step(ide_drive_t *drive,
@@ -2233,7 +2099,6 @@ static void setup_driver_defaults (ide_driver_t *d)
 	if (d->cleanup == NULL)		d->cleanup = default_cleanup;
 	if (d->do_request == NULL)	d->do_request = default_do_request;
 	if (d->end_request == NULL)	d->end_request = default_end_request;
-	if (d->sense == NULL)		d->sense = default_sense;
 	if (d->error == NULL)		d->error = default_error;
 	if (d->abort == NULL)		d->abort = default_abort;
 	if (d->pre_reset == NULL)	d->pre_reset = default_pre_reset;

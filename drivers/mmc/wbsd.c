@@ -16,13 +16,13 @@
 #include <linux/device.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
-#include <linux/blkdev.h>
-
+#include <linux/highmem.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/protocol.h>
 
 #include <asm/io.h>
 #include <asm/dma.h>
+#include <asm/scatterlist.h>
 
 #include "wbsd.h"
 

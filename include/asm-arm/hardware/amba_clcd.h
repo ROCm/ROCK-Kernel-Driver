@@ -125,6 +125,11 @@ struct clcd_board {
 	int	(*setup)(struct clcd_fb *);
 
 	/*
+	 * mmap the framebuffer memory
+	 */
+	int	(*mmap)(struct clcd_fb *, struct vm_area_struct *);
+
+	/*
 	 * Remove platform specific parts of CLCD driver
 	 */
 	void	(*remove)(struct clcd_fb *);

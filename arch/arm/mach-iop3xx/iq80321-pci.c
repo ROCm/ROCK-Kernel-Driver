@@ -5,6 +5,7 @@
  *
  * Author: Rory Bolt <rorybolt@pacbell.net>
  * Copyright (C) 2002 Rory Bolt
+ * Copyright (C) 2004 Intel Corp.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -71,44 +72,28 @@ static int iq80321_setup(int nr, struct pci_sys_data *sys)
 
 	memset(res, 0, sizeof(struct resource) * 2);
 
-	res[0].start = IQ80321_PCI_IO_BASE + IQ80321_PCI_IO_OFFSET;
-	res[0].end   = IQ80321_PCI_IO_BASE + IQ80321_PCI_IO_SIZE - 1 + IQ80321_PCI_IO_OFFSET;
+	res[0].start = IOP321_PCI_LOWER_IO_BA + IOP321_PCI_IO_OFFSET;
+	res[0].end   = IOP321_PCI_UPPER_IO_BA + IOP321_PCI_IO_OFFSET;
 	res[0].name  = "IQ80321 PCI I/O Space";
 	res[0].flags = IORESOURCE_IO;
 
-	res[1].start = IQ80321_PCI_MEM_BASE;
-	res[1].end   = IQ80321_PCI_MEM_BASE + IQ80321_PCI_MEM_SIZE;
+	res[1].start = IOP321_PCI_LOWER_MEM_BA + IOP321_PCI_MEM_OFFSET;
+	res[1].end   = IOP321_PCI_UPPER_MEM_BA + IOP321_PCI_MEM_OFFSET;
 	res[1].name  = "IQ80321 PCI Memory Space";
 	res[1].flags = IORESOURCE_MEM;
 
 	request_resource(&ioport_resource, &res[0]);
 	request_resource(&iomem_resource, &res[1]);
 
-	/*
-	 * Since the IQ80321 is a slave card on a PCI backplane,
-	 * it uses BAR1 to reserve a portion of PCI memory space for
-	 * use with the private devices on the secondary bus
-	 * (GigE and PCI-X slot). We read BAR1 and configure
-	 * our outbound translation windows to target that
-	 * address range and assign all devices in that
-	 * address range. W/O this, certain BIOSes will fail
-	 * to boot as the IQ80321 claims addresses that are
-	 * in use by other devices.
-	 *
-	 * Note that the same cannot be done  with I/O space,
-	 * so hopefully the host will stick to the lower 64K for
-	 * PCI I/O and leave us alone.
-	 */
-	sys->mem_offset = IQ80321_PCI_MEM_BASE -
-		(*IOP321_IABAR1 & PCI_BASE_ADDRESS_MEM_MASK);
+	sys->mem_offset = IOP321_PCI_MEM_OFFSET;
+	sys->io_offset  = IOP321_PCI_IO_OFFSET;
 
 	sys->resource[0] = &res[0];
 	sys->resource[1] = &res[1];
 	sys->resource[2] = NULL;
-	sys->io_offset   = IQ80321_PCI_IO_OFFSET;
 
-	iop3xx_pcibios_min_io = IQ80321_PCI_IO_BASE;
-	iop3xx_pcibios_min_mem = IQ80321_PCI_MEM_BASE;
+	iop3xx_pcibios_min_io = IOP321_PCI_LOWER_IO_VA;
+	iop3xx_pcibios_min_mem = IOP321_PCI_LOWER_MEM_VA;
 
 	return 1;
 }

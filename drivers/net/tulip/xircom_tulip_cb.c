@@ -33,6 +33,13 @@
 
 /* A few user-configurable values. */
 
+#define xircom_debug debug
+#ifdef XIRCOM_DEBUG
+static int xircom_debug = XIRCOM_DEBUG;
+#else
+static int xircom_debug = 1;
+#endif
+
 /* Maximum events (Rx packets, etc.) to handle at each interrupt. */
 static int max_interrupt_work = 25;
 
@@ -124,18 +131,10 @@ module_param(max_interrupt_work, int, 0);
 module_param(rx_copybreak, int, 0);
 module_param(csr0, int, 0);
 
-static int num_units;
-module_param_array(options, num_units, int, 0);
-module_param_array(full_duplex, num_units, int, 0);
+module_param_array(options, int, NULL, 0);
+module_param_array(full_duplex, int, NULL, 0);
 
 #define RUN_AT(x) (jiffies + (x))
-
-#define xircom_debug debug
-#ifdef XIRCOM_DEBUG
-static int xircom_debug = XIRCOM_DEBUG;
-#else
-static int xircom_debug = 1;
-#endif
 
 /*
 				Theory of Operation

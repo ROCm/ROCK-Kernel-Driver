@@ -311,13 +311,11 @@ static int ide_pci_enable(struct pci_dev *dev, ide_pci_device_t *d)
 	ret = pci_set_dma_mask(dev, DMA_32BIT_MASK);
 	if (ret < 0) {
 		printk(KERN_ERR "%s: can't set dma mask\n", d->name);
-		pci_disable_device(dev);
 		goto out;
 	}
 
 	/* FIXME: Temporary - until we put in the hotplug interface logic
-	   Check that the bits we want are not in use by someone else.
-	   As someone else uses it, we do not (yuck) disable the device */
+	   Check that the bits we want are not in use by someone else. */
 	ret = pci_request_region(dev, 4, "ide_tmp");
 	if (ret < 0)
 		goto out;
@@ -542,12 +540,12 @@ static int ide_setup_pci_controller(struct pci_dev *dev, ide_pci_device_t *d, in
 	ret = pci_read_config_word(dev, PCI_COMMAND, &pcicmd);
 	if (ret < 0) {
 		printk(KERN_ERR "%s: error accessing PCI regs\n", d->name);
-		goto err_disable;
+		goto out;
 	}
 	if (!(pcicmd & PCI_COMMAND_IO)) {	/* is device disabled? */
 		ret = ide_pci_configure(dev, d);
 		if (ret < 0)
-			goto err_disable;
+			goto out;
 		*config = 1;
 		printk(KERN_INFO "%s: device enabled (Linux)\n", d->name);
 	}
@@ -558,17 +556,6 @@ static int ide_setup_pci_controller(struct pci_dev *dev, ide_pci_device_t *d, in
 		printk(KERN_INFO "%s: chipset revision %d\n", d->name, class_rev);
 out:
 	return ret;
-
-err_disable:
-	pci_disable_device(dev);
-	goto out;
-}
-
-static void ide_release_pci_controller(struct pci_dev *dev, ide_pci_device_t *d,
-				       int noisy)
-{
-	/* Balance ide_pci_enable() */
-	pci_disable_device(dev);
 }
 
 /**
@@ -701,7 +688,7 @@ static int do_ide_setup_pci_device(struct pci_dev *dev, ide_pci_device_t *d,
 		 */
 		ret = d->init_chipset ? d->init_chipset(dev, d->name) : 0;
 		if (ret < 0)
-			goto err_release_pci_controller;
+			goto out;
 		pciirq = ret;
 	} else if (tried_config) {
 		if (noisy)
@@ -716,7 +703,7 @@ static int do_ide_setup_pci_device(struct pci_dev *dev, ide_pci_device_t *d,
 		if (d->init_chipset) {
 			ret = d->init_chipset(dev, d->name);
 			if (ret < 0)
-				goto err_release_pci_controller;
+				goto out;
 		}
 		if (noisy)
 #ifdef __sparc__
@@ -734,10 +721,6 @@ static int do_ide_setup_pci_device(struct pci_dev *dev, ide_pci_device_t *d,
 	ide_pci_setup_ports(dev, d, pciirq, index);
 out:
 	return ret;
-
-err_release_pci_controller:
-	ide_release_pci_controller(dev, d, noisy);
-	goto out;
 }
 
 int ide_setup_pci_device(struct pci_dev *dev, ide_pci_device_t *d)

@@ -199,7 +199,7 @@ ide_startstop_t set_geometry_intr (ide_drive_t *drive)
 		return ide_stopped;
 
 	if (stat & (ERR_STAT|DRQ_STAT))
-		return DRIVER(drive)->error(drive, "set_geometry_intr", stat);
+		return ide_error(drive, "set_geometry_intr", stat);
 
 	if (HWGROUP(drive)->handler != NULL)
 		BUG();
@@ -218,7 +218,7 @@ ide_startstop_t recal_intr (ide_drive_t *drive)
 	u8 stat;
 
 	if (!OK_STAT(stat = hwif->INB(IDE_STATUS_REG), READY_STAT, BAD_STAT))
-		return DRIVER(drive)->error(drive, "recal_intr", stat);
+		return ide_error(drive, "recal_intr", stat);
 	return ide_stopped;
 }
 
@@ -235,7 +235,7 @@ ide_startstop_t task_no_data_intr (ide_drive_t *drive)
 
 	local_irq_enable();
 	if (!OK_STAT(stat = hwif->INB(IDE_STATUS_REG),READY_STAT,BAD_STAT)) {
-		return DRIVER(drive)->error(drive, "task_no_data_intr", stat);
+		return ide_error(drive, "task_no_data_intr", stat);
 		/* calls ide_end_drive_cmd */
 	}
 	if (args)
@@ -363,7 +363,7 @@ static ide_startstop_t task_error(ide_drive_t *drive, struct request *rq,
 		if (sectors > 0)
 			drive->driver->end_request(drive, 1, sectors);
 	}
-	return drive->driver->error(drive, s, stat);
+	return ide_error(drive, s, stat);
 }
 
 static void task_end_request(ide_drive_t *drive, struct request *rq, u8 stat)

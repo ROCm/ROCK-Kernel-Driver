@@ -91,6 +91,7 @@
 #define NR_IRQS			NR_IOP331_IRQS
 
 
+#if defined(CONFIG_ARCH_IQ80331)
 /*
  * Interrupts available on the IQ80331 board
  */
@@ -109,5 +110,27 @@
 #define	IRQ_IQ80331_INTB	IRQ_IOP331_XINT1
 #define	IRQ_IQ80331_INTC	IRQ_IOP331_XINT2
 #define	IRQ_IQ80331_INTD	IRQ_IOP331_XINT3
+
+#elif defined(CONFIG_MACH_IQ80332)
+/*
+ * Interrupts available on the IQ80332 board
+ */
+
+/*
+ * On board devices
+ */
+#define	IRQ_IQ80332_I82544	IRQ_IOP331_XINT0
+#define IRQ_IQ80332_UART0	IRQ_IOP331_UART0
+#define IRQ_IQ80332_UART1	IRQ_IOP331_UART1
+
+/*
+ * PCI interrupts
+ */
+#define	IRQ_IQ80332_INTA	IRQ_IOP331_XINT0
+#define	IRQ_IQ80332_INTB	IRQ_IOP331_XINT1
+#define	IRQ_IQ80332_INTC	IRQ_IOP331_XINT2
+#define	IRQ_IQ80332_INTD	IRQ_IOP331_XINT3
+
+#endif
 
 #endif // _IOP331_IRQ_H_

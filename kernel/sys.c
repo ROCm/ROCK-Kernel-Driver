@@ -23,6 +23,7 @@
 #include <linux/security.h>
 #include <linux/dcookies.h>
 #include <linux/suspend.h>
+#include <linux/tty.h>
 
 #include <linux/compat.h>
 #include <linux/syscalls.h>

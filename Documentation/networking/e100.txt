@@ -1,7 +1,7 @@
 Linux* Base Driver for the Intel(R) PRO/100 Family of Adapters
 ==============================================================
 
-September 13, 2004
+November 17, 2004
 
 
 Contents
@@ -18,9 +18,7 @@ In This Release
 ===============
 
 This file describes the Linux* Base Driver for the Intel(R) PRO/100 Family of
-Adapters, version 3.2.x.  This driver includes support for Itanium(TM)2 and
-EM64T systems.
-
+Adapters, version 3.3.x.  This driver supports 2.4.x and 2.6.x kernels. 
 
 Identifying Your Adapter
 ========================
@@ -118,12 +116,6 @@ Additional Configurations
 
   The latest release of ethtool can be found at:
   http://sf.net/projects/gkernel.  
-
-  After ethtool is installed, ethtool-copy.h must be copied and renamed to
-  ethtool.h in your kernel source tree at <linux_kernel_src>/include/linux.  
-  Backup the original ethtool.h as needed before copying.  The driver then 
-  must be recompiled in order to take advantage of the latest ethtool 
-  features.
 
   NOTE: This driver uses mii support from the kernel. As a result, when 
   there is no link, ethtool will report speed/duplex to be 10/half.

@@ -773,7 +773,7 @@ static ide_startstop_t etrax_dma_intr (ide_drive_t *drive)
 		}
 		printk("%s: bad DMA status\n", drive->name);
 	}
-	return DRIVER(drive)->error(drive, "dma_intr", stat);
+	return ide_error(drive, "dma_intr", stat);
 }
 
 /*

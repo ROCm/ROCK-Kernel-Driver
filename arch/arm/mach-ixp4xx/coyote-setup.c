@@ -89,7 +89,8 @@ static void __init coyote_init(void)
 	*IXP4XX_EXP_CS0 |= IXP4XX_FLASH_WRITABLE;
 	*IXP4XX_EXP_CS1 = *IXP4XX_EXP_CS0;
 
-	platform_add_devices(&coyote_devices, ARRAY_SIZE(coyote_devices));
+	ixp4xx_sys_init();
+	platform_add_devices(coyote_devices, ARRAY_SIZE(coyote_devices));
 }
 
 #ifdef CONFIG_ARCH_ADI_COYOTE

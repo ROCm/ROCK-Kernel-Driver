@@ -52,5 +52,6 @@ extern unsigned int processor_id;
 #include "iq80321.h"
 #include "iq31244.h"
 #include "iq80331.h"
+#include "iq80332.h"
 
 #endif  /* _ASM_ARCH_HARDWARE_H */
