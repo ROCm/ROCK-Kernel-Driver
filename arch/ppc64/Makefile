@@ -33,7 +33,7 @@ CFLAGS		+= -msoft-float -pipe -Wno-uninitialized -mminimal-toc
 ifeq ($(CONFIG_POWER4_ONLY),y)
 CFLAGS		+= -mcpu=power4
 else
-CFLAGS		+= -mtune=power4
+CFLAGS		+= -mtune=power4 -Wa,-many
 endif
 
 have_zero_bss := $(shell if $(CC) -fno-zero-initialized-in-bss -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo y; else echo n; fi)
