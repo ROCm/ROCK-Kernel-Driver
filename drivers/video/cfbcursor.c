@@ -17,9 +17,9 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
-int cfb_cursor(struct fb_info *info, struct fbcursor *cursor)
+int cfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 {
-	int i, size = ((cursor->size.x + 7) / 8) * cursor->size.y;
+	int i, size = ((cursor->image.width + 7) / 8) * cursor->image.height;
 	struct fb_image image;
 	static char data[64];
 
@@ -27,7 +27,7 @@ int cfb_cursor(struct fb_info *info, struct fbcursor *cursor)
 		switch (cursor->rop) {
 		case ROP_XOR:
 			for (i = 0; i < size; i++)
-				data[i] = (cursor->image[i] &
+				data[i] = (cursor->image.data[i] &
 					   cursor->mask[i]) ^
 				    	   cursor->dest[i];
 			break;
@@ -35,22 +35,19 @@ int cfb_cursor(struct fb_info *info, struct fbcursor *cursor)
 		default:
 			for (i = 0; i < size; i++)
 				data[i] =
-				    cursor->image[i] & cursor->mask[i];
+				    cursor->image.data[i] & cursor->mask[i];
 			break;
 		}
 	} else
 		memcpy(data, cursor->dest, size);
 
-	if (cursor->depth == 1) {
-		image.bg_color = cursor->index->entry[0];
-		image.fg_color = cursor->index->entry[1];
-	}
-		
-	image.dx = cursor->pos.x;
-	image.dy = cursor->pos.y;
-	image.width = cursor->size.x;
-	image.height = cursor->size.y;
-	image.depth = cursor->depth;
+	image.bg_color = cursor->image.bg_color;
+	image.fg_color = cursor->image.fg_color;
+	image.dx = cursor->image.dx;
+	image.dy = cursor->image.dy;
+	image.width = cursor->image.width;
+	image.height = cursor->image.height;
+	image.depth = cursor->image.depth;
 	image.data = data;
 
 	if (info->fbops->fb_imageblit)

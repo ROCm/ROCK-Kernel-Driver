@@ -149,12 +149,11 @@ void fbcon_accel_clear_margins(struct vc_data *vc, struct display *p,
 
 void fbcon_accel_cursor(struct display *p, int flags, int xx, int yy)
 {
-	static u32 palette_index[2];
-	static struct fb_index index = { 2, palette_index };
 	static char mask[64], image[64], *dest;
+	struct vc_data *vc = p->conp;
 	static int fgcolor, bgcolor, shape, width, height;
 	struct fb_info *info = p->fb_info;
-	struct fbcursor cursor;
+	struct fb_cursor cursor;
 	int c;
 	char *font;
 
@@ -165,18 +164,20 @@ void fbcon_accel_cursor(struct display *p, int flags, int xx, int yy)
 		cursor.set |= FB_CUR_SETSIZE;
 	}
 
-	if ((p->conp->vc_cursor_type & 0x0f) != shape) {
-		shape = p->conp->vc_cursor_type & 0x0f;
+	if ((vc->vc_cursor_type & 0x0f) != shape) {
+		shape = vc->vc_cursor_type & 0x0f;
 		cursor.set |= FB_CUR_SETSHAPE;
 	}
 
-	c = scr_readw((u16 *) p->cursor_pos);
+	c = scr_readw((u16 *) vc->vc_pos);
 
 	if (fgcolor != (int) attr_fgcol(p, c) ||
 	    bgcolor != (int) attr_bgcol(p, c)) {
 		fgcolor = (int) attr_fgcol(p, c);
 		bgcolor = (int) attr_bgcol(p, c);
 		cursor.set |= FB_CUR_SETCMAP;
+		cursor.image.bg_color = bgcolor;
+		cursor.image.fg_color = fgcolor;
 	}
 
 	c &= p->charmask;
@@ -190,11 +191,6 @@ void fbcon_accel_cursor(struct display *p, int flags, int xx, int yy)
 		cursor.enable = 1;
 	else
 		cursor.enable = 0;
-
-	if (cursor.set & FB_CUR_SETCMAP) {
-		palette_index[0] = bgcolor;
-		palette_index[1] = fgcolor;
-	}
 
 	if (cursor.set & FB_CUR_SETSIZE) {
 		memset(image, 0xff, 64);
@@ -236,16 +232,15 @@ void fbcon_accel_cursor(struct display *p, int flags, int xx, int yy)
 			mask[i++] = 0xff;
 	}
 
-	cursor.size.x = width;
-	cursor.size.y = height;
-	cursor.pos.x = xx * width;
-	cursor.pos.y = yy * height;
-	cursor.image = image;
+	cursor.image.width = width;
+	cursor.image.height = height;
+	cursor.image.dx = xx * width;
+	cursor.image.dy = yy * height;
+	cursor.image.depth = 1;
+	cursor.image.data = image;
 	cursor.mask = mask;
 	cursor.dest = dest;
 	cursor.rop = ROP_XOR;
-	cursor.index = &index;
-	cursor.depth = 1;
 
 	if (info->fbops->fb_cursor)
 		info->fbops->fb_cursor(info, &cursor);

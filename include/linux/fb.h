@@ -18,7 +18,7 @@
 #define FBIOGETCMAP		0x4604
 #define FBIOPUTCMAP		0x4605
 #define FBIOPAN_DISPLAY		0x4606
-#define FBIO_CURSOR            _IOWR('F', 0x08, struct fbcursor)
+#define FBIO_CURSOR            _IOWR('F', 0x08, struct fb_cursor)
 /* 0x4607-0x460B are defined below */
 /* #define FBIOGET_MONITORSPEC	0x460C */
 /* #define FBIOPUT_MONITORSPEC	0x460D */
@@ -223,11 +223,6 @@ struct fb_cmap {
 	__u16 *transp;			/* transparency, can be NULL */
 };
 
-struct fb_index {
-	__u32 len;                      /* number of entries */
-	__u32 *entry;                   /* "pseudopalette" color index entries */
-};
-
 struct fb_con2fbmap {
 	__u32 console;
 	__u32 framebuffer;
@@ -265,38 +260,6 @@ struct fb_vblank {
 	__u32 reserved[4];		/* reserved for future compatibility */
 };
 
-/*
- * hardware cursor control
- */
-
-#define FB_CUR_SETCUR   0x01
-#define FB_CUR_SETPOS   0x02
-#define FB_CUR_SETHOT   0x04
-#define FB_CUR_SETCMAP  0x08
-#define FB_CUR_SETSHAPE 0x10
-#define FB_CUR_SETDEST	0x20
-#define FB_CUR_SETSIZE	0x40
-#define FB_CUR_SETALL   0xFF
-
-struct fbcurpos {
-	__u16 x, y;
-};
-
-struct fbcursor {
-	__u16 set;		/* what to set */
-	__u16 enable;		/* cursor on/off */
-	__u8 rop;		/* bitop operation */
-	__u8 depth;		/* color depth of image */		
-	struct fbcurpos pos;	/* cursor position */
-	struct fbcurpos hot;	/* cursor hot spot */
-	struct fbcurpos size;	/* cursor bit map size */
-	struct fb_cmap cmap;	/* color map info */
-	struct fb_index *index;		
-	char *image;		/* cursor image bits */
-	char *mask;		/* cursor mask bits */
-	char *dest;		/* destination */
-};
-
 /* Internal HW accel */
 #define ROP_COPY 0
 #define ROP_XOR  1
@@ -320,14 +283,42 @@ struct fb_fillrect {
 };
 
 struct fb_image {
-	__u32 dx;	/* Where to place image */
+	__u32 dx;		/* Where to place image */
 	__u32 dy;
-	__u32 width;	/* Size of image */
+	__u32 width;		/* Size of image */
 	__u32 height;
-	__u32 fg_color;	/* Only used when a mono bitmap */
+	__u32 fg_color;		/* Only used when a mono bitmap */
 	__u32 bg_color;
-	__u8  depth;	/* Depth of the image */
-	char  *data;	/* Pointer to image data */
+	__u8  depth;		/* Depth of the image */
+	char  *data;		/* Pointer to image data */
+	struct fb_cmap cmap;	/* color map info */
+};
+
+/*
+ * hardware cursor control
+ */
+
+#define FB_CUR_SETCUR   0x01
+#define FB_CUR_SETPOS   0x02
+#define FB_CUR_SETHOT   0x04
+#define FB_CUR_SETCMAP  0x08
+#define FB_CUR_SETSHAPE 0x10
+#define FB_CUR_SETDEST	0x20
+#define FB_CUR_SETSIZE	0x40
+#define FB_CUR_SETALL   0xFF
+
+struct fbcurpos {
+	__u16 x, y;
+};
+
+struct fb_cursor {
+	__u16 set;		/* what to set */
+	__u16 enable;		/* cursor on/off */
+	__u16 rop;		/* bitop operation */
+	char *mask;		/* cursor mask bits */
+	char *dest;		/* destination */
+	struct fbcurpos hot;	/* cursor hot spot */
+	struct fb_image	image;	/* Cursor image */
 };
 
 #ifdef __KERNEL__
@@ -371,7 +362,7 @@ struct fb_ops {
     /* Draws a image to the display */
     void (*fb_imageblit)(struct fb_info *info, struct fb_image *image);
     /* Draws cursor */
-    int (*fb_cursor)(struct fb_info *info, struct fbcursor *cursor);
+    int (*fb_cursor)(struct fb_info *info, struct fb_cursor *cursor);
     /* Rotates the display */
     void (*fb_rotate)(struct fb_info *info, int angle);
     /* perform polling on fb device */
@@ -393,7 +384,7 @@ struct fb_info {
    struct fb_var_screeninfo var;        /* Current var */
    struct fb_fix_screeninfo fix;        /* Current fix */
    struct fb_monspecs monspecs;         /* Current Monitor specs */
-   struct fbcursor cursor;		/* Current cursor */	
+   struct fb_cursor cursor;		/* Current cursor */	
    struct fb_cmap cmap;                 /* Current cmap */
    struct fb_ops *fbops;
    char *screen_base;                   /* Virtual address */
@@ -457,7 +448,7 @@ struct fb_info {
 extern int fb_set_var(struct fb_var_screeninfo *var, struct fb_info *info); 
 extern int fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info); 
 extern int fb_blank(int blank, struct fb_info *info);
-extern int cfb_cursor(struct fb_info *info, struct fbcursor *cursor);
+extern int cfb_cursor(struct fb_info *info, struct fb_cursor *cursor);
 extern void cfb_fillrect(struct fb_info *info, struct fb_fillrect *rect); 
 extern void cfb_copyarea(struct fb_info *info, struct fb_copyarea *area); 
 extern void cfb_imageblit(struct fb_info *info, struct fb_image *image);

@@ -57,12 +57,6 @@ struct display {
     struct display_switch *dispsw;  /* low level operations */
     void *dispsw_data;              /* optional dispsw helper data */
 
-#if 0
-    struct fb_fix_cursorinfo fcrsr;
-    struct fb_var_cursorinfo *vcrsr;
-    struct fb_cursorstate crsrstate;
-#endif
-
     /* Filled in by the low-level console driver */
     struct vc_data *conp;           /* pointer to console data */
     struct fb_info *fb_info;        /* frame buffer for this console */
@@ -181,6 +175,6 @@ extern void set_con2fb_map(int unit, int newidx);
 #define SCROLL_YNOPARTIAL	__SCROLL_YNOPARTIAL
 
 extern void fbcon_redraw_clear(struct vc_data *, struct display *, int, int, int, int);
-extern void fbcon_redraw_bmove(struct display *, int, int, int, int, int, int);
+extern void fbcon_redraw_bmove(struct vc_data *, struct display *, int, int, int, int, int, int);
 
 #endif /* _VIDEO_FBCON_H */
