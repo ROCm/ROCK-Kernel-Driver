@@ -256,22 +256,6 @@ isdn_net_open(struct net_device *dev)
 }
 
 /*
- * Assign an ISDN-channel to a net-interface
- */
-static void
-isdn_net_bind_channel(isdn_net_local * lp, int idx)
-{
-	ulong flags;
-
-	save_flags(flags);
-	cli();
-	lp->isdn_slot = idx;
-	isdn_slot_set_rx_netdev(lp->isdn_slot, lp->netdev);
-	isdn_slot_set_st_netdev(lp->isdn_slot, lp->netdev);
-	restore_flags(flags);
-}
-
-/*
  * unbind a net-interface (resets interface after an error)
  */
 static void
@@ -281,6 +265,10 @@ isdn_net_unbind_channel(isdn_net_local * lp)
 
 	save_flags(flags);
 	cli();
+
+	if (lp->unbind)
+		lp->unbind(lp);
+
 	skb_queue_purge(&lp->super_tx_queue);
 
 	if (!lp->master) {	/* reset only master device */
@@ -299,6 +287,32 @@ isdn_net_unbind_channel(isdn_net_local * lp)
 	lp->isdn_slot = -1;
 
 	restore_flags(flags);
+}
+
+/*
+ * Assign an ISDN-channel to a net-interface
+ */
+static int
+isdn_net_bind_channel(isdn_net_local *lp, int idx)
+{
+	int retval = 0;
+	unsigned long flags;
+
+	save_flags(flags);
+	cli();
+
+	lp->isdn_slot = idx;
+	isdn_slot_set_rx_netdev(lp->isdn_slot, lp->netdev);
+	isdn_slot_set_st_netdev(lp->isdn_slot, lp->netdev);
+
+	if (lp->bind)
+		retval = lp->bind(lp);
+
+	if (retval < 0)
+		isdn_net_unbind_channel(lp);
+
+	restore_flags(flags);
+	return retval;
 }
 
 /*
@@ -1232,7 +1246,7 @@ isdn_net_init(struct net_device *ndev)
 static int
 isdn_net_do_callback(isdn_net_local *lp)
 {
-	int chi;
+	int slot;
 	/*
 	 * Is the state MANUAL?
 	 * If so, no callback can be made,
@@ -1246,34 +1260,25 @@ isdn_net_do_callback(isdn_net_local *lp)
 	printk(KERN_DEBUG "%s: start callback\n", lp->name);
 	
 	/* Grab a free ISDN-Channel */
-	if ((chi = isdn_get_free_slot(
-		     ISDN_USAGE_NET,
-		     lp->l2_proto,
-		     lp->l3_proto,
-		     lp->pre_device,
-		     lp->pre_channel,
-		     lp->msn)
-		    ) < 0) {
-		
-		printk(KERN_WARNING "isdn_net_find_icall: No channel for %s\n", lp->name);
-		return 0;
-	}
+	slot = isdn_get_free_slot(ISDN_USAGE_NET, lp->l2_proto, lp->l3_proto,
+				  lp->pre_device, lp->pre_channel, lp->msn);
+	if (slot < 0)
+		goto err;
+
+	if (isdn_net_bind_channel(lp, slot) < 0)
+		goto err;
+
 	/* Setup dialstate. */
 	lp->dial_timer.expires = jiffies + lp->cbdelay;
 	lp->dial_event = EV_NET_TIMER_CB;
 	add_timer(&lp->dial_timer);
-	
 	lp->dialstate = ST_WAIT_BEFORE_CB;
-	/* Connect interface with channel */
-	isdn_net_bind_channel(lp, chi);
-	if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
-		if (isdn_ppp_bind(lp) < 0) {
-			isdn_net_unbind_channel(lp);
-			return 0;
-		}
-	
+
 	/* Initiate dialing by returning 2 or 4 */
 	return (lp->flags & ISDN_NET_CBHUP) ? 2 : 4;
+
+ err:
+	return 0;
 }
 
 /*
@@ -1452,9 +1457,8 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 
 		strcpy(isdn_slot_num(idx), nr);
 		isdn_slot_set_usage(idx, (isdn_slot_usage(idx) & ISDN_USAGE_EXCLUSIVE) | ISDN_USAGE_NET);
-		isdn_slot_set_st_netdev(idx, lp->netdev);
-		lp->isdn_slot = slot;
-		lp->ppp_slot = -1;
+
+		isdn_net_bind_channel(lp, idx);
 		
 		lp->outgoing = 0;
 		lp->huptimer = 0;
@@ -1472,12 +1476,6 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 		add_timer(&lp->dial_timer);
 		lp->dialstate = ST_IN_WAIT_DCONN;
 		
-		if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
-			if (isdn_ppp_bind(lp) < 0) {
-				isdn_net_unbind_channel(lp);
-				restore_flags(flags);
-				return 0;
-			}
 		restore_flags(flags);
 		return 1;
 	}
@@ -1509,7 +1507,7 @@ isdn_net_findif(char *name)
  * from isdn_net_start_xmit().
  */
 int
-isdn_net_force_dial_lp(isdn_net_local * lp)
+isdn_net_force_dial_lp(isdn_net_local *lp)
 {
 	int slot;
 	unsigned long flags;
@@ -1529,12 +1527,9 @@ isdn_net_force_dial_lp(isdn_net_local * lp)
 	if (slot < 0)
 		goto err;
 
-	isdn_net_bind_channel(lp, slot);
-	if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
-		if (isdn_ppp_bind(lp) < 0) {
-			isdn_net_unbind_channel(lp);
-			goto err;
-		}
+	if (isdn_net_bind_channel(lp, slot) < 0)
+		goto err;;
+
 	/* Initiate dialing */
 	restore_flags(flags);
 	init_dialout(lp);

@@ -2927,7 +2927,8 @@ isdn_ppp_setup(isdn_net_dev *p)
 	p->dev.do_ioctl = isdn_ppp_dev_ioctl;
 	p->local.receive = isdn_ppp_receive;
 	p->local.connected = isdn_ppp_wakeup_daemon;
-	p->local.disconnected = isdn_ppp_free;
+	p->local.bind = isdn_ppp_bind;
+	p->local.unbind = isdn_ppp_free;
 
 	return 0;
 }
