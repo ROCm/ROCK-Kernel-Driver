@@ -2012,7 +2012,7 @@ static ssize_t ipr_store_diagnostics(struct class_device *class_dev,
 		wait_event(ioa_cfg->reset_wait_q, !ioa_cfg->in_reset_reload);
 
 		/* Wait for a second for any errors to be logged */
-		schedule_timeout(HZ);
+		msleep(1000);
 	} else {
 		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 		return -EIO;
