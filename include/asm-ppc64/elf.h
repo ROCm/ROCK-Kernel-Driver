@@ -122,12 +122,13 @@ extern int ucache_bsize;
  */
 #define ARCH_DLINFO							\
 do {									\
+	/* Handle glibc compatibility. */				\
+	NEW_AUX_ENT(AT_IGNOREPPC, AT_IGNOREPPC);			\
+	NEW_AUX_ENT(AT_IGNOREPPC, AT_IGNOREPPC);			\
+	/* Cache size items */						\
 	NEW_AUX_ENT(AT_DCACHEBSIZE, dcache_bsize);			\
 	NEW_AUX_ENT(AT_ICACHEBSIZE, icache_bsize);			\
 	NEW_AUX_ENT(AT_UCACHEBSIZE, ucache_bsize);			\
-	/* Now handle glibc compatibility. */				\
-	NEW_AUX_ENT(AT_IGNOREPPC, AT_IGNOREPPC);			\
-	NEW_AUX_ENT(AT_IGNOREPPC, AT_IGNOREPPC);			\
  } while (0)
 
 #endif /* __PPC64_ELF_H */

@@ -1,7 +1,7 @@
 /*
  * pSeries_pci.c
  *
- * pSeries_pcibios_init(void)opyright (C) 2001 Dave Engebretsen, IBM Corporation
+ * Copyright (C) 2001 Dave Engebretsen, IBM Corporation
  *
  * pSeries specific routines for PCI.
  * 
@@ -563,10 +563,9 @@ alloc_phb(struct device_node *dev, char *model, unsigned int addr_size_words)
 
 	buid_vals = (int *) get_property(dev, "ibm,fw-phb-id", &len);
 	
-  if (buid_vals == NULL) {
+	if (buid_vals == NULL) {
 		phb->buid = 0;
-	} 
-  else {
+	} else {
 		struct pci_bus check;
 		if (sizeof(check.number) == 1 || sizeof(check.primary) == 1 ||
 		    sizeof(check.secondary) == 1 || sizeof(check.subordinate) == 1) {
@@ -578,11 +577,11 @@ alloc_phb(struct device_node *dev, char *model, unsigned int addr_size_words)
 			      "number, primary, secondary and subordinate are ints.\n");
     }
     
-    if (len < 2 * sizeof(int))
-      phb->buid = (unsigned long)buid_vals[0];  // Support for new OF that only has 1 integer for buid.
-    else
-      phb->buid = (((unsigned long)buid_vals[0]) << 32UL) |
-                  (((unsigned long)buid_vals[1]) & 0xffffffff);
+	if (len < 2 * sizeof(int))
+		phb->buid = (unsigned long)buid_vals[0];  // Support for new OF that only has 1 integer for buid.
+	else
+		phb->buid = (((unsigned long)buid_vals[0]) << 32UL) |
+			(((unsigned long)buid_vals[1]) & 0xffffffff);
   	
 		phb->first_busno += (phb->global_number << 8);
 		phb->last_busno += (phb->global_number << 8);
@@ -784,6 +783,7 @@ pSeries_pcibios_init_early(void)
 	ppc_md.pcibios_write_config_word = rtas_write_config_word;
 	ppc_md.pcibios_write_config_dword = rtas_write_config_dword;
 }
+
 /************************************************************************/
 /* Get a char* of the device physical location(U0.3-P1-I8)              */
 /* See the Product Topology in the RS/6000 Architecture.                */
