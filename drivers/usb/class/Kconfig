@@ -11,10 +11,8 @@ config USB_AUDIO
 	  Say Y here if you want to connect USB audio equipment such as
 	  speakers to your computer's USB port.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called audio. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called audio.
 
 comment "USB Bluetooth TTY can only be used with disabled Bluetooth subsystem"
 	depends on USB && BT
@@ -36,10 +34,8 @@ config USB_BLUETOOTH_TTY
 
 	  If in doubt, say N here.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called bluetty. If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called bluetty.
 
 config USB_MIDI
 	tristate "USB MIDI support"
@@ -59,10 +55,8 @@ config USB_MIDI
 	  * Roland UA-100
 	  * Yamaha MU1000
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called usb-midi. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called usb-midi.
 
 config USB_ACM
 	tristate "USB Modem (CDC ACM) support"
@@ -76,10 +70,8 @@ config USB_ACM
 	  /proc/bus/usb/devices, then your modem will not work with this
 	  driver.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called acm. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called acm.
 
 config USB_PRINTER
 	tristate "USB Printer support"
@@ -88,8 +80,6 @@ config USB_PRINTER
 	  Say Y here if you want to connect a USB printer to your computer's
 	  USB port.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called usblp. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called usblp.
 

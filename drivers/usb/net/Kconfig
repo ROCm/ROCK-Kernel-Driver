@@ -23,10 +23,8 @@ config USB_AX8817X_STANDALONE
 	  typically on eth0, if it is the only ethernet device, or perhaps on
 	  eth1, if you have a PCI or ISA ethernet card installed.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ax8817x.o. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ax8817x.
 
 config USB_CATC
 	tristate "USB CATC NetMate-based Ethernet device support (EXPERIMENTAL)"
@@ -44,10 +42,8 @@ config USB_CATC
 	  typically on eth0, if it is the only ethernet device, or perhaps on
 	  eth1, if you have a PCI or ISA ethernet card installed.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called catc. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called catc.
 
 config USB_KAWETH
 	tristate "USB KLSI KL5USB101-based ethernet device support"
@@ -86,10 +82,8 @@ config USB_KAWETH
 	  typically on eth0, if it is the only ethernet device, or perhaps on
 	  eth1, if you have a PCI or ISA ethernet card installed.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called kaweth. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called kaweth.
 
 config USB_PEGASUS
 	tristate "USB Pegasus/Pegasus-II based ethernet device support"
@@ -102,10 +96,8 @@ config USB_PEGASUS
 	  is Pegasus or Pegasus II based then send me (petkan@users.sourceforge.net)
 	  vendor and device IDs.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called pegasus. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called pegasus.
 
 config USB_RTL8150
 	tristate "USB RTL8150 based ethernet device support (EXPERIMENTAL)"
@@ -115,10 +107,8 @@ config USB_RTL8150
 	  Send me (petkan@users.sourceforge.net) any comments you may have.
 	  You can also check for updates at http://pegasus2.sourceforge.net/
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called rtl8150. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called rtl8150.
 
 config USB_USBNET
 	tristate "Multi-purpose USB Networking Framework"
@@ -151,10 +141,8 @@ config USB_USBNET
 
 	  For more information see <http://www.linux-usb.org/usbnet/>.
 
-	  This code is also available as a kernel module (code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called usbnet. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called usbnet.
 
 comment "USB Host-to-Host Cables"
 	depends on USB_USBNET

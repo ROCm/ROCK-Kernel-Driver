@@ -21,10 +21,8 @@ config NET_SCH_CBQ
 	  is a routine that allows you to sort your outgoing traffic into
 	  classes based on a certain criterion.
 
-	  This code is also available as a module called sch_cbq ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want).  If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this code as a module, choose M here: the
+	  module will be called sch_cbq.
 
 config NET_SCH_HTB
 	tristate "HTB packet scheduler"
@@ -38,10 +36,8 @@ config NET_SCH_HTB
 	  HTB is very similar to the CBQ regarding its goals however is has 
 	  different properties and different algorithm.
 
-	  This code is also available as a module called sch_htb ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want).  If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this code as a module, choose M here: the
+	  module will be called sch_htb.
 
 config NET_SCH_CSZ
 	tristate "CSZ packet scheduler"
@@ -55,10 +51,8 @@ config NET_SCH_CSZ
 
 	  Note: this scheduler is currently broken.
 
-	  This code is also available as a module called sch_csz ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this code as a module, choose M here: the
+	  module will be called sch_csz.
 
 #tristate '  H-PFQ packet scheduler' CONFIG_NET_SCH_HPFQ
 #tristate '  H-FSC packet scheduler' CONFIG_NET_SCH_HFCS
@@ -72,10 +66,8 @@ config NET_SCH_ATM
 	  the flow(s) it is handling to a given virtual circuit (see the top of
 	  <file:net/sched/sch_atm.c>).
 
-	  This code is also available as a module called sch_atm ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this code as a module, choose M here: the
+	  module will be called sch_atm.
 
 config NET_SCH_PRIO
 	tristate "The simplest PRIO pseudoscheduler"
@@ -85,10 +77,8 @@ config NET_SCH_PRIO
 	  "scheduler" for some of your network devices or as a leaf discipline
 	  for the CBQ scheduling algorithm. If unsure, say Y.
 
-	  This code is also available as a module called sch_prio ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this code as a module, choose M here: the
+	  module will be called sch_prio.
 
 config NET_SCH_RED
 	tristate "RED queue"
@@ -99,10 +89,8 @@ config NET_SCH_RED
 	  the top of <file:net/sched/sch_red.c> for details and references
 	  about the algorithm).
 
-	  This code is also available as a module called sch_red ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want).  If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this code as a module, choose M here: the
+	  module will be called sch_red.
 
 config NET_SCH_SFQ
 	tristate "SFQ queue"
@@ -114,10 +102,8 @@ config NET_SCH_SFQ
 	  <file:net/sched/sch_sfq.c> for details and references about the SFQ
 	  algorithm).
 
-	  This code is also available as a module called sch_sfq ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this code as a module, choose M here: the
+	  module will be called sch_sfq.
 
 config NET_SCH_TEQL
 	tristate "TEQL queue"
@@ -130,10 +116,8 @@ config NET_SCH_TEQL
 	  one virtual device. (see the top of <file:net/sched/sch_teql.c> for
 	  details).
 
-	  This code is also available as a module called sch_teql ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this code as a module, choose M here: the
+	  module will be called sch_teql.
 
 config NET_SCH_TBF
 	tristate "TBF queue"
@@ -144,10 +128,8 @@ config NET_SCH_TBF
 	  leaf discipline for the CBQ scheduling algorithm (see the top of
 	  <file:net/sched/sch_tbf.c> for a description of the TBF algorithm).
 
-	  This code is also available as a module called sch_tbf ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this code as a module, choose M here: the
+	  module will be called sch_tbf.
 
 config NET_SCH_GRED
 	tristate "GRED queue"
@@ -158,10 +140,8 @@ config NET_SCH_GRED
 	  (see the top of <file:net/sched/sch_red.c> for details and
 	  references about the algorithm).
 
-	  This code is also available as a module called sch_gred ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this code as a module, choose M here: the
+	  module will be called sch_gred.
 
 config NET_SCH_DSMARK
 	tristate "Diffserv field marker"
@@ -172,10 +152,8 @@ config NET_SCH_DSMARK
 	  Technical information on this method, with pointers to associated
 	  RFCs, is available at <http://www.gta.ufrj.br/diffserv/>.
 
-	  This code is also available as a module called sch_dsmark ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want).  If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this code as a module, choose M here: the
+	  module will be called sch_dsmark.
 
 config NET_SCH_INGRESS
 	tristate "Ingress Qdisc"
@@ -185,10 +163,8 @@ config NET_SCH_INGRESS
 	  and drop packets when this bandwidth exceeds your desired rate.
 	  If unsure, say Y.
 
-	  This code is also available as a module called cls_ingress
-	  ( = code which can be inserted in and removed from the running
-	  kernel whenever you want).  If you want to compile it as a module,
-	  say M here and read <file:Documentation/modules.txt>.
+	  To compile this code as a module, choose M here: the
+	  module will be called cls_ingress.
 
 config NET_QOS
 	bool "QoS support"
@@ -240,10 +216,8 @@ config NET_CLS_TCINDEX
 	  feature if you want to implement Differentiated Services using
 	  sch_dsmark. If unsure, say Y.
 
-	  This code is also available as a module called cls_tcindex
-	  ( = code which can be inserted in and removed from the running
-	  kernel whenever you want). If you want to compile it as a module,
-	  say M here and read <file:Documentation/modules.txt>.
+	  To compile this code as a module, choose M here: the
+	  module will be called cls_tcindex.
 
 config NET_CLS_ROUTE4
 	tristate "Routing table based classifier"
@@ -252,10 +226,8 @@ config NET_CLS_ROUTE4
 	  If you say Y here, you will be able to classify outgoing packets
 	  according to the route table entry they matched. If unsure, say Y.
 
-	  This code is also available as a module called cls_route ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want).  If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this code as a module, choose M here: the
+	  module will be called cls_route.
 
 config NET_CLS_ROUTE
 	bool
@@ -269,10 +241,8 @@ config NET_CLS_FW
 	  If you say Y here, you will be able to classify outgoing packets
 	  according to firewall criteria you specified.
 
-	  This code is also available as a module called cls_fw ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want).  If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this code as a module, choose M here: the
+	  module will be called cls_fw.
 
 config NET_CLS_U32
 	tristate "U32 classifier"
@@ -281,10 +251,8 @@ config NET_CLS_U32
 	  If you say Y here, you will be able to classify outgoing packets
 	  according to their destination address. If unsure, say Y.
 
-	  This code is also available as a module called cls_u32 ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want).  If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this code as a module, choose M here: the
+	  module will be called cls_u32.
 
 config NET_CLS_RSVP
 	tristate "Special RSVP classifier"
@@ -297,10 +265,8 @@ config NET_CLS_RSVP
 	  Say Y here if you want to be able to classify outgoing packets based
 	  on their RSVP requests.
 
-	  This code is also available as a module called cls_rsvp ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want).  If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this code as a module, choose M here: the
+	  module will be called cls_rsvp.
 
 config NET_CLS_RSVP6
 	tristate "Special RSVP classifier for IPv6"
@@ -314,10 +280,8 @@ config NET_CLS_RSVP6
 	  on their RSVP requests and you are using the new Internet Protocol
 	  IPv6 as opposed to the older and more common IPv4.
 
-	  This code is also available as a module called cls_rsvp6 ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want).  If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this code as a module, choose M here: the
+	  module will be called cls_rsvp6.
 
 config NET_CLS_POLICE
 	bool "Traffic policing (needed for in/egress)"

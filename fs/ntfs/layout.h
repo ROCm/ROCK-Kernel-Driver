@@ -42,8 +42,8 @@
 #define const_cpu_to_le32(x)	__constant_cpu_to_le32(x)
 #define const_cpu_to_le64(x)	__constant_cpu_to_le64(x)
 
-/* The NTFS oem_id */
-#define magicNTFS	const_cpu_to_le64(0x202020205346544e) /* "NTFS    " */
+/* The NTFS oem_id "NTFS    " */
+#define magicNTFS	const_cpu_to_le64(0x202020205346544eULL)
 
 /*
  * Location of bootsector on partition:

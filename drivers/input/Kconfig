@@ -19,10 +19,8 @@ config INPUT
 
 	  If unsure, say Y.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called input. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called input.
 
 comment "Userland interfaces"
 
@@ -39,10 +37,8 @@ config INPUT_MOUSEDEV
 
 	  If unsure, say Y.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called mousedev. If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called mousedev.
 
 config INPUT_MOUSEDEV_PSAUX
 	bool "Provide legacy /dev/psaux device" if EMBEDDED
@@ -80,10 +76,8 @@ config INPUT_JOYDEV
 
 	  More information is available: <file:Documentation/input/joystick.txt>
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called joydev. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called joydev.
 
 config INPUT_TSDEV
 	tristate "Touchscreen interface"
@@ -95,10 +89,8 @@ config INPUT_TSDEV
 
 	  If unsure, say N.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called tsdev. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called tsdev.
 
 config INPUT_TSDEV_SCREEN_X
 	int "Horizontal screen resolution"
@@ -117,10 +109,8 @@ config INPUT_EVDEV
 	  Say Y here if you want your input device events be accessible
 	  under char device 13:64+ - /dev/input/eventX in a generic way.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called evdev. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called evdev.
 
 config INPUT_EVBUG
 	tristate "Event debugging"
@@ -134,10 +124,8 @@ config INPUT_EVBUG
 
 	  If unsure, say N.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called joydev. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called evbug.
 
 comment "Input I/O drivers"
 

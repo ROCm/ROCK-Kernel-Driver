@@ -162,11 +162,8 @@ config PCMCIA
 	  for location).  Please also read the PCMCIA-HOWTO, available from
 	  <http://www.tldp.org/docs.html#howto>.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  When compiled this way, there will be modules called pcmcia_core
-	  and ds.  If you want to compile it as a module, say M here and
-	  read <file:Documentation/modules.txt>.
+	  To compile this driver as modules, choose M here: the
+	  modules will be called pcmcia_core and ds.
 
 config SBUS
 	bool
@@ -248,11 +245,8 @@ config SUN_OPENPROMFS
 	  virtual file system, which you can mount to /proc/openprom by "mount
 	  -t openpromfs none /proc/openprom".
 
-	  If you want to compile the /proc/openprom support as a module ( =
-	  code which can be inserted in and removed from the running kernel
-	  whenever you want), say M here and read
-	  <file:Documentation/modules.txt>.
-	  The module will be called openpromfs.  If unsure, say M.
+	  To compile the /proc/openprom support as a module, choose M here: the
+	  module will be called openpromfs.  If unsure, choose M.
 
 source "fs/Kconfig.binfmt"
 
@@ -280,9 +274,7 @@ config PRINTER
 	  It is possible to share one parallel port among several devices
 	  (e.g. printer and ZIP drive) and it is safe to compile the
 	  corresponding drivers into the kernel.  If you want to compile this
-	  driver as a module however ( = code which can be inserted in and
-	  removed from the running kernel whenever you want), say M here and
-	  read <file:Documentation/modules.txt> and
+	  driver as a module however, choose M here and read
 	  <file:Documentation/parport.txt>.  The module will be called lp.
 
 	  If you have several parallel ports, you can specify which ports to
@@ -321,10 +313,8 @@ config BLK_DEV_FD
 	  well as location of the fdutils package used to configure additional
 	  parameters of the driver at run time.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called floppy. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called floppy.
 
 config BLK_DEV_LOOP
 	tristate "Loopback device support"
@@ -370,10 +360,8 @@ config BLK_DEV_LOOP
 	  Note that this loop device has nothing to do with the loopback
 	  device used for network connections from the machine to itself.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>. The module
-	  will be called loop.
+	  To compile this driver as a module, choose M here: the
+	  module will be called loop.
 
 	  Most users will answer N here.
 
@@ -399,10 +387,8 @@ config BLK_DEV_NBD
 	  Note that this has nothing to do with the network file systems NFS
 	  or Coda; you can say N here even if you intend to use NFS or Coda.
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>. The module
-	  will be called nbd.
+	  To compile this driver as a module, choose M here: the
+	  module will be called nbd.
 
 	  If unsure, say N.
 
@@ -421,10 +407,8 @@ config BLK_DEV_RAM
 	  Note that the kernel command line option "ramdisk=XX" is now
 	  obsolete. For details, read <file:Documentation/ramdisk.txt>.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M and read <file:Documentation/modules.txt>. The module will be
-	  called rd.
+	  To compile this driver as a module, choose M here: the
+	  module will be called rd.
 
 	  Most normal users won't need the RAM disk functionality, and can
 	  thus say N here.
@@ -534,11 +518,8 @@ config SOFT_WATCHDOG
 	  from some situations that the hardware watchdog will recover
 	  from. Equally it's a lot cheaper to install.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>. The module will be called
-	  softdog.
+	  To compile this driver as a module, choose M here: the
+	  module will be called softdog.
 
 endmenu
 

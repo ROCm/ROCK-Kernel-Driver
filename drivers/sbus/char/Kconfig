@@ -8,9 +8,10 @@ config SUN_OPENPROMIO
 	  PROM device tree. The driver implements a SunOS-compatible
 	  interface and a NetBSD-compatible interface.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M and read <file:Documentation/modules.txt>. If unsure, say Y.
+	  To compile this driver as a module, choose M here: the
+	  module will be called openprom.
+
+	  If unsure, say Y.
 
 config SUN_MOSTEK_RTC
 	tristate "Mostek real time clock support"

@@ -26,10 +26,8 @@ config USB_EHCI_HCD
 
 	  You may want to read <file:Documentation/usb/ehci.txt>.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ehci-hcd. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ehci-hcd.
 
 config USB_OHCI_HCD
 	tristate "OHCI HCD support"
@@ -44,10 +42,8 @@ config USB_OHCI_HCD
 	  based system where you're not sure, the "lspci -v" entry will list the
 	  right "prog-if" for your USB controller(s):  EHCI, OHCI, or UHCI.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ohci-hcd. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ohci-hcd.
 
 config USB_UHCI_HCD
 	tristate "UHCI HCD (most Intel and VIA) support"
@@ -62,10 +58,8 @@ config USB_UHCI_HCD
 	  (like VIA VP2, VP3, MVP3, Apollo Pro, Apollo Pro II or Apollo Pro
 	  133). If unsure, say Y.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called uhci-hcd. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called uhci-hcd.
 
 config USB_SL811HS
 	tristate "SL811HS support"
@@ -75,8 +69,6 @@ config USB_SL811HS
 
 	  If you do not know what this is, please say N.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called hc_sl811. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called hc_sl811.
 

@@ -117,10 +117,7 @@ agp_remap (unsigned long offset, unsigned long size, drm_device_t *dev)
 		page_map[i] = pfn_to_page(phys_addr_map[i] >> PAGE_SHIFT);
 	addr = vmap(page_map, num_pages, VM_IOREMAP, PAGE_AGP);
 	vfree(page_map);
-	if (!addr)
-		return NULL;
 
-	flush_tlb_kernel_range((unsigned long) addr, (unsigned long) addr + size);
 	return addr;
 }
 
@@ -222,6 +219,18 @@ int DRM(mem_info)(char *buf, char **start, off_t offset,
 void *DRM(alloc)(size_t size, int area)
 {
 	return kmalloc(size, GFP_KERNEL);
+}
+
+/** Wrapper around kmalloc() */
+void *DRM(calloc)(size_t size, size_t nmemb, int area)
+{
+	void *addr;
+
+	addr = kmalloc(size * nmemb, GFP_KERNEL);
+	if (addr != NULL)
+		memset((void *)addr, 0, size * nmemb);
+
+	return addr;
 }
 
 /** Wrapper around kmalloc() and kfree() */

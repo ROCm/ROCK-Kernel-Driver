@@ -14,10 +14,8 @@ config HOTPLUG_PCI
 	  powered up and running.  The file system pcihpfs must be mounted
 	  in order to interact with any PCI Hotplug controllers.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called pci_hotplug. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called pci_hotplug.
 
 	  When in doubt, say N.
 
@@ -39,10 +37,8 @@ config HOTPLUG_PCI_FAKE
 
 	  Use this module at your own risk.  You have been warned!
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called fakephp. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called fakephp.
 
 	  When in doubt, say N.
 
@@ -53,10 +49,8 @@ config HOTPLUG_PCI_COMPAQ
 	  Say Y here if you have a motherboard with a Compaq PCI Hotplug
 	  controller.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called cpqphp. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called cpqphp.
 
 	  When in doubt, say N.
 
@@ -77,10 +71,8 @@ config HOTPLUG_PCI_IBM
 	  Say Y here if you have a motherboard with a IBM PCI Hotplug
 	  controller.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called cpqphp. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ibmphp.
 
 	  When in doubt, say N.
 
@@ -91,10 +83,8 @@ config HOTPLUG_PCI_ACPI
 	  Say Y here if you have a system that supports PCI Hotplug using
 	  ACPI.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called acpiphp. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called acpiphp.
 
 	  When in doubt, say N.
 
@@ -114,10 +104,8 @@ config HOTPLUG_PCI_CPCI_ZT5550
 	  Say Y here if you have an Performance Technologies (formerly Intel,
           formerly just Ziatech) Ziatech ZT5550 CompactPCI system card.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called cpcihp_zt5550. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called cpcihp_zt5550.
 
 	  When in doubt, say N.
 
@@ -129,10 +117,8 @@ config HOTPLUG_PCI_CPCI_GENERIC
 	  hotswap signal as a bit in a system register that can be read through
 	  standard port I/O.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called cpcihp_generic. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called cpcihp_generic.
 
 	  When in doubt, say N.
 

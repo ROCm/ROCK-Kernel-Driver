@@ -14,11 +14,8 @@ config ZFTAPE
 	  interface (i.e. the hardware independent part of the driver) has
 	  been moved to a separate module.
 
-	  If you say M zftape will be compiled as a runtime loadable
-	  module ( = code which can be inserted in and removed from the
-	  running kernel whenever you want).  In this case you should read
-	  <file:Documentation/modules.txt>.  The module will be called
-	  zftape.
+	  To compile this driver as a module, choose M here: the
+	  module will be called zftape.
 
 	  Regardless of whether you say Y or M here, an additional runtime
 	  loadable module called `zft-compressor' which contains code to

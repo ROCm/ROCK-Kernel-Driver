@@ -784,6 +784,7 @@ extern void	     DRM(mem_init)(void);
 extern int	     DRM(mem_info)(char *buf, char **start, off_t offset,
 				   int request, int *eof, void *data);
 extern void	     *DRM(alloc)(size_t size, int area);
+extern void	     *DRM(calloc)(size_t nmemb, size_t size, int area);
 extern void	     *DRM(realloc)(void *oldpt, size_t oldsize, size_t size,
 				   int area);
 extern void	     DRM(free)(void *pt, size_t size, int area);
