@@ -145,7 +145,7 @@ pci_unregister_driver(struct pci_driver *drv)
 }
 
 static struct pci_driver pci_compat_driver = {
-	name: "compat"
+	.name = "compat"
 };
 
 /**
@@ -200,9 +200,9 @@ static int pci_bus_match(struct device * dev, struct device_driver * drv)
 }
 
 struct bus_type pci_bus_type = {
-	name:		"pci",
-	match:		pci_bus_match,
-	hotplug:	pci_hotplug,
+	.name		= "pci",
+	.match		= pci_bus_match,
+	.hotplug	= pci_hotplug,
 };
 
 static int __init pci_driver_init(void)
