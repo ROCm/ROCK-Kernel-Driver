@@ -391,8 +391,6 @@ static void __exit cleanup_slots (void)
 		list_del(&slot->slot_list);
 		pci_hp_deregister(slot->hotplug_slot);
 	}
-
-	return;
 }
 
 
@@ -409,11 +407,7 @@ static int __init acpiphp_init(void)
 	if (retval)
 		return retval;
 
-	retval = init_slots();
-	if (retval)
-		return retval;
-
-	return 0;
+	return init_slots();
 }
 
 
