@@ -536,9 +536,14 @@ static int __init tc35815_probe1(struct pci_dev *pdev, unsigned int base_addr, u
 	struct net_device *dev;
 
 	/* Allocate a new 'dev' if needed. */
-	dev = init_etherdev(NULL, 0);
+	dev = init_etherdev(NULL, sizeof(struct tc35815_local));
 	if (dev == NULL)
 		return -ENOMEM;
+
+	/*
+	 * init_etherdev allocs and zeros dev->priv
+	 */
+	lp = dev->priv;
 
 	if (tc35815_debug  &&  version_printed++ == 0)
 		printk(KERN_DEBUG "%s", version);
@@ -571,17 +576,7 @@ static int __init tc35815_probe1(struct pci_dev *pdev, unsigned int base_addr, u
 	printk("\n");
 
 	/* Initialize the device structure. */
-	if (dev->priv == NULL) {
-		dev->priv = kmalloc(sizeof(struct tc35815_local), GFP_KERNEL);
-		if (dev->priv == NULL)
-			return -ENODEV;
-	}
-	lp = dev->priv;
-
 	lp->pdev = pdev;
-
-	memset(lp, 0, sizeof(struct tc35815_local));
-
 	lp->next_module = root_tc35815_dev;
 	root_tc35815_dev = dev;
 
@@ -1764,7 +1759,6 @@ static void __exit tc35815_cleanup_module(void)
 	while (root_tc35815_dev) {
 		struct net_device *dev = root_tc35815_dev;
 		next_dev = ((struct tc35815_local *)dev->priv)->next_module;
-		kfree(dev->priv);
 		iounmap((void *)(dev->base_addr));
 		unregister_netdev(dev);
 		kfree(dev);
