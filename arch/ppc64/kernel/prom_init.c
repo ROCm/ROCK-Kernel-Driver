@@ -1108,6 +1108,16 @@ static void __init prom_init_stdout(void)
 	}
 }
 
+static void __init prom_close_stdin(void)
+{
+	unsigned long offset = reloc_offset();
+	struct prom_t *_prom = PTRRELOC(&prom);
+	ihandle val;
+
+	if (prom_getprop(_prom->chosen, "stdin", &val, sizeof(val)) > 0)
+		call_prom("close", 1, 0, val);
+}
+
 static int __init prom_find_machine_type(void)
 {
 	unsigned long offset = reloc_offset();
@@ -1685,6 +1695,9 @@ unsigned long __init prom_init(unsigned long r3, unsigned long r4, unsigned long
 	 */
        	prom_printf("copying OF device tree ...\n");
        	flatten_device_tree();
+
+	/* in case stdin is USB and still active on IBM machines... */
+	prom_close_stdin();
 
 	/*
 	 * Call OF "quiesce" method to shut down pending DMA's from

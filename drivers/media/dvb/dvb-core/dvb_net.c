@@ -6,13 +6,13 @@
  * Copyright (C) 2002 Ralph Metzler <rjkm@metzlerbros.de>
  *
  * ULE Decapsulation code:
- * Copyright (C) 2003 gcs - Global Communication & Services GmbH.
- *                and Institute for Computer Sciences
- *                    Salzburg University.
+ * Copyright (C) 2003, 2004 gcs - Global Communication & Services GmbH.
+ *                      and Department of Scientific Computing
+ *                          Paris Lodron University of Salzburg.
  *                    Hilmar Linder <hlinder@cosy.sbg.ac.at>
  *                and Wolfram Stering <wstering@cosy.sbg.ac.at>
  *
- * ULE Decaps according to draft-fair-ipdvb-ule-01.txt.
+ * ULE Decaps according to draft-ietf-ipdvb-ule-03.txt.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -30,6 +30,31 @@
  * Or, point your browser to http://www.gnu.org/copyleft/gpl.html
  */
 
+/*
+ * ULE ChangeLog:
+ * Feb 2004: hl/ws v1: Implementing draft-fair-ipdvb-ule-01.txt
+ *
+ * Dec 2004: hl/ws v2: Implementing draft-ietf-ipdvb-ule-03.txt:
+ *                       ULE Extension header handling.
+ *                     Bugreports by Moritz Vieth and Hanno Tersteegen,
+ *                       Fraunhofer Institute for Open Communication Systems
+ *                       Competence Center for Advanced Satellite Communications.
+ *                     Bugfixes and robustness improvements.
+ *                     Filtering on dest MAC addresses, if present (D-Bit = 0)
+ *                     ULE_DEBUG compile-time option.
+ */
+
+/*
+ * FIXME / TODO (dvb_net.c):
+ *
+ * Unloading does not work for 2.6.9 kernels: a refcount doesn't go to zero.
+ *
+ * TS_FEED callback is called once for every single TS cell although it is
+ * registered (in dvb_net_feed_start()) for 100 TS cells (used for dvb_net_ule()).
+ *
+ */
+
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -60,6 +85,10 @@ static inline __u32 iov_crc32( __u32 c, struct kvec *iov, unsigned int cnt )
 
 #define DVB_NET_MULTICAST_MAX 10
 
+#undef ULE_DEBUG
+
+#ifdef ULE_DEBUG
+
 #define isprint(c)	((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))
 
 static void hexdump( const unsigned char *buf, unsigned short len )
@@ -89,6 +118,7 @@ static void hexdump( const unsigned char *buf, unsigned short len )
 	}
 }
 
+#endif
 
 struct dvb_net_priv {
 	int in_use;
@@ -110,18 +140,19 @@ struct dvb_net_priv {
 #define RX_MODE_PROMISC 3
 	struct work_struct set_multicast_list_wq;
 	struct work_struct restart_net_feed_wq;
-	unsigned char feedtype;
-	int need_pusi;
-	unsigned char tscc;			/* TS continuity counter after sync. */
-	struct sk_buff *ule_skb;
-	unsigned short ule_sndu_len;
-	unsigned short ule_sndu_type;
-	unsigned char ule_sndu_type_1;
-	unsigned char ule_dbit;			/* whether the DestMAC address present
-						 * bit is set or not. */
-	unsigned char ule_ethhdr_complete;	/* whether we have completed the Ethernet
-						 * header for the current ULE SNDU. */
-	int ule_sndu_remain;
+	unsigned char feedtype;			/* Either FEED_TYPE_ or FEED_TYPE_ULE */
+	int need_pusi;				/* Set to 1, if synchronization on PUSI required. */
+	unsigned char tscc;			/* TS continuity counter after sync on PUSI. */
+	struct sk_buff *ule_skb;		/* ULE SNDU decodes into this buffer. */
+	unsigned char *ule_next_hdr;		/* Pointer into skb to next ULE extension header. */
+	unsigned short ule_sndu_len;		/* ULE SNDU length in bytes, w/o D-Bit. */
+	unsigned short ule_sndu_type;		/* ULE SNDU type field, complete. */
+	unsigned char ule_sndu_type_1;		/* ULE SNDU type field, if split across 2 TS cells. */
+	unsigned char ule_dbit;			/* Whether the DestMAC address present
+						 * or not (bit is set). */
+	unsigned char ule_bridged;		/* Whether the ULE_BRIDGED extension header was found. */
+	int ule_sndu_remain;			/* Nr. of bytes still required for current ULE SNDU. */
+	unsigned long ts_count;			/* Current ts cell counter. */
 };
 
 
@@ -141,7 +172,11 @@ static unsigned short dvb_net_eth_type_trans(struct sk_buff *skb,
 	
 	skb->mac.raw=skb->data;
 	skb_pull(skb,dev->hard_header_len);
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,8)
+	eth = skb->mac.ethernet;
+#else
 	eth = eth_hdr(skb);
+#endif
 	
 	if (*eth->h_dest & 1) {
 		if(memcmp(eth->h_dest,dev->broadcast, ETH_ALEN)==0)
@@ -173,78 +208,194 @@ static unsigned short dvb_net_eth_type_trans(struct sk_buff *skb,
 #define TS_SZ	188
 #define TS_SYNC	0x47
 #define TS_TEI	0x80
+#define TS_SC	0xC0
 #define TS_PUSI	0x40
 #define TS_AF_A	0x20
 #define TS_AF_D	0x10
 
+/* ULE Extension Header handlers. */
+
 #define ULE_TEST	0
 #define ULE_BRIDGED	1
-#define ULE_LLC		2
 
+int ule_test_sndu( struct dvb_net_priv *p )
+{
+	return -1;
+}
+
+int ule_bridged_sndu( struct dvb_net_priv *p )
+{
+	/* BRIDGE SNDU handling sucks in draft-ietf-ipdvb-ule-03.txt.
+	 * This has to be the last extension header, otherwise it won't work.
+	 * Blame the authors!
+	 */
+	p->ule_bridged = 1;
+	return 0;
+}
+
+
+/** Handle ULE extension headers.
+ *  Function is called after a successful CRC32 verification of an ULE SNDU to complete its decoding.
+ *  Returns: >= 0: nr. of bytes consumed by next extension header
+ *  	     -1:   Mandatory extension header that is not recognized or TEST SNDU; discard.
+ */
+static int handle_one_ule_extension( struct dvb_net_priv *p )
+{
+	/* Table of mandatory extension header handlers.  The header type is the index. */
+	static int (*ule_mandatory_ext_handlers[255])( struct dvb_net_priv *p ) =
+		{ [0] = ule_test_sndu, [1] = ule_bridged_sndu, [2] = NULL,  };
+
+	/* Table of optional extension header handlers.  The header type is the index. */
+	static int (*ule_optional_ext_handlers[255])( struct dvb_net_priv *p ) = { NULL, };
+
+	int ext_len = 0;
+	unsigned char hlen = (p->ule_sndu_type & 0x0700) >> 8;
+	unsigned char htype = p->ule_sndu_type & 0x00FF;
+
+	/* Discriminate mandatory and optional extension headers. */
+	if (hlen == 0) {
+		/* Mandatory extension header */
+		if (ule_mandatory_ext_handlers[htype]) {
+			ext_len = ule_mandatory_ext_handlers[htype]( p );
+			p->ule_next_hdr += ext_len;
+			if (! p->ule_bridged) {
+				p->ule_sndu_type = ntohs( *(unsigned short *)p->ule_next_hdr );
+				p->ule_next_hdr += 2;
+			} else {
+				p->ule_sndu_type = ntohs( *(unsigned short *)(p->ule_next_hdr + ((p->ule_dbit ? 2 : 3) * ETH_ALEN)) );
+				/* This assures the extension handling loop will terminate. */
+			}
+		} else
+			ext_len = -1;	/* SNDU has to be discarded. */
+	} else {
+		/* Optional extension header.  Calculate the length. */
+		ext_len = hlen << 2;
+		/* Process the optional extension header according to its type. */
+		if (ule_optional_ext_handlers[htype])
+			(void)ule_optional_ext_handlers[htype]( p );
+		p->ule_next_hdr += ext_len;
+		p->ule_sndu_type = ntohs( *(unsigned short *)p->ule_next_hdr );
+		p->ule_next_hdr += 2;
+	}
+
+	return ext_len;
+}
+
+static int handle_ule_extensions( struct dvb_net_priv *p )
+{
+	int total_ext_len = 0, l;
+
+	p->ule_next_hdr = p->ule_skb->data;
+	do {
+		l = handle_one_ule_extension( p );
+		if (l == -1) return -1;	/* Stop extension header processing and discard SNDU. */
+		total_ext_len += l;
+
+	} while (p->ule_sndu_type < 1536);
+
+	return total_ext_len;
+}
+
+
+/** Prepare for a new ULE SNDU: reset the decoder state. */
 static inline void reset_ule( struct dvb_net_priv *p )
 {
 	p->ule_skb = NULL;
+	p->ule_next_hdr = NULL;
 	p->ule_sndu_len = 0;
 	p->ule_sndu_type = 0;
 	p->ule_sndu_type_1 = 0;
 	p->ule_sndu_remain = 0;
 	p->ule_dbit = 0xFF;
-	p->ule_ethhdr_complete = 0;
+	p->ule_bridged = 0;
 }
 
-static const char eth_dest_addr[] = { 0x0b, 0x0a, 0x09, 0x08, 0x04, 0x03 };
-
+/**
+ * Decode ULE SNDUs according to draft-ietf-ipdvb-ule-03.txt from a sequence of
+ * TS cells of a single PID.
+ */
 static void dvb_net_ule( struct net_device *dev, const u8 *buf, size_t buf_len )
 {
 	struct dvb_net_priv *priv = (struct dvb_net_priv *)dev->priv;
-	unsigned long skipped = 0L, skblen = 0L;
+	unsigned long skipped = 0L;
 	u8 *ts, *ts_end, *from_where = NULL, ts_remain = 0, how_much = 0, new_ts = 1;
 	struct ethhdr *ethh = NULL;
-	unsigned int emergency_count = 0;
+
+#ifdef ULE_DEBUG
+	/* The code inside ULE_DEBUG keeps a history of the last 100 TS cells processed. */
+	static unsigned char ule_hist[100*TS_SZ];
+	static unsigned char *ule_where = ule_hist, ule_dump = 0;
+#endif
 
 	if (dev == NULL) {
 		printk( KERN_ERR "NO netdev struct!\n" );
 		return;
 	}
 
-	for (ts = (char *)buf, ts_end = (char *)buf + buf_len; ts < ts_end; ) {
-
-		if (emergency_count++ > 200) {
-			/* Huh?? */
-			hexdump(ts, TS_SZ);
-			printk(KERN_WARNING "*** LOOP ALERT! ts %p ts_remain %u "
-				"how_much %u, ule_skb %p, ule_len %u, ule_remain %u\n",
-				ts, ts_remain, how_much, priv->ule_skb,
-				priv->ule_sndu_len, priv->ule_sndu_remain);
-			break;
-		}
+	/* For all TS cells in current buffer.
+	 * Appearently, we are called for every single TS cell.
+	 */
+	for (ts = (char *)buf, ts_end = (char *)buf + buf_len; ts < ts_end; /* no default incr. */ ) {
 
 		if (new_ts) {
-			if ((ts[0] != TS_SYNC) || (ts[1] & TS_TEI)) {
-				printk(KERN_WARNING "Invalid TS cell: SYNC %#x, TEI %u.\n",
-				       ts[0], ts[1] & TS_TEI >> 7);
+			/* We are about to process a new TS cell. */
+
+#ifdef ULE_DEBUG
+			if (ule_where >= &ule_hist[100*TS_SZ]) ule_where = ule_hist;
+			memcpy( ule_where, ts, TS_SZ );
+			if (ule_dump) {
+				hexdump( ule_where, TS_SZ );
+				ule_dump = 0;
+		}
+			ule_where += TS_SZ;
+#endif
+
+			/* Check TS error conditions: sync_byte, transport_error_indicator, scrambling_control . */
+			if ((ts[0] != TS_SYNC) || (ts[1] & TS_TEI) || ((ts[3] & TS_SC) != 0)) {
+				printk(KERN_WARNING "%lu: Invalid TS cell: SYNC %#x, TEI %u, SC %#x.\n",
+				       priv->ts_count, ts[0], ts[1] & TS_TEI >> 7, ts[3] & 0xC0 >> 6);
+
+				/* Drop partly decoded SNDU, reset state, resync on PUSI. */
+				if (priv->ule_skb) {
+					dev_kfree_skb( priv->ule_skb );
+					/* Prepare for next SNDU. */
+					((struct dvb_net_priv *) dev->priv)->stats.rx_errors++;
+					((struct dvb_net_priv *) dev->priv)->stats.rx_frame_errors++;
+				}
+				reset_ule(priv);
+				priv->need_pusi = 1;
+
+				/* Continue with next TS cell. */
+				ts += TS_SZ;
+				priv->ts_count++;
 				continue;
 			}
+
 			ts_remain = 184;
 			from_where = ts + 4;
 		}
 		/* Synchronize on PUSI, if required. */
 		if (priv->need_pusi) {
 			if (ts[1] & TS_PUSI) {
-				/* Find beginning of first ULE SNDU in current TS cell.
-				 * priv->need_pusi = 0; */
+				/* Find beginning of first ULE SNDU in current TS cell. */
+				/* Synchronize continuity counter. */
 				priv->tscc = ts[3] & 0x0F;
 				/* There is a pointer field here. */
 				if (ts[4] > ts_remain) {
-					printk(KERN_ERR "Invalid ULE packet "
-					       "(pointer field %d)\n", ts[4]);
+					printk(KERN_ERR "%lu: Invalid ULE packet "
+					       "(pointer field %d)\n", priv->ts_count, ts[4]);
+					ts += TS_SZ;
+					priv->ts_count++;
 					continue;
 				}
+				/* Skip to destination of pointer field. */
 				from_where = &ts[5] + ts[4];
 				ts_remain -= 1 + ts[4];
 				skipped = 0;
 			} else {
 				skipped++;
+				ts += TS_SZ;
+				priv->ts_count++;
 				continue;
 			}
 		}
@@ -255,32 +406,45 @@ static void dvb_net_ule( struct net_device *dev, const u8 *buf, size_t buf_len )
 				priv->tscc = (priv->tscc + 1) & 0x0F;
 			else {
 				/* TS discontinuity handling: */
+				printk(KERN_WARNING "%lu: TS discontinuity: got %#x, "
+				       "exptected %#x.\n", priv->ts_count, ts[3] & 0x0F, priv->tscc);
+				/* Drop partly decoded SNDU, reset state, resync on PUSI. */
 				if (priv->ule_skb) {
 					dev_kfree_skb( priv->ule_skb );
 					/* Prepare for next SNDU. */
-					reset_ule(priv);
+					// reset_ule(priv);  moved to below.
 					((struct dvb_net_priv *) dev->priv)->stats.rx_errors++;
 					((struct dvb_net_priv *) dev->priv)->stats.rx_frame_errors++;
 				}
+				reset_ule(priv);
 				/* skip to next PUSI. */
-				printk(KERN_WARNING "TS discontinuity: got %#x, "
-				       "exptected %#x.\n", ts[3] & 0x0F, priv->tscc);
 				priv->need_pusi = 1;
+				ts += TS_SZ;
+				priv->ts_count++;
 				continue;
 			}
 			/* If we still have an incomplete payload, but PUSI is
-			 * set, some TS cells are missing.
+			 * set; some TS cells are missing.
 			 * This is only possible here, if we missed exactly 16 TS
-			 * cells (continuity counter). */
+			 * cells (continuity counter wrap). */
 			if (ts[1] & TS_PUSI) {
 				if (! priv->need_pusi) {
-					/* printk(KERN_WARNING "Skipping pointer field %u.\n", *from_where); */
 					if (*from_where > 181) {
-						printk(KERN_WARNING "*** Invalid pointer "
-						       "field: %u.  Current TS cell "
-						       "follows:\n", *from_where);
-						hexdump( ts, TS_SZ );
-						printk(KERN_WARNING "-------------------\n");
+						/* Pointer field is invalid.  Drop this TS cell and any started ULE SNDU. */
+						printk(KERN_WARNING "%lu: Invalid pointer "
+						       "field: %u.\n", priv->ts_count, *from_where);
+
+						/* Drop partly decoded SNDU, reset state, resync on PUSI. */
+						if (priv->ule_skb) {
+							dev_kfree_skb( priv->ule_skb );
+							((struct dvb_net_priv *) dev->priv)->stats.rx_errors++;
+							((struct dvb_net_priv *) dev->priv)->stats.rx_frame_errors++;
+						}
+						reset_ule(priv);
+						priv->need_pusi = 1;
+						ts += TS_SZ;
+						priv->ts_count++;
+						continue;
 					}
 					/* Skip pointer field (we're processing a
 					 * packed payload). */
@@ -290,21 +454,26 @@ static void dvb_net_ule( struct net_device *dev, const u8 *buf, size_t buf_len )
 					priv->need_pusi = 0;
 
 				if (priv->ule_sndu_remain > 183) {
+					/* Current SNDU lacks more data than there could be available in the
+					 * current TS cell. */
 					((struct dvb_net_priv *) dev->priv)->stats.rx_errors++;
 					((struct dvb_net_priv *) dev->priv)->stats.rx_length_errors++;
-					printk(KERN_WARNING "Expected %d more SNDU bytes, but "
-					       "got PUSI.  Flushing incomplete payload.\n",
-					       priv->ule_sndu_remain);
+					printk(KERN_WARNING "%lu: Expected %d more SNDU bytes, but "
+					       "got PUSI (pf %d, ts_remain %d).  Flushing incomplete payload.\n",
+					       priv->ts_count, priv->ule_sndu_remain, ts[4], ts_remain);
 					dev_kfree_skb(priv->ule_skb);
 					/* Prepare for next SNDU. */
 					reset_ule(priv);
+					/* Resync: go to where pointer field points to: start of next ULE SNDU. */
+					from_where += ts[4];
+					ts_remain -= ts[4];
 				}
 			}
 		}
 
 		/* Check if new payload needs to be started. */
 		if (priv->ule_skb == NULL) {
-			/* Start a new payload w/ skb.
+			/* Start a new payload with skb.
 			 * Find ULE header.  It is only guaranteed that the
 			 * length field (2 bytes) is contained in the current
 			 * TS.
@@ -318,6 +487,7 @@ static void dvb_net_ule( struct net_device *dev, const u8 *buf, size_t buf_len )
 			}
 
 			if (! priv->ule_sndu_len) {
+				/* Got at least two bytes, thus extrace the SNDU length. */
 				priv->ule_sndu_len = from_where[0] << 8 | from_where[1];
 				if (priv->ule_sndu_len & 0x8000) {
 					/* D-Bit is set: no dest mac present. */
@@ -326,17 +496,14 @@ static void dvb_net_ule( struct net_device *dev, const u8 *buf, size_t buf_len )
 				} else
 					priv->ule_dbit = 0;
 
-				/* printk(KERN_WARNING "ULE D-Bit: %d, SNDU len %u.\n",
-				          priv->ule_dbit, priv->ule_sndu_len); */
-
 				if (priv->ule_sndu_len > 32763) {
-					printk(KERN_WARNING "Invalid ULE SNDU length %u. "
-					       "Resyncing.\n", priv->ule_sndu_len);
-					hexdump(ts, TS_SZ);
+					printk(KERN_WARNING "%lu: Invalid ULE SNDU length %u. "
+					       "Resyncing.\n", priv->ts_count, priv->ule_sndu_len);
 					priv->ule_sndu_len = 0;
 					priv->need_pusi = 1;
 					new_ts = 1;
 					ts += TS_SZ;
+					priv->ts_count++;
 					continue;
 				}
 				ts_remain -= 2;	/* consume the 2 bytes SNDU length. */
@@ -354,11 +521,12 @@ static void dvb_net_ule( struct net_device *dev, const u8 *buf, size_t buf_len )
 				case 1:
 					priv->ule_sndu_type = from_where[0] << 8;
 					priv->ule_sndu_type_1 = 1; /* first byte of ule_type is set. */
-					/* ts_remain -= 1; from_where += 1;
-					 *   here not necessary, because we continue. */
+					ts_remain -= 1; from_where += 1;
+					/* Continue w/ next TS. */
 				case 0:
 					new_ts = 1;
 					ts += TS_SZ;
+					priv->ts_count++;
 					continue;
 
 				default: /* complete ULE header is present in current TS. */
@@ -376,24 +544,9 @@ static void dvb_net_ule( struct net_device *dev, const u8 *buf, size_t buf_len )
 					break;
 			}
 
-			if (priv->ule_sndu_type == ULE_TEST) {
-				/* Test SNDU, discarded by the receiver. */
-				printk(KERN_WARNING "Discarding ULE Test SNDU (%d bytes). "
-				       "Resyncing.\n", priv->ule_sndu_len);
-				priv->ule_sndu_len = 0;
-				priv->need_pusi = 1;
-				continue;
-			}
-
-			skblen = priv->ule_sndu_len;	/* Including CRC32 */
-			if (priv->ule_sndu_type != ULE_BRIDGED) {
-				skblen += ETH_HLEN;
-#if 1
-				if (! priv->ule_dbit)
-					skblen -= ETH_ALEN;
-#endif
-			}
-			priv->ule_skb = dev_alloc_skb(skblen);
+			/* Allocate the skb (decoder target buffer) with the correct size, as follows:
+			 * prepare for the largest case: bridged SNDU with MAC address (dbit = 0). */
+			priv->ule_skb = dev_alloc_skb( priv->ule_sndu_len + ETH_HLEN + ETH_ALEN );
 			if (priv->ule_skb == NULL) {
 				printk(KERN_NOTICE "%s: Memory squeeze, dropping packet.\n",
 				       dev->name);
@@ -401,130 +554,129 @@ static void dvb_net_ule( struct net_device *dev, const u8 *buf, size_t buf_len )
 				return;
 			}
 
-#if 0
-			if (priv->ule_sndu_type != ULE_BRIDGED) {
-				// skb_reserve(priv->ule_skb, 2);    /* longword align L3 header */
-				// Create Ethernet header.
-				ethh = (struct ethhdr *)skb_put( priv->ule_skb, ETH_HLEN );
-				memset( ethh->h_source, 0x00, ETH_ALEN );
-				if (priv->ule_dbit) {
-					// Dest MAC address not present --> generate our own.
-					memcpy( ethh->h_dest, eth_dest_addr, ETH_ALEN );
-				} else {
-					// Dest MAC address could be split across two TS cells.
-					// FIXME: implement.
-
-					printk( KERN_WARNING "%s: got destination MAC "
-						"address.\n", dev->name );
-					memcpy( ethh->h_dest, eth_dest_addr, ETH_ALEN );
-				}
-				ethh->h_proto = htons(priv->ule_sndu_type == ULE_LLC ?
-						      priv->ule_sndu_len : priv->ule_sndu_type);
-			}
-#endif
-			/* this includes the CRC32 _and_ dest mac, if !dbit! */
+			/* This includes the CRC32 _and_ dest mac, if !dbit. */
 			priv->ule_sndu_remain = priv->ule_sndu_len;
 			priv->ule_skb->dev = dev;
+			/* Leave space for Ethernet or bridged SNDU header (eth hdr plus one MAC addr). */
+			skb_reserve( priv->ule_skb, ETH_HLEN + ETH_ALEN );
 		}
 
 		/* Copy data into our current skb. */
 		how_much = min(priv->ule_sndu_remain, (int)ts_remain);
-		if ((priv->ule_ethhdr_complete < ETH_ALEN) &&
-		    (priv->ule_sndu_type != ULE_BRIDGED)) {
-			ethh = (struct ethhdr *)priv->ule_skb->data;
-			if (! priv->ule_dbit) {
-				if (how_much >= (ETH_ALEN - priv->ule_ethhdr_complete)) {
-					/* copy dest mac address. */
-					memcpy(skb_put(priv->ule_skb,
-						       (ETH_ALEN - priv->ule_ethhdr_complete)),
-					       from_where,
-					       (ETH_ALEN - priv->ule_ethhdr_complete));
-					memset(ethh->h_source, 0x00, ETH_ALEN);
-					ethh->h_proto = htons(priv->ule_sndu_type == ULE_LLC ?
-							      priv->ule_sndu_len :
-							      priv->ule_sndu_type);
-					skb_put(priv->ule_skb, ETH_ALEN + 2);
-
-					how_much -= (ETH_ALEN - priv->ule_ethhdr_complete);
-					priv->ule_sndu_remain -= (ETH_ALEN -
-								  priv->ule_ethhdr_complete);
-					ts_remain -= (ETH_ALEN - priv->ule_ethhdr_complete);
-					from_where += (ETH_ALEN - priv->ule_ethhdr_complete);
-					priv->ule_ethhdr_complete = ETH_ALEN;
-				}
-			} else {
-				/* Generate whole Ethernet header. */
-				memcpy(ethh->h_dest, eth_dest_addr, ETH_ALEN);
-				memset(ethh->h_source, 0x00, ETH_ALEN);
-				ethh->h_proto = htons(priv->ule_sndu_type == ULE_LLC ?
-						      priv->ule_sndu_len : priv->ule_sndu_type);
-				skb_put(priv->ule_skb, ETH_HLEN);
-				priv->ule_ethhdr_complete = ETH_ALEN;
-			}
-		}
-		/* printk(KERN_WARNING "Copying %u bytes, ule_sndu_remain = %u, "
-		          "ule_sndu_len = %u.\n", how_much, priv->ule_sndu_remain,
-			  priv->ule_sndu_len); */
 		memcpy(skb_put(priv->ule_skb, how_much), from_where, how_much);
 		priv->ule_sndu_remain -= how_much;
 		ts_remain -= how_much;
 		from_where += how_much;
-
-		if ((priv->ule_ethhdr_complete < ETH_ALEN) &&
-		    (priv->ule_sndu_type != ULE_BRIDGED)) {
-			priv->ule_ethhdr_complete += how_much;
-		}
 
 		/* Check for complete payload. */
 		if (priv->ule_sndu_remain <= 0) {
 			/* Check CRC32, we've got it in our skb already. */
 			unsigned short ulen = htons(priv->ule_sndu_len);
 			unsigned short utype = htons(priv->ule_sndu_type);
-			struct kvec iov[4] = {
+			struct kvec iov[3] = {
 				{ &ulen, sizeof ulen },
 				{ &utype, sizeof utype },
-				{ NULL, 0 },
-				{ priv->ule_skb->data + ETH_HLEN,
-					priv->ule_skb->len - ETH_HLEN - 4 }
+				{ priv->ule_skb->data, priv->ule_skb->len - 4 }
 			};
 			unsigned long ule_crc = ~0L, expected_crc;
 			if (priv->ule_dbit) {
 				/* Set D-bit for CRC32 verification,
 				 * if it was set originally. */
 				ulen |= 0x0080;
-			} else {
-				iov[2].iov_base = priv->ule_skb->data;
-				iov[2].iov_len = ETH_ALEN;
 			}
-			ule_crc = iov_crc32(ule_crc, iov, 4);
+
+			ule_crc = iov_crc32(ule_crc, iov, 3);
 			expected_crc = *((u8 *)priv->ule_skb->tail - 4) << 24 |
 				*((u8 *)priv->ule_skb->tail - 3) << 16 |
 				*((u8 *)priv->ule_skb->tail - 2) << 8 |
 				*((u8 *)priv->ule_skb->tail - 1);
 			if (ule_crc != expected_crc) {
-				printk(KERN_WARNING "CRC32 check %s: %#lx / %#lx.\n",
-				       ule_crc != expected_crc ? "FAILED" : "OK",
-				       ule_crc, expected_crc);
-				hexdump(priv->ule_skb->data + ETH_HLEN,
-					priv->ule_skb->len - ETH_HLEN);
+				printk(KERN_WARNING "%lu: CRC32 check FAILED: %#lx / %#lx, SNDU len %d type %#x, ts_remain %d, next 2: %x.\n",
+				       priv->ts_count, ule_crc, expected_crc, priv->ule_sndu_len, priv->ule_sndu_type, ts_remain, ts_remain > 2 ? *(unsigned short *)from_where : 0);
+
+#ifdef ULE_DEBUG
+				hexdump( iov[0].iov_base, iov[0].iov_len );
+				hexdump( iov[1].iov_base, iov[1].iov_len );
+				hexdump( iov[2].iov_base, iov[2].iov_len );
+
+				if (ule_where == ule_hist) {
+					hexdump( &ule_hist[98*TS_SZ], TS_SZ );
+					hexdump( &ule_hist[99*TS_SZ], TS_SZ );
+				} else if (ule_where == &ule_hist[TS_SZ]) {
+					hexdump( &ule_hist[99*TS_SZ], TS_SZ );
+					hexdump( ule_hist, TS_SZ );
+				} else {
+					hexdump( ule_where - TS_SZ - TS_SZ, TS_SZ );
+					hexdump( ule_where - TS_SZ, TS_SZ );
+				}
+				ule_dump = 1;
+#endif
 
 				((struct dvb_net_priv *) dev->priv)->stats.rx_errors++;
 				((struct dvb_net_priv *) dev->priv)->stats.rx_crc_errors++;
 				dev_kfree_skb(priv->ule_skb);
 			} else {
+				/* CRC32 verified OK. */
+				/* Handle ULE Extension Headers. */
+				if (priv->ule_sndu_type < 1536) {
+					/* There is an extension header.  Handle it accordingly. */
+					int l = handle_ule_extensions( priv );
+					if (l < 0) {
+						/* Mandatory extension header unknown or TEST SNDU.  Drop it. */
+						// printk( KERN_WARNING "Dropping SNDU, extension headers.\n" );
+						dev_kfree_skb( priv->ule_skb );
+						goto sndu_done;
+					}
+					skb_pull( priv->ule_skb, l );
+				}
+
 				/* CRC32 was OK. Remove it from skb. */
 				priv->ule_skb->tail -= 4;
 				priv->ule_skb->len -= 4;
+
+				/* Filter on receiver's destination MAC address, if present. */
+				if (!priv->ule_dbit) {
+					/* The destination MAC address is the next data in the skb. */
+					if (memcmp( priv->ule_skb->data, dev->dev_addr, ETH_ALEN )) {
+						/* MAC addresses don't match.  Drop SNDU. */
+						// printk( KERN_WARNING "Dropping SNDU, MAC address.\n" );
+						dev_kfree_skb( priv->ule_skb );
+						goto sndu_done;
+					}
+					if (! priv->ule_bridged) {
+						skb_push( priv->ule_skb, ETH_ALEN + 2 );
+						ethh = (struct ethhdr *)priv->ule_skb->data;
+						memcpy( ethh->h_dest, ethh->h_source, ETH_ALEN );
+						memset( ethh->h_source, 0, ETH_ALEN );
+						ethh->h_proto = htons( priv->ule_sndu_type );
+					} else {
+						/* Skip the Receiver destination MAC address. */
+						skb_pull( priv->ule_skb, ETH_ALEN );
+					}
+				} else {
+					if (! priv->ule_bridged) {
+						skb_push( priv->ule_skb, ETH_HLEN );
+						ethh = (struct ethhdr *)priv->ule_skb->data;
+						memcpy( ethh->h_dest, dev->dev_addr, ETH_ALEN );
+						memset( ethh->h_source, 0, ETH_ALEN );
+						ethh->h_proto = htons( priv->ule_sndu_type );
+					} else {
+						/* skb is in correct state; nothing to do. */
+					}
+				}
+				priv->ule_bridged = 0;
+
 				/* Stuff into kernel's protocol stack. */
 				priv->ule_skb->protocol = dvb_net_eth_type_trans(priv->ule_skb, dev);
 				/* If D-bit is set (i.e. destination MAC address not present),
-				 * receive the packet anyhw. */
-				/* if (priv->ule_dbit && skb->pkt_type == PACKET_OTHERHOST) */
-					priv->ule_skb->pkt_type = PACKET_HOST;
+				 * receive the packet anyhow. */
+				/* if (priv->ule_dbit && skb->pkt_type == PACKET_OTHERHOST)
+					priv->ule_skb->pkt_type = PACKET_HOST; */
 				((struct dvb_net_priv *) dev->priv)->stats.rx_packets++;
 				((struct dvb_net_priv *) dev->priv)->stats.rx_bytes += priv->ule_skb->len;
 				netif_rx(priv->ule_skb);
 			}
+			sndu_done:
 			/* Prepare for next SNDU. */
 			reset_ule(priv);
 		}
@@ -544,6 +696,7 @@ static void dvb_net_ule( struct net_device *dev, const u8 *buf, size_t buf_len )
 		} else {
 			new_ts = 1;
 			ts += TS_SZ;
+			priv->ts_count++;
 			if (priv->ule_skb == NULL) {
 				priv->need_pusi = 1;
 				priv->ule_sndu_type_1 = 0;
@@ -661,6 +814,7 @@ static int dvb_net_sec_callback(const u8 *buffer1, size_t buffer1_len,
 
 static int dvb_net_tx(struct sk_buff *skb, struct net_device *dev)
 {
+	dev_kfree_skb(skb);
 	return 0;
 }
 
@@ -722,7 +876,7 @@ static int dvb_net_feed_start(struct net_device *dev)
         unsigned char *mac = (unsigned char *) dev->dev_addr;
 		
 	dprintk("%s: rx_mode %i\n", __FUNCTION__, priv->rx_mode);
-	if (priv->secfeed || priv->secfilter || priv->multi_secfilter[0])
+	if (priv->tsfeed || priv->secfeed || priv->secfilter || priv->multi_secfilter[0])
 		printk("%s: BUG %d\n", __FUNCTION__, __LINE__);
 
 	priv->secfeed=NULL;
@@ -1047,13 +1201,14 @@ static int dvb_net_add_if(struct dvb_net *dvbnet, u16 pid, u8 feedtype)
 }
 
 
-static int dvb_net_remove_if(struct dvb_net *dvbnet, int num)
+static int dvb_net_remove_if(struct dvb_net *dvbnet, unsigned int num)
 {
 	struct net_device *net = dvbnet->device[num];
-	struct dvb_net_priv *priv = net->priv;
+	struct dvb_net_priv *priv;
 
 	if (!dvbnet->state[num])
 		return -EINVAL;
+	priv = net->priv;
 	if (priv->in_use)
 		return -EBUSY;
 
@@ -1114,10 +1269,18 @@ static int dvb_net_do_ioctl(struct inode *inode, struct file *file,
 		break;
 	}
 	case NET_REMOVE_IF:
+	{
+		int ret;
+
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
-		module_put(dvbdev->adapter->module);
-		return dvb_net_remove_if(dvbnet, (int) (long) parg);
+		if ((unsigned int) parg >= DVB_NET_DEVICES_MAX)
+			return -EINVAL;
+		ret = dvb_net_remove_if(dvbnet, (unsigned int) parg);
+		if (!ret)
+			module_put(dvbdev->adapter->module);
+		return ret;
+	}
 
 	/* binary compatiblity cruft */
 	case __NET_ADD_IF_OLD:
@@ -1193,6 +1356,7 @@ void dvb_net_release (struct dvb_net *dvbnet)
 		dvb_net_remove_if(dvbnet, i);
 	}
 }
+EXPORT_SYMBOL(dvb_net_release);
 
 
 int dvb_net_init (struct dvb_adapter *adap, struct dvb_net *dvbnet,
@@ -1210,4 +1374,4 @@ int dvb_net_init (struct dvb_adapter *adap, struct dvb_net *dvbnet,
 
 	return 0;
 }
-
+EXPORT_SYMBOL(dvb_net_init);

@@ -8,7 +8,9 @@
 #include <linux/compiler.h>
 #include <linux/types.h>
 
+#ifdef __KERNEL__
 #include <asm/atomic.h>
+#endif
 
 /*
  * Current version of the filter code architecture.

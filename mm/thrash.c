@@ -19,7 +19,10 @@ unsigned long swap_token_check;
 struct mm_struct * swap_token_mm = &init_mm;
 
 #define SWAP_TOKEN_CHECK_INTERVAL (HZ * 2)
-#define SWAP_TOKEN_TIMEOUT (HZ * 300)
+#define SWAP_TOKEN_TIMEOUT	0
+/*
+ * Currently disabled; Needs further code to work at HZ * 300.
+ */
 unsigned long swap_token_default_timeout = SWAP_TOKEN_TIMEOUT;
 
 /*

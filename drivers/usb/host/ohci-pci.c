@@ -121,10 +121,7 @@ static int ohci_pci_suspend (struct usb_hcd *hcd, u32 state)
 	msleep (100);
 	
 #ifdef CONFIG_PMAC_PBOOK
-	if (_machine == _MACH_Pmac)
-		disable_irq ((to_pci_dev(hcd->self.controller))->irq);
-
-	{
+	if (_machine == _MACH_Pmac) {
 	   	struct device_node	*of_node;
  
 		/* Disable USB PAD & cell clock */
@@ -132,7 +129,7 @@ static int ohci_pci_suspend (struct usb_hcd *hcd, u32 state)
 		if (of_node)
 			pmac_call_feature(PMAC_FTR_USB_ENABLE, of_node, 0, 0);
 	}
-#endif
+#endif /* CONFIG_PMAC_PBOOK */
 	return 0;
 }
 
@@ -143,7 +140,7 @@ static int ohci_pci_resume (struct usb_hcd *hcd)
 	int			retval = 0;
 
 #ifdef CONFIG_PMAC_PBOOK
-	{
+	if (_machine == _MACH_Pmac) {
 		struct device_node *of_node;
 
 		/* Re-enable USB PAD & cell clock */
@@ -151,7 +148,7 @@ static int ohci_pci_resume (struct usb_hcd *hcd)
 		if (of_node)
 			pmac_call_feature (PMAC_FTR_USB_ENABLE, of_node, 0, 1);
 	}
-#endif
+#endif /* CONFIG_PMAC_PBOOK */
 
 	/* resume root hub */
 	if (time_before (jiffies, ohci->next_statechange))
@@ -165,12 +162,6 @@ static int ohci_pci_resume (struct usb_hcd *hcd)
 	usb_unlock_device (hcd->self.root_hub);
 #endif
 
-	if (retval == 0) {
-#ifdef CONFIG_PMAC_PBOOK
-		if (_machine == _MACH_Pmac)
-			enable_irq (to_pci_dev(hcd->self.controller)->irq);
-#endif
-	}
 	return retval;
 }
 

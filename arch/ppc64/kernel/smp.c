@@ -76,8 +76,6 @@ extern unsigned char stab_array[];
 
 extern int cpu_idle(void *unused);
 void smp_call_function_interrupt(void);
-extern long register_vpa(unsigned long flags, unsigned long proc,
-			 unsigned long vpa);
 
 int smt_enabled_at_boot = 1;
 

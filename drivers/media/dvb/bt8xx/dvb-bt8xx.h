@@ -26,6 +26,10 @@
 #include "dvbdev.h"
 #include "dvb_net.h"
 #include "bttv.h"
+#include "mt352.h"
+#include "sp887x.h"
+#include "dst.h"
+#include "nxt6000.h"
 
 struct dvb_bt8xx_card {
 	struct semaphore lock;
@@ -44,4 +48,5 @@ struct dvb_bt8xx_card {
 	struct i2c_adapter *i2c_adapter;
 	struct dvb_net dvbnet;
 				
+	struct dvb_frontend* fe;
 };

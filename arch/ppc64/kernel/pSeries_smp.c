@@ -59,16 +59,6 @@
 
 extern void pseries_secondary_smp_init(unsigned long); 
 
-static void vpa_init(int cpu)
-{
-	unsigned long flags, pcpu = get_hard_smp_processor_id(cpu);
-
-	/* Register the Virtual Processor Area (VPA) */
-	flags = 1UL << (63 - 18);
-	register_vpa(flags, pcpu, __pa((unsigned long)&(paca[cpu].lppaca)));
-}
-
-
 /* Get state of physical CPU.
  * Return codes:
  *	0	- The processor is in the RTAS stopped state

@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
-# Linux kernel version: 2.6.10-rc2-m68k
-# Mon Nov 15 12:46:49 2004
+# Linux kernel version: 2.6.10-rc3-m68k
+# Sun Dec  5 14:21:25 2004
 #
 CONFIG_M68K=y
 CONFIG_MMU=y
@@ -137,6 +137,7 @@ CONFIG_BLK_DEV_LOOP=y
 CONFIG_BLK_DEV_CRYPTOLOOP=m
 CONFIG_BLK_DEV_NBD=m
 CONFIG_BLK_DEV_RAM=y
+CONFIG_BLK_DEV_RAM_COUNT=16
 CONFIG_BLK_DEV_RAM_SIZE=4096
 CONFIG_BLK_DEV_INITRD=y
 CONFIG_INITRAMFS_SOURCE=""
@@ -722,6 +723,10 @@ CONFIG_DMASOUND=m
 # CONFIG_USB_ARCH_HAS_OHCI is not set
 
 #
+# NOTE: USB_STORAGE enables SCSI, and 'SCSI disk support' may also be needed; see USB_STORAGE Help for more information
+#
+
+#
 # USB Gadget Support
 #
 # CONFIG_USB_GADGET is not set
@@ -953,7 +958,7 @@ CONFIG_CRYPTO_TEST=m
 # Library routines
 #
 CONFIG_CRC_CCITT=m
-CONFIG_CRC32=m
+CONFIG_CRC32=y
 CONFIG_LIBCRC32C=m
 CONFIG_ZLIB_INFLATE=y
 CONFIG_ZLIB_DEFLATE=m

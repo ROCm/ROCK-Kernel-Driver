@@ -91,7 +91,7 @@ udelay (unsigned long usecs)
 	unsigned long cycles = usecs*local_cpu_data->cyc_per_usec;
 
 	while (ia64_get_itc() - start < cycles)
-		/* skip */;
+		cpu_relax();
 }
 
 #endif /* _ASM_IA64_DELAY_H */

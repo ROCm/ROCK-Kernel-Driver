@@ -466,7 +466,7 @@ ppc4xx_init_dma_channel(unsigned int dmanr, ppc_dma_ch_t * p_init)
 
 	/* clear all polarity signals and then "or" in new signal levels */
 	polarity &= ~GET_DMA_POLARITY(dmanr);
-	polarity |= p_dma_ch->polarity;
+	polarity |= p_init->polarity;
 #if DCRN_POL > 0
 	mtdcr(DCRN_POL, polarity);
 #endif

@@ -160,7 +160,8 @@ static int tcindex_init(struct tcf_proto *tp)
 }
 
 
-static int tcindex_delete(struct tcf_proto *tp, unsigned long arg)
+static int
+__tcindex_delete(struct tcf_proto *tp, unsigned long arg, int lock)
 {
 	struct tcindex_data *p = PRIV(tp);
 	struct tcindex_filter_result *r = (struct tcindex_filter_result *) arg;
@@ -182,9 +183,11 @@ static int tcindex_delete(struct tcf_proto *tp, unsigned long arg)
 
 found:
 		f = *walk;
-		tcf_tree_lock(tp); 
+		if (lock)
+			tcf_tree_lock(tp);
 		*walk = f->next;
-		tcf_tree_unlock(tp);
+		if (lock)
+			tcf_tree_unlock(tp);
 	}
 	tcf_unbind_filter(tp, &r->res);
 #ifdef CONFIG_NET_CLS_POLICE
@@ -195,6 +198,10 @@ found:
 	return 0;
 }
 
+static int tcindex_delete(struct tcf_proto *tp, unsigned long arg)
+{
+	return __tcindex_delete(tp, arg, 1);
+}
 
 /*
  * There are no parameters for tcindex_init, so we overload tcindex_change
@@ -384,7 +391,7 @@ static void tcindex_walk(struct tcf_proto *tp, struct tcf_walker *walker)
 static int tcindex_destroy_element(struct tcf_proto *tp,
     unsigned long arg, struct tcf_walker *walker)
 {
-	return tcindex_delete(tp,arg);
+	return __tcindex_delete(tp, arg, 0);
 }
 
 

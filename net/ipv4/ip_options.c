@@ -515,6 +515,8 @@ int ip_options_get(struct ip_options **optp, unsigned char *data, int optlen, in
 		kfree(opt);
 		return -EINVAL;
 	}
+	if (*optp)
+		kfree(*optp);
 	*optp = opt;
 	return 0;
 }

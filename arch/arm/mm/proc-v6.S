@@ -201,6 +201,11 @@ __v6_setup:
 	mov	r10, #0x1f			@ domains 0, 1 = manager
 	mcr	p15, 0, r10, c3, c0, 0		@ load domain access register
 	mrc	p15, 0, r0, c1, c0, 0		@ read control register
+#ifdef CONFIG_VFP
+	mrc	p15, 0, r10, c1, c0, 2
+	orr	r10, r10, #(3 << 20)
+	mcr	p15, 0, r10, c1, c0, 2		@ Enable full access to VFP
+#endif
 	ldr	r10, cr1_clear			@ get mask for bits to clear
 	bic	r0, r0, r10			@ clear bits them
 	ldr	r10, cr1_set			@ get mask for bits to set
@@ -250,8 +255,8 @@ cpu_elf_name:
 	 */
 	.type	__v6_proc_info, #object
 __v6_proc_info:
-	.long	0x00070000
-	.long	0x00ff0000
+	.long	0x0007b000
+	.long	0x0007f000
 	.long	0x00000c0e
 	b	__v6_setup
 	.long	cpu_arch_name

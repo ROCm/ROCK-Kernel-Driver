@@ -142,7 +142,7 @@ typedef struct uioc {
 
 	caddr_t			buf_vaddr;
 	dma_addr_t		buf_paddr;
-	uint8_t			pool_index;
+	int8_t			pool_index;
 	uint8_t			free_buf;
 
 	uint8_t			timedout;

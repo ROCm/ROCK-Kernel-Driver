@@ -305,14 +305,14 @@ static void copy_to_high_bio_irq(struct bio *to, struct bio *from)
 	}
 }
 
-static void bounce_end_io(struct bio *bio, mempool_t *pool)
+static void bounce_end_io(struct bio *bio, mempool_t *pool, int err)
 {
 	struct bio *bio_orig = bio->bi_private;
 	struct bio_vec *bvec, *org_vec;
-	int i, err = 0;
+	int i;
 
-	if (!test_bit(BIO_UPTODATE, &bio->bi_flags))
-		err = -EIO;
+	if (test_bit(BIO_EOPNOTSUPP, &bio->bi_flags))
+		set_bit(BIO_EOPNOTSUPP, &bio_orig->bi_flags);
 
 	/*
 	 * free up bounce indirect pages used
@@ -334,7 +334,7 @@ static int bounce_end_io_write(struct bio *bio, unsigned int bytes_done,int err)
 	if (bio->bi_size)
 		return 1;
 
-	bounce_end_io(bio, page_pool);
+	bounce_end_io(bio, page_pool, err);
 	return 0;
 }
 
@@ -343,18 +343,18 @@ static int bounce_end_io_write_isa(struct bio *bio, unsigned int bytes_done, int
 	if (bio->bi_size)
 		return 1;
 
-	bounce_end_io(bio, isa_page_pool);
+	bounce_end_io(bio, isa_page_pool, err);
 	return 0;
 }
 
-static void __bounce_end_io_read(struct bio *bio, mempool_t *pool)
+static void __bounce_end_io_read(struct bio *bio, mempool_t *pool, int err)
 {
 	struct bio *bio_orig = bio->bi_private;
 
 	if (test_bit(BIO_UPTODATE, &bio->bi_flags))
 		copy_to_high_bio_irq(bio_orig, bio);
 
-	bounce_end_io(bio, pool);
+	bounce_end_io(bio, pool, err);
 }
 
 static int bounce_end_io_read(struct bio *bio, unsigned int bytes_done, int err)
@@ -362,7 +362,7 @@ static int bounce_end_io_read(struct bio *bio, unsigned int bytes_done, int err)
 	if (bio->bi_size)
 		return 1;
 
-	__bounce_end_io_read(bio, page_pool);
+	__bounce_end_io_read(bio, page_pool, err);
 	return 0;
 }
 
@@ -371,7 +371,7 @@ static int bounce_end_io_read_isa(struct bio *bio, unsigned int bytes_done, int 
 	if (bio->bi_size)
 		return 1;
 
-	__bounce_end_io_read(bio, isa_page_pool);
+	__bounce_end_io_read(bio, isa_page_pool, err);
 	return 0;
 }
 

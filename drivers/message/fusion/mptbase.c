@@ -155,7 +155,6 @@ static MPT_EVHANDLER		 MptEvHandlers[MPT_MAX_PROTOCOL_DRIVERS];
 static MPT_RESETHANDLER		 MptResetHandlers[MPT_MAX_PROTOCOL_DRIVERS];
 static struct mpt_pci_driver 	*MptDeviceDriverHandlers[MPT_MAX_PROTOCOL_DRIVERS];
 
-static int	FusionInitCalled = 0;
 static int	mpt_base_index = -1;
 static int	last_drv_idx = -1;
 
@@ -337,15 +336,13 @@ mpt_interrupt(int irq, void *bus_id, struct pt_regs *r)
 			ioc_stat = le16_to_cpu(mr->u.reply.IOCStatus);
 			if (ioc_stat & MPI_IOCSTATUS_FLAG_LOG_INFO_AVAILABLE) {
 				u32	 log_info = le32_to_cpu(mr->u.reply.IOCLogInfo);
-				if ((int)ioc->chip_type <= (int)FC929)
+				if (ioc->bus_type == FC)
 					mpt_fc_log_info(ioc, log_info);
-				else
+				else if (ioc->bus_type == SCSI)
 					mpt_sp_log_info(ioc, log_info);
 			}
 			if (ioc_stat & MPI_IOCSTATUS_MASK) {
-				if ((int)ioc->chip_type <= (int)FC929)
-						;
-				else
+				if (ioc->bus_type == SCSI)
 					mpt_sp_ioc_info(ioc, (u32)ioc_stat, mf);
 			}
 		} else {
@@ -392,7 +389,7 @@ mpt_interrupt(int irq, void *bus_id, struct pt_regs *r)
 		}
 
 #ifdef MPT_DEBUG_IRQ
-		if ((int)ioc->chip_type > (int)FC929) {
+		if (ioc->bus_type == SCSI) {
 			/* Verify mf, mr are reasonable.
 			 */
 			if ((mf) && ((mf >= MPT_INDEX_2_MFPTR(ioc, ioc->req_depth))
@@ -602,22 +599,6 @@ mpt_register(MPT_CALLBACK cbfunc, MPT_DRIVER_CLASS dclass)
 	int i;
 
 	last_drv_idx = -1;
-
-#ifndef MODULE
-	/*
-	 *  Handle possibility of the mptscsih_detect() routine getting
-	 *  called *before* fusion_init!
-	 */
-	if (!FusionInitCalled) {
-		dprintk((KERN_INFO MYNAM ": Hmmm, calling fusion_init from mpt_register!\n"));
-		/*
-		 *  NOTE! We'll get recursion here, as fusion_init()
-		 *  calls mpt_register()!
-		 */
-		fusion_init();
-		FusionInitCalled++;
-	}
-#endif
 
 	/*
 	 *  Search for empty callback slot in this order: {N,...,7,6,5,...,1}
@@ -1220,22 +1201,21 @@ mptbase_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		ioc->pio_chip = (SYSIF_REGS __iomem *)pmem;
 	}
 
-	ioc->chip_type = FCUNK;
 	if (pdev->device == MPI_MANUFACTPAGE_DEVICEID_FC909) {
-		ioc->chip_type = FC909;
 		ioc->prod_name = "LSIFC909";
+		ioc->bus_type = FC;
 	}
 	if (pdev->device == MPI_MANUFACTPAGE_DEVICEID_FC929) {
-		ioc->chip_type = FC929;
 		ioc->prod_name = "LSIFC929";
+		ioc->bus_type = FC;
 	}
 	else if (pdev->device == MPI_MANUFACTPAGE_DEVICEID_FC919) {
-		ioc->chip_type = FC919;
 		ioc->prod_name = "LSIFC919";
+		ioc->bus_type = FC;
 	}
 	else if (pdev->device == MPI_MANUFACTPAGE_DEVICEID_FC929X) {
-		ioc->chip_type = FC929X;
 		pci_read_config_byte(pdev, PCI_CLASS_REVISION, &revision);
+		ioc->bus_type = FC;
 		if (revision < XL_929) {
 			ioc->prod_name = "LSIFC929X";
 			/* 929X Chip Fix. Set Split transactions level
@@ -1254,8 +1234,8 @@ mptbase_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		}
 	}
 	else if (pdev->device == MPI_MANUFACTPAGE_DEVICEID_FC919X) {
-		ioc->chip_type = FC919X;
 		ioc->prod_name = "LSIFC919X";
+		ioc->bus_type = FC;
 		/* 919X Chip Fix. Set Split transactions level
 		 * for PCIX. Set MOST bits to zero.
 		 */
@@ -1264,8 +1244,8 @@ mptbase_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		pci_write_config_byte(pdev, 0x6a, pcixcmd);
 	}
 	else if (pdev->device == MPI_MANUFACTPAGE_DEVID_53C1030) {
-		ioc->chip_type = C1030;
 		ioc->prod_name = "LSI53C1030";
+		ioc->bus_type = SCSI;
 		/* 1030 Chip Fix. Disable Split transactions
 		 * for PCIX. Set MOST bits to zero if Rev < C0( = 8).
 		 */
@@ -1277,8 +1257,8 @@ mptbase_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		}
 	}
 	else if (pdev->device == MPI_MANUFACTPAGE_DEVID_1030_53C1035) {
-		ioc->chip_type = C1035;
 		ioc->prod_name = "LSI53C1035";
+		ioc->bus_type = SCSI;
 	}
 
 	sprintf(ioc->name, "ioc%d", ioc->id);
@@ -1326,9 +1306,7 @@ mptbase_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* NEW!  20010220 -sralston
 	 * Check for "bound ports" (929, 929X, 1030, 1035) to reduce redundant resets.
 	 */
-	if ((ioc->chip_type == FC929) || (ioc->chip_type == C1030)
-			|| (ioc->chip_type == C1035) || (ioc->chip_type == FC929X))
-		mpt_detect_bound_ports(ioc, pdev);
+	mpt_detect_bound_ports(ioc, pdev);
 
 	if ((r = mpt_do_ioc_recovery(ioc,
 	  MPT_HOSTEVENT_IOC_BRINGUP, CAN_SLEEP)) != 0) {
@@ -1760,7 +1738,7 @@ mpt_do_ioc_recovery(MPT_ADAPTER *ioc, u32 reason, int sleepFlag)
 	 *	and we try GetLanConfigPages again...
 	 */
 	if ((ret == 0) && (reason == MPT_HOSTEVENT_IOC_BRINGUP)) {
-		if ((int)ioc->chip_type <= (int)FC929) {
+		if (ioc->bus_type == FC) {
 			/*
 			 *  Pre-fetch FC port WWN and stuff...
 			 *  (FCPortPage0_t stuff)
@@ -2103,20 +2081,8 @@ MakeIocReady(MPT_ADAPTER *ioc, int force, int sleepFlag)
 	}
 
 	/* Is it already READY? */
-	if (!statefault && (ioc_state & MPI_IOC_STATE_MASK) == MPI_IOC_STATE_READY) {
-		if ((int)ioc->chip_type <= (int)FC929)
-			return 0;
-		else {
-			return 0;
-			/* Workaround from broken 1030 FW.
-			 * Force a diagnostic reset if fails.
-			 */
-/*			if ((r = SendIocReset(ioc, MPI_FUNCTION_IOC_MESSAGE_UNIT_RESET, sleepFlag)) == 0)
-				return 0;
-			else
-				statefault = 4; */
-		}
-	}
+	if (!statefault && (ioc_state & MPI_IOC_STATE_MASK) == MPI_IOC_STATE_READY) 
+		return 0;
 
 	/*
 	 *	Check to see if IOC is in FAULT state.
@@ -2513,11 +2479,11 @@ SendIocInit(MPT_ADAPTER *ioc, int sleepFlag)
 	ddlprintk((MYIOC_s_INFO_FMT "upload_fw %d facts.Flags=%x\n",
 		   ioc->name, ioc->upload_fw, ioc->facts.Flags));
 
-	if ((int)ioc->chip_type <= (int)FC929) {
+	if (ioc->bus_type == FC)
 		ioc_init.MaxDevices = MPT_MAX_FC_DEVICES;
-	} else {
+	else
 		ioc_init.MaxDevices = MPT_MAX_SCSI_DEVICES;
-	}
+	
 	ioc_init.MaxBuses = MPT_MAX_BUS;
 
 	ioc_init.ReplyFrameSize = cpu_to_le16(ioc->reply_sz);	/* in BYTES */
@@ -2622,7 +2588,7 @@ SendPortEnable(MPT_ADAPTER *ioc, int portnum, int sleepFlag)
 
 	/* RAID FW may take a long time to enable
 	 */
-	if ((int)ioc->chip_type <= (int)FC929) {
+	if (ioc->bus_type == FC) {
 		ii = mpt_handshake_req_reply_wait(ioc, req_sz, (u32*)&port_enable,
 				reply_sz, (u16*)&reply_buf, 65 /*seconds*/, sleepFlag);
 	} else {
@@ -2992,7 +2958,7 @@ KickStart(MPT_ADAPTER *ioc, int force, int sleepFlag)
 	int cnt,cntdn;
 
 	dinitprintk((KERN_WARNING MYNAM ": KickStarting %s!\n", ioc->name));
-	if ((int)ioc->chip_type > (int)FC929) {
+	if (ioc->bus_type == SCSI) {
 		/* Always issue a Msg Unit Reset first. This will clear some
 		 * SCSI bus hang conditions.
 		 */
@@ -3420,7 +3386,7 @@ initChainBuffers(MPT_ADAPTER *ioc)
 	dinitprintk((KERN_INFO MYNAM ": %s Now numSGE=%d num_sge=%d num_chain=%d\n",
 		ioc->name, numSGE, num_sge, num_chain));
 
-	if ((int) ioc->chip_type > (int) FC929)
+	if (ioc->bus_type == SCSI)
 		num_chain *= MPT_SCSI_CAN_QUEUE;
 	else
 		num_chain *= MPT_FC_CAN_QUEUE;
@@ -5277,7 +5243,7 @@ procmpt_iocinfo_read(char *buf, char **start, off_t offset, int request, int *eo
 		len += sprintf(buf+len, "  PortNumber = %d (of %d)\n",
 				p+1,
 				ioc->facts.NumberOfPorts);
-		if ((int)ioc->chip_type <= (int)FC929) {
+		if (ioc->bus_type == FC) {
 			if (ioc->pfacts[p].ProtocolFlags & MPI_PORTFACTS_PROTOCOL_LAN) {
 				u8 *a = (u8*)&ioc->lan_cnfg_page1.HardwareAddressLow;
 				len += sprintf(buf+len, "    LanAddr = %02X:%02X:%02X:%02X:%02X:%02X\n",
@@ -5920,11 +5886,6 @@ fusion_init(void)
 {
 	int i;
 	int r;
-
-	if (FusionInitCalled++) {
-		dprintk((KERN_INFO MYNAM ": INFO - Driver late-init entry point called\n"));
-		return 0;
-	}
 
 	show_mptmod_ver(my_NAME, my_VERSION);
 	printk(KERN_INFO COPYRIGHT "\n");

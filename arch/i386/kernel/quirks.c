@@ -1,10 +1,11 @@
 /*
  * This file contains work-arounds for x86 and x86_64 platform bugs.
  */
+#include <linux/config.h>
 #include <linux/pci.h>
 #include <linux/irq.h>
 
-#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_SMP)
+#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_SMP) && defined(CONFIG_PCI)
 
 void __devinit quirk_intel_irqbalance(struct pci_dev *dev)
 {

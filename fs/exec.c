@@ -1094,19 +1094,18 @@ int do_execve(char * filename,
 	int retval;
 	int i;
 
-	file = open_exec(filename);
-
-	retval = PTR_ERR(file);
-	if (IS_ERR(file))
-		return retval;
-
-	sched_exec();
-
 	retval = -ENOMEM;
 	bprm = kmalloc(sizeof(*bprm), GFP_KERNEL);
 	if (!bprm)
 		goto out_ret;
 	memset(bprm, 0, sizeof(*bprm));
+
+	file = open_exec(filename);
+	retval = PTR_ERR(file);
+	if (IS_ERR(file))
+		goto out_kfree;
+
+	sched_exec();
 
 	bprm->p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
 
@@ -1114,6 +1113,7 @@ int do_execve(char * filename,
 	bprm->filename = filename;
 	bprm->interp = filename;
 	bprm->mm = mm_alloc();
+	retval = -ENOMEM;
 	if (!bprm->mm)
 		goto out_file;
 
@@ -1180,6 +1180,8 @@ out_file:
 		allow_write_access(bprm->file);
 		fput(bprm->file);
 	}
+
+out_kfree:
 	kfree(bprm);
 
 out_ret:

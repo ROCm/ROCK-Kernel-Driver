@@ -5060,6 +5060,7 @@ static int snd_hdsp_free(hdsp_t *hdsp)
 	if (hdsp->port)
 		pci_release_regions(hdsp->pci);
 		
+	pci_disable_device(hdsp->pci);
 	return 0;
 }
 

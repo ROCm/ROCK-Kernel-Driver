@@ -122,7 +122,7 @@ static int ehci_hub_resume (struct usb_hcd *hcd)
 		writel (temp, &ehci->regs->port_status [i]);
 	}
 	i = HCS_N_PORTS (ehci->hcs_params);
-	msleep (20);
+	mdelay (20);
 	while (i--) {
 		temp = readl (&ehci->regs->port_status [i]);
 		if ((temp & PORT_SUSPEND) == 0)
@@ -286,7 +286,7 @@ ehci_hub_descriptor (
 	if (HCS_INDICATOR (ehci->hcs_params))
 		temp |= 0x0080;		/* per-port indicators (LEDs) */
 #endif
-	desc->wHubCharacteristics = cpu_to_le16 (temp);
+	desc->wHubCharacteristics = (__force __u16)cpu_to_le16 (temp);
 }
 
 /*-------------------------------------------------------------------------*/

@@ -65,7 +65,7 @@ CONFIG_KMOD=y
 # CONFIG_ARCH_SHARK is not set
 # CONFIG_ARCH_S3C2410 is not set
 # CONFIG_ARCH_OMAP is not set
-CONFIG_ARCH_VERSATILE_PB=y
+CONFIG_ARCH_VERSATILE=y
 
 #
 # CLPS711X/EP721X Implementations
@@ -110,6 +110,12 @@ CONFIG_ARCH_VERSATILE_PB=y
 #
 
 #
+# Versatile platform type
+#
+CONFIG_ARCH_VERSATILE_PB=y
+# CONFIG_MACH_VERSATILE_AB is not set
+
+#
 # Processor Type
 #
 CONFIG_CPU_32=y
@@ -144,8 +150,8 @@ CONFIG_ZBOOT_ROM_BSS=0x0
 #
 # At least one math emulation must be selected
 #
-# CONFIG_FPE_NWFPE is not set
-CONFIG_FPE_FASTFPE=y
+CONFIG_FPE_NWFPE=y
+# CONFIG_FPE_NWFPE_XP is not set
 CONFIG_BINFMT_ELF=y
 # CONFIG_BINFMT_AOUT is not set
 # CONFIG_BINFMT_MISC is not set

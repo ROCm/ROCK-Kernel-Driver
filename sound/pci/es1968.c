@@ -2411,6 +2411,7 @@ static int es1968_suspend(snd_card_t *card, unsigned int state)
 	snd_ac97_suspend(chip->ac97);
 	snd_es1968_bob_stop(chip);
 	snd_es1968_set_acpi(chip, ACPI_D3);
+	pci_disable_device(chip->pci);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
@@ -2424,6 +2425,7 @@ static int es1968_resume(snd_card_t *card, unsigned int state)
 
 	/* restore all our config */
 	pci_enable_device(chip->pci);
+	pci_set_master(chip->pci);
 	snd_es1968_chip_init(chip);
 
 	/* need to restore the base pointers.. */ 
@@ -2467,6 +2469,7 @@ static int snd_es1968_free(es1968_t *chip)
 	chip->master_switch = NULL;
 	chip->master_volume = NULL;
 	pci_release_regions(chip->pci);
+	pci_disable_device(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -2518,12 +2521,15 @@ static int __devinit snd_es1968_create(snd_card_t * card,
 	if (pci_set_dma_mask(pci, 0x0fffffff) < 0 ||
 	    pci_set_consistent_dma_mask(pci, 0x0fffffff) < 0) {
 		snd_printk("architecture does not support 28bit PCI busmaster DMA\n");
+		pci_disable_device(pci);
 		return -ENXIO;
 	}
 
 	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
-	if (! chip)
+	if (! chip) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 
 	/* Set Vars */
 	chip->type = chip_type;
@@ -2543,6 +2549,7 @@ static int __devinit snd_es1968_create(snd_card_t * card,
 
 	if ((err = pci_request_regions(pci, "ESS Maestro")) < 0) {
 		kfree(chip);
+		pci_disable_device(pci);
 		return err;
 	}
 	chip->io_port = pci_resource_start(pci, 0);

@@ -2076,6 +2076,7 @@ static int snd_vt1724_free(ice1712_t *ice)
 	}
 	pci_release_regions(ice->pci);
 	snd_ice1712_akm4xxx_free(ice);
+	pci_disable_device(ice->pci);
 	kfree(ice);
 	return 0;
 }
@@ -2105,8 +2106,10 @@ static int __devinit snd_vt1724_create(snd_card_t * card,
 		return err;
 
 	ice = kcalloc(1, sizeof(*ice), GFP_KERNEL);
-	if (ice == NULL)
+	if (ice == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	ice->vt1724 = 1;
 	spin_lock_init(&ice->reg_lock);
 	init_MUTEX(&ice->gpio_mutex);
@@ -2124,6 +2127,7 @@ static int __devinit snd_vt1724_create(snd_card_t * card,
 
 	if ((err = pci_request_regions(pci, "ICE1724")) < 0) {
 		kfree(ice);
+		pci_disable_device(pci);
 		return err;
 	}
 	ice->port = pci_resource_start(pci, 0);

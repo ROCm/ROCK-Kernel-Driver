@@ -741,6 +741,7 @@ static int init_or_cleanup(int init)
 		goto cleanup_nothing;
 
 #ifdef CONFIG_PROC_FS
+	ret = -ENOMEM;
 	proc = proc_net_fops_create("ip_conntrack", 0440, &ct_file_ops);
 	if (!proc) goto cleanup_init;
 

@@ -615,12 +615,13 @@ static int ia_avail_descs(IADEV *iadev) {
    return tmp;
 }    
 
+static int ia_pkt_tx (struct atm_vcc *vcc, struct sk_buff *skb);
+
 static int ia_que_tx (IADEV *iadev) { 
    struct sk_buff *skb;
    int num_desc;
    struct atm_vcc *vcc;
    struct ia_vcc *iavcc;
-   static int ia_pkt_tx (struct atm_vcc *vcc, struct sk_buff *skb);
    num_desc = ia_avail_descs(iadev);
 
    while (num_desc && (skb = skb_dequeue(&iadev->tx_backlog))) {

@@ -1020,10 +1020,10 @@ void __init setup_arch(char **cmdline_p)
 	/* set up the bootmem stuff with available memory */
 	do_init_bootmem();
 
+	ppc_md.setup_arch();
+
 	/* Select the correct idle loop for the platform. */
 	idle_setup();
-
-	ppc_md.setup_arch();
 
 	paging_init();
 	ppc64_boot_msg(0x15, "Setup Done");

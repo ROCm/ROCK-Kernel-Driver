@@ -93,34 +93,35 @@ acpi_ex_store_buffer_to_buffer (
 			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
 
-		target_desc->common.flags &= ~AOPOBJ_STATIC_POINTER;
 		target_desc->buffer.length = length;
 	}
 
-	/*
-	 * Buffer is a static allocation,
-	 * only place what will fit in the buffer.
-	 */
+	/* Copy source buffer to target buffer */
+
 	if (length <= target_desc->buffer.length) {
 		/* Clear existing buffer and copy in the new one */
 
 		ACPI_MEMSET (target_desc->buffer.pointer, 0, target_desc->buffer.length);
 		ACPI_MEMCPY (target_desc->buffer.pointer, buffer, length);
+
+		/* Set the new length of the target */
+
+		target_desc->buffer.length = length;
 	}
 	else {
-		/*
-		 * Truncate the source, copy only what will fit
-		 */
+		/* Truncate the source, copy only what will fit */
+
 		ACPI_MEMCPY (target_desc->buffer.pointer, buffer, target_desc->buffer.length);
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-			"Truncating src buffer from %X to %X\n",
+			"Truncating source buffer from %X to %X\n",
 			length, target_desc->buffer.length));
 	}
 
 	/* Copy flags */
 
 	target_desc->buffer.flags = source_desc->buffer.flags;
+	target_desc->common.flags &= ~AOPOBJ_STATIC_POINTER;
 	return_ACPI_STATUS (AE_OK);
 }
 

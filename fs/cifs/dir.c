@@ -399,9 +399,6 @@ cifs_lookup(struct inode *parent_dir_inode, struct dentry *direntry, struct name
 	     (" parent inode = 0x%p name is: %s and dentry = 0x%p",
 	      parent_dir_inode, direntry->d_name.name, direntry));
 
-	if(nd) {  /* BB removeme */
-		cFYI(1,("In lookup nd flags 0x%x open intent flags 0x%x",nd->flags,nd->intent.open.flags));
-	} /* BB removeme BB */
 	/* BB Add check of incoming data - e.g. frame not longer than maximum SMB - let server check the namelen BB */
 
 	/* check whether path exists */

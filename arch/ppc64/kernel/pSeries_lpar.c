@@ -259,6 +259,22 @@ out:
 	return found;
 }
 
+void vpa_init(int cpu)
+{
+	int hwcpu = get_hard_smp_processor_id(cpu);
+	unsigned long vpa = (unsigned long)&(paca[cpu].lppaca);
+	long ret;
+	unsigned long flags;
+
+	/* Register the Virtual Processor Area (VPA) */
+	flags = 1UL << (63 - 18);
+	ret = register_vpa(flags, hwcpu, __pa(vpa));
+
+	if (ret)
+		printk(KERN_ERR "WARNING: vpa_init: VPA registration for "
+				"cpu %d (hw %d) of area %lx returns %ld\n",
+				cpu, hwcpu, __pa(vpa), ret);
+}
 
 long pSeries_lpar_hpte_insert(unsigned long hpte_group,
 			      unsigned long va, unsigned long prpn,

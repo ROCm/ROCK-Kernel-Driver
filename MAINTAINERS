@@ -1731,6 +1731,12 @@ M:	tsbogend@alpha.franken.de
 L:	linux-net@vger.kernel.org
 S:	Maintained
 
+PHRAM MTD DRIVER
+P:	Jörn Engel
+M:	joern@wh.fh-wedel.de
+L:	linux-mtd@lists.infradead.org
+S:	Maintained
+
 POSIX CLOCKS and TIMERS
 P:	George Anzinger
 M:	george@mvista.com
@@ -2487,6 +2493,13 @@ W1 DALLAS'S 1-WIRE BUS
 P:	Evgeniy Polyakov
 M:	johnpol@2ka.mipt.ru
 L:	sensors@stimpy.netroedge.com
+S:	Maintained
+
+W83L51xD SD/MMC CARD INTERFACE DRIVER
+P:	Pierre Ossman
+M:	drzeus-wbsd@drzeus.cx
+L:	wbsd-devel@list.drzeus.cx
+W:	http://projects.drzeus.cx/wbsd
 S:	Maintained
 
 W83L785TS HARDWARE MONITOR DRIVER

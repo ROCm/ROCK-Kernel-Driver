@@ -1,3 +1,53 @@
+Version 1.28
+------------
+Add module init parm for large SMB buffer size (to allow it to be changed
+from its default of 16K) which is especially useful for large file copy
+when mounting with the directio mount option. Fix oops after 
+returning from mount when experimental ExtendedSecurity enabled and
+SpnegoNegotiated returning invalid error. Fix case to retry better when 
+peek returns from 1 to 3 bytes on socket which should have more data.
+Fixed path based calls (such as cifs lookup) to handle path names
+longer than 530 (now can handle PATH_MAX).
+
+Version 1.27
+------------
+Turn off DNOTIFY (directory change notification support) by default
+(unless built with the experimental flag) to fix hang with KDE
+file browser. Fix DNOTIFY flag mappings.  Fix hang (in wait_event
+waiting on an SMB response) in SendReceive when session dies but
+reconnects quickly from another task.  Add module init  parms for
+minimum number of large and small network buffers in the buffer pools,
+and for the maximum number of simultaneous requests.
+
+Version 1.26
+------------
+Add setfacl support to allow setting of ACLs remotely to Samba 3.10 and later
+and other POSIX CIFS compliant servers.  Fix error mapping for getfacl 
+to EOPNOTSUPP when server does not support posix acls on the wire. Fix 
+improperly zeroed buffer in CIFS Unix extensions set times call. 
+
+Version 1.25
+------------
+Fix internationlization problem in cifs readdir with filenames that map to 
+longer UTF8 strings than the string on the wire was in Unicode.  Add workaround
+for readdir to netapp servers. Fix search rewind (seek into readdir to return 
+non-consecutive entries).  Do not do readdir when server negotiates 
+buffer size to small to fit filename. Add support for reading POSIX ACLs from
+the server (add also acl and noacl mount options).
+
+Version 1.24
+------------
+Optionally allow using server side inode numbers, rather than client generated
+ones by specifying mount option "serverino" - this is required for some apps
+to work which double check hardlinked files and have persistent inode numbers.
+
+Version 1.23
+------------
+Multiple bigendian fixes. On little endian systems (for reconnect after
+network failure) fix tcp session reconnect code so we do not try first
+to reconnect on reverse of port 445. Treat reparse points (NTFS junctions)
+as directories rather than symlinks because we can do follow link on them.
+
 Version 1.22
 ------------
 Add config option to enable XATTR (extended attribute) support, mapping
