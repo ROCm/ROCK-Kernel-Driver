@@ -792,7 +792,9 @@ do_kern_mount(const char *fstype, int flags, char *name, void *data)
 	mnt = alloc_vfsmnt(name);
 	if (!mnt)
 		goto out;
-	if (type->fs_flags & FS_REQUIRES_DEV)
+	if (type->get_sb)
+		sb = type->get_sb(type, flags, name, data);
+	else if (type->fs_flags & FS_REQUIRES_DEV)
 		sb = get_sb_bdev(type, flags, name, data);
 	else if (type->fs_flags & FS_SINGLE)
 		sb = get_sb_single(type, flags, name, data);

@@ -926,9 +926,20 @@ struct dquot_operations {
 	int (*transfer) (struct inode *, struct iattr *);
 };
 
+/*
+ *		NOTE NOTE NOTE
+ *
+ *	->read_super() is going to die.  New method (->get_sb) should replace
+ * it.  The only reason why ->read_super() is left for _SHORT_ transition
+ * period is to avoid a single patch touching every fs.  They will be
+ * converted one-by-one and ONCE THAT IS DONE OR TWO WEEKS HAD PASSED
+ * (whatever sooner) ->read_super() WILL DISAPPEAR.  
+ */
+
 struct file_system_type {
 	const char *name;
 	int fs_flags;
+	struct super_block *(*get_sb) (struct file_system_type *, int, char *, void *);
 	struct super_block *(*read_super) (struct super_block *, void *, int);
 	struct module *owner;
 	struct file_system_type * next;
