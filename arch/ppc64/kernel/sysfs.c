@@ -161,7 +161,7 @@ void ppc64_enable_pmcs(void)
 #ifdef CONFIG_PPC_PSERIES
 	/* instruct hypervisor to maintain PMCs */
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR)
-		get_paca()->lppaca.xPMCRegsInUse = 1;
+		get_paca()->lppaca.pmcregs_in_use = 1;
 
 	/*
 	 * On SMT machines we have to set the run latch in the ctrl register

@@ -57,7 +57,7 @@ static __inline__ void _raw_spin_unlock(spinlock_t *lock)
 
 #if defined(CONFIG_PPC_SPLPAR) || defined(CONFIG_PPC_ISERIES)
 /* We only yield to the hypervisor if we are in shared processor mode */
-#define SHARED_PROCESSOR (get_paca()->lppaca.xSharedProc)
+#define SHARED_PROCESSOR (get_paca()->lppaca.shared_proc)
 extern void __spin_yield(spinlock_t *lock);
 extern void __rw_yield(rwlock_t *lock);
 #else /* SPLPAR || ISERIES */

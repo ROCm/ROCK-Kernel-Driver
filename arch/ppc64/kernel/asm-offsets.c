@@ -102,10 +102,10 @@ int main(void)
         DEFINE(PACAEMERGSP, offsetof(struct paca_struct, emergency_sp));
 	DEFINE(PACALPPACA, offsetof(struct paca_struct, lppaca));
 	DEFINE(PACAHWCPUID, offsetof(struct paca_struct, hw_cpu_id));
-        DEFINE(LPPACASRR0, offsetof(struct ItLpPaca, xSavedSrr0));
-        DEFINE(LPPACASRR1, offsetof(struct ItLpPaca, xSavedSrr1));
-	DEFINE(LPPACAANYINT, offsetof(struct ItLpPaca, xIntDword.xAnyInt));
-	DEFINE(LPPACADECRINT, offsetof(struct ItLpPaca, xIntDword.xFields.xDecrInt));
+	DEFINE(LPPACASRR0, offsetof(struct lppaca, saved_srr0));
+	DEFINE(LPPACASRR1, offsetof(struct lppaca, saved_srr1));
+	DEFINE(LPPACAANYINT, offsetof(struct lppaca, int_dword.any_int));
+	DEFINE(LPPACADECRINT, offsetof(struct lppaca, int_dword.fields.decr_int));
 
 	/* RTAS */
 	DEFINE(RTASBASE, offsetof(struct rtas_t, base));

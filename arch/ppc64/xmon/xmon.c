@@ -1497,7 +1497,7 @@ super_regs(void)
 	unsigned long val;
 #ifdef CONFIG_PPC_ISERIES
 	struct paca_struct *ptrPaca = NULL;
-	struct ItLpPaca *ptrLpPaca = NULL;
+	struct lppaca *ptrLpPaca = NULL;
 	struct ItLpRegSave *ptrLpRegSave = NULL;
 #endif
 
@@ -1521,10 +1521,10 @@ super_regs(void)
 		printf("  Local Processor Control Area (LpPaca): \n");
 		ptrLpPaca = ptrPaca->lppaca_ptr;
 		printf("    Saved Srr0=%.16lx  Saved Srr1=%.16lx \n",
-		       ptrLpPaca->xSavedSrr0, ptrLpPaca->xSavedSrr1);
+		       ptrLpPaca->saved_srr0, ptrLpPaca->saved_srr1);
 		printf("    Saved Gpr3=%.16lx  Saved Gpr4=%.16lx \n",
-		       ptrLpPaca->xSavedGpr3, ptrLpPaca->xSavedGpr4);
-		printf("    Saved Gpr5=%.16lx \n", ptrLpPaca->xSavedGpr5);
+		       ptrLpPaca->saved_gpr3, ptrLpPaca->saved_gpr4);
+		printf("    Saved Gpr5=%.16lx \n", ptrLpPaca->saved_gpr5);
     
 		printf("  Local Processor Register Save Area (LpRegSave): \n");
 		ptrLpRegSave = ptrPaca->reg_save_ptr;

@@ -228,7 +228,7 @@ static void iSeries_tb_recal(void)
 /*
  * For iSeries shared processors, we have to let the hypervisor
  * set the hardware decrementer.  We set a virtual decrementer
- * in the ItLpPaca and call the hypervisor if the virtual
+ * in the lppaca and call the hypervisor if the virtual
  * decrementer is less than the current value in the hardware
  * decrementer. (almost always the new decrementer value will
  * be greater than the current hardware decementer so the hypervisor
@@ -254,7 +254,7 @@ int timer_interrupt(struct pt_regs * regs)
 	profile_tick(CPU_PROFILING, regs);
 #endif
 
-	lpaca->lppaca.xIntDword.xFields.xDecrInt = 0;
+	lpaca->lppaca.int_dword.fields.decr_int = 0;
 
 	while (lpaca->next_jiffy_update_tb <= (cur_tb = get_tb())) {
 		/*

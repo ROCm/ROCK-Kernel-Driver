@@ -259,8 +259,8 @@ void do_IRQ(struct pt_regs *regs)
 
 	lpaca = get_paca();
 #ifdef CONFIG_SMP
-	if (lpaca->lppaca.xIntDword.xFields.xIpiCnt) {
-		lpaca->lppaca.xIntDword.xFields.xIpiCnt = 0;
+	if (lpaca->lppaca.int_dword.fields.ipi_cnt) {
+		lpaca->lppaca.int_dword.fields.ipi_cnt = 0;
 		iSeries_smp_message_recv(regs);
 	}
 #endif /* CONFIG_SMP */
@@ -270,8 +270,8 @@ void do_IRQ(struct pt_regs *regs)
 
 	irq_exit();
 
-	if (lpaca->lppaca.xIntDword.xFields.xDecrInt) {
-		lpaca->lppaca.xIntDword.xFields.xDecrInt = 0;
+	if (lpaca->lppaca.int_dword.fields.decr_int) {
+		lpaca->lppaca.int_dword.fields.decr_int = 0;
 		/* Signal a fake decrementer interrupt */
 		timer_interrupt(regs);
 	}
