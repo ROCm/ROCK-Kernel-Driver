@@ -461,15 +461,20 @@ static int raid1_issue_flush(request_queue_t *q, struct gendisk *disk,
 	spin_lock_irqsave(&conf->device_lock, flags);
 	for (i=0; i<mddev->raid_disks; i++) {
 		mdk_rdev_t *rdev = conf->mirrors[i].rdev;
-		if (rdev && !rdev->faulty) {
+		if (rdev && !rdev->faulty && atomic_read(&rdev->nr_pending)) {
 			struct block_device *bdev = rdev->bdev;
 			request_queue_t *r_queue = bdev_get_queue(bdev);
 
-			if (r_queue->issue_flush_fn) {
+			atomic_inc(&rdev->nr_pending);
+			spin_unlock_irqrestore(&conf->device_lock, flags);
+
+			if (r_queue->issue_flush_fn)
 				ret = r_queue->issue_flush_fn(r_queue, bdev->bd_disk, error_sector);
-				if (ret)
-					break;
-			}
+
+			spin_lock_irqsave(&conf->device_lock, flags);
+			atomic_dec(&rdev->nr_pending);
+			if (ret)
+				break;
 		}
 	}
 	spin_unlock_irqrestore(&conf->device_lock, flags);
@@ -485,11 +490,17 @@ static void unplug_slaves(mddev_t *mddev)
 	spin_lock_irqsave(&conf->device_lock, flags);
 	for (i=0; i<mddev->raid_disks; i++) {
 		mdk_rdev_t *rdev = conf->mirrors[i].rdev;
-		if (rdev && !rdev->faulty) {
+		if (rdev && atomic_read(&rdev->nr_pending)) {
 			request_queue_t *r_queue = bdev_get_queue(rdev->bdev);
+
+			atomic_inc(&rdev->nr_pending);
+			spin_unlock_irqrestore(&conf->device_lock, flags);
 
 			if (r_queue->unplug_fn)
 				r_queue->unplug_fn(r_queue);
+
+			spin_lock_irqsave(&conf->device_lock, flags);
+			atomic_dec(&rdev->nr_pending);
 		}
 	}
 	spin_unlock_irqrestore(&conf->device_lock, flags);

@@ -159,16 +159,25 @@ static void unplug_slaves(mddev_t *mddev)
 {
 	multipath_conf_t *conf = mddev_to_conf(mddev);
 	int i;
+	unsigned long flags;
 
+	spin_lock_irqsave(&conf->device_lock, flags);
 	for (i=0; i<mddev->raid_disks; i++) {
 		mdk_rdev_t *rdev = conf->multipaths[i].rdev;
 		if (rdev && !rdev->faulty) {
 			request_queue_t *r_queue = bdev_get_queue(rdev->bdev);
 
+			atomic_inc(&rdev->nr_pending);
+			spin_unlock_irqrestore(&conf->device_lock, flags);
+
 			if (r_queue->unplug_fn)
 				r_queue->unplug_fn(r_queue);
+
+			spin_lock_irqsave(&conf->device_lock, flags);
+			atomic_dec(&rdev->nr_pending);
 		}
 	}
+	spin_unlock_irqrestore(&conf->device_lock, flags);
 }
 static void multipath_unplug(request_queue_t *q)
 {
