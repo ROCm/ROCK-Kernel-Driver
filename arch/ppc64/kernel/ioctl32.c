@@ -4496,7 +4496,7 @@ int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int, u
 {
 	int i;
 	if (!additional_ioctls) {
-		additional_ioctls = get_zeroed_page(GFP_KERNEL);
+		additional_ioctls = (struct ioctl_trans *)get_zeroed_page(GFP_KERNEL);
 		if (!additional_ioctls)
 			return -ENOMEM;
 	}

@@ -11,10 +11,11 @@
 #include <linux/sched.h>
 #include <linux/signal.h>
 #include <linux/cache.h>
-#include <asm/io.h>
-#include "i8259.h"
 #include <linux/irq.h>
+#include <linux/interrupt.h>
+#include <asm/io.h>
 #include <asm/ppcdebug.h>
+#include "i8259.h"
 
 unsigned char cached_8259[2] = { 0xff, 0xff };
 #define cached_A1 (cached_8259[0])
