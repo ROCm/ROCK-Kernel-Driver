@@ -697,19 +697,20 @@ static int transition_frequency(struct powernow_k8_data *data, unsigned int inde
 		return 1;
 	}
 
-	dprintk(KERN_DEBUG PFX "changing to fid 0x%x, vid 0x%x\n", fid, vid);
+	dprintk(KERN_DEBUG PFX "cpu %d, changing to fid 0x%x, vid 0x%x\n",
+				smp_processor_id(), fid, vid);
 
 	freqs.cpu = data->cpu;
 
-	freqs.old = find_freq_from_fid(data->currfid);
-	freqs.new = find_freq_from_fid(fid);
+	freqs.old = find_khz_freq_from_fid(data->currfid);
+	freqs.new = find_khz_freq_from_fid(fid);
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
 	down(&fidvid_sem);
 	res = transition_fid_vid(data, fid, vid);
 	up(&fidvid_sem);
 
-	freqs.new = find_freq_from_fid(data->currfid);
+	freqs.new = find_khz_freq_from_fid(data->currfid);
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 
 	return res;
