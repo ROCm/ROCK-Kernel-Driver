@@ -332,11 +332,11 @@ struct net_device * __init el16_probe(int unit)
 	else if (io != 0)
 		err = -ENXIO;		/* Don't probe at all. */
 	else {
-			for (port = ports; *port; port++) {
-					err = el16_probe1(dev, io);
-					if (!err)
-						break;
-			}
+		for (port = ports; *port; port++) {
+			err = el16_probe1(dev, *port);
+			if (!err)
+				break;
+		}
 	}
 
 	if (err)
