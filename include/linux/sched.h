@@ -568,6 +568,7 @@ struct sched_domain {
 	int flags;			/* See SD_FLAG_* */
 
 	/* Runtime fields. */
+	unsigned long last_balance;	/* init to jiffies. units in jiffies */
 	unsigned int balance_interval;	/* initialise to 1. units in ms. */
 	unsigned int nr_balance_failed; /* initialise to 0 */
 };
@@ -584,6 +585,7 @@ struct sched_domain {
 	.cache_hot_time		= 0,			\
 	.cache_nice_tries	= 0,			\
 	.flags			= SD_FLAG_FASTMIGRATE | SD_FLAG_NEWIDLE | SD_FLAG_WAKE,\
+	.last_balance		= jiffies,		\
 	.balance_interval	= 1,			\
 	.nr_balance_failed	= 0,			\
 }
@@ -600,6 +602,7 @@ struct sched_domain {
 	.cache_hot_time		= (5*1000000/2),	\
 	.cache_nice_tries	= 1,			\
 	.flags			= SD_FLAG_FASTMIGRATE | SD_FLAG_NEWIDLE,\
+	.last_balance		= jiffies,		\
 	.balance_interval	= 1,			\
 	.nr_balance_failed	= 0,			\
 }
@@ -617,6 +620,7 @@ struct sched_domain {
 	.cache_hot_time		= (10*1000000),		\
 	.cache_nice_tries	= 1,			\
 	.flags			= SD_FLAG_EXEC,		\
+	.last_balance		= jiffies,		\
 	.balance_interval	= 1,			\
 	.nr_balance_failed	= 0,			\
 }

@@ -1759,26 +1759,26 @@ static void rebalance_tick(int this_cpu, runqueue_t *this_rq, enum idle_type idl
 
 	/* Run through all this CPU's domains */
 	do {
-		int modulo;
+		unsigned long interval;
 
 		if (unlikely(!domain->groups))
 			break;
 
-		modulo = domain->balance_interval;
-
+		interval = domain->balance_interval;
 		if (idle != IDLE)
-			modulo *= domain->busy_factor;
+			interval *= domain->busy_factor;
 
 		/* scale ms to jiffies */
-		modulo = modulo * HZ / 1000;
-		if (modulo == 0)
-			modulo = 1;
+		interval = interval * HZ / 1000;
+		if (unlikely(interval == 0))
+			interval = 1;
 
-		if (!(j % modulo)) {
+		if (j - domain->last_balance >= interval) {
 			if (load_balance(this_cpu, this_rq, domain, idle)) {
 				/* We've pulled tasks over so no longer idle */
 				idle = NOT_IDLE;
 			}
+			domain->last_balance += interval;
 		}
 
 		domain = domain->parent;
