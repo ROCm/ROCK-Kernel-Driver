@@ -880,12 +880,12 @@ static int uhci_submit_control(struct uhci_hcd *uhci, struct urb *urb)
 	urbp->qh = qh;
 	qh->urbp = urbp;
 
+	uhci_insert_tds_in_qh(qh, urb, UHCI_PTR_BREADTH);
+
 	/* Low speed transfers get a different queue, and won't hog the bus */
-	if (urb->dev->speed == USB_SPEED_LOW) {
-		uhci_insert_tds_in_qh(qh, urb, UHCI_PTR_DEPTH);
+	if (urb->dev->speed == USB_SPEED_LOW)
 		uhci_insert_qh(uhci, uhci->skel_ls_control_qh, urb);
-	} else {
-		uhci_insert_tds_in_qh(qh, urb, UHCI_PTR_BREADTH);
+	else {
 		uhci_insert_qh(uhci, uhci->skel_hs_control_qh, urb);
 		uhci_inc_fsbr(uhci, urb);
 	}
