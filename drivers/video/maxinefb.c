@@ -41,13 +41,8 @@
 /* whether are really running on a maxine, KM                       */
 #include <asm/bootinfo.h>
 
-#define arraysize(x)    (sizeof(x)/sizeof(*(x)))
-
-static struct display disp;
 static struct fb_info fb_info;
-
-unsigned long fb_regs;
-unsigned char fb_bitmask;
+static struct display disp;
 
 static struct fb_var_screeninfo maxinefb_defined = {
 	xres:		1024,
@@ -108,10 +103,9 @@ static int maxinefb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	green >>= 8;	/* wide, but the harware colormap */
 	blue  >>= 8;	/* registers are only 8 bits wide */
 
-	hw_colorvalue =
-	    (blue << 16) + (green << 8) + (red);
-	maxinefb_ims332_write_register(IMS332_REG_COLOR_PALETTE +
-				       regno,
+	hw_colorvalue = (blue << 16) + (green << 8) + (red);
+	
+	maxinefb_ims332_write_register(IMS332_REG_COLOR_PALETTE + regno,
 				       hw_colorvalue);
 	return 0;
 }
@@ -179,6 +173,7 @@ int __init maxinefb_init(void)
 	fb_info.updatevar = gen_update_var;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
+	fb_alloc_cmap(&fb_info.cmap, 256, 0);
 	gen_set_disp(-1, &fb_info);
 
 	if (register_framebuffer(&fb_info) < 0)

@@ -83,7 +83,8 @@ anakinfb_init(void)
 	memset(&display, 0, sizeof(struct display));
 
 	strcpy(fb_info.modename, anakinfb_fix.id);
-	fb_info.node = fb_info.currcon = -1;
+	fb_info.node = NODEV;
+	fb_info.currcon = -1;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 	fb_info.fbops = &anakinfb_ops;
 	fb_info.var = anakinfb_var;

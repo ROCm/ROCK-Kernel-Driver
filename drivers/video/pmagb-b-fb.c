@@ -40,12 +40,6 @@
 #include "pmagb-b-fb.h"
 
 #include <video/fbcon.h>
-#include <video/fbcon-mfb.h>
-#include <video/fbcon-cfb2.h>
-#include <video/fbcon-cfb4.h>
-#include <video/fbcon-cfb8.h>
-
-#define arraysize(x)    (sizeof(x)/sizeof(*(x)))
 
 struct pmagb_b_ramdac_regs {
 	unsigned char addr_low;
@@ -57,317 +51,119 @@ struct pmagb_b_ramdac_regs {
 	unsigned char cmap;
 };
 
-struct pmagb_b_my_fb_info {
-	struct fb_info info;
-	struct pmagb_b_ramdac_regs *bt459_regs;
-	unsigned long pmagbb_fb_start;
-	unsigned long pmagbb_fb_size;
-	unsigned long pmagbb_fb_line_length;
-};
-
-static struct display disp;
 /*
  * Max 3 TURBOchannel slots -> max 3 PMAGB-B :)
  */
-static struct pmagb_b_my_fb_info pmagbb_fb_info[3];
+static struct fb_info pmagbb_fb_info[3];
+static struct display pmagbb_disp[3];
 
 static struct fb_var_screeninfo pmagbbfb_defined = {
-	0, 0, 0, 0,		/* W,H, W, H (virtual) load xres,xres_virtual */
-	0, 0,			/* virtual -> visible no offset */
-	0,			/* depth -> load bits_per_pixel */
-	0,			/* greyscale ? */
-	{0, 0, 0},		/* R */
-	{0, 0, 0},		/* G */
-	{0, 0, 0},		/* B */
-	{0, 0, 0},		/* transparency */
-	0,			/* standard pixel format */
-	FB_ACTIVATE_NOW,
-	274, 195,		/* 14" monitor */
-	FB_ACCEL_NONE,
-	0L, 0L, 0L, 0L, 0L,
-	0L, 0L, 0,		/* No sync info */
-	FB_VMODE_NONINTERLACED,
-	{0, 0, 0, 0, 0, 0}
+	xres:		1280,
+	yres:		1024,
+	xres_virtual:	1280,
+	yres_virtual:	1024,
+	bits_per_pixel:	8,
+	activate:	FB_ACTIVATE_NOW,
+	height:		274,
+	width:		195,
+	accel_flags:	FB_ACCEL_NONE,
+	vmode:		FB_VMODE_NONINTERLACED,
 };
 
-struct pmagbbfb_par {
-};
-
-struct pmagbbfb_par current_par;
-
-static void pmagbbfb_encode_var(struct fb_var_screeninfo *var,
-				struct pmagbbfb_par *par)
-{
-	int i = 0;
-	var->xres = 1280;
-	var->yres = 1024;
-	var->xres_virtual = 1280;
-	var->yres_virtual = 1024;
-	var->xoffset = 0;
-	var->yoffset = 0;
-	var->bits_per_pixel = 8;
-	var->grayscale = 0;
-	var->transp.offset = 0;
-	var->transp.length = 0;
-	var->transp.msb_right = 0;
-	var->nonstd = 0;
-	var->activate = 1;
-	var->height = -1;
-	var->width = -1;
-	var->vmode = FB_VMODE_NONINTERLACED;
-	var->pixclock = 0;
-	var->sync = 0;
-	var->left_margin = 0;
-	var->right_margin = 0;
-	var->upper_margin = 0;
-	var->lower_margin = 0;
-	var->hsync_len = 0;
-	var->vsync_len = 0;
-	for (i = 0; i < arraysize(var->reserved); i++)
-		var->reserved[i] = 0;
-}
-
-static void pmagbbfb_get_par(struct pmagbbfb_par *par)
-{
-	*par = current_par;
-}
-
-static int pmagbb_fb_update_var(int con, struct fb_info *info)
-{
-	return 0;
-}
-
-static int pmagbb_do_fb_set_var(struct fb_var_screeninfo *var,
-				int isactive)
-{
-	struct pmagbbfb_par par;
-
-	pmagbbfb_get_par(&par);
-	pmagbbfb_encode_var(var, &par);
-	return 0;
+static struct fb_fix_screeninfo pmagbafb_fix = {
+	id:		"PMAGB-BA",
+	smem_len:	(1280 * 1024),
+	type:		FB_TYPE_PACKED_PIXELS,
+	visual:		FB_VISUAL_PSEUDOCOLOR,
+	line_length:	1280,
 }
 
 /*
  * Turn hardware cursor off
  */
-void pmagbbfb_erase_cursor(struct pmagb_b_my_fb_info *info)
+void pmagbbfb_erase_cursor(struct pmagb_b_ramdac_regs *bt459_regs)
 {
-	info->bt459_regs->addr_low = 0;
-	info->bt459_regs->addr_hi = 3;
-	info->bt459_regs->data = 0;
-}
-
-/*
- * Write to a Bt459 color map register
- */
-void pmagb_b_bt459_write_colormap(struct pmagb_b_my_fb_info *info,
-				  int reg, __u8 red, __u8 green, __u8 blue)
-{
-	info->bt459_regs->addr_low = (__u8) reg;
-	info->bt459_regs->addr_hi = 0;
-	info->bt459_regs->cmap = red;
-	info->bt459_regs->cmap = green;
-	info->bt459_regs->cmap = blue;
-}
-
-/*
- * Get the palette
- */
-
-static int pmagbbfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
-			     struct fb_info *info)
-{
-	unsigned int i;
-	unsigned int length;
-
-	if (((cmap->start) + (cmap->len)) >= 256) {
-		length = 256 - (cmap->start);
-	} else {
-		length = cmap->len;
-	}
-	for (i = 0; i < length; i++) {
-		/*
-		 * TODO
-		 */
-	}
-	return 0;
+	bt459_regs->addr_low = 0;
+	bt459_regs->addr_hi = 3;
+	bt459_regs->data = 0;
 }
 
 /*
  * Set the palette. 
  */
-static int pmagbbfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			     struct fb_info *info)
+static int pmagbbfb_setcolreg(unsigned regno, unsigned red, unsigned green,
+                              unsigned blue, unsigned transp,
+                              struct fb_info *info)
 {
-	unsigned int i;
-	__u8 cmap_red, cmap_green, cmap_blue;
-	unsigned int length;
+	struct pmagb_b_ramdac_regs *bt459_regs = (struct pmagb_b_ramdac_regs *) info->par;
+	
+	if (regno >= info->cmap.len)
+		return 1;
 
-	if (((cmap->start) + (cmap->len)) >= 256)
-		length = 256 - (cmap->start);
-	else
-		length = cmap->len;
+	red   >>= 8;	/* The cmap fields are 16 bits    */
+	green >>= 8;	/* wide, but the harware colormap */
+	blue  >>= 8;	/* registers are only 8 bits wide */
 
-	for (i = 0; i < length; i++) {
-		cmap_red = ((cmap->red[i]) >> 8);	/* The cmap fields are 16 bits    */
-		cmap_green = ((cmap->green[i]) >> 8);	/* wide, but the harware colormap */
-		cmap_blue = ((cmap->blue[i]) >> 8);	/* registers are only 8 bits wide */
-
-		pmagb_b_bt459_write_colormap((struct pmagb_b_my_fb_info *)
-					     info, cmap->start + i,
-					     cmap_red, cmap_green,
-					     cmap_blue);
-	}
+	bt459_regs->addr_low = (__u8) regno;
+	bt459_regs->addr_hi = 0;
+	bt459_regs->cmap = red;
+	bt459_regs->cmap = green;
+	bt459_regs->cmap = blue;
 	return 0;
-}
-
-static int pmagbbfb_get_var(struct fb_var_screeninfo *var, int con,
-			    struct fb_info *info)
-{
-	struct pmagbbfb_par par;
-	if (con == -1) {
-		pmagbbfb_get_par(&par);
-		pmagbbfb_encode_var(var, &par);
-	} else
-		*var = fb_display[con].var;
-	return 0;
-}
-
-
-static int pmagbbfb_set_var(struct fb_var_screeninfo *var, int con,
-			    struct fb_info *info)
-{
-	int err;
-
-	if ((err = pmagbb_do_fb_set_var(var, 1)))
-		return err;
-	return 0;
-}
-
-static void pmagbbfb_encode_fix(struct fb_fix_screeninfo *fix,
-				struct pmagbbfb_par *par,
-				struct pmagb_b_my_fb_info *info)
-{
-	memset(fix, 0, sizeof(struct fb_fix_screeninfo));
-	strcpy(fix->id, "PMAGB-BA");
-
-	fix->smem_start = info->pmagbb_fb_start;
-	fix->smem_len = info->pmagbb_fb_size;
-	fix->type = FB_TYPE_PACKED_PIXELS;
-	fix->visual = FB_VISUAL_PSEUDOCOLOR;
-	fix->xpanstep = 0;
-	fix->ypanstep = 0;
-	fix->ywrapstep = 0;
-	fix->line_length = info->pmagbb_fb_line_length;
-}
-
-static int pmagbbfb_get_fix(struct fb_fix_screeninfo *fix, int con,
-			    struct fb_info *info)
-{
-	struct pmagbbfb_par par;
-
-	pmagbbfb_get_par(&par);
-	pmagbbfb_encode_fix(fix, &par, (struct pmagb_b_my_fb_info *) info);
-
-	return 0;
-}
-
-static int pmagbbfb_switch(int con, struct fb_info *info)
-{
-	pmagbb_do_fb_set_var(&fb_display[con].var, 1);
-	info->currcon = con;
-	return 0;
-}
-
-static void pmagbbfb_set_disp(int con, struct pmagb_b_my_fb_info *info)
-{
-	struct fb_fix_screeninfo fix;
-	struct display *display;
-
-	if (con >= 0)
-		display = &fb_display[con];
-	else
-		display = &disp;	/* used during initialization */
-
-	pmagbbfb_get_fix(&fix, con, (struct fb_info *) info);
-
-	display->visual = fix.visual;
-	display->type = fix.type;
-	display->type_aux = fix.type_aux;
-	display->ypanstep = fix.ypanstep;
-	display->ywrapstep = fix.ywrapstep;
-	display->line_length = fix.line_length;
-	display->next_line = fix.line_length;
-	display->can_soft_blank = 0;
-	display->inverse = 0;
-
-	display->dispsw = &fbcon_cfb8;
 }
 
 static struct fb_ops pmagbbfb_ops = {
 	owner:		THIS_MODULE,
-	fb_get_fix:	pmagbbfb_get_fix,
-	fb_get_var:	pmagbbfb_get_var,
-	fb_set_var:	pmagbbfb_set_var,
-	fb_get_cmap:	pmagbbfb_get_cmap,
-	fb_set_cmap:	pmagbbfb_set_cmap,
+	fb_get_fix:	gen_get_fix,
+	fb_get_var:	gen_get_var,
+	fb_set_var:	gen_set_var,
+	fb_get_cmap:	gen_get_cmap,
+	fb_set_cmap:	gen_set_cmap,
+	fb_setcolreg:	pmagbbfb_setcolreg,
+	fb_fillrect:	cfb_fillrect,
+	fb_copyarea:	cfb_copyarea,
+	fb_imageblit:	cfb_imageblit,
 };
 
 int __init pmagbbfb_init_one(int slot)
 {
 	unsigned long base_addr = get_tc_base_addr(slot);
-	struct pmagb_b_my_fb_info *ip =
-	    (struct pmagb_b_my_fb_info *) &pmagbb_fb_info[slot];
+	struct fb_info *info = &pmagbb_fb_info[slot];
+	struct display *disp = &pmagbb_disp[slot];
 
 	printk("PMAGB-BA framebuffer in slot %d\n", slot);
-
 	/*
 	 * Framebuffer display memory base address and friends
 	 */
-	ip->bt459_regs =
-	    (struct pmagb_b_ramdac_regs *) (base_addr +
-					    PMAGB_B_BT459_OFFSET);
-	ip->pmagbb_fb_start = base_addr + PMAGB_B_ONBOARD_FBMEM_OFFSET;
-	ip->pmagbb_fb_size = 1280 * 1024;
-	ip->pmagbb_fb_line_length = 1280;
-
+	pmagbbfb_fix.smem_start = base_addr + PMAGB_B_ONBOARD_FBMEM_OFFSET;
+	info->par = (base_addr + PMAGB_B_BT459_OFFSET); 
+	
 	/*
 	 * Configure the Bt459 RAM DAC
 	 */
-	pmagbbfb_erase_cursor(ip);
-
-	/*
-	 *      Fill in the available video resolution
-	 */
-
-	pmagbbfb_defined.xres = 1280;
-	pmagbbfb_defined.yres = 1024;
-	pmagbbfb_defined.xres_virtual = 1280;
-	pmagbbfb_defined.yres_virtual = 1024;
-	pmagbbfb_defined.bits_per_pixel = 8;
+	pmagbbfb_erase_cursor((struct pmagb_b_ramdac_regs *) info->par);
 
 	/*
 	 *      Let there be consoles..
 	 */
-	strcpy(ip->info.modename, "PMAGB-BA");
-	ip->info.changevar = NULL;
-	ip->info.node = NODEV;
-	ip->info.fbops = &pmagbbfb_ops;
-	ip->info.screen_base = (char *) ip->pmagbb_fb_start;
-	fix->smem_len = info->pmagbb_fb_size;
-	ip->info.disp = &disp;
-	ip->info.currcon = -1;
-	ip->info.switch_con = &pmagbbfb_switch;
-	ip->info.updatevar = &pmagbb_fb_update_var;
-	ip->info.flags = FBINFO_FLAG_DEFAULT;
+	strcpy(info->modename, pmagbbfb_fix.id);
+	info->changevar = NULL;
+	info->node = NODEV;
+	info->fbops = &pmagbbfb_ops;
+	info->var = pmagbbfb_defined;
+	info->fix = pmagbbfb_fix;
+	info->screen_base = pmagbbfb_fix.smem_start; 
+	info->disp = &disp;
+	info->currcon = -1;
+	info->switch_con = gen_switch;
+	info->updatevar = gen_update_var;
+	info->flags = FBINFO_FLAG_DEFAULT;
 
-	pmagbb_do_fb_set_var(&pmagbbfb_defined, 1);
-	pmagbbfb_get_var(&disp.var, -1, (struct fb_info *) ip);
-	pmagbbfb_set_disp(-1, ip);
+	fb_alloc_cmap(&fb_info.cmap, 256, 0);
+	gen_set_disp(-1, info);
 
-	if (register_framebuffer((struct fb_info *) ip) < 0)
+	if (register_framebuffer(info) < 0)
 		return 1;
-
 	return 0;
 }
 
