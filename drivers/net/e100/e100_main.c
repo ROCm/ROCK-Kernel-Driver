@@ -46,6 +46,21 @@
 
 /* Change Log
  *
+ * 2.1.29	12/20/02
+ *   o Bug fix: Device command timeout due to SMBus processing during init
+ *   o Bug fix: Not setting/clearing I (Interrupt) bit in tcb correctly
+ *   o Bug fix: Not using EEPROM WoL setting as default in ethtool
+ *   o Bug fix: Not able to set autoneg on using ethtool when interface down
+ *   o Bug fix: Not able to change speed/duplex using ethtool/mii
+ *     when interface up
+ *   o Bug fix: Ethtool shows autoneg on when forced to 100/Full
+ *   o Bug fix: Compiler error when CONFIG_PROC_FS not defined
+ *   o Bug fix: 2.5.44 e100 doesn't load with preemptive kernel enabled
+ *     (sleep while holding spinlock)
+ *   o Bug fix: 2.1.24-k1 doesn't display complete statistics
+ *   o Bug fix: System panic due to NULL watchdog timer dereference during
+ *     ifconfig down, rmmod and insmod
+ *
  * 2.1.24       10/7/02
  *   o Bug fix: Wrong files under /proc/net/PRO_LAN_Adapters/ when interface
  *     name is changed
@@ -56,21 +71,6 @@
  *   o Removed misleading printks
  *
  * 2.1.12       8/2/02
- *   o Feature: ethtool register dump
- *   o Bug fix: Driver passes wrong name to /proc/interrupts
- *   o Bug fix: Ethernet bridging not working 
- *   o Bug fix: Promiscuous mode is not working
- *   o Bug fix: Checked return value from copy_from_user (William Stinson,
- *     wstinson@infonie.fr)
- *   o Bug fix: ARP wake on LAN fails
- *   o Bug fix: mii-diag does not update driver level's speed, duplex and
- *     re-configure flow control
- *   o Bug fix: Ethtool shows wrong speed/duplex when not connected
- *   o Bug fix: Ethtool shows wrong speed/duplex when reconnected if forced 
- *     speed/duplex
- *   o Bug fix: PHY loopback diagnostic fails
- *
- * 2.1.6        7/5/02
  */
  
 #include <linux/config.h>
@@ -135,7 +135,7 @@ static void e100_non_tx_background(unsigned long);
 
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
-char e100_driver_version[]="2.1.24-k2";
+char e100_driver_version[]="2.1.29-k1";
 const char *e100_full_driver_name = "Intel(R) PRO/100 Network Driver";
 char e100_short_driver_name[] = "e100";
 static int e100nics = 0;
@@ -652,7 +652,7 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	cal_checksum = e100_eeprom_calculate_chksum(bdp);
 	read_checksum = e100_eeprom_read(bdp, (bdp->eeprom_size - 1));
 	if (cal_checksum != read_checksum) {
-                printk(KERN_ERR "e100: Corrupted EERPROM on instance #%d\n",
+                printk(KERN_ERR "e100: Corrupted EEPROM on instance #%d\n",
 		       e100nics);
                 rc = -ENODEV;
                 goto err_pci;
@@ -2948,19 +2948,6 @@ e100_D101M_checksum(struct e100_private *bdp, struct sk_buff *skb)
 void __devinit
 e100_print_brd_conf(struct e100_private *bdp)
 {
-	if (netif_carrier_ok(bdp->device)) {
-		printk(KERN_NOTICE
-		       "  Mem:0x%08lx  IRQ:%d  Speed:%d Mbps  Dx:%s\n",
-		       (unsigned long) bdp->device->mem_start,
-		       bdp->device->irq, bdp->cur_line_speed,
-		       (bdp->cur_dplx_mode == FULL_DUPLEX) ? "Full" : "Half");
-	} else {
-		printk(KERN_NOTICE
-		       "  Mem:0x%08lx  IRQ:%d  Speed:%d Mbps  Dx:%s\n",
-		       (unsigned long) bdp->device->mem_start,
-		       bdp->device->irq, 0, "N/A");
-	}
-
 	/* Print the string if checksum Offloading was enabled */
 	if (bdp->flags & DF_CSUM_OFFLOAD)
 		printk(KERN_NOTICE "  Hardware receive checksums enabled\n");
