@@ -5,8 +5,9 @@
 
 O_TARGET     := pci.o
 
+mod-subdirs  := ac97 ali5451 cs46xx emu10k1 korg1212 nm256 rme9652 trident ymfpci
+
 subdir-y     := ac97 ali5451 cs46xx emu10k1 korg1212 nm256 rme9652 trident ymfpci
-subdir-m     := $(subdir-y)
 
 snd-als4000-objs := als4000.o
 snd-cmipci-objs := cmipci.o

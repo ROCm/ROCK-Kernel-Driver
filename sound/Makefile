@@ -5,21 +5,17 @@ O_TARGET := sound.o
 
 export-objs     := sound_core.o
 
+mod-subdirs	:= oss core i2c drivers isa pci ppc synth
+
 obj-$(CONFIG_SOUND) += soundcore.o
 
 subdir-$(CONFIG_SOUND_PRIME) += oss
-
 ifeq ($(CONFIG_SOUND_PRIME),y)
-  subdir-m += oss
   obj-y += oss/sounddrivers.o
 endif
 
-_subdirs := core i2c drivers isa pci ppc arm synth
-
-subdir-$(CONFIG_SND) += $(_subdirs)
-
+subdir-$(CONFIG_SND) += core i2c drivers isa pci ppc arm synth
 ifeq ($(CONFIG_SND),y)
-  subdir-m += $(_subdirs)
   obj-y += core/core.o i2c/_i2c.o
   obj-y += drivers/drivers.o \
 	   drivers/mpu401/_mpu401.o \

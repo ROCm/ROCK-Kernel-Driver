@@ -5,8 +5,9 @@
 
 O_TARGET     := drivers.o
 
+mod-subdirs  := opl3 mpu401
+
 subdir-y     := opl3 mpu401
-subdir-m     := $(subdir-y)
 
 snd-dummy-objs := dummy.o
 snd-mtpav-objs := mtpav.o

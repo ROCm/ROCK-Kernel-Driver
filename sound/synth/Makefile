@@ -5,8 +5,9 @@
 
 O_TARGET     := synth.o
 
+mod-subdirs  := emux
+
 subdir-y     := emux
-subdir-m     := $(subdir-y)
 
 export-objs  := util_mem.o
 

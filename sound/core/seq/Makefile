@@ -5,9 +5,11 @@
 
 O_TARGET     := sq.o
 
+mod-subdirs  := instr
+
 subdir-y     := instr
-subdir-m     := $(subdir-y)
 obj-y        += instr/instr.o
+
 subdir-$(CONFIG_SND_SEQUENCER_OSS) += oss
 ifeq ($(CONFIG_SND_SEQUENCER_OSS),y)
   obj-y	     += oss/oss.o

@@ -5,8 +5,9 @@
 
 O_TARGET     := isa.o
 
+mod-subdirs  := ad1816a ad1848 cs423x es1688 gus opti9xx sb wavefront
+
 subdir-y     := ad1816a ad1848 cs423x es1688 gus opti9xx sb wavefront
-subdir-m     := $(subdir-y)
 
 snd-als100-objs := als100.o
 snd-azt2320-objs := azt2320.o
