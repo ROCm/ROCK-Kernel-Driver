@@ -1566,8 +1566,11 @@ static int ext3_add_nondir(handle_t *handle,
 {
 	int err = ext3_add_entry(handle, dentry, inode);
 	if (!err) {
-		d_instantiate(dentry, inode);
-		return 0;
+		err = ext3_mark_inode_dirty(handle, inode);
+		if (!err) {
+			d_instantiate(dentry, inode);
+			return 0;
+		}
 	}
 	ext3_dec_count(handle, inode);
 	iput(inode);
@@ -1609,7 +1612,6 @@ static int ext3_create (struct inode * dir, struct dentry * dentry, int mode)
 		else
 			inode->i_mapping->a_ops = &ext3_aops;
 		err = ext3_add_nondir(handle, dentry, inode);
-		ext3_mark_inode_dirty(handle, inode);
 	}
 	ext3_journal_stop(handle, dir);
 	unlock_kernel();
@@ -1642,7 +1644,6 @@ static int ext3_mknod (struct inode * dir, struct dentry *dentry,
 		inode->i_op = &ext3_special_inode_operations;
 #endif
 		err = ext3_add_nondir(handle, dentry, inode);
-		ext3_mark_inode_dirty(handle, inode);
 	}
 	ext3_journal_stop(handle, dir);
 	unlock_kernel();
@@ -2105,7 +2106,6 @@ static int ext3_symlink (struct inode * dir,
 	}
 	EXT3_I(inode)->i_disksize = inode->i_size;
 	err = ext3_add_nondir(handle, dentry, inode);
-	ext3_mark_inode_dirty(handle, inode);
 out_stop:
 	ext3_journal_stop(handle, dir);
 	unlock_kernel();
@@ -2140,7 +2140,6 @@ static int ext3_link (struct dentry * old_dentry,
 	atomic_inc(&inode->i_count);
 
 	err = ext3_add_nondir(handle, dentry, inode);
-	ext3_mark_inode_dirty(handle, inode);
 	ext3_journal_stop(handle, dir);
 	unlock_kernel();
 	return err;
