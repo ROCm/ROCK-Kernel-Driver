@@ -1,6 +1,9 @@
 #ifndef _NET_DN_FIB_H
 #define _NET_DN_FIB_H
 
+/* WARNING: The ordering of these elements must match ordering
+ *          of RTA_* rtnetlink attribute numbers.
+ */
 struct dn_kern_rta
 {
         void            *rta_dst;
@@ -13,8 +16,10 @@ struct dn_kern_rta
         struct rtattr   *rta_mx;
         struct rtattr   *rta_mp;
         unsigned char   *rta_protoinfo;
-        unsigned char   *rta_flow;
+        u32             *rta_flow;
         struct rta_cacheinfo *rta_ci;
+	struct rta_session *rta_sess;
+	u8		*rta_hoplimit;
 };
 
 struct dn_fib_res {

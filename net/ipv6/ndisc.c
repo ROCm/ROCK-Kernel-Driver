@@ -976,7 +976,7 @@ void ndisc_recv_na(struct sk_buff *skb)
 				struct rt6_info *rt;
 				rt = rt6_get_dflt_router(saddr, dev);
 				if (rt)
-					ip6_del_rt(rt, NULL);
+					ip6_del_rt(rt, NULL, NULL);
 			}
 		} else {
 			if (msg->icmph.icmp6_router)
@@ -1050,7 +1050,7 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 	rt = rt6_get_dflt_router(&skb->nh.ipv6h->saddr, skb->dev);
 
 	if (rt && lifetime == 0) {
-		ip6_del_rt(rt, NULL);
+		ip6_del_rt(rt, NULL, NULL);
 		rt = NULL;
 	}
 

@@ -27,8 +27,6 @@
 #include <asm/uaccess.h>
 #include <net/compat.h>
 
-#define AA(__x)		((unsigned long)(__x))
-
 static inline int iov_from_user_compat_to_kern(struct iovec *kiov,
 					  struct compat_iovec *uiov32,
 					  int niov)
@@ -393,31 +391,27 @@ static int do_set_attach_filter(int fd, int level, int optname,
 	struct compat_sock_fprog *fprog32 = (struct compat_sock_fprog *)optval;
 	struct sock_fprog kfprog;
 	mm_segment_t old_fs;
-	compat_uptr_t uptr;
-	unsigned int fsize;
 	int ret;
+	compat_uptr_t ptr;
 
 	if (!access_ok(VERIFY_READ, fprog32, sizeof(*fprog32)) ||
 	    __get_user(kfprog.len, &fprog32->len) ||
-	    __get_user(uptr, &fprog32->filter))
+	    __get_user(ptr, &fprog32->filter))
 		return -EFAULT;
+	kfprog.filter = compat_ptr(ptr);	
 
-	fsize = kfprog.len * sizeof(struct sock_filter);
-	kfprog.filter = (struct sock_filter *)kmalloc(fsize, GFP_KERNEL);
-	if (kfprog.filter == NULL)
-		return -ENOMEM;
-	if (copy_from_user(kfprog.filter, compat_ptr(uptr), fsize)) {
-		kfree(kfprog.filter);
+	if (kfprog.len * sizeof(struct sock_filter) < kfprog.len) 
+		return -EINVAL;
+
+	if (verify_area(VERIFY_READ, kfprog.filter, 
+				    kfprog.len * sizeof(struct sock_filter)))
 		return -EFAULT;
-	}
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 	ret = sys_setsockopt(fd, level, optname,
 			     (char *)&kfprog, sizeof(kfprog));
 	set_fs(old_fs);
-
-	kfree(kfprog.filter);
 	return ret;
 }
 

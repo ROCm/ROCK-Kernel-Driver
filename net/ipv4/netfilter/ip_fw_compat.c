@@ -35,7 +35,7 @@ extern unsigned int
 do_masquerade(struct sk_buff **pskb, const struct net_device *dev);
 
 extern unsigned int
-check_for_masq_error(struct sk_buff *pskb);
+check_for_masq_error(struct sk_buff **pskb);
 
 extern unsigned int
 check_for_demasq(struct sk_buff **pskb);
@@ -167,7 +167,7 @@ fw_in(unsigned int hooknum,
 			/* Handle ICMP errors from client here */
 			if ((*pskb)->nh.iph->protocol == IPPROTO_ICMP
 			    && (*pskb)->nfct)
-				check_for_masq_error(*pskb);
+				check_for_masq_error(pskb);
 		}
 		return NF_ACCEPT;
 

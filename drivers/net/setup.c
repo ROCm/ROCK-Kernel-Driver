@@ -16,7 +16,6 @@ extern int dmascc_init(void);
 extern int arcnet_init(void); 
 extern int scc_enet_init(void); 
 extern int fec_enet_init(void); 
-extern int dlci_setup(void); 
 extern int sdla_setup(void); 
 extern int sdla_c_setup(void); 
 extern int comx_init(void);
@@ -51,9 +50,6 @@ static struct net_probe pci_probes[] __initdata = {
 #if defined(CONFIG_DMASCC)
 	{dmascc_init, 0},
 #endif	
-#if defined(CONFIG_DLCI)
-	{dlci_setup, 0},
-#endif
 #if defined(CONFIG_SDLA)
 	{sdla_c_setup, 0},
 #endif

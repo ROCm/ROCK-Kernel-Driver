@@ -731,6 +731,7 @@ void brioctl_set(int (*hook)(unsigned long))
 	br_ioctl_hook = hook;
 	up(&br_ioctl_mutex);
 }
+EXPORT_SYMBOL(brioctl_set);
 
 static DECLARE_MUTEX(vlan_ioctl_mutex);
 static int (*vlan_ioctl_hook)(unsigned long arg);
@@ -741,12 +742,18 @@ void vlan_ioctl_set(int (*hook)(unsigned long))
 	vlan_ioctl_hook = hook;
 	up(&vlan_ioctl_mutex);
 }
+EXPORT_SYMBOL(vlan_ioctl_set);
 
-#ifdef CONFIG_DLCI
-extern int dlci_ioctl(unsigned int, void *);
-#else
-int (*dlci_ioctl_hook)(unsigned int, void *);
-#endif
+static DECLARE_MUTEX(dlci_ioctl_mutex);
+static int (*dlci_ioctl_hook)(unsigned int, void *);
+
+void dlci_ioctl_set(int (*hook)(unsigned int, void *))
+{
+	down(&dlci_ioctl_mutex);
+	dlci_ioctl_hook = hook;
+	up(&dlci_ioctl_mutex);
+}
+EXPORT_SYMBOL(dlci_ioctl_set);
 
 /*
  *	With an ioctl, arg may well be a user mode pointer, but we don't know
@@ -820,24 +827,16 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			break;
 		case SIOCADDDLCI:
 		case SIOCDELDLCI:
-		/* Convert this to always call through a hook */
-#ifdef CONFIG_DLCI
-			lock_kernel();
-			err = dlci_ioctl(cmd, (void *)arg);
-			unlock_kernel();
-			break;
-#else
 			err = -ENOPKG;
 #ifdef CONFIG_KMOD
 			if (!dlci_ioctl_hook)
 				request_module("dlci");
 #endif
 			if (dlci_ioctl_hook) {
-				lock_kernel();
+				down(&dlci_ioctl_mutex);
 				err = dlci_ioctl_hook(cmd, (void *)arg);
-				unlock_kernel();
+				up(&dlci_ioctl_mutex);
 			}
-#endif
 			break;
 		default:
 			err = sock->ops->ioctl(sock, cmd, arg);

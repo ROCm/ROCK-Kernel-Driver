@@ -228,13 +228,11 @@ EXPORT_SYMBOL(destroy_EII_client);
 #if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
 EXPORT_SYMBOL(dev_change_flags);
 #endif
-EXPORT_SYMBOL(vlan_ioctl_set);
 
 EXPORT_SYMBOL(scm_detach_fds);
 
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
 EXPORT_SYMBOL(br_handle_frame_hook);
-EXPORT_SYMBOL(brioctl_set);
 #endif
 
 #ifdef CONFIG_NET_DIVERT
@@ -284,11 +282,6 @@ EXPORT_SYMBOL(unregister_inetaddr_notifier);
 
 /* needed for ip_gre -cw */
 EXPORT_SYMBOL(ip_statistics);
-
-#ifdef CONFIG_DLCI_MODULE
-extern int (*dlci_ioctl_hook)(unsigned int, void *);
-EXPORT_SYMBOL(dlci_ioctl_hook);
-#endif
 
 EXPORT_SYMBOL(xfrm_user_policy);
 EXPORT_SYMBOL(km_waitq);

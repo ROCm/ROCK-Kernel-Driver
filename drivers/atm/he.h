@@ -371,13 +371,8 @@ struct he_vcc
 
 	int rc_index;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
-	struct wait_queue *rx_waitq;
-	atruct wait_queue *tx_waitq;
-#else
 	wait_queue_head_t rx_waitq;
 	wait_queue_head_t tx_waitq;
-#endif
 };
 
 #define HE_VCC(vcc)	((struct he_vcc *)(vcc->dev_data))
