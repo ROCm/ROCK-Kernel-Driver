@@ -1,1177 +1,3033 @@
 /*
  *  linux/drivers/char/vt.c
  *
- *  Copyright (C) 1992 obz under the linux copyright
- *
- *  Dynamic diacritical handling - aeb@cwi.nl - Dec 1993
- *  Dynamic keymap and string allocation - aeb@cwi.nl - May 1994
- *  Restrict VT switching via ioctl() - grif@cs.ucr.edu - Dec 1995
- *  Some code moved for less code duplication - Andi Kleen - Mar 1997
- *  Check put/get_user, cleanups - acme@conectiva.com.br - Jun 2001
+ *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
-#include <linux/config.h>
-#include <linux/types.h>
-#include <linux/errno.h>
+/*
+ * Hopefully this will be a rather complete VT102 implementation.
+ *
+ * Beeping thanks to John T Kohl.
+ *
+ * Virtual Consoles, Screen Blanking, Screen Dumping, Color, Graphics
+ *   Chars, and VT100 enhancements by Peter MacDonald.
+ *
+ * Copy and paste function by Andrew Haylett,
+ *   some enhancements by Alessandro Rubini.
+ *
+ * Code to check for different video-cards mostly by Galen Hunt,
+ * <g-hunt@ee.utah.edu>
+ *
+ * Rudimentary ISO 10646/Unicode/UTF-8 character set support by
+ * Markus Kuhn, <mskuhn@immd4.informatik.uni-erlangen.de>.
+ *
+ * Dynamic allocation of consoles, aeb@cwi.nl, May 1994
+ * Resizing of consoles, aeb, 940926
+ *
+ * Code for xterm like mouse click reporting by Peter Orbaek 20-Jul-94
+ * <poe@daimi.aau.dk>
+ *
+ * User-defined bell sound, new setterm control sequences and printk
+ * redirection by Martin Mares <mj@k332.feld.cvut.cz> 19-Nov-95
+ *
+ * APM screenblank bug fixed Takashi Manabe <manabe@roy.dsl.tutics.tut.jp>
+ *
+ * Merge with the abstract console driver by Geert Uytterhoeven
+ * <geert@linux-m68k.org>, Jan 1997.
+ *
+ *   Original m68k console driver modifications by
+ *
+ *     - Arno Griffioen <arno@usn.nl>
+ *     - David Carter <carter@cs.bris.ac.uk>
+ * 
+ *   Note that the abstract console driver allows all consoles to be of
+ *   potentially different sizes, so the following variables depend on the
+ *   current console (currcons):
+ *
+ *     - video_num_columns
+ *     - video_num_lines
+ *     - video_size_row
+ *     - can_do_color
+ *
+ *   The abstract console driver provides a generic interface for a text
+ *   console. It supports VGA text mode, frame buffer based graphical consoles
+ *   and special graphics processors that are only accessible through some
+ *   registers (e.g. a TMS340x0 GSP).
+ *
+ *   The interface to the hardware is specified using a special structure
+ *   (struct consw) which contains function pointers to console operations
+ *   (see <linux/console.h> for more information).
+ *
+ * Support for changeable cursor shape
+ * by Pavel Machek <pavel@atrey.karlin.mff.cuni.cz>, August 1997
+ *
+ * Ported to i386 and con_scrolldelta fixed
+ * by Emmanuel Marty <core@ggi-project.org>, April 1998
+ *
+ * Resurrected character buffers in videoram plus lots of other trickery
+ * by Martin Mares <mj@atrey.karlin.mff.cuni.cz>, July 1998
+ *
+ * Removed old-style timers, introduced console_timer, made timer
+ * deletion SMP-safe.  17Jun00, Andrew Morton <andrewm@uow.edu.au>
+ *
+ * Removed console_lock, enabled interrupts across all console operations
+ * 13 March 2001, Andrew Morton
+ */
+
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/tty.h>
-#include <linux/timer.h>
+#include <linux/tty_flip.h>
 #include <linux/kernel.h>
-#include <linux/kd.h>
-#include <linux/vt.h>
 #include <linux/string.h>
+#include <linux/errno.h>
+#include <linux/kd.h>
 #include <linux/slab.h>
 #include <linux/major.h>
-#include <linux/fs.h>
+#include <linux/mm.h>
 #include <linux/console.h>
+#include <linux/init.h>
+#include <linux/devfs_fs_kernel.h>
+#include <linux/vt_kern.h>
+#include <linux/selection.h>
+#include <linux/console_struct.h>
+#include <linux/kbd_kern.h>
+#include <linux/consolemap.h>
+#include <linux/timer.h>
+#include <linux/interrupt.h>
+#include <linux/config.h>
+#include <linux/version.h>
+#include <linux/tqueue.h>
+#include <linux/bootmem.h>
+#include <linux/pm.h>
 
 #include <asm/io.h>
+#include <asm/system.h>
 #include <asm/uaccess.h>
+#include <asm/bitops.h>
 
-#include <linux/kbd_kern.h>
-#include <linux/vt_kern.h>
-#include <linux/kbd_diacr.h>
-#include <linux/selection.h>
+#include "console_macros.h"
 
-char vt_dont_switch;
-extern struct tty_driver console_driver;
 
-#define VT_IS_IN_USE(i)	(console_driver.table[i] && console_driver.table[i]->count)
-#define VT_BUSY(i)	(VT_IS_IN_USE(i) || i == fg_console || i == sel_cons)
+const struct consw *conswitchp;
+
+/* A bitmap for codes <32. A bit of 1 indicates that the code
+ * corresponding to that bit number invokes some special action
+ * (such as cursor movement) and should not be displayed as a
+ * glyph unless the disp_ctrl mode is explicitly enabled.
+ */
+#define CTRL_ACTION 0x0d00ff81
+#define CTRL_ALWAYS 0x0800f501	/* Cannot be overridden by disp_ctrl */
 
 /*
- * Console (vt and kd) routines, as defined by USL SVR4 manual, and by
- * experimentation and study of X386 SYSV handling.
- *
- * One point of difference: SYSV vt's are /dev/vtX, which X >= 0, and
- * /dev/console is a separate ttyp. Under Linux, /dev/tty0 is /dev/console,
- * and the vc start at /dev/ttyX, X >= 1. We maintain that here, so we will
- * always treat our set of vt as numbered 1..MAX_NR_CONSOLES (corresponding to
- * ttys 0..MAX_NR_CONSOLES-1). Explicitly naming VT 0 is illegal, but using
- * /dev/tty0 (fg_console) as a target is legal, since an implicit aliasing
- * to the current console is done by the main ioctl code.
+ * Here is the default bell parameters: 750HZ, 1/8th of a second
  */
+#define DEFAULT_BELL_PITCH	750
+#define DEFAULT_BELL_DURATION	(HZ/8)
 
-struct vt_struct *vt_cons[MAX_NR_CONSOLES];
+extern void vcs_make_devfs (unsigned int index, int unregister);
+extern void console_map_init(void);
 
-/* Keyboard type: Default is KB_101, but can be set by machine
- * specific code.
- */
-unsigned char keyboard_type = KB_101;
+static struct tty_struct *console_table[MAX_NR_CONSOLES];
+static struct termios *console_termios[MAX_NR_CONSOLES];
+static struct termios *console_termios_locked[MAX_NR_CONSOLES];
+struct vc vc_cons [MAX_NR_CONSOLES];
 
-#if !defined(__alpha__) && !defined(__ia64__) && !defined(__mips__) && !defined(__arm__) && !defined(__sh__)
-asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int on);
+#ifndef VT_SINGLE_DRIVER
+static const struct consw *con_driver_map[MAX_NR_CONSOLES];
 #endif
 
-unsigned int video_font_height;
-unsigned int default_font_height;
-unsigned int video_scan_lines;
+static int con_open(struct tty_struct *, struct file *);
+static void vc_init(unsigned int console, unsigned int rows,
+		    unsigned int cols, int do_clear);
+static void blank_screen(unsigned long dummy);
+static void gotoxy(int currcons, int new_x, int new_y);
+static void save_cur(int currcons);
+static void reset_terminal(int currcons, int do_clear);
+static void con_flush_chars(struct tty_struct *tty);
+static void set_vesa_blanking(unsigned long arg);
+static void set_cursor(int currcons);
+static void hide_cursor(int currcons);
+static void unblank_screen_t(unsigned long dummy);
+static void console_callback(void *ignored);
+static void __init con_init_devfs (void);
+
+static int printable;		/* Is console ready for printing? */
+
+int do_poke_blanked_console;
+int console_blanked;
+
+static int vesa_blank_mode; /* 0:none 1:suspendV 2:suspendH 3:powerdown */
+static int blankinterval = 10*60*HZ;
+static int vesa_off_interval;
+
+static struct tq_struct console_callback_tq = {
+	routine: console_callback,
+};
 
 /*
- * these are the valid i/o ports we're allowed to change. they map all the
- * video ports
+ * fg_console is the current virtual console,
+ * last_console is the last used one,
+ * want_console is the console we want to switch to,
+ * kmsg_redirect is the console for kernel messages,
  */
-#define GPFIRST 0x3b4
-#define GPLAST 0x3df
-#define GPNUM (GPLAST - GPFIRST + 1)
+int fg_console;
+int last_console;
+int want_console = -1;
+int kmsg_redirect;
 
-#define i (tmp.kb_index)
-#define s (tmp.kb_table)
-#define v (tmp.kb_value)
-static inline int
-do_kdsk_ioctl(int cmd, struct kbentry *user_kbe, int perm, struct kbd_struct *kbd)
+/*
+ * For each existing display, we have a pointer to console currently visible
+ * on that display, allowing consoles other than fg_console to be refreshed
+ * appropriately. Unless the low-level driver supplies its own display_fg
+ * variable, we use this one for the "master display".
+ */
+static struct vc_data *master_display_fg;
+
+/*
+ * Unfortunately, we need to delay tty echo when we're currently writing to the
+ * console since the code is (and always was) not re-entrant, so we schedule
+ * all flip requests to process context with schedule-task() and run it from
+ * console_callback().
+ */
+
+/*
+ * For the same reason, we defer scrollback to the console callback.
+ */
+static int scrollback_delta;
+
+/*
+ * Hook so that the power management routines can (un)blank
+ * the console on our behalf.
+ */
+int (*console_blank_hook)(int);
+
+static struct timer_list console_timer;
+
+/*
+ *	Low-Level Functions
+ */
+
+#define IS_FG (currcons == fg_console)
+#define IS_VISIBLE CON_IS_VISIBLE(vc_cons[currcons].d)
+
+#ifdef VT_BUF_VRAM_ONLY
+#define DO_UPDATE 0
+#else
+#define DO_UPDATE IS_VISIBLE
+#endif
+
+static int pm_con_request(struct pm_dev *dev, pm_request_t rqst, void *data);
+static struct pm_dev *pm_con;
+
+static inline unsigned short *screenpos(int currcons, int offset, int viewed)
 {
-	struct kbentry tmp;
-	ushort *key_map, val, ov;
+	unsigned short *p;
+	
+	if (!viewed)
+		p = (unsigned short *)(origin + offset);
+	else if (!sw->con_screen_pos)
+		p = (unsigned short *)(visible_origin + offset);
+	else
+		p = sw->con_screen_pos(vc_cons[currcons].d, offset);
+	return p;
+}
 
-	if (copy_from_user(&tmp, user_kbe, sizeof(struct kbentry)))
-		return -EFAULT;
-	if (i >= NR_KEYS || s >= MAX_NR_KEYMAPS)
-		return -EINVAL;	
+static inline void scrolldelta(int lines)
+{
+	scrollback_delta += lines;
+	schedule_console_callback();
+}
 
-	switch (cmd) {
-	case KDGKBENT:
-		key_map = key_maps[s];
-		if (key_map) {
-		    val = U(key_map[i]);
-		    if (kbd->kbdmode != VC_UNICODE && KTYP(val) >= NR_TYPES)
-			val = K_HOLE;
-		} else
-		    val = (i ? K_HOLE : K_NOSUCHMAP);
-		return put_user(val, &user_kbe->kb_value);
-	case KDSKBENT:
-		if (!perm)
-			return -EPERM;
-		if (!i && v == K_NOSUCHMAP) {
-			/* disallocate map */
-			key_map = key_maps[s];
-			if (s && key_map) {
-			    key_maps[s] = 0;
-			    if (key_map[0] == U(K_ALLOCATED)) {
-					kfree(key_map);
-					keymap_count--;
-			    }
+void schedule_console_callback(void)
+{
+	schedule_task(&console_callback_tq);
+}
+
+static void scrup(int currcons, unsigned int t, unsigned int b, int nr)
+{
+	unsigned short *d, *s;
+
+	if (t+nr >= b)
+		nr = b - t - 1;
+	if (b > video_num_lines || t >= b || nr < 1)
+		return;
+	if (IS_VISIBLE && sw->con_scroll(vc_cons[currcons].d, t, b, SM_UP, nr))
+		return;
+	d = (unsigned short *) (origin+video_size_row*t);
+	s = (unsigned short *) (origin+video_size_row*(t+nr));
+	scr_memcpyw(d, s, (b-t-nr) * video_size_row);
+	scr_memsetw(d + (b-t-nr) * video_num_columns, video_erase_char, video_size_row*nr);
+}
+
+static void
+scrdown(int currcons, unsigned int t, unsigned int b, int nr)
+{
+	unsigned short *s;
+	unsigned int step;
+
+	if (t+nr >= b)
+		nr = b - t - 1;
+	if (b > video_num_lines || t >= b || nr < 1)
+		return;
+	if (IS_VISIBLE && sw->con_scroll(vc_cons[currcons].d, t, b, SM_DOWN, nr))
+		return;
+	s = (unsigned short *) (origin+video_size_row*t);
+	step = video_num_columns * nr;
+	scr_memmovew(s + step, s, (b-t-nr)*video_size_row);
+	scr_memsetw(s, video_erase_char, 2*step);
+}
+
+static void do_update_region(int currcons, unsigned long start, int count)
+{
+#ifndef VT_BUF_VRAM_ONLY
+	unsigned int xx, yy, offset;
+	u16 *p;
+
+	p = (u16 *) start;
+	if (!sw->con_getxy) {
+		offset = (start - origin) / 2;
+		xx = offset % video_num_columns;
+		yy = offset / video_num_columns;
+	} else {
+		int nxx, nyy;
+		start = sw->con_getxy(vc_cons[currcons].d, start, &nxx, &nyy);
+		xx = nxx; yy = nyy;
+	}
+	for(;;) {
+		u16 attrib = scr_readw(p) & 0xff00;
+		int startx = xx;
+		u16 *q = p;
+		while (xx < video_num_columns && count) {
+			if (attrib != (scr_readw(p) & 0xff00)) {
+				if (p > q)
+					sw->con_putcs(vc_cons[currcons].d, q, p-q, yy, startx);
+				startx = xx;
+				q = p;
+				attrib = scr_readw(p) & 0xff00;
+			}
+			p++;
+			xx++;
+			count--;
+		}
+		if (p > q)
+			sw->con_putcs(vc_cons[currcons].d, q, p-q, yy, startx);
+		if (!count)
+			break;
+		xx = 0;
+		yy++;
+		if (sw->con_getxy) {
+			p = (u16 *)start;
+			start = sw->con_getxy(vc_cons[currcons].d, start, NULL, NULL);
+		}
+	}
+#endif
+}
+
+void update_region(int currcons, unsigned long start, int count)
+{
+	if (DO_UPDATE) {
+		hide_cursor(currcons);
+		do_update_region(currcons, start, count);
+		set_cursor(currcons);
+	}
+}
+
+/* Structure of attributes is hardware-dependent */
+
+static u8 build_attr(int currcons, u8 _color, u8 _intensity, u8 _blink, u8 _underline, u8 _reverse)
+{
+	if (sw->con_build_attr)
+		return sw->con_build_attr(vc_cons[currcons].d, _color, _intensity, _blink, _underline, _reverse);
+
+#ifndef VT_BUF_VRAM_ONLY
+/*
+ * ++roman: I completely changed the attribute format for monochrome
+ * mode (!can_do_color). The formerly used MDA (monochrome display
+ * adapter) format didn't allow the combination of certain effects.
+ * Now the attribute is just a bit vector:
+ *  Bit 0..1: intensity (0..2)
+ *  Bit 2   : underline
+ *  Bit 3   : reverse
+ *  Bit 7   : blink
+ */
+	{
+	u8 a = color;
+	if (!can_do_color)
+		return _intensity |
+		       (_underline ? 4 : 0) |
+		       (_reverse ? 8 : 0) |
+		       (_blink ? 0x80 : 0);
+	if (_underline)
+		a = (a & 0xf0) | ulcolor;
+	else if (_intensity == 0)
+		a = (a & 0xf0) | halfcolor;
+	if (_reverse)
+		a = ((a) & 0x88) | ((((a) >> 4) | ((a) << 4)) & 0x77);
+	if (_blink)
+		a ^= 0x80;
+	if (_intensity == 2)
+		a ^= 0x08;
+	if (hi_font_mask == 0x100)
+		a <<= 1;
+	return a;
+	}
+#else
+	return 0;
+#endif
+}
+
+static void update_attr(int currcons)
+{
+	attr = build_attr(currcons, color, intensity, blink, underline, reverse ^ decscnm);
+	video_erase_char = (build_attr(currcons, color, 1, blink, 0, decscnm) << 8) | ' ';
+}
+
+/* Note: inverting the screen twice should revert to the original state */
+
+void invert_screen(int currcons, int offset, int count, int viewed)
+{
+	unsigned short *p;
+
+	count /= 2;
+	p = screenpos(currcons, offset, viewed);
+	if (sw->con_invert_region)
+		sw->con_invert_region(vc_cons[currcons].d, p, count);
+#ifndef VT_BUF_VRAM_ONLY
+	else {
+		u16 *q = p;
+		int cnt = count;
+		u16 a;
+
+		if (!can_do_color) {
+			while (cnt--) {
+			    a = scr_readw(q);
+			    a ^= 0x0800;
+			    scr_writew(a, q);
+			    q++;
+			}
+		} else if (hi_font_mask == 0x100) {
+			while (cnt--) {
+				a = scr_readw(q);
+				a = ((a) & 0x11ff) | (((a) & 0xe000) >> 4) | (((a) & 0x0e00) << 4);
+				scr_writew(a, q);
+				q++;
+			}
+		} else {
+			while (cnt--) {
+				a = scr_readw(q);
+				a = ((a) & 0x88ff) | (((a) & 0x7000) >> 4) | (((a) & 0x0700) << 4);
+				scr_writew(a, q);
+				q++;
+			}
+		}
+	}
+#endif
+	if (DO_UPDATE)
+		do_update_region(currcons, (unsigned long) p, count);
+}
+
+/* used by selection: complement pointer position */
+void complement_pos(int currcons, int offset)
+{
+	static unsigned short *p;
+	static unsigned short old;
+	static unsigned short oldx, oldy;
+
+	if (p) {
+		scr_writew(old, p);
+		if (DO_UPDATE)
+			sw->con_putc(vc_cons[currcons].d, old, oldy, oldx);
+	}
+	if (offset == -1)
+		p = NULL;
+	else {
+		unsigned short new;
+		p = screenpos(currcons, offset, 1);
+		old = scr_readw(p);
+		new = old ^ complement_mask;
+		scr_writew(new, p);
+		if (DO_UPDATE) {
+			oldx = (offset >> 1) % video_num_columns;
+			oldy = (offset >> 1) / video_num_columns;
+			sw->con_putc(vc_cons[currcons].d, new, oldy, oldx);
+		}
+	}
+}
+
+static void insert_char(int currcons, unsigned int nr)
+{
+	unsigned short *p, *q = (unsigned short *) pos;
+
+	p = q + video_num_columns - nr - x;
+	while (--p >= q)
+		scr_writew(scr_readw(p), p + nr);
+	scr_memsetw(q, video_erase_char, nr*2);
+	need_wrap = 0;
+	if (DO_UPDATE) {
+		unsigned short oldattr = attr;
+		sw->con_bmove(vc_cons[currcons].d,y,x,y,x+nr,1,
+			      video_num_columns-x-nr);
+		attr = video_erase_char >> 8;
+		while (nr--)
+			sw->con_putc(vc_cons[currcons].d,
+				     video_erase_char,y,x+nr);
+		attr = oldattr;
+	}
+}
+
+static void delete_char(int currcons, unsigned int nr)
+{
+	unsigned int i = x;
+	unsigned short *p = (unsigned short *) pos;
+
+	while (++i <= video_num_columns - nr) {
+		scr_writew(scr_readw(p+nr), p);
+		p++;
+	}
+	scr_memsetw(p, video_erase_char, nr*2);
+	need_wrap = 0;
+	if (DO_UPDATE) {
+		unsigned short oldattr = attr;
+		sw->con_bmove(vc_cons[currcons].d, y, x+nr, y, x, 1,
+			      video_num_columns-x-nr);
+		attr = video_erase_char >> 8;
+		while (nr--)
+			sw->con_putc(vc_cons[currcons].d,
+				     video_erase_char, y,
+				     video_num_columns-1-nr);
+		attr = oldattr;
+	}
+}
+
+static int softcursor_original;
+
+static void add_softcursor(int currcons)
+{
+	int i = scr_readw((u16 *) pos);
+	u32 type = cursor_type;
+
+	if (! (type & 0x10)) return;
+	if (softcursor_original != -1) return;
+	softcursor_original = i;
+	i |= ((type >> 8) & 0xff00 );
+	i ^= ((type) & 0xff00 );
+	if ((type & 0x20) && ((softcursor_original & 0x7000) == (i & 0x7000))) i ^= 0x7000;
+	if ((type & 0x40) && ((i & 0x700) == ((i & 0x7000) >> 4))) i ^= 0x0700;
+	scr_writew(i, (u16 *) pos);
+	if (DO_UPDATE)
+		sw->con_putc(vc_cons[currcons].d, i, y, x);
+}
+
+static void hide_cursor(int currcons)
+{
+	if (currcons == sel_cons)
+		clear_selection();
+	if (softcursor_original != -1) {
+		scr_writew(softcursor_original,(u16 *) pos);
+		if (DO_UPDATE)
+			sw->con_putc(vc_cons[currcons].d, softcursor_original, y, x);
+		softcursor_original = -1;
+	}
+	sw->con_cursor(vc_cons[currcons].d,CM_ERASE);
+}
+
+static void set_cursor(int currcons)
+{
+    if (!IS_FG || console_blanked || vcmode == KD_GRAPHICS)
+	return;
+    if (deccm) {
+	if (currcons == sel_cons)
+		clear_selection();
+	add_softcursor(currcons);
+	if ((cursor_type & 0x0f) != 1)
+	    sw->con_cursor(vc_cons[currcons].d,CM_DRAW);
+    } else
+	hide_cursor(currcons);
+}
+
+static void set_origin(int currcons)
+{
+	if (!IS_VISIBLE ||
+	    !sw->con_set_origin ||
+	    !sw->con_set_origin(vc_cons[currcons].d))
+		origin = (unsigned long) screenbuf;
+	visible_origin = origin;
+	scr_end = origin + screenbuf_size;
+	pos = origin + video_size_row*y + 2*x;
+}
+
+static inline void save_screen(int currcons)
+{
+	if (sw->con_save_screen)
+		sw->con_save_screen(vc_cons[currcons].d);
+}
+
+/*
+ *	Redrawing of screen
+ */
+
+void redraw_screen(int new_console, int is_switch)
+{
+	int redraw = 1;
+	int currcons, old_console;
+
+	if (!vc_cons_allocated(new_console)) {
+		/* strange ... */
+		/* printk("redraw_screen: tty %d not allocated ??\n", new_console+1); */
+		return;
+	}
+
+	if (is_switch) {
+		currcons = fg_console;
+		hide_cursor(currcons);
+		if (fg_console != new_console) {
+			struct vc_data **display = vc_cons[new_console].d->vc_display_fg;
+			old_console = (*display) ? (*display)->vc_num : fg_console;
+			*display = vc_cons[new_console].d;
+			fg_console = new_console;
+			currcons = old_console;
+			if (!IS_VISIBLE) {
+				save_screen(currcons);
+				set_origin(currcons);
+			}
+			currcons = new_console;
+			if (old_console == new_console)
+				redraw = 0;
+		}
+	} else {
+		currcons = new_console;
+		hide_cursor(currcons);
+	}
+
+	if (redraw) {
+		int update;
+		set_origin(currcons);
+		update = sw->con_switch(vc_cons[currcons].d);
+		set_palette(currcons);
+		if (update && vcmode != KD_GRAPHICS)
+			do_update_region(currcons, origin, screenbuf_size/2);
+	}
+	set_cursor(currcons);
+	if (is_switch) {
+		set_leds();
+		compute_shiftstate();
+	}
+}
+
+/*
+ *	Allocation, freeing and resizing of VTs.
+ */
+
+int vc_cons_allocated(unsigned int i)
+{
+	return (i < MAX_NR_CONSOLES && vc_cons[i].d);
+}
+
+static void visual_init(int currcons, int init)
+{
+    /* ++Geert: sw->con_init determines console size */
+    sw = conswitchp;
+#ifndef VT_SINGLE_DRIVER
+    if (con_driver_map[currcons])
+	sw = con_driver_map[currcons];
+#endif
+    cons_num = currcons;
+    display_fg = &master_display_fg;
+    vc_cons[currcons].d->vc_uni_pagedir_loc = &vc_cons[currcons].d->vc_uni_pagedir;
+    vc_cons[currcons].d->vc_uni_pagedir = 0;
+    hi_font_mask = 0;
+    complement_mask = 0;
+    can_do_color = 0;
+    sw->con_init(vc_cons[currcons].d, init);
+    if (!complement_mask)
+        complement_mask = can_do_color ? 0x7700 : 0x0800;
+    s_complement_mask = complement_mask;
+    video_size_row = video_num_columns<<1;
+    screenbuf_size = video_num_lines*video_size_row;
+}
+
+int vc_allocate(unsigned int currcons)	/* return 0 on success */
+{
+	if (currcons >= MAX_NR_CONSOLES)
+		return -ENXIO;
+	if (!vc_cons[currcons].d) {
+	    long p, q;
+
+	    /* prevent users from taking too much memory */
+	    if (currcons >= MAX_NR_USER_CONSOLES && !capable(CAP_SYS_RESOURCE))
+	      return -EPERM;
+
+	    /* due to the granularity of kmalloc, we waste some memory here */
+	    /* the alloc is done in two steps, to optimize the common situation
+	       of a 25x80 console (structsize=216, screenbuf_size=4000) */
+	    /* although the numbers above are not valid since long ago, the
+	       point is still up-to-date and the comment still has its value
+	       even if only as a historical artifact.  --mj, July 1998 */
+	    p = (long) kmalloc(structsize, GFP_KERNEL);
+	    if (!p)
+		return -ENOMEM;
+	    memset((void *)p, 0, structsize);
+	    vc_cons[currcons].d = (struct vc_data *)p;
+	    vt_cons[currcons] = (struct vt_struct *)(p+sizeof(struct vc_data));
+	    visual_init(currcons, 1);
+	    if (!*vc_cons[currcons].d->vc_uni_pagedir_loc)
+		con_set_default_unimap(currcons);
+	    q = (long)kmalloc(screenbuf_size, GFP_KERNEL);
+	    if (!q) {
+		kfree((char *) p);
+		vc_cons[currcons].d = NULL;
+		vt_cons[currcons] = NULL;
+		return -ENOMEM;
+	    }
+	    screenbuf = (unsigned short *) q;
+	    kmalloced = 1;
+	    vc_init(currcons, video_num_lines, video_num_columns, 1);
+
+	    if (!pm_con) {
+		    pm_con = pm_register(PM_SYS_DEV,
+					 PM_SYS_VGA,
+					 pm_con_request);
+	    }
+	}
+	return 0;
+}
+
+/*
+ * Change # of rows and columns (0 means unchanged/the size of fg_console)
+ * [this is to be used together with some user program
+ * like resize that changes the hardware videomode]
+ */
+int vc_resize(unsigned int lines, unsigned int cols,
+	      unsigned int first, unsigned int last)
+{
+	unsigned int cc, ll, ss, sr, todo = 0;
+	unsigned int currcons = fg_console, i;
+	unsigned short *newscreens[MAX_NR_CONSOLES];
+
+	cc = (cols ? cols : video_num_columns);
+	ll = (lines ? lines : video_num_lines);
+	sr = cc << 1;
+	ss = sr * ll;
+
+ 	for (currcons = first; currcons <= last; currcons++) {
+		if (!vc_cons_allocated(currcons) ||
+		    (cc == video_num_columns && ll == video_num_lines))
+			newscreens[currcons] = NULL;
+		else {
+			unsigned short *p = (unsigned short *) kmalloc(ss, GFP_USER);
+			if (!p) {
+				for (i = first; i < currcons; i++)
+					if (newscreens[i])
+						kfree(newscreens[i]);
+				return -ENOMEM;
+			}
+			newscreens[currcons] = p;
+			todo++;
+		}
+	}
+	if (!todo)
+		return 0;
+
+	for (currcons = first; currcons <= last; currcons++) {
+		unsigned int occ, oll, oss, osr;
+		unsigned long ol, nl, nlend, rlth, rrem;
+		if (!newscreens[currcons] || !vc_cons_allocated(currcons))
+			continue;
+
+		oll = video_num_lines;
+		occ = video_num_columns;
+		osr = video_size_row;
+		oss = screenbuf_size;
+
+		video_num_lines = ll;
+		video_num_columns = cc;
+		video_size_row = sr;
+		screenbuf_size = ss;
+
+		rlth = min(osr, sr);
+		rrem = sr - rlth;
+		ol = origin;
+		nl = (long) newscreens[currcons];
+		nlend = nl + ss;
+		if (ll < oll)
+			ol += (oll - ll) * osr;
+
+		update_attr(currcons);
+
+		while (ol < scr_end) {
+			scr_memcpyw((unsigned short *) nl, (unsigned short *) ol, rlth);
+			if (rrem)
+				scr_memsetw((void *)(nl + rlth), video_erase_char, rrem);
+			ol += osr;
+			nl += sr;
+		}
+		if (nlend > nl)
+			scr_memsetw((void *) nl, video_erase_char, nlend - nl);
+		if (kmalloced)
+			kfree(screenbuf);
+		screenbuf = newscreens[currcons];
+		kmalloced = 1;
+		screenbuf_size = ss;
+		set_origin(currcons);
+
+		/* do part of a reset_terminal() */
+		top = 0;
+		bottom = video_num_lines;
+		gotoxy(currcons, x, y);
+		save_cur(currcons);
+
+		if (console_table[currcons]) {
+			struct winsize ws, *cws = &console_table[currcons]->winsize;
+			memset(&ws, 0, sizeof(ws));
+			ws.ws_row = video_num_lines;
+			ws.ws_col = video_num_columns;
+			if ((ws.ws_row != cws->ws_row || ws.ws_col != cws->ws_col) &&
+			    console_table[currcons]->pgrp > 0)
+				kill_pg(console_table[currcons]->pgrp, SIGWINCH, 1);
+			*cws = ws;
+		}
+
+		if (IS_VISIBLE)
+			update_screen(currcons);
+	}
+
+	return 0;
+}
+
+
+void vc_disallocate(unsigned int currcons)
+{
+	acquire_console_sem();
+	if (vc_cons_allocated(currcons)) {
+	    sw->con_deinit(vc_cons[currcons].d);
+	    if (kmalloced)
+		kfree(screenbuf);
+	    if (currcons >= MIN_NR_CONSOLES)
+		kfree(vc_cons[currcons].d);
+	    vc_cons[currcons].d = NULL;
+	}
+	release_console_sem();
+}
+
+/*
+ *	VT102 emulator
+ */
+
+#define set_kbd(x) set_vc_kbd_mode(kbd_table+currcons,x)
+#define clr_kbd(x) clr_vc_kbd_mode(kbd_table+currcons,x)
+#define is_kbd(x) vc_kbd_mode(kbd_table+currcons,x)
+
+#define decarm		VC_REPEAT
+#define decckm		VC_CKMODE
+#define kbdapplic	VC_APPLIC
+#define lnm		VC_CRLF
+
+/*
+ * this is what the terminal answers to a ESC-Z or csi0c query.
+ */
+#define VT100ID "\033[?1;2c"
+#define VT102ID "\033[?6c"
+
+unsigned char color_table[] = { 0, 4, 2, 6, 1, 5, 3, 7,
+				       8,12,10,14, 9,13,11,15 };
+
+/* the default colour table, for VGA+ colour systems */
+int default_red[] = {0x00,0xaa,0x00,0xaa,0x00,0xaa,0x00,0xaa,
+    0x55,0xff,0x55,0xff,0x55,0xff,0x55,0xff};
+int default_grn[] = {0x00,0x00,0xaa,0x55,0x00,0x00,0xaa,0xaa,
+    0x55,0x55,0xff,0xff,0x55,0x55,0xff,0xff};
+int default_blu[] = {0x00,0x00,0x00,0x00,0xaa,0xaa,0xaa,0xaa,
+    0x55,0x55,0x55,0x55,0xff,0xff,0xff,0xff};
+
+/*
+ * gotoxy() must verify all boundaries, because the arguments
+ * might also be negative. If the given position is out of
+ * bounds, the cursor is placed at the nearest margin.
+ */
+static void gotoxy(int currcons, int new_x, int new_y)
+{
+	int min_y, max_y;
+
+	if (new_x < 0)
+		x = 0;
+	else
+		if (new_x >= video_num_columns)
+			x = video_num_columns - 1;
+		else
+			x = new_x;
+ 	if (decom) {
+		min_y = top;
+		max_y = bottom;
+	} else {
+		min_y = 0;
+		max_y = video_num_lines;
+	}
+	if (new_y < min_y)
+		y = min_y;
+	else if (new_y >= max_y)
+		y = max_y - 1;
+	else
+		y = new_y;
+	pos = origin + y*video_size_row + (x<<1);
+	need_wrap = 0;
+}
+
+/* for absolute user moves, when decom is set */
+static void gotoxay(int currcons, int new_x, int new_y)
+{
+	gotoxy(currcons, new_x, decom ? (top+new_y) : new_y);
+}
+
+void scrollback(int lines)
+{
+	int currcons = fg_console;
+
+	if (!lines)
+		lines = video_num_lines/2;
+	scrolldelta(-lines);
+}
+
+void scrollfront(int lines)
+{
+	int currcons = fg_console;
+
+	if (!lines)
+		lines = video_num_lines/2;
+	scrolldelta(lines);
+}
+
+static void lf(int currcons)
+{
+    	/* don't scroll if above bottom of scrolling region, or
+	 * if below scrolling region
+	 */
+    	if (y+1 == bottom)
+		scrup(currcons,top,bottom,1);
+	else if (y < video_num_lines-1) {
+	    	y++;
+		pos += video_size_row;
+	}
+	need_wrap = 0;
+}
+
+static void ri(int currcons)
+{
+    	/* don't scroll if below top of scrolling region, or
+	 * if above scrolling region
+	 */
+	if (y == top)
+		scrdown(currcons,top,bottom,1);
+	else if (y > 0) {
+		y--;
+		pos -= video_size_row;
+	}
+	need_wrap = 0;
+}
+
+static inline void cr(int currcons)
+{
+	pos -= x<<1;
+	need_wrap = x = 0;
+}
+
+static inline void bs(int currcons)
+{
+	if (x) {
+		pos -= 2;
+		x--;
+		need_wrap = 0;
+	}
+}
+
+static inline void del(int currcons)
+{
+	/* ignored */
+}
+
+static void csi_J(int currcons, int vpar)
+{
+	unsigned int count;
+	unsigned short * start;
+
+	switch (vpar) {
+		case 0:	/* erase from cursor to end of display */
+			count = (scr_end-pos)>>1;
+			start = (unsigned short *) pos;
+			if (DO_UPDATE) {
+				/* do in two stages */
+				sw->con_clear(vc_cons[currcons].d, y, x, 1,
+					      video_num_columns-x);
+				sw->con_clear(vc_cons[currcons].d, y+1, 0,
+					      video_num_lines-y-1,
+					      video_num_columns);
 			}
 			break;
-		}
-
-		if (KTYP(v) < NR_TYPES) {
-		    if (KVAL(v) > max_vals[KTYP(v)])
-				return -EINVAL;
-		} else
-		    if (kbd->kbdmode != VC_UNICODE)
-				return -EINVAL;
-
-		/* ++Geert: non-PC keyboards may generate keycode zero */
-#if !defined(__mc68000__) && !defined(__powerpc__)
-		/* assignment to entry 0 only tests validity of args */
-		if (!i)
+		case 1:	/* erase from start to cursor */
+			count = ((pos-origin)>>1)+1;
+			start = (unsigned short *) origin;
+			if (DO_UPDATE) {
+				/* do in two stages */
+				sw->con_clear(vc_cons[currcons].d, 0, 0, y,
+					      video_num_columns);
+				sw->con_clear(vc_cons[currcons].d, y, 0, 1,
+					      x + 1);
+			}
 			break;
-#endif
-
-		if (!(key_map = key_maps[s])) {
-			int j;
-
-			if (keymap_count >= MAX_NR_OF_USER_KEYMAPS &&
-			    !capable(CAP_SYS_RESOURCE))
-				return -EPERM;
-
-			key_map = (ushort *) kmalloc(sizeof(plain_map),
-						     GFP_KERNEL);
-			if (!key_map)
-				return -ENOMEM;
-			key_maps[s] = key_map;
-			key_map[0] = U(K_ALLOCATED);
-			for (j = 1; j < NR_KEYS; j++)
-				key_map[j] = U(K_HOLE);
-			keymap_count++;
-		}
-		ov = U(key_map[i]);
-		if (v == ov)
-			break;	/* nothing to do */
-		/*
-		 * Attention Key.
-		 */
-		if (((ov == K_SAK) || (v == K_SAK)) && !capable(CAP_SYS_ADMIN))
-			return -EPERM;
-		key_map[i] = U(v);
-		if (!s && (KTYP(ov) == KT_SHIFT || KTYP(v) == KT_SHIFT))
-			compute_shiftstate();
-		break;
-	}
-	return 0;
-}
-#undef i
-#undef s
-#undef v
-
-static inline int 
-do_kbkeycode_ioctl(int cmd, struct kbkeycode *user_kbkc, int perm)
-{
-	struct kbkeycode tmp;
-	int kc = 0;
-
-	if (copy_from_user(&tmp, user_kbkc, sizeof(struct kbkeycode)))
-		return -EFAULT;
-	switch (cmd) {
-	case KDGETKEYCODE:
-		kc = getkeycode(tmp.scancode);
-		if (kc >= 0)
-			kc = put_user(kc, &user_kbkc->keycode);
-		break;
-	case KDSETKEYCODE:
-		if (!perm)
-			return -EPERM;
-		kc = setkeycode(tmp.scancode, tmp.keycode);
-		break;
-	}
-	return kc;
-}
-
-static inline int
-do_kdgkb_ioctl(int cmd, struct kbsentry *user_kdgkb, int perm)
-{
-	struct kbsentry tmp;
-	char *p;
-	u_char *q;
-	int sz;
-	int delta;
-	char *first_free, *fj, *fnw;
-	int i, j, k;
-
-	/* we mostly copy too much here (512bytes), but who cares ;) */
-	if (copy_from_user(&tmp, user_kdgkb, sizeof(struct kbsentry)))
-		return -EFAULT;
-	tmp.kb_string[sizeof(tmp.kb_string)-1] = '\0';
-	if (tmp.kb_func >= MAX_NR_FUNC)
-		return -EINVAL;
-	i = tmp.kb_func;
-
-	switch (cmd) {
-	case KDGKBSENT:
-		sz = sizeof(tmp.kb_string) - 1; /* sz should have been
-						  a struct member */
-		q = user_kdgkb->kb_string;
-		p = func_table[i];
-		if(p)
-			for ( ; *p && sz; p++, sz--)
-				if (put_user(*p, q++))
-					return -EFAULT;
-		if (put_user('\0', q))
-			return -EFAULT;
-		return ((p && *p) ? -EOVERFLOW : 0);
-	case KDSKBSENT:
-		if (!perm)
-			return -EPERM;
-
-		q = func_table[i];
-		first_free = funcbufptr + (funcbufsize - funcbufleft);
-		for (j = i+1; j < MAX_NR_FUNC && !func_table[j]; j++) 
-			;
-		if (j < MAX_NR_FUNC)
-			fj = func_table[j];
-		else
-			fj = first_free;
-
-		delta = (q ? -strlen(q) : 1) + strlen(tmp.kb_string);
-		if (delta <= funcbufleft) { 	/* it fits in current buf */
-		    if (j < MAX_NR_FUNC) {
-			memmove(fj + delta, fj, first_free - fj);
-			for (k = j; k < MAX_NR_FUNC; k++)
-			    if (func_table[k])
-				func_table[k] += delta;
-		    }
-		    if (!q)
-		      func_table[i] = fj;
-		    funcbufleft -= delta;
-		} else {			/* allocate a larger buffer */
-		    sz = 256;
-		    while (sz < funcbufsize - funcbufleft + delta)
-		      sz <<= 1;
-		    fnw = (char *) kmalloc(sz, GFP_KERNEL);
-		    if(!fnw)
-		      return -ENOMEM;
-
-		    if (!q)
-		      func_table[i] = fj;
-		    if (fj > funcbufptr)
-			memmove(fnw, funcbufptr, fj - funcbufptr);
-		    for (k = 0; k < j; k++)
-		      if (func_table[k])
-			func_table[k] = fnw + (func_table[k] - funcbufptr);
-
-		    if (first_free > fj) {
-			memmove(fnw + (fj - funcbufptr) + delta, fj, first_free - fj);
-			for (k = j; k < MAX_NR_FUNC; k++)
-			  if (func_table[k])
-			    func_table[k] = fnw + (func_table[k] - funcbufptr) + delta;
-		    }
-		    if (funcbufptr != func_buf)
-		      kfree(funcbufptr);
-		    funcbufptr = fnw;
-		    funcbufleft = funcbufleft - delta + sz - funcbufsize;
-		    funcbufsize = sz;
-		}
-		strcpy(func_table[i], tmp.kb_string);
-		break;
-	}
-	return 0;
-}
-
-static inline int 
-do_fontx_ioctl(int cmd, struct consolefontdesc *user_cfd, int perm)
-{
-	struct consolefontdesc cfdarg;
-	struct console_font_op op;
-	int i;
-
-	if (copy_from_user(&cfdarg, user_cfd, sizeof(struct consolefontdesc))) 
-		return -EFAULT;
- 	
-	switch (cmd) {
-	case PIO_FONTX:
-		if (!perm)
-			return -EPERM;
-		op.op = KD_FONT_OP_SET;
-		op.flags = KD_FONT_FLAG_OLD;
-		op.width = 8;
-		op.height = cfdarg.charheight;
-		op.charcount = cfdarg.charcount;
-		op.data = cfdarg.chardata;
-		return con_font_op(fg_console, &op);
-	case GIO_FONTX: {
-		op.op = KD_FONT_OP_GET;
-		op.flags = KD_FONT_FLAG_OLD;
-		op.width = 8;
-		op.height = cfdarg.charheight;
-		op.charcount = cfdarg.charcount;
-		op.data = cfdarg.chardata;
-		i = con_font_op(fg_console, &op);
-		if (i)
-			return i;
-		cfdarg.charheight = op.height;
-		cfdarg.charcount = op.charcount;
-		if (copy_to_user(user_cfd, &cfdarg, sizeof(struct consolefontdesc)))
-			return -EFAULT;
-		return 0;
-		}
-	}
-	return -EINVAL;
-}
-
-static inline int 
-do_unimap_ioctl(int cmd, struct unimapdesc *user_ud,int perm)
-{
-	struct unimapdesc tmp;
-	int i = 0; 
-
-	if (copy_from_user(&tmp, user_ud, sizeof tmp))
-		return -EFAULT;
-	if (tmp.entries) {
-		i = verify_area(VERIFY_WRITE, tmp.entries, 
-						tmp.entry_ct*sizeof(struct unipair));
-		if (i) return i;
-	}
-	switch (cmd) {
-	case PIO_UNIMAP:
-		if (!perm)
-			return -EPERM;
-		return con_set_unimap(fg_console, tmp.entry_ct, tmp.entries);
-	case GIO_UNIMAP:
-		return con_get_unimap(fg_console, tmp.entry_ct, &(user_ud->entry_ct), tmp.entries);
-	}
-	return 0;
-}
-
-/*
- * We handle the console-specific ioctl's here.  We allow the
- * capability to modify any console, not just the fg_console. 
- */
-int vt_ioctl(struct tty_struct *tty, struct file * file,
-	     unsigned int cmd, unsigned long arg)
-{
-	int i, perm;
-	unsigned int console;
-	unsigned char ucval;
-	struct kbd_struct * kbd;
-	struct vt_struct *vt = (struct vt_struct *)tty->driver_data;
-
-	console = vt->vc_num;
-
-	if (!vc_cons_allocated(console)) 	/* impossible? */
-		return -ENOIOCTLCMD;
-
-	/*
-	 * To have permissions to do most of the vt ioctls, we either have
-	 * to be the owner of the tty, or have CAP_SYS_TTY_CONFIG.
-	 */
-	perm = 0;
-	if (current->tty == tty || capable(CAP_SYS_TTY_CONFIG))
-		perm = 1;
- 
-	kbd = kbd_table + console;
-	switch (cmd) {
-	case KIOCSOUND:
-		if (!perm)
-			return -EPERM;
-		if (arg)
-			arg = 1193180 / arg;
-		kd_mksound(arg, 0);
-		return 0;
-
-	case KDMKTONE:
-		if (!perm)
-			return -EPERM;
-	{
-		unsigned int ticks, count;
-		
-		/*
-		 * Generate the tone for the appropriate number of ticks.
-		 * If the time is zero, turn off sound ourselves.
-		 */
-		ticks = HZ * ((arg >> 16) & 0xffff) / 1000;
-		count = ticks ? (arg & 0xffff) : 0;
-		if (count)
-			count = 1193180 / count;
-		kd_mksound(count, ticks);
-		return 0;
-	}
-
-	case KDGKBTYPE:
-		/*
-		 * this is naive.
-		 */
-		ucval = keyboard_type;
-		goto setchar;
-
-#if !defined(__alpha__) && !defined(__ia64__) && !defined(__mips__) && !defined(__arm__) && !defined(__sh__)
-		/*
-		 * These cannot be implemented on any machine that implements
-		 * ioperm() in user level (such as Alpha PCs).
-		 */
-	case KDADDIO:
-	case KDDELIO:
-		/*
-		 * KDADDIO and KDDELIO may be able to add ports beyond what
-		 * we reject here, but to be safe...
-		 */
-		if (arg < GPFIRST || arg > GPLAST)
-			return -EINVAL;
-		return sys_ioperm(arg, 1, (cmd == KDADDIO)) ? -ENXIO : 0;
-
-	case KDENABIO:
-	case KDDISABIO:
-		return sys_ioperm(GPFIRST, GPNUM,
-				  (cmd == KDENABIO)) ? -ENXIO : 0;
-#endif
-
-	/* Linux m68k/i386 interface for setting the keyboard delay/repeat rate */
-		
-	case KDKBDREP:
-	{
-		struct kbd_repeat kbrep;
-		
-		if (!capable(CAP_SYS_TTY_CONFIG))
-			return -EPERM;
-
-		if (copy_from_user(&kbrep, (void *)arg,
-				   sizeof(struct kbd_repeat)))
-			return -EFAULT;
-		if ((i = kbd_rate( &kbrep )))
-			return i;
-		if (copy_to_user((void *)arg, &kbrep,
-				 sizeof(struct kbd_repeat)))
-			return -EFAULT;
-		return 0;
-	}
-
-	case KDSETMODE:
-		/*
-		 * currently, setting the mode from KD_TEXT to KD_GRAPHICS
-		 * doesn't do a whole lot. i'm not sure if it should do any
-		 * restoration of modes or what...
-		 */
-		if (!perm)
-			return -EPERM;
-		switch (arg) {
-		case KD_GRAPHICS:
-			break;
-		case KD_TEXT0:
-		case KD_TEXT1:
-			arg = KD_TEXT;
-		case KD_TEXT:
+		case 2: /* erase whole display */
+			count = video_num_columns * video_num_lines;
+			start = (unsigned short *) origin;
+			if (DO_UPDATE)
+				sw->con_clear(vc_cons[currcons].d, 0, 0,
+					      video_num_lines,
+					      video_num_columns);
 			break;
 		default:
-			return -EINVAL;
-		}
-		if (vt_cons[console]->vc_mode == (unsigned char) arg)
-			return 0;
-		vt_cons[console]->vc_mode = (unsigned char) arg;
-		if (console != fg_console)
-			return 0;
-		/*
-		 * explicitly blank/unblank the screen if switching modes
-		 */
-		if (arg == KD_TEXT)
-			unblank_screen();
-		else
-			do_blank_screen(1);
-		return 0;
-
-	case KDGETMODE:
-		ucval = vt_cons[console]->vc_mode;
-		goto setint;
-
-	case KDMAPDISP:
-	case KDUNMAPDISP:
-		/*
-		 * these work like a combination of mmap and KDENABIO.
-		 * this could be easily finished.
-		 */
-		return -EINVAL;
-
-	case KDSKBMODE:
-		if (!perm)
-			return -EPERM;
-		switch(arg) {
-		  case K_RAW:
-			kbd->kbdmode = VC_RAW;
-			break;
-		  case K_MEDIUMRAW:
-			kbd->kbdmode = VC_MEDIUMRAW;
-			break;
-		  case K_XLATE:
-			kbd->kbdmode = VC_XLATE;
-			compute_shiftstate();
-			break;
-		  case K_UNICODE:
-			kbd->kbdmode = VC_UNICODE;
-			compute_shiftstate();
-			break;
-		  default:
-			return -EINVAL;
-		}
-		if (tty->ldisc.flush_buffer)
-			tty->ldisc.flush_buffer(tty);
-		return 0;
-
-	case KDGKBMODE:
-		ucval = ((kbd->kbdmode == VC_RAW) ? K_RAW :
-				 (kbd->kbdmode == VC_MEDIUMRAW) ? K_MEDIUMRAW :
-				 (kbd->kbdmode == VC_UNICODE) ? K_UNICODE :
-				 K_XLATE);
-		goto setint;
-
-	/* this could be folded into KDSKBMODE, but for compatibility
-	   reasons it is not so easy to fold KDGKBMETA into KDGKBMODE */
-	case KDSKBMETA:
-		switch(arg) {
-		  case K_METABIT:
-			clr_vc_kbd_mode(kbd, VC_META);
-			break;
-		  case K_ESCPREFIX:
-			set_vc_kbd_mode(kbd, VC_META);
-			break;
-		  default:
-			return -EINVAL;
-		}
-		return 0;
-
-	case KDGKBMETA:
-		ucval = (vc_kbd_mode(kbd, VC_META) ? K_ESCPREFIX : K_METABIT);
-	setint:
-		return put_user(ucval, (int *)arg); 
-
-	case KDGETKEYCODE:
-	case KDSETKEYCODE:
-		if(!capable(CAP_SYS_TTY_CONFIG))
-			perm=0;
-		return do_kbkeycode_ioctl(cmd, (struct kbkeycode *)arg, perm);
-
-	case KDGKBENT:
-	case KDSKBENT:
-		return do_kdsk_ioctl(cmd, (struct kbentry *)arg, perm, kbd);
-
-	case KDGKBSENT:
-	case KDSKBSENT:
-		return do_kdgkb_ioctl(cmd, (struct kbsentry *)arg, perm);
-
-	case KDGKBDIACR:
-	{
-		struct kbdiacrs *a = (struct kbdiacrs *)arg;
-
-		if (put_user(accent_table_size, &a->kb_cnt))
-			return -EFAULT;
-		if (copy_to_user(a->kbdiacr, accent_table, accent_table_size*sizeof(struct kbdiacr)))
-			return -EFAULT;
-		return 0;
+			return;
 	}
+	scr_memsetw(start, video_erase_char, 2*count);
+	need_wrap = 0;
+}
 
-	case KDSKBDIACR:
-	{
-		struct kbdiacrs *a = (struct kbdiacrs *)arg;
-		unsigned int ct;
+static void csi_K(int currcons, int vpar)
+{
+	unsigned int count;
+	unsigned short * start;
 
-		if (!perm)
-			return -EPERM;
-		if (get_user(ct,&a->kb_cnt))
-			return -EFAULT;
-		if (ct >= MAX_DIACR)
-			return -EINVAL;
-		accent_table_size = ct;
-		if (copy_from_user(accent_table, a->kbdiacr, ct*sizeof(struct kbdiacr)))
-			return -EFAULT;
-		return 0;
+	switch (vpar) {
+		case 0:	/* erase from cursor to end of line */
+			count = video_num_columns-x;
+			start = (unsigned short *) pos;
+			if (DO_UPDATE)
+				sw->con_clear(vc_cons[currcons].d, y, x, 1,
+					      video_num_columns-x);
+			break;
+		case 1:	/* erase from start of line to cursor */
+			start = (unsigned short *) (pos - (x<<1));
+			count = x+1;
+			if (DO_UPDATE)
+				sw->con_clear(vc_cons[currcons].d, y, 0, 1,
+					      x + 1);
+			break;
+		case 2: /* erase whole line */
+			start = (unsigned short *) (pos - (x<<1));
+			count = video_num_columns;
+			if (DO_UPDATE)
+				sw->con_clear(vc_cons[currcons].d, y, 0, 1,
+					      video_num_columns);
+			break;
+		default:
+			return;
 	}
+	scr_memsetw(start, video_erase_char, 2 * count);
+	need_wrap = 0;
+}
 
-	/* the ioctls below read/set the flags usually shown in the leds */
-	/* don't use them - they will go away without warning */
-	case KDGKBLED:
-		ucval = kbd->ledflagstate | (kbd->default_ledflagstate << 4);
-		goto setchar;
+static void csi_X(int currcons, int vpar) /* erase the following vpar positions */
+{					  /* not vt100? */
+	int count;
 
-	case KDSKBLED:
-		if (!perm)
-			return -EPERM;
-		if (arg & ~0x77)
-			return -EINVAL;
-		kbd->ledflagstate = (arg & 7);
-		kbd->default_ledflagstate = ((arg >> 4) & 7);
-		set_leds();
-		return 0;
+	if (!vpar)
+		vpar++;
+	count = (vpar > video_num_columns-x) ? (video_num_columns-x) : vpar;
 
-	/* the ioctls below only set the lights, not the functions */
-	/* for those, see KDGKBLED and KDSKBLED above */
-	case KDGETLED:
-		ucval = getledstate();
-	setchar:
-		return put_user(ucval, (char*)arg);
+	scr_memsetw((unsigned short *) pos, video_erase_char, 2 * count);
+	if (DO_UPDATE)
+		sw->con_clear(vc_cons[currcons].d, y, x, 1, count);
+	need_wrap = 0;
+}
 
-	case KDSETLED:
-		if (!perm)
-		  return -EPERM;
-		setledstate(kbd, arg);
-		return 0;
+static void default_attr(int currcons)
+{
+	intensity = 1;
+	underline = 0;
+	reverse = 0;
+	blink = 0;
+	color = def_color;
+}
 
-	/*
-	 * A process can indicate its willingness to accept signals
-	 * generated by pressing an appropriate key combination.
-	 * Thus, one can have a daemon that e.g. spawns a new console
-	 * upon a keypress and then changes to it.
-	 * Probably init should be changed to do this (and have a
-	 * field ks (`keyboard signal') in inittab describing the
-	 * desired action), so that the number of background daemons
-	 * does not increase.
-	 */
-	case KDSIGACCEPT:
-	{
-		extern int spawnpid, spawnsig;
-		if (!perm || !capable(CAP_KILL))
-		  return -EPERM;
-		if (arg < 1 || arg > _NSIG || arg == SIGKILL)
-		  return -EINVAL;
-		spawnpid = current->pid;
-		spawnsig = arg;
-		return 0;
-	}
+/* console_sem is held */
+static void csi_m(int currcons)
+{
+	int i;
 
-	case VT_SETMODE:
-	{
-		struct vt_mode tmp;
-
-		if (!perm)
-			return -EPERM;
-		if (copy_from_user(&tmp, (void*)arg, sizeof(struct vt_mode)))
-			return -EFAULT;
-		if (tmp.mode != VT_AUTO && tmp.mode != VT_PROCESS)
-			return -EINVAL;
-		vt_cons[console]->vt_mode = tmp;
-		/* the frsig is ignored, so we set it to 0 */
-		vt_cons[console]->vt_mode.frsig = 0;
-		vt_cons[console]->vt_pid = current->pid;
-		/* no switch is required -- saw@shade.msu.ru */
-		vt_cons[console]->vt_newvt = -1; 
-		return 0;
-	}
-
-	case VT_GETMODE:
-		return copy_to_user((void*)arg, &(vt_cons[console]->vt_mode), 
-							sizeof(struct vt_mode)) ? -EFAULT : 0; 
-
-	/*
-	 * Returns global vt state. Note that VT 0 is always open, since
-	 * it's an alias for the current VT, and people can't use it here.
-	 * We cannot return state for more than 16 VTs, since v_state is short.
-	 */
-	case VT_GETSTATE:
-	{
-		struct vt_stat *vtstat = (struct vt_stat *)arg;
-		unsigned short state, mask;
-
-		if (put_user(fg_console + 1, &vtstat->v_active))
-			return -EFAULT;
-		state = 1;	/* /dev/tty0 is always open */
-		for (i = 0, mask = 2; i < MAX_NR_CONSOLES && mask; ++i, mask <<= 1)
-			if (VT_IS_IN_USE(i))
-				state |= mask;
-		return put_user(state, &vtstat->v_state);
-	}
-
-	/*
-	 * Returns the first available (non-opened) console.
-	 */
-	case VT_OPENQRY:
-		for (i = 0; i < MAX_NR_CONSOLES; ++i)
-			if (! VT_IS_IN_USE(i))
+	for (i=0;i<=npar;i++)
+		switch (par[i]) {
+			case 0:	/* all attributes off */
+				default_attr(currcons);
 				break;
-		ucval = i < MAX_NR_CONSOLES ? (i+1) : -1;
-		goto setint;		 
-
-	/*
-	 * ioctl(fd, VT_ACTIVATE, num) will cause us to switch to vt # num,
-	 * with num >= 1 (switches to vt 0, our console, are not allowed, just
-	 * to preserve sanity).
-	 */
-	case VT_ACTIVATE:
-		if (!perm)
-			return -EPERM;
-		if (arg == 0 || arg > MAX_NR_CONSOLES)
-			return -ENXIO;
-		arg--;
-		i = vc_allocate(arg);
-		if (i)
-			return i;
-		set_console(arg);
-		return 0;
-
-	/*
-	 * wait until the specified VT has been activated
-	 */
-	case VT_WAITACTIVE:
-		if (!perm)
-			return -EPERM;
-		if (arg == 0 || arg > MAX_NR_CONSOLES)
-			return -ENXIO;
-		return vt_waitactive(arg-1);
-
-	/*
-	 * If a vt is under process control, the kernel will not switch to it
-	 * immediately, but postpone the operation until the process calls this
-	 * ioctl, allowing the switch to complete.
-	 *
-	 * According to the X sources this is the behavior:
-	 *	0:	pending switch-from not OK
-	 *	1:	pending switch-from OK
-	 *	2:	completed switch-to OK
-	 */
-	case VT_RELDISP:
-		if (!perm)
-			return -EPERM;
-		if (vt_cons[console]->vt_mode.mode != VT_PROCESS)
-			return -EINVAL;
-
-		/*
-		 * Switching-from response
-		 */
-		if (vt_cons[console]->vt_newvt >= 0)
-		{
-			if (arg == 0)
-				/*
-				 * Switch disallowed, so forget we were trying
-				 * to do it.
-				 */
-				vt_cons[console]->vt_newvt = -1;
-
-			else
-			{
-				/*
-				 * The current vt has been released, so
-				 * complete the switch.
-				 */
-				int newvt = vt_cons[console]->vt_newvt;
-				vt_cons[console]->vt_newvt = -1;
-				i = vc_allocate(newvt);
-				if (i)
-					return i;
-				/*
-				 * When we actually do the console switch,
-				 * make sure we are atomic with respect to
-				 * other console switches..
-				 */
-				acquire_console_sem();
-				complete_change_console(newvt);
-				release_console_sem();
-			}
+			case 1:
+				intensity = 2;
+				break;
+			case 2:
+				intensity = 0;
+				break;
+			case 4:
+				underline = 1;
+				break;
+			case 5:
+				blink = 1;
+				break;
+			case 7:
+				reverse = 1;
+				break;
+			case 10: /* ANSI X3.64-1979 (SCO-ish?)
+				  * Select primary font, don't display
+				  * control chars if defined, don't set
+				  * bit 8 on output.
+				  */
+				translate = set_translate(charset == 0
+						? G0_charset
+						: G1_charset,currcons);
+				disp_ctrl = 0;
+				toggle_meta = 0;
+				break;
+			case 11: /* ANSI X3.64-1979 (SCO-ish?)
+				  * Select first alternate font, lets
+				  * chars < 32 be displayed as ROM chars.
+				  */
+				translate = set_translate(IBMPC_MAP,currcons);
+				disp_ctrl = 1;
+				toggle_meta = 0;
+				break;
+			case 12: /* ANSI X3.64-1979 (SCO-ish?)
+				  * Select second alternate font, toggle
+				  * high bit before displaying as ROM char.
+				  */
+				translate = set_translate(IBMPC_MAP,currcons);
+				disp_ctrl = 1;
+				toggle_meta = 1;
+				break;
+			case 21:
+			case 22:
+				intensity = 1;
+				break;
+			case 24:
+				underline = 0;
+				break;
+			case 25:
+				blink = 0;
+				break;
+			case 27:
+				reverse = 0;
+				break;
+			case 38: /* ANSI X3.64-1979 (SCO-ish?)
+				  * Enables underscore, white foreground
+				  * with white underscore (Linux - use
+				  * default foreground).
+				  */
+				color = (def_color & 0x0f) | background;
+				underline = 1;
+				break;
+			case 39: /* ANSI X3.64-1979 (SCO-ish?)
+				  * Disable underline option.
+				  * Reset colour to default? It did this
+				  * before...
+				  */
+				color = (def_color & 0x0f) | background;
+				underline = 0;
+				break;
+			case 49:
+				color = (def_color & 0xf0) | foreground;
+				break;
+			default:
+				if (par[i] >= 30 && par[i] <= 37)
+					color = color_table[par[i]-30]
+						| background;
+				else if (par[i] >= 40 && par[i] <= 47)
+					color = (color_table[par[i]-40]<<4)
+						| foreground;
+				break;
 		}
+	update_attr(currcons);
+}
 
-		/*
-		 * Switched-to response
-		 */
-		else
-		{
-			/*
-			 * If it's just an ACK, ignore it
-			 */
-			if (arg != VT_ACKACQ)
-				return -EINVAL;
-		}
-
-		return 0;
-
-	 /*
-	  * Disallocate memory associated to VT (but leave VT1)
-	  */
-	 case VT_DISALLOCATE:
-		if (arg > MAX_NR_CONSOLES)
-			return -ENXIO;
-		if (arg == 0) {
-		    /* disallocate all unused consoles, but leave 0 */
-		    for (i=1; i<MAX_NR_CONSOLES; i++)
-		      if (! VT_BUSY(i))
-			vc_disallocate(i);
-		} else {
-		    /* disallocate a single console, if possible */
-		    arg--;
-		    if (VT_BUSY(arg))
-		      return -EBUSY;
-		    if (arg)			      /* leave 0 */
-		      vc_disallocate(arg);
-		}
-		return 0;
-
-	case VT_RESIZE:
-	{
-		struct vt_sizes *vtsizes = (struct vt_sizes *) arg;
-		ushort ll,cc;
-		if (!perm)
-			return -EPERM;
-		if (get_user(ll, &vtsizes->v_rows) ||
-		    get_user(cc, &vtsizes->v_cols))
-			return -EFAULT;
-		return vc_resize_all(ll, cc);
+static void respond_string(const char * p, struct tty_struct * tty)
+{
+	while (*p) {
+		tty_insert_flip_char(tty, *p, 0);
+		p++;
 	}
+	con_schedule_flip(tty);
+}
 
-	case VT_RESIZEX:
-	{
-		struct vt_consize *vtconsize = (struct vt_consize *) arg;
-		ushort ll,cc,vlin,clin,vcol,ccol;
-		if (!perm)
-			return -EPERM;
-		if (verify_area(VERIFY_READ, (void *)vtconsize,
-				sizeof(struct vt_consize)))
-			return -EFAULT;
-		__get_user(ll, &vtconsize->v_rows);
-		__get_user(cc, &vtconsize->v_cols);
-		__get_user(vlin, &vtconsize->v_vlin);
-		__get_user(clin, &vtconsize->v_clin);
-		__get_user(vcol, &vtconsize->v_vcol);
-		__get_user(ccol, &vtconsize->v_ccol);
-		vlin = vlin ? vlin : video_scan_lines;
-		if ( clin )
-		  {
-		    if ( ll )
-		      {
-			if ( ll != vlin/clin )
-			  return -EINVAL; /* Parameters don't add up */
-		      }
-		    else 
-		      ll = vlin/clin;
-		  }
-		if ( vcol && ccol )
-		  {
-		    if ( cc )
-		      {
-			if ( cc != vcol/ccol )
-			  return -EINVAL;
-		      }
-		    else
-		      cc = vcol/ccol;
-		  }
+static void cursor_report(int currcons, struct tty_struct * tty)
+{
+	char buf[40];
 
-		if ( clin > 32 )
-		  return -EINVAL;
-		    
-		if ( vlin )
-		  video_scan_lines = vlin;
-		if ( clin )
-		  video_font_height = clin;
-		
-		return vc_resize_all(ll, cc);
-  	}
+	sprintf(buf, "\033[%d;%dR", y + (decom ? top+1 : 1), x+1);
+	respond_string(buf, tty);
+}
 
-	case PIO_FONT: {
-		struct console_font_op op;
-		if (!perm)
-			return -EPERM;
-		op.op = KD_FONT_OP_SET;
-		op.flags = KD_FONT_FLAG_OLD | KD_FONT_FLAG_DONT_RECALC;	/* Compatibility */
-		op.width = 8;
-		op.height = 0;
-		op.charcount = 256;
-		op.data = (char *) arg;
-		return con_font_op(fg_console, &op);
-	}
+static inline void status_report(struct tty_struct * tty)
+{
+	respond_string("\033[0n", tty);	/* Terminal ok */
+}
 
-	case GIO_FONT: {
-		struct console_font_op op;
-		op.op = KD_FONT_OP_GET;
-		op.flags = KD_FONT_FLAG_OLD;
-		op.width = 8;
-		op.height = 32;
-		op.charcount = 256;
-		op.data = (char *) arg;
-		return con_font_op(fg_console, &op);
-	}
+static inline void respond_ID(struct tty_struct * tty)
+{
+	respond_string(VT102ID, tty);
+}
 
-	case PIO_CMAP:
-                if (!perm)
-			return -EPERM;
-                return con_set_cmap((char *)arg);
+void mouse_report(struct tty_struct * tty, int butt, int mrx, int mry)
+{
+	char buf[8];
 
-	case GIO_CMAP:
-                return con_get_cmap((char *)arg);
+	sprintf(buf, "\033[M%c%c%c", (char)(' ' + butt), (char)('!' + mrx),
+		(char)('!' + mry));
+	respond_string(buf, tty);
+}
 
-	case PIO_FONTX:
-	case GIO_FONTX:
-		return do_fontx_ioctl(cmd, (struct consolefontdesc *)arg, perm);
+/* invoked via ioctl(TIOCLINUX) and through set_selection */
+int mouse_reporting(void)
+{
+	int currcons = fg_console;
 
-	case PIO_FONTRESET:
-	{
-		if (!perm)
-			return -EPERM;
+	return report_mouse;
+}
 
-#ifdef BROKEN_GRAPHICS_PROGRAMS
-		/* With BROKEN_GRAPHICS_PROGRAMS defined, the default
-		   font is not saved. */
-		return -ENOSYS;
-#else
-		{
-		struct console_font_op op;
-		op.op = KD_FONT_OP_SET_DEFAULT;
-		op.data = NULL;
-		i = con_font_op(fg_console, &op);
-		if (i) return i;
-		con_set_default_unimap(fg_console);
-		return 0;
-		}
+/* console_sem is held */
+static void set_mode(int currcons, int on_off)
+{
+	int i;
+
+	for (i=0; i<=npar; i++)
+		if (ques) switch(par[i]) {	/* DEC private modes set/reset */
+			case 1:			/* Cursor keys send ^[Ox/^[[x */
+				if (on_off)
+					set_kbd(decckm);
+				else
+					clr_kbd(decckm);
+				break;
+			case 3:	/* 80/132 mode switch unimplemented */
+				deccolm = on_off;
+#if 0
+				(void) vc_resize(video_num_lines, deccolm ? 132 : 80);
+				/* this alone does not suffice; some user mode
+				   utility has to change the hardware regs */
 #endif
-	}
+				break;
+			case 5:			/* Inverted screen on/off */
+				if (decscnm != on_off) {
+					decscnm = on_off;
+					invert_screen(currcons, 0, screenbuf_size, 0);
+					update_attr(currcons);
+				}
+				break;
+			case 6:			/* Origin relative/absolute */
+				decom = on_off;
+				gotoxay(currcons,0,0);
+				break;
+			case 7:			/* Autowrap on/off */
+				decawm = on_off;
+				break;
+			case 8:			/* Autorepeat on/off */
+				if (on_off)
+					set_kbd(decarm);
+				else
+					clr_kbd(decarm);
+				break;
+			case 9:
+				report_mouse = on_off ? 1 : 0;
+				break;
+			case 25:		/* Cursor on/off */
+				deccm = on_off;
+				break;
+			case 1000:
+				report_mouse = on_off ? 2 : 0;
+				break;
+		} else switch(par[i]) {		/* ANSI modes set/reset */
+			case 3:			/* Monitor (display ctrls) */
+				disp_ctrl = on_off;
+				break;
+			case 4:			/* Insert Mode on/off */
+				decim = on_off;
+				break;
+			case 20:		/* Lf, Enter == CrLf/Lf */
+				if (on_off)
+					set_kbd(lnm);
+				else
+					clr_kbd(lnm);
+				break;
+		}
+}
 
-	case KDFONTOP: {
-		struct console_font_op op;
-		if (copy_from_user(&op, (void *) arg, sizeof(op)))
-			return -EFAULT;
-		if (!perm && op.op != KD_FONT_OP_GET)
-			return -EPERM;
-		i = con_font_op(console, &op);
-		if (i) return i;
-		if (copy_to_user((void *) arg, &op, sizeof(op)))
-			return -EFAULT;
-		return 0;
-	}
-
-	case PIO_SCRNMAP:
-		if (!perm)
-			return -EPERM;
-		return con_set_trans_old((unsigned char *)arg);
-
-	case GIO_SCRNMAP:
-		return con_get_trans_old((unsigned char *)arg);
-
-	case PIO_UNISCRNMAP:
-		if (!perm)
-			return -EPERM;
-		return con_set_trans_new((unsigned short *)arg);
-
-	case GIO_UNISCRNMAP:
-		return con_get_trans_new((unsigned short *)arg);
-
-	case PIO_UNIMAPCLR:
-	      { struct unimapinit ui;
-		if (!perm)
-			return -EPERM;
-		i = copy_from_user(&ui, (void *)arg, sizeof(struct unimapinit));
-		if (i) return -EFAULT;
-		con_clear_unimap(fg_console, &ui);
-		return 0;
-	      }
-
-	case PIO_UNIMAP:
-	case GIO_UNIMAP:
-		return do_unimap_ioctl(cmd, (struct unimapdesc *)arg, perm);
-
-	case VT_LOCKSWITCH:
-		if (!capable(CAP_SYS_TTY_CONFIG))
-		   return -EPERM;
-		vt_dont_switch = 1;
-		return 0;
-	case VT_UNLOCKSWITCH:
-		if (!capable(CAP_SYS_TTY_CONFIG))
-		   return -EPERM;
-		vt_dont_switch = 0;
-		return 0;
-	default:
-		return -ENOIOCTLCMD;
+/* console_sem is held */
+static void setterm_command(int currcons)
+{
+	switch(par[0]) {
+		case 1:	/* set color for underline mode */
+			if (can_do_color && par[1] < 16) {
+				ulcolor = color_table[par[1]];
+				if (underline)
+					update_attr(currcons);
+			}
+			break;
+		case 2:	/* set color for half intensity mode */
+			if (can_do_color && par[1] < 16) {
+				halfcolor = color_table[par[1]];
+				if (intensity == 0)
+					update_attr(currcons);
+			}
+			break;
+		case 8:	/* store colors as defaults */
+			def_color = attr;
+			if (hi_font_mask == 0x100)
+				def_color >>= 1;
+			default_attr(currcons);
+			update_attr(currcons);
+			break;
+		case 9:	/* set blanking interval */
+			blankinterval = ((par[1] < 60) ? par[1] : 60) * 60 * HZ;
+			poke_blanked_console();
+			break;
+		case 10: /* set bell frequency in Hz */
+			if (npar >= 1)
+				bell_pitch = par[1];
+			else
+				bell_pitch = DEFAULT_BELL_PITCH;
+			break;
+		case 11: /* set bell duration in msec */
+			if (npar >= 1)
+				bell_duration = (par[1] < 2000) ?
+					par[1]*HZ/1000 : 0;
+			else
+				bell_duration = DEFAULT_BELL_DURATION;
+			break;
+		case 12: /* bring specified console to the front */
+			if (par[1] >= 1 && vc_cons_allocated(par[1]-1))
+				set_console(par[1] - 1);
+			break;
+		case 13: /* unblank the screen */
+			poke_blanked_console();
+			break;
+		case 14: /* set vesa powerdown interval */
+			vesa_off_interval = ((par[1] < 60) ? par[1] : 60) * 60 * HZ;
+			break;
 	}
 }
 
-/*
- * Sometimes we want to wait until a particular VT has been activated. We
- * do it in a very simple manner. Everybody waits on a single queue and
- * get woken up at once. Those that are satisfied go on with their business,
- * while those not ready go back to sleep. Seems overkill to add a wait
- * to each vt just for this - usually this does nothing!
- */
-static DECLARE_WAIT_QUEUE_HEAD(vt_activate_queue);
-
-/*
- * Sleeps until a vt is activated, or the task is interrupted. Returns
- * 0 if activation, -EINTR if interrupted.
- */
-int vt_waitactive(int vt)
+/* console_sem is held */
+static void csi_at(int currcons, unsigned int nr)
 {
-	int retval;
-	DECLARE_WAITQUEUE(wait, current);
+	if (nr > video_num_columns - x)
+		nr = video_num_columns - x;
+	else if (!nr)
+		nr = 1;
+	insert_char(currcons, nr);
+}
 
-	add_wait_queue(&vt_activate_queue, &wait);
-	for (;;) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		retval = 0;
-		if (vt == fg_console)
-			break;
-		retval = -EINTR;
-		if (signal_pending(current))
-			break;
-		schedule();
+/* console_sem is held */
+static void csi_L(int currcons, unsigned int nr)
+{
+	if (nr > video_num_lines - y)
+		nr = video_num_lines - y;
+	else if (!nr)
+		nr = 1;
+	scrdown(currcons,y,bottom,nr);
+	need_wrap = 0;
+}
+
+/* console_sem is held */
+static void csi_P(int currcons, unsigned int nr)
+{
+	if (nr > video_num_columns - x)
+		nr = video_num_columns - x;
+	else if (!nr)
+		nr = 1;
+	delete_char(currcons, nr);
+}
+
+/* console_sem is held */
+static void csi_M(int currcons, unsigned int nr)
+{
+	if (nr > video_num_lines - y)
+		nr = video_num_lines - y;
+	else if (!nr)
+		nr=1;
+	scrup(currcons,y,bottom,nr);
+	need_wrap = 0;
+}
+
+/* console_sem is held (except via vc_init->reset_terminal */
+static void save_cur(int currcons)
+{
+	saved_x		= x;
+	saved_y		= y;
+	s_intensity	= intensity;
+	s_underline	= underline;
+	s_blink		= blink;
+	s_reverse	= reverse;
+	s_charset	= charset;
+	s_color		= color;
+	saved_G0	= G0_charset;
+	saved_G1	= G1_charset;
+}
+
+/* console_sem is held */
+static void restore_cur(int currcons)
+{
+	gotoxy(currcons,saved_x,saved_y);
+	intensity	= s_intensity;
+	underline	= s_underline;
+	blink		= s_blink;
+	reverse		= s_reverse;
+	charset		= s_charset;
+	color		= s_color;
+	G0_charset	= saved_G0;
+	G1_charset	= saved_G1;
+	translate	= set_translate(charset ? G1_charset : G0_charset,currcons);
+	update_attr(currcons);
+	need_wrap = 0;
+}
+
+enum { ESnormal, ESesc, ESsquare, ESgetpars, ESgotpars, ESfunckey,
+	EShash, ESsetG0, ESsetG1, ESpercent, ESignore, ESnonstd,
+	ESpalette };
+
+/* console_sem is held (except via vc_init()) */
+static void reset_terminal(int currcons, int do_clear)
+{
+	top		= 0;
+	bottom		= video_num_lines;
+	vc_state	= ESnormal;
+	ques		= 0;
+	translate	= set_translate(LAT1_MAP,currcons);
+	G0_charset	= LAT1_MAP;
+	G1_charset	= GRAF_MAP;
+	charset		= 0;
+	need_wrap	= 0;
+	report_mouse	= 0;
+	utf             = 0;
+	utf_count       = 0;
+
+	disp_ctrl	= 0;
+	toggle_meta	= 0;
+
+	decscnm		= 0;
+	decom		= 0;
+	decawm		= 1;
+	deccm		= 1;
+	decim		= 0;
+
+	set_kbd(decarm);
+	clr_kbd(decckm);
+	clr_kbd(kbdapplic);
+	clr_kbd(lnm);
+	kbd_table[currcons].lockstate = 0;
+	kbd_table[currcons].slockstate = 0;
+	kbd_table[currcons].ledmode = LED_SHOW_FLAGS;
+	kbd_table[currcons].ledflagstate = kbd_table[currcons].default_ledflagstate;
+	/* do not do set_leds here because this causes an endless tasklet loop
+	   when the keyboard hasn't been initialized yet */
+
+	cursor_type = CUR_DEFAULT;
+	complement_mask = s_complement_mask;
+
+	default_attr(currcons);
+	update_attr(currcons);
+
+	tab_stop[0]	= 0x01010100;
+	tab_stop[1]	=
+	tab_stop[2]	=
+	tab_stop[3]	=
+	tab_stop[4]	= 0x01010101;
+
+	bell_pitch = DEFAULT_BELL_PITCH;
+	bell_duration = DEFAULT_BELL_DURATION;
+
+	gotoxy(currcons,0,0);
+	save_cur(currcons);
+	if (do_clear)
+	    csi_J(currcons,2);
+}
+
+/* console_sem is held */
+static void do_con_trol(struct tty_struct *tty, unsigned int currcons, int c)
+{
+	/*
+	 *  Control characters can be used in the _middle_
+	 *  of an escape sequence.
+	 */
+	switch (c) {
+	case 0:
+		return;
+	case 7:
+		if (bell_duration)
+			kd_mksound(bell_pitch, bell_duration);
+		return;
+	case 8:
+		bs(currcons);
+		return;
+	case 9:
+		pos -= (x << 1);
+		while (x < video_num_columns - 1) {
+			x++;
+			if (tab_stop[x >> 5] & (1 << (x & 31)))
+				break;
+		}
+		pos += (x << 1);
+		return;
+	case 10: case 11: case 12:
+		lf(currcons);
+		if (!is_kbd(lnm))
+			return;
+	case 13:
+		cr(currcons);
+		return;
+	case 14:
+		charset = 1;
+		translate = set_translate(G1_charset,currcons);
+		disp_ctrl = 1;
+		return;
+	case 15:
+		charset = 0;
+		translate = set_translate(G0_charset,currcons);
+		disp_ctrl = 0;
+		return;
+	case 24: case 26:
+		vc_state = ESnormal;
+		return;
+	case 27:
+		vc_state = ESesc;
+		return;
+	case 127:
+		del(currcons);
+		return;
+	case 128+27:
+		vc_state = ESsquare;
+		return;
 	}
-	remove_wait_queue(&vt_activate_queue, &wait);
-	current->state = TASK_RUNNING;
+	switch(vc_state) {
+	case ESesc:
+		vc_state = ESnormal;
+		switch (c) {
+		case '[':
+			vc_state = ESsquare;
+			return;
+		case ']':
+			vc_state = ESnonstd;
+			return;
+		case '%':
+			vc_state = ESpercent;
+			return;
+		case 'E':
+			cr(currcons);
+			lf(currcons);
+			return;
+		case 'M':
+			ri(currcons);
+			return;
+		case 'D':
+			lf(currcons);
+			return;
+		case 'H':
+			tab_stop[x >> 5] |= (1 << (x & 31));
+			return;
+		case 'Z':
+			respond_ID(tty);
+			return;
+		case '7':
+			save_cur(currcons);
+			return;
+		case '8':
+			restore_cur(currcons);
+			return;
+		case '(':
+			vc_state = ESsetG0;
+			return;
+		case ')':
+			vc_state = ESsetG1;
+			return;
+		case '#':
+			vc_state = EShash;
+			return;
+		case 'c':
+			reset_terminal(currcons,1);
+			return;
+		case '>':  /* Numeric keypad */
+			clr_kbd(kbdapplic);
+			return;
+		case '=':  /* Appl. keypad */
+			set_kbd(kbdapplic);
+			return;
+		}
+		return;
+	case ESnonstd:
+		if (c=='P') {   /* palette escape sequence */
+			for (npar=0; npar<NPAR; npar++)
+				par[npar] = 0 ;
+			npar = 0 ;
+			vc_state = ESpalette;
+			return;
+		} else if (c=='R') {   /* reset palette */
+			reset_palette(currcons);
+			vc_state = ESnormal;
+		} else
+			vc_state = ESnormal;
+		return;
+	case ESpalette:
+		if ( (c>='0'&&c<='9') || (c>='A'&&c<='F') || (c>='a'&&c<='f') ) {
+			par[npar++] = (c>'9' ? (c&0xDF)-'A'+10 : c-'0') ;
+			if (npar==7) {
+				int i = par[0]*3, j = 1;
+				palette[i] = 16*par[j++];
+				palette[i++] += par[j++];
+				palette[i] = 16*par[j++];
+				palette[i++] += par[j++];
+				palette[i] = 16*par[j++];
+				palette[i] += par[j];
+				set_palette(currcons);
+				vc_state = ESnormal;
+			}
+		} else
+			vc_state = ESnormal;
+		return;
+	case ESsquare:
+		for(npar = 0 ; npar < NPAR ; npar++)
+			par[npar] = 0;
+		npar = 0;
+		vc_state = ESgetpars;
+		if (c == '[') { /* Function key */
+			vc_state=ESfunckey;
+			return;
+		}
+		ques = (c=='?');
+		if (ques)
+			return;
+	case ESgetpars:
+		if (c==';' && npar<NPAR-1) {
+			npar++;
+			return;
+		} else if (c>='0' && c<='9') {
+			par[npar] *= 10;
+			par[npar] += c-'0';
+			return;
+		} else vc_state=ESgotpars;
+	case ESgotpars:
+		vc_state = ESnormal;
+		switch(c) {
+		case 'h':
+			set_mode(currcons,1);
+			return;
+		case 'l':
+			set_mode(currcons,0);
+			return;
+		case 'c':
+			if (ques) {
+				if (par[0])
+					cursor_type = par[0] | (par[1]<<8) | (par[2]<<16);
+				else
+					cursor_type = CUR_DEFAULT;
+				return;
+			}
+			break;
+		case 'm':
+			if (ques) {
+				clear_selection();
+				if (par[0])
+					complement_mask = par[0]<<8 | par[1];
+				else
+					complement_mask = s_complement_mask;
+				return;
+			}
+			break;
+		case 'n':
+			if (!ques) {
+				if (par[0] == 5)
+					status_report(tty);
+				else if (par[0] == 6)
+					cursor_report(currcons,tty);
+			}
+			return;
+		}
+		if (ques) {
+			ques = 0;
+			return;
+		}
+		switch(c) {
+		case 'G': case '`':
+			if (par[0]) par[0]--;
+			gotoxy(currcons,par[0],y);
+			return;
+		case 'A':
+			if (!par[0]) par[0]++;
+			gotoxy(currcons,x,y-par[0]);
+			return;
+		case 'B': case 'e':
+			if (!par[0]) par[0]++;
+			gotoxy(currcons,x,y+par[0]);
+			return;
+		case 'C': case 'a':
+			if (!par[0]) par[0]++;
+			gotoxy(currcons,x+par[0],y);
+			return;
+		case 'D':
+			if (!par[0]) par[0]++;
+			gotoxy(currcons,x-par[0],y);
+			return;
+		case 'E':
+			if (!par[0]) par[0]++;
+			gotoxy(currcons,0,y+par[0]);
+			return;
+		case 'F':
+			if (!par[0]) par[0]++;
+			gotoxy(currcons,0,y-par[0]);
+			return;
+		case 'd':
+			if (par[0]) par[0]--;
+			gotoxay(currcons,x,par[0]);
+			return;
+		case 'H': case 'f':
+			if (par[0]) par[0]--;
+			if (par[1]) par[1]--;
+			gotoxay(currcons,par[1],par[0]);
+			return;
+		case 'J':
+			csi_J(currcons,par[0]);
+			return;
+		case 'K':
+			csi_K(currcons,par[0]);
+			return;
+		case 'L':
+			csi_L(currcons,par[0]);
+			return;
+		case 'M':
+			csi_M(currcons,par[0]);
+			return;
+		case 'P':
+			csi_P(currcons,par[0]);
+			return;
+		case 'c':
+			if (!par[0])
+				respond_ID(tty);
+			return;
+		case 'g':
+			if (!par[0])
+				tab_stop[x >> 5] &= ~(1 << (x & 31));
+			else if (par[0] == 3) {
+				tab_stop[0] =
+					tab_stop[1] =
+					tab_stop[2] =
+					tab_stop[3] =
+					tab_stop[4] = 0;
+			}
+			return;
+		case 'm':
+			csi_m(currcons);
+			return;
+		case 'q': /* DECLL - but only 3 leds */
+			/* map 0,1,2,3 to 0,1,2,4 */
+			if (par[0] < 4)
+				setledstate(kbd_table + currcons,
+					    (par[0] < 3) ? par[0] : 4);
+			return;
+		case 'r':
+			if (!par[0])
+				par[0]++;
+			if (!par[1])
+				par[1] = video_num_lines;
+			/* Minimum allowed region is 2 lines */
+			if (par[0] < par[1] &&
+			    par[1] <= video_num_lines) {
+				top=par[0]-1;
+				bottom=par[1];
+				gotoxay(currcons,0,0);
+			}
+			return;
+		case 's':
+			save_cur(currcons);
+			return;
+		case 'u':
+			restore_cur(currcons);
+			return;
+		case 'X':
+			csi_X(currcons, par[0]);
+			return;
+		case '@':
+			csi_at(currcons,par[0]);
+			return;
+		case ']': /* setterm functions */
+			setterm_command(currcons);
+			return;
+		}
+		return;
+	case ESpercent:
+		vc_state = ESnormal;
+		switch (c) {
+		case '@':  /* defined in ISO 2022 */
+			utf = 0;
+			return;
+		case 'G':  /* prelim official escape code */
+		case '8':  /* retained for compatibility */
+			utf = 1;
+			return;
+		}
+		return;
+	case ESfunckey:
+		vc_state = ESnormal;
+		return;
+	case EShash:
+		vc_state = ESnormal;
+		if (c == '8') {
+			/* DEC screen alignment test. kludge :-) */
+			video_erase_char =
+				(video_erase_char & 0xff00) | 'E';
+			csi_J(currcons, 2);
+			video_erase_char =
+				(video_erase_char & 0xff00) | ' ';
+			do_update_region(currcons, origin, screenbuf_size/2);
+		}
+		return;
+	case ESsetG0:
+		if (c == '0')
+			G0_charset = GRAF_MAP;
+		else if (c == 'B')
+			G0_charset = LAT1_MAP;
+		else if (c == 'U')
+			G0_charset = IBMPC_MAP;
+		else if (c == 'K')
+			G0_charset = USER_MAP;
+		if (charset == 0)
+			translate = set_translate(G0_charset,currcons);
+		vc_state = ESnormal;
+		return;
+	case ESsetG1:
+		if (c == '0')
+			G1_charset = GRAF_MAP;
+		else if (c == 'B')
+			G1_charset = LAT1_MAP;
+		else if (c == 'U')
+			G1_charset = IBMPC_MAP;
+		else if (c == 'K')
+			G1_charset = USER_MAP;
+		if (charset == 1)
+			translate = set_translate(G1_charset,currcons);
+		vc_state = ESnormal;
+		return;
+	default:
+		vc_state = ESnormal;
+	}
+}
+
+/* This is a temporary buffer used to prepare a tty console write
+ * so that we can easily avoid touching user space while holding the
+ * console spinlock.  It is allocated in con_init and is shared by
+ * this code and the vc_screen read/write tty calls.
+ *
+ * We have to allocate this statically in the kernel data section
+ * since console_init (and thus con_init) are called before any
+ * kernel memory allocation is available.
+ */
+char con_buf[PAGE_SIZE];
+#define CON_BUF_SIZE	PAGE_SIZE
+DECLARE_MUTEX(con_buf_sem);
+
+/* acquires console_sem */
+static int do_con_write(struct tty_struct * tty, int from_user,
+			const unsigned char *buf, int count)
+{
+#ifdef VT_BUF_VRAM_ONLY
+#define FLUSH do { } while(0);
+#else
+#define FLUSH if (draw_x >= 0) { \
+	sw->con_putcs(vc_cons[currcons].d, (u16 *)draw_from, (u16 *)draw_to-(u16 *)draw_from, y, draw_x); \
+	draw_x = -1; \
+	}
+#endif
+
+	int c, tc, ok, n = 0, draw_x = -1;
+	unsigned int currcons;
+	unsigned long draw_from = 0, draw_to = 0;
+	struct vt_struct *vt = (struct vt_struct *)tty->driver_data;
+	u16 himask, charmask;
+	const unsigned char *orig_buf = NULL;
+	int orig_count;
+
+	if (in_interrupt())
+		return count;
+		
+	currcons = vt->vc_num;
+	if (!vc_cons_allocated(currcons)) {
+	    /* could this happen? */
+	    static int error = 0;
+	    if (!error) {
+		error = 1;
+		printk("con_write: tty %d not allocated\n", currcons+1);
+	    }
+	    return 0;
+	}
+
+	orig_buf = buf;
+	orig_count = count;
+
+	if (from_user) {
+		down(&con_buf_sem);
+
+again:
+		if (count > CON_BUF_SIZE)
+			count = CON_BUF_SIZE;
+		console_conditional_schedule();
+		if (copy_from_user(con_buf, buf, count)) {
+			n = 0; /* ?? are error codes legal here ?? */
+			goto out;
+		}
+
+		buf = con_buf;
+	}
+
+	/* At this point 'buf' is guarenteed to be a kernel buffer
+	 * and therefore no access to userspace (and therefore sleeping)
+	 * will be needed.  The con_buf_sem serializes all tty based
+	 * console rendering and vcs write/read operations.  We hold
+	 * the console spinlock during the entire write.
+	 */
+
+	acquire_console_sem();
+
+	himask = hi_font_mask;
+	charmask = himask ? 0x1ff : 0xff;
+
+	/* undraw cursor first */
+	if (IS_FG)
+		hide_cursor(currcons);
+
+	while (!tty->stopped && count) {
+		c = *buf;
+		buf++;
+		n++;
+		count--;
+
+		if (utf) {
+		    /* Combine UTF-8 into Unicode */
+		    /* Incomplete characters silently ignored */
+		    if(c > 0x7f) {
+			if (utf_count > 0 && (c & 0xc0) == 0x80) {
+				utf_char = (utf_char << 6) | (c & 0x3f);
+				utf_count--;
+				if (utf_count == 0)
+				    tc = c = utf_char;
+				else continue;
+			} else {
+				if ((c & 0xe0) == 0xc0) {
+				    utf_count = 1;
+				    utf_char = (c & 0x1f);
+				} else if ((c & 0xf0) == 0xe0) {
+				    utf_count = 2;
+				    utf_char = (c & 0x0f);
+				} else if ((c & 0xf8) == 0xf0) {
+				    utf_count = 3;
+				    utf_char = (c & 0x07);
+				} else if ((c & 0xfc) == 0xf8) {
+				    utf_count = 4;
+				    utf_char = (c & 0x03);
+				} else if ((c & 0xfe) == 0xfc) {
+				    utf_count = 5;
+				    utf_char = (c & 0x01);
+				} else
+				    utf_count = 0;
+				continue;
+			      }
+		    } else {
+		      tc = c;
+		      utf_count = 0;
+		    }
+		} else {	/* no utf */
+		  tc = translate[toggle_meta ? (c|0x80) : c];
+		}
+
+                /* If the original code was a control character we
+                 * only allow a glyph to be displayed if the code is
+                 * not normally used (such as for cursor movement) or
+                 * if the disp_ctrl mode has been explicitly enabled.
+                 * Certain characters (as given by the CTRL_ALWAYS
+                 * bitmap) are always displayed as control characters,
+                 * as the console would be pretty useless without
+                 * them; to display an arbitrary font position use the
+                 * direct-to-font zone in UTF-8 mode.
+                 */
+                ok = tc && (c >= 32 ||
+                            (!utf && !(((disp_ctrl ? CTRL_ALWAYS
+                                         : CTRL_ACTION) >> c) & 1)))
+                        && (c != 127 || disp_ctrl)
+			&& (c != 128+27);
+
+		if (vc_state == ESnormal && ok) {
+			/* Now try to find out how to display it */
+			tc = conv_uni_to_pc(vc_cons[currcons].d, tc);
+			if ( tc == -4 ) {
+                                /* If we got -4 (not found) then see if we have
+                                   defined a replacement character (U+FFFD) */
+                                tc = conv_uni_to_pc(vc_cons[currcons].d, 0xfffd);
+
+				/* One reason for the -4 can be that we just
+				   did a clear_unimap();
+				   try at least to show something. */
+				if (tc == -4)
+				     tc = c;
+                        } else if ( tc == -3 ) {
+                                /* Bad hash table -- hope for the best */
+                                tc = c;
+                        }
+			if (tc & ~charmask)
+                                continue; /* Conversion failed */
+
+			if (need_wrap || decim)
+				FLUSH
+			if (need_wrap) {
+				cr(currcons);
+				lf(currcons);
+			}
+			if (decim)
+				insert_char(currcons, 1);
+			scr_writew(himask ?
+				     ((attr << 8) & ~himask) + ((tc & 0x100) ? himask : 0) + (tc & 0xff) :
+				     (attr << 8) + tc,
+				   (u16 *) pos);
+			if (DO_UPDATE && draw_x < 0) {
+				draw_x = x;
+				draw_from = pos;
+			}
+			if (x == video_num_columns - 1) {
+				need_wrap = decawm;
+				draw_to = pos+2;
+			} else {
+				x++;
+				draw_to = (pos+=2);
+			}
+			continue;
+		}
+		FLUSH
+		do_con_trol(tty, currcons, c);
+	}
+	FLUSH
+	console_conditional_schedule();
+	release_console_sem();
+
+out:
+	if (from_user) {
+		/* If the user requested something larger than
+		 * the CON_BUF_SIZE, and the tty is not stopped,
+		 * keep going.
+		 */
+		if ((orig_count > CON_BUF_SIZE) && !tty->stopped) {
+			orig_count -= CON_BUF_SIZE;
+			orig_buf += CON_BUF_SIZE;
+			count = orig_count;
+			buf = orig_buf;
+			goto again;
+		}
+
+		up(&con_buf_sem);
+	}
+
+	return n;
+#undef FLUSH
+}
+
+/*
+ * This is the console switching callback.
+ *
+ * Doing console switching in a process context allows
+ * us to do the switches asynchronously (needed when we want
+ * to switch due to a keyboard interrupt).  Synchronization
+ * with other console code and prevention of re-entrancy is
+ * ensured with console_sem.
+ */
+static void console_callback(void *ignored)
+{
+	acquire_console_sem();
+
+	if (want_console >= 0) {
+		if (want_console != fg_console && vc_cons_allocated(want_console)) {
+			hide_cursor(fg_console);
+			change_console(want_console);
+			/* we only changed when the console had already
+			   been allocated - a new console is not created
+			   in an interrupt routine */
+		}
+		want_console = -1;
+	}
+	if (do_poke_blanked_console) { /* do not unblank for a LED change */
+		do_poke_blanked_console = 0;
+		poke_blanked_console();
+	}
+	if (scrollback_delta) {
+		int currcons = fg_console;
+		clear_selection();
+		if (vcmode == KD_TEXT)
+			sw->con_scrolldelta(vc_cons[currcons].d, scrollback_delta);
+		scrollback_delta = 0;
+	}
+
+	release_console_sem();
+}
+
+void set_console(int nr)
+{
+	want_console = nr;
+	schedule_console_callback();
+}
+
+#ifdef CONFIG_VT_CONSOLE
+
+/*
+ *	Console on virtual terminal
+ *
+ * The console must be locked when we get here.
+ */
+
+void vt_console_print(struct console *co, const char * b, unsigned count)
+{
+	int currcons = fg_console;
+	unsigned char c;
+	static unsigned long printing;
+	const ushort *start;
+	ushort cnt = 0;
+	ushort myx;
+
+	/* console busy or not yet initialized */
+	if (!printable || test_and_set_bit(0, &printing))
+		return;
+
+	pm_access(pm_con);
+
+	if (kmsg_redirect && vc_cons_allocated(kmsg_redirect - 1))
+		currcons = kmsg_redirect - 1;
+
+	/* read `x' only after setting currecons properly (otherwise
+	   the `x' macro will read the x of the foreground console). */
+	myx = x;
+
+	if (!vc_cons_allocated(currcons)) {
+		/* impossible */
+		/* printk("vt_console_print: tty %d not allocated ??\n", currcons+1); */
+		goto quit;
+	}
+
+	if (vcmode != KD_TEXT)
+		goto quit;
+
+	/* undraw cursor first */
+	if (IS_FG)
+		hide_cursor(currcons);
+
+	start = (ushort *)pos;
+
+	/* Contrived structure to try to emulate original need_wrap behaviour
+	 * Problems caused when we have need_wrap set on '\n' character */
+	while (count--) {
+		c = *b++;
+		if (c == 10 || c == 13 || c == 8 || need_wrap) {
+			if (cnt > 0) {
+				if (IS_VISIBLE)
+					sw->con_putcs(vc_cons[currcons].d, start, cnt, y, x);
+				x += cnt;
+				if (need_wrap)
+					x--;
+				cnt = 0;
+			}
+			if (c == 8) {		/* backspace */
+				bs(currcons);
+				start = (ushort *)pos;
+				myx = x;
+				continue;
+			}
+			if (c != 13)
+				lf(currcons);
+			cr(currcons);
+			start = (ushort *)pos;
+			myx = x;
+			if (c == 10 || c == 13)
+				continue;
+		}
+		scr_writew((attr << 8) + c, (unsigned short *) pos);
+		cnt++;
+		if (myx == video_num_columns - 1) {
+			need_wrap = 1;
+			continue;
+		}
+		pos+=2;
+		myx++;
+	}
+	if (cnt > 0) {
+		if (IS_VISIBLE)
+			sw->con_putcs(vc_cons[currcons].d, start, cnt, y, x);
+		x += cnt;
+		if (x == video_num_columns) {
+			x--;
+			need_wrap = 1;
+		}
+	}
+	set_cursor(currcons);
+
+	if (!oops_in_progress)
+		poke_blanked_console();
+
+quit:
+	clear_bit(0, &printing);
+}
+
+static kdev_t vt_console_device(struct console *c)
+{
+	return mk_kdev(TTY_MAJOR, c->index ? c->index : fg_console + 1);
+}
+
+struct console vt_console_driver = {
+	name:		"tty",
+	write:		vt_console_print,
+	device:		vt_console_device,
+	unblank:	unblank_screen,
+	flags:		CON_PRINTBUFFER,
+	index:		-1,
+};
+#endif
+
+/*
+ *	Handling of Linux-specific VC ioctls
+ */
+
+/*
+ * Generally a bit racy with respect to console_sem().
+ *
+ * There are some functions which don't need it.
+ *
+ * There are some functions which can sleep for arbitrary periods (paste_selection)
+ * but we don't need the lock there anyway.
+ *
+ * set_selection has locking, and definitely needs it
+ */
+
+int tioclinux(struct tty_struct *tty, unsigned long arg)
+{
+	char type, data;
+	int ret;
+
+	if (tty->driver.type != TTY_DRIVER_TYPE_CONSOLE)
+		return -EINVAL;
+	if (current->tty != tty && !capable(CAP_SYS_ADMIN))
+		return -EPERM;
+	if (get_user(type, (char *)arg))
+		return -EFAULT;
+	ret = 0;
+	switch (type)
+	{
+		case 2:
+			acquire_console_sem();
+			ret = set_selection(arg, tty, 1);
+			release_console_sem();
+			break;
+		case 3:
+			ret = paste_selection(tty);
+			break;
+		case 4:
+			unblank_screen();
+			break;
+		case 5:
+			ret = sel_loadlut(arg);
+			break;
+		case 6:
+			
+	/*
+	 * Make it possible to react to Shift+Mousebutton.
+	 * Note that 'shift_state' is an undocumented
+	 * kernel-internal variable; programs not closely
+	 * related to the kernel should not use this.
+	 */
+	 		data = shift_state;
+			ret = __put_user(data, (char *) arg);
+			break;
+		case 7:
+			data = mouse_reporting();
+			ret = __put_user(data, (char *) arg);
+			break;
+		case 10:
+			set_vesa_blanking(arg);
+			break;;
+		case 11:	/* set kmsg redirect */
+			if (!capable(CAP_SYS_ADMIN)) {
+				ret = -EPERM;
+			} else {
+				if (get_user(data, (char *)arg+1))
+					ret = -EFAULT;
+				else
+					kmsg_redirect = data;
+			}
+			break;
+		case 12:	/* get fg_console */
+			ret = fg_console;
+			break;
+		default:
+			ret = -EINVAL;
+			break;
+	}
+	return ret;
+}
+
+/*
+ *	/dev/ttyN handling
+ */
+
+static int con_write(struct tty_struct * tty, int from_user,
+		     const unsigned char *buf, int count)
+{
+	int	retval;
+
+	pm_access(pm_con);
+	retval = do_con_write(tty, from_user, buf, count);
+	con_flush_chars(tty);
+
 	return retval;
 }
 
-#define vt_wake_waitactive() wake_up(&vt_activate_queue)
-
-void reset_vc(unsigned int new_console)
+static void con_put_char(struct tty_struct *tty, unsigned char ch)
 {
-	vt_cons[new_console]->vc_mode = KD_TEXT;
-	kbd_table[new_console].kbdmode = VC_XLATE;
-	vt_cons[new_console]->vt_mode.mode = VT_AUTO;
-	vt_cons[new_console]->vt_mode.waitv = 0;
-	vt_cons[new_console]->vt_mode.relsig = 0;
-	vt_cons[new_console]->vt_mode.acqsig = 0;
-	vt_cons[new_console]->vt_mode.frsig = 0;
-	vt_cons[new_console]->vt_pid = -1;
-	vt_cons[new_console]->vt_newvt = -1;
-	if (!in_interrupt())    /* Via keyboard.c:SAK() - akpm */
-		reset_palette(new_console) ;
+	if (in_interrupt())
+		return;		/* n_r3964 calls put_char() from interrupt context */
+	pm_access(pm_con);
+	do_con_write(tty, 0, &ch, 1);
+}
+
+static int con_write_room(struct tty_struct *tty)
+{
+	if (tty->stopped)
+		return 0;
+	return 4096;		/* No limit, really; we're not buffering */
+}
+
+static int con_chars_in_buffer(struct tty_struct *tty)
+{
+	return 0;		/* we're not buffering */
 }
 
 /*
- * Performs the back end of a vt switch
+ * con_throttle and con_unthrottle are only used for
+ * paste_selection(), which has to stuff in a large number of
+ * characters...
  */
-void complete_change_console(unsigned int new_console)
+static void con_throttle(struct tty_struct *tty)
 {
-	unsigned char old_vc_mode;
+}
 
-	last_console = fg_console;
+static void con_unthrottle(struct tty_struct *tty)
+{
+	struct vt_struct *vt = (struct vt_struct *) tty->driver_data;
 
-	/*
-	 * If we're switching, we could be going from KD_GRAPHICS to
-	 * KD_TEXT mode or vice versa, which means we need to blank or
-	 * unblank the screen later.
-	 */
-	old_vc_mode = vt_cons[fg_console]->vc_mode;
-	switch_screen(new_console);
-
-	/*
-	 * This can't appear below a successful kill_proc().  If it did,
-	 * then the *blank_screen operation could occur while X, having
-	 * received acqsig, is waking up on another processor.  This
-	 * condition can lead to overlapping accesses to the VGA range
-	 * and the framebuffer (causing system lockups).
-	 *
-	 * To account for this we duplicate this code below only if the
-	 * controlling process is gone and we've called reset_vc.
-	 */
-	if (old_vc_mode != vt_cons[new_console]->vc_mode)
-	{
-		if (vt_cons[new_console]->vc_mode == KD_TEXT)
-			unblank_screen();
-		else
-			do_blank_screen(1);
-	}
-
-	/*
-	 * If this new console is under process control, send it a signal
-	 * telling it that it has acquired. Also check if it has died and
-	 * clean up (similar to logic employed in change_console())
-	 */
-	if (vt_cons[new_console]->vt_mode.mode == VT_PROCESS)
-	{
-		/*
-		 * Send the signal as privileged - kill_proc() will
-		 * tell us if the process has gone or something else
-		 * is awry
-		 */
-		if (kill_proc(vt_cons[new_console]->vt_pid,
-			      vt_cons[new_console]->vt_mode.acqsig,
-			      1) != 0)
-		{
-		/*
-		 * The controlling process has died, so we revert back to
-		 * normal operation. In this case, we'll also change back
-		 * to KD_TEXT mode. I'm not sure if this is strictly correct
-		 * but it saves the agony when the X server dies and the screen
-		 * remains blanked due to KD_GRAPHICS! It would be nice to do
-		 * this outside of VT_PROCESS but there is no single process
-		 * to account for and tracking tty count may be undesirable.
-		 */
-		        reset_vc(new_console);
-
-			if (old_vc_mode != vt_cons[new_console]->vc_mode)
-			{
-				if (vt_cons[new_console]->vc_mode == KD_TEXT)
-					unblank_screen();
-				else
-					do_blank_screen(1);
-			}
-		}
-	}
-
-	/*
-	 * Wake anyone waiting for their VT to activate
-	 */
-	vt_wake_waitactive();
-	return;
+	wake_up_interruptible(&vt->paste_wait);
 }
 
 /*
- * Performs the front-end of a vt switch
+ * Turn the Scroll-Lock LED on when the tty is stopped
  */
-void change_console(unsigned int new_console)
+static void con_stop(struct tty_struct *tty)
 {
-        if ((new_console == fg_console) || (vt_dont_switch))
-                return;
-        if (!vc_cons_allocated(new_console))
+	int console_num;
+	if (!tty)
+		return;
+	console_num = minor(tty->device) - (tty->driver.minor_start);
+	if (!vc_cons_allocated(console_num))
+		return;
+	set_vc_kbd_led(kbd_table + console_num, VC_SCROLLOCK);
+	set_leds();
+}
+
+/*
+ * Turn the Scroll-Lock LED off when the console is started
+ */
+static void con_start(struct tty_struct *tty)
+{
+	int console_num;
+	if (!tty)
+		return;
+	console_num = minor(tty->device) - (tty->driver.minor_start);
+	if (!vc_cons_allocated(console_num))
+		return;
+	clr_vc_kbd_led(kbd_table + console_num, VC_SCROLLOCK);
+	set_leds();
+}
+
+static void con_flush_chars(struct tty_struct *tty)
+{
+	struct vt_struct *vt;
+
+	if (in_interrupt())	/* from flush_to_ldisc */
 		return;
 
-	/*
-	 * If this vt is in process mode, then we need to handshake with
-	 * that process before switching. Essentially, we store where that
-	 * vt wants to switch to and wait for it to tell us when it's done
-	 * (via VT_RELDISP ioctl).
-	 *
-	 * We also check to see if the controlling process still exists.
-	 * If it doesn't, we reset this vt to auto mode and continue.
-	 * This is a cheap way to track process control. The worst thing
-	 * that can happen is: we send a signal to a process, it dies, and
-	 * the switch gets "lost" waiting for a response; hopefully, the
-	 * user will try again, we'll detect the process is gone (unless
-	 * the user waits just the right amount of time :-) and revert the
-	 * vt to auto control.
-	 */
-	if (vt_cons[fg_console]->vt_mode.mode == VT_PROCESS)
-	{
-		/*
-		 * Send the signal as privileged - kill_proc() will
-		 * tell us if the process has gone or something else
-		 * is awry
-		 */
-		if (kill_proc(vt_cons[fg_console]->vt_pid,
-			      vt_cons[fg_console]->vt_mode.relsig,
-			      1) == 0)
-		{
-			/*
-			 * It worked. Mark the vt to switch to and
-			 * return. The process needs to send us a
-			 * VT_RELDISP ioctl to complete the switch.
-			 */
-			vt_cons[fg_console]->vt_newvt = new_console;
-			return;
-		}
+	pm_access(pm_con);
+	
+	/* if we race with con_close(), vt may be null */
+	acquire_console_sem();
+	vt = (struct vt_struct *)tty->driver_data;
+	if (vt)
+		set_cursor(vt->vc_num);
+	release_console_sem();
+}
 
-		/*
-		 * The controlling process has died, so we revert back to
-		 * normal operation. In this case, we'll also change back
-		 * to KD_TEXT mode. I'm not sure if this is strictly correct
-		 * but it saves the agony when the X server dies and the screen
-		 * remains blanked due to KD_GRAPHICS! It would be nice to do
-		 * this outside of VT_PROCESS but there is no single process
-		 * to account for and tracking tty count may be undesirable.
-		 */
-		reset_vc(fg_console);
+/*
+ * Allocate the console screen memory.
+ */
+static int con_open(struct tty_struct *tty, struct file * filp)
+{
+	unsigned int	currcons;
+	int i;
 
-		/*
-		 * Fall through to normal (VT_AUTO) handling of the switch...
-		 */
+	currcons = minor(tty->device) - tty->driver.minor_start;
+
+	i = vc_allocate(currcons);
+	if (i)
+		return i;
+
+	vt_cons[currcons]->vc_num = currcons;
+	tty->driver_data = vt_cons[currcons];
+	vc_cons[currcons].d->vc_tty = tty;
+
+	if (!tty->winsize.ws_row && !tty->winsize.ws_col) {
+		tty->winsize.ws_row = video_num_lines;
+		tty->winsize.ws_col = video_num_columns;
+	}
+	if (tty->count == 1)
+		vcs_make_devfs (currcons, 0);
+	return 0;
+}
+
+static void con_close(struct tty_struct *tty, struct file * filp)
+{
+	struct vt_struct *vt;
+	
+	if (!tty)
+		return;
+	if (tty->count != 1) return;
+	vcs_make_devfs (minor(tty->device) - tty->driver.minor_start, 1);
+	vt = (struct vt_struct*)tty->driver_data;
+	if (vt)
+		vc_cons[vt->vc_num].d->vc_tty = NULL;
+	tty->driver_data = 0;
+}
+
+static void vc_init(unsigned int currcons, unsigned int rows, unsigned int cols, int do_clear)
+{
+	int j, k ;
+
+	video_num_columns = cols;
+	video_num_lines = rows;
+	video_size_row = cols<<1;
+	screenbuf_size = video_num_lines * video_size_row;
+
+	set_origin(currcons);
+	pos = origin;
+	reset_vc(currcons);
+	for (j=k=0; j<16; j++) {
+		vc_cons[currcons].d->vc_palette[k++] = default_red[j] ;
+		vc_cons[currcons].d->vc_palette[k++] = default_grn[j] ;
+		vc_cons[currcons].d->vc_palette[k++] = default_blu[j] ;
+	}
+	def_color       = 0x07;   /* white */
+	ulcolor		= 0x0f;   /* bold white */
+	halfcolor       = 0x08;   /* grey */
+	init_waitqueue_head(&vt_cons[currcons]->paste_wait);
+	reset_terminal(currcons, do_clear);
+}
+
+/*
+ * This routine initializes console interrupts, and does nothing
+ * else. If you want the screen to clear, call tty_write with
+ * the appropriate escape-sequence.
+ */
+
+struct tty_driver console_driver;
+static int console_refcount;
+
+void __init con_init(void)
+{
+	const char *display_desc = NULL;
+	unsigned int currcons = 0;
+
+	if (conswitchp)
+		display_desc = conswitchp->con_startup();
+	if (!display_desc) {
+		fg_console = 0;
+		return;
+	}
+
+	init_timer(&console_timer);
+	console_timer.function = blank_screen;
+	if (blankinterval) {
+		mod_timer(&console_timer, jiffies + blankinterval);
 	}
 
 	/*
-	 * Ignore all switches in KD_GRAPHICS+VT_AUTO mode
+	 * kmalloc is not running yet - we use the bootmem allocator.
 	 */
-	if (vt_cons[fg_console]->vc_mode == KD_GRAPHICS)
-		return;
+	for (currcons = 0; currcons < MIN_NR_CONSOLES; currcons++) {
+		vc_cons[currcons].d = (struct vc_data *)
+				alloc_bootmem(sizeof(struct vc_data));
+		vt_cons[currcons] = (struct vt_struct *)
+				alloc_bootmem(sizeof(struct vt_struct));
+		visual_init(currcons, 1);
+		screenbuf = (unsigned short *) alloc_bootmem(screenbuf_size);
+		kmalloced = 0;
+		vc_init(currcons, video_num_lines, video_num_columns, 
+			currcons || !sw->con_save_screen);
+	}
+	currcons = fg_console = 0;
+	master_display_fg = vc_cons[currcons].d;
+	set_origin(currcons);
+	save_screen(currcons);
+	gotoxy(currcons,x,y);
+	csi_J(currcons, 0);
+	update_screen(fg_console);
+	printk("Console: %s %s %dx%d",
+		can_do_color ? "colour" : "mono",
+		display_desc, video_num_columns, video_num_lines);
+	printable = 1;
+	printk("\n");
 
-	complete_change_console(new_console);
+#ifdef CONFIG_VT_CONSOLE
+	register_console(&vt_console_driver);
+#endif
 }
 
+int __init vty_init(void)
+{
+	memset(&console_driver, 0, sizeof(struct tty_driver));
+	console_driver.magic = TTY_DRIVER_MAGIC;
+	console_driver.name = "vc/%d";
+	console_driver.name_base = 1;
+	console_driver.major = TTY_MAJOR;
+	console_driver.minor_start = 1;
+	console_driver.num = MAX_NR_CONSOLES;
+	console_driver.type = TTY_DRIVER_TYPE_CONSOLE;
+	console_driver.init_termios = tty_std_termios;
+	console_driver.flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_RESET_TERMIOS;
+	/* Tell tty_register_driver() to skip consoles because they are
+	 * registered before kmalloc() is ready. We'll patch them in later. 
+	 * See comments at console_init(); see also con_init_devfs(). 
+	 */
+	console_driver.flags |= TTY_DRIVER_NO_DEVFS;
+	console_driver.refcount = &console_refcount;
+	console_driver.table = console_table;
+	console_driver.termios = console_termios;
+	console_driver.termios_locked = console_termios_locked;
+
+	console_driver.open = con_open;
+	console_driver.close = con_close;
+	console_driver.write = con_write;
+	console_driver.write_room = con_write_room;
+	console_driver.put_char = con_put_char;
+	console_driver.flush_chars = con_flush_chars;
+	console_driver.chars_in_buffer = con_chars_in_buffer;
+	console_driver.ioctl = vt_ioctl;
+	console_driver.stop = con_stop;
+	console_driver.start = con_start;
+	console_driver.throttle = con_throttle;
+	console_driver.unthrottle = con_unthrottle;
+
+	if (tty_register_driver(&console_driver))
+		panic("Couldn't register console driver\n");
+
+	kbd_init();
+	console_map_init();
+	con_init_devfs();
+	vcs_init();
+	return 0;
+}
+
+#ifndef VT_SINGLE_DRIVER
+
+static void clear_buffer_attributes(int currcons)
+{
+	unsigned short *p = (unsigned short *) origin;
+	int count = screenbuf_size/2;
+	int mask = hi_font_mask | 0xff;
+
+	for (; count > 0; count--, p++) {
+		scr_writew((scr_readw(p)&mask) | (video_erase_char&~mask), p);
+	}
+}
+
+/*
+ *	If we support more console drivers, this function is used
+ *	when a driver wants to take over some existing consoles
+ *	and become default driver for newly opened ones.
+ */
+
+void take_over_console(const struct consw *csw, int first, int last, int deflt)
+{
+	int i, j = -1;
+	const char *desc;
+
+	desc = csw->con_startup();
+	if (!desc) return;
+	if (deflt)
+		conswitchp = csw;
+
+	for (i = first; i <= last; i++) {
+		int old_was_color;
+		int currcons = i;
+
+		con_driver_map[i] = csw;
+
+		if (!vc_cons[i].d || !vc_cons[i].d->vc_sw)
+			continue;
+
+		j = i;
+		if (IS_VISIBLE)
+			save_screen(i);
+		old_was_color = vc_cons[i].d->vc_can_do_color;
+		vc_cons[i].d->vc_sw->con_deinit(vc_cons[i].d);
+		visual_init(i, 0);
+		update_attr(i);
+
+		/* If the console changed between mono <-> color, then
+		 * the attributes in the screenbuf will be wrong.  The
+		 * following resets all attributes to something sane.
+		 */
+		if (old_was_color != vc_cons[i].d->vc_can_do_color)
+			clear_buffer_attributes(i);
+
+		if (IS_VISIBLE)
+			update_screen(i);
+	}
+	printk("Console: switching ");
+	if (!deflt)
+		printk("consoles %d-%d ", first+1, last+1);
+	if (j >= 0)
+		printk("to %s %s %dx%d\n",
+		       vc_cons[j].d->vc_can_do_color ? "colour" : "mono",
+		       desc, vc_cons[j].d->vc_cols, vc_cons[j].d->vc_rows);
+	else
+		printk("to %s\n", desc);
+}
+
+void give_up_console(const struct consw *csw)
+{
+	int i;
+
+	for(i = 0; i < MAX_NR_CONSOLES; i++)
+		if (con_driver_map[i] == csw)
+			con_driver_map[i] = NULL;
+}
+
+#endif
+
+/*
+ *	Screen blanking
+ */
+
+static void set_vesa_blanking(unsigned long arg)
+{
+    char *argp = (char *)arg + 1;
+    unsigned int mode;
+    get_user(mode, argp);
+    vesa_blank_mode = (mode < 4) ? mode : 0;
+}
+
+/* We can't register the console with devfs during con_init(), because it
+ * is called before kmalloc() works.  This function is called later to
+ * do the registration.
+ */
+static void __init con_init_devfs (void)
+{
+	int i;
+
+	for (i = 0; i < console_driver.num; i++)
+		tty_register_devfs (&console_driver, DEVFS_FL_AOPEN_NOTIFY,
+				    console_driver.minor_start + i);
+}
+
+/*
+ * This is called by a timer handler
+ */
+static void vesa_powerdown(void)
+{
+    struct vc_data *c = vc_cons[fg_console].d;
+    /*
+     *  Power down if currently suspended (1 or 2),
+     *  suspend if currently blanked (0),
+     *  else do nothing (i.e. already powered down (3)).
+     *  Called only if powerdown features are allowed.
+     */
+    switch (vesa_blank_mode) {
+	case VESA_NO_BLANKING:
+	    c->vc_sw->con_blank(c, VESA_VSYNC_SUSPEND+1);
+	    break;
+	case VESA_VSYNC_SUSPEND:
+	case VESA_HSYNC_SUSPEND:
+	    c->vc_sw->con_blank(c, VESA_POWERDOWN+1);
+	    break;
+    }
+}
+
+/*
+ * This is a timer handler
+ */
+static void vesa_powerdown_screen(unsigned long dummy)
+{
+	console_timer.function = unblank_screen_t;
+
+	vesa_powerdown();
+}
+
+static void timer_do_blank_screen(int entering_gfx, int from_timer_handler)
+{
+	int currcons = fg_console;
+	int i;
+
+	if (console_blanked)
+		return;
+
+	/* entering graphics mode? */
+	if (entering_gfx) {
+		hide_cursor(currcons);
+		save_screen(currcons);
+		sw->con_blank(vc_cons[currcons].d, -1);
+		console_blanked = fg_console + 1;
+		set_origin(currcons);
+		return;
+	}
+
+	/* don't blank graphics */
+	if (vcmode != KD_TEXT) {
+		console_blanked = fg_console + 1;
+		return;
+	}
+
+	hide_cursor(currcons);
+	if (!from_timer_handler)
+		del_timer_sync(&console_timer);
+	if (vesa_off_interval) {
+		console_timer.function = vesa_powerdown_screen;
+		mod_timer(&console_timer, jiffies + vesa_off_interval);
+	} else {
+		if (!from_timer_handler)
+			del_timer_sync(&console_timer);
+		console_timer.function = unblank_screen_t;
+	}
+
+	save_screen(currcons);
+	/* In case we need to reset origin, blanking hook returns 1 */
+	i = sw->con_blank(vc_cons[currcons].d, 1);
+	console_blanked = fg_console + 1;
+	if (i)
+		set_origin(currcons);
+
+	if (console_blank_hook && console_blank_hook(1))
+		return;
+    	if (vesa_blank_mode)
+		sw->con_blank(vc_cons[currcons].d, vesa_blank_mode + 1);
+}
+
+void do_blank_screen(int entering_gfx)
+{
+	timer_do_blank_screen(entering_gfx, 0);
+}
+
+/*
+ * This is a timer handler
+ */
+static void unblank_screen_t(unsigned long dummy)
+{
+	unblank_screen();
+}
+
+/*
+ * Called by timer as well as from vt_console_driver
+ */
+void unblank_screen(void)
+{
+	int currcons;
+
+	if (!console_blanked)
+		return;
+	if (!vc_cons_allocated(fg_console)) {
+		/* impossible */
+		printk("unblank_screen: tty %d not allocated ??\n", fg_console+1);
+		return;
+	}
+	currcons = fg_console;
+	if (vcmode != KD_TEXT)
+		return; /* but leave console_blanked != 0 */
+
+	console_timer.function = blank_screen;
+	if (blankinterval) {
+		mod_timer(&console_timer, jiffies + blankinterval);
+	}
+
+	console_blanked = 0;
+	if (console_blank_hook)
+		console_blank_hook(0);
+	set_palette(currcons);
+	if (sw->con_blank(vc_cons[currcons].d, 0))
+		/* Low-level driver cannot restore -> do it ourselves */
+		update_screen(fg_console);
+	set_cursor(fg_console);
+}
+
+/*
+ * This is both a user-level callable and a timer handler
+ */
+static void blank_screen(unsigned long dummy)
+{
+	timer_do_blank_screen(0, 1);
+}
+
+void poke_blanked_console(void)
+{
+	del_timer(&console_timer);
+	if (!vt_cons[fg_console] || vt_cons[fg_console]->vc_mode == KD_GRAPHICS)
+		return;
+	if (console_blanked) {
+		console_timer.function = unblank_screen_t;
+		mod_timer(&console_timer, jiffies);	/* Now */
+	} else if (blankinterval) {
+		mod_timer(&console_timer, jiffies + blankinterval);
+	}
+}
+
+/*
+ *	Palettes
+ */
+
+void set_palette(int currcons)
+{
+	if (vcmode != KD_GRAPHICS)
+		sw->con_set_palette(vc_cons[currcons].d, color_table);
+}
+
+static int set_get_cmap(unsigned char *arg, int set)
+{
+    int i, j, k;
+
+    for (i = 0; i < 16; i++)
+	if (set) {
+	    get_user(default_red[i], arg++);
+	    get_user(default_grn[i], arg++);
+	    get_user(default_blu[i], arg++);
+	} else {
+	    put_user(default_red[i], arg++);
+	    put_user(default_grn[i], arg++);
+	    put_user(default_blu[i], arg++);
+	}
+    if (set) {
+	for (i = 0; i < MAX_NR_CONSOLES; i++)
+	    if (vc_cons_allocated(i)) {
+		for (j = k = 0; j < 16; j++) {
+		    vc_cons[i].d->vc_palette[k++] = default_red[j];
+		    vc_cons[i].d->vc_palette[k++] = default_grn[j];
+		    vc_cons[i].d->vc_palette[k++] = default_blu[j];
+		}
+		set_palette(i);
+	    }
+    }
+    return 0;
+}
+
+/*
+ * Load palette into the DAC registers. arg points to a colour
+ * map, 3 bytes per colour, 16 colours, range from 0 to 255.
+ */
+
+int con_set_cmap(unsigned char *arg)
+{
+	return set_get_cmap (arg,1);
+}
+
+int con_get_cmap(unsigned char *arg)
+{
+	return set_get_cmap (arg,0);
+}
+
+void reset_palette(int currcons)
+{
+	int j, k;
+	for (j=k=0; j<16; j++) {
+		palette[k++] = default_red[j];
+		palette[k++] = default_grn[j];
+		palette[k++] = default_blu[j];
+	}
+	set_palette(currcons);
+}
+
+/*
+ *  Font switching
+ *
+ *  Currently we only support fonts up to 32 pixels wide, at a maximum height
+ *  of 32 pixels. Userspace fontdata is stored with 32 bytes (shorts/ints, 
+ *  depending on width) reserved for each character which is kinda wasty, but 
+ *  this is done in order to maintain compatibility with the EGA/VGA fonts. It 
+ *  is upto the actual low-level console-driver convert data into its favorite
+ *  format (maybe we should add a `fontoffset' field to the `display'
+ *  structure so we wont have to convert the fontdata all the time.
+ *  /Jes
+ */
+
+#define max_font_size 65536
+
+int con_font_op(int currcons, struct console_font_op *op)
+{
+	int rc = -EINVAL;
+	int size = max_font_size, set;
+	u8 *temp = NULL;
+	struct console_font_op old_op;
+
+	if (vt_cons[currcons]->vc_mode != KD_TEXT)
+		goto quit;
+	memcpy(&old_op, op, sizeof(old_op));
+	if (op->op == KD_FONT_OP_SET) {
+		if (!op->data)
+			return -EINVAL;
+		if (op->charcount > 512)
+			goto quit;
+		if (!op->height) {		/* Need to guess font height [compat] */
+			int h, i;
+			u8 *charmap = op->data, tmp;
+			
+			/* If from KDFONTOP ioctl, don't allow things which can be done in userland,
+			   so that we can get rid of this soon */
+			if (!(op->flags & KD_FONT_FLAG_OLD))
+				goto quit;
+			rc = -EFAULT;
+			for (h = 32; h > 0; h--)
+				for (i = 0; i < op->charcount; i++) {
+					if (get_user(tmp, &charmap[32*i+h-1]))
+						goto quit;
+					if (tmp)
+						goto nonzero;
+				}
+			rc = -EINVAL;
+			goto quit;
+		nonzero:
+			rc = -EINVAL;
+			op->height = h;
+		}
+		if (op->width > 32 || op->height > 32)
+			goto quit;
+		size = (op->width+7)/8 * 32 * op->charcount;
+		if (size > max_font_size)
+			return -ENOSPC;
+		set = 1;
+	} else if (op->op == KD_FONT_OP_GET)
+		set = 0;
+	else
+		return sw->con_font_op(vc_cons[currcons].d, op);
+	if (op->data) {
+		temp = kmalloc(size, GFP_KERNEL);
+		if (!temp)
+			return -ENOMEM;
+		if (set && copy_from_user(temp, op->data, size)) {
+			rc = -EFAULT;
+			goto quit;
+		}
+		op->data = temp;
+	}
+
+	acquire_console_sem();
+	rc = sw->con_font_op(vc_cons[currcons].d, op);
+	release_console_sem();
+
+	op->data = old_op.data;
+	if (!rc && !set) {
+		int c = (op->width+7)/8 * 32 * op->charcount;
+		
+		if (op->data && op->charcount > old_op.charcount)
+			rc = -ENOSPC;
+		if (!(op->flags & KD_FONT_FLAG_OLD)) {
+			if (op->width > old_op.width || 
+			    op->height > old_op.height)
+				rc = -ENOSPC;
+		} else {
+			if (op->width != 8)
+				rc = -EIO;
+			else if ((old_op.height && op->height > old_op.height) ||
+			         op->height > 32)
+				rc = -ENOSPC;
+		}
+		if (!rc && op->data && copy_to_user(op->data, temp, c))
+			rc = -EFAULT;
+	}
+quit:	if (temp)
+		kfree(temp);
+	return rc;
+}
+
+/*
+ *	Interface exported to selection and vcs.
+ */
+
+/* used by selection */
+u16 screen_glyph(int currcons, int offset)
+{
+	u16 w = scr_readw(screenpos(currcons, offset, 1));
+	u16 c = w & 0xff;
+
+	if (w & hi_font_mask)
+		c |= 0x100;
+	return c;
+}
+
+/* used by vcs - note the word offset */
+unsigned short *screen_pos(int currcons, int w_offset, int viewed)
+{
+	return screenpos(currcons, 2 * w_offset, viewed);
+}
+
+void getconsxy(int currcons, char *p)
+{
+	p[0] = x;
+	p[1] = y;
+}
+
+void putconsxy(int currcons, char *p)
+{
+	gotoxy(currcons, p[0], p[1]);
+	set_cursor(currcons);
+}
+
+u16 vcs_scr_readw(int currcons, const u16 *org)
+{
+	if ((unsigned long)org == pos && softcursor_original != -1)
+		return softcursor_original;
+	return scr_readw(org);
+}
+
+void vcs_scr_writew(int currcons, u16 val, u16 *org)
+{
+	scr_writew(val, org);
+	if ((unsigned long)org == pos) {
+		softcursor_original = -1;
+		add_softcursor(currcons);
+	}
+}
+
+static int pm_con_request(struct pm_dev *dev, pm_request_t rqst, void *data)
+{
+	switch (rqst)
+	{
+	case PM_RESUME:
+		unblank_screen();
+		break;
+	case PM_SUSPEND:
+		do_blank_screen(0);
+		break;
+	}
+	return 0;
+}
+
+/*
+ *	Visible symbols for modules
+ */
+
+EXPORT_SYMBOL(color_table);
+EXPORT_SYMBOL(default_red);
+EXPORT_SYMBOL(default_grn);
+EXPORT_SYMBOL(default_blu);
+EXPORT_SYMBOL(video_font_height);
+EXPORT_SYMBOL(video_scan_lines);
+EXPORT_SYMBOL(vc_resize);
+EXPORT_SYMBOL(fg_console);
+EXPORT_SYMBOL(console_blank_hook);
+EXPORT_SYMBOL(vt_cons);
+#ifndef VT_SINGLE_DRIVER
+EXPORT_SYMBOL(take_over_console);
+EXPORT_SYMBOL(give_up_console);
+#endif
