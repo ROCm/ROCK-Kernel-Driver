@@ -699,6 +699,7 @@ static int wl3501_mgmt_join(struct wl3501_card *this, u16 stas)
 	signal.timeout = 10;
 	memcpy((char *)&(signal.beacon_period),
 	       (char *)&(this->bss_set[stas].beacon_period), 72);
+	/* FIXME: next two stmts should be reverted or deleted, study */
 	this->cap_info = signal.cap_info;
 	this->chan = signal.phy_pset[2];
 
@@ -1823,6 +1824,18 @@ static int wl3501_get_name(struct net_device *dev, struct iw_request_info *info,
 	return 0;
 }
 
+static int wl3501_get_freq(struct net_device *dev, struct iw_request_info *info,
+			   union iwreq_data *wrqu, char *extra)
+{
+	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	int f = this->chan;
+	wrqu->freq.m = f;
+	printk(KERN_INFO "%s: bss_basic_rate_set=%-10.10s\n", __FUNCTION__,
+		this->bss_set[f].bss_basic_rate_set);
+	wrqu->freq.e = 0;
+	return 0;
+}
+
 static int wl3501_set_mode(struct net_device *dev, struct iw_request_info *info,
 			   union iwreq_data *wrqu, char *extra)
 {
@@ -1944,10 +1957,31 @@ static int wl3501_get_essid(struct net_device *dev,
 	return 0;
 }
 
+static int wl3501_set_nick(struct net_device *dev, struct iw_request_info *info,
+			   union iwreq_data *wrqu, char *extra)
+{
+	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+
+	if (wrqu->data.length > sizeof(this->nick))
+		return -E2BIG;
+	strlcpy(this->nick, extra, wrqu->data.length);
+	return 0;
+}
+
+static int wl3501_get_nick(struct net_device *dev, struct iw_request_info *info,
+			   union iwreq_data *wrqu, char *extra)
+{
+	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+
+	strlcpy(extra, this->nick, 32);
+	wrqu->data.length = strlen(extra);
+	return 0;
+}
+
 static const iw_handler	wl3501_handler[] = {
 	[SIOCGIWNAME	- SIOCSIWCOMMIT] = wl3501_get_name,
 	//[SIOCSIWFREQ	- SIOCSIWCOMMIT] = wl3501_set_freq,
-	//[SIOCGIWFREQ	- SIOCSIWCOMMIT] = wl3501_get_freq,
+	[SIOCGIWFREQ	- SIOCSIWCOMMIT] = wl3501_get_freq,
 	[SIOCSIWMODE	- SIOCSIWCOMMIT] = wl3501_set_mode,
 	[SIOCGIWMODE	- SIOCSIWCOMMIT] = wl3501_get_mode,
 	[SIOCGIWSENS	- SIOCSIWCOMMIT] = wl3501_get_sens,
@@ -1960,8 +1994,8 @@ static const iw_handler	wl3501_handler[] = {
 	[SIOCGIWAP	- SIOCSIWCOMMIT] = wl3501_get_wap,
 	[SIOCSIWESSID	- SIOCSIWCOMMIT] = wl3501_set_essid,
 	[SIOCGIWESSID	- SIOCSIWCOMMIT] = wl3501_get_essid,
-	//[SIOCSIWENCODE	- SIOCSIWCOMMIT] = wl3501_set_encode,
-	//[SIOCGIWENCODE	- SIOCSIWCOMMIT] = wl3501_get_encode,
+	[SIOCSIWNICKN	- SIOCSIWCOMMIT] = wl3501_set_nick,
+	[SIOCGIWNICKN	- SIOCSIWCOMMIT] = wl3501_get_nick,
 };
 
 static const struct iw_handler_def wl3501_handler_def = {
@@ -2176,6 +2210,7 @@ static void wl3501_config(dev_link_t *link)
 	this->essid[2]		= 'A';
 	this->essid[3]		= 'N';
 	this->essid[4]		= 'Y';
+	strlcpy(this->nick, "Planet WL3501", sizeof(this->nick));
 	spin_lock_init(&this->lock);
 
 	switch (this->freq_domain) {

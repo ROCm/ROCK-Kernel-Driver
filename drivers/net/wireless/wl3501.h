@@ -427,6 +427,7 @@ struct wl3501_card {
 	int				ether_type;
 	int				net_type;
 	u8				keep_essid[34];
+	unsigned char			nick[32];
 	u8				chan;
 	u8				def_chan;
 	u8				cap_info;
