@@ -97,14 +97,10 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 	rqstp->rq_reffh = fh;
 
 	if (!fhp->fh_dentry) {
-		dev_t xdev = 0;
-		ino_t xino = 0;
 		__u32 *datap=NULL;
 		__u32 tfh[3];		/* filehandle fragment for oldstyle filehandles */
 		int fileid_type;
 		int data_left = fh->fh_size/4;
-		int nfsdev;
-		int fsid = 0;
 
 		error = nfserr_stale;
 		if (rqstp->rq_vers > 2)
@@ -113,6 +109,7 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 			return nfserr_nofilehandle;
 
 		if (fh->fh_version == 1) {
+			int len;
 			datap = fh->fh_auth;
 			if (--data_left<0) goto out;
 			switch (fh->fh_auth_type) {
@@ -122,39 +119,37 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 
 			switch (fh->fh_fsid_type) {
 			case 0:
-				if ((data_left-=2)<0) goto out;
-				nfsdev = ntohl(*datap++);
-				xdev = MKDEV(nfsdev>>16, nfsdev&0xFFFF);
-				xino = *datap++;
+				len = 2;
 				break;
 			case 1:
-				if ((data_left-=1)<0) goto out;
-				fsid = *datap++;
+				len = 1;
 				break;
 			default:
 				goto out;
 			}
+			if ((data_left -= len)<0) goto out;
+			exp = exp_find(rqstp->rq_client, fh->fh_fsid_type, datap);
+			datap += len;
 		} else {
+			dev_t xdev;
+			ino_t xino;
 			if (fh->fh_size != NFS_FHSIZE)
 				goto out;
 			/* assume old filehandle format */
 			xdev = u32_to_dev_t(fh->ofh_xdev);
 			xino = u32_to_ino_t(fh->ofh_xino);
+			mk_fsid_v0(tfh, xdev, xino);
+			exp = exp_find(rqstp->rq_client, 0, tfh);
 		}
 
 		/*
 		 * Look up the export entry.
 		 */
 		error = nfserr_stale; 
-		if (fh->fh_version == 1 && fh->fh_fsid_type == 1)
-			exp = exp_get_fsid(rqstp->rq_client, fsid);
-		else
-			exp = exp_get(rqstp->rq_client, xdev, xino);
 
-		if (!exp) {
+		if (!exp)
 			/* export entry revoked */
 			goto out;
-		}
 
 		/* Check if the request originated from a secure port. */
 		error = nfserr_perm;
@@ -367,13 +362,14 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 		    (ref_fh_fsid_type == 1)) {
 			fhp->fh_handle.fh_fsid_type = 1;
 			/* fsid_type 1 == 4 bytes filesystem id */
-			*datap++ = exp->ex_fsid;
+			mk_fsid_v1(datap, exp->ex_fsid);
+			datap += 1;
 			fhp->fh_handle.fh_size = 2*4;
 		} else {
 			fhp->fh_handle.fh_fsid_type = 0;
 			/* fsid_type 0 == 2byte major, 2byte minor, 4byte inode */
-			*datap++ = htonl((MAJOR(ex_dev)<<16)| MINOR(ex_dev));
-			*datap++ = ino_t_to_u32(exp->ex_dentry->d_inode->i_ino);
+			mk_fsid_v0(datap, ex_dev, exp->ex_dentry->d_inode->i_ino);
+			datap += 2;
 			fhp->fh_handle.fh_size = 3*4;
 		}
 		if (inode) {

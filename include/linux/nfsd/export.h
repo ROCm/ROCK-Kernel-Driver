@@ -98,8 +98,7 @@ void			exp_readlock(void);
 void			exp_readunlock(void);
 struct svc_client *	exp_getclient(struct sockaddr_in *sin);
 void			exp_putclient(struct svc_client *clp);
-struct svc_export *	exp_get(struct svc_client *clp, dev_t dev, ino_t ino);
-struct svc_export *	exp_get_fsid(struct svc_client *clp, int fsid);
+struct svc_expkey *	exp_find_key(struct svc_client *clp, int fsid_type, u32 *fsidv);
 struct svc_export *	exp_get_by_name(struct svc_client *clp,
 					struct vfsmount *mnt,
 					struct dentry *dentry);
@@ -109,6 +108,15 @@ int			exp_rootfh(struct svc_client *,
 					char *path, struct knfsd_fh *, int maxsize);
 int			nfserrno(int errno);
 
+static inline struct svc_export *
+exp_find(struct svc_client *clp, int fsid_type, u32 *fsidv)
+{
+	struct svc_expkey *ek = exp_find_key(clp, fsid_type, fsidv);
+	if (ek)
+		return ek->ek_export;
+	else
+		return NULL;
+}
 
 #endif /* __KERNEL__ */
 

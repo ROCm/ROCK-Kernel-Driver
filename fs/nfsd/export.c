@@ -88,32 +88,39 @@ static int export_hash(svc_client *clp, struct dentry *dentry)
 	return rv & EXPORT_HASHMASK;
 }
 
-/*
- * Find the client's export entry matching xdev/xino.
- */
 struct svc_expkey *
-exp_get_key(svc_client *clp, dev_t dev, ino_t ino)
+exp_find_key(svc_client *clp, int fsid_type, u32 *fsidv)
 {
 	struct list_head *head;
 	struct svc_expkey *ek;
-	u32 fsidv[2];
 	
 	if (!clp)
 		return NULL;
 
-	mk_fsid_v0(fsidv, dev, ino);
-
-	head = &clp->cl_export[expkey_hash(0, fsidv)];
+	head = &clp->cl_export[expkey_hash(fsid_type, fsidv)];
 	list_for_each_entry(ek, head, ek_hash)
-		if (ek->ek_fsidtype == 0 &&
+		if (ek->ek_fsidtype == fsid_type &&
 		    fsidv[0] == ek->ek_fsid[0] &&
-		    fsidv[1] == ek->ek_fsid[1] &&
+		    (fsid_type == 1 || fsidv[1] == ek->ek_fsid[1]) &&
 		    clp      == ek->ek_client)
 			return ek;
 
 	return NULL;
 }
-inline svc_export *
+
+/*
+ * Find the client's export entry matching xdev/xino.
+ */
+static inline struct svc_expkey *
+exp_get_key(svc_client *clp, dev_t dev, ino_t ino)
+{
+	u32 fsidv[2];
+	
+	mk_fsid_v0(fsidv, dev, ino);
+	return exp_find_key(clp, 0, fsidv);
+}
+
+static inline svc_export *
 exp_get(svc_client *clp, dev_t dev, ino_t ino)
 {
 	struct svc_expkey *ek;
@@ -128,28 +135,17 @@ exp_get(svc_client *clp, dev_t dev, ino_t ino)
 /*
  * Find the client's export entry matching fsid
  */
-struct svc_expkey *
+static inline struct svc_expkey *
 exp_get_fsid_key(svc_client *clp, int fsid)
 {
-	struct list_head *head;
-	struct svc_expkey *ek;
 	u32 fsidv[2];
-
-	if (!clp)
-		return NULL;
 
 	mk_fsid_v1(fsidv, fsid);
 
-	head = &clp->cl_export[expkey_hash(1, fsidv)];
-	list_for_each_entry(ek, head, ek_hash) {
-		if (ek->ek_fsidtype == 1 &&
-		    fsidv[0] == ek->ek_fsid[0] &&
-		    clp      == ek->ek_client)
-			return ek;
-	}
-	return NULL;
+	return exp_find_key(clp, 1, fsidv);
 }
-inline svc_export *
+
+static inline svc_export *
 exp_get_fsid(svc_client *clp, int fsid)
 {
 	struct svc_expkey *ek;
