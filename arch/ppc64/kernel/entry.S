@@ -231,6 +231,7 @@ syscall_dotrace:
 syscall_exit_trace:
 	std	r3,GPR3(r1)
 	bl	.save_nvgprs
+	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	.do_syscall_trace_leave
 	REST_NVGPRS(r1)
 	ld	r3,GPR3(r1)
@@ -324,6 +325,7 @@ _GLOBAL(ppc64_rt_sigreturn)
 	ld	r4,TI_FLAGS(r4)
 	andi.	r4,r4,(_TIF_SYSCALL_T_OR_A|_TIF_SINGLESTEP)
 	beq+	81f
+	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	.do_syscall_trace_leave
 81:	b	.ret_from_except
 
