@@ -101,19 +101,27 @@ static int open(struct inode * inode, struct file * file)
 	if (!kobj || !attr)
 		goto Done;
 
+	/* Grab the module reference for this attribute if we have one */
+	error = -ENODEV;
+	if (!try_module_get(attr->attr.owner)) 
+		goto Done;
+
 	error = -EACCES;
 	if ((file->f_mode & FMODE_WRITE) && !attr->write)
-		goto Done;
+		goto Error;
 	if ((file->f_mode & FMODE_READ) && !attr->read)
-		goto Done;
+		goto Error;
 
 	error = -ENOMEM;
 	file->private_data = kmalloc(PAGE_SIZE, GFP_KERNEL);
 	if (!file->private_data)
-		goto Done;
+		goto Error;
 
 	error = 0;
+    goto Done;
 
+ Error:
+	module_put(attr->attr.owner);
  Done:
 	if (error && kobj)
 		kobject_put(kobj);
@@ -123,10 +131,12 @@ static int open(struct inode * inode, struct file * file)
 static int release(struct inode * inode, struct file * file)
 {
 	struct kobject * kobj = file->f_dentry->d_parent->d_fsdata;
+	struct bin_attribute * attr = file->f_dentry->d_fsdata;
 	u8 * buffer = file->private_data;
 
 	if (kobj) 
 		kobject_put(kobj);
+	module_put(attr->attr.owner);
 	kfree(buffer);
 	return 0;
 }

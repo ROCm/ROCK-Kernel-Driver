@@ -42,7 +42,7 @@ static int object_path_length(struct kobject * kobj)
 	struct kobject * p = kobj;
 	int length = 1;
 	do {
-		length += strlen(p->name) + 1;
+		length += strlen(kobject_name(p)) + 1;
 		p = p->parent;
 	} while (p);
 	return length;
@@ -54,11 +54,11 @@ static void fill_object_path(struct kobject * kobj, char * buffer, int length)
 
 	--length;
 	for (p = kobj; p; p = p->parent) {
-		int cur = strlen(p->name);
+		int cur = strlen(kobject_name(p));
 
 		/* back up enough to print this bus id with '/' */
 		length -= cur;
-		strncpy(buffer + length,p->name,cur);
+		strncpy(buffer + length,kobject_name(p),cur);
 		*(buffer + --length) = '/';
 	}
 }
