@@ -227,5 +227,17 @@ config DM_ZERO
 	  A target that discards writes, and returns all zeroes for
 	  reads.  Useful in some recovery situations.
 
+config DM_MULTIPATH
+	tristate "Multipath target (EXPERIMENTAL)"
+	depends on BLK_DEV_DM && EXPERIMENTAL
+	---help---
+	  Allow volume managers to support multipath hardware.
+
+config DM_FLAKEY
+       tristate "Flakey target (EXPERIMENTAL)"
+       depends on BLK_DEV_DM && EXPERIMENTAL
+       ---help---
+         A debug only target that intermittently fails io.
+ 
 endmenu
 
