@@ -19,9 +19,6 @@
 
 #include <asm/uaccess.h>
 
-#include <linux/nfs_fs.h>
-#include <linux/nfs_fs_sb.h>
-#include <linux/nfs_mount.h>
 #include <linux/seq_file.h>
 
 struct vfsmount *do_kern_mount(char *type, int flags, char *name, void *data);
@@ -198,50 +195,10 @@ static inline void mangle(struct seq_file *m, const char *s)
 	seq_escape(m, s, " \t\n\\");
 }
 
-static void show_nfs_mount(struct seq_file *m, struct vfsmount *mnt)
-{
-	static struct proc_nfs_info {
-		int flag;
-		char *str;
-		char *nostr;
-	} nfs_info[] = {
-		{ NFS_MOUNT_SOFT, ",soft", ",hard" },
-		{ NFS_MOUNT_INTR, ",intr", "" },
-		{ NFS_MOUNT_POSIX, ",posix", "" },
-		{ NFS_MOUNT_TCP, ",tcp", ",udp" },
-		{ NFS_MOUNT_NOCTO, ",nocto", "" },
-		{ NFS_MOUNT_NOAC, ",noac", "" },
-		{ NFS_MOUNT_NONLM, ",nolock", ",lock" },
-		{ NFS_MOUNT_BROKEN_SUID, ",broken_suid", "" },
-		{ 0, NULL, NULL }
-	};
-	struct proc_nfs_info *nfs_infop;
-	struct nfs_server *nfss = &mnt->mnt_sb->u.nfs_sb.s_server;
-
-	seq_printf(m, ",v%d", nfss->rpc_ops->version);
-	seq_printf(m, ",rsize=%d", nfss->rsize);
-	seq_printf(m, ",wsize=%d", nfss->wsize);
-	if (nfss->acregmin != 3*HZ)
-		seq_printf(m, ",acregmin=%d", nfss->acregmin/HZ);
-	if (nfss->acregmax != 60*HZ)
-		seq_printf(m, ",acregmax=%d", nfss->acregmax/HZ);
-	if (nfss->acdirmin != 30*HZ)
-		seq_printf(m, ",acdirmin=%d", nfss->acdirmin/HZ);
-	if (nfss->acdirmax != 60*HZ)
-		seq_printf(m, ",acdirmax=%d", nfss->acdirmax/HZ);
-	for (nfs_infop = nfs_info; nfs_infop->flag; nfs_infop++) {
-		if (nfss->flags & nfs_infop->flag)
-			seq_puts(m, nfs_infop->str);
-		else
-			seq_puts(m, nfs_infop->nostr);
-	}
-	seq_puts(m, ",addr=");
-	mangle(m, nfss->hostname);
-}
-
 static int show_vfsmnt(struct seq_file *m, void *v)
 {
 	struct vfsmount *mnt = v;
+	int err = 0;
 	static struct proc_fs_info {
 		int flag;
 		char *str;
@@ -281,10 +238,10 @@ static int show_vfsmnt(struct seq_file *m, void *v)
 		if (mnt->mnt_flags & fs_infop->flag)
 			seq_puts(m, fs_infop->str);
 	}
-	if (strcmp("nfs", mnt->mnt_sb->s_type->name) == 0)
-		show_nfs_mount(m, mnt);
+	if (mnt->mnt_sb->s_op->show_options)
+		err = mnt->mnt_sb->s_op->show_options(m, mnt);
 	seq_puts(m, " 0 0\n");
-	return 0;
+	return err;
 }
 
 struct seq_operations mounts_op = {

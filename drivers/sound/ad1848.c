@@ -162,7 +162,7 @@ static struct {
     ,{CAP_F_TIMER} /* MD_1845_SSCAPE */
 };
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 static int isapnp	= 1;
 static int isapnpjump	= 0;
 static int reverse	= 0;
@@ -2830,7 +2830,7 @@ MODULE_PARM(deskpro_xl, "i");           /* Special magic for Deskpro XL boxen */
 MODULE_PARM(deskpro_m, "i");            /* Special magic for Deskpro M box */
 MODULE_PARM(soundpro, "i");             /* More special magic for SoundPro chips */
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 MODULE_PARM(isapnp,	"i");
 MODULE_PARM(isapnpjump,	"i");
 MODULE_PARM(reverse,	"i");
@@ -3000,7 +3000,7 @@ static int __init init_ad1848(void)
 {
 	printk(KERN_INFO "ad1848/cs4248 codec driver Copyright (C) by Hannu Savolainen 1993-1996\n");
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 	if(isapnp && (ad1848_isapnp_probe(&cfg) < 0) ) {
 		printk(KERN_NOTICE "ad1848: No ISAPnP cards found, trying standard ones...\n");
 		isapnp = 0;
@@ -3035,7 +3035,7 @@ static void __exit cleanup_ad1848(void)
 	if(loaded)
 		unload_ms_sound(&cfg);
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 	if(audio_activated)
 		if(ad1848_dev)
 			ad1848_dev->deactivate(ad1848_dev);

@@ -219,9 +219,8 @@ pdev_enable_device(struct pci_dev *dev)
 		cmd |= PCI_COMMAND_IO;
 	}
 
-	/* ??? Always turn on bus mastering.  If the device doesn't support
-	   it, the bit will go into the bucket. */
-	cmd |= PCI_COMMAND_MASTER;
+	/* Do not enable bus mastering.  A device could corrupt
+	 * system memory by DMAing before a driver is ready for it. */
 
 	/* Set the cache line and default latency (32).  */
 	pci_write_config_word(dev, PCI_CACHE_LINE_SIZE,

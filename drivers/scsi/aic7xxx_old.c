@@ -4127,7 +4127,7 @@ aic7xxx_timer(struct aic7xxx_host *p)
   unsigned long cpu_flags = 0;
   struct aic7xxx_scb *scb;
 
-  spin_lock_irqsave(&io_request_lock, cpu_flags);
+  spin_lock_irqsave(&p->host->host_lock, cpu_flags);
   p->dev_timer_active &= ~(0x01 << MAX_TARGETS);
   if ( (p->dev_timer_active & (0x01 << p->scsi_id)) &&
        time_after_eq(jiffies, p->dev_expires[p->scsi_id]) )
@@ -4184,7 +4184,7 @@ aic7xxx_timer(struct aic7xxx_host *p)
   }
 
   aic7xxx_run_waiting_queues(p);
-  spin_unlock_irqrestore(&io_request_lock, cpu_flags);
+  spin_unlock_irqrestore(&p->host->host_lock, cpu_flags);
 }
 
 /*+F*************************************************************************
@@ -7011,7 +7011,7 @@ do_aic7xxx_isr(int irq, void *dev_id, struct pt_regs *regs)
   p = (struct aic7xxx_host *)dev_id;
   if(!p)
     return;
-  spin_lock_irqsave(&io_request_lock, cpu_flags);
+  spin_lock_irqsave(&p->host->host_lock, cpu_flags);
   p->flags |= AHC_IN_ISR;
   do
   {
@@ -7020,7 +7020,7 @@ do_aic7xxx_isr(int irq, void *dev_id, struct pt_regs *regs)
   aic7xxx_done_cmds_complete(p);
   aic7xxx_run_waiting_queues(p);
   p->flags &= ~AHC_IN_ISR;
-  spin_unlock_irqrestore(&io_request_lock, cpu_flags);
+  spin_unlock_irqrestore(&p->host->host_lock, cpu_flags);
 }
 
 /*+F*************************************************************************
@@ -11148,7 +11148,7 @@ aic7xxx_panic_abort(struct aic7xxx_host *p, Scsi_Cmnd *cmd)
   disable_irq(p->irq);
   aic7xxx_print_card(p);
   aic7xxx_print_scratch_ram(p);
-  spin_unlock_irq(&io_request_lock);
+  spin_unlock_irq(&p->host->host_lock);
   for(;;) barrier();
 }
 

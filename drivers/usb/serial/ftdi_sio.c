@@ -173,7 +173,7 @@ static void ftdi_sio_break_ctl		(struct usb_serial_port *port, int break_state )
 /* Should rename most ftdi_sio's to ftdi_ now since there are two devices 
    which share common code */ 
 
-struct usb_serial_device_type ftdi_sio_device = {
+static struct usb_serial_device_type ftdi_sio_device = {
 	name:			"FTDI SIO",
 	id_table:		id_table_sio,
 	needs_interrupt_in:	MUST_HAVE_NOT,
@@ -196,7 +196,7 @@ struct usb_serial_device_type ftdi_sio_device = {
         shutdown:               ftdi_sio_shutdown,
 };
 
-struct usb_serial_device_type ftdi_8U232AM_device = {
+static struct usb_serial_device_type ftdi_8U232AM_device = {
 	name:			"FTDI 8U232AM",
 	id_table:		id_table_8U232AM,
 	needs_interrupt_in:	DONT_CARE,
@@ -660,7 +660,7 @@ static void ftdi_sio_read_bulk_callback (struct urb *urb)
 } /* ftdi_sio_serial_read_bulk_callback */
 
 
-__u16 translate_baudrate_to_ftdi(unsigned int cflag, ftdi_type_t ftdi_type) 
+static __u16 translate_baudrate_to_ftdi(unsigned int cflag, ftdi_type_t ftdi_type) 
 { /* translate_baudrate_to_ftdi */
 	
 	__u16 urb_value = ftdi_sio_b9600;

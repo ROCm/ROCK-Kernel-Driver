@@ -30,6 +30,7 @@
 #include <linux/blkdev.h>
 #include <linux/completion.h>
 #include <linux/delay.h>
+#include <linux/genhd.h>
 #include <linux/hdreg.h>
 #include <linux/blkpg.h>
 #include <linux/interrupt.h>
@@ -306,9 +307,9 @@ static inline void DAC960_DeallocateCommand(DAC960_Command_T *Command)
 
 static void DAC960_WaitForCommand(DAC960_Controller_T *Controller)
 {
-  spin_unlock_irq(&io_request_lock);
+  spin_unlock_irq(&Controller->RequestQueue->queue_lock);
   __wait_event(Controller->CommandWaitQueue, Controller->FreeCommands);
-  spin_lock_irq(&io_request_lock);
+  spin_lock_irq(&Controller->RequestQueue->queue_lock);
 }
 
 
@@ -1922,76 +1923,6 @@ static boolean DAC960_V2_ReportDeviceConfiguration(DAC960_Controller_T
 
 
 /*
-  DAC960_BackMergeFunction is the Back Merge Function for the DAC960 driver.
-*/
-
-static int DAC960_BackMergeFunction(RequestQueue_T *RequestQueue,
-				    IO_Request_T *Request,
-				    BufferHeader_T *BufferHeader,
-				    int MaxSegments)
-{
-  DAC960_Controller_T *Controller =
-    (DAC960_Controller_T *) RequestQueue->queuedata;
-  if (Request->bhtail->b_data + Request->bhtail->b_size == BufferHeader->b_data)
-    return true;
-  if (Request->nr_segments < MaxSegments &&
-      Request->nr_segments < Controller->DriverScatterGatherLimit)
-    {
-      Request->nr_segments++;
-      return true;
-    }
-  return false;
-}
-
-
-/*
-  DAC960_FrontMergeFunction is the Front Merge Function for the DAC960 driver.
-*/
-
-static int DAC960_FrontMergeFunction(RequestQueue_T *RequestQueue,
-				     IO_Request_T *Request,
-				     BufferHeader_T *BufferHeader,
-				     int MaxSegments)
-{
-  DAC960_Controller_T *Controller =
-    (DAC960_Controller_T *) RequestQueue->queuedata;
-  if (BufferHeader->b_data + BufferHeader->b_size == Request->bh->b_data)
-    return true;
-  if (Request->nr_segments < MaxSegments &&
-      Request->nr_segments < Controller->DriverScatterGatherLimit)
-    {
-      Request->nr_segments++;
-      return true;
-    }
-  return false;
-}
-
-
-/*
-  DAC960_MergeRequestsFunction is the Merge Requests Function for the
-  DAC960 driver.
-*/
-
-static int DAC960_MergeRequestsFunction(RequestQueue_T *RequestQueue,
-					IO_Request_T *Request,
-					IO_Request_T *NextRequest,
-					int MaxSegments)
-{
-  DAC960_Controller_T *Controller =
-    (DAC960_Controller_T *) RequestQueue->queuedata;
-  int TotalSegments = Request->nr_segments + NextRequest->nr_segments;
-  if (Request->bhtail->b_data + Request->bhtail->b_size
-      == NextRequest->bh->b_data)
-    TotalSegments--;
-  if (TotalSegments > MaxSegments ||
-      TotalSegments > Controller->DriverScatterGatherLimit)
-    return false;
-  Request->nr_segments = TotalSegments;
-  return true;
-}
-
-
-/*
   DAC960_RegisterBlockDevice registers the Block Device structures
   associated with Controller.
 */
@@ -2015,15 +1946,15 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
     Initialize the I/O Request Queue.
   */
   RequestQueue = BLK_DEFAULT_QUEUE(MajorNumber);
-  blk_init_queue(RequestQueue, DAC960_RequestFunction);
+  blk_init_queue(RequestQueue, DAC960_RequestFunction, "dac960");
   blk_queue_headactive(RequestQueue, 0);
-  RequestQueue->back_merge_fn = DAC960_BackMergeFunction;
-  RequestQueue->front_merge_fn = DAC960_FrontMergeFunction;
-  RequestQueue->merge_requests_fn = DAC960_MergeRequestsFunction;
   RequestQueue->queuedata = Controller;
+  RequestQueue->max_segments = Controller->DriverScatterGatherLimit;
+  RequestQueue->max_sectors = Controller->MaxBlocksPerCommand;
   Controller->RequestQueue = RequestQueue;
   /*
-    Initialize the Max Sectors per Request array.
+    Initialize the Disk Partitions array, Partition Sizes array, Block Sizes
+    array, and Max Sectors per Request array.
   */
   for (MinorNumber = 0; MinorNumber < DAC960_MinorCount; MinorNumber++)
     Controller->MaxSectorsPerRequest[MinorNumber] =
@@ -2031,7 +1962,6 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
   Controller->GenericDiskInfo.part = Controller->DiskPartitions;
   Controller->GenericDiskInfo.sizes = Controller->PartitionSizes;
   blksize_size[MajorNumber] = Controller->BlockSizes;
-  max_sectors[MajorNumber] = Controller->MaxSectorsPerRequest;
   /*
     Initialize Read Ahead to 128 sectors.
   */
@@ -2080,9 +2010,7 @@ static void DAC960_UnregisterBlockDevice(DAC960_Controller_T *Controller)
   */
   Controller->GenericDiskInfo.part = NULL;
   Controller->GenericDiskInfo.sizes = NULL;
-  blk_size[MajorNumber] = NULL;
-  blksize_size[MajorNumber] = NULL;
-  max_sectors[MajorNumber] = NULL;
+  blk_clear(MajorNumber);
   /*
     Remove the Generic Disk Information structure from the list.
   */
@@ -2813,23 +2741,24 @@ static void DAC960_V1_QueueReadWriteCommand(DAC960_Command_T *Command)
       CommandMailbox->Type5.ScatterGatherCount = Command->SegmentCount;
       while (BufferHeader != NULL)
 	{
-	  if (BufferHeader->b_data == LastDataEndPointer)
+	  if (bio_data(BufferHeader) == LastDataEndPointer)
 	    {
 	      ScatterGatherList[SegmentNumber-1].SegmentByteCount +=
-		BufferHeader->b_size;
-	      LastDataEndPointer += BufferHeader->b_size;
+		bio_size(BufferHeader);
+	      LastDataEndPointer += bio_size(BufferHeader);
 	    }
 	  else
 	    {
 	      ScatterGatherList[SegmentNumber].SegmentDataPointer =
-		Virtual_to_Bus32(BufferHeader->b_data);
+		Virtual_to_Bus32(bio_data(BufferHeader));
 	      ScatterGatherList[SegmentNumber].SegmentByteCount =
-		BufferHeader->b_size;
-	      LastDataEndPointer = BufferHeader->b_data + BufferHeader->b_size;
+		bio_size(BufferHeader);
+	      LastDataEndPointer = bio_data(BufferHeader) +
+		bio_size(BufferHeader);
 	      if (SegmentNumber++ > Controller->DriverScatterGatherLimit)
 		panic("DAC960: Scatter/Gather Segment Overflow\n");
 	    }
-	  BufferHeader = BufferHeader->b_reqnext;
+	  BufferHeader = BufferHeader->bi_next;
 	}
       if (SegmentNumber != Command->SegmentCount)
 	panic("DAC960: SegmentNumber != SegmentCount\n");
@@ -2903,23 +2832,24 @@ static void DAC960_V2_QueueReadWriteCommand(DAC960_Command_T *Command)
 				 .ScatterGatherSegments;
       while (BufferHeader != NULL)
 	{
-	  if (BufferHeader->b_data == LastDataEndPointer)
+	  if (bio_data(BufferHeader) == LastDataEndPointer)
 	    {
 	      ScatterGatherList[SegmentNumber-1].SegmentByteCount +=
-		BufferHeader->b_size;
-	      LastDataEndPointer += BufferHeader->b_size;
+		bio_size(BufferHeader);
+	      LastDataEndPointer += bio_size(BufferHeader);
 	    }
 	  else
 	    {
 	      ScatterGatherList[SegmentNumber].SegmentDataPointer =
-		Virtual_to_Bus64(BufferHeader->b_data);
+		Virtual_to_Bus64(bio_data(BufferHeader));
 	      ScatterGatherList[SegmentNumber].SegmentByteCount =
-		BufferHeader->b_size;
-	      LastDataEndPointer = BufferHeader->b_data + BufferHeader->b_size;
+		bio_size(BufferHeader);
+	      LastDataEndPointer = bio_data(BufferHeader) +
+		bio_size(BufferHeader);
 	      if (SegmentNumber++ > Controller->DriverScatterGatherLimit)
 		panic("DAC960: Scatter/Gather Segment Overflow\n");
 	    }
-	  BufferHeader = BufferHeader->b_reqnext;
+	  BufferHeader = BufferHeader->bi_next;
 	}
       if (SegmentNumber != Command->SegmentCount)
 	panic("DAC960: SegmentNumber != SegmentCount\n");
@@ -2947,7 +2877,7 @@ static boolean DAC960_ProcessRequest(DAC960_Controller_T *Controller,
   while (true)
     {
       if (list_empty(RequestQueueHead)) return false;
-      Request = blkdev_entry_next_request(RequestQueueHead);
+      Request = elv_next_request(RequestQueue);
       Command = DAC960_AllocateCommand(Controller);
       if (Command != NULL) break;
       if (!WaitForCommand) return false;
@@ -2958,12 +2888,10 @@ static boolean DAC960_ProcessRequest(DAC960_Controller_T *Controller,
   else Command->CommandType = DAC960_WriteCommand;
   Command->Completion = Request->waiting;
   Command->LogicalDriveNumber = DAC960_LogicalDriveNumber(Request->rq_dev);
-  Command->BlockNumber =
-    Request->sector
-    + Controller->GenericDiskInfo.part[MINOR(Request->rq_dev)].start_sect;
+  Command->BlockNumber = Request->sector;
   Command->BlockCount = Request->nr_sectors;
   Command->SegmentCount = Request->nr_segments;
-  Command->BufferHeader = Request->bh;
+  Command->BufferHeader = Request->bio;
   Command->RequestBuffer = Request->buffer;
   blkdev_dequeue_request(Request);
   blkdev_release_request(Request);
@@ -3016,8 +2944,10 @@ static void DAC960_RequestFunction(RequestQueue_T *RequestQueue)
 static inline void DAC960_ProcessCompletedBuffer(BufferHeader_T *BufferHeader,
 						 boolean SuccessfulIO)
 {
-  blk_finished_io(BufferHeader->b_size >> 9);
-  BufferHeader->b_end_io(BufferHeader, SuccessfulIO);
+  if (SuccessfulIO)
+    set_bit(BIO_UPTODATE, &BufferHeader->bi_flags);
+  blk_finished_io(bio_sectors(BufferHeader));
+  BufferHeader->bi_end_io(BufferHeader);
 }
 
 
@@ -3071,13 +3001,13 @@ static void DAC960_V1_ReadWriteError(DAC960_Command_T *Command)
 	       Controller, Controller->ControllerNumber,
 	       Command->LogicalDriveNumber, Command->BlockNumber,
 	       Command->BlockNumber + Command->BlockCount - 1);
-  if (DAC960_PartitionNumber(Command->BufferHeader->b_rdev) > 0)
+  if (DAC960_PartitionNumber(Command->BufferHeader->bi_dev) > 0)
     DAC960_Error("  /dev/rd/c%dd%dp%d: relative blocks %u..%u\n",
 		 Controller, Controller->ControllerNumber,
 		 Command->LogicalDriveNumber,
-		 DAC960_PartitionNumber(Command->BufferHeader->b_rdev),
-		 Command->BufferHeader->b_rsector,
-		 Command->BufferHeader->b_rsector + Command->BlockCount - 1);
+		 DAC960_PartitionNumber(Command->BufferHeader->bi_dev),
+		 Command->BufferHeader->bi_sector,
+		 Command->BufferHeader->bi_sector + Command->BlockCount - 1);
 }
 
 
@@ -3104,8 +3034,8 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  */
 	  while (BufferHeader != NULL)
 	    {
-	      BufferHeader_T *NextBufferHeader = BufferHeader->b_reqnext;
-	      BufferHeader->b_reqnext = NULL;
+	      BufferHeader_T *NextBufferHeader = BufferHeader->bi_next;
+	      BufferHeader->bi_next = NULL;
 	      DAC960_ProcessCompletedBuffer(BufferHeader, true);
 	      BufferHeader = NextBufferHeader;
 	    }
@@ -3119,7 +3049,7 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
       else if ((CommandStatus == DAC960_V1_IrrecoverableDataError ||
 		CommandStatus == DAC960_V1_BadDataEncountered) &&
 	       BufferHeader != NULL &&
-	       BufferHeader->b_reqnext != NULL)
+	       BufferHeader->bi_next != NULL)
 	{
 	  DAC960_V1_CommandMailbox_T *CommandMailbox =
 	    &Command->V1.CommandMailbox;
@@ -3133,10 +3063,10 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	      Command->CommandType = DAC960_WriteRetryCommand;
 	      CommandMailbox->Type5.CommandOpcode = DAC960_V1_Write;
 	    }
-	  Command->BlockCount = BufferHeader->b_size >> DAC960_BlockSizeBits;
+	  Command->BlockCount = bio_size(BufferHeader) >> DAC960_BlockSizeBits;
 	  CommandMailbox->Type5.LD.TransferLength = Command->BlockCount;
 	  CommandMailbox->Type5.BusAddress =
-	    Virtual_to_Bus32(BufferHeader->b_data);
+	    Virtual_to_Bus32(bio_data(BufferHeader));
 	  DAC960_QueueCommand(Command);
 	  return;
 	}
@@ -3149,8 +3079,8 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  */
 	  while (BufferHeader != NULL)
 	    {
-	      BufferHeader_T *NextBufferHeader = BufferHeader->b_reqnext;
-	      BufferHeader->b_reqnext = NULL;
+	      BufferHeader_T *NextBufferHeader = BufferHeader->bi_next;
+	      BufferHeader->bi_next = NULL;
 	      DAC960_ProcessCompletedBuffer(BufferHeader, false);
 	      BufferHeader = NextBufferHeader;
 	    }
@@ -3164,8 +3094,8 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
   else if (CommandType == DAC960_ReadRetryCommand ||
 	   CommandType == DAC960_WriteRetryCommand)
     {
-      BufferHeader_T *NextBufferHeader = BufferHeader->b_reqnext;
-      BufferHeader->b_reqnext = NULL;
+      BufferHeader_T *NextBufferHeader = BufferHeader->bi_next;
+      BufferHeader->bi_next = NULL;
       /*
 	Perform completion processing for this single buffer.
       */
@@ -3182,14 +3112,14 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  DAC960_V1_CommandMailbox_T *CommandMailbox =
 	    &Command->V1.CommandMailbox;
 	  Command->BlockNumber +=
-	    BufferHeader->b_size >> DAC960_BlockSizeBits;
+	    bio_size(BufferHeader) >> DAC960_BlockSizeBits;
 	  Command->BlockCount =
-	    NextBufferHeader->b_size >> DAC960_BlockSizeBits;
+	    bio_size(NextBufferHeader) >> DAC960_BlockSizeBits;
 	  Command->BufferHeader = NextBufferHeader;
 	  CommandMailbox->Type5.LD.TransferLength = Command->BlockCount;
 	  CommandMailbox->Type5.LogicalBlockAddress = Command->BlockNumber;
 	  CommandMailbox->Type5.BusAddress =
-	    Virtual_to_Bus32(NextBufferHeader->b_data);
+	    Virtual_to_Bus32(bio_data(NextBufferHeader));
 	  DAC960_QueueCommand(Command);
 	  return;
 	}
@@ -3935,13 +3865,13 @@ static void DAC960_V2_ReadWriteError(DAC960_Command_T *Command)
 	       Controller, Controller->ControllerNumber,
 	       Command->LogicalDriveNumber, Command->BlockNumber,
 	       Command->BlockNumber + Command->BlockCount - 1);
-  if (DAC960_PartitionNumber(Command->BufferHeader->b_rdev) > 0)
+  if (DAC960_PartitionNumber(Command->BufferHeader->bi_dev) > 0)
     DAC960_Error("  /dev/rd/c%dd%dp%d: relative blocks %u..%u\n",
 		 Controller, Controller->ControllerNumber,
 		 Command->LogicalDriveNumber,
-		 DAC960_PartitionNumber(Command->BufferHeader->b_rdev),
-		 Command->BufferHeader->b_rsector,
-		 Command->BufferHeader->b_rsector + Command->BlockCount - 1);
+		 DAC960_PartitionNumber(Command->BufferHeader->bi_dev),
+		 Command->BufferHeader->bi_sector,
+		 Command->BufferHeader->bi_sector + Command->BlockCount - 1);
 }
 
 
@@ -4210,8 +4140,8 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  */
 	  while (BufferHeader != NULL)
 	    {
-	      BufferHeader_T *NextBufferHeader = BufferHeader->b_reqnext;
-	      BufferHeader->b_reqnext = NULL;
+	      BufferHeader_T *NextBufferHeader = BufferHeader->bi_next;
+	      BufferHeader->bi_next = NULL;
 	      DAC960_ProcessCompletedBuffer(BufferHeader, true);
 	      BufferHeader = NextBufferHeader;
 	    }
@@ -4225,19 +4155,19 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
       else if (Command->V2.RequestSense.SenseKey
 	       == DAC960_SenseKey_MediumError &&
 	       BufferHeader != NULL &&
-	       BufferHeader->b_reqnext != NULL)
+	       BufferHeader->bi_next != NULL)
 	{
 	  if (CommandType == DAC960_ReadCommand)
 	    Command->CommandType = DAC960_ReadRetryCommand;
 	  else Command->CommandType = DAC960_WriteRetryCommand;
-	  Command->BlockCount = BufferHeader->b_size >> DAC960_BlockSizeBits;
+	  Command->BlockCount = bio_size(BufferHeader) >> DAC960_BlockSizeBits;
 	  CommandMailbox->SCSI_10.CommandControlBits
 				 .AdditionalScatterGatherListMemory = false;
 	  CommandMailbox->SCSI_10.DataTransferSize =
 	    Command->BlockCount << DAC960_BlockSizeBits;
 	  CommandMailbox->SCSI_10.DataTransferMemoryAddress
 				 .ScatterGatherSegments[0].SegmentDataPointer =
-	    Virtual_to_Bus64(BufferHeader->b_data);
+	    Virtual_to_Bus64(bio_data(BufferHeader));
 	  CommandMailbox->SCSI_10.DataTransferMemoryAddress
 				 .ScatterGatherSegments[0].SegmentByteCount =
 	    CommandMailbox->SCSI_10.DataTransferSize;
@@ -4255,8 +4185,8 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 	  */
 	  while (BufferHeader != NULL)
 	    {
-	      BufferHeader_T *NextBufferHeader = BufferHeader->b_reqnext;
-	      BufferHeader->b_reqnext = NULL;
+	      BufferHeader_T *NextBufferHeader = BufferHeader->bi_next;
+	      BufferHeader->bi_next = NULL;
 	      DAC960_ProcessCompletedBuffer(BufferHeader, false);
 	      BufferHeader = NextBufferHeader;
 	    }
@@ -4270,8 +4200,8 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
   else if (CommandType == DAC960_ReadRetryCommand ||
 	   CommandType == DAC960_WriteRetryCommand)
     {
-      BufferHeader_T *NextBufferHeader = BufferHeader->b_reqnext;
-      BufferHeader->b_reqnext = NULL;
+      BufferHeader_T *NextBufferHeader = BufferHeader->bi_next;
+      BufferHeader->bi_next = NULL;
       /*
 	Perform completion processing for this single buffer.
       */
@@ -4286,16 +4216,16 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
       if (NextBufferHeader != NULL)
 	{
 	  Command->BlockNumber +=
-	    BufferHeader->b_size >> DAC960_BlockSizeBits;
+	    bio_size(BufferHeader) >> DAC960_BlockSizeBits;
 	  Command->BlockCount =
-	    NextBufferHeader->b_size >> DAC960_BlockSizeBits;
+	    bio_size(NextBufferHeader) >> DAC960_BlockSizeBits;
 	  Command->BufferHeader = NextBufferHeader;
 	  CommandMailbox->SCSI_10.DataTransferSize =
 	    Command->BlockCount << DAC960_BlockSizeBits;
 	  CommandMailbox->SCSI_10.DataTransferMemoryAddress
 				 .ScatterGatherSegments[0]
 				 .SegmentDataPointer =
-	    Virtual_to_Bus64(NextBufferHeader->b_data);
+	    Virtual_to_Bus64(bio_data(NextBufferHeader));
 	  CommandMailbox->SCSI_10.DataTransferMemoryAddress
 				 .ScatterGatherSegments[0]
 				 .SegmentByteCount =
@@ -5416,7 +5346,8 @@ static int DAC960_IOCTL(Inode_T *Inode, File_T *File,
   int LogicalDriveNumber = DAC960_LogicalDriveNumber(Inode->i_rdev);
   DiskGeometry_T Geometry, *UserGeometry;
   DAC960_Controller_T *Controller;
-  int PartitionNumber;
+  int res;
+
   if (File != NULL && (File->f_flags & O_NONBLOCK))
     return DAC960_UserIOCTL(Inode, File, Request, Argument);
   if (ControllerNumber < 0 || ControllerNumber > DAC960_ControllerCount - 1)
@@ -5465,61 +5396,27 @@ static int DAC960_IOCTL(Inode_T *Inode, File_T *File,
 	    LogicalDeviceInfo->ConfigurableDeviceSize
 	    / (Geometry.heads * Geometry.sectors);
 	}
-      Geometry.start =
-	Controller->GenericDiskInfo.part[MINOR(Inode->i_rdev)].start_sect;
+      Geometry.start = get_start_sect(Inode->i_rdev);
       return (copy_to_user(UserGeometry, &Geometry,
 			   sizeof(DiskGeometry_T)) ? -EFAULT : 0);
     case BLKGETSIZE:
-      /* Get Device Size. */
-      if ((unsigned long *) Argument == NULL) return -EINVAL;
-      return put_user(Controller->GenericDiskInfo.part[MINOR(Inode->i_rdev)]
-						 .nr_sects,
-		      (unsigned long *) Argument);
     case BLKGETSIZE64:
-      if ((u64 *) Argument == NULL) return -EINVAL;
-      return put_user((u64) Controller->GenericDiskInfo
-				       .part[MINOR(Inode->i_rdev)]
-				       .nr_sects << 9,
-		      (u64 *) Argument);
     case BLKRAGET:
     case BLKRASET:
     case BLKFLSBUF:
     case BLKBSZGET:
     case BLKBSZSET:
       return blk_ioctl(Inode->i_rdev, Request, Argument);
+
     case BLKRRPART:
       /* Re-Read Partition Table. */
       if (!capable(CAP_SYS_ADMIN)) return -EACCES;
       if (Controller->LogicalDriveUsageCount[LogicalDriveNumber] > 1)
 	return -EBUSY;
-      for (PartitionNumber = 0;
-	   PartitionNumber < DAC960_MaxPartitions;
-	   PartitionNumber++)
-	{
-	  KernelDevice_T Device = DAC960_KernelDevice(ControllerNumber,
-						      LogicalDriveNumber,
-						      PartitionNumber);
-	  int MinorNumber = DAC960_MinorNumber(LogicalDriveNumber,
-					       PartitionNumber);
-	  if (Controller->GenericDiskInfo.part[MinorNumber].nr_sects == 0)
-	    continue;
-	  /*
-	    Flush all changes and invalidate buffered state.
-	  */
-	  invalidate_device(Device, 1);
-	  /*
-	    Clear existing partition sizes.
-	  */
-	  if (PartitionNumber > 0)
-	    {
-	      Controller->GenericDiskInfo.part[MinorNumber].start_sect = 0;
-	      Controller->GenericDiskInfo.part[MinorNumber].nr_sects = 0;
-	    }
-	  /*
-	    Reset the Block Size so that the partition table can be read.
-	  */
-	  set_blocksize(Device, BLOCK_SIZE);
-	}
+      res = wipe_partitions(Inode->i_rdev);
+      if (res) /* nothing */
+	return res;
+
       DAC960_RegisterDisk(Controller, LogicalDriveNumber);
       return 0;
     }
@@ -5641,11 +5538,11 @@ static int DAC960_UserIOCTL(Inode_T *Inode, File_T *File,
 	    while (Controller->V1.DirectCommandActive[DCDB.Channel]
 						     [DCDB.TargetID])
 	      {
-		spin_unlock_irq(&io_request_lock);
+		spin_unlock_irq(&Controller->RequestQueue->queue_lock);
 		__wait_event(Controller->CommandWaitQueue,
 			     !Controller->V1.DirectCommandActive
 					     [DCDB.Channel][DCDB.TargetID]);
-		spin_lock_irq(&io_request_lock);
+		spin_lock_irq(&Controller->RequestQueue->queue_lock);
 	      }
 	    Controller->V1.DirectCommandActive[DCDB.Channel]
 					      [DCDB.TargetID] = true;

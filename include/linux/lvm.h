@@ -468,6 +468,12 @@ typedef struct lv_bmap {
 } lv_bmap_t;
 
 /*
+ * fixme...
+ */
+#define LVM_MAX_ATOMIC_IO	512
+#define LVM_MAX_SECTORS		(LVM_MAX_ATOMIC_IO * 2)
+
+/*
  * Structure Logical Volume (LV) Version 3
  */
 
@@ -505,6 +511,7 @@ typedef struct lv_v5 {
 	uint lv_snapshot_minor;
 #ifdef __KERNEL__
 	struct kiobuf *lv_iobuf;
+	sector_t blocks[LVM_MAX_SECTORS];
 	struct kiobuf *lv_COW_table_iobuf;
 	struct rw_semaphore lv_lock;
 	struct list_head *lv_snapshot_hash_table;

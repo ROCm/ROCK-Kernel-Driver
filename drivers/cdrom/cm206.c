@@ -866,7 +866,7 @@ static void do_cm206_request(request_queue_t * q)
 			end_request(0);
 			continue;
 		}
-		spin_unlock_irq(&io_request_lock);
+		spin_unlock_irq(&q->queue_lock);
 		error = 0;
 		for (i = 0; i < CURRENT->nr_sectors; i++) {
 			int e1, e2;
@@ -893,7 +893,7 @@ static void do_cm206_request(request_queue_t * q)
 				debug(("cm206_request: %d %d\n", e1, e2));
 			}
 		}
-		spin_lock_irq(&io_request_lock);
+		spin_lock_irq(&q->queue_lock);
 		end_request(!error);
 	}
 }

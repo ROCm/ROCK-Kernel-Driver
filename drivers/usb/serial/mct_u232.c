@@ -154,7 +154,7 @@ static __devinitdata struct usb_device_id mct_u232_du_h3sp_table [] = {
 MODULE_DEVICE_TABLE (usb, id_table_combined);
 
 
-struct usb_serial_device_type mct_u232_device = {
+static struct usb_serial_device_type mct_u232_device = {
 	name:		     "Magic Control Technology USB-RS232",
 	id_table:	     mct_u232_table,
 	needs_interrupt_in:  MUST_HAVE,	 /* 2 interrupt-in endpoints */
@@ -178,7 +178,7 @@ struct usb_serial_device_type mct_u232_device = {
 	shutdown:	     mct_u232_shutdown,
 };
 
-struct usb_serial_device_type mct_u232_sitecom_device = {
+static struct usb_serial_device_type mct_u232_sitecom_device = {
 	name:		     "MCT/Sitecom USB-RS232",
 	id_table:	     mct_u232_sitecom_table,
 	needs_interrupt_in:  MUST_HAVE,	 /* 2 interrupt-in endpoints */
@@ -202,7 +202,7 @@ struct usb_serial_device_type mct_u232_sitecom_device = {
 	shutdown:	     mct_u232_shutdown,
 };
 
-struct usb_serial_device_type mct_u232_du_h3sp_device = {
+static struct usb_serial_device_type mct_u232_du_h3sp_device = {
         name:                "MCT/D-Link DU-H3SP USB BAY",
         id_table:            mct_u232_du_h3sp_table,
         needs_interrupt_in:  MUST_HAVE,  /* 2 interrupt-in endpoints */

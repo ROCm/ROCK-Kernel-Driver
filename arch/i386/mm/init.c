@@ -25,6 +25,7 @@
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
 #include <linux/bootmem.h>
+#include <linux/slab.h>
 
 #include <asm/processor.h>
 #include <asm/system.h>
@@ -333,7 +334,7 @@ void __init paging_init(void)
 {
 	pagetable_init();
 
-	__asm__( "movl %%ecx,%%cr3\n" ::"c"(__pa(swapper_pg_dir)));
+	__asm__( "movl %0,%%cr3\n" ::"r"(__pa(swapper_pg_dir)));
 
 #if CONFIG_X86_PAE
 	/*
@@ -596,3 +597,17 @@ void si_meminfo(struct sysinfo *val)
 	val->mem_unit = PAGE_SIZE;
 	return;
 }
+
+#if defined(CONFIG_X86_PAE)
+struct kmem_cache_s *pae_pgd_cachep;
+void __init pgtable_cache_init(void)
+{
+	/*
+	 * PAE pgds must be 16-byte aligned:
+	 */
+	pae_pgd_cachep = kmem_cache_create("pae_pgd", 32, 0,
+		SLAB_HWCACHE_ALIGN | SLAB_MUST_HWCACHE_ALIGN, NULL, NULL);
+	if (!pae_pgd_cachep)
+		panic("init_pae(): Cannot alloc pae_pgd SLAB cache");
+}
+#endif /* CONFIG_X86_PAE */

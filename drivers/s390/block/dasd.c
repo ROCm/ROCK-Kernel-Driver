@@ -730,13 +730,6 @@ dasd_register_major (major_info_t * major_info)
 		goto out_hardsect_size;
 	memset (hardsect_size[major], 0, (1 << MINORBITS) * sizeof (int));
 
-        /* init max_sectors */
-	max_sectors[major] =
-	    (int *) kmalloc ((1 << MINORBITS) * sizeof (int), GFP_ATOMIC);
-	if (!max_sectors[major])
-		goto out_max_sectors;
-	memset (max_sectors[major], 0, (1 << MINORBITS) * sizeof (int));
-
 	/* finally do the gendisk stuff */
 	major_info->gendisk.part = kmalloc ((1 << MINORBITS) *
 					    sizeof (struct hd_struct),
@@ -755,10 +748,6 @@ dasd_register_major (major_info_t * major_info)
 
         /* error handling - free the prior allocated memory */  
       out_gendisk:
-	kfree (max_sectors[major]);
-	max_sectors[major] = NULL;
-
-      out_max_sectors:
 	kfree (hardsect_size[major]);
 	hardsect_size[major] = NULL;
 
@@ -825,12 +814,8 @@ dasd_unregister_major (major_info_t * major_info)
 	kfree (blk_size[major]);
 	kfree (blksize_size[major]);
 	kfree (hardsect_size[major]);
-	kfree (max_sectors[major]);
 
-	blk_size[major]      = NULL;
-	blksize_size[major]  = NULL;
-	hardsect_size[major] = NULL;
-	max_sectors[major]   = NULL;
+	blk_clear(major);
 
 	rc = devfs_unregister_blkdev (major, DASD_NAME);
 	if (rc < 0) {
@@ -1704,10 +1689,6 @@ dasd_process_queues (dasd_device_t * device)
                                 dasd_end_request (req, 0);
                                 dasd_dequeue_request (queue,req);
                         } else {
-                            /* relocate request according to partition table */
-                            req->sector +=
-                                device->major_info->gendisk.
-                                part[MINOR (req->rq_dev)].start_sect;
                             cqr = device->discipline->build_cp_from_req (device, req);
                             if (cqr == NULL) {
 
@@ -1716,10 +1697,7 @@ dasd_process_queues (dasd_device_t * device)
                                                              "on request %p\n",
                                                              device->devinfo.devno,
                                                              req);
-                                    /* revert relocation of request */
-                                    req->sector -=
-                                        device->major_info->gendisk.
-                                        part[MINOR (req->rq_dev)].start_sect;
+
                                     break;	/* terminate request queue loop */
                                     
                             }
@@ -1769,10 +1747,10 @@ static void
 dasd_run_bh (dasd_device_t * device)
 {
 	long flags;
-	spin_lock_irqsave (&io_request_lock, flags);
+	spin_lock_irqsave (&device->request_queue.queue_lock, flags);
 	atomic_set (&device->bh_scheduled, 0);
 	dasd_process_queues (device);
-	spin_unlock_irqrestore (&io_request_lock, flags);
+	spin_unlock_irqrestore (&device->request_queue.queue_lock, flags);
 }
 
 /*
@@ -2468,14 +2446,12 @@ do_dasd_ioctl (struct inode *inp, /* unsigned */ int no, unsigned long data)
 			dasd_info.chanq_len = 0;
 			if (device->request_queue->request_fn) {
 				struct list_head *l;
+				request_queue_t *q = drive->request_queue;
 				ccw_req_t *cqr = device->queue.head;
-				spin_lock_irqsave (&io_request_lock, flags);
-				list_for_each (l,
-					       &device->request_queue->
-					       queue_head) {
+				spin_lock_irqsave (&q->queue_lock, flags);
+				list_for_each (l, q->queue_head, queue_head)
 					dasd_info.req_queue_len++;
-				}
-				spin_unlock_irqrestore (&io_request_lock,
+				spin_unlock_irqrestore (&q->queue_lock,
 							flags);
 				s390irq_spin_lock_irqsave (device->devinfo.irq,
 							   flags);
@@ -2668,7 +2644,7 @@ block_device_operations dasd_device_operations =
 
 /* SECTION: Management of device list */
 int
-dasd_fillgeo(int kdev,struct hd_geometry *geo)
+dasd_fillgeo(kdev_t kdev,struct hd_geometry *geo)
 {
 	dasd_device_t *device = dasd_device_from_kdev (kdev);
 
@@ -2679,8 +2655,7 @@ dasd_fillgeo(int kdev,struct hd_geometry *geo)
 		return -EINVAL;
 
 	device->discipline->fill_geometry (device, geo);
-	geo->start = device->major_info->gendisk.part[MINOR(kdev)].start_sect 
-		     >> device->sizes.s2b_shift;;
+	geo->start = get_start_sect(kdev);
         return 0;
 } 
 
@@ -3365,6 +3340,12 @@ dasd_setup_blkdev (dasd_device_t *device )
         int major = MAJOR(device->kdev);
         int minor = MINOR(device->kdev);
 
+        device->request_queue = kmalloc(sizeof(request_queue_t),GFP_KERNEL);
+        device->request_queue->queuedata = device;
+        blk_init_queue (device->request_queue, do_dasd_request);
+        blk_queue_headactive (device->request_queue, 0);
+        elevator_init (&(device->request_queue->elevator),ELEVATOR_NOOP);
+
         for (i = 0; i < (1 << DASD_PARTN_BITS); i++) {
                 if (i == 0)
                         device->major_info->gendisk.sizes[minor] =
@@ -3374,17 +3355,11 @@ dasd_setup_blkdev (dasd_device_t *device )
                         device->major_info->gendisk.sizes[minor + i] = 0;
                 hardsect_size[major][minor + i] = device->sizes.bp_block;
                 blksize_size[major][minor + i] = device->sizes.bp_block;
-                max_sectors[major][minor + i] =
-                        device->discipline->max_blocks << 
-                        device->sizes.s2b_shift;
+		blk_queue_max_sectors(device->request_queue,
+		 device->discipline->max_blocks << device->sizes.s2b_shift);
 		device->major_info->gendisk.part[minor+i].start_sect = 0;
 		device->major_info->gendisk.part[minor+i].nr_sects = 0;
         }
-        device->request_queue = kmalloc(sizeof(request_queue_t),GFP_KERNEL);
-        device->request_queue->queuedata = device;
-        blk_init_queue (device->request_queue, do_dasd_request);
-        blk_queue_headactive (device->request_queue, 0);
-        elevator_init (&(device->request_queue->elevator),ELEVATOR_NOOP);
         return rc;
 }
 
@@ -3411,7 +3386,6 @@ dasd_disable_blkdev (dasd_device_t *device )
                 device->major_info->gendisk.sizes[minor + i] = 0;
                 hardsect_size[major][minor + i] = 0;
                 blksize_size[major][minor + i] = 0;
-                max_sectors[major][minor + i] = 0;
         }
         if (device->request_queue) {
             blk_cleanup_queue (device->request_queue);

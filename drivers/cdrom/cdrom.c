@@ -1987,7 +1987,7 @@ static int mmc_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 			return -EINVAL;
 
 		/* FIXME: we need upper bound checking, too!! */
-		if (lba < 0 || ra.nframes <= 0)
+		if (lba < 0 || ra.nframes <= 0 || ra.nframes > 64)
 			return -EINVAL;
 
 		/*

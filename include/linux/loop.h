@@ -49,8 +49,8 @@ struct loop_device {
 	int		old_gfp_mask;
 
 	spinlock_t		lo_lock;
-	struct buffer_head	*lo_bh;
-	struct buffer_head	*lo_bhtail;
+	struct bio 		*lo_bio;
+	struct bio		*lo_biotail;
 	int			lo_state;
 	struct semaphore	lo_sem;
 	struct semaphore	lo_ctl_mutex;

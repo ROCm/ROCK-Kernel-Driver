@@ -28,7 +28,7 @@
 #define KIO_STATIC_PAGES	(KIO_MAX_ATOMIC_IO / (PAGE_SIZE >> 10) + 1)
 #define KIO_MAX_SECTORS		(KIO_MAX_ATOMIC_IO * 2)
 
-/* The main kiobuf struct used for all our IO! */
+/* The main kiobuf struct */
 
 struct kiobuf 
 {
@@ -48,8 +48,7 @@ struct kiobuf
 	
 	/* Always embed enough struct pages for atomic IO */
 	struct page *	map_array[KIO_STATIC_PAGES];
-	struct buffer_head * bh[KIO_MAX_SECTORS];
-	unsigned long blocks[KIO_MAX_SECTORS];
+	sector_t	blocks[KIO_MAX_SECTORS];
 
 	/* Dynamic state for IO completion: */
 	atomic_t	io_count;	/* IOs still in progress */
@@ -69,7 +68,7 @@ void	mark_dirty_kiobuf(struct kiobuf *iobuf, int bytes);
 
 /* fs/iobuf.c */
 
-void	end_kio_request(struct kiobuf *, int);
+int	end_kio_request(struct kiobuf *, int);
 void	simple_wakeup_kiobuf(struct kiobuf *);
 int	alloc_kiovec(int nr, struct kiobuf **);
 void	free_kiovec(int nr, struct kiobuf **);
@@ -81,6 +80,9 @@ extern void free_kiobuf_bhs(struct kiobuf *);
 /* fs/buffer.c */
 
 int	brw_kiovec(int rw, int nr, struct kiobuf *iovec[], 
-		   kdev_t dev, unsigned long b[], int size);
+		   kdev_t dev, sector_t [], int size);
+
+/* fs/bio.c */
+void	ll_rw_kio(int rw, struct kiobuf *kio, kdev_t dev, sector_t block);
 
 #endif /* __LINUX_IOBUF_H */

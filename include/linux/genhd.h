@@ -86,11 +86,11 @@ struct gendisk {
 };
 
 /* drivers/block/genhd.c */
-extern struct gendisk *gendisk_head;
-
 extern void add_gendisk(struct gendisk *gp);
 extern void del_gendisk(struct gendisk *gp);
 extern struct gendisk *get_gendisk(kdev_t dev);
+extern unsigned long get_start_sect(kdev_t dev);
+extern unsigned long get_nr_sects(kdev_t dev);
 
 #endif  /*  __KERNEL__  */
 
@@ -244,35 +244,10 @@ char *disk_name (struct gendisk *hd, int minor, char *buf);
 extern void devfs_register_partitions (struct gendisk *dev, int minor,
 				       int unregister);
 
-
-
-/*
- * FIXME: this should use genhd->minor_shift, but that is slow to look up.
- */
 static inline unsigned int disk_index (kdev_t dev)
 {
-	int major = MAJOR(dev);
-	int minor = MINOR(dev);
-	unsigned int index;
-
-	switch (major) {
-		case DAC960_MAJOR+0:
-			index = (minor & 0x00f8) >> 3;
-			break;
-		case SCSI_DISK0_MAJOR:
-			index = (minor & 0x00f0) >> 4;
-			break;
-		case IDE0_MAJOR:	/* same as HD_MAJOR */
-		case XT_DISK_MAJOR:
-			index = (minor & 0x0040) >> 6;
-			break;
-		case IDE1_MAJOR:
-			index = ((minor & 0x0040) >> 6) + 2;
-			break;
-		default:
-			return 0;
-	}
-	return index;
+	struct gendisk *g = get_gendisk(dev);
+	return g ? (MINOR(dev) >> g->minor_shift) : 0;
 }
 
 #endif

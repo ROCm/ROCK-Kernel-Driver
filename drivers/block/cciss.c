@@ -84,7 +84,7 @@ static struct board_type products[] = {
 #define MAX_CONFIG_WAIT 1000 
 
 #define READ_AHEAD 	 128
-#define NR_CMDS		 128 /* #commands that can be outstanding */
+#define NR_CMDS		 384 /* #commands that can be outstanding */
 #define MAX_CTLR 8
 
 #define CCISS_DMA_MASK	0xFFFFFFFF	/* 32 bit DMA */
@@ -147,7 +147,6 @@ static int cciss_proc_get_info(char *buffer, char **start, off_t offset,
                 "       IRQ: %d\n"
                 "       Logical drives: %d\n"
                 "       Current Q depth: %d\n"
-		"       Current # commands on controller %d\n"
                 "       Max Q depth since init: %d\n"
 		"       Max # commands on controller since init: %d\n"
 		"       Max SG entries since init: %d\n\n",
@@ -158,8 +157,7 @@ static int cciss_proc_get_info(char *buffer, char **start, off_t offset,
                 (unsigned long)h->vaddr,
                 (unsigned int)h->intr,
                 h->num_luns, 
-                h->Qdepth, h->commands_outstanding,
-		h->maxQsinceinit, h->max_outstanding, h->maxSG);
+                h->Qdepth, h->maxQsinceinit, h->max_outstanding, h->maxSG);
 
         pos += size; len += size;
 	for(i=0; i<h->num_luns; i++) {
@@ -237,7 +235,7 @@ static CommandList_struct * cmd_alloc(ctlr_info_t *h, int get_from_pool)
                 	i = find_first_zero_bit(h->cmd_pool_bits, NR_CMDS);
                         if (i == NR_CMDS)
                                 return NULL;
-                } while(test_and_set_bit(i%32, h->cmd_pool_bits+(i/32)) != 0);
+                } while(test_and_set_bit(i & 31, h->cmd_pool_bits+(i/32)) != 0);
 #ifdef CCISS_DEBUG
 		printk(KERN_DEBUG "cciss: using command buffer %d\n", i);
 #endif
@@ -308,13 +306,10 @@ static void cciss_geninit( int ctlr)
 
 		/* for each partition */ 
 		for(j=0; j<MAX_PART; j++)
-		{
 			hba[ctlr]->blocksizes[(i<<NWD_SHIFT) + j] = 1024; 
 
-			hba[ctlr]->hardsizes[ (i<<NWD_SHIFT) + j] = 
-				drv->block_size;
-		}
 		hba[ctlr]->gendisk.nr_real++;
+		(BLK_DEFAULT_QUEUE(MAJOR_NR + ctlr))->hardsect_size = drv->block_size;
 	}
 }
 /*
@@ -377,8 +372,6 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 {
 	int ctlr = MAJOR(inode->i_rdev) - MAJOR_NR;
 	int dsk  = MINOR(inode->i_rdev) >> NWD_SHIFT;
-	int diskinfo[4];
-	struct hd_geometry *geo = (struct hd_geometry *)arg;
 
 #ifdef CCISS_DEBUG
 	printk(KERN_DEBUG "cciss_ioctl: Called with cmd=%x %lx\n", cmd, arg);
@@ -386,6 +379,10 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 	
 	switch(cmd) {
 	case HDIO_GETGEO:
+	{
+		struct hd_geometry *geo = (struct hd_geometry *)arg;
+		int diskinfo[4];
+
 		if (hba[ctlr]->drv[dsk].cylinders) {
 			diskinfo[0] = hba[ctlr]->drv[dsk].heads;
 			diskinfo[1] = hba[ctlr]->drv[dsk].sectors;
@@ -393,20 +390,18 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		} else {
 			diskinfo[0] = 0xff;
 			diskinfo[1] = 0x3f;
-			diskinfo[2] = hba[ctlr]->drv[dsk].nr_blocks / (0xff*0x3f);		}
+			diskinfo[2] = hba[ctlr]->drv[dsk].nr_blocks / (0xff*0x3f);
+		}
 		put_user(diskinfo[0], &geo->heads);
 		put_user(diskinfo[1], &geo->sectors);
 		put_user(diskinfo[2], &geo->cylinders);
-		put_user(hba[ctlr]->hd[MINOR(inode->i_rdev)].start_sect, &geo->start);
+		put_user(get_start_sect(inode->i_rdev), &geo->start);
 		return 0;
-	case BLKGETSIZE:
-		put_user(hba[ctlr]->hd[MINOR(inode->i_rdev)].nr_sects, (unsigned long *)arg);
-		return 0;
-	case BLKGETSIZE64:
-		put_user((u64)hba[ctlr]->hd[MINOR(inode->i_rdev)].nr_sects << 9, (u64*)arg);
-		return 0;
+	}
 	case BLKRRPART:
 		return revalidate_logvol(inode->i_rdev, 1);
+	case BLKGETSIZE:
+	case BLKGETSIZE64:
 	case BLKFLSBUF:
 	case BLKBSZSET:
 	case BLKBSZGET:
@@ -415,9 +410,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 	case BLKRASET:
 	case BLKRAGET:
 	case BLKPG:
-	case BLKELVGET:
-	case BLKELVSET:
-		return( blk_ioctl(inode->i_rdev, cmd, arg));
+		return blk_ioctl(inode->i_rdev, cmd, arg);
 	case CCISS_GETPCIINFO:
 	{
 		cciss_pci_info_struct pciinfo;
@@ -459,16 +452,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 //			printk("cciss_ioctl: delay and count cannot be 0\n");
 			return( -EINVAL);
 		}
-		spin_lock_irqsave(&io_request_lock, flags);
-		/* Can only safely update if no commands outstanding */ 
-		if (c->commands_outstanding > 0 )
-		{
-//			printk("cciss_ioctl: cannot change coalasing "
-//				"%d commands outstanding on controller\n", 
-//					c->commands_outstanding);
-			spin_unlock_irqrestore(&io_request_lock, flags);
-			return(-EINVAL);
-		}
+		spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
 		/* Update the field, and then ring the doorbell */ 
 		writel( intinfo.delay, 
 			&(c->cfgtable->HostWrite.CoalIntDelay));
@@ -484,7 +468,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 			/* delay and try again */
 			udelay(1000);
 		}	
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 		if (i >= MAX_CONFIG_WAIT)
 			return( -EFAULT);
                 return(0);
@@ -515,7 +499,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 		if (copy_from_user(NodeName, (void *) arg, sizeof( NodeName_type)))
 			return -EFAULT;
 
-		spin_lock_irqsave(&io_request_lock, flags);
+		spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
 
 			/* Update the field, and then ring the doorbell */ 
 		for(i=0;i<16;i++)
@@ -531,7 +515,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 			/* delay and try again */
 			udelay(1000);
 		}	
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 		if (i >= MAX_CONFIG_WAIT)
 			return( -EFAULT);
                 return(0);
@@ -658,11 +642,11 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 			c->SG[0].Ext = 0;  // we are not chaining
 		}
 		/* Put the request on the tail of the request queue */
-		spin_lock_irqsave(&io_request_lock, flags);
+		spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
 		addQ(&h->reqQ, c);
 		h->Qdepth++;
 		start_io(h);
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 
 		/* Wait for completion */
 		while(c->cmd_type != CMD_IOCTL_DONE)
@@ -710,42 +694,32 @@ static int revalidate_logvol(kdev_t dev, int maxusage)
         int ctlr, target;
         struct gendisk *gdev;
         unsigned long flags;
-        int max_p;
-        int start;
-        int i;
+        int res;
 
         target = MINOR(dev) >> NWD_SHIFT;
         ctlr = MAJOR(dev) - MAJOR_NR;
         gdev = &(hba[ctlr]->gendisk);
 
-        spin_lock_irqsave(&io_request_lock, flags);
+        spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
         if (hba[ctlr]->drv[target].usage_count > maxusage) {
-                spin_unlock_irqrestore(&io_request_lock, flags);
+                spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
                 printk(KERN_WARNING "cciss: Device busy for "
                         "revalidation (usage=%d)\n",
                         hba[ctlr]->drv[target].usage_count);
                 return -EBUSY;
         }
         hba[ctlr]->drv[target].usage_count++;
-        spin_unlock_irqrestore(&io_request_lock, flags);
+        spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 
-        max_p = gdev->max_p;
-        start = target << gdev->minor_shift;
+	res = wipe_partitions(dev);
+	if (res)
+		goto leave;
 
-        for(i=max_p-1; i>=0; i--) {
-                int minor = start+i;
-                invalidate_device(MKDEV(MAJOR_NR + ctlr, minor), 1);
-                gdev->part[minor].start_sect = 0;
-                gdev->part[minor].nr_sects = 0;
-
-                /* reset the blocksize so we can read the partition table */
-                blksize_size[MAJOR_NR+ctlr][minor] = 1024;
-        }
 	/* setup partitions per disk */
-	grok_partitions(gdev, target, MAX_PART, 
-			hba[ctlr]->drv[target].nr_blocks);
+	grok_partitions(dev, hba[ctlr]->drv[target].nr_blocks);
+leave:
         hba[ctlr]->drv[target].usage_count--;
-        return 0;
+        return res;
 }
 
 static int frevalidate_logvol(kdev_t dev)
@@ -776,15 +750,15 @@ static int revalidate_allvol(kdev_t dev)
         if (MINOR(dev) != 0)
                 return -ENXIO;
 
-        spin_lock_irqsave(&io_request_lock, flags);
+        spin_lock_irqsave(CCISS_LOCK(ctlr), flags);
         if (hba[ctlr]->usage_count > 1) {
-                spin_unlock_irqrestore(&io_request_lock, flags);
+                spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
                 printk(KERN_WARNING "cciss: Device busy for volume"
                         " revalidation (usage=%d)\n", hba[ctlr]->usage_count);
                 return -EBUSY;
         }
-        spin_unlock_irqrestore(&io_request_lock, flags);
         hba[ctlr]->usage_count++;
+	spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
 
         /*
          * Set the partition and block size structures for all volumes
@@ -793,7 +767,6 @@ static int revalidate_allvol(kdev_t dev)
 	memset(hba[ctlr]->hd,         0, sizeof(struct hd_struct) * 256);
         memset(hba[ctlr]->sizes,      0, sizeof(int) * 256);
         memset(hba[ctlr]->blocksizes, 0, sizeof(int) * 256);
-        memset(hba[ctlr]->hardsizes,  0, sizeof(int) * 256);
         memset(hba[ctlr]->drv,        0, sizeof(drive_info_struct)
 						* CISS_MAX_LUN);
         hba[ctlr]->gendisk.nr_real = 0;
@@ -1089,11 +1062,11 @@ static void start_io( ctlr_info_t *h)
 	while(( c = h->reqQ) != NULL )
 	{
 		/* can't do anything if fifo is full */
-		if ((h->access.fifo_full(h)))
-		{
-			printk(KERN_WARNING "cciss: fifo full \n");
-			return;
+		if ((h->access.fifo_full(h))) {
+			printk(KERN_WARNING "cciss: fifo full\n");
+			break;
 		}
+
 		/* Get the frist entry from the Request Q */ 
 		removeQ(&(h->reqQ), c);
 		h->Qdepth--;
@@ -1106,18 +1079,18 @@ static void start_io( ctlr_info_t *h)
 	}
 }
 
-static inline void complete_buffers( struct buffer_head *bh, int status)
+static inline void complete_buffers(struct bio *bio, int status)
 {
-	struct buffer_head *xbh;
-	
-	while(bh)
-	{
-		xbh = bh->b_reqnext; 
-		bh->b_reqnext = NULL; 
-		blk_finished_io(bh->b_size >> 9);
-		bh->b_end_io(bh, status);
-		bh = xbh;
+	while (bio) {
+		int nsecs = bio_sectors(bio);
+
+		struct bio *xbh = bio->bi_next; 
+		bio->bi_next = NULL; 
+		blk_finished_io(nsecs);
+		bio_endio(bio, status, nsecs);
+		bio = xbh;
 	}
+
 } 
 /* checks the status of the job and calls complete buffers to mark all 
  * buffers for the completed job. 
@@ -1135,7 +1108,7 @@ static inline void complete_command( CommandList_struct *cmd, int timeout)
 	{
 		temp64.val32.lower = cmd->SG[i].Addr.lower;
 		temp64.val32.upper = cmd->SG[i].Addr.upper;
-		pci_unmap_single(hba[cmd->ctlr]->pdev,
+		pci_unmap_page(hba[cmd->ctlr]->pdev,
 			temp64.val, cmd->SG[i].Len, 
 			(cmd->Request.Type.Direction == XFER_READ) ? 
 				PCI_DMA_FROMDEVICE : PCI_DMA_TODEVICE);
@@ -1214,83 +1187,38 @@ static inline void complete_command( CommandList_struct *cmd, int timeout)
 				status=0;
 		}
 	}
-	complete_buffers(cmd->rq->bh, status);
+
+	complete_buffers(cmd->rq->bio, status);
 
 #ifdef CCISS_DEBUG
 	printk("Done with %p\n", cmd->rq);
 #endif /* CCISS_DEBUG */ 
+
 	end_that_request_last(cmd->rq);
-}
-
-
-static inline int cpq_new_segment(request_queue_t *q, struct request *rq,
-                                  int max_segments)
-{
-        if (rq->nr_segments < MAXSGENTRIES) {
-                rq->nr_segments++;
-                return 1;
-        }
-        return 0;
-}
-
-static int cpq_back_merge_fn(request_queue_t *q, struct request *rq,
-                             struct buffer_head *bh, int max_segments)
-{
-        if (rq->bhtail->b_data + rq->bhtail->b_size == bh->b_data)
-                return 1;
-        return cpq_new_segment(q, rq, max_segments);
-}
-
-static int cpq_front_merge_fn(request_queue_t *q, struct request *rq,
-                             struct buffer_head *bh, int max_segments)
-{
-        if (bh->b_data + bh->b_size == rq->bh->b_data)
-                return 1;
-        return cpq_new_segment(q, rq, max_segments);
-}
-
-static int cpq_merge_requests_fn(request_queue_t *q, struct request *rq,
-                                 struct request *nxt, int max_segments)
-{
-        int total_segments = rq->nr_segments + nxt->nr_segments;
-
-        if (rq->bhtail->b_data + rq->bhtail->b_size == nxt->bh->b_data)
-                total_segments--;
-
-        if (total_segments > MAXSGENTRIES)
-                return 0;
-
-        rq->nr_segments = total_segments;
-        return 1;
 }
 
 /* 
  * Get a request and submit it to the controller. 
- * Currently we do one request at a time.  Ideally we would like to send
- * everything to the controller on the first call, but there is a danger
- * of holding the io_request_lock for to long.  
  */
 static void do_cciss_request(request_queue_t *q)
 {
 	ctlr_info_t *h= q->queuedata; 
 	CommandList_struct *c;
 	int log_unit, start_blk, seg;
-	char *lastdataend;
-	struct buffer_head *bh;
 	struct list_head *queue_head = &q->queue_head;
 	struct request *creq;
 	u64bit temp64;
-	struct my_sg tmp_sg[MAXSGENTRIES];
-	int i;
+	struct scatterlist tmp_sg[MAXSGENTRIES];
+	int i, dir;
 
-	if (q->plugged)
+	if (blk_queue_plugged(q))
 		goto startio;
 
-queue_next:
+queue:
 	if (list_empty(queue_head))
 		goto startio;
 
-	creq =	blkdev_entry_next_request(queue_head); 
+	creq = elv_next_request(q);
 	if (creq->nr_segments > MAXSGENTRIES)
                 BUG();
 
@@ -1299,7 +1227,7 @@ queue_next:
                 printk(KERN_WARNING "doreq cmd for %d, %x at %p\n",
                                 h->ctlr, creq->rq_dev, creq);
                 blkdev_dequeue_request(creq);
-                complete_buffers(creq->bh, 0);
+                complete_buffers(creq->bio, 0);
 		end_that_request_last(creq);
 		goto startio;
         }
@@ -1309,10 +1237,9 @@ queue_next:
 
 	blkdev_dequeue_request(creq);
 
-	spin_unlock_irq(&io_request_lock);
+	spin_unlock_irq(&q->queue_lock);
 
-	c->cmd_type = CMD_RWREQ;      
-	bh = creq->bh;
+	c->cmd_type = CMD_RWREQ;
 	c->rq = creq;
 	
 	/* fill in the request */ 
@@ -1328,41 +1255,26 @@ queue_next:
 		(creq->cmd == READ) ? XFER_READ: XFER_WRITE; 
 	c->Request.Timeout = 0; // Don't time out	
 	c->Request.CDB[0] = (creq->cmd == READ) ? CCISS_READ : CCISS_WRITE;
-	start_blk = hba[h->ctlr]->hd[MINOR(creq->rq_dev)].start_sect + creq->sector;
+	start_blk = creq->sector;
 #ifdef CCISS_DEBUG
-	if (bh == NULL)
-		panic("cciss: bh== NULL?");
 	printk(KERN_DEBUG "ciss: sector =%d nr_sectors=%d\n",(int) creq->sector,
 		(int) creq->nr_sectors);	
 #endif /* CCISS_DEBUG */
-	seg = 0; 
-	lastdataend = NULL;
-	while(bh)
-	{
-		if (bh->b_data == lastdataend)
-		{  // tack it on to the last segment 
-			tmp_sg[seg-1].len +=bh->b_size;
-			lastdataend += bh->b_size;
-		} else
-		{
-			if (seg == MAXSGENTRIES)
-				BUG();
-			tmp_sg[seg].len = bh->b_size;
-			tmp_sg[seg].start_addr = bh->b_data;
-			lastdataend = bh->b_data + bh->b_size;
-			seg++;
-		}
-		bh = bh->b_reqnext;
-	}
+
+	seg = blk_rq_map_sg(q, creq, tmp_sg);
+
 	/* get the DMA records for the setup */ 
+	if (c->Request.Type.Direction == XFER_READ)
+		dir = PCI_DMA_FROMDEVICE;
+	else
+		dir = PCI_DMA_TODEVICE;
+
 	for (i=0; i<seg; i++)
 	{
-		c->SG[i].Len = tmp_sg[i].len;
-		temp64.val = (__u64) pci_map_single( h->pdev,
-			tmp_sg[i].start_addr,
-			tmp_sg[i].len,
-			(c->Request.Type.Direction == XFER_READ) ? 
-                                PCI_DMA_FROMDEVICE : PCI_DMA_TODEVICE);
+		c->SG[i].Len = tmp_sg[i].length;
+		temp64.val = (__u64) pci_map_page(h->pdev, tmp_sg[i].page,
+			 		  tmp_sg[i].offset, tmp_sg[i].length,
+					  dir);
 		c->SG[i].Addr.lower = temp64.val32.lower;
                 c->SG[i].Addr.upper = temp64.val32.upper;
                 c->SG[i].Ext = 0;  // we are not chaining
@@ -1386,14 +1298,14 @@ queue_next:
 	c->Request.CDB[8]= creq->nr_sectors & 0xff; 
 	c->Request.CDB[9] = c->Request.CDB[11] = c->Request.CDB[12] = 0;
 
-	spin_lock_irq(&io_request_lock);
+	spin_lock_irq(&q->queue_lock);
 
 	addQ(&(h->reqQ),c);
 	h->Qdepth++;
 	if(h->Qdepth > h->maxQsinceinit)
 		h->maxQsinceinit = h->Qdepth; 
 
-	goto queue_next;
+	goto queue;
 startio:
 	start_io(h);
 }
@@ -1414,7 +1326,7 @@ static void do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
 	 * If there are completed commands in the completion queue,
 	 * we had better do something about it.
 	 */
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(CCISS_LOCK(h->ctlr), flags);
 	while( h->access.intr_pending(h))
 	{
 		while((a = h->access.command_completed(h)) != FIFO_EMPTY) 
@@ -1447,11 +1359,12 @@ static void do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
 			}
 		}
 	}
+
 	/*
 	 * See if we can queue up some more IO
 	 */
 	do_cciss_request(BLK_DEFAULT_QUEUE(MAJOR_NR + h->ctlr));
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(CCISS_LOCK(h->ctlr), flags);
 }
 /* 
  *  We cannot read the structure directly, for portablity we must use 
@@ -1873,7 +1786,18 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 	sprintf(hba[i]->devname, "cciss%d", i);
 	hba[i]->ctlr = i;
 	hba[i]->pdev = pdev;
-			
+
+	/* configure PCI DMA stuff */
+	if (!pci_set_dma_mask(pdev, (u64) 0xffffffffffffffff))
+		printk("cciss: using DAC cycles\n");
+	else if (!pci_set_dma_mask(pdev, 0xffffffff))
+		printk("cciss: not using DAC cycles\n");
+	else {
+		printk("cciss: no suitable DMA available\n");
+		free_hba(i);
+		return -ENODEV;
+	}
+
 	if( register_blkdev(MAJOR_NR+i, hba[i]->devname, &cciss_fops))
 	{
 		printk(KERN_ERR "cciss:  Unable to get major number "
@@ -1942,19 +1866,15 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 
 	q = BLK_DEFAULT_QUEUE(MAJOR_NR + i);
         q->queuedata = hba[i];
-        blk_init_queue(q, do_cciss_request);
+        blk_init_queue(q, do_cciss_request, hba[i]->devname);
         blk_queue_headactive(q, 0);		
+	blk_queue_bounce_limit(q, hba[i]->pdev->dma_mask);
+	q->max_segments = MAXSGENTRIES;
+	blk_queue_max_sectors(q, 512);
 
 	/* fill in the other Kernel structs */
 	blksize_size[MAJOR_NR+i] = hba[i]->blocksizes;
-        hardsect_size[MAJOR_NR+i] = hba[i]->hardsizes;
         read_ahead[MAJOR_NR+i] = READ_AHEAD;
-
-	/* Set the pointers to queue functions */ 
-	q->back_merge_fn = cpq_back_merge_fn;
-        q->front_merge_fn = cpq_front_merge_fn;
-        q->merge_requests_fn = cpq_merge_requests_fn;
-
 
 	/* Fill in the gendisk data */ 	
 	hba[i]->gendisk.major = MAJOR_NR + i;
@@ -2004,12 +1924,11 @@ static void __devexit cciss_remove_one (struct pci_dev *pdev)
 	unregister_blkdev(MAJOR_NR+i, hba[i]->devname);
 	remove_proc_entry(hba[i]->devname, proc_cciss);	
 	
-
 	/* remove it from the disk list */
 	del_gendisk(&(hba[i]->gendisk));
 
-	pci_free_consistent(hba[i]->pdev, NR_CMDS * sizeof(CommandList_struct), 
-		hba[i]->cmd_pool, hba[i]->cmd_pool_dhandle);
+	pci_free_consistent(hba[i]->pdev, NR_CMDS * sizeof(CommandList_struct),
+			    hba[i]->cmd_pool, hba[i]->cmd_pool_dhandle);
 	pci_free_consistent(hba[i]->pdev, NR_CMDS * sizeof( ErrorInfo_struct),
 		hba[i]->errinfo_pool, hba[i]->errinfo_pool_dhandle);
 	kfree(hba[i]->cmd_pool_bits);
@@ -2017,32 +1936,31 @@ static void __devexit cciss_remove_one (struct pci_dev *pdev)
 }	
 
 static struct pci_driver cciss_pci_driver = {
-	 name:   "cciss",
-	probe:  cciss_init_one,
-	remove:  cciss_remove_one,
-	id_table:  cciss_pci_device_id, /* id_table */
+	name:		"cciss",
+	probe:		cciss_init_one,
+	remove:		cciss_remove_one,
+	id_table:	cciss_pci_device_id, /* id_table */
 };
 
 /*
-*  This is it.  Register the PCI driver information for the cards we control
-*  the OS will call our registered routines when it finds one of our cards. 
-*/
+ *  This is it.  Register the PCI driver information for the cards we control
+ *  the OS will call our registered routines when it finds one of our cards. 
+ */
 int __init cciss_init(void)
 {
-
 	printk(KERN_INFO DRIVER_NAME "\n");
+
 	/* Register for out PCI devices */
 	if (pci_register_driver(&cciss_pci_driver) > 0 )
 		return 0;
 	else 
 		return -ENODEV;
 
- }
+}
 
 EXPORT_NO_SYMBOLS;
 static int __init init_cciss_module(void)
 {
-
 	return ( cciss_init());
 }
 

@@ -593,6 +593,7 @@ void __init ide_init_svwks (ide_hwif_t *hwif)
 		if (!noautodma)
 			hwif->autodma = 1;
 		hwif->dmaproc = &svwks_dmaproc;
+		hwif->highmem = 1;
 	} else {
 		hwif->autodma = 0;
 		hwif->drives[0].autotune = 1;

@@ -1660,8 +1660,8 @@ S:	Maintained
 W:	http://misc.nu/hugh/keyspan/
 
 USB SUBSYSTEM
-P:	Johannes Erdfelt
-M:	johannes@erdfelt.com
+P:	Greg Kroah-Hartman
+M:	greg@kroah.com
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 W:	http://www.linux-usb.org

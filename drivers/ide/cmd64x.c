@@ -795,5 +795,7 @@ void __init ide_init_cmd64x (ide_hwif_t *hwif)
 		default:
 			break;
 	}
+
+	hwif->highmem = 1;
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 }

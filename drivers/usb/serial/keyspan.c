@@ -176,7 +176,7 @@ struct keyspan_port_private {
 
 
 /* Functions used by new usb-serial code. */
-int keyspan_init (void)
+static int __init keyspan_init (void)
 {
 	usb_serial_register (&keyspan_usa18x_pre_device);
 	usb_serial_register (&keyspan_usa19_pre_device);
@@ -201,7 +201,7 @@ int keyspan_init (void)
 	return 0;
 }
 
-void keyspan_exit (void)
+static void __exit keyspan_exit (void)
 {
 	usb_serial_deregister (&keyspan_usa18x_pre_device);
 	usb_serial_deregister (&keyspan_usa19_pre_device);
@@ -1089,7 +1089,7 @@ static urb_t *keyspan_setup_urb(struct usb_serial *serial, int endpoint,
 	return urb;
 }
 
-struct callbacks {
+static struct callbacks {
 	void	(*instat_callback)(urb_t *);
 	void	(*glocont_callback)(urb_t *);
 	void	(*indat_callback)(urb_t *);

@@ -80,7 +80,7 @@ static unsigned int ultra_portlist[] __initdata =
 int ultra_probe(struct net_device *dev);
 static int ultra_probe1(struct net_device *dev, int ioaddr);
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 static int ultra_probe_isapnp(struct net_device *dev);
 #endif
 
@@ -100,7 +100,7 @@ static void ultra_pio_output(struct net_device *dev, int count,
 							 const unsigned char *buf, const int start_page);
 static int ultra_close_card(struct net_device *dev);
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 static struct isapnp_device_id ultra_device_ids[] __initdata = {
         {       ISAPNP_VENDOR('S','M','C'), ISAPNP_FUNCTION(0x8416),
                 ISAPNP_VENDOR('S','M','C'), ISAPNP_FUNCTION(0x8416),
@@ -140,7 +140,7 @@ int __init ultra_probe(struct net_device *dev)
 	else if (base_addr != 0)	/* Don't probe at all. */
 		return -ENXIO;
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 	/* Look for any installed ISAPnP cards */
 	if (isapnp_present() && (ultra_probe_isapnp(dev) == 0))
 		return 0;
@@ -279,7 +279,7 @@ out:
 	return retval;
 }
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 static int __init ultra_probe_isapnp(struct net_device *dev)
 {
         int i;
@@ -544,7 +544,7 @@ cleanup_module(void)
 			/* NB: ultra_close_card() does free_irq */
 			int ioaddr = dev->base_addr - ULTRA_NIC_OFFSET;
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 			struct pci_dev *idev = (struct pci_dev *)ei_status.priv;
 			if (idev)
 				idev->deactivate(idev);

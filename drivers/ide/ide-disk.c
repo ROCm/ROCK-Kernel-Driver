@@ -27,6 +27,7 @@
  * Version 1.09		added increment of rq->sector in ide_multwrite
  *			added UDMA 3/4 reporting
  * Version 1.10		request queue changes, Ultra DMA 100
+ * Version 1.11		Highmem I/O support, Jens Axboe <axboe@suse.de>
  */
 
 #define IDEDISK_VERSION	"1.10"
@@ -139,7 +140,9 @@ static ide_startstop_t read_intr (ide_drive_t *drive)
 	byte stat;
 	int i;
 	unsigned int msect, nsect;
+	unsigned long flags;
 	struct request *rq;
+	char *to;
 
 	/* new way for dealing with premature shared PCI interrupts */
 	if (!OK_STAT(stat=GET_STAT(),DATA_READY,BAD_R_STAT)) {
@@ -150,8 +153,8 @@ static ide_startstop_t read_intr (ide_drive_t *drive)
 		ide_set_handler(drive, &read_intr, WAIT_CMD, NULL);
 		return ide_started;
 	}
+
 	msect = drive->mult_count;
-	
 read_next:
 	rq = HWGROUP(drive)->rq;
 	if (msect) {
@@ -160,14 +163,15 @@ read_next:
 		msect -= nsect;
 	} else
 		nsect = 1;
-	idedisk_input_data(drive, rq->buffer, nsect * SECTOR_WORDS);
+	to = ide_map_buffer(rq, &flags);
+	idedisk_input_data(drive, to, nsect * SECTOR_WORDS);
 #ifdef DEBUG
 	printk("%s:  read: sectors(%ld-%ld), buffer=0x%08lx, remaining=%ld\n",
 		drive->name, rq->sector, rq->sector+nsect-1,
 		(unsigned long) rq->buffer+(nsect<<9), rq->nr_sectors-nsect);
 #endif
+	ide_unmap_buffer(to, &flags);
 	rq->sector += nsect;
-	rq->buffer += nsect<<9;
 	rq->errors = 0;
 	i = (rq->nr_sectors -= nsect);
 	if (((long)(rq->current_nr_sectors -= nsect)) <= 0)
@@ -201,14 +205,16 @@ static ide_startstop_t write_intr (ide_drive_t *drive)
 #endif
 		if ((rq->nr_sectors == 1) ^ ((stat & DRQ_STAT) != 0)) {
 			rq->sector++;
-			rq->buffer += 512;
 			rq->errors = 0;
 			i = --rq->nr_sectors;
 			--rq->current_nr_sectors;
 			if (((long)rq->current_nr_sectors) <= 0)
 				ide_end_request(1, hwgroup);
 			if (i > 0) {
-				idedisk_output_data (drive, rq->buffer, SECTOR_WORDS);
+				unsigned long flags;
+				char *to = ide_map_buffer(rq, &flags);
+				idedisk_output_data (drive, to, SECTOR_WORDS);
+				ide_unmap_buffer(to, &flags);
 				ide_set_handler (drive, &write_intr, WAIT_CMD, NULL);
                                 return ide_started;
 			}
@@ -238,28 +244,28 @@ int ide_multwrite (ide_drive_t *drive, unsigned int mcount)
   	do {
   		char *buffer;
   		int nsect = rq->current_nr_sectors;
- 
+		unsigned long flags;
+
 		if (nsect > mcount)
 			nsect = mcount;
 		mcount -= nsect;
-		buffer = rq->buffer;
 
+		buffer = ide_map_buffer(rq, &flags);
 		rq->sector += nsect;
-		rq->buffer += nsect << 9;
 		rq->nr_sectors -= nsect;
 		rq->current_nr_sectors -= nsect;
 
 		/* Do we move to the next bh after this? */
 		if (!rq->current_nr_sectors) {
-			struct buffer_head *bh = rq->bh->b_reqnext;
+			struct bio *bio = rq->bio->bi_next;
 
 			/* end early early we ran out of requests */
-			if (!bh) {
+			if (!bio) {
 				mcount = 0;
 			} else {
-				rq->bh = bh;
-				rq->current_nr_sectors = bh->b_size >> 9;
-				rq->buffer             = bh->b_data;
+				rq->bio = bio;
+				rq->current_nr_sectors = bio_sectors(bio);
+				rq->hard_cur_sectors = rq->current_nr_sectors;
 			}
 		}
 
@@ -268,6 +274,7 @@ int ide_multwrite (ide_drive_t *drive, unsigned int mcount)
 		 * re-entering us on the last transfer.
 		 */
 		idedisk_output_data(drive, buffer, nsect<<7);
+		ide_unmap_buffer(buffer, &flags);
 	} while (mcount);
 
         return 0;
@@ -279,7 +286,6 @@ int ide_multwrite (ide_drive_t *drive, unsigned int mcount)
 static ide_startstop_t multwrite_intr (ide_drive_t *drive)
 {
 	byte stat;
-	int i;
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
 	struct request *rq = &hwgroup->wrq;
 
@@ -302,10 +308,8 @@ static ide_startstop_t multwrite_intr (ide_drive_t *drive)
 			 */
 			if (!rq->nr_sectors) {	/* all done? */
 				rq = hwgroup->rq;
-				for (i = rq->nr_sectors; i > 0;){
-					i -= rq->current_nr_sectors;
-					ide_end_request(1, hwgroup);
-				}
+
+				__ide_end_request(hwgroup, 1, rq->nr_sectors);
 				return ide_stopped;
 			}
 		}
@@ -367,6 +371,8 @@ static ide_startstop_t recal_intr (ide_drive_t *drive)
  */
 static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long block)
 {
+	unsigned long flags;
+
 	if (IDE_CONTROL_REG)
 		OUT_BYTE(drive->ctl,IDE_CONTROL_REG);
 	OUT_BYTE(0x00, IDE_FEATURE_REG);
@@ -444,16 +450,17 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsig
 			hwgroup->wrq = *rq; /* scratchpad */
 			ide_set_handler (drive, &multwrite_intr, WAIT_CMD, NULL);
 			if (ide_multwrite(drive, drive->mult_count)) {
-				unsigned long flags;
-				spin_lock_irqsave(&io_request_lock, flags);
+				spin_lock_irqsave(&ide_lock, flags);
 				hwgroup->handler = NULL;
 				del_timer(&hwgroup->timer);
-				spin_unlock_irqrestore(&io_request_lock, flags);
+				spin_unlock_irqrestore(&ide_lock, flags);
 				return ide_stopped;
 			}
 		} else {
+			char *buffer = ide_map_buffer(rq, &flags);
 			ide_set_handler (drive, &write_intr, WAIT_CMD, NULL);
-			idedisk_output_data(drive, rq->buffer, SECTOR_WORDS);
+			idedisk_output_data(drive, buffer, SECTOR_WORDS);
+			ide_unmap_buffer(buffer, &flags);
 		}
 		return ide_started;
 	}
@@ -482,7 +489,8 @@ static void idedisk_release (struct inode *inode, struct file *filp, ide_drive_t
 {
 	if (drive->removable && !drive->usage) {
 		invalidate_bdev(inode->i_bdev, 0);
-		if (drive->doorlocking && ide_wait_cmd(drive, WIN_DOORUNLOCK, 0, 0, 0, NULL))
+		if (drive->doorlocking &&
+		    ide_wait_cmd(drive, WIN_DOORUNLOCK, 0, 0, 0, NULL))
 			drive->doorlocking = 0;
 	}
 	MOD_DEC_USE_COUNT;
@@ -495,9 +503,7 @@ static int idedisk_media_change (ide_drive_t *drive)
 
 static void idedisk_revalidate (ide_drive_t *drive)
 {
-	grok_partitions(HWIF(drive)->gd, drive->select.b.unit,
-			1<<PARTN_BITS,
-			current_capacity(drive));
+	ide_revalidate_drive(drive);
 }
 
 /*
@@ -673,7 +679,7 @@ static int set_nowerr(ide_drive_t *drive, int arg)
 		return -EBUSY;
 	drive->nowerr = arg;
 	drive->bad_wstat = arg ? BAD_R_STAT : BAD_W_STAT;
-	spin_unlock_irq(&io_request_lock);
+	spin_unlock_irq(&ide_lock);
 	return 0;
 }
 
@@ -691,7 +697,6 @@ static void idedisk_add_settings(ide_drive_t *drive)
 	ide_add_setting(drive,	"nowerr",		SETTING_RW,					HDIO_GET_NOWERR,	HDIO_SET_NOWERR,	TYPE_BYTE,	0,	1,				1,	1,	&drive->nowerr,			set_nowerr);
 	ide_add_setting(drive,	"breada_readahead",	SETTING_RW,					BLKRAGET,		BLKRASET,		TYPE_INT,	0,	255,				1,	2,	&read_ahead[major],		NULL);
 	ide_add_setting(drive,	"file_readahead",	SETTING_RW,					BLKFRAGET,		BLKFRASET,		TYPE_INTA,	0,	4096,			PAGE_SIZE,	1024,	&max_readahead[major][minor],	NULL);
-	ide_add_setting(drive,	"max_kb_per_request",	SETTING_RW,					BLKSECTGET,		BLKSECTSET,		TYPE_INTA,	1,	255,				1,	2,	&max_sectors[major][minor],	NULL);
 	ide_add_setting(drive,	"lun",			SETTING_RW,					-1,			-1,			TYPE_INT,	0,	7,				1,	1,	&drive->lun,			NULL);
 	ide_add_setting(drive,	"failures",		SETTING_RW,					-1,			-1,			TYPE_INT,	0,	65535,				1,	1,	&drive->failures,		NULL);
 	ide_add_setting(drive,	"max_failures",		SETTING_RW,					-1,			-1,			TYPE_INT,	0,	65535,				1,	1,	&drive->max_failures,		NULL);

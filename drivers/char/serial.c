@@ -122,7 +122,7 @@ static char *serial_revdate = "2001-07-08";
 #define ENABLE_SERIAL_ACPI
 #endif
 
-#if defined(CONFIG_ISAPNP)|| (defined(CONFIG_ISAPNP_MODULE) && defined(MODULE))
+#ifdef __ISAPNP__
 #ifndef ENABLE_SERIAL_PNP
 #define ENABLE_SERIAL_PNP
 #endif

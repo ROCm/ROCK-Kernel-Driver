@@ -523,6 +523,7 @@ void __init ide_init_piix (ide_hwif_t *hwif)
 	if (!hwif->dma_base)
 		return;
 
+	hwif->highmem = 1;
 #ifndef CONFIG_BLK_DEV_IDEDMA
 	hwif->autodma = 0;
 #else /* CONFIG_BLK_DEV_IDEDMA */

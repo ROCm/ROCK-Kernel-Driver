@@ -5,13 +5,7 @@
 #include <linux/locks.h>
 #include <linux/config.h>
 #include <linux/spinlock.h>
-
-/*
- * Spinlock for protecting the request queue which
- * is mucked around with in interrupts on potentially
- * multiple CPU's..
- */
-extern spinlock_t io_request_lock;
+#include <linux/compiler.h>
 
 /*
  * Initialization functions.
@@ -87,13 +81,18 @@ void initrd_init(void);
  * code duplication in drivers.
  */
 
-static inline void blkdev_dequeue_request(struct request * req)
+static inline void blkdev_dequeue_request(struct request *req)
 {
-	list_del(&req->queue);
+	if (req->bio)
+		bio_hash_remove(req->bio);
+	if (req->biotail)
+		bio_hash_remove(req->biotail);
+
+	list_del(&req->queuelist);
 }
 
-int end_that_request_first(struct request *req, int uptodate, char *name);
-void end_that_request_last(struct request *req);
+int end_that_request_first(struct request *, int uptodate, int nr_sectors);
+void end_that_request_last(struct request *);
 
 #if defined(MAJOR_NR) || defined(IDE_DRIVER)
 
@@ -338,11 +337,15 @@ static void floppy_off(unsigned int nr);
 #if !defined(IDE_DRIVER)
 
 #ifndef CURRENT
-#define CURRENT blkdev_entry_next_request(&blk_dev[MAJOR_NR].request_queue.queue_head)
+#define CURRENT elv_next_request(&blk_dev[MAJOR_NR].request_queue)
+#endif
+#ifndef QUEUE
+#define QUEUE (&blk_dev[MAJOR_NR].request_queue)
 #endif
 #ifndef QUEUE_EMPTY
-#define QUEUE_EMPTY list_empty(&blk_dev[MAJOR_NR].request_queue.queue_head)
+#define QUEUE_EMPTY blk_queue_empty(QUEUE)
 #endif
+
 
 #ifndef DEVICE_NAME
 #define DEVICE_NAME "unknown"
@@ -367,16 +370,14 @@ static void (DEVICE_REQUEST)(request_queue_t *);
 #endif
 
 #define INIT_REQUEST \
-	if (QUEUE_EMPTY) {\
+	if (QUEUE_EMPTY) { \
 		CLEAR_INTR; \
-		return; \
+		return;	 \
 	} \
 	if (MAJOR(CURRENT->rq_dev) != MAJOR_NR) \
 		panic(DEVICE_NAME ": request list destroyed"); \
-	if (CURRENT->bh) { \
-		if (!buffer_locked(CURRENT->bh)) \
-			panic(DEVICE_NAME ": block not locked"); \
-	}
+	if (!CURRENT->bio) \
+		panic(DEVICE_NAME ": no bio"); \
 
 #endif /* !defined(IDE_DRIVER) */
 
@@ -385,10 +386,11 @@ static void (DEVICE_REQUEST)(request_queue_t *);
 
 #if ! SCSI_BLK_MAJOR(MAJOR_NR) && (MAJOR_NR != COMPAQ_SMART2_MAJOR)
 
-static inline void end_request(int uptodate) {
+static inline void end_request(int uptodate)
+{
 	struct request *req = CURRENT;
 
-	if (end_that_request_first(req, uptodate, DEVICE_NAME))
+	if (end_that_request_first(req, uptodate, CURRENT->hard_cur_sectors))
 		return;
 
 #ifndef DEVICE_NO_RANDOM

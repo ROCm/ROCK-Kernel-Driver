@@ -1,5 +1,5 @@
 This file contains some additional information for the Philips webcams.
-E-mail: webcam@smcc.demon.nl                        Last updated: 2001-07-27
+E-mail: webcam@smcc.demon.nl                        Last updated: 2001-09-24
 
 The main webpage for the Philips driver is http://www.smcc.demon.nl/webcam/.
 It contains a lot of extra information, a FAQ, and the binary plugin
@@ -13,11 +13,9 @@ You can build this code either into your kernel, or as a module. I recommend
 the latter, since it makes troubleshooting a lot easier. The built-in
 microphone is supported through the USB Audio class.
 
-(Taken from install.html)
-
 When you load the module you can set some default settings for the
-camera; some programs depend on a particular image-size or -format. The
-options are:
+camera; some programs depend on a particular image-size or -format and
+don't know how to set it properly in the driver. The options are:
 
 size
    Can be one of 'sqcif', 'qsif', 'qcif', 'sif', 'cif' or
@@ -99,6 +97,57 @@ leds
    This parameter works only with the ToUCam range of cameras (730, 740,
    750). For other cameras this command is silently ignored, and the LED
    cannot be controlled.
+
+dev_hint
+   A long standing problem with USB devices is their dynamic nature: you
+   never know what device a camera gets assigned; it depends on module load
+   order, the hub configuration, the order in which devices are plugged in,
+   and the phase of the moon (i.e. it can be random). With this option you
+   can give the driver a hint as to what video device node (/dev/videoX) it
+   should use with a specific camera. This is also handy if you have two
+   cameras of the same model.
+
+   A camera is specified by its type (the number from the camera model,
+   like PCA645, PCVC750VC, etc) and optionally the serial number (visible
+   in /proc/bus/usb/devices). A hint consists of a string with the following
+   format:
+
+      [type[.serialnumber]:]node
+      
+   The square brackets mean that both the type and the serialnumber are
+   optional, but a serialnumber cannot be specified without a type (which
+   would be rather pointless). The serialnumber is separated from the type
+   by a '.'; the node number by a ':'.
+   
+   This somewhat cryptic syntax is best explained by a few examples:
+
+     dev_hint=3,5              The first detected cam gets assigned
+                               /dev/video3, the second /dev/video5. Any
+                               other cameras will get the first free 
+                               available slot (see below).
+
+     dev_hint=645:1,680=2      The PCA645 camera will get /dev/video1,
+                               and a PCVC680 /dev/video2.
+                               
+     dev_hint=645.0123:3,645.4567:0	The PCA645 camera with serialnumber 
+                                        0123 goes to /dev/video3, the same
+                                        camera model with the 4567 serial
+                                        gets /dev/video0.
+
+     dev_hint=750:1,4,5,6       The PCVC750 camera will get /dev/video1, the 
+                                next 3 Philips cams will use /dev/video4 
+                                through /dev/video6.
+
+   Some points worth knowing:
+   - Serialnumbers are case sensitive and must be written full, including 
+     leading zeroes (it's treated as a string).
+   - If a device node is already occupied, registration will fail and 
+     the webcam is not available.
+   - You can have up to 64 video devices; be sure to make enough device
+     nodes in /dev if you want to spread the numbers (this does not apply
+     to devfs). After /dev/video9 comes /dev/video10 (not /dev/videoA).
+   - If a camera does not match any dev_hint, it will simply get assigned
+     the first available device node, just as it used to be.
 
 trace
    In order to better detect problems, it is now possible to turn on a

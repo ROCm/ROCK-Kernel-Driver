@@ -1895,10 +1895,9 @@ void cleanup_module(void)
 	free_irq(IRQ_AMIGA_DSKBLK, NULL);
 	custom.dmacon = DMAF_DISK; /* disable DMA */
 	amiga_chip_free(raw_buf);
-	blk_size[MAJOR_NR] = NULL;
-	blksize_size[MAJOR_NR] = NULL;
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 	release_mem_region(CUSTOM_PHYSADDR+0x20, 8);
 	unregister_blkdev(MAJOR_NR, "fd");
+	blk_clear(MAJOR_NR);
 }
 #endif

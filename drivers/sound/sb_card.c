@@ -69,7 +69,7 @@
 #include "sb_mixer.h"
 #include "sb.h"
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 #define SB_CARDS_MAX 5
 #else
 #define SB_CARDS_MAX 1
@@ -196,7 +196,7 @@ struct pci_dev 	*sb_dev[SB_CARDS_MAX] 	= {NULL},
 		*opl_dev[SB_CARDS_MAX]	= {NULL};
 
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 static int isapnp	= 1;
 static int isapnpjump	= 0;
 static int multiple	= 1;
@@ -226,7 +226,7 @@ MODULE_PARM(sm_games,	"i");
 MODULE_PARM(esstype,	"i");
 MODULE_PARM(acer,	"i");
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 MODULE_PARM(isapnp,	"i");
 MODULE_PARM(isapnpjump,	"i");
 MODULE_PARM(multiple,	"i");
@@ -251,7 +251,7 @@ MODULE_PARM_DESC(sm_games,	"Enable support for Logitech soundman games");
 MODULE_PARM_DESC(esstype,	"ESS chip type");
 MODULE_PARM_DESC(acer,		"Set this to detect cards in some ACER notebooks");
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 
 /* Please add new entries at the end of the table */
 static struct {
@@ -909,8 +909,8 @@ static int __init init_sb(void)
 	printk(KERN_INFO "Soundblaster audio driver Copyright (C) by Hannu Savolainen 1993-1996\n");
 	
 	for(card = 0; card < max; card++, sb_cards_num++) {
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
-		/* Please remember that even with CONFIG_ISAPNP defined one
+#ifdef __ISAPNP__
+		/* Please remember that even with __ISAPNP__ defined one
 		 * should still be able to disable PNP support for this 
 		 * single driver! */
 		if((!pnplegacy||card>0) && isapnp && (sb_isapnp_probe(&cfg[card], &cfg_mpu[card], card) < 0) ) {
@@ -997,7 +997,7 @@ static void __exit cleanup_sb(void)
 		if (sbmpu[i])
 			unload_sbmpu(&cfg_mpu[i]);
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 		if(!audio_activated[i] && sb_dev[i])
 			sb_dev[i]->deactivate(sb_dev[i]);
 		if(!mpu_activated[i] && mpu_dev[i])

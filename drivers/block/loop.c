@@ -168,8 +168,7 @@ static void figure_loop_size(struct loop_device *lo)
 					lo->lo_device);
 }
 
-static int lo_send(struct loop_device *lo, struct buffer_head *bh, int bsize,
-		   loff_t pos)
+static int lo_send(struct loop_device *lo, struct bio *bio, int bsize, loff_t pos)
 {
 	struct file *file = lo->lo_backing_file; /* kudos to NFsckingS */
 	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
@@ -183,8 +182,8 @@ static int lo_send(struct loop_device *lo, struct buffer_head *bh, int bsize,
 	down(&mapping->host->i_sem);
 	index = pos >> PAGE_CACHE_SHIFT;
 	offset = pos & (PAGE_CACHE_SIZE - 1);
-	len = bh->b_size;
-	data = bh->b_data;
+	len = bio_size(bio);
+	data = bio_data(bio);
 	while (len > 0) {
 		int IV = index * (PAGE_CACHE_SIZE/bsize) + offset/bsize;
 		int transfer_result;
@@ -263,18 +262,17 @@ static int lo_read_actor(read_descriptor_t * desc, struct page *page, unsigned l
 	return size;
 }
 
-static int lo_receive(struct loop_device *lo, struct buffer_head *bh, int bsize,
-		      loff_t pos)
+static int lo_receive(struct loop_device *lo, struct bio *bio, int bsize, loff_t pos)
 {
 	struct lo_read_data cookie;
 	read_descriptor_t desc;
 	struct file *file;
 
 	cookie.lo = lo;
-	cookie.data = bh->b_data;
+	cookie.data = bio_data(bio);
 	cookie.bsize = bsize;
 	desc.written = 0;
-	desc.count = bh->b_size;
+	desc.count = bio_size(bio);
 	desc.buf = (char*)&cookie;
 	desc.error = 0;
 	spin_lock_irq(&lo->lo_lock);
@@ -310,46 +308,46 @@ static inline unsigned long loop_get_iv(struct loop_device *lo,
 	return IV;
 }
 
-static int do_bh_filebacked(struct loop_device *lo, struct buffer_head *bh, int rw)
+static int do_bio_filebacked(struct loop_device *lo, struct bio *bio)
 {
 	loff_t pos;
 	int ret;
 
-	pos = ((loff_t) bh->b_rsector << 9) + lo->lo_offset;
+	pos = ((loff_t) bio->bi_sector << 9) + lo->lo_offset;
 
-	if (rw == WRITE)
-		ret = lo_send(lo, bh, loop_get_bs(lo), pos);
+	if (bio_rw(bio) == WRITE)
+		ret = lo_send(lo, bio, loop_get_bs(lo), pos);
 	else
-		ret = lo_receive(lo, bh, loop_get_bs(lo), pos);
+		ret = lo_receive(lo, bio, loop_get_bs(lo), pos);
 
 	return ret;
 }
 
-static void loop_end_io_transfer(struct buffer_head *bh, int uptodate);
-static void loop_put_buffer(struct buffer_head *bh)
+static int loop_end_io_transfer(struct bio *, int);
+static void loop_put_buffer(struct bio *bio)
 {
 	/*
-	 * check b_end_io, may just be a remapped bh and not an allocated one
+	 * check bi_end_io, may just be a remapped bio
 	 */
-	if (bh && bh->b_end_io == loop_end_io_transfer) {
-		__free_page(bh->b_page);
-		kmem_cache_free(bh_cachep, bh);
+	if (bio && bio->bi_end_io == loop_end_io_transfer) {
+		__free_page(bio_page(bio));
+		bio_put(bio);
 	}
 }
 
 /*
- * Add buffer_head to back of pending list
+ * Add bio to back of pending list
  */
-static void loop_add_bh(struct loop_device *lo, struct buffer_head *bh)
+static void loop_add_bio(struct loop_device *lo, struct bio *bio)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&lo->lo_lock, flags);
-	if (lo->lo_bhtail) {
-		lo->lo_bhtail->b_reqnext = bh;
-		lo->lo_bhtail = bh;
+	if (lo->lo_biotail) {
+		lo->lo_biotail->bi_next = bio;
+		lo->lo_biotail = bio;
 	} else
-		lo->lo_bh = lo->lo_bhtail = bh;
+		lo->lo_bio = lo->lo_biotail = bio;
 	spin_unlock_irqrestore(&lo->lo_lock, flags);
 
 	up(&lo->lo_bh_mutex);
@@ -358,70 +356,60 @@ static void loop_add_bh(struct loop_device *lo, struct buffer_head *bh)
 /*
  * Grab first pending buffer
  */
-static struct buffer_head *loop_get_bh(struct loop_device *lo)
+static struct bio *loop_get_bio(struct loop_device *lo)
 {
-	struct buffer_head *bh;
+	struct bio *bio;
 
 	spin_lock_irq(&lo->lo_lock);
-	if ((bh = lo->lo_bh)) {
-		if (bh == lo->lo_bhtail)
-			lo->lo_bhtail = NULL;
-		lo->lo_bh = bh->b_reqnext;
-		bh->b_reqnext = NULL;
+	if ((bio = lo->lo_bio)) {
+		if (bio == lo->lo_biotail)
+			lo->lo_biotail = NULL;
+		lo->lo_bio = bio->bi_next;
+		bio->bi_next = NULL;
 	}
 	spin_unlock_irq(&lo->lo_lock);
 
-	return bh;
+	return bio;
 }
 
 /*
- * when buffer i/o has completed. if BH_Dirty is set, this was a WRITE
- * and lo->transfer stuff has already been done. if not, it was a READ
- * so queue it for the loop thread and let it do the transfer out of
- * b_end_io context (we don't want to do decrypt of a page with irqs
+ * if this was a WRITE lo->transfer stuff has already been done. for READs,
+ * queue it for the loop thread and let it do the transfer out of
+ * bi_end_io context (we don't want to do decrypt of a page with irqs
  * disabled)
  */
-static void loop_end_io_transfer(struct buffer_head *bh, int uptodate)
+static int loop_end_io_transfer(struct bio *bio, int nr_sectors)
 {
-	struct loop_device *lo = &loop_dev[MINOR(bh->b_dev)];
+	struct loop_device *lo = &loop_dev[MINOR(bio->bi_dev)];
+	int uptodate = test_bit(BIO_UPTODATE, &bio->bi_flags);
 
-	if (!uptodate || test_bit(BH_Dirty, &bh->b_state)) {
-		struct buffer_head *rbh = bh->b_private;
+	if (!uptodate || bio_rw(bio) == WRITE) {
+		struct bio *rbh = bio->bi_private;
 
-		rbh->b_end_io(rbh, uptodate);
+		bio_endio(rbh, uptodate, nr_sectors);
 		if (atomic_dec_and_test(&lo->lo_pending))
 			up(&lo->lo_bh_mutex);
-		loop_put_buffer(bh);
+		loop_put_buffer(bio);
 	} else
-		loop_add_bh(lo, bh);
+		loop_add_bio(lo, bio);
+
+	return 0;
 }
 
-static struct buffer_head *loop_get_buffer(struct loop_device *lo,
-					   struct buffer_head *rbh)
+static struct bio *loop_get_buffer(struct loop_device *lo, struct bio *rbh)
 {
-	struct buffer_head *bh;
+	struct page *page;
+	struct bio *bio;
 
 	/*
 	 * for xfer_funcs that can operate on the same bh, do that
 	 */
 	if (lo->lo_flags & LO_FLAGS_BH_REMAP) {
-		bh = rbh;
+		bio = rbh;
 		goto out_bh;
 	}
 
-	do {
-		bh = kmem_cache_alloc(bh_cachep, SLAB_NOIO);
-		if (bh)
-			break;
-
-		run_task_queue(&tq_disk);
-		schedule_timeout(HZ);
-	} while (1);
-	memset(bh, 0, sizeof(*bh));
-
-	bh->b_size = rbh->b_size;
-	bh->b_dev = rbh->b_rdev;
-	bh->b_state = (1 << BH_Req) | (1 << BH_Mapped) | (1 << BH_Lock);
+	bio = bio_alloc(GFP_NOIO, 1);
 
 	/*
 	 * easy way out, although it does waste some memory for < PAGE_SIZE
@@ -429,41 +417,46 @@ static struct buffer_head *loop_get_buffer(struct loop_device *lo,
 	 * so can we :-)
 	 */
 	do {
-		bh->b_page = alloc_page(GFP_NOIO);
-		if (bh->b_page)
+		page = alloc_page(GFP_NOIO);
+		if (page)
 			break;
 
 		run_task_queue(&tq_disk);
 		schedule_timeout(HZ);
 	} while (1);
 
-	bh->b_data = page_address(bh->b_page);
-	bh->b_end_io = loop_end_io_transfer;
-	bh->b_private = rbh;
-	init_waitqueue_head(&bh->b_wait);
+	bio->bi_io_vec->bvl_vec[0].bv_page = page;
+	bio->bi_io_vec->bvl_vec[0].bv_len = bio_size(rbh);
+	bio->bi_io_vec->bvl_vec[0].bv_offset = bio_offset(rbh);
+
+	bio->bi_io_vec->bvl_cnt = 1;
+	bio->bi_io_vec->bvl_idx = 1;
+	bio->bi_io_vec->bvl_size = bio_size(rbh);
+
+	bio->bi_end_io = loop_end_io_transfer;
+	bio->bi_private = rbh;
 
 out_bh:
-	bh->b_rsector = rbh->b_rsector + (lo->lo_offset >> 9);
+	bio->bi_sector = rbh->bi_sector + (lo->lo_offset >> 9);
+	bio->bi_rw = rbh->bi_rw;
 	spin_lock_irq(&lo->lo_lock);
-	bh->b_rdev = lo->lo_device;
+	bio->bi_dev = lo->lo_device;
 	spin_unlock_irq(&lo->lo_lock);
 
-	return bh;
+	return bio;
 }
 
-static int loop_make_request(request_queue_t *q, int rw, struct buffer_head *rbh)
+static int loop_make_request(request_queue_t *q, struct bio *rbh)
 {
-	struct buffer_head *bh = NULL;
+	struct bio *bh = NULL;
 	struct loop_device *lo;
 	unsigned long IV;
+	int rw = bio_rw(rbh);
 
-	if (!buffer_locked(rbh))
-		BUG();
-
-	if (MINOR(rbh->b_rdev) >= max_loop)
+	if (MINOR(rbh->bi_dev) >= max_loop)
 		goto out;
 
-	lo = &loop_dev[MINOR(rbh->b_rdev)];
+	lo = &loop_dev[MINOR(rbh->bi_dev)];
 	spin_lock_irq(&lo->lo_lock);
 	if (lo->lo_state != Lo_bound)
 		goto inactive;
@@ -476,25 +469,17 @@ static int loop_make_request(request_queue_t *q, int rw, struct buffer_head *rbh
 	} else if (rw == READA) {
 		rw = READ;
 	} else if (rw != READ) {
-		printk(KERN_ERR "loop: unknown command (%d)\n", rw);
+		printk(KERN_ERR "loop: unknown command (%x)\n", rw);
 		goto err;
 	}
 
-#if CONFIG_HIGHMEM
-	rbh = create_bounce(rw, rbh);
-#endif
+	blk_queue_bounce(q, &rbh);
 
 	/*
 	 * file backed, queue for loop_thread to handle
 	 */
 	if (lo->lo_flags & LO_FLAGS_DO_BMAP) {
-		/*
-		 * rbh locked at this point, noone else should clear
-		 * the dirty flag
-		 */
-		if (rw == WRITE)
-			set_bit(BH_Dirty, &rbh->b_state);
-		loop_add_bh(lo, rbh);
+		loop_add_bio(lo, rbh);
 		return 0;
 	}
 
@@ -502,15 +487,14 @@ static int loop_make_request(request_queue_t *q, int rw, struct buffer_head *rbh
 	 * piggy old buffer on original, and submit for I/O
 	 */
 	bh = loop_get_buffer(lo, rbh);
-	IV = loop_get_iv(lo, rbh->b_rsector);
+	IV = loop_get_iv(lo, rbh->bi_sector);
 	if (rw == WRITE) {
-		set_bit(BH_Dirty, &bh->b_state);
-		if (lo_do_transfer(lo, WRITE, bh->b_data, rbh->b_data,
-				   bh->b_size, IV))
+		if (lo_do_transfer(lo, WRITE, bio_data(bh), bio_data(rbh),
+				   bio_size(bh), IV))
 			goto err;
 	}
 
-	generic_make_request(rw, bh);
+	generic_make_request(bh);
 	return 0;
 
 err:
@@ -518,14 +502,14 @@ err:
 		up(&lo->lo_bh_mutex);
 	loop_put_buffer(bh);
 out:
-	buffer_IO_error(rbh);
+	bio_io_error(rbh);
 	return 0;
 inactive:
 	spin_unlock_irq(&lo->lo_lock);
 	goto out;
 }
 
-static inline void loop_handle_bh(struct loop_device *lo,struct buffer_head *bh)
+static inline void loop_handle_bio(struct loop_device *lo, struct bio *bio)
 {
 	int ret;
 
@@ -533,19 +517,17 @@ static inline void loop_handle_bh(struct loop_device *lo,struct buffer_head *bh)
 	 * For block backed loop, we know this is a READ
 	 */
 	if (lo->lo_flags & LO_FLAGS_DO_BMAP) {
-		int rw = !!test_and_clear_bit(BH_Dirty, &bh->b_state);
-
-		ret = do_bh_filebacked(lo, bh, rw);
-		bh->b_end_io(bh, !ret);
+		ret = do_bio_filebacked(lo, bio);
+		bio_endio(bio, !ret, bio_sectors(bio));
 	} else {
-		struct buffer_head *rbh = bh->b_private;
-		unsigned long IV = loop_get_iv(lo, rbh->b_rsector);
+		struct bio *rbh = bio->bi_private;
+		unsigned long IV = loop_get_iv(lo, rbh->bi_sector);
 
-		ret = lo_do_transfer(lo, READ, bh->b_data, rbh->b_data,
-				     bh->b_size, IV);
+		ret = lo_do_transfer(lo, READ, bio_data(bio), bio_data(rbh),
+				     bio_size(bio), IV);
 
-		rbh->b_end_io(rbh, !ret);
-		loop_put_buffer(bh);
+		bio_endio(rbh, !ret, bio_sectors(bio));
+		loop_put_buffer(bio);
 	}
 }
 
@@ -558,7 +540,7 @@ static inline void loop_handle_bh(struct loop_device *lo,struct buffer_head *bh)
 static int loop_thread(void *data)
 {
 	struct loop_device *lo = data;
-	struct buffer_head *bh;
+	struct bio *bio;
 
 	daemonize();
 	exit_files(current);
@@ -592,12 +574,12 @@ static int loop_thread(void *data)
 		if (!atomic_read(&lo->lo_pending))
 			break;
 
-		bh = loop_get_bh(lo);
-		if (!bh) {
-			printk("loop: missing bh\n");
+		bio = loop_get_bio(lo);
+		if (!bio) {
+			printk("loop: missing bio\n");
 			continue;
 		}
-		loop_handle_bh(lo, bh);
+		loop_handle_bio(lo, bio);
 
 		/*
 		 * upped both for pending work and tear-down, lo_pending
@@ -683,7 +665,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file, kdev_t dev,
 
 	set_blocksize(dev, bs);
 
-	lo->lo_bh = lo->lo_bhtail = NULL;
+	lo->lo_bio = lo->lo_biotail = NULL;
 	kernel_thread(loop_thread, lo, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
 	down(&lo->lo_sem);
 
@@ -873,7 +855,7 @@ static int lo_ioctl(struct inode * inode, struct file * file,
 			err = -ENXIO;
 			break;
 		}
-		err = put_user((unsigned long)loop_sizes[lo->lo_number] << 1, (unsigned long *) arg);
+		err = put_user((unsigned long) loop_sizes[lo->lo_number] << 1, (unsigned long *) arg);
 		break;
 	case BLKGETSIZE64:
 		if (lo->lo_state != Lo_bound) {
@@ -1019,11 +1001,11 @@ int __init loop_init(void)
 
 	loop_sizes = kmalloc(max_loop * sizeof(int), GFP_KERNEL);
 	if (!loop_sizes)
-		goto out_sizes;
+		goto out_mem;
 
 	loop_blksizes = kmalloc(max_loop * sizeof(int), GFP_KERNEL);
 	if (!loop_blksizes)
-		goto out_blksizes;
+		goto out_mem;
 
 	blk_queue_make_request(BLK_DEFAULT_QUEUE(MAJOR_NR), loop_make_request);
 
@@ -1047,9 +1029,8 @@ int __init loop_init(void)
 	printk(KERN_INFO "loop: loaded (max %d devices)\n", max_loop);
 	return 0;
 
-out_sizes:
+out_mem:
 	kfree(loop_dev);
-out_blksizes:
 	kfree(loop_sizes);
 	printk(KERN_ERR "loop: ran out of memory\n");
 	return -ENOMEM;

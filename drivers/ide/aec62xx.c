@@ -557,6 +557,7 @@ void __init ide_init_aec62xx (ide_hwif_t *hwif)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base)
 		hwif->dmaproc = &aec62xx_dmaproc;
+	hwif->highmem = 1;
 #else /* !CONFIG_BLK_DEV_IDEDMA */
 	hwif->drives[0].autotune = 1;
 	hwif->drives[1].autotune = 1;

@@ -119,7 +119,8 @@ int sym53c8xx_release(struct Scsi_Host *);
 	this_id:		7,					\
 	sg_tablesize:		0,					\
 	cmd_per_lun:		0,					\
-	use_clustering:		DISABLE_CLUSTERING}
+	use_clustering:		DISABLE_CLUSTERING,			\
+	highmem_io:		1}
 
 #endif /* defined(HOSTS_C) || defined(MODULE) */ 
 

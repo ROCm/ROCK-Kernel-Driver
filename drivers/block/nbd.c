@@ -165,14 +165,14 @@ void nbd_send_req(struct socket *sock, struct request *req)
 		FAIL("Sendmsg failed for control.");
 
 	if (req->cmd == WRITE) {
-		struct buffer_head *bh = req->bh;
+		struct bio *bio = req->bio;
 		DEBUG("data, ");
 		do {
-			result = nbd_xmit(1, sock, bh->b_data, bh->b_size, bh->b_reqnext == NULL ? 0 : MSG_MORE);
+			result = nbd_xmit(1, sock, bio_data(bio), bio_size(bio), bio->bi_next == NULL ? 0 : MSG_MORE);
 			if (result <= 0)
 				FAIL("Send data failed.");
-			bh = bh->b_reqnext;
-		} while(bh);
+			bio = bio->bi_next;
+		} while(bio);
 	}
 	return;
 
@@ -205,14 +205,14 @@ struct request *nbd_read_stat(struct nbd_device *lo)
 	if (ntohl(reply.error))
 		FAIL("Other side returned error.");
 	if (req->cmd == READ) {
-		struct buffer_head *bh = req->bh;
+		struct bio *bio = req->bio;
 		DEBUG("data, ");
 		do {
-			result = nbd_xmit(0, lo->sock, bh->b_data, bh->b_size, MSG_WAITALL);
+			result = nbd_xmit(0, lo->sock, bio_data(bio), bio_size(bio), MSG_WAITALL);
 			if (result <= 0)
 				HARDFAIL("Recv data failed.");
-			bh = bh->b_reqnext;
-		} while(bh);
+			bio = bio->bi_next;
+		} while(bio);
 	}
 	DEBUG("done.\n");
 	return req;
@@ -250,7 +250,7 @@ void nbd_do_it(struct nbd_device *lo)
 			goto out;
 		}
 #endif
-		list_del(&req->queue);
+		blkdev_dequeue_request(req);
 		up (&lo->queue_lock);
 		
 		nbd_end_request(req);
@@ -285,7 +285,7 @@ void nbd_clear_que(struct nbd_device *lo)
 		}
 #endif
 		req->errors++;
-		list_del(&req->queue);
+		blkdev_dequeue_request(req);
 		up(&lo->queue_lock);
 
 		nbd_end_request(req);
@@ -333,22 +333,22 @@ static void do_nbd_request(request_queue_t * q)
 #endif
 		req->errors = 0;
 		blkdev_dequeue_request(req);
-		spin_unlock_irq(&io_request_lock);
+		spin_unlock_irq(&q->queue_lock);
 
 		down (&lo->queue_lock);
-		list_add(&req->queue, &lo->queue_head);
+		list_add(&req->queuelist, &lo->queue_head);
 		nbd_send_req(lo->sock, req);	/* Why does this block?         */
 		up (&lo->queue_lock);
 
-		spin_lock_irq(&io_request_lock);
+		spin_lock_irq(&q->queue_lock);
 		continue;
 
 	      error_out:
 		req->errors++;
 		blkdev_dequeue_request(req);
-		spin_unlock(&io_request_lock);
+		spin_unlock(&q->queue_lock);
 		nbd_end_request(req);
-		spin_lock(&io_request_lock);
+		spin_lock(&q->queue_lock);
 	}
 	return;
 }
@@ -501,7 +501,7 @@ static int __init nbd_init(void)
 #endif
 	blksize_size[MAJOR_NR] = nbd_blksizes;
 	blk_size[MAJOR_NR] = nbd_sizes;
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_nbd_request);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_nbd_request, "nbd");
 	blk_queue_headactive(BLK_DEFAULT_QUEUE(MAJOR_NR), 0);
 	for (i = 0; i < MAX_NBD; i++) {
 		nbd_dev[i].refcnt = 0;

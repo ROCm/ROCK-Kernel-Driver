@@ -594,9 +594,21 @@ static void save_match (ide_hwif_t *hwif, ide_hwif_t *new, ide_hwif_t **match)
 static void ide_init_queue(ide_drive_t *drive)
 {
 	request_queue_t *q = &drive->queue;
+	int max_sectors;
 
 	q->queuedata = HWGROUP(drive);
-	blk_init_queue(q, do_ide_request);
+	blk_init_queue(q, do_ide_request, drive->name);
+
+	/* IDE can do up to 128K per request, pdc4030 needs smaller limit */
+#ifdef CONFIG_BLK_DEV_PDC4030
+	max_sectors = 127;
+#else
+	max_sectors = 255;
+#endif
+	blk_queue_max_sectors(q, max_sectors);
+
+	/* IDE DMA can do PRD_ENTRIES number of segments */
+	q->max_segments = PRD_ENTRIES;
 }
 
 /*
@@ -670,7 +682,7 @@ static int init_irq (ide_hwif_t *hwif)
 		hwgroup->rq       = NULL;
 		hwgroup->handler  = NULL;
 		hwgroup->drive    = NULL;
-		hwgroup->busy     = 0;
+		hwgroup->flags	  = 0;
 		init_timer(&hwgroup->timer);
 		hwgroup->timer.function = &ide_timer_expiry;
 		hwgroup->timer.data = (unsigned long) hwgroup;
@@ -749,7 +761,7 @@ static void init_gendisk (ide_hwif_t *hwif)
 {
 	struct gendisk *gd;
 	unsigned int unit, units, minors;
-	int *bs, *max_sect, *max_ra;
+	int *bs, *max_ra;
 	extern devfs_handle_t ide_devfs_handle;
 
 	/* figure out maximum drive number on the interface */
@@ -762,23 +774,15 @@ static void init_gendisk (ide_hwif_t *hwif)
 	gd->sizes = kmalloc (minors * sizeof(int), GFP_KERNEL);
 	gd->part  = kmalloc (minors * sizeof(struct hd_struct), GFP_KERNEL);
 	bs        = kmalloc (minors*sizeof(int), GFP_KERNEL);
-	max_sect  = kmalloc (minors*sizeof(int), GFP_KERNEL);
 	max_ra    = kmalloc (minors*sizeof(int), GFP_KERNEL);
 
 	memset(gd->part, 0, minors * sizeof(struct hd_struct));
 
 	/* cdroms and msdos f/s are examples of non-1024 blocksizes */
 	blksize_size[hwif->major] = bs;
-	max_sectors[hwif->major] = max_sect;
 	max_readahead[hwif->major] = max_ra;
 	for (unit = 0; unit < minors; ++unit) {
 		*bs++ = BLOCK_SIZE;
-#ifdef CONFIG_BLK_DEV_PDC4030
-		*max_sect++ = ((hwif->chipset == ide_pdc4030) ? 127 : 255);
-#else
-		/* IDE can do up to 128K per request. */
-		*max_sect++ = 255;
-#endif
 		*max_ra++ = MAX_READAHEAD;
 	}
 
@@ -870,13 +874,6 @@ static int hwif_init (ide_hwif_t *hwif)
 	read_ahead[hwif->major] = 8;	/* (4kB) */
 	hwif->present = 1;	/* success */
 
-#if (DEBUG_SPINLOCK > 0)
-{
-	static int done = 0;
-	if (!done++)
-		printk("io_request_lock is %p\n", &io_request_lock);    /* FIXME */
-}
-#endif
 	return hwif->present;
 }
 

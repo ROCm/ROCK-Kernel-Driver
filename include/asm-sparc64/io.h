@@ -18,6 +18,8 @@ extern unsigned long virt_to_bus_not_defined_use_pci_map(volatile void *addr);
 extern unsigned long bus_to_virt_not_defined_use_pci_map(volatile void *addr);
 #define bus_to_virt bus_to_virt_not_defined_use_pci_map
 
+#define page_to_phys(page)	(((page) - mem_map) << PAGE_SHIFT)
+
 /* Different PCI controllers we support have their PCI MEM space
  * mapped to an either 2GB (Psycho) or 4GB (Sabre) aligned area,
  * so need to chop off the top 33 or 32 bits.

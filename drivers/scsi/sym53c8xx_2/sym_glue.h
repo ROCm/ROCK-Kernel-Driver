@@ -456,10 +456,10 @@ struct sym_shcb {
 	char		chip_name[8];
 	struct pci_dev	*device;
 
+	struct Scsi_Host *host;
+
 	u_char		bus;		/* PCI BUS number		*/
 	u_char		device_fn;	/* PCI BUS device and function	*/
-
-	spinlock_t	smp_lock;	/* Lock for SMP threading       */
 
 	vm_offset_t	mmio_va;	/* MMIO kernel virtual address	*/
 	vm_offset_t	ram_va;		/* RAM  kernel virtual address	*/

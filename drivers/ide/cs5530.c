@@ -352,9 +352,10 @@ void __init ide_init_cs5530 (ide_hwif_t *hwif)
 		unsigned int basereg, d0_timings;
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-		hwif->dmaproc  = &cs5530_dmaproc;
+	hwif->dmaproc  = &cs5530_dmaproc;
+	hwif->highmem = 1;
 #else
-		hwif->autodma = 0;
+	hwif->autodma = 0;
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
 		hwif->tuneproc = &cs5530_tuneproc;

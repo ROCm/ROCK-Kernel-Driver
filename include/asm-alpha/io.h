@@ -60,6 +60,8 @@ static inline void * phys_to_virt(unsigned long address)
 	return (void *) (address + IDENT_ADDR);
 }
 
+#define page_to_phys(page)	(((page) - (page)->zone->zone_mem_map) << PAGE_SHIFT)
+
 /*
  * Change addresses as seen by the kernel (virtual) to addresses as
  * seen by a device (bus), and vice versa.

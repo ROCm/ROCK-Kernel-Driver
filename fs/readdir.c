@@ -79,6 +79,10 @@ int dcache_readdir(struct file * filp, void * dirent, filldir_t filldir)
 			while(1) {
 				struct dentry *de = list_entry(list, struct dentry, d_child);
 
+				/*
+				 * See comment on top of function on why we
+				 * can just drop the lock here..
+				 */
 				if (!list_empty(&de->d_hash) && de->d_inode) {
 					spin_unlock(&dcache_lock);
 					if (filldir(dirent, de->d_name.name, de->d_name.len, filp->f_pos, de->d_inode->i_ino, DT_UNKNOWN) < 0)

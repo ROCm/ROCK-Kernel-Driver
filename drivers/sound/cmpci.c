@@ -2496,7 +2496,6 @@ static int cm_midi_open(struct inode *inode, struct file *file)
 	spin_unlock_irqrestore(&s->lock, flags);
 	s->open_mode |= (file->f_mode << FMODE_MIDI_SHIFT) & (FMODE_MIDI_READ | FMODE_MIDI_WRITE);
 	up(&s->open_sem);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -2694,7 +2693,6 @@ static int cm_dmfm_open(struct inode *inode, struct file *file)
 	outb(1, s->iosynth+3);  /* enable OPL3 */
 	s->open_mode |= FMODE_DMFM;
 	up(&s->open_sem);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 

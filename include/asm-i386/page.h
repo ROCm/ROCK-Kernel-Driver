@@ -101,6 +101,12 @@ extern void do_BUG(const char *file, int line);
 	BUG(); \
 } while (0)
 
+#define BUG_ON(condition)			\
+	do {					\
+		if (unlikely((int)(condition)))	\
+			BUG();			\
+	} while (0)
+
 /* Pure 2^n version of get_order */
 static __inline__ int get_order(unsigned long size)
 {

@@ -448,7 +448,7 @@ static __devinitdata struct usb_device_id keyspan_usa49w_ids[] = {
 };
 
     /* Structs for the devices, pre and post renumeration. */
-struct usb_serial_device_type keyspan_usa18x_pre_device = {
+static struct usb_serial_device_type keyspan_usa18x_pre_device = {
 	name:			"Keyspan USA18X - (without firmware)",
 	id_table:		keyspan_usa18x_pre_ids,
 	needs_interrupt_in:	DONT_CARE,
@@ -461,7 +461,7 @@ struct usb_serial_device_type keyspan_usa18x_pre_device = {
 	startup:		keyspan_fake_startup	
 };
 
-struct usb_serial_device_type keyspan_usa19_pre_device = {
+static struct usb_serial_device_type keyspan_usa19_pre_device = {
 	name:			"Keyspan USA19 - (without firmware)",
 	id_table:		keyspan_usa19_pre_ids,
 	needs_interrupt_in:	DONT_CARE,
@@ -475,7 +475,7 @@ struct usb_serial_device_type keyspan_usa19_pre_device = {
 };
 
 
-struct usb_serial_device_type keyspan_usa19w_pre_device = {
+static struct usb_serial_device_type keyspan_usa19w_pre_device = {
 	name:			"Keyspan USA19W - (without firmware)",
 	id_table:		keyspan_usa19w_pre_ids,
 	needs_interrupt_in:	DONT_CARE,
@@ -489,7 +489,7 @@ struct usb_serial_device_type keyspan_usa19w_pre_device = {
 };
 
 
-struct usb_serial_device_type keyspan_usa28_pre_device = {
+static struct usb_serial_device_type keyspan_usa28_pre_device = {
 	name:			"Keyspan USA28 - (without firmware)",
 	id_table:		keyspan_usa28_pre_ids,
 	needs_interrupt_in:	DONT_CARE,
@@ -502,7 +502,7 @@ struct usb_serial_device_type keyspan_usa28_pre_device = {
 	startup:		keyspan_fake_startup	
 };
 
-struct usb_serial_device_type keyspan_usa28x_pre_device = {
+static struct usb_serial_device_type keyspan_usa28x_pre_device = {
 	name:			"Keyspan USA28X - (without firmware)",
 	id_table:		keyspan_usa28x_pre_ids,
 	needs_interrupt_in:	DONT_CARE,
@@ -515,7 +515,7 @@ struct usb_serial_device_type keyspan_usa28x_pre_device = {
 	startup:		keyspan_fake_startup	
 };
 
-struct usb_serial_device_type keyspan_usa28xa_pre_device = {
+static struct usb_serial_device_type keyspan_usa28xa_pre_device = {
 	name:			"Keyspan USA28XA - (without firmware)",
 	id_table:		keyspan_usa28xa_pre_ids,
 	needs_interrupt_in:	DONT_CARE,
@@ -528,7 +528,7 @@ struct usb_serial_device_type keyspan_usa28xa_pre_device = {
 	startup:		keyspan_fake_startup	
 };
 
-struct usb_serial_device_type keyspan_usa28xb_pre_device = {
+static struct usb_serial_device_type keyspan_usa28xb_pre_device = {
 	name:			"Keyspan USA28XB - (without firmware)",
 	id_table:		keyspan_usa28xb_pre_ids,
 	needs_interrupt_in:	DONT_CARE,
@@ -541,7 +541,7 @@ struct usb_serial_device_type keyspan_usa28xb_pre_device = {
 	startup:		keyspan_fake_startup	
 };
 
-struct usb_serial_device_type keyspan_usa49w_pre_device = {
+static struct usb_serial_device_type keyspan_usa49w_pre_device = {
 	name:			"Keyspan USA49W - (without firmware)",
 	id_table:		keyspan_usa49w_pre_ids,
 	needs_interrupt_in:	DONT_CARE,
@@ -554,7 +554,7 @@ struct usb_serial_device_type keyspan_usa49w_pre_device = {
 	startup:		keyspan_fake_startup	
 };
 
-struct usb_serial_device_type keyspan_usa18x_device = {
+static struct usb_serial_device_type keyspan_usa18x_device = {
 	name:			"Keyspan USA18X",
 	id_table:		keyspan_usa18x_ids,
 	needs_interrupt_in:	DONT_CARE,	
@@ -580,7 +580,7 @@ struct usb_serial_device_type keyspan_usa18x_device = {
 	shutdown:		keyspan_shutdown,
 };
 
-struct usb_serial_device_type keyspan_usa19_device = {
+static struct usb_serial_device_type keyspan_usa19_device = {
 	name:			"Keyspan USA19",
 	id_table:		keyspan_usa19_ids,
 	needs_interrupt_in:	DONT_CARE,	
@@ -607,7 +607,7 @@ struct usb_serial_device_type keyspan_usa19_device = {
 };
 
 
-struct usb_serial_device_type keyspan_usa19w_device = {
+static struct usb_serial_device_type keyspan_usa19w_device = {
 	name:			"Keyspan USA19W",
 	id_table:		keyspan_usa19w_ids,
 	needs_interrupt_in:	DONT_CARE,	
@@ -634,7 +634,7 @@ struct usb_serial_device_type keyspan_usa19w_device = {
 };
 
 
-struct usb_serial_device_type keyspan_usa28_device = {
+static struct usb_serial_device_type keyspan_usa28_device = {
 	name:			"Keyspan USA28",
 	id_table:		keyspan_usa28_ids,
 	needs_interrupt_in:	DONT_CARE,	
@@ -652,7 +652,7 @@ struct usb_serial_device_type keyspan_usa28_device = {
 };
 
 
-struct usb_serial_device_type keyspan_usa28x_device = {
+static struct usb_serial_device_type keyspan_usa28x_device = {
 	name:			"Keyspan USA28X/XB",
 	id_table:		keyspan_usa28x_ids,
 	needs_interrupt_in:	DONT_CARE,	
@@ -679,7 +679,7 @@ struct usb_serial_device_type keyspan_usa28x_device = {
 
 };
 
-struct usb_serial_device_type keyspan_usa28xa_device = {
+static struct usb_serial_device_type keyspan_usa28xa_device = {
 	name:			"Keyspan USA28XA",
 	id_table:		keyspan_usa28xa_ids,
 	needs_interrupt_in:	DONT_CARE,	
@@ -706,7 +706,7 @@ struct usb_serial_device_type keyspan_usa28xa_device = {
 
 };
 
-struct usb_serial_device_type keyspan_usa49w_device = {
+static struct usb_serial_device_type keyspan_usa49w_device = {
 	name:			"Keyspan USA49W",
 	id_table:		keyspan_usa49w_ids,
 	needs_interrupt_in:	DONT_CARE,	

@@ -105,7 +105,6 @@ static ctl_table raid_root_table[] = {
  */
 struct hd_struct md_hd_struct[MAX_MD_DEVS];
 static int md_blocksizes[MAX_MD_DEVS];
-static int md_hardsect_sizes[MAX_MD_DEVS];
 static int md_maxreadahead[MAX_MD_DEVS];
 static mdk_thread_t *md_recovery_thread;
 
@@ -172,14 +171,14 @@ void del_mddev_mapping(mddev_t * mddev, kdev_t dev)
 	mddev_map[minor].data = NULL;
 }
 
-static int md_make_request(request_queue_t *q, int rw, struct buffer_head * bh)
+static int md_make_request (request_queue_t *q, struct bio *bio)
 {
-	mddev_t *mddev = kdev_to_mddev(bh->b_rdev);
+	mddev_t *mddev = kdev_to_mddev(bio->bi_dev);
 
 	if (mddev && mddev->pers)
-		return mddev->pers->make_request(mddev, rw, bh);
+		return mddev->pers->make_request(mddev, bio_rw(bio), bio);
 	else {
-		buffer_IO_error(bh);
+		bio_io_error(bio);
 		return 0;
 	}
 }
@@ -1701,19 +1700,14 @@ static int do_md_run(mddev_t * mddev)
 	 * device.
 	 * Also find largest hardsector size
 	 */
-	md_hardsect_sizes[mdidx(mddev)] = 512;
 	ITERATE_RDEV(mddev,rdev,tmp) {
 		if (rdev->faulty)
 			continue;
 		invalidate_device(rdev->dev, 1);
-		if (get_hardsect_size(rdev->dev)
-			> md_hardsect_sizes[mdidx(mddev)])
-			md_hardsect_sizes[mdidx(mddev)] =
-				get_hardsect_size(rdev->dev);
+		md_blocksizes[mdidx(mddev)] = 1024;
+		if (get_hardsect_size(rdev->dev) > md_blocksizes[mdidx(mddev)])
+			md_blocksizes[mdidx(mddev)] = get_hardsect_size(rdev->dev);
 	}
-	md_blocksizes[mdidx(mddev)] = 1024;
-	if (md_blocksizes[mdidx(mddev)] < md_hardsect_sizes[mdidx(mddev)])
-		md_blocksizes[mdidx(mddev)] = md_hardsect_sizes[mdidx(mddev)];
 	mddev->pers = pers[pnum];
 
 	err = mddev->pers->run(mddev);
@@ -2769,7 +2763,7 @@ static int md_ioctl(struct inode *inode, struct file *file,
 						(short *) &loc->cylinders);
 			if (err)
 				goto abort_unlock;
-			err = md_put_user (md_hd_struct[minor].start_sect,
+			err = md_put_user (get_start_sect(dev),
 						(long *) &loc->start);
 			goto done_unlock;
 	}
@@ -3621,13 +3615,11 @@ static void md_geninit(void)
 	for(i = 0; i < MAX_MD_DEVS; i++) {
 		md_blocksizes[i] = 1024;
 		md_size[i] = 0;
-		md_hardsect_sizes[i] = 512;
 		md_maxreadahead[i] = MD_READAHEAD;
 	}
 	blksize_size[MAJOR_NR] = md_blocksizes;
 	blk_size[MAJOR_NR] = md_size;
 	max_readahead[MAJOR_NR] = md_maxreadahead;
-	hardsect_size[MAJOR_NR] = md_hardsect_sizes;
 
 	dprintk("md: sizeof(mdp_super_t) = %d\n", (int)sizeof(mdp_super_t));
 
@@ -3670,7 +3662,8 @@ int md__init md_init(void)
 
 	md_recovery_thread = md_register_thread(md_do_recovery, NULL, name);
 	if (!md_recovery_thread)
-		printk(KERN_ALERT "md: bug: couldn't allocate md_recovery_thread\n");
+		printk(KERN_ALERT
+		       "md: bug: couldn't allocate md_recovery_thread\n");
 
 	md_register_reboot_notifier(&md_notifier);
 	raid_table_header = register_sysctl_table(raid_root_table, 1);
@@ -4008,15 +4001,10 @@ void cleanup_module(void)
 #endif
 
 	del_gendisk(&md_gendisk);
-
 	blk_dev[MAJOR_NR].queue = NULL;
-	blksize_size[MAJOR_NR] = NULL;
-	blk_size[MAJOR_NR] = NULL;
-	max_readahead[MAJOR_NR] = NULL;
-	hardsect_size[MAJOR_NR] = NULL;
-
+	blk_clear(MAJOR_NR);
+	
 	free_device_names();
-
 }
 #endif
 

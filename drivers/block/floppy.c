@@ -576,7 +576,7 @@ static int fdc; /* current fdc */
 static struct floppy_struct *_floppy = floppy_type;
 static unsigned char current_drive;
 static long current_count_sectors;
-static unsigned char sector_t; /* sector in track */
+static unsigned char fsector_t; /* sector in track */
 static unsigned char in_sector_offset;	/* offset within physical sector,
 					 * expressed in units of 512 bytes */
 
@@ -2276,8 +2276,8 @@ static int do_format(kdev_t device, struct format_descr *tmp_format_req)
  * logical buffer */
 static void request_done(int uptodate)
 {
-	int block;
 	unsigned long flags;
+	int block;
 
 	probing = 0;
 	reschedule_timeout(MAXTIMEOUT, "request done %d", uptodate);
@@ -2296,7 +2296,7 @@ static void request_done(int uptodate)
 			DRS->maxtrack = 1;
 
 		/* unlock chained buffers */
-		spin_lock_irqsave(&io_request_lock, flags);
+		spin_lock_irqsave(&QUEUE->queue_lock, flags);
 		while (current_count_sectors && !QUEUE_EMPTY &&
 		       current_count_sectors >= CURRENT->current_nr_sectors){
 			current_count_sectors -= CURRENT->current_nr_sectors;
@@ -2304,7 +2304,7 @@ static void request_done(int uptodate)
 			CURRENT->sector += CURRENT->current_nr_sectors;
 			end_request(1);
 		}
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(&QUEUE->queue_lock, flags);
 
 		if (current_count_sectors && !QUEUE_EMPTY){
 			/* "unlock" last subsector */
@@ -2329,9 +2329,9 @@ static void request_done(int uptodate)
 			DRWE->last_error_sector = CURRENT->sector;
 			DRWE->last_error_generation = DRS->generation;
 		}
-		spin_lock_irqsave(&io_request_lock, flags);
+		spin_lock_irqsave(&QUEUE->queue_lock, flags);
 		end_request(0);
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(&QUEUE->queue_lock, flags);
 	}
 }
 
@@ -2377,7 +2377,7 @@ static void rw_interrupt(void)
 		printk("rt=%d t=%d\n", R_TRACK, TRACK);
 		printk("heads=%d eoc=%d\n", heads, eoc);
 		printk("spt=%d st=%d ss=%d\n", SECT_PER_TRACK,
-		       sector_t, ssize);
+		       fsector_t, ssize);
 		printk("in_sector_offset=%d\n", in_sector_offset);
 	}
 #endif
@@ -2424,7 +2424,7 @@ static void rw_interrupt(void)
 	} else if (CT(COMMAND) == FD_READ){
 		buffer_track = raw_cmd->track;
 		buffer_drive = current_drive;
-		INFBOUND(buffer_max, nr_sectors + sector_t);
+		INFBOUND(buffer_max, nr_sectors + fsector_t);
 	}
 	cont->redo();
 }
@@ -2432,19 +2432,19 @@ static void rw_interrupt(void)
 /* Compute maximal contiguous buffer size. */
 static int buffer_chain_size(void)
 {
-	struct buffer_head *bh;
+	struct bio *bio;
 	int size;
 	char *base;
 
 	base = CURRENT->buffer;
 	size = CURRENT->current_nr_sectors << 9;
-	bh = CURRENT->bh;
+	bio = CURRENT->bio;
 
-	if (bh){
-		bh = bh->b_reqnext;
-		while (bh && bh->b_data == base + size){
-			size += bh->b_size;
-			bh = bh->b_reqnext;
+	if (bio){
+		bio = bio->bi_next;
+		while (bio && bio_data(bio) == base + size){
+			size += bio_size(bio);
+			bio = bio->bi_next;
 		}
 	}
 	return size >> 9;
@@ -2453,13 +2453,13 @@ static int buffer_chain_size(void)
 /* Compute the maximal transfer size */
 static int transfer_size(int ssize, int max_sector, int max_size)
 {
-	SUPBOUND(max_sector, sector_t + max_size);
+	SUPBOUND(max_sector, fsector_t + max_size);
 
 	/* alignment */
 	max_sector -= (max_sector % _floppy->sect) % ssize;
 
 	/* transfer size, beginning not aligned */
-	current_count_sectors = max_sector - sector_t ;
+	current_count_sectors = max_sector - fsector_t ;
 
 	return max_sector;
 }
@@ -2470,7 +2470,7 @@ static int transfer_size(int ssize, int max_sector, int max_size)
 static void copy_buffer(int ssize, int max_sector, int max_sector_2)
 {
 	int remaining; /* number of transferred 512-byte sectors */
-	struct buffer_head *bh;
+	struct bio *bio;
 	char *buffer, *dma_buffer;
 	int size;
 
@@ -2479,8 +2479,8 @@ static void copy_buffer(int ssize, int max_sector, int max_sector_2)
 				   CURRENT->nr_sectors);
 
 	if (current_count_sectors <= 0 && CT(COMMAND) == FD_WRITE &&
-	    buffer_max > sector_t + CURRENT->nr_sectors)
-		current_count_sectors = minimum(buffer_max - sector_t,
+	    buffer_max > fsector_t + CURRENT->nr_sectors)
+		current_count_sectors = minimum(buffer_max - fsector_t,
 						CURRENT->nr_sectors);
 
 	remaining = current_count_sectors << 9;
@@ -2491,7 +2491,7 @@ static void copy_buffer(int ssize, int max_sector, int max_sector_2)
 		printk("current_count_sectors=%ld\n", current_count_sectors);
 		printk("remaining=%d\n", remaining >> 9);
 		printk("CURRENT->nr_sectors=%ld\n",CURRENT->nr_sectors);
-		printk("CURRENT->current_nr_sectors=%ld\n",
+		printk("CURRENT->current_nr_sectors=%u\n",
 		       CURRENT->current_nr_sectors);
 		printk("max_sector=%d\n", max_sector);
 		printk("ssize=%d\n", ssize);
@@ -2500,9 +2500,9 @@ static void copy_buffer(int ssize, int max_sector, int max_sector_2)
 
 	buffer_max = maximum(max_sector, buffer_max);
 
-	dma_buffer = floppy_track_buffer + ((sector_t - buffer_min) << 9);
+	dma_buffer = floppy_track_buffer + ((fsector_t - buffer_min) << 9);
 
-	bh = CURRENT->bh;
+	bio = CURRENT->bio;
 	size = CURRENT->current_nr_sectors << 9;
 	buffer = CURRENT->buffer;
 
@@ -2514,8 +2514,8 @@ static void copy_buffer(int ssize, int max_sector, int max_sector_2)
 		    dma_buffer < floppy_track_buffer){
 			DPRINT("buffer overrun in copy buffer %d\n",
 				(int) ((floppy_track_buffer - dma_buffer) >>9));
-			printk("sector_t=%d buffer_min=%d\n",
-			       sector_t, buffer_min);
+			printk("fsector_t=%d buffer_min=%d\n",
+			       fsector_t, buffer_min);
 			printk("current_count_sectors=%ld\n",
 			       current_count_sectors);
 			if (CT(COMMAND) == FD_READ)
@@ -2536,15 +2536,15 @@ static void copy_buffer(int ssize, int max_sector, int max_sector_2)
 			break;
 
 		dma_buffer += size;
-		bh = bh->b_reqnext;
+		bio = bio->bi_next;
 #ifdef FLOPPY_SANITY_CHECK
-		if (!bh){
+		if (!bio){
 			DPRINT("bh=null in copy buffer after copy\n");
 			break;
 		}
 #endif
-		size = bh->b_size;
-		buffer = bh->b_data;
+		size = bio_size(bio);
+		buffer = bio_data(bio);
 	}
 #ifdef FLOPPY_SANITY_CHECK
 	if (remaining){
@@ -2636,7 +2636,7 @@ static int make_raw_rw_request(void)
 	max_sector = _floppy->sect * _floppy->head;
 
 	TRACK = CURRENT->sector / max_sector;
-	sector_t = CURRENT->sector % max_sector;
+	fsector_t = CURRENT->sector % max_sector;
 	if (_floppy->track && TRACK >= _floppy->track) {
 		if (CURRENT->current_nr_sectors & 1) {
 			current_count_sectors = 1;
@@ -2644,17 +2644,17 @@ static int make_raw_rw_request(void)
 		} else
 			return 0;
 	}
-	HEAD = sector_t / _floppy->sect;
+	HEAD = fsector_t / _floppy->sect;
 
 	if (((_floppy->stretch & FD_SWAPSIDES) || TESTF(FD_NEED_TWADDLE)) &&
-	    sector_t < _floppy->sect)
+	    fsector_t < _floppy->sect)
 		max_sector = _floppy->sect;
 
 	/* 2M disks have phantom sectors on the first track */
 	if ((_floppy->rate & FD_2M) && (!TRACK) && (!HEAD)){
 		max_sector = 2 * _floppy->sect / 3;
-		if (sector_t >= max_sector){
-			current_count_sectors = minimum(_floppy->sect - sector_t,
+		if (fsector_t >= max_sector){
+			current_count_sectors = minimum(_floppy->sect - fsector_t,
 							CURRENT->nr_sectors);
 			return 1;
 		}
@@ -2676,7 +2676,7 @@ static int make_raw_rw_request(void)
 	GAP = _floppy->gap;
 	CODE2SIZE;
 	SECT_PER_TRACK = _floppy->sect << 2 >> SIZECODE;
-	SECTOR = ((sector_t % _floppy->sect) << 2 >> SIZECODE) + 1;
+	SECTOR = ((fsector_t % _floppy->sect) << 2 >> SIZECODE) + 1;
 
 	/* tracksize describes the size which can be filled up with sectors
 	 * of size ssize.
@@ -2684,11 +2684,11 @@ static int make_raw_rw_request(void)
 	tracksize = _floppy->sect - _floppy->sect % ssize;
 	if (tracksize < _floppy->sect){
 		SECT_PER_TRACK ++;
-		if (tracksize <= sector_t % _floppy->sect)
+		if (tracksize <= fsector_t % _floppy->sect)
 			SECTOR--;
 
 		/* if we are beyond tracksize, fill up using smaller sectors */
-		while (tracksize <= sector_t % _floppy->sect){
+		while (tracksize <= fsector_t % _floppy->sect){
 			while(tracksize + ssize > _floppy->sect){
 				SIZECODE--;
 				ssize >>= 1;
@@ -2704,12 +2704,12 @@ static int make_raw_rw_request(void)
 		max_sector = _floppy->sect;
 	}
 
-	in_sector_offset = (sector_t % _floppy->sect) % ssize;
-	aligned_sector_t = sector_t - in_sector_offset;
+	in_sector_offset = (fsector_t % _floppy->sect) % ssize;
+	aligned_sector_t = fsector_t - in_sector_offset;
 	max_size = CURRENT->nr_sectors;
 	if ((raw_cmd->track == buffer_track) && 
 	    (current_drive == buffer_drive) &&
-	    (sector_t >= buffer_min) && (sector_t < buffer_max)) {
+	    (fsector_t >= buffer_min) && (fsector_t < buffer_max)) {
 		/* data already in track buffer */
 		if (CT(COMMAND) == FD_READ) {
 			copy_buffer(1, max_sector, buffer_max);
@@ -2717,8 +2717,8 @@ static int make_raw_rw_request(void)
 		}
 	} else if (in_sector_offset || CURRENT->nr_sectors < ssize){
 		if (CT(COMMAND) == FD_WRITE){
-			if (sector_t + CURRENT->nr_sectors > ssize &&
-			    sector_t + CURRENT->nr_sectors < ssize + ssize)
+			if (fsector_t + CURRENT->nr_sectors > ssize &&
+			    fsector_t + CURRENT->nr_sectors < ssize + ssize)
 				max_size = ssize + ssize;
 			else
 				max_size = ssize;
@@ -2731,7 +2731,7 @@ static int make_raw_rw_request(void)
 		int direct, indirect;
 
 		indirect= transfer_size(ssize,max_sector,max_buffer_sectors*2) -
-			sector_t;
+			fsector_t;
 
 		/*
 		 * Do NOT use minimum() here---MAX_DMA_ADDRESS is 64 bits wide
@@ -2746,7 +2746,7 @@ static int make_raw_rw_request(void)
 		if (CROSS_64KB(CURRENT->buffer, max_size << 9))
 			max_size = (K_64 - 
 				    ((unsigned long)CURRENT->buffer) % K_64)>>9;
-		direct = transfer_size(ssize,max_sector,max_size) - sector_t;
+		direct = transfer_size(ssize,max_sector,max_size) - fsector_t;
 		/*
 		 * We try to read tracks, but if we get too many errors, we
 		 * go back to reading just one sector at a time.
@@ -2765,8 +2765,8 @@ static int make_raw_rw_request(void)
 			raw_cmd->length = current_count_sectors << 9;
 			if (raw_cmd->length == 0){
 				DPRINT("zero dma transfer attempted from make_raw_request\n");
-				DPRINT("indirect=%d direct=%d sector_t=%d",
-					indirect, direct, sector_t);
+				DPRINT("indirect=%d direct=%d fsector_t=%d",
+					indirect, direct, fsector_t);
 				return 0;
 			}
 /*			check_dma_crossing(raw_cmd->kernel_data, 
@@ -2784,12 +2784,12 @@ static int make_raw_rw_request(void)
 	/* claim buffer track if needed */
 	if (buffer_track != raw_cmd->track ||  /* bad track */
 	    buffer_drive !=current_drive || /* bad drive */
-	    sector_t > buffer_max ||
-	    sector_t < buffer_min ||
+	    fsector_t > buffer_max ||
+	    fsector_t < buffer_min ||
 	    ((CT(COMMAND) == FD_READ ||
 	      (!in_sector_offset && CURRENT->nr_sectors >= ssize))&&
 	     max_sector > 2 * max_buffer_sectors + buffer_min &&
-	     max_size + sector_t > 2 * max_buffer_sectors + buffer_min)
+	     max_size + fsector_t > 2 * max_buffer_sectors + buffer_min)
 	    /* not enough space */){
 		buffer_track = -1;
 		buffer_drive = current_drive;
@@ -2836,7 +2836,7 @@ static int make_raw_rw_request(void)
 				       floppy_track_buffer) >> 9),
 			       current_count_sectors);
 		printk("st=%d ast=%d mse=%d msi=%d\n",
-		       sector_t, aligned_sector_t, max_sector, max_size);
+		       fsector_t, aligned_sector_t, max_sector, max_size);
 		printk("ssize=%x SIZECODE=%d\n", ssize, SIZECODE);
 		printk("command=%x SECTOR=%d HEAD=%d, TRACK=%d\n",
 		       COMMAND, SECTOR, HEAD, TRACK);
@@ -2854,8 +2854,8 @@ static int make_raw_rw_request(void)
 		    raw_cmd->kernel_data + raw_cmd->length >
 		    floppy_track_buffer + (max_buffer_sectors  << 10)){
 			DPRINT("buffer overrun in schedule dma\n");
-			printk("sector_t=%d buffer_min=%d current_count=%ld\n",
-			       sector_t, buffer_min,
+			printk("fsector_t=%d buffer_min=%d current_count=%ld\n",
+			       fsector_t, buffer_min,
 			       raw_cmd->length >> 9);
 			printk("current_count_sectors=%ld\n",
 			       current_count_sectors);
@@ -2908,8 +2908,6 @@ static void redo_fd_request(void)
 		}
 		if (MAJOR(CURRENT->rq_dev) != MAJOR_NR)
 			panic(DEVICE_NAME ": request list destroyed");
-		if (CURRENT->bh && !buffer_locked(CURRENT->bh))
-			panic(DEVICE_NAME ": block not locked");
 
 		device = CURRENT->rq_dev;
 		set_fdc(DRIVE(device));
@@ -4172,7 +4170,7 @@ int __init floppy_init(void)
 
 	blk_size[MAJOR_NR] = floppy_sizes;
 	blksize_size[MAJOR_NR] = floppy_blocksizes;
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST, "floppy");
 	reschedule_timeout(MAXTIMEOUT, "floppy init", MAXTIMEOUT);
 	config_types();
 

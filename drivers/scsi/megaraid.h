@@ -223,7 +223,8 @@
     cmd_per_lun:    	MAX_CMD_PER_LUN,	/* SCSI Commands per LUN	*/\
     present:	  	0,		       	/* Present			*/\
     unchecked_isa_dma:	0,		       	/* Default Unchecked ISA DMA	*/\
-    use_clustering:   	ENABLE_CLUSTERING  	/* Enable Clustering		*/\
+    use_clustering:   	ENABLE_CLUSTERING,  	/* Enable Clustering		*/\
+	highmem_io:		1,													\
   }
 #endif
 

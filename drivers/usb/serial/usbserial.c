@@ -397,7 +397,7 @@ static struct termios *		serial_termios_locked[SERIAL_TTY_MINORS];
 static struct usb_serial	*serial_table[SERIAL_TTY_MINORS];	/* initially all NULL */
 
 
-LIST_HEAD(usb_serial_driver_list);
+static LIST_HEAD(usb_serial_driver_list);
 
 
 static struct usb_serial *get_serial_by_minor (int minor)
@@ -1433,7 +1433,7 @@ static struct tty_driver serial_tty_driver = {
 };
 
 
-int usb_serial_init(void)
+static int __init usb_serial_init(void)
 {
 	int i;
 	int result;
@@ -1473,7 +1473,7 @@ int usb_serial_init(void)
 }
 
 
-void usb_serial_exit(void)
+static void __exit usb_serial_exit(void)
 {
 
 #ifdef CONFIG_USB_SERIAL_GENERIC

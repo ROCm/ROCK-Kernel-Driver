@@ -8,51 +8,31 @@
 
 #include <linux/iobuf.h>
 #include <linux/slab.h>
-#include <linux/vmalloc.h>
 
-void end_kio_request(struct kiobuf *kiobuf, int uptodate)
+int end_kio_request(struct kiobuf *kiobuf, int uptodate)
 {
+	int ret = 1;
+
 	if ((!uptodate) && !kiobuf->errno)
 		kiobuf->errno = -EIO;
 
 	if (atomic_dec_and_test(&kiobuf->io_count)) {
+		ret = 0;
 		if (kiobuf->end_io)
 			kiobuf->end_io(kiobuf);
 		wake_up(&kiobuf->wait_queue);
 	}
+
+	return ret;
 }
 
 static void kiobuf_init(struct kiobuf *iobuf)
 {
 	memset(iobuf, 0, sizeof(*iobuf));
 	init_waitqueue_head(&iobuf->wait_queue);
+	atomic_set(&iobuf->io_count, 0);
 	iobuf->array_len = KIO_STATIC_PAGES;
 	iobuf->maplist   = iobuf->map_array;
-}
-
-int alloc_kiobuf_bhs(struct kiobuf * kiobuf)
-{
-	int i;
-
-	for (i = 0; i < KIO_MAX_SECTORS; i++)
-		if (!(kiobuf->bh[i] = kmem_cache_alloc(bh_cachep, SLAB_KERNEL))) {
-			while (i--) {
-				kmem_cache_free(bh_cachep, kiobuf->bh[i]);
-				kiobuf->bh[i] = NULL;
-			}
-			return -ENOMEM;
-		}
-	return 0;
-}
-
-void free_kiobuf_bhs(struct kiobuf * kiobuf)
-{
-	int i;
-
-	for (i = 0; i < KIO_MAX_SECTORS; i++) {
-		kmem_cache_free(bh_cachep, kiobuf->bh[i]);
-		kiobuf->bh[i] = NULL;
-	}
 }
 
 int alloc_kiovec(int nr, struct kiobuf **bufp)
@@ -61,17 +41,12 @@ int alloc_kiovec(int nr, struct kiobuf **bufp)
 	struct kiobuf *iobuf;
 	
 	for (i = 0; i < nr; i++) {
-		iobuf = vmalloc(sizeof(struct kiobuf));
+		iobuf = kmalloc(sizeof(struct kiobuf), GFP_KERNEL);
 		if (!iobuf) {
 			free_kiovec(i, bufp);
 			return -ENOMEM;
 		}
 		kiobuf_init(iobuf);
- 		if (alloc_kiobuf_bhs(iobuf)) {
-			vfree(iobuf);
- 			free_kiovec(i, bufp);
- 			return -ENOMEM;
- 		}
 		bufp[i] = iobuf;
 	}
 	
@@ -89,8 +64,7 @@ void free_kiovec(int nr, struct kiobuf **bufp)
 			unlock_kiovec(1, &iobuf);
 		if (iobuf->array_len > KIO_STATIC_PAGES)
 			kfree (iobuf->maplist);
-		free_kiobuf_bhs(iobuf);
-		vfree(bufp[i]);
+		kfree(bufp[i]);
 	}
 }
 

@@ -935,7 +935,6 @@ struct page * find_or_create_page(struct address_space *mapping, unsigned long i
 	spin_unlock(&pagecache_lock);
 	if (!page) {
 		struct page *newpage = alloc_page(gfp_mask);
-		page = ERR_PTR(-ENOMEM);
 		if (newpage) {
 			spin_lock(&pagecache_lock);
 			page = __find_lock_page_helper(mapping, index, *hash);

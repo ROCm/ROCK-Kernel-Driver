@@ -423,8 +423,6 @@ STATIC int scsi_request_sense(Scsi_Cmnd * SCpnt)
 	unsigned char scsi_result0[256], *scsi_result = NULL;
 	int saved_result;
 
-	ASSERT_LOCK(&io_request_lock, 0);
-
 	memcpy((void *) SCpnt->cmnd, (void *) generic_sense,
 	       sizeof(generic_sense));
 
@@ -583,16 +581,14 @@ void scsi_sleep(int timeout)
 STATIC void scsi_send_eh_cmnd(Scsi_Cmnd * SCpnt, int timeout)
 {
 	unsigned long flags;
-	struct Scsi_Host *host;
+	struct Scsi_Host *host = SCpnt->host;
 
-	ASSERT_LOCK(&io_request_lock, 0);
+	ASSERT_LOCK(&host->host_lock, 0);
 
-	host = SCpnt->host;
-
-      retry:
+retry:
 	/*
-	 * We will use a queued command if possible, otherwise we will emulate the
-	 * queuing and calling of completion function ourselves.
+	 * We will use a queued command if possible, otherwise we will
+	 * emulate the queuing and calling of completion function ourselves.
 	 */
 	SCpnt->owner = SCSI_OWNER_LOWLEVEL;
 
@@ -609,9 +605,9 @@ STATIC void scsi_send_eh_cmnd(Scsi_Cmnd * SCpnt, int timeout)
 		SCpnt->host->eh_action = &sem;
 		SCpnt->request.rq_status = RQ_SCSI_BUSY;
 
-		spin_lock_irqsave(&io_request_lock, flags);
+		spin_lock_irqsave(&SCpnt->host->host_lock, flags);
 		host->hostt->queuecommand(SCpnt, scsi_eh_done);
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(&SCpnt->host->host_lock, flags);
 
 		down(&sem);
 
@@ -634,10 +630,10 @@ STATIC void scsi_send_eh_cmnd(Scsi_Cmnd * SCpnt, int timeout)
 			 * abort a timed out command or not.  Not sure how
 			 * we should treat them differently anyways.
 			 */
-			spin_lock_irqsave(&io_request_lock, flags);
+			spin_lock_irqsave(&SCpnt->host->host_lock, flags);
 			if (SCpnt->host->hostt->eh_abort_handler)
 				SCpnt->host->hostt->eh_abort_handler(SCpnt);
-			spin_unlock_irqrestore(&io_request_lock, flags);
+			spin_unlock_irqrestore(&SCpnt->host->host_lock, flags);
 			
 			SCpnt->request.rq_status = RQ_SCSI_DONE;
 			SCpnt->owner = SCSI_OWNER_ERROR_HANDLER;
@@ -650,13 +646,13 @@ STATIC void scsi_send_eh_cmnd(Scsi_Cmnd * SCpnt, int timeout)
 		int temp;
 
 		/*
-		 * We damn well had better never use this code.  There is no timeout
-		 * protection here, since we would end up waiting in the actual low
-		 * level driver, we don't know how to wake it up.
+		 * We damn well had better never use this code.  There is no
+		 * timeout protection here, since we would end up waiting in
+		 * the actual low level driver, we don't know how to wake it up.
 		 */
-		spin_lock_irqsave(&io_request_lock, flags);
+		spin_lock_irqsave(&host->host_lock, flags);
 		temp = host->hostt->command(SCpnt);
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(&host->host_lock, flags);
 
 		SCpnt->result = temp;
 		/* Fall through to code below to examine status. */
@@ -664,8 +660,8 @@ STATIC void scsi_send_eh_cmnd(Scsi_Cmnd * SCpnt, int timeout)
 	}
 
 	/*
-	 * Now examine the actual status codes to see whether the command actually
-	 * did complete normally.
+	 * Now examine the actual status codes to see whether the command
+	 * actually did complete normally.
 	 */
 	if (SCpnt->eh_state == SUCCESS) {
 		int ret = scsi_eh_completed_normally(SCpnt);
@@ -776,9 +772,9 @@ STATIC int scsi_try_to_abort_command(Scsi_Cmnd * SCpnt, int timeout)
 
 	SCpnt->owner = SCSI_OWNER_LOWLEVEL;
 
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(&SCpnt->host->host_lock, flags);
 	rtn = SCpnt->host->hostt->eh_abort_handler(SCpnt);
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(&SCpnt->host->host_lock, flags);
 	return rtn;
 }
 
@@ -808,9 +804,9 @@ STATIC int scsi_try_bus_device_reset(Scsi_Cmnd * SCpnt, int timeout)
 	}
 	SCpnt->owner = SCSI_OWNER_LOWLEVEL;
 
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(&SCpnt->host->host_lock, flags);
 	rtn = SCpnt->host->hostt->eh_device_reset_handler(SCpnt);
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(&SCpnt->host->host_lock, flags);
 
 	if (rtn == SUCCESS)
 		SCpnt->eh_state = SUCCESS;
@@ -841,9 +837,9 @@ STATIC int scsi_try_bus_reset(Scsi_Cmnd * SCpnt)
 		return FAILED;
 	}
 
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(&SCpnt->host->host_lock, flags);
 	rtn = SCpnt->host->hostt->eh_bus_reset_handler(SCpnt);
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(&SCpnt->host->host_lock, flags);
 
 	if (rtn == SUCCESS)
 		SCpnt->eh_state = SUCCESS;
@@ -887,9 +883,9 @@ STATIC int scsi_try_host_reset(Scsi_Cmnd * SCpnt)
 	if (SCpnt->host->hostt->eh_host_reset_handler == NULL) {
 		return FAILED;
 	}
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(&SCpnt->host->host_lock, flags);
 	rtn = SCpnt->host->hostt->eh_host_reset_handler(SCpnt);
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(&SCpnt->host->host_lock, flags);
 
 	if (rtn == SUCCESS)
 		SCpnt->eh_state = SUCCESS;
@@ -1230,7 +1226,7 @@ STATIC void scsi_restart_operations(struct Scsi_Host *host)
 	Scsi_Device *SDpnt;
 	unsigned long flags;
 
-	ASSERT_LOCK(&io_request_lock, 0);
+	ASSERT_LOCK(&host->host_lock, 0);
 
 	/*
 	 * Next free up anything directly waiting upon the host.  This will be
@@ -1247,19 +1243,22 @@ STATIC void scsi_restart_operations(struct Scsi_Host *host)
 	 * now that error recovery is done, we will need to ensure that these
 	 * requests are started.
 	 */
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(&host->host_lock, flags);
 	for (SDpnt = host->host_queue; SDpnt; SDpnt = SDpnt->next) {
-		request_queue_t *q;
+		request_queue_t *q = &SDpnt->request_queue;
+
 		if ((host->can_queue > 0 && (host->host_busy >= host->can_queue))
 		    || (host->host_blocked)
 		    || (host->host_self_blocked)
 		    || (SDpnt->device_blocked)) {
 			break;
 		}
-		q = &SDpnt->request_queue;
+
+		spin_lock(&q->queue_lock);
 		q->request_fn(q);
+		spin_unlock(&q->queue_lock);
 	}
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(&host->host_lock, flags);
 }
 
 /*
@@ -1306,7 +1305,7 @@ STATIC int scsi_unjam_host(struct Scsi_Host *host)
 	Scsi_Cmnd *SCdone;
 	int timed_out;
 
-	ASSERT_LOCK(&io_request_lock, 0);
+	ASSERT_LOCK(&host->host_lock, 0);
 
 	SCdone = NULL;
 

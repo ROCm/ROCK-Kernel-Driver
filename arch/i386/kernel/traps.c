@@ -697,7 +697,7 @@ asmlinkage void do_spurious_interrupt_bug(struct pt_regs * regs,
  */
 asmlinkage void math_state_restore(struct pt_regs regs)
 {
-	__asm__ __volatile__("clts");		/* Allow maths ops (or we recurse) */
+	clts();		/* Allow maths ops (or we recurse) */
 
 	if (current->used_math) {
 		restore_fpu(current);

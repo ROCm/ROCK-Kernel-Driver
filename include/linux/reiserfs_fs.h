@@ -1856,7 +1856,7 @@ void make_le_item_head (struct item_head * ih, const struct cpu_key * key,
 			loff_t offset, int type, int length, int entry_count);
 /*void store_key (struct key * key);
 void forget_key (struct key * key);*/
-int reiserfs_get_block (struct inode * inode, long block,
+int reiserfs_get_block (struct inode * inode, sector_t block,
 			struct buffer_head * bh_result, int create);
 struct inode * reiserfs_iget (struct super_block * s, 
 			      const struct cpu_key * key);

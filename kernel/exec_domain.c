@@ -102,7 +102,7 @@ lookup_exec_domain(u_long personality)
 	}
 #endif
 
-	ep = NULL;
+	ep = &default_exec_domain;
 out:
 	read_unlock(&exec_domains_lock);
 	return (ep);
@@ -162,8 +162,6 @@ __set_personality(u_long personality)
 	struct exec_domain	*ep, *oep;
 
 	ep = lookup_exec_domain(personality);
-	if (ep == NULL)
-		return -EINVAL;
 	if (ep == current->exec_domain) {
 		current->personality = personality;
 		return 0;

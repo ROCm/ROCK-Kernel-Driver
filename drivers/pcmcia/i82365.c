@@ -813,11 +813,7 @@ static void __init add_pcic(int ns, int type)
 
 #ifdef CONFIG_ISA
 
-#if defined(CONFIG_ISAPNP) || (defined(CONFIG_ISAPNP_MODULE) && defined(MODULE))
-#define I82365_ISAPNP
-#endif
-
-#ifdef I82365_ISAPNP
+#ifdef __ISAPNP__
 static struct isapnp_device_id id_table[] __initdata = {
 	{ 	ISAPNP_ANY_ID, ISAPNP_ANY_ID, ISAPNP_VENDOR('P', 'N', 'P'),
 		ISAPNP_FUNCTION(0x0e00), (unsigned long) "Intel 82365-Compatible" },
@@ -836,7 +832,7 @@ static void __init isa_probe(void)
 {
     int i, j, sock, k, ns, id;
     ioaddr_t port;
-#ifdef I82365_ISAPNP
+#ifdef __ISAPNP__
     struct isapnp_device_id *devid;
     struct pci_dev *dev;
 
@@ -1647,7 +1643,7 @@ static void __exit exit_i82365(void)
 	i365_set(i, I365_CSCINT, 0);
 	release_region(socket[i].ioaddr, 2);
     }
-#if defined(CONFIG_ISA) && defined(I82365_ISAPNP)
+#if defined(CONFIG_ISA) && defined(__ISAPNP__)
     if (i82365_pnpdev && i82365_pnpdev->deactivate)
 		i82365_pnpdev->deactivate(i82365_pnpdev);
 #endif

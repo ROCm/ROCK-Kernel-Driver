@@ -129,7 +129,7 @@ scsi_unregister(struct Scsi_Host * sh){
  * once we are 100% sure that we want to use this host adapter -  it is a
  * pain to reverse this, so we try to avoid it 
  */
-
+extern int blk_nohighio;
 struct Scsi_Host * scsi_register(Scsi_Host_Template * tpnt, int j){
     struct Scsi_Host * retval, *shpnt, *o_shp;
     Scsi_Host_Name *shn, *shn2;
@@ -160,6 +160,7 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template * tpnt, int j){
 	    break;
 	}
     }
+    spin_lock_init(&retval->host_lock);
     atomic_set(&retval->host_active,0);
     retval->host_busy = 0;
     retval->host_failed = 0;
@@ -235,6 +236,8 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template * tpnt, int j){
     retval->cmd_per_lun = tpnt->cmd_per_lun;
     retval->unchecked_isa_dma = tpnt->unchecked_isa_dma;
     retval->use_clustering = tpnt->use_clustering;   
+    if (!blk_nohighio)
+	retval->highmem_io = tpnt->highmem_io;
 
     retval->select_queue_depths = tpnt->select_queue_depths;
     retval->max_sectors = tpnt->max_sectors;

@@ -125,6 +125,7 @@ static spinlock_t i2o_dev_lock = SPIN_LOCK_UNLOCKED;
  * Function table to send to bus specific layers
  * See <include/linux/i2o.h> for explanation of this
  */
+#ifdef CONFIG_I2O_PCI_MODULE
 static struct i2o_core_func_table i2o_core_functions =
 {
 	i2o_install_controller,
@@ -135,7 +136,6 @@ static struct i2o_core_func_table i2o_core_functions =
 	i2o_delete_controller
 };
 
-#ifdef CONFIG_I2O_PCI_MODULE
 extern int i2o_pci_core_attach(struct i2o_core_func_table *);
 extern void i2o_pci_core_detach(void);
 #endif /* CONFIG_I2O_PCI_MODULE */

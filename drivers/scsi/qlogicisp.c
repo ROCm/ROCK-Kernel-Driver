@@ -1403,11 +1403,6 @@ static int isp1020_init(struct Scsi_Host *sh)
 	command &= ~PCI_COMMAND_MEMORY; 
 #endif
 
-	if (!(command & PCI_COMMAND_MASTER)) {
-		printk("qlogicisp : bus mastering is disabled\n");
-		return 1;
-	}
-
 	sh->io_port = io_base;
 
 	if (!request_region(sh->io_port, 0xff, "qlogicisp")) {
@@ -1471,6 +1466,8 @@ static int isp1020_init(struct Scsi_Host *sh)
 		printk("qlogicisp : can't allocate request queue\n");
 		goto out_unmap;
 	}
+
+	pci_set_master(pdev);
 
 	LEAVE("isp1020_init");
 

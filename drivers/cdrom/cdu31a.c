@@ -1583,7 +1583,10 @@ static void do_cdu31a_request(request_queue_t * q)
 	/* Make sure we have a valid TOC. */
 	sony_get_toc();
 
-	spin_unlock_irq(&io_request_lock);
+	/*
+	 * jens: driver has lots of races
+	 */
+	spin_unlock_irq(&q->queue_lock);
 
 	/* Make sure the timer is cancelled. */
 	del_timer(&cdu31a_abort_timer);
@@ -1730,7 +1733,7 @@ static void do_cdu31a_request(request_queue_t * q)
 	}
 
       end_do_cdu31a_request:
-	spin_lock_irq(&io_request_lock);
+	spin_lock_irq(&q->queue_lock);
 #if 0
 	/* After finished, cancel any pending operations. */
 	abort_read();

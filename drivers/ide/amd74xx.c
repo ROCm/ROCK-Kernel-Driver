@@ -75,7 +75,8 @@ static unsigned int amd74xx_swdma_check (struct pci_dev *dev)
 {
 	unsigned int class_rev;
 
-	if (dev->device == PCI_DEVICE_ID_AMD_VIPER_7411)
+	if ((dev->device == PCI_DEVICE_ID_AMD_VIPER_7411) ||
+	    (dev->device == PCI_DEVICE_ID_AMD_VIPER_7441))
 		return 0;
 
 	pci_read_config_dword(dev, PCI_CLASS_REVISION, &class_rev);
@@ -122,8 +123,8 @@ static int amd74xx_tune_chipset (ide_drive_t *drive, byte speed)
 	pci_read_config_byte(dev, 0x4c, &pio_timing);
 
 #ifdef DEBUG
-	printk("%s: UDMA 0x%02x DMAPIO 0x%02x PIO 0x%02x ",
-		drive->name, ultra_timing, dma_pio_timing, pio_timing);
+	printk("%s:%d: Speed 0x%02x UDMA 0x%02x DMAPIO 0x%02x PIO 0x%02x\n",
+		drive->name, drive->dn, speed, ultra_timing, dma_pio_timing, pio_timing);
 #endif
 
 	ultra_timing	&= ~0xC7;
@@ -131,22 +132,19 @@ static int amd74xx_tune_chipset (ide_drive_t *drive, byte speed)
 	pio_timing	&= ~(0x03 << drive->dn);
 
 #ifdef DEBUG
-	printk(":: UDMA 0x%02x DMAPIO 0x%02x PIO 0x%02x ",
-		ultra_timing, dma_pio_timing, pio_timing);
+	printk("%s: UDMA 0x%02x DMAPIO 0x%02x PIO 0x%02x\n",
+		drive->name, ultra_timing, dma_pio_timing, pio_timing);
 #endif
 
 	switch(speed) {
 #ifdef CONFIG_BLK_DEV_IDEDMA
+		case XFER_UDMA_7:
+		case XFER_UDMA_6:
+			speed = XFER_UDMA_5;
 		case XFER_UDMA_5:
-#undef __CAN_MODE_5
-#ifdef __CAN_MODE_5
 			ultra_timing |= 0x46;
 			dma_pio_timing |= 0x20;
 			break;
-#else
-			printk("%s: setting to mode 4, driver problems in mode 5.\n", drive->name);
-			speed = XFER_UDMA_4;
-#endif /* __CAN_MODE_5 */
 		case XFER_UDMA_4:
 			ultra_timing |= 0x45;
 			dma_pio_timing |= 0x20;
@@ -222,8 +220,8 @@ static int amd74xx_tune_chipset (ide_drive_t *drive, byte speed)
 	pci_write_config_byte(dev, 0x4c, pio_timing);
 
 #ifdef DEBUG
-	printk(":: UDMA 0x%02x DMAPIO 0x%02x PIO 0x%02x\n",
-		ultra_timing, dma_pio_timing, pio_timing);
+	printk("%s: UDMA 0x%02x DMAPIO 0x%02x PIO 0x%02x\n",
+		drive->name, ultra_timing, dma_pio_timing, pio_timing);
 #endif
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
@@ -303,11 +301,12 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 	struct pci_dev *dev	= hwif->pci_dev;
 	struct hd_driveid *id	= drive->id;
 	byte udma_66		= eighty_ninty_three(drive);
-	byte udma_100		= (dev->device==PCI_DEVICE_ID_AMD_VIPER_7411) ? 1 : 0;
+	byte udma_100		= ((dev->device==PCI_DEVICE_ID_AMD_VIPER_7411)||
+				   (dev->device==PCI_DEVICE_ID_AMD_VIPER_7441)) ? 1 : 0;
 	byte speed		= 0x00;
 	int  rval;
 
-	if ((id->dma_ultra & 0x0020) && (udma_66)&& (udma_100)) {
+	if ((id->dma_ultra & 0x0020) && (udma_66) && (udma_100)) {
 		speed = XFER_UDMA_5;
 	} else if ((id->dma_ultra & 0x0010) && (udma_66)) {
 		speed = XFER_UDMA_4;
@@ -331,7 +330,7 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 
 	(void) amd74xx_tune_chipset(drive, speed);
 
-	rval = (int)(	((id->dma_ultra >> 11) & 3) ? ide_dma_on :
+	rval = (int)(	((id->dma_ultra >> 11) & 7) ? ide_dma_on :
 			((id->dma_ultra >> 8) & 7) ? ide_dma_on :
 			((id->dma_mword >> 8) & 7) ? ide_dma_on :
 						     ide_dma_off_quietly);
@@ -352,7 +351,7 @@ static int config_drive_xfer_rate (ide_drive_t *drive)
 		}
 		dma_func = ide_dma_off_quietly;
 		if (id->field_valid & 4) {
-			if (id->dma_ultra & 0x002F) {
+			if (id->dma_ultra & 0x003F) {
 				/* Force if Capable UltraDMA */
 				dma_func = config_chipset_for_dma(drive);
 				if ((id->field_valid & 2) &&

@@ -47,6 +47,7 @@
 #include <linux/highmem.h>
 #include <linux/module.h>
 #include <linux/completion.h>
+#include <linux/compiler.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -548,7 +549,7 @@ static void remove_from_queues(struct buffer_head *bh)
 	spin_unlock(&lru_list_lock);
 }
 
-struct buffer_head * get_hash_table(kdev_t dev, int block, int size)
+struct buffer_head * get_hash_table(kdev_t dev, sector_t block, int size)
 {
 	struct buffer_head *bh, **p = &hash(dev, block);
 
@@ -1014,7 +1015,7 @@ void invalidate_inode_buffers(struct inode *inode)
  * 14.02.92: changed it to sync dirty buffers a bit: better performance
  * when the filesystem starts to get full of dirty blocks (I hope).
  */
-struct buffer_head * getblk(kdev_t dev, int block, int size)
+struct buffer_head * getblk(kdev_t dev, sector_t block, int size)
 {
 	for (;;) {
 		struct buffer_head * bh;
@@ -1988,7 +1989,8 @@ done:
 	goto done;
 }
 
-int generic_block_bmap(struct address_space *mapping, long block, get_block_t *get_block)
+sector_t generic_block_bmap(struct address_space *mapping, sector_t block,
+			    get_block_t *get_block)
 {
 	struct buffer_head tmp;
 	struct inode *inode = mapping->host;
@@ -2001,7 +2003,7 @@ int generic_block_bmap(struct address_space *mapping, long block, get_block_t *g
 int generic_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsigned long blocknr, int blocksize, get_block_t * get_block)
 {
 	int i, nr_blocks, retval;
-	unsigned long * blocks = iobuf->blocks;
+	sector_t *blocks = iobuf->blocks;
 
 	nr_blocks = iobuf->length / blocksize;
 	/* build the blocklist */
@@ -2012,7 +2014,7 @@ int generic_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsig
 		bh.b_dev = inode->i_dev;
 		bh.b_size = blocksize;
 
-		retval = get_block(inode, blocknr, &bh, rw == READ ? 0 : 1);
+		retval = get_block(inode, blocknr, &bh, rw & 1);
 		if (retval)
 			goto out;
 
@@ -2033,61 +2035,10 @@ int generic_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsig
 		blocks[i] = bh.b_blocknr;
 	}
 
-	retval = brw_kiovec(rw, 1, &iobuf, inode->i_dev, iobuf->blocks, blocksize);
+	retval = brw_kiovec(rw, 1, &iobuf, inode->i_dev, blocks, blocksize);
 
  out:
 	return retval;
-}
-
-/*
- * IO completion routine for a buffer_head being used for kiobuf IO: we
- * can't dispatch the kiobuf callback until io_count reaches 0.  
- */
-
-static void end_buffer_io_kiobuf(struct buffer_head *bh, int uptodate)
-{
-	struct kiobuf *kiobuf;
-	
-	mark_buffer_uptodate(bh, uptodate);
-
-	kiobuf = bh->b_private;
-	unlock_buffer(bh);
-	end_kio_request(kiobuf, uptodate);
-}
-
-/*
- * For brw_kiovec: submit a set of buffer_head temporary IOs and wait
- * for them to complete.  Clean up the buffer_heads afterwards.  
- */
-
-static int wait_kio(int rw, int nr, struct buffer_head *bh[], int size)
-{
-	int iosize, err;
-	int i;
-	struct buffer_head *tmp;
-
-	iosize = 0;
-	err = 0;
-
-	for (i = nr; --i >= 0; ) {
-		iosize += size;
-		tmp = bh[i];
-		if (buffer_locked(tmp)) {
-			wait_on_buffer(tmp);
-		}
-		
-		if (!buffer_uptodate(tmp)) {
-			/* We are traversing bh'es in reverse order so
-                           clearing iosize on error calculates the
-                           amount of IO before the first error. */
-			iosize = 0;
-			err = -EIO;
-		}
-	}
-	
-	if (iosize)
-		return iosize;
-	return err;
 }
 
 /*
@@ -2101,22 +2052,13 @@ static int wait_kio(int rw, int nr, struct buffer_head *bh[], int size)
  * It is up to the caller to make sure that there are enough blocks
  * passed in to completely map the iobufs to disk.
  */
-
-int brw_kiovec(int rw, int nr, struct kiobuf *iovec[], 
-	       kdev_t dev, unsigned long b[], int size)
+int brw_kiovec(int rw, int nr, struct kiobuf *iovec[], kdev_t dev, sector_t b[],
+	       int size)
 {
-	int		err;
-	int		length;
 	int		transferred;
 	int		i;
-	int		bufind;
-	int		pageind;
-	int		bhind;
-	int		offset;
-	unsigned long	blocknr;
-	struct kiobuf *	iobuf = NULL;
-	struct page *	map;
-	struct buffer_head *tmp, **bhs = NULL;
+	int		err;
+	struct kiobuf *	iobuf;
 
 	if (!nr)
 		return 0;
@@ -2126,8 +2068,7 @@ int brw_kiovec(int rw, int nr, struct kiobuf *iovec[],
 	 */
 	for (i = 0; i < nr; i++) {
 		iobuf = iovec[i];
-		if ((iobuf->offset & (size-1)) ||
-		    (iobuf->length & (size-1)))
+		if ((iobuf->offset & (size-1)) || (iobuf->length & (size-1)))
 			return -EINVAL;
 		if (!iobuf->nr_pages)
 			panic("brw_kiovec: iobuf not initialised");
@@ -2136,94 +2077,28 @@ int brw_kiovec(int rw, int nr, struct kiobuf *iovec[],
 	/* 
 	 * OK to walk down the iovec doing page IO on each page we find. 
 	 */
-	bufind = bhind = transferred = err = 0;
 	for (i = 0; i < nr; i++) {
 		iobuf = iovec[i];
-		offset = iobuf->offset;
-		length = iobuf->length;
 		iobuf->errno = 0;
-		if (!bhs)
-			bhs = iobuf->bh;
-		
-		for (pageind = 0; pageind < iobuf->nr_pages; pageind++) {
-			map  = iobuf->maplist[pageind];
-			if (!map) {
-				err = -EFAULT;
-				goto finished;
-			}
-			
-			while (length > 0) {
-				blocknr = b[bufind++];
-				if (blocknr == -1UL) {
-					if (rw == READ) {
-						/* there was an hole in the filesystem */
-						memset(kmap(map) + offset, 0, size);
-						flush_dcache_page(map);
-						kunmap(map);
 
-						transferred += size;
-						goto skip_block;
-					} else
-						BUG();
-				}
-				tmp = bhs[bhind++];
-
-				tmp->b_size = size;
-				set_bh_page(tmp, map, offset);
-				tmp->b_this_page = tmp;
-
-				init_buffer(tmp, end_buffer_io_kiobuf, iobuf);
-				tmp->b_dev = dev;
-				tmp->b_blocknr = blocknr;
-				tmp->b_state = (1 << BH_Mapped) | (1 << BH_Lock) | (1 << BH_Req);
-
-				if (rw == WRITE) {
-					set_bit(BH_Uptodate, &tmp->b_state);
-					clear_bit(BH_Dirty, &tmp->b_state);
-				} else
-					set_bit(BH_Uptodate, &tmp->b_state);
-
-				atomic_inc(&iobuf->io_count);
-				submit_bh(rw, tmp);
-				/* 
-				 * Wait for IO if we have got too much 
-				 */
-				if (bhind >= KIO_MAX_SECTORS) {
-					kiobuf_wait_for_io(iobuf); /* wake-one */
-					err = wait_kio(rw, bhind, bhs, size);
-					if (err >= 0)
-						transferred += err;
-					else
-						goto finished;
-					bhind = 0;
-				}
-
-			skip_block:
-				length -= size;
-				offset += size;
-
-				if (offset >= PAGE_SIZE) {
-					offset = 0;
-					break;
-				}
-			} /* End of block loop */
-		} /* End of page loop */		
-	} /* End of iovec loop */
-
-	/* Is there any IO still left to submit? */
-	if (bhind) {
-		kiobuf_wait_for_io(iobuf); /* wake-one */
-		err = wait_kio(rw, bhind, bhs, size);
-		if (err >= 0)
-			transferred += err;
-		else
-			goto finished;
+		ll_rw_kio(rw, iobuf, dev, b[i] * (size >> 9));
 	}
 
- finished:
-	if (transferred)
-		return transferred;
-	return err;
+	/*
+	 * now they are all submitted, wait for completion
+	 */
+	transferred = 0;
+	err = 0;
+	for (i = 0; i < nr; i++) {
+		iobuf = iovec[i];
+		kiobuf_wait_for_io(iobuf);
+		if (iobuf->errno && !err)
+			err = iobuf->errno;
+		if (!err)
+			transferred += iobuf->length;
+	}
+
+	return err ? err : transferred;
 }
 
 /*
@@ -2238,7 +2113,7 @@ int brw_kiovec(int rw, int nr, struct kiobuf *iovec[],
  * FIXME: we need a swapper_inode->get_block function to remove
  *        some of the bmap kludges and interface ugliness here.
  */
-int brw_page(int rw, struct page *page, kdev_t dev, int b[], int size)
+int brw_page(int rw, struct page *page, kdev_t dev, sector_t b[], int size)
 {
 	struct buffer_head *head, *bh;
 
@@ -2326,7 +2201,7 @@ static struct page * grow_dev_page(struct block_device *bdev, unsigned long inde
 	struct buffer_head *bh;
 
 	page = find_or_create_page(bdev->bd_inode->i_mapping, index, GFP_NOFS);
-	if (IS_ERR(page))
+	if (!page)
 		return NULL;
 
 	if (!PageLocked(page))
@@ -2489,6 +2364,9 @@ static int sync_page_buffers(struct buffer_head *head, unsigned int gfp_mask)
 int try_to_free_buffers(struct page * page, unsigned int gfp_mask)
 {
 	struct buffer_head * tmp, * bh = page->buffers;
+
+	BUG_ON(!PageLocked(page));
+	BUG_ON(!bh);
 
 cleaned_buffers_try_again:
 	spin_lock(&lru_list_lock);

@@ -13,8 +13,7 @@ extern struct page *highmem_start_page;
 /* declarations for linux/mm/highmem.c */
 unsigned int nr_free_highpages(void);
 
-extern struct buffer_head * create_bounce(int rw, struct buffer_head * bh_orig);
-
+extern void create_bounce(struct bio **bio_orig, int gfp_mask);
 
 static inline char *bh_kmap(struct buffer_head *bh)
 {
@@ -24,6 +23,42 @@ static inline char *bh_kmap(struct buffer_head *bh)
 static inline void bh_kunmap(struct buffer_head *bh)
 {
 	kunmap(bh->b_page);
+}
+
+/*
+ * remember to add offset! and never ever reenable interrupts between a
+ * bio_kmap_irq and bio_kunmap_irq!!
+ */
+static inline char *bio_kmap_irq(struct bio *bio, unsigned long *flags)
+{
+	unsigned long addr;
+
+	__save_flags(*flags);
+
+	/*
+	 * could be low
+	 */
+	if (!PageHighMem(bio_page(bio)))
+		return bio_data(bio);
+
+	/*
+	 * it's a highmem page
+	 */
+	__cli();
+	addr = (unsigned long) kmap_atomic(bio_page(bio), KM_BIO_IRQ);
+
+	if (addr & ~PAGE_MASK)
+		BUG();
+
+	return (char *) addr + bio_offset(bio);
+}
+
+static inline void bio_kunmap_irq(char *buffer, unsigned long *flags)
+{
+	unsigned long ptr = (unsigned long) buffer & PAGE_MASK;
+
+	kunmap_atomic((void *) ptr, KM_BIO_IRQ);
+	__restore_flags(*flags);
 }
 
 #else /* CONFIG_HIGHMEM */
@@ -39,6 +74,9 @@ static inline void *kmap(struct page *page) { return page_address(page); }
 
 #define bh_kmap(bh)	((bh)->b_data)
 #define bh_kunmap(bh)	do { } while (0)
+
+#define bio_kmap_irq(bio, flags)	(bio_data(bio))
+#define bio_kunmap_irq(buf, flags)	do { *(flags) = 0; } while (0)
 
 #endif /* CONFIG_HIGHMEM */
 

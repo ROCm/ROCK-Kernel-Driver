@@ -4930,7 +4930,7 @@ static void DO_SBPCD_REQUEST(request_queue_t * q)
 		sbpcd_end_request(req, 0);
 	if (req -> sector == -1)
 		sbpcd_end_request(req, 0);
-	spin_unlock_irq(&io_request_lock);
+	spin_unlock_irq(&q->queue_lock);
 
 	down(&ioctl_read_sem);
 	if (req->cmd != READ)
@@ -4970,7 +4970,7 @@ static void DO_SBPCD_REQUEST(request_queue_t * q)
 			xnr, req, req->sector, req->nr_sectors, jiffies);
 #endif
 		up(&ioctl_read_sem);
-		spin_lock_irq(&io_request_lock);
+		spin_lock_irq(&q->queue_lock);
 		sbpcd_end_request(req, 1);
 		goto request_loop;
 	}
@@ -5011,7 +5011,7 @@ static void DO_SBPCD_REQUEST(request_queue_t * q)
 				xnr, req, req->sector, req->nr_sectors, jiffies);
 #endif
 			up(&ioctl_read_sem);
-			spin_lock_irq(&io_request_lock);
+			spin_lock_irq(&q->queue_lock);
 			sbpcd_end_request(req, 1);
 			goto request_loop;
 		}
@@ -5027,7 +5027,7 @@ static void DO_SBPCD_REQUEST(request_queue_t * q)
 #endif
 	up(&ioctl_read_sem);
 	sbp_sleep(0);    /* wait a bit, try again */
-	spin_lock_irq(&io_request_lock);
+	spin_lock_irq(&q->queue_lock);
 	sbpcd_end_request(req, 0);
 	goto request_loop;
 }

@@ -782,7 +782,7 @@ int pwc_camera_power(struct pwc_device *pdev, int power)
 {
 	char buf;
 
-	if (pdev->type < 675 || pdev->release < 6)
+	if (pdev->type < 675 || (pdev->type < 730 && pdev->release < 6))
 		return 0;	/* Not supported by Nala or Timon < release 6 */
 
 	if (power)

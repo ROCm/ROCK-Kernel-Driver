@@ -586,8 +586,10 @@ MODULE_LICENSE ("GPL");
 #define DRIVER_LOCK(p)
 #define DRIVER_UNLOCK(p)
 #define IO_LOCK_T unsigned long io_flags = 0
-#define IO_LOCK spin_lock_irqsave(&io_request_lock,io_flags);
-#define IO_UNLOCK spin_unlock_irqrestore(&io_request_lock,io_flags);
+#define IO_LOCK(host) spin_lock_irqsave(&(host)->host_lock,io_flags)
+#define IO_UNLOCK(host) spin_unlock_irqrestore(&(host)->host_lock,io_flags)
+#define IO_LOCK_IRQ(host) spin_lock_irq(&(host)->host_lock)
+#define IO_UNLOCK_IRQ(host) spin_unlock_irq(&(host)->host_lock)
 
 #define queue_task_irq(a,b)     queue_task(a,b)
 #define queue_task_irq_off(a,b) queue_task(a,b)
@@ -612,8 +614,8 @@ MODULE_DESCRIPTION ("LSI Logic MegaRAID driver");
 #define DRIVER_LOCK(p)
 #define DRIVER_UNLOCK(p)
 #define IO_LOCK_T unsigned long io_flags = 0
-#define IO_LOCK spin_lock_irqsave(&io_request_lock,io_flags);
-#define IO_UNLOCK spin_unlock_irqrestore(&io_request_lock,io_flags);
+#define IO_LOCK(host) spin_lock_irqsave(&io_request_lock,io_flags);
+#define IO_UNLOCK(host) spin_unlock_irqrestore(&io_request_lock,io_flags);
 
 #define pci_free_consistent(a,b,c,d)
 #define pci_unmap_single(a,b,c,d)
@@ -2101,7 +2103,7 @@ static void megaraid_isr (int irq, void *devp, struct pt_regs *regs)
 		for (idx = 0; idx < MAX_FIRMWARE_STATUS; idx++)
 			completed[idx] = 0;
 
-		IO_LOCK;
+		IO_LOCK(megaCfg->host);
 
 		megaCfg->nInterrupts++;
 		qCnt = 0xff;
@@ -2220,7 +2222,7 @@ static void megaraid_isr (int irq, void *devp, struct pt_regs *regs)
 		megaCfg->flag &= ~IN_ISR;
 		/* Loop through any pending requests */
 		mega_runpendq (megaCfg);
-		IO_UNLOCK;
+		IO_UNLOCK(megaCfg->host);
 
 	}
 
@@ -3032,9 +3034,7 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 					    sizeof (mega_mailbox64),
 					    &(megaCfg->dma_handle64));
 
-		mega_register_mailbox (megaCfg,
-				       virt_to_bus ((void *) megaCfg->
-						    mailbox64ptr));
+		mega_register_mailbox (megaCfg, megaCfg->dma_handle64);
 #else
 		mega_register_mailbox (megaCfg,
 				       virt_to_bus ((void *) &megaCfg->
@@ -3800,7 +3800,7 @@ int megaraid_queue (Scsi_Cmnd * SCpnt, void (*pktComp) (Scsi_Cmnd *))
 
 		if (pScb->SCpnt->cmnd[0] == M_RD_IOCTL_CMD_NEW) {
 			init_MUTEX_LOCKED (&pScb->ioctl_sem);
-			spin_unlock_irq (&io_request_lock);
+			IO_UNLOCK_IRQ(megaCfg->host);
 			down (&pScb->ioctl_sem);
     		user_area = (char *)*((u32*)&pScb->SCpnt->cmnd[4]);
 			if (copy_to_user
@@ -3809,7 +3809,7 @@ int megaraid_queue (Scsi_Cmnd * SCpnt, void (*pktComp) (Scsi_Cmnd *))
 				    ("megaraid: Error copying ioctl return value to user buffer.\n");
 				pScb->SCpnt->result = (DID_ERROR << 16);
 			}
-			spin_lock_irq (&io_request_lock);
+		    IO_LOCK_IRQ(megaCfg->host);
 			DRIVER_LOCK (megaCfg);
 			kfree (pScb->buff_ptr);
 			pScb->buff_ptr = NULL;
@@ -4744,10 +4744,10 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 
 		init_MUTEX_LOCKED(&mimd_ioctl_sem);
 
-		IO_LOCK;
+		IO_LOCK(shpnt);
 		megaraid_queue(scsicmd, megadev_ioctl_done);
 
-		IO_UNLOCK;
+		IO_UNLOCK(shpnt);
 
 		down(&mimd_ioctl_sem);
 
@@ -4893,10 +4893,10 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 
 		init_MUTEX_LOCKED (&mimd_ioctl_sem);
 
-		IO_LOCK;
+		IO_LOCK(shpnt);
 		megaraid_queue (scsicmd, megadev_ioctl_done);
 
-		IO_UNLOCK;
+		IO_UNLOCK(shpnt);
 		down (&mimd_ioctl_sem);
 
 		if (!scsicmd->result && outlen) {

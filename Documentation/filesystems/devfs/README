@@ -3,7 +3,7 @@ Devfs (Device File System) FAQ
 
 Linux Devfs (Device File System) FAQ
 Richard Gooch
-29-SEP-2001
+9-NOV-2001
 
 -----------------------------------------------------------------------------
 
@@ -11,7 +11,9 @@ NOTE: the master copy of this document is available online at:
 
 http://www.atnf.csiro.au/~rgooch/linux/docs/devfs.html
 and looks much better than the text version distributed with the
-kernel sources.
+kernel sources. A mirror site is available at:
+
+http://www.ras.ucalgary.ca/~rgooch/linux/docs/devfs.html
 
 There is also an optional daemon that may be used with devfs. You can
 find out more about it at:

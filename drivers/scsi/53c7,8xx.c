@@ -1427,13 +1427,14 @@ ncr_pci_init (Scsi_Host_Template *tpnt, int board, int chip,
 	return -1;
     }
 
-#ifdef __powerpc__
     if ( ! (command & PCI_COMMAND_MASTER)) {
-      printk("SCSI: PCI Master Bit has not been set. Setting...\n");
+      printk(KERN_INFO "SCSI: PCI Master Bit has not been set. Setting...\n");
       command |= PCI_COMMAND_MASTER|PCI_COMMAND_IO;
       pci_write_config_word(pdev, PCI_COMMAND, command);
+    }
 
-      if (io_port >= 0x10000000 && is_prep ) {
+#ifdef __powerpc__
+    if (io_port >= 0x10000000 && is_prep ) {
 	      /* Mapping on PowerPC can't handle this! */
 	      unsigned long new_io_port;
 	      new_io_port = (io_port & 0x00FFFFFF) | 0x01000000;
@@ -1441,7 +1442,6 @@ ncr_pci_init (Scsi_Host_Template *tpnt, int board, int chip,
 	      io_port = new_io_port;
 	      pci_write_config_dword(pdev, PCI_BASE_ADDRESS_0, io_port);
 	      pdev->base_address[0] = io_port;
-      }
     }
 #endif
 

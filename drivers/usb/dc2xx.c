@@ -112,12 +112,15 @@ static struct usb_device_id camera_table [] = {
 	/* These have a different application level protocol which
 	 * is part of the Flashpoint "DigitaOS".  That supports some
 	 * non-camera devices, and some non-Kodak cameras.
+	 * Use this driver to get USB and "OpenDis" to talk.
 	 */  
 	{ USB_DEVICE(0x040a, 0x0100) },		// Kodak DC-220
 	{ USB_DEVICE(0x040a, 0x0110) },		// Kodak DC-260
 	{ USB_DEVICE(0x040a, 0x0111) },		// Kodak DC-265
 	{ USB_DEVICE(0x040a, 0x0112) },		// Kodak DC-290
 	{ USB_DEVICE(0xf003, 0x6002) },		// HP PhotoSmart C500
+	{ USB_DEVICE(0x03f0, 0x4102) },		// HP PhotoSmart C618
+	{ USB_DEVICE(0x0a17, 0x1001) },		// Pentax EI-200
 
 	/* Other USB devices may well work here too, so long as they
 	 * just stick to half duplex bulk packet exchanges.  That

@@ -1123,9 +1123,9 @@ ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 	if (host == NULL)
 		return (ENOMEM);
 
-	ahc_lock(ahc, &s);
 	*((struct ahc_softc **)host->hostdata) = ahc;
 	ahc->platform_data->host = host;
+	ahc_lock(ahc, &s);
 	host->can_queue = AHC_MAX_QUEUE;
 	host->cmd_per_lun = 2;
 	host->sg_tablesize = AHC_NSEG;
@@ -1272,7 +1272,9 @@ ahc_platform_alloc(struct ahc_softc *ahc, void *platform_arg)
 	TAILQ_INIT(&ahc->platform_data->completeq);
 	TAILQ_INIT(&ahc->platform_data->device_runq);
 	ahc->platform_data->hw_dma_mask = 0xFFFFFFFF;
-	ahc_lockinit(ahc);
+	/*
+	 * ahc_lockinit done by scsi_register, as we don't own that lock
+	 */
 	ahc_done_lockinit(ahc);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
 	init_MUTEX_LOCKED(&ahc->platform_data->eh_sem);
@@ -1530,22 +1532,17 @@ ahc_linux_device_queue_depth(struct ahc_softc *ahc, Scsi_Device * device)
 int
 ahc_linux_queue(Scsi_Cmnd * cmd, void (*scsi_done) (Scsi_Cmnd *))
 {
-	struct	 ahc_softc *ahc;
+	struct	 ahc_softc *ahc = *(struct ahc_softc **)cmd->host->hostdata;
 	struct	 ahc_linux_device *dev;
-	u_long	 flags;
-
-	ahc = *(struct ahc_softc **)cmd->host->hostdata;
 
 	/*
 	 * Save the callback on completion function.
 	 */
 	cmd->scsi_done = scsi_done;
 
-	ahc_lock(ahc, &flags);
 	dev = ahc_linux_get_device(ahc, cmd->channel, cmd->target,
 				   cmd->lun, /*alloc*/TRUE);
 	if (dev == NULL) {
-		ahc_unlock(ahc, &flags);
 		printf("aic7xxx_linux_queue: Unable to allocate device!\n");
 		return (-ENOMEM);
 	}
@@ -1556,7 +1553,6 @@ ahc_linux_queue(Scsi_Cmnd * cmd, void (*scsi_done) (Scsi_Cmnd *))
 		dev->flags |= AHC_DEV_ON_RUN_LIST;
 		ahc_linux_run_device_queues(ahc);
 	}
-	ahc_unlock(ahc, &flags);
 	return (0);
 }
 
@@ -2408,12 +2404,10 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 	       flag == SCB_ABORT ? "n ABORT" : " TARGET RESET");
 
 	/*
-	 * It is a bug that the upper layer takes
-	 * this lock just prior to calling us.
+	 * we used to drop io_request_lock and lock ahc from here, but
+	 * now that the global lock is gone the upper layer have already
+	 * done what ahc_lock would do /jens
 	 */
-	spin_unlock_irq(&io_request_lock);
-
-	ahc_lock(ahc, &s);
 
 	/*
 	 * First determine if we currently own this command.
@@ -2661,7 +2655,7 @@ done:
 	ahc_unlock(ahc, &s);
 	if (acmd != NULL)
 		ahc_linux_run_complete_queue(ahc, acmd);
-	spin_lock_irq(&io_request_lock);
+	ahc_lock(ahc, &s);
 	return (retval);
 }
 
@@ -2704,14 +2698,7 @@ ahc_linux_bus_reset(Scsi_Cmnd *cmd)
 	u_long s;
 	int    found;
 
-	/*
-	 * It is a bug that the upper layer takes
-	 * this lock just prior to calling us.
-	 */
-	spin_unlock_irq(&io_request_lock);
-
 	ahc = *(struct ahc_softc **)cmd->host->hostdata;
-	ahc_lock(ahc, &s);
 	found = ahc_reset_channel(ahc, cmd->channel + 'A',
 				  /*initiate reset*/TRUE);
 	acmd = TAILQ_FIRST(&ahc->platform_data->completeq);
@@ -2724,7 +2711,7 @@ ahc_linux_bus_reset(Scsi_Cmnd *cmd)
 	if (acmd != NULL)
 		ahc_linux_run_complete_queue(ahc, acmd);
 
-	spin_lock_irq(&io_request_lock);
+	ahc_lock(ahc, &s);
 	return SUCCESS;
 }
 

@@ -115,7 +115,6 @@ static int __sound_insert_unit(struct sound_unit * s, struct sound_unit **list, 
 	*list=s;
 	
 	
-	MOD_INC_USE_COUNT;
 	return n;
 }
 
@@ -133,7 +132,6 @@ static void __sound_remove_unit(struct sound_unit **list, int unit)
 			*list=p->next;
 			devfs_unregister (p->de);
 			kfree(p);
-			MOD_DEC_USE_COUNT;
 			return;
 		}
 		list=&(p->next);

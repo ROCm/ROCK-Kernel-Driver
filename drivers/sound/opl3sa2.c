@@ -99,7 +99,7 @@
 #define CHIPSET_OPL3SA2 0
 #define CHIPSET_OPL3SA3 1
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 #define OPL3SA2_CARDS_MAX 4
 #else
 #define OPL3SA2_CARDS_MAX 1
@@ -147,7 +147,7 @@ static int __initdata dma2	= -1;
 static int __initdata ymode	= -1;
 static int __initdata loopback	= -1;
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 /* PnP specific parameters */
 static int __initdata isapnp = 1;
 static int __initdata multiple = 1;
@@ -191,7 +191,7 @@ MODULE_PARM_DESC(ymode, "Set Yamaha 3D enhancement mode (0 = Desktop/Normal, 1 =
 MODULE_PARM(loopback, "i");
 MODULE_PARM_DESC(loopback, "Set A/D input source. Useful for echo cancellation (0 = Mic Rch (default), 1 = Mono output loopback)");
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 MODULE_PARM(isapnp, "i");
 MODULE_PARM_DESC(isapnp, "When set to 0, ISA PnP support will be disabled");
 
@@ -807,7 +807,7 @@ static void __exit unload_opl3sa2(struct address_info* hw_config, int card)
 }
 
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 
 struct isapnp_device_id isapnp_opl3sa2_list[] __initdata = {
 	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
@@ -888,7 +888,7 @@ static int __init opl3sa2_isapnp_probe(struct address_info* hw_cfg,
 
 	return 0;
 }
-#endif /* CONFIG_ISAPNP || CONFIG_ISAPNP_MODULE */
+#endif /* __ISAPNP__ */
 
 /* End of component functions */
 
@@ -909,9 +909,9 @@ static int __init init_opl3sa2(void)
 	
 	max = (multiple && isapnp) ? OPL3SA2_CARDS_MAX : 1;
 	for(card = 0; card < max; card++, opl3sa2_cards_num++) {
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 		/*
-		 * Please remember that even with CONFIG_ISAPNP defined one
+		 * Please remember that even with __ISAPNP__ defined one
 		 * should still be able to disable PNP support for this 
 		 * single driver!
 		 */
@@ -1039,7 +1039,7 @@ static void __exit cleanup_opl3sa2(void)
 		unload_opl3sa2_mss(&cfg_mss[card]);
 		unload_opl3sa2(&cfg[card], card);
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 		if(opl3sa2_activated[card] && opl3sa2_dev[card]) {
 			opl3sa2_dev[card]->deactivate(opl3sa2_dev[card]);
 
@@ -1058,7 +1058,7 @@ module_exit(cleanup_opl3sa2);
 static int __init setup_opl3sa2(char *str)
 {
 	/* io, irq, dma, dma2,... */
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 	int ints[11];
 #else
 	int ints[9];
@@ -1073,7 +1073,7 @@ static int __init setup_opl3sa2(char *str)
 	mpu_io   = ints[6];
 	ymode    = ints[7];
 	loopback = ints[8];
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 	isapnp   = ints[9];
 	multiple = ints[10];
 #endif

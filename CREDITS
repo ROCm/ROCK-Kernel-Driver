@@ -140,9 +140,11 @@ D: Aladdin 1533/1543(C) chipset IDE
 D: VIA MVP-3/TX Pro III chipset IDE
 
 N: Jens Axboe
-E: axboe@image.dk
-D: Linux CD-ROM maintainer
-D: jiffies wrap fixes + schedule timeouts depending on HZ == 100
+E: axboe@suse.de
+D: Linux CD-ROM maintainer, DVD support
+D: elevator + block layer rewrites
+D: highmem I/O support
+D: misc hacking on IDE, SCSI, block drivers, etc
 S: Peter Bangs Vej 258, 2TH
 S: 2500 Valby
 S: Denmark

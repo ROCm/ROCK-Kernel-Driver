@@ -458,7 +458,7 @@ static int pf_ioctl(struct inode *inode,struct file *file,
 		if (PF.access == 1) {
 			pf_eject(unit);
 			return 0;
-			}
+		}
 	    case HDIO_GETGEO:
                 if (!geo) return -EINVAL;
                 err = verify_area(VERIFY_WRITE,geo,sizeof(*geo));

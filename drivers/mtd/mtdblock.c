@@ -29,7 +29,7 @@
 #if LINUX_VERSION_CODE < 0x20300
 #define QUEUE_PLUGGED (blk_dev[MAJOR_NR].plug_tq.sync)
 #else
-#define QUEUE_PLUGGED (blk_dev[MAJOR_NR].request_queue.plugged)
+#define QUEUE_PLUGGED (blk_queue_plugged(QUEUE))
 #endif
 
 #ifdef CONFIG_DEVFS_FS
@@ -402,7 +402,7 @@ static release_t mtdblock_release(struct inode *inode, struct file *file)
 
 /* 
  * This is a special request_fn because it is executed in a process context 
- * to be able to sleep independently of the caller.  The io_request_lock 
+ * to be able to sleep independently of the caller.  The queue_lock 
  * is held upon entry and exit.
  * The head of our request queue is considered active so there is no need 
  * to dequeue requests before we are done.
@@ -416,7 +416,7 @@ static void handle_mtdblock_request(void)
 	for (;;) {
 		INIT_REQUEST;
 		req = CURRENT;
-		spin_unlock_irq(&io_request_lock);
+		spin_unlock_irq(&QUEUE->queue_lock);
 		mtdblk = mtdblks[MINOR(req->rq_dev)];
 		res = 0;
 
@@ -458,7 +458,7 @@ static void handle_mtdblock_request(void)
 		}
 
 end_req:
-		spin_lock_irq(&io_request_lock);
+		spin_lock_irq(&QUEUE->queue_lock);
 		end_request(res);
 	}
 }
@@ -490,16 +490,16 @@ int mtdblock_thread(void *dummy)
 	while (!leaving) {
 		add_wait_queue(&thr_wq, &wait);
 		set_current_state(TASK_INTERRUPTIBLE);
-		spin_lock_irq(&io_request_lock);
+		spin_lock_irq(&QUEUE->queue_lock);
 		if (QUEUE_EMPTY || QUEUE_PLUGGED) {
-			spin_unlock_irq(&io_request_lock);
+			spin_unlock_irq(&QUEUE->queue_lock);
 			schedule();
 			remove_wait_queue(&thr_wq, &wait); 
 		} else {
 			remove_wait_queue(&thr_wq, &wait); 
 			set_current_state(TASK_RUNNING);
 			handle_mtdblock_request();
-			spin_unlock_irq(&io_request_lock);
+			spin_unlock_irq(&QUEUE->queue_lock);
 		}
 	}
 

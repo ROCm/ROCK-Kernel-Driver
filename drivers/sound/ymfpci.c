@@ -1872,7 +1872,6 @@ static int ymf_open(struct inode *inode, struct file *file)
 #endif
 	up(&unit->open_sem);
 
-	MOD_INC_USE_COUNT;
 	return 0;
 
 out_nodma:
@@ -1921,7 +1920,6 @@ static int ymf_release(struct inode *inode, struct file *file)
 
 	up(&codec->open_sem);
 
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -1949,7 +1947,6 @@ static int ymf_open_mixdev(struct inode *inode, struct file *file)
  match:
 	file->private_data = unit->ac97_codec[i];
 
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -1963,11 +1960,11 @@ static int ymf_ioctl_mixdev(struct inode *inode, struct file *file,
 
 static int ymf_release_mixdev(struct inode *inode, struct file *file)
 {
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
 static /*const*/ struct file_operations ymf_fops = {
+	owner:		THIS_MODULE,
 	llseek:		no_llseek,
 	read:		ymf_read,
 	write:		ymf_write,
@@ -1979,6 +1976,7 @@ static /*const*/ struct file_operations ymf_fops = {
 };
 
 static /*const*/ struct file_operations ymf_mixer_fops = {
+	owner:		THIS_MODULE,
 	llseek:		no_llseek,
 	ioctl:		ymf_ioctl_mixdev,
 	open:		ymf_open_mixdev,
@@ -2043,13 +2041,6 @@ static int ymf_resume(struct pci_dev *pcidev)
 	ymfpci_aclink_reset(unit->pci);
 	ymfpci_codec_ready(unit, 0, 1);		/* prints diag if not ready. */
 
-	for (i = 0; i < NR_AC97; i++) {
-		codec = unit->ac97_codec[i];
-		if (!codec)
-			continue;
-		ac97_restore_state(codec);
-	}
-
 #ifdef CONFIG_SOUND_YMFPCI_LEGACY
 	/* XXX At this time the legacy registers are probably deprogrammed. */
 #endif
@@ -2063,6 +2054,13 @@ static int ymf_resume(struct pci_dev *pcidev)
 	if (unit->start_count) {
 		ymfpci_writel(unit, YDSXGR_MODE, 3);
 		unit->active_bank = ymfpci_readl(unit, YDSXGR_CTRLSELECT) & 1;
+	}
+
+	for (i = 0; i < NR_AC97; i++) {
+		codec = unit->ac97_codec[i];
+		if (!codec)
+			continue;
+		ac97_restore_state(codec);
 	}
 
 	unit->suspended = 0;

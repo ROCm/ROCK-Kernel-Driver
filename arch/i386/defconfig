@@ -286,7 +286,6 @@ CONFIG_SD_EXTRA_DEVS=40
 #
 # Some SCSI devices (e.g. CD jukebox) support multiple LUNs
 #
-CONFIG_SCSI_DEBUG_QUEUES=y
 CONFIG_SCSI_MULTI_LUN=y
 CONFIG_SCSI_CONSTANTS=y
 # CONFIG_SCSI_LOGGING is not set
@@ -431,6 +430,7 @@ CONFIG_EEPRO100=y
 # CONFIG_SUNDANCE is not set
 # CONFIG_TLAN is not set
 # CONFIG_VIA_RHINE is not set
+# CONFIG_VIA_RHINE_MMIO is not set
 # CONFIG_WINBOND_840 is not set
 # CONFIG_NET_POCKET is not set
 

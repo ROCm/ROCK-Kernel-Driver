@@ -59,11 +59,6 @@ static int nftl_blocksizes[256];
 /* .. for the Linux partition table handling. */
 struct hd_struct part_table[256];
 
-#if LINUX_VERSION_CODE < 0x20328
-static void dummy_init (struct gendisk *crap)
-{}
-#endif
-
 static struct gendisk nftl_gendisk = {
 	major:		MAJOR_NR,
 	major_name:	"nftl",
@@ -166,7 +161,8 @@ static void NFTL_setup(struct mtd_info *mtd)
 #if LINUX_VERSION_CODE < 0x20328
 	resetup_one_dev(&nftl_gendisk, firstfree);
 #else
-	grok_partitions(&nftl_gendisk, firstfree, 1<<NFTL_PARTN_BITS, nftl->nr_sects);
+	grok_partitions(MKDEV(MAJOR_NR,firstfree<<NFTL_PARTN_BITS),
+			nftl->nr_sects);
 #endif
 }
 
@@ -786,7 +782,7 @@ static int NFTL_readblock(struct NFTLrecord *nftl, unsigned block, char *buffer)
 static int nftl_ioctl(struct inode * inode, struct file * file, unsigned int cmd, unsigned long arg)
 {
 	struct NFTLrecord *nftl;
-	int p;
+	int res;
 
 	nftl = NFTLs[MINOR(inode->i_rdev) >> NFTL_PARTN_BITS];
 
@@ -799,16 +795,9 @@ static int nftl_ioctl(struct inode * inode, struct file * file, unsigned int cmd
 		g.heads = nftl->heads;
 		g.sectors = nftl->sectors;
 		g.cylinders = nftl->cylinders;
-		g.start = part_table[MINOR(inode->i_rdev)].start_sect;
+		g.start = get_start_sect(inode->i_rdev);
 		return copy_to_user((void *)arg, &g, sizeof g) ? -EFAULT : 0;
 	}
-	case BLKGETSIZE:   /* Return device size */
-		return put_user(part_table[MINOR(inode->i_rdev)].nr_sects,
-                                (unsigned long *) arg);
-	case BLKGETSIZE64:
-		return put_user((u64)part_table[MINOR(inode->i_rdev)].nr_sects << 9,
-                                (u64 *)arg);
-
 	case BLKFLSBUF:
 		if (!capable(CAP_SYS_ADMIN)) return -EACCES;
 		fsync_dev(inode->i_rdev);
@@ -825,27 +814,17 @@ static int nftl_ioctl(struct inode * inode, struct file * file, unsigned int cmd
 		 * or we won't be able to re-use the partitions,
 		 * if there was a change and we don't want to reboot
 		 */
-		p = (1<<NFTL_PARTN_BITS) - 1;
-		while (p-- > 0) {
-			kdev_t devp = MKDEV(MAJOR(inode->i_dev), MINOR(inode->i_dev)+p);
-			if (part_table[p].nr_sects > 0)
-				invalidate_device (devp, 1);
+		res = wipe_partitions(inode->i_rdev);
+		if (!res)
+			grok_partitions(inode->i_rdev, nftl->nr_sects);
 
-			part_table[MINOR(inode->i_dev)+p].start_sect = 0;
-			part_table[MINOR(inode->i_dev)+p].nr_sects = 0;
-		}
-		
-#if LINUX_VERSION_CODE < 0x20328
-		resetup_one_dev(&nftl_gendisk, MINOR(inode->i_rdev) >> NFTL_PARTN_BITS);
-#else
-		grok_partitions(&nftl_gendisk, MINOR(inode->i_rdev) >> NFTL_PARTN_BITS,
-				1<<NFTL_PARTN_BITS, nftl->nr_sects);
-#endif
-		return 0;
+		return res;
 
 #if (LINUX_VERSION_CODE < 0x20303)		
 	RO_IOCTLS(inode->i_rdev, arg);  /* ref. linux/blk.h */
 #else
+	case BLKGETSIZE:
+	case BLKGETSIZE64:
 	case BLKROSET:
 	case BLKROGET:
 	case BLKSSZGET:
@@ -859,7 +838,7 @@ static int nftl_ioctl(struct inode * inode, struct file * file, unsigned int cmd
 
 void nftl_request(RQFUNC_ARG)
 {
-	unsigned int dev, block, nsect;
+	unsigned int dev, unit, block, nsect;
 	struct NFTLrecord *nftl;
 	char *buffer;
 	struct request *req;
@@ -871,10 +850,11 @@ void nftl_request(RQFUNC_ARG)
 		
 		/* We can do this because the generic code knows not to
 		   touch the request at the head of the queue */
-		spin_unlock_irq(&io_request_lock);
+		spin_unlock_irq(&QUEUE->queue_lock);
 
 		DEBUG(MTD_DEBUG_LEVEL2, "NFTL_request\n");
-		DEBUG(MTD_DEBUG_LEVEL3, "NFTL %s request, from sector 0x%04lx for 0x%04lx sectors\n",
+		DEBUG(MTD_DEBUG_LEVEL3,
+		      "NFTL %s request, from sector 0x%04lx for 0x%04lx sectors\n",
 		      (req->cmd == READ) ? "Read " : "Write",
 		      req->sector, req->current_nr_sectors);
 
@@ -884,8 +864,8 @@ void nftl_request(RQFUNC_ARG)
 		buffer = req->buffer;
 		res = 1; /* succeed */
 
-		if (dev >= MAX_NFTLS * (1<<NFTL_PARTN_BITS)) {
-			/* there is no such partition */
+		unit = dev >> NFTL_PARTN_BITS;
+		if (unit >= MAX_NFTLS || dev != (unit << NFTL_PARTN_BITS)) {
 			printk("nftl: bad minor number: device = %s\n",
 			       kdevname(req->rq_dev));
 			res = 0; /* fail */
@@ -905,8 +885,6 @@ void nftl_request(RQFUNC_ARG)
 			res = 0; /* fail */
 			goto repeat;
 		}
-		
-		block += part_table[dev].start_sect;
 		
 		if (req->cmd == READ) {
 			DEBUG(MTD_DEBUG_LEVEL2, "NFTL read request of 0x%x sectors @ %x "
@@ -953,7 +931,7 @@ void nftl_request(RQFUNC_ARG)
 		}
 	repeat: 
 		DEBUG(MTD_DEBUG_LEVEL3, "end_request(%d)\n", res);
-		spin_lock_irq(&io_request_lock);
+		spin_lock_irq(&QUEUE->queue_lock);
 		end_request(res);
 	}
 }

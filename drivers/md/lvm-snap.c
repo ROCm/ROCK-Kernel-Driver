@@ -351,7 +351,7 @@ int lvm_snapshot_COW(kdev_t org_phys_dev,
 	blksize_snap = lvm_get_blksize(snap_phys_dev);
 	max_blksize = max(blksize_org, blksize_snap);
 	min_blksize = min(blksize_org, blksize_snap);
-	max_sectors = KIO_MAX_SECTORS * (min_blksize>>9);
+	max_sectors = LVM_MAX_SECTORS * (min_blksize>>9);
 
 	if (chunk_size % (max_blksize>>9))
 		goto fail_blksize;
@@ -363,20 +363,20 @@ int lvm_snapshot_COW(kdev_t org_phys_dev,
 
 		iobuf->length = nr_sectors << 9;
 
-		if(!lvm_snapshot_prepare_blocks(iobuf->blocks, org_start,
+		if(!lvm_snapshot_prepare_blocks(lv_snap->blocks, org_start,
 						nr_sectors, blksize_org))
 			goto fail_prepare;
 
 		if (brw_kiovec(READ, 1, &iobuf, org_phys_dev,
-			       iobuf->blocks, blksize_org) != (nr_sectors<<9))
+			       lv_snap->blocks, blksize_org) != (nr_sectors<<9))
 			goto fail_raw_read;
 
-		if(!lvm_snapshot_prepare_blocks(iobuf->blocks, snap_start,
+		if(!lvm_snapshot_prepare_blocks(lv_snap->blocks, snap_start,
 						nr_sectors, blksize_snap))
 			goto fail_prepare;
 
 		if (brw_kiovec(WRITE, 1, &iobuf, snap_phys_dev,
-			       iobuf->blocks, blksize_snap) != (nr_sectors<<9))
+			       lv_snap->blocks, blksize_snap) !=(nr_sectors<<9))
 			goto fail_raw_write;
 	}
 
@@ -505,7 +505,7 @@ int lvm_snapshot_alloc(lv_t * lv_snap)
 	ret = alloc_kiovec(1, &lv_snap->lv_iobuf);
 	if (ret) goto out;
 
-	max_sectors = KIO_MAX_SECTORS << (PAGE_SHIFT-9);
+	max_sectors = LVM_MAX_SECTORS << (PAGE_SHIFT-9);
 
 	ret = lvm_snapshot_alloc_iobuf_pages(lv_snap->lv_iobuf, max_sectors);
 	if (ret) goto out_free_kiovec;
@@ -542,8 +542,6 @@ out_free_kiovec:
 
 void lvm_snapshot_release(lv_t * lv)
 {
-	int 	nbhs = KIO_MAX_SECTORS;
-
 	if (lv->lv_block_exception)
 	{
 		vfree(lv->lv_block_exception);

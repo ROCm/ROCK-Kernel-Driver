@@ -359,7 +359,7 @@ static struct media_table {
 	{ "Default", 0, 0xFF, XCVR_10baseT, 10000},
 };
 
-#ifdef CONFIG_ISAPNP
+#ifdef __ISAPNP__
 static struct isapnp_device_id corkscrew_isapnp_adapters[] = {
 	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
 		ISAPNP_VENDOR('T', 'C', 'M'), ISAPNP_FUNCTION(0x5051),
@@ -372,7 +372,7 @@ MODULE_DEVICE_TABLE(isapnp, corkscrew_isapnp_adapters);
 static int corkscrew_isapnp_phys_addr[3];
 
 static int nopnp;
-#endif /* CONFIG_ISAPNP */
+#endif /* __ISAPNP__ */
 
 static int corkscrew_scan(struct net_device *dev);
 static struct net_device *corkscrew_found_device(struct net_device *dev,
@@ -450,12 +450,12 @@ static int corkscrew_scan(struct net_device *dev)
 {
 	int cards_found = 0;
 	static int ioaddr;
-#ifdef CONFIG_ISAPNP
+#ifdef __ISAPNP__
 	short i;
 	static int pnp_cards;
 #endif
 
-#ifdef CONFIG_ISAPNP
+#ifdef __ISAPNP__
 	if(nopnp == 1)
 		goto no_pnp;
 	for(i=0; corkscrew_isapnp_adapters[i].vendor != 0; i++) {
@@ -513,17 +513,17 @@ static int corkscrew_scan(struct net_device *dev)
 		}
 	}
 no_pnp:
-#endif /* CONFIG_ISAPNP */
+#endif /* __ISAPNP__ */
 
 	/* Check all locations on the ISA bus -- evil! */
 	for (ioaddr = 0x100; ioaddr < 0x400; ioaddr += 0x20) {
 		int irq;
-#ifdef CONFIG_ISAPNP
+#ifdef __ISAPNP__
 		/* Make sure this was not already picked up by isapnp */
 		if(ioaddr == corkscrew_isapnp_phys_addr[0]) continue;
 		if(ioaddr == corkscrew_isapnp_phys_addr[1]) continue;
 		if(ioaddr == corkscrew_isapnp_phys_addr[2]) continue;
-#endif /* CONFIG_ISAPNP */
+#endif /* __ISAPNP__ */
 		if (check_region(ioaddr, CORKSCREW_TOTAL_SIZE))
 			continue;
 		/* Check the resource configuration for a matching ioaddr. */

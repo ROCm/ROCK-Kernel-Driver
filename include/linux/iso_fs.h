@@ -220,7 +220,7 @@ int get_acorn_filename(struct iso_directory_record *, char *, struct inode *);
 
 extern struct dentry *isofs_lookup(struct inode *, struct dentry *);
 extern struct buffer_head *isofs_bread(struct inode *, unsigned int, unsigned int);
-extern int isofs_get_blocks(struct inode *, long, struct buffer_head **, unsigned long);
+extern int isofs_get_blocks(struct inode *, sector_t, struct buffer_head **, unsigned long);
 
 extern struct inode_operations isofs_dir_inode_operations;
 extern struct file_operations isofs_dir_operations;

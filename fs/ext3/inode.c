@@ -719,7 +719,7 @@ err_out:
  */
 
 static int ext3_get_block_handle(handle_t *handle, struct inode *inode, 
-				 long iblock,
+				 sector_t iblock,
 				 struct buffer_head *bh_result, int create)
 {
 	int err = -EIO;
@@ -823,7 +823,7 @@ changed:
 	goto reread;
 }
 
-static int ext3_get_block(struct inode *inode, long iblock,
+static int ext3_get_block(struct inode *inode, sector_t iblock,
 			struct buffer_head *bh_result, int create)
 {
 	handle_t *handle = 0;

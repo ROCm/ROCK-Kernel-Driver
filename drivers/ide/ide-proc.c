@@ -190,7 +190,7 @@ static int proc_ide_write_config
 			if (hwif->mate && hwif->mate->hwgroup)
 				mategroup = (ide_hwgroup_t *)(hwif->mate->hwgroup);
 			cli();	/* all CPUs; ensure all writes are done together */
-			while (mygroup->busy || (mategroup && mategroup->busy)) {
+			while (test_bit(IDE_BUSY, &mygroup->flags) || (mategroup && test_bit(IDE_BUSY, &mategroup->flags))) {
 				sti();	/* all CPUs */
 				if (0 < (signed long)(jiffies - timeout)) {
 					printk("/proc/ide/%s/config: channel(s) busy, cannot write\n", hwif->name);

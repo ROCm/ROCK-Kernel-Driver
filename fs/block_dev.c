@@ -102,7 +102,7 @@ int set_blocksize(kdev_t dev, int size)
 	return 0;
 }
 
-static int blkdev_get_block(struct inode * inode, long iblock, struct buffer_head * bh, int create)
+static int blkdev_get_block(struct inode * inode, sector_t iblock, struct buffer_head * bh, int create)
 {
 	if (iblock >= max_block(inode->i_rdev))
 		return -EIO;

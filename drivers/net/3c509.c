@@ -175,7 +175,7 @@ static struct el3_mca_adapters_struct el3_mca_adapters[] __initdata = {
 };
 #endif /* CONFIG_MCA */
 
-#if defined(CONFIG_ISAPNP) || defined(CONFIG_ISAPNP_MODULE)
+#ifdef __ISAPNP__
 static struct isapnp_device_id el3_isapnp_adapters[] __initdata = {
 	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
 		ISAPNP_VENDOR('T', 'C', 'M'), ISAPNP_FUNCTION(0x5090),
@@ -206,7 +206,7 @@ MODULE_LICENSE("GPL");
 
 
 static u16 el3_isapnp_phys_addr[8][3];
-#endif /* CONFIG_ISAPNP || CONFIG_ISAPNP_MODULE */
+#endif /* __ISAPNP__ */
 static int nopnp;
 
 int __init el3_probe(struct net_device *dev)
@@ -217,9 +217,9 @@ int __init el3_probe(struct net_device *dev)
 	u16 phys_addr[3];
 	static int current_tag;
 	int mca_slot = -1;
-#if defined(CONFIG_ISAPNP) || defined(CONFIG_ISAPNP_MODULE)
+#ifdef __ISAPNP__
 	static int pnp_cards;
-#endif /* CONFIG_ISAPNP || CONFIG_ISAPNP_MODULE */
+#endif /* __ISAPNP__ */
 
 	if (dev) SET_MODULE_OWNER(dev);
 
@@ -323,7 +323,7 @@ int __init el3_probe(struct net_device *dev)
 	}
 #endif /* CONFIG_MCA */
 
-#if defined(CONFIG_ISAPNP) || defined(CONFIG_ISAPNP_MODULE)
+#ifdef __ISAPNP__
 	if (nopnp == 1)
 		goto no_pnp;
 
@@ -359,7 +359,7 @@ int __init el3_probe(struct net_device *dev)
 		}
 	}
 no_pnp:
-#endif /* CONFIG_ISAPNP || CONFIG_ISAPNP_MODULE */
+#endif /* __ISAPNP__ */
 
 	/* Select an open I/O location at 0x1*0 to do contention select. */
 	for ( ; id_port < 0x200; id_port += 0x10) {
@@ -405,7 +405,7 @@ no_pnp:
 		phys_addr[i] = htons(id_read_eeprom(i));
 	}
 
-#if defined(CONFIG_ISAPNP) || defined(CONFIG_ISAPNP_MODULE)
+#ifdef __ISAPNP__
 	if (nopnp == 0) {
 		/* The ISA PnP 3c509 cards respond to the ID sequence.
 		   This check is needed in order not to register them twice. */
@@ -425,7 +425,7 @@ no_pnp:
 			}
 		}
 	}
-#endif /* CONFIG_ISAPNP || CONFIG_ISAPNP_MODULE */
+#endif /* __ISAPNP__ */
 
 	{
 		unsigned int iobase = id_read_eeprom(8);
@@ -1017,10 +1017,10 @@ MODULE_PARM_DESC(debug, "EtherLink III debug level (0-6)");
 MODULE_PARM_DESC(irq, "EtherLink III IRQ number(s) (assigned)");
 MODULE_PARM_DESC(xcvr,"EtherLink III tranceiver(s) (0=internal, 1=external)");
 MODULE_PARM_DESC(max_interrupt_work, "EtherLink III maximum events handled per interrupt");
-#ifdef CONFIG_ISAPNP
+#ifdef __ISAPNP__
 MODULE_PARM(nopnp, "i");
 MODULE_PARM_DESC(nopnp, "EtherLink III disable ISA PnP support (0-1)");
-#endif	/* CONFIG_ISAPNP */
+#endif	/* __ISAPNP__ */
 
 int
 init_module(void)

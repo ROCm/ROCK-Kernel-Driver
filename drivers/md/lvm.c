@@ -236,7 +236,7 @@
 /*
  * External function prototypes
  */
-static int lvm_make_request_fn(request_queue_t*, int, struct buffer_head*);
+static int lvm_make_request_fn(request_queue_t*, struct bio *);
 
 static int lvm_blk_ioctl(struct inode *, struct file *, uint, ulong);
 static int lvm_blk_open(struct inode *, struct file *);
@@ -262,7 +262,7 @@ static void lvm_init_vars(void);
 #ifdef LVM_HD_NAME
 extern void (*lvm_hd_name_ptr) (char *, int);
 #endif
-static int lvm_map(struct buffer_head *, int);
+static int lvm_map(struct bio *);
 static int lvm_do_lock_lvm(void);
 static int lvm_do_le_remap(vg_t *, void *);
 
@@ -291,9 +291,9 @@ static void lvm_geninit(struct gendisk *);
 static void __update_hardsectsize(lv_t *lv);
 
 
-static void _queue_io(struct buffer_head *bh, int rw);
-static struct buffer_head *_dequeue_io(void);
-static void _flush_io(struct buffer_head *bh);
+static void _queue_io(struct bio *bh, int rw);
+static struct bio *_dequeue_io(void);
+static void _flush_io(struct bio *bh);
 
 static int _open_pv(pv_t *pv);
 static void _close_pv(pv_t *pv);
@@ -346,7 +346,7 @@ static DECLARE_WAIT_QUEUE_HEAD(lvm_wait);
 static spinlock_t lvm_lock = SPIN_LOCK_UNLOCKED;
 static spinlock_t lvm_snapshot_lock = SPIN_LOCK_UNLOCKED;
 
-static struct buffer_head *_pe_requests;
+static struct bio *_pe_requests;
 static DECLARE_RWSEM(_pe_lock);
 
 
@@ -369,7 +369,6 @@ struct block_device_operations lvm_blk_dops =
 /* gendisk structures */
 static struct hd_struct lvm_hd_struct[MAX_LV];
 static int lvm_blocksizes[MAX_LV];
-static int lvm_hardsectsizes[MAX_LV];
 static int lvm_size[MAX_LV];
 
 static struct gendisk lvm_gendisk =
@@ -451,9 +450,7 @@ static void lvm_cleanup(void)
 
 	del_gendisk(&lvm_gendisk);
 
-	blk_size[MAJOR_NR] = NULL;
-	blksize_size[MAJOR_NR] = NULL;
-	hardsect_size[MAJOR_NR] = NULL;
+	blk_clear(MAJOR_NR);
 
 #ifdef LVM_HD_NAME
 	/* reference from linux/drivers/block/genhd.c */
@@ -1037,25 +1034,25 @@ static int lvm_get_snapshot_use_rate(lv_t *lv, void *arg)
 
 static int lvm_user_bmap(struct inode *inode, struct lv_bmap *user_result)
 {
-	struct buffer_head bh;
+	struct bio bio;
 	unsigned long block;
 	int err;
 
 	if (get_user(block, &user_result->lv_block))
 		return -EFAULT;
 
-	memset(&bh,0,sizeof bh);
-	bh.b_blocknr = block;
-	bh.b_dev = bh.b_rdev = inode->i_rdev;
-	bh.b_size = lvm_get_blksize(bh.b_dev);
- 	bh.b_rsector = block * (bh.b_size >> 9);
-	if ((err=lvm_map(&bh, READ)) < 0)  {
+	memset(&bio,0,sizeof(bio));
+	bio.bi_dev = inode->i_rdev;
+	bio.bi_io_vec.bv_len = lvm_get_blksize(bio.bi_dev);
+ 	bio.bi_sector = block * bio_sectors(&bio);
+	bio.bi_rw = READ;
+	if ((err=lvm_map(&bio)) < 0)  {
 		printk("lvm map failed: %d\n", err);
 		return -EINVAL;
 	}
 
-	return put_user(kdev_t_to_nr(bh.b_rdev), &user_result->lv_dev) ||
-	       put_user(bh.b_rsector/(bh.b_size>>9), &user_result->lv_block) ?
+	return put_user(kdev_t_to_nr(bio.bi_dev), &user_result->lv_dev) ||
+	       put_user(bio.bi_sector/bio_sectors(&bio), &user_result->lv_block) ?
 	       -EFAULT : 0;
 }
 
@@ -1104,7 +1101,7 @@ static inline int _should_defer(kdev_t pv, ulong sector, uint32_t pe_size) {
 		(sector < (pe_lock_req.data.pv_offset + pe_size)));
 }
 
-static inline int _defer_extent(struct buffer_head *bh, int rw,
+static inline int _defer_extent(struct bio *bh, int rw,
 				kdev_t pv, ulong sector, uint32_t pe_size)
 {
 	if (pe_lock_req.lock == LOCK_PE) {
@@ -1122,17 +1119,18 @@ static inline int _defer_extent(struct buffer_head *bh, int rw,
 	return 0;
 }
 
-static int lvm_map(struct buffer_head *bh, int rw)
+static int lvm_map(struct bio *bh)
 {
-	int minor = MINOR(bh->b_rdev);
+	int minor = MINOR(bh->bi_dev);
 	ulong index;
 	ulong pe_start;
-	ulong size = bh->b_size >> 9;
-	ulong rsector_org = bh->b_rsector;
+	ulong size = bio_sectors(bh);
+	ulong rsector_org = bh->bi_sector;
 	ulong rsector_map;
 	kdev_t rdev_map;
 	vg_t *vg_this = vg[VG_BLK(minor)];
 	lv_t *lv = vg_this->lv[LV_BLK(minor)];
+	int rw = bio_data_dir(bh);
 
 
 	down_read(&lv->lv_lock);
@@ -1153,7 +1151,7 @@ static int lvm_map(struct buffer_head *bh, int rw)
 
 	P_MAP("%s - lvm_map minor: %d  *rdev: %s  *rsector: %lu  size:%lu\n",
 	      lvm_name, minor,
-	      kdevname(bh->b_rdev),
+	      kdevname(bh->bi_dev),
 	      rsector_org, size);
 
 	if (rsector_org + size > lv->lv_size) {
@@ -1248,13 +1246,15 @@ static int lvm_map(struct buffer_head *bh, int rw)
  	}
 
  out:
-	bh->b_rdev = rdev_map;
-	bh->b_rsector = rsector_map;
+	if (test_bit(BIO_HASHED, &bh->bi_flags))
+		BUG();
+	bh->bi_dev = rdev_map;
+	bh->bi_sector = rsector_map;
 	up_read(&lv->lv_lock);
 	return 1;
 
  bad:
-	buffer_IO_error(bh);
+	bio_io_error(bh);
 	up_read(&lv->lv_lock);
 	return -1;
 } /* lvm_map() */
@@ -1287,10 +1287,9 @@ void lvm_hd_name(char *buf, int minor)
 /*
  * make request function
  */
-static int lvm_make_request_fn(request_queue_t *q,
-			       int rw,
-			       struct buffer_head *bh) {
-	return (lvm_map(bh, rw) <= 0) ? 0 : 1;
+static int lvm_make_request_fn(request_queue_t *q, struct bio *bio)
+{
+	return (lvm_map(bio) <= 0) ? 0 : 1;
 }
 
 
@@ -1331,7 +1330,7 @@ lock_try_again:
 static int lvm_do_pe_lock_unlock(vg_t *vg_ptr, void *arg)
 {
 	pe_lock_req_t new_lock;
-	struct buffer_head *bh;
+	struct bio *bh;
 	uint p;
 
 	if (vg_ptr == NULL) return -ENXIO;
@@ -1820,8 +1819,6 @@ static void __update_hardsectsize(lv_t *lv) {
 				max_hardsectsize = hardsectsize;
 		}
 	}
-
-	lvm_hardsectsizes[MINOR(lv->lv_dev)] = max_hardsectsize;
 }
 
 /*
@@ -2665,7 +2662,6 @@ static void __init lvm_geninit(struct gendisk *lvm_gdisk)
 
 	blk_size[MAJOR_NR] = lvm_size;
 	blksize_size[MAJOR_NR] = lvm_blocksizes;
-	hardsect_size[MAJOR_NR] = lvm_hardsectsizes;
 
 	return;
 } /* lvm_gen_init() */
@@ -2673,16 +2669,16 @@ static void __init lvm_geninit(struct gendisk *lvm_gdisk)
 
 
 /* Must have down_write(_pe_lock) when we enqueue buffers */
-static void _queue_io(struct buffer_head *bh, int rw) {
-	if (bh->b_reqnext) BUG();
-	bh->b_reqnext = _pe_requests;
+static void _queue_io(struct bio *bh, int rw) {
+	if (bh->bi_next) BUG();
+	bh->bi_next = _pe_requests;
 	_pe_requests = bh;
 }
 
 /* Must have down_write(_pe_lock) when we dequeue buffers */
-static struct buffer_head *_dequeue_io(void)
+static struct bio *_dequeue_io(void)
 {
-	struct buffer_head *bh = _pe_requests;
+	struct bio *bh = _pe_requests;
 	_pe_requests = NULL;
 	return bh;
 }
@@ -2697,13 +2693,14 @@ static struct buffer_head *_dequeue_io(void)
  * If, for some reason, the same PE is locked again before all of these writes
  * have finished, then these buffers will just be re-queued (i.e. no danger).
  */
-static void _flush_io(struct buffer_head *bh)
+static void _flush_io(struct bio *bh)
 {
 	while (bh) {
-		struct buffer_head *next = bh->b_reqnext;
-		bh->b_reqnext = NULL;
+		struct bio *next = bh->bi_next;
+		bh->bi_next = NULL;
 		/* resubmit this buffer head */
-		generic_make_request(WRITE, bh);
+		bh->bi_rw = WRITE; /* needed? */
+		generic_make_request(bh);
 		bh = next;
 	}
 }

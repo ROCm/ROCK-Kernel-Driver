@@ -642,10 +642,10 @@ spinlock_t sym53c8xx_lock = SPIN_LOCK_UNLOCKED;
 #define	NCR_LOCK_NCB(np, flags)    spin_lock_irqsave(&np->smp_lock, flags)
 #define	NCR_UNLOCK_NCB(np, flags)  spin_unlock_irqrestore(&np->smp_lock, flags)
 
-#define	NCR_LOCK_SCSI_DONE(np, flags) \
-		spin_lock_irqsave(&io_request_lock, flags)
-#define	NCR_UNLOCK_SCSI_DONE(np, flags) \
-		spin_unlock_irqrestore(&io_request_lock, flags)
+#define	NCR_LOCK_SCSI_DONE(host, flags) \
+		spin_lock_irqsave(&((host)->host_lock), flags)
+#define	NCR_UNLOCK_SCSI_DONE(host, flags) \
+		spin_unlock_irqrestore(&((host)->host_lock), flags)
 
 #else
 
@@ -656,8 +656,8 @@ spinlock_t sym53c8xx_lock = SPIN_LOCK_UNLOCKED;
 #define	NCR_LOCK_NCB(np, flags)    do { save_flags(flags); cli(); } while (0)
 #define	NCR_UNLOCK_NCB(np, flags)  do { restore_flags(flags); } while (0)
 
-#define	NCR_LOCK_SCSI_DONE(np, flags)    do {;} while (0)
-#define	NCR_UNLOCK_SCSI_DONE(np, flags)  do {;} while (0)
+#define	NCR_LOCK_SCSI_DONE(host, flags)    do {;} while (0)
+#define	NCR_UNLOCK_SCSI_DONE(host, flags)  do {;} while (0)
 
 #endif
 
@@ -13676,9 +13676,9 @@ static void sym53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs)
      if (DEBUG_FLAGS & DEBUG_TINY) printk ("]\n");
 
      if (done_list) {
-          NCR_LOCK_SCSI_DONE(np, flags);
+          NCR_LOCK_SCSI_DONE(done_list->host, flags);
           ncr_flush_done_cmds(done_list);
-          NCR_UNLOCK_SCSI_DONE(np, flags);
+          NCR_UNLOCK_SCSI_DONE(done_list->host, flags);
      }
 }
 
@@ -13699,9 +13699,9 @@ static void sym53c8xx_timeout(unsigned long npref)
      NCR_UNLOCK_NCB(np, flags);
 
      if (done_list) {
-          NCR_LOCK_SCSI_DONE(np, flags);
+          NCR_LOCK_SCSI_DONE(done_list->host, flags);
           ncr_flush_done_cmds(done_list);
-          NCR_UNLOCK_SCSI_DONE(np, flags);
+          NCR_UNLOCK_SCSI_DONE(done_list->host, flags);
      }
 }
 

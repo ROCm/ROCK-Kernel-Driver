@@ -7,7 +7,7 @@
 
 //general boundary defintions
 #define SENSEINFOBYTES          32//note that this value may vary between host implementations
-#define MAXSGENTRIES            31
+#define MAXSGENTRIES            32
 #define MAXREPLYQS              256
 
 //Command Status value

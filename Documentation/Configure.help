@@ -6644,17 +6644,6 @@ CONFIG_CHR_DEV_SG
   <file:Documentation/scsi.txt>. The module will be called sg.o. If unsure,
   say N.
 
-Enable extra checks in SCSI queueing code
-CONFIG_SCSI_DEBUG_QUEUES
-  This option turns on a lot of additional consistency checking for
-  the new queueing code. This will adversely affect performance, but
-  it is likely that bugs will be caught sooner if this is turned on.
-  This will typically cause the kernel to panic if an error is
-  detected, but it would have probably crashed if the panic weren't
-  there. Comments/questions/problems to linux-scsi mailing list
-  please. See <http://www.andante.org/scsi_queue.html> for more
-  up-to-date information.
-
 Probe all LUNs on each SCSI device
 CONFIG_SCSI_MULTI_LUN
   If you have a SCSI device that supports more than one LUN (Logical

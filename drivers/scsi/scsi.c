@@ -186,10 +186,22 @@ extern void scsi_old_times_out(Scsi_Cmnd * SCpnt);
  *              handler in the list - ultimately they call scsi_request_fn
  *              to do the dirty deed.
  */
-void  scsi_initialize_queue(Scsi_Device * SDpnt, struct Scsi_Host * SHpnt) {
-	blk_init_queue(&SDpnt->request_queue, scsi_request_fn);
-        blk_queue_headactive(&SDpnt->request_queue, 0);
-        SDpnt->request_queue.queuedata = (void *) SDpnt;
+void  scsi_initialize_queue(Scsi_Device * SDpnt, struct Scsi_Host * SHpnt)
+{
+	char name[16];
+
+	request_queue_t *q = &SDpnt->request_queue;
+
+	sprintf(name, "scsi%d%d%d", SDpnt->id, SDpnt->lun, SDpnt->channel);
+	blk_init_queue(q, scsi_request_fn, name);
+	blk_queue_headactive(q, 0);
+	q->queuedata = (void *) SDpnt;
+#ifdef DMA_CHUNK_SIZE
+	blk_queue_max_segments(q, 64);
+#else
+	blk_queue_max_segments(q, SHpnt->sg_tablesize);
+#endif
+	blk_queue_max_sectors(q, SHpnt->max_sectors);
 }
 
 #ifdef MODULE
@@ -227,9 +239,7 @@ static void scsi_wait_done(Scsi_Cmnd * SCpnt)
 	req = &SCpnt->request;
 	req->rq_status = RQ_SCSI_DONE;	/* Busy, but indicate request done */
 
-	if (req->waiting != NULL) {
-		complete(req->waiting);
-	}
+	complete(req->waiting);
 }
 
 /*
@@ -620,8 +630,6 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 	unsigned long flags = 0;
 	unsigned long timeout;
 
-	ASSERT_LOCK(&io_request_lock, 0);
-
 #if DEBUG
 	unsigned long *ret = 0;
 #ifdef __mips__
@@ -632,6 +640,8 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 #endif
 
 	host = SCpnt->host;
+
+	ASSERT_LOCK(&host->host_lock, 0);
 
 	/* Assign a unique nonzero serial_number. */
 	if (++serial_number == 0)
@@ -692,9 +702,9 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 			 * length exceeds what the host adapter can handle.
 			 */
 			if (CDB_SIZE(SCpnt) <= SCpnt->host->max_cmd_len) {
-				spin_lock_irqsave(&io_request_lock, flags);
+				spin_lock_irqsave(&host->host_lock, flags);
 				rtn = host->hostt->queuecommand(SCpnt, scsi_done);
-				spin_unlock_irqrestore(&io_request_lock, flags);
+				spin_unlock_irqrestore(&host->host_lock, flags);
 				if (rtn != 0) {
 					scsi_delete_timer(SCpnt);
 					scsi_mlqueue_insert(SCpnt, SCSI_MLQUEUE_HOST_BUSY);
@@ -703,10 +713,11 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 			} else {
 				SCSI_LOG_MLQUEUE(3, printk("queuecommand : command too long.\n"));
 				SCpnt->result = (DID_ABORT << 16);
-				spin_lock_irqsave(&io_request_lock, flags);
+				spin_lock_irqsave(&host->host_lock, flags);
 				scsi_done(SCpnt);
-				spin_unlock_irqrestore(&io_request_lock, flags);
+				spin_unlock_irqrestore(&host->host_lock, flags);
 				rtn = 1;
+
 			}
 		} else {
 			/*
@@ -714,15 +725,15 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 			 * length exceeds what the host adapter can handle.
 			 */
 			if (CDB_SIZE(SCpnt) <= SCpnt->host->max_cmd_len) {
-				spin_lock_irqsave(&io_request_lock, flags);
+				spin_lock_irqsave(&host->host_lock, flags);
 				host->hostt->queuecommand(SCpnt, scsi_old_done);
-				spin_unlock_irqrestore(&io_request_lock, flags);
+				spin_unlock_irqrestore(&host->host_lock, flags);
 			} else {
 				SCSI_LOG_MLQUEUE(3, printk("queuecommand : command too long.\n"));
 				SCpnt->result = (DID_ABORT << 16);
-				spin_lock_irqsave(&io_request_lock, flags);
+				spin_lock_irqsave(&host->host_lock, flags);
 				scsi_old_done(SCpnt);
-				spin_unlock_irqrestore(&io_request_lock, flags);
+				spin_unlock_irqrestore(&host->host_lock, flags);
 				rtn = 1;
 			}
 		}
@@ -730,11 +741,11 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 		int temp;
 
 		SCSI_LOG_MLQUEUE(3, printk("command() :  routine at %p\n", host->hostt->command));
-                spin_lock_irqsave(&io_request_lock, flags);
+                spin_lock_irqsave(&host->host_lock, flags);
 		temp = host->hostt->command(SCpnt);
 		SCpnt->result = temp;
 #ifdef DEBUG_DELAY
-                spin_unlock_irqrestore(&io_request_lock, flags);
+                spin_unlock_irqrestore(&host->host_lock, flags);
 		clock = jiffies + 4 * HZ;
 		while (time_before(jiffies, clock)) {
 			barrier();
@@ -742,14 +753,14 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 		}
 		printk("done(host = %d, result = %04x) : routine at %p\n",
 		       host->host_no, temp, host->hostt->command);
-                spin_lock_irqsave(&io_request_lock, flags);
+                spin_lock_irqsave(&host->host_lock, flags);
 #endif
 		if (host->hostt->use_new_eh_code) {
 			scsi_done(SCpnt);
 		} else {
 			scsi_old_done(SCpnt);
 		}
-                spin_unlock_irqrestore(&io_request_lock, flags);
+                spin_unlock_irqrestore(&host->host_lock, flags);
 	}
 	SCSI_LOG_MLQUEUE(3, printk("leaving scsi_dispatch_cmnd()\n"));
 	return rtn;
@@ -817,7 +828,7 @@ void scsi_do_req(Scsi_Request * SRpnt, const void *cmnd,
 	Scsi_Device * SDpnt = SRpnt->sr_device;
 	struct Scsi_Host *host = SDpnt->host;
 
-	ASSERT_LOCK(&io_request_lock, 0);
+	ASSERT_LOCK(&host->host_lock, 0);
 
 	SCSI_LOG_MLQUEUE(4,
 			 {
@@ -914,7 +925,7 @@ void scsi_init_cmd_from_req(Scsi_Cmnd * SCpnt, Scsi_Request * SRpnt)
 {
 	struct Scsi_Host *host = SCpnt->host;
 
-	ASSERT_LOCK(&io_request_lock, 0);
+	ASSERT_LOCK(&host->host_lock, 0);
 
 	SCpnt->owner = SCSI_OWNER_MIDLEVEL;
 	SRpnt->sr_command = SCpnt;
@@ -1004,7 +1015,7 @@ void scsi_do_cmd(Scsi_Cmnd * SCpnt, const void *cmnd,
 {
 	struct Scsi_Host *host = SCpnt->host;
 
-	ASSERT_LOCK(&io_request_lock, 0);
+	ASSERT_LOCK(&host->host_lock, 0);
 
 	SCpnt->pid = scsi_pid++;
 	SCpnt->owner = SCSI_OWNER_MIDLEVEL;
@@ -1355,10 +1366,10 @@ void scsi_finish_command(Scsi_Cmnd * SCpnt)
 	Scsi_Request * SRpnt;
 	unsigned long flags;
 
-	ASSERT_LOCK(&io_request_lock, 0);
-
 	host = SCpnt->host;
 	device = SCpnt->device;
+
+	ASSERT_LOCK(&host->host_lock, 0);
 
         /*
          * We need to protect the decrement, as otherwise a race condition
@@ -1367,10 +1378,10 @@ void scsi_finish_command(Scsi_Cmnd * SCpnt)
          * one execution context, but the device and host structures are
          * shared.
          */
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(&host->host_lock, flags);
 	host->host_busy--;	/* Indicate that we are free */
 	device->device_busy--;	/* Decrement device usage counter. */
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(&host->host_lock, flags);
 
         /*
          * Clear the flags which say that the device/host is no longer
@@ -1858,7 +1869,6 @@ static int scsi_register_host(Scsi_Host_Template * tpnt)
 	Scsi_Device *SDpnt;
 	struct Scsi_Device_Template *sdtpnt;
 	const char *name;
-	unsigned long flags;
 	int out_of_space = 0;
 
 	if (tpnt->next || !tpnt->detect)
@@ -1868,7 +1878,7 @@ static int scsi_register_host(Scsi_Host_Template * tpnt)
 
 	/* If max_sectors isn't set, default to max */
 	if (!tpnt->max_sectors)
-		tpnt->max_sectors = MAX_SECTORS;
+		tpnt->max_sectors = 1024;
 
 	pcount = next_scsi_host;
 
@@ -1882,10 +1892,11 @@ static int scsi_register_host(Scsi_Host_Template * tpnt)
 	   using the new scsi code. NOTE: the detect routine could
 	   redefine the value tpnt->use_new_eh_code. (DB, 13 May 1998) */
 
+	/*
+	 * detect should do its own locking
+	 */
 	if (tpnt->use_new_eh_code) {
-		spin_lock_irqsave(&io_request_lock, flags);
 		tpnt->present = tpnt->detect(tpnt);
-		spin_unlock_irqrestore(&io_request_lock, flags);
 	} else
 		tpnt->present = tpnt->detect(tpnt);
 

@@ -2036,7 +2036,6 @@ static int m3_open(struct inode *inode, struct file *file)
     set_fmt(s, fmtm, fmts);
     s->open_mode |= file->f_mode & (FMODE_READ | FMODE_WRITE);
 
-    MOD_INC_USE_COUNT;
     up(&s->open_sem);
     spin_unlock_irqrestore(&s->lock, flags);
     return 0;
@@ -2075,7 +2074,6 @@ static int m3_release(struct inode *inode, struct file *file)
     up(&s->open_sem);
     wake_up(&s->open_wait);
 
-    MOD_DEC_USE_COUNT;
     return 0;
 }
 
@@ -2142,14 +2140,12 @@ static int m3_open_mixdev(struct inode *inode, struct file *file)
     int minor = MINOR(inode->i_rdev);
     struct m3_card *card = devs;
 
-    MOD_INC_USE_COUNT;
     for (card = devs; card != NULL; card = card->next) {
         if((card->ac97 != NULL) && (card->ac97->dev_mixer == minor))
                 break;
     }
 
     if (!card) {
-        MOD_DEC_USE_COUNT;
         return -ENODEV;
     }
 
@@ -2160,7 +2156,6 @@ static int m3_open_mixdev(struct inode *inode, struct file *file)
 
 static int m3_release_mixdev(struct inode *inode, struct file *file)
 {
-    MOD_DEC_USE_COUNT;
     return 0;
 }
 
@@ -2173,6 +2168,7 @@ static int m3_ioctl_mixdev(struct inode *inode, struct file *file, unsigned int 
 }
 
 static struct file_operations m3_mixer_fops = {
+    owner:          THIS_MODULE,
     llseek:         no_llseek,
     ioctl:          m3_ioctl_mixdev,
     open:           m3_open_mixdev,
@@ -2546,6 +2542,7 @@ static void m3_enable_ints(struct m3_card *card)
 }
 
 static struct file_operations m3_audio_fops = {
+    owner:      THIS_MODULE,
     llseek:     &no_llseek,
     read:       &m3_read,
     write:      &m3_write,

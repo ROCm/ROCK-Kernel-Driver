@@ -140,7 +140,7 @@ static __devinitdata struct usb_device_id gocom232_table [] = {
 MODULE_DEVICE_TABLE (usb, id_table_combined);
 
 /* All of the device info needed for the Belkin dockstation serial converter */
-struct usb_serial_device_type belkin_dockstation_device = {
+static struct usb_serial_device_type belkin_dockstation_device = {
 	name:			"Belkin F5U120-PC USB Serial Adapter",
 	id_table:		belkin_dockstation_table,		/* the Belkin F5U103 device */
 	needs_interrupt_in:	MUST_HAVE,			/* this device must have an interrupt in endpoint */
@@ -161,7 +161,7 @@ struct usb_serial_device_type belkin_dockstation_device = {
 };
 
 /* All of the device info needed for the Belkin serial converter */
-struct usb_serial_device_type belkin_sa_device = {
+static struct usb_serial_device_type belkin_sa_device = {
 	name:			"Belkin F5U103 USB Serial Adapter",
 	id_table:		belkin_sa_table,		/* the Belkin F5U103 device */
 	needs_interrupt_in:	MUST_HAVE,			/* this device must have an interrupt in endpoint */
@@ -183,7 +183,7 @@ struct usb_serial_device_type belkin_sa_device = {
 
 
 /* This driver also supports the "old" school Belkin single port adaptor */
-struct usb_serial_device_type belkin_old_device = {
+static struct usb_serial_device_type belkin_old_device = {
 	name:			"Belkin USB Serial Adapter",
 	id_table:		belkin_old_table,		/* the old Belkin device */
 	needs_interrupt_in:	MUST_HAVE,			/* this device must have an interrupt in endpoint */
@@ -204,7 +204,7 @@ struct usb_serial_device_type belkin_old_device = {
 };
 
 /* this driver also works for the Peracom single port adapter */
-struct usb_serial_device_type peracom_device = {
+static struct usb_serial_device_type peracom_device = {
 	name:			"Peracom single port USB Serial Adapter",
 	id_table:		peracom_table,			/* the Peracom device */
 	needs_interrupt_in:	MUST_HAVE,			/* this device must have an interrupt in endpoint */
@@ -225,7 +225,7 @@ struct usb_serial_device_type peracom_device = {
 };
 
 /* the GoHubs Go-COM232 device is the same as the Peracom single port adapter */
-struct usb_serial_device_type gocom232_device = {
+static struct usb_serial_device_type gocom232_device = {
 	name:			"GO-COM232 USB Serial Converter",
 	id_table:		gocom232_table,			/* the GO-COM232 device */
 	needs_interrupt_in:	MUST_HAVE,			/* this device must have an interrupt in endpoint */

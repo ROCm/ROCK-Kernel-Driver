@@ -1258,7 +1258,7 @@ static int __initdata irq = -1;
 static int __initdata dma = -1;
 static int __initdata dma2 = -1;
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 struct pci_dev	*ad1816_dev  = NULL;
 
 static int activated	= 1;
@@ -1280,7 +1280,7 @@ MODULE_PARM(dma2,"i");
 MODULE_PARM(ad1816_clockfreq,"i");
 MODULE_PARM(options,"i");
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 
 static struct pci_dev *activate_dev(char *devname, char *resname, struct pci_dev *dev)
 {
@@ -1407,7 +1407,7 @@ int __init ad1816_probe_isapnp(struct address_info *hw_config)
 static int __init init_ad1816(void)
 {
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 	if(isapnp && (ad1816_probe_isapnp(&cfg) < 0) ) {
 		printk(KERN_NOTICE "ad1816: No ISAPnP cards found, trying standard ones...\n");
 		isapnp = 0;
@@ -1447,7 +1447,7 @@ static void __exit cleanup_ad1816 (void)
 	}     
 	nr_ad1816_devs=0;
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 	if(activated)
 		if(ad1816_dev)
 			ad1816_dev->deactivate(ad1816_dev);

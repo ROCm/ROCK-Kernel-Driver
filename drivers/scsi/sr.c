@@ -88,7 +88,6 @@ Scsi_CD *scsi_CDs;
 static int *sr_sizes;
 
 static int *sr_blocksizes;
-static int *sr_hardsizes;
 
 static int sr_open(struct cdrom_device_info *, int);
 void get_sectorsize(int);
@@ -218,8 +217,8 @@ static void rw_intr(Scsi_Cmnd * SCpnt)
 		(SCpnt->sense_buffer[4] << 16) |
 		(SCpnt->sense_buffer[5] << 8) |
 		SCpnt->sense_buffer[6];
-		if (SCpnt->request.bh != NULL)
-			block_sectors = SCpnt->request.bh->b_size >> 9;
+		if (SCpnt->request.bio != NULL)
+			block_sectors = bio_sectors(SCpnt->request.bio);
 		if (block_sectors < 4)
 			block_sectors = 4;
 		if (scsi_CDs[device_nr].device->sector_size == 2048)
@@ -663,6 +662,7 @@ void get_sectorsize(int i)
 		scsi_CDs[i].needs_sector_size = 0;
 		sr_sizes[i] = scsi_CDs[i].capacity >> (BLOCK_SIZE_BITS - 9);
 	};
+	blk_queue_hardsect_size(blk_get_queue(MAJOR_NR), sector_size);
 	scsi_free(buffer, 512);
 }
 
@@ -811,21 +811,14 @@ static int sr_init()
 	if (!sr_blocksizes)
 		goto cleanup_sizes;
 
-	sr_hardsizes = kmalloc(sr_template.dev_max * sizeof(int), GFP_ATOMIC);
-	if (!sr_hardsizes)
-		goto cleanup_blocksizes;
 	/*
 	 * These are good guesses for the time being.
 	 */
-	for (i = 0; i < sr_template.dev_max; i++) {
+	for (i = 0; i < sr_template.dev_max; i++)
 		sr_blocksizes[i] = 2048;
-		sr_hardsizes[i] = 2048;
-        }
+
 	blksize_size[MAJOR_NR] = sr_blocksizes;
-        hardsect_size[MAJOR_NR] = sr_hardsizes;
 	return 0;
-cleanup_blocksizes:
-	kfree(sr_blocksizes);
 cleanup_sizes:
 	kfree(sr_sizes);
 cleanup_cds:
@@ -897,7 +890,6 @@ void sr_finish()
 	else
 		read_ahead[MAJOR_NR] = 4;	/* 4 sector read-ahead */
 
-	return;
 }
 
 static void sr_detach(Scsi_Device * SDp)
@@ -905,17 +897,18 @@ static void sr_detach(Scsi_Device * SDp)
 	Scsi_CD *cpnt;
 	int i;
 
-	for (cpnt = scsi_CDs, i = 0; i < sr_template.dev_max; i++, cpnt++)
+	for (cpnt = scsi_CDs, i = 0; i < sr_template.dev_max; i++, cpnt++) {
 		if (cpnt->device == SDp) {
 			/*
-			 * Since the cdrom is read-only, no need to sync the device.
+			 * Since the cdrom is read-only, no need to sync
+			 * the device.
 			 * We should be kind to our buffer cache, however.
 			 */
 			invalidate_device(MKDEV(MAJOR_NR, i), 0);
 
 			/*
-			 * Reset things back to a sane state so that one can re-load a new
-			 * driver (perhaps the same one).
+			 * Reset things back to a sane state so that one can
+			 * re-load a new driver (perhaps the same one).
 			 */
 			unregister_cdrom(&(cpnt->cdi));
 			cpnt->device = NULL;
@@ -926,7 +919,7 @@ static void sr_detach(Scsi_Device * SDp)
 			sr_sizes[i] = 0;
 			return;
 		}
-	return;
+	}
 }
 
 static int __init init_sr(void)
@@ -948,13 +941,9 @@ static void __exit exit_sr(void)
 
 		kfree(sr_blocksizes);
 		sr_blocksizes = NULL;
-		kfree(sr_hardsizes);
-		sr_hardsizes = NULL;
 	}
-	blksize_size[MAJOR_NR] = NULL;
-        hardsect_size[MAJOR_NR] = NULL;
-	blk_size[MAJOR_NR] = NULL;
 	read_ahead[MAJOR_NR] = 0;
+	blk_clear(MAJOR_NR);
 
 	sr_template.dev_max = 0;
 }

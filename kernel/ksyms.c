@@ -121,6 +121,8 @@ EXPORT_SYMBOL(kmap_high);
 EXPORT_SYMBOL(kunmap_high);
 EXPORT_SYMBOL(highmem_start_page);
 EXPORT_SYMBOL(create_bounce);
+EXPORT_SYMBOL(kmap_prot);
+EXPORT_SYMBOL(kmap_pte);
 #endif
 
 /* filesystem internal functions */
@@ -290,7 +292,6 @@ EXPORT_SYMBOL(tty_std_termios);
 
 /* block device driver support */
 EXPORT_SYMBOL(blksize_size);
-EXPORT_SYMBOL(hardsect_size);
 EXPORT_SYMBOL(blk_size);
 EXPORT_SYMBOL(blk_dev);
 EXPORT_SYMBOL(is_read_only);
@@ -307,8 +308,8 @@ EXPORT_SYMBOL(register_disk);
 EXPORT_SYMBOL(tq_disk);
 EXPORT_SYMBOL(init_buffer);
 EXPORT_SYMBOL(refile_buffer);
-EXPORT_SYMBOL(max_sectors);
 EXPORT_SYMBOL(max_readahead);
+EXPORT_SYMBOL(wipe_partitions);
 
 /* tty routines */
 EXPORT_SYMBOL(tty_hangup);

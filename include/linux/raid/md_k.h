@@ -220,7 +220,7 @@ struct mddev_s
 struct mdk_personality_s
 {
 	char *name;
-	int (*make_request)(mddev_t *mddev, int rw, struct buffer_head * bh);
+	int (*make_request)(mddev_t *mddev, int rw, struct bio *bio);
 	int (*run)(mddev_t *mddev);
 	int (*stop)(mddev_t *mddev);
 	int (*status)(char *page, mddev_t *mddev);

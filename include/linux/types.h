@@ -113,6 +113,17 @@ typedef		__u64		u_int64_t;
 typedef		__s64		int64_t;
 #endif
 
+/*
+ * transition to 64-bit sector_t, possibly making it an option...
+ */
+#undef BLK_64BIT_SECTOR
+
+#ifdef BLK_64BIT_SECTOR
+typedef u64 sector_t;
+#else
+typedef unsigned long sector_t;
+#endif
+
 #endif /* __KERNEL_STRICT_NAMES */
 
 /*

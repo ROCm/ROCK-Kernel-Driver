@@ -61,10 +61,6 @@
 
 #include <linux/genhd.h>
 
-/*
- *  static const char RCSid[] = "$Header:";
- */
-
 #define SD_MAJOR(i) (!(i) ? SCSI_DISK0_MAJOR : SCSI_DISK1_MAJOR-1+(i))
 
 #define SCSI_DISKS_PER_MAJOR	16
@@ -72,8 +68,7 @@
 #define SD_MINOR_NUMBER(i)	((i) & 255)
 #define MKDEV_SD_PARTITION(i)	MKDEV(SD_MAJOR_NUMBER(i), (i) & 255)
 #define MKDEV_SD(index)		MKDEV_SD_PARTITION((index) << 4)
-#define N_USED_SCSI_DISKS  (sd_template.dev_max + SCSI_DISKS_PER_MAJOR - 1)
-#define N_USED_SD_MAJORS   (N_USED_SCSI_DISKS / SCSI_DISKS_PER_MAJOR)
+#define N_USED_SD_MAJORS	(1 + ((sd_template.dev_max - 1) >> 4))
 
 #define MAX_RETRIES 5
 
@@ -89,14 +84,12 @@ struct hd_struct *sd;
 static Scsi_Disk *rscsi_disks;
 static int *sd_sizes;
 static int *sd_blocksizes;
-static int *sd_hardsizes;	/* Hardware sector size */
 static int *sd_max_sectors;
 
 static int check_scsidisk_media_change(kdev_t);
 static int fop_revalidate_scsidisk(kdev_t);
 
 static int sd_init_onedisk(int);
-
 
 static int sd_init(void);
 static void sd_finish(void);
@@ -123,7 +116,6 @@ static struct Scsi_Device_Template sd_template = {
 	detach:sd_detach,
 	init_command:sd_init_command,
 };
-
 
 static void rw_intr(Scsi_Cmnd * SCpnt);
 
@@ -191,11 +183,11 @@ static int sd_ioctl(struct inode * inode, struct file * file, unsigned int cmd, 
 					    &diskinfo[0]);
 			else scsicam_bios_param(&rscsi_disks[DEVICE_NR(dev)],
 					dev, &diskinfo[0]);
-
 			if (put_user(diskinfo[0], &loc->heads) ||
 				put_user(diskinfo[1], &loc->sectors) ||
 				put_user(diskinfo[2], &loc->cylinders) ||
-				put_user(sd[SD_PARTITION(inode->i_rdev)].start_sect, &loc->start))
+				put_user((unsigned) get_start_sect(inode->i_rdev),
+					 (unsigned long *) &loc->start))
 				return -EFAULT;
 			return 0;
 		}
@@ -226,7 +218,8 @@ static int sd_ioctl(struct inode * inode, struct file * file, unsigned int cmd, 
 			if (put_user(diskinfo[0], &loc->heads) ||
 				put_user(diskinfo[1], &loc->sectors) ||
 				put_user(diskinfo[2], (unsigned int *) &loc->cylinders) ||
-				put_user(sd[SD_PARTITION(inode->i_rdev)].start_sect, &loc->start))
+				put_user((unsigned)get_start_sect(inode->i_rdev),
+					 (unsigned long *)&loc->start))
 				return -EFAULT;
 			return 0;
 		}
@@ -239,10 +232,12 @@ static int sd_ioctl(struct inode * inode, struct file * file, unsigned int cmd, 
 		case BLKFLSBUF:
 		case BLKSSZGET:
 		case BLKPG:
-		case BLKELVGET:
-		case BLKELVSET:
+                case BLKELVGET:
+                case BLKELVSET:
 		case BLKBSZGET:
 		case BLKBSZSET:
+		case BLKHASHPROF:
+		case BLKHASHCLEAR:
 			return blk_ioctl(inode->i_rdev, cmd, arg);
 
 		case BLKRRPART: /* Re-read partition tables */
@@ -251,7 +246,8 @@ static int sd_ioctl(struct inode * inode, struct file * file, unsigned int cmd, 
 			return revalidate_scsidisk(dev, 1);
 
 		default:
-			return scsi_ioctl(rscsi_disks[DEVICE_NR(dev)].device , cmd, (void *) arg);
+			return scsi_ioctl(rscsi_disks[DEVICE_NR(dev)].device,
+					  cmd, (void *) arg);
 	}
 }
 
@@ -301,7 +297,7 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 	SCSI_LOG_HLQUEUE(1, printk("Doing sd request, dev = %d, block = %d\n", devm, block));
 
 	dpnt = &rscsi_disks[dev];
-	if (devm >= (sd_template.dev_max << 4) ||
+	if (devm >= (sd_template.dev_max << 4) || (devm & 0xf) ||
 	    !dpnt ||
 	    !dpnt->device->online ||
  	    block + SCpnt->request.nr_sectors > sd[devm].nr_sects) {
@@ -309,7 +305,7 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 		SCSI_LOG_HLQUEUE(2, printk("Retry with 0x%p\n", SCpnt));
 		return 0;
 	}
-	block += sd[devm].start_sect;
+
 	if (dpnt->device->changed) {
 		/*
 		 * quietly refuse to do anything to a changed disc until the changed
@@ -618,8 +614,8 @@ static void rw_intr(Scsi_Cmnd * SCpnt)
 			(SCpnt->sense_buffer[4] << 16) |
 			(SCpnt->sense_buffer[5] << 8) |
 			SCpnt->sense_buffer[6];
-			if (SCpnt->request.bh != NULL)
-				block_sectors = SCpnt->request.bh->b_size >> 9;
+			if (SCpnt->request.bio != NULL)
+				block_sectors = bio_sectors(SCpnt->request.bio);
 			switch (SCpnt->device->sector_size) {
 			case 1024:
 				error_sector <<= 1;
@@ -642,7 +638,7 @@ static void rw_intr(Scsi_Cmnd * SCpnt)
 			default:
 				break;
 			}
-			error_sector -= sd[SD_PARTITION(SCpnt->request.rq_dev)].start_sect;
+
 			error_sector &= ~(block_sectors - 1);
 			good_sectors = error_sector - SCpnt->request.sector;
 			if (good_sectors < 0 || good_sectors >= this_count)
@@ -970,15 +966,11 @@ static int sd_init_onedisk(int i)
 			 * So I have created this table. See ll_rw_blk.c
 			 * Jacques Gelinas (Jacques@solucorp.qc.ca)
 			 */
-			int m;
 			int hard_sector = sector_size;
 			int sz = rscsi_disks[i].capacity * (hard_sector/256);
 
 			/* There are 16 minors allocated for each major device */
-			for (m = i << 4; m < ((i + 1) << 4); m++) {
-				sd_hardsizes[m] = hard_sector;
-			}
-
+			blk_queue_hardsect_size(blk_get_queue(SD_MAJOR(i)), hard_sector);
 			printk("SCSI device %s: "
 			       "%d %d-byte hdwr sectors (%d MB)\n",
 			       nbuff, rscsi_disks[i].capacity,
@@ -1063,7 +1055,7 @@ static int sd_registered;
 
 static int sd_init()
 {
-	int i;
+	int i, maxparts;
 
 	if (sd_template.dev_noticed == 0)
 		return 0;
@@ -1074,10 +1066,17 @@ static int sd_init()
 	if (sd_template.dev_max > N_SD_MAJORS * SCSI_DISKS_PER_MAJOR)
 		sd_template.dev_max = N_SD_MAJORS * SCSI_DISKS_PER_MAJOR;
 
+	/* At most 16 partitions on each scsi disk. */
+	maxparts = (sd_template.dev_max << 4);
+	if (maxparts == 0)
+		return 0;
+
 	if (!sd_registered) {
 		for (i = 0; i < N_USED_SD_MAJORS; i++) {
-			if (devfs_register_blkdev(SD_MAJOR(i), "sd", &sd_fops)) {
-				printk("Unable to get major %d for SCSI disk\n", SD_MAJOR(i));
+			if (devfs_register_blkdev(SD_MAJOR(i), "sd",
+						  &sd_fops)) {
+				printk("Unable to get major %d for SCSI disk\n",
+				       SD_MAJOR(i));
 				return 1;
 			}
 		}
@@ -1087,32 +1086,26 @@ static int sd_init()
 	if (rscsi_disks)
 		return 0;
 
-	rscsi_disks = kmalloc(sd_template.dev_max * sizeof(Scsi_Disk), GFP_ATOMIC);
-	if (!rscsi_disks)
-		goto cleanup_devfs;
-	memset(rscsi_disks, 0, sd_template.dev_max * sizeof(Scsi_Disk));
+	/* allocate memory */
+#define init_mem_lth(x,n)	x = kmalloc((n) * sizeof(*x), GFP_ATOMIC)
+#define zero_mem_lth(x,n)	memset(x, 0, (n) * sizeof(*x))
 
-	/* for every (necessary) major: */
-	sd_sizes = kmalloc((sd_template.dev_max << 4) * sizeof(int), GFP_ATOMIC);
-	if (!sd_sizes)
-		goto cleanup_disks;
-	memset(sd_sizes, 0, (sd_template.dev_max << 4) * sizeof(int));
+	init_mem_lth(rscsi_disks, sd_template.dev_max);
+	init_mem_lth(sd_sizes, maxparts);
+	init_mem_lth(sd_blocksizes, maxparts);
+	init_mem_lth(sd, maxparts);
+	init_mem_lth(sd_gendisks, N_USED_SD_MAJORS);
+	init_mem_lth(sd_max_sectors, sd_template.dev_max << 4);
 
-	sd_blocksizes = kmalloc((sd_template.dev_max << 4) * sizeof(int), GFP_ATOMIC);
-	if (!sd_blocksizes)
-		goto cleanup_sizes;
-	
-	sd_hardsizes = kmalloc((sd_template.dev_max << 4) * sizeof(int), GFP_ATOMIC);
-	if (!sd_hardsizes)
-		goto cleanup_blocksizes;
+	if (!rscsi_disks || !sd_sizes || !sd_blocksizes || !sd || !sd_gendisks)
+		goto cleanup_mem;
 
-	sd_max_sectors = kmalloc((sd_template.dev_max << 4) * sizeof(int), GFP_ATOMIC);
-	if (!sd_max_sectors)
-		goto cleanup_max_sectors;
+	zero_mem_lth(rscsi_disks, sd_template.dev_max);
+	zero_mem_lth(sd_sizes, maxparts);
+	zero_mem_lth(sd, maxparts);
 
-	for (i = 0; i < sd_template.dev_max << 4; i++) {
+	for (i = 0; i < maxparts; i++) {
 		sd_blocksizes[i] = 1024;
-		sd_hardsizes[i] = 512;
 		/*
 		 * Allow lowlevel device drivers to generate 512k large scsi
 		 * commands if they know what they're doing and they ask for it
@@ -1122,45 +1115,34 @@ static int sd_init()
 	}
 
 	for (i = 0; i < N_USED_SD_MAJORS; i++) {
-		blksize_size[SD_MAJOR(i)] = sd_blocksizes + i * (SCSI_DISKS_PER_MAJOR << 4);
-		hardsect_size[SD_MAJOR(i)] = sd_hardsizes + i * (SCSI_DISKS_PER_MAJOR << 4);
-		max_sectors[SD_MAJOR(i)] = sd_max_sectors + i * (SCSI_DISKS_PER_MAJOR << 4);
-	}
-	/*
-	 * FIXME: should unregister blksize_size, hardsect_size and max_sectors when
-	 * the module is unloaded.
-	 */
-	sd = kmalloc((sd_template.dev_max << 4) *
-					  sizeof(struct hd_struct),
-					  GFP_ATOMIC);
-	if (!sd)
-		goto cleanup_sd;
-	memset(sd, 0, (sd_template.dev_max << 4) * sizeof(struct hd_struct));
+		request_queue_t *q = blk_get_queue(SD_MAJOR(i));
+		int parts_per_major = (SCSI_DISKS_PER_MAJOR << 4);
 
-	if (N_USED_SD_MAJORS > 1)
-		sd_gendisks = kmalloc(N_USED_SD_MAJORS * sizeof(struct gendisk), GFP_ATOMIC);
-		if (!sd_gendisks)
-			goto cleanup_sd_gendisks;
+		blksize_size[SD_MAJOR(i)] =
+			sd_blocksizes + i * parts_per_major;
+		blk_queue_hardsect_size(q, 512);
+ 	}
+
 	for (i = 0; i < N_USED_SD_MAJORS; i++) {
+		int N = SCSI_DISKS_PER_MAJOR;
+
 		sd_gendisks[i] = sd_gendisk;
-		sd_gendisks[i].de_arr = kmalloc (SCSI_DISKS_PER_MAJOR * sizeof *sd_gendisks[i].de_arr,
-                                                 GFP_ATOMIC);
-		if (!sd_gendisks[i].de_arr)
-			goto cleanup_gendisks_de_arr;
-                memset (sd_gendisks[i].de_arr, 0,
-                        SCSI_DISKS_PER_MAJOR * sizeof *sd_gendisks[i].de_arr);
-		sd_gendisks[i].flags = kmalloc (SCSI_DISKS_PER_MAJOR * sizeof *sd_gendisks[i].flags,
-                                                GFP_ATOMIC);
-		if (!sd_gendisks[i].flags)
-			goto cleanup_gendisks_flags;
-                memset (sd_gendisks[i].flags, 0,
-                        SCSI_DISKS_PER_MAJOR * sizeof *sd_gendisks[i].flags);
+
+		init_mem_lth(sd_gendisks[i].de_arr, N);
+		init_mem_lth(sd_gendisks[i].flags, N);
+
+		if (!sd_gendisks[i].de_arr || !sd_gendisks[i].flags)
+			goto cleanup_gendisks;
+
+		zero_mem_lth(sd_gendisks[i].de_arr, N);
+		zero_mem_lth(sd_gendisks[i].flags, N);
+
 		sd_gendisks[i].major = SD_MAJOR(i);
 		sd_gendisks[i].major_name = "sd";
 		sd_gendisks[i].minor_shift = 4;
 		sd_gendisks[i].max_p = 1 << 4;
-		sd_gendisks[i].part = sd + (i * SCSI_DISKS_PER_MAJOR << 4);
-		sd_gendisks[i].sizes = sd_sizes + (i * SCSI_DISKS_PER_MAJOR << 4);
+		sd_gendisks[i].part = sd + i * (N << 4);
+		sd_gendisks[i].sizes = sd_sizes + i * (N << 4);
 		sd_gendisks[i].nr_real = 0;
 		sd_gendisks[i].real_devices =
 		    (void *) (rscsi_disks + i * SCSI_DISKS_PER_MAJOR);
@@ -1168,27 +1150,21 @@ static int sd_init()
 
 	return 0;
 
-cleanup_gendisks_flags:
-	kfree(sd_gendisks[i].de_arr);
-cleanup_gendisks_de_arr:
-	while (--i >= 0 ) {
+#undef init_mem_lth
+#undef zero_mem_lth
+
+cleanup_gendisks:
+	/* kfree can handle NULL, so no test is required here */
+	for (i = 0; i < N_USED_SD_MAJORS; i++) {
 		kfree(sd_gendisks[i].de_arr);
 		kfree(sd_gendisks[i].flags);
 	}
+cleanup_mem:
 	kfree(sd_gendisks);
-cleanup_sd_gendisks:
 	kfree(sd);
-cleanup_sd:
-	kfree(sd_max_sectors);
-cleanup_max_sectors:
-	kfree(sd_hardsizes);
-cleanup_blocksizes:
 	kfree(sd_blocksizes);
-cleanup_sizes:
 	kfree(sd_sizes);
-cleanup_disks:
 	kfree(rscsi_disks);
-cleanup_devfs:
 	for (i = 0; i < N_USED_SD_MAJORS; i++) {
 		devfs_unregister_blkdev(SD_MAJOR(i), "sd");
 	}
@@ -1203,7 +1179,7 @@ static void sd_finish()
 
 	for (i = 0; i < N_USED_SD_MAJORS; i++) {
 		blk_dev[SD_MAJOR(i)].queue = sd_find_queue;
-		add_gendisk(&sd_gendisks[i]);
+		add_gendisk(&(sd_gendisks[i]));
 	}
 
 	for (i = 0; i < sd_template.dev_max; ++i)
@@ -1293,9 +1269,7 @@ static int sd_attach(Scsi_Device * SDp)
 int revalidate_scsidisk(kdev_t dev, int maxusage)
 {
 	int target;
-	int max_p;
-	int start;
-	int i;
+	int res;
 
 	target = DEVICE_NR(dev);
 
@@ -1305,36 +1279,18 @@ int revalidate_scsidisk(kdev_t dev, int maxusage)
 	}
 	DEVICE_BUSY = 1;
 
-	max_p = sd_gendisks->max_p;
-	start = target << sd_gendisks->minor_shift;
-
-	for (i = max_p - 1; i >= 0; i--) {
-		int index = start + i;
-		invalidate_device(MKDEV_SD_PARTITION(index), 1);
-		sd_gendisks->part[index].start_sect = 0;
-		sd_gendisks->part[index].nr_sects = 0;
-		/*
-		 * Reset the blocksize for everything so that we can read
-		 * the partition table.  Technically we will determine the
-		 * correct block size when we revalidate, but we do this just
-		 * to make sure that everything remains consistent.
-		 */
-		sd_blocksizes[index] = 1024;
-		if (rscsi_disks[target].device->sector_size == 2048)
-			sd_blocksizes[index] = 2048;
-		else
-			sd_blocksizes[index] = 1024;
-	}
+	res = wipe_partitions(dev);
+	if (res)
+		goto leave;
 
 #ifdef MAYBE_REINIT
 	MAYBE_REINIT;
 #endif
 
-	grok_partitions(&SD_GENDISK(target), target % SCSI_DISKS_PER_MAJOR,
-			1<<4, CAPACITY);
-
+	grok_partitions(dev, CAPACITY);
+leave:
 	DEVICE_BUSY = 0;
-	return 0;
+	return res;
 }
 
 static int fop_revalidate_scsidisk(kdev_t dev)
@@ -1344,6 +1300,7 @@ static int fop_revalidate_scsidisk(kdev_t dev)
 static void sd_detach(Scsi_Device * SDp)
 {
 	Scsi_Disk *dpnt;
+	kdev_t dev;
 	int i, j;
 	int max_p;
 	int start;
@@ -1351,18 +1308,13 @@ static void sd_detach(Scsi_Device * SDp)
 	for (dpnt = rscsi_disks, i = 0; i < sd_template.dev_max; i++, dpnt++)
 		if (dpnt->device == SDp) {
 
-			/* If we are disconnecting a disk driver, sync and invalidate
-			 * everything */
 			max_p = sd_gendisk.max_p;
 			start = i << sd_gendisk.minor_shift;
+			dev = MKDEV_SD_PARTITION(start);
+			wipe_partitions(dev);
+			for (j = max_p - 1; j >= 0; j--)
+				sd_sizes[start + j] = 0;
 
-			for (j = max_p - 1; j >= 0; j--) {
-				int index = start + j;
-				invalidate_device(MKDEV_SD_PARTITION(index), 1);
-				sd_gendisks->part[index].start_sect = 0;
-				sd_gendisks->part[index].nr_sects = 0;
-				sd_sizes[index] = 0;
-			}
                         devfs_register_partitions (&SD_GENDISK (i),
                                                    SD_MINOR_NUMBER (start), 1);
 			/* unregister_disk() */
@@ -1375,7 +1327,6 @@ static void sd_detach(Scsi_Device * SDp)
 			SD_GENDISK(i).nr_real--;
 			return;
 		}
-	return;
 }
 
 static int __init init_sd(void)
@@ -1398,14 +1349,11 @@ static void __exit exit_sd(void)
 		kfree(rscsi_disks);
 		kfree(sd_sizes);
 		kfree(sd_blocksizes);
-		kfree(sd_hardsizes);
 		kfree((char *) sd);
 	}
 	for (i = 0; i < N_USED_SD_MAJORS; i++) {
-		del_gendisk(&sd_gendisks[i]);
-		blk_size[SD_MAJOR(i)] = NULL;
-		hardsect_size[SD_MAJOR(i)] = NULL;
-		read_ahead[SD_MAJOR(i)] = 0;
+		del_gendisk(&(sd_gendisks[i]));
+		blk_clear(SD_MAJOR(i));
 	}
 	sd_template.dev_max = 0;
 	if (sd_gendisks != &sd_gendisk)

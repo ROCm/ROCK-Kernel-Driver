@@ -425,6 +425,7 @@ void __init ide_init_hpt34x (ide_hwif_t *hwif)
 			hwif->autodma = 0;
 
 		hwif->dmaproc = &hpt34x_dmaproc;
+		hwif->highmem = 1;
 	} else {
 		hwif->drives[0].autotune = 1;
 		hwif->drives[1].autotune = 1;

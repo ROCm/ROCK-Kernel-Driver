@@ -4689,8 +4689,8 @@ out_reject:
 	return;
 out_clrack:
 	OUTL_DSP (SCRIPTA_BA (np, clrack));
-	return;
 out_stuck:
+	;
 }
 
 /*
@@ -5223,9 +5223,8 @@ static void sym_alloc_lcb_tags (hcb_p np, u_char tn, u_char ln)
 	 *  And accept tagged commands now.
 	 */
 	lp->head.itlq_tbl_sa = cpu_to_scr(vtobus(lp->itlq_tbl));
-
-	return;
 fail:
+	;
 }
 
 /*

@@ -888,7 +888,7 @@ static int isofs_statfs (struct super_block *sb, struct statfs *buf)
  * or getblk() if they are not.  Returns the number of blocks inserted
  * (0 == error.)
  */
-int isofs_get_blocks(struct inode *inode, long iblock,
+int isofs_get_blocks(struct inode *inode, sector_t iblock,
 		     struct buffer_head **bh_result, unsigned long nblocks)
 {
 	unsigned long b_off;
@@ -976,7 +976,7 @@ abort:
 /*
  * Used by the standard interfaces.
  */
-static int isofs_get_block(struct inode *inode, long iblock,
+static int isofs_get_block(struct inode *inode, sector_t iblock,
 		    struct buffer_head *bh_result, int create)
 {
 	if ( create ) {

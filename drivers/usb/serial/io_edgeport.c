@@ -318,11 +318,6 @@ enum RXSTATE {
 };
 
 
-/* the info for all of the devices that this driver supports */
-int EdgeportDevices[] = EDGEPORT_DEVICE_IDS;
-#define NUM_EDGEPORT_DEVICES (sizeof(EdgeportDevices) / sizeof(int))
-
-
 /* Transmit Fifo 
  * This Transmit queue is an extension of the edgeport Rx buffer. 
  * The maximum amount of data buffered in both the edgeport 
@@ -495,17 +490,15 @@ static void unicode_to_ascii		(char *string, short *unicode, int unicode_size);
 // ************************************************************************
 // ************************************************************************
 
-// These functions should be in firmware.c
-
 /************************************************************************
  *									*
- *	update_edgeport_E2PROM()	Compare current versions of		*
+ * update_edgeport_E2PROM()	Compare current versions of		*
  *				Boot ROM and Manufacture 		*
  *				Descriptors with versions		*
  *				embedded in this driver			*
  *									*
  ************************************************************************/
-void update_edgeport_E2PROM (struct edgeport_serial *edge_serial)
+static void update_edgeport_E2PROM (struct edgeport_serial *edge_serial)
 {
 	__u32 BootCurVer;
 	__u32 BootNewVer;

@@ -26,9 +26,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/string.h>
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
 #include <linux/isapnp.h>
-#endif
 
 #include "sound_config.h"
 
@@ -205,7 +203,7 @@ static awe_chan_info channels[AWE_MAX_CHANNELS];
 
 int io = AWE_DEFAULT_BASE_ADDR; /* Emu8000 base address */
 int memsize = AWE_DEFAULT_MEM_SIZE; /* memory size in Kbytes */
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 static int isapnp = -1;
 #else
 static int isapnp = 0;
@@ -4772,7 +4770,7 @@ awe_detect_base(int addr)
 	return 1;
 }
 	
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 static struct {
 	unsigned short card_vendor, card_device;
 	unsigned short vendor;
@@ -4841,7 +4839,7 @@ awe_detect(void)
 {
 	int base;
 
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 	if (isapnp) {
 		if (awe_probe_isapnp(&io) < 0) {
 			printk(KERN_ERR "AWE32: No ISAPnP cards found\n");
@@ -6132,7 +6130,7 @@ int __init attach_awe(void)
 void __exit unload_awe(void)
 {
 	_unload_awe();
-#if defined CONFIG_ISAPNP || defined CONFIG_ISAPNP_MODULE
+#ifdef __ISAPNP__
 	if (isapnp)
 		awe_deactivate_isapnp();
 #endif /* isapnp */

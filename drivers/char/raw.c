@@ -126,10 +126,8 @@ int raw_open(struct inode *inode, struct file *filp)
 	if (is_mounted(rdev)) {
 		if (blksize_size[MAJOR(rdev)])
 			sector_size = blksize_size[MAJOR(rdev)][MINOR(rdev)];
-	} else {
-		if (hardsect_size[MAJOR(rdev)])
-			sector_size = hardsect_size[MAJOR(rdev)][MINOR(rdev)];
-	}
+	} else
+		sector_size = get_hardsect_size(rdev);
 
 	set_blocksize(rdev, sector_size);
 	raw_devices[minor].sector_size = sector_size;
@@ -273,16 +271,14 @@ ssize_t	rw_raw_dev(int rw, struct file *filp, char *buf,
 	struct kiobuf * iobuf;
 	int		new_iobuf;
 	int		err = 0;
-	unsigned long	blocknr, blocks;
+	unsigned long	blocks;
 	size_t		transferred;
 	int		iosize;
-	int		i;
 	int		minor;
 	kdev_t		dev;
 	unsigned long	limit;
-
 	int		sector_size, sector_bits, sector_mask;
-	int		max_sectors;
+	sector_t	blocknr;
 	
 	/*
 	 * First, a few checks on device size limits 
@@ -307,7 +303,6 @@ ssize_t	rw_raw_dev(int rw, struct file *filp, char *buf,
 	sector_size = raw_devices[minor].sector_size;
 	sector_bits = raw_devices[minor].sector_bits;
 	sector_mask = sector_size- 1;
-	max_sectors = KIO_MAX_SECTORS >> (sector_bits - 9);
 	
 	if (blk_size[MAJOR(dev)])
 		limit = (((loff_t) blk_size[MAJOR(dev)][MINOR(dev)]) << BLOCK_SIZE_BITS) >> sector_bits;
@@ -325,18 +320,10 @@ ssize_t	rw_raw_dev(int rw, struct file *filp, char *buf,
 	if ((*offp >> sector_bits) >= limit)
 		goto out_free;
 
-	/*
-	 * Split the IO into KIO_MAX_SECTORS chunks, mapping and
-	 * unmapping the single kiobuf as we go to perform each chunk of
-	 * IO.  
-	 */
-
 	transferred = 0;
 	blocknr = *offp >> sector_bits;
 	while (size > 0) {
 		blocks = size >> sector_bits;
-		if (blocks > max_sectors)
-			blocks = max_sectors;
 		if (blocks > limit - blocknr)
 			blocks = limit - blocknr;
 		if (!blocks)
@@ -348,10 +335,7 @@ ssize_t	rw_raw_dev(int rw, struct file *filp, char *buf,
 		if (err)
 			break;
 
-		for (i=0; i < blocks; i++) 
-			iobuf->blocks[i] = blocknr++;
-		
-		err = brw_kiovec(rw, 1, &iobuf, dev, iobuf->blocks, sector_size);
+		err = brw_kiovec(rw, 1, &iobuf, dev, &blocknr, sector_size);
 
 		if (rw == READ && err > 0)
 			mark_dirty_kiobuf(iobuf, err);
@@ -361,6 +345,8 @@ ssize_t	rw_raw_dev(int rw, struct file *filp, char *buf,
 			size -= err;
 			buf += err;
 		}
+
+		blocknr += blocks;
 
 		unmap_kiobuf(iobuf);
 

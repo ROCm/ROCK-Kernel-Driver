@@ -87,7 +87,7 @@ static __devinitdata struct usb_device_id id_table [] = {
 MODULE_DEVICE_TABLE (usb, id_table);
 
 
-struct usb_serial_device_type zyxel_omninet_device = {
+static struct usb_serial_device_type zyxel_omninet_device = {
 	name:			"ZyXEL - omni.net lcd plus usb",
 	id_table:		id_table,
 	needs_interrupt_in:	MUST_HAVE,

@@ -107,7 +107,6 @@ static struct hd_struct hd[MAX_HD<<6];
 static int hd_sizes[MAX_HD<<6];
 static int hd_blocksizes[MAX_HD<<6];
 static int hd_hardsectsizes[MAX_HD<<6];
-static int hd_maxsect[MAX_HD<<6];
 
 static struct timer_list device_timer;
 
@@ -560,19 +559,18 @@ repeat:
 	dev = MINOR(CURRENT->rq_dev);
 	block = CURRENT->sector;
 	nsect = CURRENT->nr_sectors;
-	if (dev >= (NR_HD<<6) || block >= hd[dev].nr_sects || ((block+nsect) > hd[dev].nr_sects)) {
-#ifdef DEBUG
-		if (dev >= (NR_HD<<6))
+	if (dev >= (NR_HD<<6) || (dev & 0x3f) ||
+	    block >= hd[dev].nr_sects || ((block+nsect) > hd[dev].nr_sects)) {
+		if (dev >= (NR_HD<<6) || (dev & 0x3f))
 			printk("hd: bad minor number: device=%s\n",
 			       kdevname(CURRENT->rq_dev));
 		else
 			printk("hd%c: bad access: block=%d, count=%d\n",
 				(MINOR(CURRENT->rq_dev)>>6)+'a', block, nsect);
-#endif
 		end_request(0);
 		goto repeat;
 	}
-	block += hd[dev].start_sect;
+
 	dev >>= 6;
 	if (special_op[dev]) {
 		if (do_special_op(dev))
@@ -634,22 +632,17 @@ static int hd_ioctl(struct inode * inode, struct file * file,
 			g.heads = hd_info[dev].head;
 			g.sectors = hd_info[dev].sect;
 			g.cylinders = hd_info[dev].cyl;
-			g.start = hd[MINOR(inode->i_rdev)].start_sect;
+			g.start = get_start_sect(inode->i_rdev);
 			return copy_to_user(loc, &g, sizeof g) ? -EFAULT : 0; 
 		}
-
-         	case BLKGETSIZE:   /* Return device size */
-			return put_user(hd[MINOR(inode->i_rdev)].nr_sects, 
-					(unsigned long *) arg);
-         	case BLKGETSIZE64:
-			return put_user((u64)hd[MINOR(inode->i_rdev)].nr_sects << 9, 
-					(u64 *) arg);
 
 		case BLKRRPART: /* Re-read partition tables */
 			if (!capable(CAP_SYS_ADMIN))
 				return -EACCES;
 			return revalidate_hddisk(inode->i_rdev, 1);
 
+         	case BLKGETSIZE:
+		case BLKGETSIZE64:
 		case BLKROSET:
 		case BLKROGET:
 		case BLKRASET:
@@ -733,11 +726,9 @@ static void __init hd_geninit(void)
 	for(drive=0; drive < (MAX_HD << 6); drive++) {
 		hd_blocksizes[drive] = 1024;
 		hd_hardsectsizes[drive] = 512;
-		hd_maxsect[drive]=255;
 	}
 	blksize_size[MAJOR_NR] = hd_blocksizes;
 	hardsect_size[MAJOR_NR] = hd_hardsectsizes;
-	max_sectors[MAJOR_NR] = hd_maxsect;
 
 #ifdef __i386__
 	if (!NR_HD) {
@@ -840,6 +831,7 @@ int __init hd_init(void)
 		return -1;
 	}
 	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), 255);
 	read_ahead[MAJOR_NR] = 8;		/* 8 sector (4kB) read-ahead */
 	add_gendisk(&hd_gendisk);
 	init_timer(&device_timer);
@@ -868,9 +860,7 @@ static int revalidate_hddisk(kdev_t dev, int maxusage)
 {
 	int target;
 	struct gendisk * gdev;
-	int max_p;
-	int start;
-	int i;
+	int res;
 	long flags;
 
 	target = DEVICE_NR(dev);
@@ -885,25 +875,20 @@ static int revalidate_hddisk(kdev_t dev, int maxusage)
 	DEVICE_BUSY = 1;
 	restore_flags(flags);
 
-	max_p = gdev->max_p;
-	start = target << gdev->minor_shift;
-
-	for (i=max_p - 1; i >=0 ; i--) {
-		int minor = start + i;
-		invalidate_device(MKDEV(MAJOR_NR, minor), 1);
-		gdev->part[minor].start_sect = 0;
-		gdev->part[minor].nr_sects = 0;
-	}
+	res = wipe_partitions(dev);
+	if (res)
+		goto leave;
 
 #ifdef MAYBE_REINIT
 	MAYBE_REINIT;
 #endif
 
-	grok_partitions(gdev, target, 1<<6, CAPACITY);
+	grok_partitions(dev, CAPACITY);
 
+leave:
 	DEVICE_BUSY = 0;
 	wake_up(&busy_wait);
-	return 0;
+	return res;
 }
 
 static int parse_hd_setup (char *line) {

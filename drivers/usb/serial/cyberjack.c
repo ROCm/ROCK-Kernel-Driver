@@ -76,7 +76,7 @@ static __devinitdata struct usb_device_id id_table [] = {
 
 MODULE_DEVICE_TABLE (usb, id_table);
 
-struct usb_serial_device_type cyberjack_device = {
+static struct usb_serial_device_type cyberjack_device = {
 	name:			"Reiner SCT Cyberjack USB card reader",
 	id_table:		id_table,
 	needs_interrupt_in:	MUST_HAVE,

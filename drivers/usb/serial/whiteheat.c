@@ -131,7 +131,7 @@ static void whiteheat_unthrottle	(struct usb_serial_port *port);
 static int  whiteheat_startup		(struct usb_serial *serial);
 static void whiteheat_shutdown		(struct usb_serial *serial);
 
-struct usb_serial_device_type whiteheat_fake_device = {
+static struct usb_serial_device_type whiteheat_fake_device = {
 	name:			"Connect Tech - WhiteHEAT - (prerenumeration)",
 	id_table:		id_table_prerenumeration,
 	needs_interrupt_in:	DONT_CARE,				/* don't have to have an interrupt in endpoint */
@@ -144,7 +144,7 @@ struct usb_serial_device_type whiteheat_fake_device = {
 	startup:		whiteheat_startup	
 };
 
-struct usb_serial_device_type whiteheat_device = {
+static struct usb_serial_device_type whiteheat_device = {
 	name:			"Connect Tech - WhiteHEAT",
 	id_table:		id_table_std,
 	needs_interrupt_in:	DONT_CARE,				/* don't have to have an interrupt in endpoint */

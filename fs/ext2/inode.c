@@ -505,7 +505,7 @@ changed:
  * reachable from inode.
  */
 
-static int ext2_get_block(struct inode *inode, long iblock, struct buffer_head *bh_result, int create)
+static int ext2_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_result, int create)
 {
 	int err = -EIO;
 	int offsets[4];

@@ -153,11 +153,7 @@ static struct ns558* ns558_isa_probe(int io, struct ns558 *next)
 	return port;
 }
 
-#if defined(CONFIG_ISAPNP) || (defined(CONFIG_ISAPNP_MODULE) && defined(MODULE))
-#define NSS558_ISAPNP
-#endif
-
-#ifdef NSS558_ISAPNP
+#ifdef __ISAPNP__
 
 static struct isapnp_device_id pnp_devids[] = {
 	{ ISAPNP_ANY_ID, ISAPNP_ANY_ID, ISAPNP_VENDOR('@','P','@'), ISAPNP_DEVICE(0x0001), 0 },
@@ -229,7 +225,7 @@ deactivate:
 int __init ns558_init(void)
 {
 	int i = 0;
-#ifdef NSS558_ISAPNP
+#ifdef __ISAPNP__
 	struct isapnp_device_id *devid;
 	struct pci_dev *dev = NULL;
 #endif
@@ -245,7 +241,7 @@ int __init ns558_init(void)
  * Probe for PnP ports.
  */
 
-#ifdef NSS558_ISAPNP
+#ifdef __ISAPNP__
 	for (devid = pnp_devids; devid->vendor; devid++) {
 		while ((dev = isapnp_find_dev(NULL, devid->vendor, devid->function, dev))) {
 			ns558 = ns558_pnp_probe(dev, ns558);
@@ -264,7 +260,7 @@ void __exit ns558_exit(void)
 		gameport_unregister_port(&port->gameport);
 		switch (port->type) {
 
-#ifdef NSS558_ISAPNP
+#ifdef __ISAPNP__
 			case NS558_PNP:
 				if (port->dev->deactivate)
 					port->dev->deactivate(port->dev);

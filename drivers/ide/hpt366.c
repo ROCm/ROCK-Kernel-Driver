@@ -730,6 +730,7 @@ void __init ide_init_hpt366 (ide_hwif_t *hwif)
 			hwif->autodma = 1;
 		else
 			hwif->autodma = 0;
+		hwif->highmem = 1;
 	} else {
 		hwif->autodma = 0;
 		hwif->drives[0].autotune = 1;

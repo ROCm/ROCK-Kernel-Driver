@@ -2191,7 +2191,7 @@ static char
   of the Linux Kernel and I/O Subsystem.
 */
 
-typedef struct buffer_head BufferHeader_T;
+typedef struct bio BufferHeader_T;
 typedef struct file File_T;
 typedef struct block_device_operations BlockDeviceOperations_T;
 typedef struct completion Completion_T;
@@ -2475,7 +2475,6 @@ typedef struct DAC960_Controller
   DiskPartition_T DiskPartitions[DAC960_MinorCount];
   int PartitionSizes[DAC960_MinorCount];
   int BlockSizes[DAC960_MinorCount];
-  int MaxSectorsPerRequest[DAC960_MinorCount];
   unsigned char ProgressBuffer[DAC960_ProgressBufferSize];
   unsigned char UserStatusBuffer[DAC960_UserMessageSize];
 }
@@ -2509,7 +2508,7 @@ static inline
 void DAC960_AcquireControllerLock(DAC960_Controller_T *Controller,
 				  ProcessorFlags_T *ProcessorFlags)
 {
-  spin_lock_irqsave(&io_request_lock, *ProcessorFlags);
+  spin_lock_irqsave(&Controller->RequestQueue->queue_lock, *ProcessorFlags);
 }
 
 
@@ -2521,13 +2520,13 @@ static inline
 void DAC960_ReleaseControllerLock(DAC960_Controller_T *Controller,
 				  ProcessorFlags_T *ProcessorFlags)
 {
-  spin_unlock_irqrestore(&io_request_lock, *ProcessorFlags);
+  spin_unlock_irqrestore(&Controller->RequestQueue->queue_lock, *ProcessorFlags);
 }
 
 
 /*
   DAC960_AcquireControllerLockRF acquires exclusive access to Controller,
-  but is only called from the request function with the io_request_lock held.
+  but is only called from the request function with the queue lock held.
 */
 
 static inline
@@ -2539,7 +2538,7 @@ void DAC960_AcquireControllerLockRF(DAC960_Controller_T *Controller,
 
 /*
   DAC960_ReleaseControllerLockRF releases exclusive access to Controller,
-  but is only called from the request function with the io_request_lock held.
+  but is only called from the request function with the queue lock held.
 */
 
 static inline
@@ -2558,7 +2557,7 @@ static inline
 void DAC960_AcquireControllerLockIH(DAC960_Controller_T *Controller,
 				    ProcessorFlags_T *ProcessorFlags)
 {
-  spin_lock_irqsave(&io_request_lock, *ProcessorFlags);
+  spin_lock_irqsave(&Controller->RequestQueue->queue_lock, *ProcessorFlags);
 }
 
 
@@ -2571,7 +2570,7 @@ static inline
 void DAC960_ReleaseControllerLockIH(DAC960_Controller_T *Controller,
 				    ProcessorFlags_T *ProcessorFlags)
 {
-  spin_unlock_irqrestore(&io_request_lock, *ProcessorFlags);
+  spin_unlock_irqrestore(&Controller->RequestQueue->queue_lock, *ProcessorFlags);
 }
 
 

@@ -37,24 +37,25 @@ extern int requests_out;
 static void
 nbd_end_request(struct request *req)
 {
-	struct buffer_head *bh;
+	struct bio *bio;
 	unsigned nsect;
 	unsigned long flags;
 	int uptodate = (req->errors == 0) ? 1 : 0;
+	request_queue_t *q = req->q;
 
 #ifdef PARANOIA
 	requests_out++;
 #endif
-	spin_lock_irqsave(&io_request_lock, flags);
-	while((bh = req->bh) != NULL) {
-		nsect = bh->b_size >> 9;
+	spin_lock_irqsave(&q->queue_lock, flags);
+	while((bio = req->bio) != NULL) {
+		nsect = bio_sectors(bio);
 		blk_finished_io(nsect);
-		req->bh = bh->b_reqnext;
-		bh->b_reqnext = NULL;
-		bh->b_end_io(bh, uptodate);
+		req->bio = bio->bi_next;
+		bio->bi_next = NULL;
+		bio_endio(bio, uptodate, nsect);
 	}
 	blkdev_release_request(req);
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(&q->queue_lock, flags);
 }
 
 #define MAX_NBD 128

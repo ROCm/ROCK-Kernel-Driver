@@ -56,11 +56,6 @@ typedef struct {
 
 #ifdef __KERNEL__
 
-struct my_sg {
-	int size;
-	char *start_addr;
-};
-
 struct ctlr_info;
 typedef struct ctlr_info ctlr_info_t;
 
@@ -121,6 +116,9 @@ struct ctlr_info {
 	struct timer_list timer;
 	unsigned int misc_tflags;
 };
+
+#define IDA_LOCK(i)	(&((BLK_DEFAULT_QUEUE(MAJOR_NR + i))->queue_lock))
+
 #endif
 
 #endif /* CPQARRAY_H */

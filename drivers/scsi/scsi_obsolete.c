@@ -145,9 +145,10 @@ static void scsi_dump_status(void);
 
 void scsi_old_times_out(Scsi_Cmnd * SCpnt)
 {
+	struct Scsi_Host *host = SCpnt->host;
 	unsigned long flags;
 
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(&host->host_lock, flags);
 
 	/* Set the serial_number_at_timeout to the current serial_number */
 	SCpnt->serial_number_at_timeout = SCpnt->serial_number;
@@ -164,7 +165,7 @@ void scsi_old_times_out(Scsi_Cmnd * SCpnt)
 			break;
 	case IN_ABORT:
 		printk("SCSI host %d abort (pid %ld) timed out - resetting\n",
-		       SCpnt->host->host_no, SCpnt->pid);
+		       host->host_no, SCpnt->pid);
 		if (!scsi_reset(SCpnt, SCSI_RESET_ASYNCHRONOUS))
 			break;
 	case IN_RESET:
@@ -175,7 +176,7 @@ void scsi_old_times_out(Scsi_Cmnd * SCpnt)
 		 */
 		printk("SCSI host %d channel %d reset (pid %ld) timed out - "
 		       "trying harder\n",
-		       SCpnt->host->host_no, SCpnt->channel, SCpnt->pid);
+		       host->host_no, SCpnt->channel, SCpnt->pid);
 		SCpnt->internal_timeout &= ~IN_RESET;
 		SCpnt->internal_timeout |= IN_RESET2;
 		scsi_reset(SCpnt,
@@ -188,7 +189,7 @@ void scsi_old_times_out(Scsi_Cmnd * SCpnt)
 		 * Maybe the HBA itself crashed and this will shake it loose.
 		 */
 		printk("SCSI host %d reset (pid %ld) timed out - trying to shake it loose\n",
-		       SCpnt->host->host_no, SCpnt->pid);
+		       host->host_no, SCpnt->pid);
 		SCpnt->internal_timeout &= ~(IN_RESET | IN_RESET2);
 		SCpnt->internal_timeout |= IN_RESET3;
 		scsi_reset(SCpnt,
@@ -197,26 +198,25 @@ void scsi_old_times_out(Scsi_Cmnd * SCpnt)
 
 	default:
 		printk("SCSI host %d reset (pid %ld) timed out again -\n",
-		       SCpnt->host->host_no, SCpnt->pid);
+		       host->host_no, SCpnt->pid);
 		printk("probably an unrecoverable SCSI bus or device hang.\n");
 		break;
 
 	}
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(&host->host_lock, flags);
 
 }
 
 /*
  *  From what I can find in scsi_obsolete.c, this function is only called
  *  by scsi_old_done and scsi_reset.  Both of these functions run with the
- *  io_request_lock already held, so we need do nothing here about grabbing
+ *  host_lock already held, so we need do nothing here about grabbing
  *  any locks.
  */
 static void scsi_request_sense(Scsi_Cmnd * SCpnt)
 {
 	SCpnt->flags |= WAS_SENSE | ASKED_FOR_SENSE;
 	update_timeout(SCpnt, SENSE_TIMEOUT);
-
 
 	memcpy((void *) SCpnt->cmnd, (void *) generic_sense,
 	       sizeof(generic_sense));
@@ -238,9 +238,9 @@ static void scsi_request_sense(Scsi_Cmnd * SCpnt)
          * Ugly, ugly.  The newer interfaces all assume that the lock
          * isn't held.  Mustn't disappoint, or we deadlock the system.
          */
-        spin_unlock_irq(&io_request_lock);
+        spin_unlock_irq(&SCpnt->host->host_lock);
 	scsi_dispatch_cmd(SCpnt);
-        spin_lock_irq(&io_request_lock);
+        spin_lock_irq(&SCpnt->host->host_lock);
 }
 
 
@@ -646,9 +646,9 @@ void scsi_old_done(Scsi_Cmnd * SCpnt)
                          * assume that the lock isn't held.  Mustn't
                          * disappoint, or we deadlock the system.  
                          */
-                        spin_unlock_irq(&io_request_lock);
+			spin_unlock_irq(&host->host_lock);
 			scsi_dispatch_cmd(SCpnt);
-                        spin_lock_irq(&io_request_lock);
+			spin_lock_irq(&host->host_lock);
 		}
 		break;
 	default:
@@ -674,7 +674,7 @@ void scsi_old_done(Scsi_Cmnd * SCpnt)
                  * use, the upper code is run from a bottom half handler, so
                  * it isn't an issue.
                  */
-                spin_unlock_irq(&io_request_lock);
+                spin_unlock_irq(&host->host_lock);
 		SRpnt = SCpnt->sc_request;
 		if( SRpnt != NULL ) {
 			SRpnt->sr_result = SRpnt->sr_command->result;
@@ -686,7 +686,7 @@ void scsi_old_done(Scsi_Cmnd * SCpnt)
 		}
 
 		SCpnt->done(SCpnt);
-                spin_lock_irq(&io_request_lock);
+                spin_lock_irq(&host->host_lock);
 	}
 #undef CMD_FINISHED
 #undef REDO
@@ -725,10 +725,10 @@ static int scsi_abort(Scsi_Cmnd * SCpnt, int why)
 			return 0;
 		}
 		if (SCpnt->internal_timeout & IN_ABORT) {
-			spin_unlock_irq(&io_request_lock);
+			spin_unlock_irq(&host->host_lock);
 			while (SCpnt->internal_timeout & IN_ABORT)
 				barrier();
-			spin_lock_irq(&io_request_lock);
+			spin_lock_irq(&host->host_lock);
 		} else {
 			SCpnt->internal_timeout |= IN_ABORT;
 			oldto = update_timeout(SCpnt, ABORT_TIMEOUT);
@@ -908,10 +908,10 @@ static int scsi_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
 				return 0;
 			}
 		if (SCpnt->internal_timeout & IN_RESET) {
-			spin_unlock_irq(&io_request_lock);
+			spin_unlock_irq(&host->host_lock);
 			while (SCpnt->internal_timeout & IN_RESET)
 				barrier();
-			spin_lock_irq(&io_request_lock);
+			spin_lock_irq(&host->host_lock);
 		} else {
 			SCpnt->internal_timeout |= IN_RESET;
 			update_timeout(SCpnt, RESET_TIMEOUT);

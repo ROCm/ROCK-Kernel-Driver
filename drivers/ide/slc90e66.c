@@ -373,6 +373,7 @@ void __init ide_init_slc90e66 (ide_hwif_t *hwif)
 		return;
 
 	hwif->autodma = 0;
+	hwif->highmem = 1;
 #ifdef CONFIG_BLK_DEV_IDEDMA 
 	if (!noautodma)
 		hwif->autodma = 1;

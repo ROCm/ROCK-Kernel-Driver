@@ -149,6 +149,21 @@ typedef unsigned char	byte;	/* used everywhere */
 #define DATA_READY		(DRQ_STAT)
 
 /*
+ * Our Physical Region Descriptor (PRD) table should be large enough
+ * to handle the biggest I/O request we are likely to see.  Since requests
+ * can have no more than 256 sectors, and since the typical blocksize is
+ * two or more sectors, we could get by with a limit of 128 entries here for
+ * the usual worst case.  Most requests seem to include some contiguous blocks,
+ * further reducing the number of table entries required.
+ *
+ * As it turns out though, we must allocate a full 4KB page for this,
+ * so the two PRD tables (ide0 & ide1) will each get half of that,
+ * allowing each to have about 256 entries (8 bytes each) from this.
+ */
+#define PRD_BYTES	8
+#define PRD_ENTRIES	(PAGE_SIZE / (2 * PRD_BYTES))
+
+/*
  * Some more useful definitions
  */
 #define IDE_MAJOR_NAME	"hd"	/* the same for all i/f; see also genhd.c */
@@ -223,6 +238,23 @@ typedef int (ide_ack_intr_t)(struct hwif_s *);
 #endif
 
 /*
+ * hwif_chipset_t is used to keep track of the specific hardware
+ * chipset used by each IDE interface, if known.
+ */
+typedef enum {  ide_unknown,    ide_generic,    ide_pci,
+                ide_cmd640,     ide_dtc2278,    ide_ali14xx,
+                ide_qd65xx,     ide_umc8672,    ide_ht6560b,
+                ide_pdc4030,    ide_rz1000,     ide_trm290,
+                ide_cmd646,     ide_cy82c693,   ide_4drives,
+                ide_pmac,       ide_etrax100
+} hwif_chipset_t;
+
+#define IDE_CHIPSET_PCI_MASK    \
+    ((1<<ide_pci)|(1<<ide_cmd646)|(1<<ide_ali14xx))
+#define IDE_CHIPSET_IS_PCI(c)   ((IDE_CHIPSET_PCI_MASK >> (c)) & 1)
+
+
+/*
  * Structure to hold all information about the location of this port
  */
 typedef struct hw_regs_s {
@@ -231,6 +263,7 @@ typedef struct hw_regs_s {
 	int		dma;			/* our dma entry */
 	ide_ack_intr_t	*ack_intr;		/* acknowledge interrupt */
 	void		*priv;			/* interface specific data */
+	hwif_chipset_t  chipset;
 } hw_regs_t;
 
 /*
@@ -440,22 +473,6 @@ typedef void (ide_rw_proc_t) (ide_drive_t *, ide_dma_action_t);
  */
 typedef int (ide_busproc_t) (struct hwif_s *, int);
 
-/*
- * hwif_chipset_t is used to keep track of the specific hardware
- * chipset used by each IDE interface, if known.
- */
-typedef enum {	ide_unknown,	ide_generic,	ide_pci,
-		ide_cmd640,	ide_dtc2278,	ide_ali14xx,
-		ide_qd65xx,	ide_umc8672,	ide_ht6560b,
-		ide_pdc4030,	ide_rz1000,	ide_trm290,
-		ide_cmd646,	ide_cy82c693,	ide_4drives,
-		ide_pmac,       ide_etrax100
-} hwif_chipset_t;
-
-#define IDE_CHIPSET_PCI_MASK	\
-    ((1<<ide_pci)|(1<<ide_cmd646)|(1<<ide_ali14xx))
-#define IDE_CHIPSET_IS_PCI(c)	((IDE_CHIPSET_PCI_MASK >> (c)) & 1)
-
 #ifdef CONFIG_BLK_DEV_IDEPCI
 typedef struct ide_pci_devid_s {
 	unsigned short	vid;
@@ -488,7 +505,6 @@ typedef struct hwif_s {
 	struct scatterlist *sg_table;	/* Scatter-gather list used to build the above */
 	int sg_nents;			/* Current number of entries in it */
 	int sg_dma_direction;		/* dma transfer direction */
-	int sg_dma_active;		/* is it in use */
 	struct hwif_s	*mate;		/* other hwif from same PCI chip */
 	unsigned long	dma_base;	/* base addr for dma ports */
 	unsigned	dma_extra;	/* extra addr for dma ports */
@@ -507,6 +523,7 @@ typedef struct hwif_s {
 	unsigned	reset      : 1;	/* reset after probe */
 	unsigned	autodma    : 1;	/* automatically try to enable DMA at boot */
 	unsigned	udma_four  : 1;	/* 1=ATA-66 capable, 0=default */
+	unsigned	highmem	   : 1; /* can do full 32-bit dma */
 	byte		channel;	/* for dual-port chips: 0=primary, 1=secondary */
 #ifdef CONFIG_BLK_DEV_IDEPCI
 	struct pci_dev	*pci_dev;	/* for pci chipsets */
@@ -541,10 +558,12 @@ typedef ide_startstop_t (ide_handler_t)(ide_drive_t *);
  */
 typedef int (ide_expiry_t)(ide_drive_t *);
 
+#define IDE_BUSY	0
+#define IDE_SLEEP	1
+
 typedef struct hwgroup_s {
 	ide_handler_t		*handler;/* irq handler, if active */
-	volatile int		busy;	/* BOOL: protects all fields below */
-	int			sleeping; /* BOOL: wake us up on timer expiry */
+	unsigned long		flags;	/* BUSY, SLEEPING */
 	ide_drive_t		*drive;	/* current drive */
 	ide_hwif_t		*hwif;	/* ptr to current hwif in linked-list */
 	struct request		*rq;	/* current request */
@@ -711,7 +730,8 @@ extern int noautodma;
 #define LOCAL_END_REQUEST	/* Don't generate end_request in blk.h */
 #include <linux/blk.h>
 
-void ide_end_request(byte uptodate, ide_hwgroup_t *hwgroup);
+inline int __ide_end_request(ide_hwgroup_t *, int, int);
+int ide_end_request(byte uptodate, ide_hwgroup_t *hwgroup);
 
 /*
  * This is used for (nearly) all data transfers from/to the IDE interface
@@ -787,6 +807,11 @@ ide_drive_t *get_info_ptr (kdev_t i_rdev);
 unsigned long current_capacity (ide_drive_t *drive);
 
 /*
+ * Revalidate (read partition tables)
+ */
+void ide_revalidate_drive (ide_drive_t *drive);
+
+/*
  * Start a reset operation for an IDE interface.
  * The caller should return immediately after invoking this.
  */
@@ -812,6 +837,21 @@ typedef enum {
 	ide_preempt,	/* insert rq in front of current request */
 	ide_end		/* insert rq at end of list, but don't wait for it */
 } ide_action_t;
+
+/*
+ * temporarily mapping a (possible) highmem bio for PIO transfer
+ */
+#define ide_rq_offset(rq) (((rq)->hard_cur_sectors - (rq)->current_nr_sectors) << 9)
+
+extern inline void *ide_map_buffer(struct request *rq, unsigned long *flags)
+{
+	return bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
+}
+
+extern inline void ide_unmap_buffer(char *buffer, unsigned long *flags)
+{
+	bio_kunmap_irq(buffer, flags);
+}
 
 /*
  * This function issues a special IDE device request
@@ -960,5 +1000,8 @@ unsigned long ide_get_or_set_dma_base (ide_hwif_t *hwif, int extra, const char *
 #endif
 
 void hwif_unregister (ide_hwif_t *hwif);
+
+#define DRIVE_LOCK(drive)	(&(drive)->queue.queue_lock)
+extern spinlock_t ide_lock;
 
 #endif /* _IDE_H */

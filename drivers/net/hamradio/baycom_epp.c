@@ -807,10 +807,11 @@ static int receive(struct net_device *dev, int cnt)
 /* --------------------------------------------------------------------- */
 
 #ifdef __i386__
+#include <asm/msr.h>
 #define GETTICK(x)                                                \
 ({                                                                \
 	if (cpu_has_tsc)                                          \
-		__asm__ __volatile__("rdtsc" : "=a" (x) : : "dx");\
+		rdtscl(x);                                        \
 })
 #else /* __i386__ */
 #define GETTICK(x)

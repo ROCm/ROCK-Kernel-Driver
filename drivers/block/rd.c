@@ -98,7 +98,7 @@ static int initrd_users;
 static unsigned long rd_length[NUM_RAMDISKS];	/* Size of RAM disks in bytes   */
 static int rd_hardsec[NUM_RAMDISKS];		/* Size of real blocks in bytes */
 static int rd_blocksizes[NUM_RAMDISKS];		/* Size of 1024 byte blocks :)  */
-static int rd_kbsize[NUM_RAMDISKS];		/* Size in blocks of 1024 bytes */
+static int rd_kbsize[NUM_RAMDISKS];	/* Size in blocks of 1024 bytes */
 static devfs_handle_t devfs_handle;
 static struct block_device *rd_bdev[NUM_RAMDISKS];/* Protected device data */
 
@@ -227,19 +227,18 @@ static struct address_space_operations ramdisk_aops = {
 	commit_write: ramdisk_commit_write,
 };
 
-static int rd_blkdev_pagecache_IO(int rw, struct buffer_head * sbh, int minor)
+static int rd_blkdev_pagecache_IO(int rw, struct bio *sbh, int minor)
 {
 	struct address_space * mapping;
 	unsigned long index;
 	int offset, size, err;
 
 	err = -EIO;
-	err = 0;
 	mapping = rd_bdev[minor]->bd_inode->i_mapping;
 
-	index = sbh->b_rsector >> (PAGE_CACHE_SHIFT - 9);
-	offset = (sbh->b_rsector << 9) & ~PAGE_CACHE_MASK;
-	size = sbh->b_size;
+	index = sbh->bi_sector >> (PAGE_CACHE_SHIFT - 9);
+	offset = (sbh->bi_sector << 9) & ~PAGE_CACHE_MASK;
+	size = bio_size(sbh);
 
 	do {
 		int count;
@@ -276,18 +275,18 @@ static int rd_blkdev_pagecache_IO(int rw, struct buffer_head * sbh, int minor)
 		if (rw == READ) {
 			src = kmap(page);
 			src += offset;
-			dst = bh_kmap(sbh);
+			dst = bio_kmap(sbh);
 		} else {
 			dst = kmap(page);
 			dst += offset;
-			src = bh_kmap(sbh);
+			src = bio_kmap(sbh);
 		}
 		offset = 0;
 
 		memcpy(dst, src, count);
 
 		kunmap(page);
-		bh_kunmap(sbh);
+		bio_kunmap(sbh);
 
 		if (rw == READ) {
 			flush_dcache_page(page);
@@ -311,19 +310,19 @@ static int rd_blkdev_pagecache_IO(int rw, struct buffer_head * sbh, int minor)
  * 19-JAN-1998  Richard Gooch <rgooch@atnf.csiro.au>  Added devfs support
  *
  */
-static int rd_make_request(request_queue_t * q, int rw, struct buffer_head *sbh)
+static int rd_make_request(request_queue_t * q, struct bio *sbh)
 {
 	unsigned int minor;
 	unsigned long offset, len;
+	int rw = sbh->bi_rw;
 
-	minor = MINOR(sbh->b_rdev);
+	minor = MINOR(sbh->bi_dev);
 
 	if (minor >= NUM_RAMDISKS)
 		goto fail;
 
-	
-	offset = sbh->b_rsector << 9;
-	len = sbh->b_size;
+	offset = sbh->bi_sector << 9;
+	len = bio_size(sbh);
 
 	if ((offset + len) > rd_length[minor])
 		goto fail;
@@ -338,10 +337,11 @@ static int rd_make_request(request_queue_t * q, int rw, struct buffer_head *sbh)
 	if (rd_blkdev_pagecache_IO(rw, sbh, minor))
 		goto fail;
 
-	sbh->b_end_io(sbh,1);
+	set_bit(BIO_UPTODATE, &sbh->bi_flags);
+	sbh->bi_end_io(sbh, len >> 9);
 	return 0;
  fail:
-	sbh->b_end_io(sbh,0);
+	bio_io_error(sbh);
 	return 0;
 } 
 
@@ -477,9 +477,7 @@ static void __exit rd_cleanup (void)
 
 	devfs_unregister (devfs_handle);
 	unregister_blkdev( MAJOR_NR, "ramdisk" );
-	hardsect_size[MAJOR_NR] = NULL;
-	blksize_size[MAJOR_NR] = NULL;
-	blk_size[MAJOR_NR] = NULL;
+	blk_clear(MAJOR_NR);
 }
 #endif
 
@@ -524,7 +522,6 @@ int __init rd_init (void)
 	register_disk(NULL, MKDEV(MAJOR_NR,INITRD_MINOR), 1, &rd_bd_op, rd_size<<1);
 #endif
 
-	hardsect_size[MAJOR_NR] = rd_hardsec;		/* Size of the RAM disk blocks */
 	blksize_size[MAJOR_NR] = rd_blocksizes;		/* Avoid set_blocksize() check */
 	blk_size[MAJOR_NR] = rd_kbsize;			/* Size of the RAM disk in kB  */
 

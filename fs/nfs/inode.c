@@ -32,6 +32,7 @@
 #include <linux/nfs_flushd.h>
 #include <linux/lockd/bind.h>
 #include <linux/smp_lock.h>
+#include <linux/seq_file.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -51,6 +52,7 @@ static void nfs_put_super(struct super_block *);
 static void nfs_clear_inode(struct inode *);
 static void nfs_umount_begin(struct super_block *);
 static int  nfs_statfs(struct super_block *, struct statfs *);
+static int  nfs_show_options(struct seq_file *, struct vfsmount *);
 
 static struct super_operations nfs_sops = { 
 	read_inode:	nfs_read_inode,
@@ -60,6 +62,7 @@ static struct super_operations nfs_sops = {
 	statfs:		nfs_statfs,
 	clear_inode:	nfs_clear_inode,
 	umount_begin:	nfs_umount_begin,
+	show_options:	nfs_show_options,
 };
 
 /*
@@ -551,6 +554,48 @@ nfs_statfs(struct super_block *sb, struct statfs *buf)
  out_err:
 	printk("nfs_statfs: statfs error = %d\n", -error);
 	buf->f_bsize = buf->f_blocks = buf->f_bfree = buf->f_bavail = -1;
+	return 0;
+}
+
+static int nfs_show_options(struct seq_file *m, struct vfsmount *mnt)
+{
+	static struct proc_nfs_info {
+		int flag;
+		char *str;
+		char *nostr;
+	} nfs_info[] = {
+		{ NFS_MOUNT_SOFT, ",soft", ",hard" },
+		{ NFS_MOUNT_INTR, ",intr", "" },
+		{ NFS_MOUNT_POSIX, ",posix", "" },
+		{ NFS_MOUNT_TCP, ",tcp", ",udp" },
+		{ NFS_MOUNT_NOCTO, ",nocto", "" },
+		{ NFS_MOUNT_NOAC, ",noac", "" },
+		{ NFS_MOUNT_NONLM, ",nolock", ",lock" },
+		{ NFS_MOUNT_BROKEN_SUID, ",broken_suid", "" },
+		{ 0, NULL, NULL }
+	};
+	struct proc_nfs_info *nfs_infop;
+	struct nfs_server *nfss = &mnt->mnt_sb->u.nfs_sb.s_server;
+
+	seq_printf(m, ",v%d", nfss->rpc_ops->version);
+	seq_printf(m, ",rsize=%d", nfss->rsize);
+	seq_printf(m, ",wsize=%d", nfss->wsize);
+	if (nfss->acregmin != 3*HZ)
+		seq_printf(m, ",acregmin=%d", nfss->acregmin/HZ);
+	if (nfss->acregmax != 60*HZ)
+		seq_printf(m, ",acregmax=%d", nfss->acregmax/HZ);
+	if (nfss->acdirmin != 30*HZ)
+		seq_printf(m, ",acdirmin=%d", nfss->acdirmin/HZ);
+	if (nfss->acdirmax != 60*HZ)
+		seq_printf(m, ",acdirmax=%d", nfss->acdirmax/HZ);
+	for (nfs_infop = nfs_info; nfs_infop->flag; nfs_infop++) {
+		if (nfss->flags & nfs_infop->flag)
+			seq_puts(m, nfs_infop->str);
+		else
+			seq_puts(m, nfs_infop->nostr);
+	}
+	seq_puts(m, ",addr=");
+	seq_escape(m, nfss->hostname, " \t\n\\");
 	return 0;
 }
 

@@ -61,7 +61,7 @@ static void udf_merge_extents(struct inode *,
 static void udf_update_extents(struct inode *,
 	long_ad [EXTENT_MERGE_SIZE], int, int,
 	lb_addr, Uint32, struct buffer_head **);
-static int udf_get_block(struct inode *, long, struct buffer_head *, int);
+static int udf_get_block(struct inode *, sector_t, struct buffer_head *, int);
 
 /*
  * udf_put_inode
@@ -314,7 +314,7 @@ struct buffer_head * udf_expand_dir_adinicb(struct inode *inode, int *block, int
 	return dbh;
 }
 
-static int udf_get_block(struct inode *inode, long block, struct buffer_head *bh_result, int create)
+static int udf_get_block(struct inode *inode, sector_t block, struct buffer_head *bh_result, int create)
 {
 	int err, new;
 	struct buffer_head *bh;

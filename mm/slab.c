@@ -109,9 +109,11 @@
 #if DEBUG
 # define CREATE_MASK	(SLAB_DEBUG_INITIAL | SLAB_RED_ZONE | \
 			 SLAB_POISON | SLAB_HWCACHE_ALIGN | \
-			 SLAB_NO_REAP | SLAB_CACHE_DMA)
+			 SLAB_NO_REAP | SLAB_CACHE_DMA | \
+			 SLAB_MUST_HWCACHE_ALIGN)
 #else
-# define CREATE_MASK	(SLAB_HWCACHE_ALIGN | SLAB_NO_REAP | SLAB_CACHE_DMA)
+# define CREATE_MASK	(SLAB_HWCACHE_ALIGN | SLAB_NO_REAP | \
+			 SLAB_CACHE_DMA | SLAB_MUST_HWCACHE_ALIGN)
 #endif
 
 /*
@@ -649,7 +651,7 @@ kmem_cache_create (const char *name, size_t size, size_t offset,
 		flags &= ~SLAB_POISON;
 	}
 #if FORCED_DEBUG
-	if (size < (PAGE_SIZE>>3))
+	if ((size < (PAGE_SIZE>>3)) && !(flags & SLAB_MUST_HWCACHE_ALIGN))
 		/*
 		 * do not red zone large object, causes severe
 		 * fragmentation.

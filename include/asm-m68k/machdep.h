@@ -5,7 +5,6 @@ struct pt_regs;
 struct kbd_repeat;
 struct mktime;
 struct hwclk_time;
-struct gendisk;
 struct buffer_head;
 
 extern void (*mach_sched_init) (void (*handler)(int, void *, struct pt_regs *));

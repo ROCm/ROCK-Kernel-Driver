@@ -38,6 +38,7 @@ typedef struct kmem_cache_s kmem_cache_t;
 #define	SLAB_NO_REAP		0x00001000UL	/* never reap from the cache */
 #define	SLAB_HWCACHE_ALIGN	0x00002000UL	/* align objs on a h/w cache lines */
 #define SLAB_CACHE_DMA		0x00004000UL	/* use GFP_DMA memory */
+#define SLAB_MUST_HWCACHE_ALIGN	0x00008000UL	/* force alignment */
 
 /* flags passed to a constructor func */
 #define	SLAB_CTOR_CONSTRUCTOR	0x001UL		/* if not set, then deconstructor */
@@ -76,6 +77,7 @@ extern kmem_cache_t	*dquot_cachep;
 extern kmem_cache_t	*bh_cachep;
 extern kmem_cache_t	*fs_cachep;
 extern kmem_cache_t	*sigact_cachep;
+extern kmem_cache_t	*bio_cachep;
 
 #endif	/* __KERNEL__ */
 

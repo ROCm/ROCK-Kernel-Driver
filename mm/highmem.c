@@ -21,6 +21,9 @@
 #include <linux/highmem.h>
 #include <linux/swap.h>
 #include <linux/slab.h>
+#include <linux/compiler.h>
+
+#include <linux/kernel_stat.h>
 
 /*
  * Virtual_count is not a pure "count".
@@ -186,7 +189,7 @@ void kunmap_high(struct page *page)
 		wake_up(&pkmap_map_wait);
 }
 
-#define POOL_SIZE 32
+#define POOL_SIZE 64
 
 /*
  * This lock gets no contention at all, normally.
@@ -200,75 +203,39 @@ int nr_emergency_bhs;
 static LIST_HEAD(emergency_bhs);
 
 /*
- * Simple bounce buffer support for highmem pages.
- * This will be moved to the block layer in 2.5.
+ * Simple bounce buffer support for highmem pages. Depending on the
+ * queue gfp mask set, *to may or may not be a highmem page. kmap it
+ * always, it will do the Right Thing
  */
-
-static inline void copy_from_high_bh (struct buffer_head *to,
-			 struct buffer_head *from)
+static inline void copy_from_high_bio(struct bio *to, struct bio *from)
 {
-	struct page *p_from;
-	char *vfrom;
+	unsigned char *vto, *vfrom;
 
-	p_from = from->b_page;
+	if (unlikely(in_interrupt()))
+		BUG();
 
-	vfrom = kmap_atomic(p_from, KM_USER0);
-	memcpy(to->b_data, vfrom + bh_offset(from), to->b_size);
-	kunmap_atomic(vfrom, KM_USER0);
+	vto = bio_kmap(to);
+	vfrom = bio_kmap(from);
+
+	memcpy(vto, vfrom + bio_offset(from), bio_size(to));
+
+	bio_kunmap(from);
+	bio_kunmap(to);
 }
 
-static inline void copy_to_high_bh_irq (struct buffer_head *to,
-			 struct buffer_head *from)
+static inline void copy_to_high_bio_irq(struct bio *to, struct bio *from)
 {
-	struct page *p_to;
-	char *vto;
+	unsigned char *vto, *vfrom;
 	unsigned long flags;
 
-	p_to = to->b_page;
 	__save_flags(flags);
 	__cli();
-	vto = kmap_atomic(p_to, KM_BOUNCE_READ);
-	memcpy(vto + bh_offset(to), from->b_data, to->b_size);
+	vto = kmap_atomic(bio_page(to), KM_BOUNCE_READ);
+	vfrom = kmap_atomic(bio_page(from), KM_BOUNCE_READ);
+	memcpy(vto + bio_offset(to), vfrom, bio_size(to));
+	kunmap_atomic(vfrom, KM_BOUNCE_READ);
 	kunmap_atomic(vto, KM_BOUNCE_READ);
 	__restore_flags(flags);
-}
-
-static inline void bounce_end_io (struct buffer_head *bh, int uptodate)
-{
-	struct page *page;
-	struct buffer_head *bh_orig = (struct buffer_head *)(bh->b_private);
-	unsigned long flags;
-
-	bh_orig->b_end_io(bh_orig, uptodate);
-
-	page = bh->b_page;
-
-	spin_lock_irqsave(&emergency_lock, flags);
-	if (nr_emergency_pages >= POOL_SIZE)
-		__free_page(page);
-	else {
-		/*
-		 * We are abusing page->list to manage
-		 * the highmem emergency pool:
-		 */
-		list_add(&page->list, &emergency_pages);
-		nr_emergency_pages++;
-	}
-	
-	if (nr_emergency_bhs >= POOL_SIZE) {
-#ifdef HIGHMEM_DEBUG
-		/* Don't clobber the constructed slab cache */
-		init_waitqueue_head(&bh->b_wait);
-#endif
-		kmem_cache_free(bh_cachep, bh);
-	} else {
-		/*
-		 * Ditto in the bh case, here we abuse b_inode_buffers:
-		 */
-		list_add(&bh->b_inode_buffers, &emergency_bhs);
-		nr_emergency_bhs++;
-	}
-	spin_unlock_irqrestore(&emergency_lock, flags);
 }
 
 static __init int init_emergency_pool(void)
@@ -290,44 +257,63 @@ static __init int init_emergency_pool(void)
 		list_add(&page->list, &emergency_pages);
 		nr_emergency_pages++;
 	}
-	while (nr_emergency_bhs < POOL_SIZE) {
-		struct buffer_head * bh = kmem_cache_alloc(bh_cachep, SLAB_ATOMIC);
-		if (!bh) {
-			printk("couldn't refill highmem emergency bhs");
-			break;
-		}
-		list_add(&bh->b_inode_buffers, &emergency_bhs);
-		nr_emergency_bhs++;
-	}
 	spin_unlock_irq(&emergency_lock);
-	printk("allocated %d pages and %d bhs reserved for the highmem bounces\n",
-	       nr_emergency_pages, nr_emergency_bhs);
-
+	printk("allocated %d pages reserved for the highmem bounces\n", nr_emergency_pages);
 	return 0;
 }
 
 __initcall(init_emergency_pool);
 
-static void bounce_end_io_write (struct buffer_head *bh, int uptodate)
+static inline void bounce_end_io (struct bio *bio, int nr_sectors)
 {
-	bounce_end_io(bh, uptodate);
+	struct bio *bio_orig = bio->bi_private;
+	struct page *page = bio_page(bio);
+	unsigned long flags;
+
+	if (test_bit(BIO_UPTODATE, &bio->bi_flags))
+		set_bit(BIO_UPTODATE, bio_orig->bi_flags);
+
+	bio_orig->bi_end_io(bio_orig, nr_sectors);
+
+	spin_lock_irqsave(&emergency_lock, flags);
+	if (nr_emergency_pages >= POOL_SIZE) {
+		spin_unlock_irqrestore(&emergency_lock, flags);
+		__free_page(page);
+	} else {
+		/*
+		 * We are abusing page->list to manage
+		 * the highmem emergency pool:
+		 */
+		list_add(&page->list, &emergency_pages);
+		nr_emergency_pages++;
+		spin_unlock_irqrestore(&emergency_lock, flags);
+	}
+
+	bio_hash_remove(bio);
+	bio_put(bio);
 }
 
-static void bounce_end_io_read (struct buffer_head *bh, int uptodate)
+static void bounce_end_io_write (struct bio *bio, int nr_sectors)
 {
-	struct buffer_head *bh_orig = (struct buffer_head *)(bh->b_private);
-
-	if (uptodate)
-		copy_to_high_bh_irq(bh_orig, bh);
-	bounce_end_io(bh, uptodate);
+	bounce_end_io(bio, nr_sectors);
 }
 
-struct page *alloc_bounce_page (void)
+static void bounce_end_io_read (struct bio *bio, int nr_sectors)
+{
+	struct bio *bio_orig = bio->bi_private;
+
+	if (test_bit(BIO_UPTODATE, &bio->bi_flags))
+		copy_to_high_bio_irq(bio_orig, bio);
+
+	bounce_end_io(bio, nr_sectors);
+}
+
+struct page *alloc_bounce_page(int gfp_mask)
 {
 	struct list_head *tmp;
 	struct page *page;
 
-	page = alloc_page(GFP_NOHIGHIO);
+	page = alloc_page(gfp_mask);
 	if (page)
 		return page;
 	/*
@@ -360,91 +346,35 @@ repeat_alloc:
 	goto repeat_alloc;
 }
 
-struct buffer_head *alloc_bounce_bh (void)
-{
-	struct list_head *tmp;
-	struct buffer_head *bh;
-
-	bh = kmem_cache_alloc(bh_cachep, SLAB_NOHIGHIO);
-	if (bh)
-		return bh;
-	/*
-	 * No luck. First, kick the VM so it doesnt idle around while
-	 * we are using up our emergency rations.
-	 */
-	wakeup_bdflush();
-
-repeat_alloc:
-	/*
-	 * Try to allocate from the emergency pool.
-	 */
-	tmp = &emergency_bhs;
-	spin_lock_irq(&emergency_lock);
-	if (!list_empty(tmp)) {
-		bh = list_entry(tmp->next, struct buffer_head, b_inode_buffers);
-		list_del(tmp->next);
-		nr_emergency_bhs--;
-	}
-	spin_unlock_irq(&emergency_lock);
-	if (bh)
-		return bh;
-
-	/* we need to wait I/O completion */
-	run_task_queue(&tq_disk);
-
-	current->policy |= SCHED_YIELD;
-	__set_current_state(TASK_RUNNING);
-	schedule();
-	goto repeat_alloc;
-}
-
-struct buffer_head * create_bounce(int rw, struct buffer_head * bh_orig)
+void create_bounce(struct bio **bio_orig, int gfp_mask)
 {
 	struct page *page;
-	struct buffer_head *bh;
+	struct bio *bio;
 
-	if (!PageHighMem(bh_orig->b_page))
-		return bh_orig;
+	bio = bio_alloc(GFP_NOHIGHIO, 1);
 
-	bh = alloc_bounce_bh();
 	/*
-	 * This is wasteful for 1k buffers, but this is a stopgap measure
-	 * and we are being ineffective anyway. This approach simplifies
-	 * things immensly. On boxes with more than 4GB RAM this should
-	 * not be an issue anyway.
+	 * wasteful for 1kB fs, but machines with lots of ram are less likely
+	 * to have 1kB fs for anything that needs to go fast. so all things
+	 * considered, it should be ok.
 	 */
-	page = alloc_bounce_page();
+	page = alloc_bounce_page(gfp_mask);
 
-	set_bh_page(bh, page, 0);
+	bio->bi_dev = (*bio_orig)->bi_dev;
+	bio->bi_sector = (*bio_orig)->bi_sector;
+	bio->bi_rw = (*bio_orig)->bi_rw;
 
-	bh->b_next = NULL;
-	bh->b_blocknr = bh_orig->b_blocknr;
-	bh->b_size = bh_orig->b_size;
-	bh->b_list = -1;
-	bh->b_dev = bh_orig->b_dev;
-	bh->b_count = bh_orig->b_count;
-	bh->b_rdev = bh_orig->b_rdev;
-	bh->b_state = bh_orig->b_state;
-#ifdef HIGHMEM_DEBUG
-	bh->b_flushtime = jiffies;
-	bh->b_next_free = NULL;
-	bh->b_prev_free = NULL;
-	/* bh->b_this_page */
-	bh->b_reqnext = NULL;
-	bh->b_pprev = NULL;
-#endif
-	/* bh->b_page */
-	if (rw == WRITE) {
-		bh->b_end_io = bounce_end_io_write;
-		copy_from_high_bh(bh, bh_orig);
+	bio->bi_io_vec->bvl_vec[0].bv_page = page;
+	bio->bi_io_vec->bvl_vec[0].bv_len = bio_size(*bio_orig);
+	bio->bi_io_vec->bvl_vec[0].bv_offset = 0;
+
+	bio->bi_private = *bio_orig;
+
+	if (bio_rw(bio) == WRITE) {
+		bio->bi_end_io = bounce_end_io_write;
+		copy_from_high_bio(bio, *bio_orig);
 	} else
-		bh->b_end_io = bounce_end_io_read;
-	bh->b_private = (void *)bh_orig;
-	bh->b_rsector = bh_orig->b_rsector;
-#ifdef HIGHMEM_DEBUG
-	memset(&bh->b_wait, -1, sizeof(bh->b_wait));
-#endif
+		bio->bi_end_io = bounce_end_io_read;
 
-	return bh;
+	*bio_orig = bio;
 }
-

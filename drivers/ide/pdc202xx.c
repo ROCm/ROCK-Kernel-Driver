@@ -893,6 +893,7 @@ void __init ide_init_pdc202xx (ide_hwif_t *hwif)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
 		hwif->dmaproc = &pdc202xx_dmaproc;
+		hwif->highmem = 1;
 		if (!noautodma)
 			hwif->autodma = 1;
 	} else {

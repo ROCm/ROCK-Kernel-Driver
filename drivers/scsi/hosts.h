@@ -291,6 +291,8 @@ typedef struct	SHT
      */
     unsigned emulated:1;
 
+    unsigned highmem_io:1;
+
     /*
      * Name of proc directory
      */
@@ -317,6 +319,7 @@ struct Scsi_Host
     struct Scsi_Host      * next;
     Scsi_Device           * host_queue;
 
+    spinlock_t		  host_lock;
 
     struct task_struct    * ehandler;  /* Error recovery thread. */
     struct semaphore      * eh_wait;   /* The error recovery thread waits on
@@ -390,6 +393,7 @@ struct Scsi_Host
     unsigned in_recovery:1;
     unsigned unchecked_isa_dma:1;
     unsigned use_clustering:1;
+    unsigned highmem_io:1;
     /*
      * True if this host was loaded as a loadable module
      */

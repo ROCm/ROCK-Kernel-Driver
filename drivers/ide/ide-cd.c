@@ -891,7 +891,7 @@ static ide_startstop_t cdrom_read_intr (ide_drive_t *drive)
 	int stat;
 	int ireason, len, sectors_to_transfer, nskip;
 	struct cdrom_info *info = drive->driver_data;
-	int i, dma = info->dma, dma_error = 0;
+	int dma = info->dma, dma_error = 0;
 	ide_startstop_t startstop;
 
 	struct request *rq = HWGROUP(drive)->rq;
@@ -908,10 +908,7 @@ static ide_startstop_t cdrom_read_intr (ide_drive_t *drive)
  
 	if (dma) {
 		if (!dma_error) {
-			for (i = rq->nr_sectors; i > 0;) {
-				i -= rq->current_nr_sectors;
-				ide_end_request(1, HWGROUP(drive));
-			}
+			__ide_end_request(HWGROUP(drive), 1, rq->nr_sectors);
 			return ide_stopped;
 		} else
 			return ide_error (drive, "dma error", stat);
@@ -926,7 +923,7 @@ static ide_startstop_t cdrom_read_intr (ide_drive_t *drive)
 		/* If we're not done filling the current buffer, complain.
 		   Otherwise, complete the command normally. */
 		if (rq->current_nr_sectors > 0) {
-			printk ("%s: cdrom_read_intr: data underrun (%ld blocks)\n",
+			printk ("%s: cdrom_read_intr: data underrun (%u blocks)\n",
 				drive->name, rq->current_nr_sectors);
 			cdrom_end_request (0, drive);
 		} else
@@ -959,8 +956,7 @@ static ide_startstop_t cdrom_read_intr (ide_drive_t *drive)
 
 	/* First, figure out if we need to bit-bucket
 	   any of the leading sectors. */
-	nskip = MIN ((int)(rq->current_nr_sectors - (rq->bh->b_size >> SECTOR_BITS)),
-		     sectors_to_transfer);
+	nskip = MIN(rq->current_nr_sectors - bio_sectors(rq->bio), sectors_to_transfer);
 
 	while (nskip > 0) {
 		/* We need to throw away a sector. */
@@ -1058,7 +1054,7 @@ static int cdrom_read_from_buffer (ide_drive_t *drive)
 	   represent the number of sectors to skip at the start of a transfer
 	   will fail.  I think that this will never happen, but let's be
 	   paranoid and check. */
-	if (rq->current_nr_sectors < (rq->bh->b_size >> SECTOR_BITS) &&
+	if (rq->current_nr_sectors < bio_sectors(rq->bio) &&
 	    (rq->sector % SECTORS_PER_FRAME) != 0) {
 		printk ("%s: cdrom_read_from_buffer: buffer botch (%ld)\n",
 			drive->name, rq->sector);
@@ -1097,9 +1093,9 @@ static ide_startstop_t cdrom_start_read_continuation (ide_drive_t *drive)
 	nskip = (sector % SECTORS_PER_FRAME);
 	if (nskip > 0) {
 		/* Sanity check... */
-		if (rq->current_nr_sectors != (rq->bh->b_size >> SECTOR_BITS) &&
+		if (rq->current_nr_sectors != bio_sectors(rq->bio) &&
 			(rq->sector % CD_FRAMESIZE != 0)) {
-			printk ("%s: cdrom_start_read_continuation: buffer botch (%lu)\n",
+			printk ("%s: cdrom_start_read_continuation: buffer botch (%u)\n",
 				drive->name, rq->current_nr_sectors);
 			cdrom_end_request (0, drive);
 			return ide_stopped;
@@ -1192,66 +1188,17 @@ static ide_startstop_t cdrom_start_seek (ide_drive_t *drive, unsigned int block)
 	return cdrom_start_packet_command (drive, 0, cdrom_start_seek_continuation);
 }
 
-static inline int cdrom_merge_requests(struct request *rq, struct request *nxt)
-{
-	int ret = 1;
-
-	/*
-	 * partitions not really working, but better check anyway...
-	 */
-	if (rq->cmd == nxt->cmd && rq->rq_dev == nxt->rq_dev) {
-		rq->nr_sectors += nxt->nr_sectors;
-		rq->hard_nr_sectors += nxt->nr_sectors;
-		rq->bhtail->b_reqnext = nxt->bh;
-		rq->bhtail = nxt->bhtail;
-		list_del(&nxt->queue);
-		blkdev_release_request(nxt);
-		ret = 0;
-	}
-
-	return ret;
-}
-
-/*
- * the current request will always be the first one on the list
- */
-static void cdrom_attempt_remerge(ide_drive_t *drive, struct request *rq)
-{
-	struct list_head *entry;
-	struct request *nxt;
-	unsigned long flags;
-
-	spin_lock_irqsave(&io_request_lock, flags);
-
-	while (1) {
-		entry = rq->queue.next;
-		if (entry == &drive->queue.queue_head)
-			break;
-
-		nxt = blkdev_entry_to_request(entry);
-		if (rq->sector + rq->nr_sectors != nxt->sector)
-			break;
-		else if (rq->nr_sectors + nxt->nr_sectors > SECTORS_MAX)
-			break;
-
-		if (cdrom_merge_requests(rq, nxt))
-			break;
-	}
-
-	spin_unlock_irqrestore(&io_request_lock, flags);
-}
-
 /* Fix up a possibly partially-processed request so that we can
-   start it over entirely, or even put it back on the request queue. */
+   start it over entirely */
 static void restore_request (struct request *rq)
 {
-	if (rq->buffer != rq->bh->b_data) {
-		int n = (rq->buffer - rq->bh->b_data) / SECTOR_SIZE;
-		rq->buffer = rq->bh->b_data;
+	if (rq->buffer != bio_data(rq->bio)) {
+		int n = (rq->buffer - (char *) bio_data(rq->bio)) / SECTOR_SIZE;
+		rq->buffer = bio_data(rq->bio);
 		rq->nr_sectors += n;
 		rq->sector -= n;
 	}
-	rq->current_nr_sectors = rq->bh->b_size >> SECTOR_BITS;
+	rq->hard_cur_sectors = rq->current_nr_sectors = bio_sectors(rq->bio);
 	rq->hard_nr_sectors = rq->nr_sectors;
 	rq->hard_sector = rq->sector;
 }
@@ -1281,7 +1228,7 @@ static ide_startstop_t cdrom_start_read (ide_drive_t *drive, unsigned int block)
 	if (cdrom_read_from_buffer(drive))
 		return ide_stopped;
 
-	cdrom_attempt_remerge(drive, rq);
+	blk_attempt_remerge(&drive->queue, rq);
 
 	/* Clear the local sector buffer. */
 	info->nsectors_buffered = 0;
@@ -1532,7 +1479,7 @@ static ide_startstop_t cdrom_write_intr(ide_drive_t *drive)
 {
 	int stat, ireason, len, sectors_to_transfer, uptodate;
 	struct cdrom_info *info = drive->driver_data;
-	int i, dma_error = 0, dma = info->dma;
+	int dma_error = 0, dma = info->dma;
 	ide_startstop_t startstop;
 
 	struct request *rq = HWGROUP(drive)->rq;
@@ -1559,10 +1506,7 @@ static ide_startstop_t cdrom_write_intr(ide_drive_t *drive)
 			return ide_error(drive, "dma error", stat);
 
 		rq = HWGROUP(drive)->rq;
-		for (i = rq->nr_sectors; i > 0;) {
-			i -= rq->current_nr_sectors;
-			ide_end_request(1, HWGROUP(drive));
-		}
+		__ide_end_request(HWGROUP(drive), 1, rq->nr_sectors);
 		return ide_stopped;
 	}
 
@@ -1577,7 +1521,7 @@ static ide_startstop_t cdrom_write_intr(ide_drive_t *drive)
 		 */
 		uptodate = 1;
 		if (rq->current_nr_sectors > 0) {
-			printk("%s: write_intr: data underrun (%ld blocks)\n",
+			printk("%s: write_intr: data underrun (%u blocks)\n",
 			drive->name, rq->current_nr_sectors);
 			uptodate = 0;
 		}
@@ -1674,7 +1618,7 @@ static ide_startstop_t cdrom_start_write(ide_drive_t *drive, struct request *rq)
 	 * remerge requests, often the plugging will not have had time
 	 * to do this properly
 	 */
-	cdrom_attempt_remerge(drive, rq);
+	blk_attempt_remerge(&drive->queue, rq);
 
 	info->nsectors_buffered = 0;
 
@@ -2202,7 +2146,9 @@ static int ide_cdrom_packet(struct cdrom_device_info *cdi,
 	pc.quiet = cgc->quiet;
 	pc.timeout = cgc->timeout;
 	pc.sense = cgc->sense;
-	return cgc->stat = cdrom_queue_packet_command(drive, &pc);
+	cgc->stat = cdrom_queue_packet_command(drive, &pc);
+	cgc->buflen -= pc.buflen;
+	return cgc->stat;
 }
 
 static
@@ -2711,7 +2657,6 @@ static void ide_cdrom_add_settings(ide_drive_t *drive)
 
 	ide_add_setting(drive,	"breada_readahead",	SETTING_RW, BLKRAGET, BLKRASET, TYPE_INT, 0, 255, 1, 2, &read_ahead[major], NULL);
 	ide_add_setting(drive,	"file_readahead",	SETTING_RW, BLKFRAGET, BLKFRASET, TYPE_INTA, 0, INT_MAX, 1, 1024, &max_readahead[major][minor],	NULL);
-	ide_add_setting(drive,	"max_kb_per_request",	SETTING_RW, BLKSECTGET, BLKSECTSET, TYPE_INTA, 1, 255, 1, 2, &max_sectors[major][minor], NULL);
 	ide_add_setting(drive,	"dsc_overlap",		SETTING_RW, -1, -1, TYPE_BYTE, 0, 1, 1,	1, &drive->dsc_overlap, NULL);
 }
 
@@ -2875,7 +2820,7 @@ int ide_cdrom_open (struct inode *ip, struct file *fp, ide_drive_t *drive)
 	MOD_INC_USE_COUNT;
 	if (info->buffer == NULL)
 		info->buffer = (char *) kmalloc(SECTOR_BUFFER_SIZE, GFP_KERNEL);
-        if ((info->buffer == NULL) || (rc = cdrom_open(ip, fp))) {
+	if ((info->buffer == NULL) || (rc = cdrom_open(ip, fp))) {
 		drive->usage--;
 		MOD_DEC_USE_COUNT;
 	}

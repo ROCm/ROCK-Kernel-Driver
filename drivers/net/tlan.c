@@ -2265,8 +2265,8 @@ TLan_FinishReset( struct net_device *dev )
 				printk("TLAN: Partner capability: ");
 					for (i = 5; i <= 10; i++)
 						if (partner & (1<<i))
-							printk("%s", media[i-5]);
-							printk("\n");
+							printk("%s",media[i-5]);
+				printk("\n");
 			}
 
 			TLan_DioWrite8( dev->base_addr, TLAN_LED_REG, TLAN_LED_LINK );

@@ -7,7 +7,8 @@
  * (C) Copyright Gregory P. Smith 1999
  * (C) Copyright Deti Fliegl 1999 (new USB architecture)
  * (C) Copyright Randy Dunlap 2000
- * (C) Copyright David Brownell 2000 (kernel hotplug, usb_device_id)
+ * (C) Copyright David Brownell 2000-2001 (kernel hotplug, usb_device_id,
+ 	more docs, etc)
  * (C) Copyright Yggdrasil Computing, Inc. 2000
  *     (usb_device_id matching changes by Adam J. Richter)
  *
@@ -193,6 +194,22 @@ void usb_deregister(struct usb_driver *driver)
 	up (&usb_bus_list_lock);
 }
 
+/**
+ * usb_ifnum_to_if - get the interface object with a given interface number
+ * @dev: the device whose current configuration is considered
+ * @ifnum: the desired interface
+ *
+ * This walks the device descriptor for the currently active configuration
+ * and returns a pointer to the interface with that particular interface
+ * number, or null.
+ *
+ * Note that configuration descriptors are not required to assign interface
+ * numbers sequentially, so that it would be incorrect to assume that
+ * the first interface in that descriptor corresponds to interface zero.
+ * This routine helps device drivers avoid such mistakes.
+ * However, you should make sure that you do the right thing with any
+ * alternate settings available for this interfaces.
+ */
 struct usb_interface *usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum)
 {
 	int i;
@@ -204,6 +221,20 @@ struct usb_interface *usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum)
 	return NULL;
 }
 
+/**
+ * usb_epnum_to_ep_desc - get the endpoint object with a given endpoint number
+ * @dev: the device whose current configuration is considered
+ * @epnum: the desired endpoint
+ *
+ * This walks the device descriptor for the currently active configuration,
+ * and returns a pointer to the endpoint with that particular endpoint
+ * number, or null.
+ *
+ * Note that interface descriptors are not required to assign endpont
+ * numbers sequentially, so that it would be incorrect to assume that
+ * the first endpoint in that descriptor corresponds to interface zero.
+ * This routine helps device drivers avoid such mistakes.
+ */
 struct usb_endpoint_descriptor *usb_epnum_to_ep_desc(struct usb_device *dev, unsigned epnum)
 {
 	int i, j, k;
@@ -356,7 +387,7 @@ static void usb_bus_put(struct usb_bus *bus)
 }
 
 /**
- *	usb_alloc_bus - creates a new USB host controller structure
+ *	usb_alloc_bus - creates a new USB host controller structure (usbcore-internal)
  *	@op: pointer to a struct usb_operations that this bus structure should use
  *
  *	Creates a USB host controller bus structure with the specified 
@@ -398,7 +429,7 @@ struct usb_bus *usb_alloc_bus(struct usb_operations *op)
 }
 
 /**
- *	usb_free_bus - frees the memory used by a bus structure
+ *	usb_free_bus - frees the memory used by a bus structure (usbcore-internal)
  *	@bus: pointer to the bus to free
  *
  *	(For use only by USB Host Controller Drivers.)
@@ -412,10 +443,12 @@ void usb_free_bus(struct usb_bus *bus)
 }
 
 /**
- *	usb_register_bus - registers the USB host controller with the usb core
+ *	usb_register_bus - registers the USB host controller with the usb core (usbcore-internal)
  *	@bus: pointer to the bus to register
  *
  *	(For use only by USB Host Controller Drivers.)
+ *
+ * This call is synchronous, and may not be used in an interrupt context.
  */
 void usb_register_bus(struct usb_bus *bus)
 {
@@ -441,10 +474,12 @@ void usb_register_bus(struct usb_bus *bus)
 }
 
 /**
- *	usb_deregister_bus - deregisters the USB host controller
+ *	usb_deregister_bus - deregisters the USB host controller (usbcore-internal)
  *	@bus: pointer to the bus to deregister
  *
  *	(For use only by USB Host Controller Drivers.)
+ *
+ * This call is synchronous, and may not be used in an interrupt context.
  */
 void usb_deregister_bus(struct usb_bus *bus)
 {
@@ -493,27 +528,49 @@ static void usb_check_support(struct usb_device *dev)
 }
 
 
-/*
- * This is intended to be used by usb device drivers that need to
- * claim more than one interface on a device at once when probing
- * (audio and acm are good examples).  No device driver should have
- * to mess with the internal usb_interface or usb_device structure
- * members.
+/**
+ * usb_driver_claim_interface - bind a driver to an interface
+ * @driver: the driver to be bound
+ * @iface: the interface to which it will be bound
+ * @priv: driver data associated with that interface
+ *
+ * This is used by usb device drivers that need to claim more than one
+ * interface on a device when probing (audio and acm are current examples).
+ * No device driver should directly modify internal usb_interface or
+ * usb_device structure members.
+ *
+ * Few drivers should need to use this routine, since the most natural
+ * way to bind to an interface is to return the private data from
+ * the driver's probe() method.  Any driver that does use this must
+ * first be sure that no other driver has claimed the interface, by
+ * checking with usb_interface_claimed().
  */
 void usb_driver_claim_interface(struct usb_driver *driver, struct usb_interface *iface, void* priv)
 {
 	if (!iface || !driver)
 		return;
 
-	dbg("%s driver claimed interface %p", driver->name, iface);
+	// FIXME change API to report an error in this case
+	if (iface->driver)
+	    err ("%s driver booted %s off interface %p",
+	    	driver->name, iface->driver->name, iface);
+	else
+	    dbg("%s driver claimed interface %p", driver->name, iface);
 
 	iface->driver = driver;
 	iface->private_data = priv;
 } /* usb_driver_claim_interface() */
 
-/*
+/**
+ * usb_interface_claimed - returns true iff an interface is claimed
+ * @iface: the interface being checked
+ *
  * This should be used by drivers to check other interfaces to see if
- * they are available or not.
+ * they are available or not.  If another driver has claimed the interface,
+ * they may not claim it.  Otherwise it's OK to claim it using
+ * usb_driver_claim_interface().
+ *
+ * Returns true (nonzero) iff the interface is claimed, else false (zero).
  */
 int usb_interface_claimed(struct usb_interface *iface)
 {
@@ -523,8 +580,19 @@ int usb_interface_claimed(struct usb_interface *iface)
 	return (iface->driver != NULL);
 } /* usb_interface_claimed() */
 
-/*
- * This should be used by drivers to release their claimed interfaces
+/**
+ * usb_driver_release_interface - unbind a driver from an interface
+ * @driver: the driver to be unbound
+ * @iface: the interface from which it will be unbound
+ * 
+ * This should be used by drivers to release their claimed interfaces.
+ * It is normally called in their disconnect() methods, and only for
+ * drivers that bound to more than one interface in their probe().
+ *
+ * When the USB subsystem disconnect()s a driver from some interface,
+ * it automatically invokes this method for that interface.  That
+ * means that even drivers that used usb_driver_claim_interface()
+ * usually won't need to call this.
  */
 void usb_driver_release_interface(struct usb_driver *driver, struct usb_interface *iface)
 {
@@ -923,9 +991,15 @@ static void usb_find_drivers(struct usb_device *dev)
 	}
 }
 
-/*
- * Only HC's should call usb_alloc_dev and usb_free_dev directly
- * Anybody may use usb_inc_dev_use or usb_dec_dev_use
+/**
+ * usb_alloc_dev - allocate a usb device structure (usbcore-internal)
+ * @parent: hub to which device is connected
+ * @bus: bus used to access the device
+ *
+ * Only hub drivers (including virtual root hub drivers for host
+ * controllers) should ever call this.
+ *
+ * This call is synchronous, and may not be used in an interrupt context.
  */
 struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 {
@@ -952,6 +1026,8 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 	return dev;
 }
 
+// usbcore-internal ...
+// but usb_dec_dev_use() is #defined to this, and that's public!!
 void usb_free_dev(struct usb_device *dev)
 {
 	if (atomic_dec_and_test(&dev->refcnt)) {
@@ -964,14 +1040,25 @@ void usb_free_dev(struct usb_device *dev)
 	}
 }
 
+/**
+ * usb_inc_dev_use - record another reference to a device
+ * @dev: the device being referenced
+ *
+ * Each live reference to a device should be refcounted.
+ *
+ * Device drivers should normally record such references in their
+ * open() methods.
+ * Drivers should then release them, using usb_dec_dev_use(), in their
+ * close() methods.
+ */
 void usb_inc_dev_use(struct usb_device *dev)
 {
 	atomic_inc(&dev->refcnt);
 }
 
-/* ------------------------------------------------------------------------------------- 
+/* ---------------------------------------------------------------------- 
  * New USB Core Functions
- * -------------------------------------------------------------------------------------*/
+ * ----------------------------------------------------------------------*/
 
 /**
  *	usb_alloc_urb - creates a new urb for a USB driver to use
@@ -1017,6 +1104,58 @@ void usb_free_urb(urb_t* urb)
 		kfree(urb);
 }
 /*-------------------------------------------------------------------*/
+
+/**
+ * usb_submit_urb - asynchronously issue a transfer request for an endpoint
+ * @urb: pointer to the urb describing the request
+ *
+ * This submits a transfer request, and transfers control of the URB
+ * describing that request to the USB subsystem.  Request completion will
+ * indicated later, asynchronously, by calling the completion handler.
+ * This call may be issued in interrupt context.
+ *
+ * The caller must have correctly initialized the URB before submitting
+ * it.  Macros such as FILL_BULK_URB() and FILL_CONTROL_URB() are
+ * available to ensure that most fields are correctly initialized, for
+ * the particular kind of transfer, although they will not initialize
+ * any transfer flags.
+ *
+ * Successful submissions return 0; otherwise this routine returns a
+ * negative error number.
+ *
+ * Unreserved Bandwidth Transfers:
+ *
+ * Bulk or control requests complete only once.  When the completion
+ * function is called, control of the URB is returned to the device
+ * driver which issued the request.  The completion handler may then
+ * immediately free or reuse that URB.
+ *
+ * Bulk URBs will be queued if the USB_QUEUE_BULK transfer flag is set
+ * in the URB.  This can be used to maximize bandwidth utilization by
+ * letting the USB controller start work on the next URB without any
+ * delay to report completion (scheduling and processing an interrupt)
+ * and then submit that next request.
+ *
+ * For control endpoints, the synchronous usb_control_msg() call is
+ * often used (in non-interrupt context) instead of this call.
+ *
+ * Reserved Bandwidth Transfers:
+ *
+ * Periodic URBs (interrupt or isochronous) are completed repeatedly,
+ * until the original request is aborted.  When the completion callback
+ * indicates the URB has been unlinked (with a special status code),
+ * control of that URB returns to the device driver.  Otherwise, the
+ * completion handler does not control the URB, and should not change
+ * any of its fields.
+ *
+ * Note that isochronous URBs should be submitted in a "ring" data
+ * structure (using urb->next) to ensure that they are resubmitted
+ * appropriately.
+ *
+ * If the USB subsystem can't reserve sufficient bandwidth to perform
+ * the periodic request, and bandwidth reservation is being done for
+ * this controller, submitting such a periodic request will fail. 
+ */
 int usb_submit_urb(urb_t *urb)
 {
 	if (urb && urb->dev && urb->dev->bus && urb->dev->bus->op)
@@ -1026,6 +1165,31 @@ int usb_submit_urb(urb_t *urb)
 }
 
 /*-------------------------------------------------------------------*/
+
+/**
+ * usb_unlink_urb - abort/cancel a transfer request for an endpoint
+ * @urb: pointer to urb describing a previously submitted request
+ *
+ * This routine cancels an in-progress request.  The requests's
+ * completion handler will be called with a status code indicating
+ * that the request has been canceled, and that control of the URB
+ * has been returned to that device driver.  This is the only way
+ * to stop an interrupt transfer, so long as the device is connected.
+ *
+ * When the USB_ASYNC_UNLINK transfer flag for the URB is clear, this
+ * request is synchronous.  Success is indicated by returning zero,
+ * at which time the urb will have been unlinked,
+ * and the completion function will see status -ENOENT.  Failure is
+ * indicated by any other return value.  This mode may not be used
+ * when unlinking an urb from an interrupt context, such as a bottom
+ * half or a completion handler,
+ *
+ * When the USB_ASYNC_UNLINK transfer flag for the URB is set, this
+ * request is asynchronous.  Success is indicated by returning -EINPROGRESS,
+ * at which time the urb will normally not have been unlinked,
+ * and the completion function will see status -ECONNRESET.  Failure is
+ * indicated by any other return value.
+ */
 int usb_unlink_urb(urb_t *urb)
 {
 	if (urb && urb->dev && urb->dev->bus && urb->dev->bus->op)
@@ -1050,7 +1214,7 @@ static void usb_api_blocking_completion(urb_t *urb)
 }
 
 /*-------------------------------------------------------------------*
- *                         COMPATIBILITY STUFF                       *
+ *                         SYNCHRONOUS CALLS                         *
  *-------------------------------------------------------------------*/
 
 // Starts urb and waits for completion or timeout
@@ -1145,7 +1309,7 @@ int usb_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe,
  *	This function sends a simple control message to a specified endpoint
  *	and waits for the message to complete, or timeout.
  *	
- *	If successful, it returns 0, othwise a negative error number.
+ *	If successful, it returns 0, otherwise a negative error number.
  *
  *	Don't use this function from within an interrupt context, like a
  *	bottom half handler.  If you need a asyncronous message, or need to send
@@ -1188,9 +1352,9 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe, __u8 request, __u
  *	This function sends a simple bulk message to a specified endpoint
  *	and waits for the message to complete, or timeout.
  *	
- *	If successful, it returns 0, othwise a negative error number.
- *	The number of actual bytes transferred will be plaed in the 
- *	actual_timeout paramater.
+ *	If successful, it returns 0, otherwise a negative error number.
+ *	The number of actual bytes transferred will be stored in the 
+ *	actual_length paramater.
  *
  *	Don't use this function from within an interrupt context, like a
  *	bottom half handler.  If you need a asyncronous message, or need to
@@ -1214,16 +1378,19 @@ int usb_bulk_msg(struct usb_device *usb_dev, unsigned int pipe,
 	return usb_start_wait_urb(urb,timeout,actual_length);
 }
 
-/*
- * usb_get_current_frame_number()
+/**
+ * usb_get_current_frame_number - return current bus frame number
+ * @dev: the device whose bus is being queried
  *
- * returns the current frame number for the parent USB bus/controller
- * of the given USB device.
+ * Returns the current frame number for the USB host controller
+ * used with the given USB device.  This can be used when scheduling
+ * isochronous requests.
  */
-int usb_get_current_frame_number(struct usb_device *usb_dev)
+int usb_get_current_frame_number(struct usb_device *dev)
 {
-	return usb_dev->bus->op->get_frame_number (usb_dev);
+	return dev->bus->op->get_frame_number (dev);
 }
+
 /*-------------------------------------------------------------------*/
 
 static int usb_parse_endpoint(struct usb_endpoint_descriptor *endpoint, unsigned char *buffer, int size)
@@ -1556,6 +1723,7 @@ int usb_parse_configuration(struct usb_config_descriptor *config, char *buffer)
 	return size;
 }
 
+// usbcore-internal:  enumeration/hub only!!
 void usb_destroy_configuration(struct usb_device *dev)
 {
 	int c, i, j, k;
@@ -1685,8 +1853,16 @@ int __usb_get_extra_descriptor(char *buffer, unsigned size, unsigned char type, 
 	return -1;
 }
 
-/*
+/**
+ * usb_disconnect - disconnect a device (usbcore-internal)
+ * @pdev: pointer to device being disconnected
+ *
  * Something got disconnected. Get rid of it, and all of its children.
+ *
+ * Only hub drivers (including virtual root hub drivers for host
+ * controllers) should ever call this.
+ *
+ * This call is synchronous, and may not be used in an interrupt context.
  */
 void usb_disconnect(struct usb_device **pdev)
 {
@@ -1735,11 +1911,17 @@ void usb_disconnect(struct usb_device **pdev)
 	usb_free_dev(dev);
 }
 
-/*
+/**
+ * usb_connect - connects a new device during enumeration (usbcore-internal)
+ * @dev: partially enumerated device
+ *
  * Connect a new USB device. This basically just initializes
  * the USB device information and sets up the topology - it's
  * up to the low-level driver to reset the port and actually
  * do the setup (the upper levels don't know how to do that).
+ *
+ * Only hub drivers (including virtual root hub drivers for host
+ * controllers) should ever call this.
  */
 void usb_connect(struct usb_device *dev)
 {
@@ -1747,6 +1929,9 @@ void usb_connect(struct usb_device *dev)
 	// FIXME needs locking for SMP!!
 	/* why? this is called only from the hub thread, 
 	 * which hopefully doesn't run on multiple CPU's simultaneously 8-)
+	 * ... it's also called from modprobe/rmmod/apmd threads as part
+	 * of virtual root hub init/reinit.  In the init case, the hub code 
+	 * won't have seen this, but not so for reinit ... 
 	 */
 	dev->descriptor.bMaxPacketSize0 = 8;  /* Start off at 8 bytes  */
 #ifndef DEVNUM_ROUND_ROBIN
@@ -1777,12 +1962,35 @@ void usb_connect(struct usb_device *dev)
 #endif
 #define SET_TIMEOUT 3
 
+// hub driver only!!! for enumeration
 int usb_set_address(struct usb_device *dev)
 {
 	return usb_control_msg(dev, usb_snddefctrl(dev), USB_REQ_SET_ADDRESS,
 		0, dev->devnum, 0, NULL, 0, HZ * GET_TIMEOUT);
 }
 
+/**
+ * usb_get_descriptor - issues a generic GET_DESCRIPTOR request
+ * @dev: the device whose descriptor is being retrieved
+ * @type: the descriptor type (USB_DT_*)
+ * @index: the number of the descriptor
+ * @buf: where to put the descriptor
+ * @size: how big is "buf"?
+ *
+ * Gets a USB descriptor.  Convenience functions exist to simplify
+ * getting some types of descriptors.  Use
+ * usb_get_device_descriptor() for USB_DT_DEVICE,
+ * and usb_get_string() or usb_string() for USB_DT_STRING.
+ * Configuration descriptors (USB_DT_CONFIG) are part of the device
+ * structure, at least for the current configuration.
+ * In addition to a number of USB-standard descriptors, some
+ * devices also use vendor-specific descriptors.
+ *
+ * This call is synchronous, and may not be used in an interrupt context.
+ *
+ * Returns zero on success, or else the status code returned by the
+ * underlying usb_control_msg() call.
+ */
 int usb_get_descriptor(struct usb_device *dev, unsigned char type, unsigned char index, void *buf, int size)
 {
 	int i = 5;
@@ -1800,6 +2008,7 @@ int usb_get_descriptor(struct usb_device *dev, unsigned char type, unsigned char
 	return result;
 }
 
+// FIXME  Doesn't use USB_DT_CLASS ... but hid-core.c expects it this way
 int usb_get_class_descriptor(struct usb_device *dev, int ifnum,
 		unsigned char type, unsigned char id, void *buf, int size)
 {
@@ -1808,6 +2017,27 @@ int usb_get_class_descriptor(struct usb_device *dev, int ifnum,
 		(type << 8) + id, ifnum, buf, size, HZ * GET_TIMEOUT);
 }
 
+/**
+ * usb_get_string - gets a string descriptor
+ * @dev: the device whose string descriptor is being retrieved
+ * @langid: code for language chosen (from string descriptor zero)
+ * @index: the number of the descriptor
+ * @buf: where to put the string
+ * @size: how big is "buf"?
+ *
+ * Retrieves a string, encoded using UTF-16LE (Unicode, 16 bits per character,
+ * in little-endian byte order).
+ * The usb_string() function will often be a convenient way to turn
+ * these strings into kernel-printable form.
+ *
+ * Strings may be referenced in device, configuration, interface, or other
+ * descriptors, and could also be used in vendor-specific ways.
+ *
+ * This call is synchronous, and may not be used in an interrupt context.
+ *
+ * Returns zero on success, or else the status code returned by the
+ * underlying usb_control_msg() call.
+ */
 int usb_get_string(struct usb_device *dev, unsigned short langid, unsigned char index, void *buf, int size)
 {
 	return usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
@@ -1815,6 +2045,24 @@ int usb_get_string(struct usb_device *dev, unsigned short langid, unsigned char 
 		(USB_DT_STRING << 8) + index, langid, buf, size, HZ * GET_TIMEOUT);
 }
 
+/**
+ * usb_get_device_descriptor - (re)reads the device descriptor
+ * @dev: the device whose device descriptor is being updated
+ *
+ * Updates the copy of the device descriptor stored in the device structure,
+ * which dedicates space for this purpose.  Note that several fields are
+ * converted to the host CPU's byte order:  the USB version (bcdUSB), and
+ * vendors product and version fields (idVendor, idProduct, and bcdDevice).
+ * That lets device drivers compare against non-byteswapped constants.
+ *
+ * There's normally no need to use this call, although some devices
+ * will change their descriptors after events like updating firmware.
+ *
+ * This call is synchronous, and may not be used in an interrupt context.
+ *
+ * Returns zero on success, or else the status code returned by the
+ * underlying usb_control_msg() call.
+ */
 int usb_get_device_descriptor(struct usb_device *dev)
 {
 	int ret = usb_get_descriptor(dev, USB_DT_DEVICE, 0, &dev->descriptor,
@@ -1828,12 +2076,34 @@ int usb_get_device_descriptor(struct usb_device *dev)
 	return ret;
 }
 
+/**
+ * usb_get_status - issues a GET_STATUS call
+ * @dev: the device whose status is being checked
+ * @type: USB_RECIP_*; for device, interface, or endpoint
+ * @target: zero (for device), else interface or endpoint number
+ * @data: pointer to two bytes of bitmap data
+ *
+ * Returns device, interface, or endpoint status.  Normally only of
+ * interest to see if the device is self powered, or has enabled the
+ * remote wakeup facility; or whether a bulk or interrupt endpoint
+ * is halted ("stalled").
+ *
+ * Bits in these status bitmaps are set using the SET_FEATURE request,
+ * and cleared using the CLEAR_FEATURE request.  The usb_clear_halt()
+ * function should be used to clear halt ("stall") status.
+ *
+ * This call is synchronous, and may not be used in an interrupt context.
+ *
+ * Returns zero on success, or else the status code returned by the
+ * underlying usb_control_msg() call.
+ */
 int usb_get_status(struct usb_device *dev, int type, int target, void *data)
 {
 	return usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
 		USB_REQ_GET_STATUS, USB_DIR_IN | type, 0, target, data, 2, HZ * GET_TIMEOUT);
 }
 
+// FIXME hid-specific !!  DOES NOT BELONG HERE
 int usb_get_protocol(struct usb_device *dev, int ifnum)
 {
 	unsigned char type;
@@ -1847,6 +2117,7 @@ int usb_get_protocol(struct usb_device *dev, int ifnum)
 	return type;
 }
 
+// FIXME hid-specific !!  DOES NOT BELONG HERE
 int usb_set_protocol(struct usb_device *dev, int ifnum, int protocol)
 {
 	return usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
@@ -1854,6 +2125,7 @@ int usb_set_protocol(struct usb_device *dev, int ifnum, int protocol)
 		protocol, ifnum, NULL, 0, HZ * SET_TIMEOUT);
 }
 
+// FIXME hid-specific !!  DOES NOT BELONG HERE
 int usb_set_idle(struct usb_device *dev, int ifnum, int duration, int report_id)
 {
 	return usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
@@ -1861,6 +2133,7 @@ int usb_set_idle(struct usb_device *dev, int ifnum, int duration, int report_id)
 		(duration << 8) | report_id, ifnum, NULL, 0, HZ * SET_TIMEOUT);
 }
 
+// hub-only!!
 void usb_set_maxpacket(struct usb_device *dev)
 {
 	int i, b;
@@ -1890,9 +2163,26 @@ void usb_set_maxpacket(struct usb_device *dev)
 	}
 }
 
-/*
- * endp: endpoint number in bits 0-3;
- *	direction flag in bit 7 (1 = IN, 0 = OUT)
+/**
+ * usb_clear_halt - tells device to clear endpoint halt/stall condition
+ * @dev: device whose endpoint is halted
+ * @pipe: endpoint "pipe" being cleared
+ *
+ * This is used to clear halt conditions for bulk and interrupt endpoints,
+ * as reported by URB completion status.  Endpoints that are halted are
+ * sometimes referred to as being "stalled".  Such endpoints are unable
+ * to transmit or receive data until the halt status is cleared.  Any URBs
+ * queued queued for such an endpoint should normally be unlinked before
+ * clearing the halt condition.
+ *
+ * Note that control and isochronous endpoints don't halt, although control
+ * endpoints report "protocol stall" (for unsupported requests) using the
+ * same status code used to report a true stall.
+ *
+ * This call is synchronous, and may not be used in an interrupt context.
+ *
+ * Returns zero on success, or else the status code returned by the
+ * underlying usb_control_msg() call.
  */
 int usb_clear_halt(struct usb_device *dev, int pipe)
 {
@@ -1941,6 +2231,33 @@ int usb_clear_halt(struct usb_device *dev, int pipe)
 	return 0;
 }
 
+/**
+ * usb_set_interface - Makes a particular alternate setting be current
+ * @dev: the device whose interface is being updated
+ * @interface: the interface being updated
+ * @alternate: the setting being chosen.
+ *
+ * This is used to enable data transfers on interfaces that may not
+ * be enabled by default.  Not all devices support such configurability.
+ *
+ * Within any given configuration, each interface may have several
+ * alternative settings.  These are often used to control levels of
+ * bandwidth consumption.  For example, the default setting for a high
+ * speed interrupt endpoint may not send more than about 4KBytes per
+ * microframe, and isochronous endpoints may never be part of a an
+ * interface's default setting.  To access such bandwidth, alternate
+ * interface setting must be made current.
+ *
+ * Note that in the Linux USB subsystem, bandwidth associated with
+ * an endpoint in a given alternate setting is not reserved until an
+ * is submitted that needs that bandwidth.  Some other operating systems
+ * allocate bandwidth early, when a configuration is chosen.
+ *
+ * This call is synchronous, and may not be used in an interrupt context.
+ *
+ * Returns zero on success, or else the status code returned by the
+ * underlying usb_control_msg() call.
+ */
 int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 {
 	struct usb_interface *iface;
@@ -1964,6 +2281,35 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
 	return 0;
 }
 
+/**
+ * usb_set_configuration - Makes a particular device setting be current
+ * @dev: the device whose configuration is being updated
+ * @configuration: the configuration being chosen.
+ *
+ * This is used to enable non-default device modes.  Not all devices
+ * support this kind of configurability.  By default, configuration
+ * zero is selected after enumeration; many devices only have a single
+ * configuration.
+ *
+ * USB devices may support one or more configurations, which affect
+ * power consumption and the functionality available.  For example,
+ * the default configuration is limited to using 100mA of bus power,
+ * so that when certain device functionality requires more power,
+ * and the device is bus powered, that functionality will be in some
+ * non-default device configuration.  Other device modes may also be
+ * reflected as configuration options, such as whether two ISDN
+ * channels are presented as independent 64Kb/s interfaces or as one
+ * bonded 128Kb/s interface.
+ *
+ * Note that USB has an additional level of device configurability,
+ * associated with interfaces.  That configurability is accessed using
+ * usb_set_interface().
+ *
+ * This call is synchronous, and may not be used in an interrupt context.
+ *
+ * Returns zero on success, or else the status code returned by the
+ * underlying usb_control_msg() call.
+ */
 int usb_set_configuration(struct usb_device *dev, int configuration)
 {
 	int i, ret;
@@ -1992,6 +2338,7 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 	return 0;
 }
 
+// FIXME hid-specific !!  DOES NOT BELONG HERE
 int usb_get_report(struct usb_device *dev, int ifnum, unsigned char type, unsigned char id, void *buf, int size)
 {
 	return usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
@@ -1999,6 +2346,7 @@ int usb_get_report(struct usb_device *dev, int ifnum, unsigned char type, unsign
 		(type << 8) + id, ifnum, buf, size, HZ * GET_TIMEOUT);
 }
 
+// FIXME hid-specific !!  DOES NOT BELONG HERE
 int usb_set_report(struct usb_device *dev, int ifnum, unsigned char type, unsigned char id, void *buf, int size)
 {
 	return usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
@@ -2006,6 +2354,7 @@ int usb_set_report(struct usb_device *dev, int ifnum, unsigned char type, unsign
 		(type << 8) + id, ifnum, buf, size, HZ);
 }
 
+// hub driver only !!
 int usb_get_configuration(struct usb_device *dev)
 {
 	int result;
@@ -2106,9 +2455,28 @@ err:
 	return result;
 }
 
-/*
- * usb_string:
- *	returns string length (> 0) or error (< 0)
+/**
+ * usb_string - returns ISO 8859-1 version of a string descriptor
+ * @dev: the device whose string descriptor is being retrieved
+ * @index: the number of the descriptor
+ * @buf: where to put the string
+ * @size: how big is "buf"?
+ * 
+ * This converts the UTF-16LE encoded strings returned by devices, from
+ * usb_get_string_descriptor(), to null-terminated ISO-8859-1 encoded ones
+ * that are more usable in most kernel contexts.  Note that all characters
+ * in the chosen descriptor that can't be encoded using ISO-8859-1
+ * are converted to the question mark ("?") character, and this function
+ * chooses strings in the first language supported by the device.
+ *
+ * The ASCII (or, redundantly, "US-ASCII") character set is the seven-bit
+ * subset of ISO 8859-1. ISO-8859-1 is the eight-bit subset of Unicode,
+ * and is appropriate for use many uses of English and several other
+ * Western European languages.  (But it doesn't include the "Euro" symbol.)
+ *
+ * This call is synchronous, and may not be used in an interrupt context.
+ *
+ * Returns length of the string (>= 0) or usb_control_msg status (< 0).
  */
 int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 {
@@ -2155,7 +2523,7 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 		if (idx >= size)
 			break;
 		if (tbuf[u+1])			/* high byte */
-			buf[idx++] = '?';  /* non-ASCII character */
+			buf[idx++] = '?';  /* non ISO-8859-1 character */
 		else
 			buf[idx++] = tbuf[u];
 	}
@@ -2173,6 +2541,11 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
  * get the ball rolling..
  *
  * Returns 0 for success, != 0 for error.
+ *
+ * This call is synchronous, and may not be used in an interrupt context.
+ *
+ * Only hub drivers (including virtual root hub drivers for host
+ * controllers) should ever call this.
  */
 int usb_new_device(struct usb_device *dev)
 {

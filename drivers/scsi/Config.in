@@ -20,10 +20,6 @@ dep_tristate '  SCSI generic support' CONFIG_CHR_DEV_SG $CONFIG_SCSI
 
 comment 'Some SCSI devices (e.g. CD jukebox) support multiple LUNs'
 
-#if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-   bool '  Enable extra checks in new queueing code' CONFIG_SCSI_DEBUG_QUEUES
-#fi
-
 bool '  Probe all LUNs on each SCSI device' CONFIG_SCSI_MULTI_LUN
   
 bool '  Verbose SCSI error reporting (kernel size +=12K)' CONFIG_SCSI_CONSTANTS

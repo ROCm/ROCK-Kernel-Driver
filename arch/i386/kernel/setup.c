@@ -157,6 +157,7 @@ unsigned char aux_device_present;
 extern void mcheck_init(struct cpuinfo_x86 *c);
 extern int root_mountflags;
 extern char _text, _etext, _edata, _end;
+extern int blk_nohighio;
 
 static int disable_x86_serial_nr __initdata = 1;
 static int disable_x86_fxsr __initdata = 0;
@@ -782,7 +783,7 @@ static void __init parse_mem_cmdline (char ** cmdline_p)
 void __init setup_arch(char **cmdline_p)
 {
 	unsigned long bootmap_size, low_mem_size;
-	unsigned long start_pfn, max_pfn, max_low_pfn;
+	unsigned long start_pfn, max_low_pfn;
 	int i;
 
 #ifdef CONFIG_VISWS
@@ -1067,6 +1068,14 @@ static int __init tsc_setup(char *str)
 __setup("notsc", tsc_setup);
 #endif
 
+static int __init highio_setup(char *str)
+{
+	printk("i386: disabling HIGHMEM block I/O\n");
+	blk_nohighio = 1;
+	return 1;
+}
+__setup("nohighio", highio_setup);
+ 
 static int __init get_model_name(struct cpuinfo_x86 *c)
 {
 	unsigned int *v;

@@ -66,6 +66,7 @@
 #define TYPE_0_CMD_BLK_LENGTH 2
 #define TYPE_1_CMD_BLK_LENGTH 4
 
+#define PS2ESDI_LOCK (&((BLK_DEFAULT_QUEUE(MAJOR_NR))->queue_lock))
 
 static void reset_ctrl(void);
 
@@ -118,7 +119,6 @@ static int access_count[MAX_HD];
 static char ps2esdi_valid[MAX_HD];
 static int ps2esdi_sizes[MAX_HD << 6];
 static int ps2esdi_blocksizes[MAX_HD << 6];
-static int ps2esdi_maxsect[MAX_HD << 6];
 static int ps2esdi_drives;
 static struct hd_struct ps2esdi[MAX_HD << 6];
 static u_short io_base;
@@ -221,8 +221,7 @@ int init_module(void) {
 }
 
 void
-cleanup_module(void)
-{
+cleanup_module(void) {
 	if(ps2esdi_slot) {
 		mca_mark_as_unused(ps2esdi_slot);
 		mca_set_adapter_procfn(ps2esdi_slot, NULL, NULL);
@@ -231,8 +230,9 @@ cleanup_module(void)
 	free_dma(dma_arb_level);
   	free_irq(PS2ESDI_IRQ, NULL);
 	devfs_unregister_blkdev(MAJOR_NR, "ed");
-	del_gendisk(&ps2esdi_gendisk);
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	del_gendisk(&ps2esdi_gendisk);
+	blk_clear(MAJOR_NR);
 }
 #endif /* MODULE */
 
@@ -415,16 +415,13 @@ static void __init ps2esdi_geninit(void)
 
 	ps2esdi_gendisk.nr_real = ps2esdi_drives;
 
-	/* 128 was old default, maybe maxsect=255 is ok too? - Paul G. */
-	for (i = 0; i < (MAX_HD << 6); i++) {
-		ps2esdi_maxsect[i] = 128;
+	for (i = 0; i < (MAX_HD << 6); i++)
 		ps2esdi_blocksizes[i] = 1024;
-	}
 
 	request_dma(dma_arb_level, "ed");
 	request_region(io_base, 4, "ed");
 	blksize_size[MAJOR_NR] = ps2esdi_blocksizes;
-	max_sectors[MAJOR_NR] = ps2esdi_maxsect;
+	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), 128);
 
 	for (i = 0; i < ps2esdi_drives; i++) {
 		register_disk(&ps2esdi_gendisk,MKDEV(MAJOR_NR,i<<6),1<<6,
@@ -495,13 +492,9 @@ static void do_ps2esdi_request(request_queue_t * q)
 		       CURRENT->current_nr_sectors);
 #endif
 
-
-		block = CURRENT->sector + ps2esdi[MINOR(CURRENT->rq_dev)].start_sect;
-
-#if 0
-		printk("%s: blocknumber : %d\n", DEVICE_NAME, block);
-#endif
+		block = CURRENT->sector;
 		count = CURRENT->current_nr_sectors;
+
 		switch (CURRENT->cmd) {
 		case READ:
 			ps2esdi_readwrite(READ, CURRENT_DEV, block, count);
@@ -958,10 +951,10 @@ static void ps2esdi_normal_interrupt_handler(u_int int_ret_code)
 		break;
 	}
 	if(ending != -1) {
-		spin_lock_irqsave(&io_request_lock, flags);
+		spin_lock_irqsave(PS2ESDI_LOCK, flags);
 		end_request(ending);
 		do_ps2esdi_request(BLK_DEFAULT_QUEUE(MAJOR_NR));
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(PS2ESDI_LOCK, flags);
 	}
 }				/* handle interrupts */
 
@@ -1100,10 +1093,10 @@ static int ps2esdi_ioctl(struct inode *inode,
 				put_user(ps2esdi_info[dev].head, (char *) &geometry->heads);
 				put_user(ps2esdi_info[dev].sect, (char *) &geometry->sectors);
 				put_user(ps2esdi_info[dev].cyl, (short *) &geometry->cylinders);
-				put_user(ps2esdi[MINOR(inode->i_rdev)].start_sect,
+				put_user(get_start_sect(inode->i_rdev),
 					    (long *) &geometry->start);
 
-				return (0);
+				return 0;
 			}
 			break;
 
@@ -1132,8 +1125,7 @@ static int ps2esdi_ioctl(struct inode *inode,
 static int ps2esdi_reread_partitions(kdev_t dev)
 {
 	int target = DEVICE_NR(dev);
-	int start = target << ps2esdi_gendisk.minor_shift;
-	int partition;
+	int res;
 
 	cli();
 	ps2esdi_valid[target] = (access_count[target] != 1);
@@ -1141,21 +1133,16 @@ static int ps2esdi_reread_partitions(kdev_t dev)
 	if (ps2esdi_valid[target])
 		return (-EBUSY);
 
-	for (partition = ps2esdi_gendisk.max_p - 1;
-	     partition >= 0; partition--) {
-		int minor = (start | partition);
-		invalidate_device(MKDEV(MAJOR_NR, minor), 1);
-		ps2esdi_gendisk.part[minor].start_sect = 0;
-		ps2esdi_gendisk.part[minor].nr_sects = 0;
-	}
-
-	grok_partitions(&ps2esdi_gendisk, target, 1<<6, 
-		ps2esdi_info[target].head * ps2esdi_info[target].cyl * ps2esdi_info[target].sect);
-
+	res = wipe_partitions(dev);
+	if (res == 0)
+		grok_partitions(dev, ps2esdi_info[target].head
+				* ps2esdi_info[target].cyl
+				* ps2esdi_info[target].sect);
+ 
 	ps2esdi_valid[target] = 1;
 	wake_up(&ps2esdi_wait_open);
 
-	return (0);
+	return (res);
 }
 
 static void ps2esdi_reset_timer(unsigned long unused)

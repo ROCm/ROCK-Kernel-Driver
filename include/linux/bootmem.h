@@ -18,6 +18,11 @@ extern unsigned long max_low_pfn;
 extern unsigned long min_low_pfn;
 
 /*
+ * highest page
+ */
+extern unsigned long max_pfn;
+
+/*
  * node_bootmem_map is a map pointer - the bits represent all physical 
  * memory pages (including holes) on the node.
  */

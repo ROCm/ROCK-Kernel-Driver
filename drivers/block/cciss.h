@@ -15,11 +15,6 @@
 
 #define MAJOR_NR COMPAQ_CISS_MAJOR 
 
-struct my_sg {
-	int len;
-	char *start_addr;
-};
-
 struct ctlr_info;
 typedef struct ctlr_info ctlr_info_t;
 
@@ -85,9 +80,8 @@ struct ctlr_info
 	struct gendisk   gendisk;
 	   // indexed by minor numbers
 	struct hd_struct hd[256];
-	int              sizes[256];
+	int		 sizes[256];
 	int              blocksizes[256];
-	int              hardsizes[256];
 };
 
 /*  Defining the diffent access_menthods */
@@ -247,5 +241,8 @@ struct board_type {
 	char	*product_name;
 	struct access_method *access;
 };
+
+#define CCISS_LOCK(i)	(&((BLK_DEFAULT_QUEUE(MAJOR_NR + i))->queue_lock))
+
 #endif /* CCISS_H */
 

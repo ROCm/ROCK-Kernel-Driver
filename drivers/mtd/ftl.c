@@ -1166,7 +1166,7 @@ static int ftl_ioctl(struct inode *inode, struct file *file,
 	put_user(1, (char *)&geo->heads);
 	put_user(8, (char *)&geo->sectors);
 	put_user((sect>>3), (short *)&geo->cylinders);
-	put_user(ftl_hd[minor].start_sect, (u_long *)&geo->start);
+	put_user(get_start_sect(inode->i_rdev), (u_long *)&geo->start);
 	break;
     case BLKGETSIZE:
 	ret = put_user(ftl_hd[minor].nr_sects, (unsigned long *)arg);
@@ -1206,42 +1206,27 @@ static int ftl_ioctl(struct inode *inode, struct file *file,
 
 ======================================================================*/
 
-static int ftl_reread_partitions(int minor)
+static int ftl_reread_partitions(kdev_t dev)
 {
+    int minor = MINOR(dev);
     partition_t *part = myparts[minor >> 4];
-    int i, whole;
+    int res;
 
     DEBUG(0, "ftl_cs: ftl_reread_partition(%d)\n", minor);
     if ((atomic_read(&part->open) > 1)) {
 	    return -EBUSY;
     }
-    whole = minor & ~(MAX_PART-1);
 
-    i = MAX_PART - 1;
-    while (i-- > 0) {
-	if (ftl_hd[whole+i].nr_sects > 0) {
-	    kdev_t rdev = MKDEV(FTL_MAJOR, whole+i);
-
-	    invalidate_device(rdev, 1);
-	}
-	ftl_hd[whole+i].start_sect = 0;
-	ftl_hd[whole+i].nr_sects = 0;
-    }
+    res = wipe_partitions(dev);
+    if (res)
+	goto leave;
 
     scan_header(part);
 
     register_disk(&ftl_gendisk, whole >> PART_BITS, MAX_PART,
 		  &ftl_blk_fops, le32_to_cpu(part->header.FormattedSize)/SECTOR_SIZE);
 
-#ifdef PCMCIA_DEBUG
-    for (i = 0; i < MAX_PART; i++) {
-	if (ftl_hd[whole+i].nr_sects > 0)
-	    printk(KERN_INFO "  %d: start %ld size %ld\n", i,
-		   ftl_hd[whole+i].start_sect,
-		   ftl_hd[whole+i].nr_sects);
-    }
-#endif
-    return 0;
+    return res;
 }
 
 /*======================================================================
@@ -1431,7 +1416,7 @@ static void __exit cleanup_ftl(void)
 
     unregister_blkdev(FTL_MAJOR, "ftl");
     blk_cleanup_queue(BLK_DEFAULT_QUEUE(FTL_MAJOR));
-    blksize_size[FTL_MAJOR] = NULL;
+    bklk_clear(FTL_MAJOR);
 
     del_gendisk(&ftl_gendisk);
 }

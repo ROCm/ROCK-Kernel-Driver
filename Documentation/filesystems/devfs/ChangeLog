@@ -1778,3 +1778,19 @@ Changes for patch v196
   Thanks to Kari Hurtta <hurtta@leija.mh.fmi.fi>
 
 - Avoid deadlock in <devfs_follow_link> by using temporary buffer
+===============================================================================
+Changes for patch v197
+
+- First release of new locking code for devfs core (v1.0)
+
+- Fixed bug in drivers/cdrom/cdrom.c
+===============================================================================
+Changes for patch v198
+
+- Discard temporary buffer, now use "%s" for dentry names
+
+- Don't generate path in <try_modload>: use fake entry instead
+
+- Use "existing" directory in <_devfs_make_parent_for_leaf>
+
+- Use slab cache rather than fixed buffer for devfsd events

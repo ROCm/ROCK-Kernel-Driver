@@ -36,7 +36,7 @@
 static int rw_swap_page_base(int rw, swp_entry_t entry, struct page *page)
 {
 	unsigned long offset;
-	int zones[PAGE_SIZE/512];
+	sector_t zones[PAGE_SIZE/512];
 	int zones_used;
 	kdev_t dev = 0;
 	int block_size;

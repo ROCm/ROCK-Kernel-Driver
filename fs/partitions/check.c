@@ -1,4 +1,6 @@
 /*
+ *  fs/partitions/check.c
+ *
  *  Code extracted from drivers/block/genhd.c
  *  Copyright (C) 1991-1998  Linus Torvalds
  *  Re-organised Feb 1998 Russell King
@@ -33,8 +35,6 @@
 #include "sun.h"
 #include "ibm.h"
 #include "ultrix.h"
-
-extern int *blk_size[];
 
 int warn_no_part = 1; /*This is ugly: should make genhd removable media aware*/
 
@@ -369,38 +369,50 @@ void register_disk(struct gendisk *gdev, kdev_t dev, unsigned minors,
 {
 	if (!gdev)
 		return;
-	grok_partitions(gdev, MINOR(dev)>>gdev->minor_shift, minors, size);
+	grok_partitions(dev, size);
 }
 
-void grok_partitions(struct gendisk *dev, int drive, unsigned minors, long size)
+void grok_partitions(kdev_t dev, long size)
 {
-	int i;
-	int first_minor	= drive << dev->minor_shift;
-	int end_minor	= first_minor + dev->max_p;
+	int i, minors, first_minor, end_minor;
+	struct gendisk *g = get_gendisk(dev);
 
-	if(!dev->sizes)
-		blk_size[dev->major] = NULL;
+	if (!g)
+		return;
 
-	dev->part[first_minor].nr_sects = size;
+	minors = 1 << g->minor_shift;
+	first_minor = MINOR(dev);
+	if (first_minor & (minors-1)) {
+		printk("grok_partitions: bad device 0x%02x:%02x\n",
+		       MAJOR(dev), first_minor);
+		first_minor &= ~(minors-1);
+	}
+	end_minor = first_minor + minors;
+ 
+	if (!g->sizes)
+		blk_size[g->major] = NULL;
+
+	g->part[first_minor].nr_sects = size;
+
 	/* No such device or no minors to use for partitions */
 	if (!size || minors == 1)
 		return;
 
-	if (dev->sizes) {
-		dev->sizes[first_minor] = size >> (BLOCK_SIZE_BITS - 9);
+	if (g->sizes) {
+		g->sizes[first_minor] = size >> (BLOCK_SIZE_BITS - 9);
 		for (i = first_minor + 1; i < end_minor; i++)
-			dev->sizes[i] = 0;
+			g->sizes[i] = 0;
 	}
-	blk_size[dev->major] = dev->sizes;
-	check_partition(dev, MKDEV(dev->major, first_minor), 1 + first_minor);
+	blk_size[g->major] = g->sizes;
+	check_partition(g, MKDEV(g->major, first_minor), 1 + first_minor);
 
  	/*
  	 * We need to set the sizes array before we will be able to access
  	 * any of the partitions on this device.
  	 */
-	if (dev->sizes != NULL) {	/* optional safeguard in ll_rw_blk.c */
+	if (g->sizes != NULL) {	/* optional safeguard in ll_rw_blk.c */
 		for (i = first_minor; i < end_minor; i++)
-			dev->sizes[i] = dev->part[i].nr_sects >> (BLOCK_SIZE_BITS - 9);
+			g->sizes[i] = g->part[i].nr_sects >> (BLOCK_SIZE_BITS - 9);
 	}
 }
 
@@ -425,4 +437,44 @@ fail:
 	}
 	p->v = NULL;
 	return NULL;
+}
+
+int wipe_partitions(kdev_t dev)
+{
+	struct gendisk *g;
+	kdev_t devp;
+	int p, major, minor, minor0, max_p, res;
+
+	g = get_gendisk(dev);
+	if (g == NULL)
+		return -EINVAL;
+
+	max_p = 1 << g->minor_shift;
+	major = MAJOR(dev);
+	minor = MINOR(dev);
+	minor0 = minor & ~(max_p - 1);
+	if (minor0 != minor)		/* for now only whole-disk reread */
+		return -EINVAL;		/* %%% later.. */
+
+	/* invalidate stuff */
+	for (p = max_p - 1; p >= 0; p--) {
+		minor = minor0 + p;
+		devp = MKDEV(major,minor);
+#if 0					/* %%% superfluous? */
+		if (g->part[minor].nr_sects == 0)
+			continue;
+#endif
+		res = invalidate_device(devp, 1);
+		if (res)
+			return res;
+		g->part[minor].start_sect = 0;
+		g->part[minor].nr_sects = 0;
+	}
+
+	/* some places do blksize_size[major][minor] = 1024,
+	   as preparation for reading partition table - superfluous */
+	/* sd.c used to set blksize_size to 2048 in case
+	   rscsi_disks[target].device->sector_size == 2048 */
+
+	return 0;
 }

@@ -707,24 +707,24 @@ static void idefloppy_end_request (byte uptodate, ide_hwgroup_t *hwgroup)
 static void idefloppy_input_buffers (ide_drive_t *drive, idefloppy_pc_t *pc, unsigned int bcount)
 {
 	struct request *rq = pc->rq;
-	struct buffer_head *bh = rq->bh;
+	struct bio *bio = rq->bio;
 	int count;
 
 	while (bcount) {
-		if (pc->b_count == bh->b_size) {
+		if (pc->b_count == bio_size(bio)) {
 			rq->sector += rq->current_nr_sectors;
 			rq->nr_sectors -= rq->current_nr_sectors;
 			idefloppy_end_request (1, HWGROUP(drive));
-			if ((bh = rq->bh) != NULL)
+			if ((bio = rq->bio) != NULL)
 				pc->b_count = 0;
 		}
-		if (bh == NULL) {
-			printk (KERN_ERR "%s: bh == NULL in idefloppy_input_buffers, bcount == %d\n", drive->name, bcount);
+		if (bio == NULL) {
+			printk (KERN_ERR "%s: bio == NULL in idefloppy_input_buffers, bcount == %d\n", drive->name, bcount);
 			idefloppy_discard_data (drive, bcount);
 			return;
 		}
-		count = IDEFLOPPY_MIN (bh->b_size - pc->b_count, bcount);
-		atapi_input_bytes (drive, bh->b_data + pc->b_count, count);
+		count = IDEFLOPPY_MIN (bio_size(bio) - pc->b_count, bcount);
+		atapi_input_bytes (drive, bio_data(bio) + pc->b_count, count);
 		bcount -= count; pc->b_count += count;
 	}
 }
@@ -732,7 +732,7 @@ static void idefloppy_input_buffers (ide_drive_t *drive, idefloppy_pc_t *pc, uns
 static void idefloppy_output_buffers (ide_drive_t *drive, idefloppy_pc_t *pc, unsigned int bcount)
 {
 	struct request *rq = pc->rq;
-	struct buffer_head *bh = rq->bh;
+	struct bio *bio = rq->bio;
 	int count;
 	
 	while (bcount) {
@@ -740,13 +740,13 @@ static void idefloppy_output_buffers (ide_drive_t *drive, idefloppy_pc_t *pc, un
 			rq->sector += rq->current_nr_sectors;
 			rq->nr_sectors -= rq->current_nr_sectors;
 			idefloppy_end_request (1, HWGROUP(drive));
-			if ((bh = rq->bh) != NULL) {
-				pc->b_data = bh->b_data;
-				pc->b_count = bh->b_size;
+			if ((bio = rq->bio) != NULL) {
+				pc->b_data = bio_data(bio);
+				pc->b_count = bio_size(bio);
 			}
 		}
-		if (bh == NULL) {
-			printk (KERN_ERR "%s: bh == NULL in idefloppy_output_buffers, bcount == %d\n", drive->name, bcount);
+		if (bio == NULL) {
+			printk (KERN_ERR "%s: bio == NULL in idefloppy_output_buffers, bcount == %d\n", drive->name, bcount);
 			idefloppy_write_zeros (drive, bcount);
 			return;
 		}
@@ -760,9 +760,9 @@ static void idefloppy_output_buffers (ide_drive_t *drive, idefloppy_pc_t *pc, un
 static void idefloppy_update_buffers (ide_drive_t *drive, idefloppy_pc_t *pc)
 {
 	struct request *rq = pc->rq;
-	struct buffer_head *bh = rq->bh;
+	struct bio *bio = rq->bio;
 
-	while ((bh = rq->bh) != NULL)
+	while ((bio = rq->bio) != NULL)
 		idefloppy_end_request (1, HWGROUP(drive));
 }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
@@ -1210,7 +1210,7 @@ static void idefloppy_create_rw_cmd (idefloppy_floppy_t *floppy, idefloppy_pc_t 
 	pc->callback = &idefloppy_rw_callback;
 	pc->rq = rq;
 	pc->b_data = rq->buffer;
-	pc->b_count = rq->cmd == READ ? 0 : rq->bh->b_size;
+	pc->b_count = rq->cmd == READ ? 0 : bio_size(rq->bio);
 	if (rq->cmd == WRITE)
 		set_bit (PC_WRITING, &pc->flags);
 	pc->buffer = NULL;
@@ -1778,9 +1778,7 @@ static int idefloppy_media_change (ide_drive_t *drive)
  */
 static void idefloppy_revalidate (ide_drive_t *drive)
 {
-	grok_partitions(HWIF(drive)->gd, drive->select.b.unit,
-			1<<PARTN_BITS,
-			current_capacity(drive));
+	ide_revalidate_drive(drive);
 }
 
 /*
@@ -1920,7 +1918,6 @@ static void idefloppy_add_settings(ide_drive_t *drive)
 	ide_add_setting(drive,	"bios_sect",		SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	63,				1,	1,	&drive->bios_sect,		NULL);
 	ide_add_setting(drive,	"breada_readahead",	SETTING_RW,					BLKRAGET,		BLKRASET,		TYPE_INT,	0,	255,				1,	2,	&read_ahead[major],		NULL);
 	ide_add_setting(drive,	"file_readahead",	SETTING_RW,					BLKFRAGET,		BLKFRASET,		TYPE_INTA,	0,	INT_MAX,			1,	1024,	&max_readahead[major][minor],	NULL);
-	ide_add_setting(drive,	"max_kb_per_request",	SETTING_RW,					BLKSECTGET,		BLKSECTSET,		TYPE_INTA,	1,	255,				1,	2,	&max_sectors[major][minor],	NULL);
 
 }
 
@@ -1930,8 +1927,7 @@ static void idefloppy_add_settings(ide_drive_t *drive)
 static void idefloppy_setup (ide_drive_t *drive, idefloppy_floppy_t *floppy)
 {
 	struct idefloppy_id_gcw gcw;
-	int major = HWIF(drive)->major, i;
-	int minor = drive->select.b.unit << PARTN_BITS;
+	int i;
 
 	*((unsigned short *) &gcw) = drive->id->config;
 	drive->driver_data = floppy;
@@ -1953,34 +1949,17 @@ static void idefloppy_setup (ide_drive_t *drive, idefloppy_floppy_t *floppy)
 	 */
 
 	if (strcmp(drive->id->model, "IOMEGA ZIP 100 ATAPI") == 0)
-	{
-		for (i = 0; i < 1 << PARTN_BITS; i++)
-			max_sectors[major][minor + i] = 64;
-	}
-  /*
-   *      Guess what?  The IOMEGA Clik! drive also needs the
-   *      above fix.  It makes nasty clicking noises without
-   *      it, so please don't remove this.
-   */
-  if (strcmp(drive->id->model, "IOMEGA Clik! 40 CZ ATAPI") == 0)
-  {
-    for (i = 0; i < 1 << PARTN_BITS; i++)
-      max_sectors[major][minor + i] = 64;
-    set_bit(IDEFLOPPY_CLIK_DRIVE, &floppy->flags);
-  }
+		blk_queue_max_sectors(&drive->queue, 64);
 
 	/*
 	*      Guess what?  The IOMEGA Clik! drive also needs the
 	*      above fix.  It makes nasty clicking noises without
 	*      it, so please don't remove this.
 	*/
-	if (strcmp(drive->id->model, "IOMEGA Clik! 40 CZ ATAPI") == 0) 
-	{
-		for (i = 0; i < 1 << PARTN_BITS; i++)
-			max_sectors[major][minor + i] = 64;
+	if (strcmp(drive->id->model, "IOMEGA Clik! 40 CZ ATAPI") == 0) {
+		blk_queue_max_sectors(&drive->queue, 64);
 		set_bit(IDEFLOPPY_CLIK_DRIVE, &floppy->flags);
 	}
-
 
 	(void) idefloppy_get_capacity (drive);
 	idefloppy_add_settings(drive);

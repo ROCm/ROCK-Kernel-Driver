@@ -2042,6 +2042,7 @@ static int isp2x00_init(struct Scsi_Host *sh)
 		return 1;
 	}
 
+	pci_set_master(pdev);
 	if (!(command & PCI_COMMAND_MASTER)) {
 		printk("qlogicfc%d : bus mastering is disabled\n", hostdata->host_id);
 		return 1;

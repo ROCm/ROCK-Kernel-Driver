@@ -25,6 +25,7 @@
  */
 unsigned long max_low_pfn;
 unsigned long min_low_pfn;
+unsigned long max_pfn;
 
 /* return the number of _pages_ that will be allocated for the boot bitmap */
 unsigned long __init bootmem_bootmap_pages (unsigned long pages)
