@@ -2097,7 +2097,7 @@ static void ewrk3_exit_module(void)
 		ewrk3_devs[i]->irq = 0;
 
 		release_region(ewrk3_devs[i]->base_addr, EWRK3_TOTAL_SIZE);
-		kfree(ewrk3_devs[i]);
+		free_netdev(ewrk3_devs[i]);
 		ewrk3_devs[i] = NULL;
 	}
 }

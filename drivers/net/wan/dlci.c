@@ -509,7 +509,7 @@ int dlci_del(struct dlci_add *dlci)
 		open_dev[i] = NULL;
 
 	kfree(master->priv);
-	kfree(master);
+	free_netdev(master);
 
 	MOD_DEC_USE_COUNT;
 

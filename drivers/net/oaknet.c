@@ -687,7 +687,7 @@ static void __exit oaknet_cleanup_module (void)
 		release_region(ioaddr, OAKNET_IO_SIZE);
 		iounmap(ioaddr);
 		unregister_netdev(oaknet_dev);
-		kfree(priv);
+		free_netdev(priv);
 	}
 
 	/* Convert to loop once driver supports multiple devices. */

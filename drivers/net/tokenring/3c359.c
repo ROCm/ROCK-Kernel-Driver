@@ -1787,7 +1787,7 @@ static void __devexit xl_remove_one (struct pci_dev *pdev)
 	iounmap(xl_priv->xl_mmio) ; 
 	pci_release_regions(pdev) ; 
 	pci_set_drvdata(pdev,NULL) ; 
-	kfree(dev);
+	free_netdev(dev);
 	return ; 
 }
 

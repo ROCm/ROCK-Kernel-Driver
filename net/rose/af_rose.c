@@ -1580,7 +1580,7 @@ static void __exit rose_exit(void)
 
 		if (dev) {
 			unregister_netdev(dev);
-			kfree(dev);
+			free_netdev(dev);
 		}
 	}
 

@@ -722,7 +722,7 @@ static void ipip6_tunnel_setup(struct net_device *dev)
 {
 	SET_MODULE_OWNER(dev);
 	dev->uninit		= ipip6_tunnel_uninit;
-	dev->destructor 	= (void (*)(struct net_device *))kfree;
+	dev->destructor 	= free_netdev;
 	dev->hard_start_xmit	= ipip6_tunnel_xmit;
 	dev->get_stats		= ipip6_tunnel_get_stats;
 	dev->do_ioctl		= ipip6_tunnel_ioctl;

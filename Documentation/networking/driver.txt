@@ -82,3 +82,13 @@ Probing guidelines:
 1) Any hardware layer address you obtain for your device should
    be verified.  For example, for ethernet check it with
    linux/etherdevice.h:is_valid_ether_addr()
+
+Close/stop guidelines:
+
+1) After the dev->stop routine has been called, the hardware must
+   not receive or transmit any data.  All in flight packets must
+   be aborted. If necessary, poll or wait for completion of 
+   any reset commands.
+
+2) The dev->stop routine will be called by unregister_netdevice
+   if device is still UP.

@@ -1534,7 +1534,7 @@ static void __exit mpt_lan_exit(void)
 		printk (KERN_INFO ": %s/%s: Fusion MPT LAN device unregistered\n",
 			       IOC_AND_NETDEV_NAMES_s_s(dev));
 		unregister_netdev(dev);
-		//mpt_landev[i] = (struct net_device *) 0xdeadbeef; /* Debug */
+		free_netdev(dev);
 		mpt_landev[i] = NULL;
 	}
 

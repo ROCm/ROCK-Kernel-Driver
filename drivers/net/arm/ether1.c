@@ -1082,7 +1082,7 @@ static void __devexit ether1_remove(struct expansion_card *ec)
 
 	release_region(dev->base_addr, 16);
 	release_region(dev->base_addr + 0x800, 4096);
-	kfree(dev);
+	free_netdev(dev);
 }
 
 static const struct ecard_id ether1_ids[] = {

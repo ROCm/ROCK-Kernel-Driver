@@ -586,21 +586,15 @@ asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int on)
 
 /* BUFFER is PAGE_SIZE bytes long. */
 
-extern char *sparc_cpu_type[];
-extern char *sparc_fpu_type[];
+extern char *sparc_cpu_type;
+extern char *sparc_fpu_type;
 
 extern void smp_info(struct seq_file *);
 extern void smp_bogo(struct seq_file *);
 extern void mmu_info(struct seq_file *);
 
-#ifndef CONFIG_SMP
-unsigned long up_clock_tick;
-#endif
-
 static int show_cpuinfo(struct seq_file *m, void *__unused)
 {
-	int cpuid = smp_processor_id();
-
 	seq_printf(m, 
 		   "cpu\t\t: %s\n"
 		   "fpu\t\t: %s\n"
@@ -614,18 +608,18 @@ static int show_cpuinfo(struct seq_file *m, void *__unused)
 		   "Cpu0ClkTck\t: %016lx\n"
 #endif
 		   ,
-		   sparc_cpu_type[cpuid],
-		   sparc_fpu_type[cpuid],
+		   sparc_cpu_type,
+		   sparc_fpu_type,
 		   prom_rev,
 		   prom_prev >> 16,
 		   (prom_prev >> 8) & 0xff,
 		   prom_prev & 0xff,
-		   (long)linux_num_cpus,
+		   (long)num_possible_cpus(),
 		   (long)num_online_cpus()
 #ifndef CONFIG_SMP
-		   , loops_per_jiffy/(500000/HZ),
-		   (loops_per_jiffy/(5000/HZ)) % 100,
-		   up_clock_tick
+		   , cpu_data(0).udelay_val/(500000/HZ),
+		   (cpu_data(0).udelay_val/(5000/HZ)) % 100,
+		   cpu_data(0).clock_tick
 #endif
 		);
 #ifdef CONFIG_SMP
@@ -680,21 +674,24 @@ void sun_do_break(void)
 int serial_console;
 int stop_a_enabled = 1;
 
-static struct cpu *sparc64_cpus;
-
 static int __init topology_init(void)
 {
-	int i;
+	int i, err;
 
-	sparc64_cpus = kmalloc(NR_CPUS * sizeof(struct cpu), GFP_KERNEL);
-	if (!sparc64_cpus)
-		return -ENOMEM;
-	memset(sparc64_cpus, 0, NR_CPUS * sizeof(struct cpu));
+	err = -ENOMEM;
 	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_possible(i))
-			register_cpu(&sparc64_cpus[i], i, NULL);
+		if (cpu_possible(i)) {
+			struct cpu *p = kmalloc(sizeof(*p), GFP_KERNEL);
+
+			if (p) {
+				memset(p, 0, sizeof(*p));
+				register_cpu(p, i, NULL);
+				err = 0;
+			}
+		}
 	}
-	return 0;
+
+	return err;
 }
 
 subsys_initcall(topology_init);

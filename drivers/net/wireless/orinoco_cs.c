@@ -286,7 +286,7 @@ orinoco_cs_detach(dev_link_t * link)
 		      dev);
 		unregister_netdev(dev);
 	}
-	kfree(dev);
+	free_netdev(dev);
 }				/* orinoco_cs_detach */
 
 /*

@@ -908,7 +908,7 @@ static int wanrouter_delete_interface(struct wan_device *wandev, char *name)
 
 	unregister_netdev(dev);
 
-	kfree(dev);
+	free_netdev(dev);
 
 	return 0;
 }

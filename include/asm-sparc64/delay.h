@@ -9,6 +9,7 @@
 
 #include <linux/config.h>
 #include <linux/param.h>
+#include <asm/cpudata.h>
 
 #ifndef __ASSEMBLY__
 
@@ -58,11 +59,7 @@ extern __inline__ void __ndelay(unsigned long usecs, unsigned long lps)
 	__delay(usecs * HZ);
 }
 
-#ifdef CONFIG_SMP
-#define __udelay_val cpu_data[smp_processor_id()].udelay_val
-#else
-#define __udelay_val loops_per_jiffy
-#endif
+#define __udelay_val cpu_data(smp_processor_id()).udelay_val
 
 #define udelay(usecs) __udelay((usecs),__udelay_val)
 #define ndelay(usecs) __ndelay((usecs),__udelay_val)

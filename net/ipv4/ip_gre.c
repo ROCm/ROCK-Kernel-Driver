@@ -1128,7 +1128,7 @@ static void ipgre_tunnel_setup(struct net_device *dev)
 {
 	SET_MODULE_OWNER(dev);
 	dev->uninit		= ipgre_tunnel_uninit;
-	dev->destructor 	= (void (*)(struct net_device *))kfree;
+	dev->destructor 	= free_netdev;
 	dev->hard_start_xmit	= ipgre_tunnel_xmit;
 	dev->get_stats		= ipgre_tunnel_get_stats;
 	dev->do_ioctl		= ipgre_tunnel_ioctl;

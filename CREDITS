@@ -631,17 +631,18 @@ S: (ask for current address)
 S: USA
 
 N: Alan Cox
-W: http://roadrunner.swansea.linux.org.uk/alan.shtml
-E: alan@lxorguk.ukuu.org.uk
-E: alan@www.linux.org.uk (linux.org.uk stuff)
-E: Alan.Cox@linux.org (if others fail)
+W: http://www.linux.org.uk/diary/
 D: Linux Networking (0.99.10->2.0.29)
 D: Original Appletalk, AX.25, and IPX code
-D: Current 3c501 hacker. >>More 3c501 info/tricks wanted<<.
+D: 3c501 hacker
 D: Watchdog timer drivers
 D: Linux/SMP x86 (up to 2.0 only)
 D: Initial Mac68K port
 D: Video4Linux design, bw-qcam and PMS driver ports.
+D: IDE modularisation work
+D: Z85230 driver
+D: Former security contact point (please use vendor-sec@lst.de)
+D: ex 2.2 maintainer
 D: 2.1.x modular sound
 S: c/o Red Hat UK Ltd
 S: Alexandra House

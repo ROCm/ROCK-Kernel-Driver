@@ -1623,7 +1623,7 @@ static void __devexit w840_remove1 (struct pci_dev *pdev)
 #ifndef USE_IO_OPS
 		iounmap((char *)(dev->base_addr));
 #endif
-		kfree(dev);
+		free_netdev(dev);
 	}
 
 	pci_set_drvdata(pdev, NULL);

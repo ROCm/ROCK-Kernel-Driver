@@ -941,7 +941,7 @@ static __exit void znet_cleanup (void)
 		kfree (znet->rx_start);
 		kfree (znet->tx_start);
 		unregister_netdev (znet_dev);
-		kfree (znet_dev);
+		free_netdev (znet_dev);
 	}
 #endif
 }

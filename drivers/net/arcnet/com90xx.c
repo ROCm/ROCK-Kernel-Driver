@@ -639,7 +639,7 @@ static void __exit com90xx_exit(void)
 		release_region(dev->base_addr, ARCNET_TOTAL_SIZE);
 		release_mem_region(dev->mem_start, dev->mem_end - dev->mem_start + 1);
 		kfree(dev->priv);
-		kfree(dev);
+		free_netdev(dev);
 	}
 }
 

@@ -1582,7 +1582,7 @@ static void __exit sparc_lance_cleanup(void)
 
 		unregister_netdev(root_lance_dev->dev);
 		lance_free_hwresources(root_lance_dev);
-		kfree(root_lance_dev->dev);
+		free_netdev(root_lance_dev->dev);
 		root_lance_dev = lp;
 	}
 }

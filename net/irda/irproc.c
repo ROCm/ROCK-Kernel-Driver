@@ -62,14 +62,18 @@ static struct irda_entry dir[] = {
 void __init irda_proc_register(void) 
 {
 	int i;
+	struct proc_dir_entry *d;
 
 	proc_irda = proc_mkdir("net/irda", NULL);
 	if (proc_irda == NULL)
 		return;
 	proc_irda->owner = THIS_MODULE;
 
-	for (i=0; i<ARRAY_SIZE(dir); i++)
-		create_proc_info_entry(dir[i].name,0,proc_irda,dir[i].fn);
+	for (i=0; i<ARRAY_SIZE(dir); i++) {
+		d = create_proc_info_entry(dir[i].name,0,proc_irda,dir[i].fn);
+		if (d)
+			d->owner = THIS_MODULE;
+	}
 }
 
 /*

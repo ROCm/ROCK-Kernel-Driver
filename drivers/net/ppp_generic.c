@@ -2256,11 +2256,6 @@ ppp_get_stats(struct ppp *ppp, struct ppp_stats *st)
  * and for initialization.
  */
 
-static void ppp_device_destructor(struct net_device *dev)
-{
-	kfree(dev);
-}
-
 /*
  * Create a new ppp interface unit.  Fails if it can't allocate memory
  * or if there is already a unit with the requested number.
@@ -2309,7 +2304,7 @@ ppp_create_interface(int unit, int *retp)
 	dev->init = ppp_net_init;
 	sprintf(dev->name, "ppp%d", unit);
 	dev->priv = ppp;
-	dev->destructor = ppp_device_destructor;
+	dev->destructor = free_netdev;
 
 	rtnl_lock();
 	ret = register_netdevice(dev);
