@@ -484,9 +484,14 @@ struct net_device
 	int padded;
 };
 
+#define	NETDEV_ALIGN		32
+#define	NETDEV_ALIGN_CONST	(NETDEV_ALIGN - 1)
+
 static inline void *netdev_priv(struct net_device *dev)
 {
-	return (char *)dev + ((sizeof(struct net_device) + 31) & ~31);
+	return (char *)dev + ((sizeof(struct net_device)
+					+ NETDEV_ALIGN_CONST)
+				& ~NETDEV_ALIGN_CONST);
 }
 
 #define SET_MODULE_OWNER(dev) do { } while (0)

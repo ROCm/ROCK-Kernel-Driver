@@ -50,7 +50,6 @@
 #include "lmc_debug.h"
 #include "lmc_ioctl.h"
 #include "lmc_proto.h"
-//#include "lmc_proto_raw.h"
 
 /*
  * The compile-time variable SPPPSTUP causes the module to be

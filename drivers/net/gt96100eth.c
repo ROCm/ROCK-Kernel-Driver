@@ -1212,7 +1212,7 @@ gt96100_rx(struct net_device *dev, u32 status)
 		    cmdstat, nextOut);
 
 		if (cmdstat & (u32)rxOwn) {
-			//err(__FUNCTION__ ": device owns descriptor!\n");
+			//err("%s: device owns descriptor!\n", __FUNCTION__);
 			// DMA is not finished updating descriptor???
 			// Leave and come back later to pick-up where
 			// we left off.
