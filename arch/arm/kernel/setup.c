@@ -219,9 +219,7 @@ static inline void dump_cache(const char *prefix, unsigned int cache)
 
 static void __init dump_cpu_info(void)
 {
-	unsigned int info;
-
-	asm("mrc p15, 0, %0, c0, c0, 1" : "=r" (info));
+	unsigned int info = read_cpuid(CPUID_CACHETYPE);
 
 	if (info != processor_id) {
 		printk("CPU: D %s cache\n", cache_types[CACHE_TYPE(info)]);
@@ -803,9 +801,7 @@ static int c_show(struct seq_file *m, void *v)
 	seq_printf(m, "CPU revision\t: %d\n", processor_id & 15);
 
 	{
-		unsigned int cache_info;
-
-		asm("mrc p15, 0, %0, c0, c0, 1" : "=r" (cache_info));
+		unsigned int cache_info = read_cpuid(CPUID_CACHETYPE);
 		if (cache_info != processor_id) {
 			seq_printf(m, "Cache type\t: %s\n"
 				      "Cache clean\t: %s\n"

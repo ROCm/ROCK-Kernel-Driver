@@ -74,6 +74,8 @@ typedef elf_vrreg_t elf_vrregset_t[ELF_NVRREG];
 
 #ifdef __KERNEL__
 
+struct task_struct;
+
 /*
  * This is used to ensure we don't load something for the wrong architecture.
  */

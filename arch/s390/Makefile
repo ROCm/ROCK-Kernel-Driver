@@ -50,6 +50,9 @@ libs-y		+= arch/$(ARCH)/lib/
 drivers-y	+= drivers/s390/
 drivers-$(CONFIG_MATHEMU) += arch/$(ARCH)/math-emu/
 
+# must be linked after kernel
+drivers-$(CONFIG_OPROFILE)	+= arch/s390/oprofile/
+
 boot		:= arch/$(ARCH)/boot
 
 all: image

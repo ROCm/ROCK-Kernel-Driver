@@ -636,7 +636,7 @@ dmabounce_unregister_dev(struct device *dev)
 	}
 
 	if (!list_empty(&device_info->safe_buffers)) {
-		printk(KERN_ERR,
+		printk(KERN_ERR
 			"%s: Removing from dmabounce with pending buffers!\n",
 			dev->bus_id);
 		BUG();

@@ -38,7 +38,7 @@ struct xfs_mount;
 struct xfs_iocore;
 struct xfs_inode;
 struct xfs_bmbt_irec;
-struct page_buf_s;
+struct xfs_buf;
 struct xfs_iomap;
 
 #if defined(XFS_RW_TRACE)
@@ -89,8 +89,8 @@ extern void xfs_inval_cached_trace(struct xfs_iocore *,
 
 extern int xfs_bmap(struct bhv_desc *, xfs_off_t, ssize_t, int,
 			struct xfs_iomap *, int *);
-extern int xfsbdstrat(struct xfs_mount *, struct page_buf_s *);
-extern int xfs_bdstrat_cb(struct page_buf_s *);
+extern int xfsbdstrat(struct xfs_mount *, struct xfs_buf *);
+extern int xfs_bdstrat_cb(struct xfs_buf *);
 
 extern int xfs_zero_eof(struct vnode *, struct xfs_iocore *, xfs_off_t,
 				xfs_fsize_t, xfs_fsize_t);

@@ -2463,7 +2463,8 @@ CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon, __u64 size,
 	int bytes_returned = 0;
 	__u32 tmp;
 
-	cFYI(1, ("SetFileSize (via SetFileInfo) %lld",size));
+	cFYI(1, ("SetFileSize (via SetFileInfo) %lld",
+			(long long)size));
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
 	if (rc)

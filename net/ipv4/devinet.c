@@ -998,7 +998,7 @@ out:
 	return NOTIFY_DONE;
 }
 
-struct notifier_block ip_netdev_notifier = {
+static struct notifier_block ip_netdev_notifier = {
 	.notifier_call =inetdev_event,
 };
 

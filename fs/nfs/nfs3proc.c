@@ -374,6 +374,11 @@ exit:
 		};
 		dprintk("NFS call  setattr (post-create)\n");
 
+		if (!(sattr->ia_valid & ATTR_ATIME_SET))
+			sattr->ia_valid |= ATTR_ATIME;
+		if (!(sattr->ia_valid & ATTR_MTIME_SET))
+			sattr->ia_valid |= ATTR_MTIME;
+
 		/* Note: we could use a guarded setattr here, but I'm
 		 * not sure this buys us anything (and I'd have
 		 * to revamp the NFSv3 XDR code) */

@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.113 $
+ *   $Revision: 1.115 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -138,6 +138,7 @@ struct css_driver io_subchannel_driver = {
 };
 
 struct workqueue_struct *ccw_device_work;
+struct workqueue_struct *ccw_device_notify_work;
 static wait_queue_head_t ccw_device_init_wq;
 static atomic_t ccw_device_init_count;
 
@@ -149,20 +150,30 @@ init_ccw_bus_type (void)
 	init_waitqueue_head(&ccw_device_init_wq);
 	atomic_set(&ccw_device_init_count, 0);
 
-	ccw_device_work = create_workqueue("cio");
+	ccw_device_work = create_singlethread_workqueue("cio");
 	if (!ccw_device_work)
 		return -ENOMEM; /* FIXME: better errno ? */
-
+	ccw_device_notify_work = create_singlethread_workqueue("cio_notify");
+	if (!ccw_device_notify_work) {
+		ret = -ENOMEM; /* FIXME: better errno ? */
+		goto out_err;
+	}
 	if ((ret = bus_register (&ccw_bus_type)))
-		return ret;
+		goto out_err;
 
 	if ((ret = driver_register(&io_subchannel_driver.drv)))
-		return ret;
+		goto out_err;
 
 	wait_event(ccw_device_init_wq,
 		   atomic_read(&ccw_device_init_count) == 0);
 	flush_workqueue(ccw_device_work);
 	return 0;
+out_err:
+	if (ccw_device_work)
+		destroy_workqueue(ccw_device_work);
+	if (ccw_device_notify_work)
+		destroy_workqueue(ccw_device_notify_work);
+	return ret;
 }
 
 static void __exit
@@ -170,6 +181,7 @@ cleanup_ccw_bus_type (void)
 {
 	driver_unregister(&io_subchannel_driver.drv);
 	bus_unregister(&ccw_bus_type);
+	destroy_workqueue(ccw_device_notify_work);
 	destroy_workqueue(ccw_device_work);
 }
 
@@ -553,18 +565,21 @@ out:
 	wake_up(&cdev->private->wait_q);
 }
 
-static void
-device_call_sch_unregister(void *data)
+void
+ccw_device_call_sch_unregister(void *data)
 {
 	struct ccw_device *cdev = data;
 	struct subchannel *sch;
 
 	sch = to_subchannel(cdev->dev.parent);
-	device_unregister(&sch->dev);
+	/* Check if device is registered. */
+	if (!list_empty(&sch->dev.node))
+		device_unregister(&sch->dev);
 	/* Reset intparm to zeroes. */
 	sch->schib.pmcw.intparm = 0;
 	cio_modify(sch);
 	put_device(&cdev->dev);
+	put_device(&sch->dev);
 }
 
 /*
@@ -587,7 +602,7 @@ io_subchannel_recog_done(struct ccw_device *cdev)
 			break;
 		sch = to_subchannel(cdev->dev.parent);
 		INIT_WORK(&cdev->private->kick_work,
-			  device_call_sch_unregister, (void *) cdev);
+			  ccw_device_call_sch_unregister, (void *) cdev);
 		queue_work(ccw_device_work, &cdev->private->kick_work);
 		break;
 	case DEV_STATE_BOXED:
@@ -982,3 +997,4 @@ EXPORT_SYMBOL(ccw_driver_unregister);
 EXPORT_SYMBOL(get_ccwdev_by_busid);
 EXPORT_SYMBOL(ccw_bus_type);
 EXPORT_SYMBOL(ccw_device_work);
+EXPORT_SYMBOL(ccw_device_notify_work);

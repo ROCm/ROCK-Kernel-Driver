@@ -227,7 +227,7 @@ __ccw_device_do_pgid(struct ccw_device *cdev, __u8 func)
 		ret = cio_start (sch, cdev->private->iccws,
 				 cdev->private->imask);
 		/* ret is 0, -EBUSY, -EACCES or -ENODEV */
-		if (ret != -EACCES)
+		if ((ret != -EACCES) && (ret != -ENODEV))
 			return ret;
 	}
 	/* PGID command failed on this path. Switch it off. */

@@ -98,6 +98,8 @@ struct thread_struct {
 
 typedef struct thread_struct thread_struct;
 
+#define ARCH_MIN_TASKALIGN	8
+
 #ifndef __s390x__
 # define __SWAPPER_PG_DIR __pa(&swapper_pg_dir[0]) + _SEGMENT_TABLE
 #else /* __s390x__ */

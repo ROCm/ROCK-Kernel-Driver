@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.19 $)
+ * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.24 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  * This file contains code related to sysfs.
@@ -41,10 +41,11 @@ qeth_dev_state_show(struct device *dev, char *buf)
 		return sprintf(buf, "HARDSETUP\n");
 	case CARD_STATE_SOFTSETUP:
 		return sprintf(buf, "SOFTSETUP\n");
-	case CARD_STATE_UP_LAN_OFFLINE:
-		return sprintf(buf, "UP (LAN OFFLINE)\n");
-	case CARD_STATE_UP_LAN_ONLINE:
+	case CARD_STATE_UP:
+		if (card->lan_online)
 		return sprintf(buf, "UP (LAN ONLINE)\n");
+		else
+			return sprintf(buf, "UP (LAN OFFLINE)\n");
 	case CARD_STATE_RECOVER:
 		return sprintf(buf, "RECOVER\n");
 	default:
@@ -293,7 +294,8 @@ qeth_dev_bufcnt_store(struct device *dev, const char *buf, size_t count)
 {
 	struct qeth_card *card = dev->driver_data;
 	char *tmp;
-	unsigned int cnt;
+	int cnt, old_cnt;
+	int rc;
 
 	if (!card)
 		return -EINVAL;
@@ -302,12 +304,15 @@ qeth_dev_bufcnt_store(struct device *dev, const char *buf, size_t count)
 	    (card->state != CARD_STATE_RECOVER))
 		return -EPERM;
 
-	cnt = simple_strtoul(buf, &tmp, 16);
+	old_cnt = card->qdio.in_buf_pool.buf_count;
+	cnt = simple_strtoul(buf, &tmp, 10);
 	cnt = (cnt < QETH_IN_BUF_COUNT_MIN) ? QETH_IN_BUF_COUNT_MIN :
 		((cnt > QETH_IN_BUF_COUNT_MAX) ? QETH_IN_BUF_COUNT_MAX : cnt);
-	card->qdio.in_buf_pool.buf_count = cnt;
-	/* TODO: steel/add buffers from/to a running card's buffer pool (?) */
-
+	if (old_cnt != cnt) {
+		if ((rc = qeth_realloc_buffer_pool(card, cnt)))
+			PRINT_WARN("Error (%d) while setting "
+				   "buffer count.\n", rc);
+	}
 	return count;
 }
 
@@ -356,45 +361,31 @@ qeth_dev_route_store(struct qeth_card *card, struct qeth_routing_info *route,
 
 	if (!strcmp(tmp, "no_router")){
 		route->type = NO_ROUTER;
-		goto check_reset;
-	}
-
-	if (card->info.type == QETH_CARD_TYPE_IQD) {
-		if (!strcmp(tmp, "primary_connector")) {
-			route->type = PRIMARY_CONNECTOR;
-		} else if (!strcmp(tmp, "secondary_connector")) {
-			route->type = SECONDARY_CONNECTOR;
-		} else if (!strcmp(tmp, "multicast_router")) {
-			route->type = MULTICAST_ROUTER;
-		} else
-			goto out_inval;
+	} else if (!strcmp(tmp, "primary_connector")) {
+		route->type = PRIMARY_CONNECTOR;
+	} else if (!strcmp(tmp, "secondary_connector")) {
+		route->type = SECONDARY_CONNECTOR;
+	} else if (!strcmp(tmp, "multicast_router")) {
+		route->type = MULTICAST_ROUTER;
+	} else if (!strcmp(tmp, "primary_router")) {
+		route->type = PRIMARY_ROUTER;
+	} else if (!strcmp(tmp, "secondary_router")) {
+		route->type = SECONDARY_ROUTER;
+	} else if (!strcmp(tmp, "multicast_router")) {
+		route->type = MULTICAST_ROUTER;
 	} else {
-		if (!strcmp(tmp, "primary_router")) {
-			route->type = PRIMARY_ROUTER;
-		} else if (!strcmp(tmp, "secondary_router")) {
-			route->type = SECONDARY_ROUTER;
-		} else if (!strcmp(tmp, "multicast_router")) {
-			if (qeth_is_ipafunc_supported(card, prot,
-						      IPA_OSA_MC_ROUTER))
-				route->type = MULTICAST_ROUTER;
-			else
-				goto out_inval;
-		} else
-			goto out_inval;
+		PRINT_WARN("Invalid routing type '%s'.\n", tmp);
+		return -EINVAL;
 	}
-check_reset:
-	if (old_route_type != route->type){
+	if (((card->state == CARD_STATE_SOFTSETUP) ||
+	     (card->state == CARD_STATE_UP)) &&
+	    (old_route_type != route->type)){
 		if (prot == QETH_PROT_IPV4)
 			rc = qeth_setrouting_v4(card);
 		else if (prot == QETH_PROT_IPV6)
 			rc = qeth_setrouting_v6(card);
 	}
 	return count;
-out_inval:
-	PRINT_WARN("Routing type '%s' not supported for interface %s.\n"
-		   "Router status not changed.\n",
-		   tmp, card->info.if_name);
-	return -EINVAL;
 }
 
 static ssize_t
@@ -572,8 +563,7 @@ qeth_dev_recover_store(struct device *dev, const char *buf, size_t count)
 	if (!card)
 		return -EINVAL;
 
-	if ((card->state != CARD_STATE_UP_LAN_ONLINE) &&
-	    (card->state != CARD_STATE_UP_LAN_OFFLINE))
+	if (card->state != CARD_STATE_UP)
 		return -EPERM;
 
 	i = simple_strtoul(buf, &tmp, 16);
@@ -585,7 +575,6 @@ qeth_dev_recover_store(struct device *dev, const char *buf, size_t count)
 
 static DEVICE_ATTR(recover, 0200, NULL, qeth_dev_recover_store);
 
-/* TODO */
 static ssize_t
 qeth_dev_broadcast_mode_show(struct device *dev, char *buf)
 {
@@ -603,7 +592,6 @@ qeth_dev_broadcast_mode_show(struct device *dev, char *buf)
 		       "all rings":"local");
 }
 
-/* TODO */
 static ssize_t
 qeth_dev_broadcast_mode_store(struct device *dev, const char *buf, size_t count)
 {
@@ -642,7 +630,6 @@ qeth_dev_broadcast_mode_store(struct device *dev, const char *buf, size_t count)
 static DEVICE_ATTR(broadcast_mode, 0644, qeth_dev_broadcast_mode_show,
 		   qeth_dev_broadcast_mode_store);
 
-/* TODO */
 static ssize_t
 qeth_dev_canonical_macaddr_show(struct device *dev, char *buf)
 {
@@ -659,7 +646,6 @@ qeth_dev_canonical_macaddr_show(struct device *dev, char *buf)
 				     QETH_TR_MACADDR_CANONICAL)? 1:0);
 }
 
-/* TODO */
 static ssize_t
 qeth_dev_canonical_macaddr_store(struct device *dev, const char *buf,
 				  size_t count)

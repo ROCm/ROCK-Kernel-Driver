@@ -39,7 +39,7 @@ obj-$(CONFIG_ADIR)		+= i8259.o indirect_pci.o pci_auto.o \
 obj-$(CONFIG_EBONY)		+= indirect_pci.o pci_auto.o todc_time.o
 obj-$(CONFIG_EV64260)		+= gt64260_common.o gt64260_pic.o \
 					indirect_pci.o todc_time.o pci_auto.o
-obj-$(CONFIG_GEMINI)		+= open_pic.o i8259.o indirect_pci.o
+obj-$(CONFIG_GEMINI)		+= open_pic.o indirect_pci.o
 obj-$(CONFIG_K2)		+= i8259.o indirect_pci.o todc_time.o \
 					pci_auto.o
 obj-$(CONFIG_LOPEC)		+= pci_auto.o open_pic.o i8259.o todc_time.o
@@ -57,8 +57,8 @@ obj-$(CONFIG_PPLUS)		+= hawk_common.o open_pic.o i8259.o \
 				   indirect_pci.o todc_time.o pci_auto.o
 obj-$(CONFIG_PRPMC750)		+= open_pic.o indirect_pci.o pci_auto.o \
 					hawk_common.o
-obj-$(CONFIG_PRPMC800)		+= open_pic.o indirect_pci.o pci_auto.o \
-					hawk_common.o harrier.o
+obj-$(CONFIG_HARRIER)		+= harrier.o
+obj-$(CONFIG_PRPMC800)		+= open_pic.o indirect_pci.o pci_auto.o
 obj-$(CONFIG_SANDPOINT)		+= i8259.o open_pic.o pci_auto.o todc_time.o
 obj-$(CONFIG_SPRUCE)		+= cpc700_pic.o indirect_pci.o pci_auto.o \
 				   todc_time.o

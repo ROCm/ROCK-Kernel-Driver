@@ -311,6 +311,7 @@ BEGIN_FTR_SECTION
 	beq	2f		/* if yes, don't slbie it */
 	oris	r6,r6,0x0800	/* set C (class) bit */
 	slbie	r6
+	slbie	r6		/* Workaround POWER5 < DD2.1 issue */
 2:
 END_FTR_SECTION_IFSET(CPU_FTR_SLB)
 	clrrdi	r7,r8,THREAD_SHIFT	/* base of new stack */
