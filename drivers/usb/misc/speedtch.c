@@ -310,6 +310,69 @@ static void udsl_extract_cells (struct udsl_instance_data *instance, unsigned ch
 				atomic_inc (&vcc->stats->rx_err);
 			continue;
 		}
+
+		skb = vcc_data->skb;
+
+		if (skb->len + ATM_CELL_PAYLOAD > vcc_data->max_pdu) {
+			dbg ("udsl_extract_cells: buffer overrun (max_pdu: %u, skb->len %u, vcc: 0x%p)", vcc_data->max_pdu, skb->len, vcc);
+			/* discard cells already received */
+			skb_trim (skb, 0);
+			BUG_ON (vcc_data->max_pdu < ATM_CELL_PAYLOAD);
+		}
+
+		memcpy (skb->tail, source + ATM_CELL_HEADER, ATM_CELL_PAYLOAD);
+		__skb_put (skb, ATM_CELL_PAYLOAD);
+
+		if (pti) {
+			length = (source [ATM_CELL_SIZE - 6] << 8) + source [ATM_CELL_SIZE - 5];
+
+			/* guard against overflow */
+			if (length > ATM_MAX_AAL5_PDU) {
+				dbg ("udsl_extract_cells: bogus length %u (vcc: 0x%p)", length, vcc);
+				goto drop;
+			}
+
+			pdu_length = UDSL_NUM_CELLS (length) * ATM_CELL_PAYLOAD;
+
+			if (skb->len < pdu_length) {
+				dbg ("udsl_extract_cells: bogus pdu_length %u (skb->len: %u, vcc: 0x%p)", pdu_length, skb->len, vcc);
+				goto drop;
+			}
+
+			if (crc32_be (~0, skb->tail - pdu_length, pdu_length) != 0xc704dd7b) {
+				dbg ("udsl_extract_cells: packet failed crc check (vcc: 0x%p)", vcc);
+				goto drop;
+			}
+
+			if (!atm_charge (vcc, skb->truesize)) {
+				dbg ("udsl_extract_cells: failed atm_charge (skb->truesize: %u)", skb->truesize);
+				goto drop_no_stats; /* atm_charge increments rx_drop */
+			}
+
+			/* now that we are sure to send the skb, it is ok to change skb->data */
+			if (skb->len > pdu_length)
+				skb_pull (skb, skb->len - pdu_length); /* discard initial junk */
+
+			skb_trim (skb, length); /* drop zero padding and trailer */
+
+			atomic_inc (&vcc->stats->rx);
+
+			PACKETDEBUG (skb->data, skb->len);
+
+			vdbg ("udsl_extract_cells: sending skb 0x%p, skb->len %u, skb->truesize %u", skb, skb->len, skb->truesize);
+
+			vcc->push (vcc, skb);
+
+			vcc_data->skb = NULL;
+
+			continue;
+
+drop:
+			atomic_inc (&vcc->stats->rx_err);
+drop_no_stats:
+			skb_trim (skb, 0);
+		}
+	}
 }
 
 
@@ -466,8 +529,10 @@ made_progress:
 		rcv = list_entry (instance->spare_receivers.next, struct udsl_receiver, list);
 		list_del (&rcv->list);
 		spin_unlock_irq (&instance->receive_lock);
+
 		buf = list_entry (instance->spare_receive_buffers.next, struct udsl_receive_buffer, list);
 		list_del (&buf->list);
+
 		rcv->buffer = buf;
 
 		usb_fill_bulk_urb (rcv->urb,
@@ -984,6 +1049,7 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 
 		list_add (&rcv->list, &instance->spare_receivers);
 	}
+
 	for (i = 0; i < UDSL_NUM_RCV_BUFS; i++) {
 		struct udsl_receive_buffer *buf = &(instance->receive_buffers [i]);
 
@@ -1013,7 +1079,6 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 		struct udsl_send_buffer *buf = &(instance->send_buffers [i]);
 
 		if (!(buf->base = kmalloc (UDSL_SND_BUF_SIZE * ATM_CELL_SIZE, GFP_KERNEL))) {
-			dbg ("udsl_usb_probe: no memory for send buffer %d!", i);
 			dbg ("udsl_usb_probe: no memory for send buffer %d!", i);
 			goto fail;
 		}
