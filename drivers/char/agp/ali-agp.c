@@ -19,9 +19,9 @@ static int ali_fetch_size(void)
 
 	pci_read_config_dword(agp_bridge->dev, ALI_ATTBASE, &temp);
 	temp &= ~(0xfffffff0);
-	values = A_SIZE_32(agp_bridge->aperture_sizes);
+	values = A_SIZE_32(agp_bridge->driver->aperture_sizes);
 
-	for (i = 0; i < agp_bridge->num_aperture_sizes; i++) {
+	for (i = 0; i < agp_bridge->driver->num_aperture_sizes; i++) {
 		if (temp == values[i].size_value) {
 			agp_bridge->previous_size =
 			    agp_bridge->current_size = (void *) (values + i);
@@ -118,7 +118,7 @@ static unsigned long ali_mask_memory(unsigned long addr, int type)
 {
 	/* Memory type is ignored */
 
-	return addr | agp_bridge->masks[0].mask;
+	return addr | agp_bridge->driver->masks[0].mask;
 }
 
 static void m1541_cache_flush(void)
@@ -196,10 +196,10 @@ static struct aper_size_info_32 ali_generic_sizes[7] =
 	{4, 1024, 0, 3}
 };
 
-struct agp_bridge_data ali_generic_bridge = {
-	.type			= ALI_GENERIC,
+struct agp_bridge_driver ali_generic_bridge = {
+	.owner			= THIS_MODULE,
 	.masks			= ali_generic_masks,
-	.aperture_sizes		= (void *)ali_generic_sizes,
+	.aperture_sizes		= ali_generic_sizes,
 	.size_type		= U32_APER_SIZE,
 	.num_aperture_sizes	= 7,
 	.configure		= ali_configure,
@@ -221,10 +221,10 @@ struct agp_bridge_data ali_generic_bridge = {
 	.resume			= agp_generic_resume,
 };
 
-struct agp_bridge_data ali_m1541_bridge = {
-	.type			= ALI_GENERIC,
+struct agp_bridge_driver ali_m1541_bridge = {
+	.owner			= THIS_MODULE,
 	.masks			= ali_generic_masks,
-	.aperture_sizes		= (void *)ali_generic_sizes,
+	.aperture_sizes		= ali_generic_sizes,
 	.size_type		= U32_APER_SIZE,
 	.num_aperture_sizes	= 7,
 	.configure		= ali_configure,
@@ -288,10 +288,6 @@ struct agp_device_ids ali_agp_device_ids[] __initdata =
 	{ }, /* dummy final entry, always present */
 };
 
-static struct agp_driver ali_agp_driver = {
-	.owner = THIS_MODULE,
-};
-
 static int __init agp_ali_probe(struct pci_dev *pdev,
 				const struct pci_device_id *ent)
 {
@@ -320,13 +316,18 @@ static int __init agp_ali_probe(struct pci_dev *pdev,
 
 	printk(KERN_WARNING PFX "Trying generic ALi routines"
 	       " for device id: %04x\n", pdev->device);
-	bridge = &ali_generic_bridge;
-	goto generic;
 
 found:
+	bridge = agp_alloc_bridge();
+	if (!bridge)
+		return -ENOMEM;
+
+	bridge->dev = pdev;
+	bridge->capndx = cap_ptr;
+
 	switch (pdev->device) {
 	case PCI_DEVICE_ID_AL_M1541:
-		bridge = &ali_m1541_bridge;
+		bridge->driver = &ali_m1541_bridge;
 		break;
 	case PCI_DEVICE_ID_AL_M1621:
 		pci_read_config_byte(pdev, 0xFB, &hidden_1621_id);
@@ -351,31 +352,29 @@ found:
 		default:
 			break;
 		}
+		/*FALLTHROUGH*/
 	default:
-		bridge = &ali_generic_bridge;
+		bridge->driver = &ali_generic_bridge;
 	}
 
 	printk(KERN_INFO PFX "Detected ALi %s chipset\n",
 			devs[j].chipset_name);
-generic:
-	bridge->dev = pdev;
-	bridge->capndx = cap_ptr;
 
 	/* Fill in the mode register */
 	pci_read_config_dword(pdev,
 			bridge->capndx+PCI_AGP_STATUS,
 			&bridge->mode);
-	
-	memcpy(agp_bridge, bridge, sizeof(struct agp_bridge_data));
 
-	ali_agp_driver.dev = pdev;
-	agp_register_driver(&ali_agp_driver);
-	return 0;
+	pci_set_drvdata(pdev, bridge);
+	return agp_add_bridge(bridge);
 }
 
 static void __exit agp_ali_remove(struct pci_dev *pdev)
 {
-	agp_unregister_driver(&ali_agp_driver);
+	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
+
+	agp_remove_bridge(bridge);
+	agp_put_bridge(bridge);
 }
 
 static struct pci_device_id agp_ali_pci_table[] __initdata = {

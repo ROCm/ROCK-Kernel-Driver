@@ -81,7 +81,7 @@ static void alpha_core_agp_tlbflush(agp_memory *mem)
 static unsigned long alpha_core_agp_mask_memory(unsigned long addr, int type)
 {
 	/* Memory type is ignored */
-	return addr | agp_bridge->masks[0].mask;
+	return addr | agp_bridge->driver->masks[0].mask;
 }
 
 static void alpha_core_agp_enable(u32 mode)
@@ -109,7 +109,7 @@ static int alpha_core_agp_insert_memory(agp_memory *mem, off_t pg_start,
 
 	status = agp->ops->bind(agp, pg_start, mem);
 	mb();
-	agp_bridge->tlb_flush(mem);
+	alpha_core_agp_tlbflush(mem);
 
 	return status;
 }
@@ -121,23 +121,17 @@ static int alpha_core_agp_remove_memory(agp_memory *mem, off_t pg_start,
 	int status;
 
 	status = agp->ops->unbind(agp, pg_start, mem);
-	agp_bridge->tlb_flush(mem);
+	alpha_core_agp_tlbflush(mem);
 	return status;
 }
 
-
-static struct agp_driver alpha_core_agp_driver = {
-	.owner = THIS_MODULE,
-};
-	
-struct agp_bridge_data alpha_core_agp_bridge = {
-	.type			= ALPHA_CORE_AGP,
+struct agp_bridge_driver alpha_core_agp_driver = {
+	.owner			= THIS_MODULE,
 	.masks			= alpha_core_agp_masks,
 	.aperture_sizes		= aper_size,
 	.current_size		= aper_size,	/* only one entry */
 	.size_type		= FIXED_APER_SIZE,
 	.num_aperture_sizes	= 1,
-	.dev_private_data	= agp,
 	.configure		= alpha_core_agp_configure,
 	.fetch_size		= alpha_core_agp_fetch_size,
 	.cleanup		= alpha_core_agp_cleanup,
@@ -157,6 +151,8 @@ struct agp_bridge_data alpha_core_agp_bridge = {
 	.cant_use_aperture	= 1,
 	.vm_ops			= &alpha_core_agp_vm_ops,
 };
+
+struct agp_bridge_data *alpha_bridge;
 
 int __init
 alpha_core_agp_setup(void)
@@ -190,14 +186,20 @@ alpha_core_agp_setup(void)
 	pdev->device = 0xffff;
 	pdev->sysdata = agp->hose;
 
-	alpha_core_agp_bridge.dev = pdev;
-	memcpy(agp_bridge, &alpha_core_agp_bridge,
-			sizeof(struct agp_bridge_data));
+	alpha_bridge = agp_alloc_bridge();
+	if (!alpha_bridge)
+		goto fail;
 
-	alpha_core_agp_driver.dev = pdev;
-	agp_register_driver(&alpha_core_agp_driver);
+	alpha_bridge->driver = &alpha_core_agp_driver;
+	alpha_bridge->dev_private_data = agp;
+	alpha_bridge->dev = pdev;
+
 	printk(KERN_INFO "Detected AGP on hose %d\n", agp->hose->index);
-	return 0;
+	return agp_add_bridge(alpha_bridge);
+
+ fail:
+	kfree(pdev);
+	return -ENOMEM;
 }
 
 static int __init agp_alpha_core_init(void)
@@ -209,8 +211,8 @@ static int __init agp_alpha_core_init(void)
 
 static void __exit agp_alpha_core_cleanup(void)
 {
-	agp_unregister_driver(&alpha_core_agp_driver);
-	/* no pci driver for core */
+	agp_remove_bridge(alpha_bridge);
+	agp_put_bridge(alpha_bridge);
 }
 
 module_init(agp_alpha_core_init);

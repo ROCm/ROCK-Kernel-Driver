@@ -203,7 +203,7 @@ static int serverworks_fetch_size(void)
 	u32 temp2;
 	struct aper_size_info_lvl2 *values;
 
-	values = A_SIZE_LVL2(agp_bridge->aperture_sizes);
+	values = A_SIZE_LVL2(agp_bridge->driver->aperture_sizes);
 	pci_read_config_dword(agp_bridge->dev,serverworks_private.gart_addr_ofs,&temp);
 	pci_write_config_dword(agp_bridge->dev,serverworks_private.gart_addr_ofs,
 					SVWRKS_SIZE_MASK);
@@ -211,7 +211,7 @@ static int serverworks_fetch_size(void)
 	pci_write_config_dword(agp_bridge->dev,serverworks_private.gart_addr_ofs,temp);
 	temp2 &= SVWRKS_SIZE_MASK;
 
-	for (i = 0; i < agp_bridge->num_aperture_sizes; i++) {
+	for (i = 0; i < agp_bridge->driver->num_aperture_sizes; i++) {
 		if (temp2 == values[i].size_value) {
 			agp_bridge->previous_size =
 			    agp_bridge->current_size = (void *) (values + i);
@@ -222,6 +222,37 @@ static int serverworks_fetch_size(void)
 	}
 
 	return 0;
+}
+
+/*
+ * This routine could be implemented by taking the addresses
+ * written to the GATT, and flushing them individually.  However
+ * currently it just flushes the whole table.  Which is probably
+ * more efficent, since agp_memory blocks can be a large number of
+ * entries.
+ */
+static void serverworks_tlbflush(agp_memory * temp)
+{
+	unsigned long end;
+
+	OUTREG8(serverworks_private.registers, SVWRKS_POSTFLUSH, 0x01);
+	end = jiffies + 3*HZ;
+	while(INREG8(serverworks_private.registers, 
+		     SVWRKS_POSTFLUSH) == 0x01) {
+		if((signed)(end - jiffies) <= 0) {
+			printk(KERN_ERR "Posted write buffer flush took more"
+			       "then 3 seconds\n");
+		}
+	}
+	OUTREG32(serverworks_private.registers, SVWRKS_DIRFLUSH, 0x00000001);
+	end = jiffies + 3*HZ;
+	while(INREG32(serverworks_private.registers, 
+		     SVWRKS_DIRFLUSH) == 0x00000001) {
+		if((signed)(end - jiffies) <= 0) {
+			printk(KERN_ERR "TLB flush took more"
+			       "then 3 seconds\n");
+		}
+	}
 }
 
 static int serverworks_configure(void)
@@ -253,7 +284,7 @@ static int serverworks_configure(void)
 	enable_reg |= 0x1; /* Agp Enable bit */
 	pci_write_config_byte(serverworks_private.svrwrks_dev,
 			      SVWRKS_AGP_ENABLE, enable_reg);
-	agp_bridge->tlb_flush(NULL);
+	serverworks_tlbflush(NULL);
 
 	agp_bridge->capndx = pci_find_capability(serverworks_private.svrwrks_dev, PCI_CAP_ID_AGP);
 
@@ -277,43 +308,11 @@ static void serverworks_cleanup(void)
 	iounmap((void *) serverworks_private.registers);
 }
 
-/*
- * This routine could be implemented by taking the addresses
- * written to the GATT, and flushing them individually.  However
- * currently it just flushes the whole table.  Which is probably
- * more efficent, since agp_memory blocks can be a large number of
- * entries.
- */
-
-static void serverworks_tlbflush(agp_memory * temp)
-{
-	unsigned long end;
-
-	OUTREG8(serverworks_private.registers, SVWRKS_POSTFLUSH, 0x01);
-	end = jiffies + 3*HZ;
-	while(INREG8(serverworks_private.registers, 
-		     SVWRKS_POSTFLUSH) == 0x01) {
-		if((signed)(end - jiffies) <= 0) {
-			printk(KERN_ERR "Posted write buffer flush took more"
-			       "then 3 seconds\n");
-		}
-	}
-	OUTREG32(serverworks_private.registers, SVWRKS_DIRFLUSH, 0x00000001);
-	end = jiffies + 3*HZ;
-	while(INREG32(serverworks_private.registers, 
-		     SVWRKS_DIRFLUSH) == 0x00000001) {
-		if((signed)(end - jiffies) <= 0) {
-			printk(KERN_ERR "TLB flush took more"
-			       "then 3 seconds\n");
-		}
-	}
-}
-
 static unsigned long serverworks_mask_memory(unsigned long addr, int type)
 {
 	/* Only type 0 is supported by the serverworks chipsets */
 
-	return addr | agp_bridge->masks[0].mask;
+	return addr | agp_bridge->driver->masks[0].mask;
 }
 
 static int serverworks_insert_memory(agp_memory * mem,
@@ -351,9 +350,9 @@ static int serverworks_insert_memory(agp_memory * mem,
 		addr = (j * PAGE_SIZE) + agp_bridge->gart_bus_addr;
 		cur_gatt = SVRWRKS_GET_GATT(addr);
 		cur_gatt[GET_GATT_OFF(addr)] =
-			agp_bridge->mask_memory(mem->memory[i], mem->type);
+			agp_bridge->driver->mask_memory(mem->memory[i], mem->type);
 	}
-	agp_bridge->tlb_flush(mem);
+	serverworks_tlbflush(mem);
 	return 0;
 }
 
@@ -369,7 +368,7 @@ static int serverworks_remove_memory(agp_memory * mem, off_t pg_start,
 	}
 
 	global_cache_flush();
-	agp_bridge->tlb_flush(mem);
+	serverworks_tlbflush(mem);
 
 	for (i = pg_start; i < (mem->page_count + pg_start); i++) {
 		addr = (i * PAGE_SIZE) + agp_bridge->gart_bus_addr;
@@ -378,7 +377,7 @@ static int serverworks_remove_memory(agp_memory * mem, off_t pg_start,
 			(unsigned long) agp_bridge->scratch_page;
 	}
 
-	agp_bridge->tlb_flush(mem);
+	serverworks_tlbflush(mem);
 	return 0;
 }
 
@@ -420,13 +419,12 @@ static void serverworks_agp_enable(u32 mode)
 	agp_device_command(command, 0);
 }
 
-struct agp_bridge_data sworks_bridge = {
-	.type			= SVWRKS_GENERIC,
+struct agp_bridge_driver sworks_driver = {
+	.owner			= THIS_MODULE,
 	.masks			= serverworks_masks,
-	.aperture_sizes		= (void *)serverworks_sizes,
+	.aperture_sizes		= serverworks_sizes,
 	.size_type		= LVL2_APER_SIZE,
 	.num_aperture_sizes	= 7,
-	.dev_private_data	= &serverworks_private,
 	.configure		= serverworks_configure,
 	.fetch_size		= serverworks_fetch_size,
 	.cleanup		= serverworks_cleanup,
@@ -446,13 +444,10 @@ struct agp_bridge_data sworks_bridge = {
 	.resume			= agp_generic_resume,
 };
 
-static struct agp_driver serverworks_agp_driver = {
-	.owner = THIS_MODULE,
-};
-
 static int __init agp_serverworks_probe(struct pci_dev *pdev,
 					const struct pci_device_id *ent)
 {
+	struct agp_bridge_data *bridge;
 	struct pci_dev *bridge_dev;
 	u32 temp, temp2;
 
@@ -465,8 +460,6 @@ static int __init agp_serverworks_probe(struct pci_dev *pdev,
 		       "device.\n");
 		return -ENODEV;
 	}
-
-	sworks_bridge.dev = pdev;
 
 	switch (pdev->device) {
 	case PCI_DEVICE_ID_SERVERWORKS_HE:
@@ -505,15 +498,24 @@ static int __init agp_serverworks_probe(struct pci_dev *pdev,
 		}
 	}
 
-	memcpy(agp_bridge, &sworks_bridge, sizeof(struct agp_bridge_data));
-	serverworks_agp_driver.dev = pdev;
-	agp_register_driver(&serverworks_agp_driver);
-	return 0;
+	bridge = agp_alloc_bridge();
+	if (!bridge)
+		return -ENOMEM;
+
+	bridge->driver = &sworks_driver;
+	bridge->dev_private_data = &serverworks_private,
+	bridge->dev = pdev;
+
+	pci_set_drvdata(pdev, bridge);
+	return agp_add_bridge(bridge);
 }
 
 static void __exit agp_serverworks_remove(struct pci_dev *pdev)
 {
-	agp_unregister_driver(&serverworks_agp_driver);
+	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
+
+	agp_remove_bridge(bridge);
+	agp_put_bridge(bridge);
 }
 
 static struct pci_device_id agp_serverworks_pci_table[] __initdata = {

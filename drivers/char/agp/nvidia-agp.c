@@ -47,9 +47,9 @@ static int nvidia_fetch_size(void)
 
 	pci_read_config_byte(agp_bridge->dev, NVIDIA_0_APSIZE, &size_value);
 	size_value &= 0x0f;
-	values = A_SIZE_8(agp_bridge->aperture_sizes);
+	values = A_SIZE_8(agp_bridge->driver->aperture_sizes);
 
-	for (i = 0; i < agp_bridge->num_aperture_sizes; i++) {
+	for (i = 0; i < agp_bridge->driver->num_aperture_sizes; i++) {
 		if (size_value == values[i].size_value) {
 			agp_bridge->previous_size =
 				agp_bridge->current_size = (void *) (values + i);
@@ -143,7 +143,7 @@ static void nvidia_cleanup(void)
 static unsigned long nvidia_mask_memory(unsigned long addr, int type)
 {
 	/* Memory type is ignored */
-	return addr | agp_bridge->masks[0].mask;
+	return addr | agp_bridge->driver->masks[0].mask;
 }
 
 #if 0
@@ -242,13 +242,12 @@ static struct gatt_mask nvidia_generic_masks[] =
 };
 
 
-struct agp_bridge_data nvidia_bridge = {
-	.type			= NVIDIA_GENERIC,
+struct agp_bridge_driver nvidia_driver = {
+	.owner			= THIS_MODULE,
 	.masks			= nvidia_generic_masks,
-	.aperture_sizes		= (void *) nvidia_generic_sizes,
+	.aperture_sizes		= nvidia_generic_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 5,
-	.dev_private_data	= (void *) &nvidia_private,
 	.configure		= nvidia_configure,
 	.fetch_size		= nvidia_fetch_size,
 	.cleanup		= nvidia_cleanup,
@@ -268,14 +267,10 @@ struct agp_bridge_data nvidia_bridge = {
 	.resume			= agp_generic_resume,
 };
 
-static struct agp_driver nvidia_agp_driver = {
-	.owner			= THIS_MODULE,
-};
-
-
 static int __init agp_nvidia_probe(struct pci_dev *pdev,
 				   const struct pci_device_id *ent)
 {
+	struct agp_bridge_data *bridge;
 	u8 cap_ptr;
 
 	nvidia_private.dev_1 =
@@ -319,24 +314,30 @@ static int __init agp_nvidia_probe(struct pci_dev *pdev,
 		break;
 	}
 
-	nvidia_bridge.dev = pdev;
-	nvidia_bridge.capndx = cap_ptr;
+	bridge = agp_alloc_bridge();
+	if (!bridge)
+		return -ENOMEM;
+
+	bridge->driver = &nvidia_driver;
+	bridge->dev_private_data = &nvidia_private,
+	bridge->dev = pdev;
+	bridge->capndx = cap_ptr;
 
 	/* Fill in the mode register */
 	pci_read_config_dword(pdev,
-			nvidia_bridge.capndx+PCI_AGP_STATUS,
-			&nvidia_bridge.mode);
+			bridge->capndx+PCI_AGP_STATUS,
+			&bridge->mode);
 
-	memcpy(agp_bridge, &nvidia_bridge, sizeof(struct agp_bridge_data));
-
-	nvidia_agp_driver.dev = pdev;
-	agp_register_driver(&nvidia_agp_driver);
-	return 0;
+	pci_set_drvdata(pdev, bridge);
+	return agp_add_bridge(bridge);
 }
 
 static void __exit agp_nvidia_remove(struct pci_dev *pdev)
 {
-	agp_unregister_driver(&nvidia_agp_driver);
+	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
+
+	agp_remove_bridge(bridge);
+	agp_put_bridge(bridge);
 }
 
 static struct pci_device_id agp_nvidia_pci_table[] __initdata = {

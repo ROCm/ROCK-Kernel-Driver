@@ -69,7 +69,7 @@ static struct {
 	} *lp_desc;
 } i460;
 
-static const struct aper_size_info_8 i460_sizes[3] =
+static struct aper_size_info_8 i460_sizes[3] =
 {
 	/*
 	 * The 32GB aperture is only available with a 4M GART page size.  Due to the
@@ -107,7 +107,7 @@ static int i460_fetch_size (void)
 		return 0;
 	}
 
-	values = A_SIZE_8(agp_bridge->aperture_sizes);
+	values = A_SIZE_8(agp_bridge->driver->aperture_sizes);
 
 	pci_read_config_byte(agp_bridge->dev, INTEL_I460_AGPSIZ, &temp);
 
@@ -130,7 +130,7 @@ static int i460_fetch_size (void)
 	else
 		i460.dynamic_apbase = INTEL_I460_APBASE;
 
-	for (i = 0; i < agp_bridge->num_aperture_sizes; i++) {
+	for (i = 0; i < agp_bridge->driver->num_aperture_sizes; i++) {
 		/*
 		 * Dynamically calculate the proper num_entries and page_order values for
 		 * the define aperture sizes. Take care not to shift off the end of
@@ -140,7 +140,7 @@ static int i460_fetch_size (void)
 		values[i].page_order = log2((sizeof(u32)*values[i].num_entries) >> PAGE_SHIFT);
 	}
 
-	for (i = 0; i < agp_bridge->num_aperture_sizes; i++) {
+	for (i = 0; i < agp_bridge->driver->num_aperture_sizes; i++) {
 		/* Neglect control bits when matching up size_value */
 		if ((temp & I460_AGPSIZ_MASK) == values[i].size_value) {
 			agp_bridge->previous_size = agp_bridge->current_size = (void *) (values + i);
@@ -306,7 +306,7 @@ static int i460_insert_memory_small_io_page (agp_memory *mem, off_t pg_start, in
 	for (i = 0, j = io_pg_start; i < mem->page_count; i++) {
 		paddr = mem->memory[i];
 		for (k = 0; k < I460_IOPAGES_PER_KPAGE; k++, j++, paddr += io_page_size)
-			WR_GATT(j, agp_bridge->mask_memory(paddr, mem->type));
+			WR_GATT(j, agp_bridge->driver->mask_memory(paddr, mem->type));
 	}
 	WR_FLUSH_GATT(j - 1);
 	return 0;
@@ -417,7 +417,7 @@ static int i460_insert_memory_large_io_page (agp_memory * mem, off_t pg_start, i
 			if (i460_alloc_large_page(lp) < 0)
 				return -ENOMEM;
 			pg = lp - i460.lp_desc;
-			WR_GATT(pg, agp_bridge->mask_memory(lp->paddr, 0));
+			WR_GATT(pg, agp_bridge->driver->mask_memory(lp->paddr, 0));
 			WR_FLUSH_GATT(pg);
 		}
 
@@ -439,7 +439,7 @@ static int i460_remove_memory_large_io_page (agp_memory * mem, off_t pg_start, i
 	struct lp_desc *start, *end, *lp;
 	void *temp;
 
-	temp = agp_bridge->current_size;
+	temp = agp_bridge->driver->current_size;
 	num_entries = A_SIZE_8(temp)->num_entries;
 
 	/* Figure out what pg_start means in terms of our large GART pages */
@@ -519,13 +519,14 @@ static void i460_destroy_page (void *page)
 static unsigned long i460_mask_memory (unsigned long addr, int type)
 {
 	/* Make sure the returned address is a valid GATT entry */
-	return (agp_bridge->masks[0].mask
+	return (agp_bridge->driver->masks[0].mask
 		| (((addr & ~((1 << I460_IO_PAGE_SHIFT) - 1)) & 0xffffff000) >> 12));
 }
 
-struct agp_bridge_data intel_i460_bridge = {
+struct agp_bridge_driver intel_i460_driver = {
+	.owner			= THIS_MODULE,
 	.masks			= i460_masks,
-	.aperture_sizes		= (void *)i460_sizes,
+	.aperture_sizes		= i460_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 3,
 	.configure		= i460_configure,
@@ -555,32 +556,34 @@ struct agp_bridge_data intel_i460_bridge = {
 	.cant_use_aperture	= 1,
 };
 
-static struct agp_driver i460_agp_driver = {
-	.owner = THIS_MODULE,
-};
-
 static int __init agp_intel_i460_probe(struct pci_dev *pdev,
 				       const struct pci_device_id *ent)
 {
+	struct agp_bridge_data *bridge;
 	u8 cap_ptr;
 
 	cap_ptr = pci_find_capability(pdev, PCI_CAP_ID_AGP);
 	if (!cap_ptr)
 		return -ENODEV;
 
-	intel_i460_bridge.dev = pdev;
-	intel_i460_bridge.capndx = cap_ptr;
+	bridge = agp_alloc_bridge();
+	if (!bridge)
+		return -ENOMEM;
 
-	memcpy(agp_bridge, &intel_i460_bridge, sizeof(struct agp_bridge_data));
+	bridge->driver = &intel_i460_driver;
+	bridge->dev = pdev;
+	bridge->capndx = cap_ptr;
 
-	i460_agp_driver.dev = pdev;
-	agp_register_driver(&i460_agp_driver);
-	return 0;
+	pci_set_drvdata(pdev, bridge);
+	return agp_add_bridge(bridge);
 }
 
-static void __exit agp_intel_i460_probe(struct pci_dev *pdev)
+static void __exit agp_intel_i460_remove(struct pci_dev *pdev)
 {
-	agp_unregister_driver(&i460_agp_driver);
+	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
+
+	agp_remove_bridge(bridge);
+	agp_put_bridge(bridge);
 }
 
 static struct pci_device_id agp_intel_i460_pci_table[] __initdata = {

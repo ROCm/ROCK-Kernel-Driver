@@ -18,9 +18,9 @@ static int via_fetch_size(void)
 	u8 temp;
 	struct aper_size_info_8 *values;
 
-	values = A_SIZE_8(agp_bridge->aperture_sizes);
+	values = A_SIZE_8(agp_bridge->driver->aperture_sizes);
 	pci_read_config_byte(agp_bridge->dev, VIA_APSIZE, &temp);
-	for (i = 0; i < agp_bridge->num_aperture_sizes; i++) {
+	for (i = 0; i < agp_bridge->driver->num_aperture_sizes; i++) {
 		if (temp == values[i].size_value) {
 			agp_bridge->previous_size =
 			    agp_bridge->current_size = (void *) (values + i);
@@ -79,7 +79,7 @@ static unsigned long via_mask_memory(unsigned long addr, int type)
 {
 	/* Memory type is ignored */
 
-	return addr | agp_bridge->masks[0].mask;
+	return addr | agp_bridge->driver->masks[0].mask;
 }
 
 
@@ -107,11 +107,11 @@ static int via_fetch_size_agp3(void)
 	u16 temp;
 	struct aper_size_info_16 *values;
 
-	values = A_SIZE_16(agp_bridge->aperture_sizes);
+	values = A_SIZE_16(agp_bridge->driver->aperture_sizes);
 	pci_read_config_word(agp_bridge->dev, VIA_AGP3_APSIZE, &temp);
 	temp &= 0xfff;
 
-	for (i = 0; i < agp_bridge->num_aperture_sizes; i++) {
+	for (i = 0; i < agp_bridge->driver->num_aperture_sizes; i++) {
 		if (temp == values[i].size_value) {
 			agp_bridge->previous_size =
 				agp_bridge->current_size = (void *) (values + i);
@@ -174,10 +174,10 @@ static struct aper_size_info_16 via_generic_agp3_sizes[11] =
 	{ 2048, 524288, 9, 1<<11}	/* 2GB <- Max supported */
 };
 
-struct agp_bridge_data via_generic_agp3_bridge = {
-	.type			= VIA_GENERIC,
+struct agp_bridge_driver via_agp3_driver = {
+	.owner			= THIS_MODULE,
 	.masks			= via_generic_masks,
-	.aperture_sizes		= (void *)via_generic_agp3_sizes,
+	.aperture_sizes		= via_generic_agp3_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 10,
 	.configure		= via_configure_agp3,
@@ -199,10 +199,10 @@ struct agp_bridge_data via_generic_agp3_bridge = {
 	.resume			= agp_generic_resume,
 };
 
-struct agp_bridge_data via_generic_bridge = {
-	.type			= VIA_GENERIC,
+struct agp_bridge_driver via_driver = {
+	.owner			= THIS_MODULE,
 	.masks			= via_generic_masks,
-	.aperture_sizes		= (void *)via_generic_sizes,
+	.aperture_sizes		= via_generic_sizes,
 	.size_type		= U8_APER_SIZE,
 	.num_aperture_sizes	= 7,
 	.configure		= via_configure,
@@ -363,16 +363,11 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 	{ }, /* dummy final entry, always present */
 };
 
-static struct agp_driver via_agp_driver = {
-	.owner = THIS_MODULE,
-};
-
-
 static int __init agp_via_probe(struct pci_dev *pdev,
 				const struct pci_device_id *ent)
 {
 	struct agp_device_ids *devs = via_agp_device_ids;
-	struct agp_bridge_data *bridge = &via_generic_bridge;
+	struct agp_bridge_data *bridge;
 	int j = 0;
 	u8 cap_ptr, reg;
 
@@ -401,6 +396,13 @@ static int __init agp_via_probe(struct pci_dev *pdev,
 	       " for device id: %04x\n", pdev->device);
 
 found:
+	bridge = agp_alloc_bridge();
+	if (!bridge)
+		return -ENOMEM;
+
+	bridge->dev = pdev;
+	bridge->capndx = cap_ptr;
+
 	switch (pdev->device) {
 	case PCI_DEVICE_ID_VIA_8367_0:
 		/*
@@ -420,9 +422,13 @@ found:
 		pci_read_config_byte(pdev, VIA_AGPSEL, &reg);
 		/* Check AGP 2.0 compatibility mode. */
 		if ((reg & (1<<1))==0) {
-			bridge = &via_generic_agp3_bridge;
+			bridge->driver = &via_agp3_driver;
 			break;
 		}
+		/*FALLTHROUGH*/
+	default:
+		bridge->driver = &via_driver;
+		break;
 	}
 
 
@@ -433,11 +439,16 @@ found:
 	pci_read_config_dword(pdev,
 			bridge->capndx+PCI_AGP_STATUS, &bridge->mode);
 
-	memcpy(agp_bridge, bridge, sizeof(struct agp_bridge_data));
+	pci_set_drvdata(pdev, bridge);
+	return agp_add_bridge(bridge);
+}
 
-	via_agp_driver.dev = pdev;
-	agp_register_driver(&via_agp_driver);
-	return 0;
+static void __exit agp_via_remove(struct pci_dev *pdev)
+{
+	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
+
+	agp_remove_bridge(bridge);
+	agp_put_bridge(bridge);
 }
 
 static struct pci_device_id agp_via_pci_table[] __initdata = {

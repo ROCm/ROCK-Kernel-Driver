@@ -29,6 +29,21 @@ static struct pci_dev * hammers[MAX_HAMMER_GARTS];
 static int gart_iterator;
 #define for_each_nb() for(gart_iterator=0;gart_iterator<nr_garts;gart_iterator++)
 
+static void flush_x86_64_tlb(struct pci_dev *dev)
+{
+	u32 tmp;
+
+	pci_read_config_dword (dev, AMD_X86_64_GARTCACHECTL, &tmp);
+	tmp |= 1<<0;
+	pci_write_config_dword (dev, AMD_X86_64_GARTCACHECTL, tmp);
+}
+
+static void amd_x86_64_tlbflush(agp_memory *temp)
+{
+	for_each_nb()
+		flush_x86_64_tlb(hammers[gart_iterator]);
+}
+
 static int x86_64_insert_memory(agp_memory * mem, off_t pg_start, int type)
 {
 	int i, j, num_entries;
@@ -61,7 +76,7 @@ static int x86_64_insert_memory(agp_memory * mem, off_t pg_start, int type)
 	}
 
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
-		addr = agp_bridge->mask_memory(mem->memory[i], mem->type);
+		addr = agp_bridge->driver->mask_memory(mem->memory[i], mem->type);
 
 		tmp = addr;
 		BUG_ON(tmp & 0xffffff0000000ffc);
@@ -71,7 +86,7 @@ static int x86_64_insert_memory(agp_memory * mem, off_t pg_start, int type)
 
 		agp_bridge->gatt_table[j] = pte;
 	}
-	agp_bridge->tlb_flush(mem);
+	amd_x86_64_tlbflush(mem);
 	return 0;
 }
 
@@ -113,7 +128,7 @@ static int amd_x86_64_fetch_size(void)
 	temp = (temp & 0xe);
 	values = A_SIZE_32(x86_64_aperture_sizes);
 
-	for (i = 0; i < agp_bridge->num_aperture_sizes; i++) {
+	for (i = 0; i < agp_bridge->driver->num_aperture_sizes; i++) {
 		if (temp == values[i].size_value) {
 			agp_bridge->previous_size =
 			    agp_bridge->current_size = (void *) (values + i);
@@ -124,25 +139,6 @@ static int amd_x86_64_fetch_size(void)
 	}
 	return 0;
 }
-
-
-static void flush_x86_64_tlb(struct pci_dev *dev)
-{
-	u32 tmp;
-
-	pci_read_config_dword (dev, AMD_X86_64_GARTCACHECTL, &tmp);
-	tmp |= 1<<0;
-	pci_write_config_dword (dev, AMD_X86_64_GARTCACHECTL, tmp);
-}
-
-
-static void amd_x86_64_tlbflush(agp_memory * temp)
-{
-	for_each_nb() {
-		flush_x86_64_tlb (hammers[gart_iterator]);
-	}
-}
-
 
 /*
  * In a multiprocessor x86-64 system, this function gets
@@ -218,7 +214,7 @@ static void amd_8151_cleanup(void)
 
 static unsigned long amd_8151_mask_memory(unsigned long addr, int type)
 {
-	return addr | agp_bridge->masks[0].mask;
+	return addr | agp_bridge->driver->masks[0].mask;
 }
 
 
@@ -227,9 +223,10 @@ static struct gatt_mask amd_8151_masks[] =
 	{.mask = 0x00000001, .type = 0}
 };
 
-struct agp_bridge_data amd_8151_bridge = {
+struct agp_bridge_driver amd_8151_driver = {
+	.owner			= THIS_MODULE,
 	.masks			= amd_8151_masks,
-	.aperture_sizes		= (void *)amd_8151_sizes,
+	.aperture_sizes		= amd_8151_sizes,
 	.size_type		= U32_APER_SIZE,
 	.num_aperture_sizes	= 7,
 	.configure		= amd_8151_configure,
@@ -251,13 +248,10 @@ struct agp_bridge_data amd_8151_bridge = {
 	.resume			= agp_generic_resume,
 };
 
-static struct agp_driver amd_k8_agp_driver = {
-	.owner = THIS_MODULE,
-};
-
 static int __init agp_amdk8_probe(struct pci_dev *pdev,
 				  const struct pci_device_id *ent)
 {
+	struct agp_bridge_data *bridge;
 	struct pci_dev *loop_dev;
 	u8 cap_ptr;
 	int i = 0;
@@ -268,13 +262,18 @@ static int __init agp_amdk8_probe(struct pci_dev *pdev,
 
 	printk(KERN_INFO PFX "Detected Opteron/Athlon64 on-CPU GART\n");
 
-	amd_8151_bridge.dev = pdev;
-	amd_8151_bridge.capndx = cap_ptr;
+	bridge = agp_alloc_bridge();
+	if (!bridge)
+		return -ENOMEM;
+
+	bridge->driver = &amd_8151_driver;
+	bridge->dev = pdev;
+	bridge->capndx = cap_ptr;
 
 	/* Fill in the mode register */
 	pci_read_config_dword(pdev,
-			amd_8151_bridge.capndx+PCI_AGP_STATUS,
-			&amd_8151_bridge.mode);
+			bridge->capndx+PCI_AGP_STATUS,
+			&bridge->mode);
 
 	/* cache pci_devs of northbridges. */
 	pci_for_each_dev(loop_dev) {
@@ -285,20 +284,23 @@ static int __init agp_amdk8_probe(struct pci_dev *pdev,
 			hammers[i++] = loop_dev;
 			nr_garts = i;
 			if (i == MAX_HAMMER_GARTS)
-				return 0;
+				goto out_free;
 		}
 	}
 
-	memcpy(agp_bridge, &amd_8151_bridge, sizeof(struct agp_bridge_data));
-
-	amd_k8_agp_driver.dev = pdev;
-	agp_register_driver(&amd_k8_agp_driver);
-	return 0;
+	pci_set_drvdata(pdev, bridge);
+	return agp_add_bridge(bridge);
+ out_free:
+	agp_put_bridge(bridge);
+	return -ENOMEM;
 }
 
 static void __exit agp_amdk8_remove(struct pci_dev *pdev)
 {
-	agp_unregister_driver(&amd_k8_agp_driver);
+	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
+
+	agp_remove_bridge(bridge);
+	agp_put_bridge(bridge);
 }
 
 static struct pci_device_id agp_amdk8_pci_table[] __initdata = {

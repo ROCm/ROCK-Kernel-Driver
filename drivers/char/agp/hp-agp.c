@@ -296,11 +296,11 @@ static int hp_zx1_insert_memory(agp_memory * mem, off_t pg_start, int type)
 		for (k = 0;
 		     k < hp->io_pages_per_kpage;
 		     k++, j++, paddr += hp->io_page_size) {
-			hp->gatt[j] = agp_bridge->mask_memory(paddr, type);
+			hp->gatt[j] = agp_bridge->driver->mask_memory(paddr, type);
 		}
 	}
 
-	agp_bridge->tlb_flush(mem);
+	agp_bridge->driver->tlb_flush(mem);
 	return 0;
 }
 
@@ -319,7 +319,7 @@ static int hp_zx1_remove_memory(agp_memory * mem, off_t pg_start, int type)
 		hp->gatt[i] = agp_bridge->scratch_page;
 	}
 
-	agp_bridge->tlb_flush(mem);
+	agp_bridge->driver->tlb_flush(mem);
 	return 0;
 }
 
@@ -328,8 +328,8 @@ static unsigned long hp_zx1_mask_memory(unsigned long addr, int type)
 	return HP_ZX1_PDIR_VALID_BIT | addr;
 }
 
-struct agp_bridge_data hp_zx1_bridge = {
-	.type			= HP_ZX1,
+struct agp_bridge_driver hp_zx1_driver = {
+	.owner			= THIS_MODULE,
 	.masks			= hp_zx1_masks,
 	.size_type		= FIXED_APER_SIZE,
 	.configure		= hp_zx1_configure,
@@ -350,13 +350,10 @@ struct agp_bridge_data hp_zx1_bridge = {
 	.cant_use_aperture	= 1,
 };
 
-static struct agp_driver hp_agp_driver = {
-	.owner			= THIS_MODULE,
-};
-
 static int __init agp_hp_probe(struct pci_dev *pdev,
 			       const struct pci_device_id *ent)
 {
+	struct agp_bridge_data *bridge;
 	int error;
 
 	/* ZX1 LBAs can be either PCI or AGP bridges */
@@ -369,18 +366,24 @@ static int __init agp_hp_probe(struct pci_dev *pdev,
 	error = hp_zx1_ioc_init();
 	if (error)
 		return error;
-	hp_zx1_bridge.dev = pdev;
 
-	memcpy(agp_bridge, &hp_zx1_bridge, sizeof(struct agp_bridge_data));
+	bridge = agp_alloc_bridge();
+	if (!bridge)
+		return -ENOMEM;
 
-	hp_agp_driver.dev = pdev;
-	agp_register_driver(&hp_agp_driver);
-	return 0;
+	bridge->driver = &hp_zx1_driver;
+	bridge->dev = pdev;
+
+	pci_set_drvdata(pdev, bridge);
+	return agp_add_bridge(bridge);
 }
 
 static void __exit agp_hp_remove(struct pci_dev *pdev)
 {
-	agp_unregister_driver(&hp_agp_driver);
+	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
+
+	agp_remove_bridge(bridge);
+	agp_put_bridge(bridge);
 }
 
 static struct pci_device_id agp_hp_pci_table[] __initdata = {
