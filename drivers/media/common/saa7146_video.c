@@ -1413,6 +1413,7 @@ static void video_close(struct saa7146_dev *dev, struct file *file)
 			spin_lock_irqsave(&dev->slock,flags);
 			saa7146_stop_preview(fh);
 			spin_unlock_irqrestore(&dev->slock,flags);
+			saa7146_res_free(fh, RESOURCE_DMA1_HPS|RESOURCE_DMA2_CLP);
 		}
 	}
 	
