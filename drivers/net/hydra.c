@@ -145,6 +145,7 @@ static int __devinit hydra_init(struct zorro_dev *z)
 #ifdef CONFIG_NET_POLL_CONTROLLER
     dev->poll_controller = ei_poll;
 #endif
+
     NS8390_init(dev, 0);
 
     err = register_netdev(dev);

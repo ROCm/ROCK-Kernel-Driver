@@ -219,6 +219,8 @@ unsigned long invalidate_mapping_pages(struct address_space *mapping,
 			ret += invalidate_complete_page(mapping, page);
 unlock:
 			unlock_page(page);
+			if (next > end)
+				break;
 		}
 		pagevec_release(&pvec);
 		cond_resched();

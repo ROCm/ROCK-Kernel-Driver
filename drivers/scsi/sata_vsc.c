@@ -158,24 +158,6 @@ static void vsc_sata_tf_read(struct ata_port *ap, struct ata_taskfile *tf)
 }
 
 
-static void vsc_sata_set_piomode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int pio)
-{
-	/* We need empty implementation, the core doesn't test for NULL
-	 * function pointer
-	 */
-}
-
-
-static void vsc_sata_set_udmamode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int udma)
-{
-	/* We need empty implementation, the core doesn't test for NULL
-	 * function pointer
-	 */
-}
-
-
 /*
  * vsc_sata_interrupt
  *
@@ -234,8 +216,6 @@ static Scsi_Host_Template vsc_sata_sht = {
 
 static struct ata_port_operations vsc_sata_ops = {
 	.port_disable		= ata_port_disable,
-	.set_piomode		= vsc_sata_set_piomode,
-	.set_udmamode		= vsc_sata_set_udmamode,
 	.tf_load		= vsc_sata_tf_load,
 	.tf_read		= vsc_sata_tf_read,
 	.exec_command		= ata_exec_command_mmio,

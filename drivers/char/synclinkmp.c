@@ -1,5 +1,5 @@
 /*
- * $Id: synclinkmp.c,v 4.14 2003/09/05 15:26:03 paulkf Exp $
+ * $Id: synclinkmp.c,v 4.19 2004/03/08 15:29:23 paulkf Exp $
  *
  * Device driver for Microgate SyncLink Multiport
  * high speed multiprotocol serial adapter.
@@ -494,7 +494,7 @@ MODULE_PARM(maxframe,"1-" __MODULE_STRING(MAX_DEVICES) "i");
 MODULE_PARM(dosyncppp,"1-" __MODULE_STRING(MAX_DEVICES) "i");
 
 static char *driver_name = "SyncLink MultiPort driver";
-static char *driver_version = "$Revision: 4.14 $";
+static char *driver_version = "$Revision: 4.19 $";
 
 static int synclinkmp_init_one(struct pci_dev *dev,const struct pci_device_id *ent);
 static void synclinkmp_remove_one(struct pci_dev *dev);
@@ -1653,10 +1653,11 @@ static void sppp_init(SLMP_INFO *info)
 	info->if_ptr = &info->pppdev;
 	info->netdev = info->pppdev.dev = d;
 
-	sppp_attach(&info->pppdev);
-
 	d->irq = info->irq_level;
 	d->priv = info;
+
+	sppp_attach(&info->pppdev);
+	cb_setup(d);
 
 	if (register_netdev(d)) {
 		printk(KERN_WARNING "%s: register_netdev failed.\n", d->name);
@@ -1828,7 +1829,7 @@ static struct net_device_stats *sppp_cb_net_stats(struct net_device *dev)
 
 static int sppp_cb_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-	SLMP_INFO *info = (SLMP_INFO *)dev->priv;
+	SLMP_INFO *info = dev->priv;
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):ioctl %s cmd=%08X\n", __FILE__,__LINE__,
 			info->netname, cmd );
@@ -2604,7 +2605,7 @@ static void shutdown(SLMP_INFO * info)
 	del_timer(&info->status_timer);
 
 	if (info->tx_buf) {
-		free_page((unsigned long) info->tx_buf);
+		kfree(info->tx_buf);
 		info->tx_buf = 0;
 	}
 

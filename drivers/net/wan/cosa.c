@@ -639,7 +639,7 @@ static void sppp_channel_delete(struct channel_data *chan)
 
 static int cosa_sppp_open(struct net_device *d)
 {
-	struct channel_data *chan = d->priv;
+	struct channel_data *chan = netdev_priv(d);
 	int err;
 	unsigned long flags;
 
@@ -679,7 +679,7 @@ static int cosa_sppp_open(struct net_device *d)
 
 static int cosa_sppp_tx(struct sk_buff *skb, struct net_device *dev)
 {
-	struct channel_data *chan = dev->priv;
+	struct channel_data *chan = netdev_priv(dev);
 
 	netif_stop_queue(dev);
 
@@ -690,7 +690,7 @@ static int cosa_sppp_tx(struct sk_buff *skb, struct net_device *dev)
 
 static void cosa_sppp_timeout(struct net_device *dev)
 {
-	struct channel_data *chan = dev->priv;
+	struct channel_data *chan = netdev_priv(dev);
 
 	if (test_bit(RXBIT, &chan->cosa->rxtx)) {
 		chan->stats.rx_errors++;
@@ -709,7 +709,7 @@ static void cosa_sppp_timeout(struct net_device *dev)
 
 static int cosa_sppp_close(struct net_device *d)
 {
-	struct channel_data *chan = d->priv;
+	struct channel_data *chan = netdev_priv(d);
 	unsigned long flags;
 
 	netif_stop_queue(d);
@@ -789,7 +789,7 @@ static int sppp_tx_done(struct channel_data *chan, int size)
 
 static struct net_device_stats *cosa_net_stats(struct net_device *dev)
 {
-	struct channel_data *chan = dev->priv;
+	struct channel_data *chan = netdev_priv(dev);
 	return &chan->stats;
 }
 
@@ -807,7 +807,7 @@ static ssize_t cosa_read(struct file *file,
 {
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
-	struct channel_data *chan = (struct channel_data *)file->private_data;
+	struct channel_data *chan = file->private_data;
 	struct cosa_data *cosa = chan->cosa;
 	char *kbuf;
 
@@ -881,7 +881,7 @@ static ssize_t cosa_write(struct file *file,
 	const char *buf, size_t count, loff_t *ppos)
 {
 	DECLARE_WAITQUEUE(wait, current);
-	struct channel_data *chan = (struct channel_data *)file->private_data;
+	struct channel_data *chan = file->private_data;
 	struct cosa_data *cosa = chan->cosa;
 	unsigned long flags;
 	char *kbuf;
@@ -990,7 +990,7 @@ static int cosa_open(struct inode *inode, struct file *file)
 
 static int cosa_release(struct inode *inode, struct file *file)
 {
-	struct channel_data *channel = (struct channel_data *)file->private_data;
+	struct channel_data *channel = file->private_data;
 	struct cosa_data *cosa;
 	unsigned long flags;
 
@@ -1205,7 +1205,7 @@ static int cosa_sppp_ioctl(struct net_device *dev, struct ifreq *ifr,
 	int cmd)
 {
 	int rv;
-	struct channel_data *chan = (struct channel_data *)dev->priv;
+	struct channel_data *chan = netdev_priv(dev);
 	rv = cosa_ioctl_common(chan->cosa, chan, cmd, (unsigned long)ifr->ifr_data);
 	if (rv == -ENOIOCTLCMD) {
 		return sppp_do_ioctl(dev, ifr, cmd);
@@ -1216,7 +1216,7 @@ static int cosa_sppp_ioctl(struct net_device *dev, struct ifreq *ifr,
 static int cosa_chardev_ioctl(struct inode *inode, struct file *file,
 	unsigned int cmd, unsigned long arg)
 {
-	struct channel_data *channel = (struct channel_data *)file->private_data;
+	struct channel_data *channel = file->private_data;
 	struct cosa_data *cosa = channel->cosa;
 	return cosa_ioctl_common(cosa, channel, cmd, arg);
 }

@@ -335,7 +335,7 @@ static int __init atp_probe1(long ioaddr)
 	/* Reset the ethernet hardware and activate the printer pass-through. */
 	write_reg_high(ioaddr, CMR1, CMR1h_RESET | CMR1h_MUX);
 
-	lp = (struct net_local *)dev->priv;
+	lp = netdev_priv(dev);
 	lp->chip_type = RTL8002;
 	lp->addr_mode = CMR2h_Normal;
 	spin_lock_init(&lp->lock);
@@ -432,7 +432,7 @@ static unsigned short __init eeprom_op(long ioaddr, u32 cmd)
    */
 static int net_open(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int ret;
 
 	/* The interrupt line is turned off (tri-stated) when the device isn't in
@@ -458,7 +458,7 @@ static int net_open(struct net_device *dev)
    the hardware may have been temporarily detached. */
 static void hardware_init(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
     int i;
 
@@ -541,7 +541,7 @@ static void write_packet(long ioaddr, int length, unsigned char *packet, int pad
 
 static void tx_timeout(struct net_device *dev)
 {
-	struct net_local *np = (struct net_local *)dev->priv;
+	struct net_local *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
 	printk(KERN_WARNING "%s: Transmit timed out, %s?\n", dev->name,
@@ -557,7 +557,7 @@ static void tx_timeout(struct net_device *dev)
 
 static int atp_send_packet(struct sk_buff *skb, struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int length;
 	unsigned long flags;
@@ -611,7 +611,7 @@ atp_interrupt(int irq, void *dev_instance, struct pt_regs * regs)
 		return IRQ_NONE;
 	}
 	ioaddr = dev->base_addr;
-	lp = (struct net_local *)dev->priv;
+	lp = netdev_priv(dev);
 
 	spin_lock(&lp->lock);
 
@@ -726,7 +726,7 @@ static void atp_timed_checker(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
 	long ioaddr = dev->base_addr;
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	int tickssofar = jiffies - lp->last_rx_time;
 	int i;
 
@@ -740,7 +740,7 @@ static void atp_timed_checker(unsigned long data)
 		for (i = 0; i < 6; i++)
 			if (read_cmd_byte(ioaddr, PAR0 + i) != atp_timed_dev->dev_addr[i])
 				{
-			struct net_local *lp = (struct net_local *)atp_timed_dev->priv;
+			struct net_local *lp = netdev_priv(atp_timed_dev);
 			write_reg_byte(ioaddr, PAR0 + i, atp_timed_dev->dev_addr[i]);
 			if (i == 2)
 			  lp->stats.tx_errors++;
@@ -762,7 +762,7 @@ static void atp_timed_checker(unsigned long data)
 /* We have a good packet(s), get it/them out of the buffers. */
 static void net_rx(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	struct rx_header rx_head;
 
@@ -838,7 +838,7 @@ static void read_block(long ioaddr, int length, unsigned char *p, int data_mode)
 static int
 net_close(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
 	netif_stop_queue(dev);
@@ -863,7 +863,7 @@ net_close(struct net_device *dev)
 static struct net_device_stats *
 net_get_stats(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	return &lp->stats;
 }
 
@@ -873,7 +873,7 @@ net_get_stats(struct net_device *dev)
 
 static void set_rx_mode_8002(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
 	if ( dev->mc_count > 0 || (dev->flags & (IFF_ALLMULTI|IFF_PROMISC))) {
@@ -890,7 +890,7 @@ static void set_rx_mode_8002(struct net_device *dev)
 
 static void set_rx_mode_8012(struct net_device *dev)
 {
-	struct net_local *lp = (struct net_local *)dev->priv;
+	struct net_local *lp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	unsigned char new_mode, mc_filter[8]; /* Multicast hash filter */
 	int i;

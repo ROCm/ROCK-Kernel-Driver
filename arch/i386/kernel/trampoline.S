@@ -23,9 +23,13 @@
  *	and IP is zero.  Thus, data addresses need to be absolute
  *	(no relocation) and are taken with regard to r_base.
  *
- *	If you work on this file, check the object module with objdump
- *	--full-contents --reloc to make sure there are no relocation
- *	entries except for the gdt one..
+ *	If you work on this file, check the object module with
+ *	objdump --reloc to make sure there are no relocation
+ *	entries except for:
+ *
+ *	TYPE              VALUE
+ *	R_386_32          startup_32_smp
+ *	R_386_32          boot_gdt_table
  */
 
 #include <linux/linkage.h>
@@ -42,7 +46,6 @@ r_base = .
 	mov	%cs, %ax	# Code and data in the same place
 	mov	%ax, %ds
 
-	mov	$1, %bx		# Flag an SMP trampoline
 	cli			# We should be safe anyway
 
 	movl	$0xA5A5A5A5, trampoline_data - r_base
@@ -54,22 +57,18 @@ r_base = .
 	xor	%ax, %ax
 	inc	%ax		# protected mode (PE) bit
 	lmsw	%ax		# into protected mode
-	jmp	flush_instr
-flush_instr:
-	ljmpl	$__BOOT_CS, $0x00100000
-			# jump to startup_32 in arch/i386/kernel/head.S
+	# flush prefetch and jump to startup_32_smp in arch/i386/kernel/head.S
+	ljmpl	$__BOOT_CS, $(startup_32_smp-__PAGE_OFFSET)
+
+	# These need to be in the same 64K segment as the above;
+	# hence we don't use the boot_gdt_descr defined in head.S
+boot_gdt:
+	.word	__BOOT_DS + 7			# gdt limit
+	.long	boot_gdt_table-__PAGE_OFFSET	# gdt base
 
 boot_idt:
-	.word	0			# idt limit = 0
-	.word	0, 0			# idt base = 0L
-
-#
-# NOTE: here we actually use CPU#0's GDT - but that is OK, we reload
-# the proper GDT shortly after booting up the secondary CPUs.
-#
-ENTRY(boot_gdt)
-	.word	__BOOT_DS + 7			# gdt limit
-	.long	boot_gdt_table-__PAGE_OFFSET	# gdt base = gdt (first SMP CPU)
+	.word	0				# idt limit = 0
+	.long	0				# idt base = 0L
 
 .globl trampoline_end
 trampoline_end:

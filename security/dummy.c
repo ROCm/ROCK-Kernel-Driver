@@ -194,7 +194,8 @@ static void dummy_sb_free_security (struct super_block *sb)
 	return;
 }
 
-static int dummy_sb_copy_data (const char *fstype, void *orig, void *copy)
+static int dummy_sb_copy_data (struct file_system_type *type,
+			       void *orig, void *copy)
 {
 	return 0;
 }

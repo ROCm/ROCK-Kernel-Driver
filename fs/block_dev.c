@@ -120,7 +120,7 @@ blkdev_get_block(struct inode *inode, sector_t iblock,
 		if (create)
 			return -EIO;
 
-		/* 
+		/*
 		 * for reads, we're just trying to fill a partial page.
 		 * return a hole, they will have to call get_block again
 		 * before they can fill it, and they will get -EIO at that

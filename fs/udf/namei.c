@@ -15,7 +15,7 @@
  *              ftp://prep.ai.mit.edu/pub/gnu/GPL
  *      Each contributing author retains all rights to their own work.
  *
- *  (C) 1998-2001 Ben Fennema
+ *  (C) 1998-2004 Ben Fennema
  *  (C) 1999-2000 Stelias Computing Inc
  *
  * HISTORY
@@ -36,11 +36,11 @@
 #include <linux/smp_lock.h>
 #include <linux/buffer_head.h>
 
-static inline int udf_match(int len, const char * const name, struct qstr *qs)
+static inline int udf_match(int len1, const char *name1, int len2, const char *name2)
 {
-	if (len != qs->len)
+	if (len1 != len2)
 		return 0;
-	return !memcmp(name, qs->name, len);
+	return !memcmp(name1, name2, len1);
 }
 
 int udf_write_fi(struct inode *inode, struct fileIdentDesc *cfi,
@@ -154,8 +154,8 @@ udf_find_entry(struct inode *dir, struct dentry *dentry,
 {
 	struct fileIdentDesc *fi=NULL;
 	loff_t f_pos;
-	int block, flen;
-	char fname[255];
+	int block, namelen;
+	char name[UDF_NAME_LEN], fname[UDF_NAME_LEN];
 	char *nameptr;
 	uint8_t lfi;
 	uint16_t liu;
@@ -165,6 +165,9 @@ udf_find_entry(struct inode *dir, struct dentry *dentry,
 	struct buffer_head *bh = NULL;
 
 	if (!dir)
+		return NULL;
+
+	if ( !(namelen = udf_put_filename(dir->i_sb, dentry->d_name.name, name, dentry->d_name.len)))
 		return NULL;
 
 	f_pos = (udf_ext0_offset(dir) >> 2);
@@ -250,13 +253,10 @@ udf_find_entry(struct inode *dir, struct dentry *dentry,
 		if (!lfi)
 			continue;
 
-		if ((flen = udf_get_filename(dir->i_sb, nameptr, fname, lfi)))
+		if (udf_match(namelen, name, lfi, nameptr))
 		{
-			if (udf_match(flen, fname, &(dentry->d_name)))
-			{
-				udf_release_data(bh);
-				return fi;
-			}
+			udf_release_data(bh);
+			return fi;
 		}
 	}
 	if (fibh->sbh != fibh->ebh)
@@ -306,7 +306,7 @@ udf_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 	struct fileIdentDesc cfi, *fi;
 	struct udf_fileident_bh fibh;
 
-	if (dentry->d_name.len > UDF_NAME_LEN)
+	if (dentry->d_name.len > UDF_NAME_LEN-2)
 		return ERR_PTR(-ENAMETOOLONG);
 
 	lock_kernel();
@@ -353,7 +353,6 @@ udf_add_entry(struct inode *dir, struct dentry *dentry,
 	char name[UDF_NAME_LEN], fname[UDF_NAME_LEN];
 	int namelen;
 	loff_t f_pos;
-	int flen;
 	char *nameptr;
 	loff_t size = (udf_ext0_offset(dir) + dir->i_size) >> 2;
 	int nfidlen;
@@ -481,8 +480,7 @@ udf_add_entry(struct inode *dir, struct dentry *dentry,
 		if (!lfi || !dentry)
 			continue;
 
-		if ((flen = udf_get_filename(dir->i_sb, nameptr, fname, lfi)) &&
-			udf_match(flen, fname, &(dentry->d_name)))
+		if (udf_match(namelen, name, lfi, nameptr))
 		{
 			if (fibh->sbh != fibh->ebh)
 				udf_release_data(fibh->ebh);
@@ -674,8 +672,8 @@ static int udf_mknod(struct inode * dir, struct dentry * dentry, int mode, dev_t
 {
 	struct inode * inode;
 	struct udf_fileident_bh fibh;
-	int err;
 	struct fileIdentDesc cfi, *fi;
+	int err;
 
 	if (!old_valid_dev(rdev))
 		return -EINVAL;
@@ -721,8 +719,8 @@ static int udf_mkdir(struct inode * dir, struct dentry * dentry, int mode)
 {
 	struct inode * inode;
 	struct udf_fileident_bh fibh;
-	int err;
 	struct fileIdentDesc cfi, *fi;
+	int err;
 
 	lock_kernel();
 	err = -EMLINK;
@@ -1119,8 +1117,8 @@ static int udf_link(struct dentry * old_dentry, struct inode * dir,
 {
 	struct inode *inode = old_dentry->d_inode;
 	struct udf_fileident_bh fibh;
-	int err;
 	struct fileIdentDesc cfi, *fi;
+	int err;
 
 	lock_kernel();
 	if (inode->i_nlink >= (256<<sizeof(inode->i_nlink))-1)

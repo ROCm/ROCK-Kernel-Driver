@@ -1,8 +1,9 @@
 /*
  * linux/arch/i386/kernel/edd.c
- *  Copyright (C) 2002, 2003 Dell Inc.
+ *  Copyright (C) 2002, 2003, 2004 Dell Inc.
  *  by Matt Domsch <Matt_Domsch@dell.com>
  *  disk80 signature by Matt Domsch, Andrew Wilks, and Sandeep K. Shandilya
+ *  legacy CHS by Patrick J. LoPresti <patl@users.sourceforge.net>
  *
  * BIOS Enhanced Disk Drive Services (EDD)
  * conformant to T13 Committee www.t13.org
@@ -60,7 +61,7 @@ MODULE_AUTHOR("Matt Domsch <Matt_Domsch@Dell.com>");
 MODULE_DESCRIPTION("sysfs interface to BIOS EDD information");
 MODULE_LICENSE("GPL");
 
-#define EDD_VERSION "0.12 2004-Jan-26"
+#define EDD_VERSION "0.13 2004-Mar-09"
 #define EDD_DEVICE_NAME_SIZE 16
 #define REPORT_URL "http://linux.dell.com/edd/results.html"
 
@@ -231,7 +232,7 @@ static ssize_t
 edd_show_raw_data(struct edd_device *edev, char *buf)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
-	ssize_t len = sizeof (*info) - 4;
+	ssize_t len = sizeof (info->params);
 	if (!edev || !info || !buf) {
 		return -EINVAL;
 	}
@@ -240,10 +241,10 @@ edd_show_raw_data(struct edd_device *edev, char *buf)
 		len = info->params.length;
 
 	/* In case of buggy BIOSs */
-	if (len > (sizeof(*info) - 4))
-		len = sizeof(*info) - 4;
+	if (len > (sizeof(info->params)))
+		len = sizeof(info->params);
 
-	memcpy(buf, ((char *)info) + 4, len);
+	memcpy(buf, &info->params, len);
 	return len;
 }
 
@@ -321,6 +322,45 @@ edd_show_info_flags(struct edd_device *edev, char *buf)
 }
 
 static ssize_t
+edd_show_legacy_cylinders(struct edd_device *edev, char *buf)
+{
+	struct edd_info *info = edd_dev_get_info(edev);
+	char *p = buf;
+	if (!edev || !info || !buf) {
+		return -EINVAL;
+	}
+
+	p += snprintf(p, left, "0x%x\n", info->legacy_cylinders);
+	return (p - buf);
+}
+
+static ssize_t
+edd_show_legacy_heads(struct edd_device *edev, char *buf)
+{
+	struct edd_info *info = edd_dev_get_info(edev);
+	char *p = buf;
+	if (!edev || !info || !buf) {
+		return -EINVAL;
+	}
+
+	p += snprintf(p, left, "0x%x\n", info->legacy_heads);
+	return (p - buf);
+}
+
+static ssize_t
+edd_show_legacy_sectors(struct edd_device *edev, char *buf)
+{
+	struct edd_info *info = edd_dev_get_info(edev);
+	char *p = buf;
+	if (!edev || !info || !buf) {
+		return -EINVAL;
+	}
+
+	p += snprintf(p, left, "0x%x\n", info->legacy_sectors);
+	return (p - buf);
+}
+
+static ssize_t
 edd_show_default_cylinders(struct edd_device *edev, char *buf)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
@@ -382,6 +422,33 @@ edd_show_sectors(struct edd_device *edev, char *buf)
  * are zero, the BIOS doesn't provide sane values, don't bother
  * creating files for them either.
  */
+
+static int
+edd_has_legacy_cylinders(struct edd_device *edev)
+{
+	struct edd_info *info = edd_dev_get_info(edev);
+	if (!edev || !info)
+		return -EINVAL;
+	return info->legacy_cylinders > 0;
+}
+
+static int
+edd_has_legacy_heads(struct edd_device *edev)
+{
+	struct edd_info *info = edd_dev_get_info(edev);
+	if (!edev || !info)
+		return -EINVAL;
+	return info->legacy_heads > 0;
+}
+
+static int
+edd_has_legacy_sectors(struct edd_device *edev)
+{
+	struct edd_info *info = edd_dev_get_info(edev);
+	if (!edev || !info)
+		return -EINVAL;
+	return info->legacy_sectors > 0;
+}
 
 static int
 edd_has_default_cylinders(struct edd_device *edev)
@@ -452,6 +519,12 @@ static EDD_DEVICE_ATTR(version, 0444, edd_show_version, NULL);
 static EDD_DEVICE_ATTR(extensions, 0444, edd_show_extensions, NULL);
 static EDD_DEVICE_ATTR(info_flags, 0444, edd_show_info_flags, NULL);
 static EDD_DEVICE_ATTR(sectors, 0444, edd_show_sectors, NULL);
+static EDD_DEVICE_ATTR(legacy_cylinders, 0444, edd_show_legacy_cylinders,
+		       edd_has_legacy_cylinders);
+static EDD_DEVICE_ATTR(legacy_heads, 0444, edd_show_legacy_heads,
+		       edd_has_legacy_heads);
+static EDD_DEVICE_ATTR(legacy_sectors, 0444, edd_show_legacy_sectors,
+		       edd_has_legacy_sectors);
 static EDD_DEVICE_ATTR(default_cylinders, 0444, edd_show_default_cylinders,
 		       edd_has_default_cylinders);
 static EDD_DEVICE_ATTR(default_heads, 0444, edd_show_default_heads,
@@ -478,6 +551,9 @@ static struct attribute * def_attrs[] = {
 
 /* These attributes are conditional and only added for some devices. */
 static struct edd_attribute * edd_attrs[] = {
+	&edd_attr_legacy_cylinders,
+	&edd_attr_legacy_heads,
+	&edd_attr_legacy_sectors,
 	&edd_attr_default_cylinders,
 	&edd_attr_default_heads,
 	&edd_attr_default_sectors_per_track,

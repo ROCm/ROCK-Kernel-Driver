@@ -796,7 +796,7 @@ static void tx_update_descriptor(struct atmel_private *priv, int is_bcast, u16 l
 
 static int start_tx (struct sk_buff *skb, struct net_device *dev)
 {
-	struct atmel_private *priv = (struct atmel_private *)dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 	struct ieee802_11_hdr header;
 	unsigned long flags;
 	u16 buff, frame_ctl, len = (ETH_ZLEN < skb->len) ? skb->len : ETH_ZLEN;
@@ -1167,7 +1167,7 @@ static void reset_irq_status(struct atmel_private *priv, u8 mask)
 static irqreturn_t service_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
-	struct atmel_private *priv = (struct atmel_private *) dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 	u8 isr;
 	
 	if (priv->card && priv->present_callback && 
@@ -1234,13 +1234,13 @@ static irqreturn_t service_interrupt(int irq, void *dev_id, struct pt_regs *regs
 
 static struct net_device_stats *atmel_get_stats (struct net_device *dev)
 {
-	struct atmel_private *priv = (struct atmel_private *)dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 	return &priv->stats;
 }
 
 static struct iw_statistics *atmel_get_wireless_stats (struct net_device *dev)
 {
-	struct atmel_private *priv = (struct atmel_private *)dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 
 	/* update the link quality here in case we are seeing no beacons 
 	   at all to drive the process */
@@ -1287,7 +1287,7 @@ static int atmel_set_mac_address(struct net_device *dev, void *p)
 
 static int atmel_open (struct net_device *dev)
 {
-	struct atmel_private *priv = (struct atmel_private *) dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 	priv->station_state = STATION_STATE_INITIALIZING;
 	if (!reset_atmel_card(dev)) {
 		priv->station_state = STATION_STATE_DOWN;
@@ -1298,7 +1298,7 @@ static int atmel_open (struct net_device *dev)
 
 static int atmel_close (struct net_device *dev)
 {
-	struct atmel_private *priv = (struct atmel_private *) dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 		
 	netif_carrier_off(dev);	
 	if (netif_running(dev))
@@ -1378,7 +1378,7 @@ static int atmel_proc_output (char *buf, struct atmel_private *priv)
 static int atmel_read_proc(char *page, char **start, off_t off,
 			   int count, int *eof, void *data)
 {
-        struct atmel_private *priv = (struct atmel_private *)data;
+        struct atmel_private *priv = data;
 	int len = atmel_proc_output (page, priv);
         if (len <= off+count) *eof = 1;
         *start = page + off;
@@ -1406,7 +1406,7 @@ struct net_device *init_atmel_card( unsigned short irq, int port, char *firmware
 		goto err_out_free;
 	}
 
-	priv = dev->priv;
+	priv = netdev_priv(dev);
 	priv->dev = dev;
 	priv->sys_dev = sys_dev;
 	priv->present_callback = card_present;
@@ -1525,7 +1525,7 @@ EXPORT_SYMBOL(init_atmel_card);
 
 void stop_atmel_card(struct net_device *dev, int freeres)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 		
 	/* put a brick on it... */
 	if (priv->bus_type == BUS_TYPE_PCCARD) 
@@ -1582,7 +1582,7 @@ static int atmel_set_essid(struct net_device *dev,
 			   struct iw_point *dwrq,
 			   char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 
 	/* Check if we asked for `any' */
 	if(dwrq->flags == 0) {
@@ -1610,7 +1610,7 @@ static int atmel_get_essid(struct net_device *dev,
 			   struct iw_point *dwrq,
 			   char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 
 	/* Get the current SSID */
 	if (priv->SSID_size == 0) {
@@ -1633,7 +1633,7 @@ static int atmel_get_wap(struct net_device *dev,
 			 struct sockaddr *awrq,
 			 char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 	memcpy(awrq->sa_data, priv->CurrentBSSID, 6);
 	awrq->sa_family = ARPHRD_ETHER;
 
@@ -1645,7 +1645,7 @@ static int atmel_set_encode(struct net_device *dev,
 			    struct iw_point *dwrq,
 			    char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 
 	/* Basic checking: do we have a key to set ?
 	 * Note : with the new API, it's impossible to get a NULL pointer.
@@ -1736,7 +1736,7 @@ static int atmel_get_encode(struct net_device *dev,
 			    struct iw_point *dwrq,
 			    char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 	int index = (dwrq->flags & IW_ENCODE_INDEX) - 1;
 	
 	if (!priv->wep_is_on)
@@ -1776,7 +1776,7 @@ static int atmel_set_rate(struct net_device *dev,
 			  struct iw_param *vwrq,
 			  char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 	
 	if (vwrq->fixed == 0) {
 		priv->tx_rate = 3;
@@ -1808,7 +1808,7 @@ static int atmel_set_mode(struct net_device *dev,
 			  __u32 *uwrq,
 			  char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 
 	if (*uwrq != IW_MODE_ADHOC && *uwrq != IW_MODE_INFRA)
 		return -EINVAL;
@@ -1822,7 +1822,7 @@ static int atmel_get_mode(struct net_device *dev,
 			  __u32 *uwrq,
 			  char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 	
 	*uwrq = priv->operating_mode;
 	return 0;
@@ -1833,7 +1833,7 @@ static int atmel_get_rate(struct net_device *dev,
 			 struct iw_param *vwrq,
 			 char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 
 	if (priv->auto_tx_rate) {
 		vwrq->fixed = 0;
@@ -1855,7 +1855,7 @@ static int atmel_set_power(struct net_device *dev,
 			   struct iw_param *vwrq,
 			   char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 	priv->power_mode = vwrq->disabled ? 0 : 1;
 	return -EINPROGRESS;
 }
@@ -1865,7 +1865,7 @@ static int atmel_get_power(struct net_device *dev,
 			   struct iw_param *vwrq,
 			   char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 	vwrq->disabled = priv->power_mode ? 0 : 1;
 	vwrq->flags = IW_POWER_ON;
 	return 0;
@@ -1876,7 +1876,7 @@ static int atmel_set_retry(struct net_device *dev,
 			   struct iw_param *vwrq,
 			   char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 	
 	if(!vwrq->disabled && (vwrq->flags & IW_RETRY_LIMIT)) {
 		if(vwrq->flags & IW_RETRY_MAX)
@@ -1899,7 +1899,7 @@ static int atmel_get_retry(struct net_device *dev,
 			   struct iw_param *vwrq,
 			   char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 
 	vwrq->disabled = 0;      /* Can't be disabled */
 
@@ -1922,7 +1922,7 @@ static int atmel_set_rts(struct net_device *dev,
 			 struct iw_param *vwrq,
 			 char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 	int rthr = vwrq->value;
 
 	if(vwrq->disabled)
@@ -1940,7 +1940,7 @@ static int atmel_get_rts(struct net_device *dev,
 			 struct iw_param *vwrq,
 			 char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 	
 	vwrq->value = priv->rts_threshold;
 	vwrq->disabled = (vwrq->value >= 2347);
@@ -1954,7 +1954,7 @@ static int atmel_set_frag(struct net_device *dev,
 			  struct iw_param *vwrq,
 			  char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 	int fthr = vwrq->value;
 
 	if(vwrq->disabled)
@@ -1973,7 +1973,7 @@ static int atmel_get_frag(struct net_device *dev,
 			  struct iw_param *vwrq,
 			  char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 
 	vwrq->value = priv->frag_threshold;
 	vwrq->disabled = (vwrq->value >= 2346);
@@ -1990,7 +1990,7 @@ static int atmel_set_freq(struct net_device *dev,
 			  struct iw_freq *fwrq,
 			  char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 	int rc = -EINPROGRESS;		/* Call commit handler */
 	
 	/* If setting by frequency, convert to a channel */
@@ -2024,7 +2024,7 @@ static int atmel_get_freq(struct net_device *dev,
 			  struct iw_freq *fwrq,
 			  char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 
 	fwrq->m = priv->channel;
 	fwrq->e = 0;
@@ -2036,7 +2036,7 @@ static int atmel_set_scan(struct net_device *dev,
 			  struct iw_param *vwrq,
 			  char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 
 	/* Note : you may have realised that, as this is a SET operation,
 	 * this is privileged and therefore a normal user can't
@@ -2074,7 +2074,7 @@ static int atmel_get_scan(struct net_device *dev,
 			  struct iw_point *dwrq,
 			  char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 	int i;
 	char *current_ev = extra;
 	struct iw_event	iwe;
@@ -2126,7 +2126,7 @@ static int atmel_get_range(struct net_device *dev,
 			   struct iw_point *dwrq,
 			   char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 	struct iw_range *range = (struct iw_range *) extra;
 	int k,i,j;
 
@@ -2193,7 +2193,7 @@ static int atmel_set_wap(struct net_device *dev,
 			 struct sockaddr *awrq,
 			 char *extra)
 {
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 	int i;
 	static const u8 bcast[] = { 255, 255, 255, 255, 255, 255 };
 	
@@ -2318,7 +2318,7 @@ static const struct iw_handler_def	atmel_handler_def =
 static int atmel_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	int rc = 0;
-	struct atmel_private *priv = (struct atmel_private *) dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 	atmel_priv_ioctl com;
 	struct iwreq *wrq = (struct iwreq *) rq;
 	unsigned char *new_firmware;
@@ -3053,7 +3053,7 @@ static void atmel_management_frame(struct atmel_private *priv, struct ieee802_11
 static void atmel_management_timer(u_long a)
 {
   struct net_device *dev = (struct net_device *) a;
-  struct atmel_private *priv = (struct atmel_private *)dev->priv;
+  struct atmel_private *priv = netdev_priv(dev);
   unsigned long flags;
   
   /* Check if the card has been yanked. */
@@ -3297,7 +3297,7 @@ static int atmel_wakeup_firmware(struct atmel_private *priv)
 static int probe_atmel_card(struct net_device *dev)
 {
 	int rc = 0;
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 	 
 	/* reset pccard */
 	if (priv->bus_type == BUS_TYPE_PCCARD) 
@@ -3486,7 +3486,7 @@ int reset_atmel_card(struct net_device *dev)
 	   which is the route into the rest of the firmare datastructures. */
 
 	int channel;
-	struct atmel_private *priv = dev->priv;
+	struct atmel_private *priv = netdev_priv(dev);
 	u8 configuration;
 	
 	/* data to add to the firmware names, in priority order

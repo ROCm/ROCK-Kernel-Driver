@@ -365,25 +365,6 @@ static void __exit amdtco_exit(void)
 	unregister_reboot_notifier(&amdtco_notifier);
 }
 
-
-#ifndef MODULE
-static int __init amdtco_setup(char *str)
-{
-	int ints[4];
-
-	str = get_options (str, ARRAY_SIZE(ints), ints);
-	if (ints[0] > 0)
-		timeout = ints[1];
-
-	if (!timeout || timeout > MAX_TIMEOUT)
-		timeout = MAX_TIMEOUT;
-
-	return 1;
-}
-
-__setup("amd7xx_tco=", amdtco_setup);
-#endif
-
 module_init(amdtco_init);
 module_exit(amdtco_exit);
 

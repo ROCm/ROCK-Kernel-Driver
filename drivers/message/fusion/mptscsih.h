@@ -15,7 +15,7 @@
  *
  *      (see also mptbase.c)
  *
- *  Copyright (c) 1999-2003 LSI Logic Corporation
+ *  Copyright (c) 1999-2004 LSI Logic Corporation
  *  Originally By: Steven J. Ralston
  *  (mailto:netscape.net)
  *  (mailto:mpt_linux_developer@lsil.com)
@@ -70,11 +70,7 @@
  *	Try to keep these at 2^N-1
  */
 #define MPT_FC_CAN_QUEUE	127
-#if defined MPT_SCSI_USE_NEW_EH
-	#define MPT_SCSI_CAN_QUEUE	127
-#else
-	#define MPT_SCSI_CAN_QUEUE	63
-#endif
+#define MPT_SCSI_CAN_QUEUE	127
 
 #define MPT_SCSI_CMD_PER_DEV_HIGH	31
 #define MPT_SCSI_CMD_PER_DEV_LOW	7
@@ -98,7 +94,7 @@
 #define MPT_SCSI_SG_DEPTH	40
 #endif
 
-/* To disable domain validation, comment the
+/* To disable domain validation, uncomment the
  * following line. No effect for FC devices.
  * For SCSI devices, driver will negotiate to
  * NVRAM settings (if available) or to maximum adapter
@@ -114,12 +110,14 @@
 #define MPTSCSIH_DOMAIN_VALIDATION      1
 #define MPTSCSIH_MAX_WIDTH              1
 #define MPTSCSIH_MIN_SYNC               0x08
+#define MPTSCSIH_SAF_TE                 0
 
 struct mptscsih_driver_setup
 {
         u8      dv;
         u8      max_width;
         u8      min_sync_fac;
+        u8      saf_te;
 };
 
 
@@ -128,6 +126,7 @@ struct mptscsih_driver_setup
         MPTSCSIH_DOMAIN_VALIDATION,             \
         MPTSCSIH_MAX_WIDTH,                     \
         MPTSCSIH_MIN_SYNC,                      \
+        MPTSCSIH_SAF_TE,                        \
 }
 
 

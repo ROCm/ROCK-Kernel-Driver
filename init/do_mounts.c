@@ -66,11 +66,11 @@ static dev_t __init try_name(char *name, int part)
 	/* read device number from .../dev */
 
 	sprintf(path, "/sys/block/%s/dev", name);
-	fd = open(path, 0, 0);
+	fd = sys_open(path, 0, 0);
 	if (fd < 0)
 		goto fail;
-	len = read(fd, buf, 32);
-	close(fd);
+	len = sys_read(fd, buf, 32);
+	sys_close(fd);
 	if (len <= 0 || len == 32 || buf[len - 1] != '\n')
 		goto fail;
 	buf[len - 1] = '\0';
@@ -96,11 +96,11 @@ static dev_t __init try_name(char *name, int part)
 
 	/* otherwise read range from .../range */
 	sprintf(path, "/sys/block/%s/range", name);
-	fd = open(path, 0, 0);
+	fd = sys_open(path, 0, 0);
 	if (fd < 0)
 		goto fail;
-	len = read(fd, buf, 32);
-	close(fd);
+	len = sys_read(fd, buf, 32);
+	sys_close(fd);
 	if (len <= 0 || len == 32 || buf[len - 1] != '\n')
 		goto fail;
 	buf[len - 1] = '\0';
@@ -162,6 +162,9 @@ dev_t __init name_to_dev_t(char *name)
 	name += 5;
 	res = Root_NFS;
 	if (strcmp(name, "nfs") == 0)
+		goto done;
+	res = Root_RAM0;
+	if (strcmp(name, "ram") == 0)
 		goto done;
 
 	if (strlen(name) > 31)
@@ -285,7 +288,7 @@ retry:
 				continue;
 		}
 	        /*
-		 * Allow the user to distinguish between failed open
+		 * Allow the user to distinguish between failed sys_open
 		 * and bad superblock on root device.
 		 */
 		__bdevname(ROOT_DEV, b);
@@ -324,21 +327,21 @@ void __init change_floppy(char *fmt, ...)
 	va_start(args, fmt);
 	vsprintf(buf, fmt, args);
 	va_end(args);
-	fd = open("/dev/root", O_RDWR | O_NDELAY, 0);
+	fd = sys_open("/dev/root", O_RDWR | O_NDELAY, 0);
 	if (fd >= 0) {
 		sys_ioctl(fd, FDEJECT, 0);
-		close(fd);
+		sys_close(fd);
 	}
 	printk(KERN_NOTICE "VFS: Insert %s and press ENTER\n", buf);
-	fd = open("/dev/console", O_RDWR, 0);
+	fd = sys_open("/dev/console", O_RDWR, 0);
 	if (fd >= 0) {
 		sys_ioctl(fd, TCGETS, (long)&termios);
 		termios.c_lflag &= ~ICANON;
 		sys_ioctl(fd, TCSETSF, (long)&termios);
-		read(fd, &c, 1);
+		sys_read(fd, &c, 1);
 		termios.c_lflag |= ICANON;
 		sys_ioctl(fd, TCSETSF, (long)&termios);
-		close(fd);
+		sys_close(fd);
 	}
 }
 #endif

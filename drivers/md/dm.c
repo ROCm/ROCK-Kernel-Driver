@@ -40,11 +40,6 @@ struct target_io {
 	struct dm_io *io;
 	struct dm_target *ti;
 	union map_info info;
-
-	sector_t bi_sector;
-	struct block_device *bi_bdev;
-	unsigned int bi_size;
-	unsigned short bi_idx;
 };
 
 /*
@@ -303,12 +298,6 @@ static int clone_endio(struct bio *bio, unsigned int done, int error)
 		return 1;
 
 	if (endio) {
-		/* Restore bio fields. */
-		bio->bi_sector = tio->bi_sector;
-		bio->bi_bdev = tio->bi_bdev;
-		bio->bi_size = tio->bi_size;
-		bio->bi_idx = tio->bi_idx;
-
 		r = endio(tio->ti, bio, error, &tio->info);
 		if (r < 0)
 			error = r;
@@ -364,16 +353,9 @@ static void __map_bio(struct dm_target *ti, struct bio *clone,
 	 */
 	atomic_inc(&tio->io->io_count);
 	r = ti->type->map(ti, clone, &tio->info);
-	if (r > 0) {
-		/* Save the bio info so we can restore it during endio. */
-		tio->bi_sector = clone->bi_sector;
-		tio->bi_bdev = clone->bi_bdev;
-		tio->bi_size = clone->bi_size;
-		tio->bi_idx = clone->bi_idx;
-
+	if (r > 0)
 		/* the bio has been remapped so dispatch it */
 		generic_make_request(clone);
-	}
 
 	else if (r < 0) {
 		/* error the io and bail out */

@@ -531,7 +531,7 @@ static struct page *buffered_rmqueue(struct zone *zone, int order, int cold)
 
 	if (page != NULL) {
 		BUG_ON(bad_range(zone, page));
-		mod_page_state(pgalloc, 1 << order);
+		mod_page_state_zone(zone, pgalloc, 1 << order);
 		prep_new_page(page, order);
 	}
 	return page;
@@ -703,6 +703,42 @@ got_pg:
 
 EXPORT_SYMBOL(__alloc_pages);
 
+#ifdef CONFIG_NUMA
+/* Early boot: Everything is done by one cpu, but the data structures will be
+ * used by all cpus - spread them on all nodes.
+ */
+static __init unsigned long get_boot_pages(unsigned int gfp_mask, unsigned int order)
+{
+static int nodenr;
+	int i = nodenr;
+	struct page *page;
+
+	for (;;) {
+		if (i > nodenr + numnodes)
+			return 0;
+		if (node_present_pages(i%numnodes)) {
+			struct zone **z;
+			/* The node contains memory. Check that there is
+			 * memory in the intended zonelist.
+			 */
+			z = NODE_DATA(i%numnodes)->node_zonelists[gfp_mask & GFP_ZONEMASK].zones;
+			while (*z) {
+				if ( (*z)->free_pages > (1UL<<order))
+					goto found_node;
+				z++;
+			}
+		}
+		i++;
+	}
+found_node:
+	nodenr = i+1;
+	page = alloc_pages_node(i%numnodes, gfp_mask, order);
+	if (!page)
+		return 0;
+	return (unsigned long) page_address(page);
+}
+#endif
+
 /*
  * Common helper functions.
  */
@@ -710,6 +746,10 @@ fastcall unsigned long __get_free_pages(unsigned int gfp_mask, unsigned int orde
 {
 	struct page * page;
 
+#ifdef CONFIG_NUMA
+	if (unlikely(!system_running))
+		return get_boot_pages(gfp_mask, order);
+#endif
 	page = alloc_pages(gfp_mask, order);
 	if (!page)
 		return 0;
@@ -1034,6 +1074,7 @@ void show_free_areas(void)
 			" high:%lukB"
 			" active:%lukB"
 			" inactive:%lukB"
+			" present:%lukB"
 			"\n",
 			zone->name,
 			K(zone->free_pages),
@@ -1041,7 +1082,8 @@ void show_free_areas(void)
 			K(zone->pages_low),
 			K(zone->pages_high),
 			K(zone->nr_active),
-			K(zone->nr_inactive)
+			K(zone->nr_inactive),
+			K(zone->present_pages)
 			);
 	}
 
@@ -1101,6 +1143,112 @@ static int __init build_zonelists_node(pg_data_t *pgdat, struct zonelist *zoneli
 	return j;
 }
 
+#ifdef CONFIG_NUMA
+#define MAX_NODE_LOAD (numnodes)
+static int __initdata node_load[MAX_NUMNODES];
+/**
+ * find_next_best_node - find the next node that should appear in a given
+ *    node's fallback list
+ * @node: node whose fallback list we're appending
+ * @used_node_mask: pointer to the bitmap of already used nodes
+ *
+ * We use a number of factors to determine which is the next node that should
+ * appear on a given node's fallback list.  The node should not have appeared
+ * already in @node's fallback list, and it should be the next closest node
+ * according to the distance array (which contains arbitrary distance values
+ * from each node to each node in the system), and should also prefer nodes
+ * with no CPUs, since presumably they'll have very little allocation pressure
+ * on them otherwise.
+ * It returns -1 if no node is found.
+ */
+static int __init find_next_best_node(int node, void *used_node_mask)
+{
+	int i, n, val;
+	int min_val = INT_MAX;
+	int best_node = -1;
+
+	for (i = 0; i < numnodes; i++) {
+		cpumask_t tmp;
+
+		/* Start from local node */
+		n = (node+i)%numnodes;
+
+		/* Don't want a node to appear more than once */
+		if (test_bit(n, used_node_mask))
+			continue;
+
+		/* Use the distance array to find the distance */
+		val = node_distance(node, n);
+
+		/* Give preference to headless and unused nodes */
+		tmp = node_to_cpumask(n);
+		if (!cpus_empty(tmp))
+			val += PENALTY_FOR_NODE_WITH_CPUS;
+
+		/* Slight preference for less loaded node */
+		val *= (MAX_NODE_LOAD*MAX_NUMNODES);
+		val += node_load[n];
+
+		if (val < min_val) {
+			min_val = val;
+			best_node = n;
+		}
+	}
+
+	if (best_node >= 0)
+		set_bit(best_node, used_node_mask);
+
+	return best_node;
+}
+
+static void __init build_zonelists(pg_data_t *pgdat)
+{
+	int i, j, k, node, local_node;
+	int prev_node, load;
+	struct zonelist *zonelist;
+	DECLARE_BITMAP(used_mask, MAX_NUMNODES);
+
+	/* initialize zonelists */
+	for (i = 0; i < MAX_NR_ZONES; i++) {
+		zonelist = pgdat->node_zonelists + i;
+		memset(zonelist, 0, sizeof(*zonelist));
+		zonelist->zones[0] = NULL;
+	}
+
+	/* NUMA-aware ordering of nodes */
+	local_node = pgdat->node_id;
+	load = numnodes;
+	prev_node = local_node;
+	CLEAR_BITMAP(used_mask, MAX_NUMNODES);
+	while ((node = find_next_best_node(local_node, used_mask)) >= 0) {
+		/*
+		 * We don't want to pressure a particular node.
+		 * So adding penalty to the first node in same
+		 * distance group to make it round-robin.
+		 */
+		if (node_distance(local_node, node) !=
+				node_distance(local_node, prev_node))
+			node_load[node] += load;
+		prev_node = node;
+		load--;
+		for (i = 0; i < MAX_NR_ZONES; i++) {
+			zonelist = pgdat->node_zonelists + i;
+			for (j = 0; zonelist->zones[j] != NULL; j++);
+
+			k = ZONE_NORMAL;
+			if (i & __GFP_HIGHMEM)
+				k = ZONE_HIGHMEM;
+			if (i & __GFP_DMA)
+				k = ZONE_DMA;
+
+	 		j = build_zonelists_node(NODE_DATA(node), zonelist, j, k);
+			zonelist->zones[j] = NULL;
+		}
+	}
+}
+
+#else	/* CONFIG_NUMA */
+
 static void __init build_zonelists(pg_data_t *pgdat)
 {
 	int i, j, k, node, local_node;
@@ -1136,6 +1284,8 @@ static void __init build_zonelists(pg_data_t *pgdat)
 		zonelist->zones[j++] = NULL;
 	} 
 }
+
+#endif	/* CONFIG_NUMA */
 
 void __init build_all_zonelists(void)
 {
@@ -1311,7 +1461,8 @@ static void __init free_area_init_core(struct pglist_data *pgdat,
 				zone_names[j], realsize, batch);
 		INIT_LIST_HEAD(&zone->active_list);
 		INIT_LIST_HEAD(&zone->inactive_list);
-		atomic_set(&zone->refill_counter, 0);
+		atomic_set(&zone->nr_scan_active, 0);
+		atomic_set(&zone->nr_scan_inactive, 0);
 		zone->nr_active = 0;
 		zone->nr_inactive = 0;
 		if (!size)
@@ -1494,23 +1645,38 @@ static char *vmstat_text[] = {
 	"pgpgout",
 	"pswpin",
 	"pswpout",
-	"pgalloc",
+	"pgalloc_high",
 
+	"pgalloc_normal",
+	"pgalloc_dma",
 	"pgfree",
 	"pgactivate",
 	"pgdeactivate",
+
 	"pgfault",
 	"pgmajfault",
+	"pgrefill_high",
+	"pgrefill_normal",
+	"pgrefill_dma",
 
-	"pgscan",
-	"pgrefill",
-	"pgsteal",
+	"pgsteal_high",
+	"pgsteal_normal",
+	"pgsteal_dma",
+	"pgscan_kswapd_high",
+	"pgscan_kswapd_normal",
+
+	"pgscan_kswapd_dma",
+	"pgscan_direct_high",
+	"pgscan_direct_normal",
+	"pgscan_direct_dma",
 	"pginodesteal",
-	"kswapd_steal",
 
+	"slabs_scanned",
+	"kswapd_steal",
 	"kswapd_inodesteal",
 	"pageoutrun",
 	"allocstall",
+
 	"pgrotated",
 };
 

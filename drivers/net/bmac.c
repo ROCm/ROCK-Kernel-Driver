@@ -226,7 +226,7 @@ volatile unsigned short bmread(struct net_device *dev, unsigned long reg_offset 
 static void
 bmac_enable_and_reset_chip(struct net_device *dev)
 {
-	struct bmac_data *bp = (struct bmac_data *) dev->priv;
+	struct bmac_data *bp = netdev_priv(dev);
 	volatile struct dbdma_regs *rd = bp->rx_dma;
 	volatile struct dbdma_regs *td = bp->tx_dma;
 
@@ -310,7 +310,7 @@ bmac_mif_write(struct net_device *dev, unsigned int addr, unsigned int val)
 static void
 bmac_init_registers(struct net_device *dev)
 {
-	struct bmac_data *bp = (struct bmac_data *) dev->priv;
+	struct bmac_data *bp = netdev_priv(dev);
 	volatile unsigned short regValue;
 	unsigned short *pWord16;
 	int i;
@@ -405,7 +405,7 @@ bmac_enable_interrupts(struct net_device *dev)
 static void
 bmac_start_chip(struct net_device *dev)
 {
-	struct bmac_data *bp = (struct bmac_data *) dev->priv;
+	struct bmac_data *bp = netdev_priv(dev);
 	volatile struct dbdma_regs *rd = bp->rx_dma;
 	unsigned short	oldConfig;
 
@@ -425,7 +425,7 @@ static void
 bmac_init_phy(struct net_device *dev)
 {
 	unsigned int addr;
-	struct bmac_data *bp = (struct bmac_data *) dev->priv;
+	struct bmac_data *bp = netdev_priv(dev);
 
 	printk(KERN_DEBUG "phy registers:");
 	for (addr = 0; addr < 32; ++addr) {
@@ -458,7 +458,7 @@ static void bmac_init_chip(struct net_device *dev)
 static int bmac_suspend(struct macio_dev *mdev, u32 state)
 {
 	struct net_device* dev = macio_get_drvdata(mdev);	
-	struct bmac_data *bp = dev->priv;	
+	struct bmac_data *bp = netdev_priv(dev);
 	unsigned long flags;
 	unsigned short config;
 	int i;
@@ -508,7 +508,7 @@ static int bmac_suspend(struct macio_dev *mdev, u32 state)
 static int bmac_resume(struct macio_dev *mdev)
 {
 	struct net_device* dev = macio_get_drvdata(mdev);	
-	struct bmac_data *bp = dev->priv;	
+	struct bmac_data *bp = netdev_priv(dev);
 
 	/* see if this is enough */
 	if (bp->opened)
@@ -525,7 +525,7 @@ static int bmac_resume(struct macio_dev *mdev)
 
 static int bmac_set_address(struct net_device *dev, void *addr)
 {
-	struct bmac_data *bp = (struct bmac_data *) dev->priv;
+	struct bmac_data *bp = netdev_priv(dev);
 	unsigned char *p = addr;
 	unsigned short *pWord16;
 	unsigned long flags;
@@ -550,7 +550,7 @@ static int bmac_set_address(struct net_device *dev, void *addr)
 
 static inline void bmac_set_timeout(struct net_device *dev)
 {
-	struct bmac_data *bp = (struct bmac_data *) dev->priv;
+	struct bmac_data *bp = netdev_priv(dev);
 	unsigned long flags;
 
 	spin_lock_irqsave(&bp->lock, flags);
@@ -656,7 +656,7 @@ bmac_init_rx_ring(struct bmac_data *bp)
 
 static int bmac_transmit_packet(struct sk_buff *skb, struct net_device *dev)
 {
-	struct bmac_data *bp = (struct bmac_data *) dev->priv;
+	struct bmac_data *bp = netdev_priv(dev);
 	volatile struct dbdma_regs *td = bp->tx_dma;
 	int i;
 
@@ -692,7 +692,7 @@ static int rxintcount;
 static irqreturn_t bmac_rxdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
-	struct bmac_data *bp = (struct bmac_data *) dev->priv;
+	struct bmac_data *bp = netdev_priv(dev);
 	volatile struct dbdma_regs *rd = bp->rx_dma;
 	volatile struct dbdma_cmd *cp;
 	int i, nb, stat;
@@ -769,7 +769,7 @@ static int txintcount;
 static irqreturn_t bmac_txdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
-	struct bmac_data *bp = (struct bmac_data *) dev->priv;
+	struct bmac_data *bp = netdev_priv(dev);
 	volatile struct dbdma_cmd *cp;
 	int stat;
 	unsigned long flags;
@@ -822,7 +822,7 @@ static irqreturn_t bmac_txdma_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 static struct net_device_stats *bmac_stats(struct net_device *dev)
 {
-	struct bmac_data *p = (struct bmac_data *) dev->priv;
+	struct bmac_data *p = netdev_priv(dev);
 
 	return &p->stats;
 }
@@ -995,7 +995,7 @@ bmac_remove_multi(struct net_device *dev,
 static void bmac_set_multicast(struct net_device *dev)
 {
 	struct dev_mc_list *dmi;
-	struct bmac_data *bp = (struct bmac_data *) dev->priv;
+	struct bmac_data *bp = netdev_priv(dev);
 	int num_addrs = dev->mc_count;
 	unsigned short rx_cfg;
 	int i;
@@ -1086,7 +1086,7 @@ static int miscintcount;
 static irqreturn_t bmac_misc_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
-	struct bmac_data *bp = (struct bmac_data *)dev->priv;
+	struct bmac_data *bp = netdev_priv(dev);
 	unsigned int status = bmread(dev, STATUS);
 	if (miscintcount++ < 10) {
 		XXDEBUG(("bmac_misc_intr\n"));
@@ -1232,7 +1232,7 @@ bmac_get_station_address(struct net_device *dev, unsigned char *ea)
 
 static void bmac_reset_and_enable(struct net_device *dev)
 {
-	struct bmac_data *bp = dev->priv;
+	struct bmac_data *bp = netdev_priv(dev);
 	unsigned long flags;
 	struct sk_buff *skb;
 	unsigned char *data;
@@ -1288,7 +1288,7 @@ static int __devinit bmac_probe(struct macio_dev *mdev, const struct of_match *m
 		return -ENOMEM;
 	}
 		
-	bp = (struct bmac_data *) dev->priv;
+	bp = netdev_priv(dev);
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &mdev->ofdev.dev);
 	macio_set_drvdata(mdev, dev);
@@ -1408,7 +1408,7 @@ out_free:
 
 static int bmac_open(struct net_device *dev)
 {
-	struct bmac_data *bp = (struct bmac_data *) dev->priv;
+	struct bmac_data *bp = netdev_priv(dev);
 	/* XXDEBUG(("bmac: enter open\n")); */
 	/* reset the chip */
 	bp->opened = 1;
@@ -1420,7 +1420,7 @@ static int bmac_open(struct net_device *dev)
 
 static int bmac_close(struct net_device *dev)
 {
-	struct bmac_data *bp = (struct bmac_data *) dev->priv;
+	struct bmac_data *bp = netdev_priv(dev);
 	volatile struct dbdma_regs *rd = bp->rx_dma;
 	volatile struct dbdma_regs *td = bp->tx_dma;
 	unsigned short config;
@@ -1469,7 +1469,7 @@ static int bmac_close(struct net_device *dev)
 static void
 bmac_start(struct net_device *dev)
 {
-	struct bmac_data *bp = dev->priv;
+	struct bmac_data *bp = netdev_priv(dev);
 	int i;
 	struct sk_buff *skb;
 	unsigned long flags;
@@ -1495,7 +1495,7 @@ bmac_start(struct net_device *dev)
 static int
 bmac_output(struct sk_buff *skb, struct net_device *dev)
 {
-	struct bmac_data *bp = dev->priv;
+	struct bmac_data *bp = netdev_priv(dev);
 	skb_queue_tail(bp->queue, skb);
 	bmac_start(dev);
 	return 0;
@@ -1504,7 +1504,7 @@ bmac_output(struct sk_buff *skb, struct net_device *dev)
 static void bmac_tx_timeout(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *) data;
-	struct bmac_data *bp = (struct bmac_data *) dev->priv;
+	struct bmac_data *bp = netdev_priv(dev);
 	volatile struct dbdma_regs *td = bp->tx_dma;
 	volatile struct dbdma_regs *rd = bp->rx_dma;
 	volatile struct dbdma_cmd *cp;
@@ -1630,7 +1630,7 @@ bmac_proc_info(char *buffer, char **start, off_t offset, int length)
 static int __devexit bmac_remove(struct macio_dev *mdev)
 {
 	struct net_device *dev = macio_get_drvdata(mdev);
-	struct bmac_data *bp = dev->priv;
+	struct bmac_data *bp = netdev_priv(dev);
 
 	unregister_netdev(dev);
 

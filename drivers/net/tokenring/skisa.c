@@ -175,7 +175,7 @@ static int __init setup_card(struct net_device *dev)
 		printk(":%2.2x", dev->dev_addr[j]);
 	printk("\n");
 		
-	tp = (struct net_local *)dev->priv;
+	tp = netdev_priv(dev);
 	tp->setnselout = sk_isa_setnselout_pins;
 		
 	tp->sifreadb = sk_isa_sifreadb;
@@ -332,7 +332,7 @@ unsigned short sk_isa_setnselout_pins(struct net_device *dev)
 
 static int sk_isa_open(struct net_device *dev)
 {  
-	struct net_local *tp = (struct net_local *)dev->priv;
+	struct net_local *tp = netdev_priv(dev);
 	unsigned short val = 0;
 	unsigned short oldval;
 	int i;

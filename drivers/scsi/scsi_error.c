@@ -894,7 +894,7 @@ static int scsi_eh_try_stu(struct scsi_cmnd *scmd)
  *
  * Notes:
  *    If commands are failing due to not ready, initializing command required,
- *	sending a start unit, if we are allowed to.
+ *	try revalidating the device, which will end up sending a start unit. 
  **/
 static int scsi_eh_stu(struct Scsi_Host *shost,
 			      struct list_head *work_q,
@@ -1293,6 +1293,8 @@ int scsi_decide_disposition(struct scsi_cmnd *scmd)
 		 */
 	case DID_SOFT_ERROR:
 		goto maybe_retry;
+	case DID_IMM_RETRY:
+		return NEEDS_RETRY;
 
 	case DID_ERROR:
 		if (msg_byte(scmd->result) == COMMAND_COMPLETE &&

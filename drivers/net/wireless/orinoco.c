@@ -599,7 +599,7 @@ static int orinoco_debug_dump_recs(struct net_device *dev);
 
 int __orinoco_up(struct net_device *dev)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	struct hermes *hw = &priv->hw;
 	int err;
 
@@ -626,7 +626,7 @@ int __orinoco_up(struct net_device *dev)
 
 int __orinoco_down(struct net_device *dev)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	struct hermes *hw = &priv->hw;
 	int err;
 
@@ -657,7 +657,7 @@ int __orinoco_down(struct net_device *dev)
 
 int orinoco_reinit_firmware(struct net_device *dev)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	struct hermes *hw = &priv->hw;
 	int err;
 
@@ -685,7 +685,7 @@ int orinoco_reinit_firmware(struct net_device *dev)
 
 static int orinoco_open(struct net_device *dev)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	unsigned long flags;
 	int err;
 
@@ -705,7 +705,7 @@ static int orinoco_open(struct net_device *dev)
 
 int orinoco_stop(struct net_device *dev)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	int err = 0;
 
 	/* We mustn't use orinoco_lock() here, because we need to be
@@ -724,7 +724,7 @@ int orinoco_stop(struct net_device *dev)
 
 static int __orinoco_program_rids(struct net_device *dev)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	hermes_t *hw = &priv->hw;
 	int err;
 	struct hermes_idstring idbuf;
@@ -912,7 +912,7 @@ ESSID in IBSS-Ad-Hoc mode.\n", dev->name);
 /* xyzzy */
 static int orinoco_reconfigure(struct net_device *dev)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	struct hermes *hw = &priv->hw;
 	unsigned long flags;
 	int err = 0;
@@ -965,7 +965,7 @@ static int orinoco_reconfigure(struct net_device *dev)
  * schedule_work() */
 static void orinoco_reset(struct net_device *dev)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	struct hermes *hw = &priv->hw;
 	int err;
 	unsigned long flags;
@@ -1070,7 +1070,7 @@ is_ethersnap(struct header_struct *hdr)
 static void
 orinoco_set_multicast_list(struct net_device *dev)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	unsigned long flags;
 
 	if (orinoco_lock(priv, &flags) != 0) {
@@ -1433,7 +1433,7 @@ static void show_rx_frame(struct orinoco_rxframe_hdr *frame)
 irqreturn_t orinoco_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *)dev_id;
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	hermes_t *hw = &priv->hw;
 	int count = MAX_IRQLOOPS_PER_IRQ;
 	u16 evstat, events;
@@ -1561,7 +1561,7 @@ static void print_linkstatus(struct net_device *dev, u16 status)
 
 static void __orinoco_ev_info(struct net_device *dev, hermes_t *hw)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	u16 infofid;
 	struct {
 		u16 len;
@@ -1662,7 +1662,7 @@ static void __orinoco_ev_info(struct net_device *dev, hermes_t *hw)
 
 static void __orinoco_ev_rx(struct net_device *dev, hermes_t *hw)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	struct net_device_stats *stats = &priv->stats;
 	struct iw_statistics *wstats = &priv->wstats;
 	struct sk_buff *skb = NULL;
@@ -1814,7 +1814,7 @@ static void __orinoco_ev_rx(struct net_device *dev, hermes_t *hw)
 
 static void __orinoco_ev_txexc(struct net_device *dev, hermes_t *hw)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	struct net_device_stats *stats = &priv->stats;
 	u16 fid = hermes_read_regn(hw, TXCOMPLFID);
 	struct hermes_tx_descriptor desc;
@@ -1840,7 +1840,7 @@ static void __orinoco_ev_txexc(struct net_device *dev, hermes_t *hw)
 
 static void __orinoco_ev_tx(struct net_device *dev, hermes_t *hw)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	struct net_device_stats *stats = &priv->stats;
 
 	stats->tx_packets++;
@@ -1850,7 +1850,7 @@ static void __orinoco_ev_tx(struct net_device *dev, hermes_t *hw)
 
 static void __orinoco_ev_alloc(struct net_device *dev, hermes_t *hw)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 
 	u16 fid = hermes_read_regn(hw, ALLOCFID);
 
@@ -1886,7 +1886,7 @@ static int determine_firmware_type(struct net_device *dev, struct sta_id *sta_id
 
 static void determine_firmware(struct net_device *dev)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	hermes_t *hw = &priv->hw;
 	int err;
 	struct sta_id sta_id;
@@ -2024,7 +2024,7 @@ static void determine_firmware(struct net_device *dev)
 static int
 orinoco_init(struct net_device *dev)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	hermes_t *hw = &priv->hw;
 	int err = 0;
 	struct hermes_idstring nickbuf;
@@ -2204,7 +2204,7 @@ orinoco_init(struct net_device *dev)
 struct net_device_stats *
 orinoco_get_stats(struct net_device *dev)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	
 	return &priv->stats;
 }
@@ -2212,7 +2212,7 @@ orinoco_get_stats(struct net_device *dev)
 struct iw_statistics *
 orinoco_get_wireless_stats(struct net_device *dev)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	hermes_t *hw = &priv->hw;
 	struct iw_statistics *wstats = &priv->wstats;
 	int err = 0;
@@ -2271,7 +2271,7 @@ orinoco_get_wireless_stats(struct net_device *dev)
 static inline void orinoco_spy_gather(struct net_device *dev, u_char *mac,
 				    int level, int noise)
 {
-	struct orinoco_private *priv = (struct orinoco_private *)dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	int i;
 
 	/* Gather wireless spy statistics: for each packet, compare the
@@ -2290,7 +2290,7 @@ orinoco_stat_gather(struct net_device *dev,
 		    struct sk_buff *skb,
 		    struct hermes_rx_descriptor *desc)
 {
-	struct orinoco_private *priv = (struct orinoco_private *)dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 
 	/* Using spy support with lots of Rx packets, like in an
 	 * infrastructure (AP), will really slow down everything, because
@@ -2311,7 +2311,7 @@ orinoco_stat_gather(struct net_device *dev,
 static int
 orinoco_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct orinoco_private *priv = (struct orinoco_private *)dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	struct net_device_stats *stats = &priv->stats;
 	hermes_t *hw = &priv->hw;
 	int err = 0;
@@ -2449,7 +2449,7 @@ orinoco_xmit(struct sk_buff *skb, struct net_device *dev)
 static void
 orinoco_tx_timeout(struct net_device *dev)
 {
-	struct orinoco_private *priv = (struct orinoco_private *)dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	struct net_device_stats *stats = &priv->stats;
 	struct hermes *hw = &priv->hw;
 
@@ -2466,7 +2466,7 @@ orinoco_tx_timeout(struct net_device *dev)
 static int
 orinoco_change_mtu(struct net_device *dev, int new_mtu)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 
 	if ( (new_mtu < ORINOCO_MIN_MTU) || (new_mtu > ORINOCO_MAX_MTU) )
 		return -EINVAL;
@@ -2484,7 +2484,7 @@ orinoco_change_mtu(struct net_device *dev, int new_mtu)
 static void
 __orinoco_set_multicast_list(struct net_device *dev)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	hermes_t *hw = &priv->hw;
 	int err = 0;
 	int promisc, mc_count;
@@ -2554,7 +2554,7 @@ __orinoco_set_multicast_list(struct net_device *dev)
 
 static int orinoco_ioctl_getiwrange(struct net_device *dev, struct iw_point *rrq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	int err = 0;
 	int mode;
 	struct iw_range range;
@@ -2699,7 +2699,7 @@ static int orinoco_ioctl_getiwrange(struct net_device *dev, struct iw_point *rrq
 
 static int orinoco_ioctl_setiwencode(struct net_device *dev, struct iw_point *erq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	int index = (erq->flags & IW_ENCODE_INDEX) - 1;
 	int setindex = priv->tx_key;
 	int enable = priv->wep_on;
@@ -2794,7 +2794,7 @@ static int orinoco_ioctl_setiwencode(struct net_device *dev, struct iw_point *er
 
 static int orinoco_ioctl_getiwencode(struct net_device *dev, struct iw_point *erq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	int index = (erq->flags & IW_ENCODE_INDEX) - 1;
 	u16 xlen = 0;
 	char keybuf[ORINOCO_MAX_KEY_SIZE];
@@ -2841,7 +2841,7 @@ static int orinoco_ioctl_getiwencode(struct net_device *dev, struct iw_point *er
 
 static int orinoco_ioctl_setessid(struct net_device *dev, struct iw_point *erq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	char essidbuf[IW_ESSID_MAX_SIZE+1];
 	int err;
 	unsigned long flags;
@@ -2874,7 +2874,7 @@ static int orinoco_ioctl_setessid(struct net_device *dev, struct iw_point *erq)
 
 static int orinoco_ioctl_getessid(struct net_device *dev, struct iw_point *erq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	char essidbuf[IW_ESSID_MAX_SIZE+1];
 	int active;
 	int err = 0;
@@ -2907,7 +2907,7 @@ static int orinoco_ioctl_getessid(struct net_device *dev, struct iw_point *erq)
 
 static int orinoco_ioctl_setnick(struct net_device *dev, struct iw_point *nrq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	char nickbuf[IW_ESSID_MAX_SIZE+1];
 	int err;
 	unsigned long flags;
@@ -2935,7 +2935,7 @@ static int orinoco_ioctl_setnick(struct net_device *dev, struct iw_point *nrq)
 
 static int orinoco_ioctl_getnick(struct net_device *dev, struct iw_point *nrq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	char nickbuf[IW_ESSID_MAX_SIZE+1];
 	int err;
 	unsigned long flags;
@@ -2957,7 +2957,7 @@ static int orinoco_ioctl_getnick(struct net_device *dev, struct iw_point *nrq)
 
 static int orinoco_ioctl_setfreq(struct net_device *dev, struct iw_freq *frq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	int chan = -1;
 	int err;
 	unsigned long flags;
@@ -2999,7 +2999,7 @@ static int orinoco_ioctl_setfreq(struct net_device *dev, struct iw_freq *frq)
 
 static int orinoco_ioctl_getsens(struct net_device *dev, struct iw_param *srq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	hermes_t *hw = &priv->hw;
 	u16 val;
 	int err;
@@ -3025,7 +3025,7 @@ static int orinoco_ioctl_getsens(struct net_device *dev, struct iw_param *srq)
 
 static int orinoco_ioctl_setsens(struct net_device *dev, struct iw_param *srq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	int val = srq->value;
 	int err;
 	unsigned long flags;
@@ -3047,7 +3047,7 @@ static int orinoco_ioctl_setsens(struct net_device *dev, struct iw_param *srq)
 
 static int orinoco_ioctl_setrts(struct net_device *dev, struct iw_param *rrq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	int val = rrq->value;
 	int err;
 	unsigned long flags;
@@ -3070,7 +3070,7 @@ static int orinoco_ioctl_setrts(struct net_device *dev, struct iw_param *rrq)
 
 static int orinoco_ioctl_setfrag(struct net_device *dev, struct iw_param *frq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	int err = 0;
 	unsigned long flags;
 
@@ -3105,7 +3105,7 @@ supported on this firmware. Using MWO robust instead.\n", dev->name);
 
 static int orinoco_ioctl_getfrag(struct net_device *dev, struct iw_param *frq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	hermes_t *hw = &priv->hw;
 	int err = 0;
 	u16 val;
@@ -3143,7 +3143,7 @@ static int orinoco_ioctl_getfrag(struct net_device *dev, struct iw_param *frq)
 
 static int orinoco_ioctl_setrate(struct net_device *dev, struct iw_param *rrq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	int err = 0;
 	int ratemode = -1;
 	int bitrate; /* 100s of kilobits */
@@ -3186,7 +3186,7 @@ static int orinoco_ioctl_setrate(struct net_device *dev, struct iw_param *rrq)
 
 static int orinoco_ioctl_getrate(struct net_device *dev, struct iw_param *rrq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	hermes_t *hw = &priv->hw;
 	int err = 0;
 	int ratemode;
@@ -3253,7 +3253,7 @@ static int orinoco_ioctl_getrate(struct net_device *dev, struct iw_param *rrq)
 
 static int orinoco_ioctl_setpower(struct net_device *dev, struct iw_param *prq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	int err = 0;
 	unsigned long flags;
 
@@ -3306,7 +3306,7 @@ static int orinoco_ioctl_setpower(struct net_device *dev, struct iw_param *prq)
 
 static int orinoco_ioctl_getpower(struct net_device *dev, struct iw_param *prq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	hermes_t *hw = &priv->hw;
 	int err = 0;
 	u16 enable, period, timeout, mcast;
@@ -3356,7 +3356,7 @@ static int orinoco_ioctl_getpower(struct net_device *dev, struct iw_param *prq)
 #if WIRELESS_EXT > 10
 static int orinoco_ioctl_getretry(struct net_device *dev, struct iw_param *rrq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	hermes_t *hw = &priv->hw;
 	int err = 0;
 	u16 short_limit, long_limit, lifetime;
@@ -3409,7 +3409,7 @@ static int orinoco_ioctl_getretry(struct net_device *dev, struct iw_param *rrq)
 
 static int orinoco_ioctl_setibssport(struct net_device *dev, struct iwreq *wrq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	int val = *( (int *) wrq->u.name );
 	int err;
 	unsigned long flags;
@@ -3429,7 +3429,7 @@ static int orinoco_ioctl_setibssport(struct net_device *dev, struct iwreq *wrq)
 
 static int orinoco_ioctl_getibssport(struct net_device *dev, struct iwreq *wrq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	int *val = (int *)wrq->u.name;
 	int err;
 	unsigned long flags;
@@ -3446,7 +3446,7 @@ static int orinoco_ioctl_getibssport(struct net_device *dev, struct iwreq *wrq)
 
 static int orinoco_ioctl_setport3(struct net_device *dev, struct iwreq *wrq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	int val = *( (int *) wrq->u.name );
 	int err = 0;
 	unsigned long flags;
@@ -3488,7 +3488,7 @@ static int orinoco_ioctl_setport3(struct net_device *dev, struct iwreq *wrq)
 
 static int orinoco_ioctl_getport3(struct net_device *dev, struct iwreq *wrq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	int *val = (int *)wrq->u.name;
 	int err;
 	unsigned long flags;
@@ -3507,7 +3507,7 @@ static int orinoco_ioctl_getport3(struct net_device *dev, struct iwreq *wrq)
  * Jean II */
 static int orinoco_ioctl_setspy(struct net_device *dev, struct iw_point *srq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	struct sockaddr address[IW_MAX_SPY];
 	int number = srq->length;
 	int i;
@@ -3554,7 +3554,7 @@ static int orinoco_ioctl_setspy(struct net_device *dev, struct iw_point *srq)
 
 static int orinoco_ioctl_getspy(struct net_device *dev, struct iw_point *srq)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	struct sockaddr address[IW_MAX_SPY];
 	struct iw_quality spy_stat[IW_MAX_SPY];
 	int number;
@@ -3601,7 +3601,7 @@ static int orinoco_ioctl_getspy(struct net_device *dev, struct iw_point *srq)
 static int
 orinoco_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	struct iwreq *wrq = (struct iwreq *)rq;
 	int err = 0;
 	int tmp;
@@ -4057,7 +4057,7 @@ struct {
 
 static int orinoco_debug_dump_recs(struct net_device *dev)
 {
-	struct orinoco_private *priv = dev->priv;
+	struct orinoco_private *priv = netdev_priv(dev);
 	hermes_t *hw = &priv->hw;
 	u8 *val8;
 	u16 *val16;
@@ -4131,7 +4131,7 @@ struct net_device *alloc_orinocodev(int sizeof_card, int (*hard_reset)(struct or
 	dev = alloc_etherdev(sizeof(struct orinoco_private) + sizeof_card);
 	if (!dev)
 		return NULL;
-	priv = (struct orinoco_private *)dev->priv;
+	priv = netdev_priv(dev);
 	priv->ndev = dev;
 	if (sizeof_card)
 		priv->card = (void *)((unsigned long)dev->priv + sizeof(struct orinoco_private));

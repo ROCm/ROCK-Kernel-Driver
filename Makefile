@@ -792,26 +792,15 @@ endef
 #                Any core files spread around are deleted as well
 # make distclean Remove editor backup files, patch leftover files and the like
 
-# Files removed with 'make clean'
-CLEAN_FILES += vmlinux System.map MC*
+# Directories & files removed with 'make clean'
+CLEAN_DIRS  += $(MODVERDIR) include/config include2
+CLEAN_FILES +=	vmlinux System.map \
+		include/linux/autoconf.h include/linux/version.h \
+		include/asm include/linux/modversions.h \
+		kernel.spec .tmp*
 
 # Files removed with 'make mrproper'
-MRPROPER_FILES += \
-	include/linux/autoconf.h include/linux/version.h \
-	.version .config .config.old config.in config.old \
-	.menuconfig.log \
-	include/asm \
-	.hdepend include/linux/modversions.h \
-	tags TAGS cscope* kernel.spec \
-	.tmp*
-
-# Directories removed with 'make mrproper'
-MRPROPER_DIRS += \
-	$(MODVERDIR) \
-	.tmp_export-objs \
-	include/config \
-	include/linux/modules \
-	include2
+MRPROPER_FILES += .version .config .config.old tags TAGS cscope*
 
 # clean - Delete all intermediate files
 #
@@ -820,38 +809,31 @@ clean-dirs += $(addprefix _clean_,$(ALL_SUBDIRS) Documentation/DocBook scripts)
 $(clean-dirs):
 	$(Q)$(MAKE) $(clean)=$(patsubst _clean_%,%,$@)
 
-.PHONY: _clean _mrproper
-ifeq ($(filter ../% /%,$(SUBDIRS)),)
+clean:		rm-dirs  := $(wildcard $(CLEAN_DIRS))
+mrproper:	rm-dirs  := $(wildcard $(MRPROPER_DIRS))
+quiet_cmd_rmdirs = $(if $(rm-dirs),CLEAN   $(rm-dirs))
+      cmd_rmdirs = rm -rf $(rm-dirs)
 
-clean_subdirs := .
-clean: _clean archclean $(clean-dirs)
-	$(call cmd,rmclean)
-mrproper distclean: clean _mrproper archmrproper
-	$(call cmd,mrproper)
+clean:		rm-files := $(wildcard $(CLEAN_FILES))
+mrproper:	rm-files := $(wildcard $(MRPROPER_FILES))
+quiet_cmd_rmfiles = $(if $(rm-files),CLEAN   $(rm-files))
+      cmd_rmfiles = rm -rf $(rm-files)
 
-else
-
-clean_subdirs := $(filter ../% /%,$(SUBDIRS))
-clean: _clean
-mrproper distclean: _mrproper
-	$(Q)rm -rf $(MODVERDIR)
-
-endif
-
-quiet_cmd_rmclean = RM  $$(CLEAN_FILES)
-cmd_rmclean	  = rm -f $(CLEAN_FILES)
-_clean:
-	@find $(clean_subdirs) $(RCS_FIND_IGNORE) \
+clean: archclean $(clean-dirs)
+	$(call cmd,rmdirs)
+	$(call cmd,rmfiles)
+	@find . $(RCS_FIND_IGNORE) \
 	 	\( -name '*.[oas]' -o -name '*.ko' -o -name '.*.cmd' \
 		-o -name '.*.d' -o -name '.*.tmp' -o -name '*.mod.c' \) \
 		-type f -print | xargs rm -f
 
-# mrproper - delete configuration + modules + core files
+# mrproper
 #
-quiet_cmd_mrproper = RM  $$(MRPROPER_DIRS) + $$(MRPROPER_FILES)
-cmd_mrproper = rm -rf $(MRPROPER_DIRS) && rm -f $(MRPROPER_FILES)
-_mrproper:
-	@find $(clean_subdirs) $(RCS_FIND_IGNORE) \
+distclean: mrproper
+mrproper: clean archmrproper
+	$(call cmd,rmdirs)
+	$(call cmd,rmfiles)
+	@find . $(RCS_FIND_IGNORE) \
 	 	\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
 	 	-o -name '.*.rej' -o -size 0 \

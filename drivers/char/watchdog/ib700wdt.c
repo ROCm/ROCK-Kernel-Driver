@@ -284,8 +284,6 @@ static struct miscdevice ibwdt_miscdev = {
 
 static struct notifier_block ibwdt_notifier = {
 	.notifier_call = ibwdt_notify_sys,
-	.next = NULL,
-	.priority = 0,
 };
 
 static int __init ibwdt_init(void)

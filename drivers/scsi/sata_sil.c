@@ -75,10 +75,6 @@ enum {
 	SIL_QUIRK_UDMA5MAX	= (1 << 1),
 };
 
-static void sil_set_piomode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int pio);
-static void sil_set_udmamode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int udma);
 static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent);
 static void sil_dev_config(struct ata_port *ap, struct ata_device *dev);
 static u32 sil_scr_read (struct ata_port *ap, unsigned int sc_reg);
@@ -141,8 +137,6 @@ static Scsi_Host_Template sil_sht = {
 static struct ata_port_operations sil_ops = {
 	.port_disable		= ata_port_disable,
 	.dev_config		= sil_dev_config,
-	.set_piomode		= sil_set_piomode,
-	.set_udmamode		= sil_set_udmamode,
 	.tf_load		= ata_tf_load_mmio,
 	.tf_read		= ata_tf_read_mmio,
 	.check_status		= ata_check_status_mmio,
@@ -285,22 +279,6 @@ static void sil_dev_config(struct ata_port *ap, struct ata_device *dev)
 		ap->udma_mask &= ATA_UDMA5;
 		return;
 	}
-}
-
-static void sil_set_piomode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int pio)
-{
-	/* We need empty implementation, the core doesn't test for NULL
-	 * function pointer
-	 */
-}
-
-static void sil_set_udmamode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int udma)
-{
-	/* We need empty implementation, the core doesn't test for NULL
-	 * function pointer
-	 */
 }
 
 static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)

@@ -566,10 +566,13 @@ static int sr_probe(struct device *dev)
 	snprintf(disk->devfs_name, sizeof(disk->devfs_name),
 			"%s/cd", sdev->devfs_name);
 	disk->driverfs_dev = &sdev->sdev_gendev;
-	register_cdrom(&cd->cdi);
 	set_capacity(disk, cd->capacity);
 	disk->private_data = &cd->driver;
 	disk->queue = sdev->request_queue;
+	cd->cdi.disk = disk;
+
+	if (register_cdrom(&cd->cdi))
+		goto fail_put;
 
 	dev_set_drvdata(dev, cd);
 	add_disk(disk);

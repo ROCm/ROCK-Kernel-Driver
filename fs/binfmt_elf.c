@@ -830,9 +830,8 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		   and some applications "depend" upon this behavior.
 		   Since we do not have the power to recompile these, we
 		   emulate the SVr4 behavior.  Sigh.  */
-		/* N.B. Shouldn't the size here be PAGE_SIZE?? */
 		down_write(&current->mm->mmap_sem);
-		error = do_mmap(NULL, 0, 4096, PROT_READ | PROT_EXEC,
+		error = do_mmap(NULL, 0, PAGE_SIZE, PROT_READ | PROT_EXEC,
 				MAP_FIXED | MAP_PRIVATE, 0);
 		up_write(&current->mm->mmap_sem);
 	}

@@ -14,13 +14,13 @@
  */
 
 struct cpu_usage_stat {
-	unsigned int user;
-	unsigned int nice;
-	unsigned int system;
-	unsigned int softirq;
-	unsigned int irq;
-	unsigned int idle;
-	unsigned int iowait;
+	u64 user;
+	u64 nice;
+	u64 system;
+	u64 softirq;
+	u64 irq;
+	u64 idle;
+	u64 iowait;
 };
 
 struct kernel_stat {
@@ -34,7 +34,7 @@ DECLARE_PER_CPU(struct kernel_stat, kstat);
 /* Must have preemption disabled for this to be meaningful. */
 #define kstat_this_cpu	__get_cpu_var(kstat)
 
-extern unsigned long nr_context_switches(void);
+extern unsigned long long nr_context_switches(void);
 
 /*
  * Number of interrupts per specific IRQ source, since bootup

@@ -1666,6 +1666,7 @@ static void netdev_get_drvinfo(struct net_device *dev,
 			       struct ethtool_drvinfo *info)
 {
 	strcpy(info->driver, "xirc2ps_cs");
+	sprintf(info->bus_info, "PCMCIA 0x%lx", dev->base_addr);
 }
 
 static struct ethtool_ops netdev_ethtool_ops = {

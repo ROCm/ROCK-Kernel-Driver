@@ -10,6 +10,12 @@
 
 #include <linux/types.h>
 
+/*
+ *	The maximum sg list length SCSI can cope with
+ *	(currently must be a power of 2 between 32 and 256)
+ */
+#define SCSI_MAX_PHYS_SEGMENTS	MAX_PHYS_SEGMENTS
+
 
 /*
  *	SCSI command lengths
@@ -277,6 +283,7 @@ struct scsi_lun {
 #define DID_BAD_INTR    0x09	/* Got an interrupt we weren't expecting.  */
 #define DID_PASSTHROUGH 0x0a	/* Force command past mid-layer            */
 #define DID_SOFT_ERROR  0x0b	/* The low level driver just wish a retry  */
+#define DID_IMM_RETRY   0x0c	/* Retry without decrementing retry count  */
 #define DRIVER_OK       0x00	/* Driver status                           */
 
 /*

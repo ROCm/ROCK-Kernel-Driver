@@ -486,7 +486,7 @@ out:
 
 static int __init eth16i_probe1(struct net_device *dev, int ioaddr)
 {
-	struct eth16i_local *lp = dev->priv;
+	struct eth16i_local *lp = netdev_priv(dev);
 	static unsigned version_printed;
 	int retval;
 
@@ -950,7 +950,7 @@ static void eth16i_eeprom_cmd(int ioaddr, unsigned char command)
 
 static int eth16i_open(struct net_device *dev)
 {
-	struct eth16i_local *lp = (struct eth16i_local *)dev->priv;
+	struct eth16i_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	
 	/* Powerup the chip */
@@ -986,7 +986,7 @@ static int eth16i_open(struct net_device *dev)
 
 static int eth16i_close(struct net_device *dev)
 {
-	struct eth16i_local *lp = (struct eth16i_local *)dev->priv;
+	struct eth16i_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 
 	eth16i_reset(dev);
@@ -1012,7 +1012,7 @@ static int eth16i_close(struct net_device *dev)
 
 static void eth16i_timeout(struct net_device *dev)
 {
-	struct eth16i_local *lp = (struct eth16i_local *)dev->priv;
+	struct eth16i_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	/* 
 	   If we get here, some higher level has decided that 
@@ -1053,7 +1053,7 @@ static void eth16i_timeout(struct net_device *dev)
 
 static int eth16i_tx(struct sk_buff *skb, struct net_device *dev)
 {
-	struct eth16i_local *lp = (struct eth16i_local *)dev->priv;
+	struct eth16i_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	int status = 0;
 	ushort length = skb->len;
@@ -1130,7 +1130,7 @@ static int eth16i_tx(struct sk_buff *skb, struct net_device *dev)
 
 static void eth16i_rx(struct net_device *dev)
 {
-	struct eth16i_local *lp = (struct eth16i_local *)dev->priv;
+	struct eth16i_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	int boguscount = MAX_RX_LOOP;
 
@@ -1232,7 +1232,7 @@ static irqreturn_t eth16i_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	int handled = 0;
 
 	ioaddr = dev->base_addr;
-	lp = (struct eth16i_local *)dev->priv;
+	lp = netdev_priv(dev);
 
 	/* Turn off all interrupts from adapter */
 	outw(ETH16I_INTR_OFF, ioaddr + TX_INTR_REG);
@@ -1340,7 +1340,7 @@ static void eth16i_skip_packet(struct net_device *dev)
 
 static void eth16i_reset(struct net_device *dev)
 {
-	struct eth16i_local *lp = (struct eth16i_local *)dev->priv;
+	struct eth16i_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 
 	if(eth16i_debug > 1) 
@@ -1372,7 +1372,7 @@ static void eth16i_multicast(struct net_device *dev)
 
 static struct net_device_stats *eth16i_get_stats(struct net_device *dev)
 {
-	struct eth16i_local *lp = (struct eth16i_local *)dev->priv;
+	struct eth16i_local *lp = netdev_priv(dev);
 	return &lp->stats;
 }
 

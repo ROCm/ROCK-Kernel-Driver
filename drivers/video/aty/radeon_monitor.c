@@ -757,7 +757,7 @@ void __devinit radeon_check_modes(struct radeonfb_info *rinfo, const char *mode_
 	    && rinfo->mon1_EDID) {
 		struct fb_var_screeninfo var;
 		RTRACE("Parsing EDID data for panel info\n");
-		if (parse_edid(rinfo->mon1_EDID, &var) == 0) {
+		if (fb_parse_edid(rinfo->mon1_EDID, &var) == 0) {
 			if (var.xres >= rinfo->panel_info.xres &&
 			    var.yres >= rinfo->panel_info.yres)
 				radeon_var_to_panel_info(rinfo, &var);

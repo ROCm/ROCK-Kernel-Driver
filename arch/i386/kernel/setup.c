@@ -50,6 +50,11 @@
 #include "setup_arch_pre.h"
 #include "mach_resources.h"
 
+/* This value is set up by the early boot code to point to the value
+   immediately after the boot time page tables.  It contains a *physical*
+   address, and must not be in the .bss segment! */
+unsigned long init_pg_tables_end __initdata = ~0UL;
+
 int disable_pse __initdata = 0;
 
 static inline char * __init machine_specific_memory_setup(void);
@@ -115,7 +120,6 @@ extern void early_cpu_init(void);
 extern void dmi_scan_machine(void);
 extern void generic_apic_probe(char *);
 extern int root_mountflags;
-extern char _end[];
 
 unsigned long saved_videomode;
 
@@ -794,7 +798,7 @@ static unsigned long __init setup_memory(void)
 	 * partially used pages are not usable - thus
 	 * we are rounding upwards:
 	 */
-	start_pfn = PFN_UP(__pa(_end));
+	start_pfn = PFN_UP(init_pg_tables_end);
 
 	find_max_pfn();
 
@@ -831,6 +835,13 @@ static unsigned long __init setup_memory(void)
 	 * enabling clean reboots, SMP operation, laptop functions.
 	 */
 	reserve_bootmem(0, PAGE_SIZE);
+
+    /* could be an AMD 768MPX chipset. Reserve a page  before VGA to prevent
+       PCI prefetch into it (errata #56). Usually the page is reserved anyways,
+       unless you have no PS/2 mouse plugged in. */
+	if (boot_cpu_data.x86_vendor == X86_VENDOR_AMD &&
+	    boot_cpu_data.x86 == 6)
+	     reserve_bootmem(0xa0000 - 4096, 4096);
 
     /* could be an AMD 768MPX chipset. Reserve a page  before VGA to prevent
        PCI prefetch (errata #56). Usually the page is reserved anyways,
@@ -1117,7 +1128,7 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.start_code = (unsigned long) _text;
 	init_mm.end_code = (unsigned long) _etext;
 	init_mm.end_data = (unsigned long) _edata;
-	init_mm.brk = (unsigned long) _end;
+	init_mm.brk = init_pg_tables_end + PAGE_OFFSET;
 
 	code_resource.start = virt_to_phys(_text);
 	code_resource.end = virt_to_phys(_etext)-1;

@@ -23,7 +23,7 @@
  *
  *      (see also mptbase.c)
  *
- *  Copyright (c) 2000-2003 LSI Logic Corporation
+ *  Copyright (c) 2000-2004 LSI Logic Corporation
  *  Originally By: Noah Romer
  *  (mailto:mpt_linux_developer@lsil.com)
  *
@@ -337,15 +337,18 @@ static int
 mpt_lan_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 {
 	struct net_device *dev = mpt_landev[ioc->id];
-	struct mpt_lan_priv *priv = (struct mpt_lan_priv *) dev->priv;
+	struct mpt_lan_priv *priv = netdev_priv(dev);
 
 	dlprintk((KERN_INFO MYNAM ": IOC %s_reset routed to LAN driver!\n",
-			reset_phase==MPT_IOC_PRE_RESET ? "pre" : "post"));
+			reset_phase==MPT_IOC_SETUP_RESET ? "setup" : (
+			reset_phase==MPT_IOC_PRE_RESET ? "pre" : "post")));
 
 	if (priv->mpt_rxfidx == NULL)
 		return (1);
 
-	if (reset_phase == MPT_IOC_PRE_RESET) {
+	if (reset_phase == MPT_IOC_SETUP_RESET) {
+		;
+	} else if (reset_phase == MPT_IOC_PRE_RESET) {
 		int i;
 		unsigned long flags;
 
@@ -406,7 +409,7 @@ mpt_lan_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *pEvReply)
 static int
 mpt_lan_open(struct net_device *dev)
 {
-	struct mpt_lan_priv *priv = (struct mpt_lan_priv *) dev->priv;
+	struct mpt_lan_priv *priv = netdev_priv(dev);
 	int i;
 
 	if (mpt_lan_reset(dev) != 0) {
@@ -497,7 +500,7 @@ mpt_lan_reset(struct net_device *dev)
 {
 	MPT_FRAME_HDR *mf;
 	LANResetRequest_t *pResetReq;
-	struct mpt_lan_priv *priv = (struct mpt_lan_priv *)dev->priv;
+	struct mpt_lan_priv *priv = netdev_priv(dev);
 
 	mf = mpt_get_msg_frame(LanCtx, priv->mpt_dev->id);
 
@@ -526,7 +529,7 @@ mpt_lan_reset(struct net_device *dev)
 static int
 mpt_lan_close(struct net_device *dev)
 {
-	struct mpt_lan_priv *priv = (struct mpt_lan_priv *) dev->priv;
+	struct mpt_lan_priv *priv = netdev_priv(dev);
 	MPT_ADAPTER *mpt_dev = priv->mpt_dev;
 	unsigned int timeout;
 	int i;
@@ -587,7 +590,7 @@ mpt_lan_close(struct net_device *dev)
 static struct net_device_stats *
 mpt_lan_get_stats(struct net_device *dev)
 {
-	struct mpt_lan_priv *priv = (struct mpt_lan_priv *)dev->priv;
+	struct mpt_lan_priv *priv = netdev_priv(dev);
 
 	return (struct net_device_stats *) &priv->stats;
 }
@@ -607,7 +610,7 @@ mpt_lan_change_mtu(struct net_device *dev, int new_mtu)
 static void
 mpt_lan_tx_timeout(struct net_device *dev)
 {
-	struct mpt_lan_priv *priv = (struct mpt_lan_priv *) dev->priv;
+	struct mpt_lan_priv *priv = netdev_priv(dev);
 	MPT_ADAPTER *mpt_dev = priv->mpt_dev;
 
 	if (mpt_dev->active) {
@@ -621,7 +624,7 @@ mpt_lan_tx_timeout(struct net_device *dev)
 static int
 mpt_lan_send_turbo(struct net_device *dev, u32 tmsg)
 {
-	struct mpt_lan_priv *priv = (struct mpt_lan_priv *) dev->priv;
+	struct mpt_lan_priv *priv = netdev_priv(dev);
 	MPT_ADAPTER *mpt_dev = priv->mpt_dev;
 	struct sk_buff *sent;
 	unsigned long flags;
@@ -654,7 +657,7 @@ mpt_lan_send_turbo(struct net_device *dev, u32 tmsg)
 static int
 mpt_lan_send_reply(struct net_device *dev, LANSendReply_t *pSendRep)
 {
-	struct mpt_lan_priv *priv = (struct mpt_lan_priv *) dev->priv;
+	struct mpt_lan_priv *priv = netdev_priv(dev);
 	MPT_ADAPTER *mpt_dev = priv->mpt_dev;
 	struct sk_buff *sent;
 	unsigned long flags;
@@ -727,7 +730,7 @@ out:
 static int
 mpt_lan_sdu_send (struct sk_buff *skb, struct net_device *dev)
 {
-	struct mpt_lan_priv *priv = (struct mpt_lan_priv *) dev->priv;
+	struct mpt_lan_priv *priv = netdev_priv(dev);
 	MPT_ADAPTER *mpt_dev = priv->mpt_dev;
 	MPT_FRAME_HDR *mf;
 	LANSendRequest_t *pSendReq;
@@ -1369,7 +1372,7 @@ mpt_register_lan_device (MPT_ADAPTER *mpt_dev, int pnum)
 
 	dev->mtu = MPT_LAN_MTU;
 
-	priv = (struct mpt_lan_priv *) dev->priv;
+	priv = netdev_priv(dev);
 
 	priv->mpt_dev = mpt_dev;
 	priv->pnum = pnum;

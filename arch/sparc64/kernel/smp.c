@@ -36,9 +36,6 @@
 #include <asm/timer.h>
 #include <asm/starfire.h>
 
-#define __KERNEL_SYSCALLS__
-#include <linux/unistd.h>
-
 extern int linux_num_cpus;
 extern void calibrate_delay(void);
 

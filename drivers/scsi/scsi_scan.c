@@ -35,6 +35,7 @@
 #include <scsi/scsi_driver.h>
 #include <scsi/scsi_devinfo.h>
 #include <scsi/scsi_host.h>
+#include <scsi/scsi_transport.h>
 #include "scsi.h"
 
 #include "scsi_priv.h"
@@ -192,7 +193,7 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	struct scsi_device *sdev, *device;
 	unsigned long flags;
 
-	sdev = kmalloc(sizeof(*sdev), GFP_ATOMIC);
+	sdev = kmalloc(sizeof(*sdev) + shost->transportt->size, GFP_ATOMIC);
 	if (!sdev)
 		goto out;
 
@@ -237,6 +238,11 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 			goto out_free_queue;
 	}
 
+	if (shost->transportt->setup) {
+		if (shost->transportt->setup(sdev))
+			goto out_cleanup_slave;
+	}
+
 	if (get_device(&sdev->host->shost_gendev)) {
 
 		device_initialize(&sdev->sdev_gendev);
@@ -253,8 +259,15 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 		snprintf(sdev->sdev_classdev.class_id, BUS_ID_SIZE,
 			 "%d:%d:%d:%d", sdev->host->host_no,
 			 sdev->channel, sdev->id, sdev->lun);
+
+		class_device_initialize(&sdev->transport_classdev);
+		sdev->transport_classdev.dev = &sdev->sdev_gendev;
+		sdev->transport_classdev.class = sdev->host->transportt->class;
+		snprintf(sdev->transport_classdev.class_id, BUS_ID_SIZE,
+			 "%d:%d:%d:%d", sdev->host->host_no,
+			 sdev->channel, sdev->id, sdev->lun);
 	} else
-		goto out_cleanup_slave;
+		goto out_cleanup_transport;
 
 	/*
 	 * If there are any same target siblings, add this to the
@@ -283,6 +296,9 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	spin_unlock_irqrestore(shost->host_lock, flags);
 	return sdev;
 
+out_cleanup_transport:
+	if (shost->transportt->cleanup)
+		shost->transportt->cleanup(sdev);
 out_cleanup_slave:
 	if (shost->hostt->slave_destroy)
 		shost->hostt->slave_destroy(sdev);
@@ -744,6 +760,8 @@ static int scsi_probe_and_add_lun(struct Scsi_Host *host,
 	} else {
 		if (sdev->host->hostt->slave_destroy)
 			sdev->host->hostt->slave_destroy(sdev);
+		if (sdev->host->transportt->cleanup)
+			sdev->host->transportt->cleanup(sdev);
 		put_device(&sdev->sdev_gendev);
 	}
  out:
@@ -1300,5 +1318,7 @@ void scsi_free_host_dev(struct scsi_device *sdev)
 
 	if (sdev->host->hostt->slave_destroy)
 		sdev->host->hostt->slave_destroy(sdev);
+	if (sdev->host->transportt->cleanup)
+		sdev->host->transportt->cleanup(sdev);
 	put_device(&sdev->sdev_gendev);
 }

@@ -70,7 +70,7 @@ static int tun_net_close(struct net_device *dev)
 /* Net device start xmit */
 static int tun_net_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct tun_struct *tun = (struct tun_struct *)dev->priv;
+	struct tun_struct *tun = netdev_priv(dev);
 
 	DBG(KERN_INFO "%s: tun_net_xmit %d\n", tun->dev->name, skb->len);
 
@@ -113,14 +113,14 @@ static void tun_net_mclist(struct net_device *dev)
 
 static struct net_device_stats *tun_net_stats(struct net_device *dev)
 {
-	struct tun_struct *tun = (struct tun_struct *)dev->priv;
+	struct tun_struct *tun = netdev_priv(dev);
 	return &tun->stats;
 }
 
 /* Initialize net device. */
 static void tun_net_init(struct net_device *dev)
 {
-	struct tun_struct *tun = (struct tun_struct *)dev->priv;
+	struct tun_struct *tun = netdev_priv(dev);
    
 	switch (tun->flags & TUN_TYPE_MASK) {
 	case TUN_TUN_DEV:
@@ -153,7 +153,7 @@ static void tun_net_init(struct net_device *dev)
 /* Poll */
 static unsigned int tun_chr_poll(struct file *file, poll_table * wait)
 {  
-	struct tun_struct *tun = (struct tun_struct *)file->private_data;
+	struct tun_struct *tun = file->private_data;
 	unsigned int mask = POLLOUT | POLLWRNORM;
 
 	if (!tun)
@@ -217,7 +217,7 @@ static __inline__ ssize_t tun_get_user(struct tun_struct *tun, struct iovec *iv,
 static ssize_t tun_chr_writev(struct file * file, const struct iovec *iv, 
 			      unsigned long count, loff_t *pos)
 {
-	struct tun_struct *tun = (struct tun_struct *)file->private_data;
+	struct tun_struct *tun = file->private_data;
 	unsigned long i;
 	size_t len;
 
@@ -279,7 +279,7 @@ static __inline__ ssize_t tun_put_user(struct tun_struct *tun,
 static ssize_t tun_chr_readv(struct file *file, const struct iovec *iv,
 			    unsigned long count, loff_t *pos)
 {
-	struct tun_struct *tun = (struct tun_struct *)file->private_data;
+	struct tun_struct *tun = file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
 	struct sk_buff *skb;
 	ssize_t len, ret = 0;
@@ -341,7 +341,7 @@ static ssize_t tun_chr_read(struct file * file, char * buf,
 
 static void tun_setup(struct net_device *dev)
 {
-	struct tun_struct *tun = dev->priv;
+	struct tun_struct *tun = netdev_priv(dev);
 
 	skb_queue_head_init(&tun->readq);
 	init_waitqueue_head(&tun->read_wait);
@@ -413,7 +413,7 @@ static int tun_set_iff(struct file *file, struct ifreq *ifr)
 		if (!dev)
 			return -ENOMEM;
 
-		tun = dev->priv;
+		tun = netdev_priv(dev);
 		tun->dev = dev;
 		tun->flags = flags;
 
@@ -455,7 +455,7 @@ static int tun_set_iff(struct file *file, struct ifreq *ifr)
 static int tun_chr_ioctl(struct inode *inode, struct file *file, 
 			 unsigned int cmd, unsigned long arg)
 {
-	struct tun_struct *tun = (struct tun_struct *)file->private_data;
+	struct tun_struct *tun = file->private_data;
 
 	if (cmd == TUNSETIFF && !tun) {
 		struct ifreq ifr;
@@ -527,7 +527,7 @@ static int tun_chr_ioctl(struct inode *inode, struct file *file,
 
 static int tun_chr_fasync(int fd, struct file *file, int on)
 {
-	struct tun_struct *tun = (struct tun_struct *)file->private_data;
+	struct tun_struct *tun = file->private_data;
 	int ret;
 
 	if (!tun)
@@ -558,7 +558,7 @@ static int tun_chr_open(struct inode *inode, struct file * file)
 
 static int tun_chr_close(struct inode *inode, struct file *file)
 {
-	struct tun_struct *tun = (struct tun_struct *)file->private_data;
+	struct tun_struct *tun = file->private_data;
 
 	if (!tun)
 		return 0;

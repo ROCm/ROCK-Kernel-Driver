@@ -76,7 +76,8 @@ struct zone {
 	spinlock_t		lru_lock;	
 	struct list_head	active_list;
 	struct list_head	inactive_list;
-	atomic_t		refill_counter;
+	atomic_t		nr_scan_active;
+	atomic_t		nr_scan_inactive;
 	unsigned long		nr_active;
 	unsigned long		nr_inactive;
 	int			all_unreclaimable; /* All pages pinned */
@@ -286,6 +287,11 @@ static inline struct zone *next_zone(struct zone *zone)
 static inline int is_highmem(struct zone *zone)
 {
 	return (zone - zone->zone_pgdat->node_zones == ZONE_HIGHMEM);
+}
+
+static inline int is_normal(struct zone *zone)
+{
+	return (zone - zone->zone_pgdat->node_zones == ZONE_NORMAL);
 }
 
 /* These two functions are used to setup the per zone pages min values */

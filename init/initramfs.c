@@ -1,10 +1,8 @@
-#define __KERNEL_SYSCALLS__
 #include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
-#include <linux/unistd.h>
 #include <linux/delay.h>
 #include <linux/string.h>
 #include <linux/syscalls.h>

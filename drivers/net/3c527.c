@@ -226,7 +226,7 @@ static struct ethtool_ops netdev_ethtool_ops;
 
 static void cleanup_card(struct net_device *dev)
 {
-	struct mc32_local *lp=dev->priv;
+	struct mc32_local *lp = netdev_priv(dev);
 	unsigned slot = lp->slot;
 	mca_mark_as_unused(slot);
 	mca_set_adapter_name(slot, NULL);
@@ -307,7 +307,7 @@ static int __init mc32_probe1(struct net_device *dev, int slot)
 	int i, err;
 	u8 POS;
 	u32 base;
-	struct mc32_local *lp = dev->priv;
+	struct mc32_local *lp = netdev_priv(dev);
 	static u16 mca_io_bases[]={
 		0x7280,0x7290,
 		0x7680,0x7690,
@@ -573,7 +573,7 @@ static inline void mc32_ready_poll(struct net_device *dev)
 
 static int mc32_command_nowait(struct net_device *dev, u16 cmd, void *data, int len)
 {
-	struct mc32_local *lp = (struct mc32_local *)dev->priv;
+	struct mc32_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	int ret = -1;
 
@@ -619,7 +619,7 @@ static int mc32_command_nowait(struct net_device *dev, u16 cmd, void *data, int 
   
 static int mc32_command(struct net_device *dev, u16 cmd, void *data, int len)
 {
-	struct mc32_local *lp = (struct mc32_local *)dev->priv;
+	struct mc32_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 	int ret = 0;
 	
@@ -671,7 +671,7 @@ static int mc32_command(struct net_device *dev, u16 cmd, void *data, int len)
 
 static void mc32_start_transceiver(struct net_device *dev) {
 
-	struct mc32_local *lp = (struct mc32_local *)dev->priv;
+	struct mc32_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 
 	/* Ignore RX overflow on device closure */ 
@@ -706,7 +706,7 @@ static void mc32_start_transceiver(struct net_device *dev) {
 
 static void mc32_halt_transceiver(struct net_device *dev) 
 {
-	struct mc32_local *lp = (struct mc32_local *)dev->priv;
+	struct mc32_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 
 	mc32_ready_poll(dev);	
@@ -743,7 +743,7 @@ static void mc32_halt_transceiver(struct net_device *dev)
 	 
 static int mc32_load_rx_ring(struct net_device *dev)
 {
-	struct mc32_local *lp = (struct mc32_local *)dev->priv;
+	struct mc32_local *lp = netdev_priv(dev);
 	int i;
 	u16 rx_base;
 	volatile struct skb_header *p;
@@ -792,7 +792,7 @@ static int mc32_load_rx_ring(struct net_device *dev)
 
 static void mc32_flush_rx_ring(struct net_device *dev)
 {
-	struct mc32_local *lp = (struct mc32_local *)dev->priv;
+	struct mc32_local *lp = netdev_priv(dev);
 	int i; 
 
 	for(i=0; i < RX_RING_LEN; i++) 
@@ -824,7 +824,7 @@ static void mc32_flush_rx_ring(struct net_device *dev)
 
 static void mc32_load_tx_ring(struct net_device *dev)
 { 
-	struct mc32_local *lp = (struct mc32_local *)dev->priv;
+	struct mc32_local *lp = netdev_priv(dev);
 	volatile struct skb_header *p;
 	int i; 
 	u16 tx_base;
@@ -861,7 +861,7 @@ static void mc32_load_tx_ring(struct net_device *dev)
 
 static void mc32_flush_tx_ring(struct net_device *dev)
 {
-	struct mc32_local *lp = (struct mc32_local *)dev->priv;
+	struct mc32_local *lp = netdev_priv(dev);
 	int i;
 
 	for (i=0; i < TX_RING_LEN; i++)
@@ -899,7 +899,7 @@ static void mc32_flush_tx_ring(struct net_device *dev)
 static int mc32_open(struct net_device *dev)
 {
 	int ioaddr = dev->base_addr;
-	struct mc32_local *lp = (struct mc32_local *)dev->priv;
+	struct mc32_local *lp = netdev_priv(dev);
 	u8 one=1;
 	u8 regs;
 	u16 descnumbuffs[2] = {TX_RING_LEN, RX_RING_LEN};
@@ -1022,7 +1022,7 @@ static void mc32_timeout(struct net_device *dev)
 
 static int mc32_send_packet(struct sk_buff *skb, struct net_device *dev)
 {
-	struct mc32_local *lp = (struct mc32_local *)dev->priv;
+	struct mc32_local *lp = netdev_priv(dev);
 	u32 head = atomic_read(&lp->tx_ring_head);
 	
 	volatile struct skb_header *p, *np;
@@ -1092,7 +1092,7 @@ static int mc32_send_packet(struct sk_buff *skb, struct net_device *dev)
 
 static void mc32_update_stats(struct net_device *dev)
 {
-	struct mc32_local *lp = (struct mc32_local *)dev->priv;
+	struct mc32_local *lp = netdev_priv(dev);
 	volatile struct mc32_stats *st = lp->stats; 
 
 	u32 rx_errors=0; 
@@ -1143,7 +1143,7 @@ static void mc32_update_stats(struct net_device *dev)
 
 static void mc32_rx_ring(struct net_device *dev)
 {
-	struct mc32_local *lp=dev->priv;		
+	struct mc32_local *lp = netdev_priv(dev);
 	volatile struct skb_header *p;
 	u16 rx_ring_tail;
 	u16 rx_old_tail;
@@ -1236,7 +1236,7 @@ static void mc32_rx_ring(struct net_device *dev)
 
 static void mc32_tx_ring(struct net_device *dev) 
 {
-	struct mc32_local *lp=(struct mc32_local *)dev->priv;
+	struct mc32_local *lp = netdev_priv(dev);
 	volatile struct skb_header *np;
 
 	/*
@@ -1333,7 +1333,7 @@ static irqreturn_t mc32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	}
  
 	ioaddr = dev->base_addr;
-	lp = (struct mc32_local *)dev->priv;
+	lp = netdev_priv(dev);
 
 	/* See whats cooking */
 
@@ -1450,7 +1450,7 @@ static irqreturn_t mc32_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 static int mc32_close(struct net_device *dev)
 {
-	struct mc32_local *lp = (struct mc32_local *)dev->priv;
+	struct mc32_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
 
 	u8 regs;
@@ -1499,7 +1499,7 @@ static int mc32_close(struct net_device *dev)
 
 static struct net_device_stats *mc32_get_stats(struct net_device *dev)
 {
-	struct mc32_local *lp = (struct mc32_local *)dev->priv;
+	struct mc32_local *lp = netdev_priv(dev);
 	
 	mc32_update_stats(dev); 
 	return &lp->net_stats;
@@ -1531,7 +1531,7 @@ static struct net_device_stats *mc32_get_stats(struct net_device *dev)
 
 static void do_mc32_set_multicast_list(struct net_device *dev, int retry)
 {
-	struct mc32_local *lp = (struct mc32_local *)dev->priv;
+	struct mc32_local *lp = netdev_priv(dev);
 	u16 filt = (1<<2); /* Save Bad Packets, for stats purposes */ 
 
 	if (dev->flags&IFF_PROMISC)

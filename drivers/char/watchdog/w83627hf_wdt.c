@@ -257,8 +257,6 @@ static struct miscdevice wdt_miscdev = {
 
 static struct notifier_block wdt_notifier = {
 	.notifier_call = wdt_notify_sys,
-	.next = NULL,
-	.priority = 0,
 };
 
 static int __init

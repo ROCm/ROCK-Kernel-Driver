@@ -24,13 +24,12 @@
 #include <linux/completion.h>
 #include <linux/cdrom.h>
 #include <linux/slab.h>
-#include <linux/bio.h>
 #include <linux/times.h>
 #include <asm/uaccess.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_ioctl.h>
-
+#include <scsi/scsi_cmnd.h>
 
 /* Command group 3 is reserved and should never be used.  */
 const unsigned char scsi_command_size[8] =
@@ -39,45 +38,9 @@ const unsigned char scsi_command_size[8] =
 	16, 12, 10, 10
 };
 
+EXPORT_SYMBOL(scsi_command_size);
+
 #define BLK_DEFAULT_TIMEOUT	(60 * HZ)
-
-/* defined in ../scsi/scsi.h  ... should it be included? */
-#ifndef SCSI_SENSE_BUFFERSIZE
-#define SCSI_SENSE_BUFFERSIZE 64
-#endif
-
-static int blk_do_rq(request_queue_t *q, struct gendisk *bd_disk,
-		     struct request *rq)
-{
-	char sense[SCSI_SENSE_BUFFERSIZE];
-	DECLARE_COMPLETION(wait);
-	int err = 0;
-
-	rq->rq_disk = bd_disk;
-
-	/*
-	 * we need an extra reference to the request, so we can look at
-	 * it after io completion
-	 */
-	rq->ref_count++;
-
-	if (!rq->sense) {
-		memset(sense, 0, sizeof(sense));
-		rq->sense = sense;
-		rq->sense_len = 0;
-	}
-
-	rq->flags |= REQ_NOMERGE;
-	rq->waiting = &wait;
-	elv_add_request(q, rq, ELEVATOR_INSERT_BACK, 1);
-	generic_unplug_device(q);
-	wait_for_completion(&wait);
-
-	if (rq->errors)
-		err = -EIO;
-
-	return err;
-}
 
 #include <scsi/sg.h>
 
@@ -148,9 +111,7 @@ static int sg_io(request_queue_t *q, struct gendisk *bd_disk,
 	unsigned long start_time;
 	int reading, writing;
 	struct request *rq;
-	struct bio *bio;
 	char sense[SCSI_SENSE_BUFFERSIZE];
-	void *buffer;
 
 	if (hdr->interface_id != 'S')
 		return -EINVAL;
@@ -167,11 +128,7 @@ static int sg_io(request_queue_t *q, struct gendisk *bd_disk,
 		return -EIO;
 
 	reading = writing = 0;
-	buffer = NULL;
-	bio = NULL;
 	if (hdr->dxfer_len) {
-		unsigned int bytes = (hdr->dxfer_len + 511) & ~511;
-
 		switch (hdr->dxfer_direction) {
 		default:
 			return -EINVAL;
@@ -186,31 +143,13 @@ static int sg_io(request_queue_t *q, struct gendisk *bd_disk,
 			break;
 		}
 
-		/*
-		 * first try to map it into a bio. reading from device will
-		 * be a write to vm.
-		 */
-		bio = bio_map_user(q, NULL, (unsigned long) hdr->dxferp,
-				   hdr->dxfer_len, reading);
+		rq = blk_rq_map_user(q, writing ? WRITE : READ, hdr->dxferp,
+				     hdr->dxfer_len);
 
-		/*
-		 * if bio setup failed, fall back to slow approach
-		 */
-		if (!bio) {
-			buffer = kmalloc(bytes, q->bounce_gfp | GFP_USER);
-			if (!buffer)
-				return -ENOMEM;
-
-			if (writing) {
-				if (copy_from_user(buffer, hdr->dxferp,
-						   hdr->dxfer_len))
-					goto out_buffer;
-			} else
-				memset(buffer, 0, hdr->dxfer_len);
-		}
-	}
-
-	rq = blk_get_request(q, writing ? WRITE : READ, __GFP_WAIT);
+		if (IS_ERR(rq))
+			return PTR_ERR(rq);
+	} else
+		rq = blk_get_request(q, READ, __GFP_WAIT);
 
 	/*
 	 * fill in request structure
@@ -226,14 +165,6 @@ static int sg_io(request_queue_t *q, struct gendisk *bd_disk,
 
 	rq->flags |= REQ_BLOCK_PC;
 
-	rq->bio = rq->biotail = NULL;
-
-	if (bio)
-		blk_rq_bio_prep(q, rq, bio);
-
-	rq->data = buffer;
-	rq->data_len = hdr->dxfer_len;
-
 	rq->timeout = (hdr->timeout * HZ) / 1000;
 	if (!rq->timeout)
 		rq->timeout = q->sg_timeout;
@@ -246,10 +177,7 @@ static int sg_io(request_queue_t *q, struct gendisk *bd_disk,
 	 * (if he doesn't check that is his problem).
 	 * N.B. a non-zero SCSI status is _not_ necessarily an error.
 	 */
-	blk_do_rq(q, bd_disk, rq);
-
-	if (bio)
-		bio_unmap_user(bio, reading);
+	blk_execute_rq(q, bd_disk, rq);
 
 	/* write to all output members */
 	hdr->status = rq->errors;	
@@ -271,22 +199,12 @@ static int sg_io(request_queue_t *q, struct gendisk *bd_disk,
 			hdr->sb_len_wr = len;
 	}
 
-	blk_put_request(rq);
-
-	if (buffer) {
-		if (reading)
-			if (copy_to_user(hdr->dxferp, buffer, hdr->dxfer_len))
-				goto out_buffer;
-
-		kfree(buffer);
-	}
+	if (blk_rq_unmap_user(rq, hdr->dxferp, hdr->dxfer_len))
+		return -EFAULT;
 
 	/* may not have succeeded, but output values written to control
 	 * structure (struct sg_io_hdr).  */
 	return 0;
-out_buffer:
-	kfree(buffer);
-	return -EFAULT;
 }
 
 #define FORMAT_UNIT_TIMEOUT		(2 * 60 * 60 * HZ)
@@ -369,7 +287,7 @@ static int sg_scsi_ioctl(request_queue_t *q, struct gendisk *bd_disk,
 	rq->data_len = bytes;
 	rq->flags |= REQ_BLOCK_PC;
 
-	blk_do_rq(q, bd_disk, rq);
+	blk_execute_rq(q, bd_disk, rq);
 	err = rq->errors & 0xff;	/* only 8 bit SCSI status */
 	if (err) {
 		if (rq->sense_len && rq->sense) {
@@ -447,6 +365,8 @@ int scsi_cmd_ioctl(struct gendisk *bd_disk, unsigned int cmd, unsigned long arg)
 			old_cdb = hdr.cmdp;
 			hdr.cmdp = cdb;
 			err = sg_io(q, bd_disk, &hdr);
+			if (err == -EFAULT)
+				break;
 
 			hdr.cmdp = old_cdb;
 			if (copy_to_user((struct sg_io_hdr *) arg, &hdr, sizeof(hdr)))
@@ -457,10 +377,9 @@ int scsi_cmd_ioctl(struct gendisk *bd_disk, unsigned int cmd, unsigned long arg)
 			struct cdrom_generic_command cgc;
 			struct sg_io_hdr hdr;
 
-			if (copy_from_user(&cgc, (struct cdrom_generic_command *) arg, sizeof(cgc))) {
-				err = -EFAULT;
+			err = -EFAULT;
+			if (copy_from_user(&cgc, (struct cdrom_generic_command *) arg, sizeof(cgc)))
 				break;
-			}
 			cgc.timeout = clock_t_to_jiffies(cgc.timeout);
 			memset(&hdr, 0, sizeof(hdr));
 			hdr.interface_id = 'S';
@@ -493,7 +412,10 @@ int scsi_cmd_ioctl(struct gendisk *bd_disk, unsigned int cmd, unsigned long arg)
 			hdr.timeout = cgc.timeout;
 			hdr.cmdp = cgc.cmd;
 			hdr.cmd_len = sizeof(cgc.cmd);
+
 			err = sg_io(q, bd_disk, &hdr);
+			if (err == -EFAULT)
+				break;
 
 			if (hdr.status)
 				err = -EIO;
@@ -529,7 +451,7 @@ int scsi_cmd_ioctl(struct gendisk *bd_disk, unsigned int cmd, unsigned long arg)
 			rq->cmd[0] = GPCMD_START_STOP_UNIT;
 			rq->cmd[4] = 0x02 + (close != 0);
 			rq->cmd_len = 6;
-			err = blk_do_rq(q, bd_disk, rq);
+			err = blk_execute_rq(q, bd_disk, rq);
 			blk_put_request(rq);
 			break;
 		default:
@@ -541,4 +463,3 @@ int scsi_cmd_ioctl(struct gendisk *bd_disk, unsigned int cmd, unsigned long arg)
 }
 
 EXPORT_SYMBOL(scsi_cmd_ioctl);
-EXPORT_SYMBOL(scsi_command_size);

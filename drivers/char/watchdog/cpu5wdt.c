@@ -20,6 +20,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/miscdevice.h>
@@ -295,11 +296,11 @@ MODULE_SUPPORTED_DEVICE("sma cpu5 watchdog");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);
 
-MODULE_PARM(port, "i");
+module_param(port, int, 0);
 MODULE_PARM_DESC(port, "base address of watchdog card, default is 0x91");
 
-MODULE_PARM(verbose, "i");
+module_param(verbose, int, 0);
 MODULE_PARM_DESC(verbose, "be verbose, default is 0 (no)");
 
-MODULE_PARM(ticks, "i");
+module_param(ticks, int, 0);
 MODULE_PARM_DESC(ticks, "count down ticks, default is 10000");

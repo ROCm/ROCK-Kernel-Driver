@@ -43,10 +43,6 @@ enum {
 static int svia_init_one (struct pci_dev *pdev, const struct pci_device_id *ent);
 static void svia_sata_phy_reset(struct ata_port *ap);
 static void svia_port_disable(struct ata_port *ap);
-static void svia_set_piomode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int pio);
-static void svia_set_udmamode (struct ata_port *ap, struct ata_device *adev,
-			       unsigned int udma);
 
 static unsigned int in_module_init = 1;
 
@@ -83,8 +79,6 @@ static Scsi_Host_Template svia_sht = {
 
 static struct ata_port_operations svia_sata_ops = {
 	.port_disable		= svia_port_disable,
-	.set_piomode		= svia_set_piomode,
-	.set_udmamode		= svia_set_udmamode,
 
 	.tf_load		= ata_tf_load_pio,
 	.tf_read		= ata_tf_read_pio,
@@ -164,38 +158,6 @@ static void svia_port_disable(struct ata_port *ap)
 	ata_port_disable(ap);
 
 	/* FIXME */
-}
-
-/**
- *	svia_set_piomode -
- *	@ap:
- *	@adev:
- *	@pio:
- *
- *	LOCKING:
- *
- */
-
-static void svia_set_piomode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int pio)
-{
-	/* FIXME: needed? */
-}
-
-/**
- *	svia_set_udmamode -
- *	@ap:
- *	@adev:
- *	@udma:
- *
- *	LOCKING:
- *
- */
-
-static void svia_set_udmamode (struct ata_port *ap, struct ata_device *adev,
-			      unsigned int udma)
-{
-	/* FIXME: needed? */
 }
 
 /**

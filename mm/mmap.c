@@ -138,17 +138,34 @@ out:
 }
 
 #ifdef DEBUG_MM_RB
-static int browse_rb(struct rb_node * rb_node) {
-	int i = 0;
-	if (rb_node) {
+static int browse_rb(struct rb_root *root) {
+	int i, j;
+	struct rb_node *nd, *pn = NULL;
+	i = 0;
+	unsigned long prev = 0, pend = 0;
+
+	for (nd = rb_first(root); nd; nd = rb_next(nd)) {
+		struct vm_area_struct *vma;
+		vma = rb_entry(nd, struct vm_area_struct, vm_rb);
+		if (vma->vm_start < prev)
+			printk("vm_start %lx prev %lx\n", vma->vm_start, prev), i = -1;
+		if (vma->vm_start < pend)
+			printk("vm_start %lx pend %lx\n", vma->vm_start, pend);
+		if (vma->vm_start > vma->vm_end)
+			printk("vm_end %lx < vm_start %lx\n", vma->vm_end, vma->vm_start);
 		i++;
-		i += browse_rb(rb_node->rb_left);
-		i += browse_rb(rb_node->rb_right);
+		pn = nd;
 	}
+	j = 0;
+	for (nd = pn; nd; nd = rb_prev(nd)) {
+		j++;
+	}
+	if (i != j)
+		printk("backwards %d, forwards %d\n", j, i), i = 0;
 	return i;
 }
 
-static void validate_mm(struct mm_struct * mm) {
+void validate_mm(struct mm_struct * mm) {
 	int bug = 0;
 	int i = 0;
 	struct vm_area_struct * tmp = mm->mmap;
@@ -158,7 +175,7 @@ static void validate_mm(struct mm_struct * mm) {
 	}
 	if (i != mm->map_count)
 		printk("map_count %d vm_next %d\n", mm->map_count, i), bug = 1;
-	i = browse_rb(mm->mm_rb.rb_node);
+	i = browse_rb(&mm->mm_rb);
 	if (i != mm->map_count)
 		printk("map_count %d rb %d\n", mm->map_count, i), bug = 1;
 	if (bug)

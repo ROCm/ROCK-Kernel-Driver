@@ -230,6 +230,7 @@ static int __devinit zorro8390_init(struct net_device *dev,
 #ifdef CONFIG_NET_POLL_CONTROLLER
     dev->poll_controller = ei_poll;
 #endif
+
     NS8390_init(dev, 0);
     err = register_netdev(dev);
     if (err)
