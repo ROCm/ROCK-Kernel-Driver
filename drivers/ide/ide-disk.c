@@ -638,7 +638,6 @@ static u8 idedisk_dump_status (ide_drive_t *drive, const char *msg, u8 stat)
 
 	local_irq_set(flags);
 	printk("%s: %s: status=0x%02x", drive->name, msg, stat);
-#if FANCY_STATUS_DUMPS
 	printk(" { ");
 	if (stat & BUSY_STAT)
 		printk("Busy ");
@@ -652,12 +651,10 @@ static u8 idedisk_dump_status (ide_drive_t *drive, const char *msg, u8 stat)
 		if (stat & ERR_STAT)	printk("Error ");
 	}
 	printk("}");
-#endif	/* FANCY_STATUS_DUMPS */
 	printk("\n");
 	if ((stat & (BUSY_STAT|ERR_STAT)) == ERR_STAT) {
 		err = hwif->INB(IDE_ERROR_REG);
 		printk("%s: %s: error=0x%02x", drive->name, msg, err);
-#if FANCY_STATUS_DUMPS
 		printk(" { ");
 		if (err & ABRT_ERR)	printk("DriveStatusError ");
 		if (err & ICRC_ERR)
@@ -700,7 +697,6 @@ static u8 idedisk_dump_status (ide_drive_t *drive, const char *msg, u8 stat)
 					(unsigned long long)HWGROUP(drive)->rq->sector);
 		}
 	}
-#endif	/* FANCY_STATUS_DUMPS */
 	printk("\n");
 	{
 		struct request *rq;

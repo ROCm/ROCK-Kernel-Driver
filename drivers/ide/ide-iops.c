@@ -1096,7 +1096,6 @@ static ide_startstop_t reset_pollfunc (ide_drive_t *drive)
 			drive->failures = 0;
 		} else {
 			drive->failures++;
-#if FANCY_STATUS_DUMPS
 			printk("master: ");
 			switch (tmp & 0x7f) {
 				case 1: printk("passed");
@@ -1114,9 +1113,6 @@ static ide_startstop_t reset_pollfunc (ide_drive_t *drive)
 			if (tmp & 0x80)
 				printk("; slave: failed");
 			printk("\n");
-#else
-			printk("failed\n");
-#endif /* FANCY_STATUS_DUMPS */
 		}
 	}
 	hwgroup->poll_timeout = 0;	/* done polling */
