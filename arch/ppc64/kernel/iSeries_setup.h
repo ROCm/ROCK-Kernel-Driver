@@ -19,8 +19,6 @@
 #ifndef	__ISERIES_SETUP_H__
 #define	__ISERIES_SETUP_H__
 
-#include <linux/seq_file.h>
-
 extern void		 iSeries_init_early(void);
 extern void		 iSeries_init(unsigned long r3,
 			            unsigned long ird_start,
@@ -28,8 +26,7 @@ extern void		 iSeries_init(unsigned long r3,
 				    unsigned long cline_start,
 				    unsigned long cline_end);
 extern void		 iSeries_setup_arch(void);
-extern void		 iSeries_setup_residual(struct seq_file *m,
-						unsigned long cpu_id);
+extern void		 iSeries_setup_residual(struct seq_file *m);
 extern void		 iSeries_get_cpuinfo(struct seq_file *m);
 extern void		 iSeries_init_IRQ(void);
 extern int		 iSeries_get_irq(struct pt_regs *regs);

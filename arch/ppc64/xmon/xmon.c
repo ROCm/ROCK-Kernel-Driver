@@ -262,8 +262,10 @@ static int find_tb_table(unsigned long codeaddr, struct tbtable *tab);
 
 static inline void disable_surveillance(void)
 {
+#ifndef CONFIG_PPC_ISERIES
         rtas_call(rtas_token("set-indicator"), 3, 1, NULL, SURVEILLANCE_TOKEN,
 		  0, 0);
+#endif
 }
 
 void

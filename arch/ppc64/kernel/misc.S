@@ -516,8 +516,7 @@ _GLOBAL(kernel_thread)
 
 #ifdef CONFIG_BINFMT_ELF32
 /* Why isn't this a) automatic, b) written in 'C'? */	
-	.data
-	.align 8
+	.balign 8
 _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall	/* 0  -  old "setup()" system call */
 	.llong .sys32_exit
@@ -544,7 +543,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_oldumount
 	.llong .sys_setuid
 	.llong .sys_getuid
-	.llong .ppc64_sys_stime		/* 25 */
+	.llong .ppc64_sys32_stime       /* 25 */
 	.llong .sys32_ptrace
 	.llong .sys_alarm
 	.llong .sys32_fstat
@@ -745,8 +744,8 @@ _GLOBAL(sys_call_table32)
 		.llong .sys_ni_syscall
 	.endr
 #endif
-	.data
-	.align 8
+
+	.balign 8
 _GLOBAL(sys_call_table)
 	.llong .sys_ni_syscall	/* 0  -  old "setup()" system call */
 	.llong .sys_exit

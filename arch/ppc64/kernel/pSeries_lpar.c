@@ -782,10 +782,6 @@ static void pSeries_lpar_hpte_updateboltedpp(unsigned long newpp,
 	}
 }
 
-/*
- * Take a spinlock around flushes to avoid bouncing the hypervisor tlbie
- * lock.
- */
 static void pSeries_lpar_hpte_invalidate(unsigned long slot, unsigned long va,
 					 int large, int local)
 {
@@ -801,10 +797,8 @@ static void pSeries_lpar_hpte_invalidate(unsigned long slot, unsigned long va,
 
 	avpn = vpn >> 11;
 
-	spin_lock_irqsave(&pSeries_lpar_tlbie_lock, flags);
 	lpar_rc = plpar_pte_remove(H_AVPN, slot, (vpn >> 4) & ~0x7fUL, &dummy1,
 				   &dummy2);
-	spin_unlock_irqrestore(&pSeries_lpar_tlbie_lock, flags);
 
 	if (lpar_rc == H_Not_Found) {
 		udbg_printf("invalidate missed\n");
@@ -846,4 +840,5 @@ void pSeries_lpar_mm_init(void)
 	ppc_md.insert_hpte      = pSeries_lpar_insert_hpte;
 	ppc_md.remove_hpte      = pSeries_lpar_remove_hpte;
 	ppc_md.make_pte         = pSeries_lpar_make_pte;
+	ppc_md.flush_hash_range	= pSeries_lpar_flush_hash_range;
 }

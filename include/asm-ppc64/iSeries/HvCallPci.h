@@ -97,6 +97,8 @@ struct HvCallPci_BridgeInfo {
 	struct HvCallPci_BusUnitInfo busUnitInfo;  // Generic bus unit info
 	u8		subBusNumber;		// Bus number of secondary bus
 	u8		maxAgents;		// Max idsels on secondary bus
+        u8              maxSubBusNumber;        // Max Sub Bus
+	u8		logicalSlotNumber;	// Logical Slot Number for IOA 
 };
     
 
