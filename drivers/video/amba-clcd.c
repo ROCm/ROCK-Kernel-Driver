@@ -207,7 +207,7 @@ static int clcdfb_set_par(struct fb_info *info)
 
 	clcdfb_set_start(fb);
 
-	clk_set_rate(fb->clk, 1000000000 / regs.pixclock);
+	clk_set_rate(fb->clk, (1000000000 / regs.pixclock) * 1000);
 
 	fb->clcd_cntl = regs.cntl;
 
