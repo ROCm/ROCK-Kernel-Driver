@@ -74,6 +74,47 @@ static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
 }
 
 /*
+ * Called under down_write(mmap_sem), page_table_lock is not held
+ */
+
+#ifdef HAVE_ARCH_HUGETLB_UNMAPPED_AREA
+unsigned long hugetlb_get_unmapped_area(struct file *file, unsigned long addr,
+		unsigned long len, unsigned long pgoff, unsigned long flags);
+#else
+static unsigned long
+hugetlb_get_unmapped_area(struct file *file, unsigned long addr,
+		unsigned long len, unsigned long pgoff, unsigned long flags)
+{
+	struct mm_struct *mm = current->mm;
+	struct vm_area_struct *vma;
+
+	if (len & ~HPAGE_MASK)
+		return -EINVAL;
+	if (len > TASK_SIZE)
+		return -ENOMEM;
+
+	if (addr) {
+		addr = ALIGN(addr, HPAGE_SIZE);
+		vma = find_vma(mm, addr);
+		if (TASK_SIZE - len >= addr &&
+		    (!vma || addr + len <= vma->vm_start))
+			return addr;
+	}
+
+	addr = ALIGN(mm->free_area_cache, HPAGE_SIZE);
+
+	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
+		/* At this point:  (!vma || addr < vma->vm_end). */
+		if (TASK_SIZE - len < addr)
+			return -ENOMEM;
+		if (!vma || addr + len <= vma->vm_start)
+			return addr;
+		addr = ALIGN(vma->vm_end, HPAGE_SIZE);
+	}
+}
+#endif
+
+/*
  * Read a page. Again trivial. If it didn't already exist
  * in the page cache, it is zero-filled.
  */
@@ -466,8 +507,9 @@ static struct address_space_operations hugetlbfs_aops = {
 };
 
 struct file_operations hugetlbfs_file_operations = {
-	.mmap		= hugetlbfs_file_mmap,
-	.fsync		= simple_sync_file,
+	.mmap			= hugetlbfs_file_mmap,
+	.fsync			= simple_sync_file,
+	.get_unmapped_area	= hugetlb_get_unmapped_area,
 };
 
 static struct inode_operations hugetlbfs_dir_inode_operations = {
