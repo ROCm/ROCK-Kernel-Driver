@@ -12,6 +12,7 @@
 #include <linux/linkage.h>
 #include <linux/vmalloc.h>
 #include <linux/tty.h>
+#include <video/edid.h>
 #include <asm/io.h>
 
 /*
@@ -91,6 +92,7 @@ static unsigned char *real_mode; /* Pointer to real-mode data */
 #define ALT_MEM_K   (*(unsigned long *)(real_mode + 0x1e0))
 #endif
 #define SCREEN_INFO (*(struct screen_info *)(real_mode+0))
+#define EDID_INFO   (*(struct edid_info *)(real_mode+0x440))
 
 extern char input_data[];
 extern int input_len;

@@ -504,6 +504,15 @@ extern int fb_get_mode(int flags, u32 val, struct fb_var_screeninfo *var,
 		       struct fb_info *info);
 extern int fb_validate_mode(struct fb_var_screeninfo *var,
 			    struct fb_info *info);
+extern int parse_edid(unsigned char *edid, struct fb_var_screeninfo *var);
+extern int fb_get_monitor_limits(unsigned char *edid, struct fb_monspecs *specs);
+extern struct fb_videomode *fb_create_modedb(unsigned char *edid, int *dbsize);
+extern void fb_destroy_modedb(struct fb_videomode *modedb);
+extern void show_edid(unsigned char *edid);
+
+/* drivers/video/modedb.c */
+#define VESA_MODEDB_SIZE 34
+extern const struct fb_videomode vesa_modes[];
 
 /* drivers/video/fbcmap.c */
 extern int fb_alloc_cmap(struct fb_cmap *cmap, int len, int transp);

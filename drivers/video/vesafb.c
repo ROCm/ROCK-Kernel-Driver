@@ -19,7 +19,9 @@
 #include <linux/fb.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
-
+#ifdef __i386__
+#include <video/edid.h>
+#endif
 #include <asm/io.h>
 #include <asm/mtrr.h>
 
@@ -213,6 +215,7 @@ int __init vesafb_setup(char *options)
 int __init vesafb_init(void)
 {
 	int video_cmap_len;
+	char *edid = 0;
 	int i;
 
 	if (screen_info.orig_video_isVGA != VIDEO_TYPE_VLFB)
@@ -296,12 +299,20 @@ int __init vesafb_init(void)
 		vesafb_defined.yres_virtual = vesafb_defined.yres;
 		ypan = 0;
 	}
-	
-	/* some dummy values for timing to make fbset happy */
-	vesafb_defined.pixclock     = 10000000 / vesafb_defined.xres * 1000 / vesafb_defined.yres;
-	vesafb_defined.left_margin  = (vesafb_defined.xres / 8) & 0xf8;
-	vesafb_defined.hsync_len    = (vesafb_defined.xres / 8) & 0xf8;
 
+#ifdef __i386__
+	edid = get_EDID_from_BIOS(0);
+	if (edid)
+		parse_edid(edid, &vesafb_defined);	
+	else		
+#endif
+	{	
+		/* some dummy values for timing to make fbset happy */
+		vesafb_defined.pixclock     = 10000000 / vesafb_defined.xres * 1000 / vesafb_defined.yres;
+		vesafb_defined.left_margin  = (vesafb_defined.xres / 8) & 0xf8;
+		vesafb_defined.hsync_len    = (vesafb_defined.xres / 8) & 0xf8;
+	}
+	
 	if (vesafb_defined.bits_per_pixel > 8) {
 		vesafb_defined.red.offset    = screen_info.red_pos;
 		vesafb_defined.red.length    = screen_info.red_size;

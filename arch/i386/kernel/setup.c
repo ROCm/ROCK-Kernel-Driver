@@ -37,6 +37,7 @@
 #include <linux/console.h>
 #include <linux/root_dev.h>
 #include <linux/highmem.h>
+#include <video/edid.h>
 #include <asm/e820.h>
 #include <asm/mpspec.h>
 #include <asm/edd.h>
@@ -85,7 +86,7 @@ struct sys_desc_table_struct {
 	unsigned short length;
 	unsigned char table[0];
 };
-
+struct edid_info edid_info;
 struct e820map e820;
 
 unsigned char aux_device_present;
@@ -883,6 +884,7 @@ void __init setup_arch(char **cmdline_p)
  	ROOT_DEV = ORIG_ROOT_DEV;
  	drive_info = DRIVE_INFO;
  	screen_info = SCREEN_INFO;
+	edid_info = EDID_INFO;
 	apm_info.bios = APM_BIOS_INFO;
 	saved_videomode = VIDEO_MODE;
 	printk("Video mode to be used for restore is %lx\n", saved_videomode);

@@ -135,6 +135,7 @@ vid1:
 #endif /* CONFIG_VIDEO_RETAIN */
 #endif /* CONFIG_VIDEO_SELECT */
 	call	mode_params			# Store mode parameters
+	call	store_edid
 	popw	%ds				# Restore original DS
 	ret
 
@@ -1885,6 +1886,39 @@ skip10:	movb	%ah, %al
 	call	prtchr	
 	popw	%cx
 	popw	%ax
+	ret
+
+store_edid:
+	pushw	%es				# just save all registers 
+	pushw	%ax				
+	pushw	%bx
+	pushw   %cx
+	pushw	%dx
+	pushw   %di
+
+	pushw	%fs                             
+	popw    %es
+
+	movl	$0x13131313, %eax		# memset block with 0x13
+	movw    $32, %cx
+	movw	$0x440, %di
+	cld
+	rep 
+	stosl  
+
+	movw	$0x4f15, %ax                    # do VBE/DDC 
+	movw	$0x01, %bx
+	movw	$0x00, %cx
+	movw    $0x01, %dx
+	movw	$0x440, %di
+	int	$0x10	
+
+	popw	%di				# restore all registers        
+	popw	%dx
+	popw	%cx
+	popw	%bx
+	popw	%ax
+	popw	%es	
 	ret
 
 # VIDEO_SELECT-only variables
