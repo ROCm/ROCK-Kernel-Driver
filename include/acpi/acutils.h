@@ -508,6 +508,10 @@ acpi_ut_execute_UID (
 	struct acpi_namespace_node      *device_node,
 	struct acpi_device_id           *uid);
 
+acpi_status
+acpi_ut_execute_sxds (
+	struct acpi_namespace_node      *device_node,
+	u8                              *highest);
 
 /*
  * ut_mutex - mutual exclusion interfaces
