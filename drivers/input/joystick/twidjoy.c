@@ -211,7 +211,7 @@ static void twidjoy_connect(struct serio *serio, struct serio_dev *dev)
 	twidjoy->dev.id.product = 0x0001;
 	twidjoy->dev.id.version = 0x0100;
 
-	twidjoy->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);	
+	twidjoy->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 
 	for (bp = twidjoy_buttons; bp->bitmask; bp++) {
 		for (i = 0; i < bp->bitmask; i++)
@@ -221,8 +221,8 @@ static void twidjoy_connect(struct serio *serio, struct serio_dev *dev)
 	twidjoy->dev.absbit[0] = BIT(ABS_X) | BIT(ABS_Y);
 
 	for (i = 0; i < 2; i++) {
-		twidjoy->dev.absmax[ABS_X+i] =  50;	
-		twidjoy->dev.absmin[ABS_X+i] = -50;	
+		twidjoy->dev.absmax[ABS_X+i] =  50;
+		twidjoy->dev.absmin[ABS_X+i] = -50;
 
 		/* TODO: arndt 20010708: Are these values appropriate? */
 		twidjoy->dev.absfuzz[ABS_X+i] = 4;

@@ -63,7 +63,7 @@ struct interact {
 	char phys[32];
 };
 
-static short interact_abs_hhfx[] = 
+static short interact_abs_hhfx[] =
 	{ ABS_RX, ABS_RY, ABS_X, ABS_Y, ABS_HAT0X, ABS_HAT0Y, -1 };
 static short interact_abs_pp8d[] =
 	{ ABS_X, ABS_Y, -1 };
@@ -166,7 +166,7 @@ static void interact_timer(unsigned long private)
 			case INTERACT_TYPE_PP8D:
 
 				for (i = 0; i < 2; i++)
-					input_report_abs(dev, interact_abs_pp8d[i], 
+					input_report_abs(dev, interact_abs_pp8d[i],
 						((data[0] >> ((i << 1) + 20)) & 1)  - ((data[0] >> ((i << 1) + 21)) & 1));
 
 				for (i = 0; i < 8; i++)
@@ -190,7 +190,7 @@ static int interact_open(struct input_dev *dev)
 {
 	struct interact *interact = dev->private;
 	if (!interact->used++)
-		mod_timer(&interact->timer, jiffies + INTERACT_REFRESH_TIME);	
+		mod_timer(&interact->timer, jiffies + INTERACT_REFRESH_TIME);
 	return 0;
 }
 
@@ -242,7 +242,7 @@ static void interact_connect(struct gameport *gameport, struct gameport_dev *dev
 	if (!interact_type[i].length) {
 		printk(KERN_WARNING "interact.c: Unknown joystick on %s. [len %d d0 %08x d1 %08x i2 %08x]\n",
 			gameport->phys, i, data[0], data[1], data[2]);
-		goto fail2;	
+		goto fail2;
 	}
 
 	sprintf(interact->phys, "%s/input0", gameport->phys);

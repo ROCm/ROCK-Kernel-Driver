@@ -48,8 +48,8 @@ MODULE_LICENSE("GPL");
 #define GRIP_STROBE_GPP		200	/* 200 us */
 #define GRIP_LENGTH_XT		4
 #define GRIP_STROBE_XT		64	/* 64 us */
-#define GRIP_MAX_CHUNKS_XT	10	
-#define GRIP_MAX_BITS_XT	30	
+#define GRIP_MAX_CHUNKS_XT	10
+#define GRIP_MAX_BITS_XT	30
 
 #define GRIP_REFRESH_TIME	HZ/50	/* 20 ms */
 
@@ -153,7 +153,7 @@ static int grip_xt_read_packet(struct gameport *gameport, int shift, unsigned in
 				buf = (buf << 1) | (u >> 1);
 				t = strobe;
 				i++;
-			} else 
+			} else
 
 			if ((((u ^ v) & (v ^ w)) >> 1) & ~(u | v | w) & 1) {
 				if (i == 20) {

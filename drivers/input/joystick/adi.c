@@ -11,18 +11,18 @@
 /*
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- * 
+ *
  * Should you need to contact me, the author, you can do so either by
  * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
  * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
@@ -72,8 +72,8 @@ MODULE_LICENSE("GPL");
  */
 
 static char *adi_names[] = {	"WingMan Extreme Digital", "ThunderPad Digital", "SideCar", "CyberMan 2",
-				"WingMan Interceptor", "WingMan Formula", "WingMan GamePad", 
-				"WingMan Extreme Digital 3D", "WingMan GamePad Extreme", 
+				"WingMan Interceptor", "WingMan Formula", "WingMan GamePad",
+				"WingMan Extreme Digital 3D", "WingMan GamePad Extreme",
 				"WingMan GamePad USB", "Unknown Device %#x" };
 
 static char adi_wmgpe_abs[] =	{ ABS_X, ABS_Y, ABS_HAT0X, ABS_HAT0Y };
@@ -178,7 +178,7 @@ static void adi_read_packet(struct adi_port *port)
 
 /*
  * adi_move_bits() detects a possible 2-stream mode, and moves
- * the bits accordingly. 
+ * the bits accordingly.
  */
 
 static void adi_move_bits(struct adi_port *port, int length)
@@ -208,7 +208,7 @@ static inline int adi_get_bits(struct adi *adi, int count)
 	int i;
 	if ((adi->idx += count) > adi->ret) return 0;
 	for (i = 0; i < count; i++)
-		bits |= ((adi->data[adi->idx - i] >> 5) & 1) << i; 
+		bits |= ((adi->data[adi->idx - i] >> 5) & 1) << i;
 	return bits;
 }
 
@@ -224,12 +224,12 @@ static int adi_decode(struct adi *adi)
 	int i, t;
 
 	if (adi->ret < adi->length || adi->id != (adi_get_bits(adi, 4) | (adi_get_bits(adi, 4) << 4)))
-		return -1;	
+		return -1;
 
-	for (i = 0; i < adi->axes10; i++) 
+	for (i = 0; i < adi->axes10; i++)
 		input_report_abs(dev, *abs++, adi_get_bits(adi, 10));
 
-	for (i = 0; i < adi->axes8; i++) 
+	for (i = 0; i < adi->axes8; i++)
 		input_report_abs(dev, *abs++, adi_get_bits(adi, 8));
 
 	for (i = 0; i < adi->buttons && i < 63; i++) {
@@ -249,7 +249,7 @@ static int adi_decode(struct adi *adi)
 
 	for (i = 63; i < adi->buttons; i++)
 		input_report_key(dev, *key++, adi_get_bits(adi, 1));
-	
+
 	input_sync(dev);
 
 	return 0;
@@ -294,7 +294,7 @@ static int adi_open(struct input_dev *dev)
 {
 	struct adi_port *port = dev->private;
 	if (!port->used++)
-		mod_timer(&port->timer, jiffies + ADI_REFRESH_TIME);	
+		mod_timer(&port->timer, jiffies + ADI_REFRESH_TIME);
 	return 0;
 }
 
@@ -334,7 +334,7 @@ static void adi_id_decode(struct adi *adi, struct adi_port *port)
 		return;
 
 	if (adi->ret < (t = adi_get_bits(adi, 10))) {
-		printk(KERN_WARNING "adi: Short ID packet: reported: %d != read: %d\n", t, adi->ret); 
+		printk(KERN_WARNING "adi: Short ID packet: reported: %d != read: %d\n", t, adi->ret);
 		return;
 	}
 
@@ -498,7 +498,7 @@ static void adi_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 	adi_init_digital(gameport);
 	adi_read_packet(port);
-	
+
 	if (port->adi[0].ret >= ADI_MIN_LEN_LENGTH)
 		adi_move_bits(port, adi_get_bits(port->adi, 10));
 
