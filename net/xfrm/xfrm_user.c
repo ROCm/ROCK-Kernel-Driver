@@ -1153,7 +1153,7 @@ static int xfrm_send_policy_notify(struct xfrm_policy *xp, int dir, int hard)
 
 	len = sizeof(struct xfrm_user_tmpl) * xp->xfrm_nr;
 	len = RTA_ALIGN(RTA_LENGTH(len));
-	len += NLMSG_ALIGN(NLMSG_LENGTH(sizeof(struct xfrm_userpolicy_info)));
+	len += NLMSG_ALIGN(NLMSG_LENGTH(sizeof(struct xfrm_user_polexpire)));
 	skb = alloc_skb(len, GFP_ATOMIC);
 	if (skb == NULL)
 		return -ENOMEM;
