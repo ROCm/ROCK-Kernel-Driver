@@ -339,7 +339,7 @@ nfsd3_proc_mknod(struct svc_rqst *rqstp, struct nfsd3_mknodargs *argp,
 		    || (argp->ftype == NF3BLK && argp->major >= MAX_BLKDEV)
 		    || argp->minor > 0xFF)
 			RETURN_STATUS(nfserr_inval);
-		rdev = ((argp->major) << 8) | (argp->minor);
+		rdev = MKDEV(argp->major, argp->minor);
 	} else
 		if (argp->ftype != NF3SOCK && argp->ftype != NF3FIFO)
 			RETURN_STATUS(nfserr_inval);
