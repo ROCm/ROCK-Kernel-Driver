@@ -2059,6 +2059,7 @@ sctp_disposition_t sctp_sf_do_9_2_shutdown(const struct sctp_endpoint *ep,
 	struct sctp_chunk *chunk = arg;
 	sctp_shutdownhdr_t *sdh;
 	sctp_disposition_t disposition;
+	struct sctp_ulpevent *ev;
 
 	/* Convert the elaborate header.  */
 	sdh = (sctp_shutdownhdr_t *)chunk->skb->data;
@@ -2089,12 +2090,28 @@ sctp_disposition_t sctp_sf_do_9_2_shutdown(const struct sctp_endpoint *ep,
 							  arg, commands);
 	}
 
+	if (SCTP_DISPOSITION_NOMEM == disposition)
+		goto out;
+
 	/*  - verify, by checking the Cumulative TSN Ack field of the
 	 *    chunk, that all its outstanding DATA chunks have been
 	 *    received by the SHUTDOWN sender.
 	 */
 	sctp_add_cmd_sf(commands, SCTP_CMD_PROCESS_CTSN,
 			SCTP_U32(chunk->subh.shutdown_hdr->cum_tsn_ack));
+
+	/* API 5.3.1.5 SCTP_SHUTDOWN_EVENT
+	 * When a peer sends a SHUTDOWN, SCTP delivers this notification to
+	 * inform the application that it should cease sending data.
+	 */
+	ev = sctp_ulpevent_make_shutdown_event(asoc, 0, GFP_ATOMIC);
+	if (!ev) {
+		disposition = SCTP_DISPOSITION_NOMEM;
+		goto out;	
+	}
+	sctp_add_cmd_sf(commands, SCTP_CMD_EVENT_ULP, SCTP_ULPEVENT(ev));
+
+out:
 	return disposition;
 }
 
