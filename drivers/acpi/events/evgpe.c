@@ -53,8 +53,8 @@
  *
  * FUNCTION:    acpi_ev_get_gpe_event_info
  *
- * PARAMETERS:  gpe_number          - Raw GPE number
- *              owning_gpe_block    - Block ptr.  NULL for GPE0/GPE1
+ * PARAMETERS:  gpe_device          - Device node.  NULL for GPE0/GPE1
+ *              gpe_number          - Raw GPE number
  *
  * RETURN:      A GPE event_info struct. NULL if not a valid GPE
  *
@@ -74,6 +74,9 @@ acpi_ev_get_gpe_event_info (
 	union acpi_operand_object       *obj_desc;
 	struct acpi_gpe_block_info      *gpe_block;
 	acpi_native_uint                i;
+
+
+	ACPI_FUNCTION_NAME ("ev_get_gpe_event_info");
 
 
 	/* A NULL gpe_block means use the FADT-defined GPE block(s) */
@@ -120,7 +123,8 @@ acpi_ev_get_gpe_event_info (
  *
  * FUNCTION:    acpi_ev_gpe_detect
  *
- * PARAMETERS:  None
+ * PARAMETERS:  gpe_xrupt_list      - Interrupt block for this interrupt.
+ *                                    Can have multiple GPE blocks attached.
  *
  * RETURN:      INTERRUPT_HANDLED or INTERRUPT_NOT_HANDLED
  *
@@ -231,7 +235,7 @@ unlock_and_exit:
  *
  * FUNCTION:    acpi_ev_asynch_execute_gpe_method
  *
- * PARAMETERS:  gpe_event_info - Info for this GPE
+ * PARAMETERS:  Context (gpe_event_info) - Info for this GPE
  *
  * RETURN:      None
  *

@@ -516,7 +516,7 @@ typedef u32                                     acpi_object_type;
 
 
 /*
- * acpi_event Types: Fixed & General Purpose
+ * Acpi Event Types: Fixed & General Purpose
  */
 typedef u32                                     acpi_event_type;
 
@@ -539,10 +539,13 @@ typedef u32                                     acpi_event_type;
 #define ACPI_EVENT_EDGE_TRIGGERED       2
 
 /*
- * GPEs
+ * Flags for GPE and Lock interfaces
  */
-#define ACPI_EVENT_WAKE_ENABLE          0x1
-#define ACPI_EVENT_WAKE_DISABLE         0x1
+#define ACPI_EVENT_WAKE_ENABLE          0x2
+#define ACPI_EVENT_WAKE_DISABLE         0x2
+
+#define ACPI_NOT_ISR                    0x1
+#define ACPI_ISR                        0x0
 
 
 /*
@@ -747,6 +750,18 @@ struct acpi_system_info
 	struct acpi_table_info              table_info [NUM_ACPI_TABLES];
 };
 
+
+/*
+ * Types specific to the OS service interfaces
+ */
+
+typedef u32
+(ACPI_SYSTEM_XFACE *OSD_HANDLER) (
+	void                            *context);
+
+typedef void
+(ACPI_SYSTEM_XFACE *OSD_EXECUTION_CALLBACK) (
+	void                            *context);
 
 /*
  * Various handlers and callback procedures

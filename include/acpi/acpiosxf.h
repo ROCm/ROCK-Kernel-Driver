@@ -77,19 +77,6 @@ struct acpi_signal_fatal_info
 
 
 /*
- * Types specific to the OS service interfaces
- */
-
-typedef u32
-(ACPI_SYSTEM_XFACE *OSD_HANDLER) (
-	void                            *context);
-
-typedef void
-(ACPI_SYSTEM_XFACE *OSD_EXECUTION_CALLBACK) (
-	void                            *context);
-
-
-/*
  * OSL Initialization and shutdown primitives
  */
 
@@ -164,9 +151,6 @@ void
 acpi_os_release_lock (
 	acpi_handle                     handle,
 	u32                             flags);
-
-#define ACPI_NOT_ISR        1
-#define ACPI_ISR            0
 
 
 /*

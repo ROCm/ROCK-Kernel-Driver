@@ -80,15 +80,13 @@ acpi_ev_sci_xrupt_handler (
 	 */
 
 	/*
-	 * Fixed acpi_events:
-	 * Check for and dispatch any Fixed acpi_events that have occurred
+	 * Fixed Events:
+	 * Check for and dispatch any Fixed Events that have occurred
 	 */
 	interrupt_handled |= acpi_ev_fixed_event_detect ();
 
-/* TBD: What if there are no GPEs defined? */
-
 	/*
-	 * GPEs:
+	 * General Purpose Events:
 	 * Check for and dispatch any GPEs that have occurred
 	 */
 	interrupt_handled |= acpi_ev_gpe_detect (gpe_xrupt_list);

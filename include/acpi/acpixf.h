@@ -348,13 +348,27 @@ acpi_disable_gpe (
 acpi_status
 acpi_clear_gpe (
 	acpi_handle                     gpe_device,
-	u32                             gpe_number);
+	u32                             gpe_number,
+	u32                             flags);
 
 acpi_status
 acpi_get_gpe_status (
 	acpi_handle                     gpe_device,
 	u32                             gpe_number,
+	u32                             flags,
 	acpi_event_status               *event_status);
+
+acpi_status
+acpi_install_gpe_block (
+	acpi_handle                     gpe_device,
+	struct acpi_generic_address     *gpe_block_address,
+	u32                             register_count,
+	u32                             interrupt_level);
+
+acpi_status
+acpi_remove_gpe_block (
+	acpi_handle                     gpe_device);
+
 
 /*
  * Resource interfaces

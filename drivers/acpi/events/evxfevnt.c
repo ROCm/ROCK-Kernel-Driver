@@ -44,6 +44,7 @@
 
 #include <acpi/acpi.h>
 #include <acpi/acevents.h>
+#include <acpi/acnamesp.h>
 
 #define _COMPONENT          ACPI_EVENTS
 	 ACPI_MODULE_NAME    ("evxfevnt")
@@ -115,6 +116,7 @@ acpi_disable (void)
 
 
 	ACPI_FUNCTION_TRACE ("acpi_disable");
+
 
 	if (!acpi_gbl_FADT) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "No FADT information present!\n"));
@@ -207,6 +209,7 @@ acpi_enable_event (
  * PARAMETERS:  gpe_device      - Parent GPE Device
  *              gpe_number      - GPE level within the GPE block
  *              Flags           - Just enable, or also wake enable?
+ *                                Called from ISR or not
  *
  * RETURN:      Status
  *
@@ -227,9 +230,13 @@ acpi_enable_gpe (
 	ACPI_FUNCTION_TRACE ("acpi_enable_gpe");
 
 
-	status = acpi_ut_acquire_mutex (ACPI_MTX_EVENTS);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
+	/* Use semaphore lock if not executing at interrupt level */
+
+	if (flags & ACPI_NOT_ISR) {
+		status = acpi_ut_acquire_mutex (ACPI_MTX_EVENTS);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
 	}
 
 	/* Ensure that we have a valid GPE number */
@@ -252,7 +259,9 @@ acpi_enable_gpe (
 	}
 
 unlock_and_exit:
-	(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
+	if (flags & ACPI_NOT_ISR) {
+		(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
+	}
 	return_ACPI_STATUS (status);
 }
 
@@ -321,6 +330,7 @@ acpi_disable_event (
  * PARAMETERS:  gpe_device      - Parent GPE Device
  *              gpe_number      - GPE level within the GPE block
  *              Flags           - Just enable, or also wake enable?
+ *                                Called from ISR or not
  *
  * RETURN:      Status
  *
@@ -341,9 +351,13 @@ acpi_disable_gpe (
 	ACPI_FUNCTION_TRACE ("acpi_disable_gpe");
 
 
-	status = acpi_ut_acquire_mutex (ACPI_MTX_EVENTS);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
+	/* Use semaphore lock if not executing at interrupt level */
+
+	if (flags & ACPI_NOT_ISR) {
+		status = acpi_ut_acquire_mutex (ACPI_MTX_EVENTS);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
 	}
 
 	/* Ensure that we have a valid GPE number */
@@ -366,7 +380,9 @@ acpi_disable_gpe (
 	}
 
 unlock_and_exit:
-	(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
+	if (flags & ACPI_NOT_ISR) {
+		(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
+	}
 	return_ACPI_STATUS (status);
 }
 
@@ -416,6 +432,7 @@ acpi_clear_event (
  *
  * PARAMETERS:  gpe_device      - Parent GPE Device
  *              gpe_number      - GPE level within the GPE block
+ *              Flags           - Called from an ISR or not
  *
  * RETURN:      Status
  *
@@ -426,7 +443,8 @@ acpi_clear_event (
 acpi_status
 acpi_clear_gpe (
 	acpi_handle                     gpe_device,
-	u32                             gpe_number)
+	u32                             gpe_number,
+	u32                             flags)
 {
 	acpi_status                     status = AE_OK;
 	struct acpi_gpe_event_info      *gpe_event_info;
@@ -435,9 +453,13 @@ acpi_clear_gpe (
 	ACPI_FUNCTION_TRACE ("acpi_clear_gpe");
 
 
-	status = acpi_ut_acquire_mutex (ACPI_MTX_EVENTS);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
+	/* Use semaphore lock if not executing at interrupt level */
+
+	if (flags & ACPI_NOT_ISR) {
+		status = acpi_ut_acquire_mutex (ACPI_MTX_EVENTS);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
 	}
 
 	/* Ensure that we have a valid GPE number */
@@ -451,7 +473,9 @@ acpi_clear_gpe (
 	status = acpi_hw_clear_gpe (gpe_event_info);
 
 unlock_and_exit:
-	(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
+	if (flags & ACPI_NOT_ISR) {
+		(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
+	}
 	return_ACPI_STATUS (status);
 }
 
@@ -506,6 +530,7 @@ acpi_get_event_status (
  *
  * PARAMETERS:  gpe_device      - Parent GPE Device
  *              gpe_number      - GPE level within the GPE block
+ *              Flags           - Called from an ISR or not
  *              Event Status    - Where the current status of the event will
  *                                be returned
  *
@@ -519,6 +544,7 @@ acpi_status
 acpi_get_gpe_status (
 	acpi_handle                     gpe_device,
 	u32                             gpe_number,
+	u32                             flags,
 	acpi_event_status               *event_status)
 {
 	acpi_status                     status = AE_OK;
@@ -528,9 +554,13 @@ acpi_get_gpe_status (
 	ACPI_FUNCTION_TRACE ("acpi_get_gpe_status");
 
 
-	status = acpi_ut_acquire_mutex (ACPI_MTX_EVENTS);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
+	/* Use semaphore lock if not executing at interrupt level */
+
+	if (flags & ACPI_NOT_ISR) {
+		status = acpi_ut_acquire_mutex (ACPI_MTX_EVENTS);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
 	}
 
 	/* Ensure that we have a valid GPE number */
@@ -546,8 +576,157 @@ acpi_get_gpe_status (
 	status = acpi_hw_get_gpe_status (gpe_event_info, event_status);
 
 unlock_and_exit:
-	(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
+	if (flags & ACPI_NOT_ISR) {
+		(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
+	}
 	return_ACPI_STATUS (status);
 }
 
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_install_gpe_block
+ *
+ * PARAMETERS:  gpe_device          - Handle to the parent GPE Block Device
+ *              gpe_block_address   - Address and space_iD
+ *              register_count      - Number of GPE register pairs in the block
+ *              interrupt_level     - H/W interrupt for the block
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Create and Install a block of GPE registers
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_install_gpe_block (
+	acpi_handle                     gpe_device,
+	struct acpi_generic_address     *gpe_block_address,
+	u32                             register_count,
+	u32                             interrupt_level)
+{
+	acpi_status                     status;
+	union acpi_operand_object       *obj_desc;
+	struct acpi_namespace_node      *node;
+	struct acpi_gpe_block_info      *gpe_block;
+
+
+	ACPI_FUNCTION_TRACE ("acpi_install_gpe_block");
+
+
+	if ((!gpe_device)      ||
+		(!gpe_block_address) ||
+		(!register_count)) {
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
+	}
+
+	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
+	node = acpi_ns_map_handle_to_node (gpe_device);
+	if (!node) {
+		status = AE_BAD_PARAMETER;
+		goto unlock_and_exit;
+	}
+
+	/*
+	 * For user-installed GPE Block Devices, the gpe_block_base_number
+	 * is always zero
+	 */
+	status = acpi_ev_create_gpe_block (node, gpe_block_address, register_count,
+			  0, interrupt_level, &gpe_block);
+	if (ACPI_FAILURE (status)) {
+		goto unlock_and_exit;
+	}
+
+	/* Get the device_object attached to the node */
+
+	obj_desc = acpi_ns_get_attached_object (node);
+	if (!obj_desc) {
+		/* No object, create a new one */
+
+		obj_desc = acpi_ut_create_internal_object (ACPI_TYPE_DEVICE);
+		if (!obj_desc) {
+			status = AE_NO_MEMORY;
+			goto unlock_and_exit;
+		}
+
+		status = acpi_ns_attach_object (node, obj_desc, ACPI_TYPE_DEVICE);
+		acpi_ut_remove_reference (obj_desc);
+		if (ACPI_FAILURE (status)) {
+			goto unlock_and_exit;
+		}
+	}
+
+	/* Install the GPE block in the device_object */
+
+	obj_desc->device.gpe_block = gpe_block;
+
+
+unlock_and_exit:
+	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+	return_ACPI_STATUS (status);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_remove_gpe_block
+ *
+ * PARAMETERS:  gpe_device          - Handle to the parent GPE Block Device
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Remove a previously installed block of GPE registers
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_remove_gpe_block (
+	acpi_handle                     gpe_device)
+{
+	union acpi_operand_object       *obj_desc;
+	acpi_status                     status;
+	struct acpi_namespace_node      *node;
+
+
+	ACPI_FUNCTION_TRACE ("acpi_remove_gpe_block");
+
+
+	if (!gpe_device) {
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
+	}
+
+	status = acpi_ut_acquire_mutex (ACPI_MTX_NAMESPACE);
+	if (ACPI_FAILURE (status)) {
+		return (status);
+	}
+
+	node = acpi_ns_map_handle_to_node (gpe_device);
+	if (!node) {
+		status = AE_BAD_PARAMETER;
+		goto unlock_and_exit;
+	}
+
+	/* Get the device_object attached to the node */
+
+	obj_desc = acpi_ns_get_attached_object (node);
+	if (!obj_desc ||
+		!obj_desc->device.gpe_block) {
+		return_ACPI_STATUS (AE_NULL_OBJECT);
+	}
+
+	/* Delete the GPE block (but not the device_object) */
+
+	status = acpi_ev_delete_gpe_block (obj_desc->device.gpe_block);
+	if (ACPI_SUCCESS (status)) {
+		obj_desc->device.gpe_block = NULL;
+	}
+
+unlock_and_exit:
+	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
+	return_ACPI_STATUS (status);
+}
 

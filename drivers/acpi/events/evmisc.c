@@ -523,10 +523,6 @@ acpi_ev_terminate (void)
 {
 	acpi_native_uint                i;
 	acpi_status                     status;
-	struct acpi_gpe_block_info      *gpe_block;
-	struct acpi_gpe_block_info      *next_gpe_block;
-	struct acpi_gpe_xrupt_info      *gpe_xrupt_info;
-	struct acpi_gpe_xrupt_info      *next_gpe_xrupt_info;
 
 
 	ACPI_FUNCTION_TRACE ("ev_terminate");
@@ -566,24 +562,6 @@ acpi_ev_terminate (void)
 		if (ACPI_FAILURE (status)) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "acpi_disable failed\n"));
 		}
-	}
-
-	/* Free global GPE blocks and related info structures */
-
-	gpe_xrupt_info = acpi_gbl_gpe_xrupt_list_head;
-	while (gpe_xrupt_info) {
-		gpe_block = gpe_xrupt_info->gpe_block_list_head;
-		while (gpe_block) {
-			next_gpe_block = gpe_block->next;
-			ACPI_MEM_FREE (gpe_block->event_info);
-			ACPI_MEM_FREE (gpe_block->register_info);
-			ACPI_MEM_FREE (gpe_block);
-
-			gpe_block = next_gpe_block;
-		}
-		next_gpe_xrupt_info = gpe_xrupt_info->next;
-		ACPI_MEM_FREE (gpe_xrupt_info);
-		gpe_xrupt_info = next_gpe_xrupt_info;
 	}
 	return_VOID;
 }

@@ -340,6 +340,7 @@ struct acpi_gpe_block_info
 {
 	struct acpi_gpe_block_info              *previous;
 	struct acpi_gpe_block_info              *next;
+	struct acpi_gpe_xrupt_info              *xrupt_block;   /* Backpointer to interrupt block */
 	struct acpi_gpe_register_info           *register_info; /* One per GPE register pair */
 	struct acpi_gpe_event_info              *event_info;    /* One for each GPE */
 	struct acpi_generic_address             block_address;  /* Base address of the block */

@@ -378,7 +378,7 @@ acpi_ec_gpe_query (
 	acpi_evaluate_object(ec->handle, object_name, NULL, NULL);
 
 end:
-	acpi_enable_gpe(NULL, ec->gpe_bit, 0);
+	acpi_enable_gpe(NULL, ec->gpe_bit, ACPI_NOT_ISR);
 }
 
 static void
@@ -391,7 +391,7 @@ acpi_ec_gpe_handler (
 	if (!ec)
 		return;
 
-	acpi_disable_gpe(NULL, ec->gpe_bit, 0);
+	acpi_disable_gpe(NULL, ec->gpe_bit, ACPI_ISR);
 
 	status = acpi_os_queue_for_execution(OSD_PRIORITY_GPE,
 		acpi_ec_gpe_query, ec);

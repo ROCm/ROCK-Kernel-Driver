@@ -126,6 +126,19 @@ acpi_status
 acpi_ev_gpe_initialize (
 	void);
 
+acpi_status
+acpi_ev_create_gpe_block (
+	struct acpi_namespace_node      *gpe_device,
+	struct acpi_generic_address     *gpe_block_address,
+	u32                             register_count,
+	u8                              gpe_block_base_number,
+	u32                             interrupt_level,
+	struct acpi_gpe_block_info      **return_gpe_block);
+
+acpi_status
+acpi_ev_delete_gpe_block (
+	struct acpi_gpe_block_info      *gpe_block);
+
 u32
 acpi_ev_gpe_dispatch (
 	struct acpi_gpe_event_info      *gpe_event_info,
