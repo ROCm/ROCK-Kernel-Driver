@@ -271,7 +271,7 @@ static void uart_shutdown(struct uart_info *info)
  */
 void
 uart_update_timeout(struct uart_port *port, unsigned int cflag,
-		    unsigned int quot)
+		    unsigned int baud)
 {
 	unsigned int bits;
 
@@ -305,7 +305,7 @@ uart_update_timeout(struct uart_port *port, unsigned int cflag,
 	 * Figure the timeout to send the above number of bits.
 	 * Add .02 seconds of slop
 	 */
-	port->timeout = (HZ * bits) / (port->uartclk / (16 * quot)) + HZ/50;
+	port->timeout = (HZ * bits) / baud + HZ/50;
 }
 
 EXPORT_SYMBOL(uart_update_timeout);
@@ -321,6 +321,12 @@ EXPORT_SYMBOL(uart_update_timeout);
  *	Decode the termios structure into a numeric baud rate,
  *	taking account of the magic 38400 baud rate (with spd_*
  *	flags), and mapping the %B0 rate to 9600 baud.
+ *
+ *	If the new baud rate is invalid, try the old termios setting.
+ *	If it's still invalid, we try 9600 baud.
+ *
+ *	Update the @termios structure to reflect the baud rate
+ *	we're actually going to be using.
  */
 unsigned int
 uart_get_baud_rate(struct uart_port *port, struct termios *termios,
@@ -383,26 +389,14 @@ EXPORT_SYMBOL(uart_get_baud_rate);
 /**
  *	uart_get_divisor - return uart clock divisor
  *	@port: uart_port structure describing the port.
- *	@termios: desired termios settings
- *	@old_termios: the original port settings, or NULL
+ *	@baud: desired baud rate
  *
- *	Calculate the uart clock divisor for the port.  If the
- *	divisor is invalid, try the old termios setting.  If
- *	the divisor is still invalid, we try 9600 baud.
- *
- *	Update the @termios structure to reflect the baud rate
- *	we're actually going to be using.
- *
- *	If 9600 baud fails, we return a zero divisor.
+ *	Calculate the uart clock divisor for the port.
  */
 unsigned int
-uart_get_divisor(struct uart_port *port, struct termios *termios,
-		 struct termios *old_termios)
+uart_get_divisor(struct uart_port *port, unsigned int baud)
 {
-	unsigned int quot, baud, max = port->uartclk / 16;
-
-	/* Determine divisor based on baud rate */
-	baud = uart_get_baud_rate(port, termios, old_termios, 0, max);
+	unsigned int quot;
 
 	/*
 	 * Old custom speed handling.
@@ -832,8 +826,17 @@ uart_set_info(struct uart_info *info, struct serial_struct *newinfo)
 		goto exit;
 	if (info->flags & UIF_INITIALIZED) {
 		if (((old_flags ^ port->flags) & UPF_SPD_MASK) ||
-		    old_custom_divisor != port->custom_divisor)
+		    old_custom_divisor != port->custom_divisor) {
+			/* If they're setting up a custom divisor or speed,
+			 * instead of clearing it, then bitch about it. No
+			 * need to rate-limit; it's CAP_SYS_ADMIN only. */
+			if (port->flags & UPF_SPD_MASK) {
+				printk(KERN_NOTICE "%s sets custom speed on %s%d. This is deprecated.\n",
+				       current->comm, info->tty->driver.name, 
+				       info->port->line);
+			}
 			uart_change_speed(info, NULL);
+		}
 	} else
 		retval = uart_startup(info, 1);
  exit:
