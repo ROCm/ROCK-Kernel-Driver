@@ -580,6 +580,8 @@ acpi_cpufreq_init (void)
 	if (!performance)
 		return_VALUE(-ENOMEM);
 
+	memset(performance, 0, NR_CPUS * sizeof(struct acpi_processor_performance));
+
 	/* register struct acpi_performance performance */
 	for (i=0; i<NR_CPUS; i++) {
 		if (cpu_online(i))
@@ -645,6 +647,9 @@ acpi_cpufreq_init (void)
 			performance[i].pr = NULL;
 		}
 	}
+
+	kfree(performance);
+
 	return_VALUE(result);
 }
 
