@@ -886,7 +886,7 @@ static void probeLptPort(unsigned idx)
       instances[idx].run_flag = 0;
       init_timer(&instances[idx].timer_list);
       instances[idx].timer_list.function = bpp_wake_up;
-      if (check_region(lpAddr,3)) return;
+      if (!request_region(lpAddr,3, dev_name)) return;
 
       /*
        * First, make sure the instance exists. Do this by writing to
@@ -904,7 +904,6 @@ static void probeLptPort(unsigned idx)
             unsigned save;
             instances[idx].present = 1;
 
-            request_region(lpAddr,3, dev_name);
             save = inb_p(lpAddr+2);
             for (testvalue=0; testvalue<BPP_DELAY; testvalue++)
                   ;
@@ -921,7 +920,9 @@ static void probeLptPort(unsigned idx)
                   instances[idx].enhanced = 1;
             outb_p(save, lpAddr+2);
       }
-
+      else {
+            release_region(lpAddr,3);
+      }
       /*
        * Leave the port in compat idle mode.
        */
