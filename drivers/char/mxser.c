@@ -328,13 +328,7 @@ struct mxser_hwconf mxsercfg[MXSER_BOARDS];
  * static functions:
  */
 
-#ifdef MODULE
-int init_module(void);
-void cleanup_module(void);
-#endif
-
 static void mxser_getcfg(int board, struct mxser_hwconf *hwconf);
-int mxser_init(void);
 static int mxser_get_ISA_conf(int, struct mxser_hwconf *);
 static int mxser_get_PCI_conf(struct pci_dev *, int, struct mxser_hwconf *);
 static void mxser_do_softint(void *);
@@ -373,21 +367,7 @@ static int mxser_set_modem_info(struct mxser_struct *, unsigned int, unsigned in
  * The MOXA C168/C104 serial driver boot-time initialization code!
  */
 
-
-#ifdef MODULE
-int init_module(void)
-{
-	int ret;
-
-	if (verbose)
-		printk("Loading module mxser ...\n");
-	ret = mxser_init();
-	if (verbose)
-		printk("Done.\n");
-	return (ret);
-}
-
-void cleanup_module(void)
+static void __exit mxser_module_exit(void)
 {
 	int i, err = 0;
 
@@ -411,8 +391,6 @@ void cleanup_module(void)
 		printk("Done.\n");
 
 }
-#endif
-
 
 int mxser_initbrd(int board, struct mxser_hwconf *hwconf)
 {
@@ -510,7 +488,7 @@ static int mxser_get_PCI_conf(struct pci_dev *pdev, int board_type, struct mxser
 	return (0);
 }
 
-int mxser_init(void)
+static int __init mxser_module_init(void)
 {
 	int i, m, retval, b;
 	int n, index;
@@ -2493,3 +2471,6 @@ static void mxser_normal_mode(int port)
 	}
 	outb(0x00, port + 4);
 }
+
+module_init(mxser_module_init);
+module_exit(mxser_module_exit);
