@@ -20,13 +20,16 @@
 
 #define update_rtc()
 
-static void timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t
+timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
 	/* Clear irq */
 	__raw_writel(1, FPGA1CONT + 0xc); 
 	__raw_writel(0, FPGA1CONT + 0xc);
 
 	do_timer(regs);
+
+	return IRQ_HANDLED;
 }
 
 void __init time_init(void)

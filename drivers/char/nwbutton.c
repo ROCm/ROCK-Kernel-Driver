@@ -146,7 +146,7 @@ static void button_sequence_finished (unsigned long parameters)
  *  increments the counter.
  */ 
 
-static void button_handler (int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t button_handler (int irq, void *dev_id, struct pt_regs *regs)
 {
 	if (button_press_count) {
 		del_timer (&button_timer);
@@ -156,6 +156,8 @@ static void button_handler (int irq, void *dev_id, struct pt_regs *regs)
 	button_timer.function = button_sequence_finished;
 	button_timer.expires = (jiffies + bdelay);
 	add_timer (&button_timer);
+
+	return IRQ_HANDLED;
 }
 
 /*

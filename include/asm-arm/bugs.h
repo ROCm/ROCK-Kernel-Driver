@@ -10,8 +10,6 @@
 #ifndef __ASM_BUGS_H
 #define __ASM_BUGS_H
 
-#include <asm/proc-fns.h>
-
 #define check_bugs() do { } while (0)
 
 #endif

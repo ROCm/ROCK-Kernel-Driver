@@ -141,12 +141,12 @@ cumanascsi_2_terminator_ctl(struct Scsi_Host *host, int on_off)
  *	      dev_id - user-defined (Scsi_Host structure)
  *	      regs   - processor registers at interrupt
  */
-static void
+static irqreturn_t
 cumanascsi_2_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct cumanascsi2_info *info = dev_id;
 
-	fas216_intr(&info->info);
+	return fas216_intr(&info->info);
 }
 
 /* Prototype: fasdmatype_t cumanascsi_2_dma_setup(host, SCpnt, direction, min_type)
