@@ -18,6 +18,7 @@
 #include <linux/major.h>
 #include <linux/fs.h>
 #include <linux/interrupt.h>
+#include <linux/mmc/host.h>
 
 #include <asm/setup.h>
 #include <asm/memory.h>
@@ -32,6 +33,7 @@
 
 #include <asm/arch/pxa-regs.h>
 #include <asm/arch/irq.h>
+#include <asm/arch/mmc.h>
 #include <asm/arch/corgi.h>
 
 #include <asm/hardware/scoop.h>
@@ -114,6 +116,82 @@ static struct platform_device corgifb_device = {
 };
 
 
+/*
+ * MMC/SD Device
+ *
+ * The card detect interrupt isn't debounced so we delay it by HZ/4
+ * to give the card a chance to fully insert/eject.
+ */
+static struct mmc_detect {
+	struct timer_list detect_timer;
+	void *devid;
+} mmc_detect;
+
+static void mmc_detect_callback(unsigned long data)
+{
+	mmc_detect_change(mmc_detect.devid);
+}
+
+static irqreturn_t corgi_mmc_detect_int(int irq, void *devid, struct pt_regs *regs)
+{
+	mmc_detect.devid=devid;
+	mod_timer(&mmc_detect.detect_timer, jiffies + HZ/4);
+	return IRQ_HANDLED;
+}
+
+static int corgi_mci_init(struct device *dev, irqreturn_t (*unused_detect_int)(int, void *, struct pt_regs *), void *data)
+{
+	int err;
+
+	/* setup GPIO for PXA25x MMC controller	*/
+	pxa_gpio_mode(GPIO6_MMCCLK_MD);
+	pxa_gpio_mode(GPIO8_MMCCS0_MD);
+	pxa_gpio_mode(CORGI_GPIO_nSD_DETECT | GPIO_IN);
+	pxa_gpio_mode(CORGI_GPIO_SD_PWR | GPIO_OUT);
+
+	err = request_irq(CORGI_IRQ_GPIO_nSD_DETECT, corgi_mmc_detect_int, SA_INTERRUPT,
+			     "MMC card detect", data);
+	if (err) {
+		printk(KERN_ERR "corgi_mci_init: MMC/SD: can't request MMC card detect IRQ\n");
+		return -1;
+	}
+
+	init_timer(&mmc_detect.detect_timer);
+	mmc_detect.detect_timer.function = mmc_detect_callback;
+	mmc_detect.detect_timer.data = (unsigned long) &mmc_detect;
+
+	set_irq_type(CORGI_IRQ_GPIO_nSD_DETECT, IRQT_BOTHEDGE);
+
+	return 0;
+}
+
+static void corgi_mci_setpower(struct device *dev, unsigned int vdd)
+{
+	struct pxamci_platform_data* p_d = dev->platform_data;
+
+	if (( 1 << vdd) & p_d->ocr_mask) {
+		printk(KERN_DEBUG "%s: on\n", __FUNCTION__);
+		GPSR1 = GPIO_bit(CORGI_GPIO_SD_PWR);
+	} else {
+		printk(KERN_DEBUG "%s: off\n", __FUNCTION__);
+		GPCR1 = GPIO_bit(CORGI_GPIO_SD_PWR);
+	}
+}
+
+static void corgi_mci_exit(struct device *dev, void *data)
+{
+	free_irq(CORGI_IRQ_GPIO_nSD_DETECT, data);
+	del_timer(&mmc_detect.detect_timer);
+}
+
+static struct pxamci_platform_data corgi_mci_platform_data = {
+	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
+	.init 		= corgi_mci_init,
+	.setpower 	= corgi_mci_setpower,
+	.exit		= corgi_mci_exit,
+};
+
+
 static struct platform_device *devices[] __initdata = {
 	&corgiscoop_device,
 	&corgissp_device,
@@ -142,6 +220,8 @@ static void __init corgi_init(void)
 		corgi_fb_info.phadadj=sharpsl_flash_param.phadadj;
 	else
 		corgi_fb_info.phadadj=-1;
+
+	pxa_set_mci_info(&corgi_mci_platform_data);
 
 	platform_add_devices(devices, ARRAY_SIZE(devices));
 }
