@@ -16,6 +16,9 @@
  *
  *  Big-endian to little-endian byte-swapping/bitmaps by
  *        David S. Miller (davem@caip.rutgers.edu), 1995
+ *
+ * Hash Tree Directory indexing (c) 2001  Daniel Phillips
+ *
  */
 
 #include <linux/fs.h>
