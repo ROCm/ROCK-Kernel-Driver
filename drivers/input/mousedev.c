@@ -1,29 +1,11 @@
 /*
- * $Id: mousedev.c,v 1.42 2002/04/09 20:51:26 jdeneux Exp $
+ * Input driver to ExplorerPS/2 device driver module.
  *
- *  Copyright (c) 1999-2001 Vojtech Pavlik
+ * Copyright (c) 1999-2002 Vojtech Pavlik
  *
- *  Input driver to ExplorerPS/2 device driver module.
- */
-
-/*
  * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- * 
- * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
+ * it under the terms of the GNU General Public License version 2 as published by
+ * the Free Software Foundation.
  */
 
 #define MOUSEDEV_MINOR_BASE 	32
@@ -61,7 +43,7 @@ struct mousedev {
 	int minor;
 	char name[16];
 	wait_queue_head_t wait;
-	struct mousedev_list *list;
+	struct list_head list;
 	struct input_handle handle;
 	devfs_handle_t devfs;
 };
@@ -69,7 +51,7 @@ struct mousedev {
 struct mousedev_list {
 	struct fasync_struct *fasync;
 	struct mousedev *mousedev;
-	struct mousedev_list *next;
+	struct list_head node;
 	int dx, dy, dz, oldx, oldy;
 	signed char ps2[6];
 	unsigned long buttons;
@@ -98,9 +80,10 @@ static void mousedev_event(struct input_handle *handle, unsigned int type, unsig
 	int index, size, wake;
 
 	while (*mousedev) {
+
 		wake = 0;
-		list = (*mousedev)->list;
-		while (list) {
+
+		list_for_each_entry(list, &(*mousedev)->list, node)
 			switch (type) {
 				case EV_ABS:
 					if (test_bit(BTN_TRIGGER, handle->dev->keybit))
@@ -116,6 +99,7 @@ static void mousedev_event(struct input_handle *handle, unsigned int type, unsig
 								list->oldx += list->dx;
 							}
 							break;
+
 						case ABS_Y:
 							size = handle->dev->absmax[ABS_Y] - handle->dev->absmin[ABS_Y];
 							if (size != 0) {
@@ -170,10 +154,10 @@ static void mousedev_event(struct input_handle *handle, unsigned int type, unsig
 							break;
 					}
 			}
-			list = list->next;
-		}
+
 		if (wake)
 			wake_up_interruptible(&((*mousedev)->wait));
+
 		mousedev++;
 	}
 }
@@ -189,21 +173,17 @@ static int mousedev_fasync(int fd, struct file *file, int on)
 static int mousedev_release(struct inode * inode, struct file * file)
 {
 	struct mousedev_list *list = file->private_data;
-	struct mousedev_list **listptr;
+	struct input_handle *handle;
+	struct mousedev *mousedev;
 
-	listptr = &list->mousedev->list;
 	mousedev_fasync(-1, file, 0);
 
-	while (*listptr && (*listptr != list))
-		listptr = &((*listptr)->next);
-	*listptr = (*listptr)->next;
+	list_del(&list->node);
 
 	if (!--list->mousedev->open) {
 		if (list->mousedev->minor == MOUSEDEV_MIX) {
-			struct list_head * node;
-			list_for_each(node,&mousedev_handler.h_list) {
-				struct input_handle *handle = to_handle_h(node);
-				struct mousedev *mousedev = handle->private;
+			list_for_each_entry(handle, &mousedev_handler.h_list, h_node) {
+				mousedev = handle->private;
 				if (!mousedev->open) {
 					if (mousedev->exist) {
 						input_close_device(&mousedev->handle);
@@ -252,8 +232,7 @@ static int mousedev_open(struct inode * inode, struct file * file)
 	memset(list, 0, sizeof(struct mousedev_list));
 
 	list->mousedev = mousedev_table[i];
-	list->next = mousedev_table[i]->list;
-	mousedev_table[i]->list = list;
+	list_add_tail(&list->node, &mousedev_table[i]->list);
 	file->private_data = list;
 
 	if (!list->mousedev->open++) {
@@ -373,35 +352,13 @@ static ssize_t mousedev_write(struct file * file, const char * buffer, size_t co
 
 static ssize_t mousedev_read(struct file * file, char * buffer, size_t count, loff_t *ppos)
 {
-	DECLARE_WAITQUEUE(wait, current);
 	struct mousedev_list *list = file->private_data;
 	int retval = 0;
 
-	if (!list->ready && !list->buffer) {
+	if (!list->ready && !list->buffer && (file->f_flags & O_NONBLOCK))
+		return -EAGAIN;
 
-		add_wait_queue(&list->mousedev->wait, &wait);
-
-		for (;;) {
-			set_current_state(TASK_INTERRUPTIBLE);
-
-			retval = 0;
-			if (list->ready || list->buffer)
-				break;
-
-			retval = -EAGAIN;
-			if (file->f_flags & O_NONBLOCK)
-				break;
-
-			retval = -ERESTARTSYS;
-			if (signal_pending(current))
-				break;
-
-			schedule();
-		}
-
-		set_current_state(TASK_RUNNING);
-		remove_wait_queue(&list->mousedev->wait, &wait);
-	}
+	retval = wait_event_interruptible(list->mousedev->wait, list->ready || list->buffer);
 
 	if (retval)
 		return retval;
@@ -454,23 +411,23 @@ static struct input_handle *mousedev_connect(struct input_handler *handler, stru
 	if (!(mousedev = kmalloc(sizeof(struct mousedev), GFP_KERNEL)))
 		return NULL;
 	memset(mousedev, 0, sizeof(struct mousedev));
+
+	INIT_LIST_HEAD(&mousedev->list);
 	init_waitqueue_head(&mousedev->wait);
 
 	mousedev->minor = minor;
-	mousedev_table[minor] = mousedev;
-	sprintf(mousedev->name, "mouse%d", minor);
-
+	mousedev->exist = 1;
 	mousedev->handle.dev = dev;
 	mousedev->handle.name = mousedev->name;
 	mousedev->handle.handler = handler;
 	mousedev->handle.private = mousedev;
-
-	mousedev->devfs = input_register_minor("mouse%d", minor, MOUSEDEV_MINOR_BASE);
+	sprintf(mousedev->name, "mouse%d", minor);
 
 	if (mousedev_mix.open)
 		input_open_device(&mousedev->handle);
 
-	mousedev->exist = 1;
+	mousedev_table[minor] = mousedev;
+	mousedev->devfs = input_register_minor("mouse%d", minor, MOUSEDEV_MINOR_BASE);
 
 	return &mousedev->handle;
 }

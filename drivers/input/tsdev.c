@@ -55,7 +55,7 @@ struct tsdev {
 	int minor;
 	char name[16];
 	wait_queue_head_t wait;
-	struct tsdev_list *list;
+	struct list_head list;
 	struct input_handle handle;
 	devfs_handle_t devfs;
 };
@@ -70,7 +70,7 @@ typedef struct {
 
 struct tsdev_list {
 	struct fasync_struct *fasync;
-	struct tsdev_list *next;
+	struct list_head node;
 	struct tsdev *tsdev;
 	int head, tail;
 	int oldx, oldy, pendown;
@@ -106,8 +106,7 @@ static int tsdev_open(struct inode *inode, struct file *file)
 	memset(list, 0, sizeof(struct tsdev_list));
 
 	list->tsdev = tsdev_table[i];
-	list->next = tsdev_table[i]->list;
-	tsdev_table[i]->list = list;
+	list_add_tail(&list->node, &tsdev_table[i]->list);
 	file->private_data = list;
 
 	if (!list->tsdev->open++)
@@ -119,14 +118,9 @@ static int tsdev_open(struct inode *inode, struct file *file)
 static int tsdev_release(struct inode *inode, struct file *file)
 {
 	struct tsdev_list *list = file->private_data;
-	struct tsdev_list **listptr;
 
-	listptr = &list->tsdev->list;
 	tsdev_fasync(-1, file, 0);
-
-	while (*listptr && (*listptr != list))
-		listptr = &((*listptr)->next);
-	*listptr = (*listptr)->next;
+	list_del(&list->node);
 
 	if (!--list->tsdev->open) {
 		if (list->tsdev->exist) {
@@ -144,45 +138,28 @@ static int tsdev_release(struct inode *inode, struct file *file)
 static ssize_t tsdev_read(struct file *file, char *buffer, size_t count,
 			  loff_t * ppos)
 {
-	DECLARE_WAITQUEUE(wait, current);
 	struct tsdev_list *list = file->private_data;
 	int retval = 0;
 
-	if (list->head == list->tail) {
-		add_wait_queue(&list->tsdev->wait, &wait);
-		set_current_state(TASK_INTERRUPTIBLE);
+	if (list->head == list->tail && list->tsdev->exist && (file->f_flags & O_NONBLOCK))
+		return -EAGAIN;
 
-		while (list->head == list->tail) {
-			if (!list->tsdev->exist) {
-				retval = -ENODEV;
-				break;
-			}
-			if (file->f_flags & O_NONBLOCK) {
-				retval = -EAGAIN;
-				break;
-			}
-			if (signal_pending(current)) {
-				retval = -ERESTARTSYS;
-				break;
-			}
-			schedule();
-		}
-		set_current_state(TASK_RUNNING);
-		remove_wait_queue(&list->tsdev->wait, &wait);
-	}
+	retval = wait_event_interruptible(list->tsdev->wait,
+		(list->head != list->tail) && list->tsdev->exist);
 
 	if (retval)
 		return retval;
 
-	while (list->head != list->tail
-	       && retval + sizeof(TS_EVENT) <= count) {
-		if (copy_to_user
-		    (buffer + retval, list->event + list->tail,
-		     sizeof(TS_EVENT)))
+	if (!list->tsdev->exist)
+		return -ENODEV;
+
+	while (list->head != list->tail && retval + sizeof(TS_EVENT) <= count) {
+		if (copy_to_user (buffer + retval, list->event + list->tail, sizeof(TS_EVENT)))
 			return -EFAULT;
 		list->tail = (list->tail + 1) & (TSDEV_BUFFER_SIZE - 1);
 		retval += sizeof(TS_EVENT);
 	}
+
 	return retval;
 }
 
@@ -232,54 +209,35 @@ static void tsdev_event(struct input_handle *handle, unsigned int type,
 			unsigned int code, int value)
 {
 	struct tsdev *tsdev = handle->private;
-	struct tsdev_list *list = tsdev->list;
+	struct tsdev_list *list;
 	struct timeval time;
 	int size;
 
-	while (list) {
+	list_for_each_entry(list, &tsdev->list, node) {
 		switch (type) {
 		case EV_ABS:
 			switch (code) {
 			case ABS_X:
 				if (!list->pendown)
 					return;
-
-				size =
-				    handle->dev->absmax[ABS_X] -
-				    handle->dev->absmin[ABS_X];
+				size = handle->dev->absmax[ABS_X] - handle->dev->absmin[ABS_X];
 				if (size > 0)
-					list->oldx =
-					    ((value -
-					      handle->dev->absmin[ABS_X]) *
-					     xres / size);
+					list->oldx = ((value - handle->dev->absmin[ABS_X]) * xres / size);
 				else
-					list->oldx =
-					    ((value -
-					      handle->dev->absmin[ABS_X]));
+					list->oldx = ((value - handle->dev->absmin[ABS_X]));
 				break;
 			case ABS_Y:
 				if (!list->pendown)
 					return;
-
-				size =
-				    handle->dev->absmax[ABS_Y] -
-				    handle->dev->absmin[ABS_Y];
+				size = handle->dev->absmax[ABS_Y] - handle->dev->absmin[ABS_Y];
 				if (size > 0)
-					list->oldy =
-					    ((value -
-					      handle->dev->absmin[ABS_Y]) *
-					     yres / size);
+					list->oldy = ((value - handle->dev->absmin[ABS_Y]) * yres / size);
 				else
-					list->oldy =
-					    ((value -
-					      handle->dev->absmin[ABS_Y]));
+					list->oldy = ((value - handle->dev->absmin[ABS_Y]));
 				break;
 			case ABS_PRESSURE:
-				list->pendown =
-				    ((value >
-				      handle->dev->
-				      absmin[ABS_PRESSURE])) ? value -
-				    handle->dev->absmin[ABS_PRESSURE] : 0;
+				list->pendown = ((value > handle->dev-> absmin[ABS_PRESSURE])) ?
+				    value - handle->dev->absmin[ABS_PRESSURE] : 0;
 				break;
 			}
 			break;
@@ -289,7 +247,6 @@ static void tsdev_event(struct input_handle *handle, unsigned int type,
 			case REL_X:
 				if (!list->pendown)
 					return;
-
 				list->oldx += value;
 				if (list->oldx < 0)
 					list->oldx = 0;
@@ -299,7 +256,6 @@ static void tsdev_event(struct input_handle *handle, unsigned int type,
 			case REL_Y:
 				if (!list->pendown)
 					return;
-
 				list->oldy += value;
 				if (list->oldy < 0)
 					list->oldy = 0;
@@ -333,7 +289,6 @@ static void tsdev_event(struct input_handle *handle, unsigned int type,
 		list->event[list->head].y = list->oldy;
 		list->head = (list->head + 1) & (TSDEV_BUFFER_SIZE - 1);
 		kill_fasync(&list->fasync, SIGIO, POLL_IN);
-		list = list->next;
 	}
 	wake_up_interruptible(&tsdev->wait);
 }
@@ -356,21 +311,23 @@ static struct input_handle *tsdev_connect(struct input_handler *handler,
 	if (!(tsdev = kmalloc(sizeof(struct tsdev), GFP_KERNEL)))
 		return NULL;
 	memset(tsdev, 0, sizeof(struct tsdev));
+
+	INIT_LIST_HEAD(&tsdev->list);
 	init_waitqueue_head(&tsdev->wait);
 
-	tsdev->minor = minor;
-	tsdev_table[minor] = tsdev;
 	sprintf(tsdev->name, "ts%d", minor);
 
+	tsdev->exist = 1;
+	tsdev->minor = minor;
 	tsdev->handle.dev = dev;
 	tsdev->handle.name = tsdev->name;
 	tsdev->handle.handler = handler;
 	tsdev->handle.private = tsdev;
 
+	tsdev_table[minor] = tsdev;
 	tsdev->devfs =
 	    input_register_minor("ts%d", minor, TSDEV_MINOR_BASE);
 
-	tsdev->exist = 1;
 
 	return &tsdev->handle;
 }

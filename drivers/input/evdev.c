@@ -1,29 +1,11 @@
 /*
- * $Id: evdev.c,v 1.48 2002/05/26 14:28:26 jdeneux Exp $
+ * Event char devices, giving access to raw input device events.
  *
- *  Copyright (c) 1999-2001 Vojtech Pavlik
+ * Copyright (c) 1999-2002 Vojtech Pavlik
  *
- *  Event char devices, giving access to raw input device events.
- */
-
-/*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- *
- * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
- * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 as published by
+ * the Free Software Foundation.
  */
 
 #define EVDEV_MINOR_BASE	64
@@ -38,7 +20,7 @@
 #include <linux/smp_lock.h>
 #include <linux/device.h>
 
-struct evdev {
+struct evdev{
 	int exist;
 	int open;
 	int minor;
@@ -46,7 +28,7 @@ struct evdev {
 	struct input_handle handle;
 	wait_queue_head_t wait;
 	devfs_handle_t devfs;
-	struct evdev_list *list;
+	struct list_head list;
 };
 
 struct evdev_list {
@@ -55,17 +37,17 @@ struct evdev_list {
 	int tail;
 	struct fasync_struct *fasync;
 	struct evdev *evdev;
-	struct evdev_list *next;
+	struct list_head node;
 };
 
-static struct evdev *evdev_table[EVDEV_MINORS] = { NULL, /* ... */ };
+static struct evdev *evdev_table[EVDEV_MINORS];
 
 static void evdev_event(struct input_handle *handle, unsigned int type, unsigned int code, int value)
 {
 	struct evdev *evdev = handle->private;
-	struct evdev_list *list = evdev->list;
+	struct evdev_list *list;
 
-	while (list) {
+	list_for_each_entry(list, &evdev->list, node) {
 
 		do_gettimeofday(&list->buffer[list->head].time);
 		list->buffer[list->head].type = type;
@@ -74,8 +56,6 @@ static void evdev_event(struct input_handle *handle, unsigned int type, unsigned
 		list->head = (list->head + 1) & (EVDEV_BUFFER_SIZE - 1);
 
 		kill_fasync(&list->fasync, SIGIO, POLL_IN);
-
-		list = list->next;
 	}
 
 	wake_up_interruptible(&evdev->wait);
@@ -91,7 +71,7 @@ static int evdev_fasync(int fd, struct file *file, int on)
 
 static int evdev_flush(struct file * file)
 {
-	struct evdev_list *list = (struct evdev_list*)file->private_data;
+	struct evdev_list *list = file->private_data;
 	if (!list->evdev->exist) return -ENODEV;
 	return input_flush_device(&list->evdev->handle, file);
 }
@@ -99,14 +79,9 @@ static int evdev_flush(struct file * file)
 static int evdev_release(struct inode * inode, struct file * file)
 {
 	struct evdev_list *list = file->private_data;
-	struct evdev_list **listptr;
 
-	listptr = &list->evdev->list;
 	evdev_fasync(-1, file, 0);
-
-	while (*listptr && (*listptr != list))
-		listptr = &((*listptr)->next);
-	*listptr = (*listptr)->next;
+	list_del(&list->node);
 
 	if (!--list->evdev->open) {
 		if (list->evdev->exist) {
@@ -132,19 +107,15 @@ static int evdev_open(struct inode * inode, struct file * file)
 	if (i >= EVDEV_MINORS || !evdev_table[i])
 		return -ENODEV;
 
-	/* Ask the driver if he wishes to accept the open() */
-	if ((accept_err = input_accept_process(&(evdev_table[i]->handle), file))) {
+	if ((accept_err = input_accept_process(&(evdev_table[i]->handle), file)))
 		return accept_err;
-	}
 
 	if (!(list = kmalloc(sizeof(struct evdev_list), GFP_KERNEL)))
 		return -ENOMEM;
 	memset(list, 0, sizeof(struct evdev_list));
 
 	list->evdev = evdev_table[i];
-	list->next = evdev_table[i]->list;
-	evdev_table[i]->list = list;
-
+	list_add_tail(&list->node, &evdev_table[i]->list);
 	file->private_data = list;
 
 	if (!list->evdev->open++)
@@ -175,39 +146,20 @@ static ssize_t evdev_write(struct file * file, const char * buffer, size_t count
 
 static ssize_t evdev_read(struct file * file, char * buffer, size_t count, loff_t *ppos)
 {
-	DECLARE_WAITQUEUE(wait, current);
 	struct evdev_list *list = file->private_data;
-	int retval = 0;
+	int retval;
 
-	if (list->head == list->tail) {
+	if (list->head == list->tail && list->evdev->exist && (file->f_flags & O_NONBLOCK))
+		return -EAGAIN;
 
-		add_wait_queue(&list->evdev->wait, &wait);
-		set_current_state(TASK_INTERRUPTIBLE);
-
-		while (list->head == list->tail) {
-
-			if (!list->evdev->exist) {
-				retval = -ENODEV;
-				break;
-			}
-			if (file->f_flags & O_NONBLOCK) {
-				retval = -EAGAIN;
-				break;
-			}
-			if (signal_pending(current)) {
-				retval = -ERESTARTSYS;
-				break;
-			}
-
-			schedule();
-		}
-
-		set_current_state(TASK_RUNNING);
-		remove_wait_queue(&list->evdev->wait, &wait);
-	}
+	retval = wait_event_interruptible(list->evdev->wait,
+		list->head != list->tail && list->evdev->exist);
 
 	if (retval)
 		return retval;
+
+	if (!list->evdev->exist)
+		return -ENODEV;
 
 	while (list->head != list->tail && retval + sizeof(struct input_event) <= count) {
 		if (copy_to_user(buffer + retval, list->buffer + list->tail,
@@ -433,21 +385,19 @@ static struct input_handle *evdev_connect(struct input_handler *handler, struct 
 		return NULL;
 	memset(evdev, 0, sizeof(struct evdev));
 
+	INIT_LIST_HEAD(&evdev->list);
 	init_waitqueue_head(&evdev->wait);
 
+	evdev->exist = 1;
 	evdev->minor = minor;
-	evdev_table[minor] = evdev;
-	
-	sprintf(evdev->name, "event%d", minor);
-
 	evdev->handle.dev = dev;
 	evdev->handle.name = evdev->name;
 	evdev->handle.handler = handler;
 	evdev->handle.private = evdev;
+	sprintf(evdev->name, "event%d", minor);
 
+	evdev_table[minor] = evdev;
 	evdev->devfs = input_register_minor("event%d", minor, EVDEV_MINOR_BASE);
-
-	evdev->exist = 1;
 
 	return &evdev->handle;
 }
