@@ -1746,6 +1746,7 @@ config VIA_VELOCITY
 	tristate "VIA Velocity support"
 	depends on NET_PCI && PCI
 	select CRC32
+	select CRC16
 	select MII
 	help
 	  If you have a VIA "Velocity" based network card say Y here.
@@ -2043,6 +2044,11 @@ config R8169
 	  To compile this driver as a module, choose M here: the module
 	  will be called r8169.  This is recommended.
 
+config R8169_NAPI
+	bool "Use Rx and Tx Polling (NAPI) (EXPERIMENTAL)"
+	depends on R8169 && EXPERIMENTAL 
+
+
 config SK98LIN
 	tristate "Marvell Yukon Chipset / SysKonnect SK-98xx Support"
 	depends on PCI
@@ -2130,6 +2136,45 @@ config TIGON3
 
 	  To compile this driver as a module, choose M here: the module
 	  will be called tg3.  This is recommended.
+
+config GIANFAR
+	tristate "Gianfar Ethernet"
+	depends on 85xx
+	help
+	  This driver supports the Gigabit TSEC on the MPC85xx 
+	  family of chips, and the FEC on the 8540
+
+config GFAR_NAPI
+	bool "NAPI Support"
+	depends on GIANFAR
+
+config MV643XX_ETH
+	tristate "MV-643XX Ethernet support"
+	depends on MOMENCO_OCELOT_C || MOMENCO_JAGUAR_ATX
+	help
+	  This driver supports the gigabit Ethernet on the Marvell MV643XX
+	  chipset which is used in the Momenco Ocelot C and Jaguar ATX.
+
+config MV643XX_ETH_0
+	bool "MV-643XX Port 0"
+	depends on MV643XX_ETH
+	help
+	  This enables support for Port 0 of the Marvell MV643XX Gigabit
+	  Ethernet.
+
+config MV643XX_ETH_1
+	bool "MV-643XX Port 1"
+	depends on MV643XX_ETH
+	help
+	  This enables support for Port 1 of the Marvell MV643XX Gigabit
+	  Ethernet.
+
+config MV643XX_ETH_2
+	bool "MV-643XX Port 2"
+	depends on MV643XX_ETH
+	help
+	  This enables support for Port 2 of the Marvell MV643XX Gigabit
+	  Ethernet.
 
 endmenu
 

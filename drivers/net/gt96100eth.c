@@ -28,7 +28,6 @@
  *                gt96100_cleanup_module(), and other general code cleanups
  *                <stevel@mvista.com>.
  */
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
@@ -66,10 +65,6 @@ static int gt96100_add_hash_entry(struct net_device *dev,
 static void read_mib_counters(struct gt96100_private *gp);
 static int read_MII(int phy_addr, u32 reg);
 static int write_MII(int phy_addr, u32 reg, u16 data);
-#if 0
-static void dump_tx_ring(struct net_device *dev);
-static void dump_rx_ring(struct net_device *dev);
-#endif
 static int gt96100_init_module(void);
 static void gt96100_cleanup_module(void);
 static void dump_MII(int dbg_lvl, struct net_device *dev);
@@ -84,7 +79,7 @@ static void abort(struct net_device *dev, u32 abort_bits);
 static void hard_stop(struct net_device *dev);
 static void enable_ether_irq(struct net_device *dev);
 static void disable_ether_irq(struct net_device *dev);
-static int gt96100_probe1(int port_num);
+static int gt96100_probe1(struct pci_dev *pci, int port_num);
 static void reset_tx(struct net_device *dev);
 static void reset_rx(struct net_device *dev);
 static int gt96100_check_tx_consistent(struct gt96100_private *gp);
@@ -164,13 +159,11 @@ chip_name(int chip_rev)
 /*
   DMA memory allocation, derived from pci_alloc_consistent.
 */
-static void *
-dmaalloc(size_t size, dma_addr_t *dma_handle)
+static void * dmaalloc(size_t size, dma_addr_t *dma_handle)
 {
 	void *ret;
 	
-	ret = (void *)__get_free_pages(GFP_ATOMIC | GFP_DMA,
-				       get_order(size));
+	ret = (void *)__get_free_pages(GFP_ATOMIC | GFP_DMA, get_order(size));
 	
 	if (ret != NULL) {
 		dma_cache_inv((unsigned long)ret, size);
@@ -184,17 +177,13 @@ dmaalloc(size_t size, dma_addr_t *dma_handle)
 	return ret;
 }
 
-static void
-dmafree(size_t size, void *vaddr)
+static void dmafree(size_t size, void *vaddr)
 {
 	vaddr = (void*)KSEG0ADDR(vaddr);
 	free_pages((unsigned long)vaddr, get_order(size));
 }
 
-
-
-static void
-gt96100_delay(int ms)
+static void gt96100_delay(int ms)
 {
 	if (in_interrupt())
 		return;
@@ -326,34 +315,6 @@ write_MII(int phy_addr, u32 reg, u16 data)
 	GT96100_WRITE(GT96100_ETH_SMI_REG, smir);
 	return 0;
 }
-
-#if 0
-// These routines work, just disabled to avoid compile warnings
-static void
-dump_tx_ring(struct net_device *dev)
-{
-	struct gt96100_private *gp = netdev_priv(dev);
-	int i;
-
-	dbg(0, "%s: txno/txni/cnt=%d/%d/%d\n", __FUNCTION__,
-	    gp->tx_next_out, gp->tx_next_in, gp->tx_count);
-
-	for (i=0; i<TX_RING_SIZE; i++)
-		dump_tx_desc(0, dev, i);
-}
-
-static void
-dump_rx_ring(struct net_device *dev)
-{
-	struct gt96100_private *gp = netdev_priv(dev);
-	int i;
-
-	dbg(0, "%s: rxno=%d\n", __FUNCTION__, gp->rx_next_out);
-
-	for (i=0; i<RX_RING_SIZE; i++)
-		dump_rx_desc(0, dev, i);
-}
-#endif
 
 static void
 dump_MII(int dbg_lvl, struct net_device *dev)
@@ -647,23 +608,19 @@ disable_ether_irq(struct net_device *dev)
 /*
  * Init GT96100 ethernet controller driver
  */
-int gt96100_init_module(void)
+static int gt96100_init_module(void)
 {
+	struct pci_dev *pci;
 	int i, retval=0;
-	u16 vendor_id, device_id;
 	u32 cpuConfig;
 
-#ifndef CONFIG_MIPS_GT96100ETH
-	return -ENODEV;
-#endif
-
-	// probe for GT96100 by reading PCI0 vendor/device ID register
-	pcibios_read_config_word(0, 0, PCI_VENDOR_ID, &vendor_id);
-	pcibios_read_config_word(0, 0, PCI_DEVICE_ID, &device_id);
-    
-	if (vendor_id != PCI_VENDOR_ID_MARVELL ||
-	    (device_id != PCI_DEVICE_ID_MARVELL_GT96100 &&
-	     device_id != PCI_DEVICE_ID_MARVELL_GT96100A)) {
+	/*
+	 * Stupid probe because this really isn't a PCI device
+	 */
+	if (!(pci = pci_find_device(PCI_VENDOR_ID_MARVELL,
+	                            PCI_DEVICE_ID_MARVELL_GT96100, NULL)) &&
+	    !(pci = pci_find_device(PCI_VENDOR_ID_MARVELL,
+		                    PCI_DEVICE_ID_MARVELL_GT96100A, NULL))) {
 		printk(KERN_ERR __FILE__ ": GT96100 not found!\n");
 		return -ENODEV;
 	}
@@ -675,17 +632,13 @@ int gt96100_init_module(void)
 		return -ENODEV;
 	}
 
-	for (i=0; i < NUM_INTERFACES; i++) {
-		retval |= gt96100_probe1(i);
-	}
+	for (i=0; i < NUM_INTERFACES; i++)
+		retval |= gt96100_probe1(pci, i);
 
 	return retval;
 }
 
-
-
-static int __init
-gt96100_probe1(int port_num)
+static int __init gt96100_probe1(struct pci_dev *pci, int port_num)
 {
 	struct gt96100_private *gp = NULL;
 	struct gt96100_if_t *gtif = &gt96100_iflist[port_num];
@@ -696,19 +649,19 @@ gt96100_probe1(int port_num)
 	struct net_device *dev = NULL;
     
 	if (gtif->irq < 0) {
-		printk(KERN_ERR "%s: irq unknown - probing not supported\n", __FUNCTION_);
+		printk(KERN_ERR "%s: irq unknown - probing not supported\n",
+		      __FUNCTION__);
 		return -ENODEV;
 	}
     
-	pcibios_read_config_byte(0, 0, PCI_REVISION_ID, &chip_rev);
+	pci_read_config_byte(pci, PCI_REVISION_ID, &chip_rev);
 
 	if (chip_rev >= REV_GT96100A_1) {
 		phyAD = GT96100_READ(GT96100_ETH_PHY_ADDR_REG);
 		phy_addr = (phyAD >> (5*port_num)) & 0x1f;
 	} else {
 		/*
-		 * not sure what's this about -- probably 
-		 * a gt bug
+		 * not sure what's this about -- probably a gt bug
 		 */
 		phy_addr = port_num;
 		phyAD = GT96100_READ(GT96100_ETH_PHY_ADDR_REG);
@@ -831,6 +784,7 @@ out1:
 	free_netdev (dev);
 out:
 	release_region(gtif->iobase, GT96100_ETH_IO_SIZE);
+
 	err("%s failed.  Returns %d\n", __FUNCTION__, retval);
 	return retval;
 }
@@ -1102,6 +1056,7 @@ gt96100_close(struct net_device *dev)
 	}
 
 	free_irq(dev->irq, dev);
+    
 	return 0;
 }
 
@@ -1312,10 +1267,11 @@ gt96100_tx_complete(struct net_device *dev, u32 status)
 		    cmdstat, nextOut);
 	
 		if (cmdstat & (u32)txOwn) {
-			//dump_tx_ring(dev);
-			// DMA is not finished writing descriptor???
-			// Leave and come back later to pick-up where
-			// we left off.
+			/*
+			 * DMA is not finished writing descriptor???
+			 * Leave and come back later to pick-up where
+			 * we left off.
+			 */
 			break;
 		}
 	
@@ -1342,7 +1298,8 @@ gt96100_tx_complete(struct net_device *dev, u32 status)
 			gp->tx_full = 0;
 			if (gp->last_psr & psrLink) {
 				netif_wake_queue(dev);
-				dbg(2, "%s: Tx Ring was full, queue waked\n", __FUNCTION_);
+				dbg(2, "%s: Tx Ring was full, queue waked\n",
+				    __FUNCTION__);
 			}
 		}
 	
@@ -1425,12 +1382,12 @@ gt96100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		
 				if ((psr & psrLink) && !gp->tx_full &&
 				    netif_queue_stopped(dev)) {
-					dbg(0, ": Link up, waking queue.\n",
-					    __FUNCTION_);
+					dbg(0, "%s: Link up, waking queue.\n",
+					    __FUNCTION__);
 					netif_wake_queue(dev);
 				} else if (!(psr & psrLink) &&
 					   !netif_queue_stopped(dev)) {
-					dbg(0, "Link down, stopping queue.\n",
+					dbg(0, "%s: Link down, stopping queue.\n",
 					    __FUNCTION__);
 					netif_stop_queue(dev);
 				}
@@ -1569,8 +1526,8 @@ static void gt96100_cleanup_module(void)
 	for (i=0; i<NUM_INTERFACES; i++) {
 		struct gt96100_if_t *gtif = &gt96100_iflist[i];
 		if (gtif->dev != NULL) {
-			struct gt96100_private *gp =
-				(struct gt96100_private *)gtif->dev->priv;
+			struct gt96100_private *gp = (struct gt96100_private *)
+				netdev_priv(gtif->dev);
 			unregister_netdev(gtif->dev);
 			dmafree(RX_HASH_TABLE_SIZE, gp->hash_table_dma);
 			dmafree(PKT_BUF_SZ*RX_RING_SIZE, gp->rx_buff);
@@ -1582,9 +1539,6 @@ static void gt96100_cleanup_module(void)
 		}
 	}
 }
-
-
-#ifndef MODULE
 
 static int __init gt96100_setup(char *options)
 {
@@ -1609,9 +1563,6 @@ static int __init gt96100_setup(char *options)
 }
 
 __setup("gt96100eth=", gt96100_setup);
-
-#endif /* !MODULE */
-
 
 module_init(gt96100_init_module);
 module_exit(gt96100_cleanup_module);

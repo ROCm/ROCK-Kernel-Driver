@@ -693,7 +693,7 @@ struct ace_private
 	int			board_idx;
 	u16			pci_command;
 	u8			pci_latency;
-	char			name[48];
+	const char		*name;
 #ifdef INDEX_DEBUG
 	spinlock_t		debug_lock
 				__attribute__ ((aligned (SMP_CACHE_BYTES)));
