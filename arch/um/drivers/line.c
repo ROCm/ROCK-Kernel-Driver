@@ -13,6 +13,7 @@
 #include "line.h"
 #include "kern.h"
 #include "user_util.h"
+#include "kern_util.h"
 #include "os.h"
 
 #define LINE_BUFSIZE 4096

@@ -33,7 +33,7 @@ long sys_fork(void)
 	struct task_struct *p;
 
 	current->thread.forking = 1;
-        p = do_fork(SIGCHLD, 0, NULL, 0, NULL);
+        p = do_fork(SIGCHLD, 0, NULL, 0, NULL, NULL);
 	current->thread.forking = 0;
 	return(IS_ERR(p) ? PTR_ERR(p) : p->pid);
 }
@@ -43,7 +43,7 @@ long sys_clone(unsigned long clone_flags, unsigned long newsp)
 	struct task_struct *p;
 
 	current->thread.forking = 1;
-	p = do_fork(clone_flags, newsp, NULL, 0, NULL);
+	p = do_fork(clone_flags, newsp, NULL, 0, NULL, NULL);
 	current->thread.forking = 0;
 	return(IS_ERR(p) ? PTR_ERR(p) : p->pid);
 }
@@ -53,7 +53,7 @@ long sys_vfork(void)
 	struct task_struct *p;
 
 	current->thread.forking = 1;
-	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, 0, NULL, 0, NULL);
+	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, 0, NULL, 0, NULL, NULL);
 	current->thread.forking = 0;
 	return(IS_ERR(p) ? PTR_ERR(p) : p->pid);
 }
@@ -182,7 +182,11 @@ int sys_ipc (uint call, int first, int second,
 
 	switch (call) {
 	case SEMOP:
-		return sys_semop (first, (struct sembuf *)ptr, second);
+		return sys_semtimedop(first, (struct sembuf *) ptr, second, 
+				      NULL);
+	case SEMTIMEDOP:
+		return sys_semtimedop(first, (struct sembuf *) ptr, second,
+				      (const struct timespec *) fifth);
 	case SEMGET:
 		return sys_semget (first, second, third);
 	case SEMCTL: {
