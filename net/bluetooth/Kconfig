@@ -7,7 +7,7 @@ menu "Bluetooth support"
 
 config BT
 	tristate "Bluetooth subsystem support"
-	---help---
+	help
 	  Bluetooth is low-cost, low-power, short-range wireless technology.
 	  It was designed as a replacement for cables and other short-range
 	  technologies like IrDA.  Bluetooth operates in personal area range
@@ -15,12 +15,12 @@ config BT
 	  Bluetooth can be found at <http://www.bluetooth.com/>.
 
 	  Linux Bluetooth subsystem consist of several layers:
-	  Bluetooth Core (HCI device and connection manager, scheduler)
-	  HCI Device drivers (interface to the hardware)
-	  L2CAP Module (L2CAP protocol)
-	  SCO Module (SCO links)
-	  RFCOMM Module (RFCOMM protocol)  
-	  BNEP Module (BNEP protocol)
+	     Bluetooth Core (HCI device and connection manager, scheduler)
+	     HCI Device drivers (interface to the hardware)
+	     L2CAP Module (L2CAP protocol)
+	     SCO Module (SCO links)
+	     RFCOMM Module (RFCOMM protocol)  
+	     BNEP Module (BNEP protocol)
 
 	  Say Y here to enable Linux Bluetooth support and to build Bluetooth Core
 	  layer.
