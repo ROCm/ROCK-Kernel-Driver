@@ -298,15 +298,28 @@ void debugfs_remove(struct dentry *dentry)
 }
 EXPORT_SYMBOL_GPL(debugfs_remove);
 
+static decl_subsys(debug, NULL, NULL);
+
 static int __init debugfs_init(void)
 {
-	return register_filesystem(&debug_fs_type);
+	int retval;
+
+	kset_set_kset_s(&debug_subsys, kernel_subsys);
+	retval = subsystem_register(&debug_subsys);
+	if (retval)
+		return retval;
+
+	retval = register_filesystem(&debug_fs_type);
+	if (retval)
+		subsystem_unregister(&debug_subsys);
+	return retval;
 }
 
 static void __exit debugfs_exit(void)
 {
 	simple_release_fs(&debugfs_mount, &debugfs_mount_count);
 	unregister_filesystem(&debug_fs_type);
+	subsystem_unregister(&debug_subsys);
 }
 
 core_initcall(debugfs_init);
