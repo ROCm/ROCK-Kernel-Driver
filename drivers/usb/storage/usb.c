@@ -724,8 +724,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 
 		US_DEBUGP("Result from usb_set_configuration is %d\n", result);
 		if (result == -EPIPE) {
-			US_DEBUGP("-- clearing stall on control interface\n");
-			usb_clear_halt(dev, usb_sndctrlpipe(dev, 0));
+			US_DEBUGP("-- stall on control interface\n");
 		} else if (result != 0) {
 			/* it's not a stall, but another error -- time to bail */
 			US_DEBUGP("-- Unknown error.  Rejecting device\n");

@@ -571,7 +571,8 @@ int usb_stor_transfer_partial(struct us_data *us, char *buf, int length)
 	/* if we stall, we need to clear it before we go on */
 	if (result == -EPIPE) {
 		US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
-		usb_stor_clear_halt(us, pipe);
+		if (usb_stor_clear_halt(us, pipe) < 0)
+			return US_BULK_TRANSFER_FAILED;
 	}
 
 	/* did we abort this command? */
@@ -997,18 +998,9 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 		return US_BULK_TRANSFER_ABORTED;
 	}
 
-	/* STALL must be cleared when it is detected */
+	/* a stall indicates a protocol error */
 	if (result == -EPIPE) {
-		US_DEBUGP("-- Stall on control pipe. Clearing\n");
-		result = usb_stor_clear_halt(us,	
-			usb_sndctrlpipe(us->pusb_dev, 0));
-
-		/* did we abort this command? */
-		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-			US_DEBUGP("usb_stor_control_msg(): transfer aborted\n");
-			return US_BULK_TRANSFER_ABORTED;
-		}
-
+		US_DEBUGP("-- Stall on control pipe\n");
 		return USB_STOR_TRANSPORT_FAILED;
 	}
 
@@ -1114,17 +1106,9 @@ int usb_stor_CB_transport(Scsi_Cmnd *srb, struct us_data *us)
 			return US_BULK_TRANSFER_ABORTED;
 		}
 
-		/* a stall is a fatal condition from the device */
+		/* a stall indicates a protocol error */
 		if (result == -EPIPE) {
-			US_DEBUGP("-- Stall on control pipe. Clearing\n");
-			result = usb_stor_clear_halt(us,
-				usb_sndctrlpipe(us->pusb_dev, 0));
-
-			/* did we abort this command? */
-			if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
-				US_DEBUGP("usb_stor_CB_transport(): transfer aborted\n");
-				return US_BULK_TRANSFER_ABORTED;
-			}
+			US_DEBUGP("-- Stall on control pipe\n");
 			return USB_STOR_TRANSPORT_FAILED;
 		}
 
@@ -1182,15 +1166,6 @@ int usb_stor_Bulk_max_lun(struct us_data *us)
 	if (result == 1)
 		return data;
 
-	/* if we get a STALL, clear the stall */
-	if (result == -EPIPE) {
-		US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
-
-		/* Use usb_clear_halt() because this is not a
-		 * scsi queued-command */
-		usb_clear_halt(us->pusb_dev, pipe);
-	}
-
 	/* return the default -- no LUNs */
 	return 0;
 }
@@ -1245,6 +1220,8 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 			US_DEBUGP("usb_stor_Bulk_transport(): transfer aborted\n");
 			return US_BULK_TRANSFER_ABORTED;
 		}
+		if (result < 0)
+			return USB_STOR_TRANSPORT_ERROR;
 		result = -EPIPE;
 	} else if (result) {
 		/* unknown error -- we've got a problem */
@@ -1293,6 +1270,8 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 			US_DEBUGP("usb_stor_Bulk_transport(): transfer aborted\n");
 			return US_BULK_TRANSFER_ABORTED;
 		}
+		if (result < 0)
+			return USB_STOR_TRANSPORT_ERROR;
 
 		/* get the status again */
 		US_DEBUGP("Attempting to get CSW (2nd try)...\n");

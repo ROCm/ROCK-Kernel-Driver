@@ -425,7 +425,8 @@ static int isd200_transfer_partial( struct us_data *us,
         /* if we stall, we need to clear it before we go on */
         if (result == -EPIPE) {
                 US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
-                usb_stor_clear_halt(us, pipe);
+                if (usb_stor_clear_halt(us, pipe) < 0)
+			return ISD200_TRANSPORT_FAILED;
         }
     
         /* did we send all the data? */
@@ -589,7 +590,8 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
 	else if (result == -EPIPE) {
 		/* if we stall, we need to clear it before we go on */
                 US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
-                usb_stor_clear_halt(us, pipe);
+                if (usb_stor_clear_halt(us, pipe) < 0)
+			return ISD200_TRANSPORT_ERROR;
 	} else if (result)  
                 return ISD200_TRANSPORT_ERROR;
     
@@ -621,7 +623,8 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
         /* did the attempt to read the CSW fail? */
         if (result == -EPIPE) {
                 US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
-                usb_stor_clear_halt(us, pipe);
+                if (usb_stor_clear_halt(us, pipe) < 0)
+			return ISD200_TRANSPORT_ERROR;
            
                 /* get the status again */
                 US_DEBUGP("Attempting to get CSW (2nd try)...\n");
@@ -946,15 +949,6 @@ int isd200_write_config( struct us_data *us )
 		US_DEBUGP("   ISD200 Config Data was written successfully\n");
         } else {
 		US_DEBUGP("   Request to write ISD200 Config Data failed!\n");
-
-		/* STALL must be cleared when they are detected */
-		if (result == -EPIPE) {
-			US_DEBUGP("-- Stall on control pipe. Clearing\n");
-			result = usb_stor_clear_halt(us,
-					usb_sndctrlpipe(us->pusb_dev, 0));
-			US_DEBUGP("-- usb_stor_clear_halt() returns %d\n", result);
-
-		}
 		retStatus = ISD200_ERROR;
         }
 
@@ -1000,15 +994,6 @@ int isd200_read_config( struct us_data *us )
 #endif
         } else {
 		US_DEBUGP("   Request to get ISD200 Config Data failed!\n");
-
-		/* STALL must be cleared when they are detected */
-		if (result == -EPIPE) {
-			US_DEBUGP("-- Stall on control pipe. Clearing\n");
-			result = usb_stor_clear_halt(us,   
-					usb_sndctrlpipe(us->pusb_dev, 0));
-			US_DEBUGP("-- usb_stor_clear_halt() returns %d\n", result);
-
-		}
 		retStatus = ISD200_ERROR;
         }
 
