@@ -6023,8 +6023,10 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 			eeprom_led_mode = led_mode_auto;
 			break;
 		};
-		if ((tp->pci_chip_rev_id == CHIPREV_ID_5703_A1 ||
-		     tp->pci_chip_rev_id == CHIPREV_ID_5703_A2) &&
+
+		if (((GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703) ||
+		     (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) ||
+		     (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705)) &&
 		    (nic_cfg & NIC_SRAM_DATA_CFG_EEPROM_WP))
 			tp->tg3_flags |= TG3_FLAG_EEPROM_WRITE_PROT;
 
