@@ -269,7 +269,7 @@ static int piix4_transaction(void)
 
 	if (temp & 0x04) {
 		result = -1;
-		dev_err(&piix4_adapter.dev, "Error: no response!\n");
+		dev_dbg(&piix4_adapter.dev, "Error: no response!\n");
 	}
 
 	if (inb_p(SMBHSTSTS) != 0x00)
@@ -467,7 +467,7 @@ static void __devexit piix4_remove(struct pci_dev *dev)
 
 
 static struct pci_driver piix4_driver = {
-	.name		= "piix4 smbus",
+	.name		= "piix4-smbus",
 	.id_table	= piix4_ids,
 	.probe		= piix4_probe,
 	.remove		= __devexit_p(piix4_remove),
