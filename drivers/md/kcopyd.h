@@ -13,9 +13,6 @@
 
 #include "dm-io.h"
 
-int kcopyd_init(void);
-void kcopyd_exit(void);
-
 /* FIXME: make this configurable */
 #define KCOPYD_MAX_REGIONS 8
 
