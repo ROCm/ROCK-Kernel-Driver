@@ -2017,9 +2017,10 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 {
 	struct tg3 *tp = netdev->priv;
 	struct tg3_hw_status *sblk = tp->hw_status;
+	unsigned long flags;
 	int done;
 
-	spin_lock_irq(&tp->lock);
+	spin_lock_irqsave(&tp->lock, flags);
 
 	if (!(tp->tg3_flags &
 	      (TG3_FLAG_USE_LINKCHG_REG |
@@ -2059,7 +2060,7 @@ static int tg3_poll(struct net_device *netdev, int *budget)
 		tg3_unmask_ints(tp);
 	}
 
-	spin_unlock_irq(&tp->lock);
+	spin_unlock_irqrestore(&tp->lock, flags);
 
 	return (done ? 0 : 1);
 }
@@ -4353,8 +4354,9 @@ out:
 static void tg3_timer(unsigned long __opaque)
 {
 	struct tg3 *tp = (struct tg3 *) __opaque;
+	unsigned long flags;
 
-	spin_lock_irq(&tp->lock);
+	spin_lock_irqsave(&tp->lock, flags);
 	spin_lock(&tp->tx_lock);
 
 	/* All of this garbage is because when using non-tagged
@@ -4436,7 +4438,7 @@ static void tg3_timer(unsigned long __opaque)
 	}
 
 	spin_unlock(&tp->tx_lock);
-	spin_unlock_irq(&tp->lock);
+	spin_unlock_irqrestore(&tp->lock, flags);
 
 	tp->timer.expires = jiffies + tp->timer_offset;
 	add_timer(&tp->timer);
