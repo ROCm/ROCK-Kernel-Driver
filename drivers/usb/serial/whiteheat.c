@@ -367,7 +367,7 @@ static int whiteheat_attach (struct usb_serial *serial)
 	pipe = usb_sndbulkpipe (serial->dev, command_port->bulk_out_endpointAddress);
 	command = kmalloc(2, GFP_KERNEL);
 	if (!command)
-		goto no_comand_buffer;
+		goto no_command_buffer;
 	command[0] = WHITEHEAT_GET_HW_INFO;
 	command[1] = 0;
 	
@@ -539,7 +539,7 @@ no_private:
 	}
 	kfree(result);
 no_result_buffer:
-	kfree(command):
+	kfree(command);
 no_command_buffer:
 	return -ENOMEM;
 }
