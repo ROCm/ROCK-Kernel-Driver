@@ -293,9 +293,11 @@ tty3270_size_wait(tub_t *tubp, long *flags, int stat)
 	while (!signal_pending(current) &&
 	    (stat? (tubp->dstat & stat) == 0:
 	     (tubp->flags & TUB_WORKING) != 0)) {
+#warning FIXME: [kj] use set_current_state instead of current->state=
 		current->state = TASK_INTERRUPTIBLE;
 		TUBUNLOCK(tubp->irq, *flags);
 		schedule();
+#warning FIXME: [kj] use set_current_state instead of current->state=
 		current->state = TASK_RUNNING;
 		TUBLOCK(tubp->irq, *flags);
 	}

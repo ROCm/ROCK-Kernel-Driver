@@ -29,17 +29,6 @@
 extern pgd_t swapper_pg_dir[] __attribute__ ((aligned (4096)));
 extern void paging_init(void);
 
-/* Caches aren't brain-dead on S390. */
-#define flush_cache_all()                       do { } while (0)
-#define flush_cache_mm(mm)                      do { } while (0)
-#define flush_cache_range(vma, start, end)      do { } while (0)
-#define flush_cache_page(vma, vmaddr)           do { } while (0)
-#define flush_page_to_ram(page)                 do { } while (0)
-#define flush_dcache_page(page)			do { } while (0)
-#define flush_icache_range(start, end)          do { } while (0)
-#define flush_icache_page(vma,pg)               do { } while (0)
-#define flush_icache_user_range(vma,pg,adr,len)	do { } while (0)
-
 /*
  * The S390 doesn't have any external MMU info: the kernel page
  * tables contain all the necessary information.
@@ -158,7 +147,8 @@ extern char empty_zero_page[PAGE_SIZE];
 
 /* Bits in the page table entry */
 #define _PAGE_PRESENT   0x001          /* Software                         */
-#define _PAGE_MKCLEAR   0x002          /* Software                         */
+#define _PAGE_MKCLEAN   0x002          /* Software                         */
+#define _PAGE_ISCLEAN   0x004          /* Software                         */
 #define _PAGE_RO        0x200          /* HW read-only                     */
 #define _PAGE_INVALID   0x400          /* HW invalid                       */
 
@@ -185,33 +175,35 @@ extern char empty_zero_page[PAGE_SIZE];
 /*
  * No mapping available
  */
-#define PAGE_INVALID    __pgprot(_PAGE_INVALID)
-#define PAGE_NONE       __pgprot(_PAGE_PRESENT | _PAGE_INVALID)
-#define PAGE_COPY       __pgprot(_PAGE_PRESENT | _PAGE_RO)
-#define PAGE_READONLY   __pgprot(_PAGE_PRESENT | _PAGE_RO)
-#define PAGE_SHARED     __pgprot(_PAGE_PRESENT )
-#define PAGE_KERNEL     __pgprot(_PAGE_PRESENT )
+#define PAGE_INVALID	  __pgprot(_PAGE_INVALID)
+#define PAGE_NONE_SHARED  __pgprot(_PAGE_PRESENT|_PAGE_INVALID)
+#define PAGE_NONE_PRIVATE __pgprot(_PAGE_PRESENT|_PAGE_INVALID|_PAGE_ISCLEAN)
+#define PAGE_RO_SHARED	  __pgprot(_PAGE_PRESENT|_PAGE_RO)
+#define PAGE_RO_PRIVATE	  __pgprot(_PAGE_PRESENT|_PAGE_RO|_PAGE_ISCLEAN)
+#define PAGE_COPY	  __pgprot(_PAGE_PRESENT|_PAGE_RO|_PAGE_ISCLEAN)
+#define PAGE_SHARED	  __pgprot(_PAGE_PRESENT)
+#define PAGE_KERNEL	  __pgprot(_PAGE_PRESENT)
 
 /*
  * The S390 can't do page protection for execute, and considers that the
  * same are read. Also, write permissions imply read permissions. This is
  * the closest we can get..
  */
-#define __P000  PAGE_NONE
-#define __P001  PAGE_READONLY
+#define __P000  PAGE_NONE_PRIVATE
+#define __P001  PAGE_RO_PRIVATE
 #define __P010  PAGE_COPY
 #define __P011  PAGE_COPY
-#define __P100  PAGE_READONLY
-#define __P101  PAGE_READONLY
+#define __P100  PAGE_RO_PRIVATE
+#define __P101  PAGE_RO_PRIVATE
 #define __P110  PAGE_COPY
 #define __P111  PAGE_COPY
 
-#define __S000  PAGE_NONE
-#define __S001  PAGE_READONLY
+#define __S000  PAGE_NONE_SHARED
+#define __S001  PAGE_RO_SHARED
 #define __S010  PAGE_SHARED
 #define __S011  PAGE_SHARED
-#define __S100  PAGE_READONLY
-#define __S101  PAGE_READONLY
+#define __S100  PAGE_RO_SHARED
+#define __S101  PAGE_RO_SHARED
 #define __S110  PAGE_SHARED
 #define __S111  PAGE_SHARED
 
@@ -222,10 +214,10 @@ extern char empty_zero_page[PAGE_SIZE];
  */
 extern inline void set_pte(pte_t *pteptr, pte_t pteval)
 {
-	if ((pte_val(pteval) & (_PAGE_MKCLEAR|_PAGE_INVALID))
-	    == _PAGE_MKCLEAR) 
+	if ((pte_val(pteval) & (_PAGE_MKCLEAN|_PAGE_INVALID))
+	    == _PAGE_MKCLEAN) 
 	{
-		pte_val(pteval) &= ~_PAGE_MKCLEAR;
+		pte_val(pteval) &= ~_PAGE_MKCLEAN;
                
 		asm volatile ("sske %0,%1" 
 				: : "d" (0), "a" (pte_val(pteval)));
@@ -233,8 +225,6 @@ extern inline void set_pte(pte_t *pteptr, pte_t pteval)
 
 	*pteptr = pteval;
 }
-
-#define pages_to_mb(x) ((x) >> (20-PAGE_SHIFT))
 
 /*
  * pgd/pmd/pte query functions
@@ -295,6 +285,8 @@ extern inline int pte_dirty(pte_t pte)
 {
 	int skey;
 
+	if (pte_val(pte) & _PAGE_ISCLEAN)
+		return 0;
 	asm volatile ("iske %0,%1" : "=d" (skey) : "a" (pte_val(pte)));
 	return skey & _PAGE_CHANGED;
 }
@@ -326,15 +318,14 @@ extern inline void pte_clear(pte_t *ptep)
 	pte_val(*ptep) = _PAGE_INVALID;
 }
 
-#define PTE_INIT(x) pte_clear(x)
-
 /*
  * The following pte_modification functions only work if 
  * pte_present() is true. Undefined behaviour if not..
  */
 extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 {
-	pte_val(pte) = (pte_val(pte) & PAGE_MASK) | pgprot_val(newprot);
+	pte_val(pte) &= PAGE_MASK | _PAGE_ISCLEAN;
+	pte_val(pte) |= pgprot_val(newprot) & ~_PAGE_ISCLEAN;
 	return pte; 
 }
 
@@ -361,13 +352,11 @@ extern inline pte_t pte_mkclean(pte_t pte)
 
 extern inline pte_t pte_mkdirty(pte_t pte)
 { 
-	/* We can't set the changed bit atomically either. For now we
-         * set (!) the page referenced bit. */
-	asm volatile ("sske %0,%1" 
-	              : : "d" (_PAGE_CHANGED|_PAGE_REFERENCED),
-		          "a" (pte_val(pte)));
-
-	pte_val(pte) &= ~_PAGE_MKCLEAR;
+	/* We do not explicitly set the dirty bit because the
+	 * sske instruction is slow. It is faster to let the
+	 * next instruction set the dirty bit.
+	 */
+	pte_val(pte) &= ~(_PAGE_MKCLEAN | _PAGE_ISCLEAN);
 	return pte;
 }
 
@@ -401,6 +390,8 @@ static inline int ptep_test_and_clear_dirty(pte_t *ptep)
 {
 	int skey;
 
+	if (pte_val(*ptep) & _PAGE_ISCLEAN)
+		return 0;
 	asm volatile ("iske %0,%1" : "=d" (skey) : "a" (*ptep));
 	if ((skey & _PAGE_CHANGED) == 0)
 		return 0;
@@ -443,42 +434,70 @@ extern inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 #define mk_pte(pg, pgprot)                                                \
 ({                                                                        \
 	struct page *__page = (pg);                                       \
+	pgprot_t __pgprot = (pgprot);					  \
 	unsigned long __physpage = __pa((__page-mem_map) << PAGE_SHIFT);  \
-	pte_t __pte = mk_pte_phys(__physpage, (pgprot));                  \
-	                                                                  \
-	if (__page != ZERO_PAGE(__physpage)) {                            \
-		int __users = page_count(__page);                         \
-		__users -= !!PagePrivate(page) + !!__page->mapping;       \
-	                                                                  \
-		if (__users == 1)                                         \
-			pte_val(__pte) |= _PAGE_MKCLEAR;                  \
-        }                                                                 \
-	                                                                  \
+	pte_t __pte = mk_pte_phys(__physpage, __pgprot);                  \
+ 	                                                                  \
+	if (!(pgprot_val(__pgprot) & _PAGE_ISCLEAN)) {			  \
+		int __users = !!PagePrivate(__page) + !!__page->mapping;  \
+		if (__users + page_count(__page) == 1)                    \
+			pte_val(__pte) |= _PAGE_MKCLEAN;                  \
+	}								  \
 	__pte;                                                            \
 })
 
-#define pte_page(x) (mem_map+(unsigned long)((pte_val(x) >> PAGE_SHIFT)))
+#define pfn_pte(pfn, pgprot)                                              \
+({                                                                        \
+	struct page *__page = mem_map+(pfn);                              \
+	pgprot_t __pgprot = (pgprot);					  \
+	unsigned long __physpage = __pa((pfn) << PAGE_SHIFT);             \
+	pte_t __pte = mk_pte_phys(__physpage, __pgprot);                  \
+	                                                                  \
+	if (!(pgprot_val(__pgprot) & _PAGE_ISCLEAN)) {			  \
+		int __users = !!PagePrivate(__page) + !!__page->mapping;  \
+		if (__users + page_count(__page) == 1)                    \
+			pte_val(__pte) |= _PAGE_MKCLEAN;                  \
+	}								  \
+	__pte;                                                            \
+})
 
-#define pmd_page(pmd) \
-        ((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
+#define pfn_pmd(pfn, pgprot)                                              \
+({                                                                        \
+	pgprot_t __pgprot = (pgprot);                                     \
+	unsigned long __physpage = __pa((pfn) << PAGE_SHIFT);             \
+	pmd_t __pmd = __pmd(__physpage + pgprot_val(__pgprot));           \
+	__pmd;                                                            \
+})
+
+#define pte_pfn(x) (pte_val(x) >> PAGE_SHIFT)
+#define pte_page(x) pfn_to_page(pte_pfn(x))
+
+#define pmd_page_kernel(pmd) (pmd_val(pmd) & PAGE_MASK)
+
+#define pmd_page(pmd) (mem_map+(pmd_val(pmd) >> PAGE_SHIFT))
+
+#define pgd_page_kernel(pgd) (pgd_val(pgd) & PAGE_MASK)
 
 /* to find an entry in a page-table-directory */
 #define pgd_index(address) ((address >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
-#define pgd_offset(mm, address) ((mm)->pgd+pgd_index(address))
-
-#define pgd_page(pmd) \
-        ((unsigned long) __va(pgd_val(pmd) & PAGE_MASK))
+#define pgd_offset(mm, address) ((mm)->pgd + pgd_index(address))
 
 /* to find an entry in a kernel page-table-directory */
 #define pgd_offset_k(address) pgd_offset(&init_mm, address)
 
 /* Find an entry in the second-level page table.. */
+#define __pmd_offset(address) (((address) >> PMD_SHIFT) & (PTRS_PER_PMD-1))
 #define pmd_offset(dir,addr) \
-	((pmd_t *) pgd_page(*(dir)) + (((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1)))
+	((pmd_t *) pgd_page_kernel(*(dir)) + __pmd_offset(addr))
 
 /* Find an entry in the third-level page table.. */
-#define pte_offset(dir,addr) \
-	((pte_t *) pmd_page(*(dir)) + (((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1)))
+#define __pte_offset(address) (((address) >> PAGE_SHIFT) & (PTRS_PER_PTE-1))
+#define pte_offset_kernel(pmd, address) \
+	((pte_t *) pmd_page_kernel(*(pmd)) + __pte_offset(address))
+#define pte_offset_map(pmd, address) pte_offset_kernel(pmd, address)
+#define pte_offset_map_nested(pmd, address) pte_offset_kernel(pmd, address)
+#define pte_unmap(pte) do { } while (0)
+#define pte_unmap_nested(pte) do { } while (0)
 
 /*
  * A page-table entry has some bits we have to treat in a special way.

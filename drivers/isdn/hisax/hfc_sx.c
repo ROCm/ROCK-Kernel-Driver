@@ -17,6 +17,7 @@
 #include "hfc_sx.h"
 #include "isdnl1.h"
 #include <linux/interrupt.h>
+#include <linux/isapnp.h>
 
 extern const char *CardType[];
 
@@ -1460,7 +1461,17 @@ hfcsx_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 	return (0);
 }
 
+#ifdef __ISAPNP__
+static struct isapnp_device_id hfc_ids[] __initdata = {
+	{ ISAPNP_VENDOR('T', 'A', 'G'), ISAPNP_FUNCTION(0x2620),
+	  ISAPNP_VENDOR('T', 'A', 'G'), ISAPNP_FUNCTION(0x2620), 
+	  (unsigned long) "Teles 16.3c2" },
+	{ 0, }
+};
 
+static struct isapnp_device_id *hdev = &hfc_ids[0];
+static struct pci_bus *pnp_c __devinitdata = NULL;
+#endif
 
 int __devinit
 setup_hfcsx(struct IsdnCard *card)
@@ -1471,6 +1482,45 @@ setup_hfcsx(struct IsdnCard *card)
 
 	strcpy(tmp, hfcsx_revision);
 	printk(KERN_INFO "HiSax: HFC-SX driver Rev. %s\n", HiSax_getrev(tmp));
+#ifdef __ISAPNP__
+	if (!card->para[1] && isapnp_present()) {
+		struct pci_bus *pb;
+		struct pci_dev *pd;
+
+		while(hdev->card_vendor) {
+			if ((pb = isapnp_find_card(hdev->card_vendor,
+				hdev->card_device, pnp_c))) {
+				pnp_c = pb;
+				pd = NULL;
+				if ((pd = isapnp_find_dev(pnp_c,
+					hdev->vendor, hdev->function, pd))) {
+					printk(KERN_INFO "HiSax: %s detected\n",
+						(char *)hdev->driver_data);
+					pd->prepare(pd);
+					pd->deactivate(pd);
+					pd->activate(pd);
+					card->para[1] = pd->resource[0].start;
+					card->para[0] = pd->irq_resource[0].start;
+					if (!card->para[0] || !card->para[1]) {
+						printk(KERN_ERR "HFC PnP:some resources are missing %ld/%lx\n",
+						card->para[0], card->para[1]);
+						pd->deactivate(pd);
+						return(0);
+					}
+					break;
+				} else {
+					printk(KERN_ERR "HFC PnP: PnP error card found, no device\n");
+				}
+			}
+			hdev++;
+			pnp_c=NULL;
+		} 
+		if (!hdev->card_vendor) {
+			printk(KERN_INFO "HFC PnP: no ISAPnP card found\n");
+			return(0);
+		}
+	}
+#endif
 	cs->hw.hfcsx.base = card->para[1] & 0xfffe;
 	cs->irq = card->para[0];
 	cs->hw.hfcsx.int_s1 = 0;
@@ -1553,7 +1603,3 @@ setup_hfcsx(struct IsdnCard *card)
 	cs->auxcmd = &hfcsx_auxcmd;
 	return (1);
 }
-
-
-
-

@@ -563,6 +563,8 @@ static void nfs_dentry_iput(struct dentry *dentry, struct inode *inode)
 		nfs_complete_unlink(dentry);
 		unlock_kernel();
 	}
+	/* When creating a negative dentry, we want to renew d_time */
+	nfs_renew_times(dentry);
 	iput(inode);
 }
 
@@ -1090,6 +1092,7 @@ out:
 		d_rehash(rehash);
 	if (!error && !S_ISDIR(old_inode->i_mode))
 		d_move(old_dentry, new_dentry);
+	nfs_renew_times(new_dentry);
 
 	/* new dentry created? */
 	if (dentry)

@@ -39,7 +39,7 @@ static void tty3270_bh(void *);
        void tty3270_sched_bh(tub_t *);
 static int tty3270_wait(tub_t *, long *);
        void tty3270_int(tub_t *, devstat_t *);
-       int tty3270_try_logging(tub_t *);
+static int tty3270_try_logging(tub_t *);
 static void tty3270_start_input(tub_t *);
 static void tty3270_do_input(tub_t *);
 static void tty3270_do_enter(tub_t *, char *, int);
@@ -47,25 +47,27 @@ static void tty3270_do_showi(tub_t *, char *, int);
        int tty3270_io(tub_t *);
 static int tty3270_show_tube(int, char *, int);
 
-int tty3270_major = -1;
+static int tty3270_major = -1;
 struct tty_driver tty3270_driver;
-int tty3270_refcount;
-struct tty_struct *tty3270_table[TUBMAXMINS];
-struct termios *tty3270_termios[TUBMAXMINS];
-struct termios *tty3270_termios_locked[TUBMAXMINS];
+static int tty3270_refcount;
+static struct tty_struct *tty3270_table[TUBMAXMINS];
+static struct termios *tty3270_termios[TUBMAXMINS];
+static struct termios *tty3270_termios_locked[TUBMAXMINS];
 #ifdef CONFIG_TN3270_CONSOLE
-int con3270_major = -1;
-struct tty_driver con3270_driver;
-int con3270_refcount;
-struct tty_struct *con3270_table[1];
-struct termios *con3270_termios[1];
-struct termios *con3270_termios_locked[1];
+static int con3270_major = -1;
+static struct tty_driver con3270_driver;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
+static int con3270_refcount;
+static struct tty_struct *con3270_table[1];
+static struct termios *con3270_termios[1];
+static struct termios *con3270_termios_locked[1];
+#endif
 #endif /* CONFIG_TN3270_CONSOLE */
 
-int tty3270_proc_index;
-int tty3270_proc_data;
-int tty3270_proc_misc;
-enum tubwhat tty3270_proc_what;
+static int tty3270_proc_index;
+static int tty3270_proc_data;
+static int tty3270_proc_misc;
+static enum tubwhat tty3270_proc_what;
 
 /*
  * tty3270_init() -- Register the tty3270 driver
@@ -471,11 +473,11 @@ tty3270_read_proc(char *buf, char **start, off_t off, int count,
 			tubp = (*tubminors)[i];
 #ifdef CONFIG_TN3270_CONSOLE
 			if (CONSOLE_IS_3270 && tubp == tub3270_con_tubp)
-				len += sprintf(buf + len, "%.3x CONSOLE %d\n",
+				len += sprintf(buf + len, "%.4x CONSOLE %d\n",
 					       tubp->devno, i);
 			else
 #endif
-				len += sprintf(buf + len, "%.3x %d %d\n",
+				len += sprintf(buf + len, "%.4x %d %d\n",
 					       tubp->devno, tty3270_major, i);
 			if (begin + len > off + count)
 				break;
@@ -525,7 +527,6 @@ tty3270_write_proc(struct file *file, const char *buffer,
 	int mycount;
 	tub_t *tubp;
 	struct tty_struct *tty;
-	kdev_t device;
 	int rc;
 
 	mycount = MIN(count, sizeof mybuf - 1);
@@ -538,13 +539,12 @@ tty3270_write_proc(struct file *file, const char *buffer,
 	 */
 	tubp = NULL;
 	tty = current->tty;
-	device = tty? tty->device: 0;
-	if (device) {
-		if (MAJOR(device) == IBM_TTY3270_MAJOR)
-			tubp = (*tubminors)[MINOR(device)];
+	if (tty) {
+		if (tub_major(tty->device) == IBM_TTY3270_MAJOR)
+			tubp = (*tubminors)[tub_minor(tty->device)];
 #ifdef CONFIG_TN3270_CONSOLE
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
-		if (CONSOLE_IS_3270 && device == S390_CONSOLE_DEV)
+		if (CONSOLE_IS_3270 && tty->device == S390_CONSOLE_DEV)
 			tubp = tub3270_con_tubp;
 #endif /* LINUX_VERSION_CODE */
 #endif /* CONFIG_TN3270_CONSOLE */
@@ -603,12 +603,20 @@ tty3270_hangup(struct tty_struct *tty)
 static void
 tty3270_bh(void *data)
 {
-	long flags;
 	tub_t *tubp;
+	ioinfo_t *ioinfop;
+	long flags;
 	struct tty_struct *tty;
 
-	tubp = data;
-	TUBLOCK(tubp->irq, flags);
+	ioinfop = ioinfo[(tubp = data)->irq];
+	while (TUBTRYLOCK(tubp->irq, flags) == 0) {
+		if (ioinfop->ui.flags.unready == 1)
+			return;
+	}
+	if (ioinfop->ui.flags.unready == 1 ||
+	    ioinfop->ui.flags.ready == 0)
+		goto do_unlock;
+
 	tubp->flags &= ~TUB_BHPENDING;
 	tty = tubp->tty;
 
@@ -691,9 +699,11 @@ tty3270_wait(tub_t *tubp, long *flags)
 	add_wait_queue(&tubp->waitq, &wait);
 	while (!signal_pending(current) &&
 	    (tubp->flags & TUB_WORKING) != 0) {
+#warning FIXME: [kj] use set_current_state instead of current->state=
 		current->state = TASK_INTERRUPTIBLE;
 		TUBUNLOCK(tubp->irq, *flags);
 		schedule();
+#warning FIXME: [kj] use set_current_state instead of current->state=
 		current->state = TASK_RUNNING;
 		TUBLOCK(tubp->irq, *flags);
 	}
@@ -763,7 +773,7 @@ tty3270_refresh(tub_t *tubp)
 	}
 }
 
-int
+static int
 tty3270_try_logging(tub_t *tubp)
 {
 	if (tubp->flags & TUB_WORKING)

@@ -13,7 +13,7 @@
 #include "kcapi.h"
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
-
+#include <linux/init.h>
 
 static char *
 cardstate2str(unsigned short cardstate)

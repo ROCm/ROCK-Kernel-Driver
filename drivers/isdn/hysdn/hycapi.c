@@ -82,10 +82,6 @@ hycapi_remove_ctr(struct capi_ctr *ctrl)
 #ifdef HYCAPI_PRINTFNAMES
 	printk(KERN_NOTICE "HYCAPI hycapi_remove_ctr\n");
 #endif 
-	if(!hy_di) {
-		printk(KERN_ERR "No capi_driver_interface set!");
-		return;
-	}
 	cinfo = (hycapictrl_info *)(ctrl->driverdata);
 	if(!cinfo) {
 		printk(KERN_ERR "No hycapictrl_info set!");
@@ -686,10 +682,6 @@ attach the capi-driver to the kernel-capi.
 int hycapi_init()
 {
 	int i;
-	if(hy_di) {
-		printk(KERN_NOTICE "HyDI allready set\n");
-		return 0;
-	}
 	for(i=0;i<CAPI_MAXAPPL;i++) {
 		memset(&(hycapi_applications[i]), 0, sizeof(hycapi_appl));
 	}

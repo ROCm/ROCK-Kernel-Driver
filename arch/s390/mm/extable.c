@@ -43,7 +43,6 @@ unsigned long
 search_exception_table(unsigned long addr)
 {
 	unsigned long ret = 0;
-	unsigned long flags;
 
 #ifndef CONFIG_MODULES
         addr &= 0x7fffffff;  /* remove amode bit from address */
@@ -52,6 +51,7 @@ search_exception_table(unsigned long addr)
 	if (ret) ret = FIX_PSW(ret);
 	return ret;
 #else
+	unsigned long flags;
 	/* The kernel is the last "module" -- no need to treat it special.  */
 	struct module *mp;
         addr &= 0x7fffffff;  /* remove amode bit from address */

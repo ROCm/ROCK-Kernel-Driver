@@ -749,6 +749,9 @@ static void pwc_isoc_handler(struct urb *urb)
 	}
 	if (awake)
 		wake_up_interruptible(&pdev->frameq);
+
+	urb->dev = pdev->udev;
+	usb_submit_urb(urb, GFP_ATOMIC);
 }
 
 
@@ -784,7 +787,7 @@ static int pwc_isoc_init(struct pwc_device *pdev)
 			break;
 		}
 	
-	if (pdev->vmax_packet_size < 0) {
+	if (pdev->vmax_packet_size < 0 || pdev->vmax_packet_size > ISO_MAX_FRAME_SIZE) {
 		Err("Failed to find packet size for video endpoint in current alternate setting.\n");
 		return -ENFILE; /* Odd error, that should be noticable */
 	}
@@ -815,7 +818,7 @@ static int pwc_isoc_init(struct pwc_device *pdev)
 	for (i = 0; i < MAX_ISO_BUFS; i++) {
 		urb = pdev->sbuf[i].urb;
 
-		urb->next = pdev->sbuf[(i + 1) % MAX_ISO_BUFS].urb;
+		urb->interval = 1; // devik
 		urb->dev = udev;
 	        urb->pipe = usb_rcvisocpipe(udev, pdev->vendpoint);
 		urb->transfer_flags = USB_ISO_ASAP;
@@ -826,8 +829,8 @@ static int pwc_isoc_init(struct pwc_device *pdev)
 		urb->start_frame = 0;
 		urb->number_of_packets = ISO_FRAMES_PER_DESC;
 		for (j = 0; j < ISO_FRAMES_PER_DESC; j++) {
-			urb->iso_frame_desc[j].offset = j * ISO_MAX_FRAME_SIZE;
-			urb->iso_frame_desc[j].length = ISO_MAX_FRAME_SIZE;
+			urb->iso_frame_desc[j].offset = j * pdev->vmax_packet_size;
+			urb->iso_frame_desc[j].length = pdev->vmax_packet_size;
 		}
 	}
 
@@ -858,7 +861,7 @@ static void pwc_isoc_cleanup(struct pwc_device *pdev)
 		usb_set_interface(pdev->udev, 0, 0);
 	/* Unlinking ISOC buffers one by one */
 	for (i = MAX_ISO_BUFS - 1; i >= 0; i--) {
-		pdev->sbuf[i].urb->next = NULL;
+		//pdev->sbuf[i].urb->next = NULL;
 		usb_unlink_urb(pdev->sbuf[i].urb);
 		usb_free_urb(pdev->sbuf[i].urb);
 		pdev->sbuf[i].urb = NULL;

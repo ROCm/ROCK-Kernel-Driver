@@ -59,7 +59,7 @@ hwc_tty_open (struct tty_struct *tty,
 	      struct file *filp)
 {
 
-	if (MINOR (tty->device) - tty->driver.minor_start)
+	if (minor (tty->device) - tty->driver.minor_start)
 		return -ENODEV;
 
 	tty->driver_data = &hwc_tty_data;
@@ -78,7 +78,7 @@ static void
 hwc_tty_close (struct tty_struct *tty,
 	       struct file *filp)
 {
-	if (MINOR (tty->device) != tty->driver.minor_start) {
+	if (minor (tty->device) != tty->driver.minor_start) {
 		printk (KERN_WARNING HWC_TTY_PRINT_HEADER
 			"do not close hwc tty because of wrong device number");
 		return;

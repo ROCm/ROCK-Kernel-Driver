@@ -158,6 +158,7 @@ MODULE_PARM_DESC(sizes, "list of device (partition) sizes " \
 /* The following items are obtained through kmalloc() in init_module() */
 
 Xpram_Dev *xpram_devices = NULL;
+int *xpram_hardsects = NULL;
 int *xpram_offsets = NULL;   /* partition offsets */
 
 #define MIN(x,y) ((x) < (y) ? (x) : (y))
@@ -938,7 +939,6 @@ int xpram_init(void)
 
 	q = BLK_DEFAULT_QUEUE(major);
 	blk_init_queue (q, xpram_request);
-	blk_queue_hardsect_size(q, xpram_hardsect);
 
 	/* we want to have XPRAM_UNUSED blocks security buffer between devices */
 	mem_usable=xpram_mem_avail-(XPRAM_UNUSED*(xpram_devs-1));
@@ -978,6 +978,16 @@ int xpram_init(void)
 		PRINT_DEBUG(" device(%d) offset = %d kB, size = %d kB\n",i, xpram_offsets[i], xpram_sizes[i]);
 #endif
 
+	xpram_hardsects = kmalloc(xpram_devs * sizeof(int), GFP_KERNEL);
+	if (!xpram_hardsects) {
+		PRINT_ERR("Not enough memory for xpram_hardsects\n");
+                PRINT_ERR("Giving up xpram\n");
+		goto fail_malloc_hardsects;
+	}
+	for (i=0; i < xpram_devs; i++) /* all the same hardsect */
+		xpram_hardsects[i] = xpram_hardsect;
+	hardsect_size[major]=xpram_hardsects;
+   
 	/* 
 	 * allocate the devices -- we can't have them static, as the number
 	 * can be specified at load time
@@ -1030,6 +1040,7 @@ int xpram_init(void)
 		  goto fail_devfs_register;
 		}
 #endif  /* WHY? */
+				 
 	}
 
 	return 0; /* succeed */
@@ -1042,7 +1053,10 @@ int xpram_init(void)
 	}
 	kfree(xpram_devices);
 	kfree (xpram_offsets);
+ fail_malloc_hardsects:
  fail_malloc_devices:
+	kfree(xpram_hardsects);
+	hardsect_size[major] = NULL;
  fail_malloc:
 	/* ???	unregister_chrdev(major, "xpram"); */
 	unregister_blkdev(major, "xpram");
@@ -1072,6 +1086,7 @@ void cleanup_module(void)
 	int i;
 
 	/* first of all, reset all the data structures */
+	kfree(hardsect_size[major]);
 	kfree(xpram_offsets);
 	blk_clear(major);
 

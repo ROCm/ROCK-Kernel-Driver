@@ -31,7 +31,7 @@
 void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 {
 	int x2, y2, lineincr, shift, shift_right, shift_left, old_dx, old_dy;
-	int n, j, linesize = p->fix.line_length, bpl = sizeof(unsigned long);
+	int j, linesize = p->fix.line_length, bpl = sizeof(unsigned long);
 	unsigned long start_index, end_index, start_mask, end_mask, last;
 	unsigned long *dst = NULL, *src = NULL;
 	char *src1, *dst1;
@@ -102,7 +102,7 @@ void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 			end_mask = -1 << ((bpl - end_index) << 3);
 			n -= end_index;
 		}
-		n = n / bpl;
+		n /= bpl;
 
 		if (n <= 0) {
 			if (start_mask) {

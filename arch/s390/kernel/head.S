@@ -649,7 +649,7 @@ _stext:	basr  %r13,0                    # get base
 #
             .align 8
 .Ldw:	    .long  0x000a0000,0x00000000
-.Linittu:   .long  init_task_union
+.Linittu:   .long  init_thread_union
 .Lstart:    .long  start_kernel
 .Lbss_bgn:  .long  __bss_start
 .Lbss_end:  .long  _end

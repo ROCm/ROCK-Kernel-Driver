@@ -83,13 +83,9 @@ local_bh_count	= 8
 #define GET_CPU_IDX \
 		movl TI_CPU(%ebx), %eax;  \
 		shll $irq_array_shift, %eax
-#define GET_CURRENT_CPU_IDX \
-		GET_THREAD_INFO(%ebx); \
-		GET_CPU_IDX
 #define CPU_IDX (,%eax)
 #else
 #define GET_CPU_IDX
-#define GET_CURRENT_CPU_IDX GET_THREAD_INFO(%ebx)
 #define CPU_IDX
 #endif
 
@@ -236,6 +232,7 @@ ENTRY(resume_kernel)
 	movl TI_FLAGS(%ebx), %ecx
 	testb $_TIF_NEED_RESCHED, %cl
 	jz restore_all
+	GET_CPU_IDX
 	movl irq_stat+local_bh_count CPU_IDX, %ecx
 	addl irq_stat+local_irq_count CPU_IDX, %ecx
 	jnz restore_all

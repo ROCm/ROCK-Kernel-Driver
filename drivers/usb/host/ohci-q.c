@@ -15,7 +15,6 @@ static void urb_free_priv (struct ohci_hcd *hc, urb_priv_t *urb_priv)
 	if (last >= 0) {
 		int		i;
 		struct td	*td = urb_priv->td [0];
-#ifdef CONFIG_PCI
 		int		len = td->urb->transfer_buffer_length;
 		int		dir = usb_pipeout (td->urb->pipe)
 					? PCI_DMA_TODEVICE
@@ -36,10 +35,6 @@ static void urb_free_priv (struct ohci_hcd *hc, urb_priv_t *urb_priv)
 		if (len && td->data_dma)
 			pci_unmap_single (hc->hcd.pdev,
 					td->data_dma, len, dir);
-#else
-#	warning "assuming no buffer unmapping is needed"
-#endif
-
 		for (i = 0; i <= last; i++) {
 			td = urb_priv->td [i];
 			if (td)
@@ -90,7 +85,6 @@ static void intr_resub (struct ohci_hcd *hc, struct urb *urb)
 	urb_priv_t	*urb_priv = urb->hcpriv;
 	unsigned long	flags;
 
-#ifdef CONFIG_PCI
 // FIXME rewrite this resubmit path.  use pci_dma_sync_single()
 // and requeue more cheaply, and only if needed.
 // Better yet ... abolish the notion of automagic resubmission.
@@ -100,7 +94,6 @@ static void intr_resub (struct ohci_hcd *hc, struct urb *urb)
 		usb_pipeout (urb->pipe)
 			? PCI_DMA_TODEVICE
 			: PCI_DMA_FROMDEVICE);
-#endif
 	/* FIXME: MP race.  If another CPU partially unlinks
 	 * this URB (urb->status was updated, hasn't yet told
 	 * us to dequeue) before we call complete() here, an
@@ -236,11 +229,11 @@ static int ep_link (struct ohci_hcd *ohci, struct ed *edi)
 		break;
 
 	case PIPE_INTERRUPT:
-		load = ed->int_load;
-		interval = ep_2_n_interval (ed->int_period);
+		load = ed->intriso.intr_info.int_load;
+		interval = ep_2_n_interval (ed->intriso.intr_info.int_period);
 		ed->interval = interval;
 		int_branch = ep_int_balance (ohci, interval, load);
-		ed->int_branch = int_branch;
+		ed->intriso.intr_info.int_branch = int_branch;
 
 		for (i = 0; i < ep_rev (6, interval); i += inter) {
 			inter = 1;
@@ -355,9 +348,9 @@ static int start_ed_unlink (struct ohci_hcd *ohci, struct ed *ed)
 		break;
 
 	case PIPE_INTERRUPT:
-		periodic_unlink (ohci, ed, ed->int_branch, ed->interval);
-		for (i = ed->int_branch; i < NUM_INTS; i += ed->interval)
-			ohci->ohci_int_load [i] -= ed->int_load;
+		periodic_unlink (ohci, ed, ed->intriso.intr_info.int_branch, ed->interval);
+		for (i = ed->intriso.intr_info.int_branch; i < NUM_INTS; i += ed->interval)
+			ohci->ohci_int_load [i] -= ed->intriso.intr_info.int_load;
 #ifdef OHCI_VERBOSE_DEBUG
 		ohci_dump_periodic (ohci, "UNLINK_INT");
 #endif
@@ -466,8 +459,8 @@ static struct ed *ep_add_ed (
 				<< 16);
 
   	if (ed->type == PIPE_INTERRUPT && ed->state == ED_UNLINK) {
-  		ed->int_period = interval;
-  		ed->int_load = load;
+  		ed->intriso.intr_info.int_period = interval;
+  		ed->intriso.intr_info.int_load = load;
   	}
 
 	spin_unlock_irqrestore (&ohci->lock, flags);
@@ -563,7 +556,7 @@ td_fill (struct ohci_hcd *ohci, unsigned int info,
 	td->hwINFO = cpu_to_le32 (info);
 	if ((td->ed->type) == PIPE_ISOCHRONOUS) {
 		td->hwCBP = cpu_to_le32 (data & 0xFFFFF000);
-		td->ed->last_iso = info & 0xffff;
+		td->ed->intriso.last_iso = info & 0xffff;
 	} else {
 		td->hwCBP = cpu_to_le32 (data); 
 	}			
@@ -610,16 +603,11 @@ static void td_submit_urb (struct urb *urb)
 	urb_priv->td_cnt = 0;
 
 	if (data_len) {
-#ifdef CONFIG_PCI
 		data = pci_map_single (ohci->hcd.pdev,
-			urb->transfer_buffer, data_len,
-			usb_pipeout (urb->pipe)
-				? PCI_DMA_TODEVICE
-				: PCI_DMA_FROMDEVICE
-			);
-#else
-#	error "what dma addr to use"
-#endif
+				       urb->transfer_buffer, data_len,
+				       usb_pipeout (urb->pipe)
+				       ? PCI_DMA_TODEVICE
+				       : PCI_DMA_FROMDEVICE);
 	} else
 		data = 0;
 
@@ -667,14 +655,10 @@ static void td_submit_urb (struct urb *urb)
 			/* control requests don't use toggle state  */
 			info = TD_CC | TD_DP_SETUP | TD_T_DATA0;
 			td_fill (ohci, info,
-#ifdef CONFIG_PCI
 				pci_map_single (ohci->hcd.pdev,
-					urb->setup_packet, 8,
-					PCI_DMA_TODEVICE),
-#else
-#	error "what dma addr to use"				
-#endif
-				8, urb, cnt++); 
+						urb->setup_packet, 8,
+						PCI_DMA_TODEVICE),
+				 8, urb, cnt++); 
 			if (data_len > 0) {  
 				info = TD_CC | TD_R | TD_T_DATA1;
 				info |= usb_pipeout (urb->pipe)

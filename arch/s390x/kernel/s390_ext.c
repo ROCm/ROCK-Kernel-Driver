@@ -10,6 +10,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
+#include <linux/errno.h>
 #include <asm/lowcore.h>
 #include <asm/s390_ext.h>
 
@@ -21,34 +22,31 @@
  * iucv and 0x2603 pfault) this is always the first element. 
  */
 ext_int_info_t *ext_int_hash[256] = { 0, };
-ext_int_info_t ext_int_info_timer;
-ext_int_info_t ext_int_info_hwc;
-ext_int_info_t ext_int_pfault;
 
 int register_external_interrupt(__u16 code, ext_int_handler_t handler) {
         ext_int_info_t *p;
         int index;
 
-        index = code & 0xff;
-        p = ext_int_hash[index];
-        while (p != NULL) {
-                if (p->code == code)
-                        return -EBUSY;
-                p = p->next;
-        }
-        if (code == 0x1004) /* time_init is done before kmalloc works :-/ */
-                p = &ext_int_info_timer;
-        else if (code == 0x2401) /* hwc_init is done too early too */
-                p = &ext_int_info_hwc;
-        else if (code == 0x2603) /* pfault_init is done too early too */
-                p = &ext_int_pfault;
-        else
-                p = (ext_int_info_t *)
-                          kmalloc(sizeof(ext_int_info_t), GFP_ATOMIC);
+	p = (ext_int_info_t *) kmalloc(sizeof(ext_int_info_t), GFP_ATOMIC);
         if (p == NULL)
                 return -ENOMEM;
         p->code = code;
         p->handler = handler;
+        index = code & 0xff;
+        p->next = ext_int_hash[index];
+        ext_int_hash[index] = p;
+        return 0;
+}
+
+int register_early_external_interrupt(__u16 code, ext_int_handler_t handler,
+				      ext_int_info_t *p) {
+        int index;
+
+        if (p == NULL)
+                return -EINVAL;
+        p->code = code;
+        p->handler = handler;
+        index = code & 0xff;
         p->next = ext_int_hash[index];
         ext_int_hash[index] = p;
         return 0;
@@ -73,9 +71,31 @@ int unregister_external_interrupt(__u16 code, ext_int_handler_t handler) {
                 q->next = p->next;
         else
                 ext_int_hash[index] = p->next;
-        if (code != 0x1004 && code != 0x2401 && code != 0x2603)
-                kfree(p);
+	kfree(p);
         return 0;
+}
+
+int unregister_early_external_interrupt(__u16 code, ext_int_handler_t handler,
+					ext_int_info_t *p) {
+	ext_int_info_t *q;
+	int index;
+
+	if (p == NULL || p->code != code || p->handler != handler)
+		return -EINVAL;
+	index = code & 0xff;
+	q = ext_int_hash[index];
+	if (p != q) {
+		while (q != NULL) {
+			if (q->next == p)
+				break;
+			q = q->next;
+		}
+		if (q == NULL)
+			return -ENOENT;
+		q->next = p->next;
+	} else
+		ext_int_hash[index] = p->next;
+	return 0;
 }
 
 EXPORT_SYMBOL(register_external_interrupt);

@@ -321,6 +321,18 @@ CONFIG_DASD_CKD
 CONFIG_DASD_FBA
   FBA devices are currently unsupported.
 
+CONFIG_DASD_AUTO_DIAG
+  Enable this option if you want your DIAG discipline module loaded
+  on DASD driver startup.
+
+CONFIG_DASD_AUTO_ECKD
+  Enable this option if you want your ECKD discipline module loaded
+  on DASD driver startup.
+
+CONFIG_DASD_AUTO_FBA
+  Enable this option if you want your FBA discipline module loaded
+  on DASD driver startup.
+
 CONFIG_TN3215
   Include support for IBM 3215 line-mode terminals.
 
@@ -342,6 +354,15 @@ CONFIG_HWC
 CONFIG_HWC_CONSOLE
   Include support for using an IBM HWC line-mode terminal as the Linux
   system console.
+
+CONFIG_HWC_CPI
+  This option enables the hardware console interface for system
+  identification This is commonly used for workload management and
+  gives you a nice name for the system on the service element.
+  Please select this option as a module since built-in operation is
+  completely untested.
+  You should only select this option if you know what you are doing,
+  need this feature and intend to run your kernel in LPAR.
 
 CONFIG_S390_TAPE
   Select this option if you want to access channel-attached tape

@@ -30,12 +30,11 @@ ifndef CONFIG_X86
 obj-y += syscall.o
 endif
 
+host-progs := gen-devlist
+
 include $(TOPDIR)/Rules.make
 
-names.o: names.c devlist.h classlist.h
+names.o: devlist.h classlist.h
 
 devlist.h classlist.h: pci.ids gen-devlist
 	./gen-devlist <pci.ids
-
-gen-devlist: gen-devlist.c
-	$(HOSTCC) $(HOSTCFLAGS) -o gen-devlist gen-devlist.c

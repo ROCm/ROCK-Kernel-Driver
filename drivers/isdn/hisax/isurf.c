@@ -16,6 +16,7 @@
 #include "isac.h"
 #include "isar.h"
 #include "isdnl1.h"
+#include <linux/isapnp.h>
 
 extern const char *CardType[];
 
@@ -193,6 +194,10 @@ isurf_auxcmd(struct IsdnCardState *cs, isdn_ctrl *ic) {
 	return(isar_auxcmd(cs, ic));
 }
 
+#ifdef __ISAPNP__
+static struct pci_bus *pnp_surf __devinitdata = NULL;
+#endif
+
 int __init
 setup_isurf(struct IsdnCard *card)
 {
@@ -210,9 +215,48 @@ setup_isurf(struct IsdnCard *card)
 		cs->hw.isurf.phymem = card->para[2];
 		cs->irq = card->para[0];
 	} else {
+#ifdef __ISAPNP__
+		struct pci_bus *pb;
+		struct pci_dev *pd;
+
+		if (isapnp_present()) {
+			cs->subtyp = 0;
+			if ((pb = isapnp_find_card(
+				ISAPNP_VENDOR('S', 'I', 'E'),
+				ISAPNP_FUNCTION(0x0010), pnp_surf))) {
+				pnp_surf = pb;
+				pd = NULL;
+				if (!(pd = isapnp_find_dev(pnp_surf,
+					ISAPNP_VENDOR('S', 'I', 'E'),
+					ISAPNP_FUNCTION(0x0010), pd))) {
+					printk(KERN_ERR "ISurfPnP: PnP error card found, no device\n");
+					return (0);
+				}
+				pd->prepare(pd);
+				pd->deactivate(pd);
+				pd->activate(pd);
+				cs->hw.isurf.reset = pd->resource[0].start;
+				cs->hw.isurf.phymem = pd->resource[1].start;
+				cs->irq = pd->irq_resource[0].start;
+				if (!cs->irq || !cs->hw.isurf.reset || !cs->hw.isurf.phymem) {
+					printk(KERN_ERR "ISurfPnP:some resources are missing %d/%x/%lx\n",
+						cs->irq, cs->hw.isurf.reset, cs->hw.isurf.phymem);
+					pd->deactivate(pd);
+					return(0);
+				}
+			} else {
+				printk(KERN_INFO "ISurfPnP: no ISAPnP card found\n");
+				return(0);
+			}
+		} else {
+			printk(KERN_INFO "ISurfPnP: no ISAPnP bus found\n");
+			return(0);
+		}
+#else
 		printk(KERN_WARNING "HiSax: %s port/mem not set\n",
 			CardType[card->typ]);
 		return (0);
+#endif
 	}
 	if (check_region(cs->hw.isurf.reset, 1)) {
 		printk(KERN_WARNING

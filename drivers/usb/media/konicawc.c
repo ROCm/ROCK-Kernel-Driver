@@ -268,7 +268,7 @@ static int konicawc_compress_iso(uvd_t *uvd, struct urb *dataurb, struct urb *st
 
 static void konicawc_isoc_irq(struct urb *urb)
 {
-	int i, len = 0;
+	int i, ret, len = 0;
 	uvd_t *uvd = urb->context;
 	struct konicawc *cam = (struct konicawc *)uvd->user_data;
 
@@ -276,15 +276,15 @@ static void konicawc_isoc_irq(struct urb *urb)
 	if (!CAMERA_IS_OPERATIONAL(uvd))
 		return;
 
-	if (urb->actual_length > 32) {
-		cam->last_data_urb = urb;
-		return;
-	}
-
 	if (!uvd->streaming) {
 		if (debug >= 1)
 			info("Not streaming, but interrupt!");
 		return;
+	}
+
+	if (urb->actual_length > 32) {
+		cam->last_data_urb = urb;
+		goto urb_done_with;
 	}
 
 	uvd->stats.urb_count++;
@@ -296,25 +296,23 @@ static void konicawc_isoc_irq(struct urb *urb)
 		len = konicawc_compress_iso(uvd, cam->last_data_urb, urb);
 		for (i = 0; i < FRAMES_PER_DESC; i++) {
 			cam->last_data_urb->iso_frame_desc[i].status = 0;
-			cam->last_data_urb->iso_frame_desc[i].actual_length = 0;
 		}
 		cam->last_data_urb = NULL;
 	}
 	uvd->stats.urb_length = len;
-	if (len <= 0) {
-		goto urb_done_with;
-	}
-
-	/* Here we got some data */
 	uvd->stats.data_count += len;
-	RingQueue_WakeUpInterruptible(&uvd->dp);
+	if(len)
+		RingQueue_WakeUpInterruptible(&uvd->dp);
 
 urb_done_with:
-
 	for (i = 0; i < FRAMES_PER_DESC; i++) {
 		urb->iso_frame_desc[i].status = 0;
-		urb->iso_frame_desc[i].actual_length = 0;
 	}
+	urb->dev = uvd->dev;
+	urb->status = 0;
+	ret = usb_submit_urb(urb, GFP_KERNEL);
+	if(ret)
+		err("usb_submit_urb error (%d)", ret);
 	return;
 }
 
@@ -346,6 +344,7 @@ static int konicawc_start_data(uvd_t *uvd)
 		urb->dev = dev;
 		urb->context = uvd;
 		urb->pipe = usb_rcvisocpipe(dev, uvd->video_endp);
+		urb->interval = 1;
 		urb->transfer_flags = USB_ISO_ASAP;
 		urb->transfer_buffer = uvd->sbuf[i].data;
 		urb->complete = konicawc_isoc_irq;
@@ -360,6 +359,7 @@ static int konicawc_start_data(uvd_t *uvd)
 		urb->dev = dev;
 		urb->context = uvd;
 		urb->pipe = usb_rcvisocpipe(dev, uvd->video_endp-1);
+		urb->interval = 1;
 		urb->transfer_flags = USB_ISO_ASAP;
 		urb->transfer_buffer = cam->sts_buf[i];
 		urb->complete = konicawc_isoc_irq;
@@ -373,17 +373,6 @@ static int konicawc_start_data(uvd_t *uvd)
 
 	cam->last_data_urb = NULL;
 	
-	/* Link URBs into a ring so that they invoke each other infinitely */
-	for (i=0; i < USBVIDEO_NUMSBUF; i++) {
-		if ((i+1) < USBVIDEO_NUMSBUF) {
-			cam->sts_urb[i]->next = uvd->sbuf[i].urb;
-			uvd->sbuf[i].urb->next = cam->sts_urb[i+1];
-		} else {
-			cam->sts_urb[i]->next = uvd->sbuf[i].urb;
-			uvd->sbuf[i].urb->next = cam->sts_urb[0];
-		}
-	}
-
 	/* Submit all URBs */
 	for (i=0; i < USBVIDEO_NUMSBUF; i++) {
 		errFlag = usb_submit_urb(uvd->sbuf[i].urb, GFP_KERNEL);

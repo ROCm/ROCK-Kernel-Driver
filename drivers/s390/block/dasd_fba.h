@@ -71,6 +71,6 @@ typedef
 
     dasd_fba_characteristics_t;
 
-int dasd_fba_init (void);
-void dasd_fba_cleanup (void);
+int dasd_fba_init(void);
+void dasd_fba_cleanup(void);
 #endif				/* DASD_FBA_H */

@@ -232,6 +232,33 @@ void vfree(void * addr)
 	printk(KERN_ERR "Trying to vfree() nonexistent vm area (%p)\n", addr);
 }
 
+/*
+ *	Allocate any pages
+ */
+
+void * vmalloc (unsigned long size)
+{
+	return __vmalloc(size, GFP_KERNEL | __GFP_HIGHMEM, PAGE_KERNEL);
+}
+
+/*
+ *	Allocate ISA addressable pages for broke crap
+ */
+
+void * vmalloc_dma (unsigned long size)
+{
+	return __vmalloc(size, GFP_KERNEL|GFP_DMA, PAGE_KERNEL);
+}
+
+/*
+ *	vmalloc 32bit PA addressable pages - eg for PCI 32bit devices
+ */
+
+void * vmalloc_32(unsigned long size)
+{
+	return __vmalloc(size, GFP_KERNEL, PAGE_KERNEL);
+}
+
 void * __vmalloc (unsigned long size, int gfp_mask, pgprot_t prot)
 {
 	void * addr;

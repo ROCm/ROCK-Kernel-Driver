@@ -24,7 +24,9 @@
 #include <linux/ptrace.h>
 #include <linux/unistd.h>
 #include <linux/stddef.h>
+#include <linux/tty.h>
 #include <linux/personality.h>
+#include <linux/binfmts.h>
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
 
@@ -267,10 +269,10 @@ get_sigframe(struct k_sigaction *ka, struct pt_regs * regs, size_t frame_size)
 
 static inline int map_signal(int sig)
 {
-	if (current->exec_domain
-	    && current->exec_domain->signal_invmap
+	if (current_thread_info()->exec_domain
+	    && current_thread_info()->exec_domain->signal_invmap
 	    && sig < 32)
-		return current->exec_domain->signal_invmap[sig];
+		return current_thread_info()->exec_domain->signal_invmap[sig];
 	else
 		return sig;
 }
@@ -300,6 +302,10 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 	                       (u16 *)(frame->retcode)))
 			goto give_sigsegv;
 	}
+
+	/* Set up backchain. */
+	if (__put_user(regs->gprs[15], (addr_t *) frame))
+		goto give_sigsegv;
 
 	/* Set up registers for signal handler */
 	regs->gprs[15] = (addr_t)frame;
@@ -335,7 +341,7 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	/* Create the ucontext.  */
 	err |= __put_user(0, &frame->uc.uc_flags);
 	err |= __put_user(0, &frame->uc.uc_link);
-	err |= __put_user(current->sas_ss_sp, &frame->uc.uc_stack.ss_sp);
+	err |= __put_user((void *)current->sas_ss_sp, &frame->uc.uc_stack.ss_sp);
 	err |= __put_user(sas_ss_flags(regs->gprs[15]),
 			  &frame->uc.uc_stack.ss_flags);
 	err |= __put_user(current->sas_ss_size, &frame->uc.uc_stack.ss_size);
@@ -353,6 +359,10 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 		err |= __put_user(S390_SYSCALL_OPCODE | __NR_rt_sigreturn, 
 	                          (u16 *)(frame->retcode));
 	}
+
+	/* Set up backchain. */
+	if (__put_user(regs->gprs[15], (addr_t *) frame))
+		goto give_sigsegv;
 
 	/* Set up registers for signal handler */
 	regs->gprs[15] = (addr_t)frame;

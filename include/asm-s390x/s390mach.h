@@ -13,10 +13,23 @@
 #include <asm/types.h>
 
 typedef struct _mci {
-	__u32	to_be_defined_1 :  9;
-	__u32 cp              :  1; /* channel-report pending */
-	__u32	to_be_defined_2 : 22;
-	__u32	to_be_defined_3;
+	__u32   sd              :  1; /* 00 system damage */
+	__u32   pd              :  1; /* 01 instruction-processing damage */
+	__u32   sr              :  1; /* 02 system recovery */
+	__u32   to_be_defined_1 :  4; /* 03-06 */
+	__u32   dg              :  1; /* 07 degradation */
+	__u32   w               :  1; /* 08 warning pending */
+	__u32   cp              :  1; /* 09 channel-report pending */
+	__u32   to_be_defined_2 :  6; /* 10-15 */
+	__u32   se              :  1; /* 16 storage error uncorrected */
+	__u32   sc              :  1; /* 17 storage error corrected */
+	__u32   ke              :  1; /* 18 storage-key error uncorrected */
+	__u32   ds              :  1; /* 19 storage degradation */
+	__u32	to_be_defined_3 :  4; /* 20-23 */
+	__u32   fa              :  1; /* 24 failing storage address validity */
+	__u32   to_be_defined_4 :  7; /* 25-31 */
+	__u32   ie              :  1; /* 32 indirect storage error */
+	__u32	to_be_defined_5 : 31; /* 33-63 */
 	} mci_t;
 
 //
