@@ -35,11 +35,11 @@
  */
 
 #include <linux/mm.h>
+#include <linux/bio.h>
 #include <linux/suspend.h>
 #include <linux/version.h>
 #include <linux/reboot.h>
 #include <linux/device.h>
-#include <linux/buffer_head.h>
 #include <linux/swapops.h>
 #include <linux/bootmem.h>
 
@@ -675,21 +675,94 @@ static int __init sanity_check(struct suspend_header *sh)
 
 static struct block_device * resume_bdev;
 
-static int __init bdev_read_page(long pos, void *buf)
+
+/**
+ *	Using bio to read from swap. 
+ *	This code requires a bit more work than just using buffer heads
+ *	but, it is the recommended way for 2.5/2.6. 
+ *	The following are to signal the beginning and end of I/O. Bios 
+ *	finish asynchronously, while we want them to happen synchronously.
+ *	A simple atomic_t, and a wait loop take care of this problem.
+ */
+
+static atomic_t io_done = ATOMIC_INIT(0);
+
+static void start_io(void)
 {
-	struct buffer_head *bh;
-	BUG_ON (pos%PAGE_SIZE);
-	bh = __bread(resume_bdev, pos/PAGE_SIZE, PAGE_SIZE);
-	if (!bh || (!bh->b_data)) {
-		return -1;
-	}
-	memcpy(buf, bh->b_data, PAGE_SIZE);	/* FIXME: may need kmap() */
-	BUG_ON(!buffer_uptodate(bh));
-	brelse(bh);
+	atomic_set(&io_done,1);
+}
+
+static int end_io(struct bio * bio, unsigned int num, int err)
+{
+	atomic_set(&io_done,0);
 	return 0;
-} 
+}
+
+static void wait_io(void)
+{
+	blk_run_queues();
+	while(atomic_read(&io_done))
+		io_schedule();
+}
+
+
+/**
+ *	submit - submit BIO request.
+ *	@rw:	READ or WRITE.
+ *	@off	physical offset of page.
+ *	@page:	page we're reading or writing.
+ *
+ *	Straight from the textbook - allocate and initialize the bio.
+ *	If we're writing, make sure the page is marked as dirty. 
+ *	Then submit it and wait. 
+ */
+
+static int submit(int rw, pgoff_t page_off, void * page)
+{
+	int error = 0;
+	struct bio * bio;
+
+	bio = bio_alloc(GFP_ATOMIC,1);
+	if (!bio)
+		return -ENOMEM;
+	bio->bi_sector = page_off * (PAGE_SIZE >> 9);
+	bio_get(bio);
+	bio->bi_bdev = resume_bdev;
+	bio->bi_end_io = end_io;
+
+	if (bio_add_page(bio, virt_to_page(page), PAGE_SIZE, 0) < PAGE_SIZE) {
+		printk("ERROR: adding page to bio at %ld\n",page_off);
+		error = -EFAULT;
+		goto Done;
+	}
+
+	if (rw == WRITE)
+		bio_set_pages_dirty(bio);
+	start_io();
+	submit_bio(rw,bio);
+	wait_io();
+ Done:
+	bio_put(bio);
+	return error;
+}
+
+static int
+read_page(pgoff_t page_off, void * page)
+{
+	return submit(READ,page_off,page);
+}
+
+static int
+write_page(pgoff_t page_off, void * page)
+{
+	return submit(WRITE,page_off,page);
+}
+
 
 extern dev_t __init name_to_dev_t(const char *line);
+
+
+#define next_entry(diskpage)	diskpage->link.next
 
 static int __init read_suspend_image(void)
 {
@@ -702,15 +775,13 @@ static int __init read_suspend_image(void)
 	if (!cur)
 		return -ENOMEM;
 
-#define PREPARENEXT \
-	{	next = cur->link.next; \
-		next.val = swp_offset(next) * PAGE_SIZE; \
-        }
-
-	if ((error = bdev_read_page(0, cur)))
+	if ((error = read_page(0, cur)))
 		goto Done;
 
-	PREPARENEXT; /* We have to read next position before we overwrite it */
+	/* 
+	 * We have to read next position before we overwrite it 
+	 */
+	next = next_entry(cur);
 
 	if (!memcmp("S1",cur->swh.magic.magic,2))
 		memcpy(cur->swh.magic.magic,"SWAP-SPACE",10);
@@ -727,15 +798,21 @@ static int __init read_suspend_image(void)
 		goto Done;
 	}
 
+	/*
+	 * Reset swap signature now.
+	 */
+	if ((error = write_page(0,cur)))
+		goto Done;
+
 	printk( "%sSignature found, resuming\n", name_resume );
 	MDELAY(1000);
 
-	if ((error = bdev_read_page(next.val, cur)))
+	if ((error = read_page(swp_offset(next), cur)))
 		goto Done;
  	/* Is this same machine? */
 	if ((error = sanity_check(&cur->sh)))
 		goto Done;
-	PREPARENEXT;
+	next = next_entry(cur);
 
 	pagedir_save = cur->sh.suspend_pagedir;
 	nr_copy_pages = cur->sh.num_pbes;
@@ -754,10 +831,10 @@ static int __init read_suspend_image(void)
 	for (i=nr_pgdir_pages-1; i>=0; i--) {
 		BUG_ON (!next.val);
 		cur = (union diskpage *)((char *) pagedir_nosave)+i;
-		error = bdev_read_page(next.val, cur);
+		error = read_page(swp_offset(next), cur);
 		if (error)
 			goto FreePagedir;
-		PREPARENEXT;
+		next = next_entry(cur);
 	}
 	BUG_ON (next.val);
 
@@ -773,8 +850,8 @@ static int __init read_suspend_image(void)
 			printk( "." );
 		/* You do not need to check for overlaps...
 		   ... check_pagedir already did this work */
-		error = bdev_read_page(swp_offset(swap_address) * PAGE_SIZE,
-				       (char *)((pagedir_nosave+i)->address));
+		error = read_page(swp_offset(swap_address),
+				  (char *)((pagedir_nosave+i)->address));
 		if (error)
 			goto FreePagedir;
 	}
@@ -868,10 +945,6 @@ int swsusp_free(void)
 {
 	PRINTK( "Freeing prev allocated pagedir\n" );
 	free_suspend_pagedir((unsigned long) pagedir_save);
-
-	PRINTK( "Fixing swap signatures... " );
-	mark_swapfiles(((swp_entry_t) {0}), MARK_SWAP_RESUME);
-	PRINTK( "ok\n" );
 	return 0;
 }
 
