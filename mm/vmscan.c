@@ -230,13 +230,8 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		 * writes.
 		 */
 		if (PageWriteback(page)) {
-			if (may_enter_fs) {
-				if (page->pte.direct ||
-					page->mapping->backing_dev_info ==
-						current->backing_dev_info) {
-					wait_on_page_writeback(page);
-				}
-			}
+			if (may_enter_fs && page_mapped(page))
+				wait_on_page_writeback(page);
 			goto keep_locked;
 		}
 
