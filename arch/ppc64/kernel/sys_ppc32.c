@@ -15,7 +15,6 @@
  */
 
 #include <asm/ptrace.h>
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/fs.h> 
@@ -244,32 +243,6 @@ out:
 	if (file)
 		fput(file);
 	return ret;
-}
-
-extern asmlinkage long sys_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg);
-asmlinkage long sys32_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg)
-{
-	switch (cmd) {
-	case F_GETLK:
-	case F_SETLK:
-	case F_SETLKW:
-	{
-		struct flock f;
-		mm_segment_t old_fs;
-		long ret;
-
-		if(get_compat_flock(&f, (struct compat_flock *)arg))
-			return -EFAULT;
-		old_fs = get_fs(); set_fs (KERNEL_DS);
-		ret = sys_fcntl(fd, cmd, (unsigned long)&f);
-		set_fs (old_fs);
-		if(put_compat_flock(&f, (struct compat_flock *)arg))
-			return -EFAULT;
-		return ret;
-	}
-	default:
-		return sys_fcntl(fd, cmd, (unsigned long)arg);
-	}
 }
 
 struct ncp_mount_data32_v3 {
@@ -2846,13 +2819,6 @@ extern asmlinkage long sys_umount(char * name, int flags);
 asmlinkage long sys32_umount(char * name, u32 flags)
 {
 	return sys_umount(name, (int)flags);
-}
-
-asmlinkage long sys32_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg)
-{
-	if (cmd >= F_GETLK64 && cmd <= F_SETLKW64)
-		return sys_fcntl(fd, cmd + F_GETLK - F_GETLK64, arg);
-	return sys32_fcntl(fd, cmd, arg);
 }
 
 struct __sysctl_args32 {

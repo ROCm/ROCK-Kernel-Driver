@@ -344,8 +344,8 @@ irq_recheck:
 recheck:
 	mfmsr	r10		/* Get current interrupt state */
 	li	r4,0
-	ori	r4,r4,MSR_EE|MSR_RI
-	andc	r10,r10,r4	/* clear MSR_EE and MSR_RI */
+	ori	r4,r4,MSR_EE
+	andc	r10,r10,r4	/* clear MSR_EE */
 	mtmsrd	r10,1		/* Update machine state */
 
 #ifdef CONFIG_PPC_ISERIES
@@ -396,7 +396,7 @@ restore:
 	mfmsr	r0
 	li	r2, MSR_RI
 	andc	r0,r0,r2
-	mtmsrd	r0
+	mtmsrd	r0,1
 
 	ld	r0,_MSR(r1)
 	mtspr	SRR1,r0
@@ -422,7 +422,7 @@ restore:
 /* Note: this must change if we start using the  TIF_NOTIFY_RESUME bit */
 do_work:
 	/* Enable interrupts */
-	ori	r10,r10,MSR_EE|MSR_RI
+	ori	r10,r10,MSR_EE
 	mtmsrd	r10,1
 
 	andi.	r0,r3,_TIF_NEED_RESCHED

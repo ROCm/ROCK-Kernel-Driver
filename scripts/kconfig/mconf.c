@@ -302,11 +302,8 @@ static void build_conf(struct menu *menu)
 					cprint1("%s%*c%s",
 						menu->data ? "-->" : "++>",
 						indent + 1, ' ', prompt);
-				} else {
-					if (menu->parent != &rootmenu)
-						cprint1("   %*c", indent + 1, ' ');
-					cprint1("%s  --->", prompt);
-				}
+				} else
+					cprint1("   %*c%s  --->", indent + 1, ' ', prompt);
 
 				cprint_done();
 				if (single_menu_mode && menu->data)
@@ -373,6 +370,11 @@ static void build_conf(struct menu *menu)
 		}
 		cprint_done();
 	} else {
+		if (menu == current_menu) {
+			cprint(":%p", menu);
+			cprint("---%*c%s", indent + 1, ' ', menu_get_prompt(menu));
+			goto conf_childs;
+		}
 		child_count++;
 		val = sym_get_tristate_value(sym);
 		if (sym_is_choice_value(sym) && val == yes) {
@@ -407,6 +409,11 @@ static void build_conf(struct menu *menu)
 		}
 		cprint1("%*c%s%s", indent + 1, ' ', menu_get_prompt(menu),
 			sym_has_value(sym) ? "" : " (NEW)");
+		if (menu->prompt->type == P_MENU) {
+			cprint1("  --->");
+			cprint_done();
+			return;
+		}
 		cprint_done();
 	}
 
@@ -445,9 +452,9 @@ static void conf(struct menu *menu)
 			cprint(":");
 			cprint("--- ");
 			cprint("L");
-			cprint("Load an Alternate Configuration File");
+			cprint("    Load an Alternate Configuration File");
 			cprint("S");
-			cprint("Save Configuration to an Alternate File");
+			cprint("    Save Configuration to an Alternate File");
 		}
 		stat = exec_conf();
 		if (stat < 0)
@@ -484,6 +491,8 @@ static void conf(struct menu *menu)
 			case 't':
 				if (sym_is_choice(sym) && sym_get_tristate_value(sym) == yes)
 					conf_choice(submenu);
+				else if (submenu->prompt->type == P_MENU)
+					conf(submenu);
 				break;
 			case 's':
 				conf_string(submenu);

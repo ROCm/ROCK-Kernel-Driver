@@ -20,7 +20,8 @@ enum phb_types {
 	phb_type_unknown    = 0x0,
 	phb_type_hypervisor = 0x1,
 	phb_type_python     = 0x10,
-	phb_type_speedwagon = 0x11
+	phb_type_speedwagon = 0x11,
+	phb_type_winnipeg   = 0x12
 };
 
 /*

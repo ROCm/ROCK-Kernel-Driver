@@ -21,6 +21,7 @@
 
 #define RTC_VERSION		"1.1"
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/types.h>

@@ -1,7 +1,7 @@
 /*
  *  linux/drivers/serial/acorn.c
  *
- *  Copyright (C) 1996-2002 Russell King.
+ *  Copyright (C) 1996-2003 Russell King.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -9,6 +9,8 @@
  */
 #include <linux/module.h>
 #include <linux/types.h>
+#include <linux/tty.h>
+#include <linux/serial_core.h>
 #include <linux/serial.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
@@ -16,6 +18,7 @@
 #include <linux/device.h>
 #include <linux/init.h>
 
+#include <asm/io.h>
 #include <asm/ecard.h>
 #include <asm/string.h>
 
@@ -24,36 +27,41 @@
 struct serial_card_type {
 	unsigned int	num_ports;
 	unsigned int	baud_base;
-	int		type;
-	int		speed;
-	int		offset[MAX_PORTS];
+	unsigned int	type;
+	unsigned int	offset[MAX_PORTS];
 };
 
 struct serial_card_info {
 	unsigned int	num_ports;
 	int		ports[MAX_PORTS];
-	unsigned long	base[MAX_PORTS];
 };
 
-static inline int serial_register_onedev(unsigned long port, int irq, unsigned int baud_base)
+static inline int
+serial_register_onedev(unsigned long baddr, void *vaddr, int irq, unsigned int baud_base)
 {
 	struct serial_struct req;
 
 	memset(&req, 0, sizeof(req));
-	req.baud_base = baud_base;
-	req.irq = irq;
-	req.port = port;
-	req.flags = 0;
+	req.irq			= irq;
+	req.flags		= UPF_AUTOPROBE | UPF_RESOURCES |
+				  UPF_SHARE_IRQ;
+	req.baud_base		= baud_base;
+	req.io_type		= UPIO_MEM;
+	req.iomem_base		= vaddr;
+	req.iomem_reg_shift	= 2;
+	req.iomap_base		= baddr;
 
 	return register_serial(&req);
 }
 
-static int __devinit serial_card_probe(struct expansion_card *ec, const struct ecard_id *id)
+static int __devinit
+serial_card_probe(struct expansion_card *ec, const struct ecard_id *id)
 {
 	struct serial_card_info *info;
 	struct serial_card_type *type = id->data;
-	unsigned long cardaddr, address;
-	int port;
+	unsigned long bus_addr;
+	unsigned char *virt_addr;
+	unsigned int port;
 
 	info = kmalloc(sizeof(struct serial_card_info), GFP_KERNEL);
 	if (!info)
@@ -64,20 +72,19 @@ static int __devinit serial_card_probe(struct expansion_card *ec, const struct e
 
 	ecard_set_drvdata(ec, info);
 
-	cardaddr = ecard_address(ec, type->type, type->speed);
+	bus_addr = ec->resource[type->type].start;
+	virt_addr = ioremap(bus_addr, ec->resource[type->type].end - bus_addr + 1);
+	if (!virt_addr) {
+		kfree(info);
+		return -ENOMEM;
+	}
 
 	for (port = 0; port < info->num_ports; port ++) {
-		address = cardaddr + type->offset[port];
+		unsigned long baddr = bus_addr + type->offset[port];
+		unsigned char *vaddr = virt_addr + type->offset[port];
 
-		info->ports[port] = -1;
-		info->base[port] = address;
-
-		if (!request_region(address, 8, "acornserial"))
-			continue;
-
-		info->ports[port] = serial_register_onedev(address, ec->irq, type->baud_base);
-		if (info->ports[port] < 0)
-			break;
+		info->ports[port] = serial_register_onedev(baddr, vaddr,
+						ec->irq, type->baud_base);
 	}
 
 	return 0;
@@ -90,12 +97,9 @@ static void __devexit serial_card_remove(struct expansion_card *ec)
 
 	ecard_set_drvdata(ec, NULL);
 
-	for (i = 0; i < info->num_ports; i++) {
-		if (info->ports[i] > 0) {
+	for (i = 0; i < info->num_ports; i++)
+		if (info->ports[i] > 0)
 			unregister_serial(info->ports[i]);
-			release_region(info->base[i], 8);
-		}
-	}
 
 	kfree(info);
 }
@@ -103,17 +107,15 @@ static void __devexit serial_card_remove(struct expansion_card *ec)
 static struct serial_card_type atomwide_type = {
 	.num_ports	= 3,
 	.baud_base	= 7372800 / 16,
-	.type		= ECARD_IOC,
-	.speed		= ECARD_SLOW,
-	.offset		= { 0xa00, 0x900, 0x800 },
+	.type		= ECARD_RES_IOCSLOW,
+	.offset		= { 0x2800, 0x2400, 0x2000 },
 };
 
 static struct serial_card_type serport_type = {
 	.num_ports	= 2,
 	.baud_base	= 3686400 / 16,
-	.type		= ECARD_IOC,
-	.speed		= ECARD_SLOW,
-	.offset		= { 0x800, 0x808 },
+	.type		= ECARD_RES_IOCSLOW,
+	.offset		= { 0x2000, 0x2020 },
 };
 
 static const struct ecard_id serial_cids[] = {
@@ -127,7 +129,8 @@ static struct ecard_driver serial_card_driver = {
 	.remove 	= __devexit_p(serial_card_remove),
 	.id_table	= serial_cids,
 	.drv = {
-		.name	= "acornserial",
+		.devclass	= &tty_devclass,
+		.name		= "8250_acorn",
 	},
 };
 
@@ -142,6 +145,7 @@ static void __exit serial_card_exit(void)
 }
 
 MODULE_AUTHOR("Russell King");
+MODULE_DESCRIPTION("Acorn 8250-compatible serial port expansion card driver");
 MODULE_LICENSE("GPL");
 
 module_init(serial_card_init);
