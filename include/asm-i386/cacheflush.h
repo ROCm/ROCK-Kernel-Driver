@@ -17,4 +17,9 @@
 void global_flush_tlb(void); 
 int change_page_attr(struct page *page, int numpages, pgprot_t prot);
 
+#ifdef CONFIG_DEBUG_PAGEALLOC
+/* internal debugging function */
+void kernel_map_pages(struct page *page, int numpages, int enable);
+#endif
+
 #endif /* _I386_CACHEFLUSH_H */

@@ -1085,9 +1085,9 @@ e100_xmit_frame(struct sk_buff *skb, struct net_device *dev)
 		goto exit1;
 	}
 
-	e100_prepare_xmit_buff(bdp, skb);
-
 	bdp->drv_stats.net_stats.tx_bytes += skb->len;
+
+	e100_prepare_xmit_buff(bdp, skb);
 
 	dev->trans_start = jiffies;
 

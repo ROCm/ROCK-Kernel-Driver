@@ -146,6 +146,7 @@ static struct file_operations ramfs_file_operations = {
 	.mmap		= generic_file_mmap,
 	.fsync		= simple_sync_file,
 	.sendfile	= generic_file_sendfile,
+	.llseek		= generic_file_llseek,
 };
 
 static struct inode_operations ramfs_file_inode_operations = {

@@ -339,9 +339,14 @@ static inline void set_page_zone(struct page *page, unsigned long zone_num)
 	page->flags |= zone_num << ZONE_SHIFT;
 }
 
-static inline void * lowmem_page_address(struct page *page)
+#ifndef CONFIG_DISCONTIGMEM
+/* The array of struct pages - for discontigmem use pgdat->lmem_map */
+extern struct page *mem_map;
+#endif
+
+static inline void *lowmem_page_address(struct page *page)
 {
-	return __va( ( (page - page_zone(page)->zone_mem_map)	+ page_zone(page)->zone_start_pfn) << PAGE_SHIFT);
+	return __va(page_to_pfn(page) << PAGE_SHIFT);
 }
 
 #if defined(CONFIG_HIGHMEM) && !defined(WANT_PAGE_VIRTUAL)
@@ -394,11 +399,6 @@ static inline int page_mapped(struct page *page)
 #define VM_FAULT_SIGBUS	0
 #define VM_FAULT_MINOR	1
 #define VM_FAULT_MAJOR	2
-
-#ifndef CONFIG_DISCONTIGMEM
-/* The array of struct pages - for discontigmem use pgdat->lmem_map */
-extern struct page *mem_map;
-#endif 
 
 extern void show_free_areas(void);
 
@@ -609,5 +609,13 @@ extern struct page * follow_page(struct mm_struct *mm, unsigned long address,
 		int write);
 extern int remap_page_range(struct vm_area_struct *vma, unsigned long from,
 		unsigned long to, unsigned long size, pgprot_t prot);
+
+#ifndef CONFIG_DEBUG_PAGEALLOC
+static inline void
+kernel_map_pages(struct page *page, int numpages, int enable)
+{
+}
+#endif
+
 #endif /* __KERNEL__ */
 #endif /* _LINUX_MM_H */
