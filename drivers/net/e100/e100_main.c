@@ -196,6 +196,7 @@ void e100_set_speed_duplex(struct e100_private *);
 char *e100_get_brand_msg(struct e100_private *);
 static u8 e100_pci_setup(struct pci_dev *, struct e100_private *);
 static u8 e100_sw_init(struct e100_private *);
+static void e100_tco_walkaround(struct e100_private *);
 static unsigned char e100_alloc_space(struct e100_private *);
 static void e100_dealloc_space(struct e100_private *);
 static int e100_alloc_tcb_pool(struct e100_private *);
@@ -213,7 +214,7 @@ u16 e100_eeprom_calculate_chksum(struct e100_private *adapter);
 
 static unsigned char e100_clr_cntrs(struct e100_private *);
 static unsigned char e100_load_microcode(struct e100_private *);
-static unsigned char e100_hw_init(struct e100_private *, u32);
+static unsigned char e100_hw_init(struct e100_private *);
 static unsigned char e100_setup_iaaddr(struct e100_private *, u8 *);
 static unsigned char e100_update_stats(struct e100_private *bdp);
 
@@ -1265,7 +1266,7 @@ e100_init(struct e100_private *bdp)
 	/* read NIC's part number */
 	e100_rd_pwa_no(bdp);
 
-	if (!e100_hw_init(bdp, PORT_SOFTWARE_RESET)) {
+	if (!e100_hw_init(bdp)) {
 		printk(KERN_ERR "e100: hw init failed\n");
 		return false;
 	}
@@ -1314,10 +1315,46 @@ e100_sw_init(struct e100_private *bdp)
 	return 1;
 }
 
+static void __devinit
+e100_tco_walkaround(struct e100_private *bdp)
+{
+	int i;
+
+	/* Do software reset */
+	e100_sw_reset(bdp, PORT_SOFTWARE_RESET);
+
+	/* Do a dummy LOAD CU BASE command. */
+	/* This gets us out of pre-driver to post-driver. */
+	e100_exec_cmplx(bdp, 0, SCB_CUC_LOAD_BASE);
+
+	/* Wait 20 msec for reset to take effect */
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout(HZ / 50);
+
+	/* disable interrupts since they are enabled */
+	/* after device reset                        */
+	e100_disable_clear_intr(bdp);
+
+	/* Wait for command to be cleared up to 1 sec */
+	for (i=0; i<1000; i++) {
+		if (!readb(&bdp->scb->scb_cmd_low))
+			break;
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(HZ / 1000);
+	}
+
+	/* Wait for TCO request bit in PMDR register to be clear */
+	for (i=0; i<500; i++) {
+		if (!(readb(&bdp->scb->scb_ext.d101m_scb.scb_pmdr) & BIT_1))
+			break;
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(HZ / 1000);
+	}
+}
+
 /**
  * e100_hw_init - initialized tthe hardware
  * @bdp: atapter's private data struct
- * @reset_cmd: s/w reset or selective reset
  *
  * This routine performs a reset on the adapter, and configures the adapter.
  * This includes configuring the 82557 LAN controller, validating and setting
@@ -1329,13 +1366,16 @@ e100_sw_init(struct e100_private *bdp)
  *      false - If the adapter failed initialization
  */
 unsigned char __devinit
-e100_hw_init(struct e100_private *bdp, u32 reset_cmd)
+e100_hw_init(struct e100_private *bdp)
 {
 	if (!e100_phy_init(bdp))
 		return false;
 
-	/* Issue a software reset to the e100 */
-	e100_sw_reset(bdp, reset_cmd);
+	e100_sw_reset(bdp, PORT_SELECTIVE_RESET);
+
+	/* Only 82559 or above needs TCO walkaround */
+	if (bdp->rev_id >= D101MA_REV_ID)
+		e100_tco_walkaround(bdp);
 
 	/* Load the CU BASE (set to 0, because we use linear mode) */
 	if (!e100_wait_exec_cmplx(bdp, 0, SCB_CUC_LOAD_BASE, 0))
