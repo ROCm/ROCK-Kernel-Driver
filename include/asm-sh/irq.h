@@ -218,7 +218,7 @@
 #define IRDA_IPR_POS	2
 #define IRDA_PRIORITY	3
 #elif defined(CONFIG_CPU_SUBTYPE_SH7750) || defined(CONFIG_CPU_SUBTYPE_SH7751) || \
-      defined(CONFIG_CPU_SUBTYPE_ST40STB1)
+      defined(CONFIG_CPU_SUBTYPE_ST40STB1) || defined(CONFIG_CPU_SUBTYPE_SH4_202)
 #define SCIF_ERI_IRQ	40
 #define SCIF_RXI_IRQ	41
 #define SCIF_BRI_IRQ	42
@@ -264,6 +264,8 @@
 #  define ONCHIP_NR_IRQS 72
 # elif defined(CONFIG_CPU_SUBTYPE_SH7760)
 #  define ONCHIP_NR_IRQS 110
+# elif defined(CONFIG_CPU_SUBTYPE_SH4_202)
+#  define ONCHIP_NR_IRQS 72
 # elif defined(CONFIG_CPU_SUBTYPE_ST40STB1)
 #  define ONCHIP_NR_IRQS 144
 # elif defined(CONFIG_CPU_SUBTYPE_SH7300)
@@ -545,7 +547,7 @@ extern int ipr_irq_demux(int irq);
 #endif /* CONFIG_CPU_SUBTYPE_SH7707 || CONFIG_CPU_SUBTYPE_SH7709 */
 
 #if defined(CONFIG_CPU_SUBTYPE_SH7750) || defined(CONFIG_CPU_SUBTYPE_SH7751) || \
-    defined(CONFIG_CPU_SUBTYPE_ST40STB1)
+    defined(CONFIG_CPU_SUBTYPE_ST40STB1) || defined(CONFIG_CPU_SUBTYPE_SH4_202)
 #define INTC_ICR        0xffd00000
 #define INTC_ICR_NMIL	(1<<15)
 #define INTC_ICR_MAI	(1<<14)
@@ -555,21 +557,26 @@ extern int ipr_irq_demux(int irq);
 #endif
 
 #ifdef CONFIG_CPU_SUBTYPE_ST40STB1
+
 #define INTC2_FIRST_IRQ 64
 #define NR_INTC2_IRQS 25
 
-#define INTC2_BASE0 0xfe080000
-#define INTC2_INTC2MODE  (INTC2_BASE0+0x80)
+#define INTC2_BASE	0xfe080000
+#define INTC2_INTC2MODE	(INTC2_BASE+0x80)
 
 #define INTC2_INTPRI_OFFSET	0x00
 #define INTC2_INTREQ_OFFSET	0x20
 #define INTC2_INTMSK_OFFSET	0x40
 #define INTC2_INTMSKCLR_OFFSET	0x60
 
-extern void make_intc2_irq(unsigned int irq,unsigned int addr,
-                           unsigned int group,int pos,int priority);
+void make_intc2_irq(unsigned int irq,
+		    unsigned int ipr_offset, unsigned int ipr_shift,
+		    unsigned int msk_offset, unsigned int msk_shift,
+		    unsigned int priority);
+void init_IRQ_intc2(void);
+void intc2_add_clear_irq(int irq, int (*fn)(int));
 
-#endif
+#endif	/* CONFIG_CPU_SUBTYPE_ST40STB1 */
 
 static inline int generic_irq_demux(int irq)
 {
@@ -582,5 +589,9 @@ static inline int generic_irq_demux(int irq)
 struct irqaction;
 struct pt_regs;
 int handle_IRQ_event(unsigned int, struct pt_regs *, struct irqaction *);
+
+#if defined(CONFIG_CPU_SUBTYPE_SH73180)
+#include <asm/irq-sh73180.h>
+#endif
 
 #endif /* __ASM_SH_IRQ_H */

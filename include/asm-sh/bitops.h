@@ -212,7 +212,7 @@ static __inline__ unsigned long __ffs(unsigned long word)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-static __inline__ unsigned long find_next_bit(unsigned long *addr,
+static __inline__ unsigned long find_next_bit(const unsigned long *addr,
 	unsigned long size, unsigned long offset)
 {
 	unsigned int *p = ((unsigned int *) addr) + (offset >> 5);

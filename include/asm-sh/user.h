@@ -1,8 +1,6 @@
 #ifndef __ASM_SH_USER_H
 #define __ASM_SH_USER_H
 
-#include <linux/types.h>
-#include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>
 
