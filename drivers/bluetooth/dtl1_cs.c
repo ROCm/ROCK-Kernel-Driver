@@ -520,6 +520,8 @@ int dtl1_open(dtl1_info_t *info)
 	hdev->destruct = dtl1_hci_destruct;
 	hdev->ioctl = dtl1_hci_ioctl;
 
+	hdev->owner = THIS_MODULE;
+	
 	if (hci_register_dev(hdev) < 0) {
 		printk(KERN_WARNING "dtl1_cs: Can't register HCI device %s.\n", hdev->name);
 		return -ENODEV;
@@ -747,8 +749,6 @@ void dtl1_config(dev_link_t *link)
 		goto failed;
 	}
 
-	MOD_INC_USE_COUNT;
-
 	if (dtl1_open(info) != 0)
 		goto failed;
 
@@ -773,8 +773,6 @@ void dtl1_release(u_long arg)
 
 	if (link->state & DEV_PRESENT)
 		dtl1_close(info);
-
-	MOD_DEC_USE_COUNT;
 
 	link->dev = NULL;
 

@@ -317,7 +317,7 @@ static inline void avoid_irq_share(struct pnp_dev *dev)
 {
 	unsigned int map = 0x1FF8;
 	struct pnp_irq *irq;
-	struct pnp_resources *res = dev->res;
+	struct pnp_resources *res = dev->possible;
 
 	serial8250_get_irq_map(&map);
 
@@ -357,10 +357,10 @@ static int __devinit check_name(char *name)
  */
 static int serial_pnp_guess_board(struct pnp_dev *dev, int *flags)
 {
-	struct pnp_resources *res = dev->res;
+	struct pnp_resources *res = dev->possible;
 	struct pnp_resources *resa;
 
-	if (!(check_name(dev->name) || (dev->card && check_name(dev->card->name))))
+	if (!(check_name(dev->dev.name) || (dev->card && check_name(dev->card->dev.name))))
 		return -ENODEV;
 
 	if (!res)

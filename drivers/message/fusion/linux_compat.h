@@ -270,6 +270,13 @@ static __inline__ int __get_order(unsigned long size)
 #define mptscsih_sync_irq(_irq) synchronize_irq()
 #endif
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,58)
+#define mpt_inc_use_count()
+#define mpt_dec_use_count()
+#else
+#define mpt_inc_use_count() MOD_INC_USE_COUNT
+#define mpt_dec_use_count() MOD_DEC_USE_COUNT
+#endif
 
 
 /*}-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/

@@ -39,14 +39,13 @@
 static int __devinit
 pbus_assign_resources_sorted(struct pci_bus *bus)
 {
-	struct list_head *ln;
+	struct pci_dev *dev;
 	struct resource *res;
 	struct resource_list head, *list, *tmp;
 	int idx, found_vga = 0;
 
 	head.next = NULL;
-	for (ln=bus->devices.next; ln != &bus->devices; ln=ln->next) {
-		struct pci_dev *dev = pci_dev_b(ln);
+	list_for_each_entry(dev, &bus->devices, bus_list) {
 		u16 class = dev->class >> 8;
 
 		if (class == PCI_CLASS_DISPLAY_VGA
@@ -201,15 +200,14 @@ pci_bridge_check_ranges(struct pci_bus *bus)
 static void __devinit
 pbus_size_io(struct pci_bus *bus)
 {
-	struct list_head *ln;
+	struct pci_dev *dev;
 	struct resource *b_res = bus->resource[0];
 	unsigned long size = 0, size1 = 0;
 
 	if (!(b_res->flags & IORESOURCE_IO))
 		return;
 
-	for (ln=bus->devices.next; ln != &bus->devices; ln=ln->next) {
-		struct pci_dev *dev = pci_dev_b(ln);
+	list_for_each_entry(dev, &bus->devices, bus_list) {
 		int i;
 		
 		for (i = 0; i < PCI_NUM_RESOURCES; i++) {
@@ -250,7 +248,7 @@ pbus_size_io(struct pci_bus *bus)
 static void __devinit
 pbus_size_mem(struct pci_bus *bus, unsigned long mask, unsigned long type)
 {
-	struct list_head *ln;
+	struct pci_dev *dev;
 	unsigned long min_align, align, size;
 	unsigned long aligns[12];	/* Alignments from 1Mb to 2Gb */
 	int order, max_order;
@@ -261,8 +259,7 @@ pbus_size_mem(struct pci_bus *bus, unsigned long mask, unsigned long type)
 	max_order = 0;
 	size = 0;
 
-	for (ln=bus->devices.next; ln != &bus->devices; ln=ln->next) {
-		struct pci_dev *dev = pci_dev_b(ln);
+	list_for_each_entry(dev, &bus->devices, bus_list) {
 		int i;
 		
 		for (i = 0; i < PCI_NUM_RESOURCES; i++) {
@@ -322,11 +319,12 @@ pbus_size_mem(struct pci_bus *bus, unsigned long mask, unsigned long type)
 void __devinit
 pci_bus_size_bridges(struct pci_bus *bus)
 {
-	struct list_head *ln;
+	struct pci_bus *b;
 	unsigned long mask, type;
 
-	for (ln=bus->children.next; ln != &bus->children; ln=ln->next)
-		pci_bus_size_bridges(pci_bus_b(ln));
+	list_for_each_entry(b, &bus->children, node) {
+		pci_bus_size_bridges(b);
+	}
 
 	/* The root bus? */
 	if (!bus->self)
@@ -350,20 +348,16 @@ EXPORT_SYMBOL(pci_bus_size_bridges);
 void __devinit
 pci_bus_assign_resources(struct pci_bus *bus)
 {
-	struct list_head *ln;
+	struct pci_bus *b;
 	int found_vga = pbus_assign_resources_sorted(bus);
 
 	if (found_vga) {
-		struct pci_bus *b;
-
 		/* Propagate presence of the VGA to upstream bridges */
 		for (b = bus; b->parent; b = b->parent) {
 			b->resource[0]->flags |= IORESOURCE_BUS_HAS_VGA;
 		}
 	}
-	for (ln=bus->children.next; ln != &bus->children; ln=ln->next) {
-		struct pci_bus *b = pci_bus_b(ln);
-
+	list_for_each_entry(b, &bus->children, node) {
 		pci_bus_assign_resources(b);
 		pci_setup_bridge(b);
 	}

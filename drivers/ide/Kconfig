@@ -239,14 +239,13 @@ config BLK_DEV_CMD640_ENHANCED
 	  and your BIOS does not already do this for you, then say Y here.
 	  Otherwise say N.
 
-config BLK_DEV_ISAPNP
-	bool "ISA-PNP EIDE support"
-	depends on BLK_DEV_IDE && ISAPNP
+config BLK_DEV_IDEPNP
+	bool "PNP EIDE support"
+	depends on BLK_DEV_IDE && PNP
 	help
-	  If you have an ISA EIDE card that is PnP (Plug and Play) and
-	  requires setup first before scanning for devices, say Y here.
-
-	  If unsure, say N.
+	  If you have a PnP (Plug and Play) compatible EIDE card and
+	  would like the kernel to automatically detect and activate
+	  it, say Y here.
 
 config BLK_DEV_IDEPCI
 	bool "PCI IDE chipset support" if PCI

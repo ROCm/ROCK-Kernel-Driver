@@ -1,8 +1,8 @@
 /*
- * resource.c - contains resource management algorithms
+ * resource.c - Contains functions for registering and analyzing resource information
  *
  * based on isapnp.c resource management (c) Jaroslav Kysela <perex@suse.cz>
- * Copyright 2002 Adam Belay <ambx1@neo.rr.com>
+ * Copyright 2003 Adam Belay <ambx1@neo.rr.com>
  *
  */
 
@@ -16,14 +16,7 @@
 #include <asm/dma.h>
 #include <asm/irq.h>
 #include <linux/ioport.h>
-#include <linux/config.h>
 #include <linux/init.h>
-
-#ifdef CONFIG_PNP_DEBUG
-	#define DEBUG
-#else
-	#undef DEBUG
-#endif
 
 #include <linux/pnp.h>
 #include "base.h"
@@ -36,7 +29,9 @@ int pnp_reserve_io[16] = { [0 ... 15] = -1 };	/* reserve (don't use) some I/O re
 int pnp_reserve_mem[16] = { [0 ... 15] = -1 };	/* reserve (don't use) some memory region */
 
 
-/* resource information adding functions */
+/*
+ * possible resource registration
+ */
 
 struct pnp_resources * pnp_build_resource(struct pnp_dev *dev, int dependent)
 {
@@ -45,8 +40,8 @@ struct pnp_resources * pnp_build_resource(struct pnp_dev *dev, int dependent)
 	res = pnp_alloc(sizeof(struct pnp_resources));
 	if (!res)
 		return NULL;
-	ptr = dev->res;
-	if (ptr && ptr->dependent && dependent) { /* add to another list */
+	ptr = dev->possible;
+	if (ptr) { /* add to another list */
 		ptra = ptr->dep;
 		while (ptra && ptra->dep)
 			ptra = ptra->dep;
@@ -54,24 +49,14 @@ struct pnp_resources * pnp_build_resource(struct pnp_dev *dev, int dependent)
 			ptr->dep = res;
 		else
 			ptra->dep = res;
-	} else {
-		if (!ptr){
-			dev->res = res;
-		}
-		else{
-			kfree(res);
-			return NULL;
-		}
-	}
+	} else
+		dev->possible = res;
 	if (dependent) {
 		res->priority = dependent & 0xff;
 		if (res->priority > PNP_RES_PRIORITY_FUNCTIONAL)
 			res->priority = PNP_RES_PRIORITY_INVALID;
-		res->dependent = 1;
-	} else {
+	} else
 		res->priority = PNP_RES_PRIORITY_PREFERRED;
-		res->dependent = 1;
-	}
 	return res;
 }
 
@@ -81,7 +66,7 @@ struct pnp_resources * pnp_find_resources(struct pnp_dev *dev, int depnum)
 	struct pnp_resources *res;
 	if (!dev)
 		return NULL;
-	res = dev->res;
+	res = dev->possible;
 	if (!res)
 		return NULL;
 	for (i = 0; i < depnum; i++)
@@ -100,7 +85,7 @@ int pnp_get_max_depnum(struct pnp_dev *dev)
 	struct pnp_resources *res;
 	if (!dev)
 		return -EINVAL;
-	res = dev->res;
+	res = dev->possible;
 	if (!res)
 		return -EINVAL;
 	while (res->dep){
@@ -109,10 +94,6 @@ int pnp_get_max_depnum(struct pnp_dev *dev)
 	}
 	return num;
 }
-
-/*
- *  Add IRQ resource to resources list.
- */
 
 int pnp_add_irq_resource(struct pnp_dev *dev, int depnum, struct pnp_irq *data)
 {
@@ -139,10 +120,6 @@ int pnp_add_irq_resource(struct pnp_dev *dev, int depnum, struct pnp_irq *data)
 	return 0;
 }
 
-/*
- *  Add DMA resource to resources list.
- */
-
 int pnp_add_dma_resource(struct pnp_dev *dev, int depnum, struct pnp_dma *data)
 {
 	struct pnp_resources *res;
@@ -162,20 +139,15 @@ int pnp_add_dma_resource(struct pnp_dev *dev, int depnum, struct pnp_dma *data)
 	return 0;
 }
 
-/*
- *  Add port resource to resources list.
- */
-
 int pnp_add_port_resource(struct pnp_dev *dev, int depnum, struct pnp_port *data)
 {
 	struct pnp_resources *res;
 	struct pnp_port *ptr;
 	res = pnp_find_resources(dev,depnum);
-	if (res==NULL)
+	if (!res)
 		return -EINVAL;
 	if (!data)
 		return -EINVAL;
-	data->res = res;
 	ptr = res->port;
 	while (ptr && ptr->next)
 		ptr = ptr->next;
@@ -185,10 +157,6 @@ int pnp_add_port_resource(struct pnp_dev *dev, int depnum, struct pnp_port *data
 		res->port = data;
 	return 0;
 }
-
-/*
- *  Add memory resource to resources list.
- */
 
 int pnp_add_mem_resource(struct pnp_dev *dev, int depnum, struct pnp_mem *data)
 {
@@ -208,32 +176,6 @@ int pnp_add_mem_resource(struct pnp_dev *dev, int depnum, struct pnp_mem *data)
 		res->mem = data;
 	return 0;
 }
-
-/*
- *  Add 32-bit memory resource to resources list.
- */
-
-int pnp_add_mem32_resource(struct pnp_dev *dev, int depnum, struct pnp_mem32 *data)
-{
-	struct pnp_resources *res;
-	struct pnp_mem32 *ptr;
-	res = pnp_find_resources(dev,depnum);
-	if (!res)
-		return -EINVAL;
-	if (!data)
-		return -EINVAL;
-	ptr = res->mem32;
-	while (ptr && ptr->next)
-		ptr = ptr->next;
-	if (ptr)
-		ptr->next = data;
-	else
-		res->mem32 = data;
-	return 0;
-}
-
-
-/* resource removing functions */
 
 static void pnp_free_port(struct pnp_port *port)
 {
@@ -279,17 +221,6 @@ static void pnp_free_mem(struct pnp_mem *mem)
 	}
 }
 
-static void pnp_free_mem32(struct pnp_mem32 *mem32)
-{
-	struct pnp_mem32 *next;
-
-	while (mem32) {
-		next = mem32->next;
-		kfree(mem32);
-		mem32 = next;
-	}
-}
-
 void pnp_free_resources(struct pnp_resources *resources)
 {
 	struct pnp_resources *next;
@@ -300,597 +231,449 @@ void pnp_free_resources(struct pnp_resources *resources)
 		pnp_free_irq(resources->irq);
 		pnp_free_dma(resources->dma);
 		pnp_free_mem(resources->mem);
-		pnp_free_mem32(resources->mem32);
 		kfree(resources);
 		resources = next;
 	}
 }
 
 
-/* resource validity checking functions */
+/*
+ * resource validity checking
+ */
 
-static int pnp_check_port(int port, int size, int idx, struct pnp_cfg *config)
+#define length(start, end) (*(end) - *(start) + 1)
+
+/* ranged_conflict - used to determine if two resource ranges conflict
+ * condition 1: check if the start of a is within b
+ * condition 2: check if the end of a is within b
+ * condition 3: check if b is engulfed by a */
+
+#define ranged_conflict(starta, enda, startb, endb) \
+((*(starta) >= *(startb) && *(starta) <= *(endb)) || \
+ (*(enda) >= *(startb) && *(enda) <= *(endb)) || \
+ (*(starta) < *(startb) && *(enda) > *(endb)))
+
+struct pnp_dev * pnp_check_port_conflicts(struct pnp_dev * dev, int idx, int mode)
 {
-	int i, tmp, rport, rsize;
-	struct pnp_dev *dev;
+	int tmp;
+	unsigned long *port, *end, *tport, *tend;
+	struct pnp_dev *tdev;
+	port = &dev->res.port_resource[idx].start;
+	end = &dev->res.port_resource[idx].end;
 
-	if (check_region(port, size))
-		return 1;
-	for (i = 0; i < 8; i++) {
-		rport = pnp_reserve_io[i << 1];
-		rsize = pnp_reserve_io[(i << 1) + 1];
-		if (port >= rport && port < rport + rsize)
-			return 1;
-		if (port + size > rport && port + size < (rport + rsize) - 1)
-			return 1;
-	}
+	/* if the resource doesn't exist, don't complain about it */
+	if (dev->res.port_resource[idx].start == 0)
+		return NULL;
 
-	pnp_for_each_dev(dev) {
-		if (dev->active) {
-			for (tmp = 0; tmp < 8; tmp++) {
-				if (pnp_port_valid(dev, tmp)) {
-					rport = pnp_port_start(dev, tmp);
-					rsize = pnp_port_len(dev, tmp);
-					if (port >= rport && port < rport + rsize)
-						return 1;
-					if (port + size > rport && port + size < (rport + rsize) - 1)
-						return 1;
-				}
+	/* check for cold conflicts */
+	pnp_for_each_dev(tdev) {
+		/* Is the device configurable? */
+		if (tdev == dev || (mode ? !dev->active : dev->active))
+			continue;
+		for (tmp = 0; tmp < PNP_MAX_PORT; tmp++) {
+			if (tdev->res.port_resource[tmp].flags & IORESOURCE_IO) {
+				tport = &tdev->res.port_resource[tmp].start;
+				tend = &tdev->res.port_resource[tmp].end;
+				if (ranged_conflict(port,end,tport,tend))
+					return tdev;
 			}
 		}
 	}
-	for (tmp = 0; tmp < 8 && tmp != idx; tmp++) {
-		if (pnp_port_valid(dev, tmp) &&
-		    pnp_flags_valid(&config->request.io_resource[tmp])) {
-			rport = config->request.io_resource[tmp].start;
-			rsize = (config->request.io_resource[tmp].end - rport) + 1;
-			if (port >= rport && port < rport + rsize)
-				return 1;
-			if (port + size > rport && port + size < (rport + rsize) - 1)
-				return 1;
+	return NULL;
+}
+
+int pnp_check_port(struct pnp_dev * dev, int idx)
+{
+	int tmp;
+	unsigned long *port, *end, *tport, *tend;
+	port = &dev->res.port_resource[idx].start;
+	end = &dev->res.port_resource[idx].end;
+
+	/* if the resource doesn't exist, don't complain about it */
+	if (dev->res.port_resource[idx].start == 0)
+		return 0;
+
+	/* check if the resource is already in use, skip if the device is active because it itself may be in use */
+	if(!dev->active) {
+		if (check_region(*port, length(port,end)))
+			return CONFLICT_TYPE_IN_USE;
+	}
+
+	/* check if the resource is reserved */
+	for (tmp = 0; tmp < 8; tmp++) {
+		int rport = pnp_reserve_io[tmp << 1];
+		int rend = pnp_reserve_io[(tmp << 1) + 1] + rport - 1;
+		if (ranged_conflict(port,end,&rport,&rend))
+			return CONFLICT_TYPE_RESERVED;
+	}
+
+	/* check for internal conflicts */
+	for (tmp = 0; tmp < PNP_MAX_PORT && tmp != idx; tmp++) {
+		if (dev->res.port_resource[tmp].flags & IORESOURCE_IO) {
+			tport = &dev->res.port_resource[tmp].start;
+			tend = &dev->res.port_resource[tmp].end;
+			if (ranged_conflict(port,end,tport,tend))
+				return CONFLICT_TYPE_INTERNAL;
 		}
 	}
+
+	/* check for warm conflicts */
+	if (pnp_check_port_conflicts(dev, idx, SEARCH_WARM))
+		return CONFLICT_TYPE_PNP_WARM;
+
 	return 0;
 }
 
-static int pnp_check_mem(unsigned int addr, unsigned int size, int idx, struct pnp_cfg *config)
+struct pnp_dev * pnp_check_mem_conflicts(struct pnp_dev * dev, int idx, int mode)
 {
-	int i, tmp;
-	unsigned int raddr, rsize;
-	struct pnp_dev *dev;
+	int tmp;
+	unsigned long *addr, *end, *taddr, *tend;
+	struct pnp_dev *tdev;
+	addr = &dev->res.mem_resource[idx].start;
+	end = &dev->res.mem_resource[idx].end;
 
-	for (i = 0; i < 8; i++) {
-		raddr = (unsigned int)pnp_reserve_mem[i << 1];
-		rsize = (unsigned int)pnp_reserve_mem[(i << 1) + 1];
-		if (addr >= raddr && addr < raddr + rsize)
-			return 1;
-		if (addr + size > raddr && addr + size < (raddr + rsize) - 1)
-			return 1;
-		if (__check_region(&iomem_resource, addr, size))
-			return 1;
-	}
-	pnp_for_each_dev(dev) {
-		if (dev->active) {
-			for (tmp = 0; tmp < 4; tmp++) {
-				if (pnp_mem_valid(dev, tmp)) {
-					raddr = pnp_mem_start(dev, tmp);
-					rsize = pnp_mem_len(dev, tmp);
-					if (addr >= raddr && addr < raddr + rsize)
-						return 1;
-					if (addr + size > raddr && addr + size < (raddr + rsize) - 1)
-						return 1;
-				}
+	/* if the resource doesn't exist, don't complain about it */
+	if (dev->res.mem_resource[idx].start == 0)
+		return NULL;
+
+	/* check for cold conflicts */
+	pnp_for_each_dev(tdev) {
+		/* Is the device configurable? */
+		if (tdev == dev || (mode ? !dev->active : dev->active))
+			continue;
+		for (tmp = 0; tmp < PNP_MAX_MEM; tmp++) {
+			if (tdev->res.mem_resource[tmp].flags & IORESOURCE_MEM) {
+				taddr = &tdev->res.mem_resource[tmp].start;
+				tend = &tdev->res.mem_resource[tmp].end;
+				if (ranged_conflict(addr,end,taddr,tend))
+					return tdev;
 			}
 		}
 	}
-	for (tmp = 0; tmp < 4 && tmp != idx; tmp++) {
-		if (pnp_mem_valid(dev, tmp) &&
-		    pnp_flags_valid(&config->request.mem_resource[tmp])) {
-			raddr = config->request.mem_resource[tmp].start;
-			rsize = (config->request.mem_resource[tmp].end - raddr) + 1;
-			if (addr >= raddr && addr < raddr + rsize)
-				return 1;
-			if (addr + size > raddr && addr + size < (raddr + rsize) - 1)
-				return 1;
+	return NULL;
+}
+
+int pnp_check_mem(struct pnp_dev * dev, int idx)
+{
+	int tmp;
+	unsigned long *addr, *end, *taddr, *tend;
+	addr = &dev->res.mem_resource[idx].start;
+	end = &dev->res.mem_resource[idx].end;
+
+	/* if the resource doesn't exist, don't complain about it */
+	if (dev->res.mem_resource[idx].start == 0)
+		return 0;
+
+	/* check if the resource is already in use, skip if the device is active because it itself may be in use */
+	if(!dev->active) {
+		if (__check_region(&iomem_resource, *addr, length(addr,end)))
+			return CONFLICT_TYPE_IN_USE;
+	}
+
+	/* check if the resource is reserved */
+	for (tmp = 0; tmp < 8; tmp++) {
+		int raddr = pnp_reserve_mem[tmp << 1];
+		int rend = pnp_reserve_mem[(tmp << 1) + 1] + raddr - 1;
+		if (ranged_conflict(addr,end,&raddr,&rend))
+			return CONFLICT_TYPE_RESERVED;
+	}
+
+	/* check for internal conflicts */
+	for (tmp = 0; tmp < PNP_MAX_MEM && tmp != idx; tmp++) {
+		if (dev->res.mem_resource[tmp].flags & IORESOURCE_MEM) {
+			taddr = &dev->res.mem_resource[tmp].start;
+			tend = &dev->res.mem_resource[tmp].end;
+			if (ranged_conflict(addr,end,taddr,tend))
+				return CONFLICT_TYPE_INTERNAL;
 		}
 	}
+
+	/* check for warm conflicts */
+	if (pnp_check_mem_conflicts(dev, idx, SEARCH_WARM))
+		return CONFLICT_TYPE_PNP_WARM;
+
 	return 0;
+}
+
+struct pnp_dev * pnp_check_irq_conflicts(struct pnp_dev * dev, int idx, int mode)
+{
+	int tmp;
+	struct pnp_dev * tdev;
+	unsigned long * irq = &dev->res.irq_resource[idx].start;
+
+	/* if the resource doesn't exist, don't complain about it */
+	if (dev->res.irq_resource[idx].start == -1)
+		return NULL;
+
+	/* check for cold conflicts */
+	pnp_for_each_dev(tdev) {
+		/* Is the device configurable? */
+		if (tdev == dev || (mode ? !dev->active : dev->active))
+			continue;
+		for (tmp = 0; tmp < PNP_MAX_IRQ; tmp++) {
+			if (tdev->res.irq_resource[tmp].flags & IORESOURCE_IRQ) {
+				if ((tdev->res.irq_resource[tmp].start == *irq))
+					return tdev;
+			}
+		}
+	}
+	return NULL;
 }
 
 static void pnp_test_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
 }
 
-static int pnp_check_interrupt(int irq, struct pnp_cfg *config)
+int pnp_check_irq(struct pnp_dev * dev, int idx)
 {
-	int i;
-#ifdef CONFIG_PCI
-	struct pci_dev *pci;
-#endif
-	struct pnp_dev *dev;
-	if (!config)
-		return 1;
+	int tmp;
+	unsigned long * irq = &dev->res.irq_resource[idx].start;
 
-	if (irq < 0 || irq > 15)
-		return 1;
-	for (i = 0; i < 16; i++) {
-		if (pnp_reserve_irq[i] == irq)
-			return 1;
+	/* if the resource doesn't exist, don't complain about it */
+	if (dev->res.irq_resource[idx].start == -1)
+		return 0;
+
+	/* check if the resource is valid */
+	if (*irq < 0 || *irq > 15)
+		return CONFLICT_TYPE_INVALID;
+
+	/* check if the resource is reserved */
+	for (tmp = 0; tmp < 16; tmp++) {
+		if (pnp_reserve_irq[tmp] == *irq)
+			return CONFLICT_TYPE_RESERVED;
 	}
-	pnp_for_each_dev(dev) {
-		if (dev->active) {
-			if ((pnp_irq_valid(dev, 0) && dev->irq_resource[0].start == irq) ||
-			    (pnp_irq_valid(dev, 1) && dev->irq_resource[1].start == irq))
-				return 1;
+
+	/* check for internal conflicts */
+	for (tmp = 0; tmp < PNP_MAX_IRQ && tmp != idx; tmp++) {
+		if (dev->res.irq_resource[tmp].flags & IORESOURCE_IRQ) {
+			if (dev->res.irq_resource[tmp].start == *irq)
+				return CONFLICT_TYPE_INTERNAL;
 		}
 	}
-	if (pnp_flags_valid(&config->request.irq_resource[0]) &&
-	    pnp_flags_valid(&config->request.irq_resource[1]) &&
-	    (config->request.irq_resource[0].start == irq))
-		return 1;
+
 #ifdef CONFIG_PCI
+	/* check if the resource is being used by a pci device */
 	if (!pnp_skip_pci_scan) {
+		struct pci_dev * pci;
 		pci_for_each_dev(pci) {
-			if (pci->irq == irq)
-				return 1;
+			if (pci->irq == *irq)
+				return CONFLICT_TYPE_PCI;
 		}
 	}
 #endif
-	if (request_irq(irq, pnp_test_handler, SA_INTERRUPT, "pnp", NULL))
-		return 1;
-	free_irq(irq, NULL);
+
+	/* check if the resource is already in use, skip if the device is active because it itself may be in use */
+	if(!dev->active) {
+		if (request_irq(*irq, pnp_test_handler, SA_INTERRUPT, "pnp", NULL))
+			return CONFLICT_TYPE_IN_USE;
+		free_irq(*irq, NULL);
+	}
+
+	/* check for warm conflicts */
+	if (pnp_check_irq_conflicts(dev, idx, SEARCH_WARM))
+		return CONFLICT_TYPE_PNP_WARM;
+
 	return 0;
 }
 
-static int pnp_check_dma(int dma, struct pnp_cfg *config)
-{
-	int i, mindma = 1;
-	struct pnp_dev *dev;
-	if (!config)
-		return 1;
 
+struct pnp_dev * pnp_check_dma_conflicts(struct pnp_dev * dev, int idx, int mode)
+{
+	int tmp;
+	struct pnp_dev * tdev;
+	unsigned long * dma = &dev->res.dma_resource[idx].start;
+
+	/* if the resource doesn't exist, don't complain about it */
+	if (dev->res.dma_resource[idx].start == -1)
+		return NULL;
+
+	/* check for cold conflicts */
+	pnp_for_each_dev(tdev) {
+		/* Is the device configurable? */
+		if (tdev == dev || (mode ? !dev->active : dev->active))
+			continue;
+		for (tmp = 0; tmp < PNP_MAX_DMA; tmp++) {
+			if (tdev->res.dma_resource[tmp].flags & IORESOURCE_DMA) {
+				if ((tdev->res.dma_resource[tmp].start == *dma))
+					return tdev;
+			}
+		}
+	}
+	return NULL;
+}
+
+int pnp_check_dma(struct pnp_dev * dev, int idx)
+{
+	int tmp, mindma = 1;
+	unsigned long * dma = &dev->res.dma_resource[idx].start;
+
+	/* if the resource doesn't exist, don't complain about it */
+	if (dev->res.dma_resource[idx].start == -1)
+		return 0;
+
+	/* check if the resource is valid */
 	if (pnp_allow_dma0 == 1)
 		mindma = 0;
-	if (dma < mindma || dma == 4 || dma > 7)
-		return 1;
-	for (i = 0; i < 8; i++) {
-		if (pnp_reserve_dma[i] == dma)
-			return 1;
+	if (*dma < mindma || *dma == 4 || *dma > 7)
+		return CONFLICT_TYPE_INVALID;
+
+	/* check if the resource is reserved */
+	for (tmp = 0; tmp < 8; tmp++) {
+		if (pnp_reserve_dma[tmp] == *dma)
+			return CONFLICT_TYPE_RESERVED;
 	}
-	pnp_for_each_dev(dev) {
-		if (dev->active) {
-			if ((pnp_dma_valid(dev, 0) && pnp_dma(dev, 0) == dma) ||
-			    (pnp_dma_valid(dev, 1) && pnp_dma(dev, 1) == dma))
-				return 1;
+
+	/* check for internal conflicts */
+	for (tmp = 0; tmp < PNP_MAX_DMA && tmp != idx; tmp++) {
+		if (dev->res.dma_resource[tmp].flags & IORESOURCE_DMA) {
+			if (dev->res.dma_resource[tmp].start == *dma)
+				return CONFLICT_TYPE_INTERNAL;
 		}
 	}
-	if (pnp_flags_valid(&config->request.dma_resource[0]) &&
-	    pnp_flags_valid(&config->request.dma_resource[1]) &&
-	    (config->request.dma_resource[0].start == dma))
-		return 1;
-	if (request_dma(dma, "pnp"))
-		return 1;
-	free_dma(dma);
+
+	/* check if the resource is already in use, skip if the device is active because it itself may be in use */
+	if(!dev->active) {
+		if (request_dma(*dma, "pnp"))
+			return CONFLICT_TYPE_IN_USE;
+		free_dma(*dma);
+	}
+
+	/* check for warm conflicts */
+	if (pnp_check_dma_conflicts(dev, idx, SEARCH_WARM))
+		return CONFLICT_TYPE_PNP_WARM;
 	return 0;
 }
 
 
-/* config generation functions */
-static int pnp_generate_port(struct pnp_cfg *config, int num)
-{
-	struct pnp_port *port;
-	unsigned long *value1, *value2, *value3;
-	if (!config || num < 0 || num > 7)
-		return -EINVAL;
-	port = config->port[num];
-	if (!port)
-		return 0;
-	value1 = &config->request.io_resource[num].start;
-	value2 = &config->request.io_resource[num].end;
-	value3 = &config->request.io_resource[num].flags;
-	*value1 = port->min;
-	*value2 = *value1 + port->size - 1;
-	*value3 = port->flags | IORESOURCE_IO;
-	while (pnp_check_port(*value1, port->size, num, config)) {
-		*value1 += port->align;
-		*value2 = *value1 + port->size - 1;
-		if (*value1 > port->max || !port->align)
-			return -ENOENT;
-	}
-	return 0;
-}
+/**
+ * pnp_init_resource_table - Resets a resource table to default values.
+ * @table: pointer to the desired resource table
+ *
+ */
 
-static int pnp_generate_mem(struct pnp_cfg *config, int num)
-{
-	struct pnp_mem *mem;
-	unsigned long *value1, *value2, *value3;
-	if (!config || num < 0 || num > 3)
-		return -EINVAL;
-	mem = config->mem[num];
-	if (!mem)
-		return 0;
-	value1 = &config->request.mem_resource[num].start;
-	value2 = &config->request.mem_resource[num].end;
-	value3 = &config->request.mem_resource[num].flags;
-	*value1 = mem->min;
-	*value2 = *value1 + mem->size - 1;
-	*value3 = mem->flags | IORESOURCE_MEM;
-	if (!(mem->flags & IORESOURCE_MEM_WRITEABLE))
-		*value3 |= IORESOURCE_READONLY;
-	if (mem->flags & IORESOURCE_MEM_CACHEABLE)
-		*value3 |= IORESOURCE_CACHEABLE;
-	if (mem->flags & IORESOURCE_MEM_RANGELENGTH)
-		*value3 |= IORESOURCE_RANGELENGTH;
-	if (mem->flags & IORESOURCE_MEM_SHADOWABLE)
-		*value3 |= IORESOURCE_SHADOWABLE;
-	while (pnp_check_mem(*value1, mem->size, num, config)) {
-		*value1 += mem->align;
-		*value2 = *value1 + mem->size - 1;
-		if (*value1 > mem->max || !mem->align)
-			return -ENOENT;
-	}
-	return 0;
-}
-
-static int pnp_generate_irq(struct pnp_cfg *config, int num)
-{
-	struct pnp_irq *irq;
-	unsigned long *value1, *value2, *value3;
-	/* IRQ priority: this table is good for i386 */
-	static unsigned short xtab[16] = {
-		5, 10, 11, 12, 9, 14, 15, 7, 3, 4, 13, 0, 1, 6, 8, 2
-	};
-	int i;
-	if (!config || num < 0 || num > 1)
-		return -EINVAL;
-	irq = config->irq[num];
-	if (!irq)
-		return 0;
-	value1 = &config->request.irq_resource[num].start;
-	value2 = &config->request.irq_resource[num].end;
-	value3 = &config->request.irq_resource[num].flags;
-	*value3 = irq->flags | IORESOURCE_IRQ;
-
-	for (i=0; i < 16; i++)
-	{
-		if(irq->map & (1<<xtab[i])) {
-		*value1 = *value2 = xtab[i];
-		if(pnp_check_interrupt(*value1,config)==0)
-			return 0;
-		}
-	}
-	return -ENOENT;
-}
-
-static int pnp_generate_dma(struct pnp_cfg *config, int num)
-{
-	struct pnp_dma *dma;
-	unsigned long *value1, *value2, *value3;
-	/* DMA priority: this table is good for i386 */
-	static unsigned short xtab[16] = {
-		1, 3, 5, 6, 7, 0, 2, 4
-	};
-	int i;
-	if (!config || num < 0 || num > 1)
-		return -EINVAL;
-	dma = config->dma[num];
-	if (!dma)
-		return 0;
-	value1 = &config->request.dma_resource[num].start;
-	value2 = &config->request.dma_resource[num].end;
-	value3 = &config->request.dma_resource[num].flags;
-	*value3 = dma->flags | IORESOURCE_DMA;
-
-	for (i=0; i < 8; i++)
-	{
-		if(dma->map & (1<<xtab[i])) {
-		*value1 = *value2 = xtab[i];
-		if(pnp_check_dma(*value1,config)==0)
-			return 0;
-		}
-	}
-	return -ENOENT;
-}
-
-int pnp_init_res_cfg(struct pnp_res_cfg *res_config)
+void pnp_init_resource_table(struct pnp_resource_table *table)
 {
 	int idx;
-
-	if (!res_config)
-		return -EINVAL;
-	for (idx = 0; idx < DEVICE_COUNT_IRQ; idx++) {
-		res_config->irq_resource[idx].start = -1;
-		res_config->irq_resource[idx].end = -1;
-		res_config->irq_resource[idx].flags = IORESOURCE_IRQ|IORESOURCE_UNSET;
+	for (idx = 0; idx < PNP_MAX_IRQ; idx++) {
+		table->irq_resource[idx].name = NULL;
+		table->irq_resource[idx].start = -1;
+		table->irq_resource[idx].end = -1;
+		table->irq_resource[idx].flags = 0;
 	}
-	for (idx = 0; idx < DEVICE_COUNT_DMA; idx++) {
-		res_config->dma_resource[idx].name = NULL;
-		res_config->dma_resource[idx].start = -1;
-		res_config->dma_resource[idx].end = -1;
-		res_config->dma_resource[idx].flags = IORESOURCE_DMA|IORESOURCE_UNSET;
+	for (idx = 0; idx < PNP_MAX_DMA; idx++) {
+		table->dma_resource[idx].name = NULL;
+		table->dma_resource[idx].start = -1;
+		table->dma_resource[idx].end = -1;
+		table->dma_resource[idx].flags = 0;
 	}
-	for (idx = 0; idx < DEVICE_COUNT_IO; idx++) {
-		res_config->io_resource[idx].name = NULL;
-		res_config->io_resource[idx].start = 0;
-		res_config->io_resource[idx].end = 0;
-		res_config->io_resource[idx].flags = IORESOURCE_IO|IORESOURCE_UNSET;
+	for (idx = 0; idx < PNP_MAX_PORT; idx++) {
+		table->port_resource[idx].name = NULL;
+		table->port_resource[idx].start = 0;
+		table->port_resource[idx].end = 0;
+		table->port_resource[idx].flags = 0;
 	}
-	for (idx = 0; idx < DEVICE_COUNT_MEM; idx++) {
-		res_config->mem_resource[idx].name = NULL;
-		res_config->mem_resource[idx].start = 0;
-		res_config->mem_resource[idx].end = 0;
-		res_config->mem_resource[idx].flags = IORESOURCE_MEM|IORESOURCE_UNSET;
+	for (idx = 0; idx < PNP_MAX_MEM; idx++) {
+		table->mem_resource[idx].name = NULL;
+		table->mem_resource[idx].start = 0;
+		table->mem_resource[idx].end = 0;
+		table->mem_resource[idx].flags = 0;
 	}
-	return 0;
-}
-
-static int pnp_prepare_request(struct pnp_dev *dev, struct pnp_cfg *config, struct pnp_res_cfg *template)
-{
-	int idx, err;
-	if (!config)
-		return -EINVAL;
-	if (dev->lock_resources)
-		return -EPERM;
-	if (dev->active)
-		return -EBUSY;
-	err = pnp_init_res_cfg(&config->request);
-	if (err < 0)
-		return err;
-	if (!template)
-		return 0;
-	for (idx = 0; idx < DEVICE_COUNT_IRQ; idx++)
-		if (pnp_flags_valid(&template->irq_resource[idx]))
-			config->request.irq_resource[idx] = template->irq_resource[idx];
-	for (idx = 0; idx < DEVICE_COUNT_DMA; idx++)
-		if (pnp_flags_valid(&template->dma_resource[idx]))
-			config->request.dma_resource[idx] = template->dma_resource[idx];
-	for (idx = 0; idx < DEVICE_COUNT_IO; idx++)
-		if (pnp_flags_valid(&template->io_resource[idx]))
-			config->request.io_resource[idx] = template->io_resource[idx];
-	for (idx = 0; idx < DEVICE_COUNT_MEM; idx++)
-		if (pnp_flags_valid(&template->io_resource[idx]))
-			config->request.mem_resource[idx] = template->mem_resource[idx];
-	return 0;
-}
-
-static int pnp_generate_request(struct pnp_dev *dev, struct pnp_cfg *config, struct pnp_res_cfg *template)
-{
-	int i, err;
-	if (!config)
-		return -EINVAL;
-	if ((err = pnp_prepare_request(dev, config, template))<0)
-		return err;
-	for (i=0; i<=7; i++)
-	{
-		if(pnp_generate_port(config,i)<0)
-			return -ENOENT;
-	}
-	for (i=0; i<=3; i++)
-	{
-		if(pnp_generate_mem(config,i)<0)
-			return -ENOENT;
-	}
-	for (i=0; i<=1; i++)
-	{
-		if(pnp_generate_irq(config,i)<0)
-			return -ENOENT;
-	}
-	for (i=0; i<=1; i++)
-	{
-		if(pnp_generate_dma(config,i)<0)
-			return -ENOENT;
-	}
-	return 0;
 }
 
 
+/**
+ * pnp_generate_rule - Creates a rule table structure based on depnum and device.
+ * @dev: pointer to the desired device
+ * @depnum: dependent function, if not valid will return an error
+ * @rule: pointer to a rule structure to record data to
+ *
+ */
 
-static struct pnp_cfg * pnp_generate_config(struct pnp_dev *dev, int depnum)
+int pnp_generate_rule(struct pnp_dev * dev, int depnum, struct pnp_rule_table * rule)
 {
-	struct pnp_cfg * config;
 	int nport = 0, nirq = 0, ndma = 0, nmem = 0;
 	struct pnp_resources * res;
 	struct pnp_port * port;
 	struct pnp_mem * mem;
 	struct pnp_irq * irq;
 	struct pnp_dma * dma;
-	if (!dev)
-		return NULL;
-	if (depnum < 0)
-		return NULL;
-	config = pnp_alloc(sizeof(struct pnp_cfg));
-	if (!config)
-		return NULL;
+
+	if (depnum < 0 || !rule)
+		return -EINVAL;
 
 	/* independent */
 	res = pnp_find_resources(dev, 0);
 	if (!res)
-		goto fail;
+		return -ENODEV;
 	port = res->port;
 	mem = res->mem;
 	irq = res->irq;
 	dma = res->dma;
 	while (port){
-		config->port[nport] = port;
+		rule->port[nport] = port;
 		nport++;
 		port = port->next;
 	}
 	while (mem){
-		config->mem[nmem] = mem;
+		rule->mem[nmem] = mem;
 		nmem++;
 		mem = mem->next;
 	}
 	while (irq){
-		config->irq[nirq] = irq;
+		rule->irq[nirq] = irq;
 		nirq++;
 		irq = irq->next;
 	}
 	while (dma){
-		config->dma[ndma] = dma;
+		rule->dma[ndma] = dma;
 		ndma++;
 		dma = dma->next;
 	}
 
 	/* dependent */
 	if (depnum == 0)
-		return config;
+		return 1;
 	res = pnp_find_resources(dev, depnum);
 	if (!res)
-		goto fail;
+		return -ENODEV;
 	port = res->port;
 	mem = res->mem;
 	irq = res->irq;
 	dma = res->dma;
 	while (port){
-		config->port[nport] = port;
+		rule->port[nport] = port;
 		nport++;
 		port = port->next;
 	}
 	while (mem){
-		config->mem[nmem] = mem;
+		rule->mem[nmem] = mem;
 		nmem++;
 		mem = mem->next;
 	}
 
 	while (irq){
-		config->irq[nirq] = irq;
+		rule->irq[nirq] = irq;
 		nirq++;
 		irq = irq->next;
 	}
 	while (dma){
-		config->dma[ndma] = dma;
+		rule->dma[ndma] = dma;
 		ndma++;
 		dma = dma->next;
 	}
-	return config;
 
-	fail:
-	kfree(config);
-	return NULL;
+	/* clear the remaining values */
+	for (; nport < PNP_MAX_PORT; nport++)
+		rule->port[nport] = NULL;
+	for (; nmem < PNP_MAX_MEM; nmem++)
+		rule->mem[nmem] = NULL;
+	for (; nirq < PNP_MAX_IRQ; nirq++)
+		rule->irq[nirq] = NULL;
+	for (; ndma < PNP_MAX_DMA; ndma++)
+		rule->dma[ndma] = NULL;
+	return 1;
 }
 
-/* PnP Device Resource Management */
-
-/**
- * pnp_activate_dev - activates a PnP device for use
- * @dev: pointer to the desired device
- *
- * finds the best resource configuration and then informs the correct pnp protocol
- */
-
-int pnp_activate_dev(struct pnp_dev *dev, struct pnp_res_cfg *template)
-{
-	int depnum, max;
-	struct pnp_cfg *config;
-	if (!dev)
-		return -EINVAL;
-        max = pnp_get_max_depnum(dev);
-	if (!pnp_can_configure(dev))
-		return -EBUSY;
-	if (dev->status != PNP_READY && dev->status != PNP_ATTACHED){
-		printk(KERN_INFO "pnp: Automatic configuration failed because the PnP device '%s' is busy\n", dev->dev.bus_id);
-		return -EINVAL;
-	}
-	if (!pnp_can_write(dev))
-		return -EINVAL;
-	if (max == 0)
-		return 0;
-	for (depnum=1; depnum <= max; depnum++)
-	{
-		config = pnp_generate_config(dev,depnum);
-		if (!config)
-			return -EINVAL;
-		if (pnp_generate_request(dev,config,template)==0)
-			goto done;
-		kfree(config);
-	}
-	printk(KERN_ERR "pnp: Automatic configuration failed for device '%s' due to resource conflicts\n", dev->dev.bus_id);
-	return -ENOENT;
-
-	done:
-	pnp_dbg("the device '%s' has been activated", dev->dev.bus_id);
-	dev->protocol->set(dev,config);
-	if (pnp_can_read(dev))
-		dev->protocol->get(dev);
-	kfree(config);
-	return 0;
-}
-
-/**
- * pnp_disable_dev - disables device
- * @dev: pointer to the desired device
- *
- * inform the correct pnp protocol so that resources can be used by other devices
- */
-
-int pnp_disable_dev(struct pnp_dev *dev)
-{
-        if (!dev)
-                return -EINVAL;
-	if (dev->status != PNP_READY){
-		printk(KERN_INFO "pnp: Disable failed becuase the PnP device '%s' is busy\n", dev->dev.bus_id);
-		return -EINVAL;
-	}
-	if (dev->lock_resources)
-		return -EPERM;
-	if (!pnp_can_disable(dev) || !dev->active)
-		return -EINVAL;
-	pnp_dbg("the device '%s' has been disabled", dev->dev.bus_id);
-	return dev->protocol->disable(dev);
-}
-
-/**
- * pnp_raw_set_dev - same as pnp_activate_dev except the resource config can be specified
- * @dev: pointer to the desired device
- * @depnum: resource dependent function
- * @mode: static or dynamic
- *
- */
-
-int pnp_raw_set_dev(struct pnp_dev *dev, int depnum, struct pnp_res_cfg *template)
-{
-	struct pnp_cfg *config;
-	if (!dev)
-		return -EINVAL;
-	if (dev->status != PNP_READY){
-		printk(KERN_INFO "pnp: Unable to set resources because the PnP device '%s' is busy\n", dev->dev.bus_id);
-		return -EINVAL;
-	}
-	if (!pnp_can_write(dev) || !pnp_can_configure(dev))
-		return -EINVAL;
-        config = pnp_generate_config(dev,depnum);
-	if (!config)
-		return -EINVAL;
-	if (pnp_generate_request(dev,config,template)==0)
-		goto done;
-	kfree(config);
-	printk(KERN_ERR "pnp: Manual configuration failed for device '%s' due to resource conflicts\n", dev->dev.bus_id);
-	return -ENOENT;
-
-	done:
-	dev->protocol->set(dev,config);
-	if (pnp_can_read(dev))
-		dev->protocol->get(dev);
-	kfree(config);
-	return 0;
-}
-
-/**
- * pnp_resource_change - change one resource
- * @resource: pointer to resource to be changed
- * @start: start of region
- * @size: size of region
- *
- */
- 
-void pnp_resource_change(struct resource *resource, unsigned long start, unsigned long size)
-{
-	if (resource == NULL)
-		return;
-	resource->flags &= ~(IORESOURCE_AUTO|IORESOURCE_UNSET);
-	resource->start = start;
-	resource->end = start + size - 1;
-}
 
 EXPORT_SYMBOL(pnp_build_resource);
 EXPORT_SYMBOL(pnp_find_resources);
@@ -899,12 +682,9 @@ EXPORT_SYMBOL(pnp_add_irq_resource);
 EXPORT_SYMBOL(pnp_add_dma_resource);
 EXPORT_SYMBOL(pnp_add_port_resource);
 EXPORT_SYMBOL(pnp_add_mem_resource);
-EXPORT_SYMBOL(pnp_add_mem32_resource);
-EXPORT_SYMBOL(pnp_init_res_cfg);
-EXPORT_SYMBOL(pnp_activate_dev);
-EXPORT_SYMBOL(pnp_disable_dev);
-EXPORT_SYMBOL(pnp_raw_set_dev);
-EXPORT_SYMBOL(pnp_resource_change);
+EXPORT_SYMBOL(pnp_init_resource_table);
+EXPORT_SYMBOL(pnp_generate_rule);
+
 
 /* format is: allowdma0 */
 
