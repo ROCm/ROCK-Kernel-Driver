@@ -623,6 +623,20 @@ acpi_bus_init (void)
 		goto error1;
 	}
 
+#ifdef CONFIG_ACPI_EC
+	/*
+	 * ACPI 2.0 requires the EC driver to be loaded and work before
+	 * the EC device is found in the namespace (i.e. before acpi_initialize_objects()
+	 * is called).
+	 *
+	 * This is accomplished by looking for the ECDT table, and getting 
+	 * the EC parameters out of that.
+	 */
+	status = acpi_ec_ecdt_probe();
+	if (ACPI_FAILURE(status))
+		goto error1;
+#endif
+
 	status = acpi_initialize_objects(ACPI_FULL_INITIALIZATION);
 	if (ACPI_FAILURE(status)) {
 		printk(KERN_ERR PREFIX "Unable to initialize ACPI objects\n");
