@@ -264,6 +264,7 @@ void dev_add_pack(struct packet_type *pt)
 	br_write_unlock_bh(BR_NETPROTO_LOCK);
 }
 
+extern void linkwatch_run_queue(void);
 
 /**
  *	dev_remove_pack	 - remove packet handler
@@ -2712,6 +2713,15 @@ int unregister_netdevice(struct net_device *dev)
 			/* Rebroadcast unregister notification */
 			notifier_call_chain(&netdev_chain,
 					    NETDEV_UNREGISTER, dev);
+
+			if (test_bit(__LINK_STATE_LINKWATCH_PENDING, &dev->state)) {
+				/* We must not have linkwatch events pending
+				 * on unregister. If this happens, we simply
+				 * run the queue unscheduled, resulting in a
+				 * noop for this device
+				 */
+				linkwatch_run_queue();
+			}
 		}
 		current->state = TASK_INTERRUPTIBLE;
 		schedule_timeout(HZ / 4);
