@@ -34,9 +34,14 @@
 #include <asm/mpc10x.h>
 #include <asm/hw_irq.h>
 #include <asm/prep_nvram.h>
+#include <asm/keyboard.h>
 
 extern char saved_command_line[];
 extern void lopec_find_bridges(void);
+extern int pckbd_translate(unsigned char scancode, unsigned char *keycode,
+		char raw_mode);
+extern char pckbd_unexpected_up(unsigned char keycode);
+extern unsigned char pckbd_sysrq_xlate[128];
 
 /*
  * Define all of the IRQ senses and polarities.  Taken from the
@@ -379,6 +384,14 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.find_end_of_memory = lopec_find_end_of_memory;
 	ppc_md.setup_io_mappings = lopec_map_io;
 
+#ifdef CONFIG_VT
+	ppc_md.kbd_translate = pckbd_translate;
+	ppc_md.kbd_unexpected_up = pckbd_unexpected_up;
+#ifdef CONFIG_MAGIC_SYSRQ
+	ppc_md.ppc_kbd_sysrq_xlate = pckbd_sysrq_xlate;
+#endif /* CONFIG_MAGIC_SYSRQ */
+#endif /* CONFIG_VT */
+ 
 	ppc_md.time_init = todc_time_init;
 	ppc_md.set_rtc_time = todc_set_rtc_time;
 	ppc_md.get_rtc_time = todc_get_rtc_time;
