@@ -3278,6 +3278,7 @@ int set_cpus_allowed(task_t *p, cpumask_t new_mask)
 		task_rq_unlock(rq, &flags);
 		wake_up_process(rq->migration_thread);
 		wait_for_completion(&req.done);
+		tlb_migrate_finish(p->mm);
 		return 0;
 	}
 out:

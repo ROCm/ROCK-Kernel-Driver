@@ -27,6 +27,7 @@
 #include <asm/delay.h>
 #include <asm/io.h>
 #include <asm/smp.h>
+#include <asm/tlb.h>
 #include <asm/numa.h>
 #include <asm/bitops.h>
 #include <asm/hw_irq.h>
@@ -59,6 +60,13 @@ wait_piowc(void)
 	return ws;
 }
 
+
+void
+sn_tlb_migrate_finish(struct mm_struct *mm)
+{
+	if (mm == current->mm)
+		flush_tlb_mm(mm);
+}
 
 
 /**
@@ -113,6 +121,13 @@ sn2_global_tlb_purge (unsigned long start, unsigned long end, unsigned long nbit
 		preempt_enable();
 		return;
 	}
+
+	if (atomic_read(&mm->mm_users) == 1) {
+		flush_tlb_mm(mm);
+		preempt_enable();
+		return;
+	}
+
 
 	nix = 0;
 	for (cnode=find_first_bit(&nodes_flushed, NR_NODES); cnode < NR_NODES; 
