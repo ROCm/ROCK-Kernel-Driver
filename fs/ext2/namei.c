@@ -31,7 +31,6 @@
 
 #include "ext2.h"
 #include <linux/pagemap.h>
-#include <linux/buffer_head.h>		/* for block_symlink() */
 
 /*
  * Couple of helper functions - make the code slightly cleaner.
@@ -165,7 +164,7 @@ static int ext2_symlink (struct inode * dir, struct dentry * dentry,
 		/* slow symlink */
 		inode->i_op = &page_symlink_inode_operations;
 		inode->i_mapping->a_ops = &ext2_aops;
-		err = block_symlink(inode, symname, l);
+		err = page_symlink(inode, symname, l);
 		if (err)
 			goto out_fail;
 	} else {

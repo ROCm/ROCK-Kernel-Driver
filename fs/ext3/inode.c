@@ -1092,7 +1092,7 @@ static int commit_write_fn(handle_t *handle, struct buffer_head *bh)
 
 /*
  * We need to pick up the new inode size which generic_commit_write gave us
- * `file' can be NULL - eg, when called from block_symlink().
+ * `file' can be NULL - eg, when called from page_symlink().
  *
  * ext3 never places buffers on inode->i_mapping->private_list.  metadata
  * buffers are managed internally.

@@ -2327,46 +2327,6 @@ int brw_page(int rw, struct page *page,
 	return 0;
 }
 
-int block_symlink(struct inode *inode, const char *symname, int len)
-{
-	struct address_space *mapping = inode->i_mapping;
-	struct page *page = grab_cache_page(mapping, 0);
-	int err = -ENOMEM;
-	char *kaddr;
-
-	if (!page)
-		goto fail;
-	err = mapping->a_ops->prepare_write(NULL, page, 0, len-1);
-	if (err)
-		goto fail_map;
-	kaddr = page_address(page);
-	memcpy(kaddr, symname, len-1);
-	mapping->a_ops->commit_write(NULL, page, 0, len-1);
-	/*
-	 * Notice that we are _not_ going to block here - end of page is
-	 * unmapped, so this will only try to map the rest of page, see
-	 * that it is unmapped (typically even will not look into inode -
-	 * ->i_size will be enough for everything) and zero it out.
-	 * OTOH it's obviously correct and should make the page up-to-date.
-	 */
-	if (!PageUptodate(page)) {
-		err = mapping->a_ops->readpage(NULL, page);
-		wait_on_page_locked(page);
-	} else {
-		unlock_page(page);
-	}
-	page_cache_release(page);
-	if (err < 0)
-		goto fail;
-	mark_inode_dirty(inode);
-	return 0;
-fail_map:
-	unlock_page(page);
-	page_cache_release(page);
-fail:
-	return err;
-}
-
 /*
  * Sanity checks for try_to_free_buffers.
  */

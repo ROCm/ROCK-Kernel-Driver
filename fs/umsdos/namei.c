@@ -499,7 +499,7 @@ static int umsdos_symlink_x (struct inode *dir, struct dentry *dentry,
 	}
 
 	len = strlen (symname) + 1;
-	ret = block_symlink(dentry->d_inode, symname, len);
+	ret = page_symlink(dentry->d_inode, symname, len);
 	if (ret < 0)
 		goto out_unlink;
 out:

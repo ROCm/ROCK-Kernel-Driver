@@ -192,7 +192,6 @@ void FASTCALL(unlock_buffer(struct buffer_head *bh));
  */
 int try_to_release_page(struct page * page, int gfp_mask);
 int block_flushpage(struct page *page, unsigned long offset);
-int block_symlink(struct inode *, const char *, int);
 int block_write_full_page(struct page*, get_block_t*);
 int block_read_full_page(struct page*, get_block_t*);
 int block_prepare_write(struct page*, unsigned, unsigned, get_block_t*);

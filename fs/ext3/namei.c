@@ -987,11 +987,11 @@ static int ext3_symlink (struct inode * dir,
 		inode->i_op = &page_symlink_inode_operations;
 		inode->i_mapping->a_ops = &ext3_aops;
 		/*
-		 * block_symlink() calls back into ext3_prepare/commit_write.
+		 * page_symlink() calls into ext3_prepare/commit_write.
 		 * We have a transaction open.  All is sweetness.  It also sets
 		 * i_size in generic_commit_write().
 		 */
-		err = block_symlink(inode, symname, l);
+		err = page_symlink(inode, symname, l);
 		if (err)
 			goto out_no_entry;
 	} else {
