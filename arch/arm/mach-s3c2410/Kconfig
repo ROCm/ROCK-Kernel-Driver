@@ -4,22 +4,22 @@ config ARCH_BAST
 	bool "Simtec Electronics BAST (EB2410ITX)"
 	depends on ARCH_S3C2410
 	help
-    	  say Y here if you are using the Simtec Electronics EB2410ITX
+	  Say Y here if you are using the Simtec Electronics EB2410ITX
 	  development board (also known as BAST)
 
-	  Product page: http://www.simtec.co.uk/products/EB2410ITX/
+	  Product page: <http://www.simtec.co.uk/products/EB2410ITX/>.
 
 config ARCH_H1940
 	bool "IPAQ H1940"
 	depends on ARCH_S3C2410
 	help
-    	  say Y here if you are using the HP IPAQ H1940
-	  http://www.handhelds.org/projects/h1940.html
+	  Say Y here if you are using the HP IPAQ H1940
+	  <http://www.handhelds.org/projects/h1940.html>.
 
 config MACH_VR1000
 	bool "Simtec VR1000"
 	depends on ARCH_S3C2410
 	help
-	  say Y here if you are using the Simtec VR1000 board.
+	  Say Y here if you are using the Simtec VR1000 board.
 
 endmenu
