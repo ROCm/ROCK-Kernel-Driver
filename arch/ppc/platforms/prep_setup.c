@@ -1126,7 +1126,7 @@ prep_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		_prep_type = _PREP_Motorola;
 	}
 
-#ifdef CONFIG_PREP_PRESIDUAL
+#ifdef CONFIG_PREP_RESIDUAL
 	/* Switch off all residual data processing if the user requests it */
 	if (strstr(cmd_line, "noresidual") != NULL)
 			res = NULL;
