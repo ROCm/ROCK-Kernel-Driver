@@ -6099,7 +6099,6 @@ static int tg3_set_ringparam(struct net_device *dev, struct ethtool_ringparam *e
 	tp->tx_pending = ering->tx_pending;
 
 	tg3_halt(tp);
-	tg3_init_rings(tp);
 	tg3_init_hw(tp);
 	netif_wake_queue(tp->dev);
 	spin_unlock(&tp->tx_lock);
@@ -6138,7 +6137,6 @@ static int tg3_set_pauseparam(struct net_device *dev, struct ethtool_pauseparam 
 	else
 		tp->tg3_flags &= ~TG3_FLAG_PAUSE_TX;
 	tg3_halt(tp);
-	tg3_init_rings(tp);
 	tg3_init_hw(tp);
 	spin_unlock(&tp->tx_lock);
 	spin_unlock_irq(&tp->lock);
