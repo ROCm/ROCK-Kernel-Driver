@@ -57,7 +57,7 @@ struct scsi_device {
 
 	void *hostdata;		/* available to low-level driver */
 	char devfs_name[256];	/* devfs junk */
-	char type;
+	signed char type;
 	char scsi_level;
 	unsigned char inquiry_len;	/* valid bytes in 'inquiry' */
 	unsigned char * inquiry;	/* INQUIRY response data */
