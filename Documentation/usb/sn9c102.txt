@@ -1,7 +1,7 @@
 
-                        SN9C10[12] PC Camera Controllers
+                         SN9C10x PC Camera Controllers
                                 Driver for Linux
-                        ================================
+                         =============================
 
                                - Documentation -
 
@@ -49,22 +49,23 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 3. Overview
 ===========
-This driver attempts to support the video streaming capabilities of the devices
-mounting the SONiX SN9C101 or SONiX SN9C102 PC Camera Controllers.
+This driver attempts to support the video and audio streaming capabilities of
+the devices mounting the SONiX SN9C101, SN9C102 and SN9C103 (or SUI-102) PC
+Camera Controllers.
 
 - It's worth to note that SONiX has never collaborated with me during the
-development of this project, despite of several requests for enough detailed
+development of this project, despite several requests for enough detailed
 specifications of the register tables, compression engine and video data format
 of the above chips -
 
 Up to 64 cameras can be handled at the same time. They can be connected and
 disconnected from the host many times without turning off the computer, if
-your system supports the hotplug facility.
+your system supports hotplugging.
 
 The driver relies on the Video4Linux2 and USB core modules. It has been
 designed to run properly on SMP systems as well.
 
-The latest version of the SN9C10[12] driver can be found at the following URL:
+The latest version of the SN9C10x driver can be found at the following URL:
 http://go.lamarinapunto.com/
 
 
@@ -150,17 +151,20 @@ Default:        2
 
 7. Optional device control through "sysfs"
 ==========================================
-It is possible to read and write both the SN9C10[12] and the image sensor
+It is possible to read and write both the SN9C10x and the image sensor
 registers by using the "sysfs" filesystem interface.
 
-Every time a supported device is recognized, a read-only file named "green" is
+Every time a supported device is recognized, a write-only file named "green" is
 created in the /sys/class/video4linux/videoX directory. You can set the green
 channel's gain by writing the desired value to it. The value may range from 0
-to 15.
+to 15 for SN9C101 or SN9C102 bridges, from 0 to 127 for SN9C103 bridges.
+Similarly, only for SN9C103 controllers, blue and red gain control files are
+available in the same directory, for which accepted values may range from 0 to
+127.
 
 There are other four entries in the directory above for each registered camera:
 "reg", "val", "i2c_reg" and "i2c_val". The first two files control the
-SN9C10[12] bridge, while the other two control the sensor chip. "reg" and
+SN9C10x bridge, while the other two control the sensor chip. "reg" and
 "i2c_reg" hold the values of the current register index where the following
 reading/writing operations are addressed at through "val" and "i2c_val". Their
 use is not intended for end-users, unless you know what you are doing. Note
@@ -169,19 +173,19 @@ support the standard I2C protocol. Also, remember that you must be logged in as
 root before writing to them.
 
 As an example, suppose we were to want to read the value contained in the
-register number 1 of the sensor register table - which usually is the product
+register number 1 of the sensor register table - which is usually the product
 identifier - of the camera registered as "/dev/video0":
 
 	[root@localhost #] cd /sys/class/video4linux/video0
 	[root@localhost #] echo 1 > i2c_reg
 	[root@localhost #] cat i2c_val
 
-Now let's set the green gain's register of the SN9C10[12] chip to 2:
+Now let's set the green gain's register of the SN9C10x chip to 2:
 
 	[root@localhost #] echo 0x11 > reg
 	[root@localhost #] echo 2 > val
 
-Note that the SN9C10[12] always returns 0 when some of its registers are read.
+Note that the SN9C10x always returns 0 when some of its registers are read.
 To avoid race conditions, all the I/O accesses to the files are serialized.
 
 
@@ -192,25 +196,52 @@ here. They have never collaborated with me, so no advertising -
 
 From the point of view of a driver, what unambiguously identify a device are
 its vendor and product USB identifiers. Below is a list of known identifiers of
-devices mounting the SN9C10[12] PC camera controllers:
+devices mounting the SN9C10x PC camera controllers:
 
 Vendor ID  Product ID
 ---------  ----------
-0xc45      0x6001
-0xc45      0x6005
-0xc45      0x6009
-0xc45      0x600d
-0xc45      0x6024
-0xc45      0x6025
-0xc45      0x6028
-0xc45      0x6029
-0xc45      0x602a
-0xc45      0x602c
-0xc45      0x6030
+0x0c45     0x6001
+0x0c45     0x6005
+0x0c45     0x6009
+0x0c45     0x600d
+0x0c45     0x6024
+0x0c45     0x6025
+0x0c45     0x6028
+0x0c45     0x6029
+0x0c45     0x602a
+0x0c45     0x602b
+0x0c45     0x602c
+0x0c45     0x6030
+0x0c45     0x6080
+0x0c45     0x6082
+0x0c45     0x6083
+0x0c45     0x6088
+0x0c45     0x608a
+0x0c45     0x608b
+0x0c45     0x608c
+0x0c45     0x608e
+0x0c45     0x608f
+0x0c45     0x60a0
+0x0c45     0x60a2
+0x0c45     0x60a3
+0x0c45     0x60a8
+0x0c45     0x60aa
+0x0c45     0x60ab
+0x0c45     0x60ac
+0x0c45     0x60ae
+0x0c45     0x60af
+0x0c45     0x60b0
+0x0c45     0x60b2
+0x0c45     0x60b3
+0x0c45     0x60b8
+0x0c45     0x60ba
+0x0c45     0x60bb
+0x0c45     0x60bc
+0x0c45     0x60be
 
 The list above does NOT imply that all those devices work with this driver: up
-until now only the ones that mount the following image sensors are supported.
-Kernel messages will always tell you whether this is the case:
+until now only the ones that mount the following image sensors are supported;
+kernel messages will always tell you whether this is the case:
 
 Model       Manufacturer
 -----       ------------
@@ -224,7 +255,7 @@ listed in the above table, you may try to add the specific USB VendorID and
 ProductID identifiers to the sn9c102_id_table[] in the file "sn9c102_sensor.h";
 then compile, load the module again and look at the kernel output.
 If this works, please send an email to me reporting the kernel messages, so
-that I will add a new entry in the list of supported devices.
+that I can add a new entry in the list of supported devices.
 
 Donations of new models for further testing and support would be much
 appreciated. I won't add official support for hardware that I don't actually
@@ -238,8 +269,8 @@ have created for this purpose, which is present in "sn9c102_sensor.h"
 (documentation is included there). As an example, have a look at the code in
 "sn9c102_pas106b.c", which uses the mentioned interface.
 
-At the moment, not yet supported image sensors are: HV7131[D|E1] (VGA),
-MI03 (VGA), OV7620 (VGA).
+At the moment, possible unsupported image sensors are: HV7131x series (VGA),
+MI03x series (VGA), OV7620 (VGA), OV7630 (VGA), CIS-VF10 (VGA).
 
 
 10. Notes for V4L2 application developers
@@ -254,12 +285,13 @@ device to switch to the other I/O method;
 - previously mapped buffer memory must always be unmapped before calling any
 of the "VIDIOC_S_CROP", "VIDIOC_TRY_FMT" and "VIDIOC_S_FMT" ioctl's. The same
 number of buffers as before will be allocated again to match the size of the
-new video frames, so you have to map them again before any I/O attempts.
+new video frames, so you have to map the buffers again before any I/O attempts
+on them.
 
 Consistently with the hardware limits, this driver also supports image
 downscaling with arbitrary scaling factors from 1, 2 and 4 in both directions.
-However the V4L2 API specifications don't correctly define how the scaling
-factor can be choosen arbitrarily by the "negotiation" of the "source" and
+However, the V4L2 API specifications don't correctly define how the scaling
+factor can be chosen arbitrarily by the "negotiation" of the "source" and
 "target" rectangles. To work around this flaw, we have added the convention
 that, during the negotiation, whenever the "VIDIOC_S_CROP" ioctl is issued, the
 scaling factor is restored to 1.
