@@ -929,6 +929,7 @@ static const struct usb_descriptor_header *fs_function[] = {
 	(struct usb_descriptor_header *) &fs_intr_in_desc,
 	NULL,
 };
+#define FS_FUNCTION_PRE_EP_ENTRIES	2
 
 
 #ifdef	CONFIG_USB_GADGET_DUALSPEED
@@ -992,6 +993,7 @@ static const struct usb_descriptor_header *hs_function[] = {
 	(struct usb_descriptor_header *) &hs_intr_in_desc,
 	NULL,
 };
+#define HS_FUNCTION_PRE_EP_ENTRIES	2
 
 /* Maxpacket and other transfer characteristics vary by speed. */
 #define ep_desc(g,fs,hs)	(((g)->speed==USB_SPEED_HIGH) ? (hs) : (fs))
@@ -3899,10 +3901,10 @@ static int __init fsg_bind(struct usb_gadget *gadget)
 	intf_desc.bNumEndpoints = i;
 	intf_desc.bInterfaceSubClass = mod_data.protocol_type;
 	intf_desc.bInterfaceProtocol = mod_data.transport_type;
-	fs_function[i+1] = NULL;
+	fs_function[i + FS_FUNCTION_PRE_EP_ENTRIES] = NULL;
 
 #ifdef CONFIG_USB_GADGET_DUALSPEED
-	hs_function[i+1] = NULL;
+	hs_function[i + HS_FUNCTION_PRE_EP_ENTRIES] = NULL;
 
 	/* Assume ep0 uses the same maxpacket value for both speeds */
 	dev_qualifier.bMaxPacketSize0 = fsg->ep0->maxpacket;
