@@ -6,11 +6,12 @@
 #include <linux/moduleparam.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+
+#include <scsi/scsi_device.h>
 #include <scsi/scsi_devinfo.h>
 
-#include "scsi.h"
-#include <scsi/scsi_host.h>
 #include "scsi_priv.h"
+
 
 /*
  * scsi_dev_info_list: structure to hold black/white listed devices.

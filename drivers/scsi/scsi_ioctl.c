@@ -5,23 +5,21 @@
  *   for the ones that remain
  */
 #include <linux/module.h>
-
-#include <asm/io.h>
-#include <asm/uaccess.h>
-#include <asm/system.h>
-#include <asm/page.h>
-
+#include <linux/blkdev.h>
 #include <linux/interrupt.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/string.h>
+#include <asm/uaccess.h>
 
-#include <linux/blkdev.h>
-#include "scsi.h"
+#include <scsi/scsi.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_eh.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_ioctl.h>
+#include <scsi/scsi_request.h>
 
 #include "scsi_logging.h"
 

@@ -56,8 +56,14 @@
 #include <linux/notifier.h>
 #include <linux/cpu.h>
 
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_dbg.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_eh.h>
 #include <scsi/scsi_host.h>
-#include "scsi.h"
+#include <scsi/scsi_tcq.h>
+#include <scsi/scsi_request.h>
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
@@ -400,7 +406,7 @@ void scsi_log_send(struct scsi_cmnd *cmd)
 			 * output in scsi_log_completion.
 			 */
 			printk("                 ");
-			print_command(cmd->cmnd);
+			scsi_print_command(cmd);
 			if (level > 3) {
 				printk(KERN_INFO "buffer = 0x%p, bufflen = %d,"
 				       " done = 0x%p, queuecommand 0x%p\n",
@@ -468,13 +474,13 @@ void scsi_log_completion(struct scsi_cmnd *cmd, int disposition)
 				printk("UNKNOWN");
 			}
 			printk(" %8x ", cmd->result);
-			print_command(cmd->cmnd);
+			scsi_print_command(cmd);
 			if (status_byte(cmd->result) & CHECK_CONDITION) {
 				/*
 				 * XXX The print_sense formatting/prefix
 				 * doesn't match this function.
 				 */
-				print_sense("", cmd);
+				scsi_print_sense("", cmd);
 			}
 			if (level > 3) {
 				printk(KERN_INFO "scsi host busy %d failed %d\n",
