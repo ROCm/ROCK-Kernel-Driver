@@ -1703,6 +1703,7 @@ static void __init de21040_get_mac_address (struct de_private *de)
 			value = dr32(ROMCmd);
 		while (value < 0 && --boguscnt > 0);
 		de->dev->dev_addr[i] = value;
+		udelay(1);
 		if (boguscnt <= 0)
 			printk(KERN_WARNING PFX "timeout reading 21040 MAC address byte %u\n", i);
 	}
