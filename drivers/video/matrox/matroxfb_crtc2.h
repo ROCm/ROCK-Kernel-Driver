@@ -27,7 +27,6 @@ struct matroxfb_dh_fb_info {
 		unsigned int	len;
 			      } mmio;
 
-	int			currcon;
 	struct display*		currcon_display;
 	
 	int			interlaced:1;
