@@ -33,7 +33,6 @@
 static char *_riotable_c_sccs_ = "@(#)riotable.c	1.2";
 #endif
 
-#define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/errno.h>
