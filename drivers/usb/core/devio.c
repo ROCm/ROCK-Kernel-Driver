@@ -350,8 +350,8 @@ static void driver_disconnect(struct usb_interface *intf)
 	 * all pending I/O requests; 2.6 does that.
 	 */
 
-	if (ifnum < 8*sizeof(ps->ifclaimed))
-		clear_bit(ifnum, &ps->ifclaimed);
+	WARN_ON(ifnum >= 8*sizeof(ps->ifclaimed));
+	clear_bit(ifnum, &ps->ifclaimed);
 	usb_set_intfdata (intf, NULL);
 
 	/* force async requests to complete */
