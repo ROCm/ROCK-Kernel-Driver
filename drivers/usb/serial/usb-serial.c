@@ -530,7 +530,9 @@ static void serial_close(struct tty_struct *tty, struct file * filp)
 	/* if disconnect beat us to the punch here, there's nothing to do */
 	if (tty && tty->driver_data) {
 		__serial_close(port, filp);
+		tty->driver_data = NULL;
 	}
+	port->tty = NULL;
 }
 
 static int serial_write (struct tty_struct * tty, int from_user, const unsigned char *buf, int count)
