@@ -79,19 +79,13 @@ extern volatile int cpu_to_logical_apicid[NR_CPUS];
 extern volatile int logical_apicid_to_cpu[MAX_APICID];
 
 /*
- * General functions that each host system must provide.
- */
- 
-extern void smp_boot_cpus(void);
-extern void smp_store_cpu_info(int id);		/* Store per CPU info (like the initial udelay numbers */
-
-/*
  * This function is needed by all SMP systems. It must _always_ be valid
  * from the initial startup. We map APIC_BASE very early in page_setup(),
  * so this is correct in the x86 case.
  */
 #define smp_processor_id() (current_thread_info()->cpu)
 
+#define cpu_possible(cpu) (phys_cpu_present_map & (1<<(cpu)))
 #define cpu_online(cpu) (cpu_online_map & (1<<(cpu)))
 
 extern inline unsigned int num_online_cpus(void)
@@ -117,6 +111,13 @@ static __inline int logical_smp_processor_id(void)
 {
 	/* we don't want to mark this access volatile - bad code generation */
 	return GET_APIC_LOGICAL_ID(*(unsigned long *)(APIC_BASE+APIC_LDR));
+}
+
+extern volatile unsigned long cpu_callout_map;
+/* We don't mark CPUs online until __cpu_up(), so we need another measure */
+static inline int num_booting_cpus(void)
+{
+	return hweight32(cpu_callout_map);
 }
 
 #endif /* !__ASSEMBLY__ */

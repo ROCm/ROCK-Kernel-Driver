@@ -1589,7 +1589,7 @@ static int apm_get_info(char *buf, char **start, off_t fpos, int length)
 
 	p = buf;
 
-	if ((num_online_cpus() == 1) &&
+	if ((num_possible_cpus() == 1) &&
 	    !(error = apm_get_power_status(&bx, &cx, &dx))) {
 		ac_line_status = (bx >> 8) & 0xff;
 		battery_status = bx & 0xff;
@@ -1720,7 +1720,7 @@ static int apm(void *unused)
 		}
 	}
 
-	if (debug && (num_online_cpus() == 1)) {
+	if (debug && (num_possible_cpus() == 1)) {
 		error = apm_get_power_status(&bx, &cx, &dx);
 		if (error)
 			printk(KERN_INFO "apm: power status not available\n");
@@ -1764,7 +1764,7 @@ static int apm(void *unused)
 		pm_power_off = apm_power_off;
 	register_sysrq_key('o', &sysrq_poweroff_op);
 
-	if (num_online_cpus() == 1) {
+	if (num_possible_cpus() == 1) {
 #if defined(CONFIG_APM_DISPLAY_BLANK) && defined(CONFIG_VT)
 		console_blank_hook = apm_console_blank;
 #endif
@@ -1907,9 +1907,7 @@ static int __init apm_init(void)
 		printk(KERN_NOTICE "apm: disabled on user request.\n");
 		return -ENODEV;
 	}
-	/* FIXME: When boot code changes, this will need to be
-           deactivated when/if a CPU comes up --RR */
-	if ((num_online_cpus() > 1) && !power_off) {
+	if ((num_possible_cpus() > 1) && !power_off) {
 		printk(KERN_NOTICE "apm: disabled - APM is not SMP safe.\n");
 		return -ENODEV;
 	}
@@ -1966,9 +1964,7 @@ static int __init apm_init(void)
 
 	kernel_thread(apm, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGHAND | SIGCHLD);
 
-	/* FIXME: When boot code changes, this will need to be
-           deactivated when/if a CPU comes up --RR */
-	if (num_online_cpus() > 1) {
+	if (num_possible_cpus() > 1) {
 		printk(KERN_NOTICE
 		   "apm: disabled - APM is not SMP safe (power off active).\n");
 		return 0;
