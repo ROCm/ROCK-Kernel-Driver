@@ -580,7 +580,7 @@ int usb_get_descriptor(struct usb_device *dev, unsigned char type, unsigned char
 		if (result == 0 || result == -EPIPE)
 			continue;
 		if (result > 1 && ((u8 *)buf)[1] != type) {
-			retval = -EPROTO;
+			result = -EPROTO;
 			continue;
 		}
 		break;
