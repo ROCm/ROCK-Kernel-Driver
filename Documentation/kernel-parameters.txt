@@ -617,6 +617,9 @@ running once the system is up.
 
 	noht		[SMP,IA-32] Disables P4 Xeon(tm) HyperThreading.
 
+	noirqdebug	[IA-32] Disables the code which attempts to detect and
+			disable unhandled interrupt sources.
+
 	noisapnp	[ISAPNP] Disables ISA PnP code.
 
 	noinitrd	[RAM] Tells the kernel not to load any configured
