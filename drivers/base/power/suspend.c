@@ -71,9 +71,6 @@ int suspend_device(struct device * dev, u32 state)
  *	b) prevent other PM operations from happening after we've begun.
  *	c) make sure we're exclusive when we disable interrupts.
  *
- *	device_resume() will release dpm_sem after restoring state to 
- *	all devices (as will this on error). You must call it once you've 
- *	called device_suspend().
  */
 
 int device_suspend(u32 state)
@@ -88,6 +85,7 @@ int device_suspend(u32 state)
 			goto Error;
 	}
  Done:
+	up(&dpm_sem);
 	return error;
  Error:
 	device_resume();

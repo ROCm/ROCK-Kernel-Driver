@@ -31,11 +31,13 @@ int resume_device(struct device * dev)
 /**
  *	device_resume - Restore state of each device in system.
  *
- *	Restore normal device state and release the dpm_sem.
+ *	Walk the dpm_off list, remove each entry, resume the device,
+ *	then add it to the dpm_active list. 
  */
 
 void device_resume(void)
 {
+	down(&dpm_sem);
 	while(!list_empty(&dpm_off)) {
 		struct list_head * entry = dpm_off.next;
 		struct device * dev = to_device(entry);
