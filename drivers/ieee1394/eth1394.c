@@ -502,7 +502,7 @@ static void ether1394_remove_host (struct hpsb_host *host)
 
 		if (hi->dev) {
 			unregister_netdev (hi->dev);
-			kfree(hi->dev);
+			free_netdev(hi->dev);
 		}
 	}
 

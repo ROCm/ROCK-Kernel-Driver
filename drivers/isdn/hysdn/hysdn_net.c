@@ -334,7 +334,7 @@ hysdn_net_release(hysdn_card * card)
 	flush_tx_buffers((struct net_local *) dev);	/* empty buffers */
 
 	unregister_netdev(dev);	/* release the device */
-	kfree(dev);		/* release the memory allocated */
+	free_netdev(dev);	/* release the memory allocated */
 	if (card->debug_flags & LOG_NET_INIT)
 		hysdn_addlog(card, "network device deleted");
 
