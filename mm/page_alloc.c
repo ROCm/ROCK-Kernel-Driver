@@ -267,9 +267,11 @@ free_pages_bulk(struct zone *zone, int count,
 void __free_pages_ok(struct page *page, unsigned int order)
 {
 	LIST_HEAD(list);
+	int i;
 
 	mod_page_state(pgfree, 1 << order);
-	free_pages_check(__FUNCTION__, page);
+	for (i = 0 ; i < (1 << order) ; ++i)
+		free_pages_check(__FUNCTION__, page + i);
 	list_add(&page->list, &list);
 	kernel_map_pages(page, 1<<order, 0);
 	free_pages_bulk(page_zone(page), 1, &list, order);
