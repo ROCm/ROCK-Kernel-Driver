@@ -139,7 +139,7 @@ int zlib_inflate_blocks(
             uInt bl, bd;
             inflate_huft *tl, *td;
 
-            zlib_inflate_trees_fixed(&bl, &bd, &tl, &td, z);
+            zlib_inflate_trees_fixed(&bl, &bd, &tl, &td, s->hufts, z);
             s->sub.decode.codes = zlib_inflate_codes_new(bl, bd, tl, td, z);
             if (s->sub.decode.codes == NULL)
             {

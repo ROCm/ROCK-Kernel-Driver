@@ -58,6 +58,7 @@ extern int zlib_inflate_trees_fixed (
     uInt *,                     /* distance desired/actual bit depth */
     inflate_huft **,            /* literal/length tree result */
     inflate_huft **,            /* distance tree result */
+    inflate_huft *,             /* space for trees */
     z_streamp);                 /* for memory allocation */
 
 #endif /* _INFTREES_H */
