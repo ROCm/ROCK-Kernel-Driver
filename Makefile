@@ -142,7 +142,7 @@ NM		= $(CROSS_COMPILE)nm
 STRIP		= $(CROSS_COMPILE)strip
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 OBJDUMP		= $(CROSS_COMPILE)objdump
-#MAKEFILES	= .config
+MAKEFILES	= .config
 GENKSYMS	= /sbin/genksyms
 DEPMOD		= /sbin/depmod
 KALLSYMS	= /sbin/kallsyms
@@ -698,7 +698,7 @@ MRPROPER_DIRS += \
 clean-dirs += $(ALL_SUBDIRS) Documentation/DocBook scripts
 
 $(addprefix _clean_,$(clean-dirs)):
-	$(MAKE) -rR -f scripts/Makefile.clean obj=$(patsubst _clean_%,%,$@)
+	$(MAKE) MAKEFILES= -rR -f scripts/Makefile.clean obj=$(patsubst _clean_%,%,$@)
 
 quiet_cmd_rmclean = RM  $$(CLEAN_FILES)
 cmd_rmclean	  = rm -f $(CLEAN_FILES)
