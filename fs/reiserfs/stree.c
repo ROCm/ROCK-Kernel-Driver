@@ -1306,7 +1306,7 @@ int reiserfs_delete_item (struct reiserfs_transaction_handle *th,
 	copy_item_head(&s_ih, PATH_PITEM_HEAD(p_s_path));
 	s_del_balance.insert_size[0] = n_del_size;
 
-	n_ret_value = fix_nodes(M_DELETE, &s_del_balance, NULL, 0);
+	n_ret_value = fix_nodes(M_DELETE, &s_del_balance, NULL, NULL);
 	if ( n_ret_value != REPEAT_SEARCH )
 	    break;
 
@@ -1446,14 +1446,14 @@ void reiserfs_delete_solid_item (struct reiserfs_transaction_handle *th,
 	}
 	quota_cut_bytes = ih_item_len(PATH_PITEM_HEAD(&path)) ;
 
-	retval = fix_nodes (M_DELETE, &tb, NULL, 0);
+	retval = fix_nodes (M_DELETE, &tb, NULL, NULL);
 	if (retval == REPEAT_SEARCH) {
 	    PROC_INFO_INC( th -> t_super, delete_solid_item_restarted );
 	    continue;
 	}
 
 	if (retval == CARRY_ON) {
-	    do_balance (&tb, 0, 0, M_DELETE);
+	    do_balance (&tb, NULL, NULL, M_DELETE);
 	    if (inode) {	/* Should we count quota for item? (we don't count quotas for save-links) */
 #ifdef REISERQUOTA_DEBUG
 		reiserfs_debug (th->t_super, "reiserquota delete_solid_item(): freeing %u id=%u type=%c", quota_cut_bytes, inode->i_uid, key2type(key));
@@ -1587,7 +1587,7 @@ static void indirect_to_direct_roll_back (struct reiserfs_transaction_handle *th
 	        "vs-5616: appended bytes found");
 	PATH_LAST_POSITION (path) --;
 	
-	removed = reiserfs_delete_item (th, path, &tail_key, inode, 0/*unbh not needed*/);
+	removed = reiserfs_delete_item (th, path, &tail_key, inode, NULL/*unbh not needed*/);
 	RFALSE( removed <= 0 || removed > tail_len,
 	        "vs-5617: there was tail %d bytes, removed item length %d bytes",
                 tail_len, removed);
@@ -1677,7 +1677,7 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
 
 	s_cut_balance.insert_size[0] = n_cut_size;
 	
-	n_ret_value = fix_nodes(c_mode, &s_cut_balance, NULL, 0);
+	n_ret_value = fix_nodes(c_mode, &s_cut_balance, NULL, NULL);
       	if ( n_ret_value != REPEAT_SEARCH )
 	    break;
 	
@@ -1935,7 +1935,7 @@ static void check_research_for_paste (struct path * path,
 	if (le_ih_k_offset (found_ih) + op_bytes_number (found_ih, get_last_bh (path)->b_size) !=
 	    cpu_key_k_offset (p_s_key) ||
 	    op_bytes_number (found_ih, get_last_bh (path)->b_size) != pos_in_item (path))
-	    reiserfs_panic (0, "PAP-5720: check_research_for_paste: "
+	    reiserfs_panic (NULL, "PAP-5720: check_research_for_paste: "
 			    "found direct item %h or position (%d) does not match to key %K",
 			    found_ih, pos_in_item (path), p_s_key);
     }
@@ -1943,7 +1943,7 @@ static void check_research_for_paste (struct path * path,
 	if (le_ih_k_offset (found_ih) + op_bytes_number (found_ih, get_last_bh (path)->b_size) != cpu_key_k_offset (p_s_key) || 
 	    I_UNFM_NUM (found_ih) != pos_in_item (path) ||
 	    get_ih_free_space (found_ih) != 0)
-	    reiserfs_panic (0, "PAP-5730: check_research_for_paste: "
+	    reiserfs_panic (NULL, "PAP-5730: check_research_for_paste: "
 			    "found indirect item (%h) or position (%d) does not match to key (%K)",
 			    found_ih, pos_in_item (path), p_s_key);
     }

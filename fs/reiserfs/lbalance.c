@@ -49,7 +49,7 @@ static void leaf_copy_dir_entries (struct buffer_info * dest_bi, struct buffer_h
                                 deh_location( &(deh[from + copy_count - 1]));
     } else {
 	copy_records_len = 0;
-	records = 0;
+	records = NULL;
     }
 
     /* when copy last to first, dest buffer can contain 0 items */
@@ -145,7 +145,7 @@ static int leaf_copy_boundary_item (struct buffer_info * dest_bi, struct buffer_
     else {
       if (bytes_or_entries == ih_item_len(ih) && is_indirect_le_ih(ih))
 	if (get_ih_free_space (ih))
-	  reiserfs_panic (0, "vs-10020: leaf_copy_boundary_item: "
+	  reiserfs_panic (NULL, "vs-10020: leaf_copy_boundary_item: "
 			  "last unformatted node must be filled entirely (%h)",
 			  ih);
     }
@@ -552,13 +552,13 @@ static void leaf_define_dest_src_infos (int shift_mode, struct tree_balance * tb
 	src_bi->bi_position = PATH_H_B_ITEM_ORDER (tb->tb_path, 0);
 	dest_bi->tb = tb;
 	dest_bi->bi_bh = Snew;
-	dest_bi->bi_parent = 0;
+	dest_bi->bi_parent = NULL;
 	dest_bi->bi_position = 0;
 	*first_last = LAST_TO_FIRST;
 	break;
     
     default:
-	reiserfs_panic (0, "vs-10250: leaf_define_dest_src_infos: shift type is unknown (%d)", shift_mode);
+	reiserfs_panic (NULL, "vs-10250: leaf_define_dest_src_infos: shift type is unknown (%d)", shift_mode);
     }
     RFALSE( src_bi->bi_bh == 0 || dest_bi->bi_bh == 0,
 	    "vs-10260: mode==%d, source (%p) or dest (%p) buffer is initialized incorrectly",
@@ -595,7 +595,7 @@ int leaf_shift_left (struct tree_balance * tb, int shift_num, int shift_bytes)
   int i;
 
   /* move shift_num (and shift_bytes bytes) items from S[0] to left neighbor L[0] */
-  i = leaf_move_items (LEAF_FROM_S_TO_L, tb, shift_num, shift_bytes, 0);
+  i = leaf_move_items (LEAF_FROM_S_TO_L, tb, shift_num, shift_bytes, NULL);
 
   if ( shift_num ) {
     if (B_NR_ITEMS (S0) == 0) { /* number of items in S[0] == 0 */
@@ -648,7 +648,7 @@ int	leaf_shift_right(
   int ret_value;
 
   /* move shift_num (and shift_bytes) items from S[0] to right neighbor R[0] */
-  ret_value = leaf_move_items (LEAF_FROM_S_TO_R, tb, shift_num, shift_bytes, 0);
+  ret_value = leaf_move_items (LEAF_FROM_S_TO_R, tb, shift_num, shift_bytes, NULL);
 
   /* replace rkey in CFR[0] by the 0-th key from R[0] */
   if (shift_num) {
@@ -829,7 +829,7 @@ void leaf_paste_in_buffer (struct buffer_info * bi, int affected_item_num,
 #ifdef CONFIG_REISERFS_CHECK
     if (zeros_number > paste_size) {
 	print_cur_tb ("10177");
-	reiserfs_panic ( 0, "vs-10177: leaf_paste_in_buffer: ero number == %d, paste_size == %d",
+	reiserfs_panic ( NULL, "vs-10177: leaf_paste_in_buffer: ero number == %d, paste_size == %d",
                          zeros_number, paste_size);
     }
 #endif /* CONFIG_REISERFS_CHECK */

@@ -549,7 +549,7 @@ static int direntry_create_vi (struct virtual_node * vn,
     
 	if (l + IH_SIZE != vi->vi_item_len + 
 	    ((is_affected && (vn->vn_mode == M_PASTE || vn->vn_mode == M_CUT)) ? insert_size : 0) ) {
-	    reiserfs_panic (0, "vs-8025: set_entry_sizes: (mode==%c, insert_size==%d), invalid length of directory item",
+	    reiserfs_panic (NULL, "vs-8025: set_entry_sizes: (mode==%c, insert_size==%d), invalid length of directory item",
 			    vn->vn_mode, insert_size);
 	}
     }

@@ -556,7 +556,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
     INITIALIZE_PATH(path);
     int pos_in_item;
     struct cpu_key key;
-    struct buffer_head * bh, * unbh = 0;
+    struct buffer_head * bh, * unbh = NULL;
     struct item_head * ih, tmp_ih;
     __u32 * item;
     int done;
@@ -1394,7 +1394,7 @@ struct inode * reiserfs_iget (struct super_block * s, const struct cpu_key * key
     if (comp_short_keys (INODE_PKEY (inode), key) || is_bad_inode (inode)) {
 	/* either due to i/o error or a stale NFS handle */
 	iput (inode);
-	inode = 0;
+	inode = NULL;
     }
     return inode;
 }
@@ -1558,13 +1558,13 @@ static int reiserfs_new_directory (struct reiserfs_transaction_handle *th,
        old type (ITEM_VERSION_1). Do not set key (second arg is 0), it
        is done by reiserfs_new_inode */
     if (old_format_only (sb)) {
-	make_le_item_head (ih, 0, KEY_FORMAT_3_5, DOT_OFFSET, TYPE_DIRENTRY, EMPTY_DIR_SIZE_V1, 2);
+	make_le_item_head (ih, NULL, KEY_FORMAT_3_5, DOT_OFFSET, TYPE_DIRENTRY, EMPTY_DIR_SIZE_V1, 2);
 	
 	make_empty_dir_item_v1 (body, ih->ih_key.k_dir_id, ih->ih_key.k_objectid,
 				INODE_PKEY (dir)->k_dir_id, 
 				INODE_PKEY (dir)->k_objectid );
     } else {
-	make_le_item_head (ih, 0, KEY_FORMAT_3_5, DOT_OFFSET, TYPE_DIRENTRY, EMPTY_DIR_SIZE, 2);
+	make_le_item_head (ih, NULL, KEY_FORMAT_3_5, DOT_OFFSET, TYPE_DIRENTRY, EMPTY_DIR_SIZE, 2);
 	
 	make_empty_dir_item (body, ih->ih_key.k_dir_id, ih->ih_key.k_objectid,
 		   		INODE_PKEY (dir)->k_dir_id, 
@@ -1606,7 +1606,7 @@ static int reiserfs_new_symlink (struct reiserfs_transaction_handle *th,
 		   le32_to_cpu (ih->ih_key.k_objectid),
 		   1, TYPE_DIRECT, 3/*key length*/);
 
-    make_le_item_head (ih, 0, KEY_FORMAT_3_5, 1, TYPE_DIRECT, item_len, 0/*free_space*/);
+    make_le_item_head (ih, NULL, KEY_FORMAT_3_5, 1, TYPE_DIRECT, item_len, 0/*free_space*/);
 
     /* look for place in the tree for new item */
     retval = search_item (sb, &key, path);
@@ -1701,7 +1701,7 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     REISERFS_I(inode)->i_prealloc_block = 0;
     REISERFS_I(inode)->i_prealloc_count = 0;
     REISERFS_I(inode)->i_trans_id = 0;
-    REISERFS_I(inode)->i_jl = 0;
+    REISERFS_I(inode)->i_jl = NULL;
     REISERFS_I(inode)->i_attrs =
 	REISERFS_I(dir)->i_attrs & REISERFS_INHERIT_MASK;
     sd_attrs_to_i_attrs( REISERFS_I(inode) -> i_attrs, inode );
@@ -1710,9 +1710,9 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     init_rwsem (&REISERFS_I(inode)->xattr_sem);
 
     if (old_format_only (sb))
-	make_le_item_head (&ih, 0, KEY_FORMAT_3_5, SD_OFFSET, TYPE_STAT_DATA, SD_V1_SIZE, MAX_US_INT);
+	make_le_item_head (&ih, NULL, KEY_FORMAT_3_5, SD_OFFSET, TYPE_STAT_DATA, SD_V1_SIZE, MAX_US_INT);
     else
-	make_le_item_head (&ih, 0, KEY_FORMAT_3_6, SD_OFFSET, TYPE_STAT_DATA, SD_SIZE, MAX_US_INT);
+	make_le_item_head (&ih, NULL, KEY_FORMAT_3_6, SD_OFFSET, TYPE_STAT_DATA, SD_SIZE, MAX_US_INT);
 
     /* key to search for correct place for new stat data */
     _make_cpu_key (&key, KEY_FORMAT_3_6, le32_to_cpu (ih.ih_key.k_dir_id),

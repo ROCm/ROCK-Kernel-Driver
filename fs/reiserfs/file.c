@@ -832,7 +832,7 @@ int reiserfs_prepare_file_region_for_write(
     struct item_head *ih = NULL; // pointer to item head that we are going to deal with
     struct buffer_head *itembuf=NULL; // Buffer head that contains items that we are going to deal with
     INITIALIZE_PATH(path); // path to item, that we are going to deal with.
-    __u32 * item=0; // pointer to item we are going to deal with
+    __u32 * item=NULL; // pointer to item we are going to deal with
     int item_pos=-1; /* Position in indirect item */
 
 

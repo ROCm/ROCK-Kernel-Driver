@@ -169,8 +169,8 @@ static int balance_leaf_when_delete (struct tree_balance * tb, int flag)
 		    if ( PATH_H_POSITION (tb->tb_path, 1) == 0 && 1 < B_NR_ITEMS(tb->FR[0]) )
 			replace_key(tb, tb->CFL[0],tb->lkey[0],tb->FR[0],1);
 
-		    leaf_move_items (LEAF_FROM_S_TO_L, tb, n, -1, 0);
-		    leaf_move_items (LEAF_FROM_R_TO_L, tb, B_NR_ITEMS(tb->R[0]), -1, 0);
+		    leaf_move_items (LEAF_FROM_S_TO_L, tb, n, -1, NULL);
+		    leaf_move_items (LEAF_FROM_R_TO_L, tb, B_NR_ITEMS(tb->R[0]), -1, NULL);
 
 		    reiserfs_invalidate_buffer (tb, tbS0);
 		    reiserfs_invalidate_buffer (tb, tb->R[0]);
@@ -178,8 +178,8 @@ static int balance_leaf_when_delete (struct tree_balance * tb, int flag)
 		    return 0;
 		}
 		/* all contents of all the 3 buffers will be in R[0] */
-		leaf_move_items (LEAF_FROM_S_TO_R, tb, n, -1, 0);
-		leaf_move_items (LEAF_FROM_L_TO_R, tb, B_NR_ITEMS(tb->L[0]), -1, 0);
+		leaf_move_items (LEAF_FROM_S_TO_R, tb, n, -1, NULL);
+		leaf_move_items (LEAF_FROM_L_TO_R, tb, B_NR_ITEMS(tb->L[0]), -1, NULL);
 
 		/* right_delimiting_key is correct in R[0] */
 		replace_key(tb, tb->CFR[0],tb->rkey[0],tb->R[0],0);
@@ -854,7 +854,7 @@ static int balance_leaf (struct tree_balance * tb,
 		    /* Insert part of the item into S_new[i] before 0-th item */
 		    bi.tb = tb;
 		    bi.bi_bh = S_new[i];
-		    bi.bi_parent = 0;
+		    bi.bi_parent = NULL;
 		    bi.bi_position = 0;
 
 		    if ( (old_len - sbytes[i]) > zeros_num ) {
@@ -882,7 +882,7 @@ static int balance_leaf (struct tree_balance * tb,
 		    /* Insert new item into S_new[i] */
 		    bi.tb = tb;
 		    bi.bi_bh = S_new[i];
-		    bi.bi_parent = 0;
+		    bi.bi_parent = NULL;
 		    bi.bi_position = 0;
 		    leaf_insert_into_buf (&bi, item_pos - n + snum[i] - 1, ih, body, zeros_num);
 
@@ -927,7 +927,7 @@ static int balance_leaf (struct tree_balance * tb,
 			    /* Paste given directory entry to directory item */
 			    bi.tb = tb;
 			    bi.bi_bh = S_new[i];
-			    bi.bi_parent = 0;
+			    bi.bi_parent = NULL;
 			    bi.bi_position = 0;
 			    leaf_paste_in_buffer (&bi, 0, pos_in_item - entry_count + sbytes[i] - 1,
 						  tb->insert_size[0], body,zeros_num);
@@ -965,7 +965,7 @@ static int balance_leaf (struct tree_balance * tb,
 			/* Append part of body into S_new[0] */
 			bi.tb = tb;
 			bi.bi_bh = S_new[i];
-			bi.bi_parent = 0;
+			bi.bi_parent = NULL;
 			bi.bi_position = 0;
 
 			if ( n_rem > zeros_num ) {
@@ -1021,7 +1021,7 @@ static int balance_leaf (struct tree_balance * tb,
 		    /* paste into item */
 		    bi.tb = tb;
 		    bi.bi_bh = S_new[i];
-		    bi.bi_parent = 0;
+		    bi.bi_parent = NULL;
 		    bi.bi_position = 0;
 		    leaf_paste_in_buffer(&bi, item_pos - n + snum[i], pos_in_item, tb->insert_size[0], body, zeros_num);
 
@@ -1196,11 +1196,11 @@ struct buffer_head * get_FEB (struct tree_balance * tb)
 
     bi.tb = tb;
     bi.bi_bh = first_b = tb->FEB[i];
-    bi.bi_parent = 0;
+    bi.bi_parent = NULL;
     bi.bi_position = 0;
     make_empty_node (&bi);
     set_buffer_uptodate(first_b);
-    tb->FEB[i] = 0;
+    tb->FEB[i] = NULL;
     tb->used[i] = first_b;
 
     return(first_b);
