@@ -1549,19 +1549,20 @@ sony535_init(void)
 #endif
 			/* now ready to use interrupts, if available */
 			sony535_irq_used = tmp_irq;
-#ifndef MODULE
-/* This code is not in MODULEs by default, since the autoirq stuff might
- * not be in the module-accessible symbol table.
- */
+
 			/* A negative sony535_irq_used will attempt an autoirq. */
 			if (sony535_irq_used < 0) {
-				autoirq_setup(0);
+				unsigned long irq_mask, delay;
+
+				irq_mask = probe_irq_on();
 				enable_interrupts();
 				outb(0, read_status_reg);	/* does a reset? */
-				sony535_irq_used = autoirq_report(10);
+				delay = jiffies + HZ/10;
+				while (time_before(jiffies, delay)) ;
+
+				sony535_irq_used = probe_irq_off(irq_mask);
 				disable_interrupts();
 			}
-#endif
 			if (sony535_irq_used > 0) {
 			    if (request_irq(sony535_irq_used, cdu535_interrupt,
 								SA_INTERRUPT, CDU535_HANDLE, NULL)) {

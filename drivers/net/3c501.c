@@ -323,14 +323,18 @@ static int __init el1_probe1(struct net_device *dev, int ioaddr)
 
 	if (dev->irq < 2)
 	{
-		autoirq_setup(2);
+		unsigned long irq_mask, delay;
+
+		irq_mask = probe_irq_on();
 		inb(RX_STATUS);		/* Clear pending interrupts. */
 		inb(TX_STATUS);
 		outb(AX_LOOP + 1, AX_CMD);
 
 		outb(0x00, AX_CMD);
 
-		autoirq = autoirq_report(1);
+		delay = jiffies + HZ/50;
+		while (time_before(jiffies, delay)) ;
+		autoirq = probe_irq_off(irq_mask);
 
 		if (autoirq == 0)
 		{

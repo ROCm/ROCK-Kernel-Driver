@@ -39,12 +39,6 @@ extern int ei_debug;
 #define ei_debug 1
 #endif
 
-#ifndef HAVE_AUTOIRQ
-/* From auto_irq.c */
-extern void autoirq_setup(int waittime);
-extern unsigned long autoirq_report(int waittime);
-#endif
-
 extern int ethdev_init(struct net_device *dev);
 extern void NS8390_init(struct net_device *dev, int startp);
 extern int ei_open(struct net_device *dev);

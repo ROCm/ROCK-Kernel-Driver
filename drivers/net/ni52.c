@@ -491,10 +491,16 @@ static int __init ni52_probe1(struct net_device *dev,int ioaddr)
 
 	if(dev->irq < 2)
 	{
-		autoirq_setup(0);
+		unsigned long irq_mask, delay;
+
+		irq_mask = probe_irq_on();
 		ni_reset586();
 		ni_attn586();
-		if(!(dev->irq = autoirq_report(2)))
+
+		delay = jiffies + HZ/50;
+		while (time_before(jiffies, delay)) ;
+		dev->irq = probe_irq_off(irq_mask);
+		if(!dev->irq)
 		{
 			printk("?autoirq, Failed to detect IRQ line!\n");
 			kfree(dev->priv);
