@@ -70,7 +70,7 @@ struct llc_sap *llc_sap_alloc(void)
 		memset(sap, 0, sizeof(*sap));
 		sap->state = LLC_SAP_STATE_ACTIVE;
 		memcpy(sap->laddr.mac, llc_main_station.mac_sa, ETH_ALEN);
-		spin_lock_init(&sap->sk_list.lock);
+		rwlock_init(&sap->sk_list.lock);
 	}
 	return sap;
 }
@@ -639,7 +639,7 @@ static int __init llc_init(void)
 
 	printk(llc_banner);
 	INIT_LIST_HEAD(&llc_main_station.sap_list.list);
-	spin_lock_init(&llc_main_station.sap_list.lock);
+	rwlock_init(&llc_main_station.sap_list.lock);
 	skb_queue_head_init(&llc_main_station.mac_pdu_q);
 	skb_queue_head_init(&llc_main_station.ev_q.list);
 	spin_lock_init(&llc_main_station.ev_q.lock);
