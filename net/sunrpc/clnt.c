@@ -659,7 +659,7 @@ call_transmit(struct rpc_task *task)
 	if (task->tk_status < 0)
 		return;
 	task->tk_status = xprt_prepare_transmit(task);
-	if (task->tk_status < 0)
+	if (task->tk_status != 0)
 		return;
 	/* Encode here so that rpcsec_gss can use correct sequence number. */
 	if (!task->tk_rqstp->rq_bytes_sent)
@@ -685,7 +685,7 @@ call_status(struct rpc_task *task)
 	struct rpc_rqst	*req = task->tk_rqstp;
 	int		status;
 
-	if (req->rq_received != 0)
+	if (req->rq_received > 0 && !req->rq_bytes_sent)
 		task->tk_status = req->rq_received;
 
 	dprintk("RPC: %4d call_status (status %d)\n", 
@@ -787,19 +787,22 @@ call_decode(struct rpc_task *task)
 
 	if (task->tk_status < 12) {
 		if (!clnt->cl_softrtry) {
-			task->tk_action = call_transmit;
+			task->tk_action = call_bind;
 			clnt->cl_stats->rpcretrans++;
-		} else {
-			printk(KERN_WARNING "%s: too small RPC reply size (%d bytes)\n",
-				clnt->cl_protname, task->tk_status);
-			rpc_exit(task, -EIO);
+			goto out_retry;
 		}
+		printk(KERN_WARNING "%s: too small RPC reply size (%d bytes)\n",
+			clnt->cl_protname, task->tk_status);
+		rpc_exit(task, -EIO);
 		return;
 	}
 
 	/* Verify the RPC header */
-	if (!(p = call_verify(task)))
-		return;
+	if (!(p = call_verify(task))) {
+		if (task->tk_action == NULL)
+			return;
+		goto out_retry;
+	}
 
 	/*
 	 * The following is an NFS-specific hack to cater for setuid
@@ -812,7 +815,7 @@ call_decode(struct rpc_task *task)
 			task->tk_flags ^= RPC_CALL_REALUID;
 			task->tk_action = call_bind;
 			task->tk_suid_retry--;
-			return;
+			goto out_retry;
 		}
 	}
 
@@ -822,6 +825,10 @@ call_decode(struct rpc_task *task)
 		task->tk_status = decode(req, p, task->tk_msg.rpc_resp);
 	dprintk("RPC: %4d call_decode result %d\n", task->tk_pid,
 					task->tk_status);
+	return;
+out_retry:
+	req->rq_received = 0;
+	task->tk_status = 0;
 }
 
 /*

@@ -138,15 +138,20 @@ xprt_from_sock(struct sock *sk)
 static int
 __xprt_lock_write(struct rpc_xprt *xprt, struct rpc_task *task)
 {
+	struct rpc_rqst *req = task->tk_rqstp;
+
 	if (!xprt->snd_task) {
-		if (xprt->nocong || __xprt_get_cong(xprt, task))
+		if (xprt->nocong || __xprt_get_cong(xprt, task)) {
 			xprt->snd_task = task;
+			if (req)
+				req->rq_bytes_sent = 0;
+		}
 	}
 	if (xprt->snd_task != task) {
 		dprintk("RPC: %4d TCP write queue full\n", task->tk_pid);
 		task->tk_timeout = 0;
 		task->tk_status = -EAGAIN;
-		if (task->tk_rqstp && task->tk_rqstp->rq_nresend)
+		if (req && req->rq_nresend)
 			rpc_sleep_on(&xprt->resend, task, NULL, NULL);
 		else
 			rpc_sleep_on(&xprt->sending, task, NULL, NULL);
@@ -181,8 +186,12 @@ __xprt_lock_write_next(struct rpc_xprt *xprt)
 		if (!task)
 			return;
 	}
-	if (xprt->nocong || __xprt_get_cong(xprt, task))
+	if (xprt->nocong || __xprt_get_cong(xprt, task)) {
+		struct rpc_rqst *req = task->tk_rqstp;
 		xprt->snd_task = task;
+		if (req)
+			req->rq_bytes_sent = 0;
+	}
 }
 
 /*
@@ -421,6 +430,9 @@ xprt_connect(struct rpc_task *task)
 		return;
 	if (xprt_connected(xprt))
 		goto out_write;
+
+	if (task->tk_rqstp)
+		task->tk_rqstp->rq_bytes_sent = 0;
 
 	/*
 	 * We're here because the xprt was marked disconnected.
@@ -1104,10 +1116,11 @@ xprt_prepare_transmit(struct rpc_task *task)
 	if (xprt->shutdown)
 		return -EIO;
 
-	if (task->tk_rpcwait)
-		rpc_remove_wait_queue(task);
-
 	spin_lock_bh(&xprt->sock_lock);
+	if (req->rq_received && !req->rq_bytes_sent) {
+		err = req->rq_received;
+		goto out_unlock;
+	}
 	if (!__xprt_lock_write(xprt, task)) {
 		err = -EAGAIN;
 		goto out_unlock;
@@ -1160,8 +1173,12 @@ xprt_transmit(struct rpc_task *task)
 		if (xprt->stream) {
 			req->rq_bytes_sent += status;
 
-			if (req->rq_bytes_sent >= req->rq_slen)
+			/* If we've sent the entire packet, immediately
+			 * reset the count of bytes sent. */
+			if (req->rq_bytes_sent >= req->rq_slen) {
+				req->rq_bytes_sent = 0;
 				goto out_receive;
+			}
 		} else {
 			if (status >= req->rq_slen)
 				goto out_receive;
@@ -1182,9 +1199,6 @@ xprt_transmit(struct rpc_task *task)
 	 *	 hence there is no danger of the waking up task being put on
 	 *	 schedq, and being picked up by a parallel run of rpciod().
 	 */
-	if (req->rq_received)
-		goto out_release;
-
 	task->tk_status = status;
 
 	switch (status) {
@@ -1214,13 +1228,12 @@ xprt_transmit(struct rpc_task *task)
 		if (xprt->stream)
 			xprt_disconnect(xprt);
 	}
- out_release:
 	xprt_release_write(xprt, task);
-	req->rq_bytes_sent = 0;
 	return;
  out_receive:
 	dprintk("RPC: %4d xmit complete\n", task->tk_pid);
 	/* Set the task's receive timeout value */
+	spin_lock_bh(&xprt->sock_lock);
 	if (!xprt->nocong) {
 		task->tk_timeout = rpc_calc_rto(&clnt->cl_rtt,
 				task->tk_msg.rpc_proc->p_timer);
@@ -1229,7 +1242,6 @@ xprt_transmit(struct rpc_task *task)
 			task->tk_timeout = req->rq_timeout.to_maxval;
 	} else
 		task->tk_timeout = req->rq_timeout.to_current;
-	spin_lock_bh(&xprt->sock_lock);
 	/* Don't race with disconnect */
 	if (!xprt_connected(xprt))
 		task->tk_status = -ENOTCONN;
@@ -1237,7 +1249,6 @@ xprt_transmit(struct rpc_task *task)
 		rpc_sleep_on(&xprt->pending, task, NULL, xprt_timer);
 	__xprt_release_write(xprt, task);
 	spin_unlock_bh(&xprt->sock_lock);
-	req->rq_bytes_sent = 0;
 }
 
 /*
