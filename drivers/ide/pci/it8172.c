@@ -42,8 +42,6 @@
 #include <asm/io.h>
 #include <asm/it8172/it8172_int.h>
 
-#include "it8172.h"
-
 /*
  * Prototypes
  */
@@ -265,6 +263,18 @@ static void __init init_hwif_it8172 (ide_hwif_t *hwif)
 	hwif->drives[0].autodma = hwif->autodma;
 	hwif->drives[1].autodma = hwif->autodma;
 }
+
+static ide_pci_device_t it8172_chipsets[] __devinitdata = {
+	{	/* 0 */
+		.name		= "IT8172G",
+		.init_chipset	= init_chipset_it8172,
+		.init_hwif	= init_hwif_it8172,
+		.channels	= 2,
+		.autodma	= AUTODMA,
+		.enablebits	= {{0x00,0x00,0x00}, {0x40,0x00,0x01}},
+		.bootable	= ON_BOARD,
+	}
+};
 
 static int __devinit it8172_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
