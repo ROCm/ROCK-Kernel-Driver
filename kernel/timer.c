@@ -194,7 +194,7 @@ void add_timer(struct timer_list *timer)
 	return;
 bug:
 	spin_unlock_irqrestore(&timerlist_lock, flags);
-	printk("bug: kernel timer added twice at %p.\n",
+	printk(KERN_ERR "BUG: kernel timer added twice at %p.\n",
 			__builtin_return_address(0));
 }
 
