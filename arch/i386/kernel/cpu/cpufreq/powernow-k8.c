@@ -72,9 +72,9 @@ static u32 batps;	/* limit on the number of p states when on battery */
 			/* - set by BIOS in the PSB/PST                    */
 
 static struct cpufreq_driver cpufreq_amd64_driver = {
-	.verify = drv_verify,
-	.target = drv_target,
-	.init = drv_cpu_init,
+	.verify = powernowk8_verify,
+	.target = powernowk8_target,
+	.init = powernowk8_cpu_init,
 	.name = "cpufreq-amd64",
 	.owner = THIS_MODULE,
 };
@@ -90,7 +90,7 @@ find_freq_from_fid(u32 fid)
 }
 
 /* Return a fid matching an input frequency in MHz */
-u32
+static u32
 find_fid_from_freq(u32 freq)
 {
 	return (freq - 800) / 100;
@@ -718,7 +718,7 @@ find_psb_table(void)
 
 /* Converts a frequency (that might not necessarily be a multiple of 200) */
 /* to a fid.                                                              */
-u32
+static u32
 find_closest_fid(u32 freq, int searchup)
 {
 	if (searchup == SEARCH_UP)
@@ -861,7 +861,7 @@ transition_frequency(u32 * preq, u32 * pmin, u32 * pmax, u32 searchup)
 
 /* Driver entry point to switch to the target frequency */
 static int
-drv_target(struct cpufreq_policy *pol, unsigned targfreq, unsigned relation)
+powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsigned relation)
 {
 	u32 checkfid = currfid;
 	u32 checkvid = currvid;
@@ -909,7 +909,7 @@ drv_target(struct cpufreq_policy *pol, unsigned targfreq, unsigned relation)
 
 /* Driver entry point to verify the policy and range of frequencies */
 static int
-drv_verify(struct cpufreq_policy *pol)
+powernowk8_verify(struct cpufreq_policy *pol)
 {
 	u32 min = pol->min / 1000;
 	u32 max = pol->max / 1000;
@@ -935,6 +935,7 @@ drv_verify(struct cpufreq_policy *pol)
 		return -ENODEV;
 	}
 
+#warning pol->policy is in undefined state here
 	res = find_match(&targ, &min, &max,
 			 pol->policy == CPUFREQ_POLICY_POWERSAVE ?
 			 SEARCH_DOWN : SEARCH_UP, 0, 0);
@@ -947,14 +948,14 @@ drv_verify(struct cpufreq_policy *pol)
 
 /* per CPU init entry point to the driver */
 static int __init
-drv_cpu_init(struct cpufreq_policy *pol)
+powernowk8_cpu_init(struct cpufreq_policy *pol)
 {
 	if (pol->cpu != 0) {
 		printk(KERN_ERR PFX "init not cpu 0\n");
 		return -ENODEV;
 	}
 
-	pol->policy = CPUFREQ_POLICY_PERFORMANCE; /* boot as fast as we can */
+	pol->governor = CPUFREQ_DEFAULT_GOVERNOR;
 
 	/* Take a crude guess here. */
 	pol->cpuinfo.transition_latency = ((rvo + 8) * vstable * VST_UNITS_20US)
@@ -980,7 +981,7 @@ drv_cpu_init(struct cpufreq_policy *pol)
 
 /* driver entry point for init */
 static int __init
-drv_init(void)
+powernowk8_init(void)
 {
 	int rc;
 
@@ -994,7 +995,7 @@ drv_init(void)
 		return rc;
 
 	if (pending_bit_stuck()) {
-		printk(KERN_ERR PFX "drv_init fail, change pending bit set\n");
+		printk(KERN_ERR PFX "powernowk8_init fail, change pending bit set\n");
 		kfree(ppst);
 		return -EIO;
 	}
@@ -1004,9 +1005,9 @@ drv_init(void)
 
 /* driver entry point for term */
 static void __exit
-drv_exit(void)
+powernowk8_exit(void)
 {
-	dprintk(KERN_INFO PFX "drv_exit\n");
+	dprintk(KERN_INFO PFX "powernowk8_exit\n");
 
 	cpufreq_unregister_driver(&cpufreq_amd64_driver);
 	kfree(ppst);
@@ -1016,5 +1017,5 @@ MODULE_AUTHOR("Paul Devriendt <paul.devriendt@amd.com>");
 MODULE_DESCRIPTION("AMD Athlon 64 and Opteron processor frequency driver.");
 MODULE_LICENSE("GPL");
 
-module_init(drv_init);
-module_exit(drv_exit);
+module_init(powernowk8_init);
+module_exit(powernowk8_exit);

@@ -373,7 +373,7 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 	case 6:
 		cpuname = "C3 'Samuel' [C5A]";
 		longhaul_version=1;
-		memcpy (clock_ratio, longhaul1_clock_ratio, sizeof(longhaul1_clock_ratio));
+		memcpy (clock_ratio, samuel1_clock_ratio, sizeof(samuel1_clock_ratio));
 		memcpy (eblcr_table, samuel1_eblcr, sizeof(samuel1_eblcr));
 		break;
 
@@ -382,13 +382,17 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 		case 0:
 			cpuname = "C3 'Samuel 2' [C5B]";
 			longhaul_version=1;
-			memcpy (clock_ratio, longhaul1_clock_ratio, sizeof(longhaul1_clock_ratio));
+			/* Note, this is not a typo, early Samuel2's had Samuel1 ratios. */
+			memcpy (clock_ratio, samuel1_clock_ratio, sizeof(samuel1_clock_ratio));
 			memcpy (eblcr_table, samuel2_eblcr, sizeof(samuel2_eblcr));
 			break;
 		case 1 ... 15:
-			cpuname = "C3 'Ezra' [C5C]";
+			if (c->x86_mask < 8)
+				cpuname = "C3 'Samuel 2' [C5B]";
+			else
+				cpuname = "C3 'Ezra' [C5C]";
 			longhaul_version=2;
-			memcpy (clock_ratio, longhaul2_clock_ratio, sizeof(longhaul2_clock_ratio));
+			memcpy (clock_ratio, ezra_clock_ratio, sizeof(ezra_clock_ratio));
 			memcpy (eblcr_table, ezra_eblcr, sizeof(ezra_eblcr));
 			break;
 		}
@@ -398,14 +402,16 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 		cpuname = "C3 'Ezra-T [C5M]";
 		longhaul_version=3;
 		numscales=32;
-		memcpy (clock_ratio, longhaul3_clock_ratio, sizeof(longhaul3_clock_ratio));
-		memcpy (eblcr_table, c5m_eblcr, sizeof(c5m_eblcr));
+		memcpy (clock_ratio, ezrat_clock_ratio, sizeof(ezrat_clock_ratio));
+		memcpy (eblcr_table, ezrat_eblcr, sizeof(ezrat_eblcr));
 		break;
 	/*
 	case 9:
 		cpuname = "C3 'Nehemiah' [C5N]";
 		longhaul_version=3;
 		numscales=32;
+		memcpy (clock_ratio, nehemiah_clock_ratio, sizeof(nehemiah_clock_ratio));
+		memcpy (eblcr_table, nehemiah_eblcr, sizeof(nehemiah_eblcr));
 	*/
 	default:
 		cpuname = "Unknown";
@@ -445,12 +451,8 @@ static int __init longhaul_init (void)
 		return -ENODEV;
 
 	switch (c->x86_model) {
-	case 6 ... 7:
+	case 6 ... 8:
 		return cpufreq_register_driver(&longhaul_driver);
-	case 8:
-		printk (KERN_INFO PFX "Ezra-T unsupported: Waiting on updated docs "
-						"from VIA before this is usable.\n");
-		break;
 	case 9:
 		printk (KERN_INFO PFX "Nehemiah unsupported: Waiting on working silicon "
 						"from VIA before this is usable.\n");
