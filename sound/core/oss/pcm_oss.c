@@ -263,7 +263,7 @@ static int snd_pcm_oss_period_size(snd_pcm_substream_t *substream,
 
 	snd_assert(oss_period_size >= 16, return -EINVAL);
 	runtime->oss.period_bytes = oss_period_size;
-	runtime->oss.period_frames = snd_pcm_alsa_frames(substream, oss_period_size);
+	runtime->oss.period_frames = 1;
 	runtime->oss.periods = oss_periods;
 	return 0;
 }
@@ -520,6 +520,8 @@ static int snd_pcm_oss_change_params(snd_pcm_substream_t *substream)
 	runtime->oss.buffer_used = 0;
 	if (runtime->dma_area)
 		snd_pcm_format_set_silence(runtime->format, runtime->dma_area, bytes_to_samples(runtime, runtime->dma_bytes));
+
+	runtime->oss.period_frames = snd_pcm_alsa_frames(substream, oss_period_size);
 
 	err = 0;
 failure:
