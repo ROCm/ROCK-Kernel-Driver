@@ -31,11 +31,6 @@ struct pcmcia_state {
             vs_Xv: 1;
 };
 
-struct pcmcia_state_array {
-  unsigned int size;
-  struct pcmcia_state *state;
-};
-
 struct pcmcia_configure {
   unsigned  vcc: 8,
             vpp: 8,
@@ -53,7 +48,7 @@ struct pcmcia_irq_info {
 struct pcmcia_low_level {
   int (*init)(struct pcmcia_init *);
   int (*shutdown)(void);
-  int (*socket_state)(struct pcmcia_state_array *);
+  void (*socket_state)(int sock, struct pcmcia_state *);
   int (*get_irq_info)(struct pcmcia_irq_info *);
   int (*configure_socket)(int sock, const struct pcmcia_configure *);
 

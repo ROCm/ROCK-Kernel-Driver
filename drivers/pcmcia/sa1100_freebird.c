@@ -75,34 +75,20 @@ static int freebird_pcmcia_shutdown(void)
   return 0;
 }
 
-static int freebird_pcmcia_socket_state(struct pcmcia_state_array
-				       *state_array){
-  unsigned long levels;
-
-  if(state_array->size<2) return -1;
-
-  memset(state_array->state, 0,
-	 (state_array->size)*sizeof(struct pcmcia_state));
-
-  levels = LINKUP_PRS;
+static void freebird_pcmcia_socket_state(int sock, struct pcmcia_state *state)
+{
+  unsigned long levels = LINKUP_PRS;
 //printk("LINKUP_PRS=%x\n",levels);
 
-  state_array->state[0].detect=
-    ((levels & (LINKUP_CD1 | LINKUP_CD2))==0)?1:0;
-
-  state_array->state[0].ready=(levels & LINKUP_RDY)?1:0;
-
-  state_array->state[0].bvd1=(levels & LINKUP_BVD1)?1:0;
-
-  state_array->state[0].bvd2=(levels & LINKUP_BVD2)?1:0;
-
-  state_array->state[0].wrprot=0; /* Not available on Assabet. */
-
-  state_array->state[0].vs_3v=1;  /* Can only apply 3.3V on Assabet. */
-
-  state_array->state[0].vs_Xv=0;
-
-  return 1;
+  if (sock == 0) {
+    state->detect = ((levels & (LINKUP_CD1 | LINKUP_CD2))==0)?1:0;
+    state->ready  = (levels & LINKUP_RDY)?1:0;
+    state->bvd1   = (levels & LINKUP_BVD1)?1:0;
+    state->bvd2   = (levels & LINKUP_BVD2)?1:0;
+    state->wrprot = 0; /* Not available on Assabet. */
+    state->vs_3v  = 1;  /* Can only apply 3.3V on Assabet. */
+    state->vs_Xv  = 0;
+  }
 }
 
 static int freebird_pcmcia_get_irq_info(struct pcmcia_irq_info *info){

@@ -66,40 +66,36 @@ int system3_pcmcia_configure_socket(int sock, const struct pcmcia_configure *con
 	return sa1111_pcmcia_configure_socket(sock, conf);
 }
 
-static int system3_pcmcia_socket_state(struct pcmcia_state_array
-		*state)
+static void system3_pcmcia_socket_state(int sock, struct pcmcia_state *state)
 {
-	unsigned long	status		= 0;
+	unsigned long status = PCSR;
 
-	if(state->size<2) return -1;
-
-	memset(state->state, 0,
-			(state->size)*sizeof(struct pcmcia_state));
-
-	status=PCSR;
-
+	switch (sock) {
 #if 0 /* PCMCIA socket not yet connected */
-	state->state[0].detect = status & PCSR_S0_DETECT ? 0 : 1;
-	state->state[0].ready  = status & PCSR_S0_READY  ? 1 : 0;
-	state->state[0].bvd1   = status & PCSR_S0_BVD1   ? 1 : 0;
-	state->state[0].bvd2   = 1;
-	state->state[0].wrprot = status & PCSR_S0_WP     ? 1 : 0;
-	state->state[0].vs_3v  = 1;
-	state->state[0].vs_Xv  = 0;
+	case 0:
+		state->detect = status & PCSR_S0_DETECT ? 0 : 1;
+		state->ready  = status & PCSR_S0_READY  ? 1 : 0;
+		state->bvd1   = status & PCSR_S0_BVD1   ? 1 : 0;
+		state->bvd2   = 1;
+		state->wrprot = status & PCSR_S0_WP     ? 1 : 0;
+		state->vs_3v  = 1;
+		state->vs_Xv  = 0;
+		break;
 #endif
 
-	state->state[1].detect = status & PCSR_S1_DETECT ? 0 : 1;
-	state->state[1].ready  = status & PCSR_S1_READY  ? 1 : 0;
-	state->state[1].bvd1   = status & PCSR_S1_BVD1   ? 1 : 0;
-	state->state[1].bvd2   = 1;
-	state->state[1].wrprot = status & PCSR_S1_WP     ? 1 : 0;
-	state->state[1].vs_3v  = 1;
-	state->state[1].vs_Xv  = 0;
+	case 1:
+		state->detect = status & PCSR_S1_DETECT ? 0 : 1;
+		state->ready  = status & PCSR_S1_READY  ? 1 : 0;
+		state->bvd1   = status & PCSR_S1_BVD1   ? 1 : 0;
+		state->bvd2   = 1;
+		state->wrprot = status & PCSR_S1_WP     ? 1 : 0;
+		state->vs_3v  = 1;
+		state->vs_Xv  = 0;
+		break;
+	}
 
-	DPRINTK( "PCSR=0x%08lx, S1_RDY_nIREQ=%d\n", status,
-			state->state[1].ready );
-
-	return 1;
+	DPRINTK("Sock %d PCSR=0x%08lx, Sx_RDY_nIREQ=%d\n",
+		sock, status, state->ready);
 }
 
 struct pcmcia_low_level system3_pcmcia_ops = {

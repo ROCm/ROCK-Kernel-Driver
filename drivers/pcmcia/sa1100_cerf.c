@@ -66,24 +66,19 @@ static int cerf_pcmcia_shutdown(void)
   return 0;
 }
 
-static int cerf_pcmcia_socket_state(struct pcmcia_state_array
-				       *state_array){
-  unsigned long levels;
-  int i = CERF_SOCKET;
+static void cerf_pcmcia_socket_state(int sock, struct pcmcia_state *state)
+{
+  unsigned long levels=GPLR;
 
-  if(state_array->size<2) return -1;
-
-  levels=GPLR;
-
-  state_array->state[i].detect=((levels & GPIO_CF_CD)==0)?1:0;
-  state_array->state[i].ready=(levels & GPIO_CF_IRQ)?1:0;
-  state_array->state[i].bvd1=(levels & GPIO_CF_BVD1)?1:0;
-  state_array->state[i].bvd2=(levels & GPIO_CF_BVD2)?1:0;
-  state_array->state[i].wrprot=0;
-  state_array->state[i].vs_3v=1;
-  state_array->state[i].vs_Xv=0;
-
-  return 1;
+  if (sock == CERF_SOCKET) {
+    state->detect=((levels & GPIO_CF_CD)==0)?1:0;
+    state->ready=(levels & GPIO_CF_IRQ)?1:0;
+    state->bvd1=(levels & GPIO_CF_BVD1)?1:0;
+    state->bvd2=(levels & GPIO_CF_BVD2)?1:0;
+    state->wrprot=0;
+    state->vs_3v=1;
+    state->vs_Xv=0;
+  }
 }
 
 static int cerf_pcmcia_get_irq_info(struct pcmcia_irq_info *info){

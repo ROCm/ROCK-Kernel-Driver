@@ -80,27 +80,19 @@ static int yopy_pcmcia_shutdown(void)
 	return 0;
 }
 
-static int yopy_pcmcia_socket_state(struct pcmcia_state_array *state_array)
+static void yopy_pcmcia_socket_state(int sock, struct pcmcia_state_array *state)
 {
-	unsigned long levels;
+	unsigned long levels = GPLR;
 
-	if (state_array->size != 1)
-		return -1;
-
-	memset(state_array->state, 0,
-	       state_array->size * sizeof(struct pcmcia_state));
-
-	levels = GPLR;
-
-	state_array->state[0].detect = (levels & GPIO_CF_CD)    ? 0 : 1;
-	state_array->state[0].ready  = (levels & GPIO_CF_READY) ? 1 : 0;
-	state_array->state[0].bvd1   = (levels & GPIO_CF_BVD1)  ? 1 : 0;
-	state_array->state[0].bvd2   = (levels & GPIO_CF_BVD2)  ? 1 : 0;
-	state_array->state[0].wrprot = 0; /* Not available on Yopy. */
-	state_array->state[0].vs_3v  = 0; /* FIXME Can only apply 3.3V on Yopy. */
-	state_array->state[0].vs_Xv  = 0;
-
-	return 1;
+	if (sock == 0) {
+		state->detect = (levels & GPIO_CF_CD)    ? 0 : 1;
+		state->ready  = (levels & GPIO_CF_READY) ? 1 : 0;
+		state->bvd1   = (levels & GPIO_CF_BVD1)  ? 1 : 0;
+		state->bvd2   = (levels & GPIO_CF_BVD2)  ? 1 : 0;
+		state->wrprot = 0; /* Not available on Yopy. */
+		state->vs_3v  = 0; /* FIXME Can only apply 3.3V on Yopy. */
+		state->vs_Xv  = 0;
+	}
 }
 
 static int yopy_pcmcia_get_irq_info(struct pcmcia_irq_info *info)

@@ -79,26 +79,19 @@ static int trizeps_pcmcia_shutdown(void)
  *
 
  ******************************************************/
-static int trizeps_pcmcia_socket_state(struct pcmcia_state_array
-				       *state_array){
-	unsigned long levels;
+static void trizeps_pcmcia_socket_state(int sock, struct pcmcia_state *state_array)
+{
+	unsigned long levels = GPLR;
 
-	if (state_array->size < NUMBER_OF_TRIZEPS_PCMCIA_SLOTS) return -1;
-
-	memset(state_array->state, 0,
-	       (state_array->size)*sizeof(struct pcmcia_state));
-
-	levels = GPLR;
-
-	state_array->state[0].detect = ((levels & GPIO_GPIO(TRIZEPS_GPIO_PCMCIA_CD0)) == 0) ? 1 : 0;
-	state_array->state[0].ready  = ((levels & GPIO_GPIO(TRIZEPS_GPIO_PCMCIA_IRQ0)) != 0) ? 1 : 0;
-	state_array->state[0].bvd1   = ((TRIZEPS_BCR1 & TRIZEPS_PCM_BVD1) !=0 ) ? 1 : 0;
-	state_array->state[0].bvd2   = ((TRIZEPS_BCR1 & TRIZEPS_PCM_BVD2) != 0) ? 1 : 0;
-	state_array->state[0].wrprot = 0; // not write protected
-	state_array->state[0].vs_3v  = ((TRIZEPS_BCR1 & TRIZEPS_nPCM_VS1) == 0) ? 1 : 0; //VS1=0 -> vs_3v=1
-	state_array->state[0].vs_Xv  = ((TRIZEPS_BCR1 & TRIZEPS_nPCM_VS2) == 0) ? 1 : 0; //VS2=0 -> vs_Xv=1
-
-	return 1;  // success
+	if (sock == 0) {
+		state->detect = ((levels & GPIO_GPIO(TRIZEPS_GPIO_PCMCIA_CD0)) == 0) ? 1 : 0;
+		state->ready  = ((levels & GPIO_GPIO(TRIZEPS_GPIO_PCMCIA_IRQ0)) != 0) ? 1 : 0;
+		state->bvd1   = ((TRIZEPS_BCR1 & TRIZEPS_PCM_BVD1) !=0 ) ? 1 : 0;
+		state->bvd2   = ((TRIZEPS_BCR1 & TRIZEPS_PCM_BVD2) != 0) ? 1 : 0;
+		state->wrprot = 0; // not write protected
+		state->vs_3v  = ((TRIZEPS_BCR1 & TRIZEPS_nPCM_VS1) == 0) ? 1 : 0; //VS1=0 -> vs_3v=1
+		state->vs_Xv  = ((TRIZEPS_BCR1 & TRIZEPS_nPCM_VS2) == 0) ? 1 : 0; //VS2=0 -> vs_Xv=1
+	}
 }
 
 /**

@@ -57,34 +57,19 @@ static int pangolin_pcmcia_shutdown(void)
   return 0;
 }
 
-static int pangolin_pcmcia_socket_state(struct pcmcia_state_array
-				       *state_array){
-  unsigned long levels;
+static void pangolin_pcmcia_socket_state(int sock, struct pcmcia_state *state)
+{
+  unsigned long levels = GPLR;;
 
-  if(state_array->size<2) return -1;
-
-  memset(state_array->state, 0, 
-	 (state_array->size)*sizeof(struct pcmcia_state));
-
-  levels=GPLR;
-#ifndef CONFIG_SA1100_PANGOLIN_PCMCIA_IDE
-  state_array->state[1].detect=((levels & GPIO_PCMCIA_CD)==0)?1:0;
-  state_array->state[1].ready=(levels & GPIO_PCMCIA_IRQ)?1:0;
-  state_array->state[1].bvd1=1; /* Not available on Pangolin. */
-  state_array->state[1].bvd2=1; /* Not available on Pangolin. */
-  state_array->state[1].wrprot=0; /* Not available on Pangolin. */
-  state_array->state[1].vs_3v=1;  /* Can only apply 3.3V on Pangolin. */
-  state_array->state[1].vs_Xv=0;
-#else
-  state_array->state[0].detect=((levels & GPIO_PCMCIA_CD)==0)?1:0;
-  state_array->state[0].ready=(levels & GPIO_PCMCIA_IRQ)?1:0;
-  state_array->state[0].bvd1=1; /* Not available on Pangolin. */
-  state_array->state[0].bvd2=1; /* Not available on Pangolin. */
-  state_array->state[0].wrprot=0; /* Not available on Pangolin. */
-  state_array->state[0].vs_3v=0;  /* voltage level is determined by jumper setting */
-  state_array->state[0].vs_Xv=0;
-#endif
-  return 1;
+  if (sock == PANGOLIN_SOCK) {
+    state->detect=((levels & GPIO_PCMCIA_CD)==0)?1:0;
+    state->ready=(levels & GPIO_PCMCIA_IRQ)?1:0;
+    state->bvd1=1; /* Not available on Pangolin. */
+    state->bvd2=1; /* Not available on Pangolin. */
+    state->wrprot=0; /* Not available on Pangolin. */
+    state->vs_3v=1;  /* Can only apply 3.3V on Pangolin. */
+    state->vs_Xv=0;
+  }
 }
 
 static int pangolin_pcmcia_get_irq_info(struct pcmcia_irq_info *info){

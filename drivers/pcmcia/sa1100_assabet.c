@@ -69,25 +69,20 @@ static int assabet_pcmcia_shutdown(void)
 	return 0;
 }
 
-static int
-assabet_pcmcia_socket_state(struct pcmcia_state_array *state_array)
+static void
+assabet_pcmcia_socket_state(int sock, struct pcmcia_state *state)
 {
-	unsigned long levels;
+	unsigned long levels = GPLR;
 
-	if (state_array->size < 2)
-		return -1;
-
-	levels = GPLR;
-
-	state_array->state[1].detect = (levels & ASSABET_GPIO_CF_CD) ? 0 : 1;
-	state_array->state[1].ready  = (levels & ASSABET_GPIO_CF_IRQ) ? 1 : 0;
-	state_array->state[1].bvd1   = (levels & ASSABET_GPIO_CF_BVD1) ? 1 : 0;
-	state_array->state[1].bvd2   = (levels & ASSABET_GPIO_CF_BVD2) ? 1 : 0;
-	state_array->state[1].wrprot = 0; /* Not available on Assabet. */
-	state_array->state[1].vs_3v  = 1; /* Can only apply 3.3V on Assabet. */
-	state_array->state[1].vs_Xv  = 0;
-
-	return 1;
+	if (sock == 1) {
+		state->detect = (levels & ASSABET_GPIO_CF_CD) ? 0 : 1;
+		state->ready  = (levels & ASSABET_GPIO_CF_IRQ) ? 1 : 0;
+		state->bvd1   = (levels & ASSABET_GPIO_CF_BVD1) ? 1 : 0;
+		state->bvd2   = (levels & ASSABET_GPIO_CF_BVD2) ? 1 : 0;
+		state->wrprot = 0; /* Not available on Assabet. */
+		state->vs_3v  = 1; /* Can only apply 3.3V on Assabet. */
+		state->vs_Xv  = 0;
+	}
 }
 
 static int assabet_pcmcia_get_irq_info(struct pcmcia_irq_info *info)

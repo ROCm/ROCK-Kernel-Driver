@@ -58,39 +58,26 @@ static int simpad_pcmcia_shutdown(void)
   return 0;
 }
 
-static int simpad_pcmcia_socket_state(struct pcmcia_state_array
-				       *state_array)
+static void simpad_pcmcia_socket_state(int sock, struct pcmcia_state *state)
 {
-  unsigned long levels;
-  unsigned long *cs3reg = CS3_BASE;
+  if (sock == 1) {
+    unsigned long levels = GPLR;
+    unsigned long *cs3reg = CS3_BASE;
 
-  if(state_array->size<2) return -1;
-
-  memset(state_array->state, 0, 
-	 (state_array->size)*sizeof(struct pcmcia_state));
-
-  levels=GPLR;
-
-  state_array->state[1].detect=((levels & GPIO_CF_CD)==0)?1:0;
-
-  state_array->state[1].ready=(levels & GPIO_CF_IRQ)?1:0;
-
-  state_array->state[1].bvd1=1; /* Not available on Simpad. */
-
-  state_array->state[1].bvd2=1; /* Not available on Simpad. */
-
-  state_array->state[1].wrprot=0; /* Not available on Simpad. */
-
+    state->detect=((levels & GPIO_CF_CD)==0)?1:0;
+    state->ready=(levels & GPIO_CF_IRQ)?1:0;
+    state->bvd1=1; /* Not available on Simpad. */
+    state->bvd2=1; /* Not available on Simpad. */
+    state->wrprot=0; /* Not available on Simpad. */
   
-  if((*cs3reg & 0x0c) == 0x0c) {
-    state_array->state[1].vs_3v=0;
-    state_array->state[1].vs_Xv=0;
-  } else
-  {
-    state_array->state[1].vs_3v=1;
-    state_array->state[1].vs_Xv=0;
+    if((*cs3reg & 0x0c) == 0x0c) {
+      state->vs_3v=0;
+      state->vs_Xv=0;
+    } else {
+      state->vs_3v=1;
+      state->vs_Xv=0;
+    }
   }
-  return 1;
 }
 
 static int simpad_pcmcia_get_irq_info(struct pcmcia_irq_info *info){

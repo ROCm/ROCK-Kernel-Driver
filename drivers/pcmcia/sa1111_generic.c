@@ -63,32 +63,31 @@ int sa1111_pcmcia_shutdown(void)
 	return 0;
 }
 
-int sa1111_pcmcia_socket_state(struct pcmcia_state_array *state)
+void sa1111_pcmcia_socket_state(int sock, struct pcmcia_state *state)
 {
-	unsigned long status;
+	unsigned long status = sa1111_readl(pcmcia->mapbase + SA1111_PCSR);
 
-	if (state->size < 2)
-		return -1;
+	switch (sock) {
+	case 0:
+		state->detect = status & PCSR_S0_DETECT ? 0 : 1;
+		state->ready  = status & PCSR_S0_READY  ? 1 : 0;
+		state->bvd1   = status & PCSR_S0_BVD1   ? 1 : 0;
+		state->bvd2   = status & PCSR_S0_BVD2   ? 1 : 0;
+		state->wrprot = status & PCSR_S0_WP     ? 1 : 0;
+		state->vs_3v  = status & PCSR_S0_VS1    ? 0 : 1;
+		state->vs_Xv  = status & PCSR_S0_VS2    ? 0 : 1;
+		break;
 
-	status = sa1111_readl(pcmcia->mapbase + SA1111_PCSR);
-
-	state->state[0].detect = status & PCSR_S0_DETECT ? 0 : 1;
-	state->state[0].ready  = status & PCSR_S0_READY  ? 1 : 0;
-	state->state[0].bvd1   = status & PCSR_S0_BVD1   ? 1 : 0;
-	state->state[0].bvd2   = status & PCSR_S0_BVD2   ? 1 : 0;
-	state->state[0].wrprot = status & PCSR_S0_WP     ? 1 : 0;
-	state->state[0].vs_3v  = status & PCSR_S0_VS1    ? 0 : 1;
-	state->state[0].vs_Xv  = status & PCSR_S0_VS2    ? 0 : 1;
-
-	state->state[1].detect = status & PCSR_S1_DETECT ? 0 : 1;
-	state->state[1].ready  = status & PCSR_S1_READY  ? 1 : 0;
-	state->state[1].bvd1   = status & PCSR_S1_BVD1   ? 1 : 0;
-	state->state[1].bvd2   = status & PCSR_S1_BVD2   ? 1 : 0;
-	state->state[1].wrprot = status & PCSR_S1_WP     ? 1 : 0;
-	state->state[1].vs_3v  = status & PCSR_S1_VS1    ? 0 : 1;
-	state->state[1].vs_Xv  = status & PCSR_S1_VS2    ? 0 : 1;
-
-	return 1;
+	case 1:
+		state->detect = status & PCSR_S1_DETECT ? 0 : 1;
+		state->ready  = status & PCSR_S1_READY  ? 1 : 0;
+		state->bvd1   = status & PCSR_S1_BVD1   ? 1 : 0;
+		state->bvd2   = status & PCSR_S1_BVD2   ? 1 : 0;
+		state->wrprot = status & PCSR_S1_WP     ? 1 : 0;
+		state->vs_3v  = status & PCSR_S1_VS1    ? 0 : 1;
+		state->vs_Xv  = status & PCSR_S1_VS2    ? 0 : 1;
+		break;
+	}
 }
 
 int sa1111_pcmcia_get_irq_info(struct pcmcia_irq_info *info)

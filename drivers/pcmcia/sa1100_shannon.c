@@ -68,32 +68,31 @@ static int shannon_pcmcia_shutdown(void)
 	return 0;
 }
 
-static int shannon_pcmcia_socket_state(struct pcmcia_state_array *state_array)
+static void shannon_pcmcia_socket_state(int sock, struct pcmcia_state *state)
 {
-	unsigned long levels;
+	unsigned long levels = GPLR;
 
-	memset(state_array->state, 0,
-	       state_array->size * sizeof(struct pcmcia_state));
+	switch (sock) {
+	case 0:
+		state->detect = (levels & SHANNON_GPIO_EJECT_0) ? 0 : 1;
+		state->ready  = (levels & SHANNON_GPIO_RDY_0) ? 1 : 0;
+		state->wrprot = 0; /* Not available on Shannon. */
+		state->bvd1   = 1; 
+		state->bvd2   = 1; 
+		state->vs_3v  = 1; /* FIXME Can only apply 3.3V on Shannon. */
+		state->vs_Xv  = 0;
+		break;
 
-	levels = GPLR;
-
-	state_array->state[0].detect = (levels & SHANNON_GPIO_EJECT_0) ? 0 : 1;
-	state_array->state[0].ready  = (levels & SHANNON_GPIO_RDY_0) ? 1 : 0;
-	state_array->state[0].wrprot = 0; /* Not available on Shannon. */
-	state_array->state[0].bvd1 = 1; 
-	state_array->state[0].bvd2 = 1; 
-	state_array->state[0].vs_3v  = 1; /* FIXME Can only apply 3.3V on Shannon. */
-	state_array->state[0].vs_Xv  = 0;
-
-	state_array->state[1].detect = (levels & SHANNON_GPIO_EJECT_1) ? 0 : 1;
-	state_array->state[1].ready  = (levels & SHANNON_GPIO_RDY_1) ? 1 : 0;
-	state_array->state[1].wrprot = 0; /* Not available on Shannon. */
-	state_array->state[1].bvd1 = 1; 
-	state_array->state[1].bvd2 = 1; 
-	state_array->state[1].vs_3v  = 1; /* FIXME Can only apply 3.3V on Shannon. */
-	state_array->state[1].vs_Xv  = 0;
-
-	return 1;
+	case 1:
+		state->detect = (levels & SHANNON_GPIO_EJECT_1) ? 0 : 1;
+		state->ready  = (levels & SHANNON_GPIO_RDY_1) ? 1 : 0;
+		state->wrprot = 0; /* Not available on Shannon. */
+		state->bvd1   = 1; 
+		state->bvd2   = 1; 
+		state->vs_3v  = 1; /* FIXME Can only apply 3.3V on Shannon. */
+		state->vs_Xv  = 0;
+		break;
+	}
 }
 
 static int shannon_pcmcia_get_irq_info(struct pcmcia_irq_info *info)

@@ -292,40 +292,33 @@ sa1100_pcmcia_events(struct pcmcia_state *state,
  */
 static void sa1100_pcmcia_task_handler(void *data)
 {
-  struct pcmcia_state state[SA1100_PCMCIA_MAX_SOCK];
-  struct pcmcia_state_array state_array;
+  struct pcmcia_state state;
   unsigned int all_events;
 
   DEBUG(4, "%s(): entering PCMCIA monitoring thread\n", __FUNCTION__);
 
-  state_array.size = sa1100_pcmcia_socket_count;
-  state_array.state = state;
-
   do {
     unsigned int events;
-    int ret, i;
-
-    memset(state, 0, sizeof(state));
+    int i;
 
     DEBUG(4, "%s(): interrogating low-level PCMCIA service\n", __FUNCTION__);
 
-    ret = pcmcia_low_level->socket_state(&state_array);
-    if (ret < 0) {
-      printk(KERN_ERR "sa1100_pcmcia: unable to read socket status\n");
-      break;
-    }
-
     all_events = 0;
 
-    for (i = 0; i < state_array.size; i++, all_events |= events) {
+    for (i = 0; i < sa1100_pcmcia_socket_count; i++) {
       struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(i);
 
-      events = sa1100_pcmcia_events(&state[i], &skt->k_state,
+      memset(&state, 0, sizeof(state));
+
+      skt->ops->socket_state(skt->nr, &state);
+
+      events = sa1100_pcmcia_events(&state, &skt->k_state,
 				    skt->cs_state.csc_mask,
 				    skt->cs_state.flags);
 
-      if (events && sa1100_pcmcia_socket[i].handler != NULL)
+      if (events && skt->handler != NULL)
 	skt->handler(skt->handler_info, events);
+      all_events |= events;
     }
   } while(all_events);
 }  /* sa1100_pcmcia_task_handler() */
@@ -469,28 +462,20 @@ static int
 sa1100_pcmcia_get_status(unsigned int sock, unsigned int *status)
 {
   struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(sock);
-  struct pcmcia_state state[SA1100_PCMCIA_MAX_SOCK];
-  struct pcmcia_state_array state_array;
+  struct pcmcia_state state;
   unsigned int stat;
 
   DEBUG(2, "%s() for sock %u\n", __FUNCTION__, skt->nr);
 
-  state_array.size = sa1100_pcmcia_socket_count;
-  state_array.state = state;
+  memset(&state, 0, sizeof(state));
 
-  memset(state, 0, sizeof(state));
+  skt->ops->socket_state(skt->nr, &state);
+  skt->k_state = state;
 
-  if ((pcmcia_low_level->socket_state(&state_array)) < 0) {
-    printk(KERN_ERR "sa1100_pcmcia: unable to get socket status\n");
-    return -1;
-  }
-
-  skt->k_state = state[sock];
-
-  stat = state[sock].detect ? SS_DETECT : 0;
-  stat |= state[sock].ready ? SS_READY  : 0;
-  stat |= state[sock].vs_3v ? SS_3VCARD : 0;
-  stat |= state[sock].vs_Xv ? SS_XVCARD : 0;
+  stat = state.detect ? SS_DETECT : 0;
+  stat |= state.ready ? SS_READY  : 0;
+  stat |= state.vs_3v ? SS_3VCARD : 0;
+  stat |= state.vs_Xv ? SS_XVCARD : 0;
 
   /* The power status of individual sockets is not available
    * explicitly from the hardware, so we just remember the state
@@ -499,11 +484,11 @@ sa1100_pcmcia_get_status(unsigned int sock, unsigned int *status)
   stat |= skt->cs_state.Vcc ? SS_POWERON : 0;
 
   if (skt->cs_state.flags & SS_IOCARD)
-    stat |= state[sock].bvd1 ? SS_STSCHG : 0;
+    stat |= state.bvd1 ? SS_STSCHG : 0;
   else {
-    if (state[sock].bvd1 == 0)
+    if (state.bvd1 == 0)
       stat |= SS_BATDEAD;
-    else if (state[sock].bvd2 == 0)
+    else if (state.bvd2 == 0)
       stat |= SS_BATWARN;
   }
 
@@ -960,23 +945,10 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops)
 	ret = ops->init(&pcmcia_init);
 	if (ret < 0) {
 		printk(KERN_ERR "Unable to initialize kernel PCMCIA service (%d).\n", ret);
-		if (ret == -1)
-			ret = -EIO;
 		goto out;
 	}
 
 	sa1100_pcmcia_socket_count = ret;
-
-	state_array.size  = ret;
-	state_array.state = state;
-
-	memset(state, 0, sizeof(state));
-
-	if (ops->socket_state(&state_array) < 0) {
-		printk(KERN_ERR "Unable to get PCMCIA status driver.\n");
-		ret = -EIO;
-		goto shutdown;
-	}
 
 	cpu_clock = cpufreq_get(0);
 
@@ -1002,7 +974,6 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops)
 		skt->nr		= i;
 		skt->ops	= ops;
 		skt->irq        = irq_info.irq;
-		skt->k_state    = state[i];
 		skt->speed_io   = SA1100_PCMCIA_IO_ACCESS;
 		skt->speed_attr = SA1100_PCMCIA_5V_MEM_ACCESS;
 		skt->speed_mem  = SA1100_PCMCIA_5V_MEM_ACCESS;
@@ -1015,6 +986,7 @@ int sa1100_register_pcmcia(struct pcmcia_low_level *ops)
 			goto out_err;
 		}
 
+		ops->socket_state(skt->nr, &skt->k_state);
 		sa1100_pcmcia_set_mecr(skt, cpu_clock);
 	}
 

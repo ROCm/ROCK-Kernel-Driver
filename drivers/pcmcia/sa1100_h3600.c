@@ -72,33 +72,31 @@ static int h3600_pcmcia_shutdown(void)
 	return 0;
 }
 
-static int
-h3600_pcmcia_socket_state(struct pcmcia_state_array *state)
+static void h3600_pcmcia_socket_state(int sock, struct pcmcia_state *state)
 {
-	unsigned long levels;
+	unsigned long levels = GPLR;
 
-	if (state->size < 2)
-		return -1;
+	switch (sock) {
+	case 0:
+		state->detect = levels & GPIO_H3600_PCMCIA_CD0 ? 0 : 1;
+		state->ready = levels & GPIO_H3600_PCMCIA_IRQ0 ? 1 : 0;
+		state->bvd1 = 0;
+		state->bvd2 = 0;
+		state->wrprot = 0; /* Not available on H3600. */
+		state->vs_3v = 0;
+		state->vs_Xv = 0;
+		break;
 
-	levels = GPLR;
-
-	state->state[0].detect = levels & GPIO_H3600_PCMCIA_CD0 ? 0 : 1;
-	state->state[0].ready = levels & GPIO_H3600_PCMCIA_IRQ0 ? 1 : 0;
-	state->state[0].bvd1 = 0;
-	state->state[0].bvd2 = 0;
-	state->state[0].wrprot = 0; /* Not available on H3600. */
-	state->state[0].vs_3v = 0;
-	state->state[0].vs_Xv = 0;
-
-	state->state[1].detect = levels & GPIO_H3600_PCMCIA_CD1 ? 0 : 1;
-	state->state[1].ready = levels & GPIO_H3600_PCMCIA_IRQ1 ? 1 : 0;
-	state->state[1].bvd1 = 0;
-	state->state[1].bvd2 = 0;
-	state->state[1].wrprot = 0; /* Not available on H3600. */
-	state->state[1].vs_3v = 0;
-	state->state[1].vs_Xv = 0;
-
-	return 1;
+	case 1:
+		state->detect = levels & GPIO_H3600_PCMCIA_CD1 ? 0 : 1;
+		state->ready = levels & GPIO_H3600_PCMCIA_IRQ1 ? 1 : 0;
+		state->bvd1 = 0;
+		state->bvd2 = 0;
+		state->wrprot = 0; /* Not available on H3600. */
+		state->vs_3v = 0;
+		state->vs_Xv = 0;
+		break;
+	}
 }
 
 static int h3600_pcmcia_get_irq_info(struct pcmcia_irq_info *info)
