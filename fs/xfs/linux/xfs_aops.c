@@ -48,6 +48,9 @@ map_blocks(
 	vnode_t			*vp = LINVFS_GET_VP(inode);
 	int			error, nmaps = 1;
 
+	if (((flags & (PBF_DIRECT|PBF_SYNC)) == PBF_DIRECT) &&
+	    (offset >= inode->i_size))
+		count = max(count, XFS_WRITE_IO_LOG);
 retry:
 	VOP_BMAP(vp, offset, count, flags, pbmapp, &nmaps, error);
 	if (flags & PBF_WRITE) {
@@ -515,7 +518,7 @@ linvfs_get_block_core(
 		/* If we are doing writes at the end of the file,
 		 * allocate in chunks
 		 */
-		if (create && (offset >= inode->i_size) && !(flags & PBF_SYNC))
+		if (create && (offset >= inode->i_size))
 			size = 1 << XFS_WRITE_IO_LOG;
 		else
 			size = 1 << inode->i_blkbits;
@@ -534,15 +537,20 @@ linvfs_get_block_core(
 		page_buf_daddr_t	bn;
 		loff_t			delta;
 
-		delta = offset - pbmap.pbm_offset;
-		delta >>= inode->i_blkbits;
+		/* For unwritten extents do not report a disk address on
+		 * the read case.
+		 */
+		if (create || ((pbmap.pbm_flags & PBMF_UNWRITTEN) == 0)) {
+			delta = offset - pbmap.pbm_offset;
+			delta >>= inode->i_blkbits;
 
-		bn = pbmap.pbm_bn >> (inode->i_blkbits - 9);
-		bn += delta;
+			bn = pbmap.pbm_bn >> (inode->i_blkbits - 9);
+			bn += delta;
 
-		bh_result->b_blocknr = bn;
-		bh_result->b_bdev = pbmap.pbm_target->pbr_bdev;
-		set_buffer_mapped(bh_result);
+			bh_result->b_blocknr = bn;
+			bh_result->b_bdev = pbmap.pbm_target->pbr_bdev;
+			set_buffer_mapped(bh_result);
+		}
 	}
 
 	/* If we previously allocated a block out beyond eof and
