@@ -1293,11 +1293,8 @@ L:	linux-net@vger.kernel.org
 S:	Maintained
 
 PNP SUPPORT
-P:	Tom Lees
-M:	tom@lpsg.demon.co.uk
-L:	pnp-users@ferret.lmh.ox.ac.uk
-L:	pnp-devel@ferret.lmh.ox.ac.uk
-W:	http://www-jcr.lmh.ox.ac.uk/~pnp/
+P:	Adam Belay
+M:	ambx1@neo.rr.com
 S:	Maintained
 
 PPP PROTOCOL DRIVERS AND COMPRESSORS

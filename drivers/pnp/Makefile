@@ -1,16 +1,12 @@
 #
-# Makefile for the kernel Plug-and-Play device drivers.
+# Makefile for the Linux Plug-and-Play Support.
 #
 
-export-objs := isapnp.o pnpbios_core.o
+obj-y		:= core.o driver.o resource.o interface.o quirks.o names.o compat.o system.o
 
-isa-pnp-proc-$(CONFIG_PROC_FS) = isapnp_proc.o
-pnpbios-proc-$(CONFIG_PROC_FS) = pnpbios_proc.o
+obj-$(CONFIG_PNPBIOS)		+= pnpbios/
+obj-$(CONFIG_ISAPNP)		+= isapnp/
 
-isa-pnp-objs := isapnp.o quirks.o $(isa-pnp-proc-y)
-pnpbios-objs := pnpbios_core.o $(pnpbios-proc-y)
-
-obj-$(CONFIG_ISAPNP) += isa-pnp.o
-obj-$(CONFIG_PNPBIOS) += pnpbios.o
+export-objs	:= core.o driver.o resource.o compat.o
 
 include $(TOPDIR)/Rules.make

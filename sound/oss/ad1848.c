@@ -47,6 +47,7 @@
 #include <linux/stddef.h>
 #include <linux/pm.h>
 #include <linux/isapnp.h>
+#include <linux/pnp.h>
 #include <linux/spinlock.h>
 
 #define DEB(x)
@@ -58,7 +59,7 @@
 
 typedef struct
 {
-	spinlock_t		lock;
+	spinlock_t	lock;
 	int             base;
 	int             irq;
 	int             dma1, dma2;
@@ -176,7 +177,7 @@ static struct {
     ,{CAP_F_TIMER} /* MD_1845_SSCAPE */
 };
 
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 static int isapnp	= 1;
 static int isapnpjump	= 0;
 static int reverse	= 0;
@@ -2920,7 +2921,7 @@ MODULE_PARM(deskpro_xl, "i");           /* Special magic for Deskpro XL boxen */
 MODULE_PARM(deskpro_m, "i");            /* Special magic for Deskpro M box */
 MODULE_PARM(soundpro, "i");             /* More special magic for SoundPro chips */
 
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 MODULE_PARM(isapnp,	"i");
 MODULE_PARM(isapnpjump,	"i");
 MODULE_PARM(reverse,	"i");
@@ -2928,7 +2929,7 @@ MODULE_PARM_DESC(isapnp,	"When set to 0, Plug & Play support will be disabled");
 MODULE_PARM_DESC(isapnpjump,	"Jumps to a specific slot in the driver's PnP table. Use the source, Luke.");
 MODULE_PARM_DESC(reverse,	"When set to 1, will reverse ISAPnP search order");
 
-struct pci_dev	*ad1848_dev  = NULL;
+struct pnp_dev	*ad1848_dev  = NULL;
 
 /* Please add new entries at the end of the table */
 static struct {
@@ -2977,7 +2978,7 @@ static struct isapnp_device_id id_table[] __devinitdata = {
 
 MODULE_DEVICE_TABLE(isapnp, id_table);
 
-static struct pci_dev *activate_dev(char *devname, char *resname, struct pci_dev *dev)
+static struct pnp_dev *activate_dev(char *devname, char *resname, struct pnp_dev *dev)
 {
 	int err;
 
@@ -2985,35 +2986,26 @@ static struct pci_dev *activate_dev(char *devname, char *resname, struct pci_dev
 	if(dev->active)
 		return(dev);
 
-	if((err = dev->activate(dev)) < 0) {
+	if((err = pnp_activate_dev(dev)) < 0) {
 		printk(KERN_ERR "ad1848: %s %s config failed (out of resources?)[%d]\n", devname, resname, err);
 
-		dev->deactivate(dev);
+		pnp_disable_dev(dev);
 
 		return(NULL);
 	}
+	audio_activated = 1;
 	return(dev);
 }
 
-static struct pci_dev *ad1848_init_generic(struct pci_bus *bus, struct address_info *hw_config, int slot)
+static struct pnp_dev *ad1848_init_generic(struct pnp_card *bus, struct address_info *hw_config, int slot)
 {
 
 	/* Configure Audio device */
-	if((ad1848_dev = isapnp_find_dev(bus, ad1848_isapnp_list[slot].vendor, ad1848_isapnp_list[slot].function, NULL)))
+	if((ad1848_dev = pnp_find_dev(bus, ad1848_isapnp_list[slot].vendor, ad1848_isapnp_list[slot].function, NULL)))
 	{
-		int ret;
-		ret = ad1848_dev->prepare(ad1848_dev);
-		/* If device is active, assume configured with /proc/isapnp
-		 * and use anyway. Some other way to check this? */
-		if(ret && ret != -EBUSY) {
-			printk(KERN_ERR "ad1848: ISAPnP found device that could not be autoconfigured.\n");
-			return(NULL);
-		}
-		if(ret == -EBUSY)
-			audio_activated = 1;
-
 		if((ad1848_dev = activate_dev(ad1848_isapnp_list[slot].name, "ad1848", ad1848_dev)))
 		{
+			get_device(&ad1848_dev->dev);
 			hw_config->io_base 	= ad1848_dev->resource[ad1848_isapnp_list[slot].mss_io].start;
 			hw_config->irq 		= ad1848_dev->irq_resource[ad1848_isapnp_list[slot].irq].start;
 			hw_config->dma 		= ad1848_dev->dma_resource[ad1848_isapnp_list[slot].dma].start;
@@ -3030,7 +3022,7 @@ static struct pci_dev *ad1848_init_generic(struct pci_bus *bus, struct address_i
 	return(ad1848_dev);
 }
 
-static int __init ad1848_isapnp_init(struct address_info *hw_config, struct pci_bus *bus, int slot)
+static int __init ad1848_isapnp_init(struct address_info *hw_config, struct pnp_card *bus, int slot)
 {
 	char *busname = bus->name[0] ? bus->name : ad1848_isapnp_list[slot].name;
 
@@ -3072,9 +3064,9 @@ static int __init ad1848_isapnp_probe(struct address_info *hw_config)
 		i = isapnpjump;
 	first = 0;
 	while(ad1848_isapnp_list[i].card_vendor != 0) {
-		static struct pci_bus *bus = NULL;
+		static struct pnp_card *bus = NULL;
 
-		while ((bus = isapnp_find_card(
+		while ((bus = pnp_find_card(
 				ad1848_isapnp_list[i].card_vendor,
 				ad1848_isapnp_list[i].card_device,
 				bus))) {
@@ -3096,7 +3088,7 @@ static int __init init_ad1848(void)
 {
 	printk(KERN_INFO "ad1848/cs4248 codec driver Copyright (C) by Hannu Savolainen 1993-1996\n");
 
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 	if(isapnp && (ad1848_isapnp_probe(&cfg) < 0) ) {
 		printk(KERN_NOTICE "ad1848: No ISAPnP cards found, trying standard ones...\n");
 		isapnp = 0;
@@ -3131,10 +3123,12 @@ static void __exit cleanup_ad1848(void)
 	if(loaded)
 		unload_ms_sound(&cfg);
 
-#ifdef __ISAPNP__
-	if(audio_activated)
-		if(ad1848_dev)
-			ad1848_dev->deactivate(ad1848_dev);
+#ifdef CONFIG_PNP
+	if(ad1848_dev){
+		if(audio_activated)
+			pnp_disable_dev(ad1848_dev);
+		put_device(&ad1848_dev->dev);
+	}
 #endif
 }
 
@@ -3148,7 +3142,7 @@ static int __init setup_ad1848(char *str)
 	int ints[6];
 	
 	str = get_options(str, ARRAY_SIZE(ints), ints);
-	
+
 	io	= ints[1];
 	irq	= ints[2];
 	dma	= ints[3];
