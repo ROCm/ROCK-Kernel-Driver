@@ -1346,7 +1346,7 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 	 */
 	dev_priv->depth_clear.rb3d_cntl = (RADEON_PLANE_MASK_ENABLE |
 					   (dev_priv->color_fmt << 10) |
-					   (1<<15));
+					   (dev_priv->microcode_version == UCODE_R100 ? RADEON_ZBLOCK16 : 0));
 
 	dev_priv->depth_clear.rb3d_zstencilcntl = 
 		(dev_priv->depth_fmt |

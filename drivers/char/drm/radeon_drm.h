@@ -193,7 +193,10 @@ typedef union {
 #define RADEON_FRONT			0x1
 #define RADEON_BACK			0x2
 #define RADEON_DEPTH			0x4
-#define RADEON_STENCIL                  0x8
+#define RADEON_STENCIL			0x8
+#define RADEON_CLEAR_FASTZ		0x80000000
+#define RADEON_USE_HIERZ		0x40000000
+#define RADEON_USE_COMP_ZBUF		0x20000000
 
 /* Primitive types
  */
