@@ -3,6 +3,7 @@
  *	Library for filesystems writers.
  */
 
+#include <linux/module.h>
 #include <linux/pagemap.h>
 #include <linux/mount.h>
 #include <linux/vfs.h>
@@ -428,3 +429,22 @@ void simple_release_fs(struct vfsmount **mount, int *count)
 	spin_unlock(&pin_fs_lock);
 	mntput(mnt);
 }
+
+/* acceptable for old filesystems */
+int old_valid_dev(dev_t dev)
+{
+	return MAJOR(dev) < 256 && MINOR(dev) < 256;
+}
+EXPORT_SYMBOL(old_valid_dev);
+
+u16 old_encode_dev(dev_t dev)
+{
+	return (MAJOR(dev) << 8) | MINOR(dev);
+}
+EXPORT_SYMBOL(old_encode_dev);
+
+dev_t old_decode_dev(u16 val)
+{
+	return MKDEV((val >> 8) & 255, val & 255);
+}
+EXPORT_SYMBOL(old_decode_dev);

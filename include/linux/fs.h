@@ -1389,6 +1389,9 @@ struct tree_descr { char *name; struct file_operations *ops; int mode; };
 extern int simple_fill_super(struct super_block *, int, struct tree_descr *);
 extern int simple_pin_fs(char *name, struct vfsmount **mount, int *count);
 extern void simple_release_fs(struct vfsmount **mount, int *count);
+extern int old_valid_dev(dev_t);
+extern u16 old_encode_dev(dev_t);
+extern dev_t old_decode_dev(u16);
 
 extern int inode_change_ok(struct inode *, struct iattr *);
 extern int inode_setattr(struct inode *, struct iattr *);

@@ -1086,6 +1086,8 @@ jffs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 
 	D1(printk("***jffs_mknod()\n"));
 
+	if (!old_valid_dev(rdev))
+		return -EINVAL;
 	lock_kernel();
 	dir_f = (struct jffs_file *)dir->u.generic_ip;
 	c = dir_f->c;

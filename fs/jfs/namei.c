@@ -1311,6 +1311,9 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 	tid_t tid;
 	struct tblock *tblk;
 
+	if (!old_valid_dev(rdev))
+		return -EINVAL;
+
 	jfs_info("jfs_mknod: %s", dentry->d_name.name);
 
 	if ((rc = get_UCSname(&dname, dentry, JFS_SBI(dir->i_sb)->nls_tab)))

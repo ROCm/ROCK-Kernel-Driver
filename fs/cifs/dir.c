@@ -265,6 +265,9 @@ int cifs_mknod(struct inode *inode, struct dentry *direntry, int mode, dev_t dev
 	char *full_path = NULL;
 	struct inode * newinode = NULL;
 
+	if (!old_valid_dev(device_number))
+		return -EINVAL;
+
 	xid = GetXid();
 
 	cifs_sb = CIFS_SB(inode->i_sb);

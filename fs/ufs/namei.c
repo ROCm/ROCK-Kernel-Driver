@@ -111,7 +111,10 @@ static int ufs_create (struct inode * dir, struct dentry * dentry, int mode,
 
 static int ufs_mknod (struct inode * dir, struct dentry *dentry, int mode, dev_t rdev)
 {
-	struct inode * inode = ufs_new_inode(dir, mode);
+	struct inode * inode;
+	if (!old_valid_dev(rdev))
+		return -EINVAL;
+	inode = ufs_new_inode(dir, mode);
 	int err = PTR_ERR(inode);
 	if (!IS_ERR(inode)) {
 		init_special_inode(inode, mode, rdev);

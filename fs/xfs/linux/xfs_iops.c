@@ -113,6 +113,9 @@ linvfs_mknod(
 	xattr_exists_t	test_default_acl = _ACL_DEFAULT_EXISTS;
 	int		error;
 
+	if (!old_valid_dev(rdev))
+		return -EINVAL;
+
 	if (test_default_acl && test_default_acl(dvp)) {
 		if (!_ACL_ALLOC(default_acl))
 			return -ENOMEM;

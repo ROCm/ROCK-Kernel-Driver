@@ -139,8 +139,14 @@ static int ext2_create (struct inode * dir, struct dentry * dentry, int mode, st
 
 static int ext2_mknod (struct inode * dir, struct dentry *dentry, int mode, dev_t rdev)
 {
-	struct inode * inode = ext2_new_inode (dir, mode);
-	int err = PTR_ERR(inode);
+	struct inode * inode;
+	int err;
+
+	if (!old_valid_dev(rdev))
+		return -EINVAL;
+
+	inode = ext2_new_inode (dir, mode);
+	err = PTR_ERR(inode);
 	if (!IS_ERR(inode)) {
 		init_special_inode(inode, inode->i_mode, rdev);
 #ifdef CONFIG_EXT2_FS_XATTR

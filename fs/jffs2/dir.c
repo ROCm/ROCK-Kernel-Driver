@@ -594,6 +594,9 @@ static int jffs2_mknod (struct inode *dir_i, struct dentry *dentry, int mode, mk
 	uint32_t writtenlen;
 	int ret;
 
+	if (!old_valid_dev(rdev))
+		return -EINVAL;
+
 	ri = jffs2_alloc_raw_inode();
 	if (!ri)
 		return -ENOMEM;
