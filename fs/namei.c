@@ -413,7 +413,8 @@ static inline int do_follow_link(struct dentry *dentry, struct nameidata *nd)
 		current->state = TASK_RUNNING;
 		schedule();
 	}
-	if ((err = security_inode_follow_link(dentry, nd)))
+	err = security_inode_follow_link(dentry, nd);
+	if (err)
 		goto loop;
 	current->link_count++;
 	current->total_link_count++;
@@ -1124,7 +1125,8 @@ int vfs_create(struct inode *dir, struct dentry *dentry, int mode)
 		return -EACCES;	/* shouldn't it be ENOSYS? */
 	mode &= S_IALLUGO;
 	mode |= S_IFREG;
-	if ((error = security_inode_create(dir, dentry, mode)))
+	error = security_inode_create(dir, dentry, mode);
+	if (error)
 		return error;
 	DQUOT_INIT(dir);
 	error = dir->i_op->create(dir, dentry, mode);
@@ -1343,7 +1345,8 @@ do_link:
 	 * stored in nd->last.name and we will have to putname() it when we
 	 * are done. Procfs-like symlinks just set LAST_BIND.
 	 */
-	if ((error = security_inode_follow_link(dentry, nd)))
+	error = security_inode_follow_link(dentry, nd);
+	if (error)
 		goto exit_dput;
 	UPDATE_ATIME(dentry->d_inode);
 	error = dentry->d_inode->i_op->follow_link(dentry, nd);
@@ -1408,7 +1411,8 @@ int vfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 	if (!dir->i_op || !dir->i_op->mknod)
 		return -EPERM;
 
-	if ((error = security_inode_mknod(dir, dentry, mode, dev)))
+	error = security_inode_mknod(dir, dentry, mode, dev);
+	if (error)
 		return error;
 
 	DQUOT_INIT(dir);
@@ -1476,7 +1480,8 @@ int vfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 		return -EPERM;
 
 	mode &= (S_IRWXUGO|S_ISVTX);
-	if ((error = security_inode_mkdir(dir, dentry, mode)))
+	error = security_inode_mkdir(dir, dentry, mode);
+	if (error)
 		return error;
 
 	DQUOT_INIT(dir);
@@ -1568,7 +1573,8 @@ int vfs_rmdir(struct inode *dir, struct dentry *dentry)
 	if (d_mountpoint(dentry))
 		error = -EBUSY;
 	else {
-		if (!(error = security_inode_rmdir(dir, dentry))) {
+		error = security_inode_rmdir(dir, dentry);
+		if (!error) {
 			error = dir->i_op->rmdir(dir, dentry);
 			if (!error)
 				dentry->d_inode->i_flags |= S_DEAD;
@@ -1641,7 +1647,8 @@ int vfs_unlink(struct inode *dir, struct dentry *dentry)
 	if (d_mountpoint(dentry))
 		error = -EBUSY;
 	else {
-		if (!(error = security_inode_unlink(dir, dentry)))
+		error = security_inode_unlink(dir, dentry);
+		if (error)
 			error = dir->i_op->unlink(dir, dentry);
 	}
 	up(&dentry->d_inode->i_sem);
@@ -1704,7 +1711,8 @@ int vfs_symlink(struct inode *dir, struct dentry *dentry, const char *oldname)
 	if (!dir->i_op || !dir->i_op->symlink)
 		return -EPERM;
 
-	if ((error = security_inode_symlink(dir, dentry, oldname)))
+	error = security_inode_symlink(dir, dentry, oldname);
+	if (error)
 		return error;
 
 	DQUOT_INIT(dir);
@@ -1774,7 +1782,8 @@ int vfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *new_de
 	if (S_ISDIR(old_dentry->d_inode->i_mode))
 		return -EPERM;
 
-	if ((error = security_inode_link(old_dentry, dir, new_dentry)))
+	error = security_inode_link(old_dentry, dir, new_dentry);
+	if (error)
 		return error;
 
 	down(&old_dentry->d_inode->i_sem);
@@ -1882,7 +1891,8 @@ int vfs_rename_dir(struct inode *old_dir, struct dentry *old_dentry,
 			return error;
 	}
 
-	if ((error = security_inode_rename(old_dir, old_dentry, new_dir, new_dentry)))
+	error = security_inode_rename(old_dir, old_dentry, new_dir, new_dentry);
+	if (error)
 		return error;
 
 	target = new_dentry->d_inode;
@@ -1916,7 +1926,8 @@ int vfs_rename_other(struct inode *old_dir, struct dentry *old_dentry,
 	struct inode *target;
 	int error;
 
-	if ((error = security_inode_rename(old_dir, old_dentry, new_dir, new_dentry)))
+	error = security_inode_rename(old_dir, old_dentry, new_dir, new_dentry);
+	if (error)
 		return error;
 
 	dget(new_dentry);

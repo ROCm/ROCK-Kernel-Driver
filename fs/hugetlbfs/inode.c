@@ -209,7 +209,7 @@ static void hugetlbfs_delete_inode(struct inode *inode)
 	if (inode->i_data.nrpages)
 		truncate_hugepages(&inode->i_data, 0);
 
-	security_ops->inode_delete(inode);
+	security_inode_delete(inode);
 
 	clear_inode(inode);
 	destroy_inode(inode);
@@ -333,7 +333,7 @@ static int hugetlbfs_setattr(struct dentry *dentry, struct iattr *attr)
 	if (error)
 		goto out;
 
-	error = security_ops->inode_setattr(dentry, attr);
+	error = security_inode_setattr(dentry, attr);
 	if (error)
 		goto out;
 

@@ -188,7 +188,8 @@ static int newseg (key_t key, int shmflg, size_t size)
 	shp->shm_flags = (shmflg & S_IRWXUGO);
 
 	shp->shm_perm.security = NULL;
-	if ((error = security_shm_alloc(shp))) {
+	error = security_shm_alloc(shp);
+	if (error) {
 		ipc_rcu_free(shp, sizeof(*shp));
 		return error;
 	}

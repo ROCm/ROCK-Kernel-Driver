@@ -274,7 +274,8 @@ int f_setown(struct file *filp, unsigned long arg, int force)
 {
 	int err;
 	
-	if ((err = security_file_set_fowner(filp)))
+	err = security_file_set_fowner(filp);
+	if (err)
 		return err;
 
 	f_modown(filp, arg, current->uid, current->euid, force);
@@ -367,7 +368,8 @@ asmlinkage long sys_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	if (!filp)
 		goto out;
 
-	if ((err = security_file_fcntl(filp, cmd, arg))) {
+	err = security_file_fcntl(filp, cmd, arg);
+	if (err) {
 		fput(filp);
 		return err;
 	}
@@ -390,7 +392,8 @@ asmlinkage long sys_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg
 	if (!filp)
 		goto out;
 
-	if ((err = security_file_fcntl(filp, cmd, arg))) {
+	err = security_file_fcntl(filp, cmd, arg);
+	if (err) {
 		fput(filp);
 		return err;
 	}
