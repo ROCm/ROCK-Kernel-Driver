@@ -453,7 +453,7 @@ extern void sock_def_destruct(struct sock *);
 extern void sock_init_data(struct socket *sock, struct sock *sk);
 
 /**
- *	__sk_filter - run a packet through a socket filter
+ *	sk_filter - run a packet through a socket filter
  *	@sk: sock associated with &sk_buff
  *	@skb: buffer to filter
  *	@needlock: set to 1 if the sock is not locked by caller.
@@ -464,14 +464,16 @@ extern void sock_init_data(struct socket *sock, struct sock *sk);
  * wrapper to sk_run_filter. It returns 0 if the packet should
  * be accepted or -EPERM if the packet should be tossed.
  *
- * This function should not be called directly, use sk_filter instead
- * to ensure that the LSM security check is also performed.
  */
 
-static inline int __sk_filter(struct sock *sk, struct sk_buff *skb, int needlock)
+static inline int sk_filter(struct sock *sk, struct sk_buff *skb, int needlock)
 {
-	int err = 0;
-
+	int err;
+	
+	err = security_sock_rcv_skb(sk, skb);
+	if (err)
+		return err;
+	
 	if (sk->filter) {
 		struct sk_filter *filter;
 		
@@ -516,17 +518,6 @@ static inline void sk_filter_charge(struct sock *sk, struct sk_filter *fp)
 {
 	atomic_inc(&fp->refcnt);
 	atomic_add(sk_filter_len(fp), &sk->omem_alloc);
-}
-
-static inline int sk_filter(struct sock *sk, struct sk_buff *skb, int needlock)
-{
-	int err;
-	
-	err = security_sock_rcv_skb(sk, skb);
-	if (err)
-		return err;
-	
-	return __sk_filter(sk, skb, needlock);
 }
 
 /*
