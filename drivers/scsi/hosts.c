@@ -45,13 +45,9 @@
 #include "scsi.h"
 #include "hosts.h"
 
-LIST_HEAD(scsi_host_tmpl_list);
-LIST_HEAD(scsi_host_hn_list);
-
-LIST_HEAD(scsi_host_list);
-spinlock_t scsi_host_list_lock = SPIN_LOCK_UNLOCKED;
-
-struct Scsi_Device_Template * scsi_devicelist;
+static LIST_HEAD(scsi_host_hn_list);
+static LIST_HEAD(scsi_host_list);
+static spinlock_t scsi_host_list_lock = SPIN_LOCK_UNLOCKED;
 
 static int scsi_host_next_hn;		/* host_no for next new host */
 static int scsi_hosts_registered;	/* cnt of registered scsi hosts */
@@ -115,7 +111,6 @@ int scsi_host_chk_and_release(struct Scsi_Host *shost)
 {
 	int pcount;
 	Scsi_Device *sdev;
-	struct Scsi_Device_Template *sdev_tp;
 	Scsi_Cmnd *scmd;
 
 	/*
@@ -175,10 +170,7 @@ int scsi_host_chk_and_release(struct Scsi_Host *shost)
 	 * structures
 	 */
 	for (sdev = shost->host_queue; sdev; sdev = sdev->next) {
-		for (sdev_tp = scsi_devicelist; sdev_tp;
-		     sdev_tp = sdev_tp->next)
-			if (sdev_tp->detach)
-				(*sdev_tp->detach) (sdev);
+		scsi_detach_device(sdev);
 
 		/* If something still attached, punt */
 		if (sdev->attached) {
@@ -471,11 +463,8 @@ int scsi_register_host(Scsi_Host_Template *shost_tp)
 {
 	int cur_cnt;
 	Scsi_Device *sdev;
-	struct Scsi_Device_Template *sdev_tp;
 	struct list_head *lh;
 	struct Scsi_Host *shost;
-
-	INIT_LIST_HEAD(&shost_tp->shtp_list);
 
 	/*
 	 * Check no detect routine.
@@ -526,8 +515,6 @@ int scsi_register_host(Scsi_Host_Template *shost_tp)
 			}
 		}
 
-		list_add_tail(&shost_tp->shtp_list, &scsi_host_tmpl_list);
-
 		/* The next step is to call scan_scsis here.  This generates the
 		 * Scsi_Devices entries
 		 */
@@ -549,31 +536,15 @@ int scsi_register_host(Scsi_Host_Template *shost_tp)
 			}
 		}
 
-		for (sdev_tp = scsi_devicelist; sdev_tp;
-		     sdev_tp = sdev_tp->next) {
-			if (sdev_tp->init && sdev_tp->dev_noticed)
-				(*sdev_tp->init) ();
-		}
-
 		/*
 		 * Next we create the Scsi_Cmnd structures for this host 
 		 */
 		list_for_each(lh, &scsi_host_list) {
 			shost = list_entry(lh, struct Scsi_Host, sh_list);
 			for (sdev = shost->host_queue; sdev; sdev = sdev->next)
-				if (sdev->host->hostt == shost_tp) {
-					scsi_build_commandblocks(sdev);
-					if (sdev->current_queue_depth == 0)
+				if (sdev->host->hostt == shost_tp)
+					if (scsi_attach_device(sdev))
 						goto out_of_space;
-					for (sdev_tp = scsi_devicelist;
-					     sdev_tp;
-					     sdev_tp = sdev_tp->next)
-						if (sdev_tp->attach)
-							(*sdev_tp->attach) (sdev);
-					if (!sdev->attached) {
-                                                scsi_release_commandblocks(sdev);
-					}
-				}
 		}
 	}
 
@@ -613,14 +584,6 @@ int scsi_unregister_host(Scsi_Host_Template *shost_tp)
 	if (pcount != scsi_hosts_registered)
 		printk(KERN_INFO "scsi : %d host%s left.\n", scsi_hosts_registered,
 		       (scsi_hosts_registered == 1) ? "" : "s");
-
-	/*
-	 * Remove it from the list if all
-	 * hosts were successfully removed (ie preset == 0)
-	 */
-	if (!shost_tp->present) {
-		list_del(&shost_tp->shtp_list);
-	}
 
 	MOD_DEC_USE_COUNT;
 

@@ -57,9 +57,6 @@ typedef struct scsi_disk Disk;
 
 typedef struct	SHT
 {
-
-    struct list_head	shtp_list;
-
     /* Used with loadable modules so that we know when it is safe to unload */
     struct module * module;
 
@@ -513,8 +510,6 @@ typedef struct SHN
 	unsigned short host_registered;
 } Scsi_Host_Name;
 	
-extern struct Scsi_Device_Template * scsi_devicelist;
-
 extern void scsi_proc_host_mkdir(Scsi_Host_Template *);
 extern void scsi_proc_host_add(struct Scsi_Host *);
 extern void scsi_proc_host_rm(struct Scsi_Host *);

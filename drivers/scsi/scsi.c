@@ -133,6 +133,12 @@ struct softscsi_data {
 static struct softscsi_data softscsi_data[NR_CPUS] __cacheline_aligned;
 
 /*
+ * List of all highlevel drivers.
+ */
+static struct Scsi_Device_Template *scsi_devicelist;
+static DECLARE_RWSEM(scsi_devicelist_mutex);
+
+/*
  * Note - the initial logging level can be set here to log events at boot time.
  * After the system is up, you may enable logging via the /proc interface.
  */
@@ -1718,7 +1724,6 @@ stop_output:
 static int proc_scsi_gen_write(struct file * file, const char * buf,
                               unsigned long length, void *data)
 {
-	struct Scsi_Device_Template *SDTpnt;
 	Scsi_Device *scd;
 	struct Scsi_Host *HBA_ptr;
 	char *p;
@@ -1924,12 +1929,7 @@ static int proc_scsi_gen_write(struct file * file, const char * buf,
 		if (scd->access_count)
 			goto out;
 
-		SDTpnt = scsi_devicelist;
-		while (SDTpnt != NULL) {
-			if (SDTpnt->detach)
-				(*SDTpnt->detach) (scd);
-			SDTpnt = SDTpnt->next;
-		}
+		scsi_detach_device(scd);
 
 		if (scd->attached == 0) {
 			/*
@@ -1969,6 +1969,56 @@ out:
 }
 #endif
 
+void scsi_detect_device(struct scsi_device *sdev)
+{
+	struct Scsi_Device_Template *sdt;
+
+	down_read(&scsi_devicelist_mutex);
+	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
+		if (sdt->detect)
+			sdev->attached += (*sdt->detect)(sdev);
+	up_read(&scsi_devicelist_mutex);
+}
+
+int scsi_attach_device(struct scsi_device *sdev)
+{
+	struct Scsi_Device_Template *sdt;
+
+	scsi_build_commandblocks(sdev);
+	if (sdev->current_queue_depth == 0)
+		goto fail;
+
+	down_read(&scsi_devicelist_mutex);
+	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
+		if (sdt->init && sdt->dev_noticed)
+			(*sdt->init) ();
+	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
+		if (sdt->attach)
+			(*sdt->attach) (sdev);
+	up_read(&scsi_devicelist_mutex);
+
+	if (!sdev->attached)
+		scsi_release_commandblocks(sdev);
+	return 0;
+
+fail:
+	printk(KERN_ERR "%s: Allocation failure during SCSI scanning, "
+			"some SCSI devices might not be configured\n",
+			__FUNCTION__);
+	return -ENOMEM;
+}
+
+void scsi_detach_device(struct scsi_device *sdev)
+{
+	struct Scsi_Device_Template *sdt;
+
+	down_read(&scsi_devicelist_mutex);
+	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
+		if (sdt->detach)
+			(*sdt->detach)(sdev);
+	up_read(&scsi_devicelist_mutex);
+}
+
 /*
  * This entry point should be called by a loadable module if it is trying
  * add a high level scsi driver to the system.
@@ -1987,8 +2037,10 @@ int scsi_register_device(struct Scsi_Device_Template *tpnt)
 	if (tpnt->next)
 		return 1;
 
+	down_write(&scsi_devicelist_mutex);
 	tpnt->next = scsi_devicelist;
 	scsi_devicelist = tpnt;
+	up_write(&scsi_devicelist_mutex);
 
 	tpnt->scsi_driverfs_driver.name = (char *)tpnt->tag;
 	tpnt->scsi_driverfs_driver.bus = &scsi_driverfs_bus_type;
@@ -2094,6 +2146,7 @@ int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
 	/*
 	 * Extract the template from the linked list.
 	 */
+	down_write(&scsi_devicelist_mutex);
 	spnt = scsi_devicelist;
 	prev_spnt = NULL;
 	while (spnt != tpnt) {
@@ -2104,6 +2157,7 @@ int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
 		scsi_devicelist = tpnt->next;
 	else
 		prev_spnt->next = spnt->next;
+	up_write(&scsi_devicelist_mutex);
 
 	MOD_DEC_USE_COUNT;
 	unlock_kernel();
