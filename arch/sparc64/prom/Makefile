@@ -3,7 +3,6 @@
 # Linux.
 #
 
-USE_STANDARD_AS_RULE := true
 EXTRA_AFLAGS := -ansi
 
 L_TARGET = promlib.a

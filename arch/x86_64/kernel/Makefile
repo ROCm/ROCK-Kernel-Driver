@@ -2,8 +2,6 @@
 # Makefile for the linux kernel.
 #
 
-USE_STANDARD_AS_RULE := true
-
 EXTRA_AFLAGS := -traditional
 
 all: kernel.o head.o head64.o init_task.o

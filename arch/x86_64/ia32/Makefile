@@ -2,8 +2,6 @@
 # Makefile for the ia32 kernel emulation subsystem.
 #
 
-USE_STANDARD_AS_RULE := true
-
 export-objs := ia32_ioctl.o	
 
 all: ia32.o

@@ -2,8 +2,6 @@
 # Makefile for alpha-specific library files..
 #
 
-USE_STANDARD_AS_RULE := true
-
 EXTRA_AFLAGS := $(CFLAGS)
 
 # Many of these routines have implementations tuned for ev6.

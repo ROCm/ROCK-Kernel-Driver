@@ -2,8 +2,6 @@
 # Makefile for the ia32 kernel emulation subsystem.
 #
 
-USE_STANDARD_AS_RULE := true
-
 all: ia32.o
 
 O_TARGET := ia32.o
