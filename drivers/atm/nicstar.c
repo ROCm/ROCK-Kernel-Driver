@@ -283,11 +283,6 @@ static int __init nicstar_module_init(void)
    struct pci_dev *pcidev;
 
    XPRINTK("nicstar: nicstar_module_init() called.\n");
-   if(!pci_present())
-   {
-      printk("nicstar: no PCI subsystem found.\n");
-      return -EIO;
-   }
 
    for(i = 0; i < NS_MAX_CARDS; i++)
       cards[i] = NULL;
