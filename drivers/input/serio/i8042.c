@@ -921,7 +921,7 @@ static int i8042_resume(struct device *dev, u32 level)
 
 	if (i8042_mux_present)
 		if (i8042_set_mux_mode(1, NULL) ||
-		    i8042_enable_mux_ports(&i8042_aux_values)) {
+		    i8042_enable_mux_ports()) {
 			printk(KERN_WARNING "i8042: failed to resume active multiplexor, mouse won't work.\n");
 		}
 
