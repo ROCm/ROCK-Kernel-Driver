@@ -95,26 +95,26 @@ writefifo(unsigned int ale, unsigned int adr, u8 off, u8 * data, int size)
 
 /* Interface functions */
 
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+ReadISAC(struct IsdnCardState *cs, u8 offset)
 {
 	return (readreg(cs->hw.niccy.isac_ale, cs->hw.niccy.isac, offset));
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writereg(cs->hw.niccy.isac_ale, cs->hw.niccy.isac, offset, value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	readfifo(cs->hw.niccy.isac_ale, cs->hw.niccy.isac, 0, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	writefifo(cs->hw.niccy.isac_ale, cs->hw.niccy.isac, 0, data, size);
 }
@@ -126,15 +126,15 @@ static struct dc_hw_ops isac_ops = {
 	.write_fifo = WriteISACfifo,
 };
 
-static u_char
-ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
+static u8
+ReadHSCX(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	return (readreg(cs->hw.niccy.hscx_ale,
 			cs->hw.niccy.hscx, offset + (hscx ? 0x40 : 0)));
 }
 
 static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
+WriteHSCX(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 {
 	writereg(cs->hw.niccy.hscx_ale,
 		 cs->hw.niccy.hscx, offset + (hscx ? 0x40 : 0), value);
@@ -162,7 +162,7 @@ static void
 niccy_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val;
+	u8 val;
 	
 	spin_lock(&cs->lock);
 	if (cs->subtyp == NICCY_PCI) {

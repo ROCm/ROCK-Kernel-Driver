@@ -33,7 +33,7 @@ static inline int
 WaitForBusy(struct IsdnCardState *cs)
 {
 	int to = 130;
-	u_char val;
+	u8 val;
 
 	while (!(hfc_read_reg(cs, HFC_STATUS, 0) & HFC_BUSY) && to) {
 		val = hfc_read_reg(cs, HFC_DATA, HFC_CIP | HFC_F2 |
@@ -79,7 +79,7 @@ GetFreeFifoBytes(struct BCState *bcs)
 }
 
 int
-ReadZReg(struct BCState *bcs, u_char reg)
+ReadZReg(struct BCState *bcs, u8 reg)
 {
 	int val;
 
@@ -96,7 +96,7 @@ hfc_clear_fifo(struct BCState *bcs)
 	struct IsdnCardState *cs = bcs->cs;
 	int idx, cnt;
 	int rcnt, z1, z2;
-	u_char cip, f1, f2;
+	u8 cip, f1, f2;
 
 	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
 		debugl1(cs, "hfc_clear_fifo");
@@ -155,12 +155,12 @@ static struct sk_buff
 *
 hfc_empty_fifo(struct BCState *bcs, int count)
 {
-	u_char *ptr;
+	u8 *ptr;
 	struct sk_buff *skb;
 	struct IsdnCardState *cs = bcs->cs;
 	int idx;
 	int chksum;
-	u_char stat, cip;
+	u8 stat, cip;
 
 	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
 		debugl1(cs, "hfc_empty_fifo");
@@ -252,7 +252,7 @@ hfc_fill_fifo(struct BCState *bcs)
 	int idx, fcnt;
 	int count;
 	int z1, z2;
-	u_char cip;
+	u8 cip;
 
 	if (!bcs->tx_skb)
 		return;
@@ -331,7 +331,7 @@ main_irq_hfc(struct BCState *bcs)
 {
 	struct IsdnCardState *cs = bcs->cs;
 	int z1, z2, rcnt;
-	u_char f1, f2, cip;
+	u8 f1, f2, cip;
 	int receive, transmit, count = 5;
 	struct sk_buff *skb;
 

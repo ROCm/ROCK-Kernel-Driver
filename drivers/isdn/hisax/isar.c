@@ -21,13 +21,13 @@
 #define ETX	0x03
 
 
-const u_char faxmodulation_s[] = "3,24,48,72,73,74,96,97,98,121,122,145,146"; 
-const u_char faxmodulation[] = {3,24,48,72,73,74,96,97,98,121,122,145,146}; 
+const u8 faxmodulation_s[] = "3,24,48,72,73,74,96,97,98,121,122,145,146"; 
+const u8 faxmodulation[] = {3,24,48,72,73,74,96,97,98,121,122,145,146}; 
 #define FAXMODCNT 13
 
 void isar_setup(struct IsdnCardState *cs);
-static void isar_pump_cmd(struct BCState *bcs, u_char cmd, u_char para);
-static inline void ll_deliver_faxstat(struct BCState *bcs, u_char status);
+static void isar_pump_cmd(struct BCState *bcs, u8 cmd, u8 para);
+static inline void ll_deliver_faxstat(struct BCState *bcs, u8 status);
 static spinlock_t isar_lock = SPIN_LOCK_UNLOCKED;
 
 static inline u8
@@ -57,8 +57,8 @@ waitforHIA(struct IsdnCardState *cs, int timeout)
 
 
 int
-sendmsg(struct IsdnCardState *cs, u_char his, u_char creg, u_char len,
-	u_char *msg)
+sendmsg(struct IsdnCardState *cs, u8 his, u8 creg, u8 len,
+	u8 *msg)
 {
 	unsigned long flags;
 	int i;
@@ -100,7 +100,7 @@ sendmsg(struct IsdnCardState *cs, u_char his, u_char creg, u_char len,
 
 /* Call only with IRQ disabled !!! */
 inline void
-rcv_mbox(struct IsdnCardState *cs, struct isar_reg *ireg, u_char *msg)
+rcv_mbox(struct IsdnCardState *cs, struct isar_reg *ireg, u8 *msg)
 {
 	int i;
 
@@ -142,8 +142,8 @@ get_irq_infos(struct IsdnCardState *cs, struct isar_reg *ireg)
 }
 
 int
-waitrecmsg(struct IsdnCardState *cs, u_char *len,
-	u_char *msg, int maxdelay)
+waitrecmsg(struct IsdnCardState *cs, u8 *len,
+	u8 *msg, int maxdelay)
 {
 	int timeout = 0;
 	unsigned long flags;
@@ -169,9 +169,9 @@ int
 ISARVersion(struct IsdnCardState *cs, char *s)
 {
 	int ver;
-	u_char msg[] = ISAR_MSG_HWVER;
-	u_char tmp[64];
-	u_char len;
+	u8 msg[] = ISAR_MSG_HWVER;
+	u8 tmp[64];
+	u8 len;
 	int debug;
 
 	cs->cardmsg(cs, CARD_RESET,  NULL);
@@ -196,13 +196,13 @@ ISARVersion(struct IsdnCardState *cs, char *s)
 }
 
 int
-isar_load_firmware(struct IsdnCardState *cs, u_char *buf)
+isar_load_firmware(struct IsdnCardState *cs, u8 *buf)
 {
 	int ret, size, cnt, debug;
-	u_char len, nom, noc;
+	u8 len, nom, noc;
 	u_short sadr, left, *sp;
-	u_char *p = buf;
-	u_char *msg, *tmpmsg, *mp, tmp[64];
+	u8 *p = buf;
+	u8 *msg, *tmpmsg, *mp, tmp[64];
 	struct isar_reg *ireg = cs->bcs[0].hw.isar.reg;
 	
 	struct {u_short sadr;
@@ -451,7 +451,7 @@ isar_bh(void *data)
 static inline void
 send_DLE_ETX(struct BCState *bcs)
 {
-	u_char dleetx[2] = {DLE,ETX};
+	u8 dleetx[2] = {DLE,ETX};
 	struct sk_buff *skb;
 	
 	if ((skb = dev_alloc_skb(2))) {
@@ -487,7 +487,7 @@ insert_dle(unsigned char *dest, unsigned char *src, int count) {
 static inline void
 isar_rcv_frame(struct IsdnCardState *cs, struct BCState *bcs)
 {
-	u_char *ptr;
+	u8 *ptr;
 	struct sk_buff *skb;
 	struct isar_reg *ireg = bcs->hw.isar.reg;
 	
@@ -507,7 +507,7 @@ isar_rcv_frame(struct IsdnCardState *cs, struct BCState *bcs)
 	case L1_MODE_TRANS:
 	case L1_MODE_V32:
 		if ((skb = dev_alloc_skb(ireg->clsb))) {
-			rcv_mbox(cs, ireg, (u_char *)skb_put(skb, ireg->clsb));
+			rcv_mbox(cs, ireg, (u8 *)skb_put(skb, ireg->clsb));
 			skb_queue_tail(&bcs->rqueue, skb);
 			sched_b_event(bcs, B_RCVBUFREADY);
 		} else {
@@ -572,7 +572,7 @@ isar_rcv_frame(struct IsdnCardState *cs, struct BCState *bcs)
 				debugl1(cs, "isar_rcv_frame: raw(%d) dle(%d)",
 					ireg->clsb, bcs->hw.isar.rcvidx);
 			if ((skb = dev_alloc_skb(bcs->hw.isar.rcvidx))) {
-				insert_dle((u_char *)skb_put(skb, bcs->hw.isar.rcvidx),
+				insert_dle((u8 *)skb_put(skb, bcs->hw.isar.rcvidx),
 					bcs->hw.isar.rcvbuf, ireg->clsb);
 				skb_queue_tail(&bcs->rqueue, skb);
 				sched_b_event(bcs, B_RCVBUFREADY);
@@ -630,7 +630,7 @@ isar_rcv_frame(struct IsdnCardState *cs, struct BCState *bcs)
 				} else if (!(skb = dev_alloc_skb(bcs->hw.isar.rcvidx))) {
 					printk(KERN_WARNING "ISAR: receive out of memory\n");
 				} else {
-					insert_dle((u_char *)skb_put(skb, len),
+					insert_dle((u8 *)skb_put(skb, len),
 						bcs->hw.isar.rcvbuf,
 						bcs->hw.isar.rcvidx);
 					skb_queue_tail(&bcs->rqueue, skb);
@@ -665,8 +665,8 @@ isar_fill_fifo(struct BCState *bcs)
 {
 	struct IsdnCardState *cs = bcs->cs;
 	int count;
-	u_char msb;
-	u_char *ptr;
+	u8 msb;
+	u8 *ptr;
 
 	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
 		debugl1(cs, "isar_fill_fifo");
@@ -737,7 +737,7 @@ isar_fill_fifo(struct BCState *bcs)
 }
 
 inline
-struct BCState *sel_bcs_isar(struct IsdnCardState *cs, u_char dpath)
+struct BCState *sel_bcs_isar(struct IsdnCardState *cs, u8 dpath)
 {
 	if ((!dpath) || (dpath == 3))
 		return(NULL);
@@ -780,7 +780,7 @@ send_frames(struct BCState *bcs)
 		if (test_and_clear_bit(BC_FLG_DLEETX, &bcs->Flag)) {
 			if (test_and_clear_bit(BC_FLG_LASTDATA, &bcs->Flag)) {
 				if (test_and_clear_bit(BC_FLG_NMD_DATA, &bcs->Flag)) {
-					u_char dummy = 0;
+					u8 dummy = 0;
 					sendmsg(bcs->cs, SET_DPS(bcs->hw.isar.dpath) |
 						ISAR_HIS_SDATA, 0x01, 1, &dummy);
 				}
@@ -795,7 +795,7 @@ send_frames(struct BCState *bcs)
 }
 
 inline void
-check_send(struct IsdnCardState *cs, u_char rdm)
+check_send(struct IsdnCardState *cs, u8 rdm)
 {
 	struct BCState *bcs;
 	
@@ -825,8 +825,8 @@ const char *dmrim[] = {"NO MOD", "NO DEF", "V32/V32b", "V22", "V21",
 static void
 isar_pump_status_rsp(struct BCState *bcs, struct isar_reg *ireg) {
 	struct IsdnCardState *cs = bcs->cs;
-	u_char ril = ireg->par[0];
-	u_char rim;
+	u8 ril = ireg->par[0];
+	u8 rim;
 
 	if (!test_and_clear_bit(ISAR_RATE_REQ, &bcs->hw.isar.reg->Flags))
 		return; 
@@ -877,9 +877,9 @@ isar_pump_status_rsp(struct BCState *bcs, struct isar_reg *ireg) {
 }
 
 static void
-isar_pump_statev_modem(struct BCState *bcs, u_char devt) {
+isar_pump_statev_modem(struct BCState *bcs, u8 devt) {
 	struct IsdnCardState *cs = bcs->cs;
-	u_char dps = SET_DPS(bcs->hw.isar.dpath);
+	u8 dps = SET_DPS(bcs->hw.isar.dpath);
 
 	switch(devt) {
 		case PSEV_10MS_TIMER:
@@ -947,7 +947,7 @@ isar_pump_statev_modem(struct BCState *bcs, u_char devt) {
 }
 
 static inline void
-ll_deliver_faxstat(struct BCState *bcs, u_char status)
+ll_deliver_faxstat(struct BCState *bcs, u8 status)
 {
         isdn_ctrl ic;
 	struct Channel *chanp = (struct Channel *) bcs->st->lli.userdata;
@@ -962,10 +962,10 @@ ll_deliver_faxstat(struct BCState *bcs, u_char status)
 }
 
 static void
-isar_pump_statev_fax(struct BCState *bcs, u_char devt) {
+isar_pump_statev_fax(struct BCState *bcs, u8 devt) {
 	struct IsdnCardState *cs = bcs->cs;
-	u_char dps = SET_DPS(bcs->hw.isar.dpath);
-	u_char p1;
+	u8 dps = SET_DPS(bcs->hw.isar.dpath);
+	u8 p1;
 
 	switch(devt) {
 		case PSEV_10MS_TIMER:
@@ -1188,7 +1188,7 @@ isar_int_main(struct IsdnCardState *cs)
 			break;
 		case ISAR_IIS_PSTEV:
 			if ((bcs = sel_bcs_isar(cs, ireg->iis >> 6))) {
-				rcv_mbox(cs, ireg, (u_char *)ireg->par);
+				rcv_mbox(cs, ireg, (u8 *)ireg->par);
 				if (bcs->mode == L1_MODE_V32) {
 					isar_pump_statev_modem(bcs, ireg->cmsb);
 				} else if (bcs->mode == L1_MODE_FAX) {
@@ -1206,7 +1206,7 @@ isar_int_main(struct IsdnCardState *cs)
 			break;
 		case ISAR_IIS_PSTRSP:
 			if ((bcs = sel_bcs_isar(cs, ireg->iis >> 6))) {
-				rcv_mbox(cs, ireg, (u_char *)ireg->par);
+				rcv_mbox(cs, ireg, (u8 *)ireg->par);
 				isar_pump_status_rsp(bcs, ireg);
 			} else {
 				debugl1(cs, "isar spurious IIS_PSTRSP %x/%x/%x",
@@ -1217,14 +1217,14 @@ isar_int_main(struct IsdnCardState *cs)
 		case ISAR_IIS_DIAG:
 		case ISAR_IIS_BSTRSP:
 		case ISAR_IIS_IOM2RSP:
-			rcv_mbox(cs, ireg, (u_char *)ireg->par);
+			rcv_mbox(cs, ireg, (u8 *)ireg->par);
 			if ((cs->debug & (L1_DEB_HSCX | L1_DEB_HSCX_FIFO))
 				== L1_DEB_HSCX) {
-				u_char *tp=debbuf;
+				u8 *tp=debbuf;
 
 				tp += sprintf(debbuf, "msg iis(%x) msb(%x)",
 					ireg->iis, ireg->cmsb);
-				QuickHex(tp, (u_char *)ireg->par, ireg->clsb);
+				QuickHex(tp, (u8 *)ireg->par, ireg->clsb);
 				debugl1(cs, debbuf);
 			}
 			break;
@@ -1257,8 +1257,8 @@ ftimer_handler(struct BCState *bcs) {
 static void
 setup_pump(struct BCState *bcs) {
 	struct IsdnCardState *cs = bcs->cs;
-	u_char dps = SET_DPS(bcs->hw.isar.dpath);
-	u_char ctrl, param[6];
+	u8 dps = SET_DPS(bcs->hw.isar.dpath);
+	u8 ctrl, param[6];
 
 	switch (bcs->mode) {
 		case L1_MODE_NULL:
@@ -1306,8 +1306,8 @@ setup_pump(struct BCState *bcs) {
 static void
 setup_sart(struct BCState *bcs) {
 	struct IsdnCardState *cs = bcs->cs;
-	u_char dps = SET_DPS(bcs->hw.isar.dpath);
-	u_char ctrl, param[2];
+	u8 dps = SET_DPS(bcs->hw.isar.dpath);
+	u8 ctrl, param[2];
 	
 	switch (bcs->mode) {
 		case L1_MODE_NULL:
@@ -1340,8 +1340,8 @@ setup_sart(struct BCState *bcs) {
 static void
 setup_iom2(struct BCState *bcs) {
 	struct IsdnCardState *cs = bcs->cs;
-	u_char dps = SET_DPS(bcs->hw.isar.dpath);
-	u_char cmsb = IOM_CTRL_ENA, msg[5] = {IOM_P1_TXD,0,0,0,0};
+	u8 dps = SET_DPS(bcs->hw.isar.dpath);
+	u8 cmsb = IOM_CTRL_ENA, msg[5] = {IOM_P1_TXD,0,0,0,0};
 	
 	if (bcs->channel)
 		msg[1] = msg[3] = 1;
@@ -1426,11 +1426,11 @@ modeisar(struct BCState *bcs, int mode, int bc)
 }
 
 static void
-isar_pump_cmd(struct BCState *bcs, u_char cmd, u_char para) 
+isar_pump_cmd(struct BCState *bcs, u8 cmd, u8 para) 
 {
 	struct IsdnCardState *cs = bcs->cs;
-	u_char dps = SET_DPS(bcs->hw.isar.dpath);
-	u_char ctrl = 0, nom = 0, p1 = 0;
+	u8 dps = SET_DPS(bcs->hw.isar.dpath);
+	u8 ctrl = 0, nom = 0, p1 = 0;
 
 	switch(cmd) {
 		case ISDN_FAX_CLASS1_FTM:
@@ -1533,7 +1533,7 @@ isar_pump_cmd(struct BCState *bcs, u_char cmd, u_char para)
 void
 isar_setup(struct IsdnCardState *cs)
 {
-	u_char msg;
+	u8 msg;
 	int i;
 	
 	/* Dpath 1, 2 */
@@ -1726,7 +1726,7 @@ isar_auxcmd(struct IsdnCardState *cs, isdn_ctrl *ic) {
 						ISDN_FEATURE_L2_FAX |
 						ISDN_FEATURE_L3_FCLASS1;
 					memcpy(&adr, ic->parm.num, sizeof(ulong));
-					if (isar_load_firmware(cs, (u_char *)adr))
+					if (isar_load_firmware(cs, (u8 *)adr))
 						return(1);
 					else 
 						ll_run(cs, features);

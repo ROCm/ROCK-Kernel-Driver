@@ -32,7 +32,7 @@ waitforXFW(struct IsdnCardState *cs, int jade)
 }
 
 static inline void
-WriteJADECMDR(struct IsdnCardState *cs, int jade, int reg, u_char data)
+WriteJADECMDR(struct IsdnCardState *cs, int jade, int reg, u8 data)
 {
 	unsigned long flags;
 
@@ -47,7 +47,7 @@ WriteJADECMDR(struct IsdnCardState *cs, int jade, int reg, u_char data)
 static void
 jade_empty_fifo(struct BCState *bcs, int count)
 {
-	u_char *ptr;
+	u8 *ptr;
 	struct IsdnCardState *cs = bcs->cs;
 
 	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
@@ -95,9 +95,9 @@ jade_fill_fifo(struct BCState *bcs)
 
 
 static inline void
-jade_interrupt(struct IsdnCardState *cs, u_char val, u_char jade)
+jade_interrupt(struct IsdnCardState *cs, u8 val, u8 jade)
 {
-	u_char r;
+	u8 r;
 	struct BCState *bcs = cs->bcs + jade;
 	struct sk_buff *skb;
 	int fifo_size = 32;
@@ -165,7 +165,7 @@ reset_xmit(struct BCState *bcs)
 }
 
 static inline void
-jade_int_main(struct IsdnCardState *cs, u_char val, int jade)
+jade_int_main(struct IsdnCardState *cs, u8 val, int jade)
 {
 	struct BCState *bcs;
 	bcs = cs->bcs + jade;

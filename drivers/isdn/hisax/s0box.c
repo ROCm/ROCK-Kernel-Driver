@@ -106,26 +106,26 @@ write_fifo(struct IsdnCardState *cs, signed int adr, u8 * data, int size)
 
 /* Interface functions */
 
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+ReadISAC(struct IsdnCardState *cs, u8 offset)
 {
 	return readreg(cs, cs->hw.teles3.isac, offset);
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writereg(cs, cs->hw.teles3.isac, offset, value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	read_fifo(cs, cs->hw.teles3.isacfifo, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	write_fifo(cs, cs->hw.teles3.isacfifo, data, size);
 }
@@ -137,14 +137,14 @@ static struct dc_hw_ops isac_ops = {
 	.write_fifo = WriteISACfifo,
 };
 
-static u_char
-ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
+static u8
+ReadHSCX(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	return readreg(cs, cs->hw.teles3.hscx[hscx], offset);
 }
 
 static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
+WriteHSCX(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 {
 	writereg(cs, cs->hw.teles3.hscx[hscx], offset, value);
 }
@@ -170,7 +170,7 @@ s0box_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 #define MAXCOUNT 5
 	struct IsdnCardState *cs = dev_id;
-	u_char val;
+	u8 val;
 	int count = 0;
 
 	spin_lock(&cs->lock);

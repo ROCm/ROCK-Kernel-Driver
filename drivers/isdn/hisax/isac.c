@@ -116,7 +116,7 @@ isac_bh(void *data)
 void
 isac_empty_fifo(struct IsdnCardState *cs, int count)
 {
-	u_char *ptr;
+	u8 *ptr;
 
 	if ((cs->debug & L1_DEB_ISAC) && !(cs->debug & L1_DEB_ISAC_FIFO))
 		debugl1(cs, "isac_empty_fifo");
@@ -164,9 +164,9 @@ isac_fill_fifo(struct IsdnCardState *cs)
 }
 
 void
-isac_interrupt(struct IsdnCardState *cs, u_char val)
+isac_interrupt(struct IsdnCardState *cs, u8 val)
 {
-	u_char exval, v1;
+	u8 exval, v1;
 	struct sk_buff *skb;
 	unsigned int count;
 

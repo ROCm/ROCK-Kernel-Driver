@@ -642,7 +642,7 @@ amd7930_liu_callback(struct IsdnCardState *cs)
 void
 amd7930_l1cmd(struct IsdnCardState *cs, int msg, void *arg)
 {
-	u_char val;
+	u8 val;
 	char tmp[32];
 	
 	if (cs->debug & L1_DEB_ISAC) {

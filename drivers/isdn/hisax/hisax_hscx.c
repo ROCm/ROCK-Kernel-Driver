@@ -113,7 +113,7 @@ static void hscx_version(struct hscx *hscx)
 
 static void hscx_empty_fifo(struct hscx *hscx, int count)
 {
-	u_char *ptr;
+	u8 *ptr;
 
 	DBG(DBG_IRQ, "count %d", count);
 

@@ -29,66 +29,66 @@ const char *teles0_revision = "$Revision: 2.13.6.2 $";
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)
 
-static inline u_char
-readisac(unsigned long adr, u_char off)
+static inline u8
+readisac(unsigned long adr, u8 off)
 {
 	return readb(adr + ((off & 1) ? 0x2ff : 0x100) + off);
 }
 
 static inline void
-writeisac(unsigned long adr, u_char off, u_char data)
+writeisac(unsigned long adr, u8 off, u8 data)
 {
 	writeb(data, adr + ((off & 1) ? 0x2ff : 0x100) + off); mb();
 }
 
 
-static inline u_char
-readhscx(unsigned long adr, int hscx, u_char off)
+static inline u8
+readhscx(unsigned long adr, int hscx, u8 off)
 {
 	return readb(adr + (hscx ? 0x1c0 : 0x180) +
 		     ((off & 1) ? 0x1ff : 0) + off);
 }
 
 static inline void
-writehscx(unsigned long adr, int hscx, u_char off, u_char data)
+writehscx(unsigned long adr, int hscx, u8 off, u8 data)
 {
 	writeb(data, adr + (hscx ? 0x1c0 : 0x180) +
 	       ((off & 1) ? 0x1ff : 0) + off); mb();
 }
 
 static inline void
-read_fifo_isac(unsigned long adr, u_char * data, int size)
+read_fifo_isac(unsigned long adr, u8 * data, int size)
 {
 	register int i;
-	register u_char *ad = (u_char *)adr + 0x100;
+	register u8 *ad = (u8 *)adr + 0x100;
 	for (i = 0; i < size; i++)
 		data[i] = readb(ad);
 }
 
 static inline void
-write_fifo_isac(unsigned long adr, u_char * data, int size)
+write_fifo_isac(unsigned long adr, u8 * data, int size)
 {
 	register int i;
-	register u_char *ad = (u_char *)adr + 0x100;
+	register u8 *ad = (u8 *)adr + 0x100;
 	for (i = 0; i < size; i++) {
 		writeb(data[i], ad); mb();
 	}
 }
 
 static inline void
-read_fifo_hscx(unsigned long adr, int hscx, u_char * data, int size)
+read_fifo_hscx(unsigned long adr, int hscx, u8 * data, int size)
 {
 	register int i;
-	register u_char *ad = (u_char *) (adr + (hscx ? 0x1c0 : 0x180));
+	register u8 *ad = (u8 *) (adr + (hscx ? 0x1c0 : 0x180));
 	for (i = 0; i < size; i++)
 		data[i] = readb(ad);
 }
 
 static inline void
-write_fifo_hscx(unsigned long adr, int hscx, u_char * data, int size)
+write_fifo_hscx(unsigned long adr, int hscx, u8 * data, int size)
 {
 	int i;
-	register u_char *ad = (u_char *) (adr + (hscx ? 0x1c0 : 0x180));
+	register u8 *ad = (u8 *) (adr + (hscx ? 0x1c0 : 0x180));
 	for (i = 0; i < size; i++) {
 		writeb(data[i], ad); mb();
 	}
@@ -96,26 +96,26 @@ write_fifo_hscx(unsigned long adr, int hscx, u_char * data, int size)
 
 /* Interface functions */
 
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+ReadISAC(struct IsdnCardState *cs, u8 offset)
 {
 	return (readisac(cs->hw.teles0.membase, offset));
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writeisac(cs->hw.teles0.membase, offset, value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	read_fifo_isac(cs->hw.teles0.membase, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	write_fifo_isac(cs->hw.teles0.membase, data, size);
 }
@@ -127,14 +127,14 @@ static struct dc_hw_ops isac_ops = {
 	.write_fifo = WriteISACfifo,
 };
 
-static u_char
-ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
+static u8
+ReadHSCX(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	return (readhscx(cs->hw.teles0.membase, hscx, offset));
 }
 
 static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
+WriteHSCX(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 {
 	writehscx(cs->hw.teles0.membase, hscx, offset, value);
 }
@@ -159,7 +159,7 @@ static void
 teles0_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val;
+	u8 val;
 	int count = 0;
 
 	spin_lock(&cs->lock);
@@ -205,7 +205,7 @@ release_io_teles0(struct IsdnCardState *cs)
 static int
 reset_teles0(struct IsdnCardState *cs)
 {
-	u_char cfval;
+	u8 cfval;
 
 	if (cs->hw.teles0.cfg_reg) {
 		switch (cs->irq) {
@@ -272,7 +272,7 @@ Teles_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 int __init
 setup_teles0(struct IsdnCard *card)
 {
-	u_char val;
+	u8 val;
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 

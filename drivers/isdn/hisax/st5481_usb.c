@@ -96,7 +96,7 @@ void st5481_usb_device_ctrl_msg(struct st5481_adapter *adapter,
  * Asynchronous pipe reset (async version of usb_clear_halt).
  */
 void st5481_usb_pipe_reset(struct st5481_adapter *adapter,
-		    u_char pipe,
+		    u8 pipe,
 		    ctrl_complete_t complete, void *context)
 {
 	DBG(1,"pipe=%02x",pipe);
@@ -178,8 +178,8 @@ static void usb_ctrl_complete(struct urb *urb, struct pt_regs *regs)
  */
 static void usb_int_complete(struct urb *urb, struct pt_regs *regs)
 {
-	u_char *data = urb->transfer_buffer;
-	u_char irqbyte;
+	u8 *data = urb->transfer_buffer;
+	u8 irqbyte;
 	struct st5481_adapter *adapter = urb->context;
 	int j;
 	int status;
@@ -248,7 +248,7 @@ int __devinit st5481_setup_usb(struct st5481_adapter *adapter)
 	struct usb_host_endpoint *endpoint;
 	int status;
 	struct urb *urb;
-	u_char *buf;
+	u8 *buf;
 	
 	DBG(1,"");
 	

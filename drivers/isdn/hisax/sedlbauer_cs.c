@@ -342,7 +342,7 @@ static void sedlbauer_config(dev_link_t *link)
     tuple_t tuple;
     cisparse_t parse;
     int last_fn, last_ret;
-    u_char buf[64];
+    u8 buf[64];
     config_info_t conf;
     win_req_t req;
     memreq_t map;

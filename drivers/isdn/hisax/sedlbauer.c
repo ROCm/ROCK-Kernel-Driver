@@ -167,26 +167,26 @@ writefifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 * data, int siz
 
 /* Interface functions */
 
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+ReadISAC(struct IsdnCardState *cs, u8 offset)
 {
 	return readreg(cs, cs->hw.sedl.isac, offset);
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writereg(cs, cs->hw.sedl.isac, offset, value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	readfifo(cs, cs->hw.sedl.isac, 0, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	writefifo(cs, cs->hw.sedl.isac, 0, data, size);
 }
@@ -198,26 +198,26 @@ static struct dc_hw_ops isac_ops = {
 	.write_fifo = WriteISACfifo,
 };
 
-static u_char
-ReadISAC_IPAC(struct IsdnCardState *cs, u_char offset)
+static u8
+ReadISAC_IPAC(struct IsdnCardState *cs, u8 offset)
 {
 	return readreg(cs, cs->hw.sedl.isac, offset|0x80);
 }
 
 static void
-WriteISAC_IPAC(struct IsdnCardState *cs, u_char offset, u_char value)
+WriteISAC_IPAC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writereg(cs, cs->hw.sedl.isac, offset|0x80, value);
 }
 
 static void
-ReadISACfifo_IPAC(struct IsdnCardState *cs, u_char * data, int size)
+ReadISACfifo_IPAC(struct IsdnCardState *cs, u8 * data, int size)
 {
 	readfifo(cs, cs->hw.sedl.isac, 0x80, data, size);
 }
 
 static void
-WriteISACfifo_IPAC(struct IsdnCardState *cs, u_char * data, int size)
+WriteISACfifo_IPAC(struct IsdnCardState *cs, u8 * data, int size)
 {
 	writefifo(cs, cs->hw.sedl.isac, 0x80, data, size);
 }
@@ -229,14 +229,14 @@ static struct dc_hw_ops ipac_dc_ops = {
 	.write_fifo = WriteISACfifo_IPAC,
 };
 
-static u_char
-ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
+static u8
+ReadHSCX(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	return readreg(cs, cs->hw.sedl.hscx, offset + (hscx ? 0x40 : 0));
 }
 
 static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
+WriteHSCX(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 {
 	writereg(cs, cs->hw.sedl.hscx, offset + (hscx ? 0x40 : 0), value);
 }
@@ -252,8 +252,8 @@ static struct bc_hw_ops hscx_ops = {
  * mode = 2 access with IRQ off and using last offset
  */
 
-static u_char
-ReadISAR(struct IsdnCardState *cs, int mode, u_char offset)
+static u8
+ReadISAR(struct IsdnCardState *cs, int mode, u8 offset)
 {	
 	if (mode == 0)
 		return readreg(cs, cs->hw.sedl.hscx, offset);
@@ -263,7 +263,7 @@ ReadISAR(struct IsdnCardState *cs, int mode, u_char offset)
 }
 
 static void
-WriteISAR(struct IsdnCardState *cs, int mode, u_char offset, u_char value)
+WriteISAR(struct IsdnCardState *cs, int mode, u8 offset, u8 value)
 {
 	if (mode == 0)
 		writereg(cs, cs->hw.sedl.hscx, offset, value);
@@ -300,7 +300,7 @@ static void
 sedlbauer_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val;
+	u8 val;
 
 	if (!cs) {
 		printk(KERN_WARNING "Sedlbauer: Spurious interrupt!\n");
@@ -346,7 +346,7 @@ static void
 sedlbauer_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char ista, val, icnt = 5;
+	u8 ista, val, icnt = 5;
 
 	if (!cs) {
 		printk(KERN_WARNING "Sedlbauer: Spurious interrupt!\n");
@@ -393,7 +393,7 @@ static void
 sedlbauer_interrupt_isar(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val;
+	u8 val;
 	int cnt = 5;
 
 	spin_lock(&cs->lock);

@@ -634,10 +634,10 @@ struct IsdnCardState *hisax_get_card(int cardnr)
 	return NULL;
 }
 
-int HiSax_readstatus(u_char * buf, int len, int user, int id, int channel)
+int HiSax_readstatus(u8 * buf, int len, int user, int id, int channel)
 {
 	int count, cnt;
-	u_char *p = buf;
+	u8 *p = buf;
 	struct IsdnCardState *cs = hisax_findcard(id);
 
 	if (cs) {
@@ -702,7 +702,7 @@ int jiftime(char *s, long mark)
 	return 8;
 }
 
-static u_char tmpbuf[HISAX_STATUS_BUFSIZE];
+static u8 tmpbuf[HISAX_STATUS_BUFSIZE];
 
 void VHiSax_putstatus(struct IsdnCardState *cs, char *head, char *fmt,
 		      va_list args)
@@ -711,7 +711,7 @@ void VHiSax_putstatus(struct IsdnCardState *cs, char *head, char *fmt,
 
 	unsigned long flags;
 	int count, i;
-	u_char *p;
+	u8 *p;
 	isdn_ctrl ic;
 	int len;
 
@@ -1711,7 +1711,7 @@ int avm_a1_init_pcmcia(void *pcm_iob, int pcm_irq, int *busy_flag, int prot)
 int __devinit hisax_init_pcmcia(void *pcm_iob, int *busy_flag,
 				struct IsdnCard *card)
 {
-	u_char ids[16];
+	u8 ids[16];
 	int ret = -1;
 
 	cards[nrcards] = *card;
@@ -2018,7 +2018,7 @@ static void hisax_bc_close(struct BCState *bcs)
 static void EChannel_proc_rcv(struct hisax_d_if *d_if)
 {
 	struct IsdnCardState *cs = d_if->cs;
-	u_char *ptr;
+	u8 *ptr;
 	struct sk_buff *skb;
 
 	while ((skb = skb_dequeue(&d_if->erq)) != NULL) {

@@ -21,7 +21,7 @@ static void
 netjet_u_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val, sval;
+	u8 val, sval;
 
 	spin_lock(&cs->lock);
 	if (!((sval = bytein(cs->hw.njet.base + NETJET_IRQSTAT1)) &

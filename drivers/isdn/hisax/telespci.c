@@ -42,8 +42,8 @@ const char *telespci_revision = "$Revision: 2.16.6.5 $";
 					portdata = readl(adr + 0x200); \
 				} while (portdata & ZORAN_PO_RQ_PEN)
 
-static inline u_char
-readisac(unsigned long adr, u_char off)
+static inline u8
+readisac(unsigned long adr, u8 off)
 {
 	register unsigned int portdata;
 
@@ -56,11 +56,11 @@ readisac(unsigned long adr, u_char off)
 	/* read data from ISAC */
 	writel(READ_DATA_ISAC, adr + 0x200);
 	ZORAN_WAIT_NOBUSY;
-	return((u_char)(portdata & ZORAN_PO_DMASK));
+	return((u8)(portdata & ZORAN_PO_DMASK));
 }
 
 static inline void
-writeisac(unsigned long adr, u_char off, u_char data)
+writeisac(unsigned long adr, u8 off, u8 data)
 {
 	register unsigned int portdata;
 
@@ -75,8 +75,8 @@ writeisac(unsigned long adr, u_char off, u_char data)
 	ZORAN_WAIT_NOBUSY;
 }
 
-static inline u_char
-readhscx(unsigned long adr, int hscx, u_char off)
+static inline u8
+readhscx(unsigned long adr, int hscx, u8 off)
 {
 	register unsigned int portdata;
 
@@ -88,11 +88,11 @@ readhscx(unsigned long adr, int hscx, u_char off)
 	/* read data from HSCX */
 	writel(READ_DATA_HSCX, adr + 0x200);
 	ZORAN_WAIT_NOBUSY;
-	return ((u_char)(portdata & ZORAN_PO_DMASK));
+	return ((u8)(portdata & ZORAN_PO_DMASK));
 }
 
 static inline void
-writehscx(unsigned long adr, int hscx, u_char off, u_char data)
+writehscx(unsigned long adr, int hscx, u8 off, u8 data)
 {
 	register unsigned int portdata;
 
@@ -107,7 +107,7 @@ writehscx(unsigned long adr, int hscx, u_char off, u_char data)
 }
 
 static inline void
-read_fifo_isac(unsigned long adr, u_char * data, int size)
+read_fifo_isac(unsigned long adr, u8 * data, int size)
 {
 	register unsigned int portdata;
 	register int i;
@@ -120,12 +120,12 @@ read_fifo_isac(unsigned long adr, u_char * data, int size)
 		ZORAN_WAIT_NOBUSY;
 		writel(READ_DATA_ISAC, adr + 0x200);
 		ZORAN_WAIT_NOBUSY;
-		data[i] = (u_char)(portdata & ZORAN_PO_DMASK);
+		data[i] = (u8)(portdata & ZORAN_PO_DMASK);
 	}
 }
 
 static void
-write_fifo_isac(unsigned long adr, u_char * data, int size)
+write_fifo_isac(unsigned long adr, u8 * data, int size)
 {
 	register unsigned int portdata;
 	register int i;
@@ -142,7 +142,7 @@ write_fifo_isac(unsigned long adr, u_char * data, int size)
 }
 
 static inline void
-read_fifo_hscx(unsigned long adr, int hscx, u_char * data, int size)
+read_fifo_hscx(unsigned long adr, int hscx, u8 * data, int size)
 {
 	register unsigned int portdata;
 	register int i;
@@ -155,12 +155,12 @@ read_fifo_hscx(unsigned long adr, int hscx, u_char * data, int size)
 		ZORAN_WAIT_NOBUSY;
 		writel(READ_DATA_HSCX, adr + 0x200);
 		ZORAN_WAIT_NOBUSY;
-		data[i] = (u_char) (portdata & ZORAN_PO_DMASK);
+		data[i] = (u8) (portdata & ZORAN_PO_DMASK);
 	}
 }
 
 static inline void
-write_fifo_hscx(unsigned long adr, int hscx, u_char * data, int size)
+write_fifo_hscx(unsigned long adr, int hscx, u8 * data, int size)
 {
 	unsigned int portdata;
 	register int i;
@@ -179,26 +179,26 @@ write_fifo_hscx(unsigned long adr, int hscx, u_char * data, int size)
 
 /* Interface functions */
 
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+ReadISAC(struct IsdnCardState *cs, u8 offset)
 {
 	return (readisac(cs->hw.teles0.membase, offset));
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writeisac(cs->hw.teles0.membase, offset, value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	read_fifo_isac(cs->hw.teles0.membase, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	write_fifo_isac(cs->hw.teles0.membase, data, size);
 }
@@ -210,14 +210,14 @@ static struct dc_hw_ops isac_ops = {
 	.write_fifo = WriteISACfifo,
 };
 
-static u_char
-ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
+static u8
+ReadHSCX(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	return (readhscx(cs->hw.teles0.membase, hscx, offset));
 }
 
 static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
+WriteHSCX(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 {
 	writehscx(cs->hw.teles0.membase, hscx, offset, value);
 }
@@ -243,7 +243,7 @@ telespci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 #define MAXCOUNT 20
 	struct IsdnCardState *cs = dev_id;
-	u_char val;
+	u8 val;
 
 	spin_lock(&cs->lock);
 	val = readhscx(cs->hw.teles0.membase, 1, HSCX_ISTA);

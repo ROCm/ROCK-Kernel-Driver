@@ -21,9 +21,9 @@
 #include "l3_1tr6.h"
 
 void
-iecpy(u_char * dest, u_char * iestart, int ieoffset)
+iecpy(u8 * dest, u8 * iestart, int ieoffset)
 {
-	u_char *p;
+	u8 *p;
 	int l;
 
 	p = iestart + ieoffset + 2;
@@ -38,7 +38,7 @@ iecpy(u_char * dest, u_char * iestart, int ieoffset)
  */
 static
 struct MessageType {
-	u_char nr;
+	u8 nr;
 	char *descr;
 } mtlist[] = {
 
@@ -198,7 +198,7 @@ struct MessageType mt_n1[] =
 
 
 static int
-prbits(char *dest, u_char b, int start, int len)
+prbits(char *dest, u8 b, int start, int len)
 {
 	char *dp = dest;
 
@@ -214,8 +214,8 @@ prbits(char *dest, u_char b, int start, int len)
 }
 
 static
-u_char *
-skipext(u_char * p)
+u8 *
+skipext(u8 * p)
 {
 	while (!(*p++ & 0x80));
 	return (p);
@@ -230,7 +230,7 @@ skipext(u_char * p)
 
 static
 struct CauseValue {
-	u_char nr;
+	u8 nr;
 	char *edescr;
 	char *ddescr;
 } cvlist[] = {
@@ -442,9 +442,9 @@ struct CauseValue {
 
 static
 int
-prcause(char *dest, u_char * p)
+prcause(char *dest, u8 * p)
 {
-	u_char *end;
+	u8 *end;
 	char *dp = dest;
 	int i, cause;
 
@@ -519,7 +519,7 @@ struct MessageType cause_1tr6[] =
 int cause_1tr6_len = (sizeof(cause_1tr6) / sizeof(struct MessageType));
 
 static int
-prcause_1tr6(char *dest, u_char * p)
+prcause_1tr6(char *dest, u8 * p)
 {
 	char *dp = dest;
 	int i, cause;
@@ -554,7 +554,7 @@ prcause_1tr6(char *dest, u_char * p)
 }
 
 static int
-prchident(char *dest, u_char * p)
+prchident(char *dest, u8 * p)
 {
 	char *dp = dest;
 
@@ -566,7 +566,7 @@ prchident(char *dest, u_char * p)
 }
 
 static int
-prcalled(char *dest, u_char * p)
+prcalled(char *dest, u8 * p)
 {
 	int l;
 	char *dp = dest;
@@ -583,7 +583,7 @@ prcalled(char *dest, u_char * p)
 	return (dp - dest);
 }
 static int
-prcalling(char *dest, u_char * p)
+prcalling(char *dest, u8 * p)
 {
 	int l;
 	char *dp = dest;
@@ -610,7 +610,7 @@ prcalling(char *dest, u_char * p)
 
 static
 int
-prbearer(char *dest, u_char * p)
+prbearer(char *dest, u8 * p)
 {
 	char *dp = dest, ch;
 
@@ -658,10 +658,10 @@ prbearer(char *dest, u_char * p)
 
 static
 int
-prbearer_ni1(char *dest, u_char * p)
+prbearer_ni1(char *dest, u8 * p)
 {
 	char *dp = dest;
-	u_char len;
+	u8 len;
 
 	p++;
 	len = *p++;
@@ -715,7 +715,7 @@ prbearer_ni1(char *dest, u_char * p)
 }
 
 static int
-general(char *dest, u_char * p)
+general(char *dest, u8 * p)
 {
 	char *dp = dest;
 	char ch = ' ';
@@ -742,7 +742,7 @@ general(char *dest, u_char * p)
 }
 
 static int
-general_ni1(char *dest, u_char * p)
+general_ni1(char *dest, u8 * p)
 {
 	char *dp = dest;
 	char ch = ' ';
@@ -769,7 +769,7 @@ general_ni1(char *dest, u_char * p)
 }
 
 static int
-prcharge(char *dest, u_char * p)
+prcharge(char *dest, u8 * p)
 {
 	char *dp = dest;
 	int l;
@@ -786,7 +786,7 @@ prcharge(char *dest, u_char * p)
 	return (dp - dest);
 }
 static int
-prtext(char *dest, u_char * p)
+prtext(char *dest, u8 * p)
 {
 	char *dp = dest;
 	int l;
@@ -802,7 +802,7 @@ prtext(char *dest, u_char * p)
 }
 
 static int
-prfeatureind(char *dest, u_char * p)
+prfeatureind(char *dest, u8 * p)
 {
 	char *dp = dest;
 
@@ -839,7 +839,7 @@ prfeatureind(char *dest, u_char * p)
 
 static
 struct DTag { /* Display tags */
-	u_char nr;
+	u8 nr;
 	char *descr;
 } dtaglist[] = {
 	{ 0x82, "Continuation" },
@@ -868,7 +868,7 @@ struct DTag { /* Display tags */
 #define DTAGSIZE sizeof(dtaglist)/sizeof(struct DTag)
 
 static int
-disptext_ni1(char *dest, u_char * p)
+disptext_ni1(char *dest, u8 * p)
 {
 	char *dp = dest;
 	int l, tag, len, i;
@@ -907,7 +907,7 @@ disptext_ni1(char *dest, u_char * p)
 	return (dp - dest);
 }
 static int
-display(char *dest, u_char * p)
+display(char *dest, u8 * p)
 {
 	char *dp = dest;
 	char ch = ' ';
@@ -936,7 +936,7 @@ display(char *dest, u_char * p)
 }
 
 int
-prfacility(char *dest, u_char * p)
+prfacility(char *dest, u8 * p)
 {
 	char *dp = dest;
 	int l, l2;
@@ -967,9 +967,9 @@ prfacility(char *dest, u_char * p)
 
 static
 struct InformationElement {
-	u_char nr;
+	u8 nr;
 	char *descr;
-	int (*f) (char *, u_char *);
+	int (*f) (char *, u8 *);
 } ielist[] = {
 
 	{
@@ -1148,11 +1148,11 @@ static struct InformationElement we_6[] =
 #define WE_6_LEN (sizeof(we_6) / sizeof(struct InformationElement))
 
 int
-QuickHex(char *txt, u_char * p, int cnt)
+QuickHex(char *txt, u8 * p, int cnt)
 {
 	register int i;
 	register char *t = txt;
-	register u_char w;
+	register u8 w;
 
 	for (i = 0; i < cnt; i++) {
 		*t++ = ' ';
@@ -1172,7 +1172,7 @@ QuickHex(char *txt, u_char * p, int cnt)
 }
 
 void
-LogFrame(struct IsdnCardState *cs, u_char * buf, int size)
+LogFrame(struct IsdnCardState *cs, u8 * buf, int size)
 {
 	char *dp;
 
@@ -1196,7 +1196,7 @@ LogFrame(struct IsdnCardState *cs, u_char * buf, int size)
 void
 dlogframe(struct IsdnCardState *cs, struct sk_buff *skb, int dir)
 {
-	u_char *bend, *buf;
+	u8 *bend, *buf;
 	char *dp;
 	unsigned char pd, cr_l, cr, mt;
 	unsigned char sapi, tei, ftyp;

@@ -36,7 +36,7 @@ static void
 hfcs_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val, stat;
+	u8 val, stat;
 
 	if (!cs) {
 		printk(KERN_WARNING "HFCS: Spurious interrupt!\n");

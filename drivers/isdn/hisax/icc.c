@@ -137,7 +137,7 @@ icc_bh(void *data)
 void
 icc_empty_fifo(struct IsdnCardState *cs, int count)
 {
-	u_char *ptr;
+	u8 *ptr;
 	unsigned long flags;
 
 	if ((cs->debug & L1_DEB_ISAC) && !(cs->debug & L1_DEB_ISAC_FIFO))
@@ -191,9 +191,9 @@ icc_fill_fifo(struct IsdnCardState *cs)
 }
 
 void
-icc_interrupt(struct IsdnCardState *cs, u_char val)
+icc_interrupt(struct IsdnCardState *cs, u8 val)
 {
-	u_char exval, v1;
+	u8 exval, v1;
 	struct sk_buff *skb;
 	unsigned int count;
 	unsigned long flags;

@@ -86,8 +86,8 @@ fcclassic_write_isac_fifo(struct isac *isac, unsigned char * data, int size)
 	outsb(adapter->isac_fifo, data, size);
 }
 
-static u_char
-fcclassic_read_hscx(struct hscx *hscx, u_char offset)
+static u8
+fcclassic_read_hscx(struct hscx *hscx, u8 offset)
 {
 	struct fritz_adapter *adapter = hscx->priv;
 
@@ -95,7 +95,7 @@ fcclassic_read_hscx(struct hscx *hscx, u_char offset)
 }
 
 static void
-fcclassic_write_hscx(struct hscx *hscx, u_char offset, u_char value)
+fcclassic_write_hscx(struct hscx *hscx, u8 offset, u8 value)
 {
 	struct fritz_adapter *adapter = hscx->priv;
 

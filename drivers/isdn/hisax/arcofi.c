@@ -29,7 +29,7 @@ add_arcofi_timer(struct IsdnCardState *cs) {
 
 static void
 send_arcofi(struct IsdnCardState *cs) {
-	u_char val;
+	u8 val;
 	
 	add_arcofi_timer(cs);
 	cs->dc.isac.mon_txp = 0;

@@ -76,11 +76,11 @@ static spinlock_t avm_pci_lock = SPIN_LOCK_UNLOCKED;
 
 /* Interface functions */
 
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+ReadISAC(struct IsdnCardState *cs, u8 offset)
 {
-	register u_char idx = (offset > 0x2f) ? AVM_ISAC_REG_HIGH : AVM_ISAC_REG_LOW;
-	register u_char val;
+	register u8 idx = (offset > 0x2f) ? AVM_ISAC_REG_HIGH : AVM_ISAC_REG_LOW;
+	register u8 val;
 	register unsigned long flags;
 
 	spin_lock_irqsave(&avm_pci_lock, flags);
@@ -91,9 +91,9 @@ ReadISAC(struct IsdnCardState *cs, u_char offset)
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
-	register u_char idx = (offset > 0x2f) ? AVM_ISAC_REG_HIGH : AVM_ISAC_REG_LOW;
+	register u8 idx = (offset > 0x2f) ? AVM_ISAC_REG_HIGH : AVM_ISAC_REG_LOW;
 	register unsigned long flags;
 
 	spin_lock_irqsave(&avm_pci_lock, flags);
@@ -103,14 +103,14 @@ WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	outb(AVM_ISAC_FIFO, cs->hw.avm.cfg_reg + 4);
 	insb(cs->hw.avm.isac, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	outb(AVM_ISAC_FIFO, cs->hw.avm.cfg_reg + 4);
 	outsb(cs->hw.avm.isac, data, size);
@@ -124,7 +124,7 @@ static struct dc_hw_ops isac_ops = {
 };
 
 static inline u_int
-ReadHDLCPCI(struct IsdnCardState *cs, int chan, u_char offset)
+ReadHDLCPCI(struct IsdnCardState *cs, int chan, u8 offset)
 {
 	register u_int idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
 	register u_int val;
@@ -138,7 +138,7 @@ ReadHDLCPCI(struct IsdnCardState *cs, int chan, u_char offset)
 }
 
 static inline void
-WriteHDLCPCI(struct IsdnCardState *cs, int chan, u_char offset, u_int value)
+WriteHDLCPCI(struct IsdnCardState *cs, int chan, u8 offset, u_int value)
 {
 	register u_int idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
 	register unsigned long flags;
@@ -149,11 +149,11 @@ WriteHDLCPCI(struct IsdnCardState *cs, int chan, u_char offset, u_int value)
 	spin_unlock_irqrestore(&avm_pci_lock, flags);
 }
 
-static inline u_char
-ReadHDLCPnP(struct IsdnCardState *cs, int chan, u_char offset)
+static inline u8
+ReadHDLCPnP(struct IsdnCardState *cs, int chan, u8 offset)
 {
-	register u_char idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
-	register u_char val;
+	register u8 idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
+	register u8 val;
 	register unsigned long flags;
 
 	spin_lock_irqsave(&avm_pci_lock, flags);
@@ -164,9 +164,9 @@ ReadHDLCPnP(struct IsdnCardState *cs, int chan, u_char offset)
 }
 
 static inline void
-WriteHDLCPnP(struct IsdnCardState *cs, int chan, u_char offset, u_char value)
+WriteHDLCPnP(struct IsdnCardState *cs, int chan, u8 offset, u8 value)
 {
-	register u_char idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
+	register u8 idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
 	register unsigned long flags;
 
 	spin_lock_irqsave(&avm_pci_lock, flags);
@@ -260,8 +260,8 @@ static inline void
 hdlc_empty_fifo(struct BCState *bcs, int count)
 {
 	register u_int *ptr;
-	u_char *p;
-	u_char idx = bcs->channel ? AVM_HDLC_2 : AVM_HDLC_1;
+	u8 *p;
+	u8 idx = bcs->channel ? AVM_HDLC_2 : AVM_HDLC_1;
 	int cnt=0;
 	struct IsdnCardState *cs = bcs->cs;
 
@@ -299,7 +299,7 @@ hdlc_empty_fifo(struct BCState *bcs, int count)
 		char *t = bcs->blog;
 
 		if (cs->subtyp == AVM_FRITZ_PNP)
-			p = (u_char *) ptr;
+			p = (u8 *) ptr;
 		t += sprintf(t, "hdlc_empty_fifo %c cnt %d",
 			     bcs->channel ? 'B' : 'A', count);
 		QuickHex(t, p, count);
@@ -590,8 +590,8 @@ static void
 avm_pcipnp_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val;
-	u_char sval;
+	u8 val;
+	u8 sval;
 
 	if (!cs) {
 		printk(KERN_WARNING "AVM PCI: Spurious interrupt!\n");

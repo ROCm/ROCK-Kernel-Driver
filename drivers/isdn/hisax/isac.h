@@ -65,7 +65,7 @@
 
 extern void ISACVersion(struct IsdnCardState *cs, char *s);
 extern void initisac(struct IsdnCardState *cs);
-extern void isac_interrupt(struct IsdnCardState *cs, u_char val);
+extern void isac_interrupt(struct IsdnCardState *cs, u8 val);
 
 static inline u8
 isac_read_reg(struct IsdnCardState *cs, u8 addr)

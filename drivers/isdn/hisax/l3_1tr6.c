@@ -28,10 +28,10 @@ const char *l3_1tr6_revision = "$Revision: 2.13.6.2 $";
 	*ptr++ = mty
 
 static void
-l3_1TR6_message(struct l3_process *pc, u_char mt, u_char pd)
+l3_1TR6_message(struct l3_process *pc, u8 mt, u8 pd)
 {
 	struct sk_buff *skb;
-	u_char *p;
+	u8 *p;
 
 	if (!(skb = l3_alloc_skb(4)))
 		return;
@@ -41,7 +41,7 @@ l3_1TR6_message(struct l3_process *pc, u_char mt, u_char pd)
 }
 
 static void
-l3_1tr6_release_req(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_release_req(struct l3_process *pc, u8 pr, void *arg)
 {
 	StopAllL3Timer(pc);
 	newl3state(pc, 19);
@@ -50,7 +50,7 @@ l3_1tr6_release_req(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_invalid(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_invalid(struct l3_process *pc, u8 pr, void *arg)
 {
 	struct sk_buff *skb = arg;
 
@@ -59,7 +59,7 @@ l3_1tr6_invalid(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_error(struct l3_process *pc, u_char *msg, struct sk_buff *skb)
+l3_1tr6_error(struct l3_process *pc, u8 *msg, struct sk_buff *skb)
 {
 	dev_kfree_skb(skb);
 	if (pc->st->l3.debug & L3_DEB_WARN)
@@ -68,14 +68,14 @@ l3_1tr6_error(struct l3_process *pc, u_char *msg, struct sk_buff *skb)
 }
 
 static void
-l3_1tr6_setup_req(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_setup_req(struct l3_process *pc, u8 pr, void *arg)
 {
 	struct sk_buff *skb;
-	u_char tmp[128];
-	u_char *p = tmp;
-	u_char *teln;
-	u_char *eaz;
-	u_char channel = 0;
+	u8 tmp[128];
+	u8 *p = tmp;
+	u8 *teln;
+	u8 *eaz;
+	u8 channel = 0;
 	int l;
 
 	MsgHead(p, pc->callref, MT_N1_SETUP, PROTO_DIS_N1);
@@ -157,9 +157,9 @@ l3_1tr6_setup_req(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_setup(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_setup(struct l3_process *pc, u8 pr, void *arg)
 {
-	u_char *p;
+	u8 *p;
 	int bcfound = 0;
 	char tmp[80];
 	struct sk_buff *skb = arg;
@@ -228,9 +228,9 @@ l3_1tr6_setup(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_setup_ack(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_setup_ack(struct l3_process *pc, u8 pr, void *arg)
 {
-	u_char *p;
+	u8 *p;
 	struct sk_buff *skb = arg;
 
 	L3DelTimer(&pc->timer);
@@ -256,9 +256,9 @@ l3_1tr6_setup_ack(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_call_sent(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_call_sent(struct l3_process *pc, u8 pr, void *arg)
 {
-	u_char *p;
+	u8 *p;
 	struct sk_buff *skb = arg;
 
 	L3DelTimer(&pc->timer);
@@ -288,7 +288,7 @@ l3_1tr6_call_sent(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_alert(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_alert(struct l3_process *pc, u8 pr, void *arg)
 {
 	struct sk_buff *skb = arg;
 
@@ -299,9 +299,9 @@ l3_1tr6_alert(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_info(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_info(struct l3_process *pc, u8 pr, void *arg)
 {
-	u_char *p;
+	u8 *p;
 	int i, tmpcharge = 0;
 	char a_charge[8], tmp[32];
 	struct sk_buff *skb = arg;
@@ -328,7 +328,7 @@ l3_1tr6_info(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_info_s2(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_info_s2(struct l3_process *pc, u8 pr, void *arg)
 {
 	struct sk_buff *skb = arg;
 
@@ -336,7 +336,7 @@ l3_1tr6_info_s2(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_connect(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_connect(struct l3_process *pc, u8 pr, void *arg)
 {
 	struct sk_buff *skb = arg;
 
@@ -352,10 +352,10 @@ l3_1tr6_connect(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_rel(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_rel(struct l3_process *pc, u8 pr, void *arg)
 {
 	struct sk_buff *skb = arg;
-	u_char *p;
+	u8 *p;
 
 	p = skb->data;
 	if ((p = findie(p, skb->len, WE0_cause, 0))) {
@@ -383,7 +383,7 @@ l3_1tr6_rel(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_rel_ack(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_rel_ack(struct l3_process *pc, u8 pr, void *arg)
 {
 	struct sk_buff *skb = arg;
 
@@ -396,10 +396,10 @@ l3_1tr6_rel_ack(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_disc(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_disc(struct l3_process *pc, u8 pr, void *arg)
 {
 	struct sk_buff *skb = arg;
-	u_char *p;
+	u8 *p;
 	int i, tmpcharge = 0;
 	char a_charge[8], tmp[32];
 
@@ -451,7 +451,7 @@ l3_1tr6_disc(struct l3_process *pc, u_char pr, void *arg)
 
 
 static void
-l3_1tr6_connect_ack(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_connect_ack(struct l3_process *pc, u8 pr, void *arg)
 {
 	struct sk_buff *skb = arg;
 
@@ -467,18 +467,18 @@ l3_1tr6_connect_ack(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_alert_req(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_alert_req(struct l3_process *pc, u8 pr, void *arg)
 {
 	newl3state(pc, 7);
 	l3_1TR6_message(pc, MT_N1_ALERT, PROTO_DIS_N1);
 }
 
 static void
-l3_1tr6_setup_rsp(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_setup_rsp(struct l3_process *pc, u8 pr, void *arg)
 {
 	struct sk_buff *skb;
-	u_char tmp[24];
-	u_char *p = tmp;
+	u8 tmp[24];
+	u8 *p = tmp;
 	int l;
 
 	MsgHead(p, pc->callref, MT_N1_CONN, PROTO_DIS_N1);
@@ -508,20 +508,20 @@ l3_1tr6_setup_rsp(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_reset(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_reset(struct l3_process *pc, u8 pr, void *arg)
 {
 	release_l3_process(pc);
 }
 
 static void
-l3_1tr6_disconnect_req(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_disconnect_req(struct l3_process *pc, u8 pr, void *arg)
 {
 	struct sk_buff *skb;
-	u_char tmp[16];
-	u_char *p = tmp;
+	u8 tmp[16];
+	u8 *p = tmp;
 	int l;
-	u_char cause = 0x10;
-	u_char clen = 1;
+	u8 cause = 0x10;
+	u8 clen = 1;
 
 	if (pc->para.cause > 0)
 		cause = pc->para.cause;
@@ -553,7 +553,7 @@ l3_1tr6_disconnect_req(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_t303(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_t303(struct l3_process *pc, u8 pr, void *arg)
 {
 	if (pc->N303 > 0) {
 		pc->N303--;
@@ -567,7 +567,7 @@ l3_1tr6_t303(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_t304(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_t304(struct l3_process *pc, u8 pr, void *arg)
 {
 	L3DelTimer(&pc->timer);
 	pc->para.cause = 0xE6;
@@ -576,14 +576,14 @@ l3_1tr6_t304(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_t305(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_t305(struct l3_process *pc, u8 pr, void *arg)
 {
 	struct sk_buff *skb;
-	u_char tmp[16];
-	u_char *p = tmp;
+	u8 tmp[16];
+	u8 *p = tmp;
 	int l;
-	u_char cause = 0x90;
-	u_char clen = 1;
+	u8 cause = 0x90;
+	u8 clen = 1;
 
 	L3DelTimer(&pc->timer);
 	if (pc->para.cause != NO_CAUSE)
@@ -612,7 +612,7 @@ l3_1tr6_t305(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_t310(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_t310(struct l3_process *pc, u8 pr, void *arg)
 {
 	L3DelTimer(&pc->timer);
 	pc->para.cause = 0xE6;
@@ -621,7 +621,7 @@ l3_1tr6_t310(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_t313(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_t313(struct l3_process *pc, u8 pr, void *arg)
 {
 	L3DelTimer(&pc->timer);
 	pc->para.cause = 0xE6;
@@ -630,7 +630,7 @@ l3_1tr6_t313(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_t308_1(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_t308_1(struct l3_process *pc, u8 pr, void *arg)
 {
 	L3DelTimer(&pc->timer);
 	l3_1TR6_message(pc, MT_N1_REL, PROTO_DIS_N1);
@@ -639,7 +639,7 @@ l3_1tr6_t308_1(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_t308_2(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_t308_2(struct l3_process *pc, u8 pr, void *arg)
 {
 	L3DelTimer(&pc->timer);
 	L3L4(pc->st, CC_RELEASE_ERR, pc);
@@ -647,7 +647,7 @@ l3_1tr6_t308_2(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_dl_reset(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_dl_reset(struct l3_process *pc, u8 pr, void *arg)
 {
         pc->para.cause = CAUSE_LocalProcErr;
         l3_1tr6_disconnect_req(pc, pr, NULL);
@@ -655,7 +655,7 @@ l3_1tr6_dl_reset(struct l3_process *pc, u_char pr, void *arg)
 }
 
 static void
-l3_1tr6_dl_release(struct l3_process *pc, u_char pr, void *arg)
+l3_1tr6_dl_release(struct l3_process *pc, u8 pr, void *arg)
 {
         newl3state(pc, 0);
         pc->para.cause = 0x1b;          /* Destination out of order */

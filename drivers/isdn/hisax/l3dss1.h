@@ -109,7 +109,7 @@
 typedef struct
   { unsigned char invoke_id; /* used invoke id in remote ops, 0 = not active */
     ulong ll_id; /* remebered ll id */
-    u_char remote_operation; /* handled remote operation, 0 = not active */ 
+    u8 remote_operation; /* handled remote operation, 0 = not active */ 
     int proc; /* rememered procedure */  
     ulong remote_result; /* result of remote operation for statcallb */
     char uus1_data[35]; /* data send during alerting or disconnect */

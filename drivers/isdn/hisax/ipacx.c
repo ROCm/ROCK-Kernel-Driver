@@ -45,7 +45,7 @@ static void __devinit dch_setstack(struct PStack *st, struct IsdnCardState *cs);
 static void __devinit dch_init(struct IsdnCardState *cs);
 static void bch_l2l1(struct PStack *st, int pr, void *arg);
 static void bch_empty_fifo(struct BCState *bcs, int count);
-static void bch_int(struct IsdnCardState *cs, u_char hscx);
+static void bch_int(struct IsdnCardState *cs, u8 hscx);
 static void bch_mode(struct BCState *bcs, int mode, int bc);
 static void bch_close_state(struct BCState *bcs);
 static int bch_open_state(struct IsdnCardState *cs, struct BCState *bcs);
@@ -112,7 +112,7 @@ ph_command(struct IsdnCardState *cs, unsigned int command)
 static inline void 
 cic_int(struct IsdnCardState *cs)
 {
-	u_char event;
+	u8 event;
 
 	event = ipacx_read_reg(cs, IPACX_CIR0) >> 4;
 	if (cs->debug &L1_DEB_ISAC) debugl1(cs, "cic_int(event=%#x)", event);
@@ -132,7 +132,7 @@ dch_l2l1(struct PStack *st, int pr, void *arg)
 {
 	struct IsdnCardState *cs = (struct IsdnCardState *) st->l1.hardware;
 	struct sk_buff *skb = arg;
-  u_char cda1_cr, cda2_cr;
+  u8 cda1_cr, cda2_cr;
 
 	switch (pr) {
 		case (PH_DATA |REQUEST):
@@ -305,7 +305,7 @@ dch_bh(void *data)
 static void 
 dch_empty_fifo(struct IsdnCardState *cs, int count)
 {
-	u_char *ptr;
+	u8 *ptr;
 
 	if ((cs->debug &L1_DEB_ISAC) && !(cs->debug &L1_DEB_ISAC_FIFO))
 		debugl1(cs, "dch_empty_fifo()");
@@ -373,7 +373,7 @@ static inline void
 dch_int(struct IsdnCardState *cs)
 {
 	struct sk_buff *skb;
-	u_char istad, rstad;
+	u8 istad, rstad;
 	int count;
 
 	istad = ipacx_read_reg(cs, IPACX_ISTAD);
@@ -503,7 +503,7 @@ bch_l2l1(struct PStack *st, int pr, void *arg)
 static void
 bch_empty_fifo(struct BCState *bcs, int count)
 {
-	u_char *ptr, hscx;
+	u8 *ptr, hscx;
 	struct IsdnCardState *cs;
 	int cnt;
 
@@ -569,13 +569,13 @@ reset_xmit(struct BCState *bcs)
 }
 
 static void
-bch_int(struct IsdnCardState *cs, u_char hscx)
+bch_int(struct IsdnCardState *cs, u8 hscx)
 {
-	u_char istab;
+	u8 istab;
 	struct BCState *bcs;
 	struct sk_buff *skb;
 	int count;
-	u_char rstab;
+	u8 rstab;
 
 	bcs = cs->bcs + hscx;
 	istab = ipacx_bc_read_reg(bcs, IPACX_ISTAB);
@@ -787,7 +787,7 @@ bch_init(struct IsdnCardState *cs, int hscx)
 void 
 interrupt_ipacx(struct IsdnCardState *cs)
 {
-	u_char ista;
+	u8 ista;
 	
 	spin_lock(&cs->lock);
 	while ((ista = ipacx_read_reg(cs, IPACX_ISTA))) {

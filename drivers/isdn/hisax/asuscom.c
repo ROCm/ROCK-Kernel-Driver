@@ -92,26 +92,26 @@ writefifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 * data, int siz
 
 /* Interface functions */
 
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+ReadISAC(struct IsdnCardState *cs, u8 offset)
 {
 	return readreg(cs, cs->hw.asus.isac, offset);
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writereg(cs, cs->hw.asus.isac, offset, value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	readfifo(cs, cs->hw.asus.isac, 0, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	writefifo(cs, cs->hw.asus.isac, 0, data, size);
 }
@@ -123,26 +123,26 @@ static struct dc_hw_ops isac_ops = {
 	.write_fifo = WriteISACfifo,
 };
 
-static u_char
-ReadISAC_IPAC(struct IsdnCardState *cs, u_char offset)
+static u8
+ReadISAC_IPAC(struct IsdnCardState *cs, u8 offset)
 {
 	return readreg(cs, cs->hw.asus.isac, offset|0x80);
 }
 
 static void
-WriteISAC_IPAC(struct IsdnCardState *cs, u_char offset, u_char value)
+WriteISAC_IPAC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writereg(cs, cs->hw.asus.isac, offset|0x80, value);
 }
 
 static void
-ReadISACfifo_IPAC(struct IsdnCardState *cs, u_char * data, int size)
+ReadISACfifo_IPAC(struct IsdnCardState *cs, u8 * data, int size)
 {
 	readfifo(cs, cs->hw.asus.isac, 0x80, data, size);
 }
 
 static void
-WriteISACfifo_IPAC(struct IsdnCardState *cs, u_char * data, int size)
+WriteISACfifo_IPAC(struct IsdnCardState *cs, u8 * data, int size)
 {
 	writefifo(cs, cs->hw.asus.isac, 0x80, data, size);
 }
@@ -154,14 +154,14 @@ static struct dc_hw_ops ipac_dc_ops = {
 	.write_fifo = WriteISACfifo_IPAC,
 };
 
-static u_char
-ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
+static u8
+ReadHSCX(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	return readreg(cs, cs->hw.asus.hscx, offset + (hscx ? 0x40 : 0));
 }
 
 static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
+WriteHSCX(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 {
 	writereg(cs, cs->hw.asus.hscx, offset + (hscx ? 0x40 : 0), value);
 }
@@ -192,7 +192,7 @@ static void
 asuscom_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val;
+	u8 val;
 
 	spin_lock(&cs->lock);
 	val = readreg(cs, cs->hw.asus.hscx, HSCX_ISTA + 0x40);
@@ -228,7 +228,7 @@ static void
 asuscom_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char ista, val, icnt = 5;
+	u8 ista, val, icnt = 5;
 
 	if (!cs) {
 		printk(KERN_WARNING "ISDNLink: Spurious interrupt!\n");
@@ -349,7 +349,7 @@ setup_asuscom(struct IsdnCard *card)
 {
 	int bytecnt;
 	struct IsdnCardState *cs = card->cs;
-	u_char val;
+	u8 val;
 	char tmp[64];
 
 	strcpy(tmp, Asuscom_revision);

@@ -80,26 +80,26 @@ writefifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 *data, int size
 
 /* Interface functions */
 
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+ReadISAC(struct IsdnCardState *cs, u8 offset)
 {
 	return readreg(cs, cs->hw.saphir.isac, offset);
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writereg(cs, cs->hw.saphir.isac, offset, value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	readfifo(cs, cs->hw.saphir.isac, 0, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	writefifo(cs, cs->hw.saphir.isac, 0, data, size);
 }
@@ -111,14 +111,14 @@ static struct dc_hw_ops isac_ops = {
 	.write_fifo = WriteISACfifo,
 };
 
-static u_char
-ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
+static u8
+ReadHSCX(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	return readreg(cs, cs->hw.saphir.hscx, offset + (hscx ? 0x40 : 0));
 }
 
 static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
+WriteHSCX(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 {
 	writereg(cs, cs->hw.saphir.hscx, offset + (hscx ? 0x40 : 0), value);
 }
@@ -145,7 +145,7 @@ static void
 saphir_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val;
+	u8 val;
 
 	spin_lock(&cs->lock);
 	val = readreg(cs, cs->hw.saphir.hscx, HSCX_ISTA + 0x40);
@@ -203,7 +203,7 @@ release_io_saphir(struct IsdnCardState *cs)
 static int
 saphir_reset(struct IsdnCardState *cs)
 {
-	u_char irq_val;
+	u8 irq_val;
 
 	switch(cs->irq) {
 		case 5: irq_val = 0;

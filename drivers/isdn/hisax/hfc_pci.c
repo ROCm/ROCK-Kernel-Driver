@@ -193,7 +193,7 @@ Sel_BCS(struct IsdnCardState *cs, int channel)
 /* clear the desired B-channel rx fifo */
 /***************************************/
 static void hfcpci_clear_fifo_rx(struct IsdnCardState *cs, int fifo)
-{       u_char fifo_state;
+{       u8 fifo_state;
         bzfifo_type *bzr;
 
 	if (fifo) {
@@ -220,7 +220,7 @@ static void hfcpci_clear_fifo_rx(struct IsdnCardState *cs, int fifo)
 /* clear the desired B-channel tx fifo */
 /***************************************/
 static void hfcpci_clear_fifo_tx(struct IsdnCardState *cs, int fifo)
-{       u_char fifo_state;
+{       u8 fifo_state;
         bzfifo_type *bzt;
 
 	if (fifo) {
@@ -247,9 +247,9 @@ static void hfcpci_clear_fifo_tx(struct IsdnCardState *cs, int fifo)
 /*********************************************/
 static struct sk_buff
 *
-hfcpci_empty_fifo(struct BCState *bcs, bzfifo_type * bz, u_char * bdata, int count)
+hfcpci_empty_fifo(struct BCState *bcs, bzfifo_type * bz, u8 * bdata, int count)
 {
-	u_char *ptr, *ptr1, new_f2;
+	u8 *ptr, *ptr1, new_f2;
 	struct sk_buff *skb;
 	struct IsdnCardState *cs = bcs->cs;
 	int total, maxlen, new_z2;
@@ -311,7 +311,7 @@ receive_dmsg(struct IsdnCardState *cs)
 	int maxlen;
 	int rcnt, total;
 	int count = 5;
-	u_char *ptr, *ptr1;
+	u8 *ptr, *ptr1;
 	dfifo_type *df;
 	z_type *zp;
 
@@ -369,12 +369,12 @@ receive_dmsg(struct IsdnCardState *cs)
 /* check for transparent receive data and read max one threshold size if avail */
 /*******************************************************************************/
 int
-hfcpci_empty_fifo_trans(struct BCState *bcs, bzfifo_type * bz, u_char * bdata)
+hfcpci_empty_fifo_trans(struct BCState *bcs, bzfifo_type * bz, u8 * bdata)
 {
 	unsigned short *z1r, *z2r;
 	int new_z2, fcnt, maxlen;
 	struct sk_buff *skb;
-	u_char *ptr, *ptr1;
+	u8 *ptr, *ptr1;
 
 	z1r = &bz->za[MAX_B_FRAMES].z1;		/* pointer to z reg */
 	z2r = z1r + 1;
@@ -428,7 +428,7 @@ main_rec_hfcpci(struct BCState *bcs)
 	int receive, count = 5;
 	struct sk_buff *skb;
 	bzfifo_type *bz;
-	u_char *bdata;
+	u8 *bdata;
 	z_type *zp;
 
 	if ((bcs->channel) && (!cs->hw.hfcpci.bswapped)) {
@@ -490,7 +490,7 @@ hfcpci_fill_dfifo(struct IsdnCardState *cs)
 	int fcnt;
 	int count, new_z1, maxlen;
 	dfifo_type *df;
-	u_char *src, *dst, new_f1;
+	u8 *src, *dst, new_f1;
 
 	if (!cs->tx_skb)
 		return;
@@ -562,8 +562,8 @@ hfcpci_fill_fifo(struct BCState *bcs)
 	int maxlen, fcnt;
 	int count, new_z1;
 	bzfifo_type *bz;
-	u_char *bdata;
-	u_char new_f1, *src, *dst;
+	u8 *bdata;
+	u8 new_f1, *src, *dst;
 	unsigned short *z1t, *z2t;
 
 	if (!bcs->tx_skb)
@@ -780,11 +780,11 @@ receive_emsg(struct IsdnCardState *cs)
 	int rcnt;
 	int receive, count = 5;
 	bzfifo_type *bz;
-	u_char *bdata;
+	u8 *bdata;
 	z_type *zp;
-	u_char *ptr, *ptr1, new_f2;
+	u8 *ptr, *ptr1, new_f2;
 	int total, maxlen, new_z2;
-	u_char e_buffer[256];
+	u8 e_buffer[256];
 
 	bz = &((fifo_area *) (cs->hw.hfcpci.fifos))->b_chans.rxbz_b2;
 	bdata = ((fifo_area *) (cs->hw.hfcpci.fifos))->b_chans.rxdat_b2;
@@ -873,10 +873,10 @@ static void
 hfcpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char exval;
+	u8 exval;
 	struct BCState *bcs;
 	int count = 15;
-	u_char val, stat;
+	u8 val, stat;
 
 	if (!cs) {
 		printk(KERN_WARNING "HFC-PCI: Spurious interrupt!\n");

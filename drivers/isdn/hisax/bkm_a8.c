@@ -92,26 +92,26 @@ writefifo(struct IsdnCardState *cs, u8 off, u8 *data, int size)
 
 /* Interface functions */
 
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+ReadISAC(struct IsdnCardState *cs, u8 offset)
 {
 	return readreg(cs, offset | 0x80);
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writereg(cs, offset | 0x80, value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	readfifo(cs, 0x80, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	writefifo(cs, 0x80, data, size);
 }
@@ -123,14 +123,14 @@ static struct dc_hw_ops isac_ops = {
 	.write_fifo = WriteISACfifo,
 };
 
-static u_char
-ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
+static u8
+ReadHSCX(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	return readreg(cs, offset + (hscx ? 0x40 : 0));
 }
 
 static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
+WriteHSCX(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 {
 	writereg(cs, offset + (hscx ? 0x40 : 0), value);
 }
@@ -167,7 +167,7 @@ static void
 bkm_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char ista, val, icnt = 5;
+	u8 ista, val, icnt = 5;
 
 	spin_lock(&cs->lock);
 	ista = readreg(cs, IPAC_ISTA);
@@ -293,7 +293,7 @@ sct_alloc_io(u_int adr, u_int len)
 static struct pci_dev *dev_a8 __initdata = NULL;
 static u16  sub_vendor_id __initdata = 0;
 static u16  sub_sys_id __initdata = 0;
-static u_char pci_irq __initdata = 0;
+static u8 pci_irq __initdata = 0;
 
 #endif /* CONFIG_PCI */
 
@@ -303,7 +303,7 @@ setup_sct_quadro(struct IsdnCard *card)
 #if CONFIG_PCI
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
-	u_char pci_rev_id;
+	u8 pci_rev_id;
 	u_int found = 0;
 	u_int pci_ioaddr1, pci_ioaddr2, pci_ioaddr3, pci_ioaddr4, pci_ioaddr5;
 

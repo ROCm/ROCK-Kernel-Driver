@@ -41,7 +41,7 @@ waitforXFW(struct IsdnCardState *cs, int hscx)
 }
 
 static inline void
-WriteHSCXCMDR(struct IsdnCardState *cs, int hscx, u_char data)
+WriteHSCXCMDR(struct IsdnCardState *cs, int hscx, u8 data)
 {
 	waitforCEC(cs, hscx);
 	WRITEHSCX(cs, hscx, HSCX_CMDR, data);
@@ -51,7 +51,7 @@ WriteHSCXCMDR(struct IsdnCardState *cs, int hscx, u_char data)
 static void
 hscx_empty_fifo(struct BCState *bcs, int count)
 {
-	u_char *ptr;
+	u8 *ptr;
 	struct IsdnCardState *cs = bcs->cs;
 
 	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
@@ -84,7 +84,7 @@ hscx_fill_fifo(struct BCState *bcs)
 	struct IsdnCardState *cs = bcs->cs;
 	int more, count;
 	int fifo_size = test_bit(HW_IPAC, &cs->HW_Flags)? 64: 32;
-	u_char *ptr;
+	u8 *ptr;
 
 	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
 		debugl1(cs, "hscx_fill_fifo");
@@ -119,9 +119,9 @@ hscx_fill_fifo(struct BCState *bcs)
 }
 
 static inline void
-hscx_interrupt(struct IsdnCardState *cs, u_char val, u_char hscx)
+hscx_interrupt(struct IsdnCardState *cs, u8 val, u8 hscx)
 {
-	u_char r;
+	u8 r;
 	struct BCState *bcs = cs->bcs + hscx;
 	struct sk_buff *skb;
 	int fifo_size = test_bit(HW_IPAC, &cs->HW_Flags)? 64: 32;
@@ -202,10 +202,10 @@ reset_xmit(struct BCState *bcs)
 }
 
 static inline void
-hscx_int_main(struct IsdnCardState *cs, u_char val)
+hscx_int_main(struct IsdnCardState *cs, u8 val)
 {
 
-	u_char exval;
+	u8 exval;
 	struct BCState *bcs;
 
 	spin_lock(&cs->lock);

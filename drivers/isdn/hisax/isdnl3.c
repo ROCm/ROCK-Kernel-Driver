@@ -77,11 +77,11 @@ l3m_debug(struct FsmInst *fi, char *fmt, ...)
 	va_end(args);
 }
 
-u_char *
-findie(u_char * p, int size, u_char ie, int wanted_set)
+u8 *
+findie(u8 * p, int size, u8 ie, int wanted_set)
 {
 	int l, codeset, maincodeset;
-	u_char *pend = p + size;
+	u8 *pend = p + size;
 
 	/* skip protocol discriminator, callref and message type */
 	p++;
@@ -123,7 +123,7 @@ findie(u_char * p, int size, u_char ie, int wanted_set)
 }
 
 int
-getcallref(u_char * p)
+getcallref(u8 * p)
 {
 	int l, cr = 0;
 

@@ -171,7 +171,7 @@ W6692_bh(void *data)
 static void
 W6692_empty_fifo(struct IsdnCardState *cs, int count)
 {
-	u_char *ptr;
+	u8 *ptr;
 
 	if ((cs->debug & L1_DEB_ISAC) && !(cs->debug & L1_DEB_ISAC_FIFO))
 		debugl1(cs, "W6692_empty_fifo");
@@ -221,7 +221,7 @@ W6692_fill_fifo(struct IsdnCardState *cs)
 static void
 W6692B_empty_fifo(struct BCState *bcs, int count)
 {
-	u_char *ptr;
+	u8 *ptr;
 	struct IsdnCardState *cs = bcs->cs;
 
 	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
@@ -271,10 +271,10 @@ reset_xmit(struct BCState *bcs)
 }
 
 static void
-W6692B_interrupt(struct IsdnCardState *cs, u_char bchan)
+W6692B_interrupt(struct IsdnCardState *cs, u8 bchan)
 {
-	u_char val;
-	u_char r;
+	u8 val;
+	u8 r;
 	struct BCState *bcs;
 	struct sk_buff *skb;
 	int count;
@@ -343,7 +343,7 @@ static void
 W6692_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val, exval, v1;
+	u8 val, exval, v1;
 	struct sk_buff *skb;
 	unsigned int count;
 	int icnt = 5;
@@ -781,8 +781,8 @@ setup_w6692(struct IsdnCard *card)
 {
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
-	u_char found = 0;
-	u_char pci_irq = 0;
+	u8 found = 0;
+	u8 pci_irq = 0;
 	u_int pci_ioaddr = 0;
 
 #ifdef __BIG_ENDIAN

@@ -23,10 +23,10 @@
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)
 
-static inline u_char
-ReadReg(struct IsdnCardState *cs, int data, u_char reg)
+static inline u8
+ReadReg(struct IsdnCardState *cs, int data, u8 reg)
 {
-	register u_char ret;
+	register u8 ret;
 
 	if (data) {
 		if (cs->hw.hfcD.cip != reg) { 
@@ -44,7 +44,7 @@ ReadReg(struct IsdnCardState *cs, int data, u_char reg)
 }
 
 static inline void
-WriteReg(struct IsdnCardState *cs, int data, u_char reg, u_char value)
+WriteReg(struct IsdnCardState *cs, int data, u8 reg, u8 value)
 {
 	if (cs->hw.hfcD.cip != reg) { 
 		cs->hw.hfcD.cip = reg;
@@ -112,9 +112,9 @@ WaitNoBusy(struct IsdnCardState *cs)
 }
 
 static int
-SelFiFo(struct IsdnCardState *cs, u_char FiFo)
+SelFiFo(struct IsdnCardState *cs, u8 FiFo)
 {
-	u_char cip;
+	u8 cip;
 
 	if (cs->hw.hfcD.fifo == FiFo)
 		return(1);
@@ -171,7 +171,7 @@ GetFreeFifoBytes_D(struct IsdnCardState *cs)
 }
 
 static int
-ReadZReg(struct IsdnCardState *cs, u_char reg)
+ReadZReg(struct IsdnCardState *cs, u8 reg)
 {
 	int val;
 
@@ -185,12 +185,12 @@ ReadZReg(struct IsdnCardState *cs, u_char reg)
 static struct sk_buff
 *hfc_empty_fifo(struct BCState *bcs, int count)
 {
-	u_char *ptr;
+	u8 *ptr;
 	struct sk_buff *skb;
 	struct IsdnCardState *cs = bcs->cs;
 	int idx;
 	int chksum;
-	u_char stat, cip;
+	u8 stat, cip;
 	
 	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
 		debugl1(cs, "hfc_empty_fifo");
@@ -266,7 +266,7 @@ hfc_fill_fifo(struct BCState *bcs)
 	struct IsdnCardState *cs = bcs->cs;
 	int idx, fcnt;
 	int count;
-	u_char cip;
+	u8 cip;
 
 	if (!bcs->tx_skb)
 		return;
@@ -334,7 +334,7 @@ main_rec_2bds0(struct BCState *bcs)
 {
 	struct IsdnCardState *cs = bcs->cs;
 	int z1, z2, rcnt;
-	u_char f1, f2, cip;
+	u8 f1, f2, cip;
 	int receive, count = 5;
 	struct sk_buff *skb;
 
@@ -542,10 +542,10 @@ int receive_dmsg(struct IsdnCardState *cs)
 	struct sk_buff *skb;
 	int idx;
 	int rcnt, z1, z2;
-	u_char stat, cip, f1, f2;
+	u8 stat, cip, f1, f2;
 	int chksum;
 	int count=5;
-	u_char *ptr;
+	u8 *ptr;
 
 	SelFiFo(cs, 4 | HFCD_REC);
 	cip = HFCD_FIFO | HFCD_F1 | HFCD_REC;
@@ -638,7 +638,7 @@ hfc_fill_dfifo(struct IsdnCardState *cs)
 {
 	int idx, fcnt;
 	int count;
-	u_char cip;
+	u8 cip;
 
 	if (!cs->tx_skb)
 		return;
@@ -710,9 +710,9 @@ struct BCState *Sel_BCS(struct IsdnCardState *cs, int channel)
 }
 
 void
-hfc2bds0_interrupt(struct IsdnCardState *cs, u_char val)
+hfc2bds0_interrupt(struct IsdnCardState *cs, u8 val)
 {
-       	u_char exval;
+       	u8 exval;
        	struct BCState *bcs;
 	int count=15;
 

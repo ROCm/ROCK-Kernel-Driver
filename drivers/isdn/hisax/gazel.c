@@ -44,35 +44,35 @@ static spinlock_t gazel_lock = SPIN_LOCK_UNLOCKED;
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)
 
-static inline u_char
+static inline u8
 readreg(unsigned int adr, u_short off)
 {
 	return bytein(adr + off);
 }
 
 static inline void
-writereg(unsigned int adr, u_short off, u_char data)
+writereg(unsigned int adr, u_short off, u8 data)
 {
 	byteout(adr + off, data);
 }
 
 
 static inline void
-read_fifo(unsigned int adr, u_char * data, int size)
+read_fifo(unsigned int adr, u8 * data, int size)
 {
 	insb(adr, data, size);
 }
 
 static void
-write_fifo(unsigned int adr, u_char * data, int size)
+write_fifo(unsigned int adr, u8 * data, int size)
 {
 	outsb(adr, data, size);
 }
 
-static inline u_char
+static inline u8
 readreg_ipac(unsigned int adr, u_short off)
 {
-	register u_char ret;
+	register u8 ret;
 	unsigned long flags;
 
 	spin_lock_irqsave(&gazel_lock, flags);
@@ -83,7 +83,7 @@ readreg_ipac(unsigned int adr, u_short off)
 }
 
 static inline void
-writereg_ipac(unsigned int adr, u_short off, u_char data)
+writereg_ipac(unsigned int adr, u_short off, u8 data)
 {
 	unsigned long flags;
 
@@ -95,14 +95,14 @@ writereg_ipac(unsigned int adr, u_short off, u_char data)
 
 
 static inline void
-read_fifo_ipac(unsigned int adr, u_short off, u_char * data, int size)
+read_fifo_ipac(unsigned int adr, u_short off, u8 * data, int size)
 {
 	byteout(adr, off);
 	insb(adr + 4, data, size);
 }
 
 static void
-write_fifo_ipac(unsigned int adr, u_short off, u_char * data, int size)
+write_fifo_ipac(unsigned int adr, u_short off, u8 * data, int size)
 {
 	byteout(adr, off);
 	outsb(adr + 4, data, size);
@@ -110,8 +110,8 @@ write_fifo_ipac(unsigned int adr, u_short off, u_char * data, int size)
 
 /* Interface functions */
 
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+ReadISAC(struct IsdnCardState *cs, u8 offset)
 {
 	u_short off2 = offset;
 
@@ -128,7 +128,7 @@ ReadISAC(struct IsdnCardState *cs, u_char offset)
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	u_short off2 = offset;
 
@@ -146,7 +146,7 @@ WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	switch (cs->subtyp) {
 		case R647:
@@ -161,7 +161,7 @@ ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	switch (cs->subtyp) {
 		case R647:
@@ -183,7 +183,7 @@ static struct dc_hw_ops isac_ops = {
 };
 
 static void
-ReadHSCXfifo(struct IsdnCardState *cs, int hscx, u_char * data, int size)
+ReadHSCXfifo(struct IsdnCardState *cs, int hscx, u8 * data, int size)
 {
 	switch (cs->subtyp) {
 		case R647:
@@ -198,7 +198,7 @@ ReadHSCXfifo(struct IsdnCardState *cs, int hscx, u_char * data, int size)
 }
 
 static void
-WriteHSCXfifo(struct IsdnCardState *cs, int hscx, u_char * data, int size)
+WriteHSCXfifo(struct IsdnCardState *cs, int hscx, u8 * data, int size)
 {
 	switch (cs->subtyp) {
 		case R647:
@@ -212,8 +212,8 @@ WriteHSCXfifo(struct IsdnCardState *cs, int hscx, u_char * data, int size)
 	}
 }
 
-static u_char
-ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
+static u8
+ReadHSCX(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	u_short off2 = offset;
 
@@ -230,7 +230,7 @@ ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
 }
 
 static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
+WriteHSCX(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 {
 	u_short off2 = offset;
 
@@ -268,7 +268,7 @@ gazel_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 #define MAXCOUNT 5
 	struct IsdnCardState *cs = dev_id;
-	u_char valisac, valhscx;
+	u8 valisac, valhscx;
 	int count = 0;
 
 	spin_lock(&cs->lock);
@@ -296,7 +296,7 @@ static void
 gazel_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char ista, val;
+	u8 ista, val;
 	int count = 0;
 
 	if (!cs) {
@@ -558,9 +558,9 @@ static int __init
 setup_gazelpci(struct IsdnCardState *cs)
 {
 	u_int pci_ioaddr0 = 0, pci_ioaddr1 = 0;
-	u_char pci_irq = 0, found;
+	u8 pci_irq = 0, found;
 	u_int nbseek, seekcard;
-	u_char pci_rev;
+	u8 pci_rev;
 
 	printk(KERN_WARNING "Gazel: PCI card automatic recognition\n");
 
@@ -658,7 +658,7 @@ setup_gazel(struct IsdnCard *card)
 {
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
-	u_char val;
+	u8 val;
 
 	strcpy(tmp, gazel_revision);
 	printk(KERN_INFO "Gazel: Driver Revision %s\n", HiSax_getrev(tmp));

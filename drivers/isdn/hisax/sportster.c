@@ -38,39 +38,39 @@ calc_off(unsigned int base, unsigned int off)
 }
 
 static inline void
-read_fifo(unsigned int adr, u_char * data, int size)
+read_fifo(unsigned int adr, u8 * data, int size)
 {
 	insb(adr, data, size);
 }
 
 static void
-write_fifo(unsigned int adr, u_char * data, int size)
+write_fifo(unsigned int adr, u8 * data, int size)
 {
 	outsb(adr, data, size);
 }
 
 /* Interface functions */
 
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+ReadISAC(struct IsdnCardState *cs, u8 offset)
 {
 	return (bytein(calc_off(cs->hw.spt.isac, offset)));
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	byteout(calc_off(cs->hw.spt.isac, offset), value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	read_fifo(cs->hw.spt.isac, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	write_fifo(cs->hw.spt.isac, data, size);
 }
@@ -82,14 +82,14 @@ static struct dc_hw_ops isac_ops = {
 	.write_fifo = WriteISACfifo,
 };
 
-static u_char
-ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
+static u8
+ReadHSCX(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	return (bytein(calc_off(cs->hw.spt.hscx[hscx], offset)));
 }
 
 static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
+WriteHSCX(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 {
 	byteout(calc_off(cs->hw.spt.hscx[hscx], offset), value);
 }
@@ -114,7 +114,7 @@ static void
 sportster_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val;
+	u8 val;
 
 	spin_lock(&cs->lock);
 	val = READHSCX(cs, 1, HSCX_ISTA);

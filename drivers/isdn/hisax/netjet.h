@@ -59,10 +59,10 @@ extern const char *CardType[];
 
 extern struct dc_hw_ops netjet_dc_ops;
 
-u_char NETjet_ReadIC(struct IsdnCardState *cs, u_char offset);
-void NETjet_WriteIC(struct IsdnCardState *cs, u_char offset, u_char value);
-void NETjet_ReadICfifo(struct IsdnCardState *cs, u_char *data, int size);
-void NETjet_WriteICfifo(struct IsdnCardState *cs, u_char *data, int size);
+u8 NETjet_ReadIC(struct IsdnCardState *cs, u8 offset);
+void NETjet_WriteIC(struct IsdnCardState *cs, u8 offset, u8 value);
+void NETjet_ReadICfifo(struct IsdnCardState *cs, u8 *data, int size);
+void NETjet_WriteICfifo(struct IsdnCardState *cs, u8 *data, int size);
 
 void read_tiger(struct IsdnCardState *cs);
 void write_tiger(struct IsdnCardState *cs);

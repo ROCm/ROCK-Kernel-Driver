@@ -26,8 +26,8 @@ static spinlock_t bkm_a4t_lock = SPIN_LOCK_UNLOCKED;
 const char *bkm_a4t_revision = "$Revision: 1.13.6.6 $";
 
 
-static inline u_char
-readreg(unsigned int ale, unsigned long adr, u_char off)
+static inline u8
+readreg(unsigned int ale, unsigned long adr, u8 off)
 {
 	register u_int ret;
 	unsigned long flags;
@@ -44,7 +44,7 @@ readreg(unsigned int ale, unsigned long adr, u_char off)
 
 
 static inline void
-readfifo(unsigned int ale, unsigned long adr, u_char off, u_char * data, int size)
+readfifo(unsigned int ale, unsigned long adr, u8 off, u8 * data, int size)
 {
 	/* fifo read without cli because it's allready done  */
 	int i;
@@ -54,7 +54,7 @@ readfifo(unsigned int ale, unsigned long adr, u_char off, u_char * data, int siz
 
 
 static inline void
-writereg(unsigned int ale, unsigned long adr, u_char off, u_char data)
+writereg(unsigned int ale, unsigned long adr, u8 off, u8 data)
 {
 	unsigned long flags;
 	unsigned int *po = (unsigned int *) adr;	/* Postoffice */
@@ -68,7 +68,7 @@ writereg(unsigned int ale, unsigned long adr, u_char off, u_char data)
 
 
 static inline void
-writefifo(unsigned int ale, unsigned long adr, u_char off, u_char * data, int size)
+writefifo(unsigned int ale, unsigned long adr, u8 off, u8 * data, int size)
 {
 	/* fifo write without cli because it's allready done  */
 	int i;
@@ -80,26 +80,26 @@ writefifo(unsigned int ale, unsigned long adr, u_char off, u_char * data, int si
 
 /* Interface functions */
 
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+ReadISAC(struct IsdnCardState *cs, u8 offset)
 {
 	return (readreg(cs->hw.ax.isac_ale, cs->hw.ax.isac_adr, offset));
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writereg(cs->hw.ax.isac_ale, cs->hw.ax.isac_adr, offset, value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	readfifo(cs->hw.ax.isac_ale, cs->hw.ax.isac_adr, 0, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	writefifo(cs->hw.ax.isac_ale, cs->hw.ax.isac_adr, 0, data, size);
 }
@@ -111,14 +111,14 @@ static struct dc_hw_ops isac_ops = {
 	.write_fifo = WriteISACfifo,
 };
 
-static u_char
-ReadJADE(struct IsdnCardState *cs, int jade, u_char offset)
+static u8
+ReadJADE(struct IsdnCardState *cs, int jade, u8 offset)
 {
 	return (readreg(cs->hw.ax.jade_ale, cs->hw.ax.jade_adr, offset + (jade == -1 ? 0 : (jade ? 0xC0 : 0x80))));
 }
 
 static void
-WriteJADE(struct IsdnCardState *cs, int jade, u_char offset, u_char value)
+WriteJADE(struct IsdnCardState *cs, int jade, u8 offset, u8 value)
 {
 	writereg(cs->hw.ax.jade_ale, cs->hw.ax.jade_adr, offset + (jade == -1 ? 0 : (jade ? 0xC0 : 0x80)), value);
 }
@@ -148,7 +148,7 @@ static void
 bkm_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val = 0;
+	u8 val = 0;
 	I20_REGISTER_FILE *pI20_Regs;
 
 	spin_lock(&cs->lock);

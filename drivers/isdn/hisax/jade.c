@@ -60,11 +60,11 @@ JadeVersion(struct IsdnCardState *cs, char *s)
 
 /* Write to indirect accessible jade register set */
 static void
-jade_write_indirect(struct IsdnCardState *cs, u_char reg, u_char value)
+jade_write_indirect(struct IsdnCardState *cs, u8 reg, u8 value)
 {
     int to = 50;
     unsigned long flags;
-    u_char ret;
+    u8 ret;
     spin_lock_irqsave(&jade_lock, flags);
     /* Write the data */
     jade_write_reg(cs, -1, COMM_JADE+1, value);

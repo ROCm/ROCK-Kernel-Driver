@@ -298,7 +298,7 @@ static void avma1cs_config(dev_link_t *link)
     cistpl_cftable_entry_t *cf = &parse.cftable_entry;
     local_info_t *dev;
     int i;
-    u_char buf[64];
+    u8 buf[64];
     char devname[128];
     int busy = 0;
     

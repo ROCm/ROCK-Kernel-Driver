@@ -26,7 +26,7 @@
 //#define SERIAL_DEBUG_REG 1
 
 #ifdef SERIAL_DEBUG_REG
-static u_char deb[32];
+static u8 deb[32];
 const char *ModemIn[] = {"RBR","IER","IIR","LCR","MCR","LSR","MSR","SCR"};
 const char *ModemOut[] = {"THR","IER","FCR","LCR","MCR","LSR","MSR","SCR"};
 #endif
@@ -436,9 +436,9 @@ close_elsastate(struct BCState *bcs)
 }
 
 void
-modem_write_cmd(struct IsdnCardState *cs, u_char *buf, int len) {
+modem_write_cmd(struct IsdnCardState *cs, u8 *buf, int len) {
 	int count, fp;
-	u_char *msg = buf;
+	u8 *msg = buf;
 	unsigned long flags;
 	
 	if (!len)

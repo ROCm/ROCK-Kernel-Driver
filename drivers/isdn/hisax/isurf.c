@@ -35,20 +35,20 @@ static const char *ISurf_revision = "$Revision: 1.10.6.2 $";
 #define ISURF_IOMEM_SIZE	0x400
 /* Interface functions */
 
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+ReadISAC(struct IsdnCardState *cs, u8 offset)
 {
 	return (readb(cs->hw.isurf.isac + offset));
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writeb(value, cs->hw.isurf.isac + offset); mb();
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	register int i;
 	for (i = 0; i < size; i++)
@@ -56,7 +56,7 @@ ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	register int i;
 	for (i = 0; i < size; i++){
@@ -77,14 +77,14 @@ static struct dc_hw_ops isac_ops = {
  * mode = 2 access with IRQ off and using last offset
  */
   
-static u_char
-ReadISAR(struct IsdnCardState *cs, int mode, u_char offset)
+static u8
+ReadISAR(struct IsdnCardState *cs, int mode, u8 offset)
 {	
 	return(readb(cs->hw.isurf.isar + offset));
 }
 
 static void
-WriteISAR(struct IsdnCardState *cs, int mode, u_char offset, u_char value)
+WriteISAR(struct IsdnCardState *cs, int mode, u8 offset, u8 value)
 {
 	writeb(value, cs->hw.isurf.isar + offset);mb();
 }
@@ -98,7 +98,7 @@ static void
 isurf_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val;
+	u8 val;
 	int cnt = 5;
 
 	spin_lock(&cs->lock);
@@ -141,7 +141,7 @@ release_io_isurf(struct IsdnCardState *cs)
 }
 
 static void
-reset_isurf(struct IsdnCardState *cs, u_char chips)
+reset_isurf(struct IsdnCardState *cs, u8 chips)
 {
 	printk(KERN_INFO "ISurf: resetting card\n");
 

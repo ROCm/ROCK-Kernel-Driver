@@ -366,7 +366,7 @@ init_bcstate(struct IsdnCardState *cs,
 #ifdef L2FRAME_DEBUG		/* psa */
 
 char *
-l2cmd(u_char cmd)
+l2cmd(u8 cmd)
 {
 	switch (cmd & ~0x10) {
 		case 1:
@@ -400,7 +400,7 @@ l2cmd(u_char cmd)
 static char tmpdeb[32];
 
 char *
-l2frames(u_char * ptr)
+l2frames(u8 * ptr)
 {
 	switch (ptr[2] & ~0x10) {
 		case 1:
@@ -432,7 +432,7 @@ l2frames(u_char * ptr)
 void
 Logl2Frame(struct IsdnCardState *cs, struct sk_buff *skb, char *buf, int dir)
 {
-	u_char *ptr;
+	u8 *ptr;
 
 	ptr = skb->data;
 

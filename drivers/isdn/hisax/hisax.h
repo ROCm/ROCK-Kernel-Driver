@@ -292,14 +292,14 @@ struct Management {
 #define NO_CAUSE 254
 
 struct Param {
-	u_char cause;
-	u_char loc;
-	u_char diag[6];
+	u8 cause;
+	u8 loc;
+	u8 diag[6];
 	int bchannel;
 	int chargeinfo;
 	int spv;		/* SPV Flag */
 	setup_parm setup;	/* from isdnif.h numbers and Serviceindicator */
-	u_char moderate;	/* transfer mode and rate (bearer octet 4) */
+	u8 moderate;	/* transfer mode and rate (bearer octet 4) */
 };
 
 
@@ -314,7 +314,7 @@ struct PStack {
 
         /* protocol specific data fields */
         union
-	 { u_char uuuu; /* only as dummy */
+	 { u8 uuuu; /* only as dummy */
 #ifdef CONFIG_HISAX_EURO
            dss1_stk_priv dss1; /* private dss1 data */
 #endif /* CONFIG_HISAX_EURO */              
@@ -338,7 +338,7 @@ struct l3_process {
 
         /* protocol specific data fields */
         union 
-	 { u_char uuuu; /* only when euro not defined, avoiding empty union */
+	 { u8 uuuu; /* only when euro not defined, avoiding empty union */
 #ifdef CONFIG_HISAX_EURO 
            dss1_proc_priv dss1; /* private dss1 data */
 #endif /* CONFIG_HISAX_EURO */            
@@ -358,53 +358,53 @@ struct bc_hw_ops {
 struct hscx_hw {
 	int hscx;
 	int rcvidx;
-	u_char *rcvbuf;         /* B-Channel receive Buffer */
-	u_char tsaxr0;
-	u_char tsaxr1;
+	u8 *rcvbuf;         /* B-Channel receive Buffer */
+	u8 tsaxr0;
+	u8 tsaxr1;
 };
 
 struct w6692B_hw {
 	int bchan;
 	int rcvidx;
-	u_char *rcvbuf;         /* B-Channel receive Buffer */
+	u8 *rcvbuf;         /* B-Channel receive Buffer */
 };
 
 struct isar_reg {
 	unsigned long Flags;
-	volatile u_char bstat;
-	volatile u_char iis;
-	volatile u_char cmsb;
-	volatile u_char clsb;
-	volatile u_char par[8];
+	volatile u8 bstat;
+	volatile u8 iis;
+	volatile u8 cmsb;
+	volatile u8 clsb;
+	volatile u8 par[8];
 };
 
 struct isar_hw {
 	int dpath;
 	int rcvidx;
 	int mml;
-	u_char state;
-	u_char cmd;
-	u_char mod;
-	u_char newcmd;
-	u_char newmod;
+	u8 state;
+	u8 cmd;
+	u8 mod;
+	u8 newcmd;
+	u8 newmod;
 	char try_mod;
 	struct timer_list ftimer;
-	u_char *rcvbuf;         /* B-Channel receive Buffer */
-	u_char conmsg[16];
+	u8 *rcvbuf;         /* B-Channel receive Buffer */
+	u8 conmsg[16];
 	struct isar_reg *reg;
 };
 
 struct hdlc_stat_reg {
 #ifdef __BIG_ENDIAN
-	u_char fill __attribute__((packed));
-	u_char mode __attribute__((packed));
-	u_char xml  __attribute__((packed));
-	u_char cmd  __attribute__((packed));
+	u8 fill __attribute__((packed));
+	u8 mode __attribute__((packed));
+	u8 xml  __attribute__((packed));
+	u8 cmd  __attribute__((packed));
 #else
-	u_char cmd  __attribute__((packed));
-	u_char xml  __attribute__((packed));
-	u_char mode __attribute__((packed));
-	u_char fill __attribute__((packed));
+	u8 cmd  __attribute__((packed));
+	u8 xml  __attribute__((packed));
+	u8 mode __attribute__((packed));
+	u8 fill __attribute__((packed));
 #endif
 };
 
@@ -415,7 +415,7 @@ struct hdlc_hw {
 	} ctrl;
 	u_int stat;
 	int rcvidx;
-	u_char *rcvbuf;         /* B-Channel receive Buffer */
+	u8 *rcvbuf;         /* B-Channel receive Buffer */
 };
 
 struct hfcB_hw {
@@ -432,24 +432,24 @@ struct tiger_hw {
 	u_int *rec;
 	dma_addr_t rec_dma;
 	int free;
-	u_char *rcvbuf;
-	u_char *sendbuf;
-	u_char *sp;
+	u8 *rcvbuf;
+	u8 *sendbuf;
+	u8 *sp;
 	int sendcnt;
 	u_int s_tot;
 	u_int r_bitcnt;
 	u_int r_tot;
 	u_int r_err;
 	u_int r_fcs;
-	u_char r_state;
-	u_char r_one;
-	u_char r_val;
-	u_char s_state;
+	u8 r_state;
+	u8 r_one;
+	u8 r_val;
+	u8 s_state;
 };
 
 struct amd7930_hw {
-	u_char *tx_buff;
-	u_char *rv_buff;
+	u8 *tx_buff;
+	u8 *rv_buff;
 	int rv_buff_in;
 	int rv_buff_out;
 	struct sk_buff *rv_skb;
@@ -494,8 +494,8 @@ struct BCState {
 	struct sk_buff_head squeue;	/* B-Channel send queue */
 	struct sk_buff_head cmpl_queue;	/* B-Channel send complete queue */
 	struct PStack *st;
-	u_char *blog;
-	u_char *conmsg;
+	u8 *blog;
+	u8 *conmsg;
 	struct timer_list transbusy;
 	struct work_struct work;
 	unsigned long event;
@@ -554,17 +554,17 @@ struct elsa_hw {
 	struct timer_list tl;
 	unsigned int MFlag;
 	struct BCState *bcs;
-	u_char *transbuf;
-	u_char *rcvbuf;
+	u8 *transbuf;
+	u8 *rcvbuf;
 	unsigned int transp;
 	unsigned int rcvp;
 	unsigned int transcnt;
 	unsigned int rcvcnt;
-	u_char IER;
-	u_char FCR;
-	u_char LCR;
-	u_char MCR;
-	u_char ctrl_reg;
+	u8 IER;
+	u8 FCR;
+	u8 LCR;
+	u8 MCR;
+	u8 ctrl_reg;
 };
 
 struct teles3_hw {
@@ -608,7 +608,7 @@ struct diva_hw {
 	unsigned int hscx;
 	unsigned int status;
 	struct timer_list tl;
-	u_char ctrl_reg;
+	u8 ctrl_reg;
 };
 
 struct asus_hw {
@@ -627,7 +627,7 @@ struct hfc_hw {
 	unsigned char cirm;
 	unsigned char ctmt;
 	unsigned char cip;
-	u_char isac_spcr;
+	u8 isac_spcr;
 	struct timer_list timer;
 };
 
@@ -802,25 +802,25 @@ struct te_hw {
 
 struct arcofi_msg {
 	struct arcofi_msg *next;
-	u_char receive;
-	u_char len;
-	u_char msg[10];
+	u8 receive;
+	u8 len;
+	u8 msg[10];
 };
 
 struct isac_chip {
 	int ph_state;
-	u_char *mon_tx;
-	u_char *mon_rx;
+	u8 *mon_tx;
+	u8 *mon_rx;
 	int mon_txp;
 	int mon_txc;
 	int mon_rxp;
 	struct arcofi_msg *arcofi_list;
 	struct timer_list arcofitimer;
 	wait_queue_head_t arcofi_wait;
-	u_char arcofi_bc;
-	u_char arcofi_state;
-	u_char mocr;
-	u_char adf2;
+	u8 arcofi_bc;
+	u8 arcofi_state;
+	u8 mocr;
+	u8 adf2;
 };
 
 struct hfcd_chip {
@@ -840,30 +840,30 @@ struct w6692_chip {
 };
 
 struct amd7930_chip {
-	u_char lmr1;
-	u_char ph_state;
-	u_char old_state;
-	u_char flg_t3;
+	u8 lmr1;
+	u8 ph_state;
+	u8 old_state;
+	u8 flg_t3;
 	unsigned int tx_xmtlen;
 	struct timer_list timer3;
-	void (*ph_command) (struct IsdnCardState *, u_char, char *);
-	void (*setIrqMask) (struct IsdnCardState *, u_char);
+	void (*ph_command) (struct IsdnCardState *, u8, char *);
+	void (*setIrqMask) (struct IsdnCardState *, u8);
 };
 
 struct icc_chip {
 	int ph_state;
-	u_char *mon_tx;
-	u_char *mon_rx;
+	u8 *mon_tx;
+	u8 *mon_rx;
 	int mon_txp;
 	int mon_txc;
 	int mon_rxp;
 	struct arcofi_msg *arcofi_list;
 	struct timer_list arcofitimer;
 	wait_queue_head_t arcofi_wait;
-	u_char arcofi_bc;
-	u_char arcofi_state;
-	u_char mocr;
-	u_char adf2;
+	u8 arcofi_bc;
+	u8 arcofi_state;
+	u8 mocr;
+	u8 adf2;
 };
 
 struct dc_hw_ops {
@@ -925,10 +925,10 @@ struct IsdnCardState {
 	} hw;
 	int myid;
 	isdn_if iif;
-	u_char *status_buf;
-	u_char *status_read;
-	u_char *status_write;
-	u_char *status_end;
+	u8 *status_buf;
+	u8 *status_read;
+	u8 *status_write;
+	u8 *status_end;
 	struct dc_hw_ops *dc_hw_ops;
 	struct bc_hw_ops *bc_hw_ops;
 	void   (*BC_Send_Data) (struct BCState *);
@@ -954,7 +954,7 @@ struct IsdnCardState {
 		struct amd7930_chip amd7930;
 		struct icc_chip icc;
 	} dc;
-	u_char *rcvbuf;
+	u8 *rcvbuf;
 	int rcvidx;
 	struct sk_buff *tx_skb;
 	int tx_cnt;
@@ -1327,8 +1327,8 @@ void setstack_l3dc(struct PStack *st, struct Channel *chanp);
 void setstack_l3bc(struct PStack *st, struct Channel *chanp);
 void releasestack_isdnl3(struct PStack *st);
 
-u_char *findie(u_char * p, int size, u_char ie, int wanted_set);
-int getcallref(u_char * p);
+u8 *findie(u8 * p, int size, u8 ie, int wanted_set);
+int getcallref(u8 * p);
 int newcallref(void);
 
 int FsmNew(struct Fsm *fsm, struct FsmNode *fnlist, int fncount);
@@ -1348,10 +1348,10 @@ int HiSax_writebuf_skb(int id, int chan, int ack, struct sk_buff *skb);
 void HiSax_putstatus(struct IsdnCardState *cs, char *head, char *fmt, ...);
 void VHiSax_putstatus(struct IsdnCardState *cs, char *head, char *fmt, va_list args);
 void HiSax_reportcard(int cardnr, int sel);
-int QuickHex(char *txt, u_char * p, int cnt);
-void LogFrame(struct IsdnCardState *cs, u_char * p, int size);
+int QuickHex(char *txt, u8 * p, int cnt);
+void LogFrame(struct IsdnCardState *cs, u8 * p, int size);
 void dlogframe(struct IsdnCardState *cs, struct sk_buff *skb, int dir);
-void iecpy(u_char * dest, u_char * iestart, int ieoffset);
+void iecpy(u8 * dest, u8 * iestart, int ieoffset);
 #ifdef ISDN_CHIP_ISAC
 void setstack_isac(struct PStack *st, struct IsdnCardState *cs);
 #endif	/* ISDN_CHIP_ISAC */

@@ -190,26 +190,26 @@ writefifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 * data, int siz
 
 /* Interface functions */
 
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+ReadISAC(struct IsdnCardState *cs, u8 offset)
 {
 	return readreg(cs, cs->hw.elsa.isac, offset);
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writereg(cs, cs->hw.elsa.isac, offset, value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	readfifo(cs, cs->hw.elsa.isac, 0, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	writefifo(cs, cs->hw.elsa.isac, 0, data, size);
 }
@@ -221,26 +221,26 @@ static struct dc_hw_ops isac_ops = {
 	.write_fifo = WriteISACfifo,
 };
 
-static u_char
-ReadISAC_IPAC(struct IsdnCardState *cs, u_char offset)
+static u8
+ReadISAC_IPAC(struct IsdnCardState *cs, u8 offset)
 {
 	return readreg(cs, cs->hw.elsa.isac, offset+0x80);
 }
 
 static void
-WriteISAC_IPAC(struct IsdnCardState *cs, u_char offset, u_char value)
+WriteISAC_IPAC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writereg(cs, cs->hw.elsa.isac, offset|0x80, value);
 }
 
 static void
-ReadISACfifo_IPAC(struct IsdnCardState *cs, u_char * data, int size)
+ReadISACfifo_IPAC(struct IsdnCardState *cs, u8 * data, int size)
 {
 	readfifo(cs, cs->hw.elsa.isac, 0x80, data, size);
 }
 
 static void
-WriteISACfifo_IPAC(struct IsdnCardState *cs, u_char * data, int size)
+WriteISACfifo_IPAC(struct IsdnCardState *cs, u8 * data, int size)
 {
 	writefifo(cs, cs->hw.elsa.isac, 0x80, data, size);
 }
@@ -252,14 +252,14 @@ static struct dc_hw_ops ipac_dc_ops = {
 	.write_fifo = WriteISACfifo_IPAC,
 };
 
-static u_char
-ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
+static u8
+ReadHSCX(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	return readreg(cs, cs->hw.elsa.hscx, offset + (hscx ? 0x40 : 0));
 }
 
 static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
+WriteHSCX(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 {
 	writereg(cs, cs->hw.elsa.hscx, offset + (hscx ? 0x40 : 0), value);
 }
@@ -269,10 +269,10 @@ static struct bc_hw_ops hscx_ops = {
 	.write_reg = WriteHSCX,
 };
 
-static inline u_char
-readitac(struct IsdnCardState *cs, u_char off)
+static inline u8
+readitac(struct IsdnCardState *cs, u8 off)
 {
-	register u_char ret;
+	register u8 ret;
 	unsigned long flags;
 
 	spin_lock_irqsave(&elsa_lock, flags);
@@ -283,7 +283,7 @@ readitac(struct IsdnCardState *cs, u_char off)
 }
 
 static inline void
-writeitac(struct IsdnCardState *cs, u_char off, u_char data)
+writeitac(struct IsdnCardState *cs, u8 off, u8 data)
 {
 	unsigned long flags;
 
@@ -296,7 +296,7 @@ writeitac(struct IsdnCardState *cs, u_char off, u_char data)
 static inline int
 TimerRun(struct IsdnCardState *cs)
 {
-	register u_char v;
+	register u8 v;
 
 	v = bytein(cs->hw.elsa.cfg);
 	if ((cs->subtyp == ELSA_QS1000) || (cs->subtyp == ELSA_QS3000))
@@ -326,7 +326,7 @@ static void
 elsa_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val;
+	u8 val;
 	int icnt=5;
 
 	spin_lock(&cs->lock);
@@ -404,7 +404,7 @@ static void
 elsa_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char ista,val;
+	u8 ista,val;
 	int icnt=5;
 
 	if (!cs) {
@@ -560,7 +560,7 @@ check_arcofi(struct IsdnCardState *cs)
 	int arcofi_present = 0;
 	char tmp[40];
 	char *t;
-	u_char *p;
+	u8 *p;
 
 	if (!cs->dc.isac.mon_tx)
 		if (!(cs->dc.isac.mon_tx=kmalloc(MAX_MON_FRAME, GFP_ATOMIC))) {
@@ -670,7 +670,7 @@ elsa_led_handler(struct IsdnCardState *cs)
 
 	if ((cs->subtyp == ELSA_QS1000PCI) ||
 		(cs->subtyp == ELSA_QS3000PCI)) {
-		u_char led = 0xff;
+		u8 led = 0xff;
 		if (cs->hw.elsa.ctrl_reg & ELSA_LINE_LED)
 			led ^= ELSA_IPAC_LINE_LED;
 		if (cs->hw.elsa.ctrl_reg & ELSA_STAT_LED)
@@ -777,7 +777,7 @@ Elsa_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 		case CARD_AUX_IND:
 			if (cs->hw.elsa.MFlag) {
 				int len;
-				u_char *msg;
+				u8 *msg;
 
 				if (!arg)
 					return(0);
@@ -882,7 +882,7 @@ int __devinit
 setup_elsa(struct IsdnCard *card)
 {
 	int bytecnt;
-	u_char val, pci_rev;
+	u8 val, pci_rev;
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 
@@ -916,15 +916,15 @@ setup_elsa(struct IsdnCard *card)
 			cs->hw.elsa.timer = cs->hw.elsa.base + ELSA_START_TIMER;
 			val = bytein(cs->hw.elsa.cfg);
 			if (cs->subtyp == ELSA_PC) {
-				const u_char CARD_IrqTab[8] =
+				const u8 CARD_IrqTab[8] =
 				{7, 3, 5, 9, 0, 0, 0, 0};
 				cs->irq = CARD_IrqTab[(val & ELSA_IRQ_IDX_PC) >> 2];
 			} else if (cs->subtyp == ELSA_PCC8) {
-				const u_char CARD_IrqTab[8] =
+				const u8 CARD_IrqTab[8] =
 				{7, 3, 5, 9, 0, 0, 0, 0};
 				cs->irq = CARD_IrqTab[(val & ELSA_IRQ_IDX_PCC8) >> 4];
 			} else {
-				const u_char CARD_IrqTab[8] =
+				const u8 CARD_IrqTab[8] =
 				{15, 10, 15, 3, 11, 5, 11, 9};
 				cs->irq = CARD_IrqTab[(val & ELSA_IRQ_IDX) >> 3];
 			}

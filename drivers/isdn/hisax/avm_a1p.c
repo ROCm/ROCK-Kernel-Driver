@@ -106,26 +106,26 @@ writefifo(struct IsdnCardState *cs, int offset, u8 *data, int size)
 	spin_unlock_irqrestore(&avm_a1p_lock, flags);
 }
 
-static inline u_char
-ReadISAC(struct IsdnCardState *cs, u_char adr)
+static inline u8
+ReadISAC(struct IsdnCardState *cs, u8 adr)
 {
 	return readreg(cs, ISAC_REG_OFFSET, adr);
 }
 
 static inline void
-WriteISAC(struct IsdnCardState *cs, u_char adr, u_char value)
+WriteISAC(struct IsdnCardState *cs, u8 adr, u8 value)
 {
 	writereg(cs, ISAC_REG_OFFSET, adr, value);
 }
 
 static inline void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	readfifo(cs, ISAC_FIFO_OFFSET, data, size);
 }
 
 static inline void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	writefifo(cs, ISAC_FIFO_OFFSET, data, size);
 }
@@ -137,26 +137,26 @@ static struct dc_hw_ops isac_ops = {
 	.write_fifo = WriteISACfifo,
 };
 
-static inline u_char
-ReadHSCX(struct IsdnCardState *cs, int hscx, u_char adr)
+static inline u8
+ReadHSCX(struct IsdnCardState *cs, int hscx, u8 adr)
 {
 	return readreg(cs, HSCX_REG_OFFSET + hscx*HSCX_CH_DIFF, adr);
 }
 
 static inline void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u_char adr, u_char value)
+WriteHSCX(struct IsdnCardState *cs, int hscx, u8 adr, u8 value)
 {
 	writereg(cs, HSCX_REG_OFFSET + hscx*HSCX_CH_DIFF, adr, value);
 }
 
 static inline void
-ReadHSCXfifo(struct IsdnCardState *cs, int hscx, u_char * data, int size)
+ReadHSCXfifo(struct IsdnCardState *cs, int hscx, u8 * data, int size)
 {
 	return readfifo(cs, HSCX_FIFO_OFFSET + hscx*HSCX_CH_DIFF, data, size);
 }
 
 static inline void
-WriteHSCXfifo(struct IsdnCardState *cs, int hscx, u_char * data, int size)
+WriteHSCXfifo(struct IsdnCardState *cs, int hscx, u8 * data, int size)
 {
 	writefifo(cs, HSCX_FIFO_OFFSET + hscx*HSCX_CH_DIFF, data, size);
 }
@@ -181,7 +181,7 @@ static void
 avm_a1p_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val, sval;
+	u8 val, sval;
 
 	spin_lock(&cs->lock);
 	while ((sval = (~bytein(cs->hw.avm.cfg_reg+ASL0_OFFSET) & ASL0_R_IRQPENDING))) {
@@ -243,7 +243,7 @@ AVM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 int __devinit
 setup_avm_a1_pcmcia(struct IsdnCard *card)
 {
-	u_char model, vers;
+	u8 model, vers;
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 

@@ -192,9 +192,9 @@ l2addrsize(struct Layer2 *l2)
 }
 
 static int
-sethdraddr(struct Layer2 *l2, u_char * header, int rsp)
+sethdraddr(struct Layer2 *l2, u8 * header, int rsp)
 {
-	u_char *ptr = header;
+	u8 *ptr = header;
 	int crbit = rsp;
 
 	if (test_bit(FLG_LAPD, &l2->flag)) {
@@ -224,31 +224,31 @@ enqueue_super(struct PStack *st,
 #define enqueue_ui(a, b) enqueue_super(a, b)
 
 inline int
-IsUI(u_char * data)
+IsUI(u8 * data)
 {
 	return ((data[0] & 0xef) == UI);
 }
 
 inline int
-IsUA(u_char * data)
+IsUA(u8 * data)
 {
 	return ((data[0] & 0xef) == UA);
 }
 
 inline int
-IsDM(u_char * data)
+IsDM(u8 * data)
 {
 	return ((data[0] & 0xef) == DM);
 }
 
 inline int
-IsDISC(u_char * data)
+IsDISC(u8 * data)
 {
 	return ((data[0] & 0xef) == DISC);
 }
 
 inline int
-IsRR(u_char * data, struct PStack *st)
+IsRR(u8 * data, struct PStack *st)
 {
 	if (test_bit(FLG_MOD128, &st->l2.flag))
 		return (data[0] == RR);
@@ -257,9 +257,9 @@ IsRR(u_char * data, struct PStack *st)
 }
 
 inline int
-IsSFrame(u_char * data, struct PStack *st)
+IsSFrame(u8 * data, struct PStack *st)
 {
-	register u_char d = *data;
+	register u8 d = *data;
 	
 	if (!test_bit(FLG_MOD128, &st->l2.flag))
 		d &= 0xf;
@@ -267,27 +267,27 @@ IsSFrame(u_char * data, struct PStack *st)
 }
 
 inline int
-IsSABME(u_char * data, struct PStack *st)
+IsSABME(u8 * data, struct PStack *st)
 {
-	u_char d = data[0] & ~0x10;
+	u8 d = data[0] & ~0x10;
 
 	return (test_bit(FLG_MOD128, &st->l2.flag) ? d == SABME : d == SABM);
 }
 
 inline int
-IsREJ(u_char * data, struct PStack *st)
+IsREJ(u8 * data, struct PStack *st)
 {
 	return (test_bit(FLG_MOD128, &st->l2.flag) ? data[0] == REJ : (data[0] & 0xf) == REJ);
 }
 
 inline int
-IsFRMR(u_char * data)
+IsFRMR(u8 * data)
 {
 	return ((data[0] & 0xef) == FRMR);
 }
 
 inline int
-IsRNR(u_char * data, struct PStack *st)
+IsRNR(u8 * data, struct PStack *st)
 {
 	return (test_bit(FLG_MOD128, &st->l2.flag) ? data[0] == RNR : (data[0] & 0xf) == RNR);
 }
@@ -361,7 +361,7 @@ int
 FRMR_error(struct PStack *st, struct sk_buff *skb)
 {
 	int headers = l2addrsize(&st->l2) + 1;
-	u_char *datap = skb->data + headers;
+	u8 *datap = skb->data + headers;
 	int rsp = *skb->data & 0x2;
 
 	if (test_bit(FLG_ORIG, &st->l2.flag))
@@ -420,10 +420,10 @@ setva(struct PStack *st, unsigned int nr)
 }
 
 static void
-send_uframe(struct PStack *st, u_char cmd, u_char cr)
+send_uframe(struct PStack *st, u8 cmd, u8 cr)
 {
 	struct sk_buff *skb;
-	u_char tmp[MAX_HEADER_LEN];
+	u8 tmp[MAX_HEADER_LEN];
 	int i;
 
 	i = sethdraddr(&st->l2, tmp, cr);
@@ -436,7 +436,7 @@ send_uframe(struct PStack *st, u_char cmd, u_char cr)
 	enqueue_super(st, skb);
 }
 
-inline u_char
+inline u8
 get_PollFlag(struct PStack * st, struct sk_buff * skb)
 {
 	return (skb->data[l2addrsize(&(st->l2))] & 0x10);
@@ -449,10 +449,10 @@ FreeSkb(struct sk_buff *skb)
 }
 
 
-inline u_char
+inline u8
 get_PollFlagFree(struct PStack *st, struct sk_buff *skb)
 {
-	u_char PF;
+	u8 PF;
 
 	PF = get_PollFlag(st, skb);
 	FreeSkb(skb);
@@ -505,7 +505,7 @@ static void
 establishlink(struct FsmInst *fi)
 {
 	struct PStack *st = fi->userdata;
-	u_char cmd;
+	u8 cmd;
 
 	clear_exception(&st->l2);
 	st->l2.rc = 0;
@@ -599,7 +599,7 @@ static void
 tx_ui(struct PStack *st)
 {
 	struct sk_buff *skb;
-	u_char header[MAX_HEADER_LEN];
+	u8 header[MAX_HEADER_LEN];
 	int i;
 
 	i = sethdraddr(&(st->l2), header, CMD);
@@ -882,11 +882,11 @@ l2_st6_dm_release(struct FsmInst *fi, int event, void *arg)
 }
 
 inline void
-enquiry_cr(struct PStack *st, u_char typ, u_char cr, u_char pf)
+enquiry_cr(struct PStack *st, u8 typ, u8 cr, u8 pf)
 {
 	struct sk_buff *skb;
 	struct Layer2 *l2;
-	u_char tmp[MAX_HEADER_LEN];
+	u8 tmp[MAX_HEADER_LEN];
 	int i;
 
 	l2 = &st->l2;
@@ -1250,7 +1250,7 @@ l2_pull_iqueue(struct FsmInst *fi, int event, void *arg)
 	struct PStack *st = fi->userdata;
 	struct sk_buff *skb, *oskb;
 	struct Layer2 *l2 = &st->l2;
-	u_char header[MAX_HEADER_LEN];
+	u8 header[MAX_HEADER_LEN];
 	int i;
 	int unsigned p1;
 	unsigned long flags;
@@ -1631,7 +1631,7 @@ static void
 isdnl2_l1l2(struct PStack *st, int pr, void *arg)
 {
 	struct sk_buff *skb = arg;
-	u_char *datap;
+	u8 *datap;
 	int ret = 1, len;
 	int c = 0;
 
