@@ -196,11 +196,6 @@ static inline void free_hdlcdev(struct net_device *dev)
 	kfree(dev);
 }
 
-static __inline__ struct net_device* hdlc_to_dev(hdlc_device *hdlc)
-{
-	return &hdlc->netdev;
-}
-
 
 static __inline__ hdlc_device* dev_to_hdlc(struct net_device *dev)
 {
