@@ -20,6 +20,7 @@
 
 extern const char *CardType[];
 static char *saphir_rev = "$Revision: 1.8.6.2 $";
+static spinlock_t saphir_lock = SPIN_LOCK_UNLOCKED;
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)
@@ -35,13 +36,12 @@ static inline u_char
 readreg(unsigned int ale, unsigned int adr, u_char off)
 {
 	register u_char ret;
-	long flags;
+	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&saphir_lock, flags);
 	byteout(ale, off);
 	ret = bytein(adr);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&saphir_lock, flags);
 	return (ret);
 }
 
@@ -58,13 +58,12 @@ readfifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size
 static inline void
 writereg(unsigned int ale, unsigned int adr, u_char off, u_char data)
 {
-	long flags;
+	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&saphir_lock, flags);
 	byteout(ale, off);
 	byteout(adr, data);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&saphir_lock, flags);
 }
 
 static inline void
@@ -182,14 +181,9 @@ SaphirWatchDog(struct IsdnCardState *cs)
 void
 release_io_saphir(struct IsdnCardState *cs)
 {
-	long flags;
-	
-	save_flags(flags);
-	cli();
 	byteout(cs->hw.saphir.cfg_reg + IRQ_REG, 0xff);
-	del_timer(&cs->hw.saphir.timer);
+	del_timer_sync(&cs->hw.saphir.timer);
 	cs->hw.saphir.timer.function = NULL;
-	restore_flags(flags);
 	if (cs->hw.saphir.cfg_reg)
 		release_region(cs->hw.saphir.cfg_reg, 6);
 }
@@ -197,7 +191,6 @@ release_io_saphir(struct IsdnCardState *cs)
 static int
 saphir_reset(struct IsdnCardState *cs)
 {
-	long flags;
 	u_char irq_val;
 
 	switch(cs->irq) {
@@ -220,15 +213,12 @@ saphir_reset(struct IsdnCardState *cs)
 			return (1);
 	}
 	byteout(cs->hw.saphir.cfg_reg + IRQ_REG, irq_val);
-	save_flags(flags);
-	sti();
 	byteout(cs->hw.saphir.cfg_reg + RESET_REG, 1);
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((30*HZ)/1000);	/* Timeout 30ms */
 	byteout(cs->hw.saphir.cfg_reg + RESET_REG, 0);
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((30*HZ)/1000);	/* Timeout 30ms */
-	restore_flags(flags);
 	byteout(cs->hw.saphir.cfg_reg + IRQ_REG, irq_val);
 	byteout(cs->hw.saphir.cfg_reg + SPARE_REG, 0x02);
 	return (0);

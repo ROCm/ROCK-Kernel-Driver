@@ -174,7 +174,6 @@ release_io_teles3(struct IsdnCardState *cs)
 static int
 reset_teles3(struct IsdnCardState *cs)
 {
-	long flags;
 	u_char irqcfg;
 
 	if (cs->typ != ISDN_CTYPE_TELESPCMCIA) {
@@ -208,28 +207,21 @@ reset_teles3(struct IsdnCardState *cs)
 				default:
 					return(1);
 			}
-			save_flags(flags);
 			byteout(cs->hw.teles3.cfg_reg + 4, irqcfg);
-			sti();
 			HZDELAY(HZ / 10 + 1);
 			byteout(cs->hw.teles3.cfg_reg + 4, irqcfg | 1);
 			HZDELAY(HZ / 10 + 1);
-			restore_flags(flags);
 		} else if (cs->typ == ISDN_CTYPE_COMPAQ_ISA) {
-			save_flags(flags);
 			byteout(cs->hw.teles3.cfg_reg, 0xff);
 			HZDELAY(2);
 			byteout(cs->hw.teles3.cfg_reg, 0x00);
 			HZDELAY(2);
-			restore_flags(flags);
 		} else {
 			/* Reset off for 16.3 PnP , thanks to Georg Acher */
-			save_flags(flags);
 			byteout(cs->hw.teles3.isac + 0x3c, 0);
 			HZDELAY(2);
 			byteout(cs->hw.teles3.isac + 0x3c, 1);
 			HZDELAY(2);
-			restore_flags(flags);
 		}
 	}
 	return(0);
