@@ -438,22 +438,6 @@ UNUSUAL_DEV(  0x066b, 0x0105, 0x0100, 0x0100,
 		US_FL_SINGLE_LUN ),
 #endif
 
-/* Following three Minolta cameras reported by Martin Pool
- * <mbp@sourcefrog.net>.  Originally discovered by Kedar Petankar,
- * Matthew Geier, Mikael Lofj"ard, Marcel de Boer.
- */
-UNUSUAL_DEV( 0x0686, 0x4006, 0x0001, 0x0001,
-		"Minolta",
-		"DiMAGE 7",
-		US_SC_SCSI, US_PR_DEVICE, NULL,
-		0 ),
-
-UNUSUAL_DEV( 0x0686, 0x400f, 0x0001, 0x0001,
-		"Minolta",
-		"DiMAGE 7Hi",
-		US_SC_SCSI, US_PR_DEVICE, NULL,
-		0 ),
-
 /* Submitted by Benny Sjostrand <benny@hostmobility.com> */
 UNUSUAL_DEV( 0x0686, 0x4011, 0x0001, 0x0001,
 		"Minolta",
