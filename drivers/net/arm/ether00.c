@@ -706,16 +706,6 @@ static int ether00_open(struct net_device* dev)
 	if (!is_valid_ether_addr(dev->dev_addr))
 		return -EINVAL;
 
-	/* Allocate private memory */
-	dev->priv=kmalloc(sizeof(struct net_priv),GFP_KERNEL);
-	if(!dev->priv)
-		return -ENOMEM;
-	memset(dev->priv,0,sizeof(struct net_priv));
-	priv=(struct net_priv*)dev->priv;
-	priv->tq_memupdate.routine=ether00_mem_update;
-	priv->tq_memupdate.data=(void*) dev;
-	spin_lock_init(&priv->rx_lock);
-
 	/* Install interrupt handlers */
 	result=request_irq(dev->irq,ether00_int,0,"ether00",dev);
 	if(result)
@@ -772,7 +762,6 @@ static int ether00_open(struct net_device* dev)
  open_err2:
 	free_irq(dev->irq,dev);
  open_err1:
-	kfree(dev->priv);
 	return result;
 
 }
@@ -848,7 +837,6 @@ static int ether00_stop(struct net_device* dev)
 	free_irq(dev->irq,dev);
 	free_irq(2,dev);
 	iounmap(priv->dma_data);
-	kfree(priv);
 
 	return 0;
 }
@@ -901,23 +889,6 @@ static void ether00_get_ethernet_address(struct net_device* dev)
 
 }
 
-static int ether00_init(struct net_device* dev)
-{
-
-	ether_setup(dev);
-
-	dev->open=ether00_open;
-	dev->stop=ether00_stop;
-	dev->set_multicast_list=ether00_set_multicast;
-	dev->hard_start_xmit=ether00_tx;
-	dev->get_stats=ether00_stats;
-
-	ether00_get_ethernet_address(dev);
-
-	SET_MODULE_OWNER(dev);
-	return 0;
-}
-
 /*
  * Keep a mapping of dev_info addresses -> port lines to use when
  * removing ports dev==NULL indicates unused entry
@@ -929,13 +900,13 @@ static struct net_device* dev_list[ETH_NR];
 static int ether00_add_device(struct pldhs_dev_info* dev_info,void* dev_ps_data)
 {
 	struct net_device *dev;
+	struct net_priv *priv;
 	void *map_addr;
 	int result;
 	int i;
 
-
 	i=0;
-	while(dev_list[i])
+	while(dev_list[i] && i < ETH_NR)
 		i++;
 
 	if(i==ETH_NR){
@@ -944,36 +915,60 @@ static int ether00_add_device(struct pldhs_dev_info* dev_info,void* dev_ps_data)
 	}
 
 
-	dev=kmalloc(sizeof(struct net_device),GFP_KERNEL);
-	if(!dev){
-		return -ENOMEM;
+	if (!request_mem_region(dev_info->base_addr, MAC_REG_SIZE, "ether00"))
+		return -EBUSY;
+
+	dev = alloc_etherdev(sizeof(struct net_priv));
+	if(!dev) {
+		result = -ENOMEM;
+		goto out_release;
 	}
 	memset(dev,0,sizeof(struct net_device));
+	memset(dev->priv, 0, sizeof(struct net_priv));
+	priv = dev->priv;
+
+	priv->tq_memupdate.routine=ether00_mem_update;
+	priv->tq_memupdate.data=(void*) dev;
+
+	spin_lock_init(&priv->rx_lock);
+
 	map_addr=ioremap_nocache(dev_info->base_addr,SZ_4K);
 	if(!map_addr){
-		return -ENOMEM;
+		result = -ENOMEM;
+		out_kfree;
 	}
 
-	dev->init=ether00_init;
-	strcpy(dev->name,"eth%d");
+	dev->open=ether00_open;
+	dev->stop=ether00_stop;
+	dev->set_multicast_list=ether00_set_multicast;
+	dev->hard_start_xmit=ether00_tx;
+	dev->get_stats=ether00_stats;
+
+	ether00_get_ethernet_address(dev);
+
+	SET_MODULE_OWNER(dev);
+
 	dev->base_addr=(unsigned int)map_addr;
 	dev->irq=dev_info->irq;
 	dev->features=NETIF_F_DYNALLOC | NETIF_F_HW_CSUM;
 
-	if(check_mem_region((unsigned int)map_addr, MAC_REG_SIZE)){
-		return -EBUSY;
-	}
-	request_mem_region((unsigned int)map_addr, MAC_REG_SIZE, "ether00");
-
 	result=register_netdev(dev);
 	if(result){
 		printk("Ether00: Error %i registering driver\n",result);
-		return result;
+		goto out_unmap;
 	}
 	printk("registered ether00 device at %#x\n",dev_info->base_addr);
 
 	dev_list[i]=dev;
 
+	return result;
+
+ out_unmap:
+	iounmap(map_addr);
+ out_kfree:
+	kfree(dev);
+ out_release:
+	release_mem_region(dev_info->base_addr, MAC_REG_SIZE);
 	return result;
 }
 

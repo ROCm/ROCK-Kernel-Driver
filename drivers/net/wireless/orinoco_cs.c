@@ -110,7 +110,7 @@ static int orinoco_cs_hard_reset(struct orinoco_private *priv);
 
 /* PCMCIA gumpf */
 static void orinoco_cs_config(dev_link_t * link);
-static void orinoco_cs_release(u_long arg);
+static void orinoco_cs_release(dev_link_t * link);
 static int orinoco_cs_event(event_t event, int priority,
 			    event_callback_args_t * args);
 
@@ -202,11 +202,6 @@ orinoco_cs_attach(void)
 	link = &card->link;
 	link->priv = dev;
 
-	/* Initialize the dev_link_t structure */
-	init_timer(&link->release);
-	link->release.function = &orinoco_cs_release;
-	link->release.data = (u_long) link;
-
 	/* Interrupt setup */
 	link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;
 	link->irq.IRQInfo1 = IRQ_INFO2_VALID | IRQ_LEVEL_ID;
@@ -272,7 +267,7 @@ orinoco_cs_detach(dev_link_t * link)
 	}
 
 	if (link->state & DEV_CONFIG) {
-		orinoco_cs_release((u_long)link);
+		orinoco_cs_release(link);
 		if (link->state & DEV_CONFIG) {
 			link->state |= DEV_STALE_LINK;
 			return;
@@ -530,7 +525,7 @@ orinoco_cs_config(dev_link_t *link)
 	orinoco_cs_error(link->handle, last_fn, last_ret);
 
  failed:
-	orinoco_cs_release((u_long) link);
+	orinoco_cs_release(link);
 }				/* orinoco_cs_config */
 
 /*
@@ -539,9 +534,8 @@ orinoco_cs_config(dev_link_t *link)
  * still open, this will be postponed until it is closed.
  */
 static void
-orinoco_cs_release(u_long arg)
+orinoco_cs_release(dev_link_t *link)
 {
-	dev_link_t *link = (dev_link_t *) arg;
 	struct net_device *dev = link->priv;
 	struct orinoco_private *priv = dev->priv;
 	unsigned long flags;
@@ -697,7 +691,7 @@ exit_orinoco_cs(void)
 		DEBUG(0, "orinoco_cs: Removing leftover devices.\n");
 	while (dev_list != NULL) {
 		if (dev_list->state & DEV_CONFIG)
-			orinoco_cs_release((u_long) dev_list);
+			orinoco_cs_release(dev_list);
 		orinoco_cs_detach(dev_list);
 	}
 }

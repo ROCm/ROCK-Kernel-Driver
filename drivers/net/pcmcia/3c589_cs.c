@@ -148,7 +148,7 @@ DRV_NAME ".c " DRV_VERSION " 2001/10/13 00:08:50 (David Hinds)";
 /*====================================================================*/
 
 static void tc589_config(dev_link_t *link);
-static void tc589_release(unsigned long arg);
+static void tc589_release(dev_link_t *link);
 static int tc589_event(event_t event, int priority,
 		       event_callback_args_t *args);
 
@@ -220,9 +220,6 @@ static dev_link_t *tc589_attach(void)
     link->priv = dev;
 
     spin_lock_init(&lp->lock);
-    init_timer(&link->release);
-    link->release.function = &tc589_release;
-    link->release.data = (unsigned long)link;
     link->io.NumPorts1 = 16;
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_16;
     link->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
@@ -298,9 +295,8 @@ static void tc589_detach(dev_link_t *link)
     if (*linkp == NULL)
 	return;
 
-    del_timer_sync(&link->release);
     if (link->state & DEV_CONFIG) {
-	tc589_release((unsigned long)link);
+	tc589_release(link);
 	if (link->state & DEV_STALE_CONFIG) {
 	    link->state |= DEV_STALE_LINK;
 	    return;
@@ -439,7 +435,7 @@ static void tc589_config(dev_link_t *link)
 cs_failed:
     cs_error(link->handle, last_fn, last_ret);
 failed:
-    tc589_release((unsigned long)link);
+    tc589_release(link);
     return;
     
 } /* tc589_config */
@@ -452,10 +448,8 @@ failed:
     
 ======================================================================*/
 
-static void tc589_release(unsigned long arg)
+static void tc589_release(dev_link_t *link)
 {
-    dev_link_t *link = (dev_link_t *)arg;
-
     DEBUG(0, "3c589_release(0x%p)\n", link);
     
     if (link->open) {
@@ -495,7 +489,7 @@ static int tc589_event(event_t event, int priority,
 	link->state &= ~DEV_PRESENT;
 	if (link->state & DEV_CONFIG) {
 	    netif_device_detach(dev);
-	    mod_timer(&link->release, jiffies + HZ/20);
+	    tc589_release(link);
 	}
 	break;
     case CS_EVENT_CARD_INSERTION:
@@ -1137,7 +1131,7 @@ static int el3_close(struct net_device *dev)
     netif_stop_queue(dev);
     del_timer_sync(&lp->media);
     if (link->state & DEV_STALE_CONFIG)
-	mod_timer(&link->release, jiffies + HZ/20);
+	     tc589_release(link);
     
     return 0;
 }
