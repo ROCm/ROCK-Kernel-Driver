@@ -116,11 +116,11 @@ static inline int aurora_paranoia_check(struct Aurora_port const * port,
 		KERN_DEBUG "aurora: Warning: null aurora port for device %s in %s\n";
 
 	if (!port) {
-		printk(badinfo, kdevname(device), routine);
+		printk(badinfo, cdevname(device), routine);
 		return 1;
 	}
 	if (port->magic != AURORA_MAGIC) {
-		printk(badmagic, kdevname(device), routine);
+		printk(badmagic, cdevname(device), routine);
 		return 1;
 	}
 #endif

@@ -448,11 +448,11 @@ static inline int sx_paranoia_check(struct sx_port const * port,
 	  KERN_ERR "sx: Warning: null sx port for device %s in %s\n";
  
 	if (!port) {
-		printk(badinfo, kdevname(device), routine);
+		printk(badinfo, cdevname(device), routine);
 		return 1;
 	}
 	if (port->magic != SX_MAGIC) {
-		printk(badmagic, kdevname(device), routine);
+		printk(badmagic, cdevname(device), routine);
 		return 1;
 	}
 

@@ -227,11 +227,11 @@ static inline int serial_paranoia_check(ser_info_t *info,
 		"Warning: null async_struct for (%s) in %s\n";
 
 	if (!info) {
-		printk(badinfo, kdevname(device), routine);
+		printk(badinfo, cdevname(device), routine);
 		return 1;
 	}
 	if (info->magic != SERIAL_MAGIC) {
-		printk(badmagic, kdevname(device), routine);
+		printk(badmagic, cdevname(device), routine);
 		return 1;
 	}
 #endif

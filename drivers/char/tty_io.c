@@ -214,11 +214,11 @@ inline int tty_paranoia_check(struct tty_struct *tty, kdev_t device,
 		"Warning: null TTY for (%s) in %s\n";
 
 	if (!tty) {
-		printk(badtty, kdevname(device), routine);
+		printk(badtty, cdevname(device), routine);
 		return 1;
 	}
 	if (tty->magic != TTY_MAGIC) {
-		printk(badmagic, kdevname(device), routine);
+		printk(badmagic, cdevname(device), routine);
 		return 1;
 	}
 #endif
@@ -244,7 +244,7 @@ static int check_tty_count(struct tty_struct *tty, const char *routine)
 	if (tty->count != count) {
 		printk(KERN_WARNING "Warning: dev (%s) tty->count(%d) "
 				    "!= #fd's(%d) in %s\n",
-		       kdevname(tty->device), tty->count, count, routine);
+		       cdevname(tty->device), tty->count, count, routine);
 		return count;
        }	
 #endif
@@ -1098,24 +1098,24 @@ static void release_dev(struct file * filp)
 #ifdef TTY_PARANOIA_CHECK
 	if (idx < 0 || idx >= tty->driver.num) {
 		printk(KERN_DEBUG "release_dev: bad idx when trying to "
-				  "free (%s)\n", kdevname(tty->device));
+				  "free (%s)\n", cdevname(tty->device));
 		return;
 	}
 	if (tty != tty->driver.table[idx]) {
 		printk(KERN_DEBUG "release_dev: driver.table[%d] not tty "
-				  "for (%s)\n", idx, kdevname(tty->device));
+				  "for (%s)\n", idx, cdevname(tty->device));
 		return;
 	}
 	if (tty->termios != tty->driver.termios[idx]) {
 		printk(KERN_DEBUG "release_dev: driver.termios[%d] not termios "
 		       "for (%s)\n",
-		       idx, kdevname(tty->device));
+		       idx, cdevname(tty->device));
 		return;
 	}
 	if (tty->termios_locked != tty->driver.termios_locked[idx]) {
 		printk(KERN_DEBUG "release_dev: driver.termios_locked[%d] not "
 		       "termios_locked for (%s)\n",
-		       idx, kdevname(tty->device));
+		       idx, cdevname(tty->device));
 		return;
 	}
 #endif
@@ -1130,20 +1130,20 @@ static void release_dev(struct file * filp)
 		if (o_tty != tty->driver.other->table[idx]) {
 			printk(KERN_DEBUG "release_dev: other->table[%d] "
 					  "not o_tty for (%s)\n",
-			       idx, kdevname(tty->device));
+			       idx, cdevname(tty->device));
 			return;
 		}
 		if (o_tty->termios != tty->driver.other->termios[idx]) {
 			printk(KERN_DEBUG "release_dev: other->termios[%d] "
 					  "not o_termios for (%s)\n",
-			       idx, kdevname(tty->device));
+			       idx, cdevname(tty->device));
 			return;
 		}
 		if (o_tty->termios_locked != 
 		      tty->driver.other->termios_locked[idx]) {
 			printk(KERN_DEBUG "release_dev: other->termios_locked["
 					  "%d] not o_termios_locked for (%s)\n",
-			       idx, kdevname(tty->device));
+			       idx, cdevname(tty->device));
 			return;
 		}
 		if (o_tty->link != tty) {
