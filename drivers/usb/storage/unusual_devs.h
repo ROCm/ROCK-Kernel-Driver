@@ -35,6 +35,14 @@
 
 /* If you edit this file, please try to keep it sorted first by VendorID,
  * then by ProductID.
+ *
+ * If you want to add an entry for this file, please send the following
+ * to greg@kroah.com:
+ *	- patch that adds the entry for your device which includes your
+ *	  email address right above the entry.
+ *	- a copy of /proc/bus/usb/devices with your device plugged in
+ *	  running with this patch.
+ *
  */
 
 UNUSUAL_DEV(  0x03ee, 0x0000, 0x0000, 0x0245, 
