@@ -73,6 +73,7 @@ bte_result_t bte_copy(u64 src, u64 dest, u64 len, u64 mode, void *notification)
 	unsigned long itc_end = 0;
 	struct bteinfo_s *btes_to_try[MAX_INTERFACES_TO_TRY];
 	int bte_if_index;
+	int bte_pri, bte_sec;
 
 	BTE_PRINTK(("bte_copy(0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%p)\n",
 		    src, dest, len, mode, notification));
@@ -85,24 +86,33 @@ bte_result_t bte_copy(u64 src, u64 dest, u64 len, u64 mode, void *notification)
 		 (src & L1_CACHE_MASK) || (dest & L1_CACHE_MASK));
 	BUG_ON(!(len < ((BTE_LEN_MASK + 1) << L1_CACHE_SHIFT)));
 
+	/* CPU 0 (per node) tries bte0 first, CPU 1 try bte1 first */
+	if (cpuid_to_subnode(smp_processor_id()) == 0) {
+		bte_pri = 0;
+		bte_sec = 1;
+	} else {
+		bte_pri = 1;
+		bte_sec = 0;
+	}
+
 	if (mode & BTE_USE_DEST) {
 		/* try remote then local */
-		btes_to_try[0] = bte_if_on_node(NASID_GET(dest), 0);
-		btes_to_try[1] = bte_if_on_node(NASID_GET(dest), 1);
+		btes_to_try[0] = bte_if_on_node(NASID_GET(dest), bte_pri);
+		btes_to_try[1] = bte_if_on_node(NASID_GET(dest), bte_sec);
 		if (mode & BTE_USE_ANY) {
-			btes_to_try[2] = bte_if_on_node(get_nasid(), 0);
-			btes_to_try[3] = bte_if_on_node(get_nasid(), 1);
+			btes_to_try[2] = bte_if_on_node(get_nasid(), bte_pri);
+			btes_to_try[3] = bte_if_on_node(get_nasid(), bte_sec);
 		} else {
 			btes_to_try[2] = NULL;
 			btes_to_try[3] = NULL;
 		}
 	} else {
 		/* try local then remote */
-		btes_to_try[0] = bte_if_on_node(get_nasid(), 0);
-		btes_to_try[1] = bte_if_on_node(get_nasid(), 1);
+		btes_to_try[0] = bte_if_on_node(get_nasid(), bte_pri);
+		btes_to_try[1] = bte_if_on_node(get_nasid(), bte_sec);
 		if (mode & BTE_USE_ANY) {
-			btes_to_try[2] = bte_if_on_node(NASID_GET(dest), 0);
-			btes_to_try[3] = bte_if_on_node(NASID_GET(dest), 1);
+			btes_to_try[2] = bte_if_on_node(NASID_GET(dest), bte_pri);
+			btes_to_try[3] = bte_if_on_node(NASID_GET(dest), bte_sec);
 		} else {
 			btes_to_try[2] = NULL;
 			btes_to_try[3] = NULL;
