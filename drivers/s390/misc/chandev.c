@@ -24,7 +24,7 @@
 #include <asm/s390dyn.h>
 #include <asm/queue.h>
 #include <linux/kmod.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #ifndef MIN
 #define MIN(a,b) ((a<b)?a:b)
 #endif
@@ -190,8 +190,8 @@ static atomic_t chandev_initialised=ATOMIC_INIT(FALSE);
 
 static unsigned long chandev_last_machine_check;
 
-
-static struct tq_struct chandev_msck_task_tq;
+static void chandev_msck_task(void *unused);
+static DECLARE_WORK(chandev_msck_work, chandev_msck_task, 0);
 static atomic_t chandev_msck_thread_lock;
 static atomic_t chandev_new_msck;
 static unsigned long chandev_last_startmsck_list_update;
@@ -666,7 +666,7 @@ static int chandev_oper_func(int irq,devreg_t *dreg)
 	chandev_last_machine_check=jiffies;
 	if(atomic_dec_and_test(&chandev_msck_thread_lock))
 	{
-		schedule_task(&chandev_msck_task_tq);
+		schedule_work(&chandev_msck_work);
 	}
 	atomic_set(&chandev_new_msck,TRUE);
 	return(0);
@@ -686,7 +686,7 @@ static void chandev_not_oper_handler(int irq,int status )
 		spin_unlock(&chandev_not_oper_spinlock);
 		if(atomic_dec_and_test(&chandev_msck_thread_lock))
 		{
-			schedule_task(&chandev_msck_task_tq);
+			schedule_work(&chandev_msck_work);
 		}
 	}
 	else
@@ -3208,13 +3208,6 @@ int __init chandev_init(void)
 #if CONFIG_PROC_FS
 	chandev_create_proc();
 #endif
-	chandev_msck_task_tq.routine=
-		chandev_msck_task;
-#if LINUX_VERSION_CODE>=KERNEL_VERSION(2,3,0)
-	INIT_LIST_HEAD(&chandev_msck_task_tq.list);
-	chandev_msck_task_tq.sync=0;
-#endif
-	chandev_msck_task_tq.data=NULL;
 	chandev_last_startmsck_list_update=chandev_last_machine_check=jiffies-HZ;
 	atomic_set(&chandev_msck_thread_lock,1);
 	chandev_lock_owner=CHANDEV_INVALID_LOCK_OWNER;

@@ -461,7 +461,7 @@ int                  rc;                    \
 int                  lock_owner;            \
 int                  lock_cnt;              \
 wait_queue_head_t    wait;                  \
-struct  tq_struct    retry_task;            \
+struct work_struct   retry_task;            \
 devstat_t	     devstat;               \
 lcs_chan_busy_state  chan_busy_state;       \
 ccw1_t               ccw[num_io_buffs+1];   \
@@ -491,7 +491,7 @@ typedef struct {
 	u32 tx_idx;		/* last buffer successfully transmitted */
 	unsigned long pkts_still_being_txed;
 	unsigned long bytes_still_being_txed;
-	struct tq_struct resume_task;
+	struct work_struct resume_task;
 	int resume_queued;
 	int resume_loopcnt;
 	uint64_t last_lcs_txpacket_time;
@@ -542,7 +542,7 @@ struct lcs_drvr_globals {
 	/* To insure only one kernel thread runs at a time */
 	atomic_t kernel_thread_lock;
 	int (*kernel_thread_routine) (lcs_drvr_globals * drvr_globals);
-	struct tq_struct kernel_thread_task;
+	struct work_struct kernel_thread_task;
 	u16 lgw_sequence_no;	/* this isn't required just being thorough */
 	atomic_t retry_cnt;
 	struct net_device_stats stats __attribute__ ((aligned(4)));
@@ -1024,7 +1024,9 @@ lcs_alloc_drvr_globals(void)
 	lcs_write_globals *write;
 	lcs_read_globals *read;
 	int cnt;
+#if LINUX_VERSION_CODE<KERNEL_VERSION(2,5,41)
 	struct tq_struct *lcs_tq;
+#endif
 
 	lcs_debug_event(2, "lcs_alloc_drvr_globals called\n");
 	drvr_globals = lcs_dma_alloc(LCS_ALLOCSIZE);
@@ -1058,6 +1060,15 @@ lcs_alloc_drvr_globals(void)
 	read->drvr_globals = drvr_globals;
 	write->drvr_globals = drvr_globals;
 	lcs_resetstate(drvr_globals);
+#if LINUX_VERSION_CODE>=KERNEL_VERSION(2,5,41)
+	INIT_WORK(&drvr_globals->kernel_thread_task, lcs_kernel_thread,
+		  (unsigned long) drvr_globals);
+	INIT_WORK(&read->retry_task, lcs_queued_restartreadio, 
+		  (unsigned long) drvr_globals);
+	INIT_WORK(&write->retry_task, lcs_queued_restartwriteio,
+		  (unsigned long) drvr_globals);
+	INIT_WORK(&resume_task, lcs_resume_writetask, (unsigned long) write);
+#else
 	lcs_tq = &drvr_globals->kernel_thread_task;
 	lcs_tq->routine = (void (*)(void *)) lcs_kernel_thread;
 	lcs_tq->data = (void *) drvr_globals;
@@ -1075,6 +1086,7 @@ lcs_alloc_drvr_globals(void)
 	write->retry_task.data = read->retry_task.data = (void *) drvr_globals;
 	write->resume_task.routine = (void (*)(void *)) lcs_resume_writetask;
 	write->resume_task.data = (void *) write;
+#endif
 	read->chan_busy_state = write->chan_busy_state = chan_dead;
 	atomic_set(&drvr_globals->kernel_thread_lock, 1);
 	spin_lock(&lcs_card_list_lock);
@@ -1093,10 +1105,14 @@ lcs_retry(lcs_chan_globals * chan_globals)
 	lcs_debug_event(1, "lcs_retry subchannel %04x scheduling retry\n",
 			chan_globals->subchannel);
 	MOD_INC_USE_COUNT;
+#if LINUX_VERSION_CODE>=KERNEL_VERSION(2,5,41)
+	schedule_work(&chan_globals->retry_task);
+#else
 #if LINUX_VERSION_CODE>KERNEL_VERSION(2,2,16)
 	schedule_task(&chan_globals->retry_task);
 #else
 	queue_task(&chan_globals->retry_task, &tq_scheduler);
+#endif
 #endif
 }
 
@@ -1445,7 +1461,11 @@ lcs_queue_write(lcs_write_globals * write)
 	 * needing mod usage counts */
 	lcs_debug_event(2, "lcs_queue_write write=%p\n", write);
 	write->resume_queued = TRUE;
+#if LINUX_VERSION_CODE>=KERNEL_VERSION(2,5,41)
+	schedule_work(&write->resume_task);
+#else
 	queue_task(&write->resume_task, &tq_immediate);
+#endif
 	mark_bh(IMMEDIATE_BH);
 }
 
@@ -1631,10 +1651,14 @@ lcs_queue_thread(int (*routine) (lcs_drvr_globals *),
 		netif_stop_queue(drvr_globals->dev);
 		MOD_INC_USE_COUNT;
 		drvr_globals->kernel_thread_routine = routine;
+#if LINUX_VERSION_CODE>=KERNEL_VERSION(2,5,41)
+		schedule_work(&drvr_globals->kernel_thread_task);
+#else
 #if LINUX_VERSION_CODE<=KERNEL_VERSION(2,2,16)
 		queue_task(&drvr_globals->kernel_thread_task, &tq_scheduler);
 #else
 		schedule_task(&drvr_globals->kernel_thread_task);
+#endif
 #endif
 	} else
 		lcs_debug_event(1,"lcs_queue_thread busy drvr_globals=%p "

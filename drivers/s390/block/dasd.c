@@ -93,6 +93,7 @@ static void dasd_flush_request_queue(dasd_device_t *);
 static void dasd_int_handler(int, void *, struct pt_regs *);
 static void dasd_flush_ccw_queue(dasd_device_t *, int);
 static void dasd_tasklet(dasd_device_t *);
+static void do_kick_device(void *data);
 
 /*
  * Parameter parsing functions. There are two for the dasd driver:
@@ -254,6 +255,7 @@ dasd_alloc_device(dasd_devmap_t *devmap)
 		     (unsigned long) device);
 	INIT_LIST_HEAD(&device->ccw_queue);
 	init_timer(&device->timer);
+	INIT_WORK(&device->kick_work, do_kick_device, (void *) (addr_t) device->devinfo.devno);
 	device->state = DASD_STATE_NEW;
 	device->target = DASD_STATE_NEW;
 
@@ -590,11 +592,13 @@ dasd_change_state(dasd_device_t *device)
  * event daemon.
  */
 static void
-do_kick_device(int devno)
+do_kick_device(void *data)
 {
+	int devno;
 	dasd_devmap_t *devmap;
 	dasd_device_t *device;
 
+	devno = (long) data;
 	devmap = dasd_devmap_from_devno(devno);
 	device = (devmap != NULL) ?
 		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
@@ -610,10 +614,8 @@ void
 dasd_kick_device(dasd_device_t *device)
 {
 	atomic_inc(&device->ref_count);
-	device->kick_tq.routine = (void *) do_kick_device;
-	device->kick_tq.data = (void *) (addr_t) device->devinfo.devno;
 	/* queue call to dasd_kick_device to the kernel event daemon. */
-	schedule_task(&device->kick_tq);
+	schedule_work(&device->kick_work);
 }
 
 /*
@@ -784,7 +786,7 @@ static void
 do_not_oper_handler(void *data)
 {
 	struct {
-		struct tq_struct tq;
+		struct work_struct work;
 		int irq;
 	} *p;
 	dasd_device_t *device;
@@ -815,7 +817,7 @@ void
 dasd_not_oper_handler(int irq, int status)
 {
 	struct {
-		struct tq_struct tq;
+		struct work_struct work;
 		int irq;
 	} *p;
 
@@ -823,11 +825,10 @@ dasd_not_oper_handler(int irq, int status)
 	if (p == NULL)
 		/* FIXME: No memory, we loose. */
 		return;
-	p->tq.routine = (void *) do_not_oper_handler;
-	p->tq.data = (void *) p;
+	INIT_WORK(&p->work, (void *) do_not_oper_handler, p);
 	p->irq = irq;
 	/* queue call to do_not_oper_handler to the kernel event daemon. */
-	schedule_task(&p->tq);
+	schedule_work(&p->work);
 }
 
 /*
@@ -837,7 +838,7 @@ static void
 do_oper_handler(void *data)
 {
 	struct {
-		struct tq_struct tq;
+		struct work_struct work;
 		int devno;
 	} *p;
 	dasd_devmap_t *devmap;
@@ -868,7 +869,7 @@ int
 dasd_oper_handler(int irq, devreg_t * devreg)
 {
 	struct {
-		struct tq_struct tq;
+		struct work_struct work;
 		int devno;
 	} *p;
 
@@ -879,10 +880,9 @@ dasd_oper_handler(int irq, devreg_t * devreg)
 	p->devno = get_devno_by_irq(irq);
 	if (p->devno == -ENODEV)
 		return -ENODEV;
-	p->tq.routine = (void *) do_oper_handler;
-	p->tq.data = (void *) p;
+	INIT_WORK(&p->work, (void *) do_oper_handler, p);
 	/* queue call to do_oper_handler to the kernel event daemon. */
-	schedule_task(&p->tq);
+	schedule_work(&p->work);
         return 0;
 
 }
@@ -1317,7 +1317,7 @@ static void
 do_state_change_pending(void *data)
 {
 	struct {
-		struct tq_struct tq;
+		struct work_struct work;
 		unsigned short devno;
 	} *p;
 	dasd_devmap_t *devmap;
@@ -1355,7 +1355,7 @@ static void
 dasd_handle_state_change_pending(devstat_t * stat)
 {
 	struct {
-		struct tq_struct tq;
+		struct work_struct work;
 		unsigned short devno;
 	} *p;
 
@@ -1363,11 +1363,10 @@ dasd_handle_state_change_pending(devstat_t * stat)
 	if (p == NULL)
 		/* No memory, let the timeout do the reactivation. */
 		return;
-	p->tq.routine = (void *) do_state_change_pending;
-	p->tq.data = (void *) p;
+	INIT_WORK(&p->work, (void *) do_state_change_pending, p);
 	p->devno = stat->devno;
 	/* queue call to do_state_change_pending to the kernel event daemon. */
-	schedule_task(&p->tq);
+	schedule_work(&p->work);
 }
 
 /*

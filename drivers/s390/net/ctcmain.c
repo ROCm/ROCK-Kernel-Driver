@@ -49,7 +49,6 @@
 #include <linux/interrupt.h>
 #include <linux/timer.h>
 #include <linux/sched.h>
-#include <linux/tqueue.h>
 
 #include <linux/signal.h>
 #include <linux/string.h>
@@ -232,11 +231,6 @@ typedef struct channel_t {
 	 */
 	ccw1_t              *ccw;
 	devstat_t           *devstat;
-
-	/**
-	 * Bottom half task queue.
-	 */
-	struct tq_struct    tq;
 
 	/**
 	 * RX/TX buffer size
@@ -797,19 +791,6 @@ static __inline__ void ctc_unpack_skb(channel *ch, struct sk_buff *pskb)
 }
 
 /**
- * Bottom half routine.
- *
- * @param ch The channel to work on.
- */
-static void ctc_bh(channel *ch)
-{
-	struct sk_buff *skb;
-
-	while ((skb = skb_dequeue(&ch->io_queue)))
-		ctc_unpack_skb(ch, skb);
-}
-
-/**
  * Check return code of a preceeding do_IO, halt_IO etc...
  *
  * @param ch          The channel, the error belongs to.
@@ -1328,11 +1309,6 @@ static void ch_action_start(fsm_instance *fi, int event, void *arg)
 		       "allocation until first transfer\n",
 		       dev->name, 
 		       (CHANNEL_DIRECTION(ch->flags) == READ) ? "RX" : "TX");
-
-	INIT_LIST_HEAD(&ch->tq.list);
-	ch->tq.sync    = 0;
-	ch->tq.routine = (void *)(void *)ctc_bh;
-	ch->tq.data    = ch;
 
 	ch->ccw[0].cmd_code = CCW_CMD_PREPARE;
 	ch->ccw[0].flags    = CCW_FLAG_SLI | CCW_FLAG_CC;

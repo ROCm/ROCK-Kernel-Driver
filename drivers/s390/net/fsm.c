@@ -9,6 +9,7 @@
 #include <linux/version.h>
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/timer.h>
 
 fsm_instance *
 init_fsm(char *name, const char **state_names, const char **event_names, int nr_states,
@@ -172,19 +173,6 @@ fsm_addtimer(fsm_timer *this, int millisec, int event, void *arg)
 	       this->fi->name, this, millisec);
 #endif
 
-#if LINUX_VERSION_CODE >= 0x020300
-	if (this->tl.list.next || this->tl.list.prev) {
-		printk(KERN_WARNING "fsm(%s): timer already active!\n",
-			this->fi->name);
-		return -1;
-	}
-#else
-	if (this->tl.next || this->tl.prev) {
-		printk(KERN_WARNING "fsm(%s): timer already active!\n",
-			this->fi->name);
-		return -1;
-	}
-#endif
 	init_timer(&this->tl);
 	this->tl.function = (void *)fsm_expire_timer;
 	this->tl.data = (long)this;
@@ -205,13 +193,7 @@ fsm_modtimer(fsm_timer *this, int millisec, int event, void *arg)
 		this->fi->name, this, millisec);
 #endif
 
-#if LINUX_VERSION_CODE >= 0x020300
-	if (this->tl.list.next || this->tl.list.prev)
-		del_timer(&this->tl);
-#else
-	if (this->tl.next || this->tl.prev)
-		del_timer(&this->tl);
-#endif
+	del_timer(&this->tl);
 	init_timer(&this->tl);
 	this->tl.function = (void *)fsm_expire_timer;
 	this->tl.data = (long)this;

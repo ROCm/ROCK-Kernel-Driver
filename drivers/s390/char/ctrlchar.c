@@ -23,10 +23,7 @@ ctrlchar_handle_sysrq(void *tty)
 	handle_sysrq(ctrlchar_sysrq_key, NULL, tty);
 }
 
-static struct tq_struct ctrlchar_tq = {
-	.list = LIST_HEAD_INIT(ctrlchar_tq.list),
-	.routine = ctrlchar_handle_sysrq,
-};
+static DECLARE_WORK(ctrlchar_work, ctrlchar_handle_sysrq, 0);
 #endif
 
 
@@ -56,8 +53,8 @@ ctrlchar_handle(const char *buf, int len, struct tty_struct *tty)
 	/* racy */
 	if (len == 3 && buf[1] == '-') {
 		ctrlchar_sysrq_key = buf[2];
-		ctrlchar_tq.data = tty;
-		schedule_task(&ctrlchar_tq);
+		ctrlchar_work.data = tty;
+		schedule_work(&ctrlchar_work);
 		return CTRLCHAR_SYSRQ;
 	}
 #endif

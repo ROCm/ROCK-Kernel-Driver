@@ -58,6 +58,7 @@
 #include <linux/genhd.h>
 #include <linux/hdreg.h>
 #include <linux/interrupt.h>
+#include <linux/workqueue.h>
 #include <asm/debug.h>
 #include <asm/dasd.h>
 #include <asm/idals.h>
@@ -292,7 +293,7 @@ typedef struct dasd_device_t {
 
 	atomic_t tasklet_scheduled;
         struct tasklet_struct tasklet;
-	struct tq_struct kick_tq;
+	struct work_struct kick_work;
 	struct timer_list timer;
 
 	debug_info_t *debug_area;
