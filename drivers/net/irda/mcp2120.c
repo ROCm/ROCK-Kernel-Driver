@@ -109,7 +109,7 @@ static int mcp2120_change_speed(struct irda_task *task)
 		}
 		break;
 	case IRDA_TASK_CHILD_WAIT:
-		WARNING(__FUNCTION__ "(), resetting dongle timed out!\n");
+		WARNING("%s(), resetting dongle timed out!\n", __FUNCTION__);
 		ret = -1;
 		break;
 	case IRDA_TASK_CHILD_DONE:
@@ -157,7 +157,7 @@ static int mcp2120_change_speed(struct irda_task *task)
                 //printk("mcp2120_change_speed irda_task_wait\n");
 		break;
 	default:
-		ERROR(__FUNCTION__ "(), unknown state %d\n", task->state);
+		ERROR("%s(), unknown state %d\n", __FUNCTION__, task->state);
 		irda_task_next_state(task, IRDA_TASK_DONE);
 		self->speed_task = NULL;
 		ret = -1;
@@ -212,7 +212,7 @@ static int mcp2120_reset(struct irda_task *task)
 		self->reset_task = NULL;
 		break;
 	default:
-		ERROR(__FUNCTION__ "(), unknown state %d\n", task->state);
+		ERROR("%s(), unknown state %d\n", __FUNCTION__, task->state);
 		irda_task_next_state(task, IRDA_TASK_DONE);
 		self->reset_task = NULL;
 		ret = -1;

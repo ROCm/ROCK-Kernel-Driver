@@ -61,7 +61,7 @@ void irlmp_add_discovery(hashbin_t *cachelog, discovery_t *new)
 	/* Set time of first discovery if node is new (see below) */
 	new->first_timestamp = new->timestamp;
 
-	spin_lock_irqsave(&irlmp->log_lock, flags);
+	spin_lock_irqsave(&cachelog->hb_spinlock, flags);
 
 	/* 
 	 * Remove all discoveries of devices that has previously been 
@@ -95,13 +95,13 @@ void irlmp_add_discovery(hashbin_t *cachelog, discovery_t *new)
 	/* Insert the new and updated version */
 	hashbin_insert(cachelog, (irda_queue_t *) new, new->daddr, NULL);
 
-	spin_unlock_irqrestore(&irlmp->log_lock, flags);
+	spin_unlock_irqrestore(&cachelog->hb_spinlock, flags);
 }
 
 /*
  * Function irlmp_add_discovery_log (cachelog, log)
  *
- *    Merge a disovery log into the cachlog.
+ *    Merge a disovery log into the cachelog.
  *
  */
 void irlmp_add_discovery_log(hashbin_t *cachelog, hashbin_t *log)
@@ -115,11 +115,17 @@ void irlmp_add_discovery_log(hashbin_t *cachelog, hashbin_t *log)
 	 *  discovery, so restart discovery again with just the half timeout
 	 *  of the normal one.
 	 */
+	/* Well... It means that there was nobody out there - Jean II */
 	if (log == NULL) {
 		/* irlmp_start_discovery_timer(irlmp, 150); */
 		return;
 	}
 
+	/*
+	 * Locking : we are the only owner of this discovery log, so
+	 * no need to lock it.
+	 * We just need to lock the global log in irlmp_add_discovery().
+	 */
 	discovery = (discovery_t *) hashbin_remove_first(log);
 	while (discovery != NULL) {
 		irlmp_add_discovery(cachelog, discovery);
@@ -146,7 +152,7 @@ void irlmp_expire_discoveries(hashbin_t *log, __u32 saddr, int force)
 
 	IRDA_DEBUG(4, __FUNCTION__ "()\n");
 
-	spin_lock_irqsave(&irlmp->log_lock, flags);
+	spin_lock_irqsave(&log->hb_spinlock, flags);
 
 	discovery = (discovery_t *) hashbin_get_first(log);
 	while (discovery != NULL) {
@@ -169,7 +175,7 @@ void irlmp_expire_discoveries(hashbin_t *log, __u32 saddr, int force)
 		}
 	}
 
-	spin_unlock_irqrestore(&irlmp->log_lock, flags);
+	spin_unlock_irqrestore(&log->hb_spinlock, flags);
 }
 
 /*
@@ -230,13 +236,13 @@ struct irda_device_info *irlmp_copy_discoveries(hashbin_t *log, int *pn, __u16 m
 		return NULL;
 
 	/* Save spin lock - spinlock should be discovery specific */
-	spin_lock_irqsave(&irlmp->log_lock, flags);
+	spin_lock_irqsave(&log->hb_spinlock, flags);
 
 	/* Create the client specific buffer */
 	n = HASHBIN_GET_SIZE(log);
 	buffer = kmalloc(n * sizeof(struct irda_device_info), GFP_ATOMIC);
 	if (buffer == NULL) {
-		spin_unlock_irqrestore(&irlmp->log_lock, flags);
+		spin_unlock_irqrestore(&log->hb_spinlock, flags);
 		return NULL;
 	}
 
@@ -257,7 +263,7 @@ struct irda_device_info *irlmp_copy_discoveries(hashbin_t *log, int *pn, __u16 m
 		discovery = (discovery_t *) hashbin_get_next(log);
 	}
 
-	spin_unlock_irqrestore(&irlmp->log_lock, flags);
+	spin_unlock_irqrestore(&log->hb_spinlock, flags);
 
 	/* Get the actual number of device in the buffer and return */
 	*pn = i;
@@ -276,7 +282,7 @@ __u32 irlmp_find_device(hashbin_t *cachelog, char *name, __u32 *saddr)
 	unsigned long flags;
 	discovery_t *d;
 
-	spin_lock_irqsave(&irlmp->log_lock, flags);
+	spin_lock_irqsave(&cachelog->hb_spinlock, flags);
 
 	/* Look at all discoveries for that link */
 	d = (discovery_t *) hashbin_get_first(cachelog);
@@ -288,13 +294,13 @@ __u32 irlmp_find_device(hashbin_t *cachelog, char *name, __u32 *saddr)
 		if (strcmp(name, d->nickname) == 0) {
 			*saddr = d->saddr;
 			
-			spin_unlock_irqrestore(&irlmp->log_lock, flags);
+			spin_unlock_irqrestore(&cachelog->hb_spinlock, flags);
 			return d->daddr;
 		}
 		d = (discovery_t *) hashbin_get_next(cachelog);
 	}
 
-	spin_unlock_irqrestore(&irlmp->log_lock, flags);
+	spin_unlock_irqrestore(&cachelog->hb_spinlock, flags);
 
 	return 0;
 }
@@ -310,7 +316,7 @@ int discovery_proc_read(char *buf, char **start, off_t offset, int length,
 {
 	discovery_t *discovery;
 	unsigned long flags;
-	hashbin_t *cachelog = irlmp_get_cachelog();
+	hashbin_t *cachelog = irlmp->cachelog;
 	int		len = 0;
 
 	if (!irlmp)
@@ -318,7 +324,7 @@ int discovery_proc_read(char *buf, char **start, off_t offset, int length,
 
 	len = sprintf(buf, "IrLMP: Discovery log:\n\n");	
 	
-	spin_lock_irqsave(&irlmp->log_lock, flags);
+	spin_lock_irqsave(&cachelog->hb_spinlock, flags);
 
 	discovery = (discovery_t *) hashbin_get_first(cachelog);
 	while (( discovery != NULL) && (len < length)) {
@@ -362,7 +368,7 @@ int discovery_proc_read(char *buf, char **start, off_t offset, int length,
 		
 		discovery = (discovery_t *) hashbin_get_next(cachelog);
 	}
-	spin_unlock_irqrestore(&irlmp->log_lock, flags);
+	spin_unlock_irqrestore(&cachelog->hb_spinlock, flags);
 
 	return len;
 }

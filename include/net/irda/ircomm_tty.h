@@ -86,8 +86,8 @@ struct ircomm_tty_cb {
 
 	struct iriap_cb *iriap; /* Instance used for querying remote IAS */
 	struct ias_object* obj;
-	int skey;
-	int ckey;
+	void *skey;
+	void *ckey;
 
 	struct termios	  normal_termios;
 	struct termios	  callout_termios;
@@ -104,6 +104,14 @@ struct ircomm_tty_cb {
 	long pgrp;		/* pgrp of opening process */
 	int  open_count;
 	int  blocked_open;	/* # of blocked opens */
+
+	/* Protect concurent access to :
+	 *	o self->open_count
+	 *	o self->ctrl_skb
+	 *	o self->tx_skb
+	 * Maybe other things may gain to be protected as well...
+	 * Jean II */
+	spinlock_t spinlock;
 };
 
 void ircomm_tty_start(struct tty_struct *tty);

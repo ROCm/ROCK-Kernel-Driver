@@ -61,7 +61,7 @@ hashbin_t *ircomm = NULL;
 
 int __init ircomm_init(void)
 {
-	ircomm = hashbin_new(HB_LOCAL); 
+	ircomm = hashbin_new(HB_LOCK); 
 	if (ircomm == NULL) {
 		ERROR(__FUNCTION__ "(), can't allocate hashbin!\n");
 		return -ENOMEM;
@@ -505,10 +505,9 @@ int ircomm_proc_read(char *buf, char **start, off_t offset, int len)
 	struct ircomm_cb *self;
 	unsigned long flags;
 	
-	save_flags(flags);
-	cli();
-
 	len = 0;
+
+	spin_lock_irqsave(&ircomm->hb_spinlock, flags);
 
 	self = (struct ircomm_cb *) hashbin_get_first(ircomm);
 	while (self != NULL) {
@@ -535,7 +534,7 @@ int ircomm_proc_read(char *buf, char **start, off_t offset, int len)
 
 		self = (struct ircomm_cb *) hashbin_get_next(ircomm);
  	} 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&ircomm->hb_spinlock, flags);
 
 	return len;
 }

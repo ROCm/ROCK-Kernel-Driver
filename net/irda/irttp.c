@@ -91,7 +91,7 @@ int __init irttp_init(void)
 
 	irttp->magic = TTP_MAGIC;
 
-	irttp->tsaps = hashbin_new(HB_LOCAL);
+	irttp->tsaps = hashbin_new(HB_LOCK);
 	if (!irttp->tsaps) {
 		ERROR("%s: can't allocate IrTTP hashbin!\n", __FUNCTION__);
 		return -ENOMEM;
@@ -433,7 +433,7 @@ struct tsap_cb *irttp_open_tsap(__u8 stsap_sel, int credit, notify_t *notify)
 	self->notify = *notify;
 	self->lsap = lsap;
 
-	hashbin_insert(irttp->tsaps, (irda_queue_t *) self, (int) self, NULL);
+	hashbin_insert(irttp->tsaps, (irda_queue_t *) self, (long) self, NULL);
 
 	if (credit > TTP_RX_MAX_CREDIT)
 		self->initial_credit = TTP_RX_MAX_CREDIT;
@@ -503,7 +503,7 @@ int irttp_close_tsap(struct tsap_cb *self)
 		return 0; /* Will be back! */
 	}
 
-	tsap = hashbin_remove(irttp->tsaps, (int) self, NULL);
+	tsap = hashbin_remove(irttp->tsaps, (long) self, NULL);
 
 	ASSERT(tsap == self, return -1;);
 
@@ -1365,31 +1365,44 @@ int irttp_connect_response(struct tsap_cb *self, __u32 max_sdu_size,
 struct tsap_cb *irttp_dup(struct tsap_cb *orig, void *instance)
 {
 	struct tsap_cb *new;
+	unsigned long flags;
 
 	IRDA_DEBUG(1, __FUNCTION__ "()\n");
 
+	/* Protect our access to the old tsap instance */
+	spin_lock_irqsave(&irttp->tsaps->hb_spinlock, flags);
+
+	/* Find the old instance */
 	if (!hashbin_find(irttp->tsaps, (int) orig, NULL)) {
 		IRDA_DEBUG(0, __FUNCTION__ "(), unable to find TSAP\n");
+		spin_unlock_irqrestore(&irttp->tsaps->hb_spinlock, flags);
 		return NULL;
 	}
+
+	/* Allocate a new instance */
 	new = kmalloc(sizeof(struct tsap_cb), GFP_ATOMIC);
 	if (!new) {
 		IRDA_DEBUG(0, __FUNCTION__ "(), unable to kmalloc\n");
+		spin_unlock_irqrestore(&irttp->tsaps->hb_spinlock, flags);
 		return NULL;
 	}
 	/* Dup */
 	memcpy(new, orig, sizeof(struct tsap_cb));
-	new->notify.instance = instance;
-	new->lsap = irlmp_dup(orig->lsap, new);
+
+	/* We don't need the old instance any more */
+	spin_unlock_irqrestore(&irttp->tsaps->hb_spinlock, flags);
 
 	/* Not everything should be copied */
+	new->notify.instance = instance;
+	new->lsap = irlmp_dup(orig->lsap, new);
 	init_timer(&new->todo_timer);
 
 	skb_queue_head_init(&new->rx_queue);
 	skb_queue_head_init(&new->tx_queue);
 	skb_queue_head_init(&new->rx_fragments);
 
-	hashbin_insert(irttp->tsaps, (irda_queue_t *) new, (int) new, NULL);
+	/* This is locked */
+	hashbin_insert(irttp->tsaps, (irda_queue_t *) new, (long) new, NULL);
 
 	return new;
 }
@@ -1723,8 +1736,8 @@ int irttp_proc_read(char *buf, char **start, off_t offset, int len)
 
 	len = 0;
 
-	save_flags(flags);
-	cli();
+	/* Protect our access to the tsap list */
+	spin_lock_irqsave(&irttp->tsaps->hb_spinlock, flags);
 
 	self = (struct tsap_cb *) hashbin_get_first(irttp->tsaps);
 	while (self != NULL) {
@@ -1770,7 +1783,7 @@ int irttp_proc_read(char *buf, char **start, off_t offset, int len)
 
 		self = (struct tsap_cb *) hashbin_get_next(irttp->tsaps);
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&irttp->tsaps->hb_spinlock, flags);
 
 	return len;
 }

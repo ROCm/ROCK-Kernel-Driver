@@ -177,7 +177,7 @@ void ircomm_lmp_flow_control(struct sk_buff *skb)
  
         line = cb->line;
 
-	self = (struct ircomm_cb *) hashbin_find(ircomm, line, NULL);
+	self = (struct ircomm_cb *) hashbin_lock_find(ircomm, line, NULL);
         if (!self) {
 		IRDA_DEBUG(2, __FUNCTION__ "(), didn't find myself\n");
                 return;
