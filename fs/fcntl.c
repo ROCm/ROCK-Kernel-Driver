@@ -52,7 +52,7 @@ static int expand_files(struct files_struct *files, int nr)
 {
 	int err, expand = 0;
 #ifdef FDSET_DEBUG	
-	printk (KERN_ERR __FUNCTION__ " %d: nr = %d\n", current->pid, nr);
+	printk (KERN_ERR "%s %d: nr = %d\n", __FUNCTION__, current->pid, nr);
 #endif
 	
 	if (nr >= files->max_fdset) {
@@ -69,7 +69,7 @@ static int expand_files(struct files_struct *files, int nr)
  out:
 #ifdef FDSET_DEBUG	
 	if (err)
-		printk (KERN_ERR __FUNCTION__ " %d: return %d\n", current->pid, err);
+		printk (KERN_ERR "%s %d: return %d\n", __FUNCTION__, current->pid, err);
 #endif
 	return err;
 }
