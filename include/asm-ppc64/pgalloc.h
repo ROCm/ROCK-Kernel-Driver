@@ -2,7 +2,10 @@
 #define _PPC64_PGALLOC_H
 
 #include <linux/mm.h>
+#include <linux/slab.h>
 #include <asm/processor.h>
+
+extern kmem_cache_t *zero_cache;
 
 /*
  * This program is free software; you can redistribute it and/or
@@ -14,16 +17,13 @@
 static inline pgd_t *
 pgd_alloc(struct mm_struct *mm)
 {
-	pgd_t *pgd = (pgd_t *)__get_free_page(GFP_KERNEL);
-	if (pgd != NULL)
-		clear_page(pgd);
-	return pgd;
+	return kmem_cache_alloc(zero_cache, GFP_KERNEL);
 }
 
 static inline void
 pgd_free(pgd_t *pgd)
 {
-	free_page((unsigned long)pgd);
+	kmem_cache_free(zero_cache, pgd);
 }
 
 #define pgd_populate(MM, PGD, PMD)	pgd_set(PGD, PMD)
@@ -31,18 +31,13 @@ pgd_free(pgd_t *pgd)
 static inline pmd_t *
 pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
 {
-	pmd_t *pmd;
-
-	pmd = (pmd_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
-	if (pmd)
-		clear_page(pmd);
-	return pmd;
+	return kmem_cache_alloc(zero_cache, GFP_KERNEL|__GFP_REPEAT);
 }
 
 static inline void
 pmd_free(pmd_t *pmd)
 {
-	free_page((unsigned long)pmd);
+	kmem_cache_free(zero_cache, pmd);
 }
 
 #define __pmd_free_tlb(tlb, pmd)	pmd_free(pmd)
@@ -54,12 +49,7 @@ pmd_free(pmd_t *pmd)
 static inline pte_t *
 pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
 {
-	pte_t *pte;
-
-	pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
-	if (pte)
-		clear_page(pte);
-	return pte;
+	return kmem_cache_alloc(zero_cache, GFP_KERNEL|__GFP_REPEAT);
 }
 
 static inline struct page *
@@ -76,7 +66,7 @@ pte_alloc_one(struct mm_struct *mm, unsigned long address)
 static inline void
 pte_free_kernel(pte_t *pte)
 {
-	free_page((unsigned long)pte);
+	kmem_cache_free(zero_cache, pte);
 }
 
 #define pte_free(pte_page)	pte_free_kernel(page_address(pte_page))
