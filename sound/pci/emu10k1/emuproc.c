@@ -175,32 +175,45 @@ static void snd_emu10k1_proc_read(snd_info_entry_t *entry,
 	};
 
 	emu10k1_t *emu = entry->private_data;
-	unsigned int val;
+	unsigned int val, val1;
 	int nefx = emu->audigy ? 64 : 32;
 	char **outputs = emu->audigy ? audigy_outs : creative_outs;
 	int idx;
 	
 	snd_iprintf(buffer, "EMU10K1\n\n");
-	val = emu->audigy ?
-		snd_emu10k1_ptr_read(emu, A_FXRT1, 0) :
-		snd_emu10k1_ptr_read(emu, FXRT, 0);
 	snd_iprintf(buffer, "Card                  : %s\n",
 		    emu->audigy ? "Audigy" : (emu->APS ? "EMU APS" : "Creative"));
 	snd_iprintf(buffer, "Internal TRAM (words) : 0x%x\n", emu->fx8010.itram_size);
 	snd_iprintf(buffer, "External TRAM (words) : 0x%x\n", (int)emu->fx8010.etram_pages.bytes);
 	snd_iprintf(buffer, "\n");
-	if (emu->audigy) {
-		snd_iprintf(buffer, "Effect Send Routing   : A=%i, B=%i, C=%i, D=%i\n",
-			    val & 0x3f,
-			    (val >> 8) & 0x3f,
-			    (val >> 16) & 0x3f,
-			    (val >> 24) & 0x3f);
-	} else {
-		snd_iprintf(buffer, "Effect Send Routing   : A=%i, B=%i, C=%i, D=%i\n",
-			    (val >> 16) & 0x0f,
-			    (val >> 20) & 0x0f,
-			    (val >> 24) & 0x0f,
-			    (val >> 28) & 0x0f);
+	snd_iprintf(buffer, "Effect Send Routing   :\n");
+	for (idx = 0; idx < NUM_G; idx++) {
+		val = emu->audigy ?
+			snd_emu10k1_ptr_read(emu, A_FXRT1, idx) :
+			snd_emu10k1_ptr_read(emu, FXRT, idx);
+		val1 = emu->audigy ?
+			snd_emu10k1_ptr_read(emu, A_FXRT2, idx) :
+			0;
+		if (emu->audigy) {
+			snd_iprintf(buffer, "Ch%i: A=%i, B=%i, C=%i, D=%i, ",
+				idx,
+				val & 0x3f,
+				(val >> 8) & 0x3f,
+				(val >> 16) & 0x3f,
+				(val >> 24) & 0x3f);
+			snd_iprintf(buffer, "E=%i, F=%i, G=%i, H=%i\n",
+				val1 & 0x3f,
+				(val1 >> 8) & 0x3f,
+				(val1 >> 16) & 0x3f,
+				(val1 >> 24) & 0x3f);
+		} else {
+			snd_iprintf(buffer, "Ch%i: A=%i, B=%i, C=%i, D=%i\n",
+				idx,
+				(val >> 16) & 0x0f,
+				(val >> 20) & 0x0f,
+				(val >> 24) & 0x0f,
+				(val >> 28) & 0x0f);
+		}
 	}
 	snd_iprintf(buffer, "\nCaptured FX Outputs   :\n");
 	for (idx = 0; idx < nefx; idx++) {
@@ -318,7 +331,7 @@ int __devinit snd_emu10k1_proc_init(emu10k1_t * emu)
 	snd_info_entry_t *entry;
 	
 	if (! snd_card_proc_new(emu->card, "emu10k1", &entry))
-		snd_info_set_text_ops(entry, emu, 1024, snd_emu10k1_proc_read);
+		snd_info_set_text_ops(entry, emu, 2048, snd_emu10k1_proc_read);
 
 	if (! snd_card_proc_new(emu->card, "fx8010_gpr", &entry)) {
 		entry->content = SNDRV_INFO_CONTENT_DATA;
