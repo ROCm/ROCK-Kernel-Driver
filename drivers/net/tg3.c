@@ -128,7 +128,8 @@
 /* minimum number of free TX descriptors required to wake up TX process */
 #define TG3_TX_WAKEUP_THRESH		(TG3_TX_RING_SIZE / 4)
 
-#define TG3_NUM_STATS		25	/* number of ETHTOOL_GSTATS u64's */
+/* number of ETHTOOL_GSTATS u64's */
+#define TG3_NUM_STATS		(sizeof(struct tg3_ethtool_stats)/sizeof(u64))
 
 static char version[] __devinitdata =
 	DRV_MODULE_NAME ".c:v" DRV_MODULE_VERSION " (" DRV_MODULE_RELDATE ")\n";
@@ -216,10 +217,13 @@ MODULE_DEVICE_TABLE(pci, tg3_pci_tbl);
 struct {
 	char string[ETH_GSTRING_LEN];
 } ethtool_stats_keys[TG3_NUM_STATS] = {
+	{ "rx_octets" },
 	{ "rx_fragments" },
 	{ "rx_ucast_packets" },
+	{ "rx_mcast_packets" },
 	{ "rx_bcast_packets" },
 	{ "rx_fcs_errors" },
+	{ "rx_align_errors" },
 	{ "rx_xon_pause_rcvd" },
 	{ "rx_xoff_pause_rcvd" },
 	{ "rx_mac_ctrl_rcvd" },
@@ -229,6 +233,19 @@ struct {
 	{ "rx_undersize_packets" },
 	{ "rx_in_length_errors" },
 	{ "rx_out_length_errors" },
+	{ "rx_64_or_less_octet_packets" },
+	{ "rx_65_to_127_octet_packets" },
+	{ "rx_128_to_255_octet_packets" },
+	{ "rx_256_to_511_octet_packets" },
+	{ "rx_512_to_1023_octet_packets" },
+	{ "rx_1024_to_1522_octet_packets" },
+	{ "rx_1523_to_2047_octet_packets" },
+	{ "rx_2048_to_4095_octet_packets" },
+	{ "rx_4096_to_8191_octet_packets" },
+	{ "rx_8192_to_9022_octet_packets" },
+
+	{ "tx_octets" },
+	{ "tx_collisions" },
 
 	{ "tx_xon_sent" },
 	{ "tx_xoff_sent" },
@@ -239,9 +256,43 @@ struct {
 	{ "tx_deferred" },
 	{ "tx_excessive_collisions" },
 	{ "tx_late_collisions" },
+	{ "tx_collide_2times" },
+	{ "tx_collide_3times" },
+	{ "tx_collide_4times" },
+	{ "tx_collide_5times" },
+	{ "tx_collide_6times" },
+	{ "tx_collide_7times" },
+	{ "tx_collide_8times" },
+	{ "tx_collide_9times" },
+	{ "tx_collide_10times" },
+	{ "tx_collide_11times" },
+	{ "tx_collide_12times" },
+	{ "tx_collide_13times" },
+	{ "tx_collide_14times" },
+	{ "tx_collide_15times" },
 	{ "tx_ucast_packets" },
 	{ "tx_mcast_packets" },
-	{ "tx_bcast_packets" }
+	{ "tx_bcast_packets" },
+	{ "tx_carrier_sense_errors" },
+	{ "tx_discards" },
+	{ "tx_errors" },
+
+	{ "dma_writeq_full" },
+	{ "dma_write_prioq_full" },
+	{ "rxbds_empty" },
+	{ "rx_discards" },
+	{ "rx_errors" },
+	{ "rx_threshold_hit" },
+
+	{ "dma_readq_full" },
+	{ "dma_read_prioq_full" },
+	{ "tx_comp_queue_full" },
+
+	{ "ring_set_send_prod_index" },
+	{ "ring_status_update" },
+	{ "nic_irqs" },
+	{ "nic_avoided_irqs" },
+	{ "nic_tx_threshold_hit" }
 };
 
 static void tg3_write_indirect_reg32(struct tg3 *tp, u32 off, u32 val)
@@ -5921,10 +5972,13 @@ static struct tg3_ethtool_stats *tg3_get_estats(struct tg3 *tp)
 	if (!hw_stats)
 		return old_estats;
 
+	ESTAT_ADD(rx_octets);
 	ESTAT_ADD(rx_fragments);
 	ESTAT_ADD(rx_ucast_packets);
+	ESTAT_ADD(rx_mcast_packets);
 	ESTAT_ADD(rx_bcast_packets);
 	ESTAT_ADD(rx_fcs_errors);
+	ESTAT_ADD(rx_align_errors);
 	ESTAT_ADD(rx_xon_pause_rcvd);
 	ESTAT_ADD(rx_xoff_pause_rcvd);
 	ESTAT_ADD(rx_mac_ctrl_rcvd);
@@ -5934,7 +5988,19 @@ static struct tg3_ethtool_stats *tg3_get_estats(struct tg3 *tp)
 	ESTAT_ADD(rx_undersize_packets);
 	ESTAT_ADD(rx_in_length_errors);
 	ESTAT_ADD(rx_out_length_errors);
+	ESTAT_ADD(rx_64_or_less_octet_packets);
+	ESTAT_ADD(rx_65_to_127_octet_packets);
+	ESTAT_ADD(rx_128_to_255_octet_packets);
+	ESTAT_ADD(rx_256_to_511_octet_packets);
+	ESTAT_ADD(rx_512_to_1023_octet_packets);
+	ESTAT_ADD(rx_1024_to_1522_octet_packets);
+	ESTAT_ADD(rx_1523_to_2047_octet_packets);
+	ESTAT_ADD(rx_2048_to_4095_octet_packets);
+	ESTAT_ADD(rx_4096_to_8191_octet_packets);
+	ESTAT_ADD(rx_8192_to_9022_octet_packets);
 
+	ESTAT_ADD(tx_octets);
+	ESTAT_ADD(tx_collisions);
 	ESTAT_ADD(tx_xon_sent);
 	ESTAT_ADD(tx_xoff_sent);
 	ESTAT_ADD(tx_flow_control);
@@ -5944,9 +6010,43 @@ static struct tg3_ethtool_stats *tg3_get_estats(struct tg3 *tp)
 	ESTAT_ADD(tx_deferred);
 	ESTAT_ADD(tx_excessive_collisions);
 	ESTAT_ADD(tx_late_collisions);
+	ESTAT_ADD(tx_collide_2times);
+	ESTAT_ADD(tx_collide_3times);
+	ESTAT_ADD(tx_collide_4times);
+	ESTAT_ADD(tx_collide_5times);
+	ESTAT_ADD(tx_collide_6times);
+	ESTAT_ADD(tx_collide_7times);
+	ESTAT_ADD(tx_collide_8times);
+	ESTAT_ADD(tx_collide_9times);
+	ESTAT_ADD(tx_collide_10times);
+	ESTAT_ADD(tx_collide_11times);
+	ESTAT_ADD(tx_collide_12times);
+	ESTAT_ADD(tx_collide_13times);
+	ESTAT_ADD(tx_collide_14times);
+	ESTAT_ADD(tx_collide_15times);
 	ESTAT_ADD(tx_ucast_packets);
 	ESTAT_ADD(tx_mcast_packets);
 	ESTAT_ADD(tx_bcast_packets);
+	ESTAT_ADD(tx_carrier_sense_errors);
+	ESTAT_ADD(tx_discards);
+	ESTAT_ADD(tx_errors);
+
+	ESTAT_ADD(dma_writeq_full);
+	ESTAT_ADD(dma_write_prioq_full);
+	ESTAT_ADD(rxbds_empty);
+	ESTAT_ADD(rx_discards);
+	ESTAT_ADD(rx_errors);
+	ESTAT_ADD(rx_threshold_hit);
+
+	ESTAT_ADD(dma_readq_full);
+	ESTAT_ADD(dma_read_prioq_full);
+	ESTAT_ADD(tx_comp_queue_full);
+
+	ESTAT_ADD(ring_set_send_prod_index);
+	ESTAT_ADD(ring_status_update);
+	ESTAT_ADD(nic_irqs);
+	ESTAT_ADD(nic_avoided_irqs);
+	ESTAT_ADD(nic_tx_threshold_hit);
 
 	return estats;
 }
