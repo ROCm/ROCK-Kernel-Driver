@@ -36,9 +36,7 @@
 
 ENTRY(trampoline_data)
 r_base = .
-#ifdef CONFIG_MULTIQUAD
-	wbinvd
-#endif /* CONFIG_MULTIQUAD */
+	wbinvd			# Needed for NUMA-Q should be harmless for others
 	mov	%cs, %ax	# Code and data in the same place
 	mov	%ax, %ds
 
