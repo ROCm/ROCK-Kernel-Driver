@@ -315,6 +315,15 @@
 #define SPRN_VRSAVE	0x100	/* Vector Register Save Register */
 #define SPRN_XER	0x001	/* Fixed Point Exception Register */
 
+/* Bit definitions for MMCR0 and PMC1 / PMC2. */
+#define MMCR0_PMC1_CYCLES	(1 << 7)
+#define MMCR0_PMC1_ICACHEMISS	(5 << 7)
+#define MMCR0_PMC1_DTLB		(6 << 7)
+#define MMCR0_PMC2_DCACHEMISS	0x6
+#define MMCR0_PMC2_CYCLES	0x1
+#define MMCR0_PMC2_ITLB		0x7
+#define MMCR0_PMC2_LOADMISSTIME	0x5
+
 /* Short-hand versions for a number of the above SPRNs */
 #define CTR	SPRN_CTR	/* Counter Register */
 #define DAR	SPRN_DAR	/* Data Address Register */

@@ -28,6 +28,7 @@
 #include <asm/pgtable.h>
 #include <asm/cputable.h>
 #include <asm/system.h>
+#include <asm/reg.h>
 
 static ssize_t ppc_htab_read(struct file * file, char __user * buf,
 			     size_t count, loff_t *ppos);
@@ -47,19 +48,6 @@ extern unsigned long pte_misses;
 extern unsigned long pte_errors;
 extern unsigned int primary_pteg_full;
 extern unsigned int htab_hash_searches;
-
-/* these will go into processor.h when I'm done debugging -- Cort */
-#define MMCR0 952
-#define MMCR0_PMC1_CYCLES (0x1<<7)
-#define MMCR0_PMC1_ICACHEMISS (0x5<<7)
-#define MMCR0_PMC1_DTLB (0x6<<7)
-#define MMCR0_PMC2_DCACHEMISS (0x6)
-#define MMCR0_PMC2_CYCLES (0x1)
-#define MMCR0_PMC2_ITLB (0x7)
-#define MMCR0_PMC2_LOADMISSTIME (0x5)
-
-#define PMC1 953
-#define PMC2 954
 
 struct file_operations ppc_htab_operations = {
         .llseek =       ppc_htab_lseek,
@@ -123,10 +111,9 @@ static ssize_t ppc_htab_read(struct file * file, char __user * buf,
 		return -EINVAL;
 
 	if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
-		asm volatile ("mfspr %0,952 \n\t"
-		    "mfspr %1,953 \n\t"
-		    "mfspr %2,954 \n\t"
-		    : "=r" (mmcr0), "=r" (pmc1), "=r" (pmc2) );
+		mmcr0 = mfspr(SPRN_MMCR0);
+		pmc1 = mfspr(SPRN_PMC1);
+		pmc2 = mfspr(SPRN_PMC2);
 		n += sprintf( buffer + n,
 			      "604 Performance Monitoring\n"
 			      "MMCR0\t\t: %08lx %s%s ",
@@ -231,10 +218,9 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 	if ( !strncmp( buffer, "off", 3) )
 	{
 		if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
-			asm volatile ("mtspr %0, %3 \n\t"
-			    "mtspr %1, %3 \n\t"
-			    "mtspr %2, %3 \n\t"			
-			    :: "i" (MMCR0), "i" (PMC1), "i" (PMC2), "r" (0));
+			mtspr(SPRN_MMCR0, 0);
+			mtspr(SPRN_PMC1, 0);
+			mtspr(SPRN_PMC2, 0);
 		}
 	}
 
@@ -242,10 +228,8 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 	{
 		if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
 			/* reset PMC1 and PMC2 */
-			asm volatile (
-				"mtspr 953, %0 \n\t"
-				"mtspr 954, %0 \n\t"
-				:: "r" (0));
+			mtspr(SPRN_PMC1, 0);
+			mtspr(SPRN_PMC2, 0);
 		}
 		htab_reloads = 0;
 		htab_evicts = 0;
@@ -257,15 +241,10 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 	{
 		if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
 			/* setup mmcr0 and clear the correct pmc */
-			asm("mfspr %0,%1\n\t"  : "=r" (tmp) : "i" (MMCR0));
-			tmp &= ~(0x60000000);
-			tmp |= 0x20000000;
-			asm volatile (
-				"mtspr %1,%0 \n\t"    /* set new mccr0 */
-				"mtspr %3,%4 \n\t"    /* reset the pmc */
-				"mtspr %5,%4 \n\t"    /* reset the pmc2 */
-				:: "r" (tmp), "i" (MMCR0), "i" (0),
-				"i" (PMC1),  "r" (0), "i"(PMC2) );
+			tmp = (mfspr(SPRN_MMCR0) & ~(0x60000000)) | 0x20000000;
+			mtspr(SPRN_MMCR0, tmp);
+			mtspr(SPRN_PMC1, 0);
+			mtspr(SPRN_PMC2, 0);
 		}
 	}
 
@@ -273,15 +252,10 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 	{
 		if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
 			/* setup mmcr0 and clear the correct pmc */
-			asm("mfspr %0,%1\n\t"  : "=r" (tmp) : "i" (MMCR0));
-			tmp &= ~(0x60000000);
-			tmp |= 0x40000000;
-			asm volatile (
-				"mtspr %1,%0 \n\t"    /* set new mccr0 */
-				"mtspr %3,%4 \n\t"    /* reset the pmc */
-				"mtspr %5,%4 \n\t"    /* reset the pmc2 */
-				:: "r" (tmp), "i" (MMCR0), "i" (0),
-				"i" (PMC1),  "r" (0), "i"(PMC2) );
+			tmp = (mfspr(SPRN_MMCR0) & ~(0x60000000)) | 0x40000000;
+			mtspr(SPRN_MMCR0, tmp);
+			mtspr(SPRN_PMC1, 0);
+			mtspr(SPRN_PMC2, 0);
 		}
 	}
 
@@ -290,14 +264,11 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 	{
 		if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
 			/* setup mmcr0 and clear the correct pmc */
-			asm("mfspr %0,%1\n\t"  : "=r" (tmp) : "i" (MMCR0));
+			tmp = mfspr(SPRN_MMCR0);
 			tmp &= ~(0x7f<<7);
 			tmp |= MMCR0_PMC1_DTLB;
-			asm volatile (
-				"mtspr %1,%0 \n\t"    /* set new mccr0 */
-				"mtspr %3,%4 \n\t"    /* reset the pmc */
-				:: "r" (tmp), "i" (MMCR0), "i" (MMCR0_PMC1_DTLB),
-				"i" (PMC1),  "r" (0) );
+			mtspr(SPRN_MMCR0, tmp);
+			mtspr(SPRN_PMC1, 0);
 		}
 	}
 
@@ -305,14 +276,11 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 	{
 		if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
 			/* setup mmcr0 and clear the correct pmc */
-			asm("mfspr %0,%1\n\t"  : "=r" (tmp) : "i" (MMCR0));
+			tmp = mfspr(SPRN_MMCR0);
 			tmp &= ~(0x7f<<7);
 			tmp |= MMCR0_PMC1_ICACHEMISS;
-			asm volatile (
-				"mtspr %1,%0 \n\t"    /* set new mccr0 */
-				"mtspr %3,%4 \n\t"    /* reset the pmc */
-				:: "r" (tmp), "i" (MMCR0),
-				"i" (MMCR0_PMC1_ICACHEMISS), "i" (PMC1),  "r" (0));
+			mtspr(SPRN_MMCR0, tmp);
+			mtspr(SPRN_PMC1, 0);
 		}
 	}
 
@@ -328,8 +296,9 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 			       "mtspr %1,%0 \n\t"    /* set new mccr0 */
 			       "mtspr %3,%4 \n\t"    /* reset the pmc */
 			       : "=r" (tmp)
-			       : "i" (MMCR0), "i" (MMCR0_PMC2_LOADMISSTIME),
-			       "i" (PMC2),  "r" (0) );
+			       : "i" (SPRN_MMCR0),
+			       "i" (MMCR0_PMC2_LOADMISSTIME),
+			       "i" (SPRN_PMC2),  "r" (0) );
 		}
 	}
 
@@ -344,8 +313,8 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 			       "mtspr %1,%0 \n\t"    /* set new mccr0 */
 			       "mtspr %3,%4 \n\t"    /* reset the pmc */
 			       : "=r" (tmp)
-			       : "i" (MMCR0), "i" (MMCR0_PMC2_ITLB),
-			       "i" (PMC2),  "r" (0) );
+			       : "i" (SPRN_MMCR0), "i" (MMCR0_PMC2_ITLB),
+			       "i" (SPRN_PMC2),  "r" (0) );
 		}
 	}
 
@@ -360,8 +329,8 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 			       "mtspr %1,%0 \n\t"    /* set new mccr0 */
 			       "mtspr %3,%4 \n\t"    /* reset the pmc */
 			       : "=r" (tmp)
-			       : "i" (MMCR0), "i" (MMCR0_PMC2_DCACHEMISS),
-			       "i" (PMC2),  "r" (0) );
+			       : "i" (SPRN_MMCR0), "i" (MMCR0_PMC2_DCACHEMISS),
+			       "i" (SPRN_PMC2),  "r" (0) );
 		}
 	}
 
