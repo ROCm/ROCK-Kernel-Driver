@@ -79,6 +79,15 @@ static unsigned long wdt_is_open;
 static int wdt_expect_close;
 static struct pci_dev *alim7101_pmu;
 
+#ifdef CONFIG_WATCHDOG_NOWAYOUT
+static int nowayout = 1;
+#else
+static int nowayout = 0;
+#endif
+ 
+MODULE_PARM(nowayout,"i");
+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
+
 /*
  *	Whack the dog
  */
@@ -155,22 +164,22 @@ static ssize_t fop_write(struct file * file, const char * buf, size_t count, lof
 		return -ESPIPE;
 
 	/* See if we got the magic character */
-	if(count) 
-	{
-		size_t ofs;
+	if(count) {
+		if (!nowayout) {
+			size_t ofs;
 
-		/* note: just in case someone wrote the magic character
-		 * five months ago... */
-		wdt_expect_close = 0;
+			/* note: just in case someone wrote the magic character
+			 * five months ago... */
+			wdt_expect_close = 0;
 
-		/* now scan */
-		for(ofs = 0; ofs != count; ofs++)
-		{
-			char c;
-			if(get_user(c, buf+ofs))
-				return -EFAULT;
-			if(c == 'V')
-				wdt_expect_close = 1;
+			/* now scan */
+			for (ofs = 0; ofs != count; ofs++) {
+				char c;
+				if (get_user(c, buf+ofs))
+					return -EFAULT;
+				if (c == 'V')
+					wdt_expect_close = 1;
+			}
 		}
 		/* someone wrote to us, we should restart timer */
 		next_heartbeat = jiffies + WDT_HEARTBEAT;
@@ -197,26 +206,22 @@ static int fop_open(struct inode * inode, struct file * file)
 
 static int fop_close(struct inode * inode, struct file * file)
 {
-#ifdef CONFIG_WDT_NOWAYOUT
 	if(wdt_expect_close)
 		wdt_turnoff();
-	else {
+	else
 		printk(OUR_NAME ": device file closed unexpectedly. Will not stop the WDT!\n");
-	}
-#else
-	wdt_turnoff();
-#endif
+
 	clear_bit(0, &wdt_is_open);
 	return 0;
 }
 
 static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
-	static struct watchdog_info ident=
+	static struct watchdog_info ident =
 	{
-		0,
-		1,
-		"ALiM7101"
+		.options = WDIOF_MAGICCLOSE,
+		.firmware_version = 1,
+		.identity = "ALiM7101"
 	};
 	
 	switch(cmd)
