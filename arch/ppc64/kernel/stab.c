@@ -22,7 +22,7 @@ int make_ste(unsigned long stab,
 	     unsigned long esid, unsigned long vsid);
 void make_slbe(unsigned long esid, unsigned long vsid,
 	       int large);
-extern struct Naca *naca;
+extern struct naca_struct *naca;
 
 /*
  * Build an entry for the base kernel segment and put it into
