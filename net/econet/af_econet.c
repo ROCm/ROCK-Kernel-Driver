@@ -562,6 +562,7 @@ static int econet_create(struct socket *sock, int protocol)
 	sk->sk_reuse = 1;
 	sock->ops = &econet_ops;
 	sock_init_data(sock,sk);
+	sk_set_owner(sk, THIS_MODULE);
 
 	eo = ec_sk(sk) = kmalloc(sizeof(*eo), GFP_KERNEL);
 	if (!eo)
