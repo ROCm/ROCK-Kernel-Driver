@@ -986,6 +986,7 @@ static int st_open(struct inode *inode, struct file *filp)
 		write_unlock(&st_dev_arr_lock);
 		return (-ENXIO);
 	}
+	filp->private_data = STp;
 	name = tape_name(STp);
 
 	if (STp->in_use) {
@@ -1052,25 +1053,15 @@ static int st_open(struct inode *inode, struct file *filp)
 static int st_flush(struct file *filp)
 {
 	int result = 0, result2;
-	struct inode *inode = filp->f_dentry->d_inode;
-	kdev_t devt = inode->i_rdev;
-	int dev = TAPE_NR(devt);
 	unsigned char cmd[MAX_COMMAND_SIZE];
 	Scsi_Request *SRpnt;
-	Scsi_Tape *STp;
-	ST_mode *STm;
-	ST_partstat *STps;
-	char *name;
+	Scsi_Tape *STp = filp->private_data;
+	ST_mode *STm = &(STp->modes[STp->current_mode]);
+	ST_partstat *STps = &(STp->ps[STp->partition]);
+	char *name = tape_name(STp);
 
 	if (file_count(filp) > 1)
 		return 0;
-
-	read_lock(&st_dev_arr_lock);
-	STp = scsi_tapes[dev];
-	read_unlock(&st_dev_arr_lock);
-	STm = &(STp->modes[STp->current_mode]);
-	STps = &(STp->ps[STp->partition]);
-	name = tape_name(STp);
 
 	if (STps->rw == ST_WRITING && !STp->pos_unknown) {
 		result = flush_write_buffer(STp);
@@ -1176,15 +1167,7 @@ static int st_flush(struct file *filp)
 static int st_release(struct inode *inode, struct file *filp)
 {
 	int result = 0;
-	Scsi_Tape *STp;
-
-	kdev_t devt = inode->i_rdev;
-	int dev;
-
-	dev = TAPE_NR(devt);
-	read_lock(&st_dev_arr_lock);
-	STp = scsi_tapes[dev];
-	read_unlock(&st_dev_arr_lock);
+	Scsi_Tape *STp = filp->private_data;
 
 	if (STp->door_locked == ST_LOCKED_AUTO)
 		do_door_lock(STp, 0);
@@ -1332,7 +1315,6 @@ static int setup_buffering(Scsi_Tape *STp, const char *buf, size_t count, int is
 static ssize_t
  st_write(struct file *filp, const char *buf, size_t count, loff_t * ppos)
 {
-	struct inode *inode = filp->f_dentry->d_inode;
 	ssize_t total;
 	ssize_t i, do_count, blks, transfer;
 	ssize_t retval;
@@ -1341,17 +1323,11 @@ static ssize_t
 	unsigned char cmd[MAX_COMMAND_SIZE];
 	const char *b_point;
 	Scsi_Request *SRpnt = NULL;
-	Scsi_Tape *STp;
+	Scsi_Tape *STp = filp->private_data;
 	ST_mode *STm;
 	ST_partstat *STps;
 	ST_buffer *STbp;
-	int dev = TAPE_NR(inode->i_rdev);
-	char *name;
-
-	read_lock(&st_dev_arr_lock);
-	STp = scsi_tapes[dev];
-	read_unlock(&st_dev_arr_lock);
-	name = tape_name(STp);
+	char *name = tape_name(STp);
 
 	if (down_interruptible(&STp->lock))
 		return -ERESTARTSYS;
@@ -1781,24 +1757,16 @@ static long read_tape(Scsi_Tape *STp, long count, Scsi_Request ** aSRpnt)
 static ssize_t
  st_read(struct file *filp, char *buf, size_t count, loff_t * ppos)
 {
-	struct inode *inode = filp->f_dentry->d_inode;
 	ssize_t total;
 	ssize_t retval = 0;
 	ssize_t i, transfer;
 	int special;
 	Scsi_Request *SRpnt = NULL;
-	Scsi_Tape *STp;
+	Scsi_Tape *STp = filp->private_data;
 	ST_mode *STm;
 	ST_partstat *STps;
-	ST_buffer *STbp;
-	int dev = TAPE_NR(inode->i_rdev);
-	char *name;
-
-	read_lock(&st_dev_arr_lock);
-	STp = scsi_tapes[dev];
-	read_unlock(&st_dev_arr_lock);
-	name = tape_name(STp);
-	STbp = STp->buffer;
+	ST_buffer *STbp = STp->buffer;
+	DEB( char *name = tape_name(STp); )
 
 	if (down_interruptible(&STp->lock))
 		return -ERESTARTSYS;
@@ -3077,17 +3045,10 @@ static int st_ioctl(struct inode *inode, struct file *file,
 	int i, cmd_nr, cmd_type, bt;
 	int retval = 0;
 	unsigned int blk;
-	Scsi_Tape *STp;
+	Scsi_Tape *STp = file->private_data;
 	ST_mode *STm;
 	ST_partstat *STps;
-	int dev = TAPE_NR(inode->i_rdev);
-	char *name;
-
-	read_lock(&st_dev_arr_lock);
-	STp = scsi_tapes[dev];
-	read_unlock(&st_dev_arr_lock);
-
-	name = tape_name(STp);
+	char *name = tape_name(STp);
 
 	if (down_interruptible(&STp->lock))
 		return -ERESTARTSYS;
