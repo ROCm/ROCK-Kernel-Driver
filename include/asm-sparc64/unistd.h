@@ -1,4 +1,4 @@
-/* $Id: unistd.h,v 1.49 2001/10/18 08:27:05 davem Exp $ */
+/* $Id: unistd.h,v 1.50 2002/02/08 03:57:18 davem Exp $ */
 #ifndef _SPARC64_UNISTD_H
 #define _SPARC64_UNISTD_H
 
@@ -202,7 +202,7 @@
 #define __NR_query_module	184 /* Linux Specific				   */
 #define __NR_setpgid            185 /* Common                                      */
 /* #define __NR_pathconf        186    SunOS Specific                              */
-/* #define __NR_fpathconf       187    SunOS Specific                              */
+#define __NR_tkill              187 /* SunOS: fpathconf                            */
 /* #define __NR_sysconf         188    SunOS Specific                              */
 #define __NR_uname              189 /* Linux Specific                              */
 #define __NR_init_module        190 /* Linux Specific                              */
@@ -273,7 +273,6 @@
 #define __NR_fdatasync          253
 #define __NR_nfsservctl         254
 #define __NR_aplib              255
-#define __NR_tkill              256
 
 #define _syscall0(type,name) \
 type name(void) \

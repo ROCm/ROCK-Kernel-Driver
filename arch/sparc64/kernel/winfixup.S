@@ -1,4 +1,4 @@
-/* $Id: winfixup.S,v 1.29 2000/03/26 09:13:48 davem Exp $
+/* $Id: winfixup.S,v 1.30 2002/02/09 19:49:30 davem Exp $
  *
  * winfixup.S: Handle cases where user stack pointer is found to be bogus.
  *
@@ -11,7 +11,7 @@
 #include <asm/ptrace.h>
 #include <asm/processor.h>
 #include <asm/spitfire.h>
-#include <asm/asm_offsets.h>
+#include <asm/thread_info.h>
 
 	.text
 	.align	32
@@ -69,8 +69,8 @@ fill_fixup:
 	mov		%g6, %o7			! Get current.
 
 	andn		%l1, PSTATE_MM, %l1		! We want to be in RMO
-	stb		%g4, [%g6 + AOFF_task_thread + AOFF_thread_fault_code]
-	stx		%g5, [%g6 + AOFF_task_thread + AOFF_thread_fault_address]
+	stb		%g4, [%g6 + TI_FAULT_CODE]
+	stx		%g5, [%g6 + TI_FAULT_ADDR]
 	wrpr		%g0, 0x0, %tl			! Out of trap levels.
 	wrpr		%l1, (PSTATE_IE | PSTATE_AG | PSTATE_RMO), %pstate
 	sethi		%uhi(PAGE_OFFSET), %g4		! Prepare page_offset global reg
@@ -94,56 +94,56 @@ fill_fixup:
 	 * do not touch %g7 or %g2 so we handle the two cases fine.
 	 */
 spill_fixup:
-	ldub		[%g6 + AOFF_task_thread + AOFF_thread_flags], %g1
-	andcc		%g1, SPARC_FLAG_32BIT, %g0
-	ldub		[%g6 + AOFF_task_thread + AOFF_thread_w_saved], %g1
+	ldx		[%g6 + TI_FLAGS], %g1
+	andcc		%g1, _TIF_32BIT, %g0
+	ldub		[%g6 + TI_WSAVED], %g1
 
 	sll		%g1, 3, %g3
 	add		%g6, %g3, %g3
-	stx		%sp, [%g3 + AOFF_task_thread + AOFF_thread_rwbuf_stkptrs]
+	stx		%sp, [%g3 + TI_RWIN_SPTRS]
 	sll		%g1, 7, %g3
 	bne,pt		%xcc, 1f
 	 add		%g6, %g3, %g3
-	stx		%l0, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x00]
-	stx		%l1, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x08]
+	stx		%l0, [%g3 + TI_REG_WINDOW + 0x00]
+	stx		%l1, [%g3 + TI_REG_WINDOW + 0x08]
 
-	stx		%l2, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x10]
-	stx		%l3, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x18]
-	stx		%l4, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x20]
-	stx		%l5, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x28]
-	stx		%l6, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x30]
-	stx		%l7, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x38]
-	stx		%i0, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x40]
-	stx		%i1, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x48]
+	stx		%l2, [%g3 + TI_REG_WINDOW + 0x10]
+	stx		%l3, [%g3 + TI_REG_WINDOW + 0x18]
+	stx		%l4, [%g3 + TI_REG_WINDOW + 0x20]
+	stx		%l5, [%g3 + TI_REG_WINDOW + 0x28]
+	stx		%l6, [%g3 + TI_REG_WINDOW + 0x30]
+	stx		%l7, [%g3 + TI_REG_WINDOW + 0x38]
+	stx		%i0, [%g3 + TI_REG_WINDOW + 0x40]
+	stx		%i1, [%g3 + TI_REG_WINDOW + 0x48]
 
-	stx		%i2, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x50]
-	stx		%i3, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x58]
-	stx		%i4, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x60]
-	stx		%i5, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x68]
-	stx		%i6, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x70]
+	stx		%i2, [%g3 + TI_REG_WINDOW + 0x50]
+	stx		%i3, [%g3 + TI_REG_WINDOW + 0x58]
+	stx		%i4, [%g3 + TI_REG_WINDOW + 0x60]
+	stx		%i5, [%g3 + TI_REG_WINDOW + 0x68]
+	stx		%i6, [%g3 + TI_REG_WINDOW + 0x70]
 	b,pt		%xcc, 2f
-	 stx		%i7, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x78]
-1:	stw		%l0, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x00]
+	 stx		%i7, [%g3 + TI_REG_WINDOW + 0x78]
+1:	stw		%l0, [%g3 + TI_REG_WINDOW + 0x00]
 
-	stw		%l1, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x04]
-	stw		%l2, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x08]
-	stw		%l3, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x0c]
-	stw		%l4, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x10]
-	stw		%l5, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x14]
-	stw		%l6, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x18]
-	stw		%l7, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x1c]
-	stw		%i0, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x20]
+	stw		%l1, [%g3 + TI_REG_WINDOW + 0x04]
+	stw		%l2, [%g3 + TI_REG_WINDOW + 0x08]
+	stw		%l3, [%g3 + TI_REG_WINDOW + 0x0c]
+	stw		%l4, [%g3 + TI_REG_WINDOW + 0x10]
+	stw		%l5, [%g3 + TI_REG_WINDOW + 0x14]
+	stw		%l6, [%g3 + TI_REG_WINDOW + 0x18]
+	stw		%l7, [%g3 + TI_REG_WINDOW + 0x1c]
+	stw		%i0, [%g3 + TI_REG_WINDOW + 0x20]
 
-	stw		%i1, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x24]
-	stw		%i2, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x28]
-	stw		%i3, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x2c]
-	stw		%i4, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x30]
-	stw		%i5, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x34]
-	stw		%i6, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x38]
-	stw		%i7, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x3c]
+	stw		%i1, [%g3 + TI_REG_WINDOW + 0x24]
+	stw		%i2, [%g3 + TI_REG_WINDOW + 0x28]
+	stw		%i3, [%g3 + TI_REG_WINDOW + 0x2c]
+	stw		%i4, [%g3 + TI_REG_WINDOW + 0x30]
+	stw		%i5, [%g3 + TI_REG_WINDOW + 0x34]
+	stw		%i6, [%g3 + TI_REG_WINDOW + 0x38]
+	stw		%i7, [%g3 + TI_REG_WINDOW + 0x3c]
 2:	add		%g1, 1, %g1
 
-	stb		%g1, [%g6 + AOFF_task_thread + AOFF_thread_w_saved]
+	stb		%g1, [%g6 + TI_WSAVED]
 	rdpr		%tstate, %g1
 	andcc		%g1, TSTATE_PRIV, %g0
 	saved
@@ -153,8 +153,8 @@ spill_fixup:
 	retry
 
 window_scheisse_from_user_common:
-	stb		%g4, [%g6 + AOFF_task_thread + AOFF_thread_fault_code]
-	stx		%g5, [%g6 + AOFF_task_thread + AOFF_thread_fault_address]
+	stb		%g4, [%g6 + TI_FAULT_CODE]
+	stx		%g5, [%g6 + TI_FAULT_ADDR]
 	wrpr		%g1, %cwp
 	ba,pt		%xcc, etrap
 	 rd		%pc, %g7
@@ -204,47 +204,47 @@ fill_fixup_mna:
 	b,pt		%xcc, rtrap
 	 nop						! yes, the nop is correct
 spill_fixup_mna:
-	ldub		[%g6 + AOFF_task_thread + AOFF_thread_flags], %g1
-	andcc		%g1, SPARC_FLAG_32BIT, %g0
-	ldub		[%g6 + AOFF_task_thread + AOFF_thread_w_saved], %g1
+	ldx		[%g6 + TI_FLAGS], %g1
+	andcc		%g1, _TIF_32BIT, %g0
+	ldub		[%g6 + TI_WSAVED], %g1
 	sll		%g1, 3, %g3
 	add		%g6, %g3, %g3
-	stx		%sp, [%g3 + AOFF_task_thread + AOFF_thread_rwbuf_stkptrs]
+	stx		%sp, [%g3 + TI_RWIN_SPTRS]
 
 	sll		%g1, 7, %g3
 	bne,pt		%xcc, 1f
 	 add		%g6, %g3, %g3
-	stx		%l0, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x00]
-	stx		%l1, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x08]
-	stx		%l2, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x10]
-	stx		%l3, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x18]
-	stx		%l4, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x20]
+	stx		%l0, [%g3 + TI_REG_WINDOW + 0x00]
+	stx		%l1, [%g3 + TI_REG_WINDOW + 0x08]
+	stx		%l2, [%g3 + TI_REG_WINDOW + 0x10]
+	stx		%l3, [%g3 + TI_REG_WINDOW + 0x18]
+	stx		%l4, [%g3 + TI_REG_WINDOW + 0x20]
 
-	stx		%l5, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x28]
-	stx		%l6, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x30]
-	stx		%l7, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x38]
-	stx		%i0, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x40]
-	stx		%i1, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x48]
-	stx		%i2, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x50]
-	stx		%i3, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x58]
-	stx		%i4, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x60]
+	stx		%l5, [%g3 + TI_REG_WINDOW + 0x28]
+	stx		%l6, [%g3 + TI_REG_WINDOW + 0x30]
+	stx		%l7, [%g3 + TI_REG_WINDOW + 0x38]
+	stx		%i0, [%g3 + TI_REG_WINDOW + 0x40]
+	stx		%i1, [%g3 + TI_REG_WINDOW + 0x48]
+	stx		%i2, [%g3 + TI_REG_WINDOW + 0x50]
+	stx		%i3, [%g3 + TI_REG_WINDOW + 0x58]
+	stx		%i4, [%g3 + TI_REG_WINDOW + 0x60]
 
-	stx		%i5, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x68]
-	stx		%i6, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x70]
-	stx		%i7, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x78]
+	stx		%i5, [%g3 + TI_REG_WINDOW + 0x68]
+	stx		%i6, [%g3 + TI_REG_WINDOW + 0x70]
+	stx		%i7, [%g3 + TI_REG_WINDOW + 0x78]
 	b,pt		%xcc, 2f
 	 add		%g1, 1, %g1
-1:	std		%l0, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x00]
-	std		%l2, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x08]
-	std		%l4, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x10]
+1:	std		%l0, [%g3 + TI_REG_WINDOW + 0x00]
+	std		%l2, [%g3 + TI_REG_WINDOW + 0x08]
+	std		%l4, [%g3 + TI_REG_WINDOW + 0x10]
 
-	std		%l6, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x18]
-	std		%i0, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x20]
-	std		%i2, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x28]
-	std		%i4, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x30]
-	std		%i6, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x38]
+	std		%l6, [%g3 + TI_REG_WINDOW + 0x18]
+	std		%i0, [%g3 + TI_REG_WINDOW + 0x20]
+	std		%i2, [%g3 + TI_REG_WINDOW + 0x28]
+	std		%i4, [%g3 + TI_REG_WINDOW + 0x30]
+	std		%i6, [%g3 + TI_REG_WINDOW + 0x38]
 	add		%g1, 1, %g1
-2:	stb		%g1, [%g6 + AOFF_task_thread + AOFF_thread_w_saved]
+2:	stb		%g1, [%g6 + TI_WSAVED]
 	rdpr		%tstate, %g1
 
 	andcc		%g1, TSTATE_PRIV, %g0
@@ -311,47 +311,47 @@ fill_fixup_dax:
 	b,pt		%xcc, rtrap
 	 nop						! yes, the nop is correct
 spill_fixup_dax:
-	ldub		[%g6 + AOFF_task_thread + AOFF_thread_flags], %g1
-	andcc		%g1, SPARC_FLAG_32BIT, %g0
-	ldub		[%g6 + AOFF_task_thread + AOFF_thread_w_saved], %g1
+	ldx		[%g6 + TI_FLAGS], %g1
+	andcc		%g1, _TIF_32BIT, %g0
+	ldub		[%g6 + TI_WSAVED], %g1
 	sll		%g1, 3, %g3
 	add		%g6, %g3, %g3
-	stx		%sp, [%g3 + AOFF_task_thread + AOFF_thread_rwbuf_stkptrs]
+	stx		%sp, [%g3 + TI_RWIN_SPTRS]
 
 	sll		%g1, 7, %g3
 	bne,pt		%xcc, 1f
 	 add		%g6, %g3, %g3
-	stx		%l0, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x00]
-	stx		%l1, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x08]
-	stx		%l2, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x10]
-	stx		%l3, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x18]
-	stx		%l4, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x20]
+	stx		%l0, [%g3 + TI_REG_WINDOW + 0x00]
+	stx		%l1, [%g3 + TI_REG_WINDOW + 0x08]
+	stx		%l2, [%g3 + TI_REG_WINDOW + 0x10]
+	stx		%l3, [%g3 + TI_REG_WINDOW + 0x18]
+	stx		%l4, [%g3 + TI_REG_WINDOW + 0x20]
 
-	stx		%l5, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x28]
-	stx		%l6, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x30]
-	stx		%l7, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x38]
-	stx		%i0, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x40]
-	stx		%i1, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x48]
-	stx		%i2, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x50]
-	stx		%i3, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x58]
-	stx		%i4, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x60]
+	stx		%l5, [%g3 + TI_REG_WINDOW + 0x28]
+	stx		%l6, [%g3 + TI_REG_WINDOW + 0x30]
+	stx		%l7, [%g3 + TI_REG_WINDOW + 0x38]
+	stx		%i0, [%g3 + TI_REG_WINDOW + 0x40]
+	stx		%i1, [%g3 + TI_REG_WINDOW + 0x48]
+	stx		%i2, [%g3 + TI_REG_WINDOW + 0x50]
+	stx		%i3, [%g3 + TI_REG_WINDOW + 0x58]
+	stx		%i4, [%g3 + TI_REG_WINDOW + 0x60]
 
-	stx		%i5, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x68]
-	stx		%i6, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x70]
-	stx		%i7, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x78]
+	stx		%i5, [%g3 + TI_REG_WINDOW + 0x68]
+	stx		%i6, [%g3 + TI_REG_WINDOW + 0x70]
+	stx		%i7, [%g3 + TI_REG_WINDOW + 0x78]
 	b,pt		%xcc, 2f
 	 add		%g1, 1, %g1
-1:	std		%l0, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x00]
-	std		%l2, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x08]
-	std		%l4, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x10]
+1:	std		%l0, [%g3 + TI_REG_WINDOW + 0x00]
+	std		%l2, [%g3 + TI_REG_WINDOW + 0x08]
+	std		%l4, [%g3 + TI_REG_WINDOW + 0x10]
 
-	std		%l6, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x18]
-	std		%i0, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x20]
-	std		%i2, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x28]
-	std		%i4, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x30]
-	std		%i6, [%g3 + AOFF_task_thread + AOFF_thread_reg_window + 0x38]
+	std		%l6, [%g3 + TI_REG_WINDOW + 0x18]
+	std		%i0, [%g3 + TI_REG_WINDOW + 0x20]
+	std		%i2, [%g3 + TI_REG_WINDOW + 0x28]
+	std		%i4, [%g3 + TI_REG_WINDOW + 0x30]
+	std		%i6, [%g3 + TI_REG_WINDOW + 0x38]
 	add		%g1, 1, %g1
-2:	stb		%g1, [%g6 + AOFF_task_thread + AOFF_thread_w_saved]
+2:	stb		%g1, [%g6 + TI_WSAVED]
 	rdpr		%tstate, %g1
 
 	andcc		%g1, TSTATE_PRIV, %g0

@@ -1,4 +1,4 @@
-/* $Id: checksum.h,v 1.32 2001/10/30 04:32:24 davem Exp $ */
+/* $Id: checksum.h,v 1.33 2002/02/01 22:01:05 davem Exp $ */
 #ifndef __SPARC_CHECKSUM_H
 #define __SPARC_CHECKSUM_H
 
@@ -16,6 +16,7 @@
  *      RFC1071 Computing the Internet Checksum
  */
  
+#include <linux/in6.h>
 #include <asm/uaccess.h>
 #include <asm/cprefix.h>
 

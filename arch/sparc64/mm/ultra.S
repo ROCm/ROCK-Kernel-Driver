@@ -1,4 +1,4 @@
-/* $Id: ultra.S,v 1.71 2002/01/23 11:27:36 davem Exp $
+/* $Id: ultra.S,v 1.72 2002/02/09 19:49:31 davem Exp $
  * ultra.S: Don't expand these all over the place...
  *
  * Copyright (C) 1997, 2000 David S. Miller (davem@redhat.com)
@@ -391,8 +391,8 @@ __prefill_dtlb:
 	rdpr		%pstate, %g7
 	wrpr		%g7, PSTATE_IE, %pstate
 	mov		TLB_TAG_ACCESS, %g1
-	stxa		%o0, [%g1] ASI_DMMU
-	stxa		%o1, [%g0] ASI_DTLB_DATA_IN
+	stxa		%o5, [%g1] ASI_DMMU
+	stxa		%o2, [%g0] ASI_DTLB_DATA_IN
 	flush		%g6
 	retl
 	 wrpr		%g7, %pstate
@@ -400,28 +400,20 @@ __prefill_itlb:
 	rdpr		%pstate, %g7
 	wrpr		%g7, PSTATE_IE, %pstate
 	mov		TLB_TAG_ACCESS, %g1
-	stxa		%o0, [%g1] ASI_IMMU
-	stxa		%o1, [%g0] ASI_ITLB_DATA_IN
+	stxa		%o5, [%g1] ASI_IMMU
+	stxa		%o2, [%g0] ASI_ITLB_DATA_IN
 	flush		%g6
 	retl
 	 wrpr		%g7, %pstate
 
 	.globl		__update_mmu_cache
-__update_mmu_cache:	/* %o0=vma, %o1=address, %o2=pte */
-	ldub		[%g6 + AOFF_task_thread + AOFF_thread_fault_code], %o3
+__update_mmu_cache:	/* %o0=hw_context, %o1=address, %o2=pte, %o3=fault_code */
 	srlx		%o1, PAGE_SHIFT, %o1
-	ldx		[%o0 + 0x0], %o4		/* XXX vma->vm_mm */
-	brz,pn		%o3, 1f
-	 sllx		%o1, PAGE_SHIFT, %o0
-	ldx		[%o4 + AOFF_mm_context], %o5
 	andcc		%o3, FAULT_CODE_DTLB, %g0
-	mov		%o2, %o1
-	and		%o5, TAG_CONTEXT_BITS, %o5
+	sllx		%o1, PAGE_SHIFT, %o5
 	bne,pt		%xcc, __prefill_dtlb
-	 or		%o0, %o5, %o0
+	 or		%o5, %o0, %o5
 	ba,a,pt		%xcc, __prefill_itlb
-1:	retl
-	 nop
 
 #ifdef CONFIG_SMP
 	/* These are all called by the slaves of a cross call, at
@@ -501,8 +493,8 @@ xcall_report_regs:
 109:	 or		%g7, %lo(109b), %g7
 	call		__show_regs
 	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
-	b,pt		%xcc, rtrap
-	 clr		%l6
+	b,pt		%xcc, rtrap_irq
+	 nop
 
 	.align		32
 	.globl		xcall_flush_dcache_page_cheetah
@@ -562,8 +554,8 @@ xcall_capture:
 109:	 or		%g7, %lo(109b), %g7
 	call		smp_penguin_jailcell
 	 nop
-	b,pt		%xcc, rtrap
-	 clr		%l6
+	b,pt		%xcc, rtrap_irq
+	 nop
 
 	.globl		xcall_promstop
 xcall_promstop:
@@ -689,8 +681,8 @@ xcall_call_function:
 109:	 or		%g7, %lo(109b), %g7
 	call		smp_call_function_client
 	 nop
-	b,pt		%xcc, rtrap
-	 clr		%l6
+	b,pt		%xcc, rtrap_irq
+	 nop
 
 	.globl		xcall_migrate_task
 xcall_migrate_task:

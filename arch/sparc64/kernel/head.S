@@ -1,4 +1,4 @@
-/* $Id: head.S,v 1.86 2001/12/05 01:02:16 davem Exp $
+/* $Id: head.S,v 1.87 2002/02/09 19:49:31 davem Exp $
  * head.S: Initial boot code for the Sparc64 port of Linux.
  *
  * Copyright (C) 1996,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -10,7 +10,7 @@
 #include <linux/config.h>
 #include <linux/version.h>
 #include <linux/errno.h>
-#include <asm/asm_offsets.h>
+#include <asm/thread_info.h>
 #include <asm/asi.h>
 #include <asm/pstate.h>
 #include <asm/ptrace.h>
@@ -491,8 +491,8 @@ spitfire_tlb_fixup:
 	stw	%g2, [%g5 + %lo(tlb_type)]
 
 tlb_fixup_done:
-	sethi	%hi(init_task_union), %g6
-	or	%g6, %lo(init_task_union), %g6
+	sethi	%hi(init_thread_union), %g6
+	or	%g6, %lo(init_thread_union), %g6
 	mov	%sp, %l6
 	mov	%o4, %l7
 

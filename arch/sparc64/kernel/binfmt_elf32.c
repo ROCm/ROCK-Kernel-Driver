@@ -149,7 +149,7 @@ struct elf_prpsinfo32
 #ifdef CONFIG_BINFMT_ELF32_MODULE
 #define CONFIG_BINFMT_ELF_MODULE CONFIG_BINFMT_ELF32_MODULE
 #endif
-#define ELF_FLAGS_INIT	current->thread.flags |= SPARC_FLAG_32BIT
+#define ELF_FLAGS_INIT	set_thread_flag(TIF_32BIT)
 
 MODULE_DESCRIPTION("Binary format loader for compatibility with 32bit SparcLinux binaries on the Ultra");
 MODULE_AUTHOR("Eric Youngdale, David S. Miller, Jakub Jelinek");

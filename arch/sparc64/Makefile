@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.51 2001/11/17 00:15:27 davem Exp $
+# $Id: Makefile,v 1.52 2002/02/09 19:49:31 davem Exp $
 # sparc64/Makefile
 #
 # Makefile for the architecture dependent flags and dependencies on the
@@ -79,12 +79,8 @@ archclean:
 	rm -f $(TOPDIR)/vmlinux.aout
 
 archmrproper:
-	rm -f $(TOPDIR)/include/asm-sparc64/asm_offsets.h
 
-archdep: check_asm
-
-check_asm: include/linux/version.h
-	$(MAKE) -C arch/sparc64/kernel check_asm
+archdep:
 
 tftpboot.img:
 	$(MAKE) -C arch/sparc64/boot tftpboot.img

@@ -1,4 +1,4 @@
-/* $Id: delay.h,v 1.12 2001/04/24 01:09:12 davem Exp $
+/* $Id: delay.h,v 1.13 2002/02/02 03:33:48 kanoj Exp $
  * delay.h: Linux delay routines on the V9.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu).
@@ -9,9 +9,13 @@
 
 #include <linux/config.h>
 #include <linux/param.h>
+
+#ifndef __ASSEMBLY__
+
 #ifdef CONFIG_SMP
-#include <linux/sched.h>
 #include <asm/smp.h>
+#else
+extern unsigned long loops_per_jiffy;
 #endif 
 
 extern __inline__ void __delay(unsigned long loops)
@@ -48,5 +52,7 @@ extern __inline__ void __udelay(unsigned long usecs, unsigned long lps)
 #endif
 
 #define udelay(usecs) __udelay((usecs),__udelay_val)
+
+#endif /* !__ASSEMBLY__ */
 
 #endif /* defined(__SPARC64_DELAY_H) */

@@ -1,9 +1,11 @@
-/* $Id: etrap.S,v 1.45 2001/09/07 21:04:40 kanoj Exp $
+/* $Id: etrap.S,v 1.46 2002/02/09 19:49:30 davem Exp $
  * etrap.S: Preparing for entry into the kernel on Sparc V9.
  *
  * Copyright (C) 1996, 1997 David S. Miller (davem@caip.rutgers.edu)
  * Copyright (C) 1997, 1998, 1999 Jakub Jelinek (jj@ultra.linux.cz)
  */
+
+#include <linux/config.h>
 
 #include <asm/asi.h>
 #include <asm/pstate.h>
@@ -25,9 +27,17 @@
 		.text		
 		.align	64
 		.globl	etrap, etrap_irq, etraptl1
-
+#ifdef CONFIG_PREEMPT
+etrap_irq:	ldsw	[%g6 + TI_PRE_COUNT], %g1
+		add	%g1, 1, %g1
+		ba,pt	%xcc, etrap_irq2
+		 stw	%g1, [%g6 + TI_PRE_COUNT]
+#endif
 etrap:		rdpr	%pil, %g2						! Single 	Group
-etrap_irq:	rdpr	%tstate, %g1						! Single 	Group
+#ifndef CONFIG_PREEMPT
+etrap_irq:
+#endif
+etrap_irq2:	rdpr	%tstate, %g1						! Single 	Group
 		sllx	%g2, 20, %g3						! IEU0		Group
 		andcc	%g1, TSTATE_PRIV, %g0					! IEU1
 		or	%g1, %g3, %g1						! IEU0		Group
@@ -60,7 +70,7 @@ etrap_irq:	rdpr	%tstate, %g1						! Single 	Group
 		wrpr	%g0, 0, %canrestore					! Single	Group+4bubbles
 		sll	%g2, 3, %g2						! IEU0		Group
 		mov	1, %l5							! IEU1
-		stb	%l5, [%l6 + AOFF_task_thread + AOFF_thread_fpdepth]	! Store
+		stb	%l5, [%l6 + TI_FPDEPTH]					! Store
 
 		wrpr	%g3, 0, %otherwin					! Single	Group+4bubbles
 		wrpr	%g2, 0, %wstate						! Single	Group+4bubbles
@@ -98,11 +108,11 @@ etrap_irq:	rdpr	%tstate, %g1						! Single 	Group
 		nop
 		nop
 
-3:		ldub	[%l6 + AOFF_task_thread + AOFF_thread_fpdepth], %l5	! Load		Group
-		add	%l6, AOFF_task_thread + AOFF_thread_fpsaved + 1, %l4	! IEU0
+3:		ldub	[%l6 + TI_FPDEPTH], %l5					! Load		Group
+		add	%l6, TI_FPSAVED + 1, %l4				! IEU0
 		srl	%l5, 1, %l3						! IEU0		Group
 		add	%l5, 2, %l5						! IEU1
-		stb	%l5, [%l6 + AOFF_task_thread + AOFF_thread_fpdepth]	! Store
+		stb	%l5, [%l6 + TI_FPDEPTH]					! Store
 		ba,pt	%xcc, 2b						! CTI
 		 stb	%g0, [%l4 + %l3]					! Store		Group
 		nop

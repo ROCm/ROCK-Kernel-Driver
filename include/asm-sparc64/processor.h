@@ -1,4 +1,4 @@
-/* $Id: processor.h,v 1.80 2001/11/17 00:10:48 davem Exp $
+/* $Id: processor.h,v 1.83 2002/02/10 06:04:33 davem Exp $
  * include/asm-sparc64/processor.h
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -21,6 +21,7 @@
 #include <asm/signal.h>
 #include <asm/segment.h>
 #include <asm/page.h>
+#include <asm/delay.h>
 
 /* Bus types */
 #define EISA_bus 0
@@ -43,29 +44,13 @@
 
 #ifndef __ASSEMBLY__
 
-#define NSWINS		7
-
 typedef struct {
 	unsigned char seg;
 } mm_segment_t;
 
 /* The Sparc processor specific thread struct. */
+/* XXX This should die, everything can go into thread_info now. */
 struct thread_struct {
-	/* D$ line 1 */
-	unsigned long ksp __attribute__ ((aligned(16)));
-	unsigned char wstate, cwp, flags;
-	mm_segment_t current_ds;
-	unsigned char w_saved, fpdepth, fault_code, use_blkcommit;
-	unsigned long fault_address;
-	unsigned char fpsaved[7];
-	unsigned char __pad2;
-	
-	/* D$ line 2, 3, 4 */
-	struct pt_regs *kregs;
-	unsigned long *utraps;
-	unsigned long gsr[7];
-	unsigned long xfsr[7];
-
 #ifdef CONFIG_DEBUG_SPINLOCK
 	/* How many spinlocks held by this thread.
 	 * Used with spin lock debugging to catch tasks
@@ -73,96 +58,29 @@ struct thread_struct {
 	 */
 	int smp_lock_count;
 	unsigned int smp_lock_pc;
+#else
+	int dummy; /* f'in gcc bug... */
 #endif
-
-	struct reg_window reg_window[NSWINS];
-	unsigned long rwbuf_stkptrs[NSWINS];
-	
-	/* Performance counter state */
-	u64 *user_cntd0, *user_cntd1;
-	u64 kernel_cntd0, kernel_cntd1;
-	u64 pcr_reg;
 };
 
 #endif /* !(__ASSEMBLY__) */
 
-#define SPARC_FLAG_UNALIGNED    0x01    /* is allowed to do unaligned accesses	*/
-#define SPARC_FLAG_NEWSIGNALS   0x02    /* task wants new-style signals		*/
-#define SPARC_FLAG_32BIT        0x04    /* task is older 32-bit binary		*/
-#define SPARC_FLAG_NEWCHILD     0x08    /* task is just-spawned child process	*/
-#define SPARC_FLAG_PERFCTR	0x10    /* task has performance counters active	*/
-
-#define FAULT_CODE_WRITE	0x01	/* Write access, implies D-TLB		*/
-#define FAULT_CODE_DTLB		0x02	/* Miss happened in D-TLB		*/
-#define FAULT_CODE_ITLB		0x04	/* Miss happened in I-TLB		*/
-#define FAULT_CODE_WINFIXUP	0x08	/* Miss happened during spill/fill	*/
-
 #ifndef CONFIG_DEBUG_SPINLOCK
-#define INIT_THREAD  {					\
-/* ksp, wstate, cwp, flags, current_ds, */ 		\
-   0,   0,      0,   0,     KERNEL_DS,			\
-/* w_saved, fpdepth, fault_code, use_blkcommit, */	\
-   0,       0,       0,          0,			\
-/* fault_address, fpsaved, __pad2, kregs, */		\
-   0,             { 0 },   0,      0,			\
-/* utraps, gsr,   xfsr, */				\
-   0,	   { 0 }, { 0 },				\
-/* reg_window */					\
-   { { { 0, }, { 0, } }, }, 				\
-/* rwbuf_stkptrs */					\
-   { 0, 0, 0, 0, 0, 0, 0, },				\
-/* user_cntd0, user_cndd1, kernel_cntd0, kernel_cntd0, pcr_reg */ \
-   0,          0,          0,		 0,            0, \
+#define INIT_THREAD  {			\
+	0,				\
 }
 #else /* CONFIG_DEBUG_SPINLOCK */
 #define INIT_THREAD  {					\
-/* ksp, wstate, cwp, flags, current_ds, */ 		\
-   0,   0,      0,   0,     KERNEL_DS,			\
-/* w_saved, fpdepth, fault_code, use_blkcommit, */	\
-   0,       0,       0,          0,			\
-/* fault_address, fpsaved, __pad2, kregs, */		\
-   0,             { 0 },   0,      0,			\
-/* utraps, gsr,   xfsr,  smp_lock_count, smp_lock_pc, */\
-   0,	   { 0 }, { 0 }, 0,		 0,		\
-/* reg_window */					\
-   { { { 0, }, { 0, } }, }, 				\
-/* rwbuf_stkptrs */					\
-   { 0, 0, 0, 0, 0, 0, 0, },				\
-/* user_cntd0, user_cndd1, kernel_cntd0, kernel_cntd0, pcr_reg */ \
-   0,          0,          0,		 0,            0, \
+/* smp_lock_count, smp_lock_pc, */			\
+   0,		   0,					\
 }
 #endif /* !(CONFIG_DEBUG_SPINLOCK) */
-
-#ifdef __KERNEL__
-#if PAGE_SHIFT == 13
-#define THREAD_SIZE (2*PAGE_SIZE)
-#define THREAD_SHIFT (PAGE_SHIFT + 1)
-#else /* PAGE_SHIFT == 13 */
-#define THREAD_SIZE PAGE_SIZE
-#define THREAD_SHIFT PAGE_SHIFT
-#endif /* PAGE_SHIFT == 13 */
-#endif /* __KERNEL__ */
 
 #ifndef __ASSEMBLY__
 
 /* Return saved PC of a blocked thread. */
-extern __inline__ unsigned long thread_saved_pc(struct thread_struct *t)
-{
-	unsigned long ret = 0xdeadbeefUL;
-	
-	if (t->ksp) {
-		unsigned long *sp;
-		sp = (unsigned long *)(t->ksp + STACK_BIAS);
-		if (((unsigned long)sp & (sizeof(long) - 1)) == 0UL &&
-		    sp[14]) {
-			unsigned long *fp;
-			fp = (unsigned long *)(sp[14] + STACK_BIAS);
-			if (((unsigned long)fp & (sizeof(long) - 1)) == 0UL)
-				ret = fp[15];
-		}
-	}
-	return ret;
-}
+struct task_struct;
+extern unsigned long thread_saved_pc(struct task_struct *);
 
 /* On Uniprocessor, even in RMO processes see TSO semantics */
 #ifdef CONFIG_SMP
@@ -178,13 +96,13 @@ do { \
 	regs->tpc = ((pc & (~3)) - 4); \
 	regs->tnpc = regs->tpc + 4; \
 	regs->y = 0; \
-	current->thread.wstate = (1 << 3); \
-	if (current->thread.utraps) { \
-		if (*(current->thread.utraps) < 2) \
-			kfree (current->thread.utraps); \
+	set_thread_wstate(1 << 3); \
+	if (current_thread_info()->utraps) { \
+		if (*(current_thread_info()->utraps) < 2) \
+			kfree(current_thread_info()->utraps); \
 		else \
-			(*(current->thread.utraps))--; \
-		current->thread.utraps = NULL; \
+			(*(current_thread_info()->utraps))--; \
+		current_thread_info()->utraps = NULL; \
 	} \
 	__asm__ __volatile__( \
 	"stx		%%g0, [%0 + %2 + 0x00]\n\t" \
@@ -207,7 +125,7 @@ do { \
 	: \
 	: "r" (regs), "r" (sp - REGWIN_SZ - STACK_BIAS), \
 	  "i" ((const unsigned long)(&((struct pt_regs *)0)->u_regs[0]))); \
-} while(0)
+} while (0)
 
 #define start_thread32(regs, pc, sp) \
 do { \
@@ -218,13 +136,13 @@ do { \
 	regs->tpc = ((pc & (~3)) - 4); \
 	regs->tnpc = regs->tpc + 4; \
 	regs->y = 0; \
-	current->thread.wstate = (2 << 3); \
-	if (current->thread.utraps) { \
-		if (*(current->thread.utraps) < 2) \
-			kfree (current->thread.utraps); \
+	set_thread_wstate(2 << 3); \
+	if (current_thread_info()->utraps) { \
+		if (*(current_thread_info()->utraps) < 2) \
+			kfree(current_thread_info()->utraps); \
 		else \
-			(*(current->thread.utraps))--; \
-		current->thread.utraps = NULL; \
+			(*(current_thread_info()->utraps))--; \
+		current_thread_info()->utraps = NULL; \
 	} \
 	__asm__ __volatile__( \
 	"stx		%%g0, [%0 + %2 + 0x00]\n\t" \
@@ -247,10 +165,10 @@ do { \
 	: \
 	: "r" (regs), "r" (sp - REGWIN32_SZ), \
 	  "i" ((const unsigned long)(&((struct pt_regs *)0)->u_regs[0]))); \
-} while(0)
+} while (0)
 
 /* Free all resources held by a thread. */
-#define release_thread(tsk)		do { } while(0)
+#define release_thread(tsk)		do { } while (0)
 
 extern pid_t kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 
@@ -261,19 +179,20 @@ extern pid_t kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 ({	extern void scheduling_functions_start_here(void); \
 	extern void scheduling_functions_end_here(void); \
 	unsigned long pc, fp, bias = 0; \
-	unsigned long task_base = (unsigned long) (__TSK); \
+	unsigned long thread_info_base; \
 	struct reg_window *rw; \
         unsigned long __ret = 0; \
 	int count = 0; \
 	if (!(__TSK) || (__TSK) == current || \
             (__TSK)->state == TASK_RUNNING) \
 		goto __out; \
+	thread_info_base = (unsigned long) ((__TSK)->thread_info); \
 	bias = STACK_BIAS; \
-	fp = (__TSK)->thread.ksp + bias; \
+	fp = (__TSK)->thread_info->ksp + bias; \
 	do { \
 		/* Bogus frame pointer? */ \
-		if (fp < (task_base + sizeof(struct task_struct)) || \
-		    fp >= (task_base + THREAD_SIZE)) \
+		if (fp < (thread_info_base + sizeof(struct thread_info)) || \
+		    fp >= (thread_info_base + THREAD_SIZE)) \
 			break; \
 		rw = (struct reg_window *) fp; \
 		pc = rw->ins[7]; \
@@ -287,26 +206,10 @@ extern pid_t kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 __out:	__ret; \
 })
 
-#define KSTK_EIP(tsk)  ((tsk)->thread.kregs->tpc)
-#define KSTK_ESP(tsk)  ((tsk)->thread.kregs->u_regs[UREG_FP])
+#define KSTK_EIP(tsk)  ((tsk)->thread_info->kregs->tpc)
+#define KSTK_ESP(tsk)  ((tsk)->thread_info->kregs->u_regs[UREG_FP])
 
-#ifdef __KERNEL__
-/* Allocation and freeing of task_struct and kernel stack. */
-#if PAGE_SHIFT == 13
-#define alloc_task_struct()   ((struct task_struct *)__get_free_pages(GFP_KERNEL, 1))
-#define free_task_struct(tsk) free_pages((unsigned long)(tsk),1)
-#else /* PAGE_SHIFT == 13 */
-#define alloc_task_struct()   ((struct task_struct *)__get_free_pages(GFP_KERNEL, 0))
-#define free_task_struct(tsk) free_pages((unsigned long)(tsk),0)
-#endif /* PAGE_SHIFT == 13 */
-#define get_task_struct(tsk)      atomic_inc(&virt_to_page(tsk)->count)
-
-#define init_task	(init_task_union.task)
-#define init_stack	(init_task_union.stack)
-
-#define cpu_relax()	do { } while (0)
-
-#endif /* __KERNEL__ */
+#define cpu_relax()	udelay(1 + smp_processor_id())
 
 #endif /* !(__ASSEMBLY__) */
 

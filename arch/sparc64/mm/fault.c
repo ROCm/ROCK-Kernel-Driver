@@ -1,4 +1,4 @@
-/* $Id: fault.c,v 1.58 2001/09/01 00:11:16 kanoj Exp $
+/* $Id: fault.c,v 1.59 2002/02/09 19:49:31 davem Exp $
  * arch/sparc64/mm/fault.c: Page fault handlers for the 64-bit Sparc.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -287,8 +287,8 @@ asmlinkage void do_sparc64_fault(struct pt_regs *regs)
 	unsigned long address;
 
 	si_code = SEGV_MAPERR;
-	fault_code = current->thread.fault_code;
-	address = current->thread.fault_address;
+	fault_code = get_thread_fault_code();
+	address = current_thread_info()->fault_address;
 
 	if ((fault_code & FAULT_CODE_ITLB) &&
 	    (fault_code & FAULT_CODE_DTLB))
@@ -301,7 +301,7 @@ asmlinkage void do_sparc64_fault(struct pt_regs *regs)
 	if (in_interrupt() || !mm)
 		goto intr_or_no_mm;
 
-	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+	if (test_thread_flag(TIF_32BIT)) {
 		regs->tpc &= 0xffffffff;
 		address &= 0xffffffff;
 	}
@@ -358,7 +358,7 @@ good_area:
 		if (tlb_type == spitfire &&
 		    (vma->vm_flags & VM_EXEC) != 0 &&
 		    vma->vm_file != NULL)
-			current->thread.use_blkcommit = 1;
+			set_thread_flag(TIF_BLKCOMMIT);
 	} else {
 		/* Allow reads even for write-only mappings */
 		if (!(vma->vm_flags & (VM_READ | VM_EXEC)))
@@ -426,7 +426,7 @@ do_sigbus:
 
 fault_done:
 	/* These values are no longer needed, clear them. */
-	current->thread.fault_code = 0;
-	current->thread.use_blkcommit = 0;
-	current->thread.fault_address = 0;
+	set_thread_fault_code(0);
+	clear_thread_flag(TIF_BLKCOMMIT);
+	current_thread_info()->fault_address = 0;
 }

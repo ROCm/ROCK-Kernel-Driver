@@ -1,4 +1,4 @@
-/*  $Id: init.c,v 1.208 2001/12/21 04:56:15 davem Exp $
+/*  $Id: init.c,v 1.209 2002/02/09 19:49:31 davem Exp $
  *  arch/sparc64/mm/init.c
  *
  *  Copyright (C) 1996-1999 David S. Miller (davem@caip.rutgers.edu)
@@ -111,8 +111,6 @@ int do_check_pgt_cache(int low, int high)
         return freed;
 }
 
-extern void __update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
-
 #ifdef CONFIG_DEBUG_DCFLUSH
 atomic_t dcpage_flushes = ATOMIC_INIT(0);
 #ifdef CONFIG_SMP
@@ -181,6 +179,8 @@ static __inline__ void clear_dcache_dirty_cpu(struct page *page, unsigned long c
 			     : "g5", "g7");
 }
 
+extern void __update_mmu_cache(unsigned long mmu_context_hw, unsigned long address, pte_t pte, int code);
+
 void update_mmu_cache(struct vm_area_struct *vma, unsigned long address, pte_t pte)
 {
 	struct page *page = pte_page(pte);
@@ -201,7 +201,9 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long address, pte_t p
 
 		clear_dcache_dirty_cpu(page, cpu);
 	}
-	__update_mmu_cache(vma, address, pte);
+	if (get_thread_fault_code())
+		__update_mmu_cache(vma->vm_mm->context & TAG_CONTEXT_BITS,
+				   address, pte, get_thread_fault_code());
 }
 
 void flush_dcache_page(struct page *page)
@@ -706,7 +708,7 @@ void prom_world(int enter)
 	int i;
 
 	if (!enter)
-		set_fs(current->thread.current_ds);
+		set_fs((mm_segment_t) { get_thread_current_ds() });
 
 	if (!prom_ditlb_set)
 		return;

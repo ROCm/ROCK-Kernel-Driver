@@ -1,4 +1,4 @@
-/* $Id: page.h,v 1.38 2001/11/30 01:04:10 davem Exp $ */
+/* $Id: page.h,v 1.39 2002/02/09 19:49:31 davem Exp $ */
 
 #ifndef _SPARC64_PAGE_H
 #define _SPARC64_PAGE_H
@@ -95,7 +95,7 @@ typedef unsigned long iopgprot_t;
 
 #endif /* (STRICT_MM_TYPECHECKS) */
 
-#define TASK_UNMAPPED_BASE	((current->thread.flags & SPARC_FLAG_32BIT) ? \
+#define TASK_UNMAPPED_BASE	(test_thread_flag(TIF_32BIT) ? \
 				 (0x0000000070000000UL) : (PAGE_OFFSET))
 
 #endif /* !(__ASSEMBLY__) */

@@ -14,7 +14,7 @@ struct fpustate {
 	u32	regs[64];
 };
 
-#define FPUSTATE (struct fpustate *)(((unsigned long)current) + AOFF_task_fpregs)
+#define FPUSTATE (struct fpustate *)(current_thread_info()->fpregs)
 
 extern __inline__ unsigned long fprs_read(void)
 {

@@ -1,4 +1,4 @@
-/* $Id: mmu_context.h,v 1.53 2002/01/30 01:40:00 davem Exp $ */
+/* $Id: mmu_context.h,v 1.54 2002/02/09 19:49:31 davem Exp $ */
 #ifndef __SPARC64_MMU_CONTEXT_H
 #define __SPARC64_MMU_CONTEXT_H
 
@@ -101,7 +101,7 @@ do { \
 	register unsigned long pgd_cache asm("o4"); \
 	paddr = __pa((__mm)->pgd); \
 	pgd_cache = 0UL; \
-	if ((__tsk)->thread.flags & SPARC_FLAG_32BIT) \
+	if ((__tsk)->thread_info->flags & _TIF_32BIT) \
 		pgd_cache = pgd_val((__mm)->pgd[0]) << 11UL; \
 	__asm__ __volatile__("wrpr	%%g0, 0x494, %%pstate\n\t" \
 			     "mov	%3, %%g4\n\t" \

@@ -1,9 +1,11 @@
-/* $Id: rtrap.S,v 1.60 2002/01/31 03:30:06 davem Exp $
+/* $Id: rtrap.S,v 1.61 2002/02/09 19:49:31 davem Exp $
  * rtrap.S: Preparing for return from trap on Sparc V9.
  *
  * Copyright (C) 1997,1998 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
  * Copyright (C) 1997 David S. Miller (davem@caip.rutgers.edu)
  */
+
+#include <linux/config.h>
 
 #include <asm/asi.h>
 #include <asm/pstate.h>
@@ -42,18 +44,18 @@ __handle_user_windows:
 		 wrpr			%g0, RTRAP_PSTATE, %pstate
 		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
 		/* Redo sched+sig checks */
-		lduw			[%g6 + AOFF_task_work], %l0
-		srlx			%l0, 24, %o0
+		ldx			[%g6 + TI_FLAGS], %l0
+		andcc			%l0, _TIF_NEED_RESCHED, %g0
 
-		brz,pt			%o0, 1f
+		be,pt			%xcc, 1f
 		 nop
 		call			schedule
 		 wrpr			%g0, RTRAP_PSTATE, %pstate
 		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
-		lduw			[%g6 + AOFF_task_work], %l0
+		ldx			[%g6 + TI_FLAGS], %l0
 
-1:		sllx			%l0, 48, %o0
-		brz,pt			%o0, __handle_user_windows_continue
+1:		andcc			%l0, (_TIF_NOTIFY_RESUME | _TIF_SIGPENDING), %g0
+		be,pt			%xcc, __handle_user_windows_continue
 		 nop
 		clr			%o0
 		mov			%l5, %o2
@@ -78,7 +80,7 @@ __handle_perfctrs:
 		call			update_perfctrs
 		 wrpr			%g0, RTRAP_PSTATE, %pstate
 		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
-		ldub			[%g6 + AOFF_task_thread + AOFF_thread_w_saved], %o2
+		ldub			[%g6 + TI_WSAVED], %o2
 		brz,pt			%o2, 1f
 		 nop
 		/* Redo userwin+sched+sig checks */
@@ -86,18 +88,18 @@ __handle_perfctrs:
 
 		 wrpr			%g0, RTRAP_PSTATE, %pstate
 		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
-		lduw			[%g6 + AOFF_task_work], %l0
-		srlx			%l0, 24, %o0
-		brz,pt			%o0, 1f
+		ldx			[%g6 + TI_FLAGS], %l0
+		andcc			%l0, _TIF_NEED_RESCHED, %g0
+		be,pt			%xcc, 1f
 
 		 nop
 		call			schedule
 		 wrpr			%g0, RTRAP_PSTATE, %pstate
 		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
-		lduw			[%g6 + AOFF_task_work], %l0
-1:		sllx			%l0, 48, %o0
+		ldx			[%g6 + TI_FLAGS], %l0
+1:		andcc			%l0, (_TIF_NOTIFY_RESUME | _TIF_SIGPENDING), %g0
 
-		brz,pt			%o0, __handle_perfctrs_continue
+		be,pt			%xcc, __handle_perfctrs_continue
 		 sethi			%hi(TSTATE_PEF), %o0
 		clr			%o0
 		mov			%l5, %o2
@@ -148,9 +150,15 @@ __handle_signal:
 		 andn			%l1, %l4, %l1
 
 		.align			64
-		.globl			rtrap_clr_l6, rtrap, irqsz_patchme
+		.globl			rtrap_irq, rtrap_clr_l6, rtrap, irqsz_patchme
+rtrap_irq:
+#ifdef CONFIG_PREEMPT
+		ldsw			[%g6 + TI_PRE_COUNT], %l0
+		sub			%l0, 1, %l0
+		stw			%l0, [%g6 + TI_PRE_COUNT]
+#endif
 rtrap_clr_l6:	clr			%l6
-rtrap:		lduw			[%g6 + AOFF_task_cpu], %l0
+rtrap:		ldub			[%g6 + TI_CPU], %l0
 		sethi			%hi(irq_stat), %l2	! &softirq_active
 		or			%l2, %lo(irq_stat), %l2	! &softirq_active
 irqsz_patchme:	sllx			%l0, 0, %l0
@@ -182,26 +190,33 @@ __handle_softirq_continue:
 		 */
 to_user:	wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
 __handle_preemption_continue:
-		lduw			[%g6 + AOFF_task_work], %l0
-		srlx			%l0, 24, %o0
-		brnz,pn			%o0, __handle_preemption
-		 sllx			%l0, 48, %o0
-		brnz,pn			%o0, __handle_signal
+		ldx			[%g6 + TI_FLAGS], %l0
+		sethi			%hi(_TIF_USER_WORK_MASK), %o0
+		or			%o0, %lo(_TIF_USER_WORK_MASK), %o0
+		andcc			%l0, %o0, %g0
+		sethi			%hi(TSTATE_PEF), %o0
+		be,pt			%xcc, user_nowork
+		 andcc			%l1, %o0, %g0
+		andcc			%l0, _TIF_NEED_RESCHED, %g0
+		bne,pn			%xcc, __handle_preemption
+		 andcc			%l0, (_TIF_NOTIFY_RESUME | _TIF_SIGPENDING), %g0
+		bne,pn			%xcc, __handle_signal
 __handle_signal_continue:
-		 ldub			[%g6 + AOFF_task_thread + AOFF_thread_w_saved], %o2
+		 ldub			[%g6 + TI_WSAVED], %o2
 		brnz,pn			%o2, __handle_user_windows
 		 nop
 __handle_user_windows_continue:
-		ldub			[%g6 + AOFF_task_thread + AOFF_thread_flags], %l5
-		andcc			%l5, SPARC_FLAG_PERFCTR, %g0
+		ldx			[%g6 + TI_FLAGS], %l5
+		andcc			%l5, _TIF_PERFCTR, %g0
 		sethi			%hi(TSTATE_PEF), %o0
 		bne,pn			%xcc, __handle_perfctrs
 __handle_perfctrs_continue:
 		 andcc			%l1, %o0, %g0
 
 		/* This fpdepth clear is neccessary for non-syscall rtraps only */
+user_nowork:
 		bne,pn			%xcc, __handle_userfpu
-		 stb			%g0, [%g6 + AOFF_task_thread + AOFF_thread_fpdepth]
+		 stb			%g0, [%g6 + TI_FPDEPTH]
 __handle_userfpu_continue:
 
 rt_continue:	ldx			[%sp + PTREGS_OFF + PT_V9_G1], %g1
@@ -254,14 +269,25 @@ rt_continue:	ldx			[%sp + PTREGS_OFF + PT_V9_G1], %g1
 
 kern_rtt:	restore
 		retry
-to_kernel:	ldub			[%g6 + AOFF_task_thread + AOFF_thread_fpdepth], %l5
+to_kernel:
+#ifdef CONFIG_PREEMPT
+		ldsw			[%g6 + TI_PRE_COUNT], %l5
+		brnz			%l5, kern_fpucheck
+		 add			%l5, 1, %l6
+		stw			%l6, [%g6 + TI_PRE_COUNT]
+		call			kpreempt_maybe
+		 wrpr			%g0, RTRAP_PSTATE, %pstate
+		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate		
+		stw			%l5, [%g6 + TI_PRE_COUNT]
+#endif
+kern_fpucheck:	ldub			[%g6 + TI_FPDEPTH], %l5
 		brz,pt			%l5, rt_continue
 		 srl			%l5, 1, %o0
-		add			%g6, AOFF_task_thread + AOFF_thread_fpsaved, %l6
+		add			%g6, TI_FPSAVED, %l6
 		ldub			[%l6 + %o0], %l2
 		sub			%l5, 2, %l5
 
-		add			%g6, AOFF_task_thread + AOFF_thread_gsr, %o1
+		add			%g6, TI_GSR, %o1
 		andcc			%l2, (FPRS_FEF|FPRS_DU), %g0
 		be,pt			%icc, 2f
 		 and			%l2, FPRS_DL, %l6
@@ -272,12 +298,12 @@ to_kernel:	ldub			[%g6 + AOFF_task_thread + AOFF_thread_fpdepth], %l5
 
 		wr			%g5, FPRS_FEF, %fprs
 		ldx			[%o1 + %o5], %g5
-		add			%g6, AOFF_task_thread + AOFF_thread_xfsr, %o1
+		add			%g6, TI_XFSR, %o1
 		membar			#StoreLoad | #LoadLoad
 		sll			%o0, 8, %o2
-		add			%g6, AOFF_task_fpregs, %o3
+		add			%g6, TI_FPREGS, %o3
 		brz,pn			%l6, 1f
-		 add			%g6, AOFF_task_fpregs+0x40, %o4
+		 add			%g6, TI_FPREGS+0x40, %o4
 
 		ldda			[%o3 + %o2] ASI_BLK_P, %f0
 		ldda			[%o4 + %o2] ASI_BLK_P, %f16
@@ -290,20 +316,20 @@ to_kernel:	ldub			[%g6 + AOFF_task_thread + AOFF_thread_fpdepth], %l5
 
 1:		membar			#Sync
 		ldx			[%o1 + %o5], %fsr
-2:		stb			%l5, [%g6 + AOFF_task_thread + AOFF_thread_fpdepth]
+2:		stb			%l5, [%g6 + TI_FPDEPTH]
 		ba,pt			%xcc, rt_continue
 		 nop
 5:		wr			%g0, FPRS_FEF, %fprs
 		membar			#StoreLoad | #LoadLoad
 		sll			%o0, 8, %o2
 
-		add			%g6, AOFF_task_fpregs+0x80, %o3
-		add			%g6, AOFF_task_fpregs+0xc0, %o4
+		add			%g6, TI_FPREGS+0x80, %o3
+		add			%g6, TI_FPREGS+0xc0, %o4
 		ldda			[%o3 + %o2] ASI_BLK_P, %f32
 		ldda			[%o4 + %o2] ASI_BLK_P, %f48
 		membar			#Sync
 		wr			%g0, FPRS_DU, %fprs
 		ba,pt			%xcc, rt_continue
-		 stb			%l5, [%g6 + AOFF_task_thread + AOFF_thread_fpdepth]
+		 stb			%l5, [%g6 + TI_FPDEPTH]
 
 #undef PTREGS_OFF

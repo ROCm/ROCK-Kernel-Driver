@@ -1,4 +1,4 @@
-/* $Id: systbls.S,v 1.102 2002/01/31 03:30:05 davem Exp $
+/* $Id: systbls.S,v 1.103 2002/02/08 03:57:14 davem Exp $
  * systbls.S: System call entry point tables for OS compatibility.
  *            The native Linux system call table lives here also.
  *
@@ -55,7 +55,7 @@ sys_call_table:
 /*170*/	.long sys_lsetxattr, sys_fsetxattr, sys_getxattr, sys_lgetxattr, sys_getdents
 /*175*/	.long sys_setsid, sys_fchdir, sys_fgetxattr, sys_listxattr, sys_llistxattr
 /*180*/	.long sys_flistxattr, sys_removexattr, sys_lremovexattr, sys_sigpending, sys_query_module
-/*185*/	.long sys_setpgid, sys_fremovexattr, sys_nis_syscall, sys_nis_syscall, sys_newuname
+/*185*/	.long sys_setpgid, sys_fremovexattr, sys_tkill, sys_nis_syscall, sys_newuname
 /*190*/	.long sys_init_module, sys_personality, sys_nis_syscall, sys_nis_syscall, sys_nis_syscall
 /*195*/	.long sys_nis_syscall, sys_nis_syscall, sys_getppid, sparc_sigaction, sys_sgetmask
 /*200*/	.long sys_ssetmask, sys_sigsuspend, sys_newlstat, sys_uselib, old_readdir
@@ -70,7 +70,7 @@ sys_call_table:
 /*240*/	.long sys_munlockall, sys_sched_setparam, sys_sched_getparam, sys_sched_setscheduler, sys_sched_getscheduler
 /*245*/	.long sys_sched_yield, sys_sched_get_priority_max, sys_sched_get_priority_min, sys_sched_rr_get_interval, sys_nanosleep
 /*250*/	.long sparc_mremap, sys_sysctl, sys_getsid, sys_fdatasync, sys_nfsservctl
-/*255*/	.long sys_nis_syscall, sys_nis_syscall, sys_tkill
+/*255*/	.long sys_nis_syscall, sys_nis_syscall
 
 #ifdef CONFIG_SUNOS_EMUL
 	/* Now the SunOS syscall table. */

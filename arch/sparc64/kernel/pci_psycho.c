@@ -1,4 +1,4 @@
-/* $Id: pci_psycho.c,v 1.32 2002/01/23 11:27:32 davem Exp $
+/* $Id: pci_psycho.c,v 1.33 2002/02/01 00:58:33 davem Exp $
  * pci_psycho.c: PSYCHO/U2P specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -13,7 +13,6 @@
 #include <linux/slab.h>
 
 #include <asm/pbm.h>
-#include <asm/fhc.h>
 #include <asm/iommu.h>
 #include <asm/irq.h>
 #include <asm/starfire.h>
@@ -1495,8 +1494,6 @@ static void psycho_pbm_init(struct pci_controller_info *p,
 	} else {
 		pbm = &p->pbm_B;
 		pbm->pci_first_slot = 2;
-		if (central_bus != NULL)
-			pbm->pci_first_slot = 1;
 		pbm->io_space.start = p->controller_regs + PSYCHO_IOSPACE_B;
 		pbm->mem_space.start = p->controller_regs + PSYCHO_MEMSPACE_B;
 	}

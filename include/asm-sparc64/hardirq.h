@@ -56,6 +56,8 @@ typedef struct {
 
 #define synchronize_irq()	barrier()
 
+#define release_irqlock(cpu)	do { } while (0)
+
 #else /* (CONFIG_SMP) */
 
 static __inline__ int irqs_running(void)

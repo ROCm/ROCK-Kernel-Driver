@@ -1,4 +1,4 @@
-/*  $Id: setup.c,v 1.71 2001/11/13 00:49:28 davem Exp $
+/*  $Id: setup.c,v 1.72 2002/02/09 19:49:30 davem Exp $
  *  linux/arch/sparc64/kernel/setup.c
  *
  *  Copyright (C) 1995,1996  David S. Miller (davem@caip.rutgers.edu)
@@ -536,7 +536,7 @@ void __init setup_arch(char **cmdline_p)
 	rd_doload = ((ram_flags & RAMDISK_LOAD_FLAG) != 0);	
 #endif
 
-	init_task.thread.kregs = &fake_swapper_regs;
+	init_task.thread_info->kregs = &fake_swapper_regs;
 
 #ifdef CONFIG_IP_PNP
 	if (!ic_set_manually) {

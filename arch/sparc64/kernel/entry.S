@@ -1,4 +1,4 @@
-/* $Id: entry.S,v 1.142 2002/01/31 03:30:06 davem Exp $
+/* $Id: entry.S,v 1.144 2002/02/09 19:49:30 davem Exp $
  * arch/sparc64/kernel/entry.S:  Sparc64 trap low-level entry points.
  *
  * Copyright (C) 1995,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -151,12 +151,12 @@ do_fpdis:
 	add		%g0, %g0, %g0
 	ba,a,pt		%xcc, rtrap_clr_l6
 
-1:	ldub		[%g6 + AOFF_task_thread + AOFF_thread_fpsaved], %g5	! Load	Group
+1:	ldub		[%g6 + TI_FPSAVED], %g5					! Load	Group
 	wr		%g0, FPRS_FEF, %fprs					! LSU	Group+4bubbles
 	andcc		%g5, FPRS_FEF, %g0					! IEU1	Group
 	be,a,pt		%icc, 1f						! CTI
 	 clr		%g7							! IEU0
-	ldx		[%g6 + AOFF_task_thread + AOFF_thread_gsr], %g7		! Load	Group
+	ldx		[%g6 + TI_GSR], %g7					! Load	Group
 1:	andcc		%g5, FPRS_DL, %g0					! IEU1
 	bne,pn		%icc, 2f						! CTI
 	 fzero		%f0							! FPA
@@ -194,11 +194,11 @@ do_fpdis:
 	b,pt		%xcc, fpdis_exit2
 	 faddd		%f0, %f2, %f60
 1:	mov		SECONDARY_CONTEXT, %g3
-	add		%g6, AOFF_task_fpregs + 0x80, %g1
+	add		%g6, TI_FPREGS + 0x80, %g1
 	faddd		%f0, %f2, %f4
 	fmuld		%f0, %f2, %f6
 	ldxa		[%g3] ASI_DMMU, %g5
-	add		%g6, AOFF_task_fpregs + 0xc0, %g2
+	add		%g6, TI_FPREGS + 0xc0, %g2
 	stxa		%g0, [%g3] ASI_DMMU
 	membar		#Sync
 	faddd		%f0, %f2, %f8
@@ -223,10 +223,10 @@ do_fpdis:
 	mov		SECONDARY_CONTEXT, %g3
 	fzero		%f34
 	ldxa		[%g3] ASI_DMMU, %g5
-	add		%g6, AOFF_task_fpregs, %g1
+	add		%g6, TI_FPREGS, %g1
 	stxa		%g0, [%g3] ASI_DMMU
 	membar		#Sync
-	add		%g6, AOFF_task_fpregs + 0x40, %g2
+	add		%g6, TI_FPREGS + 0x40, %g2
 	faddd		%f32, %f34, %f36
 	fmuld		%f32, %f34, %f38
 	ldda		[%g1] ASI_BLK_S, %f0	! grrr, where is ASI_BLK_NUCLEUS 8-(
@@ -246,7 +246,7 @@ do_fpdis:
 	ba,pt		%xcc, fpdis_exit
 	 membar		#Sync
 3:	mov		SECONDARY_CONTEXT, %g3
-	add		%g6, AOFF_task_fpregs, %g1
+	add		%g6, TI_FPREGS, %g1
 	ldxa		[%g3] ASI_DMMU, %g5
 	mov		0x40, %g2
 	stxa		%g0, [%g3] ASI_DMMU
@@ -262,7 +262,7 @@ fpdis_exit:
 	membar		#Sync
 fpdis_exit2:
 	wr		%g7, 0, %gsr
-	ldx		[%g6 + AOFF_task_thread + AOFF_thread_xfsr], %fsr
+	ldx		[%g6 + TI_XFSR], %fsr
 	rdpr		%tstate, %g3
 	or		%g3, %g4, %g3		! anal...
 	wrpr		%g3, %tstate
@@ -285,12 +285,12 @@ do_fpother_check_fitos:
 	/* NOTE: Need to preserve %g7 until we fully commit
 	 *       to the fitos fixup.
 	 */
-	stx		%fsr, [%g6 + AOFF_task_thread + AOFF_thread_xfsr]
+	stx		%fsr, [%g6 + TI_XFSR]
 	rdpr		%tstate, %g3
 	andcc		%g3, TSTATE_PRIV, %g0
 	bne,pn		%xcc, do_fptrap_after_fsr
 	 nop
-	ldx		[%g6 + AOFF_task_thread + AOFF_thread_xfsr], %g3
+	ldx		[%g6 + TI_XFSR], %g3
 	srlx		%g3, 14, %g1
 	and		%g1, 7, %g1
 	cmp		%g1, 2			! Unfinished FP-OP
@@ -310,7 +310,7 @@ do_fpother_check_fitos:
 	cmp		%g1, %g2
 	bne,pn		%xcc, do_fptrap_after_fsr
 	 nop
-	std		%f62, [%g6 + AOFF_task_fpregs + (62 * 4)]
+	std		%f62, [%g6 + TI_FPREGS + (62 * 4)]
 	sethi		%hi(fitos_table_1), %g1
 	and		%g3, 0x1f, %g2
 	or		%g1, %lo(fitos_table_1),  %g1
@@ -396,22 +396,22 @@ fitos_table_2:
 	fdtos		%f62, %f31
 
 fitos_emul_fini:
-	ldd		[%g6 + AOFF_task_fpregs + (62 * 4)], %f62
+	ldd		[%g6 + TI_FPREGS + (62 * 4)], %f62
 	done
 
 	.globl		do_fptrap
 	.align		32
 do_fptrap:
-	stx		%fsr, [%g6 + AOFF_task_thread + AOFF_thread_xfsr]
+	stx		%fsr, [%g6 + TI_XFSR]
 do_fptrap_after_fsr:
-	ldub		[%g6 + AOFF_task_thread + AOFF_thread_fpsaved], %g3
+	ldub		[%g6 + TI_FPSAVED], %g3
 	rd		%fprs, %g1
 	or		%g3, %g1, %g3
-	stb		%g3, [%g6 + AOFF_task_thread + AOFF_thread_fpsaved]
+	stb		%g3, [%g6 + TI_FPSAVED]
 	rd		%gsr, %g3
-	stx		%g3, [%g6 + AOFF_task_thread + AOFF_thread_gsr]
+	stx		%g3, [%g6 + TI_GSR]
 	mov		SECONDARY_CONTEXT, %g3
-	add		%g6, AOFF_task_fpregs, %g2
+	add		%g6, TI_FPREGS, %g2
 	ldxa		[%g3] ASI_DMMU, %g5
 	stxa		%g0, [%g3] ASI_DMMU
 	membar		#Sync
@@ -713,8 +713,8 @@ floppy_dosoftint:
 	call		sparc_floppy_irq
 	 add		%sp, STACK_BIAS + REGWIN_SZ, %o2
 
-	b,pt		%xcc, rtrap
-	 clr		%l6
+	b,pt		%xcc, rtrap_irq
+	 nop
 
 #endif /* CONFIG_BLK_DEV_FD */
 
@@ -883,7 +883,7 @@ cee_trap:
 	mov	%l5, %o1
 	call	cee_log
 	 add	%sp, STACK_BIAS + REGWIN_SZ, %o2
-	ba,a,pt	%xcc, rtrap_clr_l6
+	ba,a,pt	%xcc, rtrap_irq
 
 	/* Capture I/D/E-cache state into per-cpu error scoreboard.
 	 *
@@ -1109,7 +1109,7 @@ cheetah_fast_ecc:
 	mov		%l5, %o2
 	call		cheetah_fecc_handler
 	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
-	ba,a,pt		%xcc, rtrap_clr_l6
+	ba,a,pt		%xcc, rtrap_irq
 
 	/* Our caller has disabled I-cache and performed membar Sync. */
 	.globl		cheetah_cee
@@ -1135,7 +1135,7 @@ cheetah_cee:
 	mov		%l5, %o2
 	call		cheetah_cee_handler
 	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
-	ba,a,pt		%xcc, rtrap_clr_l6
+	ba,a,pt		%xcc, rtrap_irq
 
 	/* Our caller has disabled I-cache+D-cache and performed membar Sync. */
 	.globl		cheetah_deferred_trap
@@ -1161,7 +1161,7 @@ cheetah_deferred_trap:
 	mov		%l5, %o2
 	call		cheetah_deferred_handler
 	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
-	ba,a,pt		%xcc, rtrap_clr_l6
+	ba,a,pt		%xcc, rtrap_irq
 
 	.globl		__do_privact
 __do_privact:
@@ -1384,8 +1384,8 @@ sys_ptrace:	add		%sp, STACK_BIAS + REGWIN_SZ, %o0
 		 add		%o7, 1f-.-4, %o7
 		nop
 		.align		32
-1:		ldub		[%curptr + AOFF_task_work + 1], %l5
-		andcc		%l5, 0xff, %g0
+1:		ldx		[%curptr + TI_FLAGS], %l5
+		andcc		%l5, _TIF_SYSCALL_TRACE, %g0
 		be,pt		%icc, rtrap
 		 clr		%l6
 		call		syscall_trace
@@ -1435,14 +1435,14 @@ ret_from_syscall:
 		/* Clear SPARC_FLAG_NEWCHILD, switch_to leaves thread.flags in
 		 * %o7 for us.  Check performance counter stuff too.
 		 */
-		andn		%o7, SPARC_FLAG_NEWCHILD, %l0
+		andn		%o7, _TIF_NEWCHILD, %l0
 		mov		%g5, %o0	/* 'prev' */
 		call		schedule_tail
-		 stb		%l0, [%g6 + AOFF_task_thread + AOFF_thread_flags]
-		andcc		%l0, SPARC_FLAG_PERFCTR, %g0
+		 stx		%l0, [%g6 + TI_FLAGS]
+		andcc		%l0, _TIF_PERFCTR, %g0
 		be,pt		%icc, 1f
 		 nop
-		ldx		[%g6 + AOFF_task_thread + AOFF_thread_pcr_reg], %o7
+		ldx		[%g6 + TI_PCR], %o7
 		wr		%g0, %o7, %pcr
 
 		/* Blackbird errata workaround.  See commentary in
@@ -1465,7 +1465,7 @@ sparc_exit:	wrpr		%g0, (PSTATE_RMO | PSTATE_PEF | PSTATE_PRIV), %pstate
 		wrpr		%g0, 0x0, %otherwin
 		wrpr		%g0, (PSTATE_RMO | PSTATE_PEF | PSTATE_PRIV | PSTATE_IE), %pstate
 		ba,pt		%xcc, sys_exit
-		 stb		%g0, [%g6 + AOFF_task_thread + AOFF_thread_w_saved]
+		 stb		%g0, [%g6 + TI_WSAVED]
 
 linux_sparc_ni_syscall:
 	sethi		%hi(sys_ni_syscall), %l7
@@ -1510,11 +1510,11 @@ linux_sparc_syscall32:
 	mov		%i4, %o4				! IEU1
 	lduw		[%l7 + %l4], %l7			! Load
 	srl		%i1, 0, %o1				! IEU0	Group
-	ldub		[%curptr + AOFF_task_work + 1], %l0	! Load
+	ldx		[%curptr + TI_FLAGS], %l0		! Load
 
 	mov		%i5, %o5				! IEU1
 	srl		%i2, 0, %o2				! IEU0	Group
-	andcc		%l0, 0xff, %g0				! IEU0	Group
+	andcc		%l0, _TIF_SYSCALL_TRACE, %g0		! IEU0	Group
 	bne,pn		%icc, linux_syscall_trace32		! CTI
 	 mov		%i0, %l5				! IEU1
 	call		%l7					! CTI	Group brk forced
@@ -1538,11 +1538,11 @@ linux_sparc_syscall:
 	mov		%i1, %o1				! IEU1
 	lduw		[%l7 + %l4], %l7			! Load
 4:	mov		%i2, %o2				! IEU0	Group
-	ldub		[%curptr + AOFF_task_work + 1], %l0	! Load
+	ldx		[%curptr + TI_FLAGS], %l0		! Load
 
 	mov		%i3, %o3				! IEU1
 	mov		%i4, %o4				! IEU0	Group
-	andcc		%l0, 0xff, %g0				! IEU1	Group+1 bubble
+	andcc		%l0, _TIF_SYSCALL_TRACE, %g0		! IEU1	Group+1 bubble
 	bne,pn		%icc, linux_syscall_trace		! CTI	Group
 	 mov		%i0, %l5				! IEU0
 2:	call		%l7					! CTI	Group brk forced
@@ -1565,7 +1565,7 @@ ret_sys_call:
 	sllx		%g2, 32, %g2
 	bgeu,pn		%xcc, 1f
 
-	 andcc		%l0, 0x02, %l6	
+	 andcc		%l0, _TIF_SYSCALL_TRACE, %l6	
 	andn		%g3, %g2, %g3		/* System call success, clear Carry condition code. */
 	stx		%g3, [%sp + STACK_BIAS + REGWIN_SZ + PT_V9_TSTATE]	
 	bne,pn		%icc, linux_syscall_trace2

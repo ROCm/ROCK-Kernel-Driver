@@ -212,7 +212,7 @@ void __init smp_callin(void)
 	/* Clear this or we will die instantly when we
 	 * schedule back to this idler...
 	 */
-	current->thread.flags &= ~(SPARC_FLAG_NEWCHILD);
+	clear_thread_flag(TIF_NEWCHILD);
 
 	/* Attach to the address space of init_task. */
 	atomic_inc(&init_mm.mm_count);
@@ -236,7 +236,7 @@ extern unsigned long sparc64_cpu_startup;
  * 32-bits (I think) so to be safe we have it read the pointer
  * contained here so we work on >4GB machines. -DaveM
  */
-static struct task_struct *cpu_new_task = NULL;
+static struct thread_info *cpu_new_thread = NULL;
 
 static void smp_tune_scheduling(void);
 
@@ -261,7 +261,7 @@ void __init smp_boot_cpus(void)
 			goto ignorecpu;
 		if (cpu_present_map & (1UL << i)) {
 			unsigned long entry = (unsigned long)(&sparc64_cpu_startup);
-			unsigned long cookie = (unsigned long)(&cpu_new_task);
+			unsigned long cookie = (unsigned long)(&cpu_new_thread);
 			struct task_struct *p;
 			int timeout;
 			int no;
@@ -280,7 +280,7 @@ void __init smp_boot_cpus(void)
 			for (no = 0; no < linux_num_cpus; no++)
 				if (linux_cpus[no].mid == i)
 					break;
-			cpu_new_task = p;
+			cpu_new_thread = p->thread_info;
 			prom_startcpu(linux_cpus[no].prom_node,
 				      entry, cookie);
 			for (timeout = 0; timeout < 5000000; timeout++) {
@@ -305,7 +305,7 @@ ignorecpu:
 			__cpu_number_map[i] = -1;
 		}
 	}
-	cpu_new_task = NULL;
+	cpu_new_thread = NULL;
 	if (cpucount == 0) {
 		if (max_cpus != 1)
 			printk("Error: only one processor found.\n");
@@ -902,7 +902,7 @@ void smp_migrate_task(int cpu, task_t *p)
 	if (smp_processors_ready && (cpu_present_map & mask) != 0) {
 		u64 data0 = (((u64)&xcall_migrate_task) & 0xffffffff);
 
-		spin_lock(&migration_lock);
+		_raw_spin_lock(&migration_lock);
 		new_task = p;
 
 		if (tlb_type == spitfire)
@@ -923,7 +923,7 @@ asmlinkage void smp_task_migration_interrupt(int irq, struct pt_regs *regs)
 	clear_softint(1 << irq);
 
 	p = new_task;
-	spin_unlock(&migration_lock);
+	_raw_spin_unlock(&migration_lock);
 	sched_task_migrated(p);
 }
 

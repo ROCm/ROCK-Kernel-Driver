@@ -1,4 +1,4 @@
-/* $Id: itlb_base.S,v 1.11 2001/08/17 04:55:09 kanoj Exp $
+/* $Id: itlb_base.S,v 1.12 2002/02/09 19:49:30 davem Exp $
  * itlb_base.S:	Front end to ITLB miss replacement strategy.
  *              This is included directly into the trap table.
  *
@@ -51,8 +51,8 @@
 	rdpr		%tpc, %g5			! And load faulting VA
 	mov		FAULT_CODE_ITLB, %g4		! It was read from ITLB
 sparc64_realfault_common:				! Called by TL0 dtlb_miss too
-	stb		%g4, [%g6 + AOFF_task_thread + AOFF_thread_fault_code]
-	stx		%g5, [%g6 + AOFF_task_thread + AOFF_thread_fault_address]
+	stb		%g4, [%g6 + TI_FAULT_CODE]
+	stx		%g5, [%g6 + TI_FAULT_ADDR]
 	ba,pt		%xcc, etrap			! Save state
 1:	 rd		%pc, %g7			! ...
 	nop

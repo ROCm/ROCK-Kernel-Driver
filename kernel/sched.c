@@ -1256,12 +1256,12 @@ static void show_task(task_t * p)
 	if (p == current)
 		printk(" current  ");
 	else
-		printk(" %08lX ", thread_saved_pc(&p->thread));
+		printk(" %08lX ", thread_saved_pc(p));
 #else
 	if (p == current)
 		printk("   current task   ");
 	else
-		printk(" %016lx ", thread_saved_pc(&p->thread));
+		printk(" %016lx ", thread_saved_pc(p));
 #endif
 	{
 		unsigned long * n = (unsigned long *) (p+1);

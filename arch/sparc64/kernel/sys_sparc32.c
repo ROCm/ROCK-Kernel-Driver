@@ -1,4 +1,4 @@
-/* $Id: sys_sparc32.c,v 1.182 2001/10/18 09:06:36 davem Exp $
+/* $Id: sys_sparc32.c,v 1.184 2002/02/09 19:49:31 davem Exp $
  * sys_sparc32.c: Conversion between 32bit and 64bit native syscalls.
  *
  * Copyright (C) 1997,1998 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
@@ -49,6 +49,7 @@
 #include <linux/in.h>
 #include <linux/icmpv6.h>
 #include <linux/sysctl.h>
+#include <linux/binfmts.h>
 
 #include <asm/types.h>
 #include <asm/ipc.h>
@@ -1461,6 +1462,8 @@ out_nofds:
 
 static int cp_new_stat32(struct kstat *stat, struct stat32 *statbuf)
 {
+	int err;
+
 	err  = put_user(stat->dev, &statbuf->st_dev);
 	err |= put_user(stat->ino, &statbuf->st_ino);
 	err |= put_user(stat->mode, &statbuf->st_mode);
@@ -1479,6 +1482,7 @@ static int cp_new_stat32(struct kstat *stat, struct stat32 *statbuf)
 	err |= put_user(stat->blocks, &statbuf->st_blocks);
 	err |= put_user(0, &statbuf->__unused4[0]);
 	err |= put_user(0, &statbuf->__unused4[1]);
+
 	return err;
 }
 
@@ -2723,8 +2727,8 @@ asmlinkage int sys32_sigaction (int sig, struct old_sigaction32 *act, struct old
         struct k_sigaction new_ka, old_ka;
         int ret;
 
-	if(sig < 0) {
-		current->thread.flags |= SPARC_FLAG_NEWSIGNALS;
+	if (sig < 0) {
+		set_thread_flag(TIF_NEWSIGNALS);
 		sig = -sig;
 	}
 
@@ -2768,7 +2772,7 @@ sys32_rt_sigaction(int sig, struct sigaction32 *act, struct sigaction32 *oact,
 	/* All tasks which use RT signals (effectively) use
 	 * new style signals.
 	 */
-	current->thread.flags |= SPARC_FLAG_NEWSIGNALS;
+	set_thread_flag(TIF_NEWSIGNALS);
 
         if (act) {
 		new_ka.ka_restorer = restorer;
@@ -2991,8 +2995,8 @@ asmlinkage int sparc32_execve(struct pt_regs *regs)
 
 	if(!error) {
 		fprs_write(0);
-		current->thread.xfsr[0] = 0;
-		current->thread.fpsaved[0] = 0;
+		current_thread_info()->xfsr[0] = 0;
+		current_thread_info()->fpsaved[0] = 0;
 		regs->tstate &= ~TSTATE_PEF;
 	}
 out:

@@ -1,4 +1,4 @@
-/*  $Id: signal.c,v 1.58 2002/01/31 03:30:06 davem Exp $
+/*  $Id: signal.c,v 1.60 2002/02/09 19:49:31 davem Exp $
  *  arch/sparc64/kernel/signal.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
@@ -76,7 +76,6 @@ int copy_siginfo_to_user(siginfo_t *to, siginfo_t *from)
 asmlinkage void sparc64_set_context(struct pt_regs *regs)
 {
 	struct ucontext *ucp = (struct ucontext *) regs->u_regs[UREG_I0];
-	struct thread_struct *tp = &current->thread;
 	mc_gregset_t *grp;
 	unsigned long pc, npc, tstate;
 	unsigned long fp, i7;
@@ -84,16 +83,16 @@ asmlinkage void sparc64_set_context(struct pt_regs *regs)
 	int err;
 
 	flush_user_windows();
-	if(tp->w_saved						||
-	   (((unsigned long)ucp) & (sizeof(unsigned long)-1))	||
-	   (!__access_ok((unsigned long)ucp, sizeof(*ucp))))
+	if (get_thread_wsaved()					||
+	    (((unsigned long)ucp) & (sizeof(unsigned long)-1))	||
+	    (!__access_ok((unsigned long)ucp, sizeof(*ucp))))
 		goto do_sigsegv;
 	grp  = &ucp->uc_mcontext.mc_gregs;
 	err  = __get_user(pc, &((*grp)[MC_PC]));
 	err |= __get_user(npc, &((*grp)[MC_NPC]));
-	if(err || ((pc | npc) & 3))
+	if (err || ((pc | npc) & 3))
 		goto do_sigsegv;
-	if(regs->u_regs[UREG_I1]) {
+	if (regs->u_regs[UREG_I1]) {
 		sigset_t set;
 
 		if (_NSIG_WORDS == 1) {
@@ -109,7 +108,7 @@ asmlinkage void sparc64_set_context(struct pt_regs *regs)
 		recalc_sigpending(current);
 		spin_unlock_irq(&current->sigmask_lock);
 	}
-	if ((tp->flags & SPARC_FLAG_32BIT) != 0) {
+	if (test_thread_flag(TIF_32BIT)) {
 		pc &= 0xffffffff;
 		npc &= 0xffffffff;
 	}
@@ -143,8 +142,8 @@ asmlinkage void sparc64_set_context(struct pt_regs *regs)
 	      (&(((struct reg_window *)(STACK_BIAS+regs->u_regs[UREG_I6]))->ins[7])));
 
 	err |= __get_user(fenab, &(ucp->uc_mcontext.mc_fpregs.mcfpu_enab));
-	if(fenab) {
-		unsigned long *fpregs = (unsigned long *)(((char *)current) + AOFF_task_fpregs);
+	if (fenab) {
+		unsigned long *fpregs = current_thread_info()->fpregs;
 		unsigned long fprs;
 		
 		fprs_write(0);
@@ -157,9 +156,9 @@ asmlinkage void sparc64_set_context(struct pt_regs *regs)
 			err |= copy_from_user(fpregs+16,
 			 ((unsigned long *)&(ucp->uc_mcontext.mc_fpregs.mcfpu_fregs))+16,
 			 (sizeof(unsigned int) * 32));
-		err |= __get_user(current->thread.xfsr[0],
+		err |= __get_user(current_thread_info()->xfsr[0],
 				  &(ucp->uc_mcontext.mc_fpregs.mcfpu_fsr));
-		err |= __get_user(current->thread.gsr[0],
+		err |= __get_user(current_thread_info()->gsr[0],
 				  &(ucp->uc_mcontext.mc_fpregs.mcfpu_gsr));
 		regs->tstate &= ~TSTATE_PEF;
 	}
@@ -174,7 +173,6 @@ do_sigsegv:
 asmlinkage void sparc64_get_context(struct pt_regs *regs)
 {
 	struct ucontext *ucp = (struct ucontext *) regs->u_regs[UREG_I0];
-	struct thread_struct *tp = &current->thread;
 	mc_gregset_t *grp;
 	mcontext_t *mcp;
 	unsigned long fp, i7;
@@ -182,20 +180,20 @@ asmlinkage void sparc64_get_context(struct pt_regs *regs)
 	int err;
 
 	synchronize_user_stack();
-	if(tp->w_saved || clear_user(ucp, sizeof(*ucp)))
+	if (get_thread_wsaved() || clear_user(ucp, sizeof(*ucp)))
 		goto do_sigsegv;
 
 #if 1
 	fenab = 0; /* IMO get_context is like any other system call, thus modifies FPU state -jj */
 #else
-	fenab = (current->thread.fpsaved[0] & FPRS_FEF);
+	fenab = (current_thread_info()->fpsaved[0] & FPRS_FEF);
 #endif
 		
 	mcp = &ucp->uc_mcontext;
 	grp = &mcp->mc_gregs;
 
 	/* Skip over the trap instruction, first. */
-	if ((tp->flags & SPARC_FLAG_32BIT) != 0) {
+	if (test_thread_flag(TIF_32BIT)) {
 		regs->tpc   = (regs->tnpc & 0xffffffff);
 		regs->tnpc  = (regs->tnpc + 4) & 0xffffffff;
 	} else {
@@ -238,11 +236,11 @@ asmlinkage void sparc64_get_context(struct pt_regs *regs)
 	err |= __put_user(i7, &(mcp->mc_i7));
 
 	err |= __put_user(fenab, &(mcp->mc_fpregs.mcfpu_enab));
-	if(fenab) {
-		unsigned long *fpregs = (unsigned long *)(((char *)current) + AOFF_task_fpregs);
+	if (fenab) {
+		unsigned long *fpregs = current_thread_info()->fpregs;
 		unsigned long fprs;
 		
-		fprs = current->thread.fpsaved[0];
+		fprs = current_thread_info()->fpsaved[0];
 		if (fprs & FPRS_DL)
 			err |= copy_to_user(&(mcp->mc_fpregs.mcfpu_fregs), fpregs,
 					    (sizeof(unsigned int) * 32));
@@ -250,8 +248,8 @@ asmlinkage void sparc64_get_context(struct pt_regs *regs)
 			err |= copy_to_user(
                           ((unsigned long *)&(mcp->mc_fpregs.mcfpu_fregs))+16, fpregs+16,
 			  (sizeof(unsigned int) * 32));
-		err |= __put_user(current->thread.xfsr[0], &(mcp->mc_fpregs.mcfpu_fsr));
-		err |= __put_user(current->thread.gsr[0], &(mcp->mc_fpregs.mcfpu_gsr));
+		err |= __put_user(current_thread_info()->xfsr[0], &(mcp->mc_fpregs.mcfpu_fsr));
+		err |= __put_user(current_thread_info()->gsr[0], &(mcp->mc_fpregs.mcfpu_gsr));
 		err |= __put_user(fprs, &(mcp->mc_fpregs.mcfpu_fprs));
 	}
 	if (err)
@@ -284,7 +282,7 @@ asmlinkage void _sigpause_common(old_sigset_t set, struct pt_regs *regs)
 	sigset_t saveset;
 
 #ifdef CONFIG_SPARC32_COMPAT
-	if (current->thread.flags & SPARC_FLAG_32BIT) {
+	if (test_thread_flag(TIF_32BIT)) {
 		extern asmlinkage void _sigpause32_common(old_sigset_t32,
 							  struct pt_regs *);
 		_sigpause32_common(set, regs);
@@ -298,7 +296,7 @@ asmlinkage void _sigpause_common(old_sigset_t set, struct pt_regs *regs)
 	recalc_sigpending(current);
 	spin_unlock_irq(&current->sigmask_lock);
 	
-	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+	if (test_thread_flag(TIF_32BIT)) {
 		regs->tpc = (regs->tnpc & 0xffffffff);
 		regs->tnpc = (regs->tnpc + 4) & 0xffffffff;
 	} else {
@@ -358,7 +356,7 @@ asmlinkage void do_rt_sigsuspend(sigset_t *uset, size_t sigsetsize, struct pt_re
 	recalc_sigpending(current);
 	spin_unlock_irq(&current->sigmask_lock);
 	
-	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+	if (test_thread_flag(TIF_32BIT)) {
 		regs->tpc = (regs->tnpc & 0xffffffff);
 		regs->tnpc = (regs->tnpc + 4) & 0xffffffff;
 	} else {
@@ -388,7 +386,7 @@ asmlinkage void do_rt_sigsuspend(sigset_t *uset, size_t sigsetsize, struct pt_re
 static inline int
 restore_fpu_state(struct pt_regs *regs, __siginfo_fpu_t *fpu)
 {
-	unsigned long *fpregs = (unsigned long *)(((char *)current) + AOFF_task_fpregs);
+	unsigned long *fpregs = current_thread_info()->fpregs;
 	unsigned long fprs;
 	int err;
 
@@ -401,9 +399,9 @@ restore_fpu_state(struct pt_regs *regs, __siginfo_fpu_t *fpu)
 	if (fprs & FPRS_DU)
 		err |= copy_from_user(fpregs+16, &fpu->si_float_regs[32],
 		       	       (sizeof(unsigned int) * 32));
-	err |= __get_user(current->thread.xfsr[0], &fpu->si_fsr);
-	err |= __get_user(current->thread.gsr[0], &fpu->si_gsr);
-	current->thread.fpsaved[0] |= fprs;
+	err |= __get_user(current_thread_info()->xfsr[0], &fpu->si_fsr);
+	err |= __get_user(current_thread_info()->gsr[0], &fpu->si_gsr);
+	current_thread_info()->fpsaved[0] |= fprs;
 	return err;
 }
 
@@ -426,7 +424,7 @@ void do_rt_sigreturn(struct pt_regs *regs)
 
 	err = get_user(tpc, &sf->regs.tpc);
 	err |= __get_user(tnpc, &sf->regs.tnpc);
-	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+	if (test_thread_flag(TIF_32BIT)) {
 		tpc &= 0xffffffff;
 		tnpc &= 0xffffffff;
 	}
@@ -483,15 +481,15 @@ save_fpu_state(struct pt_regs *regs, __siginfo_fpu_t *fpu)
 	unsigned long fprs;
 	int err = 0;
 	
-	fprs = current->thread.fpsaved[0];
+	fprs = current_thread_info()->fpsaved[0];
 	if (fprs & FPRS_DL)
 		err |= copy_to_user(&fpu->si_float_regs[0], fpregs,
 				    (sizeof(unsigned int) * 32));
 	if (fprs & FPRS_DU)
 		err |= copy_to_user(&fpu->si_float_regs[32], fpregs+16,
 				    (sizeof(unsigned int) * 32));
-	err |= __put_user(current->thread.xfsr[0], &fpu->si_fsr);
-	err |= __put_user(current->thread.gsr[0], &fpu->si_gsr);
+	err |= __put_user(current_thread_info()->xfsr[0], &fpu->si_fsr);
+	err |= __put_user(current_thread_info()->gsr[0], &fpu->si_gsr);
 	err |= __put_user(fprs, &fpu->si_fprs);
 
 	return err;
@@ -524,7 +522,7 @@ setup_rt_frame(struct k_sigaction *ka, struct pt_regs *regs,
 	save_and_clear_fpu();
 	
 	sigframe_size = RT_ALIGNEDSZ;
-	if (!(current->thread.fpsaved[0] & FPRS_FEF))
+	if (!(current_thread_info()->fpsaved[0] & FPRS_FEF))
 		sigframe_size -= sizeof(__siginfo_fpu_t);
 
 	sf = (struct rt_signal_frame *)get_sigframe(ka, regs, sigframe_size);
@@ -532,7 +530,7 @@ setup_rt_frame(struct k_sigaction *ka, struct pt_regs *regs,
 	if (invalid_frame_pointer (sf, sigframe_size))
 		goto sigill;
 
-	if (current->thread.w_saved != 0) {
+	if (get_thread_wsaved() != 0) {
 #ifdef DEBUG_SIGNALS
 		printk ("%s[%d]: Invalid user stack frame for "
 			"signal delivery.\n", current->comm, current->pid);
@@ -543,7 +541,7 @@ setup_rt_frame(struct k_sigaction *ka, struct pt_regs *regs,
 	/* 2. Save the current process state */
 	err = copy_to_user(&sf->regs, regs, sizeof (*regs));
 
-	if (current->thread.fpsaved[0] & FPRS_FEF) {
+	if (current_thread_info()->fpsaved[0] & FPRS_FEF) {
 		err |= save_fpu_state(regs, &sf->fpu_state);
 		err |= __put_user((u64)&sf->fpu_state, &sf->fpu_save);
 	} else {
@@ -578,7 +576,7 @@ setup_rt_frame(struct k_sigaction *ka, struct pt_regs *regs,
 	/* 5. signal handler */
 	regs->tpc = (unsigned long) ka->sa.sa_handler;
 	regs->tnpc = (regs->tpc + 4);
-	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+	if (test_thread_flag(TIF_32BIT)) {
 		regs->tpc &= 0xffffffff;
 		regs->tnpc &= 0xffffffff;
 	}
@@ -597,9 +595,9 @@ static inline void handle_signal(unsigned long signr, struct k_sigaction *ka,
 				 sigset_t *oldset, struct pt_regs *regs)
 {
 	setup_rt_frame(ka, regs, signr, oldset, (ka->sa.sa_flags & SA_SIGINFO) ? info : NULL);
-	if(ka->sa.sa_flags & SA_ONESHOT)
+	if (ka->sa.sa_flags & SA_ONESHOT)
 		ka->sa.sa_handler = SIG_DFL;
-	if(!(ka->sa.sa_flags & SA_NOMASK)) {
+	if (!(ka->sa.sa_flags & SA_NOMASK)) {
 		spin_lock_irq(&current->sigmask_lock);
 		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
 		sigaddset(&current->blocked,signr);
@@ -611,14 +609,14 @@ static inline void handle_signal(unsigned long signr, struct k_sigaction *ka,
 static inline void syscall_restart(unsigned long orig_i0, struct pt_regs *regs,
 				     struct sigaction *sa)
 {
-	switch(regs->u_regs[UREG_I0]) {
+	switch (regs->u_regs[UREG_I0]) {
 		case ERESTARTNOHAND:
 		no_system_call_restart:
 			regs->u_regs[UREG_I0] = EINTR;
 			regs->tstate |= (TSTATE_ICARRY|TSTATE_XCARRY);
 			break;
 		case ERESTARTSYS:
-			if(!(sa->sa_flags & SA_RESTART))
+			if (!(sa->sa_flags & SA_RESTART))
 				goto no_system_call_restart;
 		/* fallthrough */
 		case ERESTARTNOINTR:
@@ -699,7 +697,7 @@ static int do_signal(sigset_t *oldset, struct pt_regs * regs,
 		oldset = &current->blocked;
 
 #ifdef CONFIG_SPARC32_COMPAT
-	if (current->thread.flags & SPARC_FLAG_32BIT) {
+	if (test_thread_flag(TIF_32BIT)) {
 		extern int do_signal32(sigset_t *, struct pt_regs *,
 				       unsigned long, int);
 		return do_signal32(oldset, regs, orig_i0, restart_syscall);
@@ -741,8 +739,8 @@ static int do_signal(sigset_t *oldset, struct pt_regs * regs,
 		
 		ka = &current->sig->action[signr-1];
 		
-		if(ka->sa.sa_handler == SIG_IGN) {
-			if(signr != SIGCHLD)
+		if (ka->sa.sa_handler == SIG_IGN) {
+			if (signr != SIGCHLD)
 				continue;
 
                         /* sys_wait4() grabs the master kernel lock, so
@@ -750,16 +748,16 @@ static int do_signal(sigset_t *oldset, struct pt_regs * regs,
                          * threaded and would not be that difficult to
                          * do anyways.
                          */
-                        while(sys_wait4(-1, NULL, WNOHANG, NULL) > 0)
+                        while (sys_wait4(-1, NULL, WNOHANG, NULL) > 0)
                                 ;
 			continue;
 		}
-		if(ka->sa.sa_handler == SIG_DFL) {
+		if (ka->sa.sa_handler == SIG_DFL) {
 			unsigned long exit_code = signr;
 			
-			if(current->pid == 1)
+			if (current->pid == 1)
 				continue;
-			switch(signr) {
+			switch (signr) {
 			case SIGCONT: case SIGCHLD: case SIGWINCH:
 				continue;
 
@@ -772,8 +770,8 @@ static int do_signal(sigset_t *oldset, struct pt_regs * regs,
 					continue;
 				current->state = TASK_STOPPED;
 				current->exit_code = signr;
-				if(!(current->p_pptr->sig->action[SIGCHLD-1].sa.sa_flags &
-				     SA_NOCLDSTOP))
+				if (!(current->p_pptr->sig->action[SIGCHLD-1].sa.sa_flags &
+				      SA_NOCLDSTOP))
 					notify_parent(current, SIGCHLD);
 				schedule();
 				continue;
@@ -792,8 +790,8 @@ static int do_signal(sigset_t *oldset, struct pt_regs * regs,
 					struct reg_window *rw = (struct reg_window *)(regs->u_regs[UREG_FP] + STACK_BIAS);
 					unsigned long ins[8];
                                                 
-					while(rw &&
-					      !(((unsigned long) rw) & 0x3)) {
+					while (rw &&
+					       !(((unsigned long) rw) & 0x3)) {
 					        copy_from_user(ins, &rw->ins[0], sizeof(ins));
 						printk("Caller[%016lx](%016lx,%016lx,%016lx,%016lx,%016lx,%016lx)\n", ins[7], ins[0], ins[1], ins[2], ins[3], ins[4], ins[5]);
 						rw = (struct reg_window *)(unsigned long)(ins[6] + STACK_BIAS);
@@ -811,15 +809,15 @@ static int do_signal(sigset_t *oldset, struct pt_regs * regs,
 				/* NOT REACHED */
 			}
 		}
-		if(restart_syscall)
+		if (restart_syscall)
 			syscall_restart(orig_i0, regs, &ka->sa);
 		handle_signal(signr, ka, &info, oldset, regs);
 		return 1;
 	}
-	if(restart_syscall &&
-	   (regs->u_regs[UREG_I0] == ERESTARTNOHAND ||
-	    regs->u_regs[UREG_I0] == ERESTARTSYS ||
-	    regs->u_regs[UREG_I0] == ERESTARTNOINTR)) {
+	if (restart_syscall &&
+	    (regs->u_regs[UREG_I0] == ERESTARTNOHAND ||
+	     regs->u_regs[UREG_I0] == ERESTARTSYS ||
+	     regs->u_regs[UREG_I0] == ERESTARTNOINTR)) {
 		/* replay the system call when we are done */
 		regs->u_regs[UREG_I0] = orig_i0;
 		regs->tpc -= 4;
@@ -830,12 +828,8 @@ static int do_signal(sigset_t *oldset, struct pt_regs * regs,
 
 void do_notify_resume(sigset_t *oldset, struct pt_regs *regs,
 		      unsigned long orig_i0, int restart_syscall,
-		      unsigned int work_pending)
+		      unsigned long thread_info_flags)
 {
-	/* We don't pass in the task_work struct as a struct because
-	 * GCC always bounces that onto the stack due to the
-	 * ABI calling conventions.
-	 */
-	if (work_pending & 0x0000ff00)
+	if (thread_info_flags & _TIF_SIGPENDING)
 		do_signal(oldset, regs, orig_i0, restart_syscall);
 }
