@@ -71,38 +71,20 @@ void __exit tekram_sir_cleanup(void)
 	irda_unregister_dongle(&tekram);
 }
 
-#define TEKRAM_STATE_POWERED	(SIRDEV_STATE_DONGLE_OPEN + 1)
-
 static int tekram_open(struct sir_dev *dev)
 {
-	unsigned delay = 0;
-	unsigned next_state = dev->fsm.substate;
 	struct qos_info *qos = &dev->qos;
 
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
-	switch(dev->fsm.substate) {
+	dev->set_dtr_rts(dev, TRUE, TRUE);
+	qos->baud_rate.bits &= IR_9600|IR_19200|IR_38400|IR_57600|IR_115200;
+	qos->min_turn_time.bits = 0x01; /* Needs at least 10 ms */	
+	irda_qos_bits_to_value(qos);
 
-	case SIRDEV_STATE_DONGLE_OPEN:
-		dev->set_dtr_rts(dev, TRUE, TRUE);
-		next_state = TEKRAM_STATE_POWERED;
-		delay = 50;
-		break;
+	/* irda thread waits 50 msec for power settling */
 
-	case TEKRAM_STATE_POWERED:
-		qos->baud_rate.bits &= IR_9600|IR_19200|IR_38400|IR_57600|IR_115200;
-		qos->min_turn_time.bits = 0x01; /* Needs at least 10 ms */	
-		irda_qos_bits_to_value(qos);
-		return 0;
-
-	default:
-		ERROR("%s - undefined state\n", __FUNCTION__);
-		return -EINVAL;
-	}
-
-	dev->fsm.substate = next_state;
-
-	return delay;
+	return 0;
 }
 
 static int tekram_close(struct sir_dev *dev)
