@@ -21,6 +21,12 @@ config MPC8540_ADS
 	help
 	  This option enables support for the MPC 8540 ADS evaluation board.
 
+config SBC8560
+	bool "WindRiver PowerQUICC III SBC8560"
+	help
+	  This option enables support for the WindRiver PowerQUICC III 
+	  SBC8560 board.
+
 endchoice
 
 # It's often necessary to know the specific 85xx processor type.
@@ -31,6 +37,11 @@ config MPC8540
 	depends on MPC8540_ADS
 	default y
 
+config MPC8560
+	bool
+	depends on SBC8560
+	default y
+
 config FSL_OCP
 	bool
 	depends on 85xx
@@ -38,7 +49,7 @@ config FSL_OCP
 
 config PPC_GEN550
 	bool
-	depends on MPC8540
+	depends on MPC8540 || SBC8560
 	default y
 
 endmenu
