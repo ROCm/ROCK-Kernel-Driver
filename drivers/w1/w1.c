@@ -338,12 +338,16 @@ static int __w1_attach_slave_device(struct w1_slave *sl)
 		return err;
 	}
 
-	w1_slave_bin_attribute.read = sl->family->fops->rbin;
-	w1_slave_attribute.show = sl->family->fops->rname;
-	w1_slave_attribute_val.show = sl->family->fops->rval;
-	w1_slave_attribute_val.attr.name = sl->family->fops->rvalname;
+	memcpy(&sl->attr_bin, &w1_slave_bin_attribute, sizeof(sl->attr_bin));
+	memcpy(&sl->attr_name, &w1_slave_attribute, sizeof(sl->attr_name));
+	memcpy(&sl->attr_val, &w1_slave_attribute_val, sizeof(sl->attr_val));
+	
+	sl->attr_bin.read = sl->family->fops->rbin;
+	sl->attr_name.show = sl->family->fops->rname;
+	sl->attr_val.show = sl->family->fops->rval;
+	sl->attr_val.attr.name = sl->family->fops->rvalname;
 
-	err = device_create_file(&sl->dev, &w1_slave_attribute);
+	err = device_create_file(&sl->dev, &sl->attr_name);
 	if (err < 0) {
 		dev_err(&sl->dev,
 			 "sysfs file creation for [%s] failed. err=%d\n",
@@ -352,23 +356,23 @@ static int __w1_attach_slave_device(struct w1_slave *sl)
 		return err;
 	}
 
-	err = device_create_file(&sl->dev, &w1_slave_attribute_val);
+	err = device_create_file(&sl->dev, &sl->attr_val);
 	if (err < 0) {
 		dev_err(&sl->dev,
 			 "sysfs file creation for [%s] failed. err=%d\n",
 			 sl->dev.bus_id, err);
-		device_remove_file(&sl->dev, &w1_slave_attribute);
+		device_remove_file(&sl->dev, &sl->attr_name);
 		device_unregister(&sl->dev);
 		return err;
 	}
 
-	err = sysfs_create_bin_file(&sl->dev.kobj, &w1_slave_bin_attribute);
+	err = sysfs_create_bin_file(&sl->dev.kobj, &sl->attr_bin);
 	if (err < 0) {
 		dev_err(&sl->dev,
 			 "sysfs file creation for [%s] failed. err=%d\n",
 			 sl->dev.bus_id, err);
-		device_remove_file(&sl->dev, &w1_slave_attribute);
-		device_remove_file(&sl->dev, &w1_slave_attribute_val);
+		device_remove_file(&sl->dev, &sl->attr_name);
+		device_remove_file(&sl->dev, &sl->attr_val);
 		device_unregister(&sl->dev);
 		return err;
 	}
@@ -397,6 +401,7 @@ static int w1_attach_slave_device(struct w1_master *dev, struct w1_reg_num *rn)
 
 	sl->owner = THIS_MODULE;
 	sl->master = dev;
+	set_bit(W1_SLAVE_ACTIVE, (long *)&sl->flags);
 
 	memcpy(&sl->reg_num, rn, sizeof(sl->reg_num));
 	atomic_set(&sl->refcnt, 0);
@@ -444,8 +449,9 @@ static void w1_slave_detach(struct w1_slave *sl)
 	while (atomic_read(&sl->refcnt))
 		schedule_timeout(10);
 
-	sysfs_remove_bin_file(&sl->dev.kobj, &w1_slave_bin_attribute);
-	device_remove_file(&sl->dev, &w1_slave_attribute);
+	sysfs_remove_bin_file (&sl->dev.kobj, &sl->attr_bin);
+	device_remove_file(&sl->dev, &sl->attr_name);
+	device_remove_file(&sl->dev, &sl->attr_val);
 	device_unregister(&sl->dev);
 	w1_family_put(sl->family);
 
@@ -551,7 +557,10 @@ static void w1_search(struct w1_master *dev)
 			if (sl->reg_num.family == tmp->family &&
 			    sl->reg_num.id == tmp->id &&
 			    sl->reg_num.crc == tmp->crc)
+			{
+				set_bit(W1_SLAVE_ACTIVE, (long *)&sl->flags);
 				break;
+			}
 			else if (sl->reg_num.family == tmp->family) {
 				family_found = 1;
 				break;
@@ -672,6 +681,8 @@ int w1_process(void *data)
 {
 	struct w1_master *dev = (struct w1_master *) data;
 	unsigned long timeout;
+	struct list_head *ent, *n;
+	struct w1_slave *sl;
 
 	daemonize("%s", dev->name);
 	allow_signal(SIGTERM);
@@ -695,7 +706,29 @@ int w1_process(void *data)
 
 		if (down_interruptible(&dev->mutex))
 			continue;
-		w1_search(dev);
+
+		list_for_each_safe(ent, n, &dev->slist) {
+			sl = list_entry(ent, struct w1_slave, w1_slave_entry);
+
+			if (sl)
+				clear_bit(W1_SLAVE_ACTIVE, (long *)&sl->flags);
+		}
+		
+      		w1_search(dev);
+		
+		list_for_each_safe(ent, n, &dev->slist) {
+			sl = list_entry(ent, struct w1_slave, w1_slave_entry);
+
+			if (sl && !test_bit(W1_SLAVE_ACTIVE, (unsigned long *)&sl->flags))
+			{
+				list_del (&sl->w1_slave_entry);
+
+				w1_slave_detach (sl);
+				kfree (sl);
+
+				dev->slave_count--;
+			}
+		}
 		up(&dev->mutex);
 	}
 

@@ -52,6 +52,8 @@ struct w1_reg_num
 #define W1_READ_PSUPPLY		0xB4
 #define W1_MATCH_ROM		0x55
 
+#define W1_SLAVE_ACTIVE		(1<<0)
+
 struct w1_slave
 {
 	struct module		*owner;
@@ -60,11 +62,15 @@ struct w1_slave
 	struct w1_reg_num	reg_num;
 	atomic_t		refcnt;
 	u8			rom[9];
+	u32			flags;
 
 	struct w1_master	*master;
 	struct w1_family 	*family;
 	struct device 		dev;
 	struct completion 	dev_released;
+
+	struct bin_attribute 	attr_bin;
+	struct device_attribute	attr_name, attr_val;
 };
 
 struct w1_bus_master
