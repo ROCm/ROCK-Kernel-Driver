@@ -1,5 +1,5 @@
 /*
- *   Copyright (C) International Business Machines Corp., 2000-2003
+ *   Copyright (C) International Business Machines Corp., 2000-2004
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -44,6 +44,7 @@
 #include <linux/fs.h>
 #include <linux/buffer_head.h>
 #include <linux/pagemap.h>
+#include <linux/quotaops.h>
 
 #include "jfs_incore.h"
 #include "jfs_filsys.h"
@@ -503,6 +504,9 @@ struct inode *diReadSpecial(struct super_block *sb, ino_t inum, int secondary)
 
 	ip->i_mapping->a_ops = &jfs_aops;
 	mapping_set_gfp_mask(ip->i_mapping, GFP_NOFS);
+
+	/* Allocations to metadata inodes should not affect quotas */
+	ip->i_flags |= S_NOQUOTA;
 
 	if ((inum == FILESYSTEM_I) && (JFS_IP(ip)->ipimap == sbi->ipaimap)) {
 		sbi->gengen = le32_to_cpu(dp->di_gengen);
@@ -2601,28 +2605,11 @@ diNewIAG(struct inomap * imap, int *iagnop, int agno, struct metapage ** mpp)
 			iagp->inosmap[i] = ONES;
 
 		flush_metapage(mp);
-#ifdef _STILL_TO_PORT
-		/* synchronously write the iag page */
-		if (bmWrite(bp)) {
-			/* Free the blocks allocated for the iag since it was
-			 * not successfully added to the inode map
-			 */
-			dbFree(ipimap, xaddr, (s64) xlen);
-
-			/* release the inode map lock */
-			IWRITE_UNLOCK(ipimap);
-
-			rc = -EIO;
-			goto out;
-		}
-
-		/* Now the iag is on disk */
 
 		/*
 		 * start tyransaction of update of the inode map
 		 * addressing structure pointing to the new iag page;
 		 */
-#endif				/*  _STILL_TO_PORT */
 		tid = txBegin(sb, COMMIT_FORCE);
 		down(&JFS_IP(ipimap)->commit_sem);
 
@@ -2644,7 +2631,7 @@ diNewIAG(struct inomap * imap, int *iagnop, int agno, struct metapage ** mpp)
 
 		/* update the inode map's inode to reflect the extension */
 		ipimap->i_size += PSIZE;
-		ipimap->i_blocks += LBLK2PBLK(sb, xlen);
+		inode_add_bytes(ipimap, PSIZE);
 
 		/*
 		 * txCommit(COMMIT_FORCE) will synchronously write address 
@@ -3085,7 +3072,7 @@ static void duplicateIXtree(struct super_block *sb, s64 blkno,
 	}
 	/* update the inode map's inode to reflect the extension */
 	ip->i_size += PSIZE;
-	ip->i_blocks += LBLK2PBLK(sb, xlen);
+	inode_add_bytes(ip, PSIZE);
 	txCommit(tid, 1, &ip, COMMIT_FORCE);
       cleanup:
 	txEnd(tid);
