@@ -6,7 +6,6 @@ HOWTO: Get An Avermedia DVB-T working under Linux
    Assumptions and Introduction
    The Avermedia DVB-T
    Getting the card going
-   Getting the Firmware
    Receiving DVB-T in Australia
    Known Limitations
    Further Update
@@ -149,28 +148,9 @@ Getting the card going
    to start accessing the card with utilities such as scan, tzap,
    dvbstream etc.
 
-   The  current version of the frontend module sp887x.o, contains
-   no firmware drivers?, so the first time you open it with a DVB
-   utility  the driver will try to download some initial firmware
-   to  the card. You will need to download this firmware from the
-   web,  or  copy  it from an installation of the Windows drivers
-   that probably came with your card, before you can use it.
-
-   The  default  Linux  filesystem  location for this firmware is
-   /usr/lib/hotplug/firmware/sc_main.mc .
-     _________________________________________________________
-
-Getting the Firmware
-
-   As the firmware for the card is no longer contained within the
-   driver,  it  is  necessary  to  extract  it  from  the windows
-   drivers.
-
-   The  Windows  drivers  for the Avermedia DVB-T can be obtained
-   from: http://babyurl.com/H3U970 and you can get an application
-   to extract the firmware from:
-   http://www.kyz.uklinux.net/cabextract.php.
-     _________________________________________________________
+   The frontend module sp887x.o, requires an external   firmware.
+   Please use  the  command "get_dvb_firmware sp887x" to download
+   it. Then copy it to /usr/lib/hotplug/firmware.
 
 Receiving DVB-T in Australia
 

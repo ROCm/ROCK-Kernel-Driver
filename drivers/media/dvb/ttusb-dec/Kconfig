@@ -12,8 +12,10 @@ config DVB_TTUSB_DEC
 	  only compressed MPEG data over the USB bus, so you need
 	  an external software decoder to watch TV on your computer.	  
 
-	  The DEC devices require firmware in order to boot into a mode in
-	  which they are slaves to the PC.  See
-	  <file:Documentation/dvb/ttusb-dec.txt> for details.
+          This driver needs external firmware. Please use the commands
+          "<kerneldir>/Documentation/dvb/get_dvb_firmware dec2000t",
+          "<kerneldir>/Documentation/dvb/get_dvb_firmware dec2540t",	
+          "<kerneldir>/Documentation/dvb/get_dvb_firmware dec3000s",
+          download/extract them, and then copy them to /usr/lib/hotplug/firmware.
 
 	  Say Y if you own such a device and want to use it.

@@ -27,8 +27,8 @@
  * 
  */
 
-#include <linux/version.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/pci.h>
 #include <asm/io.h>
@@ -46,20 +46,19 @@
 #include "bt878.h"
 #include "dst-bt878.h"
 
-#include "dvb_functions.h"
 
 /**************************************/
 /* Miscellaneous utility  definitions */
 /**************************************/
 
-unsigned int bt878_verbose = 1;
-unsigned int bt878_debug = 0;
-MODULE_PARM(bt878_verbose, "i");
+static unsigned int bt878_verbose = 1;
+static unsigned int bt878_debug;
+
+module_param_named(verbose, bt878_verbose, int, 0444);
 MODULE_PARM_DESC(bt878_verbose,
 		 "verbose startup messages, default is 1 (yes)");
-MODULE_PARM(bt878_debug, "i");
-MODULE_PARM_DESC(bt878_debug, "debug messages, default is 0 (no)");
-MODULE_LICENSE("GPL");
+module_param_named(debug, bt878_debug, int, 0644);
+MODULE_PARM_DESC(bt878_debug, "Turn on/off debugging (default:off).");
 
 int bt878_num;
 struct bt878 bt878[BT878_MAX];
@@ -339,10 +338,6 @@ static irqreturn_t bt878_irq(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
-extern int bttv_gpio_enable(unsigned int card, unsigned long mask, unsigned long data);
-extern int bttv_read_gpio(unsigned int card, unsigned long *data);
-extern int bttv_write_gpio(unsigned int card, unsigned long mask, unsigned long data);
-
 int
 bt878_device_control(struct bt878 *bt, unsigned int cmd, union dst_gpio_packet *mp)
 {
@@ -386,20 +381,20 @@ bt878_device_control(struct bt878 *bt, unsigned int cmd, union dst_gpio_packet *
 
 EXPORT_SYMBOL(bt878_device_control);
 
-struct bt878 *bt878_find_by_dvb_adap(struct dvb_adapter *adap)
+struct bt878 *bt878_find_by_i2c_adap(struct i2c_adapter *adapter)
 {
 	unsigned int card_nr;
 	
-	printk("bt878 find by dvb adap: checking \"%s\"\n",adap->name);
+	printk("bt878 find by dvb adap: checking \"%s\"\n",adapter->name);
 	for (card_nr = 0; card_nr < bt878_num; card_nr++) {
-		if (bt878[card_nr].adap_ptr == adap)
+		if (bt878[card_nr].adapter == adapter)
 			return &bt878[card_nr];
 	}
-	printk("bt878 find by dvb adap: NOT found \"%s\"\n",adap->name);
+	printk("bt878 find by dvb adap: NOT found \"%s\"\n",adapter->name);
 	return NULL;
 }
 
-EXPORT_SYMBOL(bt878_find_by_dvb_adap);
+EXPORT_SYMBOL(bt878_find_by_i2c_adap);
 
 /***********************/
 /* PCI device handling */
@@ -417,8 +412,6 @@ static int __devinit bt878_probe(struct pci_dev *dev,
 
 	printk(KERN_INFO "bt878: Bt878 AUDIO function found (%d).\n",
 	       bt878_num);
-	if (pci_enable_device(dev))
-		return -EIO;
 
 	bt = &bt878[bt878_num];
 	bt->dev = dev;
@@ -428,10 +421,11 @@ static int __devinit bt878_probe(struct pci_dev *dev,
 	bt->id = dev->device;
 	bt->irq = dev->irq;
 	bt->bt878_adr = pci_resource_start(dev, 0);
+	if (pci_enable_device(dev))
+		return -EIO;
 	if (!request_mem_region(pci_resource_start(dev, 0),
 				pci_resource_len(dev, 0), "bt878")) {
-		result = -EBUSY;
-		goto fail0;
+		return -EBUSY;
 	}
 
 	pci_read_config_byte(dev, PCI_CLASS_REVISION, &bt->revision);
@@ -502,8 +496,6 @@ static int __devinit bt878_probe(struct pci_dev *dev,
       fail1:
 	release_mem_region(pci_resource_start(bt->dev, 0),
 			   pci_resource_len(bt->dev, 0));
-      fail0:
-	pci_disable_device(dev);
 	return result;
 }
 
@@ -520,7 +512,7 @@ static void __devexit bt878_remove(struct pci_dev *pci_dev)
 
 	/* first disable interrupts before unmapping the memory! */
 	btwrite(0, BT878_AINT_MASK);
-	btwrite(~0U, BT878_AINT_STAT);
+	btwrite(~0x0UL, BT878_AINT_STAT);
 
 	/* disable PCI bus-mastering */
 	pci_read_config_byte(bt->dev, PCI_COMMAND, &command);
@@ -543,7 +535,6 @@ static void __devexit bt878_remove(struct pci_dev *pci_dev)
 	bt878_mem_free(bt);
 
 	pci_set_drvdata(pci_dev, NULL);
-	pci_disable_device(pci_dev);
 	return;
 }
 
@@ -610,6 +601,9 @@ EXPORT_SYMBOL(bt878_init_module);
 EXPORT_SYMBOL(bt878_cleanup_module);
 module_init(bt878_init_module);
 module_exit(bt878_cleanup_module);
+
+//MODULE_AUTHOR("XXX");
+MODULE_LICENSE("GPL");
 
 /*
  * Local variables:

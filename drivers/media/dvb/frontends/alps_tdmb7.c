@@ -1,4 +1,4 @@
-/* 
+/*
     Alps TDMB7 DVB OFDM frontend driver
 
     Copyright (C) 2001-2002 Convergence Integrated Media GmbH
@@ -18,20 +18,28 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-*/    
+*/
 
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/string.h>
 #include <linux/slab.h>
 
 #include "dvb_frontend.h"
-#include "dvb_functions.h"
 
+#define FRONTEND_NAME "dvbfe_alps_tdmb7"
 
-static int debug = 0;
-#define dprintk	if (debug) printk
+#define dprintk(args...) \
+	do { \
+		if (debug) printk(KERN_DEBUG FRONTEND_NAME ": " args); \
+	} while (0)
+
+static int debug;
+
+module_param(debug, int, 0644);
+MODULE_PARM_DESC(debug, "Turn on/off frontend debugging (default:off).");
 
 
 static struct dvb_frontend_info tdmb7_info = {
@@ -49,10 +57,14 @@ static struct dvb_frontend_info tdmb7_info = {
 #endif
 	.caps = FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
 	      FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
-	      FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64 | 
+	      FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64 |
               FE_CAN_RECOVER
 };
 
+struct tdmb7_state {
+	struct i2c_adapter *i2c;
+	struct dvb_adapter *dvb;
+};
 
 static u8 init_tab [] = {
 	0x04, 0x10,
@@ -75,8 +87,7 @@ static u8 init_tab [] = {
 	0x47, 0x05,
 };
 
-
-static int cx22700_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
+static int cx22700_writereg (struct i2c_adapter *i2c, u8 reg, u8 data)
 {
 	int ret;
 	u8 buf [] = { reg, data };
@@ -84,42 +95,40 @@ static int cx22700_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 
 	dprintk ("%s\n", __FUNCTION__);
 
-	ret = i2c->xfer (i2c, &msg, 1);
+	ret = i2c_transfer (i2c, &msg, 1);
 
-	if (ret != 1) 
+	if (ret != 1)
 		printk("%s: writereg error (reg == 0x%02x, val == 0x%02x, ret == %i)\n",
 			__FUNCTION__, reg, data, ret);
 
 	return (ret != 1) ? -1 : 0;
 }
 
-
-static u8 cx22700_readreg (struct dvb_i2c_bus *i2c, u8 reg)
+static u8 cx22700_readreg (struct i2c_adapter *i2c, u8 reg)
 {
 	int ret;
 	u8 b0 [] = { reg };
 	u8 b1 [] = { 0 };
 	struct i2c_msg msg [] = { { .addr = 0x43, .flags = 0, .buf = b0, .len = 1 },
 			   { .addr = 0x43, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
-        
+
 	dprintk ("%s\n", __FUNCTION__);
 
-	ret = i2c->xfer (i2c, msg, 2);
-        
-	if (ret != 2) 
+	ret = i2c_transfer (i2c, msg, 2);
+
+	if (ret != 2)
 		printk("%s: readreg error (ret == %i)\n", __FUNCTION__, ret);
 
 	return b1[0];
 }
 
-
-static int pll_write (struct dvb_i2c_bus *i2c, u8 data [4])
+static int pll_write (struct i2c_adapter *i2c, u8 data [4])
 {
 	struct i2c_msg msg = { .addr = 0x61, .flags = 0, .buf = data, .len = 4 };
 	int ret;
 
 	cx22700_writereg (i2c, 0x0a, 0x00);  /* open i2c bus switch */
-	ret = i2c->xfer (i2c, &msg, 1);
+	ret = i2c_transfer (i2c, &msg, 1);
 	cx22700_writereg (i2c, 0x0a, 0x01);  /* close i2c bus switch */
 
 	if (ret != 1)
@@ -128,12 +137,11 @@ static int pll_write (struct dvb_i2c_bus *i2c, u8 data [4])
 	return (ret != 1) ? -1 : 0;
 }
 
-
 /**
- *   set up the downconverter frequency divisor for a 
+ *   set up the downconverter frequency divisor for a
  *   reference clock comparision frequency of 125 kHz.
  */
-static int pll_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
+static int pll_set_tv_freq (struct i2c_adapter *i2c, u32 freq)
 {
 	u32 div = (freq + 36166667) / 166667;
 #if 1 //ALPS_SETTINGS
@@ -149,8 +157,7 @@ static int pll_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
 	return pll_write (i2c, buf);
 }
 
-
-static int cx22700_init (struct dvb_i2c_bus *i2c)
+static int cx22700_init (struct i2c_adapter *i2c)
 {
 	int i;
 
@@ -159,18 +166,17 @@ static int cx22700_init (struct dvb_i2c_bus *i2c)
 	cx22700_writereg (i2c, 0x00, 0x02);   /*  soft reset */
 	cx22700_writereg (i2c, 0x00, 0x00);
 
-	dvb_delay(10);
-	
+	msleep(10);
+
 	for (i=0; i<sizeof(init_tab); i+=2)
 		cx22700_writereg (i2c, init_tab[i], init_tab[i+1]);
 
 	cx22700_writereg (i2c, 0x00, 0x01);
-	
+
 	return 0;
 }
 
-
-static int cx22700_set_inversion (struct dvb_i2c_bus *i2c, int inversion)
+static int cx22700_set_inversion (struct i2c_adapter *i2c, int inversion)
 {
 	u8 val;
 
@@ -190,8 +196,7 @@ static int cx22700_set_inversion (struct dvb_i2c_bus *i2c, int inversion)
 	}
 }
 
-
-static int cx22700_set_tps (struct dvb_i2c_bus *i2c, struct dvb_ofdm_parameters *p)
+static int cx22700_set_tps (struct i2c_adapter *i2c, struct dvb_ofdm_parameters *p)
 {
 	static const u8 qam_tab [4] = { 0, 1, 0, 2 };
 	static const u8 fec_tab [6] = { 0, 1, 2, 0, 3, 4 };
@@ -253,8 +258,7 @@ static int cx22700_set_tps (struct dvb_i2c_bus *i2c, struct dvb_ofdm_parameters 
 	return 0;
 }
 
-
-static int cx22700_get_tps (struct dvb_i2c_bus *i2c, struct dvb_ofdm_parameters *p)
+static int cx22700_get_tps (struct i2c_adapter *i2c, struct dvb_ofdm_parameters *p)
 {
 	static const fe_modulation_t qam_tab [3] = { QPSK, QAM_16, QAM_64 };
 	static const fe_code_rate_t fec_tab [5] = { FEC_1_2, FEC_2_3, FEC_3_4,
@@ -278,7 +282,6 @@ static int cx22700_get_tps (struct dvb_i2c_bus *i2c, struct dvb_ofdm_parameters 
 	else
 		p->constellation = qam_tab[(val >> 3) & 0x3];
 
-
 	val = cx22700_readreg (i2c, 0x02);
 
 	if (((val >> 3) & 0x07) > 4)
@@ -291,7 +294,6 @@ static int cx22700_get_tps (struct dvb_i2c_bus *i2c, struct dvb_ofdm_parameters 
 	else
 		p->code_rate_LP = fec_tab[val & 0x07];
 
-
 	val = cx22700_readreg (i2c, 0x03);
 
 	p->guard_interval = GUARD_INTERVAL_1_32 + ((val >> 6) & 0x3);
@@ -300,10 +302,10 @@ static int cx22700_get_tps (struct dvb_i2c_bus *i2c, struct dvb_ofdm_parameters 
 	return 0;
 }
 
-
 static int tdmb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 {
-	struct dvb_i2c_bus *i2c = fe->i2c;
+	struct tdmb7_state *state = fe->data;
+	struct i2c_adapter *i2c = state->i2c;
 
 	dprintk ("%s\n", __FUNCTION__);
 
@@ -358,7 +360,7 @@ static int tdmb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		*((u16*) arg) = ~rs_ber;
 		break;
 	}
-	case FE_READ_UNCORRECTED_BLOCKS: 
+	case FE_READ_UNCORRECTED_BLOCKS:
 		*((u32*) arg) = cx22700_readreg (i2c, 0x0f);
 		cx22700_writereg (i2c, 0x0f, 0x00);
 		break;
@@ -382,7 +384,7 @@ static int tdmb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
         {
 		struct dvb_frontend_parameters *p = arg;
 		u8 reg09 = cx22700_readreg (i2c, 0x09);
-		
+
 		p->inversion = reg09 & 0x1 ? INVERSION_ON : INVERSION_OFF;
 		return cx22700_get_tps (i2c, &p->u.ofdm);
         }
@@ -406,52 +408,124 @@ static int tdmb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 	return 0;
 }
 
+static struct i2c_client client_template;
 
-
-static int tdmb7_attach (struct dvb_i2c_bus *i2c, void **data)
+static int attach_adapter (struct i2c_adapter *adapter)
 {
-        u8 b0 [] = { 0x7 };
-        u8 b1 [] = { 0 };
-        struct i2c_msg msg [] = { { .addr = 0x43, .flags = 0, .buf = b0, .len = 1 },
-                                  { .addr = 0x43, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
+	struct tdmb7_state *state;
+	struct i2c_client *client;
+	int ret;
+
+	u8 b0 [] = { 0x7 };
+	u8 b1 [] = { 0 };
+	struct i2c_msg msg [] = { { .addr = 0x43, .flags = 0, .buf = b0, .len = 1 },
+				  { .addr = 0x43, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
 
 	dprintk ("%s\n", __FUNCTION__);
 
-        if (i2c->xfer (i2c, msg, 2) != 2)
-                return -ENODEV;
+	if (i2c_transfer(adapter, msg, 2) != 2)
+		return -ENODEV;
 
-	return dvb_register_frontend (tdmb7_ioctl, i2c, NULL, &tdmb7_info);
+	if (NULL == (state = kmalloc(sizeof(struct tdmb7_state), GFP_KERNEL)))
+		return -ENOMEM;
+
+	state->i2c = adapter;
+
+	if (NULL == (client = kmalloc(sizeof(struct i2c_client), GFP_KERNEL))) {
+		kfree(state);
+		return -ENOMEM;
+	}
+
+	memcpy(client, &client_template, sizeof(struct i2c_client));
+	client->adapter = adapter;
+	i2c_set_clientdata(client, state);
+
+	ret = i2c_attach_client(client);
+	if (ret) {
+		kfree(state);
+		kfree(client);
+		return ret;
+	}
+
+	BUG_ON(!state->dvb);
+
+	ret = dvb_register_frontend (tdmb7_ioctl, state->dvb, state,
+					 &tdmb7_info, THIS_MODULE);
+	if (ret) {
+		i2c_detach_client(client);
+		kfree(state);
+		kfree(client);
+		return ret;
+	}
+
+	return 0;
 }
 
-
-static void tdmb7_detach (struct dvb_i2c_bus *i2c, void *data)
+static int detach_client (struct i2c_client *client)
 {
+	struct tdmb7_state *state = i2c_get_clientdata(client);
+
 	dprintk ("%s\n", __FUNCTION__);
 
-	dvb_unregister_frontend (tdmb7_ioctl, i2c);
+	dvb_unregister_frontend (tdmb7_ioctl, state->dvb);
+	i2c_detach_client(client);
+	BUG_ON(state->dvb);
+	kfree(client);
+	kfree(state);
+	return 0;
 }
 
+static int command (struct i2c_client *client,
+		    unsigned int cmd, void *arg)
+{
+	struct tdmb7_state *state = i2c_get_clientdata(client);
+
+	dprintk("%s\n", __FUNCTION__);
+
+	switch (cmd) {
+	case FE_REGISTER:
+		state->dvb = arg;
+		break;
+	case FE_UNREGISTER:
+		state->dvb = NULL;
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
+static struct i2c_driver driver = {
+	.owner		= THIS_MODULE,
+	.name		= FRONTEND_NAME,
+	.id		= I2C_DRIVERID_DVBFE_ALPS_TDMB7,
+	.flags		= I2C_DF_NOTIFY,
+	.attach_adapter	= attach_adapter,
+	.detach_client	= detach_client,
+	.command	= command,
+};
+
+static struct i2c_client client_template = {
+	.name		= FRONTEND_NAME,
+	.flags		= I2C_CLIENT_ALLOW_USE,
+	.driver		= &driver,
+};
 
 static int __init init_tdmb7 (void)
 {
-	dprintk ("%s\n", __FUNCTION__);
-
-	return dvb_register_i2c_device (THIS_MODULE, tdmb7_attach, tdmb7_detach);
+	return i2c_add_driver(&driver);
 }
-
 
 static void __exit exit_tdmb7 (void)
 {
-	dprintk ("%s\n", __FUNCTION__);
-
-	dvb_unregister_i2c_device (tdmb7_attach);
+	if (i2c_del_driver(&driver))
+		printk(KERN_ERR "alps_tdmb7: driver deregistration failed.\n");
 }
 
 module_init (init_tdmb7);
 module_exit (exit_tdmb7);
 
-MODULE_PARM(debug,"i");
-MODULE_PARM_DESC(debug, "enable verbose debug messages");
 MODULE_DESCRIPTION("TDMB7 DVB Frontend driver");
 MODULE_AUTHOR("Holger Waechtler");
 MODULE_LICENSE("GPL");

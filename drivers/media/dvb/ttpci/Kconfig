@@ -1,6 +1,6 @@
 config DVB_AV7110
 	tristate "AV7110 cards"
-	depends on DVB_CORE && PCI
+	depends on DVB_CORE
 	select FW_LOADER
 	select VIDEO_DEV
 	select VIDEO_SAA7146_VV
@@ -11,11 +11,16 @@ config DVB_AV7110
 	  This driver only supports the fullfeatured cards with
 	  onboard MPEG2 decoder.
 
+          This driver needs an external firmware. Please use the script
+          "<kerneldir>/Documentation/dvb/get_dvb_firmware av7110" to
+          download/extract it, and then copy it to /usr/lib/hotplug/firmware.
+
 	  Say Y if you own such a card and want to use it.
 
 config DVB_AV7110_FIRMWARE
 	bool "Compile AV7110 firmware into the driver"
 	depends on DVB_AV7110 && !STANDALONE
+	default y if DVB_AV7110=y
 	help
 	  The AV7110 firmware is normally loaded by the firmware hotplug manager.
 	  If you want to compile the firmware into the driver you need to say
@@ -33,6 +38,7 @@ config DVB_AV7110_FIRMWARE_FILE
 config DVB_AV7110_OSD
 	bool "AV7110 OSD support"
 	depends on DVB_AV7110
+	default y if DVB_AV7110=y || DVB_AV7110=m
 	help
 	  The AV7110 firmware provides some code to generate an OnScreenDisplay
 	  on the video output. This is kind of nonstandard and not guaranteed to
@@ -45,7 +51,7 @@ config DVB_AV7110_OSD
 
 config DVB_BUDGET
 	tristate "Budget cards"
-	depends on DVB_CORE && PCI
+	depends on DVB_CORE
 	select VIDEO_SAA7146
 	help
 	  Support for simple SAA7146 based DVB cards
@@ -59,7 +65,7 @@ config DVB_BUDGET
 
 config DVB_BUDGET_CI
 	tristate "Budget cards with onboard CI connector"
-	depends on DVB_CORE && PCI
+	depends on DVB_CORE
 	select VIDEO_SAA7146
 	help
 	  Support for simple SAA7146 based DVB cards
@@ -76,7 +82,7 @@ config DVB_BUDGET_CI
 
 config DVB_BUDGET_AV
 	tristate "Budget cards with analog video inputs"
-	depends on DVB_CORE && PCI
+	depends on DVB_CORE
 	select VIDEO_DEV
 	select VIDEO_SAA7146_VV
 	help
@@ -91,7 +97,7 @@ config DVB_BUDGET_AV
 
 config DVB_BUDGET_PATCH
 	tristate "AV7110 cards with Budget Patch"
-	depends on DVB_BUDGET
+	depends on DVB_CORE && DVB_BUDGET
 	select DVB_AV7110
 	help
 	  Support for Budget Patch (full TS) modification on 

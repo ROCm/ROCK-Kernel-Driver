@@ -25,6 +25,7 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/sched.h>
 #include <linux/poll.h>
 #include <linux/ioctl.h>
@@ -33,10 +34,11 @@
 #include <asm/system.h>
 
 #include "dmxdev.h"
-#include "dvb_functions.h"
 
-MODULE_PARM(debug,"i");
-static int debug = 0;
+static int debug;
+
+module_param(debug, int, 0644);
+MODULE_PARM_DESC(debug, "Turn on/off debugging (default:off).");
 
 #define dprintk	if (debug) printk
 
@@ -996,6 +998,7 @@ static int dvb_demux_release(struct inode *inode, struct file *file)
 	return dvb_dmxdev_filter_free(dmxdev, dmxdevfilter);
 }
 
+
 static struct file_operations dvb_demux_fops = {
 	.owner		= THIS_MODULE,
 	.read		= dvb_demux_read,
@@ -1005,6 +1008,7 @@ static struct file_operations dvb_demux_fops = {
 	.poll		= dvb_demux_poll,
 };
 
+
 static struct dvb_device dvbdev_demux = {
 	.priv		= NULL,
 	.users		= 1,
@@ -1012,8 +1016,9 @@ static struct dvb_device dvbdev_demux = {
 	.fops		= &dvb_demux_fops
 };
 
+
 static int dvb_dvr_do_ioctl(struct inode *inode, struct file *file,
-			    unsigned int cmd, void *parg)
+		     unsigned int cmd, void *parg)
 {
 	struct dvb_device *dvbdev=(struct dvb_device *) file->private_data;
 	struct dmxdev *dmxdev=(struct dmxdev *) dvbdev->priv;
@@ -1036,8 +1041,9 @@ static int dvb_dvr_do_ioctl(struct inode *inode, struct file *file,
 	return ret;
 }
 
+
 static int dvb_dvr_ioctl(struct inode *inode, struct file *file,
-			 unsigned int cmd, unsigned long arg)
+		  unsigned int cmd, unsigned long arg)
 {
 	return dvb_usercopy(inode, file, cmd, arg, dvb_dvr_do_ioctl);
 }
@@ -1088,7 +1094,7 @@ dvb_dmxdev_init(struct dmxdev *dmxdev, struct dvb_adapter *dvb_adapter)
 {
 	int i;
 
-	if (dmxdev->demux->open(dmxdev->demux)<0)
+	if (dmxdev->demux->open(dmxdev->demux) < 0)
 		return -EUSERS;
 	
 	dmxdev->filter = vmalloc(dmxdev->filternum*sizeof(struct dmxdev_filter));
@@ -1113,6 +1119,7 @@ dvb_dmxdev_init(struct dmxdev *dmxdev, struct dvb_adapter *dvb_adapter)
 		dvb_dmxdev_filter_state_set(&dmxdev->filter[i], DMXDEV_STATE_FREE);
 		dvb_dmxdev_dvr_state_set(&dmxdev->dvr[i], DMXDEV_STATE_FREE);
 	}
+
 	dvb_register_device(dvb_adapter, &dmxdev->dvbdev, &dvbdev_demux, dmxdev, DVB_DEVICE_DEMUX);
 	dvb_register_device(dvb_adapter, &dmxdev->dvr_dvbdev, &dvbdev_dvr, dmxdev, DVB_DEVICE_DVR);
 
@@ -1126,10 +1133,12 @@ dvb_dmxdev_release(struct dmxdev *dmxdev)
 {
 	dvb_unregister_device(dmxdev->dvbdev);
 	dvb_unregister_device(dmxdev->dvr_dvbdev);
+
 	if (dmxdev->filter) {
 		vfree(dmxdev->filter);
 		dmxdev->filter=NULL;
 	}
+
 	if (dmxdev->dvr) {
 		vfree(dmxdev->dvr);
 		dmxdev->dvr=NULL;

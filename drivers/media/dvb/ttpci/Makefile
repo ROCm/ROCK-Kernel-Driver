@@ -13,7 +13,7 @@ obj-$(CONFIG_DVB_AV7110) += dvb-ttpci.o ttpci-eeprom.o
 
 EXTRA_CFLAGS = -Idrivers/media/dvb/dvb-core/
 
-hostprogs-y	:= fdump
+host-progs	:= fdump
 
 ifdef CONFIG_DVB_AV7110_FIRMWARE
 $(obj)/av7110.o: $(obj)/fdump $(obj)/av7110_firm.h 

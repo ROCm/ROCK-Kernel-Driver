@@ -20,12 +20,16 @@
  */    
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 
 #include "dvb_frontend.h"
 
-static int sct = 0;
+#define FRONTEND_NAME "dvbfe_dummy"
 
+static int frontend_type;
+module_param(frontend_type, int, 0444);
+MODULE_PARM_DESC(frontend_type, "0 == DVB-S, 1 == DVB-C, 2 == DVB-T");
 
 /* depending on module parameter sct deliver different infos
  */
@@ -48,13 +52,13 @@ static struct dvb_frontend_info dvb_s_dummyfe_info = {
 };
 
 static struct dvb_frontend_info dvb_c_dummyfe_info = {
-	.name = "DVB-C dummy frontend",
-	.type = FE_QAM,
-	.frequency_stepsize = 62500,
-	.frequency_min = 51000000,
-	.frequency_max = 858000000,
-	.symbol_rate_min = (57840000/2)/64,     /* SACLK/64 == (XIN/2)/64 */
-	.symbol_rate_max = (57840000/2)/4,      /* SACLK/4 */
+	.name			= "DVB-C dummy frontend",
+	.type 			= FE_QAM,
+	.frequency_stepsize	= 62500,
+	.frequency_min 		= 51000000,
+	.frequency_max 		= 858000000,
+	.symbol_rate_min 	= (57840000/2)/64,     /* SACLK/64 == (XIN/2)/64 */
+	.symbol_rate_max 	= (57840000/2)/4,      /* SACLK/4 */
 #if 0
 	.frequency_tolerance	= ???,
 	.symbol_rate_tolerance	= ???,  /* ppm */  /* == 8% (spec p. 5) */
@@ -66,16 +70,16 @@ static struct dvb_frontend_info dvb_c_dummyfe_info = {
 };
 
 static struct dvb_frontend_info dvb_t_dummyfe_info = {
-	.name = "DVB-T dummy frontend",
-	.type = FE_OFDM,
-	.frequency_min = 0,
-	.frequency_max = 863250000,
-	.frequency_stepsize = 62500,
-	/*.frequency_tolerance = */	/* FIXME: 12% of SR */
-	.symbol_rate_min = 0,		/* FIXME */
-	.symbol_rate_max = 9360000,	/* FIXME */
-	.symbol_rate_tolerance = 4000,
-	.notifier_delay = 0,
+	.name			= "DVB-T dummy frontend",
+	.type 			= FE_OFDM,
+	.frequency_min 		= 0,
+	.frequency_max 		= 863250000,
+	.frequency_stepsize	= 62500,
+	/*.frequency_tolerance 	= */	/* FIXME: 12% of SR */
+	.symbol_rate_min 	= 0,		/* FIXME */
+	.symbol_rate_max 	= 9360000,	/* FIXME */
+	.symbol_rate_tolerance 	= 4000,
+	.notifier_delay 	= 0,
 	.caps = FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
 			FE_CAN_FEC_4_5 | FE_CAN_FEC_5_6 | FE_CAN_FEC_6_7 |
 			FE_CAN_FEC_7_8 | FE_CAN_FEC_8_9 | FE_CAN_FEC_AUTO |
@@ -87,8 +91,7 @@ static struct dvb_frontend_info dvb_t_dummyfe_info = {
 
 struct dvb_frontend_info *frontend_info(void)
 {
-	switch(sct)
-	{
+	switch(frontend_type) {
 	case 2:
 		return &dvb_t_dummyfe_info;
 	case 1:
@@ -168,38 +171,96 @@ static int dvbdummyfe_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *ar
         return 0;
 } 
 
+static struct i2c_client client_template;
 
-static int dvbdummyfe_attach (struct dvb_i2c_bus *i2c, void **data)
+static int dvbdummyfe_attach_adapter(struct i2c_adapter *adapter)
 {
-	return dvb_register_frontend (dvbdummyfe_ioctl, i2c, NULL, frontend_info());
+	struct dvb_adapter *dvb;
+	struct i2c_client *client;
+	int ret;
+
+	if ((client = kmalloc(sizeof(struct i2c_client), GFP_KERNEL)) == NULL)
+		return -ENOMEM;
+
+	memcpy(client, &client_template, sizeof(struct i2c_client));
+	client->adapter = adapter;
+
+	if ((ret = i2c_attach_client(client))) {
+		kfree(client);
+		return ret;
+	}
+
+	dvb = i2c_get_clientdata(client);
+	BUG_ON(!dvb);
+
+	if ((ret = dvb_register_frontend(dvbdummyfe_ioctl, dvb, NULL,
+					     frontend_info(), THIS_MODULE))) {
+		kfree(client);
+		return ret;
+	}
+
+	return 0;
 }
 
 
-static void dvbdummyfe_detach (struct dvb_i2c_bus *i2c, void *data)
+static int dvbdummyfe_detach_client(struct i2c_client *client)
 {
-	dvb_unregister_frontend (dvbdummyfe_ioctl, i2c);
+	struct dvb_adapter *dvb = i2c_get_clientdata(client);
+
+	dvb_unregister_frontend(dvbdummyfe_ioctl, dvb);
+	i2c_detach_client(client);
+	kfree(client);
+	return 0;
 }
 
+static int dvbdummyfe_command(struct i2c_client *client,
+			      unsigned int cmd, void *arg)
+{
+	switch(cmd) {
+	case FE_REGISTER:
+		i2c_set_clientdata(client, arg);
+		break;
+	case FE_UNREGISTER:
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
+static struct i2c_driver driver = {
+	.owner		= THIS_MODULE,
+	.name		= FRONTEND_NAME,
+	.id		= I2C_DRIVERID_DVBFE_DUMMY,
+	.flags		= I2C_DF_NOTIFY,
+	.attach_adapter	= dvbdummyfe_attach_adapter,
+	.detach_client	= dvbdummyfe_detach_client,
+	.command	= dvbdummyfe_command,
+};
+
+static struct i2c_client client_template = {
+	.name		= FRONTEND_NAME,
+	.flags		= I2C_CLIENT_ALLOW_USE,
+	.driver		= &driver,
+};
 
 static int __init init_dvbdummyfe (void)
 {
-	return dvb_register_i2c_device (THIS_MODULE,
-					dvbdummyfe_attach, 
-					dvbdummyfe_detach);
+	return i2c_add_driver(&driver);
 }
-
 
 static void __exit exit_dvbdummyfe (void)
 {
-	dvb_unregister_i2c_device (dvbdummyfe_attach);
+	if (i2c_del_driver(&driver))
+		printk(KERN_ERR "dummyfe: driver deregistration failed.\n");
 }
 
 
 module_init(init_dvbdummyfe);
 module_exit(exit_dvbdummyfe);
 
-
 MODULE_DESCRIPTION("DVB DUMMY Frontend");
 MODULE_AUTHOR("Emard");
 MODULE_LICENSE("GPL");
-MODULE_PARM(sct, "i");
+

@@ -569,11 +569,11 @@ int dvb_filter_pes2ts(struct dvb_filter_pes2ts *p2ts, unsigned char *pes,
 {
 	unsigned char *buf=p2ts->buf;
 	int ret=0, rest;
-	
+
 	//len=6+((pes[4]<<8)|pes[5]);
 
 	if (payload_start)
-	buf[1]|=0x40;
+		buf[1]|=0x40;
 	else
 		buf[1]&=~0x40;
 	while (len>=184) {

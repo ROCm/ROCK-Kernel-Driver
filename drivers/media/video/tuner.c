@@ -129,7 +129,8 @@ struct tunertype
 	unsigned char config; 
 	unsigned short IFPCoff; /* 622.4=16*38.90 MHz PAL, 
 				   732  =16*45.75 NTSCi, 
-				   940  =58.75 NTSC-Japan */
+				   940  =16*58.75 NTSC-Japan
+				   704  =16*44    ATSC */
 };
 
 /*
@@ -244,10 +245,14 @@ static struct tunertype tuners[] = {
 	{ "Panasonic VP27s/ENGE4324D", Panasonic, NTSC,
 	  16*160.00,16*454.00,0x01,0x02,0x08,0xce,940},
         { "LG NTSC (TAPE series)", LGINNOTEK, NTSC,
-          16*170.00, 16*450.00, 0x01,0x02,0x04,0x8e,732 },
+          16*160.00,16*442.00,0x01,0x02,0x04,0xc8,732 },
 
         { "Tenna TNF 8831 BGFF)", Philips, PAL,
           16*161.25,16*463.25,0xa0,0x90,0x30,0x8e,623},
+	{ "Microtune 4042 FI5 ATSC/NTSC dual in", Microtune, NTSC,
+	  16*162.00,16*457.00,0xa2,0x94,0x31,0x8e,732},
+        { "TCL 2002N", TCL, NTSC,
+          16*172.00,16*448.00,0x01,0x02,0x08,0x88,732},
 
 };
 #define TUNERS ARRAY_SIZE(tuners)
@@ -550,7 +555,7 @@ static void mt2032_set_tv_freq(struct i2c_client *c, unsigned int freq)
 		// NTSC
 		from = 40750*1000;
 		to   = 46750*1000;
-		if2  = 45750*1000;
+		if2  = 45750*1000; 
 	} else {
 		// PAL
 		from = 32900*1000;
@@ -854,7 +859,7 @@ static void default_set_tv_freq(struct i2c_client *c, unsigned int freq)
 
 		} else if (t->std & V4L2_STD_PAL_DK) {
 			config |= TEMIC_SET_PAL_DK;
-
+			
 		} else if (t->std & V4L2_STD_SECAM_L) {
 			config |= TEMIC_SET_PAL_L;
 
@@ -882,12 +887,16 @@ static void default_set_tv_freq(struct i2c_client *c, unsigned int freq)
 		/* 0x02 -> NTSC antenna input 1 */
 		/* 0x03 -> NTSC antenna input 2 */
 		config &= ~0x03;
-		if (t->std & V4L2_STD_ATSC)
+		if (!(t->std & V4L2_STD_ATSC))
 			config |= 2;
 		/* FIXME: input */
 		break;
-	}
 
+	case TUNER_MICROTUNE_4042FI5:
+		/* Set the charge pump for fast tuning */
+		tun->config |= 0x40;
+		break;
+	}
 	
 	/*
 	 * Philips FI1216MK2 remark from specification :
@@ -921,6 +930,37 @@ static void default_set_tv_freq(struct i2c_client *c, unsigned int freq)
         if (4 != (rc = i2c_master_send(c,buffer,4)))
                 printk("tuner: i2c i/o error: rc == %d (should be 4)\n",rc);
 
+	if (t->type == TUNER_MICROTUNE_4042FI5) {
+		// FIXME - this may also work for other tuners
+		unsigned long timeout = jiffies + msecs_to_jiffies(1);
+		u8 status_byte = 0;
+
+		/* Wait until the PLL locks */
+		for (;;) {
+			if (time_after(jiffies,timeout))
+				return;
+			if (1 != (rc = i2c_master_recv(c,&status_byte,1))) {
+				dprintk("tuner: i2c i/o read error: rc == %d (should be 1)\n",rc);
+				break;
+			}
+			/* bit 6 is PLL locked indicator */
+			if (status_byte & 0x40)
+				break;
+			udelay(10);
+		}
+		
+		/* Set the charge pump for optimized phase noise figure */
+		tun->config &= ~0x40;
+		buffer[0] = (div>>8) & 0x7f;
+		buffer[1] = div      & 0xff;
+		buffer[2] = tun->config;
+		buffer[3] = config;
+		dprintk("tuner: tv 0x%02x 0x%02x 0x%02x 0x%02x\n",
+			buffer[0],buffer[1],buffer[2],buffer[3]);
+
+		if (4 != (rc = i2c_master_send(c,buffer,4)))
+			dprintk("tuner: i2c i/o error: rc == %d (should be 4)\n",rc);
+	}
 }
 
 static void default_set_radio_freq(struct i2c_client *c, unsigned int freq)

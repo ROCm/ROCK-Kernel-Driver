@@ -219,18 +219,18 @@ struct mpg_picture {
                   /* [0] 1st field, [1] 2nd field */
 
         s8        picture_coding_type[2];
-                 /* [0] 1st field, [1] 2nd field */
+                  /* [0] 1st field, [1] 2nd field */
         s8        picture_structure[2];
-                 /* [0] 1st field, [1] 2nd field */
+                  /* [0] 1st field, [1] 2nd field */
         s8        picture_display_extension_flag[2];
-                 /* [0] 1st field, [1] 2nd field */
-                 /* picture_display_extenion() 0:no 1:exit*/
+                  /* [0] 1st field, [1] 2nd field */
+                  /* picture_display_extenion() 0:no 1:exit*/
         s8        pts_flag[2];
-                 /* [0] 1st field, [1] 2nd field */
+                  /* [0] 1st field, [1] 2nd field */
 };
 
 struct dvb_audio_info {
-	int layer               ;
+	int layer;
 	u32 bit_rate;
 	u32 frequency;
 	u32 mode;

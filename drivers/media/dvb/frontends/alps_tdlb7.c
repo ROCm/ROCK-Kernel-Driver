@@ -19,34 +19,34 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 */
+/*
+ * This driver needs external firmware. Please use the command
+ * "<kerneldir>/Documentation/dvb/get_dvb_firmware alps_tdlb7" to
+ * download/extract it, and then copy it to /usr/lib/hotplug/firmware.
+ */ 
+#define SP887X_DEFAULT_FIRMWARE "dvb-fe-tdlb7-2.16.fw"
 
-
-/* 
-    This driver needs a copy of the firmware file 'Sc_main.mc' from the Haupauge
-    windows driver in the '/usr/lib/DVB/driver/frontends' directory.
-    You can also pass the complete file name with the module parameter 'firmware_file'.
-    
-*/  
-
-#include <linux/module.h>
 #include <linux/init.h>
-#include <linux/vmalloc.h>
-#include <linux/fs.h>
-#include <linux/unistd.h>
+#include <linux/module.h>
+#include <linux/moduleparam.h>
+#include <linux/device.h>
+#include <linux/firmware.h>
 #include <linux/delay.h>
-#include <linux/syscalls.h>
 
 #include "dvb_frontend.h"
-#include "dvb_functions.h"
 
-#ifndef CONFIG_ALPS_TDLB7_FIRMWARE_LOCATION
-#define CONFIG_ALPS_TDLB7_FIRMWARE_LOCATION "/usr/lib/DVB/driver/frontends/Sc_main.mc"
-#endif
+#define FRONTEND_NAME "dvbfe_alps_tdlb7"
 
-static char * firmware_file = CONFIG_ALPS_TDLB7_FIRMWARE_LOCATION;
-static int debug = 0;
+#define dprintk(args...) \
+	do { \
+		if (debug) printk(KERN_DEBUG FRONTEND_NAME ": " args); \
+	} while (0)
 
-#define dprintk	if (debug) printk
+static int debug;
+
+module_param(debug, int, 0644);
+MODULE_PARM_DESC(debug, "Turn on/off frontend debugging (default:off).");
+
 
 /* firmware size for sp8870 */
 #define SP8870_FIRMWARE_SIZE 16382
@@ -68,14 +68,18 @@ static struct dvb_frontend_info tdlb7_info = {
 				  FE_CAN_HIERARCHY_AUTO |  FE_CAN_RECOVER
 };
 
+struct tdlb7_state {
+	struct i2c_adapter *i2c;
+	struct dvb_adapter *dvb;
+};
 
-static int sp8870_writereg (struct dvb_i2c_bus *i2c, u16 reg, u16 data)
+static int sp8870_writereg (struct i2c_adapter *i2c, u16 reg, u16 data)
 {
         u8 buf [] = { reg >> 8, reg & 0xff, data >> 8, data & 0xff };
 	struct i2c_msg msg = { .addr = 0x71, .flags = 0, .buf = buf, .len = 4 };
 	int err;
 
-        if ((err = i2c->xfer (i2c, &msg, 1)) != 1) {
+        if ((err = i2c_transfer (i2c, &msg, 1)) != 1) {
 		dprintk ("%s: writereg error (err == %i, reg == 0x%02x, data == 0x%02x)\n", __FUNCTION__, err, reg, data);
 		return -EREMOTEIO;
 	}
@@ -83,8 +87,7 @@ static int sp8870_writereg (struct dvb_i2c_bus *i2c, u16 reg, u16 data)
         return 0;
 }
 
-
-static u16 sp8870_readreg (struct dvb_i2c_bus *i2c, u16 reg)
+static u16 sp8870_readreg (struct i2c_adapter *i2c, u16 reg)
 {
 	int ret;
 	u8 b0 [] = { reg >> 8 , reg & 0xff };
@@ -92,7 +95,7 @@ static u16 sp8870_readreg (struct dvb_i2c_bus *i2c, u16 reg)
 	struct i2c_msg msg [] = { { .addr = 0x71, .flags = 0, .buf = b0, .len = 2 },
 			   { .addr = 0x71, .flags = I2C_M_RD, .buf = b1, .len = 2 } };
 
-	ret = i2c->xfer (i2c, msg, 2);
+	ret = i2c_transfer (i2c, msg, 2);
 
 	if (ret != 2) {
 		dprintk("%s: readreg error (ret == %i)\n", __FUNCTION__, ret);
@@ -102,22 +105,26 @@ static u16 sp8870_readreg (struct dvb_i2c_bus *i2c, u16 reg)
 	return (b1[0] << 8 | b1[1]);
 }
 
-
-static int sp5659_write (struct dvb_i2c_bus *i2c, u8 data [4])
+static int sp5659_write (struct i2c_adapter *i2c, u8 data [4])
 {
         int ret;
-        struct i2c_msg msg = { .addr = 0x60, .flags = 0, .buf = data, .len = 4 };
 
-        ret = i2c->xfer (i2c, &msg, 1);
+        u8 buf_open [] = { 0x206 >> 8, 0x206 & 0xff, 0x001 >> 8, 0x001 & 0xff };
+        u8 buf_close [] = { 0x206 >> 8, 0x206 & 0xff, 0x000 >> 8, 0x000 & 0xff };
 
-        if (ret != 1)
+        struct i2c_msg msg[3] = { {.addr = 0x71, .flags = 0, .buf = buf_open, .len = 4 },
+				  {.addr = 0x60, .flags = 0, .buf = data, .len = 4 },
+				  {.addr = 0x71, .flags = 0, .buf = buf_close, .len = 4 } };
+
+        ret = i2c_transfer (i2c, &msg[0], 3);
+
+        if (ret != 3)
                 printk("%s: i/o error (ret == %i)\n", __FUNCTION__, ret);
 
-        return (ret != 1) ? -1 : 0;
+        return (ret != 3) ? -EREMOTEIO : 0;
 }
 
-
-static void sp5659_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
+static void sp5659_set_tv_freq (struct i2c_adapter *i2c, u32 freq)
 {
         u32 div = (freq + 36200000) / 166666;
         u8 buf [4];
@@ -125,7 +132,7 @@ static void sp5659_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
 
 	if (freq <= 782000000)
 		pwr = 1;
-	else 
+	else
 		pwr = 2;
 
 	buf[0] = (div >> 8) & 0x7f;
@@ -134,67 +141,25 @@ static void sp5659_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
 	buf[3] = pwr << 6;
 
 	/* open i2c gate for PLL message transmission... */
-	sp8870_writereg(i2c, 0x206, 0x001);
 	sp5659_write (i2c, buf);
-	sp8870_writereg(i2c, 0x206, 0x000);
 }
 
-
-static int sp8870_read_firmware_file (const char *fn, char **fp)
-{
-        int fd;
-	loff_t filesize;
-	char *dp;
-
-	fd = sys_open(fn, 0, 0);
-	if (fd == -1) {
-                printk("%s: unable to open '%s'.\n", __FUNCTION__, fn);
-		return -EIO;
-	}
-
-	filesize = sys_lseek(fd, 0L, 2);
-	if (filesize <= 0 || filesize < SP8870_FIRMWARE_OFFSET + SP8870_FIRMWARE_SIZE) {
-	        printk("%s: firmware filesize to small '%s'\n", __FUNCTION__, fn);
-		sys_close(fd);
-		return -EIO;
-	}
-
-	*fp= dp = vmalloc(SP8870_FIRMWARE_SIZE);
-	if (dp == NULL)	{
-		printk("%s: out of memory loading '%s'.\n", __FUNCTION__, fn);
-		sys_close(fd);
-		return -EIO;
-	}
-
-	sys_lseek(fd, SP8870_FIRMWARE_OFFSET, 0);
-	if (sys_read(fd, dp, SP8870_FIRMWARE_SIZE) != SP8870_FIRMWARE_SIZE) {
-		printk("%s: failed to read '%s'.\n",__FUNCTION__, fn);
-		vfree(dp);
-		sys_close(fd);
-		return -EIO;
-	}
-
-	sys_close(fd);
-	*fp = dp;
-
-	return 0;
-}
-
-
-static int sp8870_firmware_upload (struct dvb_i2c_bus *i2c)
+static int sp8870_firmware_upload (struct i2c_adapter *i2c, const struct firmware *fw)
 {
 	struct i2c_msg msg;
-	char *fw_buf = NULL;
+	char *fw_buf = fw->data;
 	int fw_pos;
 	u8 tx_buf[255];
 	int tx_len;
 	int err = 0;
-	mm_segment_t fs = get_fs();
 
 	dprintk ("%s: ...\n", __FUNCTION__);
 
-	// system controller stop 
-	sp8870_writereg(i2c,0x0F00,0x0000);
+	if (fw->size < SP8870_FIRMWARE_SIZE + SP8870_FIRMWARE_OFFSET)
+		return -EINVAL;
+
+	// system controller stop
+	sp8870_writereg(i2c, 0x0F00, 0x0000);
 
 	// instruction RAM register hiword
 	sp8870_writereg(i2c, 0x8F08, ((SP8870_FIRMWARE_SIZE / 2) & 0xFFFF));
@@ -202,44 +167,31 @@ static int sp8870_firmware_upload (struct dvb_i2c_bus *i2c)
 	// instruction RAM MWR
 	sp8870_writereg(i2c, 0x8F0A, ((SP8870_FIRMWARE_SIZE / 2) >> 16));
 
-	// reading firmware file to buffer
-	set_fs(get_ds());
-        err = sp8870_read_firmware_file(firmware_file, (char**) &fw_buf);
-	set_fs(fs);
-	if (err != 0) {
-		printk("%s: reading firmware file failed!\n", __FUNCTION__);
-		return err;
-	}
-
 	// do firmware upload
-	fw_pos = 0;
-	while (fw_pos < SP8870_FIRMWARE_SIZE){
-		tx_len = (fw_pos <= SP8870_FIRMWARE_SIZE - 252) ? 252 : SP8870_FIRMWARE_SIZE - fw_pos;
+	fw_pos = SP8870_FIRMWARE_OFFSET;
+	while (fw_pos < SP8870_FIRMWARE_SIZE + SP8870_FIRMWARE_OFFSET){
+		tx_len = (fw_pos <= SP8870_FIRMWARE_SIZE + SP8870_FIRMWARE_OFFSET - 252) ? 252 : SP8870_FIRMWARE_SIZE + SP8870_FIRMWARE_OFFSET - fw_pos;
 		// write register 0xCF0A
 		tx_buf[0] = 0xCF;
 		tx_buf[1] = 0x0A;
 		memcpy(&tx_buf[2], fw_buf + fw_pos, tx_len);
-		msg.addr=0x71;
-		msg.flags=0;
+		msg.addr = 0x71;
+		msg.flags = 0;
 		msg.buf = tx_buf;
 		msg.len = tx_len + 2;
-        	if ((err = i2c->xfer (i2c, &msg, 1)) != 1) {
+        	if ((err = i2c_transfer (i2c, &msg, 1)) != 1) {
 			printk("%s: firmware upload failed!\n", __FUNCTION__);
 			printk ("%s: i2c error (err == %i)\n", __FUNCTION__, err);
-        		vfree(fw_buf);
 			return err;
 		}
 		fw_pos += tx_len;
 	}
 
-	vfree(fw_buf);
-
 	dprintk ("%s: done!\n", __FUNCTION__);
 	return 0;
 };
 
-
-static void sp8870_microcontroller_stop (struct dvb_i2c_bus *i2c)
+static void sp8870_microcontroller_stop (struct i2c_adapter *i2c)
 {
 	sp8870_writereg(i2c, 0x0F08, 0x000);
 	sp8870_writereg(i2c, 0x0F09, 0x000);
@@ -248,8 +200,7 @@ static void sp8870_microcontroller_stop (struct dvb_i2c_bus *i2c)
 	sp8870_writereg(i2c, 0x0F00, 0x000);
 }
 
-
-static void sp8870_microcontroller_start (struct dvb_i2c_bus *i2c)
+static void sp8870_microcontroller_start (struct i2c_adapter *i2c)
 {
 	sp8870_writereg(i2c, 0x0F08, 0x000);
 	sp8870_writereg(i2c, 0x0F09, 0x000);
@@ -261,25 +212,24 @@ static void sp8870_microcontroller_start (struct dvb_i2c_bus *i2c)
 	sp8870_readreg(i2c, 0x0D01);
 }
 
-
-static int sp8870_init (struct dvb_i2c_bus *i2c)
+static int sp8870_init (struct i2c_adapter *i2c)
 {
 	dprintk ("%s\n", __FUNCTION__);
 
 	/* enable TS output and interface pins */
 	sp8870_writereg(i2c, 0xc18, 0x00d);
 
-	// system controller stop 
+	// system controller stop
 	sp8870_microcontroller_stop(i2c);
 
 	// ADC mode
-	sp8870_writereg(i2c,0x0301,0x0003);
+	sp8870_writereg(i2c, 0x0301, 0x0003);
 
 	// Reed Solomon parity bytes passed to output
-	sp8870_writereg(i2c,0x0C13,0x0001);
+	sp8870_writereg(i2c, 0x0C13, 0x0001);
 
 	// MPEG clock is suppressed if no valid data
-	sp8870_writereg(i2c,0x0C14,0x0001);
+	sp8870_writereg(i2c, 0x0C14, 0x0001);
 
 	/* bit 0x010: enable data valid signal */
 	sp8870_writereg(i2c, 0x0D00, 0x010);
@@ -288,8 +238,7 @@ static int sp8870_init (struct dvb_i2c_bus *i2c)
 	return 0;
 }
 
-
-static int sp8870_read_status (struct dvb_i2c_bus *i2c,  fe_status_t * fe_status)
+static int sp8870_read_status (struct i2c_adapter *i2c,  fe_status_t * fe_status)
 {
 	int status;
 	int signal;
@@ -314,8 +263,7 @@ static int sp8870_read_status (struct dvb_i2c_bus *i2c,  fe_status_t * fe_status
 	return 0;
 }
 
-
-static int sp8870_read_ber (struct dvb_i2c_bus *i2c, u32 * ber)
+static int sp8870_read_ber (struct i2c_adapter *i2c, u32 * ber)
 {
 	int ret;
 	u32 tmp;
@@ -340,11 +288,10 @@ static int sp8870_read_ber (struct dvb_i2c_bus *i2c, u32 * ber)
 	*ber = tmp;
 
 	return 0;
-	}
+}
 
-
-static int sp8870_read_signal_strength (struct dvb_i2c_bus *i2c,  u16 * signal)
-	{
+static int sp8870_read_signal_strength (struct i2c_adapter *i2c,  u16 * signal)
+{
 	int ret;
 	u16 tmp;
 
@@ -366,21 +313,19 @@ static int sp8870_read_signal_strength (struct dvb_i2c_bus *i2c,  u16 * signal)
 		*signal = 0xFFFF - tmp;
 
 	return 0;
-	}
+}
 
+static int sp8870_read_snr(struct i2c_adapter *i2c, u32* snr)
+{
+	*snr = 0;
+	return -EOPNOTSUPP;
+}
 
-static int sp8870_read_snr(struct dvb_i2c_bus *i2c, u32* snr)
-	{
-                *snr=0;  
-		return -EOPNOTSUPP;
-	}
-
-
-static int sp8870_read_uncorrected_blocks (struct dvb_i2c_bus *i2c, u32* ublocks)
-	{
+static int sp8870_read_uncorrected_blocks (struct i2c_adapter *i2c, u32* ublocks)
+{
 		int ret;
 
-		*ublocks=0;  
+		*ublocks = 0;
 
 		ret = sp8870_readreg(i2c, 0xC0C);
 		if (ret < 0)
@@ -392,14 +337,12 @@ static int sp8870_read_uncorrected_blocks (struct dvb_i2c_bus *i2c, u32* ublocks
 		*ublocks = ret;
 
 		return 0;
-	}
+}
 
-
-static int sp8870_read_data_valid_signal(struct dvb_i2c_bus *i2c)
+static int sp8870_read_data_valid_signal(struct i2c_adapter *i2c)
 {
 	return (sp8870_readreg(i2c, 0x0D02) > 0);
 }
-
 
 static
 int configure_reg0xc05 (struct dvb_frontend_parameters *p, u16 *reg0xc05)
@@ -473,59 +416,57 @@ int configure_reg0xc05 (struct dvb_frontend_parameters *p, u16 *reg0xc05)
 	return 0;
 }
 
-
-static int sp8870_set_frontend_parameters (struct dvb_i2c_bus *i2c,
+static int sp8870_set_frontend_parameters (struct i2c_adapter *i2c,
 				      struct dvb_frontend_parameters *p)
-        {
+{
 	int  err;
 	u16 reg0xc05;
 
 	if ((err = configure_reg0xc05(p, &reg0xc05)))
 		return err;
 
-		// system controller stop 
+	// system controller stop
 	sp8870_microcontroller_stop(i2c);
 
 	// set tuner parameters
-		sp5659_set_tv_freq (i2c, p->frequency);
+	sp5659_set_tv_freq (i2c, p->frequency);
 
-		// sample rate correction bit [23..17]
-		sp8870_writereg(i2c,0x0319,0x000A);
-		
-		// sample rate correction bit [16..0]
-		sp8870_writereg(i2c,0x031A,0x0AAB);
+	// sample rate correction bit [23..17]
+	sp8870_writereg(i2c, 0x0319, 0x000A);
 
-		// integer carrier offset 
-		sp8870_writereg(i2c,0x0309,0x0400);
+	// sample rate correction bit [16..0]
+	sp8870_writereg(i2c, 0x031A, 0x0AAB);
 
-		// fractional carrier offset
-		sp8870_writereg(i2c,0x030A,0x0000);
+	// integer carrier offset
+	sp8870_writereg(i2c, 0x0309, 0x0400);
 
-		// filter for 6/7/8 Mhz channel
-		if (p->u.ofdm.bandwidth == BANDWIDTH_6_MHZ)
-			sp8870_writereg(i2c,0x0311,0x0002);
-		else if (p->u.ofdm.bandwidth == BANDWIDTH_7_MHZ)
-			sp8870_writereg(i2c,0x0311,0x0001);
-		else
-			sp8870_writereg(i2c,0x0311,0x0000);
+	// fractional carrier offset
+	sp8870_writereg(i2c, 0x030A, 0x0000);
 
-		// scan order: 2k first = 0x0000, 8k first = 0x0001 
-		if (p->u.ofdm.transmission_mode == TRANSMISSION_MODE_2K)
-			sp8870_writereg(i2c,0x0338,0x0000);
-		else
-			sp8870_writereg(i2c,0x0338,0x0001);
+	// filter for 6/7/8 Mhz channel
+	if (p->u.ofdm.bandwidth == BANDWIDTH_6_MHZ)
+		sp8870_writereg(i2c, 0x0311, 0x0002);
+	else if (p->u.ofdm.bandwidth == BANDWIDTH_7_MHZ)
+		sp8870_writereg(i2c, 0x0311, 0x0001);
+	else
+		sp8870_writereg(i2c, 0x0311, 0x0000);
+
+	// scan order: 2k first = 0x0000, 8k first = 0x0001
+	if (p->u.ofdm.transmission_mode == TRANSMISSION_MODE_2K)
+		sp8870_writereg(i2c, 0x0338, 0x0000);
+	else
+		sp8870_writereg(i2c, 0x0338, 0x0001);
 
 	sp8870_writereg(i2c, 0xc05, reg0xc05);
 
 	// read status reg in order to clear pending irqs
 	sp8870_readreg(i2c, 0x200);
 
-		// system controller start
+	// system controller start
 	sp8870_microcontroller_start(i2c);
 
 	return 0;
-        }
-
+}
 
 // number of trials to recover from lockup
 #define MAXTRIALS 5
@@ -537,8 +478,8 @@ static int lockups = 0;
 // only for debugging: counter for channel switches
 static int switches = 0;
 
-static int sp8870_set_frontend (struct dvb_i2c_bus *i2c, struct dvb_frontend_parameters *p)
-	{
+static int sp8870_set_frontend (struct i2c_adapter *i2c, struct dvb_frontend_parameters *p)
+{
 	/*
 	    The firmware of the sp8870 sometimes locks up after setting frontend parameters.
 	    We try to detect this by checking the data valid signal.
@@ -569,7 +510,7 @@ static int sp8870_set_frontend (struct dvb_i2c_bus *i2c, struct dvb_frontend_par
 			udelay(10);
 		}
 		if (valid)
-		break;
+			break;
 	}
 
 	if (!valid) {
@@ -592,24 +533,22 @@ static int sp8870_set_frontend (struct dvb_i2c_bus *i2c, struct dvb_frontend_par
 	return 0;
 }
 
-
-static int sp8870_sleep(struct dvb_i2c_bus *i2c)
+static int sp8870_sleep(struct i2c_adapter *i2c)
 {
 	// tristate TS output and disable interface pins
 	return sp8870_writereg(i2c, 0xC18, 0x000);
 }
 
-
-static int sp8870_wake_up(struct dvb_i2c_bus *i2c)
+static int sp8870_wake_up(struct i2c_adapter *i2c)
 {
 	// enable TS output and interface pins
 	return sp8870_writereg(i2c, 0xC18, 0x00D);
 }
 
-
 static int tdlb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 {
-	struct dvb_i2c_bus *i2c = fe->i2c;
+	struct tdlb7_state *state = (struct tdlb7_state *) fe->data;
+	struct i2c_adapter *i2c = state->i2c;
 
         switch (cmd) {
         case FE_GET_INFO:
@@ -664,61 +603,144 @@ static int tdlb7_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
         return 0;
 }
 
+static struct i2c_client client_template;
 
-static int tdlb7_attach (struct dvb_i2c_bus *i2c, void **data)
+static int attach_adapter(struct i2c_adapter *adapter)
 {
-        u8 b0 [] = { 0x02 , 0x00 };
+	struct i2c_client *client;
+	struct tdlb7_state *state;
+	const struct firmware *fw;
+	int ret;
+
+	u8 b0 [] = { 0x02 , 0x00 };
         u8 b1 [] = { 0, 0 };
         struct i2c_msg msg [] = { { .addr = 0x71, .flags = 0, .buf = b0, .len = 2 },
                                   { .addr = 0x71, .flags = I2C_M_RD, .buf = b1, .len = 2 } };
 
 	dprintk ("%s\n", __FUNCTION__);
 
-        if (i2c->xfer (i2c, msg, 2) != 2)
+	if (NULL == (client = kmalloc(sizeof(struct i2c_client), GFP_KERNEL))) {
+		return -ENOMEM;
+	}
+
+	if (NULL == (state = kmalloc(sizeof(struct tdlb7_state), GFP_KERNEL))) {
+		kfree(client);
+		return -ENOMEM;
+	}
+	state->i2c = adapter;
+
+        if (i2c_transfer (adapter, msg, 2) != 2) {
+		kfree(state);
+		kfree(client);
                 return -ENODEV;
+	}
 
-	sp8870_firmware_upload(i2c);
+	memcpy(client, &client_template, sizeof(struct i2c_client));
+	client->adapter = adapter;
+	i2c_set_clientdata(client, (void*)state);
 
-	return dvb_register_frontend (tdlb7_ioctl, i2c, NULL, &tdlb7_info);
+	ret = i2c_attach_client(client);
+	if (ret) {
+		kfree(client);
+		kfree(state);
+		return ret;
+	}
+
+	/* request the firmware, this will block until someone uploads it */
+	printk("tdlb7: waiting for firmware upload...\n");
+	ret = request_firmware(&fw, SP887X_DEFAULT_FIRMWARE, &client->dev);
+	if (ret) {
+		printk("tdlb7: no firmware upload (timeout or file not found?)\n");
+		goto out;
+	}
+
+	ret = sp8870_firmware_upload(adapter, fw);
+	if (ret) {
+		printk("tdlb7: writing firmware to device failed\n");
+		release_firmware(fw);
+		goto out;
+	}
+
+	ret = dvb_register_frontend(tdlb7_ioctl, state->dvb, state,
+					&tdlb7_info, THIS_MODULE);
+	if (ret) {
+		printk("tdlb7: registering frontend to dvb-core failed.\n");
+		release_firmware(fw);
+		goto out;
+	}
+
+	return 0;
+out:
+	i2c_detach_client(client);
+	kfree(client);
+	kfree(state);
+	return ret;
 }
 
-
-static void tdlb7_detach (struct dvb_i2c_bus *i2c, void *data)
+static int detach_client(struct i2c_client *client)
 {
+	struct tdlb7_state *state = (struct tdlb7_state*)i2c_get_clientdata(client);
+
 	dprintk ("%s\n", __FUNCTION__);
 
-	dvb_unregister_frontend (tdlb7_ioctl, i2c);
+	dvb_unregister_frontend (tdlb7_ioctl, state->dvb);
+	i2c_detach_client(client);
+	BUG_ON(state->dvb);
+	kfree(client);
+	kfree(state);
+	return 0;
 }
 
-
-static int __init init_tdlb7 (void)
+static int command (struct i2c_client *client, unsigned int cmd, void *arg)
 {
+	struct tdlb7_state *state = (struct tdlb7_state*)i2c_get_clientdata(client);
+
 	dprintk ("%s\n", __FUNCTION__);
 
-	return dvb_register_i2c_device (THIS_MODULE, tdlb7_attach, tdlb7_detach);
+	switch (cmd) {
+	case FE_REGISTER:
+		state->dvb = (struct dvb_adapter*)arg;
+		break;
+	case FE_UNREGISTER:
+		state->dvb = NULL;
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+	return 0;
 }
 
+static struct i2c_driver driver = {
+	.owner 		= THIS_MODULE,
+	.name 		= FRONTEND_NAME,
+	.id 		= I2C_DRIVERID_DVBFE_ALPS_TDLB7,
+	.flags 		= I2C_DF_NOTIFY,
+	.attach_adapter = attach_adapter,
+	.detach_client 	= detach_client,
+	.command 	= command,
+};
 
-static void __exit exit_tdlb7 (void)
+static struct i2c_client client_template = {
+	.name		= FRONTEND_NAME,
+	.flags 		= I2C_CLIENT_ALLOW_USE,
+	.driver  	= &driver,
+};
+
+static int __init init_tdlb7(void)
 {
-	dprintk ("%s\n", __FUNCTION__);
-
-	dvb_unregister_i2c_device (tdlb7_attach);
+	return i2c_add_driver(&driver);
 }
 
+static void __exit exit_tdlb7(void)
+{
+	if (i2c_del_driver(&driver))
+		printk("tdlb7: driver deregistration failed\n");
+}
 
 module_init(init_tdlb7);
 module_exit(exit_tdlb7);
 
-
-MODULE_PARM(debug,"i");
-MODULE_PARM_DESC(debug, "enable verbose debug messages");
-
-MODULE_PARM(firmware_file,"s");
-MODULE_PARM_DESC(firmware_file, "where to find the firmware file");
-
 MODULE_DESCRIPTION("TDLB7 DVB-T Frontend");
 MODULE_AUTHOR("Juergen Peitz");
 MODULE_LICENSE("GPL");
-
 

@@ -8,7 +8,7 @@
 	<ralph@convergence.de>,
 	<holger@convergence.de>,
 	<js@convergence.de>
-    
+
 
     Philips SU1278/SH
 
@@ -18,7 +18,7 @@
     LG TDQF-S001F
 
     Copyright (C) 2002 Felix Domke <tmbinc@elitedvb.net>
-                     & Andreas Oberritter <obi@linuxtv.org>
+		     & Andreas Oberritter <obi@linuxtv.org>
 
 
     Support for Samsung TBMU24112IMB used on Technisat SkyStar2 rev. 2.6B
@@ -43,43 +43,51 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-*/    
+*/
 
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <asm/div64.h>
 
 #include "dvb_frontend.h"
-#include "dvb_functions.h"
 
-#if 0
-#define dprintk(x...) printk(x)
-#else
-#define dprintk(x...)
-#endif
+#define FRONTEND_NAME "dvbfe_stv0299"
 
-static int stv0299_status = 0;
-static int disable_typhoon = 0;
+#define dprintk(args...) \
+	do { \
+		if (debug) printk(KERN_DEBUG FRONTEND_NAME ": " args); \
+	} while (0)
+
+static int debug;
+static int stv0299_status;
+
+module_param(debug, int, 0644);
+MODULE_PARM_DESC(debug, "Turn on/off frontend debugging (default:off).");
+module_param(stv0299_status, int, 0444);
+MODULE_PARM_DESC(stv0299_status, "Which status value to support "
+		 "(0 == BER (default), 1 == UCBLOCKS)");
 
 #define STATUS_BER 0
 #define STATUS_UCBLOCKS 1
 
 
 /* frontend types */
-#define UNKNOWN_FRONTEND  -1
+#define UNKNOWN_FRONTEND       -1
 #define PHILIPS_SU1278_TSA	0 // SU1278 with TSA5059 synth and datasheet recommended settings
-#define ALPS_BSRU6         1
-#define LG_TDQF_S001F      2
-#define PHILIPS_SU1278_TUA      3 // SU1278 with TUA6100 synth
-#define SAMSUNG_TBMU24112IMB    4
+#define ALPS_BSRU6		1
+#define LG_TDQF_S001F		2
+#define PHILIPS_SU1278_TUA	3 // SU1278 with TUA6100 synth
+#define SAMSUNG_TBMU24112IMB	4
 #define PHILIPS_SU1278_TSA_TT	5 // SU1278 with TSA5059 synth and TechnoTrend settings
 #define PHILIPS_SU1278_TSA_TY	6 // SU1278 with TUA5059 synth and Typhoon wiring
+#define PHILIPS_SU1278_TSA_CI	7 // SU1278 with TUA5059 synth and TerraTec Cinergy wiring
 
 /* Master Clock = 88 MHz */
-#define M_CLK (88000000UL) 
+#define M_CLK (88000000UL)
 
 /* Master Clock for TT cards = 64 MHz */
 #define M_CLK_SU1278_TSA_TT (64000000UL)
@@ -89,11 +97,11 @@ static struct dvb_frontend_info uni0299_info = {
 	.type			= FE_QPSK,
 	.frequency_min		= 950000,
 	.frequency_max		= 2150000,
-	.frequency_stepsize	= 125,   /* kHz for QPSK frontends */
+	.frequency_stepsize	= 125,	 /* kHz for QPSK frontends */
 	.frequency_tolerance	= M_CLK/2000,
 	.symbol_rate_min	= 1000000,
 	.symbol_rate_max	= 45000000,
-	.symbol_rate_tolerance	= 500,  /* ppm */
+	.symbol_rate_tolerance	= 500,	/* ppm */
 	.notifier_delay		= 0,
 	.caps = FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
 	      FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 |
@@ -108,34 +116,36 @@ struct stv0299_state {
 	u32 tuner_frequency;
 	u32 symbol_rate;
 	fe_code_rate_t fec_inner;
+	struct i2c_adapter *i2c;
+	struct dvb_adapter *dvb;
 };
 
 
 static u8 init_tab [] = {
-	0x04, 0x7d,   /* F22FR = 0x7d                                 */
-		      /* F22 = f_VCO / 128 / 0x7d = 22 kHz            */
+	0x04, 0x7d,   /* F22FR = 0x7d				      */
+		      /* F22 = f_VCO / 128 / 0x7d = 22 kHz	      */
 
-        /* I2C bus repeater */
-	0x05, 0x35,   /* I2CT = 0, SCLT = 1, SDAT = 1                 */
+	/* I2C bus repeater */
+	0x05, 0x35,   /* I2CT = 0, SCLT = 1, SDAT = 1		      */
 
- 	/* general purpose DAC registers */
+	/* general purpose DAC registers */
 	0x06, 0x40,   /* DAC not used, set to high impendance mode    */
-	0x07, 0x00,   /* DAC LSB                                      */
+	0x07, 0x00,   /* DAC LSB				      */
 
 	/* DiSEqC registers */
 	0x08, 0x40,   /* DiSEqC off, LNB power on OP2/LOCK pin on     */
-	0x09, 0x00,   /* FIFO                                         */
+	0x09, 0x00,   /* FIFO					      */
 
-        /* Input/Output configuration register */
+	/* Input/Output configuration register */
 	0x0c, 0x51,   /* OP1 ctl = Normal, OP1 val = 1 (LNB Power ON) */
-	              /* OP0 ctl = Normal, OP0 val = 1 (18 V)         */
-                      /* Nyquist filter = 00, QPSK reverse = 0        */
-                   
-        /* AGC1 control register */
+		      /* OP0 ctl = Normal, OP0 val = 1 (18 V)	      */
+		      /* Nyquist filter = 00, QPSK reverse = 0	      */
+
+	/* AGC1 control register */
 	0x0d, 0x82,   /* DC offset compensation = ON, beta_agc1 = 2   */
 
-        /* Timing loop register */
-	0x0e, 0x23,   /* alpha_tmg = 2, beta_tmg = 3                  */
+	/* Timing loop register */
+	0x0e, 0x23,   /* alpha_tmg = 2, beta_tmg = 3		      */
 
 	0x10, 0x3f,   // AGC2  0x3d
 
@@ -157,7 +167,7 @@ static u8 init_tab [] = {
 	0x22, 0x00,
 	0x23, 0x00,
 
-	0x28, 0x00,  // out imp: normal  out type: parallel FEC mode:0
+	0x28, 0x00,  // out imp: normal	 out type: parallel FEC mode:0
 
 	0x29, 0x1e,  // 1/2 threshold
 	0x2a, 0x14,  // 2/3 threshold
@@ -220,70 +230,70 @@ static u8 init_tab_samsung [] = {
 
 
 static u8 init_tab_su1278_tsa_tt [] = {
-        0x01, 0x0f,
-        0x02, 0x30,
-        0x03, 0x00,
-        0x04, 0x5b,
-        0x05, 0x85,
-        0x06, 0x02,
-        0x07, 0x00,
-        0x08, 0x02,
-        0x09, 0x00,
-        0x0C, 0x01,
-        0x0D, 0x81,
-        0x0E, 0x44,
-        0x0f, 0x14,
-        0x10, 0x3c,
-        0x11, 0x84,
-        0x12, 0xda,
-        0x13, 0x97,
-        0x14, 0x95,
-        0x15, 0xc9,
-        0x16, 0x19,
-        0x17, 0x8c,
-        0x18, 0x59,
-        0x19, 0xf8,
-        0x1a, 0xfe,
-        0x1c, 0x7f,
-        0x1d, 0x00,
-        0x1e, 0x00,
-        0x1f, 0x50,
-        0x20, 0x00,
-        0x21, 0x00,
-        0x22, 0x00,
-        0x23, 0x00,
-        0x28, 0x00,
-        0x29, 0x28,
-        0x2a, 0x14,
-        0x2b, 0x0f,
-        0x2c, 0x09,
-        0x2d, 0x09,
-        0x31, 0x1f,
-        0x32, 0x19,
-        0x33, 0xfc,
-        0x34, 0x13
+	0x01, 0x0f,
+	0x02, 0x30,
+	0x03, 0x00,
+	0x04, 0x5b,
+	0x05, 0x85,
+	0x06, 0x02,
+	0x07, 0x00,
+	0x08, 0x02,
+	0x09, 0x00,
+	0x0C, 0x01,
+	0x0D, 0x81, 
+	0x0E, 0x44,
+	0x0f, 0x14,
+	0x10, 0x3c,
+	0x11, 0x84,
+	0x12, 0xda,
+	0x13, 0x97,
+	0x14, 0x95,
+	0x15, 0xc9,
+	0x16, 0x19,
+	0x17, 0x8c,
+	0x18, 0x59,
+	0x19, 0xf8,
+	0x1a, 0xfe,
+	0x1c, 0x7f,
+	0x1d, 0x00,
+	0x1e, 0x00,
+	0x1f, 0x50,
+	0x20, 0x00,
+	0x21, 0x00,
+	0x22, 0x00,
+	0x23, 0x00,
+	0x28, 0x00,
+	0x29, 0x28,
+	0x2a, 0x14,
+	0x2b, 0x0f,
+	0x2c, 0x09,
+	0x2d, 0x09,
+	0x31, 0x1f,
+	0x32, 0x19,
+	0x33, 0xfc,
+	0x34, 0x13
 };
 
-static int stv0299_set_FEC (struct dvb_i2c_bus *i2c, fe_code_rate_t fec);
-static int stv0299_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate, int tuner_type);
+static int stv0299_set_FEC (struct i2c_adapter *i2c, fe_code_rate_t fec);
+static int stv0299_set_symbolrate (struct i2c_adapter *i2c, u32 srate, int tuner_type);
 
-static int stv0299_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
+static int stv0299_writereg (struct i2c_adapter *i2c, u8 reg, u8 data)
 {
 	int ret;
 	u8 buf [] = { reg, data };
 	struct i2c_msg msg = { .addr = 0x68, .flags = 0, .buf = buf, .len = 2 };
 
-	ret = i2c->xfer (i2c, &msg, 1);
+	ret = i2c_transfer (i2c, &msg, 1);
 
-	if (ret != 1) 
+	if (ret != 1)
 		dprintk("%s: writereg error (reg == 0x%02x, val == 0x%02x, "
 			"ret == %i)\n", __FUNCTION__, reg, data, ret);
 
-	return (ret != 1) ? -1 : 0;
+	return (ret != 1) ? -EREMOTEIO : 0;
 }
 
 
-static u8 stv0299_readreg (struct dvb_i2c_bus *i2c, u8 reg)
+static u8 stv0299_readreg (struct i2c_adapter *i2c, u8 reg)
 {
 	int ret;
 	u8 b0 [] = { reg };
@@ -291,9 +301,9 @@ static u8 stv0299_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 	struct i2c_msg msg [] = { { .addr = 0x68, .flags = 0, .buf = b0, .len = 1 },
 			   { .addr = 0x68, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
 
-	ret = i2c->xfer (i2c, msg, 2);
-        
-	if (ret != 2) 
+	ret = i2c_transfer (i2c, msg, 2);
+
+	if (ret != 2)
 		dprintk("%s: readreg error (reg == 0x%02x, ret == %i)\n",
 				__FUNCTION__, reg, ret);
 
@@ -301,22 +311,22 @@ static u8 stv0299_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 }
 
 
-static int stv0299_readregs (struct dvb_i2c_bus *i2c, u8 reg1, u8 *b, u8 len)
+static int stv0299_readregs (struct i2c_adapter *i2c, u8 reg1, u8 *b, u8 len)
 {
-        int ret;
-        struct i2c_msg msg [] = { { .addr = 0x68, .flags = 0, .buf = &reg1, .len = 1 },
-                           { .addr = 0x68, .flags = I2C_M_RD, .buf = b, .len = len } };
+	int ret;
+	struct i2c_msg msg [] = { { .addr = 0x68, .flags = 0, .buf = &reg1, .len = 1 },
+			   { .addr = 0x68, .flags = I2C_M_RD, .buf = b, .len = len } };
 
-        ret = i2c->xfer (i2c, msg, 2);
+	ret = i2c_transfer (i2c, msg, 2);
 
-        if (ret != 2)
-                dprintk("%s: readreg error (ret == %i)\n", __FUNCTION__, ret);
+	if (ret != 2)
+		dprintk("%s: readreg error (ret == %i)\n", __FUNCTION__, ret);
 
-        return ret == 2 ? 0 : ret;
+	return ret == 2 ? 0 : ret;
 }
 
 
-static int pll_write (struct dvb_i2c_bus *i2c, u8 addr, u8 *data, int len)
+static int pll_write (struct i2c_adapter *i2c, u8 addr, u8 *data, int len)
 {
 	int ret;
 	struct i2c_msg msg = { addr: addr, .flags = 0, .buf = data, .len = len };
@@ -324,7 +334,7 @@ static int pll_write (struct dvb_i2c_bus *i2c, u8 addr, u8 *data, int len)
 
 	stv0299_writereg(i2c, 0x05, 0xb5);	/*  enable i2c repeater on stv0299  */
 
-	ret =  i2c->xfer (i2c, &msg, 1);
+	ret =  i2c_transfer (i2c, &msg, 1);
 
 	stv0299_writereg(i2c, 0x05, 0x35);	/*  disable i2c repeater on stv0299  */
 
@@ -335,7 +345,7 @@ static int pll_write (struct dvb_i2c_bus *i2c, u8 addr, u8 *data, int len)
 }
 
 
-static int sl1935_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq, int ftype)
+static int sl1935_set_tv_freq (struct i2c_adapter *i2c, u32 freq, int ftype)
 {
 	u8 buf[4];
 	u32 div;
@@ -355,10 +365,10 @@ static int sl1935_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq, int ftype)
 }
 
 /**
- *   set up the downconverter frequency divisor for a 
+ *   set up the downconverter frequency divisor for a
  *   reference clock comparision frequency of 125 kHz.
  */
-static int tsa5059_set_tv_freq	(struct dvb_i2c_bus *i2c, u32 freq, int ftype, int srate)
+static int tsa5059_set_tv_freq	(struct i2c_adapter *i2c, u32 freq, int ftype, int srate)
 {
 	u8 addr;
 	u32 div;
@@ -370,8 +380,8 @@ static int tsa5059_set_tv_freq	(struct dvb_i2c_bus *i2c, u32 freq, int ftype, in
 	if ((freq < 950000) || (freq > 2150000)) return -EINVAL;
 
 	if (ftype == PHILIPS_SU1278_TSA_TT) {
-        divisor = 500;
-        regcode = 2;
+		divisor = 500;
+		regcode = 2;
 	} else {
 		divisor = 125;
 		regcode = 4;
@@ -383,21 +393,22 @@ static int tsa5059_set_tv_freq	(struct dvb_i2c_bus *i2c, u32 freq, int ftype, in
 	buf[1] = div & 0xff;
 	buf[2] = 0x80 | ((div & 0x18000) >> 10) | regcode;
 	buf[3] = 0;
-
+    
 	// tuner-specific settings
 	switch(ftype) {
 	case PHILIPS_SU1278_TSA:
 	case PHILIPS_SU1278_TSA_TT:
 	case PHILIPS_SU1278_TSA_TY:
-		if (ftype == PHILIPS_SU1278_TSA_TY)
+	case PHILIPS_SU1278_TSA_CI:
+		if (ftype == PHILIPS_SU1278_TSA_TY || ftype == PHILIPS_SU1278_TSA_CI)
 			addr = 0x61;
 		else
-		addr = 0x60;
+			addr = 0x60;
 
 		buf[3] |= 0x20;
 
 		if (srate < 4000000) buf[3] |= 1;
-	   
+
 		if (freq < 1250000) buf[3] |= 0;
 		else if (freq < 1550000) buf[3] |= 0x40;
 		else if (freq < 2050000) buf[3] |= 0x80;
@@ -408,7 +419,7 @@ static int tsa5059_set_tv_freq	(struct dvb_i2c_bus *i2c, u32 freq, int ftype, in
 		addr = 0x61;
 		buf[3] = 0xC4;
 		if (freq > 1530000) buf[3] = 0xc0;
-	 	break;
+		break;
 
 	default:
 		return -EINVAL;
@@ -421,7 +432,7 @@ static int tsa5059_set_tv_freq	(struct dvb_i2c_bus *i2c, u32 freq, int ftype, in
 #define MIN2(a,b) ((a) < (b) ? (a) : (b))
 #define MIN3(a,b,c) MIN2(MIN2(a,b),c)
 
-static int tua6100_set_tv_freq	(struct dvb_i2c_bus *i2c, u32 freq,
+static int tua6100_set_tv_freq	(struct i2c_adapter *i2c, u32 freq,
 			 int ftype, int srate)
 {
 	u8 reg0 [2] = { 0x00, 0x00 };
@@ -458,7 +469,7 @@ static int tua6100_set_tv_freq	(struct dvb_i2c_bus *i2c, u32 freq,
 			reg0[1] = 0x0B;
 		else if ((first_ZF >= 1420) && (first_ZF < 1455))
 			reg0[1] = 0x0F;
-}
+	}
 
 	if (first_ZF > 1525)
 		reg1[1] |= 0x80;
@@ -466,41 +477,41 @@ static int tua6100_set_tv_freq	(struct dvb_i2c_bus *i2c, u32 freq,
 		reg1[1] &= 0x7F;
 
 	if (_fband == 2) {
-	        if (first_ZF > 1430) { /* 1430MHZ */
-	                reg1[1] &= 0xCF; /* N2 */
+		if (first_ZF > 1430) { /* 1430MHZ */
+			reg1[1] &= 0xCF; /* N2 */
 			reg2[1] &= 0xCF; /* R2 */
 			reg2[1] |= 0x10;
-	        } else {
-        		reg1[1] &= 0xCF; /* N2 */
+		} else {
+			reg1[1] &= 0xCF; /* N2 */
 			reg1[1] |= 0x20;
 			reg2[1] &= 0xCF; /* R2 */
 			reg2[1] |= 0x10;
 		}
-}
+	}
 
 	if (_fband == 3) {
-        	if ((first_ZF >= 1455) &&
+		if ((first_ZF >= 1455) &&
 		    (first_ZF < 1630)) {
 			reg1[1] &= 0xCF; /* N2 */
 			reg1[1] |= 0x20;
 			reg2[1] &= 0xCF; /* R2 */
-	        } else {
+		} else {
 			if (first_ZF < 1455) {
-	                        reg1[1] &= 0xCF; /* N2 */
+				reg1[1] &= 0xCF; /* N2 */
 				reg1[1] |= 0x20;
-                	        reg2[1] &= 0xCF; /* R2 */
-                        	reg2[1] |= 0x10;
-	                } else {
-	                        if (first_ZF >= 1630) {
-        	                        reg1[1] &= 0xCF; /* N2 */
-                        	        reg2[1] &= 0xCF; /* R2 */
-                                	reg2[1] |= 0x10;
-	                        }
-        	        }
-	        }
+				reg2[1] &= 0xCF; /* R2 */
+				reg2[1] |= 0x10;
+			} else {
+				if (first_ZF >= 1630) {
+					reg1[1] &= 0xCF; /* N2 */
+					reg2[1] &= 0xCF; /* R2 */
+					reg2[1] |= 0x10;
+				}
+			}
+		}
 	}
 
-        /* set ports, enable P0 for symbol rates > 4Ms/s */
+	/* set ports, enable P0 for symbol rates > 4Ms/s */
 	if (srate >= 4000000)
 		reg1[1] |= 0x0c;
 	else
@@ -510,17 +521,17 @@ static int tua6100_set_tv_freq	(struct dvb_i2c_bus *i2c, u32 freq,
 
 	R = 64;
 	A = 64;
-	P = 64;  //32
+	P = 64;	 //32
 
 	M = (freq * R) / 4;		/* in Mhz */
 	N = (M - A * 1000) / (P * 1000);
 
 	reg1[1] |= (N >> 9) & 0x03;
-	reg1[2]  = (N >> 1) & 0xff;
-	reg1[3]  = (N << 7) & 0x80;
+	reg1[2]	 = (N >> 1) & 0xff;
+	reg1[3]	 = (N << 7) & 0x80;
 
 	reg2[1] |= (R >> 8) & 0x03;
-	reg2[2]  = R & 0xFF;	/* R */
+	reg2[2]	 = R & 0xFF;	/* R */
 
 	reg1[3] |= A & 0x7f;	/* A */
 
@@ -542,25 +553,25 @@ static int tua6100_set_tv_freq	(struct dvb_i2c_bus *i2c, u32 freq,
 }
 
 
-static int pll_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq, int ftype, int srate)
+static int pll_set_tv_freq (struct i2c_adapter *i2c, u32 freq, int ftype, int srate)
 {
 	switch(ftype) {
 	case SAMSUNG_TBMU24112IMB:
 		return sl1935_set_tv_freq(i2c, freq, ftype);
-
+	
 	case LG_TDQF_S001F:
 		return sl1935_set_tv_freq(i2c, freq, ftype);
-
+	    
 	case PHILIPS_SU1278_TUA:
 		return tua6100_set_tv_freq(i2c, freq, ftype, srate);
 
 	default:
 		return tsa5059_set_tv_freq(i2c, freq, ftype, srate);
-}
+	}
 }
 
 #if 0
-static int tsa5059_read_status	(struct dvb_i2c_bus *i2c)
+static int tsa5059_read_status	(struct i2c_adapter *i2c)
 {
 	int ret;
 	u8 rpt1 [] = { 0x05, 0xb5 };
@@ -571,7 +582,7 @@ static int tsa5059_read_status	(struct dvb_i2c_bus *i2c)
 
 	dprintk ("%s\n", __FUNCTION__);
 
-	ret = i2c->xfer (i2c, msg, 2);
+	ret = i2c_transfer (i2c, msg, 2);
 
 	if (ret != 2)
 		dprintk("%s: readreg error (ret == %i)\n", __FUNCTION__, ret);
@@ -581,7 +592,7 @@ static int tsa5059_read_status	(struct dvb_i2c_bus *i2c)
 #endif
 
 
-static int stv0299_init (struct dvb_i2c_bus *i2c, int ftype)
+static int stv0299_init (struct i2c_adapter *i2c, int ftype)
 {
 	int i;
 
@@ -600,34 +611,34 @@ static int stv0299_init (struct dvb_i2c_bus *i2c, int ftype)
 		break;
 
 	case PHILIPS_SU1278_TSA_TT:
-	        for (i=0; i<sizeof(init_tab_su1278_tsa_tt); i+=2) {
+		for (i=0; i<sizeof(init_tab_su1278_tsa_tt); i+=2) {
 			stv0299_writereg (i2c, init_tab_su1278_tsa_tt[i], init_tab_su1278_tsa_tt[i+1]);
 		}
-	        break;
-
+		break;
+	    
 	default:
-	stv0299_writereg (i2c, 0x01, 0x15);
+		stv0299_writereg (i2c, 0x01, 0x15);
 		stv0299_writereg (i2c, 0x02, ftype == PHILIPS_SU1278_TUA ? 0x00 : 0x30);
-	stv0299_writereg (i2c, 0x03, 0x00);
+		stv0299_writereg (i2c, 0x03, 0x00);
 
-	for (i=0; i<sizeof(init_tab); i+=2)
-		stv0299_writereg (i2c, init_tab[i], init_tab[i+1]);
+		for (i=0; i<sizeof(init_tab); i+=2)
+			stv0299_writereg (i2c, init_tab[i], init_tab[i+1]);
 
-        /* AGC1 reference register setup */
-		if (ftype == PHILIPS_SU1278_TSA || ftype == PHILIPS_SU1278_TSA_TY)
+		/* AGC1 reference register setup */
+		if (ftype == PHILIPS_SU1278_TSA || ftype == PHILIPS_SU1278_TSA_TY || ftype == PHILIPS_SU1278_TSA_CI)
 		  stv0299_writereg (i2c, 0x0f, 0x92);  /* Iagc = Inverse, m1 = 18 */
 		else if (ftype == PHILIPS_SU1278_TUA)
 		  stv0299_writereg (i2c, 0x0f, 0x94);  /* Iagc = Inverse, m1 = 20 */
-	else
-	  stv0299_writereg (i2c, 0x0f, 0x52);  /* Iagc = Normal,  m1 = 18 */
+		else
+		  stv0299_writereg (i2c, 0x0f, 0x52);  /* Iagc = Normal,  m1 = 18 */
 		break;
 	}
-	
+
 	switch(stv0299_status) {
 	case STATUS_BER:
 		stv0299_writereg(i2c, 0x34, 0x93);
 		break;
-	
+
 	case STATUS_UCBLOCKS:
 		stv0299_writereg(i2c, 0x34, 0xB3);
 		break;
@@ -637,7 +648,7 @@ static int stv0299_init (struct dvb_i2c_bus *i2c, int ftype)
 }
 
 
-static int stv0299_set_FEC (struct dvb_i2c_bus *i2c, fe_code_rate_t fec)
+static int stv0299_set_FEC (struct i2c_adapter *i2c, fe_code_rate_t fec)
 {
 	dprintk ("%s\n", __FUNCTION__);
 
@@ -677,11 +688,11 @@ static int stv0299_set_FEC (struct dvb_i2c_bus *i2c, fe_code_rate_t fec)
 		dprintk ("%s : FEC invalid\n", __FUNCTION__);
 		return -EINVAL;
 	}
-}
+    }
 }
 
 
-static fe_code_rate_t stv0299_get_fec (struct dvb_i2c_bus *i2c)
+static fe_code_rate_t stv0299_get_fec (struct i2c_adapter *i2c)
 {
 	static fe_code_rate_t fec_tab [] = { FEC_2_3, FEC_3_4, FEC_5_6,
 					     FEC_7_8, FEC_1_2 };
@@ -699,7 +710,7 @@ static fe_code_rate_t stv0299_get_fec (struct dvb_i2c_bus *i2c)
 }
 
 
-static int stv0299_wait_diseqc_fifo (struct dvb_i2c_bus *i2c, int timeout)
+static int stv0299_wait_diseqc_fifo (struct i2c_adapter *i2c, int timeout)
 {
 	unsigned long start = jiffies;
 
@@ -710,14 +721,14 @@ static int stv0299_wait_diseqc_fifo (struct dvb_i2c_bus *i2c, int timeout)
 			dprintk ("%s: timeout!!\n", __FUNCTION__);
 			return -ETIMEDOUT;
 		}
-		dvb_delay(10);
+		msleep(10);
 	};
 
 	return 0;
 }
 
 
-static int stv0299_wait_diseqc_idle (struct dvb_i2c_bus *i2c, int timeout)
+static int stv0299_wait_diseqc_idle (struct i2c_adapter *i2c, int timeout)
 {
 	unsigned long start = jiffies;
 
@@ -728,14 +739,14 @@ static int stv0299_wait_diseqc_idle (struct dvb_i2c_bus *i2c, int timeout)
 			dprintk ("%s: timeout!!\n", __FUNCTION__);
 			return -ETIMEDOUT;
 		}
-		dvb_delay(10);
+		msleep(10);
 	};
 
 	return 0;
 }
 
 
-static int stv0299_send_diseqc_msg (struct dvb_i2c_bus *i2c,
+static int stv0299_send_diseqc_msg (struct i2c_adapter *i2c,
 			     struct dvb_diseqc_master_cmd *m)
 {
 	u8 val;
@@ -766,7 +777,7 @@ static int stv0299_send_diseqc_msg (struct dvb_i2c_bus *i2c,
 }
 
 
-static int stv0299_send_diseqc_burst (struct dvb_i2c_bus *i2c, fe_sec_mini_cmd_t burst)
+static int stv0299_send_diseqc_burst (struct i2c_adapter *i2c, fe_sec_mini_cmd_t burst)
 {
 	u8 val;
 
@@ -777,7 +788,7 @@ static int stv0299_send_diseqc_burst (struct dvb_i2c_bus *i2c, fe_sec_mini_cmd_t
 
 	val = stv0299_readreg (i2c, 0x08);
 
-	if (stv0299_writereg (i2c, 0x08, (val & ~0x7) | 0x2))   /* burst mode */
+	if (stv0299_writereg (i2c, 0x08, (val & ~0x7) | 0x2))	/* burst mode */
 		return -EREMOTEIO;
 
 	if (stv0299_writereg (i2c, 0x09, burst == SEC_MINI_A ? 0x00 : 0xff))
@@ -793,12 +804,12 @@ static int stv0299_send_diseqc_burst (struct dvb_i2c_bus *i2c, fe_sec_mini_cmd_t
 }
 
 
-static int stv0299_set_tone (struct dvb_i2c_bus *i2c, fe_sec_tone_mode_t tone)
+static int stv0299_set_tone (struct i2c_adapter *i2c, fe_sec_tone_mode_t tone)
 {
 	u8 val;
 
 	dprintk("%s: %s\n", __FUNCTION__,
-		tone == SEC_TONE_ON ? "SEC_TONE_ON" : 
+		tone == SEC_TONE_ON ? "SEC_TONE_ON" :
 		tone == SEC_TONE_OFF ? "SEC_TONE_OFF" : "??");
 
 	if (stv0299_wait_diseqc_idle (i2c, 100) < 0)
@@ -809,36 +820,36 @@ static int stv0299_set_tone (struct dvb_i2c_bus *i2c, fe_sec_tone_mode_t tone)
 	switch (tone) {
 	case SEC_TONE_ON:
 	{
-	    	dprintk("%s: TONE_ON\n", __FUNCTION__);
+		dprintk("%s: TONE_ON\n", __FUNCTION__);
 		return stv0299_writereg (i2c, 0x08, val | 0x3);
-	}	
+	}
 	case SEC_TONE_OFF:
 	{
-	    	dprintk("%s: TONE_OFF\n", __FUNCTION__);
+		dprintk("%s: TONE_OFF\n", __FUNCTION__);
 		return stv0299_writereg (i2c, 0x08, (val & ~0x3) | 0x02);
 	}
 	default:
 	{
-	    	dprintk("%s: TONE INVALID\n", __FUNCTION__);
+		dprintk("%s: TONE INVALID\n", __FUNCTION__);
 		return -EINVAL;
 	}
 	};
 }
 
 
-static int stv0299_set_voltage (struct dvb_i2c_bus *i2c, fe_sec_voltage_t voltage,
+static int stv0299_set_voltage (struct i2c_adapter *i2c, fe_sec_voltage_t voltage,
 				int tuner_type)
 {
 	u8 reg0x08;
 	u8 reg0x0c;
 
 	dprintk("%s: %s\n", __FUNCTION__,
-		voltage == SEC_VOLTAGE_13 ? "SEC_VOLTAGE_13" : 
+		voltage == SEC_VOLTAGE_13 ? "SEC_VOLTAGE_13" :
 		voltage == SEC_VOLTAGE_18 ? "SEC_VOLTAGE_18" : "??");
 
 	reg0x08 = stv0299_readreg (i2c, 0x08);
 	reg0x0c = stv0299_readreg (i2c, 0x0c);
-
+    
 	/**
 	 *  H/V switching over OP0, OP1 and OP2 are LNB power enable bits
 	 */
@@ -849,11 +860,18 @@ static int stv0299_set_voltage (struct dvb_i2c_bus *i2c, fe_sec_voltage_t voltag
 		return stv0299_writereg (i2c, 0x08, 0x00); /*	LNB power off! */
 	}
 	
+	if (tuner_type == PHILIPS_SU1278_TSA_CI) 
+	{
+		stv0299_writereg (i2c, 0x08, reg0x08 & 0xBF); // switch LNB power on OP2/LOCK pin off
+	}
+	else
+	{
 		stv0299_writereg (i2c, 0x08, reg0x08 | 0x40);
+	}
 
 	switch (voltage) {
 	case SEC_VOLTAGE_13:
-		if (tuner_type == PHILIPS_SU1278_TSA_TY)
+		if (tuner_type == PHILIPS_SU1278_TSA_TY || tuner_type == PHILIPS_SU1278_TSA_CI)
 			return stv0299_writereg (i2c, 0x0c, reg0x0c | 0x10);
 		else
 			return stv0299_writereg (i2c, 0x0c, reg0x0c | 0x40);
@@ -867,57 +885,59 @@ static int stv0299_set_voltage (struct dvb_i2c_bus *i2c, fe_sec_voltage_t voltag
 }
 
 
-static int stv0299_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate, int tuner_type)
+static int stv0299_set_symbolrate (struct i2c_adapter *i2c, u32 srate, int tuner_type)
 {
 	u64 big = srate;
 	u32 ratio;
 	u8 aclk = 0;
 	u8 bclk = 0;
 	u8 m1;
-        int Mclk = M_CLK;
-
-        // check rate is within limits
+	int Mclk = M_CLK;
+    
+	// check rate is within limits
 	if ((srate < 1000000) || (srate > 45000000)) return -EINVAL;
-
-        // calculate value to program
+    
+	// calculate value to program
 	if (tuner_type == PHILIPS_SU1278_TSA_TT) Mclk = M_CLK_SU1278_TSA_TT;
-        big = big << 20;
+	big = big << 20;
 	big += (Mclk-1); // round correctly
-        do_div(big, Mclk);
-        ratio = big << 4;
-
-        // program registers
+	do_div(big, Mclk);
+	ratio = big << 4;
+    
+	// program registers
 	switch(tuner_type) {
 	case PHILIPS_SU1278_TSA_TT:
-	        stv0299_writereg (i2c, 0x0e, 0x44);
-	        if (srate >= 10000000) {
-		        stv0299_writereg (i2c, 0x13, 0x97);
-		        stv0299_writereg (i2c, 0x14, 0x95);
-		        stv0299_writereg (i2c, 0x15, 0xc9);
-		        stv0299_writereg (i2c, 0x17, 0x8c);
-		        stv0299_writereg (i2c, 0x1a, 0xfe);
-		        stv0299_writereg (i2c, 0x1c, 0x7f);
-		        stv0299_writereg (i2c, 0x2d, 0x09);
+		stv0299_writereg (i2c, 0x0e, 0x44);
+		if (srate >= 10000000) {
+			stv0299_writereg (i2c, 0x13, 0x97);
+			stv0299_writereg (i2c, 0x14, 0x95);
+			stv0299_writereg (i2c, 0x15, 0xc9);
+			stv0299_writereg (i2c, 0x17, 0x8c);
+			stv0299_writereg (i2c, 0x1a, 0xfe);
+			stv0299_writereg (i2c, 0x1c, 0x7f);
+			stv0299_writereg (i2c, 0x2d, 0x09);
 		} else {
-		        stv0299_writereg (i2c, 0x13, 0x99);
-		        stv0299_writereg (i2c, 0x14, 0x8d);
-		        stv0299_writereg (i2c, 0x15, 0xce);
-		        stv0299_writereg (i2c, 0x17, 0x43);
-		        stv0299_writereg (i2c, 0x1a, 0x1d);
-		        stv0299_writereg (i2c, 0x1c, 0x12);
-		        stv0299_writereg (i2c, 0x2d, 0x05);
+			stv0299_writereg (i2c, 0x13, 0x99);
+			stv0299_writereg (i2c, 0x14, 0x8d);
+			stv0299_writereg (i2c, 0x15, 0xce);
+			stv0299_writereg (i2c, 0x17, 0x43);
+			stv0299_writereg (i2c, 0x1a, 0x1d);
+			stv0299_writereg (i2c, 0x1c, 0x12);
+			stv0299_writereg (i2c, 0x2d, 0x05);
 		}
-	        stv0299_writereg (i2c, 0x0e, 0x23);
-	        stv0299_writereg (i2c, 0x0f, 0x94);
-	        stv0299_writereg (i2c, 0x10, 0x39);
-	        stv0299_writereg (i2c, 0x15, 0xc9);
 
-	        stv0299_writereg (i2c, 0x1f, (ratio >> 16) & 0xff);
-	        stv0299_writereg (i2c, 0x20, (ratio >>  8) & 0xff);
-	        stv0299_writereg (i2c, 0x21, (ratio      ) & 0xf0);
-	        break;
-
+		stv0299_writereg (i2c, 0x0e, 0x23);
+		stv0299_writereg (i2c, 0x0f, 0x94);
+		stv0299_writereg (i2c, 0x10, 0x39);
+		stv0299_writereg (i2c, 0x15, 0xc9);
+	    
+		stv0299_writereg (i2c, 0x1f, (ratio >> 16) & 0xff);
+		stv0299_writereg (i2c, 0x20, (ratio >>	8) & 0xff);
+		stv0299_writereg (i2c, 0x21, (ratio	 ) & 0xf0);
+		break;
+	    
 	case PHILIPS_SU1278_TSA_TY:
+	case PHILIPS_SU1278_TSA_CI:
 	case PHILIPS_SU1278_TSA:
 		aclk = 0xb5;
 		if (srate < 2000000) bclk = 0x86;
@@ -928,12 +948,12 @@ static int stv0299_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate, int tuner
 		m1 = 0x14;
 		if (srate < 4000000) m1 = 0x10;
 
-	    	stv0299_writereg (i2c, 0x13, aclk);
-  	        stv0299_writereg (i2c, 0x14, bclk);
-	        stv0299_writereg (i2c, 0x1f, (ratio >> 16) & 0xff);
-	        stv0299_writereg (i2c, 0x20, (ratio >>  8) & 0xff);
-	        stv0299_writereg (i2c, 0x21, (ratio      ) & 0xf0);
-	        stv0299_writereg (i2c, 0x0f, (stv0299_readreg(i2c, 0x0f) & 0xc0) | m1);
+		stv0299_writereg (i2c, 0x13, aclk);
+		stv0299_writereg (i2c, 0x14, bclk);
+		stv0299_writereg (i2c, 0x1f, (ratio >> 16) & 0xff);
+		stv0299_writereg (i2c, 0x20, (ratio >>	8) & 0xff);
+		stv0299_writereg (i2c, 0x21, (ratio	 ) & 0xf0);
+		stv0299_writereg (i2c, 0x0f, (stv0299_readreg(i2c, 0x0f) & 0xc0) | m1);
 		break;
 
 	case ALPS_BSRU6:
@@ -944,21 +964,21 @@ static int stv0299_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate, int tuner
 		else if (srate < 14000000) { aclk = 0xb7; bclk = 0x53; }
 		else if (srate < 30000000) { aclk = 0xb6; bclk = 0x53; }
 		else if (srate < 45000000) { aclk = 0xb4; bclk = 0x51; }
-  
-	stv0299_writereg (i2c, 0x13, aclk);
-	stv0299_writereg (i2c, 0x14, bclk);
-	stv0299_writereg (i2c, 0x1f, (ratio >> 16) & 0xff);
-	stv0299_writereg (i2c, 0x20, (ratio >>  8) & 0xff);
-	stv0299_writereg (i2c, 0x21, (ratio      ) & 0xf0);
+
+		stv0299_writereg (i2c, 0x13, aclk);
+		stv0299_writereg (i2c, 0x14, bclk);
+		stv0299_writereg (i2c, 0x1f, (ratio >> 16) & 0xff);
+		stv0299_writereg (i2c, 0x20, (ratio >>	8) & 0xff);
+		stv0299_writereg (i2c, 0x21, (ratio	 ) & 0xf0);
 		break;
 	}
-
+    
 
 	return 0;
 }
 
 
-static int stv0299_get_symbolrate (struct dvb_i2c_bus *i2c, int tuner_type)
+static int stv0299_get_symbolrate (struct i2c_adapter *i2c, int tuner_type)
 {
 	u32 Mclk = M_CLK / 4096L;
 	u32 srate;
@@ -968,8 +988,8 @@ static int stv0299_get_symbolrate (struct dvb_i2c_bus *i2c, int tuner_type)
 
 	dprintk ("%s\n", __FUNCTION__);
 
-    	if (tuner_type == PHILIPS_SU1278_TSA_TT) Mclk = M_CLK_SU1278_TSA_TT / 4096L;
-
+	if (tuner_type == PHILIPS_SU1278_TSA_TT) Mclk = M_CLK_SU1278_TSA_TT / 4096L;
+    
 	stv0299_readregs (i2c, 0x1f, sfr, 3);
 	stv0299_readregs (i2c, 0x1a, &rtf, 1);
 
@@ -977,7 +997,6 @@ static int stv0299_get_symbolrate (struct dvb_i2c_bus *i2c, int tuner_type)
 	srate *= Mclk;
 	srate /= 16;
 	srate += (sfr[2] >> 4) * Mclk / 256;
-
 	offset = (s32) rtf * (srate / 4096L);
 	offset /= 128;
 
@@ -995,19 +1014,19 @@ static int stv0299_get_symbolrate (struct dvb_i2c_bus *i2c, int tuner_type)
 
 static int uni0299_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 {
-	struct dvb_i2c_bus *i2c = fe->i2c;
 	struct stv0299_state *state = (struct stv0299_state *) fe->data;
-
+	struct i2c_adapter *i2c = state->i2c;
+   
 	dprintk ("%s\n", __FUNCTION__);
 
 	switch (cmd) {
-	case FE_GET_INFO:
+	case FE_GET_INFO: 
 	{
-	        struct dvb_frontend_info* tmp = (struct dvb_frontend_info*) arg;
+		struct dvb_frontend_info* tmp = (struct dvb_frontend_info*) arg;
 		memcpy (arg, &uni0299_info, sizeof(struct dvb_frontend_info));
 
 		if (state->tuner_type == PHILIPS_SU1278_TSA_TT) {
-		        tmp->frequency_tolerance = M_CLK_SU1278_TSA_TT / 2000;
+			tmp->frequency_tolerance = M_CLK_SU1278_TSA_TT / 2000;
 		}
 		break;
 	}
@@ -1040,10 +1059,10 @@ static int uni0299_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		break;
 	}
 
-        case FE_READ_BER:
+	case FE_READ_BER:
 		if (stv0299_status == STATUS_BER) {
-		*((u32*) arg) = (stv0299_readreg (i2c, 0x1d) << 8)
-			       | stv0299_readreg (i2c, 0x1e);
+			*((u32*) arg) = (stv0299_readreg (i2c, 0x1d) << 8)
+				       | stv0299_readreg (i2c, 0x1e);
 		} else {
 			*((u32*) arg) = 0;
 		}
@@ -1052,7 +1071,7 @@ static int uni0299_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 	case FE_READ_SIGNAL_STRENGTH:
 	{
 		s32 signal =  0xffff - ((stv0299_readreg (i2c, 0x18) << 8)
-			               | stv0299_readreg (i2c, 0x19));
+				       | stv0299_readreg (i2c, 0x19));
 
 		dprintk ("%s : FE_READ_SIGNAL_STRENGTH : AGC2I: 0x%02x%02x, signal=0x%04x\n", __FUNCTION__,
 			 stv0299_readreg (i2c, 0x18),
@@ -1063,26 +1082,26 @@ static int uni0299_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 				(signal < 0) ? 0 : signal;
 		break;
 	}
-        case FE_READ_SNR:
+	case FE_READ_SNR:
 	{
 		s32 snr = 0xffff - ((stv0299_readreg (i2c, 0x24) << 8)
-			           | stv0299_readreg (i2c, 0x25));
+				   | stv0299_readreg (i2c, 0x25));
 		snr = 3 * (snr - 0xa100);
 		*((u16*) arg) = (snr > 0xffff) ? 0xffff :
 				(snr < 0) ? 0 : snr;
 		break;
 	}
-	case FE_READ_UNCORRECTED_BLOCKS: 
+	case FE_READ_UNCORRECTED_BLOCKS:
 		if (stv0299_status == STATUS_UCBLOCKS) {
 			*((u32*) arg) = (stv0299_readreg (i2c, 0x1d) << 8)
-			               | stv0299_readreg (i2c, 0x1e);
+				       | stv0299_readreg (i2c, 0x1e);
 		} else {
 			*((u32*) arg) = 0;
 		}
 		break;
 
-        case FE_SET_FRONTEND:
-        {
+	case FE_SET_FRONTEND:
+	{
 		struct dvb_frontend_parameters *p = arg;
 		int invval = 0;
 
@@ -1126,7 +1145,7 @@ static int uni0299_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 				stv0299_writereg (i2c, 0x23, 0x00);
 				stv0299_writereg (i2c, 0x32, 0x19);
 				stv0299_set_symbolrate (i2c, p->u.qpsk.symbol_rate, state->tuner_type);
-                stv0299_set_FEC (i2c, p->u.qpsk.fec_inner);
+				stv0299_set_FEC (i2c, p->u.qpsk.fec_inner);
 			}
 			break;
 		}
@@ -1135,28 +1154,28 @@ static int uni0299_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 			pll_set_tv_freq (i2c, p->frequency, state->tuner_type, p->u.qpsk.symbol_rate);
 			stv0299_set_FEC (i2c, p->u.qpsk.fec_inner);
 			stv0299_set_symbolrate (i2c, p->u.qpsk.symbol_rate, state->tuner_type);
-		stv0299_writereg (i2c, 0x22, 0x00);
-		stv0299_writereg (i2c, 0x23, 0x00);
-		stv0299_readreg (i2c, 0x23);
-		stv0299_writereg (i2c, 0x12, 0xb9);
+			stv0299_writereg (i2c, 0x22, 0x00);
+			stv0299_writereg (i2c, 0x23, 0x00);
+			stv0299_readreg (i2c, 0x23);
+			stv0299_writereg (i2c, 0x12, 0xb9);
 			break;
 		}
 
 		state->tuner_frequency = p->frequency;
 		state->fec_inner = p->u.qpsk.fec_inner;
 		state->symbol_rate = p->u.qpsk.symbol_rate;
-                break;
-        }
+		break;
+	}
 
-        case FE_GET_FRONTEND:
-        {
+	case FE_GET_FRONTEND:
+	{
 		struct dvb_frontend_parameters *p = arg;
 		s32 derot_freq;
-	        int Mclk = M_CLK;
+		int Mclk = M_CLK;
 		int invval;
 
 		if (state->tuner_type == PHILIPS_SU1278_TSA_TT) Mclk = M_CLK_SU1278_TSA_TT;
-
+	    
 		derot_freq = (s32)(s16) ((stv0299_readreg (i2c, 0x22) << 8)
 					| stv0299_readreg (i2c, 0x23));
 
@@ -1172,17 +1191,17 @@ static int uni0299_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 
 		p->u.qpsk.fec_inner = stv0299_get_fec (i2c);
 		p->u.qpsk.symbol_rate = stv0299_get_symbolrate (i2c, state->tuner_type);
-                break;
-        }
+		break;
+	}
 
-        case FE_SLEEP:
-		stv0299_writereg (i2c, 0x0c, 0x00);  /*  LNB power off! */
-		stv0299_writereg (i2c, 0x08, 0x00); /*  LNB power off! */
+	case FE_SLEEP:
+		stv0299_writereg (i2c, 0x0c, 0x00); /*	LNB power off! */
+		stv0299_writereg (i2c, 0x08, 0x00); /*	LNB power off! */
 		stv0299_writereg (i2c, 0x02, 0x80);
 		state->initialised = 0;
 		break;
 
-        case FE_INIT:
+	case FE_INIT:
 		switch(state->tuner_type) {
 		case PHILIPS_SU1278_TSA_TT:
 			state->tuner_frequency = 0;
@@ -1240,7 +1259,7 @@ static int uni0299_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 
 		return 0;
 	}
-
+	    
 	default:
 		return -EOPNOTSUPP;
 	};
@@ -1248,13 +1267,13 @@ static int uni0299_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 	return 0;
 }
 
-static long probe_tuner (struct dvb_i2c_bus *i2c)
+static long probe_tuner (struct i2c_adapter *adapter)
 {
-	struct dvb_adapter * adapter = (struct dvb_adapter *) i2c->adapter;
-
-        /* read the status register of TSA5059 */
+	struct i2c_adapter *i2c = adapter; /* superfluous */
+	
+	/* read the status register of TSA5059 */
 	u8 rpt[] = { 0x05, 0xb5 };
-        u8 stat [] = { 0 };
+	u8 stat [] = { 0 };
 	u8 tda6100_buf [] = { 0, 0 };
 	int ret;
 	struct i2c_msg msg1 [] = {{ .addr = 0x68, .flags = 0, .buf = rpt,  len: 2 },
@@ -1269,47 +1288,47 @@ static long probe_tuner (struct dvb_i2c_bus *i2c)
 	stv0299_writereg (i2c, 0x03, 0x00);
 
 
-	printk ("%s: try to attach to %s\n", __FUNCTION__, adapter->name);
+	printk("stv0299: try to attach to %s\n", adapter->name);
 
-	if ( strcmp(adapter->name, "SkyStar2") == 0 )
-	{
-	    printk ("%s: setup for tuner Samsung TBMU24112IMB\n", __FILE__);
-
-    	    return SAMSUNG_TBMU24112IMB;
+	if (!strcmp(adapter->name, "Technisat SkyStar2 driver")) {
+	    printk ("stv0299: setup for tuner Samsung TBMU24112IMB\n");
+	    return SAMSUNG_TBMU24112IMB;
 	}
 
-	if ((ret = i2c->xfer(i2c, msg1, 2)) == 2) {
-	        if ( strcmp(adapter->name, "TT-Budget/WinTV-NOVA-CI PCI") == 0 ) {
-		        // technotrend cards require non-datasheet settings
-			printk ("%s: setup for tuner SU1278 (TSA5059 synth) on"
-				" TechnoTrend hardware\n", __FILE__);
-		        return PHILIPS_SU1278_TSA_TT;
+	if ((ret = i2c_transfer(i2c, msg1, 2)) == 2) {
+		if ( strcmp(adapter->name, "TT-Budget/WinTV-NOVA-CI PCI") == 0 ) {
+			// technotrend cards require non-datasheet settings
+			printk ("stv0299: setup for tuner SU1278 (TSA5059 synth) on TechnoTrend hardware\n");
+			return PHILIPS_SU1278_TSA_TT;
 		}  else {
-		        // fall back to datasheet-recommended settings
-			printk ("%s: setup for tuner SU1278 (TSA5059 synth)\n",
-				__FILE__);
-		        return PHILIPS_SU1278_TSA;
+			// fall back to datasheet-recommended settings
+			printk ("stv0299: setup for tuner SU1278 (TSA5059 synth)\n");
+			return PHILIPS_SU1278_TSA;
 		}
-		}
+	}
 
-	if ((ret = i2c->xfer(i2c, msg2, 2)) == 2) {
-		if ( strcmp(adapter->name, "KNC1 DVB-S") == 0 &&
-		     !disable_typhoon )
+	if ((ret = i2c_transfer(i2c, msg2, 2)) == 2) {
+		if ( strcmp(adapter->name, "KNC1 DVB-S") == 0 )
 		{
 			// Typhoon cards have unusual wiring.
-			printk ("%s: setup for tuner SU1278 (TSA5059 synth) on"
-				" Typhoon hardware\n", __FILE__);
+			printk ("stv0299: setup for tuner SU1278 (TSA5059 synth) on Typhoon hardware\n");
 			return PHILIPS_SU1278_TSA_TY;
+		} 
+		else if ( strcmp(adapter->name, "TerraTec Cinergy 1200 DVB-S") == 0 )
+		{
+			// Cinergy cards have unusual wiring.
+			printk ("%s: setup for tuner SU1278 (TSA5059 synth) on"
+				" TerraTec hardware\n", __FILE__);
+			return PHILIPS_SU1278_TSA_CI;
 		}
 		//else if ((stat[0] & 0x3f) == 0) {
 		else if (0) {
-			printk ("%s: setup for tuner TDQF-S001F\n", __FILE__);
+			printk ("stv0299: setup for tuner TDQF-S001F\n");
 			return LG_TDQF_S001F;
-	} else {
-			printk ("%s: setup for tuner BSRU6, TDQB-S00x\n",
-			__FILE__);
+		} else {
+			printk ("stv0299: setup for tuner BSRU6, TDQB-S00x\n");
 			return ALPS_BSRU6;
-	}
+		}
 	}
 
 	/**
@@ -1317,29 +1336,29 @@ static long probe_tuner (struct dvb_i2c_bus *i2c)
 	 */
 	stv0299_writereg (i2c, 0x02, 0x00);
 
-	if ((ret = i2c->xfer(i2c, msg3, 2)) == 2) {
-		printk ("%s: setup for tuner Philips SU1278 (TUA6100 synth)\n",
-			__FILE__);
+	if ((ret = i2c_transfer(i2c, msg3, 2)) == 2) {
+		printk ("stv0299: setup for tuner Philips SU1278 (TUA6100 synth)\n");
 		return PHILIPS_SU1278_TUA;
 	}
 
-	printk ("%s: unknown PLL synthesizer (ret == %i), "
-		"please report to <linuxdvb@linuxtv.org>!!\n",
-		__FILE__, ret);
+	printk ("stv0299: unknown PLL synthesizer (ret == %i), please report to <linuxdvb@linuxtv.org>!!\n", ret);
 
 	return UNKNOWN_FRONTEND;
 }
 
+static struct i2c_client client_template;
 
-static int uni0299_attach (struct dvb_i2c_bus *i2c, void **data)
+static int attach_adapter(struct i2c_adapter *adapter)
 {
+	struct i2c_client *client;
 	struct stv0299_state* state;
 	int tuner_type;
+	int ret;
 	u8 id;
- 
-	stv0299_writereg (i2c, 0x02, 0x34); /* standby off */
-	dvb_delay(200);
-	id = stv0299_readreg (i2c, 0x00);
+
+	stv0299_writereg(adapter, 0x02, 0x34); /* standby off */
+	msleep(200);
+	id = stv0299_readreg(adapter, 0x00);
 
 	dprintk ("%s: id == 0x%02x\n", __FUNCTION__, id);
 
@@ -1348,53 +1367,112 @@ static int uni0299_attach (struct dvb_i2c_bus *i2c, void **data)
 	if (id != 0xa1 && id != 0x80)
 		return -ENODEV;
 
-	if ((tuner_type = probe_tuner(i2c)) < 0)
+	if ((tuner_type = probe_tuner(adapter)) < 0)
 		return -ENODEV;
 
 	if ((state = kmalloc(sizeof(struct stv0299_state), GFP_KERNEL)) == NULL) {
 		return -ENOMEM;
 	}
 
-	*data = state;
+	if (NULL == (client = kmalloc(sizeof(struct i2c_client), GFP_KERNEL))) {
+		kfree(state);
+		return -ENOMEM;
+	}
+
 	state->tuner_type = tuner_type;
 	state->tuner_frequency = 0;
 	state->initialised = 0;
-	return dvb_register_frontend (uni0299_ioctl, i2c, (void *) state,
-			       &uni0299_info);
+	state->i2c = adapter;
+	
+	memcpy(client, &client_template, sizeof(struct i2c_client));
+	client->adapter = adapter;
+	client->addr = (0x68>>1);
+	i2c_set_clientdata(client, (void*)state);
+	
+	ret = i2c_attach_client(client);
+	if (ret) {
+		kfree(client);
+		kfree(state);
+		return -EFAULT;
+	}
+	
+	BUG_ON(!state->dvb);
+
+	ret = dvb_register_frontend(uni0299_ioctl, state->dvb, state,
+					&uni0299_info, THIS_MODULE);
+	if (ret) {
+		i2c_detach_client(client);
+		kfree(client);
+		kfree(state);
+		return -EFAULT;
+	}
+	
+	return 0;
 }
 
-
-static void uni0299_detach (struct dvb_i2c_bus *i2c, void *data)
+static int detach_client(struct i2c_client *client)
 {
-	dprintk ("%s\n", __FUNCTION__);
-	kfree(data);
-	dvb_unregister_frontend (uni0299_ioctl, i2c);
+	struct stv0299_state *state = (struct stv0299_state*)i2c_get_clientdata(client);
+
+	dvb_unregister_frontend (uni0299_ioctl, state->dvb);
+	i2c_detach_client(client);
+	kfree(client);
+	kfree(state);
+	return 0;
 }
 
+static int command (struct i2c_client *client, unsigned int cmd, void *arg)
+{
+	struct stv0299_state *data = (struct stv0299_state*)i2c_get_clientdata(client);
+	dprintk ("%s\n", __FUNCTION__);
+
+	switch (cmd) {
+	case FE_REGISTER: {
+		data->dvb = (struct dvb_adapter*)arg;
+		break;
+	}
+	case FE_UNREGISTER: {
+		data->dvb = NULL;
+		break;
+	}
+	default:
+		return -EOPNOTSUPP;
+	}
+	return 0;
+}
+
+static struct i2c_driver driver = {
+	.owner 		= THIS_MODULE,
+	.name 		= FRONTEND_NAME,
+	.id 		= I2C_DRIVERID_DVBFE_STV0299,
+	.flags 		= I2C_DF_NOTIFY,
+	.attach_adapter = attach_adapter,
+	.detach_client 	= detach_client,
+	.command 	= command,
+};
+
+static struct i2c_client client_template = {
+	.name		= FRONTEND_NAME,
+	.flags 		= I2C_CLIENT_ALLOW_USE,
+	.driver  	= &driver,
+};
 
 static int __init init_uni0299 (void)
 {
-	dprintk ("%s\n", __FUNCTION__);
-	return dvb_register_i2c_device (NULL, uni0299_attach, uni0299_detach);
+	return i2c_add_driver(&driver);
 }
-
 
 static void __exit exit_uni0299 (void)
 {
-	dprintk ("%s\n", __FUNCTION__);
-
-	dvb_unregister_i2c_device (uni0299_attach);
+	if (i2c_del_driver(&driver))
+		printk("stv0299: driver deregistration failed\n");
 }
 
 module_init (init_uni0299);
 module_exit (exit_uni0299);
 
 MODULE_DESCRIPTION("Universal STV0299/TSA5059/SL1935 DVB Frontend driver");
-MODULE_AUTHOR("Ralph Metzler, Holger Waechtler, Peter Schildmann, Felix Domke, Andreas Oberritter, Andrew de Quincey");
+MODULE_AUTHOR("Ralph Metzler, Holger Waechtler, Peter Schildmann, Felix Domke, "
+              "Andreas Oberritter, Andrew de Quincey, Kenneth Aafløy");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(stv0299_status, "i");
-MODULE_PARM_DESC(stv0299_status, "Which status value to support (0: BER, 1: UCBLOCKS)");
-
-MODULE_PARM(disable_typhoon, "i");
-MODULE_PARM_DESC(disable_typhoon, "Disable support for Philips SU1278 on Typhoon hardware.");

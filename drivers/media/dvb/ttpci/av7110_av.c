@@ -37,14 +37,10 @@
 #include <linux/smp_lock.h>
 #include <linux/fs.h>
 
-#define DEBUG_VARIABLE av7110_debug
-extern int av7110_debug;
-
 #include "av7110.h"
 #include "av7110_hw.h"
 #include "av7110_av.h"
 #include "av7110_ipack.h"
-#include "dvb_functions.h"
 
 /* MPEG-2 (ISO 13818 / H.222.0) stream types */
 #define PROG_STREAM_MAP  0xBC
@@ -92,7 +88,6 @@ extern int av7110_debug;
 #define LTW_FLAG	 0x80
 #define PIECE_RATE	 0x40
 #define SEAM_SPLICE	 0x20
-
 
 static void p_to_t(u8 const *buf, long int length, u16 pid,
 		   u8 *counter, struct dvb_demux_feed *feed);
@@ -285,12 +280,14 @@ int av7110_pes_play(void *dest, struct dvb_ringbuffer *buf, int dlen)
 	return blen;
 }
 
-
 int av7110_set_volume(struct av7110 *av7110, int volleft, int volright)
 {
 	int err, vol, val, balance = 0;
 
 	DEB_EE(("av7110: %p\n", av7110));
+
+	av7110->mixer.volume_left = volleft;
+	av7110->mixer.volume_right = volright;
 
 	switch (av7110->adac_type) {
 	case DVB_ADAC_TI:

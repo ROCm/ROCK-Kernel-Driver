@@ -167,7 +167,7 @@ static int budget_patch_attach (struct saa7146_dev* dev, struct saa7146_pci_exte
         struct budget_patch *budget;
         int err;
 	int count = 0;
-
+	
         if (!(budget = kmalloc (sizeof(struct budget_patch), GFP_KERNEL)))
                 return -ENOMEM;
 

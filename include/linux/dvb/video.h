@@ -35,7 +35,7 @@
 
 
 typedef enum {
-	VIDEO_FORMAT_4_3,     /* Select 4:3 format */ 
+	VIDEO_FORMAT_4_3,     /* Select 4:3 format */
         VIDEO_FORMAT_16_9,    /* Select 16:9 format. */
 	VIDEO_FORMAT_221_1    /* 2.21:1 */
 } video_format_t;
@@ -82,13 +82,13 @@ typedef enum {
 
 struct video_event { 
         int32_t type; 
-#define VIDEO_EVENT_SIZE_CHANGED 1
+#define VIDEO_EVENT_SIZE_CHANGED	1
 #define VIDEO_EVENT_FRAME_RATE_CHANGED	2
         time_t timestamp;
-	union { 
+	union {
 	        video_size_t size;
 		unsigned int frame_rate;	/* in frames per 1000sec */
-	} u; 
+	} u;
 };
 
 

@@ -1,9 +1,6 @@
 #ifndef __BUDGET_DVB__
 #define __BUDGET_DVB__
 
-#include <media/saa7146.h>
-
-#include "dvb_i2c.h"
 #include "dvb_frontend.h"
 #include "dvbdev.h"
 #include "demux.h"
@@ -11,6 +8,8 @@
 #include "dmxdev.h"
 #include "dvb_filter.h"
 #include "dvb_net.h"
+
+#include <media/saa7146.h>
 
 extern int budget_debug;
 
@@ -24,11 +23,11 @@ struct budget {
 
         /* devices */
         struct dvb_device       dvb_dev;
-        struct dvb_net               dvb_net;
+        struct dvb_net		dvb_net;
 
         struct saa7146_dev	*dev;
 
-	struct dvb_i2c_bus	*i2c_bus;	
+	struct i2c_adapter	i2c_adap;	
 	struct budget_info	*card;
 
 	unsigned char		*grabbing;
@@ -37,15 +36,15 @@ struct budget {
 	struct tasklet_struct   fidb_tasklet;
 	struct tasklet_struct   vpe_tasklet;
 
-        struct dmxdev                dmxdev;
+        struct dmxdev           dmxdev;
         struct dvb_demux	demux;
 
-        struct dmx_frontend          hw_frontend;
-        struct dmx_frontend          mem_frontend;
+        struct dmx_frontend     hw_frontend;
+        struct dmx_frontend     mem_frontend;
 
         int                     fe_synced; 
         struct semaphore        pid_mutex;
-
+	
 	int                     ci_present;
         int                     video_port;
 
@@ -79,6 +78,7 @@ static struct saa7146_pci_extension_data x_var = { \
 #define BUDGET_KNC1		   2
 #define BUDGET_PATCH		   3
 #define BUDGET_FS_ACTIVY	   4
+#define BUDGET_CIN1200		   5
 
 #define BUDGET_VIDEO_PORTA         0
 #define BUDGET_VIDEO_PORTB         1

@@ -296,7 +296,7 @@ int saa7146_i2c_transfer(struct saa7146_dev *dev, const struct i2c_msg msgs[], i
 
 	if ( count > 3 || 0 != (SAA7146_I2C_SHORT_DELAY & dev->ext->flags) )
 		short_delay = 1;
-  
+
 	do {
 		/* reset the i2c-device if necessary */
 		err = saa7146_i2c_reset(dev);
@@ -375,7 +375,7 @@ out:
 static int saa7146_i2c_xfer(struct i2c_adapter* adapter, struct i2c_msg msg[], int num)
 {
 	struct saa7146_dev* dev = i2c_get_adapdata(adapter);
-	
+
 	/* use helper function to transfer data */
 	return saa7146_i2c_transfer(dev, msg, num, adapter->retries);
 }
@@ -393,7 +393,7 @@ static struct i2c_algorithm saa7146_algo = {
 	.functionality	= saa7146_i2c_func,
 };
 
-int saa7146_i2c_adapter_prepare(struct saa7146_dev *dev, struct i2c_adapter *i2c_adapter, unsigned int class, u32 bitrate)
+int saa7146_i2c_adapter_prepare(struct saa7146_dev *dev, struct i2c_adapter *i2c_adapter, u32 bitrate)
 {
 	DEB_EE(("bitrate: 0x%08x\n",bitrate));
 	
@@ -404,13 +404,11 @@ int saa7146_i2c_adapter_prepare(struct saa7146_dev *dev, struct i2c_adapter *i2c
 	saa7146_i2c_reset(dev);
 
 	if( NULL != i2c_adapter ) {
-		memset(i2c_adapter,0,sizeof(struct i2c_adapter));
-		strcpy(i2c_adapter->name, dev->name);	
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
-		i2c_adapter->data = dev;
+ 		i2c_adapter->data = dev;
 #else
+		BUG_ON(!i2c_adapter->class);
 		i2c_set_adapdata(i2c_adapter,dev);
-		i2c_adapter->class = class;
 #endif
 		i2c_adapter->algo	   = &saa7146_algo;
 		i2c_adapter->algo_data     = NULL;

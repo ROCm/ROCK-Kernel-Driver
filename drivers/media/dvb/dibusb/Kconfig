@@ -1,0 +1,31 @@
+config DVB_DIBUSB
+	tristate "Twinhan/KWorld/Hama/Artec USB DVB-T devices"
+	depends on DVB_CORE && USB
+	select FW_LOADER
+	help
+	  Support for USB 1.1 DVB-T devices based on a reference design made by 
+	  DiBcom (http://www.dibcom.fr).
+
+	  Devices supported by this driver:
+
+	    Twinhan VisionPlus VisionDTV USB-Ter (VP7041)
+	    KWorld V-Stream XPERT DTV - DVB-T USB
+	    Hama DVB-T USB-Box
+	    DiBcom reference device (non-public)
+	    Ultima Electronic/Artec T1 USB TVBOX
+
+	  The VP7041 seems to be identical to "CTS Portable" (Chinese 
+	  Television System).
+
+	  These devices can be understood as budget ones, they "only" deliver
+	  the MPEG data.
+
+	  Currently all known copies of the DiBcom reference design have the DiBcom 3000MB 
+	  frontend onboard. Please enable and load this one manually in order to use this
+	  device.
+	  
+	  A firmware is needed to use the device. See Documentation/dvb/README.dibusb
+	  details.
+
+	  Say Y if you own such a device and want to use it. You should build it as
+	  a module.

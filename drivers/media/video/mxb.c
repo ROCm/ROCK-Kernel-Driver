@@ -128,8 +128,8 @@ static struct saa7146_extension_ioctls ioctls[] = {
 
 struct mxb
 {
-	struct video_device	video_dev;
-	struct video_device	vbi_dev;
+	struct video_device	*video_dev;
+	struct video_device	*vbi_dev;
 
 	struct i2c_adapter	i2c_adapter;	
 
@@ -183,7 +183,7 @@ static int mxb_probe(struct saa7146_dev* dev)
 	}
 	memset(mxb, 0x0, sizeof(struct mxb));	
 
-	saa7146_i2c_adapter_prepare(dev, &mxb->i2c_adapter, I2C_CLASS_TV_ANALOG, SAA7146_I2C_BUS_BIT_RATE_480);
+	saa7146_i2c_adapter_prepare(dev, &mxb->i2c_adapter, SAA7146_I2C_BUS_BIT_RATE_480);
 	if(i2c_add_adapter(&mxb->i2c_adapter) < 0) {
 		DEB_S(("cannot register i2c-device. skipping.\n"));
 		kfree(mxb);

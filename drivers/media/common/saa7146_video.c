@@ -38,6 +38,13 @@ static struct saa7146_format formats[] = {
 		.depth		= 32,
 		.flags		= 0,
 	}, {
+		.name 		= "RGB-32 (R-G-B)",
+		.pixelformat	= V4L2_PIX_FMT_RGB32,
+		.trans 		= RGB32_COMPOSED,
+		.depth		= 32,
+		.flags		= 0,
+		.swap		= 0x2,
+	}, {
 		.name 		= "Greyscale-8",
 		.pixelformat	= V4L2_PIX_FMT_GREY,
 		.trans 		= Y8,
@@ -183,7 +190,7 @@ static int try_fmt(struct saa7146_fh *fh, struct v4l2_format *f)
 		enum v4l2_field field;
 		int maxw, maxh;
 		int calc_bpl;
-
+		
 		DEB_EE(("V4L2_BUF_TYPE_VIDEO_CAPTURE: dev:%p, fh:%p\n",dev,fh));
 
 		fmt = format_by_fourcc(dev,f->fmt.pix.pixelformat);
@@ -270,23 +277,23 @@ int saa7146_start_preview(struct saa7146_fh *fh)
 	if (IS_CAPTURE_ACTIVE(fh) != 0) {
 		DEB_D(("streaming capture is active.\n"));
 		return -EBUSY;
-		}
+	}
 
 	/* check if overlay is running */
 	if (IS_OVERLAY_ACTIVE(fh) != 0) {		
 		if (vv->video_fh == fh) {
-		DEB_D(("overlay is already active.\n"));
-		return 0;
-	}
+			DEB_D(("overlay is already active.\n"));
+			return 0;
+		}
 		DEB_D(("overlay is already active in another open.\n"));
 		return -EBUSY;
 	}
-	
+
 	if (0 == saa7146_res_get(fh, RESOURCE_DMA1_HPS|RESOURCE_DMA2_CLP)) {
 		DEB_D(("cannot get necessary overlay resources\n"));
 		return -EBUSY;
-	}	
-	
+	}
+
 	err = try_win(dev,&fh->ov.win);
 	if (0 != err) {
 		saa7146_res_free(vv->video_fh, RESOURCE_DMA1_HPS|RESOURCE_DMA2_CLP);
@@ -324,7 +331,7 @@ int saa7146_stop_preview(struct saa7146_fh *fh)
 		DEB_D(("streaming capture is active.\n"));
 		return -EBUSY;
 	}
-
+	
 	/* check if overlay is running at all */
 	if ((vv->video_status & STATUS_OVERLAY) == 0) {		
 		DEB_D(("no active overlay.\n"));
@@ -340,7 +347,7 @@ int saa7146_stop_preview(struct saa7146_fh *fh)
 	vv->video_fh = NULL;
 
 	saa7146_disable_overlay(fh);
-	
+
 	saa7146_res_free(fh, RESOURCE_DMA1_HPS|RESOURCE_DMA2_CLP);
 
 	return 0;
@@ -388,8 +395,8 @@ static int s_fmt(struct saa7146_fh *fh, struct v4l2_format *f)
 
 		/* check if our current overlay is active */
 		if (IS_OVERLAY_ACTIVE(fh) != 0) {
-				saa7146_stop_preview(fh);
-				saa7146_start_preview(fh);
+			saa7146_stop_preview(fh);
+			saa7146_start_preview(fh);
 		}
 		return 0;
 	default:
@@ -573,8 +580,8 @@ static int set_control(struct saa7146_fh *fh, struct v4l2_control *c)
 	up(&dev->lock);
 	
 	if (IS_OVERLAY_ACTIVE(fh) != 0) {
-				saa7146_stop_preview(fh);
-				saa7146_start_preview(fh);
+		saa7146_stop_preview(fh);
+		saa7146_start_preview(fh);
 	}
 	return 0;
 }
@@ -634,7 +641,7 @@ static int saa7146_pgtable_build(struct saa7146_dev *dev, struct saa7146_buf *bu
 		/* walk all pages, copy all page addresses to ptr1 */
 		for (i = 0; i < length; i++, list++) {
 			for (p = 0; p * 4096 < list->length; p++, ptr1++) {
-				*ptr1 = sg_dma_address(list) - list->offset;
+				*ptr1 = cpu_to_le32(sg_dma_address(list) - list->offset);
 			}
 		}
 /*
@@ -712,13 +719,13 @@ static int video_begin(struct saa7146_fh *fh)
 
 	if ((vv->video_status & STATUS_CAPTURE) != 0) {
 		if (vv->video_fh == fh) {
-		DEB_S(("already capturing.\n"));
+			DEB_S(("already capturing.\n"));
 			return 0;
-	}
+		}
 		DEB_S(("already capturing in another open.\n"));
 		return -EBUSY;
 	}
-
+	
 	if ((vv->video_status & STATUS_OVERLAY) != 0) {
 		DEB_S(("warning: suspending overlay video for streaming capture.\n"));
 		vv->ov_suspend = vv->video_fh;
@@ -748,7 +755,7 @@ static int video_begin(struct saa7146_fh *fh)
 		}
 		return -EBUSY;
 	}
-
+	
 	/* clear out beginning of streaming bit (rps register 0)*/
 	saa7146_write(dev, MC2, MASK_27 );
 
@@ -804,7 +811,7 @@ static int video_end(struct saa7146_fh *fh, struct file *file)
 	saa7146_write(dev, MC1, dmas);
 
 	spin_unlock_irqrestore(&dev->slock, flags);
-	
+
 	vv->video_fh = NULL;
 	vv->video_status = 0;
 
@@ -813,8 +820,8 @@ static int video_end(struct saa7146_fh *fh, struct file *file)
 	if (vv->ov_suspend != NULL) {
 		saa7146_start_preview(vv->ov_suspend);
 		vv->ov_suspend = NULL;
-}
-
+	}
+	
 	return 0;
 }
 
@@ -908,7 +915,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		struct saa7146_format *fmt;
 
 		DEB_EE(("VIDIOC_S_FBUF\n"));
-
+		
 		if(!capable(CAP_SYS_ADMIN) &&
 		   !capable(CAP_SYS_RAWIO))
 			return -EPERM;
@@ -929,7 +936,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 			if (vv->video_fh != fh) {
 				DEB_D(("refusing to change framebuffer informations while overlay is active in another open.\n"));
 				return -EBUSY;
-		}
+			}
 		}
 
 		down(&dev->lock);
@@ -999,10 +1006,10 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		return get_control(fh,arg);
 	}
 	case VIDIOC_S_CTRL:
-
-
-
-
+/* FIXME: remove when videodev2.h update is in kernel */
+#ifdef VIDIOC_S_CTRL_OLD
+	case VIDIOC_S_CTRL_OLD:
+#endif
 	{
 		DEB_EE(("VIDIOC_S_CTRL\n"));
 		err = set_control(fh,arg);
@@ -1066,7 +1073,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		v4l2_std_id *id = arg;
 		int found = 0;
 		int i, err;
-						
+		
 		DEB_EE(("VIDIOC_S_STD\n"));
 
 		if ((vv->video_status & STATUS_CAPTURE) == STATUS_CAPTURE) {
@@ -1111,10 +1118,10 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		return 0;
 	}
 	case VIDIOC_OVERLAY:
-
-
-
-
+/* FIXME: remove when videodev2.h update is in kernel */
+#ifdef VIDIOC_OVERLAY_OLD
+	case VIDIOC_OVERLAY_OLD:
+#endif
 	{
 		int on = *(int *)arg;
 		int err = 0;
@@ -1154,11 +1161,11 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 	case VIDIOC_STREAMON: {
 		int *type = arg;
 		DEB_D(("VIDIOC_STREAMON, type:%d\n",*type));
-
+	
 		err = video_begin(fh);
 		if( 0 != err) {
-				return err;
-			}
+			return err;
+		}
 		err = videobuf_streamon(file,q);
 		return err;
 	}
@@ -1183,7 +1190,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		err = videobuf_streamoff(file,q);
 		if (0 != err) {
 			DEB_D(("warning: videobuf_streamoff() failed.\n"));
-		video_end(fh, file);
+			video_end(fh, file);
 		} else {
 			err = video_end(fh, file);
 		}
@@ -1427,7 +1434,7 @@ static void video_close(struct saa7146_dev *dev, struct file *file)
 	} else if (IS_OVERLAY_ACTIVE(fh) != 0) {
 		err = saa7146_stop_preview(fh);
 	}
-	
+		
 	/* hmm, why is this function declared void? */
 	/* return err */
 }
@@ -1456,15 +1463,15 @@ static ssize_t video_read(struct file *file, char __user *data, size_t count, lo
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
 	ssize_t ret = 0;
-
+	
 	DEB_EE(("called.\n"));
 
 	if ((vv->video_status & STATUS_CAPTURE) != 0) {
-	/* fixme: should we allow read() captures while streaming capture? */
+		/* fixme: should we allow read() captures while streaming capture? */
 		if (vv->video_fh == fh) {
-		DEB_S(("already capturing.\n"));
-		return -EBUSY;
-	}
+			DEB_S(("already capturing.\n"));
+			return -EBUSY;
+		}
 		DEB_S(("already capturing in another open.\n"));
 		return -EBUSY;
 	}
@@ -1476,7 +1483,7 @@ static ssize_t video_read(struct file *file, char __user *data, size_t count, lo
 
 	ret = videobuf_read_one(file,&fh->video_q , data, count, ppos);
 	if (ret != 0) {
-	video_end(fh, file);
+		video_end(fh, file);
 	} else {
 		ret = video_end(fh, file);
 	}
@@ -1486,7 +1493,7 @@ out:
 		saa7146_start_preview(vv->ov_suspend);
 		vv->ov_suspend = NULL;
 	}
-	
+
 	return ret;
 }
 

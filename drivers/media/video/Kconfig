@@ -295,6 +295,13 @@ config VIDEO_CX88
 	  To compile this driver as a module, choose M here: the
 	  module will be called cx8800
 
+config VIDEO_CX88_DVB
+	tristate "DVB Support for cx2388x based TV cards"
+	depends on VIDEO_CX88 && DVB_CORE
+	---help---
+	  This adds support for DVB cards based on the
+	  Connexant 2388x chip.
+
 config VIDEO_OVCAMCHIP
 	tristate "OmniVision Camera Chip support"
 	depends on VIDEO_DEV && I2C

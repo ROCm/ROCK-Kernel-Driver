@@ -15,9 +15,21 @@
 #include <linux/vmalloc.h>	/* for vmalloc() */
 #include <linux/mm.h>		/* for vmalloc_to_page() */
 
-/* ugly, but necessary to build the dvb stuff under 2.4. */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-	#include "dvb_functions.h"
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+#ifndef __CRAP_H
+static inline int try_module_get(struct module *mod)
+{
+	if (!MOD_CAN_QUERY(mod))
+		return 0;
+	__MOD_INC_USE_COUNT(mod);
+	return 1;
+}
+
+#define module_put(mod) __MOD_DEC_USE_COUNT(mod)
+#define iminor(xx) minor(xx->i_rdev)
+#define strlcpy strncpy
+#define i2c_get_adapdata(adapter) (struct saa7146_dev*)adapter->data;
+#endif
 #endif
 
 #define SAA7146_VERSION_CODE KERNEL_VERSION(0,5,0)
@@ -91,7 +103,7 @@ struct saa7146_extension
 #define SAA7146_USE_I2C_IRQ	0x1
 #define SAA7146_I2C_SHORT_DELAY	0x2
 	int	flags;
-	
+		
 	/* pairs of subvendor and subdevice ids for
 	   supported devices, last entry 0xffff, 0xfff */
 	struct module *module;
@@ -154,8 +166,8 @@ struct saa7146_dev
 };
 
 /* from saa7146_i2c.c */
-int saa7146_i2c_adapter_prepare(struct saa7146_dev *dev, struct i2c_adapter *i2c_adapter, unsigned int class, u32 bitrate);
-int saa7146_i2c_transfer(struct saa7146_dev *saa, const struct i2c_msg msgs[], int num,  int retries);
+int saa7146_i2c_adapter_prepare(struct saa7146_dev *dev, struct i2c_adapter *i2c_adapter, u32 bitrate);
+int saa7146_i2c_transfer(struct saa7146_dev *saa, const struct i2c_msg msgs[], int num, int retries);
 
 /* from saa7146_core.c */
 extern struct list_head saa7146_devices;

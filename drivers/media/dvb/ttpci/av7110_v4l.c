@@ -35,23 +35,16 @@
 #include <linux/byteorder/swabb.h>
 #include <linux/smp_lock.h>
 
-#define DEBUG_VARIABLE av7110_debug
-extern int av7110_debug;
-
-#include "dvb_i2c.h"
 #include "av7110.h"
 #include "av7110_hw.h"
 #include "av7110_av.h"
-#include "dvb_functions.h"
-
 
 int msp_writereg(struct av7110 *av7110, u8 dev, u16 reg, u16 val)
 {
 	u8 msg[5] = { dev, reg >> 8, reg & 0xff, val >> 8 , val & 0xff };
-	struct dvb_i2c_bus *i2c = av7110->i2c_bus;
 	struct i2c_msg msgs = { .flags = 0, .addr = 0x40, .len = 5, .buf = msg };
 
-	if (i2c->xfer(i2c, &msgs, 1) != 1) {
+	if (i2c_transfer(&av7110->i2c_adap, &msgs, 1) != 1) {
 		printk("av7110(%d): %s(%u = %u) failed\n",
 		       av7110->dvb_adapter->num, __FUNCTION__, reg, val);
 		return -EIO;
@@ -63,13 +56,12 @@ int msp_readreg(struct av7110 *av7110, u8 dev, u16 reg, u16 *val)
 {
 	u8 msg1[3] = { dev, reg >> 8, reg & 0xff };
 	u8 msg2[2];
-	struct dvb_i2c_bus *i2c = av7110->i2c_bus;
 	struct i2c_msg msgs[2] = {
 		{ .flags = 0,	     .addr = 0x40, .len = 3, .buf = msg1 },
 		{ .flags = I2C_M_RD, .addr = 0x40, .len = 2, .buf = msg2 }
 	};
 
-	if (i2c->xfer(i2c, msgs, 2) != 2) {
+	if (i2c_transfer(&av7110->i2c_adap, &msgs[0], 2) != 2) {
 		printk("av7110(%d): %s(%u) failed\n",
 		       av7110->dvb_adapter->num, __FUNCTION__, reg);
 		return -EIO;
@@ -77,8 +69,6 @@ int msp_readreg(struct av7110 *av7110, u8 dev, u16 reg, u16 *val)
 	*val = (msg2[0] << 8) | msg2[1];
 	return 0;
 }
-
-
 
 static struct v4l2_input inputs[2] = {
 	{
@@ -189,7 +179,7 @@ int av7110_dvb_c_switch(struct saa7146_fh *fh)
 			vv->ov_suspend = NULL;
 		}
 	}
-
+	
 	if (0 != av7110->current_input) {
 		adswitch = 1;
 		band = 0x60; /* analog band */
@@ -264,8 +254,8 @@ int av7110_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg)
 		t->signal = 0xffff;
 		t->afc = 0;
 
-		// FIXME: standard / stereo detection is still broken
-		msp_readreg(av7110, MSP_RD_DEM, 0x007e, &stereo_det);
+// FIXME: standard / stereo detection is still broken
+msp_readreg(av7110, MSP_RD_DEM, 0x007e, &stereo_det);
 printk("VIDIOC_G_TUNER: msp3400 TV standard detection: 0x%04x\n", stereo_det);
 
 		msp_readreg(av7110, MSP_RD_DSP, 0x0018, &stereo_det);
@@ -517,7 +507,7 @@ int av7110_init_analog_module(struct av7110 *av7110)
 	printk("av7110(%d): DVB-C analog module detected, initializing MSP3400\n",
 		av7110->dvb_adapter->num);
 	av7110->adac_type = DVB_ADAC_MSP;
-	dvb_delay(100); // the probing above resets the msp...
+	msleep(100); // the probing above resets the msp...
 	msp_readreg(av7110, MSP_RD_DSP, 0x001e, &version1);
 	msp_readreg(av7110, MSP_RD_DSP, 0x001f, &version2);
 	printk("av7110(%d): MSP3400 version 0x%04x 0x%04x\n",

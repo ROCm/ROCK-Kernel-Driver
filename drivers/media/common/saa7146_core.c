@@ -133,8 +133,6 @@ static struct scatterlist* vmalloc_to_sg(unsigned char *virt, int nr_pages)
 /********************************************************************************/
 /* common page table functions */
 
-#define SAA7146_PGTABLE_SIZE 4096
-
 char *saa7146_vmalloc_build_pgtable(struct pci_dev *pci, long length, struct saa7146_pgtable *pt)
 {
 	int pages = (length+PAGE_SIZE-1)/PAGE_SIZE;
@@ -182,11 +180,11 @@ int saa7146_pgtable_alloc(struct pci_dev *pci, struct saa7146_pgtable *pt)
         u32          *cpu;
         dma_addr_t   dma_addr;
 
-	cpu = pci_alloc_consistent(pci, SAA7146_PGTABLE_SIZE, &dma_addr);
+	cpu = pci_alloc_consistent(pci, PAGE_SIZE, &dma_addr);
 	if (NULL == cpu) {
 		return -ENOMEM;
 	}
-	pt->size = SAA7146_PGTABLE_SIZE;
+	pt->size = PAGE_SIZE;
 	pt->cpu  = cpu;
 	pt->dma  = dma_addr;
 
@@ -196,17 +194,13 @@ int saa7146_pgtable_alloc(struct pci_dev *pci, struct saa7146_pgtable *pt)
 int saa7146_pgtable_build_single(struct pci_dev *pci, struct saa7146_pgtable *pt,
 	struct scatterlist *list, int sglen  )
 {
-	u32   *ptr, fill;
+	u32 *ptr, fill;
 	int nr_pages = 0;
-	int   i,p;
+	int i,p;
 
-	BUG_ON( 0 == sglen);
+	BUG_ON(0 == sglen);
+	BUG_ON(list->offset > PAGE_SIZE);
 
-	if (list->offset > PAGE_SIZE) {
-		DEB_D(("offset > PAGE_SIZE. this should not happen."));
-		return -EINVAL;
-	}
-	
 	/* if we have a user buffer, the first page may not be
 	   aligned to a page boundary. */
 	pt->offset = list->offset;
@@ -217,7 +211,7 @@ int saa7146_pgtable_build_single(struct pci_dev *pci, struct saa7146_pgtable *pt
 		printk("i:%d, adr:0x%08x, len:%d, offset:%d\n", i,sg_dma_address(list), sg_dma_len(list), list->offset);
 */
 		for (p = 0; p * 4096 < list->length; p++, ptr++) {
-			*ptr = sg_dma_address(list) + p * 4096;
+			*ptr = cpu_to_le32(sg_dma_address(list) + p * 4096);
 			nr_pages++;
 		}
 	}
@@ -254,7 +248,6 @@ void saa7146_setgpio(struct saa7146_dev *dev, int port, u32 data)
 
 /********************************************************************************/
 /* interrupt handler */
-
 static irqreturn_t interrupt_hw(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct saa7146_dev *dev = (struct saa7146_dev*)dev_id;
@@ -340,7 +333,7 @@ static int saa7146_init_one(struct pci_dev *pci, const struct pci_device_id *ent
 	memset(dev, 0x0, sizeof(struct saa7146_dev));
 
 	DEB_EE(("pci:%p\n",pci));
-
+	
 	if (pci_enable_device(pci)) {
 		ERR(("pci_enable_device() failed.\n"));
 		err = -EIO;
@@ -405,25 +398,25 @@ static int saa7146_init_one(struct pci_dev *pci, const struct pci_device_id *ent
 	if( NULL == dev->d_rps0.cpu_addr ) {
 		err = -ENOMEM;
 		goto kmalloc_error_1;
-	}
+	}	
 	memset(dev->d_rps0.cpu_addr, 0x0, SAA7146_RPS_MEM);
 
 	dev->d_rps1.cpu_addr = pci_alloc_consistent(dev->pci, SAA7146_RPS_MEM, &dev->d_rps1.dma_handle);	
 	if( NULL == dev->d_rps1.cpu_addr ) {
 		err = -ENOMEM;
 		goto kmalloc_error_2;
-	}
+	}	
 	memset(dev->d_rps1.cpu_addr, 0x0, SAA7146_RPS_MEM);
-
+	
 	dev->d_i2c.cpu_addr = pci_alloc_consistent(dev->pci, SAA7146_RPS_MEM, &dev->d_i2c.dma_handle);	
 	if( NULL == dev->d_i2c.cpu_addr ) {
 		err = -ENOMEM;
 		goto kmalloc_error_3;
-	}
+	}	
 	memset(dev->d_i2c.cpu_addr, 0x0, SAA7146_RPS_MEM);
 
 	/* the rest + print status message */
-
+	
 	/* create a nice device name */
 	sprintf(&dev->name[0], "saa7146 (%d)",saa7146_num);
 

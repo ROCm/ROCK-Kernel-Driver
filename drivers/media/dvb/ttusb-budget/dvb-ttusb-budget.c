@@ -13,6 +13,7 @@
 #include <linux/slab.h>
 #include <linux/wait.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/usb.h>
 #include <linux/delay.h>
 #include <linux/time.h>
@@ -28,8 +29,6 @@
 #include <linux/dvb/dmx.h>
 #include <linux/pci.h>
 
-#include "dvb_functions.h"
-
 /*
   TTUSB_HWSECTIONS:
     the DSP supports filtering in hardware, however, since the "muxstream"
@@ -38,18 +37,21 @@
     so the best way is maybe to keep TTUSB_HWSECTIONS undef'd and just
     parse TS data. USB bandwith will be a problem when having large
     datastreams, especially for dvb-net, but hey, that's not my problem.
-	
+
   TTUSB_DISEQC, TTUSB_TONE:
     let the STC do the diseqc/tone stuff. this isn't supported at least with
     my TTUSB, so let it undef'd unless you want to implement another
     frontend. never tested.
-		
+
   DEBUG:
     define it to > 3 for really hardcore debugging. you probably don't want
     this unless the device doesn't load at all. > 2 for bandwidth statistics.
 */
 
-static int debug = 0;
+static int debug;
+
+module_param(debug, int, 0644);
+MODULE_PARM_DESC(debug, "Turn on/off debugging (default:off).");
 
 #define dprintk(x...) do { if (debug) printk(KERN_DEBUG x); } while (0)
 
@@ -80,6 +82,8 @@ struct ttusb {
 	struct dvb_adapter *adapter;
 	struct usb_device *dev;
 
+	struct i2c_adapter i2c_adap;	
+
 	int disconnecting;
 	int iso_streaming;
 
@@ -109,7 +113,7 @@ struct ttusb {
 
 	int cc;			/* MuxCounter - will increment on EVERY MUX PACKET */
 	/* (including stuffing. yes. really.) */
-
+	
 
 	u8 last_result[32];
 
@@ -242,10 +246,9 @@ static int ttusb_i2c_msg(struct ttusb *ttusb,
 	return rcv_len;
 }
 
-static int ttusb_i2c_xfer(struct dvb_i2c_bus *i2c, const struct i2c_msg msg[],
-		   int num)
+static int master_xfer(struct i2c_adapter* adapter, struct i2c_msg msg[], int num)
 {
-	struct ttusb *ttusb = i2c->data;
+	struct ttusb *ttusb = i2c_get_adapdata(adapter);
 	int i = 0;
 	int inc;
 
@@ -514,7 +517,7 @@ static int ttusb_set_tone(struct ttusb *ttusb, fe_sec_tone_mode_t tone)
 
 static int ttusb_lnb_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 {
-	struct ttusb *ttusb = fe->i2c->data;
+	struct ttusb *ttusb = fe->before_after_data;
 
 	switch (cmd) {
 	case FE_SET_VOLTAGE:
@@ -787,7 +790,7 @@ static void ttusb_iso_irq(struct urb *urb, struct pt_regs *ptregs)
 			ttusb_process_frame(ttusb, data, len);
 		}
 	}
-	usb_submit_urb(urb, GFP_KERNEL);
+	usb_submit_urb(urb, GFP_ATOMIC);
 }
 
 static void ttusb_free_iso_urbs(struct ttusb *ttusb)
@@ -822,7 +825,7 @@ static int ttusb_alloc_iso_urbs(struct ttusb *ttusb)
 
 		if (!
 		    (urb =
-		     usb_alloc_urb(FRAMES_PER_ISO_BUF, GFP_KERNEL))) {
+		     usb_alloc_urb(FRAMES_PER_ISO_BUF, GFP_ATOMIC))) {
 			ttusb_free_iso_urbs(ttusb);
 			return -ENOMEM;
 		}
@@ -880,7 +883,7 @@ static int ttusb_start_iso_xfer(struct ttusb *ttusb)
 	}
 
 	for (i = 0; i < ISO_BUF_COUNT; i++) {
-		if ((err = usb_submit_urb(ttusb->iso_urb[i], GFP_KERNEL))) {
+		if ((err = usb_submit_urb(ttusb->iso_urb[i], GFP_ATOMIC))) {
 			ttusb_stop_iso_xfer(ttusb);
 			printk
 			    ("%s: failed urb submission (%i: err = %i)!\n",
@@ -1068,6 +1071,38 @@ static struct file_operations stc_fops = {
 };
 #endif
 
+u32 functionality(struct i2c_adapter *adapter)
+{
+	return I2C_FUNC_I2C;
+}
+
+static struct i2c_algorithm ttusb_dec_algo = {
+	.name		= "ttusb dec i2c algorithm",
+	.id		= I2C_ALGO_BIT,
+	.master_xfer	= master_xfer,
+	.functionality	= functionality,
+};
+
+static int client_register(struct i2c_client *client)
+{
+	struct ttusb *ttusb = (struct ttusb*)i2c_get_adapdata(client->adapter);
+
+	if (client->driver->command)
+		return client->driver->command(client, FE_REGISTER, ttusb->adapter);
+
+	return 0;
+}
+
+static int client_unregister(struct i2c_client *client)
+{
+	struct ttusb *ttusb = (struct ttusb*)i2c_get_adapdata(client->adapter);
+
+	if (client->driver->command)
+		return client->driver->command(client, FE_UNREGISTER, ttusb->adapter);
+
+	return 0;
+}
+
 static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_device *udev;
@@ -1077,17 +1112,6 @@ static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 	dprintk("%s: TTUSB DVB connected\n", __FUNCTION__);
 
 	udev = interface_to_usbdev(intf);
-
-	/* Device has already been reset; its configuration was chosen.
-	 * If this fault happens, use a hotplug script to choose the
-	 * right configuration (write bConfigurationValue in sysfs).
-	 */
-	if (udev->actconfig->desc.bConfigurationValue != 1) {
-		dev_err(&intf->dev, "device config is #%d, need #1\n",
-			udev->actconfig->desc.bConfigurationValue);
-		return -ENODEV;
-	}
-
 
         if (intf->altsetting->desc.bInterfaceNumber != 1) return -ENODEV;
 
@@ -1117,7 +1141,29 @@ static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 
 	dvb_register_adapter(&ttusb->adapter, "Technotrend/Hauppauge Nova-USB", THIS_MODULE);
 
-	dvb_register_i2c_bus(ttusb_i2c_xfer, ttusb, ttusb->adapter, 0);
+	/* i2c */
+	memset(&ttusb->i2c_adap, 0, sizeof(struct i2c_adapter));
+	strcpy(ttusb->i2c_adap.name, "TTUSB DEC");
+
+	i2c_set_adapdata(&ttusb->i2c_adap, ttusb);
+
+#ifdef I2C_ADAP_CLASS_TV_DIGITAL
+	ttusb->i2c_adap.class 	    	  = I2C_ADAP_CLASS_TV_DIGITAL;
+#else
+	ttusb->i2c_adap.class 	    	  = I2C_CLASS_TV_DIGITAL;
+#endif
+	ttusb->i2c_adap.algo              = &ttusb_dec_algo;
+	ttusb->i2c_adap.algo_data         = NULL;
+	ttusb->i2c_adap.id                = I2C_ALGO_BIT;
+	ttusb->i2c_adap.client_register   = client_register;
+	ttusb->i2c_adap.client_unregister = client_unregister;
+	
+	result = i2c_add_adapter(&ttusb->i2c_adap);
+	if (result) {
+		dvb_unregister_adapter (ttusb->adapter);
+		return result;
+	}
+
 	dvb_add_frontend_ioctls(ttusb->adapter, ttusb_lnb_ioctl, NULL,
 				ttusb);
 
@@ -1137,9 +1183,10 @@ static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 	ttusb->dvb_demux.write_to_decoder = NULL;
 
 	if ((result = dvb_dmx_init(&ttusb->dvb_demux)) < 0) {
-		printk("ttusb_dvb: dvb_dmx_init failed (errno = %d)\n",
-		       result);
-		goto err;
+		printk("ttusb_dvb: dvb_dmx_init failed (errno = %d)\n", result);
+		i2c_del_adapter(&ttusb->i2c_adap);
+		dvb_unregister_adapter (ttusb->adapter);
+		return -ENODEV;
 	}
 //FIXME dmxdev (nur WAS?)
 	ttusb->dmxdev.filternum = ttusb->dvb_demux.filternum;
@@ -1150,15 +1197,20 @@ static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 		printk("ttusb_dvb: dvb_dmxdev_init failed (errno = %d)\n",
 		       result);
 		dvb_dmx_release(&ttusb->dvb_demux);
-		goto err;
+		i2c_del_adapter(&ttusb->i2c_adap);
+		dvb_unregister_adapter (ttusb->adapter);
+		return -ENODEV;
 	}
 
-	if (dvb_net_init
-	    (ttusb->adapter, &ttusb->dvbnet, &ttusb->dvb_demux.dmx)) {
+	if (dvb_net_init(ttusb->adapter, &ttusb->dvbnet, &ttusb->dvb_demux.dmx)) {
 		printk("ttusb_dvb: dvb_net_init failed!\n");
+		dvb_dmxdev_release(&ttusb->dmxdev);
+		dvb_dmx_release(&ttusb->dvb_demux);
+		i2c_del_adapter(&ttusb->i2c_adap);
+		dvb_unregister_adapter (ttusb->adapter);
+		return -ENODEV;
 	}
 
-      err:
 #if 0
 	ttusb->stc_devfs_handle =
 	    devfs_register(ttusb->adapter->devfs_handle, TTUSB_BUDGET_NAME,
@@ -1166,7 +1218,6 @@ static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 			   S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP
 			   | S_IROTH | S_IWOTH, &stc_fops, ttusb);
 #endif
-
 	usb_set_intfdata(intf, (void *) ttusb);
 
 	return 0;
@@ -1187,7 +1238,7 @@ static void ttusb_disconnect(struct usb_interface *intf)
 	dvb_dmxdev_release(&ttusb->dmxdev);
 	dvb_dmx_release(&ttusb->dvb_demux);
 
-	dvb_unregister_i2c_bus(ttusb_i2c_xfer, ttusb->adapter, 0);
+	i2c_del_adapter(&ttusb->i2c_adap);
 	dvb_unregister_adapter(ttusb->adapter);
 
 	ttusb_free_iso_urbs(ttusb);
@@ -1233,9 +1284,6 @@ static void __exit ttusb_exit(void)
 
 module_init(ttusb_init);
 module_exit(ttusb_exit);
-
-MODULE_PARM(debug, "i");
-MODULE_PARM_DESC(debug, "Debug or not");
 
 MODULE_AUTHOR("Holger Waechtler <holger@convergence.de>");
 MODULE_DESCRIPTION("TTUSB DVB Driver");

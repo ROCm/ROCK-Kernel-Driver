@@ -30,9 +30,8 @@ union dst_gpio_packet {
 #define DST_IG_READ	2
 #define DST_IG_TS       3
 
-struct bt878 ;
+struct bt878;
 
-int
-bt878_device_control(struct bt878 *bt, unsigned int cmd, union dst_gpio_packet *mp);
+int bt878_device_control(struct bt878 *bt, unsigned int cmd, union dst_gpio_packet *mp);
 
-struct bt878 *bt878_find_by_dvb_adap(struct dvb_adapter *adap);
+struct bt878 *bt878_find_by_i2c_adap(struct i2c_adapter *adap);

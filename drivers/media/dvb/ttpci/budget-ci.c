@@ -1,7 +1,7 @@
 /*
- * budget-ci.c: driver for the SAA7146 based Budget DVB cards 
+ * budget-ci.c: driver for the SAA7146 based Budget DVB cards
  *
- * Compiled from various sources by Michael Hunold <michael@mihu.de> 
+ * Compiled from various sources by Michael Hunold <michael@mihu.de>
  *
  *     msp430 IR support contributed by Jack Thomasson <jkt@Helius.COM>
  *     partially based on the Siemens DVB driver by Ralph+Marcus Metzler
@@ -12,19 +12,19 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- * 
+ *
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
  * GNU General Public License for more details.
- * 
+ *
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  * Or, point your browser to http://www.gnu.org/copyleft/gpl.html
- * 
+ *
  *
  * the project's page is at http://www.linuxtv.org/dvb/
  */
@@ -38,12 +38,7 @@
 #include <linux/input.h>
 #include <linux/spinlock.h>
 
-#include "dvb_functions.h"
 #include "dvb_ca_en50221.h"
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
-#include "input_fake.h"
-#endif
 
 #define DEBIADDR_IR		0x1234
 #define DEBIADDR_CICONTROL	0x0000
@@ -79,14 +74,15 @@ static u32 budget_debiread (struct budget_ci* budget_ci, u32 config, int addr, i
 {
 	struct saa7146_dev *saa = budget_ci->budget.dev;
 	u32 result = 0;
+        unsigned long flags;
 
 	if (count > 4 || count <= 0)
 		return 0;
 
-	spin_lock(&budget_ci->debilock);
-
+	spin_lock_irqsave(&budget_ci->debilock, flags);
+   
 	if (saa7146_wait_for_debi_done(saa) < 0) {
-		spin_unlock(&budget_ci->debilock);
+		spin_unlock_irqrestore(&budget_ci->debilock, flags);
 		return 0;
 	}
 
@@ -101,21 +97,22 @@ static u32 budget_debiread (struct budget_ci* budget_ci, u32 config, int addr, i
 	result = saa7146_read(saa, 0x88);
 	result &= (0xffffffffUL >> ((4 - count) * 8));
 
-	spin_unlock(&budget_ci->debilock);
+	spin_unlock_irqrestore(&budget_ci->debilock, flags);
 	return result;
 }
 
 static u8 budget_debiwrite (struct budget_ci* budget_ci, u32 config, int addr, int count, u32 value)
 {
 	struct saa7146_dev *saa = budget_ci->budget.dev;
+        unsigned long flags;
 
 	if (count > 4 || count <= 0)
 		return 0;
 
-	spin_lock(&budget_ci->debilock);
-
+	spin_lock_irqsave(&budget_ci->debilock, flags);
+   
 	if (saa7146_wait_for_debi_done(saa) < 0) {
-		spin_unlock(&budget_ci->debilock);
+		spin_unlock_irqrestore(&budget_ci->debilock, flags);
 		return 0;
 	}
 
@@ -128,7 +125,7 @@ static u8 budget_debiwrite (struct budget_ci* budget_ci, u32 config, int addr, i
 
 	saa7146_wait_for_debi_done(saa);
 
-	spin_unlock(&budget_ci->debilock);
+	spin_unlock_irqrestore(&budget_ci->debilock, flags);
 	return 0;
 }
 
@@ -138,52 +135,52 @@ static u8 budget_debiwrite (struct budget_ci* budget_ci, u32 config, int addr, i
    Hauppauge (from NOVA-CI-s box product)
    i've taken a "middle of the road" approach and note the differences
 */
-static  u16 key_map[64] = {
+static	u16 key_map[64] = {
 	/* 0x0X */
 	KEY_0, KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8,
 	KEY_9,
 	KEY_ENTER,
 	KEY_RED,
-	KEY_POWER,              /* RADIO on Hauppauge */
+	KEY_POWER,		/* RADIO on Hauppauge */
 	KEY_MUTE,
 	0,
-	KEY_A,                  /* TV on Hauppauge */
+	KEY_A,			/* TV on Hauppauge */
 	/* 0x1X */
 	KEY_VOLUMEUP, KEY_VOLUMEDOWN,
 	0, 0,
 	KEY_B,
 	0, 0, 0, 0, 0, 0, 0,
 	KEY_UP, KEY_DOWN,
-	KEY_OPTION,             /* RESERVED on Hauppauge */
+	KEY_OPTION,		/* RESERVED on Hauppauge */
 	KEY_BREAK,
 	/* 0x2X */
 	KEY_CHANNELUP, KEY_CHANNELDOWN,
-	KEY_PREVIOUS,           /* Prev. Ch on Zenith, SOURCE on Hauppauge */
+	KEY_PREVIOUS,		/* Prev. Ch on Zenith, SOURCE on Hauppauge */
 	0, KEY_RESTART, KEY_OK,
-	KEY_CYCLEWINDOWS,       /* MINIMIZE on Hauppauge */
+	KEY_CYCLEWINDOWS,	/* MINIMIZE on Hauppauge */
 	0,
-	KEY_ENTER,              /* VCR mode on Zenith */
+	KEY_ENTER,		/* VCR mode on Zenith */
 	KEY_PAUSE,
 	0,
 	KEY_RIGHT, KEY_LEFT,
 	0,
-	KEY_MENU,               /* FULL SCREEN on Hauppauge */
+	KEY_MENU,		/* FULL SCREEN on Hauppauge */
 	0,
 	/* 0x3X */
 	KEY_SLOW,
-	KEY_PREVIOUS,           /* VCR mode on Zenith */
+	KEY_PREVIOUS,		/* VCR mode on Zenith */
 	KEY_REWIND,
 	0,
 	KEY_FASTFORWARD,
 	KEY_PLAY, KEY_STOP,
 	KEY_RECORD,
-	KEY_TUNER,              /* TV/VCR on Zenith */
+	KEY_TUNER,		/* TV/VCR on Zenith */
 	0,
 	KEY_C,
 	0,
 	KEY_EXIT,
 	KEY_POWER2,
-	KEY_TUNER,              /* VCR mode on Zenith */
+	KEY_TUNER,		/* VCR mode on Zenith */
 	0,
 };
 
@@ -200,7 +197,7 @@ static void msp430_ir_debounce (unsigned long data)
 	dev->rep[0] = 0;
 	dev->timer.expires = jiffies + HZ * 350 / 1000;
 	add_timer(&dev->timer);
-	input_event(dev, EV_KEY, key_map[dev->repeat_key], 2);  /* REPEAT */
+	input_event(dev, EV_KEY, key_map[dev->repeat_key], 2);	/* REPEAT */
 }
 
 
@@ -212,22 +209,22 @@ static void msp430_ir_interrupt (unsigned long data)
 	unsigned int code = budget_debiread(budget_ci, DEBINOSWAP, DEBIADDR_IR, 2) >> 8;
 
 	if (code & 0x40) {
-	        code &= 0x3f;
+		code &= 0x3f;
 
-        	if (timer_pending(&dev->timer)) {
-                	if (code == dev->repeat_key) {
-                        	++dev->rep[0];
-	                        return;
-        	        }
-                	del_timer(&dev->timer);
-		        input_event(dev, EV_KEY, key_map[dev->repeat_key], !!0);
+		if (timer_pending(&dev->timer)) {
+			if (code == dev->repeat_key) {
+				++dev->rep[0];
+				return;
+			}
+			del_timer(&dev->timer);
+			input_event(dev, EV_KEY, key_map[dev->repeat_key], !!0);
 		}
 
 		if (!key_map[code]) {
-        	        printk ("DVB (%s): no key for %02x!\n",
+			printk ("DVB (%s): no key for %02x!\n",
 				__FUNCTION__, code);
-		        return;
-       		}
+			return;
+		}
 
 		/* initialize debounce and repeat */
 		dev->repeat_key = code;
@@ -236,7 +233,7 @@ static void msp430_ir_interrupt (unsigned long data)
 		/* 350 milliseconds */
 		dev->timer.expires = jiffies + HZ * 350 / 1000;
 		/* MAKE */
-        	input_event(dev, EV_KEY, key_map[code], !0);
+		input_event(dev, EV_KEY, key_map[code], !0);
 		add_timer(&dev->timer);
 	}
 }
@@ -264,7 +261,7 @@ static int msp430_ir_init (struct budget_ci *budget_ci)
 
 	saa7146_write(saa, IER, saa7146_read(saa, IER) | MASK_06);
 
-	saa7146_setgpio(saa, 3, SAA7146_GPIO_IRQHI); 
+	saa7146_setgpio(saa, 3, SAA7146_GPIO_IRQHI);
 
 	return 0;
 }
@@ -326,7 +323,7 @@ static int ciintf_slot_reset(struct dvb_ca_en50221* ca, int slot) {
 	saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQHI);
 	budget_ci->slot_status = SLOTSTATUS_RESET;
 	budget_debiwrite(budget_ci, DEBICICTL, DEBIADDR_CICONTROL, 1, 0);
-	dvb_delay(1);
+	msleep(1);
 	budget_debiwrite(budget_ci, DEBICICTL, DEBIADDR_CICONTROL, 1, CICONTROL_RESET);
 
 	saa7146_setgpio(saa, 1, SAA7146_GPIO_OUTHI);
@@ -372,13 +369,12 @@ static void ciintf_interrupt (unsigned long data)
 	// ensure we don't get spurious IRQs during initialisation
 	if (!budget_ci->budget.ci_present) return;
 
+	// read the CAM status
 	flags = budget_debiread(budget_ci, DEBICICTL, DEBIADDR_CICONTROL, 1);
-
-	// always set the GPIO mode back to "normal", in case the card is
-	// yanked at an inopportune moment
-	saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQLO);
-
 	if (flags & CICONTROL_CAMDETECT) {
+
+		// GPIO should be set to trigger on falling edge if a CAM is present
+		saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQLO);
 
 		if (budget_ci->slot_status & SLOTSTATUS_NONE) {
 			// CAM insertion IRQ
@@ -395,7 +391,15 @@ static void ciintf_interrupt (unsigned long data)
 			dvb_ca_en50221_frda_irq(&budget_ci->ca, 0);
 		}
 	} else {
+
+		// trigger on rising edge if a CAM is not present - when a CAM is inserted, we
+		// only want to get the IRQ when it sets READY. If we trigger on the falling edge,
+		// the CAM might not actually be ready yet.
+		saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQHI);
+
+	   	// generate a CAM removal IRQ if we haven't already
 		if (budget_ci->slot_status & SLOTSTATUS_OCCUPIED) {
+			// CAM removal IRQ
 			budget_ci->slot_status = SLOTSTATUS_NONE;
 			dvb_ca_en50221_camchange_irq(&budget_ci->ca, 0, DVB_CA_EN50221_CAMCHANGE_REMOVED);
 		}
@@ -446,7 +450,11 @@ static int ciintf_init(struct budget_ci* budget_ci)
 
 	// Setup CI slot IRQ
 	tasklet_init (&budget_ci->ciintf_irq_tasklet, ciintf_interrupt, (unsigned long) budget_ci);
-	saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQLO);
+	if (budget_ci->slot_status != SLOTSTATUS_NONE) {
+		saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQLO);
+	} else {
+		saa7146_setgpio(saa, 0, SAA7146_GPIO_IRQHI);
+	}
 	saa7146_write(saa, IER, saa7146_read(saa, IER) | MASK_03);
 	budget_debiwrite(budget_ci, DEBICICTL, DEBIADDR_CICONTROL, 1, CICONTROL_RESET);
 
@@ -475,7 +483,7 @@ static void ciintf_deinit(struct budget_ci* budget_ci)
 	saa7146_setgpio(saa, 0, SAA7146_GPIO_INPUT);
 	tasklet_kill(&budget_ci->ciintf_irq_tasklet);
 	budget_debiwrite(budget_ci, DEBICICTL, DEBIADDR_CICONTROL, 1, 0);
-	dvb_delay(1);
+	msleep(1);
 	budget_debiwrite(budget_ci, DEBICICTL, DEBIADDR_CICONTROL, 1, CICONTROL_RESET);
 
 	// disable TS data stream to CI interface
@@ -490,14 +498,14 @@ static void ciintf_deinit(struct budget_ci* budget_ci)
 
 static void budget_ci_irq (struct saa7146_dev *dev, u32 *isr)
 {
-        struct budget_ci *budget_ci = (struct budget_ci*) dev->ext_priv;
+	struct budget_ci *budget_ci = (struct budget_ci*) dev->ext_priv;
 
-        DEB_EE(("dev: %p, budget_ci: %p\n", dev, budget_ci));
+	DEB_EE(("dev: %p, budget_ci: %p\n", dev, budget_ci));
 
-        if (*isr & MASK_06)
-                tasklet_schedule (&budget_ci->msp430_irq_tasklet);
+	if (*isr & MASK_06)
+		tasklet_schedule (&budget_ci->msp430_irq_tasklet);
 
-        if (*isr & MASK_10)
+	if (*isr & MASK_10)
 		ttpci_budget_irq10_handler (dev, isr);
 
 	if ((*isr & MASK_03) && (budget_ci->budget.ci_present))
@@ -520,20 +528,19 @@ static int budget_ci_attach (struct saa7146_dev* dev,
 	spin_lock_init(&budget_ci->debilock);
 	budget_ci->budget.ci_present = 0;
 
+	dev->ext_priv = budget_ci;
+
 	if ((err = ttpci_budget_init (&budget_ci->budget, dev, info))) {
 		kfree (budget_ci);
 		return err;
 	}
-
-	dev->ext_priv = budget_ci;
 
 	tasklet_init (&budget_ci->msp430_irq_tasklet, msp430_ir_interrupt,
 		      (unsigned long) budget_ci);
 
 	msp430_ir_init (budget_ci);
 
-	// UNCOMMENT TO TEST CI INTERFACE
-//	ciintf_init(budget_ci);
+	ciintf_init(budget_ci);
 
 	return 0;
 }
@@ -564,17 +571,17 @@ static int budget_ci_detach (struct saa7146_dev* dev)
 
 
 
-static struct saa7146_extension budget_extension; 
+static struct saa7146_extension budget_extension;
 
 MAKE_BUDGET_INFO(ttbci,	"TT-Budget/WinTV-NOVA-CI PCI",	BUDGET_TT_HW_DISEQC);
-MAKE_BUDGET_INFO(ttbt2,	"TT-Budget/WinTV-NOVA-T  PCI",	BUDGET_TT);
+MAKE_BUDGET_INFO(ttbt2,	"TT-Budget/WinTV-NOVA-T	 PCI",	BUDGET_TT);
 
 static struct pci_device_id pci_tbl[] = {
 	MAKE_EXTENSION_PCI(ttbci, 0x13c2, 0x100c),
 	MAKE_EXTENSION_PCI(ttbci, 0x13c2, 0x100f),
-	MAKE_EXTENSION_PCI(ttbt2,  0x13c2, 0x1011),
+	MAKE_EXTENSION_PCI(ttbt2, 0x13c2, 0x1011),
 	{
-		.vendor    = 0,
+		.vendor	   = 0,
 	}
 };
 
@@ -582,7 +589,7 @@ MODULE_DEVICE_TABLE(pci, pci_tbl);
 
 static struct saa7146_extension budget_extension = {
 	.name		= "budget_ci dvb\0",
-	.flags	 	= 0,
+	.flags		= 0,
 
 	.module		= THIS_MODULE,
 	.pci_tbl	= &pci_tbl[0],
@@ -591,10 +598,10 @@ static struct saa7146_extension budget_extension = {
 
 	.irq_mask	= MASK_03 | MASK_06 | MASK_10,
 	.irq_func	= budget_ci_irq,
-};	
+};
 
 
-static int __init budget_ci_init(void) 
+static int __init budget_ci_init(void)
 {
 	return saa7146_register_extension(&budget_extension);
 }
@@ -603,7 +610,7 @@ static int __init budget_ci_init(void)
 static void __exit budget_ci_exit(void)
 {
 	DEB_EE((".\n"));
-	saa7146_unregister_extension(&budget_extension); 
+	saa7146_unregister_extension(&budget_extension);
 }
 
 module_init(budget_ci_init);

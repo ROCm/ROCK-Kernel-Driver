@@ -12,10 +12,10 @@
  * Misc reorganization, polishing, restyling
  *     Roberto Ragusa, r.ragusa at libero.it
  *       
- * Added hardware filtering support, 
+ * Added hardware filtering support,
  *     Niklas Peinecke, peinecke at gdv.uni-hannover.de
  *
- *
+ * 	
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License
  * as published by the Free Software Foundation; either version 2.1
@@ -30,14 +30,16 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
+
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/delay.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/version.h>
 
 #include <asm/io.h>
 
-#include "dvb_i2c.h"
 #include "dvb_frontend.h"
 
 #include <linux/dvb/frontend.h>
@@ -49,12 +51,17 @@
 #include "demux.h"
 #include "dvb_net.h"
 
-#include "dvb_functions.h"
 
-static int debug = 0;
+static int debug;
+static int enable_hw_filters = 2;
+
+module_param(debug, int, 0644);
+MODULE_PARM_DESC(debug, "Set debugging level (0 = default, 1 = most messages, 2 = all messages).");
+module_param(enable_hw_filters, int, 0444);
+MODULE_PARM_DESC(enable_hw_filters, "enable hardware filters: supported values: 0 (none), 1, 2");
+
 #define dprintk(x...)	do { if (debug>=1) printk(x); } while (0)
 #define ddprintk(x...)	do { if (debug>=2) printk(x); } while (0)
-static int enable_hw_filters = 2;
 
 #define SIZE_OF_BUF_DMA1	0x3ac00
 #define SIZE_OF_BUF_DMA2	0x758
@@ -89,7 +96,7 @@ struct adapter {
 	struct dmxdev dmxdev;
 	struct dmx_frontend hw_frontend;
 	struct dmx_frontend mem_frontend;
-	struct dvb_i2c_bus *i2c_bus;
+	struct i2c_adapter i2c_adap;	
 	struct dvb_net dvbnet;
 
 	struct semaphore i2c_sem;
@@ -277,9 +284,9 @@ static u32 flex_i2c_write(struct adapter *adapter, u32 device, u32 bus, u32 addr
 	return buf - start;
 }
 
-static int master_xfer(struct dvb_i2c_bus *i2c, const struct i2c_msg *msgs, int num)
+static int master_xfer(struct i2c_adapter* adapter, struct i2c_msg msgs[], int num)
 {
-	struct adapter *tmp = i2c->data;
+	struct adapter *tmp = i2c_get_adapdata(adapter);
 	int i, ret = 0;
 
 	if (down_interruptible(&tmp->i2c_sem))
@@ -287,16 +294,16 @@ static int master_xfer(struct dvb_i2c_bus *i2c, const struct i2c_msg *msgs, int 
 
 	ddprintk("%s: %d messages to transfer\n", __FUNCTION__, num);
 
-		for (i = 0; i < num; i++) {
+	for (i = 0; i < num; i++) {
 		ddprintk("message %d: flags=0x%x, addr=0x%x, buf=0x%x, len=%d \n", i,
 			 msgs[i].flags, msgs[i].addr, msgs[i].buf[0], msgs[i].len);
-	
-		/* allow only the mt312 and stv0299 frontends to access the bus */
-		if ((msgs[i].addr != 0x0e) && (msgs[i].addr != 0x68) && (msgs[i].addr != 0x61)) {
-		up(&tmp->i2c_sem);
 
-		return -EREMOTEIO;
-	}
+		/* allow only the mt312, mt352 and stv0299 frontends to access the bus */
+		if ((msgs[i].addr != 0x0e) && (msgs[i].addr != 0x68) &&
+		    (msgs[i].addr != 0x61) && (msgs[i].addr != 0x0f)) {
+			up(&tmp->i2c_sem);
+			return -EREMOTEIO;
+		}
 	}
 
 	// read command
@@ -312,7 +319,7 @@ static int master_xfer(struct dvb_i2c_bus *i2c, const struct i2c_msg *msgs, int 
 			for (i = 0; i < 2; i++) {
 				printk("message %d: flags=0x%x, addr=0x%x, buf=0x%x, len=%d \n", i,
 				       msgs[i].flags, msgs[i].addr, msgs[i].buf[0], msgs[i].len);
-		}
+			}
 
 			return -EREMOTEIO;
 		}
@@ -363,7 +370,7 @@ static void sram_set_net_dest(struct adapter *adapter, u8 dest)
 
 	udelay(1000);
 
-	/* return value is never used? */
+	/*return value is never used? */
 /*	return tmp; */
 }
 
@@ -383,7 +390,7 @@ static void sram_set_cai_dest(struct adapter *adapter, u8 dest)
 
 	udelay(1000);
 
-	/* return value is never used? */
+	/*return value is never used? */
 /*	return tmp; */
 }
 
@@ -403,7 +410,7 @@ static void sram_set_cao_dest(struct adapter *adapter, u8 dest)
 
 	udelay(1000);
 
-	/* return value is never used? */
+	/*return value is never used? */
 /*	return tmp; */
 }
 
@@ -547,8 +554,8 @@ static void sram_read(struct adapter *adapter, u32 addr, u8 *buf, u32 len)
 	while (len != 0) {
 		length = len;
 
-		// check if the address range belongs to the same 
-		// 32K memory chip. If not, the data is read from 
+		// check if the address range belongs to the same
+		// 32K memory chip. If not, the data is read from
 		// one chip at a time.
 		if ((addr >> 0x0f) != ((addr + len - 1) >> 0x0f)) {
 			length = (((addr >> 0x0f) + 1) << 0x0f) - addr;
@@ -569,7 +576,7 @@ static void sram_write(struct adapter *adapter, u32 addr, u8 *buf, u32 len)
 	while (len != 0) {
 		length = len;
 
-		// check if the address range belongs to the same 
+		// check if the address range belongs to the same
 		// 32K memory chip. If not, the data is written to
 		// one chip at a time.
 		if ((addr >> 0x0f) != ((addr + len - 1) >> 0x0f)) {
@@ -668,7 +675,7 @@ static u32 sram_length(struct adapter *adapter)
 	if (adapter->dw_sram_type == 0x10000)
 		return 32768;	//  32K
 	if (adapter->dw_sram_type == 0x00000)
-		return 65536;	//  64K        
+		return 65536;	//  64K
 	if (adapter->dw_sram_type == 0x20000)
 		return 131072;	// 128K
 
@@ -682,7 +689,7 @@ static u32 sram_length(struct adapter *adapter)
 
    FlexCop works only with one bank at a time. The bank is selected
    by bits 28-29 of the 0x700 register.
-  
+
    bank 0 covers addresses 0x00000-0x07fff
    bank 1 covers addresses 0x08000-0x0ffff
    bank 2 covers addresses 0x10000-0x17fff
@@ -765,7 +772,7 @@ static void sll_detect_sram_size(struct adapter *adapter)
 	sram_detect_for_flex2(adapter);
 }
 
-/* EEPROM (Skystar2 has one "24LC08B" chip on board) */
+/*EEPROM (Skystar2 has one "24LC08B" chip on board) */
 /*
 static int eeprom_write(struct adapter *adapter, u16 addr, u8 *buf, u16 len)
 {
@@ -1092,7 +1099,7 @@ static void init_pids(struct adapter *adapter)
 		dprintk("%s: setting filter %d to 0x1fff\n", __FUNCTION__, i);
 		adapter->hw_pids[i] = 0x1fff;
 		pid_set_hw_pid(adapter, i, 0x1fff);
-}
+	}
 
 	pid_set_group_pid(adapter, 0);
 	pid_set_group_mask(adapter, 0x1fe0);
@@ -1155,15 +1162,15 @@ static int add_hw_pid(struct adapter *adapter, u16 pid)
 				adapter->hw_pids[i] = pid;
 				pid_set_hw_pid(adapter, i, pid);
 				filter_enable_hw_filter(adapter, i, 1);
-		return 1;
-	}
-	}
+				return 1;
+			}
+		}
 	}
 	/* if we have not used a filter, this pid depends on whole bandwidth */
 	dprintk("%s: pid=%d whole_bandwidth\n", __FUNCTION__, pid);
 	whole_bandwidth_inc(adapter);
-		return 1;
-	}
+	return 1;
+}
 
 /* returns -1 if the pid was not present in the filters */
 static int remove_hw_pid(struct adapter *adapter, u16 pid)
@@ -1184,15 +1191,15 @@ static int remove_hw_pid(struct adapter *adapter, u16 pid)
 				adapter->hw_pids[i] = 0x1fff;
 				pid_set_hw_pid(adapter, i, 0x1fff);
 				filter_enable_hw_filter(adapter, i, 0);
-		return 1;
-	}
-	}
+				return 1;
+			}
+		}
 	}
 	/* if we have not used a filter, this pid depended on whole bandwith */
 	dprintk("%s: pid=%d whole_bandwidth\n", __FUNCTION__, pid);
 	whole_bandwidth_dec(adapter);
-		return 1;
-	}
+	return 1;
+}
 
 /* Adds a PID to the filters.
    Adding a pid more than once is possible, we keep reference counts.
@@ -1211,7 +1218,7 @@ static int add_pid(struct adapter *adapter, u16 pid)
 	for (i = 0; i < adapter->pid_count; i++)
 		if (adapter->pid_list[i] == pid) {
 			adapter->pid_rc[i]++;	// increment ref counter
-		return 1;
+			return 1;
 		}
 
 	if (adapter->pid_count == N_PID_SLOTS)
@@ -1222,8 +1229,8 @@ static int add_pid(struct adapter *adapter, u16 pid)
 	// hardware setting
 	add_hw_pid(adapter, pid);
 
-			return 1;
-		}
+	return 1;
+}
 
 /* Removes a PID from the filters. */
 static int remove_pid(struct adapter *adapter, u16 pid)
@@ -1250,7 +1257,6 @@ static int remove_pid(struct adapter *adapter, u16 pid)
 			return 1;
 		}
 	}
-
 	return -1;
 }
 
@@ -1313,7 +1319,7 @@ static void irq_dma_enable_disable_irq(struct adapter *adapter, u32 op)
        subbuffer size in 32-bit words is stored in the first 24 bits of
        register 0x004. The last 8 bits of register 0x004 contain the number
        of subbuffers.
-       
+
        the first 30 bits of register 0x000 contain the address of the first
        subbuffer. The last 2 bits contain 0, when dma1 is disabled and 1,
        when dma1 is enabled.
@@ -1328,7 +1334,7 @@ static void irq_dma_enable_disable_irq(struct adapter *adapter, u32 op)
        subbuffer size in 32-bit words is stored in the first 24 bits of
        register 0x014. The last 8 bits of register 0x014 contain the number
        of subbuffers.
-       
+
        the first 30 bits of register 0x010 contain the address of the first
        subbuffer.  The last 2 bits contain 0, when dma1 is disabled and 1,
        when dma1 is enabled.
@@ -1494,20 +1500,20 @@ static void dma_start_stop(struct adapter *adapter, u32 dma_mask, int start_stop
 		if (((dma_mask & 2) != 0) && ((adapter->dma_status & 2) != 0)) {
 			dma_enable = dma_enable & 0xfffffffd;
 		}
-		//stop dma
+		// stop dma
 		if ((dma_enable == 0) && ((adapter->dma_status & 4) != 0)) {
 			ctrl_enable_receive_data(adapter, 0);
 
 			udelay(3000);
 		}
-		//disable dma1
+		// disable dma1
 		if (((dma_mask & 1) != 0) && ((adapter->dma_status & 1) != 0) && (adapter->dmaq1.bus_addr != 0)) {
 			write_reg_dw(adapter, 0x000, adapter->dmaq1.bus_addr);
 			write_reg_dw(adapter, 0x00c, (adapter->dmaq1.bus_addr + adapter->dmaq1.buffer_size / 2) | 1);
 
 			adapter->dma_status = adapter->dma_status & ~0x00000001;
 		}
-		//disable dma2
+		// disable dma2
 		if (((dma_mask & 2) != 0) && ((adapter->dma_status & 2) != 0) && (adapter->dmaq2.bus_addr != 0)) {
 			write_reg_dw(adapter, 0x010, adapter->dmaq2.bus_addr);
 
@@ -1565,14 +1571,14 @@ static void close_stream(struct adapter *adapter, u16 pid)
 	if (adapter->capturing == 0) {
 		u32 dma_mask = 0;
 
-	if ((adapter->dma_status & 1) != 0)
-		dma_mask = dma_mask | 0x00000001;
-	if ((adapter->dma_status & 2) != 0)
-		dma_mask = dma_mask | 0x00000002;
+		if ((adapter->dma_status & 1) != 0)
+			dma_mask = dma_mask | 0x00000001;
+		if ((adapter->dma_status & 2) != 0)
+			dma_mask = dma_mask | 0x00000002;
 
-	if (dma_mask != 0) {
+		if (dma_mask != 0) {
 			dma_start_stop(adapter, dma_mask, 0);
-	}
+		}
 	}
 	remove_pid(adapter, pid);
 }
@@ -1659,7 +1665,7 @@ static irqreturn_t isr(int irq, void *dev_id, struct pt_regs *regs)
 		spin_unlock_irq(&tmp->lock);
 		return IRQ_NONE;
 	}
-	
+
 	while (value != 0) {
 		if ((value & 0x03) != 0)
 			interrupt_service_dma1(tmp);
@@ -1826,7 +1832,7 @@ static void decide_how_many_hw_filters(struct adapter *adapter)
 	int hw_filters;
 	int mod_option_hw_filters;
 
-	// FlexCop IIb & III have 6+32 hw filters    
+	// FlexCop IIb & III have 6+32 hw filters
 	// FlexCop II has 6 hw filters, every other should have at least 6
 	switch (adapter->b2c2_revision) {
 	case 0x82:		/* II */
@@ -1873,7 +1879,7 @@ static int driver_initialize(struct pci_dev *pdev)
 
 	memset(adapter, 0, sizeof(struct adapter));
 
-	pci_set_drvdata(pdev,adapter);
+	pci_set_drvdata(pdev, adapter);
 
 	adapter->pdev = pdev;
 	adapter->irq = pdev->irq;
@@ -1926,8 +1932,8 @@ static int driver_initialize(struct pci_dev *pdev)
 		pci_set_drvdata(pdev, NULL);
 		release_region(pci_resource_start(pdev, 1), pci_resource_len(pdev, 1));
 		release_mem_region(pci_resource_start(pdev, 0), pci_resource_len(pdev, 0));
-			return -ENODEV;
-		}
+		return -ENODEV;
+	}
 
 	decide_how_many_hw_filters(adapter);
 
@@ -2089,7 +2095,7 @@ static void diseqc_send_bit(struct adapter *adapter, int data)
 
 
 static void diseqc_send_byte(struct adapter *adapter, int data)
-		{
+{
 	int i, par = 1, d;
 
 	for (i = 7; i >= 0; i--) {
@@ -2099,7 +2105,7 @@ static void diseqc_send_byte(struct adapter *adapter, int data)
 	}
 
 	diseqc_send_bit(adapter, par);
-		}
+}
 
 
 static int send_diseqc_msg(struct adapter *adapter, int len, u8 *msg, unsigned long burst)
@@ -2122,7 +2128,7 @@ static int send_diseqc_msg(struct adapter *adapter, int len, u8 *msg, unsigned l
 			udelay(12500);
 			set_tuner_tone(adapter, 0);
 		}
-		dvb_delay(20);
+		msleep(20);
 	}
 
 	return 0;
@@ -2139,10 +2145,10 @@ int soft_diseqc(struct adapter *adapter, unsigned int cmd, void *arg)
 			break;
 		case SEC_TONE_OFF:
 			set_tuner_tone(adapter, 0);
-				break;
-			default:
-				return -EINVAL;
-			};
+			break;
+		default:
+			return -EINVAL;
+		};
 		break;
 
 	case FE_DISEQC_SEND_MASTER_CMD:
@@ -2165,7 +2171,7 @@ int soft_diseqc(struct adapter *adapter, unsigned int cmd, void *arg)
 }
 
 static int flexcop_diseqc_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
-		{
+{
 	struct adapter *adapter = fe->before_after_data;
 
 	struct dvb_frontend_info info;
@@ -2223,10 +2229,49 @@ static int flexcop_diseqc_ioctl(struct dvb_frontend *fe, unsigned int cmd, void 
 	default:
 
 		return -EOPNOTSUPP;
+
 	};
 
 	return 0;
 }
+
+
+static int client_register(struct i2c_client *client)
+{
+	struct adapter *adapter = (struct adapter*)i2c_get_adapdata(client->adapter);
+
+	dprintk("client_register\n");
+
+	if (client->driver->command)
+		return client->driver->command(client, FE_REGISTER, adapter->dvb_adapter);
+	return 0;
+}
+
+static int client_unregister(struct i2c_client *client)
+{
+	struct adapter *adapter = (struct adapter*)i2c_get_adapdata(client->adapter);
+
+	dprintk("client_unregister\n");
+
+	if (client->driver->command)
+		return client->driver->command(client, FE_UNREGISTER, adapter->dvb_adapter);
+	return 0;
+}
+
+u32 flexcop_i2c_func(struct i2c_adapter *adapter)
+{
+	printk("flexcop_i2c_func\n");
+
+	return I2C_FUNC_I2C;
+}
+
+static struct i2c_algorithm    flexcop_algo = {
+	.name		= "flexcop i2c algorithm",
+	.id		= I2C_ALGO_BIT,
+	.master_xfer	= master_xfer,
+	.functionality	= flexcop_i2c_func,
+};
+
 
 static int skystar2_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
@@ -2258,10 +2303,27 @@ static int skystar2_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	init_MUTEX(&adapter->i2c_sem);
 
-	adapter->i2c_bus = dvb_register_i2c_bus(master_xfer, adapter, adapter->dvb_adapter, 0);
 
-	if (!adapter->i2c_bus)
+	memset(&adapter->i2c_adap, 0, sizeof(struct i2c_adapter));
+	strcpy(adapter->i2c_adap.name, "Technisat SkyStar2 driver");
+
+	i2c_set_adapdata(&adapter->i2c_adap, adapter);
+
+#ifdef I2C_ADAP_CLASS_TV_DIGITAL
+	adapter->i2c_adap.class 	    = I2C_ADAP_CLASS_TV_DIGITAL;
+#else
+	adapter->i2c_adap.class 	    = I2C_CLASS_TV_DIGITAL;
+#endif
+	adapter->i2c_adap.algo              = &flexcop_algo;
+	adapter->i2c_adap.algo_data         = NULL;
+	adapter->i2c_adap.id                = I2C_ALGO_BIT;
+	adapter->i2c_adap.client_register   = client_register;
+	adapter->i2c_adap.client_unregister = client_unregister;
+
+	if (i2c_add_adapter(&adapter->i2c_adap) < 0) {
+		dvb_unregister_adapter (adapter->dvb_adapter);
 		return -ENOMEM;
+	}
 
 	dvb_add_frontend_ioctls(adapter->dvb_adapter, flexcop_diseqc_ioctl, NULL, adapter);
 
@@ -2327,8 +2389,7 @@ static void skystar2_remove(struct pci_dev *pdev)
 		if (adapter->dvb_adapter != NULL) {
 			dvb_remove_frontend_ioctls(adapter->dvb_adapter, flexcop_diseqc_ioctl, NULL);
 
-			if (adapter->i2c_bus != NULL)
-				dvb_unregister_i2c_bus(master_xfer, adapter->i2c_bus->adapter, adapter->i2c_bus->id);
+			i2c_del_adapter(&adapter->i2c_adap);
 
 			dvb_unregister_adapter(adapter->dvb_adapter);
 		}
@@ -2345,7 +2406,7 @@ static struct pci_device_id skystar2_pci_tbl[] = {
 MODULE_DEVICE_TABLE(pci, skystar2_pci_tbl);
 
 static struct pci_driver skystar2_pci_driver = {
-	.name = "SkyStar2",
+	.name = "Technisat SkyStar2 driver",
 	.id_table = skystar2_pci_tbl,
 	.probe = skystar2_probe,
 	.remove = skystar2_remove,
@@ -2363,11 +2424,6 @@ static void skystar2_cleanup(void)
 
 module_init(skystar2_init);
 module_exit(skystar2_cleanup);
-
-MODULE_PARM(debug, "i");
-MODULE_PARM_DESC(debug, "enable verbose debug messages: supported values: 1 and 2");
-MODULE_PARM(enable_hw_filters, "i");
-MODULE_PARM_DESC(enable_hw_filters, "enable hardware filters: supported values: 0 (none), 1, 2");
 
 MODULE_DESCRIPTION("Technisat SkyStar2 DVB PCI Driver");
 MODULE_LICENSE("GPL");

@@ -28,29 +28,31 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 
 #include "dvb_frontend.h"
 #include "mt312.h"
+
+#define FRONTEND_NAME "dvbfe_mt312"
+
+#define dprintk(args...) \
+	do { \
+		if (debug) printk(KERN_DEBUG FRONTEND_NAME ": " args); \
+	} while (0)
+
+static int debug;
+
+module_param(debug, int, 0644);
+MODULE_PARM_DESC(debug, "Turn on/off frontend debugging (default:off).");
+
 
 #define I2C_ADDR_MT312		0x0e
 #define I2C_ADDR_SL1935		0x61
 #define I2C_ADDR_TSA5059	0x61
 
-#define MT312_DEBUG		0
-
 #define MT312_SYS_CLK		90000000UL	/* 90 MHz */
 #define MT312_LPOWER_SYS_CLK	60000000UL	/* 60 MHz */
 #define MT312_PLL_CLK		10000000UL	/* 10 MHz */
-
-/* number of active frontends */
-static int mt312_count = 0;
-
-#if MT312_DEBUG == 0
-#define dprintk(x...)
-#else
-static int debug = 0;
-#define dprintk if(debug == 1) printk
-#endif
 
 static struct dvb_frontend_info mt312_info = {
 	.name = "Zarlink MT312",
@@ -70,7 +72,13 @@ static struct dvb_frontend_info mt312_info = {
             FE_CAN_RECOVER
 };
 
-static int mt312_read(struct dvb_i2c_bus *i2c,
+struct mt312_state {
+	struct i2c_adapter *i2c;
+	struct dvb_adapter *dvb;
+	int id;
+};
+
+static int mt312_read(struct i2c_adapter *i2c,
 		      const enum mt312_reg_addr reg, void *buf,
 		      const size_t count)
 {
@@ -87,26 +95,25 @@ static int mt312_read(struct dvb_i2c_bus *i2c,
 	msg[1].buf = buf;
 	msg[1].len = count;
 
-	ret = i2c->xfer(i2c, msg, 2);
+	ret = i2c_transfer(i2c, msg, 2);
 
-	if ((ret != 2) && (mt312_count != 0)) {
+	if (ret != 2) {
 		printk(KERN_ERR "%s: ret == %d\n", __FUNCTION__, ret);
 		return -EREMOTEIO;
 	}
-#if MT312_DEBUG
+
 	if(debug) {
 		int i;
-		printk(KERN_INFO "R(%d):", reg & 0x7f);
+		dprintk("R(%d):", reg & 0x7f);
 		for (i = 0; i < count; i++)
 			printk(" %02x", ((const u8 *) buf)[i]);
 		printk("\n");
 	}
-#endif
 
 	return 0;
 }
 
-static int mt312_write(struct dvb_i2c_bus *i2c,
+static int mt312_write(struct i2c_adapter *i2c,
 		       const enum mt312_reg_addr reg, const void *src,
 		       const size_t count)
 {
@@ -114,15 +121,13 @@ static int mt312_write(struct dvb_i2c_bus *i2c,
 	u8 buf[count + 1];
 	struct i2c_msg msg;
 
-#if MT312_DEBUG
 	if(debug) {
 		int i;
-		printk(KERN_INFO "W(%d):", reg & 0x7f);
+		dprintk("W(%d):", reg & 0x7f);
 		for (i = 0; i < count; i++)
 			printk(" %02x", ((const u8 *) src)[i]);
 		printk("\n");
 	}
-#endif
 
 	buf[0] = reg;
 	memcpy(&buf[1], src, count);
@@ -132,29 +137,29 @@ static int mt312_write(struct dvb_i2c_bus *i2c,
 	msg.buf = buf;
 	msg.len = count + 1;
 
-	ret = i2c->xfer(i2c, &msg, 1);
+	ret = i2c_transfer(i2c, &msg, 1);
 
 	if (ret != 1) {
-		printk(KERN_ERR "%s: ret == %d\n", __FUNCTION__, ret);
+		dprintk("%s: ret == %d\n", __FUNCTION__, ret);
 		return -EREMOTEIO;
 	}
 
 	return 0;
 }
 
-static inline int mt312_readreg(struct dvb_i2c_bus *i2c,
-				const enum mt312_reg_addr reg, u8 * val)
+static inline int mt312_readreg(struct i2c_adapter *i2c,
+				const enum mt312_reg_addr reg, u8 *val)
 {
 	return mt312_read(i2c, reg, val, 1);
 }
 
-static inline int mt312_writereg(struct dvb_i2c_bus *i2c,
+static inline int mt312_writereg(struct i2c_adapter *i2c,
 				 const enum mt312_reg_addr reg, const u8 val)
 {
 	return mt312_write(i2c, reg, &val, 1);
 }
 
-static int mt312_pll_write(struct dvb_i2c_bus *i2c, const u8 addr,
+static int mt312_pll_write(struct i2c_adapter *i2c, const u8 addr,
 			   u8 * buf, const u8 len)
 {
 	int ret;
@@ -168,7 +173,7 @@ static int mt312_pll_write(struct dvb_i2c_bus *i2c, const u8 addr,
 	if ((ret = mt312_writereg(i2c, GPP_CTRL, 0x40)) < 0)
 		return ret;
 
-	if ((ret = i2c->xfer(i2c, &msg, 1)) != 1)
+	if ((ret = i2c_transfer(i2c, &msg, 1)) != 1)
 		printk(KERN_ERR "%s: i/o error (ret == %d)\n", __FUNCTION__, ret);
 
 	if ((ret = mt312_writereg(i2c, GPP_CTRL, 0x00)) < 0)
@@ -182,7 +187,7 @@ static inline u32 mt312_div(u32 a, u32 b)
 	return (a + (b / 2)) / b;
 }
 
-static int sl1935_set_tv_freq(struct dvb_i2c_bus *i2c, u32 freq, u32 sr)
+static int sl1935_set_tv_freq(struct i2c_adapter *i2c, u32 freq, u32 sr)
 {
 	/* 155 uA, Baseband Path B */
 	u8 buf[4] = { 0x00, 0x00, 0x80, 0x00 };
@@ -219,7 +224,7 @@ static int sl1935_set_tv_freq(struct dvb_i2c_bus *i2c, u32 freq, u32 sr)
 	return mt312_pll_write(i2c, I2C_ADDR_SL1935, buf, sizeof(buf));
 }
 
-static int tsa5059_set_tv_freq(struct dvb_i2c_bus *i2c, u32 freq, u32 sr)
+static int tsa5059_set_tv_freq(struct i2c_adapter *i2c, u32 freq, u32 sr)
 {
 	u8 buf[4];
 
@@ -239,13 +244,14 @@ static int tsa5059_set_tv_freq(struct dvb_i2c_bus *i2c, u32 freq, u32 sr)
 	return mt312_pll_write(i2c, I2C_ADDR_TSA5059, buf, sizeof(buf));
 }
 
-static int mt312_reset(struct dvb_i2c_bus *i2c, const u8 full)
+static int mt312_reset(struct i2c_adapter *i2c, const u8 full)
 {
 	return mt312_writereg(i2c, RESET, full ? 0x80 : 0x40);
 }
 
-static int mt312_init(struct dvb_i2c_bus *i2c, const long id, u8 pll)
+static int mt312_initfe(struct mt312_state *state, u8 pll)
 {
+	struct i2c_adapter *i2c = state->i2c;
 	int ret;
 	u8 buf[2];
 
@@ -297,7 +303,7 @@ static int mt312_init(struct dvb_i2c_bus *i2c, const long id, u8 pll)
 	return 0;
 }
 
-static int mt312_send_master_cmd(struct dvb_i2c_bus *i2c,
+static int mt312_send_master_cmd(struct i2c_adapter *i2c,
 				 const struct dvb_diseqc_master_cmd *c)
 {
 	int ret;
@@ -328,14 +334,14 @@ static int mt312_send_master_cmd(struct dvb_i2c_bus *i2c,
 	return 0;
 }
 
-static int mt312_recv_slave_reply(struct dvb_i2c_bus *i2c,
+static int mt312_recv_slave_reply(struct i2c_adapter *i2c,
 				  struct dvb_diseqc_slave_reply *r)
 {
 	/* TODO */
 	return -EOPNOTSUPP;
 }
 
-static int mt312_send_burst(struct dvb_i2c_bus *i2c, const fe_sec_mini_cmd_t c)
+static int mt312_send_burst(struct i2c_adapter *i2c, const fe_sec_mini_cmd_t c)
 {
 	const u8 mini_tab[2] = { 0x02, 0x03 };
 
@@ -356,7 +362,7 @@ static int mt312_send_burst(struct dvb_i2c_bus *i2c, const fe_sec_mini_cmd_t c)
 	return 0;
 }
 
-static int mt312_set_tone(struct dvb_i2c_bus *i2c, const fe_sec_tone_mode_t t)
+static int mt312_set_tone(struct i2c_adapter *i2c, const fe_sec_tone_mode_t t)
 {
 	const u8 tone_tab[2] = { 0x01, 0x00 };
 
@@ -377,7 +383,7 @@ static int mt312_set_tone(struct dvb_i2c_bus *i2c, const fe_sec_tone_mode_t t)
 	return 0;
 }
 
-static int mt312_set_voltage(struct dvb_i2c_bus *i2c, const fe_sec_voltage_t v)
+static int mt312_set_voltage(struct i2c_adapter *i2c, const fe_sec_voltage_t v)
 {
 	const u8 volt_tab[3] = { 0x00, 0x40, 0x00 };
 
@@ -387,8 +393,9 @@ static int mt312_set_voltage(struct dvb_i2c_bus *i2c, const fe_sec_voltage_t v)
 	return mt312_writereg(i2c, DISEQC_MODE, volt_tab[v]);
 }
 
-static int mt312_read_status(struct dvb_i2c_bus *i2c, fe_status_t *s, const long id)
+static int mt312_read_status(struct mt312_state *state, fe_status_t *s)
 {
+	struct i2c_adapter *i2c = state->i2c;
 	int ret;
 	u8 status[3], vit_mode;
 
@@ -409,8 +416,9 @@ static int mt312_read_status(struct dvb_i2c_bus *i2c, fe_status_t *s, const long
 		*s |= FE_HAS_SYNC;	/* byte align lock */
 	if (status[0] & 0x01)
 		*s |= FE_HAS_LOCK;	/* qpsk lock */
+
 	// VP310 doesn't have AUTO, so we "implement it here" ACCJr
-	if ((id == ID_VP310) && !(status[0] & 0x01)) {
+	if ((state->id == ID_VP310) && !(status[0] & 0x01)) {
 		if ((ret = mt312_readreg(i2c, VIT_MODE, &vit_mode)) < 0)
 			return ret;
 		vit_mode ^= 0x40;
@@ -423,7 +431,7 @@ static int mt312_read_status(struct dvb_i2c_bus *i2c, fe_status_t *s, const long
 	return 0;
 }
 
-static int mt312_read_bercnt(struct dvb_i2c_bus *i2c, u32 * ber)
+static int mt312_read_bercnt(struct i2c_adapter *i2c, u32 *ber)
 {
 	int ret;
 	u8 buf[3];
@@ -436,7 +444,7 @@ static int mt312_read_bercnt(struct dvb_i2c_bus *i2c, u32 * ber)
 	return 0;
 }
 
-static int mt312_read_agc(struct dvb_i2c_bus *i2c, u16 * signal_strength)
+static int mt312_read_agc(struct i2c_adapter *i2c, u16 *signal_strength)
 {
 	int ret;
 	u8 buf[3];
@@ -456,7 +464,7 @@ static int mt312_read_agc(struct dvb_i2c_bus *i2c, u16 * signal_strength)
 	return 0;
 }
 
-static int mt312_read_snr(struct dvb_i2c_bus *i2c, u16 * snr)
+static int mt312_read_snr(struct i2c_adapter *i2c, u16 *snr)
 {
 	int ret;
 	u8 buf[2];
@@ -469,7 +477,7 @@ static int mt312_read_snr(struct dvb_i2c_bus *i2c, u16 * snr)
 	return 0;
 }
 
-static int mt312_read_ubc(struct dvb_i2c_bus *i2c, u32 * ubc)
+static int mt312_read_ubc(struct i2c_adapter *i2c, u32 *ubc)
 {
 	int ret;
 	u8 buf[2];
@@ -482,10 +490,10 @@ static int mt312_read_ubc(struct dvb_i2c_bus *i2c, u32 * ubc)
 	return 0;
 }
 
-static int mt312_set_frontend(struct dvb_i2c_bus *i2c,
-			      const struct dvb_frontend_parameters *p,
-			      const long id)
+static int mt312_set_frontend(struct mt312_state *state,
+			      const struct dvb_frontend_parameters *p)
 {
+	struct i2c_adapter *i2c = state->i2c;
 	int ret;
 	u8 buf[5], config_val;
 	u16 sr;
@@ -494,7 +502,7 @@ static int mt312_set_frontend(struct dvb_i2c_bus *i2c,
 	    { 0x00, 0x01, 0x02, 0x04, 0x3f, 0x08, 0x10, 0x20, 0x3f, 0x3f };
 	const u8 inv_tab[3] = { 0x00, 0x40, 0x80 };
 
-	int (*set_tv_freq)(struct dvb_i2c_bus *i2c, u32 freq, u32 sr);
+	int (*set_tv_freq)(struct i2c_adapter *i2c, u32 freq, u32 sr);
 
 	dprintk("%s: Freq %d\n", __FUNCTION__, p->frequency);
 
@@ -518,7 +526,7 @@ static int mt312_set_frontend(struct dvb_i2c_bus *i2c,
 	    || (p->u.qpsk.fec_inner == FEC_8_9))
 		return -EINVAL;
 
-	switch (id) {
+	switch (state->id) {
 	case ID_VP310:
 	// For now we will do this only for the VP310.
 	// It should be better for the mt312 as well, but tunning will be slower. ACCJr 09/29/03
@@ -527,13 +535,13 @@ static int mt312_set_frontend(struct dvb_i2c_bus *i2c,
 		if (p->u.qpsk.symbol_rate >= 30000000) //Note that 30MS/s should use 90MHz
 		{
 			if ((config_val & 0x0c) == 0x08) //We are running 60MHz
-				if ((ret = mt312_init(i2c, id, (u8) 90)) < 0)
+				if ((ret = mt312_initfe(state, (u8) 90)) < 0)
 					return ret;
 		}
 		else
 		{
 			if ((config_val & 0x0c) == 0x0C) //We are running 90MHz
-				if ((ret = mt312_init(i2c, id, (u8) 60)) < 0)
+				if ((ret = mt312_initfe(state, (u8) 60)) < 0)
 					return ret;
 		}
 		set_tv_freq = tsa5059_set_tv_freq;
@@ -575,8 +583,8 @@ static int mt312_set_frontend(struct dvb_i2c_bus *i2c,
 	return 0;
 }
 
-static int mt312_get_inversion(struct dvb_i2c_bus *i2c,
-			       fe_spectral_inversion_t * i)
+static int mt312_get_inversion(struct i2c_adapter *i2c,
+			       fe_spectral_inversion_t *i)
 {
 	int ret;
 	u8 vit_mode;
@@ -590,7 +598,7 @@ static int mt312_get_inversion(struct dvb_i2c_bus *i2c,
 	return 0;
 }
 
-static int mt312_get_symbol_rate(struct dvb_i2c_bus *i2c, u32 * sr)
+static int mt312_get_symbol_rate(struct i2c_adapter *i2c, u32 *sr)
 {
 	int ret;
 	u8 sym_rate_h;
@@ -637,7 +645,7 @@ static int mt312_get_symbol_rate(struct dvb_i2c_bus *i2c, u32 * sr)
 	return 0;
 }
 
-static int mt312_get_code_rate(struct dvb_i2c_bus *i2c, fe_code_rate_t * cr)
+static int mt312_get_code_rate(struct i2c_adapter *i2c, fe_code_rate_t *cr)
 {
 	const fe_code_rate_t fec_tab[8] =
 	    { FEC_1_2, FEC_2_3, FEC_3_4, FEC_5_6, FEC_6_7, FEC_7_8,
@@ -654,7 +662,7 @@ static int mt312_get_code_rate(struct dvb_i2c_bus *i2c, fe_code_rate_t * cr)
 	return 0;
 }
 
-static int mt312_get_frontend(struct dvb_i2c_bus *i2c,
+static int mt312_get_frontend(struct i2c_adapter *i2c,
 			      struct dvb_frontend_parameters *p)
 {
 	int ret;
@@ -671,7 +679,7 @@ static int mt312_get_frontend(struct dvb_i2c_bus *i2c,
 	return 0;
 }
 
-static int mt312_sleep(struct dvb_i2c_bus *i2c)
+static int mt312_sleep(struct i2c_adapter *i2c)
 {
 	int ret;
 	u8 config;
@@ -692,7 +700,8 @@ static int mt312_sleep(struct dvb_i2c_bus *i2c)
 
 static int mt312_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 {
-	struct dvb_i2c_bus *i2c = fe->i2c;
+	struct mt312_state *state = fe->data;
+	struct i2c_adapter *i2c = state->i2c;
 
 	switch (cmd) {
 	case FE_GET_INFO:
@@ -706,7 +715,7 @@ static int mt312_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		return mt312_send_master_cmd(i2c, arg);
 
 	case FE_DISEQC_RECV_SLAVE_REPLY:
-		if ((long) fe->data == ID_MT312)
+		if (state->id == ID_MT312)
 			return mt312_recv_slave_reply(i2c, arg);
 		else
 			return -EOPNOTSUPP;
@@ -724,7 +733,7 @@ static int mt312_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		return -EOPNOTSUPP;
 
 	case FE_READ_STATUS:
-		return mt312_read_status(i2c, arg, (long) fe->data);
+		return mt312_read_status(state, arg);
 
 	case FE_READ_BER:
 		return mt312_read_bercnt(i2c, arg);
@@ -739,7 +748,7 @@ static int mt312_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		return mt312_read_ubc(i2c, arg);
 
 	case FE_SET_FRONTEND:
-		return mt312_set_frontend(i2c, arg, (long) fe->data);
+		return mt312_set_frontend(state, arg);
 
 	case FE_GET_FRONTEND:
 		return mt312_get_frontend(i2c, arg);
@@ -751,12 +760,14 @@ static int mt312_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		return mt312_sleep(i2c);
 
 	case FE_INIT:
-	//For the VP310 we should run at 60MHz when ever possible.
-	//It should be better to run the mt312 ar lower speed when ever possible, but tunning will be slower. ACCJr 09/29/03
-		if ((long)fe->data == ID_MT312)
-			return mt312_init(i2c, (long) fe->data, (u8) 90);
+		/* For the VP310 we should run at 60MHz when ever possible.
+		 * It should be better to run the mt312 ar lower speed when
+		 * ever possible, but tunning will be slower. ACCJr 09/29/03
+		 */
+		if (state->id == ID_MT312)
+			return mt312_initfe(state, (u8) 90);
 		else
-			return mt312_init(i2c, (long) fe->data, (u8) 60);
+			return mt312_initfe(state, (u8) 60);
 
 	case FE_GET_TUNE_SETTINGS:
 	{
@@ -774,52 +785,124 @@ static int mt312_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 	return 0;
 }
 
-static int mt312_attach(struct dvb_i2c_bus *i2c, void **data)
+static struct i2c_client client_template;
+
+static int mt312_attach_adapter(struct i2c_adapter *adapter)
 {
+	struct mt312_state *state;
+	struct i2c_client *client;
 	int ret;
 	u8 id;
 
-	if ((ret = mt312_readreg(i2c, ID, &id)) < 0)
-		return ret;
+	dprintk("Trying to attach to adapter 0x%x:%s.\n",
+		adapter->id, adapter->name);
+
+	if (mt312_readreg(adapter, ID, &id) < 0)
+		return -ENODEV;
 
 	if ((id != ID_VP310) && (id != ID_MT312))
 		return -ENODEV;
 
-	if ((ret = dvb_register_frontend(mt312_ioctl, i2c,
-				(void *)(long)id, &mt312_info)) < 0)
-		return ret;
+	if ( !(state = kmalloc(sizeof(struct mt312_state), GFP_KERNEL)) )
+		return -ENOMEM;
 
-	mt312_count++;
+	memset(state, 0, sizeof(struct mt312_state));
+	state->i2c = adapter;
+	state->id = id;
+
+	if ( !(client = kmalloc(sizeof(struct i2c_client), GFP_KERNEL)) ) {
+		kfree(state);
+		return -ENOMEM;
+	}
+
+	memcpy(client, &client_template, sizeof(struct i2c_client));
+	client->adapter = adapter;
+	client->addr = I2C_ADDR_MT312;
+	i2c_set_clientdata(client, state);
+
+	if ((ret = i2c_attach_client(client))) {
+		kfree(client);
+		kfree(state);
+		return ret;
+	}
+
+	BUG_ON(!state->dvb);
+
+	if ((ret = dvb_register_frontend(mt312_ioctl, state->dvb, state,
+					     &mt312_info, THIS_MODULE))) {
+		i2c_detach_client(client);
+		kfree(client);
+		kfree(state);
+		return ret;
+	}
 
 	return 0;
 }
 
-static void mt312_detach(struct dvb_i2c_bus *i2c, void *data)
+static int mt312_detach_client(struct i2c_client *client)
 {
-	dvb_unregister_frontend(mt312_ioctl, i2c);
+	struct mt312_state *state = i2c_get_clientdata(client);
 
-	if (mt312_count)
-		mt312_count--;
+	dprintk ("%s\n", __FUNCTION__);
+
+	dvb_unregister_frontend (mt312_ioctl, state->dvb);
+	i2c_detach_client(client);
+	BUG_ON(state->dvb);
+	kfree(client);
+	kfree(state);
+	return 0;
 }
+
+static int mt312_command (struct i2c_client *client, unsigned int cmd, void *arg)
+{
+	struct mt312_state *state = i2c_get_clientdata(client);
+
+	dprintk ("%s\n", __FUNCTION__);
+
+	switch (cmd) {
+	case FE_REGISTER:
+		state->dvb = arg;
+		break;
+	case FE_UNREGISTER:
+		state->dvb = NULL;
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+	return 0;
+}
+
+static struct i2c_driver driver = {
+	.owner 		= THIS_MODULE,
+	.name 		= FRONTEND_NAME,
+	.id 		= I2C_DRIVERID_DVBFE_MT312,
+	.flags 		= I2C_DF_NOTIFY,
+	.attach_adapter = mt312_attach_adapter,
+	.detach_client 	= mt312_detach_client,
+	.command 	= mt312_command,
+};
+
+static struct i2c_client client_template = {
+	.name		= FRONTEND_NAME,
+	.flags 		= I2C_CLIENT_ALLOW_USE,
+	.driver  	= &driver,
+};
 
 static int __init mt312_module_init(void)
 {
-	return dvb_register_i2c_device(THIS_MODULE, mt312_attach, mt312_detach);
+	return i2c_add_driver(&driver);
 }
 
 static void __exit mt312_module_exit(void)
 {
-	dvb_unregister_i2c_device(mt312_attach);
+	if (i2c_del_driver(&driver))
+		printk(KERN_ERR "mt312: driver deregistration failed.\n");
 }
 
 module_init(mt312_module_init);
 module_exit(mt312_module_exit);
 
-#if MT312_DEBUG != 0
-MODULE_PARM(debug,"i");
-MODULE_PARM_DESC(debug, "enable verbose debug messages");
-#endif
-
 MODULE_DESCRIPTION("MT312 Satellite Channel Decoder Driver");
 MODULE_AUTHOR("Andreas Oberritter <obi@linuxtv.org>");
 MODULE_LICENSE("GPL");
+

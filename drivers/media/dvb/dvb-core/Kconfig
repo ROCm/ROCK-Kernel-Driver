@@ -8,4 +8,4 @@ config DVB_CORE
 	  to build your drivers outside the kernel, but need the DVB core. All 
 	  in-kernel drivers will select this automatically if needed.
 	  If unsure say N.
-
+ 

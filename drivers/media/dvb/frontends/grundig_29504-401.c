@@ -25,22 +25,35 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/string.h>
 #include <linux/slab.h>
 
 #include "dvb_frontend.h"
-#include "dvb_functions.h"
 
-static int debug = 0;
+#define FRONTEND_NAME "dvbfe_l64781"
 
-#define dprintk	if (debug) printk
+#define dprintk(args...) \
+	do { \
+		if (debug) printk(KERN_DEBUG FRONTEND_NAME ": " args); \
+	} while (0)
 
-struct grundig_state {
+static int debug;
+static int old_set_tv_freq;
+
+module_param(debug, int, 0644);
+MODULE_PARM_DESC(debug, "Turn on/off frontend debugging (default:off).");
+module_param(old_set_tv_freq, int, 0644);
+MODULE_PARM_DESC(old_set_tv_freq, "Use old tsa5060_set_tv_freq calculations.");
+
+struct l64781_state {
 	int first:1;
+	struct i2c_adapter *i2c;
+	struct dvb_adapter *dvb;
 };
 
-struct dvb_frontend_info grundig_29504_401_info = {
-	.name = "Grundig 29504-401",
+struct dvb_frontend_info l64781_info = {
+	.name = "Grundig 29504-401 (LSI L64781 Based)",
 	.type = FE_OFDM,
 /*	.frequency_min = ???,*/
 /*	.frequency_max = ???,*/
@@ -55,13 +68,13 @@ struct dvb_frontend_info grundig_29504_401_info = {
 };
 
 
-static int l64781_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
+static int l64781_writereg (struct i2c_adapter *i2c, u8 reg, u8 data)
 {
 	int ret;
 	u8 buf [] = { reg, data };
 	struct i2c_msg msg = { .addr = 0x55, .flags = 0, .buf = buf, .len = 2 };
 
-	if ((ret = i2c->xfer (i2c, &msg, 1)) != 1)
+	if ((ret = i2c_transfer(i2c, &msg, 1)) != 1)
 		dprintk ("%s: write_reg error (reg == %02x) = %02x!\n",
 			 __FUNCTION__, reg, ret);
 
@@ -69,7 +82,7 @@ static int l64781_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 }
 
 
-static u8 l64781_readreg (struct dvb_i2c_bus *i2c, u8 reg)
+static u8 l64781_readreg (struct i2c_adapter *i2c, u8 reg)
 {
 	int ret;
 	u8 b0 [] = { reg };
@@ -77,7 +90,7 @@ static u8 l64781_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 	struct i2c_msg msg [] = { { .addr = 0x55, .flags = 0, .buf = b0, .len = 1 },
 			   { .addr = 0x55, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
 
-	ret = i2c->xfer (i2c, msg, 2);
+	ret = i2c_transfer(i2c, msg, 2);
 
 	if (ret != 2)
 		dprintk("%s: readreg error (ret == %i)\n", __FUNCTION__, ret);
@@ -86,12 +99,12 @@ static u8 l64781_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 }
 
 
-static int tsa5060_write (struct dvb_i2c_bus *i2c, u8 data [4])
+static int tsa5060_write (struct i2c_adapter *i2c, u8 data [4])
 {
 	int ret;
 	struct i2c_msg msg = { .addr = 0x61, .flags = 0, .buf = data, .len = 4 };
 
-	if ((ret = i2c->xfer (i2c, &msg, 1)) != 1)
+	if ((ret = i2c_transfer(i2c, &msg, 1)) != 1)
 		dprintk ("%s: write_reg error == %02x!\n", __FUNCTION__, ret);
 
 	return (ret != 1) ? -1 : 0;
@@ -103,14 +116,17 @@ static int tsa5060_write (struct dvb_i2c_bus *i2c, u8 data [4])
  *   reference clock comparision frequency of 166666 Hz.
  *   frequency offset is 36125000 Hz.
  */
-static int tsa5060_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
+static int tsa5060_set_tv_freq (struct i2c_adapter *i2c, u32 freq)
 {
-#if 1
 	u32 div;
 	u8 buf [4];
 	u8 cfg, cpump, band_select;
 
-	div = (36125000 + freq) / 166666;
+	if (old_set_tv_freq)
+	        div = (36000000 + freq) / 166666;
+	else
+		div = (36125000 + freq) / 166666;
+
 	cfg = 0x88;
 
 	cpump = freq < 175000000 ? 2 : freq < 390000000 ? 1 :
@@ -121,27 +137,18 @@ static int tsa5060_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
 	buf [0] = (div >> 8) & 0x7f;
 	buf [1] = div & 0xff;
 	buf [2] = ((div >> 10) & 0x60) | cfg;
-	buf [3] = (cpump << 6) | band_select;
-#else
-	/* old code which seems to work better for at least one person */
-        u32 div;
-        u8 buf [4];
-        u8 cfg;
 
-        div = (36000000 + freq) / 166666;
-        cfg = 0x88;
+	if (old_set_tv_freq)
+		buf [3] = 0xc0;
+	else
+		buf [3] = (cpump << 6) | band_select;
 
-        buf [0] = (div >> 8) & 0x7f;
-        buf [1] = div & 0xff;
-        buf [2] = ((div >> 10) & 0x60) | cfg;
-        buf [3] = 0xc0;
-#endif
-
-	return tsa5060_write (i2c, buf);
+	return tsa5060_write(i2c, buf);
 }
 
 
-static void apply_tps (struct dvb_i2c_bus *i2c)
+
+static void apply_tps (struct i2c_adapter *i2c)
 {
 	l64781_writereg (i2c, 0x2a, 0x00);
 	l64781_writereg (i2c, 0x2a, 0x01);
@@ -155,7 +162,7 @@ static void apply_tps (struct dvb_i2c_bus *i2c)
 }
 
 
-static void reset_afc (struct dvb_i2c_bus *i2c)
+static void reset_afc (struct i2c_adapter *i2c)
 {
 	/* Set AFC stall for the AFC_INIT_FRQ setting, TIM_STALL for
 	   timing offset */
@@ -173,7 +180,7 @@ static void reset_afc (struct dvb_i2c_bus *i2c)
 }
 
 
-static int apply_frontend_param (struct dvb_i2c_bus *i2c,
+static int apply_frontend_param (struct i2c_adapter *i2c,
 			  struct dvb_frontend_parameters *param)
 {
 	/* The coderates for FEC_NONE, FEC_4_5 and FEC_FEC_6_7 are arbitrary */
@@ -285,16 +292,16 @@ static int apply_frontend_param (struct dvb_i2c_bus *i2c,
 }
 
 
-static int reset_and_configure (struct dvb_i2c_bus *i2c)
+static int reset_and_configure (struct i2c_adapter *i2c)
 {
 	u8 buf [] = { 0x06 };
 	struct i2c_msg msg = { .addr = 0x00, .flags = 0, .buf = buf, .len = 1 };
 
-	return (i2c->xfer (i2c, &msg, 1) == 1) ? 0 : -ENODEV;
+	return (i2c_transfer(i2c, &msg, 1) == 1) ? 0 : -ENODEV;
 }
 
 
-static int get_frontend(struct dvb_i2c_bus* i2c, struct dvb_frontend_parameters* param)
+static int get_frontend(struct i2c_adapter* i2c, struct dvb_frontend_parameters* param)
 {
 	int tmp;
 
@@ -412,7 +419,7 @@ static int get_frontend(struct dvb_i2c_bus* i2c, struct dvb_frontend_parameters*
 }
 
 
-static int init (struct dvb_i2c_bus *i2c)
+static int init (struct i2c_adapter *i2c)
 {
         reset_and_configure (i2c);
 
@@ -449,16 +456,16 @@ static int init (struct dvb_i2c_bus *i2c)
 
 
 static 
-int grundig_29504_401_ioctl (struct dvb_frontend *fe,
+int l64781_ioctl (struct dvb_frontend *fe,
 			     unsigned int cmd, void *arg)
 {
-	struct dvb_i2c_bus *i2c = fe->i2c;
+	struct l64781_state* state = fe->data;
+	struct i2c_adapter *i2c = state->i2c;
 	int res;
-	struct grundig_state* state = (struct grundig_state*) fe->data;
 
         switch (cmd) {
         case FE_GET_INFO:
-		memcpy (arg, &grundig_29504_401_info,
+		memcpy (arg, &l64781_info,
 			sizeof(struct dvb_frontend_info));
                 break;
 
@@ -546,7 +553,7 @@ int grundig_29504_401_ioctl (struct dvb_frontend *fe,
 		res = init (i2c);
 		if ((res == 0) && (state->first)) {
 			state->first = 0;
-			dvb_delay(200);
+			msleep(200);
 		}
 		return res;
 
@@ -567,28 +574,26 @@ int grundig_29504_401_ioctl (struct dvb_frontend *fe,
         return 0;
 } 
 
-
-static int l64781_attach (struct dvb_i2c_bus *i2c, void **data)
+static int l64781_probe(struct i2c_adapter *i2c)
 {
 	u8 reg0x3e;
 	u8 b0 [] = { 0x1a };
 	u8 b1 [] = { 0x00 };
 	struct i2c_msg msg [] = { { .addr = 0x55, .flags = 0, .buf = b0, .len = 1 },
 			   { .addr = 0x55, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
-	struct grundig_state* state;
 
 	/**
 	 *  the L64781 won't show up before we send the reset_and_configure()
 	 *  broadcast. If nothing responds there is no L64781 on the bus...
 	 */
 	if (reset_and_configure(i2c) < 0) {
-		dprintk("no response on reset_and_configure() broadcast, bailing out...\n");
+		dprintk("No response to reset and configure broadcast...\n");
 		return -ENODEV;
 	}
 
 	/* The chip always responds to reads */
-	if (i2c->xfer(i2c, msg, 2) != 2) {  
-	        dprintk("no response to read on I2C bus\n");
+	if (i2c_transfer(i2c, msg, 2) != 2) {  
+	        dprintk("No response to read on I2C bus\n");
 		return -ENODEV;
 	}
 
@@ -607,58 +612,138 @@ static int l64781_attach (struct dvb_i2c_bus *i2c, void **data)
 	/* Responds to all reads with 0 */
 	if (l64781_readreg(i2c, 0x1a) != 0) {
  	        dprintk("Read 1 returned unexpcted value\n");
-	        goto bailout;
-	}	  
+	        goto out;
+	}
 
 	/* Turn the chip on */
 	l64781_writereg (i2c, 0x3e, 0xa5);
-	
+
 	/* Responds with register default value */
 	if (l64781_readreg(i2c, 0x1a) != 0xa1) { 
  	        dprintk("Read 2 returned unexpcted value\n");
-	        goto bailout;
+	        goto out;
 	}
 
-	state = kmalloc(sizeof(struct grundig_state), GFP_KERNEL);
-	if (state == NULL) goto bailout;
-	*data = state;
-	state->first = 1;
-
-	return dvb_register_frontend (grundig_29504_401_ioctl, i2c, state,
-			       &grundig_29504_401_info);
-
- bailout:
+	return 0;
+out:
 	l64781_writereg (i2c, 0x3e, reg0x3e);  /* restore reg 0x3e */
 	return -ENODEV;
 }
 
+static struct i2c_client client_template;
 
-
-static void l64781_detach (struct dvb_i2c_bus *i2c, void *data)
+static int l64781_attach_adapter(struct i2c_adapter *adapter)
 {
-	kfree(data);
-	dvb_unregister_frontend (grundig_29504_401_ioctl, i2c);
+	struct l64781_state *state;
+	struct i2c_client *client;
+	int ret;
+
+	dprintk("Trying to attach to adapter 0x%x:%s.\n",
+		adapter->id, adapter->name);
+
+	if ((ret = l64781_probe(adapter)))
+		return ret;
+
+	if ( !(state = kmalloc(sizeof(struct l64781_state), GFP_KERNEL)) )
+		return -ENOMEM;
+
+	memset(state, 0, sizeof(struct l64781_state));
+	state->i2c = adapter;
+	state->first = 1;
+
+	if ( !(client = kmalloc(sizeof(struct i2c_client), GFP_KERNEL)) ) {
+		kfree(state);
+		return -ENOMEM;
+	}
+
+	memcpy(client, &client_template, sizeof(struct i2c_client));
+	client->adapter = adapter;
+	client->addr = 0; //XXX
+	i2c_set_clientdata(client, state);
+
+	if ((ret = i2c_attach_client(client))) {
+		kfree(state);
+		kfree(client);
+		return ret;
+	}
+
+	BUG_ON(!state->dvb);
+
+	if ((ret = dvb_register_frontend(l64781_ioctl, state->dvb, state,
+					     &l64781_info, THIS_MODULE))) {
+		i2c_detach_client(client);
+		kfree(state);
+		kfree(client);
+		return ret;
+	}
+
+	return 0;
 }
 
-
-static int __init init_grundig_29504_401 (void)
+static int l64781_detach_client(struct i2c_client *client)
 {
-	return dvb_register_i2c_device (THIS_MODULE,
-					l64781_attach, l64781_detach);
+	struct l64781_state *state = i2c_get_clientdata(client);
+
+	dvb_unregister_frontend(l64781_ioctl, state->dvb);
+	i2c_detach_client(client);
+	BUG_ON(state->dvb);
+	kfree(client);
+	kfree(state);
+	return 0;
 }
 
-
-static void __exit exit_grundig_29504_401 (void)
+static int l64781_command(struct i2c_client *client,
+			  unsigned int cmd, void *arg)
 {
-	dvb_unregister_i2c_device (l64781_attach);
+	struct l64781_state *data = i2c_get_clientdata(client);
+	dprintk ("%s\n", __FUNCTION__);
+
+	switch (cmd) {
+	case FE_REGISTER: {
+		data->dvb = arg;
+		break;
+	}
+	case FE_UNREGISTER: {
+		data->dvb = NULL;
+		break;
+	}
+	default:
+		return -EOPNOTSUPP;
+	}
+	return 0;
 }
 
-module_init(init_grundig_29504_401);
-module_exit(exit_grundig_29504_401);
+static struct i2c_driver driver = {
+	.owner 		= THIS_MODULE,
+	.name 		= FRONTEND_NAME,
+	.id 		= I2C_DRIVERID_DVBFE_L64781,
+	.flags 		= I2C_DF_NOTIFY,
+	.attach_adapter = l64781_attach_adapter,
+	.detach_client 	= l64781_detach_client,
+	.command 	= l64781_command,
+};
 
-MODULE_PARM(debug,"i");
-MODULE_PARM_DESC(debug, "enable verbose debug messages");
-MODULE_DESCRIPTION("Grundig 29504-401 DVB-T Frontend");
+static struct i2c_client client_template = {
+	.name		= FRONTEND_NAME,
+	.flags 		= I2C_CLIENT_ALLOW_USE,
+	.driver  	= &driver,
+};
+
+static int __init init_l64781 (void)
+{
+	return i2c_add_driver(&driver);
+}
+
+static void __exit exit_l64781 (void)
+{
+	if (i2c_del_driver(&driver))
+		printk(KERN_ERR "l64781: driver deregistration failed\n");
+}
+
+module_init(init_l64781);
+module_exit(exit_l64781);
+
+MODULE_DESCRIPTION("Grundig 29504-401 DVB-T Frontend (LSI L64781 Based)");
 MODULE_AUTHOR("Holger Waechtler, Marko Kohtala");
 MODULE_LICENSE("GPL");
 

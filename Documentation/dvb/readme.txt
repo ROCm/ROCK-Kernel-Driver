@@ -28,9 +28,9 @@ is the who-is-who of DVB development
 "faq.txt"
 contains frequently asked questions and their answers.
 
-"firmware.txt" 
-contains informations for required external firmware
-files and where to get them.
+"get_dvb_firmware"
+script to download and extract firmware for those devices
+that require it.
 
 "ttusb-dec.txt"
 contains detailed informations about the
@@ -40,5 +40,12 @@ TT DEC2000/DEC3000 USB DVB hardware.
 contains detailed installation instructions for the
 various bt8xx based "budget" DVB cards
 (Nebula, Pinnacle PCTV, Twinhan DST)
+
+"vp7041.txt"
+contains detailed informations about the
+Visionplus VisionDTV USB-Ter DVB-T adapter.
+
+"udev.txt"
+how to get DVB and udev up and running.
 
 Good luck and have fun!

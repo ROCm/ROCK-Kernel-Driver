@@ -21,7 +21,9 @@
 
 #include <asm/bitops.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
+#include <linux/device.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/i2c.h>
@@ -33,33 +35,32 @@
 
 #include "dvb-bt8xx.h"
 
-#include "dvb_functions.h"
-
 #include "bt878.h"
 
-/* ID THAT MUST GO INTO i2c ids */
-#ifndef  I2C_DRIVERID_DVB_BT878A
-# define I2C_DRIVERID_DVB_BT878A I2C_DRIVERID_EXP0+10
-#endif
+static int debug;
 
+module_param(debug, int, 0644);
+MODULE_PARM_DESC(debug, "Turn on/off debugging (default:off).");
 
-#define dprintk if (debug) printk
-
-extern int bttv_get_cardinfo(unsigned int card, int *type, int *cardid);
-extern struct pci_dev* bttv_get_pcidev(unsigned int card);
-
-static LIST_HEAD(card_list);
-static int debug = 0;
+#define dprintk( args... ) \
+	do { \
+		if (debug) printk(KERN_DEBUG args); \
+	} while (0)
 
 static void dvb_bt8xx_task(unsigned long data)
 {
 	struct dvb_bt8xx_card *card = (struct dvb_bt8xx_card *)data;
 
-	//printk("%d ", finished_block);
+	//printk("%d ", card->bt->finished_block);
 
 	while (card->bt->last_block != card->bt->finished_block) {
-		(card->bt->TS_Size ? dvb_dmx_swfilter_204 : dvb_dmx_swfilter)(&card->demux, &card->bt->buf_cpu[card->bt->last_block * card->bt->block_bytes], card->bt->block_bytes);
-		card->bt->last_block = (card->bt->last_block + 1) % card->bt->block_count;
+		(card->bt->TS_Size ? dvb_dmx_swfilter_204 : dvb_dmx_swfilter)
+			(&card->demux,
+			 &card->bt->buf_cpu[card->bt->last_block *
+					    card->bt->block_bytes],
+			 card->bt->block_bytes);
+		card->bt->last_block = (card->bt->last_block + 1) %
+					card->bt->block_count;
 	}
 }
 
@@ -103,23 +104,6 @@ static int dvb_bt8xx_stop_feed(struct dvb_demux_feed *dvbdmxfeed)
 	return 0;
 }
 
-static int master_xfer (struct dvb_i2c_bus *i2c, const struct i2c_msg msgs[], int num)
-{
-	struct dvb_bt8xx_card *card = i2c->data;
-	int retval;
-
-	if (down_interruptible (&card->bt->gpio_lock))
-		return -ERESTARTSYS;
-
-	retval = i2c_transfer(card->i2c_adapter,
-			      (struct i2c_msg*) msgs,
-			      num);
-
-	up(&card->bt->gpio_lock);
-
-	return retval;
-}
-
 static int is_pci_slot_eq(struct pci_dev* adev, struct pci_dev* bdev)
 {
 	if ((adev->subsystem_vendor == bdev->subsystem_vendor) &&
@@ -142,168 +126,18 @@ static struct bt878 __init *dvb_bt8xx_878_match(unsigned int bttv_nr, struct pci
 	return NULL;
 }
 
-static int __init dvb_bt8xx_card_match(unsigned int bttv_nr, char *card_name, u32 gpio_mode, u32 op_sync_orin, u32 irq_err_ignore)
-{
-	struct dvb_bt8xx_card *card;
-	struct pci_dev* bttv_pci_dev;
-
-	dprintk("dvb_bt8xx: identified card%d as %s\n", bttv_nr, card_name);
-			
-	if (!(card = kmalloc(sizeof(struct dvb_bt8xx_card), GFP_KERNEL)))
-		return -ENOMEM;
-
-	memset(card, 0, sizeof(*card));
-	card->bttv_nr = bttv_nr;
-	strncpy(card->card_name, card_name, sizeof(card_name) - 1);
-	
-	if (!(bttv_pci_dev = bttv_get_pcidev(bttv_nr))) {
-		printk("dvb_bt8xx: no pci device for card %d\n", card->bttv_nr);
-		kfree(card);
-		return -EFAULT;
-	}
-
-	if (!(card->bt = dvb_bt8xx_878_match(card->bttv_nr, bttv_pci_dev))) {
-		printk("dvb_bt8xx: unable to determine DMA core of card %d\n", card->bttv_nr);
-	
-		kfree(card);
-		return -EFAULT;
-		
-	}
-	init_MUTEX(&card->bt->gpio_lock);
-	card->bt->bttv_nr = bttv_nr;
-	card->gpio_mode = gpio_mode;
-	card->op_sync_orin = op_sync_orin;
-	card->irq_err_ignore = irq_err_ignore;
-	list_add_tail(&card->list, &card_list);
-
-	return 0;
-}
-
-static struct dvb_bt8xx_card *dvb_bt8xx_find_by_i2c_adap(struct i2c_adapter *adap)
-{
-	struct dvb_bt8xx_card *card;
-	struct list_head *item;
-	
-	printk("find by i2c adap: checking \"%s\"\n",adap->name);
-	list_for_each(item, &card_list) {
-		card = list_entry(item, struct dvb_bt8xx_card, list);
-		if (card->i2c_adapter == adap)
-			return card;
-	}
-	return NULL;
-}
-
-static struct dvb_bt8xx_card *dvb_bt8xx_find_by_pci(struct i2c_adapter *adap)
-{
-	struct dvb_bt8xx_card *card;
-	struct list_head *item;
-	struct device  *dev;
-	struct pci_dev *pci;
-	
-	printk("find by pci: checking \"%s\"\n",adap->name);
-	dev = adap->dev.parent;
-	if (NULL == dev) {
-		/* shoudn't happen with 2.6.0-test7 + newer */
-		printk("attach: Huh? i2c adapter not in sysfs tree?\n");
-		return NULL;
-	}
-	pci = to_pci_dev(dev);
-	list_for_each(item, &card_list) {
-		card = list_entry(item, struct dvb_bt8xx_card, list);
-		if (is_pci_slot_eq(pci, card->bt->dev)) {
-			return card;
-		}
-	}
-	return NULL;
-}
-
-static int dvb_bt8xx_attach(struct i2c_adapter *adap)
-{
-	struct dvb_bt8xx_card *card;
-	
-	printk("attach: checking \"%s\"\n",adap->name);
-
-	/* looking for bt878 cards ... */
-	if (adap->id != (I2C_ALGO_BIT | I2C_HW_B_BT848))
-		return 0;
-	card = dvb_bt8xx_find_by_pci(adap);
-	if (!card)
-		return 0;
-	card->i2c_adapter = adap;
-	printk("attach: \"%s\", to card %d\n",
-	       adap->name, card->bttv_nr);
-	try_module_get(adap->owner);
-
-	return 0;
-}
-
-static void dvb_bt8xx_i2c_adap_free(struct i2c_adapter *adap)
-{
-	module_put(adap->owner);
-}
-
-static int dvb_bt8xx_detach(struct i2c_adapter *adap)
-{
-	struct dvb_bt8xx_card *card;
-
-	card = dvb_bt8xx_find_by_i2c_adap(adap);
-	if (!card)
-		return 0;
-
-	/* This should not happen. We have locked the module! */
-	printk("detach: \"%s\", for card %d removed\n",
-	       adap->name, card->bttv_nr);
-	return 0;
-}
-
-static struct i2c_driver dvb_bt8xx_driver = {
-	.owner           = THIS_MODULE,
-	.name            = "dvb_bt8xx",
-        .id              = I2C_DRIVERID_DVB_BT878A,
-	.flags           = I2C_DF_NOTIFY,
-        .attach_adapter  = dvb_bt8xx_attach,
-        .detach_adapter  = dvb_bt8xx_detach,
-};
-
-static void __init dvb_bt8xx_get_adaps(void)
-{
-	i2c_add_driver(&dvb_bt8xx_driver);
-}
-
-static void __exit dvb_bt8xx_exit_adaps(void)
-{
-	i2c_del_driver(&dvb_bt8xx_driver);
-}
-
-static int __init dvb_bt8xx_load_card( struct dvb_bt8xx_card *card)
+static int __init dvb_bt8xx_load_card(struct dvb_bt8xx_card *card)
 {
 	int result;
 
-	if (!card->i2c_adapter) {
-		printk("dvb_bt8xx: unable to determine i2c adaptor of card %d, deleting\n", card->bttv_nr);
-
-		return -EFAULT;
-	
-	}
-
-	if ((result = dvb_register_adapter(&card->dvb_adapter, card->card_name, THIS_MODULE)) < 0) {
-	
+	if ((result = dvb_register_adapter(&card->dvb_adapter, card->card_name,
+					   THIS_MODULE)) < 0) {
 		printk("dvb_bt8xx: dvb_register_adapter failed (errno = %d)\n", result);
-		
-		dvb_bt8xx_i2c_adap_free(card->i2c_adapter);
 		return result;
 		
 	}
-	card->bt->adap_ptr = card->dvb_adapter;
 
-	if (!(dvb_register_i2c_bus(master_xfer, card, card->dvb_adapter, 0))) {
-		printk("dvb_bt8xx: dvb_register_i2c_bus of card%d failed\n", card->bttv_nr);
-
-		dvb_unregister_adapter(card->dvb_adapter);
-		dvb_bt8xx_i2c_adap_free(card->i2c_adapter);
-
-		return -EFAULT;
-	}
+	card->bt->adapter = card->i2c_adapter;
 
 	memset(&card->demux, 0, sizeof(struct dvb_demux));
 
@@ -319,10 +153,7 @@ static int __init dvb_bt8xx_load_card( struct dvb_bt8xx_card *card)
 	if ((result = dvb_dmx_init(&card->demux)) < 0) {
 		printk("dvb_bt8xx: dvb_dmx_init failed (errno = %d)\n", result);
 
-		dvb_unregister_i2c_bus(master_xfer, card->dvb_adapter, 0);
 		dvb_unregister_adapter(card->dvb_adapter);
-		dvb_bt8xx_i2c_adap_free(card->i2c_adapter);
-		
 		return result;
 	}
 
@@ -334,10 +165,7 @@ static int __init dvb_bt8xx_load_card( struct dvb_bt8xx_card *card)
 		printk("dvb_bt8xx: dvb_dmxdev_init failed (errno = %d)\n", result);
 
 		dvb_dmx_release(&card->demux);
-		dvb_unregister_i2c_bus(master_xfer, card->dvb_adapter, 0);
 		dvb_unregister_adapter(card->dvb_adapter);
-		dvb_bt8xx_i2c_adap_free(card->i2c_adapter);
-		
 		return result;
 	}
 
@@ -348,10 +176,7 @@ static int __init dvb_bt8xx_load_card( struct dvb_bt8xx_card *card)
 
 		dvb_dmxdev_release(&card->dmxdev);
 		dvb_dmx_release(&card->demux);
-		dvb_unregister_i2c_bus(master_xfer, card->dvb_adapter, 0);
 		dvb_unregister_adapter(card->dvb_adapter);
-		dvb_bt8xx_i2c_adap_free(card->i2c_adapter);
-		
 		return result;
 	}
 	
@@ -363,10 +188,7 @@ static int __init dvb_bt8xx_load_card( struct dvb_bt8xx_card *card)
 		card->demux.dmx.remove_frontend(&card->demux.dmx, &card->fe_hw);
 		dvb_dmxdev_release(&card->dmxdev);
 		dvb_dmx_release(&card->demux);
-		dvb_unregister_i2c_bus(master_xfer, card->dvb_adapter, 0);
 		dvb_unregister_adapter(card->dvb_adapter);
-		dvb_bt8xx_i2c_adap_free(card->i2c_adapter);
-		
 		return result;
 	}
 
@@ -377,10 +199,7 @@ static int __init dvb_bt8xx_load_card( struct dvb_bt8xx_card *card)
 		card->demux.dmx.remove_frontend(&card->demux.dmx, &card->fe_hw);
 		dvb_dmxdev_release(&card->dmxdev);
 		dvb_dmx_release(&card->demux);
-		dvb_unregister_i2c_bus(master_xfer, card->dvb_adapter, 0);
 		dvb_unregister_adapter(card->dvb_adapter);
-		dvb_bt8xx_i2c_adap_free(card->i2c_adapter);
-		
 		return result;
 	}
 
@@ -393,138 +212,167 @@ static int __init dvb_bt8xx_load_card( struct dvb_bt8xx_card *card)
 	return 0;
 }
 
-static int __init dvb_bt8xx_load_all(void)
+static int dvb_bt8xx_probe(struct device *dev)
 {
+	struct bttv_sub_device *sub = to_bttv_sub_dev(dev);
 	struct dvb_bt8xx_card *card;
-	struct list_head *entry, *entry_safe;
+	struct pci_dev* bttv_pci_dev;
+	int ret;
 
-	list_for_each_safe(entry, entry_safe, &card_list) {
-		card = list_entry(entry, struct dvb_bt8xx_card, list);
-		if (dvb_bt8xx_load_card(card) < 0) {
-			list_del(&card->list);
-			kfree(card);
-			continue;
-		}
+	if (!(card = kmalloc(sizeof(struct dvb_bt8xx_card), GFP_KERNEL)))
+		return -ENOMEM;
+
+	memset(card, 0, sizeof(*card));
+	card->bttv_nr = sub->core->nr;
+	strncpy(card->card_name, sub->core->name, sizeof(sub->core->name));
+	card->i2c_adapter = &sub->core->i2c_adap;
+
+	switch(sub->core->type)
+	{
+	case BTTV_PINNACLESAT:
+		card->gpio_mode = 0x0400C060;
+		card->op_sync_orin = 0;
+		card->irq_err_ignore = 0;
+		/* 26, 15, 14, 6, 5 
+		 * A_PWRDN  DA_DPM DA_SBR DA_IOM_DA 
+		 * DA_APP(parallel) */
+		break;
+
+	case BTTV_NEBULA_DIGITV:
+	case BTTV_AVDVBT_761:
+		card->gpio_mode = (1 << 26) | (1 << 14) | (1 << 5);
+		card->op_sync_orin = 0;
+		card->irq_err_ignore = 0;
+		/* A_PWRDN DA_SBR DA_APP (high speed serial) */
+		break;
+
+	case BTTV_AVDVBT_771: //case 0x07711461:
+		card->gpio_mode = 0x0400402B;
+		card->op_sync_orin = BT878_RISC_SYNC_MASK;
+		card->irq_err_ignore = 0;
+		/* A_PWRDN DA_SBR  DA_APP[0] PKTP=10 RISC_ENABLE FIFO_ENABLE*/
+		break;
+
+	case BTTV_TWINHAN_DST:
+		card->gpio_mode = 0x2204f2c;
+		card->op_sync_orin = BT878_RISC_SYNC_MASK;
+		card->irq_err_ignore = BT878_APABORT | BT878_ARIPERR |
+				       BT878_APPERR | BT878_AFBUS;
+		/* 25,21,14,11,10,9,8,3,2 then
+		 * 0x33 = 5,4,1,0
+		 * A_SEL=SML, DA_MLB, DA_SBR,
+		 * DA_SDR=f, fifo trigger = 32 DWORDS
+		 * IOM = 0 == audio A/D
+		 * DPM = 0 == digital audio mode
+		 * == async data parallel port
+		 * then 0x33 (13 is set by start_capture)
+		 * DA_APP = async data parallel port,
+		 * ACAP_EN = 1,
+		 * RISC+FIFO ENABLE */
+		break;
+
+	default:
+		printk(KERN_WARNING "dvb_bt8xx: Unknown bttv card type: %d.\n",
+				sub->core->type);
+		kfree(card);
+		return -ENODEV;
 	}
-	return 0;
 
+	dprintk("dvb_bt8xx: identified card%d as %s\n", card->bttv_nr, card->card_name);
+			
+	if (!(bttv_pci_dev = bttv_get_pcidev(card->bttv_nr))) {
+		printk("dvb_bt8xx: no pci device for card %d\n", card->bttv_nr);
+		kfree(card);
+		return -EFAULT;
+	}
+
+	if (!(card->bt = dvb_bt8xx_878_match(card->bttv_nr, bttv_pci_dev))) {
+		printk("dvb_bt8xx: unable to determine DMA core of card %d\n", card->bttv_nr);
+	
+		kfree(card);
+		return -EFAULT;
+		
+	}
+
+	init_MUTEX(&card->bt->gpio_lock);
+	card->bt->bttv_nr = sub->core->nr;
+
+	if ( (ret = dvb_bt8xx_load_card(card)) ) {
+		kfree(card);
+		return ret;
+	}
+
+	dev_set_drvdata(dev, card);
+	return 0;
 }
 
-#define BT878_NEBULA	0x68
-#define BT878_TWINHAN_DST 0x71
+static int dvb_bt8xx_remove(struct device *dev)
+{
+	struct dvb_bt8xx_card *card = dev_get_drvdata(dev);
+
+	dprintk("dvb_bt8xx: unloading card%d\n", card->bttv_nr);
+
+	bt878_stop(card->bt);
+	tasklet_kill(&card->bt->tasklet);
+	dvb_net_release(&card->dvbnet);
+	card->demux.dmx.remove_frontend(&card->demux.dmx, &card->fe_mem);
+	card->demux.dmx.remove_frontend(&card->demux.dmx, &card->fe_hw);
+	dvb_dmxdev_release(&card->dmxdev);
+	dvb_dmx_release(&card->demux);
+	dvb_unregister_adapter(card->dvb_adapter);
+
+	list_del(&card->list);
+	kfree(card);
+
+	return 0;
+}
+
+static void dvb_bt8xx_i2c_info(struct bttv_sub_device *sub,
+			       struct i2c_client *client, int attach)
+{
+	struct dvb_bt8xx_card *card = dev_get_drvdata(&sub->dev);
+
+	if (attach) {
+		printk("xxx attach\n");
+		if (client->driver->command)
+			client->driver->command(client, FE_REGISTER,
+						card->dvb_adapter);
+	} else {
+		printk("xxx detach\n");
+		if (client->driver->command)
+			client->driver->command(client, FE_UNREGISTER,
+						card->dvb_adapter);
+	}
+}
+
+static struct bttv_sub_driver driver = {
+	.drv = {
+		.name		= "dvb-bt8xx",
+		.probe		= dvb_bt8xx_probe,
+		.remove		= dvb_bt8xx_remove,
+		/* FIXME:
+		 * .shutdown	= dvb_bt8xx_shutdown,
+		 * .suspend	= dvb_bt8xx_suspend,
+		 * .resume	= dvb_bt8xx_resume,
+		 */
+	},
+	.i2c_info = dvb_bt8xx_i2c_info,
+};
 
 static int __init dvb_bt8xx_init(void)
 {
-	unsigned int card_nr = 0;
-	int card_id;
-	int card_type;
-
-	dprintk("dvb_bt8xx: enumerating available bttv cards...\n");
-	
-	while (bttv_get_cardinfo(card_nr, &card_type, &card_id) == 0) {
-		switch(card_id) {
-			case 0x001C11BD:
-				dvb_bt8xx_card_match(card_nr, "Pinnacle PCTV DVB-S",
-					       0x0400C060, 0, 0);
-				/* 26, 15, 14, 6, 5 
-				 * A_G2X  DA_DPM DA_SBR DA_IOM_DA 
-				 * DA_APP(parallel) */
-				break;
-			case 0x01010071:
-nebula:
-				dvb_bt8xx_card_match(card_nr, "Nebula DigiTV DVB-T",
-					     (1 << 26) | (1 << 14) | (1 << 5),
-					     0, 0);
-				/* A_PWRDN DA_SBR DA_APP (high speed serial) */
-				break;
-			case 0x07611461:
-				dvb_bt8xx_card_match(card_nr, "Avermedia DVB-T",
-					     (1 << 26) | (1 << 14) | (1 << 5),
-					     0, 0);
-				/* A_PWRDN DA_SBR DA_APP (high speed serial) */
-				break;
-			case 0x0:
-				if (card_type == BT878_NEBULA ||
-					card_type == BT878_TWINHAN_DST)
-					goto dst;
-				goto unknown_card;
-			case 0x2611BD:
-			case 0x11822:
-dst:
-				dvb_bt8xx_card_match(card_nr, "DST DVB-S", 0x2204f2c,
-						BT878_RISC_SYNC_MASK,
-						BT878_APABORT | BT878_ARIPERR | BT878_APPERR | BT878_AFBUS);
-				/* 25,21,14,11,10,9,8,3,2 then
-				 * 0x33 = 5,4,1,0
-				 * A_SEL=SML, DA_MLB, DA_SBR, 
-				 * DA_SDR=f, fifo trigger = 32 DWORDS
-				 * IOM = 0 == audio A/D
-				 * DPM = 0 == digital audio mode
-				 * == async data parallel port
-				 * then 0x33 (13 is set by start_capture)
-				 * DA_APP = async data parallel port, 
-				 * ACAP_EN = 1,
-				 * RISC+FIFO ENABLE */
-				break;
-			default:
-unknown_card:
-				printk("%s: unknown card_id found %0X\n",
-					__FUNCTION__, card_id);
-				if (card_type == BT878_NEBULA) {
-					printk("%s: bttv type set to nebula\n",
-						__FUNCTION__);
-					goto nebula;
-				}
-				if (card_type == BT878_TWINHAN_DST) {
-					printk("%s: bttv type set to Twinhan DST\n",
-						__FUNCTION__);
-					goto dst;
-				}
-				printk("%s: unknown card_type found %0X, NOT LOADED\n",
-					__FUNCTION__, card_type);
-				printk("%s: unknown card_nr found %0X\n",
-					__FUNCTION__, card_nr);
-		}
-		card_nr++;
-	}
-	dvb_bt8xx_get_adaps();
-	dvb_bt8xx_load_all();
-
-	return 0;
-
+	return bttv_sub_register(&driver, "dvb");
 }
 
 static void __exit dvb_bt8xx_exit(void)
 {
-	struct dvb_bt8xx_card *card;
-	struct list_head *entry, *entry_safe;
-
-	dvb_bt8xx_exit_adaps();
-	list_for_each_safe(entry, entry_safe, &card_list) {
-		card = list_entry(entry, struct dvb_bt8xx_card, list);
-		
-		dprintk("dvb_bt8xx: unloading card%d\n", card->bttv_nr);
-
-		bt878_stop(card->bt);
-		tasklet_kill(&card->bt->tasklet);
-		dvb_net_release(&card->dvbnet);
-		card->demux.dmx.remove_frontend(&card->demux.dmx, &card->fe_mem);
-		card->demux.dmx.remove_frontend(&card->demux.dmx, &card->fe_hw);
-		dvb_dmxdev_release(&card->dmxdev);
-		dvb_dmx_release(&card->demux);
-		dvb_unregister_i2c_bus(master_xfer, card->dvb_adapter, 0);
-		dvb_bt8xx_i2c_adap_free(card->i2c_adapter);
-		dvb_unregister_adapter(card->dvb_adapter);
-		
-		list_del(&card->list);
-		kfree(card);
-	}
-
+	bttv_sub_unregister(&driver);
 }
 
 module_init(dvb_bt8xx_init);
 module_exit(dvb_bt8xx_exit);
+
 MODULE_DESCRIPTION("Bt8xx based DVB adapter driver");
 MODULE_AUTHOR("Florian Schirmer <jolt@tuxbox.org>");
 MODULE_LICENSE("GPL");
-MODULE_PARM(debug, "i");
+

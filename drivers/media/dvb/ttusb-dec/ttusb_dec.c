@@ -22,10 +22,12 @@
 #include <asm/semaphore.h>
 #include <linux/list.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/usb.h>
+#include <linux/version.h>
 #include <linux/interrupt.h>
 #include <linux/firmware.h>
 #if defined(CONFIG_CRC32) || defined(CONFIG_CRC32_MODULE)
@@ -37,13 +39,17 @@
 
 #include "dmxdev.h"
 #include "dvb_demux.h"
-#include "dvb_i2c.h"
 #include "dvb_filter.h"
 #include "dvb_frontend.h"
 #include "dvb_net.h"
 
-static int debug = 0;
-static int output_pva = 0;
+static int debug;
+static int output_pva;
+
+module_param(debug, int, 0644);
+MODULE_PARM_DESC(debug, "Turn on/off debugging (default:off).");
+module_param(output_pva, int, 0444);
+MODULE_PARM_DESC(output_pva, "Output PVA from dvr device (default:off)");
 
 #define dprintk	if (debug) printk
 
@@ -95,7 +101,6 @@ struct ttusb_dec {
 	struct dmxdev			dmxdev;
 	struct dvb_demux		demux;
 	struct dmx_frontend		frontend;
-	struct dvb_i2c_bus		i2c_bus;
 	struct dvb_net			dvb_net;
 	struct dvb_frontend_info	*frontend_info;
 	int (*frontend_ioctl) (struct dvb_frontend *, unsigned int, void *);
@@ -105,14 +110,14 @@ struct ttusb_dec {
 	int			voltage;
 
 	/* USB bits */
-	struct usb_device	*udev;
-	u8			trans_count;
-	unsigned int		command_pipe;
-	unsigned int		result_pipe;
+	struct usb_device		*udev;
+	u8				trans_count;
+	unsigned int			command_pipe;
+	unsigned int			result_pipe;
 	unsigned int			in_pipe;
 	unsigned int			out_pipe;
 	enum ttusb_dec_interface	interface;
-	struct semaphore	usb_sem;
+	struct semaphore		usb_sem;
 
 	void			*iso_buffer;
 	dma_addr_t		iso_dma_handle;
@@ -211,7 +216,7 @@ static int ttusb_dec_send_command(struct ttusb_dec *dec, const u8 command,
 	u8 *b;
 
 	dprintk("%s\n", __FUNCTION__);
-	
+
 	b = kmalloc(COMMAND_PACKET_SIZE + 4, GFP_KERNEL);
 	if (!b)
 		return -ENOMEM;
@@ -350,9 +355,9 @@ static void ttusb_dec_set_pids(struct ttusb_dec *dec)
 
 	ttusb_dec_send_command(dec, 0x50, sizeof(b), b, NULL, NULL);
 
-		dvb_filter_pes2ts_init(&dec->a_pes2ts, dec->pid[DMX_PES_AUDIO],
+	dvb_filter_pes2ts_init(&dec->a_pes2ts, dec->pid[DMX_PES_AUDIO],
 			       ttusb_dec_audio_pes2ts_cb, dec);
-		dvb_filter_pes2ts_init(&dec->v_pes2ts, dec->pid[DMX_PES_VIDEO],
+	dvb_filter_pes2ts_init(&dec->v_pes2ts, dec->pid[DMX_PES_VIDEO],
 			       ttusb_dec_video_pes2ts_cb, dec);
 	dec->v_pes_length = 0;
 	dec->v_pes_postbytes = 0;
@@ -375,7 +380,7 @@ static void ttusb_dec_process_pva(struct ttusb_dec *dec, u8 *pva, int length)
 	case 0x01: {		/* VideoStream */
 		int prebytes = pva[5] & 0x03;
 		int postbytes = (pva[5] & 0x0c) >> 2;
-			u16 v_pes_payload_length;
+		u16 v_pes_payload_length;
 
 		if (output_pva) {
 			dec->video_filter->feed->cb.ts(pva, length, NULL, 0,
@@ -383,23 +388,23 @@ static void ttusb_dec_process_pva(struct ttusb_dec *dec, u8 *pva, int length)
 			return;
 		}
 
-			if (dec->v_pes_postbytes > 0 &&
-			    dec->v_pes_postbytes == prebytes) {
-				memcpy(&dec->v_pes[dec->v_pes_length],
+		if (dec->v_pes_postbytes > 0 &&
+		    dec->v_pes_postbytes == prebytes) {
+			memcpy(&dec->v_pes[dec->v_pes_length],
 			       &pva[12], prebytes);
 
-				dvb_filter_pes2ts(&dec->v_pes2ts, dec->v_pes,
+			dvb_filter_pes2ts(&dec->v_pes2ts, dec->v_pes,
 					  dec->v_pes_length + prebytes, 1);
-			}
+		}
 
 		if (pva[5] & 0x10) {
-				dec->v_pes[7] = 0x80;
-				dec->v_pes[8] = 0x05;
+			dec->v_pes[7] = 0x80;
+			dec->v_pes[8] = 0x05;
 
 			dec->v_pes[9] = 0x21 | ((pva[8] & 0xc0) >> 5);
 			dec->v_pes[10] = ((pva[8] & 0x3f) << 2) |
 					 ((pva[9] & 0xc0) >> 6);
-				dec->v_pes[11] = 0x01 |
+			dec->v_pes[11] = 0x01 |
 					 ((pva[9] & 0x3f) << 2) |
 					 ((pva[10] & 0x80) >> 6);
 			dec->v_pes[12] = ((pva[10] & 0x7f) << 1) |
@@ -409,33 +414,33 @@ static void ttusb_dec_process_pva(struct ttusb_dec *dec, u8 *pva, int length)
 			memcpy(&dec->v_pes[14], &pva[12 + prebytes],
 			       length - 12 - prebytes);
 			dec->v_pes_length = 14 + length - 12 - prebytes;
-			} else {
-				dec->v_pes[7] = 0x00;
-				dec->v_pes[8] = 0x00;
+		} else {
+			dec->v_pes[7] = 0x00;
+			dec->v_pes[8] = 0x00;
 
 			memcpy(&dec->v_pes[9], &pva[8], length - 8);
 			dec->v_pes_length = 9 + length - 8;
-			}
-
-			dec->v_pes_postbytes = postbytes;
-
-			if (dec->v_pes[9 + dec->v_pes[8]] == 0x00 &&
-			    dec->v_pes[10 + dec->v_pes[8]] == 0x00 &&
-			    dec->v_pes[11 + dec->v_pes[8]] == 0x01)
-				dec->v_pes[6] = 0x84;
-			else
-				dec->v_pes[6] = 0x80;
-
-			v_pes_payload_length = htons(dec->v_pes_length - 6 +
-						     postbytes);
-			memcpy(&dec->v_pes[4], &v_pes_payload_length, 2);
-
-			if (postbytes == 0)
-				dvb_filter_pes2ts(&dec->v_pes2ts, dec->v_pes,
-						  dec->v_pes_length, 1);
-
-			break;
 		}
+
+		dec->v_pes_postbytes = postbytes;
+
+		if (dec->v_pes[9 + dec->v_pes[8]] == 0x00 &&
+		    dec->v_pes[10 + dec->v_pes[8]] == 0x00 &&
+		    dec->v_pes[11 + dec->v_pes[8]] == 0x01)
+			dec->v_pes[6] = 0x84;
+		else
+			dec->v_pes[6] = 0x80;
+
+		v_pes_payload_length = htons(dec->v_pes_length - 6 +
+					     postbytes);
+		memcpy(&dec->v_pes[4], &v_pes_payload_length, 2);
+
+		if (postbytes == 0)
+			dvb_filter_pes2ts(&dec->v_pes2ts, dec->v_pes,
+					  dec->v_pes_length, 1);
+
+		break;
+	}
 
 	case 0x02:		/* MainAudioStream */
 		if (output_pva) {
@@ -517,7 +522,7 @@ static void ttusb_dec_process_packet(struct ttusb_dec *dec)
 	case TTUSB_DEC_PACKET_PVA:
 		if (dec->pva_stream_count)
 			ttusb_dec_process_pva(dec, dec->packet,
-						 dec->packet_payload_length);
+					      dec->packet_payload_length);
 		break;
 
 	case TTUSB_DEC_PACKET_SECTION:
@@ -543,7 +548,7 @@ static void swap_bytes(u8 *b, int length)
 	}
 }
 
-static void ttusb_dec_process_urb_frame(struct ttusb_dec * dec, u8 * b,
+static void ttusb_dec_process_urb_frame(struct ttusb_dec *dec, u8 *b,
 					int length)
 {
 	swap_bytes(b, length);
@@ -592,7 +597,7 @@ static void ttusb_dec_process_urb_frame(struct ttusb_dec * dec, u8 * b,
 						TTUSB_DEC_PACKET_EMPTY;
 					dec->packet_payload_length = 2;
 					dec->packet_state = 7;
-			} else {
+				} else {
 					printk("%s: unknown packet type: "
 					       "%02x%02x\n", __FUNCTION__,
 					       dec->packet[0], dec->packet[1]);
@@ -628,22 +633,22 @@ static void ttusb_dec_process_urb_frame(struct ttusb_dec * dec, u8 * b,
 			int remainder = dec->packet_payload_length -
 					dec->packet_length;
 
-				if (length >= remainder) {
+			if (length >= remainder) {
 				memcpy(dec->packet + dec->packet_length,
-					       b, remainder);
+				       b, remainder);
 				dec->packet_length += remainder;
-					b += remainder;
-					length -= remainder;
+				b += remainder;
+				length -= remainder;
 				dec->packet_state++;
-				} else {
+			} else {
 				memcpy(&dec->packet[dec->packet_length],
-					       b, length);
+				       b, length);
 				dec->packet_length += length;
-					length = 0;
-				}
-
-				break;
+				length = 0;
 			}
+
+			break;
+		}
 
 		case 7: {
 			int tail = 4;
@@ -706,7 +711,6 @@ static void ttusb_dec_process_urb(struct urb *urb, struct pt_regs *ptregs)
 
 		for (i = 0; i < FRAMES_PER_ISO_BUF; i++) {
 			struct usb_iso_packet_descriptor *d;
-
 			u8 *b;
 			int length;
 			struct urb_frame *frame;
@@ -1100,7 +1104,7 @@ static int ttusb_dec_alloc_iso_urbs(struct ttusb_dec *dec)
 				 	       &dec->iso_dma_handle);
 
 	memset(dec->iso_buffer, 0,
-	       sizeof(ISO_FRAME_SIZE * (FRAMES_PER_ISO_BUF * ISO_BUF_COUNT)));
+	       ISO_FRAME_SIZE * (FRAMES_PER_ISO_BUF * ISO_BUF_COUNT));
 
 	for (i = 0; i < ISO_BUF_COUNT; i++) {
 		struct urb *urb;
@@ -1169,6 +1173,7 @@ static int ttusb_dec_boot_dsp(struct ttusb_dec *dec)
 	u32 crc32_csum, crc32_check, tmp;
 #endif
 	const struct firmware *fw_entry = NULL;
+
 	dprintk("%s\n", __FUNCTION__);
 
 	if (request_firmware(&fw_entry, dec->firmware_name, &dec->udev->dev)) {
@@ -1181,7 +1186,7 @@ static int ttusb_dec_boot_dsp(struct ttusb_dec *dec)
 	firmware_size = fw_entry->size;
 
 	if (firmware_size < 60) {
-		printk("%s: firmware size too small for DSP code (%zu < 60).\n",
+		printk("%s: firmware size too small for DSP code (%u < 60).\n",
 			__FUNCTION__, firmware_size);
 		return -1;
 	}
@@ -1277,7 +1282,7 @@ static int ttusb_dec_init_stb(struct ttusb_dec *dec)
 			result = ttusb_dec_boot_dsp(dec);
 			if (result)
 				return result;
-		else
+			else
 				return 1;
 		} else {
 			/* We can't trust the USB IDs that some firmwares
@@ -1305,7 +1310,7 @@ static int ttusb_dec_init_stb(struct ttusb_dec *dec)
 				dec->can_playback = 1;
 
 			return 0;
-	}
+		}
 	}
 	else
 		return result;
@@ -1437,7 +1442,6 @@ static int ttusb_dec_2000t_frontend_ioctl(struct dvb_frontend *fe, unsigned int 
 	dprintk("%s\n", __FUNCTION__);
 
 	switch (cmd) {
-
 	case FE_GET_INFO:
 		dprintk("%s: FE_GET_INFO\n", __FUNCTION__);
 		memcpy(arg, dec->frontend_info,
@@ -1445,27 +1449,27 @@ static int ttusb_dec_2000t_frontend_ioctl(struct dvb_frontend *fe, unsigned int 
 		break;
 
 	case FE_READ_STATUS: {
-			fe_status_t *status = (fe_status_t *)arg;
-			dprintk("%s: FE_READ_STATUS\n", __FUNCTION__);
-			*status = FE_HAS_SIGNAL | FE_HAS_VITERBI |
-				  FE_HAS_SYNC | FE_HAS_CARRIER | FE_HAS_LOCK;
-			break;
-		}
+		fe_status_t *status = (fe_status_t *)arg;
+		dprintk("%s: FE_READ_STATUS\n", __FUNCTION__);
+		*status = FE_HAS_SIGNAL | FE_HAS_VITERBI |
+			  FE_HAS_SYNC | FE_HAS_CARRIER | FE_HAS_LOCK;
+		break;
+	}
 
 	case FE_READ_BER: {
-			u32 *ber = (u32 *)arg;
-			dprintk("%s: FE_READ_BER\n", __FUNCTION__);
-			*ber = 0;
-			return -ENOSYS;
-			break;
-		}
+		u32 *ber = (u32 *)arg;
+		dprintk("%s: FE_READ_BER\n", __FUNCTION__);
+		*ber = 0;
+		return -ENOSYS;
+		break;
+	}
 
 	case FE_READ_SIGNAL_STRENGTH: {
-			dprintk("%s: FE_READ_SIGNAL_STRENGTH\n", __FUNCTION__);
-			*(s32 *)arg = 0xFF;
-			return -ENOSYS;
-			break;
-		}
+		dprintk("%s: FE_READ_SIGNAL_STRENGTH\n", __FUNCTION__);
+		*(s32 *)arg = 0xFF;
+		return -ENOSYS;
+		break;
+	}
 
 	case FE_READ_SNR:
 		dprintk("%s: FE_READ_SNR\n", __FUNCTION__);
@@ -1480,28 +1484,28 @@ static int ttusb_dec_2000t_frontend_ioctl(struct dvb_frontend *fe, unsigned int 
 		break;
 
 	case FE_SET_FRONTEND: {
-			struct dvb_frontend_parameters *p =
-				(struct dvb_frontend_parameters *)arg;
+		struct dvb_frontend_parameters *p =
+			(struct dvb_frontend_parameters *)arg;
 		u8 b[] = { 0x00, 0x00, 0x00, 0x03,
 			   0x00, 0x00, 0x00, 0x00,
 			   0x00, 0x00, 0x00, 0x01,
 			   0x00, 0x00, 0x00, 0xff,
 			   0x00, 0x00, 0x00, 0xff };
-			u32 freq;
+		u32 freq;
 
-			dprintk("%s: FE_SET_FRONTEND\n", __FUNCTION__);
+		dprintk("%s: FE_SET_FRONTEND\n", __FUNCTION__);
 
-			dprintk("            frequency->%d\n", p->frequency);
-			dprintk("            symbol_rate->%d\n",
-				p->u.qam.symbol_rate);
-			dprintk("            inversion->%d\n", p->inversion);
+		dprintk("            frequency->%d\n", p->frequency);
+		dprintk("            symbol_rate->%d\n",
+			p->u.qam.symbol_rate);
+		dprintk("            inversion->%d\n", p->inversion);
 
-			freq = htonl(p->frequency / 1000);
-			memcpy(&b[4], &freq, sizeof (u32));
-			ttusb_dec_send_command(dec, 0x71, sizeof(b), b, NULL, NULL);
+		freq = htonl(p->frequency / 1000);
+		memcpy(&b[4], &freq, sizeof (u32));
+		ttusb_dec_send_command(dec, 0x71, sizeof(b), b, NULL, NULL);
 
-			break;
-		}
+		break;
+	}
 
 	case FE_GET_FRONTEND:
 		dprintk("%s: FE_GET_FRONTEND\n", __FUNCTION__);
@@ -1519,7 +1523,6 @@ static int ttusb_dec_2000t_frontend_ioctl(struct dvb_frontend *fe, unsigned int 
 	default:
 		dprintk("%s: unknown IOCTL (0x%X)\n", __FUNCTION__, cmd);
 		return -EINVAL;
-
 	}
 
 	return 0;
@@ -1541,27 +1544,27 @@ static int ttusb_dec_3000s_frontend_ioctl(struct dvb_frontend *fe,
 		break;
 
 	case FE_READ_STATUS: {
-			fe_status_t *status = (fe_status_t *)arg;
-			dprintk("%s: FE_READ_STATUS\n", __FUNCTION__);
-			*status = FE_HAS_SIGNAL | FE_HAS_VITERBI |
-				  FE_HAS_SYNC | FE_HAS_CARRIER | FE_HAS_LOCK;
-			break;
-		}
+		fe_status_t *status = (fe_status_t *)arg;
+		dprintk("%s: FE_READ_STATUS\n", __FUNCTION__);
+		*status = FE_HAS_SIGNAL | FE_HAS_VITERBI |
+			  FE_HAS_SYNC | FE_HAS_CARRIER | FE_HAS_LOCK;
+		break;
+	}
 
 	case FE_READ_BER: {
-			u32 *ber = (u32 *)arg;
-			dprintk("%s: FE_READ_BER\n", __FUNCTION__);
-			*ber = 0;
-			return -ENOSYS;
-			break;
-		}
+		u32 *ber = (u32 *)arg;
+		dprintk("%s: FE_READ_BER\n", __FUNCTION__);
+		*ber = 0;
+		return -ENOSYS;
+		break;
+	}
 
 	case FE_READ_SIGNAL_STRENGTH: {
-			dprintk("%s: FE_READ_SIGNAL_STRENGTH\n", __FUNCTION__);
-			*(s32 *)arg = 0xFF;
-			return -ENOSYS;
-			break;
-		}
+		dprintk("%s: FE_READ_SIGNAL_STRENGTH\n", __FUNCTION__);
+		*(s32 *)arg = 0xFF;
+		return -ENOSYS;
+		break;
+	}
 
 	case FE_READ_SNR:
 		dprintk("%s: FE_READ_SNR\n", __FUNCTION__);
@@ -1576,8 +1579,8 @@ static int ttusb_dec_3000s_frontend_ioctl(struct dvb_frontend *fe,
 		break;
 
 	case FE_SET_FRONTEND: {
-			struct dvb_frontend_parameters *p =
-				(struct dvb_frontend_parameters *)arg;
+		struct dvb_frontend_parameters *p =
+			(struct dvb_frontend_parameters *)arg;
 		u8 b[] = { 0x00, 0x00, 0x00, 0x01,
 			   0x00, 0x00, 0x00, 0x00,
 			   0x00, 0x00, 0x00, 0x01,
@@ -1588,32 +1591,32 @@ static int ttusb_dec_3000s_frontend_ioctl(struct dvb_frontend *fe,
 			   0x00, 0x00, 0x00, 0x00,
 			   0x00, 0x00, 0x00, 0x00,
 			   0x00, 0x00, 0x00, 0x00 };
-			u32 freq;
-			u32 sym_rate;
-			u32 band;
+		u32 freq;
+		u32 sym_rate;
+		u32 band;
 		u32 lnb_voltage;
 
-			dprintk("%s: FE_SET_FRONTEND\n", __FUNCTION__);
+		dprintk("%s: FE_SET_FRONTEND\n", __FUNCTION__);
 
-			dprintk("            frequency->%d\n", p->frequency);
-			dprintk("            symbol_rate->%d\n",
-				p->u.qam.symbol_rate);
-			dprintk("            inversion->%d\n", p->inversion);
+		dprintk("            frequency->%d\n", p->frequency);
+		dprintk("            symbol_rate->%d\n",
+			p->u.qam.symbol_rate);
+		dprintk("            inversion->%d\n", p->inversion);
 
-		freq = htonl(p->frequency * 1000 +
+		freq = htonl(p->frequency +
 		       (dec->hi_band ? LOF_HI : LOF_LO));
-			memcpy(&b[4], &freq, sizeof(u32));
-			sym_rate = htonl(p->u.qam.symbol_rate);
-			memcpy(&b[12], &sym_rate, sizeof(u32));
-			band = htonl(dec->hi_band ? LOF_HI : LOF_LO);
-			memcpy(&b[24], &band, sizeof(u32));
+		memcpy(&b[4], &freq, sizeof(u32));
+		sym_rate = htonl(p->u.qam.symbol_rate);
+		memcpy(&b[12], &sym_rate, sizeof(u32));
+		band = htonl(dec->hi_band ? LOF_HI : LOF_LO);
+		memcpy(&b[24], &band, sizeof(u32));
 		lnb_voltage = htonl(dec->voltage);
 		memcpy(&b[28], &lnb_voltage, sizeof(u32));
 
-			ttusb_dec_send_command(dec, 0x71, sizeof(b), b, NULL, NULL);
+		ttusb_dec_send_command(dec, 0x71, sizeof(b), b, NULL, NULL);
 
-			break;
-		}
+		break;
+	}
 
 	case FE_GET_FRONTEND:
 		dprintk("%s: FE_GET_FRONTEND\n", __FUNCTION__);
@@ -1628,20 +1631,29 @@ static int ttusb_dec_3000s_frontend_ioctl(struct dvb_frontend *fe,
 		dprintk("%s: FE_INIT\n", __FUNCTION__);
 		break;
 
-	case FE_DISEQC_SEND_MASTER_CMD:
+	case FE_DISEQC_SEND_MASTER_CMD: {
+		u8 b[] = { 0x00, 0xff, 0x00, 0x00,
+			   0x00, 0x00, 0x00, 0x00,
+			   0x00, 0x00 };
+		struct dvb_diseqc_master_cmd *cmd = arg;
+		memcpy(&b[4], cmd->msg, cmd->msg_len);
 		dprintk("%s: FE_DISEQC_SEND_MASTER_CMD\n", __FUNCTION__);
+		ttusb_dec_send_command(dec, 0x72,
+				       sizeof(b) - (6 - cmd->msg_len), b,
+				       NULL, NULL);
 		break;
+	}
 
 	case FE_DISEQC_SEND_BURST:
 		dprintk("%s: FE_DISEQC_SEND_BURST\n", __FUNCTION__);
 		break;
 
 	case FE_SET_TONE: {
-			fe_sec_tone_mode_t tone = (fe_sec_tone_mode_t)arg;
-			dprintk("%s: FE_SET_TONE\n", __FUNCTION__);
-			dec->hi_band = (SEC_TONE_ON == tone);
-			break;
-		}
+		fe_sec_tone_mode_t tone = (fe_sec_tone_mode_t)arg;
+		dprintk("%s: FE_SET_TONE\n", __FUNCTION__);
+		dec->hi_band = (SEC_TONE_ON == tone);
+		break;
+	}
 
 	case FE_SET_VOLTAGE:
 		dprintk("%s: FE_SET_VOLTAGE\n", __FUNCTION__);
@@ -1661,7 +1673,6 @@ static int ttusb_dec_3000s_frontend_ioctl(struct dvb_frontend *fe,
 	default:
 		dprintk("%s: unknown IOCTL (0x%X)\n", __FUNCTION__, cmd);
 		return -EINVAL;
-
 	}
 
 	return 0;
@@ -1669,15 +1680,13 @@ static int ttusb_dec_3000s_frontend_ioctl(struct dvb_frontend *fe,
 
 static void ttusb_dec_init_frontend(struct ttusb_dec *dec)
 {
-	dec->i2c_bus.adapter = dec->adapter;
-
-	dvb_register_frontend(dec->frontend_ioctl, &dec->i2c_bus, (void *)dec,
-			      dec->frontend_info);
+	int ret;
+	ret = dvb_register_frontend(dec->frontend_ioctl, dec->adapter, dec, dec->frontend_info, THIS_MODULE);
 }
 
 static void ttusb_dec_exit_frontend(struct ttusb_dec *dec)
 {
-	dvb_unregister_frontend(dec->frontend_ioctl, &dec->i2c_bus);
+	dvb_unregister_frontend(dec->frontend_ioctl, dec->adapter);
 }
 
 static void ttusb_dec_init_filters(struct ttusb_dec *dec)
@@ -1718,17 +1727,17 @@ static int ttusb_dec_probe(struct usb_interface *intf,
 	memset(dec, 0, sizeof(struct ttusb_dec));
 
 	switch (id->idProduct) {
-		case 0x1006:
+	case 0x1006:
 		ttusb_dec_set_model(dec, TTUSB_DEC3000S);
-			break;
+		break;
 
-		case 0x1008:
+	case 0x1008:
 		ttusb_dec_set_model(dec, TTUSB_DEC2000T);
 		break;
 
 	case 0x1009:
 		ttusb_dec_set_model(dec, TTUSB_DEC2540T);
-			break;
+		break;
 	}
 
 	dec->udev = udev;
@@ -1760,11 +1769,11 @@ static void ttusb_dec_disconnect(struct usb_interface *intf)
 	dprintk("%s\n", __FUNCTION__);
 
 	if (dec->active) {
-	ttusb_dec_exit_tasklet(dec);
+		ttusb_dec_exit_tasklet(dec);
 		ttusb_dec_exit_filters(dec);
-	ttusb_dec_exit_usb(dec);
+		ttusb_dec_exit_usb(dec);
 		ttusb_dec_exit_frontend(dec);
-	ttusb_dec_exit_dvb(dec);
+		ttusb_dec_exit_dvb(dec);
 	}
 
 	kfree(dec);
@@ -1809,9 +1818,9 @@ static struct usb_device_id ttusb_dec_table[] = {
 
 static struct usb_driver ttusb_dec_driver = {
 	.name		= "ttusb-dec",
-      .probe		= ttusb_dec_probe,
-      .disconnect	= ttusb_dec_disconnect,
-      .id_table		= ttusb_dec_table,
+	.probe		= ttusb_dec_probe,
+	.disconnect	= ttusb_dec_disconnect,
+	.id_table	= ttusb_dec_table,
 };
 
 static int __init ttusb_dec_init(void)
@@ -1840,7 +1849,3 @@ MODULE_DESCRIPTION(DRIVER_NAME);
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(usb, ttusb_dec_table);
 
-MODULE_PARM(debug, "i");
-MODULE_PARM_DESC(debug, "Debug level");
-MODULE_PARM(output_pva, "i");
-MODULE_PARM_DESC(output_pva, "Output PVA from dvr device");

@@ -28,6 +28,7 @@
 #include <linux/fs.h>
 #include <linux/list.h>
 #include <linux/devfs_fs_kernel.h>
+#include <linux/smp_lock.h>
 
 #define DVB_MAJOR 212
 
@@ -56,9 +57,6 @@ struct dvb_adapter {
 struct dvb_device {
 	struct list_head list_head;
 	struct file_operations *fops;
- 
- 
- 
 	struct dvb_adapter *adapter;
 	int type;
 	u32 id;
@@ -92,5 +90,15 @@ extern int dvb_generic_open (struct inode *inode, struct file *file);
 extern int dvb_generic_release (struct inode *inode, struct file *file);
 extern int dvb_generic_ioctl (struct inode *inode, struct file *file,
 			      unsigned int cmd, unsigned long arg);
+
+/* we don't mess with video_usercopy() any more,
+we simply define out own dvb_usercopy(), which will hopefully become
+generic_usercopy()  someday... */
+
+extern int dvb_usercopy(struct inode *inode, struct file *file,
+	                    unsigned int cmd, unsigned long arg,
+			    int (*func)(struct inode *inode, struct file *file,
+			    unsigned int cmd, void *arg));
+			      
 #endif /* #ifndef _DVBDEV_H_ */
 

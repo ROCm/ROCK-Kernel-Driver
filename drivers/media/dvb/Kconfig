@@ -8,23 +8,14 @@ config DVB
 	bool "DVB For Linux"
 	depends on NET && INET
 	---help---
-	  Support Digital Video Broadcasting hardware.  Enable this if you 
-	  own a DVB adapter and want to use it or if you compile Linux for 
+	  Support Digital Video Broadcasting hardware.  Enable this if you
+	  own a DVB adapter and want to use it or if you compile Linux for
 	  a digital SetTopBox.
 
-	  API specs and user tools are available from
-	  <http://www.linuxtv.org/>. 
+	  API specs and user tools are available from <http://www.linuxtv.org/>.
 
-	  Please report problems regarding this driver to the LinuxDVB 
+	  Please report problems regarding this driver to the LinuxDVB
 	  mailing list.
-
-	  You might want add the following lines to your /etc/modules.conf:
-	  	
-	  	alias char-major-250 dvb
-	  	alias dvb dvb-ttpci
-	  	below dvb-ttpci alps_bsru6 alps_bsrv2 \
-	  			grundig_29504-401 grundig_29504-491 \
-	  			ves1820
 
 	  If unsure say N.
 
@@ -40,6 +31,7 @@ comment "Supported USB Adapters"
 	depends on DVB_CORE && USB
 source "drivers/media/dvb/ttusb-budget/Kconfig"
 source "drivers/media/dvb/ttusb-dec/Kconfig"
+source "drivers/media/dvb/dibusb/Kconfig"
 
 comment "Supported FlexCopII (B2C2) Adapters"
 	depends on DVB_CORE && PCI
@@ -50,4 +42,3 @@ comment "Supported BT878 Adapters"
 source "drivers/media/dvb/bt8xx/Kconfig"
 
 endmenu
-

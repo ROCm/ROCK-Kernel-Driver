@@ -39,29 +39,6 @@ enum av7110_osd_palette_type
 	Pal8Bit =  256	   /* 256 colors for 16 bit palette */
 };
 
-enum av7110_window_display_type {
-	BITMAP1,	   /* 1 bit bitmap */
-	BITMAP2,	   /* 2 bit bitmap */
-	BITMAP4,	   /* 4 bit bitmap */
-	BITMAP8,	   /* 8 bit bitmap */
-	BITMAP1HR,	   /* 1 Bit bitmap half resolution */
-	BITMAP2HR,	   /* 2 bit bitmap half resolution */
-	BITMAP4HR,	   /* 4 bit bitmap half resolution */
-	BITMAP8HR,	   /* 8 bit bitmap half resolution */
-	YCRCB422,	   /* 4:2:2 YCRCB Graphic Display */
-	YCRCB444,	   /* 4:4:4 YCRCB Graphic Display */
-	YCRCB444HR,	   /* 4:4:4 YCRCB graphic half resolution */
-	VIDEOTSIZE,	   /* True Size Normal MPEG Video Display */
-	VIDEOHSIZE,	   /* MPEG Video Display Half Resolution */
-	VIDEOQSIZE,	   /* MPEG Video Display Quarter Resolution */
-	VIDEODSIZE,	   /* MPEG Video Display Double Resolution */
-	VIDEOTHSIZE,	   /* True Size MPEG Video Display Half Resolution */
-	VIDEOTQSIZE,	   /* True Size MPEG Video Display Quarter Resolution*/
-	VIDEOTDSIZE,	   /* True Size MPEG Video Display Double Resolution */
-	VIDEONSIZE,	   /* Full Size MPEG Video Display */
-	CURSOR		   /* Cursor */
-};
-
 /* switch defines */
 #define SB_GPIO 3
 #define SB_OFF	SAA7146_GPIO_OUTLO  /* SlowBlank off (TV-Mode) */
@@ -388,6 +365,7 @@ extern void av7110_reset_arm(struct av7110 *av7110);
 extern int av7110_bootarm(struct av7110 *av7110);
 extern int av7110_firmversion(struct av7110 *av7110);
 #define FW_CI_LL_SUPPORT(arm_app) ((arm_app) & 0x80000000)
+#define FW_4M_SDRAM(arm_app)      ((arm_app) & 0x40000000)
 #define FW_VERSION(arm_app)	  ((arm_app) & 0x0000FFFF)
 
 extern int av7110_fw_cmd(struct av7110 *av7110, int type, int com, int num, ...);
@@ -495,7 +473,7 @@ static int inline vidcom(struct av7110 *av7110, u32 com, u32 arg)
 
 static int inline audcom(struct av7110 *av7110, u32 com)
 {
-	return av7110_fw_cmd(av7110, COMTYPE_MISC, AV7110_FW_AUDIO_COMMAND, 4,
+	return av7110_fw_cmd(av7110, COMTYPE_MISC, AV7110_FW_AUDIO_COMMAND, 2,
 			     (com>>16), (com&0xffff));
 }
 
@@ -510,6 +488,7 @@ extern int av7110_diseqc_send(struct av7110 *av7110, int len, u8 *msg, unsigned 
 
 #ifdef CONFIG_DVB_AV7110_OSD
 extern int av7110_osd_cmd(struct av7110 *av7110, osd_cmd_t *dc);
+extern int av7110_osd_capability(struct av7110 *av7110, osd_cap_t *cap);
 #endif /* CONFIG_DVB_AV7110_OSD */
 
 

@@ -1,0 +1,152 @@
+Documentation for dib3000mb frontend driver and dibusb device driver
+
+The drivers should work with 
+
+- Twinhan VisionPlus VisionDTV USB-Ter DVB-T Device (VP7041)
+	http://www.twinhan.com/visiontv-2_4.htm
+	
+- CTS Portable (Chinese Television System)
+	http://www.2cts.tv/ctsportable/
+
+- KWorld V-Stream XPERT DTV - DVB-T USB
+	http://www.kworld.com.tw/asp/pindex.asp?id=4&pid=13
+
+- HAMA DVB-T USB device
+	http://www.hama.de/portal/articleId*110620/action*2598
+ 
+- DiBcom USB DVB-T reference device
+
+- Ultima Electronic/Artec T1 USB TVBOX
+	http://www.arteceuro.com/products-tvbox.html
+
+
+Copyright (C) 2004 Patrick Boettcher (patrick.boettcher@desy.de), 
+
+both drivers based on GPL code, which has
+
+Copyright (C) 2004 Amaury Demol for DiBcom (ademol@dibcom.fr)
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License as
+published by the Free Software Foundation, version 2.
+
+
+NEWS:
+  2004-09-13 - added support for a new device (Artec T1 USB TVBOX), thanks
+               to Christian Motschke for reporting
+  2004-09-05 - released the dibusb device and dib3000mb-frontend driver
+
+  (old news for vp7041.c)
+  2004-07-15 - found out, by accident, that the device has a TUA6010XS for 
+               frequency generator
+  2004-07-12 - figured out, that the driver should also work with the
+               CTS Portable (Chinese Television System)
+  2004-07-08 - firmware-extraction-2.422-problem solved, driver is now working 
+               properly with firmware extracted from 2.422
+			 - #if for 2.6.4 (dvb), compile issue
+			 - changed firmware handling, see vp7041.txt sec 1.1
+  2004-07-02 - some tuner modifications, v0.1, cleanups, first public
+  2004-06-28 - now using the dvb_dmx_swfilter_packets, everything 
+               runs fine now
+  2004-06-27 - able to watch and switching channels (pre-alpha)
+             - no section filtering yet
+  2004-06-06 - first TS received, but kernel oops :/
+  2004-05-14 - firmware loader is working
+  2004-05-11 - start writing the driver
+
+1. How to use?
+NOTE: This driver was developed using Linux 2.6.6., 
+it is working with 2.6.7, 2.6.8.1.
+
+Linux 2.4.x support is not planned, but patches are very welcome.
+
+NOTE: I'm using Debian testing, so the following explaination (especially
+the hotplug-path) needn't match your system, but probably it will :).
+
+1.1. Firmware
+
+The USB driver needs to download a firmware to start working.
+
+You can either use "get_dvb_firmware dibusb" to download the firmware or you
+can get it directly via 
+
+http://linuxtv.org/cgi-bin/cvsweb.cgi/dvb-kernel/firmware/dvb-dibusb-5.0.0.11.fw?rev=1.1&content-type=text/plain
+
+1.2. Compiling
+
+Since the driver is in the linux kernel, activating the driver in
+your favorite config-environment should sufficient. I recommend
+to compile the driver as module. Hotplug does the rest.
+
+1.3. Loading the drivers
+
+Hotplug is able to load the driver, when it is needed (because you plugged
+in the device).
+
+If you want to enable debug output, you have to load the driver manually.
+
+modprobe dvb-dibusb debug=1 
+modprobe dib3000mb debug=1
+
+should do the trick.
+
+When the driver is loaded successfully, the firmware file was in 
+the right place and the device is connected, the "Power"-LED should be
+turned on.
+
+At this point you should be able to start a dvb-capable application. For myself
+I used mplayer, dvbscan, tzap and kaxtv, they are working. Using the device
+as a slave device in vdr, was not working for me. Some work has to be done 
+(patches and comments are very welcome).
+
+2. Known problems and bugs
+
+TODO: 
+- add some additional URBs for USB data transfer
+- due a firmware problem i2c writes during mpeg transfers destroy the stream
+  no i2c writes during streaming, interrupt streaming, when adding another pid
+
+2.1. Adding new devices 
+
+It is not possible to determine the range of devices based on the DiBcom 
+reference design. This is because the reference design of DiBcom can be sold
+to third persons, without telling DiBcom (so done with the Twinhan VP7041 and 
+the HAMA device).
+
+When you think you have a device like this and the driver does not recognizes it,
+please send the ****load.inf and the ****cap.inf of the Windows driver to me.
+
+Sometimes the Vendor or Product ID is identical to the ones of Twinhan, even 
+though it is not a Twinhan device (e.g. HAMA), then please send me the name 
+of the device. I will add it to this list in order to make this clear to 
+others.
+
+If you are familar with C you can also add the VID and PID of the device to 
+the dvb-dibusb.[hc]-files and create a patch and send it over to me or to 
+the linux-dvb mailing list, _after_ you have tried compiling and modprobing
+it.
+
+2.2. Comments
+  
+Patches, comments and suggestions are very very welcome
+
+3. Acknowledgements
+	Amaury Demol (ademol@dibcom.fr) and Francois Kanounnikoff from DiBcom for 
+	providing specs, code and help, on which the dvb-dibusb and dib3000mb are 
+	based.
+  
+   Alex Woods for frequently answering question about usb and dvb
+    stuff, a big thank you
+
+   Bernd Wagner for helping with huge bug reports and discussions.
+   
+   Some guys on the linux-dvb mailing list for encouraging me
+   
+   Peter Schildmann >peter.schildmann-nospam-at-web.de< for his 
+    user-level firmware loader, which saves a lot of time 
+    (when writing the vp7041 driver)
+
+   Ulf Hermenau for helping me out with traditional chinese.
+   
+   André Smoktun and Christian Frömmel for supporting me with
+    hardware and listening to my problems very patient

@@ -27,17 +27,31 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/string.h>
 #include <linux/slab.h>
 
 #include "dvb_frontend.h"
-#include "dvb_functions.h"
 
-static int debug = 0;
-#define dprintk	if (debug) printk
+#define FRONTEND_NAME "dvbfe_tda8083"
+
+#define dprintk(args...) \
+	do { \
+		if (debug) printk(KERN_DEBUG FRONTEND_NAME ": " args); \
+	} while (0)
+
+static int debug;
+
+module_param(debug, int, 0644);
+MODULE_PARM_DESC(debug, "Turn on/off frontend debugging (default:off).");
 
 
-static struct dvb_frontend_info grundig_29504_491_info = {
+struct tda8083_state {
+	struct i2c_adapter *i2c;
+	struct dvb_adapter *dvb;
+};
+
+static struct dvb_frontend_info tda8083_info = {
 	.name			= "Grundig 29504-491, (TDA8083 based)",
 	.type			= FE_QPSK,
 	.frequency_min		= 950000,     /* FIXME: guessed! */
@@ -55,8 +69,6 @@ static struct dvb_frontend_info grundig_29504_491_info = {
 		FE_CAN_QPSK | FE_CAN_MUTE_TS
 };
 
-
-
 static u8 tda8083_init_tab [] = {
 	0x04, 0x00, 0x4a, 0x79, 0x04, 0x00, 0xff, 0xea,
 	0x48, 0x42, 0x79, 0x60, 0x70, 0x52, 0x9a, 0x10,
@@ -67,14 +79,13 @@ static u8 tda8083_init_tab [] = {
 };
 
 
-
-static int tda8083_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
+static int tda8083_writereg (struct i2c_adapter *i2c, u8 reg, u8 data)
 {
 	int ret;
 	u8 buf [] = { reg, data };
 	struct i2c_msg msg = { .addr = 0x68, .flags = 0, .buf = buf, .len = 2 };
 
-        ret = i2c->xfer (i2c, &msg, 1);
+        ret = i2c_transfer(i2c, &msg, 1);
 
         if (ret != 1)
                 dprintk ("%s: writereg error (reg %02x, ret == %i)\n",
@@ -84,13 +95,13 @@ static int tda8083_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 }
 
 
-static int tda8083_readregs (struct dvb_i2c_bus *i2c, u8 reg1, u8 *b, u8 len)
+static int tda8083_readregs (struct i2c_adapter *i2c, u8 reg1, u8 *b, u8 len)
 {
 	int ret;
 	struct i2c_msg msg [] = { { .addr = 0x68, .flags = 0, .buf = &reg1, .len = 1 },
 			   { .addr = 0x68, .flags = I2C_M_RD, .buf = b, .len = len } };
 
-	ret = i2c->xfer (i2c, msg, 2);
+	ret = i2c_transfer(i2c, msg, 2);
 
 	if (ret != 2)
 		dprintk ("%s: readreg error (reg %02x, ret == %i)\n",
@@ -100,7 +111,7 @@ static int tda8083_readregs (struct dvb_i2c_bus *i2c, u8 reg1, u8 *b, u8 len)
 }
 
 
-static inline u8 tda8083_readreg (struct dvb_i2c_bus *i2c, u8 reg)
+static inline u8 tda8083_readreg (struct i2c_adapter *i2c, u8 reg)
 {
 	u8 val;
 
@@ -110,12 +121,12 @@ static inline u8 tda8083_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 }
 
 
-static int tsa5522_write (struct dvb_i2c_bus *i2c, u8 data [4])
+static int tsa5522_write (struct i2c_adapter *i2c, u8 data [4])
 {
 	int ret;
 	struct i2c_msg msg = { .addr = 0x61, .flags = 0, .buf = data, .len = 4 };
 
-	ret = i2c->xfer (i2c, &msg, 1);
+	ret = i2c_transfer(i2c, &msg, 1);
 
 	if (ret != 1)
 		dprintk("%s: i/o error (ret == %i)\n", __FUNCTION__, ret);
@@ -128,7 +139,7 @@ static int tsa5522_write (struct dvb_i2c_bus *i2c, u8 data [4])
  *   set up the downconverter frequency divisor for a
  *   reference clock comparision frequency of 125 kHz.
  */
-static int tsa5522_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
+static int tsa5522_set_tv_freq (struct i2c_adapter *i2c, u32 freq)
 {
 	u32 div = freq / 125;
 	u8 buf [4] = { (div >> 8) & 0x7f, div & 0xff, 0x8e, 0x00 };
@@ -137,7 +148,7 @@ static int tsa5522_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
 }
 
 
-static int tda8083_init (struct dvb_i2c_bus *i2c)
+static int tda8083_init (struct i2c_adapter *i2c)
 {
 	int i;
 	
@@ -150,7 +161,7 @@ static int tda8083_init (struct dvb_i2c_bus *i2c)
 }
 
 
-static int tda8083_set_inversion (struct dvb_i2c_bus *i2c, fe_spectral_inversion_t inversion)
+static int tda8083_set_inversion (struct i2c_adapter *i2c, fe_spectral_inversion_t inversion)
 {
 	/*  XXX FIXME: implement other modes than FEC_AUTO */
 	if (inversion == INVERSION_AUTO)
@@ -160,7 +171,7 @@ static int tda8083_set_inversion (struct dvb_i2c_bus *i2c, fe_spectral_inversion
 }
 
 
-static int tda8083_set_fec (struct dvb_i2c_bus *i2c, fe_code_rate_t fec)
+static int tda8083_set_fec (struct i2c_adapter *i2c, fe_code_rate_t fec)
 {
 	if (fec == FEC_AUTO)
 		return tda8083_writereg (i2c, 0x07, 0xff);
@@ -172,7 +183,7 @@ static int tda8083_set_fec (struct dvb_i2c_bus *i2c, fe_code_rate_t fec)
 }
 
 
-static fe_code_rate_t tda8083_get_fec (struct dvb_i2c_bus *i2c)
+static fe_code_rate_t tda8083_get_fec (struct i2c_adapter *i2c)
 {
 	u8 index;
 	static fe_code_rate_t fec_tab [] = { FEC_8_9, FEC_1_2, FEC_2_3, FEC_3_4,
@@ -184,7 +195,7 @@ static fe_code_rate_t tda8083_get_fec (struct dvb_i2c_bus *i2c)
 }
 
 
-static int tda8083_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate)
+static int tda8083_set_symbolrate (struct i2c_adapter *i2c, u32 srate)
 {
         u32 ratio;
 	u32 tmp;
@@ -224,19 +235,19 @@ static int tda8083_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate)
 }
 
 
-static void tda8083_wait_diseqc_fifo (struct dvb_i2c_bus *i2c, int timeout)
+static void tda8083_wait_diseqc_fifo (struct i2c_adapter *i2c, int timeout)
 {
 	unsigned long start = jiffies;
 
 	while (jiffies - start < timeout &&
                !(tda8083_readreg(i2c, 0x02) & 0x80))
 	{
-		dvb_delay(50);
+		msleep(50);
 	};
 }
 
 
-static int tda8083_send_diseqc_msg (struct dvb_i2c_bus *i2c,
+static int tda8083_send_diseqc_msg (struct i2c_adapter *i2c,
 			     struct dvb_diseqc_master_cmd *m)
 {
 	int i;
@@ -254,7 +265,7 @@ static int tda8083_send_diseqc_msg (struct dvb_i2c_bus *i2c,
 }
 
 
-static int tda8083_send_diseqc_burst (struct dvb_i2c_bus *i2c, fe_sec_mini_cmd_t burst)
+static int tda8083_send_diseqc_burst (struct i2c_adapter *i2c, fe_sec_mini_cmd_t burst)
 {
 	switch (burst) {
 	case SEC_MINI_A:
@@ -273,7 +284,7 @@ static int tda8083_send_diseqc_burst (struct dvb_i2c_bus *i2c, fe_sec_mini_cmd_t
 }
 
 
-static int tda8083_set_tone (struct dvb_i2c_bus *i2c, fe_sec_tone_mode_t tone)
+static int tda8083_set_tone (struct i2c_adapter *i2c, fe_sec_tone_mode_t tone)
 {
 	tda8083_writereg (i2c, 0x26, 0xf1);
 
@@ -288,7 +299,7 @@ static int tda8083_set_tone (struct dvb_i2c_bus *i2c, fe_sec_tone_mode_t tone)
 }
 
 
-static int tda8083_set_voltage (struct dvb_i2c_bus *i2c, fe_sec_voltage_t voltage)
+static int tda8083_set_voltage (struct i2c_adapter *i2c, fe_sec_voltage_t voltage)
 {
 	switch (voltage) {
 	case SEC_VOLTAGE_13:
@@ -301,15 +312,15 @@ static int tda8083_set_voltage (struct dvb_i2c_bus *i2c, fe_sec_voltage_t voltag
 }
 
 
-static int grundig_29504_491_ioctl (struct dvb_frontend *fe, unsigned int cmd,
-			     void *arg)
+static int tda8083_ioctl(struct dvb_frontend *fe, unsigned int cmd,
+			 void *arg)
 {
-	struct dvb_i2c_bus *i2c = fe->i2c;
+	struct tda8083_state *state = fe->data;
+	struct i2c_adapter *i2c = state->i2c;
 
         switch (cmd) {
 	case FE_GET_INFO:
-		memcpy (arg, &grundig_29504_491_info, 
-			sizeof(struct dvb_frontend_info));
+		memcpy (arg, &tda8083_info, sizeof(struct dvb_frontend_info));
                 break;
 
         case FE_READ_STATUS:
@@ -426,40 +437,119 @@ static int grundig_29504_491_ioctl (struct dvb_frontend *fe, unsigned int cmd,
 	return 0;
 } 
 
+static struct i2c_client client_template;
 
-static int tda8083_attach (struct dvb_i2c_bus *i2c, void **data)
+static int tda8083_attach_adapter(struct i2c_adapter *adapter)
 {
-	if ((tda8083_readreg (i2c, 0x00)) != 0x05)
+	struct tda8083_state *state;
+	struct i2c_client *client;
+	int ret;
+
+	dprintk("Trying to attach to adapter 0x%x:%s.\n",
+		adapter->id, adapter->name);
+
+	if ((tda8083_readreg (adapter, 0x00)) != 0x05)
 		return -ENODEV;
 
-	return dvb_register_frontend (grundig_29504_491_ioctl, i2c, NULL,
-			       &grundig_29504_491_info);
+	if ( !(state = kmalloc(sizeof(struct tda8083_state), GFP_KERNEL)) )
+		return -ENOMEM;
+
+	if ( !(client = kmalloc(sizeof(struct i2c_client), GFP_KERNEL)) ) {
+		kfree(state);
+		return -ENOMEM;
+	}
+
+	memset(state, 0, sizeof(struct tda8083_state));
+	state->i2c = adapter;
+
+	memcpy(client, &client_template, sizeof(struct i2c_client));
+	client->adapter = adapter;
+	client->addr = 0; //XXX
+	i2c_set_clientdata(client, state);
+
+	if ((ret = i2c_attach_client(client))) {
+		kfree(state);
+		kfree(client);
+		return ret;
+	}
+
+	BUG_ON(!state->dvb);
+
+	if ((ret = dvb_register_frontend(tda8083_ioctl, state->dvb, state,
+					     &tda8083_info, THIS_MODULE))) {
+		i2c_detach_client(client);
+		kfree(state);
+		kfree(client);
+		return ret;
+	}
+
+	return 0;
 }
 
-
-static void tda8083_detach (struct dvb_i2c_bus *i2c, void *data)
+static int tda8083_detach_client(struct i2c_client *client)
 {
-	dvb_unregister_frontend (grundig_29504_491_ioctl, i2c);
+	struct tda8083_state *state = i2c_get_clientdata(client);
+
+	dvb_unregister_frontend (tda8083_ioctl, state->dvb);
+	i2c_detach_client(client);
+	BUG_ON(state->dvb);
+	kfree(client);
+	kfree(state);
+	return 0;
 }
 
+static int tda8083_command (struct i2c_client *client, unsigned int cmd, void *arg)
+{
+	struct tda8083_state *data = i2c_get_clientdata(client);
+	dprintk ("%s\n", __FUNCTION__);
+
+	switch (cmd) {
+	case FE_REGISTER: {
+		data->dvb = arg;
+		break;
+	}
+	case FE_UNREGISTER: {
+		data->dvb = NULL;
+		break;
+	}
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
+static struct i2c_driver driver = {
+	.owner 		= THIS_MODULE,
+	.name 		= FRONTEND_NAME,
+	.id 		= I2C_DRIVERID_DVBFE_TDA8083,
+	.flags 		= I2C_DF_NOTIFY,
+	.attach_adapter = tda8083_attach_adapter,
+	.detach_client 	= tda8083_detach_client,
+	.command 	= tda8083_command,
+};
+
+static struct i2c_client client_template = {
+	.name		= FRONTEND_NAME,
+	.flags 		= I2C_CLIENT_ALLOW_USE,
+	.driver  	= &driver,
+};
 
 static int __init init_tda8083 (void)
 {
-	return dvb_register_i2c_device (THIS_MODULE,
-					tda8083_attach, tda8083_detach);
+	return i2c_add_driver(&driver);
 }
 
-
-static void __exit exit_tda8083 (void)
+static void __exit exit_tda8083(void)
 {
-	dvb_unregister_i2c_device (tda8083_attach);
+	if (i2c_del_driver(&driver))
+		printk("grundig_29504_401: driver deregistration failed\n");
 }
 
 module_init(init_tda8083);
 module_exit(exit_tda8083);
 
-MODULE_PARM(debug,"i");
-MODULE_DESCRIPTION("Grundig 29504-491 DVB frontend driver");
+MODULE_DESCRIPTION("Grundig 29504-491 DVB frontend driver (TDA8083 Based)");
 MODULE_AUTHOR("Ralph Metzler, Holger Waechtler");
 MODULE_LICENSE("GPL");
 

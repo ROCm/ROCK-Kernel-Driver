@@ -35,6 +35,7 @@ struct saa7146_format {
 	u32	trans;
 	u8	depth;
 	u8	flags;
+	u8	swap;
 };
 
 struct saa7146_standard
@@ -126,11 +127,11 @@ struct saa7146_vv
 	struct saa7146_format		*ov_fmt;
 	struct saa7146_overlay		*ov_data;
 	struct saa7146_fh		*ov_suspend;
-
+	
 	/* video capture */
 	struct saa7146_dmaqueue		video_q;
 	enum v4l2_field			last_field;
-
+	
 	/* common: fixme? shouldn't this be in saa7146_fh?
 	   (this leads to a more complicated question: shall the driver
 	   store the different settings (for example S_INPUT) for every open
@@ -188,8 +189,8 @@ struct saa7146_use_ops  {
 };
 
 /* from saa7146_fops.c */
-int saa7146_register_device(struct video_device *vid, struct saa7146_dev* dev, char *name, int type);
-int saa7146_unregister_device(struct video_device *vid, struct saa7146_dev* dev);
+int saa7146_register_device(struct video_device **vid, struct saa7146_dev* dev, char *name, int type);
+int saa7146_unregister_device(struct video_device **vid, struct saa7146_dev* dev);
 void saa7146_buffer_finish(struct saa7146_dev *dev, struct saa7146_dmaqueue *q, int state);
 void saa7146_buffer_next(struct saa7146_dev *dev, struct saa7146_dmaqueue *q,int vbi);
 int saa7146_buffer_queue(struct saa7146_dev *dev, struct saa7146_dmaqueue *q, struct saa7146_buf *buf);

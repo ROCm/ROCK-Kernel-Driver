@@ -1,4 +1,6 @@
 /*
+ * $Id: cx88.h,v 1.33 2004/09/17 11:49:52 kraxel Exp $
+ *
  * v4l2 device driver for cx2388x based TV cards
  *
  * (c) 2003,04 Gerd Knorr <kraxel@bytesex.org> [SUSE Labs]
@@ -24,6 +26,12 @@
 #include <linux/videodev.h>
 #include <linux/kdev_t.h>
 
+#include <dvbdev.h>
+#include <dmxdev.h>
+#include <dvb_demux.h>
+#include <dvb_net.h>
+#include <dvb_frontend.h>
+
 #include <media/video-buf.h>
 #include <media/tuner.h>
 #include <media/audiochip.h>
@@ -44,8 +52,16 @@
 
 #define CX88_MAXBOARDS 8
 
+/* temporary here until new dvb-kernel code is merged ... */
+#ifndef FE_REGISTER
+# define FE_REGISTER           _IO  ('v', 84)
+# define FE_UNREGISTER         _IO  ('v', 85)
+#endif
+
 /* ----------------------------------------------------------- */
 /* defines and enums                                           */
+
+#define V4L2_I2C_CLIENTS 1
 
 #define FORMAT_FLAGS_PACKED       0x01
 #define FORMAT_FLAGS_PLANAR       0x02
@@ -59,14 +75,28 @@
 #define SHADOW_MAX                   2
 
 /* ----------------------------------------------------------- */
-/* static data                                                 */
+/* tv norms                                                    */
 
-struct cx8800_tvnorm {
+struct cx88_tvnorm {
 	char                   *name;
 	v4l2_std_id            id;
 	u32                    cxiformat;
 	u32                    cxoformat;
 };
+
+static unsigned int inline norm_maxw(struct cx88_tvnorm *norm)
+{
+	return (norm->id & V4L2_STD_625_50) ? 768 : 640;
+//	return (norm->id & V4L2_STD_625_50) ? 720 : 640;
+}
+
+static unsigned int inline norm_maxh(struct cx88_tvnorm *norm)
+{
+	return (norm->id & V4L2_STD_625_50) ? 576 : 480;
+}
+
+/* ----------------------------------------------------------- */
+/* static data                                                 */
 
 struct cx8800_fmt {
 	char  *name;
@@ -94,6 +124,7 @@ struct cx88_ctrl {
 #define SRAM_CH24 3   /* vbi   */
 #define SRAM_CH25 4   /* audio */
 #define SRAM_CH26 5
+#define SRAM_CH28 6   /* mpeg */
 /* more */
 
 struct sram_channel {
@@ -113,31 +144,39 @@ extern struct sram_channel cx88_sram_channels[];
 /* ----------------------------------------------------------- */
 /* card configuration                                          */
 
-#define CX88_BOARD_NOAUTO        UNSET
-#define CX88_BOARD_UNKNOWN               0
-#define CX88_BOARD_HAUPPAUGE             1
-#define CX88_BOARD_GDI                   2
-#define CX88_BOARD_PIXELVIEW             3
-#define CX88_BOARD_ATI_WONDER_PRO        4
-#define CX88_BOARD_WINFAST2000XP         5
-#define CX88_BOARD_AVERTV_303            6
-#define CX88_BOARD_MSI_TVANYWHERE_MASTER 7
-#define CX88_BOARD_WINFAST_DV2000        8
-#define CX88_BOARD_LEADTEK_PVR2000       9
-#define CX88_BOARD_IODATA_GVVCP3PCI      10
-#define CX88_BOARD_PROLINK_PLAYTVPVR     11
-#define CX88_BOARD_ASUS_PVR_416          12
-#define CX88_BOARD_MSI_TVANYWHERE        13
+#define CX88_BOARD_NOAUTO               UNSET
+#define CX88_BOARD_UNKNOWN                  0
+#define CX88_BOARD_HAUPPAUGE                1
+#define CX88_BOARD_GDI                      2
+#define CX88_BOARD_PIXELVIEW                3
+#define CX88_BOARD_ATI_WONDER_PRO           4
+#define CX88_BOARD_WINFAST2000XP            5
+#define CX88_BOARD_AVERTV_303               6
+#define CX88_BOARD_MSI_TVANYWHERE_MASTER    7
+#define CX88_BOARD_WINFAST_DV2000           8
+#define CX88_BOARD_LEADTEK_PVR2000          9
+#define CX88_BOARD_IODATA_GVVCP3PCI        10
+#define CX88_BOARD_PROLINK_PLAYTVPVR       11
+#define CX88_BOARD_ASUS_PVR_416            12
+#define CX88_BOARD_MSI_TVANYWHERE          13
+#define CX88_BOARD_KWORLD_DVB_T            14
+#define CX88_BOARD_DVICO_FUSIONHDTV_DVB_T1 15
+#define CX88_BOARD_KWORLD_LTV883           16
+#define CX88_BOARD_DVICO_FUSIONHDTV_3_GOLD 17
+#define CX88_BOARD_HAUPPAUGE_DVB_T1        18
+#define CX88_BOARD_CONEXANT_DVB_T1         19
 
 enum cx88_itype {
 	CX88_VMUX_COMPOSITE1 = 1,
-	CX88_VMUX_COMPOSITE2 = 2,
-	CX88_VMUX_COMPOSITE3 = 3,
-	CX88_VMUX_COMPOSITE4 = 4,
-	CX88_VMUX_TELEVISION = 5,
-	CX88_VMUX_SVIDEO     = 6,
-	CX88_VMUX_DEBUG      = 7,
-	CX88_RADIO           = 8,
+	CX88_VMUX_COMPOSITE2,
+	CX88_VMUX_COMPOSITE3,
+	CX88_VMUX_COMPOSITE4,
+	CX88_VMUX_SVIDEO,
+	CX88_VMUX_TELEVISION,
+	CX88_VMUX_CABLE,
+	CX88_VMUX_DVB,
+	CX88_VMUX_DEBUG,
+	CX88_RADIO,
 };
 
 struct cx88_input {
@@ -149,9 +188,11 @@ struct cx88_input {
 struct cx88_board {
 	char                    *name;
 	unsigned int            tuner_type;
-	int                     needs_tda9887:1;
+	int                     tda9887_conf;
 	struct cx88_input       input[8];
 	struct cx88_input       radio;
+	int                     blackbird:1;
+	int                     dvb:1;
 };
 
 struct cx88_subid {
@@ -160,7 +201,7 @@ struct cx88_subid {
 	u32     card;
 };
 
-#define INPUT(nr) (&cx88_boards[dev->board].input[nr])
+#define INPUT(nr) (&cx88_boards[core->board].input[nr])
 
 /* ----------------------------------------------------------- */
 /* device / file handle status                                 */
@@ -169,10 +210,8 @@ struct cx88_subid {
 #define RESOURCE_VIDEO         2
 #define RESOURCE_VBI           4
 
-//#define BUFFER_TIMEOUT     (HZ/2)  /* 0.5 seconds */
-#define BUFFER_TIMEOUT     (HZ*2)
-
-struct cx8800_dev;
+#define BUFFER_TIMEOUT     (HZ/2)  /* 0.5 seconds */
+//#define BUFFER_TIMEOUT     (HZ*2)
 
 /* buffer for one video frame */
 struct cx88_buffer {
@@ -194,7 +233,50 @@ struct cx88_dmaqueue {
 	u32                    count;
 };
 
-/* video filehandle status */
+struct cx88_core {
+	struct list_head           devlist;
+	atomic_t                   refcount;
+
+	/* board name */
+	int                        nr;
+	char                       name[32];
+
+	/* pci stuff */
+	int                        pci_bus;
+	int                        pci_slot;
+        u32                        *lmmio;
+        u8                         *bmmio;
+	u32                        shadow[SHADOW_MAX];
+
+	/* i2c i/o */
+	struct i2c_adapter         i2c_adap;
+	struct i2c_algo_bit_data   i2c_algo;
+	struct i2c_client          i2c_client;
+	u32                        i2c_state, i2c_rc;
+
+	/* config info */
+	unsigned int               board;
+	unsigned int               tuner_type;
+	unsigned int               tda9887_conf;
+	unsigned int               has_radio;
+
+	/* state info */
+	struct task_struct         *kthread;
+	struct cx88_tvnorm         *tvnorm;
+	u32                        tvaudio;
+	u32                        input;
+	u32                        astat;
+
+	/* used by cx88-dvb -- i2c code needs access to this for FE register */
+	struct dvb_adapter         *dvb_adapter;
+};
+
+struct cx8800_dev;
+struct cx8802_dev;
+
+/* ----------------------------------------------------------- */
+/* function 0: video stuff                                     */
+
 struct cx8800_fh {
 	struct cx8800_dev          *dev;
 	enum v4l2_buf_type         type;
@@ -220,8 +302,8 @@ struct cx8800_suspend_state {
 	int                        disabled;
 };
 
-/* global device status */
 struct cx8800_dev {
+	struct cx88_core           *core;
 	struct list_head           devlist;
         struct semaphore           lock;
        	spinlock_t                 slock;
@@ -233,76 +315,118 @@ struct cx8800_dev {
 	struct video_device        *radio_dev;
 
 	/* pci i/o */
-	char                       name[32];
 	struct pci_dev             *pci;
 	unsigned char              pci_rev,pci_lat;
-        u32                        *lmmio;
-        u8                         *bmmio;
 
-	/* config info */
-	unsigned int               board;
-	unsigned int               tuner_type;
-	unsigned int               has_radio;
-
-	/* i2c i/o */
-	struct i2c_adapter         i2c_adap;
-	struct i2c_algo_bit_data   i2c_algo;
-	struct i2c_client          i2c_client;
-	u32                        i2c_state, i2c_rc;
-
+#if 0
 	/* video overlay */
 	struct v4l2_framebuffer    fbuf;
 	struct cx88_buffer         *screen;
+#endif
 
 	/* capture queues */
 	struct cx88_dmaqueue       vidq;
 	struct cx88_dmaqueue       vbiq;
 
 	/* various v4l controls */
-	struct cx8800_tvnorm       *tvnorm;
-	u32                        tvaudio;
-	u32                        input;
 	u32                        freq;
 
 	/* other global state info */
-	u32                         shadow[SHADOW_MAX];
-	int                         shutdown;
-	pid_t                       tpid;
-	struct completion           texit;
 	struct cx8800_suspend_state state;
 };
 
 /* ----------------------------------------------------------- */
+/* function 1: audio/alsa stuff                                */
 
-#define cx_read(reg)             readl(dev->lmmio + ((reg)>>2))
-#define cx_write(reg,value)      writel((value), dev->lmmio + ((reg)>>2));
-#define cx_writeb(reg,value)     writeb((value), dev->bmmio + (reg));
+struct cx8801_dev {
+	struct cx88_core           *core;
+
+	/* pci i/o */
+	struct pci_dev             *pci;
+	unsigned char              pci_rev,pci_lat;
+};
+
+/* ----------------------------------------------------------- */
+/* function 2: mpeg stuff                                      */
+
+struct cx8802_fh {
+	struct cx8802_dev          *dev;
+	struct videobuf_queue      mpegq;
+};
+
+struct cx8802_dev {
+	struct cx88_core           *core;
+        struct semaphore           lock;
+       	spinlock_t                 slock;
+
+	/* pci i/o */
+	struct pci_dev             *pci;
+	unsigned char              pci_rev,pci_lat;
+
+	/* dma queues */
+	struct cx88_dmaqueue       mpegq;
+	u32                        ts_packet_size;
+	u32                        ts_packet_count;
+
+	/* error stats */
+	u32                        stopper_count;
+	u32                        error_count;
+	u32                        timeout_count;
+
+	/* for blackbird only */
+	struct list_head           devlist;
+	struct video_device        *mpeg_dev;
+	u32                        mailbox;
+
+	/* for dvb only */
+	struct videobuf_queue      dvbq;
+	struct task_struct         *dvb_thread;
+	struct dvb_demux           demux;
+	struct dmxdev              dmxdev;
+	struct dmx_frontend        fe_hw;
+	struct dmx_frontend        fe_mem;
+	struct dvb_net             dvbnet;
+	int                        nfeeds;
+};
+
+/* ----------------------------------------------------------- */
+
+#define cx_read(reg)             readl(core->lmmio + ((reg)>>2))
+#define cx_write(reg,value)      writel((value), core->lmmio + ((reg)>>2))
+#define cx_writeb(reg,value)     writeb((value), core->bmmio + (reg))
 
 #define cx_andor(reg,mask,value) \
-  writel((readl(dev->lmmio+((reg)>>2)) & ~(mask)) |\
-  ((value) & (mask)), dev->lmmio+((reg)>>2))
+  writel((readl(core->lmmio+((reg)>>2)) & ~(mask)) |\
+  ((value) & (mask)), core->lmmio+((reg)>>2))
 #define cx_set(reg,bit)          cx_andor((reg),(bit),(bit))
 #define cx_clear(reg,bit)        cx_andor((reg),(bit),0)
 
 #define cx_wait(d) { if (need_resched()) schedule(); else udelay(d); }
 
 /* shadow registers */
-#define cx_sread(sreg)		    (dev->shadow[sreg])
+#define cx_sread(sreg)		    (core->shadow[sreg])
 #define cx_swrite(sreg,reg,value) \
-  (dev->shadow[sreg] = value, \
-   writel(dev->shadow[sreg], dev->lmmio + ((reg)>>2)))
+  (core->shadow[sreg] = value, \
+   writel(core->shadow[sreg], core->lmmio + ((reg)>>2)))
 #define cx_sandor(sreg,reg,mask,value) \
-  (dev->shadow[sreg] = (dev->shadow[sreg] & ~(mask)) | ((value) & (mask)), \
-   writel(dev->shadow[sreg], dev->lmmio + ((reg)>>2)))
+  (core->shadow[sreg] = (core->shadow[sreg] & ~(mask)) | ((value) & (mask)), \
+   writel(core->shadow[sreg], core->lmmio + ((reg)>>2)))
 
 /* ----------------------------------------------------------- */
 /* cx88-core.c                                                 */
 
 extern char *cx88_pci_irqs[32];
 extern char *cx88_vid_irqs[32];
+extern char *cx88_mpeg_irqs[32];
 extern void cx88_print_irqbits(char *name, char *tag, char **strings,
 			       u32 bits, u32 mask);
 extern void cx88_print_ioctl(char *name, unsigned int cmd);
+
+extern void cx88_irq(struct cx88_core *core, u32 status, u32 mask);
+extern void cx88_wakeup(struct cx88_core *core,
+			struct cx88_dmaqueue *q, u32 count);
+extern void cx88_shutdown(struct cx88_core *core);
+extern int cx88_reset(struct cx88_core *core);
 
 extern int
 cx88_risc_buffer(struct pci_dev *pci, struct btcx_riscmem *risc,
@@ -310,22 +434,34 @@ cx88_risc_buffer(struct pci_dev *pci, struct btcx_riscmem *risc,
 		 unsigned int top_offset, unsigned int bottom_offset,
 		 unsigned int bpl, unsigned int padding, unsigned int lines);
 extern int
+cx88_risc_databuffer(struct pci_dev *pci, struct btcx_riscmem *risc,
+		     struct scatterlist *sglist, unsigned int bpl,
+		     unsigned int lines);
+extern int
 cx88_risc_stopper(struct pci_dev *pci, struct btcx_riscmem *risc,
 		  u32 reg, u32 mask, u32 value);
 extern void
 cx88_free_buffer(struct pci_dev *pci, struct cx88_buffer *buf);
 
-extern void cx88_risc_disasm(struct cx8800_dev *dev,
+extern void cx88_risc_disasm(struct cx88_core *core,
 			     struct btcx_riscmem *risc);
-
-extern int cx88_sram_channel_setup(struct cx8800_dev *dev,
+extern int cx88_sram_channel_setup(struct cx88_core *core,
 				   struct sram_channel *ch,
 				   unsigned int bpl, u32 risc);
-extern void cx88_sram_channel_dump(struct cx8800_dev *dev,
+extern void cx88_sram_channel_dump(struct cx88_core *core,
 				   struct sram_channel *ch);
 
-extern int cx88_pci_quirks(char *name, struct pci_dev *pci,
-			   unsigned int *latency);
+extern int cx88_set_scale(struct cx88_core *core, unsigned int width,
+			  unsigned int height, enum v4l2_field field);
+extern int cx88_set_tvnorm(struct cx88_core *core, struct cx88_tvnorm *norm);
+
+extern struct video_device *cx88_vdev_init(struct cx88_core *core,
+					   struct pci_dev *pci,
+					   struct video_device *template,
+					   char *type);
+extern struct cx88_core* cx88_core_get(struct pci_dev *pci);
+extern void cx88_core_put(struct cx88_core *core,
+			  struct pci_dev *pci);
 
 /* ----------------------------------------------------------- */
 /* cx88-vbi.c                                                  */
@@ -343,9 +479,9 @@ extern struct videobuf_queue_ops cx8800_vbi_qops;
 /* ----------------------------------------------------------- */
 /* cx88-i2c.c                                                  */
 
-extern int cx8800_i2c_init(struct cx8800_dev *dev);
-extern void cx8800_call_i2c_clients(struct cx8800_dev *dev,
-				    unsigned int cmd, void *arg);
+extern int cx88_i2c_init(struct cx88_core *core, struct pci_dev *pci);
+extern void cx88_call_i2c_clients(struct cx88_core *core,
+				  unsigned int cmd, void *arg);
 
 
 /* ----------------------------------------------------------- */
@@ -357,8 +493,8 @@ extern const unsigned int cx88_bcount;
 extern struct cx88_subid cx88_subids[];
 extern const unsigned int cx88_idcount;
 
-extern void cx88_card_list(struct cx8800_dev *dev);
-extern void cx88_card_setup(struct cx8800_dev *dev);
+extern void cx88_card_list(struct cx88_core *core, struct pci_dev *pci);
+extern void cx88_card_setup(struct cx88_core *core);
 
 /* ----------------------------------------------------------- */
 /* cx88-tvaudio.c                                              */
@@ -376,10 +512,20 @@ extern void cx88_card_setup(struct cx8800_dev *dev);
 #define WW_I2SPT	11
 #define WW_FM		12
 
-void cx88_set_tvaudio(struct cx8800_dev *dev);
-void cx88_get_stereo(struct cx8800_dev *dev, struct v4l2_tuner *t);
-void cx88_set_stereo(struct cx8800_dev *dev, u32 mode);
+void cx88_set_tvaudio(struct cx88_core *core);
+void cx88_get_stereo(struct cx88_core *core, struct v4l2_tuner *t);
+void cx88_set_stereo(struct cx88_core *core, u32 mode);
 int cx88_audio_thread(void *data);
+
+/* ----------------------------------------------------------- */
+/* cx88-mpeg.c                                                 */
+
+int cx8802_buf_prepare(struct cx8802_dev *dev, struct cx88_buffer *buf);
+void cx8802_buf_queue(struct cx8802_dev *dev, struct cx88_buffer *buf);
+void cx8802_cancel_buffers(struct cx8802_dev *dev);
+
+int cx8802_init_common(struct cx8802_dev *dev);
+void cx8802_fini_common(struct cx8802_dev *dev);
 
 /*
  * Local variables:

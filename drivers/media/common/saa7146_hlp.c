@@ -413,10 +413,10 @@ static void calculate_clipping_registers_rect(struct saa7146_dev *dev, struct sa
 
 	/* fill up cliptable */
 	for(i = 0; i < cnt_pixel; i++) {
-		clipping[2*i] |= (pixel_list[i] << 16);
+		clipping[2*i] |= cpu_to_le32(pixel_list[i] << 16);
 	}
 	for(i = 0; i < cnt_line; i++) {
-		clipping[(2*i)+1] |= (line_list[i] << 16);
+		clipping[(2*i)+1] |= cpu_to_le32(line_list[i] << 16);
 	}
 
 	/* fill up cliptable with the display infos */
@@ -430,7 +430,7 @@ static void calculate_clipping_registers_rect(struct saa7146_dev *dev, struct sa
 			if( pixel_list[i] < (x[j] + w[j])) {
 			
 				if ( pixel_list[i] >= x[j] ) {
-					clipping[2*i] |= (1 << j);			
+					clipping[2*i] |= cpu_to_le32(1 << j);			
 				}
 			}
 		}
@@ -442,7 +442,7 @@ static void calculate_clipping_registers_rect(struct saa7146_dev *dev, struct sa
 			if( line_list[i] < (y[j] + h[j]) ) {
 
 				if( line_list[i] >= y[j] ) {
-					clipping[(2*i)+1] |= (1 << j);			
+					clipping[(2*i)+1] |= cpu_to_le32(1 << j);			
 				}
 			}
 		}
@@ -491,10 +491,10 @@ static void saa7146_set_clipping_rect(struct saa7146_fh *fh)
 	struct	saa7146_video_dma vdma2;
 	u32 clip_format;
 	u32 arbtr_ctrl;
-
+	
 	/* check clipcount, disable clipping if clipcount == 0*/
 	if( fh->ov.nclips == 0 ) {
-		saa7146_disable_clipping(dev);
+	 	saa7146_disable_clipping(dev);
 		return;
 	}
 
@@ -560,9 +560,10 @@ static void saa7146_set_window(struct saa7146_dev *dev, int width, int height, e
 }
 
 /* calculate the new memory offsets for a desired position */
-static void saa7146_set_position(struct saa7146_dev *dev, int w_x, int w_y, int w_height, enum v4l2_field field)
+static void saa7146_set_position(struct saa7146_dev *dev, int w_x, int w_y, int w_height, enum v4l2_field field, u32 pixelformat)
 {	
 	struct saa7146_vv *vv = dev->vv_data;
+	struct saa7146_format *sfmt = format_by_fourcc(dev, pixelformat);
 
 	int b_depth = vv->ov_fmt->depth;
 	int b_bpl = vv->ov_fb.fmt.bytesperline;
@@ -601,7 +602,7 @@ static void saa7146_set_position(struct saa7146_dev *dev, int w_x, int w_y, int 
 		vdma1.pitch *= -1;
 	}
 		
-	vdma1.base_page = 0;
+	vdma1.base_page = sfmt->swap;
 	vdma1.num_line_byte = (vv->standard->v_field<<16)+vv->standard->h_pixels;
 
 	saa7146_write_out_dma(dev, 1, &vdma1);
@@ -621,7 +622,7 @@ static void saa7146_set_output_format(struct saa7146_dev *dev, unsigned long pal
 
 void saa7146_set_picture_prop(struct saa7146_dev *dev, int brightness, int contrast, int colour)
 {
-	u32	bcs_ctrl = 0;
+	u32 bcs_ctrl = 0;
 	
 	calculate_bcs_ctrl_register(dev, brightness, contrast, colour, &bcs_ctrl);
 	saa7146_write(dev, BCS_CTRL, bcs_ctrl);
@@ -657,14 +658,14 @@ int saa7146_enable_overlay(struct saa7146_fh *fh)
 	struct saa7146_vv *vv = dev->vv_data;
 
 	saa7146_set_window(dev, fh->ov.win.w.width, fh->ov.win.w.height, fh->ov.win.field);
-	saa7146_set_position(dev, fh->ov.win.w.left, fh->ov.win.w.top, fh->ov.win.w.height, fh->ov.win.field);
+	saa7146_set_position(dev, fh->ov.win.w.left, fh->ov.win.w.top, fh->ov.win.w.height, fh->ov.win.field, vv->ov_fmt->pixelformat);
 	saa7146_set_output_format(dev, vv->ov_fmt->trans);
 	saa7146_set_clipping_rect(fh);
 
 	/* enable video dma1 */
 	saa7146_write(dev, MC1, (MASK_06 | MASK_22));
 	return 0;
-}
+}		
 
 void saa7146_disable_overlay(struct saa7146_fh *fh)
 {
@@ -686,8 +687,8 @@ void saa7146_write_out_dma(struct saa7146_dev* dev, int which, struct saa7146_vi
 	/* calculate starting address */
 	where  = (which-1)*0x18;
 
-		saa7146_write(dev, where, 	vdma->base_odd);
-		saa7146_write(dev, where+0x04, 	vdma->base_even);
+	saa7146_write(dev, where, 	vdma->base_odd);
+	saa7146_write(dev, where+0x04, 	vdma->base_even);
 	saa7146_write(dev, where+0x08, 	vdma->prot_addr);
 	saa7146_write(dev, where+0x0c, 	vdma->pitch);
 	saa7146_write(dev, where+0x10, 	vdma->base_page);
@@ -704,6 +705,7 @@ void saa7146_write_out_dma(struct saa7146_dev* dev, int which, struct saa7146_vi
 	printk("vdma%d.num_line_byte: 0x%08x\n", which,vdma->num_line_byte);
 */
 }
+
 static int calculate_video_dma_grab_packed(struct saa7146_dev* dev, struct saa7146_buf *buf)
 {
 	struct saa7146_vv *vv = dev->vv_data;
@@ -724,11 +726,11 @@ static int calculate_video_dma_grab_packed(struct saa7146_dev* dev, struct saa71
 	if( bytesperline != 0) {
 		vdma1.pitch = bytesperline*2;
 	} else {
-	vdma1.pitch		= (width*depth*2)/8;
+		vdma1.pitch = (width*depth*2)/8;
 	}
 	vdma1.num_line_byte	= ((vv->standard->v_field<<16) + vv->standard->h_pixels);
-	vdma1.base_page		= buf->pt[0].dma | ME1;
-	
+	vdma1.base_page		= buf->pt[0].dma | ME1 | sfmt->swap;
+		
 	if( 0 != vv->vflip ) {
 		vdma1.prot_addr	= buf->pt[0].offset;
 		vdma1.base_even	= buf->pt[0].offset+(vdma1.pitch/2)*height;
@@ -785,7 +787,6 @@ static int calc_planar_422(struct saa7146_vv *vv, struct saa7146_buf *buf, struc
 		vdma3->prot_addr	= buf->pt[2].offset;
 		vdma3->base_even	= ((vdma3->pitch/2)*height)+buf->pt[2].offset;
 		vdma3->base_odd		= vdma3->base_even - (vdma3->pitch/2);
-
 	} else {
 		vdma3->base_even	= buf->pt[2].offset;
 		vdma3->base_odd		= vdma3->base_even + (vdma3->pitch/2);
@@ -938,7 +939,7 @@ static void program_capture_engine(struct saa7146_dev *dev, int planar)
 {
 	struct saa7146_vv *vv = dev->vv_data;
 	int count = 0;
-
+	
 	unsigned long e_wait = vv->current_hps_sync == SAA7146_HPS_SYNC_PORT_A ? CMD_E_FID_A : CMD_E_FID_B;
 	unsigned long o_wait = vv->current_hps_sync == SAA7146_HPS_SYNC_PORT_A ? CMD_O_FID_A : CMD_O_FID_B;
 
@@ -969,10 +970,10 @@ static void program_capture_engine(struct saa7146_dev *dev, int planar)
 	/* wait for o_fid_a/b / e_fid_a/b toggle */
 	if ( vv->last_field == V4L2_FIELD_INTERLACED ) {
 		WRITE_RPS0(CMD_PAUSE | o_wait);
-	WRITE_RPS0(CMD_PAUSE | e_wait);
+		WRITE_RPS0(CMD_PAUSE | e_wait);
 	} else if ( vv->last_field == V4L2_FIELD_TOP ) {
 		WRITE_RPS0(CMD_PAUSE | (vv->current_hps_sync == SAA7146_HPS_SYNC_PORT_A ? MASK_10 : MASK_09));
-	WRITE_RPS0(CMD_PAUSE | o_wait);
+		WRITE_RPS0(CMD_PAUSE | o_wait);
 	} else if ( vv->last_field == V4L2_FIELD_BOTTOM ) {
 		WRITE_RPS0(CMD_PAUSE | (vv->current_hps_sync == SAA7146_HPS_SYNC_PORT_A ? MASK_10 : MASK_09));
 		WRITE_RPS0(CMD_PAUSE | e_wait);
@@ -981,17 +982,17 @@ static void program_capture_engine(struct saa7146_dev *dev, int planar)
 	/* turn off video-dma1 */
 	WRITE_RPS0(CMD_WR_REG_MASK | (MC1/4));
 	WRITE_RPS0(MASK_22 | MASK_06);	    		/* => mask */
-	WRITE_RPS0(MASK_22);					/* => values */
+	WRITE_RPS0(MASK_22);				/* => values */
 	if( 0 != planar ) {
 		/* turn off video-dma2 */
 		WRITE_RPS0(CMD_WR_REG_MASK | (MC1/4));		
 		WRITE_RPS0(MASK_05 | MASK_21);	    		/* => mask */
-		WRITE_RPS0(MASK_21);					/* => values */
+		WRITE_RPS0(MASK_21);				/* => values */
 
 		/* turn off video-dma3 */
 		WRITE_RPS0(CMD_WR_REG_MASK | (MC1/4));		
 		WRITE_RPS0(MASK_04 | MASK_20);	    		/* => mask */
-		WRITE_RPS0(MASK_20);					/* => values */
+		WRITE_RPS0(MASK_20);				/* => values */
 	}
 
 	/* generate interrupt */
@@ -1006,7 +1007,7 @@ void saa7146_set_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, struc
 	struct saa7146_format *sfmt = format_by_fourcc(dev,buf->fmt->pixelformat);
 	struct saa7146_vv *vv = dev->vv_data;
 	u32 vdma1_prot_addr;
-
+	
 	DEB_CAP(("buf:%p, next:%p\n",buf,next));
 
 	vdma1_prot_addr = saa7146_read(dev, PROT_ADDR1);
@@ -1034,7 +1035,7 @@ void saa7146_set_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, struc
 		calculate_video_dma_grab_packed(dev, buf);
 		program_capture_engine(dev,0);
 	}
-
+	
 /*
 	printk("vdma%d.base_even:     0x%08x\n", 1,saa7146_read(dev,BASE_EVEN1));
 	printk("vdma%d.base_odd:      0x%08x\n", 1,saa7146_read(dev,BASE_ODD1));

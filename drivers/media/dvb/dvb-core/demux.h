@@ -284,7 +284,7 @@ struct dmx_demux {
 
         int (*get_stc) (struct dmx_demux* demux, unsigned int num,
 			u64 *stc, unsigned int *base);
-}; 
+};
 
 /*--------------------------------------------------------------------------*/ 
 /* Demux directory */ 

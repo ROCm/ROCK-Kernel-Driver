@@ -35,13 +35,22 @@
 #include <linux/slab.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 
 #include "dvb_frontend.h"
-#include "dvb_functions.h"
 
-static int debug = 0;
-#define dprintk	if (debug) printk
+#define FRONTEND_NAME "dvbfe_cx24110"
+
+#define dprintk(args...) \
+	do { \
+		if (debug) printk(KERN_DEBUG FRONTEND_NAME ": " args); \
+	} while (0)
+
+static int debug;
+
+module_param(debug, int, 0644);
+MODULE_PARM_DESC(debug, "Turn on/off frontend debugging (default:off).");
 
 
 static struct dvb_frontend_info cx24110_info = {
@@ -63,6 +72,10 @@ static struct dvb_frontend_info cx24110_info = {
 };
 /* fixme: are these values correct? especially ..._tolerance and caps */
 
+struct cx24110_state {
+	struct i2c_adapter *i2c;
+	struct dvb_adapter *dvb;
+};
 
 static struct {u8 reg; u8 data;} cx24110_regdata[]=
                       /* Comments beginning with @ denote this value should
@@ -127,7 +140,7 @@ static struct {u8 reg; u8 data;} cx24110_regdata[]=
 	};
 
 
-static int cx24110_writereg (struct dvb_i2c_bus *i2c, int reg, int data)
+static int cx24110_writereg (struct i2c_adapter *i2c, int reg, int data)
 {
         u8 buf [] = { reg, data };
 	struct i2c_msg msg = { .addr = 0x55, .flags = 0, .buf = buf, .len = 2 };
@@ -135,8 +148,9 @@ static int cx24110_writereg (struct dvb_i2c_bus *i2c, int reg, int data)
    cx24110 might show up at any address */
 	int err;
 
-        if ((err = i2c->xfer (i2c, &msg, 1)) != 1) {
-		dprintk ("%s: writereg error (err == %i, reg == 0x%02x, data == 0x%02x)\n", __FUNCTION__, err, reg, data);
+        if ((err = i2c_transfer(i2c, &msg, 1)) != 1) {
+		dprintk ("%s: writereg error (err == %i, reg == 0x%02x,"
+			 " data == 0x%02x)\n", __FUNCTION__, err, reg, data);
 		return -EREMOTEIO;
 	}
 
@@ -144,7 +158,7 @@ static int cx24110_writereg (struct dvb_i2c_bus *i2c, int reg, int data)
 }
 
 
-static u8 cx24110_readreg (struct dvb_i2c_bus *i2c, u8 reg)
+static u8 cx24110_readreg (struct i2c_adapter *i2c, u8 reg)
 {
 	int ret;
 	u8 b0 [] = { reg };
@@ -152,7 +166,7 @@ static u8 cx24110_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 	struct i2c_msg msg [] = { { .addr = 0x55, .flags = 0, .buf = b0, .len = 1 },
 			   { .addr = 0x55, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
 /* fixme (medium): address might be different from 0x55 */
-	ret = i2c->xfer (i2c, msg, 2);
+	ret = i2c_transfer(i2c, msg, 2);
 
 	if (ret != 2)
 		dprintk("%s: readreg error (ret == %i)\n", __FUNCTION__, ret);
@@ -161,7 +175,7 @@ static u8 cx24110_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 }
 
 
-static int cx24108_write (struct dvb_i2c_bus *i2c, u32 data)
+static int cx24108_write (struct i2c_adapter *i2c, u32 data)
 {
 /* tuner data is 21 bits long, must be left-aligned in data */
 /* tuner cx24108 is written through a dedicated 3wire interface on the demod chip */
@@ -195,7 +209,7 @@ dprintk("cx24110 debug: cx24108_write(%8.8x)\n",data);
 }
 
 
-static int cx24108_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
+static int cx24108_set_tv_freq (struct i2c_adapter *i2c, u32 freq)
 {
 /* fixme (low): error handling */
         int i, a, n, pump;
@@ -247,7 +261,7 @@ static int cx24108_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
         cx24108_write(i2c,pll);
         cx24110_writereg(i2c,0x56,0x7f);
 
-	dvb_delay(10); /* wait a moment for the tuner pll to lock */
+	msleep(10); /* wait a moment for the tuner pll to lock */
 
 	/* tuner pll lock can be monitored on GPIO pin 4 of cx24110 */
         while (!(cx24110_readreg(i2c,0x66)&0x20)&&i<1000)
@@ -259,7 +273,7 @@ static int cx24108_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
 }
 
 
-static int cx24110_init (struct dvb_i2c_bus *i2c)
+static int cx24110_initfe(struct i2c_adapter *i2c)
 {
 /* fixme (low): error handling */
         int i;
@@ -274,7 +288,7 @@ static int cx24110_init (struct dvb_i2c_bus *i2c)
 }
 
 
-static int cx24110_set_inversion (struct dvb_i2c_bus *i2c, fe_spectral_inversion_t inversion)
+static int cx24110_set_inversion (struct i2c_adapter *i2c, fe_spectral_inversion_t inversion)
 {
 /* fixme (low): error handling */
 
@@ -309,7 +323,7 @@ static int cx24110_set_inversion (struct dvb_i2c_bus *i2c, fe_spectral_inversion
 }
 
 
-static int cx24110_set_fec (struct dvb_i2c_bus *i2c, fe_code_rate_t fec)
+static int cx24110_set_fec (struct i2c_adapter *i2c, fe_code_rate_t fec)
 {
 /* fixme (low): error handling */
 
@@ -355,7 +369,7 @@ static int cx24110_set_fec (struct dvb_i2c_bus *i2c, fe_code_rate_t fec)
 }
 
 
-static fe_code_rate_t cx24110_get_fec (struct dvb_i2c_bus *i2c)
+static fe_code_rate_t cx24110_get_fec (struct i2c_adapter *i2c)
 {
 	int i;
 
@@ -372,7 +386,7 @@ static fe_code_rate_t cx24110_get_fec (struct dvb_i2c_bus *i2c)
 }
 
 
-static int cx24110_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate)
+static int cx24110_set_symbolrate (struct i2c_adapter *i2c, u32 srate)
 {
 /* fixme (low): add error handling */
         u32 ratio;
@@ -454,7 +468,7 @@ dprintk("cx24110 debug: entering %s(%d)\n",__FUNCTION__,srate);
 }
 
 
-static int cx24110_set_voltage (struct dvb_i2c_bus *i2c, fe_sec_voltage_t voltage)
+static int cx24110_set_voltage (struct i2c_adapter *i2c, fe_sec_voltage_t voltage)
 {
 	switch (voltage) {
 	case SEC_VOLTAGE_13:
@@ -466,16 +480,17 @@ static int cx24110_set_voltage (struct dvb_i2c_bus *i2c, fe_sec_voltage_t voltag
 	};
 }
 
-static void sendDiSEqCMessage(struct dvb_i2c_bus *i2c, struct dvb_diseqc_master_cmd *pCmd)
+static void cx24110_send_diseqc_msg(struct i2c_adapter *i2c,
+				    struct dvb_diseqc_master_cmd *cmd)
 {
 	int i, rv;
 
-	for (i = 0; i < pCmd->msg_len; i++)
-		cx24110_writereg(i2c, 0x79 + i, pCmd->msg[i]);
+	for (i = 0; i < cmd->msg_len; i++)
+		cx24110_writereg(i2c, 0x79 + i, cmd->msg[i]);
 
 	rv = cx24110_readreg(i2c, 0x76);
 
-	cx24110_writereg(i2c, 0x76, ((rv & 0x90) | 0x40) | ((pCmd->msg_len-3) & 3));
+	cx24110_writereg(i2c, 0x76, ((rv & 0x90) | 0x40) | ((cmd->msg_len-3) & 3));
 	for (i=500; i-- > 0 && !(cx24110_readreg(i2c,0x76)&0x40);)
 		; /* wait for LNB ready */
 }
@@ -483,7 +498,8 @@ static void sendDiSEqCMessage(struct dvb_i2c_bus *i2c, struct dvb_diseqc_master_
 
 static int cx24110_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 {
-	struct dvb_i2c_bus *i2c = fe->i2c;
+	struct cx24110_state *state = fe->data;
+	struct i2c_adapter *i2c = state->i2c;
 	static int lastber=0, lastbyer=0,lastbler=0, lastesn0=0, sum_bler=0;
 
         switch (cmd) {
@@ -618,7 +634,7 @@ static int cx24110_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 /* cannot do this from the FE end. How to communicate this to the place where it can be done? */
 		break;
         case FE_INIT:
-		return cx24110_init (i2c);
+		return cx24110_initfe(i2c);
 
 	case FE_SET_TONE:
 		return cx24110_writereg(i2c,0x76,(cx24110_readreg(i2c,0x76)&~0x10)|((((fe_sec_tone_mode_t) arg)==SEC_TONE_ON)?0x10:0));
@@ -626,7 +642,8 @@ static int cx24110_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		return cx24110_set_voltage (i2c, (fe_sec_voltage_t) arg);
 
 	case FE_DISEQC_SEND_MASTER_CMD:
-		sendDiSEqCMessage(i2c, (struct dvb_diseqc_master_cmd*) arg);
+		// FIXME Status?
+		cx24110_send_diseqc_msg(i2c, (struct dvb_diseqc_master_cmd*) arg);
 		return 0;
 
 	default:
@@ -636,43 +653,118 @@ static int cx24110_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
         return 0;
 }
 
+static struct i2c_client client_template;
 
-static int cx24110_attach (struct dvb_i2c_bus *i2c, void **data)
+static int attach_adapter (struct i2c_adapter *adapter)
 {
+	struct cx24110_state *state;
+	struct i2c_client *client;
+	int ret = 0;
 	u8 sig;
 
-	sig=cx24110_readreg (i2c, 0x00);
+	dprintk("Trying to attach to adapter 0x%x:%s.\n",
+		adapter->id, adapter->name);
+
+	sig = cx24110_readreg (adapter, 0x00);
 	if ( sig != 0x5a && sig != 0x69 )
 		return -ENODEV;
 
-	return dvb_register_frontend (cx24110_ioctl, i2c, NULL, &cx24110_info);
+	if ( !(state = kmalloc(sizeof(struct cx24110_state), GFP_KERNEL)) )
+		return -ENOMEM;
+
+	memset(state, 0, sizeof(struct cx24110_state));
+	state->i2c = adapter;
+
+	if ( !(client = kmalloc(sizeof(struct i2c_client), GFP_KERNEL)) ) {
+		kfree(state);
+		return -ENOMEM;
+	}
+
+	memcpy(client, &client_template, sizeof(struct i2c_client));
+	client->adapter = adapter;
+	client->addr = 0x55;
+	i2c_set_clientdata(client, state);
+
+	if ((ret = i2c_attach_client(client))) {
+		kfree(client);
+		kfree(state);
+		return ret;
+	}
+
+	BUG_ON(!state->dvb);
+
+	if ((ret = dvb_register_frontend(cx24110_ioctl, state->dvb, state,
+					     &cx24110_info, THIS_MODULE))) {
+		i2c_detach_client(client);
+		kfree(client);
+		kfree(state);
+		return ret;
+	}
+
+	return 0;
 }
 
-
-static void cx24110_detach (struct dvb_i2c_bus *i2c, void *data)
+static int detach_client (struct i2c_client *client)
 {
-	dvb_unregister_frontend (cx24110_ioctl, i2c);
+	struct cx24110_state *state = i2c_get_clientdata(client);
+
+	dvb_unregister_frontend(cx24110_ioctl, state->dvb);
+	i2c_detach_client(client);
+	BUG_ON(state->dvb);
+	kfree(client);
+	kfree(state);
+	return 0;
 }
 
-
-static int __init init_cx24110 (void)
+static int command(struct i2c_client *client, unsigned int cmd, void *arg)
 {
-	return dvb_register_i2c_device (THIS_MODULE, cx24110_attach, cx24110_detach);
+	struct cx24110_state *state = i2c_get_clientdata(client);
+
+	switch(cmd) {
+	case FE_REGISTER:
+		state->dvb = arg;
+		break;
+	case FE_UNREGISTER:
+		state->dvb = NULL;
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return 0;
 }
 
+static struct i2c_driver driver = {
+	.owner		= THIS_MODULE,
+	.name		= FRONTEND_NAME,
+	.id		= I2C_DRIVERID_DVBFE_CX24110,
+	.flags		= I2C_DF_NOTIFY,
+	.attach_adapter	= attach_adapter,
+	.detach_client	= detach_client,
+	.command	= command,
+};
 
-static void __exit exit_cx24110 (void)
+static struct i2c_client client_template = {
+	.name		= FRONTEND_NAME,
+	.flags		= I2C_CLIENT_ALLOW_USE,
+	.driver		= &driver,
+};
+
+static int __init cx24110_init(void)
 {
-	dvb_unregister_i2c_device (cx24110_attach);
+	return i2c_add_driver(&driver);
 }
 
+static void __exit cx24110_exit(void)
+{
+	if (i2c_del_driver(&driver))
+		printk(KERN_ERR "cx24110: driver deregistration failed.\n");
+}
 
-module_init(init_cx24110);
-module_exit(exit_cx24110);
-
+module_init(cx24110_init);
+module_exit(cx24110_exit);
 
 MODULE_DESCRIPTION("DVB Frontend driver module for the Conexant cx24108/cx24110 chipset");
 MODULE_AUTHOR("Peter Hettkamp");
 MODULE_LICENSE("GPL");
-MODULE_PARM(debug,"i");
 

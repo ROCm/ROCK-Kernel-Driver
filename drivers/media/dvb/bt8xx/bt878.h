@@ -26,6 +26,7 @@
 #include <linux/sched.h>
 #include <linux/spinlock.h>
 #include "bt848.h"
+#include "bttv.h"
 
 #define BT878_VERSION_CODE 0x000000
 
@@ -94,7 +95,7 @@ struct bt878 {
 	struct semaphore  gpio_lock;
 	unsigned int nr;
 	unsigned int bttv_nr;
-	struct dvb_adapter *adap_ptr;
+	struct i2c_adapter *adapter;
 	struct pci_dev *dev;
 	unsigned int id;
 	unsigned int TS_Size;

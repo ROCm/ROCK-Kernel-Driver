@@ -65,10 +65,10 @@
 #define BER_DONE               (0x08)
 #define BER_OVERFLOW           (0x10)
 
-/* 0x38 OFDM_BERTimer */     /* Use the alias registers */
+			     /* 0x38 OFDM_BERTimer *//* Use the alias registers */
 #define A_VIT_BER_TIMER_0      (0x1D)
 
-/* 0x3A VIT_BER_TIMER_0 */   /* Use the alias registers */
+			     /* 0x3A VIT_BER_TIMER_0 *//* Use the alias registers */
 #define A_VIT_BER_0            (0x1B)
 
 /* 0x40 OFDM_COR_CTL */
@@ -123,7 +123,7 @@
 /* 0x4D OFDM_ITB_FREQ_2 */
 #define OFDM_ITB_FREQ_2        (0x4D)
 
-/* 0x4E  OFDM_CAS_CTL */       
+/* 0x4E  OFDM_CAS_CTL */
 #define OFDM_CAS_CTL           (0x4E)
 #define ACSDIS                 (0x40)
 #define CCSEN                  (0x80)
@@ -152,7 +152,7 @@
 #define OFDM_SCR_CTL           (0x58)
 #define SYR_ADJ_DECAY_MASK     (0x70)
 #define SYR_ADJ_DECAY          (0x30)
- 
+
 /* 0x59 OFDM_PPM_CTL_1 */
 #define OFDM_PPM_CTL_1         (0x59)
 #define PPMMAX_MASK            (0x30)
@@ -219,7 +219,7 @@
 
 /* 0x82 EN_DMD_RACQ */
 #define EN_DMD_RACQ            (0x82)
-#define EN_DMD_RACQ_REG_VAL    (0x81) 
+#define EN_DMD_RACQ_REG_VAL    (0x81)
 #define EN_DMD_RACQ_REG_VAL_14 (0x01)
 
 /* 0x84 SNR_COMMAND */
@@ -263,4 +263,3 @@
 #define GATED_CLOCK            (0x01)
 
 #define NXT6000ASICDEVICE      (0x0b)
-

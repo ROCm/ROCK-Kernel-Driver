@@ -1,3 +1,4 @@
+
 /* 
     tuner.h - definition for different tuners
 
@@ -69,9 +70,12 @@
 #define TUNER_PHILIPS_ATSC       42
 #define TUNER_PHILIPS_FM1236_MK3 43
 #define TUNER_PHILIPS_4IN1       44	/* ATI TV Wonder Pro - Conexant */
+/* Microtune mergeged with Temic 12/31/1999 partially financed by Alps - these may be similar to Temic */ 
 #define TUNER_MICROTUNE_4049FM5  45
 #define TUNER_LG_NTSC_TAPE       47
 #define TUNER_TNF_8831BGFF       48
+#define TUNER_MICROTUNE_4042FI5  49	/* FusionHDTV 3 Gold - 4042 FI5 (3X 8147) */
+#define TUNER_TCL_2002N          50
 
 #define NOTUNER 0
 #define PAL     1	/* PAL_BG */
@@ -91,6 +95,7 @@
 #define Microtune 8
 #define HITACHI 9
 #define Panasonic 10
+#define TCL     11
 
 #define TUNER_SET_TYPE               _IOW('t',1,int)    /* set tuner type */
 #define TUNER_SET_TVFREQ             _IOW('t',2,int)    /* set tv freq */

@@ -1,4 +1,6 @@
 /*
+    $Id: cx88-i2c.c,v 1.12 2004/09/16 07:05:48 kraxel Exp $
+    
     cx88-i2c.c  --  all the i2c code is here
 
     Copyright (C) 1996,97,98 Ralph  Metzler (rjkm@thp.uni-koeln.de)
@@ -29,35 +31,42 @@
 
 #include "cx88.h"
 
+static unsigned int i2c_debug = 0;
+MODULE_PARM(i2c_debug,"i");
+MODULE_PARM_DESC(i2c_debug,"enable debug messages [i2c]");
+
+#define dprintk(level,fmt, arg...)	if (i2c_debug >= level) \
+	printk(KERN_DEBUG "%s: " fmt, core->name , ## arg)
+
 /* ----------------------------------------------------------------------- */
 
 void cx8800_bit_setscl(void *data, int state)
 {
-	struct cx8800_dev *dev = data;
+	struct cx88_core *core = data;
 
 	if (state)
-		dev->i2c_state |= 0x02;
+		core->i2c_state |= 0x02;
 	else
-		dev->i2c_state &= ~0x02;
-	cx_write(MO_I2C, dev->i2c_state);
+		core->i2c_state &= ~0x02;
+	cx_write(MO_I2C, core->i2c_state);
 	cx_read(MO_I2C);
 }
 
 void cx8800_bit_setsda(void *data, int state)
 {
-	struct cx8800_dev *dev = data;
+	struct cx88_core *core = data;
 
 	if (state)
-		dev->i2c_state |= 0x01;
+		core->i2c_state |= 0x01;
 	else
-		dev->i2c_state &= ~0x01;
-	cx_write(MO_I2C, dev->i2c_state);
+		core->i2c_state &= ~0x01;
+	cx_write(MO_I2C, core->i2c_state);
 	cx_read(MO_I2C);
 }
 
 static int cx8800_bit_getscl(void *data)
 {
-	struct cx8800_dev *dev = data;
+	struct cx88_core *core = data;
 	u32 state;
 	
 	state = cx_read(MO_I2C);
@@ -66,7 +75,7 @@ static int cx8800_bit_getscl(void *data)
 
 static int cx8800_bit_getsda(void *data)
 {
-	struct cx8800_dev *dev = data;
+	struct cx88_core *core = data;
 	u32 state;
 
 	state = cx_read(MO_I2C);
@@ -75,36 +84,48 @@ static int cx8800_bit_getsda(void *data)
 
 /* ----------------------------------------------------------------------- */
 
-#ifndef I2C_PEC
-static void cx8800_inc_use(struct i2c_adapter *adap)
-{
-	MOD_INC_USE_COUNT;
-}
-
-static void cx8800_dec_use(struct i2c_adapter *adap)
-{
-	MOD_DEC_USE_COUNT;
-}
-#endif
-
 static int attach_inform(struct i2c_client *client)
 {
-        struct cx8800_dev *dev = i2c_get_adapdata(client->adapter);
+	struct cx88_core *core = i2c_get_adapdata(client->adapter);
 
-	if (dev->tuner_type != UNSET)
-		cx8800_call_i2c_clients(dev,TUNER_SET_TYPE,&dev->tuner_type);
+	dprintk(1, "i2c attach [client=%s]\n", i2c_clientname(client));
+	if (!client->driver->command)
+		return 0;
 
-        if (1 /* fixme: debug */)
-		printk("%s: i2c attach [client=%s]\n",
-		       dev->name, i2c_clientname(client));
-        return 0;
+	if (core->tuner_type != UNSET)
+		client->driver->command(client, TUNER_SET_TYPE, &core->tuner_type);
+	if (core->tda9887_conf)
+		client->driver->command(client, TDA9887_SET_CONFIG, &core->tda9887_conf);
+	if (core->dvb_adapter)
+		client->driver->command(client, FE_REGISTER, core->dvb_adapter);
+
+	return 0;
 }
 
-void cx8800_call_i2c_clients(struct cx8800_dev *dev, unsigned int cmd, void *arg)
+static int detach_inform(struct i2c_client *client)
 {
-	if (0 != dev->i2c_rc)
+	struct cx88_core *core = i2c_get_adapdata(client->adapter);
+
+#if 0
+	/* FIXME: should switch to cx88_call_i2c_clients */
+	/* FIXME: drop FE_UNREGISTER altogether in favor of using
+	 *        i2c_driver->detach_client() ??? */
+	if (core->dvb_adapter && client->driver->command) {
+		dprintk(1, "i2c detach [client=%s] dvb_adapter %p\n",
+		        i2c_clientname(client), core->dvb_adapter);
+		return client->driver->command(client, FE_UNREGISTER, core->dvb_adapter);
+	}
+#endif
+	
+	dprintk(1, "i2c detach [client=%s]\n", i2c_clientname(client));
+	return 0;
+}
+
+void cx88_call_i2c_clients(struct cx88_core *core, unsigned int cmd, void *arg)
+{
+	if (0 != core->i2c_rc)
 		return;
-	i2c_clients_command(&dev->i2c_adap, cmd, arg);
+	i2c_clients_command(&core->i2c_adap, cmd, arg);
 }
 
 static struct i2c_algo_bit_data cx8800_i2c_algo_template = {
@@ -120,18 +141,11 @@ static struct i2c_algo_bit_data cx8800_i2c_algo_template = {
 /* ----------------------------------------------------------------------- */
 
 static struct i2c_adapter cx8800_i2c_adap_template = {
-#ifdef I2C_PEC
-	.owner             = THIS_MODULE,
-#else
-	.inc_use           = cx8800_inc_use,
-	.dec_use           = cx8800_dec_use,
-#endif
-#ifdef I2C_CLASS_TV_ANALOG
-	.class             = I2C_CLASS_TV_ANALOG,
-#endif
 	I2C_DEVNAME("cx2388x"),
+	.owner             = THIS_MODULE,
 	.id                = I2C_HW_B_BT848,
 	.client_register   = attach_inform,
+	.client_unregister = detach_inform,
 };
 
 static struct i2c_client cx8800_i2c_client_template = {
@@ -140,30 +154,42 @@ static struct i2c_client cx8800_i2c_client_template = {
 };
 
 /* init + register i2c algo-bit adapter */
-int __devinit cx8800_i2c_init(struct cx8800_dev *dev)
+int cx88_i2c_init(struct cx88_core *core, struct pci_dev *pci)
 {
-	memcpy(&dev->i2c_adap, &cx8800_i2c_adap_template,
-	       sizeof(dev->i2c_adap));
-	memcpy(&dev->i2c_algo, &cx8800_i2c_algo_template,
-	       sizeof(dev->i2c_algo));
-	memcpy(&dev->i2c_client, &cx8800_i2c_client_template,
-	       sizeof(dev->i2c_client));
+	memcpy(&core->i2c_adap, &cx8800_i2c_adap_template,
+	       sizeof(core->i2c_adap));
+	memcpy(&core->i2c_algo, &cx8800_i2c_algo_template,
+	       sizeof(core->i2c_algo));
+	memcpy(&core->i2c_client, &cx8800_i2c_client_template,
+	       sizeof(core->i2c_client));
 
-	dev->i2c_adap.dev.parent = &dev->pci->dev;
-	strlcpy(dev->i2c_adap.name,dev->name,sizeof(dev->i2c_adap.name));
-        dev->i2c_algo.data = dev;
-        i2c_set_adapdata(&dev->i2c_adap,dev);
-        dev->i2c_adap.algo_data = &dev->i2c_algo;
-        dev->i2c_client.adapter = &dev->i2c_adap;
+	if (core->tuner_type != UNSET)
+		core->i2c_adap.class |= I2C_CLASS_TV_ANALOG;
+	if (cx88_boards[core->board].dvb)
+		core->i2c_adap.class |= I2C_CLASS_TV_DIGITAL;
 
-	cx8800_bit_setscl(dev,1);
-	cx8800_bit_setsda(dev,1);
+	core->i2c_adap.dev.parent = &pci->dev;
+	strlcpy(core->i2c_adap.name,core->name,sizeof(core->i2c_adap.name));
+        core->i2c_algo.data = core;
+        i2c_set_adapdata(&core->i2c_adap,core);
+        core->i2c_adap.algo_data = &core->i2c_algo;
+        core->i2c_client.adapter = &core->i2c_adap;
 
-	dev->i2c_rc = i2c_bit_add_bus(&dev->i2c_adap);
-	printk("%s: i2c register %s\n", dev->name,
-	       (0 == dev->i2c_rc) ? "ok" : "FAILED");
-	return dev->i2c_rc;
+	cx8800_bit_setscl(core,1);
+	cx8800_bit_setsda(core,1);
+
+	core->i2c_rc = i2c_bit_add_bus(&core->i2c_adap);
+	if (0 != core->i2c_rc)
+		printk("%s: i2c register FAILED\n", core->name);
+	else
+		dprintk(1, "i2c register ok\n");
+	return core->i2c_rc;
 }
+
+/* ----------------------------------------------------------------------- */
+
+EXPORT_SYMBOL(cx88_call_i2c_clients);
+EXPORT_SYMBOL(cx88_i2c_init);
 
 /*
  * Local variables:

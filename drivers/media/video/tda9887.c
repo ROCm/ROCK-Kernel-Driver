@@ -393,7 +393,7 @@ static int tda9887_set_insmod(struct tda9887 *t, char *buf)
 		else
 			buf[1] &= ~cQSS;
 	}
-
+	
 	if (adjust >= 0x00 && adjust < 0x20)
 		buf[2] |= adjust;
 	return 0;
@@ -513,7 +513,7 @@ static int tda9887_status(struct tda9887 *t)
 {
 	unsigned char buf[1];
 	int rc;
-
+	
 	memset(buf,0,sizeof(buf));
         if (1 != (rc = i2c_master_recv(&t->client,buf,1)))
                 printk(PREFIX "i2c i/o error: rc == %d (should be 1)\n",rc);

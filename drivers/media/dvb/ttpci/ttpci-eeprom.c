@@ -35,9 +35,8 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/string.h>
+#include <linux/i2c.h>
 
-#include "dvb_i2c.h"
-#include "dvb_functions.h"
 
 #if 1
 #define dprintk(x...) do { printk(x); } while (0)
@@ -85,19 +84,19 @@ static int getmac_tt(u8 * decodedMAC, u8 * encodedMAC)
         return 0;
 }
 
-static int ttpci_eeprom_read_encodedMAC(struct dvb_i2c_bus *i2c, u8 * encodedMAC)
+static int ttpci_eeprom_read_encodedMAC(struct i2c_adapter *adapter, u8 * encodedMAC)
 {
 	int ret;
 	u8 b0[] = { 0xcc };
 
 	struct i2c_msg msg[] = {
-		{.addr = 0x50,.flags = 0,.buf = b0,.len = 1},
+		{ .addr = 0x50, .flags = 0, .buf = b0, .len = 1 },
 		{ .addr = 0x50, .flags = I2C_M_RD, .buf = encodedMAC, .len = 20 }
 	};
 
 	/* dprintk("%s\n", __FUNCTION__); */
 
-	ret = i2c->xfer(i2c, msg, 2);
+	ret = i2c_transfer(adapter, msg, 2);
 
 	if (ret != 2)		/* Assume EEPROM isn't there */
 		return (-ENODEV);
@@ -106,36 +105,34 @@ static int ttpci_eeprom_read_encodedMAC(struct dvb_i2c_bus *i2c, u8 * encodedMAC
 }
 
 
-int ttpci_eeprom_parse_mac(struct dvb_i2c_bus *i2c)
+int ttpci_eeprom_parse_mac(struct i2c_adapter *adapter, u8 *proposed_mac)
 {
 	int ret, i;
 	u8 encodedMAC[20];
 	u8 decodedMAC[6];
 
-	ret = ttpci_eeprom_read_encodedMAC(i2c, encodedMAC);
+	ret = ttpci_eeprom_read_encodedMAC(adapter, encodedMAC);
 
 	if (ret != 0) {		/* Will only be -ENODEV */
 		dprintk("Couldn't read from EEPROM: not there?\n");
-		memset(i2c->adapter->proposed_mac, 0, 6);
+		memset(proposed_mac, 0, 6);
 		return ret;
 	}
 
 	ret = getmac_tt(decodedMAC, encodedMAC);
 	if( ret != 0 ) {
-		dprintk("%s adapter %i failed MAC signature check\n",
-			i2c->adapter->name, i2c->adapter->num);
+		dprintk("adapter failed MAC signature check\n");
 		dprintk("encoded MAC from EEPROM was " );
 		for(i=0; i<19; i++) {
 			dprintk( "%.2x:", encodedMAC[i]);
 		}
 		dprintk("%.2x\n", encodedMAC[19]);
-		memset(i2c->adapter->proposed_mac, 0, 6);
+		memset(proposed_mac, 0, 6);
 		return ret;
 	}
 
-	memcpy(i2c->adapter->proposed_mac, decodedMAC, 6);
-	dprintk("%s adapter %i has MAC addr = %.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n",
-		i2c->adapter->name, i2c->adapter->num,
+	memcpy(proposed_mac, decodedMAC, 6);
+	dprintk("adapter has MAC addr = %.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n",
 		decodedMAC[0], decodedMAC[1], decodedMAC[2],
 		decodedMAC[3], decodedMAC[4], decodedMAC[5]);
 	return 0;

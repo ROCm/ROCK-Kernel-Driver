@@ -35,7 +35,6 @@
  */
 
 #include "budget.h"
-#include "dvb_functions.h"
 
 static void Set22K (struct budget *budget, int state)
 {
@@ -100,7 +99,7 @@ static int SendDiSEqCMsg (struct budget *budget, int len, u8 *msg, unsigned long
 			udelay(12500);
 			saa7146_setgpio(dev, 3, SAA7146_GPIO_OUTLO);
 		}
-		dvb_delay(20);
+		msleep(20);
 	}
 
 	return 0;
@@ -202,6 +201,8 @@ static int budget_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 
 	DEB_EE(("dev:%p, info:%p, budget:%p\n",dev,info,budget));
 
+	dev->ext_priv = budget;
+
 	if ((err = ttpci_budget_init (budget, dev, info))) {
 		printk("==> failed\n");
 		kfree (budget);
@@ -212,10 +213,8 @@ static int budget_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 		dvb_add_frontend_ioctls (budget->dvb_adapter,
 				 budget_ioctl_activy, NULL, budget);
 	else
-	dvb_add_frontend_ioctls (budget->dvb_adapter,
+		dvb_add_frontend_ioctls (budget->dvb_adapter,
 				 budget_diseqc_ioctl, NULL, budget);
-
-	dev->ext_priv = budget;
 
 	return 0;
 }
@@ -230,14 +229,14 @@ static int budget_detach (struct saa7146_dev* dev)
 		dvb_remove_frontend_ioctls (budget->dvb_adapter,
 				    budget_ioctl_activy, NULL);
 	else
-	dvb_remove_frontend_ioctls (budget->dvb_adapter,
+		dvb_remove_frontend_ioctls (budget->dvb_adapter,
 				    budget_diseqc_ioctl, NULL);
 
 	err = ttpci_budget_deinit (budget);
 
 	kfree (budget);
 	dev->ext_priv = NULL;
-
+	
 	return err;
 }
 
