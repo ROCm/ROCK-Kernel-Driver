@@ -226,7 +226,7 @@ local void send_bits(
  * this function may be called by two threads concurrently, but this is
  * harmless since both invocations do exactly the same thing.
  */
-local void tr_static_init()
+local void tr_static_init(void)
 {
     static int static_init_done = 0;
     int n;        /* iterates over tree elements */
@@ -296,8 +296,9 @@ local void tr_static_init()
 /* ===========================================================================
  * Initialize the tree data structures for a new zlib stream.
  */
-void zlib_tr_init(s)
-    deflate_state *s;
+void zlib_tr_init(
+	deflate_state *s
+)
 {
     tr_static_init();
 
@@ -326,8 +327,9 @@ void zlib_tr_init(s)
 /* ===========================================================================
  * Initialize a new block.
  */
-local void init_block(s)
-    deflate_state *s;
+local void init_block(
+	deflate_state *s
+)
 {
     int n; /* iterates over tree elements */
 

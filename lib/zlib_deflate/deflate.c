@@ -371,9 +371,10 @@ int zlib_deflateParams(
  * IN assertion: the stream state is correct and there is enough room in
  * pending_buf.
  */
-local void putShortMSB (s, b)
-    deflate_state *s;
-    uInt b;
+local void putShortMSB(
+	deflate_state *s,
+	uInt b
+)
 {
     put_byte(s, (Byte)(b >> 8));
     put_byte(s, (Byte)(b & 0xff));
@@ -385,8 +386,9 @@ local void putShortMSB (s, b)
  * to avoid allocating a large strm->next_out buffer and copying into it.
  * (See also read_buf()).
  */
-local void flush_pending(strm)
-    z_streamp strm;
+local void flush_pending(
+	z_streamp strm
+)
 {
     deflate_state *s = (deflate_state *) strm->state;
     unsigned len = s->pending;
@@ -656,8 +658,9 @@ local int read_buf(
 /* ===========================================================================
  * Initialize the "longest match" routines for a new zlib stream
  */
-local void lm_init (s)
-    deflate_state *s;
+local void lm_init(
+	deflate_state *s
+)
 {
     s->window_size = (ulg)2L*s->w_size;
 
@@ -690,9 +693,10 @@ local void lm_init (s)
 /* For 80x86 and 680x0, an optimized version will be provided in match.asm or
  * match.S. The code will be functionally equivalent.
  */
-local uInt longest_match(s, cur_match)
-    deflate_state *s;
-    IPos cur_match;                             /* current match */
+local uInt longest_match(
+	deflate_state *s,
+	IPos cur_match			/* current match */
+)
 {
     unsigned chain_length = s->max_chain_length;/* max hash chain length */
     register Byte *scan = s->window + s->strstart; /* current string */
@@ -832,10 +836,12 @@ local uInt longest_match(s, cur_match)
 /* ===========================================================================
  * Check that the match at match_start is indeed a match.
  */
-local void check_match(s, start, match, length)
-    deflate_state *s;
-    IPos start, match;
-    int length;
+local void check_match(
+	deflate_state *s,
+	IPos start,
+	IPos match,
+	int length
+)
 {
     /* check that the match is indeed a match */
     if (memcmp((char *)s->window + match,
@@ -985,9 +991,10 @@ local void fill_window(s)
  * NOTE: this function should be optimized to avoid extra copying from
  * window to pending_buf.
  */
-local block_state deflate_stored(s, flush)
-    deflate_state *s;
-    int flush;
+local block_state deflate_stored(
+	deflate_state *s,
+	int flush
+)
 {
     /* Stored blocks are limited to 0xffff bytes, pending_buf is limited
      * to pending_buf_size, and each stored block has a 5 byte header:
@@ -1043,9 +1050,10 @@ local block_state deflate_stored(s, flush)
  * new strings in the dictionary only for unmatched strings or for short
  * matches. It is used only for the fast compression options.
  */
-local block_state deflate_fast(s, flush)
-    deflate_state *s;
-    int flush;
+local block_state deflate_fast(
+	deflate_state *s,
+	int flush
+)
 {
     IPos hash_head = NIL; /* head of the hash chain */
     int bflush;           /* set if current block must be flushed */
@@ -1136,9 +1144,10 @@ local block_state deflate_fast(s, flush)
  * evaluation for matches: a match is finally adopted only if there is
  * no better match at the next window position.
  */
-local block_state deflate_slow(s, flush)
-    deflate_state *s;
-    int flush;
+local block_state deflate_slow(
+	deflate_state *s,
+	int flush
+)
 {
     IPos hash_head = NIL;    /* head of hash chain */
     int bflush;              /* set if current block must be flushed */
