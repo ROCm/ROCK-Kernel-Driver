@@ -12,6 +12,9 @@ ifndef CONFIG_SPARC64
 obj-$(CONFIG_PCI) += setup-res.o
 endif
 
+# Build the PCI Hotplug drivers if we were asked to
+obj-$(CONFIG_HOTPLUG_PCI) += hotplug/
+
 #
 # Some architectures use the generic PCI setup functions
 #

@@ -1152,7 +1152,7 @@ mpt_adapter_find_next(MPT_ADAPTER *prev)
 static int __init
 mpt_pci_scan(void)
 {
-	struct pci_dev *pdev;
+	struct pci_dev *pdev = NULL;
 	struct pci_dev *pdev2;
 	int found = 0;
 	int count = 0;
@@ -1164,11 +1164,8 @@ mpt_pci_scan(void)
 	 *  NOTE: The 929, 929X, 1030 and 1035 will appear as 2 separate PCI devices,
 	 *  one for each channel.
 	 */
-	pci_for_each_dev(pdev) {
+	while ((pdev = pci_find_device(PCI_VENDOR_ID_LSI_LOGIC, PCI_ANY_ID, pdev)) != NULL) {
 		pdev2 = NULL;
-		if (pdev->vendor != 0x1000)
-			continue;
-
 		if ((pdev->device != MPI_MANUFACTPAGE_DEVICEID_FC909) &&
 		    (pdev->device != MPI_MANUFACTPAGE_DEVICEID_FC929) &&
 		    (pdev->device != MPI_MANUFACTPAGE_DEVICEID_FC919) &&

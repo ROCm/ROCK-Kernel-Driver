@@ -1713,10 +1713,10 @@ static void __pmac
 pbook_alloc_pci_save(void)
 {
 	int npci;
-	struct pci_dev *pd;
+	struct pci_dev *pd = NULL;
 
 	npci = 0;
-	pci_for_each_dev(pd) {
+	while ((pd = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pd)) != NULL) {
 		++npci;
 	}
 	if (npci == 0)
@@ -1740,13 +1740,13 @@ static void __pmac
 pbook_pci_save(void)
 {
 	struct pci_save *ps = pbook_pci_saves;
-	struct pci_dev *pd;
+	struct pci_dev *pd = NULL;
 	int npci = pbook_npci_saves;
 	
 	if (ps == NULL)
 		return;
 
-	pci_for_each_dev(pd) {
+	while ((pd = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pd)) != NULL) {
 		if (npci-- == 0)
 			return;
 #ifndef HACKED_PCI_SAVE
@@ -1772,11 +1772,11 @@ pbook_pci_restore(void)
 {
 	u16 cmd;
 	struct pci_save *ps = pbook_pci_saves - 1;
-	struct pci_dev *pd;
+	struct pci_dev *pd = NULL;
 	int npci = pbook_npci_saves;
 	int j;
 
-	pci_for_each_dev(pd) {
+	while ((pd = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pd)) != NULL) {
 #ifdef HACKED_PCI_SAVE
 		int i;
 		if (npci-- == 0)

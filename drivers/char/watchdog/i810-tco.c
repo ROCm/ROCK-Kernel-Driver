@@ -315,14 +315,14 @@ static struct pci_dev *i810tco_pci;
 
 static unsigned char __init i810tco_getdevice (void)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 	u8 val1, val2;
 	u16 badr;
 	/*
 	 *      Find the PCI device
 	 */
 
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		if (pci_match_device(i810tco_pci_tbl, dev)) {
 			i810tco_pci = dev;
 			break;

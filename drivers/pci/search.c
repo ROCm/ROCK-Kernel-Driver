@@ -55,9 +55,9 @@ pci_find_bus(unsigned char busnr)
 struct pci_dev *
 pci_find_slot(unsigned int bus, unsigned int devfn)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		if (dev->bus->number == bus && dev->devfn == devfn)
 			return dev;
 	}
