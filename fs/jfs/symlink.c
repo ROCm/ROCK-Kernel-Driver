@@ -18,6 +18,7 @@
 
 #include <linux/fs.h>
 #include "jfs_incore.h"
+#include "jfs_xattr.h"
 
 static int jfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
@@ -34,5 +35,9 @@ static int jfs_readlink(struct dentry *dentry, char *buffer, int buflen)
 struct inode_operations jfs_symlink_inode_operations = {
 	.readlink	= jfs_readlink,
 	.follow_link	= jfs_follow_link,
+	.setxattr	= jfs_setxattr,
+	.getxattr	= jfs_getxattr,
+	.listxattr	= jfs_listxattr,
+	.removexattr	= jfs_removexattr,
 };
 

@@ -24,10 +24,12 @@
 #include "jfs_dmap.h"
 #include "jfs_unicode.h"
 #include "jfs_metapage.h"
+#include "jfs_xattr.h"
 #include "jfs_debug.h"
 
 extern struct inode_operations jfs_file_inode_operations;
 extern struct inode_operations jfs_symlink_inode_operations;
+extern struct inode_operations jfs_special_inode_operations;
 extern struct file_operations jfs_file_operations;
 extern struct address_space_operations jfs_aops;
 
@@ -672,17 +674,13 @@ int freeZeroLink(struct inode *ip)
 	 * free EA
 	 */
 	if (JFS_IP(ip)->ea.flag & DXD_EXTENT) {
-		s64 xaddr;
-		int xlen;
+		s64 xaddr = addressDXD(&JFS_IP(ip)->ea);
+		int xlen = lengthDXD(&JFS_IP(ip)->ea);
 		maplock_t maplock;	/* maplock for COMMIT_WMAP */
 		pxdlock_t *pxdlock;	/* maplock for COMMIT_WMAP */
 
 		/* free EA pages from cache */
-		xaddr = addressDXD(&JFS_IP(ip)->ea);
-		xlen = lengthDXD(&JFS_IP(ip)->ea);
-#ifdef _STILL_TO_PORT
-		bmExtentInvalidate(ip, xaddr, xlen);
-#endif
+		invalidate_dxd_metapages(ip, JFS_IP(ip)->ea);
 
 		/* free EA extent from working block map */
 		maplock.index = 1;
@@ -697,17 +695,12 @@ int freeZeroLink(struct inode *ip)
 	 * free ACL
 	 */
 	if (JFS_IP(ip)->acl.flag & DXD_EXTENT) {
-		s64 xaddr;
-		int xlen;
+		s64 xaddr = addressDXD(&JFS_IP(ip)->acl);
+		int xlen = lengthDXD(&JFS_IP(ip)->acl);
 		maplock_t maplock;	/* maplock for COMMIT_WMAP */
 		pxdlock_t *pxdlock;	/* maplock for COMMIT_WMAP */
 
-		/* free ACL pages from cache */
-		xaddr = addressDXD(&JFS_IP(ip)->acl);
-		xlen = lengthDXD(&JFS_IP(ip)->acl);
-#ifdef _STILL_TO_PORT
-		bmExtentInvalidate(ip, xaddr, xlen);
-#endif
+		invalidate_dxd_metapages(ip, JFS_IP(ip)->acl);
 
 		/* free ACL extent from working block map */
 		maplock.index = 1;
@@ -922,6 +915,14 @@ int jfs_symlink(struct inode *dip, struct dentry *dentry, const char *name)
 		i_fastsymlink = JFS_IP(ip)->i_inline;
 		memcpy(i_fastsymlink, name, ssize);
 		ip->i_size = ssize - 1;
+
+		/*
+		 * if symlink is > 128 bytes, we don't have the space to
+		 * store inline extended attributes
+		 */
+		if (ssize > sizeof (JFS_IP(ip)->i_inline))
+			JFS_IP(ip)->mode2 &= ~INLINEEA;
+
 		jFYI(1,
 		     ("jfs_symlink: fast symlink added  ssize:%d name:%s \n",
 		      ssize, name));
@@ -1337,6 +1338,7 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
 	if ((rc = dtInsert(tid, dir, &dname, &ino, &btstack)))
 		goto out3;
 
+	ip->i_op = &jfs_special_inode_operations;
 	init_special_inode(ip, ip->i_mode, rdev);
 
 	insert_inode_hash(ip);
@@ -1440,6 +1442,10 @@ struct inode_operations jfs_dir_inode_operations = {
 	.rmdir		= jfs_rmdir,
 	.mknod		= jfs_mknod,
 	.rename		= jfs_rename,
+	.setxattr	= jfs_setxattr,
+	.getxattr	= jfs_getxattr,
+	.listxattr	= jfs_listxattr,
+	.removexattr	= jfs_removexattr,
 };
 
 struct file_operations jfs_dir_operations = {

@@ -82,6 +82,10 @@ struct jfs_inode_info {
 			unchar _unused[16];	/* 16: */
 			dxd_t _dxd;		/* 16: */
 			unchar _inline[128];	/* 128: inline symlink */
+			/* _inline_ea may overlay the last part of
+			 * file._xtroot if maxentry = XTROOTINITSLOT
+			 */
+			unchar _inline_ea[128];	/* 128: inline extended attr */
 		} link;
 	} u;
 	struct inode	vfs_inode;
@@ -91,6 +95,7 @@ struct jfs_inode_info {
 #define i_dirtable u.dir._table
 #define i_dtroot u.dir._dtroot
 #define i_inline u.link._inline
+#define i_inline_ea u.link._inline_ea
 
 
 #define IREAD_LOCK(ip)		down_read(&JFS_IP(ip)->rdwrlock)

@@ -557,8 +557,7 @@ void release_metapage(metapage_t * mp)
 	jFYI(1, ("release_metapage: done\n"));
 }
 
-void invalidate_metapages(struct inode *ip, unsigned long addr,
-			 unsigned long len)
+void __invalidate_metapages(struct inode *ip, s64 addr, int len)
 {
 	metapage_t **hash_ptr;
 	unsigned long lblock;

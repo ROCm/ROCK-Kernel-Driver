@@ -815,21 +815,19 @@ int diWrite(tid_t tid, struct inode *ip)
 		memcpy(&dp->di_fastsymlink, jfs_ip->i_inline, IDATASIZE);
 		dilinelock->index++;
 	}
-#ifdef _STILL_TO_PORT
 	/*
 	 * copy inline data from in-memory inode to on-disk inode:
 	 * 128 byte slot granularity
 	 */
-	if (test_cflag(COMMIT_Inlineea, ip))
+	if (test_cflag(COMMIT_Inlineea, ip)) {
 		lv = (lv_t *) & dilinelock->lv[dilinelock->index];
 		lv->offset = (dioffset + 3 * 128) >> L2INODESLOTSIZE;
 		lv->length = 1;
-		memcpy(&dp->di_inlineea, &ip->i_inlineea, INODESLOTSIZE);
+		memcpy(&dp->di_inlineea, jfs_ip->i_inline_ea, INODESLOTSIZE);
 		dilinelock->index++;
 
 		clear_cflag(COMMIT_Inlineea, ip);
 	}
-#endif				/* _STILL_TO_PORT */
 
 	/*
 	 *      lock/copy inode base: 128 byte slot granularity
@@ -914,8 +912,6 @@ int diFree(struct inode *ip)
 	u32 bitmap, mask;
 	struct inode *ipimap = JFS_SBI(ip->i_sb)->ipimap;
 	imap_t *imap = JFS_IP(ipimap)->i_imap;
-	s64 xaddr;
-	s64 xlen;
 	pxd_t freepxd;
 	tid_t tid;
 	struct inode *iplist[3];
@@ -1181,9 +1177,7 @@ int diFree(struct inode *ip)
 	 * invalidate any page of the inode extent freed from buffer cache;
 	 */
 	freepxd = iagp->inoext[extno];
-	xaddr = addressPXD(&iagp->inoext[extno]);
-	xlen = lengthPXD(&iagp->inoext[extno]);
-	invalidate_metapages(JFS_SBI(ip->i_sb)->direct_inode, xaddr, xlen);
+	invalidate_pxd_metapages(JFS_SBI(ip->i_sb)->direct_inode, freepxd);
 
 	/*
 	 *      update iag list(s) (careful update step 2)
@@ -3046,16 +3040,17 @@ static int copy_from_dinode(dinode_t * dip, struct inode *ip)
 	jfs_ip->next_index = le32_to_cpu(dip->di_next_index);
 	jfs_ip->otime = le32_to_cpu(dip->di_otime.tv_sec);
 	jfs_ip->acltype = le32_to_cpu(dip->di_acltype);
-	/*
-	 * We may only need to do this for "special" inodes (dmap, imap)
-	 */
+
 	if (S_ISCHR(ip->i_mode) || S_ISBLK(ip->i_mode))
 		ip->i_rdev = to_kdev_t(le32_to_cpu(dip->di_rdev));
-	else if (S_ISDIR(ip->i_mode)) {
+
+	if (S_ISDIR(ip->i_mode)) {
 		memcpy(&jfs_ip->i_dirtable, &dip->di_dirtable, 384);
-	} else if (!S_ISFIFO(ip->i_mode)) {
+	} else if (S_ISREG(ip->i_mode) || S_ISLNK(ip->i_mode)) {
 		memcpy(&jfs_ip->i_xtroot, &dip->di_xtroot, 288);
-	}
+	} else
+		memcpy(&jfs_ip->i_inline_ea, &dip->di_inlineea, 128);
+
 	/* Zero the in-memory-only stuff */
 	jfs_ip->cflag = 0;
 	jfs_ip->btindex = 0;
