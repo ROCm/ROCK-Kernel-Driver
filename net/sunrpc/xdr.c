@@ -735,6 +735,10 @@ xdr_read_pages(struct xdr_stream *xdr, unsigned int len)
 int
 xdr_encode_word(struct xdr_buf *buf, unsigned int base, u32 w)
 {
+	/* We ensure that xdr buffers are always 4-byte aligned, so
+	   words will always be entirely in one area of memory in an
+	   xdr_buf. */
+#if 0
 	unsigned int n = 4;
 	w = swab32(w);
 
@@ -786,11 +790,37 @@ xdr_encode_word(struct xdr_buf *buf, unsigned int base, u32 w)
 		n--;
 	}
 	return n ? -EINVAL : 0;
+#endif
+
+	if (base < buf->head->iov_len) {
+		((u32 *) buf->head->iov_base)[base >> 2] = htonl(w);
+		return 0;
+	}
+	base -= buf->head->iov_len;
+	if (base < buf->page_len) {
+		base += buf->page_base;
+		struct page **ppages = buf->pages + (base >> PAGE_CACHE_SHIFT);
+		u32 *p = (u32 *) kmap(*ppages) +
+			 ((base & ~PAGE_CACHE_MASK) >> 2);
+		*p = htonl(w);
+		kunmap(*ppages);
+		return 0;
+	}
+	base -= buf->page_len;
+	if (base < buf->tail->iov_len) {
+		((u32 *) buf->tail->iov_base)[base >> 2] = htonl(w);
+		return 0;
+	}
+	return -EINVAL;
 }
 
 int
 xdr_decode_word(struct xdr_buf *buf, unsigned int base, u32 *w)
 {
+	/* We ensure that xdr buffers are always 4-byte aligned, so
+	   words will always be entirely in one area of memory in an
+	   xdr_buf. */
+#if 0
 	unsigned int n = 4;
 
 	while (n && base < buf->head->iov_len) {
@@ -837,6 +867,28 @@ xdr_decode_word(struct xdr_buf *buf, unsigned int base, u32 *w)
 		n--;
 	}
 	return n ? -EINVAL : 0;
+#endif
+
+	if (base < buf->head->iov_len) {
+		*w = ntohl(((u32 *) buf->head->iov_base)[base >> 2]);
+		return 0;
+	}
+	base -= buf->head->iov_len;
+	if (base < buf->page_len) {
+		base += buf->page_base;
+		struct page **ppages = buf->pages + (base >> PAGE_CACHE_SHIFT);
+		u32 *p = (u32 *) kmap(*ppages) +
+			 ((base & ~PAGE_CACHE_MASK) >> 2);
+		*w = ntohl(*p);
+		kunmap(*ppages);
+		return 0;
+	}
+	base -= buf->page_len;
+	if (base < buf->tail->iov_len) {
+		*w = ntohl(((u32 *) buf->tail->iov_base)[base >> 2]);
+		return 0;
+	}
+	return -EINVAL;
 }
 
 /* Returns 0 on success, or else a negative error code. */
@@ -957,9 +1009,9 @@ xdr_xcode_array2(struct xdr_buf *buf, unsigned int base,
 				if (avail_here) {
 					kunmap(*ppages++);
 					c = kmap(*ppages);
-					avail_page = min(PAGE_CACHE_SIZE,
-							 (unsigned int)
-							 avail_here);
+					avail_page = min(
+						(unsigned int) PAGE_CACHE_SIZE,
+						(unsigned int) avail_here);
 				}
 			}
 			if (todo) {
