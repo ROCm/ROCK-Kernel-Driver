@@ -1344,7 +1344,7 @@ static ide_startstop_t cdrom_seek_intr (ide_drive_t *drive)
 static ide_startstop_t cdrom_start_seek_continuation (ide_drive_t *drive)
 {
 	struct request *rq = HWGROUP(drive)->rq;
-	int frame = rq->sector;
+	sector_t frame = rq->sector;
 
 	sector_div(frame, queue_hardsect_size(drive->queue) >> SECTOR_BITS);
 
