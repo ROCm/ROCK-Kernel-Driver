@@ -51,7 +51,9 @@ typedef struct vfs {
 	xfs_fsid_t		*vfs_altfsid;	/* An ID fixed for life of FS */
 	bhv_head_t		vfs_bh;		/* head of vfs behavior chain */
 	struct super_block	*vfs_super;	/* Linux superblock structure */
-	struct task_struct	*vfs_sync_task;
+	struct task_struct	*vfs_sync_task;	/* xfssyncd process */
+	int 			vfs_sync_seq;	/* xfssyncd generation number */
+	wait_queue_head_t	vfs_wait_single_sync_task;
 	wait_queue_head_t	vfs_wait_sync_task;
 } vfs_t;
 
