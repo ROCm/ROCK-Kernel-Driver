@@ -2201,3 +2201,4 @@ module_exit(l2cap_cleanup);
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>");
 MODULE_DESCRIPTION("Bluetooth L2CAP ver " VERSION);
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("bt-proto-0");
