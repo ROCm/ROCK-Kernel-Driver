@@ -5,17 +5,15 @@
 #include <linux/pci.h>
 #include <linux/ide.h>
 
-static void init_setup_generic(struct pci_dev *, ide_pci_device_t *);
 static unsigned int init_chipset_generic(struct pci_dev *, const char *);
 static void init_hwif_generic(ide_hwif_t *);
 static void init_dma_generic(ide_hwif_t *, unsigned long);
 
-static ide_pci_device_t generic_chipsets[] __initdata = {
+static ide_pci_device_t generic_chipsets[] __devinitdata = {
 	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_NS,
 		device:		PCI_DEVICE_ID_NS_87410,
 		name:		"NS87410",
-		init_setup:	init_setup_generic,
 		init_chipset:	init_chipset_generic,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_generic,
@@ -29,7 +27,6 @@ static ide_pci_device_t generic_chipsets[] __initdata = {
 		vendor:		PCI_VENDOR_ID_PCTECH,
 		device:		PCI_DEVICE_ID_PCTECH_SAMURAI_IDE,
 		name:		"SAMURAI",
-		init_setup:	init_setup_generic,
 		init_chipset:	init_chipset_generic,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_generic,
@@ -43,7 +40,6 @@ static ide_pci_device_t generic_chipsets[] __initdata = {
 		vendor:		PCI_VENDOR_ID_HOLTEK,
 		device:		PCI_DEVICE_ID_HOLTEK_6565,
 		name:		"HT6565",
-		init_setup:	init_setup_generic,
 		init_chipset:	init_chipset_generic,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_generic,
@@ -57,7 +53,6 @@ static ide_pci_device_t generic_chipsets[] __initdata = {
 		vendor:		PCI_VENDOR_ID_UMC,
 		device:		PCI_DEVICE_ID_UMC_UM8673F,
 		name:		"UM8673F",
-		init_setup:	init_setup_generic,
 		init_chipset:	init_chipset_generic,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_generic,
@@ -71,7 +66,6 @@ static ide_pci_device_t generic_chipsets[] __initdata = {
 		vendor:		PCI_VENDOR_ID_UMC,
 		device:		PCI_DEVICE_ID_UMC_UM8886A,
 		name:		"UM8886A",
-		init_setup:	init_setup_generic,
 		init_chipset:	init_chipset_generic,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_generic,
@@ -85,7 +79,6 @@ static ide_pci_device_t generic_chipsets[] __initdata = {
 		vendor:		PCI_VENDOR_ID_UMC,
 		device:		PCI_DEVICE_ID_UMC_UM8886BF,
 		name:		"UM8886BF",
-		init_setup:	init_setup_generic,
 		init_chipset:	init_chipset_generic,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_generic,
@@ -99,7 +92,6 @@ static ide_pci_device_t generic_chipsets[] __initdata = {
 		vendor:		PCI_VENDOR_ID_HINT,
 		device:		PCI_DEVICE_ID_HINT_VXPROII_IDE,
 		name:		"HINT_IDE",
-		init_setup:	init_setup_generic,
 		init_chipset:	init_chipset_generic,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_generic,
@@ -113,7 +105,6 @@ static ide_pci_device_t generic_chipsets[] __initdata = {
 		vendor:		PCI_VENDOR_ID_VIA,
 		device:		PCI_DEVICE_ID_VIA_82C561,
 		name:		"VIA_IDE",
-		init_setup:	init_setup_generic,
 		init_chipset:	init_chipset_generic,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_generic,
@@ -127,7 +118,6 @@ static ide_pci_device_t generic_chipsets[] __initdata = {
 		vendor:		PCI_VENDOR_ID_OPTI,
 		device:		PCI_DEVICE_ID_OPTI_82C558,
 		name:		"OPTI621V",
-		init_setup:	init_setup_generic,
 		init_chipset:	init_chipset_generic,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_generic,
@@ -145,12 +135,11 @@ static ide_pci_device_t generic_chipsets[] __initdata = {
 	}
 };
 
-static ide_pci_device_t unknown_chipset[] __initdata = {
+static ide_pci_device_t unknown_chipset[] __devinitdata = {
 	{	/* 0 */
 		vendor:		0,
 		device:		0,
 		name:		"PCI_IDE",
-		init_setup:	init_setup_generic,
 		init_chipset:	init_chipset_generic,
 		init_iops:	NULL,
 		init_hwif:	init_hwif_generic,

@@ -29,10 +29,9 @@
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
 #include "linux32.h"
+#include "ptrace32.h"
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
-
-#define _USER_PSW_MASK32 0x0705C00080000000
 
 typedef struct 
 {
@@ -112,11 +111,11 @@ sys32_sigsuspend(struct pt_regs * regs,int history0, int history1, old_sigset_t 
 	sigset_t saveset;
 
 	mask &= _BLOCKABLE;
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	saveset = current->blocked;
 	siginitset(&current->blocked, mask);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 	regs->gprs[2] = -EINTR;
 
 	while (1) {
@@ -147,11 +146,11 @@ sys32_rt_sigsuspend(struct pt_regs * regs,sigset_t32 *unewset, size_t sigsetsize
 	}
         sigdelsetmask(&newset, ~_BLOCKABLE);
 
-        spin_lock_irq(&current->sigmask_lock);
+        spin_lock_irq(&current->sig->siglock);
         saveset = current->blocked;
         current->blocked = newset;
         recalc_sigpending();
-        spin_unlock_irq(&current->sigmask_lock);
+        spin_unlock_irq(&current->sig->siglock);
         regs->gprs[2] = -EINTR;
 
         while (1) {
@@ -290,55 +289,48 @@ sys32_sigaltstack(const stack_t32 *uss, stack_t32 *uoss, struct pt_regs *regs)
 
 static int save_sigregs32(struct pt_regs *regs,_sigregs32 *sregs)
 {
-	int err = 0;
-	s390_fp_regs fpregs;
-	int i;
+	_s390_regs_common32 regs32;
+	int err, i;
 
-	for(i=0; i<NUM_GPRS; i++) 
-		err |= __put_user(regs->gprs[i], &sregs->regs.gprs[i]);  
-	for(i=0; i<NUM_ACRS; i++)
-		err |= __put_user(regs->acrs[i], &sregs->regs.acrs[i]);  
-	err |= __copy_to_user(&sregs->regs.psw.mask, &regs->psw.mask, 4);
-	err |= __copy_to_user(&sregs->regs.psw.addr, ((char*)&regs->psw.addr)+4, 4);
-	if(!err)
-	{
-		save_fp_regs(&fpregs);
-		__put_user(fpregs.fpc, &sregs->fpregs.fpc);
-		for(i=0; i<NUM_FPRS; i++)
-			err |= __put_user(fpregs.fprs[i].d, &sregs->fpregs.fprs[i].d);  
-	}
-	return(err);
-	
+	regs32.psw.mask = PSW32_USER_BITS |
+		((__u32)(regs->psw.mask >> 32) & PSW32_MASK_CC);
+	regs32.psw.addr = PSW32_ADDR_AMODE31 | (__u32) regs->psw.addr;
+	for (i = 0; i < NUM_GPRS; i++)
+		regs32.gprs[i] = (__u32) regs->gprs[i];
+	memcpy(regs32.acrs, regs->acrs, sizeof(regs32.acrs));
+	err = __copy_to_user(&sregs->regs, &regs32, sizeof(regs32));
+	if (err)
+		return err;
+	save_fp_regs(&current->thread.fp_regs);
+	/* s390_fp_regs and _s390_fp_regs32 are the same ! */
+	return __copy_to_user(&sregs->fpregs, &current->thread.fp_regs,
+			      sizeof(_s390_fp_regs32));
 }
 
 static int restore_sigregs32(struct pt_regs *regs,_sigregs32 *sregs)
 {
-	int err = 0;
-	s390_fp_regs fpregs;
-	psw_t saved_psw=regs->psw;
-	int i;
+	_s390_regs_common32 regs32;
+	int err, i;
 
-	for(i=0; i<NUM_GPRS; i++)
-		err |= __get_user(regs->gprs[i], &sregs->regs.gprs[i]);  
-	for(i=0; i<NUM_ACRS; i++)
-		err |= __get_user(regs->acrs[i], &sregs->regs.acrs[i]);  
-	err |= __copy_from_user(&regs->psw.mask, &sregs->regs.psw.mask, 4);
-	err |= __copy_from_user(((char*)&regs->psw.addr)+4, &sregs->regs.psw.addr, 4);
+	err = __copy_from_user(&regs32, &sregs->regs, sizeof(regs32));
+	if (err)
+		return err;
+	regs->psw.mask = PSW_USER32_BITS |
+		(__u64)(regs32.psw.mask & PSW32_MASK_CC) << 32;
+	regs->psw.addr = (__u64)(regs32.psw.addr & PSW32_ADDR_INSN);
+	for (i = 0; i < NUM_GPRS; i++)
+		regs->gprs[i] = (__u64) regs32.gprs[i];
+	memcpy(regs->acrs, regs32.acrs, sizeof(regs32.acrs));
 
-	if(!err)
-	{
-		regs->trap = -1;		/* disable syscall checks */
-		regs->psw.mask=(saved_psw.mask&~PSW_MASK_DEBUGCHANGE)|
-		(regs->psw.mask&PSW_MASK_DEBUGCHANGE);
-		regs->psw.addr=(saved_psw.addr&~PSW_ADDR_DEBUGCHANGE)|
-		(regs->psw.addr&PSW_ADDR_DEBUGCHANGE);
-		__get_user(fpregs.fpc, &sregs->fpregs.fpc);
-                for(i=0; i<NUM_FPRS; i++)
-                        err |= __get_user(fpregs.fprs[i].d, &sregs->fpregs.fprs[i].d);              
-		if(!err)
-			restore_fp_regs(&fpregs);
-	}
-	return(err);
+	err = __copy_from_user(&current->thread.fp_regs, &sregs->fpregs,
+			       sizeof(_s390_fp_regs32));
+	current->thread.fp_regs.fpc &= FPC_VALID_MASK;
+	if (err)
+		return err;
+
+	restore_fp_regs(&current->thread.fp_regs);
+	regs->trap = -1;	/* disable syscall checks */
+	return 0;
 }
 
 asmlinkage long sys32_sigreturn(struct pt_regs *regs)
@@ -352,10 +344,10 @@ asmlinkage long sys32_sigreturn(struct pt_regs *regs)
 		goto badframe;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	if (restore_sigregs32(regs, &frame->sregs))
 		goto badframe;
@@ -382,10 +374,10 @@ asmlinkage long sys32_rt_sigreturn(struct pt_regs *regs)
 		goto badframe;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	current->blocked = set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	if (restore_sigregs32(regs, &frame->uc.uc_mcontext))
 		goto badframe;
@@ -470,9 +462,9 @@ static void setup_frame32(int sig, struct k_sigaction *ka,
 	/* Set up to return from userspace.  If provided, use a stub
 	   already in userspace.  */
 	if (ka->sa.sa_flags & SA_RESTORER) {
-		regs->gprs[14] = FIX_PSW(ka->sa.sa_restorer);
+		regs->gprs[14] = (__u64) ka->sa.sa_restorer;
 	} else {
-		regs->gprs[14] = FIX_PSW(frame->retcode);
+		regs->gprs[14] = (__u64) frame->retcode;
 		if (__put_user(S390_SYSCALL_OPCODE | __NR_sigreturn,
 		               (u16 *)(frame->retcode)))
 			goto give_sigsegv;
@@ -483,12 +475,12 @@ static void setup_frame32(int sig, struct k_sigaction *ka,
 		goto give_sigsegv;
 
 	/* Set up registers for signal handler */
-	regs->gprs[15] = (addr_t)frame;
-	regs->psw.addr = FIX_PSW(ka->sa.sa_handler);
-	regs->psw.mask = _USER_PSW_MASK32;
+	regs->gprs[15] = (__u64) frame;
+	regs->psw.addr = (__u64) ka->sa.sa_handler;
+	regs->psw.mask = PSW_USER32_BITS;
 
 	regs->gprs[2] = map_signal(sig);
-	regs->gprs[3] = (addr_t)&frame->sc;
+	regs->gprs[3] = (__u64) &frame->sc;
 
 	/* We forgot to include these in the sigcontext.
 	   To avoid breaking binary compatibility, they are passed as args. */
@@ -528,9 +520,9 @@ static void setup_rt_frame32(int sig, struct k_sigaction *ka, siginfo_t *info,
 	/* Set up to return from userspace.  If provided, use a stub
 	   already in userspace.  */
 	if (ka->sa.sa_flags & SA_RESTORER) {
-		regs->gprs[14] = FIX_PSW(ka->sa.sa_restorer);
+		regs->gprs[14] = (__u64) ka->sa.sa_restorer;
 	} else {
-		regs->gprs[14] = FIX_PSW(frame->retcode);
+		regs->gprs[14] = (__u64) frame->retcode;
 		err |= __put_user(S390_SYSCALL_OPCODE | __NR_rt_sigreturn,
 		                  (u16 *)(frame->retcode));
 	}
@@ -540,13 +532,13 @@ static void setup_rt_frame32(int sig, struct k_sigaction *ka, siginfo_t *info,
 		goto give_sigsegv;
 
 	/* Set up registers for signal handler */
-	regs->gprs[15] = (addr_t)frame;
-	regs->psw.addr = FIX_PSW(ka->sa.sa_handler);
-	regs->psw.mask = _USER_PSW_MASK32;
+	regs->gprs[15] = (__u64) frame;
+	regs->psw.addr = (__u64) ka->sa.sa_handler;
+	regs->psw.mask = PSW_USER32_BITS;
 
 	regs->gprs[2] = map_signal(sig);
-	regs->gprs[3] = (addr_t)&frame->info;
-	regs->gprs[4] = (addr_t)&frame->uc;
+	regs->gprs[3] = (__u64) &frame->info;
+	regs->gprs[4] = (__u64) &frame->uc;
 	return;
 
 give_sigsegv:
@@ -595,11 +587,11 @@ handle_signal32(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 		ka->sa.sa_handler = SIG_DFL;
 
 	if (!(ka->sa.sa_flags & SA_NODEFER)) {
-		spin_lock_irq(&current->sigmask_lock);
+		spin_lock_irq(&current->sig->siglock);
 		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
 		sigaddset(&current->blocked,sig);
 		recalc_sigpending();
-		spin_unlock_irq(&current->sigmask_lock);
+		spin_unlock_irq(&current->sig->siglock);
 	}
 }
 

@@ -42,6 +42,7 @@
 #include <linux/errno.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/reboot.h>
 #include <linux/vmalloc.h>
 #include <linux/smp.h>
 
@@ -98,6 +99,10 @@ static int sd_attach(Scsi_Device *);
 static int sd_detect(Scsi_Device *);
 static void sd_detach(Scsi_Device *);
 static int sd_init_command(Scsi_Cmnd *);
+static int sd_synchronize_cache(int, int);
+static int sd_notifier(struct notifier_block *, unsigned long, void *);
+
+static struct notifier_block sd_notifier_block = {sd_notifier, NULL, 0}; 
 
 static struct Scsi_Device_Template sd_template = {
 	module:THIS_MODULE,
@@ -574,6 +579,7 @@ static int sd_release(struct inode *inode, struct file *filp)
 		__MOD_DEC_USE_COUNT(sdp->host->hostt->module);
 	if (sd_template.module)
 		__MOD_DEC_USE_COUNT(sd_template.module);
+
 	return 0;
 }
 
@@ -881,6 +887,74 @@ sd_spinup_disk(Scsi_Disk *sdkp, char *diskname,
 }
 
 /*
+ * sd_read_cache_type - called only from sd_init_onedisk()
+ */
+static void
+sd_read_cache_type(Scsi_Disk *sdkp, char *diskname,
+		   Scsi_Request *SRpnt, unsigned char *buffer) {
+
+	unsigned char cmd[10];
+	Scsi_Device *sdp = sdkp->device;
+	int the_result, retries;
+
+	retries = 3;
+	do {
+
+		memset((void *) &cmd[0], 0, 10);
+		cmd[0] = MODE_SENSE;
+		cmd[1] = (sdp->scsi_level <= SCSI_2) ?
+			 ((sdp->lun << 5) & 0xe0) : 0;
+		cmd[1] |= 0x08;	/* DBD */
+		cmd[2] = 0x08;	/* current values, cache page */
+		cmd[4] = 128;	/* allocation length */
+
+
+		memset((void *) buffer, 0, 24);
+		SRpnt->sr_cmd_len = 0;
+		SRpnt->sr_sense_buffer[0] = 0;
+		SRpnt->sr_sense_buffer[2] = 0;
+
+		SRpnt->sr_data_direction = SCSI_DATA_READ;
+		scsi_wait_req(SRpnt, (void *) cmd, (void *) buffer,
+			    24, SD_TIMEOUT, MAX_RETRIES);
+
+		the_result = SRpnt->sr_result;
+		retries--;
+
+	} while (the_result && retries);
+
+	if (the_result) {
+		printk(KERN_ERR "%s : MODE SENSE failed.\n"
+		       "%s : status = %x, message = %02x, host = %d, driver = %02x \n",
+		       diskname, diskname,
+		       status_byte(the_result),
+		       msg_byte(the_result),
+		       host_byte(the_result),
+		       driver_byte(the_result)
+		    );
+		if (driver_byte(the_result) & DRIVER_SENSE)
+			print_req_sense("sd", SRpnt);
+		else
+			printk(KERN_ERR "%s : sense not available. \n", diskname);
+
+		printk(KERN_ERR "%s : assuming drive cache: write through\n", diskname);
+		sdkp->WCE = 0;
+		sdkp->RCD = 0;
+	} else {
+		const char *types[] = { "write through", "none", "write back", "write back, no read (daft)" };
+		int ct = 0;
+		int offset = buffer[3] + 4; /* offset to start of mode page */
+
+		sdkp->WCE = (buffer[offset + 2] & 0x04) == 0x04;
+		sdkp->RCD = (buffer[offset + 2] & 0x01) == 0x01;
+
+		ct =  sdkp->RCD + 2*sdkp->WCE;
+
+		printk(KERN_NOTICE "SCSI device %s: drive cache: %s\n", diskname, types[ct]);
+	}
+}
+
+/*
  * read disk capacity - called only in sd_init_onedisk()
  */
 static void
@@ -1118,6 +1192,7 @@ sd_init_onedisk(Scsi_Disk * sdkp, int dsk_nr) {
 	sdkp->write_prot = 0;
 
 	sd_spinup_disk(sdkp, diskname, SRpnt, buffer);
+	sd_read_cache_type(sdkp, diskname, SRpnt, buffer);
 
 	if (sdkp->media_present)
 		sd_read_capacity(sdkp, diskname, SRpnt, buffer);
@@ -1395,15 +1470,22 @@ static void sd_detach(Scsi_Device * sdp)
 	for (dsk_nr = 0; dsk_nr < sd_template.dev_max; dsk_nr++) {
 		sdkp = sd_dsk_arr[dsk_nr];
 		if (sdkp->device == sdp) {
-			sdkp->device = NULL;
-			sdkp->capacity = 0;
-			/* sdkp->detaching = 1; */
 			break;
 		}
 	}
 	write_unlock_irqrestore(&sd_dsk_arr_lock, iflags);
 	if (dsk_nr >= sd_template.dev_max)
 		return;
+
+	/* check that we actually have a write back cache to synchronize */
+	if(sdkp->WCE) {
+		printk(KERN_NOTICE "Synchronizing SCSI cache: ");
+		sd_synchronize_cache(dsk_nr, 1);
+		printk("\n");
+	}
+	sdkp->device = NULL;
+	sdkp->capacity = 0;
+	/* sdkp->detaching = 1; */
 
 	if (sdkp->has_been_registered) {
 		sdkp->has_been_registered = 0;
@@ -1433,6 +1515,7 @@ static int __init init_sd(void)
 		sd_template.scsi_driverfs_driver.name = (char *)sd_template.tag;
 		sd_template.scsi_driverfs_driver.bus = &scsi_driverfs_bus_type;
 		driver_register(&sd_template.scsi_driverfs_driver);
+		register_reboot_notifier(&sd_notifier_block);
 	}
 	return rc;
 }
@@ -1461,6 +1544,92 @@ static void __exit exit_sd(void)
 		blk_dev[SD_MAJOR(k)].queue = NULL;
 	sd_template.dev_max = 0;
 	remove_driver(&sd_template.scsi_driverfs_driver);
+
+	unregister_reboot_notifier(&sd_notifier_block);
+}
+
+static int sd_notifier(struct notifier_block *nbt, unsigned long event, void *buf)
+{
+	int i;
+	char *msg = "Synchronizing SCSI caches: ";
+
+	if (!(event == SYS_RESTART || event == SYS_HALT 
+	      || event == SYS_POWER_OFF))
+		return NOTIFY_DONE;
+	for (i = 0; i < sd_template.dev_max; i++) {
+		Scsi_Disk *sdkp = sd_get_sdisk(i);
+
+		if (!sdkp || !sdkp->device)
+			continue;
+		if (sdkp->WCE) {
+			if(msg) {
+				printk(KERN_NOTICE "%s", msg);
+				msg = NULL;
+			}
+			sd_synchronize_cache(i, 1);
+		}
+	}
+	if(!msg)
+		printk("\n");
+
+	return NOTIFY_OK;
+}
+
+/* send a SYNCHRONIZE CACHE instruction down to the device through the
+ * normal SCSI command structure.  Wait for the command to complete (must
+ * have user context) */
+static int sd_synchronize_cache(int index, int verbose)
+{
+	Scsi_Request *SRpnt;
+	Scsi_Disk *sdkp = sd_get_sdisk(index);
+	Scsi_Device *SDpnt = sdkp->device;
+	int retries, the_result;
+
+	if(verbose) {
+		char buf[16];
+
+		sd_dskname(index, buf);
+
+		printk("%s ", buf);
+	}
+
+	SRpnt = scsi_allocate_request(SDpnt);
+	if(!SRpnt) {
+		if(verbose)
+			printk("FAILED\n  No memory for request\n");
+		return 0;
+	}
+		
+
+	for(retries = 3; retries > 0; --retries) {
+		unsigned char cmd[10] = { 0 };
+
+		cmd[0] = SYNCHRONIZE_CACHE;
+		cmd[1] = SDpnt->scsi_level <= SCSI_2 ? (SDpnt->lun << 5) & 0xe0 : 0;
+		/* leave the rest of the command zero to indicate 
+		 * flush everything */
+		scsi_wait_req(SRpnt, (void *)cmd, NULL, 0,
+			      SD_TIMEOUT, MAX_RETRIES);
+
+		if(SRpnt->sr_result == 0)
+			break;
+	}
+
+	the_result = SRpnt->sr_result;
+	scsi_release_request(SRpnt);
+	if(verbose) {
+		if(the_result != 0) {
+			printk("FAILED\n  status = %x, message = %02x, host = %d, driver = %02x\n  ",
+			       status_byte(the_result),
+			       msg_byte(the_result),
+			       host_byte(the_result),
+			       driver_byte(the_result));
+			if (driver_byte(the_result) & DRIVER_SENSE)
+				print_req_sense("sd", SRpnt);
+
+		}
+	}
+	return (the_result == 0);
 }
 
 static Scsi_Disk * sd_get_sdisk(int index)

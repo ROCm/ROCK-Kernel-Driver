@@ -8,7 +8,7 @@
 static void init_hwif_ns87415(ide_hwif_t *);
 static void init_dma_ns87415(ide_hwif_t *, unsigned long);
 
-static ide_pci_device_t ns87415_chipsets[] __initdata = {
+static ide_pci_device_t ns87415_chipsets[] __devinitdata = {
 	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_NS,
 		device:		PCI_DEVICE_ID_NS_87415,

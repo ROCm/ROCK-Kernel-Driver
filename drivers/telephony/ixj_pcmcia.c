@@ -98,7 +98,6 @@ static dev_link_t *ixj_attach(void)
 static void ixj_detach(dev_link_t * link)
 {
 	dev_link_t **linkp;
-	long flags;
 	int ret;
 	DEBUG(0, "ixj_detach(0x%p)\n", link);
 	for (linkp = &dev_list; *linkp; linkp = &(*linkp)->next)
@@ -106,13 +105,8 @@ static void ixj_detach(dev_link_t * link)
 			break;
 	if (*linkp == NULL)
 		return;
-	save_flags(flags);
-	cli();
-	if (link->state & DEV_RELEASE_PENDING) {
-		del_timer(&link->release);
-		link->state &= ~DEV_RELEASE_PENDING;
-	}
-	restore_flags(flags);
+	del_timer_sync(&link->release);
+	link->state &= ~DEV_RELEASE_PENDING;
 	if (link->state & DEV_CONFIG)
 		ixj_cs_release((u_long) link);
 	if (link->handle) {

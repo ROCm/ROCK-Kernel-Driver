@@ -7,7 +7,7 @@
 
 static void init_hwif_rz1000(ide_hwif_t *);
 
-static ide_pci_device_t rz1000_chipsets[] __initdata = {
+static ide_pci_device_t rz1000_chipsets[] __devinitdata = {
 {
 		vendor:		PCI_VENDOR_ID_PCTECH,
 		device:		PCI_DEVICE_ID_PCTECH_RZ1000,

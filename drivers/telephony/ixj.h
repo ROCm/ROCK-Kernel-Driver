@@ -1199,7 +1199,7 @@ typedef struct {
 	unsigned char cid_play_flag;
 	char play_mode;
 	IXJ_FLAGS flags;
-	unsigned int busyflags;
+	unsigned long busyflags;
 	unsigned int rec_frame_size;
 	unsigned int play_frame_size;
 	unsigned int cid_play_frame_size;

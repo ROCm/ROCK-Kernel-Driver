@@ -68,7 +68,7 @@ extern unsigned int init_chipset_cy82c693(struct pci_dev *, const char *);
 extern void init_hwif_cy82c693(ide_hwif_t *);
 extern void init_iops_cy82c693(ide_hwif_t *);
 
-static ide_pci_device_t cy82c693_chipsets[] __initdata = {
+static ide_pci_device_t cy82c693_chipsets[] __devinitdata = {
 	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_CONTAQ,
 		device:		PCI_DEVICE_ID_CONTAQ_82C693,

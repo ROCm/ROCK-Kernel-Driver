@@ -1649,11 +1649,7 @@ static int set_mac_address(struct net_device *dev, void *addr)
 
 #ifdef MODULE
 
-static struct net_device dev_cs89x0 = {
-        "",
-        0, 0, 0, 0,
-        0, 0,
-        0, 0, 0, NULL, NULL };
+static struct net_device dev_cs89x0;
 
 /*
  * Support the 'debug' module parm even if we're compiled for non-debug to 

@@ -872,23 +872,23 @@ sys32_rt_sigqueueinfo_wrapper:
 
 #sys32_rt_sigsuspend_wrapper		# done in rt_sigsuspend_glue 
 
-	.globl  sys32_pread_wrapper 
-sys32_pread_wrapper:
+	.globl  sys32_pread64_wrapper 
+sys32_pread64_wrapper:
 	llgfr	%r2,%r2			# unsigned int
 	llgtr	%r3,%r3			# char *
 	llgfr	%r4,%r4			# size_t
 	llgfr	%r5,%r5			# u32
 	llgfr	%r6,%r6			# u32
-	jg	sys32_pread		# branch to system call
+	jg	sys32_pread64		# branch to system call
 
-	.globl  sys32_pwrite_wrapper 
-sys32_pwrite_wrapper:
+	.globl  sys32_pwrite64_wrapper 
+sys32_pwrite64_wrapper:
 	llgfr	%r2,%r2			# unsigned int
 	llgtr	%r3,%r3			# const char *
 	llgfr	%r4,%r4			# size_t
 	llgfr	%r5,%r5			# u32
 	llgfr	%r6,%r6			# u32
-	jg	sys32_pwrite		# branch to system call
+	jg	sys32_pwrite64		# branch to system call
 
 	.globl  sys32_chown16_wrapper 
 sys32_chown16_wrapper:
@@ -1114,7 +1114,7 @@ sys32_futex_wrapper:
 	lgfr	%r3,%r3			# int
 	lgfr	%r4,%r4			# int
 	llgtr	%r5,%r5			# struct timespec *
-	jg	sys_futex		# branch to system call
+	jg	sys32_futex		# branch to system call
 
 	.globl	sys32_setxattr_wrapper
 sys32_setxattr_wrapper:
@@ -1220,3 +1220,7 @@ sys32_sched_getaffinity_wrapper:
 	llgtr	%r4,%r4			# unsigned long *
 	jg	sys32_sched_getaffinity
 
+	.globl  sys32_exit_group_wrapper
+sys32_exit_group_wrapper:
+	lgfr	%r2,%r2			# int
+	jg	sys_exit_group		# branch to system call

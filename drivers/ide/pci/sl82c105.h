@@ -9,7 +9,7 @@ static unsigned int init_chipset_sl82c105(struct pci_dev *, const char *);
 static void init_hwif_sl82c105(ide_hwif_t *);
 static void init_dma_sl82c105(ide_hwif_t *, unsigned long);
 
-static ide_pci_device_t sl82c105_chipsets[] __initdata = {
+static ide_pci_device_t sl82c105_chipsets[] __devinitdata = {
 	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_WINBOND,
 		device:		PCI_DEVICE_ID_WINBOND_82C105,

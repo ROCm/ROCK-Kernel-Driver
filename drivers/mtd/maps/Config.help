@@ -127,6 +127,14 @@ CONFIG_MTD_MIXMEM
   you probably want to enable this mapping driver. More info is at
   <http://www.itc.hu/>.
 
+CONFIG_MTD_SCx200_DOCFLASH
+  Enable support for a flash chip mapped using the DOCCS signal on a
+  National Semiconductor SCx200 processor.
+
+  If you don't know what to do here, say N.
+
+  If compiled as a module, it will be called scx200_docflash.o.
+
 CONFIG_MTD_OCTAGON
   This provides a 'mapping' driver which supports the way in which
   the flash chips are connected in the Octagon-5066 Single Board

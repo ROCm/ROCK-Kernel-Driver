@@ -341,7 +341,7 @@ extern inline void raw3215_try_io(raw3215_info *raw)
  * The bottom half handler routine for 3215 devices. It tries to start
  * the next IO and wakes up processes waiting on the tty.
  */
-static void raw3215_softint(void *data)
+static void raw3215_tasklet(void *data)
 {
 	raw3215_info *raw;
 	struct tty_struct *tty;
@@ -377,8 +377,6 @@ static inline void raw3215_sched_bh(raw3215_info *raw)
         if (raw->flags & RAW3215_BH_PENDING)
                 return;       /* already pending */
         raw->flags |= RAW3215_BH_PENDING;
-	INIT_LIST_HEAD(&raw->tqueue.list);
-	raw->tqueue.sync = 0;
 	INIT_WORK(&raw->tqueue, raw3215_softint, raw);
         schedule_work(&raw->tqueue);
 }
@@ -458,7 +456,7 @@ static void raw3215_irq(int irq, void *int_parm, struct pt_regs *regs)
                 if ((raw = req->info) == NULL)
                         return;              /* That shouldn't happen ... */
 		if (req->type == RAW3215_READ && raw->tty != NULL) {
-			char *cchar;
+			unsigned int cchar;
 
 			tty = raw->tty;
                         count = 160 - req->residual;
@@ -470,14 +468,19 @@ static void raw3215_irq(int irq, void *int_parm, struct pt_regs *regs)
 			if (count >= TTY_FLIPBUF_SIZE - tty->flip.count)
 				count = TTY_FLIPBUF_SIZE - tty->flip.count - 1;
 			EBCASC(raw->inbuf, count);
-			if ((cchar = ctrlchar_handle(raw->inbuf, count, tty))) {
-				if (cchar == (char *)-1)
-					goto in_out;
+			cchar = ctrlchar_handle(raw->inbuf, count, tty);
+			switch (cchar & CTRLCHAR_MASK) {
+			case CTRLCHAR_SYSRQ:
+				break;
+
+			case CTRLCHAR_CTRL:
 				tty->flip.count++;
 				*tty->flip.flag_buf_ptr++ = TTY_NORMAL;
-				*tty->flip.char_buf_ptr++ = *cchar;
+				*tty->flip.char_buf_ptr++ = cchar;
 				tty_flip_buffer_push(raw->tty);
-			} else {
+				break;
+
+			case CTRLCHAR_NONE:
 				memcpy(tty->flip.char_buf_ptr,
 				       raw->inbuf, count);
 				if (count < 2 ||
@@ -494,12 +497,13 @@ static void raw3215_irq(int irq, void *int_parm, struct pt_regs *regs)
 				tty->flip.flag_buf_ptr += count;
 				tty->flip.count += count;
 				tty_flip_buffer_push(raw->tty);
+				break;
 			}
 		} else if (req->type == RAW3215_WRITE) {
 			raw->count -= req->len;
                         raw->written -= req->len;
 		} 
-in_out:
+
 		raw->flags &= ~RAW3215_WORKING;
 		raw3215_free_req(req);
 		/* check for empty wait */
@@ -696,13 +700,12 @@ static int raw3215_startup(raw3215_info *raw)
 
 	if (raw->flags & RAW3215_ACTIVE)
 		return 0;
-	if (request_irq(raw->irq, raw3215_irq, SA_INTERRUPT,
-			"3215 terminal driver", &raw->devstat) != 0)
+	if (s390_request_console_irq(raw->irq, raw3215_irq, SA_INTERRUPT,
+				"3215 terminal driver", &raw->devstat) != 0)
 		return -1;
 	raw->line_pos = 0;
 	raw->flags |= RAW3215_ACTIVE;
 	s390irq_spin_lock_irqsave(raw->irq, flags);
-        set_cons_dev(raw->irq);
 	raw3215_try_io(raw);
 	s390irq_spin_unlock_irqrestore(raw->irq, flags);
 
@@ -1065,12 +1068,27 @@ void __init con3215_init(void)
 	/* Check if 3215 is to be the console */
 	if (!CONSOLE_IS_3215)
 		return;
-	irq = raw3215_find_dev(0);
 
 	/* Set the console mode for VM */
 	if (MACHINE_IS_VM) {
 		cpcmd("TERM CONMODE 3215", NULL, 0);
 		cpcmd("TERM AUTOCR OFF", NULL, 0);
+	}
+
+	if (console_device != -1) {
+		/* use the device number that was specified on the
+		 * command line */
+		irq = raw3215_find_dev(0);
+	} else if (MACHINE_IS_VM) {
+		/* under VM, the console is at device number 0009
+		 * by default, so try that */
+		irq = get_irq_by_devno(0x0009);
+	} else {
+		/* unlike in 2.4, we cannot autoprobe here, since
+		 * the channel subsystem is not fully initialized.
+		 * With some luck, the HWC console can take over */
+		printk(KERN_WARNING "3215 console not found\n");
+		return;
 	}
 
 	/* allocate 3215 request structures */
@@ -1082,8 +1100,6 @@ void __init con3215_init(void)
 		raw3215_freelist = req;
 	}
 
-	ctrlchar_init();
-
 #ifdef CONFIG_TN3215_CONSOLE
         raw3215[0] = raw = (raw3215_info *)
                 alloc_bootmem_low(sizeof(raw3215_info));
@@ -1092,7 +1108,7 @@ void __init con3215_init(void)
         raw->inbuf = (char *) alloc_bootmem_low(RAW3215_INBUF_SIZE);
 
 	/* Find the first console */
-	raw->irq = raw3215_find_dev(0);
+	raw->irq = irq;
 	raw->flags |= RAW3215_FIXED;
 	INIT_WORK(&raw->tqueue, raw3215_softint, raw);
         init_waitqueue_head(&raw->empty_wait);

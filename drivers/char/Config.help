@@ -818,6 +818,12 @@ CONFIG_MIXCOMWD
   module, say M here and read <file:Documentation/modules.txt>.  Most
   people will say N.
 
+CONFIG_SCx200_WDT
+  Enable the built-in watchdog timer support on the National 
+  Semiconductor SCx200 processors.
+
+  If compiled as a module, it will be called scx200_watchdog.o.
+
 CONFIG_MACHZ_WDT
   If you are using a ZF Micro MachZ processor, say Y here, otherwise
   N.  This is the driver for the watchdog timer builtin on that
@@ -1020,4 +1026,10 @@ CONFIG_RAW_DRIVER
   The raw driver permits block devices to be bound to /dev/raw/rawN. 
   Once bound, I/O against /dev/raw/rawN uses efficient zero-copy I/O. 
   See the raw(8) manpage for more details.
+
+CONFIG_SCx200_GPIO
+  Give userspace access to the GPIO pins on the National
+  Semiconductor SCx200 processors.
+
+  If compiled as a module, it will be called scx200_gpio.o.
 

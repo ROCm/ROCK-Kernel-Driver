@@ -637,6 +637,12 @@ int s390_request_irq_special( int                      irq,
                               const char              *devname,
                               void                    *dev_id);
 
+extern int s390_request_console_irq (int irq,
+			  void (*handler) (int, void *, struct pt_regs *),
+			  unsigned long irqflags,
+			  const char *devname,
+			  void *dev_id);
+
 extern int set_cons_dev(int irq);
 extern int wait_cons_dev(int irq);
 extern schib_t *s390_get_schib( int irq );
@@ -860,28 +866,8 @@ typedef struct {
      __u32 vrdccrft : 8;    /* real device feature (output) */
      } __attribute__ ((packed,aligned(4))) diag210_t;
 
-void VM_virtual_device_info( __u16      devno,   /* device number */
-                             senseid_t *ps );    /* ptr to senseID data */
+extern int diag210( diag210_t * addr);
 
-extern __inline__ int diag210( diag210_t * addr)
-{
-        int ccode;
-
-        __asm__ __volatile__(
-#ifdef CONFIG_ARCH_S390X
-                "   sam31\n"
-                "   diag  %1,0,0x210\n"
-                "   sam64\n"
-#else
-                "   diag  %1,0,0x210\n"
-#endif
-                "   ipm   %0\n"
-                "   srl   %0,28"
-                : "=d" (ccode) 
-		: "a" (addr)
-                : "cc" );
-        return ccode;
-}
 extern __inline__ int chsc( chsc_area_t * chsc_area)
 {
 	int cc;
@@ -895,67 +881,6 @@ extern __inline__ int chsc( chsc_area_t * chsc_area)
 		: "cc" );
 	
 	return cc;
-}
-
-/*
- * Various low-level irq details needed by irq.c, process.c,
- * time.c, io_apic.c and smp.c
- *
- * Interrupt entry/exit code at both C and assembly level
- */
-
-#ifdef CONFIG_SMP
-
-#include <asm/atomic.h>
-
-static inline void irq_enter(int cpu, unsigned int irq)
-{
-        hardirq_enter(cpu);
-        while (atomic_read(&global_irq_lock) != 0) {
-                eieio();
-        }
-}
-
-static inline void irq_exit(int cpu, unsigned int irq)
-{
-        hardirq_exit(cpu);
-        release_irqlock(cpu);
-}
-
-
-#else
-
-#define irq_enter(cpu, irq)     (++local_irq_count(cpu))
-#define irq_exit(cpu, irq)      (--local_irq_count(cpu))
-
-#endif
-
-#define __STR(x) #x
-#define STR(x) __STR(x)
-
-/*
- * x86 profiling function, SMP safe. We might want to do this in
- * assembly totally?
- * is this ever used anyway?
- */
-extern char _stext;
-static inline void s390_do_profile (unsigned long addr)
-{
-        if (prof_buffer && current->pid) {
-#ifndef CONFIG_ARCH_S390X
-                addr &= 0x7fffffff;
-#endif
-                addr -= (unsigned long) &_stext;
-                addr >>= prof_shift;
-                /*
-                 * Don't ignore out-of-bounds EIP values silently,
-                 * put them into the last histogram slot, so if
-                 * present, they will show up as a sharp peak.
-                 */
-                if (addr > prof_len-1)
-                        addr = prof_len-1;
-                atomic_inc((atomic_t *)&prof_buffer[addr]);
-        }
 }
 
 #include <asm/s390io.h>

@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/proc.c
  *   S/390 common I/O routines -- proc file system entries
- *   $Revision: 1.4 $
+ *   $Revision: 1.5 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *                            IBM Corporation
@@ -267,3 +267,9 @@ cio_irq_proc_init (void)
 }
 
 __initcall (cio_irq_proc_init);
+
+void
+init_irq_proc(void)
+{
+	/* For now, nothing... */
+}

@@ -710,7 +710,7 @@ static void __init handle_initrd(void)
 
 	pid = kernel_thread(do_linuxrc, "/linuxrc", SIGCHLD);
 	if (pid > 0) {
-		while (pid != wait(&i))
+		while (pid != waitpid(-1, &i, 0))
 			yield();
 	}
 

@@ -4,7 +4,7 @@
 
 export ACPI_CFLAGS
 
-ACPI_CFLAGS	:= -D_LINUX -I$(CURDIR)/include
+ACPI_CFLAGS	:= -D_LINUX -Idrivers/acpi/include
 
 ifdef CONFIG_ACPI_DEBUG
   ACPI_CFLAGS	+= -DACPI_DEBUG_OUTPUT

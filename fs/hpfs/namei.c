@@ -187,7 +187,7 @@ int hpfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
 	struct inode *result = NULL;
 	int err;
 	if ((err = hpfs_chk_name((char *)name, &len))) return err==-ENOENT ? -EINVAL : err;
-	if (dir->i_sb->s_hpfs_eas < 2) return -EPERM;
+	if (hpfs_sb(dir->i_sb)->sb_eas < 2) return -EPERM;
 	lock_kernel();
 	if (!(fnode = hpfs_alloc_fnode(dir->i_sb, hpfs_i(dir)->i_dno, &fno, &bh))) goto bail;
 	memset(&dee, 0, sizeof dee);
@@ -255,7 +255,7 @@ int hpfs_symlink(struct inode *dir, struct dentry *dentry, const char *symlink)
 	int err;
 	if ((err = hpfs_chk_name((char *)name, &len))) return err==-ENOENT ? -EINVAL : err;
 	lock_kernel();
-	if (dir->i_sb->s_hpfs_eas < 2) {
+	if (hpfs_sb(dir->i_sb)->sb_eas < 2) {
 		unlock_kernel();
 		return -EPERM;
 	}
@@ -559,7 +559,7 @@ int hpfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		mark_buffer_dirty(bh);
 		brelse(bh);
 	}
-	hpfs_i(i)->i_conv = i->i_sb->s_hpfs_conv;
+	hpfs_i(i)->i_conv = hpfs_sb(i->i_sb)->sb_conv;
 	hpfs_decide_conv(i, (char *)new_name, new_len);
 	end1:
 	hpfs_unlock_3inodes(old_dir, new_dir, i);

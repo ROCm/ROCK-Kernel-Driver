@@ -91,6 +91,7 @@ dasd_ioctl(struct inode *inp, struct file *filp,
 	dasd_devmap_t *devmap;
 	dasd_device_t *device;
 	dasd_ioctl_list_t *ioctl;
+	struct block_device *bdev;
 	struct list_head *l;
 	const char *dir;
 	int rc;
@@ -101,13 +102,17 @@ dasd_ioctl(struct inode *inp, struct file *filp,
 		PRINT_DEBUG("empty data ptr");
 		return -EINVAL;
 	}
-	devmap = dasd_devmap_from_kdev(inp->i_rdev);
+	bdev = bdget(kdev_t_to_nr(inp->i_rdev));
+	if (!bdev)
+		return -EINVAL;
+
+	devmap = dasd_devmap_from_bdev(bdev);
 	device = (devmap != NULL) ?
 		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
 	if (IS_ERR(device)) {
 		MESSAGE(KERN_WARNING,
-			"No device registered as device (%d:%d)",
-			major(inp->i_rdev), minor(inp->i_rdev));
+			"No device registered as device %s", bdevname(bdev));
+		bdput(bdev);
 		return -EINVAL;
 	}
 	dir = _IOC_DIR (no) == _IOC_NONE ? "0" :
@@ -125,11 +130,12 @@ dasd_ioctl(struct inode *inp, struct file *filp,
 			if (ioctl->owner) {
 				if (try_inc_mod_count(ioctl->owner) != 0)
 					continue;
-				rc = ioctl->handler(inp, no, data);
+				rc = ioctl->handler(bdev, no, data);
 				__MOD_DEC_USE_COUNT(ioctl->owner);
 			} else
-				rc = ioctl->handler(inp, no, data);
+				rc = ioctl->handler(bdev, no, data);
 			dasd_put_device(devmap);
+			bdput(bdev);
 			return rc;
 		}
 	}
@@ -138,10 +144,12 @@ dasd_ioctl(struct inode *inp, struct file *filp,
 		      "unknown ioctl 0x%08x=%s'0x%x'%d(%d) data %8lx", no,
 		      dir, _IOC_TYPE(no), _IOC_NR(no), _IOC_SIZE(no), data);
 	dasd_put_device(devmap);
+	bdput(bdev);
 	return -ENOTTY;
 }
 
-static int dasd_ioctl_api_version(void *inp, int no, long args)
+static int
+dasd_ioctl_api_version(struct block_device *bdev, int no, long args)
 {
 	int ver = DASD_API_VERSION;
 	return put_user(ver, (int *) args);
@@ -150,7 +158,8 @@ static int dasd_ioctl_api_version(void *inp, int no, long args)
 /*
  * Enable device.
  */
-static int dasd_ioctl_enable(void *inp, int no, long args)
+static int
+dasd_ioctl_enable(struct block_device *bdev, int no, long args)
 {
 	dasd_devmap_t *devmap;
 	dasd_device_t *device;
@@ -158,7 +167,7 @@ static int dasd_ioctl_enable(void *inp, int no, long args)
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
-	devmap = dasd_devmap_from_kdev(((struct inode *) inp)->i_rdev);
+	devmap = dasd_devmap_from_bdev(bdev);
 	device = (devmap != NULL) ?
 		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
 	if (IS_ERR(device))
@@ -172,14 +181,15 @@ static int dasd_ioctl_enable(void *inp, int no, long args)
 /*
  * Disable device.
  */
-static int dasd_ioctl_disable(void *inp, int no, long args)
+static int
+dasd_ioctl_disable(struct block_device *bdev, int no, long args)
 {
 	dasd_devmap_t *devmap;
 	dasd_device_t *device;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
-	devmap = dasd_devmap_from_kdev(((struct inode *) inp)->i_rdev);
+	devmap = dasd_devmap_from_bdev(bdev);
 	device = (devmap != NULL) ?
 		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
 	if (IS_ERR(device))
@@ -245,7 +255,8 @@ dasd_format(dasd_device_t * device, format_data_t * fdata)
 /*
  * Format device.
  */
-static int dasd_ioctl_format(void *inp, int no, long args)
+static int
+dasd_ioctl_format(struct block_device *bdev, int no, long args)
 {
 	dasd_devmap_t *devmap;
 	dasd_device_t *device;
@@ -257,8 +268,8 @@ static int dasd_ioctl_format(void *inp, int no, long args)
 	if (!args)
 		return -EINVAL;
 	/* fdata == NULL is no longer a valid arg to dasd_format ! */
-	partn = minor(((struct inode *) inp)->i_rdev) & DASD_PARTN_MASK;
-	devmap = dasd_devmap_from_kdev(((struct inode *) inp)->i_rdev);
+	partn = MINOR(bdev->bd_dev) & DASD_PARTN_MASK;
+	devmap = dasd_devmap_from_bdev(bdev);
 	device = (devmap != NULL) ?
 		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
 	if (IS_ERR(device))
@@ -283,14 +294,15 @@ static int dasd_ioctl_format(void *inp, int no, long args)
 /*
  * Reset device profile information
  */
-static int dasd_ioctl_reset_profile(void *inp, int no, long args)
+static int
+dasd_ioctl_reset_profile(struct block_device *bdev, int no, long args)
 {
 	dasd_devmap_t *devmap;
 	dasd_device_t *device;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
-	devmap = dasd_devmap_from_kdev(((struct inode *) inp)->i_rdev);
+	devmap = dasd_devmap_from_bdev(bdev);
 	device = (devmap != NULL) ?
 		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
 	if (IS_ERR(device))
@@ -303,13 +315,14 @@ static int dasd_ioctl_reset_profile(void *inp, int no, long args)
 /*
  * Return device profile information
  */
-static int dasd_ioctl_read_profile(void *inp, int no, long args)
+static int
+dasd_ioctl_read_profile(struct block_device *bdev, int no, long args)
 {
 	dasd_devmap_t *devmap;
 	dasd_device_t *device;
 	int rc;
 
-	devmap = dasd_devmap_from_kdev(((struct inode *) inp)->i_rdev);
+	devmap = dasd_devmap_from_bdev(bdev);
 	device = (devmap != NULL) ?
 		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
 	if (IS_ERR(device))
@@ -322,12 +335,14 @@ static int dasd_ioctl_read_profile(void *inp, int no, long args)
 	return rc;
 }
 #else
-static int dasd_ioctl_reset_profile(void *inp, int no, long args)
+static int
+dasd_ioctl_reset_profile(struct block_device *bdev, int no, long args)
 {
 	return -ENOSYS;
 }
 
-static int dasd_ioctl_read_profile(void *inp, int no, long args)
+static int
+dasd_ioctl_read_profile(struct block_device *bdev, int no, long args)
 {
 	return -ENOSYS;
 }
@@ -336,15 +351,16 @@ static int dasd_ioctl_read_profile(void *inp, int no, long args)
 /*
  * Return dasd information. Used for BIODASDINFO and BIODASDINFO2.
  */
-static int dasd_ioctl_information(void *inp, int no, long args)
+static int
+dasd_ioctl_information(struct block_device *bdev, int no, long args)
 {
 	dasd_devmap_t *devmap;
 	dasd_device_t *device;
-	dasd_information2_t dasd_info;
+	dasd_information2_t *dasd_info;
 	unsigned long flags;
 	int rc;
 
-	devmap = dasd_devmap_from_kdev(((struct inode *) inp)->i_rdev);
+	devmap = dasd_devmap_from_bdev(bdev);
 	device = (devmap != NULL) ?
 		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
 	if (IS_ERR(device))
@@ -354,20 +370,26 @@ static int dasd_ioctl_information(void *inp, int no, long args)
 		return -EINVAL;
 	}
 
-	rc = device->discipline->fill_info(device, &dasd_info);
+	dasd_info = kmalloc(sizeof(dasd_information2_t), GFP_KERNEL);
+	if (dasd_info == NULL) {
+		dasd_put_device(devmap);
+		return -ENOMEM;
+	}
+	rc = device->discipline->fill_info(device, dasd_info);
 	if (rc) {
 		dasd_put_device(devmap);
+		kfree(dasd_info);
 		return rc;
 	}
 
-	dasd_info.devno = device->devinfo.devno;
-	dasd_info.schid = device->devinfo.irq;
-	dasd_info.cu_type = device->devinfo.sid_data.cu_type;
-	dasd_info.cu_model = device->devinfo.sid_data.cu_model;
-	dasd_info.dev_type = device->devinfo.sid_data.dev_type;
-	dasd_info.dev_model = device->devinfo.sid_data.dev_model;
-	dasd_info.open_count = atomic_read(&device->open_count);
-	dasd_info.status = device->state;
+	dasd_info->devno = device->devinfo.devno;
+	dasd_info->schid = device->devinfo.irq;
+	dasd_info->cu_type = device->devinfo.sid_data.cu_type;
+	dasd_info->cu_model = device->devinfo.sid_data.cu_model;
+	dasd_info->dev_type = device->devinfo.sid_data.dev_type;
+	dasd_info->dev_model = device->devinfo.sid_data.dev_model;
+	dasd_info->open_count = atomic_read(&device->open_count);
+	dasd_info->status = device->state;
 	
 	/*
 	 * check if device is really formatted
@@ -375,16 +397,16 @@ static int dasd_ioctl_information(void *inp, int no, long args)
 	 */
 	if ((device->state < DASD_STATE_READY) ||
 	    (dasd_check_blocksize(device->bp_block)))
-		dasd_info.format = DASD_FORMAT_NONE;
+		dasd_info->format = DASD_FORMAT_NONE;
 	
-	dasd_info.features = devmap->features;
+	dasd_info->features = devmap->features;
 	
 	if (device->discipline)
-		memcpy(dasd_info.type, device->discipline->name, 4);
+		memcpy(dasd_info->type, device->discipline->name, 4);
 	else
-		memcpy(dasd_info.type, "none", 4);
-	dasd_info.req_queue_len = 0;
-	dasd_info.chanq_len = 0;
+		memcpy(dasd_info->type, "none", 4);
+	dasd_info->req_queue_len = 0;
+	dasd_info->chanq_len = 0;
 	if (device->request_queue->request_fn) {
 		struct list_head *l;
 #ifdef DASD_EXTENDED_PROFILING
@@ -392,45 +414,46 @@ static int dasd_ioctl_information(void *inp, int no, long args)
 			struct list_head *l;
 			spin_lock_irqsave(&device->lock, flags);
 			list_for_each(l, &device->request_queue->queue_head)
-				dasd_info.req_queue_len++;
+				dasd_info->req_queue_len++;
 			spin_unlock_irqrestore(&device->lock, flags);
 		}
 #endif				/* DASD_EXTENDED_PROFILING */
 		spin_lock_irqsave(get_irq_lock(device->devinfo.irq), flags);
 		list_for_each(l, &device->ccw_queue)
-			dasd_info.chanq_len++;
+			dasd_info->chanq_len++;
 		spin_unlock_irqrestore(get_irq_lock(device->devinfo.irq),
 				       flags);
 	}
 	
 	rc = 0;
-	if (copy_to_user((long *) args, (long *) &dasd_info,
+	if (copy_to_user((long *) args, (long *) dasd_info,
 			 ((no == (unsigned int) BIODASDINFO2) ?
 			  sizeof (dasd_information2_t) :
 			  sizeof (dasd_information_t))))
 		rc = -EFAULT;
 	dasd_put_device(devmap);
+	kfree(dasd_info);
 	return rc;
 }
 
 /*
  * Set read only
  */
-static int dasd_ioctl_set_ro(void *inp, int no, long args)
+static int
+dasd_ioctl_set_ro(struct block_device *bdev, int no, long args)
 {
 	dasd_devmap_t *devmap;
 	dasd_device_t *device;
-	int major, minor;
 	int intval, i;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
-	if (minor(((struct inode *) inp)->i_rdev) & DASD_PARTN_MASK)
+	if (MINOR(bdev->bd_dev) & DASD_PARTN_MASK)
 		// ro setting is not allowed for partitions
 		return -EINVAL;
 	if (get_user(intval, (int *) args))
 		return -EFAULT;
-	devmap = dasd_devmap_from_kdev(((struct inode *) inp)->i_rdev);
+	devmap = dasd_devmap_from_bdev(bdev);
 	device = (devmap != NULL) ?
 		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
 	if (IS_ERR(device))
@@ -439,10 +462,8 @@ static int dasd_ioctl_set_ro(void *inp, int no, long args)
 		devmap->features |= DASD_FEATURE_READONLY;
 	else
 		devmap->features &= ~DASD_FEATURE_READONLY;
-	major = major(device->kdev);
-	minor = minor(device->kdev);
 	for (i = 0; i < (1 << DASD_PARTN_BITS); i++)
-		set_device_ro(mk_kdev(major, minor + i), intval);
+		set_device_ro(to_kdev_t(bdev->bd_dev + i), intval);
 	dasd_put_device(devmap);
 	return 0;
 }
@@ -450,16 +471,15 @@ static int dasd_ioctl_set_ro(void *inp, int no, long args)
 /*
  * Return disk geometry.
  */
-static int dasd_ioctl_getgeo(void *inp, int no, long args)
+static int
+dasd_ioctl_getgeo(struct block_device *bdev, int no, long args)
 {
 	struct hd_geometry geo = { 0, };
-	struct inode *inode = inp;
 	dasd_devmap_t *devmap;
 	dasd_device_t *device;
-	kdev_t kdev = inode->i_rdev;
 	int rc;
 
-	devmap = dasd_devmap_from_kdev(kdev);
+	devmap = dasd_devmap_from_bdev(bdev);
 	device = (devmap != NULL) ?
 		dasd_get_device(devmap) : ERR_PTR(-ENODEV);
 	if (IS_ERR(device))
@@ -468,7 +488,7 @@ static int dasd_ioctl_getgeo(void *inp, int no, long args)
 	if (device != NULL && device->discipline != NULL &&
 	    device->discipline->fill_geometry != NULL) {
 		device->discipline->fill_geometry(device, &geo);
-		geo.start = get_start_sect(inode->i_bdev);
+		geo.start = get_start_sect(bdev);
 		if (copy_to_user((struct hd_geometry *) args, &geo,
 				 sizeof (struct hd_geometry)))
 			rc = -EFAULT;

@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/chsc.c
  *   S/390 common I/O routines -- channel subsystem call
- *   $Revision: 1.9 $
+ *   $Revision: 1.12 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *                            IBM Corporation
@@ -50,6 +50,49 @@ int
 chsc_chpid_logical (int irq, int chp)
 {
 	return test_bit (ioinfo[irq]->schib.pmcw.chpid[chp], &chpids_logical);
+}
+
+static inline void
+chsc_clear_chpid(int irq, int chp)
+{
+	clear_bit(ioinfo[irq]->schib.pmcw.chpid[chp], &chpids);
+}
+
+void
+chsc_validate_chpids(int irq)
+{
+	int mask, chp;
+
+	if (ioinfo[irq]->opm) {
+		for (chp=0;chp<=7;chp++) {
+			mask = 0x80 >> chp;
+			if (ioinfo[irq]->opm & mask) {
+				if (!chsc_chpid_logical(irq,chp))
+					/* disable using this path */
+					ioinfo[irq]->opm &= ~mask;
+			} else {
+				/* This chpid is not
+				 * available to us */
+				chsc_clear_chpid(irq,chp);
+			}
+		}
+		
+	}
+	
+}
+
+void
+switch_off_chpids(int irq, __u8 mask)
+{
+	int i;
+	pmcw_t *pmcw = &ioinfo[irq]->schib.pmcw;
+
+	for (i=0;i<8;i++)
+		if ((0x80>>i) & mask
+		    & pmcw->pim
+		    & pmcw->pam
+		    & pmcw->pom)
+			clear_bit(pmcw->chpid[i], &chpids);
 }
 
 /* FIXME: this is _always_ called for every subchannel. shouldn't we
@@ -213,11 +256,9 @@ s390_do_chpid_processing( __u8 chpid)
 {
 	int irq;
 	int j;
-	int mask;
 	char dbf_txt[15];
 	int ccode;
 	int was_oper;
-	int chp = 0;
 	int mask2;
 
 	sprintf(dbf_txt, "chpr%x", chpid);
@@ -266,21 +307,7 @@ s390_do_chpid_processing( __u8 chpid)
 				ioinfo[irq]->schib.pmcw.pam &
 				ioinfo[irq]->schib.pmcw.pom;
 
-			if (ioinfo[irq]->opm) {
-				for (chp=0;chp<=7;chp++) {
-					mask2 = 0x80 >> chp;
-					if (ioinfo[irq]->opm & mask2) {
-						if (!test_bit
-						    (ioinfo[irq]->
-						     schib.pmcw.chpid[chp], 
-						     &chpids_logical)) {
-							/* disable using this path */
-							ioinfo[irq]->opm 
-								&= ~mask2;
-						}
-					}
-				}
-			}
+			chsc_validate_chpids(irq);
 
 			if (!ioinfo[irq]->opm) {
 				/*
@@ -307,20 +334,7 @@ s390_do_chpid_processing( __u8 chpid)
 						nopfunc(irq, DEVSTAT_DEVICE_GONE);
 				}
 
-			} else if (ioinfo[irq]->ui.flags.ready) {
-				/* 
-				 * Re-do path verification for the chpid in question
-				 * FIXME: is this neccessary?
-				 */
-				mask = 0x80 >> j;
-
-				if (!s390_DevicePathVerification(irq,mask)) {
-					CHSC_DEBUG (KERN_DEBUG, CRW, 2,
-						"DevicePathVerification "
-						"successful for Subchannel %x, "
-						"chpid %x\n", irq, chpid);
-				}
-			}
+			} 
 
 			s390irq_spin_unlock(irq);
 			break;
@@ -432,18 +446,7 @@ s390_process_res_acc_chpid (u8 chpid)
 				   ioinfo[irq]->schib.pmcw.pam &
 				   ioinfo[irq]->schib.pmcw.pom;
 
-		if (ioinfo[irq]->opm) {
-			for (chp=0;chp<=7;chp++) {
-				mask = 0x80 >> chp;
-				if ((ioinfo[irq]->opm & mask) &&
-				    !test_bit (ioinfo[irq]->schib.pmcw.chpid[chp],
-					       &chpids_logical)) {
-
-					/* disable using this path */
-					ioinfo[irq]->opm &= ~mask;
-				}
-			}
-		}
+		chsc_validate_chpids(irq);
 
 		if ((ioinfo[irq]->ui.flags.ready) && (chpid & ioinfo[irq]->opm))
 			s390_DevicePathVerification(irq, chpid);
@@ -456,8 +459,7 @@ s390_process_res_acc_linkaddr ( __u8 chpid, __u16 fla, u32 fla_mask)
 	char dbf_txt[15];
 	int irq = 0;
 	int ccode;
-	int chp;
-	int mask, mask2;
+	int mask2;
 	int ret;
 	int j;
 
@@ -517,18 +519,7 @@ s390_process_res_acc_linkaddr ( __u8 chpid, __u16 fla, u32 fla_mask)
 						   ioinfo[irq]->schib.pmcw.pam &
 						   ioinfo[irq]->schib.pmcw.pom;
 
-				if (ioinfo[irq]->opm) {
-					for (chp=0;chp<=7;chp++) {
-						mask = 0x80 >> chp;
-						if ((ioinfo[irq]->opm & mask)
-						    && (!test_bit (ioinfo[irq]->
-							     schib.pmcw.chpid[chp], 
-							     &chpids_logical))) {
-							/* disable using this path */
-							ioinfo[irq]->opm &= ~mask;
-						}
-					}
-				}
+				chsc_validate_chpids(irq);
 
 				if (ioinfo[irq]->ui.flags.ready)
 					s390_DevicePathVerification(irq, chpid);
@@ -782,11 +773,20 @@ cio_chpids_read (char *page, char **start, off_t off,
 	}
 
 	while (chp < NR_CHPIDS && len + entry_size < count) {
-		if ((test_bit( chp, &chpids)) && test_bit(chp, &chpids_logical))
-			len += sprintf(page+len, "0x%02X online\n", chp);
-		else if (test_bit(chp, &chpids_known))
-			len += sprintf(page+len, "0x%02X logically offline\n",
-					chp);
+		if (test_bit(chp, &chpids_known)) {
+
+			if (!test_bit(chp, &chpids))
+				len += sprintf(page+len,
+					       "0x%02X n/a\n", chp);
+			
+			else if (test_bit(chp, &chpids_logical))
+				len += sprintf(page+len,
+					       "0x%02X online\n", chp);
+			else
+				len += sprintf(page+len,
+					       "0x%02X logically offline\n", 
+					       chp);
+		}
 		chp++;
 	}
 

@@ -30,6 +30,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/kmod.h>
 
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -66,7 +67,7 @@ rwlock_t hci_task_lock = RW_LOCK_UNLOCKED;
 
 /* HCI device list */
 LIST_HEAD(hdev_list);
-spinlock_t hdev_list_lock;
+rwlock_t hdev_list_lock = RW_LOCK_UNLOCKED;
 
 /* HCI protocols */
 #define HCI_MAX_PROTO	2
@@ -74,7 +75,6 @@ struct hci_proto *hci_proto[HCI_MAX_PROTO];
 
 /* HCI notifiers list */
 static struct notifier_block *hci_notifier;
-
 
 /* ---- HCI notifications ---- */
 
@@ -93,6 +93,32 @@ void hci_notify(struct hci_dev *hdev, int event)
 	notifier_call_chain(&hci_notifier, event, hdev);
 }
 
+/* ---- HCI hotplug support ---- */
+
+#ifdef CONFIG_HOTPLUG
+
+static int hci_run_hotplug(char *dev, char *action)
+{
+	char *argv[3], *envp[5], dstr[20], astr[32];
+
+	sprintf(dstr, "DEVICE=%s", dev);
+	sprintf(astr, "ACTION=%s", action);
+
+        argv[0] = hotplug_path;
+        argv[1] = "bluetooth";
+        argv[2] = NULL;
+
+	envp[0] = "HOME=/";
+	envp[1] = "PATH=/sbin:/bin:/usr/sbin:/usr/bin";
+	envp[2] = dstr;
+	envp[3] = astr;
+	envp[4] = NULL;
+	
+	return call_usermodehelper(argv[0], argv, envp);
+}
+#else
+#define hci_run_hotplug(A...)
+#endif
 
 /* ---- HCI requests ---- */
 
@@ -270,7 +296,7 @@ struct hci_dev *hci_dev_get(int index)
 	if (index < 0)
 		return NULL;
 
-	spin_lock(&hdev_list_lock);
+	read_lock(&hdev_list_lock);
 	list_for_each(p, &hdev_list) {
 		hdev = list_entry(p, struct hci_dev, list);
 		if (hdev->id == index) {
@@ -280,7 +306,7 @@ struct hci_dev *hci_dev_get(int index)
 	}
 	hdev = NULL;
 done:
-	spin_unlock(&hdev_list_lock);
+	read_unlock(&hdev_list_lock);
 	return hdev;
 }
 
@@ -699,7 +725,7 @@ int hci_get_dev_list(unsigned long arg)
 		return -ENOMEM;
 	dr = dl->dev_req;
 
-	spin_lock_bh(&hdev_list_lock);
+	read_lock_bh(&hdev_list_lock);
 	list_for_each(p, &hdev_list) {
 		struct hci_dev *hdev;
 		hdev = list_entry(p, struct hci_dev, list);
@@ -708,7 +734,7 @@ int hci_get_dev_list(unsigned long arg)
 		if (++n >= dev_num)
 			break;
 	}
-	spin_unlock_bh(&hdev_list_lock);
+	read_unlock_bh(&hdev_list_lock);
 
 	dl->dev_num = n;
 	size = n * sizeof(struct hci_dev_req) + sizeof(__u16);
@@ -768,7 +794,7 @@ int hci_register_dev(struct hci_dev *hdev)
 	if (!hdev->open || !hdev->close || !hdev->destruct)
 		return -EINVAL;
 
-	spin_lock_bh(&hdev_list_lock);
+	write_lock_bh(&hdev_list_lock);
 
 	/* Find first available device id */
 	list_for_each(p, &hdev_list) {
@@ -807,11 +833,12 @@ int hci_register_dev(struct hci_dev *hdev)
 
 	atomic_set(&hdev->promisc, 0);
 		
-	hci_notify(hdev, HCI_DEV_REG);
-
 	MOD_INC_USE_COUNT;
 
-	spin_unlock_bh(&hdev_list_lock);
+	write_unlock_bh(&hdev_list_lock);
+
+	hci_notify(hdev, HCI_DEV_REG);
+	hci_run_hotplug(hdev->name, "register");
 
 	return id;
 }
@@ -821,13 +848,15 @@ int hci_unregister_dev(struct hci_dev *hdev)
 {
 	BT_DBG("%p name %s type %d", hdev, hdev->name, hdev->type);
 
-	spin_lock_bh(&hdev_list_lock);
+	write_lock_bh(&hdev_list_lock);
 	list_del(&hdev->list);
-	spin_unlock_bh(&hdev_list_lock);
+	write_unlock_bh(&hdev_list_lock);
 
 	hci_dev_do_close(hdev);
 
 	hci_notify(hdev, HCI_DEV_UNREG);
+	hci_run_hotplug(hdev->name, "unregister");
+	
 	hci_dev_put(hdev);
 
 	MOD_DEC_USE_COUNT;
@@ -1103,14 +1132,13 @@ static inline struct hci_conn *hci_low_sent(struct hci_dev *hdev, __u8 type, int
 {
 	struct conn_hash *h = &hdev->conn_hash;
 	struct hci_conn  *conn = NULL;
-	int num = 0, min = 0xffff;
+	int num = 0, min = ~0;
         struct list_head *p;
 
 	/* We don't have to lock device here. Connections are always 
 	 * added and removed with TX task disabled. */
 	list_for_each(p, &h->list) {
 		struct hci_conn *c;
-
 		c = list_entry(p, struct hci_conn, list);
 
 		if (c->type != type || c->state != BT_CONNECTED
@@ -1118,20 +1146,40 @@ static inline struct hci_conn *hci_low_sent(struct hci_dev *hdev, __u8 type, int
 			continue;
 		num++;
 
-		if (c->sent < min || type == SCO_LINK) {
+		if (c->sent < min) {
 			min  = c->sent;
 			conn = c;
 		}
 	}
 
 	if (conn) {
-		int q = hdev->acl_cnt / num;
+		int cnt = (type == ACL_LINK ? hdev->acl_cnt : hdev->sco_cnt);
+		int q = cnt / num;
 		*quote = q ? q : 1;
 	} else
 		*quote = 0;
 
 	BT_DBG("conn %p quote %d", conn, *quote);
 	return conn;
+}
+
+static inline void hci_acl_tx_to(struct hci_dev *hdev)
+{
+	struct conn_hash *h = &hdev->conn_hash;
+        struct list_head *p;
+	struct hci_conn  *c;
+
+	BT_ERR("%s ACL tx timeout", hdev->name);
+
+	/* Kill stalled connections */
+	list_for_each(p, &h->list) {
+		c = list_entry(p, struct hci_conn, list);
+		if (c->type == ACL_LINK && c->sent) {
+			BT_ERR("%s killing stalled ACL connection %s",
+				hdev->name, batostr(&c->dst));
+			hci_acl_disconn(c, 0x13);
+		}
+	}
 }
 
 static inline void hci_sched_acl(struct hci_dev *hdev)
@@ -1142,21 +1190,19 @@ static inline void hci_sched_acl(struct hci_dev *hdev)
 
 	BT_DBG("%s", hdev->name);
 
-	if (!hdev->acl_cnt && (jiffies - hdev->acl_last_tx) > HZ*5) {
-		BT_ERR("%s ACL tx timeout", hdev->name);
-		hdev->acl_cnt++;
-	}
-	
-	while (hdev->acl_cnt && (conn = hci_low_sent(hdev, ACL_LINK, &quote))) {
-		while (quote && (skb = skb_dequeue(&conn->data_q))) {
-			BT_DBG("skb %p len %d", skb, skb->len);
+	/* ACL tx timeout must be longer than maximum
+	 * link supervision timeout (40.9 seconds) */
+	if (!hdev->acl_cnt && (jiffies - hdev->acl_last_tx) > (HZ * 45))
+		hci_acl_tx_to(hdev);
 
+	while (hdev->acl_cnt && (conn = hci_low_sent(hdev, ACL_LINK, &quote))) {
+		while (quote-- && (skb = skb_dequeue(&conn->data_q))) {
+			BT_DBG("skb %p len %d", skb, skb->len);
 			hci_send_frame(skb);
 			hdev->acl_last_tx = jiffies;
 
-			conn->sent++;
 			hdev->acl_cnt--;
-			quote--;
+			conn->sent++;
 		}
 	}
 }
@@ -1170,15 +1216,14 @@ static inline void hci_sched_sco(struct hci_dev *hdev)
 
 	BT_DBG("%s", hdev->name);
 
-	while ((conn = hci_low_sent(hdev, SCO_LINK, &quote))) {
-		while (quote && (skb = skb_dequeue(&conn->data_q))) {
+	while (hdev->sco_cnt && (conn = hci_low_sent(hdev, SCO_LINK, &quote))) {
+		while (quote-- && (skb = skb_dequeue(&conn->data_q))) {
 			BT_DBG("skb %p len %d", skb, skb->len);
-
 			hci_send_frame(skb);
 
-			//conn->sent++;
-			//hdev->sco_cnt--;
-			quote--;
+			conn->sent++;
+			if (conn->sent == ~0)
+				conn->sent = 0;
 		}
 	}
 }
@@ -1204,7 +1249,6 @@ static void hci_tx_task(unsigned long arg)
 
 	read_unlock(&hci_task_lock);
 }
-
 
 /* ----- HCI RX task (incomming data proccessing) ----- */
 
@@ -1367,9 +1411,6 @@ static void hci_cmd_task(unsigned long arg)
 
 int hci_core_init(void)
 {
-	/* Init locks */
-	spin_lock_init(&hdev_list_lock);
-
 	return 0;
 }
 

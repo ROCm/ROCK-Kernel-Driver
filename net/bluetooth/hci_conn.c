@@ -73,7 +73,7 @@ void hci_acl_connect(struct hci_conn *conn)
 	bacpy(&cp.bdaddr, &conn->dst);
 
 	if ((ie = inquiry_cache_lookup(hdev, &conn->dst)) &&
-			inquiry_entry_age(ie) > INQUIRY_ENTRY_AGE_MAX) {
+			inquiry_entry_age(ie) <= INQUIRY_ENTRY_AGE_MAX) {
 		cp.pscan_rep_mode = ie->info.pscan_rep_mode;
 		cp.pscan_mode     = ie->info.pscan_mode;
 		cp.clock_offset   = ie->info.clock_offset | __cpu_to_le16(0x8000);
@@ -188,9 +188,6 @@ int hci_conn_del(struct hci_conn *conn)
 			acl->link = NULL;
 			hci_conn_put(acl);
 		}
-
-		/* Unacked frames */
-		hdev->sco_cnt += conn->sent;
 	} else {
 		struct hci_conn *sco = conn->link;
 		if (sco)
@@ -220,7 +217,7 @@ struct hci_dev *hci_get_route(bdaddr_t *dst, bdaddr_t *src)
 
 	BT_DBG("%s -> %s", batostr(src), batostr(dst));
 
-	spin_lock_bh(&hdev_list_lock);
+	read_lock_bh(&hdev_list_lock);
 
 	list_for_each(p, &hdev_list) {
 		struct hci_dev *d;
@@ -248,7 +245,7 @@ struct hci_dev *hci_get_route(bdaddr_t *dst, bdaddr_t *src)
 	if (hdev)
 		hci_dev_hold(hdev);
 
-	spin_unlock_bh(&hdev_list_lock);
+	read_unlock_bh(&hdev_list_lock);
 	return hdev;
 }
 

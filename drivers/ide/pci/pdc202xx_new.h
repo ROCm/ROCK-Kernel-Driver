@@ -225,7 +225,7 @@ static unsigned int init_chipset_pdcnew(struct pci_dev *, const char *);
 static void init_hwif_pdc202new(ide_hwif_t *);
 static void init_dma_pdc202new(ide_hwif_t *, unsigned long);
 
-static ide_pci_device_t pdcnew_chipsets[] __initdata = {
+static ide_pci_device_t pdcnew_chipsets[] __devinitdata = {
 	{	/* 0 */
 		vendor:		PCI_VENDOR_ID_PROMISE,
 		device:		PCI_DEVICE_ID_PROMISE_20268,

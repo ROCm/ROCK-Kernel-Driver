@@ -728,12 +728,9 @@ static void __init init_hwif_cmd64x (ide_hwif_t *hwif)
 	if (dev->device == PCI_DEVICE_ID_CMD_643)
 		hwif->ultra_mask = 0x80;
 	if (dev->device == PCI_DEVICE_ID_CMD_646)
-	{
-		if (class_rev > 0x04)
-			hwif->ultra_mask = 0x07;
-		else
-			hwif->ultra_mask = 0x80;
-	}
+		hwif->ultra_mask = (class_rev > 0x04) ? 0x07 : 0x80;
+	if (dev->device == PCI_DEVICE_ID_CMD_648)
+		hwif->ultra_mask = 0x1f;
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	hwif->ide_dma_check = &cmd64x_config_drive_for_dma;
@@ -774,6 +771,7 @@ static int __devinit cmd64x_init_one(struct pci_dev *dev, const struct pci_devic
 	if (dev->device != d->device)
 		BUG();
 	ide_setup_pci_device(dev, d);
+	MOD_INC_USE_COUNT;
 	return 0;
 }
 

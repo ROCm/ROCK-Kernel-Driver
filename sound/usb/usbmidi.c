@@ -4,6 +4,10 @@
  * Copyright (c) 2002 Clemens Ladisch
  * All rights reserved.
  *
+ * Based on the OSS usb-midi driver by NAGANO Daisuke,
+ *          NetBSD's umidi driver by Takuya SHIOZAKI,
+ *          the "USB Device Class Definition for MIDI Devices" by Roland
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -120,6 +124,10 @@ struct snd_usb_midi_in_endpoint {
 
 static void snd_usbmidi_do_output(snd_usb_midi_out_endpoint_t* ep);
 
+static const uint8_t snd_usbmidi_cin_length[] = {
+	0, 0, 2, 3, 3, 1, 2, 3, 3, 3, 3, 3, 2, 2, 3, 1
+};
+
 /*
  * Submits the URB, with error handling.
  */
@@ -152,9 +160,6 @@ static int snd_usbmidi_urb_error(int status)
 static void snd_usbmidi_input_packet(snd_usb_midi_in_endpoint_t* ep,
 				     uint8_t packet[4])
 {
-	static const uint8_t cin_length[] = {
-		0, 0, 2, 3, 3, 1, 2, 3, 3, 3, 3, 3, 2, 2, 3, 1
-	};
 	int cable = packet[0] >> 4;
 	usbmidi_in_port_t* port = &ep->ports[cable];
 	snd_seq_event_t ev;
@@ -163,7 +168,7 @@ static void snd_usbmidi_input_packet(snd_usb_midi_in_endpoint_t* ep,
 		return;
 	memset(&ev, 0, sizeof(ev));
 	if (snd_midi_event_encode(port->midi_event, &packet[1],
-				  cin_length[packet[0] & 0x0f], &ev) > 0
+				  snd_usbmidi_cin_length[packet[0] & 0x0f], &ev) > 0
 	    && ev.type != SNDRV_SEQ_EVENT_NONE) {
 		ev.source.port = port->seq_port;
 		ev.dest.client = SNDRV_SEQ_ADDRESS_SUBSCRIBERS;
@@ -199,6 +204,38 @@ static void snd_usbmidi_in_urb_complete(struct urb* urb)
 	}
 }
 
+/*
+ * Converts the data read from a Midiman device to standard USB MIDI packets.
+ */
+static void snd_usbmidi_in_midiman_complete(struct urb* urb)
+{
+	if (urb->status == 0) {
+		uint8_t* buffer = (uint8_t*)urb->transfer_buffer;
+		int i;
+
+		for (i = 0; i + 4 <= urb->actual_length; i += 4) {
+			if (buffer[i + 3] != 0) {
+				/*
+				 * snd_usbmidi_input_packet() doesn't check the
+				 * contents of the message, so we simply use
+				 * some random CIN with the desired length.
+				 */
+				static const uint8_t cin[4] = {
+					0x0, 0xf, 0x2, 0x3
+				};
+				uint8_t ctl = buffer[i + 3];
+				buffer[i + 3] = buffer[i + 2];
+				buffer[i + 2] = buffer[i + 1];
+				buffer[i + 1] = buffer[i + 0];
+				buffer[i + 0] = (ctl & 0xf0) | cin[ctl & 3];
+			} else {
+				buffer[i + 0] = 0;
+			}
+		}
+	}
+	snd_usbmidi_in_urb_complete(urb);
+}
+
 static void snd_usbmidi_out_urb_complete(struct urb* urb)
 {
 	snd_usb_midi_out_endpoint_t* ep = snd_magic_cast(snd_usb_midi_out_endpoint_t, urb->context, return);
@@ -211,6 +248,23 @@ static void snd_usbmidi_out_urb_complete(struct urb* urb)
 	spin_lock_irqsave(&ep->buffer_lock, flags);
 	snd_usbmidi_do_output(ep);
 	spin_unlock_irqrestore(&ep->buffer_lock, flags);
+}
+
+/*
+ * Converts standard USB MIDI packets to what Midman devices expect.
+ */
+static void snd_usbmidi_convert_to_midiman(struct urb* urb)
+{
+	uint8_t* buffer = (uint8_t*)urb->transfer_buffer;
+	int i;
+
+	for (i = 0; i + 4 <= urb->transfer_buffer_length; i += 4) {
+		uint8_t cin = buffer[i];
+		buffer[i + 0] = buffer[i + 1];
+		buffer[i + 1] = buffer[i + 2];
+		buffer[i + 2] = buffer[i + 3];
+		buffer[i + 3] = (cin & 0xf0) | snd_usbmidi_cin_length[cin & 0x0f];
+	}
 }
 
 /*
@@ -255,6 +309,9 @@ static void snd_usbmidi_do_output(snd_usb_midi_out_endpoint_t* ep)
 	}
 
 	if (len > 0) {
+		if (ep->umidi->quirk && ep->umidi->quirk->type == QUIRK_MIDI_MIDIMAN)
+			snd_usbmidi_convert_to_midiman(ep->urb);
+
 		ep->urb->dev = ep->umidi->chip->dev;
 		snd_usbmidi_submit_urb(ep->urb, GFP_ATOMIC);
 	}
@@ -479,22 +536,6 @@ static void snd_usbmidi_in_endpoint_delete(snd_usb_midi_in_endpoint_t* ep)
 	snd_magic_kfree(ep);
 }
 
-#ifndef OLD_USB
-/* this code is not exported from USB core anymore */
-struct usb_interface *local_usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum)
-{
-	int i;
-        
-	for (i = 0; i < dev->actconfig->bNumInterfaces; i++)
-		if (dev->actconfig->interface[i].altsetting[0].bInterfaceNumber == ifnum)
-			return &dev->actconfig->interface[i];
-                                                        
-	return NULL;
-}
-#else
-#define local_usb_ifnum_to_if usb_ifnum_to_if
-#endif
-
 /*
  * For Roland devices, use the alternate setting which uses interrupt
  * transfers for input.
@@ -507,7 +548,7 @@ static usb_endpoint_descriptor_t* snd_usbmidi_get_int_epd(snd_usb_midi_t* umidi,
 
 	if (umidi->chip->dev->descriptor.idVendor != 0x0582)
 		return NULL;
-	intf = local_usb_ifnum_to_if(umidi->chip->dev, umidi->ifnum);
+	intf = umidi->iface;
 	if (!intf || intf->num_altsetting != 2)
 		return NULL;
 
@@ -526,6 +567,14 @@ static usb_endpoint_descriptor_t* snd_usbmidi_get_int_epd(snd_usb_midi_t* umidi,
 	usb_set_interface(umidi->chip->dev, intfd->bInterfaceNumber,
 			  intfd->bAlternateSetting);
 	return &intfd->endpoint[1];
+}
+
+static usb_endpoint_descriptor_t* snd_usbmidi_get_midiman_int_epd(snd_usb_midi_t* umidi)
+{
+	usb_interface_t* intf = umidi->iface;
+	if (!intf)
+		return NULL;
+	return &intf->altsetting[0].endpoint[0];
 }
 
 /*
@@ -551,7 +600,10 @@ static int snd_usbmidi_in_endpoint_create(snd_usb_midi_t* umidi,
 	for (i = 0; i < 0x10; ++i)
 		ep->ports[i].seq_port = -1;
 
-	int_epd = snd_usbmidi_get_int_epd(umidi, ep_info->epnum);
+	if (umidi->quirk && umidi->quirk->type == QUIRK_MIDI_MIDIMAN)
+		int_epd = snd_usbmidi_get_midiman_int_epd(umidi);
+	else
+		int_epd = snd_usbmidi_get_int_epd(umidi, ep_info->epnum);
 
 	ep->urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!ep->urb) {
@@ -697,72 +749,106 @@ static int snd_usbmidi_seq_device_delete(snd_seq_device_t* seq_device)
 }
 
 /*
+ * Creates a sequencer port for an input/output cable pair.
+ */
+static int snd_usbmidi_create_port(snd_usb_midi_t* umidi,
+				   snd_usb_midi_out_endpoint_t* out_ep,
+				   snd_usb_midi_in_endpoint_t* in_ep,
+				   int cable, int port_idx)
+{
+	int cap, type, port;
+	snd_seq_port_callback_t port_callback;
+	char port_name[48];
+
+	cap = 0;
+	memset(&port_callback, 0, sizeof(port_callback));
+	port_callback.owner = THIS_MODULE;
+	if (out_ep) {
+		port_callback.event_input = snd_usbmidi_event_input;
+		port_callback.private_data = &out_ep->ports[cable];
+		cap |= SNDRV_SEQ_PORT_CAP_WRITE | SNDRV_SEQ_PORT_CAP_SUBS_WRITE;
+	}
+	if (in_ep) {
+		cap |= SNDRV_SEQ_PORT_CAP_READ | SNDRV_SEQ_PORT_CAP_SUBS_READ;
+	}
+	if (out_ep && in_ep) {
+		cap |= SNDRV_SEQ_PORT_CAP_DUPLEX;
+	}
+	/* TODO: read type bits from element descriptor */
+	type = SNDRV_SEQ_PORT_TYPE_MIDI_GENERIC;
+	/* TODO: read port name from jack descriptor */
+	snprintf(port_name, sizeof(port_name), "%s Port %d",
+		 umidi->chip->card->shortname, port_idx);
+	port = snd_seq_event_port_attach(umidi->seq_client, &port_callback,
+					 cap, type, port_name);
+	if (port < 0) {
+		snd_printk(KERN_ERR "cannot create port (error code %d)\n", port);
+		return port;
+	}
+	if (in_ep)
+		in_ep->ports[cable].seq_port = port;
+	return port;
+}
+
+/*
+ * Creates a virmidi port emulating rawmidi for the sequencer port.
+ */
+static int snd_usbmidi_create_virmidi(snd_usb_midi_t* umidi, int port,
+				      int port_idx, snd_rawmidi_t** rrmidi)
+{
+	snd_rawmidi_t *rmidi;
+	snd_virmidi_dev_t *rdev;
+	int err;
+
+	*rrmidi = NULL;
+	err = snd_virmidi_new(umidi->chip->card, port_idx, &rmidi);
+	if (err < 0)
+		return err;
+	sprintf(rmidi->name, "%s MIDI %d", umidi->chip->card->shortname, port_idx);
+	rdev = snd_magic_cast(snd_virmidi_dev_t, rmidi->private_data, return -ENXIO);
+	rdev->seq_mode = SNDRV_VIRMIDI_SEQ_ATTACH;
+	rdev->client = umidi->seq_client;
+	rdev->port = port;
+	err = snd_device_register(umidi->chip->card, rmidi);
+	if (err < 0) {
+		snd_device_free(umidi->chip->card, rmidi);
+		return err;
+	}
+	*rrmidi = rmidi;
+	return 0;
+}
+
+/*
  * After input and output endpoints have been initialized, create
  * the ALSA port for each input/output port pair in the endpoint.
  * *port_idx is the port number, which must be unique over all endpoints.
  */
-static int snd_usbmidi_create_endpoint_ports(snd_usb_midi_t* umidi, int ep, int* port_idx,
+static int snd_usbmidi_create_endpoint_ports(snd_usb_midi_t* umidi,
+					     snd_usb_midi_endpoint_t* endpoint,
+					     int* port_idx,
 					     snd_usb_midi_endpoint_info_t* ep_info)
 {
-	int c, err;
-	int cap, type, port;
-	int out, in;
-	snd_seq_port_callback_t port_callback;
-	char port_name[48];
+	int cable;
 
-	for (c = 0; c < 0x10; ++c) {
-		out = ep_info->out_cables & (1 << c);
-		in = ep_info->in_cables & (1 << c);
+	for (cable = 0; cable < 0x10; ++cable) {
+		int port, err;
+		int out = ep_info->out_cables & (1 << cable);
+		int in = ep_info->in_cables & (1 << cable);
 		if (!(in || out))
 			continue;
-		cap = 0;
-		memset(&port_callback, 0, sizeof(port_callback));
-		port_callback.owner = THIS_MODULE;
-		if (out) {
-			port_callback.event_input = snd_usbmidi_event_input;
-			port_callback.private_data = &umidi->endpoints[ep].out->ports[c];
-			cap |= SNDRV_SEQ_PORT_CAP_WRITE |
-				SNDRV_SEQ_PORT_CAP_SUBS_WRITE;	
-		}
-		if (in) {
-			cap |= SNDRV_SEQ_PORT_CAP_READ |
-				SNDRV_SEQ_PORT_CAP_SUBS_READ;
-		}
-		if (out && in) {
-			cap |= SNDRV_SEQ_PORT_CAP_DUPLEX;
-		}
-		/* TODO: read type bits from element descriptor */
-		type = SNDRV_SEQ_PORT_TYPE_MIDI_GENERIC;
-		/* TODO: read port name from jack descriptor */
-		snprintf(port_name, sizeof(port_name), "%s Port %d",
-			 umidi->chip->card->shortname, *port_idx);
-		port = snd_seq_event_port_attach(umidi->seq_client,
-						 &port_callback,
-						 cap, type, port_name);
-		if (port < 0) {
-			snd_printk(KERN_ERR "cannot create port (error code %d)\n", port);
+
+		port = snd_usbmidi_create_port(umidi,
+					       out ? endpoint->out : NULL,
+					       in ? endpoint->in : NULL,
+					       cable, *port_idx);
+		if (port < 0)
 			return port;
-		}
-		if (in)
-			umidi->endpoints[ep].in->ports[c].seq_port = port;
 
 		if (*port_idx < SNDRV_MINOR_RAWMIDIS) {
-			snd_rawmidi_t *rmidi;
-			snd_virmidi_dev_t *rdev;
-			err = snd_virmidi_new(umidi->chip->card, *port_idx, &rmidi);
+			err = snd_usbmidi_create_virmidi(umidi, port, *port_idx,
+			      				 &endpoint->rmidi[cable]);
 			if (err < 0)
 				return err;
-			rdev = snd_magic_cast(snd_virmidi_dev_t, rmidi->private_data, return -ENXIO);
-			strcpy(rmidi->name, port_name);
-			rdev->seq_mode = SNDRV_VIRMIDI_SEQ_ATTACH;
-			rdev->client = umidi->seq_client;
-			rdev->port = port;
-			err = snd_device_register(umidi->chip->card, rmidi);
-			if (err < 0) {
-				snd_device_free(umidi->chip->card, rmidi);
-				return err;
-			}
-			umidi->endpoints[ep].rmidi[c] = rmidi;
 		}
 		++*port_idx;
 	}
@@ -792,8 +878,8 @@ static int snd_usbmidi_create_endpoints(snd_usb_midi_t* umidi,
 			if (err < 0)
 				return err;
 		}
-		err = snd_usbmidi_create_endpoint_ports(umidi, i, &port_idx,
-							&endpoints[i]);
+		err = snd_usbmidi_create_endpoint_ports(umidi, &umidi->endpoints[i],
+							&port_idx, &endpoints[i]);
 		if (err < 0)
 			return err;
 		printk(KERN_INFO "snd-usb-midi: endpoint %d: created %d output and %d input ports\n",
@@ -817,9 +903,7 @@ static int snd_usbmidi_get_ms_info(snd_usb_midi_t* umidi,
 	usb_ms_endpoint_descriptor_t* ms_ep;
 	int i, epidx;
 
-	memset(endpoints, 0, sizeof(*endpoints) * MIDI_MAX_ENDPOINTS);
-
-	intf = local_usb_ifnum_to_if(umidi->chip->dev, umidi->ifnum);
+	intf = umidi->iface;
 	if (!intf)
 		return -ENXIO;
 	intfd = &intf->altsetting[0];
@@ -878,7 +962,7 @@ static int snd_usbmidi_detect_endpoint(snd_usb_midi_t* umidi,
 	usb_endpoint_descriptor_t* epd;
 
 	if (endpoint->epnum == -1) {
-		intf = local_usb_ifnum_to_if(umidi->chip->dev, umidi->ifnum);
+		intf = umidi->iface;
 		if (!intf || intf->num_altsetting < 1)
 			return -ENOENT;
 		intfd = intf->altsetting;
@@ -886,6 +970,120 @@ static int snd_usbmidi_detect_endpoint(snd_usb_midi_t* umidi,
 			return -ENOENT;
 		epd = intfd->endpoint;
 		endpoint->epnum = epd->bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
+	}
+	return 0;
+}
+
+/*
+ * Detects the endpoints and ports of Yamaha devices.
+ */
+static int snd_usbmidi_detect_yamaha(snd_usb_midi_t* umidi, 
+				     snd_usb_midi_endpoint_info_t* endpoint)
+{
+	usb_interface_t* intf;
+	usb_interface_descriptor_t* intfd;
+	uint8_t* cs_desc;
+
+	intf = umidi->iface;
+	if (!intf)
+		return -ENOENT;
+	intfd = intf->altsetting;
+	if (intfd->bNumEndpoints < 1)
+		return -ENOENT;
+
+	for (cs_desc = intfd->extra;
+	     cs_desc < intfd->extra + intfd->extralen && cs_desc[0] >= 2;
+	     cs_desc += cs_desc[0]) {
+		if (cs_desc[1] == CS_AUDIO_INTERFACE) {
+			if (cs_desc[2] == MIDI_IN_JACK)
+				endpoint->in_cables = (endpoint->in_cables << 1) | 1;
+			else if (cs_desc[2] == MIDI_OUT_JACK)
+				endpoint->out_cables = (endpoint->out_cables << 1) | 1;
+		}
+	}
+	if (!endpoint->in_cables && !endpoint->out_cables)
+		return -ENOENT;
+
+	endpoint->epnum = -1;
+	return snd_usbmidi_detect_endpoint(umidi, endpoint);
+}
+
+/*
+ * Creates the endpoints and their ports for Midiman devices.
+ */
+static int snd_usbmidi_create_endpoints_midiman(snd_usb_midi_t* umidi, int ports)
+{
+	snd_usb_midi_endpoint_info_t ep_info;
+	usb_interface_t* intf;
+	usb_interface_descriptor_t* intfd;
+	usb_endpoint_descriptor_t* epd;
+	int cable, err;
+
+	intf = umidi->iface;
+	if (!intf)
+		return -ENOENT;
+	intfd = intf->altsetting;
+	if (intfd->bNumEndpoints < (ports > 1 ? 5 : 3)) {
+		snd_printdd(KERN_ERR "not enough endpoints\n");
+		return -ENOENT;
+	}
+
+	epd = &intfd->endpoint[0];
+	if ((epd->bEndpointAddress & USB_ENDPOINT_DIR_MASK) != USB_DIR_IN ||
+	    (epd->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) != USB_ENDPOINT_XFER_INT) {
+		snd_printdd(KERN_ERR "endpoint[0] isn't interrupt\n");
+		return -ENXIO;
+	}
+	epd = &intfd->endpoint[2];
+	if ((epd->bEndpointAddress & USB_ENDPOINT_DIR_MASK) != USB_DIR_OUT ||
+	    (epd->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) != USB_ENDPOINT_XFER_BULK) {
+		snd_printdd(KERN_ERR "endpoint[2] isn't bulk output\n");
+		return -ENXIO;
+	}
+	if (ports > 1) {
+		epd = &intfd->endpoint[4];
+		if ((epd->bEndpointAddress & USB_ENDPOINT_DIR_MASK) != USB_DIR_OUT ||
+		    (epd->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) != USB_ENDPOINT_XFER_BULK) {
+			snd_printdd(KERN_ERR "endpoint[4] isn't bulk output\n");
+			return -ENXIO;
+		}
+	}
+
+	ep_info.epnum = intfd->endpoint[2].bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
+	ep_info.out_cables = 0x5555 & ((1 << ports) - 1);
+	err = snd_usbmidi_out_endpoint_create(umidi, &ep_info, &umidi->endpoints[0]);
+	if (err < 0)
+		return err;
+
+	ep_info.epnum = intfd->endpoint[0].bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
+	ep_info.in_cables = (1 << ports) - 1;
+	err = snd_usbmidi_in_endpoint_create(umidi, &ep_info, &umidi->endpoints[0]);
+	if (err < 0)
+		return err;
+	umidi->endpoints[0].in->urb->complete = snd_usbmidi_in_midiman_complete;
+
+	if (ports > 1) {
+		ep_info.epnum = intfd->endpoint[4].bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
+		ep_info.out_cables = 0xaaaa & ((1 << ports) - 1);
+		err = snd_usbmidi_out_endpoint_create(umidi, &ep_info, &umidi->endpoints[1]);
+		if (err < 0)
+			return err;
+	}
+
+	for (cable = 0; cable < ports; ++cable) {
+		int port = snd_usbmidi_create_port(umidi,
+		    				   umidi->endpoints[cable & 1].out,
+		    				   umidi->endpoints[0].in,
+		    				   cable, cable);
+		if (port < 0)
+			return port;
+
+		if (cable < SNDRV_MINOR_RAWMIDIS) {
+			int err = snd_usbmidi_create_virmidi(umidi, port, cable,
+							     &umidi->endpoints[0].rmidi[cable]);
+			if (err < 0)
+				return err;
+		}
 	}
 	return 0;
 }
@@ -912,6 +1110,7 @@ static int snd_usbmidi_seq_device_new(snd_seq_device_t* seq_device)
 	if (umidi->seq_client < 0)
 		return umidi->seq_client;
 
+	/* set the client name */
 	memset(&client_info, 0, sizeof(client_info));
 	client_info.client = umidi->seq_client;
 	client_info.type = KERNEL_CLIENT;
@@ -935,17 +1134,37 @@ static int snd_usbmidi_seq_device_new(snd_seq_device_t* seq_device)
 				  SNDRV_SEQ_IOCTL_SET_CLIENT_INFO,
 				  &client_info);
 
-	if (umidi->quirk) {
-		memcpy(endpoints, umidi->quirk->endpoints, sizeof(endpoints));
-		err = snd_usbmidi_detect_endpoint(umidi, &endpoints[0]);
-	} else {
+	/* detect the endpoint(s) to use */
+	memset(endpoints, 0, sizeof(endpoints));
+	if (!umidi->quirk) {
 		err = snd_usbmidi_get_ms_info(umidi, endpoints);
+	} else {
+		switch (umidi->quirk->type) {
+		case QUIRK_MIDI_FIXED_ENDPOINT:
+			memcpy(&endpoints[0], umidi->quirk->data,
+			       sizeof(snd_usb_midi_endpoint_info_t));
+			err = snd_usbmidi_detect_endpoint(umidi, &endpoints[0]);
+			break;
+		case QUIRK_MIDI_YAMAHA:
+			err = snd_usbmidi_detect_yamaha(umidi, &endpoints[0]);
+			break;
+		case QUIRK_MIDI_MIDIMAN:
+			err = 0;
+			break;
+		default:
+			snd_printd(KERN_ERR "invalid quirk type %d\n", umidi->quirk->type);
+			err = -ENXIO;
+			break;
+		}
 	}
-	if (err < 0) {
-		snd_usbmidi_seq_device_delete(seq_device);
-		return err;
+
+	/* create ports */
+	if (err >= 0) {
+		if (umidi->quirk && umidi->quirk->type == QUIRK_MIDI_MIDIMAN)
+			err = snd_usbmidi_create_endpoints_midiman(umidi, (int)umidi->quirk->data);
+		else
+			err = snd_usbmidi_create_endpoints(umidi, endpoints);
 	}
-	err = snd_usbmidi_create_endpoints(umidi, endpoints);
 	if (err < 0) {
 		snd_usbmidi_seq_device_delete(seq_device);
 		return err;

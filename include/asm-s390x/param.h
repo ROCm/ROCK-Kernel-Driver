@@ -9,11 +9,14 @@
 #ifndef _ASMS390_PARAM_H
 #define _ASMS390_PARAM_H
 
+#ifdef __KERNEL__
+# define HZ		100		/* Internal kernel timer frequency */
+# define USER_HZ	100		/* .. some user interfaces are in "ticks" */
+# define CLOCKS_PER_SEC	(USER_HZ)	/* like times() */
+#endif
+
 #ifndef HZ
 #define HZ 100
-#ifdef __KERNEL__
-#define hz_to_std(a) (a)
-#endif
 #endif
 
 #define EXEC_PAGESIZE	4096
@@ -28,8 +31,4 @@
 
 #define MAXHOSTNAMELEN	64	/* max length of hostname */
 
-#ifdef __KERNEL__
-# define CLOCKS_PER_SEC		HZ	/* frequency at which times() counts */
-#endif
-                                 
 #endif

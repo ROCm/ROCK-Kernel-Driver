@@ -132,6 +132,9 @@ EXPORT_SYMBOL(highmem_start_page);
 EXPORT_SYMBOL(kmap_prot);
 EXPORT_SYMBOL(kmap_pte);
 #endif
+#ifdef HASHED_PAGE_VIRTUAL
+EXPORT_SYMBOL(page_address);
+#endif
 EXPORT_SYMBOL(get_user_pages);
 
 /* filesystem internal functions */

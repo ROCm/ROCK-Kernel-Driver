@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/s390io.c
  *   S/390 common I/O routines
- *   $Revision: 1.4 $
+ *   $Revision: 1.5 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *                            IBM Corporation
@@ -212,9 +212,7 @@ s390_do_crw_pending (crwe_t * pcrwe)
 
 			CRW_DEBUG(KERN_NOTICE, 2, 
 				  "source is channel subsystem\n");
-#ifdef CONFIG_CHSC
 			s390_process_css();
-#endif
 			break;
 
 		default:

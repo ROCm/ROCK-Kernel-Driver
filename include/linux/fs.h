@@ -627,9 +627,6 @@ extern int send_sigurg(struct fown_struct *fown);
 #define MNT_FORCE	0x00000001	/* Attempt to forcibily umount */
 #define MNT_DETACH	0x00000002	/* Just detach from the tree */
 
-#include <linux/ext3_fs_sb.h>
-#include <linux/hpfs_fs_sb.h>
-
 extern struct list_head super_blocks;
 extern spinlock_t sb_lock;
 
@@ -670,8 +667,6 @@ struct super_block {
 	char s_id[32];				/* Informational name */
 
 	union {
-		struct ext3_sb_info	ext3_sb;
-		struct hpfs_sb_info	hpfs_sb;
 		void			*generic_sbp;
 	} u;
 	/*

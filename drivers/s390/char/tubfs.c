@@ -229,12 +229,12 @@ fs3270_io(tub_t *tubp, ccw1_t *ccwp)
  * fs3270_bh(tubp) -- Perform back-half processing
  */
 static void
-fs3270_bh(void *data)
+fs3270_tasklet(unsigned long data)
 {
 	long flags;
 	tub_t *tubp;
 
-	tubp = data;
+	tubp = (tub_t *) data;
 	TUBLOCK(tubp->irq, flags);
 	tubp->flags &= ~TUB_BHPENDING;
 

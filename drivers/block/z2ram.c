@@ -71,13 +71,7 @@ static int current_device   = -1;
 static spinlock_t z2ram_lock = SPIN_LOCK_UNLOCKED;
 
 static struct block_device_operations z2_fops;
-static struct gendisk z2ram_gendisk = {
-	.major = MAJOR_NR,
-	.first_minor = 0,
-	.minor_shift = 0,
-	.fops = &z2_fops,
-	.disk_name = "z2ram"
-};
+static struct gendisk *z2ram_gendisk;
 
 static void
 do_z2_request( request_queue_t * q )
@@ -320,7 +314,7 @@ z2_open( struct inode *inode, struct file *filp )
 
 	current_device = device;
 	z2ram_size <<= Z2RAM_CHUNKSHIFT;
-	set_capacity(&z2ram_gendisk, z2ram_size >> 9;   
+	set_capacity(z2ram_gendisk, z2ram_size >> 9;   
     }
 
     return 0;
@@ -355,7 +349,7 @@ static struct gendisk *z2_find(int minor)
 {
 	if (minor > Z2MINOR_COUNT)
 		return NULL;
-	return &z2ram_gendisk;
+	return z2ram_gendisk;
 }
 
 int __init 
@@ -371,9 +365,19 @@ z2_init( void )
 	    MAJOR_NR );
 	return -EBUSY;
     }
+    z2ram_gendisk = alloc_disk();
+    if (!z2ram_gendisk) {
+	unregister_blkdev( MAJOR_NR, DEVICE_NAME );
+	return -ENOMEM;
+    }
+    z2ram_gendisk->major = MAJOR_NR;
+    z2ram_gendisk->first_minor = 0;
+    z2ram_gendisk->minor_shift = 0;
+    z2ram_gendisk->fops = &z2_fops;
+    sprintf(z2ram_gendisk->disk_name, "z2ram");
 
     blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_z2_request, &z2ram_lock);
-    add_disk(&z2ram_gendisk);
+    add_disk(z2ram_gendisk);
     blk_set_probe(MAJOR_NR, z2_find);
 
     return 0;
@@ -406,7 +410,8 @@ cleanup_module( void )
     if ( unregister_blkdev( MAJOR_NR, DEVICE_NAME ) != 0 )
 	printk( KERN_ERR DEVICE_NAME ": unregister of device failed\n");
 
-    del_gendisk(&z2ram_gendisk);
+    del_gendisk(z2ram_gendisk);
+    put_disk(z2ram_gendisk);
     blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 
     if ( current_device != -1 )

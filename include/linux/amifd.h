@@ -55,7 +55,7 @@ struct amiga_floppy_struct {
     int busy;			/* true when drive is active */
     int dirty;			/* true when trackbuf is not on disk */
     int status;			/* current error code for unit */
-    struct gendisk disk;
+    struct gendisk *gendisk;
 };
 #endif
 

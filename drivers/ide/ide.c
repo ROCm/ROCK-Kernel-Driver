@@ -1945,24 +1945,14 @@ void ide_unregister (unsigned int index)
 	hwif->OUTB		= old_hwif.OUTB;
 	hwif->OUTW		= old_hwif.OUTW;
 	hwif->OUTL		= old_hwif.OUTL;
-	hwif->OUTBP		= old_hwif.OUTBP;
-	hwif->OUTWP		= old_hwif.OUTWP;
-	hwif->OUTLP		= old_hwif.OUTLP;
 	hwif->OUTSW		= old_hwif.OUTSW;
-	hwif->OUTSWP		= old_hwif.OUTSWP;
 	hwif->OUTSL		= old_hwif.OUTSL;
-	hwif->OUTSLP		= old_hwif.OUTSLP;
 
 	hwif->INB		= old_hwif.INB;
 	hwif->INW		= old_hwif.INW;
 	hwif->INL		= old_hwif.INL;
-	hwif->INBP		= old_hwif.INBP;
-	hwif->INWP		= old_hwif.INWP;
-	hwif->INLP		= old_hwif.INLP;
 	hwif->INSW		= old_hwif.INSW;
-	hwif->INSWP		= old_hwif.INSWP;
 	hwif->INSL		= old_hwif.INSL;
-	hwif->INSLP		= old_hwif.INSLP;
 #endif
 
 	hwif->mmio			= old_hwif.mmio;

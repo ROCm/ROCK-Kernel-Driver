@@ -11,19 +11,20 @@ include $(TOPDIR)/Rules.make
 
 LDFLAGS_vmlinux := -Ttext $(IMAGE_OFFSET) -e startup_32
 
-vmlinux: head.o misc.o piggy.o FORCE
+$(obj)/vmlinux: $(obj)/head.o $(obj)/misc.o $(obj)/piggy.o FORCE
 	$(call if_changed,ld)
 
-vmlinux.bin: $(TOPDIR)/vmlinux FORCE
+$(obj)/vmlinux.bin: vmlinux FORCE
 	$(call if_changed,objcopy)
 
-vmlinux.bin.gz: vmlinux.bin FORCE
+$(obj)/vmlinux.bin.gz: $(obj)/vmlinux.bin FORCE
 	$(call if_changed,gzip)
 
 LDFLAGS_piggy.o := -r --format binary --oformat elf32-i386 -T
 
-piggy.o: vmlinux.scr vmlinux.bin.gz FORCE
+$(obj)/piggy.o: $(obj)/vmlinux.scr $(obj)/vmlinux.bin.gz FORCE
 	$(call if_changed,ld)
 
 clean:
-	@rm -f vmlinux vmlinux.bin vmlinux.bin.gz
+	@echo 'Cleaning up (boot/compressed)'
+	@rm -f $(EXTRA_TARGETS)

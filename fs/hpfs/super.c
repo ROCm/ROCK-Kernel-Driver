@@ -16,7 +16,7 @@
 
 static void mark_dirty(struct super_block *s)
 {
-	if (s->s_hpfs_chkdsk && !(s->s_flags & MS_RDONLY)) {
+	if (hpfs_sb(s)->sb_chkdsk && !(s->s_flags & MS_RDONLY)) {
 		struct buffer_head *bh;
 		struct hpfs_spare_block *sb;
 		if ((sb = hpfs_map_sector(s, 17, &bh, 0))) {
@@ -37,8 +37,8 @@ static void unmark_dirty(struct super_block *s)
 	struct hpfs_spare_block *sb;
 	if (s->s_flags & MS_RDONLY) return;
 	if ((sb = hpfs_map_sector(s, 17, &bh, 0))) {
-		sb->dirty = s->s_hpfs_chkdsk > 1 - s->s_hpfs_was_error;
-		sb->old_wrote = s->s_hpfs_chkdsk >= 2 && !s->s_hpfs_was_error;
+		sb->dirty = hpfs_sb(s)->sb_chkdsk > 1 - hpfs_sb(s)->sb_was_error;
+		sb->old_wrote = hpfs_sb(s)->sb_chkdsk >= 2 && !hpfs_sb(s)->sb_was_error;
 		mark_buffer_dirty(bh);
 		brelse(bh);
 	}
@@ -60,12 +60,12 @@ void hpfs_error(struct super_block *s, char *m,...)
 	printk("HPFS: filesystem error: ");
 	if (buf) printk("%s", buf);
 	else printk("%s\n",m);
-	if (!s->s_hpfs_was_error) {
-		if (s->s_hpfs_err == 2) {
+	if (!hpfs_sb(s)->sb_was_error) {
+		if (hpfs_sb(s)->sb_err == 2) {
 			printk("; crashing the system because you wanted it\n");
 			mark_dirty(s);
 			panic("HPFS panic");
-		} else if (s->s_hpfs_err == 1) {
+		} else if (hpfs_sb(s)->sb_err == 1) {
 			if (s->s_flags & MS_RDONLY) printk("; already mounted read-only\n");
 			else {
 				printk("; remounting read-only\n");
@@ -76,7 +76,7 @@ void hpfs_error(struct super_block *s, char *m,...)
 		else printk("; corrupted filesystem mounted read/write - your computer will explode within 20 seconds ... but you wanted it so!\n");
 	} else printk("\n");
 	if (buf) kfree(buf);
-	s->s_hpfs_was_error = 1;
+	hpfs_sb(s)->sb_was_error = 1;
 }
 
 /* 
@@ -101,9 +101,12 @@ int hpfs_stop_cycles(struct super_block *s, int key, int *c1, int *c2,
 
 void hpfs_put_super(struct super_block *s)
 {
-	if (s->s_hpfs_cp_table) kfree(s->s_hpfs_cp_table);
-	if (s->s_hpfs_bmp_dir) kfree(s->s_hpfs_bmp_dir);
+	struct hpfs_sb_info *sbi = hpfs_sb(s);
+	if (sbi->sb_cp_table) kfree(sbi->sb_cp_table);
+	if (sbi->sb_bmp_dir) kfree(sbi->sb_bmp_dir);
 	unmark_dirty(s);
+	s->u.generic_sbp = NULL;
+	kfree(sbi);
 }
 
 unsigned hpfs_count_one_bitmap(struct super_block *s, secno secno)
@@ -125,28 +128,29 @@ unsigned hpfs_count_one_bitmap(struct super_block *s, secno secno)
 static unsigned count_bitmaps(struct super_block *s)
 {
 	unsigned n, count, n_bands;
-	n_bands = (s->s_hpfs_fs_size + 0x3fff) >> 14;
+	n_bands = (hpfs_sb(s)->sb_fs_size + 0x3fff) >> 14;
 	count = 0;
 	for (n = 0; n < n_bands; n++)
-		count += hpfs_count_one_bitmap(s, s->s_hpfs_bmp_dir[n]);
+		count += hpfs_count_one_bitmap(s, hpfs_sb(s)->sb_bmp_dir[n]);
 	return count;
 }
 
 int hpfs_statfs(struct super_block *s, struct statfs *buf)
 {
+	struct hpfs_sb_info *sbi = hpfs_sb(s);
 	lock_kernel();
 
-	/*if (s->s_hpfs_n_free == -1) {*/
-		s->s_hpfs_n_free = count_bitmaps(s);
-		s->s_hpfs_n_free_dnodes = hpfs_count_one_bitmap(s, s->s_hpfs_dmap);
+	/*if (sbi->sb_n_free == -1) {*/
+		sbi->sb_n_free = count_bitmaps(s);
+		sbi->sb_n_free_dnodes = hpfs_count_one_bitmap(s, sbi->sb_dmap);
 	/*}*/
 	buf->f_type = s->s_magic;
 	buf->f_bsize = 512;
-	buf->f_blocks = s->s_hpfs_fs_size;
-	buf->f_bfree = s->s_hpfs_n_free;
-	buf->f_bavail = s->s_hpfs_n_free;
-	buf->f_files = s->s_hpfs_dirband_size / 4;
-	buf->f_ffree = s->s_hpfs_n_free_dnodes;
+	buf->f_blocks = sbi->sb_fs_size;
+	buf->f_bfree = sbi->sb_n_free;
+	buf->f_bavail = sbi->sb_n_free;
+	buf->f_files = sbi->sb_dirband_size / 4;
+	buf->f_ffree = sbi->sb_n_free_dnodes;
 	buf->f_namelen = 254;
 
 	unlock_kernel();
@@ -377,14 +381,15 @@ int hpfs_remount_fs(struct super_block *s, int *flags, char *data)
 	umode_t umask;
 	int lowercase, conv, eas, chk, errs, chkdsk, timeshift;
 	int o;
+	struct hpfs_sb_info *sbi = hpfs_sb(s);
 	
 	*flags |= MS_NOATIME;
 	
-	uid = s->s_hpfs_uid; gid = s->s_hpfs_gid;
-	umask = 0777 & ~s->s_hpfs_mode;
-	lowercase = s->s_hpfs_lowercase; conv = s->s_hpfs_conv;
-	eas = s->s_hpfs_eas; chk = s->s_hpfs_chk; chkdsk = s->s_hpfs_chkdsk;
-	errs = s->s_hpfs_err; timeshift = s->s_hpfs_timeshift;
+	uid = sbi->sb_uid; gid = sbi->sb_gid;
+	umask = 0777 & ~sbi->sb_mode;
+	lowercase = sbi->sb_lowercase; conv = sbi->sb_conv;
+	eas = sbi->sb_eas; chk = sbi->sb_chk; chkdsk = sbi->sb_chkdsk;
+	errs = sbi->sb_err; timeshift = sbi->sb_timeshift;
 
 	if (!(o = parse_opts(data, &uid, &gid, &umask, &lowercase, &conv,
 	    &eas, &chk, &errs, &chkdsk, &timeshift))) {
@@ -395,18 +400,18 @@ int hpfs_remount_fs(struct super_block *s, int *flags, char *data)
 		hpfs_help();
 		return 1;
 	}
-	if (timeshift != s->s_hpfs_timeshift) {
+	if (timeshift != sbi->sb_timeshift) {
 		printk("HPFS: timeshift can't be changed using remount.\n");
 		return 1;
 	}
 
 	unmark_dirty(s);
 
-	s->s_hpfs_uid = uid; s->s_hpfs_gid = gid;
-	s->s_hpfs_mode = 0777 & ~umask;
-	s->s_hpfs_lowercase = lowercase; s->s_hpfs_conv = conv;
-	s->s_hpfs_eas = eas; s->s_hpfs_chk = chk; s->s_hpfs_chkdsk = chkdsk;
-	s->s_hpfs_err = errs; s->s_hpfs_timeshift = timeshift;
+	sbi->sb_uid = uid; sbi->sb_gid = gid;
+	sbi->sb_mode = 0777 & ~umask;
+	sbi->sb_lowercase = lowercase; sbi->sb_conv = conv;
+	sbi->sb_eas = eas; sbi->sb_chk = chk; sbi->sb_chkdsk = chkdsk;
+	sbi->sb_err = errs; sbi->sb_timeshift = timeshift;
 
 	if (!(*flags & MS_RDONLY)) mark_dirty(s);
 
@@ -419,6 +424,7 @@ static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 	struct hpfs_boot_block *bootblock;
 	struct hpfs_super_block *superblock;
 	struct hpfs_spare_block *spareblock;
+	struct hpfs_sb_info *sbi;
 
 	uid_t uid;
 	gid_t gid;
@@ -431,12 +437,18 @@ static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 
 	int o;
 
-	s->s_hpfs_bmp_dir = NULL;
-	s->s_hpfs_cp_table = NULL;
+	sbi = kmalloc(sizeof(*sbi), GFP_KERNEL);
+	if (!sbi)
+		return -ENOMEM;
+	s->u.generic_sbp = sbi;
+	memset(sbi, 0, sizeof(*sbi));
 
-	s->s_hpfs_rd_inode = 0;
-	init_MUTEX(&s->u.hpfs_sb.hpfs_creation_de);
-	init_waitqueue_head(&s->s_hpfs_iget_q);
+	sbi->sb_bmp_dir = NULL;
+	sbi->sb_cp_table = NULL;
+
+	sbi->sb_rd_inode = 0;
+	init_MUTEX(&sbi->hpfs_creation_de);
+	init_waitqueue_head(&sbi->sb_iget_q);
 
 	uid = current->uid;
 	gid = current->gid;
@@ -459,9 +471,9 @@ static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 		goto bail0;
 	}
 
-	/*s->s_hpfs_mounting = 1;*/
+	/*sbi->sb_mounting = 1;*/
 	sb_set_blocksize(s, 512);
-	s->s_hpfs_fs_size = -1;
+	sbi->sb_fs_size = -1;
 	if (!(bootblock = hpfs_map_sector(s, 0, &bh0, 0))) goto bail1;
 	if (!(superblock = hpfs_map_sector(s, 16, &bh1, 1))) goto bail2;
 	if (!(spareblock = hpfs_map_sector(s, 17, &bh2, 0))) goto bail3;
@@ -489,30 +501,30 @@ static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 	s->s_magic = HPFS_SUPER_MAGIC;
 	s->s_op = &hpfs_sops;
 
-	s->s_hpfs_root = superblock->root;
-	s->s_hpfs_fs_size = superblock->n_sectors;
-	s->s_hpfs_bitmaps = superblock->bitmaps;
-	s->s_hpfs_dirband_start = superblock->dir_band_start;
-	s->s_hpfs_dirband_size = superblock->n_dir_band;
-	s->s_hpfs_dmap = superblock->dir_band_bitmap;
-	s->s_hpfs_uid = uid;
-	s->s_hpfs_gid = gid;
-	s->s_hpfs_mode = 0777 & ~umask;
-	s->s_hpfs_n_free = -1;
-	s->s_hpfs_n_free_dnodes = -1;
-	s->s_hpfs_lowercase = lowercase;
-	s->s_hpfs_conv = conv;
-	s->s_hpfs_eas = eas;
-	s->s_hpfs_chk = chk;
-	s->s_hpfs_chkdsk = chkdsk;
-	s->s_hpfs_err = errs;
-	s->s_hpfs_timeshift = timeshift;
-	s->s_hpfs_was_error = 0;
-	s->s_hpfs_cp_table = NULL;
-	s->s_hpfs_c_bitmap = -1;
+	sbi->sb_root = superblock->root;
+	sbi->sb_fs_size = superblock->n_sectors;
+	sbi->sb_bitmaps = superblock->bitmaps;
+	sbi->sb_dirband_start = superblock->dir_band_start;
+	sbi->sb_dirband_size = superblock->n_dir_band;
+	sbi->sb_dmap = superblock->dir_band_bitmap;
+	sbi->sb_uid = uid;
+	sbi->sb_gid = gid;
+	sbi->sb_mode = 0777 & ~umask;
+	sbi->sb_n_free = -1;
+	sbi->sb_n_free_dnodes = -1;
+	sbi->sb_lowercase = lowercase;
+	sbi->sb_conv = conv;
+	sbi->sb_eas = eas;
+	sbi->sb_chk = chk;
+	sbi->sb_chkdsk = chkdsk;
+	sbi->sb_err = errs;
+	sbi->sb_timeshift = timeshift;
+	sbi->sb_was_error = 0;
+	sbi->sb_cp_table = NULL;
+	sbi->sb_c_bitmap = -1;
 	
 	/* Load bitmap directory */
-	if (!(s->s_hpfs_bmp_dir = hpfs_load_bitmap_directory(s, superblock->bitmaps)))
+	if (!(sbi->sb_bmp_dir = hpfs_load_bitmap_directory(s, superblock->bitmaps)))
 		goto bail4;
 	
 	/* Check for general fs errors*/
@@ -557,20 +569,20 @@ static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 				superblock->dir_band_start, superblock->dir_band_end, superblock->n_dir_band);
 			goto bail4;
 		}
-		a = s->s_hpfs_dirband_size;
-		s->s_hpfs_dirband_size = 0;
+		a = sbi->sb_dirband_size;
+		sbi->sb_dirband_size = 0;
 		if (hpfs_chk_sectors(s, superblock->dir_band_start, superblock->n_dir_band, "dir_band") ||
 		    hpfs_chk_sectors(s, superblock->dir_band_bitmap, 4, "dir_band_bitmap") ||
 		    hpfs_chk_sectors(s, superblock->bitmaps, 4, "bitmaps")) {
 			mark_dirty(s);
 			goto bail4;
 		}
-		s->s_hpfs_dirband_size = a;
+		sbi->sb_dirband_size = a;
 	} else printk("HPFS: You really don't want any checks? You are crazy...\n");
 
 	/* Load code page table */
 	if (spareblock->n_code_pages)
-		if (!(s->s_hpfs_cp_table = hpfs_load_code_page(s, spareblock->code_page_dir)))
+		if (!(sbi->sb_cp_table = hpfs_load_code_page(s, spareblock->code_page_dir)))
 			printk("HPFS: Warning: code page support is disabled\n");
 
 	brelse(bh2);
@@ -578,7 +590,7 @@ static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 	brelse(bh0);
 
 	hpfs_lock_iget(s, 1);
-	s->s_root = d_alloc_root(iget(s, s->s_hpfs_root));
+	s->s_root = d_alloc_root(iget(s, sbi->sb_root));
 	hpfs_unlock_iget(s);
 	if (!s->s_root || !s->s_root->d_inode) {
 		printk("HPFS: iget failed. Why???\n");
@@ -590,7 +602,7 @@ static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 	 * find the root directory's . pointer & finish filling in the inode
 	 */
 
-	root_dno = hpfs_fnode_dno(s, s->s_hpfs_root);
+	root_dno = hpfs_fnode_dno(s, sbi->sb_root);
 	if (root_dno)
 		de = map_dirent(s->s_root->d_inode, root_dno, "\001\001", 2, NULL, &qbh);
 	if (!root_dno || !de) hpfs_error(s, "unable to find root dir");
@@ -612,8 +624,10 @@ bail3:	brelse(bh1);
 bail2:	brelse(bh0);
 bail1:
 bail0:
-	if (s->s_hpfs_bmp_dir) kfree(s->s_hpfs_bmp_dir);
-	if (s->s_hpfs_cp_table) kfree(s->s_hpfs_cp_table);
+	if (sbi->sb_bmp_dir) kfree(sbi->sb_bmp_dir);
+	if (sbi->sb_cp_table) kfree(sbi->sb_cp_table);
+	s->u.generic_sbp = NULL;
+	kfree(sbi);
 	return -EINVAL;
 }
 

@@ -65,26 +65,6 @@ static void init_dma_generic (ide_hwif_t *hwif, unsigned long dmabase)
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
 
-static void __init init_setup_generic (struct pci_dev *dev, ide_pci_device_t *d)
-{
-	if ((d->vendor == PCI_VENDOR_ID_UMC) &&
-	    (d->device == PCI_DEVICE_ID_UMC_UM8886A) &&
-	    (!(PCI_FUNC(dev->devfn) & 1)))
-		return; /* UM8886A/BF pair */
-
-	if ((d->vendor == PCI_VENDOR_ID_OPTI) &&
-	    (d->device == PCI_DEVICE_ID_OPTI_82C558) &&
-	    (!(PCI_FUNC(dev->devfn) & 1)))
-		return;
-
-	ide_setup_pci_device(dev, d);
-}
-
-static void __init init_setup_unknown (struct pci_dev *dev, ide_pci_device_t *d)
-{
-	ide_setup_pci_device(dev, d);
-}
-
 #if 0
 
 	/* Logic to add back later on */
@@ -114,7 +94,18 @@ static int __devinit generic_init_one(struct pci_dev *dev, const struct pci_devi
 
 	if (dev->device != d->device)
 		BUG();
-	d->init_setup(dev, d);
+	if ((d->vendor == PCI_VENDOR_ID_UMC) &&
+	    (d->device == PCI_DEVICE_ID_UMC_UM8886A) &&
+	    (!(PCI_FUNC(dev->devfn) & 1)))
+		return 1; /* UM8886A/BF pair */
+
+	if ((d->vendor == PCI_VENDOR_ID_OPTI) &&
+	    (d->device == PCI_DEVICE_ID_OPTI_82C558) &&
+	    (!(PCI_FUNC(dev->devfn) & 1)))
+		return 1;
+
+	ide_setup_pci_device(dev, d);
+	MOD_INC_USE_COUNT;
 	return 0;
 }
 

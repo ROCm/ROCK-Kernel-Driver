@@ -116,15 +116,8 @@ static inline int fmi_getsigstr(struct fmi_device *dev)
 	val = dev->curvol ? 0x08 : 0x00;	/* unmute/mute */
 	outb(val, myport);
 	outb(val | 0x10, myport);
-	for(i=0; i< 100; i++)
-	{
-		udelay(1400);
-		cond_resched();
-	}
-/* If this becomes allowed use it ... 	
-	current->state = TASK_UNINTERRUPTIBLE;
+	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(HZ/7);
-*/	
 	res = (int)inb(myport+1);
 	outb(val, myport);
 	
@@ -296,7 +289,7 @@ static int __init fmi_init(void)
 	if (io < 0)
 		io = isapnp_fmi_probe();
 	if (io < 0) {
-		printk(KERN_ERR "radio-sf16fmi: No PnP card found.");
+		printk(KERN_ERR "radio-sf16fmi: No PnP card found.\n");
 		return io;
 	}
 	if (!request_region(io, 2, "radio-sf16fmi")) {

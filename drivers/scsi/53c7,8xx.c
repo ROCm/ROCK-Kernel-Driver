@@ -1533,8 +1533,7 @@ NCR53c7xx_detect(Scsi_Host_Template *tpnt){
     int i;
     int current_override;
     int count;			/* Number of boards detected */
-    unsigned char pci_bus, pci_device_fn;
-    static short pci_index=0;	/* Device index to PCI BIOS calls */
+    struct pci_dev *pdev = NULL;
 
     tpnt->proc_name = "ncr53c7xx";
 
@@ -1563,13 +1562,11 @@ NCR53c7xx_detect(Scsi_Host_Template *tpnt){
 
     if (pci_present()) {
 	for (i = 0; i < NPCI_CHIP_IDS; ++i) 
-	    for (pci_index = 0;
-		!pcibios_find_device (PCI_VENDOR_ID_NCR, 
-		    pci_chip_ids[i].pci_device_id, pci_index, &pci_bus, 
-		    &pci_device_fn); 
-    		++pci_index)
+	    while ((pdev = pci_find_device (PCI_VENDOR_ID_NCR,
+					    pci_chip_ids[i].pci_device_id,
+					    pdev)))
 		if (!ncr_pci_init (tpnt, BOARD_GENERIC, pci_chip_ids[i].chip, 
-		    pci_bus, pci_device_fn, /* no options */ 0))
+		    pdev->bus->number, pdev->devfn, /* no options */ 0))
 		    ++count;
     }
     return count;

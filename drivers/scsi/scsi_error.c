@@ -1341,6 +1341,13 @@ int scsi_decide_disposition(Scsi_Cmnd *scmd)
 		 * the case of trying to send too many commands to a
 		 * tagged queueing device.
 		 */
+	case BUSY:
+		/*
+		 * device can't talk to us at the moment.  Should only
+		 * occur (SAM-3) when the task queue is empty, so will cause
+		 * the empty queue handling to trigger a stall in the
+		 * device.
+		 */
 		return ADD_TO_MLQUEUE;
 	case GOOD:
 	case COMMAND_TERMINATED:
@@ -1358,8 +1365,6 @@ int scsi_decide_disposition(Scsi_Cmnd *scmd)
 		 * who knows?  FIXME(eric)
 		 */
 		return SUCCESS;
-	case BUSY:
-		goto maybe_retry;
 
 	case RESERVATION_CONFLICT:
 		printk("scsi%d (%d,%d,%d) : reservation conflict\n", 

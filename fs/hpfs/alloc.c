@@ -24,8 +24,8 @@ static int chk_if_allocated(struct super_block *s, secno sec, char *msg)
 		goto fail1;
 	}
 	hpfs_brelse4(&qbh);
-	if (sec >= s->s_hpfs_dirband_start && sec < s->s_hpfs_dirband_start + s->s_hpfs_dirband_size) {
-		unsigned ssec = (sec - s->s_hpfs_dirband_start) / 4;
+	if (sec >= hpfs_sb(s)->sb_dirband_start && sec < hpfs_sb(s)->sb_dirband_start + hpfs_sb(s)->sb_dirband_size) {
+		unsigned ssec = (sec - hpfs_sb(s)->sb_dirband_start) / 4;
 		if (!(bmp = hpfs_map_dnode_bitmap(s, &qbh))) goto fail;
 		if ((bmp[ssec >> 5] >> (ssec & 0x1f)) & 1) {
 			hpfs_error(s, "sector '%s' - %08x not allocated in directory bitmap", msg, sec);
@@ -48,11 +48,11 @@ static int chk_if_allocated(struct super_block *s, secno sec, char *msg)
 int hpfs_chk_sectors(struct super_block *s, secno start, int len, char *msg)
 {
 	if (start + len < start || start < 0x12 ||
-	    start + len > s->s_hpfs_fs_size) {
+	    start + len > hpfs_sb(s)->sb_fs_size) {
 	    	hpfs_error(s, "sector(s) '%s' badly placed at %08x", msg, start);
 		return 1;
 	}
-	if (s->s_hpfs_chk>=2) {
+	if (hpfs_sb(s)->sb_chk>=2) {
 		int i;
 		for (i = 0; i < len; i++)
 			if (chk_if_allocated(s, start + i, msg)) return 1;
@@ -127,7 +127,7 @@ static secno alloc_in_bmp(struct super_block *s, secno near, unsigned n, unsigne
 	}
 	rt:
 	if (ret) {
-		if (s->s_hpfs_chk && ((ret >> 14) != (bs >> 14) || (bmp[(ret & 0x3fff) >> 5] | ~(((1 << n) - 1) << (ret & 0x1f))) != 0xffffffff)) {
+		if (hpfs_sb(s)->sb_chk && ((ret >> 14) != (bs >> 14) || (bmp[(ret & 0x3fff) >> 5] | ~(((1 << n) - 1) << (ret & 0x1f))) != 0xffffffff)) {
 			hpfs_error(s, "Allocation doesn't work! Wanted %d, allocated at %08x", n, ret);
 			ret = 0;
 			goto b;
@@ -155,14 +155,15 @@ secno hpfs_alloc_sector(struct super_block *s, secno near, unsigned n, int forwa
 	secno sec;
 	unsigned i;
 	unsigned n_bmps;
-	int b = s->s_hpfs_c_bitmap;
+	struct hpfs_sb_info *sbi = hpfs_sb(s);
+	int b = sbi->sb_c_bitmap;
 	int f_p = 0;
 	if (forward < 0) {
 		forward = -forward;
 		f_p = 1;
 	}
 	if (lock) hpfs_lock_creation(s);
-	if (near && near < s->s_hpfs_fs_size)
+	if (near && near < sbi->sb_fs_size)
 		if ((sec = alloc_in_bmp(s, near, n, f_p ? forward : forward/4))) goto ret;
 	if (b != -1) {
 		if ((sec = alloc_in_bmp(s, b<<14, n, f_p ? forward : forward/2))) {
@@ -171,25 +172,25 @@ secno hpfs_alloc_sector(struct super_block *s, secno near, unsigned n, int forwa
 		}
 		if (b > 0x10000000) if ((sec = alloc_in_bmp(s, (b&0xfffffff)<<14, n, f_p ? forward : 0))) goto ret;
 	}	
-	n_bmps = (s->s_hpfs_fs_size + 0x4000 - 1) >> 14;
+	n_bmps = (sbi->sb_fs_size + 0x4000 - 1) >> 14;
 	for (i = 0; i < n_bmps / 2; i++) {
 		if ((sec = alloc_in_bmp(s, (n_bmps/2+i) << 14, n, forward))) {
-			s->s_hpfs_c_bitmap = n_bmps/2+i;
+			sbi->sb_c_bitmap = n_bmps/2+i;
 			goto ret;
 		}	
 		if ((sec = alloc_in_bmp(s, (n_bmps/2-i-1) << 14, n, forward))) {
-			s->s_hpfs_c_bitmap = n_bmps/2-i-1;
+			sbi->sb_c_bitmap = n_bmps/2-i-1;
 			goto ret;
 		}
 	}
 	if ((sec = alloc_in_bmp(s, (n_bmps-1) << 14, n, forward))) {
-		s->s_hpfs_c_bitmap = n_bmps-1;
+		sbi->sb_c_bitmap = n_bmps-1;
 		goto ret;
 	}
 	if (!f_p) {
 		for (i = 0; i < n_bmps; i++)
 			if ((sec = alloc_in_bmp(s, i << 14, n, 0))) {
-				s->s_hpfs_c_bitmap = 0x10000000 + i;
+				sbi->sb_c_bitmap = 0x10000000 + i;
 				goto ret;
 			}
 	}
@@ -212,17 +213,18 @@ static secno alloc_in_dirband(struct super_block *s, secno near, int lock)
 {
 	unsigned nr = near;
 	secno sec;
-	if (nr < s->s_hpfs_dirband_start)
-		nr = s->s_hpfs_dirband_start;
-	if (nr >= s->s_hpfs_dirband_start + s->s_hpfs_dirband_size)
-		nr = s->s_hpfs_dirband_start + s->s_hpfs_dirband_size - 4;
-	nr -= s->s_hpfs_dirband_start;
+	struct hpfs_sb_info *sbi = hpfs_sb(s);
+	if (nr < sbi->sb_dirband_start)
+		nr = sbi->sb_dirband_start;
+	if (nr >= sbi->sb_dirband_start + sbi->sb_dirband_size)
+		nr = sbi->sb_dirband_start + sbi->sb_dirband_size - 4;
+	nr -= sbi->sb_dirband_start;
 	nr >>= 2;
 	if (lock) hpfs_lock_creation(s);
 	sec = alloc_in_bmp(s, (~0x3fff) | nr, 1, 0);
 	if (lock) hpfs_unlock_creation(s);
 	if (!sec) return 0;
-	return ((sec & 0x3fff) << 2) + s->s_hpfs_dirband_start;
+	return ((sec & 0x3fff) << 2) + sbi->sb_dirband_start;
 }
 
 /* Alloc sector if it's free */
@@ -303,8 +305,8 @@ void hpfs_free_sectors(struct super_block *s, secno sec, unsigned n)
 
 int hpfs_check_free_dnodes(struct super_block *s, int n)
 {
-	int n_bmps = (s->s_hpfs_fs_size + 0x4000 - 1) >> 14;
-	int b = s->s_hpfs_c_bitmap & 0x0fffffff;
+	int n_bmps = (hpfs_sb(s)->sb_fs_size + 0x4000 - 1) >> 14;
+	int b = hpfs_sb(s)->sb_c_bitmap & 0x0fffffff;
 	int i, j;
 	unsigned *bmp;
 	struct quad_buffer_head qbh;
@@ -320,7 +322,7 @@ int hpfs_check_free_dnodes(struct super_block *s, int n)
 	}
 	hpfs_brelse4(&qbh);
 	i = 0;
-	if (s->s_hpfs_c_bitmap != -1 ) {
+	if (hpfs_sb(s)->sb_c_bitmap != -1 ) {
 		bmp = hpfs_map_bitmap(s, b, &qbh, "chkdn1");
 		goto chk_bmp;
 	}
@@ -349,17 +351,17 @@ int hpfs_check_free_dnodes(struct super_block *s, int n)
 
 void hpfs_free_dnode(struct super_block *s, dnode_secno dno)
 {
-	if (s->s_hpfs_chk) if (dno & 3) {
+	if (hpfs_sb(s)->sb_chk) if (dno & 3) {
 		hpfs_error(s, "hpfs_free_dnode: dnode %08x not aligned", dno);
 		return;
 	}
-	if (dno < s->s_hpfs_dirband_start ||
-	    dno >= s->s_hpfs_dirband_start + s->s_hpfs_dirband_size) {
+	if (dno < hpfs_sb(s)->sb_dirband_start ||
+	    dno >= hpfs_sb(s)->sb_dirband_start + hpfs_sb(s)->sb_dirband_size) {
 		hpfs_free_sectors(s, dno, 4);
 	} else {
 		struct quad_buffer_head qbh;
 		unsigned *bmp;
-		unsigned ssec = (dno - s->s_hpfs_dirband_start) / 4;
+		unsigned ssec = (dno - hpfs_sb(s)->sb_dirband_start) / 4;
 		lock_super(s);
 		if (!(bmp = hpfs_map_dnode_bitmap(s, &qbh))) {
 			unlock_super(s);
@@ -377,7 +379,7 @@ struct dnode *hpfs_alloc_dnode(struct super_block *s, secno near,
 			 int lock)
 {
 	struct dnode *d;
-	if (hpfs_count_one_bitmap(s, s->s_hpfs_dmap) > FREE_DNODES_ADD) {
+	if (hpfs_count_one_bitmap(s, hpfs_sb(s)->sb_dmap) > FREE_DNODES_ADD) {
 		if (!(*dno = alloc_in_dirband(s, near, lock)))
 			if (!(*dno = hpfs_alloc_sector(s, near, 4, 0, lock))) return NULL;
 	} else {
