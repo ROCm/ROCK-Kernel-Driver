@@ -42,28 +42,28 @@ static struct tty_driver console_driver;
 static int console_refcount = 0;
 
 static struct chan_ops init_console_ops = {
-	type:		"you shouldn't see this",
-	init : 		NULL,
-	open : 		NULL,
-	close :		NULL,
-	read : 		NULL,
-	write :		NULL,
-	console_write :	generic_write,
-	window_size :	NULL,
-	free : 		NULL,
-	winch:		0,
+	.type		= "you shouldn't see this",
+	.init  		= NULL,
+	.open  		= NULL,
+	.close 		= NULL,
+	.read  		= NULL,
+	.write 		= NULL,
+	.console_write 	= generic_write,
+	.window_size 	= NULL,
+	.free  		= NULL,
+	.winch		= 0,
 };
 
 static struct chan init_console_chan = {
-	list : 		{ },
-	primary :	1,
-	input :		0,
-	output :	1,
-	opened :	1,
-	fd :		1,
-	pri :		INIT_STATIC,
-	ops :		&init_console_ops,
-	data :		NULL
+	.list  		= { },
+	.primary 	= 1,
+	.input 		= 0,
+	.output 	= 1,
+	.opened 	= 1,
+	.fd 		= 1,
+	.pri 		= INIT_STATIC,
+	.ops 		= &init_console_ops,
+	.data 		= NULL
 };
 
 void stdio_announce(char *dev_name, int dev)
@@ -73,11 +73,11 @@ void stdio_announce(char *dev_name, int dev)
 }
 
 static struct chan_opts opts = {
-	announce: 	stdio_announce,
-	xterm_title:	"Virtual Console #%d",
-	raw:		1,
-	tramp_stack :	0,
-	in_kernel :	1,
+	.announce 	= stdio_announce,
+	.xterm_title	= "Virtual Console #%d",
+	.raw		= 1,
+	.tramp_stack 	= 0,
+	.in_kernel 	= 1,
 };
 
 static int con_config(char *str);
@@ -85,23 +85,23 @@ static int con_get_config(char *dev, char *str, int size, char **error_out);
 static int con_remove(char *str);
 
 static struct line_driver driver = {
-	name :			"UML console",
-	devfs_name :		"vc/%d",
-	major :			TTY_MAJOR,
-	minor_start :		0,
-	type :		 	TTY_DRIVER_TYPE_CONSOLE,
-	subtype :	 	SYSTEM_TYPE_CONSOLE,
-	read_irq :		CONSOLE_IRQ,
-	read_irq_name :		"console",
-	write_irq :		CONSOLE_WRITE_IRQ,
-	write_irq_name :	"console-write",
-	symlink_from :		"ttys",
-	symlink_to :		"vc",
-	mc : {
-		name : 		"con",
-		config :	con_config,
-		get_config :	con_get_config,
-		remove :	con_remove,
+	.name 			= "UML console",
+	.devfs_name 		= "vc/%d",
+	.major 			= TTY_MAJOR,
+	.minor_start 		= 0,
+	.type 		 	= TTY_DRIVER_TYPE_CONSOLE,
+	.subtype 	 	= SYSTEM_TYPE_CONSOLE,
+	.read_irq 		= CONSOLE_IRQ,
+	.read_irq_name 		= "console",
+	.write_irq 		= CONSOLE_WRITE_IRQ,
+	.write_irq_name 	= "console-write",
+	.symlink_from 		= "ttys",
+	.symlink_to 		= "vc",
+	.mc  = {
+		.name  		= "con",
+		.config 	= con_config,
+		.get_config 	= con_get_config,
+		.remove 	= con_remove,
 	},
 };
 
@@ -192,12 +192,12 @@ static void console_write(struct console *console, const char *string,
 }
 
 static struct tty_driver console_driver = {
-	refcount :		&console_refcount,
-	open :	 		con_open,
-	close :	 		con_close,
-	write :	 		con_write,
-	chars_in_buffer :	chars_in_buffer,
-	set_termios :		set_termios
+	.refcount 		= &console_refcount,
+	.open 	 		= con_open,
+	.close 	 		= con_close,
+	.write 	 		= con_write,
+	.chars_in_buffer 	= chars_in_buffer,
+	.set_termios 		= set_termios
 };
 
 static kdev_t console_device(struct console *c)

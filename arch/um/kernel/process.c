@@ -38,16 +38,17 @@
 #include "choose-mode.h"
 #include "mode.h"
 #ifdef CONFIG_MODE_SKAS
-#include "skas_ptrace.h"
 #include "skas.h"
+#include "skas_ptrace.h"
 #endif
 
 void init_new_thread_stack(void *sig_stack, void (*usr1_handler)(int))
 {
-	int flags = 0;
+	int flags = 0, pages;
 
 	if(sig_stack != NULL){
-		set_sigstack(sig_stack, 2 * page_size());
+		pages = (1 << CONFIG_KERNEL_STACK_ORDER) - 2;
+		set_sigstack(sig_stack, pages * page_size());
 		flags = SA_ONSTACK;
 	}
 	if(usr1_handler) set_handler(SIGUSR1, usr1_handler, flags, -1);
