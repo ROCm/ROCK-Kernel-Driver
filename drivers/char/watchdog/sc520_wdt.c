@@ -39,7 +39,9 @@
  *	-	made timeout (the emulated heartbeat) a module_param
  *	-	made the keepalive ping an internal subroutine
  *	3/27 - 2004 Changes by Sean Young <sean@mess.org>
- *	-	set MMCR_BASE_DEFAULT to 0xfffef000
+ *	-	set MMCR_BASE to 0xfffef000
+ *	-	CBAR does not need to be read
+ *	-	removed debugging printks
  *
  *  This WDT driver is different from most other Linux WDT
  *  drivers in that the driver will ping the watchdog by itself,
@@ -104,7 +106,7 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CON
 /*
  * AMD Elan SC520 - Watchdog Timer Registers
  */
-#define MMCR_BASE_DEFAULT	0xfffef000	/* The default base address */
+#define MMCR_BASE	0xfffef000	/* The default base address */
 #define OFFS_WDTMRCTL	0xCB0	/* Watchdog Timer Control Register */
 
 /* WDT Control Register bit definitions */
@@ -388,8 +390,6 @@ static void __exit sc520_wdt_unload(void)
 static int __init sc520_wdt_init(void)
 {
 	int rc = -EBUSY;
-	unsigned long cbar;
-	unsigned long MMCR_BASE;
 
 	spin_lock_init(&wdt_spinlock);
 
@@ -402,22 +402,6 @@ static int __init sc520_wdt_init(void)
 		wdt_set_heartbeat(WATCHDOG_TIMEOUT);
 		printk(KERN_INFO PFX "timeout value must be 1<=timeout<=3600, using %d\n",
 			WATCHDOG_TIMEOUT);
-	}
-
-	/* get the Base Address Register:
-	 * If the ENB bit [31] of CBAR is set => MMCR alias is enabled and MMCR base address is
-	 * the contents of CBAR[29-12].
-	 * if ENB bit is 0 => MMCR alias is disabled and the MMCR base address is the default
-	 * value. */
-	cbar = inl_p(0xfffc);
-	printk(KERN_INFO PFX "CBAR: 0x%08lx\n", cbar);
-	/* check if MMCR aliasing bit is set */
-	if (cbar & 0x80000000) {
-		printk(KERN_INFO PFX "MMCR Aliasing enabled.\n");
-		MMCR_BASE = (cbar & 0x3fffffff);
-	} else {
-		printk(KERN_INFO PFX "MMCR Aliasing NOT enabled. Using default value.\n");
-		MMCR_BASE = MMCR_BASE_DEFAULT;
 	}
 
 	wdtmrctl = ioremap((unsigned long)(MMCR_BASE + OFFS_WDTMRCTL), 2);
