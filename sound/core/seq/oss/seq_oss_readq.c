@@ -149,50 +149,37 @@ snd_seq_oss_readq_put_event(seq_oss_readq_t *q, evrec_t *ev)
 
 /*
  * pop queue
+ * caller must hold lock
  */
-evrec_t *
-snd_seq_oss_readq_pick(seq_oss_readq_t *q, int blocking, unsigned long *rflags)
+int
+snd_seq_oss_readq_pick(seq_oss_readq_t *q, evrec_t *rec)
 {
-	evrec_t *p;
-
-	spin_lock_irqsave(&q->lock, *rflags);
-	if (q->qlen == 0) {
-		if (blocking) {
-			spin_unlock(&q->lock);
-			interruptible_sleep_on_timeout(&q->midi_sleep,
-						       q->pre_event_timeout);
-			spin_lock(&q->lock);
-		}
-		if (q->qlen == 0) {
-			spin_unlock_irqrestore(&q->lock, *rflags);
-			return NULL;
-		}
-	}
-	p = q->q + q->head;
-
-	return p;
+	if (q->qlen == 0)
+		return -EAGAIN;
+	memcpy(rec, &q->q[q->head], sizeof(*rec));
+	return 0;
 }
 
 /*
- * unlock queue
+ * sleep until ready
  */
 void
-snd_seq_oss_readq_unlock(seq_oss_readq_t *q, unsigned long flags)
+snd_seq_oss_readq_wait(seq_oss_readq_t *q)
 {
-	spin_unlock_irqrestore(&q->lock, flags);
+	interruptible_sleep_on_timeout(&q->midi_sleep, q->pre_event_timeout);
 }
 
 /*
- * drain one record and unlock queue
+ * drain one record
+ * caller must hold lock
  */
 void
-snd_seq_oss_readq_free(seq_oss_readq_t *q, unsigned long flags)
+snd_seq_oss_readq_free(seq_oss_readq_t *q)
 {
 	if (q->qlen > 0) {
 		q->head = (q->head + 1) % q->maxlen;
 		q->qlen--;
 	}
-	spin_unlock_irqrestore(&q->lock, flags);
 }
 
 /*
