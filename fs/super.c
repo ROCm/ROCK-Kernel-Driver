@@ -311,7 +311,7 @@ void sync_filesystems(int wait)
 	spin_lock(&sb_lock);
 	for (sb = sb_entry(super_blocks.next); sb != sb_entry(&super_blocks);
 			sb = sb_entry(sb->s_list.next)) {
-		if (!sb->s_op->sync_fs);
+		if (!sb->s_op->sync_fs)
 			continue;
 		if (sb->s_flags & MS_RDONLY)
 			continue;
