@@ -1,10 +1,16 @@
 ToDo:
 	- Find and fix bugs.
+	- Either invalidate quotas or update the quota charges on NTFS 3.x
+	  volumes with quota tracking enabled ($Quota).
+	- Checkpoint or disable the user space journal ($UsnJrnl).
 	- Implement aops->set_page_dirty() in order to take control of buffer
 	  dirtying. Not having it means if page_has_buffers(), all buffers
 	  will be dirtied with the page. And if not they won't be. That is
 	  fine for the moment but will break once we enable metadata updates.
-	- Implement sops->dirty_inode() to implement {a,m,c} time updates and
+	  For now just always using __set_page_dirty_nobuffers() for metadata
+	  pages as nothing can dirty a page other than ourselves. Should this
+	  change, we will really need to roll our own ->set_page_dirty().
+	- Implement sops->dirty_inode() to implement {a,m,c}time updates and
 	  such things.
 	- Implement sops->write_inode().
 	- In between ntfs_prepare/commit_write, need exclusion between
@@ -604,12 +610,12 @@ tng-0.0.8 - 08/03/2002 - Now using BitKeeper, http://linux-ntfs.bkbits.net/
 	  types of inode names readdir() returns and modify ntfs_filldir()
 	  accordingly. There are several parameters to show_inodes:
 		system:	system files
-	  	win32:	long file names (including POSIX file names) [DEFAULT]
+		win32:	long file names (including POSIX file names) [DEFAULT]
 		long:	same as win32
-	  	dos:	short file names only (excluding POSIX file names)
+		dos:	short file names only (excluding POSIX file names)
 		short:	same as dos
 		posix:	same as both win32 and dos
-	  	all:	all file names
+		all:	all file names
 	  Note that the options are additive, i.e. specifying:
 		-o show_inodes=system,show_inodes=win32,show_inodes=dos
 	  is the same as specifying:
