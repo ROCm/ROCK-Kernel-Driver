@@ -99,7 +99,7 @@ static inline int elf_core_copy_task_regs(struct task_struct *t,
 }
 
 static inline int
-elf_core_copy_task_fpregs(struct task_struct *tsk, elf_fpregset_t *fpu)
+elf_core_copy_task_fpregs(struct task_struct *tsk, struct pt_regs *regs, elf_fpregset_t *fpu)
 {
 	struct ia32_user_i387_struct *fpstate = (void*)fpu;
 
