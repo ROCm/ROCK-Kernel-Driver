@@ -8,10 +8,10 @@
  *	modify it under the terms of the GNU General Public License
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
- *	
- *	Neither Alan Cox nor CymruNet Ltd. admit liability nor provide 
- *	warranty for any of this software. This material is provided 
- *	"AS-IS" and at no charge.	
+ *
+ *	Neither Alan Cox nor CymruNet Ltd. admit liability nor provide
+ *	warranty for any of this software. This material is provided
+ *	"AS-IS" and at no charge.
  *
  *	(c) Copyright 1995    Alan Cox <alan@lxorguk.ukuu.org.uk>
  *
@@ -28,14 +28,14 @@
  *	Made SMP safe for 2.3.x
  *
  *  20011127 Joel Becker (jlbec@evilplan.org>
- *	Added soft_noboot; Allows testing the softdog trigger without 
+ *	Added soft_noboot; Allows testing the softdog trigger without
  *	requiring a recompile.
  *	Added WDIOC_GETTIMEOUT and WDIOC_SETTIMOUT.
  *
  *  20020530 Joel Becker <joel.becker@oracle.com>
  *  	Added Matt Domsch's nowayout module option.
  */
- 
+
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/config.h>
@@ -73,7 +73,7 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CON
 /*
  *	Our timer
  */
- 
+
 static void watchdog_fire(unsigned long);
 
 static struct timer_list watchdog_ticktock =
@@ -84,7 +84,7 @@ static unsigned long timer_alive;
 /*
  *	If the timer expires..
  */
- 
+
 static void watchdog_fire(unsigned long data)
 {
 	if (soft_noboot)
@@ -100,12 +100,12 @@ static void watchdog_fire(unsigned long data)
 /*
  *	Allow only one person to hold it open
  */
- 
+
 static int softdog_open(struct inode *inode, struct file *file)
 {
 	if(test_and_set_bit(0, &timer_alive))
 		return -EBUSY;
-	if (nowayout) 
+	if (nowayout)
 		__module_get(THIS_MODULE);
 	/*
 	 *	Activate timer

@@ -8,7 +8,7 @@
  *	modify it under the terms of the GNU General Public License
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
- *	
+ *
  *	Neither kernel concepts nor Nils Faerber admit liability nor provide
  *	warranty for any of this software. This material is provided
  *	"AS-IS" and at no charge.
@@ -112,7 +112,7 @@ static int tco_timer_start (void)
 	outb (val, TCO1_CNT + 1);
 	val = inb (TCO1_CNT + 1);
 	spin_unlock(&tco_lock);
-	
+
 	if (val & 0x08)
 		return -1;
 	return 0;
@@ -131,7 +131,7 @@ static int tco_timer_stop (void)
 	outb (val, TCO1_CNT + 1);
 	val = inb (TCO1_CNT + 1);
 	spin_unlock(&tco_lock);
-	
+
 	if ((val & 0x08) == 0)
 		return -1;
 	return 0;
@@ -148,7 +148,7 @@ static int tco_timer_settimer (unsigned char tmrval)
 	/* "Values of 0h-3h are ignored and should not be attempted" */
 	if (tmrval > 0x3f || tmrval < 0x04)
 		return -1;
-	
+
 	spin_lock(&tco_lock);
 	val = inb (TCO1_TMR);
 	val &= 0xc0;
@@ -156,7 +156,7 @@ static int tco_timer_settimer (unsigned char tmrval)
 	outb (val, TCO1_TMR);
 	val = inb (TCO1_TMR);
 	spin_unlock(&tco_lock);
-	
+
 	if ((val & 0x3f) != tmrval)
 		return -1;
 

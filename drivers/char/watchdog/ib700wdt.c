@@ -28,7 +28,7 @@
  *      14-Dec-2001 Matt Domsch <Matt_Domsch@dell.com>
  *           Added nowayout module option to override CONFIG_WATCHDOG_NOWAYOUT
  *           Added timeout module option to override default
- * 
+ *
  */
 
 #include <linux/config.h>
@@ -174,7 +174,7 @@ ibwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	static struct watchdog_info ident = {
 		.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
 		.firmware_version = 1,
-		.identity = "IB700 WDT"
+		.identity = "IB700 WDT",
 	};
 
 	switch (cmd) {
@@ -274,7 +274,7 @@ static struct file_operations ibwdt_fops = {
 static struct miscdevice ibwdt_miscdev = {
 	.minor = WATCHDOG_MINOR,
 	.name = "watchdog",
-	.fops = &ibwdt_fops
+	.fops = &ibwdt_fops,
 };
 
 /*
@@ -285,7 +285,7 @@ static struct miscdevice ibwdt_miscdev = {
 static struct notifier_block ibwdt_notifier = {
 	.notifier_call = ibwdt_notify_sys,
 	.next = NULL,
-	.priority = 0
+	.priority = 0,
 };
 
 static int __init ibwdt_init(void)

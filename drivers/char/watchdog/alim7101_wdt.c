@@ -374,7 +374,7 @@ static int __init alim7101_wdt_init(void)
 err_out_miscdev:
 	misc_deregister(&wdt_miscdev);
 err_out:
-        return rc;
+	return rc;
 }
 
 module_init(alim7101_wdt_init);

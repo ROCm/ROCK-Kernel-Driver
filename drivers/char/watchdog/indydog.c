@@ -7,10 +7,10 @@
  *	modify it under the terms of the GNU General Public License
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
- *	
+ *
  *	based on softdog.c by Alan Cox <alan@redhat.com>
  */
- 
+
 #include <linux/module.h>
 #include <linux/config.h>
 #include <linux/types.h>
@@ -25,7 +25,7 @@
 #include <asm/sgi/sgimc.h>
 
 static unsigned long indydog_alive;
-static struct sgimc_misc_ctrl *mcmisc_regs; 
+static struct sgimc_misc_ctrl *mcmisc_regs;
 static char expect_close;
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
@@ -50,7 +50,7 @@ static void indydog_ping()
 static int indydog_open(struct inode *inode, struct file *file)
 {
 	u32 mc_ctrl0;
-	
+
 	if( test_and_set_bit(0,&indydog_alive) )
 		return -EBUSY;
 
@@ -65,7 +65,7 @@ static int indydog_open(struct inode *inode, struct file *file)
 	mc_ctrl0 = mcmisc_regs->cpuctrl0 | SGIMC_CCTRL0_WDOG;
 	mcmisc_regs->cpuctrl0 = mc_ctrl0;
 	indydog_ping();
-			
+
 	printk("Started watchdog timer.\n");
 	return 0;
 }
@@ -78,7 +78,7 @@ static int indydog_release(struct inode *inode, struct file *file)
 	 */
 
 	if (expect_close == 42) {
-		u32 mc_ctrl0 = mcmisc_regs->cpuctrl0; 
+		u32 mc_ctrl0 = mcmisc_regs->cpuctrl0;
 		mc_ctrl0 &= ~SGIMC_CCTRL0_WDOG;
 		mcmisc_regs->cpuctrl0 = mc_ctrl0;
 		printk("Stopped watchdog timer.\n");

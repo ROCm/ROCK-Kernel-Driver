@@ -258,11 +258,11 @@ static ssize_t wdt977_write(struct file *file, const char *buf, size_t count, lo
 
 static struct watchdog_info ident = {
 	.options	= WDIOF_SETTIMEOUT,
-	.identity	= "Winbond 83977"
+	.identity	= "Winbond 83977",
 };
 
 static int wdt977_ioctl(struct inode *inode, struct file *file,
-         unsigned int cmd, unsigned long arg)
+	unsigned int cmd, unsigned long arg)
 {
 	int temp;
 
@@ -342,7 +342,7 @@ static struct miscdevice wdt977_miscdev=
 {
 	.minor		= WATCHDOG_MINOR,
 	.name		= "watchdog",
-	.fops		= &wdt977_fops
+	.fops		= &wdt977_fops,
 };
 
 static int __init nwwatchdog_init(void)

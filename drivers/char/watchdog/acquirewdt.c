@@ -263,33 +263,33 @@ static int __init acq_init(void)
 		goto unreg_stop;
 	}
 
-        ret = register_reboot_notifier(&acq_notifier);
-        if (ret != 0) {
-                printk (KERN_ERR PFX "cannot register reboot notifier (err=%d)\n",
-                        ret);
-                goto unreg_regions;
-        }
-                                                                                                 
-        ret = misc_register(&acq_miscdev);
-        if (ret != 0) {
-                printk (KERN_ERR PFX "cannot register miscdev on minor=%d (err=%d)\n",
-                        WATCHDOG_MINOR, ret);
-                goto unreg_reboot;
-        }
-                                                                                                 
-        printk (KERN_INFO PFX "initialized. (nowayout=%d)\n",
-                nowayout);
-                                                                                                 
+	ret = register_reboot_notifier(&acq_notifier);
+	if (ret != 0) {
+		printk (KERN_ERR PFX "cannot register reboot notifier (err=%d)\n",
+			ret);
+		goto unreg_regions;
+	}
+
+	ret = misc_register(&acq_miscdev);
+	if (ret != 0) {
+		printk (KERN_ERR PFX "cannot register miscdev on minor=%d (err=%d)\n",
+			WATCHDOG_MINOR, ret);
+		goto unreg_reboot;
+	}
+
+	printk (KERN_INFO PFX "initialized. (nowayout=%d)\n",
+		nowayout);
+
 out:
-        return ret;
+	return ret;
 unreg_reboot:
-        unregister_reboot_notifier(&acq_notifier);
+	unregister_reboot_notifier(&acq_notifier);
 unreg_regions:
-        release_region(wdt_start, 1);
+	release_region(wdt_start, 1);
 unreg_stop:
-        if (wdt_stop != wdt_start)
-                release_region(wdt_stop, 1);
-        goto out;
+	if (wdt_stop != wdt_start)
+		release_region(wdt_stop, 1);
+	goto out;
 }
 
 static void __exit acq_exit(void)

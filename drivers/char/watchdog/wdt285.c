@@ -12,9 +12,9 @@
  *	modify it under the terms of the GNU General Public License
  *	as published by the Free Software Foundation; either version
  *	2 of the License, or (at your option) any later version.
- *	
+ *
  */
- 
+
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/types.h>
@@ -79,7 +79,7 @@ static int watchdog_open(struct inode *inode, struct file *file)
 
 	*CSR_TIMER4_CLR = 0;
 	watchdog_ping();
-	*CSR_TIMER4_CNTL = TIMER_CNTL_ENABLE | TIMER_CNTL_AUTORELOAD 
+	*CSR_TIMER4_CNTL = TIMER_CNTL_ENABLE | TIMER_CNTL_AUTORELOAD
 		| TIMER_CNTL_DIV256;
 
 #ifdef ONLY_TESTING
@@ -132,7 +132,7 @@ watchdog_write(struct file *file, const char *data, size_t len, loff_t *ppos)
 
 static struct watchdog_info ident = {
 	.options	= WDIOF_SETTIMEOUT,
-	.identity	= "Footbridge Watchdog"
+	.identity	= "Footbridge Watchdog",
 };
 
 static int
@@ -192,7 +192,7 @@ static struct file_operations watchdog_fops = {
 static struct miscdevice watchdog_miscdev = {
 	.minor		= WATCHDOG_MINOR,
 	.name		= "watchdog",
-	.fops		= &watchdog_fops
+	.fops		= &watchdog_fops,
 };
 
 static int __init footbridge_watchdog_init(void)
@@ -206,7 +206,7 @@ static int __init footbridge_watchdog_init(void)
 	if (retval < 0)
 		return retval;
 
-	printk("Footbridge Watchdog Timer: 0.01, timer margin: %d sec\n", 
+	printk("Footbridge Watchdog Timer: 0.01, timer margin: %d sec\n",
 	       soft_margin);
 
 	if (machine_is_cats())
