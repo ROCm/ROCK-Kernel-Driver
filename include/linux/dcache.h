@@ -76,25 +76,25 @@ struct dentry {
 	atomic_t d_count;
 	unsigned long d_vfs_flags;	/* moved here to be on same cacheline */
 	spinlock_t d_lock;		/* per dentry lock */
-	unsigned int d_flags;
-	unsigned long d_move_count;	/* to indicated moved dentry while lockless lookup */
 	struct inode  * d_inode;	/* Where the name belongs to - NULL is negative */
-	struct dentry * d_parent;	/* parent directory */
-	struct list_head * d_bucket;	/* lookup hash bucket */
-	struct list_head d_hash;	/* lookup hash list */
 	struct list_head d_lru;		/* LRU list */
 	struct list_head d_child;	/* child of parent list */
 	struct list_head d_subdirs;	/* our children */
 	struct list_head d_alias;	/* inode alias list */
-	int d_mounted;
-	struct qstr d_name;
-	struct qstr * d_qstr;		/* quick str ptr used in lockless lookup and concurrent d_move */
 	unsigned long d_time;		/* used by d_revalidate */
 	struct dentry_operations  *d_op;
 	struct super_block * d_sb;	/* The root of the dentry tree */
+	unsigned int d_flags;
+	int d_mounted;
 	void * d_fsdata;		/* fs-specific data */
  	struct rcu_head d_rcu;
 	struct dcookie_struct * d_cookie; /* cookie, if any */
+	unsigned long d_move_count;	/* to indicated moved dentry while lockless lookup */
+	struct qstr * d_qstr;		/* quick str ptr used in lockless lookup and concurrent d_move */
+	struct dentry * d_parent;	/* parent directory */
+	struct qstr d_name;
+	struct hlist_node d_hash;	/* lookup hash list */	
+	struct hlist_head * d_bucket;	/* lookup hash bucket */
 	unsigned char d_iname[DNAME_INLINE_LEN_MIN]; /* small names */
 } ____cacheline_aligned;
 
@@ -171,7 +171,7 @@ extern rwlock_t dparent_lock;
 static __inline__ void __d_drop(struct dentry * dentry)
 {
 	dentry->d_vfs_flags |= DCACHE_UNHASHED;
-	list_del_rcu(&dentry->d_hash);
+	hlist_del_rcu(&dentry->d_hash);
 }
 
 static __inline__ void d_drop(struct dentry * dentry)
@@ -198,7 +198,7 @@ extern struct dentry * d_alloc_anon(struct inode *);
 extern struct dentry * d_splice_alias(struct inode *, struct dentry *);
 extern void shrink_dcache_sb(struct super_block *);
 extern void shrink_dcache_parent(struct dentry *);
-extern void shrink_dcache_anon(struct list_head *);
+extern void shrink_dcache_anon(struct hlist_head *);
 extern int d_invalidate(struct dentry *);
 
 /* only used at mount-time */
