@@ -1086,6 +1086,8 @@ typedef union smb_com_transaction2 {
 #define SMB_FIND_FILE_FULL_DIRECTORY_INFO 0x102
 #define SMB_FIND_FILE_NAMES_INFO          0x103
 #define SMB_FIND_FILE_BOTH_DIRECTORY_INFO 0x104
+#define SMB_FIND_FILE_ID_FULL_DIR_INFO    0x105
+#define SMB_FIND_FILE_ID_BOTH_DIR_INFO    0x106
 #define SMB_FIND_FILE_UNIX                0x202
 
 typedef struct smb_com_transaction2_qpi_req {
@@ -1706,8 +1708,8 @@ typedef struct {
 	__le64 EndOfFile;
 	__le64 AllocationSize;
 	__le32 ExtFileAttributes;
-	__le32 FileNameLength;
 	__le32 EaSize; /* length of the xattrs */
+	__le32 FileNameLength;
 	char FileName[1];
 } FILE_FULL_DIRECTORY_INFO;   /* level 258 FF response data area */
 
@@ -1721,7 +1723,23 @@ typedef struct {
 	__le64 EndOfFile;
 	__le64 AllocationSize;
 	__le32 ExtFileAttributes;
+	__le32 EaSize; /* length of the xattrs */
+	__le64  UniqueId; /* inode num - le since Samba puts ino in low 32 bit*/
 	__le32 FileNameLength;
+	char FileName[1];
+} SEARCH_ID_FULL_DIR_INFO;   /* level 261 FF response data area */
+
+typedef struct {
+	__le32 NextEntryOffset;
+	__u32 FileIndex;
+	__le64 CreationTime;
+	__le64 LastAccessTime;
+	__le64 LastWriteTime;
+	__le64 ChangeTime;
+	__le64 EndOfFile;
+	__le64 AllocationSize;
+	__le32 ExtFileAttributes;
+	__le32 FileNameLength; /* this should be right before FileName despite what spec says - spec probably wrong */
 	__le32 EaSize; /* length of the xattrs */
 	__u8   ShortNameLength;
 	__u8   Reserved;
