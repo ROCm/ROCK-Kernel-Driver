@@ -36,7 +36,6 @@
 #include <linux/mpage.h>
 
 
-STATIC int delalloc_convert(struct inode *, struct page *, int, int);
 
 STATIC int
 map_blocks(
@@ -127,83 +126,6 @@ map_buffer_at_offset(
 	bh->b_bdev = mp->pbm_target->pbr_bdev;
 	set_buffer_mapped(bh);
 	clear_buffer_delay(bh);
-}
-
-/*
- * Convert delalloc space to real space, do not flush the
- * data out to disk, that will be done by the caller.
- */
-STATIC int
-release_page(
-	struct page		*page)
-{
-	struct inode		*inode = (struct inode*)page->mapping->host;
-	unsigned long		end_index = inode->i_size >> PAGE_CACHE_SHIFT;
-	int			ret;
-
-	/* Are we off the end of the file ? */
-	if (page->index >= end_index) {
-		unsigned offset = inode->i_size & (PAGE_CACHE_SIZE-1);
-		if ((page->index >= end_index+1) || !offset) {
-			ret =  -EIO;
-			goto out;
-		}
-	}
-
-	ret = delalloc_convert(inode, page, 0, 0);
-
-out:
-	if (ret < 0) {
-		block_invalidatepage(page, 0);
-		ClearPageUptodate(page);
-
-		return 0;
-	}
-
-	return 1;
-}
-
-/*
- * Convert delalloc or unmapped space to real space and flush out
- * to disk.
- */
-STATIC int
-write_full_page(
-	struct page		*page,
-	int			delalloc)
-{
-	struct inode		*inode = (struct inode*)page->mapping->host;
-	unsigned long		end_index = inode->i_size >> PAGE_CACHE_SHIFT;
-	int			ret;
-
-	/* Are we off the end of the file ? */
-	if (page->index >= end_index) {
-		unsigned offset = inode->i_size & (PAGE_CACHE_SIZE-1);
-		if ((page->index >= end_index+1) || !offset) {
-			ret =  -EIO;
-			goto out;
-		}
-	}
-
-	if (!page_has_buffers(page)) {
-		create_empty_buffers(page, 1 << inode->i_blkbits, 0);
-	}
-
-	ret = delalloc_convert(inode, page, 1, delalloc == 0);
-
-out:
-	if (ret < 0) {
-		/*
-		 * If it's delalloc and we have nowhere to put it,
-		 * throw it away.
-		 */
-		if (delalloc)
-			block_invalidatepage(page, 0);
-		ClearPageUptodate(page);
-		unlock_page(page);
-	}
-
-	return ret;
 }
 
 /*
@@ -347,16 +269,21 @@ submit_page(
 		end_page_writeback(page);
 }
 
-STATIC int
-map_page(
+/*
+ * Allocate & map buffers for page given the extent map. Write it out.
+ * except for the original page of a writepage, this is called on
+ * delalloc pages only, for the original page it is possible that
+ * the page has no mapping at all.
+ */
+STATIC void
+convert_page(
 	struct inode		*inode,
 	struct page		*page,
 	page_buf_bmap_t		*maps,
-	struct buffer_head	*bh_arr[],
 	int			startio,
 	int			all_bh)
 {
-	struct buffer_head	*bh, *head;
+	struct buffer_head	*bh_arr[MAX_BUF_PER_PAGE], *bh, *head;
 	page_buf_bmap_t		*mp = maps, *tmp;
 	unsigned long		end, offset, end_index;
 	int			i = 0, index = 0;
@@ -393,32 +320,12 @@ map_page(
 		}
 	} while (i++, (bh = bh->b_this_page) != head);
 
-	return index;
-}
-
-/*
- * Allocate & map buffers for page given the extent map. Write it out.
- * except for the original page of a writepage, this is called on
- * delalloc pages only, for the original page it is possible that
- * the page has no mapping at all.
- */
-STATIC void
-convert_page(
-	struct inode		*inode,
-	struct page		*page,
-	page_buf_bmap_t		*maps,
-	int			startio,
-	int			all_bh)
-{
-	struct buffer_head	*bh_arr[MAX_BUF_PER_PAGE];
-	int			cnt;
-
-	cnt = map_page(inode, page, maps, bh_arr, startio, all_bh);
 	if (startio) {
-		submit_page(page, bh_arr, cnt);
+		submit_page(page, bh_arr, index);
 	} else {
 		unlock_page(page);
 	}
+
 	page_cache_release(page);
 }
 
@@ -439,40 +346,47 @@ cluster_write(
 
 	tlast = (mp->pbm_offset + mp->pbm_bsize) >> PAGE_CACHE_SHIFT;
 	for (; tindex < tlast; tindex++) {
-		if (!(page = probe_page(inode, tindex)))
+		page = probe_page(inode, tindex);
+		if (!page)
 			break;
 		convert_page(inode, page, mp, startio, all_bh);
 	}
 }
 
 /*
- * Calling this without allocate_space set means we are being asked to
- * flush a dirty buffer head. When called with async_write set then we
- * are coming from writepage. A writepage call with allocate_space set
- * means we are being asked to write out all of the page which is before
- * EOF and therefore need to allocate space for unmapped portions of the
- * page.
+ * Calling this without startio set means we are being asked to make a dirty
+ * page ready for freeing it's buffers.  When called with startio set then
+ * we are coming from writepage.
  */
 STATIC int
 delalloc_convert(
-	struct inode		*inode,		/* inode containing page */
-	struct page		*page,		/* page to convert - locked */
-	int			startio,	/* start io on the page */
+	struct page		*page,
+	int			startio,
 	int			allocate_space)
 {
-	struct buffer_head	*bh, *head;
-	struct buffer_head	*bh_arr[MAX_BUF_PER_PAGE];
+	struct inode		*inode = page->mapping->host;
+	struct buffer_head	*bh_arr[MAX_BUF_PER_PAGE], *bh, *head;
 	page_buf_bmap_t		*mp, map;
-	int			i, cnt = 0;
-	int			len, err;
-	unsigned long		p_offset = 0;
-	loff_t			offset;
-	loff_t			end_offset;
+	unsigned long		p_offset = 0, end_index;
+	loff_t			offset, end_offset;
+	int			len, err, i, cnt = 0;
+
+	/* Are we off the end of the file ? */
+	end_index = inode->i_size >> PAGE_CACHE_SHIFT;
+	if (page->index >= end_index) {
+		unsigned remaining = inode->i_size & (PAGE_CACHE_SIZE-1);
+		if ((page->index >= end_index+1) || !remaining) {
+			return -EIO;
+		}
+	}
 
 	offset = (loff_t)page->index << PAGE_CACHE_SHIFT;
 	end_offset = offset + PAGE_CACHE_SIZE;
 	if (end_offset > inode->i_size)
 		end_offset = inode->i_size;
+	
+	if (startio && !page_has_buffers(page))
+		create_empty_buffers(page, 1 << inode->i_blkbits, 0);
 
 	bh = head = page_buffers(page);
 	mp = NULL;
@@ -491,8 +405,9 @@ delalloc_convert(
 			if (!mp) {
 				err = map_blocks(inode, offset, len, &map,
 						PBF_WRITE|PBF_FILE_ALLOCATE);
-				if (err)
+				if (err) {
 					goto error;
+				}
 				mp = match_offset_to_mapping(page, &map,
 								p_offset);
 			}
@@ -517,8 +432,9 @@ delalloc_convert(
 								bh, head);
 				err = map_blocks(inode, offset, size, &map,
 						PBF_WRITE|PBF_DIRECT);
-				if (err)
+				if (err) {
 					goto error;
+				}
 				mp = match_offset_to_mapping(page, &map,
 								p_offset);
 			}
@@ -544,12 +460,14 @@ next_bh:
 		bh = bh->b_this_page;
 	} while (offset < end_offset);
 
-	if (startio)
+	if (startio) {
 		submit_page(page, bh_arr, cnt);
+	}
 
-	if (mp)
+	if (mp) {
 		cluster_write(inode, page->index + 1, mp,
 				startio, allocate_space);
+	}
 
 	return 0;
 
@@ -557,7 +475,15 @@ error:
 	for (i = 0; i < cnt; i++) {
 		unlock_buffer(bh_arr[i]);
 	}
-
+	
+	/*
+	 * If it's delalloc and we have nowhere to put it,
+	 * throw it away.
+	 */
+	if (!allocate_space) {
+		block_invalidatepage(page, 0);
+	}
+	ClearPageUptodate(page);
 	return err;
 }
 
@@ -745,14 +671,12 @@ count_page_state(
 
 		bh = head = page_buffers(page);
 		do {
-			if (buffer_uptodate(bh) && !buffer_mapped(bh)) {
+			if (buffer_uptodate(bh) && !buffer_mapped(bh))
 				(*nr_unmapped)++;
-				continue;
-			}
-			if (!buffer_delay(bh))
-				continue;
-			(*nr_delalloc)++;
+			else if (buffer_delay(bh))
+				(*nr_delalloc)++;
 		} while ((bh = bh->b_this_page) != head);
+
 		return 1;
 	}
 
@@ -764,20 +688,22 @@ linvfs_writepage(
 	struct page		*page)
 {
 	int			error;
-	int			need_trans;
+	int			need_trans = 1;
 	int			nr_delalloc, nr_unmapped;
 
-	if (count_page_state(page, &nr_delalloc, &nr_unmapped)) {
+	if (count_page_state(page, &nr_delalloc, &nr_unmapped))
 		need_trans = nr_delalloc + nr_unmapped;
-	} else {
-		need_trans = 1;
-	}
 
 	if ((current->flags & (PF_FSTRANS)) && need_trans)
 		goto out_fail;
 
-	error = write_full_page(page, nr_delalloc);
-
+	/*
+	 * Convert delalloc or unmapped space to real space and flush out
+	 * to disk.
+	 */
+	error = delalloc_convert(page, 1, nr_delalloc == 0);
+	if (unlikely(error))
+		unlock_page(page);
 	return error;
 
 out_fail:
@@ -812,24 +738,26 @@ linvfs_release_page(
 	struct page		*page,
 	int			gfp_mask)
 {
-	int			need_trans;
 	int			nr_delalloc, nr_unmapped;
 
 	if (count_page_state(page, &nr_delalloc, &nr_unmapped)) {
-		need_trans = nr_delalloc;
-	} else {
-		need_trans = 0;
-	}
-
-	if (need_trans == 0) {
-		return try_to_free_buffers(page);
-	}
+		if (!nr_delalloc)
+			goto free_buffers;
+	} 
 
 	if (gfp_mask & __GFP_FS) {
-		if (release_page(page) == 0)
-			return try_to_free_buffers(page);
+		/*
+		 * Convert delalloc space to real space, do not flush the
+		 * data out to disk, that will be done by the caller.
+		 */
+		if (delalloc_convert(page, 0, 0) == 0)
+			goto free_buffers;
 	}
+
 	return 0;
+
+free_buffers:
+	return try_to_free_buffers(page);
 }
 
 
