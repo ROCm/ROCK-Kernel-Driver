@@ -20,13 +20,8 @@
 
 #ifdef __KERNEL__
 
-#include <linux/init.h>
 #include <linux/interrupt.h>
-#include <asm/vaddrs.h>
 #include <asm/kmap_types.h>
-#include <asm/pgtable.h>
-#include <asm/cacheflush.h>
-#include <asm/tlbflush.h>
 
 /* undef for production */
 #define HIGHMEM_DEBUG 1
@@ -72,81 +67,8 @@ static inline void kunmap(struct page *page)
 	kunmap_high(page);
 }
 
-/*
- * The use of kmap_atomic/kunmap_atomic is discouraged - kmap/kunmap
- * gives a more generic (and caching) interface. But kmap_atomic can
- * be used in IRQ contexts, so in some (very limited) cases we need
- * it.
- */
-static inline void *kmap_atomic(struct page *page, enum km_type type)
-{
-	unsigned long idx;
-	unsigned long vaddr;
-
-	inc_preempt_count();
-	if (page < highmem_start_page)
-		return page_address(page);
-
-	idx = type + KM_TYPE_NR*smp_processor_id();
-	vaddr = FIX_KMAP_BEGIN + idx * PAGE_SIZE;
-
-/* XXX Fix - Anton */
-#if 0
-	__flush_cache_one(vaddr);
-#else
-	flush_cache_all();
-#endif
-
-#if HIGHMEM_DEBUG
-	if (!pte_none(*(kmap_pte+idx)))
-		BUG();
-#endif
-	set_pte(kmap_pte+idx, mk_pte(page, kmap_prot));
-/* XXX Fix - Anton */
-#if 0
-	__flush_tlb_one(vaddr);
-#else
-	flush_tlb_all();
-#endif
-
-	return (void*) vaddr;
-}
-
-static inline void kunmap_atomic(void *kvaddr, enum km_type type)
-{
-	unsigned long vaddr = (unsigned long) kvaddr;
-	unsigned long idx = type + KM_TYPE_NR*smp_processor_id();
-
-	if (vaddr < FIX_KMAP_BEGIN) { // FIXME
-		dec_preempt_count();
-		return;
-	}
-
-	if (vaddr != FIX_KMAP_BEGIN + idx * PAGE_SIZE)
-		BUG();
-
-/* XXX Fix - Anton */
-#if 0
-	__flush_cache_one(vaddr);
-#else
-	flush_cache_all();
-#endif
-
-#ifdef HIGHMEM_DEBUG
-	/*
-	 * force other mappings to Oops if they'll try to access
-	 * this pte without first remap it
-	 */
-	pte_clear(kmap_pte+idx);
-/* XXX Fix - Anton */
-#if 0
-	__flush_tlb_one(vaddr);
-#else
-	flush_tlb_all();
-#endif
-#endif
-	dec_preempt_count();
-}
+extern void *kmap_atomic(struct page *page, enum km_type type);
+extern void kunmap_atomic(void *kvaddr, enum km_type type);
 
 static inline struct page *kmap_atomic_to_page(void *ptr)
 {

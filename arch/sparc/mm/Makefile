@@ -12,6 +12,10 @@ else
 obj-y	 += srmmu.o iommu.o io-unit.o hypersparc.o viking.o tsunami.o swift.o
 endif
 
+ifdef CONFIG_HIGHMEM
+obj-y	+= highmem.o
+endif
+
 ifdef CONFIG_SMP
 obj-y   += nosun4c.o
 else
