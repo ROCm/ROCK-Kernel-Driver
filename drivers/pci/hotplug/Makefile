@@ -51,10 +51,12 @@ pciehp-objs		:=	pciehp_core.o	\
 				pciehp_sysfs.o	\
 				pciehp_hpc.o
 
-ifeq ($(CONFIG_HOTPLUG_PCI_PCIE_PHPRM_NONACPI),y)
-  pciehp-objs += pciehprm_nonacpi.o
-else
-  pciehp-objs += pciehprm_acpi.o
+ifdef CONFIG_HOTPLUG_PCI_PCIE
+  ifdef CONFIG_ACPI_BUS
+    pciehp-objs += pciehprm_acpi.o
+  else
+    pciehp-objs += pciehprm_nonacpi.o
+  endif
 endif
 
 shpchp-objs		:=	shpchp_core.o	\
@@ -63,12 +65,14 @@ shpchp-objs		:=	shpchp_core.o	\
 				shpchp_sysfs.o	\
 				shpchp_hpc.o
 
-ifeq ($(CONFIG_HOTPLUG_PCI_SHPC_PHPRM_LEGACY),y)
-  shpchp-objs += shpchprm_legacy.o
-else
-  ifeq ($(CONFIG_HOTPLUG_PCI_SHPC_PHPRM_NONACPI),y)
-    shpchp-objs += shpchprm_nonacpi.o
-  else
+ifdef CONFIG_HOTPLUG_PCI_SHPC
+  ifdef CONFIG_ACPI_BUS
     shpchp-objs += shpchprm_acpi.o
+  else
+    ifdef CONFIG_HOTPLUG_PCI_SHPC_PHPRM_LEGACY
+      shpchp-objs += shpchprm_legacy.o
+    else
+      shpchp-objs += shpchprm_nonacpi.o
+    endif
   endif
 endif
