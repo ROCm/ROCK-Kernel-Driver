@@ -844,7 +844,7 @@ ppp_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		if (ns == 0)
 			goto outf;
 		skb_reserve(ns, dev->hard_header_len);
-		memcpy(skb_put(ns, skb->len), skb->data, skb->len);
+		skb_copy_bits(skb, 0, skb_put(ns, skb->len), skb->len);
 		kfree_skb(skb);
 		skb = ns;
 	}
@@ -1455,7 +1455,7 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 				goto err;
 			}
 			skb_reserve(ns, 2);
-			memcpy(skb_put(ns, skb->len), skb->data, skb->len);
+			skb_copy_bits(skb, 0, skb_put(ns, skb->len), skb->len);
 			kfree_skb(skb);
 			skb = ns;
 		}
@@ -1826,7 +1826,7 @@ ppp_mp_reconstruct(struct ppp *ppp)
 		if (head != tail)
 			/* copy to a single skb */
 			for (p = head; p != tail->next; p = p->next)
-				memcpy(skb_put(skb, p->len), p->data, p->len);
+				skb_copy_bits(p, 0, skb_put(skb, p->len), p->len);
 		ppp->nextseq = tail->sequence + 1;
 		head = tail->next;
 	}
