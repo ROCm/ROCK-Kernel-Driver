@@ -190,7 +190,7 @@ static void pSeriesLP_xirr_info_set(int n_cpu, int value)
 		      val64); 
 }
 
-static void pSeriesLP_cppr_info(int n_cpu, u8 value)
+void pSeriesLP_cppr_info(int n_cpu, u8 value)
 {
 	unsigned long lpar_rc;
 

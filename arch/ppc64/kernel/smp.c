@@ -300,6 +300,10 @@ void __cpu_die(unsigned int cpu)
 void cpu_die(void)
 {
 	local_irq_disable();
+	/* Some hardware requires clearing the CPPR, while other hardware does not
+	 * it is safe either way
+	 */
+	pSeriesLP_cppr_info(0, 0);
 	rtas_stop_self();
 	/* Should never get here... */
 	BUG();
