@@ -2641,7 +2641,7 @@ void __init tcp_init(void)
 		panic("Failed to allocate TCP bind hash table\n");
 	for (i = 0; i < tcp_bhash_size; i++) {
 		tcp_bhash[i].lock = SPIN_LOCK_UNLOCKED;
-		tcp_bhash[i].chain = NULL;
+		INIT_HLIST_HEAD(&tcp_bhash[i].chain);
 	}
 
 	/* Try to be a bit smarter and adjust defaults depending

@@ -157,6 +157,7 @@ static int tcp_v6_get_port(struct sock *sk, unsigned short snum)
 {
 	struct tcp_bind_hashbucket *head;
 	struct tcp_bind_bucket *tb;
+	struct hlist_node *node;
 	int ret;
 
 	local_bh_disable();
@@ -173,7 +174,7 @@ static int tcp_v6_get_port(struct sock *sk, unsigned short snum)
 				rover = low;
 			head = &tcp_bhash[tcp_bhashfn(rover)];
 			spin_lock(&head->lock);
-			for (tb = head->chain; tb; tb = tb->next)
+			tb_for_each(tb, node, &head->chain)
 				if (tb->port == rover)
 					goto next;
 			break;
@@ -190,14 +191,16 @@ static int tcp_v6_get_port(struct sock *sk, unsigned short snum)
 
 		/* OK, here is the one we will use. */
 		snum = rover;
-		tb = NULL;
 	} else {
 		head = &tcp_bhash[tcp_bhashfn(snum)];
 		spin_lock(&head->lock);
-		for (tb = head->chain; tb != NULL; tb = tb->next)
+		tb_for_each(tb, node, &head->chain)
 			if (tb->port == snum)
-				break;
+				goto tb_found;
 	}
+	tb = NULL;
+	goto tb_not_found;
+tb_found:
 	if (tb && !hlist_empty(&tb->owners)) {
 		if (tb->fastreuse > 0 && sk->sk_reuse &&
 		    sk->sk_state != TCP_LISTEN) {
@@ -208,9 +211,9 @@ static int tcp_v6_get_port(struct sock *sk, unsigned short snum)
 				goto fail_unlock;
 		}
 	}
+tb_not_found:
 	ret = 1;
-	if (tb == NULL &&
-	    (tb = tcp_bucket_create(head, snum)) == NULL)
+	if (!tb && (tb = tcp_bucket_create(head, snum)) == NULL)
 		goto fail_unlock;
 	if (hlist_empty(&tb->owners)) {
 		if (sk->sk_reuse && sk->sk_state != TCP_LISTEN)
@@ -550,7 +553,7 @@ static int tcp_v6_hash_connect(struct sock *sk)
 	}
 
 	head = &tcp_bhash[tcp_bhashfn(inet_sk(sk)->num)];
-	tb = head->chain;
+	tb = tb_head(head);
 
 	spin_lock_bh(&head->lock);
 

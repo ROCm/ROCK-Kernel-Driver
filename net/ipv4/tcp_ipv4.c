@@ -134,10 +134,7 @@ struct tcp_bind_bucket *tcp_bucket_create(struct tcp_bind_hashbucket *head,
 		tb->port = snum;
 		tb->fastreuse = 0;
 		INIT_HLIST_HEAD(&tb->owners);
-		if ((tb->next = head->chain) != NULL)
-			tb->next->pprev = &tb->next;
-		head->chain = tb;
-		tb->pprev = &head->chain;
+		hlist_add_head(&tb->node, &head->chain);
 	}
 	return tb;
 }
@@ -146,9 +143,7 @@ struct tcp_bind_bucket *tcp_bucket_create(struct tcp_bind_hashbucket *head,
 void tcp_bucket_destroy(struct tcp_bind_bucket *tb)
 {
 	if (hlist_empty(&tb->owners)) {
-		if (tb->next)
-			tb->next->pprev = tb->pprev;
-		*(tb->pprev) = tb->next;
+		__hlist_del(&tb->node);
 		kmem_cache_free(tcp_bucket_cachep, tb);
 	}
 }
@@ -211,6 +206,7 @@ static inline int tcp_bind_conflict(struct sock *sk, struct tcp_bind_bucket *tb)
 static int tcp_v4_get_port(struct sock *sk, unsigned short snum)
 {
 	struct tcp_bind_hashbucket *head;
+	struct hlist_node *node;
 	struct tcp_bind_bucket *tb;
 	int ret;
 
@@ -229,7 +225,7 @@ static int tcp_v4_get_port(struct sock *sk, unsigned short snum)
 				rover = low;
 			head = &tcp_bhash[tcp_bhashfn(rover)];
 			spin_lock(&head->lock);
-			for (tb = head->chain; tb; tb = tb->next)
+			tb_for_each(tb, node, &head->chain)
 				if (tb->port == rover)
 					goto next;
 			break;
@@ -248,15 +244,17 @@ static int tcp_v4_get_port(struct sock *sk, unsigned short snum)
 		 * non-NULL and we hold it's mutex.
 		 */
 		snum = rover;
-		tb = NULL;
 	} else {
 		head = &tcp_bhash[tcp_bhashfn(snum)];
 		spin_lock(&head->lock);
-		for (tb = head->chain; tb; tb = tb->next)
+		tb_for_each(tb, node, &head->chain)
 			if (tb->port == snum)
-				break;
+				goto tb_found;
 	}
-	if (tb && !hlist_empty(&tb->owners)) {
+	tb = NULL;
+	goto tb_not_found;
+tb_found:
+	if (!hlist_empty(&tb->owners)) {
 		if (sk->sk_reuse > 1)
 			goto success;
 		if (tb->fastreuse > 0 &&
@@ -268,6 +266,7 @@ static int tcp_v4_get_port(struct sock *sk, unsigned short snum)
 				goto fail_unlock;
 		}
 	}
+tb_not_found:
 	ret = 1;
 	if (!tb && (tb = tcp_bucket_create(head, snum)) == NULL)
 		goto fail_unlock;
@@ -646,6 +645,7 @@ static int tcp_v4_hash_connect(struct sock *sk)
  		int low = sysctl_local_port_range[0];
  		int high = sysctl_local_port_range[1];
  		int remaining = (high - low) + 1;
+		struct hlist_node *node;
  		struct tcp_tw_bucket *tw = NULL;
 
  		local_bh_disable();
@@ -677,7 +677,7 @@ static int tcp_v4_hash_connect(struct sock *sk)
  			 * because the established check is already
  			 * unique enough.
  			 */
- 			for (tb = head->chain; tb; tb = tb->next) {
+			tb_for_each(tb, node, &head->chain) {
  				if (tb->port == rover) {
  					BUG_TRAP(!hlist_empty(&tb->owners));
  					if (tb->fastreuse >= 0)

@@ -84,15 +84,26 @@ struct tcp_ehash_bucket {
 struct tcp_bind_bucket {
 	unsigned short		port;
 	signed short		fastreuse;
-	struct tcp_bind_bucket	*next;
-	struct tcp_bind_bucket	**pprev;
+	struct hlist_node	node;
 	struct hlist_head	owners;
 };
 
+#define tb_for_each(tb, node, head) hlist_for_each_entry(tb, node, head, node)
+
 struct tcp_bind_hashbucket {
 	spinlock_t		lock;
-	struct tcp_bind_bucket	*chain;
+	struct hlist_head	chain;
 };
+
+static inline struct tcp_bind_bucket *__tb_head(struct tcp_bind_hashbucket *head)
+{
+	return hlist_entry(head->chain.first, struct tcp_bind_bucket, node);
+}
+
+static inline struct tcp_bind_bucket *tb_head(struct tcp_bind_hashbucket *head)
+{
+	return hlist_empty(&head->chain) ? NULL : __tb_head(head);
+}
 
 extern struct tcp_hashinfo {
 	/* This is for sockets with full identity only.  Sockets here will
