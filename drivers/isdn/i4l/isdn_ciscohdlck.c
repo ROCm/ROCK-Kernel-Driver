@@ -226,7 +226,7 @@ isdn_ciscohdlck_connected(isdn_net_dev *idev)
 	cisco->myseq = 0;
 	cisco->mineseen = 0;
 	cisco->yourseq = 0;
-	cisco->keepalive_period = ISDN_TIMER_KEEPINT;
+	cisco->keepalive_period = 10;
 	cisco->last_slarp_in = 0;
 	cisco->line_state = 0;
 	cisco->debserint = 0;

@@ -98,7 +98,6 @@
 	((info->emu.mdmreg[REG_L2PROT] == ISDN_PROTO_L2_FAX) && \
 	 (info->emu.mdmreg[REG_L3PROT] == ISDN_PROTO_L3_FCLASS2))
 
-extern void isdn_tty_modem_ring(void);
 extern void isdn_tty_carrier_timeout(void);
 extern void isdn_tty_modem_xmit(void);
 extern int isdn_tty_init(void);

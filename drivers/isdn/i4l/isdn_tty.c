@@ -20,6 +20,7 @@
 #define VBUFX (VBUF/16)
 #endif
 
+#define RING_TIMEOUT     (5*HZ)  /* repeat RING every 5 secs */
 #define FIX_FILE_TRANSFER
 #define	DUMMY_HAYES_AT
 
@@ -27,6 +28,7 @@
 
 static int isdn_tty_edit_at(const char *, int, modem_info *, int);
 static void isdn_tty_escape_timer(unsigned long data);
+static void isdn_tty_ring_timer(unsigned long data);
 static void isdn_tty_check_esc(struct modem_info *info, 
 			       const unsigned char *p, int count);
 static void isdn_tty_modem_reset_regs(modem_info *, int);
@@ -2133,6 +2135,9 @@ isdn_tty_init(void)
 		init_timer(&info->escape_timer);
 		info->escape_timer.data = (unsigned long) info;
 		info->escape_timer.function = isdn_tty_escape_timer;
+		init_timer(&info->ring_timer);
+		info->ring_timer.data = (unsigned long) info;
+		info->ring_timer.function = isdn_tty_ring_timer;
 		skb_queue_head_init(&info->rpqueue);
 		info->xmit_size = ISDN_SERIAL_XMIT_SIZE;
 		skb_queue_head_init(&info->xmit_queue);
@@ -2315,7 +2320,7 @@ isdn_tty_find_icall(struct isdn_slot *slot, setup_parm *setup)
 					       info->line);
 					info->msr |= UART_MSR_RI;
 					isdn_tty_modem_result(RESULT_RING, info);
-					isdn_timer_ctrl(ISDN_TIMER_MODEMRING, 1);
+					mod_timer(&info->ring_timer, jiffies + RING_TIMEOUT);
 					return 1;
 				}
 			}
@@ -3980,27 +3985,18 @@ isdn_tty_edit_at(const char *p, int count, modem_info * info, int user)
 	return total;
 }
 
-/*
- * Put a RING-message to all modem-channels who have the RI-bit set.
- * This function is called every second via timer-interrupt from within
- * timer-dispatcher isdn_timer_function()
- */
-void
-isdn_tty_modem_ring(void)
+static void
+isdn_tty_ring_timer(unsigned long data)
 {
-	int ton = 0;
-	int i;
+	struct modem_info *info = (struct modem_info *) data;
 
-	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		modem_info *info = &isdn_mdm.info[i];
-		if (info->msr & UART_MSR_RI) {
-			ton = 1;
-			isdn_tty_modem_result(RESULT_RING, info);
-		}
-	}
-	isdn_timer_ctrl(ISDN_TIMER_MODEMRING, ton);
+	if (!(info->msr & UART_MSR_RI))
+		return;
+
+	isdn_tty_modem_result(RESULT_RING, info);
+	mod_timer(&info->ring_timer, jiffies + RING_TIMEOUT);
 }
-
+	
 /*
  * For all online tty's, try sending data to
  * the lower levels.
