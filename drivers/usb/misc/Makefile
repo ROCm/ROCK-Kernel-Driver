@@ -12,3 +12,4 @@ obj-$(CONFIG_USB_SPEEDTOUCH)	+= speedtch.o
 obj-$(CONFIG_USB_TEST)		+= usbtest.o
 obj-$(CONFIG_USB_TIGL)		+= tiglusb.o
 obj-$(CONFIG_USB_USS720)	+= uss720.o
+obj-$(CONFIG_USB_LEGOTOWER)	+= legousbtower.o
