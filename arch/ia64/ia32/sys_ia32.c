@@ -53,7 +53,8 @@
 #include <asm/types.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
-#include <asm/ia32.h>
+
+#include "ia32priv.h"
 
 #include <net/scm.h>
 #include <net/sock.h>
@@ -1320,7 +1321,6 @@ static int
 msgctl32 (int first, int second, void *uptr)
 {
 	int err = -EINVAL, err2;
-	struct msqid_ds m;
 	struct msqid64_ds m64;
 	struct msqid_ds32 *up32 = (struct msqid_ds32 *)uptr;
 	struct msqid64_ds32 *up64 = (struct msqid64_ds32 *)uptr;

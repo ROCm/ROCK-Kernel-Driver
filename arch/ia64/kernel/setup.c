@@ -818,8 +818,7 @@ cpu_init (void)
 	ia64_mmu_init(ia64_imva(cpu_data));
 
 #ifdef CONFIG_IA32_SUPPORT
-	/* initialize global ia32 state - CR0 and CR4 */
-	asm volatile ("mov ar.cflg = %0" :: "r" (((ulong) IA32_CR4 << 32) | IA32_CR0));
+	ia32_cpu_init();
 #endif
 
 	/* disable all local interrupt sources: */

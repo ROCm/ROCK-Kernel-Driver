@@ -15,7 +15,8 @@
 
 #include <asm/param.h>
 #include <asm/signal.h>
-#include <asm/ia32.h>
+
+#include "ia32priv.h"
 
 #define CONFIG_BINFMT_ELF32
 

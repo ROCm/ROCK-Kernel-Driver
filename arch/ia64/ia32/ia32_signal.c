@@ -28,7 +28,8 @@
 #include <asm/rse.h>
 #include <asm/sigcontext.h>
 #include <asm/segment.h>
-#include <asm/ia32.h>
+
+#include "ia32priv.h"
 
 #include "../kernel/sigframe.h"
 

@@ -12,7 +12,8 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 
-#include <asm/ia32.h>
+#include "ia32priv.h"
+
 #include <asm/ptrace.h>
 
 int

@@ -22,7 +22,8 @@
 #include <asm/pgtable.h>
 #include <asm/system.h>
 #include <asm/processor.h>
-#include <asm/ia32.h>
+
+#include "ia32priv.h"
 
 extern void die_if_kernel (char *str, struct pt_regs *regs, long err);
 
@@ -171,6 +172,13 @@ ia32_bad_interrupt (unsigned long int_num, struct pt_regs *regs)
 	siginfo.si_imm = 0;
 	siginfo.si_code = TRAP_BRKPT;
 	force_sig_info(SIGTRAP, &siginfo, current);
+}
+
+void
+ia32_cpu_init (void)
+{
+	/* initialize global ia32 state - CR0 and CR4 */
+	asm volatile ("mov ar.cflg = %0" :: "r" (((ulong) IA32_CR4 << 32) | IA32_CR0));
 }
 
 static int __init

@@ -13,7 +13,7 @@
 #include <linux/signal.h>	/* argh, msdos_fs.h isn't self-contained... */
 #include <linux/compat.h>
 
-#include <asm/ia32.h>
+#include "ia32priv.h"
 
 #include <linux/config.h>
 #include <linux/kernel.h>
