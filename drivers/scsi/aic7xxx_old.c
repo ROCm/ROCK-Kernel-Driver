@@ -234,7 +234,6 @@
 #include <linux/pci.h>
 #include <linux/proc_fs.h>
 #include <linux/blk.h>
-#include <linux/tqueue.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/smp.h>
