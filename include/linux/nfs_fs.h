@@ -397,7 +397,6 @@ extern int  nfs_readpages(struct file *, struct address_space *,
 		struct list_head *, unsigned);
 extern int  nfs_pagein_list(struct list_head *, int);
 extern void nfs_readpage_result(struct rpc_task *);
-extern void nfs_readdata_release(struct rpc_task *);
 
 /*
  * linux/fs/mount_clnt.c

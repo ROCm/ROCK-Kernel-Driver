@@ -868,14 +868,32 @@ encode_putrootfh(struct xdr_stream *xdr)
         return 0;
 }
 
+static void
+encode_stateid(struct xdr_stream *xdr, struct nfs4_state *state, fl_owner_t lockowner)
+{
+	extern nfs4_stateid zero_stateid;
+	nfs4_stateid stateid;
+	uint32_t *p;
+
+	RESERVE_SPACE(16);
+	if (state != NULL) {
+		nfs4_copy_stateid(&stateid, state, lockowner);
+		WRITEMEM(stateid.data, sizeof(stateid.data));
+	} else
+		WRITEMEM(zero_stateid.data, sizeof(zero_stateid.data));
+}
+
 static int
 encode_read(struct xdr_stream *xdr, struct nfs_readargs *args)
 {
 	uint32_t *p;
 
-	RESERVE_SPACE(32);
+	RESERVE_SPACE(4);
 	WRITE32(OP_READ);
-	WRITEMEM(args->stateid.data, sizeof(args->stateid.data));
+
+	encode_stateid(xdr, args->state, args->lockowner);
+
+	RESERVE_SPACE(12);
 	WRITE64(args->offset);
 	WRITE32(args->count);
 

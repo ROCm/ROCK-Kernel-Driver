@@ -1096,10 +1096,10 @@ nfs4_proc_read(struct nfs_read_data *rdata, struct file *filp)
 	if (filp) {
 		struct nfs4_state *state;
 		state = (struct nfs4_state *)filp->private_data;
-		nfs4_copy_stateid(&rdata->args.stateid, state, rdata->lockowner);
+		rdata->args.state = state;
 		msg.rpc_cred = state->owner->so_cred;
 	} else {
-		memcpy(&rdata->args.stateid, &zero_stateid, sizeof(rdata->args.stateid));
+		rdata->args.state = NULL;
 		msg.rpc_cred = NFS_I(inode)->mm_cred;
 	}
 
@@ -1510,27 +1510,13 @@ nfs4_proc_pathconf(struct nfs_server *server, struct nfs_fh *fhandle,
 }
 
 static void
-nfs4_restart_read(struct rpc_task *task)
-{
-	struct nfs_read_data *data = (struct nfs_read_data *)task->tk_calldata;
-	struct nfs_page *req;
-
-	rpc_restart_call(task);
-	req = nfs_list_entry(data->pages.next);
-	if (req->wb_state)
-		nfs4_copy_stateid(&data->args.stateid, req->wb_state, req->wb_lockowner);
-	else
-		memcpy(&data->args.stateid, &zero_stateid, sizeof(data->args.stateid));
-}
-
-static void
 nfs4_read_done(struct rpc_task *task)
 {
 	struct nfs_read_data *data = (struct nfs_read_data *) task->tk_calldata;
 	struct inode *inode = data->inode;
 
 	if (nfs4_async_handle_error(task, NFS_SERVER(inode)) == -EAGAIN) {
-		task->tk_action = nfs4_restart_read;
+		rpc_restart_call(task);
 		return;
 	}
 	if (task->tk_status > 0)
@@ -1540,7 +1526,7 @@ nfs4_read_done(struct rpc_task *task)
 }
 
 static void
-nfs4_proc_read_setup(struct nfs_read_data *data, unsigned int count)
+nfs4_proc_read_setup(struct nfs_read_data *data)
 {
 	struct rpc_task	*task = &data->task;
 	struct rpc_message msg = {
@@ -1550,34 +1536,15 @@ nfs4_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 		.rpc_cred = data->cred,
 	};
 	struct inode *inode = data->inode;
-	struct nfs_page *req = nfs_list_entry(data->pages.next);
 	int flags;
 
-	data->args.fh     = NFS_FH(inode);
-	data->args.offset = req_offset(req);
-	data->args.pgbase = req->wb_pgbase;
-	data->args.pages  = data->pagevec;
-	data->args.count  = count;
-	data->res.fattr   = &data->fattr;
-	data->res.count   = count;
-	data->res.eof     = 0;
 	data->timestamp   = jiffies;
-
-	data->lockowner = req->wb_lockowner;
-	if (req->wb_state)
-		nfs4_copy_stateid(&data->args.stateid, req->wb_state, req->wb_lockowner);
-	else
-		memcpy(&data->args.stateid, &zero_stateid, sizeof(data->args.stateid));
 
 	/* N.B. Do we need to test? Never called for swapfile inode */
 	flags = RPC_TASK_ASYNC | (IS_SWAPFILE(inode)? NFS_RPC_SWAPFLAGS : 0);
 
 	/* Finalize the task. */
 	rpc_init_task(task, NFS_CLIENT(inode), nfs4_read_done, flags);
-	task->tk_calldata = data;
-	/* Release requests */
-	task->tk_release = nfs_readdata_release;
-
 	rpc_call_setup(task, &msg, 0);
 }
 

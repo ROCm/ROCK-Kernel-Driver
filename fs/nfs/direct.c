@@ -128,6 +128,7 @@ nfs_direct_read_seg(struct inode *inode, struct file *file,
 		.inode		= inode,
 		.args		= {
 			.fh		= NFS_FH(inode),
+			.lockowner	= current->files,
 		},
 		.res		= {
 			.fattr		= &rdata.fattr,
