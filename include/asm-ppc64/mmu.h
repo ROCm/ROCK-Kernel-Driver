@@ -100,16 +100,6 @@ typedef struct {
 	} dw1;
 } SLBE;
 
-/*
- * This structure is used in paca.h where the layout depends on the 
- * size being 24B.
- */
-typedef struct {
-        unsigned long   real;
-        unsigned long   virt;
-        unsigned long   next_round_robin;
-} STAB;
-
 /* Hardware Page Table Entry */
 
 #define HPTES_PER_GROUP 8

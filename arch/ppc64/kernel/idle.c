@@ -76,7 +76,7 @@ static void yield_shared_processor(void)
 	 * The decrementer stops during the yield.  Force a fake decrementer
 	 * here and let the timer_interrupt code sort out the actual time.
 	 */
-	get_paca()->xLpPaca.xIntDword.xFields.xDecrInt = 1;
+	get_paca()->lppaca.xIntDword.xFields.xDecrInt = 1;
 	process_iSeries_events();
 }
 
@@ -98,8 +98,8 @@ int iSeries_idle(void)
 	lpaca = get_paca();
 
 	for (;;) {
-		if (lpaca->xLpPaca.xSharedProc) {
-			if (ItLpQueue_isLpIntPending(lpaca->lpQueuePtr))
+		if (lpaca->lppaca.xSharedProc) {
+			if (ItLpQueue_isLpIntPending(lpaca->lpqueue_ptr))
 				process_iSeries_events();
 			if (!need_resched())
 				yield_shared_processor();
@@ -111,7 +111,7 @@ int iSeries_idle(void)
 
 				while (!need_resched()) {
 					HMT_medium();
-					if (ItLpQueue_isLpIntPending(lpaca->lpQueuePtr))
+					if (ItLpQueue_isLpIntPending(lpaca->lpqueue_ptr))
 						process_iSeries_events();
 					HMT_low();
 				}
@@ -175,7 +175,7 @@ int dedicated_idle(void)
 	while (1) {
 		/* Indicate to the HV that we are idle.  Now would be
 		 * a good time to find other work to dispatch. */
-		lpaca->xLpPaca.xIdle = 1;
+		lpaca->lppaca.xIdle = 1;
 
 		oldval = test_and_clear_thread_flag(TIF_NEED_RESCHED);
 		if (!oldval) {
@@ -201,7 +201,7 @@ int dedicated_idle(void)
 				 * ST mode.
 				 */
 				if((naca->smt_state == SMT_DYNAMIC) &&
-				   (!(ppaca->xLpPaca.xIdle))) {
+				   (!(ppaca->lppaca.xIdle))) {
 					/* Indicate we are no longer polling for
 					 * work, and then clear need_resched.  If
 					 * need_resched was 1, set it back to 1
@@ -216,7 +216,6 @@ int dedicated_idle(void)
 
 					/* DRENG: Go HMT_medium here ? */
 					local_irq_disable(); 
-					lpaca->yielded = 1;
 
 					/* SMT dynamic mode.  Cede will result 
 					 * in this thread going dormant, if the
@@ -227,8 +226,6 @@ int dedicated_idle(void)
 					 * enables external interrupts.
 					 */
 					cede_processor();
-
-					lpaca->yielded = 0;
 				} else {
 					/* Give the HV an opportunity at the
 					 * processor, since we are not doing
@@ -242,7 +239,7 @@ int dedicated_idle(void)
 		}
 
 		HMT_medium();
-		lpaca->xLpPaca.xIdle = 0;
+		lpaca->lppaca.xIdle = 0;
 		schedule();
 		if (cpu_is_offline(smp_processor_id()) &&
 				system_state == SYSTEM_RUNNING)
@@ -262,11 +259,10 @@ int shared_idle(void)
 
 		/* Indicate to the HV that we are idle.  Now would be
 		 * a good time to find other work to dispatch. */
-		lpaca->xLpPaca.xIdle = 1;
+		lpaca->lppaca.xIdle = 1;
 
 		if (!need_resched()) {
 			local_irq_disable(); 
-			lpaca->yielded = 1;
 			
 			/* 
 			 * Yield the processor to the hypervisor.  We return if
@@ -276,12 +272,10 @@ int shared_idle(void)
 			 * are enabled.
 			 */
 			cede_processor();
-			
-			lpaca->yielded = 0;
 		}
 
 		HMT_medium();
-		lpaca->xLpPaca.xIdle = 0;
+		lpaca->lppaca.xIdle = 0;
 		schedule();
 	}
 
@@ -313,7 +307,7 @@ int idle_setup(void)
 #else
 	if (systemcfg->platform & PLATFORM_PSERIES) {
 		if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
-			if(get_paca()->xLpPaca.xSharedProc) {
+			if (get_paca()->lppaca.xSharedProc) {
 				printk("idle = shared_idle\n");
 				idle_loop = shared_idle;
 			} else {

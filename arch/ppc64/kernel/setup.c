@@ -703,7 +703,7 @@ int set_spread_lpevents( char * str )
 	unsigned long val = simple_strtoul( str, NULL, 0 );
 	if ( ( val > 0 ) && ( val <= NR_CPUS ) ) {
 		for ( i=1; i<val; ++i )
-			paca[i].lpQueuePtr = paca[0].lpQueuePtr;
+			paca[i].lpqueue_ptr = paca[0].lpqueue_ptr;
 		printk("lpevent processing spread over %ld processors\n", val);
 	}
 	else

@@ -36,7 +36,7 @@ static inline void slb_add_bolted(void)
 	 * Bolt in the first vmalloc segment. Since modules end
 	 * up there it gets hit very heavily.
 	 */
-	get_paca()->xStab_data.next_round_robin = 1;
+	get_paca()->stab_next_rr = 1;
 	make_slbe(esid, vsid, 0, 1);
 #endif
 }
@@ -65,7 +65,7 @@ void stab_initialize(unsigned long stab)
 		asm volatile("isync":::"memory");
 		asm volatile("slbmte  %0,%0"::"r" (0) : "memory");
 		asm volatile("isync; slbia; isync":::"memory");
-		get_paca()->xStab_data.next_round_robin = 0;
+		get_paca()->stab_next_rr = 0;
 		make_slbe(esid, vsid, seg0_largepages, 1);
 		asm volatile("isync":::"memory");
 #endif
@@ -129,7 +129,7 @@ static int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 	 * Could not find empty entry, pick one with a round robin selection.
 	 * Search all entries in the two groups.
 	 */
-	castout_entry = get_paca()->xStab_data.next_round_robin;
+	castout_entry = get_paca()->stab_next_rr;
 	for (i = 0; i < 16; i++) {
 		if (castout_entry < 8) {
 			global_entry = (esid & 0x1f) << 3;
@@ -148,7 +148,7 @@ static int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 		castout_entry = (castout_entry + 1) & 0xf;
 	}
 
-	get_paca()->xStab_data.next_round_robin = (castout_entry + 1) & 0xf;
+	get_paca()->stab_next_rr = (castout_entry + 1) & 0xf;
 
 	/* Modify the old entry to the new value. */
 
@@ -181,7 +181,7 @@ static inline void __ste_allocate(unsigned long esid, unsigned long vsid)
 	unsigned long offset;
 	int region_id = REGION_ID(esid << SID_SHIFT);
 
-	stab_entry = make_ste(get_paca()->xStab_data.virt, esid, vsid);
+	stab_entry = make_ste(get_paca()->stab_addr, esid, vsid);
 
 	if (region_id != USER_REGION_ID)
 		return;
@@ -275,7 +275,7 @@ static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
 /* Flush all user entries from the segment table of the current processor. */
 void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
 {
-	STE *stab = (STE *) get_paca()->xStab_data.virt;
+	STE *stab = (STE *) get_paca()->stab_addr;
 	STE *ste;
 	unsigned long offset = __get_cpu_var(stab_cache_ptr);
 
@@ -355,7 +355,7 @@ static void make_slbe(unsigned long esid, unsigned long vsid, int large,
 	 * paca Ksave is always valid (even when on the interrupt stack)
 	 * so we use that.
 	 */
-	castout_entry = lpaca->xStab_data.next_round_robin;
+	castout_entry = lpaca->stab_next_rr;
 	do {
 		entry = castout_entry;
 		castout_entry++; 
@@ -367,9 +367,9 @@ static void make_slbe(unsigned long esid, unsigned long vsid, int large,
 			castout_entry = 2;
 		asm volatile("slbmfee  %0,%1" : "=r" (esid_data) : "r" (entry));
 	} while (esid_data.data.v &&
-		 esid_data.data.esid == GET_ESID(lpaca->xKsave));
+		 esid_data.data.esid == GET_ESID(lpaca->kstack));
 
-	lpaca->xStab_data.next_round_robin = castout_entry;
+	lpaca->stab_next_rr = castout_entry;
 
 	/* slbie not needed as the previous mapping is still valid. */
 

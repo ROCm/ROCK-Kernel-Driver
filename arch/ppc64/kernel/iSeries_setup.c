@@ -571,7 +571,7 @@ static void __init build_iSeries_Memory_Map(void)
 static void __init setup_iSeries_cache_sizes(void)
 {
 	unsigned int i, n;
-	unsigned int procIx = get_paca()->xLpPaca.xDynHvPhysicalProcIndex;
+	unsigned int procIx = get_paca()->lppaca.xDynHvPhysicalProcIndex;
 
 	systemcfg->iCacheL1Size =
 		xIoHriProcessorVpd[procIx].xInstCacheSize * 1024;
@@ -665,7 +665,7 @@ extern unsigned long ppc_tb_freq;
 void __init iSeries_setup_arch(void)
 {
 	void *eventStack;
-	unsigned procIx = get_paca()->xLpPaca.xDynHvPhysicalProcIndex;
+	unsigned procIx = get_paca()->lppaca.xDynHvPhysicalProcIndex;
 
 	/* Add an eye catcher and the systemcfg layout version number */
 	strcpy(systemcfg->eye_catcher, "SYSTEMCFG:PPC64");

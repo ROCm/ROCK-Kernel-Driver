@@ -16,11 +16,21 @@
 #include <asm/ptrace.h>
 
 #include <asm/iSeries/ItLpPaca.h>
+#include <asm/iSeries/ItLpQueue.h>
 #include <asm/naca.h>
 #include <asm/paca.h>
 
 struct naca_struct *naca;
 struct systemcfg *systemcfg;
+
+/* This symbol is provided by the linker - let it fill in the paca
+ * field correctly */
+extern unsigned long __toc_start;
+
+/* Stack space used when we detect a bad kernel stack pointer, and
+ * early in SMP boots before relocation is enabled.
+ */
+char emergency_stack[PAGE_SIZE * NR_CPUS];
 
 /* The Paca is an array with one entry per processor.  Each contains an 
  * ItLpPaca, which contains the information shared between the 
@@ -34,22 +44,19 @@ struct systemcfg *systemcfg;
  */
 #define PACAINITDATA(number,start,lpq,asrr,asrv)			    \
 {									    \
-	.xLpPacaPtr = &paca[number].xLpPaca,				    \
-	.xLpRegSavePtr = &paca[number].xRegSav,				    \
+	.lppaca_ptr = &paca[number].lppaca,				    \
+	.reg_save_ptr = &paca[number].reg_save,				    \
 	.lock_token = 0x8000,						    \
-	.xPacaIndex = (number),		/* Paca Index */		    \
+	.paca_index = (number),		/* Paca Index */		    \
+	.lpqueue_ptr = (lpq),		/* &xItLpQueue, */		    \
 	.default_decr = 0x00ff0000,	/* Initial Decr */		    \
-	.xStab_data = {							    \
-		.real = (asrr),		/* Real pointer to segment table */ \
-		.virt = (asrv),		/* Virt pointer to segment table */ \
-		.next_round_robin = 1,					    \
-	},								    \
-	.lpQueuePtr = (lpq),		/* &xItLpQueue, */		    \
-	/* .xRtas = {							    \
-		.lock = SPIN_LOCK_UNLOCKED				    \
-	}, */								    \
-	.xProcStart = (start),		/* Processor start */		    \
-	.xLpPaca = {							    \
+	.kernel_toc = (unsigned long)(&__toc_start) + 0x8000UL,		    \
+	.stab_real = (asrr), 		/* Real pointer to segment table */ \
+	.stab_addr = (asrv),		/* Virt pointer to segment table */ \
+	.emergency_sp = &emergency_stack[((number)+1) * PAGE_SIZE],	    \
+	.cpu_start = (start),		/* Processor start */		    \
+	.stab_next_rr = 1,						    \
+	.lppaca = {							    \
 		.xDesc = 0xd397d781,	/* "LpPa" */			    \
 		.xSize = sizeof(struct ItLpPaca),			    \
 		.xFPRegsInUse = 1,					    \
@@ -58,7 +65,7 @@ struct systemcfg *systemcfg;
 		.xEndOfQuantum = 0xfffffffffffffffful,			    \
 		.xSLBCount = 64,					    \
 	},								    \
-	.xRegSav = {							    \
+	.reg_save = {							    \
 		.xDesc = 0xd397d9e2,	/* "LpRS" */			    \
 		.xSize = sizeof(struct ItLpRegSave)			    \
 	},								    \

@@ -183,7 +183,7 @@ void HvCall_writeLogBuffer(const void *buffer, u64 bufLen);
 //=====================================================================
 static inline void		HvCall_sendIPI(struct paca_struct * targetPaca)
 {
-	HvCall1( HvCallBaseSendIPI, targetPaca->xPacaIndex );
+	HvCall1( HvCallBaseSendIPI, targetPaca->paca_index );
 }
 
 //=====================================================================

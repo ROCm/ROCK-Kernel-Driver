@@ -15,6 +15,7 @@
  * 2 of the License, or (at your option) any later version.
  */
 #include <linux/config.h>
+#include <asm/paca.h>
 
 typedef struct {
 	volatile unsigned int lock;
@@ -57,12 +58,12 @@ static __inline__ int _raw_spin_trylock(spinlock_t *lock)
 "1:	lwarx		%0,0,%2		# spin_trylock\n\
 	cmpwi		0,%0,0\n\
 	bne-		2f\n\
-	lwz		%1,24(13)\n\
+	lwz		%1,%3(13)\n\
 	stwcx.		%1,0,%2\n\
 	bne-		1b\n\
 	isync\n\
 2:"	: "=&r"(tmp), "=&r"(tmp2)
-	: "r"(&lock->lock)
+	: "r"(&lock->lock), "i"(offsetof(struct paca_struct, lock_token))
 	: "cr0", "memory");
 
 	return tmp == 0;
@@ -83,12 +84,12 @@ static __inline__ void _raw_spin_lock(spinlock_t *lock)
 "2:	lwarx		%0,0,%1\n\
 	cmpwi		0,%0,0\n\
 	bne-		1b\n\
-	lwz		%0,24(13)\n\
+	lwz		%0,%2(13)\n\
 	stwcx.		%0,0,%1\n\
 	bne-		2b\n\
 	isync"
 	: "=&r"(tmp)
-	: "r"(&lock->lock)
+	: "r"(&lock->lock), "i"(offsetof(struct paca_struct, lock_token))
 	: "cr0", "memory");
 }
 
@@ -115,12 +116,13 @@ static __inline__ void _raw_spin_lock_flags(spinlock_t *lock,
 3:	lwarx		%0,0,%2\n\
 	cmpwi		0,%0,0\n\
 	bne-		1b\n\
-	lwz		%1,24(13)\n\
+	lwz		%1,%4(13)\n\
 	stwcx.		%1,0,%2\n\
 	bne-		3b\n\
 	isync"
 	: "=&r"(tmp), "=&r"(tmp2)
-	: "r"(&lock->lock), "r"(flags)
+	: "r"(&lock->lock), "r"(flags),
+	  "i" (offsetof(struct paca_struct, lock_token))
 	: "cr0", "memory");
 }
 

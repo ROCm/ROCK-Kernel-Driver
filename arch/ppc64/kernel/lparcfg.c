@@ -134,7 +134,7 @@ static int lparcfg_data(unsigned char *buf, unsigned long size)
 	}
 	memset(buf, 0, size); 
 
-	shared = (int)(lpaca->xLpPacaPtr->xSharedProc);
+	shared = (int)(lpaca->lppaca.xSharedProc);
 	n += scnprintf(buf, LPARCFG_BUFF_SIZE - n,
 		      "serial_number=%c%c%c%c%c%c%c\n", 
 		      e2a(xItExtVpdPanel.mfgID[2]),
