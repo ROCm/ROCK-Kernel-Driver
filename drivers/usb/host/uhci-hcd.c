@@ -2290,11 +2290,6 @@ static struct usb_hcd *uhci_hcd_alloc(void)
 	return &uhci->hcd;
 }
 
-static void uhci_hcd_free(struct usb_hcd *hcd)
-{
-	kfree(hcd_to_uhci(hcd));
-}
-
 /* Are there any URBs for a particular device/endpoint on a given list? */
 static int urbs_for_ep_list(struct list_head *head,
 		struct hcd_dev *hdev, int ep)
@@ -2359,7 +2354,6 @@ static const struct hc_driver uhci_driver = {
 	.stop =			uhci_stop,
 
 	.hcd_alloc =		uhci_hcd_alloc,
-	.hcd_free =		uhci_hcd_free,
 
 	.urb_enqueue =		uhci_urb_enqueue,
 	.urb_dequeue =		uhci_urb_dequeue,

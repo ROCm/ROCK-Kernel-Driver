@@ -1096,7 +1096,6 @@ static const struct hc_driver ehci_driver = {
 	 * memory lifecycle (except per-request)
 	 */
 	.hcd_alloc =		ehci_hcd_alloc,
-	.hcd_free =		ehci_hcd_free,
 
 	/*
 	 * managing i/o requests and associated device resources

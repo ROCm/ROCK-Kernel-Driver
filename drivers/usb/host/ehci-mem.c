@@ -50,11 +50,6 @@ static struct usb_hcd *ehci_hcd_alloc (void)
 	return NULL;
 }
 
-static void ehci_hcd_free (struct usb_hcd *hcd)
-{
-	kfree (hcd_to_ehci (hcd));
-}
-
 /*-------------------------------------------------------------------------*/
 
 /* Allocate the key transfer structures from the previously allocated pool */

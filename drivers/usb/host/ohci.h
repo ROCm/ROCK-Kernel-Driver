@@ -337,6 +337,11 @@ typedef struct urb_priv {
  */
 
 struct ohci_hcd {
+	/*
+	 * framework state
+	 */
+	struct usb_hcd		hcd;		/* must come first! */
+
 	spinlock_t		lock;
 
 	/*
@@ -389,10 +394,6 @@ struct ohci_hcd {
 #define	OHCI_QUIRK_INITRESET	0x04			/* SiS, OPTi, ... */
 	// there are also chip quirks/bugs in init logic
 
-	/*
-	 * framework state
-	 */
-	struct usb_hcd		hcd;
 };
 
 #define hcd_to_ohci(hcd_ptr) container_of(hcd_ptr, struct ohci_hcd, hcd)

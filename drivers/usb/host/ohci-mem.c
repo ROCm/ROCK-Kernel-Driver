@@ -40,11 +40,6 @@ static struct usb_hcd *ohci_hcd_alloc (void)
 	return NULL;
 }
 
-static void ohci_hcd_free (struct usb_hcd *hcd)
-{
-	kfree (hcd_to_ohci (hcd));
-}
-
 /*-------------------------------------------------------------------------*/
 
 static int ohci_mem_init (struct ohci_hcd *ohci)
