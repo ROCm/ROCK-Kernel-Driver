@@ -53,9 +53,10 @@
 
 typedef struct {
 	struct mm_struct	*mm;
-	unsigned int		nr;	/* == ~0U => fast mode */
-	unsigned int		fullmm;	/* non-zero means full mm flush */
-	unsigned long		freed;	/* number of pages freed */
+	unsigned int		nr;		/* == ~0U => fast mode */
+	unsigned char		fullmm;		/* non-zero means full mm flush */
+	unsigned char		need_flush;	/* really unmapped some PTEs? */
+	unsigned long		freed;		/* number of pages freed */
 	unsigned long		start_addr;
 	unsigned long		end_addr;
 	struct page 		*pages[FREE_PTE_NR];
@@ -72,6 +73,10 @@ static inline void
 ia64_tlb_flush_mmu (mmu_gather_t *tlb, unsigned long start, unsigned long end)
 {
 	unsigned int nr;
+
+	if (!tlb->need_flush)
+		return;
+	tlb->need_flush = 0;
 
 	if (tlb->fullmm) {
 		/*
@@ -168,6 +173,25 @@ tlb_finish_mmu (mmu_gather_t *tlb, unsigned long start, unsigned long end)
 }
 
 /*
+ * Logically, this routine frees PAGE.  On MP machines, the actual freeing of the page
+ * must be delayed until after the TLB has been flushed (see comments at the beginning of
+ * this file).
+ */
+static inline void
+tlb_remove_page (mmu_gather_t *tlb, struct page *page)
+{
+	tlb->need_flush = 1;
+
+	if (tlb_fast_mode(tlb)) {
+		free_page_and_swap_cache(page);
+		return;
+	}
+	tlb->pages[tlb->nr++] = page;
+	if (tlb->nr >= FREE_PTE_NR)
+		ia64_tlb_flush_mmu(tlb, tlb->start_addr, tlb->end_addr);
+}
+
+/*
  * Remove TLB entry for PTE mapped at virtual address ADDRESS.  This is called for any
  * PTE, not just those pointing to (normal) physical memory.
  */
@@ -179,28 +203,25 @@ __tlb_remove_tlb_entry (mmu_gather_t *tlb, pte_t *ptep, unsigned long address)
 	tlb->end_addr = address + PAGE_SIZE;
 }
 
-/*
- * Logically, this routine frees PAGE.  On MP machines, the actual freeing of the page
- * must be delayed until after the TLB has been flushed (see comments at the beginning of
- * this file).
- */
-static inline void
-tlb_remove_page (mmu_gather_t *tlb, struct page *page)
-{
-	if (tlb_fast_mode(tlb)) {
-		free_page_and_swap_cache(page);
-		return;
-	}
-	tlb->pages[tlb->nr++] = page;
-	if (tlb->nr >= FREE_PTE_NR)
-		ia64_tlb_flush_mmu(tlb, tlb->start_addr, tlb->end_addr);
-}
-
 #define tlb_start_vma(tlb, vma)			do { } while (0)
 #define tlb_end_vma(tlb, vma)			do { } while (0)
 
-#define tlb_remove_tlb_entry(tlb, ptep, addr)	__tlb_remove_tlb_entry(tlb, ptep, addr)
-#define pte_free_tlb(tlb, ptep)			__pte_free_tlb(tlb, ptep)
-#define pmd_free_tlb(tlb, ptep)			__pmd_free_tlb(tlb, ptep)
+#define tlb_remove_tlb_entry(tlb, ptep, addr)		\
+do {							\
+	tlb->need_flush = 1;				\
+	__tlb_remove_tlb_entry(tlb, ptep, addr);	\
+} while (0)
+
+#define pte_free_tlb(tlb, ptep)				\
+do {							\
+	tlb->need_flush = 1;				\
+	__pte_free_tlb(tlb, ptep);			\
+} while (0)
+
+#define pmd_free_tlb(tlb, ptep)				\
+do {							\
+	tlb->need_flush = 1;				\
+	__pmd_free_tlb(tlb, ptep);			\
+} while (0)
 
 #endif /* _ASM_IA64_TLB_H */
