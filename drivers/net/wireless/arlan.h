@@ -403,14 +403,14 @@ struct arlan_private {
 #define ARLAN_COM_INT                 0x80
 
 
-#define TXLAST(dev) (((struct arlan_private *)dev->priv)->txRing[((struct arlan_private *)dev->priv)->txLast])
-#define TXHEAD(dev) (((struct arlan_private *)dev->priv)->txRing[0])
-#define TXTAIL(dev) (((struct arlan_private *)dev->priv)->txRing[1])
+#define TXLAST(dev) (((struct arlan_private *)netdev_priv(dev))->txRing[((struct arlan_private *)netdev_priv(dev))->txLast])
+#define TXHEAD(dev) (((struct arlan_private *)netdev_priv(dev))->txRing[0])
+#define TXTAIL(dev) (((struct arlan_private *)netdev_priv(dev))->txRing[1])
 
 #define TXBuffStart(dev) \
- ((int)(((struct arlan_private *)dev->priv)->card)->txBuffer) - ((int)(((struct arlan_private *)dev->priv)->card) )
+ ((int)(((struct arlan_private *)netdev_priv(dev))->card)->txBuffer) - ((int)(((struct arlan_private *)netdev_priv(dev))->card) )
 #define TXBuffEnd(dev) \
- ((int)(((struct arlan_private *)dev->priv)->card)->rxBuffer) - ((int)(((struct arlan_private *)dev->priv)->card)
+ ((int)(((struct arlan_private *)netdev_priv(dev))->card)->rxBuffer) - ((int)(((struct arlan_private *)netdev_priv(dev))->card)
  
 #define READSHM(to,from,atype) {\
 	atype tmp;\
@@ -451,16 +451,16 @@ struct arlan_private {
 
 
 #define registrationBad(dev)\
-   ( (   READSHMB(((struct arlan_private *)dev->priv)->card->registrationMode)    > 0) && \
-     (   READSHMB(((struct arlan_private *)dev->priv)->card->registrationStatus) == 0)    )
+   ( (   READSHMB(((struct arlan_private *)netdev_priv(dev))->card->registrationMode)    > 0) && \
+     (   READSHMB(((struct arlan_private *)netdev_priv(dev))->card->registrationStatus) == 0)    )
 
 
 #define readControlRegister(dev)\
- 	READSHMB(((struct arlan_private *)dev->priv)->card->cntrlRegImage)
+ 	READSHMB(((struct arlan_private *)netdev_priv(dev))->card->cntrlRegImage)
 
 #define writeControlRegister(dev, v){\
-   WRITESHMB(((struct arlan_private *)dev->priv)->card->cntrlRegImage	,((v) &0xF) );\
-   WRITESHMB(((struct arlan_private *)dev->priv)->card->controlRegister	,(v) 	);}
+   WRITESHMB(((struct arlan_private *)netdev_priv(dev))->card->cntrlRegImage	,((v) &0xF) );\
+   WRITESHMB(((struct arlan_private *)netdev_priv(dev))->card->controlRegister	,(v) 	);}
 
 
 #define arlan_interrupt_lancpu(dev) {\
