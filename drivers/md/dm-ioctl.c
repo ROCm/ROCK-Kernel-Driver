@@ -297,13 +297,14 @@ int dm_hash_rename(const char *old, const char *new)
 	/*
 	 * rename and move the name cell.
 	 */
+	unregister_with_devfs(hc);
+
 	list_del(&hc->name_list);
 	old_name = hc->name;
 	hc->name = new_name;
 	list_add(&hc->name_list, _name_buckets + hash_str(new_name));
 
 	/* rename the device node in devfs */
-	unregister_with_devfs(hc);
 	register_with_devfs(hc);
 
 	up_write(&_hash_lock);
