@@ -354,10 +354,7 @@ static void __exit rpaphp_exit(void)
 static int enable_slot(struct hotplug_slot *hotplug_slot)
 {
 	int retval = 0;
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
-
-	if (slot == NULL)
-		return -ENODEV;
+	struct slot *slot = (struct slot *)hotplug_slot->private;
 
 	if (slot->state == CONFIGURED) {
 		dbg("%s: %s is already enabled\n", __FUNCTION__, slot->name);
@@ -385,10 +382,7 @@ static int enable_slot(struct hotplug_slot *hotplug_slot)
 static int disable_slot(struct hotplug_slot *hotplug_slot)
 {
 	int retval;
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
-
-	if (slot == NULL)
-		return -ENODEV;
+	struct slot *slot = (struct slot *)hotplug_slot->private;
 
 	dbg("%s - Entry: slot[%s]\n", __FUNCTION__, slot->name);
 
