@@ -547,6 +547,17 @@ static int acm_probe (struct usb_interface *intf,
 		return -EINVAL;
 	}
 
+	if (!buflen) {
+		if (intf->cur_altsetting->endpoint->extralen && intf->cur_altsetting->endpoint->extra) {
+			dev_dbg(&intf->dev,"Seeking extra descriptors on endpoint");
+			buflen = intf->cur_altsetting->endpoint->extralen;
+			buffer = intf->cur_altsetting->endpoint->extra;
+		} else {
+			err("Zero length descriptor references");
+			return -EINVAL;
+		}
+	}
+
 	while (buflen > 0) {
 		if (buffer [1] != USB_DT_CS_INTERFACE) {
 			err("skipping garbage");
