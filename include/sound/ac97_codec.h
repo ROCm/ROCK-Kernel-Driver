@@ -529,6 +529,7 @@ static inline int ac97_can_spdif(ac97_t * ac97)
 /* functions */
 int snd_ac97_bus(snd_card_t *card, int num, ac97_bus_ops_t *ops, void *private_data, ac97_bus_t **rbus); /* create new AC97 bus */
 int snd_ac97_mixer(ac97_bus_t *bus, ac97_template_t *template, ac97_t **rac97);	/* create mixer controls */
+const char *snd_ac97_get_short_name(ac97_t *ac97);
 
 void snd_ac97_write(ac97_t *ac97, unsigned short reg, unsigned short value);
 unsigned short snd_ac97_read(ac97_t *ac97, unsigned short reg);

@@ -2711,8 +2711,9 @@ static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
 	
 	snd_intel8x0_proc_init(chip);
 
-	sprintf(card->longname, "%s at 0x%lx, irq %i",
-		card->shortname, chip->addr, chip->irq);
+	snprintf(card->longname, sizeof(card->longname),
+		 "%s with %s at %#lx, irq %i", card->shortname,
+		 snd_ac97_get_short_name(chip->ac97[0]), chip->addr, chip->irq);
 
 	if (! ac97_clock[dev])
 		intel8x0_measure_ac97_clock(chip);
