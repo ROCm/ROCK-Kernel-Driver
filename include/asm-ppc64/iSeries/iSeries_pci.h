@@ -31,6 +31,7 @@
 /************************************************************************/
 
 #include <asm/iSeries/HvCallPci.h>
+#include <asm/abs_addr.h>
 
 struct pci_dev;				/* For Forward Reference        */
 struct iSeries_Device_Node;
@@ -71,7 +72,7 @@ struct iSeries_Device_Node;
 /* Converts Virtual Address to Real Address for Hypervisor calls        */
 /************************************************************************/
 
-#define REALADDR(virtaddr)  (0x8000000000000000 | (virt_to_absolute((u64)virtaddr) ))
+#define ISERIES_HV_ADDR(virtaddr)  (0x8000000000000000 | virt_to_abs(virtaddr))
 
 /************************************************************************/
 /* iSeries Device Information                                           */

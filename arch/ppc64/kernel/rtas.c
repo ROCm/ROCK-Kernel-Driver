@@ -361,7 +361,7 @@ rtas_flash_firmware(void)
 	 */
 	rtas_firmware_flash_list.num_blocks = 0;
 	flist = (struct flash_block_list *)&rtas_firmware_flash_list;
-	rtas_block_list = virt_to_absolute((unsigned long)flist);
+	rtas_block_list = virt_to_abs(flist);
 	if (rtas_block_list >= (4UL << 20)) {
 		printk(KERN_ALERT "FLASH: kernel bug...flash list header addr above 4GB\n");
 		return;
@@ -373,13 +373,13 @@ rtas_flash_firmware(void)
 	for (f = flist; f; f = next) {
 		/* Translate data addrs to absolute */
 		for (i = 0; i < f->num_blocks; i++) {
-			f->blocks[i].data = (char *)virt_to_absolute((unsigned long)f->blocks[i].data);
+			f->blocks[i].data = (char *)virt_to_abs(f->blocks[i].data);
 			image_size += f->blocks[i].length;
 		}
 		next = f->next;
 		/* Don't translate NULL pointer for last entry */
-		if(f->next)
-			f->next = (struct flash_block_list *)virt_to_absolute((unsigned long)f->next);
+		if (f->next)
+			f->next = (struct flash_block_list *)virt_to_abs(f->next);
 		else
 			f->next = 0LL;
 		/* make num_blocks into the version/length field */

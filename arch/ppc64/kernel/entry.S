@@ -139,7 +139,7 @@ _GLOBAL(ret_from_syscall_1)
 91:
 #endif
 	li	r10,-_LAST_ERRNO
-	cmpl	0,r3,r10
+	cmpld	0,r3,r10
 	blt	30f
 	neg	r3,r3
 22:	ld	r10,_CCR(r1)	/* Set SO bit in CR */
@@ -194,7 +194,7 @@ _GLOBAL(ret_from_syscall_1)
 _GLOBAL(ret_from_syscall_2)
 	std	r3,RESULT(r1)	/* Save result */	
 	li	r10,-_LAST_ERRNO
-	cmpl	0,r3,r10
+	cmpld	0,r3,r10
 	blt	60f
 	neg	r3,r3
 57:	ld	r10,_CCR(r1)	/* Set SO bit in CR */
@@ -288,6 +288,14 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 	mfcr	r23
 	std	r23,_CCR(r1)
 	std	r1,KSP(r3)	/* Set old stack pointer */
+
+#ifdef CONFIG_SMP
+	/* We need a sync somewhere here to make sure that if the
+	 * previous task gets rescheduled on another CPU, it sees all
+	 * stores it has performed on this one.
+	 */
+	sync
+#endif /* CONFIG_SMP */
 
 	addi	r6,r4,-THREAD	/* Convert THREAD to 'current' */
 	std	r6,PACACURRENT(r13)	/* Set new 'current' */
@@ -404,11 +412,9 @@ restore:
 4:	stb	r5,PACAPROCENABLED(r4)
 #endif
 
-#ifndef CONFIG_PPC_ISERIES
 	ld	r3,_MSR(r1)
 	andi.	r3,r3,MSR_RI
 	beq-	unrecov_restore
-#endif
 
 	ld	r3,_CTR(r1)
 	ld	r0,_LINK(r1)
@@ -461,12 +467,10 @@ do_work:
 	bl	.do_signal
 	b	.ret_from_except
 
-#ifndef CONFIG_PPC_ISERIES
 unrecov_restore:
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	.unrecoverable_exception
 	b	unrecov_restore
-#endif
 
 #ifdef CONFIG_PPC_PSERIES
 /*

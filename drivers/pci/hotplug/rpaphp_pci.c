@@ -398,3 +398,19 @@ int rpaphp_enable_pci_slot(struct slot *slot)
 	dbg("%s - Exit: rc[%d]\n", __FUNCTION__, retval);
 	return retval;
 }
+
+struct hotplug_slot *rpaphp_find_hotplug_slot(struct pci_dev *dev)
+{
+	struct list_head	*tmp, *n;
+	struct slot		*slot;
+
+	list_for_each_safe(tmp, n, &rpaphp_slot_head) {
+		slot = list_entry(tmp, struct slot, rpaphp_slot_list);
+		if (slot->dev.pci_dev == dev)
+			return slot->hotplug_slot;
+	}
+
+	return NULL;
+}
+
+EXPORT_SYMBOL_GPL(rpaphp_find_hotplug_slot);

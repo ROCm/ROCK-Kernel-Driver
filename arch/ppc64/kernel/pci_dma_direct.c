@@ -37,7 +37,7 @@ static void *pci_direct_alloc_consistent(struct pci_dev *hwdev, size_t size,
 	ret = (void *)__get_free_pages(GFP_ATOMIC, get_order(size));
 	if (ret != NULL) {
 		memset(ret, 0, size);
-		*dma_handle = virt_to_absolute((unsigned long)ret);
+		*dma_handle = virt_to_abs(ret);
 	}
 	return ret;
 }
@@ -51,7 +51,7 @@ static void pci_direct_free_consistent(struct pci_dev *hwdev, size_t size,
 static dma_addr_t pci_direct_map_single(struct pci_dev *hwdev, void *ptr,
 				  size_t size, int direction)
 {
-	return virt_to_absolute((unsigned long)ptr);
+	return virt_to_abs(ptr);
 }
 
 static void pci_direct_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,

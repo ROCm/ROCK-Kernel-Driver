@@ -1298,6 +1298,9 @@ next:
 	cachep->dtor = dtor;
 	cachep->name = name;
 
+	/* Don't let CPUs to come and go */
+	lock_cpu_hotplug();
+
 	if (g_cpucache_up == FULL) {
 		enable_cpucache(cachep);
 	} else {
@@ -1347,6 +1350,7 @@ next:
 			if (!strcmp(pc->name,name)) { 
 				printk("kmem_cache_create: duplicate cache %s\n",name); 
 				up(&cache_chain_sem); 
+				unlock_cpu_hotplug();
 				BUG(); 
 			}	
 		}
@@ -1356,6 +1360,7 @@ next:
 	/* cache setup completed, link it into the list */
 	list_add(&cachep->next, &cache_chain);
 	up(&cache_chain_sem);
+	unlock_cpu_hotplug();
 opps:
 	return cachep;
 }
@@ -1506,6 +1511,9 @@ int kmem_cache_destroy (kmem_cache_t * cachep)
 	if (!cachep || in_interrupt())
 		BUG();
 
+	/* Don't let CPUs to come and go */
+	lock_cpu_hotplug();
+
 	/* Find the cache in the chain of caches. */
 	down(&cache_chain_sem);
 	/*
@@ -1519,6 +1527,7 @@ int kmem_cache_destroy (kmem_cache_t * cachep)
 		down(&cache_chain_sem);
 		list_add(&cachep->next,&cache_chain);
 		up(&cache_chain_sem);
+		unlock_cpu_hotplug();
 		return 1;
 	}
 
@@ -1532,6 +1541,8 @@ int kmem_cache_destroy (kmem_cache_t * cachep)
 	kfree(cachep->lists.shared);
 	cachep->lists.shared = NULL;
 	kmem_cache_free(&cache_cache, cachep);
+
+	unlock_cpu_hotplug();
 
 	return 0;
 }

@@ -83,7 +83,8 @@ static void ibmvscsi_handle_event(struct HvLpEvent *lpevt)
  * Routines for driver initialization
  */
 int ibmvscsi_init_crq_queue(struct crq_queue *queue,
-			    struct ibmvscsi_host_data *hostdata)
+			    struct ibmvscsi_host_data *hostdata,
+			    int max_requests)
 {
 	int rc;
 
@@ -104,17 +105,18 @@ int ibmvscsi_init_crq_queue(struct crq_queue *queue,
 
       vio_setHandler_failed:
 	viopath_close(viopath_hostLp, viomajorsubtype_scsi,
-		      IBMVSCSI_MAX_REQUESTS);
+		      max_requests);
       viopath_open_failed:
 	return -1;
 }
 
 void ibmvscsi_release_crq_queue(struct crq_queue *queue,
-				struct ibmvscsi_host_data *hostdata)
+				struct ibmvscsi_host_data *hostdata,
+				int max_requests)
 {
 	vio_clearHandler(viomajorsubtype_scsi);
 	viopath_close(viopath_hostLp, viomajorsubtype_scsi,
-		      IBMVSCSI_MAX_REQUESTS);
+		      max_requests);
 }
 
 /**

@@ -42,7 +42,6 @@ struct Scsi_Host;
  */
 static const struct SRP_CMD *fake_srp_cmd = NULL;
 enum {
-	IBMVSCSI_MAX_REQUESTS = 50,
 	MAX_INDIRECT_BUFS = (sizeof(fake_srp_cmd->additional_data) -
 			     sizeof(struct indirect_descriptor)) /
 	    sizeof(struct memory_descriptor)
@@ -90,13 +89,16 @@ struct ibmvscsi_host_data {
 	struct work_struct srp_task;
 	struct list_head sent;
 	struct Scsi_Host *host;
+	struct MAD_ADAPTER_INFO_DATA madapter_info;
 };
 
 /* routines for managing a command/response queue */
 int ibmvscsi_init_crq_queue(struct crq_queue *queue,
-			    struct ibmvscsi_host_data *hostdata);
+			    struct ibmvscsi_host_data *hostdata,
+			    int max_requests);
 void ibmvscsi_release_crq_queue(struct crq_queue *queue,
-				struct ibmvscsi_host_data *hostdata);
+				struct ibmvscsi_host_data *hostdata,
+				int max_requests);
 void ibmvscsi_handle_crq(struct VIOSRP_CRQ *crq,
 			 struct ibmvscsi_host_data *hostdata);
 int ibmvscsi_send_crq(struct ibmvscsi_host_data *hostdata,
@@ -105,8 +107,5 @@ int ibmvscsi_send_crq(struct ibmvscsi_host_data *hostdata,
 /* Probe/remove routines */
 struct ibmvscsi_host_data *ibmvscsi_probe(struct device *dev);
 void ibmvscsi_remove(struct ibmvscsi_host_data *hostdata);
-
-int ibmvscsi_do_host_config(struct ibmvscsi_host_data *hostdata, 
-			    unsigned char *buffer, int length);
 
 #endif				/* IBMVSCSI_H */

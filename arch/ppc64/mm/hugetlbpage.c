@@ -189,6 +189,9 @@ static hugepte_t *hugepte_offset(struct mm_struct *mm, unsigned long addr)
 	BUG_ON(!in_hugepage_area(mm->context, addr));
 
 	pgd = pgd_offset(mm, addr);
+	if (pgd_none(*pgd))
+		return NULL;
+
 	pmd = pmd_offset(pgd, addr);
 
 	/* We shouldn't find a (normal) PTE page pointer here */
@@ -249,8 +252,11 @@ static int open_32bit_htlbpage_range(struct mm_struct *mm)
 	/* Check no VMAs are in the region */
 	vma = find_vma(mm, TASK_HPAGE_BASE_32);
 
-	if (vma && (vma->vm_start < TASK_HPAGE_END_32))
+	if (vma && (vma->vm_start < TASK_HPAGE_END_32)) {
+		printk(KERN_DEBUG "Low HTLB region busy: PID=%d  vma @ %lx-%lx\n",
+		       current->pid, vma->vm_start, vma->vm_end);
 		return -EBUSY;
+	}
 
 	/* Clean up any leftover PTE pages in the region */
 	spin_lock(&mm->page_table_lock);

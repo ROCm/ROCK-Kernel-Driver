@@ -66,11 +66,15 @@ static irqreturn_t ibmvscsi_handle_event(int irq,
  * the crq with the hypervisor.
  */
 void ibmvscsi_release_crq_queue(struct crq_queue *queue,
-				struct ibmvscsi_host_data *hostdata)
+				struct ibmvscsi_host_data *hostdata,
+				int max_requests)
 {
+	long rc;
 	struct vio_dev *vdev = to_vio_dev(hostdata->dev);
 	free_irq(vdev->irq, (void *)hostdata);
-	plpar_hcall_norets(H_FREE_CRQ, vdev->unit_address);
+	do {
+		rc = plpar_hcall_norets(H_FREE_CRQ, vdev->unit_address);
+	} while (H_isLongBusy(rc));
 	dma_unmap_single(hostdata->dev,
 			 queue->msg_token,
 			 queue->size * sizeof(*queue->msgs),
@@ -154,7 +158,8 @@ static void ibmvscsi_task(void *data)
  * Returns zero on success.
  */
 int ibmvscsi_init_crq_queue(struct crq_queue *queue,
-			    struct ibmvscsi_host_data *hostdata)
+			    struct ibmvscsi_host_data *hostdata,
+			    int max_requests)
 {
 	int rc;
 	struct vio_dev *vdev = to_vio_dev(hostdata->dev);
@@ -169,7 +174,7 @@ int ibmvscsi_init_crq_queue(struct crq_queue *queue,
 					  queue->size * sizeof(*queue->msgs),
 					  PCI_DMA_BIDIRECTIONAL);
 
-	if (pci_dma_mapping_error(queue->msg_token))
+	if (dma_mapping_error(queue->msg_token))
 		goto map_failed;
 
 	rc = plpar_hcall_norets(H_REG_CRQ,
@@ -218,24 +223,6 @@ int ibmvscsi_init_crq_queue(struct crq_queue *queue,
       malloc_failed:
 	return -1;
 }
-
-/**
- * Return host configuration data.  This interface is exported
- * because it is used by arch/ppc64 code to retrieve host
- * configuration information.
- */
-int ibmvscsi_get_host_config(struct vio_dev *vdev,
-			     unsigned char *buffer, 
-			     int length) {
-	struct ibmvscsi_host_data *hostdata = 
-		(struct ibmvscsi_host_data *) vdev->driver_data;
-
-	if (hostdata == NULL)
-		return -1;
-
-	return ibmvscsi_do_host_config(hostdata,buffer,length);
-}
-EXPORT_SYMBOL(ibmvscsi_get_host_config);
 
 /**
  * rpa_device_table: Used by vio.c to match devices in the device tree we 

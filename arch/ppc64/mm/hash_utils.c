@@ -48,6 +48,8 @@
 #include <asm/tlb.h>
 #include <asm/cacheflush.h>
 #include <asm/cputable.h>
+#include <asm/abs_addr.h>
+
 /*
  * Note:  pte   --> Linux PTE
  *        HPTE  --> PowerPC Hashed Page Table Entry
@@ -107,11 +109,11 @@ static inline void create_pte_mapping(unsigned long start, unsigned long end,
 
 		if (systemcfg->platform == PLATFORM_PSERIES_LPAR)
 			ret = pSeries_lpar_hpte_insert(hpteg, va,
-				(unsigned long)__v2a(addr) >> PAGE_SHIFT,
+				virt_to_abs(addr) >> PAGE_SHIFT,
 				0, mode, 1, large);
 		else
 			ret = pSeries_hpte_insert(hpteg, va,
-				(unsigned long)__v2a(addr) >> PAGE_SHIFT,
+				virt_to_abs(addr) >> PAGE_SHIFT,
 				0, mode, 1, large);
 
 		if (ret == -1) {
@@ -154,7 +156,7 @@ void __init htab_initialize(void)
 			ppc64_terminate_msg(0x20, "hpt space");
 			loop_forever();
 		}
-		htab_data.htab = (HPTE *)__a2v(table);
+		htab_data.htab = abs_to_virt(table);
 
 		/* htab absolute addr + encoded htabsize */
 		_SDR1 = table + __ilog2(pteg_count) - 11;

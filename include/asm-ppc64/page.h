@@ -212,19 +212,6 @@ extern int page_is_ram(unsigned long physaddr);
 
 #define __va(x) ((void *)((unsigned long)(x) + KERNELBASE))
 
-/* Given that physical addresses do not map 1-1 to absolute addresses, we
- * use these macros to better specify exactly what we want to do.
- * The only restriction on their use is that the absolute address
- * macros cannot be used until after the LMB structure has been
- * initialized in prom.c.  -Peter
- */
-#define __v2p(x) ((void *) __pa(x))
-#define __v2a(x) ((void *) phys_to_absolute(__pa(x)))
-#define __p2a(x) ((void *) phys_to_absolute(x))
-#define __p2v(x) ((void *) __va(x))
-#define __a2p(x) ((void *) absolute_to_phys(x))
-#define __a2v(x) ((void *) __va(absolute_to_phys(x)))
-
 #ifdef CONFIG_DISCONTIGMEM
 #define page_to_pfn(page)	discontigmem_page_to_pfn(page)
 #define pfn_to_page(pfn)	discontigmem_pfn_to_page(pfn)

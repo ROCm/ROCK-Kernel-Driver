@@ -50,6 +50,24 @@ static int eeh_subsystem_enabled;
 static char *eeh_opts;
 static int eeh_opts_last;
 
+/* Buffer for reporting slot-error-detail rtas calls */
+static unsigned char slot_errbuf[RTAS_ERROR_LOG_MAX];
+
+/* Workqueue data for EEH event device removal */
+struct eeh_event {
+	struct list_head	list;
+	struct pci_dev		*dev;
+	struct device_node	*dn;
+	unsigned long		reset_state;
+};
+
+static spinlock_t eeh_eventlist_lock = SPIN_LOCK_UNLOCKED;
+LIST_HEAD(eeh_eventlist);
+static void eeh_event_handler(void *);
+DECLARE_WORK(eeh_event_wq, eeh_event_handler, NULL);
+
+int (*eeh_disable_slot)(struct pci_dev *) = NULL;
+
 /* System monitoring statistics */
 static DEFINE_PER_CPU(unsigned long, total_mmio_ffs);
 static DEFINE_PER_CPU(unsigned long, false_positives);
@@ -347,6 +365,88 @@ static unsigned long eeh_token_to_phys(unsigned long token)
 }
 
 /**
+ * eeh_panic - call panic() for an eeh event that cannot be handled
+ * @dev pci device that had an eeh event
+ * @reset_state current reset state of the device slot
+ */
+static void eeh_panic(struct pci_dev *dev, unsigned long reset_state)
+{
+	/*
+	 * XXX We should create a seperate sysctl for this.
+	 *
+	 * Since the panic_on_oops sysctl is used to halt the system
+	 * in light of potential corruption, we can use it here.
+	 */
+	if (panic_on_oops)
+		panic("EEH: MMIO failure (%ld) on device:%s %s\n", reset_state,
+		      pci_name(dev), pci_pretty_name(dev));
+	else {
+		__get_cpu_var(ignored_failures)++;
+		printk(KERN_INFO "EEH: MMIO failure (%ld) on device:%s %s\n",
+		       reset_state, pci_name(dev), pci_pretty_name(dev));
+	}
+}
+
+/**
+ * eeh_register_disable_func - allows the rpaphp module to let us know
+ *				they're there.
+ * @func - pointer to rpaphp disable slot routine
+ */
+void eeh_register_disable_func(int (*func)(struct pci_dev *))
+{
+	eeh_disable_slot = func;
+}
+
+/**
+ * eeh_event_handler - handle any eeh events to see if we can disable
+ *		       the device
+ * @dummy - unused
+ */
+static void eeh_event_handler(void *dummy)
+{
+	struct list_head	*tmp, *n;
+	struct eeh_event	*event;
+	unsigned long		log_event;
+	int			rc;
+
+	spin_lock(&eeh_eventlist_lock);
+
+	memset(slot_errbuf, 0, RTAS_ERROR_LOG_MAX);
+
+	list_for_each_safe(tmp, n, &eeh_eventlist) {
+		event = list_entry(tmp, struct eeh_event, list);
+		rc = 1;
+
+		log_event = rtas_call(rtas_token("ibm,slot-error-detail"), 8, 1, NULL,
+				      event->dn->eeh_config_addr,
+				      BUID_HI(event->dn->phb->buid),
+				      BUID_LO(event->dn->phb->buid), NULL, 0,
+				      virt_to_phys(slot_errbuf), RTAS_ERROR_LOG_MAX,
+				      2 /* Permanent Error */);
+		if (log_event)
+			log_error(slot_errbuf, ERR_TYPE_RTAS_LOG, 0);
+
+		if (strcmp(event->dn->name, "ethernet") == 0) {
+			if (eeh_disable_slot != NULL)
+				rc = eeh_disable_slot(event->dev);
+		}
+
+		if (rc != 0)
+			eeh_panic(event->dev, event->reset_state);
+		else
+			printk(KERN_INFO "EEH: MMIO failure (%ld) has caused device "
+				"%s %s to be removed\n", event->reset_state,
+				pci_name(event->dev), pci_pretty_name(event->dev));
+
+		pci_dev_put(event->dev);
+		list_del(&event->list);
+		kfree(event);
+	}
+
+	spin_unlock(&eeh_eventlist_lock);
+}
+
+/**
  * eeh_check_failure - check if all 1's data is due to EEH slot freeze
  * @token i/o token, should be address in the form 0xA....
  * @val value, should be all 1's (XXX why do we need this arg??)
@@ -366,10 +466,6 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 	struct pci_dev *dev;
 	struct device_node *dn;
 	unsigned long ret, rets[2];
-	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
-	/* dont want this on the stack */
-	static unsigned char slot_err_buf[RTAS_ERROR_LOG_MAX];
-	unsigned long flags;
 
 	__get_cpu_var(total_mmio_ffs)++;
 
@@ -383,28 +479,20 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 		return val;
 
 	dn = pci_device_to_OF_node(dev);
-	if (!dn) {
-		pci_dev_put(dev);
-		return val;
-	}
+	if (!dn) 
+		goto ok_return;
 
 	/* Access to IO BARs might get this far and still not want checking. */
 	if (!(dn->eeh_mode & EEH_MODE_SUPPORTED) ||
-	    dn->eeh_mode & EEH_MODE_NOCHECK) {
-		pci_dev_put(dev);
-		return val;
-	}
+	    dn->eeh_mode & EEH_MODE_NOCHECK) 
+		goto ok_return;
 
         /* Make sure we aren't ISA */
-        if (!strcmp(dn->type, "isa")) {
-                pci_dev_put(dev);
-                return val;
-        }
+        if (!strcmp(dn->type, "isa")) 
+                goto ok_return;
 
-	if (!dn->eeh_config_addr) {
-		pci_dev_put(dev);
-		return val;
-	}
+	if (!dn->eeh_config_addr) 
+		goto ok_return;
 
 	/*
 	 * Now test for an EEH failure.  This is VERY expensive.
@@ -418,43 +506,31 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 			BUID_LO(dn->phb->buid));
 
 	if (ret == 0 && rets[1] == 1 && rets[0] >= 2) {
-		unsigned long slot_err_ret;
+		struct eeh_event 	*event;
 
-		spin_lock_irqsave(&lock, flags);
-		memset(slot_err_buf, 0, RTAS_ERROR_LOG_MAX);
-		slot_err_ret = rtas_call(rtas_token("ibm,slot-error-detail"),
-					 8, 1, NULL, dn->eeh_config_addr,
-					 BUID_HI(dn->phb->buid),
-					 BUID_LO(dn->phb->buid), NULL, 0,
-					 __pa(slot_err_buf),
-					 RTAS_ERROR_LOG_MAX,
-					 2 /* Permanent Error */);
+		/* prevent repeated reports of this failure */
+		dn->eeh_mode |= EEH_MODE_NOCHECK;
 
-		if (slot_err_ret == 0)
-			log_error(slot_err_buf, ERR_TYPE_RTAS_LOG,
-				  1 /* Fatal */);
-
-		spin_unlock_irqrestore(&lock, flags);
-
-		/*
-		 * XXX We should create a separate sysctl for this.
-		 *
-		 * Since the panic_on_oops sysctl is used to halt
-		 * the system in light of potential corruption, we
-		 * can use it here.
-		 */
-		if (panic_on_oops) {
-			panic("EEH: MMIO failure (%ld) on device:%s %s\n",
-			      rets[0], pci_name(dev), pci_pretty_name(dev));
-		} else {
-			__get_cpu_var(ignored_failures)++;
-			printk(KERN_INFO "EEH: MMIO failure (%ld) on device:%s %s\n",
-			       rets[0], pci_name(dev), pci_pretty_name(dev));
+		event = kmalloc(sizeof(*event), GFP_ATOMIC);
+		if (event == NULL) {
+			eeh_panic(dev, rets[0]);
+			goto ok_return;
 		}
+
+		event->dev = dev;
+		event->dn = dn;
+		event->reset_state = rets[0];
+
+		spin_lock(&eeh_eventlist_lock);
+		list_add(&event->list, &eeh_eventlist);
+		spin_unlock(&eeh_eventlist_lock);
+
+		schedule_work(&eeh_event_wq);
 	} else {
 		__get_cpu_var(false_positives)++;
 	}
 
+ok_return:
 	pci_dev_put(dev);
 	return val;
 }

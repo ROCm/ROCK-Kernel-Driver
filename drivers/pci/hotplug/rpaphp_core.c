@@ -54,6 +54,8 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
+void eeh_register_disable_func(int (*)(struct pci_dev *));
+
 module_param(debug, int, 0644);
 
 static int enable_slot(struct hotplug_slot *slot);
@@ -64,6 +66,7 @@ static int get_attention_status(struct hotplug_slot *slot, u8 * value);
 static int get_adapter_status(struct hotplug_slot *slot, u8 * value);
 static int get_max_bus_speed(struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value);
 static int get_cur_bus_speed(struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value);
+static int rpaphp_disable_slot(struct pci_dev *dev);
 
 struct hotplug_slot_ops rpaphp_hotplug_slot_ops = {
 	.owner = THIS_MODULE,
@@ -398,12 +401,18 @@ static int __init rpaphp_init(void)
 {
 	info(DRIVER_DESC " version: " DRIVER_VERSION "\n");
 
+	/* let EEH know they can use hotplug */
+	eeh_register_disable_func(&rpaphp_disable_slot);
+
 	/* read all the PRA info from the system */
 	return init_rpa();
 }
 
 static void __exit rpaphp_exit(void)
 {
+	/* let EEH know we are going away */
+	eeh_register_disable_func(NULL);
+
 	cleanup_slots();
 }
 
@@ -436,6 +445,11 @@ static int enable_slot(struct hotplug_slot *hotplug_slot)
       exit:
 	dbg("%s - Exit: rc[%d]\n", __FUNCTION__, retval);
 	return retval;
+}
+
+static int rpaphp_disable_slot(struct pci_dev *dev)
+{
+	return disable_slot(rpaphp_find_hotplug_slot(dev));
 }
 
 static int disable_slot(struct hotplug_slot *hotplug_slot)

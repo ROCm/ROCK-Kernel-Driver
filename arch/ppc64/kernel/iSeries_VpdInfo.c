@@ -293,7 +293,8 @@ void iSeries_Get_Location_Code(struct iSeries_Device_Node *DevNode)
 		return;
 	}
 	BusVpdLen = HvCallPci_getBusVpd(ISERIES_BUS(DevNode),
-			REALADDR(BusVpdPtr), BUS_VPDSIZE);
+					ISERIES_HV_ADDR(BusVpdPtr),
+					BUS_VPDSIZE);
 	if (BusVpdLen == 0) {
 		kfree(BusVpdPtr);
 		printk("PCI: Bus VPD Buffer zero length.\n");
