@@ -192,7 +192,7 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 	asoc->rwnd_over = 0;
 
 	/* Use my own max window until I learn something better.  */
-	asoc->peer.rwnd = sctp_rmem;
+	asoc->peer.rwnd = SCTP_DEFAULT_MAXWINDOW;
 
 	/* Set the sndbuf size for transmit.  */
 	asoc->sndbuf_used = 0;
@@ -498,7 +498,7 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 	 * so initialize ssthresh to the default value and it will be set
 	 * later when we process the INIT.
 	 */
-	peer->ssthresh = sctp_rmem;
+	peer->ssthresh = SCTP_DEFAULT_MAXWINDOW;
 
 	peer->partial_bytes_acked = 0;
 	peer->flight_size = 0;
