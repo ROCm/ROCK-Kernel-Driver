@@ -566,8 +566,9 @@ static int __devinit radeon_probe_pll_params(struct radeonfb_info *rinfo)
 		break;
 	}
 
-	do_div(vclk, 1000);
-	xtal = (xtal * denom) / num;
+	vclk *= denom;
+	do_div(vclk, 1000 * num);
+	xtal = vclk;
 
 	if ((xtal > 26900) && (xtal < 27100))
 		xtal = 2700;
@@ -1441,7 +1442,7 @@ int radeonfb_set_par(struct fb_info *info)
 			nopllcalc = 1;
 			newmode.ppll_div_3 = rinfo->panel_info.fbk_divider |
 				(rinfo->panel_info.post_divider << 16);
-			newmode.ppll_ref_div = rinfo->pll.ref_div;
+			newmode.ppll_ref_div = rinfo->panel_info.ref_divider;
 		}
 	}
 	dotClock = 1000000000 / pixClock;
@@ -1662,7 +1663,7 @@ int radeonfb_set_par(struct fb_info *info)
 		radeon_write_mode (rinfo, &newmode);
 		/* (re)initialize the engine */
 		if (!radeon_accel_disabled())
-			radeon_engine_init (rinfo);
+			radeonfb_engine_init (rinfo);
 	
 	}
 	/* Update fix */
@@ -2291,7 +2292,7 @@ static void __devexit radeonfb_pci_unregister (struct pci_dev *pdev)
 #ifdef CONFIG_FB_RADEON_I2C
 	radeon_delete_i2c_busses(rinfo);
 #endif        
-        kfree (rinfo);
+        framebuffer_release(info);
 }
 
 
@@ -2331,7 +2332,7 @@ int __init radeonfb_setup (char *options)
 			continue;
 
 		if (!strncmp(this_opt, "noaccel", 7)) {
-			radeonfb_noaccel = 1;
+			noaccel = radeonfb_noaccel = 1;
 		} else if (!strncmp(this_opt, "mirror", 6)) {
 			mirror = 1;
 		} else if (!strncmp(this_opt, "force_dfp", 9)) {

@@ -291,8 +291,8 @@ config ARM_THUMB
 	depends on CPU_ARM720T || CPU_ARM920T || CPU_ARM922T || CPU_ARM926T || CPU_ARM1020 || CPU_ARM1020E || CPU_ARM1022 || CPU_ARM1026 || CPU_XSCALE
 	default y
 	help
-	  Say Y if you want to have kernel support for ARM Thumb instructions,
-	  fault handlers, and system calls.
+	  Say Y if you want to include kernel support for running user space
+	  Thumb binaries.
 
 	  The Thumb instruction set is a compressed form of the standard ARM
 	  instruction set resulting in smaller binaries at the expense of

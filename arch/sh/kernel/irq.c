@@ -1,4 +1,4 @@
-/* $Id: irq.c,v 1.19 2004/01/10 01:25:32 lethal Exp $
+/* $Id: irq.c,v 1.20 2004/01/13 05:52:11 kkojima Exp $
  *
  * linux/arch/sh/kernel/irq.c
  *
@@ -318,6 +318,16 @@ asmlinkage int do_IRQ(unsigned long r4, unsigned long r5,
 
 	irq_enter();
 
+#ifdef CONFIG_PREEMPT
+	/*
+	 * At this point we're now about to actually call handlers,
+	 * and interrupts might get reenabled during them... bump
+	 * preempt_count to prevent any preemption while the handler
+	 * called here is pending...
+	 */
+	preempt_disable();
+#endif
+
 	/* Get IRQ number */
 	asm volatile("stc	r2_bank, %0\n\t"
 		     "shlr2	%0\n\t"
@@ -392,6 +402,15 @@ out:
 	spin_unlock(&desc->lock);
 
 	irq_exit();
+
+#ifdef CONFIG_PREEMPT
+	/*
+	 * We're done with the handlers, interrupts should be
+	 * currently disabled; decrement preempt_count now so
+	 * as we return preemption may be allowed...
+	 */
+	preempt_enable_no_resched();
+#endif
 
 	return 1;
 }

@@ -17,6 +17,7 @@
 
 #include <asm/io.h>
 #include <asm/hd64461/hd64461.h>
+#include <asm/hp6xx/io.h>
 #include <asm/irq.h>
 
 struct sh_machine_vector mv_hp680 __initmv = {

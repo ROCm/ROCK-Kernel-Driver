@@ -556,8 +556,8 @@ extern void radeonfb_fillrect(struct fb_info *info, const struct fb_fillrect *re
 extern void radeonfb_copyarea(struct fb_info *info, const struct fb_copyarea *area);
 extern void radeonfb_imageblit(struct fb_info *p, const struct fb_image *image);
 extern int radeonfb_sync(struct fb_info *info);
-extern void radeon_engine_init (struct radeonfb_info *rinfo);
-extern void radeon_engine_reset(struct radeonfb_info *rinfo);
+extern void radeonfb_engine_init (struct radeonfb_info *rinfo);
+extern void radeonfb_engine_reset(struct radeonfb_info *rinfo);
 
 /* Other functions */
 extern int radeonfb_blank(int blank, struct fb_info *info);

@@ -340,6 +340,24 @@ struct device;
 struct file;
 
 /*
+ * Register/unregister for framebuffer events
+ */
+
+/*	The resolution of the passed in fb_info about to change */ 
+#define FB_EVENT_MODE_CHANGE		0x01
+/*	The display on this fb_info is beeing suspended, no access to the
+ *	framebuffer is allowed any more after that call returns
+ */
+#define FB_EVENT_SUSPEND		0x02
+/*	The display on this fb_info was resumed, you can restore the display
+ *	if you own it
+ */
+#define FB_EVENT_RESUME			0x03
+
+extern int fb_register_client(struct notifier_block *nb);
+extern int fb_unregister_client(struct notifier_block *nb);
+
+/*
  * Pixmap structure definition
  *
  * The purpose of this structure is to translate data
@@ -363,8 +381,6 @@ struct fb_pixmap {
 					  /* access methods                */
 	void (*outbuf)(u8 *dst, u8 *addr, unsigned int size); 
 	u8   (*inbuf) (u8 *addr);
-	spinlock_t lock;                  /* spinlock                      */
-	atomic_t count;
 };
 
     /*
@@ -448,8 +464,10 @@ struct fb_info {
 	char *screen_base;		/* Virtual address */
 	struct vc_data *display_fg;	/* Console visible on this display */
 	int currcon;			/* Current VC. */
-	struct class_device class_dev;	/* Sysfs data */	
 	void *pseudo_palette;		/* Fake palette of 16 colors */ 
+#define FBINFO_STATE_RUNNING	0
+#define FBINFO_STATE_SUSPENDED	1
+	u32 state;			/* Hardware state i.e suspend */
 	/* From here on everything is device dependent */
 	void *par;	
 };
@@ -476,7 +494,7 @@ struct fb_info {
 #define fb_writeq sbus_writeq
 #define fb_memset sbus_memset_io
 
-#elif defined(__i386__) || defined(__alpha__) || defined(__x86_64__) || defined(__hppa__)
+#elif defined(__i386__) || defined(__alpha__) || defined(__x86_64__) || defined(__hppa__) || defined(__sh__)
 
 #define fb_readb __raw_readb
 #define fb_readw __raw_readw
@@ -533,9 +551,6 @@ extern int num_registered_fb;
 /* drivers/video/fbsysfs.c */
 extern struct fb_info *framebuffer_alloc(size_t size, struct device *dev);
 extern void framebuffer_release(struct fb_info *info);
-extern int fb_add_class_device(struct fb_info *info);
-
-extern struct class fb_class;
 
 /* drivers/video/fbmon.c */
 #define FB_MAXTIMINGS       0

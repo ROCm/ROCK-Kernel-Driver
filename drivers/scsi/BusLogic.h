@@ -344,7 +344,7 @@ union BusLogic_ControlRegister
     boolean InterruptReset:1;				/* Bit 5 */
     boolean SoftReset:1;				/* Bit 6 */
     boolean HardReset:1;				/* Bit 7 */
-  };
+  } cr;
 };
 
 /*
@@ -363,7 +363,7 @@ union BusLogic_StatusRegister
     boolean InitializationRequired:1;			/* Bit 5 */
     boolean DiagnosticFailure:1;			/* Bit 6 */
     boolean DiagnosticActive:1;				/* Bit 7 */
-  };
+  } sr;
 };
 
 /*
@@ -380,7 +380,7 @@ union BusLogic_InterruptRegister
     boolean ExternalBusReset:1;				/* Bit 3 */
     unsigned char Reserved:3;				/* Bits 4-6 */
     boolean InterruptValid:1;				/* Bit 7 */
-  };
+  } ir;
 };
 
 /*
@@ -395,7 +395,7 @@ union BusLogic_GeometryRegister
     enum BusLogic_BIOS_DiskGeometryTranslation Drive1Geometry:2;/* Bits 2-3 */
     unsigned char :3;						/* Bits 4-6 */
     boolean ExtendedTranslationEnabled:1;			/* Bit 7 */
-  };
+  } gr;
 };
 
 /*
@@ -1272,7 +1272,7 @@ static inline void BusLogic_SCSIBusReset(struct BusLogic_HostAdapter *HostAdapte
 {
   union BusLogic_ControlRegister ControlRegister;
   ControlRegister.All = 0;
-  ControlRegister.SCSIBusReset = true;
+  ControlRegister.cr.SCSIBusReset = true;
   outb(ControlRegister.All,
        HostAdapter->IO_Address + BusLogic_ControlRegisterOffset);
 }
@@ -1281,7 +1281,7 @@ static inline void BusLogic_InterruptReset(struct BusLogic_HostAdapter *HostAdap
 {
   union BusLogic_ControlRegister ControlRegister;
   ControlRegister.All = 0;
-  ControlRegister.InterruptReset = true;
+  ControlRegister.cr.InterruptReset = true;
   outb(ControlRegister.All,
        HostAdapter->IO_Address + BusLogic_ControlRegisterOffset);
 }
@@ -1290,7 +1290,7 @@ static inline void BusLogic_SoftReset(struct BusLogic_HostAdapter *HostAdapter)
 {
   union BusLogic_ControlRegister ControlRegister;
   ControlRegister.All = 0;
-  ControlRegister.SoftReset = true;
+  ControlRegister.cr.SoftReset = true;
   outb(ControlRegister.All,
        HostAdapter->IO_Address + BusLogic_ControlRegisterOffset);
 }
@@ -1299,7 +1299,7 @@ static inline void BusLogic_HardReset(struct BusLogic_HostAdapter *HostAdapter)
 {
   union BusLogic_ControlRegister ControlRegister;
   ControlRegister.All = 0;
-  ControlRegister.HardReset = true;
+  ControlRegister.cr.HardReset = true;
   outb(ControlRegister.All,
        HostAdapter->IO_Address + BusLogic_ControlRegisterOffset);
 }

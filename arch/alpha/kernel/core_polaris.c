@@ -4,19 +4,17 @@
  * POLARIS chip-specific code
  */
 
-#include <linux/kernel.h>
+#define __EXTERN_INLINE inline
+#include <asm/io.h>
+#include <asm/core_polaris.h>
+#undef __EXTERN_INLINE
+
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/sched.h>
 #include <linux/init.h>
 
-#include <asm/system.h>
 #include <asm/ptrace.h>
-
-#define __EXTERN_INLINE inline
-#include <asm/io.h>
-#include <asm/core_polaris.h>
-#undef __EXTERN_INLINE
 
 #include "proto.h"
 #include "pci_impl.h"

@@ -10,7 +10,7 @@
 #include <linux/rwsem.h>
 
 struct semaphore {
-	atomic_t count;
+	atomic24_t count;
 	int sleepers;
 	wait_queue_head_t wait;
 #if WAITQUEUE_DEBUG
@@ -40,7 +40,7 @@ struct semaphore {
 
 static inline void sema_init (struct semaphore *sem, int val)
 {
-	atomic_set(&sem->count, val);
+	atomic24_set(&sem->count, val);
 	sem->sleepers = 0;
 	init_waitqueue_head(&sem->wait);
 #if WAITQUEUE_DEBUG
@@ -78,7 +78,7 @@ static inline void down(struct semaphore * sem)
 
 	__asm__ __volatile__(
 	"mov	%%o7, %%g4\n\t"
-	"call	___atomic_sub\n\t"
+	"call	___atomic24_sub\n\t"
 	" add	%%o7, 8, %%o7\n\t"
 	"tst	%%g2\n\t"
 	"bl	2f\n\t"
@@ -115,7 +115,7 @@ static inline int down_interruptible(struct semaphore * sem)
 
 	__asm__ __volatile__(
 	"mov	%%o7, %%g4\n\t"
-	"call	___atomic_sub\n\t"
+	"call	___atomic24_sub\n\t"
 	" add	%%o7, 8, %%o7\n\t"
 	"tst	%%g2\n\t"
 	"bl	2f\n\t"
@@ -154,7 +154,7 @@ static inline int down_trylock(struct semaphore * sem)
 
 	__asm__ __volatile__(
 	"mov	%%o7, %%g4\n\t"
-	"call	___atomic_sub\n\t"
+	"call	___atomic24_sub\n\t"
 	" add	%%o7, 8, %%o7\n\t"
 	"tst	%%g2\n\t"
 	"bl	2f\n\t"
@@ -193,7 +193,7 @@ static inline void up(struct semaphore * sem)
 
 	__asm__ __volatile__(
 	"mov	%%o7, %%g4\n\t"
-	"call	___atomic_add\n\t"
+	"call	___atomic24_add\n\t"
 	" add	%%o7, 8, %%o7\n\t"
 	"tst	%%g2\n\t"
 	"ble	2f\n\t"

@@ -33,7 +33,7 @@ asmlinkage long sys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice)
 		return -EBADF;
 
 	mapping = file->f_mapping;
-	if (!mapping) {
+	if (!mapping || len < 0) {
 		ret = -EINVAL;
 		goto out;
 	}
