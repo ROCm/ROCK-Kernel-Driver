@@ -6,7 +6,7 @@
     the GNU General Public License.
 =========================================================================*/
 
-/* $Id: nsp_debug.c,v 1.2 2002/09/20 04:06:58 gotom Exp $ */
+/* $Id: nsp_debug.c,v 1.3 2003/07/26 14:21:09 elca Exp $ */
 
 /*
  * Show the command data of a command
@@ -138,9 +138,9 @@ static void print_commandk (unsigned char *command)
 	printk("\n");
 }
 
-static void show_command(Scsi_Cmnd *ptr)
+static void show_command(Scsi_Cmnd *SCpnt)
 {
-	print_commandk(ptr->cmnd);
+	print_commandk(SCpnt->cmnd);
 }
 
 static void show_phase(Scsi_Cmnd *SCpnt)
