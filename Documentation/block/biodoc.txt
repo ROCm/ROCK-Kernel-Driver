@@ -1175,7 +1175,7 @@ ide_map_buffer.
 8.12. Multiple block-size transfers for faster raw i/o (Shailabh Nagar,
       Badari)
 8.13  Priority based i/o scheduler - prepatches (Arjan van de Ven)
-8.14  IDE Taskfile i/o patch (Andre Hedrik)
+8.14  IDE Taskfile i/o patch (Andre Hedrick)
 8.15  Multi-page writeout and readahead patches (Andrew Morton)
 8.16  Direct i/o patches for 2.5 using kvec and bio (Badari Pulavarthy)
 

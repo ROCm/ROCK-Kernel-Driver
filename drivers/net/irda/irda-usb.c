@@ -107,9 +107,9 @@ static void irda_usb_change_speed_xbofs(struct irda_usb_cb *self);
 static int irda_usb_hard_xmit(struct sk_buff *skb, struct net_device *dev);
 static int irda_usb_open(struct irda_usb_cb *self);
 static int irda_usb_close(struct irda_usb_cb *self);
-static void speed_bulk_callback(struct urb *urb);
-static void write_bulk_callback(struct urb *urb);
-static void irda_usb_receive(struct urb *urb);
+static void speed_bulk_callback(struct urb *urb, struct pt_regs *regs);
+static void write_bulk_callback(struct urb *urb, struct pt_regs *regs);
+static void irda_usb_receive(struct urb *urb, struct pt_regs *regs);
 static int irda_usb_net_init(struct net_device *dev);
 static int irda_usb_net_open(struct net_device *dev);
 static int irda_usb_net_close(struct net_device *dev);
@@ -284,7 +284,7 @@ static void irda_usb_change_speed_xbofs(struct irda_usb_cb *self)
  * Speed URB callback
  * Now, we can only get called for the speed URB.
  */
-static void speed_bulk_callback(struct urb *urb)
+static void speed_bulk_callback(struct urb *urb, struct pt_regs *regs)
 {
 	struct irda_usb_cb *self = urb->context;
 	
@@ -486,7 +486,7 @@ drop:
 /*
  * Note : this function will be called only for tx_urb...
  */
-static void write_bulk_callback(struct urb *urb)
+static void write_bulk_callback(struct urb *urb, struct pt_regs *regs)
 {
 	unsigned long flags;
 	struct sk_buff *skb = urb->context;
@@ -753,7 +753,7 @@ static void irda_usb_submit(struct irda_usb_cb *self, struct sk_buff *skb, struc
  *     Called by the USB subsystem when a frame has been received
  *
  */
-static void irda_usb_receive(struct urb *urb) 
+static void irda_usb_receive(struct urb *urb, struct pt_regs *regs)
 {
 	struct sk_buff *skb = (struct sk_buff *) urb->context;
 	struct irda_usb_cb *self; 

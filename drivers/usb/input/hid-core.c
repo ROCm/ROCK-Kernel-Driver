@@ -898,7 +898,7 @@ static int hid_input_report(int type, struct urb *urb)
  * Input interrupt completion handler.
  */
 
-static void hid_irq_in(struct urb *urb)
+static void hid_irq_in(struct urb *urb, struct pt_regs *regs)
 {
 	struct hid_device	*hid = urb->context;
 	int			status;
@@ -1090,7 +1090,7 @@ static int hid_submit_ctrl(struct hid_device *hid)
  * Output interrupt completion handler.
  */
 
-static void hid_irq_out(struct urb *urb)
+static void hid_irq_out(struct urb *urb, struct pt_regs *regs)
 {
 	struct hid_device *hid = urb->context;
 	unsigned long flags;
@@ -1119,7 +1119,7 @@ static void hid_irq_out(struct urb *urb)
  * Control pipe completion handler.
  */
 
-static void hid_ctrl(struct urb *urb)
+static void hid_ctrl(struct urb *urb, struct pt_regs *regs)
 {
 	struct hid_device *hid = urb->context;
 	unsigned long flags;

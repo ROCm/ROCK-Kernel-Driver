@@ -193,7 +193,7 @@ static void rh_int_timer_do (unsigned long ptr)
 					   usb_pipeout (urb->pipe));
 
 			if (urb->complete) {
-				urb->complete (urb);
+				urb->complete (urb, NULL);
 			}
 		}
 	}
@@ -506,7 +506,7 @@ static int rh_submit_urb (struct urb * urb)
 	urb->hcpriv = NULL;
 	urb->dev = NULL;
 	if (urb->complete) {
-		urb->complete (urb);
+		urb->complete (urb, NULL);
 	}
 
 	return 0;
@@ -537,7 +537,7 @@ static int rh_unlink_urb (struct urb * urb)
 		if (urb->transfer_flags & URB_ASYNC_UNLINK) {
 			urb->status = -ECONNRESET;
 			if (urb->complete) {
-				urb->complete (urb);
+				urb->complete (urb, NULL);
 			}
 		} else
 			urb->status = -ENOENT;

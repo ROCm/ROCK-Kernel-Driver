@@ -315,8 +315,8 @@ static ssize_t part_stat_read(struct hd_struct * p,
 			      char *page, size_t count, loff_t off)
 {
 	return off ? 0 : sprintf(page, "%8u %8llu %8u %8llu\n",
-				p->reads, (u64)p->read_sectors,
-				p->writes, (u64)p->write_sectors);
+				p->reads, (unsigned long long)p->read_sectors,
+				p->writes, (unsigned long long)p->write_sectors);
 }
 static struct part_attribute part_attr_dev = {
 	.attr = {.name = "dev", .mode = S_IRUGO },
@@ -377,7 +377,6 @@ void add_partition(struct gendisk *disk, int part, sector_t start, sector_t len)
 	p->start_sect = start;
 	p->nr_sects = len;
 	devfs_register_partition(disk, part);
-	kobject_init(&p->kobj);
 	snprintf(p->kobj.name,KOBJ_NAME_LEN,"%s%d",disk->kobj.name,part);
 	p->kobj.parent = &disk->kobj;
 	p->kobj.subsys = &part_subsys;
@@ -406,7 +405,7 @@ void register_disk(struct gendisk *disk)
 	s = strchr(disk->kobj.name, '/');
 	if (s)
 		*s = '!';
-	kobject_register(&disk->kobj);
+	kobject_add(&disk->kobj);
 	disk_sysfs_symlinks(disk);
 
 	if (disk->flags & GENHD_FL_CD)
@@ -529,8 +528,7 @@ void del_gendisk(struct gendisk *disk)
 		sysfs_remove_link(&disk->driverfs_dev->kobj, "block");
 		put_device(disk->driverfs_dev);
 	}
-	kobject_get(&disk->kobj);	/* kobject model is fucked in head */
-	kobject_unregister(&disk->kobj);
+	kobject_del(&disk->kobj);
 }
 
 struct dev_name {

@@ -43,9 +43,6 @@
  *
  */
 
-#define MAJOR_NR ACSI_MAJOR
-#define DEVICE_NAME "ACSI"
-
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/errno.h>
@@ -971,7 +968,7 @@ static void redo_acsi_request( void )
 	aip = disk->private_data;
 	if (CURRENT->bh) {
 		if (!CURRENT->bh && !buffer_locked(CURRENT->bh))
-			panic(DEVICE_NAME ": block not locked");
+			panic("ACSI: block not locked");
 	}
 
 	block = CURRENT->sector;
@@ -1627,8 +1624,8 @@ int acsi_init( void )
 #endif
 	if (!MACH_IS_ATARI || !ATARIHW_PRESENT(ACSI))
 		return 0;
-	if (register_blkdev( MAJOR_NR, "ad", &acsi_fops )) {
-		printk( KERN_ERR "Unable to get major %d for ACSI\n", MAJOR_NR );
+	if (register_blkdev( ACSI_MAJOR, "ad", &acsi_fops )) {
+		printk( KERN_ERR "Unable to get major %d for ACSI\n", ACSI_MAJOR );
 		err = -EBUSY;
 		goto out1;
 	}
@@ -1731,7 +1728,7 @@ int acsi_init( void )
 	for( i = 0; i < NDevices; ++i ) {
 		struct gendisk *disk = acsi_gendisk[i];
 		sprintf(disk->disk_name, "ad%c", 'a'+i);
-		disk->major = MAJOR_NR;
+		disk->major = ACSI_MAJOR;
 		disk->first_minor = i << 4;
 		if (acsi_info[i].type != HARDDISK) {
 			disk->minor_shift = 0;
@@ -1751,7 +1748,7 @@ out3:
 	blk_cleanup_queue(&acsi_queue);
 	atari_stram_free( acsi_buffer );
 out2:
-	unregister_blkdev( MAJOR_NR, "ad" );
+	unregister_blkdev( ACSI_MAJOR, "ad" );
 out1:
 	return err;
 }
@@ -1778,7 +1775,7 @@ void cleanup_module(void)
 	blk_cleanup_queue(&acsi_queue);
 	atari_stram_free( acsi_buffer );
 
-	if (unregister_blkdev( MAJOR_NR, "ad" ) != 0)
+	if (unregister_blkdev( ACSI_MAJOR, "ad" ) != 0)
 		printk( KERN_ERR "acsi: cleanup_module failed\n");
 
 	for (i = 0; i < NDevices; i++) {

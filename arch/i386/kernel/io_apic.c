@@ -1749,10 +1749,11 @@ void __init setup_IO_APIC(void)
  *	APIC bugs then we can allow the modify fast path
  */
  
-static void __init io_apic_bug_finalize(void)
+static int __init io_apic_bug_finalize(void)
 {
 	if(sis_apic_bug == -1)
 		sis_apic_bug = 0;
+	return 0;
 }
 
 late_initcall(io_apic_bug_finalize);

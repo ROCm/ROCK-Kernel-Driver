@@ -401,7 +401,7 @@ unsigned int usb_stor_transfer_length(Scsi_Cmnd *srb)
 /* This is the completion handler which will wake us up when an URB
  * completes.
  */
-static void usb_stor_blocking_completion(struct urb *urb)
+static void usb_stor_blocking_completion(struct urb *urb, struct pt_regs *regs)
 {
 	struct completion *urb_done_ptr = (struct completion *)urb->context;
 
@@ -967,7 +967,7 @@ void usb_stor_abort_transport(struct us_data *us)
 	/* If we are waiting for an IRQ, simulate it */
 	if (test_bit(US_FLIDX_IP_WANTED, &us->flags)) {
 		US_DEBUGP("-- simulating missing IRQ\n");
-		usb_stor_CBI_irq(us->irq_urb);
+		usb_stor_CBI_irq(us->irq_urb, NULL);
 	}
 
 	/* Wait for the aborted command to finish */
@@ -982,7 +982,7 @@ void usb_stor_abort_transport(struct us_data *us)
  */
 
 /* The interrupt handler for CBI devices */
-void usb_stor_CBI_irq(struct urb *urb)
+void usb_stor_CBI_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct us_data *us = (struct us_data *)urb->context;
 	int status;

@@ -20,59 +20,21 @@
 
 #define SECURITY_SCAFFOLD_VERSION	"1.0.0"
 
-extern struct security_operations dummy_security_ops;	/* lives in dummy.c */
+/* things that live in dummy.c */
+extern struct security_operations dummy_security_ops;
+extern void security_fixup_ops (struct security_operations *ops);
 
 struct security_operations *security_ops;	/* Initialized to NULL */
 
-/* This macro checks that all pointers in a struct are non-NULL.  It 
- * can be fooled by struct padding for object tile alignment and when
- * pointers to data and pointers to functions aren't the same size.
- * Yes it's ugly, we'll replace it if it becomes a problem.
- */
-#define VERIFY_STRUCT(struct_type, s, e) \
-	do { \
-		unsigned long * __start = (unsigned long *)(s); \
-		unsigned long * __end = __start + \
-				sizeof(struct_type)/sizeof(unsigned long *); \
-		while (__start != __end) { \
-			if (!*__start) { \
-				printk(KERN_INFO "%s is missing something\n",\
-					#struct_type); \
-				e++; \
-				break; \
-			} \
-			__start++; \
-		} \
-	} while (0)
-
-static int inline verify (struct security_operations *ops)
+static inline int verify (struct security_operations *ops)
 {
-	int err;
-
 	/* verify the security_operations structure exists */
 	if (!ops) {
 		printk (KERN_INFO "Passed a NULL security_operations "
 			"pointer, %s failed.\n", __FUNCTION__);
 		return -EINVAL;
 	}
-
-	/* Perform a little sanity checking on our inputs */
-	err = 0;
-
-	/* This first check scans the whole security_ops struct for
-	 * missing structs or functions.
-	 *
-	 * (There is no further check now, but will leave as is until
-	 *  the lazy registration stuff is done -- JM).
-	 */
-	VERIFY_STRUCT(struct security_operations, ops, err);
-
-	if (err) {
-		printk (KERN_INFO "Not enough functions specified in the "
-			"security_operation structure, %s failed.\n",
-			__FUNCTION__);
-		return -EINVAL;
-	}
+	security_fixup_ops (ops);
 	return 0;
 }
 
@@ -106,12 +68,12 @@ int security_scaffolding_startup (void)
  */
 int register_security (struct security_operations *ops)
 {
-
 	if (verify (ops)) {
 		printk (KERN_INFO "%s could not verify "
 			"security_operations structure.\n", __FUNCTION__);
 		return -EINVAL;
 	}
+
 	if (security_ops != &dummy_security_ops) {
 		printk (KERN_INFO "There is already a security "
 			"framework initialized, %s failed.\n", __FUNCTION__);

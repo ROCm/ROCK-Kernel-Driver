@@ -863,9 +863,9 @@ int path_lookup(const char *name, unsigned int flags, struct nameidata *nd)
 			read_unlock(&current->fs->lock);
 			if (__emul_lookup_dentry(name,nd))
 				return 0;
-			read_lock(&current->fs->lock);
+		} else {
+			read_unlock(&current->fs->lock);
 		}
-		read_unlock(&current->fs->lock);
 		spin_lock(&dcache_lock);
 		nd->mnt = current->fs->rootmnt;
 		nd->dentry = current->fs->root;

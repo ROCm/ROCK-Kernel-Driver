@@ -445,7 +445,7 @@ static inline int gl_control_write (struct usbnet *dev, u8 request, u16 value)
 	return retval;
 }
 
-static void gl_interrupt_complete (struct urb *urb)
+static void gl_interrupt_complete (struct urb *urb, struct pt_regs *regs)
 {
 	int status = urb->status;
 	
@@ -1437,7 +1437,7 @@ static void defer_kevent (struct usbnet *dev, int work)
 
 /*-------------------------------------------------------------------------*/
 
-static void rx_complete (struct urb *urb);
+static void rx_complete (struct urb *urb, struct pt_regs *regs);
 
 static void rx_submit (struct usbnet *dev, struct urb *urb, int flags)
 {
@@ -1549,7 +1549,7 @@ error:
 
 /*-------------------------------------------------------------------------*/
 
-static void rx_complete (struct urb *urb)
+static void rx_complete (struct urb *urb, struct pt_regs *regs)
 {
 	struct sk_buff		*skb = (struct sk_buff *) urb->context;
 	struct skb_data		*entry = (struct skb_data *) skb->cb;
@@ -1874,7 +1874,7 @@ kevent (void *data)
 
 /*-------------------------------------------------------------------------*/
 
-static void tx_complete (struct urb *urb)
+static void tx_complete (struct urb *urb, struct pt_regs *regs)
 {
 	struct sk_buff		*skb = (struct sk_buff *) urb->context;
 	struct skb_data		*entry = (struct skb_data *) skb->cb;

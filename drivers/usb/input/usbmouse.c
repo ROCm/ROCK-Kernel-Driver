@@ -57,7 +57,7 @@ struct usb_mouse {
 	dma_addr_t data_dma;
 };
 
-static void usb_mouse_irq(struct urb *urb)
+static void usb_mouse_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_mouse *mouse = urb->context;
 	signed char *data = mouse->data;

@@ -95,8 +95,6 @@ not be guaranteed. There are several ways to assure this:
  */
 #define	SLM_CONT_CNT_REPROG
 
-#define MAJOR_NR ACSI_MAJOR
-
 #define CMDSET_TARG_LUN(cmd,targ,lun)			\
     do {										\
 		cmd[0] = (cmd[0] & ~0xe0) | (targ)<<5;	\
@@ -997,14 +995,14 @@ int slm_init( void )
 
 {
 	int i;
-	if (register_chrdev( MAJOR_NR, "slm", &slm_fops )) {
-		printk( KERN_ERR "Unable to get major %d for ACSI SLM\n", MAJOR_NR );
+	if (register_chrdev( ACSI_MAJOR, "slm", &slm_fops )) {
+		printk( KERN_ERR "Unable to get major %d for ACSI SLM\n", ACSI_MAJOR );
 		return -EBUSY;
 	}
 	
 	if (!(SLMBuffer = atari_stram_alloc( SLM_BUFFER_SIZE, NULL, "SLM" ))) {
 		printk( KERN_ERR "Unable to get SLM ST-Ram buffer.\n" );
-		unregister_chrdev( MAJOR_NR, "slm" );
+		unregister_chrdev( ACSI_MAJOR, "slm" );
 		return -ENOMEM;
 	}
 	BufferP = SLMBuffer;
@@ -1015,7 +1013,7 @@ int slm_init( void )
 		char name[16];
 		sprintf(name, "slm/%d", i);
 		devfs_register(NULL, name, DEVFS_FL_DEFAULT,
-			       MAJOR_NR, i, S_IFCHR | S_IRUSR | S_IWUSR,
+			       ACSI_MAJOR, i, S_IFCHR | S_IRUSR | S_IWUSR,
 			       &slm_fops, NULL);
 	}
 	return 0;
@@ -1044,7 +1042,7 @@ void cleanup_module(void)
 	for (i = 0; i < MAX_SLM; i++)
 		devfs_remove("slm/%d", i);
 	devfs_remove("slm");
-	if (unregister_chrdev( MAJOR_NR, "slm" ) != 0)
+	if (unregister_chrdev( ACSI_MAJOR, "slm" ) != 0)
 		printk( KERN_ERR "acsi_slm: cleanup_module failed\n");
 	atari_stram_free( SLMBuffer );
 }

@@ -86,7 +86,7 @@ struct wacom_features {
 	int pressure_max;
 	int distance_max;
 	int type;
-	void (*irq)(struct urb *urb);
+	usb_complete_t irq;
 };
 
 struct wacom {
@@ -102,7 +102,7 @@ struct wacom {
 	char phys[32];
 };
 
-static void wacom_pl_irq(struct urb *urb)
+static void wacom_pl_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct wacom *wacom = urb->context;
 	unsigned char *data = wacom->data;
@@ -157,7 +157,7 @@ exit:
 		     __FUNCTION__, retval);
 }
 
-static void wacom_penpartner_irq(struct urb *urb)
+static void wacom_penpartner_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct wacom *wacom = urb->context;
 	unsigned char *data = wacom->data;
@@ -194,7 +194,7 @@ exit:
 		     __FUNCTION__, retval);
 }
 
-static void wacom_graphire_irq(struct urb *urb)
+static void wacom_graphire_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct wacom *wacom = urb->context;
 	unsigned char *data = wacom->data;
@@ -267,7 +267,7 @@ exit:
 		     __FUNCTION__, retval);
 }
 
-static void wacom_intuos_irq(struct urb *urb)
+static void wacom_intuos_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct wacom *wacom = urb->context;
 	unsigned char *data = wacom->data;

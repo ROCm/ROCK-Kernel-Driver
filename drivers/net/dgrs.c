@@ -1278,8 +1278,10 @@ dgrs_found_device(
 	dev->init = dgrs_probe1;
 	SET_MODULE_OWNER(dev);
 	ether_setup(dev);
-	if (register_netdev(dev) != 0)
+	if (register_netdev(dev) != 0) {
+		kfree(dev);
 		return -EIO;
+	}
 
 	priv->next_dev = dgrs_root_dev;
 	dgrs_root_dev = dev;

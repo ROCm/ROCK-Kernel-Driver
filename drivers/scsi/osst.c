@@ -3602,7 +3602,7 @@ static ssize_t osst_read(struct file * filp, char * buf, size_t count, loff_t *p
 
 			if (transfer == 0) {
 				printk(KERN_WARNING
-				  "%s:W: Nothing can be transfered, requested %d, tape block size (%d%c).\n",
+				  "%s:W: Nothing can be transfered, requested %Zd, tape block size (%d%c).\n",
 			   		name, count, STp->block_size < 1024?
 					STp->block_size:STp->block_size/1024,
 				       	STp->block_size<1024?'b':'k');

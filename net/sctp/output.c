@@ -56,7 +56,6 @@
 #endif /* TEST_FRAME (not defined) */
 
 #include <linux/socket.h> /* for sa_family_t */
-#include <linux/types.h> /* For NULL, etc... */
 #include <net/sock.h>
 
 #include <net/sctp/sctp.h>

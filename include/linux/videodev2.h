@@ -819,7 +819,7 @@ struct v4l2_streamparm
 #define VIDIOC_G_JPEGCOMP	_IOR  ('V', 61, struct v4l2_jpegcompression)
 #define VIDIOC_S_JPEGCOMP	_IOW  ('V', 62, struct v4l2_jpegcompression)
 #define VIDIOC_QUERYSTD      	_IOR  ('V', 63, v4l2_std_id)
-#define VIDIOC_TRY_FMT      	_IOWR ('V', 63, struct v4l2_format)
+#define VIDIOC_TRY_FMT      	_IOWR ('V', 64, struct v4l2_format)
 
 #define BASE_VIDIOC_PRIVATE	192		/* 192-255 are private */
 

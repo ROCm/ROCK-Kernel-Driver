@@ -207,10 +207,10 @@ static void buffer_release(struct file *file, struct videobuf_buffer *vb)
 }
 
 struct videobuf_queue_ops saa7134_vbi_qops = {
-	buf_setup:    buffer_setup,
-	buf_prepare:  buffer_prepare,
-	buf_queue:    buffer_queue,
-	buf_release:  buffer_release,
+	.buf_setup    = buffer_setup,
+	.buf_prepare  = buffer_prepare,
+	.buf_queue    = buffer_queue,
+	.buf_release  = buffer_release,
 };
 
 /* ------------------------------------------------------------------ */

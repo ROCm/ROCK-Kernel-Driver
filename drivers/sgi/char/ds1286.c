@@ -349,9 +349,7 @@ static struct miscdevice ds1286_dev=
 int __init ds1286_init(void)
 {
 	printk(KERN_INFO "DS1286 Real Time Clock Driver v%s\n", DS1286_VERSION);
-	misc_register(&ds1286_dev);
-
-	return 0;
+	return misc_register(&ds1286_dev);
 }
 
 static char *days[] = {

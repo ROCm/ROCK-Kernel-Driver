@@ -24,7 +24,7 @@
 #include <linux/kdev_t.h>
 #include "video-buf.h"
 
-#define SAA7134_VERSION_CODE KERNEL_VERSION(0,2,1)
+#define SAA7134_VERSION_CODE KERNEL_VERSION(0,2,2)
 
 #ifndef TRUE
 # define TRUE (1==1)

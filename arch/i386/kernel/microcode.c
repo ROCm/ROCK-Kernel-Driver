@@ -139,6 +139,7 @@ static int __init microcode_init(void)
 			&microcode_fops, NULL);
 	if (devfs_handle == NULL && error) {
 		printk(KERN_ERR "microcode: failed to devfs_register()\n");
+		misc_deregister(&microcode_dev);
 		goto out;
 	}
 	error = 0;

@@ -85,6 +85,15 @@ extern struct bus_type * get_bus(struct bus_type * bus);
 extern void put_bus(struct bus_type * bus);
 
 
+/* iterator helpers for buses */
+
+int bus_for_each_dev(struct bus_type * bus, struct device * start, void * data,
+		     int (*fn)(struct device *, void *));
+
+int bus_for_each_drv(struct bus_type * bus, struct device_driver * start, 
+		     void * data, int (*fn)(struct device_driver *, void *));
+
+
 /* driverfs interface for exporting bus attributes */
 
 struct bus_attribute {
@@ -159,6 +168,7 @@ struct device_class {
 	struct subsystem	devsubsys;
 	struct subsystem	drvsubsys;
 	struct list_head	drivers;
+	struct list_head	devices;
 
 	int	(*add_device)(struct device *);
 	void	(*remove_device)(struct device *);
@@ -207,9 +217,7 @@ struct device_interface {
 	char			* name;
 	struct device_class	* devclass;
 
-	struct kobject		kobj;
-	struct list_head	devices;
-
+	struct subsystem	subsys;
 	u32			devnum;
 
 	int (*add_device)	(struct device *);
@@ -230,10 +238,11 @@ extern void interface_unregister(struct device_interface *);
  * and create a driverfs symlink for it.
  */
 struct intf_data {
-	struct list_head	node;
 	struct device_interface	* intf;
 	struct device		* dev;
 	u32			intf_num;
+	struct list_head	dev_entry;
+	struct kobject		kobj;
 };
 
 extern int interface_add_data(struct intf_data *);
@@ -241,9 +250,9 @@ extern int interface_add_data(struct intf_data *);
 
 
 struct device {
-	struct list_head g_list;        /* node in depth-first order list */
 	struct list_head node;		/* node in sibling list */
 	struct list_head bus_list;	/* node in bus's list */
+	struct list_head class_list;
 	struct list_head driver_list;
 	struct list_head children;
 	struct list_head intf_list;
@@ -270,6 +279,7 @@ struct device {
 					   being off. */
 
 	unsigned char *saved_state;	/* saved device state */
+	u64		*dma_mask;	/* dma mask (if dma'able device) */
 
 	void	(*release)(struct device * dev);
 };
@@ -278,12 +288,6 @@ static inline struct device *
 list_to_dev(struct list_head *node)
 {
 	return list_entry(node, struct device, node);
-}
-
-static inline struct device *
-g_list_to_dev(struct list_head *g_list)
-{
-	return list_entry(g_list, struct device, g_list);
 }
 
 static inline void *

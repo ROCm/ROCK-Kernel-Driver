@@ -110,8 +110,7 @@ int kobject_register(struct kobject * kobj)
 	if (kobj) {
 		kobject_init(kobj);
 		error = kobject_add(kobj);
-		if (error)
-			kobject_cleanup(kobj);
+		WARN_ON(error);
 	} else
 		error = -EINVAL;
 	return error;
@@ -229,6 +228,38 @@ void subsystem_unregister(struct subsystem * s)
 }
 
 
+/**
+ *	subsystem_create_file - export sysfs attribute file.
+ *	@s:	subsystem.
+ *	@a:	subsystem attribute descriptor.
+ */
+
+int subsys_create_file(struct subsystem * s, struct subsys_attribute * a)
+{
+	int error = 0;
+	if (subsys_get(s)) {
+		error = sysfs_create_file(&s->kobj,&a->attr);
+		subsys_put(s);
+	}
+	return error;
+}
+
+
+/**
+ *	subsystem_remove_file - remove sysfs attribute file.
+ *	@s:	subsystem.
+ *	@a:	attribute desciptor.
+ */
+
+void subsys_remove_file(struct subsystem * s, struct subsys_attribute * a)
+{
+	if (subsys_get(s)) {
+		sysfs_remove_file(&s->kobj,&a->attr);
+		subsys_put(s);
+	}
+}
+
+
 EXPORT_SYMBOL(kobject_init);
 EXPORT_SYMBOL(kobject_register);
 EXPORT_SYMBOL(kobject_unregister);
@@ -238,3 +269,5 @@ EXPORT_SYMBOL(kobject_put);
 EXPORT_SYMBOL(subsystem_init);
 EXPORT_SYMBOL(subsystem_register);
 EXPORT_SYMBOL(subsystem_unregister);
+EXPORT_SYMBOL(subsys_create_file);
+EXPORT_SYMBOL(subsys_remove_file);

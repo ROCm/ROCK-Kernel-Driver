@@ -60,9 +60,9 @@ static inline int sigfindinword(unsigned long word)
 	return ffz(~word);
 }
 
-#define sigmask(sig)	(1UL << ((sig) - 1))
-
 #endif /* __HAVE_ARCH_SIG_BITOPS */
+
+#define sigmask(sig)	(1UL << ((sig) - 1))
 
 #ifndef __HAVE_ARCH_SIG_SETOPS
 #include <linux/string.h>

@@ -206,7 +206,7 @@ static __u16 __inline__ fcs_compute10 (unsigned char *sp, int len, __u16 fcs)
 	return fcs;
 }
 
-static void safe_read_bulk_callback (struct urb *urb)
+static void safe_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) urb->context;
 	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);

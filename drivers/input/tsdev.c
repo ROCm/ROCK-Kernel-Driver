@@ -385,7 +385,12 @@ static struct device_interface tsdev_intf = {
 
 static int __init tsdev_init(void)
 {
-	interface_register(&tsdev_intf);
+	int retval;
+
+	retval = interface_register(&tsdev_intf);
+	if(retval < 0)
+		return retval;
+
 	input_register_handler(&tsdev_handler);
 	printk(KERN_INFO "ts: Compaq touchscreen protocol output\n");
 	return 0;

@@ -79,8 +79,6 @@
 
 #include <asm/uaccess.h>
 
-#define MAJOR_NR LOOP_MAJOR
-
 static int max_loop = 8;
 static struct loop_device *loop_dev;
 static struct gendisk **disks;
@@ -1015,9 +1013,9 @@ int __init loop_init(void)
 		max_loop = 8;
 	}
 
-	if (register_blkdev(MAJOR_NR, "loop", &lo_fops)) {
+	if (register_blkdev(LOOP_MAJOR, "loop", &lo_fops)) {
 		printk(KERN_WARNING "Unable to get major number %d for loop"
-				    " device\n", MAJOR_NR);
+				    " device\n", LOOP_MAJOR);
 		return -EIO;
 	}
 
@@ -1082,7 +1080,7 @@ void loop_exit(void)
 		devfs_remove("loop/%d", i);
 	}
 	devfs_remove("loop");
-	if (unregister_blkdev(MAJOR_NR, "loop"))
+	if (unregister_blkdev(LOOP_MAJOR, "loop"))
 		printk(KERN_WARNING "loop: cannot unregister blkdev\n");
 
 	kfree(disks);

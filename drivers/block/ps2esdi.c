@@ -27,15 +27,10 @@
    + reset after read/write error
  */
 
+#define DEVICE_NAME "PS/2 ESDI"
+
 #include <linux/config.h>
 #include <linux/major.h>
-
-#ifdef  CONFIG_BLK_DEV_PS2
-
-#define MAJOR_NR PS2ESDI_MAJOR
-#define DEVICE_NAME "PS/2 ESDI"
-#define DEVICE_NR(device) (minor(device) >> 6)
-
 #include <linux/errno.h>
 #include <linux/wait.h>
 #include <linux/interrupt.h>
@@ -153,8 +148,9 @@ int __init ps2esdi_init(void)
 
 	/* register the device - pass the name, major number and operations
 	   vector .                                                 */
-	if (register_blkdev(MAJOR_NR, "ed", &ps2esdi_fops)) {
-		printk("%s: Unable to get major number %d\n", DEVICE_NAME, MAJOR_NR);
+	if (register_blkdev(PS2ESDI_MAJOR, "ed", &ps2esdi_fops)) {
+		printk("%s: Unable to get major number %d\n", DEVICE_NAME,
+				PS2ESDI_MAJOR);
 		return -1;
 	}
 	/* set up some global information - indicating device specific info */
@@ -165,7 +161,7 @@ int __init ps2esdi_init(void)
 	if (error) {
 		printk(KERN_WARNING "PS2ESDI: error initialising"
 			" device, releasing resources\n");
-		unregister_blkdev(MAJOR_NR, "ed");
+		unregister_blkdev(PS2ESDI_MAJOR, "ed");
 		blk_cleanup_queue(&ps2esdi_queue);
 		return error;
 	}
@@ -214,7 +210,7 @@ cleanup_module(void) {
 	release_region(io_base, 4);
 	free_dma(dma_arb_level);
 	free_irq(PS2ESDI_IRQ, &ps2esdi_gendisk);
-	unregister_blkdev(MAJOR_NR, "ed");
+	unregister_blkdev(PS2ESDI_MAJOR, "ed");
 	blk_cleanup_queue(&ps2esdi_queue);
 	for (i = 0; i < ps2esdi_drives; i++) {
 		del_gendisk(ps2esdi_gendisk[i]);
@@ -421,7 +417,7 @@ static int __init ps2esdi_geninit(void)
 		struct gendisk *disk = alloc_disk(64);
 		if (!disk)
 			goto err_out4;
-		disk->major = MAJOR_NR;
+		disk->major = PS2ESDI_MAJOR;
 		disk->first_minor = i<<6;
 		sprintf(disk->disk_name, "ed%c", 'a'+i);
 		disk->fops = &ps2esdi_fops;
@@ -1090,5 +1086,3 @@ static void ps2esdi_reset_timer(unsigned long unused)
 	}
 	wake_up(&ps2esdi_int);
 }
-
-#endif

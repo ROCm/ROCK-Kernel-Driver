@@ -53,7 +53,6 @@
 #include <asm/uaccess.h>
 #include <asm/types.h>
 
-#define MAJOR_NR NBD_MAJOR
 #include <linux/nbd.h>
 
 #define LO_MAGIC 0x68797548
@@ -68,6 +67,29 @@ static spinlock_t nbd_lock = SPIN_LOCK_UNLOCKED;
 
 static int requests_in;
 static int requests_out;
+
+static void nbd_end_request(struct request *req)
+{
+	int uptodate = (req->errors == 0) ? 1 : 0;
+	request_queue_t *q = req->q;
+	struct bio *bio;
+	unsigned nsect;
+	unsigned long flags;
+
+#ifdef PARANOIA
+	requests_out++;
+#endif
+	spin_lock_irqsave(q->queue_lock, flags);
+	while((bio = req->bio) != NULL) {
+		nsect = bio_sectors(bio);
+		blk_finished_io(nsect);
+		req->bio = bio->bi_next;
+		bio->bi_next = NULL;
+		bio_endio(bio, nsect << 9, uptodate ? 0 : -EIO);
+	}
+	blk_put_request(req);
+	spin_unlock_irqrestore(q->queue_lock, flags);
+}
 
 static int nbd_open(struct inode *inode, struct file *file)
 {
@@ -538,14 +560,14 @@ static int __init nbd_init(void)
 		nbd_dev[i].disk = disk;
 	}
 
-	if (register_blkdev(MAJOR_NR, "nbd", &nbd_fops)) {
+	if (register_blkdev(NBD_MAJOR, "nbd", &nbd_fops)) {
 		printk("Unable to get major number %d for NBD\n",
-		       MAJOR_NR);
+		       NBD_MAJOR);
 		err = -EIO;
 		goto out;
 	}
 #ifdef MODULE
-	printk("nbd: registered device at major %d\n", MAJOR_NR);
+	printk("nbd: registered device at major %d\n", NBD_MAJOR);
 #endif
 	blk_init_queue(&nbd_queue, do_nbd_request, &nbd_lock);
 	devfs_mk_dir (NULL, "nbd", NULL);
@@ -562,7 +584,7 @@ static int __init nbd_init(void)
 		nbd_dev[i].blksize = 1024;
 		nbd_dev[i].blksize_bits = 10;
 		nbd_dev[i].bytesize = ((u64)0x7ffffc00) << 10; /* 2TB */
-		disk->major = MAJOR_NR;
+		disk->major = NBD_MAJOR;
 		disk->first_minor = i;
 		disk->fops = &nbd_fops;
 		disk->private_data = &nbd_dev[i];
@@ -593,7 +615,7 @@ static void __exit nbd_cleanup(void)
 	}
 	devfs_remove("nbd");
 	blk_cleanup_queue(&nbd_queue);
-	unregister_blkdev(MAJOR_NR, "nbd");
+	unregister_blkdev(NBD_MAJOR, "nbd");
 }
 
 module_init(nbd_init);

@@ -17,6 +17,7 @@ obj-$(CONFIG_CRYPTO_SHA256) += sha256.o
 obj-$(CONFIG_CRYPTO_DES) += des.o
 obj-$(CONFIG_CRYPTO_BLOWFISH) += blowfish.o
 obj-$(CONFIG_CRYPTO_TWOFISH) += twofish.o
+obj-$(CONFIG_CRYPTO_SERPENT) += serpent.o
 
 obj-$(CONFIG_CRYPTO_TEST) += tcrypt.o
 

@@ -22,5 +22,15 @@ config SECURITY_CAPABILITIES
 	  This enables the "default" Linux capabilities functionality.
 	  If you are unsure how to answer this question, answer Y.
 
+config SECURITY_ROOTPLUG
+	tristate "Root Plug Support"
+	depends on SECURITY!=n
+	help
+	  This is a sample LSM module that should only be used as such.
+	  It enables control over processes being created by root users
+	  if a specific USB device is not present in the system.
+	  
+	  If you are unsure how to answer this question, answer N.
+
 endmenu
 

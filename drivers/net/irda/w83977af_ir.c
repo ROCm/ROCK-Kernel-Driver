@@ -119,9 +119,6 @@ int __init w83977af_init(void)
 	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 
 	for (i=0; (io[i] < 2000) && (i < 4); i++) { 
-		int ioaddr = io[i];
-		if (check_region(ioaddr, CHIP_IO_EXTENT) < 0)
-			continue;
 		if (w83977af_open(i, io[i], irq[i], dma[i]) == 0)
 			return 0;
 	}
@@ -157,14 +154,21 @@ int w83977af_open(int i, unsigned int iobase, unsigned int irq,
 {
 	struct net_device *dev;
         struct w83977af_ir *self;
-	void *ret;
 	int err;
 
 	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
 
-	if (w83977af_probe(iobase, irq, dma) == -1)
-		return -1;
+	/* Lock the port that we need */
+	if (!request_region(iobase, CHIP_IO_EXTENT, driver_name)) {
+		IRDA_DEBUG(0, "%s(), can't get iobase of 0x%03x\n",
+		      __FUNCTION__ , iobase);
+		return -ENODEV;
+	}
 
+	if (w83977af_probe(iobase, irq, dma) == -1) {
+		err = -1;
+		goto err_out;
+	}
 	/*
 	 *  Allocate new instance of the driver
 	 */
@@ -172,13 +176,12 @@ int w83977af_open(int i, unsigned int iobase, unsigned int irq,
 	if (self == NULL) {
 		printk( KERN_ERR "IrDA: Can't allocate memory for "
 			"IrDA control block!\n");
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto err_out;
 	}
 	memset(self, 0, sizeof(struct w83977af_ir));
 	spin_lock_init(&self->lock);
    
-	/* Need to store self somewhere */
-	dev_self[i] = self;
 
 	/* Initialize IO */
 	self->io.fir_base   = iobase;
@@ -186,15 +189,6 @@ int w83977af_open(int i, unsigned int iobase, unsigned int irq,
         self->io.fir_ext   = CHIP_IO_EXTENT;
         self->io.dma       = dma;
         self->io.fifo_size = 32;
-
-	/* Lock the port that we need */
-	ret = request_region(self->io.fir_base, self->io.fir_ext, driver_name);
-	if (!ret) { 
-		IRDA_DEBUG(0, "%s(), can't get iobase of 0x%03x\n",
-		      __FUNCTION__ , self->io.fir_base);
-		/* w83977af_cleanup( self);  */
-		return -ENODEV;
-	}
 
 	/* Initialize QoS for this device */
 	irda_init_max_qos_capabilies(&self->qos);
@@ -218,16 +212,18 @@ int w83977af_open(int i, unsigned int iobase, unsigned int irq,
 	/* Allocate memory if needed */
 	self->rx_buff.head = (__u8 *) kmalloc(self->rx_buff.truesize,
 					      GFP_KERNEL|GFP_DMA);
-	if (self->rx_buff.head == NULL)
-		return -ENOMEM;
+	if (self->rx_buff.head == NULL) {
+		err = -ENOMEM;
+		goto err_out1;
+	}
 
 	memset(self->rx_buff.head, 0, self->rx_buff.truesize);
 	
 	self->tx_buff.head = (__u8 *) kmalloc(self->tx_buff.truesize, 
 					      GFP_KERNEL|GFP_DMA);
 	if (self->tx_buff.head == NULL) {
-		kfree(self->rx_buff.head);
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto err_out2;
 	}
 	memset(self->tx_buff.head, 0, self->tx_buff.truesize);
 
@@ -238,7 +234,8 @@ int w83977af_open(int i, unsigned int iobase, unsigned int irq,
 	
 	if (!(dev = dev_alloc("irda%d", &err))) {
 		ERROR("%s(), dev_alloc() failed!\n", __FUNCTION__);
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto err_out3;
 	}
 	dev->priv = (void *) self;
 	self->netdev = dev;
@@ -256,11 +253,24 @@ int w83977af_open(int i, unsigned int iobase, unsigned int irq,
 	rtnl_unlock();
 	if (err) {
 		ERROR("%s(), register_netdevice() failed!\n", __FUNCTION__);
-		return -1;
+		err = -1;
+		goto err_out3;
 	}
 	MESSAGE("IrDA: Registered device %s\n", dev->name);
+
+	/* Need to store self somewhere */
+	dev_self[i] = self;
 	
 	return 0;
+err_out3:
+	kfree(self->tx_buff.head);
+err_out2:	
+	kfree(self->rx_buff.head);
+err_out1:
+	kfree(self);
+err_out:
+	release_region(iobase, CHIP_IO_EXTENT);
+	return err;
 }
 
 /*

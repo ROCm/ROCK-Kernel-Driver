@@ -46,7 +46,7 @@
 	(hid_pid)->effects[(i)].owner == current->pid))
 
 /* Called when a transfer is completed */
-static void hid_pid_ctrl_out(struct urb *u)
+static void hid_pid_ctrl_out(struct urb *u, struct pt_regs *regs)
 {
 #ifdef DEBUG
     printk("hid_pid_ctrl_out - Transfer Completed\n");

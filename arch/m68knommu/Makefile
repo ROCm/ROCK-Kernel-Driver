@@ -42,7 +42,7 @@ MODEL := $(model-y)
 #
 # Some code support is grouped together for a common cpu-subclass (for
 # example all ColdFire cpu's are very similar). Determine the sub-class
-# for the selected cpu. ONLY need to define this for the non-core member
+# for the selected cpu. ONLY need to define this for the non-base member
 # of the family.
 #
 cpuclass-$(CONFIG_M5206)	:= 5307
@@ -53,7 +53,10 @@ cpuclass-$(CONFIG_M5407)	:= 5307
 cpuclass-$(CONFIG_M68EZ328)	:= 68328
 cpuclass-$(CONFIG_M68VZ328)	:= 68328
 CPUCLASS := $(cpuclass-y)
+
+ifneq ($(CPUCLASS),)
 CLASSDIR := arch/m68knommu/platform/$(cpuclass-y)/
+endif
 
 export PLATFORM BOARD MODEL CPUCLASS
 
@@ -79,9 +82,11 @@ CFLAGS += -O2 -g
 CFLAGS += -D__linux__
 CFLAGS += -DUTS_SYSNAME=\"uClinux\"
 
+LDFLAGS_BLOB	:= --format binary --oformat elf32-m68k
+
 HEAD := arch/m68knommu/platform/$(platform-y)/$(board-y)/crt0_$(model-y).o
 
-clean-files := include/asm-$(ARCH)/asm-offsets.h.tmp \
+CLEAN_FILES := include/asm-$(ARCH)/asm-offsets.h.tmp \
 	       include/asm-$(ARCH)/asm-offsets.h \
 	       arch/$(ARCH)/kernel/asm-offsets.s
 
