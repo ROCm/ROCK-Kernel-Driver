@@ -136,15 +136,14 @@ static int newary (key_t key, int nsems, int semflg)
 	sma->sem_perm.key = key;
 
 	sma->sem_perm.security = NULL;
-	retval = security_ops->sem_alloc_security(sma);
-	if (retval) {
+	if ((retval = security_sem_alloc(sma))) {
 		ipc_free(sma, size);
 		return retval;
 	}
 
 	id = ipc_addid(&sem_ids, &sma->sem_perm, sc_semmni);
 	if(id == -1) {
-		security_ops->sem_free_security(sma);
+		security_sem_free(sma);
 		ipc_free(sma, size);
 		return -ENOSPC;
 	}
@@ -427,7 +426,7 @@ static void freeary (int id)
 
 	used_sems -= sma->sem_nsems;
 	size = sizeof (*sma) + sma->sem_nsems * sizeof (struct sem);
-	security_ops->sem_free_security(sma);
+	security_sem_free(sma);
 	ipc_free(sma, size);
 }
 

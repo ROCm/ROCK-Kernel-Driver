@@ -794,7 +794,7 @@ static int dn_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	 * dn_prot_sock ? Would be nice if the capable call would go there
 	 * too.
 	 */
-	if (security_ops->dn_prot_sock(saddr) &&
+	if (security_dn_prot_sock(saddr) &&
 	    !capable(CAP_NET_BIND_SERVICE) || 
 	    saddr->sdn_objnum || (saddr->sdn_flags & SDF_WILD))
 		return -EACCES;

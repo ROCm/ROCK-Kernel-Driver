@@ -707,8 +707,7 @@ specific_send_sig_info(int sig, struct siginfo *info, struct task_struct *t, int
 	ret = -EPERM;
 	if (bad_signal(sig, info, t))
 		goto out;
-	ret = security_ops->task_kill(t, info, sig);
-	if (ret)
+	if ((ret = security_task_kill(t, info, sig)))
 		goto out;
 
 	/* The null signal is a permissions and process existence probe.

@@ -135,7 +135,7 @@ int exec_usermodehelper(char *program_path, char *argv[], char *envp[])
 	/* Give kmod all effective privileges.. */
 	curtask->euid = curtask->fsuid = 0;
 	curtask->egid = curtask->fsgid = 0;
-	security_ops->task_kmod_set_label();
+	security_task_kmod_set_label();
 
 	/* Allow execve args to be in kernel space. */
 	set_fs(KERNEL_DS);
