@@ -51,8 +51,15 @@ static int ntfs_file_open(struct inode *vi, struct file *filp)
 struct file_operations ntfs_file_ops = {
 	.llseek		= generic_file_llseek,	/* Seek inside file. */
 	.read		= generic_file_read,	/* Read from file. */
+#ifdef NTFS_RW
+	.write		= generic_file_write,	/* Write to a file. */
+#endif
 	.mmap		= generic_file_mmap,	/* Mmap file. */
- 	.sendfile	= generic_file_sendfile,/* Zero-copy data send. */
+	.sendfile	= generic_file_sendfile,/* Zero-copy data send with the
+						   data source being on the
+						   ntfs partition. We don't
+						   need to care about the data
+						   destination. */
 	.open		= ntfs_file_open,	/* Open file. */
 };
 

@@ -2,7 +2,7 @@
  * mft.c - NTFS kernel mft record operations. Part of the Linux-NTFS project.
  *
  * Copyright (c) 2001,2002 Anton Altaparmakov.
- * Copyright (C) 2002 Richard Russon.
+ * Copyright (c) 2002 Richard Russon.
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -85,13 +85,15 @@ int format_mft_record(ntfs_inode *ni, MFT_RECORD *mft_rec)
 	if (mft_rec)
 		m = mft_rec;
 	else {
-		m = map_mft_record(WRITE, ni);
+		m = map_mft_record(ni);
 		if (IS_ERR(m))
 			return PTR_ERR(m);
 	}
 	__format_mft_record(m, ni->vol->mft_record_size, ni->mft_no);
-	if (!mft_rec)
-		unmap_mft_record(WRITE, ni);
+	if (!mft_rec) {
+		// FIXME: Need to set the mft record dirty!
+		unmap_mft_record(ni);
+	}
 	return 0;
 }
 
@@ -132,7 +134,7 @@ static inline MFT_RECORD *map_mft_record_page(ntfs_inode *ni)
 	struct page *page;
 	unsigned long index, ofs, end_index;
 
-	BUG_ON(atomic_read(&ni->mft_count) || ni->page);
+	BUG_ON(ni->page);
 	/*
 	 * The index into the page cache and the offset within the page cache
 	 * page of the wanted mft record. FIXME: We need to check for
@@ -146,70 +148,36 @@ static inline MFT_RECORD *map_mft_record_page(ntfs_inode *ni)
 	end_index = mft_vi->i_size >> PAGE_CACHE_SHIFT;
 
 	/* If the wanted index is out of bounds the mft record doesn't exist. */
-	if (index >= end_index) {
+	if (unlikely(index >= end_index)) {
 		if (index > end_index || (mft_vi->i_size & ~PAGE_CACHE_MASK) <
 				ofs + vol->mft_record_size) {
 			page = ERR_PTR(-ENOENT);
-			goto up_err_out;
+			goto err_out;
 		}
 	}
 	/* Read, map, and pin the page. */
 	page = ntfs_map_page(mft_vi->i_mapping, index);
-	if (!IS_ERR(page)) {
-		/* Pin the mft record mapping in the ntfs_inode. */
-		atomic_inc(&ni->mft_count);
-
-		/* Setup the references in the ntfs_inode. */
+	if (likely(!IS_ERR(page))) {
 		ni->page = page;
 		ni->page_ofs = ofs;
-
 		return page_address(page) + ofs;
 	}
-up_err_out:
-	/* Just in case... */
+err_out:
 	ni->page = NULL;
 	ni->page_ofs = 0;
-
 	ntfs_error(vol->sb, "Failed with error code %lu.", -PTR_ERR(page));
 	return (void*)page;
 }
 
 /**
- * unmap_mft_record_page - unmap the page in which a specific mft record resides
- * @ni:		ntfs inode whose mft record page to unmap
- *
- * This unmaps the page in which the mft record of the ntfs inode @ni is
- * situated and returns. This is a NOOP if highmem is not configured.
- *
- * The unmap happens via ntfs_unmap_page() which in turn decrements the use
- * count on the page thus releasing it from the pinned state.
- *
- * We do not actually unmap the page from memory of course, as that will be
- * done by the page cache code itself when memory pressure increases or
- * whatever.
- */
-static inline void unmap_mft_record_page(ntfs_inode *ni)
-{
-	BUG_ON(atomic_read(&ni->mft_count) || !ni->page);
-	// TODO: If dirty, blah...
-	ntfs_unmap_page(ni->page);
-	ni->page = NULL;
-	ni->page_ofs = 0;
-	return;
-}
-
-/**
  * map_mft_record - map, pin and lock an mft record
- * @rw:		map for read (rw = READ) or write (rw = WRITE)
  * @ni:		ntfs inode whose MFT record to map
  *
- * First, take the mrec_lock semaphore for reading or writing, depending on
- * the value or @rw. We might now be sleeping, while waiting for the semaphore
- * if it was already locked by someone else.
+ * First, take the mrec_lock semaphore. We might now be sleeping, while waiting
+ * for the semaphore if it was already locked by someone else.
  *
- * Then increment the map reference count and return the mft. If this is the
- * first invocation, the page of the record is first mapped using
- * map_mft_record_page().
+ * The page of the record is first mapped using map_mft_record_page() before
+ * being returned to the caller.
  *
  * This in turn uses ntfs_map_page() to get the page containing the wanted mft
  * record (it in turn calls read_cache_page() which reads it in from disk if
@@ -234,11 +202,11 @@ static inline void unmap_mft_record_page(ntfs_inode *ni)
  * locking problem then is them locking the page while we are accessing it.
  *
  * So that code will end up having to own the mrec_lock of all mft
- * records/inodes present in the page before I/O can proceed. Grr. In that
- * case we wouldn't need need to bother with PG_locked and PG_uptodate as
- * nobody will be accessing anything without owning the mrec_lock semaphore.
- * But we do need to use them because of the read_cache_page() invokation and
- * the code becomes so much simpler this way that it is well worth it.
+ * records/inodes present in the page before I/O can proceed. In that case we
+ * wouldn't need to bother with PG_locked and PG_uptodate as nobody will be
+ * accessing anything without owning the mrec_lock semaphore. But we do need
+ * to use them because of the read_cache_page() invokation and the code becomes
+ * so much simpler this way that it is well worth it.
  *
  * The mft record is now ours and we return a pointer to it. You need to check
  * the returned pointer with IS_ERR() and if that is true, PTR_ERR() will return
@@ -251,89 +219,75 @@ static inline void unmap_mft_record_page(ntfs_inode *ni)
  * A: No, the inode ones mean we want to change the mft record, not we want to
  * write it out.
  */
-MFT_RECORD *map_mft_record(const int rw, ntfs_inode *ni)
+MFT_RECORD *map_mft_record(ntfs_inode *ni)
 {
 	MFT_RECORD *m;
 
-	ntfs_debug("Entering for mft_no 0x%lx, mapping for %s.", ni->mft_no,
-			rw == READ ? "READ" : "WRITE");
+	ntfs_debug("Entering for mft_no 0x%lx.", ni->mft_no);
 
 	/* Make sure the ntfs inode doesn't go away. */
 	atomic_inc(&ni->count);
 
 	/* Serialize access to this mft record. */
-	if (rw == READ)
-		down_read(&ni->mrec_lock);
-	else
-		down_write(&ni->mrec_lock);
+	down(&ni->mrec_lock);
 
-	/* If already mapped, bump reference count and return the mft record. */
-	if (atomic_read(&ni->mft_count)) {
-		BUG_ON(!ni->page);
-		atomic_inc(&ni->mft_count);
-		return page_address(ni->page) + ni->page_ofs;
-	}
-
-	/* Wasn't mapped. Map it now and return it if all was ok. */
 	m = map_mft_record_page(ni);
-	if (!IS_ERR(m))
+	if (likely(!IS_ERR(m)))
 		return m;
 
-	/* Mapping failed. Release the mft record lock. */
-	if (rw == READ)
-		up_read(&ni->mrec_lock);
-	else
-		up_write(&ni->mrec_lock);
-
-	ntfs_error(ni->vol->sb, "Failed with error code %lu.", -PTR_ERR(m));
-
-	/* Release the ntfs inode and return the error code. */
+	up(&ni->mrec_lock);
 	atomic_dec(&ni->count);
+	ntfs_error(ni->vol->sb, "Failed with error code %lu.", -PTR_ERR(m));
 	return m;
 }
 
 /**
+ * unmap_mft_record_page - unmap the page in which a specific mft record resides
+ * @ni:		ntfs inode whose mft record page to unmap
+ *
+ * This unmaps the page in which the mft record of the ntfs inode @ni is
+ * situated and returns. This is a NOOP if highmem is not configured.
+ *
+ * The unmap happens via ntfs_unmap_page() which in turn decrements the use
+ * count on the page thus releasing it from the pinned state.
+ *
+ * We do not actually unmap the page from memory of course, as that will be
+ * done by the page cache code itself when memory pressure increases or
+ * whatever.
+ */
+static inline void unmap_mft_record_page(ntfs_inode *ni)
+{
+	BUG_ON(!ni->page);
+
+	// TODO: If dirty, blah...
+	ntfs_unmap_page(ni->page);
+	ni->page = NULL;
+	ni->page_ofs = 0;
+	return;
+}
+
+/**
  * unmap_mft_record - release a mapped mft record
- * @rw:		unmap from read (@rw = READ) or write (@rw = WRITE)
  * @ni:		ntfs inode whose MFT record to unmap
  *
- * First, decrement the mapping count and when it reaches zero unmap the mft
- * record.
+ * We release the page mapping and the mrec_lock mutex which unmaps the mft
+ * record and releases it for others to get hold of. We also release the ntfs
+ * inode by decrementing the ntfs inode reference count.
  *
- * Second, release the mrec_lock semaphore.
- *
- * The mft record is now released for others to get hold of.
- *
- * Finally, release the ntfs inode by decreasing the ntfs inode reference count.
- *
- * NOTE: If caller had the mft record mapped for write and has modified it, it
- * is imperative to set the mft record dirty BEFORE calling unmap_mft_record().
- *
- * NOTE: This has to be done both for 'normal' mft records, and for extent mft
- * records.
+ * NOTE: If caller has modified the mft record, it is imperative to set the mft
+ * record dirty BEFORE calling unmap_mft_record().
  */
-void unmap_mft_record(const int rw, ntfs_inode *ni)
+void unmap_mft_record(ntfs_inode *ni)
 {
 	struct page *page = ni->page;
 
-	BUG_ON(!atomic_read(&ni->mft_count) || !page);
+	BUG_ON(!page);
 
-	ntfs_debug("Entering for mft_no 0x%lx, unmapping from %s.", ni->mft_no,
-			rw == READ ? "READ" : "WRITE");
+	ntfs_debug("Entering for mft_no 0x%lx.", ni->mft_no);
 
-	/* Only release the actual page mapping if this is the last one. */
-	if (atomic_dec_and_test(&ni->mft_count))
-		unmap_mft_record_page(ni);
-
-	/* Release the semaphore. */
-	if (rw == READ)
-		up_read(&ni->mrec_lock);
-	else
-		up_write(&ni->mrec_lock);
-
-	/* Release the ntfs inode. */
+	unmap_mft_record_page(ni);
+	up(&ni->mrec_lock);
 	atomic_dec(&ni->count);
-
 	/*
 	 * If pure ntfs_inode, i.e. no vfs inode attached, we leave it to
 	 * ntfs_clear_extent_inode() in the extent inode case, and to the
@@ -355,11 +309,6 @@ void unmap_mft_record(const int rw, ntfs_inode *ni)
  *
  * On successful return, @ntfs_ino contains a pointer to the ntfs_inode
  * structure of the mapped extent inode.
- *
- * Note, we always map for READ. We consider this lock as irrelevant because
- * the base inode will be write locked in all cases when we want to write to
- * an extent inode which already gurantees that there is no-one else accessing
- * the extent inode.
  */
 MFT_RECORD *map_extent_mft_record(ntfs_inode *base_ni, MFT_REF mref,
 		ntfs_inode **ntfs_ino)
@@ -393,21 +342,21 @@ MFT_RECORD *map_extent_mft_record(ntfs_inode *base_ni, MFT_REF mref,
 			break;
 		}
 	}
-	if (ni) {
+	if (likely(ni != NULL)) {
 		up(&base_ni->extent_lock);
 		atomic_dec(&base_ni->count);
 		/* We found the record; just have to map and return it. */
-		m = map_mft_record(READ, ni);
-		/* Map mft record increments this on success. */
+		m = map_mft_record(ni);
+		/* map_mft_record() has incremented this on success. */
 		atomic_dec(&ni->count);
-		if (!IS_ERR(m)) {
+		if (likely(!IS_ERR(m))) {
 			/* Verify the sequence number. */
-			if (le16_to_cpu(m->sequence_number) == seq_no) {
+			if (likely(le16_to_cpu(m->sequence_number) == seq_no)) {
 				ntfs_debug("Done 1.");
 				*ntfs_ino = ni;
 				return m;
 			}
-			unmap_mft_record(READ, ni);
+			unmap_mft_record(ni);
 			ntfs_error(base_ni->vol->sb, "Found stale extent mft "
 					"reference! Corrupt file system. "
 					"Run chkdsk.");
@@ -420,7 +369,7 @@ map_err_out:
 	}
 	/* Record wasn't there. Get a new ntfs inode and initialize it. */
 	ni = ntfs_new_extent_inode(base_ni->vol->sb, mft_no);
-	if (!ni) {
+	if (unlikely(!ni)) {
 		up(&base_ni->extent_lock);
 		atomic_dec(&base_ni->count);
 		return ERR_PTR(-ENOMEM);
@@ -430,15 +379,15 @@ map_err_out:
 	ni->nr_extents = -1;
 	ni->_INE(base_ntfs_ino) = base_ni;
 	/* Now map the record. */
-	m = map_mft_record(READ, ni);
-	if (IS_ERR(m)) {
+	m = map_mft_record(ni);
+	if (unlikely(IS_ERR(m))) {
 		up(&base_ni->extent_lock);
 		atomic_dec(&base_ni->count);
 		ntfs_clear_extent_inode(ni);
 		goto map_err_out;
 	}
 	/* Verify the sequence number. */
-	if (le16_to_cpu(m->sequence_number) != seq_no) {
+	if (unlikely(le16_to_cpu(m->sequence_number) != seq_no)) {
 		ntfs_error(base_ni->vol->sb, "Found stale extent mft "
 				"reference! Corrupt file system. Run chkdsk.");
 		destroy_ni = TRUE;
@@ -451,7 +400,7 @@ map_err_out:
 		int new_size = (base_ni->nr_extents + 4) * sizeof(ntfs_inode *);
 
 		tmp = (ntfs_inode **)kmalloc(new_size, GFP_NOFS);
-		if (!tmp) {
+		if (unlikely(!tmp)) {
 			ntfs_error(base_ni->vol->sb, "Failed to allocate "
 					"internal buffer.");
 			destroy_ni = TRUE;
@@ -472,7 +421,7 @@ map_err_out:
 	*ntfs_ino = ni;
 	return m;
 unm_err_out:
-	unmap_mft_record(READ, ni);
+	unmap_mft_record(ni);
 	up(&base_ni->extent_lock);
 	atomic_dec(&base_ni->count);
 	/*

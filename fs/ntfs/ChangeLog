@@ -2,6 +2,36 @@ ToDo:
 	- Find and fix bugs.
 	- Enable NFS exporting of NTFS.
 
+2.0.24 - Cleanups.
+
+	- Treat BUG_ON() as ASSERT() not VERIFY(), i.e. do not use side effects
+	  inside BUG_ON(). (Adam J. Richter)
+	- Split logical OR expressions inside BUG_ON() into individual BUG_ON()
+	  calls for improved debugging. (Adam J. Richter)
+	- Add errors flag to the ntfs volume state, accessed via
+	  NVol{,Set,Clear}Errors(vol).
+	- Do not allow read-write remounts of read-only volumes with errors.
+	- Clarify comment for ntfs file operation sendfile which was added by
+	  Christoph Hellwig a while ago (just using generic_file_sendfile())
+	  to say that ntfs ->sendfile is only used for the case where the
+	  source data is on the ntfs partition and the destination is
+	  somewhere else, i.e. nothing we need to concern ourselves with.
+	- Add generic_file_write() as our ntfs file write operation.
+
+2.0.23 - Major bug fixes (races, deadlocks, non-i386 architectures).
+
+	- Massive internal locking changes to mft record locking. Fixes lock
+	  recursion and replaces the mrec_lock read/write semaphore with a
+	  mutex. Also removes the now superfluous mft_count. This fixes several
+	  race conditions and deadlocks, especially in the future write code.
+	- Fix ntfs over loopback for compressed files by adding an
+	  optimization barrier. (gcc was screwing up otherwise ?)
+	- Miscellaneous cleanups all over the code and a fix or two in error
+	  handling code paths.
+	Thanks go to Christoph Hellwig for pointing out the following two:
+	- Remove now unused function fs/ntfs/malloc.h::vmalloc_nofs().
+	- Fix ntfs_free() for ia64 and parisc by checking for VMALLOC_END, too.
+
 2.0.22 - Cleanups, mainly to ntfs_readdir(), and use C99 initializers.
 
 	- Change fs/ntfs/dir.c::ntfs_reddir() to only read/write ->f_pos once

@@ -467,7 +467,8 @@ int ntfs_read_compressed_block(struct page *page)
 	 * Bad things happen if we get here for anything that is not an
 	 * unnamed $DATA attribute.
 	 */
-	BUG_ON(ni->type != AT_DATA || ni->name_len);
+	BUG_ON(ni->type != AT_DATA);
+	BUG_ON(ni->name_len);
 
 	pages = kmalloc(nr_pages * sizeof(struct page *), GFP_NOFS);
 
@@ -608,8 +609,27 @@ lock_retry_remap:
 		if (buffer_uptodate(tbh))
 			continue;
 		wait_on_buffer(tbh);
-		if (unlikely(!buffer_uptodate(tbh)))
-			goto read_err;
+		/*      
+		 * We need an optimization barrier here, otherwise we start
+		 * hitting the below fixup code when accessing a loopback
+		 * mounted ntfs partition. This indicates either there is a
+		 * race condition in the loop driver or, more likely, gcc
+		 * overoptimises the code without the barrier and it doesn't 
+		 * do the Right Thing(TM).
+		 */      
+		barrier();
+		if (unlikely(!buffer_uptodate(tbh))) {
+			ntfs_warning(vol->sb, "Buffer is unlocked but not "
+					"uptodate! Unplugging the disk queue " 
+					"and rescheduling.");
+			get_bh(tbh);
+			blk_run_queues();
+			schedule();
+			put_bh(tbh);
+			if (unlikely(!buffer_uptodate(tbh)))
+				goto read_err;
+			ntfs_warning(vol->sb, "Buffer is now uptodate. Good.");
+		}
 	}
 
 	/*
