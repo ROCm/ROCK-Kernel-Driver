@@ -95,17 +95,17 @@ EXPORT_SYMBOL(machine_power_off);
 
 void show_regs(struct pt_regs * regs)
 {
-	printk("\n");
-	printk("Format %02x  Vector: %04x  PC: %08lx  Status: %04x    %s\n",
+	printk(KERN_NOTICE "\n");
+	printk(KERN_NOTICE "Format %02x  Vector: %04x  PC: %08lx  Status: %04x    %s\n",
 	       regs->format, regs->vector, regs->pc, regs->sr, print_tainted());
-	printk("ORIG_D0: %08lx  D0: %08lx  A2: %08lx  A1: %08lx\n",
+	printk(KERN_NOTICE "ORIG_D0: %08lx  D0: %08lx  A2: %08lx  A1: %08lx\n",
 	       regs->orig_d0, regs->d0, regs->a2, regs->a1);
-	printk("A0: %08lx  D5: %08lx  D4: %08lx\n",
+	printk(KERN_NOTICE "A0: %08lx  D5: %08lx  D4: %08lx\n",
 	       regs->a0, regs->d5, regs->d4);
-	printk("D3: %08lx  D2: %08lx  D1: %08lx\n",
+	printk(KERN_NOTICE "D3: %08lx  D2: %08lx  D1: %08lx\n",
 	       regs->d3, regs->d2, regs->d1);
 	if (!(regs->sr & PS_S))
-		printk("USP: %08lx\n", rdusp());
+		printk(KERN_NOTICE "USP: %08lx\n", rdusp());
 }
 
 /*
@@ -113,7 +113,7 @@ void show_regs(struct pt_regs * regs)
  */
 int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 {
-	long retval;
+	int retval;
 	long clone_arg = flags | CLONE_VM;
 	mm_segment_t fs;
 
@@ -131,7 +131,8 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 			"jsr	%4@\n\t"
 			"movel	%2, %%d0\n\t"
 			"trap	#0\n"
-			"1:"
+			"1:\n\t"
+			"movel	%%d0, %0\n"
 		: "=d" (retval)
 		: "i" (__NR_clone),
 		  "i" (__NR_exit),
@@ -328,58 +329,58 @@ void dump(struct pt_regs *fp)
 	unsigned char	*tp;
 	int		i;
 
-	printk("\nCURRENT PROCESS:\n\n");
-	printk("COMM=%s PID=%d\n", current->comm, current->pid);
+	printk(KERN_EMERG "\nCURRENT PROCESS:\n\n");
+	printk(KERN_EMERG "COMM=%s PID=%d\n", current->comm, current->pid);
 
 	if (current->mm) {
-		printk("TEXT=%08x-%08x DATA=%08x-%08x BSS=%08x-%08x\n",
+		printk(KERN_EMERG "TEXT=%08x-%08x DATA=%08x-%08x BSS=%08x-%08x\n",
 			(int) current->mm->start_code,
 			(int) current->mm->end_code,
 			(int) current->mm->start_data,
 			(int) current->mm->end_data,
 			(int) current->mm->end_data,
 			(int) current->mm->brk);
-		printk("USER-STACK=%08x  KERNEL-STACK=%08x\n\n",
+		printk(KERN_EMERG "USER-STACK=%08x  KERNEL-STACK=%08x\n\n",
 			(int) current->mm->start_stack,
 			(int)(((unsigned long) current) + KTHREAD_SIZE));
 	}
 
-	printk("PC: %08lx\n", fp->pc);
-	printk("SR: %08lx    SP: %08lx\n", (long) fp->sr, (long) fp);
-	printk("d0: %08lx    d1: %08lx    d2: %08lx    d3: %08lx\n",
+	printk(KERN_EMERG "PC: %08lx\n", fp->pc);
+	printk(KERN_EMERG "SR: %08lx    SP: %08lx\n", (long) fp->sr, (long) fp);
+	printk(KERN_EMERG "d0: %08lx    d1: %08lx    d2: %08lx    d3: %08lx\n",
 		fp->d0, fp->d1, fp->d2, fp->d3);
-	printk("d4: %08lx    d5: %08lx    a0: %08lx    a1: %08lx\n",
+	printk(KERN_EMERG "d4: %08lx    d5: %08lx    a0: %08lx    a1: %08lx\n",
 		fp->d4, fp->d5, fp->a0, fp->a1);
-	printk("\nUSP: %08x   TRAPFRAME: %08x\n", (unsigned int) rdusp(),
+	printk(KERN_EMERG "\nUSP: %08x   TRAPFRAME: %08x\n", (unsigned int) rdusp(),
 		(unsigned int) fp);
 
-	printk("\nCODE:");
+	printk(KERN_EMERG "\nCODE:");
 	tp = ((unsigned char *) fp->pc) - 0x20;
 	for (sp = (unsigned long *) tp, i = 0; (i < 0x40);  i += 4) {
 		if ((i % 0x10) == 0)
-			printk("\n%08x: ", (int) (tp + i));
-		printk("%08x ", (int) *sp++);
+			printk(KERN_EMERG "\n%08x: ", (int) (tp + i));
+		printk(KERN_EMERG "%08x ", (int) *sp++);
 	}
-	printk("\n");
+	printk(KERN_EMERG "\n");
 
-	printk("\nKERNEL STACK:");
+	printk(KERN_EMERG "\nKERNEL STACK:");
 	tp = ((unsigned char *) fp) - 0x40;
 	for (sp = (unsigned long *) tp, i = 0; (i < 0xc0); i += 4) {
 		if ((i % 0x10) == 0)
-			printk("\n%08x: ", (int) (tp + i));
-		printk("%08x ", (int) *sp++);
+			printk(KERN_EMERG "\n%08x: ", (int) (tp + i));
+		printk(KERN_EMERG "%08x ", (int) *sp++);
 	}
-	printk("\n");
-	printk("\n");
+	printk(KERN_EMERG "\n");
+	printk(KERN_EMERG "\n");
 
-	printk("\nUSER STACK:");
+	printk(KERN_EMERG "\nUSER STACK:");
 	tp = (unsigned char *) (rdusp() - 0x10);
 	for (sp = (unsigned long *) tp, i = 0; (i < 0x80); i += 4) {
 		if ((i % 0x10) == 0)
-			printk("\n%08x: ", (int) (tp + i));
-		printk("%08x ", (int) *sp++);
+			printk(KERN_EMERG "\n%08x: ", (int) (tp + i));
+		printk(KERN_EMERG "%08x ", (int) *sp++);
 	}
-	printk("\n\n");
+	printk(KERN_EMERG "\n\n");
 }
 
 /*
