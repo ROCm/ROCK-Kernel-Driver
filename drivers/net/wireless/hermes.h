@@ -252,9 +252,9 @@ struct hermes_linkstatus {
 	u16 linkstatus;         /* Link status */
 } __attribute__ ((packed));
 
-typedef struct hermes_response {
+struct hermes_response {
 	u16 status, resp0, resp1, resp2;
-} hermes_response_t;
+};
 
 /* "ID" structure - used for ESSID and station nickname */
 struct hermes_idstring {
@@ -262,9 +262,9 @@ struct hermes_idstring {
 	u16 val[16];
 } __attribute__ ((packed));
 
-typedef struct hermes_multicast {
+struct hermes_multicast {
 	u8 addr[HERMES_MAX_MULTICAST][ETH_ALEN];
-} __attribute__ ((packed)) hermes_multicast_t;
+} __attribute__ ((packed));
 
 // #define HERMES_DEBUG_BUFFER 1
 #define HERMES_DEBUG_BUFSIZE 4096
@@ -316,7 +316,7 @@ void hermes_struct_init(hermes_t *hw, ulong address, int io_space,
 			int reg_spacing);
 int hermes_init(hermes_t *hw);
 int hermes_docmd_wait(hermes_t *hw, u16 cmd, u16 parm0,
-		      hermes_response_t *resp);
+		      struct hermes_response *resp);
 int hermes_allocate(hermes_t *hw, u16 size, u16 *fid);
 
 int hermes_bap_pread(hermes_t *hw, int bap, void *buf, unsigned len,

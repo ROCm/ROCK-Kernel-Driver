@@ -224,7 +224,7 @@ int hermes_init(hermes_t *hw)
  *
  * Callable from any context, but locking is your problem. */
 int hermes_docmd_wait(hermes_t *hw, u16 cmd, u16 parm0,
-		      hermes_response_t *resp)
+		      struct hermes_response *resp)
 {
 	int err;
 	int k;

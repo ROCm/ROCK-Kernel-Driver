@@ -1768,7 +1768,7 @@ __orinoco_set_multicast_list(struct net_device *dev)
 
 	if (! promisc && (mc_count || priv->mc_count) ) {
 		struct dev_mc_list *p = dev->mc_list;
-		hermes_multicast_t mclist;
+		struct hermes_multicast mclist;
 		int i;
 
 		for (i = 0; i < mc_count; i++) {
