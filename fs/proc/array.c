@@ -307,6 +307,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
  	pid_t ppid, pgid = -1, sid = -1;
 	int num_threads = 0;
 	struct mm_struct *mm;
+	char pname[sizeof(task->comm)];
 
 	state = *get_task_state(task);
 	vsize = eip = esp = 0;
@@ -314,6 +315,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	mm = task->mm;
 	if(mm)
 		mm = mmgrab(mm);
+	memcpy(pname, task->comm, sizeof(pname));
 	task_unlock(task);
 	if (mm) {
 		down_read(&mm->mmap_sem);
@@ -356,7 +358,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 %lu %lu %lu %lu %lu %ld %ld %ld %ld %d %ld %llu %lu %ld %lu %lu %lu %lu %lu \
 %lu %lu %lu %lu %lu %lu %lu %lu %d %d %lu %lu\n",
 		task->pid,
-		task->comm,
+		pname,
 		state,
 		ppid,
 		pgid,
