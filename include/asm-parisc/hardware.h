@@ -115,14 +115,13 @@ extern int register_parisc_driver(struct parisc_driver *driver);
 extern int count_parisc_driver(struct parisc_driver *driver);
 extern int unregister_parisc_driver(struct parisc_driver *driver);
 extern void walk_central_bus(void);
-extern void fixup_child_irqs(struct parisc_device *parent, int irqbase,
-		int (*choose)(struct parisc_device *parent));
-extern void print_subdevices(struct parisc_device *dev);
 extern const struct parisc_device *find_pa_parent_type(const struct parisc_device *, int);
 extern void print_parisc_devices(void);
 extern char *print_pa_hwpath(struct parisc_device *dev, char *path);
 extern char *print_pci_hwpath(struct pci_dev *dev, char *path);
 extern void get_pci_node_path(struct pci_dev *dev, struct hardware_path *path);
+extern void init_parisc_bus(void);
+extern struct device *hwpath_to_device(struct hardware_path *modpath);
 
 
 /* inventory.c: */

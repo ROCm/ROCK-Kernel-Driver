@@ -3,11 +3,7 @@
 struct parisc_device {
 	unsigned long   hpa;		/* Hard Physical Address */
 	struct parisc_device_id id;
-	struct parisc_device *parent;
-	struct parisc_device *sibling;
-	struct parisc_device *child;
 	struct parisc_driver *driver;	/* Driver for this device */
-	void		*sysdata;	/* Driver instance private data */
 	char		name[80];	/* The hardware description */
 	int		irq;
 
@@ -40,5 +36,18 @@ struct parisc_driver {
 
 #define to_parisc_device(d)	container_of(d, struct parisc_device, dev)
 #define to_parisc_driver(d)	container_of(d, struct parisc_driver, drv)
+#define parisc_parent(d)	to_parisc_device(d->dev.parent)
+
+static inline void
+parisc_set_drvdata(struct parisc_device *d, void *p)
+{
+	dev_set_drvdata(&d->dev, p);
+}
+
+static inline void *
+parisc_get_drvdata(struct parisc_device *d)
+{
+	return dev_get_drvdata(&d->dev);
+}
 
 extern struct bus_type parisc_bus_type;

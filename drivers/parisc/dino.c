@@ -951,9 +951,9 @@ dino_driver_callback(struct parisc_device *dev)
 #ifdef CONFIG_IOMMU_CCIO
 		printk(KERN_WARNING "Enabling Cujo 2.0 bug workaround\n");
 		if (dev->hpa == (unsigned long)CUJO_RAVEN_ADDR) {
-			ccio_cujo20_fixup(dev->parent, CUJO_RAVEN_BADPAGE);
+			ccio_cujo20_fixup(dev, CUJO_RAVEN_BADPAGE);
 		} else if (dev->hpa == (unsigned long)CUJO_FIREHAWK_ADDR) {
-			ccio_cujo20_fixup(dev->parent, CUJO_FIREHAWK_BADPAGE);
+			ccio_cujo20_fixup(dev, CUJO_FIREHAWK_BADPAGE);
 		} else {
 			printk("Don't recognise Cujo at address 0x%lx, not enabling workaround\n", dev->hpa);
 		}
