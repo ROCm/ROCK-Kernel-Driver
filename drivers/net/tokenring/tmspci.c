@@ -112,7 +112,7 @@ static int __devinit tms_pci_attach(struct pci_dev *pdev, const struct pci_devic
 	pci_ioaddr = pci_resource_start (pdev, 0);
 
 	/* At this point we have found a valid card. */
-	dev = alloc_trdev(0);
+	dev = alloc_trdev(sizeof(struct net_local));
 	if (!dev)
 		return -ENOMEM;
 	SET_MODULE_OWNER(dev);

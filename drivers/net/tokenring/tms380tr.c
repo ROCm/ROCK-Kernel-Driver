@@ -246,6 +246,7 @@ int tms380tr_open(struct net_device *dev)
 	
 	/* init the spinlock */
 	spin_lock_init(&tp->lock);
+	init_timer(&tp->timer);
 
 	/* Reset the hardware here. Don't forget to set the station address. */
 
@@ -266,7 +267,6 @@ int tms380tr_open(struct net_device *dev)
 		return (-1);
 	}
 
-	init_timer(&tp->timer);
 	tp->timer.expires	= jiffies + 30*HZ;
 	tp->timer.function	= tms380tr_timer_end_wait;
 	tp->timer.data		= (unsigned long)dev;
@@ -2342,37 +2342,26 @@ void tmsdev_term(struct net_device *dev)
 	tp = (struct net_local *) dev->priv;
 	pci_unmap_single(tp->pdev, tp->dmabuffer, sizeof(struct net_local),
 		PCI_DMA_BIDIRECTIONAL);
-	kfree(dev->priv);
 }
 
 int tmsdev_init(struct net_device *dev, unsigned long dmalimit, 
 		struct pci_dev *pdev)
 {
-	if (dev->priv == NULL)
+	struct net_local *tms_local;
+
+	memset(dev->priv, 0, sizeof(struct net_local));
+	tms_local = (struct net_local *)dev->priv;
+	init_waitqueue_head(&tms_local->wait_for_tok_int);
+	tms_local->dmalimit = dmalimit;
+	tms_local->pdev = pdev;
+	tms_local->dmabuffer = pci_map_single(pdev, (void *)tms_local,
+	    sizeof(struct net_local), PCI_DMA_BIDIRECTIONAL);
+	if (tms_local->dmabuffer + sizeof(struct net_local) > dmalimit)
 	{
-		struct net_local *tms_local;
-		
-		dev->priv = kmalloc(sizeof(struct net_local), GFP_KERNEL | GFP_DMA);
-		if (dev->priv == NULL)
-		{
-                        printk(KERN_INFO "%s: Out of memory for DMA\n",
-                                dev->name);
-			return -ENOMEM;
-		}
-		memset(dev->priv, 0, sizeof(struct net_local));
-		tms_local = (struct net_local *)dev->priv;
-		init_waitqueue_head(&tms_local->wait_for_tok_int);
-		tms_local->dmalimit = dmalimit;
-		tms_local->pdev = pdev;
-                tms_local->dmabuffer = pci_map_single(pdev, (void *)tms_local,
-                        sizeof(struct net_local), PCI_DMA_BIDIRECTIONAL);
-                if (tms_local->dmabuffer + sizeof(struct net_local) > dmalimit)
-                {
-			printk(KERN_INFO "%s: Memory not accessible for DMA\n",
-				dev->name);
-			tmsdev_term(dev);
-			return -ENOMEM;
-		}
+		printk(KERN_INFO "%s: Memory not accessible for DMA\n",
+			dev->name);
+		tmsdev_term(dev);
+		return -ENOMEM;
 	}
 	
 	/* These can be overridden by the card driver if needed */

@@ -112,7 +112,7 @@ static int __devinit abyss_attach(struct pci_dev *pdev, const struct pci_device_
 		
 	/* At this point we have found a valid card. */
 		
-	dev = alloc_trdev(0);
+	dev = alloc_trdev(sizeof(struct net_local));
 	if (!dev)
 		return -ENOMEM;
 
