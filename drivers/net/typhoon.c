@@ -85,8 +85,8 @@ static const int multicast_filter_limit = 32;
 #define PKT_BUF_SZ		1536
 
 #define DRV_MODULE_NAME		"typhoon"
-#define DRV_MODULE_VERSION 	"1.5.2"
-#define DRV_MODULE_RELDATE	"03/11/25"
+#define DRV_MODULE_VERSION 	"1.5.3"
+#define DRV_MODULE_RELDATE	"03/12/15"
 #define PFX			DRV_MODULE_NAME ": "
 #define ERR_PFX			KERN_ERR PFX
 
@@ -157,6 +157,7 @@ enum typhoon_cards {
 	TYPHOON_TX = 0, TYPHOON_TX95, TYPHOON_TX97, TYPHOON_SVR,
 	TYPHOON_SVR95, TYPHOON_SVR97, TYPHOON_TXM, TYPHOON_BSVR,
 	TYPHOON_FX95, TYPHOON_FX97, TYPHOON_FX95SVR, TYPHOON_FX97SVR,
+	TYPHOON_FXM,
 };
 
 /* directly indexed by enum typhoon_cards, above */
@@ -185,6 +186,8 @@ static struct typhoon_card_info typhoon_card_info[] __devinitdata = {
 	 	TYPHOON_CRYPTO_DES | TYPHOON_FIBER},
 	{ "3Com Typhoon (3CR990-FX-97 Server)",
 	 	TYPHOON_CRYPTO_DES | TYPHOON_CRYPTO_3DES | TYPHOON_FIBER},
+	{ "3Com Typhoon2 (3C990B-FX-97)",
+		TYPHOON_CRYPTO_VARIABLE | TYPHOON_FIBER},
 };
 
 /* Notes on the new subsystem numbering scheme:
@@ -202,6 +205,8 @@ static struct pci_device_id typhoon_pci_tbl[] = {
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, TYPHOON_TX97 },
 	{ PCI_VENDOR_ID_3COM, PCI_DEVICE_ID_3COM_3CR990B,
 	  PCI_ANY_ID, 0x1000, 0, 0, TYPHOON_TXM },
+	{ PCI_VENDOR_ID_3COM, PCI_DEVICE_ID_3COM_3CR990B,
+	  PCI_ANY_ID, 0x1102, 0, 0, TYPHOON_FXM },
 	{ PCI_VENDOR_ID_3COM, PCI_DEVICE_ID_3COM_3CR990B,
 	  PCI_ANY_ID, 0x2000, 0, 0, TYPHOON_BSVR },
 	{ PCI_VENDOR_ID_3COM, PCI_DEVICE_ID_3COM_3CR990_FX,
@@ -1363,6 +1368,7 @@ typhoon_download_firmware(struct typhoon *tp)
 	u32 section_len;
 	u32 len;
 	u32 load_addr;
+	u32 hmac;
 	int i;
 	int err;
 
@@ -1406,6 +1412,16 @@ typhoon_download_firmware(struct typhoon *tp)
 
 	writel(TYPHOON_INTR_BOOTCMD, ioaddr + TYPHOON_REG_INTR_STATUS);
 	writel(load_addr, ioaddr + TYPHOON_REG_DOWNLOAD_BOOT_ADDR);
+	hmac = le32_to_cpu(fHdr->hmacDigest[0]);
+	writel(hmac, ioaddr + TYPHOON_REG_DOWNLOAD_HMAC_0);
+	hmac = le32_to_cpu(fHdr->hmacDigest[1]);
+	writel(hmac, ioaddr + TYPHOON_REG_DOWNLOAD_HMAC_1);
+	hmac = le32_to_cpu(fHdr->hmacDigest[2]);
+	writel(hmac, ioaddr + TYPHOON_REG_DOWNLOAD_HMAC_2);
+	hmac = le32_to_cpu(fHdr->hmacDigest[3]);
+	writel(hmac, ioaddr + TYPHOON_REG_DOWNLOAD_HMAC_3);
+	hmac = le32_to_cpu(fHdr->hmacDigest[4]);
+	writel(hmac, ioaddr + TYPHOON_REG_DOWNLOAD_HMAC_4);
 	typhoon_post_pci_writes(ioaddr);
 	writel(TYPHOON_BOOTCMD_RUNTIME_IMAGE, ioaddr + TYPHOON_REG_COMMAND);
 
