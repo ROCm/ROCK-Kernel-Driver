@@ -1368,7 +1368,7 @@ static int do_swap_page(struct mm_struct * mm,
 	set_pte(page_table, pte);
 	page_add_anon_rmap(page, vma, address);
 
-	if (write_access || mremap_moved_anon_rmap(page, address)) {
+	if (write_access) {
 		if (do_wp_page(mm, vma, address,
 				page_table, pmd, pte) == VM_FAULT_OOM)
 			ret = VM_FAULT_OOM;

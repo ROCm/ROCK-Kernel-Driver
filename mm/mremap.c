@@ -15,7 +15,6 @@
 #include <linux/swap.h>
 #include <linux/fs.h>
 #include <linux/highmem.h>
-#include <linux/rmap.h>
 #include <linux/security.h>
 
 #include <asm/uaccess.h>
@@ -81,21 +80,6 @@ static inline pte_t *alloc_one_pte_map(struct mm_struct *mm, unsigned long addr)
 	return pte;
 }
 
-static inline int
-can_move_one_pte(pte_t *src, unsigned long new_addr)
-{
-	int move = 1;
-	if (pte_present(*src)) {
-		unsigned long pfn = pte_pfn(*src);
-		if (pfn_valid(pfn)) {
-			struct page *page = pfn_to_page(pfn);
-			if (PageAnon(page))
-				move = mremap_move_anon_rmap(page, new_addr);
-		}
-	}
-	return move;
-}
-
 static int
 move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 		unsigned long new_addr)
@@ -142,15 +126,12 @@ move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 		 * page_table_lock, we should re-check the src entry...
 		 */
 		if (src) {
-			if (!dst)
-				error = -ENOMEM;
-			else if (!can_move_one_pte(src, new_addr))
-				error = -EAGAIN;
-			else {
+			if (dst) {
 				pte_t pte;
 				pte = ptep_clear_flush(vma, old_addr, src);
 				set_pte(dst, pte);
-			}
+			} else
+				error = -ENOMEM;
 			pte_unmap_nested(src);
 		}
 		if (dst)
@@ -164,7 +145,7 @@ move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 
 static unsigned long move_page_tables(struct vm_area_struct *vma,
 		unsigned long new_addr, unsigned long old_addr,
-		unsigned long len, int *cows)
+		unsigned long len)
 {
 	unsigned long offset;
 
@@ -176,21 +157,7 @@ static unsigned long move_page_tables(struct vm_area_struct *vma,
 	 * only a few pages.. This also makes error recovery easier.
 	 */
 	for (offset = 0; offset < len; offset += PAGE_SIZE) {
-		int ret = move_one_page(vma, old_addr+offset, new_addr+offset);
-		/*
-		 * The anonmm objrmap can only track anon page movements
-		 * if the page is exclusive to one mm.  In the rare case
-		 * when mremap move is applied to a shared page, break
-		 * COW (take a copy of the page) to make it exclusive.
-		 * If shared while on swap, page will be copied when
-		 * brought back in (if it's still shared by then).
-		 */
-		if (ret == -EAGAIN) {
-			ret = make_page_exclusive(vma, old_addr+offset);
-			offset -= PAGE_SIZE;
-			(*cows)++;
-		}
-		if (ret)
+		if (move_one_page(vma, old_addr+offset, new_addr+offset) < 0)
 			break;
 		cond_resched();
 	}
@@ -208,7 +175,6 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 	unsigned long moved_len;
 	unsigned long excess = 0;
 	int split = 0;
-	int cows = 0;
 
 	/*
 	 * We'd prefer to avoid failure later on in do_munmap:
@@ -222,22 +188,19 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 	if (!new_vma)
 		return -ENOMEM;
 
-	moved_len = move_page_tables(vma, new_addr, old_addr, old_len, &cows);
+	moved_len = move_page_tables(vma, new_addr, old_addr, old_len);
 	if (moved_len < old_len) {
 		/*
 		 * On error, move entries back from new area to old,
 		 * which will succeed since page tables still there,
 		 * and then proceed to unmap new area instead of old.
 		 */
-		move_page_tables(new_vma, old_addr, new_addr, moved_len, &cows);
+		move_page_tables(new_vma, old_addr, new_addr, moved_len);
 		vma = new_vma;
 		old_len = new_len;
 		old_addr = new_addr;
 		new_addr = -ENOMEM;
 	}
-	if (cows)	/* Downgrade or remove this message later */
-		printk(KERN_WARNING "%s: mremap moved %d cows\n",
-							current->comm, cows);
 
 	/* Conceal VM_ACCOUNT so old reservation is not undone */
 	if (vm_flags & VM_ACCOUNT) {

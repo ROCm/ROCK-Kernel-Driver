@@ -76,7 +76,7 @@
 #define PG_reclaim		18	/* To be reclaimed asap */
 #define PG_compound		19	/* Part of a compound page */
 
-#define PG_anon			20	/* Anonymous page: anonmm in mapping */
+#define PG_anon			20	/* Anonymous: anon_vma in mapping */
 
 
 /*

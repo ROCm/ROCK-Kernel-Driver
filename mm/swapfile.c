@@ -537,7 +537,6 @@ static int unuse_process(struct mm_struct * mm,
 {
 	struct vm_area_struct* vma;
 	unsigned long foundaddr = 0;
-	int ret = 0;
 
 	/*
 	 * Go through process' page directory.
@@ -553,10 +552,12 @@ static int unuse_process(struct mm_struct * mm,
 		}
 	}
 	spin_unlock(&mm->page_table_lock);
-	if (foundaddr && mremap_moved_anon_rmap(page, foundaddr))
-		ret = make_page_exclusive(vma, foundaddr);
 	up_read(&mm->mmap_sem);
-	return ret;
+	/*
+	 * Currently unuse_process cannot fail, but leave error handling
+	 * at call sites for now, since we change it from time to time.
+	 */
+	return 0;
 }
 
 /*
