@@ -685,10 +685,7 @@ static int dummy_sem_semop (struct sem_array *sma,
 
 static int dummy_netlink_send (struct sock *sk, struct sk_buff *skb)
 {
-	if (current->euid == 0)
-		cap_raise (NETLINK_CB (skb).eff_cap, CAP_NET_ADMIN);
-	else
-		NETLINK_CB (skb).eff_cap = 0;
+	NETLINK_CB(skb).eff_cap = current->cap_effective;
 	return 0;
 }
 

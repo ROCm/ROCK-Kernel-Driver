@@ -284,6 +284,10 @@ typedef __u32 kernel_cap_t;
 
 #define CAP_LEASE            28
 
+#define CAP_AUDIT_WRITE      29
+
+#define CAP_AUDIT_CONTROL    30
+
 #ifdef __KERNEL__
 /* 
  * Bounding set

@@ -3502,12 +3502,20 @@ static inline int selinux_nlmsg_perm(struct sock *sk, struct sk_buff *skb)
 
 static int selinux_netlink_send(struct sock *sk, struct sk_buff *skb)
 {
-	int err = 0;
+	struct task_security_struct *tsec;
+	struct av_decision avd;
+	int err;
 
-	if (capable(CAP_NET_ADMIN))
-		cap_raise (NETLINK_CB (skb).eff_cap, CAP_NET_ADMIN);
-	else
-		NETLINK_CB(skb).eff_cap = 0;
+	err = secondary_ops->netlink_send(sk, skb);
+	if (err)
+		return err;
+
+	tsec = current->security;
+
+	avd.allowed = 0;
+	avc_has_perm_noaudit(tsec->sid, tsec->sid,
+				SECCLASS_CAPABILITY, ~0, &avd);
+	cap_mask(NETLINK_CB(skb).eff_cap, avd.allowed);
 
 	if (policydb_loaded_version >= POLICYDB_VERSION_NLCLASS)
 		err = selinux_nlmsg_perm(sk, skb);
