@@ -391,7 +391,7 @@ show_state_field(struct device *dev, char *buf)
 	return snprintf(buf, 20, "%s\n", name);
 }
 
-DEVICE_ATTR(state, S_IRUGO | S_IWUSR, show_state_field, store_state_field);
+static DEVICE_ATTR(state, S_IRUGO | S_IWUSR, show_state_field, store_state_field);
 
 
 /* Default template for device attributes.  May NOT be modified */
@@ -409,6 +409,38 @@ static struct device_attribute *scsi_sysfs_sdev_attrs[] = {
 	&dev_attr_timeout,
 	NULL
 };
+
+static ssize_t sdev_store_queue_depth_rw(struct device *dev, const char *buf,
+					 size_t count)
+{
+	int depth, retval;
+	struct scsi_device *sdev = to_scsi_device(dev);
+	struct scsi_host_template *sht = sdev->host->hostt;
+
+	if (!sht->change_queue_depth)
+		return -EINVAL;
+
+	depth = simple_strtoul(buf, NULL, 0);
+	retval = sht->change_queue_depth(sdev, depth);
+	if (retval < 0)
+		return retval;
+
+	return count;
+}
+
+static struct device_attribute sdev_attr_queue_depth_rw =
+	__ATTR(queue_depth, S_IRUGO | S_IWUSR, sdev_show_queue_depth,
+	       sdev_store_queue_depth_rw);
+
+static struct device_attribute *attr_changed_internally(
+		struct Scsi_Host *shost,
+		struct device_attribute * attr)
+{
+	if (!strcmp("queue_depth", attr->attr.name)
+	    && shost->hostt->change_queue_depth)
+		return &sdev_attr_queue_depth_rw;
+	return attr;
+}
 
 
 static struct device_attribute *attr_overridden(
@@ -550,8 +582,10 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 	for (i = 0; scsi_sysfs_sdev_attrs[i]; i++) {
 		if (!attr_overridden(sdev->host->hostt->sdev_attrs,
 					scsi_sysfs_sdev_attrs[i])) {
-			error = device_create_file(&sdev->sdev_gendev,
-					scsi_sysfs_sdev_attrs[i]);
+			struct device_attribute * attr = 
+				attr_changed_internally(sdev->host, 
+							scsi_sysfs_sdev_attrs[i]);
+			error = device_create_file(&sdev->sdev_gendev, attr);
 			if (error) {
 				scsi_remove_device(sdev);
 				goto out;

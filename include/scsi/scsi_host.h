@@ -216,6 +216,18 @@ struct scsi_host_template {
 	void (* slave_destroy)(struct scsi_device *);
 
 	/*
+	 * fill in this function to allow the queue depth of this host
+	 * to be changeable (on a per device basis).  returns either
+	 * the current queue depth setting (may be different from what
+	 * was passed in) or an error.  An error should only be
+	 * returned if the requested depth is legal but the driver was
+	 * unable to set it.  If the requested depth is illegal, the
+	 * driver should set and return the closest legal queue depth.
+	 *
+	 */
+	int (* change_queue_depth)(struct scsi_device *, int);
+
+	/*
 	 * This function determines the bios parameters for a given
 	 * harddisk.  These tend to be numbers that are made up by
 	 * the host adapter.  Parameters:
