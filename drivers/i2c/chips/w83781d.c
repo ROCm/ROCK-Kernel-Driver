@@ -1252,6 +1252,12 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 	/* Initialize the chip */
 	w83781d_init_client(new_client);
 
+	/* A few vars need to be filled upon startup */
+	for (i = 1; i <= 3; i++) {
+		data->fan_min[i - 1] = w83781d_read_value(new_client,
+					W83781D_REG_FAN_MIN(i));
+	}
+
 	/* Register sysfs hooks */
 	device_create_file_in(new_client, 0);
 	if (kind != w83783s && kind != w83697hf)

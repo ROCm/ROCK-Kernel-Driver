@@ -807,6 +807,11 @@ static int asb100_detect(struct i2c_adapter *adapter, int address, int kind)
 	/* Initialize the chip */
 	asb100_init_client(new_client);
 
+	/* A few vars need to be filled upon startup */
+	data->fan_min[0] = asb100_read_value(new_client, ASB100_REG_FAN_MIN(0));
+	data->fan_min[1] = asb100_read_value(new_client, ASB100_REG_FAN_MIN(1));
+	data->fan_min[2] = asb100_read_value(new_client, ASB100_REG_FAN_MIN(2));
+
 	/* Register sysfs hooks */
 	device_create_file_in(new_client, 0);
 	device_create_file_in(new_client, 1);
