@@ -11,7 +11,7 @@
  * not going to guess how to send commands to them, plus I expect they will
  * all speak CFI..
  *
- * $Id: jedec.c,v 1.20 2004/07/12 14:03:01 dwmw2 Exp $
+ * $Id: jedec.c,v 1.21 2004/08/09 13:19:43 dwmw2 Exp $
  */
 
 #include <linux/init.h>
@@ -780,8 +780,7 @@ static int flash_erase(struct mtd_info *mtd, struct erase_info *instr)
        	    
    //printk("done\n");
    instr->state = MTD_ERASE_DONE;
-   if (instr->callback)
-	instr->callback(instr);
+   mtd_erase_callback(instr);
    return 0;
    
    #undef flread
