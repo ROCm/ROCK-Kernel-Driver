@@ -197,16 +197,10 @@ inline int afs_iget(struct super_block *sb, struct afs_fid *fid,
 	unlock_new_inode(inode);
 
 	*_inode = inode;
-	_leave(" = 0 [CB { v=%u x=%lu t=%u } c=%p]",
+	_leave(" = 0 [CB { v=%u x=%lu t=%u }]",
 	       vnode->cb_version,
 	       vnode->cb_timeout.timo_jif,
-	       vnode->cb_type,
-#ifdef AFS_CACHING_SUPPORT
-	       vnode->cache
-#else
-	       NULL
-#endif
-	       );
+	       vnode->cb_type);
 	return 0;
 
 	/* failure */
