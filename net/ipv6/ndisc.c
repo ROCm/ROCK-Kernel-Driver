@@ -764,23 +764,24 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 			   does DAD, otherwise we ignore solicitations
 			   until DAD timer expires.
 			 */
-			if (addr_type == IPV6_ADDR_ANY) {
-				if (dev->type == ARPHRD_IEEE802_TR) { 
-					unsigned char *sadr = skb->mac.raw ;
-					if (((sadr[8] &0x7f) != (dev->dev_addr[0] & 0x7f)) ||
-					(sadr[9] != dev->dev_addr[1]) ||
-					(sadr[10] != dev->dev_addr[2]) ||
-					(sadr[11] != dev->dev_addr[3]) ||
-					(sadr[12] != dev->dev_addr[4]) ||
-					(sadr[13] != dev->dev_addr[5])) 
-					{
-						addrconf_dad_failure(ifp) ; 
-					}
-				} else {
-					addrconf_dad_failure(ifp);
-				}
-			} else
+			if (addr_type != IPV6_ADDR_ANY) {
 				in6_ifa_put(ifp);
+				return;
+			}
+			if (dev->type == ARPHRD_IEEE802_TR) {
+				unsigned char *sadr = skb->mac.raw;
+				if (((sadr[8] ^ dev->dev_addr[0]) & 0x7f) == 0 &&
+				    sadr[9] == dev->dev_addr[1] &&
+				    sadr[10] == dev->dev_addr[2] &&
+				    sadr[11] == dev->dev_addr[3] &&
+				    sadr[12] == dev->dev_addr[4] &&
+				    sadr[13] == dev->dev_addr[5]) {
+					/* looped-back to us */
+					in6_ifa_put(ifp);
+					return;
+				}
+			}
+			addrconf_dad_failure(ifp); 
 			return;
 		}
 	
