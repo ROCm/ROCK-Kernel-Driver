@@ -65,7 +65,7 @@ iounit_init(int sbi_node, int io_node, struct sbus_bus *sbus)
 	
 	for (xptend = iounit->page_table + (16 * PAGE_SIZE) / sizeof(iopte_t);
 	     xpt < xptend;)
-	     	*xpt++ = 0;
+	     	iopte_val(*xpt++) = 0;
 }
 
 /* One has to hold iounit->lock to call this */
@@ -199,7 +199,7 @@ static int iounit_map_dma_area(dma_addr_t *pba, unsigned long va, __u32 addr, in
 			pmdp = pmd_offset(pgdp, addr);
 			ptep = pte_offset_map(pmdp, addr);
 
-			set_pte(ptep, pte_val(mk_pte(virt_to_page(page), dvma_prot)));
+			set_pte(ptep, mk_pte(virt_to_page(page), dvma_prot));
 			
 			i = ((addr - IOUNIT_DMA_BASE) >> PAGE_SHIFT);
 
@@ -207,7 +207,7 @@ static int iounit_map_dma_area(dma_addr_t *pba, unsigned long va, __u32 addr, in
 				struct iounit_struct *iounit = (struct iounit_struct *)sbus->iommu;
 
 				iopte = (iopte_t *)(iounit->page_table + i);
-				*iopte = __iopte(MKIOPTE(__pa(page)));
+				*iopte = MKIOPTE(__pa(page));
 			}
 		}
 		addr += PAGE_SIZE;
