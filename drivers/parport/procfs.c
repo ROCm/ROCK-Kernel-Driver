@@ -526,7 +526,6 @@ static int __init parport_default_proc_register (void)
 
 static void __exit parport_default_proc_unregister (void)
 {
-	return 0;
 }
 #endif
 
