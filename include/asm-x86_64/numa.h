@@ -8,9 +8,6 @@ struct node {
 	u64 start,end; 
 };
 
-#define for_all_nodes(x) for ((x) = 0; (x) < numnodes; (x)++) \
-				if (node_online(x))
-
 extern int compute_hash_shift(struct node *nodes);
 
 #define ZONE_ALIGN (1UL << (MAX_ORDER+PAGE_SHIFT))

@@ -45,7 +45,7 @@ int __init compute_hash_shift(struct node *nodes)
 	/* When in doubt use brute force. */
 	while (shift < 48) { 
 		memset(memnodemap,0xff,sizeof(*memnodemap) * NODEMAPSIZE); 
-		for (i = 0; i < numnodes; i++) { 
+		for_each_online_node(i) {
 			if (nodes[i].start == nodes[i].end) 
 				continue;
 			for (addr = nodes[i].start; 
@@ -111,8 +111,6 @@ void __init setup_node_bootmem(int nodeid, unsigned long start, unsigned long en
 
 	reserve_bootmem_node(NODE_DATA(nodeid), nodedata_phys, pgdat_size); 
 	reserve_bootmem_node(NODE_DATA(nodeid), bootmap_start, bootmap_pages<<PAGE_SHIFT);
-	if (nodeid + 1 > numnodes)
-		numnodes = nodeid + 1;
 	node_set_online(nodeid);
 } 
 
@@ -197,15 +195,15 @@ static int numa_emulation(unsigned long start_pfn, unsigned long end_pfn)
  		       i,
  		       nodes[i].start, nodes[i].end,
  		       (nodes[i].end - nodes[i].start) >> 20);
+		node_set_online(i);
  	}
- 	numnodes = numa_fake;
  	memnode_shift = compute_hash_shift(nodes);
  	if (memnode_shift < 0) {
  		memnode_shift = 0;
  		printk(KERN_ERR "No NUMA hash function found. Emulation disabled.\n");
  		return -1;
  	}
- 	for (i = 0; i < numa_fake; i++)
+ 	for_each_online_node(i)
  		setup_node_bootmem(i, nodes[i].start, nodes[i].end);
  	numa_init_array();
  	return 0;
@@ -240,7 +238,8 @@ void __init numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 		/* setup dummy node covering all memory */ 
 	memnode_shift = 63; 
 	memnodemap[0] = 0;
-	numnodes = 1;
+	nodes_clear(node_online_map);
+	node_set_online(0);
 	for (i = 0; i < NR_CPUS; i++)
 		cpu_to_node[i] = 0;
 	node_to_cpumask[0] = cpumask_of_cpu(0);
@@ -258,7 +257,7 @@ unsigned long __init numa_free_all_bootmem(void)
 { 
 	int i;
 	unsigned long pages = 0;
-	for_all_nodes(i) {
+	for_each_online_node(i) {
 		pages += free_all_bootmem_node(NODE_DATA(i));
 	}
 	return pages;
@@ -267,7 +266,7 @@ unsigned long __init numa_free_all_bootmem(void)
 void __init paging_init(void)
 { 
 	int i;
-	for_all_nodes(i) { 
+	for_each_online_node(i) {
 		setup_node_zones(i); 
 	}
 } 
