@@ -20,6 +20,7 @@
 #include <asm/tlb.h>
 
 extern void unmap_page_range(mmu_gather_t *,struct vm_area_struct *vma, unsigned long address, unsigned long size);
+extern void clear_page_tables(mmu_gather_t *tlb, unsigned long first, int nr);
 
 /*
  * WARNING: the debugging will use recursive algorithms so never enable this
@@ -835,12 +836,13 @@ static struct vm_area_struct * unmap_fixup(struct mm_struct *mm,
  * "prev", if it exists, points to a vma before the one
  * we just free'd - but there's no telling how much before.
  */
-static void free_pgtables(struct mm_struct * mm, struct vm_area_struct *prev,
+static void free_pgtables(mmu_gather_t *tlb, struct vm_area_struct *prev,
 	unsigned long start, unsigned long end)
 {
 	unsigned long first = start & PGDIR_MASK;
 	unsigned long last = end + PGDIR_SIZE - 1;
 	unsigned long start_index, end_index;
+	struct mm_struct *mm = tlb->mm;
 
 	if (!prev) {
 		prev = mm->mmap;
@@ -875,7 +877,7 @@ no_mmaps:
 	start_index = pgd_index(first);
 	end_index = pgd_index(last);
 	if (end_index > start_index) {
-		clear_page_tables(mm, start_index, end_index - start_index);
+		clear_page_tables(tlb, start_index, end_index - start_index);
 		flush_tlb_pgtables(mm, first & PGDIR_MASK, last & PGDIR_MASK);
 	}
 }
@@ -974,7 +976,7 @@ int do_munmap(struct mm_struct *mm, unsigned long addr, size_t len)
 	if (extra)
 		kmem_cache_free(vm_area_cachep, extra);
 
-	free_pgtables(mm, prev, addr, addr+len);
+	free_pgtables(tlb, prev, addr, addr+len);
 	tlb_finish_mmu(tlb, addr, addr+len);
 	spin_unlock(&mm->page_table_lock);
 
@@ -1130,7 +1132,7 @@ void exit_mmap(struct mm_struct * mm)
 	if (mm->map_count)
 		BUG();
 
-	clear_page_tables(mm, FIRST_USER_PGD_NR, USER_PTRS_PER_PGD);
+	clear_page_tables(tlb, FIRST_USER_PGD_NR, USER_PTRS_PER_PGD);
 	tlb_finish_mmu(tlb, FIRST_USER_PGD_NR*PGDIR_SIZE, USER_PTRS_PER_PGD*PGDIR_SIZE);
 	spin_unlock(&mm->page_table_lock);
 }

@@ -72,28 +72,10 @@ static inline void copy_cow_page(struct page * from, struct page * to, unsigned 
 mem_map_t * mem_map;
 
 /*
- * Called by TLB shootdown 
- */
-void __free_pte(pte_t pte)
-{
-	struct page *page;
-	unsigned long pfn = pte_pfn(pte);
-	if (!pfn_valid(pfn))
-		return;
-	page = pfn_to_page(pfn);
-	if (PageReserved(page))
-		return;
-	if (pte_dirty(pte))
-		set_page_dirty(page);		
-	free_page_and_swap_cache(page);
-}
-
-
-/*
  * Note: this doesn't free the actual pages themselves. That
  * has been handled earlier when unmapping all the memory regions.
  */
-static inline void free_one_pmd(pmd_t * dir)
+static inline void free_one_pmd(mmu_gather_t *tlb, pmd_t * dir)
 {
 	struct page *pte;
 
@@ -106,10 +88,10 @@ static inline void free_one_pmd(pmd_t * dir)
 	}
 	pte = pmd_page(*dir);
 	pmd_clear(dir);
-	pte_free(pte);
+	pte_free_tlb(tlb, pte);
 }
 
-static inline void free_one_pgd(pgd_t * dir)
+static inline void free_one_pgd(mmu_gather_t *tlb, pgd_t * dir)
 {
 	int j;
 	pmd_t * pmd;
@@ -125,9 +107,9 @@ static inline void free_one_pgd(pgd_t * dir)
 	pgd_clear(dir);
 	for (j = 0; j < PTRS_PER_PMD ; j++) {
 		prefetchw(pmd+j+(PREFETCH_STRIDE/16));
-		free_one_pmd(pmd+j);
+		free_one_pmd(tlb, pmd+j);
 	}
-	pmd_free(pmd);
+	pmd_free_tlb(tlb, pmd);
 }
 
 /*
@@ -136,13 +118,13 @@ static inline void free_one_pgd(pgd_t * dir)
  *
  * Must be called with pagetable lock held.
  */
-void clear_page_tables(struct mm_struct *mm, unsigned long first, int nr)
+void clear_page_tables(mmu_gather_t *tlb, unsigned long first, int nr)
 {
-	pgd_t * page_dir = mm->pgd;
+	pgd_t * page_dir = tlb->mm->pgd;
 
 	page_dir += first;
 	do {
-		free_one_pgd(page_dir);
+		free_one_pgd(tlb, page_dir);
 		page_dir++;
 	} while (--nr);
 
@@ -362,8 +344,18 @@ static void zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long address,
 		if (pte_none(pte))
 			continue;
 		if (pte_present(pte)) {
-			/* This will eventually call __free_pte on the pte. */
-			tlb_remove_page(tlb, ptep, address + offset);
+			unsigned long pfn = pte_pfn(pte);
+
+			pte_clear(ptep);
+			pfn = pte_pfn(pte);
+			if (pfn_valid(pfn)) {
+				struct page *page = pfn_to_page(pfn);
+				if (!PageReserved(page)) {
+					if (pte_dirty(pte))
+						set_page_dirty(page);
+					tlb_remove_page(tlb, page);
+				}
+			}
 		} else {
 			free_swap_and_cache(pte_to_swp_entry(pte));
 			pte_clear(ptep);

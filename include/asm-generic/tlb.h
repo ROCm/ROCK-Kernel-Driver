@@ -28,8 +28,7 @@ typedef struct free_pte_ctx {
 	struct mm_struct	*mm;
 	unsigned long		nr;	/* set to ~0UL means fast mode */
 	unsigned long		freed;
-	unsigned long		start_addr, end_addr;
-	pte_t	ptes[FREE_PTE_NR];
+	struct page *		pages[FREE_PTE_NR];
 } mmu_gather_t;
 
 /* Users of the generic TLB shootdown code must declare this storage space. */
@@ -55,20 +54,15 @@ static inline mmu_gather_t *tlb_gather_mmu(struct mm_struct *mm)
 
 static inline void tlb_flush_mmu(mmu_gather_t *tlb, unsigned long start, unsigned long end)
 {
-	unsigned long i, nr;
+	unsigned long nr;
 
-	/* Handle the fast case first. */
-	if (tlb->nr == ~0UL) {
-		flush_tlb_mm(tlb->mm);
-		return;
-	}
+	flush_tlb_mm(tlb->mm);
 	nr = tlb->nr;
-	tlb->nr = 0;
-	if (nr)
-		flush_tlb_mm(tlb->mm);
-	for (i=0; i < nr; i++) {
-		pte_t pte = tlb->ptes[i];
-		__free_pte(pte);
+	if (nr != ~0UL) {
+		unsigned long i;
+		tlb->nr = 0;
+		for (i=0; i < nr; i++)
+			free_page_and_swap_cache(tlb->pages[i]);
 	}
 }
 
@@ -85,7 +79,6 @@ static inline void tlb_finish_mmu(mmu_gather_t *tlb, unsigned long start, unsign
 	if (rss < freed)
 		freed = rss;
 	mm->rss = rss - freed;
-
 	tlb_flush_mmu(tlb, start, end);
 }
 
@@ -95,29 +88,16 @@ static inline void tlb_finish_mmu(mmu_gather_t *tlb, unsigned long start, unsign
  *	handling the additional races in SMP caused by other CPUs caching valid
  *	mappings in their TLBs.
  */
-static inline void tlb_remove_page(mmu_gather_t *tlb, pte_t *pte, unsigned long addr)
+static inline void tlb_remove_page(mmu_gather_t *tlb, struct page *page)
 {
-	struct page *page;
-	unsigned long pfn = pte_pfn(*pte);
-
-	if (pfn_valid(pfn)) {
-		page = pfn_to_page(pfn);
-		if (!PageReserved(page))
-			tlb->freed++;
-	}
-
 	/* Handle the common case fast, first. */\
 	if (tlb->nr == ~0UL) {
-		__free_pte(*pte);
-		pte_clear(pte);
+		free_page_and_swap_cache(page);
 		return;
 	}
-	if (!tlb->nr)
-		tlb->start_addr = addr;
-	tlb->ptes[tlb->nr++] = ptep_get_and_clear(pte);
-	tlb->end_addr = addr + PAGE_SIZE;
+	tlb->pages[tlb->nr++] = page;
 	if (tlb->nr >= FREE_PTE_NR)
-		tlb_finish_mmu(tlb, 0, 0);
+		tlb_flush_mmu(tlb, 0, 0);
 }
 
 #endif /* _ASM_GENERIC__TLB_H */

@@ -35,6 +35,9 @@ static inline void pte_free(struct page *pte)
 	__free_page(pte);
 }
 
+
+#define pte_free_tlb(tlb,pte) tlb_remove_page((tlb),(pte))
+
 /*
  * allocating and freeing a pmd is trivial: the 1-entry pmd is
  * inside the pgd, so has no extra memory associated with it.
@@ -43,6 +46,7 @@ static inline void pte_free(struct page *pte)
 
 #define pmd_alloc_one(mm, addr)		({ BUG(); ((pmd_t *)2); })
 #define pmd_free(x)			do { } while (0)
+#define pmd_free_tlb(tlb,x)		do { } while (0)
 #define pgd_populate(mm, pmd, pte)	BUG()
 
 #define check_pgt_cache()	do { } while (0)
