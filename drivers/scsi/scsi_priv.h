@@ -1,6 +1,17 @@
 #ifndef _SCSI_PRIV_H
 #define _SCSI_PRIV_H
 
+#include <linux/config.h>
+#include <linux/device.h>
+
+struct request_queue;
+struct scsi_cmnd;
+struct scsi_device;
+struct scsi_host_template;
+struct scsi_request;
+struct Scsi_Host;
+
+
 /*
  * These are the values that the owner field can take.
  * They are used as an indication of who the command belongs to.
