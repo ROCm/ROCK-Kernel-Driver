@@ -66,8 +66,8 @@ static char product_name [48] = "?";
 static char bios_version [4]  = "?";
 static char serial_number[16] = "?";
 
-int force = 0;
-int power_status = 0;
+static int force = 0;
+static int power_status = 0;
 
 MODULE_AUTHOR("Massimo Dal Zotto (dz@debian.org)");
 MODULE_DESCRIPTION("Driver for accessing SMM BIOS on Dell laptops");
