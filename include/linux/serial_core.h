@@ -88,6 +88,9 @@
 /* SGI IP22 aka Indy / Challenge S / Indigo 2 */
 #define PORT_IP22ZILOG	56
 
+/* PPC CPM type number */
+#define PORT_CPM        57
+
 #ifdef __KERNEL__
 
 #include <linux/config.h>

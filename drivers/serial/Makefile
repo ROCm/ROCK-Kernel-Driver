@@ -39,3 +39,4 @@ obj-$(CONFIG_SERIAL_AU1X00) += au1x00_uart.o
 obj-$(CONFIG_SERIAL_DZ) += dz.o
 obj-$(CONFIG_SERIAL_SH_SCI) += sh-sci.o
 obj-$(CONFIG_SERIAL_BAST_SIO) += bast_sio.o
+obj-$(CONFIG_SERIAL_CPM) += cpm_uart/
