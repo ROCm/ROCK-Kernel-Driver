@@ -80,6 +80,7 @@ struct alpha_machine_vector
 	void (*device_interrupt)(unsigned long vector, struct pt_regs *regs);
 	void (*machine_check)(u64 vector, u64 la, struct pt_regs *regs);
 
+	void (*smp_callin)(void);
 	void (*init_arch)(void);
 	void (*init_irq)(void);
 	void (*init_rtc)(void);
