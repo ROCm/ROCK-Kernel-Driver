@@ -873,9 +873,9 @@ extern struct xfrm_algo_desc *xfrm_ealg_get_byidx(unsigned int idx);
 extern struct xfrm_algo_desc *xfrm_aalg_get_byid(int alg_id);
 extern struct xfrm_algo_desc *xfrm_ealg_get_byid(int alg_id);
 extern struct xfrm_algo_desc *xfrm_calg_get_byid(int alg_id);
-extern struct xfrm_algo_desc *xfrm_aalg_get_byname(char *name);
-extern struct xfrm_algo_desc *xfrm_ealg_get_byname(char *name);
-extern struct xfrm_algo_desc *xfrm_calg_get_byname(char *name);
+extern struct xfrm_algo_desc *xfrm_aalg_get_byname(char *name, int probe);
+extern struct xfrm_algo_desc *xfrm_ealg_get_byname(char *name, int probe);
+extern struct xfrm_algo_desc *xfrm_calg_get_byname(char *name, int probe);
 
 struct crypto_tfm;
 typedef void (icv_update_fn_t)(struct crypto_tfm *, struct scatterlist *, unsigned int);
