@@ -15,6 +15,7 @@
 #include <linux/init.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
+#include <linux/sysdev.h>
 #include <asm/ptrace.h>
 #include <asm/signal.h>
 #include <asm/io.h>
@@ -276,7 +277,7 @@ static void __init openpic_enable_sie(void)
 }
 #endif
 
-#if defined(CONFIG_EPIC_SERIAL_MODE) || defined(CONFIG_PMAC_PBOOK)
+#if defined(CONFIG_EPIC_SERIAL_MODE) || defined(CONFIG_PM)
 static void openpic_reset(void)
 {
 	openpic_setfield(&OpenPIC->Global.Global_Configuration0,
@@ -532,7 +533,7 @@ void openpic_reset_processor_phys(u_int mask)
 	openpic_write(&OpenPIC->Global.Processor_Initialization, mask);
 }
 
-#if defined(CONFIG_SMP) || defined(CONFIG_PMAC_PBOOK)
+#if defined(CONFIG_SMP) || defined(CONFIG_PM)
 static spinlock_t openpic_setup_lock = SPIN_LOCK_UNLOCKED;
 #endif
 
@@ -864,19 +865,54 @@ smp_openpic_message_pass(int target, int msg, unsigned long data, int wait)
 }
 #endif /* CONFIG_SMP */
 
-#ifdef CONFIG_PMAC_PBOOK
+#ifdef CONFIG_PM
+
+/*
+ * We implement the IRQ controller as a sysdev and put it
+ * to sleep at powerdown stage (the callback is named suspend,
+ * but it's old semantics, for the Device Model, it's really
+ * powerdown). The possible problem is that another sysdev that
+ * happens to be suspend after this one will have interrupts off,
+ * that may be an issue... For now, this isn't an issue on pmac
+ * though...
+ */
+
 static u32 save_ipi_vp[OPENPIC_NUM_IPI];
 static u32 save_irq_src_vp[OPENPIC_MAX_SOURCES];
 static u32 save_irq_src_dest[OPENPIC_MAX_SOURCES];
 static u32 save_cpu_task_pri[OPENPIC_MAX_PROCESSORS];
+static int openpic_suspend_count;
 
-void __pmac
-openpic_sleep_save_intrs(void)
+static void openpic_cached_enable_irq(u_int irq)
+{
+	check_arg_irq(irq);
+	save_irq_src_vp[irq - open_pic_irq_offset] &= ~OPENPIC_MASK; 
+}
+
+static void openpic_cached_disable_irq(u_int irq)
+{
+	check_arg_irq(irq);
+	save_irq_src_vp[irq - open_pic_irq_offset] |= OPENPIC_MASK; 
+}
+
+/* WARNING: Can be called directly by the cpufreq code with NULL parameter,
+ * we need something better to deal with that... Maybe switch to S1 for
+ * cpufreq changes
+ */
+int openpic_suspend(struct sys_device *sysdev, u32 state)
 {
 	int	i;
 	unsigned long flags;
 	
 	spin_lock_irqsave(&openpic_setup_lock, flags);
+
+	if (openpic_suspend_count++ > 0) {
+		spin_unlock_irqrestore(&openpic_setup_lock, flags);
+		return 0;
+	}
+
+	open_pic.enable = openpic_cached_enable_irq;
+	open_pic.disable = openpic_cached_disable_irq;
 
 	for (i=0; i<NumProcessors; i++) {
 		save_cpu_task_pri[i] = openpic_read(&OpenPIC->Processor[i].Current_Task_Priority);
@@ -889,22 +925,43 @@ openpic_sleep_save_intrs(void)
 	for (i=0; i<NumSources; i++) {
 		if (ISR[i] == 0)
 			continue;
-		save_irq_src_vp[i] = openpic_read(&ISR[i]->Vector_Priority)
-			& ~OPENPIC_ACTIVITY;
+		save_irq_src_vp[i] = openpic_read(&ISR[i]->Vector_Priority) & ~OPENPIC_ACTIVITY;
 		save_irq_src_dest[i] = openpic_read(&ISR[i]->Destination);
 	}
+
 	spin_unlock_irqrestore(&openpic_setup_lock, flags);
+
+	return 0;
 }
 
-void __pmac
-openpic_sleep_restore_intrs(void)
+/* WARNING: Can be called directly by the cpufreq code with NULL parameter,
+ * we need something better to deal with that... Maybe switch to S1 for
+ * cpufreq changes
+ */
+int openpic_resume(struct sys_device *sysdev)
 {
 	int		i;
 	unsigned long	flags;
+	u32		vppmask =	OPENPIC_PRIORITY_MASK | OPENPIC_VECTOR_MASK |
+					OPENPIC_SENSE_MASK | OPENPIC_POLARITY_MASK |
+					OPENPIC_MASK;
 
 	spin_lock_irqsave(&openpic_setup_lock, flags);
 	
+	if ((--openpic_suspend_count) > 0) {
+		spin_unlock_irqrestore(&openpic_setup_lock, flags);
+		return 0;
+	}
+
 	openpic_reset();
+
+	/* OpenPIC sometimes seem to need some time to be fully back up... */
+	do {
+		openpic_set_spurious(OPENPIC_VEC_SPURIOUS+open_pic_irq_offset);
+	} while(openpic_readfield(&OpenPIC->Global.Spurious_Vector, OPENPIC_VECTOR_MASK)
+			!= (OPENPIC_VEC_SPURIOUS + open_pic_irq_offset));
+			
+	openpic_disable_8259_pass_through();
 
 	for (i=0; i<OPENPIC_NUM_IPI; i++)
 		openpic_write(&OpenPIC->Global.IPI_Vector_Priority(i),
@@ -912,15 +969,68 @@ openpic_sleep_restore_intrs(void)
 	for (i=0; i<NumSources; i++) {
 		if (ISR[i] == 0)
 			continue;
-		openpic_write(&ISR[i]->Vector_Priority, save_irq_src_vp[i]);
 		openpic_write(&ISR[i]->Destination, save_irq_src_dest[i]);
+		openpic_write(&ISR[i]->Vector_Priority, save_irq_src_vp[i]);
+		/* make sure mask gets to controller before we return to user */
+		do {
+			openpic_write(&ISR[i]->Vector_Priority, save_irq_src_vp[i]);
+		} while (openpic_readfield(&ISR[i]->Vector_Priority, vppmask)
+			 != (save_irq_src_vp[i] & vppmask));
 	}
-	openpic_set_spurious(OPENPIC_VEC_SPURIOUS+open_pic_irq_offset);
-	openpic_disable_8259_pass_through();
 	for (i=0; i<NumProcessors; i++)
 		openpic_write(&OpenPIC->Processor[i].Current_Task_Priority,
 			      save_cpu_task_pri[i]);
 
+	open_pic.enable = openpic_enable_irq;
+	open_pic.disable = openpic_disable_irq;
+
 	spin_unlock_irqrestore(&openpic_setup_lock, flags);
+
+	return 0;
 }
-#endif /* CONFIG_PMAC_PBOOK */
+
+#endif /* CONFIG_PM */
+
+static struct sysdev_class openpic_sysclass = {
+	set_kset_name("openpic"),
+};
+
+static struct sys_device device_openpic = {
+	.id		= 0,
+	.cls		= &openpic_sysclass,
+};
+
+static struct sysdev_driver driver_openpic = {
+#ifdef CONFIG_PM
+	.suspend	= &openpic_suspend,
+	.resume		= &openpic_resume,
+#endif /* CONFIG_PM */	
+};
+
+static int __init init_openpic_sysfs(void)
+{
+	int rc;
+
+	if (!OpenPIC_Addr)
+		return -ENODEV;
+	printk(KERN_DEBUG "Registering openpic with sysfs...\n");
+	rc = sysdev_class_register(&openpic_sysclass);
+	if (rc) {
+		printk(KERN_ERR "Failed registering openpic sys class\n");
+		return -ENODEV;
+	}
+	rc = sys_device_register(&device_openpic);
+	if (rc) {
+		printk(KERN_ERR "Failed registering openpic sys device\n");
+		return -ENODEV;
+	}
+	rc = sysdev_driver_register(&openpic_sysclass, &driver_openpic);
+	if (rc) {
+		printk(KERN_ERR "Failed registering openpic sys driver\n");
+		return -ENODEV;
+	}
+	return 0;
+}
+
+subsys_initcall(init_openpic_sysfs);
+
