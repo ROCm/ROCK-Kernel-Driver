@@ -127,7 +127,7 @@ running once the system is up.
 
 	BusLogic=	[HW,SCSI]
 
-	cachesize=	[BUGS=ix86] Override level 2 CPU cache size detection.
+	cachesize=	[BUGS=IA-32] Override level 2 CPU cache size detection.
 			Sometimes CPU hardware bugs make them report the cache
 			size incorrectly. The kernel will attempt work arounds
 			to fix known problems, but for some CPUs it is not
@@ -319,7 +319,9 @@ running once the system is up.
 
 	max_scsi_luns=	[SCSI]
 
-	mca-pentium	[BUGS=ix86]
+	mca		[IA-32] On some pentium machines the mce support defaults
+				to off as the mainboard support is not always present.
+				You must activate it as a boot option
 
 	mcd=		[HW,CD]
 
@@ -338,6 +340,9 @@ running once the system is up.
 			to see the whole system memory or for test.
 
 	memfrac=	[KNL]
+
+	mem=nopentium	[BUGS=IA-32] Disable usage of 4MB pages for kernel
+			memory.
 
 	mga=		[HW,DRM]
 
@@ -365,9 +370,9 @@ running once the system is up.
 
 	nfsroot=	[NFS] nfs root filesystem for disk-less boxes.
 
-	nmi_watchdog=	[KNL,BUGS=ix86] debugging features for SMP kernels.
+	nmi_watchdog=	[KNL,BUGS=IA-32] debugging features for SMP kernels.
 
-	no387		[BUGS=ix86] Tells the kernel to use the 387 maths
+	no387		[BUGS=IA-32] Tells the kernel to use the 387 maths
 			emulation library even if a 387 maths coprocessor
 			is present.
 
@@ -385,7 +390,9 @@ running once the system is up.
 
 	nohlt		[BUGS=ARM]
  
-	no-hlt		[BUGS=ix86]
+	no-hlt		[BUGS=IA-32]
+
+	noht		[SMP,IA-32] Disables P4 Xeon(tm) HyperThreading.
 
 	noisapnp	[ISAPNP] Disables ISA PnP code.
 
@@ -402,7 +409,7 @@ running once the system is up.
 
 	nosync		[HW, M68K] Disables sync negotiation for all devices.
 
-	notsc           [BUGS=ix86] Disable Time Stamp Counter
+	notsc           [BUGS=IA-32] Disable Time Stamp Counter
 
 	nowb		[ARM]
  
@@ -518,7 +525,7 @@ running once the system is up.
 	ramdisk_start=	[RAM] Starting block of RAM disk image (so you can
 			place it after the kernel image on a boot floppy).
 
-	reboot=		[BUGS=ix86]
+	reboot=		[BUGS=IA-32]
 
 	reserve=	[KNL,BUGS] force the kernel to ignore some iomem area.
 
@@ -607,7 +614,7 @@ running once the system is up.
  
 	video=		[FB] frame buffer configuration.
 
-	vga=		[BOOT] on ix386, select a particular video mode
+	vga=		[BOOT] on IA-32, select a particular video mode
 			(use vga=ask for menu).  This is actually a
 			boot loader parameter; the value is passed to
 			the kernel using a special protocol.  See
