@@ -49,18 +49,13 @@ static u_int bus_error_jmp[100];
 #define setjmp xmon_setjmp
 #define longjmp xmon_longjmp
 
-#define memlist_entry list_entry
-#define memlist_next(x) ((x)->next)
-#define memlist_prev(x) ((x)->prev)
-
-
 /* Max number of stack frames we are willing to produce on a backtrace. */
 #define MAXFRAMECOUNT 50
 
 /* Breakpoint stuff */
 struct bpt {
 	unsigned long address;
-	unsigned instr;
+	unsigned long instr;
 	unsigned long count;
 	unsigned char enabled;
 	char funcname[64];	/* function name for humans */
@@ -968,7 +963,9 @@ const char *getvecname(unsigned long vec)
 	case 0x100:	ret = "(System Reset)"; break; 
 	case 0x200:	ret = "(Machine Check)"; break; 
 	case 0x300:	ret = "(Data Access)"; break; 
+	case 0x380:	ret = "(Data SLB Access)"; break;
 	case 0x400:	ret = "(Instruction Access)"; break; 
+	case 0x480:	ret = "(Instruction SLB Access)"; break;
 	case 0x500:	ret = "(Hardware Interrupt)"; break; 
 	case 0x600:	ret = "(Alignment)"; break; 
 	case 0x700:	ret = "(Program Check)"; break; 
@@ -1116,7 +1113,7 @@ excprint(struct pt_regs *fp)
 	printf("    sp: %lx\n", fp->gpr[1]);
 	printf("   msr: %lx\n", fp->msr);
 
-	if (fp->trap == 0x300 || fp->trap == 0x600) {
+	if (fp->trap == 0x300 || fp->trap == 0x380 || fp->trap == 0x600) {
 		printf("   dar: %lx\n", fp->dar);
 		printf(" dsisr: %lx\n", fp->dsisr);
 	}
@@ -1534,7 +1531,18 @@ static char *fault_chars[] = { "--", "**", "##" };
 static void
 handle_fault(struct pt_regs *regs)
 {
-	fault_type = regs->trap == 0x200? 0: regs->trap == 0x300? 1: 2;
+	switch (regs->trap) {
+	case 0x200:
+		fault_type = 0;
+		break;
+	case 0x300:
+	case 0x380:
+		fault_type = 1;
+		break;
+	default:
+		fault_type = 2;
+	}
+
 	longjmp(bus_error_jmp, 1);
 }
 
