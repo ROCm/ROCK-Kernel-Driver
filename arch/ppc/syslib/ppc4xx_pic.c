@@ -256,7 +256,7 @@ static void
 ppc4xx_uic_end(unsigned int irq)
 {
 	int bit, word;
-	unsigned int tr_bits;
+	unsigned int tr_bits = 0;
 
 	bit = irq & 0x1f;
 	word = irq >> 5;
