@@ -220,7 +220,7 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 		case EVIOCGID:
 			return copy_to_user((void *) arg, &dev->id, sizeof(struct input_id)) ? -EFAULT : 0;
-		
+
 		case EVIOCGKEYCODE:
 			if (get_user(t, ((int *) arg) + 0)) return -EFAULT;
 			if (t < 0 || t > dev->keycodemax || !dev->keycodesize) return -EINVAL;
@@ -428,7 +428,7 @@ static struct input_handle *evdev_connect(struct input_handler *handler, struct 
 
 	devfs_mk_cdev(MKDEV(INPUT_MAJOR, EVDEV_MINOR_BASE + minor),
 			S_IFCHR|S_IRUGO|S_IWUSR, "input/event%d", minor);
-	class_simple_device_add(input_class, 
+	class_simple_device_add(input_class,
 				MKDEV(INPUT_MAJOR, EVDEV_MINOR_BASE + minor),
 				dev->dev, "event%d", minor);
 

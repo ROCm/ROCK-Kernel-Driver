@@ -22,7 +22,7 @@ config JOYSTICK_ANALOG
 	  supports many extensions, including joysticks with throttle control,
 	  with rudders, additional hats and buttons compatible with CH
 	  Flightstick Pro, ThrustMaster FCS, 6 and 8 button gamepads, or
-	  Saitek Cyborg joysticks. 
+	  Saitek Cyborg joysticks.
 
 	  Please read the file <file:Documentation/input/joystick.txt> which
 	  contains more information.
@@ -35,7 +35,7 @@ config JOYSTICK_A3D
 	depends on INPUT && INPUT_JOYSTICK && GAMEPORT
 	help
 	  Say Y here if you have an FPGaming or MadCatz controller using the
-	  A3D protocol over the PC gameport. 
+	  A3D protocol over the PC gameport.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called a3d.
@@ -45,7 +45,7 @@ config JOYSTICK_ADI
 	depends on INPUT && INPUT_JOYSTICK && GAMEPORT
 	help
 	  Say Y here if you have a Logitech controller using the ADI
-	  protocol over the PC gameport. 
+	  protocol over the PC gameport.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called adi.
@@ -74,7 +74,7 @@ config JOYSTICK_GRIP
 	depends on INPUT && INPUT_JOYSTICK && GAMEPORT
 	help
 	  Say Y here if you have a Gravis controller using the GrIP protocol
-	  over the PC gameport. 
+	  over the PC gameport.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called grip.
@@ -94,7 +94,7 @@ config JOYSTICK_GUILLEMOT
 	depends on INPUT && INPUT_JOYSTICK && GAMEPORT
 	help
 	  Say Y here if you have a Guillemot joystick using a digital
-	  protocol over the PC gameport. 
+	  protocol over the PC gameport.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called guillemot.
@@ -124,7 +124,7 @@ config JOYSTICK_TMDC
 	depends on INPUT && INPUT_JOYSTICK && GAMEPORT
 	help
 	  Say Y here if you have a ThrustMaster controller using the
-	  DirectConnect (BSP) protocol over the PC gameport. 
+	  DirectConnect (BSP) protocol over the PC gameport.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called tmdc.
@@ -137,7 +137,7 @@ config JOYSTICK_WARRIOR
 	select SERIO
 	help
 	  Say Y here if you have a Logitech WingMan Warrior joystick connected
-	  to your computer's serial port. 
+	  to your computer's serial port.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called warrior.
@@ -253,7 +253,7 @@ config INPUT_JOYDUMP
 	help
 	  Say Y here if you want to dump data from your joystick into the system
 	  log for debugging purposes. Say N if you are making a production
-	  configuration or aren't sure. 
+	  configuration or aren't sure.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called joydump.

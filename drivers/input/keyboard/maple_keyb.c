@@ -139,7 +139,7 @@ static int dc_kbd_connect(struct maple_device *dev)
 
 	kbd->dev.name = dev->product_name;
 	kbd->dev.id.bustype = BUS_MAPLE;
-	
+
 	input_register_device(&kbd->dev);
 
 	maple_getcond_callback(dev, dc_kbd_callback, 1, MAPLE_FUNC_KEYBOARD);

@@ -14,6 +14,25 @@
 #include "psmouse.h"
 #include "logips2pp.h"
 
+/* Logitech mouse types */
+#define PS2PP_KIND_WHEEL	1
+#define PS2PP_KIND_MX		2
+#define PS2PP_KIND_TP3		3
+
+/* Logitech mouse features */
+#define PS2PP_WHEEL		0x01
+#define PS2PP_HWHEEL		0x02
+#define PS2PP_SIDE_BTN		0x04
+#define PS2PP_EXTRA_BTN		0x08
+#define PS2PP_TASK_BTN		0x10
+#define PS2PP_NAV_BTN		0x20
+
+struct ps2pp_info {
+	const int model;
+	unsigned const int kind;
+	unsigned const int features;
+};
+
 /*
  * Process a PS2++ or PS2T++ packet.
  */
@@ -63,7 +82,6 @@ void ps2pp_process_packet(struct psmouse *psmouse)
 		packet[0] &= 0x0f;
 		packet[1] = 0;
 		packet[2] = 0;
-
 	}
 }
 
@@ -76,17 +94,8 @@ void ps2pp_process_packet(struct psmouse *psmouse)
 
 static int ps2pp_cmd(struct psmouse *psmouse, unsigned char *param, unsigned char command)
 {
-	unsigned char d;
-	int i;
-
-	if (psmouse_command(psmouse,  NULL, PSMOUSE_CMD_SETSCALE11))
+	if (psmouse_sliced_command(psmouse, command))
 		return -1;
-
-	for (i = 6; i >= 0; i -= 2) {
-		d = (command >> i) & 3;
-		if(psmouse_command(psmouse, &d, PSMOUSE_CMD_SETRES))
-			return -1;
-	}
 
 	if (psmouse_command(psmouse, param, PSMOUSE_CMD_POLL))
 		return -1;
@@ -99,7 +108,7 @@ static int ps2pp_cmd(struct psmouse *psmouse, unsigned char *param, unsigned cha
  * enabled if we do nothing to it. Of course I put this in because I want it
  * disabled :P
  * 1 - enabled (if previously disabled, also default)
- * 0/2 - disabled 
+ * 0/2 - disabled
  */
 
 static void ps2pp_set_smartscroll(struct psmouse *psmouse)
@@ -113,14 +122,11 @@ static void ps2pp_set_smartscroll(struct psmouse *psmouse)
 	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
 	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
 
-	if (psmouse_smartscroll == 1) 
-		param[0] = 1;
-	else
-	if (psmouse_smartscroll > 2)
-		return;
-
-	/* else leave param[0] == 0 to disable */
-	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
+	if (psmouse_smartscroll < 2) {
+		/* 0 - disabled, 1 - enabled */
+		param[0] = psmouse_smartscroll;
+		psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
+	}
 }
 
 /*
@@ -138,124 +144,104 @@ void ps2pp_set_800dpi(struct psmouse *psmouse)
 	psmouse_command(psmouse, &param, PSMOUSE_CMD_SETRES);
 }
 
-/*
- * Detect the exact model and features of a PS2++ or PS2T++ Logitech mouse or
- * touchpad.
- */
-
-static int ps2pp_detect_model(struct psmouse *psmouse, unsigned char *param)
+static struct ps2pp_info *get_model_info(unsigned char model)
 {
-	int i;
-	static struct _logips2_list {
-		const int model;
-		unsigned const int features;
-	} logips2pp_list [] = {
-		{ 12,	PS2PP_4BTN},
-		{ 13,	0 },
-		{ 40,	PS2PP_4BTN },
-		{ 41,	PS2PP_4BTN },
-		{ 42,	PS2PP_4BTN },
-		{ 43,	PS2PP_4BTN },
-		{ 50,	0 },
-		{ 51,	0 },
-		{ 52,	PS2PP_4BTN | PS2PP_WHEEL },
-		{ 53,	PS2PP_WHEEL },
-		{ 61,	PS2PP_WHEEL | PS2PP_MX },	/* MX700 */
-		{ 73,	PS2PP_4BTN },
-		{ 75,	PS2PP_WHEEL },
-		{ 76,	PS2PP_WHEEL },
-		{ 80,	PS2PP_4BTN | PS2PP_WHEEL },
-		{ 81,	PS2PP_WHEEL },
-		{ 83,	PS2PP_WHEEL },
-		{ 88,	PS2PP_WHEEL },
-		{ 96,	0 },
-		{ 97,	0 },
-		{ 100 ,	PS2PP_WHEEL | PS2PP_MX },	/* MX510 */
-		{ 112 ,	PS2PP_WHEEL | PS2PP_MX },	/* MX500 */
-		{ 114 ,	PS2PP_WHEEL | PS2PP_MX | PS2PP_MX310 },	/* MX310 */
+	static struct ps2pp_info ps2pp_list[] = {
+		{ 12,	0,			PS2PP_SIDE_BTN},
+		{ 13,	0,			0 },
+		{ 40,	0,			PS2PP_SIDE_BTN },
+		{ 41,	0,			PS2PP_SIDE_BTN },
+		{ 42,	0,			PS2PP_SIDE_BTN },
+		{ 43,	0,			PS2PP_SIDE_BTN },
+		{ 50,	0,			0 },
+		{ 51,	0,			0 },
+		{ 52,	PS2PP_KIND_WHEEL,	PS2PP_SIDE_BTN | PS2PP_WHEEL },
+		{ 53,	PS2PP_KIND_WHEEL,	PS2PP_WHEEL },
+		{ 61,	PS2PP_KIND_MX,
+				PS2PP_WHEEL | PS2PP_SIDE_BTN | PS2PP_TASK_BTN |
+				PS2PP_EXTRA_BTN | PS2PP_NAV_BTN },	/* MX700 */
+		{ 73,	0,			PS2PP_SIDE_BTN },
+		{ 75,	PS2PP_KIND_WHEEL,	PS2PP_WHEEL },
+		{ 76,	PS2PP_KIND_WHEEL,	PS2PP_WHEEL },
+		{ 80,	PS2PP_KIND_WHEEL,	PS2PP_SIDE_BTN | PS2PP_WHEEL },
+		{ 81,	PS2PP_KIND_WHEEL,	PS2PP_WHEEL },
+		{ 83,	PS2PP_KIND_WHEEL,	PS2PP_WHEEL },
+		{ 88,	PS2PP_KIND_WHEEL,	PS2PP_WHEEL },
+		{ 96,	0,			0 },
+		{ 97,	PS2PP_KIND_TP3,		PS2PP_WHEEL | PS2PP_HWHEEL },
+		{ 100,	PS2PP_KIND_MX,
+				PS2PP_WHEEL | PS2PP_SIDE_BTN | PS2PP_TASK_BTN |
+				PS2PP_EXTRA_BTN | PS2PP_NAV_BTN },	/* MX510 */
+		{ 112,	PS2PP_KIND_MX,
+				PS2PP_WHEEL | PS2PP_SIDE_BTN | PS2PP_TASK_BTN |
+				PS2PP_EXTRA_BTN | PS2PP_NAV_BTN },	/* MX500 */
+		{ 114,	PS2PP_KIND_MX,
+				PS2PP_WHEEL | PS2PP_SIDE_BTN |
+				PS2PP_TASK_BTN | PS2PP_EXTRA_BTN },	/* M310 */
 		{ }
 	};
+	int i;
 
-	psmouse->vendor = "Logitech";
-	psmouse->model = ((param[0] >> 4) & 0x07) | ((param[0] << 3) & 0x78);
-
-	if (param[1] < 3)
-		clear_bit(BTN_MIDDLE, psmouse->dev.keybit);
-	if (param[1] < 2)
-		clear_bit(BTN_RIGHT, psmouse->dev.keybit);
-
-	psmouse->type = PSMOUSE_PS2;
-
-	for (i = 0; logips2pp_list[i].model; i++){
-		if (logips2pp_list[i].model == psmouse->model){
-			psmouse->type = PSMOUSE_PS2PP;
-			if (logips2pp_list[i].features & PS2PP_4BTN)
-				set_bit(BTN_SIDE, psmouse->dev.keybit);
-
-			if (logips2pp_list[i].features & PS2PP_WHEEL){
-				set_bit(REL_WHEEL, psmouse->dev.relbit);
-				psmouse->name = "Wheel Mouse";
-			}
-			if (logips2pp_list[i].features & PS2PP_MX) {
-				set_bit(BTN_SIDE, psmouse->dev.keybit);
-				set_bit(BTN_EXTRA, psmouse->dev.keybit);
-				set_bit(BTN_TASK, psmouse->dev.keybit);
-				if (!(logips2pp_list[i].features & PS2PP_MX310)){
-					set_bit(BTN_BACK, psmouse->dev.keybit);
-					set_bit(BTN_FORWARD, psmouse->dev.keybit);
-				}
-				psmouse->name = "MX Mouse";
-			}
-			break;
-		}
-	}
-/*
- * Do Logitech PS2++ / PS2T++ magic init.
- */
-	if (psmouse->type == PSMOUSE_PS2PP) {
-
-		if (psmouse->model == 97) { /* TouchPad 3 */
-
-			set_bit(REL_WHEEL, psmouse->dev.relbit);
-			set_bit(REL_HWHEEL, psmouse->dev.relbit);
-
-			param[0] = 0x11; param[1] = 0x04; param[2] = 0x68; /* Unprotect RAM */
-			psmouse_command(psmouse, param, 0x30d1);
-			param[0] = 0x11; param[1] = 0x05; param[2] = 0x0b; /* Enable features */
-			psmouse_command(psmouse, param, 0x30d1);
-			param[0] = 0x11; param[1] = 0x09; param[2] = 0xc3; /* Enable PS2++ */
-			psmouse_command(psmouse, param, 0x30d1);
-
-			param[0] = 0;
-			if (!psmouse_command(psmouse, param, 0x13d1) &&
-				param[0] == 0x06 && param[1] == 0x00 && param[2] == 0x14) {
-				psmouse->name = "TouchPad 3";
-				return PSMOUSE_PS2TPP;
-			}
-
-		} else {
-
-			param[0] = param[1] = param[2] = 0;
-			ps2pp_cmd(psmouse, param, 0x39); /* Magic knock */
-			ps2pp_cmd(psmouse, param, 0xDB);
-
-			if ((param[0] & 0x78) == 0x48 && (param[1] & 0xf3) == 0xc2 &&
-				(param[2] & 3) == ((param[1] >> 2) & 3)) {
-					ps2pp_set_smartscroll(psmouse);
-					return PSMOUSE_PS2PP;
-			}
-		}
-	}
-
-	return 0;
+	for (i = 0; ps2pp_list[i].model; i++)
+		if (model == ps2pp_list[i].model)
+			return &ps2pp_list[i];
+	return NULL;
 }
 
 /*
- * Logitech magic init.
+ * Set up input device's properties based on the detected mouse model.
  */
-int ps2pp_detect(struct psmouse *psmouse)
+
+static void ps2pp_set_model_properties(struct psmouse *psmouse, struct ps2pp_info *model_info)
+{
+	if (model_info->features & PS2PP_SIDE_BTN)
+		set_bit(BTN_SIDE, psmouse->dev.keybit);
+
+	if (model_info->features & PS2PP_EXTRA_BTN)
+		set_bit(BTN_EXTRA, psmouse->dev.keybit);
+
+	if (model_info->features & PS2PP_TASK_BTN)
+		set_bit(BTN_TASK, psmouse->dev.keybit);
+
+	if (model_info->features & PS2PP_NAV_BTN) {
+		set_bit(BTN_FORWARD, psmouse->dev.keybit);
+		set_bit(BTN_BACK, psmouse->dev.keybit);
+	}
+
+	if (model_info->features & PS2PP_WHEEL)
+		set_bit(REL_WHEEL, psmouse->dev.relbit);
+
+	if (model_info->features & PS2PP_HWHEEL)
+		set_bit(REL_HWHEEL, psmouse->dev.relbit);
+
+	switch (model_info->kind) {
+		case PS2PP_KIND_WHEEL:
+			psmouse->name = "Wheel Mouse";
+			break;
+
+		case PS2PP_KIND_MX:
+			psmouse->name = "MX Mouse";
+			break;
+
+		case PS2PP_KIND_TP3:
+			psmouse->name = "TouchPad 3";
+			break;
+	}
+}
+
+
+/*
+ * Logitech magic init. Detect whether the mouse is a Logitech one
+ * and its exact model and try turning on extended protocol for ones
+ * that support it.
+ */
+
+int ps2pp_init(struct psmouse *psmouse, int set_properties)
 {
 	unsigned char param[4];
+	unsigned char protocol = PSMOUSE_PS2;
+	unsigned char model, buttons;
+	struct ps2pp_info *model_info;
 
 	param[0] = 0;
 	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
@@ -265,6 +251,60 @@ int ps2pp_detect(struct psmouse *psmouse)
 	param[1] = 0;
 	psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO);
 
-	return param[1] != 0 ? ps2pp_detect_model(psmouse, param) : 0;
+	if (param[1] != 0) {
+		model = ((param[0] >> 4) & 0x07) | ((param[0] << 3) & 0x78);
+		buttons = param[1];
+		model_info = get_model_info(model);
+
+/*
+ * Do Logitech PS2++ / PS2T++ magic init.
+ */
+		if (model == 97) { /* Touch Pad 3 */
+
+			/* Unprotect RAM */
+			param[0] = 0x11; param[1] = 0x04; param[2] = 0x68;
+			psmouse_command(psmouse, param, 0x30d1);
+			/* Enable features */
+			param[0] = 0x11; param[1] = 0x05; param[2] = 0x0b;
+			psmouse_command(psmouse, param, 0x30d1);
+			/* Enable PS2++ */
+			param[0] = 0x11; param[1] = 0x09; param[2] = 0xc3;
+			psmouse_command(psmouse, param, 0x30d1);
+
+			param[0] = 0;
+			if (!psmouse_command(psmouse, param, 0x13d1) &&
+			    param[0] == 0x06 && param[1] == 0x00 && param[2] == 0x14) {
+				protocol = PSMOUSE_PS2TPP;
+			}
+
+		} else if (get_model_info(model) != NULL) {
+
+			param[0] = param[1] = param[2] = 0;
+			ps2pp_cmd(psmouse, param, 0x39); /* Magic knock */
+			ps2pp_cmd(psmouse, param, 0xDB);
+
+			if ((param[0] & 0x78) == 0x48 &&
+			    (param[1] & 0xf3) == 0xc2 &&
+			    (param[2] & 0x03) == ((param[1] >> 2) & 3)) {
+				ps2pp_set_smartscroll(psmouse);
+				protocol = PSMOUSE_PS2PP;
+			}
+		}
+
+		if (set_properties) {
+			psmouse->vendor = "Logitech";
+			psmouse->model = model;
+
+			if (buttons < 3)
+				clear_bit(BTN_MIDDLE, psmouse->dev.keybit);
+			if (buttons < 2)
+				clear_bit(BTN_RIGHT, psmouse->dev.keybit);
+
+			if (model_info)
+				ps2pp_set_model_properties(psmouse, model_info);
+		}
+	}
+
+	return protocol;
 }
 

@@ -28,6 +28,12 @@
  *    Complete rewrite using Linux Input in 2.6.3
  *    Unfortunately no calibration support at this time
  *
+ *  1.4 04/25/2004 (TEJ) tejohnson@yahoo.com
+ *    Changed reset from standard USB dev reset to vendor reset
+ *    Changed data sent to host from compensated to raw coordinates
+ *    Eliminated vendor/product module params
+ *    Performed multiple successfull tests with an EXII-5010UC
+ *
  *****************************************************************************/
 
 #include <linux/config.h>
@@ -45,25 +51,28 @@
 #include <linux/init.h>
 #include <linux/usb.h>
 
-#define MTOUCHUSB_MIN_XC                0xc8
-#define MTOUCHUSB_MAX_XC                0xff78
+#define MTOUCHUSB_MIN_XC                0x0
+#define MTOUCHUSB_MAX_XC                0x4000
 #define MTOUCHUSB_XC_FUZZ               0x0
 #define MTOUCHUSB_XC_FLAT               0x0
 #define MTOUCHUSB_MIN_YC                0x0
-#define MTOUCHUSB_MAX_YC                0xff78
+#define MTOUCHUSB_MAX_YC                0x4000
 #define MTOUCHUSB_YC_FUZZ               0x0
 #define MTOUCHUSB_YC_FLAT               0x0
-#define MTOUCHUSB_ASYC_REPORT           1
-#define MTOUCHUSB_REPORT_SIZE_DATA      11
+
+#define MTOUCHUSB_ASYNC_REPORT          1
+#define MTOUCHUSB_RESET                 7
+#define MTOUCHUSB_REPORT_DATA_SIZE      11
 #define MTOUCHUSB_REQ_CTRLLR_ID         10
 
-#define MTOUCHUSB_GET_XC(data)          (data[4]<<8 | data[3])
-#define MTOUCHUSB_GET_YC(data)          (data[6]<<8 | data[5])
+#define MTOUCHUSB_GET_XC(data)          (data[8]<<8 | data[7])
+#define MTOUCHUSB_GET_YC(data)          (data[10]<<8 | data[9])
 #define MTOUCHUSB_GET_TOUCHED(data)     ((data[2] & 0x40) ? 1:0)
 
-#define DRIVER_VERSION "v0.1"
+#define DRIVER_VERSION "v1.4"
 #define DRIVER_AUTHOR "Todd E. Johnson, tejohnson@yahoo.com"
-#define DRIVER_DESC "Microtouch USB HID Touchscreen Driver"
+#define DRIVER_DESC "3M USB Touchscreen Driver"
+#define DRIVER_LICENSE "GPL"
 
 struct mtouch_usb {
         unsigned char *data;
@@ -76,11 +85,9 @@ struct mtouch_usb {
         char phys[64];
 };
 
-static __s32 vendor=-1, product=-1;
-
 static struct usb_device_id mtouchusb_devices [] = {
-        { USB_DEVICE(0x0596, 0x0001) }, /* 3M (Formerly MicroTouch) 14-206 */
-        { }                             /* Terminating entry */
+        { USB_DEVICE(0x0596, 0x0001) },
+        { }
 };
 
 static void mtouchusb_irq(struct urb *urb, struct pt_regs *regs)
@@ -153,7 +160,7 @@ static int mtouchusb_alloc_buffers(struct usb_device *udev, struct mtouch_usb *m
 {
         dbg("%s - called", __FUNCTION__);
 
-        mtouch->data = usb_buffer_alloc(udev, MTOUCHUSB_REPORT_SIZE_DATA,
+        mtouch->data = usb_buffer_alloc(udev, MTOUCHUSB_REPORT_DATA_SIZE,
                                         SLAB_ATOMIC, &mtouch->data_dma);
 
         if (!mtouch->data)
@@ -167,7 +174,7 @@ static void mtouchusb_free_buffers(struct usb_device *udev, struct mtouch_usb *m
         dbg("%s - called", __FUNCTION__);
 
         if (mtouch->data)
-                usb_buffer_free(udev, MTOUCHUSB_REPORT_SIZE_DATA,
+                usb_buffer_free(udev, MTOUCHUSB_REPORT_DATA_SIZE,
                                 mtouch->data, mtouch->data_dma);
 }
 
@@ -180,52 +187,14 @@ static int mtouchusb_probe(struct usb_interface *intf, const struct usb_device_i
         char path[64];
         char *buf;
         int nRet;
-        int ix;
-        char valid_device = 0;
 
         dbg("%s - called", __FUNCTION__);
-        if (vendor != -1 && product != -1) {
-                info("%s - User specified USB Touch -- Vend:Prod - %x:%x",
-                     __FUNCTION__, vendor, product);
-        }
-
-        for (ix = 0; ix < sizeof (mtouchusb_devices) /
-             sizeof (struct usb_device_id); ix++) {
-                if ((udev->descriptor.idVendor ==
-                     mtouchusb_devices [ix].idVendor) &&
-                     (udev->descriptor.idProduct ==
-                     mtouchusb_devices [ix].idProduct)) {
-                        valid_device = 1;
-                        break;
-                }
-        }
-
-        if (udev->descriptor.idVendor == vendor &&
-            udev->descriptor.idProduct == product) {  /* User specified */
-                valid_device = 1;
-        }
-
-        if (!valid_device) {
-                err("%s - No valid device!", __FUNCTION__);
-                return -EIO;
-        }
-
-        if (udev->descriptor.bNumConfigurations != 1) {
-                err("%s -  Only one device configuration is supported.",
-                    __FUNCTION__);
-                return -EIO;
-        }
 
         dbg("%s - setting interface", __FUNCTION__);
         interface = intf->cur_altsetting;
 
         dbg("%s - setting endpoint", __FUNCTION__);
         endpoint = &interface->endpoint[0].desc;
-
-        if (interface->desc.bNumEndpoints != 1) {
-                err("%s - Only one endpoint is supported.", __FUNCTION__);
-                return -EIO;
-        }
 
         if (!(mtouch = kmalloc (sizeof (struct mtouch_usb), GFP_KERNEL))) {
                 err("%s - Out of memory.", __FUNCTION__);
@@ -266,8 +235,8 @@ static int mtouchusb_probe(struct usb_interface *intf, const struct usb_device_i
         mtouch->input.absmax[ABS_X] =  MTOUCHUSB_MAX_XC;
         mtouch->input.absfuzz[ABS_X] = MTOUCHUSB_XC_FUZZ;
         mtouch->input.absflat[ABS_X] = MTOUCHUSB_XC_FLAT;
-        mtouch->input.absmin[ABS_Y] =  MTOUCHUSB_MAX_YC;
-        mtouch->input.absmax[ABS_Y] =  MTOUCHUSB_MIN_YC;
+        mtouch->input.absmin[ABS_Y] =  MTOUCHUSB_MIN_YC;
+        mtouch->input.absmax[ABS_Y] =  MTOUCHUSB_MAX_YC;
         mtouch->input.absfuzz[ABS_Y] = MTOUCHUSB_YC_FUZZ;
         mtouch->input.absflat[ABS_Y] = MTOUCHUSB_YC_FLAT;
 
@@ -290,15 +259,15 @@ static int mtouchusb_probe(struct usb_interface *intf, const struct usb_device_i
         kfree(buf);
 
         nRet = usb_control_msg(mtouch->udev,
-                               usb_rcvctrlpipe(udev, 0x80),
-                               USB_REQ_GET_CONFIGURATION,
-                               USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE,
+                               usb_rcvctrlpipe(udev, 0),
+                               MTOUCHUSB_RESET,
+                               USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+                               1,
                                0,
-                               0x81,
                                NULL,
                                0,
                                HZ * USB_CTRL_SET_TIMEOUT);
-        dbg("%s - usb_control_msg - USB_REQ_GET_CONFIGURATION - bytes|err: %d",
+        dbg("%s - usb_control_msg - MTOUCHUSB_RESET - bytes|err: %d",
             __FUNCTION__, nRet);
 
         dbg("%s - usb_alloc_urb: mtouch->irq", __FUNCTION__);
@@ -315,7 +284,7 @@ static int mtouchusb_probe(struct usb_interface *intf, const struct usb_device_i
                          mtouch->udev,
                          usb_rcvintpipe(mtouch->udev, 0x81),
                          mtouch->data,
-                         MTOUCHUSB_REPORT_SIZE_DATA,
+                         MTOUCHUSB_REPORT_DATA_SIZE,
                          mtouchusb_irq,
                          mtouch,
                          endpoint->bInterval);
@@ -324,15 +293,15 @@ static int mtouchusb_probe(struct usb_interface *intf, const struct usb_device_i
         input_register_device(&mtouch->input);
 
         nRet = usb_control_msg(mtouch->udev,
-                               usb_rcvctrlpipe(udev, 0x80),
-                               MTOUCHUSB_ASYC_REPORT,
+                               usb_rcvctrlpipe(udev, 0),
+                               MTOUCHUSB_ASYNC_REPORT,
                                USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-                               MTOUCHUSB_ASYC_REPORT,
-                               MTOUCHUSB_ASYC_REPORT,
+                               1,
+                               1,
                                NULL,
                                0,
                                HZ * USB_CTRL_SET_TIMEOUT);
-        dbg("%s - usb_control_msg - MTOUCHUSB_ASYC_REPORT - bytes|err: %d",
+        dbg("%s - usb_control_msg - MTOUCHUSB_ASYNC_REPORT - bytes|err: %d",
             __FUNCTION__, nRet);
 
         printk(KERN_INFO "input: %s on %s\n", mtouch->name, path);
@@ -383,9 +352,3 @@ module_exit(mtouchusb_cleanup);
 MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL");
-MODULE_PARM(vendor, "i");
-MODULE_PARM_DESC(vendor, "User specified USB idVendor");
-MODULE_PARM(product, "i");
-MODULE_PARM_DESC(product, "User specified USB idProduct");
-
-

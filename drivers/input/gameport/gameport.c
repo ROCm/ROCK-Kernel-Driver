@@ -168,7 +168,7 @@ int gameport_open(struct gameport *gameport, struct gameport_dev *dev, int mode)
 		return -1;
 
 	gameport->dev = dev;
-	
+
 	return 0;
 }
 

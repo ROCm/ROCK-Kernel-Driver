@@ -195,7 +195,7 @@ static unsigned char find_button(struct iforce *iforce, signed short button)
 }
 
 /*
- * Analyse the changes in an effect, and tell if we need to send an condition 
+ * Analyse the changes in an effect, and tell if we need to send an condition
  * parameter packet
  */
 static int need_condition_modifier(struct iforce* iforce, struct ff_effect* new)
@@ -372,7 +372,7 @@ int iforce_upload_periodic(struct iforce* iforce, struct ff_effect* effect, int 
 	int core_err = 0;
 
 	if (!is_update || need_period_modifier(iforce, effect)) {
-		param1_err = make_period_modifier(iforce, mod1_chunk, 
+		param1_err = make_period_modifier(iforce, mod1_chunk,
 			is_update,
 			effect->u.periodic.magnitude, effect->u.periodic.offset,
 			effect->u.periodic.period, effect->u.periodic.phase);

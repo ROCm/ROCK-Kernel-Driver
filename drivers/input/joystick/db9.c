@@ -14,14 +14,14 @@
 /*
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
@@ -95,7 +95,7 @@ __obsolete_setup("db9_3=");
 struct db9 {
 	struct input_dev dev[DB9_MAX_DEVICES];
 	struct timer_list timer;
-	struct pardevice *pd;	
+	struct pardevice *pd;
 	int mode;
 	int used;
 	char phys[2][32];
@@ -188,7 +188,7 @@ static unsigned char db9_saturn_read_analog(struct parport *port, int type, int 
 }
 
 /*
- * db9_saturn_read_packet() reads whole saturn packet at connector 
+ * db9_saturn_read_packet() reads whole saturn packet at connector
  * and returns device identifier code.
  */
 static unsigned char db9_saturn_read_packet(struct parport *port, unsigned char *data, int type, int powered)
@@ -481,16 +481,16 @@ static void db9_timer(unsigned long private)
 			input_report_abs(dev, ABS_X, (data & DB9_RIGHT ? 0 : 1) - (data & DB9_LEFT ? 0 : 1));
 			input_report_abs(dev, ABS_Y, (data & DB9_DOWN  ? 0 : 1) - (data & DB9_UP   ? 0 : 1));
 
-			parport_write_control(port, 0x0a); 
+			parport_write_control(port, 0x0a);
 
-			for (i = 0; i < 7; i++) { 
+			for (i = 0; i < 7; i++) {
 				data = parport_read_data(port);
-				parport_write_control(port, 0x02); 
-				parport_write_control(port, 0x0a); 
+				parport_write_control(port, 0x02);
+				parport_write_control(port, 0x0a);
 				input_report_key(dev, db9_cd32_btn[i], ~data & DB9_FIRE2);
 				}
 
-			parport_write_control(port, 0x00); 
+			parport_write_control(port, 0x00);
 			break;
 		}
 
@@ -600,7 +600,7 @@ static struct db9 __init *db9_probe(int *config, int nargs)
 
 		db9->dev[i].evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 		for (j = 0; j < db9_buttons[db9->mode]; j++)
-			set_bit(db9_btn[db9->mode][j], db9->dev[i].keybit); 
+			set_bit(db9_btn[db9->mode][j], db9->dev[i].keybit);
 		for (j = 0; j < db9_num_axis[db9->mode]; j++) {
 			set_bit(db9_abs[j], db9->dev[i].absbit);
 			if (j < 2) {
@@ -635,7 +635,7 @@ void __exit db9_exit(void)
 {
 	int i, j;
 
-	for (i = 0; i < 3; i++) 
+	for (i = 0; i < 3; i++)
 		if (db9_base[i]) {
 			for (j = 0; j < min(db9_max_pads[db9_base[i]->mode], DB9_MAX_DEVICES); j++)
 				input_unregister_device(db9_base[i]->dev + j);

@@ -11,18 +11,18 @@
 /*
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
- * 
+ *
  * Should you need to contact me, the author, you can do so either by
  * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
  * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
@@ -223,7 +223,7 @@ static int gf2k_open(struct input_dev *dev)
 {
 	struct gf2k *gf2k = dev->private;
 	if (!gf2k->used++)
-		mod_timer(&gf2k->timer, jiffies + GF2K_REFRESH);	
+		mod_timer(&gf2k->timer, jiffies + GF2K_REFRESH);
 	return 0;
 }
 
@@ -324,7 +324,7 @@ static void gf2k_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 	for (i = 0; i < gf2k_axes[gf2k->id]; i++) {
 		gf2k->dev.absmax[gf2k_abs[i]] = (i < 2) ? gf2k->dev.abs[gf2k_abs[i]] * 2 - 32 :
-	      		  gf2k->dev.abs[gf2k_abs[0]] + gf2k->dev.abs[gf2k_abs[1]] - 32; 
+	      		  gf2k->dev.abs[gf2k_abs[0]] + gf2k->dev.abs[gf2k_abs[1]] - 32;
 		gf2k->dev.absmin[gf2k_abs[i]] = 32;
 		gf2k->dev.absfuzz[gf2k_abs[i]] = 8;
 		gf2k->dev.absflat[gf2k_abs[i]] = (i < 2) ? 24 : 0;

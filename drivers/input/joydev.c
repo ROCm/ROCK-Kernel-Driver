@@ -1,12 +1,12 @@
 /*
  * Joystick device driver for the input driver suite.
  *
- * Copyright (c) 1999-2002 Vojtech Pavlik 
- * Copyright (c) 1999 Colin Van Dyke 
+ * Copyright (c) 1999-2002 Vojtech Pavlik
+ * Copyright (c) 1999 Colin Van Dyke
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  */
 
@@ -34,7 +34,7 @@ MODULE_SUPPORTED_DEVICE("input/js");
 MODULE_LICENSE("GPL");
 
 #define JOYDEV_MINOR_BASE	0
-#define JOYDEV_MINORS		16	
+#define JOYDEV_MINORS		16
 #define JOYDEV_BUFFER_SIZE	64
 
 #define MSECS(t)	(1000 * ((t) / HZ) + 1000 * ((t) % HZ) / HZ)
@@ -115,7 +115,7 @@ static void joydev_event(struct input_handle *handle, unsigned int type, unsigne
 
 		default:
 			return;
-	}  
+	}
 
 	event.time = MSECS(jiffies);
 
@@ -449,10 +449,10 @@ static struct input_handle *joydev_connect(struct input_handler *handler, struct
 	}
 
 	joydev_table[minor] = joydev;
-	
+
 	devfs_mk_cdev(MKDEV(INPUT_MAJOR, JOYDEV_MINOR_BASE + minor),
 			S_IFCHR|S_IRUGO|S_IWUSR, "input/js%d", minor);
-	class_simple_device_add(input_class, 
+	class_simple_device_add(input_class,
 				MKDEV(INPUT_MAJOR, JOYDEV_MINOR_BASE + minor),
 				dev->dev, "js%d", minor);
 
@@ -466,7 +466,7 @@ static void joydev_disconnect(struct input_handle *handle)
 	joydev->exist = 0;
 
 	if (joydev->open)
-		input_close_device(handle);	
+		input_close_device(handle);
 	else
 		joydev_free(joydev);
 }
