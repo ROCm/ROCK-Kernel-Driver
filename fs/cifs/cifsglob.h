@@ -244,8 +244,11 @@ struct cifs_search_info {
 	loff_t index_of_last_entry;
 	__u16 entries_in_buffer;
 	__u16 info_level;
+	__u32 resume_key;
 	char * ntwrk_buf_start;
 	char * srch_entries_start;
+	char * presume_name;
+	unsigned int resume_name_len;
 	unsigned endOfSearch:1;
 	unsigned emptyDir:1;
 	unsigned unicode:1;
@@ -265,8 +268,7 @@ struct cifsFileInfo {
 	unsigned invalidHandle:1;  /* file closed via session abend */
 	struct semaphore fh_sem; /* prevents reopen race after dead ses*/
 	char * search_resume_name; /* BB removeme BB */
-	unsigned int resume_name_length;  /* BB removeme BB */
-	__u32    resume_key;              /* BB removeme BB */
+	unsigned int resume_name_length; /* BB removeme - field renamed and moved BB */
 	struct cifs_search_info srch_inf;
 };
 

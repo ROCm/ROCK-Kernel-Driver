@@ -1834,7 +1834,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 				break;
 			}
 			/* Offset of resume key same for levels 257 and 514 */
-			cifsFile->resume_key = lastFindData->FileIndex;
+			cifsFile->srch_inf.resume_key = lastFindData->FileIndex;
 			if(UnixSearch == FALSE) {
 				cifsFile->resume_name_length = 
 					le32_to_cpu(lastFindData->FileNameLength);
@@ -2000,7 +2000,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 				&findNextParms, searchHandle, 
 				cifsFile->search_resume_name,
 				cifsFile->resume_name_length,
-				cifsFile->resume_key,
+				cifsFile->srch_inf.resume_key,
 				&Unicode, &UnixSearch);
 			cFYI(1,("Count: %d  End: %d ",
 			      le16_to_cpu(findNextParms.SearchCount),
@@ -2017,7 +2017,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 					break;
 				}
 				/* Offset of resume key same for levels 257 and 514 */
-				cifsFile->resume_key = lastFindData->FileIndex;
+				cifsFile->srch_inf.resume_key = lastFindData->FileIndex;
 
 				if(UnixSearch == FALSE) {
 					cifsFile->resume_name_length = 

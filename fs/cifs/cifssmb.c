@@ -2377,10 +2377,13 @@ int CIFSFindNext2(const int xid, struct cifsTconInfo *tcon,
 	T2_FNEXT_RSP_PARMS * parms;
 	char *response_data;
 	int rc = 0;
-	int bytes_returned;
+	int bytes_returned, name_len;
 	__u16 params, byte_count;
 
-        cFYI(1, ("In FindNext"));
+	cFYI(1, ("In FindNext2"));
+
+	if(psrch_inf->endOfSearch == TRUE)
+		return -ENOENT;
 
 	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
 		(void **) &pSMBr);
@@ -2418,16 +2421,19 @@ int CIFSFindNext2(const int xid, struct cifsTconInfo *tcon,
 		psrch_inf->info_level = SMB_FIND_FILE_DIRECTORY_INFO;
 	} */
     pSMB->InformationLevel = cpu_to_le16(psrch_inf->info_level);
-	pSMB->ResumeKey = 0;  /* BB fixme add resume_key BB */
+	pSMB->ResumeKey = psrch_inf->resume_key;
 	pSMB->SearchFlags =
 	      cpu_to_le16(CIFS_SEARCH_CLOSE_AT_END | CIFS_SEARCH_RETURN_RESUME);
-	/* BB fixme check to make sure we do not cross end of smb with long resume name */
 
-/*	if(name_len < CIFS_MAX_MSGSIZE) {
-		memcpy(pSMB->ResumeFileName, resume_file_name, name_len);
-		byte_count += name_len; */ /* BB fixme - add resume file name processing BB */
-/*	} 
-	params += name_len; */
+	name_len = psrch_inf->resume_name_len;
+	params += name_len;
+	if(name_len < PATH_MAX) {
+		memcpy(pSMB->ResumeFileName, psrch_inf->presume_name, name_len);
+		byte_count += name_len;
+	} else {
+		rc = -EINVAL;
+		goto FNext2_err_exit;
+	}
 	byte_count = params + 1 /* pad */ ;
 	pSMB->TotalParameterCount = cpu_to_le16(params);
 	pSMB->ParameterCount = pSMB->TotalParameterCount;
@@ -2438,9 +2444,10 @@ int CIFSFindNext2(const int xid, struct cifsTconInfo *tcon,
 			(struct smb_hdr *) pSMBr, &bytes_returned, 0);
                                                                                               
 	if (rc) {
-		if (rc == -EBADF)
+		if (rc == -EBADF) {
+			psrch_inf->endOfSearch = TRUE;
 			rc = 0; /* search probably was closed at end of search above */
-		else
+		} else
 			cFYI(1, ("FindNext returned = %d", rc));
 	} else {                /* decode response */
 		rc = validate_t2((struct smb_t2_rsp *)pSMBr);
@@ -2451,9 +2458,11 @@ int CIFSFindNext2(const int xid, struct cifsTconInfo *tcon,
 				psrch_inf->unicode = TRUE;
 			else
 				psrch_inf->unicode = FALSE;
+			response_data = (char *) &pSMBr->hdr.Protocol +
+			       le16_to_cpu(pSMBr->t2.ParameterOffset);
+			parms = (T2_FNEXT_RSP_PARMS *)response_data;
 			response_data = (char *)&pSMBr->hdr.Protocol +
 				le16_to_cpu(pSMBr->t2.DataOffset);
-			parms = (T2_FNEXT_RSP_PARMS *)response_data;
 			cifs_buf_release(psrch_inf->ntwrk_buf_start);
 			psrch_inf->srch_entries_start = response_data;
 			psrch_inf->ntwrk_buf_start = (char *)pSMB;
@@ -2477,7 +2486,7 @@ int CIFSFindNext2(const int xid, struct cifsTconInfo *tcon,
 
 	/* Note: On -EAGAIN error only caller can retry on handle based calls
 	since file handle passed in no longer valid */
-
+FNext2_err_exit:
 	if ((rc != 0) && pSMB)
 		cifs_buf_release(pSMB);
                                                                                               
@@ -2543,7 +2552,7 @@ CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 	pSMB->SearchFlags =
 	    cpu_to_le16(CIFS_SEARCH_CLOSE_AT_END | CIFS_SEARCH_RETURN_RESUME);
 	/* BB add check to make sure we do not cross end of smb */
-	if(name_len < CIFS_MAX_MSGSIZE) {
+	if(name_len < PATH_MAX) {
 		memcpy(pSMB->ResumeFileName, resume_file_name, name_len);
 		byte_count += name_len;
 	}
