@@ -131,6 +131,10 @@ struct pccard_resource_ops {
 					 adjust_t *adj);
 	void	(*exit)			(struct pcmcia_socket *s);
 };
+/* SS_CAP_STATIC_MAP */
+extern struct pccard_resource_ops pccard_static_ops;
+/* !SS_CAP_STATIC_MAP */
+extern struct pccard_resource_ops pccard_nonstatic_ops;
 
 /*
  *  Calls to set up low-level "Socket Services" drivers

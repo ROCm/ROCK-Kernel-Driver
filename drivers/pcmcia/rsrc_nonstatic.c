@@ -34,6 +34,9 @@
 #include <pcmcia/cistpl.h>
 #include "cs_internal.h"
 
+MODULE_AUTHOR("David A. Hinds, Dominik Brodowski");
+MODULE_LICENSE("GPL");
+
 /* Parameters that can be set with 'insmod' */
 
 #define INT_MODULE_PARM(n, v) static int n = v; module_param(n, int, 0444)
@@ -769,3 +772,4 @@ struct pccard_resource_ops pccard_nonstatic_ops = {
 	.adjust_resource = nonstatic_adjust_resource_info,
 	.exit = nonstatic_release_resource_db,
 };
+EXPORT_SYMBOL(pccard_nonstatic_ops);

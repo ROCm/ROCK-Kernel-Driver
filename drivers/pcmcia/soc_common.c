@@ -758,6 +758,7 @@ int soc_common_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops
 			goto out_err_6;
 
 		skt->socket.features = SS_CAP_STATIC_MAP|SS_CAP_PCCARD;
+		skt->socket.resource_ops = &pccard_static_ops;
 		skt->socket.irq_mask = 0;
 		skt->socket.map_size = PAGE_SIZE;
 		skt->socket.pci_irq = skt->irq;

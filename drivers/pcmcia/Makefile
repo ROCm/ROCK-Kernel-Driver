@@ -6,12 +6,14 @@ ifeq ($(CONFIG_PCMCIA_DEBUG),y)
 EXTRA_CFLAGS += -DDEBUG
 endif
 
-pcmcia_core-y					+= cs.o cistpl.o rsrc_mgr.o socket_sysfs.o rsrc_nonstatic.o
+pcmcia_core-y					+= cs.o cistpl.o rsrc_mgr.o socket_sysfs.o
 pcmcia_core-$(CONFIG_CARDBUS)			+= cardbus.o
 obj-$(CONFIG_PCCARD)				+= pcmcia_core.o
 
 pcmcia-y					+= ds.o pcmcia_compat.o
 obj-$(CONFIG_PCMCIA)				+= pcmcia.o
+
+obj-$(CONFIG_PCCARD_NONSTATIC)			+= rsrc_nonstatic.o
 
 
 # socket drivers

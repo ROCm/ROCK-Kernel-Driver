@@ -290,3 +290,4 @@ struct pccard_resource_ops pccard_static_ops = {
 	.adjust_resource = NULL,
 	.exit = NULL,
 };
+EXPORT_SYMBOL(pccard_static_ops);

@@ -78,6 +78,7 @@ void release_cis_mem(struct pcmcia_socket *s)
 	s->cis_virt = NULL;
     }
 }
+EXPORT_SYMBOL(release_cis_mem);
 
 /*
  * Map the card memory at "card_offset" into virtual space.
@@ -320,6 +321,7 @@ void destroy_cis_cache(struct pcmcia_socket *s)
 		s->fake_cis = NULL;
 	}
 }
+EXPORT_SYMBOL(destroy_cis_cache);
 
 /*======================================================================
 

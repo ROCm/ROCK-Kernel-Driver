@@ -759,6 +759,7 @@ static int __devinit pd6729_pci_probe(struct pci_dev *dev,
 		socket[i].number = i;
 
 		socket[i].socket.ops = &pd6729_operations;
+		socket[i].socket.resource_ops = &pccard_nonstatic_ops;
 		socket[i].socket.dev.dev = &dev->dev;
 		socket[i].socket.driver_data = &socket[i];
 	}

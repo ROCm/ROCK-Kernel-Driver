@@ -212,7 +212,7 @@ int pcmcia_register_socket(struct pcmcia_socket *socket)
 {
 	int ret;
 
-	if (!socket || !socket->ops || !socket->dev.dev)
+	if (!socket || !socket->ops || !socket->dev.dev || !socket->resource_ops)
 		return -EINVAL;
 
 	cs_dbg(socket, 0, "pcmcia_register_socket(0x%p)\n", socket->ops);
@@ -250,11 +250,7 @@ int pcmcia_register_socket(struct pcmcia_socket *socket)
 	socket->cis_mem.flags = 0;
 	socket->cis_mem.speed = cis_speed;
 
-	/* init resource handling */
-	if (socket->features & SS_CAP_STATIC_MAP)
-		socket->resource_ops = &pccard_static_ops;
-	else
-		socket->resource_ops = &pccard_nonstatic_ops;
+
 	socket->mem_db.next = &socket->mem_db;
 	socket->io_db.next = &socket->io_db;
 

@@ -144,8 +144,6 @@ int try_irq(u_int Attributes, int irq, int specific);
 void undo_irq(u_int Attributes, int irq);
 int adjust_resource_info(client_handle_t handle, adjust_t *adj);
 void release_resource_db(struct pcmcia_socket *s);
-extern struct pccard_resource_ops pccard_static_ops;
-extern struct pccard_resource_ops pccard_nonstatic_ops;
 
 /* In socket_sysfs.c */
 extern struct class_interface pccard_sysfs_interface;
