@@ -1,4 +1,4 @@
-/* $Id: rtrap.S,v 1.59 2002/01/11 08:45:38 davem Exp $
+/* $Id: rtrap.S,v 1.60 2002/01/31 03:30:06 davem Exp $
  * rtrap.S: Preparing for return from trap on Sparc V9.
  *
  * Copyright (C) 1997,1998 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
@@ -20,8 +20,8 @@
 
 		/* Register %l6 keeps track of whether we are returning
 		 * from a system call or not.  It is cleared if we call
-		 * do_signal, and it must not be otherwise modified until
-		 * we fully commit to returning to userspace.
+		 * do_notify_resume, and it must not be otherwise modified
+		 * until we fully commit to returning to userspace.
 		 */
 
 		.text
@@ -42,22 +42,26 @@ __handle_user_windows:
 		 wrpr			%g0, RTRAP_PSTATE, %pstate
 		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
 		/* Redo sched+sig checks */
-#error		ldx			[%g6 + AOFF_task_need_resched], %l0
-		brz,pt			%l0, 1f
+		lduw			[%g6 + AOFF_task_work], %l0
+		srlx			%l0, 24, %o0
+
+		brz,pt			%o0, 1f
 		 nop
 		call			schedule
-
 		 wrpr			%g0, RTRAP_PSTATE, %pstate
 		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
-#error1:		lduw			[%g6 + AOFF_task_sigpending], %l0
-		brz,pt			%l0, __handle_user_windows_continue
+		lduw			[%g6 + AOFF_task_work], %l0
+
+1:		sllx			%l0, 48, %o0
+		brz,pt			%o0, __handle_user_windows_continue
 		 nop
 		clr			%o0
 		mov			%l5, %o2
 		mov			%l6, %o3
-
 		add			%sp, STACK_BIAS + REGWIN_SZ, %o1
-		call			do_signal
+		mov			%l0, %o4
+
+		call			do_notify_resume
 		 wrpr			%g0, RTRAP_PSTATE, %pstate
 		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
 		clr			%l6
@@ -67,8 +71,8 @@ __handle_user_windows:
 		ldx			[%sp + PTREGS_OFF + PT_V9_TSTATE], %l1
 		sethi			%hi(0xf << 20), %l4
 		and			%l1, %l4, %l4
-
 		ba,pt			%xcc, __handle_user_windows_continue
+
 		 andn			%l1, %l4, %l1
 __handle_perfctrs:
 		call			update_perfctrs
@@ -77,27 +81,31 @@ __handle_perfctrs:
 		ldub			[%g6 + AOFF_task_thread + AOFF_thread_w_saved], %o2
 		brz,pt			%o2, 1f
 		 nop
-
 		/* Redo userwin+sched+sig checks */
 		call			fault_in_user_windows
+
 		 wrpr			%g0, RTRAP_PSTATE, %pstate
 		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
-#error 1:		ldx			[%g6 + AOFF_task_need_resched], %l0
-		brz,pt			%l0, 1f
+		lduw			[%g6 + AOFF_task_work], %l0
+		srlx			%l0, 24, %o0
+		brz,pt			%o0, 1f
+
 		 nop
 		call			schedule
 		 wrpr			%g0, RTRAP_PSTATE, %pstate
-
 		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
-#error 1:		lduw			[%g6 + AOFF_task_sigpending], %l0
-		brz,pt			%l0, __handle_perfctrs_continue
+		lduw			[%g6 + AOFF_task_work], %l0
+1:		sllx			%l0, 48, %o0
+
+		brz,pt			%o0, __handle_perfctrs_continue
 		 sethi			%hi(TSTATE_PEF), %o0
 		clr			%o0
 		mov			%l5, %o2
 		mov			%l6, %o3
 		add			%sp, STACK_BIAS + REGWIN_SZ, %o1
+		mov			%l0, %o4
+		call			do_notify_resume
 
-		call			do_signal
 		 wrpr			%g0, RTRAP_PSTATE, %pstate
 		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
 		clr			%l6
@@ -108,8 +116,8 @@ __handle_perfctrs:
 		sethi			%hi(0xf << 20), %l4
 		and			%l1, %l4, %l4
 		andn			%l1, %l4, %l1
-
 		ba,pt			%xcc, __handle_perfctrs_continue
+
 		 sethi			%hi(TSTATE_PEF), %o0
 __handle_userfpu:
 		rd			%fprs, %l5
@@ -124,7 +132,8 @@ __handle_signal:
 		mov			%l5, %o2
 		mov			%l6, %o3
 		add			%sp, STACK_BIAS + REGWIN_SZ, %o1
-		call			do_signal
+		mov			%l0, %o4
+		call			do_notify_resume
 		 wrpr			%g0, RTRAP_PSTATE, %pstate
 		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
 		clr			%l6
@@ -173,13 +182,13 @@ __handle_softirq_continue:
 		 */
 to_user:	wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
 __handle_preemption_continue:
-#error		ldx			[%g6 + AOFF_task_need_resched], %l0
-		brnz,pn			%l0, __handle_preemption
-#error		 lduw			[%g6 + AOFF_task_sigpending], %l0
-		brnz,pn			%l0, __handle_signal
-		 nop
+		lduw			[%g6 + AOFF_task_work], %l0
+		srlx			%l0, 24, %o0
+		brnz,pn			%o0, __handle_preemption
+		 sllx			%l0, 48, %o0
+		brnz,pn			%o0, __handle_signal
 __handle_signal_continue:
-		ldub			[%g6 + AOFF_task_thread + AOFF_thread_w_saved], %o2
+		 ldub			[%g6 + AOFF_task_thread + AOFF_thread_w_saved], %o2
 		brnz,pn			%o2, __handle_user_windows
 		 nop
 __handle_user_windows_continue:

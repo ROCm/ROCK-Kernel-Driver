@@ -1,4 +1,4 @@
-/*  $Id: signal.c,v 1.57 2001/12/11 04:55:51 davem Exp $
+/*  $Id: signal.c,v 1.58 2002/01/31 03:30:06 davem Exp $
  *  arch/sparc64/kernel/signal.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
@@ -32,8 +32,8 @@
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
-asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs,
-			 unsigned long orig_o0, int ret_from_syscall);
+static int do_signal(sigset_t *oldset, struct pt_regs * regs,
+		     unsigned long orig_o0, int ret_from_syscall);
 
 /* This turned off for production... */
 /* #define DEBUG_SIGNALS 1 */
@@ -688,8 +688,8 @@ static inline void read_maps (void)
  * want to handle. Thus you cannot kill init even with a SIGKILL even by
  * mistake.
  */
-asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs,
-			 unsigned long orig_i0, int restart_syscall)
+static int do_signal(sigset_t *oldset, struct pt_regs * regs,
+		     unsigned long orig_i0, int restart_syscall)
 {
 	unsigned long signr;
 	siginfo_t info;
@@ -700,8 +700,8 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs,
 
 #ifdef CONFIG_SPARC32_COMPAT
 	if (current->thread.flags & SPARC_FLAG_32BIT) {
-		extern asmlinkage int do_signal32(sigset_t *, struct pt_regs *,
-						  unsigned long, int);
+		extern int do_signal32(sigset_t *, struct pt_regs *,
+				       unsigned long, int);
 		return do_signal32(oldset, regs, orig_i0, restart_syscall);
 	}
 #endif	
@@ -829,4 +829,16 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs,
 		regs->tnpc -= 4;
 	}
 	return 0;
+}
+
+void do_notify_resume(sigset_t *oldset, struct pt_regs *regs,
+		      unsigned long orig_i0, int restart_syscall,
+		      unsigned int work_pending)
+{
+	/* We don't pass in the task_work struct as a struct because
+	 * GCC always bounces that onto the stack due to the
+	 * ABI calling conventions.
+	 */
+	if (work_pending & 0x0000ff00)
+		do_signal(oldset, regs, orig_i0, restart_syscall);
 }

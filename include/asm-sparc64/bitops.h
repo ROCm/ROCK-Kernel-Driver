@@ -1,4 +1,4 @@
-/* $Id: bitops.h,v 1.38 2001/11/19 18:36:34 davem Exp $
+/* $Id: bitops.h,v 1.39 2002/01/30 01:40:00 davem Exp $
  * bitops.h: Bit string operations on the V9.
  *
  * Copyright 1996, 1997 David S. Miller (davem@caip.rutgers.edu)
@@ -64,54 +64,38 @@ do {	unsigned long __nr = (X);			\
 #define smp_mb__before_clear_bit()	do { } while(0)
 #define smp_mb__after_clear_bit()	do { } while(0)
 
-extern __inline__ int test_bit(int nr, __const__ void *addr)
+static __inline__ int test_bit(int nr, __const__ void *addr)
 {
 	return (1UL & (((__const__ long *) addr)[nr >> 6] >> (nr & 63))) != 0UL;
 }
 
 /* The easy/cheese version for now. */
-extern __inline__ unsigned long ffz(unsigned long word)
+static __inline__ unsigned long ffz(unsigned long word)
 {
 	unsigned long result;
 
-#ifdef ULTRA_HAS_POPULATION_COUNT	/* Thanks for nothing Sun... */
-	__asm__ __volatile__(
-"	brz,pn	%0, 1f\n"
-"	 neg	%0, %%g1\n"
-"	xnor	%0, %%g1, %%g2\n"
-"	popc	%%g2, %0\n"
-"1:	" : "=&r" (result)
-	  : "0" (word)
-	  : "g1", "g2");
-#else
-#if 1 /* def EASY_CHEESE_VERSION */
 	result = 0;
 	while(word & 1) {
 		result++;
 		word >>= 1;
 	}
-#else
-	unsigned long tmp;
+	return result;
+}
 
-	result = 0;	
-	tmp = ~word & -~word;
-	if (!(unsigned)tmp) {
-		tmp >>= 32;
-		result = 32;
+/**
+ * __ffs - find first bit in word.
+ * @word: The word to search
+ *
+ * Undefined if no bit exists, so code should check against 0 first.
+ */
+static __inline__ unsigned long __ffs(unsigned long word)
+{
+	unsigned long result = 0;
+
+	while (!(word & 1UL)) {
+		result++;
+		word >>= 1;
 	}
-	if (!(unsigned short)tmp) {
-		tmp >>= 16;
-		result += 16;
-	}
-	if (!(unsigned char)tmp) {
-		tmp >>= 8;
-		result += 8;
-	}
-	if (tmp & 0xf0) result += 4;
-	if (tmp & 0xcc) result += 2;
-	if (tmp & 0xaa) result ++;
-#endif
-#endif
 	return result;
 }
 
@@ -122,8 +106,12 @@ extern __inline__ unsigned long ffz(unsigned long word)
  * the libc and compiler builtin ffs routines, therefore
  * differs in spirit from the above ffz (man ffs).
  */
-
-#define ffs(x) generic_ffs(x)
+static __inline__ int ffs(int x)
+{
+	if (!x)
+		return 0;
+	return __ffs((unsigned long)x);
+}
 
 /*
  * hweightN: returns the hamming weight (i.e. the number
@@ -132,7 +120,7 @@ extern __inline__ unsigned long ffz(unsigned long word)
 
 #ifdef ULTRA_HAS_POPULATION_COUNT
 
-extern __inline__ unsigned int hweight32(unsigned int w)
+static __inline__ unsigned int hweight32(unsigned int w)
 {
 	unsigned int res;
 
@@ -140,7 +128,7 @@ extern __inline__ unsigned int hweight32(unsigned int w)
 	return res;
 }
 
-extern __inline__ unsigned int hweight16(unsigned int w)
+static __inline__ unsigned int hweight16(unsigned int w)
 {
 	unsigned int res;
 
@@ -148,7 +136,7 @@ extern __inline__ unsigned int hweight16(unsigned int w)
 	return res;
 }
 
-extern __inline__ unsigned int hweight8(unsigned int w)
+static __inline__ unsigned int hweight8(unsigned int w)
 {
 	unsigned int res;
 
@@ -165,12 +153,67 @@ extern __inline__ unsigned int hweight8(unsigned int w)
 #endif
 #endif /* __KERNEL__ */
 
+/**
+ * find_next_bit - find the next set bit in a memory region
+ * @addr: The address to base the search on
+ * @offset: The bitnumber to start searching at
+ * @size: The maximum size to search
+ */
+static __inline__ unsigned long find_next_bit(void *addr, unsigned long size, unsigned long offset)
+{
+	unsigned long *p = ((unsigned long *) addr) + (offset >> 6);
+	unsigned long result = offset & ~63UL;
+	unsigned long tmp;
+
+	if (offset >= size)
+		return size;
+	size -= result;
+	offset &= 63UL;
+	if (offset) {
+		tmp = *(p++);
+		tmp &= (~0UL << offset);
+		if (size < 64)
+			goto found_first;
+		if (tmp)
+			goto found_middle;
+		size -= 64;
+		result += 64;
+	}
+	while (size & ~63UL) {
+		if ((tmp = *(p++)))
+			goto found_middle;
+		result += 64;
+		size -= 64;
+	}
+	if (!size)
+		return result;
+	tmp = *p;
+
+found_first:
+	tmp &= (~0UL >> (64 - size));
+	if (tmp == 0UL)        /* Are any bits set? */
+		return result + size; /* Nope. */
+found_middle:
+	return result + __ffs(tmp);
+}
+
+/**
+ * find_first_bit - find the first set bit in a memory region
+ * @addr: The address to start the search at
+ * @size: The maximum size to search
+ *
+ * Returns the bit-number of the first set bit, not the number of the byte
+ * containing a bit.
+ */
+#define find_first_bit(addr, size) \
+	find_next_bit((addr), (size), 0)
+
 /* find_next_zero_bit() finds the first zero bit in a bit string of length
  * 'size' bits, starting the search at bit 'offset'. This is largely based
  * on Linus's ALPHA routines, which are pretty portable BTW.
  */
 
-extern __inline__ unsigned long find_next_zero_bit(void *addr, unsigned long size, unsigned long offset)
+static __inline__ unsigned long find_next_zero_bit(void *addr, unsigned long size, unsigned long offset)
 {
 	unsigned long *p = ((unsigned long *) addr) + (offset >> 6);
 	unsigned long result = offset & ~63UL;
@@ -219,7 +262,7 @@ extern long ___test_and_clear_le_bit(int nr, volatile void *addr);
 #define set_le_bit(nr,addr)		((void)___test_and_set_le_bit(nr,addr))
 #define clear_le_bit(nr,addr)		((void)___test_and_clear_le_bit(nr,addr))
 
-extern __inline__ int test_le_bit(int nr, __const__ void * addr)
+static __inline__ int test_le_bit(int nr, __const__ void * addr)
 {
 	int			mask;
 	__const__ unsigned char	*ADDR = (__const__ unsigned char *) addr;
@@ -232,7 +275,7 @@ extern __inline__ int test_le_bit(int nr, __const__ void * addr)
 #define find_first_zero_le_bit(addr, size) \
         find_next_zero_le_bit((addr), (size), 0)
 
-extern __inline__ unsigned long find_next_zero_le_bit(void *addr, unsigned long size, unsigned long offset)
+static __inline__ unsigned long find_next_zero_le_bit(void *addr, unsigned long size, unsigned long offset)
 {
 	unsigned long *p = ((unsigned long *) addr) + (offset >> 6);
 	unsigned long result = offset & ~63UL;

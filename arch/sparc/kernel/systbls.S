@@ -1,4 +1,4 @@
-/* $Id: systbls.S,v 1.101 2001/10/18 08:27:05 davem Exp $
+/* $Id: systbls.S,v 1.102 2002/01/31 03:30:05 davem Exp $
  * systbls.S: System call entry point tables for OS compatibility.
  *            The native Linux system call table lives here also.
  *
@@ -51,11 +51,11 @@ sys_call_table:
 /*150*/	.long sys_nis_syscall, sys_nis_syscall, sys_nis_syscall, sys_poll, sys_getdents64
 /*155*/	.long sys_fcntl64, sys_nis_syscall, sys_statfs, sys_fstatfs, sys_oldumount
 /*160*/	.long sys_nis_syscall, sys_nis_syscall, sys_getdomainname, sys_setdomainname, sys_nis_syscall
-/*165*/	.long sys_quotactl, sys_nis_syscall, sys_mount, sys_ustat, sys_nis_syscall
-/*170*/	.long sys_nis_syscall, sys_nis_syscall, sys_nis_syscall, sys_nis_syscall, sys_getdents
-/*175*/	.long sys_setsid, sys_fchdir, sys_nis_syscall, sys_nis_syscall, sys_nis_syscall
-/*180*/	.long sys_nis_syscall, sys_nis_syscall, sys_nis_syscall, sys_sigpending, sys_query_module
-/*185*/	.long sys_setpgid, sys_nis_syscall, sys_nis_syscall, sys_nis_syscall, sys_newuname
+/*165*/	.long sys_quotactl, sys_nis_syscall, sys_mount, sys_ustat, sys_setxattr
+/*170*/	.long sys_lsetxattr, sys_fsetxattr, sys_getxattr, sys_lgetxattr, sys_getdents
+/*175*/	.long sys_setsid, sys_fchdir, sys_fgetxattr, sys_listxattr, sys_llistxattr
+/*180*/	.long sys_flistxattr, sys_removexattr, sys_lremovexattr, sys_sigpending, sys_query_module
+/*185*/	.long sys_setpgid, sys_fremovexattr, sys_nis_syscall, sys_nis_syscall, sys_newuname
 /*190*/	.long sys_init_module, sys_personality, sys_nis_syscall, sys_nis_syscall, sys_nis_syscall
 /*195*/	.long sys_nis_syscall, sys_nis_syscall, sys_getppid, sparc_sigaction, sys_sgetmask
 /*200*/	.long sys_ssetmask, sys_sigsuspend, sys_newlstat, sys_uselib, old_readdir

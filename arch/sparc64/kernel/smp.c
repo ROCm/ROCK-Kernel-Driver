@@ -218,12 +218,8 @@ void __init smp_callin(void)
 	atomic_inc(&init_mm.mm_count);
 	current->active_mm = &init_mm;
 
-	init_idle();
-
 	while (!smp_threads_ready)
 		membar("#LoadLoad");
-
-	idle_startup_done();
 }
 
 void cpu_panic(void)
@@ -242,6 +238,8 @@ extern unsigned long sparc64_cpu_startup;
  */
 static struct task_struct *cpu_new_task = NULL;
 
+static void smp_tune_scheduling(void);
+
 void __init smp_boot_cpus(void)
 {
 	int cpucount = 0, i;
@@ -250,15 +248,17 @@ void __init smp_boot_cpus(void)
 	__sti();
 	smp_store_cpu_info(boot_cpu_id);
 
-	if (linux_num_cpus == 1)
+	if (linux_num_cpus == 1) {
+		smp_tune_scheduling();
 		return;
+	}
 
 	for (i = 0; i < NR_CPUS; i++) {
 		if (i == boot_cpu_id)
 			continue;
 
 		if ((cpucount + 1) == max_cpus)
-			break;
+			goto ignorecpu;
 		if (cpu_present_map & (1UL << i)) {
 			unsigned long entry = (unsigned long)(&sparc64_cpu_startup);
 			unsigned long cookie = (unsigned long)(&cpu_new_task);
@@ -272,7 +272,7 @@ void __init smp_boot_cpus(void)
 
 			p = init_task.prev_task;
 
-			p->cpu = i;
+			init_idle(p, i);
 
 			unhash_process(p);
 
@@ -300,13 +300,15 @@ void __init smp_boot_cpus(void)
 			}
 		}
 		if (!callin_flag) {
+ignorecpu:
 			cpu_present_map &= ~(1UL << i);
 			__cpu_number_map[i] = -1;
 		}
 	}
 	cpu_new_task = NULL;
 	if (cpucount == 0) {
-		printk("Error: only one processor found.\n");
+		if (max_cpus != 1)
+			printk("Error: only one processor found.\n");
 		cpu_present_map = (1UL << smp_processor_id());
 	} else {
 		unsigned long bogosum = 0;
@@ -322,6 +324,12 @@ void __init smp_boot_cpus(void)
 		smp_activated = 1;
 		smp_num_cpus = cpucount + 1;
 	}
+
+	/* We want to run this with all the other cpus spinning
+	 * in the kernel.
+	 */
+	smp_tune_scheduling();
+
 	smp_processors_ready = 1;
 	membar("#StoreStore | #StoreLoad");
 }
@@ -1170,27 +1178,94 @@ void __init smp_tick_init(void)
 	prof_counter(boot_cpu_id) = prof_multiplier(boot_cpu_id) = 1;
 }
 
-static inline unsigned long find_flush_base(unsigned long size)
-{
-	struct page *p = mem_map;
-	unsigned long found, base;
+cycles_t cacheflush_time;
+unsigned long cache_decay_ticks;
 
-	size = PAGE_ALIGN(size);
-	found = size;
-	base = (unsigned long) page_address(p);
-	while (found != 0) {
-		/* Failure. */
-		if (p >= (mem_map + max_mapnr))
-			return 0UL;
-		if (PageReserved(p)) {
-			found = size;
-			base = (unsigned long) page_address(p);
-		} else {
-			found -= PAGE_SIZE;
-		}
-		p++;
+extern unsigned long cheetah_tune_scheduling(void);
+extern unsigned long timer_ticks_per_usec_quotient;
+
+static void __init smp_tune_scheduling(void)
+{
+	unsigned long orig_flush_base, flush_base, flags, *p;
+	unsigned int ecache_size, order;
+	cycles_t tick1, tick2, raw;
+
+	/* Approximate heuristic for SMP scheduling.  It is an
+	 * estimation of the time it takes to flush the L2 cache
+	 * on the local processor.
+	 *
+	 * The ia32 chooses to use the L1 cache flush time instead,
+	 * and I consider this complete nonsense.  The Ultra can service
+	 * a miss to the L1 with a hit to the L2 in 7 or 8 cycles, and
+	 * L2 misses are what create extra bus traffic (ie. the "cost"
+	 * of moving a process from one cpu to another).
+	 */
+	printk("SMP: Calibrating ecache flush... ");
+	if (tlb_type == cheetah) {
+		cacheflush_time = cheetah_tune_scheduling();
+		goto report;
 	}
-	return base;
+
+	ecache_size = prom_getintdefault(linux_cpus[0].prom_node,
+					 "ecache-size", (512 * 1024));
+	if (ecache_size > (4 * 1024 * 1024))
+		ecache_size = (4 * 1024 * 1024);
+	orig_flush_base = flush_base =
+		__get_free_pages(GFP_KERNEL, order = get_order(ecache_size));
+
+	if (flush_base != 0UL) {
+		__save_and_cli(flags);
+
+		/* Scan twice the size once just to get the TLB entries
+		 * loaded and make sure the second scan measures pure misses.
+		 */
+		for (p = (unsigned long *)flush_base;
+		     ((unsigned long)p) < (flush_base + (ecache_size<<1));
+		     p += (64 / sizeof(unsigned long)))
+			*((volatile unsigned long *)p);
+
+		/* Now the real measurement. */
+		__asm__ __volatile__("
+		b,pt	%%xcc, 1f
+		 rd	%%tick, %0
+
+		.align	64
+1:		ldx	[%2 + 0x000], %%g1
+		ldx	[%2 + 0x040], %%g2
+		ldx	[%2 + 0x080], %%g3
+		ldx	[%2 + 0x0c0], %%g5
+		add	%2, 0x100, %2
+		cmp	%2, %4
+		bne,pt	%%xcc, 1b
+		 nop
+	
+		rd	%%tick, %1"
+		: "=&r" (tick1), "=&r" (tick2), "=&r" (flush_base)
+		: "2" (flush_base), "r" (flush_base + ecache_size)
+		: "g1", "g2", "g3", "g5");
+
+		__restore_flags(flags);
+
+		raw = (tick2 - tick1);
+
+		/* Dampen it a little, considering two processes
+		 * sharing the cache and fitting.
+		 */
+		cacheflush_time = (raw - (raw >> 2));
+
+		free_pages(orig_flush_base, order);
+	} else {
+		cacheflush_time = ((ecache_size << 2) +
+				   (ecache_size << 1));
+	}
+report:
+	/* Convert cpu ticks to jiffie ticks. */
+	cache_decay_ticks = ((long)cacheflush_time * timer_ticks_per_usec_quotient);
+	cache_decay_ticks >>= 32UL;
+	cache_decay_ticks = (cache_decay_ticks * HZ) / 1000;
+
+	printk("Using heuristic of %ld cycles, %ld ticks.\n",
+	       cacheflush_time, cache_decay_ticks);
 }
 
 /* /proc/profile writes can call this, don't __init it please. */

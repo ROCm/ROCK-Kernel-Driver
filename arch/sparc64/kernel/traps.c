@@ -1,4 +1,4 @@
-/* $Id: traps.c,v 1.83 2002/01/11 08:45:38 davem Exp $
+/* $Id: traps.c,v 1.84 2002/01/30 01:39:56 davem Exp $
  * arch/sparc64/kernel/traps.c
  *
  * Copyright (C) 1995,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -526,6 +526,21 @@ static void cheetah_flush_ecache_line(unsigned long physaddr)
 			     : "r" (physaddr), "r" (alias),
 			       "i" (ASI_PHYS_USE_EC));
 }
+
+#ifdef CONFIG_SMP
+unsigned long cheetah_tune_scheduling(void)
+{
+	unsigned long tick1, tick2, raw;
+
+	__asm__ __volatile__("rd %%tick, %0" : "=r" (tick1));
+	cheetah_flush_ecache();
+	__asm__ __volatile__("rd %%tick, %0" : "=r" (tick2));
+
+	raw = (tick2 - tick1);
+
+	return (raw - (raw >> 2));
+}
+#endif
 
 /* Unfortunately, the diagnostic access to the I-cache tags we need to
  * use to clear the thing interferes with I-cache coherency transactions.

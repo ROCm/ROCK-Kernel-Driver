@@ -1,4 +1,4 @@
-/* $Id: mmu_context.h,v 1.52 2002/01/11 08:45:38 davem Exp $ */
+/* $Id: mmu_context.h,v 1.53 2002/01/30 01:40:00 davem Exp $ */
 #ifndef __SPARC64_MMU_CONTEXT_H
 #define __SPARC64_MMU_CONTEXT_H
 
@@ -30,22 +30,20 @@
 /*
  * Every architecture must define this function. It's the fastest
  * way of searching a 168-bit bitmap where the first 128 bits are
- * unlikely to be clear. It's guaranteed that at least one of the 168
+ * unlikely to be set. It's guaranteed that at least one of the 168
  * bits is cleared.
  */
 #if MAX_RT_PRIO != 128 || MAX_PRIO != 168
 # error update this function.
 #endif
 
-static inline int sched_find_first_zero_bit(unsigned long *b)
+static inline int sched_find_first_bit(unsigned long *b)
 {
-	unsigned long rt;
-
-	rt = b[0] & b[1];
-	if (unlikely(rt != 0xffffffffffffffff))
-		return find_first_zero_bit(b, MAX_RT_PRIO);
-
-	return ffz(b[2]) + MAX_RT_PRIO;
+	if (unlikely(b[0]))
+		return __ffs(b[0]);
+	if (unlikely(b[1]))
+		return __ffs(b[1]) + 64;
+	return __ffs(b[2]) + 128;
 }
 
 static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)

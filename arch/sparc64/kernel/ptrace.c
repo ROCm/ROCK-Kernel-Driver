@@ -538,10 +538,13 @@ asmlinkage void do_ptrace(struct pt_regs *regs)
 			child->thread.kregs->tnpc = ((addr + 4) & pc_mask);
 		}
 
-		if (request == PTRACE_SYSCALL)
-			child->ptrace |= PT_TRACESYS;
-		else
-			child->ptrace &= ~PT_TRACESYS;
+		if (request == PTRACE_SYSCALL) {
+			child->ptrace |= PT_SYSCALLTRACE;
+			child->work.syscall_trace++;
+		} else {
+			child->ptrace &= ~PT_SYSCALLTRACE;
+			child->work.syscall_trace--;
+		}
 
 		child->exit_code = data;
 #ifdef DEBUG_PTRACE
@@ -621,8 +624,8 @@ asmlinkage void syscall_trace(void)
 #ifdef DEBUG_PTRACE
 	printk("%s [%d]: syscall_trace\n", current->comm, current->pid);
 #endif
-	if ((current->ptrace & (PT_PTRACED|PT_TRACESYS))
-	    != (PT_PTRACED|PT_TRACESYS))
+	if ((current->ptrace & (PT_PTRACED|PT_SYSCALLTRACE))
+	    != (PT_PTRACED|PT_SYSCALLTRACE))
 		return;
 	current->exit_code = SIGTRAP;
 	current->state = TASK_STOPPED;

@@ -1,4 +1,4 @@
-/*  $Id: signal32.c,v 1.71 2001/12/11 04:55:51 davem Exp $
+/*  $Id: signal32.c,v 1.72 2002/01/31 03:30:06 davem Exp $
  *  arch/sparc64/kernel/signal32.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
@@ -30,8 +30,8 @@
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
-asmlinkage int do_signal32(sigset_t *oldset, struct pt_regs *regs,
-			 unsigned long orig_o0, int ret_from_syscall);
+int do_signal32(sigset_t *oldset, struct pt_regs *regs,
+		unsigned long orig_o0, int ret_from_syscall);
 
 /* This turned off for production... */
 /* #define DEBUG_SIGNALS 1 */
@@ -1357,8 +1357,8 @@ static inline void read_maps (void)
  * want to handle. Thus you cannot kill init even with a SIGKILL even by
  * mistake.
  */
-asmlinkage int do_signal32(sigset_t *oldset, struct pt_regs * regs,
-			   unsigned long orig_i0, int restart_syscall)
+int do_signal32(sigset_t *oldset, struct pt_regs * regs,
+		unsigned long orig_i0, int restart_syscall)
 {
 	unsigned long signr;
 	struct k_sigaction *ka;
