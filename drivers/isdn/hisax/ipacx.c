@@ -644,23 +644,7 @@ static void
 bch_close_state(struct BCState *bcs)
 {
 	bch_mode(bcs, 0, bcs->channel);
-	if (test_and_clear_bit(BC_FLG_INIT, &bcs->Flag)) {
-		if (bcs->rcvbuf) {
-			kfree(bcs->rcvbuf);
-			bcs->rcvbuf = NULL;
-		}
-		if (bcs->blog) {
-			kfree(bcs->blog);
-			bcs->blog = NULL;
-		}
-		skb_queue_purge(&bcs->rqueue);
-		skb_queue_purge(&bcs->squeue);
-		if (bcs->tx_skb) {
-			dev_kfree_skb_any(bcs->tx_skb);
-			bcs->tx_skb = NULL;
-			clear_bit(BC_FLG_BUSY, &bcs->Flag);
-		}
-	}
+	bc_close(bcs);
 }
 
 //----------------------------------------------------------
@@ -668,30 +652,7 @@ bch_close_state(struct BCState *bcs)
 static int
 bch_open_state(struct IsdnCardState *cs, struct BCState *bcs)
 {
-	if (!test_and_set_bit(BC_FLG_INIT, &bcs->Flag)) {
-		if (!(bcs->rcvbuf = kmalloc(HSCX_BUFMAX, GFP_ATOMIC))) {
-			printk(KERN_WARNING
-				"HiSax open_bchstate(): No memory for hscx.rcvbuf\n");
-			clear_bit(BC_FLG_INIT, &bcs->Flag);
-			return (1);
-		}
-		if (!(bcs->blog = kmalloc(MAX_BLOG_SPACE, GFP_ATOMIC))) {
-			printk(KERN_WARNING
-				"HiSax open_bchstate: No memory for bcs->blog\n");
-			clear_bit(BC_FLG_INIT, &bcs->Flag);
-			kfree(bcs->rcvbuf);
-			bcs->rcvbuf = NULL;
-			return (2);
-		}
-		skb_queue_head_init(&bcs->rqueue);
-		skb_queue_head_init(&bcs->squeue);
-	}
-	bcs->tx_skb = NULL;
-	clear_bit(BC_FLG_BUSY, &bcs->Flag);
-	bcs->event = 0;
-	bcs->rcvidx = 0;
-	bcs->tx_cnt = 0;
-	return (0);
+	return bc_open(bcs);
 }
 
 //----------------------------------------------------------

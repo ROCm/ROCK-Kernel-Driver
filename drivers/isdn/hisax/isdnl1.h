@@ -459,7 +459,7 @@ recv_rme_b(struct BCState *bcs)
 
 	skb = dev_alloc_skb(count);
 	if (!skb) {
-		printk(KERN_WARNING "%s: out of memory\n", __FUNCTION__);
+		printk(KERN_WARNING "HiSax: %s: out of memory\n", __FUNCTION__);
 		return;
 	}
 	memcpy(skb_put(skb, count), bcs->rcvbuf, count);
@@ -476,3 +476,58 @@ recv_rpf_b(struct BCState *bcs)
 	recv_rme_b(bcs);
 }
 	
+static inline int
+bc_open(struct BCState *bcs)
+{
+	if (test_and_set_bit(BC_FLG_INIT, &bcs->Flag))
+		return 0;
+
+	bcs->rcvbuf = kmalloc(HSCX_BUFMAX, GFP_ATOMIC);
+	if (!bcs->rcvbuf)
+		goto err;
+
+	bcs->blog = kmalloc(MAX_BLOG_SPACE, GFP_ATOMIC);
+	if (!bcs->blog)
+		goto err_rcvbuf;
+	
+	skb_queue_head_init(&bcs->rqueue);
+	skb_queue_head_init(&bcs->squeue);
+	skb_queue_head_init(&bcs->cmpl_queue);
+
+	clear_bit(BC_FLG_BUSY, &bcs->Flag);
+	bcs->tx_skb = NULL;
+	bcs->rcvidx = 0;
+	bcs->tx_cnt = 0;
+	bcs->event = 0;
+
+	return 0;
+
+ err_rcvbuf:
+	kfree(bcs->rcvbuf);
+ err:
+	clear_bit(BC_FLG_INIT, &bcs->Flag);
+	printk(KERN_WARNING "HiSax: %s: out of memory\n", __FUNCTION__);
+	return -ENOMEM;;
+}
+
+static inline void
+bc_close(struct BCState *bcs)
+{
+	if (!test_and_clear_bit(BC_FLG_INIT, &bcs->Flag))
+		return;
+
+	kfree(bcs->rcvbuf);
+	bcs->rcvbuf = NULL;
+
+	kfree(bcs->blog);
+	bcs->blog = NULL;
+
+	skb_queue_purge(&bcs->rqueue);
+	skb_queue_purge(&bcs->squeue);
+	skb_queue_purge(&bcs->cmpl_queue);
+	if (bcs->tx_skb) {
+		dev_kfree_skb_any(bcs->tx_skb);
+		bcs->tx_skb = NULL;
+		clear_bit(BC_FLG_BUSY, &bcs->Flag);
+	}
+}
