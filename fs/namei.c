@@ -868,29 +868,31 @@ static int __emul_lookup_dentry(const char *name, struct nameidata *nd)
 		return 0;		/* something went wrong... */
 
 	if (!nd->dentry->d_inode || S_ISDIR(nd->dentry->d_inode->i_mode)) {
-		struct nameidata nd_root;
+		struct dentry *old_dentry = nd->dentry;
+		struct vfsmount *old_mnt = nd->mnt;
+		struct qstr last = nd->last;
+		int last_type = nd->last_type;
 		/*
 		 * NAME was not found in alternate root or it's a directory.  Try to find
 		 * it in the normal root:
 		 */
-		nd_root.last_type = LAST_ROOT;
-		nd_root.flags = nd->flags;
-		nd_root.depth = 0;
-		memcpy(&nd_root.intent, &nd->intent, sizeof(nd_root.intent));
+		nd->last_type = LAST_ROOT;
 		read_lock(&current->fs->lock);
-		nd_root.mnt = mntget(current->fs->rootmnt);
-		nd_root.dentry = dget(current->fs->root);
+		nd->mnt = mntget(current->fs->rootmnt);
+		nd->dentry = dget(current->fs->root);
 		read_unlock(&current->fs->lock);
-		if (path_walk(name, &nd_root))
-			return 1;
-		if (nd_root.dentry->d_inode) {
+		if (path_walk(name, nd) == 0) {
+			if (nd->dentry->d_inode) {
+				dput(old_dentry);
+				mntput(old_mnt);
+				return 1;
+			}
 			path_release(nd);
-			nd->dentry = nd_root.dentry;
-			nd->mnt = nd_root.mnt;
-			nd->last = nd_root.last;
-			return 1;
 		}
-		path_release(&nd_root);
+		nd->dentry = old_dentry;
+		nd->mnt = old_mnt;
+		nd->last = last;
+		nd->last_type = last_type;
 	}
 	return 1;
 }
