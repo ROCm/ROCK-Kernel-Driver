@@ -916,7 +916,7 @@ static int kaweth_probe(
 	if (!netdev)
 		return -ENOMEM;
 
-	kaweth = netdev_priv(dev);
+	kaweth = netdev_priv(netdev);
 	kaweth->dev = dev;
 	kaweth->net = netdev;
 
