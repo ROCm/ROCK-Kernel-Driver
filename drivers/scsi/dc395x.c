@@ -5726,9 +5726,9 @@ DC395x_init(Scsi_Host_Template * host_template, u32 io_port, u8 irq,
 	/*
 	 *$$$$$$$$$$$  MEMORY ALLOCATE FOR ADAPTER CONTROL BLOCK $$$$$$$$$$$$
 	 */
-	host = scsi_register(host_template, sizeof(struct AdapterCtlBlk));
+	host = scsi_host_alloc(host_template, sizeof(struct AdapterCtlBlk));
 	if (!host) {
-		dprintkl(KERN_INFO, "pSH scsi_register ERROR\n");
+		dprintkl(KERN_INFO, "pSH scsi_host_alloc ERROR\n");
 		return 0;
 	}
 	DC395x_print_eeprom_settings(index);
@@ -5736,7 +5736,7 @@ DC395x_init(Scsi_Host_Template * host_template, u32 io_port, u8 irq,
 	pACB = (struct AdapterCtlBlk *) host->hostdata;
 
 	if (DC395x_initACB(host, io_port, irq, index)) {
-		scsi_unregister(host);
+		scsi_host_put(host);
 		return 0;
 	}
 	DC395x_print_config(pACB);
@@ -5755,7 +5755,7 @@ DC395x_init(Scsi_Host_Template * host_template, u32 io_port, u8 irq,
 
 	} else {
 		dprintkl(KERN_INFO, "DC395x_initAdapter initial ERROR\n");
-		scsi_unregister(host);
+		scsi_host_put(host);
 		host = NULL;
 	}
 	return host;
