@@ -8,16 +8,8 @@
  * any future changes wrt the API will result in a change of the APIVERSION reported
  * to userspace by the DASDAPIVER-ioctl
  *
- * $Revision: 1.3 $
+ * $Revision: 1.4 $
  *
- * History of changes (starts July 2000)
- * 05/04/01 created by moving the kernel interface to drivers/s390/block/dasd_int.h
- * 12/06/01 DASD_API_VERSION 2 - binary compatible to 0 (new BIODASDINFO2)
- * 01/23/02 DASD_API_VERSION 3 - added BIODASDPSRD (and BIODASDENAPAV) IOCTL
- * 02/15/02 DASD_API_VERSION 4 - added BIODASDSATTR IOCTL
- * ##/##/## DASD_API_VERSION 5 - added boxed dasd support TOBEDONE
- * 21/06/02 DASD_API_VERSION 6 - fixed HDIO_GETGEO: geo.start is in sectors!
- *         
  */
 
 #ifndef DASD_H
@@ -226,6 +218,10 @@ typedef struct attrib_data_t {
 #define BIODASDSLCK    _IO(DASD_IOCTL_LETTER,4) /* steal lock */
 /* reset profiling information of a device */
 #define BIODASDPRRST   _IO(DASD_IOCTL_LETTER,5)
+/* Quiesce IO on device */
+#define BIODASDQUIESCE _IO(DASD_IOCTL_LETTER,6) 
+/* Resume IO on device */
+#define BIODASDRESUME  _IO(DASD_IOCTL_LETTER,7) 
 
 
 /* retrieve API version number */

@@ -85,7 +85,6 @@ struct pnp_option * pnp_register_dependent_option(struct pnp_dev *dev, int prior
 
 int pnp_register_irq_resource(struct pnp_option *option, struct pnp_irq *data)
 {
-	int i;
 	struct pnp_irq *ptr;
 	if (!option)
 		return -EINVAL;
@@ -101,9 +100,13 @@ int pnp_register_irq_resource(struct pnp_option *option, struct pnp_irq *data)
 		option->irq = data;
 
 #ifdef CONFIG_PCI
-	for (i=0; i<16; i++)
-		if (data->map & (1<<i))
-			pcibios_penalize_isa_irq(i);
+	{
+		int i;
+
+		for (i=0; i<16; i++)
+			if (data->map & (1<<i))
+				pcibios_penalize_isa_irq(i);
+	}
 #endif
 	return 0;
 }

@@ -162,28 +162,33 @@ void do_gettimeofday(struct timeval *tv)
 	tv->tv_usec = usec;
 }
 
-void do_settimeofday(struct timeval *tv)
+int do_settimeofday(struct timespec *tv)
 {
+	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
+		return -EINVAL;
+
 	write_seqlock_irq(&xtime_lock);
-	/* This is revolting. We need to set the xtime.tv_usec
+	/*
+	 * This is revolting. We need to set the xtime.tv_usec
 	 * correctly. However, the value in this location is
 	 * is value at the last tick.
 	 * Discover what correction gettimeofday
 	 * would have done, and then undo it!
 	 */
 	if (mach_gettimeoffset)
-		tv->tv_usec -= mach_gettimeoffset();
+		tv->tv_nsec -= (mach_gettimeoffset() * 1000);
 
-	while (tv->tv_usec < 0) {
-		tv->tv_usec += 1000000;
+	while (tv->tv_nsec < 0) {
+		tv->tv_nsec += NSEC_PER_SEC;
 		tv->tv_sec--;
 	}
 
 	xtime.tv_sec = tv->tv_sec;
-	xtime.tv_nsec = (tv->tv_usec * 1000);
+	xtime.tv_nsec = tv->tv_nsec;
 	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
 	write_sequnlock_irq(&xtime_lock);
+	return 0;
 }

@@ -34,7 +34,7 @@ struct hpsb_packet {
         } __attribute__((packed)) state;
 
         /* These are core internal. */
-        char tlabel;
+        signed char tlabel;
         char ack_code;
         char tcode;
 

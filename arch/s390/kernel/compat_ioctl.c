@@ -42,12 +42,15 @@
 #include <linux/random.h>
 #include <linux/raw.h>
 #include <linux/route.h>
+#include <linux/rtc.h>
 #include <linux/vt.h>
 #include <linux/watchdog.h>
 
 #include <linux/auto_fs.h>
+#include <linux/auto_fs4.h>
 #include <linux/devfs_fs.h>
 #include <linux/ext2_fs.h>
+#include <linux/ncp_fs.h>
 #include <linux/smb_fs.h>
 
 #include <linux/if_bonding.h>

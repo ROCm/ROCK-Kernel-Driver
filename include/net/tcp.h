@@ -1244,7 +1244,7 @@ static inline void tcp_enter_cwr(struct tcp_opt *tp)
 	}
 }
 
-extern __u32 tcp_init_cwnd(struct tcp_opt *tp);
+extern __u32 tcp_init_cwnd(struct tcp_opt *tp, struct dst_entry *dst);
 
 /* Slow start with delack produces 3 packets of burst, so that
  * it is safe "de facto".

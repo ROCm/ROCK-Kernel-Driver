@@ -1,5 +1,5 @@
 /*
- * $Id: ctcmain.c,v 1.42 2003/05/23 17:45:57 felfert Exp $
+ * $Id: ctcmain.c,v 1.43 2003/05/27 11:34:23 mschwide Exp $
  *
  * CTC / ESCON network driver
  *
@@ -36,7 +36,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.42 $
+ * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.43 $
  *
  */
 
@@ -272,7 +272,7 @@ static void
 print_banner(void)
 {
 	static int printed = 0;
-	char vbuf[] = "$Revision: 1.42 $";
+	char vbuf[] = "$Revision: 1.43 $";
 	char *version = vbuf;
 
 	if (printed)
@@ -2752,7 +2752,7 @@ ctc_init_netdevice(struct net_device * dev, int alloc_device,
 	dev->type = ARPHRD_SLIP;
 	dev->tx_queue_len = 100;
 	dev->flags = IFF_POINTOPOINT | IFF_NOARP;
-	SET_MODULE_OWNER(&tun->dev);
+	SET_MODULE_OWNER(dev);
 	return dev;
 }
 

@@ -236,7 +236,7 @@ void dump_leak(void)
 	static int dump; 
 	if (dump || !iommu_leak_tab) return;
 	dump = 1;
-	show_stack(NULL);
+	show_stack(NULL,NULL);
 	/* Very crude. dump some from the end of the table too */ 
 	printk("Dumping %d pages from end of IOMMU:\n", iommu_leak_pages); 
 	for (i = 0; i < iommu_leak_pages; i+=2) {

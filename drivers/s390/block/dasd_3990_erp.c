@@ -5,7 +5,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 2000, 2001
  *
- * $Revision: 1.24 $
+ * $Revision: 1.25 $
  */
 
 #include <linux/timer.h>
@@ -221,13 +221,6 @@ dasd_3990_erp_cleanup(struct dasd_ccw_req * erp, char final_status)
  *   Block the given device request queue to prevent from further
  *   processing until the started timer has expired or an related
  *   interrupt was received.
- *
- *  PARAMETER
- *   erp		request to be blocked
- *   expires		time to wait until restart (in jiffies) 
- *
- * RETURN VALUES
- *   void		
  */
 static void
 dasd_3990_erp_block_queue(struct dasd_ccw_req * erp, int expires)
@@ -238,7 +231,9 @@ dasd_3990_erp_block_queue(struct dasd_ccw_req * erp, int expires)
 	DEV_MESSAGE(KERN_INFO, device,
 		    "blocking request queue for %is", expires);
 
-	erp->status = DASD_CQR_PENDING;
+	device->stopped |= DASD_STOPPED_PENDING;
+	erp->status = DASD_CQR_QUEUED;
+
 	dasd_set_timer(device, expires);
 }
 
@@ -453,9 +448,11 @@ dasd_3990_erp_action_4(struct dasd_ccw_req * erp, char *sense)
 
 		if (sense[25] == 0x1D) {	/* state change pending */
 
-			DEV_MESSAGE(KERN_INFO, device, "%s",
-				    "waiting for state change pending " "int");
-
+			DEV_MESSAGE(KERN_INFO, device, 
+				    "waiting for state change pending "
+				    "interrupt, %d retries left",
+				    erp->retries);
+			
 			dasd_3990_erp_block_queue(erp, 30*HZ);
 
 		} else {

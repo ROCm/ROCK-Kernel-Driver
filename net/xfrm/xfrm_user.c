@@ -560,7 +560,7 @@ static void copy_templates(struct xfrm_policy *xp, struct xfrm_user_tmpl *ut,
 	}
 }
 
-static int copy_user_tmpl(struct xfrm_policy *pol, struct rtattr **xfrma)
+static int copy_from_user_tmpl(struct xfrm_policy *pol, struct rtattr **xfrma)
 {
 	struct rtattr *rt = xfrma[XFRMA_TMPL-1];
 	struct xfrm_user_tmpl *utmpl;
@@ -616,7 +616,7 @@ static struct xfrm_policy *xfrm_policy_construct(struct xfrm_userpolicy_info *p,
 	}
 
 	copy_from_user_policy(xp, p);
-	err = copy_user_tmpl(xp, xfrma);
+	err = copy_from_user_tmpl(xp, xfrma);
 	if (err) {
 		*errp = err;
 		kfree(xp);
@@ -653,6 +653,38 @@ static int xfrm_add_policy(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfr
 	return 0;
 }
 
+static int copy_to_user_tmpl(struct xfrm_policy *xp, struct sk_buff *skb)
+{
+	struct xfrm_user_tmpl vec[XFRM_MAX_DEPTH];
+	int i;
+
+	if (xp->xfrm_nr == 0)
+		return 0;
+
+	for (i = 0; i < xp->xfrm_nr; i++) {
+		struct xfrm_user_tmpl *up = &vec[i];
+		struct xfrm_tmpl *kp = &xp->xfrm_vec[i];
+
+		memcpy(&up->id, &kp->id, sizeof(up->id));
+		memcpy(&up->saddr, &kp->saddr, sizeof(up->saddr));
+		up->reqid = kp->reqid;
+		up->mode = kp->mode;
+		up->share = kp->share;
+		up->optional = kp->optional;
+		up->aalgos = kp->aalgos;
+		up->ealgos = kp->ealgos;
+		up->calgos = kp->calgos;
+	}
+	RTA_PUT(skb, XFRMA_TMPL,
+		(sizeof(struct xfrm_user_tmpl) * xp->xfrm_nr),
+		vec);
+
+	return 0;
+
+rtattr_failure:
+	return -1;
+}
+
 static int dump_one_policy(struct xfrm_policy *xp, int dir, int count, void *ptr)
 {
 	struct xfrm_dump_info *sp = ptr;
@@ -672,29 +704,8 @@ static int dump_one_policy(struct xfrm_policy *xp, int dir, int count, void *ptr
 	nlh->nlmsg_flags = 0;
 
 	copy_to_user_policy(xp, p, dir);
-
-	if (xp->xfrm_nr) {
-		struct xfrm_user_tmpl vec[XFRM_MAX_DEPTH];
-		int i;
-
-		for (i = 0; i < xp->xfrm_nr; i++) {
-			struct xfrm_user_tmpl *up = &vec[i];
-			struct xfrm_tmpl *kp = &xp->xfrm_vec[i];
-
-			memcpy(&up->id, &kp->id, sizeof(up->id));
-			memcpy(&up->saddr, &kp->saddr, sizeof(up->saddr));
-			up->reqid = kp->reqid;
-			up->mode = kp->mode;
-			up->share = kp->share;
-			up->optional = kp->optional;
-			up->aalgos = kp->aalgos;
-			up->ealgos = kp->ealgos;
-			up->calgos = kp->calgos;
-		}
-		RTA_PUT(skb, XFRMA_TMPL,
-			(sizeof(struct xfrm_user_tmpl) * xp->xfrm_nr),
-			vec);
-	}
+	if (copy_to_user_tmpl(xp, skb) < 0)
+		goto nlmsg_failure;
 
 	nlh->nlmsg_len = skb->tail - b;
 out:
@@ -702,7 +713,6 @@ out:
 	return 0;
 
 nlmsg_failure:
-rtattr_failure:
 	skb_trim(skb, b - skb->data);
 	return -1;
 }
@@ -1011,11 +1021,15 @@ static int build_acquire(struct sk_buff *skb, struct xfrm_state *x,
 
 	memcpy(&ua->id, &x->id, sizeof(ua->id));
 	memcpy(&ua->saddr, &x->props.saddr, sizeof(ua->saddr));
+	memcpy(&ua->sel, &x->sel, sizeof(ua->sel));
 	copy_to_user_policy(xp, &ua->policy, dir);
 	ua->aalgos = xt->aalgos;
 	ua->ealgos = xt->ealgos;
 	ua->calgos = xt->calgos;
 	ua->seq = x->km.seq = seq;
+
+	if (copy_to_user_tmpl(xp, skb) < 0)
+		goto nlmsg_failure;
 
 	nlh->nlmsg_len = skb->tail - b;
 	return skb->len;
@@ -1029,8 +1043,12 @@ static int xfrm_send_acquire(struct xfrm_state *x, struct xfrm_tmpl *xt,
 			     struct xfrm_policy *xp, int dir)
 {
 	struct sk_buff *skb;
+	size_t len;
 
-	skb = alloc_skb(sizeof(struct xfrm_user_acquire) + 16, GFP_ATOMIC);
+	len = RTA_LENGTH(sizeof(struct xfrm_user_tmpl) * xp->xfrm_nr);
+	len = RTA_ALIGN(len);
+	len += NLMSG_ALIGN(NLMSG_LENGTH(sizeof(struct xfrm_user_acquire)));
+	skb = alloc_skb(len, GFP_ATOMIC);
 	if (skb == NULL)
 		return -ENOMEM;
 

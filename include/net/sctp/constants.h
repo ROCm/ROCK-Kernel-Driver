@@ -267,7 +267,8 @@ enum { SCTP_ARBITRARY_COOKIE_ECHO_LEN = 200 };
  * nearest power of 2.
  */
 enum { SCTP_MIN_PMTU = 576 };
-enum { SCTP_MAX_DUP_TSNS = 128 };
+enum { SCTP_MAX_DUP_TSNS = 16 };
+enum { SCTP_MAX_GABS = 16 };
 
 typedef enum {
 	SCTP_COUNTER_INIT_ERROR,

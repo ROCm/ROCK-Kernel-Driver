@@ -156,8 +156,7 @@ static void internal_add_timer(tvec_base_t *base, struct timer_list *timer)
  */
 void add_timer(struct timer_list *timer)
 {
-	int cpu = get_cpu();
-	tvec_base_t *base = &per_cpu(tvec_bases, cpu);
+	tvec_base_t *base = &get_cpu_var(tvec_bases);
   	unsigned long flags;
   
   	BUG_ON(timer_pending(timer) || !timer->function);
@@ -168,7 +167,7 @@ void add_timer(struct timer_list *timer)
 	internal_add_timer(base, timer);
 	timer->base = base;
 	spin_unlock_irqrestore(&base->lock, flags);
-	put_cpu();
+	put_cpu_var(tvec_bases);
 }
 
 /***
@@ -231,7 +230,7 @@ int mod_timer(struct timer_list *timer, unsigned long expires)
 		return 1;
 
 	spin_lock_irqsave(&timer->lock, flags);
-	new_base = &per_cpu(tvec_bases, smp_processor_id());
+	new_base = &__get_cpu_var(tvec_bases);
 repeat:
 	old_base = timer->base;
 
@@ -789,7 +788,7 @@ seqlock_t xtime_lock __cacheline_aligned_in_smp = SEQLOCK_UNLOCKED;
  */
 static void run_timer_softirq(struct softirq_action *h)
 {
-	tvec_base_t *base = &per_cpu(tvec_bases, smp_processor_id());
+	tvec_base_t *base = &__get_cpu_var(tvec_bases);
 
 	if (time_after_eq(jiffies, base->timer_jiffies))
 		__run_timers(base);

@@ -123,19 +123,20 @@ void show_trace_task(struct task_struct *tsk)
 	show_trace(tsk, (unsigned long *)esp);
 }
 
-void show_stack(struct task_struct *task, unsigned long * esp)
+void show_stack(struct task_struct *task, unsigned long *esp)
 {
 	unsigned long *stack;
 	int i;
 
-	// debugging aid: "show_stack(NULL);" prints the
-	// back trace for this cpu.
-
-	if(esp==NULL)
-		esp=(unsigned long*)&esp;
+	if (esp == NULL) {
+		if (task)
+			esp = (unsigned long*)task->thread.esp;
+		else
+			esp = (unsigned long *)&esp;
+	}
 
 	stack = esp;
-	for(i=0; i < kstack_depth_to_print; i++) {
+	for(i = 0; i < kstack_depth_to_print; i++) {
 		if (((long) stack & (THREAD_SIZE-1)) == 0)
 			break;
 		if (i && ((i % 8) == 0))

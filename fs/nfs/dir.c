@@ -1015,7 +1015,9 @@ static int nfs_unlink(struct inode *dir, struct dentry *dentry)
 
 	lock_kernel();
 	spin_lock(&dcache_lock);
+	spin_lock(&dentry->d_lock);
 	if (atomic_read(&dentry->d_count) > 1) {
+		spin_unlock(&dentry->d_lock);
 		spin_unlock(&dcache_lock);
 		error = nfs_sillyrename(dir, dentry);
 		unlock_kernel();
@@ -1025,6 +1027,7 @@ static int nfs_unlink(struct inode *dir, struct dentry *dentry)
 		__d_drop(dentry);
 		need_rehash = 1;
 	}
+	spin_unlock(&dentry->d_lock);
 	spin_unlock(&dcache_lock);
 	error = nfs_safe_remove(dentry);
 	if (!error)

@@ -1295,12 +1295,12 @@ static int make_indexed_dir(handle_t *handle, struct dentry *dentry,
 	}
 	root = (struct dx_root *) bh->b_data;
 
-	EXT3_I(dir)->i_flags |= EXT3_INDEX_FL;
 	bh2 = ext3_append (handle, dir, &block, &retval);
 	if (!(bh2)) {
 		brelse(bh);
 		return retval;
 	}
+	EXT3_I(dir)->i_flags |= EXT3_INDEX_FL;
 	data1 = bh2->b_data;
 
 	/* The 0th block becomes the root, move the dirents out */

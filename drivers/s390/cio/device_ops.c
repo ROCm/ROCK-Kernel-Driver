@@ -37,6 +37,7 @@ ccw_device_set_options(struct ccw_device *cdev, unsigned long flags)
 		return -EINVAL;
 	cdev->private->options.fast = (flags & CCWDEV_EARLY_NOTIFICATION) != 0;
 	cdev->private->options.repall = (flags & CCWDEV_REPORT_ALL) != 0;
+	cdev->private->options.pgroup = (flags & CCWDEV_DO_PATHGROUP) != 0;
 	return 0;
 }
 

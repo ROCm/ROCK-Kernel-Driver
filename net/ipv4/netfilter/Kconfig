@@ -553,6 +553,13 @@ config IP_NF_ARPFILTER
 	tristate "ARP packet filtering"
 	depends on IP_NF_ARPTABLES
 
+config IP_NF_ARP_MANGLE
+	tristate "ARP payload mangling"
+	depends on IP_NF_ARPTABLES
+	help
+	  Allows altering the ARP packet payload: source and destination
+	  hardware and network addresses.
+
 # Backwards compatibility modules: only if you don't build in the others.
 config IP_NF_COMPAT_IPCHAINS
 	tristate "ipchains (2.2-style) support"

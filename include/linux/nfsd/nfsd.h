@@ -189,6 +189,7 @@ void		nfsd_lockd_shutdown(void);
 #define	nfserr_not_same		__constant_htonl(NFSERR_NOT_SAME)
 #define	nfserr_readdir_nospc	__constant_htonl(NFSERR_READDIR_NOSPC)
 #define	nfserr_bad_xdr		__constant_htonl(NFSERR_BAD_XDR)
+#define	nfserr_openmode		__constant_htonl(NFSERR_OPENMODE)
 
 /* error codes for internal use */
 /* if a request fails due to kmalloc failure, it gets dropped.

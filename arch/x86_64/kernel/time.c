@@ -47,6 +47,7 @@ unsigned long hpet_period;				/* fsecs / HPET clock */
 unsigned long hpet_tick;				/* HPET clocks / interrupt */
 unsigned long vxtime_hz = 1193182;
 int report_lost_ticks;				/* command line option */
+unsigned long long monotonic_base;
 
 struct vxtime_data __vxtime __section_vxtime;	/* for vsyscalls */
 
@@ -137,6 +138,18 @@ int do_settimeofday(struct timespec *tv)
 		tv->tv_sec--;
 	}
 
+	wall_to_monotonic.tv_sec += xtime.tv_sec - tv->tv_sec;
+	wall_to_monotonic.tv_nsec += xtime.tv_nsec - tv->tv_nsec;
+
+	if (wall_to_monotonic.tv_nsec > NSEC_PER_SEC) {
+		wall_to_monotonic.tv_nsec -= NSEC_PER_SEC;
+		wall_to_monotonic.tv_sec++;
+	}
+	if (wall_to_monotonic.tv_nsec < 0) {
+		wall_to_monotonic.tv_nsec += NSEC_PER_SEC;
+		wall_to_monotonic.tv_sec--;
+	}
+
 	xtime.tv_sec = tv->tv_sec;
 	xtime.tv_nsec = tv->tv_nsec;
 
@@ -219,6 +232,47 @@ static void set_rtc_mmss(unsigned long nowtime)
 	spin_unlock(&rtc_lock);
 }
 
+
+/* monotonic_clock(): returns # of nanoseconds passed since time_init()
+ *		Note: This function is required to return accurate
+ *		time even in the absence of multiple timer ticks.
+ */
+unsigned long long monotonic_clock(void)
+{
+	unsigned long seq;
+ 	u32 last_offset, this_offset, offset;
+	unsigned long long base;
+
+	if (vxtime.mode == VXTIME_HPET) {
+		do {
+			seq = read_seqbegin(&xtime_lock);
+
+			last_offset = vxtime.last;
+			base = monotonic_base;
+			this_offset = hpet_readl(HPET_T0_CMP) - hpet_tick;
+
+		} while (read_seqretry(&xtime_lock, seq));
+		offset = (this_offset - last_offset);
+		offset *=(NSEC_PER_SEC/HZ)/hpet_tick;
+		return base + offset;
+	}else{
+		do {
+			seq = read_seqbegin(&xtime_lock);
+
+			last_offset = vxtime.last_tsc;
+			base = monotonic_base;
+		} while (read_seqretry(&xtime_lock, seq));
+		sync_core();
+		rdtscll(this_offset);
+		offset = (this_offset - last_offset)*1000/cpu_khz; 
+		return base + offset;
+	}
+
+
+}
+EXPORT_SYMBOL(monotonic_clock);
+
+
 static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	static unsigned long rtc_update = 0;
@@ -253,6 +307,9 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			lost = (offset - vxtime.last) / hpet_tick - 1;
 		}
 
+		monotonic_base += 
+			(offset - vxtime.last)*(NSEC_PER_SEC/HZ) / hpet_tick;
+
 		vxtime.last = offset;
 	} else {
 		offset = (((tsc - vxtime.last_tsc) *
@@ -265,6 +322,8 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			lost = offset / (USEC_PER_SEC / HZ);
 			offset %= (USEC_PER_SEC / HZ);
 		}
+
+		monotonic_base += (tsc - vxtime.last_tsc)*1000000/cpu_khz ;
 
 		vxtime.last_tsc = tsc - vxtime.quot * delay / vxtime.tsc_quot;
 
@@ -543,6 +602,9 @@ void __init time_init(void)
 
 	xtime.tv_sec = get_cmos_time();
 	xtime.tv_nsec = 0;
+
+	wall_to_monotonic.tv_sec = -xtime.tv_sec;
+	wall_to_monotonic.tv_nsec = -xtime.tv_nsec;
 
 	if (!hpet_init()) {
                 vxtime_hz = (1000000000000000L + hpet_period / 2) /

@@ -90,11 +90,6 @@ struct vlan_group;
 #define MAX_HEADER (LL_MAX_HEADER + 48)
 #endif
 
-/* Reserve 16byte aligned hard_header_len, but at least 16.
- * Alternative is: dev->hard_header_len ? (dev->hard_header_len + 15)&~15 : 0
- */
-#define LL_RESERVED_SPACE(dev) (((dev)->hard_header_len&~15) + 16)
-
 /*
  *	Network device statistics. Akin to the 2.0 ether stats but
  *	with byte counters.
@@ -204,6 +199,17 @@ struct hh_cache
 	(((__len)+(HH_DATA_MOD-1))&~(HH_DATA_MOD - 1))
 	unsigned long	hh_data[HH_DATA_ALIGN(LL_MAX_HEADER)];
 };
+
+/* Reserve HH_DATA_MOD byte aligned hard_header_len, but at least that much.
+ * Alternative is:
+ *   dev->hard_header_len ? (dev->hard_header_len +
+ *                           (HH_DATA_MOD - 1)) & ~(HH_DATA_MOD - 1) : 0
+ *
+ * We could use other alignment values, but we must maintain the
+ * relationship HH alignment <= LL alignment.
+ */
+#define LL_RESERVED_SPACE(dev) \
+	(((dev)->hard_header_len&~(HH_DATA_MOD - 1)) + HH_DATA_MOD)
 
 /* These flag bits are private to the generic network queueing
  * layer, they may not be explicitly referenced by any other

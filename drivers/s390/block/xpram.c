@@ -487,7 +487,7 @@ static void __exit xpram_exit(void)
 	unregister_blkdev(XPRAM_MAJOR, XPRAM_NAME);
 	devfs_remove("slram");
 	sys_device_unregister(&xpram_sys_device);
-	sysdev_class_unregister(&xpram_sys_class);
+	sysdev_class_unregister(&xpram_sysclass);
 }
 
 static int __init xpram_init(void)
@@ -511,7 +511,7 @@ static int __init xpram_init(void)
 
 	rc = sys_device_register(&xpram_sys_device);
 	if (rc) {
-		sysdev_class_unregister(&xpram_syclass);
+		sysdev_class_unregister(&xpram_sysclass);
 		return rc;
 	}
 	rc = xpram_setup_blkdev();

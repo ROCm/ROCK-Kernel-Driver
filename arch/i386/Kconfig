@@ -1206,69 +1206,9 @@ source "drivers/block/Kconfig"
 
 source "drivers/ide/Kconfig"
 
-
-menu "SCSI device support"
-
-config SCSI
-	tristate "SCSI device support"
-	---help---
-	  If you want to use a SCSI hard disk, SCSI tape drive, SCSI CD-ROM or
-	  any other SCSI device under Linux, say Y and make sure that you know
-	  the name of your SCSI host adapter (the card inside your computer
-	  that "speaks" the SCSI protocol, also called SCSI controller),
-	  because you will be asked for it.
-
-	  You also need to say Y here if you want support for the parallel
-	  port version of the 100 MB IOMEGA ZIP drive.
-
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called scsi_mod.  If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt> and
-	  <file:Documentation/scsi/scsi.txt>.  However, do not compile this as a
-	  module if your root file system (the one containing the directory /)
-	  is located on a SCSI device.
-
 source "drivers/scsi/Kconfig"
 
-endmenu
-
-
-menu "Old CD-ROM drivers (not SCSI, not IDE)"
-	depends on ISA
-
-config CD_NO_IDESCSI
-	bool "Support non-SCSI/IDE/ATAPI CDROM drives"
-	---help---
-	  If you have a CD-ROM drive that is neither SCSI nor IDE/ATAPI, say Y
-	  here, otherwise N. Read the CD-ROM-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>.
-
-	  Note that the answer to this question doesn't directly affect the
-	  kernel: saying N will just cause the configurator to skip all
-	  the questions about these CD-ROM drives. If you are unsure what you
-	  have, say Y and find out whether you have one of the following
-	  drives.
-
-	  For each of these drivers, a file Documentation/cdrom/{driver_name}
-	  exists. Especially in cases where you do not know exactly which kind
-	  of drive you have you should read there. Most of these drivers use a
-	  file drivers/cdrom/{driver_name}.h where you can define your
-	  interface parameters and switch some internal goodies.
-
-	  All these CD-ROM drivers are also usable as a module ( = code which
-	  can be inserted in and removed from the running kernel whenever you
-	  want). If you want to compile them as module, say M instead of Y and
-	  read <file:Documentation/modules.txt>.
-
-	  If you want to use any of these CD-ROM drivers, you also have to
-	  answer Y or M to "ISO 9660 CD-ROM file system support" below (this
-	  answer will get "defaulted" for you if you enable any of the Linux
-	  CD-ROM drivers).
-
 source "drivers/cdrom/Kconfig"
-
-endmenu
 
 source "drivers/md/Kconfig"
 

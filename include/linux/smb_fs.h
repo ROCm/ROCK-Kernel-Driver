@@ -198,7 +198,7 @@ smb_is_open(struct inode *i)
 	return (SMB_I(i)->open == server_from_inode(i)->generation);
 }
 
-
+extern void smb_install_null_ops(struct smb_ops *);
 #endif /* __KERNEL__ */
 
 #endif /* _LINUX_SMB_FS_H */

@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.99 $
+ * $Revision: 1.101 $
  */
 
 #include <linux/config.h>
@@ -32,7 +32,7 @@
 /*
  * SECTION: Constant definitions to be used within this file
  */
-#define DASD_CHANQ_MAX_SIZE 5
+#define DASD_CHANQ_MAX_SIZE 4
 
 /*
  * SECTION: exported variables of dasd.c
@@ -803,24 +803,18 @@ dasd_start_IO(struct dasd_ccw_req * cqr)
  *  2) delayed start of request where start_IO failed with -EBUSY
  *  3) timeout for missing state change interrupts
  * The head of the ccw queue will have status DASD_CQR_IN_IO for 1),
- * DASD_CQR_QUEUED for 2) and DASD_CQR_PENDING for 3).
+ * DASD_CQR_QUEUED for 2) and 3).
  */
 static void
 dasd_timeout_device(unsigned long ptr)
 {
 	unsigned long flags;
 	struct dasd_device *device;
-	struct dasd_ccw_req *cqr;
 
 	device = (struct dasd_device *) ptr;
 	spin_lock_irqsave(get_ccwdev_lock(device->cdev), flags);
 	/* re-activate first request in queue */
-	if (!list_empty(&device->ccw_queue)) {
-		cqr = list_entry(device->ccw_queue.next,
-				 struct dasd_ccw_req, list);
-		if (cqr->status == DASD_CQR_PENDING)
-			cqr->status = DASD_CQR_QUEUED;
-	}
+        device->stopped &= ~DASD_STOPPED_PENDING;
 	spin_unlock_irqrestore(get_ccwdev_lock(device->cdev), flags);
 	dasd_schedule_bh(device);
 }
@@ -861,10 +855,6 @@ dasd_clear_timer(struct dasd_device *device)
 
 /*
  *   Handles the state change pending interrupt.
- *   Search for the device related request queue and check if the first
- *   cqr in queue in in status 'DASD_CQR_PENDING'.
- *   If so the status is set to 'DASD_CQR_QUEUED' to reactivate
- *   the device.
  */
 static void
 do_state_change_pending(void *data)
@@ -874,29 +864,12 @@ do_state_change_pending(void *data)
 		struct dasd_device *device;
 	} *p;
 	struct dasd_device *device;
-	struct dasd_ccw_req *cqr;
 
 	p = data;
 	device = p->device;
 	DBF_EVENT(DBF_NOTICE, "State change Interrupt for bus_id %s",
 		  device->cdev->dev.bus_id);
-
-	spin_lock_irq(get_ccwdev_lock(device->cdev));
-	/* re-activate first request in queue */
-	if (!list_empty(&device->ccw_queue)) {
-		cqr = list_entry(device->ccw_queue.next,
-				 struct dasd_ccw_req, list);
-		if (cqr == NULL) {
-			MESSAGE (KERN_DEBUG,
-				 "got state change pending interrupt on"
-				 "an idle device: bus_id %s",
-				 device->cdev->dev.bus_id);
-			return;
-		}
-		if (cqr->status == DASD_CQR_PENDING)
-			cqr->status = DASD_CQR_QUEUED;
-	}
-	spin_unlock_irq(get_ccwdev_lock(device->cdev));
+	device->stopped &= ~DASD_STOPPED_PENDING;
 	dasd_schedule_bh(device);
 	dasd_put_device(device);
 	kfree(p);
@@ -1036,7 +1009,8 @@ dasd_int_handler(struct ccw_device *cdev, unsigned long intparm,
 		if (cqr->list.next != &device->ccw_queue) {
 			next = list_entry(cqr->list.next,
 					  struct dasd_ccw_req, list);
-			if (next->status == DASD_CQR_QUEUED) {
+			if ((next->status == DASD_CQR_QUEUED) &&
+			    (!device->stopped)) {
 				if (device->discipline->start_IO(next) == 0)
 					expires = next->expires;
 				else
@@ -1264,7 +1238,8 @@ __dasd_start_head(struct dasd_device * device)
 	if (list_empty(&device->ccw_queue))
 		return;
 	cqr = list_entry(device->ccw_queue.next, struct dasd_ccw_req, list);
-	if (cqr->status == DASD_CQR_QUEUED) {
+	if ((cqr->status == DASD_CQR_QUEUED) &&
+	    (!device->stopped)) {
 		/* try to start the first I/O that can be started */
 		rc = device->discipline->start_IO(cqr);
 		if (rc == 0)

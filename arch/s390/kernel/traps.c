@@ -78,7 +78,7 @@ static int kstack_depth_to_print = 20;
 
 #endif /* CONFIG_ARCH_S390X */
 
-void show_trace(unsigned long * stack)
+void show_trace(struct task_struct *task, unsigned long * stack)
 {
 	unsigned long backchain, low_addr, high_addr, ret_addr;
 
@@ -109,10 +109,10 @@ void show_trace_task(struct task_struct *tsk)
 	 */
 	if (tsk->state == TASK_RUNNING)
 		return;
-	show_trace((unsigned long *) tsk->thread.ksp);
+	show_trace(tsk, (unsigned long *) tsk->thread.ksp);
 }
 
-void show_stack(unsigned long *sp)
+void show_stack(struct task_struct *task, unsigned long *sp)
 {
 	unsigned long *stack;
 	int i;
@@ -132,7 +132,7 @@ void show_stack(unsigned long *sp)
 		printk("%p ", (void *)*stack++);
 	}
 	printk("\n");
-	show_trace(sp);
+	show_trace(task, sp);
 }
 
 /*
@@ -140,7 +140,7 @@ void show_stack(unsigned long *sp)
  */
 void dump_stack(void)
 {
-	show_stack(0);
+	show_stack(current, 0);
 }
 
 void show_registers(struct pt_regs *regs)

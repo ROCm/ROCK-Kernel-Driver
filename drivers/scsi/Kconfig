@@ -1,3 +1,27 @@
+menu "SCSI device support"
+
+config SCSI
+	tristate "SCSI device support"
+	---help---
+	  If you want to use a SCSI hard disk, SCSI tape drive, SCSI CD-ROM or
+	  any other SCSI device under Linux, say Y and make sure that you know
+	  the name of your SCSI host adapter (the card inside your computer
+	  that "speaks" the SCSI protocol, also called SCSI controller),
+	  because you will be asked for it.
+
+	  You also need to say Y here if you have a device which speaks
+	  the SCSI protocol.  Examples of this include the parallel port
+	  version of the IOMEGA ZIP drive, USB storage devices, Fibre
+	  Channel, FireWire storage and the IDE-SCSI emulation driver.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called scsi_mod.  If you want to compile it as
+	  a module, say M here and read <file:Documentation/modules.txt> and
+	  <file:Documentation/scsi/scsi.txt>.  However, do not compile this as a
+	  module if your root file system (the one containing the directory /)
+	  is located on a SCSI device.
+
 comment "SCSI support type (disk, tape, CD-ROM)"
 	depends on SCSI
 
@@ -5,9 +29,10 @@ config BLK_DEV_SD
 	tristate "SCSI disk support"
 	depends on SCSI
 	---help---
-	  If you want to use a SCSI hard disk or the SCSI or parallel port
-	  version of the IOMEGA ZIP drive under Linux, say Y and read the
-	  SCSI-HOWTO, the Disk-HOWTO and the Multi-Disk-HOWTO, available from
+	  If you want to use SCSI hard disks, Fibre Channel disks,
+	  USB storage or the SCSI or parallel port version of
+	  the IOMEGA ZIP drive, say Y and read the SCSI-HOWTO,
+	  the Disk-HOWTO and the Multi-Disk-HOWTO, available from
 	  <http://www.tldp.org/docs.html#howto>. This is NOT for SCSI
 	  CD-ROMs.
 
@@ -65,10 +90,10 @@ config BLK_DEV_SR
 	tristate "SCSI CDROM support"
 	depends on SCSI
 	---help---
-	  If you want to use a SCSI CD-ROM under Linux, say Y and read the
-	  SCSI-HOWTO and the CD-ROM-HOWTO at
-	  <http://www.tldp.org/docs.html#howto>. Also make sure to say Y
-	  or M to "ISO 9660 CD-ROM file system support" later.
+	  If you want to use a SCSI or FireWire CD-ROM under Linux,
+	  say Y and read the SCSI-HOWTO and the CDROM-HOWTO at
+	  <http://www.tldp.org/docs.html#howto>. Also make sure to say
+	  Y or M to "ISO 9660 CD-ROM file system support" later.
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
@@ -1823,3 +1848,4 @@ endmenu
 
 source "drivers/scsi/pcmcia/Kconfig"
 
+endmenu

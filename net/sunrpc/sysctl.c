@@ -155,7 +155,6 @@ static ctl_table sunrpc_table[] = {
 	{
 		.ctl_name	= CTL_SUNRPC,
 		.procname	= "sunrpc",
-		.maxlen		= 0,
 		.mode		= 0555,
 		.child		= debug_table
 	},

@@ -52,7 +52,9 @@ CORE_Y		+= kernel/ mm/ fs/ ipc/ security/ crypto/
 CORE_Y		:= $(patsubst %/, %/built-in.o, $(CORE_Y))
 DRIVERS_Y	:= $(patsubst %/, %/built-in.o, $(drivers-y))
 NET_Y		:= $(patsubst %/, %/built-in.o, $(net-y))
-LIBS_Y		:= $(patsubst %/, %/lib.a, $(libs-y))
+LIBS_Y1		:= $(patsubst %/, %/lib.a, $(libs-y))
+LIBS_Y2		:= $(patsubst %/, %/built-in.o, $(libs-y))
+LIBS_Y		:= $(LIBS_Y1) $(LIBS_Y2)
 export INIT_Y CORE_Y DRIVERS_Y NET_Y LIBS_Y HEAD_Y
 
 # Default target

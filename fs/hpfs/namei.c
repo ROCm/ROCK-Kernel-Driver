@@ -372,12 +372,15 @@ again:
 		if (rep)
 			goto ret;
 		d_drop(dentry);
+		spin_lock(&dentry->d_lock);
 		if (atomic_read(&dentry->d_count) > 1 ||
 		    permission(inode, MAY_WRITE) ||
 		    get_write_access(inode)) {
+			spin_unlock(&dentry->d_lock);
 			d_rehash(dentry);
 			goto ret;
 		}
+		spin_unlock(&dentry->d_lock);
 		/*printk("HPFS: truncating file before delete.\n");*/
 		newattrs.ia_size = 0;
 		newattrs.ia_valid = ATTR_SIZE | ATTR_CTIME;

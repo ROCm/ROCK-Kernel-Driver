@@ -278,6 +278,19 @@ get_adapter_status(struct hotplug_slot *hotplug_slot, u8 * value)
 	return 0;
 }
 
+static void release_slot(struct hotplug_slot *hotplug_slot)
+{
+	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
+
+	if(slot == NULL)
+		return;
+
+	kfree(slot->hotplug_slot->info);
+	kfree(slot->hotplug_slot->name);
+	kfree(slot->hotplug_slot);
+	kfree(slot);
+}
+
 #define SLOT_NAME_SIZE	6
 static void
 make_slot_name(struct slot *slot)
@@ -346,6 +359,7 @@ cpci_hp_register_bus(struct pci_bus *bus, u8 first, u8 last)
 		slot->devfn = PCI_DEVFN(i, 0);
 
 		hotplug_slot->private = slot;
+		hotplug_slot->release = &release_slot;
 		make_slot_name(slot);
 		hotplug_slot->ops = &cpci_hotplug_slot_ops;
 
@@ -382,6 +396,7 @@ cpci_hp_unregister_bus(struct pci_bus *bus)
 {
 	struct slot *slot;
 	struct list_head *tmp;
+	struct list_head *next;
 	int status;
 
 	if(!bus) {
@@ -393,7 +408,7 @@ cpci_hp_unregister_bus(struct pci_bus *bus)
 		spin_unlock(&list_lock);
 		return -1;
 	}
-	list_for_each(tmp, &slot_list) {
+	list_for_each_safe(tmp, next, &slot_list) {
 		slot = list_entry(tmp, struct slot, slot_list);
 		if(slot->bus == bus) {
 			dbg("deregistering slot %s", slot->hotplug_slot->name);
@@ -405,11 +420,6 @@ cpci_hp_unregister_bus(struct pci_bus *bus)
 			}
 
 			list_del(&slot->slot_list);
-			kfree(slot->hotplug_slot->info);
-			kfree(slot->hotplug_slot->name);
-			kfree(slot->hotplug_slot);
-			kfree(slot);
-
 			slots--;
 		}
 	}

@@ -34,7 +34,6 @@
 #include <linux/sunrpc/svcsock.h>
 #include <linux/lockd/lockd.h>
 #include <linux/nfs.h>
-#include <linux/suspend.h>
 
 #define NLMDBG_FACILITY		NLMDBG_SVC
 #define LOCKD_BUFSIZE		(1024 + NLMSVC_XDRSIZE)
@@ -122,8 +121,6 @@ lockd(struct svc_rqst *rqstp)
 	while ((nlmsvc_users || !signalled()) && nlmsvc_pid == current->pid) {
 		long timeout = MAX_SCHEDULE_TIMEOUT;
 
-		if (current->flags & PF_FREEZE)
-			refrigerator(PF_IOTHREAD);
 		if (signalled()) {
 			flush_signals(current);
 			if (nlmsvc_ops) {

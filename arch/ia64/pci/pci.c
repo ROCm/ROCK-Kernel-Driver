@@ -284,21 +284,21 @@ add_window (struct acpi_resource *res, void *data)
 }
 
 struct pci_bus *
-pcibios_scan_root (void *handle, int seg, int bus)
+pci_acpi_scan_root (struct acpi_device *device, int domain, int bus)
 {
 	struct pci_root_info info;
 	struct pci_controller *controller;
 	unsigned int windows = 0;
 	char *name;
 
-	printk("PCI: Probing PCI hardware on bus (%02x:%02x)\n", seg, bus);
-	controller = alloc_pci_controller(seg);
+	printk("PCI: Probing PCI hardware on bus (%04x:%02x)\n", domain, bus);
+	controller = alloc_pci_controller(domain);
 	if (!controller)
 		goto out1;
 
-	controller->acpi_handle = handle;
+	controller->acpi_handle = device->handle;
 
-	acpi_walk_resources(handle, METHOD_NAME__CRS, count_window, &windows);
+	acpi_walk_resources(device->handle, METHOD_NAME__CRS, count_window, &windows);
 	controller->window = kmalloc(sizeof(*controller->window) * windows, GFP_KERNEL);
 	if (!controller->window)
 		goto out2;
@@ -307,10 +307,10 @@ pcibios_scan_root (void *handle, int seg, int bus)
 	if (!name)
 		goto out3;
 
-	sprintf(name, "PCI Bus %02x:%02x", seg, bus);
+	sprintf(name, "PCI Bus %04x:%02x", domain, bus);
 	info.controller = controller;
 	info.name = name;
-	acpi_walk_resources(handle, METHOD_NAME__CRS, add_window, &info);
+	acpi_walk_resources(device->handle, METHOD_NAME__CRS, add_window, &info);
 
 	return scan_root_bus(bus, &pci_root_ops, controller);
 

@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.54 $
+ *   $Revision: 1.57 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -298,20 +298,19 @@ static ssize_t
 online_store (struct device *dev, const char *buf, size_t count)
 {
 	struct ccw_device *cdev = to_ccwdev(dev);
-	unsigned int value;
+	int i;
+	char *tmp;
 
 	if (!cdev->drv)
 		return count;
 
-	sscanf(buf, "%u", &value);
-
-	if (value) {
-		if (cdev->drv->set_online)
-			ccw_device_set_online(cdev);
-	} else {
-		if (cdev->drv->set_offline)
-			ccw_device_set_offline(cdev);
-	}
+	i = simple_strtoul(buf, &tmp, 16);
+	if (i == 0 && cdev->drv->set_online)
+		ccw_device_set_online(cdev);
+	else if (i == 1 && cdev->drv->set_offline)
+		ccw_device_set_offline(cdev);
+	else
+		return -EINVAL;
 
 	return count;
 }
@@ -405,11 +404,14 @@ device_add_files (struct device *dev)
  * This allows to trigger an unconditional reserve ccw to eckd dasds
  * (if the device is something else, there should be no problems more than
  * a command reject; we don't have any means of finding out the device's
- * type if it was boxed at ipl/attach).
+ * type if it was boxed at ipl/attach for older devices and under VM).
  */
 void
-ccw_device_add_stlck(struct ccw_device *cdev)
+ccw_device_add_stlck(void *data)
 {
+	struct ccw_device *cdev;
+
+	cdev = (struct ccw_device *)data;
 	device_create_file(&cdev->dev, &dev_attr_steal_lock);
 }
 
@@ -470,6 +472,8 @@ io_subchannel_register(void *data)
 	if (ret)
 		printk(KERN_WARNING "%s: could not add attributes to %04x\n",
 		       __func__, sch->irq);
+	if (cdev->private->state == DEV_STATE_BOXED)
+		device_create_file(&cdev->dev, &dev_attr_steal_lock);
 out:
 	put_device(&sch->dev);
 }
@@ -493,6 +497,8 @@ io_subchannel_recog_done(struct ccw_device *cdev)
 		if (cdev->dev.release)
 			cdev->dev.release(&cdev->dev);
 		break;
+	case DEV_STATE_BOXED:
+		/* Device did not respond in time. */
 	case DEV_STATE_OFFLINE:
 		/* 
 		 * We can't register the device in interrupt context so
@@ -501,9 +507,6 @@ io_subchannel_recog_done(struct ccw_device *cdev)
 		INIT_WORK(&cdev->private->kick_work,
 			  io_subchannel_register, (void *) cdev);
 		queue_work(ccw_device_work, &cdev->private->kick_work);
-		break;
-	case DEV_STATE_BOXED:
-		/* Device did not respond in time. */
 		break;
 	}
 	if (atomic_dec_and_test(&ccw_device_init_count))

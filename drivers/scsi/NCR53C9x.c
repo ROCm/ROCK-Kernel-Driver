@@ -893,7 +893,7 @@ static int esp_host_info(struct NCR_ESP *esp, char *ptr, off_t offset, int len)
 int esp_proc_info(struct Scsi_Host *shost, char *buffer, char **start, off_t offset, int length,
 		  int inout)
 {
-	struct NCR_ESP *esp = (struct NCR_ESP *) SCpnt->device->host->hostdata;
+	struct NCR_ESP *esp = (struct NCR_ESP *)shost->hostdata;
 
 	if(inout)
 		return -EINVAL; /* not yet */

@@ -1215,6 +1215,7 @@ tty3215_init(void)
 		return ret;
 	}
 	tty3215_driver = driver;
+	return 0;
 }
 
 static void __exit

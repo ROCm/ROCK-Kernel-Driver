@@ -158,6 +158,17 @@ void cap_bprm_compute_creds (struct linux_binprm *bprm)
 	current->keep_capabilities = 0;
 }
 
+int cap_bprm_secureexec (struct linux_binprm *bprm)
+{
+	/* If/when this module is enhanced to incorporate capability
+	   bits on files, the test below should be extended to also perform a 
+	   test between the old and new capability sets.  For now,
+	   it simply preserves the legacy decision algorithm used by
+	   the old userland. */
+	return (current->euid != current->uid ||
+		current->egid != current->gid);
+}
+
 /* moved from kernel/sys.c. */
 /* 
  * cap_emulate_setxuid() fixes the effective / permitted capabilities of
@@ -271,6 +282,7 @@ EXPORT_SYMBOL(cap_capset_check);
 EXPORT_SYMBOL(cap_capset_set);
 EXPORT_SYMBOL(cap_bprm_set_security);
 EXPORT_SYMBOL(cap_bprm_compute_creds);
+EXPORT_SYMBOL(cap_bprm_secureexec);
 EXPORT_SYMBOL(cap_task_post_setuid);
 EXPORT_SYMBOL(cap_task_reparent_to_init);
 EXPORT_SYMBOL(cap_syslog);
@@ -289,6 +301,7 @@ static struct security_operations capability_ops = {
 
 	.bprm_compute_creds =		cap_bprm_compute_creds,
 	.bprm_set_security =		cap_bprm_set_security,
+	.bprm_secureexec =		cap_bprm_secureexec,
 
 	.task_post_setuid =		cap_task_post_setuid,
 	.task_reparent_to_init =	cap_task_reparent_to_init,

@@ -312,6 +312,20 @@ static void *get_SMBIOS_entry (void *smbios_start, void *smbios_table, u8 type, 
 	return previous;
 }
 
+static void release_slot(struct hotplug_slot *hotplug_slot)
+{
+	struct slot *slot = get_slot (hotplug_slot, __FUNCTION__);
+	
+	if (slot == NULL)
+		return;
+	
+	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
+
+	kfree(slot->hotplug_slot->info);
+	kfree(slot->hotplug_slot->name);
+	kfree(slot->hotplug_slot);
+	kfree(slot);
+}
 
 static int ctrl_slot_setup (struct controller * ctrl, void *smbios_start, void *smbios_table)
 {
@@ -401,6 +415,7 @@ static int ctrl_slot_setup (struct controller * ctrl, void *smbios_start, void *
 		new_slot->capabilities |= ((read_slot_enable(ctrl) << 2) >> ctrl_slot) & 0x04;
 
 		/* register this slot with the hotplug pci core */
+		new_slot->hotplug_slot->release = &release_slot;
 		new_slot->hotplug_slot->private = new_slot;
 		make_slot_name (new_slot->hotplug_slot->name, SLOT_NAME_SIZE, new_slot);
 		new_slot->hotplug_slot->ops = &cpqphp_hotplug_slot_ops;
@@ -415,10 +430,7 @@ static int ctrl_slot_setup (struct controller * ctrl, void *smbios_start, void *
 		result = pci_hp_register (new_slot->hotplug_slot);
 		if (result) {
 			err ("pci_hp_register failed with error %d\n", result);
-			kfree (new_slot->hotplug_slot->info);
-			kfree (new_slot->hotplug_slot->name);
-			kfree (new_slot->hotplug_slot);
-			kfree (new_slot);
+			release_slot(new_slot->hotplug_slot);
 			return result;
 		}
 		
@@ -430,9 +442,8 @@ static int ctrl_slot_setup (struct controller * ctrl, void *smbios_start, void *
 		slot_number++;
 	}
 
-	return(0);
+	return 0;
 }
-
 
 static int ctrl_slot_cleanup (struct controller * ctrl)
 {
@@ -442,12 +453,9 @@ static int ctrl_slot_cleanup (struct controller * ctrl)
 	ctrl->slot = NULL;
 
 	while (old_slot) {
+		/* memory will be freed by the release_slot callback */
 		next_slot = old_slot->next;
 		pci_hp_deregister (old_slot->hotplug_slot);
-		kfree(old_slot->hotplug_slot->info);
-		kfree(old_slot->hotplug_slot->name);
-		kfree(old_slot->hotplug_slot);
-		kfree(old_slot);
 		old_slot = next_slot;
 	}
 
@@ -498,7 +506,7 @@ static int get_slot_mapping (struct pci_bus *bus, u8 bus_num, u8 dev_num, u8 *sl
 	       sizeof(struct irq_routing_table)) / sizeof(struct irq_info);
 	// Make sure I got at least one entry
 	if (len == 0) {
-		if (PCIIRQRoutingInfoLength != NULL) kfree(PCIIRQRoutingInfoLength );
+		kfree(PCIIRQRoutingInfoLength);
 		return -1;
 	}
 
@@ -509,9 +517,7 @@ static int get_slot_mapping (struct pci_bus *bus, u8 bus_num, u8 dev_num, u8 *sl
 
 		if ((tbus == bus_num) && (tdevice == dev_num)) {
 			*slot = tslot;
-
-			if (PCIIRQRoutingInfoLength != NULL)
-				kfree(PCIIRQRoutingInfoLength);
+			kfree(PCIIRQRoutingInfoLength);
 			return 0;
 		} else {
 			// Didn't get a match on the target PCI device. Check if the
@@ -540,10 +546,10 @@ static int get_slot_mapping (struct pci_bus *bus, u8 bus_num, u8 dev_num, u8 *sl
 	// slot number for the bridge.
 	if (bridgeSlot != 0xFF) {
 		*slot = bridgeSlot;
-		if (PCIIRQRoutingInfoLength != NULL) kfree(PCIIRQRoutingInfoLength );
+		kfree(PCIIRQRoutingInfoLength);
 		return 0;
 	}
-	if (PCIIRQRoutingInfoLength != NULL) kfree(PCIIRQRoutingInfoLength );
+	kfree(PCIIRQRoutingInfoLength);
 	// Couldn't find an entry in the routing table for this PCI device
 	return -1;
 }

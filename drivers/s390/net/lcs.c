@@ -11,7 +11,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Martin Schwidefsky <schwidefsky@de.ibm.com>
  *
- *    $Revision: 1.51 $	 $Date: 2003/03/28 08:54:40 $
+ *    $Revision: 1.53 $	 $Date: 2003/06/17 11:36:45 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,7 +58,7 @@
 /**
  * initialization string for output
  */
-#define VERSION_LCS_C  "$Revision: 1.51 $"
+#define VERSION_LCS_C  "$Revision: 1.53 $"
 
 static char version[] __initdata = "LCS driver ("VERSION_LCS_C "/" VERSION_LCS_H ")";
 
@@ -1785,7 +1785,7 @@ lcs_new_device(struct ccwgroup_device *ccwgdev)
 		dev->set_multicast_list = lcs_set_multicast_list;
 #endif
 	dev->get_stats = lcs_getstats;
-	SET_MODULE_OWNER(&tun->dev);
+	SET_MODULE_OWNER(dev);
 	if (register_netdev(dev) != 0)
 		goto out;
 	netif_stop_queue(dev);
