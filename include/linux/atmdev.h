@@ -351,7 +351,7 @@ struct atm_dev {
 
 struct atmdev_ops { /* only send is required */
 	void (*dev_close)(struct atm_dev *dev);
-	int (*open)(struct atm_vcc *vcc,short vpi,int vci);
+	int (*open)(struct atm_vcc *vcc);
 	void (*close)(struct atm_vcc *vcc);
 	int (*ioctl)(struct atm_dev *dev,unsigned int cmd,void *arg);
 	int (*getsockopt)(struct atm_vcc *vcc,int level,int optname,
@@ -443,7 +443,6 @@ static inline void atm_dev_put(struct atm_dev *dev)
 int atm_charge(struct atm_vcc *vcc,int truesize);
 struct sk_buff *atm_alloc_charge(struct atm_vcc *vcc,int pdu_size,
     int gfp_flags);
-int atm_find_ci(struct atm_vcc *vcc,short *vpi,int *vci);
 int atm_pcr_goal(struct atm_trafprm *tp);
 
 void vcc_release_async(struct atm_vcc *vcc, int reply);

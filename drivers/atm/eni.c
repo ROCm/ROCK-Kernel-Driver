@@ -1881,80 +1881,18 @@ static void eni_close(struct atm_vcc *vcc)
 }
 
 
-static int get_ci(struct atm_vcc *vcc,short *vpi,int *vci)
-{
-	struct sock *s;
-	struct hlist_node *node;
-	struct atm_vcc *walk;
-
-	read_lock(&vcc_sklist_lock);
-	if (*vpi == ATM_VPI_ANY) *vpi = 0;
-	if (*vci == ATM_VCI_ANY) {
-		for (*vci = ATM_NOT_RSV_VCI; *vci < NR_VCI; (*vci)++) {
-			if (vcc->qos.rxtp.traffic_class != ATM_NONE &&
-			    ENI_DEV(vcc->dev)->rx_map[*vci])
-				continue;
-			if (vcc->qos.txtp.traffic_class != ATM_NONE) {
-				sk_for_each(s, node, &vcc_sklist) {
-					walk = atm_sk(s);
-					if (walk->dev != vcc->dev)
-						continue;
-					if (test_bit(ATM_VF_ADDR,&walk->flags)
-					    && walk->vci == *vci &&
-					    walk->qos.txtp.traffic_class !=
-					    ATM_NONE)
-						break;
-				}
-				if (node)
-					continue;
-			}
-			break;
-		}
-		read_unlock(&vcc_sklist_lock);
-		return *vci == NR_VCI ? -EADDRINUSE : 0;
-	}
-	if (*vci == ATM_VCI_UNSPEC) {
-		read_unlock(&vcc_sklist_lock);
-		return 0;
-	}
-	if (vcc->qos.rxtp.traffic_class != ATM_NONE &&
-	    ENI_DEV(vcc->dev)->rx_map[*vci]) {
-		read_unlock(&vcc_sklist_lock);
-		return -EADDRINUSE;
-	}
-	if (vcc->qos.txtp.traffic_class == ATM_NONE) {
-		read_unlock(&vcc_sklist_lock);
-		return 0;
-	}
-	sk_for_each(s, node, &vcc_sklist) {
-		walk = atm_sk(s);
-		if (walk->dev != vcc->dev)
-			continue;
-		if (test_bit(ATM_VF_ADDR,&walk->flags) && walk->vci == *vci &&
-		    walk->qos.txtp.traffic_class != ATM_NONE) {
-			read_unlock(&vcc_sklist_lock);
-			return -EADDRINUSE;
-		}
-	}
-	read_unlock(&vcc_sklist_lock);
-	return 0;
-}
-
-
-static int eni_open(struct atm_vcc *vcc,short vpi,int vci)
+static int eni_open(struct atm_vcc *vcc)
 {
 	struct eni_dev *eni_dev;
 	struct eni_vcc *eni_vcc;
 	int error;
+	short vpi = vcc->vpi;
+	int vci = vcc->vci;
 
 	DPRINTK(">eni_open\n");
 	EVENT("eni_open\n",0,0);
 	if (!test_bit(ATM_VF_PARTIAL,&vcc->flags)) ENI_VCC(vcc) = NULL;
 	eni_dev = ENI_DEV(vcc->dev);
-	error = get_ci(vcc,&vpi,&vci);
-	if (error) return error;
-	vcc->vpi = vpi;
-	vcc->vci = vci;
 	if (vci != ATM_VPI_UNSPEC && vpi != ATM_VCI_UNSPEC)
 		set_bit(ATM_VF_ADDR,&vcc->flags);
 	if (vcc->qos.aal != ATM_AAL0 && vcc->qos.aal != ATM_AAL5)

@@ -115,10 +115,12 @@ static void atmtcp_v_dev_close(struct atm_dev *dev)
 }
 
 
-static int atmtcp_v_open(struct atm_vcc *vcc,short vpi,int vci)
+static int atmtcp_v_open(struct atm_vcc *vcc)
 {
 	struct atmtcp_control msg;
 	int error;
+	short vpi = vcc->vpi;
+	int vci = vcc->vci;
 
 	memset(&msg,0,sizeof(msg));
 	msg.addr.sap_family = AF_ATMPVC;
@@ -126,8 +128,6 @@ static int atmtcp_v_open(struct atm_vcc *vcc,short vpi,int vci)
 	msg.addr.sap_addr.vpi = vpi;
 	msg.hdr.vci = htons(vci);
 	msg.addr.sap_addr.vci = vci;
-	error = atm_find_ci(vcc,&msg.addr.sap_addr.vpi,&msg.addr.sap_addr.vci);
-	if (error) return error;
 	if (vpi == ATM_VPI_UNSPEC || vci == ATM_VCI_UNSPEC) return 0;
 	msg.type = ATMTCP_CTRL_OPEN;
 	msg.qos = vcc->qos;
