@@ -165,29 +165,19 @@ endif
 # Do we have FASTFPE?
 FASTFPE		:=arch/arm/fastfpe
 ifeq ($(FASTFPE),$(wildcard $(FASTFPE)))
-SUBDIRS		+=$(FASTFPE)
-FASTFPE_OBJ	:=$(FASTFPE)/fast-math-emu.o
+FASTFPE_OBJ	:=$(FASTFPE)/
 endif
 
 # If we have a machine-specific directory, then include it in the build.
-SUBDIRS		+=arch/arm/mach-$(MACHINE) \
-		  arch/arm/kernel arch/arm/mm arch/arm/lib arch/arm/nwfpe
-CORE_FILES	:=arch/arm/mach-$(MACHINE)/$(MACHINE).o \
-		  arch/arm/kernel/kernel.o arch/arm/mm/mm.o $(CORE_FILES)
-LIBS		:=arch/arm/lib/lib.a $(LIBS)
+core-y				+= arch/arm/mach-$(MACHINE)/ \
+				   arch/arm/kernel/ arch/arm/mm/
+core-$(CONFIG_FPE_NWFPE)	+= arch/arm/nwfpe/
+core-$(CONFIG_FPE_FASTFPE)	+= $(FASTFPE_OBJ)
 
-ifeq ($(CONFIG_FPE_NWFPE),y)
-LIBS		:=arch/arm/nwfpe/math-emu.o $(LIBS)
-endif
+drivers-$(CONFIG_ARCH_CLPS7500)	+= drivers/acorn/char/
+drivers-$(CONFIG_ARCH_L7200))	+= drivers/acorn/char/
 
-ifeq ($(CONFIG_FPE_FASTFPE),y)
-LIBS		:=$(FASTFPE_OBJ) $(LIBS)
-endif
-
-ifeq ($(findstring y,$(CONFIG_ARCH_CLPS7500) $(CONFIG_ARCH_L7200)),y)
-SUBDIRS		+=drivers/acorn/char
-DRIVERS		+=drivers/acorn/char/built-in.o
-endif
+libs-y				+= arch/arm/lib/
 
 MAKEBOOT	 =$(MAKE) -C arch/$(ARCH)/boot
 MAKETOOLS	 =$(MAKE) -C arch/$(ARCH)/tools

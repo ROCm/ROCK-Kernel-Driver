@@ -2,8 +2,6 @@
 # Makefile for the linux kernel.
 #
 
-O_TARGET := kernel.o
-
 ENTRY_OBJ = entry-$(PROCESSOR).o
 
 AFLAGS_head.o := -DTEXTADDR=$(TEXTADDR)

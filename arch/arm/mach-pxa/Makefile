@@ -1,16 +1,6 @@
 #
 # Makefile for the linux kernel.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-
-O_TARGET		:= pxa.o
-
-obj-y :=
-obj-m :=
-obj-n :=
-obj-  :=
 
 export-objs := generic.o irq.o dma.o sa1111.o
 

@@ -2,8 +2,6 @@
 # Makefile for the linux kernel.
 #
 
-O_TARGET		:= sa1100.o
-
 # Common support (must be linked before board specific support)
 obj-y := generic.o irq.o dma.o
 obj-m :=
