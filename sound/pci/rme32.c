@@ -331,9 +331,8 @@ static int snd_rme32_capture_copy(snd_pcm_substream_t * substream, int channel,	
  * SPDIF I/O capabilites (half-duplex mode)
  */
 static snd_pcm_hardware_t snd_rme32_spdif_info = {
-	.info =		(SNDRV_PCM_INFO_MMAP |
+	.info =		(SNDRV_PCM_INFO_MMAP_IOMEM |
 			 SNDRV_PCM_INFO_MMAP_VALID |
-			 SNDRV_PCM_INFO_MMAP_IOMEM |
 			 SNDRV_PCM_INFO_INTERLEAVED | 
 			 SNDRV_PCM_INFO_PAUSE |
 			 SNDRV_PCM_INFO_SYNC_START),
@@ -359,9 +358,8 @@ static snd_pcm_hardware_t snd_rme32_spdif_info = {
  */
 static snd_pcm_hardware_t snd_rme32_adat_info =
 {
-	.info =		     (SNDRV_PCM_INFO_MMAP |
+	.info =		     (SNDRV_PCM_INFO_MMAP_IOMEM |
 			      SNDRV_PCM_INFO_MMAP_VALID |
-			      SNDRV_PCM_INFO_MMAP_IOMEM |
 			      SNDRV_PCM_INFO_INTERLEAVED |
 			      SNDRV_PCM_INFO_PAUSE |
 			      SNDRV_PCM_INFO_SYNC_START),
@@ -1246,6 +1244,7 @@ static snd_pcm_ops_t snd_rme32_playback_spdif_ops = {
 	.pointer =	snd_rme32_playback_pointer,
 	.copy =		snd_rme32_playback_copy,
 	.silence =	snd_rme32_playback_silence,
+	.mmap =		snd_pcm_lib_mmap_iomem,
 };
 
 static snd_pcm_ops_t snd_rme32_capture_spdif_ops = {
@@ -1258,6 +1257,7 @@ static snd_pcm_ops_t snd_rme32_capture_spdif_ops = {
 	.trigger =	snd_rme32_pcm_trigger,
 	.pointer =	snd_rme32_capture_pointer,
 	.copy =		snd_rme32_capture_copy,
+	.mmap =		snd_pcm_lib_mmap_iomem,
 };
 
 static snd_pcm_ops_t snd_rme32_playback_adat_ops = {
@@ -1270,6 +1270,7 @@ static snd_pcm_ops_t snd_rme32_playback_adat_ops = {
 	.pointer =	snd_rme32_playback_pointer,
 	.copy =		snd_rme32_playback_copy,
 	.silence =	snd_rme32_playback_silence,
+	.mmap =		snd_pcm_lib_mmap_iomem,
 };
 
 static snd_pcm_ops_t snd_rme32_capture_adat_ops = {
@@ -1281,6 +1282,7 @@ static snd_pcm_ops_t snd_rme32_capture_adat_ops = {
 	.trigger =	snd_rme32_pcm_trigger,
 	.pointer =	snd_rme32_capture_pointer,
 	.copy =		snd_rme32_capture_copy,
+	.mmap =		snd_pcm_lib_mmap_iomem,
 };
 
 /* for fullduplex mode */

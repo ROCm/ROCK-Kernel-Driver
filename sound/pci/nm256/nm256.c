@@ -742,8 +742,7 @@ snd_nm256_capture_update(nm256_t *chip)
  */
 static snd_pcm_hardware_t snd_nm256_playback =
 {
-	.info =			SNDRV_PCM_INFO_MMAP|SNDRV_PCM_INFO_MMAP_VALID|
-				SNDRV_PCM_INFO_MMAP_IOMEM|
+	.info =			SNDRV_PCM_INFO_MMAP_IOMEM |SNDRV_PCM_INFO_MMAP_VALID |
 				SNDRV_PCM_INFO_INTERLEAVED |
 				/*SNDRV_PCM_INFO_PAUSE |*/
 				SNDRV_PCM_INFO_RESUME,
@@ -762,8 +761,7 @@ static snd_pcm_hardware_t snd_nm256_playback =
 
 static snd_pcm_hardware_t snd_nm256_capture =
 {
-	.info =			SNDRV_PCM_INFO_MMAP|SNDRV_PCM_INFO_MMAP_VALID|
-				SNDRV_PCM_INFO_MMAP_IOMEM|
+	.info =			SNDRV_PCM_INFO_MMAP_IOMEM | SNDRV_PCM_INFO_MMAP_VALID |
 				SNDRV_PCM_INFO_INTERLEAVED |
 				/*SNDRV_PCM_INFO_PAUSE |*/
 				SNDRV_PCM_INFO_RESUME,
@@ -864,6 +862,7 @@ static snd_pcm_ops_t snd_nm256_playback_ops = {
 	.copy =		snd_nm256_playback_copy,
 	.silence =	snd_nm256_playback_silence,
 #endif
+	.mmap =		snd_pcm_lib_mmap_iomem,
 };
 
 static snd_pcm_ops_t snd_nm256_capture_ops = {
@@ -877,6 +876,7 @@ static snd_pcm_ops_t snd_nm256_capture_ops = {
 #ifndef __i386__
 	.copy =		snd_nm256_capture_copy,
 #endif
+	.mmap =		snd_pcm_lib_mmap_iomem,
 };
 
 static int __devinit
