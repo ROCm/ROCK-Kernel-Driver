@@ -863,6 +863,22 @@ int hci_unregister_dev(struct hci_dev *hdev)
 	return 0;
 }
 
+/* Suspend HCI device */
+int hci_suspend_dev(struct hci_dev *hdev)
+{
+	hci_notify(hdev, HCI_DEV_SUSPEND);
+	hci_run_hotplug(hdev->name, "suspend");
+	return 0;
+}
+
+/* Resume HCI device */
+int hci_resume_dev(struct hci_dev *hdev)
+{
+	hci_notify(hdev, HCI_DEV_RESUME);
+	hci_run_hotplug(hdev->name, "resume");
+	return 0;
+}       
+
 /* Receive frame from HCI drivers */
 int hci_recv_frame(struct sk_buff *skb)
 {

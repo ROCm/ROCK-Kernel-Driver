@@ -44,6 +44,9 @@
 /* HCI Core */
 EXPORT_SYMBOL(hci_register_dev);
 EXPORT_SYMBOL(hci_unregister_dev);
+EXPORT_SYMBOL(hci_suspend_dev);
+EXPORT_SYMBOL(hci_resume_dev);
+
 EXPORT_SYMBOL(hci_register_proto);
 EXPORT_SYMBOL(hci_unregister_proto);
 

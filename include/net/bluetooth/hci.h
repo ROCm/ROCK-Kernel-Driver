@@ -39,6 +39,8 @@
 #define HCI_DEV_UNREG   2
 #define HCI_DEV_UP	3
 #define HCI_DEV_DOWN	4
+#define HCI_DEV_SUSPEND 5
+#define HCI_DEV_RESUME  6
 
 /* HCI device types */
 #define HCI_VHCI	0
