@@ -36,6 +36,7 @@ ohci_pci_reset (struct usb_hcd *hcd)
 	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
 
 	ohci->regs = hcd->regs;
+	ohci->next_statechange = jiffies;
 	return hc_reset (ohci);
 }
 
@@ -118,74 +119,25 @@ ohci_pci_start (struct usb_hcd *hcd)
 static int ohci_pci_suspend (struct usb_hcd *hcd, u32 state)
 {
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
-	u16			cmd;
-	u32			tmp;
 
-	if ((ohci->hc_control & OHCI_CTRL_HCFS) != OHCI_USB_OPER) {
-		ohci_dbg (ohci, "can't suspend (state is %s)\n",
-			hcfs2string (ohci->hc_control & OHCI_CTRL_HCFS));
-		return -EIO;
-	}
+	/* suspend root hub, hoping it keeps power during suspend */
+	while (time_before (jiffies, ohci->next_statechange))
+		msec_delay (100);
 
-	/* act as if usb suspend can always be used */
-	ohci_dbg (ohci, "suspend to %d\n", state);
+#ifdef	CONFIG_USB_SUSPEND
+	(void) usb_suspend_device (hcd->self.root_hub);
+#else
+	/* FIXME lock root hub */
+	(void) ohci_hub_suspend (hcd);
+#endif
+
+	/* let things settle down a bit */
+	msec_delay (100);
 	
-	/* First stop processing */
-  	spin_lock_irq (&ohci->lock);
-	ohci->hc_control &=
-		~(OHCI_CTRL_PLE|OHCI_CTRL_CLE|OHCI_CTRL_BLE|OHCI_CTRL_IE);
-	writel (ohci->hc_control, &ohci->regs->control);
-	writel (OHCI_INTR_SF, &ohci->regs->intrstatus);
-	(void) readl (&ohci->regs->intrstatus);
-  	spin_unlock_irq (&ohci->lock);
-
-	/* Wait a frame or two */
-	mdelay (1);
-	if (!readl (&ohci->regs->intrstatus) & OHCI_INTR_SF)
-		mdelay (1);
-		
 #ifdef CONFIG_PMAC_PBOOK
 	if (_machine == _MACH_Pmac)
 		disable_irq ((to_pci_dev(hcd->self.controller))->irq);
- 	/* else, 2.4 assumes shared irqs -- don't disable */
-#endif
 
-	/* Enable remote wakeup */
-	writel (readl (&ohci->regs->intrenable) | OHCI_INTR_RD,
-		&ohci->regs->intrenable);
-
-	/* Suspend chip and let things settle down a bit */
-  	spin_lock_irq (&ohci->lock);
- 	ohci->hc_control = OHCI_USB_SUSPEND;
- 	writel (ohci->hc_control, &ohci->regs->control);
-	(void) readl (&ohci->regs->control);
-  	spin_unlock_irq (&ohci->lock);
-
-	set_current_state (TASK_UNINTERRUPTIBLE);
-	schedule_timeout (HZ/2);
-
-	tmp = readl (&ohci->regs->control) | OHCI_CTRL_HCFS;
-	switch (tmp) {
-		case OHCI_USB_RESET:
-		case OHCI_USB_RESUME:
-		case OHCI_USB_OPER:
-			ohci_err (ohci, "can't suspend; hcfs %d\n", tmp);
-			break;
-		case OHCI_USB_SUSPEND:
-			ohci_dbg (ohci, "suspended\n");
-			break;
-	}
-
-	/* In some rare situations, Apple's OHCI have happily trashed
-	 * memory during sleep. We disable its bus master bit during
-	 * suspend
-	 */
-	pci_read_config_word (to_pci_dev(hcd->self.controller), PCI_COMMAND, 
-				&cmd);
-	cmd &= ~PCI_COMMAND_MASTER;
-	pci_write_config_word (to_pci_dev(hcd->self.controller), PCI_COMMAND, 
-				cmd);
-#ifdef CONFIG_PMAC_PBOOK
 	{
 	   	struct device_node	*of_node;
  
@@ -202,7 +154,6 @@ static int ohci_pci_suspend (struct usb_hcd *hcd, u32 state)
 static int ohci_pci_resume (struct usb_hcd *hcd)
 {
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
-	int			temp;
 	int			retval = 0;
 
 #ifdef CONFIG_PMAC_PBOOK
@@ -215,90 +166,25 @@ static int ohci_pci_resume (struct usb_hcd *hcd)
 			pmac_call_feature (PMAC_FTR_USB_ENABLE, of_node, 0, 1);
 	}
 #endif
-	/* did we suspend, or were we powered off? */
-	ohci->hc_control = readl (&ohci->regs->control);
-	temp = ohci->hc_control & OHCI_CTRL_HCFS;
 
-#ifdef DEBUG
-	/* the registers may look crazy here */
-	ohci_dump_status (ohci, 0, 0);
+	/* resume root hub */
+	while (time_before (jiffies, ohci->next_statechange))
+		msec_delay (100);
+#ifdef	CONFIG_USB_SUSPEND
+	/* get extra cleanup even if remote wakeup isn't in use */
+	retval = usb_resume_device (hcd->self.root_hub);
+#else
+	down (&hcd->self.root_hub->serialize);
+	retval = ohci_hub_resume (hcd);
+	up (&hcd->self.root_hub->serialize);
 #endif
 
-	/* Re-enable bus mastering */
-	pci_set_master (to_pci_dev(ohci->hcd.self.controller));
-	
-	switch (temp) {
-
-	case OHCI_USB_RESET:	// lost power
-restart:
-		ohci_info (ohci, "USB restart\n");
-		retval = hc_restart (ohci);
-		break;
-
-	case OHCI_USB_SUSPEND:	// host wakeup
-	case OHCI_USB_RESUME:	// remote wakeup
-		ohci_info (ohci, "USB continue from %s wakeup\n",
-			 (temp == OHCI_USB_SUSPEND)
-				? "host" : "remote");
-
-		/* we "should" only need RESUME if we're SUSPENDed ... */
-		ohci->hc_control = OHCI_USB_RESUME;
-		writel (ohci->hc_control, &ohci->regs->control);
-		(void) readl (&ohci->regs->control);
-		/* Some controllers (lucent) need extra-long delays */
-		mdelay (35); /* no schedule here ! */
-
-		temp = readl (&ohci->regs->control);
-		temp = ohci->hc_control & OHCI_CTRL_HCFS;
-		if (temp != OHCI_USB_RESUME) {
-			ohci_err (ohci, "controller won't resume\n");
-			/* maybe we can reset */
-			goto restart;
-		}
-
-		/* Then re-enable operations */
-		writel (OHCI_USB_OPER, &ohci->regs->control);
-		(void) readl (&ohci->regs->control);
-		mdelay (3);
-
-		spin_lock_irq (&ohci->lock);
-		ohci->hc_control = OHCI_CONTROL_INIT | OHCI_USB_OPER;
-		if (!ohci->ed_rm_list) {
-			if (ohci->ed_controltail)
-				ohci->hc_control |= OHCI_CTRL_CLE;
-			if (ohci->ed_bulktail)
-				ohci->hc_control |= OHCI_CTRL_BLE;
-		}
-		if (hcd_to_bus (&ohci->hcd)->bandwidth_isoc_reqs
-				|| hcd_to_bus (&ohci->hcd)->bandwidth_int_reqs)
-			ohci->hc_control |= OHCI_CTRL_PLE|OHCI_CTRL_IE;
-		hcd->state = USB_STATE_RUNNING;
-		writel (ohci->hc_control, &ohci->regs->control);
-
-		/* trigger a start-frame interrupt (why?) */
-		writel (OHCI_INTR_SF, &ohci->regs->intrstatus);
-		writel (OHCI_INTR_SF, &ohci->regs->intrenable);
-
-		writel (OHCI_INTR_WDH, &ohci->regs->intrdisable);	
-		(void) readl (&ohci->regs->intrdisable);
-		spin_unlock_irq (&ohci->lock);
-
+	if (retval == 0) {
+		hcd->self.controller->power.power_state = 0;
 #ifdef CONFIG_PMAC_PBOOK
 		if (_machine == _MACH_Pmac)
 			enable_irq (to_pci_dev(hcd->self.controller)->irq);
 #endif
-
-		/* Check for a pending done list */
-		if (ohci->hcca->done_head)
-			dl_done_list (ohci, dl_reverse_done_list (ohci), NULL);
-		writel (OHCI_INTR_WDH, &ohci->regs->intrenable); 
-
-		/* assume there are TDs on the bulk and control lists */
-		writel (OHCI_BLF | OHCI_CLF, &ohci->regs->cmdstatus);
-		break;
-
-	default:
-		ohci_warn (ohci, "odd PCI resume\n");
 	}
 	return retval;
 }

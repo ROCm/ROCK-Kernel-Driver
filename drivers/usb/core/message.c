@@ -796,10 +796,6 @@ void usb_disable_interface(struct usb_device *dev, struct usb_interface *intf)
 	}
 }
 
-static void release_interface(struct device *dev)
-{
-}
-
 /*
  * usb_disable_device - Disable all the endpoints for a USB device
  * @dev: the device whose endpoints are being disabled
@@ -835,6 +831,7 @@ void usb_disable_device(struct usb_device *dev, int skip_ep0)
 			dev_dbg (&dev->dev, "unregistering interface %s\n",
 				interface->dev.bus_id);
 			device_unregister (&interface->dev);
+			dev->actconfig->interface[i] = NULL;
 		}
 		dev->actconfig = 0;
 		if (dev->state == USB_STATE_CONFIGURED)
@@ -1071,6 +1068,16 @@ int usb_reset_configuration(struct usb_device *dev)
 	return 0;
 }
 
+static void release_interface(struct device *dev)
+{
+	struct usb_interface *intf = to_usb_interface(dev);
+	struct usb_interface_cache *intfc =
+			altsetting_to_usb_interface_cache(intf->altsetting);
+
+	kref_put(&intfc->ref);
+	kfree(intf);
+}
+
 /*
  * usb_set_configuration - Makes a particular device setting be current
  * @dev: the device whose configuration is being updated
@@ -1109,19 +1116,19 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 {
 	int i, ret;
 	struct usb_host_config *cp = NULL;
-	
+	struct usb_interface **new_interfaces = NULL;
+	int n, nintf;
+
 	/* dev->serialize guards all config changes */
 
-	for (i=0; i<dev->descriptor.bNumConfigurations; i++) {
+	for (i = 0; i < dev->descriptor.bNumConfigurations; i++) {
 		if (dev->config[i].desc.bConfigurationValue == configuration) {
 			cp = &dev->config[i];
 			break;
 		}
 	}
-	if ((!cp && configuration != 0)) {
-		ret = -EINVAL;
-		goto out;
-	}
+	if ((!cp && configuration != 0))
+		return -EINVAL;
 
 	/* The USB spec says configuration 0 means unconfigured.
 	 * But if a device includes a configuration numbered 0,
@@ -1129,6 +1136,34 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 	 */
 	if (cp && configuration == 0)
 		dev_warn(&dev->dev, "config 0 descriptor??\n");
+
+	/* Allocate memory for new interfaces before doing anything else,
+	 * so that if we run out then nothing will have changed. */
+	n = nintf = 0;
+	if (cp) {
+		nintf = cp->desc.bNumInterfaces;
+		new_interfaces = kmalloc(nintf * sizeof(*new_interfaces),
+				GFP_KERNEL);
+		if (!new_interfaces) {
+			dev_err(&dev->dev, "Out of memory");
+			return -ENOMEM;
+		}
+
+		for (; n < nintf; ++n) {
+			new_interfaces[n] = kmalloc(
+					sizeof(struct usb_interface),
+					GFP_KERNEL);
+			if (!new_interfaces[n]) {
+				dev_err(&dev->dev, "Out of memory");
+				ret = -ENOMEM;
+free_interfaces:
+				while (--n >= 0)
+					kfree(new_interfaces[n]);
+				kfree(new_interfaces);
+				return ret;
+			}
+		}
+	}
 
 	/* if it's already configured, clear out old state first.
 	 * getting rid of old interfaces means unbinding their drivers.
@@ -1139,7 +1174,7 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 	if ((ret = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 			USB_REQ_SET_CONFIGURATION, 0, configuration, 0,
 			NULL, 0, HZ * USB_CTRL_SET_TIMEOUT)) < 0)
-		goto out;
+		goto free_interfaces;
 
 	dev->actconfig = cp;
 	if (!cp)
@@ -1147,13 +1182,20 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 	else {
 		dev->state = USB_STATE_CONFIGURED;
 
-		/* re-initialize hc/hcd/usbcore interface/endpoint state.
-		 * this triggers binding of drivers to interfaces; and
-		 * maybe probe() calls will choose different altsettings.
+		/* Initialize the new interface structures and the
+		 * hc/hcd/usbcore interface/endpoint state.
 		 */
-		for (i = 0; i < cp->desc.bNumInterfaces; ++i) {
-			struct usb_interface *intf = cp->interface[i];
+		for (i = 0; i < nintf; ++i) {
+			struct usb_interface_cache *intfc;
+			struct usb_interface *intf;
 			struct usb_host_interface *alt;
+
+			cp->interface[i] = intf = new_interfaces[i];
+			memset(intf, 0, sizeof(*intf));
+			intfc = cp->intf_cache[i];
+			intf->altsetting = intfc->altsetting;
+			intf->num_altsetting = intfc->num_altsetting;
+			kref_get(&intfc->ref);
 
 			alt = usb_altnum_to_altsetting(intf, 0);
 
@@ -1178,12 +1220,15 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 				 configuration,
 				 alt->desc.bInterfaceNumber);
 		}
+		kfree(new_interfaces);
 
-		/* Now that all interfaces are setup, probe() calls
-		 * may claim() any interface that's not yet bound.
-		 * Many class drivers need that: CDC, audio, video, etc.
+		/* Now that all the interfaces are set up, register them
+		 * to trigger binding of drivers to interfaces.  probe()
+		 * routines may install different altsettings and may
+		 * claim() any interfaces not yet bound.  Many class drivers
+		 * need that: CDC, audio, video, etc.
 		 */
-		for (i = 0; i < cp->desc.bNumInterfaces; ++i) {
+		for (i = 0; i < nintf; ++i) {
 			struct usb_interface *intf = cp->interface[i];
 			struct usb_interface_descriptor *desc;
 
@@ -1204,7 +1249,6 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 		}
 	}
 
-out:
 	return ret;
 }
 

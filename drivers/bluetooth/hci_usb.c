@@ -342,7 +342,7 @@ static int hci_usb_flush(struct hci_dev *hdev)
 
 static inline void hci_usb_wait_for_urb(struct urb *urb)
 {
-	while (atomic_read(&urb->count) > 1) {
+	while (atomic_read(&urb->kref.refcount) > 1) {
 		current->state = TASK_UNINTERRUPTIBLE;
 		schedule_timeout((5 * HZ + 999) / 1000);
 	}

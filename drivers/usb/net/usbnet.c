@@ -606,7 +606,7 @@ static void ax8817x_mdio_write(struct net_device *netdev, int phy_id, int loc, i
 	ax8817x_write_cmd(dev, AX_CMD_SET_HW_MII, 0, 0, 0, &buf);
 }
 
-void ax8817x_get_wol(struct net_device *net, struct ethtool_wolinfo *wolinfo)
+static void ax8817x_get_wol(struct net_device *net, struct ethtool_wolinfo *wolinfo)
 {
 	struct usbnet *dev = (struct usbnet *)net->priv;
 	u8 opt;
@@ -626,7 +626,7 @@ void ax8817x_get_wol(struct net_device *net, struct ethtool_wolinfo *wolinfo)
 	}
 }
 
-int ax8817x_set_wol(struct net_device *net, struct ethtool_wolinfo *wolinfo)
+static int ax8817x_set_wol(struct net_device *net, struct ethtool_wolinfo *wolinfo)
 {
 	struct usbnet *dev = (struct usbnet *)net->priv;
 	u8 opt = 0;
@@ -646,8 +646,8 @@ int ax8817x_set_wol(struct net_device *net, struct ethtool_wolinfo *wolinfo)
 	return 0;
 }
 
-int ax8817x_get_eeprom(struct net_device *net, 
-		       struct ethtool_eeprom *eeprom, u8 *data)
+static int ax8817x_get_eeprom(struct net_device *net,
+			      struct ethtool_eeprom *eeprom, u8 *data)
 {
 	struct usbnet *dev = (struct usbnet *)net->priv;
 	u16 *ebuf = (u16 *)data;
@@ -928,8 +928,8 @@ static struct usb_driver usbnet_driver;
  */
 static int generic_cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 {
-	u8				*buf = intf->altsetting->extra;
-	int				len = intf->altsetting->extralen;
+	u8				*buf = intf->cur_altsetting->extra;
+	int				len = intf->cur_altsetting->extralen;
 	struct usb_interface_descriptor	*d;
 	struct cdc_state		*info = (void *) &dev->data;
 	int				status;
@@ -955,7 +955,7 @@ static int generic_cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 	/* this assumes that if there's a non-RNDIS vendor variant
 	 * of cdc-acm, it'll fail RNDIS requests cleanly.
 	 */
-	rndis = (intf->altsetting->desc.bInterfaceProtocol == 0xff);
+	rndis = (intf->cur_altsetting->desc.bInterfaceProtocol == 0xff);
 
 	memset (info, 0, sizeof *info);
 	info->control = intf;
@@ -1025,7 +1025,7 @@ static int generic_cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 			}
 
 			/* a data interface altsetting does the real i/o */
-			d = &info->data->altsetting->desc;
+			d = &info->data->cur_altsetting->desc;
 			if (d->bInterfaceClass != USB_CLASS_CDC_DATA) {
 				dev_dbg (&intf->dev, "slave class %u\n",
 					d->bInterfaceClass);
@@ -3014,7 +3014,7 @@ static struct ethtool_ops usbnet_ethtool_ops;
 
 // precondition: never called in_interrupt
 
-int
+static int
 usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 {
 	struct usbnet			*dev;
@@ -3204,6 +3204,10 @@ static const struct usb_device_id	products [] = {
 	// Hawking UF200, TrendNet TU2-ET100
 	USB_DEVICE (0x07b8, 0x420a),
 	.driver_info =  (unsigned long) &hawking_uf200_info,
+}, {
+        // Billionton Systems, USB2AR 
+        USB_DEVICE (0x08dd, 0x90ff),
+        .driver_info =  (unsigned long) &ax8817x_info,
 }, {
 	// ATEN UC210T
 	USB_DEVICE (0x0557, 0x2009),

@@ -1229,6 +1229,13 @@ M:	James.Bottomley@HansenPartnership.com
 L:	linux-scsi@vger.kernel.org
 S:	Maintained
 
+LEGO USB Tower driver
+P:	Juergen Stuber
+M:	starblue@users.sourceforge.net
+L:	legousb-devel@lists.sourceforge.net
+W:	http://legousb.sourceforge.net/
+S:	Maintained
+
 LINUX FOR IBM pSERIES (RS/6000)
 P:	Paul Mackerras
 M:	paulus@au.ibm.com

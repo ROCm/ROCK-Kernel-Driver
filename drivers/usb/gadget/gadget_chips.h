@@ -20,7 +20,7 @@
 #define	gadget_is_dummy(g)	0
 #endif
 
-#ifdef CONFIG_USB_GADGET_PXA
+#ifdef CONFIG_USB_GADGET_PXA2XX
 #define	gadget_is_pxa(g)	!strcmp("pxa2xx_udc", (g)->name)
 #else
 #define	gadget_is_pxa(g)	0

@@ -87,6 +87,22 @@ static inline void ehci_qtd_free (struct ehci_hcd *ehci, struct ehci_qtd *qtd)
 }
 
 
+static void qh_destroy (struct kref *kref)
+{
+	struct ehci_qh *qh = container_of(kref, struct ehci_qh, kref);
+	struct ehci_hcd *ehci = qh->ehci;
+
+	/* clean qtds first, and know this is not linked */
+	if (!list_empty (&qh->qtd_list) || qh->qh_next.ptr) {
+		ehci_dbg (ehci, "unused qh not empty!\n");
+		BUG ();
+	}
+	if (qh->dummy)
+		ehci_qtd_free (ehci, qh->dummy);
+	usb_put_dev (qh->dev);
+	dma_pool_free (ehci->qh_pool, qh, qh->qh_dma);
+}
+
 static struct ehci_qh *ehci_qh_alloc (struct ehci_hcd *ehci, int flags)
 {
 	struct ehci_qh		*qh;
@@ -98,7 +114,8 @@ static struct ehci_qh *ehci_qh_alloc (struct ehci_hcd *ehci, int flags)
 		return qh;
 
 	memset (qh, 0, sizeof *qh);
-	atomic_set (&qh->refcount, 1);
+	kref_init(&qh->kref, qh_destroy);
+	qh->ehci = ehci;
 	qh->qh_dma = dma;
 	// INIT_LIST_HEAD (&qh->qh_list);
 	INIT_LIST_HEAD (&qh->qtd_list);
@@ -114,25 +131,15 @@ static struct ehci_qh *ehci_qh_alloc (struct ehci_hcd *ehci, int flags)
 }
 
 /* to share a qh (cpu threads, or hc) */
-static inline struct ehci_qh *qh_get (/* ehci, */ struct ehci_qh *qh)
+static inline struct ehci_qh *qh_get (struct ehci_qh *qh)
 {
-	atomic_inc (&qh->refcount);
+	kref_get(&qh->kref);
 	return qh;
 }
 
-static void qh_put (struct ehci_hcd *ehci, struct ehci_qh *qh)
+static inline void qh_put (struct ehci_qh *qh)
 {
-	if (!atomic_dec_and_test (&qh->refcount))
-		return;
-	/* clean qtds first, and know this is not linked */
-	if (!list_empty (&qh->qtd_list) || qh->qh_next.ptr) {
-		ehci_dbg (ehci, "unused qh not empty!\n");
-		BUG ();
-	}
-	if (qh->dummy)
-		ehci_qtd_free (ehci, qh->dummy);
-	usb_put_dev (qh->dev);
-	dma_pool_free (ehci->qh_pool, qh, qh->qh_dma);
+	kref_put(&qh->kref);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -145,7 +152,7 @@ static void qh_put (struct ehci_hcd *ehci, struct ehci_qh *qh)
 static void ehci_mem_cleanup (struct ehci_hcd *ehci)
 {
 	if (ehci->async)
-		qh_put (ehci, ehci->async);
+		qh_put (ehci->async);
 	ehci->async = 0;
 
 	/* DMA consistent memory and pools */

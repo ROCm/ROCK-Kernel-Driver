@@ -46,9 +46,6 @@ struct usb_cytherm {
 static int cytherm_probe(struct usb_interface *interface, 
 			 const struct usb_device_id *id);
 static void cytherm_disconnect(struct usb_interface *interface);
-int vendor_command(struct usb_device *dev, unsigned char request, 
-		   unsigned char value, unsigned char index,
-		   void *buf, int size);
 
 
 /* usb specific object needed to register this driver with the usb subsystem */
@@ -71,9 +68,9 @@ static struct usb_driver cytherm_driver = {
 
 
 /* Send a vendor command to device */
-int vendor_command(struct usb_device *dev, unsigned char request, 
-		   unsigned char value, unsigned char index,
-		   void *buf, int size)
+static int vendor_command(struct usb_device *dev, unsigned char request, 
+			  unsigned char value, unsigned char index,
+			  void *buf, int size)
 {
 	return usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
 			       request, 

@@ -3647,7 +3647,7 @@ static int ibmcam_probe(struct usb_interface *intf, const struct usb_device_id *
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
 	struct uvd *uvd = NULL;
-	int i, nas, model=0, canvasX=0, canvasY=0;
+	int ix, i, nas, model=0, canvasX=0, canvasY=0;
 	int actInterface=-1, inactInterface=-1, maxPS=0;
 	__u8 ifnum = intf->altsetting->desc.bInterfaceNumber;
 	unsigned char video_ep = 0;
@@ -3718,7 +3718,7 @@ static int ibmcam_probe(struct usb_interface *intf, const struct usb_device_id *
 	} while (0);
 
 	/* Validate found interface: must have one ISO endpoint */
-	nas = dev->actconfig->interface[ifnum]->num_altsetting;
+	nas = intf->num_altsetting;
 	if (debug > 0)
 		info("Number of alternate settings=%d.", nas);
 	if (nas < 2) {
@@ -3726,11 +3726,12 @@ static int ibmcam_probe(struct usb_interface *intf, const struct usb_device_id *
 		return -ENODEV;
 	}
 	/* Validate all alternate settings */
-	for (i=0; i < nas; i++) {
+	for (ix=0; ix < nas; ix++) {
 		const struct usb_host_interface *interface;
 		const struct usb_endpoint_descriptor *endpoint;
 
-		interface = &dev->actconfig->interface[ifnum]->altsetting[i];
+		interface = &intf->altsetting[ix];
+		i = interface->desc.bAlternateSetting;
 		if (interface->desc.bNumEndpoints != 1) {
 			err("Interface %d. has %u. endpoints!",
 			    ifnum, (unsigned)(interface->desc.bNumEndpoints));

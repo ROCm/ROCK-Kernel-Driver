@@ -22,6 +22,7 @@ static void urb_free_priv (struct ohci_hcd *hc, urb_priv_t *urb_priv)
 		}
 	}
 
+	list_del (&urb_priv->pending);
 	kfree (urb_priv);
 }
 
@@ -168,6 +169,9 @@ static void periodic_link (struct ohci_hcd *ohci, struct ed *ed)
 static int ed_schedule (struct ohci_hcd *ohci, struct ed *ed)
 {	 
 	int	branch;
+
+	if (ohci->hcd.state == USB_STATE_QUIESCING)
+		return -EAGAIN;
 
 	ed->state = ED_OPER;
 	ed->ed_prev = 0;
@@ -419,7 +423,7 @@ static struct ed *ed_get (
 	}
 
 	/* NOTE: only ep0 currently needs this "re"init logic, during
-	 * enumeration (after set_address, or if ep0 maxpacket >8).
+	 * enumeration (after set_address).
 	 */
   	if (ed->state == ED_IDLE) {
 		u32	info;
@@ -593,6 +597,7 @@ static void td_submit_urb (
 	}
 
 	urb_priv->td_cnt = 0;
+	list_add (&urb_priv->pending, &ohci->pending);
 
 	if (data_len)
 		data = urb->transfer_dma;
@@ -865,9 +870,6 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 	u32		td_dma;
 	struct td	*td_rev = NULL;
 	struct td	*td = NULL;
-  	unsigned long	flags;
-
-  	spin_lock_irqsave (&ohci->lock, flags);
 
 	td_dma = le32_to_cpup (&ohci->hcca->done_head);
 	ohci->hcca->done_head = 0;
@@ -899,7 +901,6 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 		td_rev = td;
 		td_dma = le32_to_cpup (&td->hwNextTD);
 	}	
-	spin_unlock_irqrestore (&ohci->lock, flags);
 	return td_rev;
 }
 
@@ -1013,7 +1014,9 @@ rescan_this:
    	}
 
 	/* maybe reenable control and bulk lists */ 
-	if (HCD_IS_RUNNING(ohci->hcd.state) && !ohci->ed_rm_list) {
+	if (HCD_IS_RUNNING(ohci->hcd.state)
+			&& ohci->hcd.state != USB_STATE_QUIESCING
+			&& !ohci->ed_rm_list) {
 		u32	command = 0, control = 0;
 
 		if (ohci->ed_controltail) {
@@ -1053,11 +1056,10 @@ rescan_this:
  * scanning the (re-reversed) donelist as this does.
  */
 static void
-dl_done_list (struct ohci_hcd *ohci, struct td *td, struct pt_regs *regs)
+dl_done_list (struct ohci_hcd *ohci, struct pt_regs *regs)
 {
-	unsigned long	flags;
+	struct td	*td = dl_reverse_done_list (ohci);
 
-  	spin_lock_irqsave (&ohci->lock, flags);
   	while (td) {
 		struct td	*td_next = td->next_dl_td;
 		struct urb	*urb = td->urb;
@@ -1098,5 +1100,4 @@ dl_done_list (struct ohci_hcd *ohci, struct td *td, struct pt_regs *regs)
 
     		td = td_next;
   	}  
-	spin_unlock_irqrestore (&ohci->lock, flags);
 }

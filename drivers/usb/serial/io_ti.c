@@ -279,8 +279,8 @@ static int TIPurgeDataSync (struct usb_serial_port *port, __u16 mask)
  * @address_type: Can read both XDATA and I2C
  * @buffer: pointer to input data buffer
  */
-int TIReadDownloadMemory (struct usb_device *dev, int start_address, int length,
-			  __u8 address_type, __u8 *buffer)
+static int TIReadDownloadMemory(struct usb_device *dev, int start_address,
+				int length, __u8 address_type, __u8 *buffer)
 {
 	int status = 0;
 	__u8 read_length;
@@ -328,7 +328,7 @@ int TIReadDownloadMemory (struct usb_device *dev, int start_address, int length,
 	return status;
 }
 
-int TIReadRam (struct usb_device *dev, int start_address, int length, __u8 *buffer)
+static int TIReadRam (struct usb_device *dev, int start_address, int length, __u8 *buffer)
 {
 	return TIReadDownloadMemory (dev,
 				     start_address,
@@ -612,7 +612,7 @@ static int TIChooseConfiguration (struct usb_device *dev)
 	return 0;
 }
 
-int TIReadRom (struct edgeport_serial *serial, int start_address, int length, __u8 *buffer)
+static int TIReadRom (struct edgeport_serial *serial, int start_address, int length, __u8 *buffer)
 {
 	int status;
 
@@ -632,7 +632,7 @@ int TIReadRom (struct edgeport_serial *serial, int start_address, int length, __
 	return status;
 }
 
-int TIWriteRom (struct edgeport_serial *serial, int start_address, int length, __u8 *buffer)
+static int TIWriteRom (struct edgeport_serial *serial, int start_address, int length, __u8 *buffer)
 {
 	if (serial->product_info.TiMode == TI_MODE_BOOT)
 		return TIWriteBootMemory (serial,
@@ -995,7 +995,7 @@ static int TIDownloadFirmware (struct edgeport_serial *serial)
 	if (status)
 		return status;
 
-	interface = &serial->serial->dev->config->interface[0]->altsetting->desc;
+	interface = &serial->serial->interface->cur_altsetting->desc;
 	if (!interface) {
 		dev_err (&serial->serial->dev->dev, "%s - no interface set, error!", __FUNCTION__);
 		return -ENODEV;

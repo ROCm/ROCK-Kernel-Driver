@@ -489,7 +489,7 @@ static int datafab_handle_mode_sense(struct us_data *us,
 	return USB_STOR_TRANSPORT_GOOD;
 }
 
-void datafab_info_destructor(void *extra)
+static void datafab_info_destructor(void *extra)
 {
 	// this routine is a placeholder...
 	// currently, we don't allocate any extra memory so we're okay

@@ -652,13 +652,18 @@ static void ph_disconnect(struct st5481_adapter *adapter)
 static int st5481_setup_d_out(struct st5481_adapter *adapter)
 {
 	struct usb_device *dev = adapter->usb_dev;
-	struct usb_host_interface *altsetting;
+	struct usb_interface *intf;
+	struct usb_host_interface *altsetting = NULL;
 	struct usb_host_endpoint *endpoint;
 	struct st5481_d_out *d_out = &adapter->d_out;
 
 	DBG(2,"");
 
-	altsetting = &(dev->config->interface[0]->altsetting[3]);
+	intf = usb_ifnum_to_if(dev, 0);
+	if (intf)
+		altsetting = usb_altnum_to_altsetting(intf, 3);
+	if (!altsetting)
+		return -ENXIO;
 
 	// Allocate URBs and buffers for the D channel out
 	endpoint = &altsetting->endpoint[EP_D_OUT-1];

@@ -130,6 +130,9 @@ struct zero_dev {
 	 */
 	u8			config;
 	struct usb_ep		*in_ep, *out_ep;
+
+	/* autoresume timer */
+	struct timer_list	resume;
 };
 
 #define xprintk(d,level,fmt,args...) \
@@ -167,6 +170,12 @@ module_param (buflen, uint, S_IRUGO|S_IWUSR);
 module_param (qlen, uint, S_IRUGO|S_IWUSR);
 module_param (pattern, uint, S_IRUGO|S_IWUSR);
 
+/*
+ * if it's nonzero, autoresume says how many seconds to wait
+ * before trying to wake up the host after suspend.
+ */
+static unsigned autoresume = 0;
+module_param (autoresume, uint, 0);
 
 /*
  * Normally the "loopback" configuration is second (index 1) so
@@ -224,7 +233,7 @@ device_desc = {
 	.bNumConfigurations =	2,
 };
 
-static const struct usb_config_descriptor
+static struct usb_config_descriptor
 source_sink_config = {
 	.bLength =		sizeof source_sink_config,
 	.bDescriptorType =	USB_DT_CONFIG,
@@ -237,7 +246,7 @@ source_sink_config = {
 	.bMaxPower =		1,	/* self-powered */
 };
 
-static const struct usb_config_descriptor
+static struct usb_config_descriptor
 loopback_config = {
 	.bLength =		sizeof loopback_config,
 	.bDescriptorType =	USB_DT_CONFIG,
@@ -1060,6 +1069,19 @@ zero_disconnect (struct usb_gadget *gadget)
 	 */
 }
 
+static void
+zero_autoresume (unsigned long _dev)
+{
+	struct zero_dev	*dev = (struct zero_dev *) _dev;
+	int		status;
+
+	/* normally the host would be woken up for something
+	 * more significant than just a timer firing...
+	 */
+	status = usb_gadget_wakeup (dev->gadget);
+	DBG (dev, "wakeup --> %d\n", status);
+}
+
 /*-------------------------------------------------------------------------*/
 
 static void
@@ -1072,6 +1094,7 @@ zero_unbind (struct usb_gadget *gadget)
 	/* we've already been disconnected ... no i/o is active */
 	if (dev->req)
 		free_ep_req (gadget->ep0, dev->req);
+	del_timer_sync (&dev->resume);
 	kfree (dev);
 	set_gadget_data (gadget, 0);
 }
@@ -1176,6 +1199,14 @@ autoconf_fail:
 
 	usb_gadget_set_selfpowered (gadget);
 
+	init_timer (&dev->resume);
+	dev->resume.function = zero_autoresume;
+	dev->resume.data = (unsigned long) dev;
+	if (autoresume) {
+		source_sink_config.bmAttributes |= USB_CONFIG_ATT_WAKEUP;
+		loopback_config.bmAttributes |= USB_CONFIG_ATT_WAKEUP;
+	}
+
 	gadget->ep0->driver_data = dev;
 
 	INFO (dev, "%s, version: " DRIVER_VERSION "\n", longname);
@@ -1195,6 +1226,33 @@ enomem:
 
 /*-------------------------------------------------------------------------*/
 
+static void
+zero_suspend (struct usb_gadget *gadget)
+{
+	struct zero_dev		*dev = get_gadget_data (gadget);
+
+	if (gadget->speed == USB_SPEED_UNKNOWN)
+		return;
+
+	if (autoresume) {
+		mod_timer (&dev->resume, jiffies + (HZ * autoresume));
+		DBG (dev, "suspend, wakeup in %d seconds\n", autoresume);
+	} else
+		DBG (dev, "suspend\n");
+}
+
+static void
+zero_resume (struct usb_gadget *gadget)
+{
+	struct zero_dev		*dev = get_gadget_data (gadget);
+
+	DBG (dev, "resume\n");
+	del_timer (&dev->resume);
+}
+
+
+/*-------------------------------------------------------------------------*/
+
 static struct usb_gadget_driver zero_driver = {
 #ifdef CONFIG_USB_GADGET_DUALSPEED
 	.speed		= USB_SPEED_HIGH,
@@ -1207,6 +1265,9 @@ static struct usb_gadget_driver zero_driver = {
 
 	.setup		= zero_setup,
 	.disconnect	= zero_disconnect,
+
+	.suspend	= zero_suspend,
+	.resume		= zero_resume,
 
 	.driver 	= {
 		.name		= (char *) shortname,

@@ -244,7 +244,8 @@ int st5481_setup_usb(struct st5481_adapter *adapter)
 	struct usb_device *dev = adapter->usb_dev;
 	struct st5481_ctrl *ctrl = &adapter->ctrl;
 	struct st5481_intr *intr = &adapter->intr;
-	struct usb_host_interface *altsetting;
+	struct usb_interface *intf;
+	struct usb_host_interface *altsetting = NULL;
 	struct usb_host_endpoint *endpoint;
 	int status;
 	struct urb *urb;
@@ -257,8 +258,11 @@ int st5481_setup_usb(struct st5481_adapter *adapter)
 		return status;
 	}
 
-	
-	altsetting = &(dev->config->interface[0]->altsetting[3]);	
+	intf = usb_ifnum_to_if(dev, 0);
+	if (intf)
+		altsetting = usb_altnum_to_altsetting(intf, 3);
+	if (!altsetting)
+		return -ENXIO;
 
 	// Check if the config is sane
 	if ( altsetting->desc.bNumEndpoints != 7 ) {

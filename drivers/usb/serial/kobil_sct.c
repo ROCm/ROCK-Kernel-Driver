@@ -110,7 +110,7 @@ static struct usb_driver kobil_driver = {
 };
 
 
-struct usb_serial_device_type kobil_device = {
+static struct usb_serial_device_type kobil_device = {
 	.owner =		THIS_MODULE,
 	.name =			"KOBIL USB smart card terminal",
 	.id_table =		id_table,
@@ -183,7 +183,7 @@ static int kobil_startup (struct usb_serial *serial)
 	pdev = serial->dev;
  	actconfig = pdev->actconfig;
  	interface = actconfig->interface[0];
-	altsetting = interface->altsetting;
+	altsetting = interface->cur_altsetting;
  	endpoint = altsetting->endpoint;
   
  	for (i = 0; i < altsetting->desc.bNumEndpoints; i++) {

@@ -189,8 +189,8 @@ enum w9968cf_vpp_flag {
 	VPP_UYVY_TO_RGBX = 0x08,
 };
 
-struct list_head w9968cf_dev_list; /* head of V4L registered cameras list */
-LIST_HEAD(w9968cf_dev_list);
+static struct list_head w9968cf_dev_list; /* head of V4L registered cameras list */
+static LIST_HEAD(w9968cf_dev_list);
 struct semaphore w9968cf_devlist_sem; /* semaphore for list traversal */
 
 /* Main device driver structure */
