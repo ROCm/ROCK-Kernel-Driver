@@ -223,8 +223,6 @@ struct radeon_regs {
 
        	/* Palette */
 	int		palette_valid;
-	u32		palette[256];
-	u32		palette2[256];
 };
 
 struct panel_info {
