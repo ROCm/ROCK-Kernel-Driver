@@ -413,6 +413,7 @@ static void prep_new_page(struct page *page, int order)
 			1 << PG_checked | 1 << PG_mappedtodisk);
 	page->private = 0;
 	set_page_refs(page, order);
+	kernel_map_pages(page, 1 << order, 1);
 }
 
 /* 
@@ -823,7 +824,6 @@ nopage:
 	return NULL;
 got_pg:
 	zone_statistics(zonelist, z);
-	kernel_map_pages(page, 1 << order, 1);
 	return page;
 }
 
