@@ -46,7 +46,7 @@
 #include <asm/irq.h>
 
 #include "ide_modes.h"
-#include "pdc202xx.h"
+#include "pdc202xx_old.h"
 
 #define PDC202_DEBUG_CABLE	0
 
@@ -173,39 +173,6 @@ static char * pdc202xx_info (char *buf, struct pci_dev *dev)
 	return (char *)p;
 }
 
-static char * pdc202xx_info_new (char *buf, struct pci_dev *dev)
-{
-	char *p = buf;
-//	u32 bibma = pci_resource_start(dev, 4);
-
-//	u32 reg60h = 0, reg64h = 0, reg68h = 0, reg6ch = 0;
-//	u16 reg50h = 0, word88 = 0;
-//	int udmasel[4]={0,0,0,0}, piosel[4]={0,0,0,0}, i=0, hd=0;
-
-	p += sprintf(p, "\n                                ");
-	switch(dev->device) {
-		case PCI_DEVICE_ID_PROMISE_20277:
-			p += sprintf(p, "SBFastTrak 133 Lite"); break;
-		case PCI_DEVICE_ID_PROMISE_20276:
-			p += sprintf(p, "MBFastTrak 133 Lite"); break;
-		case PCI_DEVICE_ID_PROMISE_20275:
-			p += sprintf(p, "MBUltra133"); break;
-		case PCI_DEVICE_ID_PROMISE_20271:
-			p += sprintf(p, "FastTrak TX2000"); break;
-		case PCI_DEVICE_ID_PROMISE_20270:
-			p += sprintf(p, "FastTrak LP/TX2/TX4"); break;
-		case PCI_DEVICE_ID_PROMISE_20269:
-			p += sprintf(p, "Ultra133 TX2"); break;
-		case PCI_DEVICE_ID_PROMISE_20268:
-			p += sprintf(p, "Ultra100 TX2"); break;
-		default:
-			p += sprintf(p, "Ultra series"); break;
-			break;
-	}
-	p += sprintf(p, " Chipset.\n");
-	return (char *)p;
-}
-
 static int pdc202xx_get_info (char *buffer, char **addr, off_t offset, int count)
 {
 	char *p = buffer;
@@ -213,21 +180,7 @@ static int pdc202xx_get_info (char *buffer, char **addr, off_t offset, int count
 
 	for (i = 0; i < n_pdc202_devs; i++) {
 		struct pci_dev *dev	= pdc202_devs[i];
-
-		switch(dev->device) {
-			case PCI_DEVICE_ID_PROMISE_20277:
-			case PCI_DEVICE_ID_PROMISE_20276:
-			case PCI_DEVICE_ID_PROMISE_20275:
-			case PCI_DEVICE_ID_PROMISE_20271:
-			case PCI_DEVICE_ID_PROMISE_20269:
-			case PCI_DEVICE_ID_PROMISE_20268:
-			case PCI_DEVICE_ID_PROMISE_20270:
-				p = pdc202xx_info_new(buffer, dev);
-				break;
-			default:
-				p = pdc202xx_info(buffer, dev);
-				break;
-		}
+		p = pdc202xx_info(buffer, dev);
 	}
 	return p-buffer;	/* => must be less than 4k! */
 }
@@ -239,17 +192,6 @@ static u8 pdc202xx_ratemask (ide_drive_t *drive)
 	u8 mode;
 
 	switch(HWIF(drive)->pci_dev->device) {
-		case PCI_DEVICE_ID_PROMISE_20277:
-		case PCI_DEVICE_ID_PROMISE_20276:
-		case PCI_DEVICE_ID_PROMISE_20275:
-		case PCI_DEVICE_ID_PROMISE_20271:
-		case PCI_DEVICE_ID_PROMISE_20269:
-			mode = 4;
-			break;
-		case PCI_DEVICE_ID_PROMISE_20270:
-		case PCI_DEVICE_ID_PROMISE_20268:
-			mode = 3;
-			break;
 		case PCI_DEVICE_ID_PROMISE_20267:
 		case PCI_DEVICE_ID_PROMISE_20265:
 			mode = 3;
@@ -396,55 +338,6 @@ static int pdc202xx_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	return (ide_config_drive_speed(drive, speed));
 }
 
-static int pdc202xx_new_tune_chipset (ide_drive_t *drive, u8 xferspeed)
-{
-	ide_hwif_t *hwif	= HWIF(drive);
-#ifdef CONFIG_BLK_DEV_IDEDMA
-	u32 indexreg		= hwif->dma_vendor1;
-	u32 datareg		= hwif->dma_vendor3;
-#else /* !CONFIG_BLK_DEV_IDEDMA */
-	struct pci_dev *dev	= hwif->pci_dev;
-	u32 high_16		= pci_resource_start(dev, 4);
-	u32 indexreg		= high_16 + (hwif->channel ? 0x09 : 0x01);
-	u32 datareg		= (indexreg + 2);
-#endif /* CONFIG_BLK_DEV_IDEDMA */
-	u8 thold		= 0x10;
-	u8 adj			= (drive->dn%2) ? 0x08 : 0x00;
-	u8 speed	= ide_rate_filter(pdc202xx_ratemask(drive), xferspeed);
-
-#ifdef CONFIG_BLK_DEV_IDEDMA
-	if (speed == XFER_UDMA_2) {
-		hwif->OUTB((thold + adj), indexreg);
-		hwif->OUTB((hwif->INB(datareg) & 0x7f), datareg);
-	}
-#endif /* CONFIG_BLK_DEV_IDEDMA */
-
-	switch (speed) {
-#ifdef CONFIG_BLK_DEV_IDEDMA
-		case XFER_UDMA_7:
-			speed = XFER_UDMA_6;
-		case XFER_UDMA_6:	set_ultra(0x1a, 0x01, 0xcb); break;
-		case XFER_UDMA_5:	set_ultra(0x1a, 0x02, 0xcb); break;
-		case XFER_UDMA_4:	set_ultra(0x1a, 0x03, 0xcd); break;
-		case XFER_UDMA_3:	set_ultra(0x1a, 0x05, 0xcd); break;
-		case XFER_UDMA_2:	set_ultra(0x2a, 0x07, 0xcd); break;
-		case XFER_UDMA_1:	set_ultra(0x3a, 0x0a, 0xd0); break;
-		case XFER_UDMA_0:	set_ultra(0x4a, 0x0f, 0xd5); break;
-		case XFER_MW_DMA_2:	set_ata2(0x69, 0x25); break;
-		case XFER_MW_DMA_1:	set_ata2(0x6b, 0x27); break;
-		case XFER_MW_DMA_0:	set_ata2(0xdf, 0x5f); break;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
-		case XFER_PIO_4:	set_pio(0x23, 0x09, 0x25); break;
-		case XFER_PIO_3:	set_pio(0x27, 0x0d, 0x35); break;
-		case XFER_PIO_2:	set_pio(0x23, 0x26, 0x64); break;
-		case XFER_PIO_1:	set_pio(0x46, 0x29, 0xa4); break;
-		case XFER_PIO_0:	set_pio(0xfb, 0x2b, 0xac); break;
-		default:
-			;
-	}
-
-	return (ide_config_drive_speed(drive, speed));
-}
 
 /*   0    1    2    3    4    5    6   7   8
  * 960, 480, 390, 300, 240, 180, 120, 90, 60
@@ -470,12 +363,6 @@ static void pdc202xx_tune_drive (ide_drive_t *drive, u8 pio)
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 
-static u8 pdc202xx_new_cable_detect (ide_hwif_t *hwif)
-{
-	hwif->OUTB(0x0b, hwif->dma_vendor1);
-	return ((u8)((hwif->INB(hwif->dma_vendor3) & 0x04)));
-}
-
 static u8 pdc202xx_old_cable_detect (ide_hwif_t *hwif)
 {
 	u16 CIS = 0, mask = (hwif->channel) ? (1<<11) : (1<<10);
@@ -492,27 +379,12 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 	u8 mask			= hwif->channel ? 0x08 : 0x02;
 	u8 drive_pci		= 0x60 + (drive->dn << 2);
 	u8 test1 = 0, test2 = 0, speed = -1;
-	u8 AP = 0, CLKSPD = 0, jumpbit = 0, cable = 0;
+	u8 AP = 0, CLKSPD = 0, cable = 0;
 
 	u8 ultra_66		= ((id->dma_ultra & 0x0010) ||
 				   (id->dma_ultra & 0x0008)) ? 1 : 0;
 
 	switch(dev->device) {
-		case PCI_DEVICE_ID_PROMISE_20277:
-		case PCI_DEVICE_ID_PROMISE_20276:
-		case PCI_DEVICE_ID_PROMISE_20275:
-		case PCI_DEVICE_ID_PROMISE_20271:
-		case PCI_DEVICE_ID_PROMISE_20269:
-		case PCI_DEVICE_ID_PROMISE_20270:
-		case PCI_DEVICE_ID_PROMISE_20268:
-			cable = pdc202xx_new_cable_detect(hwif);
-#if PDC202_DEBUG_CABLE
-			printk("%s: %s-pin cable, %s-pin cable, %d\n",
-				hwif->name, hwif->udma_four ? "80" : "40",
-				cable ? "40" : "80", cable);
-#endif /* PDC202_DEBUG_CABLE */
-			jumpbit = 1;
-			break;
 		case PCI_DEVICE_ID_PROMISE_20267:
 		case PCI_DEVICE_ID_PROMISE_20265:
 		case PCI_DEVICE_ID_PROMISE_20263:
@@ -523,15 +395,13 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 				hwif->name, hwif->udma_four ? "80" : "40",
 				cable ? "40" : "80", cable);
 #endif /* PDC202_DEBUG_CABLE */
-			jumpbit = 0;
 			break;
 		default:
-			cable = 1; jumpbit = 0;
-			break;
+			BUG();
 	}
 
-	if (!jumpbit)
-		CLKSPD = hwif->INB(hwif->dma_master + 0x11);
+	CLKSPD = hwif->INB(hwif->dma_master + 0x11);
+
 	/*
 	 * Set the control register to use the 66Mhz system
 	 * clock for UDMA 3/4 mode operation. If one drive on
@@ -554,8 +424,7 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 #endif /* DEBUG */
 		/* Primary   : zero out second bit */
 		/* Secondary : zero out fourth bit */
-		if (!jumpbit)
-			hwif->OUTB(CLKSPD & ~mask, (hwif->dma_master + 0x11));
+		hwif->OUTB(CLKSPD & ~mask, (hwif->dma_master + 0x11));
 		printk("Warning: %s channel requires an 80-pin cable for operation.\n", hwif->channel ? "Secondary":"Primary");
 		printk("%s reduced to Ultra33 mode.\n", drive->name);
 	} else {
@@ -566,27 +435,14 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 			 */
 			if (hwif->drives[!(drive->dn%2)].id) {
 				if (hwif->drives[!(drive->dn%2)].id->dma_ultra & 0x0078) {
-					if (!jumpbit)
-						hwif->OUTB(CLKSPD | mask, (hwif->dma_master + 0x11));
+					hwif->OUTB(CLKSPD | mask, (hwif->dma_master + 0x11));
 				} else {
-					if (!jumpbit)
-						hwif->OUTB(CLKSPD & ~mask, (hwif->dma_master + 0x11));
+					hwif->OUTB(CLKSPD & ~mask, (hwif->dma_master + 0x11));
 				}
 			} else { /* udma4 drive by itself */
-				if (!jumpbit)
-					hwif->OUTB(CLKSPD | mask, (hwif->dma_master + 0x11));
+				hwif->OUTB(CLKSPD | mask, (hwif->dma_master + 0x11));
 			}
 		}
-	}
-
-	if (jumpbit) {
-		if (drive->media != ide_disk)
-			return 0;
-		if (id->capability & 4) {	/* IORDY_EN & PREFETCH_EN */
-			hwif->OUTB((0x13 + ((drive->dn%2) ? 0x08 : 0x00)), hwif->dma_vendor1);
-			hwif->OUTB((hwif->INB(hwif->dma_vendor3)|0x03), hwif->dma_vendor3);
-		}
-		goto jumpbit_is_set;
 	}
 
 	drive_pci = 0x60 + (drive->dn << 2);
@@ -620,14 +476,11 @@ chipset_is_set:
 			pci_write_config_byte(dev, (drive_pci), AP|PREFETCH_EN);
 	}
 
-jumpbit_is_set:
-
 	speed = ide_dma_speed(drive, pdc202xx_ratemask(drive));
 
 	if (!(speed)) {
 		/* restore original pci-config space */
-		if (!jumpbit)
-			pci_write_config_dword(dev, drive_pci, drive_conf);
+		pci_write_config_dword(dev, drive_pci, drive_conf);
 		hwif->tuneproc(drive, 5);
 		return 0;
 	}
@@ -758,15 +611,6 @@ static int pdc202xx_ide_dma_timeout(ide_drive_t *drive)
 }
 
 #endif /* CONFIG_BLK_DEV_IDEDMA */
-
-static void pdc202xx_new_reset (ide_drive_t *drive)
-{
-	/*
-	 * Deleted this because it is redundant from the caller.
-	 */
-	printk("PDC202XX: %s channel reset.\n",
-		HWIF(drive)->channel ? "Secondary" : "Primary");
-}
 
 static void pdc202xx_reset_host (ide_hwif_t *hwif)
 {
@@ -912,8 +756,6 @@ static void __init init_hwif_pdc202xx (ide_hwif_t *hwif)
 	hwif->tuneproc  = &pdc202xx_tune_drive;
 	hwif->quirkproc = &pdc202xx_quirkproc;
 
-	if (hwif->pci_dev->device == PCI_DEVICE_ID_PROMISE_20267)
-		hwif->addressing = (hwif->channel) ? 0 : 1;
 	if (hwif->pci_dev->device == PCI_DEVICE_ID_PROMISE_20265)
 		hwif->addressing = (hwif->channel) ? 0 : 1;
 
@@ -955,40 +797,6 @@ static void __init init_hwif_pdc202xx (ide_hwif_t *hwif)
 	printk("%s: %s-pin cable\n",
 		hwif->name, hwif->udma_four ? "80" : "40");
 #endif /* PDC202_DEBUG_CABLE */	
-}
-
-static void __init init_hwif_pdc202new (ide_hwif_t *hwif)
-{
-	hwif->autodma = 0;
-
-	hwif->tuneproc  = &pdc202xx_tune_drive;
-	hwif->quirkproc = &pdc202xx_quirkproc;
-	hwif->speedproc = &pdc202xx_new_tune_chipset;
-	hwif->resetproc = &pdc202xx_new_reset;
-
-	if (!hwif->dma_base) {
-		hwif->drives[0].autotune = hwif->drives[1].autotune = 1;
-		return;
-	}
-
-	hwif->ultra_mask = 0x7f;
-	hwif->mwdma_mask = 0x07;
-
-#ifdef CONFIG_BLK_DEV_IDEDMA
-
-	hwif->ide_dma_check = &pdc202xx_config_drive_xfer_rate;
-	hwif->ide_dma_lostirq = &pdc202xx_ide_dma_lostirq;
-	hwif->ide_dma_timeout = &pdc202xx_ide_dma_timeout;
-	if (!(hwif->udma_four))
-		hwif->udma_four = (pdc202xx_new_cable_detect(hwif)) ? 0 : 1;
-	if (!noautodma)
-		hwif->autodma = 1;
-	hwif->drives[0].autodma = hwif->drives[1].autodma = hwif->autodma;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
-#if PDC202_DEBUG_CABLE
-	printk("%s: %s-pin cable\n",
-		hwif->name, hwif->udma_four ? "80" : "40");
-#endif /* PDC202_DEBUG_CABLE */
 }
 
 static void __init init_dma_pdc202xx (ide_hwif_t *hwif, unsigned long dmabase)
@@ -1040,11 +848,6 @@ static void __init init_dma_pdc202xx (ide_hwif_t *hwif, unsigned long dmabase)
 	}
 #endif /* CONFIG_PDC202XX_MASTER */
 
-	ide_setup_dma(hwif, dmabase, 8);
-}
-
-static void __init init_dma_pdc202new (ide_hwif_t *hwif, unsigned long dmabase)
-{
 	ide_setup_dma(hwif, dmabase, 8);
 }
 
@@ -1112,52 +915,6 @@ static void __init init_setup_pdc20265 (struct pci_dev *dev, ide_pci_device_t *d
 
 static void __init init_setup_pdc202xx (struct pci_dev *dev, ide_pci_device_t *d)
 {
-	ide_setup_pci_device(dev, d);
-}
-
-static void __init init_setup_pdc20270 (struct pci_dev *dev, ide_pci_device_t *d)
-{
-	struct pci_dev *findev;
-
-	if ((dev->bus->self &&
-	     dev->bus->self->vendor == PCI_VENDOR_ID_DEC) &&
-	    (dev->bus->self->device == PCI_DEVICE_ID_DEC_21150)) {
-		if (PCI_SLOT(dev->devfn) & 2) {
-			return;
-		}
-		d->extra = 0;
-		pci_for_each_dev(findev) {
-			if ((findev->vendor == dev->vendor) &&
-			    (findev->device == dev->device) &&
-			    (PCI_SLOT(findev->devfn) & 2)) {
-				u8 irq = 0, irq2 = 0;
-				pci_read_config_byte(dev,
-					PCI_INTERRUPT_LINE, &irq);
-				pci_read_config_byte(findev,
-					PCI_INTERRUPT_LINE, &irq2);
-				if (irq != irq2) {
-					findev->irq = dev->irq;
-					pci_write_config_byte(findev,
-						PCI_INTERRUPT_LINE, irq);
-				}
-				ide_setup_pci_devices(dev, findev, d);
-				return;
-			}
-		}
-	}
-	ide_setup_pci_device(dev, d);
-}
-
-static void __init init_setup_pdc20276 (struct pci_dev *dev, ide_pci_device_t *d)
-{
-	if ((dev->bus->self) &&
-	    (dev->bus->self->vendor == PCI_VENDOR_ID_INTEL) &&
-	    ((dev->bus->self->device == PCI_DEVICE_ID_INTEL_I960) ||
-	     (dev->bus->self->device == PCI_DEVICE_ID_INTEL_I960RM))) {
-		printk(KERN_INFO "ide: Skipping Promise PDC20276 "
-			"attached to I2O RAID controller.\n");
-		return;
-	}
 	ide_setup_pci_device(dev, d);
 }
 
