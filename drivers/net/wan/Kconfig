@@ -325,6 +325,21 @@ config HDLC_X25
 comment "X.25/LAPB support is disabled"
 	depends on WAN && HDLC && (LAPB!=m || HDLC!=m) && LAPB!=y
 
+config PCI200SYN
+	tristate "Goramo PCI200SYN support"
+	depends on HDLC && PCI
+	help
+	  This driver is for PCI200SYN cards made by Goramo sp. j.
+	  If you have such a card, say Y here and see
+	  <http://hq.pm.waw.pl/pub/hdlc/>
+
+	  If you want to compile the driver as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>.  The module
+	  will be called pci200syn.
+
+	  If unsure, say N here.
+
 config WANXL
 	tristate "SBE Inc. wanXL support"
 	depends on HDLC && PCI
