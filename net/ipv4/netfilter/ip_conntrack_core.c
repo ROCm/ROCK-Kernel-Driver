@@ -312,6 +312,7 @@ destroy_conntrack(struct nf_conntrack *nfct)
 		}
 		kmem_cache_free(ip_conntrack_expect_cachep, ct->master);
 	}
+	CONNTRACK_STAT_INC(delete);
 	WRITE_UNLOCK(&ip_conntrack_lock);
 
 	if (master)
@@ -320,7 +321,6 @@ destroy_conntrack(struct nf_conntrack *nfct)
 	DEBUGP("destroy_conntrack: returning ct=%p to slab\n", ct);
 	kmem_cache_free(ip_conntrack_cachep, ct);
 	atomic_dec(&ip_conntrack_count);
-	CONNTRACK_STAT_INC(delete);
 }
 
 static void death_by_timeout(unsigned long ul_conntrack)

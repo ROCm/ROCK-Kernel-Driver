@@ -484,26 +484,13 @@ int vlan_dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	       veth->h_vlan_proto, veth->h_vlan_TCI, veth->h_vlan_encapsulated_proto);
 #endif
 
+	stats->tx_packets++; /* for statics only */
+	stats->tx_bytes += skb->len;
+
 	skb->dev = VLAN_DEV_INFO(dev)->real_dev;
+	dev_queue_xmit(skb);
 
-	{
-		/* Please note, dev_queue_xmit consumes the pkt regardless of the
-		 * error value.  So, will copy the skb first and free if successful.
-		 */
-		struct sk_buff* skb2 = skb_get(skb);
-		int rv = dev_queue_xmit(skb2);
-		if (rv == 0) {
-			/* Was success, need to free the skb reference since we bumped up the
-			 * user count above.
-			 */
-
-			stats->tx_packets++; /* for statics only */
-			stats->tx_bytes += skb->len;
-
-			kfree_skb(skb);
-		}
-		return rv;
-	}
+	return 0;
 }
 
 int vlan_dev_hwaccel_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)

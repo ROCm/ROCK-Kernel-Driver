@@ -87,18 +87,6 @@ match(const struct sk_buff *skb,
 			       info->invert, hotdrop);
 }
 
-static inline int find_syn_match(const struct ipt_entry_match *m)
-{
-	const struct ipt_tcp *tcpinfo = (const struct ipt_tcp *)m->data;
-
-	if (strcmp(m->u.kernel.match->name, "tcp") == 0
-	    && (tcpinfo->flg_cmp & TH_SYN)
-	    && !(tcpinfo->invflags & IPT_TCP_INV_FLAGS))
-		return 1;
-
-	return 0;
-}
-
 static int
 checkentry(const char *tablename,
            const struct ipt_ip *ip,

@@ -477,6 +477,18 @@ ipt_find_target_lock(const char *name, int *error, struct semaphore *mutex)
 	return find_inlist_lock(&ipt_target, name, "ipt_", error, mutex);
 }
 
+struct ipt_target *
+__ipt_find_target_lock(const char *name, int *error)
+{
+	return ipt_find_target_lock(name,error,&ipt_mutex);
+}
+
+void
+__ipt_mutex_up(void)
+{
+	up(&ipt_mutex);
+}
+
 /* All zeroes == unconditional rule. */
 static inline int
 unconditional(const struct ipt_ip *ip)
@@ -1877,6 +1889,8 @@ EXPORT_SYMBOL(ipt_unregister_match);
 EXPORT_SYMBOL(ipt_do_table);
 EXPORT_SYMBOL(ipt_register_target);
 EXPORT_SYMBOL(ipt_unregister_target);
+EXPORT_SYMBOL_GPL(__ipt_find_target_lock);
+EXPORT_SYMBOL_GPL(__ipt_mutex_up);
 
 module_init(init);
 module_exit(fini);

@@ -739,7 +739,7 @@ static inline void hci_auth_complete_evt(struct hci_dev *hdev, struct sk_buff *s
 			conn->link_mode |= HCI_LM_AUTH;
 		clear_bit(HCI_CONN_AUTH_PEND, &conn->pend);
 
-		hci_proto_auth_cfm(conn, ev->status);
+		hci_auth_cfm(conn, ev->status);
 
 		if (test_bit(HCI_CONN_ENCRYPT_PEND, &conn->pend)) {
 			if (!ev->status) {
@@ -751,7 +751,7 @@ static inline void hci_auth_complete_evt(struct hci_dev *hdev, struct sk_buff *s
 						sizeof(cp), &cp);
 			} else {
 				clear_bit(HCI_CONN_ENCRYPT_PEND, &conn->pend);
-				hci_proto_encrypt_cfm(conn, ev->status);
+				hci_encrypt_cfm(conn, ev->status, 0x00);
 			}
 		}
 	}
@@ -780,7 +780,7 @@ static inline void hci_encrypt_change_evt(struct hci_dev *hdev, struct sk_buff *
 		}
 		clear_bit(HCI_CONN_ENCRYPT_PEND, &conn->pend);
 
-		hci_proto_encrypt_cfm(conn, ev->status);
+		hci_encrypt_cfm(conn, ev->status, ev->encrypt);
 	}
 
 	hci_dev_unlock(hdev);
