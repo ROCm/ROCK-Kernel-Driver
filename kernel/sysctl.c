@@ -311,6 +311,9 @@ static ctl_table vm_table[] = {
 	{ VM_NR_PDFLUSH_THREADS, "nr_pdflush_threads",
 	  &nr_pdflush_threads, sizeof nr_pdflush_threads,
 	  0444 /* read-only*/, NULL, &proc_dointvec},
+	{VM_SWAPPINESS, "swappiness", &vm_swappiness, sizeof(vm_swappiness),
+	 0644, NULL, &proc_dointvec_minmax, &sysctl_intvec, NULL, &zero,
+	 &one_hundred },
 #ifdef CONFIG_HUGETLB_PAGE
 	 {VM_HUGETLB_PAGES, "nr_hugepages", &htlbpage_max, sizeof(int), 0644, NULL, 
 	  &proc_dointvec},
