@@ -569,7 +569,7 @@ static int msix_capability_init(struct pci_dev	*dev)
 	struct msi_desc *entry;
 	struct msg_address address;
 	struct msg_data data;
-	int vector = 0, pos, dev_msi_cap;
+	int vector = 0, pos, dev_msi_cap, i;
 	u32 phys_addr, table_offset;
 	u32 control;
 	u8 bir;
@@ -629,12 +629,12 @@ static int msix_capability_init(struct pci_dev	*dev)
 	writel(address.hi_address, base + PCI_MSIX_ENTRY_UPPER_ADDR_OFFSET);
 	writel(*(u32*)&data, base + PCI_MSIX_ENTRY_DATA_OFFSET);
 	/* Initialize all entries from 1 up to 0 */
-	for (pos = 1; pos < dev_msi_cap; pos++) {
-		writel(0, base + pos * PCI_MSIX_ENTRY_SIZE +
+	for (i = 1; i < dev_msi_cap; i++) {
+		writel(0, base + i * PCI_MSIX_ENTRY_SIZE +
 			PCI_MSIX_ENTRY_LOWER_ADDR_OFFSET);
-		writel(0, base + pos * PCI_MSIX_ENTRY_SIZE +
+		writel(0, base + i * PCI_MSIX_ENTRY_SIZE +
 			PCI_MSIX_ENTRY_UPPER_ADDR_OFFSET);
-		writel(0, base + pos * PCI_MSIX_ENTRY_SIZE +
+		writel(0, base + i * PCI_MSIX_ENTRY_SIZE +
 			PCI_MSIX_ENTRY_DATA_OFFSET);
 	}
 	attach_msi_entry(entry, vector);
