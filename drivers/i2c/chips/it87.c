@@ -592,7 +592,6 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	struct it87_data *data;
 	int err = 0;
 	const char *name = "";
-	const char *client_name = "";
 	int is_isa = i2c_is_isa_adapter(adapter);
 
 	if (!is_isa && 
@@ -681,10 +680,8 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	if (kind == it87) {
 		name = "it87";
-		client_name = "IT87 chip";
 	} /* else if (kind == it8712) {
 		name = "it8712";
-		client_name = "IT87-J chip";
 	} */ else {
 		dev_dbg(&adapter->dev, "Internal error: unknown kind (%d)?!?",
 			kind);
@@ -692,7 +689,7 @@ int it87_detect(struct i2c_adapter *adapter, int address, int kind)
 	}
 
 	/* Fill in the remaining client fields and put it into the global list */
-	strlcpy(new_client->name, name, DEVICE_NAME_SIZE);
+	strlcpy(new_client->name, name, I2C_NAME_SIZE);
 
 	data->type = kind;
 

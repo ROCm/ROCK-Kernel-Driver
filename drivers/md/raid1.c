@@ -830,7 +830,7 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		mbio = bio_clone(bio, GFP_NOIO);
 		r1_bio->write_bios[i] = mbio;
 		mbio->bi_bdev = conf->mirrors[i].rdev->bdev;
-		mbio->bi_sector = r1_bio->sector | conf->mirrors[i].rdev->data_offset;
+		mbio->bi_sector = r1_bio->sector + conf->mirrors[i].rdev->data_offset;
 		mbio->bi_end_io	= end_sync_write;
 		mbio->bi_rw = WRITE;
 		mbio->bi_private = r1_bio;
@@ -1196,3 +1196,4 @@ static void raid_exit(void)
 module_init(raid_init);
 module_exit(raid_exit);
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("md-personality-3"); /* RAID1 */

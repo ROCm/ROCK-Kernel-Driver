@@ -534,12 +534,36 @@ static int adjoin(struct dm_table *table, struct dm_target *ti)
 }
 
 /*
+ * Used to dynamically allocate the arg array.
+ */
+static char **realloc_argv(unsigned *array_size, char **old_argv)
+{
+	char **argv;
+	unsigned new_size;
+
+	new_size = *array_size ? *array_size * 2 : 64;
+	argv = kmalloc(new_size * sizeof(*argv), GFP_KERNEL);
+	if (argv) {
+		memcpy(argv, old_argv, *array_size * sizeof(*argv));
+		*array_size = new_size;
+	}
+
+	kfree(old_argv);
+	return argv;
+}
+
+/*
  * Destructively splits up the argument list to pass to ctr.
  */
-static int split_args(int max, int *argc, char **argv, char *input)
+static int split_args(int *argc, char ***argvp, char *input)
 {
-	char *start, *end = input, *out;
+	char *start, *end = input, *out, **argv = NULL;
+	unsigned array_size = 0;
+
 	*argc = 0;
+	argv = realloc_argv(&array_size, argv);
+	if (!argv)
+		return -ENOMEM;
 
 	while (1) {
 		start = end;
@@ -568,8 +592,11 @@ static int split_args(int max, int *argc, char **argv, char *input)
 		}
 
 		/* have we already filled the array ? */
-		if ((*argc + 1) > max)
-			return -EINVAL;
+		if ((*argc + 1) > array_size) {
+			argv = realloc_argv(&array_size, argv);
+			if (!argv)
+				return -ENOMEM;
+		}
 
 		/* we know this is whitespace */
 		if (*end)
@@ -581,6 +608,7 @@ static int split_args(int max, int *argc, char **argv, char *input)
 		(*argc)++;
 	}
 
+	*argvp = argv;
 	return 0;
 }
 
@@ -588,7 +616,7 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 			sector_t start, sector_t len, char *params)
 {
 	int r = -EINVAL, argc;
-	char *argv[32];
+	char **argv;
 	struct dm_target *tgt;
 
 	if ((r = check_space(t)))
@@ -617,13 +645,14 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 		goto bad;
 	}
 
-	r = split_args(ARRAY_SIZE(argv), &argc, argv, params);
+	r = split_args(&argc, &argv, params);
 	if (r) {
-		tgt->error = "couldn't split parameters";
+		tgt->error = "couldn't split parameters (insufficient memory)";
 		goto bad;
 	}
 
 	r = tgt->type->ctr(tgt, argc, argv);
+	kfree(argv);
 	if (r)
 		goto bad;
 

@@ -114,14 +114,13 @@ static struct i2c_algo_bit_data bit_velle_data = {
 
 static struct i2c_adapter bit_velle_ops = {
 	.owner		= THIS_MODULE,
-	.id		= I2C_HW_B_VELLE,
 	.algo_data	= &bit_velle_data,
 	.name		= "Velleman K8000",
 };
 
 static int __init i2c_bitvelle_init(void)
 {
-	printk(KERN_INFO "i2c-velleman.o: i2c Velleman K8000 adapter module version %s (%s)\n", I2C_VERSION, I2C_DATE);
+	printk(KERN_INFO "i2c-velleman: i2c Velleman K8000 driver\n");
 	if (base==0) {
 		/* probe some values */
 		base=DEFAULT_BASE;
@@ -141,7 +140,7 @@ static int __init i2c_bitvelle_init(void)
 			return -ENODEV;
 		}
 	}
-	printk(KERN_DEBUG "i2c-velleman.o: found device at %#x.\n",base);
+	printk(KERN_DEBUG "i2c-velleman: found device at %#x.\n",base);
 	return 0;
 }
 

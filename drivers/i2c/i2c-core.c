@@ -581,8 +581,7 @@ int i2c_master_send(struct i2c_client *client,const char *buf ,int count)
 		 */
 		return (ret == 1 )? count : ret;
 	} else {
-		printk(KERN_ERR "i2c-core.o: I2C adapter %04x: I2C level transfers not supported\n",
-		       client->adapter->id);
+		dev_err(&client->adapter->dev, "I2C level transfers not supported\n");
 		return -ENOSYS;
 	}
 }
@@ -614,8 +613,7 @@ int i2c_master_recv(struct i2c_client *client, char *buf ,int count)
 	 	*/
 		return (ret == 1 )? count : ret;
 	} else {
-		printk(KERN_DEBUG "i2c-core.o: I2C adapter %04x: I2C level transfers not supported\n",
-		       client->adapter->id);
+		dev_err(&client->adapter->dev, "I2C level transfers not supported\n");
 		return -ENOSYS;
 	}
 }

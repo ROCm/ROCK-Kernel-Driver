@@ -24,10 +24,8 @@
 /* $Id: i2c-philips-par.c,v 1.29 2003/01/21 08:08:16 kmalkki Exp $ */
 
 #include <linux/kernel.h>
-#include <linux/ioport.h>
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/stddef.h>
 #include <linux/parport.h>
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
@@ -44,11 +42,6 @@ struct i2c_par
 
 static struct i2c_par *adapter_list;
 
-
-/* ----- global defines -----------------------------------------------	*/
-#define DEB(x)		/* should be reasonable open, close &c. 	*/
-#define DEB2(x) 	/* low level debugging - very slow 		*/
-#define DEBE(x)	x	/* error messages 				*/
 
 /* ----- printer port defines ------------------------------------------*/
 					/* Pin Port  Inverted	name	*/
@@ -163,8 +156,9 @@ static void i2c_parport_attach (struct parport *port)
 		printk(KERN_ERR "i2c-philips-par: Unable to malloc.\n");
 		return;
 	}
+	memset (adapter, 0x00, sizeof(struct i2c_par));
 
-	printk(KERN_DEBUG "i2c-philips-par.o: attaching to %s\n", port->name);
+	/* printk(KERN_DEBUG "i2c-philips-par.o: attaching to %s\n", port->name); */
 
 	adapter->pdev = parport_register_device(port, "i2c-philips-par",
 						NULL, NULL, NULL, 
@@ -191,8 +185,7 @@ static void i2c_parport_attach (struct parport *port)
 	bit_lp_setscl(port, 1);
 	parport_release(adapter->pdev);
 
-	if (i2c_bit_add_bus(&adapter->adapter) < 0)
-	{
+	if (i2c_bit_add_bus(&adapter->adapter) < 0) {
 		printk(KERN_ERR "i2c-philips-par: Unable to register with I2C.\n");
 		parport_unregister_device(adapter->pdev);
 		kfree(adapter);
@@ -207,10 +200,8 @@ static void i2c_parport_detach (struct parport *port)
 {
 	struct i2c_par *adapter, *prev = NULL;
 
-	for (adapter = adapter_list; adapter; adapter = adapter->next)
-	{
-		if (adapter->pdev->port == port)
-		{
+	for (adapter = adapter_list; adapter; adapter = adapter->next) {
+		if (adapter->pdev->port == port) {
 			parport_unregister_device(adapter->pdev);
 			i2c_bit_del_bus(&adapter->adapter);
 			if (prev)
@@ -224,21 +215,17 @@ static void i2c_parport_detach (struct parport *port)
 	}
 }
 
-
 static struct parport_driver i2c_driver = {
-	"i2c-philips-par",
-	i2c_parport_attach,
-	i2c_parport_detach,
-	NULL
+	.name =		"i2c-philips-par",
+	.attach =	i2c_parport_attach,
+	.detach =	i2c_parport_detach,
 };
 
 int __init i2c_bitlp_init(void)
 {
-	printk(KERN_INFO "i2c-philips-par.o: i2c Philips parallel port adapter module version %s (%s)\n", I2C_VERSION, I2C_DATE);
+	printk(KERN_INFO "i2c Philips parallel port adapter driver\n");
 
-	parport_register_driver(&i2c_driver);
-	
-	return 0;
+	return parport_register_driver(&i2c_driver);
 }
 
 void __exit i2c_bitlp_exit(void)
