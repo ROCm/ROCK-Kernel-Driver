@@ -39,6 +39,7 @@
 #include <net/udp.h>
 #include <net/ip.h>
 #include <linux/spinlock.h>
+#include <linux/rcupdate.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -401,16 +402,17 @@ static int econet_sendmsg(struct kiocb *iocb, struct socket *sock,
 	   y.x maps to IP a.b.c.x.  This should be replaced with something
 	   more flexible and more aware of subnet masks.  */
 	{
-		struct in_device *idev = in_dev_get(dev);
+		struct in_device *idev;
 		unsigned long network = 0;
+
+		rcu_read_lock();
+		idev = __in_dev_get(dev);
 		if (idev) {
-			read_lock(&idev->lock);
 			if (idev->ifa_list)
 				network = ntohl(idev->ifa_list->ifa_address) & 
 					0xffffff00;		/* !!! */
-			read_unlock(&idev->lock);
-			in_dev_put(idev);
 		}
+		rcu_read_unlock();
 		udpdest.sin_addr.s_addr = htonl(network | addr.station);
 	}
 
