@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.34.2.1 $
+ * $Revision: 1.34.2.2 $
  */
 
 #include <linux/config.h>
@@ -294,7 +294,7 @@ dasd_diag_check_device(struct dasd_device *device)
 		mdsk_term_io(device);
 	}
 	if (bsize <= PAGE_SIZE && label[3] == bsize &&
-	    label[0] == 0xc3d4e2f1 && label[13] != 0) {
+	    label[0] == 0xc3d4e2f1) {
 		device->blocks = label[7];
 		device->bp_block = bsize;
 		device->s2b_shift = 0;	/* bits to shift 512 to get a block */
