@@ -226,9 +226,21 @@ copy_to_user(void *to, const void *from, unsigned long n)
 	return n;
 }
 
+static inline unsigned long
+copy_in_user(void *to, const void *from, unsigned long n)
+{
+        if (!access_ok(VERIFY_READ, from, n) ||
+	     !access_ok(VERIFY_WRITE, to, n))
+		return n;
+
+	return __copy_tofrom_user(to, from, n);
+}
+
 #define __copy_from_user(to, from, size) \
 	__copy_tofrom_user((to), (from), (size))
 #define __copy_to_user(to, from, size) \
+	__copy_tofrom_user((to), (from), (size))
+#define __copy_in_user(to, from, size) \
 	__copy_tofrom_user((to), (from), (size))
 
 extern unsigned long __clear_user(void *addr, unsigned long size);

@@ -21,6 +21,7 @@
 #include <asm/paca.h>
 #include <asm/naca.h>
 #include <asm/pmc.h>
+#include <asm/cputable.h>
 
 int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid);
 void make_slbe(unsigned long esid, unsigned long vsid, int large,
@@ -38,7 +39,7 @@ void stab_initialize(unsigned long stab)
 	esid = GET_ESID(KERNELBASE);
 	vsid = get_kernel_vsid(esid << SID_SHIFT); 
 
-	if (cpu_has_slb()) {
+	if (cur_cpu_spec->cpu_features & CPU_FTR_SLB) {
 		/* Invalidate the entire SLB & all the ERATS */
 #ifdef CONFIG_PPC_ISERIES
 		asm volatile("isync; slbia; isync":::"memory");
@@ -222,7 +223,7 @@ write_entry:
 static inline void __ste_allocate(unsigned long esid, unsigned long vsid,
 				  int kernel_segment)
 {
-	if (cpu_has_slb()) {
+	if (cur_cpu_spec->cpu_features & CPU_FTR_SLB) {
 #ifndef CONFIG_PPC_ISERIES
 		if (REGION_ID(esid << SID_SHIFT) == KERNEL_REGION_ID)
 			make_slbe(esid, vsid, 1, kernel_segment); 
@@ -275,7 +276,7 @@ int ste_allocate(unsigned long ea)
 
 	esid = GET_ESID(ea);
 	__ste_allocate(esid, vsid, kernel_segment);
-	if (!cpu_has_slb()) {
+	if (!(cur_cpu_spec->cpu_features & CPU_FTR_SLB)) {
 		/* Order update */
 		asm volatile("sync":::"memory"); 
 	}
@@ -327,7 +328,7 @@ static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
 		}
 	}
 
-	if (!cpu_has_slb()) {
+	if (!(cur_cpu_spec->cpu_features & CPU_FTR_SLB)) {
 		/* Order update */
 		asm volatile("sync" : : : "memory"); 
 	}
@@ -336,7 +337,7 @@ static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
 /* Flush all user entries from the segment table of the current processor. */
 void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
 {
-	if (cpu_has_slb()) {
+	if (cur_cpu_spec->cpu_features & CPU_FTR_SLB) {
 		/*
 		 * XXX disable 32bit slb invalidate optimisation until we fix
 		 * the issue where a 32bit app execed out of a 64bit app can
