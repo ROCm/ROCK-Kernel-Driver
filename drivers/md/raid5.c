@@ -1139,23 +1139,22 @@ static void handle_stripe(struct stripe_head *sh)
 	for (i=disks; i-- ;) 
 		if (action[i]) {
 			struct bio *bi = &sh->dev[i].req;
-			int skip = 0;
-			mdk_rdev_t *rdev = NULL;
+			mdk_rdev_t *rdev ;
+
 			if (action[i] == READ+1)
 				bi->bi_end_io = raid5_end_read_request;
 			else
 				bi->bi_end_io = raid5_end_write_request;
 
 			spin_lock_irq(&conf->device_lock);
-			if (conf->disks[i].operational)
-				rdev = conf->disks[i].rdev;
-			else skip=1;
+			rdev = conf->disks[i].rdev;
+			if (!conf->disks[i].operational)
+				rdev = NULL;
 			if (rdev)
 				atomic_inc(&rdev->nr_pending);
-			else	skip=1;
 			spin_unlock_irq(&conf->device_lock);
 
-			if (!skip) {
+			if (rdev) {
 				bi->bi_bdev = rdev->bdev;
 				PRINTK("for %ld schedule op %d on disc %d\n", sh->sector, action[i]-1, i);
 				atomic_inc(&sh->count);
