@@ -648,50 +648,6 @@ int zft_check_write_access(zft_position *pos)
 	TRACE_EXIT 0;
 }
 
-/*  decide when we should lock the module in memory, even when calling
- *  the release routine. This really is necessary for use with
- *  kerneld.
- *
- *  NOTE: we MUST NOT use zft_write_protected, because this includes
- *  the file access mode as well which has no meaning with our 
- *  asynchronous update scheme.
- *
- *  Ugly, ugly. We need to look the module if we changed the block size.
- *  How sad! Need persistent modules storage!
- *
- *  NOTE: I don't want to lock the module if the number of dma buffers 
- *  has been changed. It's enough! Stop the story! Give me persisitent
- *  module storage! Do it!
- */
-int zft_dirty(void)
-{
-	if (!ft_formatted || zft_offline) { 
-		/* cannot be dirty if not formatted or offline */
-		return 0;
-	}
-	if (zft_blk_sz != CONFIG_ZFT_DFLT_BLK_SZ) {
-		/* blocksize changed, must lock */
-		return 1;
-	}
-	if (zft_mt_compression != 0) {
-		/* compression mode with /dev/qft, must lock */
-		return 1;
-	}
-	if (!zft_header_read) {
-		/* tape is logical at BOT, no lock */
-		return 0;
-	}
-	if (!zft_tape_at_lbot(&zft_pos)) {
-		/* somewhere inside a volume, lock tape */
-		return 1;
-	}
-	if (zft_volume_table_changed || zft_header_changed) {
-		/* header segments dirty if tape not write protected */
-		return !(ft_write_protected || zft_old_ftape);
-	}
-	return 0;
-}
-
 /*      OPEN routine called by kernel-interface code
  *
  *      NOTE: this is also called by mt_reset() with dev_minor == -1
