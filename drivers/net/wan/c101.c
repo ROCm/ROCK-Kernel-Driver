@@ -380,4 +380,3 @@ MODULE_AUTHOR("Krzysztof Halasa <khc@pm.waw.pl>");
 MODULE_DESCRIPTION("Moxa C101 serial port driver");
 MODULE_LICENSE("GPL");
 MODULE_PARM(hw, "s");		/* hw=irq,ram:irq,... */
-EXPORT_NO_SYMBOLS;

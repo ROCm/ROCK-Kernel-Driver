@@ -3894,7 +3894,6 @@ static void __exit idt77252_exit(void)
 module_init(idt77252_init);
 module_exit(idt77252_exit);
 
-EXPORT_NO_SYMBOLS;
 MODULE_LICENSE("GPL");
 
 MODULE_PARM(vpibits, "i");

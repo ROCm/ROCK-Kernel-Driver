@@ -3502,4 +3502,3 @@ module_init(cdu31a_init);
 module_exit(cdu31a_exit);
 
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;

@@ -480,8 +480,6 @@ static struct i2c_driver i2c_driver_bt819 = {
 	bt819_command
 };
 
-EXPORT_NO_SYMBOLS;
-
 static int bt819_setup(void)
 {
 	return i2c_register_driver(&i2c_driver_bt819);

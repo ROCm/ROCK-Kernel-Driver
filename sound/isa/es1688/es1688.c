@@ -36,8 +36,6 @@
 
 #define chip_t es1688_t
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("ESS ESx688 AudioDrive");
 MODULE_LICENSE("GPL");

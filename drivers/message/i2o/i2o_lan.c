@@ -1562,8 +1562,6 @@ void cleanup_module(void)
 	i2o_remove_handler(&i2o_lan_receive_handler);
 }
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("University of Helsinki, Department of Computer Science");
 MODULE_DESCRIPTION("I2O Lan OSM");
 MODULE_LICENSE("GPL");

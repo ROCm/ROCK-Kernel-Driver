@@ -203,8 +203,6 @@ static struct i2c_client client_template =
         &i2c_driver_tuner
 };
 
-EXPORT_NO_SYMBOLS;
-
 int __init
 tuner3036_init(void)
 {

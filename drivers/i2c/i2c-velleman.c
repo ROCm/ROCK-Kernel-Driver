@@ -184,8 +184,6 @@ int __init  i2c_bitvelle_init(void)
 	return 0;
 }
 
-EXPORT_NO_SYMBOLS;
-
 #ifdef MODULE
 MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
 MODULE_DESCRIPTION("I2C-Bus adapter routines for Velleman K8000 adapter");

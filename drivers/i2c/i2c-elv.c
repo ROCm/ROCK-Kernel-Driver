@@ -195,8 +195,6 @@ int __init i2c_bitelv_init(void)
 }
 
 
-EXPORT_NO_SYMBOLS;
-
 #ifdef MODULE
 MODULE_AUTHOR("Simon G. Vogl <simon@tk.uni-linz.ac.at>");
 MODULE_DESCRIPTION("I2C-Bus adapter routines for ELV parallel port adapter");

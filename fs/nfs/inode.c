@@ -1334,7 +1334,6 @@ static void __exit exit_nfs_fs(void)
 	unregister_filesystem(&nfs_fs_type);
 }
 
-EXPORT_NO_SYMBOLS;
 /* Not quite true; I just maintain it */
 MODULE_AUTHOR("Olaf Kirch <okir@monad.swb.de>");
 MODULE_LICENSE("GPL");

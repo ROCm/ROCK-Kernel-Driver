@@ -310,8 +310,6 @@ MODULE_PARM(io, "i");
 MODULE_PARM_DESC(io, "I/O address of the Trust FM Radio card (0x350 or 0x358)");
 MODULE_PARM(radio_nr, "i");
 
-EXPORT_NO_SYMBOLS;
-
 static void __exit cleanup_trust_module(void)
 {
 	video_unregister_device(&trust_radio);

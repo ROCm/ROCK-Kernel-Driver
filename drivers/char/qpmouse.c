@@ -379,4 +379,3 @@ module_exit(qpmouse_exit_driver);
 
 
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;

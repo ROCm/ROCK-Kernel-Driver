@@ -31,8 +31,6 @@
 /*
  * module option
  */
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("OSS-compatible sequencer module");
 MODULE_LICENSE("GPL");

@@ -434,8 +434,6 @@ static struct i2c_driver i2c_driver_saa7111 = {
 	saa7111_command
 };
 
-EXPORT_NO_SYMBOLS;
-
 static int saa7111_init(void)
 {
 	return i2c_register_driver(&i2c_driver_saa7111);

@@ -629,8 +629,6 @@ MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "CS89[02]0 debug level (0-5)");
 MODULE_LICENSE("GPL");
 
-EXPORT_NO_SYMBOLS;
-
 int
 init_module(void)
 {

@@ -1072,4 +1072,3 @@ static int gscd_bcd2bin(unsigned char bcd)
 
 MODULE_AUTHOR("Oliver Raupach <raupach@nwfs1.rz.fh-hannover.de>");
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;

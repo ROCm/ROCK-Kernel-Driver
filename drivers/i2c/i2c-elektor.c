@@ -295,8 +295,6 @@ int __init i2c_pcfisa_init(void)
 }
 
 
-EXPORT_NO_SYMBOLS;
-
 #ifdef MODULE
 MODULE_AUTHOR("Hans Berglund <hb@spacetec.no>");
 MODULE_DESCRIPTION("I2C-Bus adapter routines for PCF8584 ISA bus adapter");

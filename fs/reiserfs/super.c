@@ -1247,7 +1247,6 @@ out1:
 MODULE_DESCRIPTION("ReiserFS journaled filesystem");
 MODULE_AUTHOR("Hans Reiser <reiser@namesys.com>");
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;
 
 //
 // this is exactly what 2.3.99-pre9's init_ext2_fs is

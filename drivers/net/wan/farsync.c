@@ -33,9 +33,6 @@ MODULE_AUTHOR("R.J.Dunlop <bob.dunlop@farsite.co.uk>");
 MODULE_DESCRIPTION("FarSync T-Series X21 driver. FarSite Communications Ltd.");
 MODULE_LICENSE("GPL");
 
-EXPORT_NO_SYMBOLS;
-
-
 /*      Driver configuration and global parameters
  *      ==========================================
  */

@@ -53,7 +53,6 @@
 #define SNDRV_GET_ID
 #include <sound/initval.h>
 
-EXPORT_NO_SYMBOLS;
 MODULE_AUTHOR("Massimo Piccioni <dafastidio@libero.it>");
 MODULE_CLASSES("{sound}");
 MODULE_LICENSE("GPL");

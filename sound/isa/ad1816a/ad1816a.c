@@ -38,7 +38,6 @@
 
 #define PFX "ad1816a: "
 
-EXPORT_NO_SYMBOLS;
 MODULE_AUTHOR("Massimo Piccioni <dafastidio@libero.it>");
 MODULE_DESCRIPTION("AD1816A, AD1815");
 MODULE_LICENSE("GPL");

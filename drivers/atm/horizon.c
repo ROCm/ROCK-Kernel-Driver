@@ -2928,8 +2928,6 @@ static void __init hrz_check_args (void) {
 }
 
 #ifdef MODULE
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR(maintainer_string);
 MODULE_DESCRIPTION(description_string);
 MODULE_LICENSE("GPL");

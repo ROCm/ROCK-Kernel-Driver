@@ -42,7 +42,6 @@
 
 #include <linux/serial_reg.h>
 
-EXPORT_NO_SYMBOLS;
 MODULE_DESCRIPTION("MIDI serial u16550");
 MODULE_LICENSE("GPL");
 MODULE_CLASSES("{sound}");

@@ -305,8 +305,6 @@ MODULE_PARM(io, "i");
 MODULE_PARM(radio_nr, "i");
 MODULE_PARM_DESC(io, "I/O address of the Aztech card (0x350 or 0x358)");
 
-EXPORT_NO_SYMBOLS;
-
 static void __exit aztech_cleanup(void)
 {
 	video_unregister_device(&aztech_radio);

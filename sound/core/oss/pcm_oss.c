@@ -59,8 +59,6 @@ static int snd_pcm_oss_get_rate(snd_pcm_oss_file_t *pcm_oss_file);
 static int snd_pcm_oss_get_channels(snd_pcm_oss_file_t *pcm_oss_file);
 static int snd_pcm_oss_get_format(snd_pcm_oss_file_t *pcm_oss_file);
 
-EXPORT_NO_SYMBOLS;
-
 static inline mm_segment_t snd_enter_user(void)
 {
 	mm_segment_t fs = get_fs();

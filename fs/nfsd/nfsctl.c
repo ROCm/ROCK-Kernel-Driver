@@ -406,7 +406,6 @@ static void __exit exit_nfsd(void)
 	unregister_filesystem(&nfsd_fs_type);
 }
 
-EXPORT_NO_SYMBOLS;
 MODULE_AUTHOR("Olaf Kirch <okir@monad.swb.de>");
 MODULE_LICENSE("GPL");
 module_init(init_nfsd)

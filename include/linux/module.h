@@ -349,13 +349,6 @@ extern struct module *module_list;
 
 /* We want the EXPORT_SYMBOL tag left intact for recognition.  */
 
-#elif !defined(AUTOCONF_INCLUDED)
-
-#define __EXPORT_SYMBOL(sym,str)   error config_must_be_included_before_module
-#define EXPORT_SYMBOL(var)	   error config_must_be_included_before_module
-#define EXPORT_SYMBOL_NOVERS(var)  error config_must_be_included_before_module
-#define EXPORT_SYMBOL_GPL(var)  error config_must_be_included_before_module
-
 #elif !defined(CONFIG_MODULES)
 
 #define __EXPORT_SYMBOL(sym,str)
@@ -369,8 +362,6 @@ extern struct module *module_list;
 #define EXPORT_SYMBOL(var)	   error this_object_must_be_defined_as_export_objs_in_the_Makefile
 #define EXPORT_SYMBOL_NOVERS(var)  error this_object_must_be_defined_as_export_objs_in_the_Makefile
 #define EXPORT_SYMBOL_GPL(var)  error this_object_must_be_defined_as_export_objs_in_the_Makefile
-
-__asm__(".section __ksymtab,\"a\"\n.previous");
 
 #else
 
@@ -400,12 +391,23 @@ __attribute__((section("__ksymtab"))) =			\
 
 #endif /* __GENKSYMS__ */
 
-#ifdef MODULE
-/* Force a module to export no symbols.  */
-#define EXPORT_NO_SYMBOLS  __asm__(".section __ksymtab\n.previous")
-#else
+/* 
+ * Force a module to export no symbols.
+ * EXPORT_NO_SYMBOLS is default now, leave the define around for sources
+ * which still have it
+ */
 #define EXPORT_NO_SYMBOLS
-#endif /* MODULE */
+
+#ifdef CONFIG_MODULES
+/* 
+ * Always allocate a section "__ksymtab". If we encounter EXPORT_SYMBOL,
+ * the exported symbol will be added to it.
+ * If it remains empty, that tells modutils that we do not want to
+ * export any symbols (as opposed to it not being present, which means
+ * "export all symbols" to modutils)
+ */
+__asm__(".section __ksymtab,\"a\"\n.previous");
+#endif
 
 #ifdef CONFIG_MODULES
 #define SET_MODULE_OWNER(some_struct) do { (some_struct)->owner = THIS_MODULE; } while (0)

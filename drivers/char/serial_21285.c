@@ -495,4 +495,3 @@ void __init rs285_console_init(void)
 #endif	/* CONFIG_SERIAL_21285_CONSOLE */
 
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;

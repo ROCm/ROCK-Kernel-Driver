@@ -296,7 +296,6 @@ static int ida_proc_get_info(char *buffer, char **start, off_t offset, int lengt
 #ifdef MODULE
 
 MODULE_PARM(eisa, "1-8i");
-EXPORT_NO_SYMBOLS;
 
 /* This is a bit of a hack... */
 int __init init_module(void)

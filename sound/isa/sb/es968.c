@@ -35,8 +35,6 @@
 
 #define chip_t sb_t
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Massimo Piccioni <dafastidio@libero.it>");
 MODULE_DESCRIPTION("ESS AudioDrive ES968");
 MODULE_LICENSE("GPL");

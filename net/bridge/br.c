@@ -74,8 +74,6 @@ static void __exit br_deinit(void)
 #endif
 }
 
-EXPORT_NO_SYMBOLS;
-
 module_init(br_init)
 module_exit(br_deinit)
 MODULE_LICENSE("GPL");

@@ -42,8 +42,6 @@
 #define CARD_NAME "NeoMagic 256AV/ZX"
 #define DRIVER_NAME "NM256"
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("NeoMagic NM256AV/ZX");
 MODULE_LICENSE("GPL");

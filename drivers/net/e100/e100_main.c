@@ -399,7 +399,6 @@ static void e100_set_multi_exec(struct net_device *dev);
 MODULE_AUTHOR("Intel Corporation, <linux.nics@intel.com>");
 MODULE_DESCRIPTION(E100_FULL_DRIVER_NAME E100_VERSION);
 MODULE_LICENSE("Dual BSD/GPL");
-EXPORT_NO_SYMBOLS;
 
 E100_PARAM(TxDescriptors, "Number of transmit descriptors");
 E100_PARAM(RxDescriptors, "Number of receive descriptors");

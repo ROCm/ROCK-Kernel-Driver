@@ -35,8 +35,6 @@
 #define SNDRV_GET_ID
 #include <sound/initval.h>
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Tjeerd.Mulder@fujitsu-siemens.com");
 MODULE_DESCRIPTION("VIA VT8233");
 MODULE_LICENSE("GPL");

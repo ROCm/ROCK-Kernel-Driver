@@ -30,8 +30,6 @@ MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Routines for Gravis UltraSound soundcards - Synthesizer");
 MODULE_LICENSE("GPL");
 
-EXPORT_NO_SYMBOLS;
-
 /*
  *
  */

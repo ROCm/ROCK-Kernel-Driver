@@ -241,7 +241,6 @@ static void __exit nwbutton_exit (void)
 
 MODULE_AUTHOR("Alex Holden");
 MODULE_LICENSE("GPL");
-EXPORT_NO_SYMBOLS;
 
 module_init(nwbutton_init);
 module_exit(nwbutton_exit);

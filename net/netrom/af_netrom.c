@@ -1331,8 +1331,6 @@ static int __init nr_proto_init(void)
 module_init(nr_proto_init);
 
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_PARM(nr_ndevs, "i");
 MODULE_PARM_DESC(nr_ndevs, "number of NET/ROM devices");
 

@@ -340,8 +340,6 @@ static void __exit nwwatchdog_exit(void)
 	misc_deregister(&wdt977_miscdev);
 }
 
-EXPORT_NO_SYMBOLS;
-
 module_init(nwwatchdog_init);
 module_exit(nwwatchdog_exit);
 

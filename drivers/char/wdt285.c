@@ -182,8 +182,6 @@ static void __exit footbridge_watchdog_exit(void)
 	misc_deregister(&watchdog_miscdev);
 }
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Phil Blundell <pb@nexus.co.uk>");
 MODULE_DESCRIPTION("21285 watchdog driver");
 MODULE_LICENSE("GPL");
