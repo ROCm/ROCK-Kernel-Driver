@@ -176,6 +176,16 @@ config X86_SPEEDSTEP_LIB
 	depends on (X86_SPEEDSTEP_ICH || X86_SPEEDSTEP_SMI || X86_P4_CLOCKMOD)
 	default (X86_SPEEDSTEP_ICH || X86_SPEEDSTEP_SMI || X86_P4_CLOCKMOD)
 
+config X86_SPEEDSTEP_RELAXED_CAP_CHECK
+	bool "Relaxed speedstep capability checks"
+	depends on (X86_SPEEDSTEP_SMI || X86_SPEEDSTEP_ICH)
+	help
+	  Don't perform all checks for a speedstep capable system which would 
+	  normally be done. Some ancient or strange systems, though speedstep 
+	  capable, don't always indicate that they are speedstep capable. This 
+	  option let's the probing code bypass some of those checks if the
+	  parameter "relaxed_check=1" is passed to the module.
+
 config X86_LONGRUN
 	tristate "Transmeta LongRun"
 	depends on CPU_FREQ
