@@ -802,10 +802,10 @@ __u32 tcp_init_cwnd(struct tcp_opt *tp, struct dst_entry *dst)
 	__u32 cwnd = (dst ? dst_metric(dst, RTAX_INITCWND) : 0);
 
 	if (!cwnd) {
-		if (tp->mss_cache > 1460)
+		if (tp->mss_cache_std > 1460)
 			cwnd = 2;
 		else
-			cwnd = (tp->mss_cache > 1095) ? 3 : 4;
+			cwnd = (tp->mss_cache_std > 1095) ? 3 : 4;
 	}
 	return min_t(__u32, cwnd, tp->snd_cwnd_clamp);
 }
