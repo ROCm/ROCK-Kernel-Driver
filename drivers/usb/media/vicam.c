@@ -1,7 +1,7 @@
 /*
  * USB ViCam WebCam driver
  * Copyright (c) 2002 Joe Burks (jburks@wavicle.org),
- *                    John Tyner (fill in email address)
+ *                    John Tyner (jtyner@cs.ucr.edu)
  *
  * Supports 3COM HomeConnect PC Digital WebCam
  *
@@ -29,7 +29,7 @@
  * Andy Armstrong who reverse engineered the color encoding and
  * Pavel Machek and Chris Cheney who worked on reverse engineering the
  *    camera controls and wrote the first generation driver.
- * */
+ */
 
 #include <linux/kernel.h>
 #include <linux/wrapper.h>
@@ -408,7 +408,8 @@ struct vicam_camera {
 	struct video_device vdev;	// v4l video device
 	struct usb_device *udev;	// usb device
 
-	struct semaphore busy_lock;	// guard against SMP multithreading
+	/* guard against simultaneous accesses to the camera */
+	struct semaphore cam_lock;
 
 	int is_initialized;
 	u8 open_count;
@@ -424,17 +425,21 @@ struct vicam_camera {
 static int vicam_probe( struct usb_interface *intf, const struct usb_device_id *id);
 static void vicam_disconnect(struct usb_interface *intf);
 static void read_frame(struct vicam_camera *cam, int framenum);
+static void vicam_decode_color( char *data, char *rgb);
 
-static int
-send_control_msg(struct usb_device *udev, u8 request, u16 value, u16 index,
-		 unsigned char *cp, u16 size)
+static int __send_control_msg(struct vicam_camera *cam,
+			      u8 request,
+			      u16 value,
+			      u16 index,
+			      unsigned char *cp,
+			      u16 size)
 {
 	int status;
 
 	/* cp must be memory that has been allocated by kmalloc */
 
-	status = usb_control_msg(udev,
-				 usb_sndctrlpipe(udev, 0),
+	status = usb_control_msg(cam->udev,
+				 usb_sndctrlpipe(cam->udev, 0),
 				 request,
 				 USB_DIR_OUT | USB_TYPE_VENDOR |
 				 USB_RECIP_DEVICE, value, index,
@@ -450,6 +455,22 @@ send_control_msg(struct usb_device *udev, u8 request, u16 value, u16 index,
 	return status;
 }
 
+static int send_control_msg(struct vicam_camera *cam,
+			    u8 request,
+			    u16 value,
+			    u16 index,
+			    unsigned char *cp,
+			    u16 size)
+{
+	int status = -ENODEV;
+	down(&cam->cam_lock);
+	if (cam->udev) {
+		status = __send_control_msg(cam, request, value,
+					    index, cp, size);
+	}
+	up(&cam->cam_lock);
+	return status;
+}
 static int
 initialize_camera(struct vicam_camera *cam)
 {
@@ -465,14 +486,13 @@ initialize_camera(struct vicam_camera *cam)
 		{ .data = setup3, .size = sizeof(setup3) },
 		{ .data = NULL, .size = 0 }
 	};
-	
-	struct usb_device *udev = cam->udev;
+
 	int err, i;
 
 	for (i = 0, err = 0; firmware[i].data && !err; i++) {
 		memcpy(cam->cntrlbuf, firmware[i].data, firmware[i].size);
 
-		err = send_control_msg(udev, 0xff, 0, 0,
+		err = send_control_msg(cam, 0xff, 0, 0,
 				       cam->cntrlbuf, firmware[i].size);
 	}
 
@@ -484,11 +504,11 @@ set_camera_power(struct vicam_camera *cam, int state)
 {
 	int status;
 
-	if ((status = send_control_msg(cam->udev, 0x50, state, 0, NULL, 0)) < 0)
+	if ((status = send_control_msg(cam, 0x50, state, 0, NULL, 0)) < 0)
 		return status;
 
 	if (state) {
-		send_control_msg(cam->udev, 0x55, 1, 0, NULL, 0);
+		send_control_msg(cam, 0x55, 1, 0, NULL, 0);
 	}
 
 	return 0;
@@ -503,10 +523,6 @@ vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsign
 
 	if (!cam)
 		return -ENODEV;
-
-	/* make this _really_ smp-safe */
-	if (down_interruptible(&cam->busy_lock))
-		return -EINTR;
 
 	switch (ioctlnr) {
 		/* query capabilites */
@@ -694,6 +710,9 @@ vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsign
 			DBG("VIDIOCSYNC: %d\n", frame);
 
 			read_frame(cam, frame);
+			vicam_decode_color(cam->raw_image,
+					   cam->framebuf +
+					   frame * VICAM_MAX_FRAME_SIZE );
 
 			break;
 		}
@@ -724,7 +743,6 @@ vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsign
 		break;
 	}
 
-	up(&cam->busy_lock);
 	return retval;
 }
 
@@ -741,26 +759,25 @@ vicam_open(struct inode *inode, struct file *file)
 		       "vicam video_device improperly initialized");
 	}
 
-	if ( down_interruptible(&cam->busy_lock) )
-		return -EINTR;
+	/* the videodev_lock held above us protects us from
+	 * simultaneous opens...for now. we probably shouldn't
+	 * rely on this fact forever.
+	 */
 
 	if (cam->open_count > 0) {
 		printk(KERN_INFO
 		       "vicam_open called on already opened camera");
-		up(&cam->busy_lock);
 		return -EBUSY;
 	}
 
 	cam->raw_image = kmalloc(VICAM_MAX_READ_SIZE, GFP_KERNEL);
 	if (!cam->raw_image) {
-		up(&cam->busy_lock);
 		return -ENOMEM;
 	}
 
 	cam->framebuf = rvmalloc(VICAM_MAX_FRAME_SIZE * VICAM_FRAMES);
 	if (!cam->framebuf) {
 		kfree(cam->raw_image);
-		up(&cam->busy_lock);
 		return -ENOMEM;
 	}
 
@@ -768,7 +785,6 @@ vicam_open(struct inode *inode, struct file *file)
 	if (!cam->cntrlbuf) {
 		kfree(cam->raw_image);
 		rvfree(cam->framebuf, VICAM_MAX_FRAME_SIZE * VICAM_FRAMES);
-		up(&cam->busy_lock);
 		return -ENOMEM;
 	}
 
@@ -785,8 +801,6 @@ vicam_open(struct inode *inode, struct file *file)
 	cam->needsDummyRead = 1;
 	cam->open_count++;
 
-	up(&cam->busy_lock);
-
 	file->private_data = cam;	
 	
 	return 0;
@@ -796,14 +810,32 @@ static int
 vicam_close(struct inode *inode, struct file *file)
 {
 	struct vicam_camera *cam = file->private_data;
+	int open_count;
+	struct usb_device *udev;
+
 	DBG("close\n");
+
+	/* it's not the end of the world if
+	 * we fail to turn the camera off.
+	 */
+
 	set_camera_power(cam, 0);
 
 	kfree(cam->raw_image);
 	rvfree(cam->framebuf, VICAM_MAX_FRAME_SIZE * VICAM_FRAMES);
 	kfree(cam->cntrlbuf);
 
+	down(&cam->cam_lock);
+
 	cam->open_count--;
+	open_count = cam->open_count;
+	udev = cam->udev;
+
+	up(&cam->cam_lock);
+
+	if (!open_count && !udev) {
+		kfree(cam);
+	}
 
 	return 0;
 }
@@ -953,12 +985,18 @@ read_frame(struct vicam_camera *cam, int framenum)
 	request[8] = 0;
 	// bytes 9-15 do not seem to affect exposure or image quality
 
-	n = send_control_msg(cam->udev, 0x51, 0x80, 0, request, 16);
+	down(&cam->cam_lock);
+
+	if (!cam->udev) {
+		goto done;
+	}
+
+	n = __send_control_msg(cam, 0x51, 0x80, 0, request, 16);
 
 	if (n < 0) {
 		printk(KERN_ERR
 		       " Problem sending frame capture control message");
-		return;
+		goto done;
 	}
 
 	n = usb_bulk_msg(cam->udev,
@@ -971,9 +1009,8 @@ read_frame(struct vicam_camera *cam, int framenum)
 		       n);
 	}
 
-	vicam_decode_color(cam->raw_image,
-			 cam->framebuf +
-			 framenum * VICAM_MAX_FRAME_SIZE );
+ done:
+	up(&cam->cam_lock);
 }
 
 static int
@@ -983,17 +1020,17 @@ vicam_read( struct file *file, char *buf, size_t count, loff_t *ppos )
 
 	DBG("read %d bytes.\n", (int) count);
 
-	if ( down_interruptible(&cam->busy_lock) )
-		return -EINTR;
-
 	if (*ppos >= VICAM_MAX_FRAME_SIZE) {
 		*ppos = 0;
-		up(&cam->busy_lock);
 		return 0;
 	}
 
 	if (*ppos == 0) {
 		read_frame(cam, 0);
+		vicam_decode_color(cam->raw_image,
+				   cam->framebuf +
+				   0 * VICAM_MAX_FRAME_SIZE);
+
 	}
 
 	count = min_t(size_t, count, VICAM_MAX_FRAME_SIZE - *ppos);
@@ -1007,8 +1044,6 @@ vicam_read( struct file *file, char *buf, size_t count, loff_t *ppos )
 	if (count == VICAM_MAX_FRAME_SIZE) {
 		*ppos = 0;
 	}
-
-	up(&cam->busy_lock);
 
 	return count;
 }
@@ -1034,10 +1069,6 @@ vicam_mmap(struct file *file, struct vm_area_struct *vma)
 	 return -EINVAL;
 	 */
 
-	/* make this _really_ smp-safe */
-	if (down_interruptible(&cam->busy_lock))
-		return -EINTR;
-
 	pos = (unsigned long)cam->framebuf;
 	while (size > 0) {
 		page = kvirt_to_pa(pos);
@@ -1051,8 +1082,6 @@ vicam_mmap(struct file *file, struct vm_area_struct *vma)
 		else
 			size = 0;
 	}
-
-	up(&cam->busy_lock);
 
 	return 0;
 }
@@ -1285,7 +1314,7 @@ vicam_probe( struct usb_interface *intf, const struct usb_device_id *id)
 
 	cam->shutter_speed = 15;
 
-	init_MUTEX(&cam->busy_lock);
+	init_MUTEX(&cam->cam_lock);
 
 	memcpy(&cam->vdev, &vicam_template,
 	       sizeof (vicam_template));
@@ -1312,17 +1341,43 @@ vicam_probe( struct usb_interface *intf, const struct usb_device_id *id)
 static void
 vicam_disconnect(struct usb_interface *intf)
 {
+	int open_count;
 	struct vicam_camera *cam = dev_get_drvdata(&intf->dev);
-
 	dev_set_drvdata ( &intf->dev, NULL );
-	
-	cam->udev = NULL;
-	
+
+	/* we must unregister the device before taking its
+	 * cam_lock. This is because the video open call
+	 * holds the same lock as video unregister. if we
+	 * unregister inside of the cam_lock and open also
+	 * uses the cam_lock, we get deadlock.
+	 */
+
 	video_unregister_device(&cam->vdev);
+
+	/* stop the camera from being used */
+
+	down(&cam->cam_lock);
+
+	/* mark the camera as gone */
+
+	cam->udev = NULL;
 
 	vicam_destroy_proc_entry(cam);
 
-	kfree(cam);
+	/* the only thing left to do is synchronize with
+	 * our close/release function on who should release
+	 * the camera memory. if there are any users using the
+	 * camera, it's their job. if there are no users,
+	 * it's ours.
+	 */
+
+	open_count = cam->open_count;
+
+	up(&cam->cam_lock);
+
+	if (!open_count) {
+		kfree(cam);
+	}
 
 	printk(KERN_DEBUG "ViCam-based WebCam disconnected\n");
 }
