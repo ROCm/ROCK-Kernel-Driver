@@ -1637,12 +1637,13 @@ static int idedisk_cleanup (ide_drive_t *drive)
 }
 
 static int idedisk_init (void);
-int idedisk_reinit(ide_drive_t *drive);
+static int idedisk_reinit(ide_drive_t *drive);
 
 /*
  *      IDE subdriver functions, registered with ide.c
  */
 static ide_driver_t idedisk_driver = {
+	owner:			THIS_MODULE,
 	name:			"ide-disk",
 	version:		IDEDISK_VERSION,
 	media:			ide_disk,
@@ -1683,9 +1684,8 @@ static ide_module_t idedisk_module = {
 
 MODULE_DESCRIPTION("ATA DISK Driver");
 
-int idedisk_reinit(ide_drive_t *drive)
+static int idedisk_reinit(ide_drive_t *drive)
 {
-	MOD_INC_USE_COUNT;
 	/* strstr("foo", "") is non-NULL */
 	if (!strstr("ide-disk", drive->driver_req))
 		goto failed;
@@ -1708,10 +1708,8 @@ int idedisk_reinit(ide_drive_t *drive)
 		goto failed;
 	}
 	DRIVER(drive)->busy--;
-	MOD_DEC_USE_COUNT;
 	return 0;
 failed:
-	MOD_DEC_USE_COUNT;
 	return 1;
 }
 

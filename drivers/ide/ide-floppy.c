@@ -2144,12 +2144,13 @@ static ide_proc_entry_t idefloppy_proc[] = {
 #endif	/* CONFIG_PROC_FS */
 
 static int idefloppy_init (void);
-int idefloppy_reinit(ide_drive_t *drive);
+static int idefloppy_reinit(ide_drive_t *drive);
 
 /*
  *	IDE subdriver functions, registered with ide.c
  */
 static ide_driver_t idefloppy_driver = {
+	owner:			THIS_MODULE,
 	name:			"ide-floppy",
 	version:		IDEFLOPPY_VERSION,
 	media:			ide_floppy,
@@ -2192,10 +2193,9 @@ static ide_module_t idefloppy_module = {
 	NULL
 };
 
-int idefloppy_reinit (ide_drive_t *drive)
+static int idefloppy_reinit (ide_drive_t *drive)
 {
 	idefloppy_floppy_t *floppy;
-	MOD_INC_USE_COUNT;
 	if (!strstr("ide-floppy", drive->driver_req))
 		goto failed;
 	if (!drive->present)
@@ -2222,10 +2222,8 @@ int idefloppy_reinit (ide_drive_t *drive)
 	DRIVER(drive)->busy++;
 	idefloppy_setup (drive, floppy);
 	DRIVER(drive)->busy--;
-	MOD_DEC_USE_COUNT;
 	return 0;
 failed:
-	MOD_DEC_USE_COUNT;
 	return 1;
 }
 

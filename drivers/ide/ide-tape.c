@@ -6301,12 +6301,13 @@ static ide_proc_entry_t idetape_proc[] = {
 #endif
 
 static int idetape_init (void);
-int idetape_reinit(ide_drive_t *drive);
+static int idetape_reinit(ide_drive_t *drive);
 
 /*
  *	IDE subdriver functions, registered with ide.c
  */
 static ide_driver_t idetape_driver = {
+	owner:			THIS_MODULE,
 	name:			"ide-tape",
 	version:		IDETAPE_VERSION,
 	media:			ide_tape,
@@ -6361,12 +6362,11 @@ static struct file_operations idetape_fops = {
 	release:	idetape_chrdev_release,
 };
 
-int idetape_reinit (ide_drive_t *drive)
+static int idetape_reinit (ide_drive_t *drive)
 {
 	idetape_tape_t *tape;
 	int minor;
 
-	MOD_INC_USE_COUNT;
 	if (!strstr("ide-tape", drive->driver_req))
 		goto failed;
 	if (!drive->present)
@@ -6410,10 +6410,8 @@ int idetape_reinit (ide_drive_t *drive)
 			    S_IFCHR | S_IRUGO | S_IWUGO,
 			    &idetape_fops, NULL);
 	devfs_register_tape(tape->de_r);
-	MOD_DEC_USE_COUNT;
 	return 0;
 failed:
-	MOD_DEC_USE_COUNT;
 	return 1;
 }
 

@@ -545,6 +545,7 @@ static int idescsi_reinit(ide_drive_t *drive);
  *	IDE subdriver functions, registered with ide.c
  */
 static ide_driver_t idescsi_driver = {
+	owner:			THIS_MODULE,
 	name:			"ide-scsi",
 	version:		IDESCSI_VERSION,
 	media:			ide_scsi,
@@ -582,7 +583,6 @@ static int idescsi_reinit(ide_drive_t *drive)
 	idescsi_scsi_t *scsi;
 	int id;
 
-	MOD_INC_USE_COUNT;
 	if (!strstr("ide-scsi", drive->driver_req))
 		goto failed;
 	if (!drive->present)
@@ -602,10 +602,8 @@ static int idescsi_reinit(ide_drive_t *drive)
 	for (id = 0; id < MAX_HWIFS * MAX_DRIVES && idescsi_drives[id]; id++)
 		;
 	idescsi_setup (drive, scsi, id);
-	MOD_DEC_USE_COUNT;
 	return 0;
 failed:
-	MOD_DEC_USE_COUNT;
 	return 1;
 }
 

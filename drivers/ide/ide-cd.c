@@ -3048,9 +3048,10 @@ int ide_cdrom_cleanup(ide_drive_t *drive)
 }
 
 static int ide_cdrom_init(void);
-int ide_cdrom_reinit (ide_drive_t *drive);
+static int ide_cdrom_reinit (ide_drive_t *drive);
 
 static ide_driver_t ide_cdrom_driver = {
+	owner:			THIS_MODULE,
 	name:			"ide-cdrom",
 	version:		IDECD_VERSION,
 	media:			ide_cdrom,
@@ -3099,11 +3100,10 @@ char *ignore = NULL;
 MODULE_PARM(ignore, "s");
 MODULE_DESCRIPTION("ATAPI CD-ROM Driver");
 
-int ide_cdrom_reinit (ide_drive_t *drive)
+static int ide_cdrom_reinit (ide_drive_t *drive)
 {
 	struct cdrom_info *info;
 
-	MOD_INC_USE_COUNT;
 	if (!strstr("ide-cdrom", drive->driver_req))
 		goto failed;
 	if (!drive->present)
@@ -3141,10 +3141,8 @@ int ide_cdrom_reinit (ide_drive_t *drive)
 		goto failed;
 	}
 	DRIVER(drive)->busy--;
-	MOD_DEC_USE_COUNT;
 	return 0;
 failed:
-	MOD_DEC_USE_COUNT;
 	return 1;
 }
 

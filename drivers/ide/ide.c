@@ -2515,59 +2515,28 @@ int system_bus_clock (void)
 	return((int) ((!system_bus_speed) ? ide_system_bus_speed() : system_bus_speed ));
 }
 
+static spinlock_t drivers_lock = SPIN_LOCK_UNLOCKED;
+
 int ide_reinit_drive (ide_drive_t *drive)
 {
-	switch (drive->media) {
-#ifdef CONFIG_BLK_DEV_IDECD
-		case ide_cdrom:
-		{
-			extern int ide_cdrom_reinit(ide_drive_t *drive);
-			if (ide_cdrom_reinit(drive))
-				return 1;
-			break;
+	ide_module_t *module;
+	spin_lock(&drivers_lock);
+	for (module = ide_modules; module; module = module->next) {
+		ide_driver_t *driver = module->info;
+		if (!try_inc_mod_count(driver->owner))
+			continue;
+		spin_unlock(&drivers_lock);
+		if (driver->reinit(drive) == 0) {
+			if (driver->owner)
+				__MOD_DEC_USE_COUNT(driver->owner);
+			return 0;
 		}
-#endif /* CONFIG_BLK_DEV_IDECD */
-#ifdef CONFIG_BLK_DEV_IDEDISK
-		case ide_disk:
-		{
-			extern int idedisk_reinit(ide_drive_t *drive);
-			if (idedisk_reinit(drive))
-				return 1;
-			break;
-		}
-#endif /* CONFIG_BLK_DEV_IDEDISK */
-#ifdef CONFIG_BLK_DEV_IDEFLOPPY
-		case ide_floppy:
-		{
-			extern int idefloppy_reinit(ide_drive_t *drive);
-			if (idefloppy_reinit(drive))
-				return 1;
-			break;
-		}
-#endif /* CONFIG_BLK_DEV_IDEFLOPPY */
-#ifdef CONFIG_BLK_DEV_IDETAPE
-		case ide_tape:
-		{
-			extern int idetape_reinit(ide_drive_t *drive);
-			if (idetape_reinit(drive))
-				return 1;
-			break;
-		}
-#endif /* CONFIG_BLK_DEV_IDETAPE */
-#ifdef CONFIG_BLK_DEV_IDESCSI
-/*
- *              {
- *                      extern int idescsi_reinit(ide_drive_t *drive);
- *                      if (idescsi_reinit(drive))
- *                              return 1;
- *                      break;
- * }
- */
-#endif /* CONFIG_BLK_DEV_IDESCSI */
-		default:
-			return 1;
+		spin_lock(&drivers_lock);
+		if (driver->owner)
+			__MOD_DEC_USE_COUNT(driver->owner);
 	}
-	return 0;
+	spin_unlock(&drivers_lock);
+	return 1;
 }
 
 static int ide_ioctl (struct inode *inode, struct file *file,
@@ -3605,12 +3574,16 @@ int ide_register_module (ide_module_t *module)
 		failed--;
 	}
 
+	spin_lock(&drivers_lock);
 	for (p = ide_modules; p; p = p->next) {
-		if (p == module)
+		if (p == module) {
+			spin_unlock(&drivers_lock);
 			return 1;
+		}
 	}
 	module->next = ide_modules;
 	ide_modules = module;
+	spin_unlock(&drivers_lock);
 	revalidate_drives();
 	return 0;
 }
@@ -3635,9 +3608,11 @@ void ide_unregister_module (ide_module_t *module)
 #endif
 	}
 
+	spin_lock(&drivers_lock);
 	for (p = &ide_modules; (*p) && (*p) != module; p = &((*p)->next));
 	if (*p)
 		*p = (*p)->next;
+	spin_unlock(&drivers_lock);
 }
 
 struct block_device_operations ide_fops[] = {{

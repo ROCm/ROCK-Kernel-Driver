@@ -890,6 +890,7 @@ read_proc_t proc_ide_read_geometry;
 #define IDE_SUBDRIVER_VERSION	1
 
 typedef struct ide_driver_s {
+	struct module			*owner;
 	const char			*name;
 	const char			*version;
 	byte				media;
@@ -1218,21 +1219,6 @@ int ide_reinit_drive (ide_drive_t *drive);
 #ifdef CONFIG_BLK_DEV_IDE
 int ideprobe_init (void);
 #endif /* CONFIG_BLK_DEV_IDE */
-#ifdef CONFIG_BLK_DEV_IDEDISK
-int idedisk_reinit (ide_drive_t *drive);
-#endif /* CONFIG_BLK_DEV_IDEDISK */
-#ifdef CONFIG_BLK_DEV_IDECD
-int ide_cdrom_reinit (ide_drive_t *drive);
-#endif /* CONFIG_BLK_DEV_IDECD */
-#ifdef CONFIG_BLK_DEV_IDETAPE
-int idetape_reinit (ide_drive_t *drive);
-#endif /* CONFIG_BLK_DEV_IDETAPE */
-#ifdef CONFIG_BLK_DEV_IDEFLOPPY
-int idefloppy_reinit (ide_drive_t *drive);
-#endif /* CONFIG_BLK_DEV_IDEFLOPPY */
-#ifdef CONFIG_BLK_DEV_IDESCSI
-int idescsi_reinit (ide_drive_t *drive);
-#endif /* CONFIG_BLK_DEV_IDESCSI */
 #endif /* _IDE_C */
 
 int ide_register_module (ide_module_t *module);
