@@ -101,6 +101,8 @@ struct node_entry {
 
 	struct device device;
 
+	struct class_device class_dev;
+
 	/* Means this node is not attached anymore */
 	int in_limbo;
 
