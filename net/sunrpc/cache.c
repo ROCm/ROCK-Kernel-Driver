@@ -1063,10 +1063,15 @@ static int c_show(struct seq_file *m, void *p)
 	if (p == (void *)1)
 		return cd->cache_show(m, cd, NULL, pbuf);
 
+	ifdebug(CACHE)
+		seq_printf(m, "# expiry=%ld refcnt=%d\n",
+			   cp->expiry_time, atomic_read(&cp->refcnt));
 	cache_get(cp);
 	if (cache_check(cd, cp, NULL))
-		return 0;
-	cache_put(cp, cd);
+		/* cache_check does a cache_put on failure */
+		seq_printf(m, "# ");
+	else
+		cache_put(cp, cd);
 
 	return cd->cache_show(m, cd, cp, pbuf);
 }
