@@ -882,9 +882,9 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 
 	dprintk("svc: TCP complete record (%d bytes)\n", len);
 
-	/* Position reply write pointer immediately args,
+	/* Position reply write pointer immediately after args,
 	 * allowing for record length */
-	rqstp->rq_resbuf.base = rqstp->rq_argbuf.base + (len>>2);
+	rqstp->rq_resbuf.base = rqstp->rq_argbuf.base + 1 + (len>>2);
 	rqstp->rq_resbuf.buf  = rqstp->rq_resbuf.base + 1;
 	rqstp->rq_resbuf.len  = 1;
 	rqstp->rq_resbuf.buflen= rqstp->rq_argbuf.buflen - (len>>2) - 1;
@@ -892,7 +892,7 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 	rqstp->rq_skbuff      = 0;
 	rqstp->rq_argbuf.buf += 1;
 	rqstp->rq_argbuf.len  = (len >> 2);
-	rqstp->rq_argbuf.buflen = (len >> 2);
+	rqstp->rq_argbuf.buflen = (len >> 2) +1;
 	rqstp->rq_prot	      = IPPROTO_TCP;
 
 	/* Reset TCP read info */
