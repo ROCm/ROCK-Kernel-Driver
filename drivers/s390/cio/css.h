@@ -65,6 +65,7 @@ struct senseid {
 
 struct ccw_device_private {
 	int state;		/* device state */
+	atomic_t onoff;
 	__u16 devno;		/* device number */
 	__u16 irq;		/* subchannel number */
 	__u8 imask;		/* lpm mask for SNID/SID/SPGID */
@@ -127,6 +128,14 @@ int device_is_disconnected(struct subchannel *);
 void device_set_disconnected(struct subchannel *);
 void device_trigger_reprobe(struct subchannel *);
 
-/* Helper function for vary on/off. */
+/* Helper functions for vary on/off. */
 void device_set_waiting(struct subchannel *);
+void device_call_nopath_notify(struct subchannel *);
+
+/* Helper functions to build lists for the slow path. */
+int css_enqueue_subchannel_slow(unsigned long schid);
+void css_walk_subchannel_slow_list(void (*fn)(unsigned long));
+void css_clear_subchannel_slow_list(void);
+int css_slow_subchannels_exist(void);
+extern int need_rescan;
 #endif
