@@ -1083,6 +1083,9 @@ static struct module *load_module(void *umod,
 	sechdrs = (void *)hdr + hdr->e_shoff;
 	secstrings = (void *)hdr + sechdrs[hdr->e_shstrndx].sh_offset;
 
+	/* And these should exist, but gcc whinges if we don't init them */
+	symindex = strindex = 0;
+
 	for (i = 1; i < hdr->e_shnum; i++) {
 		/* Mark all sections sh_addr with their address in the
 		   temporary image. */
@@ -1261,6 +1264,7 @@ static struct module *load_module(void *umod,
 
 	/* Now do relocations. */
 	for (i = 1; i < hdr->e_shnum; i++) {
+		const char *strtab = (char *)sechdrs[strindex].sh_addr;
 		if (sechdrs[i].sh_type == SHT_REL)
 			err = apply_relocate(sechdrs, strtab, symindex, i,
 					     mod);
