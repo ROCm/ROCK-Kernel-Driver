@@ -86,9 +86,9 @@ static dpt_sig_S DPTI_sig = {
 #elif defined(__ia64__)
 	PROC_INTEL, PROC_IA64,
 #elif defined(__sparc__)
-	PROC_ULTRASPARC,
+	PROC_ULTRASPARC, PROC_ULTRASPARC,
 #elif defined(__alpha__)
-	PROC_ALPHA ,
+	PROC_ALPHA, PROC_ALPHA,
 #else
 	(-1),(-1),
 #endif
