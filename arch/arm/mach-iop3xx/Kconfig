@@ -4,17 +4,16 @@ menu "IOP3xx Implementation Options"
 choice
 	prompt "IOP3xx System Type"
 	default ARCH_IQ80310
+	depends on ARCH_IOP3XX
 
 config ARCH_IQ80310
 	bool "IQ80310"
-	depends on ARCH_IOP3XX
 	help
 	  Say Y here if you want to run your kernel on the Intel IQ80310
 	  evaluation kit for the IOP310 chipset.
 
 config ARCH_IQ80321
 	bool "IQ80321"
-	depends on ARCH_IOP3XX
 	help
 	  Say Y here if you want to run your kernel on the Intel IQ80321
 	  evaluation kit for the IOP321 chipset.
