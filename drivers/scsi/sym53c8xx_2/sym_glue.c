@@ -1876,7 +1876,7 @@ static int sym_setup_bus_dma_mask(hcb_p np)
 					sym_name(np));
 		}
 		else {
-			if (!pci_set_dma_mask(np->s.device, 0xffffffffUL))
+			if (pci_set_dma_mask(np->s.device, 0xffffffffUL))
 				goto out_err32;
 		}
 	}
@@ -2130,7 +2130,7 @@ sym_attach (Scsi_Host_Template *tpnt, int unit, sym_device *dev)
 
 	SYM_UNLOCK_HCB(np, flags);
 
-	scsi_set_pci_device(instance, dev->pdev);
+	scsi_set_device(instance, &dev->pdev->dev);
 
 	/*
 	 *  Now let the generic SCSI driver

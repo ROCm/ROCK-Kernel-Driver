@@ -692,7 +692,7 @@ exp_export(struct nfsctl_export *nxp)
 	new.ex_anon_gid = nxp->ex_anon_gid;
 	new.ex_fsid = nxp->ex_dev;
 
-	exp = svc_export_lookup(&new, 2);
+	exp = svc_export_lookup(&new, 1);
 
 	if (exp == NULL)
 		goto finish;

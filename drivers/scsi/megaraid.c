@@ -2963,7 +2963,7 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 		 */
 		host->max_sectors = 1024;
 
-		scsi_set_pci_device(host, pdev);
+		scsi_set_device(host, &pdev->dev);
 		megaCfg = (mega_host_config *) host->hostdata;
 		memset (megaCfg, 0, sizeof (mega_host_config));
 

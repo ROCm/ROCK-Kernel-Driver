@@ -171,30 +171,6 @@ __setup("scsi_logging=", scsi_logging_setup);
 #endif
 
 /*
- *	Issue a command and wait for it to complete
- */
- 
-static void scsi_wait_done(Scsi_Cmnd * SCpnt)
-{
-	struct request *req = SCpnt->request;
-        struct request_queue *q = SCpnt->device->request_queue;
-        unsigned long flags;
-
-        ASSERT_LOCK(q->queue_lock, 0);
-	req->rq_status = RQ_SCSI_DONE;	/* Busy, but indicate request done */
-
-        spin_lock_irqsave(q->queue_lock, flags);
-
-        if(blk_rq_tagged(req))
-                blk_queue_end_tag(q, req);
-
-        spin_unlock_irqrestore(q->queue_lock, flags);
-
-	if (req->waiting)
-		complete(req->waiting);
-}
-
-/*
  * Function:    scsi_allocate_request
  *
  * Purpose:     Allocate a request descriptor.
@@ -261,87 +237,6 @@ void scsi_release_request(Scsi_Request * req)
 	}
 
 	kfree(req);
-}
-
-/*
- * Function:    scsi_mlqueue_insert()
- *
- * Purpose:     Insert a command in the midlevel queue.
- *
- * Arguments:   cmd    - command that we are adding to queue.
- *              reason - why we are inserting command to queue.
- *
- * Lock status: Assumed that lock is not held upon entry.
- *
- * Returns:     Nothing.
- *
- * Notes:       We do this for one of two cases.  Either the host is busy
- *              and it cannot accept any more commands for the time being,
- *              or the device returned QUEUE_FULL and can accept no more
- *              commands.
- * Notes:       This could be called either from an interrupt context or a
- *              normal process context.
- */
-static int scsi_mlqueue_insert(Scsi_Cmnd * cmd, int reason)
-{
-	struct Scsi_Host *host = cmd->device->host;
-	struct scsi_device *device = cmd->device;
-
-	SCSI_LOG_MLQUEUE(1,
-		 printk("Inserting command %p into mlqueue\n", cmd));
-
-	/*
-	 * We are inserting the command into the ml queue.  First, we
-	 * cancel the timer, so it doesn't time out.
-	 */
-	scsi_delete_timer(cmd);
-
-	/*
-	 * Next, set the appropriate busy bit for the device/host.
-	 *
-	 * If the host/device isn't busy, assume that something actually
-	 * completed, and that we should be able to queue a command now.
-	 *
-	 * Note that the prior mid-layer assumption that any host could
-	 * always queue at least one command is now broken.  The mid-layer
-	 * will implement a user specifiable stall (see
-	 * scsi_host.max_host_blocked and scsi_device.max_device_blocked)
-	 * if a command is requeued with no other commands outstanding
-	 * either for the device or for the host.
-	 */
-	if (reason == SCSI_MLQUEUE_HOST_BUSY) {
-		host->host_blocked = host->max_host_blocked;
-	} else {
-		device->device_blocked = device->max_device_blocked;
-	}
-
-	/*
-	 * Register the fact that we own the thing for now.
-	 */
-	cmd->state = SCSI_STATE_MLQUEUE;
-	cmd->owner = SCSI_OWNER_MIDLEVEL;
-	cmd->bh_next = NULL;
-
-	/*
-	 * Decrement the counters, since these commands are no longer
-	 * active on the host/device.
-	 */
-	scsi_host_busy_dec_and_test(host, device);
-
-	/*
-	 * Insert this command at the head of the queue for it's device.
-	 * It will go before all other commands that are already in the queue.
-	 *
-	 * NOTE: there is magic here about the way the queue is
-	 * plugged if we have no outstanding commands.
-	 * scsi_insert_special_cmd eventually calls
-	 * blk_queue_insert().  Although this *doesn't* plug the
-	 * queue, it does call the request function.  The SCSI request
-	 * function detects the blocked condition and plugs the queue
-	 * appropriately.
-	 */
-	scsi_insert_special_cmd(cmd, 1);
-	return 0;
 }
 
 struct scsi_host_cmd_pool {
@@ -621,7 +516,7 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 			rtn = host->hostt->queuecommand(SCpnt, scsi_done);
 			spin_unlock_irqrestore(host->host_lock, flags);
 			if (rtn != 0) {
-				scsi_mlqueue_insert(SCpnt, rtn == SCSI_MLQUEUE_DEVICE_BUSY ? rtn : SCSI_MLQUEUE_HOST_BUSY);
+				scsi_queue_insert(SCpnt, rtn == SCSI_MLQUEUE_DEVICE_BUSY ? rtn : SCSI_MLQUEUE_HOST_BUSY);
 				SCSI_LOG_MLQUEUE(3,
 				   printk("queuecommand : request rejected\n"));                                
 			}
@@ -659,128 +554,6 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 	return rtn;
 }
 
-void scsi_wait_req (Scsi_Request * SRpnt, const void *cmnd ,
- 		  void *buffer, unsigned bufflen, 
- 		  int timeout, int retries)
-{
-	DECLARE_COMPLETION(wait);
-	
-	SRpnt->sr_request->waiting = &wait;
-	SRpnt->sr_request->rq_status = RQ_SCSI_BUSY;
-	scsi_do_req (SRpnt, (void *) cmnd,
-		buffer, bufflen, scsi_wait_done, timeout, retries);
-	generic_unplug_device(SRpnt->sr_device->request_queue);
-	wait_for_completion(&wait);
-	SRpnt->sr_request->waiting = NULL;
-	if( SRpnt->sr_command != NULL )
-	{
-		scsi_put_command(SRpnt->sr_command);
-		SRpnt->sr_command = NULL;
-	}
-
-}
- 
-/*
- * Function:    scsi_do_req
- *
- * Purpose:     Queue a SCSI request
- *
- * Arguments:   SRpnt     - command descriptor.
- *              cmnd      - actual SCSI command to be performed.
- *              buffer    - data buffer.
- *              bufflen   - size of data buffer.
- *              done      - completion function to be run.
- *              timeout   - how long to let it run before timeout.
- *              retries   - number of retries we allow.
- *
- * Lock status: With the new queueing code, this is SMP-safe, and no locks
- *              need be held upon entry.   The old queueing code the lock was
- *              assumed to be held upon entry.
- *
- * Returns:     Nothing.
- *
- * Notes:       Prior to the new queue code, this function was not SMP-safe.
- *              Also, this function is now only used for queueing requests
- *              for things like ioctls and character device requests - this
- *              is because we essentially just inject a request into the
- *              queue for the device. Normal block device handling manipulates
- *              the queue directly.
- */
-void scsi_do_req(Scsi_Request * SRpnt, const void *cmnd,
-	      void *buffer, unsigned bufflen, void (*done) (Scsi_Cmnd *),
-		 int timeout, int retries)
-{
-	Scsi_Device * SDpnt = SRpnt->sr_device;
-	struct Scsi_Host *host = SDpnt->host;
-
-	ASSERT_LOCK(host->host_lock, 0);
-
-	SCSI_LOG_MLQUEUE(4,
-			 {
-			 int i;
-			 int size = COMMAND_SIZE(((const unsigned char *)cmnd)[0]);
-			 printk("scsi_do_req (host = %d, channel = %d target = %d, "
-		    "buffer =%p, bufflen = %d, done = %p, timeout = %d, "
-				"retries = %d)\n"
-				"command : ", host->host_no, SDpnt->channel, SDpnt->id, buffer,
-				bufflen, done, timeout, retries);
-			 for (i	 = 0; i < size; ++i)
-			 	printk("%02x  ", ((unsigned char *) cmnd)[i]);
-			 	printk("\n");
-			 });
-
-	if (!host) {
-		panic("Invalid or not present host.\n");
-	}
-
-	/*
-	 * If the upper level driver is reusing these things, then
-	 * we should release the low-level block now.  Another one will
-	 * be allocated later when this request is getting queued.
-	 */
-	if( SRpnt->sr_command != NULL )
-	{
-		scsi_put_command(SRpnt->sr_command);
-		SRpnt->sr_command = NULL;
-	}
-
-	/*
-	 * We must prevent reentrancy to the lowlevel host driver.  This prevents
-	 * it - we enter a loop until the host we want to talk to is not busy.
-	 * Race conditions are prevented, as interrupts are disabled in between the
-	 * time we check for the host being not busy, and the time we mark it busy
-	 * ourselves.
-	 */
-
-
-	/*
-	 * Our own function scsi_done (which marks the host as not busy, disables
-	 * the timeout counter, etc) will be called by us or by the
-	 * scsi_hosts[host].queuecommand() function needs to also call
-	 * the completion function for the high level driver.
-	 */
-
-	memcpy((void *) SRpnt->sr_cmnd, (const void *) cmnd, 
-	       sizeof(SRpnt->sr_cmnd));
-	SRpnt->sr_bufflen = bufflen;
-	SRpnt->sr_buffer = buffer;
-	SRpnt->sr_allowed = retries;
-	SRpnt->sr_done = done;
-	SRpnt->sr_timeout_per_command = timeout;
-
-	if (SRpnt->sr_cmd_len == 0)
-		SRpnt->sr_cmd_len = COMMAND_SIZE(SRpnt->sr_cmnd[0]);
-
-	/*
-	 * At this point, we merely set up the command, stick it in the normal
-	 * request queue, and return.  Eventually that request will come to the
-	 * top of the list, and will be dispatched.
-	 */
-	scsi_insert_special_req(SRpnt, 0);
-
-	SCSI_LOG_MLQUEUE(3, printk("Leaving scsi_do_req()\n"));
-}
- 
 /*
  * Function:    scsi_init_cmd_from_req
  *
@@ -998,7 +771,7 @@ static void scsi_softirq(struct softirq_action *h)
 				 */
 				SCSI_LOG_MLCOMPLETE(3, printk("Command rejected as device queue full, put on ml queue %p\n",
                                                               SCpnt));
-				scsi_mlqueue_insert(SCpnt, SCSI_MLQUEUE_DEVICE_BUSY);
+				scsi_queue_insert(SCpnt, SCSI_MLQUEUE_DEVICE_BUSY);
 				break;
 			default:
 				/*
