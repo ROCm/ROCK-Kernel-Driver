@@ -176,6 +176,7 @@ extern unsigned long cache_decay_ticks;
 #define	MAX_SCHEDULE_TIMEOUT	LONG_MAX
 extern signed long FASTCALL(schedule_timeout(signed long timeout));
 asmlinkage void schedule(void);
+extern int max_timeslice, min_timeslice;
 
 struct namespace;
 

@@ -134,6 +134,9 @@ enum
 	KERN_KDB=64,		/* int: kdb on/off */
 	KERN_S390_HZ_TIMER=65,  /* int: hz timer on or off */
 	KERN_DUMP=66,		/* directory: dump parameters */
+	KERN_MAXTIMESLICE=67,	/* int: nice -20 max timeslice */
+	KERN_MINTIMESLICE=68,	/* int: nice +19 min timeslice */
+	KERN_HZ=69,		/* unsigned long: interal kernel HZ */
 };
 
 

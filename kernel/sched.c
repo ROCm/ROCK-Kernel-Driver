@@ -79,12 +79,19 @@ EXPORT_SYMBOL(dump_oncpu);
 /*
  * These are the 'tuning knobs' of the scheduler:
  *
- * Minimum timeslice is 10 msecs, default timeslice is 100 msecs,
- * maximum timeslice is 200 msecs. Timeslices get refilled after
- * they expire.
+ * Minimum timeslice is 10 msecs, default timeslice is 150 msecs,
+ * maximum timeslice is 300 msecs. Timeslices get refilled after
+ * they expire. 
  */
-#define MIN_TIMESLICE		( 10 * HZ / 1000)
-#define MAX_TIMESLICE		(200 * HZ / 1000)
+#define __MIN_TIMESLICE		  10000
+#define __MAX_TIMESLICE		 300000
+#define __MIN_TIMESLICE_DESKTOP	   2000
+#define __MAX_TIMESLICE_DESKTOP	  60000
+/* the sysctl values are exported in usec units to userspace */
+int max_timeslice = __MAX_TIMESLICE, min_timeslice = __MIN_TIMESLICE;
+#define MAX_TIMESLICE ((max_timeslice * HZ + 999999) / 1000000)
+#define MIN_TIMESLICE ((min_timeslice * HZ + 999999) / 1000000)
+
 #define ON_RUNQUEUE_WEIGHT	 30
 #define CHILD_PENALTY		 95
 #define PARENT_PENALTY		100
@@ -2965,3 +2972,13 @@ task_t *kdb_cpu_curr(int cpu)
 	return(cpu_curr(cpu));
 }
 #endif
+
+static int __init init_desktop(char *str)
+{
+	min_timeslice = __MIN_TIMESLICE_DESKTOP;
+	max_timeslice = __MAX_TIMESLICE_DESKTOP;
+	return 1;
+}
+__setup("desktop", init_desktop);
+
+
