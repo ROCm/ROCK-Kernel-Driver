@@ -422,6 +422,10 @@ void __init check_bugs(void)
 	check_devanon();
 }
 
+void apply_alternatives(void *start, void *end)
+{
+}
+
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
  * Emacs will notice this stuff at the end of the file and automatically
