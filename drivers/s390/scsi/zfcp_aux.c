@@ -63,6 +63,7 @@
 
 /* accumulated log level (module parameter) */
 static u32 loglevel = ZFCP_LOG_LEVEL_DEFAULTS;
+static char *device;
 /*********************** FUNCTION PROTOTYPES *********************************/
 
 /* written against the module interface */
@@ -94,13 +95,14 @@ MODULE_AUTHOR("Heiko Carstens <heiko.carstens@de.ibm.com>, "
 	      "Wolfgang Taphorn <taphorn@de.ibm.com>, "
 	      "Aron Zeh <arzeh@de.ibm.com>, "
 	      "IBM Deutschland Entwicklung GmbH");
-/* what this driver module is about */
 MODULE_DESCRIPTION
     ("FCP (SCSI over Fibre Channel) HBA driver for IBM eServer zSeries");
 MODULE_LICENSE("GPL");
-/* log level may be provided as a module parameter */
+
+module_param(device, charp, 0);
+MODULE_PARM_DESC(device, "specify initial device");
+
 module_param(loglevel, uint, 0);
-/* short explaination of the previous module parameter */
 MODULE_PARM_DESC(loglevel,
 		 "log levels, 8 nibbles: "
 		 "(unassigned) ERP QDIO DIO Config FSF SCSI Other, "
@@ -316,17 +318,19 @@ zfcp_in_els_dbf_event(struct zfcp_adapter *adapter, const char *text,
 #endif
 }
 
-#ifndef MODULE
 /**
  * zfcp_device_setup - setup function
  * @str: pointer to parameter string
  *
- * Parse the kernel parameter string "zfcp_device=..."
+ * Parse "device=..." parameter string.
  */
 static int __init
 zfcp_device_setup(char *str)
 {
 	char *tmp;
+
+	if (!str)
+		return 0;
 
 	tmp = strchr(str, ',');
 	if (!tmp)
@@ -344,17 +348,12 @@ zfcp_device_setup(char *str)
 	zfcp_data.init_fcp_lun = simple_strtoull(tmp, &tmp, 0);
 	if (*tmp != '\0')
 		goto err_out;
-
-	zfcp_data.init_is_valid = 1;
-	goto out;
+	return 1;
 
  err_out:
-	ZFCP_LOG_NORMAL("Parse error for parameter string %s\n", str);
- out:
-	return 1;
+	ZFCP_LOG_NORMAL("Parse error for device parameter string %s\n", str);
+	return 0;
 }
-
-__setup("zfcp_device=", zfcp_device_setup);
 
 static void __init
 zfcp_init_device_configure(void)
@@ -397,8 +396,6 @@ zfcp_init_device_configure(void)
 	return;
 }
 
-#endif  /* #ifndef MODULE */
-
 static int __init
 zfcp_module_init(void)
 {
@@ -440,10 +437,9 @@ zfcp_module_init(void)
 		ZFCP_LOG_NORMAL("Registering with common I/O layer failed.\n");
 		goto out_ccw_register;
 	}
-#ifndef MODULE
-	if (zfcp_data.init_is_valid)
+
+	if (zfcp_device_setup(device))
 		zfcp_init_device_configure();
-#endif
 
 	goto out;
 
@@ -493,19 +489,6 @@ zfcp_reboot_handler(struct notifier_block *notifier, unsigned long code,
 
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_CONFIG
 #define ZFCP_LOG_AREA_PREFIX		ZFCP_LOG_AREA_PREFIX_CONFIG
-
-#ifndef MODULE
-/* zfcp_loglevel boot_parameter */
-static int __init
-zfcp_loglevel_setup(char *str)
-{
-	loglevel = simple_strtoul(str, NULL, 0);
-	ZFCP_LOG_TRACE("loglevel is 0x%x\n", loglevel);
-	return 1;		/* why just 1? */
-}
-
-__setup("zfcp_loglevel=", zfcp_loglevel_setup);
-#endif				/* not MODULE */
 
 /**
  * zfcp_get_unit_by_lun - find unit in unit list of port by fcp lun

@@ -1015,7 +1015,7 @@ extern inline int ffs (int x)
                 "    jnz  4f\n"
                 "    ahi  %0,1\n"
                 "4:"
-                : "=&d" (r), "+d" (x) : : "cc" );
+                : "+d" (r), "+d" (x) : : "cc" );
         return r;
 }
 

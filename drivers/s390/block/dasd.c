@@ -1980,6 +1980,7 @@ EXPORT_SYMBOL(dasd_term_IO);
 
 EXPORT_SYMBOL_GPL(dasd_generic_probe);
 EXPORT_SYMBOL_GPL(dasd_generic_remove);
+EXPORT_SYMBOL_GPL(dasd_generic_notify);
 EXPORT_SYMBOL_GPL(dasd_generic_set_online);
 EXPORT_SYMBOL_GPL(dasd_generic_set_offline);
 EXPORT_SYMBOL_GPL(dasd_generic_auto_online);
