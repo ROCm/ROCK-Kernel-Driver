@@ -704,7 +704,7 @@ static struct pci_serial_quirk pci_serial_quirks[] = {
 		.subdevice	= PCI_SUBDEVICE_ID_OCTPRO232,
 		.init		= sbs_init,
 		.setup		= sbs_setup,
-		.exit		= sbs_exit
+		.exit		= __devexit_p(sbs_exit),
 	},
 	/*
 	 * SBS Technologies, Inc., PMC-OCTALPRO 422
@@ -716,7 +716,7 @@ static struct pci_serial_quirk pci_serial_quirks[] = {
 		.subdevice	= PCI_SUBDEVICE_ID_OCTPRO422,
 		.init		= sbs_init,
 		.setup		= sbs_setup,
-		.exit		= sbs_exit
+		.exit		= __devexit_p(sbs_exit),
 	},
 	/*
 	 * SBS Technologies, Inc., P-Octal 232
@@ -728,7 +728,7 @@ static struct pci_serial_quirk pci_serial_quirks[] = {
 		.subdevice	= PCI_SUBDEVICE_ID_POCTAL232,
 		.init		= sbs_init,
 		.setup		= sbs_setup,
-		.exit		= sbs_exit
+		.exit		= __devexit_p(sbs_exit),
 	},
 	/*
 	 * SBS Technologies, Inc., P-Octal 422
@@ -740,7 +740,7 @@ static struct pci_serial_quirk pci_serial_quirks[] = {
 		.subdevice	= PCI_SUBDEVICE_ID_POCTAL422,
 		.init		= sbs_init,
 		.setup		= sbs_setup,
-		.exit		= sbs_exit
+		.exit		= __devexit_p(sbs_exit),
 	},
 
 	/*
