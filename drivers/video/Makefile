@@ -28,6 +28,7 @@ obj-$(CONFIG_FONT_8x16)           += font_8x16.o
 obj-$(CONFIG_FONT_6x11)           += font_6x11.o
 obj-$(CONFIG_FONT_PEARL_8x8)      += font_pearl_8x8.o
 obj-$(CONFIG_FONT_ACORN_8x8)      += font_acorn_8x8.o
+obj-$(CONFIG_FONT_MINI_4x6)       += font_mini_4x6.o
 
 # Add fbmon.o back into obj-$(CONFIG_FB) in 2.5.x
 obj-$(CONFIG_FB)                  += fbmem.o fbcmap.o modedb.o fbcon.o fonts.o fbgen.o
