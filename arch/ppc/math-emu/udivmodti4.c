@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.udivmodti4.c 1.5 05/17/01 18:14:23 cort
- */
 /* This has so very few changes over libgcc2's __udivmoddi4 it isn't funny.  */
 
 #include "soft-fp.h"

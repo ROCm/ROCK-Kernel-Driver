@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.soft-fp.h 1.5 05/17/01 18:14:23 cort
- */
 #ifndef SOFT_FP_H
 #define SOFT_FP_H
 

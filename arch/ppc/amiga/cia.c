@@ -1,8 +1,5 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
- *  linux/arch/m68k/amiga/cia.c - CIA support
+ *  arch/ppc/amiga/cia.c - CIA support
  *
  *  Copyright (C) 1996 Roman Zippel
  *

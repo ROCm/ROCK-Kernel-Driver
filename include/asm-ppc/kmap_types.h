@@ -1,6 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
 #ifdef __KERNEL__
 #ifndef _ASM_KMAP_TYPES_H
 #define _ASM_KMAP_TYPES_H

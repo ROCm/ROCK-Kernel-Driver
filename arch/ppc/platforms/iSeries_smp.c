@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * SMP support for iSeries/LPAR.
  *
  * Copyright (C) 2001 IBM Corp.

@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.error_log.h 1.5 05/17/01 18:14:21 cort
- */
 #ifndef __ERROR_LOG_H__
 #define __ERROR_LOG_H__
 

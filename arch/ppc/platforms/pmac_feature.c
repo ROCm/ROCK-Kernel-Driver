@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  *  arch/ppc/platforms/pmac_feature.c
  *
  *  Copyright (C) 1996-2001 Paul Mackerras (paulus@cs.anu.edu.au)

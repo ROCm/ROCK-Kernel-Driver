@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.bootx.h 1.5 05/17/01 18:14:24 cort
- */
-/*
  * This file describes the structure passed from the BootX application
  * (for MacOS) when it is used to boot Linux.
  *

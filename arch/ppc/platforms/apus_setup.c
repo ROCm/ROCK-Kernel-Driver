@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  *  arch/ppc/platforms/apus_setup.c
  *
  *  Copyright (C) 1998, 1999  Jesper Skov

@@ -1,8 +1,5 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
- *  linux/openpic.h -- OpenPIC definitions
+ *  arch/ppc/kernel/open_pic_defs.h -- OpenPIC definitions
  *
  *  Copyright (C) 1997 Geert Uytterhoeven
  *

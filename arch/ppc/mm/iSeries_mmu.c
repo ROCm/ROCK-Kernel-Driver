@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Procedures for MMU handling on iSeries systems, where we
  * have to call the hypervisor to change things in the hash
  * table.

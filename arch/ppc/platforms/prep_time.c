@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  *  arch/ppc/platforms/prep_time.c
  *
  *  Copyright (C) 1991, 1992, 1995  Linus Torvalds

@@ -1,6 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- *
  * arch/ppc/boot/prep/misc.c
  *
  * Adapted for PowerPC by Gary Thomas
@@ -20,6 +18,7 @@
 #include <asm/bootinfo.h>
 #include <asm/mmu.h>
 #include <asm/byteorder.h>
+
 #include "nonstdio.h"
 #include "zlib.h"
 
@@ -51,7 +50,6 @@ int keyb_present = 1;	/* keyboard controller is present by default */
 RESIDUAL hold_resid_buf;
 RESIDUAL *hold_residual = &hold_resid_buf;
 unsigned long initrd_size = 0;
-unsigned long orig_MSR;
 
 char *zimage_start;
 int zimage_size;
@@ -66,16 +64,11 @@ int orig_x, orig_y = 24;
 #endif /* CONFIG_VGA_CONSOLE */
 
 extern int CRT_tstc(void);
-extern void of_init(void *handler);
-extern int of_finddevice(const char *device_specifier, int *phandle);
-extern int of_getprop(int phandle, const char *name, void *buf, int buflen,
-		int *size);
 extern int vga_init(unsigned char *ISA_mem);
 extern void gunzip(void *, int, unsigned char *, int *);
-
-extern void _put_MSR(unsigned int val);
 extern unsigned long serial_init(int chan, void *ignored);
 extern void serial_fixups(void);
+extern unsigned long get_mem_size(void);
 
 void
 writel(unsigned int val, unsigned int address)
@@ -120,15 +113,12 @@ scroll(void)
 
 unsigned long
 decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
-		  RESIDUAL *residual, void *OFW_interface)
+		  RESIDUAL *residual)
 {
 	int timer = 0;
 	extern unsigned long start;
 	char *cp, ch;
 	unsigned long TotalMemory;
-	int dev_handle;
-	int mem_info[2];
-	int res, size;
 	unsigned char board_type;
 	unsigned char base_mod;
 	int start_multi = 0;
@@ -141,6 +131,11 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 #if defined(CONFIG_VGA_CONSOLE)
 	vga_init((unsigned char *)0xC0000000);
 #endif /* CONFIG_VGA_CONSOLE */
+
+	/* 
+	 * Find out how much memory we have.
+	 */
+	TotalMemory = get_mem_size();
 
 	/*
 	 * Tell the user where we were loaded at and where we were relocated
@@ -218,47 +213,6 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 	} else {
 		/* Tell the user we didn't find anything. */
 		puts("No residual data found.\n");
-
-		/* Assume 32M in the absence of more info... */
-		TotalMemory = 0x02000000;
-
-		/*
-		 * This is a 'best guess' check.  We want to make sure
-		 * we don't try this on a PReP box without OF
-		 *     -- Cort
-		 */
-		while (OFW_interface && ((unsigned long)OFW_interface < 0x10000000) )
-		{
-			/* We need to restore the slightly inaccurate
-			 * MSR so that OpenFirmware will behave. -- Tom
-			 */
-			_put_MSR(orig_MSR);
-			of_init(OFW_interface);
-
-			/* get handle to memory description */
-			res = of_finddevice("/memory@0",
-					    &dev_handle);
-			if (res)
-				break;
-
-			/* get the info */
-			res = of_getprop(dev_handle,
-					 "reg",
-					 mem_info,
-					 sizeof(mem_info),
-					 &size);
-			if (res)
-				break;
-
-			TotalMemory = mem_info[1];
-			break;
-		}
-
-		hold_residual->TotalMemory = TotalMemory;
-		residual = hold_residual;
-
-		/* Enforce a sane MSR for booting. */
-		_put_MSR(MSR_IP);
         }
 
 	/* assume the chunk below 8M is free */
@@ -361,6 +315,11 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 		rec->data[1] = 0;
 		rec->size = sizeof(struct bi_record) + 2 *
 			sizeof(unsigned long);
+		rec = (struct bi_record *)((unsigned long)rec + rec->size);
+
+		rec->tag = BI_MEMSIZE;
+		rec->data[0] = TotalMemory;
+		rec->size = sizeof(struct bi_record) + sizeof(unsigned long);
 		rec = (struct bi_record *)((unsigned long)rec + rec->size);
 
 		rec->tag = BI_CMD_LINE;

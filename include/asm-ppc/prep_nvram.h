@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.prep_nvram.h 1.7 05/17/01 18:14:25 cort
- */
-/*
  * PreP compliant NVRAM access
  */
 

@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Copyright (C) 1996 Paul Mackerras.
  */
 

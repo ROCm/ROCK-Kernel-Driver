@@ -1,6 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
 #ifdef __KERNEL__
 #ifndef __PPC_MMU_CONTEXT_H
 #define __PPC_MMU_CONTEXT_H

@@ -1,10 +1,8 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- *
  *  PowerPC version derived from arch/arm/mm/consistent.c
  *    Copyright (C) 2001 Dan Malek (dmalek@jlc.net)
  *
- *  linux/arch/arm/mm/consistent.c
+ *  arch/arm/mm/consistent.c
  *
  *  Copyright (C) 2000 Russell King
  *

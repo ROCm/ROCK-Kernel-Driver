@@ -1,6 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
 #ifdef __KERNEL__
 #ifndef __ASM_SOFTIRQ_H
 #define __ASM_SOFTIRQ_H

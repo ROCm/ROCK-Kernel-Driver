@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.checksum.h 1.8 05/17/01 18:14:24 cort
- */
 #ifdef __KERNEL__
 #ifndef _PPC_CHECKSUM_H
 #define _PPC_CHECKSUM_H

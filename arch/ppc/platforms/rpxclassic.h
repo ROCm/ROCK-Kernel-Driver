@@ -1,8 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-
-/*
  * A collection of structures, addresses, and values associated with
  * the RPCG RPX-Classic board.  Copied from the RPX-Lite stuff.
  *

@@ -1,8 +1,5 @@
 /*
- * BK Id: SCCS/s.amigappc.h 1.5 05/17/01 18:14:24 cort
- */
-/*
-** asm-m68k/amigappc.h -- This header defines some values and pointers for
+** asm-ppc/amigappc.h -- This header defines some values and pointers for
 **                        the Phase 5 PowerUp card.
 **
 ** Copyright 1997, 1998 by Phase5, Germany.

@@ -260,6 +260,7 @@ else
    if [ "$CONFIG_SMP" = "y" ]; then
       define_bool CONFIG_X86_IO_APIC y
       define_bool CONFIG_X86_LOCAL_APIC y
+      define_bool CONFIG_X86_MPPARSE y
    fi
    bool 'PCI support' CONFIG_PCI
    if [ "$CONFIG_PCI" = "y" ]; then
@@ -437,7 +438,19 @@ if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
    fi
 fi
 
+if [ "$CONFIG_X86_LOCAL_APIC" = "y" ]; then
+   define_bool CONFIG_X86_EXTRA_IRQS y
+   define_bool CONFIG_X86_FIND_SMP_CONFIG y
+fi
+
 endmenu
 
 source security/Config.in
 source lib/Config.in
+
+if [ "$CONFIG_SMP" = "y" ]; then
+   define_bool CONFIG_X86_SMP y
+   define_bool CONFIG_X86_HT y
+fi
+
+define_bool CONFIG_X86_BIOS_REBOOT y

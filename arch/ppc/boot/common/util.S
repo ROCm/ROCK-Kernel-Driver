@@ -160,11 +160,6 @@ udelay:
 	blt	2b
 3:	blr
 
-.globl _put_MSR
-_put_MSR:
-	mtmsr	r3
-	blr
-
 	.section ".relocate_code","xa"
 /*
  * Flush and enable instruction cache

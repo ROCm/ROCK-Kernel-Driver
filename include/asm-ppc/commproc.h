@@ -1,8 +1,4 @@
 /*
- * BK Id: SCCS/s.commproc.h 1.16 09/27/01 12:41:09 trini
- */
-
-/*
  * MPC8xx Communication Processor Module.
  * Copyright (c) 1997 Dan Malek (dmalek@jlc.net)
  *

@@ -1,6 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
 #ifndef _ASM_PPC_PARAM_H
 #define _ASM_PPC_PARAM_H
 

@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * vreset.c
  *
  * Initialize the VGA control registers to 80x25 text mode.

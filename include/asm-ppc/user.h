@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.user.h 1.5 05/17/01 18:14:26 cort
- */
 #ifdef __KERNEL__
 #ifndef _PPC_USER_H
 #define _PPC_USER_H

@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Definitions for using the Apple Descriptor-Based DMA controller
  * in Power Macintosh computers.
  *

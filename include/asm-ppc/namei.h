@@ -1,10 +1,8 @@
 /*
- * BK Id: SCCS/s.namei.h 1.5 05/17/01 18:14:25 cort
- */
-/* linux/include/asm-ppc/namei.h
- * Adapted from linux/include/asm-alpha/namei.h
+ * include/asm-ppc/namei.h
+ * Adapted from include/asm-alpha/namei.h
  *
- * Included from linux/fs/namei.c
+ * Included from fs/namei.c
  */
 
 #ifdef __KERNEL__

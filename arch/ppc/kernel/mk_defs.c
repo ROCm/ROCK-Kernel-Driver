@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * This program is used to generate definitions needed by
  * assembly language modules.
  *

@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  *  arch/ppc/kernel/irq.c
  *
  *  Derived from arch/i386/kernel/irq.c
