@@ -314,9 +314,11 @@ looped_back:
 	dst_release(xchg(&skb->dst, NULL));
 	ip6_route_input(skb);
 	if (skb->dst->error) {
+		skb_push(skb, skb->data - skb->nh.raw);
 		dst_input(skb);
 		return -1;
 	}
+
 	if (skb->dst->dev->flags&IFF_LOOPBACK) {
 		if (skb->nh.ipv6h->hop_limit <= 1) {
 			IP6_INC_STATS_BH(IPSTATS_MIB_INHDRERRORS);
@@ -329,6 +331,7 @@ looped_back:
 		goto looped_back;
 	}
 
+	skb_push(skb, skb->data - skb->nh.raw);
 	dst_input(skb);
 	return -1;
 }
