@@ -62,17 +62,6 @@
 #define DPRINTK(a,b...)
 #endif
 
-/* Memory barriers. */
-#ifdef __mc68000__
-#define DEFW()
-#define DEFR()
-#define DEFRW()	
-#else
-#define DEFW()		wmb()
-#define DEFR()		rmb()
-#define DEFRW()		mb()
-#endif
-
 /*
  * Driver data 
  */
@@ -182,7 +171,7 @@ inline static u32 pm2_RDAC_RD(struct pm2fb_par* p, s32 idx)
 		index = PM2VR_RD_INDEXED_DATA;
 		break;
 	}	
-	DEFRW();
+	mb();
 	return pm2_RD(p, index);
 }
 
@@ -198,21 +187,21 @@ inline static void pm2_RDAC_WR(struct pm2fb_par* p, s32 idx, u32 v)
 		index = PM2VR_RD_INDEXED_DATA;
 		break;
 	}	
-	DEFRW();
+	mb();
 	pm2_WR(p, index, v);
 }
 
 inline static u32 pm2v_RDAC_RD(struct pm2fb_par* p, s32 idx)
 {
 	pm2_WR(p, PM2VR_RD_INDEX_LOW, idx & 0xff);
-	DEFRW();
+	mb();
 	return pm2_RD(p, PM2VR_RD_INDEXED_DATA);
 }
 
 inline static void pm2v_RDAC_WR(struct pm2fb_par* p, s32 idx, u32 v)
 {
 	pm2_WR(p, PM2VR_RD_INDEX_LOW, idx & 0xff);
-	DEFRW();
+	mb();
 	pm2_WR(p, PM2VR_RD_INDEXED_DATA, v);
 }
 
@@ -222,7 +211,7 @@ inline static void pm2v_RDAC_WR(struct pm2fb_par* p, s32 idx, u32 v)
 inline static void WAIT_FIFO(struct pm2fb_par* p, u32 a)
 {
 	while( pm2_RD(p, PM2R_IN_FIFO_SPACE) < a );
-	DEFRW();
+	mb();
 }
 #endif
 
@@ -342,7 +331,7 @@ static void clear_palette(struct pm2fb_par* p) {
 
 	WAIT_FIFO(p, 1);
 	pm2_WR(p, PM2R_RD_PALETTE_WRITE_ADDRESS, 0);
-	DEFW();
+	wmb();
 	while (i--) {
 		WAIT_FIFO(p, 3);
 		pm2_WR(p, PM2R_RD_PALETTE_DATA, 0);
@@ -366,14 +355,14 @@ static void reset_card(struct pm2fb_par* p)
 	if (p->type == PM2_TYPE_PERMEDIA2V)
 		pm2_WR(p, PM2VR_RD_INDEX_HIGH, 0);
 	pm2_WR(p, PM2R_RESET_STATUS, 0);
-	DEFRW();
+	mb();
 	while (pm2_RD(p, PM2R_RESET_STATUS) & PM2F_BEING_RESET)
 		;
-	DEFRW();
+	mb();
 #ifdef CONFIG_FB_PM2_FIFO_DISCONNECT
 	DPRINTK("FIFO disconnect enabled\n");
 	pm2_WR(p, PM2R_FIFO_DISCON, 1);
-	DEFRW();
+	mb();
 #endif
 }
 #endif
@@ -464,11 +453,11 @@ static void set_color(struct pm2fb_par* p, unsigned char regno,
 {
 	WAIT_FIFO(p, 4);
 	pm2_WR(p, PM2R_RD_PALETTE_WRITE_ADDRESS, regno);
-	DEFW();
+	wmb();
 	pm2_WR(p, PM2R_RD_PALETTE_DATA, r);
-	DEFW();
+	wmb();
 	pm2_WR(p, PM2R_RD_PALETTE_DATA, g);
-	DEFW();
+	wmb();
 	pm2_WR(p, PM2R_RD_PALETTE_DATA, b);
 }
 
@@ -482,14 +471,14 @@ static void set_pixclock(struct pm2fb_par* par, u32 clk)
 		pm2_mnp(clk, &m, &n, &p);
 		WAIT_FIFO(par, 8);
 		pm2_RDAC_WR(par, PM2I_RD_PIXEL_CLOCK_A3, 0);
-		DEFW();
+		wmb();
 		pm2_RDAC_WR(par, PM2I_RD_PIXEL_CLOCK_A1, m);
 		pm2_RDAC_WR(par, PM2I_RD_PIXEL_CLOCK_A2, n);
-		DEFW();
+		wmb();
 		pm2_RDAC_WR(par, PM2I_RD_PIXEL_CLOCK_A3, 8|p);
-		DEFW();
+		wmb();
 		pm2_RDAC_RD(par, PM2I_RD_PIXEL_CLOCK_STATUS);
-		DEFR();
+		rmb();
 		for (i = 256;
 		     i && !(pm2_RD(par, PM2R_RD_INDEXED_DATA) & PM2F_PLL_LOCKED);
 		     i--)
@@ -746,7 +735,7 @@ static int pm2fb_set_par(struct fb_info *info)
     
 	set_aperture(par, depth);
     
-	DEFRW();
+	mb();
 	WAIT_FIFO(par, 19);
 	pm2_RDAC_WR(par, PM2I_RD_COLOR_KEY_CONTROL,
 		    ( depth == 8 ) ? 0 : PM2F_COLOR_KEY_TEST_OFF);
@@ -794,13 +783,13 @@ static int pm2fb_set_par(struct fb_info *info)
 	pm2_WR(par, PM2R_VS_END, vsend);
 	pm2_WR(par, PM2R_VB_END, vbend);
 	pm2_WR(par, PM2R_SCREEN_STRIDE, stride);
-	DEFW();
+	wmb();
 	pm2_WR(par, PM2R_WINDOW_ORIGIN, 0);
 	pm2_WR(par, PM2R_SCREEN_SIZE, (height << 16) | width);
 	pm2_WR(par, PM2R_SCISSOR_MODE, PM2F_SCREEN_SCISSOR_ENABLE);
-	DEFW();
+	wmb();
 	pm2_WR(par, PM2R_SCREEN_BASE, base);
-	DEFW();
+	wmb();
 	set_video(par, video);
 	WAIT_FIFO(par, 4);
 	switch (par->type) {
