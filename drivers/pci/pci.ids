@@ -1551,9 +1551,14 @@
 	0001  i960 PCI bus interface
 	1076  VScom 800 8 port serial adaptor
 	1077  VScom 400 4 port serial adaptor
+	9030  PCI <-> IOBus Bridge (Hot Swap)
+		15ed 1002  Macrolink MCCS 8-port Serial (Hot Swap)
+		15ed 1003  Macrolink MCCS 16-port Serial (Hot Swap)
 	9036  9036
 	9050  PCI <-> IOBus Bridge
 		10b5 2273  SH-ARC SoHard ARCnet card
+		15ed 1000  Macrolink MCCS 8-port Serial
+		15ed 1001  Macrolink MCCS 16-port Serial
 		d84d 4006  EX-4006 1P
 		d84d 4008  EX-4008 1P EPP/ECP
 		d84d 4014  EX-4014 2P
@@ -3941,6 +3946,12 @@
 1413  Addonics
 1414  Microsoft Corporation
 1415  Oxford Semiconductor Ltd
+	9501  16PCI954 Function 0
+		15ed 2000  Macrolink MCCR Serial p0-3 of 8
+		15ed 2001  Macrolink MCCR Serial p0-3 of 16
+	9511  16PCI954 Function 1
+		15ed 2000  Macrolink MCCR Serial p4-7 of 8
+		15ed 2001  Macrolink MCCR Serial p4-15 of 16
 1416  Multiwave Innovation pte Ltd
 1417  Convergenet Technologies Inc
 1418  Kyushu electronics systems Inc
