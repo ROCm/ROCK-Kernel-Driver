@@ -707,11 +707,19 @@ static void ewrk3_init(struct net_device *dev)
 	struct ewrk3_private *lp = (struct ewrk3_private *) dev->priv;
 	u_char csr, page;
 	u_long iobase = dev->base_addr;
+	int i;
 
 	/*
 	   ** Enable any multicasts
 	 */
 	set_multicast_list(dev);
+
+	/*
+	** Set hardware MAC address. Address is initialized from the EEPROM
+	** during startup but may have since been changed by the user.
+	*/
+	for (i=0; i<ETH_ALEN; i++)
+		outb(dev->dev_addr[i], EWRK3_PAR0 + i);
 
 	/*
 	   ** Clean out any remaining entries in all the queues here
