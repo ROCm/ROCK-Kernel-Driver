@@ -1,6 +1,7 @@
 #ifndef _LINUX_BLKDEV_H
 #define _LINUX_BLKDEV_H
 
+#include <linux/config.h>
 #include <linux/major.h>
 #include <linux/genhd.h>
 #include <linux/list.h>
@@ -301,8 +302,18 @@ extern unsigned long blk_max_low_pfn, blk_max_pfn;
 #define BLK_BOUNCE_ANY		((u64)blk_max_pfn << PAGE_SHIFT)
 #define BLK_BOUNCE_ISA		(ISA_DMA_THRESHOLD)
 
+#if CONFIG_MMU
 extern int init_emergency_isa_pool(void);
 extern void blk_queue_bounce(request_queue_t *q, struct bio **bio);
+#else
+static inline int init_emergency_isa_pool(void)
+{
+	return 0;
+}
+static inline void blk_queue_bounce(request_queue_t *q, struct bio **bio)
+{
+}
+#endif /* CONFIG_MMU */
 
 #define rq_for_each_bio(bio, rq)	\
 	if ((rq->bio))			\
