@@ -270,18 +270,10 @@ nfs_readpage_result(struct rpc_task *task)
 							req->wb_pgbase + count,
 							req->wb_bytes - count);
 
-				if (data->res.eof ||
-				    ((fattr->valid & NFS_ATTR_FATTR) &&
-				     ((req_offset(req) + count) >= fattr->size)))
-					SetPageUptodate(page);
-				else
-					if (count < req->wb_bytes)
-						SetPageError(page);
 				count = 0;
-			} else {
+			} else
 				count -= PAGE_CACHE_SIZE;
-				SetPageUptodate(page);
-			}
+			SetPageUptodate(page);
 		} else
 			SetPageError(page);
 		unlock_page(page);
