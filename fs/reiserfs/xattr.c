@@ -1371,9 +1371,11 @@ __reiserfs_permission (struct inode *inode, int mask, struct nameidata *nd,
 			goto check_groups;
                 }
 #endif
-	} else if (in_group_p(inode->i_gid))
+	} else {
 check_groups:
-		mode >>= 3;
+		if (in_group_p(inode->i_gid))
+			mode >>= 3;
+	}
 
 	/*
 	 * If the DACs are ok we don't need any capability check.
