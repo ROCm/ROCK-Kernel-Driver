@@ -238,9 +238,10 @@ u64 ide_get_error_location(ide_drive_t *drive, char *args)
 		high = ide_read_24(drive);
 	} else {
 		u8 cur = HWIF(drive)->INB(IDE_SELECT_REG);
-		if (cur & 0x40)
+		if (cur & 0x40) {
+			high = cur & 0xf;
 			low = (hcyl << 16) | (lcyl << 8) | sect;
-		else {
+		} else {
 			low = hcyl * drive->head * drive->sect;
 			low += lcyl * drive->sect;
 			low += sect - 1;
