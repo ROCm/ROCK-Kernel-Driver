@@ -1116,13 +1116,13 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
  * where seqids are incremented
  */
 
-#define ENCODE_SEQID_OP_TAIL(stateowner)		\
+#define ENCODE_SEQID_OP_TAIL(stateowner) do {		\
 	BUG_ON(!stateowner);				\
 	if (seqid_mutating_err(nfserr) && stateowner) {	\
 		if (stateowner->so_confirmed)		\
 			stateowner->so_seqid++;		\
 	}						\
-	return nfserr;
+} while(0)
 
 
 static u32 nfs4_ftypes[16] = {
@@ -1773,7 +1773,7 @@ nfsd4_encode_open(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_open 
 	ENCODE_SEQID_OP_TAIL(open->op_stateowner);
 }
 
-static int
+static void
 nfsd4_encode_open_confirm(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_open_confirm *oc)
 {
 	ENCODE_HEAD;
@@ -1788,7 +1788,7 @@ nfsd4_encode_open_confirm(struct nfsd4_compoundres *resp, int nfserr, struct nfs
 	ENCODE_SEQID_OP_TAIL(oc->oc_stateowner);
 }
 
-static int
+static void
 nfsd4_encode_open_downgrade(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_open_downgrade *od)
 {
 	ENCODE_HEAD;
