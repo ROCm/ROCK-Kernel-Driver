@@ -1028,6 +1028,7 @@ config SCSI_IPR_DUMP
 config SCSI_ZALON
 	tristate "Zalon SCSI support"
 	depends on GSC && SCSI
+	select SCSI_SPI_ATTRS
 	help
 	  The Zalon is a GSC/HSC bus interface chip that sits between the
 	  PA-RISC processor and the NCR 53c720 SCSI controller on C100,
@@ -1038,6 +1039,7 @@ config SCSI_ZALON
 config SCSI_NCR_Q720
 	tristate "NCR Quad 720 MCA SCSI support"
 	depends on MCA && SCSI
+	select SCSI_SPI_ATTRS
 	help
 	  This is a driver for the MicroChannel Quad 720 card produced by
 	  NCR and commonly used in 345x/35xx/4100 class machines.  It always
