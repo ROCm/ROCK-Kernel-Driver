@@ -375,7 +375,9 @@ struct nfsd4_compoundargs {
 		struct tmpbuf *next;
 		void *buf;
 	}				*to_free;
-	
+
+	struct svc_rqst			*rqstp;
+
 	u32				taglen;
 	char *				tag;
 	u32				minorversion;
@@ -419,7 +421,7 @@ void nfsd4_encode_operation(struct nfsd4_compoundres *, struct nfsd4_op *);
 void nfsd4_encode_replay(struct nfsd4_compoundres *resp, struct nfsd4_op *op);
 int nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 		       struct dentry *dentry, u32 *buffer, int *countp, 
-		       u32 *bmval);
+		       u32 *bmval, struct svc_rqst *);
 extern int nfsd4_setclientid(struct svc_rqst *rqstp, 
 		struct nfsd4_setclientid *setclid);
 extern int nfsd4_setclientid_confirm(struct svc_rqst *rqstp, 

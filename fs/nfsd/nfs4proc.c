@@ -568,7 +568,8 @@ nfsd4_verify(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_ver
 
 	status = nfsd4_encode_fattr(current_fh, current_fh->fh_export,
 				    current_fh->fh_dentry, buf,
-				    &count, verify->ve_bmval);
+				    &count, verify->ve_bmval,
+				    rqstp);
 
 	/* this means that nfsd4_encode_fattr() ran out of space */
 	if (status == nfserr_resource && count == 0)

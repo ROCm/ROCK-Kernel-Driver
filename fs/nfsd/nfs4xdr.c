@@ -51,10 +51,10 @@
 #include <linux/sunrpc/xdr.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/sunrpc/clnt.h>
-#include <linux/sunrpc/name_lookup.h>
 #include <linux/nfsd/nfsd.h>
 #include <linux/nfsd/state.h>
 #include <linux/nfsd/xdr4.h>
+#include <linux/nfsd_idmap.h>
 
 #define NFSDDBG_FACILITY		NFSDDBG_XDR
 
@@ -373,7 +373,7 @@ nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval, struct iattr *ia
 		READMEM(buf, dummy32);
 		if (check_utf8(buf, dummy32))
 			return nfserr_inval;
-		if ((status = name_get_uid(buf, dummy32, &iattr->ia_uid)))
+		if ((status = nfsd_map_name_to_uid(argp->rqstp, buf, dummy32, &iattr->ia_uid)))
 			goto out_nfserr;
 		iattr->ia_valid |= ATTR_UID;
 	}
@@ -386,7 +386,7 @@ nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval, struct iattr *ia
 		READMEM(buf, dummy32);
 		if (check_utf8(buf, dummy32))
 			return nfserr_inval;
-		if ((status = name_get_gid(buf, dummy32, &iattr->ia_gid)))
+		if ((status = nfsd_map_name_to_gid(argp->rqstp, buf, dummy32, &iattr->ia_gid)))
 			goto out_nfserr;
 		iattr->ia_valid |= ATTR_GID;
 	}
@@ -1239,13 +1239,16 @@ static u32 nfs4_ftypes[16] = {
  */
 int
 nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
-		   struct dentry *dentry, u32 *buffer, int *countp, u32 *bmval)
+		struct dentry *dentry, u32 *buffer, int *countp, u32 *bmval,
+		struct svc_rqst *rqstp)
 {
 	u32 bmval0 = bmval[0];
 	u32 bmval1 = bmval[1];
 	struct kstat stat;
-	struct name_ent *owner = NULL;
-	struct name_ent *group = NULL;
+	char owner[IDMAP_NAMESZ];
+	u32 ownerlen = 0;
+	char group[IDMAP_NAMESZ];
+	u32 grouplen = 0;
 	struct svc_fh tempfh;
 	struct kstatfs statfs;
 	int buflen = *countp << 2;
@@ -1277,14 +1280,20 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 		fhp = &tempfh;
 	}
 	if (bmval1 & FATTR4_WORD1_OWNER) {
-		status = name_get_user(stat.uid, &owner);
-		if (status)
+		int temp = nfsd_map_uid_to_name(rqstp, stat.uid, owner);
+		if (temp < 0) {
+			status = temp;
 			goto out_nfserr;
+		}
+		ownerlen = (unsigned) temp;
 	}
 	if (bmval1 & FATTR4_WORD1_OWNER_GROUP) {
-		status = name_get_group(stat.gid, &group);
-		if (status)
+		int temp = nfsd_map_gid_to_name(rqstp, stat.gid, group);
+		if (temp < 0) {
+			status = temp;
 			goto out_nfserr;
+		}
+		grouplen = (unsigned) temp;
 	}
 
 	if ((buflen -= 16) < 0)
@@ -1485,20 +1494,18 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 		WRITE32(stat.nlink);
 	}
 	if (bmval1 & FATTR4_WORD1_OWNER) {
-		int namelen  = strlen(owner->name);
-		buflen -= (XDR_QUADLEN(namelen) << 2) + 4;
+		buflen -= (XDR_QUADLEN(ownerlen) << 2) + 4;
 		if (buflen < 0)
 			goto out_resource;
-		WRITE32(namelen);
-		WRITEMEM(owner->name, namelen);
+		WRITE32(ownerlen);
+		WRITEMEM(owner, ownerlen);
 	}
 	if (bmval1 & FATTR4_WORD1_OWNER_GROUP) {
-		int namelen = strlen(group->name);
-		buflen -= (XDR_QUADLEN(namelen) << 2) + 4;
+		buflen -= (XDR_QUADLEN(grouplen) << 2) + 4;
 		if (buflen < 0)
 			goto out_resource;
-		WRITE32(namelen);
-		WRITEMEM(group->name, namelen);
+		WRITE32(grouplen);
+		WRITEMEM(group, grouplen);
 	}
 	if (bmval1 & FATTR4_WORD1_RAWDEV) {
 		if ((buflen -= 8) < 0)
@@ -1566,10 +1573,6 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 out:
 	if (fhp == &tempfh)
 		fh_put(&tempfh);
-	if (owner)
-		name_put(owner);
-	if (group)
-		name_put(group);
 	return status;
 out_nfserr:
 	status = nfserrno(status);
@@ -1648,7 +1651,8 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 		}
 
 		nfserr = nfsd4_encode_fattr(NULL, exp,
-				dentry, p, &buflen, cd->rd_bmval);
+				dentry, p, &buflen, cd->rd_bmval,
+				cd->rd_rqstp);
 		if (!nfserr) {
 			p += buflen;
 			goto out;
@@ -1771,7 +1775,8 @@ nfsd4_encode_getattr(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_ge
 
 	buflen = resp->end - resp->p - (COMPOUND_ERR_SLACK_SPACE >> 2);
 	nfserr = nfsd4_encode_fattr(fhp, fhp->fh_export, fhp->fh_dentry,
-				    resp->p, &buflen, getattr->ga_bmval);
+				    resp->p, &buflen, getattr->ga_bmval,
+				    resp->rqstp);
 
 	if (!nfserr)
 		resp->p += buflen;
@@ -2381,6 +2386,7 @@ nfs4svc_decode_compoundargs(struct svc_rqst *rqstp, u32 *p, struct nfsd4_compoun
 	args->tmpp = NULL;
 	args->to_free = NULL;
 	args->ops = args->iops;
+	args->rqstp = rqstp;
 
 	status = nfsd4_decode_compound(args);
 	if (status) {
