@@ -2,8 +2,8 @@
  * upcase.c - Generate the full NTFS Unicode upcase table in little endian.
  *	      Part of the Linux-NTFS project.
  *
- * Copyright (C) 2001 Richard Russon <ntfs@flatcap.org>
- * Copyright (c) 2001,2002 Anton Altaparmakov
+ * Copyright (c) 2001 Richard Russon <ntfs@flatcap.org>
+ * Copyright (c) 2001-2003 Anton Altaparmakov
  *
  * Modified for mkntfs inclusion 9 June 2001 by Anton Altaparmakov.
  * Modified for kernel inclusion 10 September 2001 by Anton Altparmakov.
@@ -28,7 +28,7 @@
 
 uchar_t *generate_default_upcase(void)
 {
-	const int uc_run_table[][3] = { /* Start, End, Add */
+	static const int uc_run_table[][3] = { /* Start, End, Add */
 	{0x0061, 0x007B,  -32}, {0x0451, 0x045D, -80}, {0x1F70, 0x1F72,  74},
 	{0x00E0, 0x00F7,  -32}, {0x045E, 0x0460, -80}, {0x1F72, 0x1F76,  86},
 	{0x00F8, 0x00FF,  -32}, {0x0561, 0x0587, -48}, {0x1F76, 0x1F78, 100},
@@ -45,7 +45,7 @@ uchar_t *generate_default_upcase(void)
 	{0}
 	};
 
-	const int uc_dup_table[][2] = { /* Start, End */
+	static const int uc_dup_table[][2] = { /* Start, End */
 	{0x0100, 0x012F}, {0x01A0, 0x01A6}, {0x03E2, 0x03EF}, {0x04CB, 0x04CC},
 	{0x0132, 0x0137}, {0x01B3, 0x01B7}, {0x0460, 0x0481}, {0x04D0, 0x04EB},
 	{0x0139, 0x0149}, {0x01CD, 0x01DD}, {0x0490, 0x04BF}, {0x04EE, 0x04F5},
@@ -55,7 +55,7 @@ uchar_t *generate_default_upcase(void)
 	{0}
 	};
 
-	const int uc_word_table[][2] = { /* Offset, Value */
+	static const int uc_word_table[][2] = { /* Offset, Value */
 	{0x00FF, 0x0178}, {0x01AD, 0x01AC}, {0x01F3, 0x01F1}, {0x0269, 0x0196},
 	{0x0183, 0x0182}, {0x01B0, 0x01AF}, {0x0253, 0x0181}, {0x026F, 0x019C},
 	{0x0185, 0x0184}, {0x01B9, 0x01B8}, {0x0254, 0x0186}, {0x0272, 0x019D},

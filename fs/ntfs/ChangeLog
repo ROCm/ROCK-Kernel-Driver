@@ -20,6 +20,12 @@ ToDo:
 	  sufficient for synchronisation here. We then just need to make sure
 	  ntfs_readpage/writepage/truncate interoperate properly with us.
 
+2.1.1 - WIP
+
+	- Add handling for initialized_size != data_size in compressed files.
+	- Reduce function local stack usage from 0x3d4 bytes to just noise in
+	  fs/ntfs/upcase.c. (Randy Dunlap <rddunlap@osdl.ord>)
+
 2.1.0 - First steps towards write support: implement file overwrite.
 
 	- Add configuration option for developmental write support with an
