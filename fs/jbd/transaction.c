@@ -41,16 +41,9 @@
  *	processes trying to touch the journal while it is in transition.
  */
 
-static transaction_t *get_transaction(journal_t *journal)
+static transaction_t *
+get_transaction(journal_t *journal, transaction_t *transaction)
 {
-	transaction_t * transaction;
-
-	transaction = jbd_kmalloc(sizeof(*transaction), GFP_NOFS);
-	if (!transaction)
-		return NULL;
-	
-	memset(transaction, 0, sizeof(*transaction));
-	
 	transaction->t_journal = journal;
 	transaction->t_state = T_RUNNING;
 	transaction->t_tid = journal->j_transaction_sequence++;
@@ -60,12 +53,12 @@ static transaction_t *get_transaction(journal_t *journal)
 	spin_lock_init(&transaction->t_jcb_lock);
 
 	/* Set up the commit timer for the new transaction. */
-	J_ASSERT (!journal->j_commit_timer_active);
+	J_ASSERT(!journal->j_commit_timer_active);
 	journal->j_commit_timer_active = 1;
 	journal->j_commit_timer->expires = transaction->t_expires;
 	add_timer(journal->j_commit_timer);
 	
-	J_ASSERT (journal->j_running_transaction == NULL);
+	J_ASSERT(journal->j_running_transaction == NULL);
 	journal->j_running_transaction = transaction;
 
 	return transaction;
@@ -91,6 +84,7 @@ static int start_this_handle(journal_t *journal, handle_t *handle)
 	transaction_t *transaction;
 	int needed;
 	int nblocks = handle->h_buffer_credits;
+	transaction_t *new_transaction = NULL;
 
 	if (nblocks > journal->j_max_transaction_buffers) {
 		printk(KERN_ERR "JBD: %s wants too many credits (%d > %d)\n",
@@ -99,40 +93,67 @@ static int start_this_handle(journal_t *journal, handle_t *handle)
 		return -ENOSPC;
 	}
 
+alloc_transaction:
+	if (!journal->j_running_transaction) {
+		new_transaction = jbd_kmalloc(sizeof(*new_transaction),
+						GFP_NOFS);
+		if (!new_transaction)
+			return -ENOMEM;
+		memset(new_transaction, 0, sizeof(*new_transaction));
+	}
+
 	jbd_debug(3, "New handle %p going live.\n", handle);
 
 repeat:
 
 	lock_journal(journal);
 
+	/*
+	 * We need to hold j_state_lock until t_updates has been incremented,
+	 * for proper journal barrier handling
+	 */
+	spin_lock(&journal->j_state_lock);
 	if (is_journal_aborted(journal) ||
 	    (journal->j_errno != 0 && !(journal->j_flags & JFS_ACK_ERR))) {
+		spin_unlock(&journal->j_state_lock);
 		unlock_journal(journal);
 		return -EROFS; 
 	}
 
 	/* Wait on the journal's transaction barrier if necessary */
 	if (journal->j_barrier_count) {
+		spin_unlock(&journal->j_state_lock);
 		unlock_journal(journal);
-		sleep_on(&journal->j_wait_transaction_locked);
+		wait_event(journal->j_wait_transaction_locked,
+				journal->j_barrier_count == 0);
 		goto repeat;
 	}
 	
 repeat_locked:
-	if (!journal->j_running_transaction)
-		get_transaction(journal);
+	if (!journal->j_running_transaction) {
+		if (!new_transaction) {
+			spin_unlock(&journal->j_state_lock);
+			unlock_journal(journal);
+			goto alloc_transaction;
+		}
+		get_transaction(journal, new_transaction);
+	}
+
 	/* @@@ Error? */
 	J_ASSERT(journal->j_running_transaction);
 	
 	transaction = journal->j_running_transaction;
 
-	/* If the current transaction is locked down for commit, wait
-	 * for the lock to be released. */
-
+	/*
+	 * If the current transaction is locked down for commit, wait for the
+	 * lock to be released.
+	 */
 	if (transaction->t_state == T_LOCKED) {
+		spin_unlock(&journal->j_state_lock);
 		unlock_journal(journal);
 		jbd_debug(3, "Handle %p stalling...\n", handle);
-		sleep_on(&journal->j_wait_transaction_locked);
+		wait_event(journal->j_wait_transaction_locked,
+				transaction->t_state != T_LOCKED);
 		goto repeat;
 	}
 	
@@ -145,16 +166,24 @@ repeat_locked:
 	needed = transaction->t_outstanding_credits + nblocks;
 
 	if (needed > journal->j_max_transaction_buffers) {
-		/* If the current transaction is already too large, then
-		 * start to commit it: we can then go back and attach
-		 * this handle to a new transaction. */
-		
+		/*
+		 * If the current transaction is already too large, then start
+		 * to commit it: we can then go back and attach this handle to
+		 * a new transaction.
+		 */
+		DEFINE_WAIT(wait);
+
 		spin_unlock(&transaction->t_handle_lock);
+		spin_unlock(&journal->j_state_lock);
 		jbd_debug(2, "Handle %p starting new commit...\n", handle);
+		prepare_to_wait(&journal->j_wait_transaction_locked, &wait,
+				TASK_UNINTERRUPTIBLE);
 		log_start_commit(journal, transaction);
 		unlock_journal(journal);
-		sleep_on(&journal->j_wait_transaction_locked);
+		schedule();
+		finish_wait(&journal->j_wait_transaction_locked, &wait);
 		lock_journal(journal);
+		spin_lock(&journal->j_state_lock);
 		goto repeat_locked;
 	}
 
@@ -191,7 +220,9 @@ repeat_locked:
 	if (log_space_left(journal) < needed) {
 		jbd_debug(2, "Handle %p waiting for checkpoint...\n", handle);
 		spin_unlock(&transaction->t_handle_lock);
+		spin_unlock(&journal->j_state_lock);
 		log_wait_for_space(journal, needed);
+		spin_lock(&journal->j_state_lock);
 		goto repeat_locked;
 	}
 
@@ -206,9 +237,8 @@ repeat_locked:
 		  handle, nblocks, transaction->t_outstanding_credits,
 		  log_space_left(journal));
 	spin_unlock(&transaction->t_handle_lock);
-
+	spin_unlock(&journal->j_state_lock);
 	unlock_journal(journal);
-	
 	return 0;
 }
 
@@ -407,11 +437,13 @@ int journal_restart(handle_t *handle, int nblocks)
  */
 void journal_lock_updates(journal_t *journal)
 {
+	DEFINE_WAIT(wait);
+
 	lock_journal(journal);
 
-	lock_kernel();
+	spin_lock(&journal->j_state_lock);
 	++journal->j_barrier_count;
-	unlock_kernel();
+	spin_unlock(&journal->j_state_lock);
 
 	/* Wait until there are no running updates */
 	while (1) {
@@ -423,19 +455,23 @@ void journal_lock_updates(journal_t *journal)
 			spin_unlock(&transaction->t_handle_lock);
 			break;
 		}
-		
+		prepare_to_wait(&journal->j_wait_updates, &wait,
+				TASK_UNINTERRUPTIBLE);
 		spin_unlock(&transaction->t_handle_lock);
 		unlock_journal(journal);
-		sleep_on(&journal->j_wait_updates);
+		schedule();
+		finish_wait(&journal->j_wait_updates, &wait);
 		lock_journal(journal);
 	}
 
 	unlock_journal(journal);
 
-	/* We have now established a barrier against other normal
-	 * updates, but we also need to barrier against other
-	 * journal_lock_updates() calls to make sure that we serialise
-	 * special journal-locked operations too. */
+	/*
+	 * We have now established a barrier against other normal updates, but
+	 * we also need to barrier against other journal_lock_updates() calls
+	 * to make sure that we serialise special journal-locked operations
+	 * too.
+	 */
 	down(&journal->j_barrier);
 }
 
@@ -451,12 +487,12 @@ void journal_unlock_updates (journal_t *journal)
 {
 	lock_journal(journal);
 
-	J_ASSERT (journal->j_barrier_count != 0);
-	
+	J_ASSERT(journal->j_barrier_count != 0);
+
 	up(&journal->j_barrier);
-	lock_kernel();
+	spin_lock(&journal->j_state_lock);
 	--journal->j_barrier_count;
-	unlock_kernel();
+	spin_unlock(&journal->j_state_lock);
 	wake_up(&journal->j_wait_transaction_locked);
 	unlock_journal(journal);
 }
