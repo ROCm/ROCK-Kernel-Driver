@@ -160,6 +160,12 @@ static __inline__ int tcp_bhashfn(__u16 lport)
 extern void tcp_bind_hash(struct sock *sk, struct tcp_bind_bucket *tb,
 			  unsigned short snum);
 
+#if (BITS_PER_LONG == 64)
+#define TCP_ADDRCMP_ALIGN_BYTES 8
+#else
+#define TCP_ADDRCMP_ALIGN_BYTES 4
+#endif
+
 /* This is a TIME_WAIT bucket.  It works around the memory consumption
  * problems of sockets in such a state on heavily loaded servers, but
  * without violating the protocol specification.
@@ -184,7 +190,8 @@ struct tcp_tw_bucket {
 	__u16			tw_sport;
 	/* Socket demultiplex comparisons on incoming packets. */
 	/* these five are in inet_opt */
-	__u32			tw_daddr;
+	__u32			tw_daddr
+		__attribute__((aligned(TCP_ADDRCMP_ALIGN_BYTES)));
 	__u32			tw_rcv_saddr;
 	__u16			tw_dport;
 	__u16			tw_num;

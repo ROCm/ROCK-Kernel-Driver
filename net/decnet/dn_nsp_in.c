@@ -812,7 +812,7 @@ got_it:
 			printk(KERN_DEBUG "NSP: 0x%02x 0x%02x 0x%04x 0x%04x %d\n",
 				(int)cb->rt_flags, (int)cb->nsp_flags, 
 				(int)cb->src_port, (int)cb->dst_port, 
-				(int)sock_owned_by_user(sk));
+				!!sock_owned_by_user(sk));
 		if (!sock_owned_by_user(sk))
 			ret = dn_nsp_backlog_rcv(sk, skb);
 		else

@@ -2343,14 +2343,9 @@ static void ppp_shutdown_interface(struct ppp *ppp)
 	dev = ppp->dev;
 	ppp->dev = 0;
 	ppp_unlock(ppp);
-	if (dev) {
-		rtnl_lock();
-
-		/* This will call dev_close() for us. */
-		unregister_netdevice(dev);
-
-		rtnl_unlock();
-	}
+	/* This will call dev_close() for us. */
+	if (dev)
+		unregister_netdev(dev);
 	cardmap_set(&all_ppp_units, ppp->file.index, NULL);
 	ppp->file.dead = 1;
 	ppp->owner = NULL;
