@@ -46,24 +46,22 @@ MODULE_PARM(debug, "i");
 MODULE_AUTHOR("Kai Germaschewski <kai.germaschewski@gmx.de>/Karsten Keil <kkeil@suse.de>");
 MODULE_DESCRIPTION("AVM Fritz!PCI/PnP ISDN driver");
 
-// FIXME temporary hack until I sort out the new PnP stuff
-#define __ISAPNP__
-
 static struct pci_device_id fcpci_ids[] __devinitdata = {
-	{ PCI_VENDOR_ID_AVM, PCI_DEVICE_ID_AVM_A1   , PCI_ANY_ID, PCI_ANY_ID,
-	  0, 0, (unsigned long) "Fritz!Card PCI" },
-	{ PCI_VENDOR_ID_AVM, PCI_DEVICE_ID_AVM_A1_V2, PCI_ANY_ID, PCI_ANY_ID,
-	  0, 0, (unsigned long) "Fritz!Card PCI v2" },
-	{ }
+	{ .vendor      = PCI_VENDOR_ID_AVM,
+	  .device      = PCI_DEVICE_ID_AVM_A1,
+	  .subvendor   = PCI_ANY_ID,
+	  .subdevice   = PCI_ANY_ID,
+	  .driver_data = (unsigned long) "Fritz!Card PCI",
+	},
+	{ .vendor      = PCI_VENDOR_ID_AVM,
+	  .device      = PCI_DEVICE_ID_AVM_A1_V2,
+	  .subvendor   = PCI_ANY_ID,
+	  .subdevice   = PCI_ANY_ID,
+	  .driver_data = (unsigned long) "Fritz!Card PCI v2" },
+	{}
 };
-MODULE_DEVICE_TABLE(pci, fcpci_ids);
 
-static struct pnp_card_device_id fcpnp_ids[] __devinitdata = {
-	{ .id = "AVM0900", 
-	  .driver_data = (unsigned long) "Fritz!Card PnP",
-	  .devs = { { "AVM0900" } } }
-};
-MODULE_DEVICE_TABLE(pnp_card, fcpnp_ids);
+MODULE_DEVICE_TABLE(pci, fcpci_ids);
 
 static int protocol = 2;       /* EURO-ISDN Default */
 MODULE_PARM(protocol, "i");
@@ -908,10 +906,10 @@ static struct pci_driver fcpci_driver = {
 	.id_table = fcpci_ids,
 };
 
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP_CARD
 
 static int __devinit fcpnp_probe(struct pnp_card *card,
-				 const struct pnp_card_device_id *card_id)
+				 const struct pnp_card_id *card_id)
 {
 	struct fritz_adapter *adapter;
 	struct pnp_dev *pnp_dev;
@@ -957,6 +955,14 @@ static void __devexit fcpnp_remove(struct pnp_card *pcard)
 	delete_adapter(adapter);
 }
 
+static struct pnp_card_id fcpnp_ids[] __devinitdata = {
+	{ .id          = "AVM0900", 
+	  .driver_data = (unsigned long) "Fritz!Card PnP",
+	  .devs        = { { "AVM0900" } },
+	},
+	{}
+};
+
 static struct pnpc_driver fcpnp_driver = {
 	.name     = "fcpnp",
 	.probe    = fcpnp_probe,
@@ -968,7 +974,7 @@ static struct pnpc_driver fcpnp_driver = {
 
 static int __init hisax_fcpcipnp_init(void)
 {
-	int retval, pci_nr_found;
+	int retval = 0, pci_nr_found;
 
 	printk(KERN_INFO "hisax_fcpcipnp: Fritz!Card PCI/PCIv2/PnP ISDN driver v0.0.1\n");
 
@@ -977,10 +983,8 @@ static int __init hisax_fcpcipnp_init(void)
 		goto out;
 	pci_nr_found = retval;
 
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP_CARD
 	retval = pnpc_register_driver(&fcpnp_driver);
-#else
-	retval = 0;
 #endif
 	if (retval < 0)
 		goto out_unregister_pci;
@@ -988,14 +992,14 @@ static int __init hisax_fcpcipnp_init(void)
 #if !defined(CONFIG_HOTPLUG) || defined(MODULE)
 	if (pci_nr_found + retval == 0) {
 		retval = -ENODEV;
-		goto out_unregister_isapnp;
+		goto out_unregister_pnp;
 	}
 #endif
 	return 0;
 
 #if !defined(CONFIG_HOTPLUG) || defined(MODULE)
- out_unregister_isapnp:
-#ifdef __ISAPNP__
+ out_unregister_pnp:
+#ifdef CONFIG_PNP_CARD
 	pnpc_unregister_driver(&fcpnp_driver);
 #endif
 #endif
@@ -1007,7 +1011,7 @@ static int __init hisax_fcpcipnp_init(void)
 
 static void __exit hisax_fcpcipnp_exit(void)
 {
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP_CARD
 	pnpc_unregister_driver(&fcpnp_driver);
 #endif
 	pci_unregister_driver(&fcpci_driver);
