@@ -32,6 +32,7 @@
 #include <linux/init.h>
 #include <linux/agp_backend.h>
 #include "agp.h"
+#include "via.h"
 
 
 static int via_fetch_size(void)

@@ -381,4 +381,26 @@ struct agp_bridge_data {
 #define HP_ZX1_PDIR_BASE	0x320
 #define HP_ZX1_CACHE_FLUSH	0x428
 
+struct agp_device_ids {
+	unsigned short device_id; /* first, to make table easier to read */
+	enum chipset_type chipset;
+	const char *chipset_name;
+	int (*chipset_setup) (struct pci_dev *pdev);	/* used to override generic */
+};
+
+struct agp_bridge_info {
+	unsigned short vendor_id;
+	const char *vendor_name;
+	int (*chipset_setup) (struct pci_dev *pdev);
+	struct agp_device_ids *ids;
+};
+
+extern struct agp_bridge_info ali_agp_bridge_info;
+extern struct agp_bridge_info amd_k8_agp_bridge_info;
+extern struct agp_bridge_info amd_agp_bridge_info;
+extern struct agp_bridge_info intel_agp_bridge_info;
+extern struct agp_bridge_info sis_agp_bridge_info;
+extern struct agp_bridge_info via_agp_bridge_info;
+extern struct agp_bridge_info hp_agp_bridge_info;
+
 #endif				/* _AGP_BACKEND_PRIV_H */

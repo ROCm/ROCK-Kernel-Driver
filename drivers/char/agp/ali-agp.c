@@ -32,6 +32,7 @@
 #include <linux/init.h>
 #include <linux/agp_backend.h>
 #include "agp.h"
+#include "ali.h"
 
 static int ali_fetch_size(void)
 {

@@ -13,6 +13,7 @@
 #include <linux/init.h>
 #include <linux/agp_backend.h>
 #include "agp.h"
+#include "k8-agp.h"
 
 extern int agp_memory_reserved;
 extern __u32 *agp_gatt_table; 
