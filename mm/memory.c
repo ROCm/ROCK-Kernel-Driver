@@ -1778,13 +1778,11 @@ struct page * vmalloc_to_page(void * vmalloc_addr)
 	if (!pgd_none(*pgd)) {
 		pmd = pmd_offset(pgd, addr);
 		if (!pmd_none(*pmd)) {
-			preempt_disable();
 			ptep = pte_offset_map(pmd, addr);
 			pte = *ptep;
 			if (pte_present(pte))
 				page = pte_page(pte);
 			pte_unmap(ptep);
-			preempt_enable();
 		}
 	}
 	return page;
