@@ -512,12 +512,12 @@ static const struct amd_flash_info jedec_table[] = {
 			ERASEINFO(0x10000,8),
 		}
 	}, {
-		mfr_id: MANUFACTURER_AMD,
-		dev_id: AM29F002T,
-		name: "AMD AM29F002T",
-		DevSize: SIZE_256KiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x10000,3),
+		.mfr_id = MANUFACTURER_AMD,
+		.dev_id = AM29F002T,
+		.name = "AMD AM29F002T",
+		.DevSize = SIZE_256KiB,
+		.NumEraseRegions = 4,
+		.regions = {ERASEINFO(0x10000,3),
 			  ERASEINFO(0x08000,1),
 			  ERASEINFO(0x02000,2),
 			  ERASEINFO(0x04000,1)
@@ -768,12 +768,12 @@ static const struct amd_flash_info jedec_table[] = {
 			ERASEINFO(0x04000,1)
 		}
 	}, {
-		mfr_id: MANUFACTURER_HYUNDAI,
-		dev_id: HY29F002T,
-		name: "Hyundai HY29F002T",
-		DevSize: SIZE_256KiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x10000,3),
+		.mfr_id = MANUFACTURER_HYUNDAI,
+		.dev_id = HY29F002T,
+		.name = "Hyundai HY29F002T",
+		.DevSize = SIZE_256KiB,
+		.NumEraseRegions = 4,
+		.regions = {ERASEINFO(0x10000,3),
 			  ERASEINFO(0x08000,1),
 			  ERASEINFO(0x02000,2),
 			  ERASEINFO(0x04000,1)
@@ -1162,12 +1162,12 @@ static const struct amd_flash_info jedec_table[] = {
 			ERASEINFO(0x10000,7),
 		}
 	}, {
-		mfr_id: MANUFACTURER_MACRONIX,
-		dev_id: MX29F002T,
-		name: "Macronix MX29F002T",
-		DevSize: SIZE_256KiB,
-		NumEraseRegions: 4,
-		regions: {ERASEINFO(0x10000,3),
+		.mfr_id = MANUFACTURER_MACRONIX,
+		.dev_id = MX29F002T,
+		.name = "Macronix MX29F002T",
+		.DevSize = SIZE_256KiB,
+		.NumEraseRegions = 4,
+		.regions = {ERASEINFO(0x10000,3),
 			  ERASEINFO(0x08000,1),
 			  ERASEINFO(0x02000,2),
 			  ERASEINFO(0x04000,1)
@@ -1247,7 +1247,7 @@ static const struct amd_flash_info jedec_table[] = {
  		.DevSize	= SIZE_256KiB,
  		.CmdSet		= P_ID_SST_PAGE,
  		.NumEraseRegions= 1,
- 		regions: {ERASEINFO(0x01000,64),
+ 		.regions = {ERASEINFO(0x01000,64),
  		}
          }, {
  		.mfr_id		= MANUFACTURER_SST,
@@ -1259,7 +1259,7 @@ static const struct amd_flash_info jedec_table[] = {
  		.DevSize	= SIZE_256KiB,
  		.CmdSet		= P_ID_SST_PAGE,
  		.NumEraseRegions= 1,
- 		regions: {ERASEINFO(0x01000,64),
+ 		.regions = {ERASEINFO(0x01000,64),
  		}
 	}, {
 		.mfr_id		= MANUFACTURER_SST,

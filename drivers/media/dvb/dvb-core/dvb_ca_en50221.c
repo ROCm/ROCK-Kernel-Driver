@@ -1484,21 +1484,20 @@ static unsigned int dvb_ca_en50221_io_poll(struct file *file, poll_table *wait)
 
 
 static struct file_operations dvb_ca_fops = {
-        owner: THIS_MODULE,
-        read: dvb_ca_en50221_io_read,
-        write: dvb_ca_en50221_io_write,
-        ioctl: dvb_ca_en50221_io_ioctl,
-        open: dvb_ca_en50221_io_open,
-        release: dvb_ca_en50221_io_release,
-        poll: dvb_ca_en50221_io_poll,
+        .owner = THIS_MODULE,
+        .read = dvb_ca_en50221_io_read,
+        .write = dvb_ca_en50221_io_write,
+        .ioctl = dvb_ca_en50221_io_ioctl,
+        .open = dvb_ca_en50221_io_open,
+        .release = dvb_ca_en50221_io_release,
+        .poll = dvb_ca_en50221_io_poll,
 };
 
 static struct dvb_device dvbdev_ca = {
-        priv: NULL,
-        users: 1,
-        readers: 1,
-        writers: 1,
-        fops: &dvb_ca_fops,
+        .users = 1,
+        .readers = 1,
+        .writers = 1,
+        .fops = &dvb_ca_fops,
 };
 
 
