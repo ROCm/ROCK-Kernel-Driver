@@ -1523,8 +1523,8 @@ static int i810fb_suspend(struct pci_dev *dev, u32 state)
 	info->fbops->fb_blank(blank, info);
 
 	if (!prev_state) { 
-		par->drm_agp->unbind_memory(par->i810_gtt.i810_fb_memory);
-		par->drm_agp->unbind_memory(par->i810_gtt.i810_cursor_memory);
+		agp_unbind_memory(par->i810_gtt.i810_fb_memory);
+		agp_unbind_memory(par->i810_gtt.i810_cursor_memory);
 		pci_disable_device(dev);
 	}
 	pci_save_state(dev);
@@ -1544,10 +1544,10 @@ static int i810fb_resume(struct pci_dev *dev)
 	pci_restore_state(dev);
 	pci_set_power_state(dev, 0);
 	pci_enable_device(dev);
-	par->drm_agp->bind_memory(par->i810_gtt.i810_fb_memory, 
-				  par->fb.offset);
-	par->drm_agp->bind_memory(par->i810_gtt.i810_cursor_memory, 
-				  par->cursor_heap.offset);
+	agp_bind_memory(par->i810_gtt.i810_fb_memory,
+			par->fb.offset);
+	agp_bind_memory(par->i810_gtt.i810_cursor_memory,
+			par->cursor_heap.offset);
 
 	info->fbops->fb_blank(VESA_NO_BLANKING, info);
 
@@ -1599,39 +1599,36 @@ static int __devinit i810_alloc_agp_mem(struct fb_info *info)
 	i810_fix_offsets(par);
 	size = par->fb.size + par->iring.size;
 
-	par->drm_agp = (drm_agp_t *) inter_module_get("drm_agp");
-	if (!par->drm_agp) {
-		printk("i810fb: cannot acquire agp\n");
+	if (agp_backend_acquire()) {
+		printk("i810fb_alloc_fbmem: cannot acquire agpgart\n");
 		return -ENODEV;
 	}
-	par->drm_agp->acquire(); 
-
 	if (!(par->i810_gtt.i810_fb_memory = 
-	      par->drm_agp->allocate_memory(size >> 12, AGP_NORMAL_MEMORY))) {
+	      agp_allocate_memory(size >> 12, AGP_NORMAL_MEMORY))) {
 		printk("i810fb_alloc_fbmem: can't allocate framebuffer "
 		       "memory\n");
-		par->drm_agp->release();
+		agp_backend_release();
 		return -ENOMEM;
 	}
-	if (par->drm_agp->bind_memory(par->i810_gtt.i810_fb_memory, 
-				      par->fb.offset)) {
+	if (agp_bind_memory(par->i810_gtt.i810_fb_memory,
+			    par->fb.offset)) {
 		printk("i810fb_alloc_fbmem: can't bind framebuffer memory\n");
-		par->drm_agp->release();
+		agp_backend_release();
 		return -EBUSY;
 	}	
 	
 	if (!(par->i810_gtt.i810_cursor_memory = 
-	      par->drm_agp->allocate_memory(par->cursor_heap.size >> 12, 
-					    AGP_PHYSICAL_MEMORY))) {
+	      agp_allocate_memory(par->cursor_heap.size >> 12,
+				  AGP_PHYSICAL_MEMORY))) {
 		printk("i810fb_alloc_cursormem:  can't allocate" 
 		       "cursor memory\n");
-		par->drm_agp->release();
+		agp_backend_release();
 		return -ENOMEM;
 	}
-	if (par->drm_agp->bind_memory(par->i810_gtt.i810_cursor_memory, 
+	if (agp_bind_memory(par->i810_gtt.i810_cursor_memory,
 			    par->cursor_heap.offset)) {
 		printk("i810fb_alloc_cursormem: cannot bind cursor memory\n");
-		par->drm_agp->release();
+		agp_backend_release();
 		return -EBUSY;
 	}	
 
@@ -1639,7 +1636,7 @@ static int __devinit i810_alloc_agp_mem(struct fb_info *info)
 
 	i810_fix_pointers(par);
 
-	par->drm_agp->release();
+	agp_backend_release();
 
 	return 0;
 }
@@ -1945,19 +1942,13 @@ static int __devinit i810fb_init_pci (struct pci_dev *dev,
 static void i810fb_release_resource(struct fb_info *info, 
 				    struct i810fb_par *par)
 {
+	struct gtt_data *gtt = &par->i810_gtt;
 	unset_mtrr(par);
-	if (par->drm_agp) {
-		drm_agp_t *agp = par->drm_agp;
-		struct gtt_data *gtt = &par->i810_gtt;
 
-		if (par->i810_gtt.i810_cursor_memory)
-			agp->free_memory(gtt->i810_cursor_memory);
-		if (par->i810_gtt.i810_fb_memory)
-			agp->free_memory(gtt->i810_fb_memory);
-
-		inter_module_put("drm_agp");
-		par->drm_agp = NULL;
-	}
+	if (par->i810_gtt.i810_cursor_memory)
+		agp_free_memory(gtt->i810_cursor_memory);
+	if (par->i810_gtt.i810_fb_memory)
+		agp_free_memory(gtt->i810_fb_memory);
 
 	if (par->mmio_start_virtual)
 		iounmap(par->mmio_start_virtual);

@@ -251,7 +251,6 @@ struct i810fb_par {
 	struct heap_data         iring;
 	struct heap_data         cursor_heap;
 	struct vgastate          state;
-	drm_agp_t                *drm_agp;
 	atomic_t                 use_count;
 	u32 pseudo_palette[17];
 	unsigned long mmio_start_phys;
