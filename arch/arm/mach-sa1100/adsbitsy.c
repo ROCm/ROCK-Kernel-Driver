@@ -147,4 +147,5 @@ MACHINE_START(ADSBITSY, "ADS Bitsy")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	MAPIO(adsbitsy_map_io)
 	INITIRQ(adsbitsy_init_irq)
+	INITTIME(sa1100_init_time)
 MACHINE_END

@@ -65,6 +65,11 @@ static void __init omap_generic_map_io(void)
 	omap_map_io();
 }
 
+static void __init omap_generic_init_time(void)
+{
+	omap_init_time();
+}
+
 MACHINE_START(OMAP_GENERIC, "Generic OMAP-1510/1610/1710")
 	MAINTAINER("Tony Lindgren <tony@atomide.com>")
 	BOOT_MEM(0x10000000, 0xfff00000, 0xfef00000)
@@ -72,4 +77,6 @@ MACHINE_START(OMAP_GENERIC, "Generic OMAP-1510/1610/1710")
 	MAPIO(omap_generic_map_io)
 	INITIRQ(omap_generic_init_irq)
 	INIT_MACHINE(omap_generic_init)
+	INITTIME(omap_generic_init_time)
 MACHINE_END
+

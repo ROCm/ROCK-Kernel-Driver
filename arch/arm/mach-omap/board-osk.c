@@ -94,5 +94,6 @@ MACHINE_START(OMAP_OSK, "TI-OSK")
 	BOOT_PARAMS(0x10000100)
 	MAPIO(osk_map_io)
 	INITIRQ(osk_init_irq)
+	INITTIME(omap_init_time)
 	INIT_MACHINE(osk_init)
 MACHINE_END

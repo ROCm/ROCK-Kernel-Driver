@@ -33,6 +33,7 @@
 
 extern void clps711x_map_io(void);
 extern void clps711x_init_irq(void);
+extern void clps711x_init_time(void);
 
 struct meminfo memmap = {
 	.nr_banks	= 1,
@@ -82,4 +83,5 @@ MACHINE_START(FORTUNET, "ARM-FortuNet")
 	FIXUP(fortunet_fixup)
 	MAPIO(clps711x_map_io)
 	INITIRQ(clps711x_init_irq)
+	INITTIME(clps711x_init_time)
 MACHINE_END

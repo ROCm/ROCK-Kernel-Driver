@@ -156,5 +156,6 @@ MACHINE_START(OMAP_INNOVATOR, "TI-Innovator")
 	BOOT_PARAMS(0x10000100)
 	MAPIO(innovator_map_io)
 	INITIRQ(innovator_init_irq)
+	INITTIME(omap_init_time)
 	INIT_MACHINE(innovator_init)
 MACHINE_END
