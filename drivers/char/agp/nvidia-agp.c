@@ -250,8 +250,8 @@ struct agp_bridge_driver nvidia_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
-static int __init agp_nvidia_probe(struct pci_dev *pdev,
-				   const struct pci_device_id *ent)
+static int __devinit agp_nvidia_probe(struct pci_dev *pdev,
+				      const struct pci_device_id *ent)
 {
 	struct agp_bridge_data *bridge;
 	u8 cap_ptr;

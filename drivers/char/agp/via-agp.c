@@ -211,7 +211,7 @@ struct agp_bridge_driver via_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
-static struct agp_device_ids via_agp_device_ids[] __initdata =
+static struct agp_device_ids via_agp_device_ids[] __devinitdata =
 {
 	{
 		.device_id	= PCI_DEVICE_ID_VIA_82C597_0,
@@ -371,8 +371,8 @@ static void check_via_agp3 (struct agp_bridge_data *bridge)
 }
 
 
-static int __init agp_via_probe(struct pci_dev *pdev,
-				const struct pci_device_id *ent)
+static int __devinit agp_via_probe(struct pci_dev *pdev,
+				   const struct pci_device_id *ent)
 {
 	struct agp_device_ids *devs = via_agp_device_ids;
 	struct agp_bridge_data *bridge;

@@ -403,7 +403,7 @@ struct agp_bridge_driver ati_generic_bridge = {
 };
 
 
-static struct agp_device_ids ati_agp_device_ids[] __initdata =
+static struct agp_device_ids ati_agp_device_ids[] __devinitdata =
 {
 	{
 		.device_id	= PCI_DEVICE_ID_ATI_RS100,
@@ -436,8 +436,8 @@ static struct agp_device_ids ati_agp_device_ids[] __initdata =
 	{ }, /* dummy final entry, always present */
 };
 
-static int __init agp_ati_probe(struct pci_dev *pdev,
-				const struct pci_device_id *ent)
+static int __devinit agp_ati_probe(struct pci_dev *pdev,
+				   const struct pci_device_id *ent)
 {
 	struct agp_device_ids *devs = ati_agp_device_ids;
 	struct agp_bridge_data *bridge;
