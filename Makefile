@@ -665,7 +665,7 @@ endef
 # byte-wise identical to our version for multiple configurations.
 # ---------------------------------------------------------------------------
 
-include/linux/version.h: Makefile
+include/linux/version.h: FORCE
 	@echo '  CHK     $@';				\
 	if [ -e $@ ]; then				\
 	    CURRENT="$$(				\

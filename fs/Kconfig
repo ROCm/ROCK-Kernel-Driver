@@ -1333,6 +1333,17 @@ config NFS_V3
 
 	  If unsure, say N.
 
+config NFS_ACL
+	bool "NFS_ACL protocol extension"
+	depends on NFS_V3
+	select QSORT
+	help
+	  Implement the NFS_ACL protocol extension for manipulating POSIX
+	  Access Control Lists.  The server must also implement the NFS_ACL
+	  protocol extension; see the CONFIG_NFSD_ACL option.
+
+	  If unsure, say N.
+
 config NFS_V4
 	bool "Provide NFSv4 client support (EXPERIMENTAL)"
 	depends on NFS_FS && EXPERIMENTAL
@@ -1401,6 +1412,16 @@ config NFSD_V3
 	help
 	  If you would like to include the NFSv3 server as well as the NFSv2
 	  server, say Y here.  If unsure, say Y.
+
+config NFSD_ACL
+	bool "NFS_ACL protocol extension"
+	depends on NFSD_V3
+	select QSORT
+	help
+	  Implement the NFS_ACL protocol extension for manipulating POSIX
+	  Access Control Lists on exported file systems.  The clients must
+	  also implement the NFS_ACL protocol extension; see the
+	  CONFIG_NFS_ACL option.  If unsure, say N.
 
 config NFSD_V4
 	bool "Provide NFSv4 server support (EXPERIMENTAL)"

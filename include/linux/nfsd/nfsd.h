@@ -15,6 +15,7 @@
 #include <linux/unistd.h>
 #include <linux/dirent.h>
 #include <linux/fs.h>
+#include <linux/posix_acl.h>
 #include <linux/mount.h>
 
 #include <linux/nfsd/debug.h>
@@ -60,6 +61,8 @@ extern struct svc_program	nfsd_program;
 extern struct svc_version	nfsd_version2, nfsd_version3,
 				nfsd_version4;
 
+extern struct svc_program	nfsd_acl_program;
+extern struct svc_version	nfsd_acl_version3;
 /*
  * Function prototypes.
  */
@@ -118,6 +121,22 @@ int		nfsd_statfs(struct svc_rqst *, struct svc_fh *,
 
 int		nfsd_notify_change(struct inode *, struct iattr *);
 int		nfsd_permission(struct svc_export *, struct dentry *, int);
+
+#ifdef CONFIG_NFSD_ACL
+struct posix_acl *nfsd_get_posix_acl(struct svc_fh *, int);
+int nfsd_set_posix_acl(struct svc_fh *, int, struct posix_acl *);
+#else
+static inline struct posix_acl *
+nfsd_get_posix_acl(struct svc_fh *fhp, int acl_type)
+{
+	return ERR_PTR(-EOPNOTSUPP);
+}
+static inline int
+nfsd_set_posix_acl(struct svc_fh *fhp, int type, struct posix_acl *acl)
+{
+	return -EOPNOTSUPP;
+}
+#endif
 
 
 /* 
