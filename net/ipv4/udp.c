@@ -1349,10 +1349,6 @@ struct proto udp_prot = {
 /* ------------------------------------------------------------------------ */
 #ifdef CONFIG_PROC_FS
 
-struct udp_iter_state {
-	int bucket;
-};
-
 static __inline__ struct sock *udp_get_bucket(struct seq_file *seq, loff_t *pos)
 {
 	int i;
@@ -1362,7 +1358,7 @@ static __inline__ struct sock *udp_get_bucket(struct seq_file *seq, loff_t *pos)
 
 	for (; state->bucket < UDP_HTABLE_SIZE; ++state->bucket)
 		for (i = 0, sk = udp_hash[state->bucket]; sk; ++i, sk = sk->next) {
-			if (sk->family != PF_INET)
+			if (sk->family != state->family)
 				continue;
 			if (l--)
 				continue;
@@ -1389,15 +1385,16 @@ static void *udp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 		goto out;
 	}
 
+	state = seq->private;
+
 	sk = v;
 	sk = sk->next;
 
 	for (; sk; sk = sk->next) {
-		if (sk->family == AF_INET)
+		if (sk->family == state->family)
 			goto out;
 	}
 
-	state = seq->private;
 	if (++state->bucket >= UDP_HTABLE_SIZE) 
 		goto out;
 
@@ -1413,7 +1410,68 @@ static void udp_seq_stop(struct seq_file *seq, void *v)
 	read_unlock(&udp_hash_lock);
 }
 
-static void udp_format_sock(struct sock *sp, char *tmpbuf, int bucket)
+static int udp_seq_open(struct inode *inode, struct file *file)
+{
+	struct udp_seq_afinfo *afinfo = PDE(inode)->data;
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct udp_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
+
+	if (!s)
+		goto out;
+	memset(s, 0, sizeof(*s));
+	s->family		= afinfo->family;
+	s->seq_ops.start	= udp_seq_start;
+	s->seq_ops.next		= udp_seq_next;
+	s->seq_ops.show		= afinfo->seq_show;
+	s->seq_ops.stop		= udp_seq_stop;
+
+	rc = seq_open(file, &s->seq_ops);
+	if (rc)
+		goto out_kfree;
+
+	seq	     = file->private_data;
+	seq->private = s;
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
+}
+
+/* ------------------------------------------------------------------------ */
+int udp_proc_register(struct udp_seq_afinfo *afinfo)
+{
+	struct proc_dir_entry *p;
+	int rc = 0;
+
+	if (!afinfo)
+		return -EINVAL;
+	afinfo->seq_fops->owner		= afinfo->owner;
+	afinfo->seq_fops->open		= udp_seq_open;
+	afinfo->seq_fops->read		= seq_read;
+	afinfo->seq_fops->llseek	= seq_lseek;
+	afinfo->seq_fops->release	= seq_release_private;
+
+	p = create_proc_entry(afinfo->name, S_IRUGO, proc_net);
+	if (p) {
+		p->data = afinfo;
+		p->proc_fops = afinfo->seq_fops;
+	} else
+		rc = -ENOMEM;
+	return rc;
+}
+
+void udp_proc_unregister(struct udp_seq_afinfo *afinfo)
+{
+	if (!afinfo)
+		return;
+	remove_proc_entry(afinfo->name, proc_net);
+	memset(afinfo->seq_fops, 0, sizeof(*afinfo->seq_fops));
+}
+
+/* ------------------------------------------------------------------------ */
+static void udp4_format_sock(struct sock *sp, char *tmpbuf, int bucket)
 {
 	struct inet_opt *inet = inet_sk(sp);
 	unsigned int dest = inet->daddr;
@@ -1429,7 +1487,7 @@ static void udp_format_sock(struct sock *sp, char *tmpbuf, int bucket)
 		atomic_read(&sp->refcnt), sp);
 }
 
-static int udp_seq_show(struct seq_file *seq, void *v)
+static int udp4_seq_show(struct seq_file *seq, void *v)
 {
 	if (v == (void *)1)
 		seq_printf(seq, "%-127s\n",
@@ -1440,68 +1498,29 @@ static int udp_seq_show(struct seq_file *seq, void *v)
 		char tmpbuf[129];
 		struct udp_iter_state *state = seq->private;
 
-		udp_format_sock(v, tmpbuf, state->bucket);
+		udp4_format_sock(v, tmpbuf, state->bucket);
 		seq_printf(seq, "%-127s\n", tmpbuf);
 	}
 	return 0;
 }
+
 /* ------------------------------------------------------------------------ */
-
-static struct seq_operations udp_seq_ops = {
-	.start  = udp_seq_start,
-	.next   = udp_seq_next,
-	.stop   = udp_seq_stop,
-	.show   = udp_seq_show,
-};
-
-static int udp_seq_open(struct inode *inode, struct file *file)
-{
-	struct seq_file *seq;
-	int rc = -ENOMEM;
-	struct udp_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
-       
-	if (!s)
-		goto out;
-
-	rc = seq_open(file, &udp_seq_ops);
-	if (rc)
-		goto out_kfree;
-
-	seq	     = file->private_data;
-	seq->private = s;
-	memset(s, 0, sizeof(*s));
-out:
-	return rc;
-out_kfree:
-	kfree(s);
-	goto out;
-}
-
-static struct file_operations udp_seq_fops = {
+static struct file_operations udp4_seq_fops;
+static struct udp_seq_afinfo udp4_seq_afinfo = {
 	.owner		= THIS_MODULE,
-	.open           = udp_seq_open,
-	.read           = seq_read,
-	.llseek         = seq_lseek,
-	.release	= seq_release_private,
+	.name		= "udp",
+	.family		= AF_INET,
+	.seq_show	= udp4_seq_show,
+	.seq_fops	= &udp4_seq_fops,
 };
 
-/* ------------------------------------------------------------------------ */
-
-int __init udp_proc_init(void)
+int __init udp4_proc_init(void)
 {
-	struct proc_dir_entry *p;
-	int rc = 0;
-
-	p = create_proc_entry("udp", S_IRUGO, proc_net);
-	if (p)
-		p->proc_fops = &udp_seq_fops;
-	else
-		rc = -ENOMEM;
-	return rc;
+	return udp_proc_register(&udp4_seq_afinfo);
 }
 
-void __init udp_proc_exit(void)
+void udp4_proc_exit(void)
 {
-	remove_proc_entry("udp", proc_net);
+	udp_proc_unregister(&udp4_seq_afinfo);
 }
 #endif /* CONFIG_PROC_FS */
