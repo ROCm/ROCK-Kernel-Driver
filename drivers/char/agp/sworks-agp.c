@@ -160,8 +160,8 @@ static int serverworks_create_gatt_table(void)
 		return retval;
 	}
 
-	agp_bridge.gatt_table_real = page_dir.real;
-	agp_bridge.gatt_table = page_dir.remapped;
+	agp_bridge.gatt_table_real = (unsigned long *)page_dir.real;
+	agp_bridge.gatt_table = (unsigned long *)page_dir.remapped;
 	agp_bridge.gatt_bus_addr = virt_to_phys(page_dir.real);
 
 	/* Get the address for the gart region.
@@ -189,8 +189,8 @@ static int serverworks_free_gatt_table(void)
 {
 	struct serverworks_page_map page_dir;
    
-	page_dir.real = agp_bridge.gatt_table_real;
-	page_dir.remapped = agp_bridge.gatt_table;
+	page_dir.real = (unsigned long *)agp_bridge.gatt_table_real;
+	page_dir.remapped = (unsigned long *)agp_bridge.gatt_table;
 
 	serverworks_free_gatt_pages();
 	serverworks_free_page_map(&page_dir);

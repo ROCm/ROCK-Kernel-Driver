@@ -466,7 +466,7 @@ int agp_generic_create_gatt_table(void)
 	for (page = virt_to_page(table); page <= virt_to_page(table_end); page++)
 		SetPageReserved(page);
 
-	agp_bridge.gatt_table_real = (unsigned long *) table;
+	agp_bridge.gatt_table_real = (u32 *) table;
 	agp_gatt_table = (void *)table; 
 	CACHE_FLUSH();
 	agp_bridge.gatt_table = ioremap_nocache(virt_to_phys(table),
