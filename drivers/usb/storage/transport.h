@@ -164,6 +164,9 @@ extern int usb_stor_ctrl_transfer(struct us_data *us, unsigned int pipe,
 		void *data, u16 size);
 extern int usb_stor_bulk_transfer_buf(struct us_data *us, unsigned int pipe,
 		char *buf, unsigned int length, unsigned int *act_len);
+extern int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
+		struct scatterlist *sg, int num_sg, unsigned int length,
+		unsigned int *act_len);
 extern int usb_stor_bulk_transfer_sg(struct us_data *us, unsigned int pipe,
 		char *buf, unsigned int length, int use_sg, int *residual);
 

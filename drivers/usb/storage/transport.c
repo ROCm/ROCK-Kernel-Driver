@@ -655,43 +655,107 @@ int usb_stor_bulk_transfer_buf(struct us_data *us, unsigned int pipe,
 }
 
 /*
+ * Transfer a scatter-gather list via bulk transfer
+ *
+ * This function does basically the same thing as usb_stor_bulk_transfer_buf()
+ * above, but it uses the usbcore scatter-gather primitives
+ */
+int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
+		struct scatterlist *sg, int num_sg, unsigned int length,
+		unsigned int *act_len)
+{
+	int result;
+	int partial;
+
+	/* initialize the scatter-gather request block */
+	US_DEBUGP("usb_stor_bulk_transfer_sglist(): xfer %d bytes, "
+			"%d entires\n", length, num_sg);
+	result = usb_sg_init(us->current_sg, us->pusb_dev, pipe, 0,
+			sg, num_sg, length, SLAB_NOIO);
+	if (result) {
+		US_DEBUGP("usb_sg_init returned %d\n", result);
+		return USB_STOR_XFER_ERROR;
+	}
+
+	/* since the block has been initialized successfully, it's now
+	 * okay to cancel it */
+	set_bit(US_FLIDX_CANCEL_SG, &us->flags);
+
+	/* has the current command been aborted? */
+	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+
+		/* cancel the request, if it hasn't been cancelled already */
+		if (test_and_clear_bit(US_FLIDX_CANCEL_SG, &us->flags)) {
+			US_DEBUGP("-- cancelling sg request\n");
+			usb_sg_cancel(us->current_sg);
+		}
+	}
+
+	usb_sg_wait(us->current_sg);
+	clear_bit(US_FLIDX_CANCEL_SG, &us->flags);
+
+	result = us->current_sg->status;
+	partial = us->current_sg->bytes;
+	US_DEBUGP("usb_sg_wait() returned %d xferrerd %d/%d\n",
+			result, partial, length);
+	if (act_len)
+		*act_len = partial;
+
+	/* if we stall, we need to clear it before we go on */
+	if (result == -EPIPE) {
+		US_DEBUGP("clearing endpoint halt for pipe 0x%x,"
+				"stalled at %d bytes\n", pipe, partial);
+		if (usb_stor_clear_halt(us, pipe) < 0)
+			return USB_STOR_XFER_ERROR;
+		return USB_STOR_XFER_STALLED;
+	}
+
+	/* NAK - that means we've tried this a few times already */
+	if (result == -ETIMEDOUT) {
+		US_DEBUGP("-- device NAKed\n");
+		return USB_STOR_XFER_ERROR;
+	}
+
+	/* the catch-all error case */
+	if (result) {
+		US_DEBUGP("-- unknown error\n");
+		return USB_STOR_XFER_ERROR;
+	}
+
+	/* did we send all the data? */
+	if (partial == length) {
+		US_DEBUGP("-- transfer complete\n");
+		return USB_STOR_XFER_GOOD;
+	}
+
+	/* no error code, so we must have transferred some data,
+	 * just not all of it */
+	US_DEBUGP("-- transferred only %d bytes\n", partial);
+	return USB_STOR_XFER_SHORT;
+}
+
+/*
  * Transfer an entire SCSI command's worth of data payload over the bulk
  * pipe.
  *
- * Note that this uses usb_stor_bulk_transfer_buf to achieve its goals --
- * this function simply determines if we're going to use scatter-gather or not,
- * and acts appropriately.
+ * Nore that this uses the usb_stor_bulk_transfer_buf() and
+ * usb_stor_bulk_transfer_sglist() to achieve its goals --
+ * this function simply determines whether we're going to use
+ * scatter-gather or not, and acts apropriately.
  */
 int usb_stor_bulk_transfer_sg(struct us_data* us, unsigned int pipe,
 		char *buf, unsigned int length_left, int use_sg, int *residual)
 {
-	int i;
-	int result = USB_STOR_XFER_ERROR;
-	struct scatterlist *sg;
-	unsigned int amount;
+	int result;
 	unsigned int partial;
 
 	/* are we scatter-gathering? */
 	if (use_sg) {
-
-		/* loop over all the scatter gather structures and 
-		 * make the appropriate requests for each, until done
-		 */
-		sg = (struct scatterlist *) buf;
-		for (i = 0; (i < use_sg) && (length_left > 0); (i++, ++sg)) {
-
-			/* transfer the lesser of the next buffer or the
-			 * remaining data */
-			amount = sg->length < length_left ?
-					sg->length : length_left;
-			result = usb_stor_bulk_transfer_buf(us, pipe,
-					sg_address(*sg), amount, &partial);
-			length_left -= partial;
-
-			/* if we get an error, end the loop here */
-			if (result != USB_STOR_XFER_GOOD)
-				break;
-		}
+		/* use the usb core scatter-gather primitives */
+		result = usb_stor_bulk_transfer_sglist(us, pipe,
+				(struct scatterlist *) buf, use_sg,
+				length_left, &partial);
+		length_left -= partial;
 	} else {
 		/* no scatter-gather, just make the request */
 		result = usb_stor_bulk_transfer_buf(us, pipe, buf, 
@@ -924,6 +988,12 @@ void usb_stor_abort_transport(struct us_data *us)
 	if (test_and_clear_bit(US_FLIDX_CAN_CANCEL, &us->flags)) {
 		US_DEBUGP("-- cancelling URB\n");
 		usb_unlink_urb(us->current_urb);
+	}
+
+	/* If we are waiting for a scatter-gather operation, cancel it. */
+	if (test_and_clear_bit(US_FLIDX_CANCEL_SG, &us->flags)) {
+		US_DEBUGP("-- cancelling sg request\n");
+		usb_sg_cancel(us->current_sg);
 	}
 
 	/* If we are waiting for an IRQ, simulate it */
