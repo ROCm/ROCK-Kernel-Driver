@@ -34,6 +34,11 @@
 
 #include <media/saa7146_vv.h>
 
+
+#define ANALOG_TUNER_VES1820 1
+#define ANALOG_TUNER_STV0297 2
+#define ANALOG_TUNER_VBI     0x100
+
 extern int av7110_debug;
 
 #define dprintk(level,args...) \
@@ -82,7 +87,7 @@ struct av7110 {
 	char			*card_name;
 
 	/* support for analog module of dvb-c */
-	int			has_analog_tuner;
+	int			analog_tuner_flags;
 	int			current_input;
 	u32			current_freq;
 				
@@ -122,8 +127,8 @@ struct av7110 {
 
         spinlock_t              debilock;
         struct semaphore        dcomlock;
-        int                     debitype;
-        int                     debilen;
+	volatile int		debitype;
+	volatile int		debilen;
 
 
         /* Recording and playback flags */
@@ -235,6 +240,7 @@ struct av7110 {
 	int (*fe_set_tone)(struct dvb_frontend* fe, fe_sec_tone_mode_t tone);
 	int (*fe_set_voltage)(struct dvb_frontend* fe, fe_sec_voltage_t voltage);
 	int (*fe_dishnetwork_send_legacy_command)(struct dvb_frontend* fe, unsigned int cmd);
+	int (*fe_set_frontend)(struct dvb_frontend* fe, struct dvb_frontend_parameters* params);
 };
 
 

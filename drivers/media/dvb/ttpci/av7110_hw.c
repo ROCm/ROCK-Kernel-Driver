@@ -110,16 +110,16 @@ void av7110_reset_arm(struct av7110 *av7110)
 	saa7146_setgpio(av7110->dev, RESET_LINE, SAA7146_GPIO_OUTLO);
 
 	/* Disable DEBI and GPIO irq */
-	IER_DISABLE(av7110->dev, (MASK_19 | MASK_03));
-	saa7146_write(av7110->dev, ISR, (MASK_19 | MASK_03));
+	SAA7146_IER_DISABLE(av7110->dev, MASK_19 | MASK_03);
+	SAA7146_ISR_CLEAR(av7110->dev, MASK_19 | MASK_03);
 
 	saa7146_setgpio(av7110->dev, RESET_LINE, SAA7146_GPIO_OUTHI);
 	msleep(30);	/* the firmware needs some time to initialize */
 
 	ARM_ResetMailBox(av7110);
 
-	saa7146_write(av7110->dev, ISR, (MASK_19 | MASK_03));
-	IER_ENABLE(av7110->dev, MASK_03);
+	SAA7146_ISR_CLEAR(av7110->dev, MASK_19 | MASK_03);
+	SAA7146_IER_ENABLE(av7110->dev, MASK_03);
 
 	av7110->arm_ready = 1;
 	dprintk(1, "reset ARM\n");
@@ -223,8 +223,8 @@ int av7110_bootarm(struct av7110 *av7110)
 	saa7146_setgpio(dev, RESET_LINE, SAA7146_GPIO_OUTLO);
 
 	/* Disable DEBI and GPIO irq */
-	IER_DISABLE(av7110->dev, MASK_03 | MASK_19);
-	saa7146_write(av7110->dev, ISR, (MASK_19 | MASK_03));
+	SAA7146_IER_DISABLE(av7110->dev, MASK_03 | MASK_19);
+	SAA7146_ISR_CLEAR(av7110->dev, MASK_19 | MASK_03);
 
 	/* enable DEBI */
 	saa7146_write(av7110->dev, MC1, 0x08800880);
@@ -280,8 +280,8 @@ int av7110_bootarm(struct av7110 *av7110)
 
 	//ARM_ClearIrq(av7110);
 	ARM_ResetMailBox(av7110);
-	saa7146_write(av7110->dev, ISR, (MASK_19 | MASK_03));
-	IER_ENABLE(av7110->dev, MASK_03);
+	SAA7146_ISR_CLEAR(av7110->dev, MASK_19 | MASK_03);
+	SAA7146_IER_ENABLE(av7110->dev, MASK_03);
 
 	av7110->arm_errors = 0;
 	av7110->arm_ready = 1;
@@ -293,13 +293,44 @@ int av7110_bootarm(struct av7110 *av7110)
  * DEBI command polling
  ****************************************************************************/
 
+int av7110_wait_msgstate(struct av7110 *av7110, u16 flags)
+{
+	unsigned long start;
+	u32 stat;
+
+	if (FW_VERSION(av7110->arm_app) <= 0x261c) {
+		/* not supported by old firmware */
+		msleep(50);
+		return 0;
+	}
+
+	/* new firmware */
+	start = jiffies;
+	for (;;) {
+		if (down_interruptible(&av7110->dcomlock))
+			return -ERESTARTSYS;
+		stat = rdebi(av7110, DEBINOSWAP, MSGSTATE, 0, 2);
+		up(&av7110->dcomlock);
+		if ((stat & flags) == 0) {
+			break;
+		}
+		if (time_after(jiffies, start + ARM_WAIT_FREE)) {
+			printk(KERN_ERR "%s: timeout waiting for MSGSTATE %04x\n",
+				__FUNCTION__, stat & flags);
+			return -1;
+		}
+		msleep(1);
+	}
+	return 0;
+}
+
 int __av7110_send_fw_cmd(struct av7110 *av7110, u16* buf, int length)
 {
 	int i;
 	unsigned long start;
-#ifdef COM_DEBUG
+	char *type = NULL;
+	u16 flags[2] = {0, 0};
 	u32 stat;
-#endif
 
 //	dprintk(4, "%p\n", av7110);
 
@@ -330,14 +361,45 @@ int __av7110_send_fw_cmd(struct av7110 *av7110, u16* buf, int length)
 	}
 #endif
 
+	switch ((buf[0] >> 8) & 0xff) {
+	case COMTYPE_PIDFILTER:
+	case COMTYPE_ENCODER:
+	case COMTYPE_REC_PLAY:
+	case COMTYPE_MPEGDECODER:
+		type = "MSG";
+		flags[0] = GPMQOver;
+		flags[1] = GPMQFull;
+		break;
+	case COMTYPE_OSD:
+		type = "OSD";
+		flags[0] = OSDQOver;
+		flags[1] = OSDQFull;
+		break;
+	default:
+		break;
+	}
+
+	if (type != NULL) {
+		/* non-immediate COMMAND type */
 	start = jiffies;
-	while (rdebi(av7110, DEBINOSWAP, MSGSTATE, 0, 2) & OSDQFull) {
-		msleep(1);
-		if (time_after(jiffies, start + ARM_WAIT_OSD)) {
-			printk(KERN_ERR "dvb-ttpci: %s(): timeout waiting for !OSDQFull\n", __FUNCTION__);
+		for (;;) {
+			stat = rdebi(av7110, DEBINOSWAP, MSGSTATE, 0, 2);
+			if (stat & flags[0]) {
+				printk(KERN_ERR "%s: %s QUEUE overflow\n",
+					__FUNCTION__, type);
+				return -1;
+			}
+			if ((stat & flags[1]) == 0)
+				break;
+			if (time_after(jiffies, start + ARM_WAIT_FREE)) {
+				printk(KERN_ERR "%s: timeout waiting on busy %s QUEUE\n",
+					__FUNCTION__, type);
 			return -1;
 		}
+			msleep(1);
+		}
 	}
+
 	for (i = 2; i < length; i++)
 		wdebi(av7110, DEBINOSWAP, COMMAND + 2 * i, (u32) buf[i], 2);
 
@@ -972,7 +1034,7 @@ int av7110_osd_cmd(struct av7110 *av7110, osd_cmd_t *dc)
 			goto out;
 		} else {
 			int i, len = dc->x0-dc->color+1;
-			u8 __user *colors = dc->data;
+			u8 __user *colors = (u8 *)dc->data;
 			u8 r, g, b, blend;
 
 			for (i = 0; i<len; i++) {

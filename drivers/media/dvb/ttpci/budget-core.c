@@ -56,7 +56,7 @@ static int stop_ts_capture(struct budget *budget)
                 return budget->feeding;
 
         saa7146_write(budget->dev, MC1, MASK_20); // DMA3 off
-	IER_DISABLE(budget->dev, MASK_10);
+	SAA7146_IER_DISABLE(budget->dev, MASK_10);
         return 0;
 }
 
@@ -124,7 +124,7 @@ static int start_ts_capture (struct budget *budget)
       	saa7146_write(dev, MC2, (MASK_04 | MASK_20));
      	saa7146_write(dev, MC1, (MASK_04 | MASK_20)); // DMA3 on
 
-	IER_ENABLE(budget->dev, MASK_10); // VPE
+	SAA7146_IER_ENABLE(budget->dev, MASK_10);	// VPE
 
         return ++budget->feeding;
 }

@@ -844,6 +844,7 @@ static struct tda1004x_config philips_tdm1316l_config = {
 
 	.demod_address = 0x8,
 	.invert = 0,
+	.invert_oclk = 0,
 	.pll_init = philips_tdm1316l_pll_init,
 	.pll_set = philips_tdm1316l_pll_set,
 	.request_firmware = philips_tdm1316l_request_firmware,

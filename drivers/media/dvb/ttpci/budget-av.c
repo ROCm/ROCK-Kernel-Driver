@@ -563,22 +563,12 @@ static int philips_tu1216_pll_init(struct dvb_frontend *fe)
 {
 	struct budget *budget = (struct budget *) fe->dvb->priv;
 	static u8 tu1216_init[] = { 0x0b, 0xf5, 0x85, 0xab };
-	static u8 disable_mc44BC374c[] = { 0x1d, 0x74, 0xa0, 0x68 };
-	struct i2c_msg tuner_msg = {.addr = 0x60,.flags = 0,.buf = tu1216_init,.len =
-			sizeof(tu1216_init) };
+	struct i2c_msg tuner_msg = {.addr = 0x60,.flags = 0,.buf = tu1216_init,.len = sizeof(tu1216_init) };
 
 	// setup PLL configuration
 	if (i2c_transfer(&budget->i2c_adap, &tuner_msg, 1) != 1)
 		return -EIO;
 	msleep(1);
-
-	// disable the mc44BC374c (do not check for errors)
-	tuner_msg.addr = 0x65;
-	tuner_msg.buf = disable_mc44BC374c;
-	tuner_msg.len = sizeof(disable_mc44BC374c);
-	if (i2c_transfer(&budget->i2c_adap, &tuner_msg, 1) != 1) {
-		i2c_transfer(&budget->i2c_adap, &tuner_msg, 1);
-	}
 
 	return 0;
 }
@@ -593,7 +583,7 @@ static int philips_tu1216_pll_set(struct dvb_frontend *fe, struct dvb_frontend_p
 	u8 band, cp, filter;
 
 	// determine charge pump
-	tuner_frequency = params->frequency + 36130000;
+	tuner_frequency = params->frequency + 36166000;
 	if (tuner_frequency < 87000000)
 		return -EINVAL;
 	else if (tuner_frequency < 130000000)
@@ -620,7 +610,7 @@ static int philips_tu1216_pll_set(struct dvb_frontend *fe, struct dvb_frontend_p
 	// determine band
 	if (params->frequency < 49000000)
 		return -EINVAL;
-	else if (params->frequency < 159000000)
+	else if (params->frequency < 161000000)
 		band = 1;
 	else if (params->frequency < 444000000)
 		band = 2;
@@ -632,17 +622,14 @@ static int philips_tu1216_pll_set(struct dvb_frontend *fe, struct dvb_frontend_p
 	// setup PLL filter
 	switch (params->u.ofdm.bandwidth) {
 	case BANDWIDTH_6_MHZ:
-		tda1004x_write_byte(fe, 0x0C, 0);
 		filter = 0;
 		break;
 
 	case BANDWIDTH_7_MHZ:
-		tda1004x_write_byte(fe, 0x0C, 0);
 		filter = 0;
 		break;
 
 	case BANDWIDTH_8_MHZ:
-		tda1004x_write_byte(fe, 0x0C, 0xFF);
 		filter = 1;
 		break;
 
@@ -651,11 +638,11 @@ static int philips_tu1216_pll_set(struct dvb_frontend *fe, struct dvb_frontend_p
 	}
 
 	// calculate divisor
-	// ((36130000+((1000000/6)/2)) + Finput)/(1000000/6)
-	tuner_frequency = (((params->frequency / 1000) * 6) + 217280) / 1000;
+	// ((36166000+((1000000/6)/2)) + Finput)/(1000000/6)
+	tuner_frequency = (((params->frequency / 1000) * 6) + 217496) / 1000;
 
 	// setup tuner buffer
-	tuner_buf[0] = tuner_frequency >> 8;
+	tuner_buf[0] = (tuner_frequency >> 8) & 0x7f;
 	tuner_buf[1] = tuner_frequency & 0xff;
 	tuner_buf[2] = 0xca;
 	tuner_buf[3] = (cp << 5) | (filter << 3) | band;
@@ -679,6 +666,7 @@ struct tda1004x_config philips_tu1216_config = {
 
 	.demod_address = 0x8,
 	.invert = 1,
+	.invert_oclk = 1,
 	.pll_init = philips_tu1216_pll_init,
 	.pll_set = philips_tu1216_pll_set,
 	.request_firmware = philips_tu1216_request_firmware,
