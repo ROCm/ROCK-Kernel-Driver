@@ -56,10 +56,8 @@ typedef __u64	vnumber_t;
 
 /*
  * MP locking protocols:
- *	v_flag, v_count				VN_LOCK/VN_UNLOCK
- *	v_vfsp					VN_LOCK/VN_UNLOCK
+ *	v_flag, v_vfsp				VN_LOCK/VN_UNLOCK
  *	v_type					read-only or fs-dependent
- *	v_list, v_hashp, v_hashn		freelist lock
  */
 typedef struct vnode {
 	__u32		v_flag;			/* vnode flags (see below) */
@@ -70,9 +68,9 @@ typedef struct vnode {
 
 	spinlock_t	v_lock;			/* don't use VLOCK on Linux */
 	struct inode	v_inode;		/* linux inode */
-#ifdef	CONFIG_XFS_VNODE_TRACING
+#ifdef CONFIG_XFS_VNODE_TRACING
 	struct ktrace	*v_trace;		/* trace header structure    */
-#endif	/* CONFIG_XFS_VNODE_TRACING */
+#endif
 } vnode_t;
 
 /*
@@ -170,7 +168,6 @@ typedef enum vchange {
 #define v_fops		v_bh.bh_first->bd_ops  /* ops for first behavior */
 
 
-union rval;
 struct uio;
 struct file;
 struct vattr;
@@ -275,11 +272,6 @@ typedef struct vnodeops {
  */
 #define _VOP_(op, vp)	(*((vnodeops_t *)(vp)->v_fops)->op)
 
-/*
- * Be careful with VOP_OPEN, since we're holding the chain lock on the
- * original vnode and VOP_OPEN semantic allows the new vnode to be returned
- * in vpp. The practice of passing &vp for vpp just doesn't work.
- */
 #define VOP_READ(vp,file,buf,size,offset,cr,rv)				\
 {									\
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
