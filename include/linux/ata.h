@@ -33,8 +33,6 @@ enum {
 	ATA_MAX_DEVICES		= 2,	/* per bus/port */
 	ATA_MAX_PRD		= 256,	/* we could make these 256/256 */
 	ATA_SECT_SIZE		= 512,
-	ATA_SECT_SIZE_MASK	= (ATA_SECT_SIZE - 1),
-	ATA_SECT_DWORDS		= ATA_SECT_SIZE / sizeof(u32),
 
 	ATA_ID_WORDS		= 256,
 	ATA_ID_PROD_OFS		= 27,
@@ -142,6 +140,12 @@ enum {
 	XFER_PIO_2		= 0x0A,
 	XFER_PIO_1		= 0x09,
 	XFER_PIO_0		= 0x08,
+
+	/* legacy IDE 'stuff' */
+	XFER_SW_DMA_2		= 0x12,
+	XFER_SW_DMA_1		= 0x11,
+	XFER_SW_DMA_0		= 0x10,
+	XFER_PIO_SLOW		= 0x00,
 
 	/* ATAPI stuff */
 	ATAPI_PKT_DMA		= (1 << 0),
