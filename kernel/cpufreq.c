@@ -54,7 +54,7 @@ static DECLARE_RWSEM		(cpufreq_notifier_rwsem);
 static LIST_HEAD(cpufreq_governor_list);
 static DECLARE_MUTEX		(cpufreq_governor_sem);
 
-static int cpufreq_cpu_get(unsigned int cpu)
+static struct cpufreq_policy * cpufreq_cpu_get(unsigned int cpu)
 {
 	struct cpufreq_policy *data;
 	unsigned long flags;
@@ -84,14 +84,14 @@ static int cpufreq_cpu_get(unsigned int cpu)
 
 	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
 
-	return 1;
+	return data;
 
  err_out_put_module:
 	module_put(cpufreq_driver->owner);
  err_out_unlock:
 	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
  err_out:
-	return 0;
+	return NULL;
 }
 
 static void cpufreq_cpu_put(unsigned int cpu)
@@ -574,18 +574,18 @@ inline int cpufreq_driver_target(struct cpufreq_policy *policy,
 				 unsigned int relation)
 {
 	unsigned int ret;
-	unsigned int cpu = policy->cpu;
 
-	if (!cpufreq_cpu_get(cpu))
+	policy = cpufreq_cpu_get(policy->cpu);
+	if (!policy)
 		return -EINVAL;
 
-	down(&cpufreq_driver->policy[cpu].lock);
+	down(&policy->lock);
 
 	ret = cpufreq_driver->target(policy, target_freq, relation);
 
-	up(&cpufreq_driver->policy[cpu].lock);
+	up(&policy->lock);
 
-	cpufreq_cpu_put(cpu);
+	cpufreq_cpu_put(policy->cpu);
 
 	return ret;
 }
@@ -595,9 +595,9 @@ EXPORT_SYMBOL_GPL(cpufreq_driver_target);
 int cpufreq_governor(unsigned int cpu, unsigned int event)
 {
 	int ret = 0;
-	struct cpufreq_policy *policy = &cpufreq_driver->policy[cpu];
+	struct cpufreq_policy *policy = cpufreq_cpu_get(cpu);
 
-	if (!cpufreq_cpu_get(cpu))
+	if (!policy)
 		return -EINVAL;
 
 	switch (policy->policy) {
