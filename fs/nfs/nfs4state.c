@@ -416,6 +416,7 @@ __nfs4_put_open_state(struct nfs4_state *state)
 {
 	struct inode *inode = state->inode;
 	struct nfs4_state_owner *owner = state->owner;
+	struct nfs4_exception exception = { };
 	int status = 0;
 
 	if (!atomic_dec_and_lock(&state->count, &inode->i_lock)) {
@@ -427,16 +428,18 @@ __nfs4_put_open_state(struct nfs4_state *state)
 	spin_unlock(&inode->i_lock);
 	list_del(&state->open_states);
 	if (state->state != 0) {
-		do {
-			status = nfs4_do_close(inode, state);
+		for (;;) {
+			status = _nfs4_do_close(inode, state);
+			up(&owner->so_sema);
 			if (!status)
 				break;
-			up(&owner->so_sema);
-			status = nfs4_handle_error(NFS_SERVER(inode), status);
+			status = nfs4_handle_exception(NFS_SERVER(inode), status, &exception);
+			if (!exception.retry)
+				break;
 			down(&owner->so_sema);
-		} while (!status);
-	}
-	up(&owner->so_sema);
+		}
+	} else
+		up(&owner->so_sema);
 	nfs4_free_open_state(state);
 	nfs4_put_state_owner(owner);
 }
@@ -453,6 +456,7 @@ nfs4_close_state(struct nfs4_state *state, mode_t mode)
 {
 	struct inode *inode = state->inode;
 	struct nfs4_state_owner *owner = state->owner;
+	struct nfs4_exception exception = { };
 	int newstate;
 	int status = 0;
 
@@ -477,17 +481,17 @@ nfs4_close_state(struct nfs4_state *state, mode_t mode)
 		if (state->state == newstate)
 			break;
 		if (newstate != 0)
-			status = nfs4_do_downgrade(inode, state, newstate);
+			status = _nfs4_do_downgrade(inode, state, newstate);
 		else
-			status = nfs4_do_close(inode, state);
+			status = _nfs4_do_close(inode, state);
 		if (!status) {
 			state->state = newstate;
 			break;
 		}
 		up(&owner->so_sema);
-		status = nfs4_handle_error(NFS_SERVER(inode), status);
+		status = nfs4_handle_exception(NFS_SERVER(inode), status, &exception);
 		down(&owner->so_sema);
-	} while (!status);
+	} while (exception.retry);
 	__nfs4_put_open_state(state);
 }
 
