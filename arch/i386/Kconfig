@@ -881,7 +881,7 @@ config REGPARM
 	depends on EXPERIMENTAL
 	default n
 	help
-	Compile the kernel with -mregparm=3. This uses an different ABI
+	Compile the kernel with -mregparm=3. This uses a different ABI
 	and passes the first three arguments of a function call in registers.
 	This will probably break binary only modules.
 
