@@ -406,8 +406,33 @@ void parport_daisy_deselect_all (struct parport *port)
 
 int parport_daisy_select (struct parport *port, int daisy, int mode)
 {
-	/* mode is currently ignored. FIXME? */
-	return cpp_daisy (port, 0xe0 + daisy) & PARPORT_STATUS_ERROR;
+	switch (mode)
+	{
+		// For these modes we should switch to EPP mode:
+		case IEEE1284_MODE_EPP:
+		case IEEE1284_MODE_EPPSL:
+		case IEEE1284_MODE_EPPSWE:
+			return (cpp_daisy (port, 0x20 + daisy) &
+				PARPORT_STATUS_ERROR);
+
+		// For these modes we should switch to ECP mode:
+		case IEEE1284_MODE_ECP:
+		case IEEE1284_MODE_ECPRLE:
+		case IEEE1284_MODE_ECPSWE: 
+			return (cpp_daisy (port, 0xd0 + daisy) &
+				PARPORT_STATUS_ERROR);
+
+		// Nothing was told for BECP in Daisy chain specification.
+		// May be it's wise to use ECP?
+		case IEEE1284_MODE_BECP:
+		// Others use compat mode
+		case IEEE1284_MODE_NIBBLE:
+		case IEEE1284_MODE_BYTE:
+		case IEEE1284_MODE_COMPAT:
+		default:
+			return (cpp_daisy (port, 0xe0 + daisy) &
+				PARPORT_STATUS_ERROR);
+	}
 }
 
 static int mux_present (struct parport *port)
