@@ -33,29 +33,6 @@ struct brick {
 
 int sn_ioif_inited = 0;		/* SN I/O infrastructure initialized? */
 
-static int
-sn_pci_read(struct pci_bus *bus, unsigned int devfn, int where, int size,
-         u32 * value)
-{
-	return raw_pci_ops->read(pci_domain_nr(bus), bus->number,
-                                 devfn, where, size, value);
-}
-
-static int
-sn_pci_write(struct pci_bus *bus, unsigned int devfn, int where, int size,
-          u32 value)
-{
-
-	return raw_pci_ops->write(pci_domain_nr(bus), bus->number,
-                                  devfn, where, size, value);
-}
-
-struct pci_ops sn_pci_root_ops = {
-	.read = sn_pci_read,
-	.write = sn_pci_write,
-};
-
-
 /*
  * Retrieve the DMA Flush List given nasid.  This list is needed 
  * to implement the WAR - Flush DMA data on PIO Reads.
@@ -281,10 +258,10 @@ static void sn_pci_fixup_slot(struct pci_dev *dev)
 }
 
 /*
- * sn_pci_fixup_bus() - This routine sets up a bus's resources
+ * sn_pci_controller_fixup() - This routine sets up a bus's resources
  * consistent with the Linux PCI abstraction layer.
  */
-static void sn_pci_fixup_bus(int segment, int busnum)
+static void sn_pci_controller_fixup(int segment, int busnum)
 {
 	int status = 0;
 	int nasid, cnode;
@@ -305,7 +282,7 @@ static void sn_pci_fixup_bus(int segment, int busnum)
 	controller = sn_alloc_pci_sysdata();
 	/* controller non-zero is BUG'd in sn_alloc_pci_sysdata */
 
-	bus = pci_scan_bus(busnum, &sn_pci_root_ops, controller);
+	bus = pci_scan_bus(busnum, &pci_root_ops, controller);
 	if (bus == NULL) {
 		return;		/* error, or bus already scanned */
 	}
@@ -377,7 +354,7 @@ static int __init sn_pci_init(void)
 #endif
 
 	for (i = 0; i < PCI_BUSES_TO_SCAN; i++) {
-		sn_pci_fixup_bus(0, i);
+		sn_pci_controller_fixup(0, i);
 	}
 
 	/*

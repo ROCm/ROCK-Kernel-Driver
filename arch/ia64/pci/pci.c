@@ -124,7 +124,7 @@ pci_write (struct pci_bus *bus, unsigned int devfn, int where, int size, u32 val
 				  devfn, where, size, value);
 }
 
-static struct pci_ops pci_root_ops = {
+struct pci_ops pci_root_ops = {
 	.read = pci_read,
 	.write = pci_write,
 };
