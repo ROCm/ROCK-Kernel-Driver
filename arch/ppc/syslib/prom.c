@@ -1212,8 +1212,6 @@ find_parent_pci_resource(struct pci_dev* pdev, struct address_range *range)
  * Request an OF device resource. Currently handles child of PCI devices,
  * or other nodes attached to the root node. Ultimately, put some
  * link to resources in the OF node.
- * WARNING: out_resource->name should be initialized before calling this
- * function.
  */
 struct resource* __openfirmware
 request_OF_resource(struct device_node* node, int index, const char* name_postfix)
@@ -1276,7 +1274,7 @@ release_OF_resource(struct device_node* node, int index)
 {
 	struct pci_dev* pcidev;
 	u8 pci_bus, pci_devfn;
-	unsigned long iomask;
+	unsigned long iomask, start, end;
 	struct device_node* nd;
 	struct resource* parent;
 	struct resource *res = NULL;
@@ -1305,18 +1303,23 @@ release_OF_resource(struct device_node* node, int index)
 	if (pcidev)
 		parent = find_parent_pci_resource(pcidev, &node->addrs[index]);
 	if (!parent) {
-		printk(KERN_WARNING "request_OF_resource(%s), parent not found\n",
+		printk(KERN_WARNING "release_OF_resource(%s), parent not found\n",
 			node->name);
 		return -ENODEV;
 	}
 
-	/* Find us in the parent */
+	/* Find us in the parent and its childs */
 	res = parent->child;
+	start = node->addrs[index].address;
+	end = start + node->addrs[index].size - 1;
 	while (res) {
-		if (res->start == node->addrs[index].address &&
-		    res->end == (res->start + node->addrs[index].size - 1))
+		if (res->start == start && res->end == end &&
+		    (res->flags & IORESOURCE_BUSY))
 		    	break;
-		res = res->sibling;
+		if (res->start <= start && res->end >= end)
+			res = res->child;
+		else
+			res = res->sibling;
 	}
 	if (!res)
 		return -ENODEV;
