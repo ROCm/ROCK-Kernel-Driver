@@ -88,7 +88,7 @@ static int nmi_callback(struct pt_regs * regs, int cpu)
 }
  
  
-static void nmi_save_registers(struct op_msrs * msrs)
+static void nmi_cpu_save_registers(struct op_msrs * msrs)
 {
 	unsigned int const nr_ctrs = model->num_counters;
 	unsigned int const nr_ctrls = model->num_controls; 
@@ -107,6 +107,15 @@ static void nmi_save_registers(struct op_msrs * msrs)
 			controls[i].saved.low,
 			controls[i].saved.high);
 	}
+}
+
+
+static void nmi_save_registers(void * dummy)
+{
+	int cpu = smp_processor_id();
+	struct op_msrs * msrs = &cpu_msrs[cpu];
+	model->fill_in_addresses(msrs);
+	nmi_cpu_save_registers(msrs);
 }
 
 
@@ -156,8 +165,6 @@ static void nmi_cpu_setup(void * dummy)
 {
 	int cpu = smp_processor_id();
 	struct op_msrs * msrs = &cpu_msrs[cpu];
-	model->fill_in_addresses(msrs);
-	nmi_save_registers(msrs);
 	spin_lock(&oprofilefs_lock);
 	model->setup_ctrs(msrs);
 	spin_unlock(&oprofilefs_lock);
@@ -177,6 +184,10 @@ static int nmi_setup(void)
 	 * break the core code horrifically.
 	 */
 	disable_lapic_nmi_watchdog();
+	/* We need to serialize save and setup for HT because the subset
+	 * of msrs are distinct for save and setup operations
+	 */
+	on_each_cpu(nmi_save_registers, NULL, 0, 1);
 	on_each_cpu(nmi_cpu_setup, NULL, 0, 1);
 	set_nmi_callback(nmi_callback);
 	nmi_enabled = 1;
