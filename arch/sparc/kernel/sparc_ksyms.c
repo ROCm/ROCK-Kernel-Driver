@@ -180,21 +180,20 @@ EXPORT_SYMBOL(io_remap_page_range);
 /* EXPORT_SYMBOL(iounit_map_dma_init); */
 /* EXPORT_SYMBOL(iounit_map_dma_page); */
 
-/* Btfixup stuff cannot have versions, it would be complicated too much */
 #ifndef CONFIG_SMP
-EXPORT_SYMBOL_NOVERS(BTFIXUP_CALL(___xchg32));
+EXPORT_SYMBOL(BTFIXUP_CALL(___xchg32));
 #else
-EXPORT_SYMBOL_NOVERS(BTFIXUP_CALL(__smp_processor_id));
+EXPORT_SYMBOL(BTFIXUP_CALL(__smp_processor_id));
 #endif
-EXPORT_SYMBOL_NOVERS(BTFIXUP_CALL(enable_irq));
-EXPORT_SYMBOL_NOVERS(BTFIXUP_CALL(disable_irq));
-EXPORT_SYMBOL_NOVERS(BTFIXUP_CALL(__irq_itoa));
-EXPORT_SYMBOL_NOVERS(BTFIXUP_CALL(mmu_unlockarea));
-EXPORT_SYMBOL_NOVERS(BTFIXUP_CALL(mmu_lockarea));
-EXPORT_SYMBOL_NOVERS(BTFIXUP_CALL(mmu_get_scsi_sgl));
-EXPORT_SYMBOL_NOVERS(BTFIXUP_CALL(mmu_get_scsi_one));
-EXPORT_SYMBOL_NOVERS(BTFIXUP_CALL(mmu_release_scsi_sgl));
-EXPORT_SYMBOL_NOVERS(BTFIXUP_CALL(mmu_release_scsi_one));
+EXPORT_SYMBOL(BTFIXUP_CALL(enable_irq));
+EXPORT_SYMBOL(BTFIXUP_CALL(disable_irq));
+EXPORT_SYMBOL(BTFIXUP_CALL(__irq_itoa));
+EXPORT_SYMBOL(BTFIXUP_CALL(mmu_unlockarea));
+EXPORT_SYMBOL(BTFIXUP_CALL(mmu_lockarea));
+EXPORT_SYMBOL(BTFIXUP_CALL(mmu_get_scsi_sgl));
+EXPORT_SYMBOL(BTFIXUP_CALL(mmu_get_scsi_one));
+EXPORT_SYMBOL(BTFIXUP_CALL(mmu_release_scsi_sgl));
+EXPORT_SYMBOL(BTFIXUP_CALL(mmu_release_scsi_one));
 
 #ifdef CONFIG_SBUS
 EXPORT_SYMBOL(sbus_root);
@@ -271,15 +270,15 @@ EXPORT_SYMBOL(__prom_getsibling);
 /* sparc library symbols */
 EXPORT_SYMBOL(bcopy);
 EXPORT_SYMBOL(memchr);
-EXPORT_SYMBOL_NOVERS(memscan);
-EXPORT_SYMBOL_NOVERS(strlen);
+EXPORT_SYMBOL(memscan);
+EXPORT_SYMBOL(strlen);
 EXPORT_SYMBOL(strnlen);
 EXPORT_SYMBOL(strcpy);
 EXPORT_SYMBOL(strncpy);
 EXPORT_SYMBOL(strcat);
 EXPORT_SYMBOL(strncat);
 EXPORT_SYMBOL(strcmp);
-EXPORT_SYMBOL_NOVERS(strncmp);
+EXPORT_SYMBOL(strncmp);
 EXPORT_SYMBOL(strchr);
 EXPORT_SYMBOL(strrchr);
 EXPORT_SYMBOL(strpbrk);
@@ -309,21 +308,17 @@ EXPORT_SYMBOL(csum_partial);
 /* Cache flushing.  */
 EXPORT_SYMBOL(sparc_flush_page_to_ram);
 
-/* No version information on this, heavily used in inline asm,
- * and will always be 'void __ret_efault(void)'.
- */
-EXPORT_SYMBOL_NOVERS(__ret_efault);
+EXPORT_SYMBOL(__ret_efault);
 
-/* No version information on these, as gcc produces such symbols. */
-EXPORT_SYMBOL_NOVERS(memcmp);
-EXPORT_SYMBOL_NOVERS(memcpy);
-EXPORT_SYMBOL_NOVERS(memset);
-EXPORT_SYMBOL_NOVERS(memmove);
-EXPORT_SYMBOL_NOVERS(__ashrdi3);
-EXPORT_SYMBOL_NOVERS(__ashldi3);
-EXPORT_SYMBOL_NOVERS(__lshrdi3);
-EXPORT_SYMBOL_NOVERS(__muldi3);
-EXPORT_SYMBOL_NOVERS(__divdi3);
+EXPORT_SYMBOL(memcmp);
+EXPORT_SYMBOL(memcpy);
+EXPORT_SYMBOL(memset);
+EXPORT_SYMBOL(memmove);
+EXPORT_SYMBOL(__ashrdi3);
+EXPORT_SYMBOL(__ashldi3);
+EXPORT_SYMBOL(__lshrdi3);
+EXPORT_SYMBOL(__muldi3);
+EXPORT_SYMBOL(__divdi3);
 
 EXPORT_SYMBOL_DOT(rem);
 EXPORT_SYMBOL_DOT(urem);
