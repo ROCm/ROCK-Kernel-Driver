@@ -10,11 +10,6 @@
  */
 #define USE_TX_COAL_NOW	 0
 
-#ifndef MAX_SKB_FRAGS
-#define MAX_SKB_FRAGS 0
-#endif
-
-
 /*
  * Addressing:
  *
@@ -638,7 +633,7 @@ struct ace_skb
 struct ace_private
 {
 	struct ace_info		*info;
-	struct ace_regs		*regs;		/* register base */
+	struct ace_regs	__iomem	*regs;		/* register base */
 	struct ace_skb		*skb;
 	dma_addr_t		info_dma;	/* 32/64 bit */
 
@@ -712,13 +707,7 @@ static inline int tx_space (struct ace_private *ap, u32 csm, u32 prd)
 }
 
 #define tx_free(ap) 		tx_space((ap)->tx_ret_csm, (ap)->tx_prd, ap)
-
-#if MAX_SKB_FRAGS
 #define tx_ring_full(ap, csm, prd)	(tx_space(ap, csm, prd) <= TX_RESERVED)
-#else
-#define tx_ring_full			0
-#endif
-
 
 static inline void set_aceaddr(aceaddr *aa, dma_addr_t addr)
 {
@@ -729,7 +718,7 @@ static inline void set_aceaddr(aceaddr *aa, dma_addr_t addr)
 }
 
 
-static inline void ace_set_txprd(struct ace_regs *regs,
+static inline void ace_set_txprd(struct ace_regs __iomem *regs,
 				 struct ace_private *ap, u32 value)
 {
 #ifdef INDEX_DEBUG
@@ -750,8 +739,8 @@ static inline void ace_set_txprd(struct ace_regs *regs,
 
 static inline void ace_mask_irq(struct net_device *dev)
 {
-	struct ace_private *ap = dev->priv;
-	struct ace_regs *regs = ap->regs;
+	struct ace_private *ap = netdev_priv(dev);
+	struct ace_regs __iomem *regs = ap->regs;
 
 	if (ACE_IS_TIGON_I(ap))
 		writel(1, &regs->MaskInt);
@@ -764,8 +753,8 @@ static inline void ace_mask_irq(struct net_device *dev)
 
 static inline void ace_unmask_irq(struct net_device *dev)
 {
-	struct ace_private *ap = dev->priv;
-	struct ace_regs *regs = ap->regs;
+	struct ace_private *ap = netdev_priv(dev);
+	struct ace_regs __iomem *regs = ap->regs;
  
 	if (ACE_IS_TIGON_I(ap))
 		writel(0, &regs->MaskInt);
