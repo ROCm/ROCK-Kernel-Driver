@@ -378,6 +378,45 @@ static int _snd_ioctl32_pcm_hw_params_old(unsigned int fd, unsigned int cmd, uns
 	return err;
 }
 
+struct sndrv_pcm_mmap_status32 {
+	s32 state;
+	s32 pad1;
+	u32 hw_ptr;
+	struct compat_timespec tstamp;
+	s32 suspended_state;
+} __attribute__((packed));
+
+struct sndrv_pcm_mmap_control32 {
+	u32 appl_ptr;
+	u32 avail_min;
+} __attribute__((packed));
+
+struct sndrv_pcm_sync_ptr32 {
+	u32 flags;
+	union {
+		struct sndrv_pcm_mmap_status32 status;
+		unsigned char reserved[64];
+	} s;
+	union {
+		struct sndrv_pcm_mmap_control32 control;
+		unsigned char reserved[64];
+	} c;
+} __attribute__((packed));
+
+#define CVT_sndrv_pcm_sync_ptr()\
+{\
+	COPY(flags);\
+	COPY(s.status.state);\
+	COPY(s.status.pad1);\
+	COPY(s.status.hw_ptr);\
+	COPY(s.status.tstamp.tv_sec);\
+	COPY(s.status.tstamp.tv_nsec);\
+	COPY(s.status.suspended_state);\
+	COPY(c.control.appl_ptr);\
+	COPY(c.control.avail_min);\
+}
+
+DEFINE_ALSA_IOCTL_BIG(pcm_sync_ptr);
 
 /*
  */
@@ -395,6 +434,7 @@ DEFINE_ALSA_IOCTL_ENTRY(pcm_readi, xferi, SNDRV_PCM_IOCTL_READI_FRAMES);
 DEFINE_ALSA_IOCTL_ENTRY(pcm_writei, xferi, SNDRV_PCM_IOCTL_WRITEI_FRAMES);
 DEFINE_ALSA_IOCTL_ENTRY(pcm_readn, xfern, SNDRV_PCM_IOCTL_READN_FRAMES);
 DEFINE_ALSA_IOCTL_ENTRY(pcm_writen, xfern, SNDRV_PCM_IOCTL_WRITEN_FRAMES);
+DEFINE_ALSA_IOCTL_ENTRY(pcm_sync_ptr, pcm_sync_ptr, SNDRV_PCM_IOCTL_SYNC_PTR);
 
 
 /*
@@ -415,6 +455,7 @@ enum {
 	SNDRV_PCM_IOCTL_READN_FRAMES32 = _IOR('A', 0x53, struct sndrv_xfern32),
 	SNDRV_PCM_IOCTL_HW_REFINE_OLD32 = _IOWR('A', 0x10, struct sndrv_pcm_hw_params_old32),
 	SNDRV_PCM_IOCTL_HW_PARAMS_OLD32 = _IOWR('A', 0x11, struct sndrv_pcm_hw_params_old32),
+	SNDRV_PCM_IOCTL_SYNC_PTR32 = _IOWR('A', 0x23, struct sndrv_pcm_sync_ptr),
 
 };
 
@@ -430,6 +471,8 @@ struct ioctl32_mapper pcm_mappers[] = {
 	{ SNDRV_PCM_IOCTL_SW_PARAMS32, AP(pcm_sw_params) },
 	{ SNDRV_PCM_IOCTL_STATUS32, AP(pcm_status) },
 	{ SNDRV_PCM_IOCTL_DELAY32, AP(pcm_delay) },
+	MAP_COMPAT(SNDRV_PCM_IOCTL_HWSYNC),
+	{ SNDRV_PCM_IOCTL_SYNC_PTR32, AP(pcm_sync_ptr) },
 	{ SNDRV_PCM_IOCTL_CHANNEL_INFO32, AP(pcm_channel_info) },
 	MAP_COMPAT(SNDRV_PCM_IOCTL_PREPARE),
 	MAP_COMPAT(SNDRV_PCM_IOCTL_RESET),
