@@ -245,6 +245,7 @@ extern inline void bond_set_slave_active_flags(struct slave *slave)
 	slave->dev->flags &= ~IFF_NOARP;
 }
 
+struct vlan_entry *bond_next_vlan(struct bonding *bond, struct vlan_entry *curr);
 int bond_dev_queue_xmit(struct bonding *bond, struct sk_buff *skb, struct net_device *slave_dev);
 
 #endif /* _LINUX_BONDING_H */

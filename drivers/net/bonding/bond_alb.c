@@ -50,6 +50,7 @@
 #include <linux/if_arp.h>
 #include <linux/if_ether.h>
 #include <linux/if_bonding.h>
+#include <linux/if_vlan.h>
 #include <net/ipx.h>
 #include <net/arp.h>
 #include <asm/byteorder.h>
@@ -79,7 +80,7 @@
 
 
 #define TLB_NULL_INDEX		0xffffffff
-#define MAX_LP_RETRY		3
+#define MAX_LP_BURST		3
 
 /* rlb defs */
 #define RLB_HASH_TABLE_SIZE	256
@@ -816,6 +817,7 @@ static void rlb_deinitialize(struct bonding *bond)
 
 static void alb_send_learning_packets(struct slave *slave, u8 mac_addr[])
 {
+	struct bonding *bond = bond_get_bond_by_slave(slave);
 	struct learning_pkt pkt;
 	int size = sizeof(struct learning_pkt);
 	int i;
@@ -825,7 +827,7 @@ static void alb_send_learning_packets(struct slave *slave, u8 mac_addr[])
 	memcpy(pkt.mac_src, mac_addr, ETH_ALEN);
 	pkt.type = __constant_htons(ETH_P_LOOP);
 
-	for (i = 0; i < MAX_LP_RETRY; i++) {
+	for (i = 0; i < MAX_LP_BURST; i++) {
 		struct sk_buff *skb;
 		char *data;
 
@@ -842,6 +844,26 @@ static void alb_send_learning_packets(struct slave *slave, u8 mac_addr[])
 		skb->protocol = pkt.type;
 		skb->priority = TC_PRIO_CONTROL;
 		skb->dev = slave->dev;
+
+		if (!list_empty(&bond->vlan_list)) {
+			struct vlan_entry *vlan;
+
+			vlan = bond_next_vlan(bond,
+					      bond->alb_info.current_alb_vlan);
+
+			bond->alb_info.current_alb_vlan = vlan;
+			if (!vlan) {
+				kfree_skb(skb);
+				continue;
+			}
+
+			skb = vlan_put_tag(skb, vlan->vlan_id);
+			if (!skb) {
+				printk(KERN_ERR DRV_NAME
+				       ": Error: failed to insert VLAN tag\n");
+				continue;
+			}
+		}
 
 		dev_queue_xmit(skb);
 	}
@@ -1586,5 +1608,13 @@ int bond_alb_set_mac_address(struct net_device *bond_dev, void *addr)
 	}
 
 	return 0;
+}
+
+void bond_alb_clear_vlan(struct bonding *bond, unsigned short vlan_id)
+{
+	if (bond->alb_info.current_alb_vlan &&
+	    (bond->alb_info.current_alb_vlan->vlan_id == vlan_id)) {
+		bond->alb_info.current_alb_vlan = NULL;
+	}
 }
 

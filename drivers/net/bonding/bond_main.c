@@ -676,6 +676,11 @@ static int bond_del_vlan(struct bonding *bond, unsigned short vlan_id)
 		if (vlan->vlan_id == vlan_id) {
 			list_del(&vlan->vlan_list);
 
+			if ((bond->params.mode == BOND_MODE_TLB) ||
+			    (bond->params.mode == BOND_MODE_ALB)) {
+				bond_alb_clear_vlan(bond, vlan_id);
+			}
+
 			dprintk("removed VLAN ID %d from bond %s\n", vlan_id,
 				bond->dev->name);
 
@@ -728,6 +733,42 @@ static int bond_has_challenged_slaves(struct bonding *bond)
 
 	dprintk("no VLAN challenged slaves found\n");
 	return 0;
+}
+
+/**
+ * bond_next_vlan - safely skip to the next item in the vlans list.
+ * @bond: the bond we're working on
+ * @curr: item we're advancing from
+ *
+ * Returns %NULL if list is empty, bond->next_vlan if @curr is %NULL,
+ * or @curr->next otherwise (even if it is @curr itself again).
+ * 
+ * Caller must hold bond->lock
+ */
+struct vlan_entry *bond_next_vlan(struct bonding *bond, struct vlan_entry *curr)
+{
+	struct vlan_entry *next, *last;
+
+	if (list_empty(&bond->vlan_list)) {
+		return NULL;
+	}
+
+	if (!curr) {
+		next = list_entry(bond->vlan_list.next,
+				  struct vlan_entry, vlan_list);
+	} else {
+		last = list_entry(bond->vlan_list.prev,
+				  struct vlan_entry, vlan_list);
+		if (last == curr) {
+			next = list_entry(bond->vlan_list.next,
+					  struct vlan_entry, vlan_list);
+		} else {
+			next = list_entry(curr->vlan_list.next,
+					  struct vlan_entry, vlan_list);
+		}
+	}
+
+	return next;
 }
 
 /**
