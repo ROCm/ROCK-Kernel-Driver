@@ -25,6 +25,7 @@ on (either the old or the new way), it needs to perform the following steps:
 	Discover resources (addresses and IRQ numbers) provided by the device
 	Allocate these resources
 	Communicate with the device
+	Disable the device
 
 Most of these topics are covered by the following sections, for the rest
 look at <linux/pci.h>, it's hopefully well commented.
@@ -162,8 +163,8 @@ You must eventually (possibly at module unload) decrement the reference
 count on these devices by calling pci_dev_put().
 
 
-3. Enabling devices
-~~~~~~~~~~~~~~~~~~~
+3. Enabling and disabling devices
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    Before you do anything with the device you've found, you need to enable
 it by calling pci_enable_device() which enables I/O and memory regions of
 the device, allocates an IRQ if necessary, assigns missing resources if
@@ -179,6 +180,12 @@ call pci_set_mwi().  This enables the PCI_COMMAND bit for Mem-Wr-Inval
 and also ensures that the cache line size register is set correctly.
 Make sure to check the return value of pci_set_mwi(), not all architectures
 may support Memory-Write-Invalidate.
+
+   If your driver decides to stop using the device (e.g., there was an
+error while setting it up or the driver module is being unloaded), it
+should call pci_disable_device() to deallocate any IRQ resources, disable
+PCI bus-mastering, etc.  You should not do anything with the device after
+calling pci_disable_device().
 
 4. How to access PCI config space
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
