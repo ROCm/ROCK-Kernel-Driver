@@ -181,6 +181,9 @@ int smp_call_function(void (*func)(void *info), void *info, int retry, int wait)
 	if (nr_cpus < 2)
 		return 0;
 
+	/* Can deadlock when called with interrupts disabled */
+	WARN_ON(irqs_disabled());
+
 	spin_lock(&smp_fn_call.lock);
 
 	atomic_set(&smp_fn_call.finished, 0);

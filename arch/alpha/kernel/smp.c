@@ -820,6 +820,9 @@ smp_call_function_on_cpu (void (*func) (void *info), void *info, int retry,
 	unsigned long timeout;
 	int num_cpus_to_call;
 	
+	/* Can deadlock when called with interrupts disabled */
+	WARN_ON(irqs_disabled());
+
 	data.func = func;
 	data.info = info;
 	data.wait = wait;
