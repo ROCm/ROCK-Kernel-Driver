@@ -18,7 +18,8 @@
  *	the "ordinary" interrupt call gates.  For legacy reasons, the ISA
  *	interrupts should be initialised here if the machine emulates a PC
  *	in any way.
- **/void __init pre_intr_init_hook(void)
+ **/
+void __init pre_intr_init_hook(void)
 {
 	init_ISA_irqs();
 }
