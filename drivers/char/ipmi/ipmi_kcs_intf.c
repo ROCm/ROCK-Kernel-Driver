@@ -1018,52 +1018,81 @@ static int init_one_kcs(int kcs_port,
 
 #ifdef CONFIG_ACPI_INTERPRETER
 
-/* Retrieve the base physical address from ACPI tables.  Originally
-   from Hewlett-Packard simple bmc.c, a GPL KCS driver. */
-
 #include <linux/acpi.h>
 
 struct SPMITable {
-	s8	Signature[4];
-	u32	Length;
-	u8	Revision;
-	u8	Checksum;
-	s8	OEMID[6];
-	s8	OEMTableID[8];
-	s8	OEMRevision[4];
-	s8	CreatorID[4];
-	s8	CreatorRevision[4];
-	s16	InterfaceType;
-	s16	SpecificationRevision;
-	u8	InterruptType;
-	u8	GPE;
-	s16	Reserved;
-	u64	GlobalSystemInterrupt;
-	u8	BaseAddress[12];
-	u8	UID[4];
-} __attribute__ ((packed));
+	s8      Signature[4];
+	u32     Length;
+	u8      Revision;
+	u8      Checksum;
+	s8      OEMID[6];
+	s8      OEMTableID[8];
+	s8      OEMRevision[4];
+	s8      CreatorID[4];
+	s8      CreatorRevision[4];
+	u8      InterfaceType[2];
+	s16     SpecificationRevision;
 
-static unsigned long acpi_find_bmc(void)
+	/*
+	 * Bit 0 - SCI interrupt supported
+	 * Bit 1 - I/O APIC/SAPIC
+	 */
+	u8      InterruptType;
+
+	/* If bit 0 of InterruptType is set, then this is the SCI
+	   interrupt in the GPEx_STS register. */
+	u8      GPE;
+
+	s16     Reserved;
+
+	/* If bit 1 of InterruptType is set, then this is the I/O
+	   APIC/SAPIC interrupt. */
+	u32     GlobalSystemInterrupt;
+
+	/* The actual register address. */
+	struct acpi_generic_address addr;
+
+	u8      UID[4];
+
+	s8      spmi_id[1]; /* A '\0' terminated array starts here. */
+};
+
+static int acpi_find_bmc(unsigned long *physaddr, int *port)
 {
-	acpi_status status;
-	struct acpi_table_header *spmi;
-	static unsigned long io_base = 0;
-
-	if (io_base != 0)
-		return io_base;
-
-	status = acpi_get_firmware_table("SPMI", 1,
-			ACPI_LOGICAL_ADDRESSING, &spmi);
-
-	if (status != AE_OK) {
-		printk(KERN_ERR "ipmi_kcs: SPMI table not found.\n");
-		return 0;
-	}
-
-	memcpy(&io_base, ((struct SPMITable *)spmi)->BaseAddress,
-			sizeof(io_base));
+	acpi_status          status;
+	struct SPMITable     *spmi;
 	
-	return io_base;
+	status = acpi_get_firmware_table("SPMI", 1,
+					 ACPI_LOGICAL_ADDRESSING,
+					 (struct acpi_table_header **) &spmi);
+	if (status != AE_OK)
+		goto not_found;
+
+	if (spmi->InterfaceType[0] != 1)
+		/* Not IPMI. */
+		goto not_found;
+
+	if (spmi->InterfaceType[1] != 1)
+		/* Not KCS. */
+		goto not_found;
+
+	if (spmi->addr.address_space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY) {
+		*physaddr = spmi->addr.address;
+		printk("ipmi_kcs_intf: Found ACPI-specified state machine"
+		       " at memory address 0x%lx\n",
+		       (unsigned long) spmi->addr.address);
+	} else if (spmi->addr.address_space_id == ACPI_ADR_SPACE_SYSTEM_IO) {
+		*port = spmi->addr.address;
+		printk("ipmi_kcs_intf: Found ACPI-specified state machine"
+		       " at I/O address 0x%lx\n",
+		       (int) spmi->addr.address);
+	} else
+		goto not_found; /* Not an address type we recognise. */
+
+	return 0;
+
+ not_found:
+	return -ENODEV;
 }
 #endif
 
@@ -1074,6 +1103,7 @@ static __init int init_ipmi_kcs(void)
 	int		i = 0;
 #ifdef CONFIG_ACPI_INTERPRETER
 	unsigned long	physaddr = 0;
+	int             port = 0;
 #endif
 
 	if (initialized)
@@ -1101,20 +1131,19 @@ static __init int init_ipmi_kcs(void)
 	/* Only try the defaults if enabled and resources are available
 	   (because they weren't already specified above). */
 
-	if (kcs_trydefaults) {
+	if (kcs_trydefaults && (pos == 0)) {
+		rv = -EINVAL;
 #ifdef CONFIG_ACPI_INTERPRETER
-		if ((physaddr = acpi_find_bmc())) {
-			if (!check_mem_region(physaddr, 2)) {
-				rv = init_one_kcs(0, 
-						  0, 
-						  physaddr, 
-						  &(kcs_infos[pos]));
-				if (rv == 0)
-					pos++;
-			}
+		if (rv && (physaddr = acpi_find_bmc(&physaddr, &port) == 0)) {
+			rv = init_one_kcs(port, 
+					  0, 
+					  physaddr, 
+					  &(kcs_infos[pos]));
+			if (rv == 0)
+				pos++;
 		}
 #endif
-		if (!check_region(DEFAULT_IO_PORT, 2)) {
+		if (rv) {
 			rv = init_one_kcs(DEFAULT_IO_PORT, 
 					  0, 
 					  0, 
