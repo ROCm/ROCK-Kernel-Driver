@@ -282,8 +282,8 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 				; /* try to free the page below */
 			}
 		}
-		pte_chain_unlock(page);
 #endif /* CONFIG_SWAP */
+		pte_chain_unlock(page);
 
 		/*
 		 * If the page is dirty, only perform writeback if that write
