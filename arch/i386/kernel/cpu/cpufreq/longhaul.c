@@ -100,6 +100,22 @@ static int longhaul_get_cpu_mult(void)
 }
 
 
+static void do_powersaver(int version)
+{
+	rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
+	longhaul.bits.SoftBusRatio = clock_ratio_index & 0xf;
+	longhaul.bits.SoftBusRatio4 = (clock_ratio_index & 0x10) >> 4;
+	longhaul.bits.EnableSoftBusRatio = 1;
+	longhaul.bits.RevisionKey = 0;
+	wrmsrl(MSR_VIA_LONGHAUL, longhaul.val);
+	__hlt();
+
+	rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
+	longhaul.bits.EnableSoftBusRatio = 0;
+	longhaul.bits.RevisionKey = version;
+	wrmsrl (MSR_VIA_LONGHAUL, longhaul.val);
+}
+
 /**
  * longhaul_set_cpu_frequency()
  * @clock_ratio_index : bitpattern of the new multiplier.
@@ -135,6 +151,9 @@ static void longhaul_setstate(unsigned int clock_ratio_index)
 	/*
 	 * Longhaul v1. (Samuel[C5A] and Samuel2 stepping 0[C5B])
 	 * Software controlled multipliers only.
+	 *
+	 * *NB* Until we get voltage scaling working v1 & v2 are the same code.
+	 * Longhaul v2 appears in Samuel2 Steppings 1->7 [C5b] and Ezra [C5C]
 	 */
 	case 1:
 		rdmsrl (MSR_VIA_BCR2, bcr2.val);
@@ -152,46 +171,26 @@ static void longhaul_setstate(unsigned int clock_ratio_index)
 		break;
 
 	/*
-	 * Powersaver. (Ezra-T [C5M], Nehemiah [C5N])
+	 * Longhaul v3 (aka Powersaver). (Ezra-T [C5M])
 	 * We can scale voltage with this too, but that's currently
 	 * disabled until we come up with a decent 'match freq to voltage'
 	 * algorithm.
-	 * We also need to do the voltage/freq setting in order depending
-	 * on the direction of scaling (like we do in powernow-k7.c)
-	 * Ezra-T was alleged to do FSB scaling too, but it never worked in practice.
+	 * When we add voltage scaling, we will also need to do the
+	 * voltage/freq setting in order depending on the direction
+	 * of scaling (like we do in powernow-k7.c)
 	 */
 	case 2:
-		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
-		longhaul.bits.SoftBusRatio = clock_ratio_index & 0xf;
-		longhaul.bits.SoftBusRatio4 = (clock_ratio_index & 0x10) >> 4;
-		longhaul.bits.EnableSoftBusRatio = 1;
-		/* We must program the revision key only with values we
-		 * know about, not blindly copy it from 0:3 */
-		longhaul.bits.RevisionKey = 3;	/* SoftVID & SoftBSEL */
-		wrmsrl(MSR_VIA_LONGHAUL, longhaul.val);
-		__hlt();
-
-		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
-		longhaul.bits.EnableSoftBusRatio = 0;
-		longhaul.bits.RevisionKey = 3;
-		wrmsrl (MSR_VIA_LONGHAUL, longhaul.val);
+		do_powersaver(3);
 		break;
 
+	/*
+	 * Powersaver. (Nehemiah [C5N])
+	 * As for Ezra-T, we don't do voltage yet.
+	 * This can do FSB scaling too, but it has never been proven
+	 * to work in practice.
+	 */
 	case 3:
-		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
-		longhaul.bits.SoftBusRatio = clock_ratio_index & 0xf;
-		longhaul.bits.SoftBusRatio4 = (clock_ratio_index & 0x10) >> 4;
-		longhaul.bits.EnableSoftBusRatio = 1;
-
-		longhaul.bits.RevisionKey = 0x0;
-
-		wrmsrl(MSR_VIA_LONGHAUL, longhaul.val);
-		__hlt();
-
-		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
-		longhaul.bits.EnableSoftBusRatio = 0;
-		longhaul.bits.RevisionKey = 0xf;
-		wrmsrl (MSR_VIA_LONGHAUL, longhaul.val);
+		do_powersaver(0xf);
 		break;
 	}
 
