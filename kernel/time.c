@@ -168,11 +168,11 @@ asmlinkage long sys_settimeofday(struct timeval __user *tv, struct timezone __us
 	if (tv) {
 		if (copy_from_user(&new_tv, tv, sizeof(*tv)))
 			return -EFAULT;
+		new_tv.tv_nsec *= NSEC_PER_USEC;
 	}
 	if (tz) {
 		if (copy_from_user(&new_tz, tz, sizeof(*tz)))
 			return -EFAULT;
-		new_tv.tv_nsec *= NSEC_PER_USEC;
 	}
 
 	return do_sys_settimeofday(tv ? &new_tv : NULL, tz ? &new_tz : NULL);

@@ -57,8 +57,10 @@ head-$(CONFIG_PARISC64)	:= arch/parisc/kernel/head64.o
 
 CFLAGS	+= $(cflags-y)
 
-core-y	+= $(addprefix arch/parisc/, kernel/pdc_cons.o kernel/process.o   \
-		mm/ kernel/ hpux/ math-emu/ kernel/init_task.o )
+kernel-y			:= mm/ kernel/ math-emu/ kernel/init_task.o
+kernel-$(CONFIG_HPUX)		+= hpux/
+
+core-y	+= $(addprefix arch/parisc/, $(kernel-y))
 libs-y	+= arch/parisc/lib/ `$(CC) -print-libgcc-file-name`
 
 drivers-$(CONFIG_OPROFILE)		+= arch/parisc/oprofile/

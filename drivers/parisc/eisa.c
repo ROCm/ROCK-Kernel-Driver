@@ -213,7 +213,7 @@ static struct irq_region eisa_irq_region = {
 	.action	= action,
 };
 
-static void eisa_irq(int _, void *intr_dev, struct pt_regs *regs)
+static irqreturn_t eisa_irq(int _, void *intr_dev, struct pt_regs *regs)
 {
 	extern void do_irq(struct irqaction *a, int i, struct pt_regs *p);
 	int irq = gsc_readb(0xfc01f000); /* EISA supports 16 irqs */
@@ -262,11 +262,13 @@ static void eisa_irq(int _, void *intr_dev, struct pt_regs *regs)
 		eisa_out8(master_mask, 0x21);
 	}
 	spin_unlock_irqrestore(&eisa_irq_lock, flags);
+	return IRQ_HANDLED;
 }
 
-static void dummy_irq2_handler(int _, void *dev, struct pt_regs *regs)
+static irqreturn_t dummy_irq2_handler(int _, void *dev, struct pt_regs *regs)
 {
 	printk(KERN_ALERT "eisa: uhh, irq2?\n");
+	return IRQ_HANDLED;
 }
 
 static void init_eisa_pic(void)

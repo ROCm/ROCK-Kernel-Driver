@@ -290,9 +290,10 @@ int udpv6_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	if (addr_type == IPV6_ADDR_MAPPED) {
 		struct sockaddr_in sin;
 
-		if (__ipv6_only_sock(sk))
-			return -ENETUNREACH;
-
+		if (__ipv6_only_sock(sk)) {
+			err = -ENETUNREACH;
+			goto out;
+		}
 		sin.sin_family = AF_INET;
 		sin.sin_addr.s_addr = daddr->s6_addr32[3];
 		sin.sin_port = usin->sin6_port;
@@ -300,8 +301,8 @@ int udpv6_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 		err = udp_connect(sk, (struct sockaddr*) &sin, sizeof(sin));
 
 ipv4_connected:
-		if (err < 0)
-			return err;
+		if (err)
+			goto out;
 		
 		ipv6_addr_set(&np->daddr, 0, 0, htonl(0x0000ffff), inet->daddr);
 
@@ -314,7 +315,7 @@ ipv4_connected:
 			ipv6_addr_set(&np->rcv_saddr, 0, 0, htonl(0x0000ffff),
 				      inet->rcv_saddr);
 		}
-		return 0;
+		goto out;
 	}
 
 	if (addr_type&IPV6_ADDR_LINKLOCAL) {
@@ -322,8 +323,8 @@ ipv4_connected:
 		    usin->sin6_scope_id) {
 			if (sk->sk_bound_dev_if &&
 			    sk->sk_bound_dev_if != usin->sin6_scope_id) {
-				fl6_sock_release(flowlabel);
-				return -EINVAL;
+				err = -EINVAL;
+				goto out;
 			}
 			sk->sk_bound_dev_if = usin->sin6_scope_id;
 			if (!sk->sk_bound_dev_if &&
@@ -332,8 +333,10 @@ ipv4_connected:
 		}
 
 		/* Connect to link-local address requires an interface */
-		if (!sk->sk_bound_dev_if)
-			return -EINVAL;
+		if (!sk->sk_bound_dev_if) {
+			err = -EINVAL;
+			goto out;
+		}
 	}
 
 	ipv6_addr_copy(&np->daddr, daddr);
@@ -370,31 +373,33 @@ ipv4_connected:
 
 	if ((err = dst->error) != 0) {
 		dst_release(dst);
-		fl6_sock_release(flowlabel);
-		return err;
+		goto out;
 	}
 
 	/* get the source address used in the appropriate device */
 
 	err = ipv6_get_saddr(dst, daddr, &fl.fl6_src);
 
-	if (err == 0) {
-		if (ipv6_addr_any(&np->saddr))
-			ipv6_addr_copy(&np->saddr, &fl.fl6_src);
-
-		if (ipv6_addr_any(&np->rcv_saddr)) {
-			ipv6_addr_copy(&np->rcv_saddr, &fl.fl6_src);
-			inet->rcv_saddr = LOOPBACK4_IPV6;
-		}
-
-		ip6_dst_store(sk, dst,
-			      !ipv6_addr_cmp(&fl.fl6_dst, &np->daddr) ?
-			      &np->daddr : NULL);
-
-		sk->sk_state = TCP_ESTABLISHED;
+	if (err) {
+		dst_release(dst);
+		goto out;
 	}
-	fl6_sock_release(flowlabel);
 
+	if (ipv6_addr_any(&np->saddr))
+		ipv6_addr_copy(&np->saddr, &fl.fl6_src);
+
+	if (ipv6_addr_any(&np->rcv_saddr)) {
+		ipv6_addr_copy(&np->rcv_saddr, &fl.fl6_src);
+		inet->rcv_saddr = LOOPBACK4_IPV6;
+	}
+
+	ip6_dst_store(sk, dst,
+		      !ipv6_addr_cmp(&fl.fl6_dst, &np->daddr) ?
+		      &np->daddr : NULL);
+
+	sk->sk_state = TCP_ESTABLISHED;
+out:
+	fl6_sock_release(flowlabel);
 	return err;
 }
 

@@ -381,7 +381,7 @@ static struct irq_region_ops dino_irq_ops = {
  * ilr_loop counter is a kluge to prevent a "stuck" IRQ line from
  * wedging the CPU. Could be removed or made optional at some point.
  */
-static void
+static irqreturn_t
 dino_isr(int irq, void *intr_dev, struct pt_regs *regs)
 {
 	struct dino_device *dino_dev = DINO_DEV(intr_dev);
@@ -441,7 +441,9 @@ ilr_again:
 		if (--ilr_loop > 0)
 			goto ilr_again;
 		printk("Dino %lx: stuck interrupt %d\n", dino_dev->hba.base_addr, mask);
+		return IRQ_NONE;
 	}
+	return IRQ_HANDLED;
 }
 
 static int dino_choose_irq(struct parisc_device *dev)

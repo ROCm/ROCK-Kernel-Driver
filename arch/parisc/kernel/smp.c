@@ -147,7 +147,7 @@ halt_processor(void)
 }
 
 
-void
+irqreturn_t
 ipi_interrupt(int irq, void *dev_id, struct pt_regs *regs) 
 {
 	int this_cpu = smp_processor_id();
@@ -256,7 +256,7 @@ ipi_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			} /* Switch */
 		} /* while (ops) */
 	}
-	return;
+	return IRQ_HANDLED;
 }
 
 
@@ -515,14 +515,14 @@ static struct task_struct *fork_by_hand(void)
 	 * don't care about the regs settings since
 	 * we'll never reschedule the forked task.
 	 */
-	return do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
+	return copy_process(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
 }
 
 
 /*
  * Bring one cpu online.
  */
-static int smp_boot_one_cpu(int cpuid, int cpunum)
+static int __init smp_boot_one_cpu(int cpuid, int cpunum)
 {
 	struct task_struct *idle;
 	long timeout;
@@ -537,9 +537,11 @@ static int smp_boot_one_cpu(int cpuid, int cpunum)
 	 * Sheesh . . .
 	 */
 
-	if ((idle = fork_by_hand()) == 0) 
+	idle = fork_by_hand();
+	if (IS_ERR(idle))
 		panic("SMP: fork failed for CPU:%d", cpuid);
 
+	wake_up_forked_process(idle);
 	init_idle(idle, cpunum);
 	unhash_process(idle);
 	idle->thread_info->cpu = cpunum;
@@ -613,7 +615,7 @@ alive:
 void __init smp_boot_cpus(void)
 {
 	int i, cpu_count = 1;
-	unsigned long bogosum = loops_per_jiffy; /* Count Monarch */
+	unsigned long bogosum = cpu_data[0].loops_per_jiffy; /* Count Monarch */
 
 	/* REVISIT - assumes first CPU reported by PAT PDC is BSP */
 	int bootstrap_processor=cpu_data[0].cpuid;	/* CPU ID of BSP */
@@ -650,7 +652,7 @@ void __init smp_boot_cpus(void)
 			if (smp_boot_one_cpu(cpu_data[i].cpuid, cpu_count) < 0)
 				continue;
 
-			bogosum += loops_per_jiffy;
+			bogosum += cpu_data[i].loops_per_jiffy;
 			cpu_count++; /* Count good CPUs only... */
 			
 			cpu_present_mask |= 1UL << i;
