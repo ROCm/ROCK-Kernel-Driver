@@ -141,9 +141,11 @@ dev_t __init name_to_dev_t(char *name)
 	dev_t res = 0;
 	int part;
 
+#ifdef CONFIG_SYSFS
 	sys_mkdir("/sys", 0700);
 	if (sys_mount("sysfs", "/sys", "sysfs", 0, NULL) < 0)
 		goto out;
+#endif
 
 	if (strncmp(name, "/dev/", 5) != 0) {
 		unsigned maj, min;

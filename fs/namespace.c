@@ -24,7 +24,15 @@
 #include <asm/uaccess.h>
 
 extern int __init init_rootfs(void);
+
+#ifdef CONFIG_SYSFS
 extern int __init sysfs_init(void);
+#else
+static inline int sysfs_init(void)
+{
+	return 0;
+}
+#endif
 
 /* spinlock for vfsmount related operations, inplace of dcache_lock */
 spinlock_t vfsmount_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
