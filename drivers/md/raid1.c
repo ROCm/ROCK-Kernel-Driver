@@ -825,7 +825,7 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		if (!conf->mirrors[i].rdev || 
 		    conf->mirrors[i].rdev->faulty)
 			continue;
-		if (i == conf->last_used)
+		if (conf->mirrors[i].rdev->bdev == bio->bi_bdev)
 			/*
 			 * we read from here, no need to write
 			 */
