@@ -122,8 +122,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
         
 	*childregs = *regs;  /* struct copy of pt_regs */
         
-        p->set_child_tid = p->clear_child_tid = NULL;
-	
         childregs->r10 = 0;  /* child returns 0 after a fork/clone */
 	
 	/* put the switch stack right below the pt_regs */

@@ -247,8 +247,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long spu,
 	unsigned long sp = (unsigned long)tsk->thread_info + THREAD_SIZE;
 	extern void ret_from_fork(void);
 
-	tsk->set_child_tid = tsk->clear_child_tid = NULL;
-
 	/* Copy registers */
 	sp -= sizeof (struct pt_regs);
 	childregs = (struct pt_regs *)sp;
