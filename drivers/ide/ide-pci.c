@@ -168,8 +168,7 @@ static int __init setup_host_channel(struct pci_dev *dev,
 		int port,
 		u8 class_rev,
 		int pciirq,
-		int autodma,
-		unsigned short *pcicmd)
+		int autodma)
 {
 	unsigned long base = 0;
 	unsigned long dma_base;
@@ -319,23 +318,12 @@ controller_ok:
 
 		goto no_dma;
 	}
-	if (!(*pcicmd & PCI_COMMAND_MASTER)) {
-		/*
-		 * Set up BM-DMA capability (PnP BIOS should have done this
-		 * already).  Default to DMA off on the drive, if we had to
-		 * configure it here.  This should most propably be enabled no
-		 * all chipsets which can be expected to be used on systems
-		 * without a BIOS equivalent.
-		 */
-		if (!(d->flags | ATA_F_FDMA))
-			ch->autodma = 0;
-		pci_write_config_word(dev, PCI_COMMAND, *pcicmd | PCI_COMMAND_MASTER);
-		if (pci_read_config_word(dev, PCI_COMMAND, pcicmd) || !(*pcicmd & PCI_COMMAND_MASTER)) {
-			printk("%s: %s error updating PCICMD\n",
-					ch->name, dev->name);
-			dma_base = 0;
-		}
-	}
+
+	/* The function below will check itself whatever there is something to
+	 * be done or not. We don't have therefore to care whatever it was
+	 * already enabled by the primary channel run.
+	 */
+	pci_set_master(dev);
 	if (d->init_dma)
 		d->init_dma(ch, dma_base);
 	else
@@ -472,8 +460,8 @@ check_if_enabled:
 	/*
 	 * Set up IDE chanells. First the primary, then the secondary.
 	 */
-	setup_host_channel(dev, d, ATA_PRIMARY, class_rev, pciirq, autodma, &pcicmd);
-	setup_host_channel(dev, d, ATA_SECONDARY, class_rev, pciirq, autodma, &pcicmd);
+	setup_host_channel(dev, d, ATA_PRIMARY, class_rev, pciirq, autodma);
+	setup_host_channel(dev, d, ATA_SECONDARY, class_rev, pciirq, autodma);
 }
 
 /*
