@@ -1238,6 +1238,9 @@ static inline int sctp_setsockopt_autoclose(struct sock *sk, char *optval,
 {
 	sctp_opt_t *sp = sctp_sk(sk);
 
+	/* Applicable to UDP-style socket only */
+	if (SCTP_SOCKET_TCP == sp->type)
+		return -EOPNOTSUPP;
 	if (optlen != sizeof(int))
 		return -EINVAL;
 	if (copy_from_user(&sp->autoclose, optval, optlen))
@@ -1593,6 +1596,9 @@ static inline int sctp_getsockopt_set_events(struct sock *sk, int len, char *opt
 
 static inline int sctp_getsockopt_autoclose(struct sock *sk, int len, char *optval, int *optlen)
 {
+	/* Applicable to UDP-style socket only */
+	if (SCTP_SOCKET_TCP == sctp_sk(sk)->type)
+		return -EOPNOTSUPP;
 	if (len != sizeof(int))
 		return -EINVAL;
 	if (copy_to_user(optval, &sctp_sk(sk)->autoclose, len))
@@ -1614,10 +1620,10 @@ SCTP_STATIC int sctp_do_peeloff(sctp_association_t *assoc, struct socket **newso
 	int err = 0;
 
 	/* An association cannot be branched off from an already peeled-off
-	 * socket.
+	 * socket, nor is this supported for tcp style sockets.
 	 */
-	if (SCTP_SOCKET_UDP_HIGH_BANDWIDTH == sctp_sk(oldsk)->type)
-		return -EINVAL;
+	if (SCTP_SOCKET_UDP != sctp_sk(oldsk)->type)
+		return -EOPNOTSUPP;
 
 	/* Create a new socket.  */
 	err = sock_create(PF_INET, SOCK_SEQPACKET, IPPROTO_SCTP, &tmpsock);
