@@ -1291,8 +1291,7 @@ static void sa1100fb_enable_controller(struct sa1100fb_info *fbi)
 #error Where is GPIO24 set as an output?  Can we fit this in somewhere else?
 	if (machine_is_graphicsclient()) {
 		// From ADS doc again...same as disable
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(20 * HZ / 1000);
+		msleep(20);
 		GPSR |= GPIO_GPIO24;
 	}
 #endif
@@ -1327,8 +1326,7 @@ static void sa1100fb_disable_controller(struct sa1100fb_info *fbi)
 		 * We'll wait 20msec.
 		 */
 		GPCR |= GPIO_GPIO24;
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(20 * HZ / 1000);
+		msleep(20);
 	}
 #endif
 #ifdef CONFIG_SA1100_HUW_WEBPANEL
