@@ -64,6 +64,7 @@ struct device_driver {
 };
 
 struct device {
+	struct list_head g_list;        /* node in depth-first order list */
 	struct list_head node;		/* node in sibling list */
 	struct list_head children;
 	struct device 	* parent;
@@ -97,6 +98,12 @@ static inline struct device *
 list_to_dev(struct list_head *node)
 {
 	return list_entry(node, struct device, node);
+}
+
+static inline struct device *
+g_list_to_dev(struct list_head *g_list)
+{
+	return list_entry(g_list, struct device, g_list);
 }
 
 /*
