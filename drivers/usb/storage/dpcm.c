@@ -48,9 +48,9 @@ int dpcm_transport(Scsi_Cmnd *srb, struct us_data *us)
   if(srb == NULL)
     return USB_STOR_TRANSPORT_ERROR;
 
-  US_DEBUGP("dpcm_transport: LUN=%d\n", srb->lun);
+  US_DEBUGP("dpcm_transport: LUN=%d\n", srb->device->lun);
 
-  switch(srb->lun) {
+  switch(srb->device->lun) {
   case 0:
 
     /*
@@ -68,15 +68,15 @@ int dpcm_transport(Scsi_Cmnd *srb, struct us_data *us)
     /*
      * Set the LUN to 0 (just in case).
      */
-    srb->lun = 0; us->srb->lun = 0;
+    srb->device->lun = 0; us->srb->device->lun = 0;
     ret = sddr09_transport(srb, us);
-    srb->lun = 1; us->srb->lun = 1;
+    srb->device->lun = 1; us->srb->device->lun = 1;
 
     return ret;
 #endif
 
   default:
-    US_DEBUGP("dpcm_transport: Invalid LUN %d\n", srb->lun);
+    US_DEBUGP("dpcm_transport: Invalid LUN %d\n", srb->device->lun);
     return USB_STOR_TRANSPORT_ERROR;
   }
 }

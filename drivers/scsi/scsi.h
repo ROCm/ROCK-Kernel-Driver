@@ -728,10 +728,9 @@ struct scsi_request {
 struct scsi_cmnd {
 	int     sc_magic;
 
-	struct Scsi_Host *host;
+	struct scsi_device *device;
 	unsigned short state;
 	unsigned short owner;
-	Scsi_Device *device;
 	Scsi_Request *sc_request;
 	struct scsi_cmnd *next;
 	struct scsi_cmnd *reset_chain;
@@ -771,9 +770,14 @@ struct scsi_cmnd {
 	struct scsi_cmnd *bh_next;	/* To enumerate the commands waiting 
 					   to be processed. */
 
-	unsigned int target;
-	unsigned int lun;
-	unsigned int channel;
+/* OBSOLETE, please do not use -- obosolete stuff. */
+/* Use cmd->device->{id, channel, lun} instead */
+/* 	unsigned int target; */
+/* 	unsigned int lun; */
+/* 	unsigned int channel; */
+/* OBSOLETE, use cmd->device->host instead */	
+/* 	struct Scsi_Host   *host; */
+
 	unsigned char cmd_len;
 	unsigned char old_cmd_len;
 	unsigned char sc_data_direction;

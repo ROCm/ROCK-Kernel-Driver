@@ -2187,7 +2187,7 @@ int tw_scsi_eh_abort(Scsi_Cmnd *SCpnt)
 		return (FAILED);
 	}
 
-	tw_dev = (TW_Device_Extension *)SCpnt->host->hostdata;
+	tw_dev = (TW_Device_Extension *)SCpnt->device->host->hostdata;
 	if (tw_dev == NULL) {
 		printk(KERN_WARNING "3w-xxxx: tw_scsi_eh_abort(): Invalid device extension.\n");
 		return (FAILED);
@@ -2200,14 +2200,14 @@ int tw_scsi_eh_abort(Scsi_Cmnd *SCpnt)
 	for (i=0;i<TW_Q_LENGTH;i++) {
 		if (tw_dev->srb[i] == SCpnt) {
 			if (tw_dev->state[i] == TW_S_STARTED) {
-				printk(KERN_WARNING "3w-xxxx: scsi%d: Unit #%d: Command (%p) timed out.\n", tw_dev->host->host_no, tw_dev->srb[i]==0 ? 0 : tw_dev->srb[i]->target, SCpnt);
+				printk(KERN_WARNING "3w-xxxx: scsi%d: Unit #%d: Command (%p) timed out.\n", tw_dev->host->host_no, tw_dev->srb[i]==0 ? 0 : tw_dev->srb[i]->device->id, SCpnt);
 				tw_dev->state[i] = TW_S_COMPLETED;
 				tw_state_request_finish(tw_dev, i);
 				spin_unlock(&tw_dev->tw_lock);
 				return (SUCCESS);
 			}
 			if (tw_dev->state[i] == TW_S_PENDING) {
-				printk(KERN_WARNING "3w-xxxx: scsi%d: Unit #%d: Command (%p) timed out.\n", tw_dev->host->host_no, tw_dev->srb[i]==0 ? 0 : tw_dev->srb[i]->target, SCpnt);
+				printk(KERN_WARNING "3w-xxxx: scsi%d: Unit #%d: Command (%p) timed out.\n", tw_dev->host->host_no, tw_dev->srb[i]==0 ? 0 : tw_dev->srb[i]->device->id, SCpnt);
 				if (tw_dev->pending_head == TW_Q_LENGTH-1) {
 					tw_dev->pending_head = TW_Q_START;
 				} else {
@@ -2221,7 +2221,7 @@ int tw_scsi_eh_abort(Scsi_Cmnd *SCpnt)
 			}
 			if (tw_dev->state[i] == TW_S_POSTED) {
 				/* If the command has already been posted, we have to reset the card */
-				printk(KERN_WARNING "3w-xxxx: scsi%d: Unit #%d: Command (%p) timed out, resetting card.\n", tw_dev->host->host_no, tw_dev->srb[i]==0 ? 0 : tw_dev->srb[i]->target, SCpnt);
+				printk(KERN_WARNING "3w-xxxx: scsi%d: Unit #%d: Command (%p) timed out, resetting card.\n", tw_dev->host->host_no, tw_dev->srb[i]==0 ? 0 : tw_dev->srb[i]->device->id, SCpnt);
 				/* We have to let AEN requests through before the reset */
 				spin_unlock(&tw_dev->tw_lock);
 				spin_unlock_irq(tw_dev->host->host_lock);
@@ -2254,7 +2254,7 @@ int tw_scsi_eh_reset(Scsi_Cmnd *SCpnt)
 		return (FAILED);
 	}
 
-	tw_dev = (TW_Device_Extension *)SCpnt->host->hostdata;
+	tw_dev = (TW_Device_Extension *)SCpnt->device->host->hostdata;
 	if (tw_dev == NULL) {
 		printk(KERN_WARNING "3w-xxxx: tw_scsi_eh_reset(): Invalid device extension.\n");
 		return (FAILED);
@@ -2356,7 +2356,7 @@ int tw_scsi_queue(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	int request_id = 0;
 	int error = 0;
 	unsigned long flags = 0;
-	TW_Device_Extension *tw_dev = (TW_Device_Extension *)SCpnt->host->hostdata;
+	TW_Device_Extension *tw_dev = (TW_Device_Extension *)SCpnt->device->host->hostdata;
 
 	if (tw_dev == NULL) {
 		printk(KERN_WARNING "3w-xxxx: tw_scsi_queue(): Invalid device extension.\n");
@@ -2369,7 +2369,7 @@ int tw_scsi_queue(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	dprintk(KERN_NOTICE "3w-xxxx: tw_scsi_queue()\n");
 
 	/* Skip scsi command if it isn't for us */
-	if ((tw_dev->is_unit_present[SCpnt->target] == FALSE) || (SCpnt->lun != 0)) {
+	if ((tw_dev->is_unit_present[SCpnt->device->id] == FALSE) || (SCpnt->device->lun != 0)) {
 		SCpnt->result = (DID_BAD_TARGET << 16);
 		done(SCpnt);
 		spin_unlock_irqrestore(&tw_dev->tw_lock, flags);
@@ -2618,7 +2618,7 @@ int tw_scsiop_mode_sense(TW_Device_Extension *tw_dev, int request_id)
 
 	param = (TW_Param *)tw_dev->alignment_virtual_address[request_id];
 	memset(param, 0, sizeof(TW_Sector));
-	param->table_id = TW_UNIT_INFORMATION_TABLE_BASE + tw_dev->srb[request_id]->target;
+	param->table_id = TW_UNIT_INFORMATION_TABLE_BASE + tw_dev->srb[request_id]->device->id;
 	param->parameter_id = 7; /* unit flags */
 	param->parameter_size_bytes = 1;
 	param_value = tw_dev->alignment_physical_address[request_id];
@@ -2697,7 +2697,7 @@ int tw_scsiop_read_capacity(TW_Device_Extension *tw_dev, int request_id)
 	command_packet->byte0.sgl_offset = 2;
 	command_packet->size = 4;
 	command_packet->request_id = request_id;
-	command_packet->byte3.unit = tw_dev->srb[request_id]->target;
+	command_packet->byte3.unit = tw_dev->srb[request_id]->device->id;
 	command_packet->byte3.host_id = 0;
 	command_packet->status = 0;
 	command_packet->flags = 0;
@@ -2711,7 +2711,7 @@ int tw_scsiop_read_capacity(TW_Device_Extension *tw_dev, int request_id)
 	param = (TW_Param *)tw_dev->alignment_virtual_address[request_id];
 	memset(param, 0, sizeof(TW_Sector));
 	param->table_id = TW_UNIT_INFORMATION_TABLE_BASE + 
-	tw_dev->srb[request_id]->target;
+	tw_dev->srb[request_id]->device->id;
 	param->parameter_id = 4;	/* unitcapacity parameter */
 	param->parameter_size_bytes = 4;
 	param_value = tw_dev->alignment_physical_address[request_id];
@@ -2817,7 +2817,7 @@ int tw_scsiop_read_write(TW_Device_Extension *tw_dev, int request_id)
 	command_packet->byte0.sgl_offset = 3;
 	command_packet->size = 3;
 	command_packet->request_id = request_id;
-	command_packet->byte3.unit = srb->target;
+	command_packet->byte3.unit = srb->device->id;
 	command_packet->byte3.host_id = 0;
 	command_packet->status = 0;
 	command_packet->flags = 0;
@@ -2924,7 +2924,7 @@ int tw_scsiop_synchronize_cache(TW_Device_Extension *tw_dev, int request_id)
 	command_packet->byte0.sgl_offset = 0;
 	command_packet->size = 2;
 	command_packet->request_id = request_id;
-	command_packet->byte3.unit = tw_dev->srb[request_id]->target;
+	command_packet->byte3.unit = tw_dev->srb[request_id]->device->id;
 	command_packet->byte3.host_id = 0;
 	command_packet->status = 0;
 	command_packet->flags = 0;

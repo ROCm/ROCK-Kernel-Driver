@@ -348,7 +348,7 @@ static int idescsi_end_request (ide_drive_t *drive, int uptodate, int nrsecs)
 			} else printk("\n");
 		}
 	}
-	host = pc->scsi_cmd->host;
+	host = pc->scsi_cmd->device->host;
 	spin_lock_irqsave(host->host_lock, flags);
 	pc->done(pc->scsi_cmd);
 	spin_unlock_irqrestore(host->host_lock, flags);
@@ -802,13 +802,13 @@ static inline int should_transform(ide_drive_t *drive, Scsi_Cmnd *cmd)
 
 int idescsi_queue (Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
 {
-	ide_drive_t *drive = idescsi_drives[cmd->target];
+	ide_drive_t *drive = idescsi_drives[cmd->device->id];
 	idescsi_scsi_t *scsi;
 	struct request *rq = NULL;
 	idescsi_pc_t *pc = NULL;
 
 	if (!drive) {
-		printk (KERN_ERR "ide-scsi: drive id %d not present\n", cmd->target);
+		printk (KERN_ERR "ide-scsi: drive id %d not present\n", cmd->device->id);
 		goto abort;
 	}
 	scsi = drive->driver_data;
@@ -853,9 +853,9 @@ int idescsi_queue (Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
 	rq->special = (char *) pc;
 	rq->bio = idescsi_dma_bio (drive, pc);
 	rq->flags = REQ_SPECIAL;
-	spin_unlock_irq(cmd->host->host_lock);
+	spin_unlock_irq(cmd->device->host->host_lock);
 	(void) ide_do_drive_cmd (drive, rq, ide_end);
-	spin_lock_irq(cmd->host->host_lock);
+	spin_lock_irq(cmd->device->host->host_lock);
 	return 0;
 abort:
 	if (pc) kfree (pc);
@@ -869,7 +869,7 @@ int idescsi_abort (Scsi_Cmnd *cmd)
 {
 	int countdown = 8;
 	unsigned long flags;
-	ide_drive_t *drive = idescsi_drives[cmd->target];
+	ide_drive_t *drive = idescsi_drives[cmd->device->id];
 	idescsi_scsi_t *scsi;
 
 	printk (KERN_ERR "ide-scsi: abort called for %lu\n", cmd->serial_number);
@@ -901,7 +901,7 @@ int idescsi_reset (Scsi_Cmnd *cmd)
 {
 	unsigned long flags;
 	struct request *req;
-	ide_drive_t *drive = idescsi_drives[cmd->target];
+	ide_drive_t *drive = idescsi_drives[cmd->device->id];
 
 	printk (KERN_ERR "ide-scsi: reset called for %lu\n", cmd->serial_number);
 	/* first null the handler for the drive and let any process
