@@ -1496,7 +1496,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		break;
 	case FDFMTEND:
 		floppy_off(drive);
-		invalidate_device(inode->i_rdev, 0);
+		invalidate_bdev(inode->i_bdev, 0);
 		break;
 	case FDGETPRM:
 		memset((void *)&getprm, 0, sizeof (getprm));
@@ -1603,9 +1603,6 @@ static int floppy_open(struct inode *inode, struct file *filp)
 		MOD_INC_USE_COUNT;
 #endif
 	local_irq_restore(flags);
-
-	if (old_dev != system)
-		invalidate_buffers(mk_kdev(FLOPPY_MAJOR, drive + (system << 2)));
 
 	unit[drive].dtype=&data_types[system];
 	unit[drive].blocks=unit[drive].type->heads*unit[drive].type->tracks*

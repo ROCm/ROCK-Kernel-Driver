@@ -1102,9 +1102,8 @@ extern int fs_may_remount_ro(struct super_block *);
 #define bio_data_dir(bio)	((bio)->bi_rw & 1)
 
 extern int check_disk_change(struct block_device *);
-extern int full_check_disk_change(struct block_device *);
-extern int __check_disk_change(dev_t);
 extern int invalidate_inodes(struct super_block *);
+extern int __invalidate_device(struct block_device *, int);
 extern int invalidate_device(kdev_t, int);
 unsigned long invalidate_mapping_pages(struct address_space *mapping,
 					pgoff_t start, pgoff_t end);
