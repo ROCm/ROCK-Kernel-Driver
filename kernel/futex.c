@@ -49,16 +49,18 @@ union futex_key {
 	struct {
 		unsigned long pgoff;
 		struct inode *inode;
+		int offset;
 	} shared;
 	struct {
 		unsigned long uaddr;
 		struct mm_struct *mm;
+		int offset;
 	} private;
 	struct {
 		unsigned long word;
 		void *ptr;
+		int offset;
 	} both;
-	int offset;
 };
 
 /*
@@ -91,7 +93,7 @@ static inline struct list_head *hash_futex(union futex_key *key)
 {
 	return &futex_queues[hash_long(key->both.word
 				       + (unsigned long) key->both.ptr
-				       + key->offset, FUTEX_HASHBITS)];
+				       + key->both.offset, FUTEX_HASHBITS)];
 }
 
 /*
@@ -101,7 +103,7 @@ static inline int match_futex(union futex_key *key1, union futex_key *key2)
 {
 	return (key1->both.word == key2->both.word
 		&& key1->both.ptr == key2->both.ptr
-		&& key1->offset == key2->offset);
+		&& key1->both.offset == key2->both.offset);
 }
 
 /*
@@ -127,10 +129,10 @@ static int get_futex_key(unsigned long uaddr, union futex_key *key)
 	/*
 	 * The futex address must be "naturally" aligned.
 	 */
-	key->offset = uaddr % PAGE_SIZE;
-	if (unlikely((key->offset % sizeof(u32)) != 0))
+	key->both.offset = uaddr % PAGE_SIZE;
+	if (unlikely((key->both.offset % sizeof(u32)) != 0))
 		return -EINVAL;
-	uaddr -= key->offset;
+	uaddr -= key->both.offset;
 
 	/*
 	 * The futex is hashed differently depending on whether
@@ -199,6 +201,7 @@ static int get_futex_key(unsigned long uaddr, union futex_key *key)
 		key->shared.pgoff =
 			page->index << (PAGE_CACHE_SHIFT - PAGE_SHIFT);
 		put_page(page);
+		return 0;
 	}
 	return err;
 }
@@ -208,7 +211,7 @@ static int get_futex_key(unsigned long uaddr, union futex_key *key)
  * Wake up all waiters hashed on the physical page that is mapped
  * to this virtual address:
  */
-static inline int futex_wake(unsigned long uaddr, int num)
+static int futex_wake(unsigned long uaddr, int num)
 {
 	struct list_head *i, *next, *head;
 	union futex_key key;
@@ -247,7 +250,7 @@ out:
  * Requeue all waiters hashed on one physical page to another
  * physical page.
  */
-static inline int futex_requeue(unsigned long uaddr1, unsigned long uaddr2,
+static int futex_requeue(unsigned long uaddr1, unsigned long uaddr2,
 				int nr_wake, int nr_requeue)
 {
 	struct list_head *i, *next, *head1, *head2;
@@ -282,6 +285,9 @@ static inline int futex_requeue(unsigned long uaddr1, unsigned long uaddr2,
 				this->key = key2;
 				if (ret - nr_wake >= nr_requeue)
 					break;
+				/* Make sure to stop if key1 == key2 */
+				if (head1 == head2 && head1 != next)
+					head1 = i;
 			}
 		}
 	}
@@ -320,7 +326,7 @@ static inline int unqueue_me(struct futex_q *q)
 	return ret;
 }
 
-static inline int futex_wait(unsigned long uaddr, int val, unsigned long time)
+static int futex_wait(unsigned long uaddr, int val, unsigned long time)
 {
 	DECLARE_WAITQUEUE(wait, current);
 	int ret, curval;
