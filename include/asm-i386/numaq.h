@@ -38,14 +38,12 @@
 #define MAX_ELEMENTS 256
 #define ELEMENT_REPRESENTS 8 /* 256 Mb */
 
-#define PHYSADDR_TO_NID(pa) numaqpa_to_nid(pa)
-#define PFN_TO_NID(pa) numaqpfn_to_nid(pa)
 #define MAX_NUMNODES		8
 #ifdef CONFIG_NUMA
 #define _cpu_to_node(cpu) (cpu_to_logical_apicid(cpu) >> 4)
 #endif /* CONFIG_NUMA */
-extern int numaqpa_to_nid(u64);
-extern int numaqpfn_to_nid(unsigned long);
+extern int pa_to_nid(u64);
+extern int pfn_to_nid(unsigned long);
 extern void get_memcfg_numaq(void);
 #define get_memcfg_numa() get_memcfg_numaq()
 

@@ -83,7 +83,7 @@ int physnode_map[MAX_ELEMENTS] = { [0 ... (MAX_ELEMENTS - 1)] = -1};
 #define MB_TO_ELEMENT(x) (x >> ELEMENT_REPRESENTS)
 #define PA_TO_MB(pa) (pa >> 20) 	/* assumption: a physical address is in bytes */
 
-int numaqpa_to_nid(u64 pa)
+int pa_to_nid(u64 pa)
 {
 	int nid;
 	
@@ -96,9 +96,9 @@ int numaqpa_to_nid(u64 pa)
 	return nid;
 }
 
-int numaqpfn_to_nid(unsigned long pfn)
+int pfn_to_nid(unsigned long pfn)
 {
-	return numaqpa_to_nid(((u64)pfn) << PAGE_SHIFT);
+	return pa_to_nid(((u64)pfn) << PAGE_SHIFT);
 }
 
 /*

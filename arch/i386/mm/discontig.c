@@ -39,7 +39,7 @@ struct pfns {
 	unsigned long max_pfn;
 };
 
-struct plat_pglist_data *plat_node_data[MAX_NUMNODES];
+struct pglist_data *node_data[MAX_NUMNODES];
 bootmem_data_t plat_node_bdata;
 struct pfns plat_node_bootpfns[MAX_NUMNODES];
 
@@ -74,8 +74,8 @@ static void __init find_max_pfn_node(int nid)
 	}
 	plat_node_bootpfns[nid].max_pfn = end;
 
-	node_datasz = PFN_UP(sizeof(struct plat_pglist_data));
-	PLAT_NODE_DATA(nid) = (struct plat_pglist_data *)(__va(min_low_pfn << PAGE_SHIFT));
+	node_datasz = PFN_UP(sizeof(struct pglist_data));
+	NODE_DATA(nid) = (struct pglist_data *)(__va(min_low_pfn << PAGE_SHIFT));
 	min_low_pfn += node_datasz;
 }
 
@@ -289,7 +289,7 @@ void __init set_max_mapnr_init(void)
 	num_physpages = highend_pfn;
 
 	for (nid = 0; nid < numnodes; nid++) {
-		lmax_mapnr = PLAT_NODE_DATA_STARTNR(nid) + PLAT_NODE_DATA_SIZE(nid);
+		lmax_mapnr = node_startnr(nid) + node_size(nid);
 		if (lmax_mapnr > max_mapnr) {
 			max_mapnr = lmax_mapnr;
 		}
