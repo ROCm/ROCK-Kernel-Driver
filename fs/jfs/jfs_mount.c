@@ -426,14 +426,15 @@ static int chkSuper(struct super_block *sb)
  */
 int updateSuper(struct super_block *sb, uint state)
 {
-	int rc;
-	metapage_t *mp;
 	struct jfs_superblock *j_sb;
+	struct jfs_sb_info *sbi = JFS_SBI(sb);
+	metapage_t *mp;
+	int rc;
 
 	/*
 	 * Only fsck can fix dirty state
 	 */
-	if (JFS_SBI(sb)->state == FM_DIRTY)
+	if (sbi->state == FM_DIRTY)
 		return 0;
 
 	if ((rc = readSuper(sb, &mp)))
@@ -442,13 +443,12 @@ int updateSuper(struct super_block *sb, uint state)
 	j_sb = (struct jfs_superblock *) (mp->data);
 
 	j_sb->s_state = cpu_to_le32(state);
-	JFS_SBI(sb)->state = state;
+	sbi->state = state;
 
 	if (state == FM_MOUNT) {
 		/* record log's dev_t and mount serial number */
-		j_sb->s_logdev =
-			cpu_to_le32(JFS_SBI(sb)->log->bdev->bd_dev);
-		j_sb->s_logserial = cpu_to_le32(JFS_SBI(sb)->log->serial);
+		j_sb->s_logdev = cpu_to_le32(sbi->log->bdev->bd_dev);
+		j_sb->s_logserial = cpu_to_le32(sbi->log->serial);
 	} else if (state == FM_CLEAN) {
 		/*
 		 * If this volume is shared with OS/2, OS/2 will need to
