@@ -93,7 +93,7 @@ static inline void adfs_writename(char *to, char *from, int maxlen)
 #define dir_u32(idx)				\
 	({ int _buf = idx >> blocksize_bits;	\
 	   int _off = idx - (_buf << blocksize_bits);\
-	  *(u32 *)(bh[_buf]->b_data + _off);	\
+	  *(__le32 *)(bh[_buf]->b_data + _off);	\
 	})
 
 #define bufoff(_bh,_idx)			\
@@ -112,7 +112,7 @@ adfs_dir_checkbyte(const struct adfs_dir *dir)
 {
 	struct buffer_head * const *bh = dir->bh;
 	const int blocksize_bits = dir->sb->s_blocksize_bits;
-	union { u32 *ptr32; u8 *ptr8; } ptr, end;
+	union { __le32 *ptr32; u8 *ptr8; } ptr, end;
 	u32 dircheck = 0;
 	int last = 5 - 26;
 	int i = 0;
@@ -125,7 +125,7 @@ adfs_dir_checkbyte(const struct adfs_dir *dir)
 	do {
 		last += 26;
 		do {
-			dircheck = cpu_to_le32(dir_u32(i)) ^ ror13(dircheck);
+			dircheck = le32_to_cpu(dir_u32(i)) ^ ror13(dircheck);
 
 			i += sizeof(u32);
 		} while (i < (last & ~3));
@@ -155,8 +155,8 @@ adfs_dir_checkbyte(const struct adfs_dir *dir)
 	end.ptr8 = ptr.ptr8 + 36;
 
 	do {
-		unsigned int v = *ptr.ptr32++;
-		dircheck = cpu_to_le32(v) ^ ror13(dircheck);
+		__le32 v = *ptr.ptr32++;
+		dircheck = le32_to_cpu(v) ^ ror13(dircheck);
 	} while (ptr.ptr32 < end.ptr32);
 
 	return (dircheck ^ (dircheck >> 8) ^ (dircheck >> 16) ^ (dircheck >> 24)) & 0xff;
