@@ -519,47 +519,6 @@
 #define	PVR_MAJ(pvr)	(((pvr) >>  4) & 0xF)	/* Major revision field */
 #define	PVR_MIN(pvr)	(((pvr) >>  0) & 0xF)	/* Minor revision field */
 
-/* Processor Version Numbers */
-
-#define	PVR_403GA	0x00200000
-#define	PVR_403GB	0x00200100
-#define	PVR_403GC	0x00200200
-#define	PVR_403GCX	0x00201400
-#define	PVR_405GP	0x40110000
-#define	PVR_STB03XXX	0x40310000
-#define	PVR_NP405H	0x41410000
-#define	PVR_NP405L	0x41610000
-#define	PVR_601		0x00010000
-#define	PVR_602		0x00050000
-#define	PVR_603		0x00030000
-#define	PVR_603e	0x00060000
-#define	PVR_603ev	0x00070000
-#define	PVR_603r	0x00071000
-#define	PVR_604		0x00040000
-#define	PVR_604e	0x00090000
-#define	PVR_604r	0x000A0000
-#define	PVR_620		0x00140000
-#define	PVR_740		0x00080000
-#define	PVR_750		PVR_740
-#define	PVR_740P	0x10080000
-#define	PVR_750P	PVR_740P
-#define	PVR_7400	0x000C0000
-#define	PVR_7410	0x800C0000
-#define	PVR_7450	0x80000000
-/*
- * For the 8xx processors, all of them report the same PVR family for
- * the PowerPC core. The various versions of these processors must be
- * differentiated by the version number in the Communication Processor
- * Module (CPM).
- */
-#define	PVR_821		0x00500000
-#define	PVR_823		PVR_821
-#define	PVR_850		PVR_821
-#define	PVR_860		PVR_821
-#define	PVR_8240	0x00810100
-#define	PVR_8245	0x80811014
-#define	PVR_8260	PVR_8240
-
 /* We only need to define a new _MACH_xxx for machines which are part of
  * a configuration which supports more than one type of different machine.
  * This is currently limited to CONFIG_ALL_PPC and CHRP/PReP/PMac. -- Tom
@@ -690,11 +649,7 @@ extern struct task_struct *last_task_used_altivec;
  * as soon as I get around to remapping the io areas with the BATs
  * to match the mac we can raise this. -- Cort
  */
-#ifdef CONFIG_TASK_SIZE_BOOL
-#define TASK_SIZE	CONFIG_TASK_SIZE
-#else
-#define TASK_SIZE	(0x80000000UL)
-#endif
+#define TASK_SIZE	(CONFIG_TASK_SIZE)
 
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
@@ -787,6 +742,19 @@ extern inline void prefetchw(const void *x)
 }
 
 #define spin_lock_prefetch(x)	prefetchw(x)
+
+#ifdef CONFIG_XMON
+extern void xmon(struct pt_regs *);
+#define BUG() do { \
+	printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
+	xmon(0); \
+} while (0)
+#else
+#define BUG() do { \
+	printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
+	__asm__ __volatile__(".long 0x0"); \
+} while (0)
+#endif
 
 #endif /* !__ASSEMBLY__ */
 
