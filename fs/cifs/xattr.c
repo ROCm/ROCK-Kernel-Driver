@@ -34,9 +34,51 @@
 /* also note could add check for security prefix XATTR_SECURITY_PREFIX */ 
 
 
-int cifs_removexattr(struct dentry * direntry, const char * name)
+int cifs_removexattr(struct dentry * direntry, const char * ea_name)
 {
 	int rc = -EOPNOTSUPP;
+#ifdef CONFIG_CIFS_XATTR
+	int xid;
+	struct cifs_sb_info *cifs_sb;
+	struct cifsTconInfo *pTcon;
+	struct super_block * sb;
+	char * full_path;
+                                                                                     
+	if(direntry == NULL)
+		return -EIO;
+	if(direntry->d_inode == NULL)
+		return -EIO;
+	sb = direntry->d_inode->i_sb;
+	if(sb == NULL)
+		return -EIO;
+	xid = GetXid();
+                                                                                     
+	cifs_sb = CIFS_SB(sb);
+	pTcon = cifs_sb->tcon;
+                                                                                     
+	down(&sb->s_vfs_rename_sem);
+	full_path = build_path_from_dentry(direntry);
+	up(&sb->s_vfs_rename_sem);
+	if(full_path == NULL) {
+		FreeXid(xid);
+		return -ENOMEM;
+	}
+	if(ea_name == NULL) {
+		cFYI(1,("Null xattr names not supported"));
+	} else if(strncmp(ea_name,CIFS_XATTR_USER_PREFIX,5)) {
+		cFYI(1,("illegal xattr namespace %s (only user namespace supported)",ea_name));
+		/* BB what if no namespace prefix? */
+		/* Should we just pass them to server, except for
+		system and perhaps security prefixes? */
+	} else {
+		ea_name+=5; /* skip past user. prefix */
+		rc = CIFSSMBSetEA(xid,pTcon,full_path,ea_name,0,
+			(__u16)0, cifs_sb->local_nls);
+	}
+	if (full_path)
+		kfree(full_path);
+	FreeXid(xid);
+#endif
 	return rc;
 }
 

@@ -3370,7 +3370,8 @@ SetEARetry:
 
 	/*BB add length check that it would fit in negotiated SMB buffer size BB */
 	/* if(ea_value_len > buffer_size - 512 (enough for header)) */
-	memcpy(parm_data->list[0].name+name_len+1,ea_value,ea_value_len);
+	if(ea_value_len)
+		memcpy(parm_data->list[0].name+name_len+1,ea_value,ea_value_len);
 
 	pSMB->TotalDataCount = pSMB->DataCount;
 	pSMB->ParameterCount = cpu_to_le16(pSMB->ParameterCount);
