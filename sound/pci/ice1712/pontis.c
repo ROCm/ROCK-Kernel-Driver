@@ -353,11 +353,10 @@ static void set_gpio_bit(ice1712_t *ice, unsigned int bit, int val)
 	snd_ice1712_gpio_write(ice, tmp);
 }
 
-static void spi_send_bits(ice1712_t *ice, unsigned int data, int bits)
+static void spi_send_byte(ice1712_t *ice, unsigned char data)
 {
 	int i;
-	/* assume bits are aligned to 8 */
-	for (i = 0; i < bits; i++) {
+	for (i = 0; i < 8; i++) {
 		set_gpio_bit(ice, PONTIS_CS_CLK, 0);
 		udelay(1);
 		set_gpio_bit(ice, PONTIS_CS_WDATA, data & 0x80);
@@ -368,12 +367,13 @@ static void spi_send_bits(ice1712_t *ice, unsigned int data, int bits)
 	}
 }
 
-static unsigned int spi_read_bits(ice1712_t *ice, int bits)
+static unsigned int spi_read_byte(ice1712_t *ice)
 {
 	int i;
 	unsigned int val = 0;
 
-	for (i = 0; i < bits; i++) {
+	for (i = 0; i < 8; i++) {
+		val <<= 1;
 		set_gpio_bit(ice, PONTIS_CS_CLK, 0);
 		udelay(1);
 		if (snd_ice1712_gpio_read(ice) & PONTIS_CS_RDATA)
@@ -381,7 +381,6 @@ static unsigned int spi_read_bits(ice1712_t *ice, int bits)
 		udelay(1);
 		set_gpio_bit(ice, PONTIS_CS_CLK, 1);
 		udelay(1);
-		val <<= 1;
 	}
 	return val;
 }
@@ -389,12 +388,13 @@ static unsigned int spi_read_bits(ice1712_t *ice, int bits)
 
 static void spi_write(ice1712_t *ice, unsigned int dev, unsigned int reg, unsigned int data)
 {
-	unsigned int val;
-	val = ((dev & ~1) << 16) | (reg << 8) | data;
 	snd_ice1712_gpio_set_dir(ice, PONTIS_CS_CS|PONTIS_CS_WDATA|PONTIS_CS_CLK);
 	snd_ice1712_gpio_set_mask(ice, ~(PONTIS_CS_CS|PONTIS_CS_WDATA|PONTIS_CS_CLK));
 	set_gpio_bit(ice, PONTIS_CS_CS, 0);
-	spi_send_bits(ice, val, 24);
+	spi_send_byte(ice, dev & ~1); /* WRITE */
+	spi_send_byte(ice, reg); /* MAP */
+	spi_send_byte(ice, data); /* DATA */
+	/* trigger */
 	set_gpio_bit(ice, PONTIS_CS_CS, 1);
 	udelay(1);
 	/* restore */
@@ -405,16 +405,18 @@ static void spi_write(ice1712_t *ice, unsigned int dev, unsigned int reg, unsign
 static unsigned int spi_read(ice1712_t *ice, unsigned int dev, unsigned int reg)
 {
 	unsigned int val;
-	val = ((dev & ~1) << 8) | reg;
 	snd_ice1712_gpio_set_dir(ice, PONTIS_CS_CS|PONTIS_CS_WDATA|PONTIS_CS_CLK);
 	snd_ice1712_gpio_set_mask(ice, ~(PONTIS_CS_CS|PONTIS_CS_WDATA|PONTIS_CS_CLK));
 	set_gpio_bit(ice, PONTIS_CS_CS, 0);
-	spi_send_bits(ice, val, 16);
+	spi_send_byte(ice, dev & ~1); /* WRITE */
+	spi_send_byte(ice, reg); /* MAP */
+	/* trigger */
 	set_gpio_bit(ice, PONTIS_CS_CS, 1);
 	udelay(1);
 	set_gpio_bit(ice, PONTIS_CS_CS, 0);
-	spi_send_bits(ice, dev | 1, 8);
-	val = spi_read_bits(ice, 8);
+	spi_send_byte(ice, dev | 1); /* READ */
+	val = spi_read_byte(ice);
+	/* trigger */
 	set_gpio_bit(ice, PONTIS_CS_CS, 1);
 	udelay(1);
 	/* restore */
@@ -496,11 +498,15 @@ static int pontis_gpio_mask_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t 
 static int pontis_gpio_mask_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+	unsigned int val;
+	int changed;
 	down(&ice->gpio_mutex);
 	/* 4-7 reserved */
-	ice->gpio.write_mask = (~ucontrol->value.integer.value[0] & 0xffff) | 0x00f0;
+	val = (~ucontrol->value.integer.value[0] & 0xffff) | 0x00f0;
+	changed = val != ice->gpio.write_mask;
+	ice->gpio.write_mask = val;
 	up(&ice->gpio_mutex);
-	return 0;
+	return changed;
 }
 
 static int pontis_gpio_dir_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *ucontrol)
@@ -516,11 +522,15 @@ static int pontis_gpio_dir_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *
 static int pontis_gpio_dir_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	ice1712_t *ice = snd_kcontrol_chip(kcontrol);
+	unsigned int val;
+	int changed;
 	down(&ice->gpio_mutex);
 	/* 4-7 reserved */
-	ice->gpio.direction = ucontrol->value.integer.value[0] & 0xff0f;
+	val = ucontrol->value.integer.value[0] & 0xff0f;
+	changed = (val != ice->gpio.direction);
+	ice->gpio.direction = val;
 	up(&ice->gpio_mutex);
-	return 0;
+	return changed;
 }
 
 static int pontis_gpio_data_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
@@ -759,7 +769,7 @@ static int __devinit pontis_init(ice1712_t *ice)
 	};
 	static unsigned char cs_inits[] = {
 		0x04,	0x80,	/* RUN, RXP0 */
-		0x05,	0x00,	/* slave, 24bit */
+		0x05,	0x05,	/* slave, 24bit */
 		0x01,	0x00,
 		0x02,	0x00,
 		0x03,	0x00,
