@@ -548,10 +548,10 @@ dcssblk_remove_store(struct device *dev, const char *buf, size_t count)
 	dev_info->gd->queue = NULL;
 	put_disk(dev_info->gd);
 	device_unregister(&dev_info->dev);
-	put_device(&dev_info->dev);
 	segment_unload(dev_info->segment_name);
 	PRINT_DEBUG("Segment %s unloaded successfully\n",
 			dev_info->segment_name);
+	put_device(&dev_info->dev);
 	rc = count;
 out_buf:
 	kfree(local_buf);
