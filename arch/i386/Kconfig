@@ -826,6 +826,14 @@ config EFI
 	anything about EFI).  However, even with this option, the resultant
 	kernel should continue to boot on existing non-EFI platforms.
 
+config IRQBALANCE
+ 	bool "Enable kernel irq balancing"
+	depends on SMP
+	default y
+	help
+ 	  The defalut yes will allow the kernel to do irq load balancing.
+	  Saying no will keep the kernel from doing irq load balancing.
+
 config HAVE_DEC_LOCK
 	bool
 	depends on (SMP || PREEMPT) && X86_CMPXCHG

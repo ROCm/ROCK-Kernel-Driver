@@ -280,7 +280,7 @@ static void set_ioapic_affinity_irq(unsigned int irq, cpumask_t cpumask)
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
-#if defined(CONFIG_SMP)
+#if defined(CONFIG_IRQBALANCE)
 # include <asm/processor.h>	/* kernel_thread() */
 # include <linux/kernel_stat.h>	/* kstat */
 # include <linux/slab.h>		/* kmalloc() */
@@ -689,9 +689,11 @@ static inline void move_irq(int irq)
 
 __initcall(balanced_irq_init);
 
-#else /* !SMP */
+#else /* !CONFIG_IRQBALANCE */
 static inline void move_irq(int irq) { }
+#endif /* CONFIG_IRQBALANCE */
 
+#ifndef CONFIG_SMP
 void send_IPI_self(int vector)
 {
 	unsigned int cfg;
@@ -706,7 +708,7 @@ void send_IPI_self(int vector)
 	 */
 	apic_write_around(APIC_ICR, cfg);
 }
-#endif /* defined(CONFIG_SMP) */
+#endif /* !CONFIG_SMP */
 
 
 /*
