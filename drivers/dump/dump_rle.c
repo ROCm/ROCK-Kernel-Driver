@@ -22,7 +22,8 @@
  *       reasonable, if possible.  This is the same routine we use in IRIX.
  */
 static u16
-dump_compress_rle(const u8 *old, u16 oldsize, u8 *new, u16 newsize)
+dump_compress_rle(const u8 *old, u16 oldsize, u8 *new, u16 newsize,
+		unsigned long loc)
 {
 	u16 ri, wi, count = 0;
 	u_char value = 0, cur_byte;

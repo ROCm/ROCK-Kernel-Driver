@@ -307,7 +307,8 @@ int dump_lcrash_add_data(unsigned long loc, unsigned long len)
 		size = bytes = (len > PAGE_SIZE) ? PAGE_SIZE : len;	
 		/* check for compression */
 		if (dump_allow_compress(page, bytes)) {
-			size = dump_compress_data((char *)addr, bytes, (char *)buf);
+			size = dump_compress_data((char *)addr, bytes, 
+				(char *)buf, loc);
 		}
 		/* set the compressed flag if the page did compress */
 		if (size && (size < bytes)) {

@@ -247,10 +247,11 @@ static inline int dump_add_data(unsigned long loc, unsigned long sz)
 }
 
 /* Compression operation */
-static inline int dump_compress_data(char *src, int slen, char *dst)
+static inline int dump_compress_data(char *src, int slen, char *dst,
+		unsigned long loc)
 {
 	return dump_config.dumper->compress->compress_func(src, slen, 
-		dst, DUMP_DPC_PAGE_SIZE);
+		dst, DUMP_DPC_PAGE_SIZE, loc);
 }
 
 

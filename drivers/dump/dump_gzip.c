@@ -20,6 +20,7 @@
 #include <linux/vmalloc.h>
 
 static void *deflate_workspace;
+static unsigned long workspace_paddr[2];
 
 /*
  * Name: dump_compress_gzip()
@@ -27,14 +28,23 @@ static void *deflate_workspace;
  *       deflate functions similar to what's used in PPP).
  */
 static u16
-dump_compress_gzip(const u8 *old, u16 oldsize, u8 *new, u16 newsize)
+dump_compress_gzip(const u8 *old, u16 oldsize, u8 *new, u16 newsize,
+		unsigned long loc)
 {
 	/* error code and dump stream */
 	int err;
 	z_stream dump_stream;
-	
+	struct page *pg = (struct page *)loc;
+	unsigned long paddr =  page_to_pfn(pg) << PAGE_SHIFT;
+
 	dump_stream.workspace = deflate_workspace;
-	
+	if ((paddr == workspace_paddr[0]) || (paddr == workspace_paddr[1])) {
+		/* 
+		 * This page belongs to deflate_workspace used as temporary 
+		 * buffer for compression. Hence, dump them without compression.
+		 */
+		return(0);
+	}
 	if ((err = zlib_deflateInit(&dump_stream, Z_BEST_COMPRESSION)) != Z_OK) {
 		/* fall back to RLE compression */
 		printk("dump_compress_gzip(): zlib_deflateInit() "
@@ -87,6 +97,8 @@ static struct __dump_compress dump_gzip_compression = {
 static int __init
 dump_compress_gzip_init(void)
 {
+	struct page *pg;
+
 	deflate_workspace = vmalloc(zlib_deflate_workspacesize());
 	if (!deflate_workspace) {
 		printk("dump_compress_gzip_init(): Failed to "
@@ -94,6 +106,17 @@ dump_compress_gzip_init(void)
 			zlib_deflate_workspacesize());
 		return -ENOMEM;
 	}
+	/*
+	 * Need to find pages (workspace) that are used for compression.
+	 * Even though zlib_deflate_workspacesize() is 64 pages (approximately)
+	 * depends on the arch, we used only 2 pages. Hence, get the physical
+	 * addresses for these 2 pages and used them to not to compress those
+	 * pages.
+	 */
+	pg = vmalloc_to_page(deflate_workspace);
+	workspace_paddr[0] = page_to_pfn(pg) << PAGE_SHIFT;
+	pg = vmalloc_to_page(deflate_workspace + DUMP_PAGE_SIZE);
+	workspace_paddr[1] = page_to_pfn(pg) << PAGE_SHIFT;
 	dump_register_compression(&dump_gzip_compression);
 	return 0;
 }

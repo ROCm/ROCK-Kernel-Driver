@@ -281,7 +281,7 @@ struct __dump_compress {
 	const char *compress_name;
 
 	/* the compression function to call */
-	u16 (*compress_func)(const u8 *, u16, u8 *, u16);
+	u16 (*compress_func)(const u8 *, u16, u8 *, u16, unsigned long);
 };
 
 /* functions for dump compression registration */
