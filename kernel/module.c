@@ -771,6 +771,18 @@ static int check_version(Elf_Shdr *sechdrs,
 	return 1;
 }
 
+static inline int check_modstruct_version(Elf_Shdr *sechdrs,
+					  unsigned int versindex,
+					  struct module *mod)
+{
+	unsigned int i;
+	struct kernel_symbol_group *ksg;
+
+	if (!__find_symbol("struct_module", &ksg, &i, 1))
+		BUG();
+	return check_version(sechdrs, versindex, "struct_module", mod, ksg, i);
+}
+
 /* First part is kernel version, which we ignore. */
 static inline int same_magic(const char *amagic, const char *bmagic)
 {
@@ -785,6 +797,13 @@ static inline int check_version(Elf_Shdr *sechdrs,
 				struct module *mod, 
 				struct kernel_symbol_group *ksg,
 				unsigned int symidx)
+{
+	return 1;
+}
+
+static inline int check_modstruct_version(Elf_Shdr *sechdrs,
+					  unsigned int versindex,
+					  struct module *mod)
 {
 	return 1;
 }
@@ -1184,6 +1203,12 @@ static struct module *load_module(void *umod,
 		goto free_hdr;
 	}
 	mod = (void *)sechdrs[modindex].sh_addr;
+
+	/* Check module struct version now, before we try to use module. */
+	if (!check_modstruct_version(sechdrs, versindex, mod)) {
+		err = -ENOEXEC;
+		goto free_hdr;
+	}
 
 	/* This is allowed: modprobe --force will invalidate it. */
 	if (!vmagindex) {
@@ -1630,3 +1655,9 @@ static int __init symbols_init(void)
 }
 
 __initcall(symbols_init);
+
+#ifdef CONFIG_MODVERSIONS
+/* Generate the signature for struct module here, too, for modversions. */
+void struct_module(struct module *mod) { return; }
+EXPORT_SYMBOL(struct_module);
+#endif

@@ -308,6 +308,7 @@ read_symbols(char *modname)
 	const char *symname;
 	struct module *mod;
 	struct elf_info info = { };
+	struct symbol *s;
 	Elf_Sym *sym;
 
 	/* When there's no vmlinux, don't print warnings about
@@ -326,6 +327,17 @@ read_symbols(char *modname)
 		handle_moddevtable(mod, &info, sym, symname);
 	}
 	parse_elf_finish(&info);
+
+	/* Our trick to get versioning for struct_module - it's
+	 * never passed as an argument to an exported function, so
+	 * the automatic versioning doesn't pick it up, but it's really
+	 * important anyhow */
+	if (modversions) {
+		s = alloc_symbol("struct_module");
+		/* add to list */
+		s->next = mod->unres;
+		mod->unres = s;
+	}
 }
 
 #define SZ 500
@@ -502,6 +514,7 @@ main(int argc, char **argv)
 {
 	struct module *mod;
 	struct buffer buf = { };
+	struct symbol *s;
 	char fname[SZ];
 
 	for (; argv[1]; argv++) {
