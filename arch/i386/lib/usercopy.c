@@ -9,66 +9,20 @@
 #include <asm/uaccess.h>
 #include <asm/mmx.h>
 
-#ifdef CONFIG_X86_USE_3DNOW_AND_WORKS
-
-unsigned long
-__generic_copy_to_user(void *to, const void *from, unsigned long n)
+#ifdef INTEL_MOVSL
+static inline int movsl_is_ok(const void *a1, const void *a2, unsigned long n)
 {
-	if (access_ok(VERIFY_WRITE, to, n))
-	{
-		if(n<512)
-			__copy_user(to,from,n);
-		else
-			mmx_copy_user(to,from,n);
-	}
-	return n;
+	if (n < 64)
+		return 1;
+	if ((((const long)a1 ^ (const long)a2) & movsl_mask.mask) == 0)
+		return 1;
+	return 0;
 }
-
-unsigned long
-__generic_copy_from_user(void *to, const void *from, unsigned long n)
-{
-	if (access_ok(VERIFY_READ, from, n))
-	{
-		if(n<512)
-			__copy_user_zeroing(to,from,n);
-		else
-			mmx_copy_user_zeroing(to, from, n);
-	}
-	else
-		memset(to, 0, n);
-	return n;
-}
-
 #else
-
-unsigned long
-__generic_copy_to_user(void *to, const void *from, unsigned long n)
+static inline int movsl_is_ok(const void *a1, const void *a2, unsigned long n)
 {
-	prefetch(from);
-	if (access_ok(VERIFY_WRITE, to, n)) {
-		if (movsl_is_ok(to, from, n))
-			__copy_user(to, from, n);
-		else
-			n = __copy_user_int(to, from, n);
-	}
-	return n;
+	return 1;
 }
-
-unsigned long
-__generic_copy_from_user(void *to, const void *from, unsigned long n)
-{
-	prefetchw(to);
-	if (access_ok(VERIFY_READ, from, n)) {
-		if (movsl_is_ok(to, from, n))
-			__copy_user_zeroing(to,from,n);
-		else
-			n = __copy_user_zeroing_int(to, from, n);
-	} else {
-		memset(to, 0, n);
-	}
-	return n;
-}
-
 #endif
 
 /*
@@ -198,12 +152,9 @@ long strnlen_user(const char *s, long n)
 }
 
 #ifdef INTEL_MOVSL
-/*
- * Copy To/From Userspace
- */
 
-/* Generic arbitrary sized copy.  */
-unsigned long __copy_user_int(void *to, const void *from,unsigned long size)
+static unsigned long
+__copy_user_intel(void *to, const void *from,unsigned long size)
 {
 	int d0, d1;
 	__asm__ __volatile__(
@@ -289,8 +240,8 @@ unsigned long __copy_user_int(void *to, const void *from,unsigned long size)
 	return size;
 }
 
-unsigned long
-__copy_user_zeroing_int(void *to, const void *from, unsigned long size)
+static unsigned long
+__copy_user_zeroing_intel(void *to, const void *from, unsigned long size)
 {
 	int d0, d1;
 	__asm__ __volatile__(
@@ -383,4 +334,129 @@ __copy_user_zeroing_int(void *to, const void *from, unsigned long size)
 		       : "eax", "edx", "memory");
 	return size;
 }
+#else	/* INTEL_MOVSL */
+
+/*
+ * Leave these declared but undefined.  They should not be any references to
+ * them
+ */
+unsigned long
+__copy_user_zeroing_intel(void *to, const void *from, unsigned long size);
+unsigned long
+__copy_user_intel(void *to, const void *from,unsigned long size);
+
 #endif	/* INTEL_MOVSL */
+
+/* Generic arbitrary sized copy.  */
+#define __copy_user(to,from,size)					\
+do {									\
+	int __d0, __d1, __d2;						\
+	__asm__ __volatile__(						\
+		"	cmp  $7,%0\n"					\
+		"	jbe  1f\n"					\
+		"	movl %1,%0\n"					\
+		"	negl %0\n"					\
+		"	andl $7,%0\n"					\
+		"	subl %0,%3\n"					\
+		"4:	rep; movsb\n"					\
+		"	movl %3,%0\n"					\
+		"	shrl $2,%0\n"					\
+		"	andl $3,%3\n"					\
+		"	.align 2,0x90\n"				\
+		"0:	rep; movsl\n"					\
+		"	movl %3,%0\n"					\
+		"1:	rep; movsb\n"					\
+		"2:\n"							\
+		".section .fixup,\"ax\"\n"				\
+		"5:	addl %3,%0\n"					\
+		"	jmp 2b\n"					\
+		"3:	lea 0(%3,%0,4),%0\n"				\
+		"	jmp 2b\n"					\
+		".previous\n"						\
+		".section __ex_table,\"a\"\n"				\
+		"	.align 4\n"					\
+		"	.long 4b,5b\n"					\
+		"	.long 0b,3b\n"					\
+		"	.long 1b,2b\n"					\
+		".previous"						\
+		: "=&c"(size), "=&D" (__d0), "=&S" (__d1), "=r"(__d2)	\
+		: "3"(size), "0"(size), "1"(to), "2"(from)		\
+		: "memory");						\
+} while (0)
+
+#define __copy_user_zeroing(to,from,size)				\
+do {									\
+	int __d0, __d1, __d2;						\
+	__asm__ __volatile__(						\
+		"	cmp  $7,%0\n"					\
+		"	jbe  1f\n"					\
+		"	movl %1,%0\n"					\
+		"	negl %0\n"					\
+		"	andl $7,%0\n"					\
+		"	subl %0,%3\n"					\
+		"4:	rep; movsb\n"					\
+		"	movl %3,%0\n"					\
+		"	shrl $2,%0\n"					\
+		"	andl $3,%3\n"					\
+		"	.align 2,0x90\n"				\
+		"0:	rep; movsl\n"					\
+		"	movl %3,%0\n"					\
+		"1:	rep; movsb\n"					\
+		"2:\n"							\
+		".section .fixup,\"ax\"\n"				\
+		"5:	addl %3,%0\n"					\
+		"	jmp 6f\n"					\
+		"3:	lea 0(%3,%0,4),%0\n"				\
+		"6:	pushl %0\n"					\
+		"	pushl %%eax\n"					\
+		"	xorl %%eax,%%eax\n"				\
+		"	rep; stosb\n"					\
+		"	popl %%eax\n"					\
+		"	popl %0\n"					\
+		"	jmp 2b\n"					\
+		".previous\n"						\
+		".section __ex_table,\"a\"\n"				\
+		"	.align 4\n"					\
+		"	.long 4b,5b\n"					\
+		"	.long 0b,3b\n"					\
+		"	.long 1b,6b\n"					\
+		".previous"						\
+		: "=&c"(size), "=&D" (__d0), "=&S" (__d1), "=r"(__d2)	\
+		: "3"(size), "0"(size), "1"(to), "2"(from)		\
+		: "memory");						\
+} while (0)
+
+
+unsigned long __copy_to_user(void *to, const void *from, unsigned long n)
+{
+	if (movsl_is_ok(to, from, n))
+		__copy_user(to, from, n);
+	else
+		n = __copy_user_intel(to, from, n);
+	return n;
+}
+
+unsigned long __copy_from_user(void *to, const void *from, unsigned long n)
+{
+	if (movsl_is_ok(to, from, n))
+		__copy_user_zeroing(to, from, n);
+	else
+		n = __copy_user_zeroing_intel(to, from, n);
+	return n;
+}
+
+unsigned long copy_to_user(void *to, const void *from, unsigned long n)
+{
+	prefetch(from);
+	if (access_ok(VERIFY_WRITE, to, n))
+		n = __copy_to_user(to, from, n);
+	return n;
+}
+
+unsigned long copy_from_user(void *to, const void *from, unsigned long n)
+{
+	prefetchw(to);
+	if (access_ok(VERIFY_READ, from, n))
+		n = __copy_from_user(to, from, n);
+	return n;
+}
