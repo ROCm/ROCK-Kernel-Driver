@@ -29,9 +29,6 @@
 #include <linux/if_bridge.h>
 #include <linux/if_vlan.h>
 #include <linux/random.h>
-#ifdef CONFIG_NET_DIVERT
-#include <linux/divert.h>
-#endif /* CONFIG_NET_DIVERT */
 
 #ifdef CONFIG_INET
 #include <net/protocol.h>
@@ -69,10 +66,6 @@ EXPORT_SYMBOL(make_EII_client);
 EXPORT_SYMBOL(destroy_EII_client);
 #endif
 
-#ifdef CONFIG_NET_DIVERT
-EXPORT_SYMBOL(alloc_divert_blk);
-EXPORT_SYMBOL(free_divert_blk);
-#endif /* CONFIG_NET_DIVERT */
 
 #ifdef CONFIG_INET
 /* Internet layer registration */
