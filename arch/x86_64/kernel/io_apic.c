@@ -66,6 +66,14 @@ static struct irq_pin_list {
 	short apic, pin, next;
 } irq_2_pin[PIN_MAP_SIZE];
 
+#ifdef CONFIG_PCI_USE_VECTOR
+int vector_irq[NR_IRQS] = { [0 ... NR_IRQS -1] = -1};
+#define vector_to_irq(vector) 	\
+	(platform_legacy_irq(vector) ? vector : vector_irq[vector])
+#else
+#define vector_to_irq(vector)	(vector)
+#endif
+
 /*
  * The common case is 1:1 IRQ<->pin mappings. Sometimes there are
  * shared ISA-space IRQs, so we have to support them. We are super
@@ -147,6 +155,13 @@ void clear_IO_APIC_pin(unsigned int apic, unsigned int pin)
 	struct IO_APIC_route_entry entry;
 	unsigned long flags;
 
+	/* Check delivery_mode to be sure we're not clearing an SMI pin */
+	spin_lock_irqsave(&ioapic_lock, flags);
+	*(((int*)&entry) + 0) = io_apic_read(apic, 0x10 + 2 * pin);
+	*(((int*)&entry) + 1) = io_apic_read(apic, 0x11 + 2 * pin);
+	spin_unlock_irqrestore(&ioapic_lock, flags);
+	if (entry.delivery_mode == dest_SMI)
+		return;
 	/*
 	 * Disable it in the IO-APIC irq-routing table:
 	 */
@@ -625,7 +640,8 @@ static inline int IO_APIC_irq_trigger(int irq)
 /* irq_vectors is indexed by the sum of all RTEs in all I/O APICs. */
 u8 irq_vector[NR_IRQ_VECTORS] = { FIRST_DEVICE_VECTOR , 0 };
 
-static int __init assign_irq_vector(int irq)
+#ifndef CONFIG_PCI_USE_VECTOR
+int __init assign_irq_vector(int irq)
 {
 	static int current_vector = FIRST_DEVICE_VECTOR, offset = 0;
 	BUG_ON(irq >= NR_IRQ_VECTORS);
@@ -647,10 +663,34 @@ next:
 	IO_APIC_VECTOR(irq) = current_vector;
 	return current_vector;
 }
+#endif
 
 extern void (*interrupt[NR_IRQS])(void);
-static struct hw_interrupt_type ioapic_level_irq_type;
-static struct hw_interrupt_type ioapic_edge_irq_type;
+static struct hw_interrupt_type ioapic_level_type;
+static struct hw_interrupt_type ioapic_edge_type;
+
+#define IOAPIC_AUTO	-1
+#define IOAPIC_EDGE	0
+#define IOAPIC_LEVEL	1
+
+static inline void ioapic_register_intr(int irq, int vector, unsigned long trigger)
+{
+	if (use_pci_vector() && !platform_legacy_irq(irq)) {
+		if ((trigger == IOAPIC_AUTO && IO_APIC_irq_trigger(irq)) ||
+				trigger == IOAPIC_LEVEL)
+			irq_desc[vector].handler = &ioapic_level_type;
+		else
+			irq_desc[vector].handler = &ioapic_edge_type;
+		set_intr_gate(vector, interrupt[vector]);
+	} else	{
+		if ((trigger == IOAPIC_AUTO && IO_APIC_irq_trigger(irq)) ||
+				trigger == IOAPIC_LEVEL)
+			irq_desc[irq].handler = &ioapic_level_type;
+		else
+			irq_desc[irq].handler = &ioapic_edge_type;
+		set_intr_gate(vector, interrupt[irq]);
+	}
+}
 
 void __init setup_IO_APIC_irqs(void)
 {
@@ -702,13 +742,7 @@ void __init setup_IO_APIC_irqs(void)
 			vector = assign_irq_vector(irq);
 			entry.vector = vector;
 
-			if (IO_APIC_irq_trigger(irq))
-				irq_desc[irq].handler = &ioapic_level_irq_type;
-			else
-				irq_desc[irq].handler = &ioapic_edge_irq_type;
-
-			set_intr_gate(vector, interrupt[irq]);
-		
+			ioapic_register_intr(irq, vector, IOAPIC_AUTO);
 			if (!apic && (irq < 16))
 				disable_8259A_irq(irq);
 		}
@@ -755,7 +789,7 @@ void __init setup_ExtINT_IRQ0_pin(unsigned int pin, int vector)
 	 * The timer IRQ doesn't have to know that behind the
 	 * scene we have a 8259A-master in AEOI mode ...
 	 */
-	irq_desc[0].handler = &ioapic_edge_irq_type;
+	irq_desc[0].handler = &ioapic_edge_type;
 
 	/*
 	 * Add it to the IO-APIC irq-routing table:
@@ -1210,9 +1244,6 @@ static int __init timer_irq_works(void)
  * that was delayed but this is now handled in the device
  * independent code.
  */
-#define enable_edge_ioapic_irq unmask_IO_APIC_irq
-
-static void disable_edge_ioapic_irq (unsigned int irq) { /* nothing */ }
 
 /*
  * Starting up a edge-triggered IO-APIC interrupt is
@@ -1241,8 +1272,6 @@ static unsigned int startup_edge_ioapic_irq(unsigned int irq)
 	return was_pending;
 }
 
-#define shutdown_edge_ioapic_irq	disable_edge_ioapic_irq
-
 /*
  * Once we have recorded IRQ_PENDING already, we can mask the
  * interrupt for real. This prevents IRQ storms from unhandled
@@ -1255,9 +1284,6 @@ static void ack_edge_ioapic_irq(unsigned int irq)
 		mask_IO_APIC_irq(irq);
 	ack_APIC_irq();
 }
-
-static void end_edge_ioapic_irq (unsigned int i) { /* nothing */ }
-
 
 /*
  * Level triggered interrupts can just be masked,
@@ -1279,10 +1305,6 @@ static unsigned int startup_level_ioapic_irq (unsigned int irq)
 
 	return 0; /* don't check for pending */
 }
-
-#define shutdown_level_ioapic_irq	mask_IO_APIC_irq
-#define enable_level_ioapic_irq		unmask_IO_APIC_irq
-#define disable_level_ioapic_irq	mask_IO_APIC_irq
 
 static void end_level_ioapic_irq (unsigned int irq)
 {
@@ -1343,9 +1365,7 @@ static void end_level_ioapic_irq (unsigned int irq)
 	}
 }
 
-static void mask_and_ack_level_ioapic_irq (unsigned int irq) { /* nothing */ }
-
-static void set_ioapic_affinity (unsigned int irq, cpumask_t mask)
+static void set_ioapic_affinity_irq(unsigned int irq, cpumask_t mask)
 {
 	unsigned long flags;
 	unsigned int dest;
@@ -1362,6 +1382,58 @@ static void set_ioapic_affinity (unsigned int irq, cpumask_t mask)
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 }
 
+#ifdef CONFIG_PCI_USE_VECTOR
+static unsigned int startup_edge_ioapic_vector(unsigned int vector)
+{
+	int irq = vector_to_irq(vector);
+
+	return startup_edge_ioapic_irq(irq);
+}
+
+static void ack_edge_ioapic_vector(unsigned int vector)
+{
+	int irq = vector_to_irq(vector);
+
+	ack_edge_ioapic_irq(irq);
+}
+
+static unsigned int startup_level_ioapic_vector (unsigned int vector)
+{
+	int irq = vector_to_irq(vector);
+
+	return startup_level_ioapic_irq (irq);
+}
+
+static void end_level_ioapic_vector (unsigned int vector)
+{
+	int irq = vector_to_irq(vector);
+
+	end_level_ioapic_irq(irq);
+}
+
+static void mask_IO_APIC_vector (unsigned int vector)
+{
+	int irq = vector_to_irq(vector);
+
+	mask_IO_APIC_irq(irq);
+}
+
+static void unmask_IO_APIC_vector (unsigned int vector)
+{
+	int irq = vector_to_irq(vector);
+
+	unmask_IO_APIC_irq(irq);
+}
+
+static void set_ioapic_affinity_vector (unsigned int vector,
+					cpumask_t cpu_mask)
+{
+	int irq = vector_to_irq(vector);
+
+	set_ioapic_affinity_irq(irq, cpu_mask);
+}
+#endif
+
 /*
  * Level and edge triggered IO-APIC interrupts need different handling,
  * so we use two separate IRQ descriptors. Edge triggered IRQs can be
@@ -1371,25 +1443,25 @@ static void set_ioapic_affinity (unsigned int irq, cpumask_t mask)
  * races.
  */
 
-static struct hw_interrupt_type ioapic_edge_irq_type = {
+static struct hw_interrupt_type ioapic_edge_type = {
 	.typename = "IO-APIC-edge",
-	.startup = startup_edge_ioapic_irq,
-	.shutdown = shutdown_edge_ioapic_irq,
-	.enable = enable_edge_ioapic_irq,
-	.disable = disable_edge_ioapic_irq,
-	.ack = ack_edge_ioapic_irq,
-	.end = end_edge_ioapic_irq,
+	.startup 	= startup_edge_ioapic,
+	.shutdown 	= shutdown_edge_ioapic,
+	.enable 	= enable_edge_ioapic,
+	.disable 	= disable_edge_ioapic,
+	.ack 		= ack_edge_ioapic,
+	.end 		= end_edge_ioapic,
 	.set_affinity = set_ioapic_affinity,
 };
 
-static struct hw_interrupt_type ioapic_level_irq_type = {
+static struct hw_interrupt_type ioapic_level_type = {
 	.typename = "IO-APIC-level",
-	.startup = startup_level_ioapic_irq,
-	.shutdown = shutdown_level_ioapic_irq,
-	.enable = enable_level_ioapic_irq,
-	.disable = disable_level_ioapic_irq,
-	.ack = mask_and_ack_level_ioapic_irq,
-	.end = end_level_ioapic_irq,
+	.startup 	= startup_level_ioapic,
+	.shutdown 	= shutdown_level_ioapic,
+	.enable 	= enable_level_ioapic,
+	.disable 	= disable_level_ioapic,
+	.ack 		= mask_and_ack_level_ioapic,
+	.end 		= end_level_ioapic,
 	.set_affinity = set_ioapic_affinity,
 };
 
@@ -1409,7 +1481,13 @@ static inline void init_IO_APIC_traps(void)
 	 * 0x80, because int 0x80 is hm, kind of importantish. ;)
 	 */
 	for (irq = 0; irq < NR_IRQS ; irq++) {
-		if (IO_APIC_IRQ(irq) && !IO_APIC_VECTOR(irq)) {
+		int tmp = irq;
+		if (use_pci_vector()) {
+			if (!platform_legacy_irq(tmp))
+				if ((tmp = vector_to_irq(tmp)) == -1)
+					continue;
+		}
+		if (IO_APIC_IRQ(tmp) && !IO_APIC_VECTOR(tmp)) {
 			/*
 			 * Hmm.. We don't have an entry for this,
 			 * so default to an old-fashioned 8259
@@ -1837,10 +1915,12 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 	       mp_ioapics[ioapic].mpc_apicid, pin, entry.vector, irq,
 	       edge_level, active_high_low);
 
+ 	if (use_pci_vector() && !platform_legacy_irq(irq))
+		irq = IO_APIC_VECTOR(irq);
 	if (edge_level) {
-		irq_desc[irq].handler = &ioapic_level_irq_type;
+		irq_desc[irq].handler = &ioapic_level_type;
 	} else {
-		irq_desc[irq].handler = &ioapic_edge_irq_type;
+		irq_desc[irq].handler = &ioapic_edge_type;
 	}
 
 	set_intr_gate(entry.vector, interrupt[irq]);

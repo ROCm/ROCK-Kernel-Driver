@@ -345,6 +345,8 @@ void oops_end(void)
 	bust_spinlocks(0); 
 	spin_unlock(&die_lock); 
 	local_irq_enable();	/* make sure back scroll still works */
+	if (panic_on_oops)
+		panic("Oops"); 
 } 
 
 void __die(const char * str, struct pt_regs * regs, long err)
@@ -353,8 +355,8 @@ void __die(const char * str, struct pt_regs * regs, long err)
 	printk(KERN_EMERG "%s: %04lx [%u]\n", str, err & 0xffff,++die_counter);
 	notify_die(DIE_OOPS, (char *)str, regs, err, 255, SIGSEGV);
 	show_registers(regs);
-	/* Execute summary in case the oops scrolled away */
-	printk(KERN_EMERG "RIP "); 
+	/* Executive summary in case the oops scrolled away */
+	printk("RIP "); 
 	printk_address(regs->rip); 
 	printk(" RSP <%016lx>\n", regs->rsp); 
 }
@@ -848,3 +850,11 @@ void __init trap_init(void)
 	cpu_init();
 }
 
+
+/* Actual parsing is done early in setup.c. */
+static int __init oops_dummy(char *s)
+{ 
+	panic_on_oops = 1;
+	return -1; 
+} 
+__setup("oops=", oops_dummy); 

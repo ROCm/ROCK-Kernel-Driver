@@ -38,6 +38,9 @@ startup_32:
 
 	movl %ebx,%ebp	/* Save trampoline flag */
 	
+	movl $__KERNEL_DS,%eax
+	movl %eax,%ds
+	
 	/* If the CPU doesn't support CPUID this will double fault.
 	 * Unfortunately it is hard to check for CPUID without a stack. 
 	 */
@@ -114,24 +117,10 @@ reach_compatibility_mode:
 	movl	$(pGDT32 - __START_KERNEL_map), %eax
 	lgdt	(%eax)
 
+second:	
 	movl    $(ljumpvector - __START_KERNEL_map), %eax
 	/* Finally jump in 64bit mode */
 	ljmp	*(%eax)
-
-second:
-	/* abuse syscall to get into 64bit mode. this way we don't need
-	   a working low identity mapping just for the short 32bit roundtrip. 
-	   XXX kludge. this should not be needed. */
-	movl  $MSR_STAR,%ecx
-	xorl  %eax,%eax
-	movl  $(__USER32_CS<<16)|__KERNEL_CS,%edx
-	wrmsr
-
-	movl  $MSR_CSTAR,%ecx
-	movl  $0xffffffff,%edx
-	movl  $0x80100100,%eax	# reach_long64 absolute
-	wrmsr
-	syscall
 
 	.code64
 	.org 0x100	

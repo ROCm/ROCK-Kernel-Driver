@@ -52,6 +52,8 @@ int iommu_merge = 0;
 int iommu_sac_force = 0; 
 int iommu_fullflush = 1;
 
+#define MAX_NB 8
+
 /* Allocation bitmap for the remapping area */ 
 static spinlock_t iommu_bitmap_lock = SPIN_LOCK_UNLOCKED;
 static unsigned long *iommu_gart_bitmap; /* guarded by iommu_bitmap_lock */
@@ -71,8 +73,8 @@ static unsigned long *iommu_gart_bitmap; /* guarded by iommu_bitmap_lock */
 	     if (dev->bus->number == 0 && 				     \
 		    (PCI_SLOT(dev->devfn) >= 24) && (PCI_SLOT(dev->devfn) <= 31))
 
-static struct pci_dev *northbridges[NR_CPUS + 1];
-static u32 northbridge_flush_word[NR_CPUS + 1];
+static struct pci_dev *northbridges[MAX_NB];
+static u32 northbridge_flush_word[MAX_NB];
 
 #define EMERGENCY_PAGES 32 /* = 128KB */ 
 
@@ -107,6 +109,8 @@ static unsigned long alloc_iommu(int size)
 			need_flush = 1;
 		} 
 	} 
+	if (iommu_fullflush)
+		need_flush = 1;
 	spin_unlock_irqrestore(&iommu_bitmap_lock, flags);      
 	return offset;
 } 
@@ -135,9 +139,11 @@ static void flush_gart(struct pci_dev *dev)
 	int i;
 
 	spin_lock_irqsave(&iommu_bitmap_lock, flags);
-	if (need_flush || iommu_fullflush) { 
-		for (i = 0; northbridges[i]; i++) {
+	if (need_flush) { 
+		for (i = 0; i < MAX_NB; i++) {
 			u32 w;
+			if (!northbridges[i]) 
+				continue;
 			if (bus >= 0 && !(cpu_isset_const(i, bus_cpumask)))
 				continue;
 			pci_write_config_dword(northbridges[i], 0x9c, 
@@ -767,10 +773,9 @@ static int __init pci_iommu_init(void)
 	for_all_nb(dev) {
 		u32 flag; 
 		int cpu = PCI_SLOT(dev->devfn) - 24;
-		if (cpu >= NR_CPUS)
+		if (cpu >= MAX_NB)
 			continue;
 		northbridges[cpu] = dev;
-
 		pci_read_config_dword(dev, 0x9c, &flag); /* cache flush word */
 		northbridge_flush_word[cpu] = flag; 
 	}
@@ -783,7 +788,8 @@ static int __init pci_iommu_init(void)
 /* Must execute after PCI subsystem */
 fs_initcall(pci_iommu_init);
 
-/* iommu=[size][,noagp][,off][,force][,noforce][,leak][,memaper[=order]]
+/* iommu=[size][,noagp][,off][,force][,noforce][,leak][,memaper[=order]][,merge]
+         [,forcesac][,fullflush][,nomerge]
    size  set size of iommu (in bytes) 
    noagp don't initialize the AGP driver and use full aperture.
    off   don't use the IOMMU
@@ -791,6 +797,10 @@ fs_initcall(pci_iommu_init);
    memaper[=order] allocate an own aperture over RAM with size 32MB^order.  
    noforce don't force IOMMU usage. Default.
    force  Force IOMMU.
+   merge  Do SG merging. Implies force (experimental)  
+   nomerge Don't do SG merging.
+   forcesac For SAC mode for masks <40bits  (experimental)
+   fullflush Flush IOMMU on each allocation (for testing)
 */
 __init int iommu_setup(char *opt) 
 { 
@@ -804,8 +814,10 @@ __init int iommu_setup(char *opt)
 		    no_iommu = 1;
 	    if (!memcmp(p,"force", 5))
 		    force_iommu = 1;
-	    if (!memcmp(p,"noforce", 7))
+	    if (!memcmp(p,"noforce", 7)) { 
+		    iommu_merge = 0;
 		    force_iommu = 0;
+	    }
 	    if (!memcmp(p, "memaper", 7)) { 
 		    fallback_aper_force = 1; 
 		    p += 7; 
@@ -816,6 +828,16 @@ __init int iommu_setup(char *opt)
 		    panic_on_overflow = 1;
 	    if (!memcmp(p, "nopanic", 7))
 		    panic_on_overflow = 0;	    
+	    if (!memcmp(p, "merge", 5)) { 
+		    iommu_merge = 1;
+		    force_iommu = 1; 
+	    }
+	    if (!memcmp(p, "nomerge", 7))
+		    iommu_merge = 0;
+	    if (!memcmp(p, "forcesac", 8))
+		    iommu_sac_force = 1;
+	    if (!memcmp(p, "fullflush", 9))
+		    iommu_fullflush = 1;
 #ifdef CONFIG_IOMMU_LEAK
 	    if (!memcmp(p,"leak", 4)) { 
 		    leak_trace = 1;

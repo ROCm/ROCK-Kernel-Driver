@@ -44,12 +44,15 @@ MODULE_PARM_DESC(dst_verbose,
 MODULE_PARM(dst_debug, "i");
 MODULE_PARM_DESC(dst_debug, "debug messages, default is 0 (no)");
 
-unsigned int dst_type = (-1U);
-unsigned int dst_type_flags = (-1U);
-MODULE_PARM(dst_type, "i");
+#define DST_MAX_CARDS	6
+unsigned int dst_cur_no = 0;
+
+unsigned int dst_type[DST_MAX_CARDS] = { [0 ... (DST_MAX_CARDS-1)] = (-1U)};
+unsigned int dst_type_flags[DST_MAX_CARDS] = { [0 ... (DST_MAX_CARDS-1)] = (-1U)};
+MODULE_PARM(dst_type, "1-" __stringify(DST_MAX_CARDS) "i");
 MODULE_PARM_DESC(dst_type,
 		"Type of DST card, 0 Satellite, 1 terrestial TV, 2 Cable, default driver determined");
-MODULE_PARM(dst_type_flags, "i");
+MODULE_PARM(dst_type_flags, "1-" __stringify(DST_MAX_CARDS) "i");
 MODULE_PARM_DESC(dst_type_flags,
 		"Type flags of DST card, bitfield 1=10 byte tuner, 2=TS is 204, 4=symdiv");
 
@@ -102,8 +105,7 @@ static struct dvb_frontend_info dst_info_sat = {
 	.symbol_rate_max	= 45000000,
 /*     . symbol_rate_tolerance	= 	???,*/
 	.notifier_delay		= 50,                /* 1/20 s */
-	.caps = FE_CAN_INVERSION_AUTO |
-		FE_CAN_FEC_AUTO |
+	.caps = FE_CAN_FEC_AUTO |
 		FE_CAN_QPSK
 };
 
@@ -117,8 +119,7 @@ static struct dvb_frontend_info dst_info_cable = {
 	.symbol_rate_max	= 45000000,
 /*     . symbol_rate_tolerance	= 	???,*/
 	.notifier_delay		= 50,                /* 1/20 s */
-	.caps = FE_CAN_INVERSION_AUTO |
-		FE_CAN_FEC_AUTO |
+	.caps = FE_CAN_FEC_AUTO |
 		FE_CAN_QAM_AUTO
 };
 
@@ -128,8 +129,7 @@ static struct dvb_frontend_info dst_info_tv = {
 	.frequency_min 		= 137000000,
 	.frequency_max 		= 858000000,
 	.frequency_stepsize 	= 166667,
-	.caps = FE_CAN_INVERSION_AUTO |
-	    FE_CAN_FEC_AUTO |
+	.caps = FE_CAN_FEC_AUTO |
 	    FE_CAN_QAM_AUTO |
 	    FE_CAN_TRANSMISSION_MODE_AUTO | FE_CAN_GUARD_INTERVAL_AUTO
 };
@@ -421,8 +421,6 @@ static int dst_set_inversion (struct dst_data *dst, fe_spectral_inversion_t inve
 	case INVERSION_ON:
 		val[8] |= 0x80;
 		break;
-	case INVERSION_AUTO:
-		break;
 	default:
 		return -EINVAL;
 	}
@@ -607,25 +605,25 @@ static int dst_check_ci (struct dst_data *dst)
 		use_dst_type = DST_TYPE_IS_SAT;
 		use_type_flags = DST_TYPE_HAS_SYMDIV;
 	}
-	switch (dst_type) {
+	switch (dst_type[dst_cur_no]) {
 		case (-1U):
 			/* not used */
 			break;
 		case DST_TYPE_IS_SAT:
 		case DST_TYPE_IS_TERR:
 		case DST_TYPE_IS_CABLE:
-			use_dst_type = (u8)dst_type;
+			use_dst_type = (u8)(dst_type[dst_cur_no]);
 			break;
 		default:
 			printk("%s: invalid user override dst type %d, not used\n",
-				__FUNCTION__, dst_type);
+				__FUNCTION__, dst_type[dst_cur_no]);
 			break;
 	}
 	dst_type_print(use_dst_type);
-	if (dst_type_flags != (-1U)) {
+	if (dst_type_flags[dst_cur_no] != (-1U)) {
 		printk("%s: user override dst type flags 0x%x\n",
-				__FUNCTION__, dst_type_flags);
-		use_type_flags = dst_type_flags;
+				__FUNCTION__, dst_type_flags[dst_cur_no]);
+		use_type_flags = dst_type_flags[dst_cur_no];
 	}
 	dst->type_flags = use_type_flags;
 	dst->dst_type= use_dst_type;
@@ -1129,6 +1127,10 @@ static int dst_attach (struct dvb_i2c_bus *i2c, void **data)
 	struct dvb_frontend_info *info;
 
 	dprintk("%s: check ci\n", __FUNCTION__);
+	if (dst_cur_no >= DST_MAX_CARDS) {
+		dprintk("%s: can't have more than %d cards\n", __FUNCTION__, DST_MAX_CARDS);
+		return -ENODEV;
+	}
 	bt = bt878_find_by_dvb_adap(i2c->adapter);
 	if (!bt)
 		return -ENODEV;
@@ -1157,7 +1159,7 @@ static int dst_attach (struct dvb_i2c_bus *i2c, void **data)
 		info = &dst_info_cable;
 
 	dvb_register_frontend (dst_ioctl, i2c, dst, info);
-
+	dst_cur_no++;
 	return 0;
 }
 

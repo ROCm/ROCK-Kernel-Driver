@@ -538,31 +538,41 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 	if (!oldset)
 		oldset = &current->blocked;
 
-	if (IS_IA32_PROCESS(&scr->pt)) {
-		if (in_syscall) {
-			if (errno >= 0)
-				restart = 0;
-			else
-				errno = -errno;
-		}
-	} else if ((long) scr->pt.r10 != -1)
-		/*
-		 * A system calls has to be restarted only if one of the error codes
-		 * ERESTARTNOHAND, ERESTARTSYS, or ERESTARTNOINTR is returned.  If r10
-		 * isn't -1 then r8 doesn't hold an error code and we don't need to
-		 * restart the syscall, so we can clear the "restart" flag here.
-		 */
-		restart = 0;
-
+	/*
+	 * This only loops in the rare cases of handle_signal() failing, in which case we
+	 * need to push through a forced SIGSEGV.
+	 */
 	while (1) {
 		int signr = get_signal_to_deliver(&info, &scr->pt, NULL);
+
+		/*
+		 * get_signal_to_deliver() may have run a debugger (via notify_parent())
+		 * and the debugger may have modified the state (e.g., to arrange for an
+		 * inferior call), thus it's important to check for restarting _after_
+		 * get_signal_to_deliver().
+		 */
+		if (IS_IA32_PROCESS(&scr->pt)) {
+			if (in_syscall) {
+				if (errno >= 0)
+					restart = 0;
+				else
+					errno = -errno;
+			}
+		} else if ((long) scr->pt.r10 != -1)
+			/*
+			 * A system calls has to be restarted only if one of the error codes
+			 * ERESTARTNOHAND, ERESTARTSYS, or ERESTARTNOINTR is returned.  If r10
+			 * isn't -1 then r8 doesn't hold an error code and we don't need to
+			 * restart the syscall, so we can clear the "restart" flag here.
+			 */
+			restart = 0;
 
 		if (signr <= 0)
 			break;
 
 		ka = &current->sighand->action[signr - 1];
 
-		if (restart) {
+		if (unlikely(restart)) {
 			switch (errno) {
 			      case ERESTART_RESTARTBLOCK:
 			      case ERESTARTNOHAND:
@@ -582,6 +592,7 @@ ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall)
 					scr->pt.cr_iip -= 2;
 				} else
 					ia64_decrement_ip(&scr->pt);
+				restart = 0; /* don't restart twice if handle_signal() fails... */
 			}
 		}
 

@@ -18,7 +18,7 @@
     LG TDQF-S001F
 
     Copyright (C) 2002 Felix Domke <tmbinc@elitedvb.net>
-                     & Andreas Oberritter <andreas@oberritter.de>
+                     & Andreas Oberritter <obi@linuxtv.org>
 
 
     Support for Samsung TBMU24112IMB used on Technisat SkyStar2 rev. 2.6B

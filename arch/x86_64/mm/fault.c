@@ -378,7 +378,7 @@ no_context:
 	printk_address(regs->rip);
 	dump_pagetable(address);
 	__die("Oops", regs, error_code);
-	/* Execute summary in case the body of the oops scrolled away */
+	/* Executive summary in case the body of the oops scrolled away */
 	printk(KERN_EMERG "CR2: %016lx\n", address);
 	oops_end(); 
 	do_exit(SIGKILL);

@@ -233,7 +233,7 @@ static int ves1820_setup_reg0 (struct dvb_frontend *fe, u8 reg0,
 	 *  check lock and toggle inversion bit if required...
 	 */
 	if (INVERSION_AUTO == inversion && !(ves1820_readreg (fe, 0x11) & 0x08)) {
-		mdelay(30);
+		mdelay(50);
 		if (!(ves1820_readreg (fe, 0x11) & 0x08)) {
 			reg0 ^= 0x20;
 			ves1820_writereg (fe, 0x00, reg0 & 0xfe);
@@ -349,7 +349,7 @@ static int ves1820_set_parameters (struct dvb_frontend *fe,
 
 	/* yes, this speeds things up: userspace reports lock in about 8 ms
 	   instead of 500 to 1200 ms after calling FE_SET_FRONTEND. */
-	mdelay(30);
+	mdelay(50);
 
 	return 0;
 }

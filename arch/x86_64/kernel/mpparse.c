@@ -881,7 +881,6 @@ void __init mp_parse_prt (void)
 {
 	struct list_head	*node = NULL;
 	struct acpi_prt_entry	*entry = NULL;
-	int			vector = 0;
 	int			ioapic = -1;
 	int			ioapic_pin = 0;
 	int			irq = 0;
@@ -933,20 +932,22 @@ void __init mp_parse_prt (void)
 		if ((1<<bit) & mp_ioapic_routing[ioapic].pin_programmed[idx]) {
 			printk(KERN_DEBUG "Pin %d-%d already programmed\n",
 				mp_ioapic_routing[ioapic].apic_id, ioapic_pin);
+ 			if (use_pci_vector() && !platform_legacy_irq(irq))
+ 				irq = IO_APIC_VECTOR(irq);
 			entry->irq = irq;
 			continue;
 		}
 
 		mp_ioapic_routing[ioapic].pin_programmed[idx] |= (1<<bit);
-
-		vector = io_apic_set_pci_routing(ioapic, ioapic_pin, irq, edge_level, active_high_low);
-		if (vector)
+		if (!io_apic_set_pci_routing(ioapic, ioapic_pin, irq, edge_level, active_high_low)) {
+ 			if (use_pci_vector() && !platform_legacy_irq(irq))
+ 				irq = IO_APIC_VECTOR(irq);
 			entry->irq = irq;
-
-		printk(KERN_DEBUG "%02x:%02x:%02x[%c] -> %d-%d -> vector 0x%02x"
+ 		}
+		printk(KERN_DEBUG "%02x:%02x:%02x[%c] -> %d-%d"
 			" -> IRQ %d\n", entry->id.segment, entry->id.bus, 
 			entry->id.device, ('A' + entry->pin), 
-			mp_ioapic_routing[ioapic].apic_id, ioapic_pin, vector, 
+			mp_ioapic_routing[ioapic].apic_id, ioapic_pin,
 			entry->irq);
 	}
 	
