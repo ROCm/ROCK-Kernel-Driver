@@ -32,11 +32,3 @@ obj-$(CONFIG_SND_RAWMIDI)	+= snd-rawmidi.o
 obj-$(CONFIG_SND_OSSEMUL)	+= oss/
 obj-$(CONFIG_SND_SEQUENCER)	+= seq/
 obj-$(CONFIG_SND_BIT32_EMUL) += ioctl32/
-
-# Toplevel Module Dependency
-obj-$(CONFIG_SND_VIRMIDI) += snd-timer.o
-obj-$(CONFIG_SND_SERIAL_U16550) += snd-timer.o
-obj-$(CONFIG_SND_MTPAV) += snd-timer.o
-obj-$(CONFIG_SND_MPU401) += snd-timer.o
-
-obj-m := $(sort $(obj-m))

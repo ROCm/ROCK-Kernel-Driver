@@ -15,6 +15,7 @@ config SND_DUMMY
 config SND_VIRMIDI
 	tristate "Virtual MIDI soundcard"
 	depends on SND_SEQUENCER
+	select SND_TIMER
 	select SND_RAWMIDI
 	help
 	  Say 'Y' or 'M' to include virtual MIDI driver. This driver allows to
@@ -23,6 +24,7 @@ config SND_VIRMIDI
 config SND_MTPAV
 	tristate "MOTU MidiTimePiece AV multiport MIDI"
 	depends on SND
+	select SND_TIMER
 	select SND_RAWMIDI
 	help
 	  Say 'Y' or 'M' to include support for MOTU MidiTimePiece AV multiport
@@ -31,6 +33,7 @@ config SND_MTPAV
 config SND_SERIAL_U16550
 	tristate "UART16550 - MIDI only driver"
 	depends on SND
+	select SND_TIMER
 	select SND_RAWMIDI
 	help
 	  Say 'Y' or 'M' to include support for MIDI serial port driver. It works
@@ -39,6 +42,7 @@ config SND_SERIAL_U16550
 config SND_MPU401
 	tristate "Generic MPU-401 UART driver"
 	depends on SND
+	select SND_TIMER
 	select SND_RAWMIDI
 	help
 	  Say 'Y' or 'M' to include support for MPU401 hardware using UART access.
