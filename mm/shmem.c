@@ -1239,7 +1239,7 @@ shmem_file_write(struct file *file, const char __user *buf, size_t count, loff_t
 		pos += bytes;
 		buf += bytes;
 		if (pos > inode->i_size)
-			inode->i_size = pos;
+			i_size_write(inode, pos);
 
 		flush_dcache_page(page);
 		set_page_dirty(page);
