@@ -124,6 +124,7 @@
 #include <linux/spinlock.h>
 #include <linux/completion.h>
 #include <linux/sched.h>
+#include <linux/init.h>
 #include <linux/proc_fs.h>
 #include <asm/dma.h>
 #include <asm/system.h>
@@ -2058,7 +2059,8 @@ static struct device_attribute NCR_700_active_tags_attr = {
 	.show = NCR_700_show_active_tags,
 };
 
-STATIC int __init NCR_700_init(void)
+STATIC int __init
+NCR_700_init(void)
 {
 	scsi_sysfs_modify_sdev_attribute(&NCR_700_dev_attrs,
 					 &NCR_700_queue_depth_attr);
