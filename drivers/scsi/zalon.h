@@ -15,12 +15,7 @@ extern struct proc_dir_entry proc_scsi_zalon7xx;
 int zalon7xx_detect(Scsi_Host_Template *tpnt);
 const char *ncr53c8xx_info(struct Scsi_Host *host);
 int ncr53c8xx_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-
-#ifdef MODULE
 int zalon7xx_release(struct Scsi_Host *);
-#else
-#define zalon7xx_release NULL
-#endif
 
 #define GSC_SCSI_ZALON_OFFSET 0x800
 
