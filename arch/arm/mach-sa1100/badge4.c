@@ -109,7 +109,7 @@ static int __init badge4_init(void)
 	return 0;
 }
 
-__initcall(badge4_init);
+arch_initcall(badge4_init);
 
 
 static unsigned badge4_5V_bitmap = 0;

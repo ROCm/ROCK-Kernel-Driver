@@ -48,7 +48,7 @@ static int __init freebird_init(void)
 	return 0;
 }
 
-__initcall(freebird_init);
+arch_initcall(freebird_init);
 
 static struct map_desc freebird_io_desc[] __initdata = {
  /* virtual     physical    length      type */

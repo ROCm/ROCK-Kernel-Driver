@@ -1,0 +1,10 @@
+mainmenu_option next_comment
+comment 'Epxa10db'
+
+if [ "$CONFIG_ARCH_CAMELOT" = "y" ]; then
+   comment 'PLD hotswap support'
+   define_bool CONFIG_PLD y
+   dep_bool 'Support for PLD device hotplugging (experimental)' CONFIG_PLD_HOTSWAP $CONFIG_EXPERIMENTAL
+fi
+
+endmenu

@@ -52,6 +52,4 @@
 #define __virt_to_bus(x)	 __virt_to_phys(x)
 #define __bus_to_virt(x)	 __phys_to_virt(x)
 
-#define	PHYS_TO_NID(x)		0
-
 #endif

@@ -40,6 +40,14 @@
 		.macro	writeb, rb
 		strb	\rb, [r3, #0]
 		.endm
+#elif defined(CONFIG_ARCH_PXA) /* Xscale-type */
+		.macro 	loadsp, rb
+		mov	\rb, #0x40000000
+		orr	\rb, \rb, #0x00100000
+		.endm
+		.macro	writeb, rb
+		strb	\rb, [r3, #0]
+		.endm
 #else
 #error no serial architecture defined
 #endif

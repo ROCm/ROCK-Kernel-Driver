@@ -117,8 +117,8 @@ __turn_mmu_on:
 #ifdef CONFIG_ALIGNMENT_TRAP
 	orr	r0, r0, #2			@ ...........A.
 #endif
-	mcr	p15, 0, r0, c1, c0
-	mov	r0, r0
+	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
+	mrc	p15, 0, r0, c1, c0, 0		@ read it back.
 	mov	r0, r0
 	mov	r0, r0
 	mov	pc, lr

@@ -126,7 +126,7 @@ static int __init assabet_init(void)
 	return 0;
 }
 
-__initcall(assabet_init);
+arch_initcall(assabet_init);
 
 
 /*

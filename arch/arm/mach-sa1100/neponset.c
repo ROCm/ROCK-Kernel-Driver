@@ -216,7 +216,7 @@ static int __init neponset_init(void)
 	return sa1111_init(&neponset_device, 0x40000000, IRQ_NEPONSET_SA1111);
 }
 
-__initcall(neponset_init);
+arch_initcall(neponset_init);
 
 static struct map_desc neponset_io_desc[] __initdata = {
  /* virtual     physical    length type */

@@ -124,7 +124,7 @@ static int __init pxa_dma_init (void)
 	return ret;
 }
 
-__initcall(pxa_dma_init);
+arch_initcall(pxa_dma_init);
 
 EXPORT_SYMBOL(pxa_request_dma);
 EXPORT_SYMBOL(pxa_free_dma);

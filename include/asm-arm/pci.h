@@ -12,6 +12,34 @@
 
 struct pci_dev;
 
+/*
+ * For SA-1111 these functions are "magic" and utilize bounce
+ * buffers as need to workaround SA-1111 DMA bugs.  They are called in
+ * place of their pci_* counterparts when dev_is_sa1111() returns true.
+ */
+dma_addr_t sa1111_map_single(struct pci_dev *, void *, size_t, int);
+void sa1111_unmap_single(struct pci_dev *, dma_addr_t, size_t, int);
+int sa1111_map_sg(struct pci_dev *, struct scatterlist *, int, int);
+void sa1111_unmap_sg(struct pci_dev *, struct scatterlist *, int, int);
+void sa1111_dma_sync_single(struct pci_dev *, dma_addr_t, size_t, int);
+void sa1111_dma_sync_sg(struct pci_dev *, struct scatterlist *, int, int);
+
+#ifdef CONFIG_SA1111
+
+#define SA1111_FAKE_PCIDEV ((struct pci_dev *) 1111)
+
+static inline int dev_is_sa1111(const struct pci_dev *dev)
+{
+	return (dev == SA1111_FAKE_PCIDEV);
+}
+
+#else
+
+static inline int dev_is_sa1111(const struct pci_dev *dev) { return 0; }
+
+#endif
+
+
 static inline void pcibios_set_master(struct pci_dev *dev)
 {
 	/* No special bus mastering setup handling */
@@ -61,17 +89,9 @@ pci_free_consistent(struct pci_dev *hwdev, size_t size, void *vaddr,
 static inline dma_addr_t
 pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
 {
-#ifdef CONFIG_SA1111
-	extern dma_addr_t sa1111_map_single(struct pci_dev *, void *, size_t, int);
-
-	/*
-	 * for SA1111 these functions are "magic" and relocate buffers.  We
-	 * only need to do these if hwdev is non-null; otherwise we expect
-	 * the buffer to already be suitable for DMA.
-	 */
-	if (hwdev != NULL)
+	if (dev_is_sa1111(hwdev))
 		return sa1111_map_single(hwdev, ptr, size, direction);
-#endif
+
 	consistent_sync(ptr, size, direction);
 	return virt_to_bus(ptr);
 }
@@ -86,12 +106,9 @@ pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, int direction)
 static inline void
 pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr, size_t size, int direction)
 {
-#ifdef CONFIG_SA1111
-	extern void sa1111_unmap_single(struct pci_dev *, dma_addr_t, size_t, int);
-
-	if (hwdev != NULL)
+	if (dev_is_sa1111(hwdev))
 		sa1111_unmap_single(hwdev, dma_addr, size, direction);
-#endif
+
 	/* nothing to do */
 }
 
@@ -99,7 +116,7 @@ pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr, size_t size, int di
  * Whether pci_unmap_{single,page} is a nop depends upon the
  * configuration.
  */
-#ifdef CONFIG_PCI
+#if defined(CONFIG_PCI) || defined(CONFIG_SA1111)
 #define DECLARE_PCI_UNMAP_ADDR(ADDR_NAME)	dma_addr_t ADDR_NAME;
 #define DECLARE_PCI_UNMAP_LEN(LEN_NAME)		__u32 LEN_NAME;
 #define pci_unmap_addr(PTR, ADDR_NAME)		((PTR)->ADDR_NAME)
@@ -135,6 +152,9 @@ pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int directi
 {
 	int i;
 
+	if (dev_is_sa1111(hwdev))
+		return sa1111_map_sg(hwdev, sg, nents, direction);
+
 	for (i = 0; i < nents; i++, sg++) {
 		char *virt;
 
@@ -153,6 +173,11 @@ pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int directi
 static inline void
 pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int direction)
 {
+	if (dev_is_sa1111(hwdev)) {
+		sa1111_unmap_sg(hwdev, sg, nents, direction);
+		return;
+	}
+
 	/* nothing to do */
 }
 
@@ -168,6 +193,11 @@ pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nents, int direc
 static inline void
 pci_dma_sync_single(struct pci_dev *hwdev, dma_addr_t dma_handle, size_t size, int direction)
 {
+	if (dev_is_sa1111(hwdev)) {
+	  	sa1111_dma_sync_single(hwdev, dma_handle, size, direction);
+		return;
+	}
+
 	consistent_sync(bus_to_virt(dma_handle), size, direction);
 }
 
@@ -181,6 +211,11 @@ static inline void
 pci_dma_sync_sg(struct pci_dev *hwdev, struct scatterlist *sg, int nelems, int direction)
 {
 	int i;
+
+	if (dev_is_sa1111(hwdev)) {
+	  	sa1111_dma_sync_sg(hwdev, sg, nelems, direction);
+		return;
+	}
 
 	for (i = 0; i < nelems; i++, sg++) {
 		char *virt = page_address(sg->page) + sg->offset;
@@ -203,6 +238,19 @@ static inline int pci_dma_supported(struct pci_dev *hwdev, u64 mask)
 
 /* Return the index of the PCI controller for device PDEV. */
 #define pci_controller_num(PDEV)	(0)
+
+
+#if defined(CONFIG_SA1111) && !defined(CONFIG_PCI)
+/* SA-1111 needs these prototypes even when !defined(CONFIG_PCI) */
+
+/* kmem_cache style wrapper around pci_alloc_consistent() */
+struct pci_pool *pci_pool_create (const char *name, struct pci_dev *dev,
+		size_t size, size_t align, size_t allocation, int flags);
+void pci_pool_destroy (struct pci_pool *pool);
+
+void *pci_pool_alloc (struct pci_pool *pool, int flags, dma_addr_t *handle);
+void pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t addr);
+#endif
 
 #endif /* __KERNEL__ */
  
