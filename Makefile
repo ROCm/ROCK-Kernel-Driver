@@ -36,13 +36,36 @@ KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
 				  -e s/arm.*/arm/ -e s/sa110/arm/ \
 				  -e s/s390x/s390/ )
-ARCH := $(SUBARCH)
 
 # Remove hyphens since they have special meaning in RPM filenames
 KERNELPATH=kernel-$(subst -,,$(KERNELRELEASE))
 
+# Cross compiling and selecting different set of gcc/bin-utils
+# ---------------------------------------------------------------------------
+#
+# When performing cross compilation for other architectures ARCH shall be set
+# to the target architecture. (See arch/* for the possibilities).
+# ARCH can be set during invocation of make:
+# make ARCH=ia64
+# Another way is to have ARCH set in the environment.
+# The default ARCH is the host where make is executed.
+
+# CROSS_COMPILE specify the prefix used for all executables used
+# during compilation. Only gcc and related bin-utils executables
+# are prefixed with $(CROSS_COMPILE).
+# CROSS_COMPILE can be set on the command line
+# make CROSS_COMPILE=ia64-linux-
+# Alternatively CROSS_COMPILE can be set in the environment.
+# Default value for CROSS_COMPILE is not to prefix executables
+# Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
+
+ARCH		?= $(SUBARCH)
+CROSS_COMPILE	?=
+
+# Architecture as present in compile.h
 UTS_MACHINE := $(ARCH)
 
+# SHELL used by kbuild
 CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 	  else if [ -x /bin/bash ]; then echo /bin/bash; \
 	  else echo sh; fi ; fi)
@@ -53,7 +76,6 @@ HOSTCXX  	= g++
 HOSTCFLAGS	= -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer
 HOSTCXXFLAGS	= -O2
 
-CROSS_COMPILE 	=
 
 # 	That's our default target when none is given on the command line
 #	Note that 'modules' will be added as a prerequisite as well, 
@@ -783,25 +805,27 @@ rpm:	clean spec
 
 help:
 	@echo  'Cleaning targets:'
-	@echo  '  clean		- remove most generated files but keep the config'
-	@echo  '  mrproper	- remove all generated files + config + various backup files'
+	@echo  '  clean		  - remove most generated files but keep the config'
+	@echo  '  mrproper	  - remove all generated files + config + various backup files'
 	@echo  ''
 	@echo  'Configuration targets:'
-	@echo  '  oldconfig	- Update current config utilising a line-oriented program'
-	@echo  '  menuconfig	- Update current config utilising a menu based program'
-	@echo  '  xconfig	- Update current config utilising a X-based program'
-	@echo  '  defconfig	- New config with default answer to all options'
-	@echo  '  allmodconfig	- New config selecting modules when possible'
-	@echo  '  allyesconfig	- New config where all options are accepted with yes'
-	@echo  '  allnoconfig	- New minimal config'
+	@echo  '  oldconfig	  - Update current config utilising a line-oriented program'
+	@echo  '  menuconfig	  - Update current config utilising a menu based program'
+	@echo  '  xconfig	  - Update current config utilising a QT based front-end'
+	@echo  '  gconfig	  - Update current config utilising a GTK based front-end'
+	@echo  '  defconfig	  - New config with default answer to all options'
+	@echo  '  allmodconfig	  - New config selecting modules when possible'
+	@echo  '  allyesconfig	  - New config where all options are accepted with yes'
+	@echo  '  allnoconfig	  - New minimal config'
 	@echo  ''
 	@echo  'Other generic targets:'
-	@echo  '  all		- Build all targets marked with [*]'
-	@echo  '* vmlinux	- Build the bare kernel'
-	@echo  '* modules	- Build all modules'
-	@echo  '  dir/file.[ois]- Build specified target only'
-	@echo  '  rpm		- Build a kernel as an RPM package'
-	@echo  '  tags/TAGS	- Generate tags file for editors'
+	@echo  '  all		  - Build all targets marked with [*]'
+	@echo  '* vmlinux	  - Build the bare kernel'
+	@echo  '* modules	  - Build all modules'
+	@echo  '  modules_install - Install all modules'
+	@echo  '  dir/file.[ois]  - Build specified target only'
+	@echo  '  rpm		  - Build a kernel as an RPM package'
+	@echo  '  tags/TAGS	  - Generate tags file for editors'
 	@echo  ''
 	@echo  'Documentation targets:'
 	@$(MAKE) --no-print-directory -f Documentation/DocBook/Makefile dochelp
@@ -809,6 +833,9 @@ help:
 	@echo  'Architecture specific targets ($(ARCH)):'
 	@$(if $(archhelp),$(archhelp),\
 		echo '  No architecture specific help defined for $(ARCH)')
+	@echo  ''
+	@echo  '  make V=0|1 [targets] 0 => quiet build (default), 1 => verbose build'
+	@echo  '  make C=1   [targets] Check all c source with checker tool'
 	@echo  ''
 	@echo  'Execute "make" or "make all" to build all targets marked with [*] '
 	@echo  'For further info browse Documentation/kbuild/*'
