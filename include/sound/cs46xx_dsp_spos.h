@@ -177,6 +177,26 @@ typedef struct _dsp_spos_instance_t {
 	/* SPDIF status */
 	int spdif_status_out;
 	int spdif_status_in;
+
+	/* SPDIF input sample rate converter */
+	dsp_scb_descriptor_t * spdif_in_src;
+	/* SPDIF input asynch. receiver */
+	dsp_scb_descriptor_t * asynch_rx_scb;
+
+	/* Capture record mixer SCB */
+	dsp_scb_descriptor_t * record_mixer_scb;
+    
+	/* CODEC input SCB */
+	dsp_scb_descriptor_t * codec_in_scb;
+
+	/* reference snooper */
+	dsp_scb_descriptor_t * ref_snoop_scb;
+
+	/* record sources */
+	dsp_scb_descriptor_t * pcm_input;
+	dsp_scb_descriptor_t * adc_input;
+
+	int spdif_in_sample_rate;
 } dsp_spos_instance_t;
 
 #endif /* __DSP_SPOS_H__ */

@@ -25,8 +25,8 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
+#include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/init.h>
@@ -625,6 +625,7 @@ static int snd_emu10k1_capture_trigger(snd_pcm_substream_t * substream,
 		}
 		snd_emu10k1_ptr_write(emu, epcm->capture_bs_reg, 0, epcm->capture_bs_val);
 		epcm->running = 1;
+		epcm->first_ptr = 1;
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 		epcm->running = 0;
@@ -682,6 +683,10 @@ static snd_pcm_uframes_t snd_emu10k1_capture_pointer(snd_pcm_substream_t * subst
 
 	if (!epcm->running)
 		return 0;
+	if (epcm->first_ptr) {
+		udelay(50);	// hack, it takes awhile until capture is started
+		epcm->first_ptr = 0;
+	}
 	ptr = snd_emu10k1_ptr_read(emu, epcm->capture_idx_reg, 0) & 0x0000ffff;
 	return bytes_to_frames(runtime, ptr);
 }

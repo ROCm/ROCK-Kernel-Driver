@@ -795,7 +795,8 @@ struct _snd_emu10k1_pcm {
 	snd_pcm_substream_t *substream;
 	emu10k1_voice_t *voices[2];
 	emu10k1_voice_t *extra;
-	int running;
+	unsigned short running;
+	unsigned short first_ptr;
 	snd_util_memblk_t *memblk;
 	unsigned int start_addr;
 	unsigned int ccca_start_addr;

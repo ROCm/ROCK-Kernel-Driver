@@ -23,7 +23,6 @@
 #include "config.h"
 #endif
 
-#define __NO_VERSION__
 #include <linux/version.h>
 #include <linux/config.h>
 #ifdef ALSA_BUILD

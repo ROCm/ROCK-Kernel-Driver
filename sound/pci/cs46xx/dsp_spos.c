@@ -20,7 +20,6 @@
  */
 
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <asm/io.h>
 #include <linux/delay.h>
@@ -251,8 +250,8 @@ static int add_symbols (cs46xx_t * chip, dsp_module_desc_t * module)
 
 			ins->symbol_table.nsymbols++;
 		} else {
-			// if (0) printk ("dsp_spos: symbol <%s> duplicated, probably nothing wrong with that (Cirrus?)\n",
-			//                module->symbol_table.symbols[i].symbol_name);
+          /* if (0) printk ("dsp_spos: symbol <%s> duplicated, probably nothing wrong with that (Cirrus?)\n",
+                             module->symbol_table.symbols[i].symbol_name); */
 		}
 	}
 
@@ -335,6 +334,10 @@ dsp_spos_instance_t *  cs46xx_dsp_spos_create (cs46xx_t * chip)
 		cs46xx_dsp_spos_destroy(ins);
 		return NULL;
 	}
+
+	/* default SPDIF input sample rate
+	   to 48000 khz */
+	ins->spdif_in_sample_rate = 32000;
 
 	return ins;
 }
@@ -688,7 +691,7 @@ static void cs46xx_dsp_proc_sample_dump_read (snd_info_entry_t *entry, snd_info_
 
 	snd_iprintf(buffer,"\n\n");
 	col = 0;
-	for (i = SPDIFO_IP_OUTPUT_BUFFER1 - 0x80;i < SPDIFO_IP_OUTPUT_BUFFER1; i += sizeof(u32),col ++) {
+	for (i = SPDIFI_IP_OUTPUT_BUFFER1;i < SPDIFI_IP_OUTPUT_BUFFER1 + 0x40; i += sizeof(u32),col ++) {
 		if (col == 4) {
 			snd_iprintf(buffer,"\n");
 			col = 0;
@@ -1083,17 +1086,15 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 	dsp_scb_descriptor_t * timing_master_scb;
 	dsp_scb_descriptor_t * codec_out_scb;
 	dsp_scb_descriptor_t * codec_in_scb;
-	dsp_scb_descriptor_t * pcm_reader_scb;
 	dsp_scb_descriptor_t * src_task_scb;
 	dsp_scb_descriptor_t * master_mix_scb;
+	dsp_scb_descriptor_t * record_mix_scb;
 	dsp_scb_descriptor_t * write_back_scb;
 	dsp_scb_descriptor_t * vari_decimate_scb;
 	dsp_scb_descriptor_t * pcm_serial_input_task;
 	dsp_scb_descriptor_t * asynch_tx_scb;
-	dsp_scb_descriptor_t * asynch_rx_scb;
 	dsp_scb_descriptor_t * sec_codec_out_scb;
 	dsp_scb_descriptor_t * magic_snoop_scb;
-	dsp_scb_descriptor_t * sec_magic_snoop_scb;
 
 	spos_control_block_t sposcb = {
 		/* 0 */ HFG_TREE_SCB,HFG_STACK,
@@ -1310,13 +1311,9 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 				0,0
 			}
 		};
-		// debug_tree = 1;
 		cs46xx_dsp_create_task_tree(chip,"BGtaskTreeHdr",(u32 *)&bg_task_tree_hdr,BG_TREE_SCB_ADDR,0x35);
-		// debug_tree = 0;
-    
 	}
 
-	//debug_scb = 1;
 	/* create timing master SCB */
 	timing_master_scb = cs46xx_dsp_create_timing_master_scb(chip);
 
@@ -1335,21 +1332,6 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 	ins->master_mix_scb = master_mix_scb;
 
 	if (!master_mix_scb) goto _fail_end;
-#if 0
-	/* the sample rate converter SCB */
-	src_task_scb = cs46xx_dsp_create_src_task_scb(chip,"SrcTaskSCB_I",
-						      SRC_OUTPUT_BUF1,
-						      SRC_DELAY_BUF1,SRCTASK_SCB_ADDR,
-						      asynch_tx_scb,
-
-						      SCB_ON_PARENT_SUBLIST_SCB);
-	/* create the PCM reader SCB */
-	pcm_reader_scb = cs46xx_dsp_create_pcm_reader_scb(chip,"PCMReaderSCB_I",
-							  PCM_READER_BUF1,PCMREADER_SCB_ADDR,
-							  0, /* playback how hw addr */
-							  src_task_scb,
-							  SCB_ON_PARENT_SUBLIST_SCB);
-#endif
 
 	/* create codec in */
 	codec_in_scb = cs46xx_dsp_create_codec_in_scb(chip,"CodecInSCB",0x0010,0x00A0,
@@ -1357,7 +1339,8 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
                                                   CODECIN_SCB_ADDR,codec_out_scb,
                                                   SCB_ON_PARENT_NEXT_SCB);
 	if (!codec_in_scb) goto _fail_end;
-  
+	ins->codec_in_scb = codec_in_scb;
+
 	/* create write back scb */
 	write_back_scb = cs46xx_dsp_create_mix_to_ostream_scb(chip,"WriteBackSCB",
 							      WRITE_BACK_BUF1,WRITE_BACK_SPB,
@@ -1385,25 +1368,14 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 								SCB_ON_PARENT_SUBLIST_SCB);
 	if (!vari_decimate_scb) goto _fail_end;
 
+	/* create the record mixer SCB */
+	record_mix_scb = cs46xx_dsp_create_mix_only_scb(chip,"RecordMixerSCB",
+							MIX_SAMPLE_BUF2,0x170,
+							vari_decimate_scb,
+							SCB_ON_PARENT_SUBLIST_SCB);
+	ins->record_mixer_scb = record_mix_scb;
 
-	/* pcm input */
-	pcm_serial_input_task = cs46xx_dsp_create_pcm_serial_input_scb(chip,"PCMSerialInput",
-								       PCMSERIALIN_SCB_ADDR,
-								       codec_in_scb, vari_decimate_scb,
-								       SCB_ON_PARENT_SUBLIST_SCB);
-	if (!pcm_serial_input_task) goto _fail_end;
-  
-
-#if 0  /* asynch. receive task */
-	asynch_rx_scb = cs46xx_dsp_create_asynch_fg_rx_scb(chip,"AsynchFGRxSCB",
-							   ASYNCRX_SCB_ADDR,
-							   SPDIFI_SCB_INST,
-							   SPDIFI_IP_OUTPUT_BUFFER1,
-							   master_mix_scb,
-							   SCB_ON_PARENT_NEXT_SCB);
-	if (!asynch_rx_scb) goto _fail_end;
-#endif
-
+	if (!record_mix_scb) goto _fail_end;
 
 	/* create secondary CODEC output */
 	sec_codec_out_scb = cs46xx_dsp_create_codec_out_scb(chip,"CodecOutSCB_II",0x0010,0x0040,
@@ -1419,6 +1391,7 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 							     sec_codec_out_scb,
 							     SCB_ON_PARENT_SUBLIST_SCB);
 	if (!magic_snoop_scb) goto _fail_end;
+	ins->ref_snoop_scb = magic_snoop_scb;
 
 	/* The asynch. transfer task */
 	asynch_tx_scb = cs46xx_dsp_create_asynch_fg_tx_scb(chip,"AsynchFGTxSCB",ASYNCTX_SCB_ADDR,
@@ -1445,16 +1418,19 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 
 
 	/* the magic snooper */
-#if 0
-	sec_magic_snoop_scb = cs46xx_dsp_create_magic_snoop_scb (chip,"MagicSnoopSCB_II",OUTPUTSNOOPII_SCB_ADDR,
-								 MIX_SAMPLE_BUF1,
-								 master_mix_scb,
-								 asynch_tx_scb,
-								 SCB_ON_PARENT_SUBLIST_SCB);
-	if (!sec_magic_scb) goto _fail_end;
-#endif
 
-	//debug_scb = 0;
+	src_task_scb = cs46xx_dsp_create_src_task_scb(chip,"SrcTaskSCB_SPDIFI",
+						      SRC_OUTPUT_BUF1,
+						      SRC_DELAY_BUF1,SRCTASK_SCB_ADDR,
+						      master_mix_scb,
+						      SCB_ON_PARENT_SUBLIST_SCB);
+
+	if (!src_task_scb) goto _fail_end;
+
+	/* NOTE: when we now how to detect the SPDIF input
+	   sample rate we will use this SRC to adjust it */
+	ins->spdif_in_src = src_task_scb;
+
 	cs46xx_dsp_async_init(chip,timing_master_scb);
 	return 0;
 
@@ -1493,15 +1469,19 @@ int cs46xx_dsp_async_init (cs46xx_t *chip, dsp_scb_descriptor_t * fg_entry)
 		spdifoscb_t spdifo_scb = {
 			/* 0 */ DSP_SPOS_UUUU,
 			{
-				/* 1 */ 0xb0, //DSP_SPOS_UUUU,
-				/* 2 */ 0, //DSP_SPOS_UUUU,
-				/* 3 */ 0, //DSP_SPOS_UUUU, 
-				/* 4 */ 0, //DSP_SPOS_UUUU,
+				/* 1 */ 0xb0, 
+				/* 2 */ 0, 
+				/* 3 */ 0, 
+				/* 4 */ 0, 
 			},
-			/* 5 */ 0x00000085,
+			/* NOTE: the SPDIF output task read samples in mono
+			   format, the AsynchFGTxSCB task writes to buffer
+			   in stereo format
+			*/
+			/* 5 */ RSCONFIG_SAMPLE_16MONO + RSCONFIG_MODULO_256,
 			/* 6 */ ( SPDIFO_IP_OUTPUT_BUFFER1 << 0x10 )  |  0xFFFC,
-			/* 7 */ 0,0, // DSP_SPOS_UU,1, //DSP_SPOS_DC,DSP_SPOS_UU, 
-			/* 8 */ 0, //DSP_SPOS_UUUU,      
+			/* 7 */ 0,0, 
+			/* 8 */ 0, 
 			/* 9 */ FG_TASK_HEADER_ADDR, NULL_SCB_ADDR, 
 			/* A */ spdifo_task->address,
 			SPDIFO_SCB_INST + SPDIFOFIFOPointer,
@@ -1528,8 +1508,11 @@ int cs46xx_dsp_async_init (cs46xx_t *chip, dsp_scb_descriptor_t * fg_entry)
 			/* 9 */ SPDIFO_SCB_INST, NULL_SCB_ADDR,
 			/* A */ spdifi_task->address,
 			SPDIFI_SCB_INST + SPDIFIFIFOPointer,
-              
-			/* B */ 0x00000083,				
+			/* NOTE: The SPDIF input task write the sample in mono
+			   format from the HW FIFO, the AsynchFGRxSCB task  reads 
+			   them in stereo 
+			*/
+			/* B */ RSCONFIG_SAMPLE_16MONO + RSCONFIG_MODULO_128,
 			/* C */ (SPDIFI_IP_OUTPUT_BUFFER1 << 0x10) | 0xFFFC,
 			/* D */ 0x8048,0,
 			/* E */ 0x01f0,0x0001,
@@ -1543,7 +1526,7 @@ int cs46xx_dsp_async_init (cs46xx_t *chip, dsp_scb_descriptor_t * fg_entry)
 			/* 2 */ 0,
 			/* 3 */ 1,4000,
 			/* 4 */ 0x0118,0x0001,
-			/* 5 */ 0x00000083,
+			/* 5 */ RSCONFIG_SAMPLE_16MONO + RSCONFIG_MODULO_64,
 			/* 6 */ (ASYNC_IP_OUTPUT_BUFFER1 << 0x10) | 0xFFFC,
 			/* 7 */ DSP_SPOS_UU,0x3,
 			/* 8 */ DSP_SPOS_UUUU,
@@ -1614,8 +1597,8 @@ int cs46xx_dsp_async_init (cs46xx_t *chip, dsp_scb_descriptor_t * fg_entry)
 		   is the FG task tree */
 		fg_entry->parent_scb_ptr = spdifo_scb_desc;
 
-		/* dirty hack to start forground task ... */
-		//snd_cs46xx_poke(chip,DSP_PARAMETER_BYTE_OFFSET  + 0x070 * sizeof(u32),0x066a0ba0);
+		/* Async MASTER ENABLE, affects both SPDIF input and output */
+		snd_cs46xx_pokeBA0(chip, BA0_ASER_MASTER, 0x1 );
 	}
 
 	return 0;
@@ -1626,19 +1609,7 @@ int cs46xx_dsp_enable_spdif_out (cs46xx_t *chip)
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 
 	/* set SPDIF output FIFO slot */
-	snd_cs46xx_pokeBA0(chip, BA0_ASER_FADDR, ( 0x8100 | ((SP_SPDOUT_FIFO >> 4) << 4) ));
-
-	/* Async MASTER ENABLE */
-	snd_cs46xx_pokeBA0(chip, BA0_ASER_MASTER, 0x1 );
-
-#if 0
-	/* reset buffers */
-	snd_cs46xx_poke (chip, (SPDIFO_SCB_INST + 6) << 2,(SPDIFO_IP_OUTPUT_BUFFER1 << 0x10)  |  0xFFFC);
-	snd_cs46xx_poke (chip, (ASYNCTX_SCB_ADDR + 12) << 2, (SPDIFO_IP_OUTPUT_BUFFER1) << 0x10);
-
-	/* insert the foreground asynch tranfer task */
-	snd_cs46xx_poke (chip, (MASTERMIX_SCB_ADDR + 9) << 2, ASYNCTX_SCB_ADDR << 0x10 /*| ASYNCRX_SCB_ADDR*/);
-#endif
+	snd_cs46xx_pokeBA0(chip, BA0_ASER_FADDR, ( 0x8000 | ((SP_SPDOUT_FIFO >> 4) << 4) ));
 
 	/* SPDIF output MASTER ENABLE */
 	cs46xx_poke_via_dsp (chip,SP_SPDOUT_CONTROL, 0x80000000);
@@ -1658,13 +1629,8 @@ int  cs46xx_dsp_disable_spdif_out (cs46xx_t *chip)
 {
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 
-#if 0
-	/* unlink the foreground asynch tranfer task */
-	snd_cs46xx_poke (chip, (MASTERMIX_SCB_ADDR + 9) << 2, SRCTASK_SCB_ADDR << 0x10 /* | ASYNCRX_SCB_ADDR*/);
-#endif
-
-	/* Async MASTER DISABLE */
-	snd_cs46xx_pokeBA0(chip, BA0_ASER_MASTER, 0x0 );
+	/* disable  SPDIF output FIFO slot */
+	snd_cs46xx_pokeBA0(chip, BA0_ASER_FADDR, 0);
 
 	/* SPDIF output MASTER DISABLE */
 	cs46xx_poke_via_dsp (chip,SP_SPDOUT_CONTROL, 0x0);
@@ -1679,11 +1645,38 @@ int cs46xx_dsp_enable_spdif_in (cs46xx_t *chip)
 {
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 
-	/* Async MASTER ENABLE */
-	snd_cs46xx_pokeBA0(chip, BA0_ASER_MASTER, 0x1 );
+	/* turn on amplifier */
+	chip->active_ctrl(chip, 1);
+	chip->amplifier_ctrl(chip, 1);
 
-	/* Time countdown enable */
+	/* set SPDIF input sample rate 
+	   NOTE: only 48khz support for SPDIF input this time */
+	cs46xx_dsp_set_src_sample_rate(chip,ins->spdif_in_src,48000);
+
+
+	snd_assert (ins->asynch_rx_scb == NULL,return -EINVAL);
+	snd_assert (ins->spdif_in_src != NULL,return -EINVAL);
+
+	/* create and start the asynchronous receiver SCB */
+	ins->asynch_rx_scb = cs46xx_dsp_create_asynch_fg_rx_scb(chip,"AsynchFGRxSCB",
+								ASYNCRX_SCB_ADDR,
+								SPDIFI_SCB_INST,
+								SPDIFI_IP_OUTPUT_BUFFER1,
+								ins->spdif_in_src,
+								SCB_ON_PARENT_SUBLIST_SCB);
+
+	if (!ins->asynch_rx_scb) 
+		return -EINVAL;
+
+	/* reset SPDIF input sample buffer pointer */
+	snd_cs46xx_poke (chip, (SPDIFI_SCB_INST + 0x0c) << 2,
+			 (SPDIFI_IP_OUTPUT_BUFFER1 << 0x10) | 0xFFFC);
+
+	/* time countdown enable */
 	cs46xx_poke_via_dsp (chip,SP_ASER_COUNTDOWN, 0x80000000);
+
+	/* reset FIFO ptr */
+	cs46xx_poke_via_dsp (chip,SP_SPDIN_FIFOPTR, 0x0);
 
 	/* SPDIF input MASTER ENABLE */
 	cs46xx_poke_via_dsp (chip,SP_SPDIN_CONTROL, 0x800003ff);
@@ -1698,15 +1691,79 @@ int cs46xx_dsp_disable_spdif_in (cs46xx_t *chip)
 {
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 
+	snd_assert (ins->asynch_rx_scb != NULL, return -EINVAL);
+
+	/* Time countdown disable */
+	cs46xx_poke_via_dsp (chip,SP_ASER_COUNTDOWN, 0x00000000);
+
 	/* SPDIF input MASTER DISABLE */
 	cs46xx_poke_via_dsp (chip,SP_SPDIN_CONTROL, 0x000003ff);
 
+	/* Remove the asynchronous receiver SCB */
+	cs46xx_dsp_remove_scb (chip,ins->asynch_rx_scb);
+	ins->asynch_rx_scb = NULL;
+
 	/* monitor state */
 	ins->spdif_status_in = 0;
+
+	/* restore amplifier */
+	chip->active_ctrl(chip, -1);
+	chip->amplifier_ctrl(chip, -1);
+
 	return 0;
 }
 
-int  cs46xx_poke_via_dsp (cs46xx_t *chip,u32 address,u32 data)
+int cs46xx_dsp_enable_pcm_capture (cs46xx_t *chip)
+{
+	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
+
+	snd_assert (ins->pcm_input == NULL,return -EINVAL);
+	snd_assert (ins->ref_snoop_scb != NULL,return -EINVAL);
+
+	ins->pcm_input = cs46xx_add_record_source(chip,ins->ref_snoop_scb,PCMSERIALIN_PCM_SCB_ADDR,
+                                                  "PCMSerialInput_Wave");
+                                                  
+	return 0;
+}
+
+int cs46xx_dsp_disable_pcm_capture (cs46xx_t *chip)
+{
+	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
+
+	snd_assert (ins->pcm_input != NULL,return -EINVAL);
+
+	cs46xx_dsp_remove_scb (chip,ins->pcm_input);
+	ins->pcm_input = NULL;
+
+	return 0;
+}
+
+int cs46xx_dsp_enable_adc_capture (cs46xx_t *chip)
+{
+	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
+
+	snd_assert (ins->adc_input == NULL,return -EINVAL);
+	snd_assert (ins->codec_in_scb != NULL,return -EINVAL);
+
+	ins->adc_input = cs46xx_add_record_source(chip,ins->codec_in_scb,PCMSERIALIN_SCB_ADDR,
+						  "PCMSerialInput_ADC");
+                                                  
+	return 0;
+}
+
+int cs46xx_dsp_disable_adc_capture (cs46xx_t *chip)
+{
+	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
+
+	snd_assert (ins->adc_input != NULL,return -EINVAL);
+
+	cs46xx_dsp_remove_scb (chip,ins->adc_input);
+	ins->adc_input = NULL;
+
+	return 0;
+}
+
+int cs46xx_poke_via_dsp (cs46xx_t *chip,u32 address,u32 data)
 {
 	u32 temp;
 	int  i;

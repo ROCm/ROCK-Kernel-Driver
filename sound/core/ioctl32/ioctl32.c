@@ -18,7 +18,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/sched.h>
 #include <linux/smp_lock.h>

@@ -20,7 +20,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
 
-#define __NO_VERSION__
 #include "seq_oss_writeq.h"
 #include "seq_oss_event.h"
 #include "seq_oss_timer.h"

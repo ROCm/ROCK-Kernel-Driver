@@ -26,7 +26,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/time.h>
 #include <linux/init.h>
