@@ -194,12 +194,6 @@ static ssize_t fop_write(struct file * file, const char * buf, size_t count, lof
 	return 0;
 }
 
-static ssize_t fop_read(struct file * file, char * buf, size_t count, loff_t * ppos)
-{
-	/* No can do */
-	return -EINVAL;
-}
-
 static int fop_open(struct inode * inode, struct file * file)
 {
 	switch(minor(inode->i_rdev)) 
@@ -260,7 +254,6 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 static struct file_operations wdt_fops = {
 	.owner		= THIS_MODULE,
 	.llseek		= no_llseek,
-	.read		= fop_read,
 	.write		= fop_write,
 	.open		= fop_open,
 	.release	= fop_close,

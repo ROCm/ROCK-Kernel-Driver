@@ -349,14 +349,6 @@ static ssize_t zf_write(struct file *file, const char *buf, size_t count,
 	return 0;
 }
 
-static ssize_t zf_read(struct file *file, char *buf, size_t count, 
-							loff_t *ppos)
-{
-	return -EINVAL;
-}
-
-
-
 static int zf_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	unsigned long arg)
 {
@@ -448,7 +440,6 @@ static int zf_notify_sys(struct notifier_block *this, unsigned long code,
 
 static struct file_operations zf_fops = {
 	.owner          = THIS_MODULE,
-	.read           = zf_read,
 	.write          = zf_write,
 	.ioctl          = zf_ioctl,
 	.open           = zf_open,
