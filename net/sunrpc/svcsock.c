@@ -577,12 +577,15 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 
 	if (skb_is_nonlinear(skb)) {
 		/* we have to copy */
+		local_bh_disable();
 		if (csum_partial_copy_to_xdr(&rqstp->rq_arg, skb)) {
+			local_bh_enable();
 			/* checksum error */
 			skb_free_datagram(svsk->sk_sk, skb);
 			svc_sock_received(svsk);
 			return 0;
 		}
+		local_bh_enable();
 		skb_free_datagram(svsk->sk_sk, skb); 
 	} else {
 		/* we can use it in-place */
@@ -1435,7 +1438,7 @@ static struct cache_deferred_req *
 svc_defer(struct cache_req *req)
 {
 	struct svc_rqst *rqstp = container_of(req, struct svc_rqst, rq_chandle);
-	int size = sizeof(struct svc_deferred_req) + (rqstp->rq_arg.head[0].iov_len);
+	int size = sizeof(struct svc_deferred_req) + (rqstp->rq_arg.len);
 	struct svc_deferred_req *dr;
 
 	if (rqstp->rq_arg.page_len)
@@ -1444,6 +1447,7 @@ svc_defer(struct cache_req *req)
 		dr = rqstp->rq_deferred;
 		rqstp->rq_deferred = NULL;
 	} else {
+		int skip  = rqstp->rq_arg.len - rqstp->rq_arg.head[0].iov_len;
 		/* FIXME maybe discard if size too large */
 		dr = kmalloc(size, GFP_KERNEL);
 		if (dr == NULL)
@@ -1452,8 +1456,8 @@ svc_defer(struct cache_req *req)
 		dr->serv = rqstp->rq_server;
 		dr->prot = rqstp->rq_prot;
 		dr->addr = rqstp->rq_addr;
-		dr->argslen = rqstp->rq_arg.head[0].iov_len >> 2;
-		memcpy(dr->args, rqstp->rq_arg.head[0].iov_base, dr->argslen<<2);
+		dr->argslen = rqstp->rq_arg.len >> 2;
+		memcpy(dr->args, rqstp->rq_arg.head[0].iov_base-skip, dr->argslen<<2);
 	}
 	spin_lock(&rqstp->rq_server->sv_lock);
 	rqstp->rq_sock->sk_inuse++;
