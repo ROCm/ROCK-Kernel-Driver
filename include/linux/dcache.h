@@ -7,6 +7,7 @@
 #include <linux/list.h>
 #include <linux/spinlock.h>
 #include <linux/cache.h>
+#include <linux/rcupdate.h>
 #include <asm/bug.h>
 
 struct vfsmount;
@@ -30,6 +31,7 @@ struct qstr {
 	const unsigned char * name;
 	unsigned int len;
 	unsigned int hash;
+	char name_str[0];
 };
 
 struct dentry_stat_t {
@@ -72,21 +74,26 @@ struct dcookie_struct;
  
 struct dentry {
 	atomic_t d_count;
+	unsigned long d_vfs_flags;	/* moved here to be on same cacheline */
+	spinlock_t d_lock;		/* per dentry lock */
 	unsigned int d_flags;
+	unsigned long d_move_count;	/* to indicated moved dentry while lockless lookup */
 	struct inode  * d_inode;	/* Where the name belongs to - NULL is negative */
 	struct dentry * d_parent;	/* parent directory */
+	struct list_head * d_bucket;	/* lookup hash bucket */
 	struct list_head d_hash;	/* lookup hash list */
-	struct list_head d_lru;		/* d_count = 0 LRU list */
+	struct list_head d_lru;		/* LRU list */
 	struct list_head d_child;	/* child of parent list */
 	struct list_head d_subdirs;	/* our children */
 	struct list_head d_alias;	/* inode alias list */
 	int d_mounted;
 	struct qstr d_name;
+	struct qstr * d_qstr;		/* quick str ptr used in lockless lookup and concurrent d_move */
 	unsigned long d_time;		/* used by d_revalidate */
 	struct dentry_operations  *d_op;
 	struct super_block * d_sb;	/* The root of the dentry tree */
-	unsigned long d_vfs_flags;
 	void * d_fsdata;		/* fs-specific data */
+ 	struct rcu_head d_rcu;
 	struct dcookie_struct * d_cookie; /* cookie, if any */
 	unsigned char d_iname[DNAME_INLINE_LEN_MIN]; /* small names */
 } ____cacheline_aligned;
@@ -139,6 +146,7 @@ d_iput:		no		no		yes
       */
 
 #define DCACHE_REFERENCED	0x0008  /* Recently used, don't discard. */
+#define DCACHE_UNHASHED		0x0010	
 
 extern spinlock_t dcache_lock;
 extern rwlock_t dparent_lock;
@@ -162,7 +170,8 @@ extern rwlock_t dparent_lock;
 
 static __inline__ void __d_drop(struct dentry * dentry)
 {
-	list_del_init(&dentry->d_hash);
+	dentry->d_vfs_flags |= DCACHE_UNHASHED;
+	list_del_rcu(&dentry->d_hash);
 }
 
 static __inline__ void d_drop(struct dentry * dentry)
@@ -229,7 +238,6 @@ extern void d_move(struct dentry *, struct dentry *);
 
 /* appendix may either be NULL or be used for transname suffixes */
 extern struct dentry * d_lookup(struct dentry *, struct qstr *);
-extern struct dentry * __d_lookup(struct dentry *, struct qstr *);
 
 /* validate "insecure" dentry pointer */
 extern int d_validate(struct dentry *, struct dentry *);
@@ -254,9 +262,8 @@ extern char * d_path(struct dentry *, struct vfsmount *, char *, int);
 static __inline__ struct dentry * dget(struct dentry *dentry)
 {
 	if (dentry) {
-		if (!atomic_read(&dentry->d_count))
-			BUG();
 		atomic_inc(&dentry->d_count);
+		dentry->d_vfs_flags |= DCACHE_REFERENCED;
 	}
 	return dentry;
 }
@@ -272,7 +279,7 @@ extern struct dentry * dget_locked(struct dentry *);
  
 static __inline__ int d_unhashed(struct dentry *dentry)
 {
-	return list_empty(&dentry->d_hash);
+	return (dentry->d_vfs_flags & DCACHE_UNHASHED);
 }
 
 extern void dput(struct dentry *);
