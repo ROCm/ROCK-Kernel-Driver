@@ -2258,12 +2258,12 @@ static int __init zs_console_setup(struct console *con, char *options)
 }
 
 static struct console sgi_console_driver = {
-	name:		"ttyS",
-	write:		zs_console_write,
-	device:		zs_console_device,
-	setup:		zs_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name		= "ttyS",
+	.write		= zs_console_write,
+	.device		= zs_console_device,
+	.setup		= zs_console_setup,
+	.flags		= CON_PRINTBUFFER,
+	.index		= -1,
 };
 
 /*

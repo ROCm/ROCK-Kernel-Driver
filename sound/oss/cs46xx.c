@@ -75,6 +75,7 @@
  *	turned on.
  */
  
+#include <linux/interrupt.h>
 #include <linux/list.h>
 #include <linux/version.h>
 #include <linux/module.h>
@@ -87,18 +88,18 @@
 #include <linux/soundcard.h>
 #include <linux/pci.h>
 #include <linux/bitops.h>
-#include <asm/io.h>
-#include <asm/dma.h>
 #include <linux/init.h>
 #include <linux/poll.h>
-#include <linux/smp_lock.h>
 #include <linux/wrapper.h>
+#include <linux/ac97_codec.h>
+
+#include <asm/io.h>
+#include <asm/dma.h>
 #include <asm/uaccess.h>
 #include <asm/hardirq.h>
-#include <linux/ac97_codec.h>
+
 #include "cs46xxpm-24.h"
 #include "cs46xx_wrapper-24.h"
-
 #include "cs461x.h"
 
 /* MIDI buffer sizes */
@@ -5243,22 +5244,85 @@ struct cs_card_type
 	void (*active)(struct cs_card *, int);
 };
 
-static struct cs_card_type cards[]={
-	{0x1489, 0x7001, "Genius Soundmaker 128 value", amp_none, NULL, NULL},
-	{0x5053, 0x3357, "Voyetra", amp_voyetra, NULL, NULL},
-	{0x1071, 0x6003, "Mitac MI6020/21", amp_voyetra, NULL, NULL},
-	{0x14AF, 0x0050, "Hercules Game Theatre XP", amp_hercules, NULL, NULL},
-	{0x1681, 0x0050, "Hercules Game Theatre XP", amp_hercules, NULL, NULL},
-	{0x1681, 0x0051, "Hercules Game Theatre XP", amp_hercules, NULL, NULL},
-	{0x1681, 0x0052, "Hercules Game Theatre XP", amp_hercules, NULL, NULL},
-	{0x1681, 0x0053, "Hercules Game Theatre XP", amp_hercules, NULL, NULL},
-	{0x1681, 0x0054, "Hercules Game Theatre XP", amp_hercules, NULL, NULL},
+static struct cs_card_type cards[] = {
+	{
+		.vendor	= 0x1489,
+		.id	= 0x7001,
+		.name	= "Genius Soundmaker 128 value",
+		.amp	= amp_none,
+	},
+	{
+		.vendor	= 0x5053,
+		.id	= 0x3357,
+		.name	= "Voyetra",
+		.amp	= amp_voyetra,
+	},
+	{
+		.vendor	= 0x1071,
+		.id	= 0x6003,
+		.name	= "Mitac MI6020/21",
+		.amp	= amp_voyetra,
+	},
+	{
+		.vendor	= 0x14AF,
+		.id	= 0x0050,
+		.name	= "Hercules Game Theatre XP",
+		.amp	= amp_hercules,
+	},
+	{
+		.vendor	= 0x1681,
+		.id	= 0x0050,
+		.name	= "Hercules Game Theatre XP",
+		.amp	= amp_hercules,
+	},
+	{
+		.vendor	= 0x1681,
+		.id	= 0x0051,
+		.name	= "Hercules Game Theatre XP",
+		.amp	= amp_hercules,
+	},
+	{
+		.vendor	= 0x1681,
+		.id	= 0x0052,
+		.name	= "Hercules Game Theatre XP",
+		.amp	= amp_hercules,
+	},
+	{
+		.vendor	= 0x1681,
+		.id	= 0x0053,
+		.name	= "Hercules Game Theatre XP",
+		.amp	= amp_hercules,
+	},
+	{
+		.vendor	= 0x1681,
+		.id	= 0x0054,
+		.name	= "Hercules Game Theatre XP",
+		.amp	= amp_hercules,
+	},
 	/* Not sure if the 570 needs the clkrun hack */
-	{PCI_VENDOR_ID_IBM, 0x0132, "Thinkpad 570", amp_none, NULL, clkrun_hack},
-	{PCI_VENDOR_ID_IBM, 0x0153, "Thinkpad 600X/A20/T20", amp_none, NULL, clkrun_hack},
-	{PCI_VENDOR_ID_IBM, 0x1010, "Thinkpad 600E (unsupported)", NULL, NULL, NULL},
-	{0, 0, "Card without SSID set", NULL, NULL, NULL },
-	{0, 0, NULL, NULL, NULL}
+	{
+		.vendor	= PCI_VENDOR_ID_IBM,
+		.id	= 0x0132,
+		.name	= "Thinkpad 570",
+		.amp	= amp_none,
+		.active	= clkrun_hack,
+	},
+	{
+		.vendor	= PCI_VENDOR_ID_IBM,
+		.id	= 0x0153,
+		.name	= "Thinkpad 600X/A20/T20",
+		.amp	= amp_none,
+		.active	= clkrun_hack,
+	},
+	{
+		.vendor	= PCI_VENDOR_ID_IBM,
+		.id	= 0x1010,
+		.name	= "Thinkpad 600E (unsupported)",
+	},
+	{
+		.name	= "Card without SSID set",
+	},
+	{ 0, },
 };
 
 MODULE_AUTHOR("Alan Cox <alan@redhat.com>, Jaroslav Kysela, <pcaudio@crystal.cirrus.com>");
@@ -5622,22 +5686,39 @@ enum {
 };
 
 static struct pci_device_id cs46xx_pci_tbl[] __devinitdata = {
-	
-	{PCI_VENDOR_ID_CIRRUS, PCI_DEVICE_ID_CIRRUS_4610, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CS46XX_4610},
-	{PCI_VENDOR_ID_CIRRUS, PCI_DEVICE_ID_CIRRUS_4612, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CS46XX_4612},
-	{PCI_VENDOR_ID_CIRRUS, PCI_DEVICE_ID_CIRRUS_4615, PCI_ANY_ID, PCI_ANY_ID, 0, 0, CS46XX_4615},
-	{0,}
+	{
+		.vendor	     = PCI_VENDOR_ID_CIRRUS,
+		.device	     = PCI_DEVICE_ID_CIRRUS_4610,
+		.subvendor   = PCI_ANY_ID,
+		.subdevice   = PCI_ANY_ID,
+		.driver_data = CS46XX_4610,
+	},
+	{
+		.vendor	     = PCI_VENDOR_ID_CIRRUS,
+		.device	     = PCI_DEVICE_ID_CIRRUS_4612,
+		.subvendor   = PCI_ANY_ID,
+		.subdevice   = PCI_ANY_ID,
+		.driver_data = CS46XX_4612,
+	},
+	{
+		.vendor	     = PCI_VENDOR_ID_CIRRUS,
+		.device	     = PCI_DEVICE_ID_CIRRUS_4615,
+		.subvendor   = PCI_ANY_ID,
+		.subdevice   = PCI_ANY_ID,
+		.driver_data = CS46XX_4615,
+	},
+	{ 0, },
 };
 
 MODULE_DEVICE_TABLE(pci, cs46xx_pci_tbl);
 
 struct pci_driver cs46xx_pci_driver = {
-	.name= "cs46xx",
-	.id_table= cs46xx_pci_tbl,
-	.probe= cs46xx_probe,
-	.remove= cs46xx_remove,
-	.suspend= CS46XX_SUSPEND_TBL,
-	.resume= CS46XX_RESUME_TBL,
+	.name	  = "cs46xx",
+	.id_table = cs46xx_pci_tbl,
+	.probe	  = cs46xx_probe,
+	.remove	  = cs46xx_remove,
+	.suspend  = CS46XX_SUSPEND_TBL,
+	.resume	  = CS46XX_RESUME_TBL,
 };
 
 int __init cs46xx_init_module(void)

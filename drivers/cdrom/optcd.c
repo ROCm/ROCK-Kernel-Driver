@@ -1076,7 +1076,7 @@ static int tries;		/* ibid?? */
 static int timeout = 0;
 
 static void poll(unsigned long data);
-static struct timer_list req_timer = {function: poll};
+static struct timer_list req_timer = {.function = poll};
 
 
 static void poll(unsigned long data)

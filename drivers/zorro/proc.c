@@ -76,8 +76,8 @@ proc_bus_zorro_read(struct file *file, char *buf, size_t nbytes, loff_t *ppos)
 }
 
 static struct file_operations proc_bus_zorro_operations = {
-	llseek:		proc_bus_zorro_lseek,
-	read:		proc_bus_zorro_read,
+	.llseek		= proc_bus_zorro_lseek,
+	.read		= proc_bus_zorro_read,
 };
 
 static int

@@ -74,7 +74,7 @@ static void evbug_disconnect(struct input_handle *handle)
 }
 
 static struct input_device_id evbug_ids[] = {
-	{ driver_info: 1 },	/* Matches all devices */
+	{ .driver_info = 1 },	/* Matches all devices */
 	{ },			/* Terminating zero entry */
 };
 

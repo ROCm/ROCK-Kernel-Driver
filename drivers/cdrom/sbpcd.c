@@ -5469,22 +5469,22 @@ static void sbpcd_release(struct cdrom_device_info * cdi)
  */
 static int sbpcd_media_changed( struct cdrom_device_info *cdi, int disc_nr);
 static struct cdrom_device_ops sbpcd_dops = {
-	open:			sbpcd_open,
-	release:		sbpcd_release,
-	drive_status:		sbpcd_drive_status,
-	media_changed:		sbpcd_media_changed,
-	tray_move:		sbpcd_tray_move,
-	lock_door:		sbpcd_lock_door,
-	select_speed:		sbpcd_select_speed,
-	get_last_session:	sbpcd_get_last_session,
-	get_mcn:		sbpcd_get_mcn,
-	reset:			sbpcd_reset,
-	audio_ioctl:		sbpcd_audio_ioctl,
-	dev_ioctl:		sbpcd_dev_ioctl,
-	capability:		CDC_CLOSE_TRAY | CDC_OPEN_TRAY | CDC_LOCK |
+	.open			= sbpcd_open,
+	.release		= sbpcd_release,
+	.drive_status		= sbpcd_drive_status,
+	.media_changed		= sbpcd_media_changed,
+	.tray_move		= sbpcd_tray_move,
+	.lock_door		= sbpcd_lock_door,
+	.select_speed		= sbpcd_select_speed,
+	.get_last_session	= sbpcd_get_last_session,
+	.get_mcn		= sbpcd_get_mcn,
+	.reset			= sbpcd_reset,
+	.audio_ioctl		= sbpcd_audio_ioctl,
+	.dev_ioctl		= sbpcd_dev_ioctl,
+	.capability		= CDC_CLOSE_TRAY | CDC_OPEN_TRAY | CDC_LOCK |
 				CDC_MULTI_SESSION | CDC_MEDIA_CHANGED |
 				CDC_MCN | CDC_PLAY_AUDIO | CDC_IOCTLS,
-	n_minors:		1,
+	.n_minors		= 1,
 };
 
 /*==========================================================================*/

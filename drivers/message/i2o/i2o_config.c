@@ -904,14 +904,14 @@ static int cfg_fasync(int fd, struct file *fp, int on)
 
 static struct file_operations config_fops =
 {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		cfg_read,
-	write:		cfg_write,
-	ioctl:		cfg_ioctl,
-	open:		cfg_open,
-	release:	cfg_release,
-	fasync:		cfg_fasync,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= cfg_read,
+	.write		= cfg_write,
+	.ioctl		= cfg_ioctl,
+	.open		= cfg_open,
+	.release	= cfg_release,
+	.fasync		= cfg_fasync,
 };
 
 static struct miscdevice i2o_miscdev = {

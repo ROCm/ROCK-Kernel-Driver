@@ -238,7 +238,6 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 	for (mpnt = current->mm->mmap ; mpnt ; mpnt = mpnt->vm_next) {
 		struct file *file;
 
-		retval = -ENOMEM;
 		if(mpnt->vm_flags & VM_DONTCOPY)
 			continue;
 		if (mpnt->vm_flags & VM_ACCOUNT) {
@@ -283,7 +282,7 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 			tmp->vm_ops->open(tmp);
 
 		if (retval)
-			goto fail_nomem;
+			goto fail;
 	}
 	retval = 0;
 	build_mmap_rb(mm);
@@ -293,6 +292,8 @@ out:
 	up_write(&oldmm->mmap_sem);
 	return retval;
 fail_nomem:
+	retval = -ENOMEM;
+  fail:
 	vm_unacct_memory(charge);
 	goto out;
 }

@@ -73,25 +73,25 @@ typedef struct dasd_eckd_private_t {
 static
 devreg_t dasd_eckd_known_devices[] = {
 	{
-		ci: { hc: { ctype: 0x3880, dtype:3390 } },
-		flag:(DEVREG_MATCH_CU_TYPE | DEVREG_MATCH_DEV_TYPE |
+		.ci = { .hc = { .ctype = 0x3880, .dtype = 3390 } },
+		.flag = (DEVREG_MATCH_CU_TYPE | DEVREG_MATCH_DEV_TYPE |
 		      DEVREG_TYPE_DEVCHARS),
-		oper_func:dasd_oper_handler
+		.oper_func = dasd_oper_handler
 	},
 	{
-		ci: { hc: { ctype:0x3990 } },
-		flag:(DEVREG_MATCH_CU_TYPE | DEVREG_TYPE_DEVCHARS),
-		oper_func:dasd_oper_handler
+		.ci = { .hc = { .ctype = 0x3990 } },
+		.flag = (DEVREG_MATCH_CU_TYPE | DEVREG_TYPE_DEVCHARS),
+		.oper_func = dasd_oper_handler
 	},
 	{
-		ci: { hc: { ctype:0x2105 } },
-		flag:(DEVREG_MATCH_CU_TYPE | DEVREG_TYPE_DEVCHARS),
-		oper_func:dasd_oper_handler
+		.ci = { .hc = { .ctype = 0x2105 } },
+		.flag = (DEVREG_MATCH_CU_TYPE | DEVREG_TYPE_DEVCHARS),
+		.oper_func = dasd_oper_handler
 	},
 	{
-		ci: { hc: { ctype:0x9343 } },
-		flag:(DEVREG_MATCH_CU_TYPE | DEVREG_TYPE_DEVCHARS),
-		oper_func:dasd_oper_handler
+		.ci = { .hc = { .ctype = 0x9343 } },
+		.flag = (DEVREG_MATCH_CU_TYPE | DEVREG_TYPE_DEVCHARS),
+		.oper_func = dasd_oper_handler
 	}
 };
 
@@ -1418,22 +1418,22 @@ dasd_eckd_dump_sense(struct dasd_device_t *device, dasd_ccw_req_t * req)
  * for one request. Give a little safety and the result is 240.
  */
 static dasd_discipline_t dasd_eckd_discipline = {
-	owner:THIS_MODULE,
-	name:"ECKD",
-	ebcname:"ECKD",
-	max_blocks:240,
-	check_device:dasd_eckd_check_device,
-	do_analysis:dasd_eckd_do_analysis,
-	fill_geometry:dasd_eckd_fill_geometry,
-	start_IO:dasd_start_IO,
-	term_IO:dasd_term_IO,
-	format_device:dasd_eckd_format_device,
-	examine_error:dasd_eckd_examine_error,
-	erp_action:dasd_eckd_erp_action,
-	erp_postaction:dasd_eckd_erp_postaction,
-	build_cp:dasd_eckd_build_cp,
-	dump_sense:dasd_eckd_dump_sense,
-	fill_info:dasd_eckd_fill_info,
+	.owner = THIS_MODULE,
+	.name = "ECKD",
+	.ebcname = "ECKD",
+	.max_blocks = 240,
+	.check_device = dasd_eckd_check_device,
+	.do_analysis = dasd_eckd_do_analysis,
+	.fill_geometry = dasd_eckd_fill_geometry,
+	.start_IO = dasd_start_IO,
+	.term_IO = dasd_term_IO,
+	.format_device = dasd_eckd_format_device,
+	.examine_error = dasd_eckd_examine_error,
+	.erp_action = dasd_eckd_erp_action,
+	.erp_postaction = dasd_eckd_erp_postaction,
+	.build_cp = dasd_eckd_build_cp,
+	.dump_sense = dasd_eckd_dump_sense,
+	.fill_info = dasd_eckd_fill_info,
 };
 
 int

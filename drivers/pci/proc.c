@@ -285,16 +285,16 @@ static int proc_bus_pci_release(struct inode *inode, struct file *file)
 #endif /* HAVE_PCI_MMAP */
 
 static struct file_operations proc_bus_pci_operations = {
-	llseek:		proc_bus_pci_lseek,
-	read:		proc_bus_pci_read,
-	write:		proc_bus_pci_write,
-	ioctl:		proc_bus_pci_ioctl,
+	.llseek		= proc_bus_pci_lseek,
+	.read		= proc_bus_pci_read,
+	.write		= proc_bus_pci_write,
+	.ioctl		= proc_bus_pci_ioctl,
 #ifdef HAVE_PCI_MMAP
-	open:		proc_bus_pci_open,
-	release:	proc_bus_pci_release,
-	mmap:		proc_bus_pci_mmap,
+	.open		= proc_bus_pci_open,
+	.release	= proc_bus_pci_release,
+	.mmap		= proc_bus_pci_mmap,
 #ifdef HAVE_ARCH_PCI_GET_UNMAPPED_AREA
-	get_unmapped_area: get_pci_unmapped_area,
+	.get_unmapped_area = get_pci_unmapped_area,
 #endif /* HAVE_ARCH_PCI_GET_UNMAPPED_AREA */
 #endif /* HAVE_PCI_MMAP */
 };
@@ -365,10 +365,10 @@ static int show_device(struct seq_file *m, void *v)
 }
 
 static struct seq_operations proc_bus_pci_devices_op = {
-	start:	pci_seq_start,
-	next:	pci_seq_next,
-	stop:	pci_seq_stop,
-	show:	show_device
+	.start	= pci_seq_start,
+	.next	= pci_seq_next,
+	.stop	= pci_seq_stop,
+	.show	= show_device
 };
 
 struct proc_dir_entry *proc_bus_pci_dir;
@@ -567,10 +567,10 @@ static int show_dev_config(struct seq_file *m, void *v)
 }
 
 static struct seq_operations proc_pci_op = {
-	start:	pci_seq_start,
-	next:	pci_seq_next,
-	stop:	pci_seq_stop,
-	show:	show_dev_config
+	.start	= pci_seq_start,
+	.next	= pci_seq_next,
+	.stop	= pci_seq_stop,
+	.show	= show_dev_config
 };
 
 static int proc_bus_pci_dev_open(struct inode *inode, struct file *file)
@@ -578,20 +578,20 @@ static int proc_bus_pci_dev_open(struct inode *inode, struct file *file)
 	return seq_open(file, &proc_bus_pci_devices_op);
 }
 static struct file_operations proc_bus_pci_dev_operations = {
-	open:		proc_bus_pci_dev_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	seq_release,
+	.open		= proc_bus_pci_dev_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
 };
 static int proc_pci_open(struct inode *inode, struct file *file)
 {
 	return seq_open(file, &proc_pci_op);
 }
 static struct file_operations proc_pci_operations = {
-	open:		proc_pci_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	seq_release,
+	.open		= proc_pci_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
 };
 
 static int __init pci_proc_init(void)

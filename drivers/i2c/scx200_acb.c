@@ -419,10 +419,10 @@ static void scx200_acb_dec_use(struct i2c_adapter *adapter)
 
 /* For now, we only handle combined mode (smbus) */
 static struct i2c_algorithm scx200_acb_algorithm = {
-	name:		"NatSemi SCx200 ACCESS.bus",
-	id:		I2C_ALGO_SMBUS,
-	smbus_xfer:	scx200_acb_smbus_xfer,
-	functionality:	scx200_acb_func,
+	.name		= "NatSemi SCx200 ACCESS.bus",
+	.id		= I2C_ALGO_SMBUS,
+	.smbus_xfer	= scx200_acb_smbus_xfer,
+	.functionality	= scx200_acb_func,
 };
 
 struct scx200_acb_iface *scx200_acb_list;

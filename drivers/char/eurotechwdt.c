@@ -27,25 +27,25 @@
  */
 
 #include <linux/config.h>
+#include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
-#include <linux/smp_lock.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
 #include <linux/slab.h>
 #include <linux/ioport.h>
 #include <linux/fcntl.h>
-#include <asm/io.h>
-#include <asm/uaccess.h>
-#include <asm/system.h>
 #include <linux/notifier.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
+
+#include <asm/io.h>
+#include <asm/uaccess.h>
+#include <asm/system.h>
 
 static int eurwdt_is_open;
 static spinlock_t eurwdt_lock;
@@ -256,9 +256,9 @@ static int eurwdt_ioctl(struct inode *inode, struct file *file,
         unsigned int cmd, unsigned long arg)
 {
    static struct watchdog_info ident = {
-      options		: WDIOF_CARDRESET,
-      firmware_version	: 1,
-      identity		: "WDT Eurotech CPU-1220/1410"
+	.options	  = WDIOF_CARDRESET,
+	.firmware_version = 1,
+	.identity	  = "WDT Eurotech CPU-1220/1410",
    };
 
    int time;
@@ -396,11 +396,10 @@ static struct file_operations eurwdt_fops = {
         .release        = eurwdt_release,
 };
 
-static struct miscdevice eurwdt_miscdev =
-{
-        WATCHDOG_MINOR,
-        "watchdog",
-        &eurwdt_fops
+static struct miscdevice eurwdt_miscdev = {
+	.minor	= WATCHDOG_MINOR,
+	.name	= "watchdog",
+	.fops	= &eurwdt_fops
 };
  
 /*
@@ -408,11 +407,8 @@ static struct miscdevice eurwdt_miscdev =
  *      turn the timebomb registers off.
  */
  
-static struct notifier_block eurwdt_notifier =
-{
-        eurwdt_notify_sys,
-        NULL,
-        0
+static struct notifier_block eurwdt_notifier = {
+	.notifier_call = eurwdt_notify_sys,
 };
  
 /**

@@ -262,11 +262,11 @@ dasd_devices_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations dasd_devices_file_ops = {
-	owner:THIS_MODULE,
-	read:dasd_generic_read,		/* read */
-	write:dasd_devices_write,	/* write */
-	open:dasd_devices_open,		/* open */
-	release:dasd_generic_close,	/* close */
+	.owner = THIS_MODULE,
+	.read = dasd_generic_read,		/* read */
+	.write = dasd_devices_write,	/* write */
+	.open = dasd_devices_open,		/* open */
+	.release = dasd_generic_close,	/* close */
 };
 
 static struct inode_operations dasd_devices_inode_ops = {
@@ -416,11 +416,11 @@ out_error:
 }
 
 static struct file_operations dasd_statistics_file_ops = {
-	owner:	THIS_MODULE,
-	read:	dasd_generic_read,	/* read */
-	write:	dasd_statistics_write,	/* write */
-	open:	dasd_statistics_open,	/* open */
-	release:dasd_generic_close,	/* close */
+	.owner	= THIS_MODULE,
+	.read	= dasd_generic_read,	/* read */
+	.write	= dasd_statistics_write,	/* write */
+	.open	= dasd_statistics_open,	/* open */
+	.release = dasd_generic_close,	/* close */
 };
 
 static struct inode_operations dasd_statistics_inode_ops = {

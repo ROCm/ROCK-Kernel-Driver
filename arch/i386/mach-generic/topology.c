@@ -26,6 +26,7 @@
  * Send feedback to <colpatch@us.ibm.com>
  */
 #include <linux/init.h>
+#include <linux/smp.h>
 #include <asm/cpu.h>
 
 struct i386_cpu cpu_devices[NR_CPUS];

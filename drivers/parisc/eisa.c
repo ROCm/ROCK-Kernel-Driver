@@ -205,9 +205,9 @@ static struct irqaction action[IRQ_PER_REGION];
 
 /* EISA needs to be fixed at IRQ region #0 (EISA_IRQ_REGION) */
 static struct irq_region eisa_irq_region = {
-	ops:	{ eisa_disable_irq, eisa_enable_irq, eisa_mask_irq, eisa_unmask_irq },
-	data:	{ name: "EISA", irqbase: 0 },
-	action:	action,
+	.ops	= { eisa_disable_irq, eisa_enable_irq, eisa_mask_irq, eisa_unmask_irq },
+	.data	= { .name = "EISA", .irqbase = 0 },
+	.action	= action,
 };
 
 static void eisa_irq(int _, void *intr_dev, struct pt_regs *regs)

@@ -160,10 +160,15 @@ extern rwlock_t dparent_lock;
  * timeouts or autofs deletes).
  */
 
+static __inline__ void __d_drop(struct dentry * dentry)
+{
+	list_del_init(&dentry->d_hash);
+}
+
 static __inline__ void d_drop(struct dentry * dentry)
 {
 	spin_lock(&dcache_lock);
-	list_del_init(&dentry->d_hash);
+ 	__d_drop(dentry);
 	spin_unlock(&dcache_lock);
 }
 

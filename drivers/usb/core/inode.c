@@ -255,7 +255,7 @@ static void d_unhash(struct dentry *dentry)
 		if (atomic_read(&dentry->d_count) != 2)
 			break;
 	case 2:
-		list_del_init(&dentry->d_hash);
+		__d_drop(dentry);
 	}
 	spin_unlock(&dcache_lock);
 }
