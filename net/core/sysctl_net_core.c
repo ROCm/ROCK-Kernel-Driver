@@ -8,6 +8,7 @@
 #include <linux/mm.h>
 #include <linux/sysctl.h>
 #include <linux/config.h>
+#include <linux/module.h>
 
 #ifdef CONFIG_SYSCTL
 
