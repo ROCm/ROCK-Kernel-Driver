@@ -798,6 +798,7 @@ static int atkbd_reconnect(struct serio *serio)
 {
 	struct atkbd *atkbd = serio->private;
 	struct serio_dev *dev = serio->dev;
+	unsigned char param[1];
 
 	if (!dev) {
 		printk(KERN_DEBUG "atkbd: reconnect request, but serio is disconnected, ignoring...\n");
@@ -805,11 +806,19 @@ static int atkbd_reconnect(struct serio *serio)
 	}
 
 	if (atkbd->write) {
+		param[0] = (test_bit(LED_SCROLLL, atkbd->dev.led) ? 1 : 0)
+		         | (test_bit(LED_NUML,    atkbd->dev.led) ? 2 : 0)
+ 		         | (test_bit(LED_CAPSL,   atkbd->dev.led) ? 4 : 0);
+		
 		if (atkbd_probe(atkbd))
 			return -1;
 		if (atkbd->set != atkbd_set_3(atkbd))
 			return -1;
+		
 		atkbd_enable(atkbd);
+
+		if (atkbd_command(atkbd, param, ATKBD_CMD_SETLEDS))
+			return -1;
 	}
 
 	return 0;
