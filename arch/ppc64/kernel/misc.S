@@ -504,9 +504,9 @@ _GLOBAL(kernel_thread)
 /* Why isn't this a) automatic, b) written in 'C'? */	
 	.balign 8
 _GLOBAL(sys_call_table32)
-	.llong .sys_ni_syscall	/* 0  -  old "setup()" system call */
-	.llong .sys32_exit
-	.llong .sys32_fork
+	.llong .sys_ni_syscall		/* 0 - old setup syscall */
+	.llong .sys_exit
+	.llong .sys_fork
 	.llong .sys_read
 	.llong .sys_write
 	.llong .sys32_open		/* 5 */
@@ -521,8 +521,8 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_mknod
 	.llong .sys_chmod		/* 15 */
 	.llong .sys_lchown
-	.llong .sys_ni_syscall			/* old break syscall holder */
-	.llong .sys32_stat
+	.llong .sys_ni_syscall		/* old break syscall */
+	.llong .sys_ni_syscall		/* old stat syscall */
 	.llong .sys32_lseek
 	.llong .sys_getpid              /* 20 */
 	.llong .sys32_mount
@@ -532,14 +532,14 @@ _GLOBAL(sys_call_table32)
 	.llong .ppc64_sys32_stime       /* 25 */
 	.llong .sys32_ptrace
 	.llong .sys_alarm
-	.llong .sys32_fstat
+	.llong .sys_ni_syscall		/* old fstat syscall */
 	.llong .sys32_pause
 	.llong .sys32_utime		/* 30 */
-	.llong .sys_ni_syscall			/* old stty syscall holder */
-	.llong .sys_ni_syscall			/* old gtty syscall holder */
+	.llong .sys_ni_syscall		/* old stty syscall */
+	.llong .sys_ni_syscall		/* old gtty syscall */
 	.llong .sys32_access
 	.llong .sys32_nice
-	.llong .sys_ni_syscall	/* 35 */	/* old ftime syscall holder */
+	.llong .sys_ni_syscall		/* 35 - old ftime syscall */
 	.llong .sys_sync
 	.llong .sys32_kill
 	.llong .sys_rename
@@ -548,21 +548,21 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_dup
 	.llong .sys_pipe
 	.llong .sys32_times
-	.llong .sys_ni_syscall			/* old prof syscall holder */
-	.llong .sys_brk		/* 45 */
+	.llong .sys_ni_syscall		/* old prof syscall */
+	.llong .sys_brk			/* 45 */
 	.llong .sys_setgid
 	.llong .sys_getgid
 	.llong .sys_signal
 	.llong .sys_geteuid
-	.llong .sys_getegid  	/* 50 */
+	.llong .sys_getegid		/* 50 */
 	.llong .sys_acct
-	.llong .sys32_umount			/* recycled never used phys() */
-	.llong .sys_ni_syscall			/* old lock syscall holder */
+	.llong .sys32_umount
+	.llong .sys_ni_syscall		/* old lock syscall */
 	.llong .sys32_ioctl
 	.llong .sys32_fcntl		/* 55 */
-	.llong .sys_ni_syscall			/* old mpx syscall holder */
+	.llong .sys_ni_syscall		/* old mpx syscall */
 	.llong .sys32_setpgid
-	.llong .sys_ni_syscall			/* old ulimit syscall holder */
+	.llong .sys_ni_syscall		/* old ulimit syscall */
 	.llong .sys_olduname
 	.llong .sys32_umask		/* 60 */
 	.llong .sys_chroot
@@ -588,11 +588,11 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_setgroups
 	.llong .ppc32_select
 	.llong .sys_symlink
-	.llong .sys32_lstat
+	.llong .sys_ni_syscall		/* old lstat syscall */
 	.llong .sys32_readlink	        /* 85 */
 	.llong .sys_uselib
-	.llong .sys32_swapon
-	.llong .sys32_reboot
+	.llong .sys_swapon
+	.llong .sys_reboot
 	.llong .old32_readdir
 	.llong .sys32_mmap		/* 90 */
 	.llong .sys_munmap
@@ -602,34 +602,34 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_fchown              /* 95 */
 	.llong .sys32_getpriority
 	.llong .sys32_setpriority
-	.llong .sys_ni_syscall			/* old profil syscall holder */
+	.llong .sys_ni_syscall		/* old profil syscall */
 	.llong .sys32_statfs
-	.llong .sys32_fstatfs	/* 100 */
-	.llong .sys_ni_syscall		/* old ioperm syscall holder */
+	.llong .sys32_fstatfs		/* 100 */
+	.llong .sys_ioperm
 	.llong .sys32_socketcall
 	.llong .sys32_syslog
 	.llong .sys32_setitimer
-	.llong .sys32_getitimer	/* 105 */
+	.llong .sys32_getitimer		/* 105 */
 	.llong .sys32_newstat
 	.llong .sys32_newlstat
 	.llong .sys32_newfstat
 	.llong .sys_uname
-	.llong .sys_ni_syscall		/* 110 old iopl syscall holder */
+	.llong .sys_ni_syscall		/* 110 old iopl syscall */
 	.llong .sys_vhangup
-	.llong .sys_ni_syscall		/* old 'idle' syscall */
-	.llong .sys_ni_syscall		/* old vm86 syscall holder */
+	.llong .sys_ni_syscall		/* old idle syscall */
+	.llong .sys_ni_syscall		/* old vm86 syscall */
 	.llong .sys32_wait4
-	.llong .sys_swapoff	/* 115 */
+	.llong .sys_swapoff		/* 115 */
 	.llong .sys32_sysinfo
 	.llong .sys32_ipc
 	.llong .sys_fsync
 	.llong .ppc32_sigreturn
-	.llong .sys32_clone		/* 120 */
+	.llong .sys_clone		/* 120 */
 	.llong .sys32_setdomainname
 	.llong .ppc64_newuname
-	.llong .sys_ni_syscall		/* old modify_ldt syscall holder */
+	.llong .sys_ni_syscall		/* old modify_ldt syscall */
 	.llong .sys32_adjtimex
-	.llong .sys_mprotect	/* 125 */
+	.llong .sys_mprotect		/* 125 */
 	.llong .sys32_sigprocmask
 	.llong .sys32_create_module
 	.llong .sys32_init_module
@@ -638,7 +638,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_quotactl
 	.llong .sys32_getpgid
 	.llong .sys_fchdir
-	.llong .sys32_bdflush
+	.llong .sys_bdflush
 	.llong .sys32_sysfs		/* 135 */
 	.llong .sys32_personality
 	.llong .sys_ni_syscall	        /* for afs_syscall */
@@ -689,37 +689,37 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_getcwd
 	.llong .sys_capget
 	.llong .sys_capset
-	.llong .sys32_sigaltstack	        /* 185 */
+	.llong .sys32_sigaltstack	/* 185 */
 	.llong .sys32_sendfile
-	.llong .sys_ni_syscall		/* streams1 */
-	.llong .sys_ni_syscall		/* streams2 */
-	.llong .sys32_vfork
+	.llong .sys_ni_syscall		/* reserved for streams1 */
+	.llong .sys_ni_syscall		/* reserved for streams2 */
+	.llong .sys_vfork
 	.llong .sys32_getrlimit	        /* 190 */
 	.llong .sys32_readahead
-	.llong .sys_ni_syscall		/* 192 - reserved - mmap2 */
-	.llong .sys32_truncate64	/* 193 - truncate64 */
-	.llong .sys32_ftruncate64	/* 194 - ftruncate64 */
-	.llong .sys_stat64      	/* 195 - stat64 */
-	.llong .sys_lstat64     	/* 196 - lstat64 */
-	.llong .sys_fstat64		/* 197 - fstat64 */
-	.llong .sys32_pciconfig_read  	/* 198 */
-	.llong .sys32_pciconfig_write  	/* 199 */
-	.llong .sys_ni_syscall		/* 200 - reserved - sys_pciconfig_iobase */
-	.llong .sys_ni_syscall		/* 201 - reserved - MacOnLinux - new */
-	.llong .sys_getdents64		/* 202 */
-	.llong .sys_pivot_root		/* 203 */
-	.llong .sys32_fcntl64		/* 204 */
+	.llong .ppc32_mmap2
+	.llong .sys32_truncate64
+	.llong .sys32_ftruncate64
+	.llong .sys_stat64      	/* 195 */
+	.llong .sys_lstat64
+	.llong .sys_fstat64
+	.llong .sys32_pciconfig_read
+	.llong .sys32_pciconfig_write
+	.llong .sys_ni_syscall		/* 200 - reserved for sys_pciconfig_iobase */
+	.llong .sys_ni_syscall		/* reserved for MacOnLinux */
+	.llong .sys_getdents64
+	.llong .sys_pivot_root
+	.llong .sys32_fcntl64
 	.llong .sys_madvise		/* 205 */
-	.llong .sys_mincore		/* 206 */
-	.llong .sys_gettid		/* 207 */
-	.llong .sys_tkill		/* 208 */
+	.llong .sys_mincore
+	.llong .sys_gettid
+	.llong .sys_tkill
 	.llong .sys_setxattr
-	.llong .sys_lsetxattr	/* 210 */
+	.llong .sys_lsetxattr		/* 210 */
 	.llong .sys_fsetxattr
 	.llong .sys_getxattr
 	.llong .sys_lgetxattr
 	.llong .sys_fgetxattr
-	.llong .sys_listxattr	/* 215 */
+	.llong .sys_listxattr		/* 215 */
 	.llong .sys_llistxattr
 	.llong .sys_flistxattr
 	.llong .sys_removexattr
@@ -730,15 +730,16 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_sched_getaffinity
 	.llong .sys_ni_syscall		/* reserved for security */
 	.llong .sys_ni_syscall		/* 225 - reserved for tux */
+	.llong .sys32_sendfile64
 
-	.rept NR_syscalls-225
+	.rept NR_syscalls-226
 		.llong .sys_ni_syscall
 	.endr
 #endif
 
 	.balign 8
 _GLOBAL(sys_call_table)
-	.llong .sys_ni_syscall	/* 0  -  old "setup()" system call */
+	.llong .sys_ni_syscall		/* 0 - old setup syscall */
 	.llong .sys_exit
 	.llong .sys_fork
 	.llong .sys_read
@@ -748,17 +749,17 @@ _GLOBAL(sys_call_table)
 	.llong .sys_waitpid
 	.llong .sys_creat
 	.llong .sys_link
-	.llong .sys_unlink	/* 10 */
+	.llong .sys_unlink		/* 10 */
 	.llong .sys_execve
 	.llong .sys_chdir
 	.llong .sys64_time
 	.llong .sys_mknod
 	.llong .sys_chmod		/* 15 */
 	.llong .sys_lchown
-	.llong .sys_ni_syscall			/* old break syscall holder */
-	.llong .sys_stat
+	.llong .sys_ni_syscall		/* old break syscall */
+	.llong .sys_ni_syscall		/* old stat syscall */
 	.llong .sys_lseek
-	.llong .sys_getpid	/* 20 */
+	.llong .sys_getpid		/* 20 */
 	.llong .sys_mount
 	.llong .sys_oldumount
 	.llong .sys_setuid
@@ -766,14 +767,14 @@ _GLOBAL(sys_call_table)
 	.llong .ppc64_sys_stime		/* 25 */
 	.llong .sys_ptrace
 	.llong .sys_alarm
-	.llong .sys_fstat
+	.llong .sys_ni_syscall		/* old fstat syscall */
 	.llong .sys_pause
 	.llong .sys_utime		/* 30 */
-	.llong .sys_ni_syscall			/* old stty syscall holder */
-	.llong .sys_ni_syscall			/* old gtty syscall holder */
+	.llong .sys_ni_syscall		/* old stty syscall */
+	.llong .sys_ni_syscall		/* old gtty syscall */
 	.llong .sys_access
 	.llong .sys_nice
-	.llong .sys_ni_syscall	/* 35 */	/* old ftime syscall holder */
+	.llong .sys_ni_syscall		/* 35 - old ftime syscall */
 	.llong .sys_sync
 	.llong .sys_kill
 	.llong .sys_rename
@@ -782,78 +783,78 @@ _GLOBAL(sys_call_table)
 	.llong .sys_dup
 	.llong .sys_pipe
 	.llong .sys_times
-	.llong .sys_ni_syscall			/* old prof syscall holder */
-	.llong .sys_brk		/* 45 */
+	.llong .sys_ni_syscall		/* old prof syscall */
+	.llong .sys_brk			/* 45 */
 	.llong .sys_setgid
 	.llong .sys_getgid
 	.llong .sys_signal
 	.llong .sys_geteuid
-	.llong .sys_getegid	/* 50 */
+	.llong .sys_getegid		/* 50 */
 	.llong .sys_acct
-	.llong .sys_umount			/* recycled never used phys() */
-	.llong .sys_ni_syscall			/* old lock syscall holder */
+	.llong .sys_umount
+	.llong .sys_ni_syscall		/* old lock syscall */
 	.llong .sys_ioctl
 	.llong .sys_fcntl		/* 55 */
-	.llong .sys_ni_syscall			/* old mpx syscall holder */
+	.llong .sys_ni_syscall		/* old mpx syscall */
 	.llong .sys_setpgid
-	.llong .sys_ni_syscall			/* old ulimit syscall holder */
+	.llong .sys_ni_syscall		/* old ulimit syscall */
 	.llong .sys_olduname
 	.llong .sys_umask		/* 60 */
 	.llong .sys_chroot
 	.llong .sys_ustat
 	.llong .sys_dup2
 	.llong .sys_getppid
-	.llong .sys_getpgrp	/* 65 */
+	.llong .sys_getpgrp		/* 65 */
 	.llong .sys_setsid
 	.llong .sys_sigaction
 	.llong .sys_sgetmask
 	.llong .sys_ssetmask
-	.llong .sys_setreuid	/* 70 */
+	.llong .sys_setreuid		/* 70 */
 	.llong .sys_setregid
 	.llong .sys_sigsuspend
 	.llong .sys_sigpending
 	.llong .sys_sethostname
-	.llong .sys_setrlimit	/* 75 */
+	.llong .sys_setrlimit		/* 75 */
 	.llong .sys_old_getrlimit
 	.llong .sys_getrusage
 	.llong .sys_gettimeofday
 	.llong .sys_settimeofday
-	.llong .sys_getgroups	/* 80 */
+	.llong .sys_getgroups		/* 80 */
 	.llong .sys_setgroups
 	.llong .sys_select
 	.llong .sys_symlink
-	.llong .sys_lstat
-	.llong .sys_readlink	/* 85 */
+	.llong .sys_ni_syscall		/* old lstat syscall */
+	.llong .sys_readlink		/* 85 */
 	.llong .sys_uselib
 	.llong .sys_swapon
 	.llong .sys_reboot
 	.llong .old_readdir
-	.llong .sys_mmap	/* 90 */
+	.llong .sys_mmap		/* 90 */
 	.llong .sys_munmap
 	.llong .sys_truncate
 	.llong .sys_ftruncate
 	.llong .sys_fchmod
-	.llong .sys_fchown	/* 95 */
+	.llong .sys_fchown		/* 95 */
 	.llong .sys_getpriority
 	.llong .sys_setpriority
-	.llong .sys_ni_syscall			/* old profil syscall holder */
+	.llong .sys_ni_syscall		/* old profil syscall holder */
 	.llong .sys_statfs
-	.llong .sys_fstatfs	/* 100 */
-	.llong .sys_ni_syscall		/* old ioperm syscall holder */
+	.llong .sys_fstatfs		/* 100 */
+	.llong .sys_ioperm
 	.llong .sys_socketcall
 	.llong .sys_syslog
 	.llong .sys_setitimer
-	.llong .sys_getitimer	/* 105 */
+	.llong .sys_getitimer		/* 105 */
 	.llong .sys_newstat
 	.llong .sys_newlstat
 	.llong .sys_newfstat
 	.llong .sys_uname
-	.llong .sys_ni_syscall		/* 110 old iopl syscall holder */
+	.llong .sys_ni_syscall		/* 110 old iopl syscall */
 	.llong .sys_vhangup
-	.llong .sys_ni_syscall	/* old 'idle' syscall */
-	.llong .sys_ni_syscall		/* old vm86 syscall holder */
+	.llong .sys_ni_syscall		/* old idle syscall */
+	.llong .sys_ni_syscall		/* old vm86 syscall */
 	.llong .sys_wait4
-	.llong .sys_swapoff	/* 115 */
+	.llong .sys_swapoff		/* 115 */
 	.llong .sys_sysinfo
 	.llong .sys_ipc
 	.llong .sys_fsync
@@ -863,7 +864,7 @@ _GLOBAL(sys_call_table)
 	.llong .ppc64_newuname
 	.llong .sys_ni_syscall		/* old modify_ldt syscall */
 	.llong .sys_adjtimex
-	.llong .sys_mprotect	/* 125 */
+	.llong .sys_mprotect		/* 125 */
 	.llong .sys_sigprocmask
 	.llong .sys_create_module
 	.llong .sys_init_module
@@ -925,35 +926,35 @@ _GLOBAL(sys_call_table)
 	.llong .sys_capset
 	.llong .sys_sigaltstack	        /* 185 */
 	.llong .sys_sendfile
-	.llong .sys_ni_syscall		/* streams1 */
-	.llong .sys_ni_syscall		/* streams2 */
+	.llong .sys_ni_syscall		/* reserved for streams1 */
+	.llong .sys_ni_syscall		/* reserved for streams2 */
 	.llong .sys_vfork
 	.llong .sys_getrlimit	        /* 190 */
 	.llong .sys_readahead
-	.llong .sys_ni_syscall		/* 192 - reserved - mmap2 */
-	.llong .sys_ni_syscall		/* 193 - reserved - truncate64 */
-	.llong .sys_ni_syscall		/* 194 - reserved - ftruncate64 */
-	.llong .sys_ni_syscall		/* 195 - reserved - stat64 */
-	.llong .sys_ni_syscall		/* 196 - reserved - lstat64 */
-	.llong .sys_ni_syscall		/* 197 - reserved - fstat64 */
-	.llong .sys_pciconfig_read	/* 198 */
-	.llong .sys_pciconfig_write 	/* 199 */
+	.llong .sys_ni_syscall		/* 32bit only mmap2 */
+	.llong .sys_ni_syscall		/* 32bit only truncate64 */
+	.llong .sys_ni_syscall		/* 32bit only ftruncate64 */
+	.llong .sys_ni_syscall		/* 195 - 32bit only stat64 */
+	.llong .sys_ni_syscall		/* 32bit only lstat64 */
+	.llong .sys_ni_syscall		/* 32bit only fstat64 */
+	.llong .sys_pciconfig_read
+	.llong .sys_pciconfig_write
 	.llong .sys_ni_syscall		/* 200 - reserved - sys_pciconfig_iobase */
-	.llong .sys_ni_syscall		/* 201 - reserved - MacOnLinux - new */
-	.llong .sys_getdents64		/* 202 */
-	.llong .sys_pivot_root		/* 203 */
-	.llong .sys_ni_syscall		/* 204 */
+	.llong .sys_ni_syscall		/* reserved for MacOnLinux */
+	.llong .sys_getdents64
+	.llong .sys_pivot_root
+	.llong .sys_ni_syscall		/* 32bit only fcntl64 */
 	.llong .sys_madvise		/* 205 */
-	.llong .sys_mincore		/* 206 */
-	.llong .sys_gettid		/* 207 */
-	.llong .sys_tkill		/* 208 */
+	.llong .sys_mincore
+	.llong .sys_gettid
+	.llong .sys_tkill
 	.llong .sys_setxattr
-	.llong .sys_lsetxattr	/* 210 */
+	.llong .sys_lsetxattr		/* 210 */
 	.llong .sys_fsetxattr
 	.llong .sys_getxattr
 	.llong .sys_lgetxattr
 	.llong .sys_fgetxattr
-	.llong .sys_listxattr	/* 215 */
+	.llong .sys_listxattr		/* 215 */
 	.llong .sys_llistxattr
 	.llong .sys_flistxattr
 	.llong .sys_removexattr
@@ -964,7 +965,8 @@ _GLOBAL(sys_call_table)
 	.llong .sys_sched_getaffinity
 	.llong .sys_ni_syscall		/* reserved for security */
 	.llong .sys_ni_syscall		/* reserved for tux */
+	.llong .sys_ni_syscall		/* 225 - 32bit only sendfile64 */
 
-	.rept NR_syscalls-225
-	.llong .sys_ni_syscall
+	.rept NR_syscalls-226
+		.llong .sys_ni_syscall
 	.endr

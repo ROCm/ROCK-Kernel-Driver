@@ -128,7 +128,6 @@ struct device_node {
 	int	busno;			/* for pci devices */
 	int	devfn;			/* for pci devices */
 	struct  pci_controller *phb;	/* for pci devices */
-	int	status;			/* current status of device */
 	struct	TceTable *tce_table;	/* for phb's or bridges */
 #define DN_STATUS_BIST_FAILED (1<<0)
 	struct	property *properties;

@@ -113,10 +113,6 @@ _GLOBAL(DoSyscall)
 	clrldi	r4,r4,32
 	clrldi	r5,r5,32
 	clrldi	r6,r6,32
-#if 0 /* XXX Why not ??? - Anton */
-	clrldi	r7,r7,32
-	clrldi	r8,r8,32
-#endif
 	b	17f
 15:
 #endif
@@ -187,10 +183,6 @@ _GLOBAL(ret_from_syscall_1)
 	clrldi	r4,r4,32
 	clrldi	r5,r5,32
 	clrldi	r6,r6,32
-#if 0 /* XXX Why not ??? - Anton */
-	clrldi	r7,r7,32
-	clrldi	r8,r8,32
-#endif
 	b	57f
 55:
 #endif

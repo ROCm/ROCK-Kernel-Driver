@@ -78,14 +78,12 @@ rtas_read_config_##size(struct device_node *dn, int offset, type val) {  \
 	 \
 	if (dn == NULL) { \
 		ret = -2; \
-	} else if (dn->status) { \
-		ret = -1; \
 	} else { \
 		addr = (dn->busno << 16) | (dn->devfn << 8) | offset; \
 		buid = dn->phb->buid; \
 		if (buid) { \
 			ret = rtas_call(ibm_read_pci_config, 4, 2, &returnval, addr, buid >> 32, buid & 0xffffffff, nbytes); \
-                        if (ret < 0) \
+                        if (ret < 0|| (returnval == 0xffffffff)) \
                                ret = rtas_fake_read(dn, offset, nbytes, &returnval); \
 		} else { \
 			ret = rtas_call(read_pci_config, 2, 2, &returnval, addr, nbytes); \
@@ -111,8 +109,6 @@ rtas_write_config_##size(struct device_node *dn, int offset, type val) { \
 	 \
 	if (dn == NULL) { \
 		ret = -2; \
-	} else if (dn->status) { \
-		ret = -1; \
 	} else { \
 		buid = dn->phb->buid; \
 		addr = (dn->busno << 16) | (dn->devfn << 8) | offset; \
