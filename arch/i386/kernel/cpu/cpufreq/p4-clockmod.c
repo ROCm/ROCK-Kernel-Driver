@@ -49,8 +49,6 @@ enum {
 static int has_N44_O17_errata[NR_CPUS];
 static int stock_freq;
 
-static struct cpufreq_driver p4clockmod_driver;
-
 
 static int cpufreq_p4_setdc(unsigned int cpu, unsigned int newstate)
 {
@@ -220,9 +218,7 @@ static int cpufreq_p4_cpu_init(struct cpufreq_policy *policy)
 	/* cpuinfo and default policy values */
 	policy->policy = CPUFREQ_POLICY_PERFORMANCE;
 	policy->cpuinfo.transition_latency = 1000;
-#ifdef CONFIG_CPU_FREQ_24_API
-	p4clockmod_driver.cpu_cur_freq[policy->cpu] = stock_freq;
-#endif
+	policy->cur = stock_freq;
 
 	return cpufreq_frequency_table_cpuinfo(policy, &p4clockmod_table[0]);
 }

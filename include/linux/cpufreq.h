@@ -62,6 +62,8 @@ struct cpufreq_policy {
 	unsigned int            cpu;    /* cpu nr or CPUFREQ_ALL_CPUS */
 	unsigned int            min;    /* in kHz */
 	unsigned int            max;    /* in kHz */
+	unsigned int            cur;    /* in kHz, only needed if cpufreq
+					 * governors are used */
         unsigned int            policy; /* see above */
 	struct cpufreq_governor *governor; /* see below */
 	struct cpufreq_cpuinfo  cpuinfo;     /* see above */
@@ -164,10 +166,6 @@ struct cpufreq_driver {
 	/* optional, for the moment */
 	int	(*init)		(struct cpufreq_policy *policy);
 	int	(*exit)		(struct cpufreq_policy *policy);
-	/* 2.4. compatible API */
-#ifdef CONFIG_CPU_FREQ_24_API
-	unsigned int		cpu_cur_freq[NR_CPUS];
-#endif
 };
 
 int cpufreq_register_driver(struct cpufreq_driver *driver_data);
@@ -208,13 +206,18 @@ int cpufreq_restore(void);
 /* the proc_intf.c needs this */
 int cpufreq_parse_governor (char *str_governor, unsigned int *policy, struct cpufreq_governor **governor);
 
-#ifdef CONFIG_CPU_FREQ_24_API
+#if defined(CONFIG_CPU_FREQ_GOV_USERSPACE) || defined(CONFIG_CPU_FREQ_GOV_USERSPACE_MODULE)
 /*********************************************************************
- *                        CPUFREQ 2.4. INTERFACE                     *
+ *                      CPUFREQ USERSPACE GOVERNOR                   *
  *********************************************************************/
+extern struct cpufreq_governor cpufreq_gov_userspace;
+int cpufreq_gov_userspace_init(void);
+
 int cpufreq_setmax(unsigned int cpu);
 int cpufreq_set(unsigned int kHz, unsigned int cpu);
 unsigned int cpufreq_get(unsigned int cpu);
+
+#ifdef CONFIG_CPU_FREQ_24_API
 
 /* /proc/sys/cpu */
 enum {
@@ -260,44 +263,9 @@ enum {
 	CPU_NR_FREQ = 3,
 };
 
-#define CTL_CPU_VARS_SPEED_MAX(cpunr) { \
-                .ctl_name	= CPU_NR_FREQ_MAX, \
-                .data		= &cpu_max_freq[cpunr], \
-                .procname	= "speed-max", \
-                .maxlen		= sizeof(cpu_max_freq[cpunr]),\
-                .mode		= 0444, \
-                .proc_handler	= proc_dointvec, }
-
-#define CTL_CPU_VARS_SPEED_MIN(cpunr) { \
-                .ctl_name	= CPU_NR_FREQ_MIN, \
-                .data		= &cpu_min_freq[cpunr], \
-                .procname	= "speed-min", \
-                .maxlen		= sizeof(cpu_min_freq[cpunr]),\
-                .mode		= 0444, \
-                .proc_handler	= proc_dointvec, }
-
-#define CTL_CPU_VARS_SPEED(cpunr) { \
-                .ctl_name	= CPU_NR_FREQ, \
-                .procname	= "speed", \
-                .mode		= 0644, \
-                .proc_handler	= cpufreq_procctl, \
-                .strategy	= cpufreq_sysctl, \
-                .extra1		= (void*) (cpunr), }
-
-#define CTL_TABLE_CPU_VARS(cpunr) static ctl_table ctl_cpu_vars_##cpunr[] = {\
-                CTL_CPU_VARS_SPEED_MAX(cpunr), \
-                CTL_CPU_VARS_SPEED_MIN(cpunr), \
-                CTL_CPU_VARS_SPEED(cpunr),  \
-                { .ctl_name = 0, }, }
-
-/* the ctl_table entry for each CPU */
-#define CPU_ENUM(s) { \
-                .ctl_name	= (CPU_NR + s), \
-                .procname	= #s, \
-                .mode		= 0555, \
-                .child		= ctl_cpu_vars_##s }
-
 #endif /* CONFIG_CPU_FREQ_24_API */
+
+#endif /* CONFIG_CPU_FREQ_GOV_USERSPACE */
 
 
 /*********************************************************************
