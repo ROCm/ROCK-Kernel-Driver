@@ -28,6 +28,7 @@
 #include <asm/system.h>
 #include <asm/sections.h>
 #include <asm/of_device.h>
+#include <linux/kthread.h>
 
 #undef DEBUG
 
@@ -70,7 +71,6 @@ static enum {ADT7460, ADT7467} therm_type;
 static int therm_bus, therm_address;
 static struct of_device * of_dev;
 static struct thermostat* thermostat;
-static pid_t monitor_thread_id;
 static int monitor_running;
 static struct completion monitor_task_compl;
 
@@ -237,16 +237,11 @@ static int monitor_task(void *arg)
 #ifdef DEBUG
 	int mfan_speed;
 #endif
-	
-	lock_kernel();
-	daemonize("kfand");
-	unlock_kernel();
-	strcpy(current->comm, "thermostat");
 	monitor_running = 1;
 
 	while(monitor_running)
 	{
-		msleep(2000);
+		msleep_interruptible(2000);
 
 		/* Check status */
 		/* local   : chip */
@@ -405,8 +400,7 @@ attach_one_thermostat(struct i2c_adapter *adapter, int addr, int busno)
 	
 	init_completion(&monitor_task_compl);
 	
-	monitor_thread_id = kernel_thread(monitor_task, th,
-		SIGCHLD | CLONE_KERNEL);
+	kthread_run(monitor_task, th, "kfand");
 
 	return 0;
 }
