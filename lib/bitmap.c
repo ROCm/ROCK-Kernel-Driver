@@ -12,6 +12,26 @@
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
 
+/*
+ * bitmaps provide an array of bits, implemented using an an
+ * array of unsigned longs.  The number of valid bits in a
+ * given bitmap need not be an exact multiple of BITS_PER_LONG.
+ *
+ * The possible unused bits in the last, partially used word
+ * of a bitmap are 'don't care'.  The implementation makes
+ * no particular effort to keep them zero.  It ensures that
+ * their value will not affect the results of any operation.
+ * The bitmap operations that return Boolean (bitmap_empty,
+ * for example) or scalar (bitmap_weight, for example) results
+ * carefully filter out these unused bits from impacting their
+ * results.
+ *
+ * These operations actually hold to a slightly stronger rule:
+ * if you don't input any bitmaps to these ops that have some
+ * unused bits set, then they won't output any set unused bits
+ * in output bitmaps.
+ */
+
 int bitmap_empty(const unsigned long *bitmap, int bits)
 {
 	int k, lim = bits/BITS_PER_LONG;
@@ -43,7 +63,7 @@ int bitmap_full(const unsigned long *bitmap, int bits)
 EXPORT_SYMBOL(bitmap_full);
 
 int bitmap_equal(const unsigned long *bitmap1,
-		unsigned long *bitmap2, int bits)
+		const unsigned long *bitmap2, int bits)
 {
 	int k, lim = bits/BITS_PER_LONG;
 	for (k = 0; k < lim; ++k)
@@ -59,13 +79,14 @@ int bitmap_equal(const unsigned long *bitmap1,
 }
 EXPORT_SYMBOL(bitmap_equal);
 
-void bitmap_complement(unsigned long *bitmap, int bits)
+void bitmap_complement(unsigned long *dst, const unsigned long *src, int bits)
 {
-	int k;
-	int nr = BITS_TO_LONGS(bits);
+	int k, lim = bits/BITS_PER_LONG;
+	for (k = 0; k < lim; ++k)
+		dst[k] = ~src[k];
 
-	for (k = 0; k < nr; ++k)
-		bitmap[k] = ~bitmap[k];
+	if (bits % BITS_PER_LONG)
+		dst[k] = ~src[k] & ((1UL << (bits % BITS_PER_LONG)) - 1);
 }
 EXPORT_SYMBOL(bitmap_complement);
 
@@ -172,6 +193,60 @@ void bitmap_or(unsigned long *dst, const unsigned long *bitmap1,
 		dst[k] = bitmap1[k] | bitmap2[k];
 }
 EXPORT_SYMBOL(bitmap_or);
+
+void bitmap_xor(unsigned long *dst, const unsigned long *bitmap1,
+				const unsigned long *bitmap2, int bits)
+{
+	int k;
+	int nr = BITS_TO_LONGS(bits);
+
+	for (k = 0; k < nr; k++)
+		dst[k] = bitmap1[k] ^ bitmap2[k];
+}
+EXPORT_SYMBOL(bitmap_xor);
+
+void bitmap_andnot(unsigned long *dst, const unsigned long *bitmap1,
+				const unsigned long *bitmap2, int bits)
+{
+	int k;
+	int nr = BITS_TO_LONGS(bits);
+
+	for (k = 0; k < nr; k++)
+		dst[k] = bitmap1[k] & ~bitmap2[k];
+}
+EXPORT_SYMBOL(bitmap_andnot);
+
+int bitmap_intersects(const unsigned long *bitmap1,
+				const unsigned long *bitmap2, int bits)
+{
+	int k, lim = bits/BITS_PER_LONG;
+	for (k = 0; k < lim; ++k)
+		if (bitmap1[k] & bitmap2[k])
+			return 1;
+
+	if (bits % BITS_PER_LONG)
+		if ((bitmap1[k] & bitmap2[k]) &
+				((1UL << (bits % BITS_PER_LONG)) - 1))
+			return 1;
+	return 0;
+}
+EXPORT_SYMBOL(bitmap_intersects);
+
+int bitmap_subset(const unsigned long *bitmap1,
+				const unsigned long *bitmap2, int bits)
+{
+	int k, lim = bits/BITS_PER_LONG;
+	for (k = 0; k < lim; ++k)
+		if (bitmap1[k] & ~bitmap2[k])
+			return 0;
+
+	if (bits % BITS_PER_LONG)
+		if ((bitmap1[k] & ~bitmap2[k]) &
+				((1UL << (bits % BITS_PER_LONG)) - 1))
+			return 0;
+	return 1;
+}
+EXPORT_SYMBOL(bitmap_subset);
 
 #if BITS_PER_LONG == 32
 int bitmap_weight(const unsigned long *bitmap, int bits)
