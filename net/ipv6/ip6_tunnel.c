@@ -540,8 +540,7 @@ ip6ip6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 	read_unlock(&ip6ip6_lock);
 	icmpv6_send(skb, ICMPV6_DEST_UNREACH, ICMPV6_ADDR_UNREACH, 0, skb->dev);
 discard:
-	kfree_skb(skb);
-	return 0;
+	return 1;
 }
 
 static inline struct ipv6_txoptions *create_tel(__u8 encap_limit)
@@ -1097,10 +1096,9 @@ ip6ip6_fb_tnl_dev_init(struct net_device *dev)
 	return 0;
 }
 
-static struct inet6_protocol ip6ip6_protocol = {
+static struct xfrm6_tunnel ip6ip6_handler = {
 	.handler = ip6ip6_rcv,
 	.err_handler = ip6ip6_err,
-	.flags = INET6_PROTO_FINAL
 };
 
 /**
@@ -1113,9 +1111,9 @@ static int __init ip6_tunnel_init(void)
 {
 	int  err;
 
-	if ((err = inet6_add_protocol(&ip6ip6_protocol, IPPROTO_IPV6)) < 0) {
-		printk(KERN_ERR "Failed to register IPv6 protocol\n");
-		return err;
+	if (xfrm6_tunnel_register(&ip6ip6_handler) < 0) {
+		printk(KERN_ERR "ip6ip6 init: can't register tunnel\n");
+		return -EAGAIN;
 	}
 	ip6ip6_fb_tnl_dev = alloc_netdev(sizeof(struct ip6_tnl), "ip6tnl0",
 					 ip6ip6_tnl_dev_setup);
@@ -1132,7 +1130,7 @@ static int __init ip6_tunnel_init(void)
 	}
 	return 0;
 fail:
-	inet6_del_protocol(&ip6ip6_protocol, IPPROTO_IPV6);
+	xfrm6_tunnel_deregister(&ip6ip6_handler);
 	return err;
 }
 
@@ -1142,8 +1140,10 @@ fail:
 
 static void __exit ip6_tunnel_cleanup(void)
 {
+	if (xfrm6_tunnel_deregister(&ip6ip6_handler) < 0)
+		printk(KERN_INFO "ip6ip6 close: can't deregister tunnel\n");
+
 	unregister_netdev(ip6ip6_fb_tnl_dev);
-	inet6_del_protocol(&ip6ip6_protocol, IPPROTO_IPV6);
 }
 
 module_init(ip6_tunnel_init);

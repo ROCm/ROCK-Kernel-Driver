@@ -258,6 +258,66 @@ static void ipcomp6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	xfrm_state_put(x);
 }
 
+static struct xfrm_state *ipcomp6_tunnel_create(struct xfrm_state *x)
+{
+	struct xfrm_state *t = NULL;
+
+	t = xfrm_state_alloc();
+	if (!t)
+		goto out;
+
+	t->id.proto = IPPROTO_IPV6;
+	t->id.spi = xfrm6_tunnel_alloc_spi((xfrm_address_t *)&x->props.saddr);
+	memcpy(t->id.daddr.a6, x->id.daddr.a6, sizeof(struct in6_addr));
+	memcpy(&t->sel, &x->sel, sizeof(t->sel));
+	t->props.family = AF_INET6;
+	t->props.mode = 1;
+	memcpy(t->props.saddr.a6, x->props.saddr.a6, sizeof(struct in6_addr));
+
+	t->type = xfrm_get_type(IPPROTO_IPV6, t->props.family);
+	if (t->type == NULL)
+		goto error;
+
+	if (t->type->init_state(t, NULL))
+		goto error;
+
+	t->km.state = XFRM_STATE_VALID;
+	atomic_set(&t->tunnel_users, 1);
+
+out:
+	return t;
+
+error:
+	xfrm_state_put(t);
+	goto out;
+}
+
+static int ipcomp6_tunnel_attach(struct xfrm_state *x)
+{
+	int err = 0;
+	struct xfrm_state *t = NULL;
+	u32 spi;
+
+	spi = xfrm6_tunnel_spi_lookup((xfrm_address_t *)&x->props.saddr);
+	if (spi)
+		t = xfrm_state_lookup((xfrm_address_t *)&x->id.daddr,
+					      spi, IPPROTO_IPV6, AF_INET6);
+	if (!t) {
+		t = ipcomp6_tunnel_create(x);
+		if (!t) {
+			err = -EINVAL;
+			goto out;
+		}
+		xfrm_state_insert(t);
+		xfrm_state_hold(t);
+	}
+	x->tunnel = t;
+	atomic_inc(&t->tunnel_users);
+
+out:
+	return err;
+}
+
 static void ipcomp6_free_data(struct ipcomp_data *ipcd)
 {
 	if (ipcd->tfm)
@@ -271,8 +331,11 @@ static void ipcomp6_destroy(struct xfrm_state *x)
 	struct ipcomp_data *ipcd = x->data;
 	if (!ipcd)
 		return;
+	xfrm_state_delete_tunnel(x);
 	ipcomp6_free_data(ipcd);
 	kfree(ipcd);
+
+	xfrm6_tunnel_free_spi((xfrm_address_t *)&x->props.saddr);
 }
 
 static int ipcomp6_init_state(struct xfrm_state *x, void *args)
@@ -302,6 +365,12 @@ static int ipcomp6_init_state(struct xfrm_state *x, void *args)
 	ipcd->tfm = crypto_alloc_tfm(x->calg->alg_name, 0);
 	if (!ipcd->tfm)
 		goto error;
+
+	if (x->props.mode) {
+		err = ipcomp6_tunnel_attach(x);
+		if (err)
+			goto error;
+	}
 
 	calg_desc = xfrm_calg_get_byname(x->calg->alg_name);
 	BUG_ON(!calg_desc);

@@ -277,10 +277,12 @@ void __init xfrm6_init(void)
 {
 	xfrm6_policy_init();
 	xfrm6_state_init();
+	xfrm6_tunnel_init();
 }
 
 void __exit xfrm6_fini(void)
 {
+	xfrm6_tunnel_fini();
 	//xfrm6_input_fini();
 	xfrm6_policy_fini();
 	xfrm6_state_fini();
