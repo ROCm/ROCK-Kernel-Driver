@@ -210,44 +210,93 @@ static inline void prep_new_page(struct page *page)
 	set_page_count(page, 1);
 }
 
+/* 
+ * Do the hard work of removing an element from the buddy allocator.
+ * Call me with the zone->lock already held.
+ */
+static struct page *__rmqueue(struct zone *zone, unsigned int order)
+{
+	struct free_area * area;
+	unsigned int current_order = order;
+	struct list_head *head, *curr;
+	struct page *page;
+	unsigned int index;
+
+	for (current_order=order; current_order < MAX_ORDER; ++current_order) {
+		area = zone->free_area + current_order;
+		head = &area->free_list;
+		curr = head->next;
+
+		if (list_empty(&area->free_list))
+			continue;
+
+		page = list_entry(curr, struct page, list);
+		BUG_ON(bad_range(zone, page));
+		list_del(curr);
+		index = page - zone->zone_mem_map;
+		if (current_order != MAX_ORDER-1)
+			MARK_USED(index, current_order, area);
+		zone->free_pages -= 1UL << order;
+		page = expand(zone, page, index, order, current_order, area);
+		return page;
+	}
+
+	return NULL;
+}
+
+/* Obtain a single element from the buddy allocator */
 static struct page *rmqueue(struct zone *zone, unsigned int order)
 {
-	struct free_area *area = zone->free_area + order;
-	unsigned int curr_order = order;
-	struct list_head *head, *curr;
 	unsigned long flags;
 	struct page *page;
 
 	spin_lock_irqsave(&zone->lock, flags);
-	do {
-		head = &area->free_list;
-		curr = head->next;
-
-		if (curr != head) {
-			unsigned int index;
-
-			page = list_entry(curr, struct page, list);
-			BUG_ON(bad_range(zone, page));
-			list_del(curr);
-			index = page - zone->zone_mem_map;
-			if (curr_order != MAX_ORDER-1)
-				MARK_USED(index, curr_order, area);
-			zone->free_pages -= 1UL << order;
-
-			page = expand(zone, page, index, order, curr_order, area);
-			spin_unlock_irqrestore(&zone->lock, flags);
-
-			if (bad_range(zone, page))
-				BUG();
-			prep_new_page(page);
-			return page;	
-		}
-		curr_order++;
-		area++;
-	} while (curr_order < MAX_ORDER);
+	page = __rmqueue(zone, order);
 	spin_unlock_irqrestore(&zone->lock, flags);
 
-	return NULL;
+	if (page != NULL) {
+		BUG_ON(bad_range(zone, page));
+		prep_new_page(page);
+	}
+	return page;
+}
+
+/* 
+ * Obtain a specified number of elements from the buddy allocator, all under
+ * a single hold of the lock, for efficiency.  Add them to the supplied list.
+ * Returns the number of new pages which were placed at *list.
+ */
+static int rmqueue_bulk(struct zone *zone, unsigned int order, 
+			unsigned long count, struct list_head *list)
+{
+	unsigned long flags;
+	int i, allocated = 0;
+	struct page *page;
+	struct list_head *curr;
+	LIST_HEAD(temp);
+	
+	spin_lock_irqsave(&zone->lock, flags);
+	for (i = 0; i < count; ++i) {
+		page = __rmqueue(zone, order);
+		if (page == NULL)
+			break;
+		++allocated;
+		list_add(&page->list, &temp);
+	}
+	spin_unlock_irqrestore(&zone->lock, flags);
+
+	/*
+	 * This may look inefficient because we're walking the list again,
+	 * but the cachelines are hot, so it's very cheap, and this way we
+	 * can drop the zone lock much earlier
+	 */
+	list_for_each(curr, &temp) {
+		page = list_entry(curr, struct page, list);
+		BUG_ON(bad_range(zone, page));
+		prep_new_page(page);
+	}
+	list_splice(&temp, list->prev);
+	return allocated;
 }
 
 #ifdef CONFIG_SOFTWARE_SUSPEND
