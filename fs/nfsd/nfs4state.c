@@ -1949,8 +1949,11 @@ nfs4_set_lock_denied(struct file_lock *fl, struct nfsd4_lock_denied *deny)
 	unsigned int hval = lockownerid_hashval(sop->so_id);
 
 	deny->ld_sop = NULL;
-	if (nfs4_verify_lock_stateowner(sop, hval))
+	if (nfs4_verify_lock_stateowner(sop, hval)) {
+		kref_get(&sop->so_ref);
 		deny->ld_sop = sop;
+		deny->ld_clientid = sop->so_client->cl_clientid;
+	}
 	deny->ld_start = fl->fl_start;
 	deny->ld_length = ~(u64)0;
 	if (fl->fl_end != ~(u64)0)

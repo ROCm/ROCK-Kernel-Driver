@@ -1994,9 +1994,10 @@ nfsd4_encode_lock_denied(struct nfsd4_compoundres *resp, struct nfsd4_lock_denie
 	WRITE64(ld->ld_length);
 	WRITE32(ld->ld_type);
 	if (ld->ld_sop) {
-		WRITEMEM(&ld->ld_sop->so_client->cl_clientid, 8);
+		WRITEMEM(&ld->ld_clientid, 8);
 		WRITE32(ld->ld_sop->so_owner.len);
 		WRITEMEM(ld->ld_sop->so_owner.data, ld->ld_sop->so_owner.len);
+		kref_put(&ld->ld_sop->so_ref, nfs4_free_stateowner);
 	}  else {  /* non - nfsv4 lock in conflict, no clientid nor owner */
 		WRITE64((u64)0); /* clientid */
 		WRITE32(0); /* length of owner name */
