@@ -1304,6 +1304,8 @@ sub create_parameterlist($$$) {
     }
     
     foreach my $arg (split($splitter, $args)) {
+	# strip comments
+	$arg =~ s/\/\*.*\*\///;
         # strip leading/trailing spaces
         $arg =~ s/^\s*//;
 	$arg =~ s/\s*$//;
