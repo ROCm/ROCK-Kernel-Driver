@@ -1,5 +1,5 @@
 /*
- *  sata_promise.c - Promise SATA
+ *  sata_sx4.c - Promise SATA
  *
  *  Copyright 2003-2004 Red Hat, Inc.
  *
