@@ -125,8 +125,6 @@ static int valkyrie_set_var(struct fb_var_screeninfo *var, int con,
 			 struct fb_info *info);
 static int valkyrie_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info);
-static int valkyrie_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			  struct fb_info *info);
 static int valkyriefb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 			     u_int transp, struct fb_info *info);
 static int valkyriefb_blank(int blank_mode, struct fb_info *info);
@@ -153,7 +151,7 @@ static struct fb_ops valkyriefb_ops = {
 	fb_get_var:	valkyrie_get_var,
 	fb_set_var:	valkyrie_set_var,
 	fb_get_cmap:	valkyrie_get_cmap,
-	fb_set_cmap:	valkyrie_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
 	fb_setcolreg:	valkyriefb_setcolreg,
 	fb_blank:	valkyriefb_blank,
 };
@@ -249,27 +247,6 @@ static int valkyrie_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 		int size = fb_display[con].var.bits_per_pixel == 16 ? 32 : 256;
 		fb_copy_cmap(fb_default_cmap(size), cmap, kspc ? 0 : 2);
 	}
-	return 0;
-}
-
-static int valkyrie_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			 struct fb_info *info)
-{
-	struct display *disp = &fb_display[con];
-	int err;
-
-	if (disp->cmap.len == 0) {
-		int size = fb_display[con].var.bits_per_pixel == 16 ? 32 : 256;
-		err = fb_alloc_cmap(&disp->cmap, size, 0);
-		if (err) {
-			return err;
-		}
-	}
-
-	if (con == info->currcon) {
-		return fb_set_cmap(cmap, kspc, info);
-	}
-	fb_copy_cmap(cmap, &disp->cmap, kspc ? 0 : 1);
 	return 0;
 }
 

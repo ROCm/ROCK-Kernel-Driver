@@ -385,7 +385,7 @@ static struct fb_ops pm2fb_ops={
 	fb_get_var:	fbgen_get_var,
 	fb_set_var:	fbgen_set_var,
 	fb_get_cmap:	fbgen_get_cmap,
-	fb_set_cmap:	fbgen_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
 	fb_setcolreg:	pm2fb_setcolreg,
 	fb_pan_display:	fbgen_pan_display,
 	fb_blank:	fbgen_blank,

@@ -800,30 +800,13 @@ static int macfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 	return 0;
 }
 
-static int macfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			  struct fb_info *info)
-{
-	int err;
-
-	if (!fb_display[con].cmap.len) {	/* no colormap allocated? */
-		err = fb_alloc_cmap(&fb_display[con].cmap,video_cmap_len,0);
-		if (err)
-			return err;
-	}
-	if (con == info->currcon)			/* current console? */
-		return fb_set_cmap(cmap, kspc, info);
-	else
-		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
-	return 0;
-}
-
 static struct fb_ops macfb_ops = {
 	owner:		THIS_MODULE,
 	fb_get_fix:	macfb_get_fix,
 	fb_get_var:	macfb_get_var,
 	fb_set_var:	macfb_set_var,
 	fb_get_cmap:	macfb_get_cmap,
-	fb_set_cmap:	macfb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
 	fb_setcolreg:	macfb_setcolreg,
 };
 

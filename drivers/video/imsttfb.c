@@ -1537,24 +1537,6 @@ imsttfb_get_cmap (struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
 	return 0;
 }
 
-static int
-imsttfb_set_cmap (struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
-{
-	int err;
-
-	if (!fb_display[con].cmap.len) {	/* no colormap allocated? */
-		int size = fb_display[con].var.bits_per_pixel == 16 ? 32 : 256;
-		if ((err = fb_alloc_cmap(&fb_display[con].cmap, size, 0)))
-			return err;
-	}
-	if (con == info->currcon)			/* current console? */
-		return fb_set_cmap(cmap, kspc, info);
-	else
-		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
-
-	return 0;
-}
-
 static int 
 imsttfb_blank (int blank, struct fb_info *info)
 {
@@ -1693,7 +1675,7 @@ static struct fb_ops imsttfb_ops = {
 	fb_get_var:	imsttfb_get_var,
 	fb_set_var:	imsttfb_set_var,
 	fb_get_cmap:	imsttfb_get_cmap,
-	fb_set_cmap:	imsttfb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
 	fb_setcolreg:	imsttfb_setcolreg,
 	fb_pan_display:	imsttfb_pan_display,
 	fb_blank:	imsttfb_blank,

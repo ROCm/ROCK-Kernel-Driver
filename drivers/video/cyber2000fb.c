@@ -540,37 +540,6 @@ cyber2000fb_update_start(struct cfb_info *cfb, struct fb_var_screeninfo *var)
 	return 0;
 }
 
-/*
- * Set the Colormap
- */
-static int
-cyber2000fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-		     struct fb_info *info)
-{
-	struct cfb_info *cfb = (struct cfb_info *)info;
-	struct display *display = fb_display + con;
-	struct fb_cmap *dcmap = &display->cmap;
-	int err = 0;
-
-	/* no colormap allocated? */
-	if (!dcmap->len)
-		err = fb_alloc_cmap(dcmap, 256, 0);
-
-	/*
-	 * we should be able to remove this test once fbcon has been
-	 * "improved" --rmk
-	 */
-	if (!err && display == cfb->display) {
-		err = fb_set_cmap(cmap, kspc, &cfb->fb);
-		dcmap = &cfb->fb.cmap;
-	}
-
-	if (!err)
-		fb_copy_cmap(cmap, dcmap, kspc ? 0 : 1);
-
-	return err;
-}
-
 static int
 cyber2000fb_decode_crtc(struct par_info *hw, struct cfb_info *cfb,
 			struct fb_var_screeninfo *var)
@@ -1142,7 +1111,7 @@ static int cyber2000fb_blank(int blank, struct fb_info *info)
 static struct fb_ops cyber2000fb_ops = {
 	owner:		THIS_MODULE,
 	fb_set_var:	cyber2000fb_set_var,
-	fb_set_cmap:	cyber2000fb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
 	fb_setcolreg:	cyber2000fb_setcolreg,
 	fb_pan_display:	cyber2000fb_pan_display,
 	fb_blank:	cyber2000fb_blank,

@@ -397,25 +397,6 @@ static int igafb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
         return 0;
 }
 
-static int igafb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-	                  struct fb_info *info)
-{
-        int err;
-	struct fb_info_iga *fb = (struct fb_info_iga*) info;
-
-        if (!fb_display[con].cmap.len) {        /* no colormap allocated? */
-                err = fb_alloc_cmap(&fb_display[con].cmap,
-				    fb->video_cmap_len,0);
-                if (err)
-                        return err;
-        }
-        if (con == info->currcon)                     /* current console? */
-                return fb_set_cmap(cmap, kspc, info);
-        else
-                fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
-        return 0;
-}
-
 /*
  * Framebuffer option structure
  */
@@ -425,7 +406,7 @@ static struct fb_ops igafb_ops = {
 	fb_get_var:	igafb_get_var,
 	fb_set_var:	igafb_set_var,
 	fb_get_cmap:	igafb_get_cmap,
-	fb_set_cmap:	igafb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
 	fb_setcolreg:	igafb_setcolreg,
 #ifdef __sparc__
 	fb_mmap:	igafb_mmap,

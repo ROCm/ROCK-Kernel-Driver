@@ -181,7 +181,7 @@ int gen_get_cmap(struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
 }
 
 /**
- *	fbgen_set_cmap - set the colormap
+ *	gen_set_cmap - set the colormap
  *	@cmap: frame buffer colormap structure
  *	@kspc: boolean, 0 copy local, 1 get_user() function
  *	@con: virtual console number
@@ -194,20 +194,20 @@ int gen_get_cmap(struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
  *
  */
 
-int fbgen_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-		   struct fb_info *info)
+int gen_set_cmap(struct fb_cmap *cmap, int kspc, int con,
+		 struct fb_info *info)
 {
-    int err;
+    struct display *disp = (con < 0) ? info->disp: &fb_display[con]; 	
+    int err, size = disp->var.bits_per_pixel == 16 ? 32 : 256;
 
-    if (!fb_display[con].cmap.len) {	/* no colormap allocated ? */
-	int size = fb_display[con].var.bits_per_pixel == 16 ? 64 : 256;
-	if ((err = fb_alloc_cmap(&fb_display[con].cmap, size, 0)))
+    if (!disp->cmap.len) {	/* no colormap allocated ? */
+	if ((err = fb_alloc_cmap(&disp->cmap, size, 0)))
 	    return err;
     }
     if (con == info->currcon)			/* current console ? */
 	return fb_set_cmap(cmap, kspc, info);
     else
-	fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
+	fb_copy_cmap(cmap, &disp->cmap, kspc ? 0 : 1);
     return 0;
 }
 
@@ -458,7 +458,7 @@ EXPORT_SYMBOL(gen_get_var);
 EXPORT_SYMBOL(fbgen_set_var);
 EXPORT_SYMBOL(fbgen_get_cmap);
 EXPORT_SYMBOL(gen_get_cmap);
-EXPORT_SYMBOL(fbgen_set_cmap);
+EXPORT_SYMBOL(gen_set_cmap);
 EXPORT_SYMBOL(fbgen_pan_display);
 /* helper functions */
 EXPORT_SYMBOL(fbgen_do_set_var);

@@ -564,8 +564,6 @@ static int radeonfb_set_var (struct fb_var_screeninfo *var, int con,
                              struct fb_info *info);
 static int radeonfb_get_cmap (struct fb_cmap *cmap, int kspc, int con,
                               struct fb_info *info);
-static int radeonfb_set_cmap (struct fb_cmap *cmap, int kspc, int con,
-                              struct fb_info *info);
 static int radeonfb_setcolreg (unsigned regno, unsigned red, unsigned green,
                                unsigned blue, unsigned transp, struct fb_info *info);
 static int radeonfb_pan_display (struct fb_var_screeninfo *var, int con,
@@ -608,7 +606,7 @@ static struct fb_ops radeon_fb_ops = {
 	fb_get_var:		radeonfb_get_var,
 	fb_set_var:		radeonfb_set_var,
 	fb_get_cmap:		radeonfb_get_cmap,
-	fb_set_cmap:		radeonfb_set_cmap,
+	fb_set_cmap:		gen_set_cmap,
 	fb_setcolreg:		radeonfb_setcolreg,
 	fb_pan_display:		radeonfb_pan_display,
 	fb_blank:		radeonfb_blank,

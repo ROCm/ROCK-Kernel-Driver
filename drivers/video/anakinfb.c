@@ -127,23 +127,6 @@ anakinfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 }
 
 static int
-anakinfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			struct fb_info *info)
-{
-	int err;
-
-	if (!fb_display[con].cmap.len) {
-		if ((err = fb_alloc_cmap(&fb_display[con].cmap, 16, 0)))
-			return err;
-	}
-	if (con == info->currcon)
-		return fb_set_cmap(cmap, kspc, info);
-	else
-		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
-	return 0;
-}
-
-static int
 anakinfb_switch_con(int con, struct fb_info *info)
 { 
 	info->currcon = con;
@@ -171,7 +154,7 @@ static struct fb_ops anakinfb_ops = {
 	fb_get_var:	anakinfb_get_var,
 	fb_set_var:	anakinfb_set_var,
 	fb_get_cmap:	anakinfb_get_cmap,
-	fb_set_cmap:	anakinfb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
 	fb_setcolreg:	anakinfb_setcolreg,
 	fb_blank:	anakinfb_blank,
 };

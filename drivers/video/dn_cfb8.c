@@ -117,8 +117,6 @@ static int dn_fb_set_var(struct fb_var_screeninfo *var, int isactive,
 			 struct fb_info *info);
 static int dn_fb_get_cmap(struct fb_cmap *cmap,int kspc,int con,
 			  struct fb_info *info);
-static int dn_fb_set_cmap(struct fb_cmap *cmap,int kspc,int con,
-			  struct fb_info *info);
 static int dn_fb_blank(int blank,struct fb_info *info);
 
 
@@ -135,7 +133,7 @@ static struct fb_ops dn_fb_ops = {
 	fb_get_var:	dn_fb_get_var,
 	fb_set_var:	dn_fb_set_var,
 	fb_get_cmap:	dn_fb_get_cmap,
-	fb_set_cmap:	dn_fb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
 	fb_blank:	dn_fb_blank,
 };
 
@@ -247,15 +245,6 @@ static int dn_fb_get_cmap(struct fb_cmap *cmap,int kspc,int con,
 	printk("get cmap not supported\n");
 
 	return -EINVAL;
-}
-
-static int dn_fb_set_cmap(struct fb_cmap *cmap,int kspc,int con,
-			  struct fb_info *info) {
-
-	printk("set cmap not supported\n");
-
-	return -EINVAL;
-
 }
 
 static void dn_fb_set_disp(int con, struct fb_info *info) {

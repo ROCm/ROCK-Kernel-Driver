@@ -223,8 +223,6 @@ static int sstfb_set_var(struct fb_var_screeninfo *var,
                          int con, struct fb_info *info);
 static int sstfb_get_cmap(struct fb_cmap *cmap, int kspc,
                           int con, struct fb_info *info);
-static int sstfb_set_cmap(struct fb_cmap *cmap, int kspc,
-                          int con, struct fb_info *info);
 static int sstfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
                            u_int transp, struct fb_info *info);
 static int sstfb_pan_display(struct fb_var_screeninfo *var,
@@ -281,7 +279,7 @@ static struct fb_ops sstfb_ops = {
 	fb_get_var:	sstfb_get_var,
 	fb_set_var:	sstfb_set_var,
 	fb_get_cmap:	sstfb_get_cmap,
-	fb_set_cmap:	sstfb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
 	fb_setcolreg:	sstfb_setcolreg,
 	fb_pan_display:	sstfb_pan_display,
 	fb_ioctl:	sstfb_ioctl,
@@ -856,29 +854,6 @@ static int sstfb_set_var(struct fb_var_screeninfo *var,
 
 	return 0;
 #undef sst_info
-}
-
-
-static int sstfb_set_cmap(struct fb_cmap *cmap, int kspc,
-                          int con, struct fb_info *info)
-{
-	struct display *d = (con<0) ? info->disp : fb_display + con;
-
-	f_dprintk("sstfb_set_cmap\n");
-	f_ddprintk("con: %d, currcon: %d, d->cmap.len %d\n",
-		 con, info->currcon, d->cmap.len);
-
-	if (d->cmap.len != 16 ) {	/* or test if cmap.len == 0 ? */
-		int err;
-		err = fb_alloc_cmap(&d->cmap, 16, 0); /* cmap size=16 */
-		if (err) return err;
-	}
-	if (con == info->currcon) {
-		return fb_set_cmap(cmap, kspc, info);
-	} else {
-		fb_copy_cmap(cmap, &d->cmap, kspc ? 0 : 1);
-	}
-	return 0;
 }
 
 static int sstfb_get_cmap(struct fb_cmap *cmap, int kspc,

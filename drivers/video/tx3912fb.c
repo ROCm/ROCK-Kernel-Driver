@@ -47,12 +47,8 @@ static int tx3912fb_set_var(struct fb_var_screeninfo *var, int con,
 				struct fb_info *info);
 static int tx3912fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 				struct fb_info *info);
-static int tx3912fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-				struct fb_info *info);
 static int tx3912fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 			u_int transp, struct fb_info *info);
-static int tx3912fb_ioctl(struct inode *inode, struct file *file, u_int cmd,
-				u_long arg, int con, struct fb_info *info);
 
 /*
  * Interface used by console driver
@@ -82,9 +78,8 @@ static struct fb_ops tx3912fb_ops = {
 	fb_get_var: tx3912fb_get_var,
 	fb_set_var: tx3912fb_set_var,
 	fb_get_cmap: tx3912fb_get_cmap,
-	fb_set_cmap: tx3912fb_set_cmap,
+	fb_set_cmap: gen_set_cmap,
 	fb_setcolreg:	tx3912fb_setcolreg,
-	fb_ioctl: tx3912fb_ioctl,
 };
 
 
@@ -302,36 +297,6 @@ static int tx3912fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 		fb_copy_cmap(fb_default_cmap(1<<fb_display[con].var.bits_per_pixel), cmap, kspc ? 0 : 2);
 
 	return 0;
-}
-
-/*
- *  Set the Colormap
- */
-static int tx3912fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			struct fb_info *info)
-{
-	int err;
-
-	if (!fb_display[con].cmap.len)
-		if ((err = fb_alloc_cmap(&fb_display[con].cmap,
-				1<<fb_display[con].var.bits_per_pixel, 0)))
-			return err;
-
-	if (con == info->currcon)
-		return fb_set_cmap(cmap, kspc, info);
-	else
-		fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
-
-	return 0;
-}
-
-/*
- *  Framebuffer ioctl
- */
-static int tx3912fb_ioctl(struct inode *inode, struct file *file, u_int cmd,
-				u_long arg, int con, struct fb_info *info)
-{
-	return -EINVAL;
 }
 
 /*

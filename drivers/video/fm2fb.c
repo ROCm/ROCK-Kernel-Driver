@@ -188,8 +188,6 @@ static int fm2fb_set_var(struct fb_var_screeninfo *var, int con,
 			 struct fb_info *info);
 static int fm2fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info);
-static int fm2fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			  struct fb_info *info);
 static int fm2fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 			   u_int transp, struct fb_info *info);
 static int fm2fb_blank(int blank, struct fb_info *info);
@@ -215,7 +213,7 @@ static struct fb_ops fm2fb_ops = {
 	fb_get_var:	fm2fb_get_var,
 	fb_set_var:	fm2fb_set_var,
 	fb_get_cmap:	fm2fb_get_cmap,
-	fb_set_cmap:	fm2fb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
 	fb_setcolreg:	fm2fb_setcolreg,
 	fb_blank:	fm2fb_blank,
 };
@@ -296,28 +294,6 @@ static int fm2fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 	fb_copy_cmap(fb_default_cmap(256), cmap, kspc ? 0 : 2);
     return 0;
 }
-
-    /*
-     *  Set the Colormap
-     */
-
-static int fm2fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			  struct fb_info *info)
-{
-    int err;
-
-    if (!fb_display[con].cmap.len) {	/* no colormap allocated? */
-	if ((err = fb_alloc_cmap(&fb_display[con].cmap, 256, 0)))
-	    return err;
-    }
-    if (con == info->currcon) {		/* current console? */
-	err = fb_set_cmap(cmap, kspc, info);
-	return err;
-    } else
-	fb_copy_cmap(cmap, &fb_display[con].cmap, kspc ? 0 : 1);
-    return 0;
-}
-
 
     /*
      *  Initialisation

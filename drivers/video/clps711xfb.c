@@ -89,30 +89,6 @@ clps7111fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 }
 		    
 /*
- * Set the colormap
- */
-static int
-clps7111fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-		    struct fb_info *info)
-{
-	struct fb_cmap *dcmap = &fb_display[con].cmap;
-	int err = 0;
-
-	/* no colormap allocated? */
-	if (!dcmap->len)
-		err = fb_alloc_cmap(dcmap, CMAP_SIZE, 0);
-
-	if (!err && con == info->currcon) {
-		err = fb_set_cmap(cmap, kspc, info);
-		dcmap = &info->cmap;
-	}
-
-	if (!err)
-		fb_copy_cmap(cmap, dcmap, kspc ? 0 : 1);
-	return err;
-}
-
-/*
  *    Set the User Defined Part of the Display
  */
 static int
@@ -238,7 +214,7 @@ clps7111fb_set_var(struct fb_var_screeninfo *var, int con,
 static struct fb_ops clps7111fb_ops = {
 	owner:		THIS_MODULE,
 	fb_set_var:	clps7111fb_set_var,
-	fb_set_cmap:	clps7111fb_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
 	fb_get_fix:	gen_get_fix,
 	fb_get_var:	gen_get_var,
 	fb_get_cmap:	gen_get_cmap,

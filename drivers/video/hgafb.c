@@ -532,25 +532,6 @@ static int hgafb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 }
 
 /**
- *	hga_set_cmap - set the colormap
- *	@cmap:struct fb_cmap to set
- *	@kspc:called from kernel space?
- *	@con:unused
- *	@info:pointer to fb_info object containing info for current hga board
- *
- *	This wrapper function passes it's input parameters to fb_set_cmap().
- *	Callback function hgafb_setcolreg() is used to set the color registers.
- */
-
-int hga_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-                 struct fb_info *info)
-{
-	CHKINFO(-EINVAL);
-	DPRINTK("hga_set_cmap: con:%d\n", con);
-	return fb_set_cmap(cmap, kspc, info);
-}
-
-/**
  *	hga_pan_display - pan or wrap the display
  *	@var:contains new xoffset, yoffset and vmode values
  *	@con:unused
@@ -619,7 +600,7 @@ static struct fb_ops hgafb_ops = {
 	fb_get_var:	hga_get_var,
 	fb_set_var:	hga_set_var,
 	fb_get_cmap:	hga_get_cmap,
-	fb_set_cmap:	hga_set_cmap,
+	fb_set_cmap:	gen_set_cmap,
 	fb_setcolreg:	hgafb_setcolreg,
 	fb_pan_display:	hga_pan_display,
 	fb_blank:	hgafb_blank,
