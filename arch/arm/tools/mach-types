@@ -6,7 +6,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Mon Jun 28 20:58:04 2004
+# Last update: Fri Jul 2 11:58:36 2004
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -557,3 +557,5 @@ aml42800aa		MACH_AML42800AA		AML42800AA		546
 ml674001		MACH_MACH_TYPE_ML674001	MACH_TYPE_ML674001	547
 lpc2294			MACH_LPC2294		LPC2294			548
 switchgrass		MACH_SWITCHGRASS	SWITCHGRASS		549
+ens_cmu			MACH_ENS_CMU		ENS_CMU			550
+mm6_sdb			MACH_MM6_SDB		MM6_SDB			551
