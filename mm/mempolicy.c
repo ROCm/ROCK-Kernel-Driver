@@ -1004,14 +1004,11 @@ static __init int numa_policy_init(void)
 {
 	policy_cache = kmem_cache_create("numa_policy",
 					 sizeof(struct mempolicy),
-					 0, 0, NULL, NULL);
+					 0, SLAB_PANIC, NULL, NULL);
 
 	sn_cache = kmem_cache_create("shared_policy_node",
 				     sizeof(struct sp_node),
-				     0, 0, NULL, NULL);
-
-	if (!policy_cache || !sn_cache)
-		panic("Cannot create NUMA policy cache");
+				     0, SLAB_PANIC, NULL, NULL);
 	return 0;
 }
 module_init(numa_policy_init);
