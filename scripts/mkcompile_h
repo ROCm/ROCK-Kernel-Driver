@@ -3,6 +3,20 @@ ARCH=$2
 SMP=$3
 CC=$4
 
+# If compile.h exists already and we don't own autoconf.h
+# (i.e. we're not the same user who did make *config), don't
+# modify compile.h
+# So "sudo make install" won't change the "compiled by <user>"
+# do "compiled by root"
+
+if [ -r $TARGET -a ! -O ../include/linux/autoconf.h ]; then
+  echo ' (not modified)'
+  exit 0
+fi
+
+# Do not expand names
+set -f
+
 if [ -r ../.version ]; then
   VERSION=`cat ../.version`
 else

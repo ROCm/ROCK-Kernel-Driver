@@ -4,7 +4,7 @@
 
 # Objects that export symbols.
 
-export-objs	:= adb.o rtc.o mac_hid.o via-pmu.o
+export-objs	:= adb.o mac_hid.o via-pmu.o
 
 # Object file lists.
 

@@ -2,8 +2,6 @@
 # Makefile for the Linux TCP/IP (INET) layer.
 #
 
-export-objs = ipip.o ip_gre.o
-
 obj-y     := utils.o route.o inetpeer.o proc.o protocol.o \
 	     ip_input.o ip_fragment.o ip_forward.o ip_options.o \
 	     ip_output.o ip_sockglue.o \
