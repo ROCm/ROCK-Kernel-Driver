@@ -191,34 +191,34 @@
        (info->ind_bits = ( (info->ind_bits & 0xEF) | (((u8) ind) & 0x10)))
 
 /* Sequence-numbered PDU format (4 bytes in length) */
-typedef struct llc_pdu_sn {
+struct llc_pdu_sn {
 	u8 dsap;
 	u8 ssap;
 	u8 ctrl_1;
 	u8 ctrl_2;
-} llc_pdu_sn_t;
+};
 
 /* Un-numbered PDU format (3 bytes in length) */
-typedef struct llc_pdu_un {
+struct llc_pdu_un {
 	u8 dsap;
 	u8 ssap;
 	u8 ctrl_1;
-} llc_pdu_un_t;
+};
 
 /* LLC Type 1 XID command/response information fields format */
-typedef struct llc_xid_info {
+struct llc_xid_info {
 	u8 fmt_id;	/* always 0x18 for LLC */
 	u8 type;	/* different if NULL/non-NULL LSAP */
 	u8 rw;		/* sender receive window */
-} llc_xid_info_t;
+};
 
 /* LLC Type 2 FRMR response information field format */
-typedef struct llc_frmr_info {
+struct llc_frmr_info {
 	u16 rej_pdu_ctrl;	/* bits 1-8 if U-PDU */
 	u8  curr_ssv;		/* current send state variable val */
 	u8  curr_rsv;		/* current receive state variable */
 	u8  ind_bits;		/* indicator bits set with macro */
-} llc_frmr_info_t;
+};
 
 extern void llc_pdu_set_cmd_rsp(struct sk_buff *skb, u8 type);
 extern void llc_pdu_set_pf_bit(struct sk_buff *skb, u8 bit_value);
@@ -246,7 +246,8 @@ extern int llc_pdu_init_as_xid_rsp(struct sk_buff *skb, u8 svcs_supported,
 				   u8 rx_window);
 extern int llc_pdu_init_as_test_rsp(struct sk_buff *skb,
 				    struct sk_buff *ev_skb);
-extern int llc_pdu_init_as_frmr_rsp(struct sk_buff *skb, llc_pdu_sn_t *prev_pdu,
+extern int llc_pdu_init_as_frmr_rsp(struct sk_buff *skb,
+				    struct llc_pdu_sn *prev_pdu,
 				    u8 f_bit, u8 vs, u8 vr, u8 vzyxw);
 extern int llc_pdu_init_as_rr_rsp(struct sk_buff *skb, u8 f_bit, u8 nr);
 extern int llc_pdu_init_as_rej_rsp(struct sk_buff *skb, u8 f_bit, u8 nr);

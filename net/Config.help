@@ -266,8 +266,13 @@ CONFIG_LAPB
   module will be called lapb.o.  If unsure, say N.
 
 CONFIG_LLC
-  This is a Logical Link Layer protocol used for X.25 connections over
-  Ethernet, using ordinary Ethernet cards.
+  This is a Logical Link Layer protocol used for Appletalk, IPX and in
+  the future by NetBEUI and by the linux-sna project. It originally
+  came from Procom Inc. that released the code for 2.0.36 and was
+  ported to 2.{4,5}. Select this if you want to have support for
+  those protocols or if you want to have the sockets interface for
+  LLC.
+  
 
 CONFIG_NET_DIVERT
   The Frame Diverter allows you to divert packets from the

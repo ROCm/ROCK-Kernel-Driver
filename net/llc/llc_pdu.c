@@ -20,7 +20,7 @@
 
 static int llc_pdu_decode_pdu_type(struct sk_buff *skb, u8 *type);
 static int llc_get_llc_hdr_length(u8 pdu_type);
-static u8 llc_pdu_get_pf_bit(llc_pdu_sn_t *pdu);
+static u8 llc_pdu_get_pf_bit(struct llc_pdu_sn *pdu);
 
 /**
  *	llc_pdu_header_init - initializes pdu header
@@ -35,18 +35,18 @@ static u8 llc_pdu_get_pf_bit(llc_pdu_sn_t *pdu);
 void llc_pdu_header_init(struct sk_buff *skb, u8 pdu_type, u8 ssap,
 			 u8 dsap, u8 cr)
 {
-	llc_pdu_un_t *p;
+	struct llc_pdu_un *pdu;
 
 	skb->nh.raw = skb_push(skb, llc_get_llc_hdr_length(pdu_type));
-	p = (llc_pdu_un_t *)skb->nh.raw;
-	p->dsap = dsap;
-	p->ssap = ssap;
-	p->ssap |= cr;
+	pdu = (struct llc_pdu_un *)skb->nh.raw;
+	pdu->dsap = dsap;
+	pdu->ssap = ssap;
+	pdu->ssap |= cr;
 }
 
 void llc_pdu_set_cmd_rsp(struct sk_buff *skb, u8 pdu_type)
 {
-	((llc_pdu_un_t *)skb->nh.raw)->ssap |= pdu_type;
+	((struct llc_pdu_un *)skb->nh.raw)->ssap |= pdu_type;
 }
 
 /**
@@ -61,20 +61,20 @@ void llc_pdu_set_cmd_rsp(struct sk_buff *skb, u8 pdu_type)
 void llc_pdu_set_pf_bit(struct sk_buff *skb, u8 bit_value)
 {
 	u8 pdu_type;
+	struct llc_pdu_sn *pdu;
 
 	if (llc_pdu_decode_pdu_type(skb, &pdu_type))
 		goto out;
+
+	pdu = (struct llc_pdu_sn *)skb->nh.raw;
+	
 	switch (pdu_type) {
 		case LLC_PDU_TYPE_I:
 		case LLC_PDU_TYPE_S:
-			((llc_pdu_sn_t *)skb->nh.raw)->ctrl_2 =
-				(((llc_pdu_sn_t *)skb->nh.raw)->ctrl_2 & 0xFE) |
-				bit_value;
+			pdu->ctrl_2 = (pdu->ctrl_2 & 0xFE) | bit_value;
 			break;
 		case LLC_PDU_TYPE_U:
-			((llc_pdu_un_t *)skb->nh.raw)->ctrl_1 |=
-				(((llc_pdu_un_t *)skb->nh.raw)->ctrl_1 & 0xEF) |
-				(bit_value << 4);
+			pdu->ctrl_1 |= (pdu->ctrl_1 & 0xEF) | (bit_value << 4);
 			break;
 	}
 out:;
@@ -92,19 +92,21 @@ out:;
 int llc_pdu_decode_pf_bit(struct sk_buff *skb, u8 *pf_bit)
 {
 	u8 pdu_type;
+	struct llc_pdu_sn *pdu;
 	int rc = llc_pdu_decode_pdu_type(skb, &pdu_type);
 
 	if (rc)
 		goto out;
+
+	pdu = (struct llc_pdu_sn *)skb->nh.raw;
+
 	switch (pdu_type) {
 		case LLC_PDU_TYPE_I:
 		case LLC_PDU_TYPE_S:
-			*pf_bit = ((llc_pdu_sn_t *)skb->nh.raw)->ctrl_2 &
-				  LLC_S_PF_BIT_MASK;
+			*pf_bit = pdu->ctrl_2 & LLC_S_PF_BIT_MASK;
 			break;
 		case LLC_PDU_TYPE_U:
-			*pf_bit = (((llc_pdu_un_t *)skb->nh.raw)->ctrl_1 &
-				  LLC_U_PF_BIT_MASK) >> 4;
+			*pf_bit = (pdu->ctrl_1 & LLC_U_PF_BIT_MASK) >> 4;
 			break;
 	}
 out:
@@ -121,7 +123,8 @@ out:
  */
 int llc_pdu_decode_cr_bit(struct sk_buff *skb, u8 *cr_bit)
 {
-	*cr_bit = ((llc_pdu_un_t *)skb->nh.raw)->ssap & LLC_PDU_CMD_RSP_MASK;
+	*cr_bit = ((struct llc_pdu_un *)skb->nh.raw)->ssap &
+		  LLC_PDU_CMD_RSP_MASK;
 	return 0;
 }
 
@@ -167,7 +170,7 @@ int llc_pdu_decode_da(struct sk_buff *skb, u8 *da)
  */
 int llc_pdu_decode_dsap(struct sk_buff *skb, u8 *dsap)
 {
-	*dsap = ((llc_pdu_un_t *)skb->nh.raw)->dsap & 0xFE;
+	*dsap = ((struct llc_pdu_un *)skb->nh.raw)->dsap & 0xFE;
 	return 0;
 }
 
@@ -181,7 +184,7 @@ int llc_pdu_decode_dsap(struct sk_buff *skb, u8 *dsap)
  */
 int llc_pdu_decode_ssap(struct sk_buff *skb, u8 *ssap)
 {
-	*ssap = ((llc_pdu_un_t *)skb->nh.raw)->ssap & 0xFE;
+	*ssap = ((struct llc_pdu_un *)skb->nh.raw)->ssap & 0xFE;
 	return 0;
 }
 
@@ -193,7 +196,7 @@ int llc_pdu_decode_ssap(struct sk_buff *skb, u8 *ssap)
  */
 int llc_pdu_init_as_ui_cmd(struct sk_buff *skb)
 {
-	llc_pdu_un_t *pdu = (llc_pdu_un_t *)skb->nh.raw;
+	struct llc_pdu_un *pdu = (struct llc_pdu_un *)skb->nh.raw;
 
 	pdu->ctrl_1  = LLC_PDU_TYPE_U;
 	pdu->ctrl_1 |= LLC_1_PDU_CMD_UI;
@@ -210,13 +213,13 @@ int llc_pdu_init_as_ui_cmd(struct sk_buff *skb)
 int llc_pdu_init_as_xid_cmd(struct sk_buff *skb, u8 svcs_supported,
 			    u8 rx_window)
 {
-	llc_xid_info_t *xid_info;
-	llc_pdu_un_t *pdu = (llc_pdu_un_t *)skb->nh.raw;
+	struct llc_xid_info *xid_info;
+	struct llc_pdu_un *pdu = (struct llc_pdu_un *)skb->nh.raw;
 
 	pdu->ctrl_1	 = LLC_PDU_TYPE_U;
 	pdu->ctrl_1	|= LLC_1_PDU_CMD_XID;
 	pdu->ctrl_1	|= LLC_U_PF_BIT_MASK;
-	xid_info	 = (llc_xid_info_t *)(((u8 *)&pdu->ctrl_1) + 1);
+	xid_info	 = (struct llc_xid_info *)(((u8 *)&pdu->ctrl_1) + 1);
 	xid_info->fmt_id = LLC_XID_FMT_ID;	/* 0x81 */
 	xid_info->type	 = svcs_supported;
 	xid_info->rw	 = rx_window << 1;	/* size of recieve window */
@@ -232,7 +235,7 @@ int llc_pdu_init_as_xid_cmd(struct sk_buff *skb, u8 svcs_supported,
  */
 int llc_pdu_init_as_test_cmd(struct sk_buff *skb)
 {
-	llc_pdu_un_t *pdu = (llc_pdu_un_t *)skb->nh.raw;
+	struct llc_pdu_un *pdu = (struct llc_pdu_un *)skb->nh.raw;
 
 	pdu->ctrl_1  = LLC_PDU_TYPE_U;
 	pdu->ctrl_1 |= LLC_1_PDU_CMD_TEST;
@@ -249,7 +252,7 @@ int llc_pdu_init_as_test_cmd(struct sk_buff *skb)
  */
 int llc_pdu_init_as_disc_cmd(struct sk_buff *skb, u8 p_bit)
 {
-	llc_pdu_un_t *pdu = (llc_pdu_un_t *)skb->nh.raw;
+	struct llc_pdu_un *pdu = (struct llc_pdu_un *)skb->nh.raw;
 
 	pdu->ctrl_1  = LLC_PDU_TYPE_U;
 	pdu->ctrl_1 |= LLC_2_PDU_CMD_DISC;
@@ -268,7 +271,7 @@ int llc_pdu_init_as_disc_cmd(struct sk_buff *skb, u8 p_bit)
  */
 int llc_pdu_init_as_i_cmd(struct sk_buff *skb, u8 p_bit, u8 ns, u8 nr)
 {
-	llc_pdu_sn_t *pdu = (llc_pdu_sn_t *)skb->nh.raw;
+	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)skb->nh.raw;
 
 	pdu->ctrl_1  = LLC_PDU_TYPE_I;
 	pdu->ctrl_2  = 0;
@@ -288,7 +291,7 @@ int llc_pdu_init_as_i_cmd(struct sk_buff *skb, u8 p_bit, u8 ns, u8 nr)
  */
 int llc_pdu_init_as_rej_cmd(struct sk_buff *skb, u8 p_bit, u8 nr)
 {
-	llc_pdu_sn_t *pdu = (llc_pdu_sn_t *)skb->nh.raw;
+	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)skb->nh.raw;
 
 	pdu->ctrl_1  = LLC_PDU_TYPE_S;
 	pdu->ctrl_1 |= LLC_2_PDU_CMD_REJ;
@@ -309,7 +312,7 @@ int llc_pdu_init_as_rej_cmd(struct sk_buff *skb, u8 p_bit, u8 nr)
  */
 int llc_pdu_init_as_rnr_cmd(struct sk_buff *skb, u8 p_bit, u8 nr)
 {
-	llc_pdu_sn_t *pdu = (llc_pdu_sn_t *)skb->nh.raw;
+	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)skb->nh.raw;
 
 	pdu->ctrl_1  = LLC_PDU_TYPE_S;
 	pdu->ctrl_1 |= LLC_2_PDU_CMD_RNR;
@@ -330,7 +333,7 @@ int llc_pdu_init_as_rnr_cmd(struct sk_buff *skb, u8 p_bit, u8 nr)
  */
 int llc_pdu_init_as_rr_cmd(struct sk_buff *skb, u8 p_bit, u8 nr)
 {
-	llc_pdu_sn_t *pdu = (llc_pdu_sn_t *)skb->nh.raw;
+	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)skb->nh.raw;
 
 	pdu->ctrl_1  = LLC_PDU_TYPE_S;
 	pdu->ctrl_1 |= LLC_2_PDU_CMD_RR;
@@ -349,7 +352,7 @@ int llc_pdu_init_as_rr_cmd(struct sk_buff *skb, u8 p_bit, u8 nr)
  */
 int llc_pdu_init_as_sabme_cmd(struct sk_buff *skb, u8 p_bit)
 {
-	llc_pdu_un_t *pdu = (llc_pdu_un_t *)skb->nh.raw;
+	struct llc_pdu_un *pdu = (struct llc_pdu_un *)skb->nh.raw;
 
 	pdu->ctrl_1  = LLC_PDU_TYPE_U;
 	pdu->ctrl_1 |= LLC_2_PDU_CMD_SABME;
@@ -366,7 +369,7 @@ int llc_pdu_init_as_sabme_cmd(struct sk_buff *skb, u8 p_bit)
  */
 int llc_pdu_init_as_dm_rsp(struct sk_buff *skb, u8 f_bit)
 {
-	llc_pdu_un_t *pdu = (llc_pdu_un_t *)skb->nh.raw;
+	struct llc_pdu_un *pdu = (struct llc_pdu_un *)skb->nh.raw;
 
 	pdu->ctrl_1  = LLC_PDU_TYPE_U;
 	pdu->ctrl_1 |= LLC_2_PDU_RSP_DM;
@@ -385,14 +388,14 @@ int llc_pdu_init_as_dm_rsp(struct sk_buff *skb, u8 f_bit)
 int llc_pdu_init_as_xid_rsp(struct sk_buff *skb, u8 svcs_supported,
 			    u8 rx_window)
 {
-	llc_xid_info_t *xid_info;
-	llc_pdu_un_t *pdu = (llc_pdu_un_t *)skb->nh.raw;
+	struct llc_xid_info *xid_info;
+	struct llc_pdu_un *pdu = (struct llc_pdu_un *)skb->nh.raw;
 
 	pdu->ctrl_1	 = LLC_PDU_TYPE_U;
 	pdu->ctrl_1	|= LLC_1_PDU_CMD_XID;
 	pdu->ctrl_1	|= LLC_U_PF_BIT_MASK;
 
-	xid_info	 = (llc_xid_info_t *)(((u8 *)&pdu->ctrl_1) + 1);
+	xid_info	 = (struct llc_xid_info *)(((u8 *)&pdu->ctrl_1) + 1);
 	xid_info->fmt_id = LLC_XID_FMT_ID;
 	xid_info->type	 = svcs_supported;
 	xid_info->rw	 = rx_window << 1;
@@ -410,7 +413,7 @@ int llc_pdu_init_as_xid_rsp(struct sk_buff *skb, u8 svcs_supported,
 int llc_pdu_init_as_test_rsp(struct sk_buff *skb, struct sk_buff *ev_skb)
 {
 	int dsize;
-	llc_pdu_un_t *pdu = (llc_pdu_un_t *)skb->nh.raw;
+	struct llc_pdu_un *pdu = (struct llc_pdu_un *)skb->nh.raw;
 
 	pdu->ctrl_1  = LLC_PDU_TYPE_U;
 	pdu->ctrl_1 |= LLC_1_PDU_CMD_TEST;
@@ -435,19 +438,19 @@ int llc_pdu_init_as_test_rsp(struct sk_buff *skb, struct sk_buff *ev_skb)
  *
  *	Builds a pdu frame as a FRMR response.
  */
-int llc_pdu_init_as_frmr_rsp(struct sk_buff *skb, llc_pdu_sn_t *prev_pdu,
+int llc_pdu_init_as_frmr_rsp(struct sk_buff *skb, struct llc_pdu_sn *prev_pdu,
 			     u8 f_bit, u8 vs, u8 vr, u8 vzyxw)
 {
-	llc_frmr_info_t *frmr_info;
+	struct llc_frmr_info *frmr_info;
 	u8 prev_pf = 0;
 	u8 *ctrl;
-	llc_pdu_sn_t *pdu = (llc_pdu_sn_t *)skb->nh.raw;
+	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)skb->nh.raw;
 
 	pdu->ctrl_1  = LLC_PDU_TYPE_U;
 	pdu->ctrl_1 |= LLC_2_PDU_RSP_FRMR;
 	pdu->ctrl_1 |= ((f_bit & 1) << 4) & LLC_U_PF_BIT_MASK;
 
-	frmr_info = (llc_frmr_info_t *)&pdu->ctrl_2;
+	frmr_info = (struct llc_frmr_info *)&pdu->ctrl_2;
 	ctrl = (u8 *)&prev_pdu->ctrl_1;
 	FRMR_INFO_SET_REJ_CNTRL(frmr_info,ctrl);
 	FRMR_INFO_SET_Vs(frmr_info, vs);
@@ -473,7 +476,7 @@ int llc_pdu_init_as_frmr_rsp(struct sk_buff *skb, llc_pdu_sn_t *prev_pdu,
  */
 int llc_pdu_init_as_rr_rsp(struct sk_buff *skb, u8 f_bit, u8 nr)
 {
-	llc_pdu_sn_t *pdu = (llc_pdu_sn_t *)skb->nh.raw;
+	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)skb->nh.raw;
 
 	pdu->ctrl_1  = LLC_PDU_TYPE_S;
 	pdu->ctrl_1 |= LLC_2_PDU_RSP_RR;
@@ -494,7 +497,7 @@ int llc_pdu_init_as_rr_rsp(struct sk_buff *skb, u8 f_bit, u8 nr)
  */
 int llc_pdu_init_as_rej_rsp(struct sk_buff *skb, u8 f_bit, u8 nr)
 {
-	llc_pdu_sn_t *pdu = (llc_pdu_sn_t *)skb->nh.raw;
+	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)skb->nh.raw;
 
 	pdu->ctrl_1  = LLC_PDU_TYPE_S;
 	pdu->ctrl_1 |= LLC_2_PDU_RSP_REJ;
@@ -515,7 +518,7 @@ int llc_pdu_init_as_rej_rsp(struct sk_buff *skb, u8 f_bit, u8 nr)
  */
 int llc_pdu_init_as_rnr_rsp(struct sk_buff *skb, u8 f_bit, u8 nr)
 {
-	llc_pdu_sn_t *pdu = (llc_pdu_sn_t *)skb->nh.raw;
+	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)skb->nh.raw;
 
 	pdu->ctrl_1  = LLC_PDU_TYPE_S;
 	pdu->ctrl_1 |= LLC_2_PDU_RSP_RNR;
@@ -535,7 +538,7 @@ int llc_pdu_init_as_rnr_rsp(struct sk_buff *skb, u8 f_bit, u8 nr)
  */
 int llc_pdu_init_as_ua_rsp(struct sk_buff *skb, u8 f_bit)
 {
-	llc_pdu_un_t *pdu = (llc_pdu_un_t *)skb->nh.raw;
+	struct llc_pdu_un *pdu = (struct llc_pdu_un *)skb->nh.raw;
 
 	pdu->ctrl_1  = LLC_PDU_TYPE_U;
 	pdu->ctrl_1 |= LLC_2_PDU_RSP_UA;
@@ -552,7 +555,7 @@ int llc_pdu_init_as_ua_rsp(struct sk_buff *skb, u8 f_bit)
  */
 static int llc_pdu_decode_pdu_type(struct sk_buff *skb, u8 *type)
 {
-	llc_pdu_un_t *pdu = (llc_pdu_un_t *)skb->nh.raw;
+	struct llc_pdu_un *pdu = (struct llc_pdu_un *)skb->nh.raw;
 
 	if (pdu->ctrl_1 & 1) {
 		if ((pdu->ctrl_1 & LLC_PDU_TYPE_U) == LLC_PDU_TYPE_U)
@@ -574,7 +577,7 @@ static int llc_pdu_decode_pdu_type(struct sk_buff *skb, u8 *type)
 int llc_decode_pdu_type(struct sk_buff *skb, u8 *dest)
 {
 	u8 type = LLC_DEST_CONN; /* I-PDU or S-PDU type */
-	llc_pdu_sn_t *pdu = (llc_pdu_sn_t *)skb->nh.raw;
+	struct llc_pdu_sn *pdu = (struct llc_pdu_sn *)skb->nh.raw;
 
 	if ((pdu->ctrl_1 & LLC_PDU_TYPE_MASK) != LLC_PDU_TYPE_U)
 		goto out;
@@ -629,7 +632,7 @@ static int llc_get_llc_hdr_length(u8 pdu_type)
  *	This function extracts p/f bit of input PDU. at first examines type of
  *	PDU and then extracts p/f bit. Returns the p/f bit.
  */
-static u8 llc_pdu_get_pf_bit(llc_pdu_sn_t *pdu)
+static u8 llc_pdu_get_pf_bit(struct llc_pdu_sn *pdu)
 {
 	u8 pdu_type;
 	u8 pf_bit = 0;
