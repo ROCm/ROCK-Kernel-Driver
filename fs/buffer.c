@@ -2580,7 +2580,7 @@ void __init buffer_init(void)
 
 	bh_cachep = kmem_cache_create("buffer_head",
 			sizeof(struct buffer_head), 0,
-			SLAB_HWCACHE_ALIGN, init_buffer_head, NULL);
+			0, init_buffer_head, NULL);
 	bh_mempool = mempool_create(MAX_UNUSED_BUFFERS, bh_mempool_alloc,
 				bh_mempool_free, NULL);
 	for (i = 0; i < ARRAY_SIZE(bh_wait_queue_heads); i++)
