@@ -126,7 +126,7 @@ kdba_bt_stack_ppc(struct pt_regs *regs, kdb_machreg_t *addr, int argcount,
 	if (!addr)
 		addr = (kdb_machreg_t *)p->thread.ksp;
 
-	if (addr && !task_curr(p)) {
+	if (addr && (!p || !task_curr(p))) {
 		eip = 0;
 		esp = *addr;
 		ebp = 0;
