@@ -38,33 +38,32 @@
  */
 static int nommu_vma_list_show(struct seq_file *m, void *v)
 {
-	struct vm_area_struct *map;
+	struct vm_area_struct *vma;
 	unsigned long ino = 0;
 	struct file *file;
 	dev_t dev = 0;
 	int flags, len;
 
-	map = list_entry((struct list_head *) v,
-			 struct vm_area_struct, vm_link);
+	vma = rb_entry((struct rb_node *) v, struct vm_area_struct, vm_rb);
 
-	flags = map->vm_flags;
-	file = map->vm_file;
+	flags = vma->vm_flags;
+	file = vma->vm_file;
 
 	if (file) {
-		struct inode *inode = map->vm_file->f_dentry->d_inode;
+		struct inode *inode = vma->vm_file->f_dentry->d_inode;
 		dev = inode->i_sb->s_dev;
 		ino = inode->i_ino;
 	}
 
 	seq_printf(m,
 		   "%08lx-%08lx %c%c%c%c %08lx %02x:%02x %lu %n",
-		   map->vm_start,
-		   map->vm_end,
+		   vma->vm_start,
+		   vma->vm_end,
 		   flags & VM_READ ? 'r' : '-',
 		   flags & VM_WRITE ? 'w' : '-',
 		   flags & VM_EXEC ? 'x' : '-',
 		   flags & VM_MAYSHARE ? 's' : 'p',
-		   map->vm_pgoff << PAGE_SHIFT,
+		   vma->vm_pgoff << PAGE_SHIFT,
 		   MAJOR(dev), MINOR(dev), ino, &len);
 
 	if (file) {
@@ -81,15 +80,15 @@ static int nommu_vma_list_show(struct seq_file *m, void *v)
 
 static void *nommu_vma_list_start(struct seq_file *m, loff_t *_pos)
 {
-	struct list_head *_p;
+	struct rb_node *_rb;
 	loff_t pos = *_pos;
 	void *next = NULL;
 
 	down_read(&nommu_vma_sem);
 
-	list_for_each(_p, &nommu_vma_list) {
+	for (_rb = rb_first(&nommu_vma_tree); _rb; _rb = rb_next(_rb)) {
 		if (pos == 0) {
-			next = _p;
+			next = _rb;
 			break;
 		}
 	}
@@ -104,12 +103,8 @@ static void nommu_vma_list_stop(struct seq_file *m, void *v)
 
 static void *nommu_vma_list_next(struct seq_file *m, void *v, loff_t *pos)
 {
-	struct list_head *_p = v;
-
 	(*pos)++;
-
-	_p = _p->next;
-	return (_p != &nommu_vma_list) ? _p : NULL;
+	return rb_next((struct rb_node *) v);
 }
 
 static struct seq_operations proc_nommu_vma_list_seqop = {
