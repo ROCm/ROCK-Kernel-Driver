@@ -78,6 +78,14 @@ extern void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr, size_t 
 #define pci_unmap_len_set(PTR, LEN_NAME, VAL)		\
 	(((PTR)->LEN_NAME) = (VAL))
 
+/*
+ * Same as above, only with pages instead of mapped addresses.
+ */
+extern dma_addr_t pci_map_page(struct pci_dev *hwdev, struct page *page,
+			unsigned long offset, size_t size, int direction);
+extern void pci_unmap_page(struct pci_dev *hwdev,
+			dma_addr_t dma_address, size_t size, int direction);
+
 /* Map a set of buffers described by scatterlist in streaming
  * mode for DMA.  This is the scather-gather version of the
  * above pci_map_single interface.  Here the scatter gather list

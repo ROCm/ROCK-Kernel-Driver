@@ -511,6 +511,26 @@ void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t ba, size_t size,
 	}
 }
 
+/*
+ * Same as pci_map_single, but with pages.
+ */
+dma_addr_t pci_map_page(struct pci_dev *hwdev, struct page *page,
+			unsigned long offset, size_t size, int direction)
+{
+	if (direction == PCI_DMA_NONE)
+		BUG();
+	/* IIep is write-through, not flushing. */
+	return page_to_phys(page) + offset;
+}
+
+void pci_unmap_page(struct pci_dev *hwdev,
+			dma_addr_t dma_address, size_t size, int direction)
+{
+	if (direction == PCI_DMA_NONE)
+		BUG();
+	/* mmu_inval_dma_area XXX */
+}
+
 /* Map a set of buffers described by scatterlist in streaming
  * mode for DMA.  This is the scather-gather version of the
  * above pci_map_single interface.  Here the scatter gather list
