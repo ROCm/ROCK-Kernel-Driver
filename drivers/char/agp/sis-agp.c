@@ -223,25 +223,24 @@ static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 }
 
 
-static int __init agp_find_supported_device(struct pci_dev *dev)
+static int agp_sis_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
-	agp_bridge.dev = dev;
+	u8 cap_ptr = 0;
 
-	if (pci_find_capability(dev, PCI_CAP_ID_AGP)==0)
+	cap_ptr = pci_find_capability(dev, PCI_CAP_ID_AGP);
+	if (cap_ptr == 0)
 		return -ENODEV;
 
 	/* probe for known chipsets */
-	return agp_lookup_host_bridge (dev);
-}
-
-
-static int agp_sis_probe (struct pci_dev *dev, const struct pci_device_id *ent)
-{
-	if (agp_find_supported_device(dev) == 0) {
+	if (agp_lookup_host_bridge(dev) != -ENODEV) {
+		agp_bridge.dev = dev;
+		agp_bridge.capndx = cap_ptr;
+		/* Fill in the mode register */
+		pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+4, &agp_bridge.mode);
 		agp_register_driver(dev);
 		return 0;
 	}
-	return -ENODEV;	
+	return -ENODEV;
 }
 
 static struct pci_device_id agp_sis_pci_table[] __initdata = {

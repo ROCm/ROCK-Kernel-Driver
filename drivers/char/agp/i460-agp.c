@@ -562,9 +562,14 @@ int __init intel_i460_setup (struct pci_dev *pdev __attribute__((unused)))
 
 static int agp_intel_i460_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
-	if (pci_find_capability(dev, PCI_CAP_ID_AGP)==0)
+	u8 cap_ptr = 0;
+
+	cap_ptr = pci_find_capability(dev, PCI_CAP_ID_AGP);
+	if (cap_ptr == 0)
 		return -ENODEV;
 
+	agp_bridge.dev = dev;
+	agp_bridge.capndx = cap_ptr;
 	intel_i460_setup(dev);
 	agp_register_driver(dev);
 	return 0;

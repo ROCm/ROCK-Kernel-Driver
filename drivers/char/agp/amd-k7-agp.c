@@ -439,25 +439,23 @@ static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 
 /* Supported Device Scanning routine */
 
-static int __init agp_find_supported_device(struct pci_dev *dev)
-{
-	agp_bridge.dev = dev;
-
-	if (pci_find_capability(dev, PCI_CAP_ID_AGP)==0)
-		return -ENODEV;
-
-	/* probe for known chipsets */
-	return agp_lookup_host_bridge (dev);
-}
-
-
 static int agp_amdk7_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
-	if (agp_find_supported_device(dev) == 0) {
+	u8 cap_ptr = 0;
+
+	cap_ptr = pci_find_capability(dev, PCI_CAP_ID_AGP);
+	if (cap_ptr == 0)
+		return -ENODEV;
+
+	if (agp_lookup_host_bridge(dev) != -ENODEV) {
+		agp_bridge.dev = dev;
+		agp_bridge.capndx = cap_ptr;
+		/* Fill in the mode register */
+		pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+4, &agp_bridge.mode);
 		agp_register_driver(dev);
 		return 0;
 	}
-	return -ENODEV;	
+	return -ENODEV;
 }
 
 static struct pci_device_id agp_amdk7_pci_table[] __initdata = {

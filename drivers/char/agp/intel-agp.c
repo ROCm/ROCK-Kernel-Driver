@@ -1329,6 +1329,7 @@ static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
 static int __init agp_find_supported_device(struct pci_dev *dev)
 {
 	struct pci_dev *i810_dev;
+	u8 cap_ptr = 0;
 
 	agp_bridge.dev = dev;
 
@@ -1424,8 +1425,13 @@ static int __init agp_find_supported_device(struct pci_dev *dev)
 		break;
 	}
 
-	if (pci_find_capability(dev, PCI_CAP_ID_AGP)==0)
+	cap_ptr = pci_find_capability(dev, PCI_CAP_ID_AGP);
+	if (cap_ptr == 0)
 		return -ENODEV;
+	agp_bridge.capndx = cap_ptr;
+
+	/* Fill in the mode register */
+	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+4, &agp_bridge.mode);
 
 	/* probe for known chipsets */
 	return agp_lookup_host_bridge(dev);
@@ -1489,4 +1495,3 @@ module_exit(agp_intel_cleanup);
 MODULE_PARM(agp_try_unsupported, "1i");
 MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_LICENSE("GPL and additional rights");
-

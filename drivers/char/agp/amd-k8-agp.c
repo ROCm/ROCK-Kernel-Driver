@@ -370,7 +370,7 @@ static void agp_x86_64_agp_enable(u32 mode)
 	}
 
 
-	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx + 4, &command);
+	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+4, &command);
 
 	/*
 	 * PASS2: go through all devices that claim to be
@@ -429,7 +429,7 @@ static void agp_x86_64_agp_enable(u32 mode)
 
 	command |= 0x100;
 
-	pci_write_config_dword(agp_bridge.dev, agp_bridge.capndx + 8, command);
+	pci_write_config_dword(agp_bridge.dev, agp_bridge.capndx+8, command);
 
 	/*
 	 * PASS4: Go through all AGP devices and update the
@@ -477,9 +477,17 @@ static int __init amd_8151_setup (struct pci_dev *pdev)
 
 static int agp_amdk8_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 {
-	if (pci_find_capability(dev, PCI_CAP_ID_AGP)==0)
+	u8 cap_ptr = 0;
+
+	cap_ptr = pci_find_capability(dev, PCI_CAP_ID_AGP);
+	if (cap_ptr == 0)
 		return -ENODEV;
 
+	agp_bridge.dev = dev;
+	agp_bridge.capndx = cap_ptr;
+
+	/* Fill in the mode register */
+	pci_read_config_dword(agp_bridge.dev, agp_bridge.capndx+4, &agp_bridge.mode);
 	amd_8151_setup(dev);
 	agp_register_driver(dev);
 	return 0;
