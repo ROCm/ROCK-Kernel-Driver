@@ -5,7 +5,7 @@
  * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
  * 
  * This file is licenced under the GPL.
- * $Id: ohci-mem.c,v 1.2 2002/01/19 00:22:13 dbrownell Exp $
+ * $Id: ohci-mem.c,v 1.3 2002/03/22 16:04:54 dbrownell Exp $
  */
 
 /*-------------------------------------------------------------------------*/

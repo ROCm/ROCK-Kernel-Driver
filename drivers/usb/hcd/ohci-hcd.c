@@ -56,7 +56,7 @@
  * v1.0 1999/04/27 initial release
  *
  * This file is licenced under the GPL.
- * $Id: ohci-hcd.c,v 1.7 2002/01/19 00:20:56 dbrownell Exp $
+ * $Id: ohci-hcd.c,v 1.9 2002/03/27 20:41:57 dbrownell Exp $
  */
  
 #include <linux/config.h>
@@ -106,7 +106,7 @@
  *	- lots more testing!!
  */
 
-#define DRIVER_VERSION "$Revision: 1.7 $"
+#define DRIVER_VERSION "$Revision: 1.9 $"
 #define DRIVER_AUTHOR "Roman Weissgaerber <weissg@vienna.at>, David Brownell"
 #define DRIVER_DESC "USB 1.1 'Open' Host Controller (OHCI) Driver"
 
