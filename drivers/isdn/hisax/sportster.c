@@ -20,7 +20,6 @@
 
 extern const char *CardType[];
 const char *sportster_revision = "$Revision: 1.14.6.2 $";
-static spinlock_t sportster_lock = SPIN_LOCK_UNLOCKED;
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)
@@ -148,19 +147,14 @@ release_io_sportster(struct IsdnCardState *cs)
 void
 reset_sportster(struct IsdnCardState *cs)
 {
-	long flags;
-
 	cs->hw.spt.res_irq |= SPORTSTER_RESET; /* Reset On */
 	byteout(cs->hw.spt.cfg_reg + SPORTSTER_RES_IRQ, cs->hw.spt.res_irq);
-	save_flags(flags);
-	sti();
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((10*HZ)/1000);
 	cs->hw.spt.res_irq &= ~SPORTSTER_RESET; /* Reset Off */
 	byteout(cs->hw.spt.cfg_reg + SPORTSTER_RES_IRQ, cs->hw.spt.res_irq);
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((10*HZ)/1000);
-	restore_flags(flags);
 }
 
 static int

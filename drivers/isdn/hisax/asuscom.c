@@ -262,14 +262,10 @@ release_io_asuscom(struct IsdnCardState *cs)
 static void
 reset_asuscom(struct IsdnCardState *cs)
 {
-	long flags;
-
 	if (cs->subtyp == ASUS_IPAC)
 		writereg(cs->hw.asus.adr, cs->hw.asus.isac, IPAC_POTA2, 0x20);
 	else
 		byteout(cs->hw.asus.adr, ASUS_RESET);	/* Reset On */
-	save_flags(flags);
-	sti();
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((10*HZ)/1000);
 	if (cs->subtyp == ASUS_IPAC)
@@ -285,7 +281,6 @@ reset_asuscom(struct IsdnCardState *cs)
 		writereg(cs->hw.asus.adr, cs->hw.asus.isac, IPAC_MASK, 0xc0);
 		writereg(cs->hw.asus.adr, cs->hw.asus.isac, IPAC_PCFG, 0x12);
 	}
-	restore_flags(flags);
 }
 
 static int

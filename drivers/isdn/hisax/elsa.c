@@ -483,8 +483,6 @@ release_io_elsa(struct IsdnCardState *cs)
 static void
 reset_elsa(struct IsdnCardState *cs)
 {
-	long flags;
-
 	if (cs->hw.elsa.timer) {
 		/* Wait 1 Timer */
 		byteout(cs->hw.elsa.timer, 0);
@@ -504,8 +502,6 @@ reset_elsa(struct IsdnCardState *cs)
 			byteout(cs->hw.elsa.trig, 0xff);
 	}
 	if ((cs->subtyp == ELSA_QS1000PCI) || (cs->subtyp == ELSA_QS3000PCI) || (cs->subtyp == ELSA_PCMCIA_IPAC)) {
-		save_flags(flags);
-		sti();
 		writereg(cs->hw.elsa.ale, cs->hw.elsa.isac, IPAC_POTA2, 0x20);
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout((10*HZ)/1000); /* Timeout 10ms */
@@ -513,7 +509,6 @@ reset_elsa(struct IsdnCardState *cs)
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		writereg(cs->hw.elsa.ale, cs->hw.elsa.isac, IPAC_MASK, 0xc0);
 		schedule_timeout((10*HZ)/1000); /* Timeout 10ms */
-		restore_flags(flags);
 		if (cs->subtyp != ELSA_PCMCIA_IPAC) {
 			writereg(cs->hw.elsa.ale, cs->hw.elsa.isac, IPAC_ACFG, 0x0);
 			writereg(cs->hw.elsa.ale, cs->hw.elsa.isac, IPAC_AOE, 0x3c);
@@ -674,7 +669,6 @@ static int
 Elsa_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 {
 	int ret = 0;
-	long flags;
 
 	switch (mt) {
 		case CARD_RESET:
@@ -703,16 +697,13 @@ Elsa_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			} else if (cs->subtyp == ELSA_QS3000PCI) {
 				ret = 0;
 			} else {
-				save_flags(flags);
 				cs->hw.elsa.counter = 0;
-				sti();
 				cs->hw.elsa.ctrl_reg |= ELSA_ENA_TIMER_INT;
 				cs->hw.elsa.status |= ELSA_TIMER_AKTIV;
 				byteout(cs->hw.elsa.ctrl, cs->hw.elsa.ctrl_reg);
 				byteout(cs->hw.elsa.timer, 0);
 				set_current_state(TASK_UNINTERRUPTIBLE);
 				schedule_timeout((110*HZ)/1000);
-				restore_flags(flags);
 				cs->hw.elsa.ctrl_reg &= ~ELSA_ENA_TIMER_INT;
 				byteout(cs->hw.elsa.ctrl, cs->hw.elsa.ctrl_reg);
 				cs->hw.elsa.status &= ~ELSA_TIMER_AKTIV;
@@ -795,7 +786,6 @@ probe_elsa_adr(unsigned int adr, int typ)
 {
 	int i, in1, in2, p16_1 = 0, p16_2 = 0, p8_1 = 0, p8_2 = 0, pc_1 = 0,
 	 pc_2 = 0, pfp_1 = 0, pfp_2 = 0;
-	unsigned long flags;
 
 	/* In case of the elsa pcmcia card, this region is in use,
 	   reserved for us by the card manager. So we do not check it
@@ -806,7 +796,6 @@ probe_elsa_adr(unsigned int adr, int typ)
 		       adr);
 		return (0);
 	}
-	spin_lock_irqsave(&elsa_lock, flags);
 	for (i = 0; i < 16; i++) {
 		in1 = inb(adr + ELSA_CONFIG);	/* 'toggelt' bei */
 		in2 = inb(adr + ELSA_CONFIG);	/* jedem Zugriff */
@@ -819,7 +808,6 @@ probe_elsa_adr(unsigned int adr, int typ)
 		pfp_1 += 0x40 & in1;
 		pfp_2 += 0x40 & in2;
 	}
-	spin_unlock_irqrestore(&elsa_lock, flags);
 	printk(KERN_INFO "Elsa: Probing IO 0x%x", adr);
 	if (65 == ++p16_1 * ++p16_2) {
 		printk(" PCC-16/PCF found\n");
@@ -874,7 +862,6 @@ static struct pci_bus *pnp_c __devinitdata = NULL;
 int __devinit
 setup_elsa(struct IsdnCard *card)
 {
-	unsigned long flags;
 	int bytecnt;
 	u_char val, pci_rev;
 	struct IsdnCardState *cs = card->cs;
@@ -1166,9 +1153,7 @@ setup_elsa(struct IsdnCard *card)
 				return (0);
 			}
 		}
-		spin_lock_irqsave(&elsa_lock, flags);
 		HZDELAY(1);	/* wait >=10 ms */
-		spin_unlock_irqrestore(&elsa_lock, flags);
 		if (TimerRun(cs)) {
 			printk(KERN_WARNING "Elsa: timer do not run down\n");
 			release_io_elsa(cs);

@@ -221,19 +221,14 @@ enable_bkm_int(struct IsdnCardState *cs, unsigned bEnable)
 static void
 reset_bkm(struct IsdnCardState *cs)
 {
-	long flags;
-
 	if (cs->subtyp == SCT_1) {
 		wordout(cs->hw.ax.plx_adr + 0x50, (wordin(cs->hw.ax.plx_adr + 0x50) & ~4));
-		save_flags(flags);
-		sti();
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout((10 * HZ) / 1000);
 		/* Remove the soft reset */
 		wordout(cs->hw.ax.plx_adr + 0x50, (wordin(cs->hw.ax.plx_adr + 0x50) | 4));
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout((10 * HZ) / 1000);
-		restore_flags(flags);
 	}
 }
 

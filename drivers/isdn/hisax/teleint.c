@@ -219,20 +219,15 @@ release_io_TeleInt(struct IsdnCardState *cs)
 static void
 reset_TeleInt(struct IsdnCardState *cs)
 {
-	long flags;
-
 	printk(KERN_INFO "TeleInt: resetting card\n");
 	cs->hw.hfc.cirm |= HFC_RESET;
 	byteout(cs->hw.hfc.addr | 1, cs->hw.hfc.cirm);	/* Reset On */
-	save_flags(flags);
-	sti();
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((30*HZ)/1000);
 	cs->hw.hfc.cirm &= ~HFC_RESET;
 	byteout(cs->hw.hfc.addr | 1, cs->hw.hfc.cirm);	/* Reset Off */
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((10*HZ)/1000);
-	restore_flags(flags);
 }
 
 static int

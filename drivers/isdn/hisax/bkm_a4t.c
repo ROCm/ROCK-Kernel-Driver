@@ -196,12 +196,8 @@ enable_bkm_int(struct IsdnCardState *cs, unsigned bEnable)
 static void
 reset_bkm(struct IsdnCardState *cs)
 {
-	long flags;
-
 	if (cs->typ == ISDN_CTYPE_BKM_A4T) {
 		I20_REGISTER_FILE *pI20_Regs = (I20_REGISTER_FILE *) (cs->hw.ax.base);
-		save_flags(flags);
-		sti();
 		/* Issue the I20 soft reset     */
 		pI20_Regs->i20SysControl = 0xFF;	/* all in */
 		set_current_state(TASK_UNINTERRUPTIBLE);
@@ -228,7 +224,6 @@ reset_bkm(struct IsdnCardState *cs)
 						g_A4T_ISAR_RES);
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout((10 * HZ) / 1000);
-		restore_flags(flags);
 	}
 }
 

@@ -181,13 +181,9 @@ SaphirWatchDog(struct IsdnCardState *cs)
 void
 release_io_saphir(struct IsdnCardState *cs)
 {
-	unsigned long flags;
-	
-	spin_lock_irqsave(&saphir_lock, flags);
 	byteout(cs->hw.saphir.cfg_reg + IRQ_REG, 0xff);
-	del_timer(&cs->hw.saphir.timer);
+	del_timer_sync(&cs->hw.saphir.timer);
 	cs->hw.saphir.timer.function = NULL;
-	spin_unlock_irqrestore(&saphir_lock, flags);
 	if (cs->hw.saphir.cfg_reg)
 		release_region(cs->hw.saphir.cfg_reg, 6);
 }
@@ -195,7 +191,6 @@ release_io_saphir(struct IsdnCardState *cs)
 static int
 saphir_reset(struct IsdnCardState *cs)
 {
-	long flags;
 	u_char irq_val;
 
 	switch(cs->irq) {
@@ -218,15 +213,12 @@ saphir_reset(struct IsdnCardState *cs)
 			return (1);
 	}
 	byteout(cs->hw.saphir.cfg_reg + IRQ_REG, irq_val);
-	save_flags(flags);
-	sti();
 	byteout(cs->hw.saphir.cfg_reg + RESET_REG, 1);
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((30*HZ)/1000);	/* Timeout 30ms */
 	byteout(cs->hw.saphir.cfg_reg + RESET_REG, 0);
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((30*HZ)/1000);	/* Timeout 30ms */
-	restore_flags(flags);
 	byteout(cs->hw.saphir.cfg_reg + IRQ_REG, irq_val);
 	byteout(cs->hw.saphir.cfg_reg + SPARE_REG, 0x02);
 	return (0);

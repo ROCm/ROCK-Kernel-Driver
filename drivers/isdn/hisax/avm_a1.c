@@ -18,7 +18,6 @@
 
 extern const char *CardType[];
 static const char *avm_revision = "$Revision: 2.13.6.2 $";
-static spinlock_t avm_a1_lock = SPIN_LOCK_UNLOCKED;
 
 #define	 AVM_A1_STAT_ISAC	0x01
 #define	 AVM_A1_STAT_HSCX	0x02
@@ -180,7 +179,6 @@ setup_avm_a1(struct IsdnCard *card)
 {
 	u_char val;
 	struct IsdnCardState *cs = card->cs;
-	unsigned long flags;
 	char tmp[64];
 
 	strcpy(tmp, avm_revision);
@@ -255,7 +253,6 @@ setup_avm_a1(struct IsdnCard *card)
 		release_ioregs(cs, 0x1f);
 		return (0);
 	}
-	spin_lock_irqsave(&avm_a1_lock, flags);
 	byteout(cs->hw.avm.cfg_reg, 0x0);
 	HZDELAY(HZ / 5 + 1);
 	byteout(cs->hw.avm.cfg_reg, 0x1);
@@ -269,7 +266,6 @@ setup_avm_a1(struct IsdnCard *card)
 	HZDELAY(HZ / 5 + 1);
 	byteout(cs->hw.avm.cfg_reg, 0x0);
 	HZDELAY(HZ / 5 + 1);
-	spin_unlock_irqrestore(&avm_a1_lock, flags);
 
 	val = bytein(cs->hw.avm.cfg_reg);
 	printk(KERN_INFO "AVM A1: Byte at %x is %x\n",

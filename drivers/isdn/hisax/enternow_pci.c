@@ -137,13 +137,9 @@ static void dummywr(struct IsdnCardState *cs, int chan, BYTE off, BYTE value)
 static void
 reset_enpci(struct IsdnCardState *cs)
 {
-	long flags;
-
 	if (cs->debug & L1_DEB_ISAC)
 		debugl1(cs, "enter:now PCI: reset");
 
-	save_flags(flags);
-	sti();
 	/* Reset on, (also for AMD) */
 	cs->hw.njet.ctrl_reg = 0x07;
 	OutByte(cs->hw.njet.base + NETJET_CTRL, cs->hw.njet.ctrl_reg);
@@ -156,13 +152,11 @@ reset_enpci(struct IsdnCardState *cs)
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	/* 80ms delay */
 	schedule_timeout((80*HZ)/1000);
-	restore_flags(flags);
 	cs->hw.njet.auxd = 0;  // LED-status
 	cs->hw.njet.dmactrl = 0;
 	OutByte(cs->hw.njet.base + NETJET_AUXCTRL, ~TJ_AMD_IRQ);
 	OutByte(cs->hw.njet.base + NETJET_IRQMASK1, TJ_AMD_IRQ);
 	OutByte(cs->hw.njet.auxa, cs->hw.njet.auxd); // LED off
-
 }
 
 

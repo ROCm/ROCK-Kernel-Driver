@@ -708,11 +708,7 @@ avm_pcipnp_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 static void
 reset_avmpcipnp(struct IsdnCardState *cs)
 {
-	long flags;
-
 	printk(KERN_INFO "AVM PCI/PnP: reset\n");
-	save_flags(flags);
-	sti();
 	outb(AVM_STATUS0_RESET | AVM_STATUS0_DIS_TIMER, cs->hw.avm.cfg_reg + 2);
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((10*HZ)/1000); /* Timeout 10ms */

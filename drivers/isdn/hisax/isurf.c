@@ -20,7 +20,6 @@
 extern const char *CardType[];
 
 static const char *ISurf_revision = "$Revision: 1.10.6.2 $";
-static spinlock_t isurf_lock = SPIN_LOCK_UNLOCKED;
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)
@@ -135,19 +134,14 @@ release_io_isurf(struct IsdnCardState *cs)
 static void
 reset_isurf(struct IsdnCardState *cs, u_char chips)
 {
-	long flags;
-
 	printk(KERN_INFO "ISurf: resetting card\n");
 
 	byteout(cs->hw.isurf.reset, chips); /* Reset On */
-	save_flags(flags);
-	sti();
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((10*HZ)/1000);
 	byteout(cs->hw.isurf.reset, ISURF_ISAR_EA); /* Reset Off */
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((10*HZ)/1000);
-	restore_flags(flags);
 }
 
 static int

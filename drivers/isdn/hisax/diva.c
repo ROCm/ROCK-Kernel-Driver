@@ -749,10 +749,6 @@ release_io_diva(struct IsdnCardState *cs)
 static void
 reset_diva(struct IsdnCardState *cs)
 {
-	long flags;
-
-	save_flags(flags);
-	sti();
 	if (cs->subtyp == DIVA_IPAC_ISA) {
 		writereg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_POTA2, 0x20);
 		set_current_state(TASK_UNINTERRUPTIBLE);
@@ -799,7 +795,6 @@ reset_diva(struct IsdnCardState *cs)
 		}
 		byteout(cs->hw.diva.ctrl, cs->hw.diva.ctrl_reg);
 	}
-	restore_flags(flags);
 }
 
 #define DIVA_ASSIGN 1

@@ -22,7 +22,6 @@
 
 extern const char *CardType[];
 const char *teles3_revision = "$Revision: 2.17.6.2 $";
-static spinlock_t teles3_lock = SPIN_LOCK_UNLOCKED;
 
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)
@@ -175,7 +174,6 @@ release_io_teles3(struct IsdnCardState *cs)
 static int
 reset_teles3(struct IsdnCardState *cs)
 {
-	unsigned long flags;
 	u_char irqcfg;
 
 	if (cs->typ != ISDN_CTYPE_TELESPCMCIA) {
@@ -209,27 +207,21 @@ reset_teles3(struct IsdnCardState *cs)
 				default:
 					return(1);
 			}
-			spin_lock_irqsave(&teles3_lock, flags);
 			byteout(cs->hw.teles3.cfg_reg + 4, irqcfg);
 			HZDELAY(HZ / 10 + 1);
 			byteout(cs->hw.teles3.cfg_reg + 4, irqcfg | 1);
 			HZDELAY(HZ / 10 + 1);
-			spin_unlock_irqrestore(&teles3_lock, flags);
 		} else if (cs->typ == ISDN_CTYPE_COMPAQ_ISA) {
-			spin_lock_irqsave(&teles3_lock, flags);
 			byteout(cs->hw.teles3.cfg_reg, 0xff);
 			HZDELAY(2);
 			byteout(cs->hw.teles3.cfg_reg, 0x00);
 			HZDELAY(2);
-			spin_unlock_irqrestore(&teles3_lock, flags);
 		} else {
 			/* Reset off for 16.3 PnP , thanks to Georg Acher */
-			spin_lock_irqsave(&teles3_lock, flags);
 			byteout(cs->hw.teles3.isac + 0x3c, 0);
 			HZDELAY(2);
 			byteout(cs->hw.teles3.isac + 0x3c, 1);
 			HZDELAY(2);
-			spin_unlock_irqrestore(&teles3_lock, flags);
 		}
 	}
 	return(0);

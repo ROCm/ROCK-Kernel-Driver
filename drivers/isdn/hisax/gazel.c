@@ -356,17 +356,14 @@ release_io_gazel(struct IsdnCardState *cs)
 static int
 reset_gazel(struct IsdnCardState *cs)
 {
-	unsigned long flags;
 	unsigned long plxcntrl, addr = cs->hw.gazel.cfg_reg;
 
 	switch (cs->subtyp) {
 		case R647:
-			spin_lock_irqsave(&gazel_lock, flags);
 			writereg(addr, 0, 0);
 			HZDELAY(10);
 			writereg(addr, 0, 1);
 			HZDELAY(2);
-			spin_unlock_irqrestore(&gazel_lock, flags);
 			break;
 		case R685:
 			plxcntrl = inl(addr + PLX_CNTRL);

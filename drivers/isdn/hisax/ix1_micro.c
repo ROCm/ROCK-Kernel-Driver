@@ -183,18 +183,15 @@ release_io_ix1micro(struct IsdnCardState *cs)
 static void
 ix1_reset(struct IsdnCardState *cs)
 {
-	unsigned long flags;
 	int cnt;
 
 	/* reset isac */
-	spin_lock_irqsave(&ix1_micro_lock, flags);
 	cnt = 3 * (HZ / 10) + 1;
 	while (cnt--) {
 		byteout(cs->hw.ix1.cfg_reg + SPECIAL_PORT_OFFSET, 1);
 		HZDELAY(1);	/* wait >=10 ms */
 	}
 	byteout(cs->hw.ix1.cfg_reg + SPECIAL_PORT_OFFSET, 0);
-	spin_unlock_irqrestore(&ix1_micro_lock, flags);
 }
 
 static int

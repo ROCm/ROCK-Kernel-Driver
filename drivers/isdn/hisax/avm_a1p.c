@@ -246,7 +246,6 @@ setup_avm_a1_pcmcia(struct IsdnCard *card)
 {
 	u_char model, vers;
 	struct IsdnCardState *cs = card->cs;
-	unsigned long flags;
 	char tmp[64];
 
 
@@ -260,7 +259,6 @@ setup_avm_a1_pcmcia(struct IsdnCard *card)
 	cs->irq = card->para[0];
 
 
-	spin_lock_irqsave(&avm_a1p_lock, flags);
 	outb(cs->hw.avm.cfg_reg+ASL1_OFFSET, ASL1_W_ENABLE_S0);
 
 	byteout(cs->hw.avm.cfg_reg+ASL0_OFFSET,0x00);
@@ -270,8 +268,6 @@ setup_avm_a1_pcmcia(struct IsdnCard *card)
 	byteout(cs->hw.avm.cfg_reg+ASL0_OFFSET,0x00);
 
 	byteout(cs->hw.avm.cfg_reg+ASL0_OFFSET, ASL0_W_TDISABLE|ASL0_W_TRESET);
-
-	spin_unlock_irqrestore(&avm_a1p_lock, flags);
 
 	model = bytein(cs->hw.avm.cfg_reg+MODREG_OFFSET);
 	vers = bytein(cs->hw.avm.cfg_reg+VERREG_OFFSET);

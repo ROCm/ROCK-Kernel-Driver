@@ -421,16 +421,12 @@ release_io_sedlbauer(struct IsdnCardState *cs)
 static void
 reset_sedlbauer(struct IsdnCardState *cs)
 {
-	long flags;
-
 	printk(KERN_INFO "Sedlbauer: resetting card\n");
 
 	if (!((cs->hw.sedl.bus == SEDL_BUS_PCMCIA) &&
 	   (cs->hw.sedl.chip == SEDL_CHIP_ISAC_HSCX))) {
 		if (cs->hw.sedl.chip == SEDL_CHIP_IPAC) {
 			writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, IPAC_POTA2, 0x20);
-			save_flags(flags);
-			sti();
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout((10*HZ)/1000);
 			writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, IPAC_POTA2, 0x0);
@@ -441,28 +437,21 @@ reset_sedlbauer(struct IsdnCardState *cs)
 			writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, IPAC_AOE, 0x0);
 			writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, IPAC_MASK, 0xc0);
 			writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, IPAC_PCFG, 0x12);
-			restore_flags(flags);
 		} else if ((cs->hw.sedl.chip == SEDL_CHIP_ISAC_ISAR) &&
 			(cs->hw.sedl.bus == SEDL_BUS_PCI)) {
 			byteout(cs->hw.sedl.cfg_reg +3, cs->hw.sedl.reset_on);
-			save_flags(flags);
-			sti();
 			current->state = TASK_UNINTERRUPTIBLE;
 			schedule_timeout((20*HZ)/1000);
 			byteout(cs->hw.sedl.cfg_reg +3, cs->hw.sedl.reset_off);
 			current->state = TASK_UNINTERRUPTIBLE;
 			schedule_timeout((20*HZ)/1000);
-			restore_flags(flags);
 		} else {		
 			byteout(cs->hw.sedl.reset_on, SEDL_RESET);	/* Reset On */
-			save_flags(flags);
-			sti();
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout((10*HZ)/1000);
 			byteout(cs->hw.sedl.reset_off, 0);	/* Reset Off */
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout((10*HZ)/1000);
-			restore_flags(flags);
 		}
 	}
 }
@@ -551,7 +540,6 @@ setup_sedlbauer(struct IsdnCard *card)
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 	u16 sub_vendor_id, sub_id;
-	unsigned long flags;
 
 	strcpy(tmp, Sedlbauer_revision);
 	printk(KERN_INFO "HiSax: Sedlbauer driver Rev. %s\n", HiSax_getrev(tmp));
@@ -684,12 +672,9 @@ setup_sedlbauer(struct IsdnCard *card)
 		byteout(cs->hw.sedl.cfg_reg+ 2, 0xdd);
 		byteout(cs->hw.sedl.cfg_reg+ 5, 0x02);
 		byteout(cs->hw.sedl.cfg_reg +3, cs->hw.sedl.reset_on);
-		save_flags(flags);
-		sti();
 		current->state = TASK_UNINTERRUPTIBLE;
 		schedule_timeout((10*HZ)/1000);
 		byteout(cs->hw.sedl.cfg_reg +3, cs->hw.sedl.reset_off);
-		restore_flags(flags);
 #else
 		printk(KERN_WARNING "Sedlbauer: NO_PCI_BIOS\n");
 		return (0);

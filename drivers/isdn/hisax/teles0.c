@@ -24,7 +24,6 @@
 extern const char *CardType[];
 
 const char *teles0_revision = "$Revision: 2.13.6.2 $";
-static spinlock_t teles0_lock = SPIN_LOCK_UNLOCKED;
 
 #define TELES_IOMEM_SIZE	0x400
 #define byteout(addr,val) outb(val,addr)
@@ -197,9 +196,7 @@ static int
 reset_teles0(struct IsdnCardState *cs)
 {
 	u_char cfval;
-	unsigned long flags;
 
-	spin_lock_irqsave(&teles0_lock, flags);
 	if (cs->hw.teles0.cfg_reg) {
 		switch (cs->irq) {
 			case 2:
@@ -228,7 +225,6 @@ reset_teles0(struct IsdnCardState *cs)
 				cfval = 0x0E;
 				break;
 			default:
-				spin_unlock_irqrestore(&teles0_lock, flags);
 				return(1);
 		}
 		cfval |= ((cs->hw.teles0.phymem >> 9) & 0xF0);
@@ -241,7 +237,6 @@ reset_teles0(struct IsdnCardState *cs)
 	HZDELAY(HZ / 5 + 1);
 	writeb(1, cs->hw.teles0.membase + 0x80); mb();
 	HZDELAY(HZ / 5 + 1);
-	spin_unlock_irqrestore(&teles0_lock, flags);
 	return(0);
 }
 
