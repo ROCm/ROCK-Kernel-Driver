@@ -454,8 +454,6 @@ void unmap_page_range(struct mmu_gather *tlb, struct vm_area_struct *vma,
 
 	BUG_ON(address >= end);
 
-	lru_add_drain();
-
 	dir = pgd_offset(vma->vm_mm, address);
 	tlb_start_vma(tlb, vma);
 	do {
@@ -482,16 +480,105 @@ void unmap_page_range(struct mmu_gather *tlb, struct vm_area_struct *vma,
 #endif
 
 /**
+ * unmap_vmas - unmap a range of memory covered by a list of vma's
+ * @tlbp: address of the caller's struct mmu_gather
+ * @mm: the controlling mm_struct
+ * @vma: the starting vma
+ * @start_addr: virtual address at which to start unmapping
+ * @end_addr: virtual address at which to end unmapping
+ * @nr_accounted: Place number of unmapped pages in vm-accountable vma's here
+ *
+ * Returns the number of vma's which were covered by the unmapping.
+ *
+ * Unmap all pages in the vma list.  Called under page_table_lock.
+ *
+ * We aim to not hold page_table_lock for too long (for scheduling latency
+ * reasons).  So zap pages in ZAP_BLOCK_SIZE bytecounts.  This means we need to
+ * return the ending mmu_gather to the caller.
+ *
+ * Only addresses between `start' and `end' will be unmapped.
+ *
+ * The VMA list must be sorted in ascending virtual address order.
+ *
+ * unmap_vmas() assumes that the caller will flush the whole unmapped address
+ * range after unmap_vmas() returns.  So the only responsibility here is to
+ * ensure that any thus-far unmapped pages are flushed before unmap_vmas()
+ * drops the lock and schedules.
+ */
+int unmap_vmas(struct mmu_gather **tlbp, struct mm_struct *mm,
+		struct vm_area_struct *vma, unsigned long start_addr,
+		unsigned long end_addr, unsigned long *nr_accounted)
+{
+	unsigned long zap_bytes = ZAP_BLOCK_SIZE;
+	unsigned long tlb_start;	/* For tlb_finish_mmu */
+	int tlb_start_valid = 0;
+	int ret = 0;
+
+	if (vma) {	/* debug.  killme. */
+		if (end_addr <= vma->vm_start)
+			printk("%s: end_addr(0x%08lx) <= vm_start(0x%08lx)\n",
+				__FUNCTION__, end_addr, vma->vm_start);
+		if (start_addr >= vma->vm_end)
+			printk("%s: start_addr(0x%08lx) <= vm_end(0x%08lx)\n",
+				__FUNCTION__, start_addr, vma->vm_end);
+	}
+
+	for ( ; vma && vma->vm_start < end_addr; vma = vma->vm_next) {
+		unsigned long start;
+		unsigned long end;
+
+		start = max(vma->vm_start, start_addr);
+		if (start >= vma->vm_end)
+			continue;
+		end = min(vma->vm_end, end_addr);
+		if (end <= vma->vm_start)
+			continue;
+
+		if (vma->vm_flags & VM_ACCOUNT)
+			*nr_accounted += (end - start) >> PAGE_SHIFT;
+
+		ret++;
+		while (start != end) {
+			unsigned long block = min(zap_bytes, end - start);
+
+			if (!tlb_start_valid) {
+				tlb_start = start;
+				tlb_start_valid = 1;
+			}
+
+			unmap_page_range(*tlbp, vma, start, start + block);
+			start += block;
+			zap_bytes -= block;
+			if (zap_bytes != 0)
+				continue;
+			if (need_resched()) {
+				tlb_finish_mmu(*tlbp, tlb_start, start);
+				cond_resched_lock(&mm->page_table_lock);
+				*tlbp = tlb_gather_mmu(mm, 0);
+				tlb_start_valid = 0;
+			}
+			zap_bytes = ZAP_BLOCK_SIZE;
+		}
+		if (vma->vm_next && vma->vm_next->vm_start < vma->vm_end)
+			printk("%s: VMA list is not sorted correctly!\n",
+				__FUNCTION__);		
+	}
+	return ret;
+}
+
+/**
  * zap_page_range - remove user pages in a given range
  * @vma: vm_area_struct holding the applicable pages
  * @address: starting address of pages to zap
  * @size: number of bytes to zap
  */
-void zap_page_range(struct vm_area_struct *vma, unsigned long address, unsigned long size)
+void zap_page_range(struct vm_area_struct *vma,
+			unsigned long address, unsigned long size)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	struct mmu_gather *tlb;
-	unsigned long end, block;
+	unsigned long end = address + size;
+	unsigned long nr_accounted = 0;
 
 	might_sleep();
 
@@ -501,30 +588,11 @@ void zap_page_range(struct vm_area_struct *vma, unsigned long address, unsigned 
 	}
 
 	lru_add_drain();
-
 	spin_lock(&mm->page_table_lock);
-
-  	/*
- 	 * This was once a long-held spinlock.  Now we break the
- 	 * work up into ZAP_BLOCK_SIZE units and relinquish the
- 	 * lock after each interation.  This drastically lowers
- 	 * lock contention and allows for a preemption point.
-  	 */
-	while (size) {
-		block = (size > ZAP_BLOCK_SIZE) ? ZAP_BLOCK_SIZE : size;
- 		end = address + block;
- 
- 		flush_cache_range(vma, address, end);
- 		tlb = tlb_gather_mmu(mm, 0);
- 		unmap_page_range(tlb, vma, address, end);
- 		tlb_finish_mmu(tlb, address, end);
- 
- 		cond_resched_lock(&mm->page_table_lock);
- 
- 		address += block;
- 		size -= block;
- 	}
-
+	flush_cache_range(vma, address, end);
+	tlb = tlb_gather_mmu(mm, 0);
+	unmap_vmas(&tlb, mm, vma, address, end, &nr_accounted);
+	tlb_finish_mmu(tlb, address, end);
 	spin_unlock(&mm->page_table_lock);
 }
 
