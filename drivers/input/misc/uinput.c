@@ -218,43 +218,25 @@ static int uinput_write(struct file *file, const char *buffer, size_t count, lof
 
 static ssize_t uinput_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
 {
-	struct uinput_device	*udev;
+	struct uinput_device *udev = file->private_data;
 	int retval = 0;
-	DECLARE_WAITQUEUE(waitq, current);
 
-	udev = (struct uinput_device *)file->private_data;
+	if (udev->head == udev->tail && (udev->state & UIST_CREATED) && (file->f_flags & O_NONBLOCK))
+		return -EAGAIN;
 
-	if (udev->head == udev->tail) {
-		add_wait_queue(&udev->waitq, &waitq);
-		current->state = TASK_INTERRUPTIBLE;
-
-		while (udev->head == udev->tail) {
-			if (!(udev->state & UIST_CREATED)) {
-				retval = -ENODEV;
-				break;
-			}
-			if (file->f_flags & O_NONBLOCK) {
-				retval = -EAGAIN;
-				break;
-			}
-			if (signal_pending(current)) {
-				retval = -ERESTARTSYS;
-				break;
-			}
-			schedule();
-		}
-		current->state = TASK_RUNNING;
-		remove_wait_queue(&udev->waitq, &waitq);
-	}
+	retval = wait_event_interruptible(udev->waitq,
+		udev->head != udev->tail && (udev->state & UIST_CREATED));
 
 	if (retval)
 		return retval;
 
+	if (!(udev->state & UIST_CREATED))
+		return -ENODEV;
+
 	while (udev->head != udev->tail && retval + sizeof(struct uinput_device) <= count) {
 		if (copy_to_user(buffer + retval, &(udev->buff[udev->tail]),
-		    sizeof(struct input_event)))
-			return -EFAULT;
-		udev->tail = (udev->tail + 1)%(UINPUT_BUFFER_SIZE - 1);
+		    sizeof(struct input_event))) return -EFAULT;
+		udev->tail = (udev->tail + 1) % (UINPUT_BUFFER_SIZE - 1);
 		retval += sizeof(struct input_event);
 	}
 
