@@ -82,7 +82,7 @@ extern int bionet_probe(struct net_device *);
 extern int pamsnet_probe(struct net_device *);
 extern struct net_device *cs89x0_probe(int unit);
 extern int hplance_probe(struct net_device *dev);
-extern int bagetlance_probe(struct net_device *);
+extern struct net_device *bagetlance_probe(int unit);
 extern int mvme147lance_probe(struct net_device *dev);
 extern struct net_device *tc515_probe(int unit);
 extern struct net_device *lance_probe(int unit);
@@ -339,6 +339,10 @@ static struct devprobe mips_probes[] __initdata = {
 #ifdef CONFIG_MIPS_JAZZ_SONIC
 	{sonic_probe, 0},
 #endif
+	{NULL, 0},
+};
+
+static struct devprobe2 mips_probes2[] __initdata = {
 #ifdef CONFIG_BAGETLANCE        /* Lance-based Baget ethernet boards */
         {bagetlance_probe, 0},
 #endif
@@ -392,6 +396,7 @@ static void __init ethif_probe2(int unit)
 	if (base_addr == 1)
 		return;
 
+	probe_list2(unit, mips_probes2, base_addr == 0) &&
 	probe_list2(unit, eisa_probes, base_addr == 0) &&
 	probe_list2(unit, mca_probes, base_addr == 0) &&
 	probe_list2(unit, isa_probes, base_addr == 0) &&
