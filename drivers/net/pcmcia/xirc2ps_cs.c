@@ -74,9 +74,11 @@
 #include <linux/interrupt.h>
 #include <linux/in.h>
 #include <linux/delay.h>
+#include <linux/ethtool.h>
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
+#include <asm/uaccess.h>
 
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -1715,6 +1717,26 @@ do_open(struct net_device *dev)
     return 0;
 }
 
+static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
+{
+	u32 ethcmd;
+		
+	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
+		return -EFAULT;
+	
+	switch (ethcmd) {
+	case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
+		strncpy(info.driver, "xirc2ps_cs", sizeof(info.driver)-1);
+		if (copy_to_user(useraddr, &info, sizeof(info)))
+			return -EFAULT;
+		return 0;
+	}
+	}
+	
+	return -EOPNOTSUPP;
+}
+
 static int
 do_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
@@ -1730,6 +1752,8 @@ do_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	return -EOPNOTSUPP;
 
     switch(cmd) {
+      case SIOCETHTOOL:
+        return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
       case SIOCDEVPRIVATE:	/* Get the address of the PHY in use. */
 	data[0] = 0;		/* we have only this address */
 	/* fall trough */
