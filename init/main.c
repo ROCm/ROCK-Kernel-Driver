@@ -491,6 +491,7 @@ asmlinkage void __init start_kernel(void)
 }
 
 int __initdata initcall_debug;
+int __initdata sysfs_mounted;
 
 static int __init initcall_debug_setup(char *str)
 {
@@ -535,6 +536,8 @@ static void __init do_initcalls(void)
 	flush_scheduled_work();
 }
 
+int init_elf_binfmt(void);
+
 /*
  * Ok, the machine is now initialized. None of the devices
  * have been touched yet, but the CPU subsystem is up and
@@ -554,6 +557,7 @@ static void __init do_basic_setup(void)
 	sock_init();
 
 	init_workqueues();
+	init_elf_binfmt();
 	do_initcalls();
 }
 
