@@ -389,12 +389,6 @@ xprt_close(struct rpc_xprt *xprt)
 	sk->no_check	 = 0;
 
 	sock_release(sock);
-	/*
-	 *	TCP doesn't require the rpciod now - other things may
-	 *	but rpciod handles that not us.
-	 */
-	if(xprt->stream)
-		rpciod_down();
 }
 
 /*
@@ -1457,11 +1451,6 @@ xprt_bind_socket(struct rpc_xprt *xprt, struct socket *sock)
 	/* Reset to new socket */
 	xprt->sock = sock;
 	xprt->inet = sk;
-	/*
-	 *	TCP requires the rpc I/O daemon is present
-	 */
-	if(xprt->stream)
-		rpciod_up();
 
 	return;
 }
