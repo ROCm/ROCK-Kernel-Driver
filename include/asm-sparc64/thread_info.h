@@ -28,6 +28,7 @@
 
 #include <asm/ptrace.h>
 #include <asm/types.h>
+#include <asm/page.h>
 
 struct task_struct;
 struct exec_domain;
