@@ -215,7 +215,8 @@ acpi_os_predefined_override (const struct acpi_predefined_names *init_val,
 
 	*new_val = NULL;
 	if (!memcmp (init_val->name, "_OS_", 4) && strlen(acpi_os_name)) {
-		printk(KERN_INFO PREFIX "Overriding _OS definition\n");
+		printk(KERN_INFO PREFIX "Overriding _OS definition %s\n",
+			acpi_os_name);
 		*new_val = acpi_os_name;
 	}
 

@@ -413,30 +413,6 @@ static __init int swab_apm_power_in_minutes(struct dmi_blacklist *d)
 }
 
 /*
- * The Intel 440GX hall of shame. 
- *
- * On many (all we have checked) of these boxes the $PIRQ table is wrong.
- * The MP1.4 table is right however and so SMP kernels tend to work. 
- */
- 
-static __init int broken_pirq(struct dmi_blacklist *d)
-{
-
-	printk(KERN_INFO " *** Possibly defective BIOS detected (irqtable)\n");
-	printk(KERN_INFO " *** Many BIOSes matching this signature have incorrect IRQ routing tables.\n");
-	printk(KERN_INFO " *** If you see IRQ problems, in particular SCSI resets and hangs at boot\n");
-	printk(KERN_INFO " *** contact your hardware vendor and ask about updates.\n");
-	printk(KERN_INFO " *** Building an SMP kernel may evade the bug some of the time.\n");
-#ifdef CONFIG_X86_IO_APIC
-	{
-		extern int skip_ioapic_setup;
-		skip_ioapic_setup = 0;
-	}
-#endif
-	return 0;
-}
-
-/*
  * ASUS K7V-RM has broken ACPI table defining sleep modes
  */
 
@@ -555,14 +531,33 @@ static __init __attribute__((unused)) int force_acpi_ht(struct dmi_blacklist *d)
 #endif
 
 #ifdef	CONFIG_ACPI_PCI
+static __init int disable_acpi_irq(struct dmi_blacklist *d) 
+{ 
+	printk(KERN_NOTICE "%s detected: force use of acpi=noirq\n", d->ident); 	
+	acpi_noirq_set();
+	return 0;
+}
 static __init int disable_acpi_pci(struct dmi_blacklist *d) 
 { 
 	printk(KERN_NOTICE "%s detected: force use of pci=noacpi\n", d->ident); 	
-	acpi_noirq_set();
+	acpi_disable_pci();
 	return 0;
-} 
+}  
 #endif
 
+/*
+ * early nForce2 reference BIOS shipped with a
+ * bogus ACPI IRQ0 -> pin2 interrupt override -- ignore it
+ */
+static __init int ignore_timer_override(struct dmi_blacklist *d)
+{
+	extern int acpi_skip_timer_override;
+	printk(KERN_NOTICE "%s detected: BIOS IRQ0 pin2 override"
+		" will be ignored\n", d->ident); 	
+
+	acpi_skip_timer_override = 1;
+	return 0;
+}
 /*
  *	Process the DMI blacklists
  */
@@ -815,52 +810,6 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			NO_MATCH, NO_MATCH
 			} },
 
-	/* Problem Intel 440GX bioses */
-
-	{ broken_pirq, "SABR1 Bios", {			/* Bad $PIR */
-			MATCH(DMI_BIOS_VENDOR, "Intel Corporation"),
-			MATCH(DMI_BIOS_VERSION,"SABR1"),
-			NO_MATCH, NO_MATCH
-			} },
-	{ broken_pirq, "l44GX Bios", {        		/* Bad $PIR */
-			MATCH(DMI_BIOS_VENDOR, "Intel Corporation"),
-			MATCH(DMI_BIOS_VERSION,"L440GX0.86B.0094.P10"),
-			NO_MATCH, NO_MATCH
-                        } },
-	{ broken_pirq, "l44GX Bios", {        		/* Bad $PIR */
-			MATCH(DMI_BIOS_VENDOR, "Intel Corporation"),
-			MATCH(DMI_BIOS_VERSION,"L440GX0.86B.0115.P12"),
-			NO_MATCH, NO_MATCH
-                        } },
-	{ broken_pirq, "l44GX Bios", {        		/* Bad $PIR */
-			MATCH(DMI_BIOS_VENDOR, "Intel Corporation"),
-			MATCH(DMI_BIOS_VERSION,"L440GX0.86B.0120.P12"),
-			NO_MATCH, NO_MATCH
-                        } },
-	{ broken_pirq, "l44GX Bios", {		/* Bad $PIR */
-			MATCH(DMI_BIOS_VENDOR, "Intel Corporation"),
-			MATCH(DMI_BIOS_VERSION,"L440GX0.86B.0125.P13"),
-			NO_MATCH, NO_MATCH
-			} },
-	{ broken_pirq, "l44GX Bios", {		/* Bad $PIR */
-			MATCH(DMI_BIOS_VENDOR, "Intel Corporation"),
-			MATCH(DMI_BIOS_VERSION,"L440GX0.86B.0066.P07.9906041405"),
-			NO_MATCH, NO_MATCH
-			} },
-
-	{ broken_pirq, "IBM xseries 370", {		/* Bad $PIR */
-			MATCH(DMI_BIOS_VENDOR, "IBM"),
-			MATCH(DMI_BIOS_VERSION,"MMKT33AUS"),
-			NO_MATCH, NO_MATCH
-			} },
-                        
-	/* Intel in disguise - In this case they can't hide and they don't run
-	   too well either... */
-	{ broken_pirq, "Dell PowerEdge 8450", {		/* Bad $PIR */
-			MATCH(DMI_PRODUCT_NAME, "Dell PowerEdge 8450"),
-			NO_MATCH, NO_MATCH, NO_MATCH
-			} },
-			
 	{ broken_acpi_Sx, "ASUS K7V-RM", {		/* Bad ACPI Sx table */
 			MATCH(DMI_BIOS_VERSION,"ASUS K7V-RM ACPI BIOS Revision 1003A"),
 			MATCH(DMI_BOARD_NAME, "<K7V-RM>"),
@@ -1018,6 +967,49 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_BOARD_VENDOR, "IBM"),
 			MATCH(DMI_PRODUCT_NAME, "eserver xSeries 440"),
 			NO_MATCH, NO_MATCH }},
+
+	/*
+	 * Systems with nForce2 BIOS timer override bug
+	 * nVidia claims all nForce have timer on pin0,
+	 * and applying this workaround is a NOP on fixed BIOS,
+	 * so prospects are good for replacing these entries
+	 * with something to key of chipset PCI-ID.
+	 */
+	{ ignore_timer_override, "Abit NF7-S v2", {
+			MATCH(DMI_BOARD_VENDOR, "http://www.abit.com.tw/"),
+			MATCH(DMI_BOARD_NAME, "NF7-S/NF7,NF7-V (nVidia-nForce2)"),
+			MATCH(DMI_BIOS_VERSION, "6.00 PG"),
+			MATCH(DMI_BIOS_DATE, "03/24/2004") }},
+
+	{ ignore_timer_override, "Asus A7N8X v2", {
+			MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC."),
+			MATCH(DMI_BOARD_NAME, "A7N8X2.0"),
+			MATCH(DMI_BIOS_VERSION, "ASUS A7N8X2.0 Deluxe ACPI BIOS Rev 1007"),
+			MATCH(DMI_BIOS_DATE, "10/06/2003") }},
+
+	{ ignore_timer_override, "Asus A7N8X-X", {
+			MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC."),
+			MATCH(DMI_BOARD_NAME, "A7N8X-X"),
+			MATCH(DMI_BIOS_VERSION, "ASUS A7N8X-X ACPI BIOS Rev 1009"),
+			MATCH(DMI_BIOS_DATE, "2/3/2004") }},
+
+	{ ignore_timer_override, "MSI K7N2-Delta", {
+			MATCH(DMI_BOARD_VENDOR, "MICRO-STAR INTERNATIONAL CO., LTD"),
+			MATCH(DMI_BOARD_NAME, "MS-6570"),
+			MATCH(DMI_BIOS_VERSION, "6.00 PG"),
+			MATCH(DMI_BIOS_DATE, "03/29/2004") }},
+
+	{ ignore_timer_override, "Shuttle SN41G2", {
+			MATCH(DMI_BOARD_VENDOR, "Shuttle Inc"),
+			MATCH(DMI_BOARD_NAME, "FN41"),
+			MATCH(DMI_BIOS_VERSION, "6.00 PG"),
+			MATCH(DMI_BIOS_DATE, "01/14/2004") }},
+
+	{ ignore_timer_override, "Shuttle AN35N", {
+			MATCH(DMI_BOARD_VENDOR, "Shuttle Inc"),
+			MATCH(DMI_BOARD_NAME, "AN35"),
+			MATCH(DMI_BIOS_VERSION, "6.00 PG"),
+			MATCH(DMI_BIOS_DATE, "12/05/2003") }},
 #endif	// CONFIG_ACPI_BOOT
 
 #ifdef	CONFIG_ACPI_PCI
@@ -1025,13 +1017,21 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 	 *	Boxes that need ACPI PCI IRQ routing disabled
 	 */
 
-	{ disable_acpi_pci, "ASUS A7V", {
+	{ disable_acpi_irq, "ASUS A7V", {
 			MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC"),
 			MATCH(DMI_BOARD_NAME, "<A7V>"),
 			/* newer BIOS, Revision 1011, does work */
 			MATCH(DMI_BIOS_VERSION, "ASUS A7V ACPI BIOS Revision 1007"),
 			NO_MATCH }},
 
+	/*
+	 *	Boxes that need ACPI PCI IRQ routing and PCI scan disabled
+	 */
+	{ disable_acpi_pci, "ASUS PR-DLS", {	/* _BBN 0 bug */
+			MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC."),
+			MATCH(DMI_BOARD_NAME, "PR-DLS"),
+			MATCH(DMI_BIOS_VERSION, "ASUS PR-DLS ACPI BIOS Revision 1010"),
+			MATCH(DMI_BIOS_DATE, "03/21/2003") }},
 #endif
 
 	{ NULL, }
