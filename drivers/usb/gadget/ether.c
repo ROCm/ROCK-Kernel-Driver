@@ -242,6 +242,10 @@ MODULE_PARM_DESC(host_addr, "Host Ethernet Address");
 #define	DEV_CONFIG_SUBSET
 #endif
 
+#ifdef CONFIG_USB_GADGET_LH7A40X
+#define DEV_CONFIG_CDC
+#endif
+
 #ifdef CONFIG_USB_GADGET_SA1100
 /* use non-CDC for backwards compatibility */
 #define	DEV_CONFIG_SUBSET
@@ -2329,6 +2333,8 @@ eth_bind (struct usb_gadget *gadget)
 		device_desc.bcdDevice = __constant_cpu_to_le16 (0x0207);
 	} else if (gadget_is_omap (gadget)) {
 		device_desc.bcdDevice = __constant_cpu_to_le16 (0x0208);
+	} else if (gadget_is_lh7a40x(gadget)) {
+		device_desc.bcdDevice = __constant_cpu_to_le16 (0x0209);
 	} else {
 		/* can't assume CDC works.  don't want to default to
 		 * anything less functional on CDC-capable hardware,

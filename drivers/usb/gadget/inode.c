@@ -261,6 +261,10 @@ static void put_ep (struct ep_data *data)
 #define CHIP			"sa1100"
 #endif
 
+#ifdef CONFIG_USB_GADGET_LH7A40X
+#define CHIP			"lh7a40x_udc"
+#endif
+
 /*----------------------------------------------------------------------*/
 
 /* NOTE:  don't use dev_printk calls before binding to the gadget

@@ -44,6 +44,12 @@
 #define	gadget_is_sa1100(g)	0
 #endif
 
+#ifdef CONFIG_USB_GADGET_LH7A40X
+#define	gadget_is_lh7a40x(g)	!strcmp("lh7a40x_udc", (g)->name)
+#else
+#define	gadget_is_lh7a40x(g)	0
+#endif
+
 #ifdef CONFIG_USB_GADGET_MQ11XX
 #define	gadget_is_mq11xx(g)	!strcmp("mq11xx_udc", (g)->name)
 #else
