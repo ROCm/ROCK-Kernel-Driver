@@ -248,7 +248,7 @@ void irda_task_delete(struct irda_task *task)
  *    processing, and notify the parent task, that is waiting for this task
  *    to complete.
  */
-int irda_task_kick(struct irda_task *task)
+static int irda_task_kick(struct irda_task *task)
 {
 	int finished = TRUE;
 	int count = 0;

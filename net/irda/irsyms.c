@@ -159,7 +159,6 @@ EXPORT_SYMBOL(irda_device_dongle_cleanup);
 EXPORT_SYMBOL(irda_device_register_dongle);
 EXPORT_SYMBOL(irda_device_unregister_dongle);
 EXPORT_SYMBOL(irda_task_execute);
-EXPORT_SYMBOL(irda_task_kick);
 EXPORT_SYMBOL(irda_task_next_state);
 EXPORT_SYMBOL(irda_task_delete);
 
