@@ -96,12 +96,10 @@
 #include <linux/init.h>
 #include <linux/version.h>
 #include <linux/slab.h>
-
 #include <asm/io.h>
 #include <asm/ioctl.h>
 #include <asm/uaccess.h>
-
-#include "sstfb.h"
+#include <video/sstfb.h>
 
 
 /* initialized by setup */

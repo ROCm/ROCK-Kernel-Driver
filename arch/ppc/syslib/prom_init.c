@@ -34,8 +34,9 @@
 #include <asm/open_pic.h>
 #include <asm/cacheflush.h>
 
-#ifdef CONFIG_FB
-#include <asm/linux_logo.h>
+#ifdef CONFIG_LOGO_LINUX_CLUT224
+#include <linux/linux_logo.h>
+extern const struct linux_logo logo_linux_clut224;
 #endif
 
 /*
@@ -294,6 +295,7 @@ check_display(unsigned long mem)
 		0xff, 0xff, 0x55,
 		0xff, 0xff, 0xff
 	};
+	const unsigned char *clut;
 
 	prom_disp_node = 0;
 
@@ -360,20 +362,20 @@ try_again:
 			 * method is available.
 			 * Should update this to use set-colors.
 			 */
-			for (i = 0; i < 32; i++)
-				if (prom_set_color(ih, i, default_colors[i*3],
-						   default_colors[i*3+1],
-						   default_colors[i*3+2]) != 0)
+			clut = default_colors;
+			for (i = 0; i < 32; i++, clut += 3)
+				if (prom_set_color(ih, i, clut[0], clut[1],
+						   clut[2]) != 0)
 					break;
 
-#ifdef CONFIG_FRAMEBUFFER_CONSOLE
-			for (i = 0; i < LINUX_LOGO_COLORS; i++)
-				if (prom_set_color(ih, i + 32,
-						   linux_logo_red[i],
-						   linux_logo_green[i],
-						   linux_logo_blue[i]) != 0)
+#ifdef CONFIG_LOGO_LINUX_CLUT224
+			clut = logo_linux_clut224.clut;
+			for (i = 0; i < logo_linux_clut224.clutsize;
+			     i++, clut += 3)
+				if (prom_set_color(ih, i + 32, clut[0],
+						   clut[1], clut[2]) != 0)
 					break;
-#endif /* CONFIG_FRAMEBUFFER_CONSOLE */
+#endif /* CONFIG_LOGO_LINUX_CLUT224 */
 		}
 	}
 

@@ -41,8 +41,7 @@
 #include <asm/pgtable.h>
 
 #include <linux/fb.h>
-#define INCLUDE_LINUX_LOGO_DATA
-#include <asm/linux_logo.h>
+#include <linux/linux_logo.h>
 
 #ifdef CONFIG_FRAMEBUFFER_CONSOLE
 #include "console/fbcon.h"
@@ -365,21 +364,20 @@ int num_registered_fb;
 static int ofonly __initdata = 0;
 #endif
 
-#define LOGO_H		80
-#define LOGO_W		80
-
 static inline unsigned safe_shift(unsigned d, int n)
 {
 	return n < 0 ? d >> -n : d << n;
 }
 
-static void __init fb_set_logocmap(struct fb_info *info)
+static void __init fb_set_logocmap(struct fb_info *info,
+				   const struct linux_logo *logo)
 {
 	struct fb_cmap palette_cmap;
 	u16 palette_green[16];
 	u16 palette_blue[16];
 	u16 palette_red[16];
 	int i, j, n;
+	const unsigned char *clut = logo->clut;
 
 	palette_cmap.start = 0;
 	palette_cmap.len = 16;
@@ -388,34 +386,32 @@ static void __init fb_set_logocmap(struct fb_info *info)
 	palette_cmap.blue = palette_blue;
 	palette_cmap.transp = NULL;
 
-	for (i = 0; i < LINUX_LOGO_COLORS; i += n) {
-		n = LINUX_LOGO_COLORS - i;
+	for (i = 0; i < logo->clutsize; i += n) {
+		n = logo->clutsize - i;
 		/* palette_cmap provides space for only 16 colors at once */
 		if (n > 16)
 			n = 16;
 		palette_cmap.start = 32 + i;
 		palette_cmap.len = n;
 		for (j = 0; j < n; ++j) {
-			palette_cmap.red[j] =
-				(linux_logo_red[i + j] << 8) |
-				 linux_logo_red[i + j];
-			palette_cmap.green[j] =
-				(linux_logo_green[i + j] << 8) |
-				 linux_logo_green[i + j];
-			palette_cmap.blue[j] =
-				(linux_logo_blue[i + j] << 8) |
-				 linux_logo_blue[i + j];
+			palette_cmap.red[j] = clut[0] << 8 | clut[0];
+			palette_cmap.green[j] = clut[1] << 8 | clut[1];
+			palette_cmap.blue[j] = clut[2] << 8 | clut[2];
+			clut += 3;
 		}
 		fb_set_cmap(&palette_cmap, 1, info);
 	}
 }
 
-static void  __init fb_set_logo_truepalette(struct fb_info *info, u32 *palette)
+static void  __init fb_set_logo_truepalette(struct fb_info *info,
+					    const struct linux_logo *logo,
+					    u32 *palette)
 {
 	unsigned char mask[9] = { 0,0x80,0xc0,0xe0,0xf0,0xf8,0xfc,0xfe,0xff };
 	unsigned char redmask, greenmask, bluemask;
 	int redshift, greenshift, blueshift;
 	int i;
+	const unsigned char *clut = logo->clut;
 
 	/*
 	 * We have to create a temporary palette since console palette is only
@@ -429,14 +425,17 @@ static void  __init fb_set_logo_truepalette(struct fb_info *info, u32 *palette)
 	greenshift = info->var.green.offset - (8 - info->var.green.length);
 	blueshift  = info->var.blue.offset  - (8 - info->var.blue.length);
 
-	for ( i = 0; i < LINUX_LOGO_COLORS; i++) {
-		palette[i+32] = (safe_shift((linux_logo_red[i]   & redmask), redshift) |
-				 safe_shift((linux_logo_green[i] & greenmask), greenshift) |
-				 safe_shift((linux_logo_blue[i]  & bluemask), blueshift));
+	for ( i = 0; i < logo->clutsize; i++) {
+		palette[i+32] = (safe_shift((clut[0] & redmask), redshift) |
+				 safe_shift((clut[1] & greenmask), greenshift) |
+				 safe_shift((clut[2] & bluemask), blueshift));
+		clut += 3;
 	}
 }
 
-static void __init fb_set_logo_directpalette(struct fb_info *info, u32 *palette)
+static void __init fb_set_logo_directpalette(struct fb_info *info,
+					     const struct linux_logo *logo,
+					     u32 *palette)
 {
 	int redshift, greenshift, blueshift;
 	int i;
@@ -445,40 +444,54 @@ static void __init fb_set_logo_directpalette(struct fb_info *info, u32 *palette)
 	greenshift = info->var.green.offset;
 	blueshift = info->var.blue.offset;
 
-	for (i = 32; i < LINUX_LOGO_COLORS; i++)
+	for (i = 32; i < logo->clutsize; i++)
 		palette[i] = i << redshift | i << greenshift | i << blueshift;
 }
 
-static void __init fb_set_logo(struct fb_info *info, u8 *logo, int needs_logo)
+static void __init fb_set_logo(struct fb_info *info,
+			       const struct linux_logo *logo, u8 *dst,
+			       int needs_logo)
 {
-	int i, j;
+	int i, j, shift;
+	const u8 *src = logo->data;
+	u8 d, xor = 0;
 
 	switch (needs_logo) {
 	case 4:
-		for (i = 0; i < (LOGO_W * LOGO_H)/2; i++) {
-			logo[i*2] = linux_logo16[i] >> 4;
-			logo[(i*2)+1] = linux_logo16[i] & 0xf;
+		for (i = 0; i < logo->height; i++)
+			for (j = 0; j < logo->width; src++) {
+				*dst++ = *src >> 4;
+				j++;
+				if (j < logo->width) {
+					*dst++ = *src & 0x0f;
+					j++;
+				}
+			}
+		break;
+	case ~1:
+		xor = 0xff;
+	case 1:
+		for (i = 0; i < logo->height; i++) {
+			shift = 7;
+			d = *src++ ^ xor;
+			for (j = 0; j < logo->width; j++) {
+				*dst++ = (d >> shift) & 1;
+				shift = (shift-1) & 7;
+				if (shift == 7)
+					d = *src++ ^ xor;
+			}
 		}
 		break;
-	case 1:
-	case ~1:
-	default:
-		for (i = 0; i < (LOGO_W * LOGO_H)/8; i++)
-			for (j = 0; j < 8; j++)
-				logo[i*8 + j] = (linux_logo_bw[i] &  (7 - j)) ?
-						((needs_logo == 1) ? 1 : 0) :
-						((needs_logo == 1) ? 0 : 1);
-			break;
 	}
 }
 
 /*
- * Three (3) kinds of logo maps exist.  linux_logo (>16 colors), linux_logo_16
- * (16 colors) and linux_logo_bw (2 colors).  Depending on the visual format and
- * color depth of the framebuffer, the DAC, the pseudo_palette, and the logo data
- * will be adjusted accordingly.
+ * Three (3) kinds of logo maps exist.  linux_logo_clut224 (>16 colors),
+ * linux_logo_vga16 (16 colors) and linux_logo_mono (2 colors).  Depending on
+ * the visual format and color depth of the framebuffer, the DAC, the
+ * pseudo_palette, and the logo data will be adjusted accordingly.
  *
- * Case 1 - linux_logo:
+ * Case 1 - linux_logo_clut224:
  * Color exceeds the number of console colors (16), thus we set the hardware DAC
  * using fb_set_cmap() appropriately.  The "needs_cmapreset"  flag will be set.
  *
@@ -486,14 +499,14 @@ static void __init fb_set_logo(struct fb_info *info, u8 *logo, int needs_logo)
  * one for temporary use. The "needs_directpalette" or "needs_truepalette" flags
  * will be set.
  *
- * Case 2 - linux_logo_16:
+ * Case 2 - linux_logo_vga16:
  * The number of colors just matches the console colors, thus there is no need
  * to set the DAC or the pseudo_palette.  However, the bitmap is packed, ie,
  * each byte contains color information for two pixels (upper and lower nibble).
  * To be consistent with fb_imageblit() usage, we therefore separate the two
  * nibbles into separate bytes. The "needs_logo" flag will be set to 4.
  *
- * Case 3 - linux_logo_bw:
+ * Case 3 - linux_logo_mono:
  * This is similar with Case 2.  Each byte contains information for 8 pixels.
  * We isolate each bit and expand each into a byte. The "needs_logo" flag will
  * be set to 1.
@@ -506,6 +519,8 @@ int fb_show_logo(struct fb_info *info)
 	int needs_truepalette = 0;
 	int needs_cmapreset = 0;
 	struct fb_image image;
+	const struct linux_logo *logo = 0;
+	int type;
 	int needs_logo = 0;
 	int done = 0, x;
 
@@ -517,11 +532,18 @@ int fb_show_logo(struct fb_info *info)
 
 	/* reasonable default */
 	if (image.depth >= 8)
-		image.data = linux_logo;
+		type = LINUX_LOGO_CLUT224;
 	else if (image.depth >= 4)
-		image.data = linux_logo16;
+		type = LINUX_LOGO_VGA16;
 	else
-		image.data = linux_logo_bw;
+		type = LINUX_LOGO_MONO;
+
+	/* Return if no suitable logo was found */
+	logo = fb_find_logo(type);
+	if (!logo || logo->height > info->var.yres)
+		return 0;
+
+	image.data = logo->data;
 
 	switch (info->fix.visual) {
 	case FB_VISUAL_TRUECOLOR:
@@ -566,42 +588,42 @@ int fb_show_logo(struct fb_info *info)
 	}
 
 	if (needs_cmapreset)
-		fb_set_logocmap(info);
+		fb_set_logocmap(info, logo);
 
 	if (needs_truepalette || needs_directpalette) {
 		palette = kmalloc(256 * 4, GFP_KERNEL);
 		if (palette == NULL)
-			return 1;
+			return 0;
 
 		if (needs_truepalette)
-			fb_set_logo_truepalette(info, palette);
+			fb_set_logo_truepalette(info, logo, palette);
 		else
-			fb_set_logo_directpalette(info, palette);
+			fb_set_logo_directpalette(info, logo, palette);
 
 		saved_pseudo_palette = info->pseudo_palette;
 		info->pseudo_palette = palette;
 	}
 
 	if (needs_logo) {
-		logo_new = kmalloc(LOGO_W * LOGO_H, GFP_KERNEL);
+		logo_new = kmalloc(logo->width * logo->height, GFP_KERNEL);
 		if (logo_new == NULL) {
 			if (palette)
 				kfree(palette);
 			if (saved_pseudo_palette)
 				info->pseudo_palette = saved_pseudo_palette;
-			return 1;
+			return 0;
 		}
 
 		image.data = logo_new;
-		fb_set_logo(info, logo_new, needs_logo);
+		fb_set_logo(info, logo, logo_new, needs_logo);
 	}
 
-	image.width = LOGO_W;
-	image.height = LOGO_H;
+	image.width = logo->width;
+	image.height = logo->height;
 	image.dy = 0;
 
-	for (x = 0; x < num_online_cpus() * (LOGO_W + 8) &&
-	     x < info->var.xres - (LOGO_W + 8); x += (LOGO_W + 8)) {
+	for (x = 0; x < num_online_cpus() * (logo->width + 8) &&
+	     x <= info->var.xres-logo->width; x += (logo->width + 8)) {
 		image.dx = x;
 		info->fbops->fb_imageblit(info, &image);
 		done = 1;
@@ -613,7 +635,7 @@ int fb_show_logo(struct fb_info *info)
 		info->pseudo_palette = saved_pseudo_palette;
 	if (logo_new != NULL)
 		kfree(logo_new);
-	return 0;
+	return logo->height;
 }
 
 static int fbmem_read_proc(char *buf, char **start, off_t offset,

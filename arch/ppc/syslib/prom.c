@@ -37,9 +37,6 @@
 #include <asm/pci-bridge.h>
 #include <asm/open_pic.h>
 
-#ifdef CONFIG_FB
-#include <asm/linux_logo.h>
-#endif
 
 struct pci_address {
 	unsigned a_hi;

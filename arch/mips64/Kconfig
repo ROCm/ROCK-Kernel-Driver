@@ -5,6 +5,10 @@
 
 mainmenu "Linux Kernel Configuration"
 
+config MIPS64
+	bool
+	default y
+
 config MMU
 	bool
 	default y

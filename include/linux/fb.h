@@ -294,7 +294,7 @@ struct fb_image {
 	__u32 fg_color;		/* Only used when a mono bitmap */
 	__u32 bg_color;
 	__u8  depth;		/* Depth of the image */
-	char  *data;		/* Pointer to image data */
+	const char *data;	/* Pointer to image data */
 	struct fb_cmap cmap;	/* color map info */
 };
 

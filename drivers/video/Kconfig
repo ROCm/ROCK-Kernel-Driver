@@ -923,6 +923,7 @@ config FB_VIRTUAL
 	  If unsure, say N.
 
 source "drivers/video/console/Kconfig"
+source "drivers/video/logo/Kconfig"
 
 endmenu
 

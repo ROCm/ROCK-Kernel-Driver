@@ -34,7 +34,7 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/fb.h>
-#include "maxinefb.h"
+#include <video/maxinefb.h>
 
 /* bootinfo.h defines the machine type values, needed when checking */
 /* whether are really running on a maxine, KM                       */

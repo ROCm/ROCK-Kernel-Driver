@@ -26,13 +26,10 @@
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <video/newport.h>
-#define INCLUDE_LINUX_LOGO_DATA
-#include <asm/linux_logo.h>
 
+#include <linux/linux_logo.h>
 #include <linux/font.h>
 
-#define LOGO_W		80
-#define LOGO_H		80
 
 extern struct font_desc font_vga_8x16;
 
@@ -98,30 +95,11 @@ static inline void newport_init_cmap(void)
 	}
 }
 
-static inline void newport_show_logo(void)
-{
-	unsigned long i;
-
-	for (i = 0; i < LINUX_LOGO_COLORS; i++) {
-		newport_bfwait();
-		newport_cmap_setaddr(npregs, i + 0x20);
-		newport_cmap_setrgb(npregs,
-				    linux_logo_red[i],
-				    linux_logo_green[i],
-				    linux_logo_blue[i]);
-	}
-
-	newport_wait();
-	npregs->set.drawmode0 = (NPORT_DMODE0_DRAW | NPORT_DMODE0_BLOCK |
-				 NPORT_DMODE0_CHOST);
-
-	npregs->set.xystarti = ((newport_xsize - LOGO_W) << 16) | (0);
-	npregs->set.xyendi = ((newport_xsize - 1) << 16);
-	newport_wait();
-
-	for (i = 0; i < LOGO_W * LOGO_H; i++)
-		npregs->go.hostrw0 = linux_logo[i] << 24;
-}
+#ifdef CONFIG_LOGO_SGI_CLUT224
+static void newport_show_logo(void);
+#else
+#define newport_show_logo()	do { } while (0)
+#endif
 
 static inline void newport_clear_screen(int xstart, int ystart, int xend,
 					int yend, int ci)
@@ -743,3 +721,38 @@ int cleanup_module(void)
 	return 0;
 }
 #endif
+
+
+#ifdef CONFIG_LOGO_SGI_CLUT224
+
+#undef __initdata
+#define __initdata
+#include "../logo/logo_sgi_clut224.c"
+
+static void newport_show_logo(void)
+{
+	const struct linux_logo *logo = &logo_sgi_clut224;
+	const unsigned char *clut = logo->clut;
+	const unsigned char *data = logo->data;
+	unsigned long i;
+
+	for (i = 0; i < logo->clutsize; i++) {
+		newport_bfwait();
+		newport_cmap_setaddr(npregs, i + 0x20);
+		newport_cmap_setrgb(npregs, clut[0], clut[1], clut[2]);
+		clut += 3;
+	}
+
+	newport_wait();
+	npregs->set.drawmode0 = (NPORT_DMODE0_DRAW | NPORT_DMODE0_BLOCK |
+				 NPORT_DMODE0_CHOST);
+
+	npregs->set.xystarti = ((newport_xsize - logo->width) << 16) | (0);
+	npregs->set.xyendi = ((newport_xsize - 1) << 16);
+	newport_wait();
+
+	for (i = 0; i < logo->width*logo->height; i++)
+		npregs->go.hostrw0 = *data++ << 24;
+}
+#endif /* CONFIG_LOGO_SGI_CLUT224 */
+

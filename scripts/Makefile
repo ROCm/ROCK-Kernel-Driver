@@ -8,7 +8,7 @@
 # docproc: 	 Preprocess .tmpl file in order to generate .sgml documentation
 # conmakehash:	 Create arrays for initializing the kernel console tables
 
-host-progs    := fixdep split-include conmakehash docproc kallsyms
+host-progs    := fixdep split-include conmakehash docproc kallsyms pnmtologo
 build-targets := $(host-progs)
 
 # Let clean descend into subdirs

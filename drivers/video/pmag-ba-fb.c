@@ -34,7 +34,7 @@
 #include <asm/bootinfo.h>
 #include <asm/dec/machtype.h>
 #include <asm/dec/tc.h>
-#include "pmag-ba-fb.h"
+#include <video/pmag-ba-fb.h>
 
 struct pmag_ba_ramdac_regs {
 	unsigned char addr_low;

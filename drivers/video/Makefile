@@ -5,6 +5,7 @@
 # Each configuration option enables a list of files.
 
 obj-$(CONFIG_VT)		  += console/
+obj-$(CONFIG_LOGO)		  += logo/
 
 obj-$(CONFIG_FB)                  += fbmem.o fbmon.o fbcmap.o modedb.o softcursor.o
 # Only include macmodes.o if we have FB support and are PPC

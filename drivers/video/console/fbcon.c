@@ -104,12 +104,9 @@
 #  define DPRINTK(fmt, args...)
 #endif
 
-#define LOGO_H			80
-#define LOGO_W			80
-#define LOGO_LINE	(LOGO_W/8)
-
 struct display fb_display[MAX_NR_CONSOLES];
 char con2fb_map[MAX_NR_CONSOLES];
+static int logo_height;
 static int logo_lines;
 static int logo_shown = -1;
 /* Software scrollback */
@@ -395,7 +392,7 @@ void accel_putcs(struct vc_data *vc, struct display *p,
 	image.dx = xx * vc->vc_font.width;
 	image.dy = yy * vc->vc_font.height;
 	image.height = vc->vc_font.height;
-	image.depth = 1;
+	image.depth = 0;
 
 	if (!(vc->vc_font.width & 7)) {
 		unsigned int pitch, cnt, i, j, k;
@@ -948,7 +945,8 @@ static void fbcon_set_display(int con, int init, int logo)
 		int cnt;
 		int step;
 
-		logo_lines = (LOGO_H + vc->vc_font.height - 1) / vc->vc_font.height;
+		logo_lines = (logo_height + vc->vc_font.height - 1) /
+			     vc->vc_font.height;
 		q = (unsigned short *) (vc->vc_origin +
 					vc->vc_size_row * old_rows);
 		step = logo_lines * old_cols;
@@ -1943,7 +1941,8 @@ static int fbcon_switch(struct vc_data *vc)
 		accel_clear_margins(vc, p, 0);
 	if (logo_shown == -2) {
 		logo_shown = fg_console;
-		fb_show_logo(info);	/* This is protected above by initmem_freed */
+		/* This is protected above by initmem_freed */
+		logo_height = fb_show_logo(info);
 		update_region(fg_console,
 			      vc->vc_origin + vc->vc_size_row * vc->vc_top,
 			      vc->vc_size_row * (vc->vc_bottom -
