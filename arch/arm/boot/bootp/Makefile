@@ -7,10 +7,10 @@ LDFLAGS_bootp	:=-p --no-undefined -X \
 		 --defsym params_phys=$(PARAMS_PHYS) -T
 AFLAGS_initrd.o :=-DINITRD=\"$(INITRD)\"
 
-targets	:= bootp bootp.lds init.o kernel.o initrd.o
+targets	:= bootp init.o kernel.o initrd.o
 
 # Note that bootp.lds picks up kernel.o and initrd.o
-$(obj)/bootp:	$(addprefix $(obj)/,bootp.lds init.o kernel.o initrd.o) FORCE
+$(obj)/bootp:	$(src)/bootp.lds $(addprefix $(obj)/,init.o kernel.o initrd.o) FORCE
 	$(call if_changed,ld)
 	@:
 

@@ -234,7 +234,7 @@ hysdn_log_read(struct file *file, char __user *buf, size_t count, loff_t * off)
 	if ((len = strlen(inf->log_start)) <= count) {
 		if (copy_to_user(buf, inf->log_start, len))
 			return -EFAULT;
-		file->f_pos += len;
+		*off += len;
 		return (len);
 	}
 	return (0);
