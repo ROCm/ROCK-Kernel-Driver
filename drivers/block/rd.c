@@ -77,7 +77,6 @@ int initrd_below_start_ok;
 /* Various static variables go here.  Most are used only in the RAM disk code.
  */
 
-static unsigned long rd_length[NUM_RAMDISKS];	/* Size of RAM disks in bytes   */
 static struct gendisk *rd_disks[NUM_RAMDISKS];
 static devfs_handle_t devfs_handle;
 static struct block_device *rd_bdev[NUM_RAMDISKS];/* Protected device data */
@@ -147,21 +146,14 @@ static struct address_space_operations ramdisk_aops = {
 	commit_write: ramdisk_commit_write,
 };
 
-static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec,
-				  sector_t sector, int minor)
+static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec, sector_t sector,
+				struct address_space *mapping)
 {
-	struct address_space * mapping;
-	unsigned long index;
-	unsigned int vec_offset;
-	int offset, size, err;
-
-	err = 0;
-	mapping = rd_bdev[minor]->bd_inode->i_mapping;
-
-	index = sector >> (PAGE_CACHE_SHIFT - 9);
-	offset = (sector << 9) & ~PAGE_CACHE_MASK;
-	size = vec->bv_len;
-	vec_offset = vec->bv_offset;
+	unsigned long index = sector >> (PAGE_CACHE_SHIFT - 9);
+	unsigned int vec_offset = vec->bv_offset;
+	int offset = (sector << 9) & ~PAGE_CACHE_MASK;
+	int size = vec->bv_len;
+	int err = 0;
 
 	do {
 		int count;
@@ -197,12 +189,10 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec,
 		index++;
 
 		if (rw == READ) {
-			src = kmap(page);
-			src += offset;
+			src = kmap(page) + offset;
 			dst = kmap(vec->bv_page) + vec_offset;
 		} else {
-			dst = kmap(page);
-			dst += offset;
+			dst = kmap(page) + offset;
 			src = kmap(vec->bv_page) + vec_offset;
 		}
 		offset = 0;
@@ -227,22 +217,6 @@ static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec,
 	return err;
 }
 
-static int rd_blkdev_bio_IO(struct bio *bio, unsigned int minor)
-{
-	struct bio_vec *bvec;
-	sector_t sector;
-	int ret = 0, i, rw;
-
-	sector = bio->bi_sector;
-	rw = bio_data_dir(bio);
-	bio_for_each_segment(bvec, bio, i) {
-		ret |= rd_blkdev_pagecache_IO(rw, bvec, sector, minor);
-		sector += bvec->bv_len >> 9;
-	}
-
-	return ret;
-}
-
 /*
  *  Basically, my strategy here is to set up a buffer-head which can't be
  *  deleted, and make that my Ramdisk.  If the request is outside of the
@@ -251,37 +225,33 @@ static int rd_blkdev_bio_IO(struct bio *bio, unsigned int minor)
  * 19-JAN-1998  Richard Gooch <rgooch@atnf.csiro.au>  Added devfs support
  *
  */
-static int rd_make_request(request_queue_t * q, struct bio *sbh)
+static int rd_make_request(request_queue_t * q, struct bio *bio)
 {
-	unsigned int minor;
-	unsigned long offset, len;
-	int rw = sbh->bi_rw;
+	struct block_device *bdev = bio->bi_bdev;
+	struct address_space * mapping = bdev->bd_inode->i_mapping;
+	sector_t sector = bio->bi_sector;
+	unsigned long len = bio->bi_size >> 9;
+	int rw = bio_data_dir(bio);
+	struct bio_vec *bvec;
+	int ret = 0, i;
 
-	minor = minor(to_kdev_t(sbh->bi_bdev->bd_dev));
-
-	if (minor >= NUM_RAMDISKS)
-		goto fail;
-
-	offset = sbh->bi_sector << 9;
-	len = sbh->bi_size;
-
-	if ((offset + len) > rd_length[minor])
+	if (sector + len > get_capacity(bdev->bd_disk))
 		goto fail;
 
 	if (rw==READA)
 		rw=READ;
-	if ((rw != READ) && (rw != WRITE)) {
-		printk(KERN_INFO "RAMDISK: bad command: %d\n", rw);
-		goto fail;
+
+	bio_for_each_segment(bvec, bio, i) {
+		ret |= rd_blkdev_pagecache_IO(rw, bvec, sector, mapping);
+		sector += bvec->bv_len >> 9;
 	}
-
-	if (rd_blkdev_bio_IO(sbh, minor))
+	if (ret)
 		goto fail;
 
-	bio_endio(sbh, sbh->bi_size, 0);
+	bio_endio(bio, bio->bi_size, 0);
 	return 0;
- fail:
-	bio_io_error(sbh, sbh->bi_size);
+fail:
+	bio_io_error(bio, bio->bi_size);
 	return 0;
 } 
 
@@ -373,21 +343,18 @@ static int rd_open(struct inode * inode, struct file * filp)
 	}
 #endif
 
-	if (unit >= NUM_RAMDISKS)
-		return -ENXIO;
-
 	/*
 	 * Immunize device against invalidate_buffers() and prune_icache().
 	 */
 	if (rd_bdev[unit] == NULL) {
-		rd_bdev[unit] = bdget(kdev_t_to_nr(inode->i_rdev));
-		rd_bdev[unit]->bd_openers++;
-		rd_bdev[unit]->bd_block_size = rd_blocksize;
-		rd_bdev[unit]->bd_inode->i_mapping->a_ops = &ramdisk_aops;
-		rd_bdev[unit]->bd_inode->i_mapping->backing_dev_info = &rd_backing_dev_info;
-		rd_bdev[unit]->bd_inode->i_size = rd_length[unit];
-		rd_bdev[unit]->bd_queue = &blk_dev[MAJOR_NR].request_queue;
-		rd_bdev[unit]->bd_disk = get_disk(rd_disks[unit]);
+		struct block_device *bdev = inode->i_bdev;
+		rd_bdev[unit] = bdev;
+		bdev->bd_openers++;
+		bdev->bd_block_size = rd_blocksize;
+		inode->i_mapping->a_ops = &ramdisk_aops;
+		inode->i_mapping->backing_dev_info = &rd_backing_dev_info;
+		get_disk(bdev->bd_disk);
+		bdev->bd_inode->i_size = get_capacity(bdev->bd_disk) << 9;
 	}
 
 	return 0;
@@ -422,6 +389,7 @@ static void __exit rd_cleanup (void)
 	unregister_blkdev( MAJOR_NR, "ramdisk" );
 }
 
+static struct request_queue rd_queue;
 /* This is the registration and initialization section of the RAM disk driver */
 static int __init rd_init (void)
 {
@@ -456,15 +424,15 @@ static int __init rd_init (void)
 		goto out;
 	}
 
-	blk_queue_make_request(BLK_DEFAULT_QUEUE(MAJOR_NR), &rd_make_request);
+	blk_queue_make_request(&rd_queue, &rd_make_request);
 
 	for (i = 0; i < NUM_RAMDISKS; i++) {
 		struct gendisk *disk = rd_disks[i];
 		/* rd_size is given in kB */
-		rd_length[i] = rd_size << 10;
 		disk->major = MAJOR_NR;
 		disk->first_minor = i;
 		disk->fops = &rd_bd_op;
+		disk->queue = &rd_queue;
 		sprintf(disk->disk_name, "rd%d", i);
 		set_capacity(disk, rd_size * 2);
 	}
