@@ -733,7 +733,7 @@ static inline int todrop_entry(struct ip_vs_conn *cp)
 	/* if the conn entry hasn't lasted for 60 seconds, don't drop it.
 	   This will leave enough time for normal connection to get
 	   through. */
-	if (cp->timeout+jiffies-cp->timer.expires < 60*HZ)
+	if (time_before(cp->timeout + jiffies, cp->timer.expires + 60*HZ))
 		return 0;
 
 	/* Don't drop the entry if its number of incoming packets is not

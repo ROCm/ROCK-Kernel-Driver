@@ -295,8 +295,8 @@ static inline void ip_vs_lblc_full_check(struct ip_vs_lblc_table *tbl)
 
 		write_lock(&tbl->lock);
 		list_for_each_entry_safe(en, nxt, &tbl->bucket[j], list) {
-			if ((now - en->lastuse) <
-			    sysctl_ip_vs_lblc_expiration) 
+			if (time_before(now, 
+					en->lastuse + sysctl_ip_vs_lblc_expiration))
 				continue;
 
 			ip_vs_lblc_free(en);
@@ -350,7 +350,7 @@ static void ip_vs_lblc_check_expire(unsigned long data)
 
 		write_lock(&tbl->lock);
 		list_for_each_entry_safe(en, nxt, &tbl->bucket[j], list) {
-			if ((now - en->lastuse) < ENTRY_TIMEOUT) 
+			if (time_before(now, en->lastuse + ENTRY_TIMEOUT))
 				continue;
 
 			ip_vs_lblc_free(en);

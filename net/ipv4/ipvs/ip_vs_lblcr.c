@@ -481,10 +481,10 @@ static inline void ip_vs_lblcr_full_check(struct ip_vs_lblcr_table *tbl)
 
 		write_lock(&tbl->lock);
 		list_for_each_entry_safe(en, nxt, &tbl->bucket[j], list) {
-			if ((now - en->lastuse) <
-			    sysctl_ip_vs_lblcr_expiration) {
+			if (time_after(en->lastuse+sysctl_ip_vs_lblcr_expiration,
+				       now))
 				continue;
-			}
+
 			ip_vs_lblcr_free(en);
 			atomic_dec(&tbl->entries);
 		}
@@ -536,7 +536,7 @@ static void ip_vs_lblcr_check_expire(unsigned long data)
 
 		write_lock(&tbl->lock);
 		list_for_each_entry_safe(en, nxt, &tbl->bucket[j], list) {
-			if ((now - en->lastuse) < ENTRY_TIMEOUT) 
+			if (time_before(now, en->lastuse+ENTRY_TIMEOUT))
 				continue;
 
 			ip_vs_lblcr_free(en);
