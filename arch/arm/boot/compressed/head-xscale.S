@@ -34,20 +34,6 @@ __XScale_start:
 		bic	r0, r0, #0x1000		@ clear Icache
 		mcr	p15, 0, r0, c1, c0, 0
 
-#ifdef	CONFIG_ARCH_IQ80321
-		mov	r7, #MACH_TYPE_IQ80321
-#endif
-
-#ifdef  CONFIG_ARCH_IQ31244
-		mov	r7, #(MACH_TYPE_IQ31244 & 0xff)
-		orr	r7, r7, #(MACH_TYPE_IQ31244 & 0xff00)
-#endif
-
-#ifdef  CONFIG_ARCH_IQ80331
-		mov	r7, #(MACH_TYPE_IQ80331 & 0xff)
-		orr	r7, r7, #(MACH_TYPE_IQ80331 & 0xff00)
-#endif
-
 #ifdef CONFIG_ARCH_LUBBOCK
 		mov	r7, #MACH_TYPE_LUBBOCK
 #endif
