@@ -531,6 +531,7 @@ struct file_operations linvfs_dir_operations = {
 
 static struct vm_operations_struct linvfs_file_vm_ops = {
 	.nopage		= filemap_nopage,
+	.populate	= filemap_populate,
 #ifdef HAVE_VMOP_MPROTECT
 	.mprotect	= linvfs_mprotect,
 #endif
