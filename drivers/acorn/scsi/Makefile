@@ -2,8 +2,6 @@
 # Makefile for drivers/acorn/scsi
 #
 
-USE_STANDARD_AS_RULE := true
-
 O_TARGET	:= acorn-scsi.o
 
 obj-y		:=

@@ -321,7 +321,7 @@ static void inline do_trap(int trapnr, int signr, char *str, int vm86,
 		printk(KERN_CRIT "PNPBIOS fault.. attempting recovery.\n");
 		__asm__ volatile(
 			"movl %0, %%esp\n\t"
-			"jmp %1\n\t"
+			"jmp *%1\n\t"
 			: "=a" (pnp_bios_fault_esp), "=b" (pnp_bios_fault_eip));
 		panic("do_trap: can't hit this");
 	}

@@ -14,8 +14,6 @@
 # Free Software Foundation;  either version 2 of the  License, or (at your
 # option) any later version.
 
-USE_STANDARD_AS_RULE		:= true
-
 # Normally, we use the 'misc-simple.c' file for decompress_kernel and
 # whatnot.  Sometimes we need to override this however.
 MISC				:= ../common/misc-simple.o

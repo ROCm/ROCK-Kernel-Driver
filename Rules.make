@@ -52,6 +52,9 @@ ALL_SUB_DIRS	:= $(sort $(subdir-y) $(subdir-m) $(subdir-n) $(subdir-))
 # Common rules
 #
 
+# Compile C sources (.c)
+# ---------------------------------------------------------------------------
+
 # export_flags will be set to -DEXPORT_SYMBOL for objects in $(export-objs)
 
 c_flags = $(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(export_flags)
@@ -71,11 +74,9 @@ cmd_cc_o_c = $(CC) $(c_flags) -c -o $@ $<
 %.o: %.c dummy
 	$(call if_changed,cmd_cc_o_c)
 
-# Old makefiles define their own rules for compiling .S files,
-# but these standard rules are available for any Makefile that
-# wants to use them.  Our plan is to incrementally convert all
-# the Makefiles to these standard rules.  -- rmk, mec
-ifdef USE_STANDARD_AS_RULE
+
+# Compile assembler sources (.S)
+# ---------------------------------------------------------------------------
 
 a_flags = $(AFLAGS) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
 
@@ -89,11 +90,7 @@ cmd_as_o_S = $(CC) $(a_flags) -c -o $@ $<
 %.o: %.S dummy
 	$(call if_changed,cmd_as_o_S)
 
-endif
-
-# FIXME is anybody using this rule? Why does it have EXTRA_CFLAGS?
-%.o: %.s
-	$(AS) $(AFLAGS) $(EXTRA_CFLAGS) -o $@ $<
+# ---------------------------------------------------------------------------
 
 %.lst: %.c
 	$(CC) $(c_flags) -g -c -o $*.o $<

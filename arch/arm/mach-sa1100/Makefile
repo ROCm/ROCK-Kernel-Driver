@@ -2,8 +2,6 @@
 # Makefile for the linux kernel.
 #
 
-USE_STANDARD_AS_RULE := true
-
 O_TARGET		:= sa1100.o
 
 # Common support (must be linked before board specific support)

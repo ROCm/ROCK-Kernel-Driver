@@ -2,8 +2,6 @@
 # Makefile for MIPS-specific library files..
 #
 
-USE_STANDARD_AS_RULE := true
-
 EXTRA_AFLAGS := $(CFLAGS)
 
 L_TARGET = lib.a
