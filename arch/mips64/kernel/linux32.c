@@ -39,125 +39,59 @@
 /*
  * Revalidate the inode. This is required for proper NFS attribute caching.
  */
-static __inline__ int
-do_revalidate(struct dentry *dentry)
-{
-	struct inode * inode = dentry->d_inode;
 
-	if (inode->i_op && inode->i_op->revalidate)
-		return inode->i_op->revalidate(dentry);
-
-	return 0;
-}
-
-static int cp_new_stat32(struct inode * inode, struct stat32 * statbuf)
+static int cp_new_stat32(struct kstat *stat, struct stat32 *statbuf)
 {
 	struct stat32 tmp;
-	unsigned int blocks, indirect;
 
 	memset(&tmp, 0, sizeof(tmp));
-	tmp.st_dev = kdev_t_to_nr(inode->i_dev);
-	tmp.st_ino = inode->i_ino;
-	tmp.st_mode = inode->i_mode;
-	tmp.st_nlink = inode->i_nlink;
-	SET_STAT_UID(tmp, inode->i_uid);
-	SET_STAT_GID(tmp, inode->i_gid);
-	tmp.st_rdev = kdev_t_to_nr(inode->i_rdev);
-	tmp.st_size = inode->i_size;
-	tmp.st_atime = inode->i_atime;
-	tmp.st_mtime = inode->i_mtime;
-	tmp.st_ctime = inode->i_ctime;
-
-	/*
-	 * st_blocks and st_blksize are approximated with a simple algorithm if
-	 * they aren't supported directly by the filesystem. The minix and msdos
-	 * filesystems don't keep track of blocks, so they would either have to
-	 * be counted explicitly (by delving into the file itself), or by using
-	 * this simple algorithm to get a reasonable (although not 100%
-	 * accurate) value.
-	 */
-
-	/*
-	 * Use minix fs values for the number of direct and indirect blocks.
-	 * The count is now exact for the minix fs except that it counts zero
-	 * blocks.  Everything is in units of BLOCK_SIZE until the assignment
-	 * to tmp.st_blksize.
-	 */
-#define D_B   7
-#define I_B   (BLOCK_SIZE / sizeof(unsigned short))
-
-	if (!inode->i_blksize) {
-		blocks = (tmp.st_size + BLOCK_SIZE - 1) / BLOCK_SIZE;
-		if (blocks > D_B) {
-			indirect = (blocks - D_B + I_B - 1) / I_B;
-			blocks += indirect;
-			if (indirect > 1) {
-				indirect = (indirect - 1 + I_B - 1) / I_B;
-				blocks += indirect;
-				if (indirect > 1)
-					blocks++;
-			}
-		}
-		tmp.st_blocks = (BLOCK_SIZE / 512) * blocks;
-		tmp.st_blksize = BLOCK_SIZE;
-	} else {
-		tmp.st_blocks = inode->i_blocks;
-		tmp.st_blksize = inode->i_blksize;
-	}
-
+	tmp.st_dev = stat->dev;
+	tmp.st_ino = stat->ino;
+	tmp.st_mode = stat->mode;
+	tmp.st_nlink = stat->nlink;
+	SET_STAT_UID(tmp, stat->uid);
+	SET_STAT_GID(tmp, stat->gid);
+	tmp.st_rdev = stat->rdev;
+	tmp.st_size = stat->size;
+	tmp.st_atime = stat->atime;
+	tmp.st_mtime = stat->mtime;
+	tmp.st_ctime = stat->ctime;
+	tmp.st_blocks = stat->blocks;
+	tmp.st_blksize = stat->blksize;
 	return copy_to_user(statbuf,&tmp,sizeof(tmp)) ? -EFAULT : 0;
 }
 
 asmlinkage int sys32_newstat(char * filename, struct stat32 *statbuf)
 {
-	struct nameidata nd;
-	int error;
+	struct kstat stat;
+	int error = vfs_stat(filename, &stat);
 
-	error = user_path_walk(filename, &nd);
-	if (!error) {
-		error = do_revalidate(nd.dentry);
-		if (!error)
-			error = cp_new_stat32(nd.dentry->d_inode, statbuf);
-
-		path_release(&nd);
-	}
+	if (!error)
+		error = cp_new_stat32(&stat, statbuf);
 
 	return error;
 }
 
 asmlinkage int sys32_newlstat(char * filename, struct stat32 *statbuf)
 {
-	struct nameidata nd;
-	int error;
+	struct kstat stat;
+	int error = vfs_lstat(filename, &stat);
 
-	error = user_path_walk_link(filename, &nd);
-	if (!error) {
-		error = do_revalidate(nd.dentry);
-		if (!error)
-			error = cp_new_stat32(nd.dentry->d_inode, statbuf);
-
-		path_release(&nd);
-	}
+	if (!error)
+		error = cp_new_stat32(&stat, statbuf);
 
 	return error;
 }
 
 asmlinkage long sys32_newfstat(unsigned int fd, struct stat32 * statbuf)
 {
-	struct file * f;
-	int err = -EBADF;
+	struct kstat stat;
+	int error = vfs_fstat(fd, &stat);
 
-	f = fget(fd);
-	if (f) {
-		struct dentry * dentry = f->f_dentry;
+	if (!error)
+		error = cp_new_stat32(&stat, statbuf);
 
-		err = do_revalidate(dentry);
-		if (!err)
-			err = cp_new_stat32(dentry->d_inode, statbuf);
-		fput(f);
-	}
-
-	return err;
+	return error;
 }
 
 asmlinkage int sys_mmap2(void) {return 0;}

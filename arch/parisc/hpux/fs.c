@@ -141,110 +141,56 @@ int hpux_mount(const char *fs, const char *path, int mflag,
 	return -ENOSYS;
 }
 
-static int cp_hpux_stat(struct inode * inode, struct hpux_stat64 * statbuf)
+static int cp_hpux_stat(struct kstat *stat, struct hpux_stat64 *statbuf)
 {
 	struct hpux_stat64 tmp;
-	unsigned int blocks, indirect;
 
 	memset(&tmp, 0, sizeof(tmp));
-	tmp.st_dev = kdev_t_to_nr(inode->i_dev);
-	tmp.st_ino = inode->i_ino;
-	tmp.st_mode = inode->i_mode;
-	tmp.st_nlink = inode->i_nlink;
-	tmp.st_uid = inode->i_uid;
-	tmp.st_gid = inode->i_gid;
-	tmp.st_rdev = kdev_t_to_nr(inode->i_rdev);
-	tmp.st_size = inode->i_size;
-	tmp.st_atime = inode->i_atime;
-	tmp.st_mtime = inode->i_mtime;
-	tmp.st_ctime = inode->i_ctime;
-
-#define D_B   7
-#define I_B   (BLOCK_SIZE / sizeof(unsigned short))
-
-	if (!inode->i_blksize) {
-		blocks = (tmp.st_size + BLOCK_SIZE - 1) / BLOCK_SIZE;
-		if (blocks > D_B) {
-			indirect = (blocks - D_B + I_B - 1) / I_B;
-			blocks += indirect;
-			if (indirect > 1) {
-				indirect = (indirect - 1 + I_B - 1) / I_B;
-				blocks += indirect;
-				if (indirect > 1)
-					blocks++;
-			}
-		}
-		tmp.st_blocks = (BLOCK_SIZE / 512) * blocks;
-		tmp.st_blksize = BLOCK_SIZE;
-	} else {
-		tmp.st_blocks = inode->i_blocks;
-		tmp.st_blksize = inode->i_blksize;
-	}
+	tmp.st_dev = stat->dev;
+	tmp.st_ino = stat->ino;
+	tmp.st_mode = stat->mode;
+	tmp.st_nlink = stat->nlink;
+	tmp.st_uid = stat->uid;
+	tmp.st_gid = stat->gid;
+	tmp.st_rdev = stat->rdev;
+	tmp.st_size = stat->size;
+	tmp.st_atime = stat->atime;
+	tmp.st_mtime = stat->mtime;
+	tmp.st_ctime = stat->ctime;
+	tmp.st_blocks = stat->blocks;
+	tmp.st_blksize = stat->blksize;
 	return copy_to_user(statbuf,&tmp,sizeof(tmp)) ? -EFAULT : 0;
-}
-
-/*
- * Revalidate the inode. This is required for proper NFS attribute caching.
- * Blatently copied wholesale from fs/stat.c
- */
-static __inline__ int
-do_revalidate(struct dentry *dentry)
-{
-	struct inode * inode = dentry->d_inode;
-	if (inode->i_op && inode->i_op->revalidate)
-		return inode->i_op->revalidate(dentry);
-	return 0;
 }
 
 long hpux_stat64(const char *path, struct hpux_stat64 *buf)
 {
-	struct nameidata nd;
-	int error;
+	struct kstat stat;
+	int error = vfs_stat(filename, &stat);
 
-	lock_kernel();
-	error = user_path_walk(path, &nd);
-	if (!error) {
-		error = do_revalidate(nd.dentry);
-		if (!error)
-			error = cp_hpux_stat(nd.dentry->d_inode, buf);
-		path_release(&nd);
-	}
-	unlock_kernel();
+	if (!error)
+		error = cp_hpux_stat(&stat, statbuf);
+
 	return error;
 }
 
 long hpux_fstat64(unsigned int fd, struct hpux_stat64 *statbuf)
 {
-	struct file * f;
-	int err = -EBADF;
+	struct kstat stat;
+	int error = vfs_fstat(fd, &stat);
 
-	lock_kernel();
-	f = fget(fd);
-	if (f) {
-		struct dentry * dentry = f->f_dentry;
+	if (!error)
+		error = cp_hpux_stat(&stat, statbuf);
 
-		err = do_revalidate(dentry);
-		if (!err)
-			err = cp_hpux_stat(dentry->d_inode, statbuf);
-		fput(f);
-	}
-	unlock_kernel();
-	return err;
+	return error;
 }
 
 long hpux_lstat64(char *filename, struct hpux_stat64 *statbuf)
 {
-	struct nameidata nd;
-	int error;
+	struct kstat stat;
+	int error = vfs_lstat(filename, &stat);
 
-	lock_kernel();
-	error = user_path_walk_link(filename, &nd);
-	if (!error) {
-		error = do_revalidate(nd.dentry);
-		if (!error)
-			error = cp_hpux_stat(nd.dentry->d_inode, statbuf);
-		path_release(&nd);
-	}
-	unlock_kernel();
+	if (!error)
+		error = cp_hpux_stat(&stat, statbuf);
+
 	return error;
 }
