@@ -217,6 +217,12 @@ static void tg3_disable_ints(struct tg3 *tp)
 	tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
 }
 
+static inline void tg3_cond_int(struct tg3 *tp)
+{
+	if (tp->hw_status->status & SD_STATUS_UPDATED)
+		tw32(GRC_LOCAL_CTRL, tp->grc_local_ctrl | GRC_LCLCTRL_SETINT);
+}
+
 static void tg3_enable_ints(struct tg3 *tp)
 {
 	tw32(TG3PCI_MISC_HOST_CTRL,
@@ -224,12 +230,10 @@ static void tg3_enable_ints(struct tg3 *tp)
 	tw32_mailbox(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW, 0x00000000);
 	tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
 
-	if (tp->hw_status->status & SD_STATUS_UPDATED)
-		tw32(GRC_LOCAL_CTRL,
-		     tp->grc_local_ctrl | GRC_LCLCTRL_SETINT);
+	tg3_cond_int(tp);
 }
 
-/* these three netif_xxx funcs should be moved into generic net layer */
+/* these netif_xxx funcs should be moved into generic net layer */
 static void netif_poll_disable(struct net_device *dev)
 {
 	while (test_and_set_bit(__LINK_STATE_RX_SCHED, &dev->state)) {
@@ -255,25 +259,26 @@ static inline void __netif_rx_complete(struct net_device *dev)
 
 static inline void netif_tx_disable(struct net_device *dev)
 {
-	netif_stop_queue(dev);
 	spin_lock_bh(&dev->xmit_lock);
+	netif_stop_queue(dev);
 	spin_unlock_bh(&dev->xmit_lock);
 }
 
 static inline void tg3_netif_stop(struct tg3 *tp)
 {
-	netif_tx_disable(tp->dev);
 	netif_poll_disable(tp->dev);
+	netif_tx_disable(tp->dev);
 }
 
 static inline void tg3_netif_start(struct tg3 *tp)
 {
-	netif_poll_enable(tp->dev);
 	netif_wake_queue(tp->dev);
 	/* NOTE: unconditional netif_wake_queue is only appropriate
 	 * so long as all callers are assured to have free tx slots
 	 * (such as after tg3_init_hw)
 	 */
+	netif_poll_enable(tp->dev);
+	tg3_cond_int(tp);
 }
 
 static void tg3_switch_clocks(struct tg3 *tp)
