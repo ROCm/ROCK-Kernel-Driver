@@ -186,7 +186,7 @@ static dev_link_t *avmcs_attach(void)
     client_reg.event_handler = &avmcs_event;
     client_reg.Version = 0x0210;
     client_reg.event_callback_args.client_data = link;
-    ret = CardServices(RegisterClient, &link->handle, &client_reg);
+    ret = pcmcia_register_client(&link->handle, &client_reg);
     if (ret != 0) {
 	cs_error(link->handle, RegisterClient, ret);
 	avmcs_detach(link);
@@ -232,7 +232,7 @@ static void avmcs_detach(dev_link_t *link)
 
     /* Break the link with Card Services */
     if (link->handle)
-	CardServices(DeregisterClient, link->handle);
+	pcmcia_deregister_client(link->handle);
     
     /* Unlink device structure, free pieces */
     *linkp = link->next;
@@ -251,19 +251,29 @@ static void avmcs_detach(dev_link_t *link)
     
 ======================================================================*/
 
-static int get_tuple(int fn, client_handle_t handle, tuple_t *tuple,
+static int get_tuple(client_handle_t handle, tuple_t *tuple,
 		     cisparse_t *parse)
 {
-    int i;
-    i = CardServices(fn, handle, tuple);
+    int i = pcmcia_get_tuple_data(handle, tuple);
     if (i != CS_SUCCESS) return i;
-    i = CardServices(GetTupleData, handle, tuple);
-    if (i != CS_SUCCESS) return i;
-    return CardServices(ParseTuple, handle, tuple, parse);
+    return pcmcia_parse_tuple(handle, tuple, parse);
 }
 
-#define first_tuple(a, b, c) get_tuple(GetFirstTuple, a, b, c)
-#define next_tuple(a, b, c) get_tuple(GetNextTuple, a, b, c)
+static int first_tuple(client_handle_t handle, tuple_t *tuple,
+		     cisparse_t *parse)
+{
+    int i = pcmcia_get_first_tuple(handle, tuple);
+    if (i != CS_SUCCESS) return i;
+    return get_tuple(handle, tuple, parse);
+}
+
+static int next_tuple(client_handle_t handle, tuple_t *tuple,
+		     cisparse_t *parse)
+{
+    int i = pcmcia_get_next_tuple(handle, tuple);
+    if (i != CS_SUCCESS) return i;
+    return get_tuple(handle, tuple, parse);
+}
 
 static void avmcs_config(dev_link_t *link)
 {
@@ -287,14 +297,14 @@ static void avmcs_config(dev_link_t *link)
     */
     do {
 	tuple.DesiredTuple = CISTPL_CONFIG;
-	i = CardServices(GetFirstTuple, handle, &tuple);
+	i = pcmcia_get_first_tuple(handle, &tuple);
 	if (i != CS_SUCCESS) break;
 	tuple.TupleData = buf;
 	tuple.TupleDataMax = 64;
 	tuple.TupleOffset = 0;
-	i = CardServices(GetTupleData, handle, &tuple);
+	i = pcmcia_get_tuple_data(handle, &tuple);
 	if (i != CS_SUCCESS) break;
-	i = CardServices(ParseTuple, handle, &tuple, &parse);
+	i = pcmcia_parse_tuple(handle, &tuple, &parse);
 	if (i != CS_SUCCESS) break;
 	link->conf.ConfigBase = parse.config.base;
     } while (0);
@@ -337,7 +347,7 @@ static void avmcs_config(dev_link_t *link)
                 printk(KERN_INFO "avm_cs: testing i/o %#x-%#x\n",
 			link->io.BasePort1,
 		        link->io.BasePort1+link->io.NumPorts1-1);
-		i = CardServices(RequestIO, link->handle, &link->io);
+		i = pcmcia_request_io(link->handle, &link->io);
 		if (i == CS_SUCCESS) goto found_port;
 	    }
 	    i = next_tuple(handle, &tuple, &parse);
@@ -352,21 +362,21 @@ found_port:
 	/*
 	 * allocate an interrupt line
 	 */
-	i = CardServices(RequestIRQ, link->handle, &link->irq);
+	i = pcmcia_request_irq(link->handle, &link->irq);
 	if (i != CS_SUCCESS) {
 	    cs_error(link->handle, RequestIRQ, i);
-	    CardServices(ReleaseIO, link->handle, &link->io);
+	    pcmcia_release_io(link->handle, &link->io);
 	    break;
 	}
 	
 	/*
          * configure the PCMCIA socket
 	  */
-	i = CardServices(RequestConfiguration, link->handle, &link->conf);
+	i = pcmcia_request_configuration(link->handle, &link->conf);
 	if (i != CS_SUCCESS) {
 	    cs_error(link->handle, RequestConfiguration, i);
-	    CardServices(ReleaseIO, link->handle, &link->io);
-	    CardServices(ReleaseIRQ, link->handle, &link->irq);
+	    pcmcia_release_io(link->handle, &link->io);
+	    pcmcia_release_irq(link->handle, &link->irq);
 	    break;
 	}
 
@@ -437,9 +447,9 @@ static void avmcs_release(dev_link_t *link)
     link->dev = NULL;
     
     /* Don't bother checking to see if these succeed or not */
-    CardServices(ReleaseConfiguration, link->handle);
-    CardServices(ReleaseIO, link->handle, &link->io);
-    CardServices(ReleaseIRQ, link->handle, &link->irq);
+    pcmcia_release_configuration(link->handle);
+    pcmcia_release_io(link->handle, &link->io);
+    pcmcia_release_irq(link->handle, &link->irq);
     link->state &= ~DEV_CONFIG;
     
     if (link->state & DEV_STALE_LINK)
@@ -481,14 +491,14 @@ static int avmcs_event(event_t event, int priority,
 	/* Fall through... */
     case CS_EVENT_RESET_PHYSICAL:
 	if (link->state & DEV_CONFIG)
-	    CardServices(ReleaseConfiguration, link->handle);
+	    pcmcia_release_configuration(link->handle);
 	break;
     case CS_EVENT_PM_RESUME:
 	link->state &= ~DEV_SUSPEND;
 	/* Fall through... */
     case CS_EVENT_CARD_RESET:
 	if (link->state & DEV_CONFIG)
-	    CardServices(RequestConfiguration, link->handle, &link->conf);
+	    pcmcia_request_configuration(link->handle, &link->conf);
 	break;
     }
     return 0;

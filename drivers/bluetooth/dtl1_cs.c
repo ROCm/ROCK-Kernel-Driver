@@ -603,7 +603,7 @@ dev_link_t *dtl1_attach(void)
 	client_reg.Version = 0x0210;
 	client_reg.event_callback_args.client_data = link;
 
-	ret = CardServices(RegisterClient, &link->handle, &client_reg);
+	ret = pcmcia_register_client(&link->handle, &client_reg);
 	if (ret != CS_SUCCESS) {
 		cs_error(link->handle, RegisterClient, ret);
 		dtl1_detach(link);
@@ -632,7 +632,7 @@ void dtl1_detach(dev_link_t *link)
 		dtl1_release(link);
 
 	if (link->handle) {
-		ret = CardServices(DeregisterClient, link->handle);
+		ret = pcmcia_deregister_client(link->handle);
 		if (ret != CS_SUCCESS)
 			cs_error(link->handle, DeregisterClient, ret);
 	}
@@ -643,25 +643,30 @@ void dtl1_detach(dev_link_t *link)
 	kfree(info);
 }
 
-
-static int get_tuple(int fn, client_handle_t handle, tuple_t *tuple, cisparse_t *parse)
+static int get_tuple(client_handle_t handle, tuple_t *tuple, cisparse_t *parse)
 {
 	int i;
 
-	i = CardServices(fn, handle, tuple);
-	if (i != CS_SUCCESS)
-		return CS_NO_MORE_ITEMS;
-
-	i = CardServices(GetTupleData, handle, tuple);
+	i = pcmcia_get_tuple_data(handle, tuple);
 	if (i != CS_SUCCESS)
 		return i;
 
-	return CardServices(ParseTuple, handle, tuple, parse);
+	return pcmcia_parse_tuple(handle, tuple, parse);
 }
 
+static int first_tuple(client_handle_t handle, tuple_t *tuple, cisparse_t *parse)
+{
+	if (pcmcia_get_first_tuple(handle, tuple) != CS_SUCCESS)
+		return CS_NO_MORE_ITEMS;
+	return get_tuple(handle, tuple, parse);
+}
 
-#define first_tuple(a, b, c) get_tuple(GetFirstTuple, a, b, c)
-#define next_tuple(a, b, c) get_tuple(GetNextTuple, a, b, c)
+static int next_tuple(client_handle_t handle, tuple_t *tuple, cisparse_t *parse)
+{
+	if (pcmcia_get_next_tuple(handle, tuple) != CS_SUCCESS)
+		return CS_NO_MORE_ITEMS;
+	return get_tuple(handle, tuple, parse);
+}
 
 void dtl1_config(dev_link_t *link)
 {
@@ -691,7 +696,7 @@ void dtl1_config(dev_link_t *link)
 
 	/* Configure card */
 	link->state |= DEV_CONFIG;
-	i = CardServices(GetConfigurationInfo, handle, &config);
+	i = pcmcia_get_configuration_info(handle, &config);
 	link->conf.Vcc = config.Vcc;
 
 	tuple.TupleData = (cisdata_t *)buf;
@@ -709,7 +714,7 @@ void dtl1_config(dev_link_t *link)
 			link->io.BasePort1 = cf->io.win[0].base;
 			link->io.NumPorts1 = cf->io.win[0].len;	/*yo */
 			link->io.IOAddrLines = cf->io.flags & CISTPL_IO_LINES_MASK;
-			i = CardServices(RequestIO, link->handle, &link->io);
+			i = pcmcia_request_io(link->handle, &link->io);
 			if (i == CS_SUCCESS)
 				break;
 		}
@@ -721,13 +726,13 @@ void dtl1_config(dev_link_t *link)
 		goto failed;
 	}
 
-	i = CardServices(RequestIRQ, link->handle, &link->irq);
+	i = pcmcia_request_irq(link->handle, &link->irq);
 	if (i != CS_SUCCESS) {
 		cs_error(link->handle, RequestIRQ, i);
 		link->irq.AssignedIRQ = 0;
 	}
 
-	i = CardServices(RequestConfiguration, link->handle, &link->conf);
+	i = pcmcia_request_configuration(link->handle, &link->conf);
 	if (i != CS_SUCCESS) {
 		cs_error(link->handle, RequestConfiguration, i);
 		goto failed;
@@ -759,9 +764,9 @@ void dtl1_release(dev_link_t *link)
 
 	link->dev = NULL;
 
-	CardServices(ReleaseConfiguration, link->handle);
-	CardServices(ReleaseIO, link->handle, &link->io);
-	CardServices(ReleaseIRQ, link->handle, &link->irq);
+	pcmcia_release_configuration(link->handle);
+	pcmcia_release_io(link->handle, &link->io);
+	pcmcia_release_irq(link->handle, &link->irq);
 
 	link->state &= ~DEV_CONFIG;
 }
@@ -789,14 +794,14 @@ int dtl1_event(event_t event, int priority, event_callback_args_t *args)
 		/* Fall through... */
 	case CS_EVENT_RESET_PHYSICAL:
 		if (link->state & DEV_CONFIG)
-			CardServices(ReleaseConfiguration, link->handle);
+			pcmcia_release_configuration(link->handle);
 		break;
 	case CS_EVENT_PM_RESUME:
 		link->state &= ~DEV_SUSPEND;
 		/* Fall through... */
 	case CS_EVENT_CARD_RESET:
 		if (DEV_OK(link))
-			CardServices(RequestConfiguration, link->handle, &link->conf);
+			pcmcia_request_configuration(link->handle, &link->conf);
 		break;
 	}
 
