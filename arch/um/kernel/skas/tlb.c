@@ -18,6 +18,7 @@ static void fix_range(struct mm_struct *mm, unsigned long start_addr,
 		      unsigned long end_addr, int force)
 {
 	pgd_t *npgd;
+	pmd_t *npud;
 	pmd_t *npmd;
 	pte_t *npte;
 	unsigned long addr;
@@ -27,7 +28,8 @@ static void fix_range(struct mm_struct *mm, unsigned long start_addr,
 	fd = mm->context.skas.mm_fd;
 	for(addr = start_addr; addr < end_addr;){
 		npgd = pgd_offset(mm, addr);
-		npmd = pmd_offset(npgd, addr);
+		npud = pud_offset(npgd, addr);
+		npmd = pmd_offset(npud, addr);
 		if(pmd_present(*npmd)){
 			npte = pte_offset_kernel(npmd, addr);
 			r = pte_read(*npte);
@@ -79,7 +81,8 @@ void flush_tlb_kernel_range_skas(unsigned long start, unsigned long end)
 	mm = &init_mm;
 	for(addr = start; addr < end;){
 		pgd = pgd_offset(mm, addr);
-		pmd = pmd_offset(pgd, addr);
+		pud = pud_offset(pgd, addr);
+		pmd = pmd_offset(pud, addr);
 		if(pmd_present(*pmd)){
 			pte = pte_offset_kernel(pmd, addr);
 			if(!pte_present(*pte) || pte_newpage(*pte)){

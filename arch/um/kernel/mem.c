@@ -135,7 +135,8 @@ pte_t *kmap_pte;
 pgprot_t kmap_prot;
 
 #define kmap_get_fixmap_pte(vaddr)					\
-	pte_offset(pmd_offset(pgd_offset_k(vaddr), (vaddr)), (vaddr))
+	pte_offset_kernel(pmd_offset(pud_offset(pgd_offset_k(vaddr), (vaddr)),\
+ 			  (vaddr)), (vaddr))
 
 void __init kmap_init(void)
 {

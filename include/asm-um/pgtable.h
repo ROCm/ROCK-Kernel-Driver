@@ -7,8 +7,6 @@
 #ifndef __UM_PGTABLE_H
 #define __UM_PGTABLE_H
 
-#include <asm-generic/4level-fixup.h>
-
 #include "linux/sched.h"
 #include "asm/processor.h"
 #include "asm/page.h"
@@ -23,7 +21,6 @@ extern unsigned long *empty_zero_page;
 #define pgtable_cache_init() do ; while (0)
 
 /* PMD_SHIFT determines the size of the area a second-level page table can map */
-#define PMD_SHIFT	22
 #define PMD_SIZE	(1UL << PMD_SHIFT)
 #define PMD_MASK	(~(PMD_SIZE-1))
 
@@ -39,7 +36,6 @@ extern unsigned long *empty_zero_page;
 #define PTRS_PER_PTE	1024
 #define PTRS_PER_PMD	1
 #define PTRS_PER_PGD	1024
-#define USER_PTRS_PER_PGD	(TASK_SIZE/PGDIR_SIZE)
 #define FIRST_USER_PGD_NR       0
 
 #define pte_ERROR(e) \
@@ -175,6 +171,15 @@ extern pte_t * __bad_pagetable(void);
 
 #define pmd_newpage(x)  (pmd_val(x) & _PAGE_NEWPAGE)
 #define pmd_mkuptodate(x) (pmd_val(x) &= ~_PAGE_NEWPAGE)
+
+#define pud_newpage(x)  (pud_val(x) & _PAGE_NEWPAGE)
+#define pud_mkuptodate(x) (pud_val(x) &= ~_PAGE_NEWPAGE)
+
+static inline pud_t *__pud_alloc(struct mm_struct *mm, pgd_t *pgd,
+				 unsigned long addr)
+{
+	BUG();
+}
 
 /*
  * The "pgd_xxx()" functions here are trivial for a folded two-level
@@ -374,15 +379,15 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
  * this macro returns the index of the entry in the pgd page which would
  * control the given virtual address
  */
-#define pgd_index(address) ((address >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
+#define pgd_index(address) (((address) >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
+
+#define pgd_index_k(addr) pgd_index(addr)
 
 /*
  * pgd_offset() returns a (pgd_t *)
  * pgd_index() is used get the offset into the pgd page's array of pgd_t's;
  */
-#define pgd_offset(mm, address) \
-((mm)->pgd + ((address) >> PGDIR_SHIFT))
-
+#define pgd_offset(mm, address) ((mm)->pgd+pgd_index(address))
 
 /*
  * a shortcut which implies the use of the kernel's pgd, instead
@@ -390,14 +395,14 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
  */
 #define pgd_offset_k(address) pgd_offset(&init_mm, address)
 
+/*
+ * the pmd page can be thought of an array like this: pmd_t[PTRS_PER_PMD]
+ *
+ * this macro returns the index of the entry in the pmd page which would
+ * control the given virtual address
+ */
 #define pmd_index(address) \
 		(((address) >> PMD_SHIFT) & (PTRS_PER_PMD-1))
-
-/* Find an entry in the second-level page table.. */
-static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
-{
-	return (pmd_t *) dir;
-}
 
 /*
  * the pte page can be thought of an array like this: pte_t[PTRS_PER_PTE]
@@ -429,6 +434,8 @@ static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
 #define kern_addr_valid(addr) (1)
 
 #include <asm-generic/pgtable.h>
+
+#include <asm-um/pgtable-nopud.h>
 
 #endif
 

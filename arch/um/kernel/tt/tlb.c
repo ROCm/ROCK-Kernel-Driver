@@ -19,6 +19,7 @@ static void fix_range(struct mm_struct *mm, unsigned long start_addr,
 		      unsigned long end_addr, int force)
 {
 	pgd_t *npgd;
+	pud_t *npud;
 	pmd_t *npmd;
 	pte_t *npte;
 	unsigned long addr;
@@ -42,7 +43,8 @@ static void fix_range(struct mm_struct *mm, unsigned long start_addr,
 			continue;
 		}
 		npgd = pgd_offset(mm, addr);
-		npmd = pmd_offset(npgd, addr);
+		npud = pud_offset(npgd, addr);
+		npmd = pmd_offset(npud, addr);
 		if(pmd_present(*npmd)){
 			npte = pte_offset_kernel(npmd, addr);
 			r = pte_read(*npte);
@@ -90,6 +92,7 @@ static void flush_kernel_vm_range(unsigned long start, unsigned long end,
 {
 	struct mm_struct *mm;
 	pgd_t *pgd;
+	pud_t *pmd;
 	pmd_t *pmd;
 	pte_t *pte;
 	unsigned long addr;
@@ -98,7 +101,8 @@ static void flush_kernel_vm_range(unsigned long start, unsigned long end,
 	mm = &init_mm;
 	for(addr = start; addr < end;){
 		pgd = pgd_offset(mm, addr);
-		pmd = pmd_offset(pgd, addr);
+		pud = pud_offset(pgd, addr);
+		pmd = pmd_offset(pud, addr);
 		if(pmd_present(*pmd)){
 			pte = pte_offset_kernel(pmd, addr);
 			if(!pte_present(*pte) || pte_newpage(*pte)){
@@ -155,6 +159,7 @@ void mprotect_kernel_vm(int w)
 {
 	struct mm_struct *mm;
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
 	unsigned long addr;
@@ -162,7 +167,8 @@ void mprotect_kernel_vm(int w)
 	mm = &init_mm;
 	for(addr = start_vm; addr < end_vm;){
 		pgd = pgd_offset(mm, addr);
-		pmd = pmd_offset(pgd, addr);
+		pud = pud_offset(pgd, addr);
+		pmd = pmd_offset(pud, addr);
 		if(pmd_present(*pmd)){
 			pte = pte_offset_kernel(pmd, addr);
 			if(pte_present(*pte)) protect_vm_page(addr, w, 0);

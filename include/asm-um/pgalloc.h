@@ -13,12 +13,14 @@
 #define pmd_populate_kernel(mm, pmd, pte) \
 		set_pmd(pmd, __pmd(_PAGE_TABLE + (unsigned long) __pa(pte)))
 
-static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd, 
-				struct page *pte)
-{
-	set_pmd(pmd, __pmd(_PAGE_TABLE + page_to_phys(pte)));
-}
+#define pmd_populate(mm, pmd, pte) 				\
+	set_pmd(pmd, __pmd(_PAGE_TABLE +			\
+		((unsigned long long)page_to_pfn(pte) <<	\
+			(unsigned long long) PAGE_SHIFT)))
 
+/*
+ * Allocate and free page tables.
+ */
 extern pgd_t *pgd_alloc(struct mm_struct *);
 extern void pgd_free(pgd_t *pgd);
 
@@ -45,7 +47,7 @@ static inline void pte_free(struct page *pte)
 #define pmd_alloc_one(mm, addr)		({ BUG(); ((pmd_t *)2); })
 #define pmd_free(x)			do { } while (0)
 #define __pmd_free_tlb(tlb,x)		do { } while (0)
-#define pgd_populate(mm, pmd, pte)	BUG()
+#define pud_populate(mm, pmd, pte)	BUG()
 
 #define check_pgt_cache()	do { } while (0)
 
