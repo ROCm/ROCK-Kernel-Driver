@@ -13,7 +13,6 @@
 /* RED-PEN: this is accessed without any locking */
 extern unsigned int *usage_table;
 
-static int mtrr_seq_show(struct seq_file *seq, void *offset);
 
 #define FILE_FCOUNT(f) (((struct seq_file *)((f)->private_data))->private)
 
@@ -32,6 +31,8 @@ char *mtrr_attrib_to_str(int x)
 {
 	return (x <= 6) ? mtrr_strings[x] : "?";
 }
+
+#ifdef CONFIG_PROC_FS
 
 static int
 mtrr_file_add(unsigned long base, unsigned long size,
@@ -291,6 +292,8 @@ mtrr_close(struct inode *ino, struct file *file)
 	return single_release(ino, file);
 }
 
+static int mtrr_seq_show(struct seq_file *seq, void *offset);
+
 static int mtrr_open(struct inode *inode, struct file *file)
 {
 	if (!mtrr_if) 
@@ -310,11 +313,9 @@ static struct file_operations mtrr_fops = {
 	.release = mtrr_close,
 };
 
-#  ifdef CONFIG_PROC_FS
 
 static struct proc_dir_entry *proc_root_mtrr;
 
-#  endif			/*  CONFIG_PROC_FS  */
 
 static int mtrr_seq_show(struct seq_file *seq, void *offset)
 {
@@ -351,15 +352,14 @@ static int mtrr_seq_show(struct seq_file *seq, void *offset)
 
 static int __init mtrr_if_init(void)
 {
-#ifdef CONFIG_PROC_FS
 	proc_root_mtrr =
 	    create_proc_entry("mtrr", S_IWUSR | S_IRUGO, &proc_root);
 	if (proc_root_mtrr) {
 		proc_root_mtrr->owner = THIS_MODULE;
 		proc_root_mtrr->proc_fops = &mtrr_fops;
 	}
-#endif
 	return 0;
 }
 
 arch_initcall(mtrr_if_init);
+#endif			/*  CONFIG_PROC_FS  */
