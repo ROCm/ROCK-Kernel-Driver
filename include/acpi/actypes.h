@@ -798,11 +798,11 @@ struct acpi_system_info
  */
 
 typedef u32
-(ACPI_SYSTEM_XFACE *OSD_HANDLER) (
+(ACPI_SYSTEM_XFACE *acpi_osd_handler) (
 	void                            *context);
 
 typedef void
-(ACPI_SYSTEM_XFACE *OSD_EXECUTION_CALLBACK) (
+(ACPI_SYSTEM_XFACE *acpi_osd_exec_callback) (
 	void                            *context);
 
 /*

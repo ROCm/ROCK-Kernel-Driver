@@ -292,13 +292,13 @@ acpi_enter_sleep_state (
 	 * 1) Disable/Clear all GPEs
 	 * 2) Enable all wakeup GPEs
 	 */
-	status = acpi_hw_disable_all_gpes ();
+	status = acpi_hw_disable_all_gpes (ACPI_ISR);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
 	acpi_gbl_system_awake_and_running = FALSE;
 
-	status = acpi_hw_enable_all_wakeup_gpes ();
+	status = acpi_hw_enable_all_wakeup_gpes (ACPI_ISR);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -431,13 +431,13 @@ acpi_enter_sleep_state_s4bios (
 	 * 1) Disable/Clear all GPEs
 	 * 2) Enable all wakeup GPEs
 	 */
-	status = acpi_hw_disable_all_gpes ();
+	status = acpi_hw_disable_all_gpes (ACPI_ISR);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
 	acpi_gbl_system_awake_and_running = FALSE;
 
-	status = acpi_hw_enable_all_wakeup_gpes ();
+	status = acpi_hw_enable_all_wakeup_gpes (ACPI_ISR);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -467,6 +467,7 @@ acpi_enter_sleep_state_s4bios (
  * RETURN:      Status
  *
  * DESCRIPTION: Perform OS-independent ACPI cleanup after a sleep
+ *              Called with interrupts ENABLED.
  *
  ******************************************************************************/
 
@@ -557,13 +558,13 @@ acpi_leave_sleep_state (
 	 * 1) Disable/Clear all GPEs
 	 * 2) Enable all runtime GPEs
 	 */
-	status = acpi_hw_disable_all_gpes ();
+	status = acpi_hw_disable_all_gpes (ACPI_NOT_ISR);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
 	acpi_gbl_system_awake_and_running = TRUE;
 
-	status = acpi_hw_enable_all_runtime_gpes ();
+	status = acpi_hw_enable_all_runtime_gpes (ACPI_NOT_ISR);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}

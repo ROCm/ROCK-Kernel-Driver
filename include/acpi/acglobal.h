@@ -90,11 +90,11 @@ extern      u32                                 acpi_gbl_nesting_level;
  ****************************************************************************/
 
 /*
- * Create the predefined _OSI method in the namespace? Default is TRUE
- * because ACPI CA is fully compatible with other ACPI implementations.
- * Changing this will revert ACPI CA (and machine ASL) to pre-OSI behavior.
+ * Enable "slack" in the AML interpreter?  Default is FALSE, and the
+ * interpreter strictly follows the ACPI specification.  Setting to TRUE
+ * allows the interpreter to forgive certain bad AML constructs.
  */
-ACPI_EXTERN u8       ACPI_INIT_GLOBAL (acpi_gbl_create_osi_method, TRUE);
+ACPI_EXTERN u8       ACPI_INIT_GLOBAL (acpi_gbl_enable_interpeter_slack, FALSE);
 
 /*
  * Automatically serialize ALL control methods? Default is FALSE, meaning
@@ -103,6 +103,13 @@ ACPI_EXTERN u8       ACPI_INIT_GLOBAL (acpi_gbl_create_osi_method, TRUE);
  * reentrancy even though methods are marked "not_serialized".
  */
 ACPI_EXTERN u8       ACPI_INIT_GLOBAL (acpi_gbl_all_methods_serialized, FALSE);
+
+/*
+ * Create the predefined _OSI method in the namespace? Default is TRUE
+ * because ACPI CA is fully compatible with other ACPI implementations.
+ * Changing this will revert ACPI CA (and machine ASL) to pre-OSI behavior.
+ */
+ACPI_EXTERN u8       ACPI_INIT_GLOBAL (acpi_gbl_create_osi_method, TRUE);
 
 /*
  * Disable wakeup GPEs during runtime? Default is TRUE because WAKE and

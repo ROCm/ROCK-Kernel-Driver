@@ -105,17 +105,18 @@ acpi_ev_valid_gpe_event (
  * FUNCTION:    acpi_ev_walk_gpe_list
  *
  * PARAMETERS:  gpe_walk_callback   - Routine called for each GPE block
+ *              Flags               - ACPI_NOT_ISR or ACPI_ISR
  *
  * RETURN:      Status
  *
  * DESCRIPTION: Walk the GPE lists.
- *              FUNCTION MUST BE CALLED WITH INTERRUPTS DISABLED
  *
  ******************************************************************************/
 
 acpi_status
 acpi_ev_walk_gpe_list (
-	ACPI_GPE_CALLBACK       gpe_walk_callback)
+	ACPI_GPE_CALLBACK       gpe_walk_callback,
+	u32                             flags)
 {
 	struct acpi_gpe_block_info      *gpe_block;
 	struct acpi_gpe_xrupt_info      *gpe_xrupt_info;
@@ -125,7 +126,7 @@ acpi_ev_walk_gpe_list (
 	ACPI_FUNCTION_TRACE ("ev_walk_gpe_list");
 
 
-	acpi_os_acquire_lock (acpi_gbl_gpe_lock, ACPI_ISR);
+	acpi_os_acquire_lock (acpi_gbl_gpe_lock, flags);
 
 	/* Walk the interrupt level descriptor list */
 
@@ -149,7 +150,7 @@ acpi_ev_walk_gpe_list (
 	}
 
 unlock_and_exit:
-	acpi_os_release_lock (acpi_gbl_gpe_lock, ACPI_ISR);
+	acpi_os_release_lock (acpi_gbl_gpe_lock, flags);
 	return_ACPI_STATUS (status);
 }
 

@@ -61,6 +61,7 @@
  * RETURN:      none
  *
  * DESCRIPTION: Clears all fixed and general purpose status bits
+ *              THIS FUNCTION MUST BE CALLED WITH INTERRUPTS DISABLED
  *
  ******************************************************************************/
 
@@ -103,7 +104,7 @@ acpi_hw_clear_acpi_status (
 
 	/* Clear the GPE Bits in all GPE registers in all GPE blocks */
 
-	status = acpi_ev_walk_gpe_list (acpi_hw_clear_gpe_block);
+	status = acpi_ev_walk_gpe_list (acpi_hw_clear_gpe_block, ACPI_ISR);
 
 unlock_and_exit:
 	if (flags & ACPI_MTX_LOCK) {
