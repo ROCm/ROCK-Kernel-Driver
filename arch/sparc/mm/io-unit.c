@@ -135,7 +135,8 @@ static void iounit_get_scsi_sgl(struct scatterlist *sg, int sz, struct sbus_bus 
 
 	/* FIXME: Cache some resolved pages - often several sg entries are to the same page */
 	spin_lock_irqsave(&iounit->lock, flags);
-	for (; sz >= 0; sz--) {
+	while (sz != 0) {
+		--sz;
 		sg[sz].dvma_address = iounit_get_area(iounit, (unsigned long)page_address(sg[sz].page) + sg[sz].offset, sg[sz].length);
 		sg[sz].dvma_length = sg[sz].length;
 	}
@@ -163,7 +164,8 @@ static void iounit_release_scsi_sgl(struct scatterlist *sg, int sz, struct sbus_
 	struct iounit_struct *iounit = (struct iounit_struct *)sbus->iommu;
 
 	spin_lock_irqsave(&iounit->lock, flags);
-	for (; sz >= 0; sz--) {
+	while (sz != 0) {
+		--sz;
 		len = ((sg[sz].dvma_address & ~PAGE_MASK) + sg[sz].length + (PAGE_SIZE-1)) >> PAGE_SHIFT;
 		vaddr = (sg[sz].dvma_address - IOUNIT_DMA_BASE) >> PAGE_SHIFT;
 		IOD(("iounit_release %08lx-%08lx\n", (long)vaddr, (long)len+vaddr));
