@@ -463,7 +463,7 @@ int journal_write_metadata_buffer(transaction_t *transaction,
 	 * Right, time to make up the new buffer_head.
 	 */
 	do {
-		new_bh = alloc_buffer_head(0);
+		new_bh = alloc_buffer_head();
 		if (!new_bh) {
 			printk (KERN_NOTICE "%s: ENOMEM at alloc_buffer_head, "
 				"trying again.\n", __FUNCTION__);

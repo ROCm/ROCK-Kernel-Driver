@@ -152,14 +152,16 @@ __set_page_buffers(struct page *page, struct buffer_head *head)
 {
 	if (page_has_buffers(page))
 		buffer_error();
-	set_page_buffers(page, head);
 	page_cache_get(page);
+	SetPagePrivate(page);
+	page->private = (unsigned long)head;
 }
 
 static inline void
 __clear_page_buffers(struct page *page)
 {
-	clear_page_buffers(page);
+	ClearPagePrivate(page);
+	page->private = 0;
 	page_cache_release(page);
 }
 
@@ -376,7 +378,7 @@ out:
 }
 
 /*
- * Various filesystems appear to want __get_hash_table to be non-blocking.
+ * Various filesystems appear to want __find_get_block to be non-blocking.
  * But it's the page lock which protects the buffers.  To get around this,
  * we get exclusion from try_to_free_buffers with the blockdev mapping's
  * private_lock.
@@ -387,7 +389,7 @@ out:
  * private_lock is contended then so is mapping->page_lock).
  */
 struct buffer_head *
-__get_hash_table(struct block_device *bdev, sector_t block, int unused)
+__find_get_block(struct block_device *bdev, sector_t block, int unused)
 {
 	struct inode *bd_inode = bdev->bd_inode;
 	struct address_space *bd_mapping = bd_inode->i_mapping;
@@ -492,7 +494,7 @@ static void free_more_memory(void)
 }
 
 /*
- * I/O completion handler for block_read_full_page() and brw_page() - pages
+ * I/O completion handler for block_read_full_page() - pages
  * which come unlocked at the end of I/O.
  */
 static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
@@ -542,14 +544,6 @@ static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
 	 */
 	if (page_uptodate && !PageError(page))
 		SetPageUptodate(page);
-
-	/*
-	 * swap page handling is a bit hacky.  A standalone completion handler
-	 * for swapout pages would fix that up.  swapin can use this function.
-	 */
-	if (PageSwapCache(page) && PageWriteback(page))
-		end_page_writeback(page);
-
 	unlock_page(page);
 	return;
 
@@ -856,8 +850,9 @@ void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode)
 		if (mapping->assoc_mapping != buffer_mapping)
 			BUG();
 	}
-	buffer_insert_list(&buffer_mapping->private_lock,
-			bh, &mapping->private_list);
+	if (list_empty(&bh->b_assoc_buffers))
+		buffer_insert_list(&buffer_mapping->private_lock,
+				bh, &mapping->private_list);
 }
 EXPORT_SYMBOL(mark_buffer_dirty_inode);
 
@@ -952,12 +947,12 @@ void invalidate_inode_buffers(struct inode *inode)
  * the size of each buffer.. Use the bh->b_this_page linked list to
  * follow the buffers created.  Return NULL if unable to create more
  * buffers.
- * The async flag is used to differentiate async IO (paging, swapping)
- * from ordinary buffer allocations, and only async requests are allowed
- * to sleep waiting for buffer heads. 
+ *
+ * The retry flag is used to differentiate async IO (paging, swapping)
+ * which may not fail from ordinary buffer allocations.
  */
 static struct buffer_head *
-create_buffers(struct page * page, unsigned long size, int async)
+create_buffers(struct page * page, unsigned long size, int retry)
 {
 	struct buffer_head *bh, *head;
 	long offset;
@@ -966,7 +961,7 @@ try_again:
 	head = NULL;
 	offset = PAGE_SIZE;
 	while ((offset -= size) >= 0) {
-		bh = alloc_buffer_head(async);
+		bh = alloc_buffer_head();
 		if (!bh)
 			goto no_grow;
 
@@ -1003,7 +998,7 @@ no_grow:
 	 * become available.  But we don't want tasks sleeping with 
 	 * partially complete buffers, so all were released above.
 	 */
-	if (!async)
+	if (!retry)
 		return NULL;
 
 	/* We're _really_ low on memory. Now we just
@@ -1096,7 +1091,7 @@ grow_dev_page(struct block_device *bdev, unsigned long block,
 
 	/*
 	 * Link the page to the buffers and initialise them.  Take the
-	 * lock to be atomic wrt __get_hash_table(), which does not
+	 * lock to be atomic wrt __find_get_block(), which does not
 	 * run under the page lock.
 	 */
 	spin_lock(&inode->i_mapping->private_lock);
@@ -1169,7 +1164,7 @@ __getblk(struct block_device *bdev, sector_t block, int size)
 	for (;;) {
 		struct buffer_head * bh;
 
-		bh = __get_hash_table(bdev, block, size);
+		bh = __find_get_block(bdev, block, size);
 		if (bh) {
 			touch_buffer(bh);
 			return bh;
@@ -1218,7 +1213,7 @@ void mark_buffer_dirty(struct buffer_head *bh)
 {
 	if (!buffer_uptodate(bh))
 		buffer_error();
-	if (!test_set_buffer_dirty(bh))
+	if (!buffer_dirty(bh) && !test_set_buffer_dirty(bh))
 		__set_page_dirty_nobuffers(bh->b_page);
 }
 
@@ -1243,10 +1238,17 @@ void __brelse(struct buffer_head * buf)
  * bforget() is like brelse(), except it discards any
  * potentially dirty data.
  */
-void __bforget(struct buffer_head * buf)
+void __bforget(struct buffer_head *bh)
 {
-	clear_buffer_dirty(buf);
-	__brelse(buf);
+	clear_buffer_dirty(bh);
+	if (!list_empty(&bh->b_assoc_buffers)) {
+		struct address_space *buffer_mapping = bh->b_page->mapping;
+
+		spin_lock(&buffer_mapping->private_lock);
+		list_del_init(&bh->b_assoc_buffers);
+		spin_unlock(&buffer_mapping->private_lock);
+	}
+	__brelse(bh);
 }
 
 /**
@@ -1359,11 +1361,11 @@ int block_invalidatepage(struct page *page, unsigned long offset)
 {
 	struct buffer_head *head, *bh, *next;
 	unsigned int curr_off = 0;
+	int ret = 1;
 
-	if (!PageLocked(page))
-		BUG();
+	BUG_ON(!PageLocked(page));
 	if (!page_has_buffers(page))
-		return 1;
+		goto out;
 
 	head = page_buffers(page);
 	bh = head;
@@ -1385,12 +1387,10 @@ int block_invalidatepage(struct page *page, unsigned long offset)
 	 * The get_block cached value has been unconditionally invalidated,
 	 * so real IO is not possible anymore.
 	 */
-	if (offset == 0) {
-		if (!try_to_release_page(page, 0))
-			return 0;
-	}
-
-	return 1;
+	if (offset == 0)
+		ret = try_to_release_page(page, 0);
+out:
+	return ret;
 }
 EXPORT_SYMBOL(block_invalidatepage);
 
@@ -1449,7 +1449,7 @@ void unmap_underlying_metadata(struct block_device *bdev, sector_t block)
 {
 	struct buffer_head *old_bh;
 
-	old_bh = __get_hash_table(bdev, block, 0);
+	old_bh = __find_get_block(bdev, block, 0);
 	if (old_bh) {
 #if 0	/* This happens.  Later. */
 		if (buffer_dirty(old_bh))
@@ -2266,68 +2266,6 @@ int brw_kiovec(int rw, int nr, struct kiobuf *iovec[],
 }
 
 /*
- * Start I/O on a page.
- * This function expects the page to be locked and may return
- * before I/O is complete. You then have to check page->locked
- * and page->uptodate.
- *
- * FIXME: we need a swapper_inode->get_block function to remove
- *        some of the bmap kludges and interface ugliness here.
- *
- * NOTE: unlike file pages, swap pages are locked while under writeout.
- * This is to throttle processes which reuse their swapcache pages while
- * they are under writeout, and to ensure that there is no I/O going on
- * when the page has been successfully locked.  Functions such as
- * free_swap_and_cache() need to guarantee that there is no I/O in progress
- * because they will be freeing up swap blocks, which may then be reused.
- *
- * Swap pages are also marked PageWriteback when they are being written
- * so that memory allocators will throttle on them.
- */
-int brw_page(int rw, struct page *page,
-		struct block_device *bdev, sector_t b[], int size)
-{
-	struct buffer_head *head, *bh;
-
-	BUG_ON(!PageLocked(page));
-
-	if (!page_has_buffers(page))
-		create_empty_buffers(page, size, 0);
-	head = bh = page_buffers(page);
-
-	/* Stage 1: lock all the buffers */
-	do {
-		lock_buffer(bh);
-		bh->b_blocknr = *(b++);
-		bh->b_bdev = bdev;
-		set_buffer_mapped(bh);
-		if (rw == WRITE) {
-			set_buffer_uptodate(bh);
-			clear_buffer_dirty(bh);
-		}
-		/*
-		 * Swap pages are locked during writeout, so use
-		 * buffer_async_read in strange ways.
-		 */
-		mark_buffer_async_read(bh);
-		bh = bh->b_this_page;
-	} while (bh != head);
-
-	if (rw == WRITE) {
-		BUG_ON(PageWriteback(page));
-		SetPageWriteback(page);
-	}
-
-	/* Stage 2: start the IO */
-	do {
-		struct buffer_head *next = bh->b_this_page;
-		submit_bh(rw, bh);
-		bh = next;
-	} while (bh != head);
-	return 0;
-}
-
-/*
  * Sanity checks for try_to_free_buffers.
  */
 static void check_ttfb_buffer(struct page *page, struct buffer_head *bh)
@@ -2456,7 +2394,7 @@ asmlinkage long sys_bdflush(int func, long data)
 static kmem_cache_t *bh_cachep;
 static mempool_t *bh_mempool;
 
-struct buffer_head *alloc_buffer_head(int async)
+struct buffer_head *alloc_buffer_head(void)
 {
 	return mempool_alloc(bh_mempool, GFP_NOFS);
 }

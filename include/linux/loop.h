@@ -62,14 +62,6 @@ typedef	int (* transfer_proc_t)(struct loop_device *, int cmd,
 				char *raw_buf, char *loop_buf, int size,
 				int real_block);
 
-static inline int lo_do_transfer(struct loop_device *lo, int cmd, char *rbuf,
-				 char *lbuf, int size, int rblock)
-{
-	if (!lo->transfer)
-		return 0;
-
-	return lo->transfer(lo, cmd, rbuf, lbuf, size, rblock);
-}
 #endif /* __KERNEL__ */
 
 /*

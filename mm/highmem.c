@@ -17,6 +17,7 @@
  */
 
 #include <linux/mm.h>
+#include <linux/bio.h>
 #include <linux/pagemap.h>
 #include <linux/mempool.h>
 #include <linux/blkdev.h>
@@ -347,13 +348,15 @@ static void bounce_end_io_read_isa(struct bio *bio)
 	return __bounce_end_io_read(bio, isa_page_pool);
 }
 
-void create_bounce(unsigned long pfn, int gfp, struct bio **bio_orig)
+void blk_queue_bounce(request_queue_t *q, struct bio **bio_orig)
 {
 	struct page *page;
 	struct bio *bio = NULL;
 	int i, rw = bio_data_dir(*bio_orig), bio_gfp;
 	struct bio_vec *to, *from;
 	mempool_t *pool;
+	unsigned long pfn = q->bounce_pfn;
+	int gfp = q->bounce_gfp;
 
 	BUG_ON((*bio_orig)->bi_idx);
 

@@ -19,10 +19,14 @@
     Software Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 	(For earlier history, see arch/i386/kernel/mtrr.c)
-	September 2001	Dave Jones <davej@suse.de>
+	v2.00	September 2001	Dave Jones <davej@suse.de>
 		Initial rewrite for x86-64.
-
+	  Removal of non-Intel style MTRR code.
+	v2.01  June 2002  Dave Jones <davej@suse.de>
+	  Removal of redundant abstraction layer.
+	  64-bit fixes.
 */
+
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
@@ -60,35 +64,19 @@
 #include <asm/hardirq.h>
 #include <linux/irq.h>
 
-#define MTRR_VERSION            "2.00 (20020207)"
+#define MTRR_VERSION "2.01 (20020605)"
 
 #define TRUE  1
 #define FALSE 0
 
-#define MTRRcap_MSR     0x0fe
-#define MTRRdefType_MSR 0x2ff
-
-#define MTRRphysBase_MSR(reg) (0x200 + 2 * (reg))
-#define MTRRphysMask_MSR(reg) (0x200 + 2 * (reg) + 1)
+#define MSR_MTRRphysBase(reg) (0x200 + 2 * (reg))
+#define MSR_MTRRphysMask(reg) (0x200 + 2 * (reg) + 1)
 
 #define NUM_FIXED_RANGES 88
-#define MTRRfix64K_00000_MSR 0x250
-#define MTRRfix16K_80000_MSR 0x258
-#define MTRRfix16K_A0000_MSR 0x259
-#define MTRRfix4K_C0000_MSR 0x268
-#define MTRRfix4K_C8000_MSR 0x269
-#define MTRRfix4K_D0000_MSR 0x26a
-#define MTRRfix4K_D8000_MSR 0x26b
-#define MTRRfix4K_E0000_MSR 0x26c
-#define MTRRfix4K_E8000_MSR 0x26d
-#define MTRRfix4K_F0000_MSR 0x26e
-#define MTRRfix4K_F8000_MSR 0x26f
 
-#ifdef CONFIG_SMP
 #define MTRR_CHANGE_MASK_FIXED     0x01
 #define MTRR_CHANGE_MASK_VARIABLE  0x02
 #define MTRR_CHANGE_MASK_DEFTYPE   0x04
-#endif
 
 typedef u8 mtrr_type;
 
@@ -97,49 +85,43 @@ typedef u8 mtrr_type;
 #ifdef CONFIG_SMP
 #define set_mtrr(reg,base,size,type) set_mtrr_smp (reg, base, size, type)
 #else
-#define set_mtrr(reg,base,size,type) (*set_mtrr_up) (reg, base, size, type, \
-						       TRUE)
+#define set_mtrr(reg,base,size,type) set_mtrr_up (reg, base, size, type, TRUE)
 #endif
 
 #if defined(CONFIG_PROC_FS) || defined(CONFIG_DEVFS_FS)
 #define USERSPACE_INTERFACE
 #endif
 
-#ifndef USERSPACE_INTERFACE
-#define compute_ascii() while (0)
-#endif
-
 #ifdef USERSPACE_INTERFACE
 static char *ascii_buffer;
 static unsigned int ascii_buf_bytes;
-#endif
-static unsigned int *usage_table;
-static DECLARE_MUTEX (main_lock);
-
-/*  Private functions  */
-#ifdef USERSPACE_INTERFACE
 static void compute_ascii (void);
+#else
+#define compute_ascii() while (0)
 #endif
+
+static unsigned int *usage_table;
+static DECLARE_MUTEX (mtrr_lock);
 
 struct set_mtrr_context {
-    unsigned long flags;
-    unsigned long deftype_lo;
-    unsigned long deftype_hi;
-    unsigned long cr4val;
+	u32 deftype_lo;
+	u32 deftype_hi;
+	u64 flags;
+	u64 cr4val;
 };
 
 
 /*  Put the processor into a state where MTRRs can be safely set  */
 static void set_mtrr_prepare (struct set_mtrr_context *ctxt)
 {
-	unsigned long cr0;
+	u64 cr0;
 
 	/* Disable interrupts locally */
 	__save_flags(ctxt->flags);
 	__cli();
 
     /*  Save value of CR4 and clear Page Global Enable (bit 7)  */
-	if (cpu_has_ge) {
+	if (cpu_has_pge) { 
 	 ctxt->cr4val = read_cr4();
 		write_cr4(ctxt->cr4val & ~(1UL << 7));
     }
@@ -152,8 +134,8 @@ static void set_mtrr_prepare (struct set_mtrr_context *ctxt)
            wbinvd();
 
 	/*  Disable MTRRs, and set the default type to uncached  */
-	rdmsr(MTRRdefType_MSR, ctxt->deftype_lo, ctxt->deftype_hi);
-	wrmsr(MTRRdefType_MSR, ctxt->deftype_lo & 0xf300UL, ctxt->deftype_hi);
+	rdmsr(MSR_MTRRdefType, ctxt->deftype_lo, ctxt->deftype_hi);
+	wrmsr(MSR_MTRRdefType, ctxt->deftype_lo & 0xf300UL, ctxt->deftype_hi);
 }
 
 
@@ -164,7 +146,7 @@ static void set_mtrr_done (struct set_mtrr_context *ctxt)
     wbinvd();
 
     /*  Restore MTRRdefType  */
-	wrmsr(MTRRdefType_MSR, ctxt->deftype_lo, ctxt->deftype_hi);
+	wrmsr(MSR_MTRRdefType, ctxt->deftype_lo, ctxt->deftype_hi);
 
     /*  Enable caches  */
 	write_cr0(read_cr0() & 0xbfffffff);
@@ -181,9 +163,9 @@ static void set_mtrr_done (struct set_mtrr_context *ctxt)
 /*  This function returns the number of variable MTRRs  */
 static unsigned int get_num_var_ranges (void)
 {
-    unsigned long config, dummy;
+	u32 config, dummy;
 
-	rdmsr (MTRRcap_MSR, config, dummy);
+	rdmsr (MSR_MTRRcap, config, dummy);
 	return (config & 0xff);
 }
 
@@ -191,21 +173,21 @@ static unsigned int get_num_var_ranges (void)
 /*  Returns non-zero if we have the write-combining memory type  */
 static int have_wrcomb (void)
 {
-    unsigned long config, dummy;
+	u32 config, dummy;
 
-	rdmsr (MTRRcap_MSR, config, dummy);
+	rdmsr (MSR_MTRRcap, config, dummy);
 	return (config & (1 << 10));
 }
 
 
-static u32 size_or_mask, size_and_mask;
+static u64 size_or_mask, size_and_mask;
 
-static void get_mtrr (unsigned int reg, unsigned long *base,
-		unsigned long *size, mtrr_type * type)
+static void get_mtrr (unsigned int reg, u64 *base, u32 *size, mtrr_type * type)
 {
-    unsigned long mask_lo, mask_hi, base_lo, base_hi;
+	u32 mask_lo, mask_hi, base_lo, base_hi;
+	u64 newsize;
 
-	rdmsr (MTRRphysMask_MSR (reg), mask_lo, mask_hi);
+	rdmsr (MSR_MTRRphysMask(reg), mask_lo, mask_hi);
 	if ((mask_lo & 0x800) == 0) {
 	/*  Invalid (i.e. free) range  */
 	*base = 0;
@@ -214,32 +196,29 @@ static void get_mtrr (unsigned int reg, unsigned long *base,
 	return;
     }
 
-	rdmsr (MTRRphysBase_MSR (reg), base_lo, base_hi);
+	rdmsr (MSR_MTRRphysBase(reg), base_lo, base_hi);
 
     /* Work out the shifted address mask. */
-    mask_lo = size_or_mask | mask_hi << (32 - PAGE_SHIFT)
-		| mask_lo >> PAGE_SHIFT;
-
-    /* This works correctly if size is a power of two, i.e. a
-       contiguous range. */
-     *size = -mask_lo;
+	newsize = (u64) mask_hi << 32 | (mask_lo & ~0x800);
+	newsize = ~newsize+1;
+	*size = (u32) newsize >> PAGE_SHIFT;
      *base = base_hi << (32 - PAGE_SHIFT) | base_lo >> PAGE_SHIFT;
      *type = base_lo & 0xff;
 }
 
 
 
-static void set_mtrr_up (unsigned int reg, unsigned long base,
-			       unsigned long size, mtrr_type type, int do_safe)
-/*  [SUMMARY] Set variable MTRR register on the local CPU.
-    <reg> The register to set.
-    <base> The base address of the region.
-    <size> The size of the region. If this is 0 the region is disabled.
-    <type> The type of the region.
-    <do_safe> If TRUE, do the change safely. If FALSE, safety measures should
-    be done externally.
-    [RETURNS] Nothing.
-*/
+/*
+ * Set variable MTRR register on the local CPU.
+ *  <reg> The register to set.
+ *  <base> The base address of the region.
+ *  <size> The size of the region. If this is 0 the region is disabled.
+ *  <type> The type of the region.
+ *  <do_safe> If TRUE, do the change safely. If FALSE, safety measures should
+ *  be done externally.
+ */
+static void set_mtrr_up (unsigned int reg, u64 base,
+		   u32 size, mtrr_type type, int do_safe)
 {
     struct set_mtrr_context ctxt;
 
@@ -249,12 +228,12 @@ static void set_mtrr_up (unsigned int reg, unsigned long base,
 	if (size == 0) {
 	/* The invalid bit is kept in the mask, so we simply clear the
 	   relevant mask register to disable a range. */
-	wrmsr (MTRRphysMask_MSR (reg), 0, 0);
+		wrmsr (MSR_MTRRphysMask(reg), 0, 0);
 	} else {
-	wrmsr (MTRRphysBase_MSR (reg), base << PAGE_SHIFT | type,
+		wrmsr (MSR_MTRRphysBase(reg), base << PAGE_SHIFT | type,
 		(base & size_and_mask) >> (32 - PAGE_SHIFT));
-	wrmsr (MTRRphysMask_MSR (reg), -size << PAGE_SHIFT | 0x800,
-		(-size & size_and_mask) >> (32 - PAGE_SHIFT));
+		wrmsr (MSR_MTRRphysMask(reg), (-size-1) << PAGE_SHIFT | 0x800,
+		       ((-size-1) & size_and_mask) >> (32 - PAGE_SHIFT));
     }
 	if (do_safe)
 		set_mtrr_done (&ctxt);
@@ -264,41 +243,40 @@ static void set_mtrr_up (unsigned int reg, unsigned long base,
 #ifdef CONFIG_SMP
 
 struct mtrr_var_range {
-    unsigned long base_lo;
-    unsigned long base_hi;
-    unsigned long mask_lo;
-    unsigned long mask_hi;
+	u32 base_lo;
+	u32 base_hi;
+	u32 mask_lo;
+	u32 mask_hi;
 };
 
 /*  Get the MSR pair relating to a var range  */
 static void __init get_mtrr_var_range (unsigned int index,
 					   struct mtrr_var_range *vr)
 {
-    rdmsr (MTRRphysBase_MSR (index), vr->base_lo, vr->base_hi);
-    rdmsr (MTRRphysMask_MSR (index), vr->mask_lo, vr->mask_hi);
+	rdmsr (MSR_MTRRphysBase(index), vr->base_lo, vr->base_hi);
+	rdmsr (MSR_MTRRphysMask(index), vr->mask_lo, vr->mask_hi);
 }
 
 
 /*  Set the MSR pair relating to a var range. Returns TRUE if
     changes are made  */
-static int __init
-set_mtrr_var_range_testing (unsigned int index, struct mtrr_var_range *vr)
+static int __init set_mtrr_var_range_testing (unsigned int index,
+		struct mtrr_var_range *vr)
 {
-    unsigned int lo, hi;
+	u32 lo, hi;
     int changed = FALSE;
 
-	rdmsr (MTRRphysBase_MSR (index), lo, hi);
-	if ((vr->base_lo & 0xfffff0ffUL) != (lo & 0xfffff0ffUL)
-	    || (vr->base_hi & 0xfUL) != (hi & 0xfUL)) {
-		wrmsr (MTRRphysBase_MSR (index), vr->base_lo, vr->base_hi);
+	rdmsr (MSR_MTRRphysBase(index), lo, hi);
+	if ((vr->base_lo & 0xfffff0ff) != (lo & 0xfffff0ff)
+	    || (vr->base_hi & 0x000fffff) != (hi & 0x000fffff)) {
+		wrmsr (MSR_MTRRphysBase(index), vr->base_lo, vr->base_hi);
 	changed = TRUE;
     }
 
-	rdmsr (MTRRphysMask_MSR (index), lo, hi);
-
-	if ((vr->mask_lo & 0xfffff800UL) != (lo & 0xfffff800UL)
-	    || (vr->mask_hi & 0xfUL) != (hi & 0xfUL)) {
-		wrmsr (MTRRphysMask_MSR (index), vr->mask_lo, vr->mask_hi);
+	rdmsr (MSR_MTRRphysMask(index), lo, hi);
+	if ((vr->mask_lo & 0xfffff800) != (lo & 0xfffff800)
+	    || (vr->mask_hi & 0x000fffff) != (hi & 0x000fffff)) {
+		wrmsr (MSR_MTRRphysMask(index), vr->mask_lo, vr->mask_hi);
 	changed = TRUE;
     }
     return changed;
@@ -307,45 +285,50 @@ set_mtrr_var_range_testing (unsigned int index, struct mtrr_var_range *vr)
 
 static void __init get_fixed_ranges (mtrr_type * frs)
 {
-	unsigned long *p = (unsigned long *) frs;
+	u32 *p = (u32 *) frs;
     int i;
 
-	rdmsr (MTRRfix64K_00000_MSR, p[0], p[1]);
+	rdmsr (MSR_MTRRfix64K_00000, p[0], p[1]);
 
     for (i = 0; i < 2; i++)
-		rdmsr (MTRRfix16K_80000_MSR + i, p[2 + i * 2], p[3 + i * 2]);
+		rdmsr (MSR_MTRRfix16K_80000 + i, p[2 + i * 2], p[3 + i * 2]);
     for (i = 0; i < 8; i++)
-		rdmsr (MTRRfix4K_C0000_MSR + i, p[6 + i * 2], p[7 + i * 2]);
+		rdmsr (MSR_MTRRfix4K_C0000 + i, p[6 + i * 2], p[7 + i * 2]);
 }
 
 
 static int __init set_fixed_ranges_testing (mtrr_type * frs)
 {
-	unsigned long *p = (unsigned long *) frs;
+	u32 *p = (u32 *) frs;
     int changed = FALSE;
     int i;
-    unsigned long lo, hi;
+	u32 lo, hi;
 
-	rdmsr (MTRRfix64K_00000_MSR, lo, hi);
+	printk (KERN_INFO "mtrr: rdmsr 64K_00000\n");
+	rdmsr (MSR_MTRRfix64K_00000, lo, hi);
 	if (p[0] != lo || p[1] != hi) {
-	wrmsr (MTRRfix64K_00000_MSR, p[0], p[1]);
+		printk (KERN_INFO "mtrr: Writing %x:%x to 64K MSR. lohi were %x:%x\n", p[0], p[1], lo, hi);
+		wrmsr (MSR_MTRRfix64K_00000, p[0], p[1]);
 	changed = TRUE;
     }
 
+	printk (KERN_INFO "mtrr: rdmsr 16K_80000\n");
 	for (i = 0; i < 2; i++) {
-	rdmsr (MTRRfix16K_80000_MSR + i, lo, hi);
+		rdmsr (MSR_MTRRfix16K_80000 + i, lo, hi);
 		if (p[2 + i * 2] != lo || p[3 + i * 2] != hi) {
-			wrmsr (MTRRfix16K_80000_MSR + i, p[2 + i * 2],
-			       p[3 + i * 2]);
+			printk (KERN_INFO "mtrr: Writing %x:%x to 16K MSR%d. lohi were %x:%x\n", p[2 + i * 2], p[3 + i * 2], i, lo, hi );
+			wrmsr (MSR_MTRRfix16K_80000 + i, p[2 + i * 2], p[3 + i * 2]);
 	    changed = TRUE;
 	}
     }
 
+	printk (KERN_INFO "mtrr: rdmsr 4K_C0000\n");
 	for (i = 0; i < 8; i++) {
-	rdmsr (MTRRfix4K_C0000_MSR + i, lo, hi);
+		rdmsr (MSR_MTRRfix4K_C0000 + i, lo, hi);
+		printk (KERN_INFO "mtrr: MTRRfix4K_C0000+%d = %x:%x\n", i, lo, hi);
 		if (p[6 + i * 2] != lo || p[7 + i * 2] != hi) {
-			wrmsr (MTRRfix4K_C0000_MSR + i, p[6 + i * 2],
-			       p[7 + i * 2]);
+			printk (KERN_INFO "mtrr: Writing %x:%x to 4K MSR%d. lohi were %x:%x\n", p[6 + i * 2], p[7 + i * 2], i, lo, hi);
+			wrmsr (MSR_MTRRfix4K_C0000 + i, p[6 + i * 2], p[7 + i * 2]);
 	    changed = TRUE;
 	}
     }
@@ -357,8 +340,8 @@ struct mtrr_state {
     unsigned int num_var_ranges;
     struct mtrr_var_range *var_ranges;
     mtrr_type fixed_ranges[NUM_FIXED_RANGES];
-    unsigned char enabled;
     mtrr_type def_type;
+	unsigned char enabled;
 };
 
 
@@ -367,9 +350,9 @@ static void __init get_mtrr_state (struct mtrr_state *state)
 {
     unsigned int nvrs, i;
     struct mtrr_var_range *vrs;
-    unsigned long lo, dummy;
+	u32 lo, dummy;
 
-	nvrs = state->num_var_ranges = get_num_var_ranges ();
+	nvrs = state->num_var_ranges = get_num_var_ranges();
     vrs = state->var_ranges
               = kmalloc (nvrs * sizeof (struct mtrr_var_range), GFP_KERNEL);
     if (vrs == NULL)
@@ -379,7 +362,7 @@ static void __init get_mtrr_state (struct mtrr_state *state)
 	get_mtrr_var_range (i, &vrs[i]);
     get_fixed_ranges (state->fixed_ranges);
 
-    rdmsr (MTRRdefType_MSR, lo, dummy);
+	rdmsr (MSR_MTRRdefType, lo, dummy);
     state->def_type = (lo & 0xff);
     state->enabled = (lo & 0xc00) >> 10;
 }
@@ -393,17 +376,18 @@ static void __init finalize_mtrr_state (struct mtrr_state *state)
 }
 
 
-static unsigned long __init set_mtrr_state (struct mtrr_state *state,
+/*
+ * Set the MTRR state for this CPU.
+ *  <state> The MTRR state information to read.
+ *  <ctxt> Some relevant CPU context.
+ *  [NOTE] The CPU must already be in a safe state for MTRR changes.
+ *  [RETURNS] 0 if no changes made, else a mask indication what was changed.
+ */
+static u64 __init set_mtrr_state (struct mtrr_state *state,
 						struct set_mtrr_context *ctxt)
-/*  [SUMMARY] Set the MTRR state for this CPU.
-    <state> The MTRR state information to read.
-    <ctxt> Some relevant CPU context.
-    [NOTE] The CPU must already be in a safe state for MTRR changes.
-    [RETURNS] 0 if no changes made, else a mask indication what was changed.
-*/
 {
     unsigned int i;
-    unsigned long change_mask = 0;
+	u64 change_mask = 0;
 
     for (i = 0; i < state->num_var_ranges; i++)
 		if (set_mtrr_var_range_testing (i, &state->var_ranges[i]))
@@ -428,16 +412,16 @@ static volatile int wait_barrier_execute = FALSE;
 static volatile int wait_barrier_cache_enable = FALSE;
 
 struct set_mtrr_data {
-    unsigned long smp_base;
-    unsigned long smp_size;
+	u64 smp_base;
+	u32 smp_size;
     unsigned int smp_reg;
     mtrr_type smp_type;
 };
 
+/*
+ * Synchronisation handler. Executed by "other" CPUs.
+ */
 static void ipi_handler (void *info)
-/*  [SUMMARY] Synchronisation handler. Executed by "other" CPUs.
-    [RETURNS] Nothing.
-*/
 {
     struct set_mtrr_data *data = info;
     struct set_mtrr_context ctxt;
@@ -449,7 +433,7 @@ static void ipi_handler (void *info)
 		barrier ();
 
     /*  The master has cleared me to execute  */
-    (*set_mtrr_up) (data->smp_reg, data->smp_base, data->smp_size,
+	set_mtrr_up (data->smp_reg, data->smp_base, data->smp_size,
 		    data->smp_type, FALSE);
 
     /*  Notify master CPU that I've executed the function  */
@@ -462,8 +446,7 @@ static void ipi_handler (void *info)
 }
 
 
-static void set_mtrr_smp (unsigned int reg, unsigned long base,
-			  unsigned long size, mtrr_type type)
+static void set_mtrr_smp (unsigned int reg, u64 base, u32 size, mtrr_type type)
 {
     struct set_mtrr_data data;
     struct set_mtrr_context ctxt;
@@ -490,7 +473,7 @@ static void set_mtrr_smp (unsigned int reg, unsigned long base,
 	/* Set up for completion wait and then release other CPUs to change MTRRs */
     atomic_set (&undone_count, smp_num_cpus - 1);
     wait_barrier_execute = FALSE;
-    (*set_mtrr_up) (reg, base, size, type, FALSE);
+	set_mtrr_up (reg, base, size, type, FALSE);
 
     /*  Now wait for other CPUs to complete the function  */
 	while (atomic_read (&undone_count) > 0)
@@ -505,7 +488,7 @@ static void set_mtrr_smp (unsigned int reg, unsigned long base,
 
 
 /*  Some BIOS's are fucked and don't set all MTRRs the same!  */
-static void __init mtrr_state_warn (unsigned long mask)
+static void __init mtrr_state_warn (u32 mask)
 {
 	if (!mask)
 		return;
@@ -521,7 +504,7 @@ static void __init mtrr_state_warn (unsigned long mask)
 #endif  /*  CONFIG_SMP  */
 
 
-static char inline * attrib_to_str (int x)
+static inline char * attrib_to_str (int x)
 {
     return (x <= 6) ? mtrr_strings[x] : "?";
 }
@@ -551,21 +534,20 @@ static void __init init_table (void)
 }
 
 
-static int generic_get_free_region (unsigned long base,
-		unsigned long size)
-/*  [SUMMARY] Get a free MTRR.
-    <base> The starting (base) address of the region.
-    <size> The size (in bytes) of the region.
-    [RETURNS] The index of the region on success, else -1 on error.
+/*
+ * Get a free MTRR.
+ * returns the index of the region on success, else -1 on error.
 */
+static int get_free_region(void)
 {
     int i, max;
     mtrr_type ltype;
-    unsigned long lbase, lsize;
+	u64 lbase;
+	u32 lsize;
 
     max = get_num_var_ranges ();
 	for (i = 0; i < max; ++i) {
-	(*get_mtrr) (i, &lbase, &lsize, &ltype);
+		get_mtrr (i, &lbase, &lsize, &ltype);
 		if (lsize == 0)
 			return i;
     }
@@ -573,22 +555,19 @@ static int generic_get_free_region (unsigned long base,
 }
 
 
-static int (*get_free_region) (unsigned long base,
-			       unsigned long size) = generic_get_free_region;
-
 /**
  *	mtrr_add_page - Add a memory type region
  *	@base: Physical base address of region in pages (4 KB)
  *	@size: Physical size of region in pages (4 KB)
  *	@type: Type of MTRR desired
  *	@increment: If this is true do usage counting on the region
+ *	Returns The MTRR register on success, else a negative number
+ *	indicating the error code.
  *
- *	Memory type region registers control the caching on newer Intel and
- *	non Intel processors. This function allows drivers to request an
- *	MTRR is added. The details and hardware specifics of each processor's
- *	implementation are hidden from the caller, but nevertheless the 
- *	caller should expect to need to provide a power of two size on an
- *	equivalent power of two boundary.
+ *	Memory type region registers control the caching on newer
+ *	processors. This function allows drivers to request an MTRR is added.
+ *	The caller should expect to need to provide a power of two size on
+ *	an equivalent power of two boundary.
  *
  *	If the region cannot be added either because all regions are in use
  *	or the CPU cannot support it a negative value is returned. On success
@@ -596,42 +575,28 @@ static int (*get_free_region) (unsigned long base,
  *	as a cookie only.
  *
  *	On a multiprocessor machine the changes are made to all processors.
- *	This is required on x86 by the Intel processors.
  *
  *	The available types are
  *
  *	%MTRR_TYPE_UNCACHABLE	-	No caching
- *
  *	%MTRR_TYPE_WRBACK	-	Write data back in bursts whenever
- *
  *	%MTRR_TYPE_WRCOMB	-	Write data back soon but allow bursts
- *
  *	%MTRR_TYPE_WRTHROUGH	-	Cache reads but not writes
  *
  *	BUGS: Needs a quiet flag for the cases where drivers do not mind
  *	failures and do not wish system log messages to be sent.
  */
 
-int mtrr_add_page (unsigned long base, unsigned long size,
-		unsigned int type, char increment)
+int mtrr_add_page (u64 base, u32 size, unsigned int type, char increment)
 {
-/*  [SUMMARY] Add an MTRR entry.
-    <base> The starting (base, in pages) address of the region.
-    <size> The size of the region. (in pages)
-    <type> The type of the new region.
-    <increment> If true and the region already exists, the usage count will be
-    incremented.
-    [RETURNS] The MTRR register on success, else a negative number indicating
-    the error code.
-    [NOTE] This routine uses a spinlock.
-*/
     int i, max;
     mtrr_type ltype;
-    unsigned long lbase, lsize, last;
+	u64 lbase, last;
+	u32 lsize;
 
 	if (base + size < 0x100) {
 		printk (KERN_WARNING
-			"mtrr: cannot set region below 1 MiB (0x%lx000,0x%lx000)\n",
+			"mtrr: cannot set region below 1 MiB (0x%lx000,0x%x000)\n",
 		    base, size);
 	    return -EINVAL;
 	}
@@ -644,7 +609,7 @@ int mtrr_add_page (unsigned long base, unsigned long size,
 
 	if (lbase != last) {
 		printk (KERN_WARNING
-			"mtrr: base(0x%lx000) is not aligned on a size(0x%lx000) boundary\n",
+			"mtrr: base(0x%lx000) is not aligned on a size(0x%x000) boundary\n",
 			base, size);
 	return -EINVAL;
     }
@@ -655,7 +620,7 @@ int mtrr_add_page (unsigned long base, unsigned long size,
     }
 
     /*  If the type is WC, check that this processor supports it  */
-	if ((type == MTRR_TYPE_WRCOMB) && !have_wrcomb ()) {
+	if ((type == MTRR_TYPE_WRCOMB) && !have_wrcomb()) {
 		printk (KERN_WARNING
 			"mtrr: your processor doesn't support write-combining\n");
         return -ENOSYS;
@@ -669,9 +634,9 @@ int mtrr_add_page (unsigned long base, unsigned long size,
     increment = increment ? 1 : 0;
     max = get_num_var_ranges ();
     /*  Search for existing MTRR  */
-	down (&main_lock);
+	down (&mtrr_lock);
 	for (i = 0; i < max; ++i) {
-	(*get_mtrr) (i, &lbase, &lsize, &ltype);
+		get_mtrr (i, &lbase, &lsize, &ltype);
 		if (base >= lbase + lsize)
 			continue;
 		if ((base < lbase) && (base + size <= lbase))
@@ -679,41 +644,41 @@ int mtrr_add_page (unsigned long base, unsigned long size,
 
 	/*  At this point we know there is some kind of overlap/enclosure  */
 		if ((base < lbase) || (base + size > lbase + lsize)) {
-			up (&main_lock);
+			up (&mtrr_lock);
 			printk (KERN_WARNING
-				"mtrr: 0x%lx000,0x%lx000 overlaps existing"
-				" 0x%lx000,0x%lx000\n", base, size, lbase,
-				lsize);
+				"mtrr: 0x%lx000,0x%x000 overlaps existing"
+				" 0x%lx000,0x%x000\n", base, size, lbase, lsize);
 	    return -EINVAL;
 	}
 	/*  New region is enclosed by an existing region  */
 		if (ltype != type) {
 			if (type == MTRR_TYPE_UNCACHABLE)
 				continue;
-			up (&main_lock);
+			up (&mtrr_lock);
 			printk
-			    ("mtrr: type mismatch for %lx000,%lx000 old: %s new: %s\n",
-			     base, size, attrib_to_str (ltype),
+			    ("mtrr: type mismatch for %lx000,%x000 old: %s new: %s\n",
+			     base, size,
+				 attrib_to_str (ltype),
 			     attrib_to_str (type));
 	    return -EINVAL;
 	}
 		if (increment)
 			++usage_table[i];
 	compute_ascii ();
-		up (&main_lock);
+		up (&mtrr_lock);
 	return i;
     }
     /*  Search for an empty MTRR  */
-    i = (*get_free_region) (base, size);
+	i = get_free_region();
 	if (i < 0) {
-		up (&main_lock);
+		up (&mtrr_lock);
 	printk ("mtrr: no more MTRRs available\n");
 	return i;
     }
     set_mtrr (i, base, size, type);
     usage_table[i] = 1;
     compute_ascii ();
-	up (&main_lock);
+	up (&mtrr_lock);
     return i;
 }
 
@@ -724,13 +689,13 @@ int mtrr_add_page (unsigned long base, unsigned long size,
  *	@size: Physical size of region
  *	@type: Type of MTRR desired
  *	@increment: If this is true do usage counting on the region
+ *	Return the MTRR register on success, else a negative numbe
+ *	indicating the error code.
  *
- *	Memory type region registers control the caching on newer Intel and
- *	non Intel processors. This function allows drivers to request an
- *	MTRR is added. The details and hardware specifics of each processor's
- *	implementation are hidden from the caller, but nevertheless the 
- *	caller should expect to need to provide a power of two size on an
- *	equivalent power of two boundary.
+ *	Memory type region registers control the caching on newer processors.
+ *	This function allows drivers to request an MTRR is added.
+ *	The caller should expect to need to provide a power of two size on
+ *	an equivalent power of two boundary.
  *
  *	If the region cannot be added either because all regions are in use
  *	or the CPU cannot support it a negative value is returned. On success
@@ -743,33 +708,19 @@ int mtrr_add_page (unsigned long base, unsigned long size,
  *	The available types are
  *
  *	%MTRR_TYPE_UNCACHABLE	-	No caching
- *
  *	%MTRR_TYPE_WRBACK	-	Write data back in bursts whenever
- *
  *	%MTRR_TYPE_WRCOMB	-	Write data back soon but allow bursts
- *
  *	%MTRR_TYPE_WRTHROUGH	-	Cache reads but not writes
  *
  *	BUGS: Needs a quiet flag for the cases where drivers do not mind
  *	failures and do not wish system log messages to be sent.
  */
 
-int mtrr_add (unsigned long base, unsigned long size, unsigned int type,
-		char increment)
+int mtrr_add (u64 base, u32 size, unsigned int type, char increment)
 {
-/*  [SUMMARY] Add an MTRR entry.
-    <base> The starting (base) address of the region.
-    <size> The size (in bytes) of the region.
-    <type> The type of the new region.
-    <increment> If true and the region already exists, the usage count will be
-    incremented.
-    [RETURNS] The MTRR register on success, else a negative number indicating
-    the error code.
-*/
-
 	if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1))) {
 	printk ("mtrr: size and base must be multiples of 4 kiB\n");
-	printk ("mtrr: size: 0x%lx  base: 0x%lx\n", size, base);
+		printk ("mtrr: size: 0x%x  base: 0x%lx\n", size, base);
 	return -EINVAL;
     }
 	return mtrr_add_page (base >> PAGE_SHIFT, size >> PAGE_SHIFT, type,
@@ -792,55 +743,46 @@ int mtrr_add (unsigned long base, unsigned long size, unsigned int type,
  *	code.
  */
  
-int mtrr_del_page (int reg, unsigned long base, unsigned long size)
-/*  [SUMMARY] Delete MTRR/decrement usage count.
-    <reg> The register. If this is less than 0 then <<base>> and <<size>> must
-    be supplied.
-    <base> The base address of the region. This is ignored if <<reg>> is >= 0.
-    <size> The size of the region. This is ignored if <<reg>> is >= 0.
-    [RETURNS] The register on success, else a negative number indicating
-    the error code.
-    [NOTE] This routine uses a spinlock.
-*/
+int mtrr_del_page (int reg, u64 base, u32 size)
 {
     int i, max;
     mtrr_type ltype;
-    unsigned long lbase, lsize;
+	u64 lbase;
+	u32 lsize;
 
     max = get_num_var_ranges ();
-    down (&main_lock);
+	down (&mtrr_lock);
 	if (reg < 0) {
 	/*  Search for existing MTRR  */
 		for (i = 0; i < max; ++i) {
-	    (*get_mtrr) (i, &lbase, &lsize, &ltype);
+			get_mtrr (i, &lbase, &lsize, &ltype);
 			if (lbase == base && lsize == size) {
 		reg = i;
 		break;
 	    }
 	}
 		if (reg < 0) {
-			up (&main_lock);
-			printk ("mtrr: no MTRR for %lx000,%lx000 found\n", base,
-				size);
+			up (&mtrr_lock);
+			printk ("mtrr: no MTRR for %lx000,%x000 found\n", base, size);
 	    return -EINVAL;
 	}
     }
 
 	if (reg >= max) {
-	up (&main_lock);
+		up (&mtrr_lock);
 	printk ("mtrr: register: %d too big\n", reg);
 	return -EINVAL;
     }
-    (*get_mtrr) (reg, &lbase, &lsize, &ltype);
+	get_mtrr (reg, &lbase, &lsize, &ltype);
 
 	if (lsize < 1) {
-	up (&main_lock);
+		up (&mtrr_lock);
 	printk ("mtrr: MTRR %d not used\n", reg);
 	return -EINVAL;
     }
 
 	if (usage_table[reg] < 1) {
-	up (&main_lock);
+		up (&mtrr_lock);
 	printk ("mtrr: reg: %d has count=0\n", reg);
 	return -EINVAL;
     }
@@ -848,7 +790,7 @@ int mtrr_del_page (int reg, unsigned long base, unsigned long size)
 	if (--usage_table[reg] < 1)
 		set_mtrr (reg, 0, 0, 0);
     compute_ascii ();
-    up (&main_lock);
+	up (&mtrr_lock);
     return reg;
 }
 
@@ -868,19 +810,11 @@ int mtrr_del_page (int reg, unsigned long base, unsigned long size)
  *	code.
  */
  
-int mtrr_del (int reg, unsigned long base, unsigned long size)
-/*  [SUMMARY] Delete MTRR/decrement usage count.
-    <reg> The register. If this is less than 0 then <<base>> and <<size>> must
-    be supplied.
-    <base> The base address of the region. This is ignored if <<reg>> is >= 0.
-    <size> The size of the region. This is ignored if <<reg>> is >= 0.
-    [RETURNS] The register on success, else a negative number indicating
-    the error code.
-*/
+int mtrr_del (int reg, u64 base, u32 size)
 {
 	if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1))) {
 	printk ("mtrr: size and base must be multiples of 4 kiB\n");
-	printk ("mtrr: size: 0x%lx  base: 0x%lx\n", size, base);
+		printk ("mtrr: size: 0x%x  base: 0x%lx\n", size, base);
 	return -EINVAL;
     }
 	return mtrr_del_page (reg, base >> PAGE_SHIFT, size >> PAGE_SHIFT);
@@ -889,8 +823,8 @@ int mtrr_del (int reg, unsigned long base, unsigned long size)
 
 #ifdef USERSPACE_INTERFACE
 
-static int mtrr_file_add (unsigned long base, unsigned long size,
-			  unsigned int type, char increment, struct file *file, int page)
+static int mtrr_file_add (u64 base, u32 size, unsigned int type,
+		struct file *file, int page)
 {
     int reg, max;
     unsigned int *fcount = file->private_data;
@@ -910,7 +844,7 @@ static int mtrr_file_add (unsigned long base, unsigned long size,
 		if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1))) {
 			printk
 			    ("mtrr: size and base must be multiples of 4 kiB\n");
-	    printk ("mtrr: size: 0x%lx  base: 0x%lx\n", size, base);
+			printk ("mtrr: size: 0x%x  base: 0x%lx\n", size, base);
 	    return -EINVAL;
 	}
 	base >>= PAGE_SHIFT;
@@ -925,7 +859,7 @@ static int mtrr_file_add (unsigned long base, unsigned long size,
 }
 
 
-static int mtrr_file_del (unsigned long base, unsigned long size,
+static int mtrr_file_del (u64 base, u32 size,
 			  struct file *file, int page)
 {
     int reg;
@@ -935,7 +869,7 @@ static int mtrr_file_del (unsigned long base, unsigned long size,
 		if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1))) {
 			printk
 			    ("mtrr: size and base must be multiples of 4 kiB\n");
-	    printk ("mtrr: size: 0x%lx  base: 0x%lx\n", size, base);
+			printk ("mtrr: size: 0x%x  base: 0x%lx\n", size, base);
 	    return -EINVAL;
 	}
 	base >>= PAGE_SHIFT;
@@ -977,9 +911,9 @@ static ssize_t mtrr_write (struct file *file, const char *buf,
     "disable=%d"
 */
 {
-    int i, err;
-    unsigned long reg;
-    unsigned long long base, size;
+	int i, err, reg;
+	u64 base;
+	u32 size;
     char *ptr;
     char line[LINE_SIZE];
 
@@ -1027,7 +961,7 @@ static ssize_t mtrr_write (struct file *file, const char *buf,
 
 	if ((base & 0xfff) || (size & 0xfff)) {
 	printk ("mtrr: size and base must be multiples of 4 kiB\n");
-	printk ("mtrr: size: 0x%Lx  base: 0x%Lx\n", size, base);
+		printk ("mtrr: size: 0x%x  base: 0x%lx\n", size, base);
 	return -EINVAL;
     }
 
@@ -1046,9 +980,7 @@ static ssize_t mtrr_write (struct file *file, const char *buf,
 			continue;
 	base >>= PAGE_SHIFT;
 	size >>= PAGE_SHIFT;
-		err =
-		    mtrr_add_page ((unsigned long) base, (unsigned long) size,
-				   i, 1);
+		err = mtrr_add_page ((u64) base, size, i, 1);
 		if (err < 0)
 			return err;
 	return len;
@@ -1076,7 +1008,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 		if (copy_from_user (&sentry, (void *) arg, sizeof sentry))
 	    return -EFAULT;
 		err =
-		    mtrr_file_add (sentry.base, sentry.size, sentry.type, 1,
+		    mtrr_file_add (sentry.base, sentry.size, sentry.type,
 				   file, 0);
 		if (err < 0)
 			return err;
@@ -1117,7 +1049,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 	    return -EFAULT;
 		if (gentry.regnum >= get_num_var_ranges ())
 			return -EINVAL;
-	(*get_mtrr) (gentry.regnum, &gentry.base, &gentry.size, &type);
+		get_mtrr (gentry.regnum, &gentry.base, &gentry.size, &type);
 
 	/* Hide entries that go above 4GB */
 		if (gentry.base + gentry.size > 0x100000
@@ -1139,7 +1071,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 		if (copy_from_user (&sentry, (void *) arg, sizeof sentry))
 	    return -EFAULT;
 		err =
-		    mtrr_file_add (sentry.base, sentry.size, sentry.type, 1,
+		    mtrr_file_add (sentry.base, sentry.size, sentry.type,
 				   file, 1);
 		if (err < 0)
 			return err;
@@ -1180,7 +1112,7 @@ static int mtrr_ioctl (struct inode *inode, struct file *file,
 	    return -EFAULT;
 		if (gentry.regnum >= get_num_var_ranges ())
 			return -EINVAL;
-	(*get_mtrr) (gentry.regnum, &gentry.base, &gentry.size, &type);
+		get_mtrr (gentry.regnum, &gentry.base, &gentry.size, &type);
 	gentry.type = type;
 
 		if (copy_to_user ((void *) arg, &gentry, sizeof gentry))
@@ -1199,7 +1131,6 @@ static int mtrr_close (struct inode *ino, struct file *file)
 	if (fcount == NULL)
 		return 0;
 
-	lock_kernel ();
     max = get_num_var_ranges ();
 	for (i = 0; i < max; ++i) {
 		while (fcount[i] > 0) {
@@ -1208,7 +1139,6 @@ static int mtrr_close (struct inode *ino, struct file *file)
 	    --fcount[i];
 	}
     }
-	unlock_kernel ();
     kfree (fcount);
     file->private_data = NULL;
     return 0;
@@ -1234,12 +1164,13 @@ static void compute_ascii (void)
     char factor;
     int i, max;
     mtrr_type type;
-    unsigned long base, size;
+	u64 base;
+	u32 size;
 
     ascii_buf_bytes = 0;
     max = get_num_var_ranges ();
 	for (i = 0; i < max; i++) {
-	(*get_mtrr) (i, &base, &size, &type);
+		get_mtrr (i, &base, &size, &type);
 		if (size == 0)
 			usage_table[i] = 0;
 		else {
@@ -1253,11 +1184,10 @@ static void compute_ascii (void)
 	    }
 	    sprintf
 		(ascii_buffer + ascii_buf_bytes,
-		 "reg%02i: base=0x%05lx000 (%4liMB), size=%4li%cB: %s, count=%d\n",
+			     "reg%02i: base=0x%05lx000 (%4liMB), size=%4i%cB: %s, count=%d\n",
 		 i, base, base >> (20 - PAGE_SHIFT), size, factor,
 		 attrib_to_str (type), usage_table[i]);
-			ascii_buf_bytes +=
-			    strlen (ascii_buffer + ascii_buf_bytes);
+			ascii_buf_bytes += strlen (ascii_buffer + ascii_buf_bytes);
 	}
     }
     devfs_set_file_size (devfs_handle, ascii_buf_bytes);
@@ -1283,22 +1213,16 @@ static void __init mtrr_setup (void)
 		if ((cpuid_eax (0x80000000) >= 0x80000008)) {
 			u32	phys_addr;
 			phys_addr = cpuid_eax (0x80000008) & 0xff;
-			size_or_mask =
-			    ~((1 << (phys_addr - PAGE_SHIFT)) - 1);
-			size_and_mask = ~size_or_mask & 0xfff00000;
-		} else {
-			/* FIXME: This is to make it work on Athlon during debugging. */
-		size_or_mask  = 0xff000000; /* 36 bits */
-		size_and_mask = 0x00f00000;
+			size_or_mask = ~((1 << (phys_addr - PAGE_SHIFT)) - 1);
+			size_and_mask = ~size_or_mask & 0xfffffffffff00000;
 	}
-
 		printk ("mtrr: detected mtrr type: x86-64\n");
     }
 }
 
 #ifdef CONFIG_SMP
 
-static volatile unsigned long smp_changes_mask __initdata = 0;
+static volatile u32 smp_changes_mask __initdata = 0;
 static struct mtrr_state smp_mtrr_state __initdata = { 0, 0 };
 
 void __init mtrr_init_boot_cpu (void)
@@ -1310,7 +1234,8 @@ void __init mtrr_init_boot_cpu (void)
 
 void __init mtrr_init_secondary_cpu (void)
 {
-    unsigned long mask, count;
+	u64 mask;
+	int count;
     struct set_mtrr_context ctxt;
 
     /*  Note that this is not ideal, since the cache is only flushed/disabled
@@ -1357,4 +1282,3 @@ int __init mtrr_init (void)
     init_table ();
     return 0;
 }
-

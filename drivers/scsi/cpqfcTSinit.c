@@ -39,6 +39,7 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/timer.h>
+#include <linux/init.h>
 #include <linux/ioport.h>  // request_region() prototype
 #include <linux/vmalloc.h> // ioremap()
 //#if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,7)

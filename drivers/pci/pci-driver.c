@@ -210,3 +210,4 @@ EXPORT_SYMBOL(pci_match_device);
 EXPORT_SYMBOL(pci_register_driver);
 EXPORT_SYMBOL(pci_unregister_driver);
 EXPORT_SYMBOL(pci_dev_driver);
+EXPORT_SYMBOL(pci_bus_type);

@@ -169,7 +169,7 @@ asmlinkage long sys_msync(unsigned long start, size_t len, int flags)
 {
 	unsigned long end;
 	struct vm_area_struct * vma;
-	int unmapped_error, error = -EINVAL;
+	int unmapped_error, error = -ENOMEM;
 
 	down_read(&current->mm->mmap_sem);
 	if (start & ~PAGE_MASK)
@@ -185,18 +185,18 @@ asmlinkage long sys_msync(unsigned long start, size_t len, int flags)
 		goto out;
 	/*
 	 * If the interval [start,end) covers some unmapped address ranges,
-	 * just ignore them, but return -EFAULT at the end.
+	 * just ignore them, but return -ENOMEM at the end.
 	 */
 	vma = find_vma(current->mm, start);
 	unmapped_error = 0;
 	for (;;) {
 		/* Still start < end. */
-		error = -EFAULT;
+		error = -ENOMEM;
 		if (!vma)
 			goto out;
 		/* Here start < vma->vm_end. */
 		if (start < vma->vm_start) {
-			unmapped_error = -EFAULT;
+			unmapped_error = -ENOMEM;
 			start = vma->vm_start;
 		}
 		/* Here vma->vm_start <= start < vma->vm_end. */
@@ -220,5 +220,3 @@ out:
 	up_read(&current->mm->mmap_sem);
 	return error;
 }
-
-

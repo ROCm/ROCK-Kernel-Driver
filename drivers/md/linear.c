@@ -20,7 +20,7 @@
 
 #include <linux/raid/md.h>
 #include <linux/slab.h>
-
+#include <linux/bio.h>
 #include <linux/raid/linear.h>
 
 #define MAJOR_NR MD_MAJOR

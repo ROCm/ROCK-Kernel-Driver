@@ -45,6 +45,12 @@ static inline void wait_on_inode(struct inode *inode)
 /*
  * mm/page-writeback.c
  */
+extern int dirty_background_ratio;
+extern int dirty_async_ratio;
+extern int dirty_sync_ratio;
+extern int dirty_writeback_centisecs;
+extern int dirty_expire_centisecs;
+
 void balance_dirty_pages(struct address_space *mapping);
 void balance_dirty_pages_ratelimited(struct address_space *mapping);
 int pdflush_operation(void (*fn)(unsigned long), unsigned long arg0);

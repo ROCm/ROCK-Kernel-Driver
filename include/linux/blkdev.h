@@ -246,12 +246,7 @@ extern unsigned long blk_max_low_pfn, blk_max_pfn;
 #define BLK_BOUNCE_ISA		(ISA_DMA_THRESHOLD)
 
 extern int init_emergency_isa_pool(void);
-extern void create_bounce(unsigned long pfn, int gfp, struct bio **bio_orig);
-
-extern inline void blk_queue_bounce(request_queue_t *q, struct bio **bio)
-{
-	create_bounce(q->bounce_pfn, q->bounce_gfp, bio);
-}
+void blk_queue_bounce(request_queue_t *q, struct bio **bio);
 
 #define rq_for_each_bio(bio, rq)	\
 	if ((rq->bio))			\

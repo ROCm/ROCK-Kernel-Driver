@@ -204,13 +204,8 @@ int vfs_permission(struct inode * inode, int mask)
 
 int permission(struct inode * inode,int mask)
 {
-	if (inode->i_op && inode->i_op->permission) {
-		int retval;
-		lock_kernel();
-		retval = inode->i_op->permission(inode, mask);
-		unlock_kernel();
-		return retval;
-	}
+	if (inode->i_op && inode->i_op->permission)
+		return inode->i_op->permission(inode, mask);
 	return vfs_permission(inode, mask);
 }
 

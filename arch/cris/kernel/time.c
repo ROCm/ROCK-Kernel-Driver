@@ -44,6 +44,8 @@
 
 #include <asm/svinto.h>
 
+u64 jiffies_64;
+
 static int have_rtc;  /* used to remember if we have an RTC or not */
 
 /* define this if you need to use print_timestamp */

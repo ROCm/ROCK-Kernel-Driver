@@ -252,6 +252,7 @@
 #include <linux/poll.h>
 #include <linux/init.h>
 #include <linux/fs.h>
+#include <linux/tqueue.h>
 
 #include <asm/processor.h>
 #include <asm/uaccess.h>
