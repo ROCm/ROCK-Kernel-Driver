@@ -96,7 +96,11 @@ SECTIONS
   . = ALIGN(PAGE_SIZE);
   __init_begin = .;
   .init.text : AT(ADDR(.init.text) - PAGE_OFFSET)
-	{ *(.init.text) }
+	{
+	  _sinittext = .;
+	  *(.init.text)
+	  _einittext = .;
+	}
 
   .init.data : AT(ADDR(.init.data) - PAGE_OFFSET)
 	{ *(.init.data) }

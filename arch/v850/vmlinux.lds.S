@@ -105,7 +105,9 @@
 #define RAMK_INIT_CONTENTS_NO_END					      \
 		. = ALIGN (4096) ;					      \
 		__init_start = . ;					      \
+			_sinittext = .;					      \
 			*(.init.text)	/* 2.5 convention */		      \
+			_einittext = .;					      \
 			*(.init.data)					      \
 			*(.text.init)	/* 2.4 convention */		      \
 			*(.data.init)					      \
@@ -125,7 +127,9 @@
 /* The contents of `init' section for a ROM-resident kernel which
    should go into ROM.  */	
 #define ROMK_INIT_ROM_CONTENTS						      \
+			_sinittext = .;					      \
 			*(.init.text)	/* 2.5 convention */		      \
+			_einittext = .;					      \
 			*(.text.init)	/* 2.4 convention */		      \
 		INITCALL_CONTENTS					      \
 		INITRAMFS_CONTENTS
