@@ -1301,7 +1301,7 @@ static int __init early_xmon(char *p)
 {
 	/* ensure xmon is enabled */
 	xmon_init();
-	debugger(0);
+	debugger(NULL);
 
 	return 0;
 }

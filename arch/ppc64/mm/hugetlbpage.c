@@ -249,7 +249,7 @@ int prepare_hugepage_range(unsigned long addr, unsigned long len)
 {
 	if (within_hugepage_high_range(addr, len))
 		return 0;
-	else if ((addr < 0x100000000) && ((addr+len) < 0x100000000)) {
+	else if ((addr < 0x100000000UL) && ((addr+len) < 0x100000000UL)) {
 		int err;
 		/* Yes, we need both tests, in case addr+len overflows
 		 * 64-bit arithmetic */
