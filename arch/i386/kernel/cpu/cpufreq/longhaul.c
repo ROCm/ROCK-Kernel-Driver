@@ -245,7 +245,16 @@ static int __init longhaul_get_ranges (void)
 		else
 			minmult = multipliers[invalue];
 
-		fsb = guess_fsb(maxmult);
+		switch (longhaul.bits.MaxMHzFSB) {
+		case 0x0:	fsb=133;
+				break;
+		case 0x1:	fsb=100;
+				break;
+		case 0x2:	printk (KERN_INFO PFX "Invalid (reserved) FSB!\n");
+			return -EINVAL;
+		case 0x3:	fsb=66;
+				break;
+		}
 		break;
 	}
 
