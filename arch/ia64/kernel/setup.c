@@ -64,6 +64,8 @@ struct screen_info screen_info;
 
 unsigned long ia64_iobase;	/* virtual address for I/O accesses */
 
+unsigned char aux_device_present = 0xaa;        /* XXX remove this when legacy I/O is gone */
+
 #define COMMAND_LINE_SIZE	512
 
 char saved_command_line[COMMAND_LINE_SIZE]; /* used in proc filesystem */

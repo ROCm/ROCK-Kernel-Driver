@@ -68,6 +68,23 @@
 irq_desc_t _irq_desc[NR_IRQS] __cacheline_aligned =
 	{ [0 ... NR_IRQS-1] = { IRQ_DISABLED, &no_irq_type, NULL, 0, SPIN_LOCK_UNLOCKED}};
 
+#ifdef CONFIG_IA64_GENERIC
+struct irq_desc * __ia64_irq_desc (unsigned int irq)
+{
+	return _irq_desc + irq;
+}
+
+ia64_vector __ia64_irq_to_vector (unsigned int irq)
+{
+	return (ia64_vector) irq;
+}
+
+unsigned int __ia64_local_vector_to_irq (ia64_vector vec)
+{
+	return (unsigned int) vec;
+}
+#endif
+
 static void register_irq_proc (unsigned int irq);
 
 /*

@@ -23,6 +23,7 @@
 #include <linux/string.h>
 #include <linux/types.h>
 #include <linux/irq.h>
+#include <linux/acpi.h>
 #ifdef CONFIG_SERIAL_ACPI
 #include <linux/acpi_serial.h>
 #endif
@@ -58,9 +59,34 @@ asm (".weak iosapic_version");
 const char *
 acpi_get_sysname (void)
 {
-	/* the following should go away once we have an ACPI parser: */
 #ifdef CONFIG_IA64_GENERIC
-	return "hpsim";
+	if (efi.acpi20) {
+		acpi20_rsdp_t *rsdp20;
+		acpi_xsdt_t *xsdt;
+		acpi_desc_table_hdr_t *hdrp;
+
+		rsdp20 = efi.acpi20;
+		if (strncmp(rsdp20->signature,
+		            ACPI_RSDP_SIG, ACPI_RSDP_SIG_LEN)) {
+			printk("ACPI 2.0 RSDP signature incorrect, default to DIG compatible\n");
+			return "dig";
+		}
+
+		xsdt = __va(rsdp20->xsdt);
+		hdrp = &xsdt->header;
+		if (strncmp(hdrp->signature,
+		            ACPI_XSDT_SIG, ACPI_XSDT_SIG_LEN)) {
+			printk("ACPI 2.0 XSDT signature incorrect, default to DIG compatible\n");
+			return "dig";
+		}
+
+		if (!strcmp(hdrp->oem_id, "HP")) {
+			printk("Enabling Hewlett Packard zx1 chipset support\n");
+			return "hpzx1";
+		}
+	}
+
+	return "dig";
 #else
 # if defined (CONFIG_IA64_HP_SIM)
 	return "hpsim";
@@ -68,13 +94,14 @@ acpi_get_sysname (void)
 	return "sn1";
 # elif defined (CONFIG_IA64_SGI_SN2)
 	return "sn2";
+# elif defined (CONFIG_IA64_HP_ZX1)
+	return "hpzx1";
 # elif defined (CONFIG_IA64_DIG)
 	return "dig";
 # else
 #	error Unknown platform.  Fix acpi.c.
 # endif
 #endif
-
 }
 
 /*
@@ -679,3 +706,74 @@ acpi_parse (acpi_rsdp_t *rsdp)
 # endif /* CONFIG_ACPI */
 	return 1;
 }
+
+#ifdef CONFIG_ACPI
+
+#include "../drivers/acpi/include/platform/acgcc.h"
+#include "../drivers/acpi/include/actypes.h"
+#include "../drivers/acpi/include/acexcep.h"
+#include "../drivers/acpi/include/acpixf.h"
+#include "../drivers/acpi/include/actbl.h"
+#include "../drivers/acpi/include/acconfig.h"
+#include "../drivers/acpi/include/acmacros.h"
+#include "../drivers/acpi/include/aclocal.h"
+#include "../drivers/acpi/include/acobject.h"
+#include "../drivers/acpi/include/acstruct.h"
+#include "../drivers/acpi/include/acnamesp.h"
+#include "../drivers/acpi/include/acutils.h"
+
+/**
+ * acpi_get_crs - Return the current resource settings for a device
+ * obj: A handle for this device
+ * buf: A buffer to be populated by this call.
+ *
+ * Pass a valid handle, typically obtained by walking the namespace and a
+ * pointer to an allocated buffer, and this function will fill in the buffer
+ * with a list of acpi_resource structures.
+ */
+acpi_status acpi_get_crs(acpi_handle obj, acpi_buffer *buf)
+{
+	acpi_status result;
+	buf->length = 0;
+	buf->pointer = NULL;
+
+	result = acpi_get_current_resources(obj, buf);
+	if (result != AE_BUFFER_OVERFLOW)
+		return result;
+	buf->pointer = kmalloc(buf->length, GFP_KERNEL);
+	if (!buf->pointer)
+		return -ENOMEM;
+
+	result = acpi_get_current_resources(obj, buf);
+
+	return result;
+}
+
+acpi_resource *acpi_get_crs_next(acpi_buffer *buf, int *offset)
+{
+	acpi_resource *res;
+
+	if (*offset >= buf->length)
+		return NULL;
+
+	res = buf->pointer + *offset;
+	*offset += res->length;
+	return res;
+}
+
+acpi_resource_data *acpi_get_crs_type(acpi_buffer *buf, int *offset, int type)
+{
+	for (;;) {
+		acpi_resource *res = acpi_get_crs_next(buf, offset);
+		if (!res)
+			return NULL;
+		if (res->id == type)
+			return &res->data;
+	}
+}
+
+void acpi_dispose_crs(acpi_buffer *buf)
+{
+	kfree(buf->pointer);
+}
+#endif /* CONFIG_ACPI */

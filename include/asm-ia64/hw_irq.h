@@ -88,6 +88,7 @@ hw_resend_irq (struct hw_interrupt_type *h, unsigned int vector)
 
 extern struct irq_desc _irq_desc[NR_IRQS];
 
+#ifndef CONFIG_IA64_GENERIC
 static inline struct irq_desc *
 __ia64_irq_desc (unsigned int irq)
 {
@@ -105,6 +106,7 @@ __ia64_local_vector_to_irq (ia64_vector vec)
 {
 	return (unsigned int) vec;
 }
+#endif
 
 /*
  * Next follows the irq descriptor interface.  On IA-64, each CPU supports 256 interrupt

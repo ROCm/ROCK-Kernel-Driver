@@ -35,8 +35,6 @@
 char drive_info[4*16];
 extern int pcat_compat;
 
-unsigned char aux_device_present = 0xaa;	/* XXX remove this when legacy I/O is gone */
-
 void __init
 dig_setup (char **cmdline_p)
 {
