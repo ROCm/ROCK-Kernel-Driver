@@ -72,23 +72,15 @@ so this is not actually a restriction.
 static u32 batps;	/* limit on the number of p states when on battery */
 			/* - set by BIOS in the PSB/PST                    */
 
-static struct cpufreq_driver cpufreq_amd64_driver = {
-	.verify = powernowk8_verify,
-	.target = powernowk8_target,
-	.init = powernowk8_cpu_init,
-	.name = "cpufreq-amd64",
-	.owner = THIS_MODULE,
-};
-
 #define SEARCH_UP     1
 #define SEARCH_DOWN   0
 
-/* Return a frequency in MHz, given an input fid */
-u32
-find_freq_from_fid(u32 fid)
+ /* Return a frequency in MHz, given an input fid */
+static u32 find_freq_from_fid(u32 fid)
 {
-	return 800 + (fid * 100);
+ 	return 800 + (fid * 100);
 }
+
 
 /* Return the vco fid for an input fid */
 static u32
@@ -99,37 +91,6 @@ convert_fid_to_vco_fid(u32 fid)
 	} else {
 		return fid;
 	}
-}
-
-/* Sort the fid/vid frequency table into ascending order by fid. The spec */
-/* implies that it will be sorted by BIOS, but, it only implies it, and I */
-/* prefer not to trust when I can check.                                  */
-/* Yes, it is a simple bubble sort, but the PST is really small, so the   */
-/* choice of algorithm is pretty irrelevant.                              */
-static inline void
-sort_pst(struct pst_s *ppst, u32 numpstates)
-{
-	u32 i;
-	u8 tempfid;
-	u8 tempvid;
-	int swaps = 1;
-
-	while (swaps) {
-		swaps = 0;
-		for (i = 0; i < (numpstates - 1); i++) {
-			if (ppst[i].fid > ppst[i + 1].fid) {
-				swaps = 1;
-				tempfid = ppst[i].fid;
-				tempvid = ppst[i].vid;
-				ppst[i].fid = ppst[i + 1].fid;
-				ppst[i].vid = ppst[i + 1].vid;
-				ppst[i + 1].fid = tempfid;
-				ppst[i + 1].vid = tempvid;
-			}
-		}
-	}
-
-	return;
 }
 
 /* Return 1 if the pending bit is set. Unless we are actually just told the */
@@ -539,7 +500,6 @@ find_psb_table(void)
 {
 	struct psb_s *psb;
 	struct pst_s *pst;
-	struct pst_s *ppst;
 	unsigned i, j;
 	u32 lastfid;
 	u32 mvs;
@@ -636,25 +596,52 @@ find_psb_table(void)
 			return -ENODEV;
 		}
 
+		pst = (struct pst_s *) (psb + 1);
+		lastfid = 0xFFFFFFFF;
+		for (j = 0; j < numps; j++) {
+			if (pst[j].vid > LEAST_VID) {
+				printk(KERN_ERR PFX "vid invalid : 0x%x\n", pst[j].vid);
+				return -EINVAL;
+			}
+			if (pst[j].vid < rvo) {	/* vid + rvo >= 0 */
+				printk(KERN_ERR PFX
+				       "BIOS error - 0 vid exceeded with pstate %d\n",
+				       j);
+				return -ENODEV;
+			}
+			if (pst[j].vid < maxvid + rvo) {	/* vid + rvo >= maxvid */
+				printk(KERN_ERR PFX
+				       "BIOS error - maxvid exceeded with pstate %d\n",
+				       j);
+				return -ENODEV;
+			}
+			if ((pst[j].fid > MAX_FID)
+			    || (pst[j].fid & 1)
+			    || (pst[j].fid < HI_FID_TABLE_BOTTOM)){
+				printk(KERN_ERR PFX "fid invalid : 0x%x\n", pst[j].fid);
+				return -EINVAL;
+			}
+			if (pst[j].fid < lastfid)
+				lastfid = pst[j].fid;
+		}
+		if (lastfid & 1) {
+			printk(KERN_ERR PFX "lastfid invalid\n");
+			return -EINVAL;
+		}
+		if (lastfid > LO_FID_TABLE_TOP) {
+			printk(KERN_INFO PFX  "first fid not from lo freq table\n");
+		}
+
 		powernow_table = kmalloc((sizeof(struct cpufreq_frequency_table) * (numps + 1)), GFP_KERNEL);
 		if (!powernow_table) {
 			printk(KERN_ERR PFX "powernow_table memory alloc failure\n");
 			return -ENOMEM;
 		}
 
-		ppst = kmalloc(sizeof (struct pst_s) * numps, GFP_KERNEL);
-		if (!ppst) {
-			printk(KERN_ERR PFX "ppst memory alloc failure\n");
-			return -ENOMEM;
-		}
-
-		pst = (struct pst_s *) (psb + 1);
 		for (j = 0; j < numps; j++) {
-			ppst[j].fid = pst[j].fid;
-			ppst[j].vid = pst[j].vid;
 			printk(KERN_INFO PFX
 			       "   %d : fid 0x%x, vid 0x%x\n", j,
-			       ppst[j].fid, ppst[j].vid);
+			       pst[j].fid, pst[j].vid);
 			powernow_table[j].index = pst[j].fid; /* lower 8 bits */
 			powernow_table[j].index |= (pst[j].vid << 8); /* upper 8 bits */
 			powernow_table[j].frequency = find_freq_from_fid(pst[j].fid);
@@ -662,55 +649,8 @@ find_psb_table(void)
 		powernow_table[numps].frequency = CPUFREQ_TABLE_END;
 		powernow_table[numps].index = 0;
 
-		sort_pst(ppst, numps);
-
-		lastfid = ppst[0].fid;
-		if (lastfid > LO_FID_TABLE_TOP)
-			printk(KERN_INFO BFX "first fid not in lo freq tbl\n");
-
-		if ((lastfid > MAX_FID) || (lastfid & 1) || (ppst[0].vid > LEAST_VID)) {
-			printk(KERN_ERR BFX "first fid/vid bad (0x%x - 0x%x)\n",
-			       lastfid, ppst[0].vid);
-			kfree(powernow_table);
-			kfree(ppst);
-			return -ENODEV;
-		}
-
-		for (j = 1; j < numps; j++) {
-			if ((lastfid >= ppst[j].fid)
-			    || (ppst[j].fid & 1)
-			    || (ppst[j].fid < HI_FID_TABLE_BOTTOM)
-			    || (ppst[j].fid > MAX_FID)
-			    || (ppst[j].vid > LEAST_VID)) {
-				printk(KERN_ERR BFX
-				       "invalid fid/vid in pst(%x %x)\n",
-				       ppst[j].fid, ppst[j].vid);
-				kfree(ppst);
-				return -ENODEV;
-			}
-			lastfid = ppst[j].fid;
-		}
-
-		for (j = 0; j < numps; j++) {
-			if (ppst[j].vid < rvo) {	/* vid+rvo >= 0 */
-				printk(KERN_ERR BFX
-				       "0 vid exceeded with pstate %d\n", j);
-				kfree(powernow_table);
-				kfree(ppst);
-				return -ENODEV;
-			}
-			if (ppst[j].vid < maxvid+rvo) { /* vid+rvo >= maxvid */
-				printk(KERN_ERR BFX
-				       "maxvid exceeded with pstate %d\n", j);
-				kfree(powernow_table);
-				kfree(ppst);
-				return -ENODEV;
-			}
-		}
-
 		if (query_current_values_with_pending_wait()) {
 			kfree(powernow_table);
-			kfree(ppst);
 			return -EIO;
 		}
 
@@ -718,13 +658,10 @@ find_psb_table(void)
 		       currfid, currvid);
 
 		for (j = 0; j < numps; j++)
-			if ((ppst[j].fid==currfid) && (ppst[j].vid==currvid)) {
-				kfree(ppst);
+			if ((pst[j].fid==currfid) && (pst[j].vid==currvid))
 				return 0;
-			}
 
 		printk(KERN_ERR BFX "currfid/vid do not match PST, ignoring\n");
-		kfree(ppst);
 		return 0;
 	}
 
@@ -873,6 +810,27 @@ powernowk8_cpu_init(struct cpufreq_policy *pol)
 
 	return 0;
 }
+
+static int __exit powernowk8_cpu_exit (struct cpufreq_policy *pol)
+{
+	if (pol->cpu != 0)
+		return -EINVAL;
+
+	if (powernow_table)
+		kfree(powernow_table);
+
+	return 0;
+}
+
+static struct cpufreq_driver cpufreq_amd64_driver = {
+	.verify = powernowk8_verify,
+	.target = powernowk8_target,
+	.init = powernowk8_cpu_init,
+	.exit = powernowk8_cpu_exit,
+	.name = "powernow-k8",
+	.owner = THIS_MODULE,
+};
+
 
 /* driver entry point for init */
 static int __init
