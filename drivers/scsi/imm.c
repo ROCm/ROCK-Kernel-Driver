@@ -1208,19 +1208,10 @@ static int __imm_attach(struct parport *pb)
 		goto out1;
 
 	/* now the glue ... */
-	switch (dev->mode) {
-	case IMM_NIBBLE:
-	case IMM_PS2:
+	if (dev->mode == IMM_NIBBLE || dev->mode == IMM_PS2)
 		ports = 3;
-		break;
-	case IMM_EPP_8:
-	case IMM_EPP_16:
-	case IMM_EPP_32:
+	else
 		ports = 8;
-		break;
-	default:	/* Never gets here */
-		BUG();
-	}
 
 	INIT_WORK(&dev->imm_tq, imm_interrupt, dev);
 

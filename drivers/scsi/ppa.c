@@ -1069,21 +1069,10 @@ static int __ppa_attach(struct parport *pb)
 		goto out1;
 
 	/* now the glue ... */
-	switch (dev->mode) {
-	case PPA_NIBBLE:
+	if (dev->mode == PPA_NIBBLE || dev->mode == PPA_PS2)
 		ports = 3;
-		break;
-	case PPA_PS2:
-		ports = 3;
-		break;
-	case PPA_EPP_8:
-	case PPA_EPP_16:
-	case PPA_EPP_32:
+	else
 		ports = 8;
-		break;
-	default:	/* Never gets here */
-		BUG();
-	}
 
 	INIT_WORK(&dev->ppa_tq, ppa_interrupt, dev);
 
