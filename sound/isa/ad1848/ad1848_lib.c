@@ -587,7 +587,7 @@ static int snd_ad1848_capture_prepare(snd_pcm_substream_t * substream)
 
 irqreturn_t snd_ad1848_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	ad1848_t *chip = snd_magic_cast(ad1848_t, dev_id, return);
+	ad1848_t *chip = snd_magic_cast(ad1848_t, dev_id, return IRQ_NONE);
 
 	if ((chip->mode & AD1848_MODE_PLAY) && chip->playback_substream &&
 	    (chip->mode & AD1848_MODE_RUNNING))

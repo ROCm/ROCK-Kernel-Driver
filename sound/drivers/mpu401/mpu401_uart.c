@@ -123,7 +123,7 @@ static irqreturn_t _snd_mpu401_uart_interrupt(mpu401_t *mpu)
  */
 irqreturn_t snd_mpu401_uart_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	mpu401_t *mpu = snd_magic_cast(mpu401_t, dev_id, return);
+	mpu401_t *mpu = snd_magic_cast(mpu401_t, dev_id, return IRQ_NONE);
 	
 	if (mpu == NULL)
 		return IRQ_NONE;

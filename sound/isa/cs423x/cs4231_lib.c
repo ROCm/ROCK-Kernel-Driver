@@ -969,7 +969,7 @@ static void snd_cs4231_overrange(cs4231_t *chip)
 
 irqreturn_t snd_cs4231_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	cs4231_t *chip = snd_magic_cast(cs4231_t, dev_id, return);
+	cs4231_t *chip = snd_magic_cast(cs4231_t, dev_id, return IRQ_NONE);
 	unsigned char status;
 
 	status = snd_cs4231_in(chip, CS4231_IRQ_STATUS);

@@ -1885,7 +1885,7 @@ static int __devinit snd_cs4281_midi(cs4281_t * chip, int device, snd_rawmidi_t 
 
 static irqreturn_t snd_cs4281_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	cs4281_t *chip = snd_magic_cast(cs4281_t, dev_id, return);
+	cs4281_t *chip = snd_magic_cast(cs4281_t, dev_id, return IRQ_NONE);
 	unsigned int status, dma, val;
 	cs4281_dma_t *cdma;
 

@@ -400,7 +400,7 @@ int __devinit snd_ice1712_init_cs8427(ice1712_t *ice, int addr)
 
 static irqreturn_t snd_ice1712_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	ice1712_t *ice = snd_magic_cast(ice1712_t, dev_id, return);
+	ice1712_t *ice = snd_magic_cast(ice1712_t, dev_id, return IRQ_NONE);
 	unsigned char status;
 	int handled = 0;
 

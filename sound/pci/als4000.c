@@ -358,7 +358,7 @@ static snd_pcm_uframes_t snd_als4000_playback_pointer(snd_pcm_substream_t * subs
 
 static irqreturn_t snd_als4000_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	sb_t *chip = snd_magic_cast(sb_t, dev_id, return);
+	sb_t *chip = snd_magic_cast(sb_t, dev_id, return IRQ_NONE);
 	unsigned long flags;
 	unsigned gcr_status;
 	unsigned sb_status;

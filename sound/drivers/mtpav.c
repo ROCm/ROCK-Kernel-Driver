@@ -587,7 +587,7 @@ static void snd_mtpav_read_bytes(mtpav_t * mcrd)
 
 static irqreturn_t snd_mtpav_irqh(int irq, void *dev_id, struct pt_regs *regs)
 {
-	mtpav_t *mcard = snd_magic_cast(mtpav_t, dev_id, return);
+	mtpav_t *mcard = snd_magic_cast(mtpav_t, dev_id, return IRQ_NONE);
 
 	//printk("irqh()\n");
 	spin_lock(&mcard->spinlock);
