@@ -559,12 +559,13 @@ static struct accessmap	nfs3_anyaccess[] = {
 	 * to the server to check for access for things like /dev/null
 	 * (which really, the server doesn't care about).  So
 	 * We provide simple access checking for them, looking
-	 * mainly at mode bits
+	 * mainly at mode bits, and we make sure to ignore read-only
+	 * filesystem checks
 	 */
     {	NFS3_ACCESS_READ,	MAY_READ			},
     {	NFS3_ACCESS_EXECUTE,	MAY_EXEC			},
-    {	NFS3_ACCESS_MODIFY,	MAY_WRITE			},
-    {	NFS3_ACCESS_EXTEND,	MAY_WRITE			},
+    {	NFS3_ACCESS_MODIFY,	MAY_WRITE|MAY_LOCAL_ACCESS	},
+    {	NFS3_ACCESS_EXTEND,	MAY_WRITE|MAY_LOCAL_ACCESS	},
 
     {	0,			0				}
 };
