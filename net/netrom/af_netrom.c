@@ -36,6 +36,7 @@
 #include <linux/notifier.h>
 #include <net/netrom.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <net/ip.h>
 #include <net/tcp.h>
 #include <net/arp.h>
@@ -1234,22 +1235,54 @@ static int nr_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	return 0;
 }
 
-static int nr_get_info(char *buffer, char **start, off_t offset, int length)
+#ifdef CONFIG_PROC_FS
+
+/* Marker for header entry */
+#define NETROM_PROC_START	((void *)1)
+static void *nr_info_start(struct seq_file *seq, loff_t *pos)
 {
 	struct sock *s;
 	struct hlist_node *node;
-	struct net_device *dev;
-	const char *devname;
-	int len = 0;
-	off_t pos = 0;
-	off_t begin = 0;
+	int i = 1;
 
 	spin_lock_bh(&nr_list_lock);
-
-	len += sprintf(buffer, "user_addr dest_node src_node  dev    my  your  st  vs  vr  va    t1     t2     t4      idle   n2  wnd Snd-Q Rcv-Q inode\n");
+	if (*pos == 0)
+		return NETROM_PROC_START;
 
 	sk_for_each(s, node, &nr_list) {
-		nr_cb *nr;
+		if (i == *pos)
+			return s;
+		++i;
+	}
+	return NULL;
+}
+
+static void *nr_info_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	++*pos;
+
+	return (v == NETROM_PROC_START) ? sk_head(&nr_list) 
+		: sk_next((struct sock *)v);
+}
+	
+static void nr_info_stop(struct seq_file *seq, void *v)
+{
+	spin_unlock_bh(&nr_list_lock);
+}
+
+static int nr_info_show(struct seq_file *seq, void *v)
+{
+	struct sock *s = v;
+	struct net_device *dev;
+	nr_cb *nr;
+	const char *devname;
+
+	if (v == NETROM_PROC_START)
+		seq_puts(seq,
+"user_addr dest_node src_node  dev    my  your  st  vs  vr  va    t1     t2     t4      idle   n2  wnd Snd-Q Rcv-Q inode\n");
+
+	else {
+
 		bh_lock_sock(s);
 		nr = nr_sk(s);
 
@@ -1258,11 +1291,10 @@ static int nr_get_info(char *buffer, char **start, off_t offset, int length)
 		else
 			devname = dev->name;
 
-		len += sprintf(buffer + len, "%-9s ",
-			ax2asc(&nr->user_addr));
-		len += sprintf(buffer + len, "%-9s ",
-			ax2asc(&nr->dest_addr));
-		len += sprintf(buffer + len, "%-9s %-3s  %02X/%02X %02X/%02X %2d %3d %3d %3d %3lu/%03lu %2lu/%02lu %3lu/%03lu %3lu/%03lu %2d/%02d %3d %5d %5d %ld\n",
+		seq_printf(seq, "%-9s ", ax2asc(&nr->user_addr));
+		seq_printf(seq, "%-9s ", ax2asc(&nr->dest_addr));
+		seq_printf(seq, 
+"%-9s %-3s  %02X/%02X %02X/%02X %2d %3d %3d %3d %3lu/%03lu %2lu/%02lu %3lu/%03lu %3lu/%03lu %2d/%02d %3d %5d %5d %ld\n",
 			ax2asc(&nr->source_addr),
 			devname,
 			nr->my_index,
@@ -1288,27 +1320,31 @@ static int nr_get_info(char *buffer, char **start, off_t offset, int length)
 			atomic_read(&s->sk_rmem_alloc),
 			s->sk_socket ? SOCK_INODE(s->sk_socket)->i_ino : 0L);
 
-		pos = begin + len;
-
-		if (pos < offset) {
-			len   = 0;
-			begin = pos;
-		}
 		bh_unlock_sock(s);
-		if (pos > offset + length)
-			break;
 	}
-
-	spin_unlock_bh(&nr_list_lock);
-
-	*start = buffer + (offset - begin);
-	len   -= (offset - begin);
-
-	if (len > length)
-		len = length;
-
-	return len;
+	return 0;
 }
+
+static struct seq_operations nr_info_seqops = {
+	.start = nr_info_start,
+	.next = nr_info_next,
+	.stop = nr_info_stop,
+	.show = nr_info_show,
+};
+ 
+static int nr_info_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &nr_info_seqops);
+}
+ 
+static struct file_operations nr_info_fops = {
+	.owner = THIS_MODULE,
+	.open = nr_info_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = seq_release,
+};
+#endif	/* CONFIG_PROC_FS */
 
 static struct net_proto_family nr_family_ops = {
 	.family		=	PF_NETROM,
@@ -1399,10 +1435,11 @@ static int __init nr_proto_init(void)
 
 	nr_loopback_init();
 
-	proc_net_create("nr", 0, nr_get_info);
-	proc_net_create("nr_neigh", 0, nr_neigh_get_info);
-	proc_net_create("nr_nodes", 0, nr_nodes_get_info);
+	proc_net_fops_create("nr", S_IRUGO, &nr_info_fops);
+	proc_net_fops_create("nr_neigh", S_IRUGO, &nr_neigh_fops);
+	proc_net_fops_create("nr_nodes", S_IRUGO, &nr_nodes_fops);
 	return 0;
+
  fail:
 	while (--i >= 0)
 		unregister_netdev(dev_nr[i]);

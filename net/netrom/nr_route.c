@@ -36,6 +36,7 @@
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include <net/netrom.h>
+#include <linux/seq_file.h>
 
 static unsigned int nr_neigh_no = 1;
 
@@ -839,70 +840,138 @@ int nr_route_frame(struct sk_buff *skb, ax25_cb *ax25)
 	return ret;
 }
 
-int nr_nodes_get_info(char *buffer, char **start, off_t offset, int length)
+#ifdef CONFIG_PROC_FS
+#define NETROM_PROC_START	((void *) 1)
+
+static void *nr_node_start(struct seq_file *seq, loff_t *pos)
 {
 	struct nr_node *nr_node;
 	struct hlist_node *node;
-	int len     = 0;
-	off_t pos   = 0;
-	off_t begin = 0;
-	int i;
-
-	spin_lock_bh(&nr_node_list_lock);
-	len += sprintf(buffer, "callsign  mnemonic w n qual obs neigh qual obs neigh qual obs neigh\n");
+	int i = 1;
+ 
+ 	spin_lock_bh(&nr_node_list_lock);
+	if (*pos == 0)
+		return NETROM_PROC_START;
 
 	nr_node_for_each(nr_node, node, &nr_node_list) {
+		if (i == *pos)
+			return nr_node;
+		++i;
+	}
+
+	return NULL;
+}
+
+static void *nr_node_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct hlist_node *node;
+	++*pos;
+	
+	node = (v == NETROM_PROC_START)  
+		? nr_node_list.first
+		: ((struct nr_node *)v)->node_node.next;
+
+	return hlist_entry(node, struct nr_node, node_node);
+}
+
+static void nr_node_stop(struct seq_file *seq, void *v)
+{
+	spin_unlock_bh(&nr_node_list_lock);
+}
+
+static int nr_node_show(struct seq_file *seq, void *v)
+{
+	int i;
+
+	if (v == NETROM_PROC_START)
+		seq_puts(seq,
+			 "callsign  mnemonic w n qual obs neigh qual obs neigh qual obs neigh\n");
+	else {
+		struct nr_node *nr_node = v;
 		nr_node_lock(nr_node);
-		len += sprintf(buffer + len, "%-9s %-7s  %d %d",
+		seq_printf(seq, "%-9s %-7s  %d %d",
 			ax2asc(&nr_node->callsign),
 			(nr_node->mnemonic[0] == '\0') ? "*" : nr_node->mnemonic,
 			nr_node->which + 1,
 			nr_node->count);
 
 		for (i = 0; i < nr_node->count; i++) {
-			len += sprintf(buffer + len, "  %3d   %d %05d",
+			seq_printf(seq, "  %3d   %d %05d",
 				nr_node->routes[i].quality,
 				nr_node->routes[i].obs_count,
 				nr_node->routes[i].neighbour->number);
 		}
 		nr_node_unlock(nr_node);
 
-		len += sprintf(buffer + len, "\n");
-
-		pos = begin + len;
-
-		if (pos < offset) {
-			len   = 0;
-			begin = pos;
-		}
-
-		if (pos > offset + length)
-			break;
+		seq_puts(seq, "\n");
 	}
-	spin_unlock_bh(&nr_node_list_lock);
-
-	*start = buffer + (offset - begin);
-	len   -= (offset - begin);
-
-	if (len > length) len = length;
-
-	return len;
+	return 0;
 }
 
-int nr_neigh_get_info(char *buffer, char **start, off_t offset, int length)
+static struct seq_operations nr_node_seqops = {
+	.start = nr_node_start,
+	.next = nr_node_next,
+	.stop = nr_node_stop,
+	.show = nr_node_show,
+};
+
+static int nr_node_info_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &nr_node_seqops);
+}
+
+struct file_operations nr_nodes_fops = {
+	.owner = THIS_MODULE,
+	.open = nr_node_info_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = seq_release,
+};
+
+static void *nr_neigh_start(struct seq_file *seq, loff_t *pos)
 {
 	struct nr_neigh *nr_neigh;
 	struct hlist_node *node;
-	int len     = 0;
-	off_t pos   = 0;
-	off_t begin = 0;
-	int i;
+	int i = 1;
 
 	spin_lock_bh(&nr_neigh_list_lock);
-	len += sprintf(buffer, "addr  callsign  dev  qual lock count failed digipeaters\n");
+	if (*pos == 0)
+		return NETROM_PROC_START;
 
 	nr_neigh_for_each(nr_neigh, node, &nr_neigh_list) {
-		len += sprintf(buffer + len, "%05d %-9s %-4s  %3d    %d   %3d    %3d",
+		if (i == *pos)
+			return nr_neigh;
+	}
+	return NULL;
+}
+
+static void *nr_neigh_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct hlist_node *node;
+	++*pos;
+	
+	node = (v == NETROM_PROC_START)  
+		? nr_neigh_list.first
+		: ((struct nr_neigh *)v)->neigh_node.next;
+
+	return hlist_entry(node, struct nr_neigh, neigh_node);
+}
+
+static void nr_neigh_stop(struct seq_file *seq, void *v)
+{
+	spin_unlock_bh(&nr_neigh_list_lock);
+}
+
+static int nr_neigh_show(struct seq_file *seq, void *v)
+{
+	int i;
+
+	if (v == NETROM_PROC_START)
+		seq_puts(seq, "addr  callsign  dev  qual lock count failed digipeaters\n");
+	else {
+		struct nr_neigh *nr_neigh = v;
+
+		seq_printf(seq, "%05d %-9s %-4s  %3d    %d   %3d    %3d",
 			nr_neigh->number,
 			ax2asc(&nr_neigh->callsign),
 			nr_neigh->dev ? nr_neigh->dev->name : "???",
@@ -913,31 +982,36 @@ int nr_neigh_get_info(char *buffer, char **start, off_t offset, int length)
 
 		if (nr_neigh->digipeat != NULL) {
 			for (i = 0; i < nr_neigh->digipeat->ndigi; i++)
-				len += sprintf(buffer + len, " %s", ax2asc(&nr_neigh->digipeat->calls[i]));
+				seq_printf(seq, " %s", 
+					   ax2asc(&nr_neigh->digipeat->calls[i]));
 		}
 
-		len += sprintf(buffer + len, "\n");
-
-		pos = begin + len;
-
-		if (pos < offset) {
-			len   = 0;
-			begin = pos;
-		}
-
-		if (pos > offset + length)
-			break;
+		seq_puts(seq, "\n");
 	}
-
-	spin_unlock_bh(&nr_neigh_list_lock);
-
-	*start = buffer + (offset - begin);
-	len   -= (offset - begin);
-
-	if (len > length) len = length;
-
-	return len;
+	return 0;
 }
+
+static struct seq_operations nr_neigh_seqops = {
+	.start = nr_neigh_start,
+	.next = nr_neigh_next,
+	.stop = nr_neigh_stop,
+	.show = nr_neigh_show,
+};
+
+static int nr_neigh_info_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &nr_neigh_seqops);
+}
+
+struct file_operations nr_neigh_fops = {
+	.owner = THIS_MODULE,
+	.open = nr_neigh_info_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = seq_release,
+};
+
+#endif
 
 /*
  *	Free all memory associated with the nodes and routes lists.

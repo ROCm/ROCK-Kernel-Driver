@@ -209,8 +209,8 @@ extern struct net_device *nr_dev_get(ax25_address *);
 extern int  nr_rt_ioctl(unsigned int, void *);
 extern void nr_link_failed(ax25_cb *, int);
 extern int  nr_route_frame(struct sk_buff *, ax25_cb *);
-extern int  nr_nodes_get_info(char *, char **, off_t, int);
-extern int  nr_neigh_get_info(char *, char **, off_t, int);
+extern struct file_operations nr_nodes_fops;
+extern struct file_operations nr_neigh_fops;
 extern void nr_rt_free(void);
 
 /* nr_subr.c */
