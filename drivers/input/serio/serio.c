@@ -64,7 +64,6 @@ EXPORT_SYMBOL(serio_reconnect);
 struct serio_event {
 	int type;
 	struct serio *serio;
-	struct serio_dev *dev;
 	struct list_head node;
 };
 
@@ -90,24 +89,18 @@ static void serio_find_dev(struct serio *serio)
 #define SERIO_RECONNECT		2
 #define SERIO_REGISTER_PORT	3
 #define SERIO_UNREGISTER_PORT	4
-#define SERIO_REGISTER_DEVICE	5
 
 static DECLARE_WAIT_QUEUE_HEAD(serio_wait);
 static DECLARE_COMPLETION(serio_exited);
 
-static void serio_invalidate_pending_events(struct serio *serio, struct serio_dev *dev)
+static void serio_invalidate_pending_events(struct serio *serio)
 {
 	struct serio_event *event;
 
-	list_for_each_entry(event, &serio_event_list, node) {
+	list_for_each_entry(event, &serio_event_list, node)
 		if (event->serio == serio)
 			event->serio = NULL;
-		if (event->dev == dev)
-			event->dev = NULL;
-	}
 }
-
-void __serio_register_device(struct serio_dev *dev);
 
 void serio_handle_events(void)
 {
@@ -118,11 +111,11 @@ void serio_handle_events(void)
 		event = container_of(node, struct serio_event, node);
 
 		down(&serio_sem);
-		if (!event->serio && !event->dev)
+		if (event->serio == NULL)
 			goto event_done;
 
 		switch (event->type) {
-			case SERIO_REGISTER_PORT:
+			case SERIO_REGISTER_PORT :
 				__serio_register_port(event->serio);
 				break;
 
@@ -130,17 +123,13 @@ void serio_handle_events(void)
 				__serio_unregister_port(event->serio);
 				break;
 
-			case SERIO_REGISTER_DEVICE:
-				__serio_register_device(event->dev);
-				break;
- 
-			case SERIO_RECONNECT:
+			case SERIO_RECONNECT :
 				if (event->serio->dev && event->serio->dev->reconnect)
 					if (event->serio->dev->reconnect(event->serio) == 0)
 						break;
 				/* reconnect failed - fall through to rescan */
 
-			case SERIO_RESCAN:
+			case SERIO_RESCAN :
 				if (event->serio->dev && event->serio->dev->disconnect)
 					event->serio->dev->disconnect(event->serio);
 				serio_find_dev(event->serio);
@@ -174,14 +163,13 @@ static int serio_thread(void *nothing)
 	complete_and_exit(&serio_exited, 0);
 }
 
-static void serio_queue_event(struct serio *serio, struct serio_dev *dev, int event_type)
+static void serio_queue_event(struct serio *serio, int event_type)
 {
 	struct serio_event *event;
 
 	if ((event = kmalloc(sizeof(struct serio_event), GFP_ATOMIC))) {
 		event->type = event_type;
 		event->serio = serio;
-		event->dev = dev;
 
 		list_add_tail(&event->node, &serio_event_list);
 		wake_up(&serio_wait);
@@ -190,12 +178,12 @@ static void serio_queue_event(struct serio *serio, struct serio_dev *dev, int ev
 
 void serio_rescan(struct serio *serio)
 {
-	serio_queue_event(serio, NULL, SERIO_RESCAN);
+	serio_queue_event(serio, SERIO_RESCAN);
 }
 
 void serio_reconnect(struct serio *serio)
 {
-	serio_queue_event(serio, NULL, SERIO_RECONNECT);
+	serio_queue_event(serio, SERIO_RECONNECT);
 }
 
 irqreturn_t serio_interrupt(struct serio *serio,
@@ -219,7 +207,9 @@ irqreturn_t serio_interrupt(struct serio *serio,
 
 void serio_register_port(struct serio *serio)
 {
-	serio_queue_event(serio, NULL, SERIO_REGISTER_PORT);
+	down(&serio_sem);
+	__serio_register_port(serio);
+	up(&serio_sem);
 }
 
 /*
@@ -229,7 +219,7 @@ void serio_register_port(struct serio *serio)
  */
 void serio_register_port_delayed(struct serio *serio)
 {
-	serio_queue_event(serio, NULL, SERIO_REGISTER_PORT);
+	serio_queue_event(serio, SERIO_REGISTER_PORT);
 }
 
 /*
@@ -257,7 +247,7 @@ void serio_unregister_port(struct serio *serio)
  */
 void serio_unregister_port_delayed(struct serio *serio)
 {
-	serio_queue_event(serio, NULL, SERIO_UNREGISTER_PORT);
+	serio_queue_event(serio, SERIO_UNREGISTER_PORT);
 }
 
 /*
@@ -267,24 +257,21 @@ void serio_unregister_port_delayed(struct serio *serio)
  */
 void __serio_unregister_port(struct serio *serio)
 {
-	serio_invalidate_pending_events(serio, NULL);
+	serio_invalidate_pending_events(serio);
 	list_del_init(&serio->node);
 	if (serio->dev && serio->dev->disconnect)
 		serio->dev->disconnect(serio);
 }
 
-void __serio_register_device(struct serio_dev *dev)
+void serio_register_device(struct serio_dev *dev)
 {
 	struct serio *serio;
+	down(&serio_sem);
 	list_add_tail(&dev->node, &serio_dev_list);
 	list_for_each_entry(serio, &serio_list, node)
 		if (!serio->dev && dev->connect)
 			dev->connect(serio, dev);
-}
-
-void serio_register_device(struct serio_dev *dev)
-{
-	serio_queue_event(NULL, dev, SERIO_REGISTER_DEVICE);
+	up(&serio_sem);
 }
 
 void serio_unregister_device(struct serio_dev *dev)
@@ -292,9 +279,6 @@ void serio_unregister_device(struct serio_dev *dev)
 	struct serio *serio;
 
 	down(&serio_sem);
-
-        serio_invalidate_pending_events(NULL, dev);
-
 	list_del_init(&dev->node);
 
 	list_for_each_entry(serio, &serio_list, node) {

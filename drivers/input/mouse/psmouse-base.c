@@ -2,7 +2,6 @@
  * PS/2 mouse driver
  *
  * Copyright (c) 1999-2002 Vojtech Pavlik
- * Copyright (c) 2003-2004 Dmitry Torokhov
  */
 
 /*
@@ -22,7 +21,6 @@
 #include "psmouse.h"
 #include "synaptics.h"
 #include "logips2pp.h"
-#include "alps.h"
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("PS/2 mouse driver");
@@ -55,7 +53,7 @@ __obsolete_setup("psmouse_smartscroll=");
 __obsolete_setup("psmouse_resetafter=");
 __obsolete_setup("psmouse_rate=");
 
-static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "PS2T++", "GenPS/2", "ImPS/2", "ImExPS/2", "SynPS/2", "AlpsPS/2" };
+static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "PS2T++", "GenPS/2", "ImPS/2", "ImExPS/2", "SynPS/2"};
 
 /*
  * psmouse_process_byte() analyzes the PS/2 data stream and reports
@@ -456,26 +454,6 @@ static int psmouse_extensions(struct psmouse *psmouse,
  * Make sure that touchpad is in relative mode, gestures (taps) are enabled
  */
 		synaptics_reset(psmouse);
-	}
-
-/*
- * Try ALPS TouchPad
- */
-	if (max_proto > PSMOUSE_PS2 && alps_detect(psmouse)) {
-
-		if (set_properties) {
-			psmouse->vendor = "ALPS";
-			psmouse->name = "TouchPad";
-		}
-
-		if (max_proto > PSMOUSE_IMEX)
-			if (!set_properties || alps_init(psmouse) == 0)
-				return PSMOUSE_ALPS;
-
-/*
- * Don't try anything fancy, just basic Intellimouse/Explorer protocols
- */
-		max_proto = PSMOUSE_IMEX;
 	}
 
 	if (max_proto > PSMOUSE_IMEX && genius_detect(psmouse)) {
