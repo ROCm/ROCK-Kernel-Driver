@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#116 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.c#119 $
  *
  * $FreeBSD$
  */
@@ -4898,12 +4898,12 @@ ahc_init(struct ahc_softc *ahc)
 
 #ifdef AHC_DEBUG
 	if (ahc_debug & AHC_SHOW_MISC) {
-		printf("%s: hardware scb %Zu bytes; kernel scb %Zu bytes; "
-		       "ahc_dma %Zu bytes\n",
+		printf("%s: hardware scb %u bytes; kernel scb %u bytes; "
+		       "ahc_dma %u bytes\n",
 			ahc_name(ahc),
-			sizeof(struct hardware_scb),
-			sizeof(struct scb),
-			sizeof(struct ahc_dma_seg));
+			(u_int)sizeof(struct hardware_scb),
+			(u_int)sizeof(struct scb),
+			(u_int)sizeof(struct ahc_dma_seg));
 	}
 #endif /* AHC_DEBUG */
 
@@ -4974,7 +4974,7 @@ ahc_init(struct ahc_softc *ahc)
 			 * connection type we have with the target.
 			 */
 			tinfo->user.period = ahc_syncrates->period;
-			tinfo->user.offset = ~0;
+			tinfo->user.offset = MAX_OFFSET;
 		} else {
 			u_int scsirate;
 			uint16_t mask;
@@ -5009,7 +5009,7 @@ ahc_init(struct ahc_softc *ahc)
 				if (offset == 0)
 					tinfo->user.period = 0;
 				else
-					tinfo->user.offset = ~0;
+					tinfo->user.offset = MAX_OFFSET;
 				if ((scsirate & SXFR_ULTRA2) <= 8/*10MHz*/
 				 && (ahc->features & AHC_DT) != 0)
 					tinfo->user.ppr_options =
@@ -5027,7 +5027,7 @@ ahc_init(struct ahc_softc *ahc)
 						   ? AHC_SYNCRATE_ULTRA
 						   : AHC_SYNCRATE_FAST);
 				if (tinfo->user.period != 0)
-					tinfo->user.offset = ~0;
+					tinfo->user.offset = MAX_OFFSET;
 			}
 			if (tinfo->user.period == 0)
 				tinfo->user.offset = 0;
