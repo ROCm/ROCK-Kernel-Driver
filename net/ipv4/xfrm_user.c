@@ -1,6 +1,13 @@
 /* xfrm_user.c: User interface to configure xfrm engine.
  *
  * Copyright (C) 2002 David S. Miller (davem@redhat.com)
+ *
+ * Changes
+ *
+ *	Mitsuru KANDA @USAGI       : IPv6 Support 
+ * 	Kazunori MIYAZAWA @USAGI   :
+ * 	Kunihiro Ishiguro          :
+ * 	
  */
 
 #include <linux/module.h>
@@ -17,6 +24,9 @@
 #include <linux/ipsec.h>
 #include <linux/init.h>
 #include <linux/security.h>
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+#include <linux/in6.h>
+#endif
 #include <net/sock.h>
 #include <net/xfrm.h>
 
