@@ -61,10 +61,12 @@ static inline runqueue_t *lock_task_rq(task_t *p, unsigned long *flags)
 	struct runqueue *__rq;
 
 repeat_lock_task:
+	preempt_disable();
 	__rq = task_rq(p);
 	spin_lock_irqsave(&__rq->lock, *flags);
 	if (unlikely(__rq != task_rq(p))) {
 		spin_unlock_irqrestore(&__rq->lock, *flags);
+		preempt_enable();
 		goto repeat_lock_task;
 	}
 	return __rq;
@@ -73,6 +75,7 @@ repeat_lock_task:
 static inline void unlock_task_rq(runqueue_t *rq, unsigned long *flags)
 {
 	spin_unlock_irqrestore(&rq->lock, *flags);
+	preempt_enable();
 }
 /*
  * Adding/removing a task to/from a priority array:
@@ -195,6 +198,7 @@ static inline void resched_task(task_t *p)
 #ifdef CONFIG_SMP
 	int need_resched, nrpolling;
 
+	preempt_disable();
 	/* minimise the chance of sending an interrupt to poll_idle() */
 	nrpolling = test_tsk_thread_flag(p,TIF_POLLING_NRFLAG);
 	need_resched = test_and_set_tsk_thread_flag(p,TIF_NEED_RESCHED);
@@ -202,6 +206,7 @@ static inline void resched_task(task_t *p)
 
 	if (!need_resched && !nrpolling && (p->thread_info->cpu != smp_processor_id()))
 		smp_send_reschedule(p->thread_info->cpu);
+	preempt_enable();
 #else
 	set_tsk_need_resched(p);
 #endif
@@ -219,6 +224,7 @@ void wait_task_inactive(task_t * p)
 	runqueue_t *rq;
 
 repeat:
+	preempt_disable();
 	rq = task_rq(p);
 	while (unlikely(rq->curr == p)) {
 		cpu_relax();
@@ -227,9 +233,11 @@ repeat:
 	rq = lock_task_rq(p, &flags);
 	if (unlikely(rq->curr == p)) {
 		unlock_task_rq(rq, &flags);
+		preempt_enable();
 		goto repeat;
 	}
 	unlock_task_rq(rq, &flags);
+	preempt_enable();
 }
 
 /*
@@ -295,7 +303,10 @@ int wake_up_process(task_t * p)
 
 void wake_up_forked_process(task_t * p)
 {
-	runqueue_t *rq = this_rq();
+	runqueue_t *rq;
+	
+	preempt_disable();
+	rq = this_rq();
 
 	p->state = TASK_RUNNING;
 	if (!rt_task(p)) {
@@ -308,6 +319,7 @@ void wake_up_forked_process(task_t * p)
 	p->thread_info->cpu = smp_processor_id();
 	activate_task(p, rq);
 	spin_unlock_irq(&rq->lock);
+	preempt_enable();
 }
 
 asmlinkage void schedule_tail(task_t *prev)
@@ -635,17 +647,31 @@ void scheduling_functions_start_here(void) { }
  */
 asmlinkage void schedule(void)
 {
-	task_t *prev = current, *next;
-	runqueue_t *rq = this_rq();
+	task_t *prev, *next;
+	runqueue_t *rq;
 	prio_array_t *array;
 	list_t *queue;
 	int idx;
 
 	if (unlikely(in_interrupt()))
 		BUG();
+
+	preempt_disable();
+	prev = current;
+	rq = this_rq();
+	
 	release_kernel_lock(prev, smp_processor_id());
 	spin_lock_irq(&rq->lock);
 
+#ifdef CONFIG_PREEMPT
+	/*
+	 * if entering from preempt_schedule, off a kernel preemption,
+	 * go straight to picking the next task.
+	 */
+	if (unlikely(preempt_get_count() & PREEMPT_ACTIVE))
+		goto pick_next_task;
+#endif
+	
 	switch (prev->state) {
 	case TASK_RUNNING:
 		prev->sleep_timestamp = jiffies;
@@ -659,7 +685,7 @@ asmlinkage void schedule(void)
 	default:
 		deactivate_task(prev, rq);
 	}
-#if CONFIG_SMP
+#if CONFIG_SMP || CONFIG_PREEMPT
 pick_next_task:
 #endif
 	if (unlikely(!rq->nr_running)) {
@@ -707,8 +733,24 @@ switch_tasks:
 	spin_unlock_irq(&rq->lock);
 
 	reacquire_kernel_lock(current);
+	preempt_enable_no_resched();
 	return;
 }
+
+#ifdef CONFIG_PREEMPT
+/*
+ * this is is the entry point to schedule() from in-kernel preemption.
+ */
+asmlinkage void preempt_schedule(void)
+{
+	do {
+		current_thread_info()->preempt_count += PREEMPT_ACTIVE;
+		schedule();
+		current_thread_info()->preempt_count -= PREEMPT_ACTIVE;
+		barrier();
+	} while (test_thread_flag(TIF_NEED_RESCHED));
+}
+#endif /* CONFIG_PREEMPT */
 
 /*
  * The core wakeup function.  Non-exclusive wakeups (nr_exclusive == 0) just
@@ -1105,8 +1147,11 @@ out_unlock:
 
 asmlinkage long sys_sched_yield(void)
 {
-	runqueue_t *rq = this_rq();
+	runqueue_t *rq;
 	prio_array_t *array;
+
+	preempt_disable();
+	rq = this_rq();
 
 	/*
 	 * Decrease the yielding task's priority by one, to avoid
@@ -1134,6 +1179,7 @@ asmlinkage long sys_sched_yield(void)
 		__set_bit(current->prio, array->bitmap);
 	}
 	spin_unlock(&rq->lock);
+	preempt_enable_no_resched();
 
 	schedule();
 

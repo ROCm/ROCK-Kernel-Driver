@@ -167,6 +167,7 @@ fi
 bool 'Math emulation' CONFIG_MATH_EMULATION
 bool 'MTRR (Memory Type Range Register) support' CONFIG_MTRR
 bool 'Symmetric multi-processing support' CONFIG_SMP
+bool 'Preemptible Kernel' CONFIG_PREEMPT
 if [ "$CONFIG_SMP" != "y" ]; then
    bool 'Local APIC support on uniprocessors' CONFIG_X86_UP_APIC
    dep_bool 'IO-APIC support on uniprocessors' CONFIG_X86_UP_IOAPIC $CONFIG_X86_UP_APIC
@@ -180,9 +181,12 @@ else
    bool 'Multiquad NUMA system' CONFIG_MULTIQUAD
 fi
 
-if [ "$CONFIG_SMP" = "y" -a "$CONFIG_X86_CMPXCHG" = "y" ]; then
-   define_bool CONFIG_HAVE_DEC_LOCK y
+if [ "$CONFIG_SMP" = "y" -o "$CONFIG_PREEMPT" = "y" ]; then
+   if [ "$CONFIG_X86_CMPXCHG" = "y" ]; then
+      define_bool CONFIG_HAVE_DEC_LOCK y
+   fi
 fi
+
 endmenu
 
 mainmenu_option next_comment

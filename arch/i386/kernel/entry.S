@@ -69,6 +69,37 @@ IF_MASK		= 0x00000200
 NT_MASK		= 0x00004000
 VM_MASK		= 0x00020000
 
+/* These are offsets into the irq_stat structure
+ * There is one per cpu and it is aligned to 32
+ * byte boundry (we put that here as a shift count)
+ */
+irq_array_shift			= CONFIG_X86_L1_CACHE_SHIFT
+irq_stat_local_irq_count	= 4
+irq_stat_local_bh_count		= 8
+
+#ifdef CONFIG_SMP
+#define GET_CPU_INDX	movl TI_CPU(%ebx),%eax;  \
+                        shll $irq_array_shift,%eax
+#define GET_CURRENT_CPU_INDX GET_THREAD_INFO(%ebx); \
+                             GET_CPU_INDX
+#define CPU_INDX (,%eax)
+#else
+#define GET_CPU_INDX
+#define GET_CURRENT_CPU_INDX GET_THREAD_INFO(%ebx)
+#define CPU_INDX
+#endif
+
+#ifdef CONFIG_PREEMPT
+#define preempt_stop cli
+#define init_ret_intr \
+	cli; \
+	decl TI_PRE_COUNT(%ebx);
+#else
+#define preempt_stop
+#define init_ret_intr
+#define resume_kernel restore_all
+#endif
+
 #define SAVE_ALL \
 	cld; \
 	pushl %es; \
@@ -176,11 +207,12 @@ ENTRY(ret_from_fork)
 	ALIGN
 ENTRY(ret_from_intr)
 	GET_THREAD_INFO(%ebx)
+	init_ret_intr
 ret_from_exception:
 	movl EFLAGS(%esp),%eax		# mix EFLAGS and CS
 	movb CS(%esp),%al
 	testl $(VM_MASK | 3),%eax
-	jz restore_all			# returning to kernel-space or vm86-space
+	jz resume_kernel		# returning to kernel or vm86-space
 ENTRY(resume_userspace)
  	cli				# make sure we don't miss an interrupt setting need_resched
  					# or sigpending between sampling and the iret
@@ -188,6 +220,22 @@ ENTRY(resume_userspace)
 	andl $_TIF_WORK_MASK,%ecx	# is there any work to be done on int/excp return?
 	jne work_pending
 	jmp restore_all
+
+#ifdef CONFIG_PREEMPT
+ENTRY(resume_kernel)
+	cmpl $0,TI_PRE_COUNT(%ebx)
+	jnz restore_all
+	movl TI_FLAGS(%ebx),%ecx
+	testb $_TIF_NEED_RESCHED,%cl
+	jz restore_all
+	movl SYMBOL_NAME(irq_stat)+irq_stat_local_bh_count CPU_INDX,%ecx
+	addl SYMBOL_NAME(irq_stat)+irq_stat_local_irq_count CPU_INDX,%ecx
+	jnz restore_all
+	incl TI_PRE_COUNT(%ebx)
+	sti
+	call SYMBOL_NAME(preempt_schedule)
+	jmp ret_from_intr
+#endif
 
 	# system call handler stub
 	ALIGN
@@ -302,6 +350,7 @@ error_code:
 	GET_THREAD_INFO(%ebx)
 	call *%edi
 	addl $8,%esp
+	preempt_stop
 	jmp ret_from_exception
 
 ENTRY(coprocessor_error)
@@ -321,12 +370,14 @@ ENTRY(device_not_available)
 	movl %cr0,%eax
 	testl $0x4,%eax			# EM (math emulation bit)
 	jne device_not_available_emulate
+	preempt_stop
 	call SYMBOL_NAME(math_state_restore)
 	jmp ret_from_exception
 device_not_available_emulate:
 	pushl $0		# temporary storage for ORIG_EIP
 	call  SYMBOL_NAME(math_emulate)
 	addl $4,%esp
+	preempt_stop
 	jmp ret_from_exception
 
 ENTRY(debug)

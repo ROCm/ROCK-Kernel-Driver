@@ -2,6 +2,10 @@
 #define __LINUX_SPINLOCK_H
 
 #include <linux/config.h>
+#include <linux/linkage.h>
+#include <linux/compiler.h>
+#include <linux/thread_info.h>
+#include <linux/kernel.h>
 
 /*
  * These are the generic versions of the spinlocks and read-write
@@ -62,8 +66,10 @@
 
 #if (DEBUG_SPINLOCKS < 1)
 
+#ifndef CONFIG_PREEMPT
 #define atomic_dec_and_lock(atomic,lock) atomic_dec_and_test(atomic)
 #define ATOMIC_DEC_AND_LOCK
+#endif
 
 /*
  * Your basic spinlocks, allowing only a single CPU anywhere
@@ -79,11 +85,11 @@
 #endif
 
 #define spin_lock_init(lock)	do { } while(0)
-#define spin_lock(lock)		(void)(lock) /* Not "unused variable". */
+#define _raw_spin_lock(lock)	(void)(lock) /* Not "unused variable". */
 #define spin_is_locked(lock)	(0)
-#define spin_trylock(lock)	({1; })
+#define _raw_spin_trylock(lock)	({1; })
 #define spin_unlock_wait(lock)	do { } while(0)
-#define spin_unlock(lock)	do { } while(0)
+#define _raw_spin_unlock(lock)	do { } while(0)
 
 #elif (DEBUG_SPINLOCKS < 2)
 
@@ -142,12 +148,78 @@ typedef struct {
 #endif
 
 #define rwlock_init(lock)	do { } while(0)
-#define read_lock(lock)		(void)(lock) /* Not "unused variable". */
-#define read_unlock(lock)	do { } while(0)
-#define write_lock(lock)	(void)(lock) /* Not "unused variable". */
-#define write_unlock(lock)	do { } while(0)
+#define _raw_read_lock(lock)	(void)(lock) /* Not "unused variable". */
+#define _raw_read_unlock(lock)	do { } while(0)
+#define _raw_write_lock(lock)	(void)(lock) /* Not "unused variable". */
+#define _raw_write_unlock(lock)	do { } while(0)
 
 #endif /* !SMP */
+
+#ifdef CONFIG_PREEMPT
+
+asmlinkage void preempt_schedule(void);
+
+#define preempt_get_count() (current_thread_info()->preempt_count)
+
+#define preempt_disable() \
+do { \
+	++current_thread_info()->preempt_count; \
+	barrier(); \
+} while (0)
+
+#define preempt_enable_no_resched() \
+do { \
+	--current_thread_info()->preempt_count; \
+	barrier(); \
+} while (0)
+
+#define preempt_enable() \
+do { \
+	--current_thread_info()->preempt_count; \
+	barrier(); \
+	if (unlikely(!(current_thread_info()->preempt_count) && \
+		test_thread_flag(TIF_NEED_RESCHED))) \
+			preempt_schedule(); \
+} while (0)
+
+#define spin_lock(lock)	\
+do { \
+	preempt_disable(); \
+	_raw_spin_lock(lock); \
+} while(0)
+
+#define spin_trylock(lock)	({preempt_disable(); _raw_spin_trylock(lock) ? \
+				1 : ({preempt_enable(); 0;});})
+#define spin_unlock(lock) \
+do { \
+	_raw_spin_unlock(lock); \
+	preempt_enable(); \
+} while (0)
+
+#define read_lock(lock)		({preempt_disable(); _raw_read_lock(lock);})
+#define read_unlock(lock)	({_raw_read_unlock(lock); preempt_enable();})
+#define write_lock(lock)	({preempt_disable(); _raw_write_lock(lock);})
+#define write_unlock(lock)	({_raw_write_unlock(lock); preempt_enable();})
+#define write_trylock(lock)	({preempt_disable();_raw_write_trylock(lock) ? \
+				1 : ({preempt_enable(); 0;});})
+
+#else
+
+#define preempt_get_count()	do { } while (0)
+#define preempt_disable()	do { } while (0)
+#define preempt_enable_no_resched()	do {} while(0)
+#define preempt_enable()	do { } while (0)
+
+#define spin_lock(lock)		_raw_spin_lock(lock)
+#define spin_trylock(lock)	_raw_spin_trylock(lock)
+#define spin_unlock(lock)	_raw_spin_unlock(lock)
+
+#define read_lock(lock)		_raw_read_lock(lock)
+#define read_unlock(lock)	_raw_read_unlock(lock)
+#define write_lock(lock)	_raw_write_lock(lock)
+#define write_unlock(lock)	_raw_write_unlock(lock)
+#define write_trylock(lock)	_raw_write_trylock(lock)
+#endif
 
 /* "lock on reference count zero" */
 #ifndef ATOMIC_DEC_AND_LOCK

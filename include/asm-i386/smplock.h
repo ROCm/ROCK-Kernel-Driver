@@ -10,7 +10,15 @@
 
 extern spinlock_t kernel_flag;
 
+#ifdef CONFIG_SMP
 #define kernel_locked()		spin_is_locked(&kernel_flag)
+#else
+#ifdef CONFIG_PREEMPT
+#define kernel_locked()		preempt_get_count()
+#else
+#define kernel_locked()		1
+#endif
+#endif
 
 /*
  * Release global kernel lock and global interrupt lock
@@ -43,6 +51,11 @@ do {						\
  */
 static __inline__ void lock_kernel(void)
 {
+#ifdef CONFIG_PREEMPT
+	if (current->lock_depth == -1)
+		spin_lock(&kernel_flag);
+	++current->lock_depth;
+#else
 #if 1
 	if (!++current->lock_depth)
 		spin_lock(&kernel_flag);
@@ -54,6 +67,7 @@ static __inline__ void lock_kernel(void)
 		"\n9:"
 		:"=m" (__dummy_lock(&kernel_flag)),
 		 "=m" (current->lock_depth));
+#endif
 #endif
 }
 

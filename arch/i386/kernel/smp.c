@@ -497,7 +497,7 @@ void smp_migrate_task(int cpu, task_t *p)
 	/*
 	 * The target CPU will unlock the migration spinlock:
 	 */
-	spin_lock(&migration_lock);
+	_raw_spin_lock(&migration_lock);
 	new_task = p;
 	send_IPI_mask(1 << cpu, TASK_MIGRATION_VECTOR);
 }
@@ -511,7 +511,7 @@ asmlinkage void smp_task_migration_interrupt(void)
 
 	ack_APIC_irq();
 	p = new_task;
-	spin_unlock(&migration_lock);
+	_raw_spin_unlock(&migration_lock);
 	sched_task_migrated(p);
 }
 /*

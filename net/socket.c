@@ -132,7 +132,7 @@ static struct file_operations socket_file_ops = {
 
 static struct net_proto_family *net_families[NPROTO];
 
-#ifdef CONFIG_SMP
+#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 static atomic_t net_family_lockct = ATOMIC_INIT(0);
 static spinlock_t net_family_lock = SPIN_LOCK_UNLOCKED;
 

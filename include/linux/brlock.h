@@ -171,11 +171,11 @@ static inline void br_write_unlock (enum brlock_indices idx)
 }
 
 #else
-# define br_read_lock(idx)	((void)(idx))
-# define br_read_unlock(idx)	((void)(idx))
-# define br_write_lock(idx)	((void)(idx))
-# define br_write_unlock(idx)	((void)(idx))
-#endif
+# define br_read_lock(idx)	({ (void)(idx); preempt_disable(); })
+# define br_read_unlock(idx)	({ (void)(idx); preempt_enable(); })
+# define br_write_lock(idx)	({ (void)(idx); preempt_disable(); })
+# define br_write_unlock(idx)	({ (void)(idx); preempt_enable(); })
+#endif	/* CONFIG_SMP */
 
 /*
  * Now enumerate all of the possible sw/hw IRQ protected

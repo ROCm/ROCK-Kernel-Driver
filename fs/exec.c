@@ -420,8 +420,8 @@ static int exec_mmap(void)
 		active_mm = current->active_mm;
 		current->mm = mm;
 		current->active_mm = mm;
-		task_unlock(current);
 		activate_mm(active_mm, mm);
+		task_unlock(current);
 		mm_release();
 		if (old_mm) {
 			if (active_mm != old_mm) BUG();
