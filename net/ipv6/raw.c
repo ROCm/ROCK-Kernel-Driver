@@ -452,6 +452,7 @@ static int rawv6_push_pending_frames(struct sock *sk, struct flowi *fl, struct r
 	struct sk_buff *skb;
 	int err = 0;
 	u16 *csum;
+	u32 tmp_csum;
 
 	if (!opt->checksum)
 		goto send;
@@ -466,26 +467,24 @@ static int rawv6_push_pending_frames(struct sock *sk, struct flowi *fl, struct r
 		goto out;
 	}
 
+	/* should be check HW csum miyazawa */
 	if (skb_queue_len(&sk->sk_write_queue) == 1) {
 		/*
 		 * Only one fragment on the socket.
 		 */
-		/* should be check HW csum miyazawa */
-		*csum = csum_ipv6_magic(&fl->fl6_src,
-					&fl->fl6_dst,
-					len, fl->proto, skb->csum);
+		tmp_csum = skb->csum;
 	} else {
-		u32 tmp_csum = 0;
+		tmp_csum = 0;
 
 		skb_queue_walk(&sk->sk_write_queue, skb) {
 			tmp_csum = csum_add(tmp_csum, skb->csum);
 		}
-
-		tmp_csum = csum_ipv6_magic(&fl->fl6_src,
-					   &fl->fl6_dst,
-					   len, fl->proto, tmp_csum);
-		*csum = tmp_csum;
 	}
+
+	*csum = csum_ipv6_magic(&fl->fl6_src,
+				&fl->fl6_dst,
+				len, fl->proto, tmp_csum);
+
 	if (*csum == 0)
 		*csum = -1;
 send:
