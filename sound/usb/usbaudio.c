@@ -573,21 +573,18 @@ static void snd_complete_urb(struct urb *urb, struct pt_regs *regs)
 	snd_urb_ctx_t *ctx = (snd_urb_ctx_t *)urb->context;
 	snd_usb_substream_t *subs = ctx->subs;
 	snd_pcm_substream_t *substream = ctx->subs->pcm_substream;
-	int err;
+	int err = 0;
 
-	clear_bit(ctx->index, &subs->active_mask);
-	clear_bit(ctx->index, &subs->unlink_mask);
-	if (subs->running && subs->ops.retire(subs, substream->runtime, urb))
-		return;
-	if (! subs->running) /* can be stopped during retire callback */
-		return;
-	if ((err = subs->ops.prepare(subs, substream->runtime, urb)) < 0 ||
+	if ((subs->running && subs->ops.retire(subs, substream->runtime, urb)) ||
+	    ! subs->running || /* can be stopped during retire callback */
+	    (err = subs->ops.prepare(subs, substream->runtime, urb)) < 0 ||
 	    (err = usb_submit_urb(urb, GFP_ATOMIC)) < 0) {
-		snd_printd(KERN_ERR "cannot submit urb (err = %d)\n", err);
-		snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
-		return;
+		clear_bit(ctx->index, &subs->active_mask);
+		if (err < 0) {
+			snd_printd(KERN_ERR "cannot submit urb (err = %d)\n", err);
+			snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
+		}
 	}
-	set_bit(ctx->index, &subs->active_mask);
 }
 
 
@@ -599,21 +596,18 @@ static void snd_complete_sync_urb(struct urb *urb, struct pt_regs *regs)
 	snd_urb_ctx_t *ctx = (snd_urb_ctx_t *)urb->context;
 	snd_usb_substream_t *subs = ctx->subs;
 	snd_pcm_substream_t *substream = ctx->subs->pcm_substream;
-	int err;
+	int err = 0;
 
-	clear_bit(ctx->index + 16, &subs->active_mask);
-	clear_bit(ctx->index + 16, &subs->unlink_mask);
-	if (subs->running && subs->ops.retire_sync(subs, substream->runtime, urb))
-		return;
-	if (! subs->running) /* can be stopped during retire callback */
-		return;
-	if ((err = subs->ops.prepare_sync(subs, substream->runtime, urb))  < 0 ||
+	if ((subs->running && subs->ops.retire_sync(subs, substream->runtime, urb)) ||
+	    ! subs->running || /* can be stopped during retire callback */
+	    (err = subs->ops.prepare_sync(subs, substream->runtime, urb)) < 0 ||
 	    (err = usb_submit_urb(urb, GFP_ATOMIC)) < 0) {
-		snd_printd(KERN_ERR "cannot submit sync urb (err = %d)\n", err);
-		snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
-		return;
+		clear_bit(ctx->index + 16, &subs->active_mask);
+		if (err < 0) {
+			snd_printd(KERN_ERR "cannot submit sync urb (err = %d)\n", err);
+			snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
+		}
 	}
-	set_bit(ctx->index + 16, &subs->active_mask);
 }
 
 
@@ -694,9 +688,11 @@ static int start_urbs(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 		}
 	}
 
+	subs->active_mask = 0;
+	subs->unlink_mask = 0;
 	subs->running = 1;
 	for (i = 0; i < subs->nurbs; i++) {
-		if ((err = usb_submit_urb(subs->dataurb[i].urb, GFP_KERNEL)) < 0) {
+		if ((err = usb_submit_urb(subs->dataurb[i].urb, GFP_ATOMIC)) < 0) {
 			snd_printk(KERN_ERR "cannot submit datapipe for urb %d, err = %d\n", i, err);
 			goto __error;
 		}
@@ -704,7 +700,7 @@ static int start_urbs(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 	}
 	if (subs->syncpipe) {
 		for (i = 0; i < SYNC_URBS; i++) {
-			if ((err = usb_submit_urb(subs->syncurb[i].urb, GFP_KERNEL)) < 0) {
+			if ((err = usb_submit_urb(subs->syncurb[i].urb, GFP_ATOMIC)) < 0) {
 				snd_printk(KERN_ERR "cannot submit syncpipe for urb %d, err = %d\n", i, err);
 				goto __error;
 			}
@@ -843,8 +839,6 @@ static int init_substream_urbs(snd_usb_substream_t *subs, unsigned int period_by
 	subs->hwptr_done = 0;
 	subs->transfer_sched = 0;
 	subs->transfer_done = 0;
-	subs->active_mask = 0;
-	subs->unlink_mask = 0;
 
 	/* calculate the max. size of packet */
 	maxsize = ((subs->freqmax + 0x3fff) * (frame_bits >> 3)) >> 14;
@@ -1282,9 +1276,6 @@ static int snd_usb_pcm_prepare(snd_pcm_substream_t *substream)
 	/* some unit conversions in runtime */
 	subs->maxframesize = bytes_to_frames(runtime, subs->maxpacksize);
 	subs->curframesize = bytes_to_frames(runtime, subs->curpacksize);
-
-	/* deactivate urbs to be sure */
-	deactivate_urbs(subs, 0, 0);
 
 	return 0;
 }
