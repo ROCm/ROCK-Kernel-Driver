@@ -71,7 +71,7 @@ struct rpc_timeout {
 				to_initval,		/* initial timeout */
 				to_maxval,		/* max timeout */
 				to_increment;		/* if !exponential */
-	short			to_retries;		/* max # of retries */
+	unsigned int		to_retries;		/* max # of retries */
 	unsigned char		to_exponential;
 };
 

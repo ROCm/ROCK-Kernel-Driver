@@ -584,9 +584,11 @@ xprt_complete_rqst(struct rpc_xprt *xprt, struct rpc_rqst *req, int copied)
 		xprt_adjust_cwnd(xprt, copied);
 		__xprt_put_cong(xprt, req);
 	       	if (!req->rq_nresend) {
-			int timer = rpcproc_timer(clnt, task->tk_msg.rpc_proc);
+			unsigned timer =
+				rpcproc_timer(clnt, task->tk_msg.rpc_proc);
 			if (timer)
-				rpc_update_rtt(&clnt->cl_rtt, timer, (long)jiffies - req->rq_xtime);
+				rpc_update_rtt(&clnt->cl_rtt, timer,
+						(long)jiffies - req->rq_xtime);
 		}
 		rpc_clear_timeo(&clnt->cl_rtt);
 	}
