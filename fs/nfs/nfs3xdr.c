@@ -651,20 +651,23 @@ nfs3_xdr_getaclargs(struct rpc_rqst *req, u32 *p,
 	*p++ = htonl(args->mask);
 	req->rq_slen = xdr_adjust_iovec(req->rq_svec, p);
 
-	/* Allocate memory for the reply */
-	for (count = 0; count < NFSACL_MAXPAGES; count++) {
-		args->pages[count] = alloc_page(GFP_KERNEL);
-		if (!args->pages[count]) {
-			while (count)
-				__free_page(args->pages[--count]);
-			return -ENOMEM;
+	if (args->mask & (NFS3_ACL | NFS3_DFACL)) {
+		/* Allocate memory for the reply */
+		for (count = 0; count < NFSACL_MAXPAGES; count++) {
+			args->pages[count] = alloc_page(GFP_KERNEL);
+			if (!args->pages[count]) {
+				while (count)
+					__free_page(args->pages[--count]);
+				return -ENOMEM;
+			}
 		}
-	}
 
-	/* Inline the page array */
-	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS3_getaclres_sz) << 2;
-	xdr_inline_pages(&req->rq_rcv_buf, replen, args->pages, 0,
-			 count << PAGE_SHIFT);
+		/* Inline the page array */
+		replen = (RPC_REPHDRSIZE + auth->au_rslack +
+			  NFS3_getaclres_sz) << 2;
+		xdr_inline_pages(&req->rq_rcv_buf, replen, args->pages, 0,
+				 count << PAGE_SHIFT);
+	}
 	return 0;
 }
 #endif  /* CONFIG_NFS_ACL */
