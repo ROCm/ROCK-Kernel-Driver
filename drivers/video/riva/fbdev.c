@@ -441,6 +441,8 @@ static void rivafb_load_cursor_image(struct riva_par *par, u8 *data8,
 	int i, j, k = 0;
 	u32 b, tmp;
 	u32 *data = (u32 *)data8;
+	bg = le16_to_cpu(bg);
+	fg = le16_to_cpu(fg);
 
 	for (i = 0; i < h; i++) {
 		b = *data++;
@@ -1155,6 +1157,12 @@ static int rivafb_set_par(struct fb_info *info)
 	struct riva_par *par = (struct riva_par *) info->par;
 
 	NVTRACE_ENTER();
+	riva_common_setup(par);
+	RivaGetConfig(&par->riva, par->Chipset);
+	/* vgaHWunlock() + riva unlock (0x7F) */
+	CRTCout(par, 0x11, 0xFF);
+	par->riva.LockUnlock(&par->riva, 0);
+
 	riva_load_video_mode(info);
 	riva_setup_accel(info);
 	
@@ -1939,15 +1947,14 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 			goto err_out_free_nv3_pramin;
 		}
 		rivafb_fix.accel = FB_ACCEL_NV3;
-		default_par->bus = 1;
 		break;
 	case NV_ARCH_04:
 	case NV_ARCH_10:
 	case NV_ARCH_20:
+	case NV_ARCH_30:
 		default_par->riva.PCRTC0 = (unsigned *)(default_par->ctrl_base + 0x00600000);
 		default_par->riva.PRAMIN = (unsigned *)(default_par->ctrl_base + 0x00710000);
 		rivafb_fix.accel = FB_ACCEL_NV4;
-		default_par->bus = 2;
 		break;
 	}
 
@@ -2157,9 +2164,9 @@ MODULE_PARM_DESC(forceCRTC, "Forces usage of a particular CRTC in case autodetec
 #ifdef CONFIG_MTRR
 MODULE_PARM(nomtrr, "i");
 MODULE_PARM_DESC(nomtrr, "Disables MTRR support (0 or 1=disabled) (default=0)");
+#endif
 MODULE_PARM(strictmode, "i");
 MODULE_PARM_DESC(strictmode, "Only use video modes from EDID");
-#endif
 #endif /* MODULE */
 
 MODULE_AUTHOR("Ani Joshi, maintainer");
