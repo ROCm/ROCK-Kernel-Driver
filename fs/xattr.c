@@ -67,9 +67,11 @@ setxattr(struct dentry *d, char *name, void *value, size_t size, int flags)
 	if (flags & ~(XATTR_CREATE|XATTR_REPLACE))
 		return -EINVAL;
 
-	if (copy_from_user(kname, name, XATTR_NAME_MAX))
-		return -EFAULT;
-	kname[XATTR_NAME_MAX] = '\0';
+	error = strncpy_from_user(kname, name, sizeof(kname));
+	if (error == 0 || error == sizeof(kname))
+		error = -ERANGE;
+	if (error < 0)
+		return error;
 
 	kvalue = xattr_alloc(size, XATTR_SIZE_MAX);
 	if (IS_ERR(kvalue))
@@ -143,9 +145,11 @@ getxattr(struct dentry *d, char *name, void *value, size_t size)
 	void *kvalue;
 	char kname[XATTR_NAME_MAX + 1];
 
-	if (copy_from_user(kname, name, XATTR_NAME_MAX))
-		return -EFAULT;
-	kname[XATTR_NAME_MAX] = '\0';
+	error = strncpy_from_user(kname, name, sizeof(kname));
+	if (error == 0 || error == sizeof(kname))
+		error = -ERANGE;
+	if (error < 0)
+		return error;
 
 	kvalue = xattr_alloc(size, XATTR_SIZE_MAX);
 	if (IS_ERR(kvalue))
@@ -285,9 +289,11 @@ removexattr(struct dentry *d, char *name)
 	int error;
 	char kname[XATTR_NAME_MAX + 1];
 
-	if (copy_from_user(kname, name, XATTR_NAME_MAX))
-		return -EFAULT;
-	kname[XATTR_NAME_MAX] = '\0';
+	error = strncpy_from_user(kname, name, sizeof(kname));
+	if (error == 0 || error == sizeof(kname))
+		error = -ERANGE;
+	if (error < 0)
+		return error;
 
 	error = -EOPNOTSUPP;
 	if (d->d_inode->i_op && d->d_inode->i_op->removexattr) {
