@@ -255,7 +255,7 @@ int timer_interrupt(struct pt_regs * regs)
 	unsigned long cpu = lpaca->xPacaIndex;
 	struct ItLpQueue * lpq;
 
-	irq_enter(cpu);
+	irq_enter();
 
 #ifndef CONFIG_PPC_ISERIES
 	if (!user_mode(regs))
@@ -291,7 +291,7 @@ int timer_interrupt(struct pt_regs * regs)
 	if (lpq && ItLpQueue_isLpIntPending(lpq))
 		lpEvent_count += ItLpQueue_process(lpq, regs); 
 
-	irq_exit(cpu);
+	irq_exit();
 
 	if (softirq_pending(cpu))
 		do_softirq();

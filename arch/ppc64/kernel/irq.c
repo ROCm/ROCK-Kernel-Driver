@@ -165,6 +165,20 @@ setup_irq(unsigned int irq, struct irqaction * new)
 	return 0;
 }
 
+#ifdef CONFIG_SMP
+
+inline void synchronize_irq(unsigned int irq)
+{
+	while (irq_desc[irq].status & IRQ_INPROGRESS) {
+		barrier();
+		cpu_relax();
+	}
+}
+
+#endif /* CONFIG_SMP */
+
+/* XXX Make this into free_irq() - Anton */
+
 /* This could be promoted to a real free_irq() ... */
 static int
 do_free_irq(int irq, void* dev_id)
@@ -192,11 +206,8 @@ do_free_irq(int irq, void* dev_id)
 			}
 			spin_unlock_irqrestore(&desc->lock,flags);
 
-#ifdef CONFIG_SMP
 			/* Wait to make sure it's not being used on another CPU */
-			while (desc->status & IRQ_INPROGRESS)
-				barrier();
-#endif
+			synchronize_irq(irq);
 			irq_kfree(action);
 			return 0;
 		}
@@ -293,12 +304,7 @@ void free_irq(unsigned int irq, void *dev_id)
 void disable_irq(unsigned int irq)
 {
 	disable_irq_nosync(irq);
-
-	if (!local_irq_count(smp_processor_id())) {
-		do {
-			barrier();
-		} while (irq_desc[irq].status & IRQ_INPROGRESS);
-	}
+	synchronize_irq(irq);
 }
 
 /**
@@ -568,7 +574,7 @@ int do_IRQ(struct pt_regs *regs)
 	struct ItLpQueue *lpq;
 #endif
 
-	irq_enter(cpu);
+	irq_enter();
 
 #ifdef CONFIG_PPC_ISERIES
 	lpaca = get_paca();
@@ -599,7 +605,7 @@ int do_IRQ(struct pt_regs *regs)
 		ppc_spurious_interrupts++;
 #endif
 
-        irq_exit(cpu);
+        irq_exit();
 
 #ifdef CONFIG_PPC_ISERIES
 	if (lpaca->xLpPaca.xIntDword.xFields.xDecrInt) {
@@ -642,160 +648,6 @@ void __init init_IRQ(void)
 	ppc_md.init_IRQ();
 	if(ppc_md.init_ras_IRQ) ppc_md.init_ras_IRQ(); 
 }
-
-#ifdef CONFIG_SMP
-unsigned char global_irq_holder = NO_PROC_ID;
-
-static void show(char * str)
-{
-	int cpu = smp_processor_id();
-	int i;
-
-	printk("\n%s, CPU %d:\n", str, cpu);
-	printk("irq:  %d [ ", irqs_running());
-	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_online(i))
-			printk("%u ", __brlock_array[i][BR_GLOBALIRQ_LOCK]);
-	}
-	printk("]\nbh:   %d [ ",
-		(spin_is_locked(&global_bh_lock) ? 1 : 0));
-	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_online(i))
-			printk("%u ", local_bh_count(i));
-	}
-	printk("]\n");
-}
-
-#define MAXCOUNT 10000000
-
-void synchronize_irq(void)
-{
-	if (irqs_running()) {
-		cli();
-		sti();
-	}
-}
-
-static inline void get_irqlock(int cpu)
-{
-        int count;
-
-        if ((unsigned char)cpu == global_irq_holder)
-                return;
-
-        count = MAXCOUNT;
-again:
-        br_write_lock(BR_GLOBALIRQ_LOCK);
-        for (;;) {
-                spinlock_t *lock;
-
-                if (!irqs_running() &&
-                    (local_bh_count(smp_processor_id()) || !spin_is_locked(&global_bh_lock)))
-                        break;
-
-                br_write_unlock(BR_GLOBALIRQ_LOCK);
-                lock = &__br_write_locks[BR_GLOBALIRQ_LOCK].lock;
-                while (irqs_running() ||
-                       spin_is_locked(lock) ||
-                       (!local_bh_count(smp_processor_id()) && spin_is_locked(&global_bh_lock))) {
-                        if (!--count) {
-                                show("get_irqlock");
-                                count = (~0 >> 1);
-                        }
-                        __sti();
-                        barrier();
-                        __cli();
-                }
-                goto again;
-        }
-
-        global_irq_holder = cpu;
-}
-
-/*
- * A global "cli()" while in an interrupt context
- * turns into just a local cli(). Interrupts
- * should use spinlocks for the (very unlikely)
- * case that they ever want to protect against
- * each other.
- *
- * If we already have local interrupts disabled,
- * this will not turn a local disable into a
- * global one (problems with spinlocks: this makes
- * save_flags+cli+sti usable inside a spinlock).
- */
-void __global_cli(void)
-{
-	unsigned long flags;
-	
-	__save_flags(flags);
-	if (flags & (1UL << 15)) {
-		int cpu = smp_processor_id();
-		__cli();
-		if (!local_irq_count(cpu))
-			get_irqlock(cpu);
-	}
-}
-
-void __global_sti(void)
-{
-	int cpu = smp_processor_id();
-
-	if (!local_irq_count(cpu))
-		release_irqlock(cpu);
-	__sti();
-}
-
-/*
- * SMP flags value to restore to:
- * 0 - global cli
- * 1 - global sti
- * 2 - local cli
- * 3 - local sti
- */
-unsigned long __global_save_flags(void)
-{
-	int retval;
-	int local_enabled;
-	unsigned long flags;
-
-	__save_flags(flags);
-	local_enabled = (flags >> 15) & 1;
-	/* default to local */
-	retval = 2 + local_enabled;
-
-	/* check for global flags if we're not in an interrupt */
-	if (!local_irq_count(smp_processor_id())) {
-		if (local_enabled)
-			retval = 1;
-		if (global_irq_holder == (unsigned char) smp_processor_id())
-			retval = 0;
-	}
-	return retval;
-}
-
-void __global_restore_flags(unsigned long flags)
-{
-	switch (flags) {
-	case 0:
-		__global_cli();
-		break;
-	case 1:
-		__global_sti();
-		break;
-	case 2:
-		__cli();
-		break;
-	case 3:
-		__sti();
-		break;
-	default:
-		printk("global_restore_flags: %016lx caller %p\n",
-			flags, __builtin_return_address(0));
-	}
-}
-
-#endif /* CONFIG_SMP */
 
 static struct proc_dir_entry * root_irq_dir;
 static struct proc_dir_entry * irq_dir [NR_IRQS];

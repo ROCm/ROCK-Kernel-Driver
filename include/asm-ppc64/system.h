@@ -101,22 +101,14 @@ extern void dump_regs(struct pt_regs *);
 
 #ifndef CONFIG_SMP
 
+/*
+ * Compatibility macros - they will be removed after some time.
+ */
 #define cli()	__cli()
 #define sti()	__sti()
 #define save_flags(flags)	__save_flags(flags)
 #define restore_flags(flags)	__restore_flags(flags)
 #define save_and_cli(flags)	__save_and_cli(flags)
-
-#else /* CONFIG_SMP */
-
-extern void __global_cli(void);
-extern void __global_sti(void);
-extern unsigned long __global_save_flags(void);
-extern void __global_restore_flags(unsigned long);
-#define cli() __global_cli()
-#define sti() __global_sti()
-#define save_flags(x) ((x)=__global_save_flags())
-#define restore_flags(x) __global_restore_flags(x)
 
 #endif /* !CONFIG_SMP */
 
