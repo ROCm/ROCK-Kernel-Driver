@@ -75,7 +75,7 @@ static inline int page_mapping_inuse(struct page * page)
 	struct address_space *mapping = page->mapping;
 
 	/* Page is in somebody's page tables. */
-	if (page->pte.chain)
+	if (page_mapped(page))
 		return 1;
 
 	/* XXX: does this happen ? */
@@ -140,7 +140,7 @@ shrink_list(struct list_head *page_list, int nr_pages,
 		 *
 		 * XXX: implement swap clustering ?
 		 */
-		if (page->pte.chain && !mapping && !PagePrivate(page)) {
+		if (page_mapped(page) && !mapping && !PagePrivate(page)) {
 			pte_chain_unlock(page);
 			if (!add_to_swap(page))
 				goto activate_locked;
@@ -151,7 +151,7 @@ shrink_list(struct list_head *page_list, int nr_pages,
 		 * The page is mapped into the page tables of one or more
 		 * processes. Try to unmap it here.
 		 */
-		if (page->pte.chain && mapping) {
+		if (page_mapped(page) && mapping) {
 			switch (try_to_unmap(page)) {
 			case SWAP_ERROR:
 			case SWAP_FAIL:
@@ -408,9 +408,9 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in)
 	while (!list_empty(&l_hold)) {
 		page = list_entry(l_hold.prev, struct page, lru);
 		list_del(&page->lru);
-		if (page->pte.chain) {
+		if (page_mapped(page)) {
 			pte_chain_lock(page);
-			if (page->pte.chain && page_referenced(page)) {
+			if (page_mapped(page) && page_referenced(page)) {
 				pte_chain_unlock(page);
 				list_add(&page->lru, &l_active);
 				continue;

@@ -811,6 +811,8 @@ extern inline void set_context(unsigned long val)
 
 #include <asm-generic/pgtable.h>
 
+typedef pte_t *pte_addr_t;
+
 #endif /* !defined (_LANGUAGE_ASSEMBLY) */
 
 /*

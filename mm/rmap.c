@@ -43,11 +43,11 @@
  * We use an array of pte pointers in this structure to minimise cache misses
  * while traversing reverse maps.
  */
-#define NRPTE (L1_CACHE_BYTES/sizeof(void *) - 1)
+#define NRPTE ((L1_CACHE_BYTES - sizeof(void *))/sizeof(pte_addr_t))
 
 struct pte_chain {
 	struct pte_chain *next;
-	pte_t *ptes[NRPTE];
+	pte_addr_t ptes[NRPTE];
 };
 
 static kmem_cache_t	*pte_chain_cache;
@@ -126,8 +126,10 @@ int page_referenced(struct page * page)
 		referenced++;
 
 	if (PageDirect(page)) {
-		if (ptep_test_and_clear_young(page->pte.direct))
+		pte_t *pte = rmap_ptep_map(page->pte.direct);
+		if (ptep_test_and_clear_young(pte))
 			referenced++;
+		rmap_ptep_unmap(pte);
 	} else {
 		int nr_chains = 0;
 
@@ -136,11 +138,15 @@ int page_referenced(struct page * page)
 			int i;
 
 			for (i = NRPTE-1; i >= 0; i--) {
-				pte_t *p = pc->ptes[i];
-				if (!p)
+				pte_addr_t pte_paddr = pc->ptes[i];
+				pte_t *p;
+
+				if (!pte_paddr)
 					break;
+				p = rmap_ptep_map(pte_paddr);
 				if (ptep_test_and_clear_young(p))
 					referenced++;
+				rmap_ptep_unmap(p);
 				nr_chains++;
 			}
 		}
@@ -150,7 +156,6 @@ int page_referenced(struct page * page)
 			SetPageDirect(page);
 			pc->ptes[NRPTE-1] = 0;
 			pte_chain_free(pc);
-			dec_page_state(nr_reverse_maps);
 		}
 	}
 	return referenced;
@@ -166,8 +171,8 @@ int page_referenced(struct page * page)
  */
 void page_add_rmap(struct page * page, pte_t * ptep)
 {
-	struct pte_chain * pte_chain;
-	unsigned long pfn = pte_pfn(*ptep);
+	pte_addr_t pte_paddr = ptep_to_paddr(ptep);
+	struct pte_chain *pte_chain;
 	int i;
 
 #ifdef DEBUG_RMAP
@@ -179,23 +184,26 @@ void page_add_rmap(struct page * page, pte_t * ptep)
 		BUG();
 #endif
 
-	if (!pfn_valid(pfn) || PageReserved(page))
+	if (!pfn_valid(page_to_pfn(page)) || PageReserved(page))
 		return;
 
 	pte_chain_lock(page);
 
 #ifdef DEBUG_RMAP
+	/*
+	 * This stuff needs help to get up to highmem speed.
+	 */
 	{
 		struct pte_chain * pc;
 		if (PageDirect(page)) {
-			if (page->pte.direct == ptep)
+			if (page->pte.direct == pte_paddr)
 				BUG();
 		} else {
 			for (pc = page->pte.chain; pc; pc = pc->next) {
 				for (i = 0; i < NRPTE; i++) {
-					pte_t *p = pc->ptes[i];
+					pte_addr_t p = pc->ptes[i];
 
-					if (p && p == ptep)
+					if (p && p == pte_paddr)
 						BUG();
 				}
 			}
@@ -203,19 +211,19 @@ void page_add_rmap(struct page * page, pte_t * ptep)
 	}
 #endif
 
-	if (page->pte.chain == NULL) {
-		page->pte.direct = ptep;
+	if (page->pte.direct == 0) {
+		page->pte.direct = pte_paddr;
 		SetPageDirect(page);
 		goto out;
 	}
-	
+
 	if (PageDirect(page)) {
 		/* Convert a direct pointer into a pte_chain */
 		ClearPageDirect(page);
 		pte_chain = pte_chain_alloc();
 		pte_chain->ptes[NRPTE-1] = page->pte.direct;
-		pte_chain->ptes[NRPTE-2] = ptep;
-		mod_page_state(nr_reverse_maps, 2);
+		pte_chain->ptes[NRPTE-2] = pte_paddr;
+		page->pte.direct = 0;
 		page->pte.chain = pte_chain;
 		goto out;
 	}
@@ -227,23 +235,22 @@ void page_add_rmap(struct page * page, pte_t * ptep)
 		new = pte_chain_alloc();
 		new->next = pte_chain;
 		page->pte.chain = new;
-		new->ptes[NRPTE-1] = ptep;
-		inc_page_state(nr_reverse_maps);
+		new->ptes[NRPTE-1] = pte_paddr;
 		goto out;
 	}
 
-	BUG_ON(pte_chain->ptes[NRPTE-1] == NULL);
+	BUG_ON(!pte_chain->ptes[NRPTE-1]);
 
 	for (i = NRPTE-2; i >= 0; i--) {
-		if (pte_chain->ptes[i] == NULL) {
-			pte_chain->ptes[i] = ptep;
-			inc_page_state(nr_reverse_maps);
+		if (!pte_chain->ptes[i]) {
+			pte_chain->ptes[i] = pte_paddr;
 			goto out;
 		}
 	}
 	BUG();
 out:
 	pte_chain_unlock(page);
+	inc_page_state(nr_reverse_maps);
 	return;
 }
 
@@ -259,19 +266,22 @@ out:
  */
 void page_remove_rmap(struct page * page, pte_t * ptep)
 {
+	pte_addr_t pte_paddr = ptep_to_paddr(ptep);
 	struct pte_chain *pc;
-	unsigned long pfn = page_to_pfn(page);
 
 	if (!page || !ptep)
 		BUG();
-	if (!pfn_valid(pfn) || PageReserved(page))
+	if (!pfn_valid(page_to_pfn(page)) || PageReserved(page))
 		return;
 
 	pte_chain_lock(page);
 
+	BUG_ON(page->pte.direct == 0);
+ 
 	if (PageDirect(page)) {
-		if (page->pte.direct == ptep) {
-			page->pte.direct = NULL;
+		if (page->pte.direct == pte_paddr) {
+			page->pte.direct = 0;
+			dec_page_state(nr_reverse_maps);
 			ClearPageDirect(page);
 			goto out;
 		}
@@ -285,17 +295,17 @@ void page_remove_rmap(struct page * page, pte_t * ptep)
 			if (pc->next)
 				prefetch(pc->next);
 			for (i = 0; i < NRPTE; i++) {
-				pte_t *p = pc->ptes[i];
+				pte_addr_t pa = pc->ptes[i];
 
-				if (!p)
+				if (!pa)
 					continue;
 				if (victim_i == -1)
 					victim_i = i;
-				if (p != ptep)
+				if (pa != pte_paddr)
 					continue;
 				pc->ptes[i] = start->ptes[victim_i];
-				start->ptes[victim_i] = NULL;
 				dec_page_state(nr_reverse_maps);
+				start->ptes[victim_i] = 0;
 				if (victim_i == NRPTE-1) {
 					/* Emptied a pte_chain */
 					page->pte.chain = start->next;
@@ -343,9 +353,10 @@ out:
  *		pte_chain_lock		page_launder()
  *		    mm->page_table_lock	try_to_unmap_one(), trylock
  */
-static int FASTCALL(try_to_unmap_one(struct page *, pte_t *));
-static int try_to_unmap_one(struct page * page, pte_t * ptep)
+static int FASTCALL(try_to_unmap_one(struct page *, pte_addr_t));
+static int try_to_unmap_one(struct page * page, pte_addr_t paddr)
 {
+	pte_t *ptep = rmap_ptep_map(paddr);
 	unsigned long address = ptep_to_address(ptep);
 	struct mm_struct * mm = ptep_to_mm(ptep);
 	struct vm_area_struct * vma;
@@ -359,8 +370,11 @@ static int try_to_unmap_one(struct page * page, pte_t * ptep)
 	 * We need the page_table_lock to protect us from page faults,
 	 * munmap, fork, etc...
 	 */
-	if (!spin_trylock(&mm->page_table_lock))
+	if (!spin_trylock(&mm->page_table_lock)) {
+		rmap_ptep_unmap(ptep);
 		return SWAP_AGAIN;
+	}
+
 
 	/* During mremap, it's possible pages are not in a VMA. */
 	vma = find_vma(mm, address);
@@ -382,8 +396,7 @@ static int try_to_unmap_one(struct page * page, pte_t * ptep)
 
 	/* Store the swap location in the pte. See handle_pte_fault() ... */
 	if (PageSwapCache(page)) {
-		swp_entry_t entry;
-		entry.val = page->index;
+		swp_entry_t entry = { .val = page->index };
 		swap_duplicate(entry);
 		set_pte(ptep, swp_entry_to_pte(entry));
 	}
@@ -397,6 +410,7 @@ static int try_to_unmap_one(struct page * page, pte_t * ptep)
 	ret = SWAP_SUCCESS;
 
 out_unlock:
+	rmap_ptep_unmap(ptep);
 	spin_unlock(&mm->page_table_lock);
 	return ret;
 }
@@ -432,7 +446,7 @@ int try_to_unmap(struct page * page)
 	if (PageDirect(page)) {
 		ret = try_to_unmap_one(page, page->pte.direct);
 		if (ret == SWAP_SUCCESS) {
-			page->pte.direct = NULL;
+			page->pte.direct = 0;
 			ClearPageDirect(page);
 		}
 		goto out;
@@ -446,14 +460,14 @@ int try_to_unmap(struct page * page)
 		if (next_pc)
 			prefetch(next_pc);
 		for (i = 0; i < NRPTE; i++) {
-			pte_t *p = pc->ptes[i];
+			pte_addr_t pte_paddr = pc->ptes[i];
 
-			if (!p)
+			if (!pte_paddr)
 				continue;
 			if (victim_i == -1) 
 				victim_i = i;
 
-			switch (try_to_unmap_one(page, p)) {
+			switch (try_to_unmap_one(page, pte_paddr)) {
 			case SWAP_SUCCESS:
 				/*
 				 * Release a slot.  If we're releasing the
@@ -462,7 +476,7 @@ int try_to_unmap(struct page * page)
 				 * refer to the same thing.  It works out.
 				 */
 				pc->ptes[i] = start->ptes[victim_i];
-				start->ptes[victim_i] = NULL;
+				start->ptes[victim_i] = 0;
 				dec_page_state(nr_reverse_maps);
 				victim_i++;
 				if (victim_i == NRPTE) {
