@@ -2287,6 +2287,7 @@ void ntfs_truncate(struct inode *vi)
 	ntfs_inode *ni = NTFS_I(vi);
 	ntfs_attr_search_ctx *ctx;
 	MFT_RECORD *m;
+	int err;
 
 	m = map_mft_record(ni);
 	if (IS_ERR(m)) {
@@ -2303,6 +2304,24 @@ void ntfs_truncate(struct inode *vi)
 		// FIXME: We can't report an error code upstream.  So what do
 		// we do?!?  make_bad_inode() seems a bit harsh...
 		unmap_mft_record(ni);
+		return;
+	}
+	err = ntfs_attr_lookup(ni->type, ni->name, ni->name_len,
+			CASE_SENSITIVE, 0, NULL, 0, ctx);
+	if (unlikely(err)) {
+		if (err == -ENOENT) {
+			ntfs_error(vi->i_sb, "Open attribute is missing from "
+					"mft record.  Inode 0x%lx is corrupt.  "
+					"Run chkdsk.", vi->i_ino);
+			make_bad_inode(vi);
+		} else {
+			ntfs_error(vi->i_sb, "Failed to lookup attribute in "
+					"inode 0x%lx (error code %d).",
+					vi->i_ino, err);
+			// FIXME: We can't report an error code upstream.  So
+			// what do we do?!?  make_bad_inode() seems a bit
+			// harsh...
+		}
 		goto out;
 	}
 	/* If the size has not changed there is nothing to do. */
