@@ -764,9 +764,11 @@ static void openpic_end_ipi(unsigned int irq_nr)
 	openpic_eoi();
 }
 
-static void openpic_ipi_action(int cpl, void *dev_id, struct pt_regs *regs)
+static irqreturn_t openpic_ipi_action(int cpl, void *dev_id,
+					struct pt_regs *regs)
 {
 	smp_message_recv(cpl-openpic_vec_ipi, regs);
+	return IRQ_HANDLED;
 }
 
 #endif /* CONFIG_SMP */
