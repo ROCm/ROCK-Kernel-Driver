@@ -110,7 +110,6 @@ struct pcmcia_bus_socket {
 	wait_queue_head_t	queue, request;
 	struct work_struct	removal;
 	socket_bind_t		*bind;
-	struct device		*socket_dev;
 	struct pcmcia_socket	*parent;
 };
 
@@ -874,7 +873,6 @@ static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 	init_waitqueue_head(&s->request);
 
 	/* initialize data */
-	s->socket_dev = socket->dev.dev;
 	INIT_WORK(&s->removal, handle_removal, s);
 	s->parent = socket;
 
