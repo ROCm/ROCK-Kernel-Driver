@@ -111,7 +111,7 @@ int ipv6_sock_ac_join(struct sock *sk, int ifindex, struct in6_addr *addr)
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
-	if (ipv6_addr_type(addr) & IPV6_ADDR_MULTICAST)
+	if (ipv6_addr_is_multicast(addr))
 		return -EINVAL;
 	if (ipv6_chk_addr(addr, NULL, 0))
 		return -EINVAL;

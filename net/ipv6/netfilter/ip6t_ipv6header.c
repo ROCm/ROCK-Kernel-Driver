@@ -1,8 +1,15 @@
 /* ipv6header match - matches IPv6 packets based
-on whether they contain certain headers */
+   on whether they contain certain headers */
 
 /* Original idea: Brad Chapman 
  * Rewritten by: Andras Kis-Szabo <kisza@sch.bme.hu> */
+
+/* (C) 2001-2002 Andras Kis-Szabo <kisza@sch.bme.hu>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
 
 #include <linux/module.h>
 #include <linux/skbuff.h>

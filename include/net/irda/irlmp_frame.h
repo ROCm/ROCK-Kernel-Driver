@@ -40,7 +40,7 @@
 
 #define CONTROL_BIT    0x80
 
-inline void irlmp_send_data_pdu(struct lap_cb *self, __u8 dlsap, __u8 slsap, 
+void irlmp_send_data_pdu(struct lap_cb *self, __u8 dlsap, __u8 slsap,
 				int expedited, struct sk_buff *skb);
 void irlmp_send_lcf_pdu(struct lap_cb *self, __u8 dlsap, __u8 slsap, 
 			__u8 opcode, struct sk_buff *skb);

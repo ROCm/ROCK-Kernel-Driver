@@ -1147,7 +1147,7 @@ regen:
 	 *  - XXX: already assigned to an address on the device
 	 */
 	if (idev->rndid[0] == 0xfd && 
-	    (idev->rndid[1]&idev->rndid[2]&idev->rndid[3]&idev->rndid[4]&idev->rndid[5]&idev->rndid[6]) &&
+	    (idev->rndid[1]&idev->rndid[2]&idev->rndid[3]&idev->rndid[4]&idev->rndid[5]&idev->rndid[6]) == 0xff &&
 	    (idev->rndid[7]&0x80))
 		goto regen;
 	if ((idev->rndid[0]|idev->rndid[1]) == 0) {

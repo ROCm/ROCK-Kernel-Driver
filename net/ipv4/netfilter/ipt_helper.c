@@ -1,12 +1,15 @@
+/* iptables module to match on related connections */
 /*
- * iptables module to match on related connections
- *   (c) 2001 Martin Josefsson <gandalf@wlug.westbo.se>
+ * (C) 2001 Martin Josefsson <gandalf@wlug.westbo.se>
  *
- * Released under the terms of GNU GPLv2.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
  *   19 Mar 2002 Harald Welte <laforge@gnumonks.org>:
  *   		 - Port to newnat infrastructure
  */
+
 #include <linux/module.h>
 #include <linux/skbuff.h>
 #include <linux/netfilter.h>

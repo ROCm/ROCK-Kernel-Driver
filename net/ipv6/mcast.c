@@ -175,7 +175,7 @@ int ipv6_sock_mc_join(struct sock *sk, int ifindex, struct in6_addr *addr)
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	int err;
 
-	if (!(ipv6_addr_type(addr) & IPV6_ADDR_MULTICAST))
+	if (!ipv6_addr_is_multicast(addr))
 		return -EINVAL;
 
 	mc_lst = sock_kmalloc(sk, sizeof(struct ipv6_mc_socklist), GFP_KERNEL);
@@ -348,7 +348,7 @@ int ip6_mc_source(int add, int omode, struct sock *sk,
 	source = &((struct sockaddr_in6 *)&pgsr->gsr_source)->sin6_addr;
 	group = &((struct sockaddr_in6 *)&pgsr->gsr_group)->sin6_addr;
 
-	if (!(ipv6_addr_type(group) & IPV6_ADDR_MULTICAST))
+	if (!ipv6_addr_is_multicast(group))
 		return -EINVAL;
 
 	idev = ip6_mc_find_dev(group, pgsr->gsr_interface);
@@ -457,7 +457,7 @@ int ip6_mc_msfilter(struct sock *sk, struct group_filter *gsf)
 
 	group = &((struct sockaddr_in6 *)&gsf->gf_group)->sin6_addr;
 
-	if (!(ipv6_addr_type(group) & IPV6_ADDR_MULTICAST))
+	if (!ipv6_addr_is_multicast(group))
 		return -EINVAL;
 	if (gsf->gf_fmode != MCAST_INCLUDE &&
 	    gsf->gf_fmode != MCAST_EXCLUDE)
@@ -529,7 +529,7 @@ int ip6_mc_msfget(struct sock *sk, struct group_filter *gsf,
 
 	group = &((struct sockaddr_in6 *)&gsf->gf_group)->sin6_addr;
 
-	if (!(ipv6_addr_type(group) & IPV6_ADDR_MULTICAST))
+	if (!ipv6_addr_is_multicast(group))
 		return -EINVAL;
 
 	idev = ip6_mc_find_dev(group, gsf->gf_interface);

@@ -826,7 +826,7 @@ int llc_sk_init(struct sock* sk)
 		        * tx_win of remote LLC) */
 	skb_queue_head_init(&llc->pdu_unack_q);
 	sk->sk_backlog_rcv = llc_backlog_rcv;
-	llc_sk(sk) = llc;
+	sk->sk_protinfo = llc;
 out:
 	return rc;
 }
