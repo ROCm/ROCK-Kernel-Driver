@@ -132,6 +132,7 @@ struct ib_qp *ib_create_qp(struct ib_pd *pd,
 		qp->srq	       	  = qp_init_attr->srq;
 		qp->event_handler = qp_init_attr->event_handler;
 		qp->qp_context    = qp_init_attr->qp_context;
+		qp->qp_type	  = qp_init_attr->qp_type;
 		atomic_inc(&pd->usecnt);
 		atomic_inc(&qp_init_attr->send_cq->usecnt);
 		atomic_inc(&qp_init_attr->recv_cq->usecnt);
