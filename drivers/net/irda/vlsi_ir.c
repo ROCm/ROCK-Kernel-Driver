@@ -495,10 +495,10 @@ static int vlsi_proc_release(struct inode *inode, struct file *file)
 }
 
 static struct file_operations vlsi_proc_fops = {
-	open:		vlsi_proc_open,
-	llseek:		vlsi_proc_lseek,
-	read:		vlsi_proc_read,
-	release:	vlsi_proc_release,
+	.open		= vlsi_proc_open,
+	.llseek		= vlsi_proc_lseek,
+	.read		= vlsi_proc_read,
+	.release	= vlsi_proc_release,
 };
 #endif
 

@@ -369,7 +369,7 @@ orinoco_cs_config(dev_link_t *link)
 	CS_CHECK(GetFirstTuple, handle, &tuple);
 	while (1) {
 		cistpl_cftable_entry_t *cfg = &(parse.cftable_entry);
-		cistpl_cftable_entry_t dflt = { index: 0 };
+		cistpl_cftable_entry_t dflt = { .index = 0 };
 
 		CFG_CHECK(GetTupleData, handle, &tuple);
 		CFG_CHECK(ParseTuple, handle, &tuple, &parse);
