@@ -89,7 +89,6 @@
 #include <linux/types.h>
 
 #include <asm/fpu.h>
-#include <asm/offsets.h>
 #include <asm/page.h>
 #include <asm/percpu.h>
 #include <asm/rse.h>
