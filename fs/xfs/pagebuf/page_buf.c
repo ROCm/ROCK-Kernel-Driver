@@ -1460,7 +1460,7 @@ pagebuf_mapout_locked(
 caddr_t
 pagebuf_offset(
 	page_buf_t		*pb,
-	off_t			offset)
+	size_t			offset)
 {
 	struct page		*page;
 
