@@ -391,12 +391,12 @@ void dump_thread(struct pt_regs * regs, struct user * dump)
  */
 pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 {
-	pid_t __ret;
+	register unsigned int r0 asm("r0") = flags | CLONE_VM | CLONE_UNTRACED;
+	register unsigned int r1 asm("r1") = 0;
+	register pid_t __ret asm("r0");
 
 	__asm__ __volatile__(
-	"orr	r0, %1, %2	@ kernel_thread sys_clone	\n\
-	mov	r1, #0						\n\
-	"__syscall(clone)"					\n\
+	__syscall(clone)"	@ kernel_thread sys_clone	\n\
 	movs	%0, r0		@ if we are the child		\n\
 	bne	1f						\n\
 	mov	fp, #0		@ ensure that fp is zero	\n\
@@ -406,8 +406,8 @@ pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 	b	sys_exit					\n\
 1:	"
         : "=r" (__ret)
-        : "Ir" (flags), "r" (CLONE_VM | CLONE_UNTRACED), "r" (fn), "r" (arg)
-	: "r0", "r1", "lr");
+        : "0" (r0), "r" (r1), "r" (fn), "r" (arg)
+	: "lr");
 	return __ret;
 }
 
