@@ -940,10 +940,6 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 			break;
 
 		case MPI_IOCSTATUS_SCSI_PROTOCOL_ERROR:		/* 0x0047 */
-			if (pScsiReply->SCSIState & MPI_SCSI_STATE_TERMINATED) {
-				/*  Not real sure here either...  */
-				sc->result = DID_RESET << 16;
-			} else
 				sc->result = DID_SOFT_ERROR << 16;
 			break;
 
