@@ -339,16 +339,16 @@ linvfs_write_inode(
 	int			sync)
 {
 	vnode_t			*vp = LINVFS_GET_VP(inode);
-	int			error, flags = FLUSH_INODE;
+	int			error = 0, flags = FLUSH_INODE;
 
-	error = 0;
 	if (vp) {
 		vn_trace_entry(vp, __FUNCTION__, (inst_t *)__return_address);
 		if (sync)
 			flags |= FLUSH_SYNC;
 		VOP_IFLUSH(vp, flags, error);
 	}
-	return error;
+
+	return -error;
 }
 
 STATIC void
