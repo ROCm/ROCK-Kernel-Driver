@@ -300,9 +300,15 @@ static int ip_recent_ctrl(struct file *file, const char *input, unsigned long si
 	info->name[IPT_RECENT_NAME_LEN-1] = '\0';
 
 	skb = kmalloc(sizeof(struct sk_buff),GFP_KERNEL);
-	if(!skb) { return -ENOMEM; }
+	if (!skb) {
+		used = -ENOMEM;
+		goto out_free_info;
+	}
 	skb->nh.iph = kmalloc(sizeof(struct iphdr),GFP_KERNEL);
-	if(!skb->nh.iph) { return -ENOMEM; }
+	if (!skb->nh.iph) {
+		used = -ENOMEM;
+		goto out_free_skb;
+	}
 
 	skb->nh.iph->saddr = addr;
 	skb->nh.iph->daddr = 0;
@@ -311,7 +317,9 @@ static int ip_recent_ctrl(struct file *file, const char *input, unsigned long si
 	match(skb,NULL,NULL,info,0,NULL);
 
 	kfree(skb->nh.iph);
+out_free_skb:
 	kfree(skb);
+out_free_info:
 	kfree(info);
 
 #ifdef DEBUG
