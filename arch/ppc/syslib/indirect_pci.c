@@ -37,9 +37,16 @@ indirect_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
 		if (bus->number != hose->first_busno)
 			cfg_type = 1;
 
-	out_be32(hose->cfg_addr,
-		 (((offset & 0xfc) | cfg_type) << 24) | (devfn << 16)
-		 | ((bus->number - hose->bus_offset) << 8) | 0x80);
+#ifdef CONFIG_PPC_INDIRECT_PCI_BE
+	out_be32(hose->cfg_addr, 					 
+		 (0x80000000 | ((dev->bus->number - hose->bus_offset) << 16) 
+		  | (dev->devfn << 8) | ((offset & 0xfc) | cfg_type)));	
+#else
+	out_le32(hose->cfg_addr, 					 
+		 (0x80000000 | ((dev->bus->number - hose->bus_offset) << 16) 
+		  | (dev->devfn << 8) | ((offset & 0xfc) | cfg_type)));	
+#endif
+
 	/*
 	 * Note: the caller has already checked that offset is
 	 * suitably aligned and that len is 1, 2 or 4.
@@ -75,9 +82,16 @@ indirect_write_config(struct pci_bus *bus, unsigned int devfn, int offset,
 		if (bus->number != hose->first_busno)
 			cfg_type = 1;
 
-	out_be32(hose->cfg_addr,
-		 (((offset & 0xfc) | cfg_type) << 24) | (devfn << 16)
-		 | ((bus->number - hose->bus_offset) << 8) | 0x80);
+#ifdef CONFIG_PPC_INDIRECT_PCI_BE
+	out_be32(hose->cfg_addr, 					 
+		 (0x80000000 | ((dev->bus->number - hose->bus_offset) << 16) 
+		  | (dev->devfn << 8) | ((offset & 0xfc) | cfg_type)));	
+#else
+	out_le32(hose->cfg_addr, 					 
+		 (0x80000000 | ((dev->bus->number - hose->bus_offset) << 16) 
+		  | (dev->devfn << 8) | ((offset & 0xfc) | cfg_type)));	
+#endif
+
 	/*
 	 * Note: the caller has already checked that offset is
 	 * suitably aligned and that len is 1, 2 or 4.
