@@ -63,12 +63,13 @@
  *                 or has the same number as an existing one
  *          0: all OK.
  */
-int add_partition(kdev_t dev, struct blkpg_partition *p)
+int add_partition(struct block_device *bdev, struct blkpg_partition *p)
 {
 	struct gendisk *g;
 	long long ppstart, pplength;
 	long pstart, plength;
 	int i, drive, first_minor, end_minor, minor;
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
 
 	/* convert bytes to sectors, check for fit in a hd_struct */
 	ppstart = (p->start >> 9);
@@ -126,8 +127,9 @@ int add_partition(kdev_t dev, struct blkpg_partition *p)
  *
  * Note that the dev argument refers to the entire disk, not the partition.
  */
-int del_partition(kdev_t dev, struct blkpg_partition *p)
+int del_partition(struct block_device *bdev, struct blkpg_partition *p)
 {
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	struct gendisk *g;
 	kdev_t devp;
 	int drive, first_minor, minor;
@@ -168,7 +170,7 @@ int del_partition(kdev_t dev, struct blkpg_partition *p)
 	return 0;
 }
 
-int blkpg_ioctl(kdev_t dev, struct blkpg_ioctl_arg *arg)
+int blkpg_ioctl(struct block_device *bdev, struct blkpg_ioctl_arg *arg)
 {
 	struct blkpg_ioctl_arg a;
 	struct blkpg_partition p;
@@ -188,9 +190,9 @@ int blkpg_ioctl(kdev_t dev, struct blkpg_ioctl_arg *arg)
 			if (!capable(CAP_SYS_ADMIN))
 				return -EACCES;
 			if (a.op == BLKPG_ADD_PARTITION)
-				return add_partition(dev, &p);
+				return add_partition(bdev, &p);
 			else
-				return del_partition(dev, &p);
+				return del_partition(bdev, &p);
 		default:
 			return -EINVAL;
 	}
@@ -263,7 +265,7 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 #endif
 
 		case BLKPG:
-			return blkpg_ioctl(dev, (struct blkpg_ioctl_arg *) arg);
+			return blkpg_ioctl(bdev, (struct blkpg_ioctl_arg *) arg);
 			
 		/*
 		 * deprecated, use the /proc/iosched interface instead
