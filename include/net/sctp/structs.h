@@ -58,6 +58,7 @@
 #include <linux/socket.h>	/* linux/in.h needs this!!    */
 #include <linux/in.h>		/* We get struct sockaddr_in. */
 #include <linux/in6.h>		/* We get struct in6_addr     */
+#include <linux/ipv6.h>
 #include <asm/param.h>		/* We get MAXHOSTNAMELEN.     */
 #include <asm/atomic.h>		/* This gets us atomic counters.  */
 #include <linux/skbuff.h>	/* We need sk_buff_head. */
@@ -84,7 +85,6 @@ struct sctp_inq;
 struct sctp_outq;
 struct sctp_bind_addr;
 struct sctp_ulpq;
-struct sctp_opt;
 struct sctp_ep_common;
 struct sctp_ssnmap;
 
@@ -234,7 +234,9 @@ typedef enum {
 } sctp_socket_type_t;
 
 /* Per socket SCTP information. */
-struct sctp_opt {
+struct sctp_sock {
+	/* inet_sock has to be the first member of sctp_sock */
+	struct inet_sock inet;
 	/* What kind of a socket is this? */
 	sctp_socket_type_t type;
 
@@ -272,6 +274,22 @@ struct sctp_opt {
 	struct sk_buff_head pd_lobby;
 };
 
+static inline struct sctp_sock *sctp_sk(const struct sock *sk)
+{
+       return (struct sctp_sock *)sk;
+}
+
+static inline struct sock *sctp_opt2sk(const struct sctp_sock *sp)
+{
+       return (struct sock *)sp;
+}
+
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+struct sctp6_sock {
+       struct sctp_sock  sctp;
+       struct ipv6_pinfo inet6;
+};
+#endif /* CONFIG_IPV6 */
 
 
 /* This is our APPLICATION-SPECIFIC state cookie.
@@ -487,12 +505,12 @@ struct sctp_af {
 	int		(*to_addr_param) (const union sctp_addr *,
 					  union sctp_addr_param *); 
 	int		(*addr_valid)	(union sctp_addr *,
-					 struct sctp_opt *);
+					 struct sctp_sock *);
 	sctp_scope_t	(*scope) (union sctp_addr *);
 	void		(*inaddr_any)	(union sctp_addr *, unsigned short);
 	int		(*is_any)	(const union sctp_addr *);
 	int		(*available)	(union sctp_addr *,
-					 struct sctp_opt *);
+					 struct sctp_sock *);
 	int		(*skb_iif)	(const struct sk_buff *sk);
 	int		(*is_ce)	(const struct sk_buff *sk);
 	void		(*seq_dump_addr)(struct seq_file *seq,
@@ -510,16 +528,16 @@ int sctp_register_af(struct sctp_af *);
 struct sctp_pf {
 	void (*event_msgname)(struct sctp_ulpevent *, char *, int *);
 	void (*skb_msgname)  (struct sk_buff *, char *, int *);
-	int  (*af_supported) (sa_family_t, struct sctp_opt *);
+	int  (*af_supported) (sa_family_t, struct sctp_sock *);
 	int  (*cmp_addr) (const union sctp_addr *,
 			  const union sctp_addr *,
-			  struct sctp_opt *);
-	int  (*bind_verify) (struct sctp_opt *, union sctp_addr *);
-	int  (*send_verify) (struct sctp_opt *, union sctp_addr *);
-	int  (*supported_addrs)(const struct sctp_opt *, __u16 *);
+			  struct sctp_sock *);
+	int  (*bind_verify) (struct sctp_sock *, union sctp_addr *);
+	int  (*send_verify) (struct sctp_sock *, union sctp_addr *);
+	int  (*supported_addrs)(const struct sctp_sock *, __u16 *);
 	struct sock *(*create_accept_sk) (struct sock *sk,
 					  struct sctp_association *asoc);
-	void (*addr_v4map) (struct sctp_opt *, union sctp_addr *);
+	void (*addr_v4map) (struct sctp_sock *, union sctp_addr *);
 	struct sctp_af *af;
 };
 
@@ -922,7 +940,7 @@ struct sctp_transport *sctp_transport_new(const union sctp_addr *, int);
 void sctp_transport_set_owner(struct sctp_transport *,
 			      struct sctp_association *);
 void sctp_transport_route(struct sctp_transport *, union sctp_addr *,
-			  struct sctp_opt *);
+			  struct sctp_sock *);
 void sctp_transport_pmtu(struct sctp_transport *);
 void sctp_transport_free(struct sctp_transport *);
 void sctp_transport_reset_timers(struct sctp_transport *);
@@ -1071,11 +1089,11 @@ int sctp_add_bind_addr(struct sctp_bind_addr *, union sctp_addr *,
 		       int gfp);
 int sctp_del_bind_addr(struct sctp_bind_addr *, union sctp_addr *);
 int sctp_bind_addr_match(struct sctp_bind_addr *, const union sctp_addr *,
-			 struct sctp_opt *);
+			 struct sctp_sock *);
 union sctp_addr *sctp_find_unmatch_addr(struct sctp_bind_addr	*bp,
 					const union sctp_addr	*addrs,
 					int			addrcnt,
-					struct sctp_opt		*opt);
+					struct sctp_sock	*opt);
 union sctp_params sctp_bind_addrs_to_raw(const struct sctp_bind_addr *bp,
 					 int *addrs_len, int gfp);
 int sctp_raw_to_bind_addrs(struct sctp_bind_addr *bp, __u8 *raw, int len,
