@@ -12,7 +12,6 @@ obj-n		:=
 obj-		:=
 
 export-objs		:= fas216.o queue.o msgqueue.o
-list-multi		:= acornscsi_mod.o
 acornscsi_mod-objs	:= acornscsi.o acornscsi-io.o
 
 obj-$(CONFIG_SCSI_ACORNSCSI_3)	+= acornscsi_mod.o queue.o msgqueue.o
@@ -25,6 +24,3 @@ obj-$(CONFIG_SCSI_POWERTECSCSI)	+= powertec.o fas216.o queue.o msgqueue.o
 obj-$(CONFIG_SCSI_EESOXSCSI)	+= eesox.o fas216.o queue.o msgqueue.o
 
 include $(TOPDIR)/Rules.make
-
-acornscsi_mod.o: $(acornscsi_mod-objs)
-	$(LD) -r -o $@ $(acornscsi_mod-objs)

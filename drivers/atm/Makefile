@@ -1,4 +1,3 @@
-# File: drivers/atm/Makefile
 #
 # Makefile for the Linux network (ATM) device drivers.
 #
@@ -57,7 +56,6 @@ obj-$(CONFIG_ATM_FORE200E) += fore_200e.o
 
 EXTRA_CFLAGS=-g
 
-list-multi	:= fore_200e.o
 fore_200e-objs	:= fore200e.o $(FORE200E_FW_OBJS)
 
 include $(TOPDIR)/Rules.make
@@ -91,9 +89,6 @@ fore200e_mkfirm: fore200e_mkfirm.c
 %.bin %.bin1 %.bin2: %.data
 	objcopy -Iihex $< -Obinary $@.gz
 	gzip -df $@.gz
-
-fore_200e.o: $(fore_200e-objs)
-	$(LD) -r -o $@ $(fore_200e-objs)
 
 # firmware dependency stuff taken from drivers/sound/Makefile
 FORE200E_FW_UP_TO_DATE :=
