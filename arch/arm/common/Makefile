@@ -2,7 +2,6 @@
 # Makefile for the linux kernel.
 #
 
-obj-y				+= platform.o
 obj-$(CONFIG_ARM_AMBA)		+= amba.o
 obj-$(CONFIG_ICST525)		+= icst525.o
 obj-$(CONFIG_SA1111)		+= sa1111.o

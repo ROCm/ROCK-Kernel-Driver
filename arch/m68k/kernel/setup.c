@@ -62,7 +62,6 @@ struct mem_info m68k_memory[NUM_MEMINFO];
 static struct mem_info m68k_ramdisk;
 
 static char m68k_command_line[CL_SIZE];
-char saved_command_line[CL_SIZE];
 
 char m68k_debug_device[6] = "";
 

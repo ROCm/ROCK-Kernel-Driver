@@ -280,15 +280,6 @@ unsigned long get_wchan(struct task_struct *p);
  */
 #define return_address() ({__asm__ __volatile__("":::"$31");__builtin_return_address(0);})
 
-/*
- * For now.  The 32-bit cycle counter is screwed up so solving this nicely takes a little
- * brainwork ...
- */
-static inline unsigned long long sched_clock(void)
-{
-	return 0ULL;
-}
-
 #ifdef CONFIG_CPU_HAS_PREFETCH
 
 #define ARCH_HAS_PREFETCH

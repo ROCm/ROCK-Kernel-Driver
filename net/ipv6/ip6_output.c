@@ -852,8 +852,8 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 		np->cork.hop_limit = hlimit;
 		inet->cork.fragsize = mtu = dst_pmtu(&rt->u.dst);
 		inet->cork.length = 0;
-		inet->sndmsg_page = NULL;
-		inet->sndmsg_off = 0;
+		sk->sk_sndmsg_page = NULL;
+		sk->sk_sndmsg_off = 0;
 		exthdrlen = rt->u.dst.header_len + (opt ? opt->opt_flen : 0);
 		length += exthdrlen;
 		transhdrlen += exthdrlen;
@@ -969,8 +969,8 @@ alloc_new_skb:
 		} else {
 			int i = skb_shinfo(skb)->nr_frags;
 			skb_frag_t *frag = &skb_shinfo(skb)->frags[i-1];
-			struct page *page = inet->sndmsg_page;
-			int off = inet->sndmsg_off;
+			struct page *page = sk->sk_sndmsg_page;
+			int off = sk->sk_sndmsg_off;
 			unsigned int left;
 
 			if (page && (left = PAGE_SIZE - off) > 0) {
@@ -982,7 +982,7 @@ alloc_new_skb:
 						goto error;
 					}
 					get_page(page);
-					skb_fill_page_desc(skb, i, page, inet->sndmsg_off, 0);
+					skb_fill_page_desc(skb, i, page, sk->sk_sndmsg_off, 0);
 					frag = &skb_shinfo(skb)->frags[i];
 				}
 			} else if(i < MAX_SKB_FRAGS) {
@@ -993,8 +993,8 @@ alloc_new_skb:
 					err = -ENOMEM;
 					goto error;
 				}
-				inet->sndmsg_page = page;
-				inet->sndmsg_off = 0;
+				sk->sk_sndmsg_page = page;
+				sk->sk_sndmsg_off = 0;
 
 				skb_fill_page_desc(skb, i, page, 0, 0);
 				frag = &skb_shinfo(skb)->frags[i];
@@ -1008,7 +1008,7 @@ alloc_new_skb:
 				err = -EFAULT;
 				goto error;
 			}
-			inet->sndmsg_off += copy;
+			sk->sk_sndmsg_off += copy;
 			frag->size += copy;
 			skb->len += copy;
 			skb->data_len += copy;

@@ -9,7 +9,7 @@ obj-y		+= cpu-probe.o branch.o entry.o genex.o irq.o process.o \
 		   time.o traps.o unaligned.o
 
 ifdef CONFIG_MODULES
-obj-y				+= mips_ksyms.o
+obj-y				+= mips_ksyms.o module.o
 obj-$(CONFIG_MIPS32)		+= module-elf32.o
 obj-$(CONFIG_MIPS64)		+= module-elf64.o
 endif
@@ -23,6 +23,7 @@ obj-$(CONFIG_CPU_R4300)		+= r4k_fpu.o r4k_switch.o
 obj-$(CONFIG_CPU_R4X00)		+= r4k_fpu.o r4k_switch.o
 obj-$(CONFIG_CPU_R5000)		+= r4k_fpu.o r4k_switch.o
 obj-$(CONFIG_CPU_R5432)		+= r4k_fpu.o r4k_switch.o
+obj-$(CONFIG_CPU_R8000)		+= r4k_fpu.o r4k_switch.o
 obj-$(CONFIG_CPU_RM7000)	+= r4k_fpu.o r4k_switch.o
 obj-$(CONFIG_CPU_RM9000)	+= r4k_fpu.o r4k_switch.o
 obj-$(CONFIG_CPU_NEVADA)	+= r4k_fpu.o r4k_switch.o

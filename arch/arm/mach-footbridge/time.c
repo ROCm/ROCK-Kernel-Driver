@@ -275,7 +275,7 @@ void __init footbridge_init_time(void)
 		*CSR_TIMER1_CNTL = TIMER_CNTL_ENABLE | TIMER_CNTL_AUTORELOAD | TIMER_CNTL_DIV16;
 
 		footbridge_timer_irq.name = "Timer1 Timer Tick";
-		footbrdige_timer_irq.handler = timer1_interrupt;
+		footbridge_timer_irq.handler = timer1_interrupt;
 		
 		setup_irq(IRQ_TIMER1, &footbridge_timer_irq);
 
@@ -289,8 +289,8 @@ void __init footbridge_init_time(void)
 		gettimeoffset = isa_gettimeoffset;
 
 		footbridge_timer_irq.name = "ISA Timer Tick";
-		footbrdige_timer_irq.handler = isa_timer_interrupt;
+		footbridge_timer_irq.handler = isa_timer_interrupt;
 		
-		setup_irq(IRQ_ISA, &footbridge_timer_irq);
+		setup_irq(IRQ_ISA_TIMER, &footbridge_timer_irq);
 	}
 }

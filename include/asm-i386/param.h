@@ -18,5 +18,6 @@
 #endif
 
 #define MAXHOSTNAMELEN	64	/* max length of hostname */
+#define COMMAND_LINE_SIZE 256
 
 #endif

@@ -533,7 +533,7 @@ extBalloc(struct inode *ip, s64 hint, s64 * nblocks, s64 * blkno)
 		nb = nblks = *nblocks;
 
 	/* try to allocate blocks */
-	while ((rc = dbAlloc(ip, hint, nb, &daddr))) {
+	while ((rc = dbAlloc(ip, hint, nb, &daddr)) != 0) {
 		/* if something other than an out of space error,
 		 * stop and return this error.
 		 */

@@ -34,7 +34,6 @@
 #define COMMAND_LINE_SIZE _POSIX_ARG_MAX
 
 /* Changed in linux_main and setup_arch, which run before SMP is started */
-char saved_command_line[COMMAND_LINE_SIZE] = { 0 };
 char command_line[COMMAND_LINE_SIZE] = { 0 };
 
 void add_arg(char *cmd_line, char *arg)

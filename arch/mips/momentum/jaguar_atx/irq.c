@@ -42,7 +42,7 @@
 extern asmlinkage void jaguar_handle_int(void);
 
 static struct irqaction cascade_mv64340 = {
-	no_action, SA_INTERRUPT, 0, "MV64340-Cascade", NULL, NULL
+	no_action, SA_INTERRUPT, CPU_MASK_NONE, "MV64340-Cascade", NULL, NULL
 };
 
 void __init init_IRQ(void)

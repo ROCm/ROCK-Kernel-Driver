@@ -190,28 +190,28 @@ static inline int isonum_712(char *p)
 {
 	return *(s8 *)p;
 }
-static inline int isonum_721(char *p)
+static inline unsigned int isonum_721(char *p)
 {
 	return le16_to_cpu(get_unaligned((u16 *)p));
 }
-static inline int isonum_722(char *p)
+static inline unsigned int isonum_722(char *p)
 {
 	return be16_to_cpu(get_unaligned((u16 *)p));
 }
-static inline int isonum_723(char *p)
+static inline unsigned int isonum_723(char *p)
 {
 	/* Ignore bigendian datum due to broken mastering programs */
 	return le16_to_cpu(get_unaligned((u16 *)p));
 }
-static inline int isonum_731(char *p)
+static inline unsigned int isonum_731(char *p)
 {
 	return le32_to_cpu(get_unaligned((u32 *)p));
 }
-static inline int isonum_732(char *p)
+static inline unsigned int isonum_732(char *p)
 {
 	return be32_to_cpu(get_unaligned((u32 *)p));
 }
-static inline int isonum_733(char *p)
+static inline unsigned int isonum_733(char *p)
 {
 	/* Ignore bigendian datum due to broken mastering programs */
 	return le32_to_cpu(get_unaligned((u32 *)p));

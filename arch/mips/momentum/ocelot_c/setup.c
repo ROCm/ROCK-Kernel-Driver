@@ -193,7 +193,7 @@ int m48t37y_set_time(unsigned long sec)
 	rtc_base[0x7ff9] = BIN2BCD(tm.tm_sec);
 
 	/* day of week -- not really used, but let's keep it up-to-date */
-	rtc_base[0x7ffc] = CONV_BIN2BCD(tm.tm_wday + 1);
+	rtc_base[0x7ffc] = BIN2BCD(tm.tm_wday + 1);
 
 	/* disable writing */
 	rtc_base[0x7ff8] = 0x00;

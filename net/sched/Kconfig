@@ -275,10 +275,10 @@ config NET_CLS_U32
 	  module will be called cls_u32.
 
 config CLS_U32_PERF
-	bool "     U32 classifier perfomance counters"
+	bool "     U32 classifier performance counters"
 	depends on NET_CLS_U32
 	help
-	  gathers stats that could be used to tune u32 classifier perfomance.
+	  gathers stats that could be used to tune u32 classifier performance.
 	  Requires a new iproute2
 	  You MUST NOT turn this on if you dont have an update iproute2.
 

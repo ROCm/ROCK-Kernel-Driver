@@ -28,11 +28,11 @@ static inline cpumask_t target_cpus(void)
 	static unsigned long cpu = NR_CPUS;
 	do {
 		if (cpu >= NR_CPUS)
-			cpu = first_cpu_const(cpu_online_map);
+			cpu = first_cpu(cpu_online_map);
 		else
-			cpu = next_cpu_const(cpu, cpu_online_map);
+			cpu = next_cpu(cpu, cpu_online_map);
 	} while (cpu >= NR_CPUS);
-	return mk_cpumask_const(cpumask_of_cpu(cpu));
+	return cpumask_of_cpu(cpu);
 }
 #define TARGET_CPUS	(target_cpus())
 
@@ -149,12 +149,12 @@ static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
 }
 
 /* As we are using single CPU as destination, pick only one CPU here */
-static inline unsigned int cpu_mask_to_apicid(cpumask_const_t cpumask)
+static inline unsigned int cpu_mask_to_apicid(cpumask_t cpumask)
 {
 	int cpu;
 	int apicid;	
 
-	cpu = first_cpu_const(cpumask);
+	cpu = first_cpu(cpumask);
 	apicid = cpu_to_logical_apicid(cpu);
 	return apicid;
 }

@@ -167,6 +167,8 @@ struct sock_common {
   *	@sk_socket - Identd and reporting IO signals
   *	@sk_user_data - RPC layer private data
   *	@sk_owner - module that owns this socket
+  *	@sk_sndmsg_page - cached page for sendmsg
+  *	@sk_sndmsg_off - cached offset for sendmsg
   *	@sk_send_head - front of stuff to transmit
   *	@sk_write_pending - a write to stream socket waits to start
   *	@sk_queue_shrunk - write queue has been shrunk recently
@@ -249,8 +251,10 @@ struct sock {
 	struct timeval		sk_stamp;
 	struct socket		*sk_socket;
 	void			*sk_user_data;
-	struct sk_buff		*sk_send_head;
 	struct module		*sk_owner;
+	struct page		*sk_sndmsg_page;
+	__u32			sk_sndmsg_off;
+	struct sk_buff		*sk_send_head;
 	int			sk_write_pending;
 	void			*sk_security;
 	__u8			sk_queue_shrunk;
@@ -487,10 +491,11 @@ extern int sk_stream_wait_connect(struct sock *sk, long *timeo_p);
 extern int sk_stream_wait_memory(struct sock *sk, long *timeo_p);
 extern void sk_stream_wait_close(struct sock *sk, long timeo_p);
 extern int sk_stream_error(struct sock *sk, int flags, int err);
+extern void sk_stream_kill_queues(struct sock *sk);
 
 extern int sk_wait_data(struct sock *sk, long *timeo);
 
-/* IP protocol blocks we attach to sockets.
+/* Networking protocol blocks we attach to sockets.
  * socket layer -> transport layer interface
  * transport -> network interface is defined by struct inet_proto
  */
@@ -533,6 +538,22 @@ struct proto {
 	void			(*hash)(struct sock *sk);
 	void			(*unhash)(struct sock *sk);
 	int			(*get_port)(struct sock *sk, unsigned short snum);
+
+	/* Memory pressure */
+	void			(*enter_memory_pressure)(void);
+	atomic_t		*memory_allocated;	/* Current allocated memory. */
+	atomic_t		*sockets_allocated;	/* Current number of sockets. */
+	/*
+	 * Pressure flag: try to collapse.
+	 * Technical note: it is used by multiple contexts non atomically.
+	 * All the sk_stream_mem_schedule() is of this nature: accounting
+	 * is strict, actions are advisory and have some latency.
+	 */
+	int			*memory_pressure;
+	int			*sysctl_mem;
+	int			*sysctl_wmem;
+	int			*sysctl_rmem;
+	int			max_header;
 
 	char			name[32];
 
@@ -622,6 +643,37 @@ static inline struct socket *SOCKET_I(struct inode *inode)
 static inline struct inode *SOCK_INODE(struct socket *socket)
 {
 	return &container_of(socket, struct socket_alloc, socket)->vfs_inode;
+}
+
+extern void __sk_stream_mem_reclaim(struct sock *sk);
+extern int sk_stream_mem_schedule(struct sock *sk, int size, int kind);
+
+#define SK_STREAM_MEM_QUANTUM ((int)PAGE_SIZE)
+
+static inline int sk_stream_pages(int amt)
+{
+	return (amt + SK_STREAM_MEM_QUANTUM - 1) / SK_STREAM_MEM_QUANTUM;
+}
+
+static inline void sk_stream_mem_reclaim(struct sock *sk)
+{
+	if (sk->sk_forward_alloc >= SK_STREAM_MEM_QUANTUM)
+		__sk_stream_mem_reclaim(sk);
+}
+
+static inline void sk_stream_writequeue_purge(struct sock *sk)
+{
+	struct sk_buff *skb;
+
+	while ((skb = __skb_dequeue(&sk->sk_write_queue)) != NULL)
+		sk_stream_free_skb(sk, skb);
+	sk_stream_mem_reclaim(sk);
+}
+
+static inline int sk_stream_rmem_schedule(struct sock *sk, struct sk_buff *skb)
+{
+	return (int)skb->truesize <= sk->sk_forward_alloc ||
+		sk_stream_mem_schedule(sk, skb->truesize, 1);
 }
 
 /* Used by processes to "lock" a socket state, so that
@@ -1103,6 +1155,46 @@ static inline void sk_stream_moderate_sndbuf(struct sock *sk)
 		sk->sk_sndbuf = min(sk->sk_sndbuf, sk->sk_wmem_queued / 2);
 		sk->sk_sndbuf = max(sk->sk_sndbuf, SOCK_MIN_SNDBUF);
 	}
+}
+
+static inline struct sk_buff *sk_stream_alloc_pskb(struct sock *sk,
+						   int size, int mem, int gfp)
+{
+	struct sk_buff *skb = alloc_skb(size + sk->sk_prot->max_header, gfp);
+
+	if (skb) {
+		skb->truesize += mem;
+		if (sk->sk_forward_alloc >= (int)skb->truesize ||
+		    sk_stream_mem_schedule(sk, skb->truesize, 0)) {
+			skb_reserve(skb, sk->sk_prot->max_header);
+			return skb;
+		}
+		__kfree_skb(skb);
+	} else {
+		sk->sk_prot->enter_memory_pressure();
+		sk_stream_moderate_sndbuf(sk);
+	}
+	return NULL;
+}
+
+static inline struct sk_buff *sk_stream_alloc_skb(struct sock *sk,
+						  int size, int gfp)
+{
+	return sk_stream_alloc_pskb(sk, size, 0, gfp);
+}
+
+static inline struct page *sk_stream_alloc_page(struct sock *sk)
+{
+	struct page *page = NULL;
+
+	if (sk->sk_forward_alloc >= (int)PAGE_SIZE ||
+	    sk_stream_mem_schedule(sk, PAGE_SIZE, 0))
+		page = alloc_pages(sk->sk_allocation, 0);
+	else {
+		sk->sk_prot->enter_memory_pressure();
+		sk_stream_moderate_sndbuf(sk);
+	}
+	return page;
 }
 
 #define sk_stream_for_retrans_queue(skb, sk)				\

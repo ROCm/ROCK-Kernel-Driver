@@ -235,7 +235,7 @@ e_inval:
  *	Handle IP routing ioctl calls. These are used to manipulate the routing tables
  */
  
-int ip_rt_ioctl(unsigned int cmd, void *arg)
+int ip_rt_ioctl(unsigned int cmd, void __user *arg)
 {
 	int err;
 	struct kern_rta rta;

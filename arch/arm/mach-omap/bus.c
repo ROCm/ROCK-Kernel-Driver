@@ -81,40 +81,6 @@ static struct bus_type omap_bus_types[OMAP_NR_BUSES] = {
 	},
 };
 
-#ifdef CONFIG_ARCH_OMAP1510
-/*
- * NOTE: This code _should_ go somewhere else. But let's wait for the
- *	 dma-mapping code to settle down first.
- */
-
-/*
- * Test for Local Bus device in order to do address translation between
- * dma_handle and Local Bus address.
- */
-inline int dmadev_uses_omap_lbus(struct device * dev)
-{
-	if (dev == NULL || !cpu_is_omap1510())
-		return 0;
-	return dev->bus == &omap_bus_types[OMAP_BUS_LBUS] ? 1 : 0;
-}
-
-/*
- * Translate bus address to Local Bus address for dma-mapping
- */
-inline int dmadev_to_lbus(dma_addr_t addr)
-{
-	return bus_to_lbus(addr);
-}
-
-/*
- * Translate Local Bus address to bus address for dma-mapping
- */
-inline int lbus_to_dmadev(dma_addr_t addr)
-{
-	return lbus_to_bus(addr);
-}
-#endif
-
 static int omap_bus_match(struct device *dev, struct device_driver *drv)
 {
 	struct omap_dev *omapdev = OMAP_DEV(dev);
@@ -278,8 +244,3 @@ EXPORT_SYMBOL(omap_driver_unregister);
 EXPORT_SYMBOL(omap_device_register);
 EXPORT_SYMBOL(omap_device_unregister);
 
-#ifdef CONFIG_ARCH_OMAP1510
-EXPORT_SYMBOL(dmadev_uses_omap_lbus);
-EXPORT_SYMBOL(dmadev_to_lbus);
-EXPORT_SYMBOL(lbus_to_dmadev);
-#endif

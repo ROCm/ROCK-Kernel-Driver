@@ -36,7 +36,7 @@
  * Stub for no-op vnode operations that return error status.
  */
 int
-fs_noerr()
+fs_noerr(void)
 {
 	return 0;
 }
@@ -45,7 +45,7 @@ fs_noerr()
  * Operation unsupported under this file system.
  */
 int
-fs_nosys()
+fs_nosys(void)
 {
 	return ENOSYS;
 }
@@ -55,7 +55,7 @@ fs_nosys()
  */
 /* ARGSUSED */
 void
-fs_noval()
+fs_noval(void)
 {
 }
 

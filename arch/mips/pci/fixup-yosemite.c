@@ -26,21 +26,12 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 
-static char irq_tab_yosemite[8][5] __initdata = {
-	/*       INTA  INTB  INTC  INTD */
-	{    -1,   -1,   -1,   -1,   -1 },
-	{    -1,    3,    3,    3,    3 },
-	{    -1,    4,    4,    4,    4 },
-	{    -1,   -1,   -1,   -1,   -1 },
-	{    -1,   -1,   -1,   -1,   -1 },
-	{    -1,   -1,   -1,   -1,   -1 },
-	{    -1,   -1,   -1,   -1,   -1 },
-	{    -1,   -1,   -1,   -1,   -1 },
-};
-
 int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
-	return irq_tab_yosemite[slot][pin];
+	if (pin == 0)
+		return -1;
+
+	return 3;			/* Everything goes to one irq bit */
 }
 
 struct pci_fixup pcibios_fixups[] = {

@@ -103,7 +103,7 @@ static ssize_t proc_mpc_read(struct file *file, char __user *buff,
 			     size_t count, loff_t *pos){
         unsigned long page = 0;
 	unsigned char *temp;
-        int length = 0;
+        ssize_t length = 0;
 	int i = 0;
 	struct mpoa_client *mpc = mpcs;
 	in_cache_entry *in_entry;

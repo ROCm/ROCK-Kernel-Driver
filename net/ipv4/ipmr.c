@@ -109,7 +109,7 @@ static int ip_mr_forward(struct sk_buff *skb, struct mfc_cache *cache, int local
 static int ipmr_cache_report(struct sk_buff *pkt, vifi_t vifi, int assert);
 static int ipmr_fill_mroute(struct sk_buff *skb, struct mfc_cache *c, struct rtmsg *rtm);
 
-static struct inet_protocol pim_protocol;
+static struct net_protocol pim_protocol;
 
 static struct timer_list ipmr_expire_timer;
 
@@ -1867,7 +1867,7 @@ static struct file_operations ipmr_mfc_fops = {
 #endif	
 
 #ifdef CONFIG_IP_PIMSM_V2
-static struct inet_protocol pim_protocol = {
+static struct net_protocol pim_protocol = {
 	.handler	=	pim_rcv,
 };
 #endif

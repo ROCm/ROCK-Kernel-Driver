@@ -164,6 +164,7 @@ enum
 	VM_LAPTOP_MODE=23,	/* vm laptop mode */
 	VM_BLOCK_DUMP=24,	/* block dump mode */
 	VM_HUGETLB_GROUP=25,	/* permitted hugetlb group */
+	VM_VFS_CACHE_PRESSURE=26, /* dcache/icache reclaim pressure */
 };
 
 

@@ -61,6 +61,7 @@ struct pci_func {
 	u8 configured;
 	u8 switch_save;
 	u8 presence_save;
+	u8 pwr_save;
 	u32 base_length[0x06];
 	u8 base_type[0x06];
 	u16 reserved2;

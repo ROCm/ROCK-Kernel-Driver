@@ -11,6 +11,7 @@
  */
 #include <linux/kernel.h>
 #include <linux/mm.h>
+#include <linux/interrupt.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -174,7 +175,7 @@ static struct irqaction ebsa110_timer_irq = {
 /*
  * Set up timer interrupt.
  */
-void __init ebsa110_time_init(void)
+static void __init ebsa110_init_time(void)
 {
 	/*
 	 * Timer 1, mode 2, LSB/MSB

@@ -18,6 +18,7 @@
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <linux/bitops.h>
+#include <linux/fb.h>
 
 #include <asm/types.h>
 #include <asm/setup.h>
@@ -31,6 +32,7 @@
 #include <asm/mach/irq.h>
 
 #include <asm/arch/mainstone.h>
+#include <asm/arch/pxafb.h>
 
 #include "generic.h"
 
@@ -116,9 +118,66 @@ static struct platform_device smc91x_device = {
 	.resource	= smc91x_resources,
 };
 
+
+static void mainstone_backlight_power(int on)
+{
+	if (on) {
+		pxa_gpio_mode(GPIO16_PWM0_MD);
+		pxa_set_cken(CKEN0_PWM0, 1);
+		PWM_CTRL0 = 0;
+		PWM_PWDUTY0 = 0x3ff;
+		PWM_PERVAL0 = 0x3ff;
+	} else {
+		PWM_CTRL0 = 0;
+		PWM_PWDUTY0 = 0x0;
+		PWM_PERVAL0 = 0x3FF;
+		pxa_set_cken(CKEN0_PWM0, 0);
+	}
+}
+
+static struct pxafb_mach_info toshiba_ltm04c380k __initdata = {
+	.pixclock		= 50000,
+	.xres			= 640,
+	.yres			= 480,
+	.bpp			= 16,
+	.hsync_len		= 1,
+	.left_margin		= 0x9f,
+	.right_margin		= 1,
+	.vsync_len		= 44,
+	.upper_margin		= 0,
+	.lower_margin		= 0,
+	.sync			= FB_SYNC_HOR_HIGH_ACT|FB_SYNC_VERT_HIGH_ACT,
+	.lccr0			= LCCR0_Act,
+	.lccr3			= LCCR3_PCP,
+	.pxafb_backlight_power	= mainstone_backlight_power,
+};
+
+static struct pxafb_mach_info toshiba_ltm035a776c __initdata = {
+	.pixclock		= 110000,
+	.xres			= 240,
+	.yres			= 320,
+	.bpp			= 16,
+	.hsync_len		= 4,
+	.left_margin		= 8,
+	.right_margin		= 20,
+	.vsync_len		= 3,
+	.upper_margin		= 1,
+	.lower_margin		= 10,
+	.sync			= FB_SYNC_HOR_HIGH_ACT|FB_SYNC_VERT_HIGH_ACT,
+	.lccr0			= LCCR0_Act,
+	.lccr3			= LCCR3_PCP,
+	.pxafb_backlight_power	= mainstone_backlight_power,
+};
+
 static void __init mainstone_init(void)
 {
 	platform_add_device(&smc91x_device);
+
+	/* reading the BSR might be handy to select LCD type here */
+	if (0)
+		set_pxa_fb_info(&toshiba_ltm04c380k);
+	else
+		set_pxa_fb_info(&toshiba_ltm035a776c);
 }
 
 

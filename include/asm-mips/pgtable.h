@@ -125,8 +125,6 @@ static inline void pte_clear(pte_t *ptep)
 
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 
-#define PTE_FILE_MAX_BITS	27
-
 /*
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..

@@ -23,7 +23,6 @@
 
 int dir_notify_enable = 1;
 
-static rwlock_t dn_lock = RW_LOCK_UNLOCKED;
 static kmem_cache_t *dn_cache;
 
 static void redo_inode_mask(struct inode *inode)
@@ -46,7 +45,7 @@ void dnotify_flush(struct file *filp, fl_owner_t id)
 	inode = filp->f_dentry->d_inode;
 	if (!S_ISDIR(inode->i_mode))
 		return;
-	write_lock(&dn_lock);
+	spin_lock(&inode->i_lock);
 	prev = &inode->i_dnotify;
 	while ((dn = *prev) != NULL) {
 		if ((dn->dn_owner == id) && (dn->dn_filp == filp)) {
@@ -57,7 +56,7 @@ void dnotify_flush(struct file *filp, fl_owner_t id)
 		}
 		prev = &dn->dn_next;
 	}
-	write_unlock(&dn_lock);
+	spin_unlock(&inode->i_lock);
 }
 
 int fcntl_dirnotify(int fd, struct file *filp, unsigned long arg)
@@ -81,7 +80,7 @@ int fcntl_dirnotify(int fd, struct file *filp, unsigned long arg)
 	dn = kmem_cache_alloc(dn_cache, SLAB_KERNEL);
 	if (dn == NULL)
 		return -ENOMEM;
-	write_lock(&dn_lock);
+	spin_lock(&inode->i_lock);
 	prev = &inode->i_dnotify;
 	while ((odn = *prev) != NULL) {
 		if ((odn->dn_owner == id) && (odn->dn_filp == filp)) {
@@ -104,12 +103,13 @@ int fcntl_dirnotify(int fd, struct file *filp, unsigned long arg)
 	inode->i_dnotify_mask |= arg & ~DN_MULTISHOT;
 	dn->dn_next = inode->i_dnotify;
 	inode->i_dnotify = dn;
-out:
-	write_unlock(&dn_lock);
-	return error;
+	spin_unlock(&inode->i_lock);
+	return 0;
+
 out_free:
+	spin_unlock(&inode->i_lock);
 	kmem_cache_free(dn_cache, dn);
-	goto out;
+	return error;
 }
 
 void __inode_dir_notify(struct inode *inode, unsigned long event)
@@ -119,7 +119,7 @@ void __inode_dir_notify(struct inode *inode, unsigned long event)
 	struct fown_struct *	fown;
 	int			changed = 0;
 
-	write_lock(&dn_lock);
+	spin_lock(&inode->i_lock);
 	prev = &inode->i_dnotify;
 	while ((dn = *prev) != NULL) {
 		if ((dn->dn_mask & event) == 0) {
@@ -138,7 +138,7 @@ void __inode_dir_notify(struct inode *inode, unsigned long event)
 	}
 	if (changed)
 		redo_inode_mask(inode);
-	write_unlock(&dn_lock);
+	spin_unlock(&inode->i_lock);
 }
 
 EXPORT_SYMBOL(__inode_dir_notify);

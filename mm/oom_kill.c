@@ -230,12 +230,6 @@ void out_of_memory(void)
 	static unsigned long first, last, count, lastkill;
 	unsigned long now, since;
 
-	/*
-	 * Enough swap space left?  Not OOM.
-	 */
-	if (nr_swap_pages > 0)
-		return;
-
 	spin_lock(&oom_lock);
 	now = jiffies;
 	since = now - last;

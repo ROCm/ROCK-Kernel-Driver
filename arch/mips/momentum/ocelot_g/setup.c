@@ -1,6 +1,4 @@
 /*
- * setup.c
- *
  * BRIEF MODULE DESCRIPTION
  * Momentum Computer Ocelot-G (CP7000G) - board dependent boot routines
  *
@@ -55,14 +53,14 @@
 #include <asm/bootinfo.h>
 #include <asm/page.h>
 #include <asm/io.h>
+#include <asm/gt64240.h>
 #include <asm/irq.h>
 #include <asm/pci.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/reboot.h>
 #include <linux/bootmem.h>
-#include <linux/blkdev.h>
-#include "gt64240.h"
+
 #include "ocelot_pld.h"
 
 #ifdef CONFIG_GALILLEO_GT64240_ETH
@@ -88,8 +86,6 @@ static unsigned long ENTRYLO(unsigned long paddr)
 		_CACHE_UNCACHED)) >> 6;
 }
 
-static void __init setup_l3cache(unsigned long size);
-
 /* setup code for a handoff from a version 2 PMON 2000 PROM */
 void PMON_v2_setup(void)
 {
@@ -104,8 +100,10 @@ void PMON_v2_setup(void)
 		GT64240 Internal Regs	0xf4000000	0xe0000000
 		UARTs (CS2)		0xfd000000	0xe0001000
 	*/
-	add_wired_entry(ENTRYLO(0xf4000000), ENTRYLO(0xf4010000), 0xf4000000, PM_64K);
-	add_wired_entry(ENTRYLO(0xfd000000), ENTRYLO(0xfd001000), 0xfd000000, PM_4K);
+	add_wired_entry(ENTRYLO(0xf4000000), ENTRYLO(0xf4010000),
+	                0xf4000000, PM_64K);
+	add_wired_entry(ENTRYLO(0xfd000000), ENTRYLO(0xfd001000),
+	                0xfd000000, PM_4K);
 
 	/* Also a temporary entry to let us talk to the Ocelot PLD and NVRAM
 	   in the CS[012] region. We can't use ioremap() yet. The NVRAM
@@ -114,15 +112,57 @@ void PMON_v2_setup(void)
 		Ocelot PLD (CS0)	0xfc000000	0xe0020000
 		NVRAM (CS1)		0xfc800000	0xe0030000
 	*/
-	add_temporary_entry(ENTRYLO(0xfc000000), ENTRYLO(0xfc010000), 0xfc000000, PM_64K);
-	add_temporary_entry(ENTRYLO(0xfc800000), ENTRYLO(0xfc810000), 0xfc800000, PM_64K);
+	add_temporary_entry(ENTRYLO(0xfc000000), ENTRYLO(0xfc010000),
+	                    0xfc000000, PM_64K);
+	add_temporary_entry(ENTRYLO(0xfc800000), ENTRYLO(0xfc810000),
+	                    0xfc800000, PM_64K);
 
 	gt64240_base = 0xf4000000;
 }
 
-static void __init momenco_ocelot_g_setup(void)
+extern int rm7k_tcache_enabled;
+
+/*
+ * This runs in KSEG1. See the verbiage in rm7k.c::probe_scache()
+ */
+#define Page_Invalidate_T 0x16
+static void __init setup_l3cache(unsigned long size)
 {
-	void (*l3func)(unsigned long)=KSEG1ADDR(&setup_l3cache);
+	int register i;
+
+	printk("Enabling L3 cache...");
+
+	/* Enable the L3 cache in the GT64120A's CPU Configuration register */
+	GT_WRITE(0, GT_READ(0) | (1<<14));
+
+	/* Enable the L3 cache in the CPU */
+	set_c0_config(1<<12 /* CONF_TE */);
+
+	/* Clear the cache */
+	write_c0_taglo(0);
+	write_c0_taghi(0);
+
+	for (i=0; i < size; i+= 4096) {
+		__asm__ __volatile__ (
+			".set noreorder\n\t"
+			".set mips3\n\t"
+			"cache %1, (%0)\n\t"
+			".set mips0\n\t"
+			".set reorder"
+			:
+			: "r" (KSEG0ADDR(i)),
+			  "i" (Page_Invalidate_T));
+	}
+
+	/* Let the RM7000 MM code know that the tertiary cache is enabled */
+	rm7k_tcache_enabled = 1;
+
+	printk("Done\n");
+}
+
+static int  __init momenco_ocelot_g_setup(void)
+{
+	void (*l3func)(unsigned long) = (void *) KSEG1ADDR(setup_l3cache);
 	unsigned int tmpword;
 
 	board_time_init = gt64240_time_init;
@@ -200,51 +240,11 @@ static void __init momenco_ocelot_g_setup(void)
 
 	/* FIXME: Fix up the DiskOnChip mapping */
 	GT_WRITE(0x468, 0xfef73);
+
+	return 0;
 }
 
 early_initcall(momenco_ocelot_g_setup);
-
-extern int rm7k_tcache_enabled;
-/*
- * This runs in KSEG1. See the verbiage in rm7k.c::probe_scache()
- */
-#define Page_Invalidate_T 0x16
-static void __init setup_l3cache(unsigned long size)
-{
-	int register i;
-	unsigned long tmp;
-
-	printk("Enabling L3 cache...");
-
-	/* Enable the L3 cache in the GT64120A's CPU Configuration register */
-	GT_READ(0, &tmp);
-	GT_WRITE(0, tmp | (1<<14));
-
-	/* Enable the L3 cache in the CPU */
-	set_c0_config(1<<12 /* CONF_TE */);
-
-	/* Clear the cache */
-	write_c0_taglo(0);
-	write_c0_taghi(0);
-
-	for (i=0; i < size; i+= 4096) {
-		__asm__ __volatile__ (
-			".set noreorder\n\t"
-			".set mips3\n\t"
-			"cache %1, (%0)\n\t"
-			".set mips0\n\t"
-			".set reorder"
-			:
-			: "r" (KSEG0ADDR(i)),
-			  "i" (Page_Invalidate_T));
-	}
-
-	/* Let the RM7000 MM code know that the tertiary cache is enabled */
-	rm7k_tcache_enabled = 1;
-
-	printk("Done\n");
-}
-
 
 /* This needs to be one of the first initcalls, because no I/O port access
    can work before this */
@@ -252,12 +252,12 @@ static void __init setup_l3cache(unsigned long size)
 static int io_base_ioremap(void)
 {
 	/* we're mapping PCI accesses from 0xc0000000 to 0xf0000000 */
-	void *io_remap_range = ioremap(0xc0000000, 0x30000000);
+	unsigned long io_remap_range;
 
-	if (!io_remap_range) {
+	io_remap_range = (unsigned long) ioremap(0xc0000000, 0x30000000);
+	if (!io_remap_range)
 		panic("Could not ioremap I/O port range");
-	}
-	printk("io_remap_range set at 0x%08x\n", (uint32_t)io_remap_range);
+
 	set_io_port_base(io_remap_range - 0xc0000000);
 
 	return 0;

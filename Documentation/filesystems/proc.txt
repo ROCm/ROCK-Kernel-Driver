@@ -1115,6 +1115,18 @@ program to load modules on demand.
 The files  in  this directory can be used to tune the operation of the virtual
 memory (VM)  subsystem  of  the  Linux  kernel.
 
+vfs_cache_pressure
+------------------
+
+Controls the tendency of the kernel to reclaim the memory which is used for
+caching of directory and inode objects.
+
+At the default value of vfs_cache_pressure=100 the kernel will attempt to
+reclaim dentries and inodes at a "fair" rate with respect to pagecache and
+swapcache reclaim.  Decreasing vfs_cache_pressure causes the kernel to prefer
+to retain dentry and inode caches.  Increasing vfs_cache_pressure beyond 100
+causes the kernel to prefer to reclaim dentries and inodes.
+
 dirty_background_ratio
 ----------------------
 

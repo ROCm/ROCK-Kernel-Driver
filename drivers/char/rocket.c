@@ -1258,7 +1258,7 @@ static int rp_tiocmset(struct tty_struct *tty, struct file *file,
 	return 0;
 }
 
-static int get_config(struct r_port *info, struct rocket_config *retinfo)
+static int get_config(struct r_port *info, struct rocket_config __user *retinfo)
 {
 	struct rocket_config tmp;
 
@@ -1276,7 +1276,7 @@ static int get_config(struct r_port *info, struct rocket_config *retinfo)
 	return 0;
 }
 
-static int set_config(struct r_port *info, struct rocket_config *new_info)
+static int set_config(struct r_port *info, struct rocket_config __user *new_info)
 {
 	struct rocket_config new_serial;
 
@@ -1319,7 +1319,7 @@ static int set_config(struct r_port *info, struct rocket_config *new_info)
  *  to user space.  See setrocket.c where the info is used to create
  *  the /dev/ttyRx ports.
  */
-static int get_ports(struct r_port *info, struct rocket_ports *retports)
+static int get_ports(struct r_port *info, struct rocket_ports __user *retports)
 {
 	struct rocket_ports tmp;
 	int board;
@@ -1341,11 +1341,11 @@ static int get_ports(struct r_port *info, struct rocket_ports *retports)
 	return 0;
 }
 
-static int reset_rm2(struct r_port *info, unsigned long arg)
+static int reset_rm2(struct r_port *info, void __user *arg)
 {
 	int reset;
 
-	if (copy_from_user(&reset, (void *) arg, sizeof (int)))
+	if (copy_from_user(&reset, arg, sizeof (int)))
 		return -EFAULT;
 	if (reset)
 		reset = 1;
@@ -1362,7 +1362,7 @@ static int reset_rm2(struct r_port *info, unsigned long arg)
 	return 0;
 }
 
-static int get_version(struct r_port *info, struct rocket_version *retvers)
+static int get_version(struct r_port *info, struct rocket_version __user *retvers)
 {
 	if (copy_to_user(retvers, &driver_version, sizeof (*retvers)))
 		return -EFAULT;
@@ -1374,25 +1374,26 @@ static int rp_ioctl(struct tty_struct *tty, struct file *file,
 		    unsigned int cmd, unsigned long arg)
 {
 	struct r_port *info = (struct r_port *) tty->driver_data;
+	void __user *argp = (void __user *)arg;
 
 	if (cmd != RCKP_GET_PORTS && rocket_paranoia_check(info, "rp_ioctl"))
 		return -ENXIO;
 
 	switch (cmd) {
 	case RCKP_GET_STRUCT:
-		if (copy_to_user((void *) arg, info, sizeof (struct r_port)))
+		if (copy_to_user(argp, info, sizeof (struct r_port)))
 			return -EFAULT;
 		return 0;
 	case RCKP_GET_CONFIG:
-		return get_config(info, (struct rocket_config *) arg);
+		return get_config(info, argp);
 	case RCKP_SET_CONFIG:
-		return set_config(info, (struct rocket_config *) arg);
+		return set_config(info, argp);
 	case RCKP_GET_PORTS:
-		return get_ports(info, (struct rocket_ports *) arg);
+		return get_ports(info, argp);
 	case RCKP_RESET_RM2:
-		return reset_rm2(info, arg);
+		return reset_rm2(info, argp);
 	case RCKP_GET_VERSION:
-		return get_version(info, (struct rocket_version *) arg);
+		return get_version(info, argp);
 	default:
 		return -ENOIOCTLCMD;
 	}

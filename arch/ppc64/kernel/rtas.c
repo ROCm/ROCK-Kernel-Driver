@@ -139,15 +139,13 @@ log_rtas_error(struct rtas_args	*rtas_args)
 		log_error(rtas_err_buf, ERR_TYPE_RTAS_LOG, 0);
 }
 
-long
-rtas_call(int token, int nargs, int nret,
-	  unsigned long *outputs, ...)
+int rtas_call(int token, int nargs, int nret, int *outputs, ...)
 {
 	va_list list;
 	int i, logit = 0;
 	unsigned long s;
 	struct rtas_args *rtas_args;
-	long ret;
+	int ret;
 
 	PPCDBG(PPCDBG_RTAS, "Entering rtas_call\n");
 	PPCDBG(PPCDBG_RTAS, "\ttoken    = 0x%x\n", token);
@@ -167,8 +165,8 @@ rtas_call(int token, int nargs, int nret,
 	rtas_args->rets  = (rtas_arg_t *)&(rtas_args->args[nargs]);
 	va_start(list, outputs);
 	for (i = 0; i < nargs; ++i) {
-		rtas_args->args[i] = (rtas_arg_t)LONG_LSW(va_arg(list, ulong));
-		PPCDBG(PPCDBG_RTAS, "\tnarg[%d] = 0x%lx\n", i, rtas_args->args[i]);
+		rtas_args->args[i] = va_arg(list, rtas_arg_t);
+		PPCDBG(PPCDBG_RTAS, "\tnarg[%d] = 0x%x\n", i, rtas_args->args[i]);
 	}
 	va_end(list);
 
@@ -191,7 +189,7 @@ rtas_call(int token, int nargs, int nret,
 	if (nret > 1 && outputs != NULL)
 		for (i = 0; i < nret-1; ++i)
 			outputs[i] = rtas_args->rets[i+1];
-	ret = (ulong)((nret > 0) ? rtas_args->rets[0] : 0);
+	ret = (nret > 0)? rtas_args->rets[0]: 0;
 
 	/* Gotta do something different here, use global lock for now... */
 	spin_unlock_irqrestore(&rtas.lock, s);
@@ -227,20 +225,13 @@ int
 rtas_get_power_level(int powerdomain, int *level)
 {
 	int token = rtas_token("get-power-level");
-	long powerlevel;
 	int rc;
 
 	if (token == RTAS_UNKNOWN_SERVICE)
 		return RTAS_UNKNOWN_OP;
 
-	while(1) {
-		rc = (int) rtas_call(token, 1, 2, &powerlevel, powerdomain);
-		if (rc == RTAS_BUSY)
-			udelay(1);
-		else
-			break;
-	}
-	*level = (int) powerlevel;
+	while ((rc = rtas_call(token, 1, 2, level, powerdomain)) == RTAS_BUSY)
+		udelay(1);
 	return rc;
 }
 
@@ -249,25 +240,21 @@ rtas_set_power_level(int powerdomain, int level, int *setlevel)
 {
 	int token = rtas_token("set-power-level");
 	unsigned int wait_time;
-	long returned_level;
 	int rc;
 
 	if (token == RTAS_UNKNOWN_SERVICE)
 		return RTAS_UNKNOWN_OP;
 
 	while (1) {
-		rc = (int) rtas_call(token, 2, 2, &returned_level, powerdomain,
-					level);
+		rc = rtas_call(token, 2, 2, setlevel, powerdomain, level);
 		if (rc == RTAS_BUSY)
 			udelay(1);
 		else if (rtas_is_extended_busy(rc)) {
 			wait_time = rtas_extended_busy_delay_time(rc);
 			udelay(wait_time * 1000);
-		}
-		else
+		} else
 			break;
 	}
-	*setlevel = (int) returned_level;
 	return rc;
 }
 
@@ -276,25 +263,21 @@ rtas_get_sensor(int sensor, int index, int *state)
 {
 	int token = rtas_token("get-sensor-state");
 	unsigned int wait_time;
-	long returned_state;
 	int rc;
 
 	if (token == RTAS_UNKNOWN_SERVICE)
 		return RTAS_UNKNOWN_OP;
 
 	while (1) {
-		rc = (int) rtas_call(token, 2, 2, &returned_state, sensor,
-					index);
+		rc = rtas_call(token, 2, 2, state, sensor, index);
 		if (rc == RTAS_BUSY)
 			udelay(1);
 		else if (rtas_is_extended_busy(rc)) {
 			wait_time = rtas_extended_busy_delay_time(rc);
 			udelay(wait_time * 1000);
-		}
-		else
+		} else
 			break;
 	}
-	*state = (int) returned_state;
 	return rc;
 }
 
@@ -309,8 +292,7 @@ rtas_set_indicator(int indicator, int index, int new_value)
 		return RTAS_UNKNOWN_OP;
 
 	while (1) {
-		rc = (int) rtas_call(token, 3, 1, NULL, indicator, index,
-					new_value);
+		rc = rtas_call(token, 3, 1, NULL, indicator, index, new_value);
 		if (rc == RTAS_BUSY)
 			udelay(1);
 		else if (rtas_is_extended_busy(rc)) {
@@ -409,7 +391,7 @@ rtas_restart(char *cmd)
 	if (rtas_firmware_flash_list.next)
 		rtas_flash_firmware();
 
-        printk("RTAS system-reboot returned %ld\n",
+        printk("RTAS system-reboot returned %d\n",
 	       rtas_call(rtas_token("system-reboot"), 0, 1, NULL));
         for (;;);
 }
@@ -420,8 +402,8 @@ rtas_power_off(void)
 	if (rtas_firmware_flash_list.next)
 		rtas_flash_bypass_warning();
         /* allow power on only with power button press */
-        printk("RTAS power-off returned %ld\n",
-               rtas_call(rtas_token("power-off"), 2, 1, NULL,0xffffffff,0xffffffff));
+        printk("RTAS power-off returned %d\n",
+               rtas_call(rtas_token("power-off"), 2, 1, NULL, -1, -1));
         for (;;);
 }
 
@@ -438,7 +420,7 @@ static char rtas_os_term_buf[2048];
 
 void rtas_os_term(char *str)
 {
-	long status;
+	int status;
 
 	snprintf(rtas_os_term_buf, 2048, "OS panic: %s", str);
 
@@ -449,7 +431,7 @@ void rtas_os_term(char *str)
 		if (status == RTAS_BUSY)
 			udelay(1);
 		else if (status != 0)
-			printk(KERN_EMERG "ibm,os-term call failed %ld\n",
+			printk(KERN_EMERG "ibm,os-term call failed %d\n",
 			       status);
 	} while (status == RTAS_BUSY);
 }

@@ -321,7 +321,7 @@ int tcf_act_police(struct sk_buff **pskb, struct tc_action *a)
 
 		PSCHED_GET_TIME(now);
 
-		toks = PSCHED_TDIFF_SAFE(now, p->t_c, p->burst, 0);
+		toks = PSCHED_TDIFF_SAFE(now, p->t_c, p->burst, (void)0);
 
 		if (p->P_tab) {
 			ptoks = toks + p->ptoks;
@@ -523,7 +523,7 @@ int tcf_police(struct sk_buff *skb, struct tcf_police *p)
 
 		PSCHED_GET_TIME(now);
 
-		toks = PSCHED_TDIFF_SAFE(now, p->t_c, p->burst, 0);
+		toks = PSCHED_TDIFF_SAFE(now, p->t_c, p->burst, (void)0);
 
 		if (p->P_tab) {
 			ptoks = toks + p->ptoks;

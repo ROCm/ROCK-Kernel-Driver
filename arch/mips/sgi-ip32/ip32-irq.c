@@ -123,9 +123,9 @@ extern irqreturn_t crime_cpuerr_intr (int irq, void *dev_id,
 				      struct pt_regs *regs);
 
 struct irqaction memerr_irq = { crime_memerr_intr, SA_INTERRUPT,
-				0, "CRIME memory error", NULL, NULL };
+			CPU_MASK_NONE, "CRIME memory error", NULL, NULL };
 struct irqaction cpuerr_irq = { crime_cpuerr_intr, SA_INTERRUPT,
-				0, "CRIME CPU error", NULL, NULL };
+			CPU_MASK_NONE, "CRIME CPU error", NULL, NULL };
 
 extern void ip32_handle_int(void);
 

@@ -256,7 +256,7 @@ static void __init ap_init(void)
 	unsigned long sc_dec;
 	int i;
 
-	platform_add_device(&cfi_flash_device);
+	platform_device_register(&cfi_flash_device);
 
 	sc_dec = readl(VA_SC_BASE + INTEGRATOR_SC_DEC_OFFSET);
 	for (i = 0; i < 4; i++) {

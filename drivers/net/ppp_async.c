@@ -238,7 +238,7 @@ ppp_asynctty_close(struct tty_struct *tty)
  */
 static ssize_t
 ppp_asynctty_read(struct tty_struct *tty, struct file *file,
-		  unsigned char *buf, size_t count)
+		  unsigned char __user *buf, size_t count)
 {
 	return -EAGAIN;
 }
@@ -249,7 +249,7 @@ ppp_asynctty_read(struct tty_struct *tty, struct file *file,
  */
 static ssize_t
 ppp_asynctty_write(struct tty_struct *tty, struct file *file,
-		   const unsigned char *buf, size_t count)
+		   const unsigned char __user *buf, size_t count)
 {
 	return -EAGAIN;
 }
@@ -260,6 +260,7 @@ ppp_asynctty_ioctl(struct tty_struct *tty, struct file *file,
 {
 	struct asyncppp *ap = ap_get(tty);
 	int err, val;
+	int __user *p = (int __user *)arg;
 
 	if (ap == 0)
 		return -ENXIO;
@@ -270,7 +271,7 @@ ppp_asynctty_ioctl(struct tty_struct *tty, struct file *file,
 		if (ap == 0)
 			break;
 		err = -EFAULT;
-		if (put_user(ppp_channel_index(&ap->chan), (int *) arg))
+		if (put_user(ppp_channel_index(&ap->chan), p))
 			break;
 		err = 0;
 		break;
@@ -280,7 +281,7 @@ ppp_asynctty_ioctl(struct tty_struct *tty, struct file *file,
 		if (ap == 0)
 			break;
 		err = -EFAULT;
-		if (put_user(ppp_unit_number(&ap->chan), (int *) arg))
+		if (put_user(ppp_unit_number(&ap->chan), p))
 			break;
 		err = 0;
 		break;
@@ -299,7 +300,7 @@ ppp_asynctty_ioctl(struct tty_struct *tty, struct file *file,
 
 	case FIONREAD:
 		val = 0;
-		if (put_user(val, (int *) arg))
+		if (put_user(val, p))
 			break;
 		err = 0;
 		break;
@@ -397,6 +398,8 @@ static int
 ppp_async_ioctl(struct ppp_channel *chan, unsigned int cmd, unsigned long arg)
 {
 	struct asyncppp *ap = chan->private;
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 	int err, val;
 	u32 accm[8];
 
@@ -404,12 +407,12 @@ ppp_async_ioctl(struct ppp_channel *chan, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case PPPIOCGFLAGS:
 		val = ap->flags | ap->rbits;
-		if (put_user(val, (int *) arg))
+		if (put_user(val, p))
 			break;
 		err = 0;
 		break;
 	case PPPIOCSFLAGS:
-		if (get_user(val, (int *) arg))
+		if (get_user(val, p))
 			break;
 		ap->flags = val & ~SC_RCV_BITS;
 		spin_lock_irq(&ap->recv_lock);
@@ -419,34 +422,34 @@ ppp_async_ioctl(struct ppp_channel *chan, unsigned int cmd, unsigned long arg)
 		break;
 
 	case PPPIOCGASYNCMAP:
-		if (put_user(ap->xaccm[0], (u32 *) arg))
+		if (put_user(ap->xaccm[0], (u32 __user *)argp))
 			break;
 		err = 0;
 		break;
 	case PPPIOCSASYNCMAP:
-		if (get_user(ap->xaccm[0], (u32 *) arg))
+		if (get_user(ap->xaccm[0], (u32 __user *)argp))
 			break;
 		err = 0;
 		break;
 
 	case PPPIOCGRASYNCMAP:
-		if (put_user(ap->raccm, (u32 *) arg))
+		if (put_user(ap->raccm, (u32 __user *)argp))
 			break;
 		err = 0;
 		break;
 	case PPPIOCSRASYNCMAP:
-		if (get_user(ap->raccm, (u32 *) arg))
+		if (get_user(ap->raccm, (u32 __user *)argp))
 			break;
 		err = 0;
 		break;
 
 	case PPPIOCGXASYNCMAP:
-		if (copy_to_user((void __user *) arg, ap->xaccm, sizeof(ap->xaccm)))
+		if (copy_to_user(argp, ap->xaccm, sizeof(ap->xaccm)))
 			break;
 		err = 0;
 		break;
 	case PPPIOCSXASYNCMAP:
-		if (copy_from_user(accm, (void __user *) arg, sizeof(accm)))
+		if (copy_from_user(accm, argp, sizeof(accm)))
 			break;
 		accm[2] &= ~0x40000000U;	/* can't escape 0x5e */
 		accm[3] |= 0x60000000U;		/* must escape 0x7d, 0x7e */
@@ -455,12 +458,12 @@ ppp_async_ioctl(struct ppp_channel *chan, unsigned int cmd, unsigned long arg)
 		break;
 
 	case PPPIOCGMRU:
-		if (put_user(ap->mru, (int *) arg))
+		if (put_user(ap->mru, p))
 			break;
 		err = 0;
 		break;
 	case PPPIOCSMRU:
-		if (get_user(val, (int *) arg))
+		if (get_user(val, p))
 			break;
 		if (val < PPP_MRU)
 			val = PPP_MRU;

@@ -365,7 +365,8 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 	unsigned long addr;
 	struct pci_dev *dev;
 	struct device_node *dn;
-	unsigned long ret, rets[2];
+	unsigned long ret;
+	int rets[2];
 	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
 	/* dont want this on the stack */
 	static unsigned char slot_err_buf[RTAS_ERROR_LOG_MAX];
@@ -444,11 +445,11 @@ unsigned long eeh_check_failure(void *token, unsigned long val)
 		 * can use it here.
 		 */
 		if (panic_on_oops) {
-			panic("EEH: MMIO failure (%ld) on device:%s %s\n",
+			panic("EEH: MMIO failure (%d) on device:%s %s\n",
 			      rets[0], pci_name(dev), pci_pretty_name(dev));
 		} else {
 			__get_cpu_var(ignored_failures)++;
-			printk(KERN_INFO "EEH: MMIO failure (%ld) on device:%s %s\n",
+			printk(KERN_INFO "EEH: MMIO failure (%d) on device:%s %s\n",
 			       rets[0], pci_name(dev), pci_pretty_name(dev));
 		}
 	} else {

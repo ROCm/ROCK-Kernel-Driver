@@ -301,7 +301,7 @@ static void jmr3927_ioc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 static struct irqaction ioc_action = {
-	jmr3927_ioc_interrupt, 0, 0, "IOC", NULL, NULL,
+	jmr3927_ioc_interrupt, 0, CPU_MASK_NONE, "IOC", NULL, NULL,
 };
 
 static void jmr3927_isac_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -318,7 +318,7 @@ static void jmr3927_isac_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 static struct irqaction isac_action = {
-	jmr3927_isac_interrupt, 0, 0, "ISAC", NULL, NULL,
+	jmr3927_isac_interrupt, 0, CPU_MASK_NONE, "ISAC", NULL, NULL,
 };
 
 
@@ -327,7 +327,7 @@ static void jmr3927_isaerr_interrupt(int irq, void * dev_id, struct pt_regs * re
 	printk(KERN_WARNING "ISA error interrupt (irq 0x%x).\n", irq);
 }
 static struct irqaction isaerr_action = {
-	jmr3927_isaerr_interrupt, 0, 0, "ISA error", NULL, NULL,
+	jmr3927_isaerr_interrupt, 0, CPU_MASK_NONE, "ISA error", NULL, NULL,
 };
 
 static void jmr3927_pcierr_interrupt(int irq, void * dev_id, struct pt_regs * regs)
@@ -337,7 +337,7 @@ static void jmr3927_pcierr_interrupt(int irq, void * dev_id, struct pt_regs * re
 	       tx3927_pcicptr->pcistat, tx3927_pcicptr->lbstat);
 }
 static struct irqaction pcierr_action = {
-	jmr3927_pcierr_interrupt, 0, 0, "PCI error", NULL, NULL,
+	jmr3927_pcierr_interrupt, 0, CPU_MASK_NONE, "PCI error", NULL, NULL,
 };
 
 int jmr3927_ether1_irq = 0;

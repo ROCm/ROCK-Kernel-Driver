@@ -941,6 +941,7 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	ret = pcmcia_get_configuration_info(s->handle, &buf.config);
 	break;
     case DS_GET_FIRST_TUPLE:
+	pcmcia_validate_mem(s->parent);
 	ret = pcmcia_get_first_tuple(s->handle, &buf.tuple);
 	break;
     case DS_GET_NEXT_TUPLE:
@@ -962,6 +963,7 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	ret = pcmcia_get_status(s->handle, &buf.status);
 	break;
     case DS_VALIDATE_CIS:
+	pcmcia_validate_mem(s->parent);
 	ret = pcmcia_validate_cis(s->handle, &buf.cisinfo);
 	break;
     case DS_SUSPEND_CARD:

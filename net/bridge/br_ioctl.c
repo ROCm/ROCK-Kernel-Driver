@@ -403,6 +403,6 @@ int br_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	}
 
-	printk(KERN_DEBUG "Bridge does not support ioctl 0x%x\n", cmd);
+	pr_debug("Bridge does not support ioctl 0x%x\n", cmd);
 	return -EOPNOTSUPP;
 }

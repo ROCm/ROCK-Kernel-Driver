@@ -154,7 +154,6 @@ static int ____call_usermodehelper(void *data)
 {
 	struct subprocess_info *sub_info = data;
 	int retval;
-	cpumask_t mask = CPU_MASK_ALL;
 
 	/* Unblock all signals. */
 	flush_signals(current);
@@ -165,7 +164,7 @@ static int ____call_usermodehelper(void *data)
 	spin_unlock_irq(&current->sighand->siglock);
 
 	/* We can run anywhere, unlike our parent keventd(). */
-	set_cpus_allowed(current, mask);
+	set_cpus_allowed(current, CPU_MASK_ALL);
 
 	retval = -EPERM;
 	if (current->fs->root)

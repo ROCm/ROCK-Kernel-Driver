@@ -48,8 +48,6 @@
 
 TODC_ALLOC();
 
-extern char saved_command_line[];
-
 extern void pplus_setup_hose(void);
 extern void pplus_set_VIA_IDE_native(void);
 
