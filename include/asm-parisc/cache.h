@@ -18,8 +18,10 @@
  */
 #ifdef CONFIG_PA20
 #define L1_CACHE_BYTES 64
+#define L1_CACHE_SHIFT 6
 #else
 #define L1_CACHE_BYTES 32
+#define L1_CACHE_SHIFT 5
 #endif
 
 #define L1_CACHE_ALIGN(x)       (((x)+(L1_CACHE_BYTES-1))&~(L1_CACHE_BYTES-1))

@@ -28,20 +28,19 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/kernel.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
 #include <linux/ioport.h>
 #include <linux/spinlock.h>
-#include <linux/ioport.h>
-#include <asm/semaphore.h>
-#include <asm/io.h>
-#include <asm/uaccess.h>
 #include <linux/notifier.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
 #include <linux/isapnp.h>
 #include <linux/pci.h>
+
+#include <asm/semaphore.h>
+#include <asm/io.h>
+#include <asm/uaccess.h>
 
 #define SC1200_MODULE_VER	"build 20020303"
 #define SC1200_MODULE_NAME	"sc1200wdt"

@@ -482,7 +482,7 @@ nfsd_proc_readdir(struct svc_rqst *rqstp, struct nfsd_readdirargs *argp,
 
 	resp->count = resp->buffer - argp->buffer;
 	if (resp->offset)
-		*resp->offset = (u32)offset;
+		*resp->offset = htonl(offset);
 
 	fh_put(&argp->fh);
 	return nfserr;

@@ -42,6 +42,7 @@
 #include <asm/page.h>
 #include <asm/pdc.h>
 #include <asm/irq.h>		/* for struct irq_region */
+#include <asm/parisc-device.h>
 
 struct system_cpuinfo_parisc boot_cpu_data;
 struct cpuinfo_parisc cpu_data[NR_CPUS];

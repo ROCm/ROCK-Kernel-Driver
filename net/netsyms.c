@@ -534,6 +534,7 @@ EXPORT_SYMBOL(alloc_skb);
 EXPORT_SYMBOL(__kfree_skb);
 EXPORT_SYMBOL(skb_clone);
 EXPORT_SYMBOL(skb_copy);
+EXPORT_SYMBOL(skb_pad);
 EXPORT_SYMBOL(netif_rx);
 EXPORT_SYMBOL(netif_receive_skb);
 EXPORT_SYMBOL(dev_add_pack);

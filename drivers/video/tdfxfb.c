@@ -177,7 +177,7 @@ static struct fb_ops tdfxfb_ops = {
 	.fb_pan_display	= tdfxfb_pan_display,
 	.fb_fillrect	= tdfxfb_fillrect,
 	.fb_copyarea	= tdfxfb_copyarea,
-	.fb_imageblit	= tdfxfb_imageblit,
+	.fb_imageblit	= cfb_imageblit,
 	.fb_sync	= banshee_wait_idle,
 	.fb_cursor	= soft_cursor,
 };
@@ -939,14 +939,16 @@ static void tdfxfb_imageblit(struct fb_info *info, struct fb_image *pixmap)
 	u8 *chardata = (u8 *) pixmap->data;
 	u32 srcfmt;
 
-	if (pixmap->depth == 1) {
+	if (pixmap->depth != 1) {
+		//banshee_make_room(par, 6 + ((size + 3) >> 2));
+		//srcfmt = stride | ((bpp+((bpp==8) ? 0 : 8)) << 13) | 0x400000;
+		cfb_imageblit(info, pixmap);
+		return;
+	} else {
 		banshee_make_room(par, 8 + ((size + 3) >> 2));
 		tdfx_outl(par, COLORFORE, pixmap->fg_color);
 		tdfx_outl(par, COLORBACK, pixmap->bg_color);
 		srcfmt = 0x400000;
-	} else {
-		//banshee_make_room(par, 6 + ((size + 3) >> 2));
-		//srcfmt = stride | ((bpp+((bpp==8) ? 0 : 8)) << 13) | 0x400000;
 	}	
 
 	tdfx_outl(par,	SRCXY,     0);

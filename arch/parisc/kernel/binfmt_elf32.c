@@ -19,7 +19,7 @@ typedef unsigned int elf_greg_t;
 #include <linux/module.h>
 #include <linux/config.h>
 #include <linux/elfcore.h>
-#include "sys32.h"		/* struct timeval32 */
+#include <linux/compat.h>
 
 #define elf_prstatus elf_prstatus32
 struct elf_prstatus32
@@ -32,10 +32,10 @@ struct elf_prstatus32
 	pid_t	pr_ppid;
 	pid_t	pr_pgrp;
 	pid_t	pr_sid;
-	struct timeval32 pr_utime;	/* User time */
-	struct timeval32 pr_stime;	/* System time */
-	struct timeval32 pr_cutime;	/* Cumulative user time */
-	struct timeval32 pr_cstime;	/* Cumulative system time */
+	struct compat_timeval pr_utime;		/* User time */
+	struct compat_timeval pr_stime;		/* System time */
+	struct compat_timeval pr_cutime;	/* Cumulative user time */
+	struct compat_timeval pr_cstime;	/* Cumulative system time */
 	elf_gregset_t pr_reg;	/* GP registers */
 	int pr_fpvalid;		/* True if math co-processor being used.  */
 };
@@ -88,5 +88,13 @@ struct elf_prpsinfo32
 
 #define SET_PERSONALITY(ex, ibcs2) \
 	current->personality = PER_LINUX_32BIT
+
+#define jiffies_to_timeval jiffies_to_compat_timeval 
+static __inline__ void
+jiffies_to_compat_timeval(unsigned long jiffies, struct compat_timeval *value)
+{
+	value->tv_usec = (jiffies % HZ) * (1000000L / HZ);
+	value->tv_sec = jiffies / HZ;
+}
 
 #include "../../../fs/binfmt_elf.c"

@@ -12,11 +12,6 @@
     set_fs (old_fs); \
 }
 
-struct timeval32 {
-	int tv_sec;
-	int tv_usec;
-};
-
 typedef __u32 __sighandler_t32;
 
 #include <linux/signal.h>

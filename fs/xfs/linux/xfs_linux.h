@@ -42,6 +42,7 @@
 #include <linux/sched.h>
 #include <linux/bitops.h>
 #include <linux/major.h>
+#include <linux/pagemap.h>
 #include <linux/vfs.h>
 
 #include <asm/page.h>
@@ -169,7 +170,6 @@ typedef struct xfs_dirent {		/* data from readdir() */
 #define DEFAULT_PROJID	0
 #define dfltprid	DEFAULT_PROJID
 
-#define MAXNAMELEN	256
 #define MAXPATHLEN	1024
 
 #define FINVIS		0x0100	/* don't update timestamps - XFS */

@@ -51,6 +51,7 @@
 
 #include "float.h"
 #include "types.h"
+#include <asm/processor.h>
 /* #include <sys/debug.h> */
 /* #include <machine/sys/mdep_private.h> */
 
@@ -166,6 +167,20 @@ static void update_status_cbit();
 
 #define VASSERT(x)
 
+static void parisc_linux_get_fpu_type(u_int fpregs[])
+{
+	/* on pa-linux the fpu type is not filled in by the
+	 * caller; it is constructed here  
+	 */ 
+	if (boot_cpu_data.cpu_type == pcxs)
+		fpregs[FPU_TYPE_FLAG_POS] = TIMEX_EXTEN_FLAG;
+	else if (boot_cpu_data.cpu_type == pcxt ||
+	         boot_cpu_data.cpu_type == pcxt_)
+		fpregs[FPU_TYPE_FLAG_POS] = ROLEX_EXTEN_FLAG;
+	else if (boot_cpu_data.cpu_type >= pcxu)
+		fpregs[FPU_TYPE_FLAG_POS] = PA2_0_FPU_FLAG;
+}
+
 /*
  * this routine will decode the excepting floating point instruction and
  * call the approiate emulation routine.
@@ -183,6 +198,8 @@ fpudispatch(u_int ir, u_int excp_code, u_int holder, u_int fpregs[])
 
 	/* All FP emulation code assumes that ints are 4-bytes in length */
 	VASSERT(sizeof(int) == 4);
+
+	parisc_linux_get_fpu_type(fpregs);
 
 	fpu_type_flags=fpregs[FPU_TYPE_FLAG_POS];  /* get fpu type flags */
 

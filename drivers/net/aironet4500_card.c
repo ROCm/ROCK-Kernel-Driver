@@ -455,10 +455,7 @@ static void awc_pnp_release(void) {
 
 		if (awc_proc_unset_fun)
 			awc_proc_unset_fun(i);
-		if (isapnp_cfg_begin(logdev->PNP_BUS->PNP_BUS_NUMBER, logdev->PNP_DEV_NUMBER)<0)
-			printk("isapnp cfg failed at release \n");
-		isapnp_deactivate(logdev->PNP_DEV_NUMBER);
-		isapnp_cfg_end();
+		pnp_device_detach(logdev);
 
 		release_region(aironet4500_devices[i]->base_addr, AIRONET4X00_IO_SIZE);
 //		release_region(isa_cisaddr, AIRONET4X00_CIS_SIZE, "aironet4x00 cis");

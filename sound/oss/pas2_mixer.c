@@ -25,7 +25,7 @@
 #define DEB(what)		/* (what) */
 #endif
 
-extern int      translate_code;
+extern int      pas_translate_code;
 extern char     pas_model;
 extern int     *pas_osp;
 extern int      pas_audiodev;
@@ -71,7 +71,7 @@ mix_write(unsigned char data, int ioaddr)
 
 	if (pas_model == 4)
 	  {
-		  outw(data | (data << 8), (ioaddr + translate_code) - 1);
+		  outw(data | (data << 8), (ioaddr + pas_translate_code) - 1);
 		  outb((0x80), 0);
 	} else
 		pas_write(data, ioaddr);

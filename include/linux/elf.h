@@ -156,11 +156,12 @@ typedef __s64	Elf64_Sxword;
 #define STT_SECTION 3
 #define STT_FILE    4
 
-#define ELF32_ST_BIND(x) ((x) >> 4)
-#define ELF32_ST_TYPE(x) (((unsigned int) x) & 0xf)
-
-#define ELF64_ST_BIND(x) ((x) >> 4)
-#define ELF64_ST_TYPE(x) (((unsigned int) x) & 0xf)
+#define ELF_ST_BIND(x)		((x) >> 4)
+#define ELF_ST_TYPE(x)		(((unsigned int) x) & 0xf)
+#define ELF32_ST_BIND(x)	ELF_ST_BIND(x)
+#define ELF32_ST_TYPE(x)	ELF_ST_TYPE(x)
+#define ELF64_ST_BIND(x)	ELF_ST_BIND(x)
+#define ELF64_ST_TYPE(x)	ELF_ST_TYPE(x)
 
 /* Symbolic values for the entries in the auxiliary table
    put on the initial stack */

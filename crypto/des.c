@@ -1279,10 +1279,8 @@ static int __init init(void)
 		goto out;
 
 	ret = crypto_register_alg(&des3_ede_alg);
-	if (ret < 0) {
+	if (ret < 0)
 		crypto_unregister_alg(&des_alg);
-		goto out;
-	}
 out:	
 	return ret;
 }

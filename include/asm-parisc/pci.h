@@ -131,74 +131,6 @@ struct pci_bios_ops {
 	void (*fixup_bus)(struct pci_bus *bus);
 };
 
-/*
-** See Documentation/DMA-mapping.txt
-*/
-struct pci_dma_ops {
-	int  (*dma_supported)(struct pci_dev *dev, u64 mask);
-	void *(*alloc_consistent)(struct pci_dev *dev, size_t size, dma_addr_t *iova);
-	void (*free_consistent)(struct pci_dev *dev, size_t size, void *vaddr, dma_addr_t iova);
-	dma_addr_t (*map_single)(struct pci_dev *dev, void *addr, size_t size, int direction);
-	void (*unmap_single)(struct pci_dev *dev, dma_addr_t iova, size_t size, int direction);
-	int  (*map_sg)(struct pci_dev *dev, struct scatterlist *sg, int nents, int direction);
-	void (*unmap_sg)(struct pci_dev *dev, struct scatterlist *sg, int nhwents, int direction);
-	void (*dma_sync_single)(struct pci_dev *dev, dma_addr_t iova, size_t size, int direction);
-	void (*dma_sync_sg)(struct pci_dev *dev, struct scatterlist *sg, int nelems, int direction);
-};
-
-
-/*
-** We could live without the hppa_dma_ops indirection if we didn't want
-** to support 4 different coherent dma models with one binary (they will
-** someday be loadable modules):
-**     I/O MMU        consistent method           dma_sync behavior
-**  =============   ======================       =======================
-**  a) PA-7x00LC    uncachable host memory          flush/purge
-**  b) U2/Uturn      cachable host memory              NOP
-**  c) Ike/Astro     cachable host memory              NOP
-**  d) EPIC/SAGA     memory on EPIC/SAGA         flush/reset DMA channel
-**
-** PA-7[13]00LC processors have a GSC bus interface and no I/O MMU.
-**
-** Systems (eg PCX-T workstations) that don't fall into the above
-** categories will need to modify the needed drivers to perform
-** flush/purge and allocate "regular" cacheable pages for everything.
-*/
-
-extern struct pci_dma_ops *hppa_dma_ops;
-
-#ifdef CONFIG_PA11
-extern struct pci_dma_ops pcxl_dma_ops;
-extern struct pci_dma_ops pcx_dma_ops;
-#endif
-
-/*
-** Oops hard if we haven't setup hppa_dma_ops by the time the first driver
-** attempts to initialize.
-** Since panic() is a (void)(), pci_dma_panic() is needed to satisfy
-** the (int)() required by pci_dma_supported() interface.
-*/
-static inline int pci_dma_panic(char *msg)
-{
-	extern void panic(const char *, ...);	/* linux/kernel.h */
-	panic(msg);
-	/* NOTREACHED */
-	return -1;
-}
-
-#define pci_dma_supported(p, m)	( \
-	(NULL == hppa_dma_ops) \
-	?  pci_dma_panic("Dynamic DMA support missing...OOPS!\n(Hint: was Astro/Ike/U2/Uturn not claimed?)\n") \
-	: hppa_dma_ops->dma_supported(p,m) \
-)
-
-#define pci_alloc_consistent(p, s, a)	hppa_dma_ops->alloc_consistent(p,s,a)
-#define pci_free_consistent(p, s, v, a)	hppa_dma_ops->free_consistent(p,s,v,a)
-#define pci_map_single(p, v, s, d)	hppa_dma_ops->map_single(p, v, s, d)
-#define pci_unmap_single(p, a, s, d)	hppa_dma_ops->unmap_single(p, a, s, d)
-#define pci_map_sg(p, sg, n, d)		hppa_dma_ops->map_sg(p, sg, n, d)
-#define pci_unmap_sg(p, sg, n, d)	hppa_dma_ops->unmap_sg(p, sg, n, d)
-
 /* pci_unmap_{single,page} is not a nop, thus... */
 #define DECLARE_PCI_UNMAP_ADDR(ADDR_NAME)	\
 	dma_addr_t ADDR_NAME;
@@ -213,24 +145,6 @@ static inline int pci_dma_panic(char *msg)
 #define pci_unmap_len_set(PTR, LEN_NAME, VAL)		\
 	(((PTR)->LEN_NAME) = (VAL))
 
-/* For U2/Astro/Ike based platforms (which are fully I/O coherent)
-** dma_sync is a NOP. Let's keep the performance path short here.
-*/
-#define pci_dma_sync_single(p, a, s, d)	{ if (hppa_dma_ops->dma_sync_single) \
-	hppa_dma_ops->dma_sync_single(p, a, s, d); \
-	}
-#define pci_dma_sync_sg(p, sg, n, d)	{ if (hppa_dma_ops->dma_sync_sg) \
-	hppa_dma_ops->dma_sync_sg(p, sg, n, d); \
-	}
-
-/* No highmem on parisc, plus we have an IOMMU, so mapping pages is easy. */
-#define pci_map_page(dev, page, off, size, dir) \
-	pci_map_single(dev, (page_address(page) + (off)), size, dir)
-#define pci_unmap_page(dev,addr,sz,dir) pci_unmap_single(dev,addr,sz,dir)
-
-/* Don't support DAC yet. */
-#define pci_dac_dma_supported(pci_dev, mask)	(0)
-
 /*
 ** Stuff declared in arch/parisc/kernel/pci.c
 */
@@ -243,7 +157,6 @@ extern struct pci_hba_data *parisc_pci_hba[];
 #ifdef CONFIG_PCI
 extern void pcibios_register_hba(struct pci_hba_data *);
 extern void pcibios_set_master(struct pci_dev *);
-extern void pcibios_assign_unassigned_resources(struct pci_bus *);
 #else
 extern inline void pcibios_register_hba(struct pci_hba_data *x)
 {
@@ -264,35 +177,13 @@ extern inline void pcibios_register_hba(struct pci_hba_data *x)
 #define PCIBIOS_MIN_IO          0x10
 #define PCIBIOS_MIN_MEM         0x1000 /* NBPG - but pci/setup-res.c dies */
 
+/* Don't support DAC yet. */
+#define pci_dac_dma_supported(pci_dev, mask)   (0)
+
 /* Return the index of the PCI controller for device PDEV. */
-#define pci_controller_num(PDEV)	(0)
+#define	pci_controller_num(PDEV)	(0)
 
-#define GET_IOC(dev) ((struct ioc *)(HBA_DATA(dev->sysdata)->iommu))
-
-#ifdef CONFIG_IOMMU_CCIO
-struct parisc_device;
-struct ioc;
-void * ccio_get_iommu(const struct parisc_device *dev);
-struct pci_dev * ccio_get_fake(const struct parisc_device *dev);
-int ccio_request_resource(const struct parisc_device *dev,
-		struct resource *res);
-int ccio_allocate_resource(const struct parisc_device *dev,
-		struct resource *res, unsigned long size,
-		unsigned long min, unsigned long max, unsigned long align,
-		void (*alignf)(void *, struct resource *, unsigned long, unsigned long),
-		void *alignf_data);
-#else /* !CONFIG_IOMMU_CCIO */
-#define ccio_get_iommu(dev) NULL
-#define ccio_get_fake(dev) NULL
-#define ccio_request_resource(dev, res) request_resource(&iomem_resource, res)
-#define ccio_allocate_resource(dev, res, size, min, max, align, alignf, data) \
-		allocate_resource(&iomem_resource, res, size, min, max, \
-				align, alignf, data)
-#endif /* !CONFIG_IOMMU_CCIO */
-
-#ifdef CONFIG_IOMMU_SBA
-struct parisc_device;
-void * sba_get_iommu(struct parisc_device *dev);
-#endif
+/* export the pci_ DMA API in terms of the dma_ one */
+#include <asm-generic/pci-dma-compat.h>
 
 #endif /* __ASM_PARISC_PCI_H */

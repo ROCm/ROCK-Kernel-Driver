@@ -29,26 +29,6 @@
 
 #ifndef __ASSEMBLY__
 
-/*
- * XXX I am hitting compiler bugs with __builtin_trap. This has
- * hit me before and rusty was blaming his netfilter bugs on
- * this so lets disable it. - Anton
- */
-#if 0
-/* We need the mb()'s so we don't trigger a compiler bug - Anton */
-#define BUG() do { \
-	mb(); \
-	__builtin_trap(); \
-	mb(); \
-} while(0)
-#else
-#define BUG() do { \
-	printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); *(int *)0=0; \
-} while (0)
-#endif
-
-#define PAGE_BUG(page)	BUG()
-
 #define clear_page(page)	 memset((void *)(page), 0, PAGE_SIZE)
 #define copy_page(to,from) 	memcpy((void *)(to), (void *)(from), PAGE_SIZE)
 #define clear_user_page(addr, vaddr, page)	clear_page(addr)

@@ -680,6 +680,8 @@ static int suspend_prepare_image(void)
 	struct sysinfo i;
 	unsigned int nr_needed_pages = 0;
 
+	drain_local_pages();
+
 	pagedir_nosave = NULL;
 	printk( "/critical section: Counting pages to copy" );
 	nr_copy_pages = count_and_copy_data_pages(NULL);
@@ -714,6 +716,7 @@ static int suspend_prepare_image(void)
 	nr_copy_pages_check = nr_copy_pages;
 	pagedir_order_check = pagedir_order;
 
+	drain_local_pages();	/* During allocating of suspend pagedir, new cold pages may appear. Kill them */
 	if (nr_copy_pages != count_and_copy_data_pages(pagedir_nosave))	/* copy */
 		BUG();
 

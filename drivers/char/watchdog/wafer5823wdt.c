@@ -27,16 +27,15 @@
  */
 
 #include <linux/module.h>
-#include <linux/kernel.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
 #include <linux/ioport.h>
-#include <asm/io.h>
-#include <asm/uaccess.h>
 #include <linux/notifier.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
+#include <asm/io.h>
+#include <asm/uaccess.h>
 
 static unsigned long wafwdt_is_open;
 static spinlock_t wafwdt_lock;

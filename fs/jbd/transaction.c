@@ -578,9 +578,6 @@ static void jbd_unexpected_dirty_buffer(struct journal_head *jh)
  * part of the transaction, that is).
  *
  * Returns an error code or 0 on success.
- *
- * In full data journalling mode the buffer may be of type BJ_AsyncData,
- * because we're write()ing a buffer which is also part of a shared mapping.
  */
 
 static int
@@ -949,26 +946,16 @@ out:
  * The buffer is placed on the transaction's data list and is marked as
  * belonging to the transaction.
  *
- * If `async' is set then the writebabk will be initiated by the caller
- * using submit_bh -> end_buffer_async_write.  We put the buffer onto
- * t_async_datalist.
- * 
  * Returns error number or 0 on success.  
  *
  * journal_dirty_data() can be called via page_launder->ext3_writepage
  * by kswapd.  So it cannot block.  Happily, there's nothing here
  * which needs lock_journal if `async' is set.
- *
- * When the buffer is on the current transaction we freely move it
- * between BJ_AsyncData and BJ_SyncData according to who tried to
- * change its state last.
  */
-
-int journal_dirty_data (handle_t *handle, struct buffer_head *bh, int async)
+int journal_dirty_data (handle_t *handle, struct buffer_head *bh)
 {
 	journal_t *journal = handle->h_transaction->t_journal;
 	int need_brelse = 0;
-	int wanted_jlist = async ? BJ_AsyncData : BJ_SyncData;
 	struct journal_head *jh;
 
 	if (is_handle_aborted(handle))
@@ -1046,8 +1033,7 @@ int journal_dirty_data (handle_t *handle, struct buffer_head *bh, int async)
 			 * the write() data.
 			 */
 			if (jh->b_jlist != BJ_None &&
-					jh->b_jlist != BJ_SyncData &&
-					jh->b_jlist != BJ_AsyncData) {
+					jh->b_jlist != BJ_SyncData) {
 				JBUFFER_TRACE(jh, "Not stealing");
 				goto no_journal;
 			}
@@ -1058,7 +1044,7 @@ int journal_dirty_data (handle_t *handle, struct buffer_head *bh, int async)
 			 * again because that can cause the write-out loop in
 			 * commit to never terminate.
 			 */
-			if (!async && buffer_dirty(bh)) {
+			if (buffer_dirty(bh)) {
 				atomic_inc(&bh->b_count);
 				spin_unlock(&journal_datalist_lock);
 				need_brelse = 1;
@@ -1084,18 +1070,18 @@ int journal_dirty_data (handle_t *handle, struct buffer_head *bh, int async)
 		 * committing transaction, so might still be left on that
 		 * transaction's metadata lists.
 		 */
-		if (jh->b_jlist != wanted_jlist) {
+		if (jh->b_jlist != BJ_SyncData) {
 			JBUFFER_TRACE(jh, "not on correct data list: unfile");
 			J_ASSERT_JH(jh, jh->b_jlist != BJ_Shadow);
 			__journal_unfile_buffer(jh);
 			jh->b_transaction = NULL;
 			JBUFFER_TRACE(jh, "file as data");
 			__journal_file_buffer(jh, handle->h_transaction,
-						wanted_jlist);
+						BJ_SyncData);
 		}
 	} else {
 		JBUFFER_TRACE(jh, "not on a transaction");
-		__journal_file_buffer(jh, handle->h_transaction, wanted_jlist);
+		__journal_file_buffer(jh, handle->h_transaction, BJ_SyncData);
 	}
 no_journal:
 	spin_unlock(&journal_datalist_lock);
@@ -1559,12 +1545,12 @@ __blist_del_buffer(struct journal_head **list, struct journal_head *jh)
  * Remove a buffer from the appropriate transaction list.
  *
  * Note that this function can *change* the value of
- * bh->b_transaction->t_sync_datalist, t_async_datalist, t_buffers, t_forget,
+ * bh->b_transaction->t_sync_datalist, t_buffers, t_forget,
  * t_iobuf_list, t_shadow_list, t_log_list or t_reserved_list.  If the caller
  * is holding onto a copy of one of thee pointers, it could go bad.
  * Generally the caller needs to re-read the pointer from the transaction_t.
  *
- * If bh->b_jlist is BJ_SyncData or BJ_AsyncData then we may have been called
+ * If bh->b_jlist is BJ_SyncData then we may have been called
  * via journal_try_to_free_buffer() or journal_clean_data_list().  In that
  * case, journal_datalist_lock will be held, and the journal may not be locked.
  */
@@ -1589,9 +1575,6 @@ void __journal_unfile_buffer(struct journal_head *jh)
 		return;
 	case BJ_SyncData:
 		list = &transaction->t_sync_datalist;
-		break;
-	case BJ_AsyncData:
-		list = &transaction->t_async_datalist;
 		break;
 	case BJ_Metadata:
 		transaction->t_nr_buffers--;
@@ -1658,7 +1641,7 @@ static inline int __journal_try_to_free_buffer(struct buffer_head *bh)
 		goto out;
 
 	if (jh->b_transaction != 0 && jh->b_cp_transaction == 0) {
-		if (jh->b_jlist == BJ_SyncData || jh->b_jlist==BJ_AsyncData) {
+		if (jh->b_jlist == BJ_SyncData) {
 			/* A written-back ordered data buffer */
 			JBUFFER_TRACE(jh, "release data");
 			__journal_unfile_buffer(jh);
@@ -1993,9 +1976,6 @@ void __journal_file_buffer(struct journal_head *jh,
 		return;
 	case BJ_SyncData:
 		list = &transaction->t_sync_datalist;
-		break;
-	case BJ_AsyncData:
-		list = &transaction->t_async_datalist;
 		break;
 	case BJ_Metadata:
 		transaction->t_nr_buffers++;

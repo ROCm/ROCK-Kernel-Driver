@@ -848,7 +848,7 @@ static void ide_init_queue(ide_drive_t *drive)
  * but anything else has led to problems on some machines.  We re-enable
  * interrupts as much as we can safely do in most places.
  */
-int init_irq (ide_hwif_t *hwif)
+static int init_irq (ide_hwif_t *hwif)
 {
 	unsigned long flags;
 	unsigned int index;
@@ -993,8 +993,6 @@ int init_irq (ide_hwif_t *hwif)
 	printk("\n");
 	return 0;
 }
-
-EXPORT_SYMBOL(init_irq);
 
 static int ata_lock(dev_t dev, void *data)
 {

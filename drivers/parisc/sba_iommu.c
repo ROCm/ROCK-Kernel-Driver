@@ -40,6 +40,7 @@
 #include <linux/proc_fs.h>
 #include <asm/runway.h>		/* for proc_runway_root */
 #include <asm/pdc.h>		/* for PDC_MODEL_* */
+#include <asm/parisc-device.h>
 
 #define MODULE_NAME "SBA"
 
@@ -803,7 +804,7 @@ sba_mark_invalid(struct ioc *ioc, dma_addr_t iova, size_t byte_cnt)
  * See Documentation/DMA-mapping.txt
  */
 static int
-sba_dma_supported( struct pci_dev *dev, u64 mask)
+sba_dma_supported( struct device *dev, u64 mask)
 {
 	if (dev == NULL) {
 		printk(KERN_ERR MODULE_NAME ": EISA/ISA/et al not supported\n");
@@ -811,10 +812,8 @@ sba_dma_supported( struct pci_dev *dev, u64 mask)
 		return(0);
 	}
 
-	dev->dma_mask = mask;	/* save it */
-
 	/* only support 32-bit PCI devices - no DAC support (yet) */
-	return((int) (mask == 0xffffffff));
+	return((int) (mask == 0xffffffffUL));
 }
 
 
@@ -828,7 +827,8 @@ sba_dma_supported( struct pci_dev *dev, u64 mask)
  * See Documentation/DMA-mapping.txt
  */
 static dma_addr_t
-sba_map_single(struct pci_dev *dev, void *addr, size_t size, int direction)
+sba_map_single(struct device *dev, void *addr, size_t size,
+	       enum dma_data_direction direction)
 {
 	struct ioc *ioc;
 	unsigned long flags; 
@@ -840,7 +840,6 @@ sba_map_single(struct pci_dev *dev, void *addr, size_t size, int direction)
 	ASSERT(size > 0);
 	ASSERT(size <= DMA_CHUNK_SIZE);
 
-	ASSERT(dev->sysdata);
 	ioc = GET_IOC(dev);
 	ASSERT(ioc);
 
@@ -906,7 +905,8 @@ sba_map_single(struct pci_dev *dev, void *addr, size_t size, int direction)
  * See Documentation/DMA-mapping.txt
  */
 static void
-sba_unmap_single(struct pci_dev *dev, dma_addr_t iova, size_t size, int direction)
+sba_unmap_single(struct device *dev, dma_addr_t iova, size_t size,
+		 enum dma_data_direction direction)
 {
 	struct ioc *ioc;
 #if DELAYED_RESOURCE_CNT > 0
@@ -915,7 +915,6 @@ sba_unmap_single(struct pci_dev *dev, dma_addr_t iova, size_t size, int directio
 	unsigned long flags; 
 	dma_addr_t offset;
 
-	ASSERT(dev->sysdata);
 	ioc = GET_IOC(dev);
 	ASSERT(ioc);
 
@@ -976,7 +975,7 @@ sba_unmap_single(struct pci_dev *dev, dma_addr_t iova, size_t size, int directio
  * See Documentation/DMA-mapping.txt
  */
 static void *
-sba_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_handle)
+sba_alloc_consistent(struct device *hwdev, size_t size, dma_addr_t *dma_handle)
 {
 	void *ret;
 
@@ -1007,7 +1006,8 @@ sba_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_handle)
  * See Documentation/DMA-mapping.txt
  */
 static void
-sba_free_consistent(struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle)
+sba_free_consistent(struct device *hwdev, size_t size, void *vaddr,
+		    dma_addr_t dma_handle)
 {
 	sba_unmap_single(hwdev, dma_handle, size, 0);
 	free_pages((unsigned long) vaddr, get_order(size));
@@ -1269,7 +1269,8 @@ sba_coalesce_chunks( struct ioc *ioc,
  * See Documentation/DMA-mapping.txt
  */
 static int
-sba_map_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents, int direction)
+sba_map_sg(struct device *dev, struct scatterlist *sglist, int nents,
+	   enum dma_data_direction direction)
 {
 	struct ioc *ioc;
 	int coalesced, filled = 0;
@@ -1277,7 +1278,6 @@ sba_map_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents, int direc
 
 	DBG_RUN_SG("%s() START %d entries\n", __FUNCTION__, nents);
 
-	ASSERT(dev->sysdata);
 	ioc = GET_IOC(dev);
 	ASSERT(ioc);
 
@@ -1351,7 +1351,8 @@ sba_map_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents, int direc
  * See Documentation/DMA-mapping.txt
  */
 static void 
-sba_unmap_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents, int direction)
+sba_unmap_sg(struct device *dev, struct scatterlist *sglist, int nents,
+	     enum dma_data_direction direction)
 {
 	struct ioc *ioc;
 #ifdef ASSERT_PDIR_SANITY
@@ -1361,7 +1362,6 @@ sba_unmap_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents, int dir
 	DBG_RUN_SG("%s() START %d entries,  %p,%x\n",
 		__FUNCTION__, nents, sg_virt_addr(sglist), sglist->length);
 
-	ASSERT(dev->sysdata);
 	ioc = GET_IOC(dev);
 	ASSERT(ioc);
 
@@ -1395,16 +1395,17 @@ sba_unmap_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents, int dir
 
 }
 
-static struct pci_dma_ops sba_ops = {
-	sba_dma_supported,
-	sba_alloc_consistent,	/* allocate cacheable host mem */
-	sba_free_consistent,	/* release cacheable host mem */
-	sba_map_single,
-	sba_unmap_single,
-	sba_map_sg,
-	sba_unmap_sg,
-	NULL,			/* dma_sync_single */
-	NULL			/* dma_sync_sg */
+static struct hppa_dma_ops sba_ops = {
+	.dma_supported =	sba_dma_supported,
+	.alloc_consistent =	sba_alloc_consistent,
+	.alloc_noncoherent =	sba_alloc_consistent,
+	.free_consistent =	sba_free_consistent,
+	.map_single =		sba_map_single,
+	.unmap_single =		sba_unmap_single,
+	.map_sg =		sba_map_sg,
+	.unmap_sg =		sba_unmap_sg,
+	.dma_sync_single =	NULL,
+	.dma_sync_sg =		NULL,
 };
 
 
@@ -1977,6 +1978,8 @@ sba_driver_callback(struct parisc_device *dev)
 
 	printk(KERN_INFO "%s found %s at 0x%lx\n",
 		MODULE_NAME, version, dev->hpa);
+	snprintf(dev->dev.name, sizeof(dev->dev.name), "%s version %s",
+		 MODULE_NAME, version);
 
 #ifdef DEBUG_SBA_INIT
 	sba_dump_tlb(dev->hpa);

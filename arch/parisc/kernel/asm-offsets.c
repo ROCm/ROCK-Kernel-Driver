@@ -29,6 +29,7 @@
 
 int main(void)
 {
+	DEFINE(TASK_THREAD_INFO, offsetof(struct task_struct, thread_info));
 	DEFINE(TASK_STATE, offsetof(struct task_struct, state));
 	DEFINE(TASK_FLAGS, offsetof(struct task_struct, flags));
 	DEFINE(TASK_SIGPENDING, offsetof(struct task_struct, pending));
@@ -213,6 +214,7 @@ int main(void)
 	DEFINE(PT_SIZE, sizeof(struct pt_regs));
 	DEFINE(PT_SZ_ALGN, align(sizeof(struct pt_regs), 64));
 	BLANK();
+	DEFINE(TI_TASK, offsetof(struct thread_info, task));
 	DEFINE(TI_EXEC_DOMAIN, offsetof(struct thread_info, exec_domain));
 	DEFINE(TI_FLAGS, offsetof(struct thread_info, flags));
 	DEFINE(TI_CPU, offsetof(struct thread_info, cpu));

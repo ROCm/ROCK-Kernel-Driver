@@ -20,18 +20,6 @@
 
 #ifndef __ASSEMBLY__
 
-#ifdef CONFIG_DEBUG_BUGVERBOSE
-extern void do_BUG(const char *file, int line);
-#define BUG() do {					\
-	do_BUG(__FILE__, __LINE__);			\
-	__builtin_trap();				\
-} while (0)
-#else
-#define BUG()		__builtin_trap()
-#endif
-
-#define PAGE_BUG(page)	BUG()
-
 /* Sparc64 is slow at multiplication, we prefer to use some extra space. */
 #define WANT_PAGE_VIRTUAL 1
 

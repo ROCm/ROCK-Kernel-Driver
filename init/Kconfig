@@ -156,7 +156,7 @@ config MODULE_UNLOAD
 
 config MODULE_FORCE_UNLOAD
 	bool "Forced module unloading"
-	depends on MODULES && EXPERIMENTAL
+	depends on MODULE_UNLOAD && EXPERIMENTAL
 	help
 	  This option allows you to force a module to unload, even if the
 	  kernel believes it is unsafe: the kernel will remove the module

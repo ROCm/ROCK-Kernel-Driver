@@ -2512,26 +2512,23 @@ ctc_stats(struct net_device * dev)
 #define CTRL_BUFSIZE 40
 
 static ssize_t
-buffer_show(struct device *dev, char *buf, size_t count, loff_t off)
+buffer_show(struct device *dev, char *buf)
 {
 	struct ctc_priv *priv;
 
 	priv = dev->driver_data;
 	if (!priv)
 		return -ENODEV;
-	return off ? 0 : snprintf(buf, count, "%d\n",
-				  priv->channel[READ]->max_bufsize);
+	return sprintf(buf, "%d\n",
+		       priv->channel[READ]->max_bufsize);
 }
 
 static ssize_t
-buffer_write(struct device *dev, const char *buf, size_t count, loff_t off)
+buffer_write(struct device *dev, const char *buf, size_t count)
 {
 	struct ctc_priv *priv;
 	struct net_device *ndev;
 	int bs1;
-
-	if (off)
-		return 0;
 
 	priv = dev->driver_data;
 	if (!priv)

@@ -262,7 +262,8 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 
 	pci_read_config_dword(dev, PCI_PRIMARY_BUS, &buses);
 	DBG("Scanning behind PCI bridge %s, config %06x, pass %d\n", dev->slot_name, buses & 0xffffff, pass);
-	if ((buses & 0xffff00) && !pcibios_assign_all_busses()) {
+	if ((buses & 0xffff00) && !pcibios_assign_all_busses() && !is_cardbus) {
+		unsigned int cmax;
 		/*
 		 * Bus already configured by firmware, process it in the first
 		 * pass and just note the configuration.
@@ -274,13 +275,8 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 		child->secondary = (buses >> 8) & 0xFF;
 		child->subordinate = (buses >> 16) & 0xFF;
 		child->number = child->secondary;
-		if (!is_cardbus) {
-			unsigned int cmax = pci_do_scan_bus(child);
-			if (cmax > max) max = cmax;
-		} else {
-			unsigned int cmax = child->subordinate;
-			if (cmax > max) max = cmax;
-		}
+		cmax = pci_do_scan_bus(child);
+		if (cmax > max) max = cmax;
 	} else {
 		/*
 		 * We need to assign a number to this bus which we always

@@ -585,7 +585,6 @@ void __journal_drop_transaction(journal_t *journal, transaction_t *transaction)
 	J_ASSERT (transaction->t_ilist == NULL);
 	J_ASSERT (transaction->t_buffers == NULL);
 	J_ASSERT (transaction->t_sync_datalist == NULL);
-	J_ASSERT (transaction->t_async_datalist == NULL);
 	J_ASSERT (transaction->t_forget == NULL);
 	J_ASSERT (transaction->t_iobuf_list == NULL);
 	J_ASSERT (transaction->t_shadow_list == NULL);

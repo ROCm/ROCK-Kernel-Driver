@@ -43,7 +43,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/proc_fs.h>
 #include <linux/miscdevice.h>
@@ -51,6 +50,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/perf.h>
+#include <asm/parisc-device.h>
 #include <asm/processor.h>
 #include <asm/runway.h>
 #include <asm/io.h>		/* for __raw_read() */
@@ -269,8 +269,6 @@ static int perf_open(struct inode *inode, struct file *file)
 	perf_enabled = 1;
  	spin_unlock(&perf_lock);
 
-	MOD_INC_USE_COUNT;
-
 	return 0;
 }
 
@@ -282,8 +280,6 @@ static int perf_release(struct inode *inode, struct file *file)
 	spin_lock(&perf_lock);
 	perf_enabled = 0;
 	spin_unlock(&perf_lock);
-
-	MOD_DEC_USE_COUNT;
 
 	return 0;
 }
@@ -500,7 +496,7 @@ static struct miscdevice perf_dev = {
  */
 static int __init perf_init(void)
 {
-	int retval;
+	int ret;
 
 	/* Determine correct processor interface to use */
 	bitmask_array = perf_bitmasks;
@@ -520,11 +516,11 @@ static int __init perf_init(void)
 		return -ENODEV;
 	}
 
-	retval = misc_register(&perf_dev);
-	if (retval < 0) {
+	ret = misc_register(&perf_dev);
+	if (ret) {
 		printk(KERN_ERR "Performance monitoring counters: "
 			"cannot register misc device.\n");
-		return retval;
+		return ret;
 	}
 
 	/* Patch the images to match the system */

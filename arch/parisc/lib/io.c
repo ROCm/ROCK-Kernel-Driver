@@ -14,9 +14,9 @@
  * Assumes the device can cope with 32-bit transfers.  If it can't,
  * don't use this function.
  */
-void memcpy_toio(unsigned long dest, const void *src, int count)
+void __memcpy_toio(unsigned long dest, unsigned long src, int count)
 {
-	if ((dest & 3) != ((unsigned long)src & 3))
+	if ((dest & 3) != (src & 3))
 		goto bytecopy;
 	while (dest & 3) {
 		writeb(*(char *)src, dest++);
@@ -25,7 +25,7 @@ void memcpy_toio(unsigned long dest, const void *src, int count)
 	}
 	while (count > 3) {
 		__raw_writel(*(u32 *)src, dest);
-		(unsigned long) src += 4;
+		src += 4;
 		dest += 4;
 		count -= 4;
 	}
@@ -49,13 +49,13 @@ void memcpy_toio(unsigned long dest, const void *src, int count)
 **      Minimize total number of transfers at cost of CPU cycles.
 **	TODO: only look at src alignment and adjust the stores to dest.
 */
-void memcpy_fromio(void *dest, unsigned long src, int count)
+void __memcpy_fromio(unsigned long dest, unsigned long src, int count)
 {
 	/* first compare alignment of src/dst */ 
-	if ( (((unsigned long)dest ^ src) & 1) || (count < 2) )
+	if ( ((dest ^ src) & 1) || (count < 2) )
 		goto bytecopy;
 
-	if ( (((unsigned long)dest ^ src) & 2) || (count < 4) )
+	if ( ((dest ^ src) & 2) || (count < 4) )
 		goto shortcopy;
 
 	/* Then check for misaligned start address */
@@ -101,7 +101,7 @@ void memcpy_fromio(void *dest, unsigned long src, int count)
  * Assumes the device can cope with 32-bit transfers.  If it can't,
  * don't use this function.
  */
-void memset_io(unsigned long dest, char fill, int count)
+void __memset_io(unsigned long dest, char fill, int count)
 {
 	u32 fill32 = (fill << 24) | (fill << 16) | (fill << 8) | fill;
 	while (dest & 3) {

@@ -1,5 +1,4 @@
-/* -*- mode: asm -*-
- *
+/*
  *  linux/arch/m68knommu/platform/68360/entry.S
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
@@ -11,98 +10,29 @@
  *
  * Linux/m68k support by Hamish Macdonald
  * M68360 Port by SED Systems, and Lineo.
- *
- */
-
-/*
- * entry.S  contains the system-call and fault low-level handling routines.
- * This also contains the timer-interrupt handler, as well as all interrupts
- * and faults that can result in a task-switch.
- *
- * NOTE: This code handles signal-recognition, which happens every time
- * after a timer-interrupt and after each system call.
- *
- */
-
-/*
- * 12/03/96 Jes: Currently we only support m68k single-cpu systems, so
- *               all pointers that used to be 'current' are now entry
- *               number 0 in the 'current_set' list.
  */
 
 #include <linux/config.h>
 #include <linux/sys.h>
 #include <linux/linkage.h>
 #include <asm/thread_info.h>
+#include <asm/errno.h>
 #include <asm/setup.h>
 #include <asm/segment.h>
-#include <asm/entry.h>
-#include <asm/errno.h>
 #include <asm/traps.h>
 #include <asm/asm-offsets.h>
+#include <asm/entry.h>
 
-#define IMMED #
-#define DBG_PUTC(x)	moveb IMMED x,0xfffff907; \
-			moveb IMMED '\r',0xfffff907; \
-			moveb IMMED '\n',0xfffff907
-LD0         =   0x20
-LORIG_D0    =   0x24
+.text
 
 .globl system_call
-.globl buserr
-.globl trap
 .globl resume
 .globl ret_from_exception
 .globl ret_from_signal
 .globl sys_call_table
-.globl sys_fork
-.globl sys_clone
-.globl sys_vfork
 .globl ret_from_interrupt
 .globl bad_interrupt
 .globl inthandler
-
-.text
-ENTRY(buserr)
-	SAVE_ALL_INT
-	/* GET_CURRENT(%d0) */
-	movel	%sp,%sp@- 		/* stack frame pointer argument*/
-	bsrw	buserr_c
-	addql	#4,%sp
-	jra	ret_from_exception
-
-ENTRY(trap)
-	SAVE_ALL_INT
-	GET_CURRENT(%d0)
-    moveq.l #-1,%d0
-    move.l  %d0,%sp@(LORIG_D0)
-/* may have to test for LFORMATVEC here as was done in teh 2.0 module */
-	movel	%sp,%sp@- 		/* stack frame pointer argument*/
-	bsrw	trap_c
-	addql	#4,%sp
-	jra	ret_from_exception
-
-
-ENTRY(reschedule)
-	/* save top of frame*/
-	pea	%sp@
-	jbsr	set_esp0
-	addql	#4,%sp
-
-	pea	ret_from_exception
-	jmp	schedule
-
-	/* After a fork we jump here directly from resume,*/
-	/* so that %d1 contains the previous task*/
-	/* Theoretically only needed on SMP, but let's watch*/
-	/* what happens in schedule_tail() in future...*/
-ENTRY(ret_from_fork)
-#ifdef CONFIG_SMP
-	movel	%d1,%sp@-
-	jsr	schedule_tail
-	addql	#4,%sp
-#endif
-	jra	ret_from_exception
 
 badsys:
 	movel	#-ENOSYS,%sp@(PT_D0)
@@ -123,8 +53,8 @@ do_trace:
 	lea	sys_call_table, %a0
 	jbsr	%a0@(%d1)
 
-1:	movel	%d0,%sp@(PT_D0)		/* save the return value*/
-	subql	#4,%sp			/* dummy return address*/
+1:	movel	%d0,%sp@(PT_D0)		/* save the return value */
+	subql	#4,%sp			/* dummy return address */
 	SAVE_SWITCH_STACK
 	jbsr	syscall_trace
 
@@ -134,9 +64,8 @@ ret_from_signal:
 	jra	ret_from_exception
 
 ENTRY(system_call)
-	SAVE_ALL_SYS
+	SAVE_ALL
 
-	GET_CURRENT(%d1)
 	/* save top of frame*/
 	pea	%sp@
 	jbsr	set_esp0
@@ -191,14 +120,11 @@ Lreturn:
 	RESTORE_ALL
 
 /*
-** This is the main interrupt handler, responsible for calling process_int()
-*/
-
+ * This is the main interrupt handler, responsible for calling process_int()
+ */
 inthandler:
-	SAVE_ALL_INT
-	GET_CURRENT(%d0)
+	SAVE_ALL
 	addql	#1,local_irq_count	/*  put exception # in d0*/
-/*	bfextu %sp@(PT_VECTOR){#4,#10},%d0 */
 	movew	%sp@(PT_VECTOR), %d0
 	and.l	#0x3ff, %d0
 	lsr.l   #0x02,  %d0
@@ -215,16 +141,9 @@ ret_from_interrupt:
 2:
 	RESTORE_ALL
 1:
-#if 1
-/*	bfextu  %sp@(PT_SR){#5,#3},%d0 */	/* Check for nested interrupt.*/
 	moveb	%sp@(PT_SR), %d0
 	and	#7, %d0
-
-#if MAX_NOINT_IPL > 0
-	cmpiw	#MAX_NOINT_IPL,%d0
-#endif
 	jhi	2b
-#endif
 	/* check if we need to do software interrupts */
 
 	movel	irq_stat+CPUSTAT_SOFTIRQ_PENDING,%d0
@@ -234,111 +153,31 @@ ret_from_interrupt:
 	jra	do_softirq
 
 
-/* Handler for uninitialized and spurious interrupts */
-
+/*
+ * Handler for uninitialized and spurious interrupts.
+ */
 bad_interrupt:
 	addql	#1,num_spurious
 	rte
 
-ENTRY(sys_fork)
-	SAVE_SWITCH_STACK	
-	pea	%sp@(SWITCH_STACK_SIZE)
-	jbsr	m68k_fork
-	addql	#4,%sp
-	RESTORE_SWITCH_STACK
-	rts
-
-ENTRY(sys_clone)
-	SAVE_SWITCH_STACK
-	pea	%sp@(SWITCH_STACK_SIZE)
-	jbsr	m68k_clone
-	addql	#4,%sp
-	RESTORE_SWITCH_STACK
-	rts
-
-ENTRY(sys_vfork)
-	SAVE_SWITCH_STACK	
-	pea	%sp@(SWITCH_STACK_SIZE)
-	jbsr	m68k_vfork
-	addql	#4,%sp
-	RESTORE_SWITCH_STACK
-	rts
-
-ENTRY(sys_sigsuspend)
-	SAVE_SWITCH_STACK
-	pea	%sp@(SWITCH_STACK_SIZE)
-	jbsr	do_sigsuspend
-	addql	#4,%sp
-	RESTORE_SWITCH_STACK
-	rts
-
-ENTRY(sys_rt_sigsuspend)
-	SAVE_SWITCH_STACK
-	pea	%sp@(SWITCH_STACK_SIZE)
-	jbsr	do_rt_sigsuspend
-	addql	#4,%sp
-	RESTORE_SWITCH_STACK
-	rts
-
-ENTRY(sys_sigreturn)
-	SAVE_SWITCH_STACK
-	jbsr	do_sigreturn
-	RESTORE_SWITCH_STACK
-	rts
-
-ENTRY(sys_rt_sigreturn)
-	SAVE_SWITCH_STACK
-	jbsr	do_rt_sigreturn
-	RESTORE_SWITCH_STACK
-	rts
-
-resume:
-	/*
-	 * Beware - when entering resume, prev (the current task) is
-	 * in a0, next (the new task) is in a1,so don't change these
-	 * registers until their contents are no longer needed.
-	 */
-
-	/* save prev thread in d1 */
-	movel	%a0,%d1
-
-	/* save sr */
-	movew	%sr,%a0@(TASK_THREAD+THREAD_SR)
-#ifdef USE_SFC_DFC
-	/* save fs (sfc,%dfc) (may be pointing to kernel memory) */
-	movec	%sfc,%d0
-	movew	%d0,%a0@(TASK_THREAD+THREAD_FS)
-#endif
-
-	/* save non-scratch registers on stack */
-	SAVE_SWITCH_STACK
-
-	/* save usp */
-	/* it is better to use a movel here instead of a movew 8*) */
-	movel	%usp,%a2
+/*
+ * Beware - when entering resume, prev (the current task) is
+ * in a0, next (the new task) is in a1,so don't change these
+ * registers until their contents are no longer needed.
+ */
+ENTRY(resume)
+	movel	%a0,%d1				/* save prev thread in d1 */
+	movew	%sr,%a0@(TASK_THREAD+THREAD_SR)	/* save sr */
+	movel	%usp,%a2			/* save usp */
 	movel	%a2,%a0@(TASK_THREAD+THREAD_USP)
 
-	/* save current kernel stack pointer */
-	movel	%sp,%a0@(TASK_THREAD+THREAD_KSP)
-
-	/* restore the kernel stack pointer */
-	movel	%a1@(TASK_THREAD+THREAD_KSP),%sp
-
-	/* restore non-scratch registers */
+	SAVE_SWITCH_STACK
+	movel	%sp,%a0@(TASK_THREAD+THREAD_KSP) /* save kernel stack */
+	movel	%a1@(TASK_THREAD+THREAD_KSP),%sp /* restore new thread stack */
 	RESTORE_SWITCH_STACK
 
-	/* restore user stack pointer */
-	movel	%a1@(TASK_THREAD+THREAD_USP),%a0
+	movel	%a1@(TASK_THREAD+THREAD_USP),%a0 /* restore user stack */
 	movel	%a0,%usp
-
-#ifdef USE_SFC_DFC
-	/* restore fs (sfc,%dfc) */
-	movew	%a1@(TASK_THREAD+THREAD_FS),%a0
-	movec	%a0,%sfc
-	movec	%a0,%dfc
-#endif
-	/* restore status register */
-	movew	%a1@(TASK_THREAD+THREAD_SR),%sr
-
+	movew	%a1@(TASK_THREAD+THREAD_SR),%sr	/* restore thread status reg */
 	rts
 

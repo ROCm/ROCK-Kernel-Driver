@@ -217,7 +217,7 @@ sys_clone(unsigned long clone_flags, unsigned long usp,
 {
 	struct task_struct *p;
 	int *user_tid = (int *)regs->gr[26];
-	p = do_fork(clone_flags & ~CLONE_IDLETASK, usp, regs, 0, user_tid);
+	p = do_fork(clone_flags & ~CLONE_IDLETASK, usp, regs, 0, user_tid, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -225,7 +225,7 @@ int
 sys_vfork(struct pt_regs *regs)
 {
 	struct task_struct *p;
-	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gr[30], regs, 0, NULL);
+	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gr[30], regs, 0, NULL, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -293,6 +293,11 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	}
 
 	return 0;
+}
+
+unsigned long thread_saved_pc(struct task_struct *t)
+{
+	return t->thread.regs.kpc;
 }
 
 /*

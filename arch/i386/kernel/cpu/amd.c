@@ -56,7 +56,7 @@ static void __init init_amd(struct cpuinfo_x86 *c)
 				if (inl (CBAR) & CBAR_ENB)
 					outl (0 | CBAR_KEY, CBAR);
 			}
-
+			break;
 		case 5:
 			if( c->x86_model < 6 )
 			{

@@ -1,115 +1,315 @@
+/*
+ *	vmlinux.lds.S -- master linker script for m68knommu arch
+ *
+ *	(C) Copyright 2002, Greg Ungerer <gerg@snapgear.com>
+ *
+ *	This ends up looking compilcated, because of the number of
+ *	address variations for ram and rom/flash layouts. The real
+ *	work of the linker script is all at the end, and reasonably
+ *	strait forward.
+ */
 
 #include <linux/config.h>
 
+/*
+ *	Original Palm pilot (same for Xcopilot).
+ *	There is really only a rom target for this.
+ */
 #ifdef CONFIG_PILOT3
-#ifdef CONFIG_ROMKERNEL
-#include "platform/68328/pilot/rom.ld"
+#define	ROMVEC_START	0x10c00000
+#define	ROMVEC_LENGTH	0x10400
+#define	ROM_START	0x10c10400
+#define	ROM_LENGTH	0xfec00
+#define	ROM_END		0x10d00000
+#define	RAMVEC_START	0x00000000
+#define	RAMVEC_LENGTH	0x400
+#define	RAM_START	0x10000400
+#define	RAM_LENGTH	0xffc00
+#define	RAM_END		0x10100000
+#define	DATA_ADDR	RAM_START
 #endif
+
+/*
+ *	Same setup on both the uCsimm and uCdimm.
+ */
+#if defined(CONFIG_UCSIMM) || defined(CONFIG_UCDIMM)
 #ifdef CONFIG_RAMKERNEL
-#include "platform/68328/pilot/ram.ld"
+#define	ROMVEC_START	0x10c10000
+#define	ROMVEC_LENGTH	0x400
+#define	ROM_START	0x10c10400
+#define	ROM_LENGTH	0x1efc00
+#define	ROM_END		0x10e00000
+#define	RAMVEC_START	0x00000000
+#define	RAMVEC_LENGTH	0x400
+#define	RAM_START	0x00020400
+#define	RAM_LENGTH	0x7dfc00
+#define	RAM_END		0x00800000
+#endif
+#ifdef CONFIG_ROMKERNEL
+#define	ROMVEC_START	0x10c10000
+#define	ROMVEC_LENGTH	0x400
+#define	ROM_START	0x10c10400
+#define	ROM_LENGTH	0x1efc00
+#define	ROM_END		0x10e00000
+#define	RAMVEC_START	0x00000000
+#define	RAMVEC_LENGTH	0x400
+#define	RAM_START	0x00020000
+#define	RAM_LENGTH	0x600000
+#define	RAM_END		0x00800000
+#endif
+#ifdef CONFIG_HIMEMKERNEL
+#define	ROMVEC_START	0x00600000
+#define	ROMVEC_LENGTH	0x400
+#define	ROM_START	0x00600400
+#define	ROM_LENGTH	0x1efc00
+#define	ROM_END		0x007f0000
+#define	RAMVEC_START	0x00000000
+#define	RAMVEC_LENGTH	0x400
+#define	RAM_START	0x00020000
+#define	RAM_LENGTH	0x5e0000
+#define	RAM_END		0x00600000
 #endif
 #endif
 
-#ifdef CONFIG_UCSIMM
-#ifdef CONFIG_RAMKERNEL
-#include "platform/68EZ328/ucsimm/ram.ld"
-#endif
-#ifdef CONFIG_ROMKERNEL
-#include "platform/68EZ328/ucsimm/rom.ld"
-#endif
-#ifdef CONFIG_HIMEMKERNEL
-#include "platform/68EZ328/ucsimm/himem.ld"
-#endif
-#endif
-
-#ifdef CONFIG_UCDIMM
-#ifdef CONFIG_RAMKERNEL
-#include "platform/68VZ328/ucdimm/ram.ld"
-#endif
-#ifdef CONFIG_ROMKERNEL
-#include "platform/68VZ328/ucdimm/rom.ld"
-#endif
-#ifdef CONFIG_HIMEMKERNEL
-#include "platform/68VZ328/ucdimm/himem.ld"
-#endif
-#endif
 #ifdef CONFIG_DRAGEN2
 #ifdef CONFIG_RAMKERNEL
-#include "platform/68VZ328/de2/ram.ld"
+#define	ROMVEC_START	0x04030000
+#define	ROMVEC_LENGTH	0x400
+#define	ROM_START	0x04030400
+#define	ROM_LENGTH	0x1cec00
+#define	ROM_END		0x04200000
+#define	RAMVEC_START	0x00000000
+#define	RAMVEC_LENGTH	0x400
+#define	RAM_START	0x00010400
+#define	RAM_LENGTH	0x1ff0000
+#define	RAM_END		0x02000000
 #endif
 #ifdef CONFIG_ROMKERNEL
-#include "platform/68VZ328/de2/rom.ld"
+#define	ROMVEC_START	0x04030000
+#define	ROMVEC_LENGTH	0x400
+#define	ROM_START	0x04030400
+#define	ROM_LENGTH	0x1cec00
+#define	ROM_END		0x04200000
+#define	RAMVEC_START	0x00000000
+#define	RAMVEC_LENGTH	0x400
+#define	RAM_START	0x00010000
+#define	RAM_LENGTH	0x1ff0000
+#define	RAM_END		0x02000000
 #endif
 #ifdef CONFIG_HIMEMKERNEL
-#include "platform/68VZ328/de2/himem.ld"
+#define	ROMVEC_START	0x01e00000
+#define	ROMVEC_LENGTH	0x400
+#define	ROM_START	0x01e00400
+#define	ROM_LENGTH	0x1ffc00
+#define	ROM_END		0x02000000
+#define	RAMVEC_START	0x00000000
+#define	RAMVEC_LENGTH	0x400
+#define	RAM_START	0x00010000
+#define	RAM_LENGTH	0x1df0000
+#define	RAM_END		0x01e00000
 #endif
 #endif
 
 #ifdef CONFIG_UCQUICC
+#define	ROMVEC_START	0x00000000
+#define	ROMVEC_LENGTH	0x404
+#define	ROM_START	0x00000404
+#define	ROM_LENGTH	0x1ff6fc
+#define	ROM_END		0x00200000
+#define	RAMVEC_START	0x00200000
+#define	RAMVEC_LENGTH	0x404
+#define	RAM_START	0x00200404
+#define	RAM_LENGTH	0x1ff6fc
+#define	RAM_END		0x00400000
+#endif
+
+/*
+ *	The standard Arnewsh 5206 board only has 1MiB of ram. Not normally
+ *	enough to be usefull. Assume the user has fitted something larger,
+ *	at least 4MiB in size. No point in not letting the kernel completely
+ *	link, it will be obvious if it is too big when they go to load it.
+ */
+#if defined(CONFIG_ARN5206)
+#define	RAM_START	0x10000
+#define	RAM_LENGTH	0x3f0000
+#endif
+
+/*
+ *	The Motorola 5206eLITE board only has 1MiB of static RAM.
+ */
+#if defined(CONFIG_ELITE)
+#define	RAM_START	0x30020000
+#define	RAM_END		0xe0000
+#endif
+
+/*
+ *	All the Motorola eval boards have the same basic arrangement.
+ *	The end of RAM will vary depending on how much ram is fitted,
+ *	but this isn't important here, we assume at least 4MiB.
+ */
+#if defined(CONFIG_M5206eC3) || defined(CONFIG_M5249C3) || \
+    defined(CONFIG_M5272C3) || defined(CONFIG_M5306C3) || \
+    defined(CONFIG_ARN5307) || defined(CONFIG_M5407C3)
+#define	RAM_START	0x20000
+#define	RAM_LENGTH	0x3e0000
+#endif
+
+/*
+ *	These flash boot boards use all of ram for operation. Again the
+ *	actual memory size is not important here, assume at least 4MiB.
+ *	They currently have no support for running in flash.
+ */
+#if defined(CONFIG_NETtel) || defined(CONFIG_eLIA) || \
+    defined(CONFIG_DISKtel) || defined(CONFIG_SECUREEDGEMP3) || \
+    defined(CONFIG_CLEOPATRA)
+#define	RAM_START	0x400
+#define	RAM_LENGTH	0x3ffc00
+#endif
+
 #ifdef CONFIG_RAMKERNEL
-#include "platform/68360/uCquicc/ram.ld"
+#define	TEXT		ram
+#define	DATA		ram
+#define	INIT		ram
+#define	BSS		ram
 #endif
 #ifdef CONFIG_ROMKERNEL
-#include "platform/68360/uCquicc/rom.ld"
-#endif
-#endif
-
-#ifdef CONFIG_ARN5206
-#include "platform/5206/ARNEWSH/ram.ld"
+#define	TEXT		rom
+#define	DATA		ram
+#define	INIT		ram
+#define	BSS		ram
 #endif
 
-#ifdef CONFIG_M5206eC3
-#include "platform/5206e/MOTOROLA/ram.ld"
-#endif
-#ifdef CONFIG_ELITE
-#include "platform/5206e/eLITE/ram.ld"
+#ifndef DATA_ADDR
+#define	DATA_ADDR
 #endif
 
-#ifdef CONFIG_M5249C3
-#include "platform/5249/MOTOROLA/ram.ld"
+
+OUTPUT_ARCH(m68k)
+ENTRY(_start)
+
+MEMORY {
+#ifdef RAMVEC_START
+	ramvec	: ORIGIN = RAMVEC_START, LENGTH = RAMVEC_LENGTH
+#endif
+	ram	: ORIGIN = RAM_START, LENGTH = RAM_LENGTH
+#ifdef RAM_END
+	eram	: ORIGIN = RAM_END, LENGTH = 0
+#endif
+#ifdef ROM_START
+	romvec	: ORIGIN = ROMVEC_START, LENGTH = ROMVEC_LENGTH
+	rom	: ORIGIN = ROM_START, LENGTH = ROM_LENGTH
+	erom	: ORIGIN = ROM_END, LENGTH = 0
+#endif
+}
+
+jiffies = jiffies_64 + 4;
+
+SECTIONS {
+
+#ifdef ROMVEC_START
+	. = ROMVEC_START ;
+	.romvec : {
+		__rom_start = . ;
+		_romvec = .;
+		*(.data.initvect)
+	} > romvec
 #endif
 
-#ifdef CONFIG_M5272C3
-#include "platform/5272/MOTOROLA/ram.ld"
+	.text : {
+		_stext = . ;
+        	*(.text)
+        	*(.text.lock)
+		*(.rodata)
+		*(.rodata.*)
+
+		. = ALIGN(0x4) ;
+		*(.kstrtab)
+
+		. = ALIGN(16);          /* Exception table              */
+		__start___ex_table = .;
+		*(__ex_table)
+		__stop___ex_table = .;
+
+		__start___ksymtab = .;  /* Kernel symbol table          */
+		*(__ksymtab)
+		__stop___ksymtab = .;
+
+		. = ALIGN(4) ;
+		_etext = . ;
+	} > TEXT
+
+#ifdef ROM_END
+	. = ROM_END ;
+	.erom : {
+		__rom_end = . ;
+	} > erom
+#endif
+#ifdef RAMVEC_START
+	. = RAMVEC_START ;
+	.ramvec : {
+		__ramvec = .;
+	} > ramvec
 #endif
 
-#ifdef CONFIG_ARN5307
-#include "platform/5307/ARNEWSH/ram.ld"
-#endif
-#ifdef CONFIG_M5307C3
-#include "platform/5307/MOTOROLA/ram.ld"
-#endif
-#ifdef CONFIG_eLIA
-#include "platform/5307/eLIA/ram.ld"
-#endif
-#ifdef CONFIG_DISKtel
-#include "platform/5307/DISKtel/ram.ld"
-#endif
-#ifdef CONFIG_SECUREEDGEMP3
-#include "platform/5307/MP3/ram.ld"
-#endif
+	.data DATA_ADDR : {
+		. = ALIGN(4);
+		_sdata = . ;
+		*(.data)
+		. = ALIGN(8192) ;
+		*(.data.init_task)
+		_edata = . ;
+	} > DATA
 
-#ifdef CONFIG_M5407
-#include "platform/5407/MOTOROLA/ram.ld"
-#endif
+	.init : {
+		. = ALIGN(4096);
+		__init_begin = .;
+		*(.init.text)
+		*(.init.data)
+		. = ALIGN(16);
+		__setup_start = .;
+		*(.init.setup)
+		__setup_end = .;
+		__start___param = .;
+		*(__param)
+		__stop___param = .;
+		__initcall_start = .;
+		*(.initcall1.init)
+		*(.initcall2.init)
+		*(.initcall3.init)
+		*(.initcall4.init)
+		*(.initcall5.init)
+		*(.initcall6.init)
+		*(.initcall7.init)
+		__initcall_end = .;
+		. = ALIGN(4);
+		__initramfs_start = .;
+		*(.init.ramfs)
+		__initramfs_end = .;
+		. = ALIGN(4);
+		__init_end = .;
+	} > INIT
 
-#ifdef CONFIG_CLEOPATRA
-#ifdef CONFIG_M5307
-#include "platform/5307/CLEOPATRA/ram.ld"
-#endif
-#ifdef CONFIG_M5407
-#include "platform/5407/CLEOPATRA/ram.ld"
-#endif
-#endif
+	/DISCARD/ : {
+		*(.exit.text)
+		*(.exit.data)
+		*(.exitcall.exit)
+	}
 
-#ifdef CONFIG_NETtel
-#ifdef CONFIG_M5206e
-#include "platform/5206e/NETtel/ram.ld"
+	.bss : {
+		. = ALIGN(4);
+		_sbss = . ;
+		*(.bss)
+		*(COMMON)
+		. = ALIGN(4) ;
+		_ebss = . ;
+	} > BSS
+
+#ifdef RAM_END
+	. = RAM_END ;
+	.eram : {
+		__ramend = . ;
+		_ramend = . ;
+	} > eram
 #endif
-#ifdef CONFIG_M5272
-#include "platform/5272/NETtel/ram.ld"
-#endif
-#ifdef CONFIG_M5307
-#include "platform/5307/NETtel/ram.ld"
-#endif
-#endif
+}
+

@@ -102,13 +102,19 @@
 	.endm
 
 #ifdef __LP64__
-#define LDREG   ldd
-#define STREG   std
+#define LDREG	ldd
+#define STREG	std
+#define LDREGM	ldd,mb
+#define STREGM	std,ma
 #define RP_OFFSET	16
+#define FRAME_SIZE	128
 #else
-#define LDREG   ldw
-#define STREG   stw
+#define LDREG	ldw
+#define STREG	stw
+#define LDREGM	ldwm
+#define STREGM	stwm
 #define RP_OFFSET	20
+#define FRAME_SIZE	64
 #endif
 
 	.macro loadgp

@@ -56,7 +56,7 @@ static int pdc_console_setup(struct console *co, char *options)
 #define PDC_CONSOLE_DEVICE pdc_console_device
 static kdev_t pdc_console_device (struct console *c)
 {
-        return mk_kdev(PDCCONS_MAJOR, 0);
+        return mk_kdev(MUX_MAJOR, 0);
 }
 #else
 #define PDC_CONSOLE_DEVICE NULL

@@ -18,69 +18,51 @@
 #
 
 ifdef CONFIG_PARISC64
-CROSS_COMPILE := hppa64-linux-
-UTS_MACHINE := parisc64
-LDFLAGS_BLOB := --format binary --oformat elf64-hppa-linux
-
+CROSS_COMPILE	:= hppa64-linux-
+UTS_MACHINE	:= parisc64
+LDFLAGS_BLOB	:= --format binary --oformat elf64-hppa-linux
 else
-MACHINE	:= $(subst 64,,$(shell uname -m))
-ifneq (${MACHINE},parisc)
-# cross compilation
-CROSS_COMPILE := hppa-linux-
+MACHINE := $(subst 64,,$(shell uname -m))
+ifneq ($(MACHINE),parisc)
+CROSS_COMPILE	:= hppa-linux-
 endif
-LDFLAGS_BLOB := --format binary --oformat elf32-hppa-linux
+LDFLAGS_BLOB	:= --format binary --oformat elf32-hppa-linux
 endif
 
 FINAL_LD=$(CROSS_COMPILE)ld --warn-common --warn-section-align 
 
 OBJCOPY_FLAGS =-O binary -R .note -R .comment -S
 
-CFLAGS_PIPE := -pipe
-CFLAGS_NSR  := -fno-strength-reduce
-CFLAGS := $(CFLAGS) -D__linux__ $(CFLAGS_PIPE) $(CFLAGS_NSR)
+cflags-y	:= -D__linux__ -pipe -fno-strength-reduce
 
 # These should be on for older toolchains or SOM toolchains that don't
 # enable them by default.
-CFLAGS += -mno-space-regs -mfast-indirect-calls
+cflags-y	+= -mno-space-regs -mfast-indirect-calls
 
 # No fixed-point multiply
-CFLAGS += -mdisable-fpregs
+cflags-y	+= -mdisable-fpregs
 
 # Without this, "ld -r" results in .text sections that are too big
 # (> 0x40000) for branches to reach stubs.
-CFLAGS += -ffunction-sections
+cflags-y	+= -ffunction-sections
 
 # select which processor to optimise for
-ifdef CONFIG_PA7100
-CFLAGS += -march=1.1 -mschedule=7100
-endif
+cflags-$(CONFIG_PA7100)		+= -march=1.1 -mschedule=7100
+cflags-$(CONFIG_PA7200)		+= -march=1.1 -mschedule=7200
+cflags-$(CONFIG_PA7100LC)	+= -march=1.1 -mschedule=7100LC
+cflags-$(CONFIG_PA8X00)		+= -march=2.0 -mschedule=8000
 
-ifdef CONFIG_PA7200
-CFLAGS += -march=1.1 -mschedule=7200
-endif
+head-y			:= arch/parisc/kernel/head.o 
+head-$(CONFIG_PARISC64)	:= arch/parisc/kernel/head64.o
 
-ifdef CONFIG_PA7100LC
-CFLAGS += -march=1.1 -mschedule=7100LC
-endif
+CFLAGS	+= $(cflags-y)
+HEAD	:= $(head-y)
 
-ifdef CONFIG_PA8X00
-CFLAGS += -march=2.0 -mschedule=8000
-endif
+core-y	+= $(addprefix arch/parisc/, kernel/pdc_cons.o kernel/process.o   \
+		mm/ kernel/ hpux/ math-emu/ kernel/init_task.o )
+libs-y	+= arch/parisc/lib/ `$(CC) -print-libgcc-file-name`
 
-HEAD := arch/parisc/kernel/head.o 
-ifdef CONFIG_PARISC64
-HEAD := arch/parisc/kernel/head64.o
-endif
-
-core-y					+= arch/parisc/kernel/pdc_cons.o  \
-					   arch/parisc/kernel/process.o   \
-	   				   arch/parisc/mm/	          \
-					   arch/parisc/kernel/            \
-					   arch/parisc/hpux/		  \
-					   arch/parisc/math-emu/	  \
-					   arch/parisc/kernel/init_task.o
-libs-y					+= arch/parisc/lib/ \
-					   `$(CC) -print-libgcc-file-name`
+drivers-$(CONFIG_OPROFILE)		+= arch/parisc/oprofile/
 
 palo: vmlinux
 	@if [ $$(palo -f /dev/null >/dev/null 2>&1 ; echo $$?) != 2 ]; then \
@@ -101,33 +83,26 @@ oldpalo: vmlinux
 	export TOPDIR=`pwd`; \
 	unset STRIP LDFLAGS CPP CPPFLAGS AFLAGS CFLAGS CC LD; cd ../palo && make lifimage
 
-Image: palo
+# Shorthands for known targets not supported by parisc, use palo as default
+Image zImage bzImage: palo
 
-Image-clean:
+prepare: include/asm-parisc/offsets.h
 
-ramdisk.o:
-
-zImage: palo
-
-bzImage: palo
-
-compressed: zImage
-
-install: 
-
-archmrproper:
-
-archclean:
-
-prepare: include/asm-$(ARCH)/offsets.h
-
-arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
+arch/parisc/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/config/MARKER
 
-include/asm-$(ARCH)/offsets.h.tmp: arch/$(ARCH)/kernel/asm-offsets.s
-	@$(generate-asm-offsets.h) < $< > $@
-
-include/asm-$(ARCH)/offsets.h: include/asm-$(ARCH)/offsets.h.tmp
+include/asm-parisc/offsets.h: arch/parisc/kernel/asm-offsets.s
 	@echo -n '  Generating $@'
+	@$(generate-asm-offsets.h) < $< > $@.tmp
 	@$(update-if-changed)
 
+archclean:
+archmrproper:
+
+CLEAN_FILES	+= palo.conf lifimage include/asm-parisc/offsets.h \
+		include/asm-parisc/offsets.h.tmp
+
+define archhelp
+	@echo  '* vmlinux	- Uncompressed kernel image (./vmlinux)'
+	@echo  '  palo		- Bootable image (./lifimage)'
+endef

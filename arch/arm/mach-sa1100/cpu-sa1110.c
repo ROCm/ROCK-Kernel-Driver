@@ -309,6 +309,7 @@ static struct cpufreq_driver sa1110_driver = {
 	.verify		 = sa11x0_verify_speed,
 	.setpolicy	 = sa1110_setspeed,
 	.policy		 = &sa1110_policy,
+	.name		= "sa1110",
 };
 
 static int __init sa1110_clk_init(void)
@@ -344,4 +345,4 @@ static int __init sa1110_clk_init(void)
 	return 0;
 }
 
-core_initcall(sa1110_clk_init);
+arch_initcall(sa1110_clk_init);

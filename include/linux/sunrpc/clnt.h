@@ -28,6 +28,8 @@ struct rpc_portmap {
 	__u16			pm_port;
 };
 
+struct rpc_inode;
+
 /*
  * The high-level client handle
  */
@@ -58,6 +60,8 @@ struct rpc_clnt {
 
 	int			cl_nodelen;	/* nodename length */
 	char 			cl_nodename[UNX_MAXNODENAME];
+	char			cl_pathname[30];/* Path in rpc_pipe_fs */
+	struct dentry *		cl_dentry;	/* inode */
 };
 #define cl_timeout		cl_xprt->timeout
 #define cl_prog			cl_pmap.pm_prog

@@ -40,6 +40,7 @@
 #include <asm/io.h>
 #include <asm/hardware.h>
 #include <asm/processor.h>
+#include <asm/parisc-device.h>
 #include <asm/delay.h>
 #include <asm/eisa_bus.h>
 
@@ -322,6 +323,7 @@ static int __devinit eisa_probe(struct parisc_device *dev)
 
 	printk(KERN_INFO "%s EISA Adapter found at 0x%08lx\n", 
 		name, dev->hpa);
+	snprintf(dev->dev.name, sizeof(dev->dev.name), "%s EISA", name);
 
 	eisa_dev.hba.dev = dev;
 	eisa_dev.hba.iommu = ccio_get_iommu(dev);

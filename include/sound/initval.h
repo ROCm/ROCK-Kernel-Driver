@@ -97,18 +97,6 @@ static int snd_legacy_auto_probe(unsigned long *ports, int (*probe)(unsigned lon
 }
 #endif
 
-#ifdef SNDRV_LEGACY_FIND_FREE_IOPORT
-static long snd_legacy_find_free_ioport(long *port_table, long size)
-{
-	while (*port_table != -1) {
-		if (!check_region(*port_table, size))
-			return *port_table;
-		port_table++;
-	}
-	return -1;
-}
-#endif
-
 #ifdef SNDRV_LEGACY_FIND_FREE_IRQ
 #include <linux/interrupt.h>
 

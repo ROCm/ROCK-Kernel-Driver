@@ -22,7 +22,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	        "fpu", "vme", "de", "pse", "tsc", "msr", "pae", "mce",
 	        "cx8", "apic", NULL, "sep", "mtrr", "pge", "mca", "cmov",
 	        "pat", "pse36", "pn", "clflush", NULL, "dts", "acpi", "mmx",
-	        "fxsr", "sse", "sse2", "ss", "ht", "tm", "ia64", NULL,
+	        "fxsr", "sse", "sse2", "ss", "ht", "tm", "ia64", "pbe",
 
 		/* AMD-defined */
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,

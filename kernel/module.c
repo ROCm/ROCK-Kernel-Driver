@@ -679,19 +679,19 @@ static int obsolete_params(const char *name,
 	if (!kp)
 		return -ENOMEM;
 
-	DEBUGP("Module %s has %u obsolete params\n", name, num);
-	for (i = 0; i < num; i++)
-		DEBUGP("Param %i: %s type %s\n",
-		       num, obsparm[i].name, obsparm[i].type);
-
 	for (i = 0; i < num; i++) {
+		char sym_name[128 + sizeof(MODULE_SYMBOL_PREFIX)];
+
+		snprintf(sym_name, sizeof(sym_name), "%s%s",
+			 MODULE_SYMBOL_PREFIX, obsparm[i].name);
+
 		kp[i].name = obsparm[i].name;
 		kp[i].perm = 000;
 		kp[i].set = set_obsolete;
 		kp[i].get = NULL;
 		obsparm[i].addr
 			= (void *)find_local_symbol(sechdrs, symindex, strtab,
-						    obsparm[i].name);
+						    sym_name);
 		if (!obsparm[i].addr) {
 			printk("%s: falsely claims to have parameter %s\n",
 			       name, obsparm[i].name);
@@ -722,28 +722,22 @@ static int obsolete_params(const char *name,
 }
 #endif /* CONFIG_OBSOLETE_MODPARM */
 
-/* Find an symbol for this module (ie. resolve internals first).
-   It we find one, record usage.  Must be holding module_mutex. */
-unsigned long find_symbol_internal(Elf_Shdr *sechdrs,
-				   unsigned int symindex,
-				   const char *strtab,
-				   const char *name,
-				   struct module *mod,
-				   struct kernel_symbol_group **ksg)
+/* Resolve a symbol for this module.  I.e. if we find one, record usage.
+   Must be holding module_mutex. */
+static unsigned long resolve_symbol(Elf_Shdr *sechdrs,
+				    unsigned int symindex,
+				    const char *strtab,
+				    const char *name,
+				    struct module *mod)
 {
+	struct kernel_symbol_group *ksg;
 	unsigned long ret;
 
-	ret = find_local_symbol(sechdrs, symindex, strtab, name);
-	if (ret) {
-		*ksg = NULL;
-		return ret;
-	}
-	/* Look in other modules... */
 	spin_lock_irq(&modlist_lock);
-	ret = __find_symbol(name, ksg, mod->license_gplok);
+	ret = __find_symbol(name, &ksg, mod->license_gplok);
 	if (ret) {
 		/* This can fail due to OOM, or module unloading */
-		if (!use_module(mod, (*ksg)->owner))
+		if (!use_module(mod, ksg->owner))
 			ret = 0;
 	}
 	spin_unlock_irq(&modlist_lock);
@@ -832,21 +826,19 @@ static int simplify_symbols(Elf_Shdr *sechdrs,
 			    unsigned int strindex,
 			    struct module *mod)
 {
-	unsigned int i;
-	Elf_Sym *sym;
+	Elf_Sym *sym = (void *)sechdrs[symindex].sh_addr;
+	const char *strtab = (char *)sechdrs[strindex].sh_addr;
+	unsigned int i, n = sechdrs[symindex].sh_size / sizeof(Elf_Sym);
+	int ret = 0;
 
-	/* First simplify defined symbols, so if they become the
-           "answer" to undefined symbols, copying their st_value us
-           correct. */
-	for (sym = (void *)sechdrs[symindex].sh_addr, i = 0;
-	     i < sechdrs[symindex].sh_size / sizeof(Elf_Sym);
-	     i++) {
+	for (i = 1; i < n; i++) {
 		switch (sym[i].st_shndx) {
 		case SHN_COMMON:
 			/* We compiled with -fno-common.  These are not
 			   supposed to happen.  */
 			DEBUGP("Common symbol: %s\n", strtab + sym[i].st_name);
-			return -ENOEXEC;
+			ret = -ENOEXEC;
+			break;
 
 		case SHN_ABS:
 			/* Don't need to do anything */
@@ -855,6 +847,20 @@ static int simplify_symbols(Elf_Shdr *sechdrs,
 			break;
 
 		case SHN_UNDEF:
+			sym[i].st_value
+			  = resolve_symbol(sechdrs, symindex, strtab,
+					   strtab + sym[i].st_name, mod);
+
+			/* Ok if resolved.  */
+			if (sym[i].st_value != 0)
+				break;
+			/* Ok if weak.  */
+			if (ELF_ST_BIND(sym[i].st_info) == STB_WEAK)
+				break;
+
+			printk(KERN_WARNING "%s: Unknown symbol %s\n",
+			       mod->name, strtab + sym[i].st_name);
+			ret = -ENOENT;
 			break;
 
 		default:
@@ -862,30 +868,11 @@ static int simplify_symbols(Elf_Shdr *sechdrs,
 				= (unsigned long)
 				(sechdrs[sym[i].st_shndx].sh_addr
 				 + sym[i].st_value);
+			break;
 		}
 	}
 
-	/* Now try to resolve undefined symbols */
-	for (sym = (void *)sechdrs[symindex].sh_addr, i = 0;
-	     i < sechdrs[symindex].sh_size / sizeof(Elf_Sym);
-	     i++) {
-		if (sym[i].st_shndx == SHN_UNDEF) {
-			/* Look for symbol */
-			struct kernel_symbol_group *ksg = NULL;
-			const char *strtab 
-				= (char *)sechdrs[strindex].sh_addr;
-
-			sym[i].st_value
-				= find_symbol_internal(sechdrs,
-						       symindex,
-						       strtab,
-						       strtab + sym[i].st_name,
-						       mod,
-						       &ksg);
-		}
-	}
-
-	return 0;
+	return ret;
 }
 
 /* Update size with this section: return offset. */
@@ -1096,17 +1083,17 @@ static struct module *load_module(void *umod,
 	mod = (void *)sechdrs[modindex].sh_addr;
 
 	/* Now copy in args */
-	err = strlen_user(uargs);
-	if (err < 0)
+	arglen = strlen_user(uargs);
+	if (!arglen) {
+		err = -EFAULT;
 		goto free_hdr;
-	arglen = err;
-
-	args = kmalloc(arglen+1, GFP_KERNEL);
+	}
+	args = kmalloc(arglen, GFP_KERNEL);
 	if (!args) {
 		err = -ENOMEM;
 		goto free_hdr;
 	}
-	if (copy_from_user(args, uargs, arglen+1) != 0) {
+	if (copy_from_user(args, uargs, arglen) != 0) {
 		err = -EFAULT;
 		goto free_mod;
 	}
@@ -1422,6 +1409,15 @@ static int m_show(struct seq_file *m, void *p)
 	seq_printf(m, "%s %lu",
 		   mod->name, mod->init_size + mod->core_size);
 	print_unload_info(m, mod);
+
+	/* Informative for users. */
+	seq_printf(m, " %s",
+		   mod->state == MODULE_STATE_GOING ? "Unloading":
+		   mod->state == MODULE_STATE_COMING ? "Loading":
+		   "Live");
+	/* Used by oprofile and other similar tools. */
+	seq_printf(m, " 0x%p", mod->module_core);
+
 	seq_printf(m, "\n");
 	return 0;
 }

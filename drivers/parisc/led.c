@@ -404,7 +404,7 @@ static void led_get_diskio_stats(int addvalue)
 	int major, disk, total;
 	
 	total = 0;
-#ifdef 0
+#if 0
 	/*
 	 * this section will no longer work in 2.5, as we no longer
 	 * have either kstat.dk_drive nor DK_MAX_*.  It can probably

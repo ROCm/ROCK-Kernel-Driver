@@ -1538,7 +1538,7 @@ static struct fb_ops riva_fb_ops = {
 	.fb_blank 	= rivafb_blank,
 	.fb_fillrect 	= rivafb_fillrect,
 	.fb_copyarea 	= rivafb_copyarea,
-	.fb_imageblit 	= rivafb_imageblit,
+	.fb_imageblit 	= cfb_imageblit,
 	.fb_cursor	= soft_cursor,	
 	.fb_sync 	= rivafb_sync,
 };

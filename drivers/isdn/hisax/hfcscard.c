@@ -69,8 +69,7 @@ hfcs_release(struct IsdnCardState *cs)
 {
 	release2bds0(cs);
 	del_timer(&cs->hw.hfcD.timer);
-	if (cs->hw.hfcD.addr)
-		release_region(cs->hw.hfcD.addr, 2);
+	hisax_release_resources(cs);
 }
 
 static int
@@ -112,12 +111,6 @@ hfcs_reset(struct IsdnCardState *cs)
 	cs->hw.hfcD.sctrl = 0;
 	hfcs_write_reg(cs, HFCD_DATA, HFCD_SCTRL, cs->hw.hfcD.sctrl);
 	return 0;
-}
-
-static int
-hfcs_card_msg(struct IsdnCardState *cs, int mt, void *arg)
-{
-	return(0);
 }
 
 static void
@@ -243,16 +236,8 @@ setup_hfcs(struct IsdnCard *card)
 		cs->hw.hfcD.bfifosize = 7*1024 + 512;
 	} else
 		return (0);
-	if (check_region((cs->hw.hfcD.addr), 2)) {
-		printk(KERN_WARNING
-		       "HiSax: %s config port %x-%x already in use\n",
-		       CardType[card->typ],
-		       cs->hw.hfcD.addr,
-		       cs->hw.hfcD.addr + 2);
-		return (0);
-	} else {
-		request_region(cs->hw.hfcD.addr, 2, "HFCS isdn");
-	}
+	if (!request_io(&cs->rs, cs->hw.hfcD.addr, 2, "HFCS isdn"))
+		return 0;
 	printk(KERN_INFO
 	       "HFCS: defined at 0x%x IRQ %d HZ %d\n",
 	       cs->hw.hfcD.addr,
@@ -271,7 +256,6 @@ setup_hfcs(struct IsdnCard *card)
 	cs->hw.hfcD.timer.data = (long) cs;
 	init_timer(&cs->hw.hfcD.timer);
 	hfcs_reset(cs);
-	cs->cardmsg = &hfcs_card_msg;
 	cs->card_ops = &hfcs_ops;
 	return (1);
 }

@@ -13,6 +13,7 @@
 
 #include <asm/ptrace.h>
 #include <asm/types.h>
+#include <asm/errno.h>
 
 #include <linux/string.h>
 #include <linux/interrupt.h>
@@ -93,5 +94,22 @@ extern unsigned long txn_alloc_addr(int);
 
 /* soft power switch support (power.c) */
 extern struct tasklet_struct power_tasklet;
+
+struct notifier_block;
+
+#ifdef CONFIG_PROFILING
+int register_profile_notifier(struct notifier_block *nb);
+int unregister_profile_notifier(struct notifier_block *nb);
+#else
+static inline int register_profile_notifier(struct notifier_block *nb)
+{
+    return -ENOSYS;
+}
+
+static inline int unregister_profile_notifier(struct notifier_block *nb)
+{
+    return -ENOSYS;
+}
+#endif
 
 #endif	/* _ASM_PARISC_IRQ_H */

@@ -264,37 +264,6 @@ write_out_data_locked:
 	goto write_out_data_locked;
 
 sync_datalist_empty:
-	/*
-	 * Wait for all the async writepage data.  As they become unlocked
-	 * in end_buffer_async_write(), the only place where they can be
-	 * reaped is in try_to_free_buffers(), and we're locked against
-	 * that.
-	 */
-	while ((jh = commit_transaction->t_async_datalist)) {
-		struct buffer_head *bh = jh2bh(jh);
-		if (buffer_locked(bh)) {
-			spin_unlock(&journal_datalist_lock);
-			unlock_journal(journal);
-			wait_on_buffer(bh);
-			lock_journal(journal);
-			spin_lock(&journal_datalist_lock);
-			continue;	/* List may have changed */
-		}
-		if (jh->b_next_transaction) {
-			/*
-			 * For writepage() buffers in journalled data mode: a
-			 * later transaction may want the buffer for "metadata"
-			 */
-			__journal_refile_buffer(jh);
-		} else {
-			BUFFER_TRACE(bh, "finished async writeout: unfile");
-			__journal_unfile_buffer(jh);
-			jh->b_transaction = NULL;
-			__journal_remove_journal_head(bh);
-			BUFFER_TRACE(bh, "finished async writeout: refile");
-			__brelse(bh);
-		}
-	}
 	spin_unlock(&journal_datalist_lock);
 
 	/*
@@ -304,7 +273,6 @@ sync_datalist_empty:
 	 * clean by now, so check that it is in fact empty.
 	 */
 	J_ASSERT (commit_transaction->t_sync_datalist == NULL);
-	J_ASSERT (commit_transaction->t_async_datalist == NULL);
 
 	jbd_debug (3, "JBD: commit phase 3\n");
 
@@ -629,7 +597,6 @@ skip_commit: /* The journal should be unlocked by now. */
 	jbd_debug(3, "JBD: commit phase 7\n");
 
 	J_ASSERT(commit_transaction->t_sync_datalist == NULL);
-	J_ASSERT(commit_transaction->t_async_datalist == NULL);
 	J_ASSERT(commit_transaction->t_buffers == NULL);
 	J_ASSERT(commit_transaction->t_checkpoint_list == NULL);
 	J_ASSERT(commit_transaction->t_iobuf_list == NULL);

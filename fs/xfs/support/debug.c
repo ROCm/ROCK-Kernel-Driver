@@ -41,7 +41,10 @@ static char		message[256];	/* keep it off the stack */
 static spinlock_t 	xfs_err_lock = SPIN_LOCK_UNLOCKED;
 
 /* Translate from CE_FOO to KERN_FOO, err_level(CE_FOO) == KERN_FOO */
-static char		*err_level[8] = {KERN_EMERG, KERN_ALERT, KERN_CRIT,
+#define XFS_MAX_ERR_LEVEL	7
+#define XFS_ERR_MASK		((1 << 3) - 1)
+static char		*err_level[XFS_MAX_ERR_LEVEL+1] =
+					{KERN_EMERG, KERN_ALERT, KERN_CRIT,
 					 KERN_ERR, KERN_WARNING, KERN_NOTICE,
 					 KERN_INFO, KERN_DEBUG};
 
@@ -82,15 +85,22 @@ void
 cmn_err(register int level, char *fmt, ...)
 {
 	char	*fp = fmt;
-	va_list ap;
+	int	len;
+	int	flags;
+	va_list	ap;
 
-	spin_lock(&xfs_err_lock);
+	level &= XFS_ERR_MASK;
+	if (level > XFS_MAX_ERR_LEVEL)
+		level = XFS_MAX_ERR_LEVEL;
+	spin_lock_irqsave(&xfs_err_lock,flags);
 	va_start(ap, fmt);
 	if (*fmt == '!') fp++;
-	vsprintf(message, fp, ap);
-	printk("%s%s\n", err_level[level], message);
+	len = vsprintf(message, fp, ap);
+	if (message[len-1] != '\n')
+		strcat(message, "\n");
+	printk("%s%s", err_level[level], message);
 	va_end(ap);
-	spin_unlock(&xfs_err_lock);
+	spin_unlock_irqrestore(&xfs_err_lock,flags);
 
 	if (level == CE_PANIC)
 		BUG();
@@ -100,10 +110,18 @@ cmn_err(register int level, char *fmt, ...)
 void
 icmn_err(register int level, char *fmt, va_list ap)
 {
-	spin_lock(&xfs_err_lock);
-	vsprintf(message, fmt, ap);
-	spin_unlock(&xfs_err_lock);
-	printk("%s%s\n", err_level[level], message);
+	int	len;
+	int	flags;
+
+	level &= XFS_ERR_MASK;
+	if(level > XFS_MAX_ERR_LEVEL)
+		level = XFS_MAX_ERR_LEVEL;
+	spin_lock_irqsave(&xfs_err_lock,flags);
+	len = vsprintf(message, fmt, ap);
+	if (message[len-1] != '\n')
+		strcat(message, "\n");
+	spin_unlock_irqrestore(&xfs_err_lock,flags);
+	printk("%s%s", err_level[level], message);
 	if (level == CE_PANIC)
 		BUG();
 }

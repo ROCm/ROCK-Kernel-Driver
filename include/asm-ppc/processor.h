@@ -718,19 +718,6 @@ extern inline void prefetchw(const void *x)
 
 #define spin_lock_prefetch(x)	prefetchw(x)
 
-#ifdef CONFIG_XMON
-extern void xmon(struct pt_regs *);
-#define BUG() do { \
-	printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
-	xmon(0); \
-} while (0)
-#else
-#define BUG() do { \
-	printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
-	__asm__ __volatile__(".long 0x0"); \
-} while (0)
-#endif
-
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __ASM_PPC_PROCESSOR_H */

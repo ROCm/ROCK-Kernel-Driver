@@ -206,12 +206,14 @@ static int __init ne_probe_isapnp(struct net_device *dev)
 			if (pnp_device_attach(idev) < 0)
 				continue;
 			if (pnp_activate_dev(idev, NULL) < 0) {
-			      __again:
 			      	pnp_device_detach(idev);
+			      	continue;
 			}
 			/* if no io and irq, search for next */
-			if (!pnp_port_valid(idev, 0) || !pnp_irq_valid(idev, 0))
-				goto __again;
+			if (!pnp_port_valid(idev, 0) || !pnp_irq_valid(idev, 0)) {
+				pnp_device_detach(idev);
+				continue;
+			}
 			/* found it */
 			dev->base_addr = pnp_port_start(idev, 0);
 			dev->irq = pnp_irq(idev, 0);
@@ -785,9 +787,9 @@ void cleanup_module(void)
 		struct net_device *dev = &dev_ne[this_dev];
 		if (dev->priv != NULL) {
 			void *priv = dev->priv;
-			struct pci_dev *idev = (struct pci_dev *)ei_status.priv;
+			struct pnp_dev *idev = (struct pnp_dev *)ei_status.priv;
 			if (idev)
-				idev->deactivate(idev);
+				pnp_device_detach(idev);
 			free_irq(dev->irq, dev);
 			release_region(dev->base_addr, NE_IO_EXTENT);
 			unregister_netdev(dev);

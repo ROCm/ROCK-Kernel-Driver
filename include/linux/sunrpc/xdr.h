@@ -80,7 +80,9 @@ struct xdr_buf {
 #define	rpc_autherr_badverf	__constant_htonl(RPC_AUTH_BADVERF)
 #define	rpc_autherr_rejectedverf __constant_htonl(RPC_AUTH_REJECTEDVERF)
 #define	rpc_autherr_tooweak	__constant_htonl(RPC_AUTH_TOOWEAK)
-
+#define	rpcsec_gsserr_credproblem	__constant_htonl(RPCSEC_GSS_CREDPROBLEM)
+#define	rpcsec_gsserr_ctxproblem	__constant_htonl(RPCSEC_GSS_CTXPROBLEM)
+#define	rpc_autherr_oldseqnum	__constant_htonl(101)
 
 /*
  * Miscellaneous XDR helper functions

@@ -89,11 +89,11 @@ struct stat64 {
 
 	signed long long	st_blocks;
 	signed int		st_atime;
-	unsigned int		__unused1;
+	unsigned int		st_atime_nsec;
 	signed int		st_mtime;
-	unsigned int		__unused2;
+	unsigned int		st_mtime_nsec;
 	signed int		st_ctime;
-	unsigned int		__unused3;
+	unsigned int		st_ctime_nsec;
 	unsigned long long	st_ino;
 };
 

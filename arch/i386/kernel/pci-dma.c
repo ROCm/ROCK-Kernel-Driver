@@ -14,10 +14,11 @@
 #include <asm/io.h>
 
 void *dma_alloc_coherent(struct device *dev, size_t size,
-			   dma_addr_t *dma_handle)
+			   dma_addr_t *dma_handle, int gfp)
 {
 	void *ret;
-	int gfp = GFP_ATOMIC;
+	/* ignore region specifiers */
+	gfp &= ~(__GFP_DMA | __GFP_HIGHMEM);
 
 	if (dev == NULL || (*dev->dma_mask < 0xffffffff))
 		gfp |= GFP_DMA;

@@ -75,6 +75,14 @@ config X86_SUMMIT
 
 	  If you don't have one of these computers, you should say N here.
 
+config X86_BIGSMP
+	bool "Support for other sub-arch SMP systems with more than 8 CPUs"
+	help
+	  This option is needed for the systems that have more than 8 CPUs
+	  and if the system is not of any sub-arch type above.
+
+	  If you don't have such a system, you should say N here.
+
 # Visual Workstation support is utterly broken.
 # If you want to see it working mail an VW540 to hch@infradead.org 8)
 #config X86_VISWS
@@ -120,7 +128,7 @@ config M386
 	  - "Pentium-Pro" for the Intel Pentium Pro.
 	  - "Pentium-II" for the Intel Pentium II or pre-Coppermine Celeron.
 	  - "Pentium-III" for the Intel Pentium III or Coppermine Celeron.
-	  - "Pentium-4" for the Intel Pentium 4.
+	  - "Pentium-4" for the Intel Pentium 4 or P4-based Celeron.
 	  - "K6" for the AMD K6, K6-II and K6-III (aka K6-3D).
 	  - "Athlon" for the AMD K7 family (Athlon/Duron/Thunderbird).
 	  - "Crusoe" for the Transmeta Crusoe series.
@@ -183,11 +191,13 @@ config MPENTIUMIII
 	  extensions.
 
 config MPENTIUM4
-	bool "Pentium-4"
+	bool "Pentium-4/Celeron(P4-based)"
 	help
-	  Select this for Intel Pentium 4 chips.  Presently these are
-	  treated almost like Pentium IIIs, but with a different cache
-	  shift.
+	  Select this for Intel Pentium 4 chips.  This includes both
+	  the Pentium 4 and P4-based Celeron chips.  This option
+	  enables compile flags optimized for the chip, uses the
+	  correct cache shift, and applies any applicable Pentium III
+	  optimizations.
 
 config MK6
 	bool "K6/K6-II/K6-III"
@@ -947,15 +957,27 @@ config CPU_FREQ
 
 	  If in doubt, say N.
 
+config CPU_FREQ_PROC_INTF
+	bool "/proc/cpufreq interface (DEPRECATED)"
+	depends on CPU_FREQ && PROC_FS
+	help
+	  This enables the /proc/cpufreq interface for controlling
+	  CPUFreq. Please note that it is recommended to use the sysfs
+	  interface instead (which is built automatically). 
+	  
+	  For details, take a look at linux/Documentation/cpufreq. 
+	  
+	  If in doubt, say N.
+
 config CPU_FREQ_24_API
 	bool "/proc/sys/cpu/ interface (2.4. / OLD)"
 	depends on CPU_FREQ
 	help
 	  This enables the /proc/sys/cpu/ sysctl interface for controlling
 	  CPUFreq, as known from the 2.4.-kernel patches for CPUFreq. 2.5
-	  uses /proc/cpufreq instead. Please note that some drivers do not 
-	  work well with the 2.4. /proc/sys/cpu sysctl interface, so if in
-	  doubt, say N here.
+	  uses a sysfs interface instead. Please note that some drivers do 
+	  not work well with the 2.4. /proc/sys/cpu sysctl interface,
+	  so if in doubt, say N here.
 
 	  For details, take a look at linux/Documentation/cpufreq. 
 
@@ -1032,6 +1054,18 @@ config X86_LONGRUN
 	  For details, take a look at linux/Documentation/cpufreq. 
 
 	  If in doubt, say N.
+
+config X86_GX_SUSPMOD
+	tristate "Cyrix MediaGX/NatSemi Geode Suspend Modulation"
+	depends on CPU_FREQ
+	help
+	 This add the CPUFreq driver for NatSemi Geode processors which
+	 support suspend modulation.
+
+	 For details, take a look at linux/Documentation/cpufreq.
+
+	 If in doubt, say N.
+
 
 endmenu
 

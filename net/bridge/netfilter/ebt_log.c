@@ -78,7 +78,7 @@ static void ebt_log(const struct sk_buff *skb, const struct net_device *in,
 	spin_unlock_bh(&ebt_log_lock);
 }
 
-struct ebt_watcher log =
+static struct ebt_watcher log =
 {
 	{NULL, NULL}, EBT_LOG_WATCHER, ebt_log, ebt_log_check, NULL,
 	THIS_MODULE

@@ -193,7 +193,8 @@ typedef struct pglist_data {
 extern int numnodes;
 extern struct pglist_data *pgdat_list;
 
-void get_zone_counts(unsigned long *active, unsigned long *inactive);
+void get_zone_counts(unsigned long *active, unsigned long *inactive,
+			unsigned long *free);
 void build_all_zonelists(void);
 void wakeup_kswapd(struct zone *zone);
 

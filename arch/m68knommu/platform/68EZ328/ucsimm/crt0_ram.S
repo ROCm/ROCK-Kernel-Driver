@@ -1,13 +1,8 @@
-	.global __text_start
 	.global __main
-	.global __bss_start
-	.global __bss_end
 	.global __ram_start
 	.global __ram_end
 	.global __rom_start
 	.global __rom_end
-	.global __data_start
-	.global __data_end
 
         .global _rambase
         .global _ramstart
@@ -75,7 +70,7 @@ pclp1:
 	/* Copy me to RAM */
 	moveal	#__rom_start, %a0
 	moveal	#__ram_start, %a1
-	moveal	#__data_end, %a2
+	moveal	#_edata, %a2
 
 	/* Copy %a0 to %a1 until %a1 == %a2 */
 LD1:
@@ -107,8 +102,8 @@ pclp3:
 	beq	pclp3
 #endif /* DEBUG */
 	moveal	#0x007ffff0, %ssp
-	moveal	#__bss_start, %a0
-	moveal	#__bss_end, %a1
+	moveal	#_sbss, %a0
+	moveal	#_ebss, %a1
 
 	/* Copy 0 to %a0 until %a0 >= %a1 */
 L1:

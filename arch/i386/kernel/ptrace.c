@@ -21,6 +21,8 @@
 #include <asm/processor.h>
 #include <asm/i387.h>
 #include <asm/debugreg.h>
+#include <asm/ldt.h>
+#include <asm/desc.h>
 
 /*
  * does not yet catch signals sent when the child dies.
@@ -146,6 +148,85 @@ void ptrace_disable(struct task_struct *child)
 
 	tmp = get_stack_long(child, EFL_OFFSET) & ~TRAP_FLAG;
 	put_stack_long(child, EFL_OFFSET, tmp);
+}
+
+/*
+ * Perform get_thread_area on behalf of the traced child.
+ */
+static int
+ptrace_get_thread_area(struct task_struct *child,
+		       int idx, struct user_desc *user_desc)
+{
+	struct user_desc info;
+	struct desc_struct *desc;
+
+/*
+ * Get the current Thread-Local Storage area:
+ */
+
+#define GET_BASE(desc) ( \
+	(((desc)->a >> 16) & 0x0000ffff) | \
+	(((desc)->b << 16) & 0x00ff0000) | \
+	( (desc)->b        & 0xff000000)   )
+
+#define GET_LIMIT(desc) ( \
+	((desc)->a & 0x0ffff) | \
+	 ((desc)->b & 0xf0000) )
+
+#define GET_32BIT(desc)		(((desc)->b >> 23) & 1)
+#define GET_CONTENTS(desc)	(((desc)->b >> 10) & 3)
+#define GET_WRITABLE(desc)	(((desc)->b >>  9) & 1)
+#define GET_LIMIT_PAGES(desc)	(((desc)->b >> 23) & 1)
+#define GET_PRESENT(desc)	(((desc)->b >> 15) & 1)
+#define GET_USEABLE(desc)	(((desc)->b >> 20) & 1)
+
+	if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX)
+		return -EINVAL;
+
+	desc = child->thread.tls_array + idx - GDT_ENTRY_TLS_MIN;
+
+	info.entry_number = idx;
+	info.base_addr = GET_BASE(desc);
+	info.limit = GET_LIMIT(desc);
+	info.seg_32bit = GET_32BIT(desc);
+	info.contents = GET_CONTENTS(desc);
+	info.read_exec_only = !GET_WRITABLE(desc);
+	info.limit_in_pages = GET_LIMIT_PAGES(desc);
+	info.seg_not_present = !GET_PRESENT(desc);
+	info.useable = GET_USEABLE(desc);
+
+	if (copy_to_user(user_desc, &info, sizeof(info)))
+		return -EFAULT;
+
+	return 0;
+}
+
+/*
+ * Perform set_thread_area on behalf of the traced child.
+ */
+static int
+ptrace_set_thread_area(struct task_struct *child,
+		       int idx, struct user_desc *user_desc)
+{
+	struct user_desc info;
+	struct desc_struct *desc;
+
+	if (copy_from_user(&info, user_desc, sizeof(info)))
+		return -EFAULT;
+
+	if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX)
+		return -EINVAL;
+
+	desc = child->thread.tls_array + idx - GDT_ENTRY_TLS_MIN;
+	if (LDT_empty(&info)) {
+		desc->a = 0;
+		desc->b = 0;
+	} else {
+		desc->a = LDT_entry_a(&info);
+		desc->b = LDT_entry_b(&info);
+	}
+
+	return 0;
 }
 
 asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
@@ -415,6 +496,16 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		ret = set_fpxregs(child, (struct user_fxsr_struct *)data);
 		break;
 	}
+
+	case PTRACE_GET_THREAD_AREA:
+		ret = ptrace_get_thread_area(child,
+					     addr, (struct user_desc *) data);
+		break;
+
+	case PTRACE_SET_THREAD_AREA:
+		ret = ptrace_set_thread_area(child,
+					     addr, (struct user_desc *) data);
+		break;
 
 	default:
 		ret = ptrace_request(child, request, addr, data);

@@ -23,7 +23,7 @@
 
 extern void free_proc_entry(struct proc_dir_entry *);
 
-struct proc_dir_entry * de_get(struct proc_dir_entry *de)
+static inline struct proc_dir_entry * de_get(struct proc_dir_entry *de)
 {
 	if (de)
 		atomic_inc(&de->count);
@@ -33,7 +33,7 @@ struct proc_dir_entry * de_get(struct proc_dir_entry *de)
 /*
  * Decrements the use count and checks for deferred deletion.
  */
-void de_put(struct proc_dir_entry *de)
+static void de_put(struct proc_dir_entry *de)
 {
 	if (de) {	
 		lock_kernel();		
@@ -221,7 +221,6 @@ out_fail:
 int proc_fill_super(struct super_block *s, void *data, int silent)
 {
 	struct inode * root_inode;
-	struct task_struct *p;
 
 	s->s_blocksize = 1024;
 	s->s_blocksize_bits = 10;
@@ -234,11 +233,7 @@ int proc_fill_super(struct super_block *s, void *data, int silent)
 	/*
 	 * Fixup the root inode's nlink value
 	 */
-	read_lock(&tasklist_lock);
-	for_each_process(p)
-		if (p->pid)
-			root_inode->i_nlink++;
-	read_unlock(&tasklist_lock);
+	root_inode->i_nlink += nr_processes();
 	s->s_root = d_alloc_root(root_inode);
 	if (!s->s_root)
 		goto out_no_root;

@@ -427,8 +427,6 @@ printk("SC1200: save_state(%u)\n", state);
 
 static int sc1200_suspend (struct pci_dev *dev, u32 state)
 {
-	ide_hwif_t	*hwif = NULL;
-
 	printk("SC1200: suspend(%u)\n", state);
 	/* You don't need to iterate over disks -- sysfs should have done that for you already */ 
 

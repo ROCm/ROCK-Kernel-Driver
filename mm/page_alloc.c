@@ -776,15 +776,18 @@ void get_full_page_state(struct page_state *ret)
 	__get_page_state(ret, sizeof(*ret) / sizeof(unsigned long));
 }
 
-void get_zone_counts(unsigned long *active, unsigned long *inactive)
+void get_zone_counts(unsigned long *active,
+		unsigned long *inactive, unsigned long *free)
 {
 	struct zone *zone;
 
 	*active = 0;
 	*inactive = 0;
+	*free = 0;
 	for_each_zone(zone) {
 		*active += zone->nr_active;
 		*inactive += zone->nr_inactive;
+		*free += zone->free_pages;
 	}
 }
 
@@ -838,6 +841,7 @@ void show_free_areas(void)
 	int cpu, temperature;
 	unsigned long active;
 	unsigned long inactive;
+	unsigned long free;
 	struct zone *zone;
 
 	for_each_zone(zone) {
@@ -863,7 +867,7 @@ void show_free_areas(void)
 	}
 
 	get_page_state(&ps);
-	get_zone_counts(&active, &inactive);
+	get_zone_counts(&active, &inactive, &free);
 
 	printk("\nFree pages: %11ukB (%ukB HighMem)\n",
 		K(nr_free_pages()),

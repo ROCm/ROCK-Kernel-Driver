@@ -65,6 +65,10 @@ mcore-$(CONFIG_X86_VISWS)	:= mach-visws
 mflags-$(CONFIG_X86_NUMAQ)	:= -Iinclude/asm-i386/mach-numaq
 mcore-$(CONFIG_X86_NUMAQ)	:= mach-default
 
+# BIGSMP subarch support
+mflags-$(CONFIG_X86_BIGSMP)	:= -Iinclude/asm-i386/mach-bigsmp
+mcore-$(CONFIG_X86_BIGSMP)	:= mach-default
+
 # default subarch .h files
 mflags-y += -Iinclude/asm-i386/mach-default
 

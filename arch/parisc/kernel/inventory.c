@@ -28,6 +28,7 @@
 #include <asm/pdc.h>
 #include <asm/processor.h>
 #include <asm/page.h>
+#include <asm/parisc-device.h>
 
 /*
 ** Debug options
@@ -529,7 +530,8 @@ static void __init system_map_inventory(void)
 	 * first stop the usb controller, otherwise the machine
 	 * might crash during iommu setup
 	 */
-	pdc_suspend_usb();
+#warning We still probably need to worry about USB here, but how?
+        /* pdc_suspend_usb(); */
 
 	for (i = 0; status != PDC_BAD_PROC && status != PDC_NE_MOD; i++) {
 		struct parisc_device *dev;
@@ -587,6 +589,8 @@ void __init do_memory_inventory(void)
 
 void __init do_device_inventory(void)
 {
+	extern void parisc_generic_device_register(void);
+
 	printk(KERN_INFO "Searching for devices...\n");
 
 	switch (pdc_type) {
@@ -606,7 +610,7 @@ void __init do_device_inventory(void)
 	default:
 		panic("Unknown PDC type!\n");
 	}
-
+	parisc_generic_device_register();
 	printk(KERN_INFO "Found devices:\n");
 	print_parisc_devices();
 }

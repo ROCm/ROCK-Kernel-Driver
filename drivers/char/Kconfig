@@ -6,6 +6,7 @@ menu "Character devices"
 
 config VT
 	bool "Virtual terminal"
+	requires INPUT=y
 	---help---
 	  If you say Y here, you will get support for terminal devices with
 	  display and keyboard devices. These are called "virtual" because you
@@ -636,6 +637,8 @@ comment "from the tpqic02-support package.  It is available at"
 comment "metalab.unc.edu or ftp://titus.cfw.com/pub/Linux/util/"
 	depends on QIC02_TAPE && QIC02_DYNCONF
 
+source "drivers/char/ipmi/Kconfig"
+
 source "drivers/char/watchdog/Kconfig"
 
 config DS1620
@@ -771,6 +774,7 @@ config NVRAM
 
 config RTC
 	tristate "Enhanced Real Time Clock Support"
+	depends on !PPC32 && !PARISC && !IA64
 	---help---
 	  If you say Y here and create a character special file /dev/rtc with
 	  major number 10 and minor number 135 using mknod ("man mknod"), you

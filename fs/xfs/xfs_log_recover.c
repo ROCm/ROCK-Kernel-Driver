@@ -2952,7 +2952,6 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 
 				if (!error) {
 					ASSERT(ip->i_d.di_nlink == 0);
-					ASSERT(ip->i_d.di_mode != 0);
 
 					/* setup for the next pass */
 					agino = INT_GET(dip->di_next_unlinked,
@@ -2970,7 +2969,9 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 					ip->i_d.di_dmevmask = 0;
 
 					/*
-					 * Drop our reference to the
+					 * If this is a new inode, handle
+					 * it specially.  Otherwise,
+					 * just drop our reference to the
 					 * inode.  If there are no
 					 * other references, this will
 					 * send the inode to
@@ -2978,7 +2979,10 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 					 * truncate the file and free
 					 * the inode.
 					 */
-					VN_RELE(XFS_ITOV(ip));
+					if (ip->i_d.di_mode == 0)
+						xfs_iput_new(ip, 0);
+					else
+						VN_RELE(XFS_ITOV(ip));
 				} else {
 					/*
 					 * We can't read in the inode

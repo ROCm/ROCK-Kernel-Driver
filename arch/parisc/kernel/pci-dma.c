@@ -71,7 +71,7 @@ void dump_resmap(void)
 static inline void dump_resmap(void) {;}
 #endif
 
-static int pa11_dma_supported( struct pci_dev *dev, u64 mask)
+static int pa11_dma_supported( struct device *dev, u64 mask)
 {
 	return 1;
 }
@@ -349,7 +349,7 @@ pcxl_dma_init(void)
 
 __initcall(pcxl_dma_init);
 
-static void * pa11_dma_alloc_consistent (struct pci_dev *hwdev, size_t size, dma_addr_t *dma_handle)
+static void * pa11_dma_alloc_consistent (struct device *dev, size_t size, dma_addr_t *dma_handle, int flag)
 {
 	unsigned long vaddr;
 	unsigned long paddr;
@@ -358,7 +358,7 @@ static void * pa11_dma_alloc_consistent (struct pci_dev *hwdev, size_t size, dma
 	order = get_order(size);
 	size = 1 << (order + PAGE_SHIFT);
 	vaddr = pcxl_alloc_range(size);
-	paddr = __get_free_pages(GFP_ATOMIC, order);
+	paddr = __get_free_pages(flag, order);
 	flush_kernel_dcache_range(paddr, size);
 	paddr = __pa(paddr);
 	map_uncached_pages(vaddr, size, paddr);
@@ -369,13 +369,13 @@ static void * pa11_dma_alloc_consistent (struct pci_dev *hwdev, size_t size, dma
 ** ISA cards will certainly only support 24-bit DMA addressing.
 ** Not clear if we can, want, or need to support ISA.
 */
-	if (!hwdev || hwdev->dma_mask != 0xffffffff)
+	if (!dev || *dev->dma_mask != 0xffffffff)
 		gfp |= GFP_DMA;
 #endif
 	return (void *)vaddr;
 }
 
-static void pa11_dma_free_consistent (struct pci_dev *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle)
+static void pa11_dma_free_consistent (struct device *dev, size_t size, void *vaddr, dma_addr_t dma_handle)
 {
 	int order;
 
@@ -386,9 +386,9 @@ static void pa11_dma_free_consistent (struct pci_dev *hwdev, size_t size, void *
 	free_pages((unsigned long)__va(dma_handle), order);
 }
 
-static dma_addr_t pa11_dma_map_single(struct pci_dev *dev, void *addr, size_t size, int direction)
+static dma_addr_t pa11_dma_map_single(struct device *dev, void *addr, size_t size, enum dma_data_direction direction)
 {
-	if (direction == PCI_DMA_NONE) {
+	if (direction == DMA_NONE) {
 		printk(KERN_ERR "pa11_dma_map_single(PCI_DMA_NONE) called by %p\n", __builtin_return_address(0));
 		BUG();
 	}
@@ -397,14 +397,14 @@ static dma_addr_t pa11_dma_map_single(struct pci_dev *dev, void *addr, size_t si
 	return virt_to_phys(addr);
 }
 
-static void pa11_dma_unmap_single(struct pci_dev *dev, dma_addr_t dma_handle, size_t size, int direction)
+static void pa11_dma_unmap_single(struct device *dev, dma_addr_t dma_handle, size_t size, enum dma_data_direction direction)
 {
-	if (direction == PCI_DMA_NONE) {
+	if (direction == DMA_NONE) {
 		printk(KERN_ERR "pa11_dma_unmap_single(PCI_DMA_NONE) called by %p\n", __builtin_return_address(0));
 		BUG();
 	}
 
-	if (direction == PCI_DMA_TODEVICE)
+	if (direction == DMA_TO_DEVICE)
 	    return;
 
 	/*
@@ -417,11 +417,11 @@ static void pa11_dma_unmap_single(struct pci_dev *dev, dma_addr_t dma_handle, si
 	return;
 }
 
-static int pa11_dma_map_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents, int direction)
+static int pa11_dma_map_sg(struct device *dev, struct scatterlist *sglist, int nents, enum dma_data_direction direction)
 {
 	int i;
 
-	if (direction == PCI_DMA_NONE)
+	if (direction == DMA_NONE)
 	    BUG();
 
 	for (i = 0; i < nents; i++, sglist++ ) {
@@ -433,14 +433,14 @@ static int pa11_dma_map_sg(struct pci_dev *dev, struct scatterlist *sglist, int 
 	return nents;
 }
 
-static void pa11_dma_unmap_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents, int direction)
+static void pa11_dma_unmap_sg(struct device *dev, struct scatterlist *sglist, int nents, enum dma_data_direction direction)
 {
 	int i;
 
-	if (direction == PCI_DMA_NONE)
+	if (direction == DMA_NONE)
 	    BUG();
 
-	if (direction == PCI_DMA_TODEVICE)
+	if (direction == DMA_TO_DEVICE)
 	    return;
 
 	/* once we do combining we'll need to use phys_to_virt(sg_dma_address(sglist)) */
@@ -450,15 +450,15 @@ static void pa11_dma_unmap_sg(struct pci_dev *dev, struct scatterlist *sglist, i
 	return;
 }
 
-static void pa11_dma_sync_single(struct pci_dev *dev, dma_addr_t dma_handle, size_t size, int direction)
+static void pa11_dma_sync_single(struct device *dev, dma_addr_t dma_handle, unsigned long offset, size_t size, enum dma_data_direction direction)
 {
-	if (direction == PCI_DMA_NONE)
+	if (direction == DMA_NONE)
 	    BUG();
 
-	flush_kernel_dcache_range((unsigned long) phys_to_virt(dma_handle), size);
+	flush_kernel_dcache_range((unsigned long) phys_to_virt(dma_handle) + offset, size);
 }
 
-static void pa11_dma_sync_sg(struct pci_dev *dev, struct scatterlist *sglist, int nents, int direction)
+static void pa11_dma_sync_sg(struct device *dev, struct scatterlist *sglist, int nents, enum dma_data_direction direction)
 {
 	int i;
 
@@ -468,40 +468,56 @@ static void pa11_dma_sync_sg(struct pci_dev *dev, struct scatterlist *sglist, in
 		flush_kernel_dcache_range(sg_virt_addr(sglist), sglist->length);
 }
 
-struct pci_dma_ops pcxl_dma_ops = {
-	pa11_dma_supported,			/* dma_support */
-	pa11_dma_alloc_consistent,
-	pa11_dma_free_consistent,
-	pa11_dma_map_single,			/* map_single */
-	pa11_dma_unmap_single,			/* unmap_single */
-	pa11_dma_map_sg,			/* map_sg */
-	pa11_dma_unmap_sg,			/* unmap_sg */
-	pa11_dma_sync_single,			/* dma_sync_single */
-	pa11_dma_sync_sg			/* dma_sync_sg */
+struct hppa_dma_ops pcxl_dma_ops = {
+	.dma_supported =	pa11_dma_supported,
+	.alloc_consistent =	pa11_dma_alloc_consistent,
+	.alloc_noncoherent =	pa11_dma_alloc_consistent,
+	.free_consistent =	pa11_dma_free_consistent,
+	.map_single =		pa11_dma_map_single,
+	.unmap_single =		pa11_dma_unmap_single,
+	.map_sg =		pa11_dma_map_sg,
+	.unmap_sg =		pa11_dma_unmap_sg,
+	.dma_sync_single =	pa11_dma_sync_single,
+	.dma_sync_sg =		pa11_dma_sync_sg,
 };
 
-static void *fail_alloc_consistent(struct pci_dev *hwdev, size_t size,
-		dma_addr_t *dma_handle)
+static void *fail_alloc_consistent(struct device *dev, size_t size,
+				   dma_addr_t *dma_handle, int flag)
 {
 	return NULL;
 }
 
-static void fail_free_consistent(struct pci_dev *dev, size_t size,
-		void *vaddr, dma_addr_t iova)
+static void *pa11_dma_alloc_noncoherent(struct device *dev, size_t size,
+					  dma_addr_t *dma_handle, int flag)
 {
+	void *addr = NULL;
+
+	/* rely on kmalloc to be cacheline aligned */
+	addr = kmalloc(size, flag);
+	if(addr)
+		*dma_handle = (dma_addr_t)virt_to_phys(addr);
+
+	return addr;
+}
+
+static void pa11_dma_free_noncoherent(struct device *dev, size_t size,
+					void *vaddr, dma_addr_t iova)
+{
+	kfree(vaddr);
 	return;
 }
 
-struct pci_dma_ops pcx_dma_ops = {
-	pa11_dma_supported,			/* dma_support */
-	fail_alloc_consistent,
-	fail_free_consistent,
-	pa11_dma_map_single,			/* map_single */
-	pa11_dma_unmap_single,			/* unmap_single */
-	pa11_dma_map_sg,			/* map_sg */
-	pa11_dma_unmap_sg,			/* unmap_sg */
-	pa11_dma_sync_single,			/* dma_sync_single */
-	pa11_dma_sync_sg			/* dma_sync_sg */
+struct hppa_dma_ops pcx_dma_ops = {
+	.dma_supported =	pa11_dma_supported,
+	.alloc_consistent =	fail_alloc_consistent,
+	.alloc_noncoherent =	pa11_dma_alloc_noncoherent,
+	.free_consistent =	pa11_dma_free_noncoherent,
+	.map_single =		pa11_dma_map_single,
+	.unmap_single =		pa11_dma_unmap_single,
+	.map_sg =		pa11_dma_map_sg,
+	.unmap_sg =		pa11_dma_unmap_sg,
+	.dma_sync_single =	pa11_dma_sync_single,
+	.dma_sync_sg =		pa11_dma_sync_sg,
 };
 
 

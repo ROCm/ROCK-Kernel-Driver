@@ -384,7 +384,8 @@ int cpqfcTS_detect(Scsi_Host_Template *ScsiHostTemplate)
 
       // Since we have two 256-byte I/O port ranges (upper
       // and lower), check them both
-      if( check_region( cpqfcHBAdata->fcChip.Registers.IOBaseU, 0xff) )
+      if( !request_region( cpqfcHBAdata->fcChip.Registers.IOBaseU,
+      	                   0xff, DEV_NAME ) )
       {
 	printk("  cpqfcTS address in use: %x\n", 
 			cpqfcHBAdata->fcChip.Registers.IOBaseU);
@@ -393,21 +394,21 @@ int cpqfcTS_detect(Scsi_Host_Template *ScsiHostTemplate)
 	continue;
       }	
       
-      if( check_region( cpqfcHBAdata->fcChip.Registers.IOBaseL, 0xff) )
+      if( !request_region( cpqfcHBAdata->fcChip.Registers.IOBaseL,
+      			   0xff, DEV_NAME ) )
       {
   	printk("  cpqfcTS address in use: %x\n", 
 	      			cpqfcHBAdata->fcChip.Registers.IOBaseL);
+	release_region( cpqfcHBAdata->fcChip.Registers.IOBaseU, 0xff );
 	free_irq( HostAdapter->irq, HostAdapter);
         scsi_unregister( HostAdapter);
 	continue;
       }	
       
-      // OK, we should be able to grab everything we need now.
-      request_region( cpqfcHBAdata->fcChip.Registers.IOBaseL, 0xff, DEV_NAME);
-      request_region( cpqfcHBAdata->fcChip.Registers.IOBaseU, 0xff, DEV_NAME);
-      DEBUG_PCI(printk("  Requesting 255 I/O addresses @ %x\n",
+      // OK, we have grabbed everything we need now.
+      DEBUG_PCI(printk("  Reserved 255 I/O addresses @ %x\n",
         cpqfcHBAdata->fcChip.Registers.IOBaseL ));
-      DEBUG_PCI(printk("  Requesting 255 I/O addresses @ %x\n",
+      DEBUG_PCI(printk("  Reserved 255 I/O addresses @ %x\n",
         cpqfcHBAdata->fcChip.Registers.IOBaseU ));
 
      

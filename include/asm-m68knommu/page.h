@@ -94,28 +94,6 @@ extern unsigned long memory_end;
 #define	virt_addr_valid(kaddr)	(((void *)(kaddr) >= (void *)PAGE_OFFSET) && \
 				((void *)(kaddr) < (void *)memory_end))
 
-
-#ifdef CONFIG_NO_KERNEL_MSG
-#define	BUG_PRINT()
-#else
-#define	BUG_PRINT() printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__)
-#endif
-
-
-// #define BUG_PANIC()	asm volatile ("halt") /* drop to debugger */
-// #define BUG_PANIC()	while(1)
-#define BUG_PANIC()	panic("BUG!")
-
-
-#define BUG() do { \
-	BUG_PRINT(); \
-	BUG_PANIC(); \
-} while (0)
-
-#define PAGE_BUG(page) do { \
-	BUG(); \
-} while (0)
-
 #endif /* __ASSEMBLY__ */
 
 #endif /* __KERNEL__ */

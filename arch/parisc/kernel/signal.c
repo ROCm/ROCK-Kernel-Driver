@@ -29,6 +29,7 @@
 #include <asm/rt_sigframe.h>
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
+#include <asm/cacheflush.h>
 
 #define DEBUG_SIG 0
 
@@ -39,6 +40,10 @@
 #endif
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
+
+/* Use this to get at 32-bit user passed pointers. 
+ *    See sys_sparc32.c for description about these. */
+#define A(__x)	((unsigned long)(__x))
 
 int do_signal(sigset_t *oldset, struct pt_regs *regs, int in_syscall);
 
@@ -308,28 +313,26 @@ setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 			   (unsigned long) &frame->tramp[4]);
 #else
 	/* It should *always* be cache line-aligned, but the compiler
-           sometimes screws up. */
+	sometimes screws up. */
 	asm volatile("fdc 0(%%sr3,%0)\n\t"
 		     "fdc %1(%%sr3,%0)\n\t"
 		     "sync\n\t"
 		     "fic 0(%%sr3,%0)\n\t"
 		     "fic %1(%%sr3,%0)\n\t"
 		     "sync\n\t"
-		     : : "r" (frame->tramp), "r" (L1_CACHE_BYTES));
+		      : : "r" (frame->tramp), "r" (L1_CACHE_BYTES));
 #endif
+
 	rp = (unsigned long) frame->tramp;
 
 	if (err)
 		goto give_sigsegv;
 
-#ifdef __LP64__
 /* Much more has to happen with signals than this -- but it'll at least */
 /* provide a pointer to some places which definitely need a look. */
-#define HACK unsigned int
-#else
-#define HACK unsigned long
-#endif
-	haddr = (HACK) ka->sa.sa_handler;
+#define HACK u32
+
+	haddr = (HACK)A(ka->sa.sa_handler);
 	/* ARGH!  Fucking brain damage.  You don't want to know. */
 	if (haddr & 2) {
 		HACK *plabel;
@@ -355,13 +358,13 @@ setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 
 	regs->gr[2]  = rp;                /* userland return pointer */
 	regs->gr[26] = sig;               /* signal number */
-	regs->gr[25] = (HACK) &frame->info; /* siginfo pointer */
-	regs->gr[24] = (HACK) &frame->uc;   /* ucontext pointer */
+	regs->gr[25] = (HACK)A(&frame->info); /* siginfo pointer */
+	regs->gr[24] = (HACK)A(&frame->uc);   /* ucontext pointer */
 	DBG(("making sigreturn frame: %#lx + %#x = %#lx\n",
 	       regs->gr[30], PARISC_RT_SIGFRAME_SIZE,
 	       regs->gr[30] + PARISC_RT_SIGFRAME_SIZE));
 	/* Raise the user stack pointer to make a proper call frame. */
-	regs->gr[30] = ((HACK) frame + PARISC_RT_SIGFRAME_SIZE);
+	regs->gr[30] = ((HACK)A(frame) + PARISC_RT_SIGFRAME_SIZE);
 
 	DBG(("SIG deliver (%s:%d): frame=0x%p sp=%#lx iaoq=%#lx/%#lx rp=%#lx\n",
 	       current->comm, current->pid, frame, regs->gr[30],

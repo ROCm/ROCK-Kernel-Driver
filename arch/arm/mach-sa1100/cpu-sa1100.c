@@ -214,6 +214,7 @@ static struct cpufreq_driver sa1100_driver = {
 	.verify		= sa11x0_verify_speed,
 	.setpolicy	= sa1100_setspeed,
 	.policy		= &sa1100_policy,
+	.name		= "sa1100",
 };
 
 static int __init sa1100_dram_init(void)
@@ -231,4 +232,4 @@ static int __init sa1100_dram_init(void)
 	return ret;
 }
 
-core_initcall(sa1100_dram_init);
+arch_initcall(sa1100_dram_init);

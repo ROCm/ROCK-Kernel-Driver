@@ -13,11 +13,24 @@
 
 #include <linux/config.h>
 #include <linux/sunrpc/sched.h>
+#include <linux/sunrpc/msg_prot.h>
+#include <linux/sunrpc/xdr.h>
 
 #include <asm/atomic.h>
 
 /* size of the nodename buffer */
 #define UNX_MAXNODENAME	32
+
+/* Maximum size (in bytes) of an rpc credential or verifier */
+#define RPC_MAX_AUTH_SIZE (400)
+
+/* Work around the lack of a VFS credential */
+struct auth_cred {
+	uid_t	uid;
+	gid_t	gid;
+	int	ngroups;
+	gid_t	*groups;
+};
 
 /*
  * Client user credentials
@@ -56,6 +69,10 @@ struct rpc_auth {
 	unsigned int		au_rslack;	/* reply verf size guess */
 	unsigned int		au_flags;	/* various flags */
 	struct rpc_authops *	au_ops;		/* operations */
+	rpc_authflavor_t	au_flavor;	/* pseudoflavor (note may
+						 * differ from the flavor in
+						 * au_ops->au_flavor in gss
+						 * case) */
 
 	/* per-flavor data */
 };
@@ -71,16 +88,16 @@ struct rpc_authops {
 #ifdef RPC_DEBUG
 	char *			au_name;
 #endif
-	struct rpc_auth *	(*create)(struct rpc_clnt *);
+	struct rpc_auth *	(*create)(struct rpc_clnt *, rpc_authflavor_t);
 	void			(*destroy)(struct rpc_auth *);
 
-	struct rpc_cred *	(*crcreate)(int);
+	struct rpc_cred *	(*crcreate)(struct rpc_auth*, struct auth_cred *, int);
 };
 
 struct rpc_credops {
 	void			(*crdestroy)(struct rpc_cred *);
 
-	int			(*crmatch)(struct rpc_cred *, int);
+	int			(*crmatch)(struct auth_cred *, struct rpc_cred *, int);
 	u32 *			(*crmarshal)(struct rpc_task *, u32 *, int);
 	int			(*crrefresh)(struct rpc_task *);
 	u32 *			(*crvalidate)(struct rpc_task *, u32 *);
@@ -92,10 +109,13 @@ extern struct rpc_authops	authnull_ops;
 extern struct rpc_authops	authdes_ops;
 #endif
 
+u32			pseudoflavor_to_flavor(rpc_authflavor_t);
+
 int			rpcauth_register(struct rpc_authops *);
 int			rpcauth_unregister(struct rpc_authops *);
 struct rpc_auth *	rpcauth_create(rpc_authflavor_t, struct rpc_clnt *);
 void			rpcauth_destroy(struct rpc_auth *);
+struct rpc_cred *	rpcauth_lookup_credcache(struct rpc_auth *, struct auth_cred *, int);
 struct rpc_cred *	rpcauth_lookupcred(struct rpc_auth *, int);
 struct rpc_cred *	rpcauth_bindcred(struct rpc_task *);
 void			rpcauth_holdcred(struct rpc_task *);

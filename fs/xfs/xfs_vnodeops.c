@@ -82,7 +82,7 @@ xfs_open(
 /*
  * xfs_getattr
  */
-int
+STATIC int
 xfs_getattr(
 	bhv_desc_t	*bdp,
 	vattr_t		*vap,
@@ -1935,8 +1935,6 @@ xfs_create(
 
 	dm_di_mode = vap->va_mode|VTTOIF(vap->va_type);
 	namelen = VNAMELEN(dentry);
-	if (namelen >= MAXNAMELEN)
-		return XFS_ERROR(ENAMETOOLONG);
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_CREATE)) {
 		error = dm_send_namesp_event(DM_EVENT_CREATE,
@@ -2433,8 +2431,7 @@ xfs_remove(
 		return XFS_ERROR(EIO);
 
 	namelen = VNAMELEN(dentry);
-	if (namelen >= MAXNAMELEN)
-		return XFS_ERROR(ENAMETOOLONG);
+
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_REMOVE)) {
 		error = dm_send_namesp_event(DM_EVENT_REMOVE, dir_bdp, DM_RIGHT_NULL,
 					NULL, DM_RIGHT_NULL,
@@ -2668,8 +2665,6 @@ xfs_link(
 	vn_trace_entry(src_vp, __FUNCTION__, (inst_t *)__return_address);
 
 	target_namelen = VNAMELEN(dentry);
-	if (target_namelen >= MAXNAMELEN)
-		return XFS_ERROR(ENAMETOOLONG);
 	if (src_vp->v_type == VDIR)
 		return XFS_ERROR(EPERM);
 
@@ -2857,8 +2852,6 @@ xfs_mkdir(
 		return XFS_ERROR(EIO);
 
 	dir_namelen = VNAMELEN(dentry);
-	if (dir_namelen >= MAXNAMELEN)
-		return XFS_ERROR(ENAMETOOLONG);
 
 	tp = NULL;
 	dp_joined_to_trans = B_FALSE;
@@ -3100,8 +3093,6 @@ xfs_rmdir(
 	if (XFS_FORCED_SHUTDOWN(XFS_BHVTOI(dir_bdp)->i_mount))
 		return XFS_ERROR(EIO);
 	namelen = VNAMELEN(dentry);
-	if (namelen >= MAXNAMELEN)
-		return XFS_ERROR(ENAMETOOLONG);
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_REMOVE)) {
 		error = dm_send_namesp_event(DM_EVENT_REMOVE,
@@ -3415,8 +3406,7 @@ xfs_symlink(
 		return XFS_ERROR(EIO);
 
 	link_namelen = VNAMELEN(dentry);
-	if (link_namelen >= MAXNAMELEN)
-		return XFS_ERROR(ENAMETOOLONG);
+
 	/*
 	 * Check component lengths of the target path name.
 	 */
@@ -4067,6 +4057,49 @@ xfs_finish_reclaim(
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
 	xfs_ireclaim(ip);
+	return 0;
+}
+
+int
+xfs_finish_reclaim_all(xfs_mount_t *mp)
+{
+	int		purged;
+	xfs_inode_t	*ip;
+	vnode_t		*vp;
+	int		done = 0;
+
+	while (!done) {
+		purged = 0;
+		XFS_MOUNT_ILOCK(mp);
+		ip = mp->m_inodes;
+		if (ip == NULL) {
+			break;
+		}
+		do {
+			/* Make sure we skip markers inserted by sync */
+			if (ip->i_mount == NULL) {
+				ip = ip->i_mnext;
+				continue;
+			}
+	
+			/*
+			 * It's up to our caller to purge the root
+			 * and quota vnodes later.
+			 */
+			vp = XFS_ITOV_NULL(ip);
+	
+			if (!vp) {
+				XFS_MOUNT_IUNLOCK(mp);	
+				xfs_finish_reclaim(ip, 0, XFS_IFLUSH_ASYNC);
+				purged = 1;
+				break;
+			}
+		} while (ip != mp->m_inodes);
+	
+		done = !purged;
+	}
+
+	XFS_MOUNT_IUNLOCK(mp);
 	return 0;
 }
 

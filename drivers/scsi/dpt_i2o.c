@@ -1491,7 +1491,7 @@ static int adpt_i2o_parse_lct(adpt_hba* pHba)
 							pDev->next_lun; pDev = pDev->next_lun){
 					}
 					pDev->next_lun = kmalloc(sizeof(struct adpt_device),GFP_KERNEL);
-					if(pDev == NULL) {
+					if(pDev->next_lun == NULL) {
 						return -ENOMEM;
 					}
 					memset(pDev->next_lun,0,sizeof(struct adpt_device));

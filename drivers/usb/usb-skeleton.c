@@ -86,7 +86,7 @@ MODULE_DEVICE_TABLE (usb, skel_table);
 #define USB_SKEL_MINOR_BASE	0
 #else
 /* Get a minor range for your devices from the usb maintainer */
-#define USB_SKEL_MINOR_BASE	200
+#define USB_SKEL_MINOR_BASE	192
 #endif
 
 /* Structure to hold all of our device specific stuff */

@@ -24,7 +24,7 @@ device_read_power(struct device * dev, char * page)
 }
 
 static ssize_t
-device_write_power(struct device * dev, const char * buf)
+device_write_power(struct device * dev, const char * buf, size_t count)
 {
 	char	str_command[20];
 	char	str_level[20];
@@ -80,7 +80,7 @@ device_write_power(struct device * dev, const char * buf)
 			error = 0;
 	}
  done:
-	return error < 0 ? error : strlen(buf);
+	return error < 0 ? error : count;
 }
 
 static DEVICE_ATTR(power,S_IWUSR | S_IRUGO,

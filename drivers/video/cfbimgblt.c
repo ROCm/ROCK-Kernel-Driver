@@ -19,10 +19,6 @@
  *  up to the nearest byte. For example a bitmap 12 bits wide must be two 
  *  bytes width. 
  *
- *  FIXME
- *  The code for 24 bit is horrible. It copies byte by byte size instead of
- *  longs like the other sizes. Needs to be optimized.
- *  
  *  Tony: 
  *  Incorporate mask tables similar to fbcon-cfb*.c in 2.4 API.  This speeds 
  *  up the code significantly.
@@ -32,7 +28,6 @@
  *
  *  Also need to add code to deal with cards endians that are different than
  *  the native cpu endians. I also need to deal with MSB position in the word.
- *
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -98,8 +93,9 @@ static u32 cfb_tab32[] = {
 #define SHIFT_LOW(val, bits)   ((val) >> (bits))
 #endif
 
-static inline void color_imageblit(struct fb_image *image, struct fb_info *p, u8 *dst1, 
-				   unsigned long start_index, unsigned long pitch_index)
+static inline void color_imageblit(struct fb_image *image, struct fb_info *p, 
+				   u8 *dst1, unsigned long start_index,
+				   unsigned long pitch_index)
 {
 	/* Draw the penguin */
 	unsigned long *dst, *dst2, color = 0, val, shift;
@@ -116,8 +112,8 @@ static inline void color_imageblit(struct fb_image *image, struct fb_info *p, u8
 		val = 0;
 		
 		if (start_index) {
-			unsigned long start_mask = ~(SHIFT_HIGH(~0UL, start_index));
-
+			unsigned long start_mask = ~(SHIFT_HIGH(~0UL,
+								start_index));
 			val = FB_READL(dst) & start_mask;
 			shift = start_index;
 		}
@@ -131,10 +127,9 @@ static inline void color_imageblit(struct fb_image *image, struct fb_info *p, u8
 			val |= SHIFT_HIGH(color, shift);
 			if (shift >= null_bits) {
 				FB_WRITEL(val, dst++);
-				if (shift == null_bits)
-					val = 0;
-				else
-					val = SHIFT_LOW(color, BITS_PER_LONG - shift);
+	
+				val = (shift == null_bits) ? 0 : 
+					SHIFT_LOW(color,BITS_PER_LONG - shift);
 			}
 			shift += bpp;
 			shift &= (BITS_PER_LONG - 1);
@@ -157,60 +152,62 @@ static inline void color_imageblit(struct fb_image *image, struct fb_info *p, u8
 	}
 }
 
-static inline void slow_imageblit(struct fb_image *image, struct fb_info *p, u8 *dst1,
-				  unsigned long fgcolor, unsigned long bgcolor, 
-				  unsigned long start_index, unsigned long pitch_index)
+static inline void slow_imageblit(struct fb_image *image, struct fb_info *p, 
+				  u8 *dst1, unsigned long fgcolor,
+				  unsigned long bgcolor, 
+				  unsigned long start_index,
+				  unsigned long pitch_index)
 {
-	unsigned long i, j, l = 8;
-	unsigned long shift, color, bpp = p->var.bits_per_pixel;
+	unsigned long shift, color = 0, bpp = p->var.bits_per_pixel;
 	unsigned long *dst, *dst2, val, pitch = p->fix.line_length;
 	unsigned long null_bits = BITS_PER_LONG - bpp;
-	u8 *src = image->data;
+	unsigned long spitch = (image->width+7)/8;
+	u8 *src = image->data, *s;
+	unsigned long i, j, l;
 	
 	dst2 = (unsigned long *) dst1;
 
 	for (i = image->height; i--; ) {
-		shift = 0;
-		val = 0;
+		shift = val = 0;
+		l = 8;
 		j = image->width;
 		dst = (unsigned long *) dst1;
+		s = src;
 
 		/* write leading bits */
 		if (start_index) {
-			unsigned long start_mask = ~(SHIFT_HIGH(~0UL, start_index));
-
+			unsigned long start_mask = ~(SHIFT_HIGH(~0UL,
+								start_index));
 			val = FB_READL(dst) & start_mask;
 			shift = start_index;
 		}
+
 		while (j--) {
 			l--;
-			if (*src & (1 << l)) 
-				color = fgcolor;
-			else 
-				color = bgcolor;
+			color = (*s & (1 << l)) ? fgcolor : bgcolor;
 			color <<= LEFT_POS(bpp);
 			val |= SHIFT_HIGH(color, shift);
 			
 			/* Did the bitshift spill bits to the next long? */
 			if (shift >= null_bits) {
 				FB_WRITEL(val, dst++);
-				if (shift == null_bits)
-					val = 0;
-				else
-					val = SHIFT_LOW(color, BITS_PER_LONG - shift);
+				val = (shift == null_bits) ? 0 :
+					 SHIFT_LOW(color,BITS_PER_LONG - shift);
 			}
 			shift += bpp;
 			shift &= (BITS_PER_LONG - 1);
-			if (!l) { l = 8; src++; };
+			if (!l) { l = 8; s++; };
 		}
+
 		/* write trailing bits */
  		if (shift) {
 			unsigned long end_mask = SHIFT_HIGH(~0UL, shift);
 
 			FB_WRITEL((FB_READL(dst) & end_mask) | val, dst);
 		}
-		dst1 += pitch;	
-
+		
+		dst1 += pitch;
+		src += spitch;	
 		if (pitch_index) {
 			dst2 += pitch;
 			dst1 = (char *) dst2;
@@ -223,26 +220,34 @@ static inline void slow_imageblit(struct fb_image *image, struct fb_info *p, u8 
 	}
 }
 
-static inline void fast_imageblit(struct fb_image *image, struct fb_info *p, u8 *dst1, 
-				  unsigned long fgcolor, unsigned long bgcolor) 
+/*
+ * fast_imageblit - optimized monochrome color expansion
+ *
+ * Only if:  bits_per_pixel == 8, 16, or 32
+ *           image->width is divisible by pixel/dword (ppw);
+ *           fix->line_legth is divisible by 4;
+ *           beginning and end of a scanline is dword aligned
+ */
+static inline void fast_imageblit(struct fb_image *image, struct fb_info *p, 
+				  u8 *dst1, unsigned long fgcolor, 
+				  unsigned long bgcolor) 
 {
-	int i, j, k, l = 8, n;
-	unsigned long bit_mask, end_mask, eorx; 
-	unsigned long fgx = fgcolor, bgx = bgcolor, pad, bpp = p->var.bits_per_pixel;
-	unsigned long tmp = (1 << bpp) - 1;
-	unsigned long ppw = BITS_PER_LONG/bpp, ppos;
+	unsigned long fgx = fgcolor, bgx = bgcolor, bpp = p->var.bits_per_pixel;
+	unsigned long ppw = BITS_PER_LONG/bpp, spitch = (image->width + 7)/8;
+	unsigned long bit_mask, end_mask, eorx, shift;
+	char *s = image->data, *src;
 	unsigned long *dst;
 	u32 *tab = NULL;
-	char *src = image->data;
+	int i, j, k;
 		
-	switch (ppw) {
-	case 4:
+	switch (bpp) {
+	case 8:
 		tab = cfb_tab8;
 		break;
-	case 2:
+	case 16:
 		tab = cfb_tab16;
 		break;
-	case 1:
+	case 32:
 		tab = cfb_tab32;
 		break;
 	}
@@ -254,56 +259,39 @@ static inline void fast_imageblit(struct fb_image *image, struct fb_info *p, u8 
 		bgx |= bgcolor;
 	}
 	
-	n = ((image->width + 7) / 8);
-	pad = (n * 8) - image->width;
-	n = image->width % ppw;
-	
 	bit_mask = (1 << ppw) - 1;
 	eorx = fgx ^ bgx;
-
 	k = image->width/ppw;
 
 	for (i = image->height; i--; ) {
-		dst = (unsigned long *) dst1;
+		dst = (unsigned long *) dst1, shift = 8; src = s;
 		
 		for (j = k; j--; ) {
-			l -= ppw;
-			end_mask = tab[(*src >> l) & bit_mask]; 
+			shift -= ppw;
+			end_mask = tab[(*src >> shift) & bit_mask];
 			FB_WRITEL((end_mask & eorx)^bgx, dst++);
-			if (!l) { l = 8; src++; }
+			if (!shift) { shift = 8; src++; }		
 		}
-		if (n) {
-			end_mask = 0;	
-			ppos = LEFT_POS(bpp);
-			for (j = n; j > 0; j--) {
-				l--;
-				if (*src & (1 << l))
-					end_mask |= tmp << ppos;
-				NEXT_POS(ppos, bpp);
-				if (!l) { l = 8; src++; }
-			}
-			FB_WRITEL((end_mask & eorx)^bgx, dst++);
-		}
-		l -= pad;		
-		dst1 += p->fix.line_length;	
+		dst1 += p->fix.line_length;
+		s += spitch;
 	}
 }	
 	
 void cfb_imageblit(struct fb_info *p, struct fb_image *image)
 {
-	int x2, y2, vxres, vyres;
 	unsigned long fgcolor, bgcolor, start_index, bitstart, pitch_index = 0;
 	unsigned long bpl = sizeof(unsigned long), bpp = p->var.bits_per_pixel;
+	int x2, y2, vxres, vyres;
 	u8 *dst1;
 
 	vxres = p->var.xres_virtual;
 	vyres = p->var.yres_virtual;
 	/* 
-	 * We could use hardware clipping but on many cards you get around hardware
-	 * clipping by writing to framebuffer directly like we are doing here. 
+	 * We could use hardware clipping but on many cards you get around
+	 * hardware clipping by writing to framebuffer directly like we are
+	 * doing here. 
 	 */
-	if (image->dx > vxres ||
-	    image->dy > vyres)
+	if (image->dx > vxres || image->dy > vyres)
 		return;
 
 	x2 = image->dx + image->width;
@@ -323,18 +311,22 @@ void cfb_imageblit(struct fb_info *p, struct fb_image *image)
 	bitstart &= ~(bpl - 1);
 	dst1 = p->screen_base + bitstart;
 
+	if (p->fbops->fb_sync)
+		p->fbops->fb_sync(p);
+
 	if (image->depth == 1) {
 		if (p->fix.visual == FB_VISUAL_TRUECOLOR ||
 		    p->fix.visual == FB_VISUAL_DIRECTCOLOR) {
-			fgcolor = ((u32 *)(p->pseudo_palette))[image->fg_color];
-			bgcolor = ((u32 *)(p->pseudo_palette))[image->bg_color];
+			fgcolor = ((u32*)(p->pseudo_palette))[image->fg_color];
+			bgcolor = ((u32*)(p->pseudo_palette))[image->bg_color];
 		} else {
 			fgcolor = image->fg_color;
 			bgcolor = image->bg_color;
 		}	
 		
 		if (BITS_PER_LONG % bpp == 0 && !start_index && !pitch_index && 
-		    bpp >= 8 && bpp <= 32 && (image->width & 7) == 0) 
+		    ((image->width & (BITS_PER_LONG/bpp-1)) == 0) &&
+		    bpp >= 8 && bpp <= 32) 			
 			fast_imageblit(image, p, dst1, fgcolor, bgcolor);
 		else 
 			slow_imageblit(image, p, dst1, fgcolor, bgcolor, start_index, pitch_index);

@@ -14,10 +14,12 @@
 #include <linux/sunrpc/auth.h>
 
 #define NFS_NGROUPS	16
+
 struct unx_cred {
 	struct rpc_cred		uc_base;
-	uid_t			uc_fsuid;
-	gid_t			uc_gid, uc_fsgid;
+	gid_t			uc_gid;
+	uid_t			uc_puid;		/* process uid */
+	gid_t			uc_pgid;		/* process gid */
 	gid_t			uc_gids[NFS_NGROUPS];
 };
 #define uc_uid			uc_base.cr_uid
@@ -36,7 +38,7 @@ struct unx_cred {
 static struct rpc_credops	unix_credops;
 
 static struct rpc_auth *
-unx_create(struct rpc_clnt *clnt)
+unx_create(struct rpc_clnt *clnt, rpc_authflavor_t flavor)
 {
 	struct rpc_auth	*auth;
 
@@ -62,13 +64,13 @@ unx_destroy(struct rpc_auth *auth)
 }
 
 static struct rpc_cred *
-unx_create_cred(int flags)
+unx_create_cred(struct rpc_auth *auth, struct auth_cred *acred, int flags)
 {
 	struct unx_cred	*cred;
 	int		i;
 
 	dprintk("RPC:      allocating UNIX cred for uid %d gid %d\n",
-				current->uid, current->gid);
+				acred->uid, acred->gid);
 
 	if (!(cred = (struct unx_cred *) kmalloc(sizeof(*cred), GFP_KERNEL)))
 		return NULL;
@@ -76,20 +78,20 @@ unx_create_cred(int flags)
 	atomic_set(&cred->uc_count, 0);
 	cred->uc_flags = RPCAUTH_CRED_UPTODATE;
 	if (flags & RPC_TASK_ROOTCREDS) {
-		cred->uc_uid = cred->uc_fsuid = 0;
-		cred->uc_gid = cred->uc_fsgid = 0;
+		cred->uc_uid = cred->uc_puid = 0;
+		cred->uc_gid = cred->uc_pgid = 0;
 		cred->uc_gids[0] = NOGROUP;
 	} else {
-		int groups = current->ngroups;
+		int groups = acred->ngroups;
 		if (groups > NFS_NGROUPS)
 			groups = NFS_NGROUPS;
 
-		cred->uc_uid = current->uid;
-		cred->uc_gid = current->gid;
-		cred->uc_fsuid = current->fsuid;
-		cred->uc_fsgid = current->fsgid;
+		cred->uc_uid = acred->uid;
+		cred->uc_gid = acred->gid;
+		cred->uc_puid = current->uid;
+		cred->uc_pgid = current->gid;
 		for (i = 0; i < groups; i++)
-			cred->uc_gids[i] = (gid_t) current->groups[i];
+			cred->uc_gids[i] = (gid_t) acred->groups[i];
 		if (i < NFS_NGROUPS)
 		  cred->uc_gids[i] = NOGROUP;
 	}
@@ -110,7 +112,7 @@ unx_destroy_cred(struct rpc_cred *cred)
  * request root creds (e.g. for NFS swapping).
  */
 static int
-unx_match(struct rpc_cred *rcred, int taskflags)
+unx_match(struct auth_cred *acred, struct rpc_cred *rcred, int taskflags)
 {
 	struct unx_cred	*cred = (struct unx_cred *) rcred;
 	int		i;
@@ -118,22 +120,22 @@ unx_match(struct rpc_cred *rcred, int taskflags)
 	if (!(taskflags & RPC_TASK_ROOTCREDS)) {
 		int groups;
 
-		if (cred->uc_uid != current->uid
-		 || cred->uc_gid != current->gid
-		 || cred->uc_fsuid != current->fsuid
-		 || cred->uc_fsgid != current->fsgid)
+		if (cred->uc_uid != acred->uid
+		 || cred->uc_gid != acred->gid
+		 || cred->uc_puid != current->uid
+		 || cred->uc_pgid != current->gid)
 			return 0;
 
-		groups = current->ngroups;
+		groups = acred->ngroups;
 		if (groups > NFS_NGROUPS)
 			groups = NFS_NGROUPS;
 		for (i = 0; i < groups ; i++)
-			if (cred->uc_gids[i] != (gid_t) current->groups[i])
+			if (cred->uc_gids[i] != (gid_t) acred->groups[i])
 				return 0;
 		return 1;
 	}
-	return (cred->uc_uid == 0 && cred->uc_fsuid == 0
-	     && cred->uc_gid == 0 && cred->uc_fsgid == 0
+	return (cred->uc_uid == 0 && cred->uc_puid == 0
+	     && cred->uc_gid == 0 && cred->uc_pgid == 0
 	     && cred->uc_gids[0] == (gid_t) NOGROUP);
 }
 
@@ -162,12 +164,12 @@ unx_marshal(struct rpc_task *task, u32 *p, int ruid)
 	p += (n + 3) >> 2;
 
 	/* Note: we don't use real uid if it involves raising priviledge */
-	if (ruid && cred->uc_uid != 0 && cred->uc_gid != 0) {
+	if (ruid && cred->uc_puid != 0 && cred->uc_pgid != 0) {
+		*p++ = htonl((u32) cred->uc_puid);
+		*p++ = htonl((u32) cred->uc_pgid);
+	} else {
 		*p++ = htonl((u32) cred->uc_uid);
 		*p++ = htonl((u32) cred->uc_gid);
-	} else {
-		*p++ = htonl((u32) cred->uc_fsuid);
-		*p++ = htonl((u32) cred->uc_fsgid);
 	}
 	hold = p++;
 	for (i = 0; i < 16 && cred->uc_gids[i] != (gid_t) NOGROUP; i++)
@@ -206,7 +208,7 @@ unx_validate(struct rpc_task *task, u32 *p)
 	}
 
 	size = ntohl(*p++);
-	if (size > 400) {
+	if (size > RPC_MAX_AUTH_SIZE) {
 		printk("RPC: giant verf size: %u\n", size);
 		return NULL;
 	}

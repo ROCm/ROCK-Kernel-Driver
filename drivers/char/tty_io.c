@@ -833,6 +833,11 @@ static int init_dev(kdev_t device, struct tty_struct **ret_tty)
 	 * and locked termios may be retained.)
 	 */
 
+	if (!try_module_get(driver->owner)) {
+		retval = -ENODEV;
+		goto end_init;
+	}
+
 	o_tty = NULL;
 	tp = o_tp = NULL;
 	ltp = o_ltp = NULL;
@@ -991,6 +996,7 @@ free_mem_out:
 	free_tty_struct(tty);
 
 fail_no_mem:
+	module_put(driver->owner);
 	retval = -ENOMEM;
 	goto end_init;
 
@@ -1033,6 +1039,7 @@ static void release_mem(struct tty_struct *tty, int idx)
 	tty->magic = 0;
 	(*tty->driver.refcount)--;
 	list_del(&tty->tty_files);
+	module_put(tty->driver.owner);
 	free_tty_struct(tty);
 }
 
@@ -1836,6 +1843,8 @@ static void __do_SAK(void *arg)
 #else
 	struct tty_struct *tty = arg;
 	struct task_struct *p;
+	struct list_head *l;
+	struct pid *pid;
 	int session;
 	int		i;
 	struct file	*filp;
@@ -1848,9 +1857,8 @@ static void __do_SAK(void *arg)
 	if (tty->driver.flush_buffer)
 		tty->driver.flush_buffer(tty);
 	read_lock(&tasklist_lock);
-	for_each_process(p) {
-		if ((p->tty == tty) ||
-		    ((session > 0) && (p->session == session))) {
+	for_each_task_pid(session, PIDTYPE_SID, p, l, pid) {
+		if (p->tty == tty || session > 0) {
 			printk(KERN_NOTICE "SAK: killed process %d"
 			    " (%s): p->session==tty->session\n",
 			    p->pid, p->comm);

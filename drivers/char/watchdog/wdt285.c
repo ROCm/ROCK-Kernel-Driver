@@ -25,7 +25,6 @@
 #include <linux/reboot.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
-#include <linux/smp_lock.h>
 
 #include <asm/irq.h>
 #include <asm/uaccess.h>
@@ -124,10 +123,10 @@ static ssize_t watchdog_write(struct file *file, const char *data, size_t len, l
 static int watchdog_ioctl(struct inode *inode, struct file *file,
 	unsigned int cmd, unsigned long arg)
 {
-	int i;
+	int i, new_margin;
 	static struct watchdog_info ident=
 	{
-		0,
+		WDIOF_SETTIMEOUT,
 		0,
 		"Footbridge Watchdog"
 	};
@@ -145,6 +144,17 @@ static int watchdog_ioctl(struct inode *inode, struct file *file,
 		case WDIOC_KEEPALIVE:
 			watchdog_ping();
 			return 0;
+		case WDIOC_SETTIMEOUT:
+			if (get_user(new_margin, (int *)arg))
+				return -EFAULT;
+			/* Arbitrary, can't find the card's limits */
+			if ((new_marg < 0) || (new_margin > 60))
+				return -EINVAL;
+			soft_margin = new_margin;
+			watchdog_ping();
+			/* Fall */
+		case WDIOC_GETTIMEOUT:
+			return put_user(soft_margin, (int *)arg);
 	}
 }
 
@@ -166,10 +176,15 @@ static struct miscdevice watchdog_miscdev=
 
 static int __init footbridge_watchdog_init(void)
 {
+	int retval;
+
 	if (machine_is_netwinder())
 		return -ENODEV;
 
-	misc_register(&watchdog_miscdev);
+	retval = misc_register(&watchdog_miscdev);
+	if(retval < 0)
+		return retval;
+
 	printk("Footbridge Watchdog Timer: 0.01, timer margin: %d sec\n", 
 	       soft_margin);
 	if (machine_is_cats())

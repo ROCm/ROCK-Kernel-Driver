@@ -19,7 +19,7 @@
 
 #include "pas2.h"
 
-extern spinlock_t lock;
+extern spinlock_t pas_lock;
 
 static int      midi_busy = 0, input_opened = 0;
 static int      my_dev;
@@ -51,11 +51,11 @@ static int pas_midi_open(int dev, int mode,
 	pas_write(0x20 | 0x40,
 		  0x178b);
 
-	spin_lock_irqsave(&lock, flags);
+	spin_lock_irqsave(&pas_lock, flags);
 
 	if ((err = pas_set_intr(0x10)) < 0)
 	{
-		spin_unlock_irqrestore(&lock, flags);
+		spin_unlock_irqrestore(&pas_lock, flags);
 		return err;
 	}
 	/*
@@ -83,7 +83,7 @@ static int pas_midi_open(int dev, int mode,
 
 	pas_write(0xff, 0x1B88);
 
-	spin_unlock_irqrestore(&lock, flags);
+	spin_unlock_irqrestore(&pas_lock, flags);
 
 	midi_busy = 1;
 	qlen = qhead = qtail = 0;
@@ -133,7 +133,7 @@ static int pas_midi_out(int dev, unsigned char midi_byte)
 	 * Drain the local queue first
 	 */
 
-	spin_lock_irqsave(&lock, flags);
+	spin_lock_irqsave(&pas_lock, flags);
 
 	while (qlen && dump_to_midi(tmp_queue[qhead]))
 	{
@@ -141,7 +141,7 @@ static int pas_midi_out(int dev, unsigned char midi_byte)
 		qhead++;
 	}
 
-	spin_unlock_irqrestore(&lock, flags);
+	spin_unlock_irqrestore(&pas_lock, flags);
 
 	/*
 	 *	Output the byte if the local queue is empty.
@@ -158,13 +158,13 @@ static int pas_midi_out(int dev, unsigned char midi_byte)
 	if (qlen >= 256)
 		return 0;	/* Local queue full */
 
-	spin_lock_irqsave(&lock, flags);
+	spin_lock_irqsave(&pas_lock, flags);
 
 	tmp_queue[qtail] = midi_byte;
 	qlen++;
 	qtail++;
 
-	spin_unlock_irqrestore(&lock, flags);
+	spin_unlock_irqrestore(&pas_lock, flags);
 
 	return 1;
 }
@@ -244,7 +244,7 @@ void pas_midi_interrupt(void)
 	}
 	if (stat & (0x08 | 0x10))
 	{
-		spin_lock(&lock);/* called in irq context */
+		spin_lock(&pas_lock);/* called in irq context */
 
 		while (qlen && dump_to_midi(tmp_queue[qhead]))
 		{
@@ -252,7 +252,7 @@ void pas_midi_interrupt(void)
 			qhead++;
 		}
 
-		spin_unlock(&lock);
+		spin_unlock(&pas_lock);
 	}
 	if (stat & 0x40)
 	{

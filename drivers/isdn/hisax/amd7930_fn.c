@@ -804,3 +804,12 @@ Amd7930_init(struct IsdnCardState *cs)
 		}
 	}
 }
+
+int
+amd7930_setup(struct IsdnCardState *cs, struct dc_hw_ops *amd7930_ops,
+	      void (*set_irq_mask)(struct IsdnCardState *, u8 val))
+{
+	cs->dc_hw_ops = amd7930_ops;
+        cs->dc.amd7930.setIrqMask = set_irq_mask;
+	return 0;
+}

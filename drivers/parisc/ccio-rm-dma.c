@@ -74,8 +74,6 @@ static int ccio_dma_supported( struct pci_dev *dev, u64 mask)
 		return(0);
 	}
 
-	dev->dma_mask = mask;   /* save it */
-
 	/* only support 32-bit devices (ie PCI/GSC) */
 	return((int) (mask >= 0xffffffffUL));
 }

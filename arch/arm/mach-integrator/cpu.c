@@ -166,6 +166,7 @@ static struct cpufreq_driver integrator_driver = {
 	.verify		= integrator_verify_speed,
 	.setpolicy	= integrator_set_policy,
 	.policy		= &integrator_policy,
+	.name		= "integrator",
 };
 #endif
 
@@ -227,4 +228,4 @@ static int __init integrator_cpu_init(void)
 	return 0;
 }
 
-core_initcall(integrator_cpu_init);
+arch_initcall(integrator_cpu_init);

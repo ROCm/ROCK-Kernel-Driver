@@ -3025,21 +3025,9 @@ static int rtc32_ioctl(unsigned fd, unsigned cmd, unsigned long arg)
 } 
 
 /* Fix sizeof(sizeof()) breakage */
-#define BLKELVGET_32   _IOR(0x12,106,int)
-#define BLKELVSET_32   _IOW(0x12,107,int)
 #define BLKBSZGET_32   _IOR(0x12,112,int)
 #define BLKBSZSET_32   _IOW(0x12,113,int)
 #define BLKGETSIZE64_32        _IOR(0x12,114,int)
-
-static int do_blkelvget(unsigned int fd, unsigned int cmd, unsigned long arg)
-{
-       return sys_ioctl(fd, BLKELVGET, arg);
-}
-
-static int do_blkelvset(unsigned int fd, unsigned int cmd, unsigned long arg)
-{
-       return sys_ioctl(fd, BLKELVSET, arg);
-}
 
 static int do_blkbszget(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
@@ -4427,9 +4415,6 @@ HANDLE_IOCTL(USBDEVFS_REAPURB32, do_usbdevfs_reapurb)
 HANDLE_IOCTL(USBDEVFS_REAPURBNDELAY32, do_usbdevfs_reapurb)
 HANDLE_IOCTL(USBDEVFS_DISCSIGNAL32, do_usbdevfs_discsignal)
 /* take care of sizeof(sizeof()) breakage */
-/* elevator */
-HANDLE_IOCTL(BLKELVGET_32, do_blkelvget)
-HANDLE_IOCTL(BLKELVSET_32, do_blkelvset)
 /* block stuff */
 HANDLE_IOCTL(BLKBSZGET_32, do_blkbszget)
 HANDLE_IOCTL(BLKBSZSET_32, do_blkbszset)

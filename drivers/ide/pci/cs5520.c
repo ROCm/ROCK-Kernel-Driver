@@ -166,6 +166,8 @@ static int cs5520_tune_chipset(ide_drive_t *drive, u8 xferspeed)
 	/* ATAPI is harder so leave it for now */
 	if(!error && drive->media == ide_disk)
 		error = hwif->ide_dma_on(drive);
+
+	return error;
 }	
 	
 static void cs5520_tune_drive(ide_drive_t *drive, u8 pio)

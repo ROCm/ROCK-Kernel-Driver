@@ -25,6 +25,7 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/console.h>
+#include <linux/kallsyms.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -42,7 +43,7 @@
 #define PRINT_USER_FAULTS /* (turn this on if you want user faults to be */
 			  /*  dumped to the console via printk)          */
 
-static int printbinary(char *buf, unsigned long x, int nbits)
+int printbinary(char *buf, unsigned long x, int nbits)
 {
 	unsigned long mask = 1UL << (nbits - 1);
 	while (mask != 0) {
@@ -192,6 +193,19 @@ void show_trace_task(struct task_struct *tsk)
 
 void die_if_kernel(char *str, struct pt_regs *regs, long err)
 {
+	if (user_mode(regs)) {
+		if (err == 0)
+			return; /* STFU */
+
+		printk(KERN_CRIT "%s (pid %d): %s (code %ld) at " RFMT "\n",
+			current->comm, current->pid, str, err, regs->iaoq[0]);
+#ifdef PRINT_USER_FAULTS
+		/* XXX for debugging only */
+		show_regs(regs);
+#endif
+		return;
+	}
+
 	/* Amuse the user in a SPARC fashion */
 	printk(
 "      _______________________________ \n"
@@ -202,19 +216,6 @@ void die_if_kernel(char *str, struct pt_regs *regs, long err)
 "                 (__)\\       )\\/\\\n"
 "                  U  ||----w |\n"
 "                     ||     ||\n");
-
-	if (user_mode(regs)) {
-#ifdef PRINT_USER_FAULTS
-		if (err == 0)
-			return; /* STFU */
-
-		/* XXX for debugging only */
-		printk(KERN_DEBUG "%s (pid %d): %s (code %ld)\n",
-			current->comm, current->pid, str, err);
-		show_regs(regs);
-#endif
-		return;
-	}
 	
 	/* unlock the pdc lock if necessary */
 	pdc_emergency_unlock();

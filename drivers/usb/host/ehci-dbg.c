@@ -325,7 +325,7 @@ static void qh_lines (struct ehci_qh *qh, char **nextp, unsigned *sizep)
 }
 
 static ssize_t
-show_async (struct device *dev, char *buf, size_t count, loff_t off)
+show_async (struct device *dev, char *buf)
 {
 	struct pci_dev		*pdev;
 	struct ehci_hcd		*ehci;
@@ -334,13 +334,10 @@ show_async (struct device *dev, char *buf, size_t count, loff_t off)
 	char			*next;
 	struct ehci_qh		*qh;
 
-	if (off != 0)
-		return 0;
-
 	pdev = container_of (dev, struct pci_dev, dev);
 	ehci = container_of (pci_get_drvdata (pdev), struct ehci_hcd, hcd);
 	next = buf;
-	size = count;
+	size = PAGE_SIZE;
 
 	/* dumps a snapshot of the async schedule.
 	 * usually empty except for long-term bulk reads, or head.
@@ -358,14 +355,14 @@ show_async (struct device *dev, char *buf, size_t count, loff_t off)
 	}
 	spin_unlock_irqrestore (&ehci->lock, flags);
 
-	return count - size;
+	return PAGE_SIZE - size;
 }
 static DEVICE_ATTR (async, S_IRUGO, show_async, NULL);
 
 #define DBG_SCHED_LIMIT 64
 
 static ssize_t
-show_periodic (struct device *dev, char *buf, size_t count, loff_t off)
+show_periodic (struct device *dev, char *buf)
 {
 	struct pci_dev		*pdev;
 	struct ehci_hcd		*ehci;
@@ -375,8 +372,6 @@ show_periodic (struct device *dev, char *buf, size_t count, loff_t off)
 	char			*next;
 	unsigned		i, tag;
 
-	if (off != 0)
-		return 0;
 	if (!(seen = kmalloc (DBG_SCHED_LIMIT * sizeof *seen, SLAB_ATOMIC)))
 		return 0;
 	seen_count = 0;
@@ -384,7 +379,7 @@ show_periodic (struct device *dev, char *buf, size_t count, loff_t off)
 	pdev = container_of (dev, struct pci_dev, dev);
 	ehci = container_of (pci_get_drvdata (pdev), struct ehci_hcd, hcd);
 	next = buf;
-	size = count;
+	size = PAGE_SIZE;
 
 	temp = snprintf (next, size, "size = %d\n", ehci->periodic_size);
 	size -= temp;
@@ -468,14 +463,14 @@ show_periodic (struct device *dev, char *buf, size_t count, loff_t off)
 	spin_unlock_irqrestore (&ehci->lock, flags);
 	kfree (seen);
 
-	return count - size;
+	return PAGE_SIZE - size;
 }
 static DEVICE_ATTR (periodic, S_IRUGO, show_periodic, NULL);
 
 #undef DBG_SCHED_LIMIT
 
 static ssize_t
-show_registers (struct device *dev, char *buf, size_t count, loff_t off)
+show_registers (struct device *dev, char *buf)
 {
 	struct pci_dev		*pdev;
 	struct ehci_hcd		*ehci;
@@ -485,14 +480,11 @@ show_registers (struct device *dev, char *buf, size_t count, loff_t off)
 	static char		fmt [] = "%*s\n";
 	static char		label [] = "";
 
-	if (off != 0)
-		return 0;
-
 	pdev = container_of (dev, struct pci_dev, dev);
 	ehci = container_of (pci_get_drvdata (pdev), struct ehci_hcd, hcd);
 
 	next = buf;
-	size = count;
+	size = PAGE_SIZE;
 
 	spin_lock_irqsave (&ehci->lock, flags);
 
@@ -568,7 +560,7 @@ show_registers (struct device *dev, char *buf, size_t count, loff_t off)
 
 	spin_unlock_irqrestore (&ehci->lock, flags);
 
-	return count - size;
+	return PAGE_SIZE - size;
 }
 static DEVICE_ATTR (registers, S_IRUGO, show_registers, NULL);
 

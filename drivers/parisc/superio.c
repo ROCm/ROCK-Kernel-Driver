@@ -390,7 +390,7 @@ int superio_fixup_irq(struct pci_dev *pcidev)
 void __devinit
 superio_serial_init(void)
 {
-#ifdef CONFIG_SERIAL
+#ifdef CONFIG_SERIAL_8250
 	struct serial_struct *serial;
 	int retval;
 	
@@ -443,7 +443,7 @@ superio_serial_init(void)
 	retval = register_serial(serial);
 	if (retval < 0)
 		printk(KERN_WARNING "SuperIO: Register Serial #1 failed.\n");
-#endif /* CONFIG_SERIAL */
+#endif /* CONFIG_SERIAL_8250 */
 }
 
 EXPORT_SYMBOL(superio_serial_init);
@@ -504,7 +504,7 @@ static int __devinit superio_probe(struct pci_dev *dev, const struct pci_device_
 #ifdef CONFIG_PARPORT_PC
 		superio_parport_init();
 #endif
-#ifdef CONFIG_SERIAL
+#ifdef CONFIG_SERIAL_8250
 		superio_serial_init();
 #endif
 		/* REVISIT : superio_fdc_init() ? */
@@ -530,6 +530,11 @@ static struct pci_driver superio_driver = {
 
 static int __init superio_modinit(void)
 {
+#ifdef CONFIG_SERIAL_8250
+	extern int serial8250_init(void);
+	serial8250_init();
+#endif
+
 	return pci_module_init(&superio_driver);
 }
 

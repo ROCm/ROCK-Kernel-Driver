@@ -30,11 +30,12 @@
 #include <linux/utsname.h>
 
 #include <linux/sunrpc/clnt.h>
+#include <linux/sunrpc/rpc_pipe_fs.h>
 
 #include <linux/nfs.h>
 
 
-#define RPC_SLACK_SPACE		512	/* total overkill */
+#define RPC_SLACK_SPACE		(1024)	/* total overkill */
 
 #ifdef RPC_DEBUG
 # define RPCDBG_FACILITY	RPCDBG_CALL
@@ -108,8 +109,19 @@ rpc_create_client(struct rpc_xprt *xprt, char *servname,
 
 	rpc_init_rtt(&clnt->cl_rtt, xprt->timeout.to_initval);
 
-	if (!rpcauth_create(flavor, clnt))
+	snprintf(clnt->cl_pathname, sizeof(clnt->cl_pathname),
+			"/%s/clnt%p", clnt->cl_protname, clnt);
+	clnt->cl_dentry = rpc_mkdir(clnt->cl_pathname, clnt);
+	if (IS_ERR(clnt->cl_dentry)) {
+		printk(KERN_INFO "RPC: Couldn't create pipefs entry %s\n",
+				clnt->cl_pathname);
+		goto out_no_path;
+	}
+	if (!rpcauth_create(flavor, clnt)) {
+		printk(KERN_INFO "RPC: Couldn't create auth handle (flavor %u)\n",
+				flavor);
 		goto out_no_auth;
+	}
 
 	/* save the nodename */
 	clnt->cl_nodelen = strlen(system_utsname.nodename);
@@ -123,8 +135,8 @@ out_no_clnt:
 	printk(KERN_INFO "RPC: out of memory in rpc_create_client\n");
 	goto out;
 out_no_auth:
-	printk(KERN_INFO "RPC: Couldn't create auth handle (flavor %u)\n",
-		flavor);
+	rpc_rmdir(clnt->cl_pathname);
+out_no_path:
 	kfree(clnt);
 	clnt = NULL;
 	goto out;
@@ -176,6 +188,7 @@ rpc_destroy_client(struct rpc_clnt *clnt)
 		rpcauth_destroy(clnt->cl_auth);
 		clnt->cl_auth = NULL;
 	}
+	rpc_rmdir(clnt->cl_pathname);
 	if (clnt->cl_xprt) {
 		xprt_destroy(clnt->cl_xprt);
 		clnt->cl_xprt = NULL;
@@ -470,7 +483,7 @@ call_allocate(struct rpc_task *task)
 
 	dprintk("RPC: %4d call_allocate (status %d)\n", 
 				task->tk_pid, task->tk_status);
-	task->tk_action = call_encode;
+	task->tk_action = call_bind;
 	if (task->tk_buffer)
 		return;
 
@@ -510,8 +523,6 @@ call_encode(struct rpc_task *task)
 	dprintk("RPC: %4d call_encode (status %d)\n", 
 				task->tk_pid, task->tk_status);
 
-	task->tk_action = call_bind;
-
 	/* Default buffer setup */
 	bufsiz = task->tk_bufsize >> 1;
 	sndbuf->head[0].iov_base = (void *)task->tk_buffer;
@@ -533,7 +544,8 @@ call_encode(struct rpc_task *task)
 	if (!(p = call_header(task))) {
 		printk(KERN_INFO "RPC: call_header failed, exit EIO\n");
 		rpc_exit(task, -EIO);
-	} else
+		return;
+	}
 	if (encode && (status = encode(req, p, task->tk_msg.rpc_argp)) < 0) {
 		printk(KERN_WARNING "%s: can't encode arguments: %d\n",
 				clnt->cl_protname, -status);
@@ -617,8 +629,17 @@ call_transmit(struct rpc_task *task)
 	task->tk_action = call_status;
 	if (task->tk_status < 0)
 		return;
+	task->tk_status = xprt_prepare_transmit(task);
+	if (task->tk_status < 0)
+		return;
+	/* Encode here so that rpcsec_gss can use correct sequence number. */
+	call_encode(task);
+	if (task->tk_status < 0)
+		return;
 	xprt_transmit(task);
-	if (!task->tk_msg.rpc_proc->p_decode && task->tk_status >= 0) {
+	if (task->tk_status < 0)
+		return;
+	if (!task->tk_msg.rpc_proc->p_decode) {
 		task->tk_action = NULL;
 		rpc_wake_up_task(task);
 	}
@@ -758,7 +779,7 @@ call_decode(struct rpc_task *task)
 		if (RPC_IS_SETUID(task) && task->tk_suid_retry) {
 			dprintk("RPC: %4d retry squashed uid\n", task->tk_pid);
 			task->tk_flags ^= RPC_CALL_REALUID;
-			task->tk_action = call_encode;
+			task->tk_action = call_bind;
 			task->tk_suid_retry--;
 			return;
 		}
@@ -793,13 +814,23 @@ call_refresh(struct rpc_task *task)
 static void
 call_refreshresult(struct rpc_task *task)
 {
+	int status = task->tk_status;
 	dprintk("RPC: %4d call_refreshresult (status %d)\n", 
 				task->tk_pid, task->tk_status);
 
-	if (task->tk_status < 0)
-		rpc_exit(task, -EACCES);
-	else
-		task->tk_action = call_reserve;
+	task->tk_status = 0;
+	task->tk_action = call_reserve;
+	if (status >= 0)
+		return;
+	switch (status) {
+		case -EPIPE:
+			rpc_delay(task, 3*HZ);
+		case -ETIMEDOUT:
+			task->tk_action = call_refresh;
+			break;
+		default:
+			rpc_exit(task, -EACCES);
+	}
 }
 
 /*
@@ -864,7 +895,7 @@ call_verify(struct rpc_task *task)
 			task->tk_garb_retry--;
 			dprintk("RPC: %4d call_verify: retry garbled creds\n",
 							task->tk_pid);
-			task->tk_action = call_encode;
+			task->tk_action = call_bind;
 			return NULL;
 		case RPC_AUTH_TOOWEAK:
 			printk(KERN_NOTICE "call_verify: server requires stronger "
@@ -899,7 +930,7 @@ garbage:
 	if (task->tk_garb_retry) {
 		task->tk_garb_retry--;
 		dprintk(KERN_WARNING "RPC: garbage, retrying %4d\n", task->tk_pid);
-		task->tk_action = call_encode;
+		task->tk_action = call_bind;
 		return NULL;
 	}
 	printk(KERN_WARNING "RPC: garbage, exit EIO\n");

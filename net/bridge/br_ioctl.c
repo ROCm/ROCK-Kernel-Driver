@@ -230,7 +230,7 @@ static int br_ioctl_deviceless(unsigned int cmd,
 	return -EOPNOTSUPP;
 }
 
-DECLARE_MUTEX(ioctl_mutex);
+static DECLARE_MUTEX(ioctl_mutex);
 
 int br_ioctl_deviceless_stub(unsigned long arg)
 {

@@ -1239,6 +1239,12 @@ static int via_rhine_start_tx(struct sk_buff *skb, struct net_device *dev)
 	/* Calculate the next Tx descriptor entry. */
 	entry = np->cur_tx % TX_RING_SIZE;
 
+	if (skb->len < ETH_ZLEN) {
+		skb = skb_padto(skb, ETH_ZLEN);
+		if (skb == NULL)
+			return 0;
+	}
+
 	np->tx_skbuff[entry] = skb;
 
 	if ((np->drv_flags & ReqTxAlign) &&

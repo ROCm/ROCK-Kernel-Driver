@@ -3615,19 +3615,17 @@ __setup("st=", st_setup);
 #endif
 
 /* Driverfs file support */
-static ssize_t st_device_kdev_read(struct device *driverfs_dev, 
-				   char *page, size_t count, loff_t off)
+static ssize_t st_device_kdev_read(struct device *dev, char *page)
 {
 	kdev_t kdev; 
-	kdev.value=(int)(long)driverfs_dev->driver_data;
-	return off ? 0 : sprintf(page, "%x\n",kdev.value);
+	kdev.value=(int)dev->driver_data;
+	return sprintf(page, "%x\n",kdev.value);
 }
 static DEVICE_ATTR(kdev,S_IRUGO,st_device_kdev_read,NULL);
 
-static ssize_t st_device_type_read(struct device *driverfs_dev, 
-				   char *page, size_t count, loff_t off) 
+static ssize_t st_device_type_read(struct device *ev, char * page)
 {
-	return off ? 0 : sprintf (page, "CHR\n");
+	return sprintf (page, "CHR\n");
 }
 static DEVICE_ATTR(type,S_IRUGO,st_device_type_read,NULL);
 

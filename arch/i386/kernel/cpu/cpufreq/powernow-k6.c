@@ -184,6 +184,9 @@ static int __init powernow_k6_init(void)
 
 	driver->verify        = &powernow_k6_verify;
 	driver->setpolicy     = &powernow_k6_setpolicy;
+	driver->init = NULL;
+	driver->exit = NULL;
+	strncpy(driver->name, "powernow-k6", CPUFREQ_NAME_LEN);
 
 	/* cpuinfo and default policy values */
 	driver->policy[0].cpu    = 0;

@@ -77,7 +77,8 @@ lasi_init_irq(struct busdevice *this_lasi)
 
 	/* Resets */
 	/* gsc_writel(0xFFFFFFFF, lasi_base+0x2000);*/	/* Parallel */
-	gsc_writel(0xFFFFFFFF, lasi_base+0x4004);	/* Audio */
+	if(pdc_add_valid(lasi_base+0x4004) == PDC_OK)
+		gsc_writel(0xFFFFFFFF, lasi_base+0x4004);	/* Audio */
 	/* gsc_writel(0xFFFFFFFF, lasi_base+0x5000);*/	/* Serial */ 
 	/* gsc_writel(0xFFFFFFFF, lasi_base+0x6000);*/	/* SCSI */
 	gsc_writel(0xFFFFFFFF, lasi_base+0x7000);	/* LAN */
@@ -184,6 +185,8 @@ lasi_init_chip(struct parisc_device *dev)
 	lasi->version = gsc_readl(lasi->hpa + LASI_VER) & 0xf;
 	printk(KERN_INFO "%s version %d at 0x%lx found.\n",
 		lasi->name, lasi->version, lasi->hpa);
+	snprintf(dev->dev.name, sizeof(dev->dev.name), "%s version %d",
+		 lasi->name, lasi->version);
 
 	/* initialize the chassis LEDs really early */ 
 	lasi_led_init(lasi->hpa);
