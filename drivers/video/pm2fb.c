@@ -190,13 +190,6 @@ inline static void pm2_RDAC_WR(struct pm2fb_par* p, s32 idx, u32 v)
 	pm2_WR(p, index, v);
 }
 
-inline static u32 pm2v_RDAC_RD(struct pm2fb_par* p, s32 idx)
-{
-	pm2_WR(p, PM2VR_RD_INDEX_LOW, idx & 0xff);
-	mb();
-	return pm2_RD(p, PM2VR_RD_INDEXED_DATA);
-}
-
 inline static void pm2v_RDAC_WR(struct pm2fb_par* p, s32 idx, u32 v)
 {
 	pm2_WR(p, PM2VR_RD_INDEX_LOW, idx & 0xff);

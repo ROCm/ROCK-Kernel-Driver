@@ -523,13 +523,6 @@ static inline void writeAttr(int reg, unsigned char val)
 	t_outb(val, 0x3C0);
 }
 
-static inline unsigned char readAttr(int reg)
-{
-	readb(((struct tridentfb_par *)fb_info.par)->io_virt + CRT + 0x0A);	//flip-flop to index
-	t_outb(reg, 0x3C0);
-	return t_inb(0x3C1);
-}
-
 static inline void write3CE(int reg, unsigned char val)
 {
 	t_outb(reg, 0x3CE);
