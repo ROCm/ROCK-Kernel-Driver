@@ -430,7 +430,6 @@ static int shmem_unuse_inode(struct shmem_inode_info *info, swp_entry_t entry, s
 	swp_entry_t *ptr;
 	unsigned long idx;
 	int offset;
-	struct inode *inode;
 
 	idx = 0;
 	ptr = info->i_direct;
@@ -457,54 +456,43 @@ static int shmem_unuse_inode(struct shmem_inode_info *info, swp_entry_t entry, s
 	spin_unlock (&info->lock);
 	return 0;
 found:
-	idx += offset;
-	inode = igrab(&info->vfs_inode);
-	/* move head to start search for next from here */
-	list_move_tail(&shmem_inodes, &info->list);
-	spin_unlock(&shmem_ilock);
-	swap_free(entry);
-	ptr[offset] = (swp_entry_t) {0};
-
-	while (inode && move_from_swap_cache(page, idx, inode->i_mapping)) {
-		/*
-		 * Yield for kswapd, and try again - but we're still
-		 * holding the page lock - ugh! fix this up later on.
-		 * Beware of inode being unlinked or truncated: just
-		 * leave try_to_unuse to delete_from_swap_cache if so.
-		 */
-		spin_unlock(&info->lock);
-		yield();
-		spin_lock(&info->lock);
-		ptr = shmem_swp_entry(info, idx, 0);
-		if (IS_ERR(ptr))
-			break;
+	if (move_from_swap_cache(page, idx + offset,
+			info->vfs_inode.i_mapping) == 0) {
+		ptr[offset] = (swp_entry_t) {0};
+		info->swapped--;
 	}
-
-	info->swapped--;
-	SetPageUptodate(page);
 	spin_unlock(&info->lock);
-	if (inode)
-		iput(inode);
+	SetPageUptodate(page);
+	/*
+	 * Decrement swap count even when the entry is left behind:
+	 * try_to_unuse will skip over mms, then reincrement count.
+	 */
+	swap_free(entry);
 	return 1;
 }
 
 /*
  * shmem_unuse() search for an eventually swapped out shmem page.
- * Note shmem_unuse_inode drops shmem_ilock itself if successful.
  */
-void shmem_unuse(swp_entry_t entry, struct page *page)
+int shmem_unuse(swp_entry_t entry, struct page *page)
 {
 	struct list_head *p;
 	struct shmem_inode_info * info;
+	int found = 0;
 
 	spin_lock (&shmem_ilock);
 	list_for_each(p, &shmem_inodes) {
 		info = list_entry(p, struct shmem_inode_info, list);
 
-		if (info->swapped && shmem_unuse_inode(info, entry, page))
-			return;
+		if (info->swapped && shmem_unuse_inode(info, entry, page)) {
+			/* move head to start search for next from here */
+			list_move_tail(&shmem_inodes, &info->list);
+			found = 1;
+			break;
+		}
 	}
 	spin_unlock (&shmem_ilock);
+	return found;
 }
 
 /*
