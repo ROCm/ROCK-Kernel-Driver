@@ -1614,7 +1614,7 @@ static int sdebug_add_adapter()
                         printk(KERN_ERR "%s: out of memory at line %d\n",
                                __FUNCTION__, __LINE__);
                         error = -ENOMEM;
-			goto clean1;
+			goto clean;
                 }
                 memset(sdbg_devinfo, 0, sizeof(*sdbg_devinfo));
                 sdbg_devinfo->sdbg_host = sdbg_host;
@@ -1634,12 +1634,12 @@ static int sdebug_add_adapter()
         error = device_register(&sdbg_host->dev);
 
         if (error)
-		goto clean2;
+		goto clean;
 
 	++scsi_debug_add_host;
         return error;
 
-clean2:
+clean:
 	list_for_each_safe(lh, lh_sf, &sdbg_host->dev_info_list) {
 		sdbg_devinfo = list_entry(lh, struct sdebug_dev_info,
 					  dev_list);
@@ -1647,7 +1647,6 @@ clean2:
 		kfree(sdbg_devinfo);
 	}
 
-clean1:
 	kfree(sdbg_host);
         return error;
 }
