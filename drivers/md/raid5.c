@@ -1550,7 +1550,8 @@ memory = conf->max_nr_stripes * (sizeof(struct stripe_head) +
 	print_raid5_conf(conf);
 
 	/* Ok, everything is just fine now */
-	return (0);
+	mddev->array_size =  mddev->size * (mddev->raid_disks - 1);
+	return 0;
 abort:
 	if (conf) {
 		print_raid5_conf(conf);

@@ -125,8 +125,6 @@ static ctl_table raid_root_table[] = {
 	{ .ctl_name = 0 }
 };
 
-sector_t md_size[MAX_MD_DEVS];
-
 static struct block_device_operations md_fops;
 
 static struct gendisk *disks[MAX_MD_DEVS];
@@ -286,21 +284,6 @@ static sector_t calc_dev_size(mdk_rdev_t *rdev, unsigned chunk_size)
 	if (chunk_size)
 		size &= ~((sector_t)chunk_size/1024 - 1);
 	return size;
-}
-
-static sector_t zoned_raid_size(mddev_t *mddev)
-{
-	mdk_rdev_t * rdev;
-	struct list_head *tmp;
-
-	/*
-	 * do size and offset calculations.
-	 */
-
-	ITERATE_RDEV(mddev,rdev,tmp)
-		md_size[mdidx(mddev)] += rdev->size;
-
-	return 0;
 }
 
 static int alloc_disk_sb(mdk_rdev_t * rdev)
@@ -1453,87 +1436,6 @@ abort:
 	return 1;
 }
 
-static int device_size_calculation(mddev_t * mddev)
-{
-	int data_disks = 0;
-	unsigned int readahead;
-	struct list_head *tmp;
-	mdk_rdev_t *rdev;
-
-	/*
-	 * Do device size calculation. Bail out if too small.
-	 * (we have to do this after having validated chunk_size,
-	 * because device size has to be modulo chunk_size)
-	 */
-
-	ITERATE_RDEV(mddev,rdev,tmp) {
-		if (rdev->faulty)
-			continue;
-		if (rdev->size < mddev->chunk_size / 1024) {
-			printk(KERN_WARNING
-				"md: Dev %s smaller than chunk_size:"
-				" %lluk < %dk\n",
-				bdev_partition_name(rdev->bdev),
-				(unsigned long long)rdev->size,
-				mddev->chunk_size / 1024);
-			return -EINVAL;
-		}
-	}
-
-	switch (mddev->level) {
-		case LEVEL_MULTIPATH:
-			data_disks = 1;
-			break;
-		case -3:
-			data_disks = 1;
-			break;
-		case -2:
-			data_disks = 1;
-			break;
-		case LEVEL_LINEAR:
-			zoned_raid_size(mddev);
-			data_disks = 1;
-			break;
-		case 0:
-			zoned_raid_size(mddev);
-			data_disks = mddev->raid_disks;
-			break;
-		case 1:
-			data_disks = 1;
-			break;
-		case 4:
-		case 5:
-			data_disks = mddev->raid_disks-1;
-			break;
-		default:
-			printk(KERN_ERR "md: md%d: unsupported raid level %d\n",
-				mdidx(mddev), mddev->level);
-			goto abort;
-	}
-	if (!md_size[mdidx(mddev)])
-		md_size[mdidx(mddev)] = mddev->size * data_disks;
-
-	readahead = (VM_MAX_READAHEAD * 1024) / PAGE_SIZE;
-	if (!mddev->level || (mddev->level == 4) || (mddev->level == 5)) {
-		readahead = (mddev->chunk_size>>PAGE_SHIFT) * 4 * data_disks;
-		if (readahead < data_disks * (MAX_SECTORS>>(PAGE_SHIFT-9))*2)
-			readahead = data_disks * (MAX_SECTORS>>(PAGE_SHIFT-9))*2;
-	} else {
-		// (no multipath branch - it uses the default setting)
-		if (mddev->level == -3)
-			readahead = 0;
-	}
-
-	printk(KERN_INFO "md%d: max total readahead window set to %ldk\n",
-		mdidx(mddev), readahead*(PAGE_SIZE/1024));
-
-	printk(KERN_INFO
-		"md%d: %d data-disks, max readahead per data-disk: %ldk\n",
-		mdidx(mddev), data_disks, readahead/data_disks*(PAGE_SIZE/1024));
-	return 0;
-abort:
-	return 1;
-}
 
 static struct gendisk *md_probe(dev_t dev, int *part, void *data)
 {
@@ -1597,12 +1499,6 @@ static int do_md_run(mddev_t * mddev)
 		return -EBUSY;
 
 	/*
-	 * Resize disks to align partitions size on a given
-	 * chunk size.
-	 */
-	md_size[mdidx(mddev)] = 0;
-
-	/*
 	 * Analyze all RAID superblock(s)
 	 */
 	if (!mddev->raid_disks && analyze_sbs(mddev)) {
@@ -1642,6 +1538,21 @@ static int do_md_run(mddev_t * mddev)
 				chunk_size, PAGE_SIZE);
 			return -EINVAL;
 		}
+
+		/* devices must have minimum size of one chunk */
+		ITERATE_RDEV(mddev,rdev,tmp) {
+			if (rdev->faulty)
+				continue;
+			if (rdev->size < chunk_size / 1024) {
+				printk(KERN_WARNING
+					"md: Dev %s smaller than chunk_size:"
+					" %lluk < %dk\n",
+					bdev_partition_name(rdev->bdev),
+					(unsigned long long)rdev->size,
+					chunk_size / 1024);
+				return -EINVAL;
+			}
+		}
 	}
 
 	if (pnum >= MAX_PERSONALITY) {
@@ -1658,9 +1569,6 @@ static int do_md_run(mddev_t * mddev)
 	}
 #endif
 
-	if (device_size_calculation(mddev))
-		return -EINVAL;
-
 	/*
 	 * Drop all container device buffers, from now on
 	 * the only valid external interface is through the md
@@ -1672,18 +1580,6 @@ static int do_md_run(mddev_t * mddev)
 			continue;
 		sync_blockdev(rdev->bdev);
 		invalidate_bdev(rdev->bdev, 0);
-#if 0
-	/*
-	 * Aside of obvious breakage (code below results in block size set
-	 * according to the sector size of last component instead of the
-	 * maximal sector size), we have more interesting problem here.
-	 * Namely, we actually ought to set _sector_ size for the array
-	 * and that requires per-array request queues.  Disabled for now.
-	 */
-		md_blocksizes[mdidx(mddev)] = 1024;
-		if (bdev_hardsect_size(rdev->bdev) > md_blocksizes[mdidx(mddev)])
-			md_blocksizes[mdidx(mddev)] = bdev_hardsect_size(rdev->bdev);
-#endif
 	}
 
 	md_probe(mdidx(mddev), NULL, NULL);
@@ -1727,8 +1623,8 @@ static int do_md_run(mddev_t * mddev)
 	
 	set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
 	md_wakeup_thread(mddev->thread);
-	set_capacity(disk, md_size[mdidx(mddev)]<<1);
-	return (0);
+	set_capacity(disk, mddev->array_size<<1);
+	return 0;
 }
 
 static int restart_array(mddev_t *mddev)
@@ -1828,7 +1724,7 @@ static int do_md_stop(mddev_t * mddev, int ro)
 
 		export_array(mddev);
 
-		md_size[mdidx(mddev)] = 0;
+		mddev->array_size = 0;
 		disk = disks[mdidx(mddev)];
 		if (disk)
 			set_capacity(disk, 0);
@@ -3052,9 +2948,10 @@ static int md_seq_show(struct seq_file *seq, void *v)
 		if (!list_empty(&mddev->disks)) {
 			if (mddev->pers)
 				seq_printf(seq, "\n      %llu blocks",
-						 (unsigned long long)md_size[mdidx(mddev)]);
+					(unsigned long long)mddev->array_size);
 			else
-				seq_printf(seq, "\n      %llu blocks", (unsigned long long)size);
+				seq_printf(seq, "\n      %llu blocks",
+					(unsigned long long)size);
 		}
 
 		if (mddev->pers) {
@@ -3563,11 +3460,6 @@ struct notifier_block md_notifier = {
 static void md_geninit(void)
 {
 	struct proc_dir_entry *p;
-	int i;
-
-	for(i = 0; i < MAX_MD_DEVS; i++) {
-		md_size[i] = 0;
-	}
 
 	dprintk("md: sizeof(mdp_super_t) = %d\n", (int)sizeof(mdp_super_t));
 
@@ -3682,7 +3574,6 @@ static __exit void md_exit(void)
 module_init(md_init)
 module_exit(md_exit)
 
-EXPORT_SYMBOL(md_size);
 EXPORT_SYMBOL(register_md_personality);
 EXPORT_SYMBOL(unregister_md_personality);
 EXPORT_SYMBOL(md_error);

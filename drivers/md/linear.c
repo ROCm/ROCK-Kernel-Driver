@@ -91,6 +91,8 @@ static int linear_run (mddev_t *mddev)
 
 	conf->smallest = NULL;
 	cnt = 0;
+	mddev->array_size = 0;
+
 	ITERATE_RDEV(mddev,rdev,tmp) {
 		int j = rdev->raid_disk;
 		dev_info_t *disk = conf->disks + j;
@@ -102,6 +104,7 @@ static int linear_run (mddev_t *mddev)
 
 		disk->rdev = rdev;
 		disk->size = rdev->size;
+		mddev->array_size += rdev->size;
 
 		if (!conf->smallest || (disk->size < conf->smallest->size))
 			conf->smallest = disk;
@@ -121,7 +124,7 @@ static int linear_run (mddev_t *mddev)
 		unsigned round;
 		unsigned long base;
 
-		sz = md_size[mdidx(mddev)];
+		sz = mddev->array_size;
 		base = conf->smallest->size;
 		round = sector_div(sz, base);
 		nb_zone = conf->nr_zones = sz + (round ? 1 : 0);
