@@ -643,6 +643,7 @@ struct isp2x00_hostdata {
 	u_char queued;
 	u_char host_id;
         struct timer_list explore_timer;
+	struct id_name_map tempmap[QLOGICFC_MAX_ID + 1];
 };
 
 
@@ -836,21 +837,12 @@ static int isp2x00_make_portdb(struct Scsi_Host *host)
 
 	short param[8];
 	int i, j;
-	struct id_name_map *map; /* base of array [QLOGICFC_MAX_ID + 1] */
-	struct id_name_map *mapx; /* array entry pointer */
 	struct isp2x00_hostdata *hostdata;
 
-	hostdata = (struct isp2x00_hostdata *) host->hostdata;
-
-	map = kmalloc((QLOGICFC_MAX_ID + 1) * sizeof(struct id_name_map), GFP_ATOMIC);
-	if (!map) {
-	        printk("qlogicfc%d : error getting memory -- cannot make port database.\n",
-				hostdata->host_id);
-		goto fini;
-	}
-	memset(map, 0, (QLOGICFC_MAX_ID + 1) * sizeof(struct id_name_map));
-
 	isp2x00_disable_irqs(host);
+
+	hostdata = (struct isp2x00_hostdata *) host->hostdata;
+	memset(hostdata->tempmap, 0, sizeof(hostdata->tempmap));
 
 #if ISP2x00_FABRIC
 	for (i = 0x81; i < QLOGICFC_MAX_ID; i++) {
@@ -876,74 +868,72 @@ static int isp2x00_make_portdb(struct Scsi_Host *host)
 	if (param[0] == MBOX_COMMAND_COMPLETE) {
 		hostdata->port_id = ((u_int) param[3]) << 16;
 		hostdata->port_id |= param[2];
-		map->loop_id = param[1];
-		map->wwn = hostdata->wwn;
+		hostdata->tempmap[0].loop_id = param[1];
+		hostdata->tempmap[0].wwn = hostdata->wwn;
 	}
 	else {
 	        printk("qlogicfc%d : error getting scsi id.\n", hostdata->host_id);
 	}
 
-        for (i = 0, mapx = map; i <= QLOGICFC_MAX_ID; i++, mapx++)
-                mapx->loop_id = map->loop_id;
+        for (i = 0; i <=QLOGICFC_MAX_ID; i++)
+                hostdata->tempmap[i].loop_id = hostdata->tempmap[0].loop_id;
    
-        for (i = 0, j = 1, mapx = map + 1; i <= QLOGICFC_MAX_LOOP_ID; i++) {
+        for (i = 0, j = 1; i <= QLOGICFC_MAX_LOOP_ID; i++) {
                 param[0] = MBOX_GET_PORT_NAME;
 		param[1] = (i << 8) & 0xff00;
 
 		isp2x00_mbox_command(host, param);
 
 		if (param[0] == MBOX_COMMAND_COMPLETE) {
-			mapx->loop_id = i;
-			mapx->wwn = ((u64) (param[2] & 0xff)) << 56;
-			mapx->wwn |= ((u64) ((param[2] >> 8) & 0xff)) << 48;
-			mapx->wwn |= ((u64) (param[3] & 0xff)) << 40;
-			mapx->wwn |= ((u64) ((param[3] >> 8) & 0xff)) << 32;
-			mapx->wwn |= ((u64) (param[6] & 0xff)) << 24;
-			mapx->wwn |= ((u64) ((param[6] >> 8) & 0xff)) << 16;
-			mapx->wwn |= ((u64) (param[7] & 0xff)) << 8;
-			mapx->wwn |= ((u64) ((param[7] >> 8) & 0xff));
+			hostdata->tempmap[j].loop_id = i;
+			hostdata->tempmap[j].wwn = ((u64) (param[2] & 0xff)) << 56;
+			hostdata->tempmap[j].wwn |= ((u64) ((param[2] >> 8) & 0xff)) << 48;
+			hostdata->tempmap[j].wwn |= ((u64) (param[3] & 0xff)) << 40;
+			hostdata->tempmap[j].wwn |= ((u64) ((param[3] >> 8) & 0xff)) << 32;
+			hostdata->tempmap[j].wwn |= ((u64) (param[6] & 0xff)) << 24;
+			hostdata->tempmap[j].wwn |= ((u64) ((param[6] >> 8) & 0xff)) << 16;
+			hostdata->tempmap[j].wwn |= ((u64) (param[7] & 0xff)) << 8;
+			hostdata->tempmap[j].wwn |= ((u64) ((param[7] >> 8) & 0xff));
 
 			j++;
-			mapx++;
+
 		}
 	}
 
 
 #if ISP2x00_FABRIC
-	isp2x00_init_fabric(host, map, j);
+	isp2x00_init_fabric(host, hostdata->tempmap, j);
 #endif
 
-	for (i = 0, mapx = map; i <= QLOGICFC_MAX_ID; i++, mapx++) {
-		struct id_name_map *tmap; /* second array entry pointer */
-		if (mapx->wwn != hostdata->port_db[i].wwn) {
-			for (j = 0, tmap = map; j <= QLOGICFC_MAX_ID; j++, tmap++) {
-				if (tmap->wwn == hostdata->port_db[i].wwn) {
-					hostdata->port_db[i].loop_id = tmap->loop_id;
+	for (i = 0; i <= QLOGICFC_MAX_ID; i++) {
+		if (hostdata->tempmap[i].wwn != hostdata->port_db[i].wwn) {
+			for (j = 0; j <= QLOGICFC_MAX_ID; j++) {
+				if (hostdata->tempmap[j].wwn == hostdata->port_db[i].wwn) {
+					hostdata->port_db[i].loop_id = hostdata->tempmap[j].loop_id;
 					break;
 				}
 			}
 			if (j == QLOGICFC_MAX_ID + 1)
-				hostdata->port_db[i].loop_id = map->loop_id;
+				hostdata->port_db[i].loop_id = hostdata->tempmap[0].loop_id;
 
 			for (j = 0; j <= QLOGICFC_MAX_ID; j++) {
-				if (hostdata->port_db[j].wwn == mapx->wwn || !hostdata->port_db[j].wwn) {
+				if (hostdata->port_db[j].wwn == hostdata->tempmap[i].wwn || !hostdata->port_db[j].wwn) {
 					break;
 				}
 			}
 			if (j == QLOGICFC_MAX_ID + 1)
 				printk("qlogicfc%d : Too many scsi devices, no more room in port map.\n", hostdata->host_id);
 			if (!hostdata->port_db[j].wwn) {
-				hostdata->port_db[j].loop_id = mapx->loop_id;
-				hostdata->port_db[j].wwn = mapx->wwn;
+				hostdata->port_db[j].loop_id = hostdata->tempmap[i].loop_id;
+				hostdata->port_db[j].wwn = hostdata->tempmap[i].wwn;
 			}
 		} else
-			hostdata->port_db[i].loop_id = mapx->loop_id;
+			hostdata->port_db[i].loop_id = hostdata->tempmap[i].loop_id;
 
 	}
 
 	isp2x00_enable_irqs(host);
-	kfree(map);
-fini:
+
 	return 0;
 }
 

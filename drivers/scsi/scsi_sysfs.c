@@ -275,12 +275,8 @@ show_rescan_field (struct device *dev, char *buf)
 static ssize_t
 store_rescan_field (struct device *dev, const char *buf, size_t count) 
 {
-	int ret = ENODEV;
-	struct scsi_device *sdev;
-	sdev = to_scsi_device(dev);
-	if (sdev)
-		ret = scsi_rescan_device(sdev);
-	return ret;
+	scsi_rescan_device(to_scsi_device(dev));
+	return 0;
 }
 
 static DEVICE_ATTR(rescan, S_IRUGO | S_IWUSR, show_rescan_field, store_rescan_field)

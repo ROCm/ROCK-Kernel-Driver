@@ -25,7 +25,6 @@
 #include <asm/processor.h>
 #include <asm/checksum.h>
 #include <linux/interrupt.h>
-#include <asm/softirq.h>
 #include <asm/fpu.h>
 #include <asm/irq.h>
 #include <asm/machvec.h>

@@ -48,7 +48,7 @@ static int pc98_first_bios_param(struct scsi_device *sdev, int *ip)
 int pc98_bios_param(struct scsi_device *sdev, struct block_device *bdev,
 			sector_t capacity, int *ip)
 {
-	static struct Scsi_Host *first_real = first_real_host();
+	struct Scsi_Host *first_real = first_real_host();
 
 	if (sdev->host == first_real && sdev->id < 7 &&
 	    __PC9800SCA_TEST_BIT(PC9800SCA_DISK_EQUIPS, sdev->id))

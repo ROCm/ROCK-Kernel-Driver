@@ -1,26 +1,33 @@
-This module, cifs, is a filesystem that implements the SMB/CIFS protocol, which is the
-protocol used by Windows based operating systems (including Windows 2000 and its successors)
-as well as Samba, OS/2 and many others operating systems and network file server appliances.
-The Cifs VFS filesystem module is designed to work well with servers that implement the newer versions
-(dialects) of the SMB/CIFS protocol such as Samba, the program written by Andrew Tridgell
-that turns any Unix host into a file server for DOS or Windows clients, as well as Windows NT,
-Windows 2000 and its successors.  It is not designed to handle older smb servers well, those that
-implement older versions of the dialect (such as OS/2 or Windows 95), for this purpose use smbfs.  
+This module, cifs, is a filesystem that implements the SMB/CIFS
+protocol, which is the protocol used by Windows based operating systems
+(including Windows 2000 and its successors) as well as Samba, OS/2 and
+many others operating systems and network file server appliances. The
+Cifs VFS filesystem module is designed to work well with servers that
+implement the newer versions (dialects) of the SMB/CIFS protocol such as
+Samba, the program written by Andrew Tridgell that turns any Unix host
+into a file server for DOS or Windows clients, as well as Windows NT,
+Windows 2000 and its successors. It is not designed to handle older smb
+servers well, those that implement older versions of the dialect (such
+as OS/2 or Windows 95), for this purpose use smbfs.
 
-This module can support mounting without a mount helper program.  The mount syntax is:
-        mount //server_ip_address/share_name  /mnt -o user=username,password=your_password
-where "username", "your_password" and "server_ip_address" and "share_name" should be replaced
-with specific values (supplied by the user) e.g.  
-	mount //9.53.216.16/public /mnt -o user=jsmith,password=openup  
+This module can support mounting without a mount helper program. The
+mount syntax is:
+  mount //server_ip/share_name /mnt -o user=username,password=your_password
 
-This cifs implementation is designed to handle network caching (safely) as well as to implement locking,
-large file (64 bit access), distributed file system ("dfs") and other advanced protocol features. It
-also implements the SNIA standard for Unix extensions to CIFS (when communicating with servers such as
-Samba 2.2.3 or later which support it).
+where "username", "your_password" and "server_ip" and "share_name"
+should be replaced with specific values (supplied by the user) e.g.
+  mount //9.53.216.16/public /mnt -o user=jsmith,password=openup
+
+This cifs implementation is designed to handle network caching (safely)
+as well as to implement locking, large file (64 bit access), distributed
+file system ("dfs") and other advanced protocol features. It also
+implements the SNIA standard for Unix extensions to CIFS (when
+communicating with servers such as Samba 2.2.3 or later which support it).
 
 For more information contact sfrench@us.ibm.com
 
-Cifs is an SMB client (or gateway). For more info on the SMB/CIFS protocol and Samba, including
-documentation, please go to http://www.samba.org/ and then on to your nearest mirror.  For more
+Cifs is an SMB client (or gateway). For more info on the SMB/CIFS
+protocol and Samba, including documentation, please go to
+http://www.samba.org/ and then on to your nearest mirror. For more
 information about the cifs vfs, go to the project page at:
 	http://us1.samba.org/samba/Linux_CIFS_client.html

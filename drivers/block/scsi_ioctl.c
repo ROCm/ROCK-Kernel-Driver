@@ -45,7 +45,8 @@ const unsigned char scsi_command_size[8] =
 #define SCSI_SENSE_BUFFERSIZE 64
 #endif
 
-int blk_do_rq(request_queue_t *q, struct block_device *bdev, struct request *rq)
+static int blk_do_rq(request_queue_t *q, struct block_device *bdev, 
+		     struct request *rq)
 {
 	DECLARE_COMPLETION(wait);
 	int err = 0;
@@ -368,6 +369,7 @@ static int sg_scsi_ioctl(request_queue_t *q, struct block_device *bdev,
 		goto error;
 
 	switch (opcode) {
+		case SEND_DIAGNOSTIC:
 		case FORMAT_UNIT:
 			rq->timeout = FORMAT_UNIT_TIMEOUT;
 			break;
@@ -398,7 +400,8 @@ static int sg_scsi_ioctl(request_queue_t *q, struct block_device *bdev,
 	if (in_len)
 		rq->flags |= REQ_RW;
 
-	err = blk_do_rq(q, bdev, rq);
+	blk_do_rq(q, bdev, rq);
+	err = rq->errors & 0xff;	/* only 8 bit SCSI status */
 	if (err) {
 		if (rq->sense_len)
 			if (copy_to_user(sic->data, rq->sense, rq->sense_len))

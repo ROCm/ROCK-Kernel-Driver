@@ -16,7 +16,6 @@
 #include <asm/semaphore.h>
 #include <asm/checksum.h>
 #include <asm/hardirq.h>
-#include <asm/softirq.h>
 #include <asm/current.h>
 
 

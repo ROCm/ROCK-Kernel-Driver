@@ -743,6 +743,7 @@ sclp_tty_init(void)
 
 	memset (&sclp_tty_driver, 0, sizeof(struct tty_driver));
 	sclp_tty_driver.magic = TTY_DRIVER_MAGIC;
+	sclp_tty_driver.owner = THIS_MODULE;
 	sclp_tty_driver.driver_name = "tty_sclp";
 	sclp_tty_driver.name = "ttyS";
 	sclp_tty_driver.name_base = 0;

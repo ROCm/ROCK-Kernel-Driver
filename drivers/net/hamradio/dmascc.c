@@ -285,9 +285,8 @@ static inline unsigned char random(void);
 /* Initialization variables */
 
 static int io[MAX_NUM_DEVS] __initdata = { 0, };
-/* Beware! hw[] is also used in cleanup_module(). If __initdata also applies
-   to modules, we may not declare hw[] as __initdata */
-static struct scc_hardware hw[NUM_TYPES] __initdata = HARDWARE;
+/* Beware! hw[] is also used in cleanup_module(). */
+static struct scc_hardware hw[NUM_TYPES] __initdata_or_module = HARDWARE;
 static char ax25_broadcast[7] __initdata =
   { 'Q'<<1, 'S'<<1, 'T'<<1, ' '<<1, ' '<<1, ' '<<1, '0'<<1 };
 static char ax25_test[7] __initdata =
