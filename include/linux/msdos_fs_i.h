@@ -18,7 +18,7 @@ struct msdos_inode_info {
 	int i_attrs;	/* unused attribute bits */
 	int i_ctime_ms;	/* unused change time in milliseconds */
 	loff_t i_pos;	/* on-disk position of directory entry or 0 */
-	struct list_head i_fat_hash;	/* hash by i_location */
+	struct hlist_node i_fat_hash;	/* hash by i_location */
 	struct inode vfs_inode;
 };
 
