@@ -59,12 +59,6 @@ static int acpi_pm_prepare(u32 state)
 
 	ACPI_FLUSH_CPU_CACHE();
 
-	/* Do arch specific saving of state. */
-	if (state > PM_SUSPEND_STANDBY) {
-		if ((error = acpi_save_state_mem()))
-			goto Err;
-	}
-
 	acpi_enter_sleep_state_prep(acpi_state);
 
 	return 0;
@@ -90,6 +84,15 @@ static int acpi_pm_enter(u32 state)
 	u32 acpi_state = acpi_suspend_states[state];
 
 	ACPI_FLUSH_CPU_CACHE();
+
+	/* Do arch specific saving of state. */
+	if (state > PM_SUSPEND_STANDBY) {
+		int error = acpi_save_state_mem();
+		if (error)
+			return error;
+	}
+
+
 	local_irq_save(flags);
 	switch (state)
 	{
@@ -114,6 +117,15 @@ static int acpi_pm_enter(u32 state)
 	local_irq_restore(flags);
 	printk(KERN_DEBUG "Back to C!\n");
 
+	/* restore processor state
+	 * We should only be here if we're coming back from STR or STD.
+	 * And, in the case of the latter, the memory image should have already
+	 * been loaded from disk.
+	 */
+	if (state > PM_SUSPEND_STANDBY)
+		acpi_restore_state_mem();
+
+
 	return ACPI_SUCCESS(status) ? 0 : -EFAULT;
 }
 
@@ -129,14 +141,6 @@ static int acpi_pm_enter(u32 state)
 static int acpi_pm_finish(u32 state)
 {
 	acpi_leave_sleep_state(state);
-
-	/* restore processor state
-	 * We should only be here if we're coming back from STR or STD.
-	 * And, in the case of the latter, the memory image should have already
-	 * been loaded from disk.
-	 */
-	if (state > ACPI_STATE_S1)
-		acpi_restore_state_mem();
 
 	/* reset firmware waking vector */
 	acpi_set_firmware_waking_vector((acpi_physical_address) 0);
