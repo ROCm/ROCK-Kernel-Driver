@@ -203,10 +203,12 @@ acpi_ut_set_integer_width (
 
 	if (revision <= 1) {
 		acpi_gbl_integer_bit_width = 32;
+		acpi_gbl_integer_nybble_width = 8;
 		acpi_gbl_integer_byte_width = 4;
 	}
 	else {
 		acpi_gbl_integer_bit_width = 64;
+		acpi_gbl_integer_nybble_width = 16;
 		acpi_gbl_integer_byte_width = 8;
 	}
 }

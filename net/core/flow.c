@@ -12,7 +12,6 @@
 #include <linux/random.h>
 #include <linux/init.h>
 #include <linux/slab.h>
-#include <linux/interrupt.h>
 #include <linux/smp.h>
 #include <linux/completion.h>
 #include <linux/percpu.h>
@@ -301,7 +300,8 @@ void flow_cache_flush(void)
 
 	local_bh_disable();
 	smp_call_function(flow_cache_flush_per_cpu, &info, 1, 0);
-	flow_cache_flush_tasklet((unsigned long)&info);
+	if (test_bit(smp_processor_id(), &info.cpumap))
+		flow_cache_flush_tasklet((unsigned long)&info);
 	local_bh_enable();
 
 	wait_for_completion(&info.completion);
@@ -309,12 +309,10 @@ void flow_cache_flush(void)
 	up(&flow_flush_sem);
 }
 
-static void __devinit flow_cache_cpu_online(int cpu)
+static int __devinit flow_cache_cpu_prepare(int cpu)
 {
 	struct tasklet_struct *tasklet;
 	unsigned long order;
-
-	flow_hash_rnd_recalc(cpu) = 1;
 
 	for (order = 0;
 	     (PAGE_SIZE << order) <
@@ -325,15 +323,28 @@ static void __devinit flow_cache_cpu_online(int cpu)
 	flow_table(cpu) = (struct flow_cache_entry **)
 		__get_free_pages(GFP_KERNEL, order);
 
+	if (!flow_table(cpu))
+		return NOTIFY_BAD;
+
 	memset(flow_table(cpu), 0, PAGE_SIZE << order);
+
+	flow_hash_rnd_recalc(cpu) = 1;
+	flow_count(cpu) = 0;
 
 	tasklet = flow_flush_tasklet(cpu);
 	tasklet_init(tasklet, flow_cache_flush_tasklet, 0);
 
+	return NOTIFY_OK;
+}
+
+static int __devinit flow_cache_cpu_online(int cpu)
+{
 	down(&flow_cache_cpu_sem);
 	set_bit(cpu, &flow_cache_cpu_map);
 	flow_cache_cpu_count++;
 	up(&flow_cache_cpu_sem);
+
+	return NOTIFY_OK;
 }
 
 static int __devinit flow_cache_cpu_notify(struct notifier_block *self,
@@ -342,7 +353,10 @@ static int __devinit flow_cache_cpu_notify(struct notifier_block *self,
 	unsigned long cpu = (unsigned long)cpu;
 	switch (action) {
 	case CPU_UP_PREPARE:
-		flow_cache_cpu_online(cpu);
+		return flow_cache_cpu_prepare(cpu);
+		break;
+	case CPU_ONLINE:
+		return flow_cache_cpu_online(cpu);
 		break;
 	}
 	return NOTIFY_OK;
@@ -354,6 +368,8 @@ static struct notifier_block __devinitdata flow_cache_cpu_nb = {
 
 static int __init flow_cache_init(void)
 {
+	int i;
+
 	flow_cachep = kmem_cache_create("flow_cache",
 					sizeof(struct flow_cache_entry),
 					0, SLAB_HWCACHE_ALIGN,
@@ -371,8 +387,15 @@ static int __init flow_cache_init(void)
 	flow_hash_rnd_timer.expires = jiffies + FLOW_HASH_RND_PERIOD;
 	add_timer(&flow_hash_rnd_timer);
 
-	flow_cache_cpu_online(smp_processor_id());
 	register_cpu_notifier(&flow_cache_cpu_nb);
+	for (i = 0; i < NR_CPUS; i++) {
+		if (!cpu_online(i))
+			continue;
+		if (flow_cache_cpu_prepare(i) == NOTIFY_OK &&
+		    flow_cache_cpu_online(i) == NOTIFY_OK)
+			continue;
+		panic("NET: failed to initialise flow cache hash table\n");
+	}
 
 	return 0;
 }

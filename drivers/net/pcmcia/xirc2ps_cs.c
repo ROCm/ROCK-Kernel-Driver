@@ -358,7 +358,6 @@ static dev_link_t *dev_list;
 
 typedef struct local_info_t {
     dev_link_t link;
-    struct net_device dev;
     dev_node_t node;
     struct net_device_stats stats;
     int card_type;
@@ -432,22 +431,10 @@ get_tuple(int fn, client_handle_t handle, tuple_t *tuple, cisparse_t *parse)
 #define PutByte(reg,value) outb((value), ioaddr+(reg))
 #define PutWord(reg,value) outw((value), ioaddr+(reg))
 
-static void
-busy_loop(u_long len)
-{
-    if (in_interrupt()) {
-	u_long timeout = jiffies + len;
-	u_long flags;
-	save_flags(flags);
-	sti();
-	while (time_before_eq(jiffies, timeout))
-	    ;
-	restore_flags(flags);
-    } else {
-	__set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(len);
-    }
-}
+#define Wait(n) do { \
+	set_current_state(TASK_UNINTERRUPTIBLE); \
+	schedule_timeout(n); \
+} while (0)
 
 /*====== Functions used for debugging =================================*/
 #if defined(PCMCIA_DEBUG) && 0 /* reading regs may change system status */
@@ -619,11 +606,12 @@ xirc2ps_attach(void)
     flush_stale_links();
 
     /* Allocate the device structure */
-    local = kmalloc(sizeof(*local), GFP_KERNEL);
-    if (!local) return NULL;
-    memset(local, 0, sizeof(*local));
-    link = &local->link; dev = &local->dev;
-    link->priv = dev->priv = local;
+    dev = alloc_etherdev(sizeof(local_info_t));
+    if (!dev)
+	    return NULL;
+    local = dev->priv;
+    link = &local->link;
+    link->priv = dev;
 
     init_timer(&link->release);
     link->release.function = &xirc2ps_release;
@@ -645,7 +633,6 @@ xirc2ps_attach(void)
     dev->get_stats = &do_get_stats;
     dev->do_ioctl = &do_ioctl;
     dev->set_multicast_list = &set_multicast_list;
-    ether_setup(dev);
     dev->open = &do_open;
     dev->stop = &do_stop;
 #ifdef HAVE_TX_TIMEOUT
@@ -684,7 +671,7 @@ xirc2ps_attach(void)
 static void
 xirc2ps_detach(dev_link_t * link)
 {
-    local_info_t *local = link->priv;
+    struct net_device *dev = link->priv;
     dev_link_t **linkp;
 
     DEBUG(0, "detach(0x%p)\n", link);
@@ -706,10 +693,11 @@ xirc2ps_detach(dev_link_t * link)
      */
     del_timer(&link->release);
     if (link->state & DEV_CONFIG) {
-	DEBUG(0, "detach postponed, '%s' still locked\n",
-	      link->dev->dev_name);
-	link->state |= DEV_STALE_LINK;
-	return;
+	xirc2ps_release((unsigned long)link);
+	if (link->state & DEV_STALE_CONFIG) {
+		link->state |= DEV_STALE_LINK;
+		return;
+	}
     }
 
     /* Break the link with Card Services */
@@ -719,8 +707,8 @@ xirc2ps_detach(dev_link_t * link)
     /* Unlink device structure, free it */
     *linkp = link->next;
     if (link->dev)
-	unregister_netdev(&local->dev);
-    kfree(local);
+	unregister_netdev(dev);
+    kfree(dev);
 
 } /* xirc2ps_detach */
 
@@ -745,7 +733,8 @@ xirc2ps_detach(dev_link_t * link)
 static int
 set_card_type(dev_link_t *link, const void *s)
 {
-    local_info_t *local = link->priv;
+    struct net_device *dev = link->priv;
+    local_info_t *local = dev->priv;
   #ifdef PCMCIA_DEBUG
     unsigned cisrev = ((const unsigned char *)s)[2];
   #endif
@@ -839,8 +828,8 @@ static void
 xirc2ps_config(dev_link_t * link)
 {
     client_handle_t handle = link->handle;
-    local_info_t *local = link->priv;
-    struct net_device *dev = &local->dev;
+    struct net_device *dev = link->priv;
+    local_info_t *local = dev->priv;
     tuple_t tuple;
     cisparse_t parse;
     ioaddr_t ioaddr;
@@ -1195,11 +1184,10 @@ static void
 xirc2ps_release(u_long arg)
 {
     dev_link_t *link = (dev_link_t *) arg;
-    local_info_t *local = link->priv;
-    struct net_device *dev = &local->dev;
 
     DEBUG(0, "release(0x%p)\n", link);
 
+#if 0
     /*
      * If the device is currently in use, we won't release until it
      * is actually closed.
@@ -1210,8 +1198,10 @@ xirc2ps_release(u_long arg)
 	link->state |= DEV_STALE_CONFIG;
 	return;
     }
+#endif
 
     if (link->win) {
+	struct net_device *dev = link->priv;
 	local_info_t *local = dev->priv;
 	if (local->dingo)
 	    iounmap(local->dingo_ccr - 0x0800);
@@ -1243,8 +1233,7 @@ xirc2ps_event(event_t event, int priority,
 	      event_callback_args_t * args)
 {
     dev_link_t *link = args->client_data;
-    local_info_t *lp = link->priv;
-    struct net_device *dev = &lp->dev;
+    struct net_device *dev = link->priv;
 
     DEBUG(0, "event(%d)\n", (int)event);
 
@@ -1779,12 +1768,12 @@ hardreset(struct net_device *dev)
     SelectPage(4);
     udelay(1);
     PutByte(XIRCREG4_GPR1, 0);	     /* clear bit 0: power down */
-    busy_loop(HZ/25);		     /* wait 40 msec */
+    Wait(HZ/25);		     /* wait 40 msec */
     if (local->mohawk)
 	PutByte(XIRCREG4_GPR1, 1);	 /* set bit 0: power up */
     else
 	PutByte(XIRCREG4_GPR1, 1 | 4);	 /* set bit 0: power up, bit 2: AIC */
-    busy_loop(HZ/50);		     /* wait 20 msec */
+    Wait(HZ/50);		     /* wait 20 msec */
 }
 
 static void
@@ -1798,9 +1787,9 @@ do_reset(struct net_device *dev, int full)
 
     hardreset(dev);
     PutByte(XIRCREG_CR, SoftReset); /* set */
-    busy_loop(HZ/50);		     /* wait 20 msec */
+    Wait(HZ/50);		     /* wait 20 msec */
     PutByte(XIRCREG_CR, 0);	     /* clear */
-    busy_loop(HZ/25);		     /* wait 40 msec */
+    Wait(HZ/25);		     /* wait 40 msec */
     if (local->mohawk) {
 	SelectPage(4);
 	/* set pin GP1 and GP2 to output  (0x0c)
@@ -1811,7 +1800,7 @@ do_reset(struct net_device *dev, int full)
     }
 
     /* give the circuits some time to power up */
-    busy_loop(HZ/2);		/* about 500ms */
+    Wait(HZ/2);		/* about 500ms */
 
     local->last_ptr_value = 0;
     local->silicon = local->mohawk ? (GetByte(XIRCREG4_BOV) & 0x70) >> 4
@@ -1830,7 +1819,7 @@ do_reset(struct net_device *dev, int full)
 	SelectPage(0x42);
 	PutByte(XIRCREG42_SWC1, 0x80);
     }
-    busy_loop(HZ/25);		     /* wait 40 msec to let it complete */
+    Wait(HZ/25);		     /* wait 40 msec to let it complete */
 
   #ifdef PCMCIA_DEBUG
     if (pc_debug) {
@@ -1889,7 +1878,7 @@ do_reset(struct net_device *dev, int full)
 	    printk(KERN_INFO "%s: MII selected\n", dev->name);
 	    SelectPage(2);
 	    PutByte(XIRCREG2_MSR, GetByte(XIRCREG2_MSR) | 0x08);
-	    busy_loop(HZ/50);
+	    Wait(HZ/50);
 	} else {
 	    printk(KERN_INFO "%s: MII detected; using 10mbs\n",
 		   dev->name);
@@ -1898,7 +1887,7 @@ do_reset(struct net_device *dev, int full)
 		PutByte(XIRCREG42_SWC1, 0xC0);
 	    else  /* enable 10BaseT */
 		PutByte(XIRCREG42_SWC1, 0x80);
-	    busy_loop(HZ/25);	/* wait 40 msec to let it complete */
+	    Wait(HZ/25);	/* wait 40 msec to let it complete */
 	}
 	if (full_duplex)
 	    PutByte(XIRCREG1_ECR, GetByte(XIRCREG1_ECR | FullDuplex));
@@ -1991,7 +1980,7 @@ init_mii(struct net_device *dev)
 	 * Fixme: Better to use a timer here!
 	 */
 	for (i=0; i < 35; i++) {
-	    busy_loop(HZ/10);	 /* wait 100 msec */
+	    Wait(HZ/10);	 /* wait 100 msec */
 	    status = mii_rd(ioaddr,  0, 1);
 	    if ((status & 0x0020) && (status & 0x0004))
 		break;
@@ -2083,12 +2072,8 @@ exit_xirc2ps_cs(void)
 {
 	pcmcia_unregister_driver(&xirc2ps_cs_driver);
 
-	while (dev_list) {
-		if (dev_list->state & DEV_CONFIG)
-			xirc2ps_release((u_long)dev_list);
-		if (dev_list)	/* xirc2ps_release() might already have detached... */
-			xirc2ps_detach(dev_list);
-	}
+	while (dev_list)
+		xirc2ps_detach(dev_list);
 }
 
 module_init(init_xirc2ps_cs);

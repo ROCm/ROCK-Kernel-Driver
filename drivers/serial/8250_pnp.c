@@ -315,19 +315,6 @@ static const struct pnp_device_id pnp_dev_table[] = {
 
 MODULE_DEVICE_TABLE(pnp, pnp_dev_table);
 
-static inline void avoid_irq_share(struct pnp_dev *dev)
-{
-	unsigned int map = 0x1FF8;
-	struct pnp_irq *irq;
-	struct pnp_resources *res = dev->possible;
-
-	serial8250_get_irq_map(&map);
-
-	for ( ; res; res = res->dep)
-		for (irq = res->irq; irq; irq = irq->next)
-			irq->map = map;
-}
-
 static char *modem_names[] __devinitdata = {
 	"MODEM", "Modem", "modem", "FAX", "Fax", "fax",
 	"56K", "56k", "K56", "33.6", "28.8", "14.4",
@@ -346,6 +333,29 @@ static int __devinit check_name(char *name)
 	return 0;
 }
 
+static int __devinit check_resources(struct pnp_option *option)
+{
+	struct pnp_option *tmp;
+	if (!option)
+		return 0;
+
+	for (tmp = option; tmp; tmp = tmp->next) {
+		struct pnp_port *port;
+		for (port = tmp->port; port; port = port->next)
+			if ((port->size == 8) &&
+			    ((port->min == 0x2f8) ||
+			     (port->min == 0x3f8) ||
+			     (port->min == 0x2e8) ||
+#ifdef CONFIG_X86_PC9800
+			     (port->min == 0x8b0) ||
+#endif
+			     (port->min == 0x3e8)))
+				return 1;
+	}
+
+	return 0;
+}
+
 /*
  * Given a complete unknown PnP device, try to use some heuristics to
  * detect modems. Currently use such heuristic set:
@@ -357,30 +367,16 @@ static int __devinit check_name(char *name)
  * PnP modems, alternatively we must hardcode all modems in pnp_devices[]
  * table.
  */
-static int serial_pnp_guess_board(struct pnp_dev *dev, int *flags)
+static int __devinit serial_pnp_guess_board(struct pnp_dev *dev, int *flags)
 {
-	struct pnp_resources *res = dev->possible;
-	struct pnp_resources *resa;
-
 	if (!(check_name(dev->dev.name) || (dev->card && check_name(dev->card->dev.name))))
 		return -ENODEV;
 
-	if (!res)
-		return -ENODEV;
+	if (check_resources(dev->independent))
+		return 0;
 
-	for (resa = res->dep; resa; resa = resa->dep) {
-		struct pnp_port *port;
-		for (port = res->port; port; port = port->next)
-			if ((port->size == 8) &&
-			    ((port->min == 0x2f8) ||
-			     (port->min == 0x3f8) ||
-			     (port->min == 0x2e8) ||
-#ifdef CONFIG_X86_PC9800
-			     (port->min == 0x8b0) ||
-#endif
-			     (port->min == 0x3e8)))
-				return 0;
-	}
+	if (check_resources(dev->dependent))
+		return 0;
 
 	return -ENODEV;
 }
@@ -395,8 +391,6 @@ serial_pnp_probe(struct pnp_dev * dev, const struct pnp_device_id *dev_id)
 		if (ret < 0)
 			return ret;
 	}
-	if (flags & SPCI_FL_NO_SHIRQ)
-		avoid_irq_share(dev);
 	memset(&serial_req, 0, sizeof(serial_req));
 	serial_req.irq = pnp_irq(dev,0);
 	serial_req.port = pnp_port_start(dev, 0);

@@ -134,7 +134,7 @@ acpi_ex_system_do_stall (
 
 		acpi_ex_exit_interpreter ();
 
-		acpi_os_stall (how_long);
+		acpi_os_sleep (0, (how_long / 1000) + 1);
 
 		/* And now we must get the interpreter again */
 
@@ -142,7 +142,7 @@ acpi_ex_system_do_stall (
 	}
 
 	else {
-		acpi_os_sleep (0, (how_long / 1000) + 1);
+		acpi_os_stall (how_long);
 	}
 
 	return (status);

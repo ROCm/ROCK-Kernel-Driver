@@ -156,7 +156,7 @@ EXPORT_SYMBOL(sys_exit);
 EXPORT_SYMBOL(sys_write);
 EXPORT_SYMBOL(sys_read);
 EXPORT_SYMBOL(sys_lseek);
-EXPORT_SYMBOL(__kernel_execve);
+EXPORT_SYMBOL(execve);
 EXPORT_SYMBOL(sys_setsid);
 EXPORT_SYMBOL(sys_wait4);
 

@@ -623,15 +623,20 @@ int arp_process(struct sk_buff *skb)
 	int addr_type;
 	struct neighbour *n;
 
-	/* arp_rcv below verifies the ARP header, verifies the device
-	 * is ARP'able, and linearizes the SKB (if needed).
+	/* arp_rcv below verifies the ARP header and verifies the device
+	 * is ARP'able.
 	 */
 
 	if (in_dev == NULL)
 		goto out;
 
+	/* ARP header, plus 2 device addresses, plus 2 IP addresses.  */
+	if (!pskb_may_pull(skb, (sizeof(struct arphdr) +
+				 (2 * dev->addr_len) +
+				 (2 * sizeof(u32)))))
+		goto out;
+
 	arp = skb->nh.arph;
-	arp_ptr= (unsigned char *)(arp+1);
 
 	switch (dev_type) {
 	default:	
@@ -693,6 +698,7 @@ int arp_process(struct sk_buff *skb)
 /*
  *	Extract fields
  */
+	arp_ptr= (unsigned char *)(arp+1);
 	sha	= arp_ptr;
 	arp_ptr += dev->addr_len;
 	memcpy(&sip, arp_ptr, 4);
@@ -840,11 +846,6 @@ int arp_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 
 	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)
 		goto out_of_mem;
-
-	if (skb_is_nonlinear(skb)) {
-		if (skb_linearize(skb, GFP_ATOMIC) != 0)
-			goto freeskb;
-	}
 
 	return NF_HOOK(NF_ARP, NF_ARP_IN, skb, dev, NULL, arp_process);
 

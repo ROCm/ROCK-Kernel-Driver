@@ -247,14 +247,16 @@ unsigned int arpt_do_table(struct sk_buff **pskb,
 {
 	static const char nulldevname[IFNAMSIZ] = { 0 };
 	unsigned int verdict = NF_DROP;
-	struct arphdr *arp = (*pskb)->nh.arph;
+	struct arphdr *arp;
 	int hotdrop = 0;
 	struct arpt_entry *e, *back;
 	const char *indev, *outdev;
 	void *table_base;
 
-	/* FIXME: Push down to extensions --RR */
-	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
+	/* ARP header, plus 2 device addresses, plus 2 IP addresses.  */
+	if (!pskb_may_pull((*pskb), (sizeof(struct arphdr) +
+				     (2 * (*pskb)->dev->addr_len) +
+				     (2 * sizeof(u32)))))
 		return NF_DROP;
 
 	indev = in ? in->name : nulldevname;
@@ -267,6 +269,7 @@ unsigned int arpt_do_table(struct sk_buff **pskb,
 	e = get_entry(table_base, table->private->hook_entry[hook]);
 	back = get_entry(table_base, table->private->underflow[hook]);
 
+	arp = (*pskb)->nh.arph;
 	do {
 		if (arp_packet_match(arp, (*pskb)->dev, indev, outdev, &e->arp)) {
 			struct arpt_entry_target *t;

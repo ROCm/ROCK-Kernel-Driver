@@ -303,7 +303,7 @@ isdn_tty_cmd_FCLASS1(char **p, modem_info * info)
 	isdn_ctrl c;
 	int par;
 	struct isdn_slot *slot;
-	long flags;
+	unsigned long flags;
 
 	for (c.parm.aux.cmd = 0; c.parm.aux.cmd < 7; c.parm.aux.cmd++)
 		if (!strncmp(p[0], cmd[c.parm.aux.cmd], 2))

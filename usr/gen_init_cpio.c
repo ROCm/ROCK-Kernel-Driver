@@ -56,7 +56,7 @@ static void cpio_trailer(void)
 	const char *name = "TRAILER!!!";
 
 	sprintf(s, "%s%08X%08X%08lX%08lX%08X%08lX"
-	       "%08X%08X%08X%08X%08X%08X%08X",
+	       "%08X%08X%08X%08X%08X%08ZX%08X",
 		"070701",		/* magic */
 		0,			/* ino */
 		0,			/* mode */
@@ -87,7 +87,7 @@ static void cpio_mkdir(const char *name, unsigned int mode,
 	time_t mtime = time(NULL);
 
 	sprintf(s,"%s%08X%08X%08lX%08lX%08X%08lX"
-	       "%08X%08X%08X%08X%08X%08X%08X",
+	       "%08X%08X%08X%08X%08X%08ZX%08X",
 		"070701",		/* magic */
 		ino++,			/* ino */
 		S_IFDIR | mode,		/* mode */
@@ -119,7 +119,7 @@ static void cpio_mknod(const char *name, unsigned int mode,
 		mode |= S_IFCHR;
 
 	sprintf(s,"%s%08X%08X%08lX%08lX%08X%08lX"
-	       "%08X%08X%08X%08X%08X%08X%08X",
+	       "%08X%08X%08X%08X%08X%08ZX%08X",
 		"070701",		/* magic */
 		ino++,			/* ino */
 		mode,			/* mode */
@@ -176,7 +176,7 @@ void cpio_mkfile(const char *filename, const char *location,
 	}
 
 	sprintf(s,"%s%08X%08X%08lX%08lX%08X%08lX"
-	       "%08X%08X%08X%08X%08X%08X%08X",
+	       "%08X%08X%08X%08X%08X%08ZX%08X",
 		"070701",		/* magic */
 		ino++,			/* ino */
 		mode,			/* mode */

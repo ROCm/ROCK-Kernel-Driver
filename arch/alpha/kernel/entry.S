@@ -606,7 +606,8 @@ ret_from_fork:
 	.globl	kernel_thread
 	.ent	kernel_thread
 kernel_thread:
-	ldgp	$gp, 0($27)	/* we can be called from a module */
+	/* We can be called from a module.  */
+	ldgp	$gp, 0($27)
 	.prologue 1
 	subq	$sp, SP_OFF+6*8, $sp
 	br	$1, 2f		/* load start address */
@@ -654,26 +655,56 @@ kernel_thread:
 .end kernel_thread
 
 /*
- * __kernel_execve(path, argv, envp, regs)
+ * execve(path, argv, envp)
  */
 	.align	4
-	.globl	__kernel_execve
-	.ent	__kernel_execve
-__kernel_execve:
-	ldgp	$gp, 0($27)	/* we can be called from modules.  */
-	subq	$sp, 16, $sp
-	.frame	$sp, 16, $26, 0
+	.globl	execve
+	.ent	execve
+execve:
+	/* We can be called from a module.  */
+	ldgp	$gp, 0($27)
+	lda	$sp, -(32+SIZEOF_PT_REGS+8)($sp)
+	.frame	$sp, 32+SIZEOF_PT_REGS+8, $26, 0
 	stq	$26, 0($sp)
-	stq	$19, 8($sp)
+	stq	$16, 8($sp)
+	stq	$17, 16($sp)
+	stq	$18, 24($sp)
 	.prologue 1
-	jsr	$26, do_execve
-	bne	$0, 1f		/* error! */
-	ldq	$sp, 8($sp)
+
+	lda	$16, 32($sp)
+	lda	$17, 0
+	lda	$18, SIZEOF_PT_REGS
+	bsr	$26, memset		!samegp
+
+	/* Avoid the HAE being gratuitously wrong, which would cause us
+	   to do the whole turn off interrupts thing and restore it.  */
+	ldq	$2, alpha_mv+HAE_CACHE
+	stq	$2, 152+32($sp)
+
+	ldq	$16, 8($sp)
+	ldq	$17, 16($sp)
+	ldq	$18, 24($sp)
+	lda	$19, 32($sp)
+	bsr	$26, do_execve		!samegp
+
+	ldq	$26, 0($sp)
+	bne	$0, 1f			/* error! */
+
+	/* Move the temporary pt_regs struct from its current location
+	   to the top of the kernel stack frame.  See copy_thread for
+	   details for a normal process.  */
+	lda	$16, 0x4000 - SIZEOF_PT_REGS($8)
+	lda	$17, 32($sp)
+	lda	$18, SIZEOF_PT_REGS
+	bsr	$26, memmove		!samegp
+
+	/* Take that over as our new stack frame and visit userland!  */
+	lda	$sp, 0x4000 - SIZEOF_PT_REGS($8)
 	br	$31, ret_from_sys_call
-1:	ldq	$26, 0($sp)
-	addq	$sp, 16, $sp
+
+1:	lda	$sp, 32+SIZEOF_PT_REGS+8($sp)
 	ret
-.end __kernel_execve
+.end execve
 
 
 /*
