@@ -463,7 +463,7 @@ promcon_font_op(struct vc_data *conp, struct console_font_op *op)
 }
         
 static int
-promcon_blank(struct vc_data *conp, int blank)
+promcon_blank(struct vc_data *conp, int blank, int mode_switch)
 {
 	if (blank) {
 		promcon_puts("\033[H\033[J\033[7m \033[m\b", 15);
