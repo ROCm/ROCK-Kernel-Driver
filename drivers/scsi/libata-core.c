@@ -1717,7 +1717,6 @@ static const char * ata_dma_blacklist [] = {
 	"Compaq CRD-8241B",
 	"CRD-8400B",
 	"CRD-8480B",
-	"CRD-8480C",
 	"CRD-8482B",
  	"CRD-84",
 	"SanDisk SDP3B",
