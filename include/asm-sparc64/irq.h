@@ -12,6 +12,7 @@
 #include <linux/linkage.h>
 #include <linux/kernel.h>
 #include <asm/pil.h>
+#include <asm/ptrace.h>
 
 /* You should not mess with this directly. That's the job of irq.c.
  *
