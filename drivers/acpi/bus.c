@@ -46,8 +46,10 @@ MODULE_LICENSE("GPL");
 
 #define	PREFIX			"ACPI: "
 
+
+extern int			acpi_disabled;
+
 FADT_DESCRIPTOR			acpi_fadt;
-static u8			acpi_disabled;
 struct acpi_device		*acpi_root;
 struct proc_dir_entry		*acpi_root_dir;
 

@@ -46,6 +46,8 @@ struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
 
 unsigned long mmu_cr4_features;
 
+int acpi_disabled __initdata = 0;
+
 int MCA_bus;
 /* for MCA, but anyone else can use it if they want */
 unsigned int machine_id;
@@ -522,7 +524,7 @@ static void __init setup_memory_region(void)
 } /* setup_memory_region */
 
 
-static void __init parse_mem_cmdline (char ** cmdline_p)
+static void __init parse_cmdline_early (char ** cmdline_p)
 {
 	char c = ' ', *to = command_line, *from = COMMAND_LINE;
 	int len = 0;
@@ -569,6 +571,11 @@ static void __init parse_mem_cmdline (char ** cmdline_p)
 				}
 			}
 		}
+
+		/* "acpi=off" disables both ACPI table parsing and interpreter init */
+		if (c == ' ' && !memcmp(from, "acpi=off", 8))
+			acpi_disabled = 1;
+
 		/*
 		 * highmem=size forces highmem to be exactly 'size' bytes.
 		 * This works even on boxes that have no highmem otherwise.
@@ -637,7 +644,7 @@ void __init setup_arch(char **cmdline_p)
 	data_resource.start = virt_to_phys(&_etext);
 	data_resource.end = virt_to_phys(&_edata)-1;
 
-	parse_mem_cmdline(cmdline_p);
+	parse_cmdline_early(cmdline_p);
 
 #define PFN_UP(x)	(((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
 #define PFN_DOWN(x)	((x) >> PAGE_SHIFT)
@@ -840,7 +847,8 @@ void __init setup_arch(char **cmdline_p)
 	/*
 	 * Parse the ACPI tables for possible boot-time SMP configuration.
 	 */
-	acpi_boot_init(*cmdline_p);
+	if (!acpi_disabled)
+		acpi_boot_init(*cmdline_p);
 #endif
 #ifdef CONFIG_X86_LOCAL_APIC
 	if (smp_found_config)
