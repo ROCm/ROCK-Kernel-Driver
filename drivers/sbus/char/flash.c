@@ -161,10 +161,10 @@ static struct miscdevice flash_dev = { FLASH_MINOR, "flash", &flash_fops };
 static int __init flash_init(void)
 {
 	struct sbus_bus *sbus;
-	struct sbus_dev *sdev = 0;
+	struct sbus_dev *sdev = NULL;
 #ifdef CONFIG_PCI
 	struct linux_ebus *ebus;
-	struct linux_ebus_device *edev = 0;
+	struct linux_ebus_device *edev = NULL;
 	struct linux_prom_registers regs[2];
 	int len, nregs;
 #endif

@@ -70,7 +70,7 @@ MODULE_SUPPORTED_DEVICE
  * FLIP		- Inverts display for upside-down mounted board
  * bits 0-4	- 7-segment display contents
  */
-volatile u8* d7s_regs = 0;
+volatile u8* d7s_regs = NULL;
 
 static inline void d7s_free(void)
 {

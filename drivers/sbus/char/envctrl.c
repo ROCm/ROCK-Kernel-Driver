@@ -719,7 +719,7 @@ envctrl_ioctl(struct inode *inode, struct file *file,
 static int
 envctrl_open(struct inode *inode, struct file *file)
 {
-	file->private_data = 0;
+	file->private_data = NULL;
 	return 0;
 }
 
