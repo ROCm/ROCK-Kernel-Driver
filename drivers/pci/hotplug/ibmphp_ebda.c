@@ -171,7 +171,7 @@ static void print_lo_info (void)
 {
 	struct rio_detail *ptr;
 	struct list_head *ptr1;
-	debug ("print_lo_info ---- \n");	
+	debug ("print_lo_info ----\n");	
 	list_for_each (ptr1, &rio_lo_head) {
 		ptr = list_entry (ptr1, struct rio_detail, rio_detail_list);
 		debug ("%s - rio_node_id = %x\n", __FUNCTION__, ptr->rio_node_id);
@@ -188,7 +188,7 @@ static void print_vg_info (void)
 {
 	struct rio_detail *ptr;
 	struct list_head *ptr1;
-	debug ("%s --- \n", __FUNCTION__);
+	debug ("%s ---\n", __FUNCTION__);
 	list_for_each (ptr1, &rio_vg_head) {
 		ptr = list_entry (ptr1, struct rio_detail, rio_detail_list);
 		debug ("%s - rio_node_id = %x\n", __FUNCTION__, ptr->rio_node_id);
@@ -220,7 +220,7 @@ static void __init print_ibm_slot (void)
 
 	list_for_each (ptr1, &ibmphp_slot_head) {
 		ptr = list_entry (ptr1, struct slot, ibm_slot_list);
-		debug ("%s - slot_number: %x \n", __FUNCTION__, ptr->number); 
+		debug ("%s - slot_number: %x\n", __FUNCTION__, ptr->number); 
 	}
 }
 
@@ -228,13 +228,13 @@ static void __init print_opt_vg (void)
 {
 	struct opt_rio *ptr;
 	struct list_head *ptr1;
-	debug ("%s --- \n", __FUNCTION__);
+	debug ("%s ---\n", __FUNCTION__);
 	list_for_each (ptr1, &opt_vg_head) {
 		ptr = list_entry (ptr1, struct opt_rio, opt_rio_list);
-		debug ("%s - rio_type %x \n", __FUNCTION__, ptr->rio_type); 
-		debug ("%s - chassis_num: %x \n", __FUNCTION__, ptr->chassis_num); 
-		debug ("%s - first_slot_num: %x \n", __FUNCTION__, ptr->first_slot_num); 
-		debug ("%s - middle_num: %x \n", __FUNCTION__, ptr->middle_num); 
+		debug ("%s - rio_type %x\n", __FUNCTION__, ptr->rio_type); 
+		debug ("%s - chassis_num: %x\n", __FUNCTION__, ptr->chassis_num); 
+		debug ("%s - first_slot_num: %x\n", __FUNCTION__, ptr->first_slot_num); 
+		debug ("%s - middle_num: %x\n", __FUNCTION__, ptr->middle_num); 
 	}
 }
 
@@ -670,7 +670,7 @@ static char *create_file_name (struct slot * slot_cur)
 	u8 flag = 0;
 
 	if (!slot_cur) {
-		err ("Structure passed is empty \n");
+		err ("Structure passed is empty\n");
 		return NULL;
 	}
 	
@@ -1269,14 +1269,14 @@ static int ibmphp_probe (struct pci_dev * dev, const struct pci_device_id *ids)
 	struct controller *ctrl;
 	struct list_head *tmp;
 
-	debug ("inside ibmphp_probe \n");
+	debug ("inside ibmphp_probe\n");
 	
 	list_for_each (tmp, &ebda_hpc_head) {
 		ctrl = list_entry (tmp, struct controller, ebda_hpc_list);
 		if (ctrl->ctlr_type == 1) {
 			if ((dev->devfn == ctrl->u.pci_ctlr.dev_fun) && (dev->bus->number == ctrl->u.pci_ctlr.bus)) {
 				ctrl->ctrl_dev = dev;
-				debug ("found device!!! \n");
+				debug ("found device!!!\n");
 				debug ("dev->device = %x, dev->subsystem_device = %x\n", dev->device, dev->subsystem_device);
 				return 0;
 			}
