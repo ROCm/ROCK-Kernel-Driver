@@ -135,7 +135,7 @@ struct acpi_processor_flags {
 	u8			bm_control:1;
 	u8			bm_check:1;
 	u8			has_cst:1;
-	u8			reserved:2;
+	u8			power_setup_done:1;
 };
 
 struct acpi_processor {
@@ -210,12 +210,10 @@ ssize_t acpi_processor_write_throttling (
 extern struct file_operations acpi_processor_throttling_fops;
 
 /* in processor_idle.c */
-struct dmi_system_id;
-void acpi_processor_idle (void);
-int acpi_processor_get_power_info (struct acpi_processor *pr);
-extern struct file_operations acpi_processor_power_fops;
-int no_c2c3(struct dmi_system_id *id);
+int acpi_processor_power_init(struct acpi_processor *pr, struct acpi_device *device);
 int acpi_processor_cst_has_changed (struct acpi_processor *pr);
+int acpi_processor_power_exit(struct acpi_processor *pr, struct acpi_device *device);
+
 
 /* in processor_thermal.c */
 int acpi_processor_get_limit_info (struct acpi_processor *pr);

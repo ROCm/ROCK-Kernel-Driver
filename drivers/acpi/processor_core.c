@@ -64,7 +64,6 @@
 #define ACPI_PROCESSOR_DRIVER_NAME	"ACPI Processor Driver"
 #define ACPI_PROCESSOR_DEVICE_NAME	"Processor"
 #define ACPI_PROCESSOR_FILE_INFO	"info"
-#define ACPI_PROCESSOR_FILE_POWER	"power"
 #define ACPI_PROCESSOR_FILE_THROTTLING	"throttling"
 #define ACPI_PROCESSOR_FILE_LIMIT	"limit"
 #define ACPI_PROCESSOR_NOTIFY_PERFORMANCE 0x80
@@ -116,7 +115,6 @@ struct file_operations acpi_processor_info_fops = {
 
 struct acpi_processor	*processors[NR_CPUS];
 struct acpi_processor_errata errata;
-void (*pm_idle_save)(void);
 
 
 /* --------------------------------------------------------------------------
@@ -325,19 +323,6 @@ acpi_processor_add_fs (
 		entry->owner = THIS_MODULE;
 	}
 
-	/* 'power' [R] */
-	entry = create_proc_entry(ACPI_PROCESSOR_FILE_POWER,
-		S_IRUGO, acpi_device_dir(device));
-	if (!entry)
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
-			"Unable to create '%s' fs entry\n",
-			ACPI_PROCESSOR_FILE_POWER));
-	else {
-		entry->proc_fops = &acpi_processor_power_fops;
-		entry->data = acpi_driver_data(device);
-		entry->owner = THIS_MODULE;
-	}
-
 	/* 'throttling' [R/W] */
 	entry = create_proc_entry(ACPI_PROCESSOR_FILE_THROTTLING,
 		S_IFREG|S_IRUGO|S_IWUSR, acpi_device_dir(device));
@@ -378,7 +363,6 @@ acpi_processor_remove_fs (
 
 	if (acpi_device_dir(device)) {
 		remove_proc_entry(ACPI_PROCESSOR_FILE_INFO,acpi_device_dir(device));
-		remove_proc_entry(ACPI_PROCESSOR_FILE_POWER,acpi_device_dir(device));
 		remove_proc_entry(ACPI_PROCESSOR_FILE_THROTTLING,
 			acpi_device_dir(device));
 		remove_proc_entry(ACPI_PROCESSOR_FILE_LIMIT,acpi_device_dir(device));
@@ -527,15 +511,6 @@ acpi_processor_get_info (
 		request_region(pr->throttling.address, 6, "ACPI CPU throttle");
 	}
 
-	if (!errata.smp && (pr->id == 0) && acpi_fadt.cst_cnt) {
-		status = acpi_os_write_port(acpi_fadt.smi_cmd, acpi_fadt.cst_cnt, 8);
-		if (ACPI_FAILURE(status)) {
-			ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
-					  "Notifying BIOS of _CST ability failed\n"));
-		}
-	}
-
-	acpi_processor_get_power_info(pr);
 #ifdef CONFIG_CPU_FREQ
 	acpi_processor_ppc_has_changed(pr);
 #endif
@@ -551,7 +526,6 @@ acpi_processor_start(
 {
 	int			result = 0;
 	acpi_status		status = AE_OK;
-	u32			i = 0;
 	struct acpi_processor	*pr;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_start");
@@ -579,23 +553,7 @@ acpi_processor_start(
 			"Error installing device notify handler\n"));
 	}
 
-	/*
-	 * Install the idle handler if processor power management is supported.
-	 * Note that we use previously set idle handler will be used on
-	 * platforms that only support C1.
-	 */
-	if ((pr->flags.power) && (!boot_option_idle_override)) {
-		printk(KERN_INFO PREFIX "%s [%s] (supports",
-			acpi_device_name(device), acpi_device_bid(device));
-		for (i = 1; i < ACPI_C_STATE_COUNT; i++)
-			if (pr->power.states[i].valid)
-				printk(" C%d", i);
-		printk(")\n");
-		if (pr->id == 0) {
-			pm_idle_save = pm_idle;
-			pm_idle = acpi_processor_idle;
-		}
-	}
+	acpi_processor_power_init(pr, device);
 
 	if (pr->flags.throttling) {
 		printk(KERN_INFO PREFIX "%s [%s] (supports",
@@ -698,16 +656,7 @@ acpi_processor_remove (
 			return_VALUE(-EINVAL);
 	}
 
-	/* Unregister the idle handler when processor #0 is removed. */
-	if (pr->id == 0) {
-		pm_idle = pm_idle_save;
-		/*
-		 * We are about to unload the current idle thread pm callback
-		 * (pm_idle), Wait for all processors to update cached/local
-		 * copies of pm_idle before proceeding.
-		 */
-		synchronize_kernel();
-	}
+	acpi_processor_power_exit(pr, device);
 
 	status = acpi_remove_notify_handler(pr->handle, ACPI_DEVICE_NOTIFY,
 		acpi_processor_notify);
@@ -724,16 +673,6 @@ acpi_processor_remove (
 
 	return_VALUE(0);
 }
-
-static struct dmi_system_id __initdata processor_dmi_table[] = {
-	{ no_c2c3, "IBM ThinkPad R40e", {
-	  DMI_MATCH(DMI_BIOS_VENDOR,"IBM"),
-	  DMI_MATCH(DMI_BIOS_VERSION,"1SET60WW") }},
-	{ no_c2c3, "Medion 41700", {
-	  DMI_MATCH(DMI_BIOS_VENDOR,"Phoenix Technologies LTD"),
-	  DMI_MATCH(DMI_BIOS_VERSION,"R01-A1J") }},
-	{},
-};
 
 #ifdef CONFIG_ACPI_HOTPLUG_CPU
 /****************************************************************************
@@ -1018,10 +957,6 @@ acpi_processor_init (void)
 	acpi_thermal_cpufreq_init();
 
 	acpi_processor_ppc_init();
-
-	dmi_check_system(processor_dmi_table);
-	if (max_cstate < ACPI_C_STATES_MAX)
-		printk(KERN_NOTICE "ACPI: processor limited to max C-state %d\n", max_cstate);
 
 	return_VALUE(0);
 }

@@ -48,10 +48,13 @@
 #define _COMPONENT              ACPI_PROCESSOR_COMPONENT
 ACPI_MODULE_NAME                ("acpi_processor")
 
+#define ACPI_PROCESSOR_FILE_POWER	"power"
+
 #define US_TO_PM_TIMER_TICKS(t)		((t * (PM_TIMER_FREQUENCY/1000)) / 1000)
 #define C2_OVERHEAD			4	/* 1us (3.579 ticks per us) */
 #define C3_OVERHEAD			4	/* 1us (3.579 ticks per us) */
 
+static void (*pm_idle_save)(void);
 module_param_named(max_cstate, max_cstate, uint, 0);
 
 /* --------------------------------------------------------------------------
@@ -64,7 +67,7 @@ module_param_named(max_cstate, max_cstate, uint, 0);
  *
  * To skip this limit, boot/load with a large max_cstate limit.
  */
-int no_c2c3(struct dmi_system_id *id)
+static int no_c2c3(struct dmi_system_id *id)
 {
 	if (max_cstate > ACPI_C_STATES_MAX)
 		return 0;
@@ -78,6 +81,17 @@ int no_c2c3(struct dmi_system_id *id)
 }
 
 
+
+
+static struct dmi_system_id __initdata processor_power_dmi_table[] = {
+	{ no_c2c3, "IBM ThinkPad R40e", {
+	  DMI_MATCH(DMI_BIOS_VENDOR,"IBM"),
+	  DMI_MATCH(DMI_BIOS_VERSION,"1SET60WW") }},
+	{ no_c2c3, "Medion 41700", {
+	  DMI_MATCH(DMI_BIOS_VENDOR,"Phoenix Technologies LTD"),
+	  DMI_MATCH(DMI_BIOS_VERSION,"R01-A1J") }},
+	{},
+};
 
 
 static inline u32
@@ -136,7 +150,7 @@ acpi_processor_power_activate (
 }
 
 
-void acpi_processor_idle (void)
+static void acpi_processor_idle (void)
 {
 	struct acpi_processor	*pr = NULL;
 	struct acpi_processor_cx *cx = NULL;
@@ -730,7 +744,7 @@ static int acpi_processor_power_verify(struct acpi_processor *pr)
 	return (working);
 }
 
-int acpi_processor_get_power_info (
+static int acpi_processor_get_power_info (
 	struct acpi_processor	*pr)
 {
 	unsigned int i;
@@ -791,16 +805,17 @@ int acpi_processor_cst_has_changed (struct acpi_processor *pr)
 		return_VALUE(-ENODEV);
 	}
 
+	if (!pr->flags.power_setup_done)
+		return_VALUE(-ENODEV);
+
 	/* Fall back to the default idle loop */
 	pm_idle = pm_idle_save;
-	pm_idle_save = NULL;
+	synchronize_kernel();
 
 	pr->flags.power = 0;
 	result = acpi_processor_get_power_info(pr);
-	if (pr->flags.power == 1) {
-		pm_idle_save = pm_idle;
+	if ((pr->flags.power == 1) && (pr->flags.power_setup_done))
 		pm_idle = acpi_processor_idle;
-	}
 
 	return_VALUE(result);
 }
@@ -879,10 +894,96 @@ static int acpi_processor_power_open_fs(struct inode *inode, struct file *file)
 						PDE(inode)->data);
 }
 
-struct file_operations acpi_processor_power_fops = {
+static struct file_operations acpi_processor_power_fops = {
 	.open 		= acpi_processor_power_open_fs,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
 
+
+int acpi_processor_power_init(struct acpi_processor *pr, struct acpi_device *device)
+{
+	acpi_status		status = 0;
+	static int		first_run = 0;
+	struct proc_dir_entry	*entry = NULL;
+	unsigned int i;
+
+	ACPI_FUNCTION_TRACE("acpi_processor_power_init");
+
+	if (!first_run) {
+		dmi_check_system(processor_power_dmi_table);
+		if (max_cstate < ACPI_C_STATES_MAX)
+			printk(KERN_NOTICE "ACPI: processor limited to max C-state %d\n", max_cstate);
+		first_run++;
+	}
+
+	if (!errata.smp && (pr->id == 0) && acpi_fadt.cst_cnt) {
+		status = acpi_os_write_port(acpi_fadt.smi_cmd, acpi_fadt.cst_cnt, 8);
+		if (ACPI_FAILURE(status)) {
+			ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
+					  "Notifying BIOS of _CST ability failed\n"));
+		}
+	}
+
+	acpi_processor_get_power_info(pr);
+
+	/*
+	 * Install the idle handler if processor power management is supported.
+	 * Note that we use previously set idle handler will be used on
+	 * platforms that only support C1.
+	 */
+	if ((pr->flags.power) && (!boot_option_idle_override)) {
+		printk(KERN_INFO PREFIX "CPU%d (power states:", pr->id);
+		for (i = 1; i <= pr->power.count; i++)
+			if (pr->power.states[i].valid)
+				printk(" %d[C%d]", i, pr->power.states[i].type);
+		printk(")\n");
+
+		if (pr->id == 0) {
+			pm_idle_save = pm_idle;
+			pm_idle = acpi_processor_idle;
+		}
+	}
+
+	/* 'power' [R] */
+	entry = create_proc_entry(ACPI_PROCESSOR_FILE_POWER,
+		S_IRUGO, acpi_device_dir(device));
+	if (!entry)
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
+			"Unable to create '%s' fs entry\n",
+			ACPI_PROCESSOR_FILE_POWER));
+	else {
+		entry->proc_fops = &acpi_processor_power_fops;
+		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
+	}
+
+	pr->flags.power_setup_done = 1;
+
+	return_VALUE(0);
+}
+
+int acpi_processor_power_exit(struct acpi_processor *pr, struct acpi_device *device)
+{
+	ACPI_FUNCTION_TRACE("acpi_processor_power_exit");
+
+	pr->flags.power_setup_done = 0;
+
+	if (acpi_device_dir(device))
+		remove_proc_entry(ACPI_PROCESSOR_FILE_POWER,acpi_device_dir(device));
+
+	/* Unregister the idle handler when processor #0 is removed. */
+	if (pr->id == 0) {
+		pm_idle = pm_idle_save;
+
+		/*
+		 * We are about to unload the current idle thread pm callback
+		 * (pm_idle), Wait for all processors to update cached/local
+		 * copies of pm_idle before proceeding.
+		 */
+		synchronize_kernel();
+	}
+
+	return_VALUE(0);
+}
