@@ -254,14 +254,3 @@ void devfs_dealloc_devnum(umode_t mode, dev_t devnum)
 	}
 	up(&device_list_mutex);
 }
-
-void devfs_register_partition(struct gendisk *dev, int part)
-{
-	char devname[64];
-
-	sprintf(devname, "%s/part%d", dev->devfs_name, part);
-	devfs_register(NULL, devname, 0,
-			dev->major, dev->first_minor + part,
-			S_IFBLK | S_IRUSR | S_IWUSR,
-			dev->fops, NULL);
-}

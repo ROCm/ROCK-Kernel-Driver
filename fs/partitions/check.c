@@ -251,7 +251,11 @@ void add_partition(struct gendisk *disk, int part, sector_t start, sector_t len)
 
 	p->start_sect = start;
 	p->nr_sects = len;
-	devfs_register_partition(disk, part);
+
+	devfs_mk_bdev(MKDEV(disk->major, disk->first_minor + part),
+			S_IFBLK|S_IRUSR|S_IWUSR,
+			"%s/part%d", disk->devfs_name, part);
+
 	snprintf(p->kobj.name,KOBJ_NAME_LEN,"%s%d",disk->kobj.name,part);
 	p->kobj.parent = &disk->kobj;
 	p->kobj.ktype = &ktype_part;
