@@ -304,7 +304,7 @@ static int eth_configure(int n, void *init, char *mac,
 	}
 
 	memset(device, 0, sizeof(*device));
-	device->list = LIST_HEAD_INIT(device->list);
+	device->list = INIT_LIST_HEAD(device->list);
 	device->index = n;
 
 	spin_lock(&devices_lock);
@@ -362,7 +362,7 @@ static int eth_configure(int n, void *init, char *mac,
 		return 1;
 	lp = dev->priv;
 
-	lp->list = LIST_HEAD_INIT(lp->list);
+	lp->list = INIT_LIST_HEAD(lp->list);
 	spin_lock_init(&lp->lock);
 	lp->dev = dev;
 	lp->fd = -1;
@@ -537,7 +537,7 @@ static int eth_setup(char *str)
 		return(1);
 	}
 
-	new->list = LIST_HEAD_INIT(new->list);
+	new->list = INIT_LIST_HEAD(new->list);
 	new->index = n;
 	new->init = str;
 
