@@ -450,7 +450,7 @@ static int __init rtas_init(void)
 		return 1;
 	}
 
-	entry = create_proc_entry("ppc64/error_log", S_IRUSR, NULL);
+	entry = create_proc_entry("ppc64/rtas/error_log", S_IRUSR, NULL);
 	if (entry)
 		entry->proc_fops = &proc_rtas_log_operations;
 	else
