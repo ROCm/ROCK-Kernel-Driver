@@ -75,29 +75,10 @@ BTFIXUPDEF_CALL(void,  mmu_unmap_dma_area, unsigned long busa, int len)
 #define mmu_unmap_dma_area(ba,len) BTFIXUP_CALL(mmu_unmap_dma_area)(ba,len)
 #define mmu_translate_dvma(ba)     BTFIXUP_CALL(mmu_translate_dvma)(ba)
 
-/*
- */
-BTFIXUPDEF_SIMM13(pmd_shift)
-BTFIXUPDEF_SETHI(pmd_size)
-BTFIXUPDEF_SETHI(pmd_mask)
-
-extern unsigned int pmd_align(unsigned int addr) __attribute_const__;
-extern __inline__ unsigned int pmd_align(unsigned int addr)
-{
-	return ((addr + ~BTFIXUP_SETHI(pmd_mask)) & BTFIXUP_SETHI(pmd_mask));
-}
-
 BTFIXUPDEF_SIMM13(pgdir_shift)
 BTFIXUPDEF_SETHI(pgdir_size)
 BTFIXUPDEF_SETHI(pgdir_mask)
 
-extern unsigned int pgdir_align(unsigned int addr) __attribute_const__;
-extern __inline__ unsigned int pgdir_align(unsigned int addr)
-{
-	return ((addr + ~BTFIXUP_SETHI(pgdir_mask)) & BTFIXUP_SETHI(pgdir_mask));
-}
-
-BTFIXUPDEF_SIMM13(ptrs_per_pte)
 BTFIXUPDEF_SIMM13(ptrs_per_pmd)
 BTFIXUPDEF_SIMM13(ptrs_per_pgd)
 BTFIXUPDEF_SIMM13(user_ptrs_per_pgd)
@@ -112,19 +93,19 @@ BTFIXUPDEF_INT(page_copy)
 BTFIXUPDEF_INT(page_readonly)
 BTFIXUPDEF_INT(page_kernel)
 
-#define PMD_SHIFT       	BTFIXUP_SIMM13(pmd_shift)
-#define PMD_SIZE        	BTFIXUP_SETHI(pmd_size)
-#define PMD_MASK        	BTFIXUP_SETHI(pmd_mask)
-#define PMD_ALIGN(addr) 	pmd_align(addr)
+#define PMD_SHIFT		SUN4C_PMD_SHIFT
+#define PMD_SIZE        	(1UL << PMD_SHIFT)
+#define PMD_MASK        	(~(PMD_SIZE-1))
+#define PMD_ALIGN(__addr) 	(((__addr) + ~PMD_MASK) & PMD_MASK)
 #define PGDIR_SHIFT     	BTFIXUP_SIMM13(pgdir_shift)
 #define PGDIR_SIZE      	BTFIXUP_SETHI(pgdir_size)
 #define PGDIR_MASK      	BTFIXUP_SETHI(pgdir_mask)
-#define PGDIR_ALIGN     	pgdir_align(addr)
-#define PTRS_PER_PTE    	BTFIXUP_SIMM13(ptrs_per_pte)
+#define PTRS_PER_PTE    	1024
 #define PTRS_PER_PMD    	BTFIXUP_SIMM13(ptrs_per_pmd)
 #define PTRS_PER_PGD    	BTFIXUP_SIMM13(ptrs_per_pgd)
 #define USER_PTRS_PER_PGD	BTFIXUP_SIMM13(user_ptrs_per_pgd)
 #define FIRST_USER_PGD_NR	0
+#define PTE_SIZE		(PTRS_PER_PTE*4)
 
 #define PAGE_NONE      __pgprot(BTFIXUP_INT(page_none))
 #define PAGE_SHARED    __pgprot(BTFIXUP_INT(page_shared))
