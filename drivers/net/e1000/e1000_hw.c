@@ -88,6 +88,9 @@ e1000_set_mac_type(struct e1000_hw *hw)
         break;
     case E1000_DEV_ID_82540EM:
     case E1000_DEV_ID_82540EM_LOM:
+    case E1000_DEV_ID_82540EP:
+    case E1000_DEV_ID_82540EP_LOM:
+    case E1000_DEV_ID_82540EP_LP:
         hw->mac_type = e1000_82540;
         break;
     case E1000_DEV_ID_82545EM_COPPER:
@@ -3140,6 +3143,9 @@ e1000_setup_led(struct e1000_hw *hw)
         ledctl |= (E1000_LEDCTL_MODE_LED_OFF << E1000_LEDCTL_LED0_MODE_SHIFT);
         E1000_WRITE_REG(hw, LEDCTL, ledctl);
         break;
+    case E1000_DEV_ID_82540EP:
+    case E1000_DEV_ID_82540EP_LOM:
+    case E1000_DEV_ID_82540EP_LP:
     case E1000_DEV_ID_82540EM:
     case E1000_DEV_ID_82540EM_LOM:
     case E1000_DEV_ID_82545EM_COPPER:
@@ -3173,6 +3179,9 @@ e1000_cleanup_led(struct e1000_hw *hw)
     case E1000_DEV_ID_82544GC_LOM:
         /* No cleanup necessary */
         break;
+    case E1000_DEV_ID_82540EP:
+    case E1000_DEV_ID_82540EP_LOM:
+    case E1000_DEV_ID_82540EP_LP:
     case E1000_DEV_ID_82540EM:
     case E1000_DEV_ID_82540EM_LOM:
     case E1000_DEV_ID_82545EM_COPPER:
@@ -3223,6 +3232,9 @@ e1000_led_on(struct e1000_hw *hw)
         ctrl |= E1000_CTRL_SWDPIO0;
         E1000_WRITE_REG(hw, CTRL, ctrl);
         break;
+    case E1000_DEV_ID_82540EP:
+    case E1000_DEV_ID_82540EP_LOM:
+    case E1000_DEV_ID_82540EP_LP:
     case E1000_DEV_ID_82540EM:
     case E1000_DEV_ID_82540EM_LOM:
     case E1000_DEV_ID_82545EM_COPPER:
@@ -3270,6 +3282,9 @@ e1000_led_off(struct e1000_hw *hw)
         ctrl |= E1000_CTRL_SWDPIO0;
         E1000_WRITE_REG(hw, CTRL, ctrl);
         break;
+    case E1000_DEV_ID_82540EP:
+    case E1000_DEV_ID_82540EP_LOM:
+    case E1000_DEV_ID_82540EP_LP:
     case E1000_DEV_ID_82540EM:
     case E1000_DEV_ID_82540EM_LOM:
     case E1000_DEV_ID_82545EM_COPPER:
