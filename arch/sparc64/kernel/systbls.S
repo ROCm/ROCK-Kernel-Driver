@@ -72,7 +72,7 @@ sys_call_table32:
 /*250*/	.word sys32_mremap, sys32_sysctl, sys_getsid, sys_fdatasync, sys32_nfsservctl
 	.word sys_ni_syscall, compat_clock_settime, compat_clock_gettime, compat_clock_getres, compat_clock_nanosleep
 /*260*/	.word compat_sys_sched_getaffinity, compat_sys_sched_setaffinity, compat_timer_settime, compat_timer_gettime, sys_timer_getoverrun
-	.word sys_timer_delete, sys_timer_create, sys_ni_syscall
+	.word sys_timer_delete, sys32_timer_create, sys_ni_syscall
 
 	/* Now the 64-bit native Linux syscall table. */
 
