@@ -136,17 +136,18 @@
 
 */
 
-static int	verbose = 0;
-static int	major = PG_MAJOR;
-static char	*name = PG_NAME;
-static int      disable = 0;
+static int verbose = 0;
+static int major = PG_MAJOR;
+static char *name = PG_NAME;
+static int disable = 0;
 
-static int drive0[6] = {0,0,0,-1,-1,-1};
-static int drive1[6] = {0,0,0,-1,-1,-1};
-static int drive2[6] = {0,0,0,-1,-1,-1};
-static int drive3[6] = {0,0,0,-1,-1,-1};
+static int drive0[6] = { 0, 0, 0, -1, -1, -1 };
+static int drive1[6] = { 0, 0, 0, -1, -1, -1 };
+static int drive2[6] = { 0, 0, 0, -1, -1, -1 };
+static int drive3[6] = { 0, 0, 0, -1, -1, -1 };
 
-static int (*drives[4])[6] = {&drive0,&drive1,&drive2,&drive3};
+static int (*drives[4])[6] = {
+&drive0, &drive1, &drive2, &drive3};
 static int pg_drive_count;
 
 #define D_PRT   0
@@ -159,7 +160,6 @@ static int pg_drive_count;
 #define DU              (*drives[unit])
 
 /* end of parameters */
-
 
 #include <linux/module.h>
 #include <linux/init.h>
@@ -176,30 +176,32 @@ static int pg_drive_count;
 
 #include "setup.h"
 
-static STT pg_stt[5] = {{"drive0",6,drive0},
-			{"drive1",6,drive1},
-			{"drive2",6,drive2},
-			{"drive3",6,drive3},
-			{"disable",1,&disable}};
+static STT pg_stt[5] = {
+	{"drive0", 6, drive0},
+	{"drive1", 6, drive1},
+	{"drive2", 6, drive2},
+	{"drive3", 6, drive3},
+	{"disable", 1, &disable}
+};
 
-void pg_setup( char *str, int *ints)
-
-{       generic_setup(pg_stt,5,str);
+void pg_setup(char *str, int *ints)
+{
+	generic_setup(pg_stt, 5, str);
 }
 
 #endif
 
-MODULE_PARM(verbose,"i");
-MODULE_PARM(major,"i");
-MODULE_PARM(name,"s");
-MODULE_PARM(drive0,"1-6i");
-MODULE_PARM(drive1,"1-6i");
-MODULE_PARM(drive2,"1-6i");
-MODULE_PARM(drive3,"1-6i");
+MODULE_PARM(verbose, "i");
+MODULE_PARM(major, "i");
+MODULE_PARM(name, "s");
+MODULE_PARM(drive0, "1-6i");
+MODULE_PARM(drive1, "1-6i");
+MODULE_PARM(drive2, "1-6i");
+MODULE_PARM(drive3, "1-6i");
 
 #include "paride.h"
 
-#define PG_SPIN_DEL     50              /* spin delay in micro-seconds  */
+#define PG_SPIN_DEL     50	/* spin delay in micro-seconds  */
 #define PG_SPIN         200
 #define PG_TMO		HZ
 #define PG_RESET_TMO	10*HZ
@@ -216,30 +218,30 @@ MODULE_PARM(drive3,"1-6i");
 #define ATAPI_IDENTIFY		0x12
 
 static int pg_open(struct inode *inode, struct file *file);
-static int pg_release (struct inode *inode, struct file *file);
-static ssize_t pg_read(struct file * filp, char * buf, 
-		       size_t count, loff_t *ppos);
-static ssize_t pg_write(struct file * filp, const char * buf, 
-			size_t count, loff_t *ppos);
+static int pg_release(struct inode *inode, struct file *file);
+static ssize_t pg_read(struct file *filp, char *buf,
+		       size_t count, loff_t * ppos);
+static ssize_t pg_write(struct file *filp, const char *buf,
+			size_t count, loff_t * ppos);
 static int pg_detect(void);
 
-static int pg_identify (int unit, int log);
+static int pg_identify(int unit, int log);
 
 #define PG_NAMELEN      8
 
 struct pg_unit {
-	struct pi_adapter pia;    /* interface to paride layer */
+	struct pi_adapter pia;	/* interface to paride layer */
 	struct pi_adapter *pi;
-	int busy;        	  /* write done, read expected */
-	int start;		  /* jiffies at command start */
-	int dlen;		  /* transfer size requested */
-	unsigned long timeout;	  /* timeout requested */
-	int status;		  /* last sense key */
-	int drive;		  /* drive */
-	unsigned long access;     /* count of active opens ... */
-	int present;		  /* device present ? */
+	int busy;		/* write done, read expected */
+	int start;		/* jiffies at command start */
+	int dlen;		/* transfer size requested */
+	unsigned long timeout;	/* timeout requested */
+	int status;		/* last sense key */
+	int drive;		/* drive */
+	unsigned long access;	/* count of active opens ... */
+	int present;		/* device present ? */
 	char *bufptr;
-	char name[PG_NAMELEN];	  /* pg0, pg1, ... */
+	char name[PG_NAMELEN];	/* pg0, pg1, ... */
 };
 
 struct pg_unit pg[PG_UNITS];
@@ -249,37 +251,39 @@ struct pg_unit pg[PG_UNITS];
 #define PG pg[unit]
 #define PI PG.pi
 
-static char pg_scratch[512];            /* scratch block buffer */
+static char pg_scratch[512];	/* scratch block buffer */
 
 /* kernel glue structures */
 
 static struct file_operations pg_fops = {
-	.owner =	THIS_MODULE,
-	.read =		pg_read,
-	.write =	pg_write,
-	.open =		pg_open,
-	.release =	pg_release,
+	.owner = THIS_MODULE,
+	.read = pg_read,
+	.write = pg_write,
+	.open = pg_open,
+	.release = pg_release,
 };
 
-void pg_init_units( void )
-
-{       int     unit, j;
+void pg_init_units(void)
+{
+	int unit, j;
 
 	pg_drive_count = 0;
-	for (unit=0;unit<PG_UNITS;unit++) {
-		PG.pi = & PG.pia;
-		set_bit( 0, &PG.access );
+	for (unit = 0; unit < PG_UNITS; unit++) {
+		PG.pi = &PG.pia;
+		set_bit(0, &PG.access);
 		PG.busy = 0;
 		PG.present = 0;
 		PG.bufptr = NULL;
 		PG.drive = DU[D_SLV];
 		j = 0;
-		while ((j < PG_NAMELEN-2) && (PG.name[j]=name[j])) j++;
+		while ((j < PG_NAMELEN - 2) && (PG.name[j] = name[j]))
+			j++;
 		PG.name[j++] = '0' + unit;
 		PG.name[j] = 0;
-		if (DU[D_PRT]) pg_drive_count++;
+		if (DU[D_PRT])
+			pg_drive_count++;
 	}
-} 
+}
 
 static inline int status_reg(int unit)
 {
@@ -298,9 +302,9 @@ static inline void write_reg(int unit, int reg, int val)
 
 #define DRIVE           (0xa0+0x10*PG.drive)
 
-static void pg_sleep( int cs )
-
-{       current->state = TASK_INTERRUPTIBLE;
+static void pg_sleep(int cs)
+{
+	current->state = TASK_INTERRUPTIBLE;
 	schedule_timeout(cs);
 }
 
@@ -311,8 +315,8 @@ static int pg_wait(int unit, int go, int stop, unsigned long tmo, char *msg)
 	PG.status = 0;
 
 	j = 0;
-	while ((((r=status_reg(unit))&go) || (stop&&(!(r&stop))))
-	       && time_before(jiffies,tmo)) {
+	while ((((r = status_reg(unit)) & go) || (stop && (!(r & stop))))
+	       && time_before(jiffies, tmo)) {
 		if (j++ < PG_SPIN)
 			udelay(PG_SPIN_DEL);
 		else
@@ -321,7 +325,7 @@ static int pg_wait(int unit, int go, int stop, unsigned long tmo, char *msg)
 
 	to = time_after_eq(jiffies, tmo);
 
-	if ((r&(STAT_ERR&stop)) || to) {
+	if ((r & (STAT_ERR & stop)) || to) {
 		s = read_reg(unit, 7);
 		e = read_reg(unit, 1);
 		p = read_reg(unit, 2);
@@ -342,16 +346,16 @@ static int pg_command(int unit, char *cmd, int dlen, unsigned long tmo)
 
 	pi_connect(PI);
 
-	write_reg(unit, 6,DRIVE);
+	write_reg(unit, 6, DRIVE);
 
-	if (pg_wait(unit, STAT_BUSY|STAT_DRQ, 0, tmo, "before command")) {
+	if (pg_wait(unit, STAT_BUSY | STAT_DRQ, 0, tmo, "before command")) {
 		pi_disconnect(PI);
 		return -1;
 	}
 
-	write_reg(unit, 4,dlen % 256);
-	write_reg(unit, 5,dlen / 256);
-	write_reg(unit, 7,0xa0);          /* ATAPI packet command */
+	write_reg(unit, 4, dlen % 256);
+	write_reg(unit, 5, dlen / 256);
+	write_reg(unit, 7, 0xa0);	/* ATAPI packet command */
 
 	if (pg_wait(unit, STAT_BUSY, STAT_DRQ, tmo, "command DRQ")) {
 		pi_disconnect(PI);
@@ -359,16 +363,17 @@ static int pg_command(int unit, char *cmd, int dlen, unsigned long tmo)
 	}
 
 	if (read_reg(unit, 2) != 1) {
-		printk("%s: command phase error\n",PG.name);
+		printk("%s: command phase error\n", PG.name);
 		pi_disconnect(PI);
 		return -1;
 	}
 
-	pi_write_block(PI,cmd,12);
+	pi_write_block(PI, cmd, 12);
 
 	if (verbose > 1) {
-		printk("%s: Command sent, dlen=%d packet= ", PG.name,dlen);
-		for (k=0;k<12;k++) printk("%02x ",cmd[k]&0xff);
+		printk("%s: Command sent, dlen=%d packet= ", PG.name, dlen);
+		for (k = 0; k < 12; k++)
+			printk("%02x ", cmd[k] & 0xff);
 		printk("\n");
 	}
 	return 0;
@@ -378,154 +383,169 @@ static int pg_completion(int unit, char *buf, unsigned long tmo)
 {
 	int r, d, n, p;
 
-	r = pg_wait(unit, STAT_BUSY, STAT_DRQ|STAT_READY|STAT_ERR,
+	r = pg_wait(unit, STAT_BUSY, STAT_DRQ | STAT_READY | STAT_ERR,
 		    tmo, "completion");
 
 	PG.dlen = 0;
 
-	while (read_reg(unit, 7)&STAT_DRQ) {
-		d = (read_reg(unit, 4)+256*read_reg(unit, 5));
-		n = ((d+3)&0xfffc);
-		p = read_reg(unit, 2)&3;
+	while (read_reg(unit, 7) & STAT_DRQ) {
+		d = (read_reg(unit, 4) + 256 * read_reg(unit, 5));
+		n = ((d + 3) & 0xfffc);
+		p = read_reg(unit, 2) & 3;
 		if (p == 0)
-			pi_write_block(PI,buf,n);
+			pi_write_block(PI, buf, n);
 		if (p == 2)
-			pi_read_block(PI,buf,n);
+			pi_read_block(PI, buf, n);
 		if (verbose > 1)
 			printk("%s: %s %d bytes\n", PG.name,
-			       p?"Read":"Write", n);
-		PG.dlen += (1-p)*d;
+			       p ? "Read" : "Write", n);
+		PG.dlen += (1 - p) * d;
 		buf += d;
-		r = pg_wait(unit, STAT_BUSY, STAT_DRQ|STAT_READY|STAT_ERR,
+		r = pg_wait(unit, STAT_BUSY, STAT_DRQ | STAT_READY | STAT_ERR,
 			    tmo, "completion");
 	}
 
-	pi_disconnect(PI); 
+	pi_disconnect(PI);
 
 	return r;
 }
 
-static int pg_reset( int unit )
-
-{	int	i, k, flg;
-	int	expect[5] = {1,1,1,0x14,0xeb};
+static int pg_reset(int unit)
+{
+	int i, k, flg;
+	int expect[5] = { 1, 1, 1, 0x14, 0xeb };
 
 	pi_connect(PI);
-	write_reg(unit, 6,DRIVE);
-	write_reg(unit, 7,8);
+	write_reg(unit, 6, DRIVE);
+	write_reg(unit, 7, 8);
 
-	pg_sleep(20*HZ/1000);
+	pg_sleep(20 * HZ / 1000);
 
 	k = 0;
-	while ((k++ < PG_RESET_TMO) && (status_reg(unit)&STAT_BUSY))
+	while ((k++ < PG_RESET_TMO) && (status_reg(unit) & STAT_BUSY))
 		pg_sleep(1);
 
 	flg = 1;
-	for(i=0;i<5;i++) flg &= (read_reg(unit, i+1) == expect[i]);
+	for (i = 0; i < 5; i++)
+		flg &= (read_reg(unit, i + 1) == expect[i]);
 
 	if (verbose) {
-		printk("%s: Reset (%d) signature = ",PG.name,k);
-		for (i=0;i<5;i++) printk("%3x",read_reg(unit, i+1));
-		if (!flg) printk(" (incorrect)");
+		printk("%s: Reset (%d) signature = ", PG.name, k);
+		for (i = 0; i < 5; i++)
+			printk("%3x", read_reg(unit, i + 1));
+		if (!flg)
+			printk(" (incorrect)");
 		printk("\n");
 	}
-	
+
 	pi_disconnect(PI);
-	return flg-1;	
+	return flg - 1;
 }
 
-static void xs( char *buf, char *targ, int offs, int len )
+static void xs(char *buf, char *targ, int offs, int len)
+{
+	int j, k, l;
 
-{	int	j,k,l;
-
-	j=0; l=0;
-	for (k=0;k<len;k++) 
-	   if((buf[k+offs]!=0x20)||(buf[k+offs]!=l))
-		l=targ[j++]=buf[k+offs];
-	if (l==0x20) j--;
-	targ[j]=0;
+	j = 0;
+	l = 0;
+	for (k = 0; k < len; k++)
+		if ((buf[k + offs] != 0x20) || (buf[k + offs] != l))
+			l = targ[j++] = buf[k + offs];
+	if (l == 0x20)
+		j--;
+	targ[j] = 0;
 }
 
-static int pg_identify( int unit, int log )
+static int pg_identify(int unit, int log)
+{
+	int s;
+	char *ms[2] = { "master", "slave" };
+	char mf[10], id[18];
+	char id_cmd[12] = { ATAPI_IDENTIFY, 0, 0, 0, 36, 0, 0, 0, 0, 0, 0, 0 };
+	char buf[36];
 
-{	int 	s;
-	char	*ms[2] = {"master","slave"};
-	char	mf[10], id[18];
-	char    id_cmd[12] = { ATAPI_IDENTIFY,0,0,0,36,0,0,0,0,0,0,0};
-	char	buf[36];
-
-	s = pg_command(unit,id_cmd,36,jiffies+PG_TMO);
-	if (s) return -1;
-	s = pg_completion(unit,buf,jiffies+PG_TMO);
-	if (s) return -1;
+	s = pg_command(unit, id_cmd, 36, jiffies + PG_TMO);
+	if (s)
+		return -1;
+	s = pg_completion(unit, buf, jiffies + PG_TMO);
+	if (s)
+		return -1;
 
 	if (log) {
-		xs(buf,mf,8,8);
-		xs(buf,id,16,16);
-		printk("%s: %s %s, %s\n",PG.name,mf,id,ms[PG.drive]);
+		xs(buf, mf, 8, 8);
+		xs(buf, id, 16, 16);
+		printk("%s: %s %s, %s\n", PG.name, mf, id, ms[PG.drive]);
 	}
 
 	return 0;
 }
 
-static int pg_probe( int unit )
-
-/*	returns  0, with id set if drive is detected
-		-1, if drive detection failed
-*/
-
-{	if (PG.drive == -1) {
-	   for (PG.drive=0;PG.drive<=1;PG.drive++)
-		if (!pg_reset(unit)) return pg_identify(unit,1);
+/*
+ * returns  0, with id set if drive is detected
+ *	   -1, if drive detection failed
+ */
+static int pg_probe(int unit)
+{
+	if (PG.drive == -1) {
+		for (PG.drive = 0; PG.drive <= 1; PG.drive++)
+			if (!pg_reset(unit))
+				return pg_identify(unit, 1);
 	} else {
-	   if (!pg_reset(unit)) return pg_identify(unit,1);
+		if (!pg_reset(unit))
+			return pg_identify(unit, 1);
 	}
-	return -1; 
+	return -1;
 }
 
-static int pg_detect( void )
+static int pg_detect(void)
+{
+	int k, unit;
 
-{	int	k, unit;
-
-	printk("%s: %s version %s, major %d\n",
-		name,name,PG_VERSION,major);
+	printk("%s: %s version %s, major %d\n", name, name, PG_VERSION, major);
 
 	k = 0;
 	if (pg_drive_count == 0) {
-	    unit = 0;
-	    if (pi_init(PI,1,-1,-1,-1,-1,-1,pg_scratch,
-			PI_PG,verbose,PG.name)) {
-		if (!pg_probe(unit)) {
-			PG.present = 1;
-			k++;
-		} else pi_release(PI);
-	    }
+		unit = 0;
+		if (pi_init(PI, 1, -1, -1, -1, -1, -1, pg_scratch,
+			    PI_PG, verbose, PG.name)) {
+			if (!pg_probe(unit)) {
+				PG.present = 1;
+				k++;
+			} else
+				pi_release(PI);
+		}
 
-	} else for (unit=0;unit<PG_UNITS;unit++) if (DU[D_PRT])
-	    if (pi_init(PI,0,DU[D_PRT],DU[D_MOD],DU[D_UNI],
-			DU[D_PRO],DU[D_DLY],pg_scratch,PI_PG,verbose,
-			PG.name)) { 
-		if (!pg_probe(unit)) {
-			PG.present = 1;
-			k++;
-		} else pi_release(PI);
-	    }
+	} else
+		for (unit = 0; unit < PG_UNITS; unit++)
+			if (DU[D_PRT])
+				if (pi_init
+				    (PI, 0, DU[D_PRT], DU[D_MOD], DU[D_UNI],
+				     DU[D_PRO], DU[D_DLY], pg_scratch, PI_PG,
+				     verbose, PG.name)) {
+					if (!pg_probe(unit)) {
+						PG.present = 1;
+						k++;
+					} else
+						pi_release(PI);
+				}
 
-	if (k) return 0;
+	if (k)
+		return 0;
 
-	printk("%s: No ATAPI device detected\n",name);
+	printk("%s: No ATAPI device detected\n", name);
 	return -1;
 }
 
 #define DEVICE_NR(dev)	(minor(dev) & 0x7F)
 
-static int pg_open (struct inode *inode, struct file *file)
+static int pg_open(struct inode *inode, struct file *file)
+{
+	int unit = DEVICE_NR(inode->i_rdev);
 
-{       int	unit = DEVICE_NR(inode->i_rdev);
+	if ((unit >= PG_UNITS) || (!PG.present))
+		return -ENODEV;
 
-	if ((unit >= PG_UNITS) || (!PG.present)) return -ENODEV;
-
-	if ( test_and_set_bit(0, &PG.access) ) {
+	if (test_and_set_bit(0, &PG.access)) {
 		return -EBUSY;
 	}
 
@@ -534,66 +554,72 @@ static int pg_open (struct inode *inode, struct file *file)
 		PG.busy = 0;
 	}
 
-	pg_identify(unit,(verbose>1));
+	pg_identify(unit, (verbose > 1));
 
-
-	PG.bufptr = kmalloc(PG_MAX_DATA,GFP_KERNEL);
+	PG.bufptr = kmalloc(PG_MAX_DATA, GFP_KERNEL);
 	if (PG.bufptr == NULL) {
-		clear_bit( 0, &PG.access ) ;
-		printk("%s: buffer allocation failed\n",PG.name);
+		clear_bit(0, &PG.access);
+		printk("%s: buffer allocation failed\n", PG.name);
 		return -ENOMEM;
 	}
 
 	return 0;
 }
 
-static int pg_release (struct inode *inode, struct file *file)
+static int pg_release(struct inode *inode, struct file *file)
 {
-	int	unit = DEVICE_NR(inode->i_rdev);
+	int unit = DEVICE_NR(inode->i_rdev);
 
-	if ( unit >= PG_UNITS || !test_bit(0,&PG.access) )
+	if (unit >= PG_UNITS || !test_bit(0, &PG.access))
 		return -EINVAL;
 
-	clear_bit( 0, &PG.access);
+	clear_bit(0, &PG.access);
 
 	kfree(PG.bufptr);
 	PG.bufptr = NULL;
 
 	return 0;
-
 }
 
-static ssize_t pg_write(struct file * filp, const char * buf, 
-			size_t count, loff_t *ppos)
+static ssize_t pg_write(struct file *filp, const char *buf, size_t count, loff_t *ppos)
+{
+	struct inode *ino = filp->f_dentry->d_inode;
+	int unit = DEVICE_NR(ino->i_rdev);
+	struct pg_write_hdr hdr;
+	int hs = sizeof (hdr);
 
-{       struct inode            *ino = filp->f_dentry->d_inode;
-	int                     unit = DEVICE_NR(ino->i_rdev);
-	struct pg_write_hdr     hdr;
-	int                     hs = sizeof(hdr);
+	if (PG.busy)
+		return -EBUSY;
+	if (count < hs)
+		return -EINVAL;
 
-	if (PG.busy) return -EBUSY;
-	if (count < hs) return -EINVAL;
-	
-	if (copy_from_user((char *)&hdr, buf, hs))
+	if (copy_from_user((char *) &hdr, buf, hs))
 		return -EFAULT;
 
-	if (hdr.magic != PG_MAGIC) return -EINVAL;
-	if (hdr.dlen > PG_MAX_DATA) return -EINVAL;
-	if ((count - hs) > PG_MAX_DATA) return -EINVAL;
+	if (hdr.magic != PG_MAGIC)
+		return -EINVAL;
+	if (hdr.dlen > PG_MAX_DATA)
+		return -EINVAL;
+	if ((count - hs) > PG_MAX_DATA)
+		return -EINVAL;
 
 	if (hdr.func == PG_RESET) {
-		if (count != hs) return -EINVAL;
-		if (pg_reset(unit)) return -EIO;
+		if (count != hs)
+			return -EINVAL;
+		if (pg_reset(unit))
+			return -EIO;
 		return count;
 	}
 
-	if (hdr.func != PG_COMMAND) return -EINVAL;
+	if (hdr.func != PG_COMMAND)
+		return -EINVAL;
 
 	PG.start = jiffies;
-	PG.timeout = hdr.timeout*HZ + HZ/2 + jiffies;
+	PG.timeout = hdr.timeout * HZ + HZ / 2 + jiffies;
 
-	if (pg_command(unit,hdr.packet,hdr.dlen,jiffies+PG_TMO)) {
-		if (PG.status & 0x10) return -ETIME;
+	if (pg_command(unit, hdr.packet, hdr.dlen, jiffies + PG_TMO)) {
+		if (PG.status & 0x10)
+			return -ETIME;
 		return -EIO;
 	}
 
@@ -604,22 +630,24 @@ static ssize_t pg_write(struct file * filp, const char * buf,
 	return count;
 }
 
-static ssize_t pg_read(struct file * filp, char * buf, 
-		       size_t count, loff_t *ppos)
+static ssize_t pg_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
+{
+	struct inode *ino = filp->f_dentry->d_inode;
+	int unit = DEVICE_NR(ino->i_rdev);
+	struct pg_read_hdr hdr;
+	int hs = sizeof (hdr);
+	int copy;
 
-{  	struct inode 		*ino = filp->f_dentry->d_inode;
-	int			unit = DEVICE_NR(ino->i_rdev);
-	struct pg_read_hdr 	hdr;
-	int			hs = sizeof(hdr);
-	int			copy;
-
-	if (!PG.busy) return -EINVAL;
-	if (count < hs) return -EINVAL;
+	if (!PG.busy)
+		return -EINVAL;
+	if (count < hs)
+		return -EINVAL;
 
 	PG.busy = 0;
 
-	if (pg_completion(unit,PG.bufptr,PG.timeout))
-	  if (PG.status & 0x10) return -ETIME;
+	if (pg_completion(unit, PG.bufptr, PG.timeout))
+		if (PG.status & 0x10)
+			return -ETIME;
 
 	hdr.magic = PG_MAGIC;
 	hdr.dlen = PG.dlen;
@@ -628,18 +656,19 @@ static ssize_t pg_read(struct file * filp, char * buf,
 	if (hdr.dlen < 0) {
 		hdr.dlen = -1 * hdr.dlen;
 		copy = hdr.dlen;
-		if (copy > (count - hs)) copy = count - hs;
+		if (copy > (count - hs))
+			copy = count - hs;
 	}
 
-	hdr.duration = (jiffies - PG.start + HZ/2) / HZ;
+	hdr.duration = (jiffies - PG.start + HZ / 2) / HZ;
 	hdr.scsi = PG.status & 0x0f;
 
-	if (copy_to_user(buf, (char *)&hdr, hs))
+	if (copy_to_user(buf, (char *) &hdr, hs))
 		return -EFAULT;
 	if (copy > 0)
-		if (copy_to_user(buf+hs,PG.bufptr,copy))
+		if (copy_to_user(buf + hs, PG.bufptr, copy))
 			return -EFAULT;
-	return copy+hs;
+	return copy + hs;
 }
 
 static int __init pg_init(void)
@@ -654,18 +683,19 @@ static int __init pg_init(void)
 	if (pg_detect())
 		return -1;
 
-	if (register_chrdev(major,name,&pg_fops)) {
-		printk("pg_init: unable to get major number %d\n",
-			major);
-		for (unit=0;unit<PG_UNITS;unit++)
-		  if (PG.present) pi_release(PI);
+	if (register_chrdev(major, name, &pg_fops)) {
+		printk("pg_init: unable to get major number %d\n", major);
+		for (unit = 0; unit < PG_UNITS; unit++)
+			if (PG.present)
+				pi_release(PI);
 		return -1;
 	}
-	devfs_mk_dir ("pg");
-	for (unit=0; unit<PG_UNITS; unit++)
+	devfs_mk_dir("pg");
+	for (unit = 0; unit < PG_UNITS; unit++)
 		if (PG.present) {
 			devfs_mk_cdev(MKDEV(major, unit),
-				S_IFCHR | S_IRUSR | S_IWUSR, "pg/%u", unit);
+				      S_IFCHR | S_IRUSR | S_IWUSR, "pg/%u",
+				      unit);
 		}
 	return 0;
 }
@@ -674,15 +704,16 @@ static void __exit pg_exit(void)
 {
 	int unit;
 
-	for (unit=0; unit<PG_UNITS; unit++)
+	for (unit = 0; unit < PG_UNITS; unit++)
 		if (PG.present)
 			devfs_remove("pg/%u", unit);
 
-	devfs_remove ("pg");
-	unregister_chrdev(major,name);
+	devfs_remove("pg");
+	unregister_chrdev(major, name);
 
-	for (unit=0;unit<PG_UNITS;unit++)
-		if (PG.present) pi_release(PI);
+	for (unit = 0; unit < PG_UNITS; unit++)
+		if (PG.present)
+			pi_release(PI);
 }
 
 MODULE_LICENSE("GPL");
