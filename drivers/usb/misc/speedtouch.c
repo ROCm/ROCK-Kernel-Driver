@@ -108,9 +108,9 @@
 
 /* usb_device_id struct */
 
-static struct usb_device_id udsl_usb_ids[] = {
-	{USB_DEVICE (SPEEDTOUCH_VENDORID, SPEEDTOUCH_PRODUCTID)},
-	{}			/* list terminator */
+static struct usb_device_id udsl_usb_ids [] = {
+	{ USB_DEVICE (SPEEDTOUCH_VENDORID, SPEEDTOUCH_PRODUCTID) },
+	{ }			/* Terminating entry */
 };
 
 MODULE_DEVICE_TABLE (usb, udsl_usb_ids);
@@ -141,7 +141,7 @@ struct udsl_instance_data {
 	struct usb_device *usb_dev;
 	struct udsl_data_ctx *rcvbufs;
 	struct sk_buff_head sndqueue;
-	struct udsl_usb_send_data_context send_ctx[UDSL_NUMBER_SND_URBS];
+	struct udsl_usb_send_data_context send_ctx [UDSL_NUMBER_SND_URBS];
 	int data_started;
 
 	/* atm device part */
@@ -151,7 +151,7 @@ struct udsl_instance_data {
 	struct atmsar_vcc_data *atmsar_vcc_list;
 };
 
-static const char udsl_driver_name[] = "Alcatel SpeedTouch USB";
+static const char udsl_driver_name [] = "Alcatel SpeedTouch USB";
 
 static DECLARE_MUTEX(udsl_usb_ioctl_lock);
 
@@ -200,6 +200,7 @@ static struct usb_driver udsl_usb_driver = {
 	.ioctl =	udsl_usb_ioctl,
 	.id_table =	udsl_usb_ids,
 };
+
 
 /************
 **   ATM   **
@@ -254,13 +255,14 @@ static void udsl_atm_stopdevice (struct udsl_instance_data *instance)
 	MOD_DEC_USE_COUNT;
 }
 
-static void udsl_atm_set_mac (struct udsl_instance_data *instance, const char mac[6])
+static void udsl_atm_set_mac (struct udsl_instance_data *instance, const char mac [6])
 {
 	if (!instance->atm_dev)
 		return;
 
 	memcpy (instance->atm_dev->esi, mac, 6);
 }
+
 
 /***************************************************************************
 *
@@ -308,6 +310,7 @@ static int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t * pos, char *page
 
 	return 0;
 }
+
 
 /***************************************************************************
 *
@@ -832,8 +835,8 @@ static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_i
 	struct usb_device *dev = interface_to_usbdev(intf);
 	int ifnum = intf->altsetting->desc.bInterfaceNumber;
 	int i;
-	unsigned char mac[6];
-	unsigned char mac_str[13];
+	unsigned char mac [6];
+	unsigned char mac_str [13];
 	struct udsl_instance_data *instance = NULL;
 
 	PDEBUG ("Trying device with Vendor=0x%x, Product=0x%x, ifnum %d\n",
@@ -897,6 +900,7 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 	}
 }
 
+
 /***************************************************************************
 *
 * Driver Init
@@ -905,18 +909,25 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 
 static int __init udsl_usb_init (void)
 {
-	PDEBUG ("Initializing SpeedTouch Driver Version " DRIVER_VERSION "\n");
+	PDEBUG ("udsl_usb_init: driver version " DRIVER_VERSION "\n");
 
 	return usb_register (&udsl_usb_driver);
 }
 
 static void __exit udsl_usb_cleanup (void)
 {
+	PDEBUG ("udsl_usb_cleanup\n");
+
 	usb_deregister (&udsl_usb_driver);
 }
 
 module_init(udsl_usb_init);
 module_exit(udsl_usb_cleanup);
+
+MODULE_AUTHOR (DRIVER_AUTHOR);
+MODULE_DESCRIPTION (DRIVER_DESC);
+MODULE_LICENSE ("GPL");
+
 
 #ifdef DEBUG_PACKET
 /*******************************************************************************
@@ -927,7 +938,7 @@ module_exit(udsl_usb_cleanup);
 
 static int udsl_print_packet (const unsigned char *data, int len)
 {
-	unsigned char buffer[256];
+	unsigned char buffer [256];
 	int i = 0, j = 0;
 
 	for (i = 0; i < len;) {
@@ -942,7 +953,3 @@ static int udsl_print_packet (const unsigned char *data, int len)
 };
 
 #endif				/* PACKETDEBUG */
-
-MODULE_AUTHOR (DRIVER_AUTHOR);
-MODULE_DESCRIPTION (DRIVER_DESC);
-MODULE_LICENSE ("GPL");
