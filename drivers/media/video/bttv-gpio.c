@@ -63,6 +63,7 @@ static void release_sub_device(struct device *dev)
 int bttv_sub_add_device(struct bttv_core *core, char *name)
 {
 	struct bttv_sub_device *sub;
+	int err;
 
 	sub = kmalloc(sizeof(*sub),GFP_KERNEL);
 	if (NULL == sub)
@@ -76,9 +77,13 @@ int bttv_sub_add_device(struct bttv_core *core, char *name)
 	snprintf(sub->dev.bus_id,sizeof(sub->dev.bus_id),"%s%d",
 		 name, core->nr);
 
+	err = device_register(&sub->dev);
+	if (0 != err) {
+		kfree(sub);
+		return err;
+	}
 	printk("bttv%d: add subdevice \"%s\"\n", core->nr, sub->dev.bus_id);
 	list_add_tail(&sub->list,&core->subs);
-	device_register(&sub->dev);
 	return 0;
 }
 
@@ -129,8 +134,7 @@ int bttv_sub_register(struct bttv_sub_driver *sub, char *wanted)
 {
 	sub->drv.bus = &bttv_sub_bus_type;
 	snprintf(sub->wanted,sizeof(sub->wanted),"%s",wanted);
-	driver_register(&sub->drv);
-	return 0;
+	return driver_register(&sub->drv);
 }
 EXPORT_SYMBOL(bttv_sub_register);
 
