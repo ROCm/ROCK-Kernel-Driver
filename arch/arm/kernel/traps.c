@@ -150,11 +150,6 @@ static void dump_instr(struct pt_regs *regs)
 	set_fs(fs);
 }
 
-static void __dump_stack(struct task_struct *tsk, unsigned long sp)
-{
-	dump_mem("Stack: ", sp, 8192+(unsigned long)tsk->thread_info);
-}
-
 static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 {
 	unsigned int fp;
@@ -183,14 +178,12 @@ void dump_stack(void)
 #endif
 }
 
-/*
- * This is called from SysRq-T (show_task) to display the current call
- * trace for each process.  This version will also display the running
- * threads call trace (ie, us.)
- */
-void show_trace_task(struct task_struct *tsk)
+void show_stack(struct task_struct *tsk, unsigned long *sp)
 {
-	unsigned int fp;
+	unsigned long fp;
+
+	if (!tsk)
+		tsk = current;
 
 	if (tsk != current)
 		fp = thread_saved_fp(tsk);
@@ -222,7 +215,7 @@ NORET_TYPE void die(const char *str, struct pt_regs *regs, int err)
 		current->comm, current->pid, tsk->thread_info + 1);
 
 	if (!user_mode(regs) || in_interrupt()) {
-		__dump_stack(tsk, (unsigned long)(regs + 1));
+		dump_mem("Stack: ", (unsigned long)(regs + 1), 8192+(unsigned long)tsk->thread_info);
 		dump_backtrace(regs, tsk);
 		dump_instr(regs);
 	}
