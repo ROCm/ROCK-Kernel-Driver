@@ -265,6 +265,8 @@ struct sctp_af {
 	int             (*available)    (const union sctp_addr *);
 	int             (*skb_iif)      (const struct sk_buff *sk);
 	int             (*is_ce)        (const struct sk_buff *sk);
+	void		(*seq_dump_addr)(struct seq_file *seq,
+		       			 union sctp_addr *addr);
 	__u16		net_header_len;
 	int		sockaddr_len;
 	sa_family_t	sa_family;

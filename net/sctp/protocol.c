@@ -50,6 +50,7 @@
 #include <linux/init.h>
 #include <linux/netdevice.h>
 #include <linux/inetdevice.h>
+#include <linux/seq_file.h>
 #include <net/protocol.h>
 #include <net/ip.h>
 #include <net/ipv6.h>
@@ -81,6 +82,10 @@ extern struct net_proto_family inet_family_ops;
 
 extern int sctp_snmp_proc_init(void);
 extern int sctp_snmp_proc_exit(void);
+extern int sctp_eps_proc_init(void);
+extern int sctp_eps_proc_exit(void);
+extern int sctp_assocs_proc_init(void);
+extern int sctp_assocs_proc_exit(void);
 
 /* Return the address of the control sock. */
 struct sock *sctp_get_ctl_sock(void)
@@ -91,8 +96,6 @@ struct sock *sctp_get_ctl_sock(void)
 /* Set up the proc fs entry for the SCTP protocol. */
 __init int sctp_proc_init(void)
 {
-	int rc = 0;
-
 	if (!proc_net_sctp) {
 		struct proc_dir_entry *ent;
 		ent = proc_mkdir("net/sctp", 0);
@@ -100,13 +103,20 @@ __init int sctp_proc_init(void)
 			ent->owner = THIS_MODULE;
 			proc_net_sctp = ent;
 		} else
-			rc = -ENOMEM;
+			goto out_nomem;
 	}
 
 	if (sctp_snmp_proc_init())
-		rc = -ENOMEM;
+		goto out_nomem;	
+	if (sctp_eps_proc_init())
+		goto out_nomem;	
+	if (sctp_assocs_proc_init())
+		goto out_nomem;	
 
-	return rc;
+	return 0;
+
+out_nomem:
+	return -ENOMEM;
 }
 
 /* Clean up the proc fs entry for the SCTP protocol. 
@@ -116,6 +126,8 @@ __init int sctp_proc_init(void)
 void sctp_proc_exit(void)
 {
 	sctp_snmp_proc_exit();
+	sctp_eps_proc_exit();
+	sctp_assocs_proc_exit();
 
 	if (proc_net_sctp) {
 		proc_net_sctp = NULL;
@@ -568,6 +580,12 @@ out:
 	return newsk;
 }
 
+/* Dump the v4 addr to the seq file. */
+static void sctp_v4_seq_dump_addr(struct seq_file *seq, union sctp_addr *addr)
+{
+	seq_printf(seq, "%d.%d.%d.%d ", NIPQUAD(addr->v4.sin_addr));
+}
+
 /* Event handler for inet address addition/deletion events.
  * Basically, whenever there is an event, we re-build our local address list.
  */
@@ -843,6 +861,7 @@ struct sctp_af sctp_ipv4_specific = {
 	.scope          = sctp_v4_scope,
 	.skb_iif        = sctp_v4_skb_iif,
 	.is_ce          = sctp_v4_is_ce,
+	.seq_dump_addr  = sctp_v4_seq_dump_addr,
 	.net_header_len = sizeof(struct iphdr),
 	.sockaddr_len   = sizeof(struct sockaddr_in),
 	.sa_family      = AF_INET,
