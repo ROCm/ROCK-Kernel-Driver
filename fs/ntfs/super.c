@@ -1203,7 +1203,7 @@ static unsigned long __get_nr_free_mft_records(ntfs_volume *vol)
 			nr_free -= PAGE_CACHE_SIZE * 8;
 			continue;
 		}
-		wait_on_page(page);
+		wait_on_page_locked(page);
 		/* Ignore pages which errored asynchronously. */
 		if (!PageUptodate(page)) {
 			ntfs_debug("Async read_cache_page() error. Skipping "
