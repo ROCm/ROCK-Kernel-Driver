@@ -1269,6 +1269,8 @@ static struct crypto_alg des3_ede_alg = {
 	.cia_decrypt	  	=	des3_ede_decrypt } }
 };
 
+MODULE_ALIAS("des3_ede");
+
 static int __init init(void)
 {
 	int ret = 0;
