@@ -6,15 +6,21 @@ if [ "$CONFIG_ISA" = "y" -o "$CONFIG_PCI" = "y" ]; then
    tristate '  Cisco/Aironet 34X/35X/4500/4800 ISA and PCI cards' CONFIG_AIRO
 fi
 
+tristate '  Hermes chipset 802.11b support (Orinoco/Prism2/Symbol)' CONFIG_HERMES
+
 if [ "$CONFIG_ALL_PPC" = "y" ]; then
-   tristate '  Apple Airport support (built-in)' CONFIG_APPLE_AIRPORT
+   dep_tristate '    Apple Airport support (built-in)' CONFIG_APPLE_AIRPORT $CONFIG_HERMES
+fi
+
+if [ "$CONFIG_PCI" = "y" ]; then
+   dep_tristate '    Hermes in PLX9052 based PCI adaptor support (Netgear MA301 etc.)' CONFIG_PLX_HERMES $CONFIG_HERMES $CONFIG_EXPERIMENTAL
 fi
 
 # If Pcmcia is compiled in, offer Pcmcia cards...
 if [ "$CONFIG_PCMCIA" != "n" ]; then
    comment 'Wireless Pcmcia cards support' 
 
-   tristate '  Hermes support (Orinoco/WavelanIEEE/PrismII/Symbol 802.11b cards)' CONFIG_PCMCIA_HERMES
+   dep_tristate '  Hermes PCMCIA card support' CONFIG_PCMCIA_HERMES $CONFIG_HERMES
    tristate '  Cisco/Aironet 34X/35X/4500/4800 PCMCIA cards' CONFIG_AIRO_CS
 fi
 

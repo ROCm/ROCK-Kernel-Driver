@@ -64,6 +64,7 @@
 #include <linux/input.h>
 #include <linux/videodev.h>
 #include <linux/usb.h>
+#include <linux/smp_lock.h>
 
 /*
  * Version Information
@@ -194,10 +195,14 @@ static void usb_dsbr100_disconnect(struct usb_device *dev, void *ptr)
 {
 	usb_dsbr100 *radio=ptr;
 
-	if (users)
+	lock_kernel();
+	if (users) {
+		unlock_kernel();
 		return;
+	}
 	kfree(radio);
 	usb_dsbr100_radio.priv = NULL;
+	unlock_kernel();
 }
 
 static int usb_dsbr100_ioctl(struct video_device *dev, unsigned int cmd, 
@@ -362,6 +367,7 @@ module_exit (dsbr100_exit);
 
 MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
+MODULE_LICENSE("GPL");
 
 /*
 vi: ts=8

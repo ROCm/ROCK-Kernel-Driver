@@ -1282,9 +1282,10 @@ typedef int (*read_actor_t)(read_descriptor_t *, struct page *, unsigned long, u
 /* needed for stackable file system support */
 extern loff_t default_llseek(struct file *file, loff_t offset, int origin);
 
-extern int __user_walk(const char *, unsigned, struct nameidata *);
-extern int path_init(const char *, unsigned, struct nameidata *);
-extern int path_walk(const char *, struct nameidata *);
+extern int FASTCALL(__user_walk(const char *, unsigned, struct nameidata *));
+extern int FASTCALL(path_init(const char *, unsigned, struct nameidata *));
+extern int FASTCALL(path_walk(const char *, struct nameidata *));
+extern int FASTCALL(link_path_walk(const char *, struct nameidata *));
 extern void path_release(struct nameidata *);
 extern int follow_down(struct vfsmount **, struct dentry **);
 extern int follow_up(struct vfsmount **, struct dentry **);

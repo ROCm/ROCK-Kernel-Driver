@@ -12,12 +12,14 @@
 
 /*
  * Hub Class feature numbers
+ * See USB 2.0 spec Table 11-17
  */
 #define C_HUB_LOCAL_POWER	0
 #define C_HUB_OVER_CURRENT	1
 
 /*
  * Port feature numbers
+ * See USB 2.0 spec Table 11-17
  */
 #define USB_PORT_FEAT_CONNECTION	0
 #define USB_PORT_FEAT_ENABLE		1
@@ -99,7 +101,10 @@ struct usb_hub_status {
 #define HUB_CHANGE_OVERCURRENT	0x0002
 
 
-/* Hub descriptor */
+/* 
+ * Hub descriptor 
+ * See USB 2.0 spec Table 11-13
+ */
 struct usb_hub_descriptor {
 	__u8  bDescLength;
 	__u8  bDescriptorType;
@@ -107,9 +112,9 @@ struct usb_hub_descriptor {
 	__u16 wHubCharacteristics;
 	__u8  bPwrOn2PwrGood;
 	__u8  bHubContrCurrent;
-	/* DeviceRemovable and PortPwrCtrlMask want to be variable-length 
-	   bitmaps that hold max 256 entries, but for now they're ignored */
-	__u8  bitmap[2 * ((USB_MAXCHILDREN + 1 + 7) / 8)];
+	    	/* add 1 bit for hub status change; round to bytes */
+	__u8  DeviceRemovable[(USB_MAXCHILDREN + 1 + 7) / 8];
+	__u8  PortPwrCtrlMask[(USB_MAXCHILDREN + 1 + 7) / 8];
 } __attribute__ ((packed));
 
 struct usb_device;

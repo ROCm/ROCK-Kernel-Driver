@@ -539,13 +539,12 @@ int usb_bulk_msg(struct usb_device *usb_dev, unsigned int pipe, void *data, int 
  *                         SYNCHRONOUS CALL SUPPORT                  *
  *-------------------------------------------------------------------*/
 
-typedef struct
+struct usb_api_data
 {
-  wait_queue_head_t *wakeup;
-
-  void* stuff;
-  /* more to follow */
-} api_wrapper_data;
+	wait_queue_head_t wqh;
+	int done;
+	/* void* stuff;	*/	/* Possible extension later. */
+};
 
 /* -------------------------------------------------------------------------- */
 

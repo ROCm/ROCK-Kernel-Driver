@@ -75,7 +75,7 @@ obj-$(CONFIG_BLK_DEV_ATARAID_HPT)	+= hptraid.o
 
 ide-obj-$(CONFIG_PROC_FS)		+= ide-proc.o
 
-ide-mod-objs		:= $(export-objs) $(ide-obj-y)
+ide-mod-objs		:= ide.o ide-features.o $(ide-obj-y)
 ide-probe-mod-objs	:= ide-probe.o ide-geometry.o
 
 include $(TOPDIR)/Rules.make

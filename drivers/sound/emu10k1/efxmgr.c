@@ -1,4 +1,4 @@
-/*     
+/*
  **********************************************************************
  *     efxmgr.c
  *     Copyright 1999, 2000 Creative Labs, Inc. 
@@ -49,7 +49,7 @@ int emu10k1_find_control_gpr(struct patch_manager *mgr, const char *patch_name, 
 		goto match;
 	}
 
-	for(i = 0; i < mgr->current_pages * PATCHES_PER_PAGE; i++) {
+	for (i = 0; i < mgr->current_pages * PATCHES_PER_PAGE; i++) {
 		patch = PATCH(mgr, i);
 			sprintf(s,"%s", patch->name);
 
@@ -97,77 +97,81 @@ void emu10k1_set_control_gpr(struct emu10k1_card *card, int addr, s32 val, int f
 
 //An internal function for setting OSS mixer controls.
 void emu10k1_set_oss_vol(struct emu10k1_card *card, int oss_mixer,
-			 unsigned int left, unsigned int right){
-
-	extern struct oss_scaling volume_params[SOUND_MIXER_NRDEVICES];
+			 unsigned int left, unsigned int right)
+{
+	extern char volume_params[SOUND_MIXER_NRDEVICES];
 
 	card->ac97.mixer_state[oss_mixer] = (right << 8) | left;
 
 	if (!card->isaps)
 		card->ac97.write_mixer(&card->ac97, oss_mixer, left, right);
-
 	
 	emu10k1_set_volume_gpr(card, card->mgr.ctrl_gpr[oss_mixer][0], left,
-			       volume_params[oss_mixer].scale,
-			       volume_params[oss_mixer].muting);
+			       volume_params[oss_mixer]);
+
 	emu10k1_set_volume_gpr(card, card->mgr.ctrl_gpr[oss_mixer][1], right,
-			       volume_params[oss_mixer].scale,
-			       volume_params[oss_mixer].muting);
-
+			       volume_params[oss_mixer]);
 }
-
 
 //FIXME: mute should unmute when pressed a second time
 void emu10k1_mute_irqhandler(struct emu10k1_card *card)
 {
-	struct patch_manager *mgr = &card->mgr;
-	unsigned long  flags;
+	int oss_channel = VOLCTRL_CHANNEL;
+	int left, right;
+	static int val = 0;
 
-	spin_lock_irqsave(&mgr->lock, flags);
-	emu10k1_set_oss_vol(card,VOLCTRL_CHANNEL,0,0);
-	spin_unlock_irqrestore(&mgr->lock, flags);
+	if (val) {
+		left = val & 0xff;
+		right = (val >> 8) & 0xff;
+		val = 0;
+	} else {
+		val = card->ac97.mixer_state[oss_channel];
+		left = 0;
+		right = 0;
+	}
+
+	emu10k1_set_oss_vol(card, oss_channel, left, right);
 }
 
 void emu10k1_volincr_irqhandler(struct emu10k1_card *card)
 {
-	struct patch_manager *mgr = &card->mgr;
-	unsigned long  flags;
-	unsigned int oss_channel=VOLCTRL_CHANNEL, left=0,right=0;
+	int oss_channel = VOLCTRL_CHANNEL;
+	int left, right;
 
-	spin_lock_irqsave(&mgr->lock, flags);
 	left = card->ac97.mixer_state[oss_channel] & 0xff;
 	right = (card->ac97.mixer_state[oss_channel] >> 8) & 0xff;
 
-	if((left+=VOLCTRL_STEP_SIZE )>100)
-		left=100;
-	if((right+=VOLCTRL_STEP_SIZE )>100)
-		right=100;
-	emu10k1_set_oss_vol(card,oss_channel,left,right);
-	spin_unlock_irqrestore(&mgr->lock, flags);	
+	if ((left += VOLCTRL_STEP_SIZE) > 100)
+		left = 100;
+
+	if ((right += VOLCTRL_STEP_SIZE) > 100)
+		right = 100;
+
+	emu10k1_set_oss_vol(card, oss_channel, left, right);
 }
+
 void emu10k1_voldecr_irqhandler(struct emu10k1_card *card)
 {
-	struct patch_manager *mgr = &card->mgr;
-	unsigned long  flags;
-	int oss_channel=VOLCTRL_CHANNEL, left=0,right=0;
+	int oss_channel = VOLCTRL_CHANNEL;
+	int left, right;
 
-	spin_lock_irqsave(&mgr->lock, flags);
 	left = card->ac97.mixer_state[oss_channel] & 0xff;
 	right = (card->ac97.mixer_state[oss_channel] >> 8) & 0xff;
 
-	if((left-=VOLCTRL_STEP_SIZE )<0)
-		left=0;
-	if((right-=VOLCTRL_STEP_SIZE )<0)
-		right=0;
-	emu10k1_set_oss_vol(card,oss_channel,left,right);
-	spin_unlock_irqrestore(&mgr->lock, flags);
+	if ((left -= VOLCTRL_STEP_SIZE) < 0)
+		left = 0;
+
+	if ((right -= VOLCTRL_STEP_SIZE) < 0)
+		right = 0;
+
+	emu10k1_set_oss_vol(card, oss_channel, left, right);
 }
 
-
-void emu10k1_set_volume_gpr(struct emu10k1_card *card, int addr, s32 vol, int scale, int muting)
+void emu10k1_set_volume_gpr(struct emu10k1_card *card, int addr, s32 vol, int scale)
 {
 	struct patch_manager *mgr = &card->mgr;
 	unsigned long flags;
+	int muting;
 
 	const s32 log2lin[5] ={                  //  attenuation (dB)
 		0x7fffffff,                      //       0.0         
@@ -179,10 +183,12 @@ void emu10k1_set_volume_gpr(struct emu10k1_card *card, int addr, s32 vol, int sc
 	if (addr < 0)
 		return;
 
+	muting = (scale == 0x10) ? 0x7f: scale;
+	
 	vol = (100 - vol ) * scale / 100;
 
 	// Thanks to the comp.dsp newsgroup for this neat trick:
-	vol = vol >= muting ? 0: log2lin[vol&3]>>(vol>>2);
+	vol = (vol >= muting) ? 0 : (log2lin[vol & 3] >> (vol >> 2));
 
 	spin_lock_irqsave(&mgr->lock, flags);
 	emu10k1_set_control_gpr(card, addr, vol, 0);
@@ -197,15 +203,16 @@ void emu10k1_dsp_irqhandler(struct emu10k1_card *card)
 		u32 bc;
 		bc = sblive_readptr(card, GPR_BASE + card->pt.intr_gpr, 0);
 		if (bc != 0) {
-			spin_lock_irqsave(&card->lock, flags);
+			DPD(3, "pt interrupt, bc = %d\n", bc);
+			spin_lock_irqsave(&card->pt.lock, flags);
 			card->pt.blocks_played = bc;
 			if (card->pt.blocks_played >= card->pt.blocks_copied) {
 				DPF(1, "buffer underrun in passthrough playback\n");
 				emu10k1_pt_stop(card);
 			}
 			wake_up_interruptible(&card->pt.wait);
-			spin_unlock_irqrestore(&card->lock, flags);
-			DPD(3, "pt interrupt, bc = %d\n", bc);
+			spin_unlock_irqrestore(&card->pt.lock, flags);
 		}
 	}
 }
+

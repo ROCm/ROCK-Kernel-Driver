@@ -557,7 +557,7 @@ static int eeprom_read(long addr, int location)
 {
 	int i;
 	int retval = 0;
-	int ee_addr = addr + EECtrl;
+	long ee_addr = addr + EECtrl;
 	int read_cmd = location | EE_ReadCmd;
 	writel(EE_ChipSelect, ee_addr);
 

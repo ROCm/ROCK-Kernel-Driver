@@ -8,7 +8,7 @@
 #define _ORINOCO_H
 
 /* To enable debug messages */
-//#define ORINOCO_DEBUG		3
+/*  #define ORINOCO_DEBUG		3 */
 
 #if (! defined (WIRELESS_EXT)) || (WIRELESS_EXT < 10)
 #error "orinoco_cs requires Wireless extensions v10 or later."
@@ -33,7 +33,7 @@
 #define MAX_FRAME_SIZE		2304
 
 typedef struct dldwd_key {
-	uint16_t len;
+	uint16_t len;	/* always store little-endian */
 	char data[MAX_KEY_SIZE];
 } __attribute__ ((packed)) dldwd_key_t;
 

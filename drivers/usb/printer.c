@@ -703,6 +703,9 @@ static void usblp_disconnect(struct usb_device *dev, void *ptr)
 }
 
 static struct usb_device_id usblp_ids [] = {
+	{ USB_DEVICE_INFO(7, 1, 1) },
+	{ USB_DEVICE_INFO(7, 1, 2) },
+	{ USB_DEVICE_INFO(7, 1, 3) },
 	{ USB_INTERFACE_INFO(7, 1, 1) },
 	{ USB_INTERFACE_INFO(7, 1, 2) },
 	{ USB_INTERFACE_INFO(7, 1, 3) },
@@ -738,4 +741,5 @@ module_exit(usblp_exit);
 
 MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
+MODULE_LICENSE("GPL");
 

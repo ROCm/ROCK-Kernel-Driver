@@ -4,6 +4,8 @@
  * (C) Copyright 1999 Linus Torvalds
  * (C) Copyright 1999 Johannes Erdfelt
  * (C) Copyright 1999 Gregory P. Smith
+ * (C) Copyright 2001 Brad Hards (bhards@bigpond.net.au)
+ *
  */
 
 #include <linux/config.h>
@@ -51,6 +53,7 @@ static inline char *portspeed (int portstatus)
 }
 #endif
 
+/* USB 2.0 spec Section 11.24.4.5 */
 static int usb_get_hub_descriptor(struct usb_device *dev, void *data, int size)
 {
 	return usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
@@ -58,24 +61,38 @@ static int usb_get_hub_descriptor(struct usb_device *dev, void *data, int size)
 		USB_DT_HUB << 8, 0, data, size, HZ);
 }
 
+/*
+ * USB 2.0 spec Section 11.24.2.1
+ */
 static int usb_clear_hub_feature(struct usb_device *dev, int feature)
 {
 	return usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 		USB_REQ_CLEAR_FEATURE, USB_RT_HUB, feature, 0, NULL, 0, HZ);
 }
 
+/*
+ * USB 2.0 spec Section 11.24.2.2
+ * BUG: doesn't handle port indicator selector in high byte of wIndex
+ */
 static int usb_clear_port_feature(struct usb_device *dev, int port, int feature)
 {
 	return usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 		USB_REQ_CLEAR_FEATURE, USB_RT_PORT, feature, port, NULL, 0, HZ);
 }
 
+/*
+ * USB 2.0 spec Section 11.24.2.13
+ * BUG: doesn't handle port indicator selector in high byte of wIndex
+ */
 static int usb_set_port_feature(struct usb_device *dev, int port, int feature)
 {
 	return usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 		USB_REQ_SET_FEATURE, USB_RT_PORT, feature, port, NULL, 0, HZ);
 }
 
+/*
+ * USB 2.0 spec Section 11.24.2.6
+ */
 static int usb_get_hub_status(struct usb_device *dev, void *data)
 {
 	return usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
@@ -83,6 +100,9 @@ static int usb_get_hub_status(struct usb_device *dev, void *data)
 		data, sizeof(struct usb_hub_status), HZ);
 }
 
+/*
+ * USB 2.0 spec Section 11.24.2.7
+ */
 static int usb_get_port_status(struct usb_device *dev, int port, void *data)
 {
 	return usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
@@ -230,7 +250,7 @@ static int usb_hub_configure(struct usb_hub *hub, struct usb_endpoint_descriptor
 	dbg("hub controller current requirement: %dmA", hub->descriptor->bHubContrCurrent);
 
 	for (i = 0; i < dev->maxchild; i++)
-		portstr[i] = hub->descriptor->bitmap[((i + 1) / 8)] & (1 << ((i + 1) % 8)) ? 'F' : 'R';
+		portstr[i] = hub->descriptor->DeviceRemovable[((i + 1) / 8)] & (1 << ((i + 1) % 8)) ? 'F' : 'R';
 	portstr[dev->maxchild] = 0;
 
 	dbg("port removable status: %s", portstr);
@@ -838,6 +858,7 @@ static int usb_hub_thread(void *__hub)
 
 	dbg("usb_hub_thread exiting");
 
+	unlock_kernel();
 	complete_and_exit(&khubd_exited, 0);
 }
 

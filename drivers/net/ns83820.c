@@ -1,4 +1,4 @@
-#define VERSION "0.12"
+#define VERSION "0.13"
 /* ns83820.c by Benjamin LaHaise <bcrl@redhat.com>
  *
  * $Revision: 1.34.2.8 $
@@ -44,6 +44,7 @@
  *			     - fix >> 32 bugs
  *			0.12 - add statistics counters
  *			     - add allmulti/promisc support
+ *	20011009	0.13 - hotplug support, other smaller pci api cleanups
  *
  * Driver Overview
  * ===============
@@ -374,7 +375,6 @@ struct ns83820 {
 	u8			*base;
 
 	struct pci_dev		*pci_dev;
-	struct ns83820		*next_dev;
 
 	struct rx_info		rx_info;
 
@@ -409,8 +409,6 @@ struct ns83820 {
 //free = (tx_done_idx + NR_TX_DESC-2 - free_idx) % NR_TX_DESC
 #define start_tx_okay(dev)	\
 	(((NR_TX_DESC-2 + dev->tx_done_idx - dev->tx_free_idx) % NR_TX_DESC) > NR_TX_DESC/2)
-
-static struct ns83820	*ns83820_chain;
 
 
 /* Packet Receiver
@@ -1230,7 +1228,7 @@ static void ns83820_set_multicast(struct net_device *_dev)
 	spin_unlock_irq(&dev->misc_lock);
 }
 
-static int ns83820_probe(struct pci_dev *pci_dev, const struct pci_device_id *id)
+static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_device_id *id)
 {
 	struct ns83820 *dev;
 	long addr;
@@ -1298,10 +1296,7 @@ static int ns83820_probe(struct pci_dev *pci_dev, const struct pci_device_id *id
 	dev->net_dev.set_multicast_list = ns83820_set_multicast;
 	//FIXME: dev->net_dev.tx_timeout = ns83820_tx_timeout;
 
-	lock_kernel();
-	dev->next_dev = ns83820_chain;
-	ns83820_chain = dev;
-	unlock_kernel();
+	pci_set_drvdata(pci_dev, dev);
 
 	ns83820_do_reset(dev, CR_RST);
 
@@ -1423,21 +1418,45 @@ out_disable:
 	pci_disable_device(pci_dev);
 out_free:
 	kfree(dev);
+	pci_set_drvdata(pci_dev, NULL);
 out:
 	return err;
 }
 
-static struct pci_device_id pci_device_id[] __devinitdata = {
+static void __devexit ns83820_remove_one(struct pci_dev *pci_dev)
+{
+	struct ns83820	*dev = pci_get_drvdata(pci_dev);
+
+	if (!dev)			/* paranoia */
+		return;
+
+	writel(0, dev->base + IMR);	/* paranoia */
+	writel(0, dev->base + IER);
+	readl(dev->base + IER);
+
+	unregister_netdev(&dev->net_dev);
+	free_irq(dev->pci_dev->irq, dev);
+	iounmap(dev->base);
+	pci_free_consistent(dev->pci_dev, 4 * DESC_SIZE * NR_TX_DESC,
+			dev->tx_descs, dev->tx_phy_descs);
+	pci_free_consistent(dev->pci_dev, 4 * DESC_SIZE * NR_RX_DESC,
+			dev->rx_info.descs, dev->rx_info.phy_descs);
+	pci_disable_device(dev->pci_dev);
+	kfree(dev);
+	pci_set_drvdata(pci_dev, NULL);
+}
+
+static struct pci_device_id ns83820_pci_tbl[] __devinitdata = {
 	{ 0x100b, 0x0022, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
 	{ 0, },
 };
 
 static struct pci_driver driver = {
 	name:		"ns83820",
-	id_table:	pci_device_id,
-	probe:		ns83820_probe,
+	id_table:	ns83820_pci_tbl,
+	probe:		ns83820_init_one,
+	remove:		ns83820_remove_one,
 #if 0	/* FIXME: implement */
-	remove:		,
 	suspend:	,
 	resume:		,
 #endif
@@ -1450,37 +1469,16 @@ static int __init ns83820_init(void)
 	return pci_module_init(&driver);
 }
 
-static void ns83820_exit(void)
+static void __exit ns83820_exit(void)
 {
-	struct ns83820	*dev;
-
-	for (dev = ns83820_chain; dev; ) {
-		struct ns83820 *next = dev->next_dev;
-
-		writel(0, dev->base + IMR);	/* paranoia */
-		writel(0, dev->base + IER);
-		readl(dev->base + IER);
-
-		unregister_netdev(&dev->net_dev);
-		free_irq(dev->pci_dev->irq, dev);
-		iounmap(dev->base);
-		pci_free_consistent(dev->pci_dev, 4 * DESC_SIZE * NR_TX_DESC,
-				dev->tx_descs, dev->tx_phy_descs);
-		pci_free_consistent(dev->pci_dev, 4 * DESC_SIZE * NR_RX_DESC,
-				dev->rx_info.descs, dev->rx_info.phy_descs);
-		pci_disable_device(dev->pci_dev);
-		kfree(dev);
-		dev = next;
-	}
 	pci_unregister_driver(&driver);
-	ns83820_chain = NULL;
 }
 
 MODULE_AUTHOR("Benjamin LaHaise <bcrl@redhat.com>");
 MODULE_DESCRIPTION("National Semiconductor DP83820 10/100/1000 driver");
 MODULE_LICENSE("GPL");
 
-MODULE_DEVICE_TABLE(pci, pci_device_id);
+MODULE_DEVICE_TABLE(pci, ns83820_pci_tbl);
 
 module_init(ns83820_init);
 module_exit(ns83820_exit);

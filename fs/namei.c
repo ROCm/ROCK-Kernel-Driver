@@ -324,19 +324,28 @@ static struct dentry * real_lookup(struct dentry * parent, struct qstr * name, i
 	return result;
 }
 
+/*
+ * Yes, this really increments the link_count by 5, and
+ * decrements it by 4. Together with checking against 40,
+ * this limits recursive symlink follows to 8, while
+ * limiting consecutive symlinks to 40.
+ *
+ * Without that kind of total limit, nasty chains of consecutive
+ * symlinks can cause almost arbitrarily long lookups. 
+ */
 static inline int do_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
 	int err;
-	if (current->link_count >= 8)
+	if (current->link_count >= 40)
 		goto loop;
 	if (current->need_resched) {
 		current->state = TASK_RUNNING;
 		schedule();
 	}
-	current->link_count++;
+	current->link_count += 5;
 	UPDATE_ATIME(dentry->d_inode);
 	err = dentry->d_inode->i_op->follow_link(dentry, nd);
-	current->link_count--;
+	current->link_count -= 4;
 	return err;
 loop:
 	path_release(nd);
@@ -425,6 +434,7 @@ static inline void follow_dotdot(struct nameidata *nd)
 		nd->mnt = parent;
 	}
 }
+
 /*
  * Name resolution.
  *
@@ -433,7 +443,7 @@ static inline void follow_dotdot(struct nameidata *nd)
  *
  * We expect 'base' to be positive and a directory.
  */
-int path_walk(const char * name, struct nameidata *nd)
+int link_path_walk(const char * name, struct nameidata *nd)
 {
 	struct dentry *dentry;
 	struct inode *inode;
@@ -622,6 +632,12 @@ out_dput:
 	path_release(nd);
 return_err:
 	return err;
+}
+
+int path_walk(const char * name, struct nameidata *nd)
+{
+	current->link_count = 0;
+	return link_path_walk(name, nd);
 }
 
 /* SMP-safe */
@@ -1935,7 +1951,7 @@ __vfs_follow_link(struct nameidata *nd, const char *link)
 			/* weird __emul_prefix() stuff did it */
 			goto out;
 	}
-	res = path_walk(link, nd);
+	res = link_path_walk(link, nd);
 out:
 	if (current->link_count || res || nd->last_type!=LAST_NORM)
 		return res;

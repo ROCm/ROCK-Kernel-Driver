@@ -949,12 +949,10 @@ static void kaweth_disconnect(struct usb_device *dev, void *ptr)
  *-------------------------------------------------------------------*/
 static void usb_api_blocking_completion(urb_t *urb)
 {
-        api_wrapper_data *awd = (api_wrapper_data *)urb->context;
+        struct usb_api_data *awd = (struct usb_api_data *)urb->context;
 
-        if (waitqueue_active(awd->wakeup)) {
-                wake_up(awd->wakeup);
-	}
-
+	awd->done=1;
+	wake_up(&awd->wqh);
 }
 
 /*-------------------------------------------------------------------*
@@ -965,36 +963,31 @@ static void usb_api_blocking_completion(urb_t *urb)
 static int usb_start_wait_urb(urb_t *urb, int timeout, int* actual_length)
 {
         DECLARE_WAITQUEUE(wait, current);
-        DECLARE_WAIT_QUEUE_HEAD(wqh);
-        api_wrapper_data awd;
+	struct usb_api_data awd;
         int status;
 
-        awd.wakeup = &wqh;
-        init_waitqueue_head(&wqh);
+        init_waitqueue_head(&awd.wqh);
+        awd.done = 0;
+        
         current->state = TASK_INTERRUPTIBLE;
-        add_wait_queue(&wqh, &wait);
+        add_wait_queue(&awd.wqh, &wait);
         urb->context = &awd;
         status = usb_submit_urb(urb);
         if (status) {
                 // something went wrong
                 usb_free_urb(urb);
                 current->state = TASK_RUNNING;
-                remove_wait_queue(&wqh, &wait);
+                remove_wait_queue(&awd.wqh, &wait);
                 return status;
         }
 
-        if (urb->status == -EINPROGRESS) {
-                while (timeout && urb->status == -EINPROGRESS)
-                        status = timeout = schedule_timeout(timeout);
-        } 
-	else {
-                status = 1;
-	}
+	while (timeout && !awd.done)
+		timeout = schedule_timeout(timeout);
 
         current->state = TASK_RUNNING;
-        remove_wait_queue(&wqh, &wait);
+        remove_wait_queue(&awd.wqh, &wait);
 
-        if (!status) {
+        if (!timeout) {
                 // timeout
                 kaweth_warn("usb_control/bulk_msg: timeout");
                 usb_unlink_urb(urb);  // remove urb safely

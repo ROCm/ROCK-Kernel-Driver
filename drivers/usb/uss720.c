@@ -75,9 +75,10 @@ static int get_1284_register(struct parport *pp, unsigned char reg, unsigned cha
 	if (!usbdev)
 		return -1;
 	ret = usb_control_msg(usbdev, usb_rcvctrlpipe(usbdev,0), 3, 0xc0, ((unsigned int)reg) << 8, 0, priv->reg, 7, HZ);
-	if (ret) {
-		printk(KERN_DEBUG "uss720: get_1284_register(%d) failed, status 0x%x\n",
+	if (ret != 7) {
+		printk(KERN_DEBUG "uss720: get_1284_register(%d) failed, status 0x%x expected 7\n",
 		       (unsigned int)reg, ret);
+		ret = -1;
 	} else {
 #if 0
 		printk(KERN_DEBUG "uss720: get_1284_register(%d) return %02x %02x %02x %02x %02x %02x %02x\n",
@@ -88,6 +89,7 @@ static int get_1284_register(struct parport *pp, unsigned char reg, unsigned cha
 		/* if nAck interrupts are enabled and we have an interrupt, call the interrupt procedure */
 		if (priv->reg[2] & priv->reg[1] & 0x10)
 			parport_generic_irq(0, pp, NULL);
+		ret = 0;
 	}
 	if (val)
 		*val = priv->reg[(reg >= 9) ? 0 : regindex[reg]];
@@ -636,6 +638,7 @@ static struct usb_device_id uss720_table [] = {
 	{ USB_DEVICE(0x047e, 0x1001) },
 	{ USB_DEVICE(0x0557, 0x2001) },
 	{ USB_DEVICE(0x0729, 0x1284) },
+	{ USB_DEVICE(0x1293, 0x0002) },
 	{ }						/* Terminating entry */
 };
 
@@ -653,6 +656,7 @@ static struct usb_driver uss720_driver = {
 
 MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
+MODULE_LICENSE("GPL");
 
 static int __init uss720_init(void)
 {

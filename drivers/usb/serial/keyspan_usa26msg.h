@@ -103,39 +103,39 @@ typedef struct keyspan_usa26_portControlMessage
 			when necessary, to reduce overhead on the USA26):
 	*/
 	u8	setClocking,	// BOTH: host requests baud rate be set
-		baudLo,			// BOTH: host does baud divisor calculation
-		baudHi,			// BOTH: baudHi is only used for first port (gives lower rates)
+		baudLo,		// BOTH: host does baud divisor calculation
+		baudHi,		// BOTH: baudHi is only used for first port (gives lower rates)
 		externalClock_txClocking,
-						// USA26: 0=internal, other=external
-						// USA17: 0=internal, other=external/RI
+					// USA26: 0=internal, other=external
+					// USA17: 0=internal, other=external/RI
 		rxClocking,		// USA17: 0=internal, 1=external/RI, other=external/DSR
 
 
 		setLcr,			// BOTH: host requests lcr be set
 		lcr,			// BOTH: use PARITY, STOPBITS, DATABITS below
 
-		setFlowControl,	// BOTH: host requests flow control be set
-		ctsFlowControl,	// BOTH: 1=use CTS flow control, 0=don't
-		xonFlowControl,	// BOTH: 1=use XON/XOFF flow control, 0=don't
+		setFlowControl,		// BOTH: host requests flow control be set
+		ctsFlowControl,		// BOTH: 1=use CTS flow control, 0=don't
+		xonFlowControl,		// BOTH: 1=use XON/XOFF flow control, 0=don't
 		xonChar,		// BOTH: specified in current character format
 		xoffChar,		// BOTH: specified in current character format
 
 		setTxTriState_setRts,
-						// USA26: host requests TX tri-state be set
-						// USA17: host requests RTS output be set
-		txTriState_rts,	// BOTH: 1=active (normal), 0=tristate (off)
+					// USA26: host requests TX tri-state be set
+					// USA17: host requests RTS output be set
+		txTriState_rts,		// BOTH: 1=active (normal), 0=tristate (off)
 
 		setHskoa_setDtr,
-						// USA26: host requests HSKOA output be set
-						// USA17: host requests DTR output be set
+					// USA26: host requests HSKOA output be set
+					// USA17: host requests DTR output be set
 		hskoa_dtr,		// BOTH: 1=on, 0=off
 
-		setPrescaler,	// USA26: host requests prescalar be set (default: 13)
+		setPrescaler,		// USA26: host requests prescalar be set (default: 13)
 		prescaler;		// BOTH: specified as N/8; values 8-ff are valid
-						// must be set any time internal baud rate is set;
-						// must not be set when external clocking is used
-						// note: in USA17, prescaler is applied whenever
-						// setClocking is requested
+					// must be set any time internal baud rate is set;
+					// must not be set when external clocking is used
+					// note: in USA17, prescaler is applied whenever
+					// setClocking is requested
 
 	/*
 		3.	configuration data which is simply used as is (no overhead,

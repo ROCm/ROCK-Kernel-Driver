@@ -32,7 +32,6 @@
 #ifndef _PASSTHROUGH_H
 #define _PASSTHROUGH_H
 
-#include "hwaccess.h"
 #include "audio.h"
 
 /* number of 16-bit stereo samples in XTRAM buffer */

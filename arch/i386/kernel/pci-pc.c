@@ -1150,6 +1150,26 @@ static void __init pci_fixup_piix4_acpi(struct pci_dev *d)
 	d->irq = 9;
 }
 
+/*
+ * Nobody seems to know what this does. Damn.
+ *
+ * But it does seem to fix some unspecified problem
+ * with 'movntq' copies on Athlons.
+ *
+ * VIA 8363 chipset:
+ *  - bit 7 at offset 0x55: Debug (RW)
+ */
+static void __init pci_fixup_via_athlon_bug(struct pci_dev *d)
+{
+	u8 v;
+	pci_read_config_byte(d, 0x55, &v);
+	if (v & 0x80) {
+		printk("Trying to stomp on Athlon bug...\n");
+		v &= 0x7f; /* clear bit 55.7 */
+		pci_write_config_byte(d, 0x55, v);
+	}
+}
+
 struct pci_fixup pcibios_fixups[] = {
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82451NX,	pci_fixup_i450nx },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82454GX,	pci_fixup_i450gx },
@@ -1169,6 +1189,7 @@ struct pci_fixup pcibios_fixups[] = {
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_5597,		pci_fixup_latency },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_SI,	PCI_DEVICE_ID_SI_5598,		pci_fixup_latency },
  	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82371AB_3,	pci_fixup_piix4_acpi },
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8363_0,	pci_fixup_via_athlon_bug },
 	{ 0 }
 };
 

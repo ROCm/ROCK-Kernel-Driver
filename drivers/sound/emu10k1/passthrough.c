@@ -47,7 +47,6 @@
 #include "irqmgr.h"
 #include "audio.h"
 #include "8010.h"
-#include "passthrough.h"
 
 static void pt_putsamples(struct pt_data *pt, u16 *ptr, u16 left, u16 right)
 {
@@ -209,9 +208,7 @@ void emu10k1_pt_stop(struct emu10k1_card *card)
 {
 	struct pt_data *pt = &card->pt;
 	int i;
-	unsigned long flags;
 
-	spin_lock_irqsave(&card->pt.lock, flags);
 	if (pt->state != PT_STATE_INACTIVE) {
 		DPF(2, "digital pass-through stopped\n");
 		sblive_writeptr(card, GPR_BASE + pt->enable_gpr, 0, 0);
@@ -222,7 +219,6 @@ void emu10k1_pt_stop(struct emu10k1_card *card)
 		pt->state = PT_STATE_INACTIVE;
 		kfree(pt->buf);
 	}
-	spin_unlock_irqrestore(&card->pt.lock, flags);
 }
 
 void emu10k1_pt_waveout_update(struct emu10k1_wavedevice *wave_dev)

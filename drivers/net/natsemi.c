@@ -81,6 +81,10 @@
 		* stop the nic before switching into silent rx mode
 		for wol (required according to docu).
 
+	version 1.0.10:
+		* use long for ee_addr (various)
+		* print pointers properly (DaveM)
+		* include asm/irq.h (?)
 
 	TODO:
 	* big endian support with CFG:BEM instead of cpu_to_le32
@@ -89,8 +93,8 @@
 */
 
 #define DRV_NAME	"natsemi"
-#define DRV_VERSION	"1.07+LK1.0.9"
-#define DRV_RELDATE	"Oct 02, 2001"
+#define DRV_VERSION	"1.07+LK1.0.10"
+#define DRV_RELDATE	"Oct 09, 2001"
 
 
 /* Updated to recommendations in pci-skeleton v2.03. */
@@ -178,6 +182,7 @@ static int full_duplex[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #include <asm/processor.h>		/* Processor type for cache alignment. */
 #include <asm/bitops.h>
 #include <asm/io.h>
+#include <asm/irq.h>
 #include <asm/uaccess.h>
 
 /* These identify the driver base version and may not be removed. */
@@ -656,7 +661,7 @@ static int eeprom_read(long addr, int location)
 {
 	int i;
 	int retval = 0;
-	int ee_addr = addr + EECtrl;
+	long ee_addr = addr + EECtrl;
 	int read_cmd = location | EE_ReadCmd;
 	writel(EE_Write0, ee_addr);
 
@@ -940,14 +945,12 @@ static void dump_ring(struct net_device *dev)
 
 	if (debug > 2) {
 		int i;
-		printk(KERN_DEBUG "  Tx ring at %8.8x:\n",
-			   (int)np->tx_ring);
+		printk(KERN_DEBUG "  Tx ring at %p:\n", np->tx_ring);
 		for (i = 0; i < TX_RING_SIZE; i++)
 			printk(KERN_DEBUG " #%d desc. %8.8x %8.8x %8.8x.\n",
 				   i, np->tx_ring[i].next_desc,
 				   np->tx_ring[i].cmd_status, np->tx_ring[i].addr);
-		printk(KERN_DEBUG "  Rx ring %8.8x:\n",
-			   (int)np->rx_ring);
+		printk(KERN_DEBUG "  Rx ring %p:\n", np->rx_ring);
 		for (i = 0; i < RX_RING_SIZE; i++) {
 			printk(KERN_DEBUG " #%d desc. %8.8x %8.8x %8.8x.\n",
 				   i, np->rx_ring[i].next_desc,

@@ -471,12 +471,12 @@ err_out:
 #define EE_READ_CMD		(6 << 6)
 #define EE_ERASE_CMD	(7 << 6)
 
-static int __init read_eeprom(int ioaddr, int location)
+static int __init read_eeprom(long ioaddr, int location)
 {
 	int i;
 	unsigned short retval = 0;
-	int ee_addr = ioaddr + EEPROM_Ctrl;
-	int ee_daddr = ioaddr + EEPROM_Data;
+	long ee_addr = ioaddr + EEPROM_Ctrl;
+	long ee_daddr = ioaddr + EEPROM_Data;
 	int read_cmd = location | EE_READ_CMD;
 
 	/* Shift the read command bits out. */

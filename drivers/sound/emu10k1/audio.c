@@ -49,7 +49,6 @@
 #include "irqmgr.h"
 #include "audio.h"
 #include "8010.h"
-#include "passthrough.h"
 
 static void calculate_ofrag(struct woinst *);
 static void calculate_ifrag(struct wiinst *);
@@ -984,6 +983,9 @@ static struct page *emu10k1_mm_nopage (struct vm_area_struct * vma, unsigned lon
 	unsigned long pgoff;
 	int rd, wr;
 
+	DPF(4, "emu10k1_mm_nopage()\n");
+	DPD(4, "addr: %#lx\n", address);
+
 	if (address > vma->vm_end) {
 		DPF(2, "EXIT, returning NOPAGE_SIGBUS\n");
 		return NOPAGE_SIGBUS; /* Disallow mremap */
@@ -1013,6 +1015,8 @@ static struct page *emu10k1_mm_nopage (struct vm_area_struct * vma, unsigned lon
 	}
 
 	get_page (dmapage);
+
+	DPD(4, "page: %#lx\n", dmapage);
 	return dmapage;
 }
 
@@ -1023,14 +1027,14 @@ struct vm_operations_struct emu10k1_mm_ops = {
 static int emu10k1_audio_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct emu10k1_wavedevice *wave_dev = (struct emu10k1_wavedevice *) file->private_data;
-	unsigned long maxsize, size, offset, pgoffset;
+	unsigned long max_pages, n_pages, pgoffset;
 	struct woinst *woinst = NULL;
 	struct wiinst *wiinst = NULL;
 	unsigned long flags;
 
 	DPF(2, "emu10k1_audio_mmap()\n");
 
-	maxsize = 0;
+	max_pages = 0;
 	if (vma->vm_flags & VM_WRITE) {
 		woinst = wave_dev->woinst;
 
@@ -1053,7 +1057,7 @@ static int emu10k1_audio_mmap(struct file *file, struct vm_area_struct *vma)
 		}
 
 		woinst->mmapped = 1;
-		maxsize += woinst->buffer.pages * PAGE_SIZE;
+		max_pages += woinst->buffer.pages;
 		spin_unlock_irqrestore(&woinst->lock, flags);
 	}
 
@@ -1072,21 +1076,23 @@ static int emu10k1_audio_mmap(struct file *file, struct vm_area_struct *vma)
 		}
 
 		wiinst->mmapped = 1;
-		maxsize += wiinst->buffer.pages * PAGE_SIZE;
+		max_pages += wiinst->buffer.pages;
 		spin_unlock_irqrestore(&wiinst->lock, flags);
 	}
 
-	size = vma->vm_end - vma->vm_start;
+	n_pages = ((vma->vm_end - vma->vm_start) + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	pgoffset = vma->vm_pgoff;
-	offset = pgoffset << PAGE_SHIFT;
 
-	if (offset + size > maxsize)
+	DPD(3, "vma_start: %#lx, vma_end: %#lx, vma_offset: %d\n", vma->vm_start, vma->vm_end, pgoffset);
+	DPD(3, "n_pages: %d, max_pages: %d\n", n_pages, max_pages);
+
+	if (pgoffset + n_pages > max_pages)
 		return -EINVAL;
 
 	vma->vm_flags |= VM_RESERVED;
 	vma->vm_ops = &emu10k1_mm_ops;
 	vma->vm_private_data = wave_dev;
-	
+
 	return 0;
 }
 
@@ -1240,9 +1246,11 @@ static int emu10k1_audio_release(struct inode *inode, struct file *file)
 
 		spin_lock_irqsave(&woinst->lock, flags);
 
-		if (woinst->format.passthrough && card->pt.state != PT_STATE_INACTIVE)
+		if (woinst->format.passthrough && card->pt.state != PT_STATE_INACTIVE) {
+			spin_lock(&card->pt.lock);
                         emu10k1_pt_stop(card);
-
+			spin_unlock(&card->pt.lock);
+		}
 		if (woinst->state & WAVE_STATE_OPEN) {
 			if (woinst->state & WAVE_STATE_STARTED) {
 				if (!(file->f_flags & O_NONBLOCK)) {
@@ -1259,7 +1267,7 @@ static int emu10k1_audio_release(struct inode *inode, struct file *file)
 		}
 
 		spin_unlock_irqrestore(&woinst->lock, flags);
-		/* wait for the tasklet (bottom-half) to finish */
+		/* remove the tasklet */
 		tasklet_kill(&woinst->timer.tasklet);
 		kfree(wave_dev->woinst);
 	}
@@ -1505,9 +1513,10 @@ void emu10k1_wavein_bh(unsigned long refdata)
 
 	spin_unlock_irqrestore(&wiinst->lock, flags);
 
-	if (bytestocopy >= wiinst->buffer.fragment_size && waitqueue_active(&wiinst->wait_queue))
-		wake_up_interruptible(&wiinst->wait_queue);
-	else
+	if (bytestocopy >= wiinst->buffer.fragment_size) {
+	 	if (waitqueue_active(&wiinst->wait_queue))
+			wake_up_interruptible(&wiinst->wait_queue);
+	} else
 		DPD(3, "Not enough transfer size, %d\n", bytestocopy);
 
 	return;
@@ -1539,9 +1548,10 @@ void emu10k1_waveout_bh(unsigned long refdata)
 	} else
 		spin_unlock_irqrestore(&woinst->lock, flags);
 
-	if (bytestocopy >= woinst->buffer.fragment_size && waitqueue_active(&woinst->wait_queue))
-		wake_up_interruptible(&woinst->wait_queue);
-	else
+	if (bytestocopy >= woinst->buffer.fragment_size) {
+		if (waitqueue_active(&woinst->wait_queue))
+			wake_up_interruptible(&woinst->wait_queue);
+	} else
 		DPD(3, "Not enough transfer size -> %d\n", bytestocopy);
 
 	return;

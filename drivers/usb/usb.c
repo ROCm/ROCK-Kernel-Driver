@@ -1042,15 +1042,11 @@ int usb_unlink_urb(urb_t *urb)
  *-------------------------------------------------------------------*/
 static void usb_api_blocking_completion(urb_t *urb)
 {
-	api_wrapper_data *awd = (api_wrapper_data *)urb->context;
+	struct usb_api_data *awd = (struct usb_api_data *)urb->context;
 
-	if (waitqueue_active(awd->wakeup))
-		wake_up(awd->wakeup);
-#if 0
-	else
-		dbg("(blocking_completion): waitqueue empty!"); 
-		// even occurs if urb was unlinked by timeout...
-#endif
+	awd->done = 1;
+	wmb();
+	wake_up(&awd->wqh);
 }
 
 /*-------------------------------------------------------------------*
@@ -1061,38 +1057,46 @@ static void usb_api_blocking_completion(urb_t *urb)
 static int usb_start_wait_urb(urb_t *urb, int timeout, int* actual_length)
 { 
 	DECLARE_WAITQUEUE(wait, current);
-	DECLARE_WAIT_QUEUE_HEAD(wqh);
-	api_wrapper_data awd;
+	struct usb_api_data awd;
 	int status;
-  
-	awd.wakeup = &wqh;
-	init_waitqueue_head(&wqh); 	
-	current->state = TASK_INTERRUPTIBLE;
-	add_wait_queue(&wqh, &wait);
+
+	init_waitqueue_head(&awd.wqh); 	
+	awd.done = 0;
+
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	add_wait_queue(&awd.wqh, &wait);
+
 	urb->context = &awd;
 	status = usb_submit_urb(urb);
 	if (status) {
 		// something went wrong
 		usb_free_urb(urb);
-		current->state = TASK_RUNNING;
-		remove_wait_queue(&wqh, &wait);
+		set_current_state(TASK_RUNNING);
+		remove_wait_queue(&awd.wqh, &wait);
 		return status;
 	}
 
-	if (urb->status == -EINPROGRESS) {
-		while (timeout && urb->status == -EINPROGRESS)
-			status = timeout = schedule_timeout(timeout);
-	} else
-		status = 1;
+	while (timeout && !awd.done)
+	{
+		timeout = schedule_timeout(timeout);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		rmb();
+	}
 
-	current->state = TASK_RUNNING;
-	remove_wait_queue(&wqh, &wait);
+	set_current_state(TASK_RUNNING);
+	remove_wait_queue(&awd.wqh, &wait);
 
-	if (!status) {
-		// timeout
-		printk("usb_control/bulk_msg: timeout\n");
-		usb_unlink_urb(urb);  // remove urb safely
-		status = -ETIMEDOUT;
+	if (!timeout && !awd.done) {
+		if (urb->status != -EINPROGRESS) {	/* No callback?!! */
+			printk(KERN_ERR "usb: raced timeout, "
+			    "pipe 0x%x status %d time left %d\n",
+			    urb->pipe, urb->status, timeout);
+			status = urb->status;
+		} else {
+			printk("usb_control/bulk_msg: timeout\n");
+			usb_unlink_urb(urb);  // remove urb safely
+			status = -ETIMEDOUT;
+		}
 	} else
 		status = urb->status;
 
@@ -1116,15 +1120,14 @@ int usb_internal_control_msg(struct usb_device *usb_dev, unsigned int pipe,
 	if (!urb)
 		return -ENOMEM;
   
-	FILL_CONTROL_URB(urb, usb_dev, pipe, (unsigned char*)cmd, data, len,    /* build urb */  
-		   (usb_complete_t)usb_api_blocking_completion,0);
+	FILL_CONTROL_URB(urb, usb_dev, pipe, (unsigned char*)cmd, data, len,
+		   usb_api_blocking_completion, 0);
 
 	retv = usb_start_wait_urb(urb, timeout, &length);
 	if (retv < 0)
 		return retv;
 	else
 		return length;
-	
 }
 
 /**
@@ -1205,8 +1208,8 @@ int usb_bulk_msg(struct usb_device *usb_dev, unsigned int pipe,
 	if (!urb)
 		return -ENOMEM;
 
-	FILL_BULK_URB(urb,usb_dev,pipe,(unsigned char*)data,len,   /* build urb */
-			(usb_complete_t)usb_api_blocking_completion,0);
+	FILL_BULK_URB(urb, usb_dev, pipe, data, len,
+		    usb_api_blocking_completion, 0);
 
 	return usb_start_wait_urb(urb,timeout,actual_length);
 }
@@ -1767,8 +1770,11 @@ void usb_connect(struct usb_device *dev)
  * These are the actual routines to send
  * and receive control messages.
  */
-
+#ifdef CONFIG_USB_LONG_TIMEOUT
+#define GET_TIMEOUT 4
+#else
 #define GET_TIMEOUT 3
+#endif
 #define SET_TIMEOUT 3
 
 int usb_set_address(struct usb_device *dev)
@@ -2410,3 +2416,4 @@ EXPORT_SYMBOL(usb_control_msg);
 EXPORT_SYMBOL(usb_bulk_msg);
 
 EXPORT_SYMBOL(usb_devfs_handle);
+MODULE_LICENSE("GPL");

@@ -78,6 +78,8 @@
 		Andrew Morton - Clear blocked signals, avoid
 		buffer overrun setting current->comm.
 
+		Kalle Olavi Niemitalo - Wake-on-LAN ioctls
+
 	Submitting bug reports:
 
 		"rtl8139-diag -mmmaaavvveefN" output
@@ -429,9 +431,32 @@ enum Config1Bits {
 	PWRDN = (1 << 0),	/* only on 8139, 8139A */
 };
 
+/* Bits in Config3 */
+enum Config3Bits {
+	Cfg3_FBtBEn    = (1 << 0), /* 1 = Fast Back to Back */
+	Cfg3_FuncRegEn = (1 << 1), /* 1 = enable CardBus Function registers */
+	Cfg3_CLKRUN_En = (1 << 2), /* 1 = enable CLKRUN */
+	Cfg3_CardB_En  = (1 << 3), /* 1 = enable CardBus registers */
+	Cfg3_LinkUp    = (1 << 4), /* 1 = wake up on link up */
+	Cfg3_Magic     = (1 << 5), /* 1 = wake up on Magic Packet (tm) */
+	Cfg3_PARM_En   = (1 << 6), /* 0 = software can set twister parameters */
+	Cfg3_GNTSel    = (1 << 7), /* 1 = delay 1 clock from PCI GNT signal */
+};
+
 /* Bits in Config4 */
 enum Config4Bits {
 	LWPTN = (1 << 2),	/* not on 8139, 8139A */
+};
+
+/* Bits in Config5 */
+enum Config5Bits {
+	Cfg5_PME_STS     = (1 << 0), /* 1 = PCI reset resets PME_Status */
+	Cfg5_LANWake     = (1 << 1), /* 1 = enable LANWake signal */
+	Cfg5_LDPS        = (1 << 2), /* 0 = save power when link is down */
+	Cfg5_FIFOAddrPtr = (1 << 3), /* Realtek internal SRAM testing */
+	Cfg5_UWF         = (1 << 4), /* 1 = accept unicast wakeup frame */
+	Cfg5_MWF         = (1 << 5), /* 1 = accept multicast wakeup frame */
+	Cfg5_BWF         = (1 << 6), /* 1 = accept broadcast wakeup frame */
 };
 
 enum RxConfigBits {
@@ -1041,11 +1066,11 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 		tp->duplex_lock = 1;
 	}
 	if (tp->default_port) {
-		printk(KERN_INFO "  Forcing %dMbs %s-duplex operation.\n",
+		printk(KERN_INFO "  Forcing %dMbps %s-duplex operation.\n",
 			   (option & 0x20 ? 100 : 10),
 			   (option & 0x10 ? "full" : "half"));
 		mdio_write(dev, tp->phys[0], 0,
-				   ((option & 0x20) ? 0x2000 : 0) | 	/* 100mbps? */
+				   ((option & 0x20) ? 0x2000 : 0) | 	/* 100Mbps? */
 				   ((option & 0x10) ? 0x0100 : 0)); /* Full duplex? */
 	}
 
@@ -1400,9 +1425,10 @@ static void rtl8139_hw_start (struct net_device *dev)
 	rtl_check_media (dev);
 
 	if (tp->chipset >= CH_8139B) {
-		/* disable magic packet scanning, which is enabled
-		 * when PM is enabled in Config1 */
-		RTL_W8 (Config3, RTL_R8 (Config3) & ~(1<<5));
+		/* Disable magic packet scanning, which is enabled
+		 * when PM is enabled in Config1.  It can be reenabled
+		 * via ETHTOOL_SWOL if desired.  */
+		RTL_W8 (Config3, RTL_R8 (Config3) & ~Cfg3_Magic);
 	}
 
 	DPRINTK("init buffer addresses\n");
@@ -2209,15 +2235,148 @@ static int rtl8139_close (struct net_device *dev)
 }
 
 
+/* Get the ethtool settings.  Assumes that eset points to kernel
+   memory, *eset has been initialized as {ETHTOOL_GSET}, and other
+   threads or interrupts aren't messing with the 8139.  */
+static void netdev_get_eset (struct net_device *dev, struct ethtool_cmd *eset)
+{
+	struct rtl8139_private *np = dev->priv;
+	void *ioaddr = np->mmio_addr;
+	u16 advert;
+
+	eset->supported = SUPPORTED_10baseT_Half
+		      	| SUPPORTED_10baseT_Full
+		      	| SUPPORTED_100baseT_Half
+		      	| SUPPORTED_100baseT_Full
+		      	| SUPPORTED_Autoneg
+		      	| SUPPORTED_TP;
+
+	eset->advertising = ADVERTISED_TP | ADVERTISED_Autoneg;
+	advert = mdio_read (dev, np->phys[0], 4);
+	if (advert & 0x0020)
+		eset->advertising |= ADVERTISED_10baseT_Half;
+	if (advert & 0x0040)
+		eset->advertising |= ADVERTISED_10baseT_Full;
+	if (advert & 0x0080)
+		eset->advertising |= ADVERTISED_100baseT_Half;
+	if (advert & 0x0100)
+		eset->advertising |= ADVERTISED_100baseT_Full;
+
+	eset->speed = (RTL_R8 (MediaStatus) & 0x08) ? 10 : 100;
+	/* (KON)FIXME: np->full_duplex is set or reset by the thread,
+	   which means this always shows half duplex if the interface
+	   isn't up yet, even if it has already autonegotiated.  */
+	eset->duplex = np->full_duplex ? DUPLEX_FULL : DUPLEX_HALF;
+	eset->port = PORT_TP;
+	/* (KON)FIXME: Is np->phys[0] correct?  starfire.c uses that.  */
+	eset->phy_address = np->phys[0];
+	eset->transceiver = XCVR_INTERNAL;
+	eset->autoneg = (mdio_read (dev, np->phys[0], 0) & 0x1000) != 0;
+	eset->maxtxpkt = 1;
+	eset->maxrxpkt = 1;
+}
+
+
+/* Get the ethtool Wake-on-LAN settings.  Assumes that wol points to
+   kernel memory, *wol has been initialized as {ETHTOOL_GWOL}, and
+   other threads or interrupts aren't messing with the 8139.  */
+static void netdev_get_wol (struct net_device *dev, struct ethtool_wolinfo *wol)
+{
+	struct rtl8139_private *np = dev->priv;
+	void *ioaddr = np->mmio_addr;
+
+	if (rtl_chip_info[np->chipset].flags & HasLWake) {
+		u8 cfg3 = RTL_R8 (Config3);
+		u8 cfg5 = RTL_R8 (Config5);
+
+		wol->supported = WAKE_PHY | WAKE_MAGIC
+			| WAKE_UCAST | WAKE_MCAST | WAKE_BCAST;
+
+		wol->wolopts = 0;
+		if (cfg3 & Cfg3_LinkUp)
+			wol->wolopts |= WAKE_PHY;
+		if (cfg3 & Cfg3_Magic)
+			wol->wolopts |= WAKE_MAGIC;
+		/* (KON)FIXME: See how netdev_set_wol() handles the
+		   following constants.  */
+		if (cfg5 & Cfg5_UWF)
+			wol->wolopts |= WAKE_UCAST;
+		if (cfg5 & Cfg5_MWF)
+			wol->wolopts |= WAKE_MCAST;
+		if (cfg5 & Cfg5_BWF)
+			wol->wolopts |= WAKE_BCAST;
+	}
+}
+
+
+/* Set the ethtool Wake-on-LAN settings.  Return 0 or -errno.  Assumes
+   that wol points to kernel memory and other threads or interrupts
+   aren't messing with the 8139.  */
+static int netdev_set_wol (struct net_device *dev,
+			   const struct ethtool_wolinfo *wol)
+{
+	struct rtl8139_private *np = dev->priv;
+	void *ioaddr = np->mmio_addr;
+	u32 support;
+	u8 cfg3, cfg5;
+
+	support = ((rtl_chip_info[np->chipset].flags & HasLWake)
+		   ? (WAKE_PHY | WAKE_MAGIC
+		      | WAKE_UCAST | WAKE_MCAST | WAKE_BCAST)
+		   : 0);
+	if (wol->wolopts & ~support)
+		return -EINVAL;
+
+	cfg3 = RTL_R8 (Config3) & ~(Cfg3_LinkUp | Cfg3_Magic);
+	if (wol->wolopts & WAKE_PHY)
+		cfg3 |= Cfg3_LinkUp;
+	if (wol->wolopts & WAKE_MAGIC)
+		cfg3 |= Cfg3_Magic;
+	RTL_W8 (Cfg9346, Cfg9346_Unlock);
+	RTL_W8 (Config3, cfg3);
+	RTL_W8 (Cfg9346, Cfg9346_Lock);
+
+	cfg5 = RTL_R8 (Config5) & ~(Cfg5_UWF | Cfg5_MWF | Cfg5_BWF);
+	/* (KON)FIXME: These are untested.  We may have to set the
+	   CRC0, Wakeup0 and LSBCRC0 registers too, but I have no
+	   documentation.  */
+	if (wol->wolopts & WAKE_UCAST)
+		cfg5 |= Cfg5_UWF;
+	if (wol->wolopts & WAKE_MCAST)
+		cfg5 |= Cfg5_MWF;
+	if (wol->wolopts & WAKE_BCAST)
+		cfg5 |= Cfg5_BWF;
+	RTL_W8 (Config5, cfg5);	/* need not unlock via Cfg9346 */
+
+	return 0;
+}
+
+
 static int netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
 {
 	struct rtl8139_private *np = dev->priv;
 	u32 ethcmd;
 
+	/* dev_ioctl() in ../../net/core/dev.c has already checked
+	   capable(CAP_NET_ADMIN), so don't bother with that here.  */
+
 	if (copy_from_user (&ethcmd, useraddr, sizeof (ethcmd)))
 		return -EFAULT;
 
 	switch (ethcmd) {
+	case ETHTOOL_GSET:
+		{
+			struct ethtool_cmd eset = { ETHTOOL_GSET };
+			spin_lock_irq (&np->lock);
+			netdev_get_eset (dev, &eset);
+			spin_unlock_irq (&np->lock);
+			if (copy_to_user (useraddr, &eset, sizeof (eset)))
+				return -EFAULT;
+			return 0;
+		}
+
+	/* TODO: ETHTOOL_SSET */
+		
 	case ETHTOOL_GDRVINFO:
 		{
 			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
@@ -2229,12 +2388,36 @@ static int netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
 			return 0;
 		}
 
+	case ETHTOOL_GWOL:
+		{
+			struct ethtool_wolinfo wol = { ETHTOOL_GWOL };
+			spin_lock_irq (&np->lock);
+			netdev_get_wol (dev, &wol);
+			spin_unlock_irq (&np->lock);
+			if (copy_to_user (useraddr, &wol, sizeof (wol)))
+				return -EFAULT;
+			return 0;
+		}
+
+	case ETHTOOL_SWOL:
+		{
+			struct ethtool_wolinfo wol;
+			int rc;
+			if (copy_from_user (&wol, useraddr, sizeof (wol)))
+				return -EFAULT;
+			spin_lock_irq (&np->lock);
+			rc = netdev_set_wol (dev, &wol);
+			spin_unlock_irq (&np->lock);
+			return rc;
+		}
+
 	default:
 		break;
 	}
 
 	return -EOPNOTSUPP;
 }
+
 
 static int netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 {
@@ -2245,8 +2428,11 @@ static int netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 
 	DPRINTK ("ENTER\n");
 
-	data->phy_id &= 0x1f;
-	data->reg_num &= 0x1f;
+	if (cmd != SIOCETHTOOL) {
+		/* With SIOCETHTOOL, this would corrupt the pointer.  */
+		data->phy_id &= 0x1f;
+		data->reg_num &= 0x1f;
+	}
 
 	switch (cmd) {
 	case SIOCETHTOOL:

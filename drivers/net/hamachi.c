@@ -514,8 +514,8 @@ struct hamachi_private {
 	int mii_cnt;								/* MII device addresses. */
 	u16 advertising;							/* NWay media advertisement */
 	unsigned char phys[MII_CNT];		/* MII device addresses, only first one used. */
-	u_int32_t rx_int_var, tx_int_var;	/* interrupt control variables */
-	u_int32_t option;							/* Hold on to a copy of the options */
+	u32 rx_int_var, tx_int_var;	/* interrupt control variables */
+	u32 option;							/* Hold on to a copy of the options */
 	struct pci_dev *pci_dev;
 };
 
@@ -846,8 +846,8 @@ static int hamachi_open(struct net_device *dev)
 	struct hamachi_private *hmp = dev->priv;
 	long ioaddr = dev->base_addr;
 	int i;
-	u_int32_t rx_int_var, tx_int_var;
-	u_int16_t fifo_info;
+	u32 rx_int_var, tx_int_var;
+	u16 fifo_info;
 
 	i = request_irq(dev->irq, &hamachi_interrupt, SA_SHIRQ, dev->name, dev);
 	if (i)

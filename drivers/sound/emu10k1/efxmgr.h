@@ -66,7 +66,8 @@ struct dsp_patch {
 
         u32 gpr_used[NUM_GPRS / 32];    /* bitmap of used gprs */
         u32 gpr_input[NUM_GPRS / 32];
-        u8 traml_istart;  /* starting address of the internal tram lines used */        u8 traml_isize;   /* number of internal tram lines used */
+        u8 traml_istart;  /* starting address of the internal tram lines used */
+        u8 traml_isize;   /* number of internal tram lines used */
 
         u8 traml_estart;
         u8 traml_esize;
@@ -96,10 +97,6 @@ enum {
 
 #define GPR_BASE 0x100
 #define OUTPUT_BASE 0x20
-
-//We can get this info by looking at the code start
-//#define PATCH_TYPE_INPUT        0x1
-//#define PATCH_TYPE_OUTPUT       0x2
 
 #define MAX_PATCHES_PAGES 32
 
@@ -139,6 +136,14 @@ struct patch_manager {
 
 #define PCM1_IN_L        0x04
 #define PCM1_IN_R        0x05
+//mutilchannel playback stream appear here:
+
+#define MULTI_FRONT_L	0x08
+#define MULTI_FRONT_R	0x09
+#define MULTI_REAR_L	0x0a
+#define MULTI_REAR_R	0x0b
+#define MULTI_CENTER	0x0c
+#define MULTI_LFE	0x0d
 
 #define AC97_IN_L	0x10
 #define AC97_IN_R	0x11
@@ -150,10 +155,17 @@ struct patch_manager {
 #define AC97_FRONT_R	0x21
 #define DIGITAL_OUT_L	0x22
 #define DIGITAL_OUT_R	0x23
+#define DIGITAL_CENTER	0x24
+#define DIGITAL_LFE	0x25
+
 #define ANALOG_REAR_L	0x28
 #define ANALOG_REAR_R	0x29
 #define ADC_REC_L	0x2a
 #define ADC_REC_R	0x2b
+
+#define ANALOG_CENTER	0x31
+#define ANALOG_LFE	0x32
+
 
 #define INPUT_PATCH_START(patch, nm, ln, i)		\
 do {							\

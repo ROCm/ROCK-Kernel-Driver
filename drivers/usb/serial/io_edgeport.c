@@ -478,7 +478,6 @@ static void load_application_firmware	(struct edgeport_serial *edge_serial);
 
 static void unicode_to_ascii		(char *string, short *unicode, int unicode_size);
 
-static int  get_string_desc		(struct usb_device *dev, int Id, struct usb_string_descriptor **pRetDesc);
 
 
 
@@ -614,6 +613,7 @@ static int get_string (struct usb_device *dev, int Id, char *string)
 }
 
 
+#if 0
 /************************************************************************
  *
  *  Get string descriptor from device
@@ -644,7 +644,7 @@ static int get_string_desc (struct usb_device *dev, int Id, struct usb_string_de
 	*pRetDesc = pStringDesc;
 	return 0;
 }
-
+#endif
 
 
 

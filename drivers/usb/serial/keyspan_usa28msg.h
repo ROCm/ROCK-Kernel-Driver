@@ -113,7 +113,8 @@ typedef struct keyspan_usa28_portControlMessage
 			hardly more trouble to do them than to check whether to do them):
 	*/
 	u8	parity,			// 1=use parity, 0=don't
-		ctsFlowControl,	// 1=use CTS flow control, 0=don't
+		ctsFlowControl,	        // all except 19Q: 1=use CTS flow control, 0=don't
+					// 19Q: 0x08:CTSflowControl 0x10:DSRflowControl
 		xonFlowControl,	// 1=use XON/XOFF flow control, 0=don't
 		rts,			// 1=on, 0=off
 		dtr;			// 1=on, 0=off

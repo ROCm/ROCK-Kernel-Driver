@@ -94,7 +94,6 @@ static int emu10k1_midi_open(struct inode *inode, struct file *file)
 
 	DPF(2, "emu10k1_midi_open()\n");
 
-	
 	/* Check for correct device to open */
 	list_for_each(entry, &emu10k1_devs) {
 		card = list_entry(entry, struct emu10k1_card, list);
@@ -107,10 +106,9 @@ static int emu10k1_midi_open(struct inode *inode, struct file *file)
 
 match:
 #ifdef EMU10K1_SEQUENCER
-	if(card->seq_mididev)	/* card is opened by sequencer */
-			return -EBUSY;
+	if (card->seq_mididev)	/* card is opened by sequencer */
+		return -EBUSY;
 #endif
-	
 
 	/* Wait for device to become free */
 	down(&card->open_sem);
@@ -130,9 +128,8 @@ match:
 		down(&card->open_sem);
 	}
 
-	if ((midi_dev = (struct emu10k1_mididevice *) kmalloc(sizeof(*midi_dev), GFP_KERNEL)) == NULL) {
+	if ((midi_dev = (struct emu10k1_mididevice *) kmalloc(sizeof(*midi_dev), GFP_KERNEL)) == NULL)
 		return -EINVAL;
-	}
 
 	midi_dev->card = card;
 	midi_dev->mistate = MIDIIN_STATE_STOPPED;
@@ -244,7 +241,6 @@ static int emu10k1_midi_release(struct inode *inode, struct file *file)
 	wake_up_interruptible(&card->open_wait);
 
 	unlock_kernel();
-	
 
 	return 0;
 }
@@ -462,24 +458,22 @@ int emu10k1_seq_midi_open(int dev, int mode,
 				void (*input) (int dev, unsigned char data),
 				void (*output) (int dev))
 {
-    struct emu10k1_card *card;
-    struct midi_openinfo dsCardMidiOpenInfo;
+	struct emu10k1_card *card;
+	struct midi_openinfo dsCardMidiOpenInfo;
 	struct emu10k1_mididevice *midi_dev;
-		
-	if(    midi_devs[dev] == NULL
-		|| midi_devs[dev]->devc == NULL)
-			return -EINVAL;
+
+	if (midi_devs[dev] == NULL || midi_devs[dev]->devc == NULL)
+		return -EINVAL;
 
 	card = midi_devs[dev]->devc;
 
-	if(card->open_mode)		/* card is opened native */
-			return -EBUSY;
+	if (card->open_mode)		/* card is opened native */
+		return -EBUSY;
 			
 	DPF(2, "emu10k1_seq_midi_open()\n");
 	
-	if ((midi_dev = (struct emu10k1_mididevice *) kmalloc(sizeof(*midi_dev), GFP_KERNEL)) == NULL) {
+	if ((midi_dev = (struct emu10k1_mididevice *) kmalloc(sizeof(*midi_dev), GFP_KERNEL)) == NULL)
 		return -EINVAL;
-	}
 
 	midi_dev->card = card;
 	midi_dev->mistate = MIDIIN_STATE_STOPPED;
@@ -492,10 +486,10 @@ int emu10k1_seq_midi_open(int dev, int mode,
 
 	dsCardMidiOpenInfo.refdata = (unsigned long) midi_dev;
 
-    if (emu10k1_mpuout_open(card, &dsCardMidiOpenInfo) < 0) {
-        ERROR();
-        return -ENODEV;
-    }
+	if (emu10k1_mpuout_open(card, &dsCardMidiOpenInfo) < 0) {
+		ERROR();
+		return -ENODEV;
+	}
 
 	card->seq_mididev = midi_dev;
 		
@@ -507,29 +501,26 @@ void emu10k1_seq_midi_close(int dev)
 	struct emu10k1_card *card;
 
 	DPF(2, "emu10k1_seq_midi_close()\n");
-    if(    midi_devs[dev] == NULL
-        || midi_devs[dev]->devc == NULL)
-			return;
+	if (midi_devs[dev] == NULL || midi_devs[dev]->devc == NULL)
+		return;
 
 	card = midi_devs[dev]->devc;
 	emu10k1_mpuout_close(card);
 
-	if(card->seq_mididev) {
-			kfree(card->seq_mididev);
-			card->seq_mididev = 0;
+	if (card->seq_mididev) {
+		kfree(card->seq_mididev);
+		card->seq_mididev = 0;
 	}
 }
 
 int emu10k1_seq_midi_out(int dev, unsigned char midi_byte)
 {
-
 	struct emu10k1_card *card;
 	struct midi_hdr *midihdr;
 	unsigned long flags;
 
-	if(    midi_devs[dev] == NULL
-        || midi_devs[dev]->devc == NULL)
-			return -EINVAL;
+	if (midi_devs[dev] == NULL || midi_devs[dev]->devc == NULL)
+		return -EINVAL;
 
 	card = midi_devs[dev]->devc;
 
@@ -583,21 +574,22 @@ int emu10k1_seq_midi_buffer_status(int dev)
 	struct midi_queue *queue;
 	struct emu10k1_card *card;
 
-	if(    midi_devs[dev] == NULL
-        || midi_devs[dev]->devc == NULL)
-			return -EINVAL;
+	if (midi_devs[dev] == NULL || midi_devs[dev]->devc == NULL)
+		return -EINVAL;
 
 	count = 0;
-	
+
 	card = midi_devs[dev]->devc;
 	queue = card->mpuout->firstmidiq;
 
-	while(queue != NULL) {
-			count++;
-			if(queue == card->mpuout->lastmidiq)
-					break;
-			queue = queue->next;
+	while (queue != NULL) {
+		count++;
+		if (queue == card->mpuout->lastmidiq)
+			break;
+
+		queue = queue->next;
 	}
+
 	return count;
 }
 

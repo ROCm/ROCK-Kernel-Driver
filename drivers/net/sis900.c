@@ -1,6 +1,6 @@
 /* sis900.c: A SiS 900/7016 PCI Fast Ethernet driver for Linux.
    Copyright 1999 Silicon Integrated System Corporation 
-   Revision:	1.08.00	Jun. 11 2001
+   Revision:	1.08.01	Aug. 25 2001
    
    Modified from the driver which is originally written by Donald Becker.
    
@@ -18,8 +18,9 @@
    preliminary Rev. 1.0 Jan. 18, 1998
    http://www.sis.com.tw/support/databook.htm
 
+   Rev 1.08.01 Aug. 25 2001 Hui-Fen Hsu update for 630ET & workaround for ICS1893 PHY
    Rev 1.08.00 Jun. 11 2001 Hui-Fen Hsu workaround for RTL8201 PHY and some bug fix
-   Rev 1.07.11 Apr.  2 2001 Hui-Fen Hsu  updates PCI drivers to use the new pci_set_dma_mask for kernel 2.4.3
+   Rev 1.07.11 Apr.  2 2001 Hui-Fen Hsu updates PCI drivers to use the new pci_set_dma_mask for kernel 2.4.3
    Rev 1.07.10 Mar.  1 2001 Hui-Fen Hsu <hfhsu@sis.com.tw> some bug fix & 635M/B support 
    Rev 1.07.09 Feb.  9 2001 Dave Jones <davej@suse.de> PCI enable cleanup
    Rev 1.07.08 Jan.  8 2001 Lei-Chun Chang added RTL8201 PHY support
@@ -65,7 +66,7 @@
 #include "sis900.h"
 
 static char version[] __devinitdata =
-KERN_INFO "sis900.c: v1.08.00  6/11/2001\n";
+KERN_INFO "sis900.c: v1.08.01  9/25/2001\n";
 
 static int max_interrupt_work = 40;
 static int multicast_filter_limit = 128;
@@ -406,8 +407,12 @@ static int __devinit sis900_probe (struct pci_dev *pci_dev, const struct pci_dev
 		ret = -ENODEV;
 		goto err_out_unregister;
 	}
+	
+	/* 630ET : set the mii access mode as software-mode */
+	if (revision == SIS630ET_900_REV)
+		outl(ACCESSMODE | inl(ioaddr + cr), ioaddr + cr);
 
-	/* probe for mii transciver */
+	/* probe for mii transceiver */
 	if (sis900_mii_probe(net_dev) == 0) {
 		ret = -ENODEV;
 		goto err_out_unregister;
@@ -515,6 +520,11 @@ static int __init sis900_mii_probe (struct net_device * net_dev)
         if ((sis_priv->mii->phy_id0 == 0x001D) &&
 	    ((sis_priv->mii->phy_id1&0xFFF0) == 0x8000))
         	status = sis900_reset_phy(net_dev, sis_priv->cur_phy);
+        
+        /* workaround for ICS1893 PHY */
+        if ((sis_priv->mii->phy_id0 == 0x0015) &&
+            ((sis_priv->mii->phy_id1&0xFFF0) == 0xF440))
+            	mdio_write(net_dev, sis_priv->cur_phy, 0x0018, 0xD200);
 
 	if(status & MII_STAT_LINK){
 		while (poll_bit) {
@@ -862,7 +872,7 @@ sis900_open(struct net_device *net_dev)
 
 	/* Enable all known interrupts by setting the interrupt mask. */
 	outl((RxSOVR|RxORN|RxERR|RxOK|TxURN|TxERR|TxIDLE), ioaddr + imr);
-	outl(RxENA, ioaddr + cr);
+	outl(RxENA | inl(ioaddr + cr), ioaddr + cr);
 	outl(IE, ioaddr + ier);
 
 	sis900_check_mode(net_dev, sis_priv->mii);
@@ -1039,7 +1049,7 @@ static void sis630_set_eq(struct net_device *net_dev, u8 revision)
 	struct pci_dev *dev=NULL;
 
 	if ( !(revision == SIS630E_900_REV || revision == SIS630EA1_900_REV ||
-	       revision == SIS630A_900_REV) )
+	       revision == SIS630A_900_REV || revision ==  SIS630ET_900_REV) )
 		return;
 
 	dev = pci_find_device(PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_630, dev);
@@ -1057,7 +1067,8 @@ static void sis630_set_eq(struct net_device *net_dev, u8 revision)
 			min_value=(eq_value < min_value) ? eq_value : min_value;
 		}
 		/* 630E rule to determine the equalizer value */
-		if (revision == SIS630E_900_REV || revision == SIS630EA1_900_REV) {
+		if (revision == SIS630E_900_REV || revision == SIS630EA1_900_REV ||
+		    revision == SIS630ET_900_REV) {
 			if (max_value < 5)
 				eq_value=max_value;
 			else if (max_value >= 5 && max_value < 15)
@@ -1373,7 +1384,7 @@ static void sis900_tx_timeout(struct net_device *net_dev)
 	net_dev->trans_start = jiffies;
 
 	/* FIXME: Should we restart the transmission thread here  ?? */
-	outl(TxENA, ioaddr + cr);
+	outl(TxENA | inl(ioaddr + cr), ioaddr + cr);
 
 	/* Enable all known interrupts by setting the interrupt mask. */
 	outl((RxSOVR|RxORN|RxERR|RxOK|TxURN|TxERR|TxIDLE), ioaddr + imr);
@@ -1408,7 +1419,7 @@ sis900_start_xmit(struct sk_buff *skb, struct net_device *net_dev)
 	sis_priv->tx_ring[entry].bufptr = pci_map_single(sis_priv->pci_dev,
 		skb->data, skb->len, PCI_DMA_TODEVICE);
 	sis_priv->tx_ring[entry].cmdsts = (OWN | skb->len);
-	outl(TxENA, ioaddr + cr);
+	outl(TxENA | inl(ioaddr + cr), ioaddr + cr);
 
 	if (++sis_priv->cur_tx - sis_priv->dirty_tx < NUM_TX_DESC) {
 		/* Typical path, tell upper layer that more transmission is possible */
@@ -1624,7 +1635,7 @@ static int sis900_rx(struct net_device *net_dev)
 		}
 	}
 	/* re-enable the potentially idle receive state matchine */
-	outl(RxENA , ioaddr + cr );
+	outl(RxENA | inl(ioaddr + cr), ioaddr + cr );
 
 	return 0;
 }
@@ -1722,7 +1733,7 @@ sis900_close(struct net_device *net_dev)
 	outl(0x0000, ioaddr + ier);
 
 	/* Stop the chip's Tx and Rx Status Machine */
-	outl(RxDIS | TxDIS, ioaddr + cr);
+	outl(RxDIS | TxDIS | inl(ioaddr + cr), ioaddr + cr);
 
 	del_timer(&sis_priv->timer);
 
@@ -2038,7 +2049,7 @@ static void sis900_reset(struct net_device *net_dev)
 	outl(0, ioaddr + imr);
 	outl(0, ioaddr + rfcr);
 
-	outl(RxRESET | TxRESET | RESET, ioaddr + cr);
+	outl(RxRESET | TxRESET | RESET | inl(ioaddr + cr), ioaddr + cr);
 	
 	/* Check that the chip has finished the reset. */
 	while (status && (i++ < 1000)) {

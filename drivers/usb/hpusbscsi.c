@@ -145,6 +145,8 @@ static struct usb_device_id hpusbscsi_usb_ids[] = {
 };
 
 MODULE_DEVICE_TABLE (usb, hpusbscsi_usb_ids);
+MODULE_LICENSE("GPL");
+
 
 static struct usb_driver hpusbscsi_usb_driver = {
 	name:"hpusbscsi",

@@ -189,13 +189,26 @@ typedef struct keyspan_usa49_portControlMessage
 #define	PARITY_1			0x28
 #define	PARITY_0			0x38
 
+/*
+	during normal operation, status messages are returned 
+	to the host whenever the board detects changes.  In some
+	circumstances (e.g. Windows), status messages from the
+	device cause problems; to shut them off, the host issues
+	a control message with the disableStatusMessages flags
+	set (to any non-zero value).  The device will respond to
+	this message, and then suppress further status messages;
+	it will resume sending status messages any time the host
+	sends any control message (either global or port-specific).
+*/
+
 typedef struct keyspan_usa49_globalControlMessage
 {
 	u8	portNumber,			// 0x80
 		sendGlobalStatus,	// 1/2=number of status responses requested
 		resetStatusToggle,	// 1=reset global status toggle
 		resetStatusCount,	// a cycling value
-		remoteWakeupEnable;	// 0x10=P1, 0x20=P2, 0x40=P3, 0x80=P3
+		remoteWakeupEnable,		// 0x10=P1, 0x20=P2, 0x40=P3, 0x80=P4
+		disableStatusMessages;	// 1=send no status until host talks
 } keyspan_usa49_globalControlMessage;
 
 /*

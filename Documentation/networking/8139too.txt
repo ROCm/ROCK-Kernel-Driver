@@ -164,7 +164,7 @@ the list, please report it.  That's why we do beta releases, after all...
 
 1) Work with Donald to merge fixes and updates into his driver.
 
-2) ethtool support
+2) ETHTOOL_SSET support
 
 3) PPC platform has stability problems. (XXX: verify this is still true)
 
@@ -175,8 +175,6 @@ suggestions welcome)  (WIP)
 
 9) Better documentation.  (patches welcome)
 
-11) RTL8139C support untested.
-
 12) 10base-T support flaky or slow (todo: verify this is still true)
 
 
@@ -184,6 +182,14 @@ suggestions welcome)  (WIP)
 
 Change History
 --------------
+
+Version 0.9.19 - October 9, 2001
+
+* Eliminate buffer copy for unaligned Tx's (manfred)
+* Better RX error recovery (manfred)
+* Wake-On-LAN and ETHTOOL_GSET support (Kalle Niemitalo)
+* Fix assertion in PIO mode (various)
+
 
 Version 0.9.18 - July 6, 2001
 

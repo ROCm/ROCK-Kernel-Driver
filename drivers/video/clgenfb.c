@@ -2707,7 +2707,7 @@ int __init clgenfb_init(void)
 	}
 
 #elif defined(CONFIG_ZORRO)
-	/* FIXME: CONFIG_PCI and CONFIG_ZORRO may be defined both */
+	/* FIXME: CONFIG_PCI and CONFIG_ZORRO may both be defined */
 	if (clgen_zorro_setup (fb_info, &btype)) {
 		DPRINTK ("EXIT, returning -ENXIO\n");
 		return -ENXIO;

@@ -49,7 +49,7 @@
 
 #include <linux/sched.h>
 #include <linux/errno.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 extern int usb_stor_bulk_msg(struct us_data *us, void *data, int pipe,
 			     unsigned int len, unsigned int *act_len);

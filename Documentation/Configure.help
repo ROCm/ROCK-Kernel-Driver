@@ -7637,6 +7637,53 @@ CONFIG_NET_PCMCIA_RADIO
   location). You also want to check out the PCMCIA-HOWTO, available
   from http://www.linuxdoc.org/docs.html#howto .
 
+Hermes chipset 802.11b support (Orinoco/Prism2/Symbol cards)
+CONFIG_HERMES
+  A driver for 802.11b wireless cards based based on the "Hermes" or
+  Intersil HFA384x (Prism 2) MAC controller.  This includes the vast
+  majority of the PCMCIA 802.11b cards (which are nearly all rebadges)
+  - except for the Cisco/Aironet cards.  Cards supported include the
+  Apple Airport (not a PCMCIA card), WavelanIEEE/Orinoco,
+  Cabletron/EnteraSys Roamabout, ELSA AirLancer, MELCO Buffalo, Avaya,
+  IBM High Rate Wireless, Farralon Syyline, Samsung MagicLAN, Netgear
+  MA401, LinkSys WPC-11, D-Link DWL-650, 3Com AirConnect, Intel
+  PRO/Wireless, and Symbol Spectrum24 High Rate amongst others.
+
+  This option includes the guts of the driver, but in order to
+  actually use a card you will also need to enable support for PCMCIA
+  Hermes cards, PLX9052 based PCI adaptors or the Apple Airport below.
+
+  You will also very likely also need the Wireless Tools in order to
+  configure your card and that /etc/pcmcia/wireless.opts works :
+    http://www.hpl.hp.com/personal/Jean_Tourrilhes/Linux/Tools.html
+
+Apple Airport support (built-in)
+CONFIG_APPLE_AIRPORT
+  Enable support for the Apple Airport card (which is essentially a
+  Lucent Orinoco card with a non-standard interface) built into some
+  newer Apple Macintosh machines.
+
+Hermes 802.11b in PLX9052 based PCI adaptor support
+CONFIG_PLX_HERMES
+  Enable support for PCMCIA cards supported by the "Hermes" (aka
+  orinoco_cs) driver when used in PLX9052 based PCI adaptors.  These
+  adaptors are not a full PCMCIA controller but act as a more limited
+  PCI <-> PCMCIA bridge.  Several vendors sell such adaptors so that
+  802.11b PCMCIA cards can be used in desktop machines.  The Netgear
+  MA301 is such an adaptor.
+
+  Support for these adaptors is so far still incomplete and buggy.
+  You have been warned.
+
+Hermes PCMCIA card support
+CONFIG_PCMCIA_HERMES
+  Enable support for PCMCIA 802.11b cards using the Hermes or Intersil
+  HFA384x (Prism 2) chipset.  To use your PC-cards, you will need
+  supporting software from David Hinds' pcmcia-cs package (see the
+  file Documentation/Changes for location). You also want to check out
+  the PCMCIA-HOWTO, available from
+  http://www.linuxdoc.org/docs.html#howto .
+
 Hermes support (Orinoco/WavelanIEEE/PrismII/Symbol 802.11b cards)
 CONFIG_PCMCIA_HERMES
   A driver for "Hermes" chipset based PCMCIA wireless adaptors, such
@@ -15752,25 +15799,18 @@ CONFIG_SOUND_CMPCI
 Creative EMU10K1 based PCI sound cards
 CONFIG_SOUND_EMU10K1
   Say Y or M if you have a PCI sound card using the EMU10K1 chipset,
-  such as the Creative SBLive!, SB PCI512 or Emu-APS.
+  such as the various Creative SBLive!, SB PCI512 or Emu-APS.
 
-  For more information about the degree of support for the different
-  card models please check:
-
-       http://opensource.creative.com
+  For more information on this driver and the degree of support for the
+  different card models please check <http://opensource.creative.com>.
 
   It is now possible to load dsp microcode patches into the EMU10K1
   chip.  These patches are used to implement real time sound processing
-  effects which include for example: signal routing, bass/treble control,
-  AC3 passthrough, ...
-  Userspace tools to create new patches and load/unload them can be found
-  at the above link. You need to get the source snapshot and then type:
-
-	% make tools
-	% make install-tools
-
-  in the top directory.
-
+  effects which include for example: signal routing, bass/treble
+  control, AC3 passthrough, ...
+  Userspace tools to create new patches and load/unload them can be
+  found at <http://opensource.creative.com/dist.html>.
+ 
 Creative EMU10K1 MIDI
 CONFIG_MIDI_EMU10K1
   Say Y if you want to be able to use the OSS /dev/sequencer interface.

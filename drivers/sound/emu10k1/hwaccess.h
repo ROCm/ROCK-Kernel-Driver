@@ -38,8 +38,8 @@
 #include <linux/ac97_codec.h>
 #include <linux/pci.h>
 
-#include "passthrough.h"
 #include "efxmgr.h"
+#include "passthrough.h"
 #include "midi.h"
 
 #define EMUPAGESIZE     4096            /* don't change */
@@ -122,10 +122,10 @@ struct mixer_private_ioctl {
 #define CMD_SETGPR2OSS		_IOW('D', 16, struct mixer_private_ioctl)
 #define CMD_SETMCH_FX		_IOW('D', 17, struct mixer_private_ioctl)
 #define CMD_SETPASSTHROUGH	_IOW('D', 18, struct mixer_private_ioctl)
+#define CMD_PRIVATE3_VERSION	_IOW('D', 19, struct mixer_private_ioctl)
 
-struct oss_scaling {
-	char scale, muting;
-}; 
+//up this number when breaking compatibility
+#define PRIVATE3_VERSION 1
 
 struct emu10k1_card 
 {
@@ -192,12 +192,12 @@ void emu10k1_addxmgr_free(struct emu10k1_card *, int);
 int emu10k1_find_control_gpr(struct patch_manager *, const char *, const char *);
 void emu10k1_set_control_gpr(struct emu10k1_card *, int , s32, int );
 
-void emu10k1_set_volume_gpr(struct emu10k1_card *, int, s32, int, int);
+void emu10k1_set_volume_gpr(struct emu10k1_card *, int, s32, int);
 
 
-#define VOL_6BIT 0x40,0x40
-#define VOL_5BIT 0x20,0x20
-#define VOL_4BIT 0x10,0x7f
+#define VOL_6BIT 0x40
+#define VOL_5BIT 0x20
+#define VOL_4BIT 0x10
 
 #define TIMEOUT 		    16384
 

@@ -1,4 +1,4 @@
-/* orinoco_cs.c 0.08	- (formerly known as dldwd_cs.c)
+/* orinoco_cs.c 0.08a	- (formerly known as dldwd_cs.c)
  *
  * A driver for "Hermes" chipset based PCMCIA wireless adaptors, such
  * as the Lucent WavelanIEEE/Orinoco cards and their OEM (Cabletron/
@@ -44,7 +44,7 @@
 
 /*====================================================================*/
 
-static char version[] __initdata = "orinoco_cs.c 0.08 (David Gibson <hermes@gibson.dropbear.id.au> and others)";
+static char version[] __initdata = "orinoco_cs.c 0.08a (David Gibson <hermes@gibson.dropbear.id.au> and others)";
 
 MODULE_AUTHOR("David Gibson <hermes@gibson.dropbear.id.au>");
 MODULE_DESCRIPTION("Driver for PCMCIA Lucent Orinoco, Prism II based and similar wireless cards");
@@ -200,7 +200,7 @@ dldwd_cs_cor_reset(dldwd_priv_t *priv)
 	CardServices(AccessConfigurationRegister, link->handle, &reg);
 	default_cor = reg.Value;
 
-	DEBUG(2, "dldwd : dldwd_cs_cor_reset() : cor=0x%lX\n", default_cor);
+	DEBUG(2, "dldwd : dldwd_cs_cor_reset() : cor=0x%X\n", default_cor);
 
 	/* Soft-Reset card */
 	reg.Action = CS_WRITE;
