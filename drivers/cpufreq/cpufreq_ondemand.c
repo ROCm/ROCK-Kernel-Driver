@@ -101,10 +101,8 @@ static ssize_t show_sampling_rate_min(struct cpufreq_policy *policy, char *buf)
 }
 
 #define define_one_ro(_name) 					\
-static struct freq_attr _name = { 				\
-	.attr = { .name = __stringify(_name), .mode = 0444 }, 	\
-	.show = show_##_name, 					\
-}
+static struct freq_attr _name =  				\
+__ATTR(_name, 0444, show_##_name, NULL)
 
 define_one_ro(sampling_rate_max);
 define_one_ro(sampling_rate_min);
@@ -189,12 +187,9 @@ out:
 	return count;
 }
 
-#define define_one_rw(_name) 					\
-static struct freq_attr _name = { 				\
-	.attr = { .name = __stringify(_name), .mode = 0644 }, 	\
-	.show = show_##_name, 					\
-	.store = store_##_name, 				\
-}
+#define define_one_rw(_name) \
+static struct freq_attr _name = \
+__ATTR(_name, 0644, show_##_name, store_##_name)
 
 define_one_rw(sampling_rate);
 define_one_rw(sampling_down_factor);
