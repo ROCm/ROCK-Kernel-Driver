@@ -1037,6 +1037,9 @@ END_FTR_SECTION_IFCLR(CPU_FTR_SLB)
 	 * interrupts if necessary.
 	 */
 	beq	.ret_from_except_lite
+	/* For a hash failure, we don't bother re-enabling interrupts */
+	ble-	12f
+
 	/*
 	 * hash_page couldn't handle it, set soft interrupt enable back
 	 * to what it was before the trap.  Note that .local_irq_restore
@@ -1047,6 +1050,8 @@ END_FTR_SECTION_IFCLR(CPU_FTR_SLB)
 	b	11f
 #else
 	beq	fast_exception_return   /* Return from exception on success */
+	ble-	12f			/* Failure return from hash_page */
+
 	/* fall through */
 #endif
 
@@ -1064,6 +1069,15 @@ _GLOBAL(handle_page_fault)
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	lwz	r4,_DAR(r1)
 	bl	.bad_page_fault
+	b	.ret_from_except
+
+/* We have a page fault that hash_page could handle but HV refused
+ * the PTE insertion
+ */
+12:	bl	.save_nvgprs
+	addi	r3,r1,STACK_FRAME_OVERHEAD
+	lwz	r4,_DAR(r1)
+	bl	.low_hash_fault
 	b	.ret_from_except
 
 	/* here we have a segment miss */
