@@ -339,6 +339,32 @@ static int aarp_device_event(struct notifier_block *this, unsigned long event,
 	return NOTIFY_DONE;
 }
 
+/* Expire all entries in a hash chain */
+static void __aarp_expire_all(struct aarp_entry **n)
+{
+	struct aarp_entry *t;
+
+	while (*n) {
+		t = *n;
+		*n = (*n)->next;
+		__aarp_expire(t);
+	}
+}
+
+/* Cleanup all hash chains -- module unloading */
+static void aarp_purge(void)
+{
+	int ct;
+
+	write_lock_bh(&aarp_lock);
+	for (ct = 0; ct < AARP_HASH_SIZE; ct++) {
+		__aarp_expire_all(&resolved[ct]);
+		__aarp_expire_all(&unresolved[ct]);
+		__aarp_expire_all(&proxies[ct]);
+	}
+	write_unlock_bh(&aarp_lock);
+}
+
 /*
  *	Create a new aarp entry.  This must use GFP_ATOMIC because it
  *	runs while holding spinlocks.
@@ -958,6 +984,7 @@ void aarp_cleanup_module(void)
 	del_timer(&aarp_timer);
 	unregister_netdevice_notifier(&aarp_notifier);
 	unregister_snap_client(aarp_dl);
+	aarp_purge();
 }
 
 #ifdef CONFIG_PROC_FS
