@@ -132,7 +132,6 @@ static int get_nodes(unsigned long *nodes, unsigned long __user *nmask,
 	unsigned long nlongs;
 	unsigned long endmask;
 
-	--maxnode;
 	bitmap_zero(nodes, MAX_NUMNODES);
 	if (maxnode == 0 || !nmask)
 		return 0;
