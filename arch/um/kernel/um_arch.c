@@ -110,12 +110,14 @@ unsigned long start_vm;
 unsigned long end_vm;
 int ncpus = 1;
 
+#ifdef CONFIG_MODE_TT
 /* Pointer set in linux_main, the array itself is private to each thread,
  * and changed at address space creation time so this poses no concurrency
  * problems.
  */
 static char *argv1_begin = NULL;
 static char *argv1_end = NULL;
+#endif
 
 /* Set in early boot */
 static int have_root __initdata = 0;
@@ -123,6 +125,7 @@ long physmem_size = 32 * 1024 * 1024;
 
 void set_cmdline(char *cmd)
 {
+#ifdef CONFIG_MODE_TT
 	char *umid, *ptr;
 
 	if(CHOOSE_MODE(honeypot, 0)) return;
@@ -139,6 +142,7 @@ void set_cmdline(char *cmd)
 	snprintf(ptr, (argv1_end - ptr) * sizeof(*ptr), " [%s]", cmd);
 	memset(argv1_begin + strlen(argv1_begin), '\0', 
 	       argv1_end - argv1_begin - strlen(argv1_begin));
+#endif
 }
 
 static char *usage_string = 
@@ -199,22 +203,27 @@ static int __init mode_tt_setup(char *line, int *add)
 	return(0);
 }
 
-__uml_setup("mode=tt", mode_tt_setup,
-"mode=tt\n"
-"    When both CONFIG_MODE_TT and CONFIG_MODE_SKAS are enabled, this option\n"
-"    forces UML to run in tt (tracing thread) mode.  It is not the default\n"
-"    because it's slower and less secure than skas mode.\n\n"
-);
-
 #else
 #ifdef CONFIG_MODE_SKAS
 
 #define DEFAULT_TT 0
 
+static int __init mode_tt_setup(char *line, int *add)
+{
+	printk("CONFIG_MODE_TT disabled - 'mode=tt' ignored\n");
+	return(0);
+}
+
 #else
 #ifdef CONFIG_MODE_TT
 
 #define DEFAULT_TT 1
+
+static int __init mode_tt_setup(char *line, int *add)
+{
+	printk("CONFIG_MODE_SKAS disabled - 'mode=tt' redundant\n");
+	return(0);
+}
 
 #else
 
@@ -223,6 +232,13 @@ __uml_setup("mode=tt", mode_tt_setup,
 #endif
 #endif
 #endif
+
+__uml_setup("mode=tt", mode_tt_setup,
+"mode=tt\n"
+"    When both CONFIG_MODE_TT and CONFIG_MODE_SKAS are enabled, this option\n"
+"    forces UML to run in tt (tracing thread) mode.  It is not the default\n"
+"    because it's slower and less secure than skas mode.\n\n"
+);
 
 int mode_tt = DEFAULT_TT;
 
@@ -307,8 +323,10 @@ int linux_main(int argc, char **argv)
 
 	setup_machinename(system_utsname.machine);
 
+#ifdef CONFIG_MODE_TT
 	argv1_begin = argv[1];
 	argv1_end = &argv[1][strlen(argv[1])];
+#endif
   
 	set_usable_vm(uml_physmem, get_kmem_end());
 
