@@ -167,7 +167,6 @@ xdr_ressize_check(struct svc_rqst *rqstp, u32 *p)
 	char *cp = (char*)p;
 
 	vec->iov_len = cp - (char*)vec->iov_base;
-	rqstp->rq_res.len = vec->iov_len;
 
 	return vec->iov_len <= PAGE_SIZE;
 }

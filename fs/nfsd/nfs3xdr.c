@@ -616,10 +616,6 @@ nfs3svc_encode_readres(struct svc_rqst *rqstp, u32 *p,
 			*p = 0;
 			rqstp->rq_res.tail[0].iov_len = 4 - (resp->count & 3);
 		}
-		rqstp->rq_res.len =
-			rqstp->rq_res.head[0].iov_len+
-			rqstp->rq_res.page_len+
-			rqstp->rq_res.tail[0].iov_len;
 		return 1;
 	} else
 		return xdr_ressize_check(rqstp, p);
@@ -689,9 +685,6 @@ nfs3svc_encode_readdirres(struct svc_rqst *rqstp, u32 *p,
 		*p++ = 0;		/* no more entries */
 		*p++ = htonl(resp->common.err == nfserr_eof);
 		rqstp->rq_res.page_len = ((unsigned long)p & ~PAGE_MASK);
-		rqstp->rq_res.len =
-			rqstp->rq_res.head[0].iov_len+
-			rqstp->rq_res.page_len;
 		return 1;
 	} else
 		return xdr_ressize_check(rqstp, p);

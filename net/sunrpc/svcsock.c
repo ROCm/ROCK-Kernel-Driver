@@ -1195,6 +1195,7 @@ svc_send(struct svc_rqst *rqstp)
 {
 	struct svc_sock	*svsk;
 	int		len;
+	struct xdr_buf	*xb;
 
 	if ((svsk = rqstp->rq_sock) == NULL) {
 		printk(KERN_WARNING "NULL socket pointer in %s:%d\n",
@@ -1204,6 +1205,12 @@ svc_send(struct svc_rqst *rqstp)
 
 	/* release the receive skb before sending the reply */
 	svc_release_skb(rqstp);
+
+	/* calculate over-all length */
+	xb = & rqstp->rq_res;
+	xb->len = xb->head[0].iov_len +
+		xb->page_len +
+		xb->tail[0].iov_len;
 
 	len = svsk->sk_sendto(rqstp);
 	svc_sock_release(rqstp);
