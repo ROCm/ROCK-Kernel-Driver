@@ -251,6 +251,7 @@
 #include <linux/random.h>
 #include <linux/poll.h>
 #include <linux/init.h>
+#include <linux/fs.h>
 
 #include <asm/processor.h>
 #include <asm/uaccess.h>

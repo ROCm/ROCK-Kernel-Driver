@@ -12,7 +12,7 @@
 #include <linux/config.h>
 #include <linux/module.h>
 
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/errno.h>
 #include <linux/nfs.h>
 #include <linux/in.h>

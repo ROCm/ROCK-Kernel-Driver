@@ -4,7 +4,7 @@
 
 #include <linux/fs.h>
 #include <linux/reiserfs_fs.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <asm/uaccess.h>
 #include <linux/smp_lock.h>
 #include <linux/locks.h>

@@ -12,7 +12,7 @@
 
 #include <linux/config.h>
 #include <linux/errno.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/stat.h>
 #include <linux/fcntl.h>
 #include <linux/locks.h>

@@ -5,7 +5,7 @@
 #define __NO_VERSION__
 #include <linux/config.h> /* for CONFIG_PROC_FS */
 #include <linux/module.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/mm.h>
 #include <linux/sysctl.h>
 #include <linux/swapctl.h>

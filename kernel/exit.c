@@ -18,6 +18,7 @@
 #include <linux/acct.h>
 #endif
 #include <linux/file.h>
+#include <linux/binfmts.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>

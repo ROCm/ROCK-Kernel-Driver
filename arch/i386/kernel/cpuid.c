@@ -36,6 +36,7 @@
 #include <linux/smp.h>
 #include <linux/major.h>
 #include <linux/smp_lock.h>
+#include <linux/fs.h>
 
 #include <asm/processor.h>
 #include <asm/msr.h>

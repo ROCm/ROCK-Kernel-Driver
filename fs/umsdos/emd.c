@@ -9,7 +9,7 @@
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/msdos_fs.h>

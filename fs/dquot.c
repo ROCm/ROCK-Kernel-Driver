@@ -51,7 +51,7 @@
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/fcntl.h>

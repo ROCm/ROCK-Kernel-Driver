@@ -5,7 +5,7 @@
 #include <linux/config.h>
 #include <asm/uaccess.h>
 #include <linux/string.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/reiserfs_fs.h>
 
 /* this is one and only function that is used outside (do_balance.c) */

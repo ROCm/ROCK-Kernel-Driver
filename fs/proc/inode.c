@@ -4,7 +4,7 @@
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/proc_fs.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>

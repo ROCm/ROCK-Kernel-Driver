@@ -22,6 +22,8 @@
 #include <linux/namespace.h>
 #include <linux/personality.h>
 #include <linux/file.h>
+#include <linux/binfmts.h>
+#include <linux/fs.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>

@@ -37,6 +37,7 @@
 #include <linux/usb.h>
 #include <linux/usbdevice_fs.h>
 #include <linux/smp_lock.h>
+#include <asm/byteorder.h>
 
 static struct super_operations usbfs_ops;
 static struct address_space_operations usbfs_aops;

@@ -13,7 +13,7 @@
 #include <linux/fs.h>
 #include <linux/adfs_fs.h>
 #include <linux/slab.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <linux/locks.h>

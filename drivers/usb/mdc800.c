@@ -98,6 +98,7 @@
 #include <linux/smp_lock.h>
 
 #include <linux/usb.h>
+#include <linux/fs.h>
 
 /*
  * Version Information

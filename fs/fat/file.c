@@ -6,7 +6,7 @@
  *  regular file handling primitives for fat-based filesystems
  */
 
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/locks.h>
 #include <linux/msdos_fs.h>
 #include <linux/fat_cvf.h>

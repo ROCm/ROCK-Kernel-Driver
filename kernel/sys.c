@@ -14,6 +14,7 @@
 #include <linux/prctl.h>
 #include <linux/init.h>
 #include <linux/highuid.h>
+#include <linux/fs.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>

@@ -17,7 +17,7 @@
 
 #include <linux/types.h>
 #include <linux/errno.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/kernel.h>
 #include <linux/kernel_stat.h>
 #include <linux/tty.h>

@@ -15,7 +15,7 @@
 #include <asm/div64.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/affs_fs.h>
 #include <linux/fcntl.h>
 #include <linux/kernel.h>

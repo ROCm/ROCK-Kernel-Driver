@@ -15,6 +15,7 @@
 #include <linux/sunrpc/xdr.h>
 #include <linux/sunrpc/svcauth.h>
 #include <linux/sunrpc/svcsock.h>
+#include <linux/err.h>
 
 #define RPCDBG_FACILITY	RPCDBG_AUTH
 

@@ -10,7 +10,7 @@
 #include <linux/errno.h>
 #include <linux/fs.h>
 #include <linux/ioctl.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/mm.h>
 #include <linux/highuid.h>
 

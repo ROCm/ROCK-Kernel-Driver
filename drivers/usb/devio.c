@@ -44,6 +44,7 @@
 #include <linux/usb.h>
 #include <linux/usbdevice_fs.h>
 #include <asm/uaccess.h>
+#include <asm/byteorder.h>
 
 
 struct async {

@@ -32,7 +32,7 @@
    dwmw2
 */
 #define __KERNEL_SYSCALLS__
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/unistd.h>
 
 #include <linux/module.h>

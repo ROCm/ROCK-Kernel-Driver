@@ -55,6 +55,7 @@
 #include <linux/usb.h>
 #include <linux/types.h>
 #include <asm/semaphore.h>
+#include <asm/byteorder.h>
 
 #define DEBUG
 

@@ -1257,28 +1257,7 @@ extern struct file * open_exec(const char *);
 extern int is_subdir(struct dentry *, struct dentry *);
 extern ino_t find_inode_number(struct dentry *, struct qstr *);
 
-/*
- * Kernel pointers have redundant information, so we can use a
- * scheme where we can return either an error code or a dentry
- * pointer with the same return value.
- *
- * This should be a per-architecture thing, to allow different
- * error and pointer decisions.
- */
-static inline void *ERR_PTR(long error)
-{
-	return (void *) error;
-}
-
-static inline long PTR_ERR(const void *ptr)
-{
-	return (long) ptr;
-}
-
-static inline long IS_ERR(const void *ptr)
-{
-	return (unsigned long)ptr > (unsigned long)-1000L;
-}
+#include <linux/err.h>
 
 /*
  * The bitmask for a lookup event:

@@ -8,7 +8,7 @@
 
 #include <linux/fs.h>
 #include <linux/stat.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 
 /*
  * The follow_link operation is special: it must behave as a no-op

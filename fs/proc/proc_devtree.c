@@ -4,7 +4,7 @@
  * Copyright 1997 Paul Mackerras
  */
 #include <linux/errno.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/proc_fs.h>
 #include <linux/stat.h>
 #include <linux/string.h>

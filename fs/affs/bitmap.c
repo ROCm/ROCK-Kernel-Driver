@@ -7,7 +7,7 @@
  *  block allocation, deallocation, calculation of free space.
  */
 
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/affs_fs.h>
 #include <linux/stat.h>
 #include <linux/kernel.h>

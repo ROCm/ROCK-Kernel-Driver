@@ -39,6 +39,7 @@
 #include <linux/smp_lock.h>
 #include <linux/spinlock.h>
 #include <asm/unaligned.h>
+#include <asm/byteorder.h>
 #include <linux/input.h>
 
 #undef DEBUG

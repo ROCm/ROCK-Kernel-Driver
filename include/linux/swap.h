@@ -2,6 +2,9 @@
 #define _LINUX_SWAP_H
 
 #include <linux/spinlock.h>
+#include <linux/kdev_t.h>
+#include <linux/linkage.h>
+#include <linux/mmzone.h>
 #include <asm/page.h>
 
 #define SWAP_FLAG_PREFER	0x8000	/* set if swap priority specified */
@@ -38,6 +41,14 @@ union swap_header {
 		unsigned int badpages[1];
 	} info;
 };
+
+ /* A swap entry has to fit into a "unsigned long", as
+  * the entry is hidden in the "index" field of the
+  * swapper address space.
+  */
+typedef struct {
+	unsigned long val;
+} swp_entry_t;
 
 #ifdef __KERNEL__
 

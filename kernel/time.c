@@ -24,7 +24,6 @@
  *	(Even though the technical memorandum forbids it)
  */
 
-#include <linux/mm.h>
 #include <linux/timex.h>
 #include <linux/smp_lock.h>
 

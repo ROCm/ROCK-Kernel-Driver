@@ -6,7 +6,7 @@
 #include <linux/string.h>
 #include <linux/locks.h>
 #include <linux/random.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/reiserfs_fs.h>
 #include <linux/reiserfs_fs_sb.h>
 

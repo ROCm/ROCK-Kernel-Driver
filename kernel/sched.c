@@ -18,6 +18,7 @@
 #include <asm/uaccess.h>
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
+#include <linux/completion.h>
 #include <asm/mmu_context.h>
 
 #define BITMAP_SIZE ((((MAX_PRIO+7)/8)+sizeof(long)-1)/sizeof(long))

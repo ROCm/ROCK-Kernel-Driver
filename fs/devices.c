@@ -13,7 +13,7 @@
 #include <linux/fs.h>
 #include <linux/major.h>
 #include <linux/string.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/stat.h>
 #include <linux/fcntl.h>
 #include <linux/errno.h>

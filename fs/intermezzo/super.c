@@ -20,7 +20,7 @@
 #include <linux/ext2_fs.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <linux/locks.h>

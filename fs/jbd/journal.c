@@ -23,14 +23,13 @@
  */
 
 #include <linux/module.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/fs.h>
 #include <linux/jbd.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/locks.h>
 #include <linux/smp_lock.h>
-#include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/slab.h>

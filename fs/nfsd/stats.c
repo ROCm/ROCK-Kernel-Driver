@@ -24,7 +24,7 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/proc_fs.h>
 #include <linux/stat.h>
 #define __NO_VERSION__

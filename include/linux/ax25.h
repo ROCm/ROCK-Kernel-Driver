@@ -6,6 +6,8 @@
 #ifndef	AX25_KERNEL_H
 #define	AX25_KERNEL_H
 
+#include <linux/socket.h>
+
 #define AX25_MTU	256
 #define AX25_MAX_DIGIS  8
 

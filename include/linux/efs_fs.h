@@ -27,6 +27,7 @@ static const char cprt[] = "EFS: "EFS_VERSION" - (c) 1999 Al Smith <Al.Smith@aes
 #define	EFS_BLOCKSIZE_BITS	9
 #define	EFS_BLOCKSIZE		(1 << EFS_BLOCKSIZE_BITS)
 
+#include <linux/fs.h>
 #include <linux/efs_fs_i.h>
 #include <linux/efs_dir.h>
 

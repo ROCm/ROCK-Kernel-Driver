@@ -2,6 +2,8 @@
 #define _AFFS_FS_I
 
 #include <linux/a.out.h>
+#include <linux/fs.h>
+#include <asm/semaphore.h>
 
 #define AFFS_CACHE_SIZE		PAGE_SIZE
 //#define AFFS_CACHE_SIZE		(4*4)

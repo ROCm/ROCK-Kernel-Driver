@@ -14,7 +14,7 @@
  */
 
 #include <linux/slab.h>
-#include <linux/sched.h>
+#include <linux/time.h>
 #include <linux/msdos_fs.h>
 #include <linux/dirent.h>
 

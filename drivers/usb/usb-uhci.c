@@ -40,6 +40,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/system.h>
+#include <asm/byteorder.h>
 
 /* This enables more detailed sanity checks in submit_iso */
 //#define ISO_SANITY_CHECK
