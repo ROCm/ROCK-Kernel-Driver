@@ -54,7 +54,7 @@ static inline mmu_gather_t *tlb_gather_mmu(struct mm_struct *mm, unsigned int fu
 	tlb->mm = mm;
 
 	/* Use fast mode if only one CPU is online */
-	tlb->nr = num_online_cpus() > 1 ? 0UL : ~0UL;
+	tlb->nr = num_online_cpus() > 1 ? 0U : ~0U;
 
 	tlb->fullmm = full_mm_flush;
 	tlb->freed = 0;
