@@ -610,6 +610,9 @@ typedef struct s2io_nic {
 	atomic_t rx_bufs_left[MAX_RX_RINGS];
 
 	spinlock_t tx_lock;
+#ifndef CONFIG_S2IO_NAPI
+	spinlock_t put_lock;
+#endif
 
 #define PROMISC     1
 #define ALL_MULTI   2
@@ -627,6 +630,11 @@ typedef struct s2io_nic {
 	u16 rx_pkt_count;
 	u16 tx_err_count;
 	u16 rx_err_count;
+
+#ifndef CONFIG_S2IO_NAPI
+	/* Index to the absolute position of the put pointer of Rx ring. */
+	int put_pos[MAX_RX_RINGS];
+#endif
 
 	/*
 	 *  Place holders for the virtual and physical addresses of 
