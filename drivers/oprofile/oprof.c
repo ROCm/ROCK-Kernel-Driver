@@ -20,7 +20,6 @@
 #include "oprofile_stats.h"
  
 struct oprofile_operations * oprofile_ops;
-enum oprofile_cpu oprofile_cpu_type;
 unsigned long oprofile_started;
 static unsigned long is_setup;
 static DECLARE_MUTEX(start_sem);
@@ -127,9 +126,15 @@ static int __init oprofile_init(void)
 	/* Architecture must fill in the interrupt ops and the
 	 * logical CPU type.
 	 */
-	err = oprofile_arch_init(&oprofile_ops, &oprofile_cpu_type);
+	err = oprofile_arch_init(&oprofile_ops);
 	if (err)
 		goto out;
+
+	if (!oprofile_ops->cpu_type) {
+		printk(KERN_ERR "oprofile: cpu_type not set !\n");
+		err = -EFAULT;
+		goto out;
+	}
 
 	err = oprofilefs_register();
 	if (err)

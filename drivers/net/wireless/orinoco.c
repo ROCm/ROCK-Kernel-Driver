@@ -3057,7 +3057,7 @@ static int orinoco_ioctl_getrate(struct net_device *dev, struct iw_param *rrq)
 
 	ratemode = priv->bitratemode;
 
-	if ( (ratemode < 0) || (ratemode > BITRATE_TABLE_SIZE) )
+	if ( (ratemode < 0) || (ratemode >= BITRATE_TABLE_SIZE) )
 		BUG();
 
 	rrq->value = bitrate_table[ratemode].bitrate * 100000;

@@ -1709,10 +1709,7 @@ static int event_thread(void* data)
 {
 	struct controller *ctrl;
 	lock_kernel();
-	daemonize();
-	
-	//  New name
-	strcpy(current->comm, "phpd_event");
+	daemonize("phpd_event");
 	
 	unlock_kernel();
 

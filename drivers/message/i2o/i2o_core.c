@@ -879,11 +879,9 @@ static int i2o_core_evt(void *reply_data)
 	struct i2o_controller *c = NULL;
 	unsigned long flags;
 
-	lock_kernel();
-	daemonize();
-	unlock_kernel();
+	daemonize("i2oevtd");
+	allow_signal(SIGKILL);
 
-	strcpy(current->comm, "i2oevtd");
 	evt_running = 1;
 
 	while(1)
@@ -1047,15 +1045,10 @@ static int i2o_dyn_lct(void *foo)
 	int found = 0;
 	int entries;
 	void *tmp;
-	char name[16];
 
-	lock_kernel();
-	daemonize();
-	unlock_kernel();
+	daemonize("iop%d_lctd", c->unit);
+	allow_signal(SIGKILL);
 
-	sprintf(name, "iop%d_lctd", c->unit);
-	strcpy(current->comm, name);	
-	
 	c->lct_running = 1;
 
 	while(1)
@@ -3060,7 +3053,7 @@ void i2o_report_common_status(u8 req_status)
 		"PROGRESS_REPORT"	
 	};
 
-	if (req_status > I2O_REPLY_STATUS_PROGRESS_REPORT)
+	if (req_status >= ARRAY_SIZE(REPLY_STATUS))
 		printk("RequestStatus = %0#2x", req_status);
 	else
 		printk("%s", REPLY_STATUS[req_status]);

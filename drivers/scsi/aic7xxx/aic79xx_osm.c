@@ -2854,8 +2854,7 @@ ahd_linux_dv_thread(void *data)
 	 * Complete thread creation.
 	 */
 	lock_kernel();
-	daemonize();
-	sprintf(current->comm, "ahd_dv_%d", ahd->unit);
+	daemonize("ahd_dv_%d", ahd->unit);
 	unlock_kernel();
 
 	while (1) {

@@ -95,7 +95,8 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 	struct mid_q_entry *mid_entry;
 	char *temp;
 
-	daemonize();
+	daemonize("cifsd");
+	allow_signal(SIGKILL);
 
 	server->tsk = current;	/* save process info to wake at shutdown */
 	cFYI(1, ("\nDemultiplex PID: %d", current->pid));
