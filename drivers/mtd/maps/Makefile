@@ -1,7 +1,7 @@
 #
 # linux/drivers/maps/Makefile
 #
-# $Id: Makefile.common,v 1.19 2004/09/21 14:27:16 bjd Exp $
+# $Id: Makefile.common,v 1.21 2004/12/09 20:01:05 holindho Exp $
 
 ifeq ($(CONFIG_MTD_COMPLEX_MAPPINGS),y)
 obj-$(CONFIG_MTD)		+= map_funcs.o
@@ -62,6 +62,7 @@ obj-$(CONFIG_MTD_EBONY)		+= ebony.o
 obj-$(CONFIG_MTD_OCOTEA)	+= ocotea.o
 obj-$(CONFIG_MTD_BEECH)		+= beech-mtd.o
 obj-$(CONFIG_MTD_ARCTIC)	+= arctic-mtd.o
+obj-$(CONFIG_MTD_WALNUT)        += walnut.o
 obj-$(CONFIG_MTD_H720X)		+= h720x-flash.o
 obj-$(CONFIG_MTD_SBC8240)	+= sbc8240.o
 obj-$(CONFIG_MTD_NOR_TOTO)	+= omap-toto-flash.o
@@ -70,3 +71,4 @@ obj-$(CONFIG_MTD_IXP4XX)	+= ixp4xx.o
 obj-$(CONFIG_MTD_IXP2000)	+= ixp2000.o
 obj-$(CONFIG_MTD_WRSBC8260)	+= wr_sbc82xx_flash.o
 obj-$(CONFIG_MTD_DMV182)	+= dmv182.o
+obj-$(CONFIG_MTD_SHARP_SL)	+= sharpsl-flash.o

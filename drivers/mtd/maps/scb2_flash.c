@@ -1,6 +1,6 @@
 /*
  * MTD map driver for BIOS Flash on Intel SCB2 boards
- * $Id: scb2_flash.c,v 1.10 2004/11/16 18:29:02 dwmw2 Exp $
+ * $Id: scb2_flash.c,v 1.11 2004/11/28 09:40:40 dwmw2 Exp $
  * Copyright (C) 2002 Sun Microsystems, Inc.
  * Tim Hockin <thockin@sun.com>
  *

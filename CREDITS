@@ -3578,7 +3578,6 @@ S: The Netherlands
 
 N: David Woodhouse
 E: dwmw2@infradead.org
-E: dwmw2@redhat.com
 D: ARCnet stuff, Applicom board driver, SO_BINDTODEVICE,
 D: some Alpha platform porting from 2.0, Memory Technology Devices,
 D: Acquire watchdog timer, PC speaker driver maintenance,

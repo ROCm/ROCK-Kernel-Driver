@@ -3,11 +3,11 @@
  *
  * Copyright (C) 2001-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@redhat.com>
+ * Created by David Woodhouse <dwmw2@infradead.org>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: background.c,v 1.49 2004/07/13 08:56:40 dwmw2 Exp $
+ * $Id: background.c,v 1.50 2004/11/16 20:36:10 dwmw2 Exp $
  *
  */
 

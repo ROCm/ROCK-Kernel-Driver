@@ -1,5 +1,5 @@
 /*
- * $Id: l440gx.c,v 1.16 2004/11/16 18:29:02 dwmw2 Exp $
+ * $Id: l440gx.c,v 1.17 2004/11/28 09:40:39 dwmw2 Exp $
  *
  * BIOS Flash chip on Intel 440GX board.
  *

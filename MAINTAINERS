@@ -1450,7 +1450,7 @@ S:	Maintained
 
 MEMORY TECHNOLOGY DEVICES
 P:	David Woodhouse
-M:	dwmw2@redhat.com
+M:	dwmw2@infradead.org
 W:	http://www.linux-mtd.infradead.org/
 L:	linux-mtd@lists.infradead.org
 S:	Maintained
