@@ -1886,8 +1886,8 @@ static int __init af_unix_init(void)
 					   sizeof(struct unix_sock), 0,
 					   SLAB_HWCACHE_ALIGN, 0, 0);
         if (!unix_sk_cachep)
-                printk(KERN_CRIT __FUNCTION__
-                        ": Cannot create unix_sock SLAB cache!\n");
+                printk(KERN_CRIT
+                        "af_unix_init: Cannot create unix_sock SLAB cache!\n");
 
 	sock_register(&unix_family_ops);
 #ifdef CONFIG_PROC_FS

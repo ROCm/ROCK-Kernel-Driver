@@ -1158,8 +1158,8 @@ static int __init inet_init(void)
 					   sizeof(struct raw_sock), 0,
 					   SLAB_HWCACHE_ALIGN, 0, 0);
         if (!tcp_sk_cachep || !udp_sk_cachep || !raw4_sk_cachep)
-		printk(KERN_CRIT __FUNCTION__
-			": Can't create protocol sock SLAB caches!\n");
+		printk(KERN_CRIT
+		       "inet_init: Can't create protocol sock SLAB caches!\n");
 	/*
 	 *	Tell SOCKET that we are alive... 
 	 */
