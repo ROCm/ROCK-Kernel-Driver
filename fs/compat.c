@@ -27,7 +27,6 @@
 #include <linux/ioctl32.h>
 #include <linux/init.h>
 #include <linux/sockios.h>	/* for SIOCDEVPRIVATE */
-#include <linux/fs.h>
 #include <linux/smp_lock.h>
 #include <linux/ctype.h>
 #include <linux/module.h>

@@ -25,7 +25,6 @@
 #include <linux/slab.h>
 #include <linux/timer.h>
 #include <linux/aio.h>
-#include <linux/module.h>
 #include <linux/highmem.h>
 #include <linux/workqueue.h>
 

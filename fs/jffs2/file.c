@@ -20,7 +20,6 @@
 #include <linux/highmem.h>
 #include <linux/crc32.h>
 #include <linux/jffs2.h>
-#include <linux/version.h>
 #include "nodelist.h"
 
 extern int generic_file_open(struct inode *, struct file *) __attribute__((weak));

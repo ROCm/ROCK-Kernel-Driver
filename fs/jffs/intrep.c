@@ -64,7 +64,6 @@
 #include <linux/pagemap.h>
 #include <asm/semaphore.h>
 #include <asm/byteorder.h>
-#include <linux/version.h>
 #include <linux/smp_lock.h>
 #include <linux/time.h>
 #include <linux/ctype.h>

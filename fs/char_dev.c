@@ -11,7 +11,6 @@
 #include <linux/string.h>
 
 #include <linux/major.h>
-#include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/module.h>
 #include <linux/smp_lock.h>
