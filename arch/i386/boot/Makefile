@@ -25,8 +25,8 @@ SVGA_MODE := -DSVGA_MODE=NORMAL_VGA
 
 #RAMDISK := -DRAMDISK=512
 
-EXTRA_TARGETS	:= vmlinux.bin bvmlinux.bin bootsect.o bbootsect.o \
-		   setup.o bsetup.o
+EXTRA_TARGETS	:= vmlinux.bin bvmlinux.bin bootsect bootsect.o \
+		   setup setup.o zImage bzImage
 
 host-progs	:= tools/build
 
@@ -40,14 +40,25 @@ bzImage: IMAGE_OFFSET := 0x100000
 bzImage: EXTRA_AFLAGS := -traditional $(SVGA_MODE) $(RAMDISK) -D__BIG_KERNEL__
 bzImage: BUILDFLAGS   := -b
 
-zImage bzImage: bootsect setup vmlinux.bin tools/build
-	tools/build $(BUILDFLAGS) bootsect setup vmlinux.bin $(ROOT_DEV) > $@
+quiet_cmd_image = BUILD  $(RELDIR)/$@
+cmd_image = tools/build $(BUILDFLAGS) bootsect setup vmlinux.bin \
+			$(ROOT_DEV) > $@
+
+zImage bzImage: bootsect setup vmlinux.bin tools/build FORCE
+	$(call if_changed,image)
 
 vmlinux.bin: compressed/vmlinux FORCE
 	$(call if_changed,objcopy)
 
+LDFLAGS_bootsect := -Ttext 0x0 -s --oformat binary
+LDFLAGS_setup	 := -Ttext 0x0 -s --oformat binary -e begtext
+
+setup bootsect: %: %.o FORCE
+	$(call if_changed,ld)
+
 compressed/vmlinux: FORCE
 	@$(MAKE) IMAGE_OFFSET=$(IMAGE_OFFSET) -C compressed vmlinux
+
 
 zdisk: $(BOOTIMAGE)
 	dd bs=8192 if=$(BOOTIMAGE) of=/dev/fd0
@@ -61,12 +72,6 @@ zlilo: $(BOOTIMAGE)
 
 install: $(BOOTIMAGE)
 	sh -x ./install.sh $(KERNELRELEASE) $(BOOTIMAGE) $(TOPDIR)/System.map "$(INSTALL_PATH)"
-
-bootsect: bootsect.o
-	$(LD) $(LDFLAGS) -Ttext 0x0 -s --oformat binary -o $@ $<
-
-setup: setup.o
-	$(LD) $(LDFLAGS) -Ttext 0x0 -s --oformat binary -e begtext -o $@ $<
 
 clean:
 	@echo 'Cleaning up (boot)'
