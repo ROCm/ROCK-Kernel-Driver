@@ -336,8 +336,10 @@ int blk_queue_init_tags(request_queue_t *q, int depth)
 	struct blk_queue_tag *tags;
 	int bits, i;
 
-	if (depth > queue_nr_requests)
+	if (depth > queue_nr_requests) {
 		depth = queue_nr_requests;
+		printk("blk_queue_init_tags: adjusted depth to %d\n", depth);
+	}
 
 	tags = kmalloc(sizeof(struct blk_queue_tag),GFP_ATOMIC);
 	if (!tags)
@@ -362,7 +364,7 @@ int blk_queue_init_tags(request_queue_t *q, int depth)
 	 * set the upper bits if the depth isn't a multiple of the word size
 	 */
 	for (i = depth; i < bits * BLK_TAGS_PER_LONG; i++)
-		set_bit(i, tags->tag_map);
+		__set_bit(i, tags->tag_map);
 
 	/*
 	 * assign it, all done
@@ -478,13 +480,19 @@ int blk_queue_start_tag(request_queue_t *q, struct request *rq)
 void blk_queue_invalidate_tags(request_queue_t *q)
 {
 	struct blk_queue_tag *bqt = q->queue_tags;
-	struct list_head *tmp;
+	struct list_head *tmp, *n;
 	struct request *rq;
 
-	list_for_each(tmp, &bqt->busy_list) {
+	list_for_each_safe(tmp, n, &bqt->busy_list) {
 		rq = list_entry_rq(tmp);
 
-		blk_queue_end_tag(q, rq);
+		if (rq->tag == -1) {
+			printk("bad tag found on list\n");
+			list_del(&rq->queue);
+			rq->tagged = 0;
+		} else
+			blk_queue_end_tag(q, rq);
+
 		rq->flags &= ~REQ_STARTED;
 		elv_add_request(q, rq, 0);
 	}
