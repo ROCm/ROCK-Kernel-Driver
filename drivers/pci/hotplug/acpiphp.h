@@ -201,7 +201,7 @@ struct acpiphp_func {
 
 #define SLOT_POWEREDON		(0x00000001)
 #define SLOT_ENABLED		(0x00000002)
-#define SLOT_MULTIFUNCTION	(x000000004)
+#define SLOT_MULTIFUNCTION	(0x00000004)
 
 /* function flags */
 
@@ -211,8 +211,6 @@ struct acpiphp_func {
 #define FUNC_HAS_PS1		(0x00000020)
 #define FUNC_HAS_PS2		(0x00000040)
 #define FUNC_HAS_PS3		(0x00000080)
-
-#define FUNC_EXISTS		(0x10000000) /* to make sure we call _EJ0 only for existing funcs */
 
 /* function prototypes */
 
@@ -231,6 +229,7 @@ extern u8 acpiphp_get_power_status (struct acpiphp_slot *slot);
 extern u8 acpiphp_get_attention_status (struct acpiphp_slot *slot);
 extern u8 acpiphp_get_latch_status (struct acpiphp_slot *slot);
 extern u8 acpiphp_get_adapter_status (struct acpiphp_slot *slot);
+extern u32 acpiphp_get_address (struct acpiphp_slot *slot);
 
 /* acpiphp_pci.c */
 extern struct pci_dev *acpiphp_allocate_pcidev (struct pci_bus *pbus, int dev, int fn);

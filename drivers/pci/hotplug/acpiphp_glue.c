@@ -26,12 +26,12 @@
  *
  */
 
-#include <linux/config.h>
-#include <linux/kernel.h>
+#include <linux/init.h>
 #include <linux/module.h>
+
+#include <linux/kernel.h>
 #include <linux/pci.h>
 #include <linux/smp_lock.h>
-#include <linux/init.h>
 #include <asm/semaphore.h>
 
 #include "../pci.h"
@@ -686,7 +686,7 @@ static int power_on_slot (struct acpiphp_slot *slot)
 	struct list_head *l;
 	int retval = 0;
 
-	/* is this already enabled? */
+	/* if already enabled, just skip */
 	if (slot->flags & SLOT_POWEREDON)
 		goto err_exit;
 
@@ -724,14 +724,14 @@ static int power_off_slot (struct acpiphp_slot *slot)
 
 	int retval = 0;
 
-	/* is this already enabled? */
+	/* if already disabled, just skip */
 	if ((slot->flags & SLOT_POWEREDON) == 0)
 		goto err_exit;
 
 	list_for_each (l, &slot->funcs) {
 		func = list_entry(l, struct acpiphp_func, sibling);
 
-		if (func->flags & (FUNC_HAS_PS3 | FUNC_EXISTS)) {
+		if (func->pci_dev && (func->flags & FUNC_HAS_PS3)) {
 			status = acpi_evaluate_object(func->handle, "_PS3", NULL, NULL);
 			if (ACPI_FAILURE(status)) {
 				warn("%s: _PS3 failed\n", __FUNCTION__);
@@ -745,7 +745,7 @@ static int power_off_slot (struct acpiphp_slot *slot)
 		func = list_entry(l, struct acpiphp_func, sibling);
 
 		/* We don't want to call _EJ0 on non-existing functions. */
-		if (func->flags & (FUNC_HAS_EJ0 | FUNC_EXISTS)) {
+		if (func->pci_dev && (func->flags & FUNC_HAS_EJ0)) {
 			/* _EJ0 method take one argument */
 			arg_list.count = 1;
 			arg_list.pointer = &arg;
@@ -758,7 +758,6 @@ static int power_off_slot (struct acpiphp_slot *slot)
 				retval = -1;
 				goto err_exit;
 			}
-			func->flags &= (~FUNC_EXISTS);
 		}
 	}
 
@@ -838,8 +837,6 @@ static int enable_device (struct acpiphp_slot *slot)
 		retval = acpiphp_configure_function(func);
 		if (retval)
 			goto err_exit;
-
-		func->flags |= FUNC_EXISTS;
 	}
 
 	slot->flags |= SLOT_ENABLED;
@@ -1348,4 +1345,19 @@ u8 acpiphp_get_adapter_status (struct acpiphp_slot *slot)
 	sta = get_slot_status(slot);
 
 	return (sta == 0) ? 0 : 1;
+}
+
+
+/*
+ * pci address (seg/bus/dev)
+ */
+u32 acpiphp_get_address (struct acpiphp_slot *slot)
+{
+	u32 address;
+
+	address = ((slot->bridge->seg) << 16) |
+		  ((slot->bridge->bus) << 8) |
+		  slot->device;
+
+	return address;
 }
