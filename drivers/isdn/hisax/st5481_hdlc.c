@@ -10,7 +10,7 @@
  *
  */
 
-#include <linux/crc16.h>
+#include <linux/crc-ccitt.h>
 #include "st5481_hdlc.h"
 
 
@@ -262,7 +262,7 @@ int hdlc_decode(struct hdlc_vars *hdlc, const unsigned char *src,
 			if(hdlc->data_bits==8){
 				hdlc->data_bits = 0;
 				hdlc->data_received = 1;
-				hdlc->crc = crc16_byte(hdlc->crc, hdlc->shift_reg);
+				hdlc->crc = crc_ccitt_byte(hdlc->crc, hdlc->shift_reg);
 
 				// good byte received
 				if (dsize--) {
@@ -439,7 +439,7 @@ int hdlc_encode(struct hdlc_vars *hdlc, const unsigned char *src,
 				break;
 			}
 			if(hdlc->bit_shift==8){
-				hdlc->crc = crc16_byte(hdlc->crc, hdlc->shift_reg);
+				hdlc->crc = crc_ccitt_byte(hdlc->crc, hdlc->shift_reg);
 			}
 			if(hdlc->shift_reg & 0x01){
 				hdlc->hdlc_bits1++;
