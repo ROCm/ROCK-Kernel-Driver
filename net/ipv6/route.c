@@ -336,13 +336,13 @@ struct rt6_info *rt6_lookup(struct in6_addr *daddr, struct in6_addr *saddr,
 	return NULL;
 }
 
-/* rt6_ins is called with FREE rt6_lock.
+/* ip6_ins_rt is called with FREE rt6_lock.
    It takes new route entry, the addition fails by any reason the
    route is freed. In any case, if caller does not hold it, it may
    be destroyed.
  */
 
-static int rt6_ins(struct rt6_info *rt, struct nlmsghdr *nlh, void *_rtattr)
+int ip6_ins_rt(struct rt6_info *rt, struct nlmsghdr *nlh, void *_rtattr)
 {
 	int err;
 
@@ -390,7 +390,7 @@ static struct rt6_info *rt6_cow(struct rt6_info *ort, struct in6_addr *daddr,
 
 		dst_hold(&rt->u.dst);
 
-		err = rt6_ins(rt, NULL, NULL);
+		err = ip6_ins_rt(rt, NULL, NULL);
 		if (err == 0)
 			return rt;
 
@@ -901,7 +901,7 @@ install_route:
 		rt->u.dst.metrics[RTAX_ADVMSS-1] = ipv6_advmss(dst_pmtu(&rt->u.dst));
 	rt->u.dst.dev = dev;
 	rt->rt6i_idev = in6_dev_get(dev);
-	return rt6_ins(rt, nlh, _rtattr);
+	return ip6_ins_rt(rt, nlh, _rtattr);
 
 out:
 	if (dev)
@@ -1054,7 +1054,7 @@ source_ok:
 	nrt->u.dst.metrics[RTAX_MTU-1] = ipv6_get_mtu(neigh->dev);
 	nrt->u.dst.metrics[RTAX_ADVMSS-1] = ipv6_advmss(dst_pmtu(&nrt->u.dst));
 
-	if (rt6_ins(nrt, NULL, NULL))
+	if (ip6_ins_rt(nrt, NULL, NULL))
 		goto out;
 
 	if (rt->rt6i_flags&RTF_CACHE) {
@@ -1144,7 +1144,7 @@ void rt6_pmtu_discovery(struct in6_addr *daddr, struct in6_addr *saddr,
 		dst_set_expires(&nrt->u.dst, ip6_rt_mtu_expires);
 		nrt->rt6i_flags |= RTF_DYNAMIC|RTF_CACHE|RTF_EXPIRES;
 		nrt->u.dst.metrics[RTAX_MTU-1] = pmtu;
-		rt6_ins(nrt, NULL, NULL);
+		ip6_ins_rt(nrt, NULL, NULL);
 	}
 
 out:
@@ -1336,7 +1336,7 @@ int ip6_rt_addr_add(struct in6_addr *addr, struct net_device *dev, int anycast)
 
 	ipv6_addr_copy(&rt->rt6i_dst.addr, addr);
 	rt->rt6i_dst.plen = 128;
-	rt6_ins(rt, NULL, NULL);
+	ip6_ins_rt(rt, NULL, NULL);
 
 	return 0;
 }
