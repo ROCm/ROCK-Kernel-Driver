@@ -401,26 +401,6 @@ static struct mmc_host_ops pxamci_ops = {
 	.set_ios	= pxamci_set_ios,
 };
 
-static struct resource *platform_device_resource(struct platform_device *dev, unsigned int mask, int nr)
-{
-	int i;
-
-	for (i = 0; i < dev->num_resources; i++)
-		if (dev->resource[i].flags == mask && nr-- == 0)
-			return &dev->resource[i];
-	return NULL;
-}
-
-static int platform_device_irq(struct platform_device *dev, int nr)
-{
-	int i;
-
-	for (i = 0; i < dev->num_resources; i++)
-		if (dev->resource[i].flags == IORESOURCE_IRQ && nr-- == 0)
-			return dev->resource[i].start;
-	return NO_IRQ;
-}
-
 static void pxamci_dma_irq(int dma, void *devid, struct pt_regs *regs)
 {
 	printk(KERN_ERR "DMA%d: IRQ???\n", dma);
@@ -435,8 +415,8 @@ static int pxamci_probe(struct device *dev)
 	struct resource *r;
 	int ret, irq;
 
-	r = platform_device_resource(pdev, IORESOURCE_MEM, 0);
-	irq = platform_device_irq(pdev, 0);
+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	irq = platform_get_irq(pdev, 0);
 	if (!r || irq == NO_IRQ)
 		return -ENXIO;
 
@@ -485,12 +465,9 @@ static int pxamci_probe(struct device *dev)
 	writel(0, host->base + MMC_SPI);
 	writel(64, host->base + MMC_RESTO);
 
-#ifdef CONFIG_PREEMPT
-#error Not Preempt-safe
-#endif
 	pxa_gpio_mode(GPIO6_MMCCLK_MD);
 	pxa_gpio_mode(GPIO8_MMCCS0_MD);
-	CKEN |= CKEN12_MMC;
+	pxa_set_cken(CKEN12_MMC, 1);
 
 	host->dma = pxa_request_dma("PXAMCI", DMA_PRIO_LOW, pxamci_dma_irq, host);
 	if (host->dma < 0) {
@@ -543,6 +520,8 @@ static int pxamci_remove(struct device *dev)
 		pxa_free_dma(host->dma);
 		iounmap(host->base);
 		dma_free_coherent(dev, PAGE_SIZE, host->sg_cpu, host->sg_dma);
+
+		pxa_set_cken(CKEN12_MMC, 0);
 
 		release_resource(host->res);
 
