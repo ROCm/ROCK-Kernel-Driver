@@ -65,7 +65,7 @@ static struct i2c_address_data addr_data = {
 };
 
 static int init = 1;
-MODULE_PARM(init, "i");
+module_param(init, int, 0);
 MODULE_PARM_DESC(init,
  "Chip initialization level:\n"
  " 0: None\n"
