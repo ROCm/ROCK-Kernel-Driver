@@ -174,6 +174,7 @@ struct cifsSesInfo {
 	uid_t linux_uid;        /* local Linux uid */
 	int capabilities;
 	char serverName[SERVER_NAME_LEN_WITH_NULL * 2];	/* BB make bigger for tcp names - will ipv6 and sctp addresses fit here?? */
+	char workstation_RFC1001_name[15]; /* 16th byte is always zero */
 	char userName[MAX_USERNAME_SIZE + 1];
 	char domainName[MAX_USERNAME_SIZE + 1];
 	char * password;
