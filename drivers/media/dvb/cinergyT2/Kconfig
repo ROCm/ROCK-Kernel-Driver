@@ -23,8 +23,10 @@ config DVB_CINERGYT2_STREAM_URB_COUNT
 	depends on DVB_CINERGYT2_TUNING
         default "32"
 	help
-	  USB Request Blocks for Highspeed Stream transfers are queued in a
-	  for the Host Controller. Usually the default value is a safe choice.
+	  USB Request Blocks for Highspeed Stream transfers are scheduled in
+	  a queue for the Host Controller.
+
+	  Usually the default value is a safe choice.
 
 	  You may increase this number if you are using this device in a 
 	  Server Environment with many high-traffic USB Highspeed devices 
@@ -44,6 +46,21 @@ config DVB_CINERGYT2_STREAM_BUF_SIZE
 	  sharing the same USB bus.
 
 
+config DVB_CINERGYT2_QUERY_INTERVAL
+	int "Status update interval [milliseconds]"
+	depends on DVB_CINERGYT2_TUNING
+        default "250"
+	help
+	  This is the interval for status readouts from the demodulator.
+	  You may try lower values if you need more responsive signal quality
+	  measurements.
+
+	  Please keep in mind that these updates cause traffic on the tuner
+	  control bus and thus may or may not affect receiption sensitivity.
+
+	  The default value should be a safe choice for common applications.
+
+
 config DVB_CINERGYT2_ENABLE_RC_INPUT_DEVICE
 	bool "Register the onboard IR Remote Control Receiver as Input Device"
 	depends on DVB_CINERGYT2_TUNING
@@ -56,4 +73,13 @@ config DVB_CINERGYT2_ENABLE_RC_INPUT_DEVICE
 	  delivered with the device is supported, please see the driver
 	  source code to find out how to add support for other controls.
 
+
+config DVB_CINERGYT2_RC_QUERY_INTERVAL
+	int "Infrared Remote Controller update interval [milliseconds]"
+	depends on DVB_CINERGYT2_TUNING && DVB_CINERGYT2_ENABLE_RC_INPUT_DEVICE
+        default "100"
+	help
+	  If you have a very fast-repeating remote control you can try lower
+	  values, for normal consumer receivers the default value should be
+	  a safe choice.
 
