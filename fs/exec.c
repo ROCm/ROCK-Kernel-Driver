@@ -1085,6 +1085,7 @@ int do_execve(char * filename,
 	struct linux_binprm bprm;
 	struct file *file;
 	int retval;
+	int i;
 
 	sched_balance_exec();
 
@@ -1153,7 +1154,11 @@ int do_execve(char * filename,
 
 out:
 	/* Something went wrong, return the inode and free the argument pages*/
-	free_arg_pages(&bprm);
+	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
+		struct page * page = bprm.page[i];
+		if (page)
+			__free_page(page);
+	}
 
 	if (bprm.security)
 		security_bprm_free(&bprm);
