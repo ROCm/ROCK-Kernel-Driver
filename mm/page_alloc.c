@@ -543,16 +543,13 @@ unsigned int nr_free_pages (void)
 	return sum;
 }
 
-/*
- * Amount of free RAM allocatable as buffer memory:
- */
-unsigned int nr_free_buffer_pages (void)
+static unsigned int nr_free_zone_pages(int offset)
 {
 	pg_data_t *pgdat = pgdat_list;
 	unsigned int sum = 0;
 
 	do {
-		zonelist_t *zonelist = pgdat->node_zonelists + (GFP_USER & GFP_ZONEMASK);
+		zonelist_t *zonelist = pgdat->node_zonelists + offset;
 		zone_t **zonep = zonelist->zones;
 		zone_t *zone;
 
@@ -570,30 +567,19 @@ unsigned int nr_free_buffer_pages (void)
 }
 
 /*
- * Amount of free RAM allocatable as pagecache memory:
+ * Amount of free RAM allocatable within ZONE_DMA and ZONE_NORMAL
+ */
+unsigned int nr_free_buffer_pages(void)
+{
+	return nr_free_zone_pages(GFP_USER & GFP_ZONEMASK);
+}
+
+/*
+ * Amount of free RAM allocatable within all zones
  */
 unsigned int nr_free_pagecache_pages(void)
 {
-	pg_data_t *pgdat = pgdat_list;
-	unsigned int sum = 0;
-
-	do {
-		zonelist_t *zonelist = pgdat->node_zonelists +
-				(GFP_HIGHUSER & GFP_ZONEMASK);
-		zone_t **zonep = zonelist->zones;
-		zone_t *zone;
-
-		for (zone = *zonep++; zone; zone = *zonep++) {
-			unsigned long size = zone->size;
-			unsigned long high = zone->pages_high;
-			if (size > high)
-				sum += size - high;
-		}
-
-		pgdat = pgdat->node_next;
-	} while (pgdat);
-
-	return sum;
+	return nr_free_zone_pages(GFP_HIGHUSER & GFP_ZONEMASK);
 }
 
 #if CONFIG_HIGHMEM
