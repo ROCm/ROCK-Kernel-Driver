@@ -699,6 +699,7 @@ repeat:
 	}
 	
 done_locked:
+	spin_unlock(&journal->j_list_lock);
 	if (need_copy) {
 		struct page *page;
 		int offset;
@@ -712,7 +713,6 @@ done_locked:
 		memcpy(jh->b_frozen_data, source+offset, jh2bh(jh)->b_size);
 		kunmap_atomic(source, KM_USER0);
 	}
-	spin_unlock(&journal->j_list_lock);
 	jbd_unlock_bh_state(bh);
 
 	/* If we are about to journal a buffer, then any revoke pending
