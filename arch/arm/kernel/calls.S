@@ -237,7 +237,7 @@ __syscall_start:
 /* 220 */	.long	sys_madvise
 		.long	sys_fcntl64
 		.long	sys_ni_syscall /* TUX */
-		.long	sys_ni_syscall /* Security */
+		.long	sys_security
 		.long	sys_gettid
 /* 225 */	.long	sys_readahead
 		.long	sys_setxattr

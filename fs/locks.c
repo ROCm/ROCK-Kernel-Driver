@@ -1242,6 +1242,9 @@ int fcntl_setlease(unsigned int fd, struct file *filp, long arg)
 		return -EACCES;
 	if (!S_ISREG(inode->i_mode))
 		return -EINVAL;
+	error = security_ops->file_lock(filp, arg);
+	if (error)
+		return error;
 
 	lock_kernel();
 
@@ -1359,8 +1362,7 @@ asmlinkage long sys_flock(unsigned int fd, unsigned int cmd)
 	if (error < 0)
 		goto out_putf;
 
-	error = security_ops->file_lock(filp, cmd,
-					(cmd & LOCK_NB) ? 0 : 1);
+	error = security_ops->file_lock(filp, lock->fl_type);
 	if (error)
 		goto out_putf;
 
@@ -1494,8 +1496,7 @@ int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock *l)
 		goto out;
 	}
 
-	error = security_ops->file_lock(filp, file_lock->fl_type,
-	                                cmd == F_SETLKW);
+	error = security_ops->file_lock(filp, file_lock->fl_type);
 	if (error)
 		goto out;
 
@@ -1618,8 +1619,7 @@ int fcntl_setlk64(struct file *filp, unsigned int cmd, struct flock64 *l)
 		goto out;
 	}
 
-	error = security_ops->file_lock(filp, file_lock->fl_type,
-					cmd == F_SETLKW64);
+	error = security_ops->file_lock(filp, file_lock->fl_type);
 	if (error)
 		goto out;
 

@@ -17,13 +17,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  *  Keyboard driver definitions for the Integrator architecture
+ *  Now using the input subsystem...
  */
-#include <asm/irq.h>
-
-#define NR_SCANCODES 128
-
-extern int kmi_kbd_init(void);
-
-#define kbd_disable_irq()	disable_irq(IRQ_KMIINT0)
-#define kbd_enable_irq()	enable_irq(IRQ_KMIINT0)
-#define kbd_init_hw()		kmi_kbd_init()
+#define kbd_init_hw()		do { } while (0)

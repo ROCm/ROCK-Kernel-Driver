@@ -24,13 +24,14 @@
 #include <linux/init.h>
 
 #include <asm/hardware.h>
+#include <asm/mach-types.h>
 #include <asm/io.h>
 #include <asm/system.h>
 
 #undef DEBUG
 
 extern unsigned int sa11x0_freq_to_ppcr(unsigned int khz);
-extern unsigned int sa11x0_validatespeed(unsigned int khz);
+extern unsigned int sa11x0_validatespeed(unsigned int cpu, unsigned int khz);
 extern unsigned int sa11x0_getspeed(void);
 
 struct sdram_params {
@@ -213,7 +214,7 @@ sdram_update_refresh(u_int cpu_khz, struct sdram_params *sdram)
  * above, we can match for an exact frequency.  If we don't find
  * an exact match, we will to set the lowest frequency to be safe.
  */
-static void sa1110_setspeed(unsigned int khz)
+static void sa1110_setspeed(unsigned int cpu, unsigned int khz)
 {
 	struct sdram_params *sdram = &sdram_params;
 	struct sdram_info sd;
@@ -284,6 +285,18 @@ static void sa1110_setspeed(unsigned int khz)
 	sdram_update_refresh(khz, sdram);
 }
 
+static struct cpufreq_freqs sa1110_freqs = {
+	.min		= 59000,
+	.max		= 287000,
+};
+
+static struct cpufreq_driver sa1110_driver = {
+	.freq		= &sa1110_freqs,
+	.validate	= sa11x0_validatespeed,
+	.setspeed	= sa1110_setspeed,
+	.sync		= 1,
+};
+
 static int __init sa1110_clk_init(void)
 {
 	struct sdram_params *sdram = NULL;
@@ -298,8 +311,6 @@ static int __init sa1110_clk_init(void)
 		sdram = &samsung_km416s4030ct;
 
 	if (sdram) {
-		struct cpufreq_driver cpufreq_driver;
-
 		printk(KERN_DEBUG "SDRAM: tck: %d trcd: %d trp: %d"
 			" twr: %d refresh: %d cas_latency: %d\n",
 			sdram->tck, sdram->trcd, sdram->trp,
@@ -307,15 +318,10 @@ static int __init sa1110_clk_init(void)
 
 		memcpy(&sdram_params, sdram, sizeof(sdram_params));
 
-		sa1110_setspeed(sa11x0_getspeed());
+		sa1110_freqs.cur = sa11x0_getspeed();
+		sa1110_setspeed(0, sa1110_freqs.cur);
 
-		cpufreq_driver.freq.min = 59000;
-		cpufreq_driver.freq.max = 287000;
-		cpufreq_driver.freq.cur = sa11x0_getspeed();
-		cpufreq_driver.validate = &sa11x0_validatespeed;
-		cpufreq_driver.setspeed = &sa1110_setspeed;
-
-		return cpufreq_register(cpufreq_driver);
+		return cpufreq_register(&sa1110_driver);
 	}
 
 	return 0;

@@ -109,6 +109,7 @@
 #include <linux/init.h>
 #include <linux/hdreg.h>
 #include <linux/ide.h>
+#include <linux/pci.h>
 
 #include <asm/io.h>
 
@@ -164,18 +165,18 @@ int cmd640_vlb = 0;
 #define BRST		0x59
 
 /*
+ * Protects register file access from overlapping on primary and secondary
+ * channel, since those share hardware resources.
+ */
+static spinlock_t cmd640_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
+
+/*
  * Registers and masks for easy access by drive index:
  */
 static u8 prefetch_regs[4]  = {CNTRL, CNTRL, ARTTIM23, ARTTIM23};
 static u8 prefetch_masks[4] = {CNTRL_DIS_RA0, CNTRL_DIS_RA1, ARTTIM23_DIS_RA2, ARTTIM23_DIS_RA3};
 
 #ifdef CONFIG_BLK_DEV_CMD640_ENHANCED
-
-/*
- * Protects register file access from overlapping on primary and secondary
- * channel, since those share hardware resources.
- */
-static spinlock_t cmd640_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
 
 static u8 arttim_regs[4] = {ARTTIM0, ARTTIM1, ARTTIM23, ARTTIM23};
 static u8 drwtim_regs[4] = {DRWTIM0, DRWTIM1, DRWTIM23, DRWTIM23};
@@ -214,19 +215,16 @@ static unsigned int cmd640_chip_version;
  * Therefore, we must use direct IO instead.
  */
 
-/* This is broken, but no more so than the old code.. */
-static spinlock_t cmd640_lock = SPIN_LOCK_UNLOCKED;
-
 /* PCI method 1 access */
 
 static void put_cmd640_reg_pci1 (unsigned short reg, u8 val)
 {
 	unsigned long flags;
-
-	spin_lock_irqsave(&cmd640_lock, flags);
-	outl_p((reg & 0xfc) | cmd640_key, 0xcf8);
+	
+	spin_lock_irqsave(&pci_lock, flags);
+	outb_p((reg & 0xfc) | cmd640_key, 0xcf8);
 	outb_p(val, (reg & 3) | 0xcfc);
-	spin_unlock_irqrestore(&cmd640_lock, flags);
+	spin_unlock_irqrestore(&pci_lock, flags);
 }
 
 static u8 get_cmd640_reg_pci1 (unsigned short reg)
@@ -234,10 +232,10 @@ static u8 get_cmd640_reg_pci1 (unsigned short reg)
 	u8 b;
 	unsigned long flags;
 
-	spin_lock_irqsave(&cmd640_lock, flags);
-	outl_p((reg & 0xfc) | cmd640_key, 0xcf8);
-	b = inb_p((reg & 3) | 0xcfc);
-	spin_unlock_irqrestore(&cmd640_lock, flags);
+	spin_lock_irqsave(&pci_lock, flags);
+	outb_p((reg & 0xfc) | cmd640_key, 0xcf8);
+	b=inb_p((reg & 3) | 0xcfc);
+	spin_unlock_irqrestore(&pci_lock, flags);
 	return b;
 }
 
@@ -247,11 +245,11 @@ static void put_cmd640_reg_pci2 (unsigned short reg, u8 val)
 {
 	unsigned long flags;
 
-	spin_lock_irqsave(&cmd640_lock, flags);
+	spin_lock_irqsave(&pci_lock, flags);
 	outb_p(0x10, 0xcf8);
 	outb_p(val, cmd640_key + reg);
 	outb_p(0, 0xcf8);
-	spin_unlock_irqrestore(&cmd640_lock, flags);
+	spin_unlock_irqrestore(&pci_lock, flags);
 }
 
 static u8 get_cmd640_reg_pci2 (unsigned short reg)
@@ -259,11 +257,11 @@ static u8 get_cmd640_reg_pci2 (unsigned short reg)
 	u8 b;
 	unsigned long flags;
 
-	spin_lock_irqsave(&cmd640_lock, flags);
+	spin_lock_irqsave(&pci_lock, flags);
 	outb_p(0x10, 0xcf8);
 	b = inb_p(cmd640_key + reg);
 	outb_p(0, 0xcf8);
-	spin_unlock_irqrestore(&cmd640_lock, flags);
+	spin_unlock_irqrestore(&pci_lock, flags);
 	return b;
 }
 
@@ -574,7 +572,7 @@ static void program_drive_counts (unsigned int index)
 	/*
 	 * Now that everything is ready, program the new timings
 	 */
-	spin_lock(&cmd640_lock, flags);
+	spin_lock_irqsave(&cmd640_lock, flags);
 	/*
 	 * Program the address_setup clocks into ARTTIM reg,
 	 * and then the active/recovery counts into the DRWTIM reg
@@ -695,9 +693,61 @@ out_lock:
 
 #endif
 
+/**
+ *	pci_conf1	-	check for PCI type 1 configuration
+ *	
+ *	Issues a safe probe sequence for PCI configuration type 1 and
+ *	returns non-zero if conf1 is supported. Takes the pci_config lock
+ */
+ 
+static int pci_conf1(void)
+{
+	u32 tmp;
+	unsigned long flags;
+	
+	spin_lock_irqsave(&pci_lock, flags);
+
+	OUT_BYTE(0x01, 0xCFB);
+	tmp = inl(0xCF8);
+	outl(0x80000000, 0xCF8);
+	if (inl(0xCF8) == 0x80000000) {
+		spin_unlock_irqrestore(&pci_lock, flags);
+		outl(tmp, 0xCF8);
+		return 1;
+	}
+	outl(tmp, 0xCF8);
+	spin_unlock_irqrestore(&pci_lock, flags);
+	return 0;
+}
+
+/**
+ *	pci_conf2	-	check for PCI type 2 configuration
+ *	
+ *	Issues a safe probe sequence for PCI configuration type 2 and
+ *	returns non-zero if conf2 is supported. Takes the pci_config lock.
+ */
+ 
+
+static int pci_conf2(void)
+{
+	unsigned long flags;
+	spin_lock_irqsave(&pci_lock, flags);
+	
+	OUT_BYTE(0x00, 0xCFB);
+	OUT_BYTE(0x00, 0xCF8);
+	OUT_BYTE(0x00, 0xCFA);
+	if (IN_BYTE(0xCF8) == 0x00 && IN_BYTE(0xCFA) == 0x00) {
+		spin_unlock_irqrestore(&pci_lock, flags);
+		return 1;
+	}
+	spin_unlock_irqrestore(&pci_lock, flags);
+	return 0;
+}
+
 /*
  * Probe for a cmd640 chipset, and initialize it if found.  Called from ide.c
  */
+
 int __init ide_probe_for_cmd640x(void)
 {
 #ifdef CONFIG_BLK_DEV_CMD640_ENHANCED
@@ -712,9 +762,9 @@ int __init ide_probe_for_cmd640x(void)
 		bus_type = "VLB";
 	} else {
 		cmd640_vlb = 0;
-		if (probe_for_cmd640_pci1())
+		if (pci_conf1() && probe_for_cmd640_pci1())
 			bus_type = "PCI (type1)";
-		else if (probe_for_cmd640_pci2())
+		else if (pci_conf2() && probe_for_cmd640_pci2())
 			bus_type = "PCI (type2)";
 		else
 			return 0;
