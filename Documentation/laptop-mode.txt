@@ -350,19 +350,28 @@ case "$1" in
 		echo -n "Starting laptop_mode"
 
 		if [ -d /proc/sys/vm/pagebuf ] ; then
+			# (For 2.4 and early 2.6.)
 			# This only needs to be set, not reset -- it is only used when
 			# laptop mode is enabled.
 			echo $XFS_AGE > /proc/sys/vm/pagebuf/lm_flush_age
 			echo $XFS_AGE > /proc/sys/fs/xfs/lm_sync_interval
 		elif [ -f /proc/sys/fs/xfs/lm_age_buffer ] ; then
+			# (A couple of early 2.6 laptop mode patches had these.)
 			# The same goes for these.
 			echo $XFS_AGE > /proc/sys/fs/xfs/lm_age_buffer
 			echo $XFS_AGE > /proc/sys/fs/xfs/lm_sync_interval
 		elif [ -f /proc/sys/fs/xfs/age_buffer ] ; then
+			# (2.6.6)
 			# But not for these -- they are also used in normal
 			# operation.
 			echo $XFS_AGE > /proc/sys/fs/xfs/age_buffer
 			echo $XFS_AGE > /proc/sys/fs/xfs/sync_interval
+		elif [ -f /proc/sys/fs/xfs/age_buffer_centisecs ] ; then
+			# (2.6.7 upwards)
+			# And not for these either. These are in centisecs,
+			# not USER_HZ, so we have to use $AGE, not $XFS_AGE.
+			echo $AGE > /proc/sys/fs/xfs/age_buffer_centisecs
+			echo $AGE > /proc/sys/fs/xfs/xfssyncd_centisecs
 		fi
 
 		case "$KLEVEL" in
@@ -403,9 +412,13 @@ case "$1" in
 		echo -n "Stopping laptop_mode"
 		echo "0" > /proc/sys/vm/laptop_mode
 		if [ -f /proc/sys/fs/xfs/age_buffer ] && [ ! -f /proc/sys/fs/xfs/lm_age_buffer ] ; then
-			# These need to be restored though, if there are no lm_*.
+			# These need to be restored, if there are no lm_*.
 			echo "$(($XFS_HZ*$DEF_XFS_AGE_BUFFER))" 	> /proc/sys/fs/xfs/age_buffer
 			echo "$(($XFS_HZ*$DEF_XFS_SYNC_INTERVAL))" 	> /proc/sys/fs/xfs/sync_interval
+		elif [ -f /proc/sys/fs/xfs/age_buffer_centisecs ] ; then
+			# These need to be restored as well.
+			echo "$((100*$DEF_XFS_AGE_BUFFER))" > /proc/sys/fs/xfs/age_buffer_centisecs
+			echo "$((100*$DEF_XFS_SYNC_INTERVAL))" > /proc/sys/fs/xfs/xfssyncd_centisecs
 		fi
 		case "$KLEVEL" in
 			"2.4")
