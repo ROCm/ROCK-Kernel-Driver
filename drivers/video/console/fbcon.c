@@ -2162,7 +2162,7 @@ static int fbcon_do_set_font(struct vc_data *vc, int w, int h,
 static int fbcon_copy_font(struct vc_data *vc, int con)
 {
 	struct display *od = &fb_display[con];
-	struct console_font_op *f = &vc->vc_font;
+	struct console_font *f = &vc->vc_font;
 
 	if (od->fontdata == f->data)
 		return 0;	/* already the same font... */
