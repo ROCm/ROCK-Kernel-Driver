@@ -344,6 +344,12 @@ unsigned int usb_stor_transfer_length(Scsi_Cmnd *srb)
 			   len = srb->request_bufflen;
 	   }
 
+	/* According to the linux-scsi people, any command sent which
+	 * violates this invariant is a bug.  In the hopes of removing
+	 * all the complex logic above, let's find them and eliminate them.
+	 */
+	BUG_ON(len != srb->request_bufflen);
+
 	return len;
 }
 
