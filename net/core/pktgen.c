@@ -47,6 +47,9 @@
  * Also moved to /proc/net/pktgen/ 
  * --ro 
  *
+ * Fix refcount off by one if first packet fails, potential null deref, 
+ * memleak 030710- KJP
+ *
  * See Documentation/networking/pktgen.txt for how to use this.
  */
 
@@ -85,9 +88,9 @@
 #define cycles()	((u32)get_cycles())
 
 
-#define VERSION "pktgen version 1.2"
+#define VERSION "pktgen version 1.2.1"
 static char version[] __initdata = 
-  "pktgen.c: v1.2: Packet Generator for packet performance testing.\n";
+  "pktgen.c: v1.2.1: Packet Generator for packet performance testing.\n";
 
 /* Used to help with determining the pkts on receive */
 
@@ -611,12 +614,11 @@ static void inject(struct pktgen_info* info)
 				kfree_skb(skb);
 				skb = fill_packet(odev, info);
 				if (skb == NULL) {
-					break;
+					goto out_reldev;
 				}
 				fp++;
 				fp_tmp = 0; /* reset counter */
 			}
-			atomic_inc(&skb->users);
 		}
 
 		nr_frags = skb_shinfo(skb)->nr_frags;
@@ -624,7 +626,11 @@ static void inject(struct pktgen_info* info)
 		spin_lock_bh(&odev->xmit_lock);
 		if (!netif_queue_stopped(odev)) {
 
+			atomic_inc(&skb->users);
+
 			if (odev->hard_start_xmit(skb, odev)) {
+
+				atomic_dec(&skb->users);
 				if (net_ratelimit()) {
 				   printk(KERN_INFO "Hard xmit error\n");
 				}
@@ -729,7 +735,9 @@ static void inject(struct pktgen_info* info)
 			     (unsigned long long) info->errors
 			     );
 	}
-	
+
+	kfree_skb(skb);
+
 out_reldev:
 	if (odev) {
 		dev_put(odev);
