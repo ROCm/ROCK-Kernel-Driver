@@ -175,8 +175,7 @@ static int cb_setup_cis_mem(socket_info_t * s, struct resource *res)
     
 =====================================================================*/
 
-int read_cb_mem(socket_info_t * s, u_char fn, int space,
-		u_int addr, u_int len, void *ptr)
+int read_cb_mem(socket_info_t * s, int space, u_int addr, u_int len, void *ptr)
 {
 	struct pci_dev *dev;
 	struct resource *res;
@@ -186,7 +185,7 @@ int read_cb_mem(socket_info_t * s, u_char fn, int space,
 	if (!s->cb_config)
 		goto fail;
 
-	dev = &s->cb_config[fn].dev;
+	dev = &s->cb_config[0].dev;
 
 	/* Config space? */
 	if (space == 0) {
