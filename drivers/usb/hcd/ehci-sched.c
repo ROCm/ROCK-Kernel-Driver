@@ -20,8 +20,6 @@
 
 /*-------------------------------------------------------------------------*/
 
-#include "ehci.h"
-
 /*
  * EHCI scheduled transaction support:  interrupt, iso, split iso
  * These are called "periodic" transactions in the EHCI spec.
@@ -394,6 +392,9 @@ static int intr_submit (
 				}
 				frame += period;
 			} while (frame < ehci->periodic_size);
+
+			/* update bandwidth utilization records (for usbfs) */
+			usb_claim_bandwidth (urb->dev, urb, usecs, 0);
 
 			/* maybe enable periodic schedule processing */
 			if (!ehci->periodic_urbs++) {
