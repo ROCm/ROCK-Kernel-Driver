@@ -53,7 +53,7 @@
 #include <asm/irq.h>
 #include <asm/system.h>
 
-#include "hcd.h"
+#include "../core/hcd.h"
 #include "uhci.h"
 
 #include <linux/pm.h>

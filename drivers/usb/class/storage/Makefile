@@ -6,7 +6,7 @@
 #
 
 O_TARGET	:= storage.o
-EXTRA_CFLAGS	:= -I../../scsi/
+EXTRA_CFLAGS	:= -I../../../scsi/
 
 list-multi	:= usb-storage.o
 

@@ -59,7 +59,7 @@
 #include <linux/usbdevice_fs.h>
 #include <asm/uaccess.h>
 
-#include "hcd.h"
+#include "../hcd.h"
 
 #define MAX_TOPO_LEVEL		6
 
