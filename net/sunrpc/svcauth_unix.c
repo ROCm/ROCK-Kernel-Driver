@@ -215,8 +215,7 @@ static int ip_map_parse(struct cache_detail *cd,
 
 static int ip_map_show(struct seq_file *m,
 		       struct cache_detail *cd,
-		       struct cache_head *h,
-		       char *pbuf)
+		       struct cache_head *h)
 {
 	struct ip_map *im;
 	struct in_addr addr;

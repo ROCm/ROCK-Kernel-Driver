@@ -195,8 +195,7 @@ int expkey_parse(struct cache_detail *cd, char *mesg, int mlen)
 
 static int expkey_show(struct seq_file *m,
 		       struct cache_detail *cd,
-		       struct cache_head *h,
-		       char *pbuf)
+		       struct cache_head *h)
 {
 	struct svc_expkey *ek ;
 
@@ -436,9 +435,8 @@ int svc_export_parse(struct cache_detail *cd, char *mesg, int mlen)
 static void exp_flags(struct seq_file *m, int flag, int fsid, uid_t anonu, uid_t anong);
 
 static int svc_export_show(struct seq_file *m,
-		       struct cache_detail *cd,
-		       struct cache_head *h,
-		       char *pbuf)
+			   struct cache_detail *cd,
+			   struct cache_head *h)
 {
 	struct svc_export *exp ;
 
@@ -1045,7 +1043,7 @@ static int e_show(struct seq_file *m, void *p)
 	if (cache_check(&svc_export_cache, &exp->h, NULL))
 		return 0;
 	if (cache_put(&exp->h, &svc_export_cache)) BUG();
-	return svc_export_show(m, &svc_export_cache, cp, NULL);
+	return svc_export_show(m, &svc_export_cache, cp);
 }
 
 struct seq_operations nfs_exports_op = {
