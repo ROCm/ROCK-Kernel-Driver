@@ -98,11 +98,14 @@ set_normalized_timespec (struct timespec *ts, time_t sec, long nsec)
 	ts->tv_nsec = nsec;
 }
 
-void
-do_settimeofday (struct timeval *tv)
+int
+do_settimeofday (struct timespec *tv)
 {
 	time_t wtm_sec, sec = tv->tv_sec;
-	long wtm_nsec, nsec = tv->tv_usec * 1000;
+	long wtm_nsec, nsec = tv->tv_nsec;
+
+	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
+		return -EINVAL;
 
 	write_seqlock_irq(&xtime_lock);
 	{
@@ -127,12 +130,16 @@ do_settimeofday (struct timeval *tv)
 	}
 	write_sequnlock_irq(&xtime_lock);
 	clock_was_set();
+	return 0;
 }
 
 void
 do_gettimeofday (struct timeval *tv)
 {
 	unsigned long seq, nsec, usec, sec, old, offset;
+
+	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
+		return -EINVAL;
 
 	while (1) {
 		seq = read_seqbegin(&xtime_lock);
