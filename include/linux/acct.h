@@ -78,7 +78,7 @@ struct acct
 #ifdef CONFIG_BSD_PROCESS_ACCT
 struct super_block;
 extern void acct_auto_close(struct super_block *sb);
-extern int acct_process(long exitcode);
+extern void acct_process(long exitcode);
 #else
 #define acct_auto_close(x)	do { } while (0)
 #define acct_process(x)		do { } while (0)
