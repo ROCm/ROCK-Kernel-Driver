@@ -79,6 +79,8 @@ static unsigned long first_settimeofday = 1;
 unsigned long tb_ticks_per_jiffy;
 unsigned long tb_ticks_per_usec;
 unsigned long tb_ticks_per_sec;
+unsigned long next_xtime_sync_tb;
+unsigned long xtime_sync_interval;
 unsigned long tb_to_xs;
 unsigned      tb_to_us;
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
@@ -152,6 +154,22 @@ static __inline__ void timer_check_rtc(void)
                 /* Try again one minute later */
                 last_rtc_update += 60;
         }
+}
+
+/* Synchronize xtime with do_gettimeofday */ 
+
+static __inline__ void timer_sync_xtime( unsigned long cur_tb )
+{
+	struct timeval my_tv;
+
+	if ( cur_tb > next_xtime_sync_tb ) {
+		next_xtime_sync_tb = cur_tb + xtime_sync_interval;
+		do_gettimeofday( &my_tv );
+		if ( xtime.tv_sec <= my_tv.tv_sec ) {
+			xtime.tv_sec = my_tv.tv_sec;
+			xtime.tv_usec = my_tv.tv_usec;
+		}
+	}
 }
 
 #ifdef CONFIG_PPC_ISERIES
@@ -248,6 +266,7 @@ int timer_interrupt(struct pt_regs * regs)
 			write_lock(&xtime_lock);
 			tb_last_stamp = paca->next_jiffy_update_tb;
 			do_timer(regs);
+			timer_sync_xtime( cur_tb );
 			timer_check_rtc();
 			write_unlock(&xtime_lock);
 		}
@@ -412,6 +431,9 @@ void __init time_init(void)
 	do_gtod.varp->tb_to_xs = tb_to_xs;
 	do_gtod.tb_to_us = tb_to_us;
 
+	xtime_sync_interval = tb_ticks_per_sec - (tb_ticks_per_sec/8);
+	next_xtime_sync_tb = tb_last_stamp + xtime_sync_interval;
+
 	xtime.tv_usec = 0;
 	last_rtc_update = xtime.tv_sec;
 	write_unlock_irqrestore(&xtime_lock, flags);
@@ -440,7 +462,6 @@ void ppc_adjtimex(void)
 	unsigned long tb_ticks_per_sec_delta;
 	long delta_freq, ltemp;
 	struct div_result divres; 
-	struct timeval my_tv;
 	unsigned long flags;
 	struct gettimeofday_vars * temp_varp;
 
@@ -483,10 +504,6 @@ void ppc_adjtimex(void)
 	temp_varp->stamp_xsec = new_stamp_xsec;
 	mb();
 	do_gtod.varp = temp_varp;
-
-	do_gettimeofday( &my_tv );
-	if ( xtime.tv_sec == my_tv.tv_sec ) 
-		xtime.tv_usec = my_tv.tv_usec;
 
 	write_unlock_irqrestore( &xtime_lock, flags );
 
