@@ -45,6 +45,7 @@
  * PMC flags
  */
 #define PFM_REGFL_OVFL_NOTIFY	0x1	/* send notification on overflow */
+#define PFM_REGFL_RANDOM	0x2	/* randomize sampling interval */
 
 /*
  * PMD/PMC/IBR/DBR return flags (ignored on input)
@@ -132,28 +133,28 @@ typedef struct {
 #define PFM_VERSION_MINOR(x)	((x) & 0xffff)
 
 /*
- * Entry header in the sampling buffer.
- * The header is directly followed with the PMDS saved in increasing index 
- * order: PMD4, PMD5, .... How many PMDs are present is determined by the 
- * user program during context creation.
+ * Entry header in the sampling buffer.  The header is directly followed
+ * with the PMDs saved in increasing index order: PMD4, PMD5, .... How
+ * many PMDs are present is determined by the user program during
+ * context creation.
  *
- * XXX: in this version of the entry, only up to 64 registers can be recorded
- * This should be enough for quite some time. Always check sampling format
- * before parsing entries!
+ * XXX: in this version of the entry, only up to 64 registers can be
+ * recorded. This should be enough for quite some time. Always check
+ * sampling format before parsing entries!
  *
- * Inn the case where multiple counters have overflowed at the same time, the 
- * rate field indicate the initial value of the first PMD, based on the index.
- * For instance, if PMD2 and PMD5 have ovewrflowed for this entry, the rate field
- * will show the initial value of PMD2.
+ * In the case where multiple counters overflow at the same time, the
+ * last_reset_value member indicates the initial value of the PMD with
+ * the smallest index.  For instance, if PMD2 and PMD5 have overflowed,
+ * the last_reset_value member contains the initial value of PMD2.
  */
 typedef struct {
-	int		pid;		/* identification of process */
-	int		cpu;		/* which cpu was used */
-	unsigned long	rate;		/* initial value of overflowed counter */
-	unsigned long	stamp;		/* timestamp */
-	unsigned long	ip;		/* where did the overflow interrupt happened */
-	unsigned long	regs;		/* bitmask of which registers overflowed */
-	unsigned long   period;		/* sampling period used by overflowed counter (smallest pmd index) */
+	int		pid;			/* identification of process */
+	int		cpu;			/* which cpu was used */
+	unsigned long	last_reset_value;	/* initial value of counter that overflowed */
+	unsigned long	stamp;			/* timestamp */
+	unsigned long	ip;			/* where did the overflow interrupt happened */
+	unsigned long	regs;			/* bitmask of which registers overflowed */
+	unsigned long   period;			/* unused */
 } perfmon_smpl_entry_t;
 
 extern int perfmonctl(pid_t pid, int cmd, void *arg, int narg);

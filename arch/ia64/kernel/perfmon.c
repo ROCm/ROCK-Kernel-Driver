@@ -193,10 +193,12 @@ typedef enum {
  */
 typedef struct {
 	u64 val;	/* virtual 64bit counter value */
-	u64 ival;	/* initial value from user */
+	u64 lval;	/* last value */
 	u64 long_reset;	/* reset value on sampling overflow */
 	u64 short_reset;/* reset value on overflow */
 	u64 reset_pmds[4]; /* which other pmds to reset when this counter overflows */
+	u64 seed;	/* seed for random-number generator */
+	u64 mask;	/* mask for random-number generator */
 	int flags;	/* notify/do not notify */
 } pfm_counter_t;
 
@@ -1150,13 +1152,32 @@ abort:
 	return ret;
 }
 
+static inline unsigned long
+new_counter_value (pfm_counter_t *reg, int is_long_reset)
+{
+	unsigned long val = is_long_reset ? reg->long_reset : reg->short_reset;
+	unsigned long new_seed, old_seed = reg->seed, mask = reg->mask;
+	extern unsigned long carta_random32 (unsigned long seed);
+
+	if (reg->flags & PFM_REGFL_RANDOM) {
+		new_seed = carta_random32(old_seed);
+		val -= (old_seed & mask);	/* counter values are negative numbers! */
+		if ((mask >> 32) != 0)
+			/* construct a full 64-bit random value: */
+			new_seed |= carta_random32(old_seed >> 32) << 32;
+		reg->seed = new_seed;
+	}
+	reg->lval = val;
+	return val;
+}
+
 static void
 pfm_reset_regs(pfm_context_t *ctx, unsigned long *ovfl_regs, int flag)
 {
 	unsigned long mask = ovfl_regs[0];
 	unsigned long reset_others = 0UL;
 	unsigned long val;
-	int i;
+	int i, is_long_reset = (flag & PFM_RELOAD_LONG_RESET);
 
 	DBprintk(("masks=0x%lx\n", mask));
 
@@ -1166,15 +1187,11 @@ pfm_reset_regs(pfm_context_t *ctx, unsigned long *ovfl_regs, int flag)
 	mask >>= PMU_FIRST_COUNTER;
 	for(i = PMU_FIRST_COUNTER; mask; i++, mask >>= 1) {
 		if (mask & 0x1) {
-			val  = flag == PFM_RELOAD_LONG_RESET ? 
-					ctx->ctx_soft_pmds[i].long_reset:
-					ctx->ctx_soft_pmds[i].short_reset;
-
+			val = new_counter_value(ctx->ctx_soft_pmds + i, is_long_reset);
 			reset_others |= ctx->ctx_soft_pmds[i].reset_pmds[0];
 
-			DBprintk(("[%d] %s reset soft_pmd[%d]=%lx\n", 
-			  	current->pid, 
-				flag == PFM_RELOAD_LONG_RESET ? "long" : "short", i, val));
+			DBprintk(("[%d] %s reset soft_pmd[%d]=%lx\n", current->pid,
+				  is_long_reset ? "long" : "short", i, val));
 
 			/* upper part is ignored on rval */
 			pfm_write_soft_counter(ctx, i, val);
@@ -1188,19 +1205,15 @@ pfm_reset_regs(pfm_context_t *ctx, unsigned long *ovfl_regs, int flag)
 
 		if ((reset_others & 0x1) == 0) continue;
 
-		val  = flag == PFM_RELOAD_LONG_RESET ? 
-					ctx->ctx_soft_pmds[i].long_reset:
-					ctx->ctx_soft_pmds[i].short_reset;
+		val = new_counter_value(ctx->ctx_soft_pmds + i, is_long_reset);
 
 		if (PMD_IS_COUNTING(i)) {
 			pfm_write_soft_counter(ctx, i, val);
 		} else {
 			ia64_set_pmd(i, val);
 		}
-
-		DBprintk(("[%d] %s reset_others pmd[%d]=%lx\n", 
-			  	current->pid, 
-				flag == PFM_RELOAD_LONG_RESET ? "long" : "short", i, val));
+		DBprintk(("[%d] %s reset_others pmd[%d]=%lx\n", current->pid,
+			  is_long_reset ? "long" : "short", i, val));
 	}
 	ia64_srlz_d();
 	/* just in case ! */
@@ -1283,6 +1296,9 @@ pfm_write_pmcs(struct task_struct *task, pfm_context_t *ctx, void *arg, int coun
 			ctx->ctx_soft_pmds[cnum].reset_pmds[1] = tmp.reg_reset_pmds[1];
 			ctx->ctx_soft_pmds[cnum].reset_pmds[2] = tmp.reg_reset_pmds[2];
 			ctx->ctx_soft_pmds[cnum].reset_pmds[3] = tmp.reg_reset_pmds[3];
+
+			if (tmp.reg_flags & PFM_REGFL_RANDOM)
+				ctx->ctx_soft_pmds[cnum].flags |= PFM_REGFL_RANDOM;
 		}
 		/*
 		 * execute write checker, if any
@@ -1369,11 +1385,12 @@ pfm_write_pmds(struct task_struct *task, pfm_context_t *ctx, void *arg, int coun
 
 		/* update virtualized (64bits) counter */
 		if (PMD_IS_COUNTING(cnum)) {
-			ctx->ctx_soft_pmds[cnum].ival = tmp.reg_value;
+			ctx->ctx_soft_pmds[cnum].lval = tmp.reg_value;
 			ctx->ctx_soft_pmds[cnum].val  = tmp.reg_value & ~pmu_conf.perf_ovfl_val;
 			ctx->ctx_soft_pmds[cnum].long_reset = tmp.reg_long_reset;
 			ctx->ctx_soft_pmds[cnum].short_reset = tmp.reg_short_reset;
-
+			ctx->ctx_soft_pmds[cnum].seed = tmp.reserved[0];
+			ctx->ctx_soft_pmds[cnum].mask = tmp.reserved[1];
 		}
 		/*
 		 * execute write checker, if any
@@ -2554,7 +2571,7 @@ pfm_record_sample(struct task_struct *task, pfm_context_t *ctx, unsigned long ov
 	 */
 	h->pid  = current->pid;
 	h->cpu  = smp_processor_id();
-	h->rate = 0; /* XXX: add the sampling rate used here */
+	h->last_reset_value = ovfl_mask ? ctx->ctx_soft_pmds[ffz(~ovfl_mask)].lval : 0;
 	h->ip   = regs ? regs->cr_iip : 0x0;	/* where did the fault happened */
 	h->regs = ovfl_mask; 			/* which registers overflowed */
 
@@ -3769,8 +3786,8 @@ pfm_inherit(struct task_struct *task, struct pt_regs *regs)
 	m = nctx->ctx_used_pmds[0] >> PMU_FIRST_COUNTER;
 	for(i = PMU_FIRST_COUNTER ; m ; m>>=1, i++) {
 		if ((m & 0x1) && pmu_conf.pmd_desc[i].type == PFM_REG_COUNTING) {
-			nctx->ctx_soft_pmds[i].val = nctx->ctx_soft_pmds[i].ival & ~pmu_conf.perf_ovfl_val;
-			thread->pmd[i]	      	   = nctx->ctx_soft_pmds[i].ival & pmu_conf.perf_ovfl_val;
+			nctx->ctx_soft_pmds[i].val = nctx->ctx_soft_pmds[i].lval & ~pmu_conf.perf_ovfl_val;
+			thread->pmd[i]	      	   = nctx->ctx_soft_pmds[i].lval & pmu_conf.perf_ovfl_val;
 		}
 		/* what about the other pmds? zero or keep as is */
 
