@@ -490,75 +490,71 @@ static int dev_ifconf(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	struct ifconf32 ifc32;
 	struct ifconf ifc;
-	struct ifreq32 *ifr32;
-	struct ifreq *ifr;
-	mm_segment_t old_fs;
+	struct ifconf __user *uifc;
+	struct ifreq32 __user *ifr32;
+	struct ifreq __user *ifr;
 	unsigned int i, j;
 	int err;
 
 	if (copy_from_user(&ifc32, compat_ptr(arg), sizeof(struct ifconf32)))
 		return -EFAULT;
 
-	if(ifc32.ifcbuf == 0) {
+	if (ifc32.ifcbuf == 0) {
 		ifc32.ifc_len = 0;
 		ifc.ifc_len = 0;
-		ifc.ifc_buf = NULL;
+		ifc.ifc_req = NULL;
+		uifc = compat_alloc_user_space(sizeof(struct ifconf));
 	} else {
-		ifc.ifc_len = ((ifc32.ifc_len / sizeof (struct ifreq32)) + 1) *
+		size_t len =((ifc32.ifc_len / sizeof (struct ifreq32)) + 1) *
 			sizeof (struct ifreq);
-		/* should the size be limited? -arnd */
-		ifc.ifc_buf = kmalloc (ifc.ifc_len, GFP_KERNEL);
-		if (!ifc.ifc_buf)
-			return -ENOMEM;
+		uifc = compat_alloc_user_space(sizeof(struct ifconf) + len);
+		ifc.ifc_len = len;
+		ifr = ifc.ifc_req = (void __user *)(uifc + 1);
+		ifr32 = compat_ptr(ifc32.ifcbuf);
+		for (i = 0; i < ifc32.ifc_len; i += sizeof (struct ifreq32)) {
+			if (copy_in_user(ifr, ifr32, sizeof(struct ifreq32)))
+				return -EFAULT;
+			ifr++;
+			ifr32++; 
+		}
 	}
+	if (copy_to_user(uifc, &ifc, sizeof(struct ifconf)))
+		return -EFAULT;
+
+	err = sys_ioctl (fd, SIOCGIFCONF, (unsigned long)uifc);	
+	if (err)
+		return err;
+
+	if (copy_from_user(&ifc, uifc, sizeof(struct ifconf))) 
+		return -EFAULT;
+
 	ifr = ifc.ifc_req;
 	ifr32 = compat_ptr(ifc32.ifcbuf);
-	for (i = 0; i < ifc32.ifc_len; i += sizeof (struct ifreq32)) {
-		if (copy_from_user(ifr, ifr32, sizeof (struct ifreq32))) {
-			kfree (ifc.ifc_buf);
+	for (i = 0, j = 0; i < ifc32.ifc_len && j < ifc.ifc_len;
+	     i += sizeof (struct ifreq32), j += sizeof (struct ifreq)) {
+		if (copy_in_user(ifr32, ifr, sizeof (struct ifreq32)))
 			return -EFAULT;
-		}
+		ifr32++;
 		ifr++;
-		ifr32++; 
 	}
-	old_fs = get_fs(); set_fs (KERNEL_DS);
-	err = sys_ioctl (fd, SIOCGIFCONF, (unsigned long)&ifc);	
-	set_fs (old_fs);
-	if (!err) {
-		ifr = ifc.ifc_req;
-		ifr32 = compat_ptr(ifc32.ifcbuf);
-		for (i = 0, j = 0; i < ifc32.ifc_len && j < ifc.ifc_len;
-		     i += sizeof (struct ifreq32), j += sizeof (struct ifreq)) {
-			int k = copy_to_user(ifr32, ifr, sizeof (struct ifreq32));
-			ifr32++;
-			ifr++;
-			if (k) {
-				err = -EFAULT;
-				break;
-			}
-		       
-		}
-		if (!err) {
-			if (ifc32.ifcbuf == 0) {
-				/* Translate from 64-bit structure multiple to
-				 * a 32-bit one.
-				 */
-				i = ifc.ifc_len;
-				i = ((i / sizeof(struct ifreq)) * sizeof(struct ifreq32));
-				ifc32.ifc_len = i;
-			} else {
-				if (i <= ifc32.ifc_len)
-					ifc32.ifc_len = i;
-				else
-					ifc32.ifc_len = i - sizeof (struct ifreq32);
-			}
-			if (copy_to_user(compat_ptr(arg), &ifc32, sizeof(struct ifconf32)))
-				err = -EFAULT;
-		}
+
+	if (ifc32.ifcbuf == 0) {
+		/* Translate from 64-bit structure multiple to
+		 * a 32-bit one.
+		 */
+		i = ifc.ifc_len;
+		i = ((i / sizeof(struct ifreq)) * sizeof(struct ifreq32));
+		ifc32.ifc_len = i;
+	} else {
+		if (i <= ifc32.ifc_len)
+			ifc32.ifc_len = i;
+		else
+			ifc32.ifc_len = i - sizeof (struct ifreq32);
 	}
-	if(ifc.ifc_buf != NULL)
-		kfree (ifc.ifc_buf);
-	return err;
+	if (copy_to_user(compat_ptr(arg), &ifc32, sizeof(struct ifconf32)))
+		return -EFAULT;
+
+	return 0;
 }
 
 static int ethtool_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
