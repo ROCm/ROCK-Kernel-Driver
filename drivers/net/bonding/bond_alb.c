@@ -992,6 +992,7 @@ static void alb_change_hw_addr_on_detach(struct bonding *bond, struct slave *sla
 static int alb_handle_addr_collision_on_attach(struct bonding *bond, struct slave *slave)
 {
 	struct slave *tmp_slave1, *tmp_slave2, *free_mac_slave;
+	struct slave *has_bond_addr = bond->curr_active_slave;
 	int i, j, found = 0;
 
 	if (bond->slave_cnt == 0) {
@@ -1049,6 +1050,15 @@ static int alb_handle_addr_collision_on_attach(struct bonding *bond, struct slav
 			free_mac_slave = tmp_slave1;
 			break;
 		}
+
+		if (!has_bond_addr) {
+			if (!memcmp(tmp_slave1->dev->dev_addr,
+				    bond->dev->dev_addr,
+				    ETH_ALEN)) {
+
+				has_bond_addr = tmp_slave1;
+			}
+		}
 	}
 
 	if (free_mac_slave) {
@@ -1059,7 +1069,8 @@ static int alb_handle_addr_collision_on_attach(struct bonding *bond, struct slav
 		       ": Warning: the hw address of slave %s is in use by "
 		       "the bond; giving it the hw address of %s\n",
 		       slave->dev->name, free_mac_slave->dev->name);
-	} else {
+
+	} else if (has_bond_addr) {
 		printk(KERN_ERR DRV_NAME
 		       ": Error: the hw address of slave %s is in use by the "
 		       "bond; couldn't find a slave with a free hw address to "
