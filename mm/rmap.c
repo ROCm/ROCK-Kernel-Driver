@@ -253,7 +253,7 @@ unsigned long page_address_in_vma(struct page *page, struct vm_area_struct *vma)
  * repeatedly from either page_referenced_anon or page_referenced_file.
  */
 static int page_referenced_one(struct page *page,
-	struct vm_area_struct *vma, unsigned int *mapcount)
+	struct vm_area_struct *vma, unsigned int *mapcount, int ignore_token)
 {
 	struct mm_struct *mm = vma->vm_mm;
 	unsigned long address;
@@ -288,7 +288,7 @@ static int page_referenced_one(struct page *page,
 	if (ptep_clear_flush_young(vma, address, pte))
 		referenced++;
 
-	if (mm != current->mm && has_swap_token(mm))
+	if (mm != current->mm && !ignore_token && has_swap_token(mm))
 		referenced++;
 
 	if (mm->rss > mm->rlimit_rss)
@@ -304,7 +304,7 @@ out:
 	return referenced;
 }
 
-static int page_referenced_anon(struct page *page)
+static int page_referenced_anon(struct page *page, int ignore_token)
 {
 	unsigned int mapcount;
 	struct anon_vma *anon_vma;
@@ -317,7 +317,8 @@ static int page_referenced_anon(struct page *page)
 
 	mapcount = page_mapcount(page);
 	list_for_each_entry(vma, &anon_vma->head, anon_vma_node) {
-		referenced += page_referenced_one(page, vma, &mapcount);
+		referenced += page_referenced_one(page, vma, &mapcount,
+							ignore_token);
 		if (!mapcount)
 			break;
 	}
@@ -336,7 +337,7 @@ static int page_referenced_anon(struct page *page)
  *
  * This function is only called from page_referenced for object-based pages.
  */
-static int page_referenced_file(struct page *page)
+static int page_referenced_file(struct page *page, int ignore_token)
 {
 	unsigned int mapcount;
 	struct address_space *mapping = page->mapping;
@@ -374,7 +375,8 @@ static int page_referenced_file(struct page *page)
 			referenced++;
 			break;
 		}
-		referenced += page_referenced_one(page, vma, &mapcount);
+		referenced += page_referenced_one(page, vma, &mapcount,
+							ignore_token);
 		if (!mapcount)
 			break;
 	}
@@ -391,7 +393,7 @@ static int page_referenced_file(struct page *page)
  * Quick test_and_clear_referenced for all mappings to a page,
  * returns the number of ptes which referenced the page.
  */
-int page_referenced(struct page *page, int is_locked)
+int page_referenced(struct page *page, int is_locked, int ignore_token)
 {
 	int referenced = 0;
 
@@ -403,14 +405,15 @@ int page_referenced(struct page *page, int is_locked)
 
 	if (page_mapped(page) && page->mapping) {
 		if (PageAnon(page))
-			referenced += page_referenced_anon(page);
+			referenced += page_referenced_anon(page, ignore_token);
 		else if (is_locked)
-			referenced += page_referenced_file(page);
+			referenced += page_referenced_file(page, ignore_token);
 		else if (TestSetPageLocked(page))
 			referenced++;
 		else {
 			if (page->mapping)
-				referenced += page_referenced_file(page);
+				referenced += page_referenced_file(page,
+								ignore_token);
 			unlock_page(page);
 		}
 	}
