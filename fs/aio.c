@@ -31,6 +31,7 @@
 #include <linux/brlock.h>
 #include <linux/module.h>
 
+#include <asm/kmap_types.h>
 #include <asm/uaccess.h>
 #include <linux/highmem.h>
 
