@@ -218,7 +218,7 @@ sn_setup(char **cmdline_p)
 	long status, ticks_per_sec, drift;
 	int pxm;
 	int major = sn_sal_rev_major(), minor = sn_sal_rev_minor();
-	extern nasid_t get_master_baseio_nasid(void);
+	extern nasid_t snia_get_master_baseio_nasid(void);
 	extern void sn_cpu_init(void);
 
 	MAX_DMA_ADDRESS = PAGE_OFFSET + MAX_PHYS_MEMORY;
@@ -241,8 +241,8 @@ sn_setup(char **cmdline_p)
 	}
 
 	master_nasid = get_nasid();
-	(void)get_console_nasid();
-	(void)get_master_baseio_nasid();
+	(void)snia_get_console_nasid();
+	(void)snia_get_master_baseio_nasid();
 
 	status = ia64_sal_freq_base(SAL_FREQ_BASE_REALTIME_CLOCK, &ticks_per_sec, &drift);
 	if (status != 0 || ticks_per_sec < 100000) {

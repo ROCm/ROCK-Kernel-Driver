@@ -197,6 +197,31 @@ typedef enum pciio_endian_e {
 } pciio_endian_t;
 
 /*
+ * Generic PCI bus information
+ */
+typedef enum pciio_asic_type_e {
+    PCIIO_ASIC_TYPE_UNKNOWN, 
+    PCIIO_ASIC_TYPE_MACE,
+    PCIIO_ASIC_TYPE_BRIDGE, 
+    PCIIO_ASIC_TYPE_XBRIDGE,
+    PCIIO_ASIC_TYPE_PIC,
+} pciio_asic_type_t;
+
+typedef enum pciio_bus_type_e {
+    PCIIO_BUS_TYPE_UNKNOWN,
+    PCIIO_BUS_TYPE_PCI,
+    PCIIO_BUS_TYPE_PCIX 
+} pciio_bus_type_t; 
+
+typedef enum pciio_bus_speed_e {
+    PCIIO_BUS_SPEED_UNKNOWN,
+    PCIIO_BUS_SPEED_33,
+    PCIIO_BUS_SPEED_66,
+    PCIIO_BUS_SPEED_100,
+    PCIIO_BUS_SPEED_133
+} pciio_bus_speed_t;
+
+/*
  * Interface to set PCI arbitration priority for devices that require
  * realtime characteristics.  pciio_priority_set is used to switch a
  * device between the PCI high-priority arbitration ring and the low
@@ -221,6 +246,9 @@ typedef struct pciio_piospace_s *pciio_piospace_t;
 typedef struct pciio_win_info_s *pciio_win_info_t;
 typedef struct pciio_win_map_s *pciio_win_map_t;
 typedef struct pciio_win_alloc_s *pciio_win_alloc_t;
+typedef struct pciio_bus_map_s *pciio_bus_map_t;
+typedef struct pciio_businfo_s *pciio_businfo_t;
+
 
 /* PIO MANAGEMENT */
 
@@ -451,6 +479,9 @@ pciio_driver_unreg_callback_f	(vertex_hdl_t conn, /* pci connection point */
 typedef int
 pciio_device_unregister_f	(vertex_hdl_t conn);
 
+typedef pciio_businfo_t
+pciio_businfo_get_f		(vertex_hdl_t conn);
+
 /*
  * Adapters that provide a PCI interface adhere to this software interface.
  */
@@ -499,6 +530,9 @@ typedef struct pciio_provider_s {
     pciio_driver_reg_callback_f *driver_reg_callback;
     pciio_driver_unreg_callback_f *driver_unreg_callback;
     pciio_device_unregister_f 	*device_unregister;
+
+    /* GENERIC BUS INFO */
+    pciio_businfo_get_f *businfo_get;
 } pciio_provider_t;
 
 /* PCI devices use these standard PCI provider interfaces */
@@ -743,8 +777,4 @@ sn_pci_set_vchan(struct pci_dev *pci_dev,
 int snia_badaddr_val(volatile void *addr, int len, volatile void *ptr);
 nasid_t snia_get_console_nasid(void);
 nasid_t snia_get_master_baseio_nasid(void);
-/* XXX: should probably be called __sn2_pci_rrb_alloc */
-int snia_pcibr_rrb_alloc(struct pci_dev *pci_dev, int *count_vchan0, int *count_vchan1);
-pciio_endian_t snia_pciio_endian_set(struct pci_dev *pci_dev,
-	pciio_endian_t device_end, pciio_endian_t desired_end);
 #endif				/* _ASM_IA64_SN_PCI_PCIIO_H */

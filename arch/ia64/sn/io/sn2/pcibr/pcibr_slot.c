@@ -1729,7 +1729,7 @@ pcibr_probe_slot_pic(bridge_t *bridge,
 {
 	int rv;
 	picreg_t p_old_enable = (picreg_t)0, p_new_enable;
-	extern int badaddr_val(volatile void *, int, volatile void *);
+	extern int snia_badaddr_val(volatile void *, int, volatile void *);
 
 	p_old_enable = bridge->p_int_enable_64;
 	p_new_enable = p_old_enable & ~(BRIDGE_IMR_PCI_MST_TIMEOUT | PIC_ISR_PCIX_MTOUT);
@@ -1742,7 +1742,7 @@ pcibr_probe_slot_pic(bridge_t *bridge,
 		bridge->p_int_rst_stat_64 = (BRIDGE_IRR_PCI_GRP_CLR | PIC_PCIX_GRP_CLR);
 		(void) bridge->b_wid_tflush;	/* flushbus */
 	}
-	rv = badaddr_val((void *) cfg, 4, valp);
+	rv = snia_badaddr_val((void *) cfg, 4, valp);
 	if (bridge->p_err_int_view_64 & (BRIDGE_ISR_PCI_MST_TIMEOUT | PIC_ISR_PCIX_MTOUT)) {
 		bridge->p_int_rst_stat_64 = BRIDGE_IRR_MULTI_CLR;
 		rv = 1;         /* unoccupied slot */

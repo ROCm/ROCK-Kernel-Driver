@@ -182,16 +182,16 @@ assign_widgets_to_volunteers(vertex_hdl_t xswitch, vertex_hdl_t hubv)
 		 * hub that owned it in the prom.
 		 */
 		if (is_master_baseio_nasid_widget(nasid, widgetnum)) {
-			extern nasid_t get_master_baseio_nasid(void);
+			extern nasid_t snia_get_master_baseio_nasid(void);
 			for (i=0; i<num_volunteer; i++) {
 				hubv = xvolinfo->xswitch_volunteer[i];
 				hubinfo_get(hubv, &hubinfo);
 				nasid = hubinfo->h_nasid;
-				if (nasid == get_master_baseio_nasid())
+				if (nasid == snia_get_master_baseio_nasid())
 					goto do_assignment;
 			}
 			printk("Nasid == %d, console nasid == %d",
-				nasid, get_master_baseio_nasid());
+				nasid, snia_get_master_baseio_nasid());
 			nasid = 0;
 		}
 
