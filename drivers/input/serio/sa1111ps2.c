@@ -347,7 +347,6 @@ static struct sa1111_driver ps2_driver = {
 	.drv = {
 		.name		= "sa1111-ps2",
 		.bus		= &sa1111_bus_type,
-		.devclass	= &input_devclass,
 		.probe		= ps2_probe,
 		.remove		= ps2_remove,
 		.suspend	= ps2_suspend,
