@@ -356,7 +356,7 @@ void exit_thread(void)
 
 void flush_thread(void)
 {
-	current->thread.w_saved = 0;
+	current_thread_info()->w_saved = 0;
 
 	/* No new signal delivery by default */
 	current->thread.new_signal = 0;
@@ -489,9 +489,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 	ti->kpc = (((unsigned long) ret_from_fork) - 0x8);
 	ti->kpsr = current->thread.fork_kpsr | PSR_PIL;
 	ti->kwim = current->thread.fork_kwim;
-
-	/* This is used for sun4c only */
-	atomic_set(&p->thread.refcount, 1);
 
 	if(regs->psr & PSR_PS) {
 		extern struct pt_regs fake_swapper_regs;

@@ -497,7 +497,10 @@ void trap_init(void)
 	    TI_KSP         != offsetof(struct thread_info, ksp) ||
 	    TI_KPC         != offsetof(struct thread_info, kpc) ||
 	    TI_KPSR        != offsetof(struct thread_info, kpsr) ||
-	    TI_KWIM        != offsetof(struct thread_info, kwim))
+	    TI_KWIM        != offsetof(struct thread_info, kwim) ||
+	    TI_REG_WINDOW  != offsetof(struct thread_info, reg_window) ||
+	    TI_RWIN_SPTRS  != offsetof(struct thread_info, rwbuf_stkptrs) ||
+	    TI_W_SAVED     != offsetof(struct thread_info, w_saved))
 		thread_info_offsets_are_bolixed_pete();
 
 	/* Attach to the address space of init_task. */
