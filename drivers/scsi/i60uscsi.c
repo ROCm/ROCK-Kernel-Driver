@@ -682,23 +682,6 @@ void orc_release_scb(ORC_HCS * hcsp, ORC_SCB * scbp)
 	spin_unlock_irqrestore(&(hcsp->BitAllocFlagLock), flags);
 }
 
-
-/***************************************************************************/
-void orc_release_dma(ORC_HCS * hcsp, Scsi_Cmnd * SCpnt)
-{
-	struct scatterlist *pSrbSG;
-
-	if (SCpnt->use_sg) {
-		pSrbSG = (struct scatterlist *)SCpnt->request_buffer;
-		pci_unmap_sg(hcsp->pdev, pSrbSG, SCpnt->use_sg,
-			scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
-	} else if (SCpnt->request_bufflen != 0) {
-		pci_unmap_single(hcsp->pdev, (U32)SCpnt->host_scribble,
-			SCpnt->request_bufflen,
-			scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
-	}
-}
-
 /*****************************************************************************
  Function name  : abort_SCB
  Description    : Abort a queued command.

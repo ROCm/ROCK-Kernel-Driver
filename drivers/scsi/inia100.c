@@ -108,7 +108,6 @@ extern int init_inia100Adapter_table(int);
 extern ORC_SCB *orc_alloc_scb(ORC_HCS * hcsp);
 extern void orc_exec_scb(ORC_HCS * hcsp, ORC_SCB * scbp);
 extern void orc_release_scb(ORC_HCS * hcsp, ORC_SCB * scbp);
-extern void orc_release_dma(ORC_HCS * hcsp, struct scsi_cmnd * cmnd);
 extern void orc_interrupt(ORC_HCS * hcsp);
 extern int orc_device_reset(ORC_HCS * pHCB, struct scsi_cmnd *SCpnt, unsigned int target);
 extern int orc_reset_scsi_bus(ORC_HCS * pHCB);
@@ -128,7 +127,6 @@ static void inia100BuildSCB(ORC_HCS * pHCB, ORC_SCB * pSCB, struct scsi_cmnd * S
 	struct scatterlist *pSrbSG;
 	ORC_SG *pSG;		/* Pointer to SG list           */
 	int i, count_sg;
-	U32 TotalLen;
 	ESCB *pEScb;
 
 	pEScb = pSCB->SCB_EScb;
@@ -146,7 +144,6 @@ static void inia100BuildSCB(ORC_HCS * pHCB, ORC_SCB * pSCB, struct scsi_cmnd * S
 	if ((pSCB->SCB_XferLen = (U32) SCpnt->request_bufflen)) {
 		pSG = (ORC_SG *) & pEScb->ESCB_SGList[0];
 		if (SCpnt->use_sg) {
-			TotalLen = 0;
 			pSrbSG = (struct scatterlist *) SCpnt->request_buffer;
 			count_sg = pci_map_sg(pHCB->pdev, pSrbSG, SCpnt->use_sg,
 					SCpnt->sc_data_direction);
@@ -154,14 +151,14 @@ static void inia100BuildSCB(ORC_HCS * pHCB, ORC_SCB * pSCB, struct scsi_cmnd * S
 			for (i = 0; i < count_sg; i++, pSG++, pSrbSG++) {
 				pSG->SG_Ptr = (U32) sg_dma_address(pSrbSG);
 				pSG->SG_Len = (U32) sg_dma_len(pSrbSG);
-				TotalLen += (U32) sg_dma_len(pSrbSG);
 			}
 		} else if (SCpnt->request_bufflen != 0) {/* Non SG */
 			pSCB->SCB_SGLen = 0x8;
-			pSG->SG_Ptr = (U32) pci_map_single(pHCB->pdev,
-				SCpnt->request_buffer, SCpnt->request_bufflen,
-				SCpnt->sc_data_direction);
-			SCpnt->host_scribble = (void *)pSG->SG_Ptr;
+			SCpnt->SCp.dma_handle = pci_map_single(pHCB->pdev,
+					SCpnt->request_buffer,
+					SCpnt->request_bufflen,
+					SCpnt->sc_data_direction);
+			pSG->SG_Ptr = (U32) SCpnt->SCp.dma_handle;
 			pSG->SG_Len = (U32) SCpnt->request_bufflen;
 		} else {
 			pSCB->SCB_SGLen = 0;
@@ -325,7 +322,17 @@ void inia100SCBPost(BYTE * pHcb, BYTE * pScb)
 		   (unsigned char *) &pEScb->ESCB_SGList[0], SENSE_SIZE);
 	}
 	pSRB->result = pSCB->SCB_TaStat | (pSCB->SCB_HaStat << 16);
-	orc_release_dma(pHCB, pSRB);  /* release DMA before we call scsi_done */
+
+	if (pSRB->use_sg) {
+		pci_unmap_sg(pHCB->pdev,
+			     (struct scatterlist *)pSRB->request_buffer,
+			     pSRB->use_sg, pSRB->sc_data_direction);
+	} else if (pSRB->request_bufflen != 0) {
+		pci_unmap_single(pHCB->pdev, pSRB->SCp.dma_handle,
+				 pSRB->request_bufflen,
+				 pSRB->sc_data_direction);
+	}
+
 	pSRB->scsi_done(pSRB);	/* Notify system DONE           */
 
 	orc_release_scb(pHCB, pSCB);	/* Release SCB for current channel */
