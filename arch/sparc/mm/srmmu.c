@@ -1212,7 +1212,6 @@ extern int linux_num_cpus;
 void (*poke_srmmu)(void) __initdata = NULL;
 
 extern unsigned long bootmem_init(unsigned long *pages_avail);
-extern void sun_serial_setup(void);
 
 void __init srmmu_paging_init(void)
 {
@@ -1280,13 +1279,6 @@ void __init srmmu_paging_init(void)
 
 	flush_cache_all();
 	flush_tlb_all();
-
-	/*
-	 * This does not logically belong here, but we need to
-	 * call it at the moment we are able to use the bootmem
-	 * allocator.
-	 */
-	sun_serial_setup();
 
 	sparc_context_init(num_contexts);
 

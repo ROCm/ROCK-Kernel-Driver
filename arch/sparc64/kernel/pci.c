@@ -365,7 +365,7 @@ void pcibios_align_resource(void *data, struct resource *res,
 {
 }
 
-int pcibios_enable_device(struct pci_dev *pdev)
+int pcibios_enable_device(struct pci_dev *pdev, int mask)
 {
 	return 0;
 }

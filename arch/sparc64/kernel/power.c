@@ -11,6 +11,7 @@
 #include <linux/signal.h>
 #include <linux/delay.h>
 
+#include <asm/system.h>
 #include <asm/ebus.h>
 
 #define __KERNEL_SYSCALLS__
@@ -36,8 +37,6 @@ static void power_handler(int irq, void *dev_id, struct pt_regs *regs)
 extern void machine_halt(void);
 extern void machine_alt_power_off(void);
 static void (*poweroff_method)(void) = machine_alt_power_off;
-
-extern int serial_console;
 
 void machine_power_off(void)
 {

@@ -59,6 +59,9 @@ endmenu
 mainmenu_option next_comment
 comment 'Console drivers'
 bool 'PROM console' CONFIG_PROM_CONSOLE
+if [ "$CONFIG_PROM_CONSOLE" != "y" ]; then
+   define_bool CONFIG_DUMMY_CONSOLE y
+fi
 source drivers/video/Config.in
 endmenu
 
@@ -213,6 +216,8 @@ if [ "$CONFIG_UNIX98_PTYS" = "y" ]; then
    int 'Maximum number of Unix98 PTYs in use (0-2048)' CONFIG_UNIX98_PTY_COUNT 256
 fi
 endmenu
+
+source drivers/input/Config.in
 
 source fs/Config.in
 

@@ -78,112 +78,63 @@ static __inline__ void ide_init_default_hwifs(void)
  * The following are not needed for the non-m68k ports
  */
 #define ide_ack_intr(hwif)		(1)
-#define ide_fix_driveid(id)		do {} while (0)
 #define ide_release_lock(lock)		do {} while (0)
 #define ide_get_lock(lock, hdlr, data)	do {} while (0)
 
-/* From m68k code... */
+/* XXX Known to be broken.  Axboe will fix the problems this
+ * XXX has by making seperate IN/OUT macros for IDE_DATA
+ * XXX register and rest of IDE regs and also using
+ * XXX ide_ioreg_t instead of u32 for ports. -DaveM
+ */
 
-#ifdef insl
-#undef insl
-#endif
-#ifdef outsl
-#undef outsl
-#endif
-#ifdef insw
-#undef insw
-#endif
-#ifdef outsw
-#undef outsw
-#endif
-
-#define insl(data_reg, buffer, wcount) insw(data_reg, buffer, (wcount)<<1)
-#define outsl(data_reg, buffer, wcount) outsw(data_reg, buffer, (wcount)<<1)
-
-#define insw(port, buf, nr) ide_insw((port), (buf), (nr))
-#define outsw(port, buf, nr) ide_outsw((port), (buf), (nr))
-
-static __inline__ unsigned int inw_be(unsigned long addr)
-{
-	unsigned int ret;
-
-	__asm__ __volatile__("lduha [%1] %2, %0"
+#define HAVE_ARCH_IN_BYTE
+static __inline__ u8 IN_BYTE(ide_ioreg_t addr)
+{	u8 ret;
+	 __asm__ __volatile__("lduba [%1] %2, %0\t/* ide_in_byte */"
 			     : "=r" (ret)
 			     : "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E));
-
 	return ret;
 }
-
-static __inline__ void ide_insw(unsigned long port,
-				void *dst,
-				unsigned long count)
-{
-#if (L1DCACHE_SIZE > PAGE_SIZE)		/* is there D$ aliasing problem */
-	unsigned long end = (unsigned long)dst + (count << 1);
-#endif
-	u16 *ps = dst;
-	u32 *pi;
-
-	if(((u64)ps) & 0x2) {
-		*ps++ = inw_be(port);
-		count--;
-	}
-	pi = (u32 *)ps;
-	while(count >= 2) {
-		u32 w;
-
-		w  = inw_be(port) << 16;
-		w |= inw_be(port);
-		*pi++ = w;
-		count -= 2;
-	}
-	ps = (u16 *)pi;
-	if(count)
-		*ps++ = inw_be(port);
-
-#if (L1DCACHE_SIZE > PAGE_SIZE)		/* is there D$ aliasing problem */
-	__flush_dcache_range((unsigned long)dst, end);
-#endif
+static __inline__ u16 IN_WORD(ide_ioreg_t addr)
+{	u16 ret;
+	__asm__ __volatile__("lduha [%1] %2, %0\t/* ide_in_word */"
+			     : "=r" (ret)
+			     : "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E));
+	return ret;
 }
+static __inline__ u16 IN_LONG(ide_ioreg_t addr)
+{	u32 ret;
+	__asm__ __volatile__("lduwa [%1] %2, %0\t/* ide_in_long */"
+			     : "=r" (ret)
+			     : "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E));
+	return ret;
+}
+#define IN_BYTE_P		IN_BYTE
+#define IN_WORD_P		IN_WORD
+#define IN_LONG_P		IN_LONG
 
-static __inline__ void outw_be(unsigned short w, unsigned long addr)
+#define HAVE_ARCH_OUT_BYTE
+static __inline__ void OUT_BYTE(u8 byte, ide_ioreg_t addr)
 {
-	__asm__ __volatile__("stha %0, [%1] %2"
+	__asm__ __volatile__("stba %r0, [%1] %2\t/* ide_out_byte */"
 			     : /* no outputs */
-			     : "r" (w), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E));
+			     : "Jr" (byte), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E));
 }
-
-static __inline__ void ide_outsw(unsigned long port,
-				 const void *src,
-				 unsigned long count)
+static __inline__ void OUT_WORD(u16 word, ide_ioreg_t addr)
 {
-#if (L1DCACHE_SIZE > PAGE_SIZE)		/* is there D$ aliasing problem */
-	unsigned long end = (unsigned long)src + (count << 1);
-#endif
-	const u16 *ps = src;
-	const u32 *pi;
-
-	if(((u64)src) & 0x2) {
-		outw_be(*ps++, port);
-		count--;
-	}
-	pi = (const u32 *)ps;
-	while(count >= 2) {
-		u32 w;
-
-		w = *pi++;
-		outw_be((w >> 16), port);
-		outw_be(w, port);
-		count -= 2;
-	}
-	ps = (const u16 *)pi;
-	if(count)
-		outw_be(*ps, port);
-
-#if (L1DCACHE_SIZE > PAGE_SIZE)		/* is there D$ aliasing problem */
-	__flush_dcache_range((unsigned long)src, end);
-#endif
+	__asm__ __volatile__("stha %r0, [%1] %2\t/* ide_out_word */"
+			     : /* no outputs */
+			     : "Jr" (word), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E));
 }
+static __inline__ void OUT_LONG(u32 _long, ide_ioreg_t addr)
+{
+	__asm__ __volatile__("stwa %r0, [%1] %2\t/* ide_out_long */"
+			     : /* no outputs */
+			     : "Jr" (_long), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E));
+}
+#define OUT_BYTE_P		OUT_BYTE
+#define OUT_WORD_P		OUT_WORD
+#define OUT_LONG_P		OUT_LONG
 
 #endif /* __KERNEL__ */
 
