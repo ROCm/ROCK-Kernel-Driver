@@ -20,7 +20,7 @@
 #include <asm/uaccess.h>
 
 /* Version Information */
-#define DRIVER_VERSION "v0.6.1 (2004/03/13)"
+#define DRIVER_VERSION "v0.6.2 (2004/08/27)"
 #define DRIVER_AUTHOR "Petko Manolov <petkan@users.sourceforge.net>"
 #define DRIVER_DESC "rtl8150 based usb-ethernet driver"
 
@@ -344,7 +344,7 @@ static int rtl8150_set_mac_address(struct net_device *netdev, void *p)
 
 static int rtl8150_reset(rtl8150_t * dev)
 {
-	u8 data = 0x10;
+	u8 data = 0x11;
 	int i = HZ;
 
 	set_registers(dev, CR, 1, &data);
