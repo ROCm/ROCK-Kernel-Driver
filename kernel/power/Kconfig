@@ -43,25 +43,16 @@ config SOFTWARE_SUSPEND
 	  For more information take a look at Documentation/power/swsusp.txt.
 
 config PM_DISK
-	bool "Suspend-to-Disk Support"
-	depends on PM && SWAP && X86 && !X86_64
+	bool "PMDisk Support"
+	depends on SOFTWARE_SUSPEND && X86 && !X86_64
 	---help---
-	  Suspend-to-disk is a power management state in which the contents
-	  of memory are stored on disk and the entire system is shut down or
-	  put into a low-power state (e.g. ACPI S4). When the computer is 
-	  turned back on, the stored image is loaded from disk and execution
-	  resumes from where it left off before suspending. 
 
-	  This config option enables the core infrastructure necessary to 
-	  perform the suspend and resume transition. 
+	This option enables an alternative implementation of Suspend-to-Disk.
+	It is functionally equivalent to Software Suspend, and uses many of
+	the same internal routines. But, it offers a slightly different 
+	interface.
 
-	  Currently, this suspend-to-disk implementation is based on a forked
-	  version of the swsusp code base. As such, it's still experimental,
-	  and still relies on CONFIG_SWAP. 
-
-	  More information can be found in Documentation/power/.
-
-	  If unsure, Say N.
+	If unsure, Say N.
 
 config PM_DISK_PARTITION
 	string "Default resume partition"
