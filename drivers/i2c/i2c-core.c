@@ -55,6 +55,12 @@ int i2c_device_remove(struct device *dev)
 	return 0;
 }
 
+static void i2c_adapter_dev_release(struct device *dev)
+{
+	struct i2c_adapter *adap = dev_to_i2c_adapter(dev);
+	complete(&adap->dev_released);
+}
+
 static struct device_driver i2c_adapter_driver = {
 	.name =	"i2c_adapter",
 	.bus = &i2c_bus_type,
@@ -62,9 +68,22 @@ static struct device_driver i2c_adapter_driver = {
 	.remove = i2c_device_remove,
 };
 
+static void i2c_adapter_class_dev_release(struct class_device *dev)
+{
+	struct i2c_adapter *adap = class_dev_to_i2c_adapter(dev);
+	complete(&adap->class_dev_released);
+}
+
 static struct class i2c_adapter_class = {
-	.name =		"i2c-adapter"
+	.name =		"i2c-adapter",
+	.release =	&i2c_adapter_class_dev_release,
 };
+
+static void i2c_client_release(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	complete(&client->released);
+}
 
 
 /* ---------------------------------------------------
@@ -99,6 +118,7 @@ int i2c_add_adapter(struct i2c_adapter *adap)
 		adap->dev.parent = &legacy_bus;
 	sprintf(adap->dev.bus_id, "i2c-%d", adap->nr);
 	adap->dev.driver = &i2c_adapter_driver;
+	adap->dev.release = &i2c_adapter_dev_release;
 	device_register(&adap->dev);
 
 	/* Add this adapter to the i2c_adapter class */
@@ -161,9 +181,15 @@ int i2c_del_adapter(struct i2c_adapter *adap)
 	}
 
 	/* clean up the sysfs representation */
+	init_completion(&adap->dev_released);
+	init_completion(&adap->class_dev_released);
 	class_device_unregister(&adap->class_dev);
 	device_unregister(&adap->dev);
 	list_del(&adap->list);
+
+	/* wait for sysfs to drop all references */
+	wait_for_completion(&adap->dev_released);
+	wait_for_completion(&adap->class_dev_released);
 
 	DEB(dev_dbg(&adap->dev, "adapter unregistered\n"));
 
@@ -329,6 +355,7 @@ int i2c_attach_client(struct i2c_client *client)
 	client->dev.parent = &client->adapter->dev;
 	client->dev.driver = &client->driver->driver;
 	client->dev.bus = &i2c_bus_type;
+	client->dev.release = &i2c_client_release;
 	
 	snprintf(&client->dev.bus_id[0], sizeof(client->dev.bus_id),
 		"%d-%04x", i2c_adapter_id(adapter), client->addr);
@@ -359,8 +386,10 @@ int i2c_detach_client(struct i2c_client *client)
 
 	down(&adapter->clist_lock);
 	list_del(&client->list);
+	init_completion(&client->released);
 	device_unregister(&client->dev);
 	up(&adapter->clist_lock);
+	wait_for_completion(&client->released);
 
  out:
 	return res;

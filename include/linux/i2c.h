@@ -167,6 +167,7 @@ struct i2c_client {
 	struct device dev;		/* the device structure		*/
 	struct list_head list;
 	char name[DEVICE_NAME_SIZE];
+	struct completion released;
 };
 #define to_i2c_client(d) container_of(d, struct i2c_client, dev)
 
@@ -253,8 +254,11 @@ struct i2c_adapter {
 	struct list_head clients;
 	struct list_head list;
 	char name[DEVICE_NAME_SIZE];
+	struct completion dev_released;
+	struct completion class_dev_released;
 };
-#define to_i2c_adapter(d) container_of(d, struct i2c_adapter, dev)
+#define dev_to_i2c_adapter(d) container_of(d, struct i2c_adapter, dev)
+#define class_dev_to_i2c_adapter(d) container_of(d, struct i2c_adapter, class_dev)
 
 static inline void *i2c_get_adapdata (struct i2c_adapter *dev)
 {
