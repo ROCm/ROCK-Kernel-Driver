@@ -405,7 +405,7 @@ static struct usb_serial *get_free_serial (struct usb_serial *serial, int num_po
 	return NULL;
 }
 
-static void return_serial (struct usb_serial *serial)
+static void return_serial(struct usb_serial *serial)
 {
 	int i;
 
@@ -417,8 +417,6 @@ static void return_serial (struct usb_serial *serial)
 	for (i = 0; i < serial->num_ports; ++i) {
 		serial_table[serial->minor + i] = NULL;
 	}
-
-	return;
 }
 
 static void destroy_serial(struct kref *kref)
