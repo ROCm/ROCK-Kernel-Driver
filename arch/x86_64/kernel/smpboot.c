@@ -43,6 +43,7 @@
 #include <linux/irq.h>
 #include <linux/bootmem.h>
 #include <linux/thread_info.h>
+#include <linux/module.h>
 
 #include <linux/delay.h>
 #include <linux/mc146818rtc.h>
