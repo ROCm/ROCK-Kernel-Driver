@@ -144,6 +144,7 @@ extern enum system_states {
 	SYSTEM_RESTART,
 } system_state;
 
+#define TAINT_MACHINE_CHECK		(1<<10)
 #define TAINT_PROPRIETARY_MODULE	(1<<0)
 #define TAINT_FORCED_MODULE		(1<<1)
 #define TAINT_UNSAFE_SMP		(1<<2)

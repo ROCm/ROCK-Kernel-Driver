@@ -227,6 +227,7 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 	}
 
  out:
+	tainted |= TAINT_MACHINE_CHECK;
 	/* Last thing done in the machine check exception to clear state. */
 	wrmsrl(MSR_IA32_MCG_STATUS, 0);
 }

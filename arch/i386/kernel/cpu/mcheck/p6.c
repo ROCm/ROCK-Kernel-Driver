@@ -76,6 +76,8 @@ static asmlinkage void intel_machine_check(struct pt_regs * regs, long error_cod
 	}
 	mcgstl &= ~(1<<2);
 	wrmsr (MSR_IA32_MCG_STATUS,mcgstl, mcgsth);
+
+	tainted |= TAINT_MACHINE_CHECK;
 }
 
 /* Set up machine check reporting for processors with Intel style MCE */

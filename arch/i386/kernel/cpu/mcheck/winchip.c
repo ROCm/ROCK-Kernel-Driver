@@ -19,6 +19,7 @@
 static asmlinkage void winchip_machine_check(struct pt_regs * regs, long error_code)
 {
 	printk(KERN_EMERG "CPU0: Machine Check Exception.\n");
+	tainted |= TAINT_MACHINE_CHECK;
 }
 
 /* Set up machine check reporting on the Winchip C6 series */
