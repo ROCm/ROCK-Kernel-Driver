@@ -599,7 +599,7 @@ static void get_sectorsize(struct scsi_cd *cd)
 	buffer = kmalloc(512, GFP_KERNEL | GFP_DMA);
 	if (!buffer)
 		goto Enomem;
-	SRpnt = scsi_allocate_request(cd->device);
+	SRpnt = scsi_allocate_request(cd->device, GFP_KERNEL);
 	if (!SRpnt)
 		goto Enomem;
 
@@ -713,7 +713,7 @@ static void get_capabilities(struct scsi_cd *cd)
 	};
 
 	/* allocate a request for the TEST_UNIT_READY */
-	SRpnt = scsi_allocate_request(cd->device);
+	SRpnt = scsi_allocate_request(cd->device, GFP_KERNEL);
 	if (!SRpnt) {
 		printk(KERN_WARNING "(get_capabilities:) Request allocation "
 		       "failure.\n");

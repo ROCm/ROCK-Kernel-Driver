@@ -44,7 +44,6 @@
 #include <linux/jiffies.h>
 #include <linux/sysrq.h>
 #include <linux/vmalloc.h>
-#include <linux/irq.h>
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
 #include <asm/io.h>
@@ -417,19 +416,8 @@ int show_stat(struct seq_file *p, void *v)
 	seq_printf(p, "intr %u", sum);
 
 #if !defined(CONFIG_PPC64) && !defined(CONFIG_ALPHA)
-{
-	static int last_irq = 0;
-
-	for (i = last_irq; i < NR_IRQS; i++) {
-		if (irq_desc[i].action) {
-			if (i > last_irq)
-				last_irq = i;
-		}
-	}
-
-	for (i = 0; i <= last_irq; i++)
+	for (i = 0; i <= NR_IRQS; i++)
 		seq_printf(p, " %u", kstat_irqs(i));
-}
 #endif
 
 	seq_printf(p,

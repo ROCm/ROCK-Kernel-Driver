@@ -766,7 +766,7 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 
 	i = pci_request_regions(pdev, dev->name);
 	if (i) {
-		kfree(dev);
+		free_netdev(dev);
 		return i;
 	}
 
@@ -774,7 +774,7 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 		void *mmio = ioremap (ioaddr, iosize);
 		if (!mmio) {
 			pci_release_regions(pdev);
-			kfree(dev);
+			free_netdev(dev);
 			return -ENOMEM;
 		}
 		ioaddr = (unsigned long) mmio;
@@ -838,7 +838,7 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 	if (i) {
 		pci_release_regions(pdev);
 		unregister_netdev(dev);
-		kfree(dev);
+		free_netdev(dev);
 		pci_set_drvdata(pdev, NULL);
 		return i;
 	}

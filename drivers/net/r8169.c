@@ -454,7 +454,7 @@ err_out_disable:
 	pci_disable_device(pdev);
 
 err_out:
-	kfree(dev);
+	free_netdev(dev);
 	return rc;
 }
 
@@ -514,7 +514,7 @@ rtl8169_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 		iounmap(ioaddr);
 		pci_release_regions(pdev);
 		pci_disable_device(pdev);
-		kfree(dev);
+		free_netdev(dev);
 		return rc;
 	}
 

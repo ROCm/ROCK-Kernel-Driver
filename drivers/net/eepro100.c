@@ -894,7 +894,7 @@ static int __devinit speedo_found1(struct pci_dev *pdev,
 
  err_free_unlock:
 	rtnl_unlock();
-	kfree(dev);
+	free_netdev(dev);
 	return -1;
 }
 

@@ -39,7 +39,6 @@
 #include <linux/poll.h>
 #include <linux/fcntl.h>
 #include <linux/init.h>
-#include <linux/skbuff.h>
 #include <linux/interrupt.h>
 #include <linux/socket.h>
 #include <linux/skbuff.h>
