@@ -1490,7 +1490,7 @@ static void scsi_unjam_host(struct Scsi_Host *shost)
  *    event (i.e. failure).  When this takes place, we have the job of
  *    trying to unjam the bus and restarting things.
  **/
-void scsi_error_handler(void *data)
+int scsi_error_handler(void *data)
 {
 	struct Scsi_Host *shost = (struct Scsi_Host *) data;
 	int rtn;
@@ -1594,6 +1594,7 @@ void scsi_error_handler(void *data)
 	 * the way out the door.
 	 */
 	complete_and_exit(shost->eh_notify, 0);
+	return 0;
 }
 
 /*

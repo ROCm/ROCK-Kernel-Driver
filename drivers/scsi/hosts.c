@@ -263,7 +263,7 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 
 	rval = scsi_setup_command_freelist(shost);
 	if (rval)
-		goto fail;
+		goto fail_kfree;
 
 	device_initialize(&shost->shost_gendev);
 	snprintf(shost->shost_gendev.bus_id, BUS_ID_SIZE, "host%d",
@@ -277,13 +277,17 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 		  shost->host_no);
 
 	shost->eh_notify = &complete;
-	/* XXX(hch): handle error return */
-	kernel_thread((int (*)(void *))scsi_error_handler, shost, 0);
+	rval = kernel_thread(scsi_error_handler, shost, 0);
+	if (rval < 0)
+		goto fail_destroy_freelist;
 	wait_for_completion(&complete);
 	shost->eh_notify = NULL;
 	scsi_proc_hostdir_add(shost->hostt);
 	return shost;
- fail:
+
+ fail_destroy_freelist:
+	scsi_destroy_command_freelist(shost);
+ fail_kfree:
 	kfree(shost);
 	return NULL;
 }
