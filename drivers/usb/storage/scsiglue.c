@@ -229,6 +229,21 @@ static int bus_reset( Scsi_Cmnd *srb )
 	return result < 0 ? FAILED : SUCCESS;
 }
 
+/* Report a driver-initiated device reset to the SCSI layer.
+ * Calling this for a SCSI-initiated reset is unnecessary but harmless. */
+void usb_stor_report_device_reset(struct us_data *us)
+{
+	int i;
+
+	scsi_lock(us->host);
+	scsi_report_device_reset(us->host, 0, 0);
+	if (us->flags & US_FL_SCM_MULT_TARG) {
+		for (i = 1; i < us->host->max_id; ++i)
+			scsi_report_device_reset(us->host, 0, i);
+	}
+	scsi_unlock(us->host);
+}
+
 /***********************************************************************
  * /proc/scsi/ functions
  ***********************************************************************/
