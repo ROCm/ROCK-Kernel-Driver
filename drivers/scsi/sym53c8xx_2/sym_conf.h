@@ -53,39 +53,7 @@
 #ifndef SYM_CONF_H
 #define SYM_CONF_H
 
-/*-------------------------------------------------------------------
- *  Static configuration.
- *-------------------------------------------------------------------
- */
-
-/*
- *  Also support early NCR 810, 815 and 825 chips.
- */
-#ifndef SYM_CONF_GENERIC_SUPPORT
-#define SYM_CONF_GENERIC_SUPPORT	(1)
-#endif
-
-/*
- *  Use Normal IO instead of MMIO.
- */
-/* #define SYM_CONF_IOMAPPED */
-
-/*
- *  Max tags for a device (logical unit)
- * 	We use a power of 2, (7) means 2<<7=128
- *  Maximum is 8 -> 256 tags
- */
-#ifndef SYM_CONF_MAX_TAG_ORDER
-#define SYM_CONF_MAX_TAG_ORDER	(6)
-#endif
-
-/*
- *  Max number of scatter/gather entries for en IO.
- *  Each entry costs 8 bytes in the internal CCB data structure.
- */
-#ifndef SYM_CONF_MAX_SG
-#define SYM_CONF_MAX_SG		(33)
-#endif
+#include "sym53c8xx.h"
 
 /*
  *  Max number of targets.
@@ -118,13 +86,6 @@
 /* #define SYM_CONF_MAX_START	(PAGE_SIZE/8 - 16) */
 
 /*
- *  Support for NVRAM.
- */
-#ifndef SYM_CONF_NVRAM_SUPPORT
-#define SYM_CONF_NVRAM_SUPPORT		(1)
-#endif
-
-/*
  *  Support for Immediate Arbitration.
  *  Not advised.
  */
@@ -136,148 +97,6 @@
  */
 #ifndef SYM_CONF_TIMEOUT_ORDER_MAX
 #define SYM_CONF_TIMEOUT_ORDER_MAX	(8)
-#endif
-
-/*
- *  How the driver handles DMA addressing of user data.
- *  0 :	32 bit addressing
- *  1 :	40 bit addressing
- *  2 :	64 bit addressing using segment registers
- */
-#ifndef SYM_CONF_DMA_ADDRESSING_MODE
-#define SYM_CONF_DMA_ADDRESSING_MODE	(0)
-#endif
-
-/*-------------------------------------------------------------------
- *  Configuration that could be dynamic if it was possible 
- *  to pass arguments to the driver.
- *-------------------------------------------------------------------
- */
-
-/*
- *  HOST default scsi id.
- */
-#ifndef SYM_SETUP_HOST_ID
-#define SYM_SETUP_HOST_ID	7
-#endif
-
-/*
- *  Max synchronous transfers.
- */
-#ifndef SYM_SETUP_MIN_SYNC
-#define SYM_SETUP_MIN_SYNC	(9)
-#endif
-
-/*
- *  Max wide order.
- */
-#ifndef SYM_SETUP_MAX_WIDE
-#define SYM_SETUP_MAX_WIDE	(1)
-#endif
-
-/*
- *  Max SCSI offset.
- */
-#ifndef SYM_SETUP_MAX_OFFS
-#define SYM_SETUP_MAX_OFFS	(63)
-#endif
-
-/*
- *  Default number of tags.
- */
-#ifndef SYM_SETUP_MAX_TAG
-#define SYM_SETUP_MAX_TAG	(1<<SYM_CONF_MAX_TAG_ORDER)
-#endif
-
-/*
- *  SYMBIOS NVRAM format support.
- */
-#ifndef SYM_SETUP_SYMBIOS_NVRAM
-#define SYM_SETUP_SYMBIOS_NVRAM	(1)
-#endif
-
-/*
- *  TEKRAM NVRAM format support.
- */
-#ifndef SYM_SETUP_TEKRAM_NVRAM
-#define SYM_SETUP_TEKRAM_NVRAM	(1)
-#endif
-
-/*
- *  PCI parity checking.
- *  It should not be an option, but some poor or broken 
- *  PCI-HOST bridges have been reported to make problems 
- *  when this feature is enabled.
- *  Setting this option to 0 tells the driver not to 
- *  enable the checking against PCI parity.
- */
-#ifndef SYM_SETUP_PCI_PARITY
-#define SYM_SETUP_PCI_PARITY	(2)
-#endif
-
-/*
- *  SCSI parity checking.
- */
-#ifndef SYM_SETUP_SCSI_PARITY
-#define SYM_SETUP_SCSI_PARITY	(1)
-#endif
-
-/*
- *  SCSI activity LED.
- */
-#ifndef SYM_SETUP_SCSI_LED
-#define SYM_SETUP_SCSI_LED	(0)
-#endif
-
-/*
- *  SCSI High Voltage Differential support.
- *
- *  HVD/LVD/SE capable controllers (895, 895A, 896, 1010) 
- *  report the actual SCSI BUS mode from the STEST4 IO 
- *  register.
- *
- *  But for HVD/SE only capable chips (825a, 875, 885), 
- *  the driver uses some heuristic to probe against HVD. 
- *  Normally, the chip senses the DIFFSENS signal and 
- *  should switch its BUS transceivers to high impedance 
- *  in situation of the driver having been wrong about 
- *  the actual BUS mode. May-be, the BUS mode probing of 
- *  the driver is safe, but, given that it may be partially 
- *  based on some previous IO register settings, it 
- *  cannot be stated so. Thus, decision has been taken 
- *  to require a user option to be set for the DIFF probing 
- *  to be applied for the 825a, 875 and 885 chips.
- *  
- *  This setup option works as follows:
- *
- *    0  ->  HVD only supported for 895, 895A, 896, 1010.
- *    1  ->  HVD probed  for 825A, 875, 885.
- *    2  ->  HVD assumed for 825A, 875, 885 (not advised).
- */
-#ifndef SYM_SETUP_SCSI_DIFF
-#define SYM_SETUP_SCSI_DIFF	(0)
-#endif
-
-/*
- *  IRQ mode.
- */
-#ifndef SYM_SETUP_IRQ_MODE
-#define SYM_SETUP_IRQ_MODE	(0)
-#endif
-
-/*
- *  Check SCSI BUS signal on reset.
- */
-#ifndef SYM_SETUP_SCSI_BUS_CHECK
-#define SYM_SETUP_SCSI_BUS_CHECK (1)
-#endif
-
-/*
- *  Max burst for PCI (1<<value)
- *  7 means: (1<<7) = 128 DWORDS.
- */
-#ifndef SYM_SETUP_BURST_ORDER
-#define SYM_SETUP_BURST_ORDER	(7)
 #endif
 
 /*
@@ -307,18 +126,6 @@
  */
 #ifndef SYM_SETUP_MAX_LUN
 #define SYM_SETUP_MAX_LUN	(8)
-#endif
-
-/*
- *  Bits indicating what kind of fix-ups we want.
- *
- *  Bit 0 (1) : cache line size configuration register.
- *  Bit 1 (2) : MWI bit in command register.
- *  Bit 2 (4) : latency timer if seems too low.
- */
-
-#ifndef SYM_SETUP_PCI_FIX_UP
-#define SYM_SETUP_PCI_FIX_UP (3)
 #endif
 
 #endif /* SYM_CONF_H */

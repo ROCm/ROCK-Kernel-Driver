@@ -22,6 +22,7 @@
 #include <linux/i2o-dev.h>
 
 #include <asm/semaphore.h> /* Needed for MUTEX init macros */
+#include <linux/version.h>
 #include <linux/config.h>
 #include <linux/notifier.h>
 #include <asm/atomic.h>
@@ -43,15 +44,9 @@
 
 #define I2O_MAX_MANAGERS	4
 
-#include <asm/semaphore.h> /* Needed for MUTEX init macros */
-
 /*
  *	I2O Interface Objects
  */
-
-#include <linux/config.h>
-#include <linux/notifier.h>
-#include <asm/atomic.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)
 

@@ -25,9 +25,6 @@
 #ifndef _LASI700_H
 #define _LASI700_H
 
-static int lasi700_driver_callback(struct parisc_device *dev);
-static int lasi700_driver_remove(struct parisc_device *dev);
-
 #define LASI_710_SVERSION	0x082
 #define LASI_700_SVERSION	0x071
 

@@ -91,7 +91,7 @@ extern void scsi_exit_devinfo(void);
 
 /* scsi_error.c */
 extern void scsi_times_out(struct scsi_cmnd *cmd);
-extern void scsi_error_handler(void *host);
+extern int scsi_error_handler(void *host);
 extern int scsi_decide_disposition(struct scsi_cmnd *cmd);
 extern void scsi_eh_wakeup(struct Scsi_Host *shost);
 extern int scsi_eh_scmd_add(struct scsi_cmnd *, int);

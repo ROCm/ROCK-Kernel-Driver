@@ -825,7 +825,7 @@ static int generic_NCR5380_proc_info(struct Scsi_Host *scsi_ptr, char *buffer, c
 		PRINTP("  %d pending writes" ANDP hostdata->pendingw);
 	if (hostdata->pendingr || hostdata->pendingw)
 		PRINTP("\n");
-	list_for_each_entry (dev, &scsi_ptr->my_devices, siblings) {
+	shost_for_each_device(dev, scsi_ptr) {
 		unsigned long br = hostdata->bytes_read[dev->id];
 		unsigned long bw = hostdata->bytes_write[dev->id];
 		long tr = hostdata->time_read[dev->id] / HZ;

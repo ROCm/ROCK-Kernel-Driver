@@ -312,12 +312,6 @@ struct scsi_host_template {
 	 */
 	unsigned emulated:1;
 
-	/* 
-	 * True if the driver wishes to use the generic block layer
-	 * tag queueing functions
-	 */
-	unsigned use_blk_tcq:1;
-
 	/*
 	 * Countdown for host blocking with no commands outstanding
 	 */
@@ -430,7 +424,6 @@ struct Scsi_Host {
 
 	unsigned unchecked_isa_dma:1;
 	unsigned use_clustering:1;
-	unsigned highmem_io:1;
 	unsigned use_blk_tcq:1;
 
 	/*
@@ -478,6 +471,12 @@ struct Scsi_Host {
 	 * module_init/module_exit.
 	 */
 	struct list_head sht_legacy_list;
+
+	/*
+	 * This mutex serializes all scsi scanning activity from kernel- and
+	 * userspace.
+	 */
+	struct semaphore scan_mutex;
 
 	/*
 	 * We should ensure that this is aligned, both for better performance
