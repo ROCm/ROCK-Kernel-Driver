@@ -306,6 +306,14 @@ static int invalidate_list(struct list_head *head, struct list_head *dispose)
 		struct list_head * tmp = next;
 		struct inode * inode;
 
+		/*
+		 * We can reschedule here without worrying about the list's
+		 * consistency because the per-sb list of inodes must not
+		 * change during umount anymore, and because iprune_sem keeps
+		 * shrink_icache_memory() away.
+		 */
+		cond_resched_lock(&inode_lock);
+
 		next = next->next;
 		if (tmp == head)
 			break;
