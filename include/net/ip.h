@@ -286,9 +286,20 @@ extern int	ip_call_ra_chain(struct sk_buff *skb);
 /*
  *	Functions provided by ip_fragment.o
  */
- 
-struct sk_buff *ip_defrag(struct sk_buff *skb);
-extern void ipfrag_flush(void);
+
+enum ip_defrag_users
+{
+	IP_DEFRAG_LOCAL_DELIVER,
+	IP_DEFRAG_CALL_RA_CHAIN,
+	IP_DEFRAG_CONNTRACK_IN,
+	IP_DEFRAG_CONNTRACK_OUT,
+	IP_DEFRAG_NAT_OUT,
+	IP_DEFRAG_VS_IN,
+	IP_DEFRAG_VS_OUT,
+	IP_DEFRAG_VS_FWD
+};
+
+struct sk_buff *ip_defrag(struct sk_buff *skb, u32 user);
 extern int ip_frag_nqueues;
 extern atomic_t ip_frag_mem;
 
