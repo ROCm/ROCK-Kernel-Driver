@@ -191,7 +191,7 @@ MODULE_DEVICE_TABLE (pci, rng_pci_tbl);
 #define INTEL_RNG_ADDR_LEN			3
 
 /* token to our ioremap'd RNG register area */
-static void *rng_mem;
+static void __iomem *rng_mem;
 
 static inline u8 intel_hwstatus (void)
 {
