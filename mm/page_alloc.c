@@ -734,7 +734,7 @@ fastcall unsigned long __get_free_pages(unsigned int gfp_mask, unsigned int orde
 	struct page * page;
 
 #ifdef CONFIG_NUMA
-	if (unlikely(!system_running))
+	if (unlikely(system_state == SYSTEM_BOOTING))
 		return get_boot_pages(gfp_mask, order);
 #endif
 	page = alloc_pages(gfp_mask, order);

@@ -154,11 +154,11 @@ static unsigned char __pmac pmu_nvram_read_byte(int addr)
 	struct adb_request req;
 	DECLARE_COMPLETION(req_complete); 
 	
-	req.arg = system_running ? &req_complete : NULL;
+	req.arg = system_state == SYSTEM_RUNNING ? &req_complete : NULL;
 	if (pmu_request(&req, pmu_nvram_complete, 3, PMU_READ_NVRAM,
 			(addr >> 8) & 0xff, addr & 0xff))
 		return 0xff;
-	if (system_running)
+	if (system_state == SYSTEM_RUNNING)
 		wait_for_completion(&req_complete);
 	while (!req.complete)
 		pmu_poll();
@@ -170,11 +170,11 @@ static void __pmac pmu_nvram_write_byte(int addr, unsigned char val)
 	struct adb_request req;
 	DECLARE_COMPLETION(req_complete); 
 	
-	req.arg = system_running ? &req_complete : NULL;
+	req.arg = system_state == SYSTEM_RUNNING ? &req_complete : NULL;
 	if (pmu_request(&req, pmu_nvram_complete, 4, PMU_WRITE_NVRAM,
 			(addr >> 8) & 0xff, addr & 0xff, val))
 		return;
-	if (system_running)
+	if (system_state == SYSTEM_RUNNING)
 		wait_for_completion(&req_complete);
 	while (!req.complete)
 		pmu_poll();

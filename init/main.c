@@ -94,11 +94,7 @@ extern void driver_init(void);
 extern void tc_init(void);
 #endif
 
-/*
- * Are we up and running (ie do we have all the infrastructure
- * set up)
- */
-int system_running;
+int system_state;	/* SYSTEM_BOOTING/RUNNING/SHUTDOWN */
 
 /*
  * Boot command-line arguments
@@ -613,7 +609,7 @@ static int init(void * unused)
 	 */
 	free_initmem();
 	unlock_kernel();
-	system_running = 1;
+	system_state = SYSTEM_RUNNING;
 
 	if (sys_open("/dev/console", O_RDWR, 0) < 0)
 		printk("Warning: unable to open an initial console.\n");
