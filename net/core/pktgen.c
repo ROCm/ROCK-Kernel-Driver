@@ -961,7 +961,8 @@ static int proc_write(struct file *file, const char *user_buffer,
 	if (len < 0)
 		return len;
 	memset(name, 0, sizeof(name));
-	copy_from_user(name, &user_buffer[i], len);
+	if (copy_from_user(name, &user_buffer[i], len))
+		return -EFAULT;
 	i += len;
   
 	max = count -i;
@@ -1091,18 +1092,20 @@ static int proc_write(struct file *file, const char *user_buffer,
 		if (len < 0)
 			return len;
 		memset(info->outdev, 0, sizeof(info->outdev));
-		copy_from_user(info->outdev, &user_buffer[i], len);
+		if (copy_from_user(info->outdev, &user_buffer[i], len))
+			return -EFAULT;
 		i += len;
 		sprintf(result, "OK: odev=%s", info->outdev);
 		return count;
 	}
 	if (!strcmp(name, "flag")) {
 		char f[32];
-		memset(f, 0, 32);
 		len = strn_len(&user_buffer[i], sizeof(f) - 1);
 		if (len < 0)
 			return len;
-		copy_from_user(f, &user_buffer[i], len);
+		memset(f, 0, 32);
+		if (copy_from_user(f, &user_buffer[i], len))
+			return -EFAULT;
 		i += len;
 		if (strcmp(f, "IPSRC_RND") == 0) {
 			info->flags |= F_IPSRC_RND;
@@ -1154,7 +1157,8 @@ static int proc_write(struct file *file, const char *user_buffer,
 		if (len < 0)
 			return len;
 		memset(info->dst_min, 0, sizeof(info->dst_min));
-		copy_from_user(info->dst_min, &user_buffer[i], len);
+		if (copy_from_user(info->dst_min, &user_buffer[i], len))
+			return -EFAULT;
 		if(debug)
 			printk("pg: dst_min set to: %s\n", info->dst_min);
 		i += len;
@@ -1166,7 +1170,8 @@ static int proc_write(struct file *file, const char *user_buffer,
 		if (len < 0)
 			return len;
 		memset(info->dst_max, 0, sizeof(info->dst_max));
-		copy_from_user(info->dst_max, &user_buffer[i], len);
+		if (copy_from_user(info->dst_max, &user_buffer[i], len))
+			return -EFAULT;
 		if(debug)
 			printk("pg: dst_max set to: %s\n", info->dst_max);
 		i += len;
@@ -1178,7 +1183,8 @@ static int proc_write(struct file *file, const char *user_buffer,
 		if (len < 0)
 			return len;
 		memset(info->src_min, 0, sizeof(info->src_min));
-		copy_from_user(info->src_min, &user_buffer[i], len);
+		if (copy_from_user(info->src_min, &user_buffer[i], len))
+			return -EFAULT;
 		if(debug)
 			printk("pg: src_min set to: %s\n", info->src_min);
 		i += len;
@@ -1190,7 +1196,8 @@ static int proc_write(struct file *file, const char *user_buffer,
 		if (len < 0)
 			return len;
 		memset(info->src_max, 0, sizeof(info->src_max));
-		copy_from_user(info->src_max, &user_buffer[i], len);
+		if (copy_from_user(info->src_max, &user_buffer[i], len))
+			return -EFAULT;
 		if(debug)
 			printk("pg: src_max set to: %s\n", info->src_max);
 		i += len;
@@ -1205,7 +1212,8 @@ static int proc_write(struct file *file, const char *user_buffer,
 		if (len < 0)
 			return len;
 		memset(valstr, 0, sizeof(valstr));
-		copy_from_user(valstr, &user_buffer[i], len);
+		if (copy_from_user(valstr, &user_buffer[i], len))
+			return -EFAULT;
 		i += len;
 
 		for(*m = 0;*v && m < info->dst_mac + 6; v++) {
@@ -1237,7 +1245,8 @@ static int proc_write(struct file *file, const char *user_buffer,
 		if (len < 0)
 			return len;
 		memset(valstr, 0, sizeof(valstr));
-		copy_from_user(valstr, &user_buffer[i], len);
+		if (copy_from_user(valstr, &user_buffer[i], len))
+			return -EFAULT;
 		i += len;
 
 		for(*m = 0;*v && m < info->src_mac + 6; v++) {
