@@ -721,7 +721,7 @@ static void __attach_bond_to_agg(struct port *port)
 }
 
 /**
- * __detach_bond_to_agg
+ * __detach_bond_from_agg
  * @port: the port we're looking at
  *
  * Handle the detaching of the port's control parser/multiplexer from the
@@ -826,6 +826,55 @@ static struct aggregator *__get_active_agg(struct aggregator *aggregator)
 	}
 
 	return retval;
+}
+
+/**
+ * __update_lacpdu_from_port - update a port's lacpdu fields
+ * @port: the port we're looking at
+ *
+ */
+static inline void __update_lacpdu_from_port(struct port *port)
+{
+	struct lacpdu *lacpdu = &port->lacpdu;
+
+	/* update current actual Actor parameters */
+	/* lacpdu->subtype                   initialized
+	 * lacpdu->version_number            initialized
+	 * lacpdu->tlv_type_actor_info       initialized
+	 * lacpdu->actor_information_length  initialized
+	 */
+
+	lacpdu->actor_system_priority = port->actor_system_priority;
+	lacpdu->actor_system = port->actor_system;
+	lacpdu->actor_key = port->actor_oper_port_key;
+	lacpdu->actor_port_priority = port->actor_port_priority;
+	lacpdu->actor_port = port->actor_port_number;
+	lacpdu->actor_state = port->actor_oper_port_state;
+
+	/* lacpdu->reserved_3_1              initialized
+	 * lacpdu->tlv_type_partner_info     initialized
+	 * lacpdu->partner_information_length initialized
+	 */
+
+	lacpdu->partner_system_priority = port->partner_oper_system_priority;
+	lacpdu->partner_system = port->partner_oper_system;
+	lacpdu->partner_key = port->partner_oper_key;
+	lacpdu->partner_port_priority = port->partner_oper_port_priority;
+	lacpdu->partner_port = port->partner_oper_port_number;
+	lacpdu->partner_state = port->partner_oper_port_state;
+
+	/* lacpdu->reserved_3_2              initialized
+	 * lacpdu->tlv_type_collector_info   initialized
+	 * lacpdu->collector_information_length initialized
+	 * collector_max_delay                initialized
+	 * reserved_12[12]                   initialized
+	 * tlv_type_terminator               initialized
+	 * terminator_length                 initialized
+	 * reserved_50[50]                   initialized
+	 */
+
+	/* Convert all non u8 parameters to Big Endian for transmit */
+	__ntohs_lacpdu(lacpdu);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////
@@ -1177,43 +1226,11 @@ static void ad_rx_machine(struct lacpdu *lacpdu, struct port *port)
  */
 static void ad_tx_machine(struct port *port)
 {
-	struct lacpdu *lacpdu = &port->lacpdu;
-
 	// check if tx timer expired, to verify that we do not send more than 3 packets per second
 	if (port->sm_tx_timer_counter && !(--port->sm_tx_timer_counter)) {
 		// check if there is something to send
 		if (port->ntt && (port->sm_vars & AD_PORT_LACP_ENABLED)) {
-			//update current actual Actor parameters
-			//lacpdu->subtype                   initialized
-			//lacpdu->version_number            initialized
-			//lacpdu->tlv_type_actor_info       initialized
-			//lacpdu->actor_information_length  initialized
-			lacpdu->actor_system_priority = port->actor_system_priority;
-			lacpdu->actor_system = port->actor_system;
-			lacpdu->actor_key = port->actor_oper_port_key;
-			lacpdu->actor_port_priority = port->actor_port_priority;
-			lacpdu->actor_port = port->actor_port_number;
-			lacpdu->actor_state = port->actor_oper_port_state;
-			//lacpdu->reserved_3_1              initialized
-			//lacpdu->tlv_type_partner_info     initialized
-			//lacpdu->partner_information_length initialized
-			lacpdu->partner_system_priority = port->partner_oper_system_priority;
-			lacpdu->partner_system = port->partner_oper_system;
-			lacpdu->partner_key = port->partner_oper_key;
-			lacpdu->partner_port_priority = port->partner_oper_port_priority;
-			lacpdu->partner_port = port->partner_oper_port_number;
-			lacpdu->partner_state = port->partner_oper_port_state;
-			//lacpdu->reserved_3_2              initialized
-			//lacpdu->tlv_type_collector_info   initialized
-			//lacpdu->collector_information_length initialized
-			//collector_max_delay                initialized
-			//reserved_12[12]                   initialized
-			//tlv_type_terminator               initialized
-			//terminator_length                 initialized
-			//reserved_50[50]                   initialized
-
-			// We need to convert all non u8 parameters to Big Endian for transmit
-			__ntohs_lacpdu(lacpdu);
+			__update_lacpdu_from_port(port);
 			// send the lacpdu
 			if (ad_lacpdu_send(port) >= 0) {
 				BOND_PRINT_DBG(("Sent LACPDU on port %d", port->actor_port_number));
@@ -1971,13 +1988,13 @@ void bond_3ad_unbind_slave(struct slave *slave)
 		return;
 	}
 
-	// disable the port
-	ad_disable_collecting_distributing(port);
-
-	// deinitialize port's locks if necessary(os-specific)
-	__deinitialize_port_locks(port);
-
 	BOND_PRINT_DBG(("Unbinding Link Aggregation Group %d", aggregator->aggregator_identifier));
+
+	/* Tell the partner that this port is not suitable for aggregation */
+	port->actor_oper_port_state &= ~AD_STATE_AGGREGATION;
+	__update_lacpdu_from_port(port);
+	ad_lacpdu_send(port);
+
 	// check if this aggregator is occupied
 	if (aggregator->lag_ports) {
 		// check if there are other ports related to this aggregator except
