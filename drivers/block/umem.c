@@ -1145,7 +1145,7 @@ static void mm_pci_remove(struct pci_dev *dev)
 				    card->mm_pages[1].page_dma);
 }
 
-static const struct pci_device_id __devinitdata mm_pci_ids[] = { {
+static const struct pci_device_id mm_pci_ids[] = { {
 	.vendor =	PCI_VENDOR_ID_MICRO_MEMORY,
 	.device =	PCI_DEVICE_ID_MICRO_MEMORY_5415CN,
 	}, {

@@ -49,7 +49,7 @@ struct emu {
 	char phys[32];
 };
 	
-static struct pci_device_id emu_tbl[] __devinitdata = {
+static struct pci_device_id emu_tbl[] = {
 	{ 0x1102, 0x7002, PCI_ANY_ID, PCI_ANY_ID }, /* SB Live gameport */
 	{ 0x1102, 0x7003, PCI_ANY_ID, PCI_ANY_ID }, /* Audigy gameport */
 	{ 0, }

@@ -105,7 +105,7 @@ static LIST_HEAD(ymf_devs);
  *  constants
  */
 
-static struct pci_device_id ymf_id_tbl[] __devinitdata = {
+static struct pci_device_id ymf_id_tbl[] = {
 #define DEV(v, d, data) \
   { PCI_VENDOR_ID_##v, PCI_DEVICE_ID_##v##_##d, PCI_ANY_ID, PCI_ANY_ID, 0, 0, (unsigned long)data }
 	DEV (YAMAHA, 724,  "YMF724"),

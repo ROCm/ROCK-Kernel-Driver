@@ -2327,7 +2327,7 @@ out0:
 }
 
 
-static struct pci_device_id eni_pci_tbl[] __devinitdata = {
+static struct pci_device_id eni_pci_tbl[] = {
 	{ PCI_VENDOR_ID_EF, PCI_DEVICE_ID_EF_ATM_FPGA, PCI_ANY_ID, PCI_ANY_ID,
 	  0, 0, 0 /* FPGA */ },
 	{ PCI_VENDOR_ID_EF, PCI_DEVICE_ID_EF_ATM_ASIC, PCI_ANY_ID, PCI_ANY_ID,

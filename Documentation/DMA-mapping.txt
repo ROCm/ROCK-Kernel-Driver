@@ -183,7 +183,7 @@ the case would look like this:
 pci_set_consistent_dma_mask() will always be able to set the same or a
 smaller mask as pci_set_dma_mask(). However for the rare case that a
 device driver only uses consistent allocations, one would have to
-check the return value from pci_set_consistent().
+check the return value from pci_set_consistent_dma_mask().
 
 If your 64-bit device is going to be an enormous consumer of DMA
 mappings, this can be problematic since the DMA mappings are a

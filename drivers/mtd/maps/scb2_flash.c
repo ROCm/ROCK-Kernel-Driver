@@ -218,7 +218,7 @@ scb2_flash_remove(struct pci_dev *dev)
 	pci_set_drvdata(dev, NULL);
 }
 
-static struct pci_device_id scb2_flash_pci_ids[] __devinitdata = {
+static struct pci_device_id scb2_flash_pci_ids[] = {
 	{
 	  .vendor = PCI_VENDOR_ID_SERVERWORKS,
 	  .device = PCI_DEVICE_ID_SERVERWORKS_CSB5,

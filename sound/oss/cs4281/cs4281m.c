@@ -4458,7 +4458,7 @@ static void __devinit cs4281_remove(struct pci_dev *pci_dev)
 		 "cs4281: cs4281_remove()-: remove successful\n"));
 }
 
-static struct pci_device_id cs4281_pci_tbl[] __devinitdata = {
+static struct pci_device_id cs4281_pci_tbl[] = {
 	{
 		.vendor    = PCI_VENDOR_ID_CIRRUS,
 		.device    = PCI_DEVICE_ID_CRYSTAL_CS4281,

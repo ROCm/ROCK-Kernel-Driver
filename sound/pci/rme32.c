@@ -223,7 +223,7 @@ typedef struct snd_rme32 {
 	snd_kcontrol_t *spdif_ctl;
 } rme32_t;
 
-static struct pci_device_id snd_rme32_ids[] __devinitdata = {
+static struct pci_device_id snd_rme32_ids[] = {
 	{PCI_VENDOR_ID_XILINX_RME, PCI_DEVICE_ID_DIGI32,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0,},
 	{PCI_VENDOR_ID_XILINX_RME, PCI_DEVICE_ID_DIGI32_8,

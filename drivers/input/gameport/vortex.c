@@ -159,7 +159,7 @@ static void __devexit vortex_remove(struct pci_dev *dev)
 	kfree(vortex);
 }
 
-static struct pci_device_id vortex_id_table[] __devinitdata =
+static struct pci_device_id vortex_id_table[] =
 {{ 0x12eb, 0x0001, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0x11000 },
  { 0x12eb, 0x0002, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0x28800 },
  { 0 }};

@@ -401,7 +401,7 @@ static void __devexit vt596_remove(struct pci_dev *pdev)
 	release_region(vt596_smba, 8);
 }
 
-static struct pci_device_id vt596_ids[] __devinitdata = {
+static struct pci_device_id vt596_ids[] = {
 	{
 		.vendor		= PCI_VENDOR_ID_VIA,
 		.device 	= PCI_DEVICE_ID_VIA_82C596_3,

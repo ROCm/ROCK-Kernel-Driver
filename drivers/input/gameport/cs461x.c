@@ -216,7 +216,7 @@ static int cs461x_gameport_open(struct gameport *gameport, int mode)
 	return 0;
 }
 
-static struct pci_device_id cs461x_pci_tbl[] __devinitdata = {
+static struct pci_device_id cs461x_pci_tbl[] = {
 	{ PCI_VENDOR_ID_CIRRUS, 0x6001, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 }, /* Cirrus CS4610 */
 	{ PCI_VENDOR_ID_CIRRUS, 0x6003, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 }, /* Cirrus CS4612 */
 	{ PCI_VENDOR_ID_CIRRUS, 0x6005, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 }, /* Cirrus CS4615 */

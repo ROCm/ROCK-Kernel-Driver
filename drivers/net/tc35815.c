@@ -469,7 +469,7 @@ static struct net_device *root_tc35815_dev = NULL;
 /*
  * PCI device identifiers for "new style" Linux PCI Device Drivers
  */
-static struct pci_device_id tc35815_pci_tbl[] __devinitdata = {
+static struct pci_device_id tc35815_pci_tbl[] = {
     { PCI_VENDOR_ID_TOSHIBA_2, PCI_DEVICE_ID_TOSHIBA_TC35815CF, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
     { 0, }
 };

@@ -277,7 +277,7 @@ struct snd_stru_ali {
 #endif
 };
 
-static struct pci_device_id snd_ali_ids[] __devinitdata = {
+static struct pci_device_id snd_ali_ids[] = {
 	{0x10b9, 0x5451, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },
 	{0, }
 };

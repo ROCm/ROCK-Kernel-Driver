@@ -260,7 +260,7 @@ typedef struct snd_rme96 {
 	snd_kcontrol_t	   *spdif_ctl;
 } rme96_t;
 
-static struct pci_device_id snd_rme96_ids[] __devinitdata = {
+static struct pci_device_id snd_rme96_ids[] = {
 	{ PCI_VENDOR_ID_XILINX, PCI_DEVICE_ID_DIGI96,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },
 	{ PCI_VENDOR_ID_XILINX, PCI_DEVICE_ID_DIGI96_8,

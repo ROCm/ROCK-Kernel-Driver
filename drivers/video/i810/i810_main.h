@@ -14,6 +14,22 @@
 #ifndef __I810_MAIN_H__
 #define __I810_MAIN_H__
 
+static struct pci_device_id i810fb_pci_tbl[] = {
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82810_IG1, 
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 }, 
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82810_IG3,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1  },
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82810E_IG,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 2 },
+	/* mvo: added i815 PCI-ID */  
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82815_100,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 3 },
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82815_NOAGP,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 4 },
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82815_CGC,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 5 }
+};	  
+	             
 static int  __init i810fb_init_pci (struct pci_dev *dev, 
 				       const struct pci_device_id *entry);
 static void __exit i810fb_remove_pci(struct pci_dev *dev);

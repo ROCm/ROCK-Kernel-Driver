@@ -911,7 +911,7 @@ static int yenta_dev_resume (struct pci_dev *dev)
 }
 
 
-static struct pci_device_id yenta_table [] __devinitdata = { {
+static struct pci_device_id yenta_table [] = { {
 	.class		= PCI_CLASS_BRIDGE_CARDBUS << 8,
 	.class_mask	= ~0,
 

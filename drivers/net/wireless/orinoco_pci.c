@@ -359,7 +359,7 @@ static int orinoco_pci_resume(struct pci_dev *pdev)
 	return 0;
 }
 
-static struct pci_device_id orinoco_pci_pci_id_table[] __devinitdata = {
+static struct pci_device_id orinoco_pci_pci_id_table[] = {
 	{0x1260, 0x3873, PCI_ANY_ID, PCI_ANY_ID,},
 	{0,},
 };

@@ -1417,7 +1417,7 @@ static int agp_intel_resume(struct pci_dev *pdev)
 	return 0;
 }
 
-static struct pci_device_id agp_intel_pci_table[] __initdata = {
+static struct pci_device_id agp_intel_pci_table[] = {
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
 	.class_mask	= ~0,

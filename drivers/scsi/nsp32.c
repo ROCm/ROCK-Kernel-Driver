@@ -2001,7 +2001,7 @@ static void __devexit nsp32_remove(struct pci_dev *pdev)
 	iounmap((void *)(data->MmioAddress));
 }
 
-static struct pci_device_id nsp32_pci_table[] __devinitdata = {
+static struct pci_device_id nsp32_pci_table[] = {
 	{
 		.vendor      = PCI_VENDOR_ID_IODATA,
 		.device      = PCI_DEVICE_ID_NINJASCSI_32BI_CBSC_II,

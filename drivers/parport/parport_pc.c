@@ -2825,7 +2825,7 @@ static struct parport_pc_pci {
 	/* mobility_pp */		{ 1, { { 0, 1 }, } },
 };
 
-static struct pci_device_id parport_pc_pci_tbl[] __devinitdata = {
+static struct pci_device_id parport_pc_pci_tbl[] = {
 	/* Super-IO onboard chips */
 	{ 0x1106, 0x0686, PCI_ANY_ID, PCI_ANY_ID, 0, 0, sio_via_686a },
 	{ PCI_VENDOR_ID_ITE, PCI_DEVICE_ID_ITE_8872,

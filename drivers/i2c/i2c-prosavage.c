@@ -321,7 +321,7 @@ err_adap:
 /*
  * Data for PCI driver interface
  */
-static struct pci_device_id prosavage_pci_tbl[] __devinitdata = {
+static struct pci_device_id prosavage_pci_tbl[] = {
    {
 	.vendor		=	PCI_VENDOR_ID_S3,
 	.device		=	PCI_DEVICE_ID_S3_SAVAGE4,

@@ -3352,7 +3352,7 @@ static void __devexit dfx_remove_one (struct pci_dev *pdev)
 	pci_set_drvdata(pdev, NULL);
 }
 
-static struct pci_device_id dfx_pci_tbl[] __devinitdata = {
+static struct pci_device_id dfx_pci_tbl[] = {
 	{ PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_FDDI, PCI_ANY_ID, PCI_ANY_ID, },
 	{ 0, }
 };

@@ -556,7 +556,7 @@ static struct i2c_adapter i801_adapter = {
 	},
 };
 
-static struct pci_device_id i801_ids[] __devinitdata = {
+static struct pci_device_id i801_ids[] = {
 	{
 		.vendor =	PCI_VENDOR_ID_INTEL,
 		.device =	PCI_DEVICE_ID_INTEL_82801AA_3,

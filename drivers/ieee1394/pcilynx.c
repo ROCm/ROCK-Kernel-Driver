@@ -1897,7 +1897,7 @@ static size_t get_lynx_rom(struct hpsb_host *host, quadlet_t **ptr)
         return sizeof(lynx_csr_rom);
 }
 
-static struct pci_device_id pci_table[] __devinitdata = {
+static struct pci_device_id pci_table[] = {
 	{
                 .vendor =    PCI_VENDOR_ID_TI,
                 .device =    PCI_DEVICE_ID_TI_PCILYNX,
