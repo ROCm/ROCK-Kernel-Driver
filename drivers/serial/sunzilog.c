@@ -1295,7 +1295,7 @@ static spinlock_t sunzilog_serio_lock = SPIN_LOCK_UNLOCKED;
 
 static int sunzilog_serio_write(struct serio *serio, unsigned char ch)
 {
-	struct uart_sunzilog_port *up = serio->driver;
+	struct uart_sunzilog_port *up = serio->port_data;
 	unsigned long flags;
 
 	spin_lock_irqsave(&sunzilog_serio_lock, flags);
@@ -1309,7 +1309,7 @@ static int sunzilog_serio_write(struct serio *serio, unsigned char ch)
 
 static int sunzilog_serio_open(struct serio *serio)
 {
-	struct uart_sunzilog_port *up = serio->driver;
+	struct uart_sunzilog_port *up = serio->port_data;
 	unsigned long flags;
 	int ret;
 
@@ -1326,7 +1326,7 @@ static int sunzilog_serio_open(struct serio *serio)
 
 static void sunzilog_serio_close(struct serio *serio)
 {
-	struct uart_sunzilog_port *up = serio->driver;
+	struct uart_sunzilog_port *up = serio->port_data;
 	unsigned long flags;
 
 	spin_lock_irqsave(&sunzilog_serio_lock, flags);
@@ -1549,7 +1549,7 @@ static void __init sunzilog_init_kbdms(struct uart_sunzilog_port *up, int channe
 #ifdef CONFIG_SERIO
 	memset(&up->serio, 0, sizeof(up->serio));
 
-	up->serio.driver = up;
+	up->serio.port_data = up;
 
 	up->serio.type = SERIO_RS232;
 	if (channel == KEYBOARD_LINE) {

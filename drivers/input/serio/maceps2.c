@@ -54,7 +54,7 @@ struct maceps2_data {
 
 static int maceps2_write(struct serio *dev, unsigned char val)
 {
-	struct mace_ps2port *port = ((struct maceps2_data *)dev->driver)->port;
+	struct mace_ps2port *port = ((struct maceps2_data *)dev->port_data)->port;
 	unsigned int timeout = MACE_PS2_TIMEOUT;
 
 	do {
@@ -72,7 +72,7 @@ static irqreturn_t maceps2_interrupt(int irq, void *dev_id,
 				     struct pt_regs *regs)
 {
 	struct serio *dev = dev_id;
-	struct mace_ps2port *port = ((struct maceps2_data *)dev->driver)->port;
+	struct mace_ps2port *port = ((struct maceps2_data *)dev->port_data)->port;
 	unsigned int byte;
 
 	if (mace_read(port->status) & PS2_STATUS_RX_FULL) {
@@ -85,7 +85,7 @@ static irqreturn_t maceps2_interrupt(int irq, void *dev_id,
 
 static int maceps2_open(struct serio *dev)
 {
-	struct maceps2_data *data = (struct maceps2_data *)dev->driver;
+	struct maceps2_data *data = (struct maceps2_data *)dev->port_data;
 
 	if (request_irq(data->irq, maceps2_interrupt, 0, "PS/2 port", dev)) {
 		printk(KERN_ERR "Could not allocate PS/2 IRQ\n");
@@ -106,7 +106,7 @@ static int maceps2_open(struct serio *dev)
 
 static void maceps2_close(struct serio *dev)
 {
-	struct maceps2_data *data = (struct maceps2_data *)dev->driver;
+	struct maceps2_data *data = (struct maceps2_data *)dev->port_data;
 
 	mace_write(PS2_CONTROL_TX_CLOCK_DISABLE | PS2_CONTROL_RESET,
 		   data->port->control);
@@ -118,24 +118,24 @@ static struct maceps2_data port0_data, port1_data;
 
 static struct serio maceps2_port0 =
 {
-	.type	= SERIO_8042,
-	.open	= maceps2_open,
-	.close	= maceps2_close,
-	.write	= maceps2_write,
-	.name	= "MACE PS/2 port0",
-	.phys	= "mace/serio0",
-	.driver = &port0_data,
+	.type		= SERIO_8042,
+	.open		= maceps2_open,
+	.close		= maceps2_close,
+	.write		= maceps2_write,
+	.name		= "MACE PS/2 port0",
+	.phys		= "mace/serio0",
+	.port_data	= &port0_data,
 };
 
 static struct serio maceps2_port1 =
 {
-	.type	= SERIO_8042,
-	.open	= maceps2_open,
-	.close	= maceps2_close,
-	.write	= maceps2_write,
-	.name	= "MACE PS/2 port1",
-	.phys	= "mace/serio1",
-	.driver = &port1_data,
+	.type		= SERIO_8042,
+	.open		= maceps2_open,
+	.close		= maceps2_close,
+	.write		= maceps2_write,
+	.name		= "MACE PS/2 port1",
+	.phys		= "mace/serio1",
+	.port_data	= &port1_data,
 };
 
 static int __init maceps2_init(void)

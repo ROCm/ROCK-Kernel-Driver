@@ -288,7 +288,7 @@ static irqreturn_t gscps2_interrupt(int irq, void *dev, struct pt_regs *regs)
 
 static int gscps2_write(struct serio *port, unsigned char data)
 {
-	struct gscps2port *ps2port = port->driver;
+	struct gscps2port *ps2port = port->port_data;
 
 	if (!gscps2_writeb_output(ps2port, data)) {
 		printk(KERN_DEBUG PFX "sending byte %#x failed.\n", data);
@@ -304,7 +304,7 @@ static int gscps2_write(struct serio *port, unsigned char data)
 
 static int gscps2_open(struct serio *port)
 {
-	struct gscps2port *ps2port = port->driver;
+	struct gscps2port *ps2port = port->port_data;
 
 	gscps2_reset(ps2port);
 
@@ -319,7 +319,7 @@ static int gscps2_open(struct serio *port)
 
 static void gscps2_close(struct serio *port)
 {
-	struct gscps2port *ps2port = port->driver;
+	struct gscps2port *ps2port = port->port_data;
 	gscps2_enable(ps2port, DISABLE);
 }
 
@@ -372,7 +372,7 @@ static int __init gscps2_probe(struct parisc_device *dev)
 		(ps2port->id == GSC_ID_KEYBOARD) ? "keyboard" : "mouse" );
 
 	memcpy(&ps2port->port, &gscps2_serio_port, sizeof(gscps2_serio_port));
-	ps2port->port.driver = ps2port;
+	ps2port->port.port_data = ps2port;
 	ps2port->port.name = ps2port->name;
 	ps2port->port.phys = dev->dev.bus_id;
 

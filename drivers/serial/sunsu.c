@@ -994,7 +994,7 @@ static spinlock_t sunsu_serio_lock = SPIN_LOCK_UNLOCKED;
 
 static int sunsu_serio_write(struct serio *serio, unsigned char ch)
 {
-	struct uart_sunsu_port *up = serio->driver;
+	struct uart_sunsu_port *up = serio->port_data;
 	unsigned long flags;
 	int lsr;
 
@@ -1014,7 +1014,7 @@ static int sunsu_serio_write(struct serio *serio, unsigned char ch)
 
 static int sunsu_serio_open(struct serio *serio)
 {
-	struct uart_sunsu_port *up = serio->driver;
+	struct uart_sunsu_port *up = serio->port_data;
 	unsigned long flags;
 	int ret;
 
@@ -1031,7 +1031,7 @@ static int sunsu_serio_open(struct serio *serio)
 
 static void sunsu_serio_close(struct serio *serio)
 {
-	struct uart_sunsu_port *up = serio->driver;
+	struct uart_sunsu_port *up = serio->port_data;
 	unsigned long flags;
 
 	spin_lock_irqsave(&sunsu_serio_lock, flags);
@@ -1311,7 +1311,7 @@ static int __init sunsu_kbd_ms_init(void)
 #ifdef CONFIG_SERIO
 		memset(&up->serio, 0, sizeof(up->serio));
 
-		up->serio.driver = up;
+		up->serio.port_data = up;
 
 		up->serio.type = SERIO_RS232;
 		if (up->su_type == SU_PORT_KBD) {

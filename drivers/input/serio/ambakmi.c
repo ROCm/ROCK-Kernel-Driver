@@ -54,7 +54,7 @@ static irqreturn_t amba_kmi_int(int irq, void *dev_id, struct pt_regs *regs)
 
 static int amba_kmi_write(struct serio *io, unsigned char val)
 {
-	struct amba_kmi_port *kmi = io->driver;
+	struct amba_kmi_port *kmi = io->port_data;
 	unsigned int timeleft = 10000; /* timeout in 100ms */
 
 	while ((readb(KMISTAT) & KMISTAT_TXEMPTY) == 0 && timeleft--)
@@ -68,7 +68,7 @@ static int amba_kmi_write(struct serio *io, unsigned char val)
 
 static int amba_kmi_open(struct serio *io)
 {
-	struct amba_kmi_port *kmi = io->driver;
+	struct amba_kmi_port *kmi = io->port_data;
 	unsigned int divisor;
 	int ret;
 
@@ -105,7 +105,7 @@ static int amba_kmi_open(struct serio *io)
 
 static void amba_kmi_close(struct serio *io)
 {
-	struct amba_kmi_port *kmi = io->driver;
+	struct amba_kmi_port *kmi = io->port_data;
 
 	writeb(0, KMICR);
 
@@ -131,15 +131,15 @@ static int amba_kmi_probe(struct amba_device *dev, void *id)
 
 	memset(kmi, 0, sizeof(struct amba_kmi_port));
 
-	kmi->io.type	= SERIO_8042;
-	kmi->io.write	= amba_kmi_write;
-	kmi->io.open	= amba_kmi_open;
-	kmi->io.close	= amba_kmi_close;
-	kmi->io.name	= dev->dev.bus_id;
-	kmi->io.phys	= dev->dev.bus_id;
-	kmi->io.driver	= kmi;
+	kmi->io.type		= SERIO_8042;
+	kmi->io.write		= amba_kmi_write;
+	kmi->io.open		= amba_kmi_open;
+	kmi->io.close		= amba_kmi_close;
+	kmi->io.name		= dev->dev.bus_id;
+	kmi->io.phys		= dev->dev.bus_id;
+	kmi->io.port_data	= kmi;
 
-	kmi->base	= ioremap(dev->res.start, KMI_SIZE);
+	kmi->base		= ioremap(dev->res.start, KMI_SIZE);
 	if (!kmi->base) {
 		ret = -ENOMEM;
 		goto out;

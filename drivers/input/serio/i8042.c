@@ -223,7 +223,7 @@ static int i8042_kbd_write(struct serio *port, unsigned char c)
 
 static int i8042_aux_write(struct serio *port, unsigned char c)
 {
-	struct i8042_values *values = port->driver;
+	struct i8042_values *values = port->port_data;
 	int retval;
 
 /*
@@ -251,7 +251,7 @@ static int i8042_aux_write(struct serio *port, unsigned char c)
 
 static int i8042_activate_port(struct serio *port)
 {
-	struct i8042_values *values = port->driver;
+	struct i8042_values *values = port->port_data;
 
 	i8042_flush();
 
@@ -279,7 +279,7 @@ static int i8042_activate_port(struct serio *port)
 
 static int i8042_open(struct serio *port)
 {
-	struct i8042_values *values = port->driver;
+	struct i8042_values *values = port->port_data;
 
 	if (values->mux != -1)
 		if (i8042_mux_open++)
@@ -318,7 +318,7 @@ irq_fail:
 
 static void i8042_close(struct serio *port)
 {
-	struct i8042_values *values = port->driver;
+	struct i8042_values *values = port->port_data;
 
 	if (values->mux != -1)
 		if (--i8042_mux_open)
@@ -353,7 +353,7 @@ static struct serio i8042_kbd_port =
 	.write =	i8042_kbd_write,
 	.open =		i8042_open,
 	.close =	i8042_close,
-	.driver =	&i8042_kbd_values,
+	.port_data =	&i8042_kbd_values,
 	.name =		"i8042 Kbd Port",
 	.phys =		I8042_KBD_PHYS_DESC,
 };
@@ -371,7 +371,7 @@ static struct serio i8042_aux_port =
 	.write =	i8042_aux_write,
 	.open =		i8042_open,
 	.close =	i8042_close,
-	.driver =	&i8042_aux_values,
+	.port_data =	&i8042_aux_values,
 	.name =		"i8042 Aux Port",
 	.phys =		I8042_AUX_PHYS_DESC,
 };
@@ -941,7 +941,7 @@ static void __init i8042_init_mux_values(struct i8042_values *values, struct ser
 	sprintf(i8042_mux_short[index], "AUX%d", index);
 	port->name = i8042_mux_names[index];
 	port->phys = i8042_mux_phys[index];
-	port->driver = values;
+	port->port_data = values;
 	values->name = i8042_mux_short[index];
 	values->mux = index;
 }

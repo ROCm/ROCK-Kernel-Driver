@@ -45,7 +45,7 @@ struct pcips2_data {
 
 static int pcips2_write(struct serio *io, unsigned char val)
 {
-	struct pcips2_data *ps2if = io->driver;
+	struct pcips2_data *ps2if = io->port_data;
 	unsigned int stat;
 
 	do {
@@ -101,7 +101,7 @@ static void pcips2_flush_input(struct pcips2_data *ps2if)
 
 static int pcips2_open(struct serio *io)
 {
-	struct pcips2_data *ps2if = io->driver;
+	struct pcips2_data *ps2if = io->port_data;
 	int ret, val = 0;
 
 	outb(PS2_CTRL_ENABLE, ps2if->base);
@@ -119,7 +119,7 @@ static int pcips2_open(struct serio *io)
 
 static void pcips2_close(struct serio *io)
 {
-	struct pcips2_data *ps2if = io->driver;
+	struct pcips2_data *ps2if = io->port_data;
 
 	outb(0, ps2if->base);
 
@@ -155,7 +155,7 @@ static int __devinit pcips2_probe(struct pci_dev *dev, const struct pci_device_i
 	ps2if->io.close		= pcips2_close;
 	ps2if->io.name		= pci_name(dev);
 	ps2if->io.phys		= dev->dev.bus_id;
-	ps2if->io.driver	= ps2if;
+	ps2if->io.port_data	= ps2if;
 	ps2if->dev		= dev;
 	ps2if->base		= pci_resource_start(dev, 0);
 

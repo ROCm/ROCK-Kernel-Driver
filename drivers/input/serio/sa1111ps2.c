@@ -95,7 +95,7 @@ static irqreturn_t ps2_txint(int irq, void *dev_id, struct pt_regs *regs)
  */
 static int ps2_write(struct serio *io, unsigned char val)
 {
-	struct ps2if *ps2if = io->driver;
+	struct ps2if *ps2if = io->port_data;
 	unsigned long flags;
 	unsigned int head;
 
@@ -122,7 +122,7 @@ static int ps2_write(struct serio *io, unsigned char val)
 
 static int ps2_open(struct serio *io)
 {
-	struct ps2if *ps2if = io->driver;
+	struct ps2if *ps2if = io->port_data;
 	int ret;
 
 	sa1111_enable_device(ps2if->dev);
@@ -154,7 +154,7 @@ static int ps2_open(struct serio *io)
 
 static void ps2_close(struct serio *io)
 {
-	struct ps2if *ps2if = io->driver;
+	struct ps2if *ps2if = io->port_data;
 
 	sa1111_writel(0, ps2if->base + SA1111_PS2CR);
 
@@ -247,7 +247,7 @@ static int ps2_probe(struct sa1111_dev *dev)
 	ps2if->io.close		= ps2_close;
 	ps2if->io.name		= dev->dev.bus_id;
 	ps2if->io.phys		= dev->dev.bus_id;
-	ps2if->io.driver	= ps2if;
+	ps2if->io.port_data	= ps2if;
 	ps2if->dev		= dev;
 	sa1111_set_drvdata(dev, ps2if);
 

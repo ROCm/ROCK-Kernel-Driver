@@ -214,7 +214,7 @@ static int synaptics_set_mode(struct psmouse *psmouse, int mode)
  ****************************************************************************/
 static int synaptics_pt_write(struct serio *port, unsigned char c)
 {
-	struct psmouse *parent = port->driver;
+	struct psmouse *parent = port->port_data;
 	char rate_param = SYN_PS_CLIENT_CMD; /* indicates that we want pass-through port */
 
 	if (psmouse_sliced_command(parent, c))
@@ -273,7 +273,7 @@ static void synaptics_pt_create(struct psmouse *psmouse)
 	port->serio.name = "Synaptics pass-through";
 	port->serio.phys = "synaptics-pt/serio0";
 	port->serio.write = synaptics_pt_write;
-	port->serio.driver = psmouse;
+	port->serio.port_data = psmouse;
 
 	port->activate = synaptics_pt_activate;
 }

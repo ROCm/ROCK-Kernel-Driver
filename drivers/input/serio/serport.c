@@ -44,13 +44,13 @@ char serport_name[] = "Serial port";
 
 static int serport_serio_write(struct serio *serio, unsigned char data)
 {
-	struct serport *serport = serio->driver;
+	struct serport *serport = serio->port_data;
 	return -(serport->tty->driver->write(serport->tty, 0, &data, 1) != 1);
 }
 
 static void serport_serio_close(struct serio *serio)
 {
-	struct serport *serport = serio->driver;
+	struct serport *serport = serio->port_data;
 
 	serport->serio.type = 0;
 	wake_up_interruptible(&serport->wait);
@@ -83,7 +83,7 @@ static int serport_ldisc_open(struct tty_struct *tty)
 	serport->serio.type = SERIO_RS232;
 	serport->serio.write = serport_serio_write;
 	serport->serio.close = serport_serio_close;
-	serport->serio.driver = serport;
+	serport->serio.port_data = serport;
 
 	init_waitqueue_head(&serport->wait);
 

@@ -21,7 +21,7 @@
 
 struct serio {
 	void *private;
-	void *driver;
+	void *port_data;
 	char *name;
 	char *phys;
 
