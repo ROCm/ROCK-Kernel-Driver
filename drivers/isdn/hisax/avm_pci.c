@@ -76,12 +76,12 @@ static spinlock_t avm_pci_lock = SPIN_LOCK_UNLOCKED;
 
 /* Interface functions */
 
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+ReadISAC(struct IsdnCardState *cs, u8 offset)
 {
-	register u_char idx = (offset > 0x2f) ? AVM_ISAC_REG_HIGH : AVM_ISAC_REG_LOW;
-	register u_char val;
-	register unsigned long flags;
+	u8 idx = (offset > 0x2f) ? AVM_ISAC_REG_HIGH : AVM_ISAC_REG_LOW;
+	u8 val;
+	unsigned long flags;
 
 	spin_lock_irqsave(&avm_pci_lock, flags);
 	outb(idx, cs->hw.avm.cfg_reg + 4);
@@ -91,10 +91,10 @@ ReadISAC(struct IsdnCardState *cs, u_char offset)
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
-	register u_char idx = (offset > 0x2f) ? AVM_ISAC_REG_HIGH : AVM_ISAC_REG_LOW;
-	register unsigned long flags;
+	u8 idx = (offset > 0x2f) ? AVM_ISAC_REG_HIGH : AVM_ISAC_REG_LOW;
+	unsigned long flags;
 
 	spin_lock_irqsave(&avm_pci_lock, flags);
 	outb(idx, cs->hw.avm.cfg_reg + 4);
@@ -103,25 +103,32 @@ WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	outb(AVM_ISAC_FIFO, cs->hw.avm.cfg_reg + 4);
 	insb(cs->hw.avm.isac, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	outb(AVM_ISAC_FIFO, cs->hw.avm.cfg_reg + 4);
 	outsb(cs->hw.avm.isac, data, size);
 }
 
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = ReadISAC,
+	.write_reg  = WriteISAC,
+	.read_fifo  = ReadISACfifo,
+	.write_fifo = WriteISACfifo,
+};
+
 static inline u_int
-ReadHDLCPCI(struct IsdnCardState *cs, int chan, u_char offset)
+ReadHDLCPCI(struct IsdnCardState *cs, int chan, u8 offset)
 {
-	register u_int idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
-	register u_int val;
-	register unsigned long flags;
+	u_int idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
+	u_int val;
+	unsigned long flags;
 
 	spin_lock_irqsave(&avm_pci_lock, flags);
 	outl(idx, cs->hw.avm.cfg_reg + 4);
@@ -131,10 +138,10 @@ ReadHDLCPCI(struct IsdnCardState *cs, int chan, u_char offset)
 }
 
 static inline void
-WriteHDLCPCI(struct IsdnCardState *cs, int chan, u_char offset, u_int value)
+WriteHDLCPCI(struct IsdnCardState *cs, int chan, u8 offset, u_int value)
 {
-	register u_int idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
-	register unsigned long flags;
+	u_int idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
+	unsigned long flags;
 
 	spin_lock_irqsave(&avm_pci_lock, flags);
 	outl(idx, cs->hw.avm.cfg_reg + 4);
@@ -142,12 +149,12 @@ WriteHDLCPCI(struct IsdnCardState *cs, int chan, u_char offset, u_int value)
 	spin_unlock_irqrestore(&avm_pci_lock, flags);
 }
 
-static inline u_char
-ReadHDLCPnP(struct IsdnCardState *cs, int chan, u_char offset)
+static inline u8
+ReadHDLCPnP(struct IsdnCardState *cs, int chan, u8 offset)
 {
-	register u_char idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
-	register u_char val;
-	register unsigned long flags;
+	u8 idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
+	u8 val;
+	unsigned long flags;
 
 	spin_lock_irqsave(&avm_pci_lock, flags);
 	outb(idx, cs->hw.avm.cfg_reg + 4);
@@ -157,27 +164,15 @@ ReadHDLCPnP(struct IsdnCardState *cs, int chan, u_char offset)
 }
 
 static inline void
-WriteHDLCPnP(struct IsdnCardState *cs, int chan, u_char offset, u_char value)
+WriteHDLCPnP(struct IsdnCardState *cs, int chan, u8 offset, u8 value)
 {
-	register u_char idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
-	register unsigned long flags;
+	u8 idx = chan ? AVM_HDLC_2 : AVM_HDLC_1;
+	unsigned long flags;
 
 	spin_lock_irqsave(&avm_pci_lock, flags);
 	outb(idx, cs->hw.avm.cfg_reg + 4);
 	outb(value, cs->hw.avm.isac + offset);
 	spin_unlock_irqrestore(&avm_pci_lock, flags);
-}
-
-static u_char
-ReadHDLC_s(struct IsdnCardState *cs, int chan, u_char offset)
-{
-	return(0xff & ReadHDLCPCI(cs, chan, offset));
-}
-
-static void
-WriteHDLC_s(struct IsdnCardState *cs, int chan, u_char offset, u_char value)
-{
-	WriteHDLCPCI(cs, chan, offset, value);
 }
 
 static inline
@@ -265,8 +260,8 @@ static inline void
 hdlc_empty_fifo(struct BCState *bcs, int count)
 {
 	register u_int *ptr;
-	u_char *p;
-	u_char idx = bcs->channel ? AVM_HDLC_2 : AVM_HDLC_1;
+	u8 *p;
+	u8 idx = bcs->channel ? AVM_HDLC_2 : AVM_HDLC_1;
 	int cnt=0;
 	struct IsdnCardState *cs = bcs->cs;
 
@@ -304,7 +299,7 @@ hdlc_empty_fifo(struct BCState *bcs, int count)
 		char *t = bcs->blog;
 
 		if (cs->subtyp == AVM_FRITZ_PNP)
-			p = (u_char *) ptr;
+			p = (u8 *) ptr;
 		t += sprintf(t, "hdlc_empty_fifo %c cnt %d",
 			     bcs->channel ? 'B' : 'A', count);
 		QuickHex(t, p, count);
@@ -312,7 +307,7 @@ hdlc_empty_fifo(struct BCState *bcs, int count)
 	}
 }
 
-static inline void
+static void
 hdlc_fill_fifo(struct BCState *bcs)
 {
 	struct IsdnCardState *cs = bcs->cs;
@@ -364,6 +359,10 @@ reset_xmit(struct BCState *bcs)
 	write_ctrl(bcs, 1);
 	hdlc_fill_fifo(bcs);
 }
+
+static struct bc_l1_ops hdlc_l1_ops = {
+	.fill_fifo = hdlc_fill_fifo,
+};
 
 static inline void
 HDLC_irq(struct BCState *bcs, u_int stat)
@@ -595,8 +594,8 @@ static void
 avm_pcipnp_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val;
-	u_char sval;
+	u8 val;
+	u8 sval;
 
 	if (!cs) {
 		printk(KERN_WARNING "AVM PCI: Spurious interrupt!\n");
@@ -764,30 +763,20 @@ ready:
 		printk(KERN_INFO "AVM PCI: stat %#x\n", val);
 		printk(KERN_INFO "AVM PCI: Class %X Rev %d\n",
 			val & 0xff, (val>>8) & 0xff);
-		cs->BC_Read_Reg = &ReadHDLC_s;
-		cs->BC_Write_Reg = &WriteHDLC_s;
 		break;
 	  case AVM_FRITZ_PNP:
 		val = inb(cs->hw.avm.cfg_reg);
 		ver = inb(cs->hw.avm.cfg_reg + 1);
 		printk(KERN_INFO "AVM PnP: Class %X Rev %d\n", val, ver);
 		reset_avmpcipnp(cs);
-		cs->BC_Read_Reg = &ReadHDLCPnP;
-		cs->BC_Write_Reg = &WriteHDLCPnP;
 		break;
-	  default:
-	  	printk(KERN_WARNING "AVM unknown subtype %d\n", cs->subtyp);
-	  	return(0);
 	}
 	printk(KERN_INFO "HiSax: %s config irq:%d base:0x%X\n",
 		(cs->subtyp == AVM_FRITZ_PCI) ? "AVM Fritz!PCI" : "AVM Fritz!PnP",
 		cs->irq, cs->hw.avm.cfg_reg);
 
-	cs->readisac = &ReadISAC;
-	cs->writeisac = &WriteISAC;
-	cs->readisacfifo = &ReadISACfifo;
-	cs->writeisacfifo = &WriteISACfifo;
-	cs->BC_Send_Data = &hdlc_fill_fifo;
+	cs->dc_hw_ops = &isac_ops;
+	cs->bc_l1_ops = &hdlc_l1_ops;
 	cs->cardmsg = &AVM_card_msg;
 	cs->irq_func = &avm_pcipnp_interrupt;
 	ISACVersion(cs, (cs->subtyp == AVM_FRITZ_PCI) ? "AVM PCI:" : "AVM PnP:");

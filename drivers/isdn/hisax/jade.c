@@ -20,16 +20,46 @@
 
 static spinlock_t jade_lock = SPIN_LOCK_UNLOCKED;
 
+static inline u8
+jade_read_reg(struct IsdnCardState *cs, int jade, u8 addr)
+{
+	return cs->bc_hw_ops->read_reg(cs, jade, addr);
+}
+
+static inline void
+jade_write_reg(struct IsdnCardState *cs, int jade, u8 addr, u8 val)
+{
+	cs->bc_hw_ops->write_reg(cs, jade, addr, val);
+}
+
+static inline void
+jade_read_fifo(struct BCState *bcs, u8 *p, int len)
+{
+	struct IsdnCardState *cs = bcs->cs;
+	u8 hscx = bcs->hw.hscx.hscx;
+
+	cs->bc_hw_ops->read_fifo(cs, hscx, p, len);
+}
+
+static inline void
+jade_write_fifo(struct BCState *bcs, u8 *p, int len)
+{
+	struct IsdnCardState *cs = bcs->cs;
+	u8 hscx = bcs->hw.hscx.hscx;
+
+	cs->bc_hw_ops->write_fifo(cs, hscx, p, len);
+}
+
 int __init
 JadeVersion(struct IsdnCardState *cs, char *s)
 {
     int ver,i;
     int to = 50;
-    cs->BC_Write_Reg(cs, -1, 0x50, 0x19);
+    jade_write_reg(cs, -1, 0x50, 0x19);
     i=0;
     while (to) {
     	udelay(1);
-	ver = cs->BC_Read_Reg(cs, -1, 0x60);
+	ver = jade_read_reg(cs, -1, 0x60);
 	to--;
 	if (ver)
     	    break;
@@ -41,28 +71,28 @@ JadeVersion(struct IsdnCardState *cs, char *s)
     /* Wait for the JADE */
     udelay(10);
     /* Read version */
-    ver = cs->BC_Read_Reg(cs, -1, 0x60);
+    ver = jade_read_reg(cs, -1, 0x60);
     printk(KERN_INFO "%s JADE version: %d\n", s, ver);
     return (1);
 }
 
 /* Write to indirect accessible jade register set */
 static void
-jade_write_indirect(struct IsdnCardState *cs, u_char reg, u_char value)
+jade_write_indirect(struct IsdnCardState *cs, u8 reg, u8 value)
 {
     int to = 50;
     unsigned long flags;
-    u_char ret;
+    u8 ret;
     spin_lock_irqsave(&jade_lock, flags);
     /* Write the data */
-    cs->BC_Write_Reg(cs, -1, COMM_JADE+1, value);
+    jade_write_reg(cs, -1, COMM_JADE+1, value);
     /* Say JADE we wanna write indirect reg 'reg' */
-    cs->BC_Write_Reg(cs, -1, COMM_JADE, reg);
+    jade_write_reg(cs, -1, COMM_JADE, reg);
     to = 50;
     /* Wait for RDY goes high */
     while (to) {
     	udelay(1);
-	ret = cs->BC_Read_Reg(cs, -1, COMM_JADE);
+	ret = jade_read_reg(cs, -1, COMM_JADE);
 	to--;
 	if (ret & 1)
 	    /* Got acknowledge */
@@ -93,45 +123,45 @@ modejade(struct BCState *bcs, int mode, int bc)
     bcs->mode = mode;
     bcs->channel = bc;
 	
-    cs->BC_Write_Reg(cs, jade, jade_HDLC_MODE, (mode == L1_MODE_TRANS ? jadeMODE_TMO:0x00));
-    cs->BC_Write_Reg(cs, jade, jade_HDLC_CCR0, (jadeCCR0_PU|jadeCCR0_ITF));
-    cs->BC_Write_Reg(cs, jade, jade_HDLC_CCR1, 0x00);
+    jade_write_reg(cs, jade, jade_HDLC_MODE, (mode == L1_MODE_TRANS ? jadeMODE_TMO:0x00));
+    jade_write_reg(cs, jade, jade_HDLC_CCR0, (jadeCCR0_PU|jadeCCR0_ITF));
+    jade_write_reg(cs, jade, jade_HDLC_CCR1, 0x00);
 
     jade_write_indirect(cs, jade_HDLC1SERRXPATH, 0x08);
     jade_write_indirect(cs, jade_HDLC2SERRXPATH, 0x08);
     jade_write_indirect(cs, jade_HDLC1SERTXPATH, 0x00);
     jade_write_indirect(cs, jade_HDLC2SERTXPATH, 0x00);
 
-    cs->BC_Write_Reg(cs, jade, jade_HDLC_XCCR, 0x07);
-    cs->BC_Write_Reg(cs, jade, jade_HDLC_RCCR, 0x07);
+    jade_write_reg(cs, jade, jade_HDLC_XCCR, 0x07);
+    jade_write_reg(cs, jade, jade_HDLC_RCCR, 0x07);
 
     if (bc == 0) {
-	cs->BC_Write_Reg(cs, jade, jade_HDLC_TSAX, 0x00);
-	cs->BC_Write_Reg(cs, jade, jade_HDLC_TSAR, 0x00);
+	jade_write_reg(cs, jade, jade_HDLC_TSAX, 0x00);
+	jade_write_reg(cs, jade, jade_HDLC_TSAR, 0x00);
     } else {
-	cs->BC_Write_Reg(cs, jade, jade_HDLC_TSAX, 0x04);
-	cs->BC_Write_Reg(cs, jade, jade_HDLC_TSAR, 0x04);
+	jade_write_reg(cs, jade, jade_HDLC_TSAX, 0x04);
+	jade_write_reg(cs, jade, jade_HDLC_TSAR, 0x04);
     }
     switch (mode) {
 	case (L1_MODE_NULL):
-		cs->BC_Write_Reg(cs, jade, jade_HDLC_MODE, jadeMODE_TMO);
+		jade_write_reg(cs, jade, jade_HDLC_MODE, jadeMODE_TMO);
 		break;
 	case (L1_MODE_TRANS):
-		cs->BC_Write_Reg(cs, jade, jade_HDLC_MODE, (jadeMODE_TMO|jadeMODE_RAC|jadeMODE_XAC));
+		jade_write_reg(cs, jade, jade_HDLC_MODE, (jadeMODE_TMO|jadeMODE_RAC|jadeMODE_XAC));
 		break;
 	case (L1_MODE_HDLC):
-		cs->BC_Write_Reg(cs, jade, jade_HDLC_MODE, (jadeMODE_RAC|jadeMODE_XAC));
+		jade_write_reg(cs, jade, jade_HDLC_MODE, (jadeMODE_RAC|jadeMODE_XAC));
 		break;
     }
     if (mode) {
-	cs->BC_Write_Reg(cs, jade, jade_HDLC_RCMD, (jadeRCMD_RRES|jadeRCMD_RMC));
-	cs->BC_Write_Reg(cs, jade, jade_HDLC_XCMD, jadeXCMD_XRES);
+	jade_write_reg(cs, jade, jade_HDLC_RCMD, (jadeRCMD_RRES|jadeRCMD_RMC));
+	jade_write_reg(cs, jade, jade_HDLC_XCMD, jadeXCMD_XRES);
 	/* Unmask ints */
-	cs->BC_Write_Reg(cs, jade, jade_HDLC_IMR, 0xF8);
+	jade_write_reg(cs, jade, jade_HDLC_IMR, 0xF8);
     }
     else
 	/* Mask ints */
-	cs->BC_Write_Reg(cs, jade, jade_HDLC_IMR, 0x00);
+	jade_write_reg(cs, jade, jade_HDLC_IMR, 0x00);
 }
 
 static void
@@ -233,11 +263,16 @@ setstack_jade(struct PStack *st, struct BCState *bcs)
 	return (0);
 }
 
+static struct bc_l1_ops jade_l1_ops = {
+	.fill_fifo = jade_fill_fifo,
+};
+
 void __init
 initjade(struct IsdnCardState *cs)
 {
 	int val;
 
+	cs->bc_l1_ops = &jade_l1_ops;
 	cs->bcs[0].BC_SetStack = setstack_jade;
 	cs->bcs[1].BC_SetStack = setstack_jade;
 	cs->bcs[0].BC_Close = close_jadestate;
@@ -245,42 +280,43 @@ initjade(struct IsdnCardState *cs)
 	cs->bcs[0].hw.hscx.hscx = 0;
 	cs->bcs[1].hw.hscx.hscx = 1;
 
-	cs->BC_Write_Reg(cs, 0, jade_HDLC_IMR, 0x00);
-	cs->BC_Write_Reg(cs, 1, jade_HDLC_IMR, 0x00);
+	jade_write_reg(cs, 0, jade_HDLC_IMR, 0x00);
+	jade_write_reg(cs, 1, jade_HDLC_IMR, 0x00);
 
-	val = cs->BC_Read_Reg(cs, 1, jade_HDLC_ISR);
+	val = jade_read_reg(cs, 1, jade_HDLC_ISR);
 	debugl1(cs, "jade B ISTA %x", val);
-	val = cs->BC_Read_Reg(cs, 0, jade_HDLC_ISR);
+	val = jade_read_reg(cs, 0, jade_HDLC_ISR);
 	debugl1(cs, "jade A ISTA %x", val);
-	val = cs->BC_Read_Reg(cs, 1, jade_HDLC_STAR);
+	val = jade_read_reg(cs, 1, jade_HDLC_STAR);
 	debugl1(cs, "jade B STAR %x", val);
-	val = cs->BC_Read_Reg(cs, 0, jade_HDLC_STAR);
+	val = jade_read_reg(cs, 0, jade_HDLC_STAR);
 	debugl1(cs, "jade A STAR %x", val);
 
 	/* Unmask ints */
-	cs->BC_Write_Reg(cs, 0, jade_HDLC_IMR, 0xF8);
-	cs->BC_Write_Reg(cs, 1, jade_HDLC_IMR, 0xF8);
+	jade_write_reg(cs, 0, jade_HDLC_IMR, 0xF8);
+	jade_write_reg(cs, 1, jade_HDLC_IMR, 0xF8);
 
 	/* Stop DSP audio tx/rx */
 	jade_write_indirect(cs, 0x11, 0x0f);
 	jade_write_indirect(cs, 0x17, 0x2f);
 
 	/* Transparent Mode, RxTx inactive, No Test, No RFS/TFS */
-	cs->BC_Write_Reg(cs, 0, jade_HDLC_MODE, jadeMODE_TMO);
-	cs->BC_Write_Reg(cs, 1, jade_HDLC_MODE, jadeMODE_TMO);
+	jade_write_reg(cs, 0, jade_HDLC_MODE, jadeMODE_TMO);
+	jade_write_reg(cs, 1, jade_HDLC_MODE, jadeMODE_TMO);
 	/* Power down, 1-Idle, RxTx least significant bit first */
-	cs->BC_Write_Reg(cs, 0, jade_HDLC_CCR0, 0x00);
-	cs->BC_Write_Reg(cs, 1, jade_HDLC_CCR0, 0x00);
+	jade_write_reg(cs, 0, jade_HDLC_CCR0, 0x00);
+	jade_write_reg(cs, 1, jade_HDLC_CCR0, 0x00);
 	/* Mask all interrupts */
-	cs->BC_Write_Reg(cs, 0, jade_HDLC_IMR,  0x00);
-	cs->BC_Write_Reg(cs, 1, jade_HDLC_IMR,  0x00);
+	jade_write_reg(cs, 0, jade_HDLC_IMR,  0x00);
+	jade_write_reg(cs, 1, jade_HDLC_IMR,  0x00);
 	/* Setup host access to hdlc controller */
 	jade_write_indirect(cs, jade_HDLCCNTRACCESS, (jadeINDIRECT_HAH1|jadeINDIRECT_HAH2));
 	/* Unmask HDLC int (don´t forget DSP int later on)*/
-	cs->BC_Write_Reg(cs, -1,jade_INT, (jadeINT_HDLC1|jadeINT_HDLC2));
+	jade_write_reg(cs, -1,jade_INT, (jadeINT_HDLC1|jadeINT_HDLC2));
 
 	/* once again TRANSPARENT */	
 	modejade(cs->bcs, 0, 0);
 	modejade(cs->bcs + 1, 0, 0);
 }
 
+#include "jade_irq.c"

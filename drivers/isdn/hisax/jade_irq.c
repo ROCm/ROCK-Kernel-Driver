@@ -16,7 +16,7 @@ waitforCEC(struct IsdnCardState *cs, int jade, int reg)
 {
   	int to = 50;
   	int mask = (reg == jade_HDLC_XCMD ? jadeSTAR_XCEC : jadeSTAR_RCEC);
-  	while ((READJADE(cs, jade, jade_HDLC_STAR) & mask) && to) {
+  	while ((jade_read_reg(cs, jade, jade_HDLC_STAR) & mask) && to) {
   		udelay(1);
   		to--;
   	}
@@ -32,13 +32,13 @@ waitforXFW(struct IsdnCardState *cs, int jade)
 }
 
 static inline void
-WriteJADECMDR(struct IsdnCardState *cs, int jade, int reg, u_char data)
+WriteJADECMDR(struct IsdnCardState *cs, int jade, int reg, u8 data)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&jade_irq_lock, flags);
 	waitforCEC(cs, jade, reg);
-	WRITEJADE(cs, jade, reg, data);
+	jade_write_reg(cs, jade, reg, data);
 	spin_unlock_irqrestore(&jade_irq_lock, flags);
 }
 
@@ -47,7 +47,7 @@ WriteJADECMDR(struct IsdnCardState *cs, int jade, int reg, u_char data)
 static void
 jade_empty_fifo(struct BCState *bcs, int count)
 {
-	u_char *ptr;
+	u8 *ptr;
 	struct IsdnCardState *cs = bcs->cs;
 
 	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
@@ -62,7 +62,7 @@ jade_empty_fifo(struct BCState *bcs, int count)
 	}
 	ptr = bcs->hw.hscx.rcvbuf + bcs->hw.hscx.rcvidx;
 	bcs->hw.hscx.rcvidx += count;
-	READJADEFIFO(cs, bcs->hw.hscx.hscx, ptr, count);
+	jade_read_fifo(bcs, ptr, count);
 	WriteJADECMDR(cs, bcs->hw.hscx.hscx, jade_HDLC_RCMD, jadeRCMD_RMC);
 	if (cs->debug & L1_DEB_HSCX_FIFO) {
 		char *t = bcs->blog;
@@ -74,7 +74,7 @@ jade_empty_fifo(struct BCState *bcs, int count)
 	}
 }
 
-static void
+void
 jade_fill_fifo(struct BCState *bcs)
 {
 	struct IsdnCardState *cs = bcs->cs;
@@ -88,16 +88,16 @@ jade_fill_fifo(struct BCState *bcs)
 		return;
 
 	waitforXFW(cs, hscx);
-	WRITEJADEFIFO(cs, hscx, p, count);
+	jade_write_fifo(bcs, p, count);
 	WriteJADECMDR(cs, hscx, jade_HDLC_XCMD,
 		      more ? jadeXCMD_XF : (jadeXCMD_XF|jadeXCMD_XME));
 }
 
 
 static inline void
-jade_interrupt(struct IsdnCardState *cs, u_char val, u_char jade)
+jade_interrupt(struct IsdnCardState *cs, u8 val, u8 jade)
 {
-	u_char r;
+	u8 r;
 	struct BCState *bcs = cs->bcs + jade;
 	struct sk_buff *skb;
 	int fifo_size = 32;
@@ -108,7 +108,7 @@ jade_interrupt(struct IsdnCardState *cs, u_char val, u_char jade)
 		return;
 
 	if (val & 0x80) {	/* RME */
-		r = READJADE(cs, i_jade, jade_HDLC_RSTA);
+		r = jade_read_reg(cs, i_jade, jade_HDLC_RSTA);
 		if ((r & 0xf0) != 0xa0) {
 			if (!(r & 0x80))
 				if (cs->debug & L1_DEB_WARN)
@@ -121,7 +121,7 @@ jade_interrupt(struct IsdnCardState *cs, u_char val, u_char jade)
 					debugl1(cs, "JADE %c CRC error", 'A'+jade);
 			WriteJADECMDR(cs, jade, jade_HDLC_RCMD, jadeRCMD_RMC);
 		} else {
-			count = READJADE(cs, i_jade, jade_HDLC_RBCL) & 0x1F;
+			count = jade_read_reg(cs, i_jade, jade_HDLC_RBCL) & 0x1F;
 			if (count == 0)
 				count = fifo_size;
 			jade_empty_fifo(bcs, count);
@@ -164,8 +164,8 @@ reset_xmit(struct BCState *bcs)
 	WriteJADECMDR(bcs->cs, bcs->hw.hscx.hscx, jade_HDLC_XCMD, jadeXCMD_XRES);
 }
 
-static inline void
-jade_int_main(struct IsdnCardState *cs, u_char val, int jade)
+void
+jade_int_main(struct IsdnCardState *cs, u8 val, int jade)
 {
 	struct BCState *bcs;
 	bcs = cs->bcs + jade;

@@ -450,7 +450,7 @@ static void isac_empty_fifo(struct isac *isac, int count)
 {
 	// this also works for isacsx, since
 	// CMDR(D) register works the same
-	u_char *ptr;
+	u8 *ptr;
 
 	DBG(DBG_IRQ, "count %d", count);
 
@@ -474,7 +474,7 @@ static void isac_fill_fifo(struct isac *isac)
 
 	int count;
 	unsigned char cmd;
-	u_char *ptr;
+	u8 *ptr;
 
 	if (!isac->tx_skb)
 		BUG();

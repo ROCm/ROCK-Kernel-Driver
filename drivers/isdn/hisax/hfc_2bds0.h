@@ -124,5 +124,5 @@
 extern void main_irq_2bds0(struct BCState *bcs);
 extern void init2bds0(struct IsdnCardState *cs);
 extern void release2bds0(struct IsdnCardState *cs);
-extern void hfc2bds0_interrupt(struct IsdnCardState *cs, u_char val);
+extern void hfc2bds0_interrupt(struct IsdnCardState *cs, u8 val);
 extern void set_cs_func(struct IsdnCardState *cs);

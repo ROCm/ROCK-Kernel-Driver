@@ -48,8 +48,8 @@
  *
  *
  *
- * int make_raw_hdlc_data(u_char *src, u_int slen,
- *                        u_char *dst, u_int dsize)
+ * int make_raw_hdlc_data(u8 *src, u_int slen,
+ *                        u8 *dst, u_int dsize)
  *
  *   Used for transmission.  Copies slen bytes from src to dst, performing
  *   HDLC encapsulation (flag bytes, bit-stuffing, CRC) in the process.
@@ -73,8 +73,8 @@
  *             mode 1 -> B1  mode 2  -> B2 data is used
  *
  * int read_raw_hdlc_data(struct hdlc_state *saved_state,
- *                        u_char *src, u_int slen,
- *                        u_char *dst, u_int dsize)
+ *                        u8 *src, u_int slen,
+ *                        u8 *dst, u_int dsize)
  *
  *   Used for reception.  Scans source buffer bit-by-bit looking for
  *   valid HDLC frames, which are copied to destination buffer.  HDLC
@@ -241,14 +241,14 @@ __u16 fcstab[256] =
  */
 
 
-int make_raw_hdlc_data(u_char *src, u_int slen, u_char *dst, u_int dsize)
+int make_raw_hdlc_data(u8 *src, u_int slen, u8 *dst, u_int dsize)
 {
 	register u_int i,d_cnt=0;
-	register u_char j;
-	register u_char val;
-	register u_char s_one = 0;
-	register u_char out_val = 0;
-	register u_char bitcnt = 0;
+	register u8 j;
+	register u8 val;
+	register u8 s_one = 0;
+	register u8 out_val = 0;
+	register u8 bitcnt = 0;
 	u_int fcs;
 	
 	
@@ -306,13 +306,13 @@ void init_hdlc_state(struct hdlc_state *stateptr, int mode)
  */
 
 int read_raw_hdlc_data(struct hdlc_state *saved_state,
-                       u_char *src, u_int slen, u_char *dst, u_int dsize)
+                       u8 *src, u_int slen, u8 *dst, u_int dsize)
 {
 	int retval=0;
-	register u_char val;
-	register u_char state = saved_state->state;
-	register u_char r_one = saved_state->r_one;
-	register u_char r_val = saved_state->r_val;
+	register u8 val;
+	register u8 state = saved_state->state;
+	register u8 r_one = saved_state->r_one;
+	register u8 r_val = saved_state->r_val;
 	register u_int o_bitcnt = saved_state->o_bitcnt;
 	register u_int i_bitcnt = saved_state->i_bitcnt;
 	register u_int fcs    = saved_state->fcs;

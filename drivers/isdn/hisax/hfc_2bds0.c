@@ -23,16 +23,10 @@
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)
 
-static void
-dummyf(struct IsdnCardState *cs, u_char * data, int size)
+static inline u8
+ReadReg(struct IsdnCardState *cs, int data, u8 reg)
 {
-	printk(KERN_WARNING "HiSax: hfcd dummy fifo called\n");
-}
-
-static inline u_char
-ReadReg(struct IsdnCardState *cs, int data, u_char reg)
-{
-	register u_char ret;
+	register u8 ret;
 
 	if (data) {
 		if (cs->hw.hfcD.cip != reg) { 
@@ -50,7 +44,7 @@ ReadReg(struct IsdnCardState *cs, int data, u_char reg)
 }
 
 static inline void
-WriteReg(struct IsdnCardState *cs, int data, u_char reg, u_char value)
+WriteReg(struct IsdnCardState *cs, int data, u8 reg, u8 value)
 {
 	if (cs->hw.hfcD.cip != reg) { 
 		cs->hw.hfcD.cip = reg;
@@ -64,16 +58,21 @@ WriteReg(struct IsdnCardState *cs, int data, u_char reg, u_char value)
 #endif
 }
 
+static struct bc_hw_ops hfcs_bc_ops = {
+	.read_reg  = ReadReg,
+	.write_reg = WriteReg,
+};
+
 /* Interface functions */
 
-static u_char
-readreghfcd(struct IsdnCardState *cs, u_char offset)
+static inline u8
+hfcs_read_reg(struct IsdnCardState *cs, u8 offset)
 {
-	return(ReadReg(cs, HFCD_DATA, offset));
+	return ReadReg(cs, HFCD_DATA, offset);
 }
 
-static void
-writereghfcd(struct IsdnCardState *cs, u_char offset, u_char value)
+static inline void
+hfcs_write_reg(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	WriteReg(cs, HFCD_DATA, offset, value);
 }
@@ -81,12 +80,7 @@ writereghfcd(struct IsdnCardState *cs, u_char offset, u_char value)
 void
 set_cs_func(struct IsdnCardState *cs)
 {
-	cs->readisac = &readreghfcd;
-	cs->writeisac = &writereghfcd;
-	cs->readisacfifo = &dummyf;
-	cs->writeisacfifo = &dummyf;
-	cs->BC_Read_Reg = &ReadReg;
-	cs->BC_Write_Reg = &WriteReg;
+	cs->bc_hw_ops = &hfcs_bc_ops;
 }
 
 static inline int
@@ -118,9 +112,9 @@ WaitNoBusy(struct IsdnCardState *cs)
 }
 
 static int
-SelFiFo(struct IsdnCardState *cs, u_char FiFo)
+SelFiFo(struct IsdnCardState *cs, u8 FiFo)
 {
-	u_char cip;
+	u8 cip;
 
 	if (cs->hw.hfcD.fifo == FiFo)
 		return(1);
@@ -144,7 +138,7 @@ SelFiFo(struct IsdnCardState *cs, u_char FiFo)
 	}
 	cs->hw.hfcD.fifo = FiFo;
 	WaitNoBusy(cs);
-	cs->BC_Write_Reg(cs, HFCD_DATA, cip, 0);
+	WriteReg(cs, HFCD_DATA, cip, 0);
 	WaitForBusy(cs);
 	return(2);
 }
@@ -177,7 +171,7 @@ GetFreeFifoBytes_D(struct IsdnCardState *cs)
 }
 
 static int
-ReadZReg(struct IsdnCardState *cs, u_char reg)
+ReadZReg(struct IsdnCardState *cs, u8 reg)
 {
 	int val;
 
@@ -191,12 +185,12 @@ ReadZReg(struct IsdnCardState *cs, u_char reg)
 static struct sk_buff
 *hfc_empty_fifo(struct BCState *bcs, int count)
 {
-	u_char *ptr;
+	u8 *ptr;
 	struct sk_buff *skb;
 	struct IsdnCardState *cs = bcs->cs;
 	int idx;
 	int chksum;
-	u_char stat, cip;
+	u8 stat, cip;
 	
 	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
 		debugl1(cs, "hfc_empty_fifo");
@@ -272,7 +266,7 @@ hfc_fill_fifo(struct BCState *bcs)
 	struct IsdnCardState *cs = bcs->cs;
 	int idx, fcnt;
 	int count;
-	u_char cip;
+	u8 cip;
 
 	if (!bcs->tx_skb)
 		return;
@@ -340,7 +334,7 @@ main_rec_2bds0(struct BCState *bcs)
 {
 	struct IsdnCardState *cs = bcs->cs;
 	int z1, z2, rcnt;
-	u_char f1, f2, cip;
+	u8 f1, f2, cip;
 	int receive, count = 5;
 	struct sk_buff *skb;
 
@@ -548,18 +542,18 @@ int receive_dmsg(struct IsdnCardState *cs)
 	struct sk_buff *skb;
 	int idx;
 	int rcnt, z1, z2;
-	u_char stat, cip, f1, f2;
+	u8 stat, cip, f1, f2;
 	int chksum;
 	int count=5;
-	u_char *ptr;
+	u8 *ptr;
 
 	SelFiFo(cs, 4 | HFCD_REC);
 	cip = HFCD_FIFO | HFCD_F1 | HFCD_REC;
 	WaitNoBusy(cs);
-	f1 = cs->readisac(cs, cip) & 0xf;
+	f1 = hfcs_read_reg(cs, cip) & 0xf;
 	cip = HFCD_FIFO | HFCD_F2 | HFCD_REC;
 	WaitNoBusy(cs);
-	f2 = cs->readisac(cs, cip) & 0xf;
+	f2 = hfcs_read_reg(cs, cip) & 0xf;
 	while ((f1 != f2) && count--) {
 		z1 = ReadZReg(cs, HFCD_FIFO | HFCD_Z1 | HFCD_REC);
 		z2 = ReadZReg(cs, HFCD_FIFO | HFCD_Z2 | HFCD_REC);
@@ -634,7 +628,7 @@ int receive_dmsg(struct IsdnCardState *cs)
 		WaitForBusy(cs);
 		cip = HFCD_FIFO | HFCD_F2 | HFCD_REC;
 		WaitNoBusy(cs);
-		f2 = cs->readisac(cs, cip) & 0xf;
+		f2 = hfcs_read_reg(cs, cip) & 0xf;
 	}
 	return(1);
 } 
@@ -644,7 +638,7 @@ hfc_fill_dfifo(struct IsdnCardState *cs)
 {
 	int idx, fcnt;
 	int count;
-	u_char cip;
+	u8 cip;
 
 	if (!cs->tx_skb)
 		return;
@@ -716,9 +710,9 @@ struct BCState *Sel_BCS(struct IsdnCardState *cs, int channel)
 }
 
 void
-hfc2bds0_interrupt(struct IsdnCardState *cs, u_char val)
+hfc2bds0_interrupt(struct IsdnCardState *cs, u8 val)
 {
-       	u_char exval;
+       	u8 exval;
        	struct BCState *bcs;
 	int count=15;
 
@@ -727,7 +721,7 @@ hfc2bds0_interrupt(struct IsdnCardState *cs, u_char val)
 
 	val &= cs->hw.hfcD.int_m1;
 	if (val & 0x40) { /* TE state machine irq */
-		exval = cs->readisac(cs, HFCD_STATES) & 0xf;
+		exval = hfcs_read_reg(cs, HFCD_STATES) & 0xf;
 		if (cs->debug & L1_DEB_ISAC)
 			debugl1(cs, "ph_state chg %d->%d", cs->dc.hfcd.ph_state,
 				exval);
@@ -804,24 +798,24 @@ HFCD_l1hw(struct PStack *st, int pr, void *arg)
 			xmit_pull_req_d(st);
 			break;
 		case (HW_RESET | REQUEST):
-			cs->writeisac(cs, HFCD_STATES, HFCD_LOAD_STATE | 3); /* HFC ST 3 */
+			hfcs_write_reg(cs, HFCD_STATES, HFCD_LOAD_STATE | 3); /* HFC ST 3 */
 			udelay(6);
-			cs->writeisac(cs, HFCD_STATES, 3); /* HFC ST 2 */
+			hfcs_write_reg(cs, HFCD_STATES, 3); /* HFC ST 2 */
 			cs->hw.hfcD.mst_m |= HFCD_MASTER;
-			cs->writeisac(cs, HFCD_MST_MODE, cs->hw.hfcD.mst_m);
-			cs->writeisac(cs, HFCD_STATES, HFCD_ACTIVATE | HFCD_DO_ACTION);
+			hfcs_write_reg(cs, HFCD_MST_MODE, cs->hw.hfcD.mst_m);
+			hfcs_write_reg(cs, HFCD_STATES, HFCD_ACTIVATE | HFCD_DO_ACTION);
 			l1_msg(cs, HW_POWERUP | CONFIRM, NULL);
 			break;
 		case (HW_ENABLE | REQUEST):
-			cs->writeisac(cs, HFCD_STATES, HFCD_ACTIVATE | HFCD_DO_ACTION);
+			hfcs_write_reg(cs, HFCD_STATES, HFCD_ACTIVATE | HFCD_DO_ACTION);
 			break;
 		case (HW_DEACTIVATE | REQUEST):
 			cs->hw.hfcD.mst_m &= ~HFCD_MASTER;
-			cs->writeisac(cs, HFCD_MST_MODE, cs->hw.hfcD.mst_m);
+			hfcs_write_reg(cs, HFCD_MST_MODE, cs->hw.hfcD.mst_m);
 			break;
 		case (HW_INFO3 | REQUEST):
 			cs->hw.hfcD.mst_m |= HFCD_MASTER;
-			cs->writeisac(cs, HFCD_MST_MODE, cs->hw.hfcD.mst_m);
+			hfcs_write_reg(cs, HFCD_MST_MODE, cs->hw.hfcD.mst_m);
 			break;
 		default:
 			if (cs->debug & L1_DEB_WARN)
@@ -870,7 +864,6 @@ init2bds0(struct IsdnCardState *cs)
 		cs->bcs[0].hw.hfc.send = init_send_hfcd(32);
 	if (!cs->bcs[1].hw.hfc.send)
 		cs->bcs[1].hw.hfc.send = init_send_hfcd(32);
-	cs->BC_Send_Data = hfc_fill_fifo;
 	cs->DC_Send_Data = hfc_fill_dfifo;
 	cs->bcs[0].BC_SetStack = setstack_2b;
 	cs->bcs[1].BC_SetStack = setstack_2b;

@@ -118,111 +118,137 @@ const char *Sedlbauer_Types[] =
 
 #define SEDL_RESET      0x3	/* same as DOS driver */
 
-static inline u_char
-readreg(unsigned int ale, unsigned int adr, u_char off)
+static inline u8
+readreg(struct IsdnCardState *cs, unsigned int adr, u8 off)
 {
-	register u_char ret;
+	u8 ret;
 	unsigned long flags;
 
 	spin_lock_irqsave(&sedlbauer_lock, flags);
-	byteout(ale, off);
+	byteout(cs->hw.sedl.adr, off);
 	ret = bytein(adr);
 	spin_unlock_irqrestore(&sedlbauer_lock, flags);
-	return (ret);
+	return ret;
 }
 
 static inline void
-readfifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size)
-{
-	/* fifo read without cli because it's allready done  */
-
-	byteout(ale, off);
-	insb(adr, data, size);
-}
-
-
-static inline void
-writereg(unsigned int ale, unsigned int adr, u_char off, u_char data)
+readfifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 * data, int size)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&sedlbauer_lock, flags);
-	byteout(ale, off);
-	byteout(adr, data);
+	byteout(cs->hw.sedl.adr, off);
+	insb(adr, data, size);
 	spin_unlock_irqrestore(&sedlbauer_lock, flags);
 }
 
+
 static inline void
-writefifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size)
+writereg(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 data)
 {
-	/* fifo write without cli because it's allready done  */
-	byteout(ale, off);
+	byteout(cs->hw.sedl.adr, off);
+	byteout(adr, data);
+}
+
+static inline void
+writefifo(struct IsdnCardState *cs, unsigned int adr, u8 off, u8 * data, int size)
+{
+	byteout(cs->hw.sedl.adr, off);
 	outsb(adr, data, size);
 }
 
-/* Interface functions */
-
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+isac_read(struct IsdnCardState *cs, u8 offset)
 {
-	return (readreg(cs->hw.sedl.adr, cs->hw.sedl.isac, offset));
+	return readreg(cs, cs->hw.sedl.isac, offset);
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+isac_write(struct IsdnCardState *cs, u8 offset, u8 value)
 {
-	writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, offset, value);
+	writereg(cs, cs->hw.sedl.isac, offset, value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+isac_read_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
-	readfifo(cs->hw.sedl.adr, cs->hw.sedl.isac, 0, data, size);
+	readfifo(cs, cs->hw.sedl.isac, 0, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+isac_write_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
-	writefifo(cs->hw.sedl.adr, cs->hw.sedl.isac, 0, data, size);
+	writefifo(cs, cs->hw.sedl.isac, 0, data, size);
 }
 
-static u_char
-ReadISAC_IPAC(struct IsdnCardState *cs, u_char offset)
-{
-	return (readreg(cs->hw.sedl.adr, cs->hw.sedl.isac, offset|0x80));
-}
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = isac_read,
+	.write_reg  = isac_write,
+	.read_fifo  = isac_read_fifo,
+	.write_fifo = isac_write_fifo,
+};
 
-static void
-WriteISAC_IPAC(struct IsdnCardState *cs, u_char offset, u_char value)
+static u8
+ipac_dc_read(struct IsdnCardState *cs, u8 offset)
 {
-	writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, offset|0x80, value);
-}
-
-static void
-ReadISACfifo_IPAC(struct IsdnCardState *cs, u_char * data, int size)
-{
-	readfifo(cs->hw.sedl.adr, cs->hw.sedl.isac, 0x80, data, size);
+	return readreg(cs, cs->hw.sedl.isac, offset|0x80);
 }
 
 static void
-WriteISACfifo_IPAC(struct IsdnCardState *cs, u_char * data, int size)
+ipac_dc_write(struct IsdnCardState *cs, u8 offset, u8 value)
 {
-	writefifo(cs->hw.sedl.adr, cs->hw.sedl.isac, 0x80, data, size);
-}
-
-static u_char
-ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
-{
-	return (readreg(cs->hw.sedl.adr,
-			cs->hw.sedl.hscx, offset + (hscx ? 0x40 : 0)));
+	writereg(cs, cs->hw.sedl.isac, offset|0x80, value);
 }
 
 static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
+ipac_dc_read_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
-	writereg(cs->hw.sedl.adr,
-		 cs->hw.sedl.hscx, offset + (hscx ? 0x40 : 0), value);
+	readfifo(cs, cs->hw.sedl.isac, 0x80, data, size);
 }
+
+static void
+ipac_dc_write_fifo(struct IsdnCardState *cs, u8 * data, int size)
+{
+	writefifo(cs, cs->hw.sedl.isac, 0x80, data, size);
+}
+
+static struct dc_hw_ops ipac_dc_ops = {
+	.read_reg   = ipac_dc_read,
+	.write_reg  = ipac_dc_write,
+	.read_fifo  = ipac_dc_read_fifo,
+	.write_fifo = ipac_dc_write_fifo,
+};
+
+static u8
+hscx_read(struct IsdnCardState *cs, int hscx, u8 offset)
+{
+	return readreg(cs, cs->hw.sedl.hscx, offset + (hscx ? 0x40 : 0));
+}
+
+static void
+hscx_write(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
+{
+	writereg(cs, cs->hw.sedl.hscx, offset + (hscx ? 0x40 : 0), value);
+}
+
+static void
+hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+{
+	readfifo(cs, cs->hw.sedl.hscx, hscx ? 0x40 : 0, data, size);
+}
+
+static void
+hscx_write_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+{
+	writefifo(cs, cs->hw.sedl.hscx, hscx ? 0x40 : 0, data, size);
+}
+
+static struct bc_hw_ops hscx_ops = {
+	.read_reg   = hscx_read,
+	.write_reg  = hscx_write,
+	.read_fifo  = hscx_read_fifo,
+	.write_fifo = hscx_write_fifo,
+};
 
 /* ISAR access routines
  * mode = 0 access with IRQ on
@@ -230,50 +256,40 @@ WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
  * mode = 2 access with IRQ off and using last offset
  */
 
-static u_char
-ReadISAR(struct IsdnCardState *cs, int mode, u_char offset)
+static u8
+isar_read(struct IsdnCardState *cs, int mode, u8 offset)
 {	
 	if (mode == 0)
-		return (readreg(cs->hw.sedl.adr, cs->hw.sedl.hscx, offset));
-	else if (mode == 1)
+		return readreg(cs, cs->hw.sedl.hscx, offset);
+
+	if (mode == 1)
 		byteout(cs->hw.sedl.adr, offset);
-	return(bytein(cs->hw.sedl.hscx));
+
+	return bytein(cs->hw.sedl.hscx);
 }
 
 static void
-WriteISAR(struct IsdnCardState *cs, int mode, u_char offset, u_char value)
+isar_write(struct IsdnCardState *cs, int mode, u8 offset, u8 value)
 {
 	if (mode == 0)
-		writereg(cs->hw.sedl.adr, cs->hw.sedl.hscx, offset, value);
-	else {
-		if (mode == 1)
-			byteout(cs->hw.sedl.adr, offset);
-		byteout(cs->hw.sedl.hscx, value);
-	}
+		return writereg(cs, cs->hw.sedl.hscx, offset, value);
+
+	if (mode == 1)
+		byteout(cs->hw.sedl.adr, offset);
+
+	byteout(cs->hw.sedl.hscx, value);
 }
 
-/*
- * fast interrupt HSCX stuff goes here
- */
-
-#define READHSCX(cs, nr, reg) readreg(cs->hw.sedl.adr, \
-		cs->hw.sedl.hscx, reg + (nr ? 0x40 : 0))
-#define WRITEHSCX(cs, nr, reg, data) writereg(cs->hw.sedl.adr, \
-		cs->hw.sedl.hscx, reg + (nr ? 0x40 : 0), data)
-
-#define READHSCXFIFO(cs, nr, ptr, cnt) readfifo(cs->hw.sedl.adr, \
-		cs->hw.sedl.hscx, (nr ? 0x40 : 0), ptr, cnt)
-
-#define WRITEHSCXFIFO(cs, nr, ptr, cnt) writefifo(cs->hw.sedl.adr, \
-		cs->hw.sedl.hscx, (nr ? 0x40 : 0), ptr, cnt)
-
-#include "hscx_irq.c"
+static struct bc_hw_ops isar_ops = {
+	.read_reg   = isar_read,
+	.write_reg  = isar_write,
+};
 
 static void
 sedlbauer_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val;
+	u8 val;
 
 	if (!cs) {
 		printk(KERN_WARNING "Sedlbauer: Spurious interrupt!\n");
@@ -287,50 +303,50 @@ sedlbauer_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		return;
 	}
 
-	val = readreg(cs->hw.sedl.adr, cs->hw.sedl.hscx, HSCX_ISTA + 0x40);
+	val = hscx_read(cs, 1, HSCX_ISTA);
       Start_HSCX:
 	if (val)
 		hscx_int_main(cs, val);
-	val = readreg(cs->hw.sedl.adr, cs->hw.sedl.isac, ISAC_ISTA);
+	val = isac_read(cs, ISAC_ISTA);
       Start_ISAC:
 	if (val)
 		isac_interrupt(cs, val);
-	val = readreg(cs->hw.sedl.adr, cs->hw.sedl.hscx, HSCX_ISTA + 0x40);
+	val = hscx_read(cs, 1, HSCX_ISTA);
 	if (val) {
 		if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "HSCX IntStat after IntRoutine");
 		goto Start_HSCX;
 	}
-	val = readreg(cs->hw.sedl.adr, cs->hw.sedl.isac, ISAC_ISTA);
+	val = isac_read(cs, ISAC_ISTA);
 	if (val) {
 		if (cs->debug & L1_DEB_ISAC)
 			debugl1(cs, "ISAC IntStat after IntRoutine");
 		goto Start_ISAC;
 	}
-	writereg(cs->hw.sedl.adr, cs->hw.sedl.hscx, HSCX_MASK, 0xFF);
-	writereg(cs->hw.sedl.adr, cs->hw.sedl.hscx, HSCX_MASK + 0x40, 0xFF);
-	writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, ISAC_MASK, 0xFF);
-	writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, ISAC_MASK, 0x0);
-	writereg(cs->hw.sedl.adr, cs->hw.sedl.hscx, HSCX_MASK, 0x0);
-	writereg(cs->hw.sedl.adr, cs->hw.sedl.hscx, HSCX_MASK + 0x40, 0x0);
+	hscx_write(cs, 0, HSCX_MASK, 0xFF);
+	hscx_write(cs, 1, HSCX_MASK, 0xFF);
+	isac_write(cs, ISAC_MASK, 0xFF);
+	isac_write(cs, ISAC_MASK, 0x0);
+	hscx_write(cs, 0, HSCX_MASK, 0x0);
+	hscx_write(cs, 1, HSCX_MASK, 0x0);
 }
 
 static void
 sedlbauer_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char ista, val, icnt = 5;
+	u8 ista, val, icnt = 5;
 
 	if (!cs) {
 		printk(KERN_WARNING "Sedlbauer: Spurious interrupt!\n");
 		return;
 	}
-	ista = readreg(cs->hw.sedl.adr, cs->hw.sedl.isac, IPAC_ISTA);
+	ista = readreg(cs, cs->hw.sedl.isac, IPAC_ISTA);
 Start_IPAC:
 	if (cs->debug & L1_DEB_IPAC)
 		debugl1(cs, "IPAC ISTA %02X", ista);
 	if (ista & 0x0f) {
-		val = readreg(cs->hw.sedl.adr, cs->hw.sedl.hscx, HSCX_ISTA + 0x40);
+		val = hscx_read(cs, 1, HSCX_ISTA);
 		if (ista & 0x01)
 			val |= 0x01;
 		if (ista & 0x04)
@@ -341,7 +357,7 @@ Start_IPAC:
 			hscx_int_main(cs, val);
 	}
 	if (ista & 0x20) {
-		val = 0xfe & readreg(cs->hw.sedl.adr, cs->hw.sedl.isac, ISAC_ISTA | 0x80);
+		val = ipac_dc_read(cs, ISAC_ISTA) & 0xfe;
 		if (val) {
 			isac_interrupt(cs, val);
 		}
@@ -350,7 +366,7 @@ Start_IPAC:
 		val = 0x01;
 		isac_interrupt(cs, val);
 	}
-	ista  = readreg(cs->hw.sedl.adr, cs->hw.sedl.isac, IPAC_ISTA);
+	ista  = readreg(cs, cs->hw.sedl.isac, IPAC_ISTA);
 	if ((ista & 0x3f) && icnt) {
 		icnt--;
 		goto Start_IPAC;
@@ -358,33 +374,33 @@ Start_IPAC:
 	if (!icnt)
 		if (cs->debug & L1_DEB_ISAC)
 			debugl1(cs, "Sedlbauer IRQ LOOP");
-	writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, IPAC_MASK, 0xFF);
-	writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, IPAC_MASK, 0xC0);
+	writereg(cs, cs->hw.sedl.isac, IPAC_MASK, 0xFF);
+	writereg(cs, cs->hw.sedl.isac, IPAC_MASK, 0xC0);
 }
 
 static void
 sedlbauer_interrupt_isar(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val;
+	u8 val;
 	int cnt = 5;
 
 	spin_lock(&cs->lock);
-	val = readreg(cs->hw.sedl.adr, cs->hw.sedl.hscx, ISAR_IRQBIT);
+	val = isar_read(cs, 0, ISAR_IRQBIT);
       Start_ISAR:
 	if (val & ISAR_IRQSTA)
 		isar_int_main(cs);
-	val = readreg(cs->hw.sedl.adr, cs->hw.sedl.isac, ISAC_ISTA);
+	val = isac_read(cs, ISAC_ISTA);
       Start_ISAC:
 	if (val)
 		isac_interrupt(cs, val);
-	val = readreg(cs->hw.sedl.adr, cs->hw.sedl.hscx, ISAR_IRQBIT);
+	val = isar_read(cs, 0, ISAR_IRQBIT);
 	if ((val & ISAR_IRQSTA) && --cnt) {
 		if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "ISAR IntStat after IntRoutine");
 		goto Start_ISAR;
 	}
-	val = readreg(cs->hw.sedl.adr, cs->hw.sedl.isac, ISAC_ISTA);
+	val = isac_read(cs, ISAC_ISTA);
 	if (val && --cnt) {
 		if (cs->debug & L1_DEB_ISAC)
 			debugl1(cs, "ISAC IntStat after IntRoutine");
@@ -394,10 +410,10 @@ sedlbauer_interrupt_isar(int intno, void *dev_id, struct pt_regs *regs)
 		if (cs->debug & L1_DEB_ISAC)
 			debugl1(cs, "Sedlbauer IRQ LOOP");
 
-	writereg(cs->hw.sedl.adr, cs->hw.sedl.hscx, ISAR_IRQBIT, 0);
-	writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, ISAC_MASK, 0xFF);
-	writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, ISAC_MASK, 0x0);
-	writereg(cs->hw.sedl.adr, cs->hw.sedl.hscx, ISAR_IRQBIT, ISAR_IRQMSK);
+	isar_write(cs, 0, ISAR_IRQBIT, 0);
+	isac_write(cs, ISAC_MASK, 0xFF);
+	isac_write(cs, ISAC_MASK, 0x0);
+	isar_write(cs, 0, ISAR_IRQBIT, ISAR_IRQMSK);
 	spin_unlock(&cs->lock);
 }
 
@@ -423,17 +439,17 @@ reset_sedlbauer(struct IsdnCardState *cs)
 	if (!((cs->hw.sedl.bus == SEDL_BUS_PCMCIA) &&
 	   (cs->hw.sedl.chip == SEDL_CHIP_ISAC_HSCX))) {
 		if (cs->hw.sedl.chip == SEDL_CHIP_IPAC) {
-			writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, IPAC_POTA2, 0x20);
+			writereg(cs, cs->hw.sedl.isac, IPAC_POTA2, 0x20);
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout((10*HZ)/1000);
-			writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, IPAC_POTA2, 0x0);
+			writereg(cs, cs->hw.sedl.isac, IPAC_POTA2, 0x0);
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout((10*HZ)/1000);
-			writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, IPAC_CONF, 0x0);
-			writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, IPAC_ACFG, 0xff);
-			writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, IPAC_AOE, 0x0);
-			writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, IPAC_MASK, 0xc0);
-			writereg(cs->hw.sedl.adr, cs->hw.sedl.isac, IPAC_PCFG, 0x12);
+			writereg(cs, cs->hw.sedl.isac, IPAC_CONF, 0x0);
+			writereg(cs, cs->hw.sedl.isac, IPAC_ACFG, 0xff);
+			writereg(cs, cs->hw.sedl.isac, IPAC_AOE, 0x0);
+			writereg(cs, cs->hw.sedl.isac, IPAC_MASK, 0xc0);
+			writereg(cs, cs->hw.sedl.isac, IPAC_PCFG, 0x12);
 		} else if ((cs->hw.sedl.chip == SEDL_CHIP_ISAC_ISAR) &&
 			(cs->hw.sedl.bus == SEDL_BUS_PCI)) {
 			byteout(cs->hw.sedl.cfg_reg +3, cs->hw.sedl.reset_on);
@@ -462,22 +478,17 @@ Sedl_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			return(0);
 		case CARD_RELEASE:
 			if (cs->hw.sedl.chip == SEDL_CHIP_ISAC_ISAR) {
-				writereg(cs->hw.sedl.adr, cs->hw.sedl.hscx,
-					ISAR_IRQBIT, 0);
-				writereg(cs->hw.sedl.adr, cs->hw.sedl.isac,
-					ISAC_MASK, 0xFF);
+				isar_write(cs, 0, ISAR_IRQBIT, 0);
+				isac_write(cs, ISAC_MASK, 0xFF);
 				reset_sedlbauer(cs);
-				writereg(cs->hw.sedl.adr, cs->hw.sedl.hscx,
-					ISAR_IRQBIT, 0);
-				writereg(cs->hw.sedl.adr, cs->hw.sedl.isac,
-					ISAC_MASK, 0xFF);
+				isar_write(cs, 0, ISAR_IRQBIT, 0);
+				isac_write(cs, ISAC_MASK, 0xFF);
 			}
 			release_io_sedlbauer(cs);
 			return(0);
 		case CARD_INIT:
 			if (cs->hw.sedl.chip == SEDL_CHIP_ISAC_ISAR) {
-				writereg(cs->hw.sedl.adr, cs->hw.sedl.hscx,
-					ISAR_IRQBIT, 0);
+				isar_write(cs, 0, ISAR_IRQBIT, 0);
 				initisac(cs);
 				initisar(cs);
 			} else {
@@ -695,9 +706,7 @@ ready:
 	       cs->hw.sedl.cfg_reg + bytecnt,
 	       cs->irq);
 
-	cs->BC_Read_Reg = &ReadHSCX;
-	cs->BC_Write_Reg = &WriteHSCX;
-	cs->BC_Send_Data = &hscx_fill_fifo;
+	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Sedl_card_msg;
 
 /*
@@ -706,8 +715,9 @@ ready:
  * and PCI card uses only IPAC (for the moment)
  */	
 	if (cs->hw.sedl.bus != SEDL_BUS_PCI) {
-		val = readreg(cs->hw.sedl.cfg_reg + SEDL_IPAC_ANY_ADR,
-			cs->hw.sedl.cfg_reg + SEDL_IPAC_ANY_IPAC, IPAC_ID);
+		cs->hw.sedl.adr = cs->hw.sedl.cfg_reg + SEDL_IPAC_ANY_ADR;
+		val = readreg(cs, cs->hw.sedl.cfg_reg + SEDL_IPAC_ANY_IPAC,
+			      IPAC_ID);
 		printk(KERN_DEBUG "Sedlbauer: testing IPAC version %x\n", val);
 	        if ((val == 1) || (val == 2)) {
 			/* IPAC */
@@ -742,21 +752,15 @@ ready:
 			cs->hw.sedl.hscx = cs->hw.sedl.cfg_reg + SEDL_IPAC_ANY_IPAC;
 		}
 		test_and_set_bit(HW_IPAC, &cs->HW_Flags);
-		cs->readisac = &ReadISAC_IPAC;
-		cs->writeisac = &WriteISAC_IPAC;
-		cs->readisacfifo = &ReadISACfifo_IPAC;
-		cs->writeisacfifo = &WriteISACfifo_IPAC;
+		cs->dc_hw_ops = &ipac_dc_ops;
 		cs->irq_func = &sedlbauer_interrupt_ipac;
 
-		val = readreg(cs->hw.sedl.adr, cs->hw.sedl.isac, IPAC_ID);
+		val = readreg(cs, cs->hw.sedl.isac, IPAC_ID);
 		printk(KERN_INFO "Sedlbauer: IPAC version %x\n", val);
 		reset_sedlbauer(cs);
 	} else {
 		/* ISAC_HSCX oder ISAC_ISAR */
-		cs->readisac = &ReadISAC;
-		cs->writeisac = &WriteISAC;
-		cs->readisacfifo = &ReadISACfifo;
-		cs->writeisacfifo = &WriteISACfifo;
+		cs->dc_hw_ops = &isac_ops;
 		if (cs->hw.sedl.chip == SEDL_CHIP_ISAC_ISAR) {
 			if (cs->hw.sedl.bus == SEDL_BUS_PCI) {
 				cs->hw.sedl.adr = cs->hw.sedl.cfg_reg +
@@ -783,9 +787,7 @@ ready:
 			cs->irq_func = &sedlbauer_interrupt_isar;
 			cs->auxcmd = &isar_auxcmd;
 			ISACVersion(cs, "Sedlbauer:");
-			cs->BC_Read_Reg = &ReadISAR;
-			cs->BC_Write_Reg = &WriteISAR;
-			cs->BC_Send_Data = &isar_fill_fifo;
+			cs->bc_hw_ops = &isar_ops;
 			ver = ISARVersion(cs, "Sedlbauer:");
 			if (ver < 0) {
 				printk(KERN_WARNING

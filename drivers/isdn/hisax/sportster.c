@@ -38,88 +38,101 @@ calc_off(unsigned int base, unsigned int off)
 }
 
 static inline void
-read_fifo(unsigned int adr, u_char * data, int size)
+read_fifo(unsigned int adr, u8 * data, int size)
 {
 	insb(adr, data, size);
 }
 
 static void
-write_fifo(unsigned int adr, u_char * data, int size)
+write_fifo(unsigned int adr, u8 * data, int size)
 {
 	outsb(adr, data, size);
 }
 
-/* Interface functions */
-
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+isac_read(struct IsdnCardState *cs, u8 offset)
 {
-	return (bytein(calc_off(cs->hw.spt.isac, offset)));
+	return bytein(calc_off(cs->hw.spt.isac, offset));
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+isac_write(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	byteout(calc_off(cs->hw.spt.isac, offset), value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+isac_read_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	read_fifo(cs->hw.spt.isac, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+isac_write_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	write_fifo(cs->hw.spt.isac, data, size);
 }
 
-static u_char
-ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = isac_read,
+	.write_reg  = isac_write,
+	.read_fifo  = isac_read_fifo,
+	.write_fifo = isac_write_fifo,
+};
+
+static u8
+hscx_read(struct IsdnCardState *cs, int hscx, u8 offset)
 {
-	return (bytein(calc_off(cs->hw.spt.hscx[hscx], offset)));
+	return bytein(calc_off(cs->hw.spt.hscx[hscx], offset));
 }
 
 static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
+hscx_write(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 {
 	byteout(calc_off(cs->hw.spt.hscx[hscx], offset), value);
 }
 
-/*
- * fast interrupt HSCX stuff goes here
- */
+static void
+hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+{
+	read_fifo(cs->hw.spt.hscx[hscx], data, size);
+}
 
-#define READHSCX(cs, nr, reg) bytein(calc_off(cs->hw.spt.hscx[nr], reg))
-#define WRITEHSCX(cs, nr, reg, data) byteout(calc_off(cs->hw.spt.hscx[nr], reg), data)
-#define READHSCXFIFO(cs, nr, ptr, cnt) read_fifo(cs->hw.spt.hscx[nr], ptr, cnt)
-#define WRITEHSCXFIFO(cs, nr, ptr, cnt) write_fifo(cs->hw.spt.hscx[nr], ptr, cnt)
+static void
+hscx_write_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+{
+	write_fifo(cs->hw.spt.hscx[hscx], data, size);
+}
 
-#include "hscx_irq.c"
+static struct bc_hw_ops hscx_ops = {
+	.read_reg   = hscx_read,
+	.write_reg  = hscx_write,
+	.read_fifo  = hscx_read_fifo,
+	.write_fifo = hscx_write_fifo,
+};
 
 static void
 sportster_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val;
+	u8 val;
 
 	spin_lock(&cs->lock);
-	val = READHSCX(cs, 1, HSCX_ISTA);
+	val = hscx_read(cs, 1, HSCX_ISTA);
       Start_HSCX:
 	if (val)
 		hscx_int_main(cs, val);
-	val = ReadISAC(cs, ISAC_ISTA);
+	val = isac_read(cs, ISAC_ISTA);
       Start_ISAC:
 	if (val)
 		isac_interrupt(cs, val);
-	val = READHSCX(cs, 1, HSCX_ISTA);
+	val = hscx_read(cs, 1, HSCX_ISTA);
 	if (val) {
 		if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "HSCX IntStat after IntRoutine");
 		goto Start_HSCX;
 	}
-	val = ReadISAC(cs, ISAC_ISTA);
+	val = isac_read(cs, ISAC_ISTA);
 	if (val) {
 		if (cs->debug & L1_DEB_ISAC)
 			debugl1(cs, "ISAC IntStat after IntRoutine");
@@ -246,13 +259,8 @@ setup_sportster(struct IsdnCard *card)
 	       CardType[cs->typ], cs->irq,
 	       cs->hw.spt.cfg_reg);
 
-	cs->readisac = &ReadISAC;
-	cs->writeisac = &WriteISAC;
-	cs->readisacfifo = &ReadISACfifo;
-	cs->writeisacfifo = &WriteISACfifo;
-	cs->BC_Read_Reg = &ReadHSCX;
-	cs->BC_Write_Reg = &WriteHSCX;
-	cs->BC_Send_Data = &hscx_fill_fifo;
+	cs->dc_hw_ops = &isac_ops;
+	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Sportster_card_msg;
 	cs->irq_func = &sportster_interrupt;
 	ISACVersion(cs, "Sportster:");

@@ -45,7 +45,7 @@ static void __devinit dch_setstack(struct PStack *st, struct IsdnCardState *cs);
 static void __devinit dch_init(struct IsdnCardState *cs);
 static void bch_l2l1(struct PStack *st, int pr, void *arg);
 static void bch_empty_fifo(struct BCState *bcs, int count);
-static void bch_int(struct IsdnCardState *cs, u_char hscx);
+static void bch_int(struct IsdnCardState *cs, u8 hscx);
 static void bch_mode(struct BCState *bcs, int mode, int bc);
 static void bch_close_state(struct BCState *bcs);
 static int bch_open_state(struct IsdnCardState *cs, struct BCState *bcs);
@@ -53,6 +53,47 @@ static int bch_setstack(struct PStack *st, struct BCState *bcs);
 static void __devinit bch_init(struct IsdnCardState *cs, int hscx);
 static void __init clear_pending_ints(struct IsdnCardState *cs);
 
+static inline u8
+ipacx_bc_read_reg(struct BCState *bcs, u8 addr)
+{
+	struct IsdnCardState *cs = bcs->cs;
+	u8 hscx = bcs->hw.hscx.hscx;
+
+	return cs->bc_hw_ops->read_reg(cs, hscx, addr);
+}
+
+static inline void
+ipacx_bc_write_reg(struct BCState *bcs, u8 addr, u8 val)
+{
+	struct IsdnCardState *cs = bcs->cs;
+	u8 hscx = bcs->hw.hscx.hscx;
+
+	cs->bc_hw_ops->write_reg(cs, hscx, addr, val);
+}
+
+static inline u8
+ipacx_read_reg(struct IsdnCardState *cs, u8 addr)
+{
+	return cs->dc_hw_ops->read_reg(cs, addr);
+}
+
+static inline void
+ipacx_write_reg(struct IsdnCardState *cs, u8 addr, u8 val)
+{
+	cs->dc_hw_ops->write_reg(cs, addr, val);
+}
+
+static inline void
+ipacx_read_fifo(struct IsdnCardState *cs, u8 *p, int len)
+{
+	return cs->dc_hw_ops->read_fifo(cs, p, len);
+}
+
+static inline void
+ipacx_write_fifo(struct IsdnCardState *cs, u8 *p, int len)
+{
+	return cs->dc_hw_ops->write_fifo(cs, p, len);
+}
 //----------------------------------------------------------
 // Issue Layer 1 command to chip
 //----------------------------------------------------------
@@ -62,7 +103,7 @@ ph_command(struct IsdnCardState *cs, unsigned int command)
 	if (cs->debug &L1_DEB_ISAC)
 		debugl1(cs, "ph_command (%#x) in (%#x)", command,
 			cs->dc.isac.ph_state);
-	cs->writeisac(cs, IPACX_CIX0, (command << 4) | 0x0E);
+	ipacx_write_reg(cs, IPACX_CIX0, (command << 4) | 0x0E);
 }
 
 //----------------------------------------------------------
@@ -71,9 +112,9 @@ ph_command(struct IsdnCardState *cs, unsigned int command)
 static inline void 
 cic_int(struct IsdnCardState *cs)
 {
-	u_char event;
+	u8 event;
 
-	event = cs->readisac(cs, IPACX_CIR0) >> 4;
+	event = ipacx_read_reg(cs, IPACX_CIR0) >> 4;
 	if (cs->debug &L1_DEB_ISAC) debugl1(cs, "cic_int(event=%#x)", event);
 	cs->dc.isac.ph_state = event;
 	sched_d_event(cs, D_L1STATECHANGE);
@@ -91,7 +132,7 @@ dch_l2l1(struct PStack *st, int pr, void *arg)
 {
 	struct IsdnCardState *cs = (struct IsdnCardState *) st->l1.hardware;
 	struct sk_buff *skb = arg;
-  u_char cda1_cr, cda2_cr;
+  u8 cda1_cr, cda2_cr;
 
 	switch (pr) {
 		case (PH_DATA |REQUEST):
@@ -113,21 +154,21 @@ dch_l2l1(struct PStack *st, int pr, void *arg)
 			break;
 
 		case (HW_TESTLOOP | REQUEST):
-      cs->writeisac(cs, IPACX_CDA_TSDP10, 0x80); // Timeslot 0 is B1
-      cs->writeisac(cs, IPACX_CDA_TSDP11, 0x81); // Timeslot 0 is B1
-      cda1_cr = cs->readisac(cs, IPACX_CDA1_CR);
-      cda2_cr = cs->readisac(cs, IPACX_CDA2_CR);
+      ipacx_write_reg(cs, IPACX_CDA_TSDP10, 0x80); // Timeslot 0 is B1
+      ipacx_write_reg(cs, IPACX_CDA_TSDP11, 0x81); // Timeslot 0 is B1
+      cda1_cr = ipacx_read_reg(cs, IPACX_CDA1_CR);
+      cda2_cr = ipacx_read_reg(cs, IPACX_CDA2_CR);
 			if ((long)arg &1) { // loop B1
-        cs->writeisac(cs, IPACX_CDA1_CR, cda1_cr |0x0a); 
+        ipacx_write_reg(cs, IPACX_CDA1_CR, cda1_cr |0x0a); 
       }
       else {  // B1 off
-        cs->writeisac(cs, IPACX_CDA1_CR, cda1_cr &~0x0a); 
+        ipacx_write_reg(cs, IPACX_CDA1_CR, cda1_cr &~0x0a); 
       }
 			if ((long)arg &2) { // loop B2
-        cs->writeisac(cs, IPACX_CDA1_CR, cda1_cr |0x14); 
+        ipacx_write_reg(cs, IPACX_CDA1_CR, cda1_cr |0x14); 
       }
       else {  // B2 off
-        cs->writeisac(cs, IPACX_CDA1_CR, cda1_cr &~0x14); 
+        ipacx_write_reg(cs, IPACX_CDA1_CR, cda1_cr &~0x14); 
       }
 			break;
 
@@ -157,8 +198,8 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 	int	rbchd, stard;
 
 	if (test_bit(FLG_DBUSY_TIMER, &cs->HW_Flags)) {
-		rbchd = cs->readisac(cs, IPACX_RBCHD);
-		stard = cs->readisac(cs, IPACX_STARD);
+		rbchd = ipacx_read_reg(cs, IPACX_RBCHD);
+		stard = ipacx_read_reg(cs, IPACX_STARD);
 		if (cs->debug) 
       debugl1(cs, "D-Channel Busy RBCHD %02x STARD %02x", rbchd, stard);
 		if (!(stard &0x40)) { // D-Channel Busy
@@ -177,7 +218,7 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 				printk(KERN_WARNING "HiSax: ISAC D-Channel Busy no skb\n");
 				debugl1(cs, "D-Channel Busy no skb");
 			}
-			cs->writeisac(cs, IPACX_CMDRD, 0x01); // Tx reset, generates XPR
+			ipacx_write_reg(cs, IPACX_CMDRD, 0x01); // Tx reset, generates XPR
 		}
 	}
 }
@@ -264,7 +305,7 @@ dch_bh(void *data)
 static void 
 dch_empty_fifo(struct IsdnCardState *cs, int count)
 {
-	u_char *ptr;
+	u8 *ptr;
 
 	if ((cs->debug &L1_DEB_ISAC) && !(cs->debug &L1_DEB_ISAC_FIFO))
 		debugl1(cs, "dch_empty_fifo()");
@@ -273,7 +314,7 @@ dch_empty_fifo(struct IsdnCardState *cs, int count)
 	if ((cs->rcvidx + count) >= MAX_DFRAME_LEN_L1) {
 		if (cs->debug &L1_DEB_WARN)
 			debugl1(cs, "dch_empty_fifo() incoming message too large");
-	  cs->writeisac(cs, IPACX_CMDRD, 0x80); // RMC
+	  ipacx_write_reg(cs, IPACX_CMDRD, 0x80); // RMC
 		cs->rcvidx = 0;
 		return;
 	}
@@ -281,8 +322,8 @@ dch_empty_fifo(struct IsdnCardState *cs, int count)
 	ptr = cs->rcvbuf + cs->rcvidx;
 	cs->rcvidx += count;
   
-	cs->readisacfifo(cs, ptr, count);
-	cs->writeisac(cs, IPACX_CMDRD, 0x80); // RMC
+	ipacx_read_fifo(cs, ptr, count);
+	ipacx_write_reg(cs, IPACX_CMDRD, 0x80); // RMC
   
 	if (cs->debug &L1_DEB_ISAC_FIFO) {
 		char *t = cs->dlog;
@@ -312,8 +353,8 @@ dch_fill_fifo(struct IsdnCardState *cs)
 		cmd   = 0x0A; // XTF | XME
 	}
   
-	cs->writeisacfifo(cs, p, count);
-	cs->writeisac(cs, IPACX_CMDRD, cmd);
+	ipacx_write_fifo(cs, p, count);
+	ipacx_write_reg(cs, IPACX_CMDRD, cmd);
   
   // set timeout for transmission contol
 	if (test_and_set_bit(FLG_DBUSY_TIMER, &cs->HW_Flags)) {
@@ -332,13 +373,13 @@ static inline void
 dch_int(struct IsdnCardState *cs)
 {
 	struct sk_buff *skb;
-	u_char istad, rstad;
+	u8 istad, rstad;
 	int count;
 
-	istad = cs->readisac(cs, IPACX_ISTAD);
+	istad = ipacx_read_reg(cs, IPACX_ISTAD);
   
 	if (istad &0x80) {  // RME
-	  rstad = cs->readisac(cs, IPACX_RSTAD);
+	  rstad = ipacx_read_reg(cs, IPACX_RSTAD);
 		if ((rstad &0xf0) != 0xa0) { // !(VFR && !RDO && CRC && !RAB)
 			if (!(rstad &0x80))
 				if (cs->debug &L1_DEB_WARN) 
@@ -349,9 +390,9 @@ dch_int(struct IsdnCardState *cs)
 			if (!(rstad &0x20))
 				if (cs->debug &L1_DEB_WARN) 
           debugl1(cs, "dch_int(): CRC error");
-	    cs->writeisac(cs, IPACX_CMDRD, 0x80);  // RMC
+	    ipacx_write_reg(cs, IPACX_CMDRD, 0x80);  // RMC
 		} else {  // received frame ok
-			count = cs->readisac(cs, IPACX_RBCLD);
+			count = ipacx_read_reg(cs, IPACX_RBCLD);
       if (count) count--; // RSTAB is last byte
 			count &= D_FIFO_SIZE-1;
 			if (count == 0) count = D_FIFO_SIZE;
@@ -376,7 +417,7 @@ dch_int(struct IsdnCardState *cs)
 
 	if (istad &0x20) {  // RFO
 		if (cs->debug &L1_DEB_WARN) debugl1(cs, "dch_int(): RFO");
-	  cs->writeisac(cs, IPACX_CMDRD, 0x40); //RRES
+	  ipacx_write_reg(cs, IPACX_CMDRD, 0x40); //RRES
 	}
   
 	if (istad &0x10) {  // XPR
@@ -410,10 +451,10 @@ dch_init(struct IsdnCardState *cs)
 	cs->dbusytimer.data = (long) cs;
 	init_timer(&cs->dbusytimer);
 
-  cs->writeisac(cs, IPACX_TR_CONF0, 0x00);  // clear LDD
-  cs->writeisac(cs, IPACX_TR_CONF2, 0x00);  // enable transmitter
-  cs->writeisac(cs, IPACX_MODED,    0xC9);  // transparent mode 0, RAC, stop/go
-  cs->writeisac(cs, IPACX_MON_CR,   0x00);  // disable monitor channel
+  ipacx_write_reg(cs, IPACX_TR_CONF0, 0x00);  // clear LDD
+  ipacx_write_reg(cs, IPACX_TR_CONF2, 0x00);  // enable transmitter
+  ipacx_write_reg(cs, IPACX_MODED,    0xC9);  // transparent mode 0, RAC, stop/go
+  ipacx_write_reg(cs, IPACX_MON_CR,   0x00);  // disable monitor channel
 }
 
 
@@ -462,7 +503,7 @@ bch_l2l1(struct PStack *st, int pr, void *arg)
 static void
 bch_empty_fifo(struct BCState *bcs, int count)
 {
-	u_char *ptr, hscx;
+	u8 *ptr, hscx;
 	struct IsdnCardState *cs;
 	int cnt;
 
@@ -475,7 +516,7 @@ bch_empty_fifo(struct BCState *bcs, int count)
 	if (bcs->hw.hscx.rcvidx + count > HSCX_BUFMAX) {
 		if (cs->debug &L1_DEB_WARN)
 			debugl1(cs, "bch_empty_fifo() incoming packet too large");
-	  cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x80);  // RMC
+	  ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x80);  // RMC
 		bcs->hw.hscx.rcvidx = 0;
 		return;
 	}
@@ -483,8 +524,8 @@ bch_empty_fifo(struct BCState *bcs, int count)
   // Read data uninterruptible
 	ptr = bcs->hw.hscx.rcvbuf + bcs->hw.hscx.rcvidx;
 	cnt = count;
-	while (cnt--) *ptr++ = cs->BC_Read_Reg(cs, hscx, IPACX_RFIFOB); 
-	cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x80);  // RMC
+	while (cnt--) *ptr++ = ipacx_bc_read_reg(bcs, IPACX_RFIFOB); 
+	ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x80);  // RMC
   
 	ptr = bcs->hw.hscx.rcvbuf + bcs->hw.hscx.rcvidx;
 	bcs->hw.hscx.rcvidx += count;
@@ -504,9 +545,7 @@ bch_empty_fifo(struct BCState *bcs, int count)
 void
 ipacx_fill_fifo(struct BCState *bcs)
 {
-	struct IsdnCardState *cs = bcs->cs;
 	int more, count;
-	unsigned char hscx = bcs->hw.hscx.hscx;
 	unsigned char *p;
 
 	p = xmit_fill_fifo_b(bcs, B_FIFO_SIZE, &count, &more);
@@ -514,9 +553,9 @@ ipacx_fill_fifo(struct BCState *bcs)
 		return;
 
 	while (count--)
-		cs->BC_Write_Reg(cs, hscx, IPACX_XFIFOB, *p++); 
+		ipacx_bc_write_reg(bcs, IPACX_XFIFOB, *p++); 
 
-	cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, (more ? 0x08 : 0x0a));
+	ipacx_bc_write_reg(bcs, IPACX_CMDRB, (more ? 0x08 : 0x0a));
 }
 
 //----------------------------------------------------------
@@ -526,24 +565,24 @@ ipacx_fill_fifo(struct BCState *bcs)
 static void
 reset_xmit(struct BCState *bcs)
 {
-	bcs->cs->BC_Write_Reg(bcs->cs, bcs->hw.hscx.hscx, IPACX_CMDRB, 0x01);  // XRES
+	ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x01);  // XRES
 }
 
 static void
-bch_int(struct IsdnCardState *cs, u_char hscx)
+bch_int(struct IsdnCardState *cs, u8 hscx)
 {
-	u_char istab;
+	u8 istab;
 	struct BCState *bcs;
 	struct sk_buff *skb;
 	int count;
-	u_char rstab;
+	u8 rstab;
 
 	bcs = cs->bcs + hscx;
-	istab = cs->BC_Read_Reg(cs, hscx, IPACX_ISTAB);
+	istab = ipacx_bc_read_reg(bcs, IPACX_ISTAB);
 	if (!test_bit(BC_FLG_INIT, &bcs->Flag)) return;
 
 	if (istab &0x80) {	// RME
-		rstab = cs->BC_Read_Reg(cs, hscx, IPACX_RSTAB);
+		rstab = ipacx_bc_read_reg(bcs, IPACX_RSTAB);
 		if ((rstab &0xf0) != 0xa0) { // !(VFR && !RDO && CRC && !RAB)
 			if (!(rstab &0x80))
 				if (cs->debug &L1_DEB_WARN) 
@@ -554,10 +593,10 @@ bch_int(struct IsdnCardState *cs, u_char hscx)
 			if (!(rstab &0x20))
 				if (cs->debug &L1_DEB_WARN) 
           debugl1(cs, "bch_int() B-%d: CRC error", hscx);
-	    cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x80);  // RMC
+	    ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x80);  // RMC
 		} 
     else {  // received frame ok
-			count = cs->BC_Read_Reg(cs, hscx, IPACX_RBCLB) &(B_FIFO_SIZE-1);
+			count = ipacx_bc_read_reg(bcs, IPACX_RBCLB) &(B_FIFO_SIZE-1);
 			if (count == 0) count = B_FIFO_SIZE;
 			bch_empty_fifo(bcs, count);
 			if ((count = bcs->hw.hscx.rcvidx - 1) > 0) {
@@ -594,7 +633,7 @@ bch_int(struct IsdnCardState *cs, u_char hscx)
 	if (istab &0x20) {	// RFO
 		if (cs->debug &L1_DEB_WARN) 
 			debugl1(cs, "bch_int() B-%d: RFO error", hscx);
-		cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x40);  // RRES
+		ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x40);  // RRES
 	}
 
 	if (istab &0x10) {	// XPR
@@ -623,33 +662,33 @@ bch_mode(struct BCState *bcs, int mode, int bc)
   // map controller to according timeslot
   if (!hscx)
   {
-    cs->writeisac(cs, IPACX_BCHA_TSDP_BC1, 0x80 | bc);
-    cs->writeisac(cs, IPACX_BCHA_CR,       0x88); 
+    ipacx_write_reg(cs, IPACX_BCHA_TSDP_BC1, 0x80 | bc);
+    ipacx_write_reg(cs, IPACX_BCHA_CR,       0x88); 
   }
   else
   {
-    cs->writeisac(cs, IPACX_BCHB_TSDP_BC1, 0x80 | bc);
-    cs->writeisac(cs, IPACX_BCHB_CR,       0x88); 
+    ipacx_write_reg(cs, IPACX_BCHB_TSDP_BC1, 0x80 | bc);
+    ipacx_write_reg(cs, IPACX_BCHB_CR,       0x88); 
   }
 
 	switch (mode) {
 		case (L1_MODE_NULL):
-		    cs->BC_Write_Reg(cs, hscx, IPACX_MODEB, 0xC0);  // rec off
-		    cs->BC_Write_Reg(cs, hscx, IPACX_EXMB,  0x30);  // std adj.
-		    cs->BC_Write_Reg(cs, hscx, IPACX_MASKB, 0xFF);  // ints off
-		    cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x41);  // validate adjustments
+		    ipacx_bc_write_reg(bcs, IPACX_MODEB, 0xC0);  // rec off
+		    ipacx_bc_write_reg(bcs, IPACX_EXMB,  0x30);  // std adj.
+		    ipacx_bc_write_reg(bcs, IPACX_MASKB, 0xFF);  // ints off
+		    ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x41);  // validate adjustments
 		    break;
 		case (L1_MODE_TRANS):
-		    cs->BC_Write_Reg(cs, hscx, IPACX_MODEB, 0x88);  // ext transp mode
-		    cs->BC_Write_Reg(cs, hscx, IPACX_EXMB,  0x00);  // xxx00000
-		    cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x41);  // validate adjustments
-		    cs->BC_Write_Reg(cs, hscx, IPACX_MASKB, _MASKB_IMASK);
+		    ipacx_bc_write_reg(bcs, IPACX_MODEB, 0x88);  // ext transp mode
+		    ipacx_bc_write_reg(bcs, IPACX_EXMB,  0x00);  // xxx00000
+		    ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x41);  // validate adjustments
+		    ipacx_bc_write_reg(bcs, IPACX_MASKB, _MASKB_IMASK);
 		    break;
 		case (L1_MODE_HDLC):
-		    cs->BC_Write_Reg(cs, hscx, IPACX_MODEB, 0xC8);  // transp mode 0
-		    cs->BC_Write_Reg(cs, hscx, IPACX_EXMB,  0x01);  // idle=hdlc flags crc enabled
-		    cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x41);  // validate adjustments
-		    cs->BC_Write_Reg(cs, hscx, IPACX_MASKB, _MASKB_IMASK);
+		    ipacx_bc_write_reg(bcs, IPACX_MODEB, 0xC8);  // transp mode 0
+		    ipacx_bc_write_reg(bcs, IPACX_EXMB,  0x01);  // idle=hdlc flags crc enabled
+		    ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x41);  // validate adjustments
+		    ipacx_bc_write_reg(bcs, IPACX_MASKB, _MASKB_IMASK);
 		    break;
 	}
 }
@@ -748,10 +787,10 @@ bch_init(struct IsdnCardState *cs, int hscx)
 void 
 interrupt_ipacx(struct IsdnCardState *cs)
 {
-	u_char ista;
+	u8 ista;
 	
 	spin_lock(&cs->lock);
-	while ((ista = cs->readisac(cs, IPACX_ISTA))) {
+	while ((ista = ipacx_read_reg(cs, IPACX_ISTA))) {
 		if (ista &0x80) bch_int(cs, 0); // B channel interrupts
 		if (ista &0x40) bch_int(cs, 1);
 		if (ista &0x01) dch_int(cs);    // D channel
@@ -769,17 +808,21 @@ clear_pending_ints(struct IsdnCardState *cs)
 	int ista;
 
   // all interrupts off
-  cs->writeisac(cs, IPACX_MASK, 0xff);
-	cs->writeisac(cs, IPACX_MASKD, 0xff);
-	cs->BC_Write_Reg(cs, 0, IPACX_MASKB, 0xff);
-	cs->BC_Write_Reg(cs, 1, IPACX_MASKB, 0xff);
+  ipacx_write_reg(cs, IPACX_MASK, 0xff);
+  ipacx_write_reg(cs, IPACX_MASKD, 0xff);
+  cs->bc_hw_ops->write_reg(cs, 0, IPACX_MASKB, 0xff);
+  cs->bc_hw_ops->write_reg(cs, 1, IPACX_MASKB, 0xff);
   
-  ista = cs->readisac(cs, IPACX_ISTA); 
-  if (ista &0x80) cs->BC_Read_Reg(cs, 0, IPACX_ISTAB);
-  if (ista &0x40) cs->BC_Read_Reg(cs, 1, IPACX_ISTAB);
-  if (ista &0x10) cs->readisac(cs, IPACX_CIR0);
-  if (ista &0x01) cs->readisac(cs, IPACX_ISTAD); 
+  ista = ipacx_read_reg(cs, IPACX_ISTA); 
+  if (ista &0x80) cs->bc_hw_ops->read_reg(cs, 0, IPACX_ISTAB);
+  if (ista &0x40) cs->bc_hw_ops->read_reg(cs, 1, IPACX_ISTAB);
+  if (ista &0x10) ipacx_read_reg(cs, IPACX_CIR0);
+  if (ista &0x01) ipacx_read_reg(cs, IPACX_ISTAD); 
 }
+
+static struct bc_l1_ops ipacx_bc_l1_ops = {
+	.fill_fifo = ipacx_fill_fifo,
+};
 
 //----------------------------------------------------------
 // Does chip configuration work
@@ -789,22 +832,23 @@ void __init
 init_ipacx(struct IsdnCardState *cs, int part)
 {
 	if (part &1) {  // initialise chip
+		cs->bc_l1_ops = &ipacx_bc_l1_ops;
 		clear_pending_ints(cs);
 		bch_init(cs, 0);
 		bch_init(cs, 1);
 		dch_init(cs);
 	}
 	if (part &2) {  // reenable all interrupts and start chip
-		cs->BC_Write_Reg(cs, 0, IPACX_MASKB, _MASKB_IMASK);
-		cs->BC_Write_Reg(cs, 1, IPACX_MASKB, _MASKB_IMASK);
-		cs->writeisac(cs, IPACX_MASKD, _MASKD_IMASK);
-		cs->writeisac(cs, IPACX_MASK, _MASK_IMASK); // global mask register
+		cs->bc_hw_ops->write_reg(cs, 0, IPACX_MASKB, _MASKB_IMASK);
+		cs->bc_hw_ops->write_reg(cs, 1, IPACX_MASKB, _MASKB_IMASK);
+		ipacx_write_reg(cs, IPACX_MASKD, _MASKD_IMASK);
+		ipacx_write_reg(cs, IPACX_MASK, _MASK_IMASK); // global mask register
 
     // reset HDLC Transmitters/receivers
-		cs->writeisac(cs, IPACX_CMDRD, 0x41); 
-    cs->BC_Write_Reg(cs, 0, IPACX_CMDRB, 0x41);
-    cs->BC_Write_Reg(cs, 1, IPACX_CMDRB, 0x41);
-  	ph_command(cs, IPACX_CMD_RES);
+		ipacx_write_reg(cs, IPACX_CMDRD, 0x41); 
+		cs->bc_hw_ops->write_reg(cs, 0, IPACX_CMDRB, 0x41);
+		cs->bc_hw_ops->write_reg(cs, 1, IPACX_CMDRB, 0x41);
+		ph_command(cs, IPACX_CMD_RES);
 	}
 }
 

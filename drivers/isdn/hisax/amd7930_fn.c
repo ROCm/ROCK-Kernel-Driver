@@ -77,13 +77,13 @@ LOBYTE(u16 w)
 static inline u8
 rByteAMD(struct IsdnCardState *cs, u8 reg)
 {
-	return cs->readisac(cs, reg);
+	return cs->dc_hw_ops->read_reg(cs, reg);
 }
 
 static inline void
 wByteAMD(struct IsdnCardState *cs, u8 reg, u8 val)
 {
-	cs->writeisac(cs, reg, val);
+	cs->dc_hw_ops->write_reg(cs, reg, val);
 }
 
 static void
@@ -125,7 +125,7 @@ AmdIrqOn(struct IsdnCardState *cs)
 }
 
 static void
-Amd7930_ph_command(struct IsdnCardState *cs, u_char command, char *s)
+Amd7930_ph_command(struct IsdnCardState *cs, u8 command, char *s)
 {
 	if (cs->debug & L1_DEB_ISAC)
 		debugl1(cs, "AMD7930: %s: ph_command 0x%02X", s, command);
@@ -167,8 +167,8 @@ Amd7930_get_state(struct IsdnCardState *cs) {
 static void
 Amd7930_new_ph(struct IsdnCardState *cs)
 {
-        u_char index = stateHelper[cs->dc.amd7930.old_state]*8 + stateHelper[cs->dc.amd7930.ph_state]-1;
-        u_char message = i430States[index];
+        u8 index = stateHelper[cs->dc.amd7930.old_state]*8 + stateHelper[cs->dc.amd7930.ph_state]-1;
+        u8 message = i430States[index];
 
         if (cs->debug & L1_DEB_ISAC)
 		debugl1(cs, "AMD7930: new_ph %d, old_ph %d, message %d, index %d",

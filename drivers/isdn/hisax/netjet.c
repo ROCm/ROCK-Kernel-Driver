@@ -30,11 +30,11 @@ static spinlock_t netjet_lock = SPIN_LOCK_UNLOCKED;
 
 /* Interface functions */
 
-u_char
-NETjet_ReadIC(struct IsdnCardState *cs, u_char offset)
+u8
+NETjet_ReadIC(struct IsdnCardState *cs, u8 offset)
 {
 	unsigned long flags;
-	u_char ret;
+	u8 ret;
 	
 	spin_lock_irqsave(&netjet_lock, flags);
 	cs->hw.njet.auxd &= 0xfc;
@@ -46,7 +46,7 @@ NETjet_ReadIC(struct IsdnCardState *cs, u_char offset)
 }
 
 void
-NETjet_WriteIC(struct IsdnCardState *cs, u_char offset, u_char value)
+NETjet_WriteIC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	unsigned long flags;
 	
@@ -59,14 +59,29 @@ NETjet_WriteIC(struct IsdnCardState *cs, u_char offset, u_char value)
 }
 
 void
-NETjet_ReadICfifo(struct IsdnCardState *cs, u_char *data, int size)
+NETjet_ReadICfifo(struct IsdnCardState *cs, u8 *data, int size)
 {
 	cs->hw.njet.auxd &= 0xfc;
 	byteout(cs->hw.njet.auxa, cs->hw.njet.auxd);
 	insb(cs->hw.njet.isac, data, size);
 }
 
-__u16 fcstab[256] =
+void 
+NETjet_WriteICfifo(struct IsdnCardState *cs, u8 *data, int size)
+{
+	cs->hw.njet.auxd &= 0xfc;
+	byteout(cs->hw.njet.auxa, cs->hw.njet.auxd);
+	outsb(cs->hw.njet.isac, data, size);
+}
+
+struct dc_hw_ops netjet_dc_ops = {
+	.read_reg   = NETjet_ReadIC,
+	.write_reg  = NETjet_WriteIC,
+	.read_fifo  = NETjet_ReadICfifo,
+	.write_fifo = NETjet_WriteICfifo,
+};
+
+static u16 fcstab[256] =
 {
 	0x0000, 0x1189, 0x2312, 0x329b, 0x4624, 0x57ad, 0x6536, 0x74bf,
 	0x8c48, 0x9dc1, 0xaf5a, 0xbed3, 0xca6c, 0xdbe5, 0xe97e, 0xf8f7,
@@ -102,15 +117,7 @@ __u16 fcstab[256] =
 	0x7bc7, 0x6a4e, 0x58d5, 0x495c, 0x3de3, 0x2c6a, 0x1ef1, 0x0f78
 };
 
-void 
-NETjet_WriteICfifo(struct IsdnCardState *cs, u_char *data, int size)
-{
-	cs->hw.njet.auxd &= 0xfc;
-	byteout(cs->hw.njet.auxa, cs->hw.njet.auxd);
-	outsb(cs->hw.njet.isac, data, size);
-}
-
-void fill_mem(struct BCState *bcs, u_int *pos, u_int cnt, int chan, u_char fill)
+void fill_mem(struct BCState *bcs, u_int *pos, u_int cnt, int chan, u8 fill)
 {
 	u_int mask=0x000000ff, val = 0, *p=pos;
 	u_int i;
@@ -133,7 +140,7 @@ void
 mode_tiger(struct BCState *bcs, int mode, int bc)
 {
 	struct IsdnCardState *cs = bcs->cs;
-        u_char led;
+        u8 led;
 
 	if (cs->debug & L1_DEB_HSCX)
 		debugl1(cs, "Tiger mode %d bchan %d/%d",
@@ -209,11 +216,11 @@ mode_tiger(struct BCState *bcs, int mode, int bc)
 			bytein(cs->hw.njet.base + NETJET_PULSE_CNT));
 }
 
-static void printframe(struct IsdnCardState *cs, u_char *buf, int count, char *s) {
+static void printframe(struct IsdnCardState *cs, u8 *buf, int count, char *s) {
 	char tmp[128];
 	char *t = tmp;
 	int i=count,j;
-	u_char *p = buf;
+	u8 *p = buf;
 
 	t += sprintf(t, "tiger %s(%4d)", s, count);
 	while (i>0) {
@@ -262,11 +269,11 @@ static void printframe(struct IsdnCardState *cs, u_char *buf, int count, char *s
 static int make_raw_data(struct BCState *bcs) {
 // this make_raw is for 64k
 	register u_int i,s_cnt=0;
-	register u_char j;
-	register u_char val;
-	register u_char s_one = 0;
-	register u_char s_val = 0;
-	register u_char bitcnt = 0;
+	register u8 j;
+	register u8 val;
+	register u8 s_one = 0;
+	register u8 s_val = 0;
+	register u8 bitcnt = 0;
 	u_int fcs;
 	
 	if (!bcs->tx_skb) {
@@ -352,11 +359,11 @@ static int make_raw_data(struct BCState *bcs) {
 static int make_raw_data_56k(struct BCState *bcs) {
 // this make_raw is for 56k
 	register u_int i,s_cnt=0;
-	register u_char j;
-	register u_char val;
-	register u_char s_one = 0;
-	register u_char s_val = 0;
-	register u_char bitcnt = 0;
+	register u8 j;
+	register u8 val;
+	register u8 s_one = 0;
+	register u8 s_val = 0;
+	register u8 bitcnt = 0;
 	u_int fcs;
 	
 	if (!bcs->tx_skb) {
@@ -442,16 +449,16 @@ static void got_frame(struct BCState *bcs, int count) {
 
 static void read_raw(struct BCState *bcs, u_int *buf, int cnt){
 	int i;
-	register u_char j;
-	register u_char val;
+	register u8 j;
+	register u8 val;
 	u_int  *pend = bcs->hw.tiger.rec +NETJET_DMA_RXSIZE -1;
-	register u_char state = bcs->hw.tiger.r_state;
-	register u_char r_one = bcs->hw.tiger.r_one;
-	register u_char r_val = bcs->hw.tiger.r_val;
+	register u8 state = bcs->hw.tiger.r_state;
+	register u8 r_one = bcs->hw.tiger.r_one;
+	register u8 r_val = bcs->hw.tiger.r_val;
 	register u_int bitcnt = bcs->hw.tiger.r_bitcnt;
 	u_int *p = buf;
 	int bits;
-	u_char mask;
+	u8 mask;
 
         if (bcs->mode == L1_MODE_HDLC) { // it's 64k
 		mask = 0xff;
@@ -928,9 +935,15 @@ setstack_tiger(struct PStack *st, struct BCState *bcs)
 }
 
  
+static struct bc_l1_ops netjet_l1_ops = {
+	.fill_fifo = netjet_fill_dma,
+};
+
 void __init
 inittiger(struct IsdnCardState *cs)
 {
+	cs->bc_l1_ops = &netjet_l1_ops;
+
 	cs->bcs[0].hw.tiger.send = 
 		pci_alloc_consistent(cs->hw.njet.pdev,
 				     NETJET_DMA_TXSIZE * sizeof(unsigned int),

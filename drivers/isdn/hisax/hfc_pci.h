@@ -188,18 +188,18 @@ typedef struct {
   } __attribute__((packed)) z_type;
 
 typedef struct {
-    u_char data[D_FIFO_SIZE]; /* FIFO data space */
-    u_char fill1[0x20A0-D_FIFO_SIZE]; /* reserved, do not use */
-    u_char f1,f2; /* f pointers */
-    u_char fill2[0x20C0-0x20A2]; /* reserved, do not use */
+    u8 data[D_FIFO_SIZE]; /* FIFO data space */
+    u8 fill1[0x20A0-D_FIFO_SIZE]; /* reserved, do not use */
+    u8 f1,f2; /* f pointers */
+    u8 fill2[0x20C0-0x20A2]; /* reserved, do not use */
     z_type za[MAX_D_FRAMES+1]; /* mask index with D_FREG_MASK for access */
-    u_char fill3[0x4000-0x2100]; /* align 16K */  
+    u8 fill3[0x4000-0x2100]; /* align 16K */  
   } __attribute__((packed)) dfifo_type;
 
 typedef struct {
     z_type za[MAX_B_FRAMES+1]; /* only range 0x0..0x1F allowed */ 
-    u_char f1,f2; /* f pointers */
-    u_char fill[0x2100-0x2082]; /* alignment */
+    u8 f1,f2; /* f pointers */
+    u8 fill[0x2100-0x2082]; /* alignment */
   } __attribute__((packed)) bzfifo_type;
 
 
@@ -209,29 +209,29 @@ typedef union {
       dfifo_type d_rx; /* D-receive channel */
     } __attribute__((packed)) d_chan; 
     struct {
-      u_char fill1[0x200];
-      u_char txdat_b1[B_FIFO_SIZE];
+      u8 fill1[0x200];
+      u8 txdat_b1[B_FIFO_SIZE];
       bzfifo_type txbz_b1;
 
       bzfifo_type txbz_b2;
-      u_char txdat_b2[B_FIFO_SIZE];
+      u8 txdat_b2[B_FIFO_SIZE];
 
-      u_char fill2[D_FIFO_SIZE];
+      u8 fill2[D_FIFO_SIZE];
 
-      u_char rxdat_b1[B_FIFO_SIZE];
+      u8 rxdat_b1[B_FIFO_SIZE];
       bzfifo_type rxbz_b1;
 
       bzfifo_type rxbz_b2;
-      u_char rxdat_b2[B_FIFO_SIZE];
+      u8 rxdat_b2[B_FIFO_SIZE];
     } __attribute__((packed)) b_chans;  
-    u_char fill[32768]; 
+    u8 fill[32768]; 
   } __attribute__((packed)) fifo_area;
 
 
-//#define Write_hfc(a,b,c) (*(((u_char *)a->hw.hfcpci.pci_io)+b) = c) 
-//#define Read_hfc(a,b) (*(((u_char *)a->hw.hfcpci.pci_io)+b))
-#define Write_hfc(a,b,c)	writeb(c, ((u_char *)a->hw.hfcpci.pci_io)+b)
-#define Read_hfc(a,b)		readb(((u_char *)a->hw.hfcpci.pci_io)+b)
+//#define Write_hfc(a,b,c) (*(((u8 *)a->hw.hfcpci.pci_io)+b) = c) 
+//#define Read_hfc(a,b) (*(((u8 *)a->hw.hfcpci.pci_io)+b))
+#define Write_hfc(a,b,c)	writeb(c, ((u8 *)a->hw.hfcpci.pci_io)+b)
+#define Read_hfc(a,b)		readb(((u8 *)a->hw.hfcpci.pci_io)+b)
 
 extern void main_irq_hcpci(struct BCState *bcs);
 extern void inithfcpci(struct IsdnCardState *cs);

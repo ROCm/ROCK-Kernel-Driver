@@ -34,7 +34,7 @@ const char *tei_revision = "$Revision: 2.17.6.3 $";
 
 static struct Fsm teifsm;
 
-void tei_handler(struct PStack *st, u_char pr, struct sk_buff *skb);
+void tei_handler(struct PStack *st, u8 pr, struct sk_buff *skb);
 
 enum {
 	ST_TEI_NOP,
@@ -100,10 +100,10 @@ findtei(struct PStack *st, int tei)
 }
 
 static void
-put_tei_msg(struct PStack *st, u_char m_id, unsigned int ri, u_char tei)
+put_tei_msg(struct PStack *st, u8 m_id, unsigned int ri, u8 tei)
 {
 	struct sk_buff *skb;
-	u_char *bp;
+	u8 *bp;
 
 	if (!(skb = alloc_skb(8, GFP_ATOMIC))) {
 		printk(KERN_WARNING "HiSax: No skb for TEI manager\n");

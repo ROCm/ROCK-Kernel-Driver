@@ -35,20 +35,20 @@ static const char *ISurf_revision = "$Revision: 1.10.6.2 $";
 #define ISURF_IOMEM_SIZE	0x400
 /* Interface functions */
 
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+ReadISAC(struct IsdnCardState *cs, u8 offset)
 {
 	return (readb(cs->hw.isurf.isac + offset));
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writeb(value, cs->hw.isurf.isac + offset); mb();
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	register int i;
 	for (i = 0; i < size; i++)
@@ -56,7 +56,7 @@ ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	register int i;
 	for (i = 0; i < size; i++){
@@ -64,29 +64,41 @@ WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 	}
 }
 
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = ReadISAC,
+	.write_reg  = WriteISAC,
+	.read_fifo  = ReadISACfifo,
+	.write_fifo = WriteISACfifo,
+};
+
 /* ISAR access routines
  * mode = 0 access with IRQ on
  * mode = 1 access with IRQ off
  * mode = 2 access with IRQ off and using last offset
  */
   
-static u_char
-ReadISAR(struct IsdnCardState *cs, int mode, u_char offset)
+static u8
+ReadISAR(struct IsdnCardState *cs, int mode, u8 offset)
 {	
 	return(readb(cs->hw.isurf.isar + offset));
 }
 
 static void
-WriteISAR(struct IsdnCardState *cs, int mode, u_char offset, u_char value)
+WriteISAR(struct IsdnCardState *cs, int mode, u8 offset, u8 value)
 {
 	writeb(value, cs->hw.isurf.isar + offset);mb();
 }
+
+static struct bc_hw_ops isar_ops = {
+	.read_reg  = ReadISAR,
+	.write_reg = WriteISAR,
+};
 
 static void
 isurf_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val;
+	u8 val;
 	int cnt = 5;
 
 	spin_lock(&cs->lock);
@@ -129,7 +141,7 @@ release_io_isurf(struct IsdnCardState *cs)
 }
 
 static void
-reset_isurf(struct IsdnCardState *cs, u_char chips)
+reset_isurf(struct IsdnCardState *cs, u8 chips)
 {
 	printk(KERN_INFO "ISurf: resetting card\n");
 
@@ -273,18 +285,13 @@ setup_isurf(struct IsdnCard *card)
 	cs->cardmsg = &ISurf_card_msg;
 	cs->irq_func = &isurf_interrupt;
 	cs->auxcmd = &isurf_auxcmd;
-	cs->readisac = &ReadISAC;
-	cs->writeisac = &WriteISAC;
-	cs->readisacfifo = &ReadISACfifo;
-	cs->writeisacfifo = &WriteISACfifo;
+	cs->dc_hw_ops = &isac_ops;
 	cs->bcs[0].hw.isar.reg = &cs->hw.isurf.isar_r;
 	cs->bcs[1].hw.isar.reg = &cs->hw.isurf.isar_r;
 	reset_isurf(cs, ISURF_RESET);
 	test_and_set_bit(HW_ISAR, &cs->HW_Flags);
 	ISACVersion(cs, "ISurf:");
-	cs->BC_Read_Reg = &ReadISAR;
-	cs->BC_Write_Reg = &WriteISAR;
-	cs->BC_Send_Data = &isar_fill_fifo;
+	cs->bc_hw_ops = &isar_ops;
 	ver = ISARVersion(cs, "ISurf:");
 	if (ver < 0) {
 		printk(KERN_WARNING

@@ -136,7 +136,7 @@ static void st5481B_start_xfer(void *context)
  */
 static void led_blink(struct st5481_adapter *adapter)
 {
-	u_char leds = adapter->leds;
+	u8 leds = adapter->leds;
 
 	// 50 frames/sec for each channel
 	if (++adapter->led_counter % 50) {

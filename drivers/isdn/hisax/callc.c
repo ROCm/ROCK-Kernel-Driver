@@ -1424,7 +1424,7 @@ capi_debug(struct Channel *chanp, capi_msg *cm)
 {
 	char *t = tmpbuf;
 
-	t += QuickHex(t, (u_char *)cm, (cm->Length>50)? 50: cm->Length);
+	t += QuickHex(t, (u8 *)cm, (cm->Length>50)? 50: cm->Length);
 	t--;
 	*t= 0;
 	HiSax_putstatus(chanp->cs, "Ch", "%d CAPIMSG %s", chanp->chan, tmpbuf);

@@ -67,4 +67,4 @@
 
 extern void ICCVersion(struct IsdnCardState *cs, char *s);
 extern void initicc(struct IsdnCardState *cs);
-extern void icc_interrupt(struct IsdnCardState *cs, u_char val);
+extern void icc_interrupt(struct IsdnCardState *cs, u8 val);

@@ -21,8 +21,10 @@ const char *s0box_revision = "$Revision: 2.4.6.2 $";
 static spinlock_t s0box_lock = SPIN_LOCK_UNLOCKED;
 
 static inline void
-writereg(unsigned int padr, signed int addr, u_char off, u_char val) {
+writereg(struct IsdnCardState *cs, int addr, u8 off, u8 val)
+{
 	unsigned long flags;
+	unsigned long padr = cs->hw.teles3.cfg_reg;
 
 	spin_lock_irqsave(&s0box_lock, flags);
 	outb_p(0x1c,padr+2);
@@ -36,14 +38,16 @@ writereg(unsigned int padr, signed int addr, u_char off, u_char val) {
 	spin_unlock_irqrestore(&s0box_lock, flags);
 }
 
-static u_char nibtab[] = { 1, 9, 5, 0xd, 3, 0xb, 7, 0xf,
+static u8 nibtab[] = { 1, 9, 5, 0xd, 3, 0xb, 7, 0xf,
 			 0, 0, 0, 0, 0, 0, 0, 0,
 			 0, 8, 4, 0xc, 2, 0xa, 6, 0xe } ;
 
-static inline u_char
-readreg(unsigned int padr, signed int addr, u_char off) {
-	register u_char n1, n2;
+static inline u8
+readreg(struct IsdnCardState *cs, int addr, u8 off)
+{
+	u8 n1, n2;
 	unsigned long flags;
+	unsigned long padr = cs->hw.teles3.cfg_reg;
 
 	spin_lock_irqsave(&s0box_lock, flags);
 	outb_p(0x1c,padr+2);
@@ -61,10 +65,11 @@ readreg(unsigned int padr, signed int addr, u_char off) {
 }
 
 static inline void
-read_fifo(unsigned int padr, signed int adr, u_char * data, int size)
+read_fifo(struct IsdnCardState *cs, signed int adr, u8 * data, int size)
 {
 	int i;
-	register u_char n1, n2;
+	u8 n1, n2;
+	unsigned long padr = cs->hw.teles3.cfg_reg;
 	
 	outb_p(0x1c, padr+2);
 	outb_p(0x14, padr+2);
@@ -79,13 +84,14 @@ read_fifo(unsigned int padr, signed int adr, u_char * data, int size)
 	}
 	outb_p(0x14,padr+2);
 	outb_p(0x1c,padr+2);
-	return;
 }
 
 static inline void
-write_fifo(unsigned int padr, signed int adr, u_char * data, int size)
+write_fifo(struct IsdnCardState *cs, signed int adr, u8 * data, int size)
 {
 	int i;
+	unsigned long padr = cs->hw.teles3.cfg_reg;
+
 	outb_p(0x1c, padr+2);
 	outb_p(0x14, padr+2);
 	outb_p(adr&0x7f, padr);
@@ -96,83 +102,95 @@ write_fifo(unsigned int padr, signed int adr, u_char * data, int size)
 	}
 	outb_p(0x14,padr+2);
 	outb_p(0x1c,padr+2);
-	return;
 }
 
-/* Interface functions */
-
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+isac_read(struct IsdnCardState *cs, u8 offset)
 {
-	return (readreg(cs->hw.teles3.cfg_reg, cs->hw.teles3.isac, offset));
+	return readreg(cs, cs->hw.teles3.isac, offset);
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+isac_write(struct IsdnCardState *cs, u8 offset, u8 value)
 {
-	writereg(cs->hw.teles3.cfg_reg, cs->hw.teles3.isac, offset, value);
+	writereg(cs, cs->hw.teles3.isac, offset, value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+isac_read_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
-	read_fifo(cs->hw.teles3.cfg_reg, cs->hw.teles3.isacfifo, data, size);
+	read_fifo(cs, cs->hw.teles3.isacfifo, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+isac_write_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
-	write_fifo(cs->hw.teles3.cfg_reg, cs->hw.teles3.isacfifo, data, size);
+	write_fifo(cs, cs->hw.teles3.isacfifo, data, size);
 }
 
-static u_char
-ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = isac_read,
+	.write_reg  = isac_write,
+	.read_fifo  = isac_read_fifo,
+	.write_fifo = isac_write_fifo,
+};
+
+static u8
+hscx_read(struct IsdnCardState *cs, int hscx, u8 offset)
 {
-	return (readreg(cs->hw.teles3.cfg_reg, cs->hw.teles3.hscx[hscx], offset));
+	return readreg(cs, cs->hw.teles3.hscx[hscx], offset);
 }
 
 static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
+hscx_write(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 {
-	writereg(cs->hw.teles3.cfg_reg, cs->hw.teles3.hscx[hscx], offset, value);
+	writereg(cs, cs->hw.teles3.hscx[hscx], offset, value);
 }
 
-/*
- * fast interrupt HSCX stuff goes here
- */
+static void
+hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+{
+	read_fifo(cs, cs->hw.teles3.hscxfifo[hscx], data, size);
+}
 
-#define READHSCX(cs, nr, reg) readreg(cs->hw.teles3.cfg_reg, cs->hw.teles3.hscx[nr], reg)
-#define WRITEHSCX(cs, nr, reg, data) writereg(cs->hw.teles3.cfg_reg, cs->hw.teles3.hscx[nr], reg, data)
-#define READHSCXFIFO(cs, nr, ptr, cnt) read_fifo(cs->hw.teles3.cfg_reg, cs->hw.teles3.hscxfifo[nr], ptr, cnt)
-#define WRITEHSCXFIFO(cs, nr, ptr, cnt) write_fifo(cs->hw.teles3.cfg_reg, cs->hw.teles3.hscxfifo[nr], ptr, cnt)
+static void
+hscx_write_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+{
+	write_fifo(cs, cs->hw.teles3.hscxfifo[hscx], data, size);
+}
 
-#include "hscx_irq.c"
-
+static struct bc_hw_ops hscx_ops = {
+	.read_reg   = hscx_read,
+	.write_reg  = hscx_write,
+	.read_fifo  = hscx_read_fifo,
+	.write_fifo = hscx_write_fifo,
+};
+ 
 static void
 s0box_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 #define MAXCOUNT 5
 	struct IsdnCardState *cs = dev_id;
-	u_char val;
+	u8 val;
 	int count = 0;
 
 	spin_lock(&cs->lock);
-	val = readreg(cs->hw.teles3.cfg_reg, cs->hw.teles3.hscx[1], HSCX_ISTA);
+	val = hscx_read(cs, 1, HSCX_ISTA);
       Start_HSCX:
 	if (val)
 		hscx_int_main(cs, val);
-	val = readreg(cs->hw.teles3.cfg_reg, cs->hw.teles3.isac, ISAC_ISTA);
+	val = isac_read(cs, ISAC_ISTA);
       Start_ISAC:
 	if (val)
 		isac_interrupt(cs, val);
 	count++;
-	val = readreg(cs->hw.teles3.cfg_reg, cs->hw.teles3.hscx[1], HSCX_ISTA);
+	val = hscx_read(cs, 1, HSCX_ISTA);
 	if (val && count < MAXCOUNT) {
 		if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "HSCX IntStat after IntRoutine");
 		goto Start_HSCX;
 	}
-	val = readreg(cs->hw.teles3.cfg_reg, cs->hw.teles3.isac, ISAC_ISTA);
+	val = isac_read(cs, ISAC_ISTA);
 	if (val && count < MAXCOUNT) {
 		if (cs->debug & L1_DEB_ISAC)
 			debugl1(cs, "ISAC IntStat after IntRoutine");
@@ -180,12 +198,12 @@ s0box_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	}
 	if (count >= MAXCOUNT)
 		printk(KERN_WARNING "S0Box: more than %d loops in s0box_interrupt\n", count);
-	writereg(cs->hw.teles3.cfg_reg, cs->hw.teles3.hscx[0], HSCX_MASK, 0xFF);
-	writereg(cs->hw.teles3.cfg_reg, cs->hw.teles3.hscx[1], HSCX_MASK, 0xFF);
-	writereg(cs->hw.teles3.cfg_reg, cs->hw.teles3.isac, ISAC_MASK, 0xFF);
-	writereg(cs->hw.teles3.cfg_reg, cs->hw.teles3.isac, ISAC_MASK, 0x0);
-	writereg(cs->hw.teles3.cfg_reg, cs->hw.teles3.hscx[0], HSCX_MASK, 0x0);
-	writereg(cs->hw.teles3.cfg_reg, cs->hw.teles3.hscx[1], HSCX_MASK, 0x0);
+	hscx_write(cs, 0, HSCX_MASK, 0xFF);
+	hscx_write(cs, 1, HSCX_MASK, 0xFF);
+	isac_write(cs, ISAC_MASK, 0xFF);
+	isac_write(cs, ISAC_MASK, 0x0);
+	hscx_write(cs, 0, HSCX_MASK, 0x0);
+	hscx_write(cs, 1, HSCX_MASK, 0x0);
 	spin_unlock(&cs->lock);
 }
 
@@ -248,13 +266,8 @@ setup_s0box(struct IsdnCard *card)
 	printk(KERN_INFO
 	       "HiSax: hscx A:0x%x  hscx B:0x%x\n",
 	       cs->hw.teles3.hscx[0], cs->hw.teles3.hscx[1]);
-	cs->readisac = &ReadISAC;
-	cs->writeisac = &WriteISAC;
-	cs->readisacfifo = &ReadISACfifo;
-	cs->writeisacfifo = &WriteISACfifo;
-	cs->BC_Read_Reg = &ReadHSCX;
-	cs->BC_Write_Reg = &WriteHSCX;
-	cs->BC_Send_Data = &hscx_fill_fifo;
+	cs->dc_hw_ops = &isac_ops;
+	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &S0Box_card_msg;
 	cs->irq_func = &s0box_interrupt;
 	ISACVersion(cs, "S0Box:");

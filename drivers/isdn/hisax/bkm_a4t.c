@@ -26,10 +26,10 @@ static spinlock_t bkm_a4t_lock = SPIN_LOCK_UNLOCKED;
 const char *bkm_a4t_revision = "$Revision: 1.13.6.6 $";
 
 
-static inline u_char
-readreg(unsigned int ale, unsigned long adr, u_char off)
+static inline u8
+readreg(unsigned int ale, unsigned long adr, u8 off)
 {
-	register u_int ret;
+	u_int ret;
 	unsigned long flags;
 	unsigned int *po = (unsigned int *) adr;	/* Postoffice */
 	spin_lock_irqsave(&bkm_a4t_lock, flags);
@@ -42,19 +42,8 @@ readreg(unsigned int ale, unsigned long adr, u_char off)
 	return ((unsigned char) ret);
 }
 
-
 static inline void
-readfifo(unsigned int ale, unsigned long adr, u_char off, u_char * data, int size)
-{
-	/* fifo read without cli because it's allready done  */
-	int i;
-	for (i = 0; i < size; i++)
-		*data++ = readreg(ale, adr, off);
-}
-
-
-static inline void
-writereg(unsigned int ale, unsigned long adr, u_char off, u_char data)
+writereg(unsigned int ale, unsigned long adr, u8 off, u8 data)
 {
 	unsigned long flags;
 	unsigned int *po = (unsigned int *) adr;	/* Postoffice */
@@ -66,77 +55,93 @@ writereg(unsigned int ale, unsigned long adr, u_char off, u_char data)
 	spin_unlock_irqrestore(&bkm_a4t_lock, flags);
 }
 
+static inline void
+readfifo(unsigned int ale, unsigned long adr, u8 off, u8 * data, int size)
+{
+	int i;
+
+	for (i = 0; i < size; i++)
+		*data++ = readreg(ale, adr, off);
+}
 
 static inline void
-writefifo(unsigned int ale, unsigned long adr, u_char off, u_char * data, int size)
+writefifo(unsigned int ale, unsigned long adr, u8 off, u8 * data, int size)
 {
-	/* fifo write without cli because it's allready done  */
 	int i;
 
 	for (i = 0; i < size; i++)
 		writereg(ale, adr, off, *data++);
 }
 
-
-/* Interface functions */
-
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+isac_read(struct IsdnCardState *cs, u8 offset)
 {
 	return (readreg(cs->hw.ax.isac_ale, cs->hw.ax.isac_adr, offset));
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+isac_write(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writereg(cs->hw.ax.isac_ale, cs->hw.ax.isac_adr, offset, value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+isac_read_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	readfifo(cs->hw.ax.isac_ale, cs->hw.ax.isac_adr, 0, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+isac_write_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	writefifo(cs->hw.ax.isac_ale, cs->hw.ax.isac_adr, 0, data, size);
 }
 
-static u_char
-ReadJADE(struct IsdnCardState *cs, int jade, u_char offset)
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = isac_read,
+	.write_reg  = isac_write,
+	.read_fifo  = isac_read_fifo,
+	.write_fifo = isac_write_fifo,
+};
+
+static u8
+jade_read(struct IsdnCardState *cs, int jade, u8 offset)
 {
-	return (readreg(cs->hw.ax.jade_ale, cs->hw.ax.jade_adr, offset + (jade == -1 ? 0 : (jade ? 0xC0 : 0x80))));
+	return readreg(cs->hw.ax.jade_ale, cs->hw.ax.jade_adr, offset + (jade == -1 ? 0 : (jade ? 0xC0 : 0x80)));
 }
 
 static void
-WriteJADE(struct IsdnCardState *cs, int jade, u_char offset, u_char value)
+jade_write(struct IsdnCardState *cs, int jade, u8 offset, u8 value)
 {
 	writereg(cs->hw.ax.jade_ale, cs->hw.ax.jade_adr, offset + (jade == -1 ? 0 : (jade ? 0xC0 : 0x80)), value);
 }
 
-/*
- * fast interrupt JADE stuff goes here
- */
+static void
+jade_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+{
+	readfifo(cs->hw.ax.jade_ale, cs->hw.ax.jade_adr,
+		 (hscx == -1 ? 0 : (hscx ? 0xc0 : 0x80)), data, size);
+}
 
-#define READJADE(cs, nr, reg) readreg(cs->hw.ax.jade_ale,\
- 		cs->hw.ax.jade_adr, reg + (nr == -1 ? 0 : (nr ? 0xC0 : 0x80)))
-#define WRITEJADE(cs, nr, reg, data) writereg(cs->hw.ax.jade_ale,\
- 		cs->hw.ax.jade_adr, reg + (nr == -1 ? 0 : (nr ? 0xC0 : 0x80)), data)
+static void
+jade_write_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+{
+	writefifo(cs->hw.ax.jade_ale, cs->hw.ax.jade_adr,
+		  (hscx == -1 ? 0 : (hscx ? 0xc0 : 0x80)), data, size);
+}
 
-#define READJADEFIFO(cs, nr, ptr, cnt) readfifo(cs->hw.ax.jade_ale,\
-		cs->hw.ax.jade_adr, (nr == -1 ? 0 : (nr ? 0xC0 : 0x80)), ptr, cnt)
-#define WRITEJADEFIFO(cs, nr, ptr, cnt) writefifo( cs->hw.ax.jade_ale,\
-		cs->hw.ax.jade_adr, (nr == -1 ? 0 : (nr ? 0xC0 : 0x80)), ptr, cnt)
-
-#include "jade_irq.c"
+static struct bc_hw_ops jade_ops = {
+	.read_reg   = jade_read,
+	.write_reg  = jade_write,
+	.read_fifo  = jade_read_fifo,
+	.write_fifo = jade_write_fifo,
+};
 
 static void
 bkm_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val = 0;
+	u8 val = 0;
 	I20_REGISTER_FILE *pI20_Regs;
 
 	spin_lock(&cs->lock);
@@ -327,13 +332,8 @@ setup_bkm_a4t(struct IsdnCard *card)
 	       CardType[card->typ], cs->hw.ax.base, cs->irq);
 
 	reset_bkm(cs);
-	cs->readisac = &ReadISAC;
-	cs->writeisac = &WriteISAC;
-	cs->readisacfifo = &ReadISACfifo;
-	cs->writeisacfifo = &WriteISACfifo;
-	cs->BC_Read_Reg = &ReadJADE;
-	cs->BC_Write_Reg = &WriteJADE;
-	cs->BC_Send_Data = &jade_fill_fifo;
+	cs->dc_hw_ops = &isac_ops;
+	cs->bc_hw_ops = &jade_ops;
 	cs->cardmsg = &BKM_card_msg;
 	cs->irq_func = &bkm_interrupt;
 	cs->irq_flags |= SA_SHIRQ;

@@ -17,6 +17,19 @@
 
 #define ARCOFI_TIMER_VALUE	20
 
+
+static inline u8
+isac_read(struct IsdnCardState *cs, u8 addr)
+{
+	return cs->dc_hw_ops->read_reg(cs, addr);
+}
+
+static inline void
+isac_write(struct IsdnCardState *cs, u8 addr, u8 val)
+{
+	cs->dc_hw_ops->write_reg(cs, addr, val);
+}
+
 static void
 add_arcofi_timer(struct IsdnCardState *cs) {
 	if (test_and_set_bit(FLG_ARCOFI_TIMER, &cs->HW_Flags)) {
@@ -29,7 +42,7 @@ add_arcofi_timer(struct IsdnCardState *cs) {
 
 static void
 send_arcofi(struct IsdnCardState *cs) {
-	u_char val;
+	u8 val;
 	
 	add_arcofi_timer(cs);
 	cs->dc.isac.mon_txp = 0;
@@ -43,11 +56,11 @@ send_arcofi(struct IsdnCardState *cs) {
 	}
 	cs->dc.isac.mocr &= 0x0f;
 	cs->dc.isac.mocr |= 0xa0;
-	cs->writeisac(cs, ISAC_MOCR, cs->dc.isac.mocr);
-	val = cs->readisac(cs, ISAC_MOSR);
-	cs->writeisac(cs, ISAC_MOX1, cs->dc.isac.mon_tx[cs->dc.isac.mon_txp++]);
+	isac_write(cs, ISAC_MOCR, cs->dc.isac.mocr);
+	val = isac_read(cs, ISAC_MOSR);
+	isac_write(cs, ISAC_MOX1, cs->dc.isac.mon_tx[cs->dc.isac.mon_txp++]);
 	cs->dc.isac.mocr |= 0x10;
-	cs->writeisac(cs, ISAC_MOCR, cs->dc.isac.mocr);
+	isac_write(cs, ISAC_MOCR, cs->dc.isac.mocr);
 }
 
 int

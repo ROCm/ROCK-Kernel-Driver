@@ -20,19 +20,31 @@ extern const char *CardType[];
 
 static const char *hfcs_revision = "$Revision: 1.8.6.2 $";
 
+static inline u8
+hfcs_read_reg(struct IsdnCardState *cs, int data, u8 reg)
+{
+	return cs->bc_hw_ops->read_reg(cs, data, reg);
+}
+
+static inline void
+hfcs_write_reg(struct IsdnCardState *cs, int data, u8 reg, u8 val)
+{
+	cs->bc_hw_ops->write_reg(cs, data, reg, val);
+}
+
 static void
 hfcs_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val, stat;
+	u8 val, stat;
 
 	if (!cs) {
 		printk(KERN_WARNING "HFCS: Spurious interrupt!\n");
 		return;
 	}
 	if ((HFCD_ANYINT | HFCD_BUSY_NBUSY) & 
-		(stat = cs->BC_Read_Reg(cs, HFCD_DATA, HFCD_STAT))) {
-		val = cs->BC_Read_Reg(cs, HFCD_DATA, HFCD_INT_S1);
+		(stat = hfcs_read_reg(cs, HFCD_DATA, HFCD_STAT))) {
+		val = hfcs_read_reg(cs, HFCD_DATA, HFCD_INT_S1);
 		if (cs->debug & L1_DEB_ISAC)
 			debugl1(cs, "HFCS: stat(%02x) s1(%02x)", stat, val);
 		hfc2bds0_interrupt(cs, val);
@@ -68,37 +80,37 @@ reset_hfcs(struct IsdnCardState *cs)
 	cs->hw.hfcD.cirm = HFCD_RESET;
 	if (cs->typ == ISDN_CTYPE_TELES3C)
 		cs->hw.hfcD.cirm |= HFCD_MEM8K;
-	cs->BC_Write_Reg(cs, HFCD_DATA, HFCD_CIRM, cs->hw.hfcD.cirm);	/* Reset On */
+	hfcs_write_reg(cs, HFCD_DATA, HFCD_CIRM, cs->hw.hfcD.cirm);	/* Reset On */
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((30*HZ)/1000);
 	cs->hw.hfcD.cirm = 0;
 	if (cs->typ == ISDN_CTYPE_TELES3C)
 		cs->hw.hfcD.cirm |= HFCD_MEM8K;
-	cs->BC_Write_Reg(cs, HFCD_DATA, HFCD_CIRM, cs->hw.hfcD.cirm);	/* Reset Off */
+	hfcs_write_reg(cs, HFCD_DATA, HFCD_CIRM, cs->hw.hfcD.cirm);	/* Reset Off */
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((10*HZ)/1000);
 	if (cs->typ == ISDN_CTYPE_TELES3C)
 		cs->hw.hfcD.cirm |= HFCD_INTB;
 	else if (cs->typ == ISDN_CTYPE_ACERP10)
 		cs->hw.hfcD.cirm |= HFCD_INTA;
-	cs->BC_Write_Reg(cs, HFCD_DATA, HFCD_CIRM, cs->hw.hfcD.cirm);
-	cs->BC_Write_Reg(cs, HFCD_DATA, HFCD_CLKDEL, 0x0e);
-	cs->BC_Write_Reg(cs, HFCD_DATA, HFCD_TEST, HFCD_AUTO_AWAKE); /* S/T Auto awake */
+	hfcs_write_reg(cs, HFCD_DATA, HFCD_CIRM, cs->hw.hfcD.cirm);
+	hfcs_write_reg(cs, HFCD_DATA, HFCD_CLKDEL, 0x0e);
+	hfcs_write_reg(cs, HFCD_DATA, HFCD_TEST, HFCD_AUTO_AWAKE); /* S/T Auto awake */
 	cs->hw.hfcD.ctmt = HFCD_TIM25 | HFCD_AUTO_TIMER;
-	cs->BC_Write_Reg(cs, HFCD_DATA, HFCD_CTMT, cs->hw.hfcD.ctmt);
+	hfcs_write_reg(cs, HFCD_DATA, HFCD_CTMT, cs->hw.hfcD.ctmt);
 	cs->hw.hfcD.int_m2 = HFCD_IRQ_ENABLE;
 	cs->hw.hfcD.int_m1 = HFCD_INTS_B1TRANS | HFCD_INTS_B2TRANS |
 		HFCD_INTS_DTRANS | HFCD_INTS_B1REC | HFCD_INTS_B2REC |
 		HFCD_INTS_DREC | HFCD_INTS_L1STATE;
-	cs->BC_Write_Reg(cs, HFCD_DATA, HFCD_INT_M1, cs->hw.hfcD.int_m1);
-	cs->BC_Write_Reg(cs, HFCD_DATA, HFCD_INT_M2, cs->hw.hfcD.int_m2);
-	cs->BC_Write_Reg(cs, HFCD_DATA, HFCD_STATES, HFCD_LOAD_STATE | 2); /* HFC ST 2 */
+	hfcs_write_reg(cs, HFCD_DATA, HFCD_INT_M1, cs->hw.hfcD.int_m1);
+	hfcs_write_reg(cs, HFCD_DATA, HFCD_INT_M2, cs->hw.hfcD.int_m2);
+	hfcs_write_reg(cs, HFCD_DATA, HFCD_STATES, HFCD_LOAD_STATE | 2); /* HFC ST 2 */
 	udelay(10);
-	cs->BC_Write_Reg(cs, HFCD_DATA, HFCD_STATES, 2); /* HFC ST 2 */
+	hfcs_write_reg(cs, HFCD_DATA, HFCD_STATES, 2); /* HFC ST 2 */
 	cs->hw.hfcD.mst_m = HFCD_MASTER;
-	cs->BC_Write_Reg(cs, HFCD_DATA, HFCD_MST_MODE, cs->hw.hfcD.mst_m); /* HFC Master */
+	hfcs_write_reg(cs, HFCD_DATA, HFCD_MST_MODE, cs->hw.hfcD.mst_m); /* HFC Master */
 	cs->hw.hfcD.sctrl = 0;
-	cs->BC_Write_Reg(cs, HFCD_DATA, HFCD_SCTRL, cs->hw.hfcD.sctrl);
+	hfcs_write_reg(cs, HFCD_DATA, HFCD_SCTRL, cs->hw.hfcD.sctrl);
 }
 
 static int
@@ -120,8 +132,8 @@ hfcs_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout((80*HZ)/1000);
 			cs->hw.hfcD.ctmt |= HFCD_TIM800;
-			cs->BC_Write_Reg(cs, HFCD_DATA, HFCD_CTMT, cs->hw.hfcD.ctmt); 
-			cs->BC_Write_Reg(cs, HFCD_DATA, HFCD_MST_MODE, cs->hw.hfcD.mst_m);
+			hfcs_write_reg(cs, HFCD_DATA, HFCD_CTMT, cs->hw.hfcD.ctmt); 
+			hfcs_write_reg(cs, HFCD_DATA, HFCD_MST_MODE, cs->hw.hfcD.mst_m);
 			return(0);
 		case CARD_TEST:
 			return(0);

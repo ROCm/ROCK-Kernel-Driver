@@ -16,16 +16,16 @@ struct hscx {
 	struct hisax_b_if b_if;
 	int mode;
 	int channel;
-	u_char tsaxr;
+	u8 tsaxr;
 	struct sk_buff *tx_skb;
 	int tx_cnt;
-	u_char rcvbuf[HSCX_BUFMAX];
+	u8 rcvbuf[HSCX_BUFMAX];
 	int rcvidx;
 
-	u_char (*read_hscx)      (struct hscx *, u_char);
-	void   (*write_hscx)     (struct hscx *, u_char, u_char);
-	void   (*read_hscx_fifo) (struct hscx *, u_char *, int);
-	void   (*write_hscx_fifo)(struct hscx *, u_char *, int);
+	u8 (*read_hscx)      (struct hscx *, u8);
+	void   (*write_hscx)     (struct hscx *, u8, u8);
+	void   (*read_hscx_fifo) (struct hscx *, u8 *, int);
+	void   (*write_hscx_fifo)(struct hscx *, u8 *, int);
 };
 
 void hscx_init(struct hscx *hscx);

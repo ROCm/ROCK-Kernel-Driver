@@ -31,6 +31,12 @@ extern void DChannel_proc_rcv(struct IsdnCardState *cs);
 extern void l1_msg(struct IsdnCardState *cs, int pr, void *arg);
 extern void l1_msg_b(struct PStack *st, int pr, void *arg);
 
+static inline void
+fill_fifo_b(struct BCState *bcs)
+{
+	bcs->cs->bc_l1_ops->fill_fifo(bcs);
+}
+
 #ifdef L2FRAME_DEBUG
 extern void Logl2Frame(struct IsdnCardState *cs, struct sk_buff *skb, char *buf, int dir);
 #endif
@@ -74,7 +80,7 @@ xmit_ready_b(struct BCState *bcs)
 	if (bcs->tx_skb) {
 		bcs->count = 0;
 		set_bit(BC_FLG_BUSY, &bcs->Flag);
-		bcs->cs->BC_Send_Data(bcs);
+		fill_fifo_b(bcs);
 	} else {
 		clear_bit(BC_FLG_BUSY, &bcs->Flag);
 		sched_b_event(bcs, B_XMTBUFREADY);
@@ -107,7 +113,7 @@ xmit_data_req_b(struct BCState *bcs, struct sk_buff *skb)
 		set_bit(BC_FLG_BUSY, &bcs->Flag);
 		bcs->tx_skb = skb;
 		bcs->count = 0;
-		bcs->cs->BC_Send_Data(bcs);
+		fill_fifo_b(bcs);
 	}
 	spin_unlock_irqrestore(&cs->lock, flags);
 }
@@ -153,7 +159,7 @@ xmit_pull_ind_b(struct BCState *bcs, struct sk_buff *skb)
 		set_bit(BC_FLG_BUSY, &bcs->Flag);
 		bcs->tx_skb = skb;
 		bcs->count = 0;
-		bcs->cs->BC_Send_Data(bcs);
+		fill_fifo_b(bcs);
 	}
 	spin_unlock_irqrestore(&cs->lock, flags);
 }
@@ -268,7 +274,7 @@ xmit_xpr_b(struct BCState *bcs)
 	if (bcs->tx_skb) {
 		/* last frame not done yet? */
 		if (bcs->tx_skb->len) {
-			bcs->cs->BC_Send_Data(bcs);
+			fill_fifo_b(bcs);
 			return;
 		}
 		xmit_complete_b(bcs);
@@ -310,7 +316,7 @@ xmit_xdu_b(struct BCState *bcs, void (*reset_xmit)(struct BCState *bcs))
 		debugl1(cs, "HSCX %c EXIR XDU", 'A' + bcs->channel);
 
 	if (bcs->mode == L1_MODE_TRANS) {
-		cs->BC_Send_Data(bcs);
+		fill_fifo_b(bcs);
 	} else {
 		xmit_restart_b(bcs);
 		reset_xmit(bcs);

@@ -44,74 +44,72 @@ static spinlock_t gazel_lock = SPIN_LOCK_UNLOCKED;
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)
 
-static inline u_char
+static inline u8
 readreg(unsigned int adr, u_short off)
 {
 	return bytein(adr + off);
 }
 
 static inline void
-writereg(unsigned int adr, u_short off, u_char data)
+writereg(unsigned int adr, u_short off, u8 data)
 {
 	byteout(adr + off, data);
 }
 
 
 static inline void
-read_fifo(unsigned int adr, u_char * data, int size)
+read_fifo(unsigned int adr, u8 * data, int size)
 {
 	insb(adr, data, size);
 }
 
 static void
-write_fifo(unsigned int adr, u_char * data, int size)
+write_fifo(unsigned int adr, u8 * data, int size)
 {
 	outsb(adr, data, size);
 }
 
-static inline u_char
-readreg_ipac(unsigned int adr, u_short off)
+static inline u8
+readreg_ipac(struct IsdnCardState *cs, u_short off)
 {
-	register u_char ret;
+	register u8 ret;
 	unsigned long flags;
 
 	spin_lock_irqsave(&gazel_lock, flags);
-	byteout(adr, off);
-	ret = bytein(adr + 4);
+	byteout(cs->hw.gazel.ipac, off);
+	ret = bytein(cs->hw.gazel.ipac + 4);
 	spin_unlock_irqrestore(&gazel_lock, flags);
 	return ret;
 }
 
 static inline void
-writereg_ipac(unsigned int adr, u_short off, u_char data)
+writereg_ipac(struct IsdnCardState *cs, u_short off, u8 data)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&gazel_lock, flags);
-	byteout(adr, off);
-	byteout(adr + 4, data);
+	byteout(cs->hw.gazel.ipac, off);
+	byteout(cs->hw.gazel.ipac + 4, data);
 	spin_unlock_irqrestore(&gazel_lock, flags);
 }
 
 
 static inline void
-read_fifo_ipac(unsigned int adr, u_short off, u_char * data, int size)
+read_fifo_ipac(struct IsdnCardState *cs, u_short off, u8 * data, int size)
 {
-	byteout(adr, off);
-	insb(adr + 4, data, size);
+	byteout(cs->hw.gazel.ipac, off);
+	insb(cs->hw.gazel.ipac + 4, data, size);
 }
 
 static void
-write_fifo_ipac(unsigned int adr, u_short off, u_char * data, int size)
+write_fifo_ipac(struct IsdnCardState *cs, u_short off, u8 * data, int size)
 {
-	byteout(adr, off);
-	outsb(adr + 4, data, size);
+	byteout(cs->hw.gazel.ipac, off);
+	outsb(cs->hw.gazel.ipac + 4, data, size);
 }
 
-/* Interface functions */
-
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+isac_read(struct IsdnCardState *cs, u8 offset)
 {
 	u_short off2 = offset;
 
@@ -122,13 +120,13 @@ ReadISAC(struct IsdnCardState *cs, u_char offset)
 			return (readreg(cs->hw.gazel.isac, off2));
 		case R753:
 		case R742:
-			return (readreg_ipac(cs->hw.gazel.ipac, 0x80 + off2));
+			return (readreg_ipac(cs, 0x80 + off2));
 	}
 	return 0;
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+isac_write(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	u_short off2 = offset;
 
@@ -140,13 +138,13 @@ WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
 			break;
 		case R753:
 		case R742:
-			writereg_ipac(cs->hw.gazel.ipac, 0x80 + off2, value);
+			writereg_ipac(cs, 0x80 + off2, value);
 			break;
 	}
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+isac_read_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	switch (cs->subtyp) {
 		case R647:
@@ -155,13 +153,13 @@ ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 			break;
 		case R753:
 		case R742:
-			read_fifo_ipac(cs->hw.gazel.ipac, 0x80, data, size);
+			read_fifo_ipac(cs, 0x80, data, size);
 			break;
 	}
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+isac_write_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	switch (cs->subtyp) {
 		case R647:
@@ -170,43 +168,20 @@ WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 			break;
 		case R753:
 		case R742:
-			write_fifo_ipac(cs->hw.gazel.ipac, 0x80, data, size);
+			write_fifo_ipac(cs, 0x80, data, size);
 			break;
 	}
 }
 
-static void
-ReadHSCXfifo(struct IsdnCardState *cs, int hscx, u_char * data, int size)
-{
-	switch (cs->subtyp) {
-		case R647:
-		case R685:
-			read_fifo(cs->hw.gazel.hscxfifo[hscx], data, size);
-			break;
-		case R753:
-		case R742:
-			read_fifo_ipac(cs->hw.gazel.ipac, hscx * 0x40, data, size);
-			break;
-	}
-}
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = isac_read,
+	.write_reg  = isac_write,
+	.read_fifo  = isac_read_fifo,
+	.write_fifo = isac_write_fifo,
+};
 
-static void
-WriteHSCXfifo(struct IsdnCardState *cs, int hscx, u_char * data, int size)
-{
-	switch (cs->subtyp) {
-		case R647:
-		case R685:
-			write_fifo(cs->hw.gazel.hscxfifo[hscx], data, size);
-			break;
-		case R753:
-		case R742:
-			write_fifo_ipac(cs->hw.gazel.ipac, hscx * 0x40, data, size);
-			break;
-	}
-}
-
-static u_char
-ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
+static u8
+hscx_read(struct IsdnCardState *cs, int hscx, u8 offset)
 {
 	u_short off2 = offset;
 
@@ -214,16 +189,16 @@ ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
 		case R647:
 			off2 = ((off2 << 8 & 0xf000) | (off2 & 0xf));
 		case R685:
-			return (readreg(cs->hw.gazel.hscx[hscx], off2));
+			return readreg(cs->hw.gazel.hscx[hscx], off2);
 		case R753:
 		case R742:
-			return (readreg_ipac(cs->hw.gazel.ipac, hscx * 0x40 + off2));
+			return readreg_ipac(cs, hscx * 0x40 + off2);
 	}
 	return 0;
 }
 
 static void
-WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
+hscx_write(struct IsdnCardState *cs, int hscx, u8 offset, u8 value)
 {
 	u_short off2 = offset;
 
@@ -235,47 +210,73 @@ WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
 			break;
 		case R753:
 		case R742:
-			writereg_ipac(cs->hw.gazel.ipac, hscx * 0x40 + off2, value);
+			writereg_ipac(cs, hscx * 0x40 + off2, value);
 			break;
 	}
 }
 
-/*
- * fast interrupt HSCX stuff goes here
- */
+static void
+hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 * data, int size)
+{
+	switch (cs->subtyp) {
+		case R647:
+		case R685:
+			read_fifo(cs->hw.gazel.hscxfifo[hscx], data, size);
+			break;
+		case R753:
+		case R742:
+			read_fifo_ipac(cs, hscx * 0x40, data, size);
+			break;
+	}
+}
 
-#define READHSCX(cs, nr, reg) ReadHSCX(cs, nr, reg)
-#define WRITEHSCX(cs, nr, reg, data) WriteHSCX(cs, nr, reg, data)
-#define READHSCXFIFO(cs, nr, ptr, cnt) ReadHSCXfifo(cs, nr, ptr, cnt)
-#define WRITEHSCXFIFO(cs, nr, ptr, cnt) WriteHSCXfifo(cs, nr, ptr, cnt)
+static void
+hscx_write_fifo(struct IsdnCardState *cs, int hscx, u8 * data, int size)
+{
+	switch (cs->subtyp) {
+		case R647:
+		case R685:
+			write_fifo(cs->hw.gazel.hscxfifo[hscx], data, size);
+			break;
+		case R753:
+		case R742:
+			write_fifo_ipac(cs, hscx * 0x40, data, size);
+			break;
+	}
+}
 
-#include "hscx_irq.c"
+static struct bc_hw_ops hscx_ops = {
+	.read_reg   = hscx_read,
+	.write_reg  = hscx_write,
+	.read_fifo  = hscx_read_fifo,
+	.write_fifo = hscx_write_fifo,
+};
 
 static void
 gazel_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 #define MAXCOUNT 5
 	struct IsdnCardState *cs = dev_id;
-	u_char valisac, valhscx;
+	u8 valisac, valhscx;
 	int count = 0;
 
 	spin_lock(&cs->lock);
 	do {
-		valhscx = ReadHSCX(cs, 1, HSCX_ISTA);
+		valhscx = hscx_read(cs, 1, HSCX_ISTA);
 		if (valhscx)
 			hscx_int_main(cs, valhscx);
-		valisac = ReadISAC(cs, ISAC_ISTA);
+		valisac = isac_read(cs, ISAC_ISTA);
 		if (valisac)
 			isac_interrupt(cs, valisac);
 		count++;
 	} while ((valhscx || valisac) && (count < MAXCOUNT));
 
-	WriteHSCX(cs, 0, HSCX_MASK, 0xFF);
-	WriteHSCX(cs, 1, HSCX_MASK, 0xFF);
-	WriteISAC(cs, ISAC_MASK, 0xFF);
-	WriteISAC(cs, ISAC_MASK, 0x0);
-	WriteHSCX(cs, 0, HSCX_MASK, 0x0);
-	WriteHSCX(cs, 1, HSCX_MASK, 0x0);
+	hscx_write(cs, 0, HSCX_MASK, 0xFF);
+	hscx_write(cs, 1, HSCX_MASK, 0xFF);
+	isac_write(cs, ISAC_MASK, 0xFF);
+	isac_write(cs, ISAC_MASK, 0x0);
+	hscx_write(cs, 0, HSCX_MASK, 0x0);
+	hscx_write(cs, 1, HSCX_MASK, 0x0);
 	spin_unlock(&cs->lock);
 }
 
@@ -284,17 +285,17 @@ static void
 gazel_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char ista, val;
+	u8 ista, val;
 	int count = 0;
 
 	if (!cs) {
 		printk(KERN_WARNING "Gazel: Spurious interrupt!\n");
 		return;
 	}
-	ista = ReadISAC(cs, IPAC_ISTA - 0x80);
+	ista = readreg_ipac(cs, IPAC_ISTA);
 	do {
 		if (ista & 0x0f) {
-			val = ReadHSCX(cs, 1, HSCX_ISTA);
+			val = hscx_read(cs, 1, HSCX_ISTA);
 			if (ista & 0x01)
 				val |= 0x01;
 			if (ista & 0x04)
@@ -306,7 +307,7 @@ gazel_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 			}
 		}
 		if (ista & 0x20) {
-			val = 0xfe & ReadISAC(cs, ISAC_ISTA);
+			val = isac_read(cs, ISAC_ISTA) & 0xfe;
 			if (val) {
 				isac_interrupt(cs, val);
 			}
@@ -315,13 +316,13 @@ gazel_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 			val = 0x01;
 			isac_interrupt(cs, val);
 		}
-		ista = ReadISAC(cs, IPAC_ISTA - 0x80);
+		ista = readreg_ipac(cs, IPAC_ISTA);
 		count++;
 	}
 	while ((ista & 0x3f) && (count < MAXCOUNT));
 
-	WriteISAC(cs, IPAC_MASK - 0x80, 0xFF);
-	WriteISAC(cs, IPAC_MASK - 0x80, 0xC0);
+	writereg_ipac(cs, IPAC_MASK, 0xFF);
+	writereg_ipac(cs, IPAC_MASK, 0xC0);
 }
 void
 release_io_gazel(struct IsdnCardState *cs)
@@ -381,28 +382,28 @@ reset_gazel(struct IsdnCardState *cs)
 				plxcntrl = inl(addr + PLX_CNTRL);
 			plxcntrl |= (RESET_9050 + RESET_GAZEL);
 			outl(plxcntrl, addr + PLX_CNTRL);
-			WriteISAC(cs, IPAC_POTA2 - 0x80, 0x20);
+			writereg_ipac(cs, IPAC_POTA2, 0x20);
 			HZDELAY(4);
 			plxcntrl &= ~(RESET_9050 + RESET_GAZEL);
 			outl(plxcntrl, addr + PLX_CNTRL);
 			HZDELAY(10);
-			WriteISAC(cs, IPAC_POTA2 - 0x80, 0x00);
-			WriteISAC(cs, IPAC_ACFG - 0x80, 0xff);
-			WriteISAC(cs, IPAC_AOE - 0x80, 0x0);
-			WriteISAC(cs, IPAC_MASK - 0x80, 0xff);
-			WriteISAC(cs, IPAC_CONF - 0x80, 0x1);
+			writereg_ipac(cs, IPAC_POTA2, 0x00);
+			writereg_ipac(cs, IPAC_ACFG, 0xff);
+			writereg_ipac(cs, IPAC_AOE, 0x0);
+			writereg_ipac(cs, IPAC_MASK, 0xff);
+			writereg_ipac(cs, IPAC_CONF, 0x1);
 			outb(INT_IPAC_EN + INT_PCI_EN, addr + PLX_INCSR);
-			WriteISAC(cs, IPAC_MASK - 0x80, 0xc0);
+			writereg_ipac(cs, IPAC_MASK, 0xc0);
 			break;
 		case R742:
-			WriteISAC(cs, IPAC_POTA2 - 0x80, 0x20);
+			writereg_ipac(cs, IPAC_POTA2, 0x20);
 			HZDELAY(4);
-			WriteISAC(cs, IPAC_POTA2 - 0x80, 0x00);
-			WriteISAC(cs, IPAC_ACFG - 0x80, 0xff);
-			WriteISAC(cs, IPAC_AOE - 0x80, 0x0);
-			WriteISAC(cs, IPAC_MASK - 0x80, 0xff);
-			WriteISAC(cs, IPAC_CONF - 0x80, 0x1);
-			WriteISAC(cs, IPAC_MASK - 0x80, 0xc0);
+			writereg_ipac(cs, IPAC_POTA2, 0x00);
+			writereg_ipac(cs, IPAC_ACFG, 0xff);
+			writereg_ipac(cs, IPAC_AOE, 0x0);
+			writereg_ipac(cs, IPAC_MASK, 0xff);
+			writereg_ipac(cs, IPAC_CONF, 0x1);
+			writereg_ipac(cs, IPAC_MASK, 0xc0);
 			break;
 	}
 	return (0);
@@ -501,13 +502,13 @@ setup_gazelisa(struct IsdnCard *card, struct IsdnCardState *cs)
 	// R742 decodes address even in not started...
 	// R647 returns FF if not present or not started
 	// eventually needs improvment
-	if (readreg_ipac(card->para[1], IPAC_ID) == 1)
+	cs->hw.gazel.ipac = card->para[1];
+	if (readreg_ipac(cs, IPAC_ID) == 1)
 		cs->subtyp = R742;
 	else
 		cs->subtyp = R647;
 
 	cs->hw.gazel.cfg_reg = card->para[1] + 0xC000;
-	cs->hw.gazel.ipac = card->para[1];
 	cs->hw.gazel.isac = card->para[1] + 0x8000;
 	cs->hw.gazel.hscx[0] = card->para[1];
 	cs->hw.gazel.hscx[1] = card->para[1] + 0x4000;
@@ -546,9 +547,9 @@ static int __init
 setup_gazelpci(struct IsdnCardState *cs)
 {
 	u_int pci_ioaddr0 = 0, pci_ioaddr1 = 0;
-	u_char pci_irq = 0, found;
+	u8 pci_irq = 0, found;
 	u_int nbseek, seekcard;
-	u_char pci_rev;
+	u8 pci_rev;
 
 	printk(KERN_WARNING "Gazel: PCI card automatic recognition\n");
 
@@ -646,7 +647,7 @@ setup_gazel(struct IsdnCard *card)
 {
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
-	u_char val;
+	u8 val;
 
 	strcpy(tmp, gazel_revision);
 	printk(KERN_INFO "Gazel: Driver Revision %s\n", HiSax_getrev(tmp));
@@ -676,13 +677,8 @@ setup_gazel(struct IsdnCard *card)
 		release_io_gazel(cs);
 		return (0);
 	}
-	cs->readisac = &ReadISAC;
-	cs->writeisac = &WriteISAC;
-	cs->readisacfifo = &ReadISACfifo;
-	cs->writeisacfifo = &WriteISACfifo;
-	cs->BC_Read_Reg = &ReadHSCX;
-	cs->BC_Write_Reg = &WriteHSCX;
-	cs->BC_Send_Data = &hscx_fill_fifo;
+	cs->dc_hw_ops = &isac_ops;
+	cs->bc_hw_ops = &hscx_ops;
 	cs->cardmsg = &Gazel_card_msg;
 
 	switch (cs->subtyp) {
@@ -700,10 +696,10 @@ setup_gazel(struct IsdnCard *card)
 		case R742:
 		case R753:
 			cs->irq_func = &gazel_interrupt_ipac;
-			val = ReadISAC(cs, IPAC_ID - 0x80);
+			val = readreg_ipac(cs, IPAC_ID);
 			printk(KERN_INFO "Gazel: IPAC version %x\n", val);
 			break;
 	}
 
-	return (1);
+	return 1;
 }

@@ -24,10 +24,10 @@ static spinlock_t teleint_lock = SPIN_LOCK_UNLOCKED;
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)
 
-static inline u_char
-readreg(unsigned int ale, unsigned int adr, u_char off)
+static inline u8
+readreg(unsigned int ale, unsigned int adr, u8 off)
 {
-	register u_char ret;
+	register u8 ret;
 	int max_delay = 2000;
 	unsigned long flags;
 
@@ -47,9 +47,9 @@ readreg(unsigned int ale, unsigned int adr, u_char off)
 }
 
 static inline void
-readfifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size)
+readfifo(unsigned int ale, unsigned int adr, u8 off, u8 * data, int size)
 {
-	register u_char ret;
+	register u8 ret;
 	register int max_delay = 20000;
 	register int i;
 	
@@ -68,9 +68,9 @@ readfifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size
 
 
 static inline void
-writereg(unsigned int ale, unsigned int adr, u_char off, u_char data)
+writereg(unsigned int ale, unsigned int adr, u8 off, u8 data)
 {
-	register u_char ret;
+	register u8 ret;
 	int max_delay = 2000;
 	unsigned long flags;
 
@@ -89,9 +89,9 @@ writereg(unsigned int ale, unsigned int adr, u_char off, u_char data)
 }
 
 static inline void
-writefifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int size)
+writefifo(unsigned int ale, unsigned int adr, u8 off, u8 * data, int size)
 {
-	register u_char ret;
+	register u8 ret;
 	register int max_delay = 20000;
 	register int i;
 	
@@ -111,38 +111,45 @@ writefifo(unsigned int ale, unsigned int adr, u_char off, u_char * data, int siz
 
 /* Interface functions */
 
-static u_char
-ReadISAC(struct IsdnCardState *cs, u_char offset)
+static u8
+ReadISAC(struct IsdnCardState *cs, u8 offset)
 {
 	cs->hw.hfc.cip = offset;
 	return (readreg(cs->hw.hfc.addr | 1, cs->hw.hfc.addr, offset));
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
+WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	cs->hw.hfc.cip = offset;
 	writereg(cs->hw.hfc.addr | 1, cs->hw.hfc.addr, offset, value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	cs->hw.hfc.cip = 0;
 	readfifo(cs->hw.hfc.addr | 1, cs->hw.hfc.addr, 0, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	cs->hw.hfc.cip = 0;
 	writefifo(cs->hw.hfc.addr | 1, cs->hw.hfc.addr, 0, data, size);
 }
 
-static u_char
-ReadHFC(struct IsdnCardState *cs, int data, u_char reg)
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = ReadISAC,
+	.write_reg  = WriteISAC,
+	.read_fifo  = ReadISACfifo,
+	.write_fifo = WriteISACfifo,
+};
+
+static u8
+ReadHFC(struct IsdnCardState *cs, int data, u8 reg)
 {
-	register u_char ret;
+	register u8 ret;
 
 	if (data) {
 		cs->hw.hfc.cip = reg;
@@ -156,7 +163,7 @@ ReadHFC(struct IsdnCardState *cs, int data, u_char reg)
 }
 
 static void
-WriteHFC(struct IsdnCardState *cs, int data, u_char reg, u_char value)
+WriteHFC(struct IsdnCardState *cs, int data, u8 reg, u8 value)
 {
 	byteout(cs->hw.hfc.addr | 1, reg);
 	cs->hw.hfc.cip = reg;
@@ -166,11 +173,16 @@ WriteHFC(struct IsdnCardState *cs, int data, u_char reg, u_char value)
 		debugl1(cs, "hfc W%c %02x %02x", data ? 'D' : 'C', reg, value);
 }
 
+static struct bc_hw_ops hfc_ops = {
+	.read_reg  = ReadHFC,
+	.write_reg = WriteHFC,
+};
+
 static void
 TeleInt_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val;
+	u8 val;
 
 	spin_lock(&cs->lock);
 	val = readreg(cs->hw.hfc.addr | 1, cs->hw.hfc.addr, ISAC_ISTA);
@@ -319,12 +331,8 @@ setup_TeleInt(struct IsdnCard *card)
 	       cs->irq);
 
 	reset_TeleInt(cs);
-	cs->readisac = &ReadISAC;
-	cs->writeisac = &WriteISAC;
-	cs->readisacfifo = &ReadISACfifo;
-	cs->writeisacfifo = &WriteISACfifo;
-	cs->BC_Read_Reg = &ReadHFC;
-	cs->BC_Write_Reg = &WriteHFC;
+	cs->dc_hw_ops = &isac_ops;
+	cs->bc_hw_ops = &hfc_ops;
 	cs->cardmsg = &TeleInt_card_msg;
 	cs->irq_func = &TeleInt_interrupt;
 	ISACVersion(cs, "TeleInt:");

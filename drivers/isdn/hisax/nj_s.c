@@ -17,20 +17,11 @@
 
 const char *NETjet_S_revision = "$Revision: 2.7.6.6 $";
 
-static u_char dummyrr(struct IsdnCardState *cs, int chan, u_char off)
-{
-	return(5);
-}
-
-static void dummywr(struct IsdnCardState *cs, int chan, u_char off, u_char value)
-{
-}
-
 static void
 netjet_s_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char val, sval;
+	u8 val, sval;
 
 	spin_lock(&cs->lock);
 	if (!((sval = bytein(cs->hw.njet.base + NETJET_IRQSTAT1)) &
@@ -235,13 +226,7 @@ setup_netjet_s(struct IsdnCard *card)
 		request_region(cs->hw.njet.base, bytecnt, "netjet-s isdn");
 	}
 	reset_netjet_s(cs);
-	cs->readisac  = &NETjet_ReadIC;
-	cs->writeisac = &NETjet_WriteIC;
-	cs->readisacfifo  = &NETjet_ReadICfifo;
-	cs->writeisacfifo = &NETjet_WriteICfifo;
-	cs->BC_Read_Reg  = &dummyrr;
-	cs->BC_Write_Reg = &dummywr;
-	cs->BC_Send_Data = &netjet_fill_dma;
+	cs->dc_hw_ops = &netjet_dc_ops;
 	cs->cardmsg = &NETjet_S_card_msg;
 	cs->irq_func = &netjet_s_interrupt;
 	cs->irq_flags |= SA_SHIRQ;

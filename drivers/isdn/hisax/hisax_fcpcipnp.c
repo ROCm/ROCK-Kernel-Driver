@@ -890,6 +890,24 @@ static int __devinit fcpci_probe(struct pci_dev *pdev,
 	return retval;
 }
 
+static void __devexit fcpci_remove(struct pci_dev *pdev)
+{
+	struct fritz_adapter *adapter = pci_get_drvdata(pdev);
+
+	fcpcipnp_release(adapter);
+	pci_disable_device(pdev);
+	delete_adapter(adapter);
+}
+
+static struct pci_driver fcpci_driver = {
+	.name     = "fcpci",
+	.probe    = fcpci_probe,
+	.remove   = __devexit_p(fcpci_remove),
+	.id_table = fcpci_ids,
+};
+
+#ifdef __ISAPNP__
+
 static int __devinit fcpnp_probe(struct pci_dev *pdev,
 				 const struct isapnp_device_id *ent)
 {
@@ -924,15 +942,6 @@ static int __devinit fcpnp_probe(struct pci_dev *pdev,
 	return retval;
 }
 
-static void __devexit fcpci_remove(struct pci_dev *pdev)
-{
-	struct fritz_adapter *adapter = pci_get_drvdata(pdev);
-
-	fcpcipnp_release(adapter);
-	pci_disable_device(pdev);
-	delete_adapter(adapter);
-}
-
 static void __devexit fcpnp_remove(struct pci_dev *pdev)
 {
 	struct fritz_adapter *adapter = pci_get_drvdata(pdev);
@@ -942,19 +951,14 @@ static void __devexit fcpnp_remove(struct pci_dev *pdev)
 	delete_adapter(adapter);
 }
 
-static struct pci_driver fcpci_driver = {
-	.name     = "fcpci",
-	.probe    = fcpci_probe,
-	.remove   = __devexit_p(fcpci_remove),
-	.id_table = fcpci_ids,
-};
-
 static struct isapnp_driver fcpnp_driver = {
 	.name     = "fcpnp",
 	.probe    = fcpnp_probe,
 	.remove   = __devexit_p(fcpnp_remove),
 	.id_table = fcpnp_ids,
 };
+
+#endif
 
 static int __init hisax_fcpcipnp_init(void)
 {
@@ -967,7 +971,11 @@ static int __init hisax_fcpcipnp_init(void)
 		goto out;
 	pci_nr_found = retval;
 
+#ifdef __ISAPNP__
 	retval = isapnp_register_driver(&fcpnp_driver);
+#else
+	retval = 0;
+#endif
 	if (retval < 0)
 		goto out_unregister_pci;
 
@@ -981,7 +989,9 @@ static int __init hisax_fcpcipnp_init(void)
 
 #if !defined(CONFIG_HOTPLUG) || defined(MODULE)
  out_unregister_isapnp:
+#ifdef __ISAPNP__
 	isapnp_unregister_driver(&fcpnp_driver);
+#endif
 #endif
  out_unregister_pci:
 	pci_unregister_driver(&fcpci_driver);
@@ -991,7 +1001,9 @@ static int __init hisax_fcpcipnp_init(void)
 
 static void __exit hisax_fcpcipnp_exit(void)
 {
+#ifdef __ISAPNP__
 	isapnp_unregister_driver(&fcpnp_driver);
+#endif
 	pci_unregister_driver(&fcpci_driver);
 }
 

@@ -43,11 +43,11 @@ static const char *hfcsx_revision = "$Revision: 1.9.6.3 $";
 
 #undef CCD_DEMO_BOARD
 #ifdef CCD_DEMO_BOARD
-static u_char ccd_sp_irqtab[16] = {
+static u8 ccd_sp_irqtab[16] = {
   0,0,0,0,0,2,1,0,0,0,3,4,5,0,0,6
 };
 #else /* Teles 16.3c */
-static u_char ccd_sp_irqtab[16] = {
+static u8 ccd_sp_irqtab[16] = {
   0,0,0,7,0,1,0,0,0,2,3,4,5,0,0,6
 };
 #endif
@@ -60,17 +60,17 @@ static u_char ccd_sp_irqtab[16] = {
 /* In/Out access to registers */
 /******************************/
 static inline void
-Write_hfc(struct IsdnCardState *cs, u_char regnum, u_char val)
+Write_hfc(struct IsdnCardState *cs, u8 regnum, u8 val)
 {
 
         byteout(cs->hw.hfcsx.base+1, regnum);
 	byteout(cs->hw.hfcsx.base, val);
 } 
 
-static inline u_char
-Read_hfc(struct IsdnCardState *cs, u_char regnum)
+static inline u8
+Read_hfc(struct IsdnCardState *cs, u8 regnum)
 {
-        u_char ret; 
+        u8 ret; 
 
         byteout(cs->hw.hfcsx.base+1, regnum);
 	ret = bytein(cs->hw.hfcsx.base);
@@ -82,7 +82,7 @@ Read_hfc(struct IsdnCardState *cs, u_char regnum)
 /* select a fifo and remember which one for reuse */
 /**************************************************/
 static void
-fifo_select(struct IsdnCardState *cs, u_char fifo)
+fifo_select(struct IsdnCardState *cs, u8 fifo)
 {
         if (fifo == cs->hw.hfcsx.last_fifo) 
 	  return; /* still valid */
@@ -100,7 +100,7 @@ fifo_select(struct IsdnCardState *cs, u_char fifo)
 /* If its a send fifo init needed markers */
 /******************************************/
 static void
-reset_fifo(struct IsdnCardState *cs, u_char fifo)
+reset_fifo(struct IsdnCardState *cs, u8 fifo)
 {
 	fifo_select(cs, fifo); /* first select the fifo */
 	byteout(cs->hw.hfcsx.base+1, HFCSX_CIRM);
@@ -116,10 +116,10 @@ reset_fifo(struct IsdnCardState *cs, u_char fifo)
 /* the skb is not released in any way.                       */
 /*************************************************************/
 static int
-write_fifo(struct IsdnCardState *cs, struct sk_buff *skb, u_char fifo, int trans_max)
+write_fifo(struct IsdnCardState *cs, struct sk_buff *skb, u8 fifo, int trans_max)
 {       unsigned short *msp;
         int fifo_size, count, z1, z2;
-	u_char f_msk, f1, f2, *src;
+	u8 f_msk, f1, f2, *src;
 
 	if (skb->len <= 0) return(0);
         if (fifo & 1) return(0); /* no write fifo */
@@ -205,9 +205,9 @@ write_fifo(struct IsdnCardState *cs, struct sk_buff *skb, u_char fifo, int trans
 /* the skb is not released in any way.                         */
 /***************************************************************/
 static struct sk_buff * 
-read_fifo(struct IsdnCardState *cs, u_char fifo, int trans_max)
+read_fifo(struct IsdnCardState *cs, u8 fifo, int trans_max)
 {       int fifo_size, count, z1, z2;
-	u_char f_msk, f1, f2, *dst;
+	u8 f_msk, f1, f2, *dst;
 	struct sk_buff *skb;
 
         if (!(fifo & 1)) return(NULL); /* no read fifo */
@@ -629,7 +629,7 @@ static void
 receive_emsg(struct IsdnCardState *cs)
 {
 	int count = 5;
-	u_char *ptr;
+	u8 *ptr;
 	struct sk_buff *skb;
 
 	do {
@@ -664,10 +664,10 @@ static void
 hfcsx_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
-	u_char exval;
+	u8 exval;
 	struct BCState *bcs;
 	int count = 15;
-	u_char val, stat;
+	u8 val, stat;
 
 	if (!cs) {
 		printk(KERN_WARNING "HFC-SX: Spurious interrupt!\n");
@@ -1112,6 +1112,9 @@ hfcsx_bh(void *data)
 		DChannel_proc_xmt(cs);
 }
 
+static struct bc_l1_ops hfcsx_l1_ops = {
+	.fill_fifo = hfcsx_fill_fifo,
+};
 
 /********************************/
 /* called for card init message */
@@ -1124,7 +1127,7 @@ inithfcsx(struct IsdnCardState *cs)
 	cs->dbusytimer.data = (long) cs;
 	init_timer(&cs->dbusytimer);
 	INIT_WORK(&cs->work, hfcsx_bh, cs);
-	cs->BC_Send_Data = hfcsx_fill_fifo;
+	cs->bc_l1_ops = &hfcsx_l1_ops;
 	cs->DC_Send_Data = hfcsx_fill_dfifo;
 	cs->bcs[0].BC_SetStack = setstack_2b;
 	cs->bcs[1].BC_SetStack = setstack_2b;
@@ -1285,12 +1288,6 @@ setup_hfcsx(struct IsdnCard *card)
 	} else
 		return (0);	/* no valid card type */
 
-	cs->readisac = NULL;
-	cs->writeisac = NULL;
-	cs->readisacfifo = NULL;
-	cs->writeisacfifo = NULL;
-	cs->BC_Read_Reg = NULL;
-	cs->BC_Write_Reg = NULL;
 	cs->irq_func = &hfcsx_interrupt;
 
 	cs->hw.hfcsx.timer.function = (void *) hfcsx_Timer;
