@@ -195,14 +195,15 @@ error:
 
 static void cleanup_slots(struct controller *ctrl)
 {
-	struct slot *old_slot;
+	struct slot *old_slot, *next_slot;
 
 	old_slot = ctrl->slot;
 	ctrl->slot = NULL;
 
 	while (old_slot) {
+		next_slot = old_slot->next;
 		pci_hp_deregister(old_slot->hotplug_slot);
-		old_slot = old_slot->next;
+		old_slot = next_slot;
 	}
 }
 
