@@ -5787,7 +5787,7 @@ pfm_save_regs(struct task_struct *task)
 	 */
 	psr = pfm_get_psr();
 
-	BUG_ON(foo & (IA64_PSR_I));
+	BUG_ON(psr & (IA64_PSR_I));
 
 	/*
 	 * stop monitoring:
