@@ -140,6 +140,13 @@ config MK7
 	  some extended instructions, and passes appropriate optimization
 	  flags to GCC.
 
+config MK8
+	bool "Opteron/Athlon64/Hammer/K8"
+	help
+	  Select this for an AMD Opteron or Athlon64 Hammer-family processor.  Enables
+	  use of some extended instructions, and passes appropriate optimization
+	  flags to GCC.
+
 config MELAN
 	bool "Elan"
 
@@ -200,7 +207,7 @@ config X86_L1_CACHE_SHIFT
 	int
 	default "5" if MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCRUSOE || MCYRIXIII || MK6 || MPENTIUMIII || M686 || M586MMX || M586TSC || M586
 	default "4" if MELAN || M486 || M386
-	default "6" if MK7
+	default "6" if MK7 || MK8
 	default "7" if MPENTIUM4
 
 config RWSEM_GENERIC_SPINLOCK
@@ -255,12 +262,12 @@ config X86_ALIGNMENT_16
 
 config X86_TSC
 	bool
-	depends on MWINCHIP3D || MWINCHIP2 || MCRUSOE || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMIII || M686 || M586MMX || M586TSC
+	depends on MWINCHIP3D || MWINCHIP2 || MCRUSOE || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMIII || M686 || M586MMX || M586TSC || MK8
 	default y
 
 config X86_GOOD_APIC
 	bool
-	depends on MK7 || MPENTIUM4 || MPENTIUMIII || M686 || M586MMX
+	depends on MK7 || MPENTIUM4 || MPENTIUMIII || M686 || M586MMX || MK8
 	default y
 
 config X86_INTEL_USERCOPY
@@ -270,7 +277,7 @@ config X86_INTEL_USERCOPY
 
 config X86_USE_PPRO_CHECKSUM
 	bool
-	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMIII || M686
+	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMIII || M686 || MK8
 	default y
 
 config X86_USE_3DNOW
@@ -286,6 +293,11 @@ config X86_OOSTORE
 config X86_PREFETCH
 	bool
 	depends on MPENTIUMIII || MP4
+	default y
+
+config X86_SSE2
+        bool
+	depends on MK8 || MPENTIUM4
 	default y
 
 config HUGETLB_PAGE
