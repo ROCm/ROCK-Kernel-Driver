@@ -74,85 +74,7 @@ static struct pci_ops via82c505_ops = {
 	via82c505_write_config_dword,
 };
 
-#ifdef CONFIG_ARCH_SHARK
-
-static char size_wanted;
-
-static int
-dummy_read_config_byte(struct pci_dev *dev, int where, u8 *value)
-{
-	*value=0;
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-dummy_read_config_word(struct pci_dev *dev, int where, u16 *value)
-{
-	*value=0;
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-dummy_read_config_dword(struct pci_dev *dev, int where, u32 *value)
-{
-	if (dev->devfn != 0) *value = 0;
-	else
-	  switch(where) {
-	  case PCI_VENDOR_ID:
-	    *value = PCI_VENDOR_ID_INTERG | PCI_DEVICE_ID_INTERG_2010 << 16;
-	    break;
-	  case PCI_CLASS_REVISION:
-	    *value = PCI_CLASS_DISPLAY_VGA << 16;
-	    break;
-	  case PCI_BASE_ADDRESS_0:
-	    if (size_wanted) {
-	      /* 0x00900000 bytes long (0xff700000) */
-	      *value = 0xff000000;
-	      size_wanted = 0;
-	    } else {
-	      *value = FB_START;
-	    }
-	    break;
-	  case PCI_INTERRUPT_LINE:
-	    *value = 6;
-	    break;
-	  default:
-	    *value = 0;
-	  }
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-dummy_write_config_byte(struct pci_dev *dev, int where, u8 value)
-{
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-dummy_write_config_word(struct pci_dev *dev, int where, u16 value)
-{
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-dummy_write_config_dword(struct pci_dev *dev, int where, u32 value)
-{
-	if ((dev->devfn == 0) && (where == PCI_BASE_ADDRESS_0) && (value == 0xffffffff))
-	  size_wanted = 1;
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static struct pci_ops dummy_ops = {
-	dummy_read_config_byte,
-	dummy_read_config_word,
-	dummy_read_config_dword,
-	dummy_write_config_byte,
-	dummy_write_config_word,
-	dummy_write_config_dword,
-};
-#endif
-
-void __init via82c505_init(void *sysdata)
+void __init via82c505_preinit(void *sysdata)
 {
 	struct pci_bus *bus;
 
@@ -166,13 +88,17 @@ void __init via82c505_init(void *sysdata)
 	outb(0x93,0xA8);
 	outb(0xd0,0xA9);
 
-	pci_scan_bus(0, &via82c505_ops, sysdata);
+}
 
-#ifdef CONFIG_ARCH_SHARK
-	/* 
-	 * Initialize a fake pci-bus number 1 for the CyberPro
-         * on the vlbus
-	 */
-	bus = pci_scan_bus(1, &dummy_ops, sysdata);
-#endif
+int __init via82c505_setup(int nr, struct pci_sys_data *sys)
+{
+	return (nr == 0);
+}
+
+struct pci_bus * __init via82c505_scan_bus(int nr, struct pci_sys_data *sysdata)
+{
+	if (nr == 0)
+		return pci_scan_bus(0, &via82c505_ops, sysdata);
+
+	return NULL;
 }
