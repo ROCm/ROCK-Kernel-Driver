@@ -604,9 +604,9 @@ int inet6_mc_check(struct sock *sk, struct in6_addr *mc_addr,
 			if (ipv6_addr_cmp(&psl->sl_addr[i], src_addr) == 0)
 				break;
 		}
-		if (mc->sfmode == MCAST_INCLUDE && i >= psl->sl_count);
+		if (mc->sfmode == MCAST_INCLUDE && i >= psl->sl_count)
 			rv = 0;
-		if (mc->sfmode == MCAST_EXCLUDE && i < psl->sl_count);
+		if (mc->sfmode == MCAST_EXCLUDE && i < psl->sl_count)
 			rv = 0;
 	}
 	read_unlock(&ipv6_sk_mc_lock);
