@@ -328,33 +328,65 @@ out1:
 	return NULL;
 }
 
-void __init
-pcibios_fixup_device_resources (struct pci_dev *dev, struct pci_bus *bus)
+void pcibios_resource_to_bus(struct pci_dev *dev,
+		struct pci_bus_region *region, struct resource *res)
 {
 	struct pci_controller *controller = PCI_CONTROLLER(dev);
-	struct pci_window *window;
-	int i, j;
+	unsigned long offset = 0;
+	int i;
+
+	for (i = 0; i < controller->windows; i++) {
+		struct pci_window *window = &controller->window[i];
+		if (!(window->resource.flags & res->flags))
+			continue;
+		if (window->resource.start > res->start - window->offset)
+			continue;
+		if (window->resource.end < res->end - window->offset)
+			continue;
+		offset = window->offset;
+		break;
+	}
+
+	region->start = res->start - offset;
+	region->end = res->end - offset;
+}
+
+void pcibios_bus_to_resource(struct pci_dev *dev,
+		struct resource *res, struct pci_bus_region *region)
+{
+	struct pci_controller *controller = PCI_CONTROLLER(dev);
+	unsigned long offset = 0;
+	int i;
+
+	for (i = 0; i < controller->windows; i++) {
+		struct pci_window *window = &controller->window[i];
+		if (!(window->resource.flags & res->flags))
+			continue;
+		if (window->resource.start > region->start)
+			continue;
+		if (window->resource.end < region->end)
+			continue;
+		offset = window->offset;
+		break;
+	}
+
+	res->start = region->start + offset;
+	res->end = region->end + offset;
+}
+
+static void __devinit pcibios_fixup_device_resources(struct pci_dev *dev)
+{
+	struct pci_bus_region region;
+	int i;
 	int limit = (dev->hdr_type == PCI_HEADER_TYPE_NORMAL) ? \
 		PCI_BRIDGE_RESOURCES : PCI_NUM_RESOURCES;
 
 	for (i = 0; i < limit; i++) {
-		if (!dev->resource[i].start)
+		if (!dev->resource[i].flags)
 			continue;
-
-#define contains(win, res)	((res)->start >= (win)->start && \
-				 (res)->end   <= (win)->end)
-
-		for (j = 0; j < controller->windows; j++) {
-			window = &controller->window[j];
-			if (((dev->resource[i].flags & IORESOURCE_MEM &&
-			      window->resource.flags & IORESOURCE_MEM) ||
-			     (dev->resource[i].flags & IORESOURCE_IO &&
-			      window->resource.flags & IORESOURCE_IO)) &&
-			    contains(&window->resource, &dev->resource[i])) {
-				dev->resource[i].start += window->offset;
-				dev->resource[i].end   += window->offset;
-			}
-		}
+		region.start = dev->resource[i].start;
+		region.end = dev->resource[i].end;
+		pcibios_bus_to_resource(dev, &dev->resource[i], &region);
 		pci_claim_resource(dev, i);
 	}
 }
@@ -368,7 +400,7 @@ pcibios_fixup_bus (struct pci_bus *b)
 	struct pci_dev *dev;
 
 	list_for_each_entry(dev, &b->devices, bus_list)
-		pcibios_fixup_device_resources(dev, b);
+		pcibios_fixup_device_resources(dev);
 
 	return;
 }
@@ -451,21 +483,21 @@ pci_mmap_page_range (struct pci_dev *dev, struct vm_area_struct *vma,
 		     enum pci_mmap_state mmap_state, int write_combine)
 {
 	/*
-	 * I/O space cannot be accessed via normal processor loads and stores on this
-	 * platform.
+	 * I/O space cannot be accessed via normal processor loads and
+	 * stores on this platform.
 	 */
 	if (mmap_state == pci_mmap_io)
 		/*
-		 * XXX we could relax this for I/O spaces for which ACPI indicates that
-		 * the space is 1-to-1 mapped.  But at the moment, we don't support
-		 * multiple PCI address spaces and the legacy I/O space is not 1-to-1
-		 * mapped, so this is moot.
+		 * XXX we could relax this for I/O spaces for which ACPI
+		 * indicates that the space is 1-to-1 mapped.  But at the
+		 * moment, we don't support multiple PCI address spaces and
+		 * the legacy I/O space is not 1-to-1 mapped, so this is moot.
 		 */
 		return -EINVAL;
 
 	/*
-	 * Leave vm_pgoff as-is, the PCI space address is the physical address on this
-	 * platform.
+	 * Leave vm_pgoff as-is, the PCI space address is the physical
+	 * address on this platform.
 	 */
 	vma->vm_flags |= (VM_SHM | VM_LOCKED | VM_IO);
 
