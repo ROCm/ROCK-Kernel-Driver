@@ -588,6 +588,7 @@ struct sctp6_sock {
 #endif /* CONFIG_IPV6 */
 
 #define sctp_sk(__sk) (&((struct sctp_sock *)__sk)->sctp)
+#define sctp_opt2sk(__sp) &container_of(__sp, struct sctp_sock, sctp)->sk
 
 /* Is a socket of this style? */
 #define sctp_style(sk, style) __sctp_style((sk), (SCTP_SOCKET_##style))
