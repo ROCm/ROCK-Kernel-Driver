@@ -37,6 +37,8 @@ static int trapped;
 		(MAX_UDP_CHUNK + sizeof(struct udphdr) + \
 				sizeof(struct iphdr) + sizeof(struct ethhdr))
 
+static void zap_completion_queue(void);
+
 static int checksum_udp(struct sk_buff *skb, struct udphdr *uh,
 			     unsigned short ulen, u32 saddr, u32 daddr)
 {
@@ -66,6 +68,7 @@ void netpoll_poll(struct netpoll *np)
 	if(trapped && np->dev->poll &&
 	   test_bit(__LINK_STATE_RX_SCHED, &np->dev->state))
 		np->dev->poll(np->dev, &budget);
+	zap_completion_queue();
 }
 
 static void refill_skbs(void)
@@ -115,8 +118,8 @@ static struct sk_buff * find_skb(struct netpoll *np, int len, int reserve)
 	unsigned long flags;
 	struct sk_buff *skb = NULL;
 
-repeat:
 	zap_completion_queue();
+repeat:
 	if (nr_skbs < MAX_SKBS)
 		refill_skbs();
 
@@ -165,7 +168,6 @@ repeat:
 		spin_unlock(&np->dev->xmit_lock);
 
 		netpoll_poll(np);
-		zap_completion_queue();
 		goto repeat;
 	}
 
