@@ -264,7 +264,7 @@ acpi_parse_hpet (
  * programs the PIC-mode SCI to Level Trigger.
  * (NO-OP if the BIOS set Level Trigger already)
  *
- * If a PIC-mode SCI is not recogznied or gives spurious IRQ7's
+ * If a PIC-mode SCI is not recognized or gives spurious IRQ7's
  * it may require Edge Trigger -- use "acpi_pic_sci=edge"
  * (NO-OP if the BIOS set Edge Trigger already)
  *
