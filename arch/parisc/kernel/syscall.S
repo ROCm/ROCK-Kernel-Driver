@@ -331,10 +331,12 @@ tracesys_sigexit:
 #define ENTRY_SAME(_name_) .dword sys_##_name_
 #define ENTRY_DIFF(_name_) .dword sys32_##_name_
 #define ENTRY_UHOH(_name_) .dword sys32_##unimplemented
+#define ENTRY_OURS(_name_) .dword parisc_##_name_
 #else
 #define ENTRY_SAME(_name_) .word sys_##_name_
 #define ENTRY_DIFF(_name_) .word sys_##_name_
 #define ENTRY_UHOH(_name_) .word sys_##_name_
+#define ENTRY_OURS(_name_) .word parisc_##_name_
 #endif
 
 	.align 8
@@ -398,7 +400,7 @@ sys_call_table:
 	/* struct sockaddr... */
 	ENTRY_SAME(getsockname)
 	/* it seems possible brk() could return a >4G pointer... */
-	ENTRY_SAME(brk)		/* 45 */
+	ENTRY_SAME(brk)			/* 45 */
 	ENTRY_SAME(setgid)
 	ENTRY_SAME(getgid)
 	ENTRY_SAME(signal)
@@ -476,8 +478,8 @@ sys_call_table:
 	ENTRY_DIFF(getitimer)	/* 105 */
 	ENTRY_SAME(capget)
 	ENTRY_SAME(capset)
-	ENTRY_SAME(pread64)
-	ENTRY_SAME(pwrite64)
+	ENTRY_OURS(pread64)
+	ENTRY_OURS(pwrite64)
 	ENTRY_SAME(getcwd)		/* 110 */
 	ENTRY_SAME(vhangup)
 	ENTRY_SAME(fstat64)
@@ -592,18 +594,18 @@ sys_call_table:
 	ENTRY_SAME(shmat_wrapper)
 	ENTRY_SAME(shmdt)
 	ENTRY_SAME(shmget)
-	ENTRY_SAME(shmctl_broken)		/* 195 */
+	ENTRY_SAME(shmctl_broken)	/* 195 */
 	ENTRY_SAME(ni_syscall)		/* streams1 */
 	ENTRY_SAME(ni_syscall)		/* streams2 */
 	ENTRY_SAME(lstat64)
-	ENTRY_DIFF(truncate64)
-	ENTRY_DIFF(ftruncate64)	/* 200 */
+	ENTRY_OURS(truncate64)
+	ENTRY_OURS(ftruncate64)		/* 200 */
 	ENTRY_SAME(getdents64)
 	ENTRY_DIFF(fcntl64)
 #ifdef CONFIG_XFS_FS
 	ENTRY_SAME(attrctl)
 	ENTRY_SAME(acl_get)
-	ENTRY_SAME(acl_set)            /* 205 */
+	ENTRY_SAME(acl_set)		/* 205 */
 #else
 	ENTRY_SAME(ni_syscall)
 	ENTRY_SAME(ni_syscall)

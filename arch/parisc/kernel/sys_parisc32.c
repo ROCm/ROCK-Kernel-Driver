@@ -2743,19 +2743,7 @@ asmlinkage long sys32_msgrcv(int msqid,
 
 /* LFS */
 
-extern asmlinkage long sys_truncate(const char *, loff_t);
-extern asmlinkage long sys_ftruncate(unsigned int, loff_t);
 extern asmlinkage long sys_fcntl(unsigned int, unsigned int, unsigned long);
-
-asmlinkage long sys32_truncate64(const char * path, unsigned int high, unsigned int low)
-{
-	return sys_truncate(path, (loff_t)high << 32 | low);
-}
-
-asmlinkage long sys32_ftruncate64(unsigned int fd, unsigned int high, unsigned int low)
-{
-	return sys_ftruncate(fd, (loff_t)high << 32 | low);
-}
 
 asmlinkage long sys32_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg)
 {

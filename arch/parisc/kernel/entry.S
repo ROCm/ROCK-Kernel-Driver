@@ -502,7 +502,6 @@ fault_vector_11:
 	.import		handle_real_interruption,code
 	.import		do_cpu_irq_mask,code
 	.import		parisc_stopkernel,code
-	.import		cpu_irq_region,data
 
 	/*
 	 * r26 = function to be called
@@ -528,23 +527,28 @@ __kernel_thread:
 	ldd	24(%r26), %r2
 	STREG	%r2, PT_GR27(%r1)	/* Store childs %dp */
 	ldd	16(%r26), %r26
+
+	STREG	%r22, PT_GR22(%r1)	/* Store childs %dp */
+	copy	%r0, %r22		/* user_tid */
 #endif
 	STREG	%r26, PT_GR26(%r1)  /* Store function & argument for child */
 	STREG	%r25, PT_GR25(%r1)
 	ldo	CLONE_VM(%r0), %r26   /* Force CLONE_VM since only init_mm */
 	or	%r26, %r24, %r26      /* will have kernel mappings.	 */
-	copy	%r0, %r25
+	copy	%r0, %r25		/* stack_start */
+	stw	%r0, -52(%r30)	     	/* user_tid */
 #ifdef __LP64__
 	ldo	-16(%r30),%r29		/* Reference param save area */
 #endif
 	bl	do_fork, %r2
-	copy	%r1, %r24
+	copy	%r1, %r24		/* pt_regs */
 
 	/* Parent Returns here */
 
 	LDREG	-PT_SZ_ALGN-RP_OFFSET(%r30), %r2
-	bv	%r0(%r2)
 	ldo	-PT_SZ_ALGN(%r30), %r30
+	bv	%r0(%r2)
+	ldw	TASK_PID(%r28), %r28
 
 	/*
 	 * Child Returns here
@@ -566,6 +570,7 @@ ret_from_kernel_thread:
 	LDREG	TASK_PT_GR25(%r1), %r26
 #ifdef __LP64__
 	LDREG	TASK_PT_GR27(%r1), %r27
+	LDREG	TASK_PT_GR22(%r1), %r22
 #endif
 	LDREG	TASK_PT_GR26(%r1), %r1
 	ble	0(%sr7, %r1)
@@ -785,10 +790,10 @@ intr_do_softirq:
 	.import schedule,code
 intr_do_resched:
 	/* Only do reschedule if we are returning to user space */
-	LDREG   PT_IASQ0(%r16), %r20
+	LDREG	PT_IASQ0(%r16), %r20
 	CMPIB= 0,%r20,intr_restore /* backward */
 	nop
-	LDREG   PT_IASQ1(%r16), %r20
+	LDREG	PT_IASQ1(%r16), %r20
 	CMPIB= 0,%r20,intr_restore /* backward */
 	nop
 
@@ -796,28 +801,29 @@ intr_do_resched:
 	ldo	-16(%r30),%r29		/* Reference param save area */
 #endif
 
-	ldil	L%intr_return, %r2
+	ldil	L%intr_check_sig, %r2
 	b	schedule
-	ldo	R%intr_return(%r2), %r2	/* return to intr_return, not here */
+	ldo	R%intr_check_sig(%r2), %r2
 
 
 	.import do_signal,code
 intr_do_signal:
 	/* Only do signals if we are returning to user space */
-	LDREG   PT_IASQ0(%r16), %r20
+	LDREG	PT_IASQ0(%r16), %r20
 	CMPIB= 0,%r20,intr_restore /* backward */
 	nop
-	LDREG   PT_IASQ1(%r16), %r20
+	LDREG	PT_IASQ1(%r16), %r20
 	CMPIB= 0,%r20,intr_restore /* backward */
 	nop
 
 	copy	%r0, %r24			/* unsigned long in_syscall */
 	copy	%r16, %r25			/* struct pt_regs *regs */
-	ssm     PSW_SM_I, %r0
 #ifdef __LP64__
 	ldo	-16(%r30),%r29			/* Reference param save area */
 #endif
-#warning TAUSQ FIXME, this is wrong
+
+#warning TAUSQ FIXME - review 2.5 signal return path changes
+
 	bl	do_signal,%r2
 	copy	%r0, %r26			/* sigset_t *oldset = NULL */
 
@@ -860,25 +866,18 @@ intr_extint:
 	
 	loadgp
 
-	copy	%r29, %r25	/* arg1 is pt_regs */
+	copy	%r29, %r26	/* arg0 is pt_regs */
 	copy	%r29, %r16	/* save pt_regs */
+
+	ldil	L%intr_return, %r2
 
 #ifdef __LP64__
 	ldo	-16(%r30),%r29	/* Reference param save area */
-#else
-	nop
 #endif
-	
-	/*
-	 * We need to either load the CPU's ID or IRQ region.
-	 * Until we have "per CPU" IRQ regions, this is easy.
-	 */
-	ldil	L%cpu_irq_region, %r26
-	ldil	L%intr_return, %r2
-	ldo	R%cpu_irq_region(%r26), %r26
-	
+
 	b	do_cpu_irq_mask
 	ldo	R%intr_return(%r2), %r2	/* return to intr_return, not here */
+
 
 	/* Generic interruptions (illegal insn, unaligned, page fault, etc) */
 
@@ -953,11 +952,11 @@ skip_save_ior:
 	ldo		-16(%r30),%r29	/* Reference param save area */
 #endif
 
-	ldil		L%intr_return, %r2
+	ldil		L%intr_restore, %r2
 	copy		%r25, %r16	/* save pt_regs */
 
 	b		handle_interruption
-	ldo		R%intr_return(%r2), %r2	/* return to intr_return */
+	ldo		R%intr_restore(%r2), %r2
 
 
 	/*

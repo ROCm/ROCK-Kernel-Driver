@@ -57,7 +57,7 @@ extern void ipi_interrupt(int, void *, struct pt_regs *);
 /* Bits in EIEM correlate with cpu_irq_action[].
 ** Numbered *Big Endian*! (ie bit 0 is MSB)
 */
-static unsigned long cpu_eiem = 0;
+static volatile unsigned long cpu_eiem = 0;
 
 static spinlock_t irq_lock = SPIN_LOCK_UNLOCKED;  /* protect IRQ regions */
 
@@ -104,24 +104,35 @@ static inline void unmask_cpu_irq(void *unused, int irq)
 	set_eiem(cpu_eiem);
 }
 
-static struct irqaction cpu_irq_actions[IRQ_PER_REGION] = {
+/*
+ * XXX cpu_irq_actions[] will become 2 dimensional for per CPU EIR support.
+ * correspond changes needed in:
+ * 	processor_probe()	initialize additional action arrays
+ * 	request_irq()		handle CPU IRQ region specially
+ * 	do_cpu_irq_mask()	index into the matching irq_action array.
+ */
+struct irqaction cpu_irq_actions[IRQ_PER_REGION] = {
 	[IRQ_OFFSET(TIMER_IRQ)] { handler: timer_interrupt, name: "timer", },
 #ifdef CONFIG_SMP
 	[IRQ_OFFSET(IPI_IRQ)]	{ handler: ipi_interrupt,   name: "IPI", },
 #endif
 };
 
-struct irq_region cpu_irq_region = {
+struct irq_region_ops cpu_irq_ops = {
+	disable_cpu_irq, enable_cpu_irq, unmask_cpu_irq, unmask_cpu_irq
+};
+
+struct irq_region cpu0_irq_region = {
 	ops:	{ disable_cpu_irq, enable_cpu_irq, unmask_cpu_irq, unmask_cpu_irq },
 	data:	{ dev: &cpu_data[0],
-		  name: "PA-CPU-00",
+		  name: "PARISC-CPU",
 		  irqbase: IRQ_FROM_REGION(CPU_IRQ_REGION), },
 	action:	cpu_irq_actions,
 };
 
 struct irq_region *irq_region[NR_IRQ_REGS] = {
 	[ 0 ]              NULL, /* reserved for EISA, else causes data page fault (aka code 15) */
-	[ CPU_IRQ_REGION ] &cpu_irq_region,
+	[ CPU_IRQ_REGION ] &cpu0_irq_region,
 };
 
 
@@ -192,10 +203,10 @@ int show_interrupts(struct seq_file *p, void *v)
 	unsigned int regnr = 0;
 
 	seq_puts(p, "     ");
-#if 0 /* def CONFIG_SMP */
-	for (; regnr < smp_num_cpus; regnr++)
+#ifdef CONFIG_SMP
+	for (regnr = 0; regnr < NR_CPUS; regnr++)
 #endif
-		seq_printf(p, "      CPU%d ", regnr);
+		seq_printf(p, "      CPU%02d ", regnr);
 
 #ifdef PARISC_IRQ_CR16_COUNTS
 	seq_printf(p, "[min/avg/max] (CPU cycle counts)");
@@ -216,24 +227,16 @@ int show_interrupts(struct seq_file *p, void *v)
 	    for (i = 0; i <= MAX_CPU_IRQ; i++) {
 		struct irqaction *action = &region->action[i];
 		unsigned int irq_no = IRQ_FROM_REGION(regnr) + i;
-#if 0 /* def CONFIG_SMP */
-/* We currently direct all Interrupts at the Monarch.
- * The right way to handle SMP IRQ stats is to have one IRQ region/CPU.
- */
-		unsigned int j;
-#endif
-
+		int j=0;
 		if (!action->handler)
 			continue;
 
 		seq_printf(p, "%3d: ", irq_no);
-#if 1 /* ndef CONFIG_SMP */
-		seq_printf(p, "%10u ", kstat_irqs(irq_no));
-#else
-		for (j = 0; j < smp_num_cpus; j++)
-		    seq_printf(p, "%10u ",
-			    kstat.irqs[cpu_logical_map(j)][irq_no]);
+#ifdef CONFIG_SMP
+		for (; j < NR_CPUS; j++)
 #endif
+		    seq_printf(p, "%10u ", kstat.irqs[j][regnr][irq_no]);
+
 		seq_printf(p, " %14s",
 			    region->data.name ? region->data.name : "N/A");
 #ifndef PARISC_IRQ_CR16_COUNTS
@@ -243,12 +246,12 @@ int show_interrupts(struct seq_file *p, void *v)
 			seq_printf(p, ", %s", action->name);
 #else
 		for ( ;action; action = action->next) {
-			unsigned int i, avg, min, max;
+			unsigned int k, avg, min, max;
 
 			min = max = action->cr16_hist[0];
 
-			for (avg = i = 0; i < PARISC_CR16_HIST_SIZE; i++) {
-				int hist = action->cr16_hist[i];
+			for (avg = k = 0; k < PARISC_CR16_HIST_SIZE; k++) {
+				int hist = action->cr16_hist[k];
 
 				if (hist) {
 					avg += hist;
@@ -259,7 +262,7 @@ int show_interrupts(struct seq_file *p, void *v)
 				if (hist < min) min = hist;
 			}
 
-			avg /= i;
+			avg /= k;
 			seq_printf(p, " %s[%d/%d/%d]", action->name,
 					min,avg,max);
 		}
@@ -292,7 +295,7 @@ txn_alloc_irq(void)
 
 	/* never return irq 0 cause that's the interval timer */
 	for (irq = 1; irq <= MAX_CPU_IRQ; irq++) {
-		if (cpu_irq_region.action[irq].handler == NULL) {
+		if (cpu_irq_actions[irq].handler == NULL) {
 			return (IRQ_FROM_REGION(CPU_IRQ_REGION) + irq);
 		}
 	}
@@ -314,14 +317,18 @@ txn_claim_irq(int irq)
 unsigned long
 txn_alloc_addr(int virt_irq)
 {
-	struct cpuinfo_parisc *dev = (struct cpuinfo_parisc *) (irq_region[IRQ_REGION(virt_irq)]->data.dev);
+	static int next_cpu = -1;
 
-	if (!dev) {
-		printk(KERN_ERR "txn_alloc_addr(0x%x): CPU IRQ region? dev %p\n",
-			virt_irq,dev);
-		return 0;
-	}
-	return (dev->txn_addr);
+	next_cpu++; /* assign to "next" CPU we want this bugger on */
+
+	/* validate entry */
+	while ((next_cpu < NR_CPUS) && !cpu_data[next_cpu].txn_addr)
+		next_cpu++;
+
+	if (next_cpu >= NR_CPUS) 
+		next_cpu = 0;	/* nothing else, assign monarch */
+
+	return cpu_data[next_cpu].txn_addr;
 }
 
 
@@ -365,7 +372,7 @@ void do_irq(struct irqaction *action, int irq, struct pt_regs * regs)
 	int cpu = smp_processor_id();
 
 	irq_enter();
-	++kstat.irqs[IRQ_REGION(irq)][IRQ_OFFSET(irq)];
+	++kstat.irqs[cpu][IRQ_REGION(irq)][IRQ_OFFSET(irq)];
 
 	DBG_IRQ(irq, ("do_irq(%d) %d+%d\n", irq, IRQ_REGION(irq), IRQ_OFFSET(irq)));
 
@@ -407,7 +414,7 @@ void do_irq(struct irqaction *action, int irq, struct pt_regs * regs)
 
 
 /* ONLY called from entry.S:intr_extint() */
-void do_cpu_irq_mask(struct irq_region *region, struct pt_regs *regs)
+void do_cpu_irq_mask(struct pt_regs *regs)
 {
 	unsigned long eirr_val;
 	unsigned int i=3;	/* limit time in interrupt context */
@@ -431,7 +438,7 @@ void do_cpu_irq_mask(struct irq_region *region, struct pt_regs *regs)
 	 */
 	while ((eirr_val = (mfctl(23) & cpu_eiem)) && --i) {
 		unsigned long bit = (1UL<<MAX_CPU_IRQ);
-		unsigned int irq = 0;
+		unsigned int irq;
 
 		mtctl(eirr_val, 23); /* reset bits we are going to process */
 
@@ -440,17 +447,16 @@ void do_cpu_irq_mask(struct irq_region *region, struct pt_regs *regs)
 			printk(KERN_DEBUG "do_cpu_irq_mask  %x\n", eirr_val);
 #endif
 
-		for (; eirr_val && bit; bit>>=1, irq++)
+		/* Work our way from MSb to LSb...same order we alloc EIRs */
+		for (irq = 0; eirr_val && bit; bit>>=1, irq++)
 		{
-			unsigned int irq_num;
-			if (!(bit&eirr_val))
+			if (!(bit & eirr_val & cpu_eiem))
 				continue;
 
 			/* clear bit in mask - can exit loop sooner */
 			eirr_val &= ~bit;
 
-			irq_num = region->data.irqbase + irq;
-			do_irq(&region->action[irq], irq_num, regs);
+			do_irq(&cpu_irq_actions[irq], TIMER_IRQ+irq, regs);
 		}
 	}
 	set_eiem(cpu_eiem);
@@ -673,6 +679,14 @@ void free_irq(unsigned int irq, void *dev_id)
 	spin_unlock(&irq_lock);
 	printk(KERN_ERR "Trying to free free IRQ%d\n",irq);
 }
+
+
+#ifdef CONFIG_SMP
+void synchronize_irq(unsigned int irqnum)
+{
+	while (in_irq()) ;
+}
+#endif
 
 
 /*
