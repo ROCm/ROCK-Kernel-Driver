@@ -1037,28 +1037,28 @@ int gdth_eh_abort(Scsi_Cmnd *scp);
 int gdth_eh_device_reset(Scsi_Cmnd *scp);
 int gdth_eh_bus_reset(Scsi_Cmnd *scp);
 int gdth_eh_host_reset(Scsi_Cmnd *scp);
-#define GDTH { proc_name:       "gdth",                          \
-               proc_info:       gdth_proc_info,                  \
-               name:            "GDT SCSI Disk Array Controller",\
-               detect:          gdth_detect,                     \
-               release:         gdth_release,                    \
-               info:            gdth_info,                       \
-               command:         NULL,                            \
-               queuecommand:    gdth_queuecommand,               \
-               eh_abort_handler: gdth_eh_abort,                  \
-               eh_device_reset_handler: gdth_eh_device_reset,    \
-               eh_bus_reset_handler: gdth_eh_bus_reset,          \
-               eh_host_reset_handler: gdth_eh_host_reset,        \
-               abort:           gdth_abort,                      \
-               reset:           gdth_reset,                      \
-               bios_param:      gdth_bios_param,                 \
-               can_queue:       GDTH_MAXCMDS,                    \
-               this_id:         -1,                              \
-               sg_tablesize:    GDTH_MAXSG,                      \
-               cmd_per_lun:     GDTH_MAXC_P_L,                   \
-               present:         0,                               \
-               unchecked_isa_dma: 1,                             \
-               use_clustering:  ENABLE_CLUSTERING }
+#define GDTH { .proc_name       = "gdth",                          \
+               .proc_info       = gdth_proc_info,                  \
+               .name            = "GDT SCSI Disk Array Controller",\
+               .detect          = gdth_detect,                     \
+               .release         = gdth_release,                    \
+               .info            = gdth_info,                       \
+               .command         = NULL,                            \
+               .queuecommand    = gdth_queuecommand,               \
+               .eh_abort_handler = gdth_eh_abort,                  \
+               .eh_device_reset_handler = gdth_eh_device_reset,    \
+               .eh_bus_reset_handler = gdth_eh_bus_reset,          \
+               .eh_host_reset_handler = gdth_eh_host_reset,        \
+               .abort           = gdth_abort,                      \
+               .reset           = gdth_reset,                      \
+               .bios_param      = gdth_bios_param,                 \
+               .can_queue       = GDTH_MAXCMDS,                    \
+               .this_id         = -1,                              \
+               .sg_tablesize    = GDTH_MAXSG,                      \
+               .cmd_per_lun     = GDTH_MAXC_P_L,                   \
+               .present         = 0,                               \
+               .unchecked_isa_dma = 1,                             \
+               .use_clustering  = ENABLE_CLUSTERING }
 
 #endif
 
