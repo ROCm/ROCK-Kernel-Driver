@@ -98,6 +98,7 @@
 #endif
 
 static spinlock_t iosapic_lock = SPIN_LOCK_UNLOCKED;
+cpumask_t	__cacheline_aligned pending_irq_cpumask[NR_IRQS];
 
 /* These tables map IA-64 vectors to the IOSAPIC pin that generates this vector. */
 
@@ -331,6 +332,21 @@ iosapic_set_affinity (unsigned int irq, cpumask_t mask)
 #endif
 }
 
+static inline void move_irq(int irq)
+{
+	/* note - we hold desc->lock */
+	cpumask_t tmp;
+	irq_desc_t *desc = irq_descp(irq);
+
+	if (!cpus_empty(pending_irq_cpumask[irq])) {
+		cpus_and(tmp, pending_irq_cpumask[irq], cpu_online_map);
+		if (unlikely(!cpus_empty(tmp))) {
+			desc->handler->set_affinity(irq, pending_irq_cpumask[irq]);
+		}
+		cpus_clear(pending_irq_cpumask[irq]);
+	}
+}
+
 /*
  * Handlers for level-triggered interrupts.
  */
@@ -347,6 +363,7 @@ iosapic_end_level_irq (unsigned int irq)
 {
 	ia64_vector vec = irq_to_vector(irq);
 
+	move_irq(irq);
 	writel(vec, iosapic_intr_info[vec].addr + IOSAPIC_EOI);
 }
 
@@ -386,6 +403,8 @@ static void
 iosapic_ack_edge_irq (unsigned int irq)
 {
 	irq_desc_t *idesc = irq_descp(irq);
+
+	move_irq(irq);
 	/*
 	 * Once we have recorded IRQ_PENDING already, we can mask the
 	 * interrupt for real. This prevents IRQ storms from unhandled

@@ -46,7 +46,7 @@
 #include <asm/delay.h>
 #include <asm/irq.h>
 
-
+extern cpumask_t    __cacheline_aligned pending_irq_cpumask[NR_IRQS];
 
 /*
  * Linux has a controller-independent x86 interrupt architecture.
@@ -938,7 +938,9 @@ void set_irq_affinity_info (unsigned int irq, int hwid, int redir)
 static int irq_affinity_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
-	int len = cpumask_scnprintf(page, count, irq_affinity[(long)data]);
+	int len = sprintf(page, "%s", irq_redir[(long)data] ? "r " : "");
+
+	len += cpumask_scnprintf(page+len, count, irq_affinity[(long)data]);
 	if (count - len < 2)
 		return -EINVAL;
 	len += sprintf(page + len, "\n");
@@ -956,6 +958,7 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	int rlen;
 	int prelen;
 	irq_desc_t *desc = irq_descp(irq);
+	unsigned long flags;
 
 	if (!desc->handler->set_affinity)
 		return -EIO;
@@ -994,7 +997,10 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	if (cpus_empty(tmp))
 		return -EINVAL;
 
-	desc->handler->set_affinity(irq, new_value);
+	spin_lock_irqsave(&desc->lock, flags);
+	pending_irq_cpumask[irq] = new_value;
+	spin_unlock_irqrestore(&desc->lock, flags);
+
 	return full_count;
 }
 
