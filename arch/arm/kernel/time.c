@@ -68,6 +68,16 @@ static unsigned long dummy_gettimeoffset(void)
 unsigned long (*gettimeoffset)(void) = dummy_gettimeoffset;
 
 /*
+ * Scheduler clock - returns current time in nanosec units.
+ */
+unsigned long long sched_clock(void)
+{
+	unsigned long long this_offset;
+
+	return (unsigned long long)jiffies * (1000000000 / HZ);
+}
+
+/*
  * Handle kernel profile stuff...
  */
 static inline void do_profile(struct pt_regs *regs)

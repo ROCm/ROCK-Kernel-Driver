@@ -239,23 +239,8 @@ config DISCONTIGMEM
 
 # Now handle the bus types
 config PCI
-	bool
-	default PCI_INTEGRATOR if !ARCH_FTVPCI && !ARCH_SHARK && !FOOTBRIDGE_HOST && !ARCH_IOP3XX && ARCH_INTEGRATOR
+	bool "PCI support" if ARCH_INTEGRATOR
 	default y if ARCH_FTVPCI || ARCH_SHARK || FOOTBRIDGE_HOST || ARCH_IOP3XX
-	help
-	  Find out whether you have a PCI motherboard. PCI is the name of a
-	  bus system, i.e. the way the CPU talks to the other stuff inside
-	  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
-	  VESA. If you have PCI, say Y, otherwise N.
-
-	  The PCI-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>, contains valuable
-	  information about which PCI hardware does work under Linux and which
-	  doesn't.
-
-config PCI_INTEGRATOR
-	bool "PCI support"
-	depends on !ARCH_FTVPCI && !ARCH_SHARK && !FOOTBRIDGE_HOST && !ARCH_IOP3XX && ARCH_INTEGRATOR
 	help
 	  Find out whether you have a PCI motherboard. PCI is the name of a
 	  bus system, i.e. the way the CPU talks to the other stuff inside
