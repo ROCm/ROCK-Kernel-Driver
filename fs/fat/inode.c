@@ -765,8 +765,8 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	struct buffer_head *bh;
 	struct fat_boot_sector *b;
 	struct msdos_sb_info *sbi;
-	int logical_sector_size, fat_clusters, debug, cp, first;
-	unsigned int total_sectors, rootdir_sectors;
+	u32 total_sectors, total_clusters, fat_clusters, rootdir_sectors;
+	int logical_sector_size, debug, cp, first;
 	unsigned int media;
 	long error;
 	char buf[50];
@@ -946,15 +946,24 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	total_sectors = CF_LE_W(get_unaligned((unsigned short *)&b->sectors));
 	if (total_sectors == 0)
 		total_sectors = CF_LE_L(b->total_sect);
-	sbi->clusters = (total_sectors - sbi->data_start) / sbi->sec_per_clus;
+
+	total_clusters = (total_sectors - sbi->data_start) / sbi->sec_per_clus;
 
 	if (sbi->fat_bits != 32)
-		sbi->fat_bits = (sbi->clusters > MSDOS_FAT12) ? 16 : 12;
+		sbi->fat_bits = (total_clusters > MAX_FAT12) ? 16 : 12;
 
 	/* check that FAT table does not overflow */
 	fat_clusters = sbi->fat_length * sb->s_blocksize * 8 / sbi->fat_bits;
-	if (sbi->clusters > fat_clusters - 2)
-		sbi->clusters = fat_clusters - 2;
+	total_clusters = min(total_clusters, fat_clusters - 2);
+	if (total_clusters > MAX_FAT(sb)) {
+		if (!silent)
+			printk(KERN_ERR "FAT: count of clusters too big (%u)\n",
+			       total_clusters);
+		brelse(bh);
+		goto out_invalid;
+	}
+
+	sbi->clusters = total_clusters;
 
 	brelse(bh);
 

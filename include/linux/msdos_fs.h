@@ -55,24 +55,29 @@
 #define MSDOS_DOT    ".          " /* ".", padded to MSDOS_NAME chars */
 #define MSDOS_DOTDOT "..         " /* "..", padded to MSDOS_NAME chars */
 
-#define MSDOS_FAT12 4084 /* maximum number of clusters in a 12 bit FAT */
-
 /* media of boot sector */
 #define FAT_VALID_MEDIA(x)	((0xF8 <= (x) && (x) <= 0xFF) || (x) == 0xF0)
 #define FAT_FIRST_ENT(s, x)	((MSDOS_SB(s)->fat_bits == 32 ? 0x0FFFFF00 : \
 	MSDOS_SB(s)->fat_bits == 16 ? 0xFF00 : 0xF00) | (x))
 
+/* maximum number of clusters */
+#define MAX_FAT12 0xFF4
+#define MAX_FAT16 0xFFF4
+#define MAX_FAT32 0x0FFFFFF6
+#define MAX_FAT(s) (MSDOS_SB(s)->fat_bits == 32 ? MAX_FAT32 : \
+	MSDOS_SB(s)->fat_bits == 16 ? MAX_FAT16 : MAX_FAT12)
+
 /* bad cluster mark */
 #define BAD_FAT12 0xFF7
 #define BAD_FAT16 0xFFF7
-#define BAD_FAT32 0xFFFFFF7
+#define BAD_FAT32 0x0FFFFFF7
 #define BAD_FAT(s) (MSDOS_SB(s)->fat_bits == 32 ? BAD_FAT32 : \
 	MSDOS_SB(s)->fat_bits == 16 ? BAD_FAT16 : BAD_FAT12)
 
 /* standard EOF */
 #define EOF_FAT12 0xFFF
 #define EOF_FAT16 0xFFFF
-#define EOF_FAT32 0xFFFFFFF
+#define EOF_FAT32 0x0FFFFFFF
 #define EOF_FAT(s) (MSDOS_SB(s)->fat_bits == 32 ? EOF_FAT32 : \
 	MSDOS_SB(s)->fat_bits == 16 ? EOF_FAT16 : EOF_FAT12)
 
