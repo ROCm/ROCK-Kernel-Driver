@@ -348,6 +348,7 @@ retry:
 	gss_new->uid = uid;
 	list_add(&gss_new->list, &gss_auth->upcalls);
 	gss_new = NULL;
+	task->tk_timeout = 5 * HZ;
 	rpc_sleep_on(&gss_msg->waitq, task, gss_release_callback, NULL);
 	spin_unlock(&gss_auth->lock);
 	res = rpc_queue_upcall(dentry->d_inode, msg);
