@@ -165,7 +165,7 @@ u32		  nlmsvc_cancel_blocked(struct nlm_file *, struct nlm_lock *);
 unsigned long	  nlmsvc_retry_blocked(void);
 int		  nlmsvc_traverse_blocks(struct nlm_host *, struct nlm_file *,
 					int action);
-void	  nlmsvc_grant_reply(struct nlm_cookie *cookie, u32 status);
+void	  nlmsvc_grant_reply(struct svc_rqst *, struct nlm_cookie *, u32);
 
 /*
  * File handling for the server personality
