@@ -50,6 +50,7 @@
 #include <linux/mm.h>
 #include <linux/delay.h>
 #include <linux/poll.h>
+#include <linux/init.h>
 #include <asm/system.h>
 #include <asm/segment.h>
 #include <asm/io.h>
