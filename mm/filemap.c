@@ -1134,10 +1134,26 @@ __generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 	struct file *filp = iocb->ki_filp;
 	ssize_t retval;
 	unsigned long seg;
-	size_t count = iov_length(iov, nr_segs);
+	size_t count;
 
-	if ((ssize_t) count < 0)
-		return -EINVAL;
+	count = 0;
+	for (seg = 0; seg < nr_segs; seg++) {
+		const struct iovec *iv = &iov[seg];
+
+		/*
+		 * If any segment has a negative length, or the cumulative
+		 * length ever wraps negative then return -EINVAL.
+		 */
+		count += iv->iov_len;
+		if (unlikely((ssize_t)(count|iv->iov_len) < 0))
+			return -EINVAL;
+		if (access_ok(VERIFY_WRITE, iv->iov_base, iv->iov_len))
+			continue;
+		if (seg == 0)
+			return -EFAULT;
+		nr_segs = seg;
+		break;
+	}
 
 	/* coalesce the iovecs and go direct-to-BIO for O_DIRECT */
 	if (filp->f_flags & O_DIRECT) {
@@ -1164,11 +1180,6 @@ __generic_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
 		}
 		UPDATE_ATIME(filp->f_dentry->d_inode);
 		goto out;
-	}
-
-	for (seg = 0; seg < nr_segs; seg++) {
-		if (!access_ok(VERIFY_WRITE,iov[seg].iov_base,iov[seg].iov_len))
-			return -EFAULT;
 	}
 
 	retval = 0;
@@ -2032,8 +2043,8 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 {
 	struct address_space * mapping = file->f_dentry->d_inode->i_mapping;
 	struct address_space_operations *a_ops = mapping->a_ops;
-	const size_t ocount = iov_length(iov, nr_segs);
-	size_t count =	ocount;
+	size_t ocount;		/* original count */
+	size_t count;		/* after file limit checks */
 	struct inode 	*inode = mapping->host;
 	unsigned long	limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
 	long		status = 0;
@@ -2050,13 +2061,25 @@ generic_file_write_nolock(struct file *file, const struct iovec *iov,
 	unsigned long	seg;
 	char		*buf;
 
-	if (unlikely((ssize_t)count < 0))
-		return -EINVAL;
-
+	ocount = 0;
 	for (seg = 0; seg < nr_segs; seg++) {
-		if (!access_ok(VERIFY_READ,iov[seg].iov_base,iov[seg].iov_len))
+		const struct iovec *iv = &iov[seg];
+
+		/*
+		 * If any segment has a negative length, or the cumulative
+		 * length ever wraps negative then return -EINVAL.
+		 */
+		ocount += iv->iov_len;
+		if (unlikely((ssize_t)(ocount|iv->iov_len) < 0))
+			return -EINVAL;
+		if (access_ok(VERIFY_READ, iv->iov_base, iv->iov_len))
+			continue;
+		if (seg == 0)
 			return -EFAULT;
+		nr_segs = seg;
+		break;
 	}
+	count = ocount;
 
 	pos = *ppos;
 	if (unlikely(pos < 0))
