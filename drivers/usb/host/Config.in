@@ -1,7 +1,25 @@
 #
 # USB Host Controller Drivers
 #
+comment 'USB Host Controller Drivers'
 dep_tristate '  EHCI HCD (USB 2.0) support (EXPERIMENTAL)' CONFIG_USB_EHCI_HCD $CONFIG_USB $CONFIG_EXPERIMENTAL
 dep_tristate '  OHCI HCD support (EXPERIMENTAL)' CONFIG_USB_OHCI_HCD $CONFIG_USB $CONFIG_EXPERIMENTAL
 # dep_tristate '  UHCI HCD (most Intel and VIA) support (EXPERIMENTAL)' CONFIG_USB_UHCI_HCD $CONFIG_USB $CONFIG_EXPERIMENTAL
+if [ "$CONFIG_USB_UHCI_ALT" != "y" ]; then
+   dep_tristate '  UHCI (Intel PIIX4, VIA, ...) support' CONFIG_USB_UHCI $CONFIG_USB
+fi
+if [ "$CONFIG_USB_UHCI" != "y" ]; then
+   dep_tristate '  UHCI Alternate Driver (JE) support' CONFIG_USB_UHCI_ALT $CONFIG_USB
+else
+   define_bool CONFIG_USB_UHCI_ALT n
+fi
+dep_tristate '  OHCI (Compaq, iMacs, OPTi, SiS, ALi, ...) support' CONFIG_USB_OHCI $CONFIG_USB
 
+# Turn on CONFIG_USB_HOST if any of the Host controller drivers are compiled
+# into the kernel to make our Makefile logic a bit simpler
+if [ "$CONFIG_USB_EHCI_HCD" = "y" -o "$CONFIG_USB_OHCI_HCD" = "y" -o "$CONFIG_USB_UHCI_HCD" = "y" ]; then
+   define_bool CONFIG_USB_HOST y
+fi
+if [ "$CONFIG_USB_UHCI" = "y" -o "$CONFIG_USB_UHCI_ALT" = "y" -o "$CONFIG_USB_OHCI" = "y" ]; then
+   define_bool CONFIG_USB_HOST y
+fi

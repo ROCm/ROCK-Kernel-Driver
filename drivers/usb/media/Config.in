@@ -1,0 +1,30 @@
+#
+# USB Multimedia device configuration
+#
+comment 'USB Multimedia devices'
+if [ "$CONFIG_VIDEO_DEV" = "n" ]; then
+   comment '  Video4Linux support is needed for USB Multimedia device support'
+else
+   dep_tristate '  USB IBM (Xirlink) C-it Camera support' CONFIG_USB_IBMCAM $CONFIG_USB $CONFIG_VIDEO_DEV
+   dep_tristate '  USB OV511 Camera support' CONFIG_USB_OV511 $CONFIG_USB $CONFIG_VIDEO_DEV
+   dep_tristate '  USB Philips Cameras' CONFIG_USB_PWC $CONFIG_USB $CONFIG_VIDEO_DEV
+   dep_tristate '  USB SE401 Camera support' CONFIG_USB_SE401 $CONFIG_USB $CONFIG_VIDEO_DEV
+   dep_tristate '  USB STV680 (Pencam) Camera support' CONFIG_USB_STV680 $CONFIG_USB $CONFIG_VIDEO_DEV     
+   dep_tristate '  USB 3com HomeConnect (aka vicam) support (EXPERIMENTAL)' CONFIG_USB_VICAM $CONFIG_USB $CONFIG_VIDEO_DEV $CONFIG_EXPERIMENTAL
+   dep_tristate '  D-Link USB FM radio support (EXPERIMENTAL)' CONFIG_USB_DSBR $CONFIG_USB $CONFIG_VIDEO_DEV $CONFIG_EXPERIMENTAL
+   dep_tristate '  DABUSB driver' CONFIG_USB_DABUSB $CONFIG_USB
+   dep_tristate '  USB Konica Webcam support' CONFIG_USB_KONICAWC $CONFIG_USB $CONFIG_VIDEO_DEV
+fi
+
+# Turn on CONFIG_USB_MEDIA if any of the drivers are compiled into the kernel
+# to make our Makefile logic a bit simpler
+if [ "$CONFIG_USB_IBMCAM" = "y" -o "$CONFIG_USB_OV511" = "y" -o "$CONFIG_USB_PWC" = "y" ]; then
+   define_bool CONFIG_USB_MEDIA y
+fi
+if [ "$CONFIG_USB_SE401" = "y" -o "$CONFIG_USB_STV680" = "y" -o "$CONFIG_USB_VICAM" = "y" ]; then
+   define_bool CONFIG_USB_MEDIA y
+fi
+if [ "$CONFIG_USB_DSBR" = "y" -o "$CONFIG_USB_DABUSB" = "y" -o "$CONFIG_USB_KONICAWC" = "y" ]; then
+   define_bool CONFIG_USB_MEDIA y
+fi
+
