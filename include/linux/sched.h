@@ -631,7 +631,7 @@ struct sched_domain {
 	.groups			= NULL,			\
 	.min_interval		= 8,			\
 	.max_interval		= 256*fls(num_online_cpus()),\
-	.busy_factor		= 8,			\
+	.busy_factor		= 32,			\
 	.imbalance_pct		= 125,			\
 	.cache_hot_time		= (10*1000000),		\
 	.cache_nice_tries	= 1,			\
