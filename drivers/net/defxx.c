@@ -2664,8 +2664,8 @@ static int dfx_hw_dma_uninit(DFX_board_t *bp, PI_UINT32 type)
  
 static void my_skb_align(struct sk_buff *skb, int n)
 {
-	u32 x=(u32)skb->data;	/* We only want the low bits .. */
-	u32 v;
+	unsigned long x=(unsigned long)skb->data;	
+	unsigned long v;
 	
 	v=(x+n-1)&~(n-1);	/* Where we want to be */
 	

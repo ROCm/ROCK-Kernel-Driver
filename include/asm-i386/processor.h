@@ -498,7 +498,7 @@ unsigned long get_wchan(struct task_struct *p);
 #define KSTK_EIP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)->thread_info))[1019])
 #define KSTK_ESP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)->thread_info))[1022])
 
-struct microcode {
+struct microcode_header {
 	unsigned int hdrver;
 	unsigned int rev;
 	unsigned int date;
@@ -506,10 +506,32 @@ struct microcode {
 	unsigned int cksum;
 	unsigned int ldrver;
 	unsigned int pf;
-	unsigned int reserved[5];
-	unsigned int bits[500];
+	unsigned int datasize;
+	unsigned int totalsize;
+	unsigned int reserved[3];
 };
 
+struct microcode {
+	struct microcode_header hdr;
+	unsigned int bits[0];
+};
+
+typedef struct microcode microcode_t;
+typedef struct microcode_header microcode_header_t;
+
+/* microcode format is extended from prescott processors */
+struct extended_signature {
+	unsigned int sig;
+	unsigned int pf;
+	unsigned int cksum;
+};
+
+struct extended_sigtable {
+	unsigned int count;
+	unsigned int cksum;
+	unsigned int reserved[3];
+	struct extended_signature sigs[0];
+};
 /* '6' because it used to be for P6 only (but now covers Pentium 4 as well) */
 #define MICROCODE_IOCFREE	_IO('6',0)
 
@@ -585,12 +607,12 @@ static inline void rep_nop(void)
 
 /* Prefetch instructions for Pentium III and AMD Athlon */
 /* It's not worth to care about 3dnow! prefetches for the K6
-   because they are microcoded there and very slow. */
+   because they are microcoded there and very slow.
+   However we don't do prefetches for pre XP Athlons currently
+   That should be fixed. */
 #define ARCH_HAS_PREFETCH
 extern inline void prefetch(const void *x)
 {
-	if (cpu_data[0].x86_vendor == X86_VENDOR_AMD)
-		return;		/* Some athlons fault if the address is bad */
 	alternative_input(ASM_NOP4,
 			  "prefetchnta (%1)",
 			  X86_FEATURE_XMM,

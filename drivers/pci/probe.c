@@ -572,14 +572,12 @@ int __devinit pci_scan_slot(struct pci_bus *bus, int devfn)
 		list_add_tail(&dev->bus_list, &bus->devices);
 		nr++;
 
-#if 0
 		/*
 		 * If this is a single function device,
 		 * don't scan past the first function.
 		 */
 		if (!dev->multifunction)
 			break;
-#endif
 	}
 	return nr;
 }

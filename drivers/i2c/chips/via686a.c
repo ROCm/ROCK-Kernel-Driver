@@ -735,7 +735,10 @@ static int via686a_detect(struct i2c_adapter *adapter, int address, int kind)
 	if ((err = i2c_attach_client(new_client)))
 		goto ERROR3;
 	
-	/* register sysfs hooks */
+	/* Initialize the VIA686A chip */
+	via686a_init_client(new_client);
+
+	/* Register sysfs hooks */
 	device_create_file(&new_client->dev, &dev_attr_in_input0);
 	device_create_file(&new_client->dev, &dev_attr_in_input1);
 	device_create_file(&new_client->dev, &dev_attr_in_input2);
@@ -768,8 +771,6 @@ static int via686a_detect(struct i2c_adapter *adapter, int address, int kind)
 	device_create_file(&new_client->dev, &dev_attr_fan_div2);
 	device_create_file(&new_client->dev, &dev_attr_alarm);
 
-	/* Initialize the VIA686A chip */
-	via686a_init_client(new_client);
 	return 0;
 
       ERROR3:

@@ -55,8 +55,10 @@
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/pci.h>
+#include <linux/init.h>
 #include <linux/vmalloc.h>
 #include <linux/netdevice.h>
 #include <linux/inetdevice.h>
@@ -2704,9 +2706,9 @@ static int tuner_set_tv_freq (struct saa7146_dev *dev, u32 freq)
 	buf[1] = div & 0xff;
 	buf[2] = 0x8e;
 
-	if (freq < 16*168.25 ) 
+	if (freq < (u32) (16*168.25) ) 
 		config = 0xa0;
-	else if (freq < 16*447.25) 
+	else if (freq < (u32) (16*447.25)) 
 		config = 0x90;
 	else
 		config = 0x30;
@@ -4520,28 +4522,6 @@ static int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 
 	DEB_EE(("dev: %p, av7110: %p\n",dev,av7110));
 
-	/* special case DVB-C: these cards have an analog tuner
-	   plus need some special handling, so we have separate
-	   saa7146_ext_vv data for these... */
-	if (dev->pci->subsystem_vendor == 0x110a) {
-		ret = saa7146_vv_init(dev, &av7110_vv_data_c);
-	} else {
-		ret = saa7146_vv_init(dev, &av7110_vv_data_st);
-	}
-	
-	if ( 0 != ret) {
-		ERR(("cannot init capture device. skipping.\n"));
-		kfree(av7110);
-		return -1;
-	}
-
-	if (saa7146_register_device(&av7110->v4l_dev, dev, "av7110", VFL_TYPE_GRABBER)) {
-		ERR(("cannot register capture device. skipping.\n"));
-		saa7146_vv_release(dev);
-		kfree(av7110);
-		return -1;
-	}
-
 	av7110->dev=(struct saa7146_dev *)dev;
 	dvb_register_adapter(&av7110->dvb_adapter, av7110->card_name);
 
@@ -4555,8 +4535,6 @@ static int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 						av7110->dvb_adapter, 0);
 
 	if (!av7110->i2c_bus) {
-		saa7146_unregister_device(&av7110->v4l_dev, dev);
-		saa7146_vv_release(dev);
 		dvb_unregister_adapter (av7110->dvb_adapter);
 		kfree(av7110);
 		return -ENOMEM;
@@ -4727,7 +4705,7 @@ static int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 		memcpy(standard,dvb_standard,sizeof(struct saa7146_standard)*2);
 		/* set dd1 stream a & b */
       		saa7146_write(dev, DD1_STREAM_B, 0x00000000);
-		saa7146_write(dev, DD1_INIT, 0x0200700);
+		saa7146_write(dev, DD1_INIT, 0x02000700);
 		saa7146_write(dev, MC2, (MASK_09 | MASK_25 | MASK_10 | MASK_26));
 	}
 	else if (dev->pci->subsystem_vendor == 0x110a) {
@@ -4754,17 +4732,52 @@ static int av7110_attach (struct saa7146_dev* dev, struct saa7146_pci_extension_
 	av7110_setup_irc_config (av7110, 0);
 	av7110_register(av7110);
 	
+	/* special case DVB-C: these cards have an analog tuner
+	   plus need some special handling, so we have separate
+	   saa7146_ext_vv data for these... */
+	if (0 != av7110->has_analog_tuner) {
+		ret = saa7146_vv_init(dev, &av7110_vv_data_c);
+	} else {
+		ret = saa7146_vv_init(dev, &av7110_vv_data_st);
+	}
+	
+	if ( 0 != ret) {
+		ERR(("cannot init capture device. skipping.\n"));
+		ret = -ENODEV;
+		goto err;
+	}
+
+	if (saa7146_register_device(&av7110->v4l_dev, dev, "av7110", VFL_TYPE_GRABBER)) {
+		ERR(("cannot register capture device. skipping.\n"));
+		ret = -ENODEV;
+		goto video_err;
+	}
+	
+	if (0 != av7110->has_analog_tuner) {
+		if( 0 != saa7146_register_device(&av7110->vbi_dev, dev, "av7110", VFL_TYPE_VBI)) {
+			ERR(("cannot register vbi v4l2 device. skipping.\n"));
+		}
+		/* we use this to remember that this dvb-c card cannot do vbi */
+		av7110->has_analog_tuner = 2;
+	}	
+
 	printk(KERN_INFO "av7110: found av7110-%d.\n",av7110_num);
 	av7110_num++;
         return 0;
 
-err:
-	if (av7110 )
-		kfree(av7110);
-
-	/* FIXME: error handling is pretty bogus: memory does not get freed...*/
-	saa7146_unregister_device(&av7110->v4l_dev, dev);
+video_err:
 	saa7146_vv_release(dev);
+
+err:
+	if (NULL != av7110 ) {
+		kfree(av7110);
+	}
+	if (NULL != av7110->debi_virt) {
+		pci_free_consistent(dev->pci, 8192, av7110->debi_virt, av7110->debi_bus);
+	}
+	if (NULL != av7110->iobuf) {
+		vfree(av7110->iobuf);
+	}
 
 	dvb_unregister_i2c_bus (master_xfer,av7110->i2c_bus->adapter,
 				av7110->i2c_bus->id);
@@ -4780,6 +4793,9 @@ static int av7110_detach (struct saa7146_dev* saa)
 	DEB_EE(("av7110: %p\n",av7110));
 
 	saa7146_unregister_device(&av7110->v4l_dev, saa);
+	if (2 == av7110->has_analog_tuner) {
+		saa7146_unregister_device(&av7110->vbi_dev, saa);
+	}	
 
 	av7110->arm_rmmod=1;
 	wake_up_interruptible(&av7110->arm_wait);
@@ -4948,8 +4964,8 @@ static struct saa7146_ext_vv av7110_vv_data_st = {
 static struct saa7146_ext_vv av7110_vv_data_c = {
 	.inputs		= 1,
 	.audios 	= 1,
-	.capabilities	= V4L2_CAP_TUNER,
-	.flags		= 0,
+	.capabilities	= V4L2_CAP_TUNER | V4L2_CAP_VBI_CAPTURE,
+	.flags		= SAA7146_USE_PORT_B_FOR_VBI,
 
 	.stds		= &standard[0],
 	.num_stds	= sizeof(standard)/sizeof(struct saa7146_standard),

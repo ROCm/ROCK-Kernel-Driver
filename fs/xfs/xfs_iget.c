@@ -258,6 +258,7 @@ finish_inode:
 			if (newnode) {
 				xfs_iocore_inode_reinit(ip);
 			}
+			ip->i_flags &= ~XFS_ISTALE;
 
 			vn_trace_exit(vp, "xfs_iget.found",
 						(inst_t *)__return_address);

@@ -13,6 +13,7 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/mmzone.h>
+#include <linux/module.h>
 #include <asm/lmb.h>
 
 #if 1

@@ -1288,7 +1288,7 @@ int fcntl_setlease(unsigned int fd, struct file *filp, long arg)
 
 	locks_insert_lock(before, fl);
 
-	error = f_setown(filp, current->tgid, 1);
+	error = f_setown(filp, current->pid, 0);
 out_unlock:
 	unlock_kernel();
 	return error;

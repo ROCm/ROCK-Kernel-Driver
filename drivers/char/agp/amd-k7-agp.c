@@ -365,7 +365,7 @@ struct agp_bridge_driver amd_irongate_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
-static struct agp_device_ids amd_agp_device_ids[] __initdata =
+static struct agp_device_ids amd_agp_device_ids[] __devinitdata =
 {
 	{
 		.device_id	= PCI_DEVICE_ID_AMD_FE_GATE_7006,
@@ -382,8 +382,8 @@ static struct agp_device_ids amd_agp_device_ids[] __initdata =
 	{ }, /* dummy final entry, always present */
 };
 
-static int __init agp_amdk7_probe(struct pci_dev *pdev,
-				  const struct pci_device_id *ent)
+static int __devinit agp_amdk7_probe(struct pci_dev *pdev,
+				     const struct pci_device_id *ent)
 {
 	struct agp_device_ids *devs = amd_agp_device_ids;
 	struct agp_bridge_data *bridge;

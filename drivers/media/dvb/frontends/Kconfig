@@ -16,16 +16,6 @@ config DVB_STV0299
 	  DVB adapter simply enable all supported frontends, the 
 	  right one will get autodetected.
 
-config DVB_ALPS_BSRV2
-	tristate "Alps BSRV2 (QPSK)"
-	depends on DVB_CORE
-	help
-	  A DVB-S tuner module. Say Y when you want to support this frontend.
-
-	  If you don't know what tuner module is soldered on your 
-	  DVB adapter simply enable all supported frontends, the 
-	  right one will get autodetected.
-
 config DVB_SP887X
  	tristate "Frontends with sp887x demodulators, e.g. Microtune DTF7072"
  	depends on DVB_CORE
@@ -120,6 +110,16 @@ config DVB_VES1820
 	  The VES1820 Demodulator is used on many DVB-C PCI cards and in some
 	  DVB-C SetTopBoxes. Say Y when you see this demodulator chip near your
 	  tuner module.
+
+	  If you don't know what tuner module is soldered on your 
+	  DVB adapter simply enable all supported frontends, the 
+	  right one will get autodetected.
+
+config DVB_VES1X93
+	tristate "Frontends with VES1893 or VES1993 demodulator (QPSK)"
+	depends on DVB_CORE
+	help
+	  A DVB-S tuner module. Say Y when you want to support this frontend.
 
 	  If you don't know what tuner module is soldered on your 
 	  DVB adapter simply enable all supported frontends, the 

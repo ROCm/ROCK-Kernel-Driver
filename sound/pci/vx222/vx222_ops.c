@@ -378,11 +378,7 @@ static int vx2_load_xilinx_binary(vx_core_t *chip, const snd_hwdep_dsp_image_t *
 		if (put_xilinx_data(chip, port, 8, data) < 0)
 			return -EINVAL;
 		/* don't take too much time in this loop... */
-		if (need_resched()) {
-			if (current->state != TASK_RUNNING)
-				set_current_state(TASK_RUNNING);
-			schedule();
-		}
+		cond_resched();
 	}
 	put_xilinx_data(chip, port, 4, 0xff); /* end signature */
 

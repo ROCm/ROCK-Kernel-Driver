@@ -2038,16 +2038,17 @@ static int __devinit snd_via82xx_probe(struct pci_dev *pci,
 				break;
 			}
 		}
-		if (dxs_support[dev] == VIA_DXS_AUTO)
-			dxs_support[dev] = check_dxs_list(pci);
-		/* force to use VIA8233 or 8233A model according to
-		 * dxs_support module option
-		 */
-		if (dxs_support[dev] == VIA_DXS_DISABLE)
-			chip_type = TYPE_VIA8233A;
-		else
-			chip_type = TYPE_VIA8233;
-
+		if (chip_type != TYPE_VIA8233A) {
+			if (dxs_support[dev] == VIA_DXS_AUTO)
+				dxs_support[dev] = check_dxs_list(pci);
+			/* force to use VIA8233 or 8233A model according to
+			 * dxs_support module option
+			 */
+			if (dxs_support[dev] == VIA_DXS_DISABLE)
+				chip_type = TYPE_VIA8233A;
+			else
+				chip_type = TYPE_VIA8233;
+		}
 		if (chip_type == TYPE_VIA8233A)
 			strcpy(card->driver, "VIA8233A");
 		else

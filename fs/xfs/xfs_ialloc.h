@@ -134,7 +134,10 @@ xfs_dialloc(
 int					/* error */
 xfs_difree(
 	struct xfs_trans *tp,		/* transaction pointer */
-	xfs_ino_t	inode);		/* inode to be freed */
+	xfs_ino_t	inode,		/* inode to be freed */
+	struct xfs_bmap_free *flist,	/* extents to free */
+	int		*delete,	/* set if inode cluster was deleted */
+	xfs_ino_t	*first_ino);	/* first inode in deleted cluster */
 
 /*
  * Return the location of the inode in bno/len/off,

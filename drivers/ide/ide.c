@@ -1846,8 +1846,6 @@ static int __initdata is_chipset_set[MAX_HWIFS];
  *				Not fully supported by all chipset types,
  *				and quite likely to cause trouble with
  *				older/odd IDE drives.
- * "hdx=biostimings"	: driver will NOT attempt to tune interface speed 
- * 				(DMA/PIO) but always honour BIOS timings.
  * "hdx=slow"		: insert a huge pause after each access to the data
  *				port. Should be used only as a last resort.
  *
@@ -1884,8 +1882,6 @@ static int __initdata is_chipset_set[MAX_HWIFS];
  * "idex=noautotune"	: driver will NOT attempt to tune interface speed
  *				This is the default for most chipsets,
  *				except the cmd640.
- * "idex=biostimings"	: driver will NOT attempt to tune interface speed 
- * 				(DMA/PIO) but always honour BIOS timings.
  * "idex=serialize"	: do not overlap operations on idex and ide(x^1)
  * "idex=four"		: four drives on idex and ide(x^1) share same ports
  * "idex=reset"		: reset interface before first use
@@ -1961,8 +1957,7 @@ int __init ide_setup (char *s)
 		const char *hd_words[] = {
 			"none", "noprobe", "nowerr", "cdrom", "serialize",
 			"autotune", "noautotune", "slow", "swapdata", "bswap",
-			"flash", "remap", "remap63", "scsi", "biostimings",
-			NULL };
+			"flash", "remap", "remap63", "scsi", NULL };
 		unit = s[2] - 'a';
 		hw   = unit / MAX_DRIVES;
 		unit = unit % MAX_DRIVES;
@@ -2028,9 +2023,6 @@ int __init ide_setup (char *s)
 			case -14: /* "scsi" */
 				drive->scsi = 1;
 				goto done;
-			case -15: /* "biostimings" */
-				drive->autotune = IDE_TUNE_BIOS;
-				goto done;
 			case 3: /* cyl,head,sect */
 				drive->media	= ide_disk;
 				drive->cyl	= drive->bios_cyl  = vals[0];
@@ -2065,11 +2057,11 @@ int __init ide_setup (char *s)
 	if (s[3] >= '0' && s[3] <= max_hwif) {
 		/*
 		 * Be VERY CAREFUL changing this: note hardcoded indexes below
-		 * -9,-10 : are reserved for future idex calls to ease the hardcoding.
+		 * (-8, -9, -10) are reserved to ease the hardcoding.
 		 */
 		const char *ide_words[] = {
 			"noprobe", "serialize", "autotune", "noautotune", 
-			"reset", "dma", "ata66", "biostimings", "minus9",
+			"reset", "dma", "ata66", "minus8", "minus9",
 			"minus10", "four", "qd65xx", "ht6560b", "cmd640_vlb",
 			"dtc2278", "umc8672", "ali14xx", "dc4030", NULL };
 		hw = s[3] - '0';
@@ -2149,11 +2141,8 @@ int __init ide_setup (char *s)
 #endif /* CONFIG_BLK_DEV_4DRIVES */
 			case -10: /* minus10 */
 			case -9: /* minus9 */
+			case -8: /* minus8 */
 				goto bad_option;
-			case -8: /* "biostimings" */
-				hwif->drives[0].autotune = IDE_TUNE_BIOS;
-				hwif->drives[1].autotune = IDE_TUNE_BIOS;
-				goto done;
 			case -7: /* ata66 */
 #ifdef CONFIG_BLK_DEV_IDEPCI
 				hwif->udma_four = 1;
@@ -2291,6 +2280,12 @@ static void __init probe_for_hwifs (void)
 		pnpide_init(1);
 	}
 #endif /* CONFIG_BLK_DEV_IDEPNP */
+#ifdef CONFIG_BLK_DEV_STD
+	{
+		extern void std_ide_cntl_scan(void);
+		std_ide_cntl_scan();
+	}
+#endif /* CONFIG_BLK_DEV_STD */
 }
 
 void __init ide_init_builtin_drivers (void)

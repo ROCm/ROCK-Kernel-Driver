@@ -373,7 +373,8 @@ xfs_open_by_handle(
 		put_unused_fd(new_fd);
 		return -XFS_ERROR(-PTR_ERR(filp));
 	}
-	filp->f_mode |= FINVIS;
+	if (inode->i_mode & S_IFREG)
+		filp->f_op = &linvfs_invis_file_operations;
 
 	fd_install(new_fd, filp);
 	return new_fd;
@@ -415,12 +416,11 @@ xfs_readlink_by_handle(
 
 	auio.uio_iov	= &aiov;
 	auio.uio_iovcnt	= 1;
-	auio.uio_fmode	= FINVIS;
 	auio.uio_offset	= 0;
 	auio.uio_segflg	= UIO_USERSPACE;
 	auio.uio_resid	= olen;
 
-	VOP_READLINK(vp, &auio, NULL, error);
+	VOP_READLINK(vp, &auio, IO_INVIS, NULL, error);
 
 	VN_RELE(vp);
 	return (olen - auio.uio_resid);
@@ -575,6 +575,7 @@ xfs_ioc_space(
 	bhv_desc_t		*bdp,
 	vnode_t			*vp,
 	struct file		*filp,
+	int			flags,
 	unsigned int		cmd,
 	unsigned long		arg);
 
@@ -606,6 +607,7 @@ STATIC int
 xfs_ioc_getbmap(
 	bhv_desc_t		*bdp,
 	struct file		*filp,
+	int			flags,
 	unsigned int		cmd,
 	unsigned long		arg);
 
@@ -619,6 +621,7 @@ xfs_ioctl(
 	bhv_desc_t		*bdp,
 	struct inode		*inode,
 	struct file		*filp,
+	int			ioflags,
 	unsigned int		cmd,
 	unsigned long		arg)
 {
@@ -652,7 +655,7 @@ xfs_ioctl(
 		    !capable(CAP_SYS_ADMIN))
 			return -EPERM;
 
-		return xfs_ioc_space(bdp, vp, filp, cmd, arg);
+		return xfs_ioc_space(bdp, vp, filp, ioflags, cmd, arg);
 
 	case XFS_IOC_DIOINFO: {
 		struct dioattr	da;
@@ -703,7 +706,7 @@ xfs_ioctl(
 
 	case XFS_IOC_GETBMAP:
 	case XFS_IOC_GETBMAPA:
-		return xfs_ioc_getbmap(bdp, filp, cmd, arg);
+		return xfs_ioc_getbmap(bdp, filp, ioflags, cmd, arg);
 
 	case XFS_IOC_GETBMAPX:
 		return xfs_ioc_getbmapx(bdp, arg);
@@ -865,6 +868,7 @@ xfs_ioc_space(
 	bhv_desc_t		*bdp,
 	vnode_t			*vp,
 	struct file		*filp,
+	int			ioflags,
 	unsigned int		cmd,
 	unsigned long		arg)
 {
@@ -886,7 +890,7 @@ xfs_ioc_space(
 
 	if (filp->f_flags & (O_NDELAY|O_NONBLOCK))
 		attr_flags |= ATTR_NONBLOCK;
-	if (filp->f_mode & FINVIS)
+	if (ioflags & IO_INVIS)
 		attr_flags |= ATTR_DMI;
 
 	error = xfs_change_file_space(bdp, cmd, &bf, filp->f_pos,
@@ -1153,6 +1157,7 @@ STATIC int
 xfs_ioc_getbmap(
 	bhv_desc_t		*bdp,
 	struct file		*filp,
+	int			ioflags,
 	unsigned int		cmd,
 	unsigned long		arg)
 {
@@ -1167,7 +1172,7 @@ xfs_ioc_getbmap(
 		return -XFS_ERROR(EINVAL);
 
 	iflags = (cmd == XFS_IOC_GETBMAPA ? BMV_IF_ATTRFORK : 0);
-	if (filp->f_mode & FINVIS)
+	if (ioflags & IO_INVIS)
 		iflags |= BMV_IF_NO_DMAPI_READ;
 
 	error = xfs_getbmap(bdp, &bm, (struct getbmap *)arg+1, iflags);

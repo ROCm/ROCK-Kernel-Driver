@@ -1678,7 +1678,6 @@ static ssize_t snd_timer_user_read(struct file *file, char *buffer, size_t count
 			spin_lock_irq(&tu->qlock);
 
 			remove_wait_queue(&tu->qchange_sleep, &wait);
-			set_current_state(TASK_RUNNING);
 
 			if (signal_pending(current)) {
 				err = -ERESTARTSYS;

@@ -541,7 +541,8 @@ pcnet32_probe1(unsigned long ioaddr, unsigned int irq_line, int shared,
 	pcnet32_dwio_reset(ioaddr);
 	if (pcnet32_dwio_read_csr(ioaddr, 0) == 4 && pcnet32_dwio_check(ioaddr)) {
 	    a = &pcnet32_dwio;
-	} else
+	} else {
+		printk(KERN_INFO "pcnet32: probe at %lx failed\n", ioaddr);
 		goto err_release_region;
     }
 

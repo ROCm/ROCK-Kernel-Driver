@@ -163,6 +163,7 @@
 #define AE_AML_NO_RESOURCE_END_TAG      (acpi_status) (0x001E | AE_CODE_AML)
 #define AE_AML_BAD_RESOURCE_VALUE       (acpi_status) (0x001F | AE_CODE_AML)
 #define AE_AML_CIRCULAR_REFERENCE       (acpi_status) (0x0020 | AE_CODE_AML)
+#define AE_AML_BAD_RESOURCE_LENGTH      (acpi_status) (0x0021 | AE_CODE_AML)
 
 #define AE_CODE_AML_MAX                 0x0020
 
@@ -280,7 +281,8 @@ char const   *acpi_gbl_exception_names_aml[] =
 	"AE_AML_ALIGNMENT",
 	"AE_AML_NO_RESOURCE_END_TAG",
 	"AE_AML_BAD_RESOURCE_VALUE",
-	"AE_AML_CIRCULAR_REFERENCE"
+	"AE_AML_CIRCULAR_REFERENCE",
+	"AE_AML_BAD_RESOURCE_LENGTH"
 };
 
 char const   *acpi_gbl_exception_names_ctrl[] =

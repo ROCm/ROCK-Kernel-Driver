@@ -171,12 +171,12 @@ int show_cpuinfo(struct seq_file *m, void *v)
 		return 0;
 	pvr = cpu_data[i].pvr;
 	lpj = cpu_data[i].loops_per_jiffy;
-	seq_printf(m, "processor\t: %d\n", i);
 #else
 	pvr = mfspr(PVR);
 	lpj = loops_per_jiffy;
 #endif
 
+	seq_printf(m, "processor\t: %d\n", i);
 	seq_printf(m, "cpu\t\t: ");
 
 	if (cur_cpu_spec[i]->pvr_mask)

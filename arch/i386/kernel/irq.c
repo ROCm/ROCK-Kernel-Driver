@@ -355,8 +355,10 @@ inline void disable_irq_nosync(unsigned int irq)
  
 void disable_irq(unsigned int irq)
 {
+	irq_desc_t *desc = irq_desc + irq;
 	disable_irq_nosync(irq);
-	synchronize_irq(irq);
+	if (desc->action)
+		synchronize_irq(irq);
 }
 
 /**
@@ -378,7 +380,7 @@ void enable_irq(unsigned int irq)
 	spin_lock_irqsave(&desc->lock, flags);
 	switch (desc->depth) {
 	case 1: {
-		unsigned int status = desc->status & ~IRQ_DISABLED;
+		unsigned int status = desc->status & ~(IRQ_DISABLED | IRQ_INPROGRESS);
 		desc->status = status;
 		if ((status & (IRQ_PENDING | IRQ_REPLAY)) == IRQ_PENDING) {
 			desc->status = status | IRQ_REPLAY;

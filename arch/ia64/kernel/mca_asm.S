@@ -77,12 +77,11 @@
 (p6)	movl	r10=IA64_MCA_SAME_CONTEXT;		\
 (p6)	add     _tmp=0x18,_tmp;;			\
 (p6)	ld8	r9=[_tmp],0x10;				\
-(p6)	movl	r22=ia64_mca_min_state_save_info;;	\
+(p6)	mov	r22=r0;;				\
 (p7)	ld8	r8=[_tmp],0x08;;			\
 (p7)	ld8	r9=[_tmp],0x08;;			\
 (p7)	ld8     r10=[_tmp],0x08;;			\
-(p7)	ld8     r22=[_tmp],0x08;;			\
-	DATA_VA_TO_PA(r22)
+(p7)	ld8     r22=[_tmp],0x08;;
 	// now _tmp is pointing to SAL rtn save location
 
 
@@ -97,7 +96,6 @@
 	.global ia64_init_stack
 	.global ia64_mca_sal_data_area
 	.global ia64_tlb_functional
-	.global ia64_mca_min_state_save_info
 
 	.text
 	.align 16

@@ -2041,9 +2041,9 @@ aty128fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 #define ATY_MIRROR_CRT_ON	0x00000002
 
 /* out param: u32*	backlight value: 0 to 15 */
-#define FBIO_ATY128_GET_MIRROR	_IOR('@', 1, sizeof(__u32*))
+#define FBIO_ATY128_GET_MIRROR	_IOR('@', 1, __u32*)
 /* in param: u32*	backlight value: 0 to 15 */
-#define FBIO_ATY128_SET_MIRROR	_IOW('@', 2, sizeof(__u32*))
+#define FBIO_ATY128_SET_MIRROR	_IOW('@', 2, __u32*)
 
 static int aty128fb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 			  u_long arg, struct fb_info *info)

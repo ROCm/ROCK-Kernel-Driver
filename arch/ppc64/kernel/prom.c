@@ -29,6 +29,7 @@
 #include <linux/spinlock.h>
 #include <linux/types.h>
 #include <linux/pci.h>
+#include <linux/proc_fs.h>
 #include <asm/prom.h>
 #include <asm/rtas.h>
 #include <asm/lmb.h>
@@ -44,6 +45,7 @@
 #include <asm/bitops.h>
 #include <asm/naca.h>
 #include <asm/pci.h>
+#include <asm/pci_dma.h>
 #include <asm/bootinfo.h>
 #include <asm/ppcdebug.h>
 #include "open_pic.h"
@@ -149,6 +151,10 @@ char *bootdevice = 0;
 int boot_cpuid = 0;
 
 struct device_node *allnodes = 0;
+/* use when traversing tree through the allnext, child, sibling,
+ * or parent members of struct device_node.
+ */
+static rwlock_t devtree_lock = RW_LOCK_UNLOCKED;
 
 static unsigned long call_prom(const char *service, int nargs, int nret, ...);
 static void prom_panic(const char *reason);
@@ -163,6 +169,11 @@ static int prom_next_node(phandle *);
 static struct bi_record * prom_bi_rec_verify(struct bi_record *);
 static unsigned long prom_bi_rec_reserve(unsigned long);
 static struct device_node *find_phandle(phandle);
+static void of_node_cleanup(struct device_node *);
+static struct device_node *derive_parent(const char *);
+static void add_node_proc_entries(struct device_node *);
+static void remove_node_proc_entries(struct device_node *);
+static int of_finish_dynamic_node(struct device_node *);
 
 #ifdef DEBUG_PROM
 void prom_dump_lmb(void);
@@ -1967,8 +1978,8 @@ find_path_device(const char *path)
 /*******
  *
  * New implementation of the OF "find" APIs, return a refcounted
- * object, call of_node_put() when done. Currently, still lacks
- * locking as old implementation, this is being done for ppc64.
+ * object, call of_node_put() when done.  The device tree and list
+ * are protected by a rw_lock.
  *
  * Note that property management will need some locking as well,
  * this isn't dealt with yet.
@@ -1989,14 +2000,18 @@ find_path_device(const char *path)
 struct device_node *of_find_node_by_name(struct device_node *from,
 	const char *name)
 {
-	struct device_node *np = from ? from->allnext : allnodes;
+	struct device_node *np;
 
+	read_lock(&devtree_lock);
+	np = from ? from->allnext : allnodes;
 	for (; np != 0; np = np->allnext)
-		if (np->name != 0 && strcasecmp(np->name, name) == 0)
+		if (np->name != 0 && strcasecmp(np->name, name) == 0
+		    && of_node_get(np))
 			break;
 	if (from)
 		of_node_put(from);
-	return of_node_get(np);
+	read_unlock(&devtree_lock);
+	return np;
 }
 
 /**
@@ -2013,14 +2028,18 @@ struct device_node *of_find_node_by_name(struct device_node *from,
 struct device_node *of_find_node_by_type(struct device_node *from,
 	const char *type)
 {
-	struct device_node *np = from ? from->allnext : allnodes;
+	struct device_node *np;
 
+	read_lock(&devtree_lock);
+	np = from ? from->allnext : allnodes;
 	for (; np != 0; np = np->allnext)
-		if (np->type != 0 && strcasecmp(np->type, type) == 0)
+		if (np->type != 0 && strcasecmp(np->type, type) == 0
+		    && of_node_get(np))
 			break;
 	if (from)
 		of_node_put(from);
-	return of_node_get(np);
+	read_unlock(&devtree_lock);
+	return np;
 }
 
 /**
@@ -2040,18 +2059,21 @@ struct device_node *of_find_node_by_type(struct device_node *from,
 struct device_node *of_find_compatible_node(struct device_node *from,
 	const char *type, const char *compatible)
 {
-	struct device_node *np = from ? from->allnext : allnodes;
+	struct device_node *np;
 
+	read_lock(&devtree_lock);
+	np = from ? from->allnext : allnodes;
 	for (; np != 0; np = np->allnext) {
 		if (type != NULL
 		    && !(np->type != 0 && strcasecmp(np->type, type) == 0))
 			continue;
-		if (device_is_compatible(np, compatible))
+		if (device_is_compatible(np, compatible) && of_node_get(np))
 			break;
 	}
 	if (from)
 		of_node_put(from);
-	return of_node_get(np);
+	read_unlock(&devtree_lock);
+	return np;
 }
 
 /**
@@ -2065,10 +2087,13 @@ struct device_node *of_find_node_by_path(const char *path)
 {
 	struct device_node *np = allnodes;
 
+	read_lock(&devtree_lock);
 	for (; np != 0; np = np->allnext)
-		if (np->full_name != 0 && strcasecmp(np->full_name, path) == 0)
+		if (np->full_name != 0 && strcasecmp(np->full_name, path) == 0
+		    && of_node_get(np))
 			break;
-	return of_node_get(np);
+	read_unlock(&devtree_lock);
+	return np;
 }
 
 /**
@@ -2081,11 +2106,17 @@ struct device_node *of_find_node_by_path(const char *path)
  */
 struct device_node *of_find_all_nodes(struct device_node *prev)
 {
-	struct device_node *np = prev ? prev->allnext : allnodes;
+	struct device_node *np;
 
+	read_lock(&devtree_lock);
+	np = prev ? prev->allnext : allnodes;
+	for (; np != 0; np = np->allnext)
+		if (of_node_get(np))
+			break;
 	if (prev)
 		of_node_put(prev);
-	return of_node_get(np);
+	read_unlock(&devtree_lock);
+	return np;
 }
 
 /**
@@ -2097,7 +2128,15 @@ struct device_node *of_find_all_nodes(struct device_node *prev)
  */
 struct device_node *of_get_parent(const struct device_node *node)
 {
-	return node ? of_node_get(node->parent) : NULL;
+	struct device_node *np;
+
+	if (!node)
+		return NULL;
+
+	read_lock(&devtree_lock);
+	np = of_node_get(node->parent);
+	read_unlock(&devtree_lock);
+	return np;
 }
 
 /**
@@ -2111,13 +2150,16 @@ struct device_node *of_get_parent(const struct device_node *node)
 struct device_node *of_get_next_child(const struct device_node *node,
 	struct device_node *prev)
 {
-	struct device_node *next = prev ? prev->sibling : node->child;
+	struct device_node *next;
 
+	read_lock(&devtree_lock);
+	next = prev ? prev->sibling : node->child;
 	for (; next != 0; next = next->sibling)
 		if (of_node_get(next))
 			break;
 	if (prev)
 		of_node_put(prev);
+	read_unlock(&devtree_lock);
 	return next;
 }
 
@@ -2130,7 +2172,11 @@ struct device_node *of_get_next_child(const struct device_node *node,
  */
 struct device_node *of_node_get(struct device_node *node)
 {
-	return node;
+	if (node && !OF_IS_STALE(node)) {
+		atomic_inc(&node->_users);
+		return node;
+	}
+	return NULL;
 }
 
 /**
@@ -2141,6 +2187,335 @@ struct device_node *of_node_get(struct device_node *node)
  */
 void of_node_put(struct device_node *node)
 {
+	if (!node)
+		return;
+
+	WARN_ON(0 == atomic_read(&node->_users));
+
+	if (OF_IS_STALE(node)) {
+		if (atomic_dec_and_test(&node->_users)) {
+			of_node_cleanup(node);
+			return;
+		}
+	}
+	else
+		atomic_dec(&node->_users);
+}
+
+/**
+ *	of_node_cleanup - release a dynamically allocated node
+ *	@arg:  Node to be released
+ */
+static void of_node_cleanup(struct device_node *node)
+{
+	struct property *prop = node->properties;
+
+	if (!OF_IS_DYNAMIC(node))
+		return;
+	while (prop) {
+		struct property *next = prop->next;
+		kfree(prop->name);
+		kfree(prop->value);
+		kfree(prop);
+		prop = next;
+	}
+	kfree(node->intrs);
+	kfree(node->addrs);
+	kfree(node->full_name);
+	kfree(node);
+}
+
+/**
+ *	derive_parent - basically like dirname(1)
+ *	@path:  the full_name of a node to be added to the tree
+ *
+ *	Returns the node which should be the parent of the node
+ *	described by path.  E.g., for path = "/foo/bar", returns
+ *	the node with full_name = "/foo".
+ */
+static struct device_node *derive_parent(const char *path)
+{
+	struct device_node *parent = NULL;
+	char *parent_path = "/";
+	size_t parent_path_len = strrchr(path, '/') - path + 1;
+
+	/* reject if path is "/" */
+	if (!strcmp(path, "/"))
+		return NULL;
+
+	if (strrchr(path, '/') != path) {
+		parent_path = kmalloc(parent_path_len, GFP_KERNEL);
+		if (!parent_path)
+			return NULL;
+		strlcpy(parent_path, path, parent_path_len);
+	}
+	parent = of_find_node_by_path(parent_path);
+	if (strcmp(parent_path, "/"))
+		kfree(parent_path);
+	return parent;
+}
+
+/*
+ * Routines for "runtime" addition and removal of device tree nodes.
+ */
+
+/*
+ * Given a path and a property list, construct an OF device node, add
+ * it to the device tree and global list, and place it in
+ * /proc/device-tree.  This function may sleep.
+ */
+int of_add_node(const char *path, struct property *proplist)
+{
+	struct device_node *np;
+	int err = 0;
+
+	np = kmalloc(sizeof(struct device_node), GFP_KERNEL);
+	if (!np)
+		return -ENOMEM;
+
+	memset(np, 0, sizeof(*np));
+
+	np->full_name = kmalloc(strlen(path) + 1, GFP_KERNEL);
+	if (!np->full_name) {
+		kfree(np);
+		return -ENOMEM;
+	}
+	strcpy(np->full_name, path);
+
+	np->properties = proplist;
+	OF_MARK_DYNAMIC(np);
+	of_node_get(np);
+	np->parent = derive_parent(path);
+	if (!np->parent) {
+		kfree(np);
+		return -EINVAL; /* could also be ENOMEM, though */
+	}
+
+	if (0 != (err = of_finish_dynamic_node(np))) {
+		kfree(np);
+		return err;
+	}
+
+	write_lock(&devtree_lock);
+	np->sibling = np->parent->child;
+	np->allnext = allnodes;
+	np->parent->child = np;
+	allnodes = np;
+	write_unlock(&devtree_lock);
+
+	add_node_proc_entries(np);
+
+	of_node_put(np->parent);
+	of_node_put(np);
+	return 0;
+}
+
+/*
+ * Remove an OF device node from the system.
+ */
+int of_remove_node(struct device_node *np)
+{
+	struct device_node *parent, *child;
+
+	parent = of_get_parent(np);
+	child = of_get_next_child(np, NULL);
+	if (child && !child->child && !child->sibling) {
+		/* For now, we will allow removal of a
+		 * node with one and only one child, so
+		 * that we can support removing a slot with
+		 * an IOA in it.  More general support for
+		 * subtree removal to be implemented later, if
+		 * necessary.
+		 */
+		of_remove_node(child);
+	}
+	else if (child) {
+		of_node_put(child);
+		of_node_put(parent);
+		return -EINVAL;
+	}
+	of_node_put(child);
+
+	write_lock(&devtree_lock);
+	OF_MARK_STALE(np);
+	remove_node_proc_entries(np);
+	if (allnodes == np)
+		allnodes = np->allnext;
+	else {
+		struct device_node *prev;
+		for (prev = allnodes;
+		     prev->allnext != np;
+		     prev = prev->allnext)
+			;
+		prev->allnext = np->allnext;
+	}
+
+	if (np->parent->child == np)
+		np->parent->child = np->sibling;
+	else {
+		struct device_node *prevsib;
+		for (prevsib = np->parent->child;
+		     prevsib->sibling != np;
+		     prevsib = prevsib->sibling)
+			;
+		prevsib->sibling = np->sibling;
+	}
+	write_unlock(&devtree_lock);
+	of_node_put(parent);
+	return 0;
+}
+
+/*
+ * Add a node to /proc/device-tree.
+ */
+static void add_node_proc_entries(struct device_node *np)
+{
+	struct proc_dir_entry *ent;
+
+	ent = proc_mkdir(strrchr(np->full_name, '/') + 1, np->parent->pde);
+	if (ent)
+		proc_device_tree_add_node(np, ent);
+}
+
+static void remove_node_proc_entries(struct device_node *np)
+{
+	struct property *pp = np->properties;
+	struct device_node *parent = np->parent;
+
+	while (pp) {
+		remove_proc_entry(pp->name, np->pde);
+		pp = pp->next;
+	}
+
+	/* Assuming that symlinks have the same parent directory as
+	 * np->pde.
+	 */
+	if (np->name_link)
+		remove_proc_entry(np->name_link->name, parent->pde);
+	if (np->addr_link)
+		remove_proc_entry(np->addr_link->name, parent->pde);
+	if (np->pde)
+		remove_proc_entry(np->pde->name, parent->pde);
+}
+
+/*
+ * Fix up the uninitialized fields in a new device node:
+ * name, type, n_addrs, addrs, n_intrs, intrs, and pci-specific fields
+ *
+ * A lot of boot-time code is duplicated here, because functions such
+ * as finish_node_interrupts, interpret_pci_props, etc. cannot use the
+ * slab allocator.
+ *
+ * This should probably be split up into smaller chunks.
+ */
+
+static int of_finish_dynamic_node(struct device_node *node)
+{
+	struct device_node *parent = of_get_parent(node);
+	u32 *regs;
+	unsigned int *ints;
+	int intlen, intrcells;
+	int i, j, n, err = 0;
+	unsigned int *irq;
+	struct device_node *ic;
+ 
+	node->name = get_property(node, "name", 0);
+	node->type = get_property(node, "device_type", 0);
+
+	if (!parent) {
+		err = -ENODEV;
+		goto out;
+	}
+
+	/* do the work of interpret_pci_props */
+	if (parent->type && !strcmp(parent->type, "pci")) {
+		struct address_range *adr;
+		struct pci_reg_property *pci_addrs;
+		int i, l;
+
+		pci_addrs = (struct pci_reg_property *)
+			get_property(node, "assigned-addresses", &l);
+		if (pci_addrs != 0 && l >= sizeof(struct pci_reg_property)) {
+			i = 0;
+			adr = kmalloc(sizeof(struct address_range) * 
+				      (l / sizeof(struct pci_reg_property)),
+				      GFP_KERNEL);
+			if (!adr) {
+				err = -ENOMEM;
+				goto out;
+			}
+			while ((l -= sizeof(struct pci_reg_property)) >= 0) {
+				adr[i].space = pci_addrs[i].addr.a_hi;
+				adr[i].address = pci_addrs[i].addr.a_lo;
+				adr[i].size = pci_addrs[i].size_lo;
+				++i;
+			}
+			node->addrs = adr;
+			node->n_addrs = i;
+		}
+	}
+
+	/* now do the work of finish_node_interrupts */
+
+	ints = (unsigned int *) get_property(node, "interrupts", &intlen);
+	if (!ints)
+		goto out;
+
+	intrcells = prom_n_intr_cells(node);
+	intlen /= intrcells * sizeof(unsigned int);
+	node->n_intrs = intlen;
+	node->intrs = kmalloc(sizeof(struct interrupt_info) * intlen,
+			      GFP_KERNEL);
+	if (!node->intrs) {
+		err = -ENOMEM;
+		goto out;
+	}
+
+	for (i = 0; i < intlen; ++i) {
+		node->intrs[i].line = 0;
+		node->intrs[i].sense = 1;
+		n = map_interrupt(&irq, &ic, node, ints, intrcells);
+		if (n <= 0)
+			continue;
+		node->intrs[i].line = irq_offset_up(irq[0]);
+		if (n > 1)
+			node->intrs[i].sense = irq[1];
+		if (n > 2) {
+			printk(KERN_DEBUG "hmmm, got %d intr cells for %s:", n,
+			       node->full_name);
+			for (j = 0; j < n; ++j)
+				printk(" %d", irq[j]);
+			printk("\n");
+		}
+		ints += intrcells;
+	}
+
+       /* now do the rough equivalent of update_dn_pci_info, this
+        * probably is not correct for phb's, but should work for
+	* IOAs and slots.
+        */
+
+       node->phb = parent->phb;
+
+       regs = (u32 *)get_property(node, "reg", 0);
+       if (regs) {
+               node->busno = (regs[0] >> 16) & 0xff;
+               node->devfn = (regs[0] >> 8) & 0xff;
+       }
+
+	/* fixing up tce_table */
+
+	if(strcmp(node->name, "pci") == 0 &&
+                get_property(node, "ibm,dma-window", NULL)) {
+                node->bussubno = node->busno;
+                create_pci_bus_tce_table((unsigned long)node);
+        }
+	else
+		node->tce_table = parent->tce_table;
+
+out:
+	of_node_put(parent);
+	return err;
 }
 
 /*

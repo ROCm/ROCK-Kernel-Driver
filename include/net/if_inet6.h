@@ -34,7 +34,8 @@ struct inet6_ifaddr
 	
 	__u32			valid_lft;
 	__u32			prefered_lft;
-	unsigned long		tstamp;
+	unsigned long		cstamp;	/* created timestamp */
+	unsigned long		tstamp; /* updated timestamp */
 	atomic_t		refcnt;
 	spinlock_t		lock;
 
@@ -111,6 +112,8 @@ struct ifmcaddr6
 	atomic_t		mca_refcnt;
 	spinlock_t		mca_lock;
 	unsigned char		mca_crcount;
+	unsigned long		mca_cstamp;
+	unsigned long		mca_tstamp;
 };
 
 /* Anycast stuff */
@@ -130,6 +133,8 @@ struct ifacaddr6
 	int			aca_users;
 	atomic_t		aca_refcnt;
 	spinlock_t		aca_lock;
+	unsigned long		aca_cstamp;
+	unsigned long		aca_tstamp;
 };
 
 #define	IFA_HOST	IPV6_ADDR_LOOPBACK

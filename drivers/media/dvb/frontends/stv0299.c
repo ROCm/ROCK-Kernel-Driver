@@ -910,7 +910,7 @@ static long probe_tuner (struct dvb_i2c_bus *i2c)
 }
 
 
-static int uni0299_attach (struct dvb_i2c_bus *i2c)
+static int uni0299_attach (struct dvb_i2c_bus *i2c, void **data)
 {
         long tuner_type;
 	u8 id;
@@ -928,17 +928,14 @@ static int uni0299_attach (struct dvb_i2c_bus *i2c)
 	if ((tuner_type = probe_tuner(i2c)) < 0)
 		return -ENODEV;
 
-	dvb_register_frontend (uni0299_ioctl, i2c, (void*) tuner_type, 
+	return dvb_register_frontend (uni0299_ioctl, i2c, (void*) tuner_type, 
 			       &uni0299_info);
-
-	return 0;
 }
 
 
-static void uni0299_detach (struct dvb_i2c_bus *i2c)
+static void uni0299_detach (struct dvb_i2c_bus *i2c, void *data)
 {
 	dprintk ("%s\n", __FUNCTION__);
-
 	dvb_unregister_frontend (uni0299_ioctl, i2c);
 }
 

@@ -5,8 +5,8 @@
  */
 
 #include <linux/config.h>
-#ifdef CONFIG_PROC_FS
 #include <linux/init.h>
+#ifdef CONFIG_PROC_FS
 #include <linux/proc_fs.h>
 #include <linux/spinlock.h>
 #include <linux/seq_file.h>

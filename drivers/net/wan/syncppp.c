@@ -1069,6 +1069,9 @@ void sppp_attach(struct ppp_device *pd)
 	struct sppp *sp = &pd->sppp;
 	unsigned long flags;
 
+	/* Make sure embedding is safe for sppp_of */
+	BUG_ON(sppp_of(dev) != sp);
+
 	spin_lock_irqsave(&spppq_lock, flags);
 	/* Initialize keepalive handler. */
 	if (! spppq)

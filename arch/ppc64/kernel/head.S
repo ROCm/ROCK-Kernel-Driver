@@ -952,7 +952,6 @@ _GLOBAL(do_stab_bolted)
 	mfspr	r20,SPRG2
 	mfspr	r21,SPRG1
 	rfid
-_TRACEBACK(do_stab_bolted)
 
 /*
  * r20 points to the PACA, r21 to the exception frame,
@@ -1067,7 +1066,6 @@ SLB_NUM_ENTRIES = 64
 	mfspr	r20,SPRG2
 	mfspr	r21,SPRG1
 	rfid
-_TRACEBACK(do_slb_bolted)
 
 _GLOBAL(do_stab_SI)
 	mflr	r21			/* Save LR in r21 */

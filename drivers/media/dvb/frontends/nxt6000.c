@@ -829,7 +829,7 @@ static int nxt6000_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 
 static u8 demod_addr_tbl[] = {0x14, 0x18, 0x24, 0x28};
 
-static int nxt6000_attach(struct dvb_i2c_bus *i2c)
+static int nxt6000_attach(struct dvb_i2c_bus *i2c, void **data)
 {
 
 	u8 addr_nr;
@@ -881,13 +881,14 @@ static int nxt6000_attach(struct dvb_i2c_bus *i2c)
 	
 		dvb_register_frontend(nxt6000_ioctl, i2c, (void *)(*((u32 *)&nxt)), &nxt6000_info);
 		
+		fe_count++;
 	}
 	
 	return (fe_count > 0) ? 0 : -ENODEV;
 	
 }
 
-static void nxt6000_detach(struct dvb_i2c_bus *i2c)
+static void nxt6000_detach(struct dvb_i2c_bus *i2c, void *data)
 {
 
 	dprintk("nxt6000: detach\n");

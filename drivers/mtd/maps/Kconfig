@@ -296,10 +296,18 @@ config MTD_ARCTIC
 
 config MTD_EBONY
 	tristate "CFI Flash device mapped on IBM 440GP Ebony"
-	depends on MTD_CFI && PPC32 && 440 && EBONY
+	depends on MTD_CFI && PPC32 && 44x && EBONY
 	help
 	  This enables access routines for the flash chips on the IBM 440GP
 	  Ebony board. If you have one of these boards and would like to
+	  use the flash chips on it, say 'Y'.
+
+config MTD_OCOTEA
+	tristate "CFI Flash device mapped on IBM 440GX Ocotea"
+	depends on MTD_CFI && PPC32 && 44x && OCOTEA
+	help
+	  This enables access routines for the flash chips on the IBM 440GX
+	  Ocotea board. If you have one of these boards and would like to
 	  use the flash chips on it, say 'Y'.
 
 config MTD_REDWOOD

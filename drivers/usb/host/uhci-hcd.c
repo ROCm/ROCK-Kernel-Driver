@@ -2518,7 +2518,7 @@ static int uhci_hcd_get_frame_number(struct usb_hcd *hcd)
 	return uhci_get_current_frame_number(hcd_to_uhci(hcd));
 }
 
-static const char hcd_name[] = "uhci-hcd";
+static const char hcd_name[] = "uhci_hcd";
 
 static const struct hc_driver uhci_driver = {
 	.description =		hcd_name,

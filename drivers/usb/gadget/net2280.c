@@ -50,10 +50,8 @@
 #define DEBUG	1
 // #define	VERBOSE		/* extra debug messages (success too) */
 
-#include <linux/version.h>
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/pci.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
@@ -432,6 +430,9 @@ net2280_free_request (struct usb_ep *_ep, struct usb_request *_req)
 #elif	defined(CONFIG_PPC) && !defined(CONFIG_NOT_COHERENT_CACHE)
 #define USE_KMALLOC
 
+#elif	defined(CONFIG_MIPS) && !defined(CONFIG_NONCOHERENT_IO)
+#define USE_KMALLOC
+
 /* FIXME there are other cases, including an x86-64 one ...  */
 #endif
 
@@ -453,31 +454,23 @@ net2280_alloc_buffer (
 	ep = container_of (_ep, struct net2280_ep, ep);
 	if (!_ep)
 		return 0;
-
 	*dma = DMA_ADDR_INVALID;
-	if (ep->dma) {
-#if	defined(USE_KMALLOC)
-		retval = kmalloc (bytes, gfp_flags);
-		if (retval)
-			*dma = virt_to_phys (retval);
 
-#elif	LINUX_VERSION_CODE > KERNEL_VERSION(2,5,58)
-#warning Using dma_alloc_consistent even with sub-page allocations
+#if	defined(USE_KMALLOC)
+	retval = kmalloc(bytes, gfp_flags);
+	if (retval)
+		*dma = virt_to_phys(retval);
+#else
+	if (ep->dma) {
 		/* the main problem with this call is that it wastes memory
 		 * on typical 1/N page allocations: it allocates 1-N pages.
 		 */
-		retval = dma_alloc_coherent (&ep->dev->pdev->dev,
+#warning Using dma_alloc_coherent even with buffers smaller than a page.
+		retval = dma_alloc_coherent(&ep->dev->pdev->dev,
 				bytes, dma, gfp_flags);
-#else
-#error No dma-coherent memory allocator is available
-		/* pci_alloc_consistent works, but pci_free_consistent()
-		 * isn't safe in_interrupt().  plus, in addition to the
-		 * 1/Nth page weakness, it doesn't understand gfp_flags.
-		 */
-#endif
 	} else
-		retval = kmalloc (bytes, gfp_flags);
-
+		retval = kmalloc(bytes, gfp_flags);
+#endif
 	return retval;
 }
 
@@ -490,10 +483,14 @@ net2280_free_buffer (
 ) {
 	/* free memory into the right allocator */
 #ifndef	USE_KMALLOC
-	struct net2280_ep *ep = container_of (_ep, struct net2280_ep, ep);
-	if (dma != DMA_ADDR_INVALID)
-		dma_free_coherent (&ep->dev->pdev->dev, bytes, buf, dma);
-	else
+	if (dma != DMA_ADDR_INVALID) {
+		struct net2280_ep	*ep;
+
+		ep = container_of(_ep, struct net2280_ep, ep);
+		if (!_ep)
+			return;
+		dma_free_coherent(&ep->dev->pdev->dev, bytes, buf, dma);
+	} else
 #endif
 		kfree (buf);
 }
@@ -518,8 +515,9 @@ write_fifo (struct net2280_ep *ep, struct usb_request *req)
 	/* INVARIANT:  fifo is currently empty. (testable) */
 
 	if (req) {
-		total = req->length - req->actual;
 		buf = req->buf + req->actual;
+		prefetch (buf);
+		total = req->length - req->actual;
 	} else {
 		total = 0;
 		buf = 0;
@@ -617,6 +615,7 @@ read_fifo (struct net2280_ep *ep, struct net2280_request *req)
 	/* never overflow the rx buffer. the fifo reads packets until
 	 * it sees a short one; we might not be ready for them all.
 	 */
+	prefetchw (buf);
 	count = readl (&regs->ep_avail);
 	tmp = req->req.length - req->req.actual;
 	if (count > tmp) {

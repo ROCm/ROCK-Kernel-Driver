@@ -2731,6 +2731,19 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	if (gem_get_device_address(gp))
 		goto err_out_free_consistent;
 
+	dev->open = gem_open;
+	dev->stop = gem_close;
+	dev->hard_start_xmit = gem_start_xmit;
+	dev->get_stats = gem_get_stats;
+	dev->set_multicast_list = gem_set_multicast;
+	dev->do_ioctl = gem_ioctl;
+	dev->ethtool_ops = &gem_ethtool_ops;
+	dev->tx_timeout = gem_tx_timeout;
+	dev->watchdog_timeo = 5 * HZ;
+	dev->change_mtu = gem_change_mtu;
+	dev->irq = pdev->irq;
+	dev->dma = 0;
+
 	if (register_netdev(dev)) {
 		printk(KERN_ERR PFX "Cannot register net device, "
 		       "aborting.\n");
@@ -2758,19 +2771,6 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 			gp->phy_mii.def ? gp->phy_mii.def->name : "no");
 
 	pci_set_drvdata(pdev, dev);
-
-	dev->open = gem_open;
-	dev->stop = gem_close;
-	dev->hard_start_xmit = gem_start_xmit;
-	dev->get_stats = gem_get_stats;
-	dev->set_multicast_list = gem_set_multicast;
-	dev->do_ioctl = gem_ioctl;
-	dev->ethtool_ops = &gem_ethtool_ops;
-	dev->tx_timeout = gem_tx_timeout;
-	dev->watchdog_timeo = 5 * HZ;
-	dev->change_mtu = gem_change_mtu;
-	dev->irq = pdev->irq;
-	dev->dma = 0;
 
 	/* GEM can do it all... */
 	dev->features |= NETIF_F_SG | NETIF_F_HW_CSUM;

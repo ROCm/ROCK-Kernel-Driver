@@ -1642,7 +1642,7 @@ static struct file_operations via_mixer_fops = {
 };
 
 
-static int __init via_ac97_reset (struct via_info *card)
+static int __devinit via_ac97_reset (struct via_info *card)
 {
 	struct pci_dev *pdev = card->pdev;
 	u8 tmp8;
@@ -1752,7 +1752,7 @@ static void via_ac97_codec_wait (struct ac97_codec *codec)
 }
 
 
-static int __init via_ac97_init (struct via_info *card)
+static int __devinit via_ac97_init (struct via_info *card)
 {
 	int rc;
 	u16 tmp16;
@@ -2070,7 +2070,7 @@ static struct file_operations via_dsp_fops = {
 };
 
 
-static int __init via_dsp_init (struct via_info *card)
+static int __devinit via_dsp_init (struct via_info *card)
 {
 	u8 tmp8;
 
@@ -3394,7 +3394,7 @@ static int via_dsp_release(struct inode *inode, struct file *file)
  *
  */
 
-static int __init via_init_one (struct pci_dev *pdev, const struct pci_device_id *id)
+static int __devinit via_init_one (struct pci_dev *pdev, const struct pci_device_id *id)
 {
 #ifdef CONFIG_MIDI_VIA82CXXX
 	u8 r42;
@@ -3772,7 +3772,7 @@ static void via_cleanup_proc (void)
 }
 
 
-static int __init via_card_init_proc (struct via_info *card)
+static int __devinit via_card_init_proc (struct via_info *card)
 {
 	char s[32];
 	int rc;

@@ -549,6 +549,7 @@ int set_page_dirty_lock(struct page *page)
 	unlock_page(page);
 	return ret;
 }
+EXPORT_SYMBOL(set_page_dirty_lock);
 
 /*
  * Clear a page's dirty flag, while caring for dirty memory accounting. 

@@ -295,6 +295,8 @@ int usb_hcd_pci_suspend (struct pci_dev *dev, u32 state)
 		if (retval)
 			dev_dbg (hcd->controller, "suspend fail, retval %d\n",
 					retval);
+		else
+			hcd->state = USB_STATE_SUSPENDED;
 	}
 
  	pci_set_power_state (dev, state);

@@ -561,7 +561,7 @@ int sp887x_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 
 
 static
-int sp887x_attach (struct dvb_i2c_bus *i2c)
+int sp887x_attach (struct dvb_i2c_bus *i2c, void **data)
 {
 	struct i2c_msg msg = { addr: 0x70, flags: 0, buf: NULL, len: 0 };
 
@@ -570,14 +570,12 @@ int sp887x_attach (struct dvb_i2c_bus *i2c)
 	if (i2c->xfer (i2c, &msg, 1) != 1)
                 return -ENODEV;
 
-	dvb_register_frontend (sp887x_ioctl, i2c, NULL, &sp887x_info);
-
-	return 0;
+	return dvb_register_frontend (sp887x_ioctl, i2c, NULL, &sp887x_info);
 }
 
 
 static
-void sp887x_detach (struct dvb_i2c_bus *i2c)
+void sp887x_detach (struct dvb_i2c_bus *i2c, void *data)
 {
 	dprintk ("%s\n", __FUNCTION__);
 	dvb_unregister_frontend (sp887x_ioctl, i2c);

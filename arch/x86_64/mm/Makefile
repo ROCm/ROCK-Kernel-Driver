@@ -7,7 +7,4 @@ obj-$(CONFIG_HUGETLB_PAGE) += hugetlbpage.o
 obj-$(CONFIG_DISCONTIGMEM) += numa.o
 obj-$(CONFIG_K8_NUMA) += k8topology.o
 
-$(obj)/hugetlbpage.c: 
-	@ln -sf ../../i386/mm/hugetlbpage.c $(obj)/hugetlbpage.c
-
-clean-files += hugetlbpage.c
+hugetlbpage-y = ../../i386/mm/hugetlbpage.o

@@ -903,7 +903,7 @@ xfs_mountfs(
 	 *  File systems that don't support user level file handles (i.e.
 	 *  all of them except for XFS) will leave vfs_altfsid as NULL.
 	 */
-	vfsp->vfs_altfsid = (__kernel_fsid_t *)mp->m_fixedfsid;
+	vfsp->vfs_altfsid = (fsid_t *)mp->m_fixedfsid;
 	mp->m_dmevmask = 0;	/* not persistent; set after each mount */
 
 	/*
@@ -977,7 +977,7 @@ xfs_mountfs(
 	rvp = XFS_ITOV(rip);
 	VMAP(rvp, vmap);
 
-	if (unlikely((rip->i_d.di_mode & IFMT) != IFDIR)) {
+	if (unlikely((rip->i_d.di_mode & S_IFMT) != S_IFDIR)) {
 		cmn_err(CE_WARN, "XFS: corrupted root inode");
 		prdev("Root inode %llu is not a directory",
 		      mp->m_ddev_targp, (unsigned long long)rip->i_ino);

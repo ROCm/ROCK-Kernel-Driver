@@ -424,13 +424,9 @@ static int emu8k_pcm_trigger(snd_pcm_substream_t *subs, int cmd)
  */
 #define CHECK_SCHEDULER() \
 do { \
-	if (need_resched()) {\
-		if (current->state != TASK_RUNNING)\
-			set_current_state(TASK_RUNNING);\
-		schedule();\
-		if (signal_pending(current))\
-			return -EAGAIN;\
-	}\
+	cond_resched();\
+	if (signal_pending(current))\
+		return -EAGAIN;\
 } while (0)
 
 

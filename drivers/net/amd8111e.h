@@ -606,7 +606,7 @@ typedef enum {
 /* ipg parameters */
 #define DEFAULT_IPG			0x60
 #define IFS1_DELTA			36
-#define	IPG_CONVERGE_TIME 0.5
+#define	IPG_CONVERGE_JIFFIES	(HZ / 2)
 #define	IPG_STABLE_TIME	5
 #define	MIN_IPG	96
 #define	MAX_IPG	255

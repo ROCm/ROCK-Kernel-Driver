@@ -86,7 +86,15 @@
 /* Special Purpose Registers (SPRNs)*/
 #define SPRN_CTR	0x009	/* Count Register */
 #define SPRN_DABR	0x3F5	/* Data Address Breakpoint Register */
+#if !defined(SPRN_DAC1) && !defined(SPRN_DAC2)
+#define SPRN_DAC1	0x3F6	/* Data Address Compare 1 */
+#define SPRN_DAC2	0x3F7	/* Data Address Compare 2 */
+#endif
 #define SPRN_DAR	0x013	/* Data Address Register */
+#define SPRN_TBRL	0x10C	/* Time Base Read Lower Register (user, R/O) */
+#define SPRN_TBRU	0x10D	/* Time Base Read Upper Register (user, R/O) */
+#define SPRN_TBWL	0x11C	/* Time Base Lower Register (super, R/W) */
+#define SPRN_TBWU	0x11D	/* Time Base Upper Register (super, R/W) */
 #define SPRN_DBAT0L	0x219	/* Data BAT 0 Lower Register */
 #define SPRN_DBAT0U	0x218	/* Data BAT 0 Upper Register */
 #define SPRN_DBAT1L	0x21B	/* Data BAT 1 Lower Register */
@@ -286,6 +294,8 @@
 #define SPRN_SPRG7	0x117	/* Special Purpose Register General 7 */
 #define SPRN_SRR0	0x01A	/* Save/Restore Register 0 */
 #define SPRN_SRR1	0x01B	/* Save/Restore Register 1 */
+#define SPRN_SRR2	0x3DE	/* Save/Restore Register 2 */
+#define SPRN_SRR3	0x3DF	/* Save/Restore Register 3 */
 #define SPRN_THRM1	0x3FC		/* Thermal Management Register 1 */
 /* these bits were defined in inverted endian sense originally, ugh, confusing */
 #define THRM1_TIN	(1 << 31)
@@ -397,6 +407,10 @@
 #define THRM2	SPRN_THRM2	/* Thermal Management Register 2 */
 #define THRM3	SPRN_THRM3	/* Thermal Management Register 3 */
 #define XER	SPRN_XER
+#define TBRL	SPRN_TBRL	/* Time Base Read Lower Register */
+#define TBRU	SPRN_TBRU	/* Time Base Read Upper Register */
+#define TBWL	SPRN_TBWL	/* Time Base Write Lower Register */
+#define TBWU	SPRN_TBWU	/* Time Base Write Upper Register */
 
 /* Processor Version Register */
 

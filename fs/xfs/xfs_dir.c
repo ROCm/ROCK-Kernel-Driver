@@ -216,7 +216,7 @@ xfs_dir_isempty(xfs_inode_t *dp)
 {
 	xfs_dir_sf_hdr_t *hdr;
 
-	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
+	ASSERT((dp->i_d.di_mode & S_IFMT) == S_IFDIR);
 	if (dp->i_d.di_size == 0)
 		return(1);
 	if (dp->i_d.di_size > XFS_IFORK_DSIZE(dp))
@@ -238,7 +238,7 @@ xfs_dir_init(xfs_trans_t *trans, xfs_inode_t *dir, xfs_inode_t *parent_dir)
 	args.dp = dir;
 	args.trans = trans;
 
-	ASSERT((dir->i_d.di_mode & IFMT) == IFDIR);
+	ASSERT((dir->i_d.di_mode & S_IFMT) == S_IFDIR);
 	if ((error = xfs_dir_ino_validate(trans->t_mountp, parent_dir->i_ino)))
 		return error;
 
@@ -257,7 +257,7 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	xfs_da_args_t args;
 	int retval, newsize, done;
 
-	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
+	ASSERT((dp->i_d.di_mode & S_IFMT) == S_IFDIR);
 
 	if ((retval = xfs_dir_ino_validate(trans->t_mountp, inum)))
 		return (retval);
@@ -321,7 +321,7 @@ xfs_dir_canenter(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen)
 	xfs_da_args_t args;
 	int retval, newsize;
 
-	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
+	ASSERT((dp->i_d.di_mode & S_IFMT) == S_IFDIR);
 	/*
 	 * Fill in the arg structure for this request.
 	 */
@@ -366,7 +366,7 @@ xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	xfs_da_args_t args;
 	int count, totallen, newsize, retval;
 
-	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
+	ASSERT((dp->i_d.di_mode & S_IFMT) == S_IFDIR);
 	XFS_STATS_INC(xs_dir_remove);
 	/*
 	 * Fill in the arg structure for this request.
@@ -409,7 +409,7 @@ xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 	xfs_da_args_t args;
 	int retval;
 
-	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
+	ASSERT((dp->i_d.di_mode & S_IFMT) == S_IFDIR);
 
 	XFS_STATS_INC(xs_dir_lookup);
 	/*
@@ -455,7 +455,7 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	xfs_dir_put_t put;
 
 	XFS_STATS_INC(xs_dir_getdents);
-	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
+	ASSERT((dp->i_d.di_mode & S_IFMT) == S_IFDIR);
 
 	/*
 	 * If our caller has given us a single contiguous memory buffer,
@@ -499,7 +499,7 @@ xfs_dir_replace(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 	xfs_da_args_t args;
 	int retval;
 
-	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
+	ASSERT((dp->i_d.di_mode & S_IFMT) == S_IFDIR);
 
 	if ((retval = xfs_dir_ino_validate(trans->t_mountp, inum)))
 		return retval;
@@ -545,7 +545,7 @@ xfs_dir_shortform_validate_ondisk(xfs_mount_t *mp, xfs_dinode_t *dp)
 
 
 
-	if ((INT_GET(dp->di_core.di_mode, ARCH_CONVERT) & IFMT) != IFDIR) {
+	if ((INT_GET(dp->di_core.di_mode, ARCH_CONVERT) & S_IFMT) != S_IFDIR) {
 		return 0;
 	}
 	if (INT_GET(dp->di_core.di_format, ARCH_CONVERT) != XFS_DINODE_FMT_LOCAL) {

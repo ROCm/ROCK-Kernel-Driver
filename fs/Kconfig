@@ -204,7 +204,7 @@ config REISERFS_FS
 
 	  In general, ReiserFS is as fast as ext2, but is very efficient with
 	  large directories and small files.  Additional patches are needed
-	  for NFS and quotas, please see <http://www.reiserfs.org/> for links.
+	  for NFS and quotas, please see <http://www.namesys.com/> for links.
 
 	  It is more easily extended to have features currently found in
 	  database and keyword search systems than block allocation based file
@@ -212,7 +212,7 @@ config REISERFS_FS
 	  plugins consistent with our motto ``It takes more than a license to
 	  make source code open.''
 
-	  Read <http://www.reiserfs.org/> to learn more about reiserfs.
+	  Read <http://www.namesys.com/> to learn more about reiserfs.
 
 	  Sponsored by Threshold Networks, Emusic.com, and Bigstorage.com.
 
@@ -1308,6 +1308,30 @@ config NFS_V4
 	  should only be used if you are interested in helping to test NFSv4.
 
 	  If unsure, say N.
+
+config NFS_DIRECTIO
+	bool "Allow direct I/O on NFS files (EXPERIMENTAL)"
+	depends on NFS_FS && EXPERIMENTAL
+	help
+	  This option enables applications to perform uncached I/O on files
+	  in NFS file systems using the O_DIRECT open() flag.  When O_DIRECT
+	  is set for a file, its data is not cached in the system's page
+	  cache.  Data is moved to and from user-level application buffers
+	  directly.  Unlike local disk-based file systems, NFS O_DIRECT has
+	  no alignment restrictions.
+
+	  Unless your program is designed to use O_DIRECT properly, you are
+	  much better off allowing the NFS client to manage data caching for
+	  you.  Misusing O_DIRECT can cause poor server performance or network
+	  storms.  This kernel build option defaults OFF to avoid exposing
+	  system administrators unwittingly to a potentially hazardous
+	  feature.
+
+	  For more details on NFS O_DIRECT, see fs/nfs/direct.c.
+
+	  If unsure, say N.  This reduces the size of the NFS client, and
+	  causes open() to return EINVAL if a file residing in NFS is
+	  opened with the O_DIRECT flag.
 
 config NFSD
 	tristate "NFS server support"

@@ -643,7 +643,7 @@ static int cx24110_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 }
 
 
-static int cx24110_attach (struct dvb_i2c_bus *i2c)
+static int cx24110_attach (struct dvb_i2c_bus *i2c, void **data)
 {
 	u8 sig;
 
@@ -651,13 +651,11 @@ static int cx24110_attach (struct dvb_i2c_bus *i2c)
 	if ( sig != 0x5a && sig != 0x69 )
 		return -ENODEV;
 
-	dvb_register_frontend (cx24110_ioctl, i2c, NULL, &cx24110_info);
-
-	return 0;
+	return dvb_register_frontend (cx24110_ioctl, i2c, NULL, &cx24110_info);
 }
 
 
-static void cx24110_detach (struct dvb_i2c_bus *i2c)
+static void cx24110_detach (struct dvb_i2c_bus *i2c, void *data)
 {
 	dvb_unregister_frontend (cx24110_ioctl, i2c);
 }

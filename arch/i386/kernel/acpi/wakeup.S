@@ -172,14 +172,13 @@ ENTRY(wakeup_end)
 .org	0x1000
 
 wakeup_pmode_return:
-	movl	$__KERNEL_DS, %eax
-	movl	%eax, %ds
-	movw	$0x0e00 + 'u', %ds:(0xb8016)
-
-	# restore other segment registers
-	xorl	%eax, %eax
+	movw	$__KERNEL_DS, %ax
+	movw	%ax, %ss
+	movw	%ax, %ds
+	movw	%ax, %es
 	movw	%ax, %fs
 	movw	%ax, %gs
+	movw	$0x0e00 + 'u', 0xb8016
 
 	# reload the gdt, as we need the full 32 bit address
 	lgdt	saved_gdt
@@ -192,46 +191,30 @@ wakeup_pmode_return:
 	wbinvd
 
 	# and restore the stack ... but you need gdt for this to work
-	movl	$__KERNEL_DS, %eax
-	movw	%ax, %ss
-	movw	%ax, %ds
-	movw	%ax, %es
-	movw	%ax, %fs
-	movw	%ax, %gs
-	movl	saved_esp, %esp
+	movl	saved_context_esp, %esp
 
-	movw	$0x0e00 + 'W', %ds:(0xb8018)
-	movl	$(1024*1024*3), %ecx
-	movl	$0, %esi
-	rep	lodsb
-	movw	$0x0e00 + 'O', %ds:(0xb8018)
+	movw	$0x0e00 + 'W', 0xb8018
+	outl	%eax, $0x80
+	outl	%eax, $0x80
+	movw	$0x0e00 + 'O', 0xb8018
 
 	movl	%cs:saved_magic, %eax
 	cmpl	$0x12345678, %eax
 	jne	bogus_magic
 
-	# restore the other general registers
-	movl	saved_ebx, %ebx
-	movl	saved_edi, %edi
-	movl	saved_esi, %esi
-	movl	saved_ebp, %ebp
-
 	# jump to place where we left off
 	movl	saved_eip,%eax
-	movw	$0x0e00 + 'x', %ds:(0xb8018)
-	pushl	%eax
-	popl	%eax
-	movw	$0x0e00 + '!', %ds:(0xb801a)
+	movw	$0x0e00 + 'x', 0xb8018
+	outl	%eax, $0x80
+	outl	%eax, $0x80
+	movw	$0x0e00 + '!', 0xb801a
 	jmp	*%eax
 
 bogus_magic:
-	movw	$0x0e00 + 'B', %ds:(0xb8018)
-	jmp bogus_magic
+	movw	$0x0e00 + 'B', 0xb8018
+	jmp	bogus_magic
 
-bogus_magic2:
-	movw	$0x0e00 + '2', %ds:(0xb8018)
-	jmp bogus_magic2
-		
+
 ##
 # acpi_copy_wakeup_routine
 #
@@ -267,80 +250,45 @@ ENTRY(acpi_copy_wakeup_routine)
 
 .data
 ALIGN
-ENTRY(saved_ebp)	.long	0
-ENTRY(saved_esi)	.long	0
-ENTRY(saved_edi)	.long	0
-ENTRY(saved_ebx)	.long	0
-
-ENTRY(saved_eip)	.long	0
-ENTRY(saved_esp)	.long	0
-
 ENTRY(saved_magic)	.long	0
+ENTRY(saved_eip)	.long	0
 
-ENTRY(do_suspend_lowlevel)
-	cmpl $0,4(%esp)
-	jne ret_point
-	call save_processor_state
-
-	movl %esp, saved_context_esp
-	movl %eax, saved_context_eax
+save_registers:
+	leal	4(%esp), %eax
+	movl	%eax, saved_context_esp
 	movl %ebx, saved_context_ebx
-	movl %ecx, saved_context_ecx
-	movl %edx, saved_context_edx
 	movl %ebp, saved_context_ebp
 	movl %esi, saved_context_esi
 	movl %edi, saved_context_edi
 	pushfl ; popl saved_context_eflags
 
 	movl $ret_point,saved_eip
-	movl %esp,saved_esp
-	movl %ebp,saved_ebp
-	movl %ebx,saved_ebx
-	movl %edi,saved_edi
-	movl %esi,saved_esi
+	ret
 
-	pushl $3
-	call acpi_enter_sleep_state
-	addl $4,%esp
+
+restore_registers:
+	movl saved_context_ebp, %ebp
+	movl saved_context_ebx, %ebx
+	movl saved_context_esi, %esi
+	movl saved_context_edi, %edi
+	pushl saved_context_eflags ; popfl
+	ret	
+
+ENTRY(do_suspend_lowlevel)
+	call	save_processor_state
+	call	save_registers
+	pushl	$3
+	call	acpi_enter_sleep_state
 	ret
 	.p2align 4,,7
 ret_point:
-	movl $__KERNEL_DS,%eax
-	movw %ax, %ds
-	movl saved_context_esp, %esp
-	movl saved_context_ebp, %ebp
-	movl saved_context_eax, %eax
-	movl saved_context_ebx, %ebx
-	movl saved_context_ecx, %ecx
-	movl saved_context_edx, %edx
-	movl saved_context_esi, %esi
-	movl saved_context_edi, %edi
-	call restore_processor_state
-	pushl saved_context_eflags ; popfl
+	call	restore_registers
+	call	restore_processor_state
 	ret
 
 ENTRY(do_suspend_lowlevel_s4bios)
-	cmpl $0,4(%esp)
-	jne ret_point
 	call save_processor_state
-
-	movl %esp, saved_context_esp
-	movl %eax, saved_context_eax
-	movl %ebx, saved_context_ebx
-	movl %ecx, saved_context_ecx
-	movl %edx, saved_context_edx
-	movl %ebp, saved_context_ebp
-	movl %esi, saved_context_esi
-	movl %edi, saved_context_edi
-	pushfl ; popl saved_context_eflags
-
-	movl $ret_point,saved_eip
-	movl %esp,saved_esp
-	movl %ebp,saved_ebp
-	movl %ebx,saved_ebx
-	movl %edi,saved_edi
-	movl %esi,saved_esi
-
+	call save_registers
 	call acpi_enter_sleep_state_s4bios
 	ret
 

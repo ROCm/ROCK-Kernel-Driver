@@ -154,12 +154,12 @@ xfs_swapext(
 		goto error0;
 	}
 	if ((current->fsuid != ip->i_d.di_uid) &&
-	    (error = xfs_iaccess(ip, IWRITE, NULL)) &&
+	    (error = xfs_iaccess(ip, S_IWUSR, NULL)) &&
 	    !capable_cred(NULL, CAP_FOWNER)) {
 		goto error0;
 	}
 	if ((current->fsuid != tip->i_d.di_uid) &&
-	    (error = xfs_iaccess(tip, IWRITE, NULL)) &&
+	    (error = xfs_iaccess(tip, S_IWUSR, NULL)) &&
 	    !capable_cred(NULL, CAP_FOWNER)) {
 		goto error0;
 	}

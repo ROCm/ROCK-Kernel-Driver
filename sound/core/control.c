@@ -822,10 +822,9 @@ static ssize_t snd_ctl_read(struct file *file, char *buffer, size_t count, loff_
 			}
 			init_waitqueue_entry(&wait, current);
 			add_wait_queue(&ctl->change_sleep, &wait);
-			spin_unlock_irq(&ctl->read_lock);
 			set_current_state(TASK_INTERRUPTIBLE);
+			spin_unlock_irq(&ctl->read_lock);
 			schedule();
-			set_current_state(TASK_RUNNING);
 			remove_wait_queue(&ctl->change_sleep, &wait);
 			if (signal_pending(current))
 				return result > 0 ? result : -ERESTARTSYS;

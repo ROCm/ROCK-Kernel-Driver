@@ -50,6 +50,10 @@
 #include <asm/xics.h>
 #include <asm/cputable.h>
 
+#ifdef CONFIG_KDB
+#include <linux/kdb.h>
+#endif
+
 int smp_threads_ready;
 unsigned long cache_decay_ticks;
 
@@ -76,6 +80,24 @@ static inline void set_tb(unsigned int upper, unsigned int lower)
 	mttbu(upper);
 	mttbl(lower);
 }
+
+#ifdef CONFIG_KDB
+	/* save regs here before calling kdb_ipi */
+struct pt_regs *kdb_smp_regs[NR_CPUS];
+	
+/* called for each processor.. drop each into kdb. */
+static void smp_kdb_stop_proc(void *dummy)
+{
+    kdb_ipi(kdb_smp_regs[smp_processor_id()], NULL);
+}
+	
+void smp_kdb_stop(void)
+{
+    int ret=0;
+    ret = smp_call_function(smp_kdb_stop_proc, NULL, 1, 0);
+}
+#endif
+
 
 #ifdef CONFIG_PPC_ISERIES
 static unsigned long iSeries_smp_message[NR_CPUS];
@@ -372,6 +394,9 @@ void smp_message_recv(int msg, struct pt_regs *regs)
 {
 	switch( msg ) {
 	case PPC_MSG_CALL_FUNCTION:
+#ifdef CONFIG_KDB
+	        kdb_smp_regs[smp_processor_id()]=regs;
+#endif
 		smp_call_function_interrupt();
 		break;
 	case PPC_MSG_RESCHEDULE: 

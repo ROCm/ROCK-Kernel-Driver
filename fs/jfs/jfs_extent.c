@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2002
+ *   Copyright (C) International Business Machines Corp., 2000-2003
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 
 #include <linux/fs.h>
 #include "jfs_incore.h"
+#include "jfs_superblock.h"
 #include "jfs_dmap.h"
 #include "jfs_extent.h"
 #include "jfs_debug.h"
@@ -403,8 +404,10 @@ int extHint(struct inode *ip, s64 offset, xad_t * xp)
 	 */
 	xp->flag &= XAD_NOTRECORDED;
 
-	assert(xadl.nxad == 1);
-	assert(lengthXAD(xp) == nbperpage);
+        if(xadl.nxad != 1 || lengthXAD(xp) != nbperpage) {          
+		jfs_error(ip->i_sb, "extHint: corrupt xtree");
+		return -EIO;
+        }
 
 	return (0);
 }

@@ -1653,7 +1653,7 @@ static void sppp_init(SLMP_INFO *info)
 	d->tx_timeout = sppp_cb_tx_timeout;
 	d->watchdog_timeo = 10*HZ;
 
-	if (register_netdev(d) == -1) {
+	if (register_netdev(d)) {
 		printk(KERN_WARNING "%s: register_netdev failed.\n", d->name);
 		sppp_detach(info->netdev);
 		return;
@@ -5451,8 +5451,8 @@ void write_control_reg(SLMP_INFO * info)
 }
 
 
-static int __init synclinkmp_init_one (struct pci_dev *dev,
-				       const struct pci_device_id *ent)
+static int __devinit synclinkmp_init_one (struct pci_dev *dev,
+					  const struct pci_device_id *ent)
 {
 	if (pci_enable_device(dev)) {
 		printk("error enabling pci device %p\n", dev);

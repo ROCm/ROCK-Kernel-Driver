@@ -1,11 +1,11 @@
 /*
  * $Id: ebony.c,v 1.8 2003/06/23 11:48:18 dwmw2 Exp $
- * 
+ *
  * Mapping for Ebony user flash
  *
  * Matt Porter <mporter@mvista.com>
  *
- * Copyright 2002 MontaVista Software Inc.
+ * Copyright 2002-2003 MontaVista Software Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -22,8 +22,8 @@
 #include <linux/mtd/partitions.h>
 #include <linux/config.h>
 #include <asm/io.h>
-#include <asm/ibm440.h>
-#include <platforms/ebony.h>
+#include <asm/ibm44x.h>
+#include <platforms/4xx/ebony.h>
 
 static struct mtd_info *flash;
 
@@ -71,7 +71,7 @@ int __init init_ebony(void)
 		return -ENOMEM;
 
 	fpga0_reg = readb(fpga0_adr);
-	iounmap64(fpga0_adr);
+	iounmap(fpga0_adr);
 
 	if (EBONY_BOOT_SMALL_FLASH(fpga0_reg) &&
 			!EBONY_FLASH_SEL(fpga0_reg))

@@ -1,6 +1,6 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2003
- *   Portions Copyright (c) Christoph Hellwig, 2001-2002
+ *   Copyright (C) International Business Machines Corp., 2000-2003
+ *   Portions Copyright (C) Christoph Hellwig, 2001-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -85,6 +85,42 @@ extern wait_queue_head_t jfs_IO_thread_wait;
 extern wait_queue_head_t jfs_commit_thread_wait;
 extern wait_queue_head_t jfs_sync_thread_wait;
 
+static void jfs_handle_error(struct super_block *sb)
+{
+	struct jfs_sb_info *sbi = JFS_SBI(sb);
+
+	if (sb->s_flags & MS_RDONLY)
+		return;
+
+	updateSuper(sb, FM_DIRTY);
+
+	if (sbi->flag & JFS_ERR_PANIC)
+		panic("JFS (device %s): panic forced after error\n",
+			sb->s_id);
+	else if (sbi->flag & JFS_ERR_REMOUNT_RO) {
+		jfs_err("ERROR: (device %s): remounting filesystem "
+			"as read-only\n",
+			sb->s_id);
+		sb->s_flags |= MS_RDONLY;
+	} 
+
+	/* nothing is done for continue beyond marking the superblock dirty */
+}
+
+void jfs_error(struct super_block *sb, const char * function, ...)
+{
+	static char error_buf[256];
+	va_list args;
+
+	va_start(args, function);
+	vsprintf(error_buf, function, args);
+	va_end(args);
+
+	printk(KERN_ERR "ERROR: (device %s): %s\n", sb->s_id, error_buf);
+
+	jfs_handle_error(sb);
+}
+
 static struct inode *jfs_alloc_inode(struct super_block *sb)
 {
 	struct jfs_inode_info *jfs_inode;
@@ -167,7 +203,7 @@ static void jfs_put_super(struct super_block *sb)
 
 enum {
 	Opt_integrity, Opt_nointegrity, Opt_iocharset, Opt_resize,
-	Opt_ignore, Opt_err,
+	Opt_errors, Opt_ignore, Opt_err,
 };
 
 static match_table_t tokens = {
@@ -175,6 +211,7 @@ static match_table_t tokens = {
 	{Opt_nointegrity, "nointegrity"},
 	{Opt_iocharset, "iocharset=%s"},
 	{Opt_resize, "resize=%u"},
+	{Opt_errors, "errors=%s"},
 	{Opt_ignore, "noquota"},
 	{Opt_ignore, "quota"},
 	{Opt_ignore, "usrquota"},
@@ -232,6 +269,31 @@ static int parse_options(char *options, struct super_block *sb, s64 *newLVSize,
 					"JFS: Cannot determine volume size\n");
 			} else
 				*newLVSize = simple_strtoull(resize, &resize, 0);
+			break;
+		}
+		case Opt_errors:
+		{
+			char *errors = args[0].from;
+			if (!errors || !*errors)
+				goto cleanup;
+			if (!strcmp(errors, "continue")) {
+				*flag &= ~JFS_ERR_REMOUNT_RO;
+				*flag &= ~JFS_ERR_PANIC;
+				*flag |= JFS_ERR_CONTINUE;
+			} else if (!strcmp(errors, "remount-ro")) {
+				*flag &= ~JFS_ERR_CONTINUE;
+				*flag &= ~JFS_ERR_PANIC;
+				*flag |= JFS_ERR_REMOUNT_RO;
+			} else if (!strcmp(errors, "panic")) {
+				*flag &= ~JFS_ERR_CONTINUE;
+				*flag &= ~JFS_ERR_REMOUNT_RO;
+				*flag |= JFS_ERR_PANIC;
+			} else {
+				printk(KERN_ERR
+				       "JFS: %s is an invalid error handler\n",
+				       errors);
+				goto cleanup;
+			}
 			break;
 		}
 		default:
@@ -316,7 +378,9 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	memset(sbi, 0, sizeof (struct jfs_sb_info));
 	sb->s_fs_info = sbi;
 
-	flag = 0;
+	/* initialize the mount flag and determine the default error handler */
+	flag = JFS_ERR_REMOUNT_RO;
+
 	if (!parse_options((char *) data, sb, &newLVSize, &flag)) {
 		kfree(sbi);
 		return -EINVAL;

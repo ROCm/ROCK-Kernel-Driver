@@ -422,6 +422,16 @@ static void planb_prepare_close(struct planb *pb)
 /* overlay support functions */
 /*****************************/
 
+static inline int overlay_is_active(struct planb *pb)
+{
+	unsigned int size = pb->tab_size * sizeof(struct dbdma_cmd);
+	unsigned int caddr = (unsigned)in_le32(&pb->planb_base->ch1.cmdptr);
+
+	return (in_le32(&pb->overlay_last1->cmd_dep) == pb->ch1_cmd_phys)
+			&& (caddr < (pb->ch1_cmd_phys + size))
+			&& (caddr >= (unsigned)pb->ch1_cmd_phys);
+}
+
 static void overlay_start(struct planb *pb)
 {
 
@@ -852,16 +862,6 @@ static int palette2fmt[] = {
 };
 
 #define PLANB_PALETTE_MAX 15
-
-static inline int overlay_is_active(struct planb *pb)
-{
-	unsigned int size = pb->tab_size * sizeof(struct dbdma_cmd);
-	unsigned int caddr = (unsigned)in_le32(&pb->planb_base->ch1.cmdptr);
-
-	return (in_le32(&pb->overlay_last1->cmd_dep) == pb->ch1_cmd_phys)
-			&& (caddr < (pb->ch1_cmd_phys + size))
-			&& (caddr >= (unsigned)pb->ch1_cmd_phys);
-}
 
 static int vgrab(struct planb *pb, struct video_mmap *mp)
 {

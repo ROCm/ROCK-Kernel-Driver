@@ -1105,18 +1105,9 @@ void ide_setup_dma (ide_hwif_t *hwif, unsigned long dma_base, unsigned int num_p
 
 	if (hwif->chipset != ide_trm290) {
 		u8 dma_stat = hwif->INB(hwif->dma_status);
-		printk(", BIOS settings: %s:%s%s, %s:%s%s",
+		printk(", BIOS settings: %s:%s, %s:%s",
 		       hwif->drives[0].name, (dma_stat & 0x20) ? "DMA" : "pio",
-		       hwif->drives[0].autotune == IDE_TUNE_BIOS ? 
-		       		" (used)" : "",
-		       hwif->drives[1].name, (dma_stat & 0x40) ? "DMA" : "pio",
-		       hwif->drives[1].autotune == IDE_TUNE_BIOS ? 
-		       		" (used)" : "");
-
-		if (hwif->drives[0].autotune == IDE_TUNE_BIOS)
-			hwif->drives[0].using_dma = (dma_stat & 0x20);
-		if (hwif->drives[1].autotune == IDE_TUNE_BIOS)
-			hwif->drives[1].using_dma = (dma_stat & 0x40);
+		       hwif->drives[1].name, (dma_stat & 0x40) ? "DMA" : "pio");
 	}
 	printk("\n");
 

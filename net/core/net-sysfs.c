@@ -419,6 +419,7 @@ int netdev_register_sysfs(struct net_device *net)
 	}
 
 
+	net->last_stats = net->get_stats;
 	if (net->get_stats &&
 	    (ret = sysfs_create_group(&class_dev->kobj, &netstat_group)))
 		goto out_unreg; 

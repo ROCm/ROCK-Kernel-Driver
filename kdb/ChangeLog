@@ -1,0 +1,559 @@
+2002-11-02 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.5.45.
+	* Correct build without CONFIG_KDB.
+	* kdb v2.4-2.5.45-common-1.
+
+2002-11-01 Keith Owens  <kaos@sgi.com>
+
+	* Sync with kdb v2.4-2.4.19-common-2.
+	* Add defcmd/endefcmd feature.
+	* Remove kdb_eframe_t.
+	* Clear bp data before using.
+	* Sanity check if we have pt_regs.
+	* Force LINES > 1.
+	* Remove special case for KDB_REASON_PANIC, use KDB_ENTER() instead.
+	* Remove kdba_getcurrentframe().
+	* Coexist with O(1) scheduler.
+	* Add lines option to dmesg, speed up dmesg.
+	* Add selection critera to ps and bta commands.
+	* New man page, Documentation/kdb/kdb_sr.man.
+	* kdb v2.4-2.5.44-common-1.
+
+2002-10-25 Keith Owens  <kaos@sgi.com>
+
+	* Move -fomit-frame-pointer after .config has been read.
+	* Upgrade to 2.5.44.
+	* kdb v2.3-2.5.44-common-1.
+
+2002-10-17 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.5.43.
+	* kdb v2.3-2.5.43-common-1.
+
+2002-10-14 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.5.42.
+	* kdb v2.3-2.5.42-common-1.
+
+2002-10-09 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.5.41.
+	* kdb v2.3-2.5.41-common-1.
+
+2002-10-04 Keith Owens  <kaos@sgi.com>
+
+	* Minimize differences between patches for 2.4 and 2.5 kernels.
+	* Reduce stack usage.
+	* kdb v2.3-2.5.40-common-2.
+
+2002-10-03 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.5.40.
+	* kdb v2.3-2.5.40-common-1.
+
+2002-09-24 Keith Owens  <kaos@sgi.com>
+
+	* Sync with kdb v2.3-2.4.19-common-2.
+	* Sync with 2.5.x-xfs (2.5.38).
+	* Replace kdb_port with kdb_serial to support memory mapped I/O.
+	  David Mosberger.
+	* Remove individual SGI copyrights, the general SGI copyright applies.
+	* Handle md0.  Reported by Hugh Dickins, different fix by Keith Owens.
+	* Use page_address() in kdbm_pg.c.  Hugh Dickins.
+	* Remove debugging printk from kdbm_pg.c.  Hugh Dickins.
+	* Move breakpoint address verification into arch dependent code.
+	* Dynamically resize kdb command table as required.
+	* Common code to support USB keyboard.  Sebastien Lelarge.
+	  Note: broken in 2.5 until somebody who understands USB can fix it.
+	* Add dmesg command.
+	* Clean up copyrights, Eric Sandeen.
+	* Syntax check mdWcN commands.
+
+2002-02-27 Keith Owens <kaos@sgi.com>
+
+	* Tom Duffy's kdb for 2.5.5.
+	* Sync with kdb v2.1-2.4.18-common-1.
+	* Correct kdbm_pg.c for non-highmem machines.
+	* kdb v2.1-2.5.5-common-1.
+
+2002-02-26 Keith Owens <kaos@sgi.com>
+
+	* Upgrade to 2.4.18.
+	* Add Paul Dorwin (IBM) magicpoint slides on using kdb as
+	  Documentation/kdb/slides.
+	* kdb v2.1-2.4.18-common-1.
+
+2002-01-23 Keith Owens <kaos@sgi.com>
+
+	* Sync with XFS pagebuf changes.
+	* kdb v2.1-2.4.17-common-2.
+
+2002-01-18 Keith Owens <kaos@sgi.com>
+
+	* Ignore single stepping during panic.
+	* Remove kdba_getword, kdba_putword.  Replace with kdb_getword,
+	  kdb_putword that rely on copy_xx_user.  The new functions return
+	  an error code, like copy_xx_user.
+	* New functions kdb_getarea, kdb_putarea for copying areas of data
+	  such as structures.  These functions also return an error code.
+	* Change all common code to use the new functions.
+	* bp command checks that it can read and write the word at the
+	  breakpoint before accepting the address.
+	* Break points are now set FIFO and cleared LIFO so overlapping
+	  entries give sensible results.
+	* Verify address before disassembling code.
+	* Common changes for sparc64.  Ethan Solomita, Tom Duffy.
+	* Remove ss <count>, never supported.
+	* Remove kallsyms entries from arch vmlinux.lds files.
+	* Specify which commands auto repeat.
+	* kdb v2.1-2.4.17-common-1.
+
+2002-01-07 Keith Owens <kaos@sgi.com>
+
+	* Remove console semaphore code, not good in interrupt.
+	* Remove fragment of ia64 patch that had crept into kdb.
+	* Release as kdb v2.0-2.4.17-common-3.
+
+2002-01-04 Keith Owens  <kaos@sgi.com>
+
+	* Sync xfs <-> kdb common code.
+
+2001-12-22 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.4.17.
+	* Clean up ifdef CONFIG_KDB.
+	* Add ifdef CONFIG_KDB around include kdb.h.
+	* Delete dummy kdb.h files for unsupported architectures.
+	* Delete arch i386 and ia64 specific files.  This changelog now
+	  applies to kdb common code only.
+	* Release as kdb v2.0-2.4.17-common-1.
+
+2001-12-03 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.4.16.
+	* Add include/asm-um/kdb.h stub to allow XFS to be tested under UML.
+	* Check if an interrupt frame on i386 came from user space.
+	* Out of scope bug fix in kdb_id.c.  Ethan Solomita.
+	* Changes to common code to support sparc64.  Ethan Solomita.
+	* Change GFP_KERNEL to GFP_ATOMIC in disasm.  Ethan Solomita.
+
+2001-11-16 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.4.15-pre5.
+	* Wrap () around #define expressions with unary operators.
+
+2001-11-13 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.4.15-pre4.
+	* kbdm_pg.c patch from Hugh Dickins.
+
+2001-11-07 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to 2.4.14-ia64-011105.
+	* Change name of l1 serial I/O routine, add ia64 init command.  SGI.
+	* Sync kdbm_pg with XFS.
+
+2001-11-06 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to kernel 2.4.14.
+
+2001-11-02 Keith Owens  <kaos@sgi.com>
+
+	* Sync kdbm_pg.c with XFS.
+
+2001-10-24 Keith Owens  <kaos@sgi.com>
+
+	* Upgrade to kernel 2.4.13.
+
+2001-10-14 Keith Owens  <kaos@melbourne.sgi.com>
+
+	* More use of TMPPREFIX in top level Makefile to speed up NFS compiles.
+
+	* Correct repeat calculations in md/mds commands.
+
+2001-10-10 Keith Owens  <kaos@melbourne.sgi.com>
+
+	* Copy bfd.h and ansidecl.h to arch/$(ARCH)/kdb, remove dependecies on
+	  user space includes.
+
+	* Update kdb v1.9 to kernel 2.4.11.
+
+2001-10-01 Keith Owens  <kaos@melbourne.sgi.com>
+
+	* Update kdb v1.9 to kernel 2.4.11-pre1 and 2.4.10-ac1.
+
+	* Correct loop in kdb_parse, reported by Tachino Nobuhiro.
+
+2001-09-25 Keith Owens  <kaos@melbourne.sgi.com>
+
+	* Update kdb v1.8 to kernel 2.4.10.
+
+	* kdbm_pg patch from Hugh Dickens.
+
+	* DProbes patch from Bharata B Rao.
+
+	* mdWcn and mmW patch from Vamsi Krishna S.
+
+	* i386 disasm layout patch from Jean-Marc Saffroy.
+
+	* Work around for 64 bit binutils, Simon Munton.
+
+	* kdb.mm doc correction by Chris Pascoe.
+
+	* Enter repeats the last command, IA64 disasm only prints one
+	  instruction.  Don Dugger.
+
+	* Allow kdb/modules to be linked into vmlinux.
+
+	* Remove obsolete code from kdb/modules/kdbm_{pg,vm}.c.
+
+	* Warn when commands are entered at more prompt.
+
+	* Add MODULE_AUTHOR, DESCRIPTION, LICENSE.
+
+	* Release as kdb v1.9.
+
+2001-02-27 Keith Owens  <kaos@melbourne.sgi.com>
+
+	* Update kdb v1.8 to kernel 2.4.2, sync kdb/modules with XFS.
+
+	* Hook into panic() call.
+
+2000-12-18 Keith Owens  <kaos@melbourne.sgi.com>
+
+	* Update kdb v1.7 to kernel 2.4.0-test13-pre3, sync kdb/modules with
+	XFS.
+
+2000-11-18 Keith Owens  <kaos@melbourne.sgi.com>
+
+	* Update to kernel 2.4.0-test11-pre7, including forward port of
+	bug fixes from WIP 2.4.0-test9 tree.
+
+	* Update to Cygnus CVS trees for disassembly code.
+
+	* Bump to kdb v1.6.
+
+2000-10-19 Keith Owens  <kaos@melbourne.sgi.com>
+
+	* Update to kernel 2.4.0-test10-pre4.
+
+2000-10-15 Keith Owens  <kaos@melbourne.sgi.com>
+
+	* kdb/kdbmain.c (kdb_parse): Correctly handle blank input.
+
+	* kdb/kdbmain.c (kdb_local, kdb): Reason SILENT can have NULL regs.
+
+2000-10-13 Keith Owens  <kaos@melbourne.sgi.com>
+
+	* kdb/kdbmain.c: Reduce CMD_LEN to avoid overflowing kdb_printf buffer.
+
+2000-10-11 Keith Owens  <kaos@melbourne.sgi.com>
+
+	* kdb/kdbmain.c (kdb): Test for userspace breakpoints before driving
+	  other cpus into kdb.  Speeds up gdb and avoids SMP race.
+
+	* arch/i386/kdb/kdba_io.c (get_serial_char, get_kbd_char): Ignore
+	  unprintable characters.
+
+	* arch/i386/kdb/kdba_io.c (kdba_read): Better handling of buffer size.
+
+2000-10-04 Keith Owens  <kaos@melbourne.sgi.com>
+
+	* arch/i386/kdb/kdba_bt.c (kdba_bt_process): Verify that esp is inside
+	task_struct.  Original patch by Mike Galbraith.
+
+	* kdb/kdb_io.c (kdb_getstr): Reset output line counter, remove
+	unnecessary prompts.
+
+	* arch/i386/kdb/kdbasupport.c (kdb_getregcontents): Change " cs" to
+	"xcs", ditto ss, ds, es.  gdb2kdb does not like leading spaces.
+
+	* include/asm-xxx/kdb.h: Add dummy kdb.h for all architectures except
+	ix86.  This allows #include <linux/kdb.h> to appear in arch independent
+	code without causing compile errors.
+
+	* kdb/modules/kdbm_pg: Sync with XFS.
+
+2000-10-03  Keith Owens  <kaos@melbourne.sgi.com>
+
+	* kdb/kdb_io.c (kdb_read): Ignore NMI while waiting for input.
+
+	* kdb/kdb_io.c, kdb/Makefile: Export kdb_read.
+
+2000-10-02  Keith Owens  <kaos@melbourne.sgi.com>
+
+	* arch/i386/kernel/smpboot.c (do_boot_cpu): Set nmi_watchdog_source to 2
+	to avoid premature NMI oops during cpu bring up.  We have to assume that
+	a box with more than 1 cpu has a working IO-APIC.
+
+	* Documentation/kdb/{kdb.mm,kdb_md.man}: Add mdr command.
+
+	* kdb/kdbmain.c (kdb_md): Add mdr command.
+
+	* Release as kdb v1.5 against 2.4.0-test9-pre8.
+
+	* arch/i386/kdb/kdba_io.c, arch/i386/kdb/kdbasupport.c, kdb/kdbmain.c,
+	kdb/kdb_io.c, kdb/kdb_id.c: Remove zero initializers for static
+	variables.
+
+2000-09-28  Keith Owens  <kaos@melbourne.sgi.com>
+
+	* various: Add nmi_watchdog_source, 1 local APIC, 2 IO-APIC.
+	Test nmi_watchdog_source instead of nr_ioapics so UP works on SMP hardware.
+
+	* arch/i386/kernel/io_apic.c: Rename setup_nmi to setup_nmi_io for clarity.
+
+	* kdb/kdbmain.c (kdb_parse): Only set NO_WATCHDOG if it was already set.
+
+	* kdb/kdbmain.c (kdb): Clear NO_WATCHDOG on all exit paths.
+
+	* include/linux/kdb.h: Add KDB_REASON_SILENT.
+
+	* kdb/kdbmain.c (kdb_local): Treat reason SILENT as immediate 'go'.
+
+	* kdb/kdbmain.c (kdb_init): Invoke kdb with reason SILENT to instantiate
+	any breakpoints on boot cpu.
+
+	* arch/i386/kernel/smpboot.c (smp_callin): Invoke kdb with reason SILENT
+	to instantiate any global breakpoints on this cpu.
+
+	* kdb/kdb_cmds: Remove comment that said initial commands only worked on
+	boot cpu.
+
+2000-09-27  Keith Owens  <kaos@melbourne.sgi.com>
+
+	* arch/i386/kernel/msr.c: Move {rd,wr}msr_eio to include/asm-i386/apic.h.
+
+	* include/asm-i386/apic.h: Define NMI interfaces.
+
+	* kernel/sysctl.c (kern_table):
+	* kernel/sysctl.c (do_proc_set_nmi_watchdog):
+	Add /proc/sys/kernel/nmi_watchdog.
+
+	* arch/i386/kernel/apic.c: New routines set_nmi_counter_local,
+	setup_apic_nmi_watchdog.
+
+	* arch/i386/kernel/traps.c: New routine set_nmi_watchdog().  Call apic
+	routines to set/clear local apic timer.
+
+2000-09-26  Keith Owens  <kaos@melbourne.sgi.com>
+
+	* include/linux/sysctl.h (enum): Add NMI_WATCHDOG.
+
+	* arch/i386/kernel/traps.c (nmi_watchdog_tick): Check nmi_watchdog is
+	still on.
+
+	* arch/i386/config.in: Add CONFIG_UP_NMI_WATCHDOG.
+
+	* Documentation/Configure.help: Add CONFIG_UP_NMI_WATCHDOG.
+
+	* Documentation/nmi_watchdog.txt: Update for UP NMI watchdog.
+
+2000-09-25  Keith Owens  <kaos@melbourne.sgi.com>
+
+	* arch/i386/kernel/apic.c (init_apic_mappings):
+	* arch/i386/kernel/io_apic.c (IO_APIC_init_uniprocessor):
+	Merge Keir Fraser's local APIC for uniprocessors patch.
+
+2000-09-24  Keith Owens  <kaos@melbourne.sgi.com>
+
+	* Various: Declare initialization routines as __init.
+
+	* Makefile: Define and export AWK.
+
+	* kdb/Makefile: Generate gen-kdb_cmds.c from kdb/kdb_cmds.
+
+	* kdb/kdbmain.c (kdb_init): Call new routine kdb_cmds_init to execute
+	whatever the user put in kdb/kdb_cmds.
+
+	* arch/i386/kdb/kdba_bt.c (kdba_bt_stack): New parameter to
+	indicate if esp in regs is known to be valid or not.
+
+	* kdb/kdb_bp.c, arch/i386/kdb/kdba_bp.c: More trace prints for
+	breakpoint handling.
+
+	* arch/i386/kdb/kdba_bp.c (kdba_installbp): Finally found and fixed the
+	annoying breakpoint bug where breakpoints where not always installed
+	after 'go'.
+
+	* Documentation/kdb: Update man pages kdb.mm, kdb_env.man, kdb_ss.man.
+
+	* Released as kdb-v1.5-beta1-2.4.0-test8.
+
+	* Sync to 2.4.0-test9-pre6 and release as kdb-v1.5-beta1-2.4.0-test9-pre6.
+
+2000-09-23  Keith Owens  <kaos@melbourne.sgi.com>
+
+	* arch/i386/kdb/kdbasupport.c (kdba_getregcontents): New pseudo
+	registers cesp and ceflags to help with debugging the debugger.
+
+	* kdb/kdbmain.c (kdb_local, kdb): Add KDB_REASON_RECURSE.  Add
+	environment variable RECURSE.  Add code to cope with some types of
+	recursion.
+
+	* kdb/kdbmain.c (kdb), arch/i386/kdba/kdba_bp.c: Add
+	kdba_clearsinglestep.
+
+2000-09-22  Keith Owens  <kaos@melbourne.sgi.com>
+
+	* drivers/video/vgacon.c (write_vga): No cli() if kdb is running, avoid
+	console deadlock.
+
+	* arch/i386/kernel/irq.c (get_irqlock): Warn if kdb is running, may hang.
+
+	* include/linux/kdb.h: Define KDB_IS_RUNNING as (0) if no CONFIG_KDB.
+
+	* arch/i386/kdb/kdba_bt.c (kdba_bt_stack): Do not attempt a backtrace if
+	the code segment is not in the kernel.
+
+	* kdb/modules: Change modules from MX_OBJS to M_OBJS.  Remove EXPORT_NOSYMBOLS.
+
+2000-09-21  Keith Owens  <kaos@melbourne.sgi.com>
+
+	* arch/i386/kernel/i386_ksyms.c: Move EXPORT_SYMBOLS for kdb to kdb/kdbmain.c.
+
+	* kdb/Makefile: Change kdb/kdbmain.o from O_OBJS to OX_OBJS.
+
+	* arch/i386/kernel/smp.c: Remove some #ifdef CONFIG_KDB.  Remove kdbprivate.h.
+
+	* include/linux/kdb.h: Add kdb_print_state.  Add KDB_STATE_WAIT_IPI.
+
+	* kdb/kdbmain.c (kdb): Only mark cpu as leaving if it is in KDB state.  Maintain
+	WAIT_IPI state so a cpu is only driven through NMI once.
+
+	* arch/i386/kernel/smp.c (smp_kdb_stop): All state fiddling moved to kdb().
+
+2000-09-20  Keith Owens  <kaos@melbourne.sgi.com>
+
+	* include/linux/kdb.h: #define kdb() as (0) if kdb is not configured.
+
+	* arch/i386/kernel/traps.c: Remove some #ifdef CONFIG_KDB.
+
+	* include/linux/kdbprivate.h: Move per cpu state to kdb.h.
+
+	* include/linux/kdb.h: Add KDB_STATE_NO_WATCHDOG, KDB_STATE_PRINTF_LOCK.
+	Rename KDB_DEBUG_xxx to KDB_DEBUG_FLAG_xxx.  Clean up debug flag
+	definitions.
+
+	* arch/i386/kernel/traps.c (nmi_watchdog_tick): Check no watchdog.
+
+	* kdb/kdbmain.c (kdb): Set no watchdog in normal kdb code.
+
+	* kdb/kdbmain.c (kdb_parse): Allow watchdog in commands.
+
+	* kdb/kdb_io.c (kdb_printf): No watchdog during printing.  Clean up lock handling.
+
+	* kdb/kdbmain.c (kdb_set): Clean up debug flag handling.
+
+2000-09-19  Juan J. Quintela  <quintela@fi.udc.es>
+
+	* kdb/arch/i386/kdb/kdba_io.c: Allow kdb to compile without CONFIG_VT and/or
+	serial console.
+
+2000-09-19  Keith Owens  <kaos@melbourne.sgi.com>
+
+	* include/linux/kdb.h: Define KDB_DEBUG_STATE().
+
+	* kdb/kdbmain.c (kdb): Add kdb_print_state(), calls to KDB_DEBUG_STATE().
+
+2000-09-16  Keith Owens  <kaos@melbourne.sgi.com>
+
+	* Move to finer grained control over individual processors in kdb with
+	per cpu kdb state.  Needed to allow ss[b] to only release one processor,
+	previously ss[b] released all processors.  Also need to recover from
+	errors inside kdb commands, e.g. oops in kdbm_pg code.
+
+	* various:
+	  Move global flags KDB_FLAG_SSB, KDB_FLAG_SUPRESS, KDB_FLAG_FAULT,
+	  KDB_FLAG_SS, KDB_FLAG_SSBPT, kdb_active, to per cpu state and macros
+	  KDB_STATE(xxx).
+	  Replace kdb_flags & KDB_FLAG_xxx with KDB_FLAG(xxx).
+	  Replace kdb_flags & KDB_DEBUG_xxx with KDB_DEBUG(xxx).
+	  Replace specific tests with wrapper KDB_IS_RUNNING().
+
+	* various: Remove #ifdef CONFIG_SMP from kdb code wherever
+	possible.  Simplifies the code and makes it much more readable.
+
+	* arch/i386/kdb/kdbasupport.c (kdb_setjmp): Record if we have reliable
+	longjmp data instead of assuming it is always set.
+
+	* various: Replace smp_kdb_wait with per cpu state, HOLD_CPU.
+
+	* init/main.c : Replace #ifdef KDB_DEBUG with KDB_DEBUG(CALLBACK).
+
+	* include/linux/kdbprivate.h: Separate command return codes from error
+	codes.  Add more detailed command codes.
+
+	* arch/i386/kernel/traps.c (die): Change spin_lock_irq to
+	spin_lock_irqsave.  Why did I do this?
+
+	* kdb/kdbmain.c (kdb_parse): Set per cpu flag CMD before executing kdb
+	command.  More detailed return codes for commands that affect
+	processors.
+
+	* kdb/kdbmain.c (kdb_previous_event): New, check if any processors are
+	still executing the previous kdb event.  Removes a race window where a
+	second event could enter kdb before the first had completely ended.
+
+	* kdb/kdbmain.c (kdb): Document all the concurrency conditions and how
+	kdb handles them.  ss[b] now releases only the current cpu.  Do not set
+	breakpoints when releasing for ss[b].  Recover from errors in kdb
+	commands.  Check that we have reliable longjmp data before using it.
+
+	* various: Update return code documentation.
+
+	* kdb/kdb_bp.c (kdb_ss): Separate ss and ssb return codes.
+
+	* kdb/kdbsupport.c (kdb_ipi): Finer grained algorithm for deciding
+	whether to call send a stop signal to a cpu.
+
+	* arch/i386/kdb/kdba_bp.c (kdba_db_trap): Separate ss and ssb return
+	codes.  Reinstall delayed software breakpoints per cpu instead of
+	globally.  Changed algorithm for handling ss[b].
+
+	* arch/i386/kdb/kdba_bp.c (kdba_bp_trap): Match software breakpoints per
+	cpu instead of globally.
+
+	* include/linux/kdb.h: Bump version to kdb v1.5.
+
+2000-09-16  Keith Owens  <kaos@melbourne.sgi.com>
+
+	* kernel/sysctl.c (kern_table): add /proc/sys/kernel/kdb.
+
+	* init/main.c (parse_options): add boot flags kdb=on, kdb=off,
+	kdb=early.
+
+	* include/linux/sysctl.h (enum): add KERN_KDB.
+
+	* drivers/char/serial.c (receive_chars): check kdb_on.
+
+	* drivers/char/keyboard.c (handle_scancode): check kdb_on.
+
+	* arch/i386/kernel/traps.c (nmi_watchdog_tick): check kdb_on.
+
+	* arch/i386/config.in: add CONFIG_KDB_OFF.
+
+	* Documentation/Configure.help: add CONFIG_KDB_OFF.
+
+	* kdb/kdbmain.c: add kdb_initial_cpu, kdb_on.
+
+	* kdb/kdbmain.c (kdb): check kdb_on, set kdb_initial_cpu.
+
+	* kdb/kdbmain.c (kdb_init): add Keith Owens to kdb banner.
+
+	* kdb/kdb_io.c (kdb_printf): serialize kdb_printf output.
+
+	* kdb/kdb_bt.c (kdb_bt): check environment variable BTAPROMPT.
+
+	* kdb/kdbsupport.c (kdb_ipi): ignore NMI for kdb_initial_cpu.
+
+	* kdb/modules/kdbm_pg.c (kdbm_page): merge updates from 2.4.0-test5-xfs.
+
+	* kdb/kdb_bt.man: add btp, bta, BTAPROMPT.
+
+	* kdb/kdb.mm: add CONFIG_KDB_OFF, boot flags, btp, bta.
+
+	* include/linux/kdbprivate.h: add kdb_initial_cpu.
+
+	* include/linux/kdb.h: add kdb_on, bump version to kdb v1.4.

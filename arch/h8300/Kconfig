@@ -341,8 +341,8 @@ config UNIX98_PTY_COUNT
 
 endmenu
 
-#source drivers/misc/Config.in
 source "drivers/media/Kconfig"
+source "sound/Kconfig"
 
 source "fs/Kconfig"
 

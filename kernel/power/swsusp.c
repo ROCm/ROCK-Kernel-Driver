@@ -5,7 +5,9 @@
  * machine suspend feature using pretty near only high-level routines
  *
  * Copyright (C) 1998-2001 Gabor Kuti <seasons@fornax.hu>
- * Copyright (C) 1998,2001,2002 Pavel Machek <pavel@suse.cz>
+ * Copyright (C) 1998,2001-2003 Pavel Machek <pavel@suse.cz>
+ *
+ * This file is released under the GPLv2.
  *
  * I'd like to thank the following people for their work:
  * 
@@ -273,6 +275,17 @@ static void lock_swapdevices(void) /* This is called after saving image so modif
 	swap_list_unlock();
 }
 
+/**
+ *    write_suspend_image - Write entire image to disk.
+ *
+ *    After writing suspend signature to the disk, suspend may no
+ *    longer fail: we have ready-to-run image in swap, and rollback
+ *    would happen on next reboot -- corrupting data.
+ *
+ *    Note: The buffer we allocate to use to write the suspend header is
+ *    not freed; its not needed since system is going down anyway
+ *    (plus it causes oops and I'm lazy^H^H^H^Htoo busy).
+ */
 static int write_suspend_image(void)
 {
 	int i;
@@ -281,6 +294,9 @@ static int write_suspend_image(void)
 	union diskpage *cur,  *buffer = (union diskpage *)get_zeroed_page(GFP_ATOMIC);
 	unsigned long address;
 	struct page *page;
+
+	if (!buffer)
+		return -ENOMEM;
 
 	printk( "Writing data to swap (%d pages): ", nr_copy_pages );
 	for (i=0; i<nr_copy_pages; i++) {
@@ -344,7 +360,6 @@ static int write_suspend_image(void)
 	printk( "|\n" );
 
 	MDELAY(1000);
-	free_page((unsigned long) buffer);
 	return 0;
 }
 
@@ -681,7 +696,10 @@ void do_magic_suspend_2(void)
 
 static void do_software_suspend(void)
 {
-	arch_prepare_suspend();
+	if (arch_prepare_suspend()) {
+		printk("%sArchitecture failed to prepare\n", name_suspend);
+		return;
+	}		
 	if (pm_prepare_console())
 		printk( "%sCan't allocate a console... proceeding\n", name_suspend);
 	if (!prepare_suspend_processes()) {
@@ -1031,28 +1049,34 @@ static int read_suspend_image(const char * specialfile, int noresume)
 	return error;
 }
 
-/*
- * Called from init kernel_thread.
- * We check if we have an image and if so we try to resume
+/**
+ *	software_resume - Resume from a saved image.
+ *
+ *	Called as a late_initcall (so all devices are discovered and 
+ *	initialized), we call swsusp to see if we have a saved image or not.
+ *	If so, we quiesce devices, then restore the saved image. We will 
+ *	return above (in pm_suspend_disk() ) if everything goes well. 
+ *	Otherwise, we fail gracefully and return to the normally 
+ *	scheduled program.
+ *
  */
-
-void software_resume(void)
+static int __init software_resume(void)
 {
 	if (num_online_cpus() > 1) {
 		printk(KERN_WARNING "Software Suspend has malfunctioning SMP support. Disabled :(\n");	
-		return;
+		return -EINVAL;
 	}
 	/* We enable the possibility of machine suspend */
 	software_suspend_enabled = 1;
 	if (!resume_status)
-		return;
+		return 0;
 
 	printk( "%s", name_resume );
 	if (resume_status == NORESUME) {
 		if(resume_file[0])
 			read_suspend_image(resume_file, 1);
 		printk( "disabled\n" );
-		return;
+		return 0;
 	}
 	MDELAY(1000);
 
@@ -1061,7 +1085,7 @@ void software_resume(void)
 
 	if (!resume_file[0] && resume_status == RESUME_SPECIFIED) {
 		printk( "suspension device unspecified\n" );
-		return;
+		return -EINVAL;
 	}
 
 	printk( "resuming from %s\n", resume_file);
@@ -1072,8 +1096,10 @@ void software_resume(void)
 
 read_failure:
 	pm_restore_console();
-	return;
+	return 0;
 }
+
+late_initcall(software_resume);
 
 static int __init resume_setup(char *str)
 {

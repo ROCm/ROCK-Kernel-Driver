@@ -650,6 +650,15 @@ static void ip_vs_trash_cleanup(void)
 }
 
 
+static void
+ip_vs_zero_stats(struct ip_vs_stats *stats)
+{
+	spin_lock_bh(&stats->lock);
+	memset(stats, 0, (char *)&stats->lock - (char *)stats);
+	spin_unlock_bh(&stats->lock);
+	ip_vs_zero_estimator(stats);
+}
+
 /*
  *	Update a destination in the given service
  */
@@ -689,6 +698,7 @@ __ip_vs_update_dest(struct ip_vs_service *svc,
 	} else {
 		if (dest->svc != svc) {
 			__ip_vs_unbind_svc(dest);
+			ip_vs_zero_stats(&dest->stats);
 			__ip_vs_bind_svc(dest, svc);
 		}
 	}
@@ -1276,7 +1286,7 @@ static int ip_vs_flush(void)
 	 * Flush the service table hashed by fwmark
 	 */
 	for(idx = 0; idx < IP_VS_SVC_TAB_SIZE; idx++) {
-		list_for_each_entry_safe(svc, nxt, 
+		list_for_each_entry_safe(svc, nxt,
 					 &ip_vs_svc_fwm_table[idx], f_list) {
 			write_lock_bh(&__ip_vs_svc_lock);
 			ip_vs_svc_unhash(svc);
@@ -1296,15 +1306,6 @@ static int ip_vs_flush(void)
 /*
  *	Zero counters in a service or all services
  */
-static void
-ip_vs_zero_stats(struct ip_vs_stats *stats)
-{
-	spin_lock_bh(&stats->lock);
-	memset(stats, 0, (char *)&stats->lock - (char *)stats);
-	spin_unlock_bh(&stats->lock);
-	ip_vs_zero_estimator(stats);
-}
-
 static int ip_vs_zero_service(struct ip_vs_service *svc)
 {
 	struct ip_vs_dest *dest;
@@ -1550,10 +1551,10 @@ static void *ip_vs_info_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	++*pos;
 	if (v == SEQ_START_TOKEN)
 		return ip_vs_info_array(seq,0);
-	
+
 	svc = v;
 	iter = seq->private;
-	
+
 	if (iter->table == ip_vs_svc_table) {
 		/* next service in table hashed by protocol */
 		if ((e = svc->s_list.next) != &ip_vs_svc_table[iter->bucket])
@@ -1579,7 +1580,7 @@ static void *ip_vs_info_seq_next(struct seq_file *seq, void *v, loff_t *pos)
  scan_fwmark:
 	while (++iter->bucket < IP_VS_SVC_TAB_SIZE) {
 		list_for_each_entry(svc, &ip_vs_svc_fwm_table[iter->bucket],
-				    f_list) 
+				    f_list)
 			return svc;
 	}
 
@@ -1607,7 +1608,7 @@ static int ip_vs_info_seq_show(struct seq_file *seq, void *v)
 		const struct ip_vs_iter *iter = seq->private;
 		const struct ip_vs_dest *dest;
 
-		if (iter->table == ip_vs_svc_table) 
+		if (iter->table == ip_vs_svc_table)
 			seq_printf(seq, "%s  %08X:%04X %s ",
 				   ip_vs_proto_name(svc->protocol),
 				   ntohl(svc->addr),
@@ -1625,7 +1626,7 @@ static int ip_vs_info_seq_show(struct seq_file *seq, void *v)
 			seq_putc(seq, '\n');
 
 		list_for_each_entry(dest, &svc->destinations, n_list) {
-			seq_printf(seq, 
+			seq_printf(seq,
 				   "  -> %08X:%04X      %-7s %-6d %-10d %-10d\n",
 				   ntohl(dest->addr), ntohs(dest->port),
 				   ip_vs_fwd_name(atomic_read(&dest->conn_flags)),
@@ -1686,7 +1687,7 @@ static int ip_vs_stats_show(struct seq_file *seq, void *v)
 /*               01234567 01234567 01234567 0123456701234567 0123456701234567 */
 	seq_puts(seq,
 		 "   Total Incoming Outgoing         Incoming         Outgoing\n");
-	seq_printf(seq, 	   
+	seq_printf(seq,
 		   "   Conns  Packets  Packets            Bytes            Bytes\n");
 
 	spin_lock_bh(&ip_vs_stats.lock);

@@ -264,7 +264,7 @@ nfs_file_cred(struct file *file)
 /*
  * linux/fs/nfs/direct.c
  */
-extern int nfs_direct_IO(int, struct file *, const struct iovec *, loff_t,
+extern int nfs_direct_IO(int, struct kiocb *, const struct iovec *, loff_t,
 			unsigned long);
 
 /*
@@ -403,7 +403,7 @@ static inline loff_t
 nfs_size_to_loff_t(__u64 size)
 {
 	loff_t maxsz = (((loff_t) ULONG_MAX) << PAGE_CACHE_SHIFT) + PAGE_CACHE_SIZE - 1;
-	if (size > (__u64) maxsz)
+	if (size > maxsz)
 		return maxsz;
 	return (loff_t) size;
 }

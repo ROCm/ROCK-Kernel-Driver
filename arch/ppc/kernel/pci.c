@@ -179,7 +179,8 @@ pcibios_fixup_cardbus(struct pci_dev* dev)
 	}
 	if (dev->device == PCI_DEVICE_ID_TI_1210 ||
 	    dev->device == PCI_DEVICE_ID_TI_1211 ||
-	    dev->device == PCI_DEVICE_ID_TI_1410) {
+	    dev->device == PCI_DEVICE_ID_TI_1410 ||
+	    dev->device == PCI_DEVICE_ID_TI_1510) {
 		u8 val;
 		/* 0x8c == TI122X_IRQMUX, 2 says to route the INTA
 		   signal out the MFUNC0 pin */

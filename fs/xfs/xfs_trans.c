@@ -365,7 +365,6 @@ xfs_trans_mod_sb(
 
 	switch (field) {
 	case XFS_TRANS_SB_ICOUNT:
-		ASSERT(delta > 0);
 		tp->t_icount_delta += delta;
 		break;
 	case XFS_TRANS_SB_IFREE:

@@ -150,6 +150,7 @@ struct saa7146_extension_ioctls
 
 /* flags */
 #define SAA7146_EXT_SWAP_ODD_EVEN       0x1     /* needs odd/even fields swapped */
+#define SAA7146_USE_PORT_B_FOR_VBI	0x2     /* use input port b for vbi hardware bug workaround */
 
 struct saa7146_ext_vv
 {

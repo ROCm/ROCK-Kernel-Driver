@@ -95,7 +95,7 @@ struct agp_bridge_driver sis_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
-static struct agp_device_ids sis_agp_device_ids[] __initdata =
+static struct agp_device_ids sis_agp_device_ids[] __devinitdata =
 {
 	{
 		.device_id	= PCI_DEVICE_ID_SI_530,
@@ -164,8 +164,8 @@ static struct agp_device_ids sis_agp_device_ids[] __initdata =
 	{ }, /* dummy final entry, always present */
 };
 
-static int __init agp_sis_probe(struct pci_dev *pdev,
-				const struct pci_device_id *ent)
+static int __devinit agp_sis_probe(struct pci_dev *pdev,
+				   const struct pci_device_id *ent)
 {
 	struct agp_device_ids *devs = sis_agp_device_ids;
 	struct agp_bridge_data *bridge;

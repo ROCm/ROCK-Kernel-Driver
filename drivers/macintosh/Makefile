@@ -4,6 +4,7 @@
 
 # Each configuration option enables a list of files.
 
+# Turn that into a separate config option
 obj-$(CONFIG_PPC_PMAC)		+= macio_asic.o
 
 obj-$(CONFIG_PMAC_PBOOK)	+= mediabay.o

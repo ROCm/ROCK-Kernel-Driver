@@ -1,6 +1,6 @@
 /*
- *   Copyright (c) International Business Machines  Corp., 2000-2002
- *   Copyright (c) Christoph Hellwig, 2002
+ *   Copyright (C) International Business Machines  Corp., 2000-2003
+ *   Copyright (C) Christoph Hellwig, 2002
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
 #include <linux/fs.h>
 #include <linux/xattr.h>
 #include "jfs_incore.h"
+#include "jfs_superblock.h"
 #include "jfs_dmap.h"
 #include "jfs_debug.h"
 #include "jfs_dinode.h"
@@ -381,7 +382,10 @@ static int ea_read(struct inode *ip, struct jfs_ea_list *ealist)
 		return ea_read_inline(ip, ealist);
 
 	nbytes = sizeDXD(&ji->ea);
-	assert(nbytes);
+	if (!nbytes) {
+		jfs_error(sb, "ea_read: nbytes is 0");
+		return -EIO;
+	}
 
 	/* 
 	 * Figure out how many blocks were allocated when this EA list was
@@ -477,7 +481,10 @@ static int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
 		}
 		current_blocks = 0;
 	} else {
-		assert(ji->ea.flag & DXD_EXTENT);
+		if (!(ji->ea.flag & DXD_EXTENT)) {
+			jfs_error(sb, "ea_get: invalid ea.flag)");
+			return -EIO;
+		}
 		current_blocks = (ea_size + sb->s_blocksize - 1) >>
 		    sb->s_blocksize_bits;
 	}

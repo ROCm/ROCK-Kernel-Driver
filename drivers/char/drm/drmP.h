@@ -52,9 +52,10 @@
 #include <linux/file.h>
 #include <linux/pci.h>
 #include <linux/version.h>
-#include <linux/jiffies.h>
+#include <linux/sched.h>
 #include <linux/smp_lock.h>	/* For (un)lock_kernel */
 #include <linux/mm.h>
+#include <linux/pagemap.h>
 #if defined(__alpha__) || defined(__powerpc__)
 #include <asm/pgtable.h> /* For pte_wrprotect */
 #endif
@@ -197,11 +198,7 @@ static inline struct page * vmalloc_to_page(void * vmalloc_addr)
 }
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-#define DRM_RPR_ARG(vma)
-#else
 #define DRM_RPR_ARG(vma) vma,
-#endif
 
 #define VM_OFFSET(vma) ((vma)->vm_pgoff << PAGE_SHIFT)
 

@@ -1318,6 +1318,10 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	/*
 	 * Read the swap header.
 	 */
+	if (!mapping->a_ops->readpage) {
+		error = -EINVAL;
+		goto bad_swap;
+	}
 	page = read_cache_page(mapping, 0,
 			(filler_t *)mapping->a_ops->readpage, swap_file);
 	if (IS_ERR(page)) {

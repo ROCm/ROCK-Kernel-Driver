@@ -90,6 +90,7 @@ extern int get_resource_list(struct resource *, char *buf, int size);
 
 extern int request_resource(struct resource *root, struct resource *new);
 extern int release_resource(struct resource *new);
+extern int insert_resource(struct resource *parent, struct resource *new);
 extern int allocate_resource(struct resource *root, struct resource *new,
 			     unsigned long size,
 			     unsigned long min, unsigned long max,

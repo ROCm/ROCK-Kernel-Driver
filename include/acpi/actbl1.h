@@ -51,7 +51,7 @@
  */
 struct rsdt_descriptor_rev1
 {
-	struct acpi_table_header        header;                 /* ACPI Table header */
+	ACPI_TABLE_HEADER_DEF                           /* ACPI common table header */
 	u32                             table_offset_entry [1]; /* Array of pointers to other */
 			 /* ACPI tables */
 };
@@ -78,7 +78,7 @@ struct facs_descriptor_rev1
  */
 struct fadt_descriptor_rev1
 {
-	struct acpi_table_header        header;                 /* ACPI Table header */
+	ACPI_TABLE_HEADER_DEF                           /* ACPI common table header */
 	u32                             firmware_ctrl;          /* Physical address of FACS */
 	u32                             dsdt;                   /* Physical address of DSDT */
 	u8                              model;                  /* System Interrupt Model */

@@ -384,7 +384,7 @@ static int releaseintf(struct dev_state *ps, unsigned int intf)
 	err = -EINVAL;
 	dev = ps->dev;
 	down(&dev->serialize);
-	if (dev && test_and_clear_bit(intf, &ps->ifclaimed)) {
+	if (test_and_clear_bit(intf, &ps->ifclaimed)) {
 		iface = dev->actconfig->interface[intf];
 		usb_driver_release_interface(&usbdevfs_driver, iface);
 		err = 0;

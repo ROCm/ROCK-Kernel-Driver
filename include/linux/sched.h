@@ -264,15 +264,6 @@ struct signal_struct {
 
 	/* thread group stop support, overloads group_exit_code too */
 	int			group_stop_count;
-
-	/* job control IDs */
-	pid_t pgrp;
-	pid_t tty_old_pgrp;
-	pid_t session;
-	/* boolean value for session group leader */
-	int leader;
-
-	struct tty_struct *tty; /* NULL if no tty */
 };
 
 /*
@@ -375,7 +366,12 @@ struct task_struct {
 	unsigned long personality;
 	int did_exec:1;
 	pid_t pid;
+	pid_t __pgrp;		/* Accessed via process_group() */
+	pid_t tty_old_pgrp;
+	pid_t session;
 	pid_t tgid;
+	/* boolean value for session group leader */
+	int leader;
 	/* 
 	 * pointers to (original) parent process, youngest child, younger sibling,
 	 * older sibling, respectively.  (p->father can be replaced with 
@@ -419,6 +415,7 @@ struct task_struct {
 	char comm[16];
 /* file system info */
 	int link_count, total_link_count;
+	struct tty_struct *tty; /* NULL if no tty */
 /* ipc stuff */
 	struct sysv_sem sysvsem;
 /* CPU-specific state of this task */
@@ -471,22 +468,7 @@ struct task_struct {
 
 static inline pid_t process_group(struct task_struct *tsk)
 {
-	return tsk->signal->pgrp;
-}
-
-static inline pid_t process_session(struct task_struct *tsk)
-{
-	return tsk->signal->session;
-}
-
-static inline int process_session_leader(struct task_struct *tsk)
-{
-	return tsk->signal->leader;
-}
-
-static inline struct tty_struct *process_tty(struct task_struct *tsk)
-{
-	return tsk->signal->tty;
+	return tsk->group_leader->__pgrp;
 }
 
 extern void __put_task_struct(struct task_struct *tsk);
@@ -559,6 +541,16 @@ union thread_union {
 	unsigned long stack[INIT_THREAD_SIZE/sizeof(long)];
 };
 
+#ifndef __HAVE_ARCH_KSTACK_END
+static inline int kstack_end(void *addr)
+{
+	/* Reliable end of stack detection:
+	 * Some APM bios versions misalign the stack
+	 */
+	return !(((unsigned long)addr+sizeof(void*)-1) & (THREAD_SIZE-sizeof(void*)));
+}
+#endif
+
 extern union thread_union init_thread_union;
 extern struct task_struct init_task;
 
@@ -594,6 +586,19 @@ extern void proc_caches_init(void);
 extern void flush_signals(struct task_struct *);
 extern void flush_signal_handlers(struct task_struct *, int force_default);
 extern int dequeue_signal(struct task_struct *tsk, sigset_t *mask, siginfo_t *info);
+
+static inline int dequeue_signal_lock(struct task_struct *tsk, sigset_t *mask, siginfo_t *info)
+{
+	unsigned long flags;
+	int ret;
+
+	spin_lock_irqsave(&tsk->sighand->siglock, flags);
+	ret = dequeue_signal(tsk, mask, info);
+	spin_unlock_irqrestore(&tsk->sighand->siglock, flags);
+
+	return ret;
+}	
+
 extern void block_all_signals(int (*notifier)(void *priv), void *priv,
 			      sigset_t *mask);
 extern void unblock_all_signals(void);
@@ -691,6 +696,7 @@ extern NORET_TYPE void do_group_exit(int);
 extern void reparent_to_init(void);
 extern void daemonize(const char *, ...);
 extern int allow_signal(int);
+extern int disallow_signal(int);
 extern task_t *child_reaper;
 
 extern int do_execve(char *, char __user * __user *, char __user * __user *, struct pt_regs *);

@@ -95,6 +95,7 @@ obj-$(CONFIG_LNE390) += lne390.o 8390.o
 obj-$(CONFIG_NE3210) += ne3210.o 8390.o
 obj-$(CONFIG_NET_SB1250_MAC) += sb1250-mac.o
 obj-$(CONFIG_B44) += b44.o
+obj-$(CONFIG_ARCTIC_ENET) += arctic_enet.o 8390.o
 
 obj-$(CONFIG_PPP) += ppp_generic.o slhc.o
 obj-$(CONFIG_PPP_ASYNC) += ppp_async.o
@@ -187,4 +188,4 @@ obj-$(CONFIG_NET_WIRELESS) += wireless/
 obj-$(CONFIG_NET_TULIP) += tulip/
 obj-$(CONFIG_HAMRADIO) += hamradio/
 obj-$(CONFIG_IRDA) += irda/
-
+obj-$(CONFIG_OCP_NET)	+= ibm_ocp/

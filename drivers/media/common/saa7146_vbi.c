@@ -38,8 +38,14 @@ static int vbi_workaround(struct saa7146_dev *dev)
 		WRITE_RPS1(CMD_WR_REG | (1 << 8) | (BRS_CTRL/4));
 		/* BXO = 1h, BRS to outbound */
 		WRITE_RPS1(0xc000008c);   
-		/* wait for vbi_a */
+	/* wait for vbi_a or vbi_b*/
+	if ( 0 != (SAA7146_USE_PORT_B_FOR_VBI & dev->ext_vv_data->flags)) {
+		DEB_D(("...using port b\n"));
+		WRITE_RPS1(CMD_PAUSE | MASK_09);
+	} else {
+		DEB_D(("...using port a\n"));
 		WRITE_RPS1(CMD_PAUSE | MASK_10);
+	}
 		/* upload brs */
 		WRITE_RPS1(CMD_UPLOAD | MASK_08);
 		/* load brs-control register */
@@ -106,7 +112,7 @@ static int vbi_workaround(struct saa7146_dev *dev)
 
 		if(signal_pending(current)) {
 		
-			DEB_VBI(("aborted.\n"));
+			DEB_VBI(("aborted (rps:0x%08x).\n",saa7146_read(dev,RPS_ADDR1)));
 
 			/* stop rps1 for sure */
 			saa7146_write(dev, MC1, MASK_29);
@@ -316,6 +322,11 @@ static void vbi_stop(struct saa7146_fh *fh)
 	saa7146_write(dev, MC1, MASK_20);
 
 	vv->vbi_streaming = NULL;
+
+	del_timer(&vv->vbi_q.timeout);
+	del_timer(&fh->vbi_read_timeout);
+
+	DEB_VBI(("out\n"));
 	spin_unlock_irqrestore(&dev->slock, flags);
 }
 
@@ -371,7 +382,10 @@ static void vbi_open(struct saa7146_dev *dev, struct saa7146_fh *fh)
 	fh->vbi_read_timeout.function = vbi_read_timeout;
 	fh->vbi_read_timeout.data = (unsigned long)fh;
 
+	/* fixme: enable this again, if the dvb-c w/ analog module work properly */
+/*
 	vbi_workaround(dev);
+*/
 }
 
 static void vbi_close(struct saa7146_dev *dev, struct saa7146_fh *fh, struct file *file)

@@ -373,7 +373,7 @@ STATIC int
 init_inodecache( void )
 {
 	linvfs_inode_cachep = kmem_cache_create("linvfs_icache",
-				sizeof(vnode_t), 0, 
+				sizeof(vnode_t), 0,
 				SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 				init_once, NULL);
 
@@ -579,7 +579,7 @@ linvfs_freeze_fs(
 	if (sb->s_flags & MS_RDONLY)
 		return;
 	VFS_ROOT(vfsp, &vp, error);
-	VOP_IOCTL(vp, LINVFS_GET_IP(vp), NULL, XFS_IOC_FREEZE, 0, error);
+	VOP_IOCTL(vp, LINVFS_GET_IP(vp), NULL, 0, XFS_IOC_FREEZE, 0, error);
 	VN_RELE(vp);
 }
 
@@ -592,7 +592,7 @@ linvfs_unfreeze_fs(
 	int			error;
 
 	VFS_ROOT(vfsp, &vp, error);
-	VOP_IOCTL(vp, LINVFS_GET_IP(vp), NULL, XFS_IOC_THAW, 0, error);
+	VOP_IOCTL(vp, LINVFS_GET_IP(vp), NULL, 0, XFS_IOC_THAW, 0, error);
 	VN_RELE(vp);
 }
 

@@ -714,7 +714,7 @@ static int mt312_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 	return 0;
 }
 
-static int mt312_attach(struct dvb_i2c_bus *i2c)
+static int mt312_attach(struct dvb_i2c_bus *i2c, void **data)
 {
 	int ret;
 	u8 id;
@@ -734,7 +734,7 @@ static int mt312_attach(struct dvb_i2c_bus *i2c)
 	return 0;
 }
 
-static void mt312_detach(struct dvb_i2c_bus *i2c)
+static void mt312_detach(struct dvb_i2c_bus *i2c, void *data)
 {
 	dvb_unregister_frontend(mt312_ioctl, i2c);
 

@@ -696,13 +696,15 @@ try_dma_modes:
 		} else {
 			goto fast_ata_pio;
 		}
+		return hwif->ide_dma_on(drive);
 	} else if ((id->capability & 8) || (id->field_valid & 2)) {
 fast_ata_pio:
 no_dma_set:
 		sis5513_tune_drive(drive, 5);
 		return hwif->ide_dma_off_quietly(drive);
 	}
-	return hwif->ide_dma_on(drive);
+	/* IORDY not supported */
+	return 0;
 }
 
 /* initiates/aborts (U)DMA read/write operations on a drive. */

@@ -56,6 +56,10 @@
 #include <asm/smp.h>
 #endif
 
+#ifdef CONFIG_KDB
+#include <linux/kdb.h>
+#endif /* CONFIG_KDB */
+
 /*
  * Versions of gcc older than that listed below may actually compile
  * and link okay, but the end product can have subtle run time bugs.
@@ -440,6 +444,12 @@ asmlinkage void __init start_kernel(void)
 	if (late_time_init)
 		late_time_init();
 	calibrate_delay();
+#ifdef CONFIG_KDB
+	kdb_init(); /* only call after kmem_cache_sizes_init */
+	if (KDB_FLAG(EARLYKDB)) {
+	    KDB_ENTER();
+	}
+#endif /* CONFIG_KDB */
 	pidmap_init();
 	pgtable_cache_init();
 	pte_chain_init();

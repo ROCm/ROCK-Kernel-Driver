@@ -24,12 +24,29 @@
  *	2002-09-21	rv250, r300, m9 initial support,
  *			added mirror option, 0.1.6
  *
- *	Special thanks to ATI DevRel team for their hardware donations.
+ * Other change (--BenH)
+ * 
+ * 	2003-01-01	Tweaks for PLL on some iBooks
+ * 	2003-01-01	Fix SURFACE_CNTL usage on r9000	
+ *      2003-03-23	Added new Power Management code from ATI
+ *      2003-03-23	Added default PLL values for r300 from lkml
+ *      2003-03-26	Never set TMDS_PLL_EN, it seem to break more than
+ *                      just old r300's
+ *
+ *	Special thanks to ATI DevRel team for their hardware donations,
+ *	and for spending the time to fix the power management code !
+ *	
+ *	Note: This driver in in bad need of beeing completely re-organized.
+ *	      My long term plans, if I ever get enough time for that, is
+ *	      to split the actual mode setting code so it can properly 
+ *	      work on any head, the probe code, which will be stuffed with
+ *	      OF parsing on PPC and i2c fallback (look at what XFree does)
+ *	      and the PM code ought to be in a separate file. --BenH.
  *
  */
 
 
-#define RADEON_VERSION	"0.1.6"
+#define RADEON_VERSION	"0.1.6-ben"
 
 
 #include <linux/config.h>
@@ -310,6 +327,7 @@ struct radeon_regs {
 	u32 crtc_gen_cntl;
 	u32 crtc_ext_cntl;
 	u32 dac_cntl;
+	u32 crtc_more_cntl;
 
 	u32 flags;
 	u32 pix_clock;
@@ -358,6 +376,8 @@ struct radeonfb_info {
 
 	unsigned long mmio_base;
 	unsigned long fb_base;
+
+	u32 fb_local_base;
 
 	struct pci_dev *pdev;
 
@@ -683,6 +703,8 @@ static char noaccel = 1;
 static char mirror = 0;
 static int panel_yres __initdata = 0;
 static char force_dfp __initdata = 0;
+static char force_crt __initdata = 0;
+static char force_nolcd __initdata = 0;
 static struct radeonfb_info *board_list = NULL;
 static char nomtrr __initdata = 0;
 
@@ -1229,6 +1251,83 @@ static int radeon_read_OF (struct radeonfb_info *rinfo)
 #endif	
 
 
+#ifdef CONFIG_PPC_PMAC
+#undef SET_MC_FB_FROM_APERTURE
+static void
+fixup_memory_mappings(struct radeonfb_info *rinfo)
+{
+	u32 save_crtc_gen_cntl, save_crtc2_gen_cntl;
+	u32 save_crtc_ext_cntl;
+	u32 aper_base, aper_size;
+	u32 agp_base;
+
+	/* First, we disable display to avoid interfering */
+	if (rinfo->hasCRTC2) {
+		save_crtc2_gen_cntl = INREG(CRTC2_GEN_CNTL);
+		OUTREG(CRTC2_GEN_CNTL, save_crtc2_gen_cntl | CRTC2_DISP_REQ_EN_B);
+	}
+	save_crtc_gen_cntl = INREG(CRTC_GEN_CNTL);
+	save_crtc_ext_cntl = INREG(CRTC_EXT_CNTL);
+	
+	OUTREG(CRTC_EXT_CNTL, save_crtc_ext_cntl | CRTC_DISPLAY_DIS);
+	OUTREG(CRTC_GEN_CNTL, save_crtc_gen_cntl | CRTC_DISP_REQ_EN_B);
+	mdelay(100);
+
+	aper_base = INREG(CONFIG_APER_0_BASE);
+	aper_size = INREG(CONFIG_APER_SIZE);
+
+#ifdef SET_MC_FB_FROM_APERTURE
+	/* Set framebuffer to be at the same address as set in PCI BAR */
+	OUTREG(MC_FB_LOCATION, 
+		((aper_base + aper_size - 1) & 0xffff0000) | (aper_base >> 16));
+	rinfo->fb_local_base = aper_base;
+#else
+	OUTREG(MC_FB_LOCATION, 0x7fff0000);
+	rinfo->fb_local_base = 0;
+#endif
+	agp_base = aper_base + aper_size;
+	if (agp_base & 0xf0000000)
+		agp_base = (aper_base | 0x0fffffff) + 1;
+
+	/* Set AGP to be just after the framebuffer on a 256Mb boundary. This
+	 * assumes the FB isn't mapped to 0xf0000000 or above, but this is
+	 * always the case on PPCs afaik.
+	 */
+#ifdef SET_MC_FB_FROM_APERTURE
+	OUTREG(MC_AGP_LOCATION, 0xffff0000 | (agp_base >> 16));
+#else
+	OUTREG(MC_AGP_LOCATION, 0xffffe000);
+#endif
+
+	/* Fixup the display base addresses & engine offsets while we
+	 * are at it as well
+	 */
+#ifdef SET_MC_FB_FROM_APERTURE
+	OUTREG(DISPLAY_BASE_ADDR, aper_base);
+	if (rinfo->hasCRTC2)
+		OUTREG(CRTC2_DISPLAY_BASE_ADDR, aper_base);
+#else
+	OUTREG(DISPLAY_BASE_ADDR, 0);
+	if (rinfo->hasCRTC2)
+		OUTREG(CRTC2_DISPLAY_BASE_ADDR, 0);
+#endif
+	mdelay(100);
+
+	/* Restore display settings */
+	OUTREG(CRTC_GEN_CNTL, save_crtc_gen_cntl);
+	OUTREG(CRTC_EXT_CNTL, save_crtc_ext_cntl);
+	if (rinfo->hasCRTC2)
+		OUTREG(CRTC2_GEN_CNTL, save_crtc2_gen_cntl);	
+
+#if 0
+	printk("aper_base: %08x MC_FB_LOC to: %08x, MC_AGP_LOC to: %08x\n",
+		aper_base,
+		((aper_base + aper_size - 1) & 0xffff0000) | (aper_base >> 16),
+		0xffff0000 | (agp_base >> 16));
+#endif
+}
+#endif /* CONFIG_PPC_PMAC */
+
 static void radeon_engine_init (struct radeonfb_info *rinfo)
 {
 	u32 temp;
@@ -1244,10 +1343,13 @@ static void radeon_engine_init (struct radeonfb_info *rinfo)
 	/* XXX */
 	rinfo->pitch = ((rinfo->xres_virtual * (rinfo->bpp / 8) + 0x3f)) >> 6;
 
-	radeon_fifo_wait (1);
+	radeon_fifo_wait (3);
 	temp = INREG(DEFAULT_PITCH_OFFSET);
 	OUTREG(DEFAULT_PITCH_OFFSET, ((temp & 0xc0000000) | 
-				      (rinfo->pitch << 0x16)));
+				      (rinfo->pitch << 0x16) |
+				      (rinfo->fb_local_base >> 10)));
+	OUTREG(DST_PITCH_OFFSET, (rinfo->pitch << 0x16) | (rinfo->fb_local_base >> 10));
+	OUTREG(SRC_PITCH_OFFSET, (rinfo->pitch << 0x16) | (rinfo->fb_local_base >> 10));
 
 	radeon_fifo_wait (1);
 	OUTREGP(DP_DATATYPE, 0, ~HOST_BIG_ENDIAN_EN);
@@ -1300,6 +1402,7 @@ static int __devinit radeon_init_disp (struct radeonfb_info *rinfo)
 	fb_alloc_cmap(&info->cmap, 256, 0);
 
 	var.activate = FB_ACTIVATE_NOW;
+	fb_set_var(info, &var);
         return 0;
 }
 
@@ -1573,8 +1676,8 @@ static int radeonfb_ioctl (struct inode *inode, struct file *file, unsigned int 
 			}
 
 			OUTREG(CRTC_EXT_CNTL, tmp);
+			return 0;
 
-			break;
 		case FBIO_RADEON_GET_MIRROR:
 			switch (rinfo->arch) {
 				case RADEON_R100:
@@ -1598,8 +1701,6 @@ static int radeonfb_ioctl (struct inode *inode, struct file *file, unsigned int 
 				value |= 0x02;
 
 			return put_user(value, (__u32*)arg);
-		default:
-			return -EINVAL;
 	}
 
 	return -EINVAL;
@@ -1661,7 +1762,7 @@ static int radeonfb_setcolreg (unsigned regno, unsigned red, unsigned green,
                              unsigned blue, unsigned transp, struct fb_info *info)
 {
         struct radeonfb_info *rinfo = (struct radeonfb_info *) info;
-	u32 pindex, vclk_cntl;
+	u32 pindex;
 	unsigned int i;
 	
 	if (regno > 255)
@@ -1678,8 +1779,17 @@ static int radeonfb_setcolreg (unsigned regno, unsigned red, unsigned green,
         pindex = regno;
 
         if (!rinfo->asleep) {
+        	u32 dac_cntl2, vclk_cntl;
+
 		vclk_cntl = INPLL(VCLK_ECP_CNTL);
 		OUTPLL(VCLK_ECP_CNTL, vclk_cntl & ~PIXCLK_DAC_ALWAYS_ONb);
+
+		/* Make sure we are on first palette */
+		if (rinfo->hasCRTC2) {
+			dac_cntl2 = INREG(DAC_CNTL2);
+			dac_cntl2 &= ~DAC2_PALETTE_ACCESS_CNTL;
+			OUTREG(DAC_CNTL2, dac_cntl2);
+		}
 
 		if (rinfo->bpp == 16) {
 			pindex = regno * 8;
@@ -1737,6 +1847,7 @@ static void radeon_save_state (struct radeonfb_info *rinfo,
 	/* CRTC regs */
 	save->crtc_gen_cntl = INREG(CRTC_GEN_CNTL);
 	save->crtc_ext_cntl = INREG(CRTC_EXT_CNTL);
+	save->crtc_more_cntl = INREG(CRTC_MORE_CNTL);
 	save->dac_cntl = INREG(DAC_CNTL);
         save->crtc_h_total_disp = INREG(CRTC_H_TOTAL_DISP);
         save->crtc_h_sync_strt_wid = INREG(CRTC_H_SYNC_STRT_WID);
@@ -1773,9 +1884,8 @@ static int radeonfb_set_par (struct fb_info *info)
 	    hSyncPol, vSyncStart, vSyncEnd, vSyncPol, cSync;
 	u8 hsync_adj_tab[] = {0, 0x12, 9, 9, 6, 5};
 	u8 hsync_fudge_fp[] = {2, 2, 0, 0, 5, 5};
-	u32 dotClock = 1000000000 / mode->pixclock,
-	    sync, h_sync_pol, v_sync_pol;
-	int freq = dotClock / 10;  /* x 100 */
+	u32 sync, h_sync_pol, v_sync_pol, dotClock, pixClock;
+	int freq;
         int xclk_freq, vclk_freq, xclk_per_trans, xclk_per_trans_precise;
         int useable_precision, roff, ron;
         int min_bits, format = 0;
@@ -1796,6 +1906,7 @@ static int radeonfb_set_par (struct fb_info *info)
 	vSyncStart = mode->yres + mode->lower_margin;
 	vSyncEnd = vSyncStart + mode->vsync_len;
 	vTotal = vSyncEnd + mode->upper_margin;
+	pixClock = mode->pixclock;
 
 	if ((primary_mon == MT_DFP) || (primary_mon == MT_LCD)) {
 		if (rinfo->panel_xres < mode->xres)
@@ -1810,7 +1921,11 @@ static int radeonfb_set_par (struct fb_info *info)
 		vTotal = mode->yres + rinfo->vblank;
 		vSyncStart = mode->yres + rinfo->vOver_plus;
 		vSyncEnd = vSyncStart + rinfo->vSync_width;
+
+		pixClock = 100000000 / rinfo->clock;
 	}
+	dotClock = 1000000000 / pixClock;
+	freq = dotClock / 10; /* x100 */
 
 	sync = mode->sync;
 	h_sync_pol = sync & FB_SYNC_HOR_HIGH_ACT ? 0 : 1;
@@ -1851,6 +1966,10 @@ static int radeonfb_set_par (struct fb_info *info)
 	newmode.crtc_gen_cntl = CRTC_EXT_DISP_EN | CRTC_EN |
 				(format << 8);
 
+	/* Clear auto-center etc... */
+	newmode.crtc_more_cntl = rinfo->init_state.crtc_more_cntl;
+	newmode.crtc_more_cntl &= 0xfffffff0;
+	
 	if ((primary_mon == MT_DFP) || (primary_mon == MT_LCD)) {
 		newmode.crtc_ext_cntl = VGA_ATI_LINEAR | XCRT_CNT_EN;
 		if (mirror)
@@ -1919,6 +2038,9 @@ static int radeonfb_set_par (struct fb_info *info)
 
 	rinfo->bpp = mode->bits_per_pixel;
 	rinfo->depth = depth;
+
+	RTRACE("pixclock = %lu\n", (unsigned long)pixClock);
+	RTRACE("freq = %lu\n", (unsigned long)freq);
 
 	if (freq > rinfo->pll.ppll_max)
 		freq = rinfo->pll.ppll_max;
@@ -2001,13 +2123,6 @@ static int radeonfb_set_par (struct fb_info *info)
 	if ((primary_mon == MT_DFP) || (primary_mon == MT_LCD)) {
 		unsigned int hRatio, vRatio;
 
-		/* We force the pixel clock to be always enabled. Allowing it
-		 * to be power managed during blanking would save power, but has
-		 * nasty interactions with the 2D engine & sleep code that haven't
-		 * been solved yet. --BenH
-		 */
-		newmode.vclk_ecp_cntl &= ~PIXCLK_DAC_ALWAYS_ONb;
-		
 		if (mode->xres > rinfo->panel_xres)
 			mode->xres = rinfo->panel_xres;
 		if (mode->yres > rinfo->panel_yres)
@@ -2065,9 +2180,15 @@ static int radeonfb_set_par (struct fb_info *info)
 		} else {
 			/* DFP */
 			newmode.fp_gen_cntl |= (FP_FPON | FP_TMDS_EN);
-			newmode.tmds_transmitter_cntl = (TMDS_RAN_PAT_RST |
-							 ICHCSEL | TMDS_PLL_EN) &
+			newmode.tmds_transmitter_cntl = (TMDS_RAN_PAT_RST | TMDS_ICHCSEL) &
 							 ~(TMDS_PLLRST);
+#if 1	/* Without this my DFP monitor doesn't come on at all...  - paulus */
+			/* There is something wrong with setting TMDS_PLL_EN
+			 * bit on older radeon's with ADC monitors
+			 */
+			if (rinfo->arch != RADEON_R100)
+				newmode.tmds_transmitter_cntl |= TMDS_PLL_EN;
+#endif
 			newmode.crtc_ext_cntl &= ~CRTC_CRT_ON;
 		}
 
@@ -2123,6 +2244,7 @@ static void radeon_write_mode (struct radeonfb_info *rinfo,
 	OUTREG(CRTC_GEN_CNTL, mode->crtc_gen_cntl);
 	OUTREGP(CRTC_EXT_CNTL, mode->crtc_ext_cntl,
 		CRTC_HSYNC_DIS | CRTC_VSYNC_DIS | CRTC_DISPLAY_DIS);
+	OUTREG(CRTC_MORE_CNTL, mode->crtc_more_cntl);
 	OUTREGP(DAC_CNTL, mode->dac_cntl, DAC_RANGE_CNTL | DAC_BLANKING);
 	OUTREG(CRTC_H_TOTAL_DISP, mode->crtc_h_total_disp);
 	OUTREG(CRTC_H_SYNC_STRT_WID, mode->crtc_h_sync_strt_wid);
@@ -2162,8 +2284,14 @@ static void radeon_write_mode (struct radeonfb_info *rinfo,
 
 	OUTPLLP(PPLL_CNTL, 0, ~PPLL_RESET);
 
-//	OUTREG(DDA_CONFIG, mode->dda_config);
-//	OUTREG(DDA_ON_OFF, mode->dda_on_off);
+#if 0
+	/* Those don't seem to actually exist in radeon's, despite some drivers still
+	 * apparently trying to fill them, including some ATI sample codes ...
+	 * Can someone confirm what's up ? --BenH.
+	 */
+	OUTREG(DDA_CONFIG, mode->dda_config);
+	OUTREG(DDA_ON_OFF, mode->dda_on_off);
+#endif
 
 	if ((primary_mon == MT_DFP) || (primary_mon == MT_LCD)) {
 		OUTREG(FP_CRTC_H_TOTAL_DISP, mode->fp_crtc_h_total_disp);
@@ -2308,7 +2436,7 @@ static int radeon_set_backlight_enable(int on, int level, void *data)
 	lvds_gen_cntl |= (LVDS_BL_MOD_EN | LVDS_BLON);
 	if (on && (level > BACKLIGHT_OFF)) {
 		lvds_gen_cntl |= LVDS_DIGON;
-		if (!lvds_gen_cntl & LVDS_ON) {
+		if ((lvds_gen_cntl & LVDS_ON) == 0) {
 			lvds_gen_cntl &= ~LVDS_BLON;
 			OUTREG(LVDS_GEN_CNTL, lvds_gen_cntl);
 			(void)INREG(LVDS_GEN_CNTL);
@@ -2347,14 +2475,28 @@ static int radeon_set_backlight_level(int level, void *data)
 
 #ifdef CONFIG_PMAC_PBOOK
 
-static u32 dbg_clk;
-
 /*
- * Radeon M6 Power Management code. This code currently only supports
- * the mobile chips, it's based from some informations provided by ATI
- * along with hours of tracing of MacOS drivers
+ * Radeon M6, M7 and M9 Power Management code. This code currently
+ * only supports the mobile chips in D2 mode, that is typically what
+ * is used on Apple laptops, it's based from some informations provided by ATI
+ * along with hours of tracing of MacOS drivers.
+ * 
+ * New version of this code almost totally rewritten by ATI, many thanks
+ * for their support.
  */
- 
+
+static void OUTMC( struct radeonfb_info *rinfo, u8 indx, u32 value)
+{
+	OUTREG( MC_IND_INDEX, indx | MC_IND_INDEX__MC_IND_WR_EN);	
+	OUTREG( MC_IND_DATA, value);		
+}
+
+static u32 INMC(struct radeonfb_info *rinfo, u8 indx)
+{
+	OUTREG( MC_IND_INDEX, indx);					
+	return INREG( MC_IND_DATA);
+}
+
 static void radeon_pm_save_regs(struct radeonfb_info *rinfo)
 {
 	rinfo->save_regs[0] = INPLL(PLL_PWRMGT_CNTL);
@@ -2408,6 +2550,12 @@ static void radeon_pm_restore_regs(struct radeonfb_info *rinfo)
 	OUTPLL(PIXCLKS_CNTL, rinfo->save_regs[6]);
 	OUTPLL(MCLK_MISC, rinfo->save_regs[7]);
 	
+	OUTREG(SURFACE_CNTL, rinfo->save_regs[29]);
+	OUTREG(MC_FB_LOCATION, rinfo->save_regs[30]);
+	OUTREG(DISPLAY_BASE_ADDR, rinfo->save_regs[31]);
+	OUTREG(MC_AGP_LOCATION, rinfo->save_regs[32]);
+	OUTREG(CRTC2_DISPLAY_BASE_ADDR, rinfo->save_regs[33]);
+
 	OUTREG(DISP_MISC_CNTL, rinfo->save_regs[9]);
 	OUTREG(DISP_PWR_MAN, rinfo->save_regs[10]);
 	OUTREG(LVDS_GEN_CNTL, rinfo->save_regs[11]);
@@ -2450,12 +2598,24 @@ static void radeon_pm_disable_iopad(struct radeonfb_info *rinfo)
 
 static void radeon_pm_program_v2clk(struct radeonfb_info *rinfo)
 {
-//
-//	u32 reg;
-//
-//	OUTPLL(P2PLL_REF_DIV, 0x0c);
-//
-//      .../... figure out what macos does here
+	/* Set v2clk to 65MHz */
+  	OUTPLL(pllPIXCLKS_CNTL,
+  		INPLL(pllPIXCLKS_CNTL) & ~PIXCLKS_CNTL__PIX2CLK_SRC_SEL_MASK);
+	 
+  	OUTPLL(pllP2PLL_REF_DIV, 0x0000000c);
+	OUTPLL(pllP2PLL_CNTL, 0x0000bf00);
+	OUTPLL(pllP2PLL_DIV_0, 0x00020074 | P2PLL_DIV_0__P2PLL_ATOMIC_UPDATE_W);
+	
+	OUTPLL(pllP2PLL_CNTL, INPLL(pllP2PLL_CNTL) & ~P2PLL_CNTL__P2PLL_SLEEP);
+	mdelay(1);
+
+	OUTPLL(pllP2PLL_CNTL, INPLL(pllP2PLL_CNTL) & ~P2PLL_CNTL__P2PLL_RESET); 	
+	mdelay( 1);
+
+  	OUTPLL(pllPIXCLKS_CNTL,
+  		(INPLL(pllPIXCLKS_CNTL) & ~PIXCLKS_CNTL__PIX2CLK_SRC_SEL_MASK)
+  		| (0x03 << PIXCLKS_CNTL__PIX2CLK_SRC_SEL__SHIFT));
+	mdelay( 1);	
 }
 
 static void radeon_pm_low_current(struct radeonfb_info *rinfo)
@@ -2473,10 +2633,6 @@ static void radeon_pm_low_current(struct radeonfb_info *rinfo)
 	reg &= ~PLL_PWRMGT_CNTL_SU_MCLK_USE_BCLK;
 	reg &= ~PLL_PWRMGT_CNTL_MOBILE_SU;
 	OUTPLL(PLL_PWRMGT_CNTL, reg);
-
-//	reg  = INPLL(TV_PLL_CNTL1);
-//	reg |= TV_PLL_CNTL1__TVPLL_RESET | TV_PLL_CNTL1__TVPLL_SLEEP;
-//	OUTPLL(TV_PLL_CNTL1, reg);
 	
 	reg  = INREG(TV_DAC_CNTL);
 	reg &= ~(TV_DAC_CNTL_BGADJ_MASK |TV_DAC_CNTL_DACADJ_MASK);
@@ -2486,13 +2642,8 @@ static void radeon_pm_low_current(struct radeonfb_info *rinfo)
 	OUTREG(TV_DAC_CNTL, reg);
 	
 	reg  = INREG(TMDS_TRANSMITTER_CNTL);
-	reg &= ~(TMDS_PLL_EN |TMDS_PLLRST);
+	reg &= ~(TMDS_PLL_EN | TMDS_PLLRST);
 	OUTREG(TMDS_TRANSMITTER_CNTL, reg);
-
-//	lvds_pll_cntl  = regr32(g, LVDS_PLL_CNTL);
-//	lvds_pll_cntl &= ~LVDS_PLL_CNTL__LVDS_PLL_EN;											
-//	lvds_pll_cntl |=  LVDS_PLL_CNTL__LVDS_PLL_RESET;	
-//	regw32(g, LVDS_PLL_CNTL, lvds_pll_cntl);
 
 	reg = INREG(DAC_CNTL);
 	reg &= ~DAC_CMP_EN;
@@ -2509,138 +2660,551 @@ static void radeon_pm_low_current(struct radeonfb_info *rinfo)
 
 static void radeon_pm_setup_for_suspend(struct radeonfb_info *rinfo)
 {
-	/* This code is disabled. It does what is in the pm_init
-	 * function of the MacOS driver code ATI sent me. However,
-	 * it doesn't fix my sleep problem, and is causing other issues
-	 * on wakeup (bascially the machine dying when switching consoles
-	 * I haven't had time to investigate this yet
-	 */
-#if 0
-	u32 disp_misc_cntl;
+
+	u32 sclk_cntl, mclk_cntl, sclk_more_cntl;
+
+	u32 pll_pwrmgt_cntl;
+	u32 clk_pwrmgt_cntl;
+	u32 clk_pin_cntl;
+	u32 vclk_ecp_cntl; 
+	u32 pixclks_cntl;
+	u32 disp_mis_cntl;
 	u32 disp_pwr_man;
-	u32 temp;
 
-	// set SPLL, MPLL, PPLL, P2PLL, TVPLL, SCLK, MCLK, PCLK, P2CLK,
-	// TCLK and TEST_MODE to 0
-	temp = INPLL(CLK_PWRMGT_CNTL);
-	OUTPLL(CLK_PWRMGT_CNTL , temp & ~0xc00002ff);
+	
+	/* Force Core Clocks */
+	sclk_cntl = INPLL( pllSCLK_CNTL_M6);
+	sclk_cntl |= 	SCLK_CNTL_M6__IDCT_MAX_DYN_STOP_LAT|
+			SCLK_CNTL_M6__VIP_MAX_DYN_STOP_LAT|
+			SCLK_CNTL_M6__RE_MAX_DYN_STOP_LAT|
+			SCLK_CNTL_M6__PB_MAX_DYN_STOP_LAT|
+			SCLK_CNTL_M6__TAM_MAX_DYN_STOP_LAT|
+			SCLK_CNTL_M6__TDM_MAX_DYN_STOP_LAT|
+			SCLK_CNTL_M6__RB_MAX_DYN_STOP_LAT|
+			
+			SCLK_CNTL_M6__FORCE_DISP2|
+			SCLK_CNTL_M6__FORCE_CP|
+			SCLK_CNTL_M6__FORCE_HDP|
+			SCLK_CNTL_M6__FORCE_DISP1|
+			SCLK_CNTL_M6__FORCE_TOP|
+			SCLK_CNTL_M6__FORCE_E2|
+			SCLK_CNTL_M6__FORCE_SE|
+			SCLK_CNTL_M6__FORCE_IDCT|
+			SCLK_CNTL_M6__FORCE_VIP|
+			
+			SCLK_CNTL_M6__FORCE_RE|
+			SCLK_CNTL_M6__FORCE_PB|
+			SCLK_CNTL_M6__FORCE_TAM|
+			SCLK_CNTL_M6__FORCE_TDM|
+			SCLK_CNTL_M6__FORCE_RB|
+			SCLK_CNTL_M6__FORCE_TV_SCLK|
+			SCLK_CNTL_M6__FORCE_SUBPIC|
+			SCLK_CNTL_M6__FORCE_OV0;
 
-	// Turn on Power Management
-	temp = INPLL(CLK_PWRMGT_CNTL);
-	OUTPLL(CLK_PWRMGT_CNTL , temp | 0x00000400);
+	OUTPLL( pllSCLK_CNTL_M6, sclk_cntl);
 
-	// Turn off display clock if using mobile chips
-	temp = INPLL(CLK_PWRMGT_CNTL);
-	OUTREG(CLK_PWRMGT_CNTL , temp | 0x00100000);
+	sclk_more_cntl = INPLL(pllSCLK_MORE_CNTL);
+	sclk_more_cntl |= 	SCLK_MORE_CNTL__FORCE_DISPREGS |
+				SCLK_MORE_CNTL__FORCE_MC_GUI |
+				SCLK_MORE_CNTL__FORCE_MC_HOST;
 
-	// Force PIXCLK_ALWAYS_ON and PIXCLK_DAC_ALWAYS_ON
-	temp = INPLL(VCLK_ECP_CNTL);
-	OUTPLL(VCLK_ECP_CNTL, temp & ~0x000000c0);
+	OUTPLL(pllSCLK_MORE_CNTL, sclk_more_cntl);		
 
-	// Force ECP_FORCE_ON to 1
-	temp = INPLL(VCLK_ECP_CNTL);
-	OUTPLL(VCLK_ECP_CNTL, temp | 0x00040000);
+	
+	mclk_cntl = INPLL( pllMCLK_CNTL_M6);
+	mclk_cntl &= ~(	MCLK_CNTL_M6__FORCE_MCLKA |  
+			MCLK_CNTL_M6__FORCE_MCLKB |
+			MCLK_CNTL_M6__FORCE_YCLKA | 
+			MCLK_CNTL_M6__FORCE_YCLKB | 
+			MCLK_CNTL_M6__FORCE_MC
+		      );	
+    	OUTPLL( pllMCLK_CNTL_M6, mclk_cntl);
+	
+	/* Force Display clocks	*/
+	vclk_ecp_cntl = INPLL( pllVCLK_ECP_CNTL);
+	vclk_ecp_cntl &= ~(VCLK_ECP_CNTL__PIXCLK_ALWAYS_ONb |VCLK_ECP_CNTL__PIXCLK_DAC_ALWAYS_ONb);
+	vclk_ecp_cntl |= VCLK_ECP_CNTL__ECP_FORCE_ON;
+	OUTPLL( pllVCLK_ECP_CNTL, vclk_ecp_cntl);
+	
+	
+	pixclks_cntl = INPLL( pllPIXCLKS_CNTL);
+	pixclks_cntl &= ~(	PIXCLKS_CNTL__PIXCLK_GV_ALWAYS_ONb | 
+				PIXCLKS_CNTL__PIXCLK_BLEND_ALWAYS_ONb|
+				PIXCLKS_CNTL__PIXCLK_DIG_TMDS_ALWAYS_ONb |
+				PIXCLKS_CNTL__PIXCLK_LVDS_ALWAYS_ONb|
+				PIXCLKS_CNTL__PIXCLK_TMDS_ALWAYS_ONb|
+				PIXCLKS_CNTL__PIX2CLK_ALWAYS_ONb|
+				PIXCLKS_CNTL__PIX2CLK_DAC_ALWAYS_ONb);
+						
+ 	OUTPLL( pllPIXCLKS_CNTL, pixclks_cntl);
 
-	// Force PIXCLK_BLEND_ALWAYS_ON and PIXCLK_GV_ALWAYS_ON
-	temp = INPLL(PIXCLKS_CNTL);
-       	OUTPLL(PIXCLKS_CNTL, temp & ~0x00001800);
 
-	// Forcing SCLK_CNTL to ON
-	OUTPLL(SCLK_CNTL, (INPLL(SCLK_CNTL)& 0x00000007) | 0xffff8000 );
 
-	// Set PM control over XTALIN pad
-	temp = INPLL(CLK_PIN_CNTL);
-	OUTPLL(CLK_PIN_CNTL, temp | 0x00080000);
+	/* Enable System power management */
+	pll_pwrmgt_cntl = INPLL( pllPLL_PWRMGT_CNTL);
+	
+	pll_pwrmgt_cntl |= 	PLL_PWRMGT_CNTL__SPLL_TURNOFF |
+				PLL_PWRMGT_CNTL__MPLL_TURNOFF|
+				PLL_PWRMGT_CNTL__PPLL_TURNOFF|
+				PLL_PWRMGT_CNTL__P2PLL_TURNOFF|
+				PLL_PWRMGT_CNTL__TVPLL_TURNOFF;
+						
+	OUTPLL( pllPLL_PWRMGT_CNTL, pll_pwrmgt_cntl);
+	
+	clk_pwrmgt_cntl	 = INPLL( pllCLK_PWRMGT_CNTL_M6);
+	
+	clk_pwrmgt_cntl &= ~(	CLK_PWRMGT_CNTL_M6__MPLL_PWRMGT_OFF|
+				CLK_PWRMGT_CNTL_M6__SPLL_PWRMGT_OFF|
+				CLK_PWRMGT_CNTL_M6__PPLL_PWRMGT_OFF|
+				CLK_PWRMGT_CNTL_M6__P2PLL_PWRMGT_OFF|
+				CLK_PWRMGT_CNTL_M6__MCLK_TURNOFF|
+				CLK_PWRMGT_CNTL_M6__SCLK_TURNOFF|
+				CLK_PWRMGT_CNTL_M6__PCLK_TURNOFF|
+				CLK_PWRMGT_CNTL_M6__P2CLK_TURNOFF|
+				CLK_PWRMGT_CNTL_M6__TVPLL_PWRMGT_OFF|
+				CLK_PWRMGT_CNTL_M6__GLOBAL_PMAN_EN|
+				CLK_PWRMGT_CNTL_M6__ENGINE_DYNCLK_MODE|
+				CLK_PWRMGT_CNTL_M6__ACTIVE_HILO_LAT_MASK|
+				CLK_PWRMGT_CNTL_M6__CG_NO1_DEBUG_MASK			
+			);
+						
+	clk_pwrmgt_cntl |= CLK_PWRMGT_CNTL_M6__GLOBAL_PMAN_EN | CLK_PWRMGT_CNTL_M6__DISP_PM;
+	
+	OUTPLL( pllCLK_PWRMGT_CNTL_M6, clk_pwrmgt_cntl);	
+	
+	clk_pin_cntl = INPLL( pllCLK_PIN_CNTL);
+	
+	clk_pin_cntl &= ~CLK_PIN_CNTL__ACCESS_REGS_IN_SUSPEND;
+	OUTPLL( pllMCLK_MISC, INPLL( pllMCLK_MISC) | MCLK_MISC__EN_MCLK_TRISTATE_IN_SUSPEND);	
+	
+	/* AGP PLL control */
+	OUTREG(BUS_CNTL1, INREG(BUS_CNTL1) |  BUS_CNTL1__AGPCLK_VALID);
 
-	// Force MCLK and YCLK and MC as dynamic
-    	temp = INPLL(MCLK_CNTL);
-	OUTPLL(MCLK_CNTL, temp & 0xffeaffff);
+	OUTREG(BUS_CNTL1,
+		(INREG(BUS_CNTL1) & ~BUS_CNTL1__MOBILE_PLATFORM_SEL_MASK)
+		| (2<<BUS_CNTL1__MOBILE_PLATFORM_SEL__SHIFT));	// 440BX
+	OUTREG(CRTC_OFFSET_CNTL, (INREG(CRTC_OFFSET_CNTL) & ~CRTC_OFFSET_CNTL__CRTC_STEREO_SYNC_OUT_EN));
+	
+	clk_pin_cntl &= ~CLK_PIN_CNTL__CG_CLK_TO_OUTPIN;
+	clk_pin_cntl |= CLK_PIN_CNTL__XTALIN_ALWAYS_ONb;	
+	OUTPLL( pllCLK_PIN_CNTL, clk_pin_cntl);
 
-	// PLL_TURNOFF
-	temp = INPLL(PLL_PWRMGT_CNTL);
-	OUTPLL(PLL_PWRMGT_CNTL, temp | 0x0000001f);
- 
-	// set MOBILE_SU to 1 if M6 or DDR64 is detected
-	temp = INPLL(PLL_PWRMGT_CNTL);
-	OUTPLL(PLL_PWRMGT_CNTL, temp | 0x00010000);
+	/* Solano2M */
+	OUTREG(AGP_CNTL,
+		(INREG(AGP_CNTL) & ~(AGP_CNTL__MAX_IDLE_CLK_MASK))
+		| (0x20<<AGP_CNTL__MAX_IDLE_CLK__SHIFT));
 
-	// select PM access mode (PM_MODE_SEL) (use ACPI mode)
-//      temp = INPLL(PLL_PWRMGT_CNTL);
-//      OUTPLL(PLL_PWRMGT_CNTL, temp | 0x00002000);
-	temp = INPLL(PLL_PWRMGT_CNTL);
-        OUTPLL(PLL_PWRMGT_CNTL, temp & ~0x00002000);
+	/* ACPI mode */
+	OUTPLL( pllPLL_PWRMGT_CNTL, INPLL( pllPLL_PWRMGT_CNTL) & ~PLL_PWRMGT_CNTL__PM_MODE_SEL);					
 
-	// set DISP_MISC_CNTL register
-	disp_misc_cntl = INREG(DISP_MISC_CNTL);
-	disp_misc_cntl &= ~(	DISP_MISC_CNTL_SOFT_RESET_GRPH_PP |
-				DISP_MISC_CNTL_SOFT_RESET_SUBPIC_PP |
-				DISP_MISC_CNTL_SOFT_RESET_OV0_PP |
-				DISP_MISC_CNTL_SOFT_RESET_GRPH_SCLK |
-				DISP_MISC_CNTL_SOFT_RESET_SUBPIC_SCLK |
-				DISP_MISC_CNTL_SOFT_RESET_OV0_SCLK |
-				DISP_MISC_CNTL_SOFT_RESET_GRPH2_PP |
-				DISP_MISC_CNTL_SOFT_RESET_GRPH2_SCLK |
-				DISP_MISC_CNTL_SOFT_RESET_LVDS |
-				DISP_MISC_CNTL_SOFT_RESET_TMDS |
-				DISP_MISC_CNTL_SOFT_RESET_DIG_TMDS |
-				DISP_MISC_CNTL_SOFT_RESET_TV);
-	OUTREG(DISP_MISC_CNTL, disp_misc_cntl);
 
-	// set DISP_PWR_MAN register
+	disp_mis_cntl = INREG(DISP_MISC_CNTL);
+	
+	disp_mis_cntl &= ~(	DISP_MISC_CNTL__SOFT_RESET_GRPH_PP | 
+				DISP_MISC_CNTL__SOFT_RESET_SUBPIC_PP | 
+				DISP_MISC_CNTL__SOFT_RESET_OV0_PP |
+				DISP_MISC_CNTL__SOFT_RESET_GRPH_SCLK|
+				DISP_MISC_CNTL__SOFT_RESET_SUBPIC_SCLK|
+				DISP_MISC_CNTL__SOFT_RESET_OV0_SCLK|
+				DISP_MISC_CNTL__SOFT_RESET_GRPH2_PP|
+				DISP_MISC_CNTL__SOFT_RESET_GRPH2_SCLK|
+				DISP_MISC_CNTL__SOFT_RESET_LVDS|
+				DISP_MISC_CNTL__SOFT_RESET_TMDS|
+				DISP_MISC_CNTL__SOFT_RESET_DIG_TMDS|
+				DISP_MISC_CNTL__SOFT_RESET_TV);
+	
+	OUTREG(DISP_MISC_CNTL, disp_mis_cntl);					
+						
 	disp_pwr_man = INREG(DISP_PWR_MAN);
-	// clau - 9.29.2000 - changes made to bit23:18 to set to 1 as requested by George
-	disp_pwr_man |= (DISP_PWR_MAN_DIG_TMDS_ENABLE_RST |
-                    DISP_PWR_MAN_TV_ENABLE_RST |
- //                 DISP_PWR_MAN_AUTO_PWRUP_EN |
-                    DISP_PWR_MAN_DISP_D3_GRPH_RST |
-                    DISP_PWR_MAN_DISP_D3_SUBPIC_RST |
-                    DISP_PWR_MAN_DISP_D3_OV0_RST |
-                    DISP_PWR_MAN_DISP_D1D2_GRPH_RST |
-                    DISP_PWR_MAN_DISP_D1D2_SUBPIC_RST |
-                    DISP_PWR_MAN_DISP_D1D2_OV0_RST);
-	disp_pwr_man &= ~(DISP_PWR_MAN_DISP_PWR_MAN_D3_CRTC_EN |
-                    DISP_PWR_MAN_DISP2_PWR_MAN_D3_CRTC2_EN|
-                    DISP_PWR_MAN_DISP_D3_RST |
-                    DISP_PWR_MAN_DISP_D3_REG_RST);
+	
+	disp_pwr_man &= ~(	DISP_PWR_MAN__DISP_PWR_MAN_D3_CRTC_EN	| 
+						DISP_PWR_MAN__DISP2_PWR_MAN_D3_CRTC2_EN |
+						DISP_PWR_MAN__DISP_PWR_MAN_DPMS_MASK|		
+						DISP_PWR_MAN__DISP_D3_RST|
+						DISP_PWR_MAN__DISP_D3_REG_RST
+					);
+	
+	disp_pwr_man |= DISP_PWR_MAN__DISP_D3_GRPH_RST|
+					DISP_PWR_MAN__DISP_D3_SUBPIC_RST|
+					DISP_PWR_MAN__DISP_D3_OV0_RST|
+					DISP_PWR_MAN__DISP_D1D2_GRPH_RST|
+					DISP_PWR_MAN__DISP_D1D2_SUBPIC_RST|
+					DISP_PWR_MAN__DISP_D1D2_OV0_RST|
+					DISP_PWR_MAN__DIG_TMDS_ENABLE_RST|
+					DISP_PWR_MAN__TV_ENABLE_RST| 
+//					DISP_PWR_MAN__AUTO_PWRUP_EN|
+					0;
+	
+	OUTREG(DISP_PWR_MAN, disp_pwr_man);					
+							
+	clk_pwrmgt_cntl = INPLL( pllCLK_PWRMGT_CNTL_M6);
+	pll_pwrmgt_cntl = INPLL( pllPLL_PWRMGT_CNTL) ;
+	clk_pin_cntl 	= INPLL( pllCLK_PIN_CNTL);
+	disp_pwr_man	= INREG(DISP_PWR_MAN);
+		
+	
+	/* D2 */
+	clk_pwrmgt_cntl |= CLK_PWRMGT_CNTL_M6__DISP_PM;
+	pll_pwrmgt_cntl |= PLL_PWRMGT_CNTL__MOBILE_SU | PLL_PWRMGT_CNTL__SU_SCLK_USE_BCLK;
+	clk_pin_cntl	|= CLK_PIN_CNTL__XTALIN_ALWAYS_ONb;
+	disp_pwr_man 	&= ~(DISP_PWR_MAN__DISP_PWR_MAN_D3_CRTC_EN_MASK | DISP_PWR_MAN__DISP2_PWR_MAN_D3_CRTC2_EN_MASK);							
+						
+
+	OUTPLL( pllCLK_PWRMGT_CNTL_M6, clk_pwrmgt_cntl);
+	OUTPLL( pllPLL_PWRMGT_CNTL, pll_pwrmgt_cntl);
+	OUTPLL( pllCLK_PIN_CNTL, clk_pin_cntl);
 	OUTREG(DISP_PWR_MAN, disp_pwr_man);
 
-	// clau - 10.24.2000
-	// - add in setting for BUS_CNTL1 b27:26 = 0x01 and b31 = 0x1
-	// - add in setting for AGP_CNTL  b7:0 = 0x20
-	// - add in setting for DVI_DDC_DATA_OUT_EN b17:16 = 0x0
+	/* disable display request & disable display */
+	OUTREG( CRTC_GEN_CNTL, (INREG( CRTC_GEN_CNTL) & ~CRTC_GEN_CNTL__CRTC_EN) | CRTC_GEN_CNTL__CRTC_DISP_REQ_EN_B);
+	OUTREG( CRTC2_GEN_CNTL, (INREG( CRTC2_GEN_CNTL) & ~CRTC2_GEN_CNTL__CRTC2_EN) | CRTC2_GEN_CNTL__CRTC2_DISP_REQ_EN_B);
 
-	// the following settings (two lines) are applied at a later part of this function, only on mobile platform
-	// requres -mobile flag
-	OUTREG(BUS_CNTL1, (INREG(BUS_CNTL1) & 0xf3ffffff) | 0x04000000);
-	OUTREG(BUS_CNTL1,  INREG(BUS_CNTL1) | 0x80000000);
-	OUTREG(AGP_CNTL, (INREG(AGP_CNTL) & 0xffffff00) | 0x20);
-	OUTREG(GPIO_DVI_DDC, INREG(GPIO_DVI_DDC) & 0xfffcffff);
+	mdelay(17);				   
 
-	// yulee - 12.12.2000
-	// A12 only
-	// EN_MCLK_TRISTATE_IN_SUSPEND@MCLK_MISC = 1
-	// ACCESS_REGS_IN_SUSPEND@CLK_PIN_CNTL = 0
-	// only on mobile platform
-        OUTPLL(MCLK_MISC, INPLL(MCLK_MISC) | 0x00040000 );
-    	
-	// yulee -12.12.2000
-	// AGPCLK_VALID@BUS_CNTL1 = 1
-	// MOBILE_PLATFORM_SEL@BUS_CNTL1 = 01
-	// CRTC_STEREO_SYNC_OUT_EN@CRTC_OFFSET_CNTL = 0
-	// CG_CLK_TO_OUTPIN@CLK_PIN_CNTL = 0
-	// only on mobile platform
-        OUTPLL(CLK_PIN_CNTL, INPLL(CLK_PIN_CNTL ) & 0xFFFFF7FF );
-        OUTREG(BUS_CNTL1, (INREG(BUS_CNTL1 ) & 0xF3FFFFFF) | 0x84000000 );
-        OUTREG(CRTC_OFFSET_CNTL, INREG(CRTC_OFFSET_CNTL ) & 0xFFEFFFFF );
+}
 
-        mdelay(100);
+static void radeon_pm_disable_dynamic_mode(struct radeonfb_info *rinfo)
+{
+
+	u32 sclk_cntl;
+	u32 mclk_cntl;
+	u32 sclk_more_cntl;
+	
+	u32 vclk_ecp_cntl;
+	u32 pixclks_cntl;
+
+	/* Mobility chips only */
+	if ((rinfo->arch != RADEON_M6) && (rinfo->arch != RADEON_M7) && (rinfo->arch != RADEON_M9))
+		return;
+	
+	/* Force Core Clocks */
+	sclk_cntl = INPLL( pllSCLK_CNTL_M6);
+	sclk_cntl |= 	SCLK_CNTL_M6__FORCE_CP|
+			SCLK_CNTL_M6__FORCE_HDP|
+			SCLK_CNTL_M6__FORCE_DISP1|
+			SCLK_CNTL_M6__FORCE_DISP2|
+			SCLK_CNTL_M6__FORCE_TOP|
+			SCLK_CNTL_M6__FORCE_E2|
+			SCLK_CNTL_M6__FORCE_SE|
+			SCLK_CNTL_M6__FORCE_IDCT|
+			SCLK_CNTL_M6__FORCE_VIP|
+			SCLK_CNTL_M6__FORCE_RE|
+			SCLK_CNTL_M6__FORCE_PB|
+			SCLK_CNTL_M6__FORCE_TAM|
+			SCLK_CNTL_M6__FORCE_TDM|
+			SCLK_CNTL_M6__FORCE_RB|
+			SCLK_CNTL_M6__FORCE_TV_SCLK|
+			SCLK_CNTL_M6__FORCE_SUBPIC|
+			SCLK_CNTL_M6__FORCE_OV0;
+    	OUTPLL( pllSCLK_CNTL_M6, sclk_cntl);
+	
+	
+	
+	sclk_more_cntl = INPLL(pllSCLK_MORE_CNTL);
+	sclk_more_cntl |= 	SCLK_MORE_CNTL__FORCE_DISPREGS|
+				SCLK_MORE_CNTL__FORCE_MC_GUI|
+				SCLK_MORE_CNTL__FORCE_MC_HOST;	
+	OUTPLL(pllSCLK_MORE_CNTL, sclk_more_cntl);
+	
+	/* Force Display clocks	*/
+	vclk_ecp_cntl = INPLL( pllVCLK_ECP_CNTL);
+	vclk_ecp_cntl &= ~(	VCLK_ECP_CNTL__PIXCLK_ALWAYS_ONb |
+			 	VCLK_ECP_CNTL__PIXCLK_DAC_ALWAYS_ONb);
+
+	OUTPLL( pllVCLK_ECP_CNTL, vclk_ecp_cntl);
+	
+	pixclks_cntl = INPLL( pllPIXCLKS_CNTL);
+	pixclks_cntl &= ~(	PIXCLKS_CNTL__PIXCLK_GV_ALWAYS_ONb |
+			 	PIXCLKS_CNTL__PIXCLK_BLEND_ALWAYS_ONb|
+				PIXCLKS_CNTL__PIXCLK_DIG_TMDS_ALWAYS_ONb |
+				PIXCLKS_CNTL__PIXCLK_LVDS_ALWAYS_ONb|
+				PIXCLKS_CNTL__PIXCLK_TMDS_ALWAYS_ONb|
+				PIXCLKS_CNTL__PIX2CLK_ALWAYS_ONb|
+				PIXCLKS_CNTL__PIX2CLK_DAC_ALWAYS_ONb);
+						
+ 	OUTPLL( pllPIXCLKS_CNTL, pixclks_cntl);
+
+	/* Force Memory Clocks */
+	mclk_cntl = INPLL( pllMCLK_CNTL_M6);
+	mclk_cntl &= ~(	MCLK_CNTL_M6__FORCE_MCLKA |  
+			MCLK_CNTL_M6__FORCE_MCLKB |
+			MCLK_CNTL_M6__FORCE_YCLKA |
+			MCLK_CNTL_M6__FORCE_YCLKB );
+    	OUTPLL( pllMCLK_CNTL_M6, mclk_cntl);
+}
+
+static void radeon_pm_enable_dynamic_mode(struct radeonfb_info *rinfo)
+{
+	u32 clk_pwrmgt_cntl;
+	u32 sclk_cntl;
+	u32 sclk_more_cntl;
+	u32 clk_pin_cntl;
+	u32 pixclks_cntl;
+	u32 vclk_ecp_cntl;
+	u32 mclk_cntl;
+	u32 mclk_misc;
+
+	/* Mobility chips only */
+	if ((rinfo->arch != RADEON_M6) && (rinfo->arch != RADEON_M7) && (rinfo->arch != RADEON_M9))
+		return;
+	
+	/* Set Latencies */
+	clk_pwrmgt_cntl = INPLL( pllCLK_PWRMGT_CNTL_M6);
+	
+	clk_pwrmgt_cntl &= ~(	 CLK_PWRMGT_CNTL_M6__ENGINE_DYNCLK_MODE_MASK|
+				 CLK_PWRMGT_CNTL_M6__ACTIVE_HILO_LAT_MASK|
+				 CLK_PWRMGT_CNTL_M6__DISP_DYN_STOP_LAT_MASK|
+				 CLK_PWRMGT_CNTL_M6__DYN_STOP_MODE_MASK);
+	/* Mode 1 */
+	clk_pwrmgt_cntl = 	CLK_PWRMGT_CNTL_M6__MC_CH_MODE|
+				CLK_PWRMGT_CNTL_M6__ENGINE_DYNCLK_MODE | 
+				(1<<CLK_PWRMGT_CNTL_M6__ACTIVE_HILO_LAT__SHIFT) |
+				(0<<CLK_PWRMGT_CNTL_M6__DISP_DYN_STOP_LAT__SHIFT)|
+				(0<<CLK_PWRMGT_CNTL_M6__DYN_STOP_MODE__SHIFT);
+
+	OUTPLL( pllCLK_PWRMGT_CNTL_M6, clk_pwrmgt_cntl);
+						
+
+	clk_pin_cntl = INPLL( pllCLK_PIN_CNTL);
+	clk_pin_cntl |= CLK_PIN_CNTL__SCLK_DYN_START_CNTL;
+	 
+	OUTPLL( pllCLK_PIN_CNTL, clk_pin_cntl);
+
+	/* Enable Dyanmic mode for SCLK */
+
+	sclk_cntl = INPLL( pllSCLK_CNTL_M6);	
+	sclk_cntl &= SCLK_CNTL_M6__SCLK_SRC_SEL_MASK;
+	sclk_cntl |= SCLK_CNTL_M6__FORCE_VIP;		
+
+	OUTPLL( pllSCLK_CNTL_M6, sclk_cntl);
+
+
+	sclk_more_cntl = INPLL(pllSCLK_MORE_CNTL);
+	sclk_more_cntl &= ~(SCLK_MORE_CNTL__FORCE_DISPREGS);
+				                    
+	OUTPLL(pllSCLK_MORE_CNTL, sclk_more_cntl);
+
+	
+	/* Enable Dynamic mode for PIXCLK & PIX2CLK */
+
+	pixclks_cntl = INPLL( pllPIXCLKS_CNTL);
+	
+	pixclks_cntl|=  PIXCLKS_CNTL__PIX2CLK_ALWAYS_ONb | 
+			PIXCLKS_CNTL__PIX2CLK_DAC_ALWAYS_ONb|
+			PIXCLKS_CNTL__PIXCLK_BLEND_ALWAYS_ONb|
+			PIXCLKS_CNTL__PIXCLK_GV_ALWAYS_ONb|
+			PIXCLKS_CNTL__PIXCLK_DIG_TMDS_ALWAYS_ONb|
+			PIXCLKS_CNTL__PIXCLK_LVDS_ALWAYS_ONb|
+			PIXCLKS_CNTL__PIXCLK_TMDS_ALWAYS_ONb;
+
+	OUTPLL( pllPIXCLKS_CNTL, pixclks_cntl);
+		
+		
+	vclk_ecp_cntl = INPLL( pllVCLK_ECP_CNTL);
+	
+	vclk_ecp_cntl|=  VCLK_ECP_CNTL__PIXCLK_ALWAYS_ONb | 
+			 VCLK_ECP_CNTL__PIXCLK_DAC_ALWAYS_ONb;
+
+	OUTPLL( pllVCLK_ECP_CNTL, vclk_ecp_cntl);
+
+
+	/* Enable Dynamic mode for MCLK	*/
+
+	mclk_cntl  = INPLL( pllMCLK_CNTL_M6);
+	mclk_cntl |= 	MCLK_CNTL_M6__FORCE_MCLKA|  
+			MCLK_CNTL_M6__FORCE_MCLKB|	
+			MCLK_CNTL_M6__FORCE_YCLKA|
+			MCLK_CNTL_M6__FORCE_YCLKB;
+			
+    	OUTPLL( pllMCLK_CNTL_M6, mclk_cntl);
+
+	mclk_misc = INPLL(pllMCLK_MISC);
+	mclk_misc |= 	MCLK_MISC__MC_MCLK_MAX_DYN_STOP_LAT|
+			MCLK_MISC__IO_MCLK_MAX_DYN_STOP_LAT|
+			MCLK_MISC__MC_MCLK_DYN_ENABLE|
+			MCLK_MISC__IO_MCLK_DYN_ENABLE;	
+	
+	OUTPLL(pllMCLK_MISC, mclk_misc);
+}
+
+
+static void radeon_pm_yclk_mclk_sync(struct radeonfb_info *rinfo)
+{
+	u32 mc_chp_io_cntl_a1, mc_chp_io_cntl_b1;
+
+	mc_chp_io_cntl_a1 = INMC( rinfo, ixMC_CHP_IO_CNTL_A1) & ~MC_CHP_IO_CNTL_A1__MEM_SYNC_ENA_MASK;
+	mc_chp_io_cntl_b1 = INMC( rinfo, ixMC_CHP_IO_CNTL_B1) & ~MC_CHP_IO_CNTL_B1__MEM_SYNC_ENB_MASK;
+
+	OUTMC( rinfo, ixMC_CHP_IO_CNTL_A1, mc_chp_io_cntl_a1 | (1<<MC_CHP_IO_CNTL_A1__MEM_SYNC_ENA__SHIFT));
+	OUTMC( rinfo, ixMC_CHP_IO_CNTL_B1, mc_chp_io_cntl_b1 | (1<<MC_CHP_IO_CNTL_B1__MEM_SYNC_ENB__SHIFT));
+
+	/* Wassup ? This doesn't seem to be defined, let's hope we are ok this way --BenH */
+#ifdef MCLK_YCLK_SYNC_ENABLE
+	mc_chp_io_cntl_a1 |= (2<<MC_CHP_IO_CNTL_A1__MEM_SYNC_ENA__SHIFT);
+	mc_chp_io_cntl_b1 |= (2<<MC_CHP_IO_CNTL_B1__MEM_SYNC_ENB__SHIFT);
 #endif
 
-	/* Disable CRTCs */
-	OUTREG(CRTC_GEN_CNTL, (INREG(CRTC_GEN_CNTL) & ~CRTC_EN) | CRTC_DISP_REQ_EN_B);
-	OUTREG(CRTC2_GEN_CNTL, (INREG(CRTC2_GEN_CNTL) & ~CRTC2_EN) | CRTC2_DISP_REQ_EN_B);
-	(void)INREG(CRTC2_GEN_CNTL);
-	mdelay(17);
+	OUTMC( rinfo, ixMC_CHP_IO_CNTL_A1, mc_chp_io_cntl_a1);
+	OUTMC( rinfo, ixMC_CHP_IO_CNTL_B1, mc_chp_io_cntl_b1);
+
+	mdelay( 1);
+}
+
+static void radeon_pm_program_mode_reg(struct radeonfb_info *rinfo, u16 value, u8 delay_required)
+{  
+	u32 mem_sdram_mode;
+
+	mem_sdram_mode  = INREG( MEM_SDRAM_MODE_REG);
+
+	mem_sdram_mode &= ~MEM_SDRAM_MODE_REG__MEM_MODE_REG_MASK;
+	mem_sdram_mode |= (value<<MEM_SDRAM_MODE_REG__MEM_MODE_REG__SHIFT) | MEM_SDRAM_MODE_REG__MEM_CFG_TYPE;
+	OUTREG( MEM_SDRAM_MODE_REG, mem_sdram_mode);
+
+	mem_sdram_mode |=  MEM_SDRAM_MODE_REG__MEM_SDRAM_RESET;
+	OUTREG( MEM_SDRAM_MODE_REG, mem_sdram_mode);
+
+	mem_sdram_mode &= ~MEM_SDRAM_MODE_REG__MEM_SDRAM_RESET;
+	OUTREG( MEM_SDRAM_MODE_REG, mem_sdram_mode);
+
+	if (delay_required == 1)
+		while( (INREG( MC_STATUS) & (MC_STATUS__MEM_PWRUP_COMPL_A | MC_STATUS__MEM_PWRUP_COMPL_B) ) == 0 )
+			{ }; 	
+}
+
+
+static void radeon_pm_enable_dll(struct radeonfb_info *rinfo)
+{  
+#define DLL_RESET_DELAY 	5
+#define DLL_SLEEP_DELAY		1
+
+	u32 DLL_CKO_Value = INPLL(pllMDLL_CKO)   | MDLL_CKO__MCKOA_SLEEP |  MDLL_CKO__MCKOA_RESET;
+	u32 DLL_CKA_Value = INPLL(pllMDLL_RDCKA) | MDLL_RDCKA__MRDCKA0_SLEEP | MDLL_RDCKA__MRDCKA1_SLEEP | MDLL_RDCKA__MRDCKA0_RESET | MDLL_RDCKA__MRDCKA1_RESET;
+	u32 DLL_CKB_Value = INPLL(pllMDLL_RDCKB) | MDLL_RDCKB__MRDCKB0_SLEEP | MDLL_RDCKB__MRDCKB1_SLEEP | MDLL_RDCKB__MRDCKB0_RESET | MDLL_RDCKB__MRDCKB1_RESET;
+
+	/* Setting up the DLL range for write */
+	OUTPLL(pllMDLL_CKO,   	DLL_CKO_Value);
+	OUTPLL(pllMDLL_RDCKA,  	DLL_CKA_Value);
+	OUTPLL(pllMDLL_RDCKB,	DLL_CKB_Value);
+
+	mdelay( DLL_RESET_DELAY);
+
+	/* Channel A */
+
+	/* Power Up */
+	DLL_CKO_Value &= ~(MDLL_CKO__MCKOA_SLEEP );
+	OUTPLL(pllMDLL_CKO,   	DLL_CKO_Value);
+	mdelay( DLL_SLEEP_DELAY);  		
+   
+	DLL_CKO_Value &= ~(MDLL_CKO__MCKOA_RESET );
+	OUTPLL(pllMDLL_CKO,	DLL_CKO_Value);
+	mdelay( DLL_RESET_DELAY);  		
+
+	/* Power Up */
+	DLL_CKA_Value &= ~(MDLL_RDCKA__MRDCKA0_SLEEP );
+	OUTPLL(pllMDLL_RDCKA,  	DLL_CKA_Value);
+	mdelay( DLL_SLEEP_DELAY);  		
+
+	DLL_CKA_Value &= ~(MDLL_RDCKA__MRDCKA0_RESET );
+	OUTPLL(pllMDLL_RDCKA,	DLL_CKA_Value);
+	mdelay( DLL_RESET_DELAY);  		
+
+	/* Power Up */
+	DLL_CKA_Value &= ~(MDLL_RDCKA__MRDCKA1_SLEEP);
+	OUTPLL(pllMDLL_RDCKA,	DLL_CKA_Value);
+	mdelay( DLL_SLEEP_DELAY);  		
+
+	DLL_CKA_Value &= ~(MDLL_RDCKA__MRDCKA1_RESET);
+	OUTPLL(pllMDLL_RDCKA,	DLL_CKA_Value);
+	mdelay( DLL_RESET_DELAY);  		
+
+
+	/* Channel B */
+
+	/* Power Up */
+	DLL_CKO_Value &= ~(MDLL_CKO__MCKOB_SLEEP );
+	OUTPLL(pllMDLL_CKO,   	DLL_CKO_Value);
+	mdelay( DLL_SLEEP_DELAY);  		
+   
+	DLL_CKO_Value &= ~(MDLL_CKO__MCKOB_RESET );
+	OUTPLL(pllMDLL_CKO,   	DLL_CKO_Value);
+	mdelay( DLL_RESET_DELAY);  		
+
+	/* Power Up */
+	DLL_CKB_Value &= ~(MDLL_RDCKB__MRDCKB0_SLEEP);
+	OUTPLL(pllMDLL_RDCKB,   DLL_CKB_Value);
+	mdelay( DLL_SLEEP_DELAY);  		
+
+	DLL_CKB_Value &= ~(MDLL_RDCKB__MRDCKB0_RESET);
+	OUTPLL(pllMDLL_RDCKB,   DLL_CKB_Value);
+	mdelay( DLL_RESET_DELAY);  		
+
+	/* Power Up */
+	DLL_CKB_Value &= ~(MDLL_RDCKB__MRDCKB1_SLEEP);
+	OUTPLL(pllMDLL_RDCKB,   DLL_CKB_Value);
+	mdelay( DLL_SLEEP_DELAY);  		
+
+	DLL_CKB_Value &= ~(MDLL_RDCKB__MRDCKB1_RESET);
+	OUTPLL(pllMDLL_RDCKB,   DLL_CKB_Value);
+	mdelay( DLL_RESET_DELAY);  		
+
+#undef DLL_RESET_DELAY 
+#undef DLL_SLEEP_DELAY
+}
+
+static void radeon_pm_full_reset_sdram(struct radeonfb_info *rinfo)
+{
+	u32 crtcGenCntl, crtcGenCntl2, memRefreshCntl, crtc_more_cntl, fp_gen_cntl, fp2_gen_cntl;
+ 
+	crtcGenCntl  = INREG( CRTC_GEN_CNTL);
+	crtcGenCntl2 = INREG( CRTC2_GEN_CNTL);
+
+	memRefreshCntl 	= INREG( MEM_REFRESH_CNTL);
+	crtc_more_cntl 	= INREG( CRTC_MORE_CNTL);
+	fp_gen_cntl 	= INREG( FP_GEN_CNTL);
+	fp2_gen_cntl 	= INREG( FP2_GEN_CNTL);
+ 
+
+	OUTREG( CRTC_MORE_CNTL, 	0);
+	OUTREG( FP_GEN_CNTL, 	0);
+	OUTREG( FP2_GEN_CNTL, 	0);
+ 
+	OUTREG( CRTC_GEN_CNTL,  (crtcGenCntl | CRTC_GEN_CNTL__CRTC_DISP_REQ_EN_B) );
+	OUTREG( CRTC2_GEN_CNTL, (crtcGenCntl2 | CRTC2_GEN_CNTL__CRTC2_DISP_REQ_EN_B) );
+  
+	/* Disable refresh */
+	OUTREG( MEM_REFRESH_CNTL, memRefreshCntl | MEM_REFRESH_CNTL__MEM_REFRESH_DIS);
+ 
+	/* Reset memory */
+	OUTREG( MEM_SDRAM_MODE_REG,
+		INREG( MEM_SDRAM_MODE_REG) & ~MEM_SDRAM_MODE_REG__MC_INIT_COMPLETE); // Init  Not Complete
+
+	/* DLL */
+	radeon_pm_enable_dll(rinfo);
+
+	// MLCK /YCLK sync 
+	radeon_pm_yclk_mclk_sync(rinfo);
+
+	if ((rinfo->arch == RADEON_M6) || (rinfo->arch == RADEON_M7) || (rinfo->arch == RADEON_M9)) {
+		radeon_pm_program_mode_reg(rinfo, 0x2000, 1);   
+		radeon_pm_program_mode_reg(rinfo, 0x2001, 1);   
+		radeon_pm_program_mode_reg(rinfo, 0x2002, 1);   
+		radeon_pm_program_mode_reg(rinfo, 0x0132, 1);   
+		radeon_pm_program_mode_reg(rinfo, 0x0032, 1); 
+	}	
+
+	OUTREG( MEM_SDRAM_MODE_REG,
+		INREG( MEM_SDRAM_MODE_REG) |  MEM_SDRAM_MODE_REG__MC_INIT_COMPLETE); // Init Complete
+
+	OUTREG( MEM_REFRESH_CNTL, 	memRefreshCntl);
+
+	OUTREG( CRTC_GEN_CNTL, 		crtcGenCntl);
+	OUTREG( CRTC2_GEN_CNTL, 	crtcGenCntl2);
+	OUTREG( FP_GEN_CNTL, 		fp_gen_cntl);
+	OUTREG( FP2_GEN_CNTL, 		fp2_gen_cntl);
+
+	OUTREG( CRTC_MORE_CNTL, 	crtc_more_cntl);
+
+	mdelay( 15);
 }
 
 static void radeon_set_suspend(struct radeonfb_info *rinfo, int suspend)
@@ -2655,16 +3219,16 @@ static void radeon_set_suspend(struct radeonfb_info *rinfo, int suspend)
 	 * including PCI config registers, clocks, AGP conf, ...)
 	 */
 	if (suspend) {
-		/* According to ATI, we should program V2CLK here, I have
-		 * to verify what's up exactly
+		/* Disable dynamic power management of clocks for the
+		 * duration of the suspend/resume process
 		 */
+		radeon_pm_disable_dynamic_mode(rinfo);
 		/* Save some registers */
 		radeon_pm_save_regs(rinfo);
 
-		/* Check that on M7 too, might work might not. M7 may also
-		 * need explicit enabling of PM
+		/* Prepare mobility chips for suspend
 		 */
-		if (rinfo->arch == RADEON_M6) {
+		if (rinfo->arch == RADEON_M6 || rinfo->arch == RADEON_M7 || rinfo->arch == RADEON_M9) {
 			/* Program V2CLK */
 			radeon_pm_program_v2clk(rinfo);
 		
@@ -2678,10 +3242,7 @@ static void radeon_set_suspend(struct radeonfb_info *rinfo, int suspend)
 			radeon_pm_setup_for_suspend(rinfo);
 
 			/* Reset the MDLL */
-			OUTPLL(MDLL_CKO, INPLL(MDLL_CKO) | MCKOA_RESET);
-			(void)INPLL(MDLL_RDCKA);
-			OUTPLL(MDLL_CKO, INPLL(MDLL_CKO) & ~MCKOA_RESET);
-			(void)INPLL(MDLL_RDCKA);
+			OUTPLL( pllMDLL_CKO, INPLL( pllMDLL_CKO) | MDLL_CKO__MCKOA_RESET | MDLL_CKO__MCKOB_RESET);
 		}
 
 		/* Switch PCI power managment to D2. */
@@ -2702,17 +3263,13 @@ static void radeon_set_suspend(struct radeonfb_info *rinfo, int suspend)
 		pci_write_config_word(rinfo->pdev, rinfo->pm_reg+PCI_PM_CTRL, 0);
 		mdelay(500);
 
-		dbg_clk = INPLL(1);
-
-		/* Do we need that on M7 ? */
-		if (rinfo->arch == RADEON_M6) {
-			/* Restore the MDLL */
-			OUTPLL(MDLL_CKO, INPLL(MDLL_CKO) & ~MCKOA_RESET);
-			(void)INPLL(MDLL_CKO);			
-		}
+		/* Reset the SDRAM controller */
+		if (rinfo->arch == RADEON_M6 || rinfo->arch == RADEON_M7 || rinfo->arch == RADEON_M9)
+			radeon_pm_full_reset_sdram(rinfo);
 		
 		/* Restore some registers */
 		radeon_pm_restore_regs(rinfo);
+		radeon_pm_enable_dynamic_mode(rinfo);
 	}
 }
 
@@ -2780,7 +3337,6 @@ int radeon_sleep_notify(struct pmu_sleep_notifier *self, int when)
 
 				radeonfb_blank(0, (struct fb_info *)rinfo);
 				release_console_sem();
-				printk("CLK_PIN_CNTL on wakeup was: %08x\n", dbg_clk);
 				break;
 		}
 	}
@@ -2839,7 +3395,8 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 	}
 
 	/* map the regions */
-	rinfo->mmio_base = (unsigned long) ioremap (rinfo->mmio_base_phys, RADEON_REGSIZE);
+	rinfo->mmio_base = (unsigned long) ioremap (rinfo->mmio_base_phys,
+				    		    RADEON_REGSIZE);
 	if (!rinfo->mmio_base) {
 		printk ("radeonfb: cannot map MMIO\n");
 		release_mem_region (rinfo->mmio_base_phys,
@@ -2948,13 +3505,20 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 #if !defined(__powerpc__)
 	radeon_get_moninfo(rinfo);
 #else
-	switch (pdev->device) {
-		case PCI_DEVICE_ID_ATI_RADEON_LW:
-		case PCI_DEVICE_ID_ATI_RADEON_LX:
-		case PCI_DEVICE_ID_ATI_RADEON_LY:
-		case PCI_DEVICE_ID_ATI_RADEON_LZ:
-			rinfo->dviDisp_type = MT_LCD;
-			break;
+	switch (rinfo->arch) {
+		case RADEON_M6:
+		case RADEON_M7:
+		case RADEON_M9:
+			/* If forced to no-LCD, we shut down the backlight */
+			if (force_nolcd) {
+#ifdef CONFIG_PMAC_BACKLIGHT
+				radeon_set_backlight_enable(0, BACKLIGHT_OFF, rinfo);
+#endif
+			} else {
+				rinfo->dviDisp_type = MT_LCD;
+				break;
+			}
+			/* Fall through */
 		default:
 			radeon_get_moninfo(rinfo);
 			break;
@@ -2976,7 +3540,8 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 		}
 	}
 
-	rinfo->fb_base = (unsigned long) ioremap (rinfo->fb_base_phys, rinfo->video_ram);
+	rinfo->fb_base = (unsigned long) ioremap (rinfo->fb_base_phys,
+				  		  rinfo->video_ram);
 	if (!rinfo->fb_base) {
 		printk ("radeonfb: cannot map FB\n");
 		iounmap ((void*)rinfo->mmio_base);
@@ -2988,39 +3553,23 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 		return -ENODEV;
 	}
 
-	/* I SHOULD FIX THAT CRAP ! I should probably mimmic XFree DRI
-	 * driver setup here.
-	 * 
-	 * On PPC, OF based cards setup the internal memory
-	 * mapping in strange ways. We change it so that the
-	 * framebuffer is mapped at 0 and given half of the card's
-	 * address space (2Gb). AGP is mapped high (0xe0000000) and
-	 * can use up to 512Mb. Once DRI is fully implemented, we
-	 * will have to setup the PCI remapper to remap the agp_special_page
-	 * memory page somewhere between those regions so that the card
-	 * use a normal PCI bus master cycle to access the ring read ptr.
-	 * --BenH.
-	 */
-#ifdef CONFIG_ALL_PPC
-	if (rinfo->hasCRTC2)
-		OUTREG(CRTC2_GEN_CNTL,
-			(INREG(CRTC2_GEN_CNTL) & ~CRTC2_EN) | CRTC2_DISP_REQ_EN_B);
-	OUTREG(CRTC_EXT_CNTL, INREG(CRTC_EXT_CNTL) | CRTC_DISPLAY_DIS);
-	OUTREG(MC_FB_LOCATION, 0x7fff0000);
-	OUTREG(MC_AGP_LOCATION, 0xffffe000);
-	OUTREG(DISPLAY_BASE_ADDR, 0x00000000);
-	if (rinfo->hasCRTC2)
-		OUTREG(CRTC2_DISPLAY_BASE_ADDR, 0x00000000);
-	OUTREG(SRC_OFFSET, 0x00000000);
-	OUTREG(DST_OFFSET, 0x00000000);
-	mdelay(10);
-	OUTREG(CRTC_EXT_CNTL, INREG(CRTC_EXT_CNTL) & ~CRTC_DISPLAY_DIS);
-#endif /* CONFIG_ALL_PPC */
-
 	/* save current mode regs before we switch into the new one
 	 * so we can restore this upon __exit
 	 */
 	radeon_save_state (rinfo, &rinfo->init_state);
+
+	/* On PPC, the firmware sets up a memory mapping that tends
+	 * to cause lockups when enabling the engine. We reconfigure
+	 * the card internal memory mappings properly
+	 * 
+	 * TODO: Save this in radeon_save_state so we can eventually
+	 * restore old mapping upon exit
+	 */
+#ifdef CONFIG_PPC_PMAC
+	fixup_memory_mappings(rinfo);
+#else	
+	rinfo->fb_local_base = INREG(MC_FB_LOCATION) << 16;
+#endif /* CONFIG_PPC_PMAC */
 
 	if (!noaccel) {
 		/* initialize the engine */
@@ -3059,9 +3608,14 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 #endif
 
 #ifdef CONFIG_PMAC_PBOOK
-	if (rinfo->dviDisp_type == MT_LCD) {
+	if (rinfo->arch == RADEON_M6 || rinfo->arch == RADEON_M7 || rinfo->arch == RADEON_M9) {
+		/* Find PM registers in config space */
 		rinfo->pm_reg = pci_find_capability(pdev, PCI_CAP_ID_PM);
+		/* Enable dynamic PM of chip clocks */
+		radeon_pm_enable_dynamic_mode(rinfo);
+		/* Register sleep callbacks */
 		pmu_register_sleep_notifier(&radeon_sleep_notifier);
+		printk("radeonfb: Power Management enabled for Mobility chipsets\n");
 	}
 #endif
 
@@ -3119,10 +3673,10 @@ static void __devexit radeonfb_pci_unregister (struct pci_dev *pdev)
 
 
 static struct pci_driver radeonfb_driver = {
-	.name		= "radeonfb",
-	.id_table	= radeonfb_pci_table,
-	.probe		= radeonfb_pci_register,
-	.remove		= __devexit_p(radeonfb_pci_unregister),
+	name:		"radeonfb",
+	id_table:	radeonfb_pci_table,
+	probe:		radeonfb_pci_register,
+	remove:		__devexit_p(radeonfb_pci_unregister),
 };
 
 
@@ -3154,6 +3708,12 @@ int __init radeonfb_setup (char *options)
 			mirror = 1;
 		} else if (!strncmp(this_opt, "dfp", 3)) {
 			force_dfp = 1;
+			force_nolcd = 1;
+		} else if (!strncmp(this_opt, "crt", 3)) {
+			force_crt = 1;
+			force_nolcd = 1;
+		} else if (!strncmp(this_opt, "nolcd", 5)) {
+			force_nolcd = 1;
 		} else if (!strncmp(this_opt, "panel_yres:", 11)) {
 			panel_yres = simple_strtoul((this_opt+11), NULL, 0);
 		} else if (!strncmp(this_opt, "nomtrr", 6)) {

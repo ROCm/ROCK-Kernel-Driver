@@ -78,7 +78,7 @@
 #define SYMLINK_MAPS 2
 
 extern int xfs_ioctl(bhv_desc_t *, struct inode *, struct file *,
-			unsigned int, unsigned long);
+			int, unsigned int, unsigned long);
 
 
 /*
@@ -470,15 +470,15 @@ xfs_setattr(
 		if (mask & XFS_AT_MODE) {
 			mode_t m = 0;
 
-			if ((vap->va_mode & ISUID) && !file_owner)
-				m |= ISUID;
-			if ((vap->va_mode & ISGID) &&
+			if ((vap->va_mode & S_ISUID) && !file_owner)
+				m |= S_ISUID;
+			if ((vap->va_mode & S_ISGID) &&
 			    !in_group_p((gid_t)ip->i_d.di_gid))
-				m |= ISGID;
+				m |= S_ISGID;
 #if 0
 			/* Linux allows this, Irix doesn't. */
-			if ((vap->va_mode & ISVTX) && vp->v_type != VDIR)
-				m |= ISVTX;
+			if ((vap->va_mode & S_ISVTX) && vp->v_type != VDIR)
+				m |= S_ISVTX;
 #endif
 			if (m && !capable(CAP_FSETID))
 				vap->va_mode &= ~m;
@@ -755,8 +755,8 @@ xfs_setattr(
 	 * Change file access modes.
 	 */
 	if (mask & XFS_AT_MODE) {
-		ip->i_d.di_mode &= IFMT;
-		ip->i_d.di_mode |= vap->va_mode & ~IFMT;
+		ip->i_d.di_mode &= S_IFMT;
+		ip->i_d.di_mode |= vap->va_mode & ~S_IFMT;
 
 		xfs_trans_log_inode (tp, ip, XFS_ILOG_CORE);
 		timeflags |= XFS_ICHGTIME_CHG;
@@ -776,9 +776,9 @@ xfs_setattr(
 		 * The set-user-ID and set-group-ID bits of a file will be
 		 * cleared upon successful return from chown()
 		 */
-		if ((ip->i_d.di_mode & (ISUID|ISGID)) &&
+		if ((ip->i_d.di_mode & (S_ISUID|S_ISGID)) &&
 		    !capable(CAP_FSETID)) {
-			ip->i_d.di_mode &= ~(ISUID|ISGID);
+			ip->i_d.di_mode &= ~(S_ISUID|S_ISGID);
 		}
 
 		/*
@@ -992,6 +992,7 @@ STATIC int
 xfs_readlink(
 	bhv_desc_t	*bdp,
 	uio_t		*uiop,
+	int		ioflags,
 	cred_t		*credp)
 {
 	xfs_inode_t     *ip;
@@ -1019,7 +1020,7 @@ xfs_readlink(
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 
-	ASSERT((ip->i_d.di_mode & IFMT) == IFLNK);
+	ASSERT((ip->i_d.di_mode & S_IFMT) == S_IFLNK);
 
 	offset = uiop->uio_offset;
 	count = uiop->uio_resid;
@@ -1033,7 +1034,7 @@ xfs_readlink(
 		goto error_return;
 	}
 
-	if (!(uiop->uio_fmode & FINVIS)) {
+	if (!(ioflags & IO_INVIS)) {
 		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
 	}
 
@@ -1595,8 +1596,7 @@ xfs_inactive_symlink_local(
 STATIC int
 xfs_inactive_attrs(
 	xfs_inode_t	*ip,
-	xfs_trans_t	**tpp,
-	int		*commitflags)
+	xfs_trans_t	**tpp)
 {
 	xfs_trans_t	*tp;
 	int		error;
@@ -1606,9 +1606,8 @@ xfs_inactive_attrs(
 	tp = *tpp;
 	mp = ip->i_mount;
 	ASSERT(ip->i_d.di_forkoff != 0);
-	xfs_trans_commit(tp, *commitflags, NULL);
+	xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-	*commitflags = 0;
 
 	error = xfs_attr_inactive(ip);
 	if (error) {
@@ -1620,8 +1619,8 @@ xfs_inactive_attrs(
 	tp = xfs_trans_alloc(mp, XFS_TRANS_INACTIVE);
 	error = xfs_trans_reserve(tp, 0,
 				  XFS_IFREE_LOG_RES(mp),
-				  0, 0,
-				  XFS_DEFAULT_LOG_COUNT);
+				  0, XFS_TRANS_PERM_LOG_RES,
+				  XFS_INACTIVE_LOG_COUNT);
 	if (error) {
 		ASSERT(XFS_FORCED_SHUTDOWN(mp));
 		xfs_trans_cancel(tp, 0);
@@ -1664,7 +1663,7 @@ xfs_release(
 	mp = ip->i_mount;
 
 	if (ip->i_d.di_nlink != 0) {
-		if ((((ip->i_d.di_mode & IFMT) == IFREG) &&
+		if ((((ip->i_d.di_mode & S_IFMT) == S_IFREG) &&
 		     ((ip->i_d.di_size > 0) || (VN_CACHED(vp) > 0)) &&
 		     (ip->i_df.if_flags & XFS_IFEXTENTS))  &&
 		    (!(ip->i_d.di_flags & (XFS_DIFLAG_PREALLOC|XFS_DIFLAG_APPEND)))) {
@@ -1694,10 +1693,12 @@ xfs_inactive(
 {
 	xfs_inode_t	*ip;
 	vnode_t		*vp;
+	xfs_bmap_free_t	free_list; 
+	xfs_fsblock_t	first_block;
+	int		committed;
 	xfs_trans_t	*tp;
 	xfs_mount_t	*mp;
 	int		error;
-	int		commit_flags;
 	int		truncate;
 
 	vp = BHV_TO_VNODE(bdp);
@@ -1723,7 +1724,7 @@ xfs_inactive(
 	 */
 	truncate = ((ip->i_d.di_nlink == 0) &&
 	    ((ip->i_d.di_size != 0) || (ip->i_d.di_nextents > 0)) &&
-	    ((ip->i_d.di_mode & IFMT) == IFREG));
+	    ((ip->i_d.di_mode & S_IFMT) == S_IFREG));
 
 	mp = ip->i_mount;
 
@@ -1739,7 +1740,7 @@ xfs_inactive(
 		goto out;
 
 	if (ip->i_d.di_nlink != 0) {
-		if ((((ip->i_d.di_mode & IFMT) == IFREG) &&
+		if ((((ip->i_d.di_mode & S_IFMT) == S_IFREG) &&
 		     ((ip->i_d.di_size > 0) || (VN_CACHED(vp) > 0)) &&
 		     (ip->i_df.if_flags & XFS_IFEXTENTS))  &&
 		    (!(ip->i_d.di_flags & (XFS_DIFLAG_PREALLOC|XFS_DIFLAG_APPEND)) ||
@@ -1795,14 +1796,14 @@ xfs_inactive(
 		 */
 		error = xfs_itruncate_finish(&tp, ip, 0, XFS_DATA_FORK,
 				(!(mp->m_flags & XFS_MOUNT_WSYNC) ? 1 : 0));
-		commit_flags = XFS_TRANS_RELEASE_LOG_RES;
 
 		if (error) {
-			xfs_trans_cancel(tp, commit_flags | XFS_TRANS_ABORT);
+			xfs_trans_cancel(tp,
+				XFS_TRANS_RELEASE_LOG_RES | XFS_TRANS_ABORT);
 			xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 			return (VN_INACTIVE_CACHE);
 		}
-	} else if ((ip->i_d.di_mode & IFMT) == IFLNK) {
+	} else if ((ip->i_d.di_mode & S_IFMT) == S_IFLNK) {
 
 		/*
 		 * If we get an error while cleaning up a
@@ -1819,13 +1820,11 @@ xfs_inactive(
 
 		xfs_trans_ijoin(tp, ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 		xfs_trans_ihold(tp, ip);
-		commit_flags = XFS_TRANS_RELEASE_LOG_RES;
-
 	} else {
 		error = xfs_trans_reserve(tp, 0,
 					  XFS_IFREE_LOG_RES(mp),
-					  0, 0,
-					  XFS_DEFAULT_LOG_COUNT);
+					  0, XFS_TRANS_PERM_LOG_RES,
+					  XFS_INACTIVE_LOG_COUNT);
 		if (error) {
 			ASSERT(XFS_FORCED_SHUTDOWN(mp));
 			xfs_trans_cancel(tp, 0);
@@ -1835,7 +1834,6 @@ xfs_inactive(
 		xfs_ilock(ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 		xfs_trans_ijoin(tp, ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 		xfs_trans_ihold(tp, ip);
-		commit_flags = 0;
 	}
 
 	/*
@@ -1846,7 +1844,7 @@ xfs_inactive(
 	 * because we can't use it for xfs_attr_inactive().
 	 */
 	if (ip->i_d.di_anextents > 0) {
-		error = xfs_inactive_attrs(ip, &tp, &commit_flags);
+		error = xfs_inactive_attrs(ip, &tp);
 		/*
 		 * If we got an error, the transaction is already
 		 * cancelled, and the inode is unlocked. Just get out.
@@ -1860,7 +1858,8 @@ xfs_inactive(
 	/*
 	 * Free the inode.
 	 */
-	error = xfs_ifree(tp, ip);
+	XFS_BMAP_INIT(&free_list, &first_block);
+	error = xfs_ifree(tp, ip, &free_list);
 	if (error) {
 		/*
 		 * If we fail to free the inode, shut down.  The cancel
@@ -1873,7 +1872,7 @@ xfs_inactive(
 				error, mp->m_fsname);
 			xfs_force_shutdown(mp, XFS_METADATA_IO_ERROR);
 		}
-		xfs_trans_cancel(tp, commit_flags | XFS_TRANS_ABORT);
+		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES|XFS_TRANS_ABORT);
 	} else {
 		/*
 		 * Credit the quota account(s). The inode is gone.
@@ -1884,7 +1883,9 @@ xfs_inactive(
 		 * Just ignore errors at this point.  There is
 		 * nothing we can do except to try to keep going.
 		 */
-		(void) xfs_trans_commit(tp, commit_flags, NULL);
+		(void) xfs_bmap_finish(&tp,  &free_list, first_block,
+				       &committed);
+		(void) xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
 	}
 	/*
 	 * Release the dquots held by inode, if any.
@@ -3508,7 +3509,7 @@ xfs_symlink(
 	/*
 	 * Allocate an inode for the symlink.
 	 */
-	error = xfs_dir_ialloc(&tp, dp, IFLNK | (vap->va_mode&~IFMT),
+	error = xfs_dir_ialloc(&tp, dp, S_IFLNK | (vap->va_mode&~S_IFMT),
 			       1, 0, credp, prid, resblks > 0, &ip, NULL);
 	if (error) {
 		if (error == ENOSPC)
@@ -3891,7 +3892,7 @@ xfs_reclaim(
 	ASSERT(!VN_MAPPED(vp));
 	ip = XFS_BHVTOI(bdp);
 
-	if ((ip->i_d.di_mode & IFMT) == IFREG) {
+	if ((ip->i_d.di_mode & S_IFMT) == S_IFREG) {
 		if (ip->i_d.di_size > 0) {
 			/*
 			 * Flush and invalidate any data left around that is
@@ -4597,7 +4598,7 @@ xfs_change_file_space(
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 
-	if ((error = xfs_iaccess(ip, IWRITE, credp))) {
+	if ((error = xfs_iaccess(ip, S_IWUSR, credp))) {
 		xfs_iunlock(ip, XFS_ILOCK_SHARED);
 		return error;
 	}
@@ -4704,17 +4705,17 @@ xfs_change_file_space(
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 	xfs_trans_ihold(tp, ip);
 
-	ip->i_d.di_mode &= ~ISUID;
+	ip->i_d.di_mode &= ~S_ISUID;
 
 	/*
 	 * Note that we don't have to worry about mandatory
 	 * file locking being disabled here because we only
-	 * clear the ISGID bit if the Group execute bit is
+	 * clear the S_ISGID bit if the Group execute bit is
 	 * on, but if it was on then mandatory locking wouldn't
 	 * have been enabled.
 	 */
-	if (ip->i_d.di_mode & (IEXEC >> 3))
-		ip->i_d.di_mode &= ~ISGID;
+	if (ip->i_d.di_mode & S_IXGRP)
+		ip->i_d.di_mode &= ~S_ISGID;
 
 	xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 

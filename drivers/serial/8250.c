@@ -1946,16 +1946,17 @@ serial8250_console_write(struct console *co, const char *s, unsigned int count)
 	 *	Now, do each character
 	 */
 	for (i = 0; i < count; i++, s++) {
+		wait_for_xmitr(up);
+
 		/*
 		 *	Send the character out.
 		 *	If a LF, also do CR...
 		 */
+		serial_out(up, UART_TX, *s);
 		if (*s == 10) {
 			wait_for_xmitr(up);
 			serial_out(up, UART_TX, 13);
 		}
-		wait_for_xmitr(up);
-		serial_out(up, UART_TX, *s);
 	}
 
 	/*
@@ -1982,6 +1983,25 @@ static int __init serial8250_console_setup(struct console *co, char *options)
 	if (co->index >= UART_NR)
 		co->index = 0;
 	port = &serial8250_ports[co->index].port;
+
+
+#ifdef	CONFIG_KDB
+		/*
+		 * Remember the line number of the first serial
+		 * console.  We'll make this the kdb serial console too.
+		 */
+	if (kdb_serial_line == -1) {
+	    kdb_serial_line = co->index;
+	    kdb_serial.io_type = port->iotype;
+	    if (port->iotype == SERIAL_IO_MEM) {
+		kdb_serial.iobase = (int)(port->membase);
+		kdb_serial.ioreg_shift = port->regshift;
+	    } else {
+		kdb_serial.iobase = port->iobase;
+		kdb_serial.ioreg_shift = 0;
+	    }
+	}
+#endif	/* CONFIG_KDB */
 
 	/*
 	 * Temporary fix.

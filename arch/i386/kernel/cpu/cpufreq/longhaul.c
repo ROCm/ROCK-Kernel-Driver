@@ -5,17 +5,14 @@
  *  Licensed under the terms of the GNU GPL License version 2.
  *  Based upon datasheets & sample CPUs kindly provided by VIA.
  *
- *  VIA have currently 3 different versions of Longhaul.
- *
- *  +---------------------+----------+---------------------------------+
- *  | Marketing name      | Codename | longhaul version / features.    |
- *  +---------------------+----------+---------------------------------+
- *  |  Samuel/CyrixIII    | C5A      | v1 : multipliers only           |
- *  |  Samuel2/C3         | C3E/C5B  | v1 : multiplier only            |
- *  |  Ezra               | C5C      | v2 : multipliers & voltage      |
- *  |  Ezra-T             | C5M      | v3 : multipliers, voltage & FSB |
- *  |  Nehemiah           | C5N      | v3 : multipliers, voltage & FSB |
- *  +---------------------+----------+---------------------------------+
+ *  VIA have currently 2 different versions of Longhaul.
+ *  Version 1 (Longhaul) uses the BCR2 MSR at 0x1147.
+ *   It is present only in Samuel 1, Samuel 2 and Ezra.
+ *  Version 2 (Powersaver) uses the POWERSAVER MSR at 0x110a.
+ *   It is present in Ezra-T, Nehemiah and above.
+ *   In addition to scaling multiplier, it can also scale voltage.
+ *   There is provision for scaling FSB too, but this doesn't work
+ *   too well in practice.
  *
  *  BIG FAT DISCLAIMER: Work in progress code. Possibly *dangerous*
  */
@@ -66,7 +63,11 @@ static struct cpufreq_frequency_table *longhaul_table;
 
 static unsigned int calc_speed (int mult, int fsb)
 {
-	return ((mult/10)*fsb) + ((mult%10)*(fsb/2));
+	int mhz;
+	mhz = (mult/10)*fsb;
+	if (mult%10)
+		mhz += fsb/2;
+	return mhz;
 }
 
 
@@ -76,7 +77,7 @@ static int longhaul_get_cpu_mult (void)
 
 	rdmsr (MSR_IA32_EBL_CR_POWERON, lo, hi);
 	invalue = (lo & (1<<22|1<<23|1<<24|1<<25)) >>22;
-	if (longhaul_version==3) {
+	if (longhaul_version==2) {
 		if (lo & (1<<27))
 			invalue+=16;
 	}
@@ -132,32 +133,15 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 		break;
 
 	/*
-	 * Longhaul v2. (Ezra [C5C])
+	 * Powersaver. (Ezra-T [C5M], Nehemiah [C5N])
 	 * We can scale voltage with this too, but that's currently
 	 * disabled until we come up with a decent 'match freq to voltage'
 	 * algorithm.
 	 * We also need to do the voltage/freq setting in order depending
 	 * on the direction of scaling (like we do in powernow-k7.c)
-	 */
-	case 2:
-		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
-		longhaul.bits.SoftBusRatio = clock_ratio_index & 0xf;
-		longhaul.bits.SoftBusRatio4 = (clock_ratio_index & 0x10) >> 4;
-		longhaul.bits.EnableSoftBusRatio = 1;
-		/* We must program the revision key only with values we
-		 * know about, not blindly copy it from 0:3 */
-		longhaul.bits.RevisionKey = 1;
-		wrmsrl (MSR_VIA_LONGHAUL, longhaul.val);
-		__hlt();
-
-		break;
-
-	/*
-	 * Longhaul v3. (Ezra-T [C5M], Nehemiah [C5N])
-	 * This can also do voltage scaling, but see above.
 	 * Ezra-T was alleged to do FSB scaling too, but it never worked in practice.
 	 */
-	case 3:
+	case 2:
 		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 		longhaul.bits.SoftBusRatio = clock_ratio_index & 0xf;
 		longhaul.bits.SoftBusRatio4 = (clock_ratio_index & 0x10) >> 4;
@@ -214,6 +198,7 @@ static int guess_fsb(int maxmult)
 
 static int __init longhaul_get_ranges (void)
 {
+	struct cpuinfo_x86 *c = cpu_data;
 	unsigned long invalue;
 	unsigned int minmult=0, maxmult=0;
 	unsigned int multipliers[32]= {
@@ -232,10 +217,13 @@ static int __init longhaul_get_ranges (void)
 		maxmult = longhaul_get_cpu_mult();
 		rdmsr (MSR_IA32_EBL_CR_POWERON, lo, hi);
 		invalue = (lo & (1<<18|1<<19)) >>18;
-		fsb = eblcr_fsb_table[invalue];
+		if (c->x86_model==6)
+			fsb = eblcr_fsb_table[invalue];
+		else
+			fsb = guess_fsb(maxmult);
 		break;
 
-	case 2 ... 3:
+	case 2:
 		rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
 
 		invalue = longhaul.bits.MaxMHzBR;
@@ -378,10 +366,10 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 		break;
 
 	case 7:		/* C5B / C5C */
+		longhaul_version=1;
 		switch (c->x86_mask) {
 		case 0:
 			cpuname = "C3 'Samuel 2' [C5B]";
-			longhaul_version=1;
 			/* Note, this is not a typo, early Samuel2's had Samuel1 ratios. */
 			memcpy (clock_ratio, samuel1_clock_ratio, sizeof(samuel1_clock_ratio));
 			memcpy (eblcr_table, samuel2_eblcr, sizeof(samuel2_eblcr));
@@ -391,7 +379,6 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 				cpuname = "C3 'Samuel 2' [C5B]";
 			else
 				cpuname = "C3 'Ezra' [C5C]";
-			longhaul_version=2;
 			memcpy (clock_ratio, ezra_clock_ratio, sizeof(ezra_clock_ratio));
 			memcpy (eblcr_table, ezra_eblcr, sizeof(ezra_eblcr));
 			break;
@@ -399,20 +386,21 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 		break;
 
 	case 8:
-		cpuname = "C3 'Ezra-T [C5M]";
-		longhaul_version=3;
+		cpuname = "C3 'Ezra-T' [C5M]";
+		longhaul_version=2;
 		numscales=32;
 		memcpy (clock_ratio, ezrat_clock_ratio, sizeof(ezrat_clock_ratio));
 		memcpy (eblcr_table, ezrat_eblcr, sizeof(ezrat_eblcr));
 		break;
-	/*
+
 	case 9:
 		cpuname = "C3 'Nehemiah' [C5N]";
-		longhaul_version=3;
+		longhaul_version=2;
 		numscales=32;
 		memcpy (clock_ratio, nehemiah_clock_ratio, sizeof(nehemiah_clock_ratio));
 		memcpy (eblcr_table, nehemiah_eblcr, sizeof(nehemiah_eblcr));
-	*/
+		break;
+
 	default:
 		cpuname = "Unknown";
 		break;
@@ -421,7 +409,7 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 	printk (KERN_INFO PFX "VIA %s CPU detected. Longhaul v%d supported.\n",
 					cpuname, longhaul_version);
 
-	if ((longhaul_version==2 || longhaul_version==3) && (dont_scale_voltage==0))
+	if ((longhaul_version==2) && (dont_scale_voltage==0))
 		longhaul_setup_voltagescaling();
 
 	ret = longhaul_get_ranges();

@@ -326,7 +326,7 @@ xfs_rename(
 
 	ASSERT(src_ip != NULL);
 
-	if ((src_ip->i_d.di_mode & IFMT) == IFDIR) {
+	if ((src_ip->i_d.di_mode & S_IFMT) == S_IFDIR) {
 		/*
 		 * Check for link count overflow on target_dp
 		 */
@@ -340,7 +340,7 @@ xfs_rename(
 	}
 
 	new_parent = (src_dp != target_dp);
-	src_is_directory = ((src_ip->i_d.di_mode & IFMT) == IFDIR);
+	src_is_directory = ((src_ip->i_d.di_mode & S_IFMT) == S_IFDIR);
 
 	/*
 	 * Drop the locks on our inodes so that we can do the ancestor
@@ -449,7 +449,7 @@ xfs_rename(
 		 * target and source are directories and that target can be
 		 * destroyed, or that neither is a directory.
 		 */
-		if ((target_ip->i_d.di_mode & IFMT) == IFDIR) {
+		if ((target_ip->i_d.di_mode & S_IFMT) == S_IFDIR) {
 			/*
 			 * Make sure target dir is empty.
 			 */

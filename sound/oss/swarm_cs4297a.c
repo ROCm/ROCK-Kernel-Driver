@@ -1557,7 +1557,6 @@ static int cs4297a_open_mixdev(struct inode *inode, struct file *file)
 	}
 	VALIDATE_STATE(s);
 	file->private_data = s;
-	MOD_INC_USE_COUNT;
 
 	CS_DBGOUT(CS_FUNCTION | CS_OPEN, 4,
 		  printk(KERN_INFO "cs4297a: cs4297a_open_mixdev()- 0\n"));
@@ -1572,7 +1571,6 @@ static int cs4297a_release_mixdev(struct inode *inode, struct file *file)
 	    (struct cs4297a_state *) file->private_data;
 
 	VALIDATE_STATE(s);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -1589,6 +1587,7 @@ static int cs4297a_ioctl_mixdev(struct inode *inode, struct file *file,
 //   Mixer file operations struct.
 // ******************************************************************************************
 static /*const */ struct file_operations cs4297a_mixer_fops = {
+	.owner		= THIS_MODULE,
 	.llseek		= cs4297a_llseek,
 	.ioctl		= cs4297a_ioctl_mixdev,
 	.open		= cs4297a_open_mixdev,
@@ -2368,7 +2367,6 @@ static int cs4297a_release(struct inode *inode, struct file *file)
 		s->open_mode &= ~FMODE_WRITE;
 		up(&s->open_sem_dac);
 		wake_up(&s->open_wait_dac);
-		MOD_DEC_USE_COUNT;
 	}
 	if (file->f_mode & FMODE_READ) {
 		drain_adc(s, file->f_flags & O_NONBLOCK);
@@ -2378,7 +2376,6 @@ static int cs4297a_release(struct inode *inode, struct file *file)
 		s->open_mode &= ~FMODE_READ;
 		up(&s->open_sem_adc);
 		wake_up(&s->open_wait_adc);
-		MOD_DEC_USE_COUNT;
 	}
 	return 0;
 }
@@ -2469,7 +2466,6 @@ static int cs4297a_open(struct inode *inode, struct file *file)
 		s->dma_adc.ossfragshift = s->dma_adc.ossmaxfrags =
 		    s->dma_adc.subdivision = 0;
 		up(&s->open_sem_adc);
-		MOD_INC_USE_COUNT;
 
 		if (prog_dmabuf_adc(s)) {
 			CS_DBGOUT(CS_OPEN | CS_ERROR, 2, printk(KERN_ERR
@@ -2488,7 +2484,6 @@ static int cs4297a_open(struct inode *inode, struct file *file)
 		s->dma_dac.ossfragshift = s->dma_dac.ossmaxfrags =
 		    s->dma_dac.subdivision = 0;
 		up(&s->open_sem_dac);
-		MOD_INC_USE_COUNT;
 
 		if (prog_dmabuf_dac(s)) {
 			CS_DBGOUT(CS_OPEN | CS_ERROR, 2, printk(KERN_ERR
@@ -2507,6 +2502,7 @@ static int cs4297a_open(struct inode *inode, struct file *file)
 //   Wave (audio) file operations struct.
 // ******************************************************************************************
 static /*const */ struct file_operations cs4297a_audio_fops = {
+	.owner		= THIS_MODULE,
 	.llseek		= cs4297a_llseek,
 	.read		= cs4297a_read,
 	.write		= cs4297a_write,

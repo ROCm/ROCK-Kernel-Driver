@@ -15,6 +15,17 @@
 
 KERNELLOAD	:= 0xc000000000000000
 
+ifeq ($(shell uname -m),ppc64)
+CHECKS		= checks
+endif
+
+HAS_BIARCH      := $(shell if $(CC) -m64 -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo y; else echo n; fi;)
+ifeq ($(HAS_BIARCH),y)
+AS              := $(AS) -64
+LD              := $(LD) -m elf64ppc
+CC		:= $(CC) -m64
+endif
+
 LDFLAGS		:= -m elf64ppc
 LDFLAGS_vmlinux	:= -Bstatic -e $(KERNELLOAD) -Ttext $(KERNELLOAD)
 CFLAGS		+= -msoft-float -pipe -Wno-uninitialized -mminimal-toc \
@@ -32,6 +43,11 @@ libs-y				+= arch/ppc64/lib/
 core-y				+= arch/ppc64/kernel/
 core-y				+= arch/ppc64/mm/
 core-$(CONFIG_XMON)		+= arch/ppc64/xmon/
+ifeq ($(CONFIG_KDB),y)
+  # Use ifeq for now because kdb subdirs are not in bk yet
+  # Otherwise make mrproper will die because it also cleans core-n
+  core-y			+= arch/ppc64/kdb/
+endif
 drivers-$(CONFIG_OPROFILE)	+= arch/ppc64/oprofile/
 
 boot := arch/ppc64/boot

@@ -178,9 +178,15 @@ void tcp_bind_hash(struct sock *sk, struct tcp_bind_bucket *tb,
 	tcp_sk(sk)->bind_hash = tb;
 }
 
+static inline const u32 tcp_v4_rcv_saddr(const struct sock *sk)
+{
+	return likely(sk->sk_state != TCP_TIME_WAIT) ?
+		inet_sk(sk)->rcv_saddr : tcptw_sk(sk)->tw_rcv_saddr;
+}
+
 static inline int tcp_bind_conflict(struct sock *sk, struct tcp_bind_bucket *tb)
 {
-	struct inet_opt *inet = inet_sk(sk);
+	const u32 sk_rcv_saddr = tcp_v4_rcv_saddr(sk);
 	struct sock *sk2;
 	struct hlist_node *node;
 	int reuse = sk->sk_reuse;
@@ -193,9 +199,9 @@ static inline int tcp_bind_conflict(struct sock *sk, struct tcp_bind_bucket *tb)
 		     sk->sk_bound_dev_if == sk2->sk_bound_dev_if)) {
 			if (!reuse || !sk2->sk_reuse ||
 			    sk2->sk_state == TCP_LISTEN) {
-				struct inet_opt *inet2 = inet_sk(sk2);
-				if (!inet2->rcv_saddr || !inet->rcv_saddr ||
-				    inet2->rcv_saddr == inet->rcv_saddr)
+				const u32 sk2_rcv_saddr = tcp_v4_rcv_saddr(sk2);
+				if (!sk2_rcv_saddr || !sk_rcv_saddr ||
+				    sk2_rcv_saddr == sk_rcv_saddr)
 					break;
 			}
 		}
@@ -2145,7 +2151,6 @@ static void *listening_get_first(struct seq_file *seq)
 
 		if (!sk)
 			continue;
-		++st->num;
 		if (sk->sk_family == st->family) {
 			rc = sk;
 			goto out;
@@ -2159,7 +2164,7 @@ static void *listening_get_first(struct seq_file *seq)
 			for (st->sbucket = 0; st->sbucket < TCP_SYNQ_HSIZE;
 			     ++st->sbucket) {
 				for (req = tp->listen_opt->syn_table[st->sbucket];
-				     req; req = req->dl_next, ++st->num) {
+				     req; req = req->dl_next) {
 					if (req->class->family != st->family)
 						continue;
 					rc = req;
@@ -2181,6 +2186,8 @@ static void *listening_get_next(struct seq_file *seq, void *cur)
 	struct sock *sk = cur;
 	struct tcp_iter_state* st = seq->private;
 
+	++st->num;
+
 	if (st->state == TCP_SEQ_STATE_OPENREQ) {
 		struct open_request *req = cur;
 
@@ -2188,7 +2195,6 @@ static void *listening_get_next(struct seq_file *seq, void *cur)
 		req = req->dl_next;
 		while (1) {
 			while (req) {
-				++st->num;
 				if (req->class->family == st->family) {
 					cur = req;
 					goto out;
@@ -2235,10 +2241,11 @@ static void *listening_get_idx(struct seq_file *seq, loff_t *pos)
 {
 	void *rc = listening_get_first(seq);
 
-	if (rc)
-		while (*pos && (rc = listening_get_next(seq, rc)))
-			--*pos;
-	return *pos ? NULL : rc;
+	while (rc && *pos) {
+		rc = listening_get_next(seq, rc);
+		--*pos;
+	}
+	return rc;
 }
 
 static void *established_get_first(struct seq_file *seq)
@@ -2254,7 +2261,6 @@ static void *established_get_first(struct seq_file *seq)
 		read_lock(&tcp_ehash[st->bucket].lock);
 		sk_for_each(sk, node, &tcp_ehash[st->bucket].chain) {
 			if (sk->sk_family != st->family) {
-				++st->num;
 				continue;
 			}
 			rc = sk;
@@ -2264,7 +2270,6 @@ static void *established_get_first(struct seq_file *seq)
 		tw_for_each(tw, node,
 			    &tcp_ehash[st->bucket + tcp_ehash_size].chain) {
 			if (tw->tw_family != st->family) {
-				++st->num;
 				continue;
 			}
 			rc = tw;
@@ -2284,12 +2289,13 @@ static void *established_get_next(struct seq_file *seq, void *cur)
 	struct hlist_node *node;
 	struct tcp_iter_state* st = seq->private;
 
+	++st->num;
+
 	if (st->state == TCP_SEQ_STATE_TIME_WAIT) {
 		tw = cur;
 		tw = tw_next(tw);
 get_tw:
 		while (tw && tw->tw_family != st->family) {
-			++st->num;
 			tw = tw_next(tw);
 		}
 		if (tw) {
@@ -2311,7 +2317,6 @@ get_tw:
 	sk_for_each_from(sk, node) {
 		if (sk->sk_family == st->family)
 			goto found;
-		++st->num;
 	}
 
 	st->state = TCP_SEQ_STATE_TIME_WAIT;
@@ -2327,10 +2332,11 @@ static void *established_get_idx(struct seq_file *seq, loff_t pos)
 {
 	void *rc = established_get_first(seq);
 
-	if (rc)
-		while (pos && (rc = established_get_next(seq, rc)))
-			--pos;
-	return pos ? NULL : rc;
+	while (rc && pos) {
+		rc = established_get_next(seq, rc);
+		--pos;
+	}		
+	return rc;
 }
 
 static void *tcp_get_idx(struct seq_file *seq, loff_t pos)
@@ -2354,6 +2360,8 @@ static void *tcp_get_idx(struct seq_file *seq, loff_t pos)
 
 static void *tcp_seq_start(struct seq_file *seq, loff_t *pos)
 {
+	struct tcp_iter_state* st = seq->private;
+	st->num = 0;
 	return *pos ? tcp_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
 }
 

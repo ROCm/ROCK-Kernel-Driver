@@ -2340,32 +2340,6 @@ asmlinkage long sys32_mkdir(const char * pathname, u32 mode)
 	return sys_mkdir(pathname, (int)mode);
 }
 
-
-extern asmlinkage long sys_mlockall(int flags);
-
-/* Note: it is necessary to treat flags as an unsigned int,
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
- */
-asmlinkage long sys32_mlockall(u32 flags)
-{
-	return sys_mlockall((int)flags);
-}
-
-
-extern asmlinkage long sys_msync(unsigned long start, size_t len, int flags);
-
-/* Note: it is necessary to treat flags as an unsigned int,
- * with the corresponding cast to a signed int to insure that the 
- * proper conversion (sign extension) between the register representation of a signed int (msr in 32-bit mode)
- * and the register representation of a signed int (msr in 64-bit mode) is performed.
- */
-asmlinkage long sys32_msync(unsigned long start, size_t len, u32 flags)
-{
-	return sys_msync(start, len, (int)flags);
-}
-
 extern asmlinkage long sys_nice(int increment);
 
 long sys32_nice(u32 increment)

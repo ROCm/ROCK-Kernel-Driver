@@ -1,13 +1,13 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2002 Red Hat, Inc.
+ * Copyright (C) 2002-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
+ * Created by David Woodhouse <dwmw2@redhat.com>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: os-linux.h,v 1.26 2003/05/16 18:45:25 dwmw2 Exp $
+ * $Id: os-linux.h,v 1.37 2003/10/11 11:47:23 dwmw2 Exp $
  *
  */
 
@@ -19,6 +19,9 @@
 #define os_to_jffs2_mode(x) (x)
 #define jffs2_to_os_mode(x) (x)
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,73)
+#define kstatfs statfs
+#endif
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,2)
 #define JFFS2_INODE_INFO(i) (list_entry(i, struct jffs2_inode_info, vfs_inode))
@@ -68,7 +71,7 @@
 
 /* Hmmm. P'raps generic code should only ever see versions of signal
    functions which do the locking automatically? */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,40)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,40) && !defined(__rh_config_h__)
 #define current_sig_lock current->sigmask_lock
 #else
 #define current_sig_lock current->sighand->siglock
@@ -108,10 +111,14 @@ static inline void jffs2_init_inode_info(struct jffs2_inode_info *f)
 
 #define jffs2_flash_write(c, ofs, len, retlen, buf) ((c)->mtd->write((c)->mtd, ofs, len, retlen, buf))
 #define jffs2_flash_read(c, ofs, len, retlen, buf) ((c)->mtd->read((c)->mtd, ofs, len, retlen, buf))
-#define jffs2_flush_wbuf(c, flag) do { ; } while(0)
+#define jffs2_flush_wbuf_pad(c) ({ (void)(c), 0; })
+#define jffs2_flush_wbuf_gc(c, i) ({ (void)(c), (void) i, 0; })
 #define jffs2_nand_read_failcnt(c,jeb) do { ; } while(0)
 #define jffs2_write_nand_badblock(c,jeb) do { ; } while(0)
-#define jffs2_flash_writev jffs2_flash_direct_writev
+#define jffs2_nand_flash_setup(c) (0)
+#define jffs2_nand_flash_cleanup(c) do {} while(0)
+#define jffs2_wbuf_dirty(c) (0)
+#define jffs2_flash_writev(a,b,c,d,e,f) jffs2_flash_direct_writev(a,b,c,d,e)
 #define jffs2_wbuf_timeout NULL
 #define jffs2_wbuf_process NULL
 
@@ -122,11 +129,11 @@ static inline void jffs2_init_inode_info(struct jffs2_inode_info *f)
 
 #define jffs2_flash_write_oob(c, ofs, len, retlen, buf) ((c)->mtd->write_oob((c)->mtd, ofs, len, retlen, buf))
 #define jffs2_flash_read_oob(c, ofs, len, retlen, buf) ((c)->mtd->read_oob((c)->mtd, ofs, len, retlen, buf))
-
+#define jffs2_wbuf_dirty(c) (!!(c)->wbuf_len)
 struct kstatfs;
 
 /* wbuf.c */
-int jffs2_flash_writev(struct jffs2_sb_info *c, const struct iovec *vecs, unsigned long count, loff_t to, size_t *retlen);
+int jffs2_flash_writev(struct jffs2_sb_info *c, const struct iovec *vecs, unsigned long count, loff_t to, size_t *retlen, uint32_t ino);
 int jffs2_flash_write(struct jffs2_sb_info *c, loff_t ofs, size_t len, size_t *retlen, const u_char *buf);
 int jffs2_flash_read(struct jffs2_sb_info *c, loff_t ofs, size_t len, size_t *retlen, u_char *buf);
 int jffs2_check_oob_empty(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb,int mode);
@@ -135,6 +142,8 @@ int jffs2_write_nand_cleanmarker(struct jffs2_sb_info *c, struct jffs2_erasebloc
 int jffs2_write_nand_badblock(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
 void jffs2_wbuf_timeout(unsigned long data);
 void jffs2_wbuf_process(void *data);
+int jffs2_nand_flash_setup(struct jffs2_sb_info *c);
+void jffs2_nand_flash_cleanup(struct jffs2_sb_info *c);
 #endif /* NAND */
 
 /* background.c */
@@ -151,7 +160,6 @@ extern struct file_operations jffs2_file_operations;
 extern struct inode_operations jffs2_file_inode_operations;
 extern struct address_space_operations jffs2_file_address_operations;
 int jffs2_fsync(struct file *, struct dentry *, int);
-int jffs2_setattr (struct dentry *dentry, struct iattr *iattr);
 int jffs2_do_readpage_nolock (struct inode *inode, struct page *pg);
 int jffs2_do_readpage_unlock (struct inode *inode, struct page *pg);
 int jffs2_readpage (struct file *, struct page *);
@@ -165,8 +173,10 @@ int jffs2_ioctl(struct inode *, struct file *, unsigned int, unsigned long);
 extern struct inode_operations jffs2_symlink_inode_operations;
 
 /* fs.c */
+int jffs2_setattr (struct dentry *, struct iattr *);
 void jffs2_read_inode (struct inode *);
 void jffs2_clear_inode (struct inode *);
+void jffs2_dirty_inode(struct inode *inode);
 struct inode *jffs2_new_inode (struct inode *dir_i, int mode,
 			       struct jffs2_raw_inode *ri);
 int jffs2_statfs (struct super_block *, struct kstatfs *);

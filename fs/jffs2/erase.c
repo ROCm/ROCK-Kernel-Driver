@@ -1,13 +1,13 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001, 2002 Red Hat, Inc.
+ * Copyright (C) 2001-2003 Red Hat, Inc.
  *
- * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
+ * Created by David Woodhouse <dwmw2@redhat.com>
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: erase.c,v 1.51 2003/05/11 22:47:36 dwmw2 Exp $
+ * $Id: erase.c,v 1.53 2003/10/08 17:22:54 dwmw2 Exp $
  *
  */
 
@@ -123,10 +123,11 @@ void jffs2_erase_pending_blocks(struct jffs2_sb_info *c)
 			D1(printk(KERN_DEBUG "Starting erase of pending block 0x%08x\n", jeb->offset));
 			list_del(&jeb->list);
 			c->erasing_size += c->sector_size;
+			c->wasted_size -= jeb->wasted_size;
 			c->free_size -= jeb->free_size;
 			c->used_size -= jeb->used_size;
 			c->dirty_size -= jeb->dirty_size;
-			jeb->used_size = jeb->dirty_size = jeb->free_size = 0;
+			jeb->wasted_size = jeb->used_size = jeb->dirty_size = jeb->free_size = 0;
 			jffs2_free_all_node_refs(c, jeb);
 			list_add(&jeb->list, &c->erasing_list);
 			spin_unlock(&c->erase_completion_lock);

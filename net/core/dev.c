@@ -646,11 +646,12 @@ int dev_alloc_name(struct net_device *dev, const char *name)
  *	failed. The cause of an error is returned as a negative errno code
  *	in the variable @err points to.
  *
- *	The caller must hold the @dev_base or RTNL locks when doing this in
+ *	This call is deprecated in favor of alloc_netdev because
+ *	the caller must hold the @dev_base or RTNL locks when doing this in
  *	order to avoid duplicate name allocations.
  */
 
-struct net_device *dev_alloc(const char *name, int *err)
+struct net_device *__dev_alloc(const char *name, int *err)
 {
 	struct net_device *dev = kmalloc(sizeof(*dev), GFP_KERNEL);
 
@@ -712,6 +713,19 @@ static int default_rebuild_header(struct sk_buff *skb)
 	return 1;
 }
 
+
+/*
+ * Some old buggy device drivers change get_stats after registering
+ * the device.  Try and trap them here.
+ * This can be elimnated when all devices are known fixed.
+ */
+static inline int get_stats_changed(struct net_device *dev)
+{
+	int changed = dev->last_stats != dev->get_stats;
+	dev->last_stats = dev->get_stats;
+	return changed;
+}
+
 /**
  *	dev_open	- prepare an interface for use.
  *	@dev:	device to open
@@ -736,6 +750,14 @@ int dev_open(struct net_device *dev)
 		return 0;
 
 	/*
+	 *	 Check for broken device drivers.
+	 */
+	if (get_stats_changed(dev) && net_ratelimit()) {
+		printk(KERN_ERR "%s: driver changed get_stats after register\n",
+		       dev->name);
+	}
+
+	/*
 	 *	Is it even present?
 	 */
 	if (!netif_device_present(dev))
@@ -752,6 +774,14 @@ int dev_open(struct net_device *dev)
 	}
 
 	/*
+	 * 	Check for more broken device drivers.
+	 */
+	if (get_stats_changed(dev) && net_ratelimit()) {
+		printk(KERN_ERR "%s: driver changed get_stats in open\n",
+		       dev->name);
+	}
+
+ 	/*
 	 *	If it went open OK then:
 	 */
 
@@ -942,7 +972,8 @@ void dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev)
 		 * they originated from - MvS (miquels@drinkel.ow.org)
 		 */
 		if ((ptype->dev == dev || !ptype->dev) &&
-		    (struct sock *)ptype->af_packet_priv != skb->sk) {
+		    (ptype->af_packet_priv == NULL ||
+		     (struct sock *)ptype->af_packet_priv != skb->sk)) {
 			struct sk_buff *skb2= skb_clone(skb, GFP_ATOMIC);
 			if (!skb2)
 				break;
@@ -2997,7 +3028,7 @@ EXPORT_SYMBOL(__dev_remove_pack);
 EXPORT_SYMBOL(__skb_linearize);
 EXPORT_SYMBOL(call_netdevice_notifiers);
 EXPORT_SYMBOL(dev_add_pack);
-EXPORT_SYMBOL(dev_alloc);
+EXPORT_SYMBOL(__dev_alloc);
 EXPORT_SYMBOL(dev_alloc_name);
 EXPORT_SYMBOL(dev_close);
 EXPORT_SYMBOL(dev_get_by_flags);

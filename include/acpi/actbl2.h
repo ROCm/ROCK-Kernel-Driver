@@ -71,7 +71,7 @@
  */
 struct rsdt_descriptor_rev2
 {
-	struct acpi_table_header        header;                 /* ACPI table header */
+	ACPI_TABLE_HEADER_DEF                           /* ACPI common table header */
 	u32                             table_offset_entry [1]; /* Array of pointers to  */
 			 /* ACPI table headers */
 };
@@ -82,7 +82,7 @@ struct rsdt_descriptor_rev2
  */
 struct xsdt_descriptor_rev2
 {
-	struct acpi_table_header        header;                 /* ACPI table header */
+	ACPI_TABLE_HEADER_DEF                           /* ACPI common table header */
 	u64                             table_offset_entry [1]; /* Array of pointers to  */
 			 /* ACPI table headers */
 };
@@ -124,7 +124,7 @@ struct acpi_generic_address
  */
 struct fadt_descriptor_rev2
 {
-	struct acpi_table_header        header;             /* ACPI table header */
+	ACPI_TABLE_HEADER_DEF                       /* ACPI common table header */
 	u32                             V1_firmware_ctrl;   /* 32-bit physical address of FACS */
 	u32                             V1_dsdt;            /* 32-bit physical address of DSDT */
 	u8                              reserved1;          /* System Interrupt Model isn't used in ACPI 2.0*/
@@ -192,6 +192,19 @@ struct fadt_descriptor_rev2
 	struct acpi_generic_address     xpm_tmr_blk;        /* Extended Power Mgt Timer Ctrl Reg Blk address */
 	struct acpi_generic_address     xgpe0_blk;          /* Extended General Purpose acpi_event 0 Reg Blk address */
 	struct acpi_generic_address     xgpe1_blk;          /* Extended General Purpose acpi_event 1 Reg Blk address */
+};
+
+
+/* Embedded Controller */
+
+struct ec_boot_resources
+{
+	ACPI_TABLE_HEADER_DEF
+	struct acpi_generic_address     ec_control;         /* Address of EC command/status register */
+	struct acpi_generic_address     ec_data;            /* Address of EC data register */
+	u32                             uid;                /* Unique ID - must be same as the EC _UID method */
+	u8                              gpe_bit;            /* The GPE for the EC */
+	u8                              ec_id[1];           /* Full namepath of the EC in the ACPI namespace */
 };
 
 

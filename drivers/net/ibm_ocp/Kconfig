@@ -1,0 +1,48 @@
+config IBM_OCP_ENET
+	bool "IBM on-chip ethernet"
+	depends on IBM_OCP
+
+config IBM_OCP_ENET_ERROR_MSG
+	bool "Verbose error messages"
+	depends on IBM_OCP_ENET
+	default n
+
+config IBM_OCP_ENET_RX_BUFF
+	int "Number of receive buffers"
+	depends on IBM_OCP_ENET
+	default 64
+
+config IBM_OCP_ENET_TX_BUFF
+	int "Number of transmit buffers"
+	depends on IBM_OCP_ENET
+	default 8
+
+config IBM_OCP_ENET_GAP
+	int "Frame gap"
+	depends on IBM_OCP_ENET
+	default 8
+
+config IBM_OCP_ENET_SKB_RES
+	int "Skb reserve amount"
+	depends on IBM_OCP_ENET
+	default 0
+
+config OCP_NET
+	bool
+	depends on IBM_OCP_ENET
+	default y
+
+config IBM_OCP_MAL_CNT
+	int
+	depends on IBM_OCP_ENET && ( NP405H || NP405L || 44x )
+	default 1
+
+config IBM_OCP_ZMII
+	bool
+	depends on IBM_OCP_ENET && ( NP405H || NP405L || 44x )
+	default y
+
+config CRC32
+	bool
+	depends on IBM_OCP_ENET
+	default y

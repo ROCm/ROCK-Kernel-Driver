@@ -703,6 +703,8 @@ typedef struct xfs_trans {
  *    the agi hash list and counters: sector size
  *    the inode btree entry: block size
  *    the on disk inode before ours in the agi hash list: inode cluster size
+ *    the inode btree: max depth * blocksize
+ *    the allocation btrees: 2 trees * (max depth - 1) * block size
  */
 #define	XFS_CALC_IFREE_LOG_RES(mp) \
 	((mp)->m_sb.sb_inodesize + \
@@ -710,7 +712,10 @@ typedef struct xfs_trans {
 	 (mp)->m_sb.sb_sectsize + \
 	 XFS_FSB_TO_B((mp), 1) + \
 	 MAX((__uint16_t)XFS_FSB_TO_B((mp), 1), XFS_INODE_CLUSTER_SIZE(mp)) + \
-	 (128 * 5))
+	 (128 * 5) + \
+	  (128 * (2 + XFS_IALLOC_BLOCKS(mp) + XFS_IN_MAXLEVELS(mp) + \
+	   XFS_ALLOCFREE_LOG_COUNT(mp, 1))))
+
 
 #define	XFS_IFREE_LOG_RES(mp)	((mp)->m_reservations.tr_ifree)
 
@@ -918,6 +923,7 @@ typedef struct xfs_trans {
 #define	XFS_DEFAULT_LOG_COUNT		1
 #define	XFS_DEFAULT_PERM_LOG_COUNT	2
 #define	XFS_ITRUNCATE_LOG_COUNT		2
+#define XFS_INACTIVE_LOG_COUNT		2
 #define	XFS_CREATE_LOG_COUNT		2
 #define	XFS_MKDIR_LOG_COUNT		3
 #define	XFS_SYMLINK_LOG_COUNT		3
@@ -991,6 +997,8 @@ void		xfs_trans_bhold(xfs_trans_t *, struct xfs_buf *);
 void		xfs_trans_bhold_until_committed(xfs_trans_t *, struct xfs_buf *);
 void		xfs_trans_binval(xfs_trans_t *, struct xfs_buf *);
 void		xfs_trans_inode_buf(xfs_trans_t *, struct xfs_buf *);
+void		xfs_trans_inode_buf(xfs_trans_t *, struct xfs_buf *);
+void		xfs_trans_stale_inode_buf(xfs_trans_t *, struct xfs_buf *);
 void		xfs_trans_dquot_buf(xfs_trans_t *, struct xfs_buf *, uint);
 void		xfs_trans_inode_alloc_buf(xfs_trans_t *, struct xfs_buf *);
 int		xfs_trans_iget(struct xfs_mount *, xfs_trans_t *,

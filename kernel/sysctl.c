@@ -43,6 +43,10 @@
 #include <linux/nfs_fs.h>
 #endif
 
+#ifdef CONFIG_KDB
+#include <linux/kdb.h>
+#endif /* CONFIG_KDB */
+
 #if defined(CONFIG_SYSCTL)
 
 /* External variables not in a header file. */
@@ -579,16 +583,6 @@ static ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
-#ifdef CONFIG_SMP
-	{
-		.ctl_name	= KERN_CACHEDECAYTICKS,
-		.procname	= "cache_decay_ticks",
-		.data		= &cache_decay_ticks,
-		.maxlen		= sizeof(cache_decay_ticks),
-		.mode		= 0644,
-		.proc_handler	= &proc_doulongvec_minmax,
-	},
-#endif
 	{ .ctl_name = 0 }
 };
 

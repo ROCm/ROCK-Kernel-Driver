@@ -38,6 +38,14 @@
 #include <platforms/4xx/oak.h>
 #endif
 
+#if defined(CONFIG_XILINX_ML300)
+#include <platforms/4xx/xilinx_ml300.h>
+#endif
+
+#if defined(CONFIG_RAINIER)
+#include <platforms/4xx/rainier.h>
+#endif
+
 #if defined(CONFIG_REDWOOD_4)
 #include <platforms/4xx/redwood.h>
 #endif
@@ -46,18 +54,27 @@
 #include <platforms/4xx/redwood5.h>
 #endif
 
+#if defined(CONFIG_REDWOOD_6)
+#include <platforms/4xx/redwood6.h>
+#endif
+
 #if defined(CONFIG_WALNUT)
 #include <platforms/4xx/walnut.h>
 #endif
 
+#if defined(CONFIG_BEECH)
+#include <platforms/4xx/beech.h>
+#endif
+
+#if defined(CONFIG_ARCTIC2)
+#include <platforms/4xx/arctic2.h>
+#endif
+
+#if defined(CONFIG_SYCAMORE)
+#include <platforms/4xx/sycamore.h>
+#endif
+
 #ifndef __ASSEMBLY__
-
-/*
- * The "residual" board information structure the boot loader passes
- * into the kernel.
- */
-extern bd_t __res;
-
 void ppc4xx_setup_arch(void);
 void ppc4xx_map_io(void);
 void ppc4xx_init_IRQ(void);

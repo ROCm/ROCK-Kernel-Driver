@@ -7,6 +7,7 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/device.h>
 
@@ -90,3 +91,6 @@ int lm_device_register(struct lm_device *dev)
 	}
 	return ret;
 }
+
+EXPORT_SYMBOL(lm_driver_register);
+EXPORT_SYMBOL(lm_driver_unregister);

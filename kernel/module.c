@@ -485,6 +485,7 @@ static int stopref(void *cpu)
 	set_cpus_allowed(current, cpumask_of_cpu((int)(long)cpu));
 
 	/* Ack: we are alive */
+	mb(); /* Theoretically the ack = 0 might not be on this CPU yet. */
 	atomic_inc(&stopref_thread_ack);
 
 	/* Simple state machine */
@@ -493,11 +494,13 @@ static int stopref(void *cpu)
 			local_irq_disable();
 			irqs_disabled = 1;
 			/* Ack: irqs disabled. */
+			mb(); /* Must read state first. */
 			atomic_inc(&stopref_thread_ack);
 		} else if (stopref_state == STOPREF_PREPARE && !prepared) {
 			/* Everyone is in place, hold CPU. */
 			preempt_disable();
 			prepared = 1;
+			mb(); /* Must read state first. */
 			atomic_inc(&stopref_thread_ack);
 		}
 		if (irqs_disabled || prepared)
@@ -507,6 +510,7 @@ static int stopref(void *cpu)
 	}
 
 	/* Ack: we are exiting. */
+	mb(); /* Must read state first. */
 	atomic_inc(&stopref_thread_ack);
 
 	if (irqs_disabled)

@@ -35,6 +35,7 @@
 #if	!defined(CONFIG_GT64260_CONSOLE)
 #include <linux/serial.h>
 #endif
+#include <linux/serial_core.h>
 
 #include <asm/system.h>
 #include <asm/pgtable.h>
@@ -184,7 +185,7 @@ static void __init
 ev64260_setup_arch(void)
 {
 #if	!defined(CONFIG_GT64260_CONSOLE)
-	struct serial_struct	serial_req;
+	struct uart_port port;
 #endif
 
 	if ( ppc_md.progress )
@@ -228,27 +229,25 @@ ev64260_setup_arch(void)
 	TODC_INIT(TODC_TYPE_DS1501, 0, 0, ioremap(EV64260_TODC_BASE,0x20), 8);
 
 #if	!defined(CONFIG_GT64260_CONSOLE)
-	memset(&serial_req, 0, sizeof(serial_req));
-	serial_req.line = 0;
-	serial_req.baud_base = BASE_BAUD;
-	serial_req.port = 0;
-	serial_req.irq = 85;
-	serial_req.flags = STD_COM_FLAGS;
-	serial_req.io_type = SERIAL_IO_MEM;
-	serial_req.iomem_base = ioremap(EV64260_SERIAL_0, 0x20);
-	serial_req.iomem_reg_shift = 2;
+	memset(&port, 0, sizeof(port));
+	port.membase = ioremap(EV64260_SERIAL_0, 0x20);
+	port.irq = 85;
+	port.uartclk = BASE_BAUD * 16;
+	port.regshift = 2;
+	port.flags = STD_COM_FLAGS;
+	port.iotype = SERIAL_IO_MEM;
+	port.line = 0;
 
-	if (early_serial_setup(&serial_req) != 0) {
+	if (early_serial_setup(&port) != 0) {
 		printk("Early serial init of port 0 failed\n");
 	}
 
 	/* Assume early_serial_setup() doesn't modify serial_req */
-	serial_req.line = 1;
-	serial_req.port = 1;
-	serial_req.irq = 86;
-	serial_req.iomem_base = ioremap(EV64260_SERIAL_1, 0x20);
+	port.membase = ioremap(EV64260_SERIAL_1, 0x20);
+	port.irq = 86;
+	port.line = 1;
 
-	if (early_serial_setup(&serial_req) != 0) {
+	if (early_serial_setup(&port) != 0) {
 		printk("Early serial init of port 1 failed\n");
 	}
 #endif

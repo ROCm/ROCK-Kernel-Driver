@@ -84,6 +84,30 @@
 #include <linux/circ_buf.h>
 #include <linux/spinlock.h>
 
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+/*
+ * kdb_serial_line records the serial line number of the first serial console.
+ * NOTE: The kernel ignores characters on the serial line unless a user space
+ * program has opened the line first.  To enter kdb before user space has opened
+ * the serial line, you can use the 'kdb=early' flag to lilo and set the
+ * appropriate breakpoints.
+ *
+ * kdb_serial_str[] is the sequence that the user must enter on the serial
+ * console to invoke kdb.  It can be a single character such as "\001"
+ * (control-A) or multiple characters such as "\eKdB".  NOTE: All except the
+ * last character are passed through to the application reading from the serial
+ * console.
+ *
+ * I tried to make the sequence a CONFIG_ option but most of CML1 cannot cope
+ * with '\' in strings, CML2 should be able to do it.  KAO.
+ */
+
+static int  kdb_serial_line = -1;
+static char kdb_serial_str[] = "startKDB";
+static char *kdb_serial_ptr = kdb_serial_str;
+#endif	/* CONFIG_KDB */
+
 struct uart_port;
 struct uart_info;
 struct serial_struct;
@@ -339,6 +363,31 @@ int uart_resume_port(struct uart_driver *reg, struct uart_port *port);
 
 #define uart_tx_stopped(port)		\
 	((port)->info->tty->stopped || (port)->info->tty->hw_stopped)
+
+#ifdef		 CONFIG_KDB
+static inline int
+uart_handle_kdb(struct uart_port *port, unsigned int ch,
+		 		 struct pt_regs *regs)
+{
+    if ((port->line == kdb_serial_line) && kdb_on) {
+		 if (ch == *kdb_serial_ptr) {
+		     if (!(*++kdb_serial_ptr)) {
+		 		 kdb_serial_ptr = kdb_serial_str;
+		 		 kdb(KDB_REASON_KEYBOARD, 0, regs);
+		 		 return 1;
+		     }
+		 } else {
+		     kdb_serial_ptr = kdb_serial_str;
+		 }
+    }
+
+    return 0;
+}
+#else		 /* !CONFIG_KDB */
+#define uart_handle_kdb(port,ch,regs)		 (0)
+#endif		 /* CONFIG_KDB */
+
+
 
 /*
  * The following are helper functions for the low level drivers.

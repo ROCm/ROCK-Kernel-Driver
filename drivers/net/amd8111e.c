@@ -1698,7 +1698,7 @@ static int amd8111e_resume(struct pci_dev *pci_dev)
 	/* Restart ipg timer */
 	if(lp->options & OPTION_DYN_IPG_ENABLE)	        
 		mod_timer(&lp->ipg_data.ipg_timer, 
-				jiffies + (IPG_CONVERGE_TIME * HZ));
+				jiffies + IPG_CONVERGE_JIFFIES);
 	spin_unlock_irq(&lp->lock);
 
 	return 0;
@@ -1772,7 +1772,7 @@ static void amd8111e_config_ipg(struct net_device* dev)
 		writew((u32)tmp_ipg, mmio + IPG); 
 		writew((u32)(tmp_ipg - IFS1_DELTA), mmio + IFS1); 
 	}
-	 mod_timer(&lp->ipg_data.ipg_timer, jiffies + (IPG_CONVERGE_TIME * HZ));
+	 mod_timer(&lp->ipg_data.ipg_timer, jiffies + IPG_CONVERGE_JIFFIES);
 	return;
 
 }
@@ -1909,7 +1909,7 @@ static int __devinit amd8111e_probe_one(struct pci_dev *pdev,
 		lp->ipg_data.ipg_timer.data = (unsigned long) dev;
 		lp->ipg_data.ipg_timer.function = (void *)&amd8111e_config_ipg;
 		lp->ipg_data.ipg_timer.expires = jiffies + 
-						 IPG_CONVERGE_TIME * HZ;
+						 IPG_CONVERGE_JIFFIES;
 		lp->ipg_data.ipg = DEFAULT_IPG;
 		lp->ipg_data.ipg_state = CSTATE;
 	};

@@ -198,6 +198,8 @@ config MII
 
 source "drivers/net/arm/Kconfig"
 
+source "drivers/net/ibm_ocp/Kconfig"
+
 config MACE
 	tristate "MACE (Power Mac ethernet) support"
 	depends on NET_ETHERNET && PPC_PMAC
@@ -241,6 +243,17 @@ config OAKNET
 
 	  To compile this driver as a module, choose M here: the module
 	  will be called oaknet.
+
+config ARCTIC_ENET
+	tristate "Arctic-III development sled ethernet support"
+	depends on NET_ETHERNET && ARCTIC2
+	help
+	  
+	  If you have an IBM Arctic III with an RTL8019AS ethernet
+	  chip on the development sled, say Y.  Otherwise, say N.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called arctic_enet.
 
 config ARIADNE
 	tristate "Ariadne support"
@@ -1616,7 +1629,7 @@ config SUNDANCE_MMIO
 
 config TLAN
 	tristate "TI ThunderLAN support"
-	depends on NET_PCI && (PCI || EISA)
+	depends on NET_PCI && (PCI || EISA) && !64BIT
 	---help---
 	  If you have a PCI Ethernet network card based on the ThunderLAN chip
 	  which is supported by this driver, say Y and read the
@@ -2412,7 +2425,7 @@ config IPHASE5526
 
 config RCPCI
 	tristate "Red Creek Hardware VPN (EXPERIMENTAL)"
-	depends on NETDEVICES && EXPERIMENTAL && PCI
+	depends on NETDEVICES && EXPERIMENTAL && PCI && !64BIT
 	help
 	  This is a driver for hardware which provides a Virtual Private
 	  Network (VPN). Say Y if you have it.

@@ -17,6 +17,7 @@
 #include <linux/proc_fs.h>
 #include <linux/init.h>
 #include <asm/uaccess.h>
+#include <asm/proc_fs.h>
 #include <asm/rtas.h>
 
 #define MODULE_VERSION "1.0"

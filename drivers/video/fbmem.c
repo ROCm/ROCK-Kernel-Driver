@@ -143,6 +143,8 @@ extern int sstfb_init(void);
 extern int sstfb_setup(char*);
 extern int i810fb_init(void);
 extern int i810fb_setup(char*);
+extern int ibmlcdfb_init(void);
+extern int ibmlcdfb_setup(char*);
 extern int ffb_init(void);
 extern int ffb_setup(char*);
 extern int cg6_init(void);
@@ -252,6 +254,9 @@ static struct {
 #endif	
 #ifdef CONFIG_FB_STI
 	{ "stifb", stifb_init, stifb_setup },
+#endif
+#ifdef CONFIG_FB_IBMLCDC
+	{ "ibmlcdfb", ibmlcdfb_init, ibmlcdfb_setup },
 #endif
 #ifdef CONFIG_FB_FFB
 	{ "ffb", ffb_init, ffb_setup },

@@ -1319,7 +1319,7 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb, enum v4
 			saa7146_pgtable_alloc(dev->pci, &buf->pt[0]);
 		}
 		
-		err = videobuf_iolock(dev->pci,&buf->vb,NULL);
+		err = videobuf_iolock(dev->pci,&buf->vb, &vv->ov_fb);
 		if (err)
 			goto oops;
 		err = saa7146_pgtable_build(dev,buf);

@@ -4232,7 +4232,7 @@ void mgslpc_sppp_init(MGSLPC_INFO *info)
 	d->tx_timeout = mgslpc_sppp_tx_timeout;
 	d->watchdog_timeo = 10*HZ;
 
-	if (register_netdev(d) == -1) {
+	if (register_netdev(d)) {
 		printk(KERN_WARNING "%s: register_netdev failed.\n", d->name);
 		sppp_detach(info->netdev);
 		return;

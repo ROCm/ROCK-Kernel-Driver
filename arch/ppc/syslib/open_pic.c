@@ -611,11 +611,14 @@ void openpic_request_IPIs(void)
 void __devinit do_openpic_setup_cpu(void)
 {
  	int i;
-	u32 msk = 1 << smp_hw_index[smp_processor_id()];
-
+#ifdef CONFIG_IRQ_ALL_CPUS
+	u32 msk;
+#endif
 	spin_lock(&openpic_setup_lock);
 
 #ifdef CONFIG_IRQ_ALL_CPUS
+	msk = 1 << smp_hw_index[smp_processor_id()];
+
  	/* let the openpic know we want intrs. default affinity
  	 * is 0xffffffff until changed via /proc
  	 * That's how it's done on x86. If we want it differently, then

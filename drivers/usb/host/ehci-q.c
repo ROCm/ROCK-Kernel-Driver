@@ -184,7 +184,7 @@ ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb, struct pt_regs *regs)
 		struct ehci_qh	*qh = (struct ehci_qh *) urb->hcpriv;
 
 		/* S-mask in a QH means it's an interrupt urb */
-		if ((qh->hw_info2 & cpu_to_le32 (0x00ff)) != 0) {
+		if ((qh->hw_info2 & __constant_cpu_to_le32 (0x00ff)) != 0) {
 
 			/* ... update hc-wide periodic stats (for usbfs) */
 			hcd_to_bus (&ehci->hcd)->bandwidth_int_reqs--;
@@ -224,7 +224,7 @@ ehci_urb_done (struct ehci_hcd *ehci, struct urb *urb, struct pt_regs *regs)
  * Chases up to qh->hw_current.  Returns number of completions called,
  * indicating how much "real" work we did.
  */
-#define HALT_BIT cpu_to_le32(QTD_STS_HALT)
+#define HALT_BIT __constant_cpu_to_le32(QTD_STS_HALT)
 static unsigned
 qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh, struct pt_regs *regs)
 {
@@ -377,9 +377,13 @@ halt:
 
 	return count;
 }
-#undef HALT_BIT
 
 /*-------------------------------------------------------------------------*/
+
+// high bandwidth multiplier, as encoded in highspeed endpoint descriptors
+#define hb_mult(wMaxPacketSize) (1 + (((wMaxPacketSize) >> 11) & 0x03))
+// ... and packet size, for any kind of endpoint descriptor
+#define max_packet(wMaxPacketSize) ((wMaxPacketSize) & 0x07ff)
 
 /*
  * reverse of qh_urb_transaction:  free a list of TDs.
@@ -461,7 +465,7 @@ qh_urb_transaction (
 		token |= (1 /* "in" */ << 8);
 	/* else it's already initted to "out" pid (0 << 8) */
 
-	maxpacket = usb_maxpacket (urb->dev, urb->pipe, !is_input) & 0x03ff;
+	maxpacket = max_packet(usb_maxpacket(urb->dev, urb->pipe, !is_input));
 
 	/*
 	 * buffer gets wrapped in one or more qtds;
@@ -563,11 +567,6 @@ clear_toggle (struct usb_device *udev, int ep, int is_out, struct ehci_qh *qh)
 // implicitly reset then (data toggle too).
 // That'd mean updating how usbcore talks to HCDs. (2.5?)
 
-
-// high bandwidth multiplier, as encoded in highspeed endpoint descriptors
-#define hb_mult(wMaxPacketSize) (1 + (((wMaxPacketSize) >> 11) & 0x03))
-// ... and packet size, for any kind of endpoint descriptor
-#define max_packet(wMaxPacketSize) ((wMaxPacketSize) & 0x03ff)
 
 /*
  * Each QH holds a qtd list; a QH is used for everything except iso.
@@ -728,7 +727,7 @@ static void qh_link_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 		}
 	}
 
-	qh->hw_token &= ~__constant_cpu_to_le32 (QTD_STS_HALT);
+	qh->hw_token &= ~HALT_BIT;
 
 	/* splice right after start */
 	qh->qh_next = head->qh_next;
@@ -743,6 +742,8 @@ static void qh_link_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 }
 
 /*-------------------------------------------------------------------------*/
+
+#define	QH_ADDR_MASK	__constant_le32_to_cpu(0x7f)
 
 /*
  * For control/bulk/interrupt, return QH with these TDs appended.
@@ -778,12 +779,13 @@ static struct ehci_qh *qh_append_tds (
 		/* control qh may need patching after enumeration */
 		if (unlikely (epnum == 0)) {
 			/* set_address changes the address */
-			if (le32_to_cpu (qh->hw_info1 & 0x7f) == 0)
+			if ((qh->hw_info1 & QH_ADDR_MASK) == 0)
 				qh->hw_info1 |= cpu_to_le32 (
 						usb_pipedevice (urb->pipe));
 
 			/* for full speed, ep0 maxpacket can grow */
-			else if (!(qh->hw_info1 & cpu_to_le32 (0x3 << 12))) {
+			else if (!(qh->hw_info1
+					& __constant_cpu_to_le32 (0x3 << 12))) {
 				u32	info, max;
 
 				info = le32_to_cpu (qh->hw_info1);
@@ -797,7 +799,7 @@ static struct ehci_qh *qh_append_tds (
 
                         /* usb_reset_device() briefly reverts to address 0 */
                         if (usb_pipedevice (urb->pipe) == 0)
-                                qh->hw_info1 &= cpu_to_le32(~0x7f);
+                                qh->hw_info1 &= ~QH_ADDR_MASK;
 		}
 
 		/* usb_clear_halt() means qh data toggle gets reset */
@@ -833,7 +835,7 @@ static struct ehci_qh *qh_append_tds (
 			 * HC is allowed to fetch the old dummy (4.10.2).
 			 */
 			token = qtd->hw_token;
-			qtd->hw_token = cpu_to_le32 (QTD_STS_HALT);
+			qtd->hw_token = HALT_BIT;
 			wmb ();
 			dummy = qh->dummy;
 

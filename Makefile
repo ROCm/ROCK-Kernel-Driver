@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 0
-EXTRAVERSION = -test7-$(CONFIG_RELEASE)-$(CONFIG_CFGNAME)
+EXTRAVERSION = -test8-$(CONFIG_RELEASE)-$(CONFIG_CFGNAME)
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
@@ -413,6 +413,11 @@ CFLAGS := $(CPPFLAGS) $(CFLAGS)
 AFLAGS := $(CPPFLAGS) $(AFLAGS)
 
 core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/
+ifeq ($(CONFIG_KDB),y)
+  # Use ifeq for now because kdb subdirs are not in bk yet
+  # Otherwise make mrproper will die because it also cleans core-n
+  core-y			+= kdb/
+endif
 
 SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
 		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
