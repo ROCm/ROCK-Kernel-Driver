@@ -30,6 +30,7 @@
 #include <linux/interrupt.h>
 #include <linux/notifier.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/stat.h>
 #include <linux/netfilter.h>
 #include <linux/sysctl.h>
@@ -141,39 +142,73 @@ int ax25_uid_ioctl(int cmd, struct sockaddr_ax25 *sax)
 	return -EINVAL;	/*NOTREACHED */
 }
 
-int ax25_uid_get_info(char *buffer, char **start, off_t offset, int length)
+#ifdef CONFIG_PROC_FS
+
+#define AX25_PROC_START	((void *)1)
+
+static void *ax25_uid_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	ax25_uid_assoc *pt;
-	int len     = 0;
-	off_t pos   = 0;
-	off_t begin = 0;
+	struct ax25_uid_assoc *pt;
+	int i = 1;
 
 	read_lock(&ax25_uid_lock);
-	len += sprintf(buffer, "Policy: %d\n", ax25_uid_policy);
+	if (*pos == 0)
+		return AX25_PROC_START;
 
 	for (pt = ax25_uid_list; pt != NULL; pt = pt->next) {
-		len += sprintf(buffer + len, "%6d %s\n", pt->uid, ax2asc(&pt->call));
-
-		pos = begin + len;
-
-		if (pos < offset) {
-			len = 0;
-			begin = pos;
-		}
-
-		if (pos > offset + length)
-			break;
+		if (i == *pos)
+			return pt;
+		++i;
 	}
-	read_unlock(&ax25_uid_lock);
-
-	*start = buffer + (offset - begin);
-	len   -= offset - begin;
-
-	if (len > length)
-		len = length;
-
-	return len;
+	return NULL;
 }
+
+static void *ax25_uid_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	++*pos;
+	return (v == AX25_PROC_START) ? ax25_uid_list : 
+		((struct ax25_uid_assoc *) v)->next;
+}
+
+static void ax25_uid_seq_stop(struct seq_file *seq, void *v)
+{
+	read_unlock(&ax25_uid_lock);
+}
+
+static int ax25_uid_seq_show(struct seq_file *seq, void *v)
+{
+	if (v == AX25_PROC_START)
+		seq_printf(seq, "Policy: %d\n", ax25_uid_policy);
+	else {
+		struct ax25_uid_assoc *pt = v;
+		
+
+		seq_printf(seq, "%6d %s\n", pt->uid, ax2asc(&pt->call));
+	}
+	return 0;
+}
+
+static struct seq_operations ax25_uid_seqops = {
+	.start = ax25_uid_seq_start,
+	.next = ax25_uid_seq_next,
+	.stop = ax25_uid_seq_stop,
+	.show = ax25_uid_seq_show,
+};
+
+static int ax25_uid_info_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &ax25_uid_seqops);
+}
+
+struct file_operations ax25_uid_fops = {
+	.owner = THIS_MODULE,
+	.open = ax25_uid_info_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = seq_release,
+};
+
+#endif
 
 /*
  *	Free all memory associated with UID/Callsign structures.

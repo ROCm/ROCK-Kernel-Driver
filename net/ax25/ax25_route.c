@@ -34,6 +34,7 @@
 #include <linux/mm.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/seq_file.h>
 
 static ax25_route *ax25_route_list;
 static rwlock_t ax25_route_lock = RW_LOCK_UNLOCKED;
@@ -278,66 +279,100 @@ int ax25_rt_ioctl(unsigned int cmd, void *arg)
 	}
 }
 
-int ax25_rt_get_info(char *buffer, char **start, off_t offset, int length)
+#ifdef CONFIG_PROC_FS
+
+#define AX25_PROC_START	((void *)1)
+
+static void *ax25_rt_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	ax25_route *ax25_rt;
-	int len     = 0;
-	off_t pos   = 0;
-	off_t begin = 0;
-	char *callsign;
-	int i;
-
-	read_lock(&ax25_route_lock);
-
-	len += sprintf(buffer, "callsign  dev  mode digipeaters\n");
+	struct ax25_route *ax25_rt;
+	int i = 1;
+ 
+ 	read_lock(&ax25_route_lock);
+	if (*pos == 0)
+		return AX25_PROC_START;
 
 	for (ax25_rt = ax25_route_list; ax25_rt != NULL; ax25_rt = ax25_rt->next) {
+		if (i == *pos)
+			return ax25_rt;
+		++i;
+	}
+
+	return NULL;
+}
+
+static void *ax25_rt_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	++*pos;
+	return (v == AX25_PROC_START) ? ax25_route_list : 
+		((struct ax25_route *) v)->next;
+}
+
+static void ax25_rt_seq_stop(struct seq_file *seq, void *v)
+{
+	read_unlock(&ax25_route_lock);
+}
+
+static int ax25_rt_seq_show(struct seq_file *seq, void *v)
+{
+	if (v == AX25_PROC_START)
+		seq_puts(seq, "callsign  dev  mode digipeaters\n");
+	else {
+		struct ax25_route *ax25_rt = v;
+		const char *callsign;
+		int i;
+
 		if (ax25cmp(&ax25_rt->callsign, &null_ax25_address) == 0)
 			callsign = "default";
 		else
 			callsign = ax2asc(&ax25_rt->callsign);
-		len += sprintf(buffer + len, "%-9s %-4s",
+
+		seq_printf(seq, "%-9s %-4s",
 			callsign,
 			ax25_rt->dev ? ax25_rt->dev->name : "???");
 
 		switch (ax25_rt->ip_mode) {
 		case 'V':
-			len += sprintf(buffer + len, "   vc");
+			seq_puts(seq, "   vc");
 			break;
 		case 'D':
-			len += sprintf(buffer + len, "   dg");
+			seq_puts(seq, "   dg");
 			break;
 		default:
-			len += sprintf(buffer + len, "    *");
+			seq_puts(seq, "    *");
 			break;
 		}
 
 		if (ax25_rt->digipeat != NULL)
 			for (i = 0; i < ax25_rt->digipeat->ndigi; i++)
-				len += sprintf(buffer + len, " %s", ax2asc(&ax25_rt->digipeat->calls[i]));
+				seq_printf(seq, " %s", ax2asc(&ax25_rt->digipeat->calls[i]));
 
-		len += sprintf(buffer + len, "\n");
-
-		pos = begin + len;
-
-		if (pos < offset) {
-			len   = 0;
-			begin = pos;
-		}
-
-		if (pos > offset + length)
-			break;
+		seq_puts(seq, "\n");
 	}
-	read_unlock(&ax25_route_lock);
-
-	*start = buffer + (offset - begin);
-	len   -= (offset - begin);
-
-	if (len > length)
-		len = length;
-
-	return len;
+	return 0;
 }
+
+static struct seq_operations ax25_rt_seqops = {
+	.start = ax25_rt_seq_start,
+	.next = ax25_rt_seq_next,
+	.stop = ax25_rt_seq_stop,
+	.show = ax25_rt_seq_show,
+};
+
+static int ax25_rt_info_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &ax25_rt_seqops);
+}
+
+struct file_operations ax25_route_fops = {
+	.owner = THIS_MODULE,
+	.open = ax25_rt_info_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = seq_release,
+};
+
+#endif
 
 /*
  *	Find AX.25 route
