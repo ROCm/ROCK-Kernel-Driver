@@ -87,7 +87,7 @@ static inline void kset_put(struct kset * k)
 }
 
 
-extern struct kobject * kset_find_obj(struct kset *, char *);
+extern struct kobject * kset_find_obj(struct kset *, const char *);
 
 
 struct subsystem {
