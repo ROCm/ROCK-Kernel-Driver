@@ -16,77 +16,66 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/mm.h>
+#include <linux/timer.h>
 #include <asm/byteorder.h>
 
 #include "hcd.h"	/* for usbcore internals */
 #include "usb.h"
 
-struct usb_api_data {
-	wait_queue_head_t wqh;
-	int done;
-};
-
 static void usb_api_blocking_completion(struct urb *urb, struct pt_regs *regs)
 {
-	struct usb_api_data *awd = (struct usb_api_data *)urb->context;
+	complete((struct completion *)urb->context);
+}
 
-	awd->done = 1;
-	wmb();
-	wake_up(&awd->wqh);
+
+static void timeout_kill(unsigned long data)
+{
+	struct urb	*urb = (struct urb *) data;
+
+	dev_warn(&urb->dev->dev, "%s timeout on ep%d%s\n",
+		usb_pipecontrol(urb->pipe) ? "control" : "bulk",
+		usb_pipeendpoint(urb->pipe),
+		usb_pipein(urb->pipe) ? "in" : "out");
+	usb_unlink_urb(urb);
 }
 
 // Starts urb and waits for completion or timeout
+// note that this call is NOT interruptible, while
+// many device driver i/o requests should be interruptible
 static int usb_start_wait_urb(struct urb *urb, int timeout, int* actual_length)
 { 
-	DECLARE_WAITQUEUE(wait, current);
-	struct usb_api_data awd;
-	int status;
+	struct completion	done;
+	struct timer_list	timer;
+	int			status;
 
-	init_waitqueue_head(&awd.wqh); 	
-	awd.done = 0;
+	init_completion(&done); 	
+	urb->context = &done;
+	urb->transfer_flags |= URB_ASYNC_UNLINK;
+	urb->actual_length = 0;
+	status = usb_submit_urb(urb, GFP_NOIO);
 
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	add_wait_queue(&awd.wqh, &wait);
-
-	urb->context = &awd;
-	status = usb_submit_urb(urb, GFP_ATOMIC);
-	if (status) {
-		// something went wrong
-		usb_free_urb(urb);
-		set_current_state(TASK_RUNNING);
-		remove_wait_queue(&awd.wqh, &wait);
-		return status;
-	}
-
-	while (timeout && !awd.done)
-	{
-		timeout = schedule_timeout(timeout);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		rmb();
-	}
-
-	set_current_state(TASK_RUNNING);
-	remove_wait_queue(&awd.wqh, &wait);
-
-	if (!timeout && !awd.done) {
-		if (urb->status != -EINPROGRESS) {	/* No callback?!! */
-			printk(KERN_ERR "usb: raced timeout, "
-			    "pipe 0x%x status %d time left %d\n",
-			    urb->pipe, urb->status, timeout);
-			status = urb->status;
-		} else {
-			warn("usb_control/bulk_msg: timeout");
-			usb_unlink_urb(urb);  // remove urb safely
-			status = -ETIMEDOUT;
+	if (status == 0) {
+		if (timeout > 0) {
+			init_timer(&timer);
+			timer.expires = jiffies + timeout;
+			timer.data = (unsigned long)urb;
+			timer.function = timeout_kill;
+			/* grr.  timeout _should_ include submit delays. */
+			add_timer(&timer);
 		}
-	} else
+		wait_for_completion(&done);
 		status = urb->status;
+		/* note:  HCDs return ETIMEDOUT for other reasons too */
+		if (status == -ECONNRESET)
+			status = -ETIMEDOUT;
+		if (timeout > 0)
+			del_timer_sync(&timer);
+	}
 
 	if (actual_length)
 		*actual_length = urb->actual_length;
-
 	usb_free_urb(urb);
-  	return status;
+	return status;
 }
 
 /*-------------------------------------------------------------------*/
