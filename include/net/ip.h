@@ -187,7 +187,7 @@ int ip_dont_fragment(struct sock *sk, struct dst_entry *dst)
 		 !(dst->mxlock&(1<<RTAX_MTU))));
 }
 
-extern void __ip_select_ident(struct iphdr *iph, struct dst_entry *dst);
+extern void __ip_select_ident(struct iphdr *iph, struct dst_entry *dst, int more);
 
 static inline void ip_select_ident(struct iphdr *iph, struct dst_entry *dst, struct sock *sk)
 {
@@ -200,7 +200,19 @@ static inline void ip_select_ident(struct iphdr *iph, struct dst_entry *dst, str
 		iph->id = (sk && inet_sk(sk)->daddr) ?
 					htons(inet_sk(sk)->id++) : 0;
 	} else
-		__ip_select_ident(iph, dst);
+		__ip_select_ident(iph, dst, 0);
+}
+
+static inline void ip_select_ident_more(struct iphdr *iph, struct dst_entry *dst, struct sock *sk, int more)
+{
+	if (iph->frag_off&__constant_htons(IP_DF)) {
+		if (sk && inet_sk(sk)->daddr) {
+			iph->id = htons(inet_sk(sk)->id);
+			inet_sk(sk)->id += 1 + more;
+		} else
+			iph->id = 0;
+	} else
+		__ip_select_ident(iph, dst, more);
 }
 
 /*

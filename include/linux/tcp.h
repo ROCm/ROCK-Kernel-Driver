@@ -241,7 +241,8 @@ struct tcp_opt {
 	__u32	snd_wnd;	/* The window we expect to receive	*/
 	__u32	max_window;	/* Maximal window ever seen from peer	*/
 	__u32	pmtu_cookie;	/* Last pmtu seen by socket		*/
-	__u16	mss_cache;	/* Cached effective mss, not including SACKS */
+	__u32	mss_cache;	/* Cached effective mss, not including SACKS */
+	__u16	mss_cache_std;	/* Like mss_cache, but without TSO */
 	__u16	mss_clamp;	/* Maximal mss, negotiated at connection setup */
 	__u16	ext_header_len;	/* Network protocol overhead (IP/IPv6 options) */
 	__u8	ca_state;	/* State of fast-retransmit machine 	*/

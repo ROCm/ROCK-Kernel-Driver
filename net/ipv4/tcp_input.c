@@ -772,6 +772,14 @@ tcp_sacktag_write_queue(struct sock *sk, struct sk_buff *ack_skb, u32 prior_snd_
 	int flag = 0;
 	int i;
 
+	/* So, SACKs for already sent large segments will be lost.
+	 * Not good, but alternative is to resegment the queue. */
+	if (sk->route_caps&NETIF_F_TSO) {
+		sk->route_caps &= ~NETIF_F_TSO;
+		sk->no_largesend = 1;
+		tp->mss_cache = tp->mss_cache_std;
+	}
+
 	if (!tp->sacked_out)
 		tp->fackets_out = 0;
 	prior_fackets = tp->fackets_out;
@@ -2963,6 +2971,8 @@ void tcp_cwnd_application_limited(struct sock *sk)
 /* When incoming ACK allowed to free some skb from write_queue,
  * we remember this event in flag tp->queue_shrunk and wake up socket
  * on the exit from tcp input handler.
+ *
+ * PROBLEM: sndbuf expansion does not work well with largesend.
  */
 static void tcp_new_space(struct sock *sk)
 {
@@ -2972,8 +2982,8 @@ static void tcp_new_space(struct sock *sk)
 	    !(sk->userlocks&SOCK_SNDBUF_LOCK) &&
 	    !tcp_memory_pressure &&
 	    atomic_read(&tcp_memory_allocated) < sysctl_tcp_mem[0]) {
-		int sndmem = tp->mss_clamp + MAX_TCP_HEADER + 16 +
-			     sizeof(struct sk_buff),
+ 		int sndmem = max_t(u32, tp->mss_clamp, tp->mss_cache) +
+			MAX_TCP_HEADER + 16 + sizeof(struct sk_buff),
 		    demanded = max_t(unsigned int, tp->snd_cwnd,
 						   tp->reordering + 1);
 		sndmem *= 2*demanded;
@@ -3502,6 +3512,8 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 		 */
 
 		TCP_ECN_rcv_synack(tp, th);
+		if (tp->ecn_flags&TCP_ECN_OK)
+			sk->no_largesend = 1;
 
 		tp->snd_wl1 = TCP_SKB_CB(skb)->seq;
 		tcp_ack(sk, skb, FLAG_SLOWPATH);
@@ -3627,10 +3639,13 @@ discard:
 		tp->snd_wl1    = TCP_SKB_CB(skb)->seq;
 		tp->max_window = tp->snd_wnd;
 
+		TCP_ECN_rcv_syn(tp, th);
+		if (tp->ecn_flags&TCP_ECN_OK)
+			sk->no_largesend = 1;
+
 		tcp_sync_mss(sk, tp->pmtu_cookie);
 		tcp_initialize_rcv_mss(sk);
 
-		TCP_ECN_rcv_syn(tp, th);
 
 		tcp_send_synack(sk);
 #if 0
