@@ -381,8 +381,9 @@ xfs_finish_flags(
  *	(2) logical volume with data and log subvolumes.
  *	(3) logical volume with data, log, and realtime subvolumes.
  *
- * The Linux VFS took care of finding and opening the data volume for
- * us.  We have to handle the other two (if present) here.
+ * We only have to handle opening the log and realtime volumes here if
+ * they are present.  The data subvolume has already been opened by
+ * get_sb_bdev() and is stored in vfsp->vfs_super->s_bdev.
  */
 STATIC int
 xfs_mount(
@@ -399,18 +400,23 @@ xfs_mount(
 	logdev = rtdev = NULL;
 
 	/*
+	 * Allocate VFS private data (xfs mount structure).
+	 */
+	mp = xfs_mount_init();
+
+	/*
 	 * Open real time and log devices - order is important.
 	 */
 	if (args->logname[0]) {
-		error = xfs_blkdev_get(args->logname, &logdev);
+		error = xfs_blkdev_get(mp, args->logname, &logdev);
 		if (error)
-			return error;
+			goto free_mp;
 	}
 	if (args->rtname[0]) {
-		error = xfs_blkdev_get(args->rtname, &rtdev);
+		error = xfs_blkdev_get(mp, args->rtname, &rtdev);
 		if (error) {
 			xfs_blkdev_put(logdev);
-			return error;
+			goto free_mp;
 		}
 
 		if (rtdev == ddev || rtdev == logdev) {
@@ -418,14 +424,10 @@ xfs_mount(
 	"XFS: Cannot mount filesystem with identical rtdev and ddev/logdev.");
 			xfs_blkdev_put(logdev);
 			xfs_blkdev_put(rtdev);
-			return EINVAL;
+			error = EINVAL;
+			goto free_mp;
 		}
 	}
-
-	/*
-	 * Allocate VFS private data (xfs mount structure).
-	 */
-	mp = xfs_mount_init();
 
 	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
 
@@ -476,6 +478,8 @@ xfs_mount(
 		xfs_binval(mp->m_rtdev_targp);
 	}
 	xfs_unmountfs_close(mp, NULL);
+
+ free_mp:
 	xfs_mount_free(mp, 1);
 	return error;
 }

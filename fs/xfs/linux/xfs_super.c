@@ -466,8 +466,10 @@ xfs_initialize_vnode(
 	}
 }
 
+/*ARGSUSED*/
 int
 xfs_blkdev_get(
+	xfs_mount_t		*mp,
 	const char		*name,
 	struct block_device	**bdevp)
 {
