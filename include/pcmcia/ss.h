@@ -116,7 +116,11 @@ struct pccard_operations {
 };
 
 struct pccard_resource_ops {
-	void	(*validate_mem) (struct pcmcia_socket *s);
+	void	(*validate_mem)		(struct pcmcia_socket *s);
+	int	(*adjust_io_region)	(struct resource *res,
+					 unsigned long r_start,
+					 unsigned long r_end,
+					 struct pcmcia_socket *s);
 };
 
 /*

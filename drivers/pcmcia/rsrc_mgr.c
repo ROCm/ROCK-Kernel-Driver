@@ -577,8 +577,8 @@ pcmcia_align(void *align_data, struct resource *res,
  * Adjust an existing IO region allocation, but making sure that we don't
  * encroach outside the resources which the user supplied.
  */
-int adjust_io_region(struct resource *res, unsigned long r_start,
-		     unsigned long r_end, struct pcmcia_socket *s)
+static int nonstatic_adjust_io_region(struct resource *res, unsigned long r_start,
+				      unsigned long r_end, struct pcmcia_socket *s)
 {
 	resource_map_t *m;
 	int ret = -ENOMEM;
@@ -597,6 +597,14 @@ int adjust_io_region(struct resource *res, unsigned long r_start,
 	up(&rsrc_sem);
 
 	return ret;
+}
+
+int adjust_io_region(struct resource *res, unsigned long r_start,
+		     unsigned long r_end, struct pcmcia_socket *s)
+{
+	if (s->resource_ops->adjust_io_region)
+		return s->resource_ops->adjust_io_region(res, r_start, r_end, s);
+	return -ENOMEM;
 }
 
 /*======================================================================
@@ -991,8 +999,10 @@ void release_resource_db(struct pcmcia_socket *s)
 
 struct pccard_resource_ops pccard_static_ops = {
 	.validate_mem = NULL,
+	.adjust_io_region = NULL,
 };
 
 struct pccard_resource_ops pccard_nonstatic_ops = {
 	.validate_mem = pcmcia_nonstatic_validate_mem,
+	.adjust_io_region = nonstatic_adjust_io_region,
 };
