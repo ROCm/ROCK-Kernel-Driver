@@ -37,7 +37,7 @@ static inline void set_fs (mm_segment_t fs)
 		: "cc"); \
 	(flag == 0); })
 
-#define __put_user_asm_byte(x,addr,err)				\
+#define __put_user_asm_byte(x,__pu_addr,err)			\
 	__asm__ __volatile__(					\
 	"1:	strbt	%1,[%2],#0\n"				\
 	"2:\n"							\
@@ -51,27 +51,26 @@ static inline void set_fs (mm_segment_t fs)
 	"	.long	1b, 3b\n"				\
 	"	.previous"					\
 	: "=r" (err)						\
-	: "r" (x), "r" (addr), "i" (-EFAULT), "0" (err))
+	: "r" (x), "r" (__pu_addr), "i" (-EFAULT), "0" (err)	\
+	: "cc")
 
 #ifndef __ARMEB__
-#define __put_user_asm_half(x,addr,err)				\
+#define __put_user_asm_half(x,__pu_addr,err)			\
 ({								\
 	unsigned long __temp = (unsigned long)(x);		\
-	unsigned long __ptr  = (unsigned long)(addr);		\
-	__put_user_asm_byte(__temp, __ptr, err);		\
-	__put_user_asm_byte(__temp >> 8, __ptr + 1, err);	\
+	__put_user_asm_byte(__temp, __pu_addr, err);		\
+	__put_user_asm_byte(__temp >> 8, __pu_addr + 1, err);	\
 })
 #else
-#define __put_user_asm_half(x,addr,err)				\
+#define __put_user_asm_half(x,__pu_addr,err)			\
 ({								\
 	unsigned long __temp = (unsigned long)(x);		\
-	unsigned long __ptr  = (unsigned long)(addr);		\
-	__put_user_asm_byte(__temp >> 8, __ptr, err);		\
-	__put_user_asm_byte(__temp, __ptr + 1, err);	\
+	__put_user_asm_byte(__temp >> 8, __pu_addr, err);	\
+	__put_user_asm_byte(__temp, __pu_addr + 1, err);	\
 })
 #endif
 
-#define __put_user_asm_word(x,addr,err)				\
+#define __put_user_asm_word(x,__pu_addr,err)			\
 	__asm__ __volatile__(					\
 	"1:	strt	%1,[%2],#0\n"				\
 	"2:\n"							\
@@ -85,7 +84,31 @@ static inline void set_fs (mm_segment_t fs)
 	"	.long	1b, 3b\n"				\
 	"	.previous"					\
 	: "=r" (err)						\
-	: "r" (x), "r" (addr), "i" (-EFAULT), "0" (err))
+	: "r" (x), "r" (__pu_addr), "i" (-EFAULT), "0" (err))
+
+#define __put_user_asm_dword(x,__pu_addr,err)			\
+({								\
+	unsigned long long __temp = (unsigned long long)x;	\
+	__asm__ __volatile__(					\
+	"1:	strt	%1, [%2], #0\n"				\
+	"2:	strt	%3, [%4], #0\n"				\
+	"3:\n"							\
+	"	.section .fixup,\"ax\"\n"			\
+	"	.align	2\n"					\
+	"4:	mov	%0, %5\n"				\
+	"	b	3b\n"					\
+	"	.previous\n"					\
+	"	.section __ex_table,\"a\"\n"			\
+	"	.align	3\n"					\
+	"	.long	1b, 4b\n"				\
+	"	.long	2b, 4b\n"				\
+	"	.previous"					\
+	: "=r" (err)						\
+	: "r" (__temp), "r" (__pu_addr),			\
+	  "r" (__temp >> 32), "r" (__pu_addr + 4),		\
+	  "i" (-EFAULT), "0" (err)				\
+	: "cc");						\
+})
 
 #define __get_user_asm_byte(x,addr,err)				\
 	__asm__ __volatile__(					\
