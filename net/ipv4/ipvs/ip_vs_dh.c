@@ -147,7 +147,7 @@ static int ip_vs_dh_init_svc(struct ip_vs_service *svc)
 		return -ENOMEM;
 	}
 	svc->sched_data = tbl;
-	IP_VS_DBG(6, "DH hash table (memory=%dbytes) allocated for "
+	IP_VS_DBG(6, "DH hash table (memory=%Zdbytes) allocated for "
 		  "current service\n",
 		  sizeof(struct ip_vs_dh_bucket)*IP_VS_DH_TAB_SIZE);
 
@@ -167,7 +167,7 @@ static int ip_vs_dh_done_svc(struct ip_vs_service *svc)
 
 	/* release the table itself */
 	kfree(svc->sched_data);
-	IP_VS_DBG(6, "DH hash table (memory=%dbytes) released\n",
+	IP_VS_DBG(6, "DH hash table (memory=%Zdbytes) released\n",
 		  sizeof(struct ip_vs_dh_bucket)*IP_VS_DH_TAB_SIZE);
 
 	return 0;

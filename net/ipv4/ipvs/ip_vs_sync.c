@@ -851,7 +851,7 @@ int start_sync_thread(int state, char *mcast_ifn, __u8 syncid)
 		return -EEXIST;
 
 	IP_VS_DBG(7, "%s: pid %d\n", __FUNCTION__, current->pid);
-	IP_VS_DBG(7, "Each ip_vs_sync_conn entry need %d bytes\n",
+	IP_VS_DBG(7, "Each ip_vs_sync_conn entry need %Zd bytes\n",
 		  sizeof(struct ip_vs_sync_conn));
 
 	ip_vs_sync_state |= state;
