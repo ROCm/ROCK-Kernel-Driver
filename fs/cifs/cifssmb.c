@@ -1056,6 +1056,7 @@ CIFSSMBCopy(const int xid, struct cifsTconInfo *tcon, const char * fromName,
 	COPY_RSP *pSMBr = NULL;
 	int bytes_returned;
 	int name_len, name_len2;
+	__u16 count;
 
 	cFYI(1, ("In CIFSSMBCopy"));
 copyRetry:
@@ -1067,9 +1068,7 @@ copyRetry:
 	pSMB->BufferFormat = 0x04;
 	pSMB->Tid2 = target_tid;
 
-	if(flags & COPY_TREE)
-		pSMB->Flags |= COPY_TREE;
-	pSMB->Flags = cpu_to_le16(pSMB->Flags);
+	pSMB->Flags = cpu_to_le16(flags & COPY_TREE);
 
 	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
 		name_len = cifs_strtoUCS((wchar_t *) pSMB->OldFileName, 
@@ -1098,15 +1097,15 @@ copyRetry:
 		name_len2++;    /* signature byte */
 	}
 
-	pSMB->ByteCount = 1 /* 1st signature byte */  + name_len + name_len2;
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	count = 1 /* 1st signature byte */  + name_len + name_len2;
+	pSMB->hdr.smb_buf_length += count;
+	pSMB->ByteCount = cpu_to_le16(count);
 
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 		(struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
 		cFYI(1, ("Send error in copy = %d with %d files copied",
-			rc, pSMBr->CopyCount));
+			rc, le16_to_cpu(pSMBr->CopyCount)));
 	}
 	if (pSMB)
 		cifs_buf_release(pSMB);

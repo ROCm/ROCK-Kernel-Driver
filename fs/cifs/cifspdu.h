@@ -787,9 +787,9 @@ typedef struct smb_com_rename_req {
 typedef struct smb_com_copy_req {
 	struct smb_hdr hdr;	/* wct = 3 */
 	__u16 Tid2;
-	__u16 OpenFunction;
-	__u16 Flags;
-	__u16 ByteCount;
+	__le16 OpenFunction;
+	__le16 Flags;
+	__le16 ByteCount;
 	__u8 BufferFormat;	/* 4 = ASCII or Unicode */ 
 	unsigned char OldFileName[1];
 	/* followed by __u8 BufferFormat2 */
@@ -798,7 +798,7 @@ typedef struct smb_com_copy_req {
 
 typedef struct smb_com_copy_rsp {
 	struct smb_hdr hdr;     /* wct = 1 */
-	__u16 CopyCount;    /* number of files copied */
+	__le16 CopyCount;    /* number of files copied */
 	__u16 ByteCount;    /* may be zero */
 	__u8 BufferFormat;  /* 0x04 - only present if errored file follows */
 	unsigned char ErrorFileName[1]; /* only present if error in copy */
