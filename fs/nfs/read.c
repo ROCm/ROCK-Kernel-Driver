@@ -255,11 +255,12 @@ nfs_pagein_list(struct list_head *head, int rpages)
  * received or some error occurred (timeout or socket shutdown).
  */
 void
-nfs_readpage_result(struct rpc_task *task, unsigned int count, int eof)
+nfs_readpage_result(struct rpc_task *task)
 {
 	struct nfs_read_data	*data = (struct nfs_read_data *) task->tk_calldata;
 	struct inode		*inode = data->inode;
 	struct nfs_fattr	*fattr = &data->fattr;
+	unsigned int count = data->res.count;
 
 	dprintk("NFS: %4d nfs_readpage_result, (status %d)\n",
 		task->tk_pid, task->tk_status);
@@ -279,7 +280,7 @@ nfs_readpage_result(struct rpc_task *task, unsigned int count, int eof)
 							req->wb_bytes - count);
 				kunmap(page);
 
-				if (eof ||
+				if (data->res.eof ||
 				    ((fattr->valid & NFS_ATTR_FATTR) &&
 				     ((req_offset(req) + req->wb_offset + count) >= fattr->size)))
 					SetPageUptodate(page);

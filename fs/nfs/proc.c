@@ -521,13 +521,6 @@ nfs_proc_pathconf(struct nfs_server *server, struct nfs_fh *fhandle,
 extern u32 * nfs_decode_dirent(u32 *, struct nfs_entry *, int);
 
 static void
-nfs_read_done(struct rpc_task *task)
-{
-	struct nfs_read_data *data = (struct nfs_read_data *) task->tk_calldata;
-	nfs_readpage_result(task, data->u.v3.res.count, data->u.v3.res.eof);
-}
-
-static void
 nfs_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 {
 	struct rpc_task		*task = &data->task;
@@ -536,26 +529,26 @@ nfs_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 	int			flags;
 	struct rpc_message	msg = {
 		.rpc_proc	= &nfs_procedures[NFSPROC_READ],
-		.rpc_argp	= &data->u.v3.args,
-		.rpc_resp	= &data->u.v3.res,
+		.rpc_argp	= &data->args,
+		.rpc_resp	= &data->res,
 		.rpc_cred	= data->cred,
 	};
 	
 	req = nfs_list_entry(data->pages.next);
-	data->u.v3.args.fh     = NFS_FH(inode);
-	data->u.v3.args.offset = req_offset(req) + req->wb_offset;
-	data->u.v3.args.pgbase = req->wb_offset;
-	data->u.v3.args.pages  = data->pagevec;
-	data->u.v3.args.count  = count;
-	data->u.v3.res.fattr   = &data->fattr;
-	data->u.v3.res.count   = count;
-	data->u.v3.res.eof     = 0;
+	data->args.fh     = NFS_FH(inode);
+	data->args.offset = req_offset(req) + req->wb_offset;
+	data->args.pgbase = req->wb_offset;
+	data->args.pages  = data->pagevec;
+	data->args.count  = count;
+	data->res.fattr   = &data->fattr;
+	data->res.count   = count;
+	data->res.eof     = 0;
 	
 	/* N.B. Do we need to test? Never called for swapfile inode */
 	flags = RPC_TASK_ASYNC | (IS_SWAPFILE(inode)? NFS_RPC_SWAPFLAGS : 0);
 
 	/* Finalize the task. */
-	rpc_init_task(task, NFS_CLIENT(inode), nfs_read_done, flags);
+	rpc_init_task(task, NFS_CLIENT(inode), nfs_readpage_result, flags);
 	task->tk_calldata = data;
 	/* Release requests */
 	task->tk_release = nfs_readdata_release;

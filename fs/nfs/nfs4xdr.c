@@ -64,8 +64,29 @@
 
 extern int			nfs_stat_to_errno(int);
 
+/* NFSv4 COMPOUND tags are only wanted for debugging purposes */
+#ifdef DEBUG
+#define NFS4_MAXTAGLEN		20
+#else
+#define NFS4_MAXTAGLEN		0
+#endif
+
+#define compound_encode_hdr_maxsz	3 + (NFS4_MAXTAGLEN >> 2)
+#define compound_decode_hdr_maxsz	2 + (NFS4_MAXTAGLEN >> 2)
+#define op_encode_hdr_maxsz	1
+#define op_decode_hdr_maxsz	2
+#define encode_putfh_maxsz	op_encode_hdr_maxsz + 1 + \
+				(NFS4_FHSIZE >> 2)
+#define decode_putfh_maxsz	op_decode_hdr_maxsz
+
 #define NFS4_enc_compound_sz	1024  /* XXX: large enough? */
 #define NFS4_dec_compound_sz	1024  /* XXX: large enough? */
+#define NFS4_enc_read_sz	compound_encode_hdr_maxsz + \
+				encode_putfh_maxsz + \
+				op_encode_hdr_maxsz + 7
+#define NFS4_dec_read_sz	compound_decode_hdr_maxsz + \
+				decode_putfh_maxsz + \
+				op_decode_hdr_maxsz + 2
 
 static struct {
 	unsigned int	mode;
@@ -131,6 +152,7 @@ encode_compound_hdr(struct xdr_stream *xdr, struct compound_hdr *hdr)
 	uint32_t *p;
 
 	dprintk("encode_compound: tag=%.*s\n", (int)hdr->taglen, hdr->tag);
+	BUG_ON(hdr->taglen > NFS4_MAXTAGLEN);
 	RESERVE_SPACE(12+XDR_QUADLEN(hdr->taglen));
 	WRITE32(hdr->taglen);
 	WRITEMEM(hdr->tag, hdr->taglen);
@@ -472,15 +494,15 @@ encode_open_confirm(struct xdr_stream *xdr, struct nfs4_open_confirm *open_confi
 }
 
 static int
-encode_putfh(struct xdr_stream *xdr, struct nfs4_putfh *putfh)
+encode_putfh(struct xdr_stream *xdr, struct nfs_fh *fh)
 {
-	int len = putfh->pf_fhandle->size;
+	int len = fh->size;
 	uint32_t *p;
 
 	RESERVE_SPACE(8 + len);
 	WRITE32(OP_PUTFH);
 	WRITE32(len);
-	WRITEMEM(putfh->pf_fhandle->data, len);
+	WRITEMEM(fh->data, len);
 
 	return 0;
 }
@@ -497,10 +519,8 @@ encode_putrootfh(struct xdr_stream *xdr)
 }
 
 static int
-encode_read(struct xdr_stream *xdr, struct nfs4_read *read, struct rpc_rqst *req)
+encode_read(struct xdr_stream *xdr, struct nfs_readargs *args)
 {
-	struct rpc_auth	*auth = req->rq_task->tk_auth;
-	int		replen;
 	uint32_t *p;
 
 	RESERVE_SPACE(32);
@@ -509,16 +529,8 @@ encode_read(struct xdr_stream *xdr, struct nfs4_read *read, struct rpc_rqst *req
 	WRITE32(0);
 	WRITE32(0);
 	WRITE32(0);
-	WRITE64(read->rd_offset);
-	WRITE32(read->rd_length);
-
-	/* set up reply iovec
-	 *    toplevel status + taglen + rescount + OP_PUTFH + status
-	 *       + OP_READ + status + eof + datalen = 9
-	 */
-	replen = (RPC_REPHDRSIZE + auth->au_rslack + 9) << 2;
-	xdr_inline_pages(&req->rq_rcv_buf, replen,
-			 read->rd_pages, read->rd_pgbase, read->rd_length);
+	WRITE64(args->offset);
+	WRITE32(args->count);
 
 	return 0;
 }
@@ -759,13 +771,10 @@ encode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 			status = encode_open_confirm(xdr, &cp->ops[i].u.open_confirm);
 			break;
 		case OP_PUTFH:
-			status = encode_putfh(xdr, &cp->ops[i].u.putfh);
+			status = encode_putfh(xdr, cp->ops[i].u.putfh.pf_fhandle);
 			break;
 		case OP_PUTROOTFH:
 			status = encode_putrootfh(xdr);
-			break;
-		case OP_READ:
-			status = encode_read(xdr, &cp->ops[i].u.read, req);
 			break;
 		case OP_READDIR:
 			status = encode_readdir(xdr, &cp->ops[i].u.readdir, req);
@@ -826,6 +835,37 @@ nfs4_xdr_enc_compound(struct rpc_rqst *req, uint32_t *p, struct nfs4_compound *c
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
 	status = encode_compound(&xdr, cp, req);
 	cp->timestamp = jiffies;
+	return status;
+}
+
+/*
+ * Encode a READ request
+ */
+static int
+nfs4_xdr_enc_read(struct rpc_rqst *req, uint32_t *p, struct nfs_readargs *args)
+{
+	struct rpc_auth	*auth = req->rq_task->tk_auth;
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops	= 2,
+	};
+	int replen, status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr);
+	status = encode_putfh(&xdr, args->fh);
+	if (status)
+		goto out;
+	status = encode_read(&xdr, args);
+
+	/* set up reply iovec
+	 *    toplevel status + taglen=0 + rescount + OP_PUTFH + status
+	 *       + OP_READ + status + eof + datalen = 9
+	 */
+	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS4_dec_read_sz) << 2;
+	xdr_inline_pages(&req->rq_rcv_buf, replen,
+			 args->pages, args->pgbase, args->count);
+out:
 	return status;
 }
 
@@ -1368,7 +1408,7 @@ decode_putrootfh(struct xdr_stream *xdr)
 }
 
 static int
-decode_read(struct xdr_stream *xdr, struct rpc_rqst *req, struct nfs4_read *read)
+decode_read(struct xdr_stream *xdr, struct rpc_rqst *req, struct nfs_readres *res)
 {
 	struct iovec *iov = req->rq_rvec;
 	uint32_t *p;
@@ -1382,14 +1422,6 @@ decode_read(struct xdr_stream *xdr, struct rpc_rqst *req, struct nfs4_read *read
 	READ32(eof);
 	READ32(count);
 	hdrlen = (u8 *) p - (u8 *) iov->iov_base;
-	if (iov->iov_len < hdrlen) {
-		printk(KERN_WARNING "NFS: READ reply header overflowed:"
-				"length %u > %Zu\n", hdrlen, iov->iov_len);
-		return -errno_NFSERR_IO;
-	} else if (iov->iov_len != hdrlen) {
-		dprintk("NFS: READ header is short. iovec will be shifted.\n");
-		xdr_shift_buf(&req->rq_rcv_buf, iov->iov_len - hdrlen);
-	}
 	recvd = req->rq_received - hdrlen;
 	if (count > recvd) {
 		printk(KERN_WARNING "NFS: server cheating in read reply: "
@@ -1397,9 +1429,9 @@ decode_read(struct xdr_stream *xdr, struct rpc_rqst *req, struct nfs4_read *read
 		count = recvd;
 		eof = 0;
 	}
-	if (read->rd_eof)
-		*read->rd_eof = eof;
-	*read->rd_bytes_read = count;
+	xdr_read_pages(xdr, count);
+	res->eof = eof;
+	res->count = count;
 	return 0;
 }
 
@@ -1421,17 +1453,10 @@ decode_readdir(struct xdr_stream *xdr, struct rpc_rqst *req, struct nfs4_readdir
 	COPYMEM(readdir->rd_resp_verifier, 8);
 
 	hdrlen = (char *) p - (char *) iov->iov_base;
-	if (iov->iov_len < hdrlen) {
-		printk(KERN_WARNING "NFS: READDIR reply header overflowed:"
-				"length %d > %Zu\n", hdrlen, iov->iov_len);
-		return -EIO;
-	} else if (iov->iov_len != hdrlen) {
-		dprintk("NFS: READDIR header is short. iovec will be shifted.\n");
-		xdr_shift_buf(rcvbuf, iov->iov_len - hdrlen);
-	}
 	recvd = req->rq_received - hdrlen;
 	if (pglen > recvd)
 		pglen = recvd;
+	xdr_read_pages(xdr, pglen);
 
 	BUG_ON(pglen + readdir->rd_pgbase > PAGE_CACHE_SIZE);
 	p   = (uint32_t *) kmap(page);
@@ -1731,9 +1756,6 @@ decode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 		case OP_PUTROOTFH:
 			status = decode_putrootfh(xdr);
 			break;
-		case OP_READ:
-			status = decode_read(xdr, req, &op->u.read);
-			break;
 		case OP_READDIR:
 			status = decode_readdir(xdr, req, &op->u.readdir);
 			break;
@@ -1802,6 +1824,30 @@ out:
 	return status;
 }
 
+/*
+ * Decode Read response
+ */
+static int
+nfs4_xdr_dec_read(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_readres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_putfh(&xdr);
+	if (status)
+		goto out;
+	status = decode_read(&xdr, rqstp, res);
+	if (!status)
+		status = -nfs_stat_to_errno(hdr.status);
+out:
+	return status;
+}
+
 uint32_t *
 nfs4_decode_dirent(uint32_t *p, struct nfs_entry *entry, int plus)
 {
@@ -1854,6 +1900,7 @@ nfs4_decode_dirent(uint32_t *p, struct nfs_entry *entry, int plus)
 
 struct rpc_procinfo	nfs4_procedures[] = {
   PROC(COMPOUND,	enc_compound,	dec_compound),
+  PROC(READ,		enc_read,	dec_read),
 };
 
 struct rpc_version		nfs_version4 = {

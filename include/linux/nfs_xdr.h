@@ -422,15 +422,6 @@ struct nfs4_putfh {
 	struct nfs_fh *			pf_fhandle;       /* request */
 };
 
-struct nfs4_read {
-	u64				rd_offset;        /* request */
-	u32				rd_length;        /* request */
-	u32				*rd_eof;          /* response */
-	u32				*rd_bytes_read;   /* response */
-	struct page **			rd_pages;   /* zero-copy data */
-	unsigned int			rd_pgbase;  /* zero-copy data */
-};
-
 struct nfs4_readdir {
 	u64				rd_cookie;        /* request */
 	nfs4_verifier			rd_req_verifier;  /* request */
@@ -500,7 +491,6 @@ struct nfs4_op {
 		struct nfs4_open	open;
 		struct nfs4_open_confirm open_confirm;
 		struct nfs4_putfh	putfh;
-		struct nfs4_read	read;
 		struct nfs4_readdir	readdir;
 		struct nfs4_readlink	readlink;
 		struct nfs4_remove	remove;
@@ -548,20 +538,11 @@ struct nfs_read_data {
 	struct nfs_fattr	fattr;	/* fattr storage */
 	struct list_head	pages;	/* Coalesced read requests */
 	struct page		*pagevec[NFS_READ_MAXIOV];
-	union {
-		struct {
-			struct nfs_readargs args;
-			struct nfs_readres  res;
-		} v3;   /* also v2 */
+	struct nfs_readargs args;
+	struct nfs_readres  res;
 #ifdef CONFIG_NFS_V4
-		struct {
-			struct nfs4_compound  compound;
-			struct nfs4_op        ops[3];
-			u32                   res_count;
-			u32                   res_eof;
-		} v4;
+	unsigned long		timestamp;	/* For lease renewal */
 #endif
-	} u;
 };
 
 struct nfs_write_data {
