@@ -1445,62 +1445,7 @@ source "drivers/media/Kconfig"
 
 source "fs/Kconfig"
 
-
-menu "Console drivers"
-	depends on VT
-
-config VGA_CONSOLE
-	bool "VGA text console"
-	help
-	  Saying Y here will allow you to use Linux in text mode through a
-	  display that complies with the generic VGA standard. Virtually
-	  everyone wants that.
-
-	  The program SVGATextMode can be used to utilize SVGA video cards to
-	  their full potential in text mode. Download it from
-	  <ftp://ibiblio.org/pub/Linux/utils/console/>.
-
-	  Say Y.
-
-config VIDEO_SELECT
-	bool "Video mode selection support"
-	---help---
-	  This enables support for text mode selection on kernel startup. If
-	  you want to take advantage of some high-resolution text mode your
-	  card's BIOS offers, but the traditional Linux utilities like
-	  SVGATextMode don't, you can say Y here and set the mode using the
-	  "vga=" option from your boot loader (lilo or loadlin) or set
-	  "vga=ask" which brings up a video mode menu on kernel startup. (Try
-	  "man bootparam" or see the documentation of your boot loader about
-	  how to pass options to the kernel.)
-
-	  Read the file <file:Documentation/svga.txt> for more information
-	  about the Video mode selection support. If unsure, say N.
-
-if EXPERIMENTAL
-
-config MDA_CONSOLE
-	tristate "MDA text console (dual-headed) (EXPERIMENTAL)"
-	---help---
-	  Say Y here if you have an old MDA or monochrome Hercules graphics
-	  adapter in your system acting as a second head ( = video card). You
-	  will then be able to use two monitors with your Linux system. Do not
-	  say Y here if your MDA card is the primary card in your system; the
-	  normal VGA driver will handle it.
-
-	  This driver is also available as a module ( = code which can be
-	  inserted and removed from the running kernel whenever you want).
-	  The module will be called mdacon.o. If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
-
-	  If unsure, say N.
-
 source "drivers/video/Kconfig"
-
-endif
-
-endmenu
-
 
 menu "Sound"
 

@@ -1771,7 +1771,7 @@ default_chipset:
 	}
 
 	printk("fb%d: %s frame buffer device, using %ldK of video memory\n",
-	       GET_FB_IDX(fb_info.node), fb_info.modename,
+	       minor(fb_info.node), fb_info.modename,
 	       videomemorysize>>10);
 
 	return 0;
