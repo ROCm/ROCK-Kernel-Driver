@@ -70,7 +70,7 @@ static void __devinit pcibios_fixup_ghosts(struct pci_bus *b)
 	int i;
 
 	DBG("PCI: Scanning for ghost devices on bus %d\n", b->number);
-	for (ln=b->devices.next; ln != &b->devices; ln=ln->next) {
+	list_for_each(ln, &b->devices) {
 		d = pci_dev_b(ln);
 		if ((d->class >> 8) == PCI_CLASS_BRIDGE_HOST)
 			seen_host_bridge++;
