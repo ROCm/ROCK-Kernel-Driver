@@ -80,7 +80,7 @@ extern void iSeries_pcibios_fixup(void);
 extern void pSeries_get_rtc_time(struct rtc_time *rtc_time);
 extern int  pSeries_set_rtc_time(struct rtc_time *rtc_time);
 void pSeries_calibrate_decr(void);
-static void fwnmi_init(void);
+void fwnmi_init(void);
 extern void SystemReset_FWNMI(void), MachineCheck_FWNMI(void);	/* from head.S */
 int fwnmi_active;  /* TRUE if an FWNMI handler is present */
 
@@ -184,7 +184,7 @@ chrp_init2(void)
  * the firmware supports this feature.
  *
  */
-static void __init fwnmi_init(void)
+void __init fwnmi_init(void)
 {
 	long ret;
 	int ibm_nmi_register = rtas_token("ibm,nmi-register");

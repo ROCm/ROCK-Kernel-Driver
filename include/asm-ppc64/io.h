@@ -40,7 +40,7 @@ extern int have_print;
 #define writeb(data, addr)	iSeries_Write_Byte(data,((void*)(addr)))
 #define writew(data, addr)	iSeries_Write_Word(data,((void*)(addr)))
 #define writel(data, addr)	iSeries_Write_Long(data,((void*)(addr)))
-#define memset_io(a,b,c)	iSeries_memset((void *)(a),(b),(c))
+#define memset_io(a,b,c)	iSeries_memset_io((void *)(a),(b),(c))
 #define memcpy_fromio(a,b,c)	iSeries_memcpy_fromio((void *)(a), (void *)(b), (c))
 #define memcpy_toio(a,b,c)	iSeries_memcpy_toio((void *)(a), (void *)(b), (c))
 #define inb(addr)		readb(((unsigned long)(addr)))  
@@ -66,6 +66,18 @@ extern int have_print;
 #define outw(val, port)		_outw(val, (unsigned long)port)
 #define inl(port)		_inl((unsigned long)port)
 #define outl(val, port)		_outl(val, (unsigned long)port)
+
+/*
+ * The insw/outsw/insl/outsl macros don't do byte-swapping.
+ * They are only used in practice for transferring buffers which
+ * are arrays of bytes, and byte-swapping is not appropriate in
+ * that case.  - paulus */
+#define insb(port, buf, ns)	eeh_insb((u8 *)(port), (buf), (ns))
+#define outsb(port, buf, ns)	eeh_outsb((u8 *)(port), (buf), (ns))
+#define insw(port, buf, ns)	eeh_insw_ns((u16 *)(port), (buf), (ns))
+#define outsw(port, buf, ns)	eeh_outsw_ns((u16 *)(port), (buf), (ns))
+#define insl(port, buf, nl)	eeh_insl_ns((u32 *)(port), (buf), (nl))
+#define outsl(port, buf, nl)	eeh_outsl_ns((u32 *)(port), (buf), (nl))
 #endif
 
 
@@ -80,18 +92,6 @@ extern int have_print;
 #define inl_p(port)             inl(port)
 #define outl_p(val, port)       (udelay(1), outl((val, (port)))
 
-/*
- * The insw/outsw/insl/outsl macros don't do byte-swapping.
- * They are only used in practice for transferring buffers which
- * are arrays of bytes, and byte-swapping is not appropriate in
- * that case.  - paulus */
-#define _IOMAP_VADDR(port) (IS_MAPPED_VADDR(port) ? (port) : (port)+_IO_BASE)
-#define insb(port, buf, ns)	_insb((u8 *)(_IOMAP_VADDR(port)), (buf), (ns))
-#define outsb(port, buf, ns)	_outsb((u8 *)(_IOMAP_VADDR(port)), (buf), (ns))
-#define insw(port, buf, ns)	_insw_ns((u16 *)(_IOMAP_VADDR(port)), (buf), (ns))
-#define outsw(port, buf, ns)	_outsw_ns((u16 *)(_IOMAP_VADDR(port)), (buf), (ns))
-#define insl(port, buf, nl)	_insl_ns((u32 *)(_IOMAP_VADDR(port)), (buf), (nl))
-#define outsl(port, buf, nl)	_outsl_ns((u32 *)(_IOMAP_VADDR(port)), (buf), (nl))
 
 extern void _insb(volatile u8 *port, void *buf, int ns);
 extern void _outsb(volatile u8 *port, const void *buf, int ns);
@@ -109,10 +109,10 @@ extern void _outsl_ns(volatile u32 *port, const void *buf, int nl);
  * Neither do the standard versions now, these are just here
  * for older code.
  */
-#define insw_ns(port, buf, ns)	_insw_ns((u16 *)(_IOMAP_VADDR(port)), (buf), (ns))
-#define outsw_ns(port, buf, ns)	_outsw_ns((u16 *)(_IOMAP_VADDR(port)), (buf), (ns))
-#define insl_ns(port, buf, nl)	_insl_ns((u32 *)(_IOMAP_VADDR(port)), (buf), (nl))
-#define outsl_ns(port, buf, nl)	_outsl_ns((u32 *)(_IOMAP_VADDR(port)), (buf), (nl))
+#define insw_ns(port, buf, ns)	insw(port, buf, ns)
+#define outsw_ns(port, buf, ns)	outsw(port, buf, ns)
+#define insl_ns(port, buf, nl)	insl(port, buf, nl)
+#define outsl_ns(port, buf, nl)	outsl(port, buf, nl)
 
 
 #define IO_SPACE_LIMIT ~(0UL)

@@ -51,6 +51,8 @@
 #define PPCDBG_SMP           PPCDBG_BITVAL(19)
 #define PPCDBG_BOOT          PPCDBG_BITVAL(20)
 #define PPCDBG_BUSWALK       PPCDBG_BITVAL(21)
+#define PPCDBG_PROM	     PPCDBG_BITVAL(22)
+#define PPCDBG_RTAS	     PPCDBG_BITVAL(23)
 #define PPCDBG_HTABSTRESS    PPCDBG_BITVAL(62)
 #define PPCDBG_HTABSIZE      PPCDBG_BITVAL(63)
 #define PPCDBG_NONE          (0UL)
@@ -74,7 +76,8 @@ char *trace_names[PPCDBG_NUM_FLAGS] = {
 	"signal",	"signal_xmon",
 	"binfmt32",	"binfmt64",	"binfmt_xmon",	"binfmt_32addr",
 	"alignfixup",   "tceinit",      "tce",          "phb_init",     
-	"smp",          "boot",         "buswalk"
+	"smp",          "boot",         "buswalk",	"prom",
+	"rtas"
 };
 #else
 extern char *trace_names[64];

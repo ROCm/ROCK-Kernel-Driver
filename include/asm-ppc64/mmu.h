@@ -115,7 +115,7 @@ typedef struct {
 
 typedef struct {
 	unsigned long pp0:  1; /* Page protection bit 0 */
-	unsigned long :     1; /* Reserved */
+	unsigned long ts:   1; /* Tag set bit */
 	unsigned long rpn: 50; /* Real page number */
 	unsigned long :     2; /* Reserved */
 	unsigned long ac:   1; /* Address compare */ 

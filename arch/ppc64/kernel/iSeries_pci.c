@@ -510,7 +510,7 @@ int iSeries_Scan_Bridge_Slot(HvBusNumber Bus, struct HvCallPci_BridgeInfo* Bridg
 /* I/0 Memory copy MUST use mmio commands on iSeries                    */
 /* To do; For performance, include the hv call directly                 */
 /************************************************************************/
-void* iSeries_memset(void* dest, char c, size_t Count)
+void* iSeries_memset_io(void* dest, char c, size_t Count)
 {
 	u8    ByteValue     = c;
 	long  NumberOfBytes = Count;

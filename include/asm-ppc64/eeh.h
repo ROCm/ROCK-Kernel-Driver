@@ -149,4 +149,38 @@ static inline void eeh_memcpy_toio(void *dest, void *src, unsigned long n) {
 	memcpy(vdest, src, n);
 }
 
+static inline void eeh_insb(volatile u8 *addr, void *buf, int n) {
+	volatile u8 *vaddr = (volatile u8 *)IO_TOKEN_TO_ADDR(addr);
+	_insb(vaddr, buf, n);
+	/* ToDo: look for ff's in buf[n] */
+}
+
+static inline void eeh_outsb(volatile u8 *addr, const void *buf, int n) {
+	volatile u8 *vaddr = (volatile u8 *)IO_TOKEN_TO_ADDR(addr);
+	_outsb(vaddr, buf, n);
+}
+
+static inline void eeh_insw_ns(volatile u16 *addr, void *buf, int n) {
+	volatile u16 *vaddr = (volatile u16 *)IO_TOKEN_TO_ADDR(addr);
+	_insw_ns(vaddr, buf, n);
+	/* ToDo: look for ffff's in buf[n] */
+}
+
+static inline void eeh_outsw_ns(volatile u16 *addr, const void *buf, int n) {
+	volatile u16 *vaddr = (volatile u16 *)IO_TOKEN_TO_ADDR(addr);
+	_outsw_ns(vaddr, buf, n);
+}
+
+static inline void eeh_insl_ns(volatile u32 *addr, void *buf, int n) {
+	volatile u32 *vaddr = (volatile u32 *)IO_TOKEN_TO_ADDR(addr);
+	_insl_ns(vaddr, buf, n);
+	/* ToDo: look for ffffffff's in buf[n] */
+}
+
+static inline void eeh_outsl_ns(volatile u32 *addr, const void *buf, int n) {
+	volatile u32 *vaddr = (volatile u32 *)IO_TOKEN_TO_ADDR(addr);
+	_outsl_ns(vaddr, buf, n);
+}
+
+
 #endif /* _EEH_H */

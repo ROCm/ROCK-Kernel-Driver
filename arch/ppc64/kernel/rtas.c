@@ -106,17 +106,12 @@ call_rtas_display_status(char c)
 	enter_rtas((void *)__pa((unsigned long)rtas));	
 }
 
-#if 0
-#define DEBUG_RTAS
-#endif
 int
 rtas_token(const char *service)
 {
 	int *tokp;
 	if (rtas.dev == NULL) {
-#ifdef DEBUG_RTAS
-		udbg_printf("\tNo rtas device in device-tree...\n");
-#endif /* DEBUG_RTAS */
+		PPCDBG(PPCDBG_RTAS,"\tNo rtas device in device-tree...\n");
 		return RTAS_UNKNOWN_SERVICE;
 	}
 	tokp = (int *) get_property(rtas.dev, service, NULL);
@@ -132,13 +127,11 @@ rtas_call(int token, int nargs, int nret,
 	unsigned long s;
 	struct rtas_args *rtas_args = &(get_paca()->xRtas);
 
-#ifdef DEBUG_RTAS
-	udbg_printf("Entering rtas_call\n");
-	udbg_printf("\ttoken    = 0x%x\n", token);
-	udbg_printf("\tnargs    = %d\n", nargs);
-	udbg_printf("\tnret     = %d\n", nret);
-	udbg_printf("\t&outputs = 0x%lx\n", outputs);
-#endif /* DEBUG_RTAS */
+	PPCDBG(PPCDBG_RTAS, "Entering rtas_call\n");
+	PPCDBG(PPCDBG_RTAS, "\ttoken    = 0x%x\n", token);
+	PPCDBG(PPCDBG_RTAS, "\tnargs    = %d\n", nargs);
+	PPCDBG(PPCDBG_RTAS, "\tnret     = %d\n", nret);
+	PPCDBG(PPCDBG_RTAS, "\t&outputs = 0x%lx\n", outputs);
 	if (token == RTAS_UNKNOWN_SERVICE)
 		return -1;
 
@@ -149,9 +142,7 @@ rtas_call(int token, int nargs, int nret,
 	va_start(list, outputs);
 	for (i = 0; i < nargs; ++i) {
 	  rtas_args->args[i] = (rtas_arg_t)LONG_LSW(va_arg(list, ulong));
-#ifdef DEBUG_RTAS
-	  udbg_printf("\tnarg[%d] = 0x%lx\n", i, rtas_args->args[i]);
-#endif /* DEBUG_RTAS */
+		PPCDBG(PPCDBG_RTAS, "\tnarg[%d] = 0x%lx\n", i, rtas_args->args[i]);
 	}
 	va_end(list);
 
@@ -163,22 +154,19 @@ rtas_call(int token, int nargs, int nret,
 #else
 	spin_lock_irqsave(&rtas.lock, s);
 #endif
-#ifdef DEBUG_RTAS
-	udbg_printf("\tentering rtas with 0x%lx\n", (void *)__pa((unsigned long)rtas_args));
-#endif /* DEBUG_RTAS */
+	PPCDBG(PPCDBG_RTAS, "\tentering rtas with 0x%lx\n",
+		(void *)__pa((unsigned long)rtas_args));
 	enter_rtas((void *)__pa((unsigned long)rtas_args));
-#ifdef DEBUG_RTAS
-	udbg_printf("\treturned from rtas ...\n");
-#endif /* DEBUG_RTAS */
+	PPCDBG(PPCDBG_RTAS, "\treturned from rtas ...\n");
 #if 0   /* Gotta do something different here, use global lock for now... */
 	spin_unlock_irqrestore(&rtas_args->lock, s);
 #else
 	spin_unlock_irqrestore(&rtas.lock, s);
 #endif
-#ifdef DEBUG_RTAS
+	ifppcdebug(PPCDBG_RTAS) {
 	for(i=0; i < nret ;i++)
 	  udbg_printf("\tnret[%d] = 0x%lx\n", i, (ulong)rtas_args->rets[i]);
-#endif /* DEBUG_RTAS */
+	}
 
 	if (nret > 1 && outputs != NULL)
 		for (i = 0; i < nret-1; ++i)
