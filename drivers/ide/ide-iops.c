@@ -221,23 +221,17 @@ void SELECT_INTERRUPT (ide_drive_t *drive)
 		HWIF(drive)->OUTB(drive->ctl|2, IDE_CONTROL_REG);
 }
 
-EXPORT_SYMBOL(SELECT_INTERRUPT);
-
 void SELECT_MASK (ide_drive_t *drive, int mask)
 {
 	if (HWIF(drive)->maskproc)
 		HWIF(drive)->maskproc(drive, mask);
 }
 
-EXPORT_SYMBOL(SELECT_MASK);
-
 void QUIRK_LIST (ide_drive_t *drive)
 {
 	if (HWIF(drive)->quirkproc)
 		drive->quirk_list = HWIF(drive)->quirkproc(drive);
 }
-
-EXPORT_SYMBOL(QUIRK_LIST);
 
 /*
  * Some localbus EIDE interfaces require a special access sequence
@@ -252,8 +246,6 @@ void ata_vlb_sync (ide_drive_t *drive, unsigned long port)
 	(void) HWIF(drive)->INB(port);
 	(void) HWIF(drive)->INB(port);
 }
-
-EXPORT_SYMBOL(ata_vlb_sync);
 
 /*
  * This is used for most PIO data transfers *from* the IDE interface
@@ -277,8 +269,6 @@ void ata_input_data (ide_drive_t *drive, void *buffer, u32 wcount)
 	}
 }
 
-EXPORT_SYMBOL(ata_input_data);
-
 /*
  * This is used for most PIO data transfers *to* the IDE interface
  */
@@ -300,8 +290,6 @@ void ata_output_data (ide_drive_t *drive, void *buffer, u32 wcount)
 		hwif->OUTSW(IDE_DATA_REG, buffer, wcount<<1);
 	}
 }
-
-EXPORT_SYMBOL(ata_output_data);
 
 /*
  * The following routines are mainly used by the ATAPI drivers.
