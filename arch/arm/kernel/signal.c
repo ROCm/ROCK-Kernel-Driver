@@ -8,22 +8,13 @@
  * published by the Free Software Foundation.
  */
 #include <linux/config.h>
-#include <linux/sched.h>
-#include <linux/mm.h>
-#include <linux/smp.h>
-#include <linux/smp_lock.h>
-#include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/signal.h>
-#include <linux/wait.h>
 #include <linux/ptrace.h>
 #include <linux/personality.h>
-#include <linux/tty.h>
-#include <linux/binfmts.h>
-#include <linux/elf.h>
 #include <linux/suspend.h>
 
-#include <asm/pgalloc.h>
+#include <asm/cacheflush.h>
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
