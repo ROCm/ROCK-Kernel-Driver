@@ -18,8 +18,8 @@ config CFGNAME
 	  part of the EXTRAVERSION.
 
 config RELEASE
-	int "Release number"
-	default 0
+	string "Release number"
+	default "0"
 	help
 	  The release number of the kernel sources. The configuration
 	  files provided in arch/$ARCH/defconfig.$CFGNAME set the
