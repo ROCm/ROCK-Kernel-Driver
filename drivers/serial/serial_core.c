@@ -1208,9 +1208,15 @@ static void uart_set_termios(struct tty_struct *tty, struct termios *old_termios
 static void uart_close(struct tty_struct *tty, struct file *filp)
 {
 	struct uart_state *state = tty->driver_data;
-	struct uart_port *port = state->port;
+	struct uart_port *port;
 
 	BUG_ON(!kernel_locked());
+
+	if (!state || !state->port)
+		return;
+
+	port = state->port;
+
 	DPRINTK("uart_close(%d) called\n", port->line);
 
 	down(&state->sem);
