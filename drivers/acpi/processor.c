@@ -1658,7 +1658,6 @@ static int
 acpi_cpufreq_setpolicy (
 	struct cpufreq_policy   *policy)
 {
-	unsigned int cpu = 0;
 	unsigned int i = 0;
 	struct acpi_processor *pr = NULL;
 	unsigned int next_state = 0;
@@ -1669,24 +1668,9 @@ acpi_cpufreq_setpolicy (
 	if (!policy)
 		return_VALUE(-EINVAL);
 
-	/* get a present, initialized CPU */
-	if (policy->cpu == CPUFREQ_ALL_CPUS)
-	{
-		for (i=0; i<NR_CPUS; i++) {
-			if (processors[i] != NULL) {
-				cpu = i;
-				pr = processors[cpu];
-				break;
-			}
-		}
-	}
-	else
-	{
-		cpu = policy->cpu;
-		pr = processors[cpu];
-		if (!pr)
-			return_VALUE(-EINVAL);
-	}
+	pr = processors[policy->cpu];
+	if (!pr)
+		return_VALUE(-EINVAL);
 
 	/* select appropriate P-State */
 	if (policy->policy == CPUFREQ_POLICY_POWERSAVE)
@@ -1715,19 +1699,9 @@ acpi_cpufreq_setpolicy (
 	}
 
 	/* set one or all CPUs to the new state */
-	if (policy->cpu == CPUFREQ_ALL_CPUS) {
-		for (i=0; i<NR_CPUS; i++)
-		{
-			pr = processors[cpu];
-			if (!pr || !cpu_online(cpu))
-				continue;
-			result = acpi_processor_set_performance (pr, next_state);
-		}
-	} else {
-		result = acpi_processor_set_performance (pr, next_state);
-	}
+	result = acpi_processor_set_performance (pr, next_state);
 
-	return_VALUE(0);
+	return_VALUE(result);
 }
 
 
@@ -1735,7 +1709,6 @@ static int
 acpi_cpufreq_verify (
 	struct cpufreq_policy   *policy)
 {
-	unsigned int cpu = 0;
 	unsigned int i = 0;
 	struct acpi_processor *pr = NULL;
 	unsigned int number_states = 0;
@@ -1746,24 +1719,9 @@ acpi_cpufreq_verify (
 	if (!policy)
 		return_VALUE(-EINVAL);
 
-	/* get a present, initialized CPU */
-	if (policy->cpu == CPUFREQ_ALL_CPUS)
-	{
-		for (i=0; i<NR_CPUS; i++) {
-			if (processors[i] != NULL) {
-				cpu = i;
-				pr = processors[cpu];
-				break;
-			}
-		}
-	}
-	else
-	{
-		cpu = policy->cpu;
-		pr = processors[cpu];
-		if (!pr)
-			return_VALUE(-EINVAL);
-	}
+	pr = processors[policy->cpu];
+	if (!pr)
+		return_VALUE(-EINVAL);
 
 	/* first check if min and max are within valid limits */
 	cpufreq_verify_within_limits(
@@ -1786,6 +1744,11 @@ acpi_cpufreq_verify (
 		/* round up now */
 		policy->max = pr->performance.states[next_larger_state].core_frequency * 1000;
 	}
+
+	cpufreq_verify_within_limits(
+		policy, 
+		pr->performance.states[pr->performance.state_count - 1].core_frequency * 1000,
+		pr->performance.states[pr->limit.state.px].core_frequency * 1000);
 
 	return_VALUE(0);
 }
