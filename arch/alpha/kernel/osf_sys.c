@@ -762,7 +762,7 @@ osf_setsysinfo(unsigned long op, void __user *buffer, unsigned long nbytes,
 			info.si_signo = SIGFPE;
 			info.si_errno = 0;
 			info.si_code = si_code;
-			info.si_addr = 0;  /* FIXME */
+			info.si_addr = NULL;  /* FIXME */
  			send_sig_info(SIGFPE, &info, current);
  		}
 
@@ -956,7 +956,7 @@ osf_utimes(char __user *filename, struct timeval32 __user *tvs)
 			return -EFAULT;
 	}
 
-	return do_utimes(filename, tvs ? ktvs : 0);
+	return do_utimes(filename, tvs ? ktvs : NULL);
 }
 
 #define MAX_SELECT_SECONDS \

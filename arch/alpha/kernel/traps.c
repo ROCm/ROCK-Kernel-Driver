@@ -223,7 +223,7 @@ do_entArith(unsigned long summary, unsigned long write_mask,
 		if (si_code == 0)
 			return;
 	}
-	die_if_kernel("Arithmetic fault", regs, 0, 0);
+	die_if_kernel("Arithmetic fault", regs, 0, NULL);
 
 	info.si_signo = SIGFPE;
 	info.si_errno = 0;
@@ -247,7 +247,7 @@ do_entIF(unsigned long type, struct pt_regs *regs)
 			       data[0]);
 		}
 		die_if_kernel((type == 1 ? "Kernel Bug" : "Instruction fault"),
-			      regs, type, 0);
+			      regs, type, NULL);
 	}
 
 	switch (type) {
@@ -410,7 +410,7 @@ do_entDbg(struct pt_regs *regs)
 {
 	siginfo_t info;
 
-	die_if_kernel("Instruction fault", regs, 0, 0);
+	die_if_kernel("Instruction fault", regs, 0, NULL);
 
 	info.si_signo = SIGILL;
 	info.si_errno = 0;

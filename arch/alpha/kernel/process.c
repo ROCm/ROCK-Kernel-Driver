@@ -189,7 +189,7 @@ EXPORT_SYMBOL(machine_power_off);
 void
 show_regs(struct pt_regs *regs)
 {
-	dik_show_regs(regs, 0);
+	dik_show_regs(regs, NULL);
 }
 
 /*

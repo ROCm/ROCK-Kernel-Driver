@@ -864,7 +864,7 @@ smp_call_function_on_cpu (void (*func) (void *info), void *info, int retry,
 
 	/* We either got one or timed out -- clear the lock. */
 	mb();
-	smp_call_function_data = 0;
+	smp_call_function_data = NULL;
 
 	/* 
 	 * If after both the initial and long timeout periods we still don't
