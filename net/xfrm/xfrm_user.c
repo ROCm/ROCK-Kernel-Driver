@@ -267,6 +267,8 @@ static int xfrm_add_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 	if (err)
 		return err;
 
+	xfrm_probe_algs();
+
 	x = xfrm_state_construct(p, (struct rtattr **) xfrma, &err);
 	if (!x)
 		return err;
