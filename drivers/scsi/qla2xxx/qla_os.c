@@ -1663,7 +1663,7 @@ qla2xxx_eh_host_reset(struct scsi_cmnd *cmd)
 		goto out;
 
 	/* Waiting for our command in done_queue to be returned to OS.*/
-	if (qla2x00_eh_wait_for_pending_commands(ha))
+	if (!qla2x00_eh_wait_for_pending_commands(ha))
 		rval = FAILED;
 
  out:
@@ -1784,7 +1784,7 @@ qla2xxx_slave_configure(struct scsi_device *sdev)
 
 		ql2xmaxqdepth = queue_depth;
 
-		scsi_adjust_queue_depth(sdev, MSG_ORDERED_TAG, queue_depth);
+		scsi_activate_tcq(sdev, queue_depth);
 
 		qla_printk(KERN_INFO, ha,
 		    "scsi(%d:%d:%d:%d): Enabled tagged queuing, queue "
@@ -4517,3 +4517,4 @@ module_exit(qla2x00_module_exit);
 MODULE_AUTHOR("QLogic Corporation");
 MODULE_DESCRIPTION("QLogic Fibre Channel HBA Driver");
 MODULE_LICENSE("GPL");
+MODULE_VERSION(QLA2XXX_VERSION);

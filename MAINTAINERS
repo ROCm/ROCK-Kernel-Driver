@@ -621,6 +621,8 @@ DC390/AM53C974 SCSI driver
 P:	Kurt Garloff
 M:	garloff@suse.de
 W:	http://www.garloff.de/kurt/linux/dc390/
+P:	Guennadi Liakhovetski
+M:	g.liakhovetski@gmx.de
 S:	Maintained
 
 DECnet NETWORK LAYER

@@ -1337,7 +1337,6 @@ mptbase_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 			printk(MYIOC_s_ERR_FMT "Unable to allocate interrupt %s!\n",
 					ioc->name, __irq_itoa(pdev->irq));
 #endif
-			Q_DEL_ITEM(ioc);
 			list_del(&ioc->list);
 			iounmap(mem);
 			kfree(ioc);
@@ -1369,7 +1368,6 @@ mptbase_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		  ": WARNING - %s did not initialize properly! (%d)\n",
 		  ioc->name, r);
 
-		Q_DEL_ITEM(ioc);
 		list_del(&ioc->list);
 		free_irq(ioc->pci_irq, ioc);
 		iounmap(mem);
@@ -2416,7 +2414,7 @@ GetIocFacts(MPT_ADAPTER *ioc, int sleepFlag, int reason)
 		}
 	} else {
 		printk(MYIOC_s_ERR_FMT 
-		     "Invalid IOC facts reply, msgLength=%d offsetof=%d!\n",
+		     "Invalid IOC facts reply, msgLength=%d offsetof=%zd!\n",
 		     ioc->name, facts->MsgLength, (offsetof(IOCFactsReply_t,
 		     RequestFrameSize)/sizeof(u32)));
 		return -66;

@@ -267,8 +267,8 @@ static        void nsp32_prom_stop     (nsp32_hw_data *);
 static        int  nsp32_prom_read     (nsp32_hw_data *, int);
 static        int  nsp32_prom_read_bit (nsp32_hw_data *);
 static        void nsp32_prom_write_bit(nsp32_hw_data *, int);
-static inline void nsp32_prom_set      (nsp32_hw_data *, int, int);
-static inline int  nsp32_prom_get      (nsp32_hw_data *, int);
+static        void nsp32_prom_set      (nsp32_hw_data *, int, int);
+static        int  nsp32_prom_get      (nsp32_hw_data *, int);
 
 /* debug/warning/info message */
 static void nsp32_message (const char *, int, char *, char *, ...);

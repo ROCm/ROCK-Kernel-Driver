@@ -111,7 +111,6 @@ MODULE_LICENSE("GPL");
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
 static int mptctl_id = -1;
-static struct semaphore mptctl_syscall_sem_ioc[MPT_MAX_ADAPTERS];
 
 static DECLARE_WAIT_QUEUE_HEAD ( mptctl_wait );
 
@@ -139,6 +138,9 @@ static int mptctl_replace_fw (unsigned long arg);
 static int mptctl_do_reset(unsigned long arg);
 static int mptctl_hp_hostinfo(unsigned long arg, unsigned int cmd);
 static int mptctl_hp_targetinfo(unsigned long arg);
+
+static int  mptctl_probe(struct pci_dev *, const struct pci_device_id *);
+static void mptctl_remove(struct pci_dev *);
 
 /*
  * Private function calls.
@@ -208,10 +210,10 @@ mptctl_syscall_down(MPT_ADAPTER *ioc, int nonblock)
 	}
 
 	if (nonblock) {
-		if (down_trylock(&mptctl_syscall_sem_ioc[ioc->id]))
+		if (down_trylock(&ioc->ioctl->sem_ioc))
 			rc = -EAGAIN;
 	} else {
-		if (down_interruptible(&mptctl_syscall_sem_ioc[ioc->id]))
+		if (down_interruptible(&ioc->ioctl->sem_ioc))
 			rc = -ERESTARTSYS;
 	}
 	dctlprintk((KERN_INFO MYNAM "::mptctl_syscall_down return %d\n", rc));
@@ -630,8 +632,7 @@ mptctl_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned 
 	else
 		ret = -EINVAL;
 
-
-	up(&mptctl_syscall_sem_ioc[iocp->id]);
+	up(&iocp->ioctl->sem_ioc);
 
 	return ret;
 }
@@ -2738,7 +2739,7 @@ compat_mptfwxfer_ioctl(unsigned int fd, unsigned int cmd,
 
 	ret = mptctl_do_fw_download(kfw.iocnum, kfw.bufp, kfw.fwlen);
 
-	up(&mptctl_syscall_sem_ioc[iocp->id]);
+	up(&iocp->ioctl->sem_ioc);
 
 	return ret;
 }
@@ -2792,55 +2793,91 @@ compat_mpt_command(unsigned int fd, unsigned int cmd,
 	 */
 	ret = mptctl_do_mpt_command (karg, &uarg->MF);
 
-	up(&mptctl_syscall_sem_ioc[iocp->id]);
+	up(&iocp->ioctl->sem_ioc);
 
 	return ret;
 }
 
 #endif
 
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/*
+ *	mptctl_probe - Installs ioctl devices per bus.
+ *	@pdev: Pointer to pci_dev structure
+ *
+ *	Returns 0 for success, non-zero for failure.
+ *
+ */
+
+static int
+mptctl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+{
+	int err;
+	int sz;
+	u8 *mem;
+	MPT_ADAPTER *ioc = pci_get_drvdata(pdev);
+
+	/*
+	 * Allocate and inite a MPT_IOCTL structure
+	*/
+	sz = sizeof (MPT_IOCTL);
+	mem = kmalloc(sz, GFP_KERNEL);
+	if (mem == NULL) {
+		err = -ENOMEM;
+		goto out_fail;
+	}
+
+	memset(mem, 0, sz);
+	ioc->ioctl = (MPT_IOCTL *) mem;
+	ioc->ioctl->ioc = ioc;
+	init_timer (&ioc->ioctl->timer);
+	ioc->ioctl->timer.data = (unsigned long) ioc->ioctl;
+	ioc->ioctl->timer.function = mptctl_timer_expired;
+	init_timer (&ioc->ioctl->TMtimer);
+	ioc->ioctl->TMtimer.data = (unsigned long) ioc->ioctl;
+	ioc->ioctl->TMtimer.function = mptctl_timer_expired;
+	sema_init(&ioc->ioctl->sem_ioc, 1);
+	return 0;
+
+out_fail:
+
+	mptctl_remove(pdev);
+	return err;
+}
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/*
+ *	mptctl_remove - Removed ioctl devices
+ *	@pdev: Pointer to pci_dev structure
+ *
+ *
+ */
+static void
+mptctl_remove(struct pci_dev *pdev)
+{
+	MPT_ADAPTER *ioc = pci_get_drvdata(pdev);
+
+	kfree ( ioc->ioctl );
+}
+
+static struct mpt_pci_driver mptctl_driver = {
+  .probe		= mptctl_probe,
+  .remove		= mptctl_remove,
+};
+
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 int __init mptctl_init(void)
 {
 	int err;
-	int i;
 	int where = 1;
-	int sz;
-	u8 *mem;
-	MPT_ADAPTER *ioc = NULL;
-	int iocnum;
 
 	show_mptmod_ver(my_NAME, my_VERSION);
 
-	for (i=0; i<MPT_MAX_ADAPTERS; i++) {
-		sema_init(&mptctl_syscall_sem_ioc[i], 1);
-
-		ioc = NULL;
-		if (((iocnum = mpt_verify_adapter(i, &ioc)) < 0) ||
-		    (ioc == NULL)) {
-			continue;
-		}
-		else {
-			/* This adapter instance is found.
-			 * Allocate and inite a MPT_IOCTL structure
-			 */
-			sz = sizeof (MPT_IOCTL);
-			mem = kmalloc(sz, GFP_KERNEL);
-			if (mem == NULL) {
-				err = -ENOMEM;
-				goto out_fail;
-			}
-
-			memset(mem, 0, sz);
-			ioc->ioctl = (MPT_IOCTL *) mem;
-			ioc->ioctl->ioc = ioc;
-			init_timer (&ioc->ioctl->timer);
-			ioc->ioctl->timer.data = (unsigned long) ioc->ioctl;
-			ioc->ioctl->timer.function = mptctl_timer_expired;
-			init_timer (&ioc->ioctl->TMtimer);
-			ioc->ioctl->TMtimer.data = (unsigned long) ioc->ioctl;
-			ioc->ioctl->TMtimer.function = mptctl_timer_expired;
-		}
+	if(mpt_device_driver_register(&mptctl_driver,
+	  MPTCTL_DRIVER) != 0 ) {
+		dprintk((KERN_INFO MYNAM
+		": failed to register dd callbacks\n"));
 	}
 
 #ifdef CONFIG_COMPAT
@@ -2922,29 +2959,14 @@ out_fail:
 	unregister_ioctl32_conversion(HP_GETTARGETINFO);
 #endif
 
-	for (i=0; i<MPT_MAX_ADAPTERS; i++) {
-		ioc = NULL;
-		if (((iocnum = mpt_verify_adapter(i, &ioc)) < 0) ||
-		    (ioc == NULL)) {
-			continue;
-		}
-		else {
-			if (ioc->ioctl) {
-				kfree ( ioc->ioctl );
-				ioc->ioctl = NULL;
-			}
-		}
-	}
+	mpt_device_driver_deregister(MPTCTL_DRIVER);
+
 	return err;
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 void mptctl_exit(void)
 {
-	int i;
-	MPT_ADAPTER *ioc;
-	int iocnum;
-
 	misc_deregister(&mptctl_miscdev);
 	printk(KERN_INFO MYNAM ": Deregistered /dev/%s @ (major,minor=%d,%d)\n",
 			 mptctl_miscdev.name, MISC_MAJOR, mptctl_miscdev.minor);
@@ -2956,6 +2978,8 @@ void mptctl_exit(void)
 	/* De-register callback handler from base module */
 	mpt_deregister(mptctl_id);
 	printk(KERN_INFO MYNAM ": Deregistered from Fusion MPT base driver\n");
+
+        mpt_device_driver_deregister(MPTCTL_DRIVER);
 
 #ifdef CONFIG_COMPAT
 	unregister_ioctl32_conversion(MPTIOCINFO);
@@ -2973,20 +2997,6 @@ void mptctl_exit(void)
 	unregister_ioctl32_conversion(HP_GETTARGETINFO);
 #endif
 
-	/* Free allocated memory */
-	for (i=0; i<MPT_MAX_ADAPTERS; i++) {
-		ioc = NULL;
-		if (((iocnum = mpt_verify_adapter(i, &ioc)) < 0) ||
-		    (ioc == NULL)) {
-			continue;
-		}
-		else {
-			if (ioc->ioctl) {
-				kfree ( ioc->ioctl );
-				ioc->ioctl = NULL;
-			}
-		}
-	}
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/

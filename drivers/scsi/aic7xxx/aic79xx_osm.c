@@ -415,7 +415,6 @@ uint32_t aic79xx_periodic_otag;
 /*
  * Module information and settable options.
  */
-#ifdef MODULE
 static char *aic79xx = NULL;
 /*
  * Just in case someone uses commas to separate items on the insmod
@@ -426,9 +425,8 @@ static char dummy_buffer[60] = "Please don't trounce on me insmod!!\n";
 
 MODULE_AUTHOR("Maintainer: Justin T. Gibbs <gibbs@scsiguy.com>");
 MODULE_DESCRIPTION("Adaptec Aic790X U320 SCSI Host Bus Adapter driver");
-#ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual BSD/GPL");
-#endif
+MODULE_VERSION(AIC79XX_DRIVER_VERSION);
 MODULE_PARM(aic79xx, "s");
 MODULE_PARM_DESC(aic79xx,
 "period delimited, options string.\n"
@@ -463,7 +461,6 @@ MODULE_PARM_DESC(aic79xx,
 "		Change Read Streaming for Controller's 2 and 3\n"
 "\n"
 "	options aic79xx 'aic79xx=rd_strm:{..0xFFF0.0xC0F0}'");
-#endif
 
 static void ahd_linux_handle_scsi_status(struct ahd_softc *,
 					 struct ahd_linux_device *,

@@ -188,7 +188,7 @@ extern int scsi_device_set_state(struct scsi_device *sdev,
 extern int scsi_device_quiesce(struct scsi_device *sdev);
 extern void scsi_device_resume(struct scsi_device *sdev);
 extern const char *scsi_device_state_name(enum scsi_device_state);
-static int inline scsi_device_online(struct scsi_device *sdev)
+static inline int scsi_device_online(struct scsi_device *sdev)
 {
 	return sdev->sdev_state != SDEV_OFFLINE;
 }

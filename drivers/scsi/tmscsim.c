@@ -291,9 +291,7 @@ static void dc390_SRBdone( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struc
 static void dc390_DoingSRB_Done( struct dc390_acb* pACB, struct scsi_cmnd * cmd);
 static void dc390_ScsiRstDetect( struct dc390_acb* pACB );
 static void dc390_ResetSCSIBus( struct dc390_acb* pACB );
-static void __inline__ dc390_RequestSense( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb* pSRB );
-static void __inline__ dc390_InvalidCmd( struct dc390_acb* pACB );
-static void __inline__ dc390_EnableMsgOut_Abort (struct dc390_acb*, struct dc390_srb*);
+static void dc390_EnableMsgOut_Abort(struct dc390_acb*, struct dc390_srb*);
 static irqreturn_t do_DC390_Interrupt( int, void *, struct pt_regs *);
 
 static int    dc390_initAdapter(struct Scsi_Host *psh, unsigned long io_port, u8 Irq, u8 index );
@@ -942,8 +940,6 @@ static void dc390_BuildSRB (struct scsi_cmnd *pcmd, struct dc390_dcb* pDCB, stru
 {
     pSRB->pSRBDCB = pDCB;
     pSRB->pcmd = pcmd;
-    //pSRB->ScsiCmdLen = pcmd->cmd_len;
-    //memcpy (pSRB->CmdBlock, pcmd->cmnd, pcmd->cmd_len);
     
     pSRB->SGIndex = 0;
     pSRB->AdaptStatus = 0;

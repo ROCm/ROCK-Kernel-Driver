@@ -511,8 +511,7 @@ static int eata_pio_host_reset(struct scsi_cmnd *cmd)
 	HD(cmd)->state = RESET;
 
 	spin_unlock_irq(host->host_lock);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(3 * HZ);
+	msleep(3000);
 	spin_lock_irq(host->host_lock);
 
 	DBG(DBG_ABNORM, printk(KERN_WARNING "eata_pio_reset: interrupts disabled, " "loops %d.\n", limit));

@@ -436,7 +436,6 @@ uint32_t aic7xxx_periodic_otag;
 /*
  * Module information and settable options.
  */
-#ifdef MODULE
 static char *aic7xxx = NULL;
 /*
  * Just in case someone uses commas to separate items on the insmod
@@ -447,9 +446,8 @@ static char dummy_buffer[60] = "Please don't trounce on me insmod!!\n";
 
 MODULE_AUTHOR("Maintainer: Justin T. Gibbs <gibbs@scsiguy.com>");
 MODULE_DESCRIPTION("Adaptec Aic77XX/78XX SCSI Host Bus Adapter driver");
-#ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual BSD/GPL");
-#endif
+MODULE_VERSION(AIC7XXX_DRIVER_VERSION);
 MODULE_PARM(aic7xxx, "s");
 MODULE_PARM_DESC(aic7xxx,
 "period delimited, options string.\n"
@@ -479,7 +477,6 @@ MODULE_PARM_DESC(aic7xxx,
 "\n"
 "	options aic7xxx 'aic7xxx=probe_eisa_vl.tag_info:{{}.{.10}}.seltime:1'\n"
 );
-#endif
 
 static void ahc_linux_handle_scsi_status(struct ahc_softc *,
 					 struct ahc_linux_device *,

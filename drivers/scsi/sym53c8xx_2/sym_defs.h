@@ -53,6 +53,9 @@
 #ifndef SYM_DEFS_H
 #define SYM_DEFS_H
 
+#define SYM_VERSION "2.1.18j"
+#define SYM_DRIVER_NAME	"sym-" SYM_VERSION
+
 /*
  *  Vendor.
  */

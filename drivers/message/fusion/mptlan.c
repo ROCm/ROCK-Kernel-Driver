@@ -177,11 +177,9 @@ static int LanCtx = -1;
 static u32 max_buckets_out = 127;
 static u32 tx_max_out_p = 127 - 16;
 
-static struct net_device *mpt_landev[MPT_MAX_ADAPTERS+1];
-
 #ifdef QLOGIC_NAA_WORKAROUND
 static struct NAA_Hosed *mpt_bad_naa = NULL;
-rwlock_t bad_naa_lock;
+rwlock_t bad_naa_lock = RW_LOCK_UNLOCKED;
 #endif
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -203,7 +201,7 @@ extern int mpt_lan_index;
 static int
 lan_reply (MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *reply)
 {
-	struct net_device *dev = mpt_landev[ioc->id];
+	struct net_device *dev = ioc->netdev;
 	int FreeReqFrame = 0;
 
 	dioprintk((KERN_INFO MYNAM ": %s/%s: Got reply.\n",
@@ -336,7 +334,7 @@ lan_reply (MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *reply)
 static int
 mpt_lan_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 {
-	struct net_device *dev = mpt_landev[ioc->id];
+	struct net_device *dev = ioc->netdev;
 	struct mpt_lan_priv *priv = netdev_priv(dev);
 
 	dlprintk((KERN_INFO MYNAM ": IOC %s_reset routed to LAN driver!\n",
@@ -1451,20 +1449,74 @@ mpt_register_lan_device (MPT_ADAPTER *mpt_dev, int pnum)
 	return dev;
 }
 
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+static int
+mptlan_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+{
+	MPT_ADAPTER 		*ioc = pci_get_drvdata(pdev);
+	struct net_device	*dev;
+	int			i;
+
+	for (i = 0; i < ioc->facts.NumberOfPorts; i++) {
+		printk(KERN_INFO MYNAM ": %s: PortNum=%x, "
+		       "ProtocolFlags=%02Xh (%c%c%c%c)\n",
+		       ioc->name, ioc->pfacts[i].PortNumber,
+		       ioc->pfacts[i].ProtocolFlags,
+		       MPT_PROTOCOL_FLAGS_c_c_c_c(
+			       ioc->pfacts[i].ProtocolFlags));
+
+		if (!(ioc->pfacts[i].ProtocolFlags &
+					MPI_PORTFACTS_PROTOCOL_LAN)) {
+			printk(KERN_INFO MYNAM ": %s: Hmmm... LAN protocol "
+			       "seems to be disabled on this adapter port!\n",
+			       ioc->name);
+			continue;
+		}
+
+		dev = mpt_register_lan_device(ioc, i);
+		if (!dev) {
+			printk(KERN_ERR MYNAM ": %s: Unable to register "
+			       "port%d as a LAN device\n", ioc->name,
+			       ioc->pfacts[i].PortNumber);
+			continue;
+		}
+		
+		printk(KERN_INFO MYNAM ": %s: Fusion MPT LAN device "
+		       "registered as '%s'\n", ioc->name, dev->name);
+		printk(KERN_INFO MYNAM ": %s/%s: "
+		       "LanAddr = %02X:%02X:%02X:%02X:%02X:%02X\n",
+		       IOC_AND_NETDEV_NAMES_s_s(dev),
+		       dev->dev_addr[0], dev->dev_addr[1],
+		       dev->dev_addr[2], dev->dev_addr[3],
+		       dev->dev_addr[4], dev->dev_addr[5]);
+	
+		ioc->netdev = dev;
+
+		return 0;
+	}
+
+	return -ENODEV;
+}
+
+static void
+mptlan_remove(struct pci_dev *pdev)
+{
+	MPT_ADAPTER 		*ioc = pci_get_drvdata(pdev);
+	struct net_device	*dev = ioc->netdev;
+
+	if(dev != NULL) {
+		unregister_netdev(dev);
+		free_netdev(dev);
+	}
+}
+
+static struct mpt_pci_driver mptlan_driver = {
+	.probe		= mptlan_probe,
+	.remove		= mptlan_remove,
+};
+
 static int __init mpt_lan_init (void)
 {
-	struct net_device *dev;
-	MPT_ADAPTER *p;
-	int i, j;
-
 	show_mptmod_ver(LANAME, LANVER);
-
-#ifdef QLOGIC_NAA_WORKAROUND
-	/* Init the global r/w lock for the bad_naa list. We want to do this
-	   before any boards are initialized and may be used. */
-	rwlock_init(&bad_naa_lock);
-#endif
 
 	if ((LanCtx = mpt_register(lan_reply, MPTLAN_DRIVER)) <= 0) {
 		printk (KERN_ERR MYNAM ": Failed to register with MPT base driver\n");
@@ -1476,87 +1528,31 @@ static int __init mpt_lan_init (void)
 
 	dlprintk((KERN_INFO MYNAM ": assigned context of %d\n", LanCtx));
 
-	if (mpt_reset_register(LanCtx, mpt_lan_ioc_reset) == 0) {
-		dlprintk((KERN_INFO MYNAM ": Registered for IOC reset notifications\n"));
-	} else {
+	if (mpt_reset_register(LanCtx, mpt_lan_ioc_reset)) {
 		printk(KERN_ERR MYNAM ": Eieee! unable to register a reset "
 		       "handler with mptbase! The world is at an end! "
 		       "Everything is fading to black! Goodbye.\n");
 		return -EBUSY;
 	}
 
-	for (j = 0; j < MPT_MAX_ADAPTERS; j++) {
-		mpt_landev[j] = NULL;
-	}
-
-	list_for_each_entry(p, &ioc_list, list) {
-		for (i = 0; i < p->facts.NumberOfPorts; i++) {
-			printk (KERN_INFO MYNAM ": %s: PortNum=%x, ProtocolFlags=%02Xh (%c%c%c%c)\n",
-					p->name,
-					p->pfacts[i].PortNumber,
-					p->pfacts[i].ProtocolFlags,
-					MPT_PROTOCOL_FLAGS_c_c_c_c(p->pfacts[i].ProtocolFlags));
-
-			if (!(p->pfacts[i].ProtocolFlags & MPI_PORTFACTS_PROTOCOL_LAN)) {
-				printk (KERN_INFO MYNAM ": %s: Hmmm... LAN protocol seems to be disabled on this adapter port!\n",
-						p->name);
-				continue;
-			}
-
-			dev = mpt_register_lan_device (p, i);
-			if (!dev) {
-				printk (KERN_ERR MYNAM ": %s: Unable to register port%d as a LAN device\n",
-						p->name,
-						p->pfacts[i].PortNumber);
-			}
-			printk (KERN_INFO MYNAM ": %s: Fusion MPT LAN device registered as '%s'\n",
-					p->name, dev->name);
-			printk (KERN_INFO MYNAM ": %s/%s: LanAddr = %02X:%02X:%02X:%02X:%02X:%02X\n",
-					IOC_AND_NETDEV_NAMES_s_s(dev),
-					dev->dev_addr[0], dev->dev_addr[1],
-					dev->dev_addr[2], dev->dev_addr[3],
-					dev->dev_addr[4], dev->dev_addr[5]);
-//					printk (KERN_INFO MYNAM ": %s/%s: Max_TX_outstanding = %d\n",
-//							IOC_AND_NETDEV_NAMES_s_s(dev),
-//							NETDEV_TO_LANPRIV_PTR(dev)->tx_max_out);
-			j = p->id;
-			mpt_landev[j] = dev;
-			dlprintk((KERN_INFO MYNAM "/init: dev_addr=%p, mpt_landev[%d]=%p\n",
-					dev, j,  mpt_landev[j]));
-
-		}
-	}
-
+	dlprintk((KERN_INFO MYNAM ": Registered for IOC reset notifications\n"));
+	
+	if (mpt_device_driver_register(&mptlan_driver, MPTLAN_DRIVER))
+		dprintk((KERN_INFO MYNAM ": failed to register dd callbacks\n"));
 	return 0;
 }
 
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 static void __exit mpt_lan_exit(void)
 {
-	int i;
-
+	mpt_device_driver_deregister(MPTLAN_DRIVER);
 	mpt_reset_deregister(LanCtx);
-
-	for (i = 0; mpt_landev[i] != NULL; i++) {
-		struct net_device *dev = mpt_landev[i];
-
-		printk (KERN_INFO ": %s/%s: Fusion MPT LAN device unregistered\n",
-			       IOC_AND_NETDEV_NAMES_s_s(dev));
-		unregister_netdev(dev);
-		free_netdev(dev);
-		mpt_landev[i] = NULL;
-	}
 
 	if (LanCtx >= 0) {
 		mpt_deregister(LanCtx);
 		LanCtx = -1;
 		mpt_lan_index = 0;
 	}
-
-	/* deregister any send/receive handler structs. I2Oism? */
 }
-
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
 module_init(mpt_lan_init);
 module_exit(mpt_lan_exit);

@@ -3058,19 +3058,14 @@ mptscsih_bios_param(struct scsi_device * sdev, struct block_device *bdev,
 	int		heads;
 	int		sectors;
 	sector_t	cylinders;
-#ifdef CONFIG_LBD
 	ulong 		dummy;
-#endif
 
 	heads = 64;
 	sectors = 32;
-#ifdef CONFIG_LBD
+
 	dummy = heads * sectors;
 	cylinders = capacity;
 	sector_div(cylinders,dummy);
-#else
-	cylinders = (ulong)capacity / (heads * sectors);
-#endif
 
 	/*
 	 * Handle extended translation size for logical drives
@@ -3079,13 +3074,9 @@ mptscsih_bios_param(struct scsi_device * sdev, struct block_device *bdev,
 	if ((ulong)capacity >= 0x200000) {
 		heads = 255;
 		sectors = 63;
-#ifdef CONFIG_LBD
 		dummy = heads * sectors;
 		cylinders = capacity;
 		sector_div(cylinders,dummy);
-#else
-		cylinders = (ulong)capacity / (heads * sectors);
-#endif
 	}
 
 	/* return result */
