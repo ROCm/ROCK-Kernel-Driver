@@ -37,6 +37,12 @@ config FRAME_POINTER
 	bool
 	default y
 
+# We optimistically allocate largepages from the VM, so make the limit
+# large enough (16MB)
+config FORCE_MAX_ZONEORDER
+	int
+	default "12"
+
 source "init/Kconfig"
 
 
