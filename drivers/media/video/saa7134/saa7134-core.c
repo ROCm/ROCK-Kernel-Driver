@@ -868,7 +868,8 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 		must_configure_manually();
 		dev->board = SAA7134_BOARD_UNKNOWN;
 	}
-	dev->tuner_type = saa7134_boards[dev->board].tuner_type;
+	dev->tuner_type   = saa7134_boards[dev->board].tuner_type;
+	dev->tda9887_conf = saa7134_boards[dev->board].tda9887_conf;
 	if (UNSET != tuner[saa7134_devcount])
 		dev->tuner_type = tuner[saa7134_devcount];
         printk(KERN_INFO "%s: subsystem: %04x:%04x, board: %s [card=%d,%s]\n",
@@ -919,7 +920,7 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 	/* load i2c helpers */
 	if (TUNER_ABSENT != dev->tuner_type)
 		request_module("tuner");
-	if (saa7134_boards[dev->board].need_tda9887)
+	if (dev->tda9887_conf)
 		request_module("tda9887");
   	if (card_has_ts(dev))
 		request_module("saa6752hs");
@@ -949,7 +950,7 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
 			       dev->name);
 			goto fail4;
 		}
-		printk(KERN_INFO "%s: registered device video%d [ts]\n",
+		printk(KERN_INFO "%s: registered device video%d [mpeg]\n",
 		       dev->name,dev->ts_dev->minor & 0x1f);
 	}
 	

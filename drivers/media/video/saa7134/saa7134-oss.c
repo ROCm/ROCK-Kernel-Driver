@@ -776,8 +776,6 @@ int saa7134_oss_init1(struct saa7134_dev *dev)
 	dev->oss.rate = 32000;
 	if (oss_rate)
 		dev->oss.rate = oss_rate;
-	if (saa7134_boards[dev->board].i2s_rate)
-		dev->oss.rate = saa7134_boards[dev->board].i2s_rate;
 	dev->oss.rate = (dev->oss.rate > 40000) ? 48000 : 32000;
 
 	/* mixer */
