@@ -35,6 +35,18 @@
 #define SECCLASS_SHM                                     28
 #define SECCLASS_IPC                                     29
 #define SECCLASS_PASSWD                                  30
+#define SECCLASS_DRAWABLE                                31
+#define SECCLASS_WINDOW                                  32
+#define SECCLASS_GC                                      33
+#define SECCLASS_FONT                                    34
+#define SECCLASS_COLORMAP                                35
+#define SECCLASS_PROPERTY                                36
+#define SECCLASS_CURSOR                                  37
+#define SECCLASS_XCLIENT                                 38
+#define SECCLASS_XINPUT                                  39
+#define SECCLASS_XSERVER                                 40
+#define SECCLASS_XEXTENSION                              41
+#define SECCLASS_PAX                                     42
 
 /*
  * Security identifier indices for initial entities

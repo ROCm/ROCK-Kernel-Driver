@@ -35,5 +35,17 @@ static char *class_to_string[] =
     "shm",
     "ipc",
     "passwd",
+    "drawable",
+    "window",
+    "gc",
+    "font",
+    "colormap",
+    "property",
+    "cursor",
+    "xclient",
+    "xinput",
+    "xserver",
+    "xextension",
+    "pax",
 };
 
