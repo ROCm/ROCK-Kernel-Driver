@@ -18,6 +18,9 @@
 /* Changes:
  *
  *	yoshfuji	: fix format of router-alert option
+ *	YOSHIFUJI Hideaki @USAGI:
+ *		Fixed source address for MLD message based on
+ *		<draft-ietf-magma-mld-source-02.txt>.
  */
 
 #define __NO_VERSION__
@@ -452,6 +455,7 @@ int igmp6_event_report(struct sk_buff *skb)
 	struct in6_addr *addrp;
 	struct inet6_dev *idev;
 	struct icmp6hdr *hdr;
+	int addr_type;
 
 	/* Our own report looped back. Ignore it. */
 	if (skb->pkt_type == PACKET_LOOPBACK)
@@ -463,7 +467,9 @@ int igmp6_event_report(struct sk_buff *skb)
 	hdr = (struct icmp6hdr*) skb->h.raw;
 
 	/* Drop reports with not link local source */
-	if (!(ipv6_addr_type(&skb->nh.ipv6h->saddr)&IPV6_ADDR_LINKLOCAL))
+	addr_type = ipv6_addr_type(&skb->nh.ipv6h->saddr);
+	if (addr_type != IPV6_ADDR_ANY && 
+	    !(addr_type&IPV6_ADDR_LINKLOCAL))
 		return -EINVAL;
 
 	addrp = (struct in6_addr *) (hdr + 1);
@@ -530,11 +536,11 @@ static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 	}
 
 	if (ipv6_get_lladdr(dev, &addr_buf)) {
-#if MCAST_DEBUG >= 1
-		printk(KERN_DEBUG "igmp6: %s no linklocal address\n",
-		       dev->name);
-#endif
-		goto out;
+		/* <draft-ietf-magma-mld-source-02.txt>:
+		 * use unspecified address as the source address 
+		 * when a valid link-local address is not available.
+		 */
+		memset(&addr_buf, 0, sizeof(addr_buf));
 	}
 
 	ip6_nd_hdr(sk, skb, dev, &addr_buf, snd_addr, NEXTHDR_HOP, payload_len);
