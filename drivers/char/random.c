@@ -683,7 +683,7 @@ struct sample {
 
 static struct sample *batch_entropy_pool, *batch_entropy_copy;
 static int	batch_head, batch_tail;
-static spinlock_t batch_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(batch_lock);
 
 static int	batch_max;
 static void batch_entropy_process(void *private_);

@@ -94,7 +94,7 @@ static struct list_head hvc_structs = LIST_HEAD_INIT(hvc_structs);
  * Protect the list of hvc_struct instances from inserts and removals during
  * list traversal.
  */
-static spinlock_t hvc_structs_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(hvc_structs_lock);
 
 /*
  * Initial console vtermnos for console API usage prior to full console

@@ -304,7 +304,7 @@ static DECLARE_RWSEM(interfaces_sem);
 
 /* Directly protects the ipmi_interfaces data structure.  This is
    claimed in the timer interrupt. */
-static spinlock_t interfaces_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(interfaces_lock);
 
 /* List of watchers that want to know when smi's are added and
    deleted. */

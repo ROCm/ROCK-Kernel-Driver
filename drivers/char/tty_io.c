@@ -249,7 +249,7 @@ static void tty_set_termios_ldisc(struct tty_struct *tty, int num)
  *	callers who will do ldisc lookups and cannot sleep.
  */
  
-static spinlock_t tty_ldisc_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(tty_ldisc_lock);
 static DECLARE_WAIT_QUEUE_HEAD(tty_ldisc_wait);
 static struct tty_ldisc tty_ldiscs[NR_LDISCS];	/* line disc dispatch table	*/
 
@@ -690,7 +690,7 @@ static struct file_operations hung_up_tty_fops = {
 	.release	= tty_release,
 };
 
-static spinlock_t redirect_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(redirect_lock);
 static struct file *redirect;
 
 /**

@@ -157,7 +157,7 @@ static char preaction[16] = "pre_none";
 static unsigned char preop_val = WDOG_PREOP_NONE;
 
 static char preop[16] = "preop_none";
-static spinlock_t ipmi_read_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ipmi_read_lock);
 static char data_to_read = 0;
 static DECLARE_WAIT_QUEUE_HEAD(read_q);
 static struct fasync_struct *fasync_q = NULL;

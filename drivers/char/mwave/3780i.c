@@ -61,7 +61,7 @@
 #include "mwavedd.h"
 #include "3780i.h"
 
-static spinlock_t dsp_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(dsp_lock);
 static unsigned long flags;
 
 
