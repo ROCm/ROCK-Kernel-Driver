@@ -529,7 +529,8 @@ static inline void reparent_thread(task_t *p, task_t *father, int traced)
 	p->self_exec_id++;
 
 	if (p->pdeath_signal)
-		send_group_sig_info(p->pdeath_signal, 0, p);
+		/* We already hold the tasklist_lock here.  */
+		group_send_sig_info(p->pdeath_signal, (void *) 0, p);
 
 	/* Move the child from its dying parent to the new one.  */
 	if (unlikely(traced)) {
