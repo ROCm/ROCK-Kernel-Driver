@@ -109,14 +109,20 @@ linvfs_mknod(
 	struct inode	*ip;
 	vattr_t		va;
 	vnode_t		*vp = NULL, *dvp = LINVFS_GET_VP(dir);
+	xfs_acl_t	*default_acl = NULL;
 	xattr_exists_t	test_default_acl = _ACL_DEFAULT_EXISTS;
-	int		have_default_acl = 0;
-	int		error = EINVAL;
+	int		error;
 
-	if (test_default_acl)
-		have_default_acl = test_default_acl(dvp);
+	if (test_default_acl && test_default_acl(dvp)) {
+		if (!_ACL_ALLOC(default_acl))
+			return -ENOMEM;
+		if (!_ACL_GET_DEFAULT(dvp, default_acl)) {
+			_ACL_FREE(default_acl);
+			default_acl = NULL;
+		}
+	}
 
-	if (IS_POSIXACL(dir) && !have_default_acl && has_fs_struct(current))
+	if (IS_POSIXACL(dir) && !default_acl && has_fs_struct(current))
 		mode &= ~current->fs->umask;
 
 	memset(&va, 0, sizeof(va));
@@ -140,13 +146,36 @@ linvfs_mknod(
 		break;
 	}
 
+	if (default_acl) {
+		if (!error) {
+			error = _ACL_INHERIT(vp, &va, default_acl);
+			if (!error) {
+				VMODIFY(vp);
+			} else {
+				struct dentry	teardown = {};
+				int		err2;
+
+				/* Oh, the horror.
+				 * If we can't add the ACL we must back out.
+				 * ENOSPC can hit here, among other things.
+				 */
+				teardown.d_inode = ip = LINVFS_GET_IP(vp);
+				teardown.d_name = dentry->d_name;
+				remove_inode_hash(ip);
+				make_bad_inode(ip);
+				if (S_ISDIR(mode))
+					VOP_RMDIR(dvp, &teardown, NULL, err2);
+				else
+					VOP_REMOVE(dvp, &teardown, NULL, err2);
+				VN_RELE(vp);
+			}
+		}
+		_ACL_FREE(default_acl);
+	}
+
 	if (!error) {
 		ASSERT(vp);
 		ip = LINVFS_GET_IP(vp);
-		if (!ip) {
-			VN_RELE(vp);
-			return -ENOMEM;
-		}
 
 		if (S_ISCHR(mode) || S_ISBLK(mode))
 			ip->i_rdev = to_kdev_t(rdev);
@@ -154,19 +183,6 @@ linvfs_mknod(
 			validate_fields(ip);
 		d_instantiate(dentry, ip);
 		validate_fields(dir);
-	}
-
-	if (!error && have_default_acl) {
-		_ACL_DECL	(pdacl);
-
-		if (!_ACL_ALLOC(pdacl)) {
-			error = -ENOMEM;
-		} else {
-			if (_ACL_GET_DEFAULT(dvp, pdacl))
-				error = _ACL_INHERIT(vp, &va, pdacl);
-			VMODIFY(vp);
-			_ACL_FREE(pdacl);
-		}
 	}
 	return -error;
 }
