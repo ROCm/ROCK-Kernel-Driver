@@ -136,7 +136,9 @@ static void rose_heartbeat_expiry(unsigned long param)
 	case ROSE_STATE_0:
 		/* Magic here: If we listen() and a new link dies before it
 		   is accepted() it isn't 'dead' so doesn't get removed. */
-		if (sk->destroy || (sk->state == TCP_LISTEN && sk->dead)) {
+		if (test_bit(SOCK_DESTROY, &sk->flags) ||
+				(sk->state == TCP_LISTEN &&
+					test_bit(SOCK_DEAD, &sk->flags))) {
 			rose_destroy_socket(sk);
 			return;
 		}
@@ -207,9 +209,9 @@ static void rose_idletimer_expiry(unsigned long param)
 	sk->err       = 0;
 	sk->shutdown |= SEND_SHUTDOWN;
 
-	if (!sk->dead)
+	if (!test_bit(SOCK_DEAD, &sk->flags))
 		sk->state_change(sk);
 
-	sk->dead = 1;
+	__set_bit(SOCK_DEAD, &sk->flags);
 	bh_unlock_sock(sk);
 }

@@ -1039,7 +1039,7 @@ static int wanpipe_release(struct socket *sock, struct socket *peersock)
 
 	sock->sk = NULL;
 	sk->socket = NULL;
-	sk->dead = 1;
+	__set_bit(SOCK_DEAD, &sk->flags);
 
 	/* Purge queues */
 #ifdef LINUX_2_4
@@ -1128,7 +1128,7 @@ static void release_driver(struct sock *sk)
 		while ((skb=skb_dequeue(&sk->receive_queue))!=NULL){
 			if ((deadsk = get_newsk_from_skb(skb))){
 				DBG_PRINTK (KERN_INFO "wansock: RELEASE: FOUND DEAD SOCK\n");
-				deadsk->dead=1;
+				__set_bit(SOCK_DEAD, &deadsk->flags);
 				start_cleanup_timer(deadsk);
 			}
 			kfree_skb(skb);

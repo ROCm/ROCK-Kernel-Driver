@@ -178,7 +178,7 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 	switch(optname)
 	{
 		case SO_DONTLINGER:
-			sk->linger=0;
+			__clear_bit(SOCK_LINGER, &sk->flags);
 			return 0;
 	}
 #endif	
@@ -214,7 +214,7 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 			sk->localroute=valbool;
 			break;
 		case SO_BROADCAST:
-			sk->broadcast=valbool;
+			sock_valbool_flag(sk, SOCK_BROADCAST, valbool);
 			break;
 		case SO_SNDBUF:
 			/* Don't error on this BSD doesn't and if you think
@@ -262,11 +262,11 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 				tcp_set_keepalive(sk, valbool);
 			}
 #endif
-			sk->keepopen = valbool;
+			sock_valbool_flag(sk, SOCK_KEEPOPEN, valbool);
 			break;
 
 	 	case SO_OOBINLINE:
-			sk->urginline = valbool;
+			sock_valbool_flag(sk, SOCK_URGINLINE, valbool);
 			break;
 
 	 	case SO_NO_CHECK:
@@ -290,7 +290,7 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 				break;
 			}
 			if(ling.l_onoff==0) {
-				sk->linger=0;
+				__clear_bit(SOCK_LINGER, &sk->flags);
 			} else {
 #if (BITS_PER_LONG == 32)
 				if (ling.l_linger >= MAX_SCHEDULE_TIMEOUT/HZ)
@@ -298,12 +298,12 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 				else
 #endif
 					sk->lingertime=ling.l_linger*HZ;
-				sk->linger=1;
+				__set_bit(SOCK_LINGER, &sk->flags);
 			}
 			break;
 
 		case SO_BSDCOMPAT:
-			sk->bsdism = valbool;
+			sock_valbool_flag(sk, SOCK_BSDISM, valbool);
 			break;
 
 		case SO_PASSCRED:
@@ -443,7 +443,7 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 			break;
 		
 		case SO_BROADCAST:
-			v.val= sk->broadcast;
+			v.val= test_bit(SOCK_BROADCAST, &sk->flags);
 			break;
 
 		case SO_SNDBUF:
@@ -459,7 +459,7 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 			break;
 
 		case SO_KEEPALIVE:
-			v.val = sk->keepopen;
+			v.val = test_bit(SOCK_KEEPOPEN, &sk->flags);
 			break;
 
 		case SO_TYPE:
@@ -473,7 +473,7 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 			break;
 
 		case SO_OOBINLINE:
-			v.val = sk->urginline;
+			v.val = test_bit(SOCK_URGINLINE, &sk->flags);
 			break;
 	
 		case SO_NO_CHECK:
@@ -486,12 +486,12 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 		
 		case SO_LINGER:	
 			lv=sizeof(v.ling);
-			v.ling.l_onoff=sk->linger;
+			v.ling.l_onoff = test_bit(SOCK_LINGER, &sk->flags);
  			v.ling.l_linger=sk->lingertime/HZ;
 			break;
 					
 		case SO_BSDCOMPAT:
-			v.val = sk->bsdism;
+			v.val = test_bit(SOCK_BSDISM, &sk->flags);
 			break;
 
 		case SO_TIMESTAMP:

@@ -2352,7 +2352,7 @@ static void tcp_reset(struct sock *sk)
 			sk->err = ECONNRESET;
 	}
 
-	if (!sk->dead)
+	if (!test_bit(SOCK_DEAD, &sk->flags))
 		sk->error_report(sk);
 
 	tcp_done(sk);
@@ -2379,7 +2379,7 @@ static void tcp_fin(struct sk_buff *skb, struct sock *sk, struct tcphdr *th)
 	tcp_schedule_ack(tp);
 
 	sk->shutdown |= RCV_SHUTDOWN;
-	sk->done = 1;
+	__clear_bit(SOCK_DONE, &sk->flags);
 
 	switch(sk->state) {
 		case TCP_SYN_RECV:
@@ -2428,7 +2428,7 @@ static void tcp_fin(struct sk_buff *skb, struct sock *sk, struct tcphdr *th)
 		tcp_sack_reset(tp);
 	tcp_mem_reclaim(sk);
 
-	if (!sk->dead) {
+	if (!test_bit(SOCK_DEAD, &sk->flags)) {
 		sk->state_change(sk);
 
 		/* Do not send POLL_HUP for half duplex close. */
@@ -2745,7 +2745,7 @@ queue_and_out:
 
 		if (eaten > 0) {
 			__kfree_skb(skb);
-		} else if (!sk->dead)
+		} else if (!test_bit(SOCK_DEAD, &sk->flags))
 			sk->data_ready(sk, 0);
 		return;
 	}
@@ -3247,7 +3247,7 @@ static void tcp_check_urg(struct sock * sk, struct tcphdr * th)
 	 * buggy users.
 	 */
 	if (tp->urg_seq == tp->copied_seq && tp->urg_data &&
-	    !sk->urginline &&
+	    !test_bit(SOCK_URGINLINE, &sk->flags) &&
 	    tp->copied_seq != tp->rcv_nxt) {
 		struct sk_buff *skb = skb_peek(&sk->receive_queue);
 		tp->copied_seq++;
@@ -3284,7 +3284,7 @@ static void tcp_urg(struct sock *sk, struct sk_buff *skb, struct tcphdr *th)
 			if (skb_copy_bits(skb, ptr, &tmp, 1))
 				BUG();
 			tp->urg_data = TCP_URG_VALID | tmp;
-			if (!sk->dead)
+			if (!test_bit(SOCK_DEAD, &sk->flags))
 				sk->data_ready(sk,0);
 		}
 	}
@@ -3699,7 +3699,7 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 		tcp_init_metrics(sk);
 		tcp_init_buffer_space(sk);
 
-		if (sk->keepopen)
+		if (test_bit(SOCK_KEEPOPEN, &sk->flags))
 			tcp_reset_keepalive_timer(sk, keepalive_time_when(tp));
 
 		if (!tp->snd_wscale)
@@ -3714,7 +3714,7 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 		mb();
 		tcp_set_state(sk, TCP_ESTABLISHED);
 
-		if(!sk->dead) {
+		if(!test_bit(SOCK_DEAD, &sk->flags)) {
 			sk->state_change(sk);
 			sk_wake_async(sk, 0, POLL_OUT);
 		}
@@ -3977,7 +3977,7 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb,
 				sk->shutdown |= SEND_SHUTDOWN;
 				dst_confirm(sk->dst_cache);
 
-				if (!sk->dead) {
+				if (!test_bit(SOCK_DEAD, &sk->flags)) {
 					/* Wake up lingering close() */
 					sk->state_change(sk);
 				} else {

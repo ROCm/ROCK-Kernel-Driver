@@ -90,7 +90,7 @@ static void netlink_sock_destruct(struct sock *sk)
 {
 	skb_queue_purge(&sk->receive_queue);
 
-	if (!sk->dead) {
+	if (!test_bit(SOCK_DEAD, &sk->flags)) {
 		printk("Freeing alive netlink socket %p\n", sk);
 		return;
 	}
@@ -457,7 +457,7 @@ retry:
 
 		if ((atomic_read(&sk->rmem_alloc) > sk->rcvbuf ||
 		    test_bit(0, &nlk->state)) &&
-		    !sk->dead)
+		    !test_bit(SOCK_DEAD, &sk->flags))
 			timeo = schedule_timeout(timeo);
 
 		__set_current_state(TASK_RUNNING);

@@ -198,7 +198,7 @@ void packet_sock_destruct(struct sock *sk)
 	BUG_TRAP(atomic_read(&sk->rmem_alloc)==0);
 	BUG_TRAP(atomic_read(&sk->wmem_alloc)==0);
 
-	if (!sk->dead) {
+	if (!test_bit(SOCK_DEAD, &sk->flags)) {
 		printk("Attempt to release alive packet socket: %p\n", sk);
 		return;
 	}
@@ -852,7 +852,7 @@ static int packet_do_bind(struct sock *sk, struct net_device *dev, int protocol)
 			po->running = 1;
 		} else {
 			sk->err = ENETDOWN;
-			if (!sk->dead)
+			if (!test_bit(SOCK_DEAD, &sk->flags))
 				sk->error_report(sk);
 		}
 	} else {
@@ -1392,7 +1392,7 @@ static int packet_notifier(struct notifier_block *this, unsigned long msg, void 
 					__sock_put(sk);
 					po->running = 0;
 					sk->err = ENETDOWN;
-					if (!sk->dead)
+					if (!test_bit(SOCK_DEAD, &sk->flags))
 						sk->error_report(sk);
 				}
 				if (msg == NETDEV_UNREGISTER) {

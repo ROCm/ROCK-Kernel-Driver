@@ -434,7 +434,7 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 	ax25_start_idletimer(ax25);
 
 	if (sk != NULL) {
-		if (!sk->dead)
+		if (!test_bit(SOCK_DEAD, &sk->flags))
 			sk->data_ready(sk, skb->len);
 	} else {
 		kfree_skb(skb);
