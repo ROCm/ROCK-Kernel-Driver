@@ -430,7 +430,7 @@ int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 
 	/* fill the URB */
 	FILL_CONTROL_URB(us->current_urb, us->pusb_dev, pipe, 
-			 (unsigned char*) &dr, data, size, 
+			 (unsigned char*) dr, data, size, 
 			 usb_stor_blocking_completion, NULL);
 
 	/* submit the URB */
