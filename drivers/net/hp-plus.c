@@ -351,7 +351,7 @@ hpp_mem_get_8390_hdr(struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring
 	outw(option_reg & ~(MemDisable + BootROMEnb), ioaddr + HPP_OPTION);
 	isa_memcpy_fromio(hdr, dev->mem_start, sizeof(struct e8390_pkt_hdr));
 	outw(option_reg, ioaddr + HPP_OPTION);
-	hdr->count = (hdr->count + 3) & ~3;	/* Round up allocation. */
+	hdr->count = (le16_to_cpu(hdr->count) + 3) & ~3;	/* Round up allocation. */
 }
 
 static void

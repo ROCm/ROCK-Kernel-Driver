@@ -133,6 +133,7 @@
    0.42    22-Apr-96      Fix alloc_device() bug <jari@markkus2.fimr.fi>
    0.43    16-Aug-96      Update alloc_device() to conform to de4x5.c
    0.44    08-Nov-01      use library crc32 functions <Matt_Domsch@dell.com>
+   0.45	   19-Jul-02	  fix unaligned access on alpha <martin@bruli.net>
 
    =========================================================================
  */
@@ -1008,12 +1009,13 @@ static int ewrk3_rx(struct net_device *dev)
 						}
 						p = skb->data;	/* Look at the dest addr */
 						if (p[0] & 0x01) {	/* Multicast/Broadcast */
-							if ((*(s32 *) & p[0] == -1) && (*(s16 *) & p[4] == -1)) {
+							if ((*(s16 *) & p[0] == -1) && (*(s16 *) & p[2] == -1) && (*(s16 *) & p[4] == -1)) {
 								lp->pktStats.broadcast++;
 							} else {
 								lp->pktStats.multicast++;
 							}
-						} else if ((*(s32 *) & p[0] == *(s32 *) & dev->dev_addr[0]) &&
+						} else if ((*(s16 *) & p[0] == *(s16 *) & dev->dev_addr[0]) &&
+							   (*(s16 *) & p[2] == *(s16 *) & dev->dev_addr[2]) &&
 							   (*(s16 *) & p[4] == *(s16 *) & dev->dev_addr[4])) {
 							lp->pktStats.unicast++;
 						}
