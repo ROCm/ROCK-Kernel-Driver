@@ -200,6 +200,19 @@ vfs_quotactl(
 	return ((*bhvtovfsops(next)->vfs_quotactl)(next, cmd, id, addr));
 }
 
+struct inode *
+vfs_get_inode(
+	struct bhv_desc		*bdp,
+	xfs_ino_t		ino,
+	int			fl)
+{
+	struct bhv_desc		*next = bdp;
+
+	while (! (bhvtovfsops(next))->vfs_get_inode)
+		next = BHV_NEXTNULL(next);
+	return ((*bhvtovfsops(next)->vfs_get_inode)(next, ino, fl));
+}
+
 void
 vfs_init_vnode(
 	struct bhv_desc		*bdp,
@@ -280,10 +293,14 @@ bhv_remove_vfsops(
 	struct bhv_desc		*bhv;
 
 	bhv = bhv_lookup_range(&vfsp->vfs_bh, pos, pos);
-	if (!bhv)
-		return;
-	bhv_remove(&vfsp->vfs_bh, bhv);
-	kmem_free(bhv, sizeof(*bhv));
+	if (bhv) {
+		struct bhv_module	*bm;
+
+		bm = (bhv_module_t *) BHV_PDATA(bhv);
+		bhv_remove(&vfsp->vfs_bh, bhv);
+		bhv_remove_module(bm->bm_name);
+		kmem_free(bhv, sizeof(*bhv));
+	}
 }
 
 void
@@ -295,11 +312,31 @@ bhv_remove_all_vfsops(
 
 	bhv_remove_vfsops(vfsp, VFS_POSITION_QM);
 	bhv_remove_vfsops(vfsp, VFS_POSITION_DM);
+	bhv_remove_vfsops(vfsp, VFS_POSITION_IO);
 	if (!freebase)
 		return;
 	mp = XFS_BHVTOM(bhv_lookup(VFS_BHVHEAD(vfsp), &xfs_vfsops));
 	VFS_REMOVEBHV(vfsp, &mp->m_bhv);
 	xfs_mount_free(mp, 0);
+}
+
+STATIC void
+bhv_get_vfsops(
+	struct vfs		*vfsp,
+	const char		*name,
+	const char		*module)
+{
+	struct bhv_vfsops	*ops;
+
+	ops = (struct bhv_vfsops *) bhv_lookup_module(name, module);
+	if (ops) {
+		struct bhv_module	*bm;
+
+		bm = kmem_alloc(sizeof(struct bhv_module), KM_SLEEP);
+		bm->bm_name = name;
+		bhv_desc_init(&bm->bm_desc, bm, vfsp, ops);
+		bhv_insert(&vfsp->vfs_bh, &bm->bm_desc);
+	}
 }
 
 void
@@ -310,6 +347,4 @@ bhv_insert_all_vfsops(
 
 	mp = xfs_mount_init();
 	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
-	vfs_insertdmapi(vfsp);
-	vfs_insertquota(vfsp);
 }
