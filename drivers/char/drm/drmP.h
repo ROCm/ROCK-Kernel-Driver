@@ -960,7 +960,7 @@ extern int 	      drm_put_minor(drm_device_t *dev);
 extern unsigned int   drm_debug;
 extern unsigned int   drm_cards_limit;
 extern drm_minor_t    *drm_minors;
-extern struct class_simple *drm_class;
+extern struct drm_sysfs_class *drm_class;
 extern struct proc_dir_entry *drm_proc_root;
 
 				/* Proc support (drm_proc.h) */
@@ -993,6 +993,18 @@ extern void *drm_pci_alloc(drm_device_t * dev, size_t size,
 
 extern void drm_pci_free(drm_device_t * dev, size_t size,
 			 void *vaddr, dma_addr_t busaddr);
+
+			       /* sysfs support (drm_sysfs.c) */
+struct drm_sysfs_class;
+extern struct drm_sysfs_class *drm_sysfs_create(struct module *owner,
+						char *name);
+extern void drm_sysfs_destroy(struct drm_sysfs_class *cs);
+extern struct class_device *drm_sysfs_device_add(struct drm_sysfs_class *cs,
+						 dev_t dev,
+						 struct device *device,
+						 const char *fmt, ...);
+extern void drm_sysfs_device_remove(dev_t dev);
+
 
 /* Inline replacements for DRM_IOREMAP macros */
 static __inline__ void drm_core_ioremap(struct drm_map *map, struct drm_device *dev)
