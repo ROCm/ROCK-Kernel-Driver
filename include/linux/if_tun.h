@@ -53,7 +53,7 @@ struct tun_struct {
 #endif /* __KERNEL__ */
 
 /* Read queue size */
-#define TUN_READQ_SIZE	10
+#define TUN_READQ_SIZE	500
 
 /* TUN device flags */
 #define TUN_TUN_DEV 	0x0001	

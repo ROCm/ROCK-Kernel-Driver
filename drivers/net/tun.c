@@ -16,11 +16,22 @@
  */
 
 /*
+ *  Changes:
+ *
+ *  Harald Roelle <harald.roelle@ifi.lmu.de>  2004/04/20
+ *    Fixes in packet dropping, queue length setting and queue wakeup.
+ *    Increased default tx queue length.
+ *    Added ethtool API.
+ *    Minor cleanups
+ *
  *  Daniel Podlejski <underley@underley.eu.org>
  *    Modifications for 2.3.99-pre5 kernel.
  */
 
-#define TUN_VER "1.5"
+#define DRV_NAME	"tun"
+#define DRV_VERSION	"1.6"
+#define DRV_DESCRIPTION	"Universal TUN/TAP device driver"
+#define DRV_COPYRIGHT	"(C) 1999-2004 Max Krasnyansky <maxk@qualcomm.com>"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -36,6 +47,7 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/miscdevice.h>
+#include <linux/ethtool.h>
 #include <linux/rtnetlink.h>
 #include <linux/if.h>
 #include <linux/if_arp.h>
@@ -52,6 +64,7 @@ static int debug;
 /* Network device part of the driver */
 
 static LIST_HEAD(tun_dev_list);
+static struct ethtool_ops tun_ethtool_ops;
 
 /* Net device open. */
 static int tun_net_open(struct net_device *dev)
@@ -78,18 +91,24 @@ static int tun_net_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (!tun->attached)
 		goto drop;
 
-	/* Queue packet */
-	if (!(tun->flags & TUN_ONE_QUEUE)) {
-		/* Normal queueing mode.
-		 * Packet scheduler handles dropping. */
-		if (skb_queue_len(&tun->readq) >= TUN_READQ_SIZE)
+	/* Packet dropping */
+	if (skb_queue_len(&tun->readq) >= dev->tx_queue_len) {
+		if (!(tun->flags & TUN_ONE_QUEUE)) {
+			/* Normal queueing mode. */
+			/* Packet scheduler handles dropping of further packets. */
 			netif_stop_queue(dev);
-	} else {
-		/* Single queue mode.
-		 * Driver handles dropping itself. */
-		if (skb_queue_len(&tun->readq) >= dev->tx_queue_len)
+
+			/* We won't see all dropped packets individually, so overrun
+			 * error is more appropriate. */
+			tun->stats.tx_fifo_errors++;
+		} else {
+			/* Single queue mode.
+			 * Driver handles dropping of all packets itself. */
 			goto drop;
+		}
 	}
+
+	/* Queue packet */
 	skb_queue_tail(&tun->readq, skb);
 
 	/* Notify and wake up reader process */
@@ -132,7 +151,7 @@ static void tun_net_init(struct net_device *dev)
 		/* Zero header length */
 		dev->type = ARPHRD_NONE; 
 		dev->flags = IFF_POINTOPOINT | IFF_NOARP | IFF_MULTICAST;
-		dev->tx_queue_len = 10;
+		dev->tx_queue_len = TUN_READQ_SIZE;  /* We prefer our own queue length */
 		break;
 
 	case TUN_TAP_DEV:
@@ -144,6 +163,7 @@ static void tun_net_init(struct net_device *dev)
 		get_random_bytes(dev->dev_addr + sizeof(u16), 4);
 
 		ether_setup(dev);
+		dev->tx_queue_len = TUN_READQ_SIZE;  /* We prefer our own queue length */
 		break;
 	}
 }
@@ -318,7 +338,7 @@ static ssize_t tun_chr_readv(struct file *file, const struct iovec *iv,
 			schedule();
 			continue;
 		}
-		netif_start_queue(tun->dev);
+		netif_wake_queue(tun->dev);
 
 		ret = tun_put_user(tun, skb, (struct iovec *) iv, len);
 
@@ -354,6 +374,7 @@ static void tun_setup(struct net_device *dev)
 	dev->hard_start_xmit = tun_net_xmit;
 	dev->stop = tun_net_close;
 	dev->get_stats = tun_net_stats;
+	dev->ethtool_ops = &tun_ethtool_ops;
 	dev->destructor = free_netdev;
 }
 
@@ -608,12 +629,97 @@ static struct miscdevice tun_miscdev = {
 	.devfs_name = "net/tun",
 };
 
+/* ethtool interface */
+
+static int tun_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	cmd->supported		= 0;
+	cmd->advertising	= 0;
+	cmd->speed		= SPEED_10;
+	cmd->duplex		= DUPLEX_FULL;
+	cmd->port		= PORT_TP;
+	cmd->phy_address	= 0;
+	cmd->transceiver	= XCVR_INTERNAL;
+	cmd->autoneg		= AUTONEG_DISABLE;
+	cmd->maxtxpkt		= 0;
+	cmd->maxrxpkt		= 0;
+	return 0;
+}
+
+static void tun_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+{
+	struct tun_struct *tun = netdev_priv(dev);
+
+	strcpy(info->driver, DRV_NAME);
+	strcpy(info->version, DRV_VERSION);
+	strcpy(info->fw_version, "N/A");
+
+	switch (tun->flags & TUN_TYPE_MASK) {
+	case TUN_TUN_DEV:
+		strcpy(info->bus_info, "tun");
+		break;
+	case TUN_TAP_DEV:
+		strcpy(info->bus_info, "tap");
+		break;
+	}
+}
+
+static u32 tun_get_msglevel(struct net_device *dev)
+{
+#ifdef TUN_DEBUG
+	struct tun_struct *tun = netdev_priv(dev);
+	return tun->debug;
+#else
+	return -EOPNOTSUPP;
+#endif
+}
+
+static void tun_set_msglevel(struct net_device *dev, u32 value)
+{
+#ifdef TUN_DEBUG
+	struct tun_struct *tun = netdev_priv(dev);
+	tun->debug = value;
+#endif
+}
+
+static u32 tun_get_link(struct net_device *dev)
+{
+	struct tun_struct *tun = netdev_priv(dev);
+	return tun->attached;
+}
+
+static u32 tun_get_rx_csum(struct net_device *dev)
+{
+	struct tun_struct *tun = netdev_priv(dev);
+	return (tun->flags & TUN_NOCHECKSUM) == 0;
+}
+
+static int tun_set_rx_csum(struct net_device *dev, u32 data)
+{
+	struct tun_struct *tun = netdev_priv(dev);
+	if (data)
+		tun->flags &= ~TUN_NOCHECKSUM;
+	else
+		tun->flags |= TUN_NOCHECKSUM;
+	return 0;
+}
+
+static struct ethtool_ops tun_ethtool_ops = {
+	.get_settings	= tun_get_settings,
+	.get_drvinfo	= tun_get_drvinfo,
+	.get_msglevel	= tun_get_msglevel,
+	.set_msglevel	= tun_set_msglevel,
+	.get_link	= tun_get_link,
+	.get_rx_csum	= tun_get_rx_csum,
+	.set_rx_csum	= tun_set_rx_csum
+};
+
 int __init tun_init(void)
 {
 	int ret = 0;
 
-	printk(KERN_INFO "Universal TUN/TAP device driver %s " 
-	       "(C)1999-2002 Maxim Krasnyansky\n", TUN_VER);
+	printk(KERN_INFO "tun: %s, %s\n", DRV_DESCRIPTION, DRV_VERSION);
+	printk(KERN_INFO "tun: %s\n", DRV_COPYRIGHT);
 
 	ret = misc_register(&tun_miscdev);
 	if (ret)
@@ -638,5 +744,7 @@ void tun_cleanup(void)
 
 module_init(tun_init);
 module_exit(tun_cleanup);
+MODULE_DESCRIPTION(DRV_DESCRIPTION);
+MODULE_AUTHOR(DRV_COPYRIGHT);
 MODULE_LICENSE("GPL");
 MODULE_ALIAS_MISCDEV(TUN_MINOR);
