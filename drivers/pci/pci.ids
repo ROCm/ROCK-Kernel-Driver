@@ -6248,10 +6248,13 @@
 	1676  NetXtreme BCM5750 Gigabit Ethernet
 	1677  NetXtreme BCM5751 Gigabit Ethernet
 	167c  NetXtreme BCM5750M Gigabit Ethernet
+	167d  NetXtreme BCM5751M Gigabit Ethernet
+	167e  NetXtreme BCM5751F Gigabit Ethernet
 	1696  NetXtreme BCM5782 Gigabit Ethernet
 		103c 12bc  HP d530 CMT (DG746A)
 		14e4 000d  NetXtreme BCM5782 1000Base-T
 	169c  NetXtreme BCM5788 Gigabit Ethernet
+	169d  NetXtreme BCM5789 Gigabit Ethernet
 	16a6  NetXtreme BCM5702X Gigabit Ethernet
 		0e11 00bb  NC7760 Gigabit Server Adapter (PCI-X, 10/100/1000-T)
 		1028 0126  BCM5702 1000Base-T
