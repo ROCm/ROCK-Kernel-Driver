@@ -378,7 +378,8 @@ static int __init vesafb_probe(struct device *device)
 	info->fbops = &vesafb_ops;
 	info->var = vesafb_defined;
 	info->fix = vesafb_fix;
-	info->flags = FBINFO_FLAG_DEFAULT;
+	info->flags = FBINFO_FLAG_DEFAULT |
+		(ypan) ? FBINFO_HWACCEL_YPAN : 0;
 
 	if (fb_alloc_cmap(&info->cmap, 256, 0) < 0) {
 		err = -ENXIO;
