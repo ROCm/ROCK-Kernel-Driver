@@ -260,8 +260,21 @@ sync_sb_inodes(struct super_block *sb, struct writeback_control *wbc)
 		struct address_space *mapping = inode->i_mapping;
 		struct backing_dev_info *bdi = mapping->backing_dev_info;
 
-		if (bdi->memory_backed)
+		if (bdi->memory_backed) {
+			if (sb == blockdev_superblock) {
+				/*
+				 * Dirty memory-backed blockdev: the ramdisk
+				 * driver does this.
+				 */
+				list_move(&inode->i_list, &sb->s_dirty);
+				continue;
+			}
+			/*
+			 * Assume that all inodes on this superblock are memory
+			 * backed.  Skip the superblock.
+			 */
 			break;
+		}
 
 		if (wbc->nonblocking && bdi_write_congested(bdi)) {
 			wbc->encountered_congestion = 1;
