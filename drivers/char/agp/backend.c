@@ -260,6 +260,7 @@ int agp_register_driver (struct pci_dev *dev)
 
 int __exit agp_unregister_driver(void)
 {
+	agp_bridge.type = NOT_SUPPORTED;
 	pm_unregister_all(agp_power);
 	agp_frontend_cleanup();
 	agp_backend_cleanup();
