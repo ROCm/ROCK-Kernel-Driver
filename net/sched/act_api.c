@@ -38,6 +38,11 @@
 #else
 #define DPRINTK(format,args...)
 #endif
+#if 0 /* data */
+#define D2PRINTK(format,args...) printk(KERN_DEBUG format,##args)
+#else
+#define D2PRINTK(format,args...)
+#endif
 
 static struct tc_action_ops *act_base = NULL;
 static rwlock_t act_mod_lock = RW_LOCK_UNLOCKED;
@@ -158,7 +163,7 @@ int tcf_action_exec(struct sk_buff *skb,struct tc_action *act)
 
 	if (skb->tc_verd & TC_NCLS) {
 		skb->tc_verd = CLR_TC_NCLS(skb->tc_verd);
-		DPRINTK("(%p)tcf_action_exec: cleared TC_NCLS in %s out %s\n",skb,skb->input_dev?skb->input_dev->name:"xxx",skb->dev->name);
+		D2PRINTK("(%p)tcf_action_exec: cleared TC_NCLS in %s out %s\n",skb,skb->input_dev?skb->input_dev->name:"xxx",skb->dev->name);
 		return TC_ACT_OK;
 	}
 	while ((a = act) != NULL) {
@@ -816,6 +821,8 @@ int tcf_action_add(struct rtattr *rta, struct nlmsghdr *n, u32 pid, int ovr )
 	if (NULL == act)
 		return -ENOMEM;
 
+	memset(act, 0, sizeof(*act));
+
 	ret = tcf_action_init(rta, NULL,act,NULL,ovr,0);
 	/* NOTE: We have an all-or-none model
 	 * This means that of any of the actions fail
@@ -936,13 +943,6 @@ tc_dump_action(struct sk_buff *skb, struct netlink_callback *cb)
 
 	a_o = tc_lookup_action_n(kind);
 
-#ifdef CONFIG_KMOD
-	if (NULL == a_o) {
-		DPRINTK("tc_dump_action: trying to load module %s\n", kind);
-		request_module(kind);
-		a_o = tc_lookup_action_n(kind);
-	}
-#endif
 	if (NULL == a_o) {
 		printk("failed to find %s\n", kind);
 		return 0;
