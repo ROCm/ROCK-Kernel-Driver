@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.57 $
+ *   $Revision: 1.58 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -305,9 +305,9 @@ online_store (struct device *dev, const char *buf, size_t count)
 		return count;
 
 	i = simple_strtoul(buf, &tmp, 16);
-	if (i == 0 && cdev->drv->set_online)
+	if (i == 1 && cdev->drv->set_online)
 		ccw_device_set_online(cdev);
-	else if (i == 1 && cdev->drv->set_offline)
+	else if (i == 0 && cdev->drv->set_offline)
 		ccw_device_set_offline(cdev);
 	else
 		return -EINVAL;
