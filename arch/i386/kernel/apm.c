@@ -814,16 +814,16 @@ recalc:
 	if (jiffies_since_last_check > IDLE_CALC_LIMIT) {
 		use_apm_idle = 0;
 		last_jiffies = jiffies;
-		last_stime = current->times.tms_stime;
+		last_stime = current->stime;
 	} else if (jiffies_since_last_check > idle_period) {
 		unsigned int idle_percentage;
 
-		idle_percentage = current->times.tms_stime - last_stime;
+		idle_percentage = current->stime - last_stime;
 		idle_percentage *= 100;
 		idle_percentage /= jiffies_since_last_check;
 		use_apm_idle = (idle_percentage > idle_threshold);
 		last_jiffies = jiffies;
-		last_stime = current->times.tms_stime;
+		last_stime = current->stime;
 	}
 
 	bucket = IDLE_LEAKY_MAX;
