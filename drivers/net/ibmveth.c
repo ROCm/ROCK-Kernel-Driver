@@ -734,6 +734,8 @@ static int ibmveth_poll(struct net_device *netdev, int *budget)
 		if(ibmveth_rxq_pending_buffer(adapter)) {
 			struct sk_buff *skb;
 
+			rmb();
+
 			if(!ibmveth_rxq_buffer_valid(adapter)) {
 				wmb(); /* suggested by larson1 */
 				adapter->rx_invalid_buffer++;
