@@ -28,6 +28,9 @@
 #include "yenta_socket.h"
 #include "i82365.h"
 
+static int disable_clkrun;
+module_param(disable_clkrun, bool, 0444);
+MODULE_PARM_DESC(disable_clkrun, "If PC card doesn't function properly, please try this option");
 
 #if 0
 #define debug(x,args...) printk(KERN_DEBUG "%s: " x, __func__ , ##args)
