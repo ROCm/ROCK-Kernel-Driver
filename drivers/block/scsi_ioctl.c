@@ -475,3 +475,4 @@ int scsi_cmd_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long ar
 }
 
 EXPORT_SYMBOL(scsi_cmd_ioctl);
+EXPORT_SYMBOL(scsi_command_size);

@@ -39,7 +39,6 @@ EXPORT_SYMBOL(scsi_partsize);
 EXPORT_SYMBOL(scsi_bios_ptable);
 EXPORT_SYMBOL(scsi_allocate_device);
 EXPORT_SYMBOL(scsi_do_cmd);
-EXPORT_SYMBOL(scsi_command_size);
 EXPORT_SYMBOL(scsi_ioctl);
 EXPORT_SYMBOL(print_command);
 EXPORT_SYMBOL(print_sense);
