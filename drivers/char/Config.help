@@ -1033,3 +1033,24 @@ CONFIG_SCx200_GPIO
 
   If compiled as a module, it will be called scx200_gpio.o.
 
+Texas Instruments parallel link cable support
+CONFIG_TIPAR
+  If you own a Texas Instruments graphing calculator and use a
+  parallel link cable, then you might be interested in this driver.
+
+  If you enable this driver, you will be able to communicate with
+  your calculator through a set of device nodes under /dev. The
+  main advantage of this driver is that you don't have to be root
+  to use this precise link cable (depending on the permissions on
+  the device nodes, though).
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called tipar.o. If you want to compile it as a
+  module, say M here and read Documentation/modules.txt.
+
+  If you don't know what a parallel link cable is or what a Texas
+  Instruments graphing calculator is, then you probably don't need this
+  driver.
+
+  If unsure, say N.
