@@ -708,7 +708,14 @@ CONFIG_BLK_DEV_IDE_TCQ
   Digital drives in the Expert series (by nature of really being IBM
   drives).
 
-  If you have such a drive, say Y here.
+  However, please, note that there are host chip controllers which will
+  not cooperate properly if TCQ is enabled. This may cause serious
+  data loss!
+
+  Since enabling TCQ doesn't appear to have any noticeable performance
+  impact on Linux: [feel free to correct me if you wish too please]
+  
+  Generally say N here.
 
 CONFIG_BLK_DEV_IDE_TCQ_DEPTH
   Maximum size of commands to enable per-drive. Any value between 1

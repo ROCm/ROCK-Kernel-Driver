@@ -134,7 +134,6 @@ static void tcq_invalidate_queue(struct ata_device *drive)
 	ar->XXX_handler = tcq_nop_handler;
 	ar->command_type = IDE_DRIVE_TASK_NO_DATA;
 
-	rq->rq_dev = mk_kdev(drive->channel->major, (drive->select.b.unit)<<PARTN_BITS);
 	_elv_add_request(q, rq, 0, 0);
 
 out:
@@ -359,7 +358,7 @@ static ide_startstop_t dmaq_complete(struct ata_device *drive, struct request *r
 
 	TCQ_PRINTK("%s: ending %p, tag %d\n", __FUNCTION__, rq, rq->tag);
 
-	__ata_end_request(drive, rq, !dma_stat, rq->nr_sectors);
+	ata_end_request(drive, rq, !dma_stat, rq->nr_sectors);
 
 	/*
 	 * we completed this command, check if we can service a new command

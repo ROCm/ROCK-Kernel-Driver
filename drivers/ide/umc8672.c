@@ -129,7 +129,7 @@ void __init init_umc8672(void)	/* called from ide.c */
 
 	__save_flags(flags);	/* local CPU only */
 	__cli();		/* local CPU only */
-	if (check_region(0x108, 2)) {
+	if (!request_region(0x108, 2, "umc8672")) {
 		__restore_flags(flags);
 		printk("\numc8672: PORTS 0x108-0x109 ALREADY IN USE\n");
 		return;
@@ -138,6 +138,7 @@ void __init init_umc8672(void)	/* called from ide.c */
 	if (in_umc (0xd5) != 0xa0)
 	{
 		__restore_flags(flags);	/* local CPU only */
+		release_region(0x108, 2); 
 		printk ("umc8672: not found\n");
 		return;
 	}
@@ -146,7 +147,6 @@ void __init init_umc8672(void)	/* called from ide.c */
 	umc_set_speeds (current_speeds);
 	__restore_flags(flags);	/* local CPU only */
 
-	request_region(0x108, 2, "umc8672");
 	ide_hwifs[0].chipset = ide_umc8672;
 	ide_hwifs[1].chipset = ide_umc8672;
 	ide_hwifs[0].tuneproc = &tune_umc;

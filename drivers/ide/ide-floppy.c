@@ -96,6 +96,7 @@
 #include <linux/cdrom.h>
 #include <linux/ide.h>
 #include <linux/atapi.h>
+#include <linux/buffer_head.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -367,7 +368,7 @@ static int idefloppy_end_request(struct ata_device *drive, struct request *rq, i
 		return 0;
 
 	if (!(rq->flags & REQ_SPECIAL)) {
-		__ata_end_request(drive, rq, uptodate, 0);
+		ata_end_request(drive, rq, uptodate, 0);
 		return 0;
 	}
 
@@ -731,7 +732,6 @@ static ide_startstop_t idefloppy_transfer_pc2(struct ata_device *drive, struct r
 static ide_startstop_t idefloppy_transfer_pc1(struct ata_device *drive, struct request *rq)
 {
 	idefloppy_floppy_t *floppy = drive->driver_data;
-	ide_startstop_t startstop;
 	atapi_ireason_reg_t ireason;
 	int ret;
 

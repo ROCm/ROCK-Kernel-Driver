@@ -421,6 +421,7 @@
 #include <linux/completion.h>
 #include <linux/ide.h>
 #include <linux/atapi.h>
+#include <linux/buffer_head.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -2445,7 +2446,7 @@ static ide_startstop_t idetape_do_request(struct ata_device *drive, struct reque
 		 *	We do not support buffer cache originated requests.
 		 */
 		printk (KERN_NOTICE "ide-tape: %s: Unsupported command in request queue (%ld)\n", drive->name, rq->flags);
-		__ata_end_request(drive, rq, 0, 0);			/* Let the common code handle it */
+		ata_end_request(drive, rq, 0, 0);			/* Let the common code handle it */
 		return ATA_OP_FINISHED;
 	}
 

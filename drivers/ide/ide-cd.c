@@ -556,7 +556,7 @@ static void cdrom_end_request(struct ata_device *drive, struct request *rq, int 
 	if ((rq->flags & REQ_CMD) && !rq->current_nr_sectors)
 		uptodate = 1;
 
-	__ata_end_request(drive, rq, uptodate, 0);
+	ata_end_request(drive, rq, uptodate, 0);
 }
 
 
@@ -912,7 +912,7 @@ static ide_startstop_t cdrom_read_intr(struct ata_device *drive, struct request 
 
 	if (dma) {
 		if (!dma_error) {
-			__ata_end_request(drive, rq, 1, rq->nr_sectors);
+			ata_end_request(drive, rq, 1, rq->nr_sectors);
 
 			return ATA_OP_FINISHED;
 		} else
@@ -1497,7 +1497,7 @@ static ide_startstop_t cdrom_write_intr(struct ata_device *drive, struct request
 		if (dma_error)
 			return ata_error(drive, rq, "dma error");
 
-		__ata_end_request(drive, rq, 1, rq->nr_sectors);
+		ata_end_request(drive, rq, 1, rq->nr_sectors);
 
 		return ATA_OP_FINISHED;
 	}
@@ -1936,7 +1936,7 @@ static int cdrom_read_toc(struct ata_device *drive, struct request_sense *sense)
 		   If we get an error for the regular case, we assume
 		   a CDI without additional audio tracks. In this case
 		   the readable TOC is empty (CDI tracks are not included)
-		   and only holds the Leadout entry. Heiko Eißfeldt */
+		   and only holds the Leadout entry. Heiko EiÃ^ßfeldt */
 		ntracks = 0;
 		stat = cdrom_read_tocentry(drive, CDROM_LEADOUT, 1, 0,
 					   (char *)&toc->hdr,
@@ -2840,11 +2840,11 @@ static int ide_cdrom_setup(struct ata_device *drive)
 }
 
 /* Forwarding functions to generic routines. */
-static int ide_cdrom_ioctl (struct ata_device *drive,
+static int ide_cdrom_ioctl(struct ata_device *drive,
 		     struct inode *inode, struct file *file,
 		     unsigned int cmd, unsigned long arg)
 {
-	return cdrom_ioctl (inode, file, cmd, arg);
+	return cdrom_ioctl(inode, file, cmd, arg);
 }
 
 static int ide_cdrom_open (struct inode *ip, struct file *fp, struct ata_device *drive)

@@ -244,7 +244,7 @@ static int idescsi_end_request(struct ata_device *drive, struct request *rq, int
 	u8 *scsi_buf;
 
 	if (!(rq->flags & REQ_PC)) {
-		__ata_end_request(drive, rq, uptodate, 0);
+		ata_end_request(drive, rq, uptodate, 0);
 		return 0;
 	}
 
@@ -491,14 +491,13 @@ static void idescsi_release(struct inode *inode, struct file *filp, struct ata_d
 	MOD_DEC_USE_COUNT;
 }
 
+static Scsi_Host_Template template;
 static int idescsi_cleanup (struct ata_device *drive)
 {
-	struct Scsi_Host *host = drive->driver_data;
-
 	if (ide_unregister_subdriver (drive)) {
 		return 1;
 	}
-	scsi_unregister(host);
+	scsi_unregister_host(&template);
 
 	return 0;
 }
@@ -801,7 +800,6 @@ static int __init init_idescsi_module(void)
 static void __exit exit_idescsi_module(void)
 {
 	unregister_ata_driver(&ata_ops);
-	scsi_unregister_host(&template);
 }
 
 module_init(init_idescsi_module);

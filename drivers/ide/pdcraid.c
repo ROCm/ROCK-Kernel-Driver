@@ -12,7 +12,7 @@
    
    Authors: 	Arjan van de Ven <arjanv@redhat.com>
    		
-   Based on work done by Søren Schmidt for FreeBSD  
+   Based on work done by SÃ¸ren Schmidt for FreeBSD  
 
 */
 

@@ -132,16 +132,16 @@ unsigned long last_req;
 
 unsigned long read_timer(void)
 {
+        extern spinlock_t i8253_lock;
 	unsigned long t, flags;
 	int i;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&i8253_lock, flags);
 	t = jiffies * 11932;
     	outb_p(0, 0x43);
 	i = inb_p(0x40);
 	i |= inb(0x40) << 8;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&i8253_lock, flags);
 	return(t - i);
 }
 #endif
@@ -817,8 +817,19 @@ static void __init hd_geninit(void)
 		NR_HD = 0;
 		return;
 	}
-	request_region(HD_DATA, 8, "hd");
-	request_region(HD_CMD, 1, "hd(cmd)");
+	if (!request_region(HD_DATA, 8, "hd")) {
+		printk(KERN_WARNING "hd: port 0x%x busy\n", HD_DATA);
+		NR_HD = 0;
+		free_irq(HD_IRQ, NULL);
+		return;
+	}
+	if (!request_region(HD_CMD, 1, "hd(cmd)")) {
+		printk(KERN_WARNING "hd: port 0x%x busy\n", HD_CMD);
+		NR_HD = 0;
+		free_irq(HD_IRQ, NULL);
+		release_region(HD_DATA, 8);
+		return;
+	}
 
 	hd_gendisk.nr_real = NR_HD;
 

@@ -33,18 +33,9 @@
 #include <asm/io.h>
 #include <asm/bitops.h>
 
-#define DEBUG_TASKFILE	0	/* unset when fixed */
-
-#if DEBUG_TASKFILE
-#define DTF(x...) printk(##x)
-#else
-#define DTF(x...)
-#endif
-
 /*
  * Data transfer functions for polled IO.
  */
-
 static void ata_read_32(struct ata_device *drive, void *buffer, unsigned int wcount)
 {
 	insl(IDE_DATA_REG, buffer, wcount);
@@ -144,102 +135,9 @@ void ata_write(struct ata_device *drive, void *buffer, unsigned int wcount)
 }
 
 /*
- * Needed for PCI irq sharing
- */
-int drive_is_ready(struct ata_device *drive)
-{
-	if (test_bit(IDE_DMA, drive->channel->active))
-		return udma_irq_status(drive);
-
-	/*
-	 * Need to guarantee 400ns since last command was issued?
-	 */
-
-	/* FIXME: promote this to the general status read method perhaps.
-	 */
-#ifdef CONFIG_IDEPCI_SHARE_IRQ
-	/*
-	 * We do a passive status test under shared PCI interrupts on
-	 * cards that truly share the ATA side interrupt, but may also share
-	 * an interrupt with another pci card/device.  We make no assumptions
-	 * about possible isa-pnp and pci-pnp issues yet.
-	 */
-	if (drive->channel->io_ports[IDE_CONTROL_OFFSET])
-		drive->status = GET_ALTSTAT();
-	else
-#endif
-		ata_status(drive, 0, 0);	/* Note: this may clear a pending IRQ! */
-
-	if (drive->status & BUSY_STAT)
-		return 0;	/* drive busy:  definitely not interrupting */
-
-	return 1;	/* drive ready: *might* be interrupting */
-}
-
-/*
- * This function issues a special IDE device request onto the request queue.
- *
- * If action is ide_wait, then the rq is queued at the end of the request
- * queue, and the function sleeps until it has been processed.  This is for use
- * when invoked from an ioctl handler.
- *
- * If action is ide_preempt, then the rq is queued at the head of the request
- * queue, displacing the currently-being-processed request and this function
- * returns immediately without waiting for the new rq to be completed.  This is
- * VERY DANGEROUS, and is intended for careful use by the ATAPI tape/cdrom
- * driver code.
- *
- * If action is ide_end, then the rq is queued at the end of the request queue,
- * and the function returns immediately without waiting for the new rq to be
- * completed. This is again intended for careful use by the ATAPI tape/cdrom
- * driver code.
- */
-int ide_do_drive_cmd(struct ata_device *drive, struct request *rq, ide_action_t action)
-{
-	unsigned long flags;
-	struct ata_channel *ch = drive->channel;
-	unsigned int major = ch->major;
-	request_queue_t *q = &drive->queue;
-	struct list_head *queue_head = &q->queue_head;
-	DECLARE_COMPLETION(wait);
-
-#ifdef CONFIG_BLK_DEV_PDC4030
-	if (ch->chipset == ide_pdc4030 && rq->buffer)
-		return -ENOSYS;  /* special drive cmds not supported */
-#endif
-	rq->errors = 0;
-	rq->rq_status = RQ_ACTIVE;
-	rq->rq_dev = mk_kdev(major,(drive->select.b.unit)<<PARTN_BITS);
-	if (action == ide_wait)
-		rq->waiting = &wait;
-
-	spin_lock_irqsave(ch->lock, flags);
-
-	if (action == ide_preempt)
-		drive->rq = NULL;
-	else if (!blk_queue_empty(&drive->queue))
-		queue_head = queue_head->prev;	/* ide_end and ide_wait */
-
-	__elv_add_request(q, rq, queue_head);
-
-	do_ide_request(q);
-
-	spin_unlock_irqrestore(ch->lock, flags);
-
-	if (action == ide_wait) {
-		wait_for_completion(&wait);	/* wait for it to be serviced */
-		return rq->errors ? -EIO : 0;	/* return -EIO if errors */
-	}
-
-	return 0;
-}
-
-
-/*
  * Invoked on completion of a special REQ_SPECIAL command.
  */
-static ide_startstop_t special_intr(struct ata_device *drive, struct
-		request *rq) {
+static ide_startstop_t special_intr(struct ata_device *drive, struct request *rq) {
 	unsigned long flags;
 	struct ata_channel *ch =drive->channel;
 	struct ata_taskfile *ar = rq->special;
@@ -290,21 +188,52 @@ static ide_startstop_t special_intr(struct ata_device *drive, struct
 
 int ide_raw_taskfile(struct ata_device *drive, struct ata_taskfile *ar, char *buf)
 {
-	struct request req;
+	struct request *rq;
+	unsigned long flags;
+	struct ata_channel *ch = drive->channel;
+	request_queue_t *q = &drive->queue;
+	struct list_head *queue_head = &q->queue_head;
+	DECLARE_COMPLETION(wait);
 
-	ar->command_type = IDE_DRIVE_TASK_NO_DATA;
+#ifdef CONFIG_BLK_DEV_PDC4030
+	if (ch->chipset == ide_pdc4030 && buf)
+		return -ENOSYS;  /* special drive cmds not supported */
+#endif
+
+	rq = __blk_get_request(&drive->queue, READ);
+	if (!rq)
+		rq = __blk_get_request(&drive->queue, WRITE);
+
+	/*
+	 * FIXME: Make sure there is a free slot on the list!
+	 */
+
+	BUG_ON(!rq);
+
+	rq->flags = REQ_SPECIAL;
+	rq->buffer = buf;
+	rq->special = ar;
+	rq->errors = 0;
+	rq->rq_status = RQ_ACTIVE;
+	rq->waiting = &wait;
+
 	ar->XXX_handler = special_intr;
+	ar->command_type = IDE_DRIVE_TASK_NO_DATA;
 
-	memset(&req, 0, sizeof(req));
-	req.flags = REQ_SPECIAL;
-	req.buffer = buf;
-	req.special = ar;
+	spin_lock_irqsave(ch->lock, flags);
 
-	return ide_do_drive_cmd(drive, &req, ide_wait);
+	if (!blk_queue_empty(&drive->queue))
+		queue_head = queue_head->prev;
+	__elv_add_request(q, rq, queue_head);
+
+	q->request_fn(q);
+	spin_unlock_irqrestore(ch->lock, flags);
+
+	wait_for_completion(&wait);	/* wait for it to be serviced */
+
+	return rq->errors ? -EIO : 0;	/* return -EIO if errors */
 }
 
-EXPORT_SYMBOL(drive_is_ready);
-EXPORT_SYMBOL(ide_do_drive_cmd);
 EXPORT_SYMBOL(ata_read);
 EXPORT_SYMBOL(ata_write);
 EXPORT_SYMBOL(ide_raw_taskfile);

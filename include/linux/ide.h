@@ -1,5 +1,6 @@
 #ifndef _IDE_H
 #define _IDE_H
+
 /*
  *  Copyright (C) 1994-2002  Linus Torvalds & authors
  */
@@ -57,15 +58,14 @@ typedef unsigned char	byte;	/* used everywhere */
  */
 #define ERROR_MAX	8	/* Max read/write errors per sector */
 #define ERROR_RESET	3	/* Reset controller every 4th retry */
-#define ERROR_RECAL	1	/* Recalibrate every 2nd retry */
 
 /*
- * state flags
+ * State flags.
  */
 #define DMA_PIO_RETRY	1	/* retrying in PIO */
 
 /*
- * Definitions for accessing IDE controller registers
+ * Definitions for accessing IDE controller registers.
  */
 
 enum {
@@ -192,23 +192,21 @@ typedef enum {
  * Structure to hold all information about the location of this port
  */
 typedef struct hw_regs_s {
-	ide_ioreg_t	io_ports[IDE_NR_PORTS];	/* task file registers */
-	int		irq;			/* our irq number */
-	int		dma;			/* our dma entry */
-	ide_ack_intr_t	*ack_intr;		/* acknowledge interrupt */
+	ide_ioreg_t	io_ports[IDE_NR_PORTS];		    /* task file registers */
+	int		irq;				    /* our irq number */
+	int		dma;				    /* our dma entry */
+	int		(*ack_intr)(struct ata_channel *);  /* acknowledge interrupt */
 	hwif_chipset_t  chipset;
 } hw_regs_t;
 
 /*
  * Set up hw_regs_t structure before calling ide_register_hw (optional)
  */
-void ide_setup_ports(hw_regs_t *hw,
-			ide_ioreg_t base,
-			int *offsets,
-			ide_ioreg_t ctrl,
-			ide_ioreg_t intr,
-			ide_ack_intr_t *ack_intr,
-			int irq);
+extern void ide_setup_ports(hw_regs_t *hw,
+	ide_ioreg_t base, int *offsets,
+	ide_ioreg_t ctrl, ide_ioreg_t intr,
+	int (*ack_intr)(struct ata_channel *),
+	int irq);
 
 #include <asm/ide.h>
 
@@ -282,14 +280,10 @@ struct ata_device {
 	unsigned int usage;		/* current "open()" count for drive */
 	char type; /* distingiush different devices: disk, cdrom, tape, floppy, ... */
 
-	/* NOTE: If we had proper separation between channel and host chip, we
-	 * could move this to the channel and many sync problems would
-	 * magically just go away.
-	 */
-	request_queue_t	queue;	/* per device request queue */
+	request_queue_t	queue;		/* per device request queue */
 	struct request *rq;		/* current request */
 
-	unsigned long sleep;	/* sleep until this time */
+	unsigned long sleep;		/* sleep until this time */
 
 	byte	 retry_pio;		/* retrying dma capable host in pio */
 	byte	 state;			/* retry state */
@@ -341,6 +335,7 @@ struct ata_device {
 
 	void		*driver_data;	/* extra driver data */
 	devfs_handle_t	de;		/* directory for device */
+
 	char		driver_req[10];	/* requests specific driver */
 
 	int		last_lun;	/* last logical unit */
@@ -392,6 +387,7 @@ enum {
 enum {
 	IDE_BUSY,	/* awaiting an interrupt */
 	IDE_SLEEP,
+	IDE_PIO,	/* PIO in progress */
 	IDE_DMA		/* DMA in progress */
 };
 
@@ -404,11 +400,15 @@ struct ata_channel {
 	 */
 	spinlock_t *lock;
 	unsigned long *active;		/* active processing request */
-
 	ide_startstop_t (*handler)(struct ata_device *, struct request *);	/* irq handler, if active */
+
+	/* FIXME: Only still used in PDC4030.  Localize this code there by
+	 * replacing with busy waits.
+	 */
 	struct timer_list timer;				/* failsafe timer */
 	ide_startstop_t (*expiry)(struct ata_device *, struct request *, unsigned long *);	/* irq handler, if active */
 	unsigned long poll_timeout;				/* timeout value during polled operations */
+
 	struct ata_device *drive;				/* last serviced drive */
 
 
@@ -508,8 +508,6 @@ struct ata_channel {
 extern int ide_register_hw(hw_regs_t *hw);
 extern void ide_unregister(struct ata_channel *);
 
-struct ata_taskfile;
-
 #define IDE_MAX_TAG	32
 
 #ifdef CONFIG_BLK_DEV_IDE_TCQ
@@ -605,8 +603,7 @@ extern int noautodma;
 #define DEVICE_NR(device)	(minor(device) >> PARTN_BITS)
 #include <linux/blk.h>
 
-extern int __ata_end_request(struct ata_device *, struct request *, int, unsigned int);
-
+extern int ata_end_request(struct ata_device *, struct request *, int, unsigned int);
 extern void ata_set_handler(struct ata_device *drive, ata_handler_t handler,
 		unsigned long timeout, ata_expiry_t expiry);
 
@@ -627,20 +624,9 @@ int ide_xlate_1024(kdev_t, int, int, const char *);
 struct ata_device *get_info_ptr(kdev_t i_rdev);
 
 /*
- * "action" parameter type for ide_do_drive_cmd() below.
- */
-typedef enum {
-	ide_wait,	/* insert rq at end of list, and wait for it */
-	ide_preempt,	/* insert rq in front of current request */
-	ide_end		/* insert rq at end of list, but don't wait for it */
-} ide_action_t;
-
-/*
  * temporarily mapping a (possible) highmem bio for PIO transfer
  */
 #define ide_rq_offset(rq) (((rq)->hard_cur_sectors - (rq)->current_nr_sectors) << 9)
-
-extern int ide_do_drive_cmd(struct ata_device *, struct request *, ide_action_t);
 
 struct ata_taskfile {
 	struct hd_drive_task_hdr taskfile;
@@ -654,7 +640,6 @@ extern void ata_read(struct ata_device *, void *, unsigned int);
 extern void ata_write(struct ata_device *, void *, unsigned int);
 
 extern int ide_raw_taskfile(struct ata_device *, struct ata_taskfile *, char *);
-extern void ide_fix_driveid(struct hd_driveid *id);
 extern int ide_config_drive_speed(struct ata_device *, byte);
 extern byte eighty_ninty_three(struct ata_device *);
 
@@ -803,13 +788,12 @@ extern spinlock_t ide_lock;
 
 #define DRIVE_LOCK(drive)	((drive)->queue.queue_lock)
 
-extern int drive_is_ready(struct ata_device *drive);
-
 /* Low level device access functions. */
 
 extern void ata_select(struct ata_device *, unsigned long);
 extern void ata_mask(struct ata_device *);
 extern int ata_status(struct ata_device *, u8, u8);
+extern int ata_status_irq(struct ata_device *drive);
 extern int ata_status_poll( struct ata_device *, u8, u8,
 		unsigned long, struct request *rq);
 

@@ -97,11 +97,15 @@ int ide_xlate_1024(kdev_t i_rdev, int xparm, int ptheads, const char *msg)
 		}
 	}
 
-	/* There used to be code here that assigned drive->id->CHS
-	   to drive->CHS and that to drive->bios_CHS. However, some disks have
-	   id->C/H/S = 4092/16/63 but are larger than 2.1 GB.  In such cases
-	   that code was wrong.  Moreover, there seems to be no reason to do
-	   any of these things. */
+	/* There used to be code here that assigned drive->id->CHS to
+	 * drive->CHS and that to drive->bios_CHS. However, some disks have
+	 * id->C/H/S = 4092/16/63 but are larger than 2.1 GB.  In such cases
+	 * that code was wrong.  Moreover, there seems to be no reason to do
+	 * any of these things.
+	 *
+	 * Please note that recent RedHat changes to the disk utils are bogous
+	 * and will report spurious errors.
+	 */
 
 	/* translate? */
 	if (drive->forced_geom)
@@ -169,8 +173,8 @@ int ide_xlate_1024(kdev_t i_rdev, int xparm, int ptheads, const char *msg)
 }
 
 /*
- * hd_driveid data come as little endian, it needs to be converted on big
- * endian machines.
+ * Drive ID data come as little endian, it needs to be converted on big endian
+ * machines.
  */
 void ata_fix_driveid(struct hd_driveid *id)
 {
@@ -319,11 +323,8 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
 	outb(inb(ch->dma_base + 2) & ~(1 << (5 + unit)), ch->dma_base + 2);
 #endif
 
-	/* Don't use ide_wait_cmd here - it will attempt to set_geometry and
-	 * recalibrate, but for some reason these don't work at this point
-	 * (lost interrupt).
-         *
-         * Select the drive, and issue the SETFEATURES command
+	/*
+         * Select the drive, and issue the SETFEATURES command.
          */
 	disable_irq(ch->irq);	/* disable_irq_nosync ?? */
 	udelay(1);
@@ -339,7 +340,6 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
 	udelay(1);
 	ret = ata_status_poll(drive, 0, BUSY_STAT, WAIT_CMD, NULL);
 	ata_mask(drive);
-
 	enable_irq(ch->irq);
 
 	if (ret != ATA_OP_READY) {
@@ -1127,6 +1127,7 @@ static void channel_init(struct ata_channel *ch)
 	gd->sizes = kmalloc(ATA_MINORS * sizeof(int), GFP_KERNEL);
 	if (!gd->sizes)
 		goto err_kmalloc_gd_sizes;
+	memset(gd->sizes, 0, ATA_MINORS*sizeof(gd->sizes[0]));
 
 	gd->part = kmalloc(ATA_MINORS * sizeof(struct hd_struct), GFP_KERNEL);
 	if (!gd->part)

@@ -140,12 +140,9 @@ struct ata_channel ide_hwifs[MAX_HWIFS];	/* master data repository */
  * Setup hw_regs_t structure described by parameters.  You may set up the hw
  * structure yourself OR use this routine to do it for you.
  */
-void ide_setup_ports(hw_regs_t *hw,
-		ide_ioreg_t base,
-		int *offsets,
-		ide_ioreg_t ctrl,
-		ide_ioreg_t intr,
-		ide_ack_intr_t *ack_intr,
+void ide_setup_ports(hw_regs_t *hw, ide_ioreg_t base, int *offsets,
+		ide_ioreg_t ctrl, ide_ioreg_t intr,
+		int (*ack_intr)(struct ata_channel *),
 		int irq)
 {
 	int i;
@@ -638,17 +635,6 @@ found:
  */
 
 /*
- * stridx() returns the offset of c within s,
- * or -1 if c is '\0' or not found within s.
- */
-static int __init stridx (const char *s, char c)
-{
-	char *i = strchr(s, c);
-
-	return (i && c) ? i - s : -1;
-}
-
-/*
  * Parsing for ide_setup():
  *
  * 1. the first char of s must be '='.
@@ -657,14 +643,14 @@ static int __init stridx (const char *s, char c)
  * 3. if the remainder is a series of no more than max_vals numbers
  *     separated by commas, the numbers are saved in vals[] and a
  *     count of how many were saved is returned.  Base10 is assumed,
- *     and base16 is allowed when prefixed with "0x".
+ *     and base16 is allowed when prefixed with "0x".  The number of 
+ *     values read will be placed in vals[0], and the values read will
+ *     placed in vals[1] to vals[max_vals].
  * 4. otherwise, zero is returned.
  */
 static int __init match_parm (char *s, const char *keywords[], int vals[], int max_vals)
 {
-	static const char decimal[] = "0123456789";
-	static const char hex[] = "0123456789abcdef";
-	int i, n;
+	int i;
 
 	if (*s++ == '=') {
 		/*
@@ -683,23 +669,10 @@ static int __init match_parm (char *s, const char *keywords[], int vals[], int m
 		 * or base16 when prefixed with "0x".
 		 * Return a count of how many were found.
 		 */
-		for (n = 0; (i = stridx(decimal, *s)) >= 0;) {
-			vals[n] = i;
-			while ((i = stridx(decimal, *++s)) >= 0)
-				vals[n] = (vals[n] * 10) + i;
-			if (*s == 'x' && !vals[n]) {
-				while ((i = stridx(hex, *++s)) >= 0)
-					vals[n] = (vals[n] * 0x10) + i;
-			}
-			if (++n == max_vals)
-				break;
-			if (*s == ',' || *s == ';')
-				++s;
-		}
-		if (!*s)
-			return n;
+        	get_options(s, max_vals+1, vals);
+	        return vals[0];
 	}
-	return 0;	/* zero = nothing matched */
+	return 0;
 }
 
 /*
@@ -744,7 +717,7 @@ static void __init init_global_data(void)
  */
 int __init ide_setup(char *s)
 {
-	int i, vals[3];
+	int i, vals[4];
 	struct ata_channel *ch;
 	struct ata_device *drive;
 	unsigned int hw, unit;
@@ -755,7 +728,6 @@ int __init ide_setup(char *s)
 		return 0;
 
 	if (strncmp(s,"ide",3) &&
-	    strncmp(s,"idebus",6) &&
 	    strncmp(s,"hd",2))		/* hdx= & hdxlun= */
 		return 0;
 
@@ -801,24 +773,24 @@ int __init ide_setup(char *s)
 		unit = unit % MAX_DRIVES;
 		ch = &ide_hwifs[hw];
 		drive = &ch->drives[unit];
-		if (!strncmp(s + 4, "ide-", 4)) {
+		if (!strncmp(s+3, "=ide-", 5)) {
 			strncpy(drive->driver_req, s + 4, 9);
 			goto done;
 		}
 		/*
 		 * Look for last lun option:  "hdxlun="
 		 */
-		if (!strncmp(&s[3], "lun", 3)) {
-			if (match_parm(&s[6], NULL, vals, 1) != 1)
+		if (!strncmp(s+3, "lun=", 4)) {
+	                if (*get_options(s+7, 2, vals) || vals[0]!=1)
 				goto bad_option;
-			if (vals[0] >= 0 && vals[0] <= 7) {
-				drive->last_lun = vals[0];
+			if (vals[1] >= 0 && vals[1] <= 7) {
+				drive->last_lun = vals[1];
 				drive->forced_lun = 1;
 			} else
 				printk(" -- BAD LAST LUN! Expected value from 0 to 7");
 			goto done;
 		}
-		switch (match_parm(&s[3], hd_words, vals, 3)) {
+		switch (match_parm(s+3, hd_words, vals, 3)) {
 			case -1: /* "none" */
 				drive->nobios = 1;  /* drop into "noprobe" */
 			case -2: /* "noprobe" */
@@ -864,9 +836,9 @@ int __init ide_setup(char *s)
 #endif
 			case 3: /* cyl,head,sect */
 				drive->type	= ATA_DISK;
-				drive->cyl	= drive->bios_cyl  = vals[0];
-				drive->head	= drive->bios_head = vals[1];
-				drive->sect	= drive->bios_sect = vals[2];
+				drive->cyl	= drive->bios_cyl  = vals[1];
+				drive->head	= drive->bios_head = vals[2];
+				drive->sect	= drive->bios_sect = vals[3];
 				drive->present	= 1;
 				drive->forced_geom = 1;
 				ch->noprobe = 0;
@@ -879,10 +851,10 @@ int __init ide_setup(char *s)
 	/*
 	 * Look for bus speed option:  "idebus="
 	 */
-	if (!strncmp(s, "idebus", 6)) {
-		if (match_parm(&s[6], NULL, vals, 1) != 1)
+	if (!strncmp(s, "idebus=", 7)) {
+		if (*get_options(s+7, 2, vals) || vals[0] != 1)
 			goto bad_option;
-		idebus_parameter = vals[0];
+		idebus_parameter = vals[1];
 		goto done;
 	}
 
@@ -892,92 +864,16 @@ int __init ide_setup(char *s)
 	if (!strncmp(s, "ide", 3) && s[3] >= '0' && s[3] <= max_ch) {
 		/*
 		 * Be VERY CAREFUL changing this: note hardcoded indexes below
-		 * -8,-9,-10. -11 : are reserved for future idex calls to ease the hardcoding.
 		 */
+		const char *ide_options[] = {
+			"noprobe", "serialize", "autotune", "noautotune", "reset", "dma", "ata66", NULL };
 		const char *ide_words[] = {
-			"noprobe", "serialize", "autotune", "noautotune", "reset", "dma", "ata66",
-			"minus8", "minus9", "minus10", "minus11",
 			"qd65xx", "ht6560b", "cmd640_vlb", "dtc2278", "umc8672", "ali14xx", "dc4030", NULL };
 		hw = s[3] - '0';
 		ch = &ide_hwifs[hw];
 
-		i = match_parm(&s[4], ide_words, vals, 3);
 
-		/*
-		 * Cryptic check to ensure chipset not already set for a channel:
-		 */
-		if (i > 0 || i <= -11) {			/* is parameter a chipset name? */
-			if (ch->chipset != ide_unknown)
-				goto bad_option;	/* chipset already specified */
-			if (i <= -11 && i != -18 && hw != 0)
-				goto bad_channel;		/* chipset drivers are for "ide0=" only */
-			if (i <= -11 && i != -18 && ide_hwifs[hw+1].chipset != ide_unknown)
-				goto bad_option;	/* chipset for 2nd port already specified */
-			printk("\n");
-		}
-
-		switch (i) {
-#ifdef CONFIG_BLK_DEV_PDC4030
-			case -18: /* "dc4030" */
-			{
-				extern void init_pdc4030(void);
-				init_pdc4030();
-				goto done;
-			}
-#endif
-#ifdef CONFIG_BLK_DEV_ALI14XX
-			case -17: /* "ali14xx" */
-			{
-				extern void init_ali14xx (void);
-				init_ali14xx();
-				goto done;
-			}
-#endif
-#ifdef CONFIG_BLK_DEV_UMC8672
-			case -16: /* "umc8672" */
-			{
-				extern void init_umc8672 (void);
-				init_umc8672();
-				goto done;
-			}
-#endif
-#ifdef CONFIG_BLK_DEV_DTC2278
-			case -15: /* "dtc2278" */
-			{
-				extern void init_dtc2278 (void);
-				init_dtc2278();
-				goto done;
-			}
-#endif
-#ifdef CONFIG_BLK_DEV_CMD640
-			case -14: /* "cmd640_vlb" */
-			{
-				extern int cmd640_vlb; /* flag for cmd640.c */
-				cmd640_vlb = 1;
-				goto done;
-			}
-#endif
-#ifdef CONFIG_BLK_DEV_HT6560B
-			case -13: /* "ht6560b" */
-			{
-				extern void init_ht6560b (void);
-				init_ht6560b();
-				goto done;
-			}
-#endif
-#if CONFIG_BLK_DEV_QD65XX
-			case -12: /* "qd65xx" */
-			{
-				extern void init_qd65xx (void);
-				init_qd65xx();
-				goto done;
-			}
-#endif
-			case -11: /* minus11 */
-			case -10: /* minus10 */
-			case -9: /* minus9 */
-			case -8: /* minus8 */
-				goto bad_option;
+		switch (match_parm(s+4, ide_options, vals, 1)) {
 			case -7: /* ata66 */
 #ifdef CONFIG_PCI
 				ch->udma_four = 1;
@@ -1014,16 +910,89 @@ int __init ide_setup(char *s)
 			case -1: /* "noprobe" */
 				ch->noprobe = 1;
 				goto done;
+		}
 
+		i = match_parm(&s[4], ide_words, vals, 3);
+
+		/*
+		 * Cryptic check to ensure chipset not already set for a channel:
+		 */
+		if (i) {			/* is parameter a chipset name? */
+			if (ide_hwifs[hw].chipset != ide_unknown)
+				goto bad_option;	/* chipset already specified */
+			if (i != -7 && hw != 0)
+				goto bad_channel;		/* chipset drivers are for "ide0=" only */
+			if (i != -7 && ide_hwifs[1].chipset != ide_unknown)
+				goto bad_option;	/* chipset for 2nd port already specified */
+			printk("\n");
+		}
+
+		switch (i) {
+#ifdef CONFIG_BLK_DEV_PDC4030
+			case -7:  /* "dc4030" */
+			{
+				extern void init_pdc4030(void);
+				init_pdc4030();
+				goto done;
+			}
+#endif
+#ifdef CONFIG_BLK_DEV_ALI14XX
+			case -6:  /* "ali14xx" */
+			{
+				extern void init_ali14xx (void);
+				init_ali14xx();
+				goto done;
+			}
+#endif
+#ifdef CONFIG_BLK_DEV_UMC8672
+			case -5:  /* "umc8672" */
+			{
+				extern void init_umc8672 (void);
+				init_umc8672();
+				goto done;
+			}
+#endif
+#ifdef CONFIG_BLK_DEV_DTC2278
+			case -4:  /* "dtc2278" */
+			{
+				extern void init_dtc2278 (void);
+				init_dtc2278();
+				goto done;
+			}
+#endif
+#ifdef CONFIG_BLK_DEV_CMD640
+			case -3:  /* "cmd640_vlb" */
+			{
+				extern int cmd640_vlb; /* flag for cmd640.c */
+				cmd640_vlb = 1;
+				goto done;
+			}
+#endif
+#ifdef CONFIG_BLK_DEV_HT6560B
+			case -2:  /* "ht6560b" */
+			{
+				extern void init_ht6560b (void);
+				init_ht6560b();
+				goto done;
+			}
+#endif
+#if CONFIG_BLK_DEV_QD65XX
+			case -1:  /* "qd65xx" */
+			{
+				extern void init_qd65xx (void);
+				init_qd65xx();
+				goto done;
+			}
+#endif
 			case 1:	/* base */
-				vals[1] = vals[0] + 0x206; /* default ctl */
+				vals[2] = vals[1] + 0x206; /* default ctl */
 			case 2: /* base,ctl */
-				vals[2] = 0;	/* default irq = probe for it */
+				vals[3] = 0;	/* default irq = probe for it */
 			case 3: /* base,ctl,irq */
-				ch->hw.irq = vals[2];
-				ide_init_hwif_ports(&ch->hw, (ide_ioreg_t) vals[0], (ide_ioreg_t) vals[1], &ch->irq);
+				ch->hw.irq = vals[3];
+				ide_init_hwif_ports(&ch->hw, (ide_ioreg_t) vals[1], (ide_ioreg_t) vals[2], &ch->irq);
 				memcpy(ch->io_ports, ch->hw.io_ports, sizeof(ch->io_ports));
-				ch->irq = vals[2];
+				ch->irq = vals[3];
 				ch->noprobe  = 0;
 				ch->chipset  = ide_generic;
 				goto done;

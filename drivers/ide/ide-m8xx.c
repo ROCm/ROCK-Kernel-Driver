@@ -50,7 +50,7 @@ static void print_fixed (volatile unsigned char *p);
 static void print_funcid (int func);
 static int check_ide_device (unsigned long base);
 
-static void ide_interrupt_ack (void *dev);
+static int ide_interrupt_ack(struct ata_channel *);
 static void m8xx_ide_tuneproc(struct ata_device *drive, byte pio);
 
 typedef	struct ide_ioport_desc {
@@ -326,7 +326,7 @@ m8xx_ide_init_hwif_ports(hw_regs_t *hw, ide_ioreg_t data_port,
 	/* register routine to tune PIO mode */
 	ide_hwifs[data_port].tuneproc = m8xx_ide_tuneproc;
 
-	hw->ack_intr = (ide_ack_intr_t *) ide_interrupt_ack;
+	hw->ack_intr = ide_interrupt_ack;
 	/* Enable Harddisk Interrupt,
 	 * and make it edge sensitive
 	 */
@@ -401,7 +401,7 @@ void m8xx_ide_init_hwif_ports (hw_regs_t *hw,
 			ioport_dsc[data_port].reg_off[i],
 			i, base + ioport_dsc[data_port].reg_off[i]);
 #endif
-	 	*p++ = base + ioport_dsc[data_port].reg_off[i];
+		*p++ = base + ioport_dsc[data_port].reg_off[i];
 	}
 
 	if (irq) {
@@ -412,16 +412,16 @@ void m8xx_ide_init_hwif_ports (hw_regs_t *hw,
 	/* register routine to tune PIO mode */
 	ide_hwifs[data_port].tuneproc = m8xx_ide_tuneproc;
 
-	hw->ack_intr = (ide_ack_intr_t *) ide_interrupt_ack;
+	hw->ack_intr = ide_interrupt_ack;
 	/* Enable Harddisk Interrupt,
 	 * and make it edge sensitive
 	 */
 	/* (11-18) Set edge detect for irq, no wakeup from low power mode */
 	((immap_t *) IMAP_ADDR)->im_siu_conf.sc_siel |=
 			(0x80000000 >> ioport_dsc[data_port].irq);
-}	/* m8xx_ide_init_hwif_ports() for CONFIG_IDE_8xx_DIRECT */ 
+}	/* m8xx_ide_init_hwif_ports() for CONFIG_IDE_8xx_DIRECT */
 
-#endif	/* CONFIG_IDE_8xx_DIRECT */
+#endif
 
 
 /* -------------------------------------------------------------------- */
@@ -493,11 +493,10 @@ m8xx_ide_tuneproc(struct ata_device *drive, byte pio)
 
 	printk("%s[%d] %s: not implemented yet!\n",
 		__FILE__,__LINE__,__FUNCTION__);
-#endif /* defined(CONFIG_IDE_8xx_PCCARD) || defined(CONFIG_IDE_8xx_PCMCIA */
+#endif
 }
 
-static void
-ide_interrupt_ack (void *dev)
+static int ide_interrupt_ack(struct ata_channel *ch)
 {
 #ifdef CONFIG_IDE_8xx_PCCARD
 	u_int pscr, pipr;
@@ -529,17 +528,17 @@ ide_interrupt_ack (void *dev)
 	/* clear the interrupt sources */
 	((immap_t *)IMAP_ADDR)->im_pcmcia.pcmc_pscr = pscr;
 
-#else /* ! CONFIG_IDE_8xx_PCCARD */
+#else
 	/*
 	 * Only CONFIG_IDE_8xx_PCCARD is using the interrupt of the
 	 * MPC8xx's PCMCIA controller, so there is nothing to be done here
 	 * for CONFIG_IDE_8xx_DIRECT and CONFIG_IDE_EXT_DIRECT.
 	 * The interrupt is handled somewhere else.	-- Steven
 	 */
-#endif /* CONFIG_IDE_8xx_PCCARD */
+#endif
+
+	return 0;
 }
-
-
 
 /*
  * CIS Tupel codes
@@ -655,7 +654,7 @@ static int check_ide_device (unsigned long base)
 				q+= 2;
 			}
 		}
-#endif	/* DEBUG_PCMCIA */
+#endif
 		switch (code) {
 		case CISTPL_VERS_1:
 			ident = p + 4;
