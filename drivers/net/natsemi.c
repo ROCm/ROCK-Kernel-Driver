@@ -1789,7 +1789,7 @@ static void netdev_rx(struct net_device *dev)
 				skb->dev = dev;
 				/* 16 byte align the IP header */
 				skb_reserve(skb, 2);
-				pci_dma_sync_single(np->pci_dev,
+				pci_dma_sync_single_for_cpu(np->pci_dev,
 					np->rx_dma[entry],
 					np->rx_skbuff[entry]->len,
 					PCI_DMA_FROMDEVICE);
@@ -1801,6 +1801,10 @@ static void netdev_rx(struct net_device *dev)
 				memcpy(skb_put(skb, pkt_len),
 					np->rx_skbuff[entry]->tail, pkt_len);
 #endif
+				pci_dma_sync_single_for_device(np->pci_dev,
+					np->rx_dma[entry],
+					np->rx_skbuff[entry]->len,
+					PCI_DMA_FROMDEVICE);
 			} else {
 				pci_unmap_single(np->pci_dev, np->rx_dma[entry],
 					np->rx_skbuff[entry]->len,

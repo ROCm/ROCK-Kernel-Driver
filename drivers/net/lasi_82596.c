@@ -802,9 +802,10 @@ memory_squeeze:
 				skb->dev = dev;
 				if (!rx_in_place) {
 					/* 16 byte align the data fields */
-					dma_sync_single(lp->dev, (dma_addr_t)WSWAPchar(rbd->b_data), PKT_BUF_SZ, DMA_FROM_DEVICE);
+					dma_sync_single_for_cpu(lp->dev, (dma_addr_t)WSWAPchar(rbd->b_data), PKT_BUF_SZ, DMA_FROM_DEVICE);
 					skb_reserve(skb, 2);
 					memcpy(skb_put(skb,pkt_len), rbd->v_data, pkt_len);
+					dma_sync_single_for_device(lp->dev, (dma_addr_t)WSWAPchar(rbd->b_data), PKT_BUF_SZ, DMA_FROM_DEVICE);
 				}
 				skb->len = pkt_len;
 				skb->protocol=eth_type_trans(skb,dev);

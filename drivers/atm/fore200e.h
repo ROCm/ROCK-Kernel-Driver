@@ -801,7 +801,8 @@ typedef struct fore200e_bus {
     void                 (*write)(u32, volatile u32*);
     u32                  (*dma_map)(struct fore200e*, void*, int, int);
     void                 (*dma_unmap)(struct fore200e*, u32, int, int);
-    void                 (*dma_sync)(struct fore200e*, u32, int, int);
+    void                 (*dma_sync_for_cpu)(struct fore200e*, u32, int, int);
+    void                 (*dma_sync_for_device)(struct fore200e*, u32, int, int);
     int                  (*dma_chunk_alloc)(struct fore200e*, struct chunk*, int, int, int);
     void                 (*dma_chunk_free)(struct fore200e*, struct chunk*);
     struct fore200e*     (*detect)(const struct fore200e_bus*, int);

@@ -273,8 +273,10 @@ static u32 pci_hme_read_desc32(u32 *p)
 	((__hp)->dma_map((__hp)->happy_dev, (__ptr), (__size), (__dir)))
 #define hme_dma_unmap(__hp, __addr, __size, __dir) \
 	((__hp)->dma_unmap((__hp)->happy_dev, (__addr), (__size), (__dir)))
-#define hme_dma_sync(__hp, __addr, __size, __dir) \
-	((__hp)->dma_sync((__hp)->happy_dev, (__addr), (__size), (__dir)))
+#define hme_dma_sync_for_cpu(__hp, __addr, __size, __dir) \
+	((__hp)->dma_sync_for_cpu((__hp)->happy_dev, (__addr), (__size), (__dir)))
+#define hme_dma_sync_for_device(__hp, __addr, __size, __dir) \
+	((__hp)->dma_sync_for_device((__hp)->happy_dev, (__addr), (__size), (__dir)))
 #else
 #ifdef CONFIG_SBUS
 /* SBUS only compilation */
@@ -297,8 +299,10 @@ do {	(__txd)->tx_addr = (__addr); \
 	sbus_map_single((__hp)->happy_dev, (__ptr), (__size), (__dir))
 #define hme_dma_unmap(__hp, __addr, __size, __dir) \
 	sbus_unmap_single((__hp)->happy_dev, (__addr), (__size), (__dir))
-#define hme_dma_sync(__hp, __addr, __size, __dir) \
-	sbus_dma_sync_single((__hp)->happy_dev, (__addr), (__size), (__dir))
+#define hme_dma_sync_for_cpu(__hp, __addr, __size, __dir) \
+	sbus_dma_sync_single_for_cpu((__hp)->happy_dev, (__addr), (__size), (__dir))
+#define hme_dma_sync_for_device(__hp, __addr, __size, __dir) \
+	sbus_dma_sync_single_for_device((__hp)->happy_dev, (__addr), (__size), (__dir))
 #else
 /* PCI only compilation */
 #define hme_write32(__hp, __reg, __val) \
@@ -320,8 +324,10 @@ do {	(__txd)->tx_addr = cpu_to_le32(__addr); \
 	pci_map_single((__hp)->happy_dev, (__ptr), (__size), (__dir))
 #define hme_dma_unmap(__hp, __addr, __size, __dir) \
 	pci_unmap_single((__hp)->happy_dev, (__addr), (__size), (__dir))
-#define hme_dma_sync(__hp, __addr, __size, __dir) \
-	pci_dma_sync_single((__hp)->happy_dev, (__addr), (__size), (__dir))
+#define hme_dma_sync_for_cpu(__hp, __addr, __size, __dir) \
+	pci_dma_sync_single_for_cpu((__hp)->happy_dev, (__addr), (__size), (__dir))
+#define hme_dma_sync_for_device(__hp, __addr, __size, __dir) \
+	pci_dma_sync_single_for_device((__hp)->happy_dev, (__addr), (__size), (__dir))
 #endif
 #endif
 
@@ -2069,8 +2075,9 @@ static void happy_meal_rx(struct happy_meal *hp, struct net_device *dev)
 			copy_skb->dev = dev;
 			skb_reserve(copy_skb, 2);
 			skb_put(copy_skb, len);
-			hme_dma_sync(hp, dma_addr, len, DMA_FROMDEVICE);
+			hme_dma_sync_for_cpu(hp, dma_addr, len, DMA_FROMDEVICE);
 			memcpy(copy_skb->data, skb->data, len);
+			hme_dma_sync_for_device(hp, dma_addr, len, DMA_FROMDEVICE);
 
 			/* Reuse original ring buffer. */
 			hme_write_rxd(hp, this,
@@ -2838,7 +2845,10 @@ static int __init happy_meal_sbus_init(struct sbus_dev *sdev, int is_qfe)
 	hp->write_rxd = sbus_hme_write_rxd;
 	hp->dma_map = (u32 (*)(void *, void *, long, int))sbus_map_single;
 	hp->dma_unmap = (void (*)(void *, u32, long, int))sbus_unmap_single;
-	hp->dma_sync = (void (*)(void *, u32, long, int))sbus_dma_sync_single;
+	hp->dma_sync_for_cpu = (void (*)(void *, u32, long, int))
+		sbus_dma_sync_single_for_cpu;
+	hp->dma_sync_for_device = (void (*)(void *, u32, long, int))
+		sbus_dma_sync_single_for_device;
 	hp->read32 = sbus_hme_read32;
 	hp->write32 = sbus_hme_write32;
 #endif
@@ -3182,7 +3192,10 @@ static int __init happy_meal_pci_init(struct pci_dev *pdev)
 	hp->write_rxd = pci_hme_write_rxd;
 	hp->dma_map = (u32 (*)(void *, void *, long, int))pci_map_single;
 	hp->dma_unmap = (void (*)(void *, u32, long, int))pci_unmap_single;
-	hp->dma_sync = (void (*)(void *, u32, long, int))pci_dma_sync_single;
+	hp->dma_sync_for_cpu = (void (*)(void *, u32, long, int))
+		pci_dma_sync_single_for_cpu;
+	hp->dma_sync_for_device = (void (*)(void *, u32, long, int))
+		pci_dma_sync_single_for_device;
 	hp->read32 = pci_hme_read32;
 	hp->write32 = pci_hme_write32;
 #endif

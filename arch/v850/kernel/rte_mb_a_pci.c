@@ -687,10 +687,11 @@ void pci_unmap_single (struct pci_dev *pdev, dma_addr_t dma_addr, size_t size,
    If you perform a pci_map_single() but wish to interrogate the
    buffer using the cpu, yet do not wish to teardown the PCI dma
    mapping, you must call this function before doing so.  At the next
-   point you give the PCI dma address back to the card, the device
-   again owns the buffer.  */
+   point you give the PCI dma address back to the card, you must first
+   perform a pci_dma_sync_for_device, and then the device again owns
+   the buffer.  */
 void
-pci_dma_sync_single (struct pci_dev *pdev, dma_addr_t dma_addr, size_t size,
+pci_dma_sync_single_for_cpu (struct pci_dev *pdev, dma_addr_t dma_addr, size_t size,
 		     int dir)
 {
 	void *mb_sram_addr = PCI_TO_MB_SRAM (dma_addr);
@@ -699,6 +700,22 @@ pci_dma_sync_single (struct pci_dev *pdev, dma_addr_t dma_addr, size_t size,
 	/* Synchronize the DMA buffer with the CPU buffer if necessary.  */
 	if (dir == PCI_DMA_FROMDEVICE)
 		memcpy (mapping->cpu_addr, mb_sram_addr, size);
+	else if (dir == PCI_DMA_TODEVICE)
+		; /* nothing to do */
+	else
+		panic("pci_dma_sync_single: unsupported sync dir: %d", dir);
+}
+
+void
+pci_dma_sync_single_for_device (struct pci_dev *pdev, dma_addr_t dma_addr, size_t size,
+				int dir)
+{
+	void *mb_sram_addr = PCI_TO_MB_SRAM (dma_addr);
+	struct dma_mapping *mapping = find_dma_mapping (mb_sram_addr);
+
+	/* Synchronize the DMA buffer with the CPU buffer if necessary.  */
+	if (dir == PCI_DMA_FROMDEVICE)
+		; /* nothing to do */
 	else if (dir == PCI_DMA_TODEVICE)
 		memcpy (mb_sram_addr, mapping->cpu_addr, size);
 	else
@@ -724,11 +741,18 @@ pci_unmap_sg (struct pci_dev *pdev, struct scatterlist *sg, int sg_len,int dir)
 }
 
 /* Make physical memory consistent for a set of streaming mode DMA
-   translations after a transfer.  The same as pci_dma_sync_single but
+   translations after a transfer.  The same as pci_dma_sync_single_* but
    for a scatter-gather list, same rules and usage.  */
 
 void
-pci_dma_sync_sg (struct pci_dev *dev, struct scatterlist *sg, int sg_len,
+pci_dma_sync_sg_for_cpu (struct pci_dev *dev, struct scatterlist *sg, int sg_len,
+		 int dir)
+{
+	BUG ();
+}
+
+void
+pci_dma_sync_sg_for_device (struct pci_dev *dev, struct scatterlist *sg, int sg_len,
 		 int dir)
 {
 	BUG ();
@@ -770,4 +794,5 @@ EXPORT_SYMBOL (pci_map_single);
 EXPORT_SYMBOL (pci_unmap_single);
 EXPORT_SYMBOL (pci_alloc_consistent);
 EXPORT_SYMBOL (pci_free_consistent);
-EXPORT_SYMBOL (pci_dma_sync_single);
+EXPORT_SYMBOL (pci_dma_sync_single_for_cpu);
+EXPORT_SYMBOL (pci_dma_sync_single_for_device);

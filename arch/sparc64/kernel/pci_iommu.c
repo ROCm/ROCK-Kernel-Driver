@@ -661,7 +661,7 @@ void pci_unmap_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems, 
 /* Make physical memory consistent for a single
  * streaming mode DMA translation after a transfer.
  */
-void pci_dma_sync_single(struct pci_dev *pdev, dma_addr_t bus_addr, size_t sz, int direction)
+void pci_dma_sync_single_for_cpu(struct pci_dev *pdev, dma_addr_t bus_addr, size_t sz, int direction)
 {
 	struct pcidev_cookie *pcp;
 	struct pci_iommu *iommu;
@@ -722,7 +722,7 @@ void pci_dma_sync_single(struct pci_dev *pdev, dma_addr_t bus_addr, size_t sz, i
 /* Make physical memory consistent for a set of streaming
  * mode DMA translations after a transfer.
  */
-void pci_dma_sync_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems, int direction)
+void pci_dma_sync_sg_for_cpu(struct pci_dev *pdev, struct scatterlist *sglist, int nelems, int direction)
 {
 	struct pcidev_cookie *pcp;
 	struct pci_iommu *iommu;

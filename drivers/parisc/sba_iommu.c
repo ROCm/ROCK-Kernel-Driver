@@ -1410,8 +1410,10 @@ static struct hppa_dma_ops sba_ops = {
 	.unmap_single =		sba_unmap_single,
 	.map_sg =		sba_map_sg,
 	.unmap_sg =		sba_unmap_sg,
-	.dma_sync_single =	NULL,
-	.dma_sync_sg =		NULL,
+	.dma_sync_single_for_cpu =	NULL,
+	.dma_sync_single_for_device =	NULL,
+	.dma_sync_sg_for_cpu =		NULL,
+	.dma_sync_sg_for_device =	NULL,
 };
 
 

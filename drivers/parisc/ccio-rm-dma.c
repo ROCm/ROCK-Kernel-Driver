@@ -151,8 +151,10 @@ static struct pci_dma_ops ccio_ops = {
 	ccio_unmap_single,
 	ccio_map_sg,
 	ccio_unmap_sg,
-	NULL,                   /* dma_sync_single : NOP for U2 */
-	NULL,                   /* dma_sync_sg     : ditto */
+	NULL,                   /* dma_sync_single_for_cpu : NOP for U2 */
+	NULL,                   /* dma_sync_single_for_device : NOP for U2 */
+	NULL,                   /* dma_sync_sg_for_cpu     : ditto */
+	NULL,                   /* dma_sync_sg_for_device     : ditto */
 };
 
 

@@ -212,17 +212,32 @@ static int __map_scsi_sg_data(struct pci_dev *pdev, struct scsi_cmnd *cmd)
 	return use_sg;
 }
 
-static void __sync_scsi_data(struct pci_dev *pdev, struct scsi_cmnd *cmd)
+static void __sync_scsi_data_for_cpu(struct pci_dev *pdev, struct scsi_cmnd *cmd)
 {
 	int dma_dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
 
 	switch(SYM_UCMD_PTR(cmd)->data_mapped) {
 	case 2:
-		pci_dma_sync_sg(pdev, cmd->buffer, cmd->use_sg, dma_dir);
+		pci_dma_sync_sg_for_cpu(pdev, cmd->buffer, cmd->use_sg, dma_dir);
 		break;
 	case 1:
-		pci_dma_sync_single(pdev, SYM_UCMD_PTR(cmd)->data_mapping,
-				    cmd->request_bufflen, dma_dir);
+		pci_dma_sync_single_for_cpu(pdev, SYM_UCMD_PTR(cmd)->data_mapping,
+					    cmd->request_bufflen, dma_dir);
+		break;
+	}
+}
+
+static void __sync_scsi_data_for_device(struct pci_dev *pdev, struct scsi_cmnd *cmd)
+{
+	int dma_dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
+
+	switch(SYM_UCMD_PTR(cmd)->data_mapped) {
+	case 2:
+		pci_dma_sync_sg_for_device(pdev, cmd->buffer, cmd->use_sg, dma_dir);
+		break;
+	case 1:
+		pci_dma_sync_single_for_device(pdev, SYM_UCMD_PTR(cmd)->data_mapping,
+					       cmd->request_bufflen, dma_dir);
 		break;
 	}
 }
@@ -233,8 +248,10 @@ static void __sync_scsi_data(struct pci_dev *pdev, struct scsi_cmnd *cmd)
 		__map_scsi_single_data(np->s.device, cmd)
 #define map_scsi_sg_data(np, cmd)	\
 		__map_scsi_sg_data(np->s.device, cmd)
-#define sync_scsi_data(np, cmd)		\
-		__sync_scsi_data(np->s.device, cmd)
+#define sync_scsi_data_for_cpu(np, cmd)		\
+		__sync_scsi_data_for_cpu(np->s.device, cmd)
+#define sync_scsi_data_for_device(np, cmd)		\
+		__sync_scsi_data_for_device(np->s.device, cmd)
 
 /*
  *  Complete a pending CAM CCB.
@@ -394,10 +411,11 @@ void sym_sniff_inquiry(struct sym_hcb *np, struct scsi_cmnd *cmd, int resid)
 	if (!cmd || cmd->use_sg)
 		return;
 
-	sync_scsi_data(np, cmd);
+	sync_scsi_data_for_cpu(np, cmd);
 	retv = __sym_sniff_inquiry(np, cmd->device->id, cmd->device->lun,
 				   (u_char *) cmd->request_buffer,
 				   cmd->request_bufflen - resid);
+	sync_scsi_data_for_device(np, cmd);
 	if (retv < 0)
 		return;
 	else if (retv)

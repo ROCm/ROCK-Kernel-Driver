@@ -983,18 +983,26 @@ static void rx_int(struct net_device *dev, u32 rxlimit, u32 index)
 
 			rx_skb = rrpriv->rx_skbuff[index];
 
-	        	pci_dma_sync_single(rrpriv->pci_dev, desc->addr.addrlo,
-				pkt_len, PCI_DMA_FROMDEVICE);
-
 			if (pkt_len < PKT_COPY_THRESHOLD) {
 				skb = alloc_skb(pkt_len, GFP_ATOMIC);
 				if (skb == NULL){
 					printk(KERN_WARNING "%s: Unable to allocate skb (%i bytes), deferring packet\n", dev->name, pkt_len);
 					rrpriv->stats.rx_dropped++;
 					goto defer;
-				}else
+				} else {
+					pci_dma_sync_single_for_cpu(rrpriv->pci_dev,
+								    desc->addr.addrlo,
+								    pkt_len,
+								    PCI_DMA_FROMDEVICE);
+
 					memcpy(skb_put(skb, pkt_len),
 					       rx_skb->data, pkt_len);
+
+					pci_dma_sync_single_for_device(rrpriv->pci_dev,
+								       desc->addr.addrlo,
+								       pkt_len,
+								       PCI_DMA_FROMDEVICE);
+				}
 			}else{
 				struct sk_buff *newskb;
 

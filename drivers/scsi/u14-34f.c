@@ -1184,17 +1184,17 @@ static void sync_dma(unsigned int i, unsigned int j) {
    pci_dir = scsi_to_pci_dma_dir(SCpnt->sc_data_direction);
 
    if (DEV2H(cpp->sense_addr))
-      pci_dma_sync_single(HD(j)->pdev, DEV2H(cpp->sense_addr),
+      pci_dma_sync_single_for_cpu(HD(j)->pdev, DEV2H(cpp->sense_addr),
                           DEV2H(cpp->sense_len), PCI_DMA_FROMDEVICE);
 
    if (SCpnt->use_sg)
-      pci_dma_sync_sg(HD(j)->pdev, SCpnt->request_buffer,
+      pci_dma_sync_sg_for_cpu(HD(j)->pdev, SCpnt->request_buffer,
                          SCpnt->use_sg, pci_dir);
 
    if (!DEV2H(cpp->data_len)) pci_dir = PCI_DMA_BIDIRECTIONAL;
 
    if (DEV2H(cpp->data_address))
-      pci_dma_sync_single(HD(j)->pdev, DEV2H(cpp->data_address),
+      pci_dma_sync_single_for_cpu(HD(j)->pdev, DEV2H(cpp->data_address),
                        DEV2H(cpp->data_len), pci_dir);
 }
 

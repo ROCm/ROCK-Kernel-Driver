@@ -1948,12 +1948,12 @@ static int sbp2_link_orb_command(struct scsi_id_instance_data *scsi_id,
 	SBP2_ORB_DEBUG("sending command orb %p, total orbs = %x",
 			command_orb, global_outstanding_command_orbs);
 
-	pci_dma_sync_single(hi->host->pdev, command->command_orb_dma,
-			    sizeof(struct sbp2_command_orb),
-			    PCI_DMA_BIDIRECTIONAL);
-	pci_dma_sync_single(hi->host->pdev, command->sge_dma,
-			    sizeof(command->scatter_gather_element),
-			    PCI_DMA_BIDIRECTIONAL);
+	pci_dma_sync_single_for_device(hi->host->pdev, command->command_orb_dma,
+				       sizeof(struct sbp2_command_orb),
+				       PCI_DMA_BIDIRECTIONAL);
+	pci_dma_sync_single_for_device(hi->host->pdev, command->sge_dma,
+				       sizeof(command->scatter_gather_element),
+				       PCI_DMA_BIDIRECTIONAL);
 	/*
 	 * Check to see if there are any previous orbs to use
 	 */
@@ -1994,9 +1994,9 @@ static int sbp2_link_orb_command(struct scsi_id_instance_data *scsi_id,
 			cpu_to_be32(command->command_orb_dma);
 		/* Tells hardware that this pointer is valid */
 		scsi_id->last_orb->next_ORB_hi = 0x0;
-		pci_dma_sync_single(hi->host->pdev, scsi_id->last_orb_dma,
-				    sizeof(struct sbp2_command_orb),
-				    PCI_DMA_BIDIRECTIONAL);
+		pci_dma_sync_single_for_device(hi->host->pdev, scsi_id->last_orb_dma,
+					       sizeof(struct sbp2_command_orb),
+					       PCI_DMA_BIDIRECTIONAL);
 
 		/*
 		 * Ring the doorbell
@@ -2358,12 +2358,12 @@ static int sbp2_handle_status_write(struct hpsb_host *host, int nodeid, int dest
 	if (command) {
 
 		SBP2_DEBUG("Found status for command ORB");
-		pci_dma_sync_single(hi->host->pdev, command->command_orb_dma,
-				    sizeof(struct sbp2_command_orb),
-				    PCI_DMA_BIDIRECTIONAL);
-		pci_dma_sync_single(hi->host->pdev, command->sge_dma,
-				    sizeof(command->scatter_gather_element),
-				    PCI_DMA_BIDIRECTIONAL);
+		pci_dma_sync_single_for_cpu(hi->host->pdev, command->command_orb_dma,
+					    sizeof(struct sbp2_command_orb),
+					    PCI_DMA_BIDIRECTIONAL);
+		pci_dma_sync_single_for_cpu(hi->host->pdev, command->sge_dma,
+					    sizeof(command->scatter_gather_element),
+					    PCI_DMA_BIDIRECTIONAL);
 
 		SBP2_ORB_DEBUG("matched command orb %p", &command->command_orb);
 		outstanding_orb_decr;
@@ -2534,12 +2534,12 @@ static void sbp2scsi_complete_all_commands(struct scsi_id_instance_data *scsi_id
 		SBP2_DEBUG("Found pending command to complete");
 		lh = scsi_id->sbp2_command_orb_inuse.next;
 		command = list_entry(lh, struct sbp2_command_info, list);
-		pci_dma_sync_single(hi->host->pdev, command->command_orb_dma,
-				    sizeof(struct sbp2_command_orb),
-				    PCI_DMA_BIDIRECTIONAL);
-		pci_dma_sync_single(hi->host->pdev, command->sge_dma,
-				    sizeof(command->scatter_gather_element),
-				    PCI_DMA_BIDIRECTIONAL);
+		pci_dma_sync_single_for_cpu(hi->host->pdev, command->command_orb_dma,
+					    sizeof(struct sbp2_command_orb),
+					    PCI_DMA_BIDIRECTIONAL);
+		pci_dma_sync_single_for_cpu(hi->host->pdev, command->sge_dma,
+					    sizeof(command->scatter_gather_element),
+					    PCI_DMA_BIDIRECTIONAL);
 		sbp2util_mark_command_completed(scsi_id, command);
 		if (command->Current_SCpnt) {
 			void (*done)(Scsi_Cmnd *) = command->Current_done;
@@ -2699,14 +2699,14 @@ static int sbp2scsi_abort (Scsi_Cmnd *SCpnt)
 		command = sbp2util_find_command_for_SCpnt(scsi_id, SCpnt);
 		if (command) {
 			SBP2_DEBUG("Found command to abort");
-			pci_dma_sync_single(hi->host->pdev,
-					    command->command_orb_dma,
-					    sizeof(struct sbp2_command_orb),
-					    PCI_DMA_BIDIRECTIONAL);
-			pci_dma_sync_single(hi->host->pdev,
-					    command->sge_dma,
-					    sizeof(command->scatter_gather_element),
-					    PCI_DMA_BIDIRECTIONAL);
+			pci_dma_sync_single_for_cpu(hi->host->pdev,
+						    command->command_orb_dma,
+						    sizeof(struct sbp2_command_orb),
+						    PCI_DMA_BIDIRECTIONAL);
+			pci_dma_sync_single_for_cpu(hi->host->pdev,
+						    command->sge_dma,
+						    sizeof(command->scatter_gather_element),
+						    PCI_DMA_BIDIRECTIONAL);
 			sbp2util_mark_command_completed(scsi_id, command);
 			if (command->Current_SCpnt) {
 				void (*done)(Scsi_Cmnd *) = command->Current_done;

@@ -1199,8 +1199,6 @@ static int epic_rx(struct net_device *dev)
 			short pkt_len = (status >> 16) - 4;
 			struct sk_buff *skb;
 
-			pci_dma_sync_single(ep->pci_dev, ep->rx_ring[entry].bufaddr, 
-					    ep->rx_buf_sz, PCI_DMA_FROMDEVICE);
 			if (pkt_len > PKT_BUF_SZ - 4) {
 				printk(KERN_ERR "%s: Oversized Ethernet frame, status %x "
 					   "%d bytes.\n",
@@ -1213,6 +1211,10 @@ static int epic_rx(struct net_device *dev)
 				&& (skb = dev_alloc_skb(pkt_len + 2)) != NULL) {
 				skb->dev = dev;
 				skb_reserve(skb, 2);	/* 16 byte align the IP header */
+				pci_dma_sync_single_for_cpu(ep->pci_dev,
+							    ep->rx_ring[entry].bufaddr,
+							    ep->rx_buf_sz,
+							    PCI_DMA_FROMDEVICE);
 #if 1 /* HAS_IP_COPYSUM */
 				eth_copy_and_sum(skb, ep->rx_skbuff[entry]->tail, pkt_len, 0);
 				skb_put(skb, pkt_len);
@@ -1220,6 +1222,10 @@ static int epic_rx(struct net_device *dev)
 				memcpy(skb_put(skb, pkt_len), ep->rx_skbuff[entry]->tail,
 					   pkt_len);
 #endif
+				pci_dma_sync_single_for_device(ep->pci_dev,
+							       ep->rx_ring[entry].bufaddr,
+							       ep->rx_buf_sz,
+							       PCI_DMA_FROMDEVICE);
 			} else {
 				pci_unmap_single(ep->pci_dev, 
 					ep->rx_ring[entry].bufaddr, 

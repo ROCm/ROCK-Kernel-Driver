@@ -118,8 +118,12 @@ extern int sbus_map_sg(struct sbus_dev *, struct scatterlist *, int, int);
 extern void sbus_unmap_sg(struct sbus_dev *, struct scatterlist *, int, int);
 
 /* Finally, allow explicit synchronization of streamable mappings. */
-extern void sbus_dma_sync_single(struct sbus_dev *, dma_addr_t, size_t, int);
-extern void sbus_dma_sync_sg(struct sbus_dev *, struct scatterlist *, int, int);
+extern void sbus_dma_sync_single_for_cpu(struct sbus_dev *, dma_addr_t, size_t, int);
+#define sbus_dma_sync_single sbus_dma_sync_single_for_cpu
+extern void sbus_dma_sync_single_for_device(struct sbus_dev *, dma_addr_t, size_t, int);
+extern void sbus_dma_sync_sg_for_cpu(struct sbus_dev *, struct scatterlist *, int, int);
+#define sbus_dma_sync_sg sbus_dma_sync_sg_for_cpu
+extern void sbus_dma_sync_sg_for_device(struct sbus_dev *, struct scatterlist *, int, int);
 
 /* Eric Brower (ebrower@usa.net)
  * Translate SBus interrupt levels to ino values--

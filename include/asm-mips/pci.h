@@ -82,7 +82,9 @@ extern struct page *pci_dac_dma_to_page(struct pci_dev *pdev,
 	dma64_addr_t dma_addr);
 extern unsigned long pci_dac_dma_to_offset(struct pci_dev *pdev,
 	dma64_addr_t dma_addr);
-extern void pci_dac_dma_sync_single(struct pci_dev *pdev,
+extern void pci_dac_dma_sync_single_for_cpu(struct pci_dev *pdev,
+	dma64_addr_t dma_addr, size_t len, int direction);
+extern void pci_dac_dma_sync_single_for_device(struct pci_dev *pdev,
 	dma64_addr_t dma_addr, size_t len, int direction);
 
 #endif /* __KERNEL__ */

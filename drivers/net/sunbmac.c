@@ -849,9 +849,13 @@ static void bigmac_rx(struct bigmac *bp)
 			copy_skb->dev = bp->dev;
 			skb_reserve(copy_skb, 2);
 			skb_put(copy_skb, len);
-			sbus_dma_sync_single(bp->bigmac_sdev,
-					     this->rx_addr, len, SBUS_DMA_FROMDEVICE);
+			sbus_dma_sync_single_for_cpu(bp->bigmac_sdev,
+						     this->rx_addr, len,
+						     SBUS_DMA_FROMDEVICE);
 			eth_copy_and_sum(copy_skb, (unsigned char *)skb->data, len, 0);
+			sbus_dma_sync_single_for_device(bp->bigmac_sdev,
+							this->rx_addr, len,
+							SBUS_DMA_FROMDEVICE);
 
 			/* Reuse original ring buffer. */
 			this->rx_flags =

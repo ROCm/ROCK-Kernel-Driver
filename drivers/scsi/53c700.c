@@ -373,7 +373,7 @@ NCR_700_detect(Scsi_Host_Template *tpnt,
 
 	hostdata->script = script;
 	hostdata->pScript = pScript;
-	dma_sync_single(hostdata->dev, pScript, sizeof(SCRIPT), DMA_TO_DEVICE);
+	dma_sync_single_for_device(hostdata->dev, pScript, sizeof(SCRIPT), DMA_TO_DEVICE);
 	hostdata->state = NCR_700_HOST_FREE;
 	hostdata->cmd = NULL;
 	host->max_id = 7;
@@ -1005,8 +1005,8 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 				SCp->cmnd[7] = hostdata->status[0];
 				SCp->use_sg = 0;
 				SCp->sc_data_direction = SCSI_DATA_READ;
-				dma_sync_single(hostdata->dev, slot->pCmd,
-						SCp->cmd_len, DMA_TO_DEVICE);
+				dma_sync_single_for_device(hostdata->dev, slot->pCmd,
+							   SCp->cmd_len, DMA_TO_DEVICE);
 				SCp->request_bufflen = sizeof(SCp->sense_buffer);
 				slot->dma_handle = dma_map_single(hostdata->dev, SCp->sense_buffer, sizeof(SCp->sense_buffer), DMA_FROM_DEVICE);
 				slot->SG[0].ins = bS_to_host(SCRIPT_MOVE_DATA_IN | sizeof(SCp->sense_buffer));
@@ -1030,7 +1030,7 @@ process_script_interrupt(__u32 dsps, __u32 dsp, Scsi_Cmnd *SCp,
 			//   SCp->cmnd[0] == INQUIRY && SCp->use_sg == 0) {
 			//	/* Piggy back the tag queueing support
 			//	 * on this command */
-			//	dma_sync_single(hostdata->dev,
+			//	dma_sync_single_for_cpu(hostdata->dev,
 			//			    slot->dma_handle,
 			//			    SCp->request_bufflen,
 			//			    DMA_FROM_DEVICE);
