@@ -545,9 +545,7 @@ static int __init drm_init( void )
 
 	drm_device_t *dev;
 	int i;
-#if __HAVE_CTX_BITMAP
 	int retcode;
-#endif
 	DRM_DEBUG( "\n" );
 
 #ifdef MODULE
@@ -626,9 +624,11 @@ static int __init drm_init( void )
 
 	return 0;
 
+#if (__REALLY_HAVE_AGP && __MUST_HAVE_AGP) || __HAVE_CTX_BITMAP
 fail:
 	DRM(stub_unregister)(DRM(minor)[i]);
 	DRM(takedown)( dev );
+#endif
 
 fail_reg:
 	kfree (DRM(device));
