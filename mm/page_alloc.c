@@ -93,7 +93,6 @@ void __free_pages_ok (struct page *page, unsigned int order)
 	BUG_ON(PagePrivate(page));
 	BUG_ON(page->mapping != NULL);
 	BUG_ON(PageLocked(page));
-	BUG_ON(PageLRU(page));
 	BUG_ON(PageActive(page));
 	BUG_ON(PageWriteback(page));
 	BUG_ON(page->pte.chain != NULL);
@@ -186,6 +185,7 @@ static inline void prep_new_page(struct page *page)
 	BUG_ON(PageActive(page));
 	BUG_ON(PageDirty(page));
 	BUG_ON(PageWriteback(page));
+	BUG_ON(page->pte.chain != NULL);
 	page->flags &= ~(1 << PG_uptodate | 1 << PG_error |
 			1 << PG_referenced | 1 << PG_arch_1 |
 			1 << PG_checked);
