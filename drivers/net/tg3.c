@@ -1619,7 +1619,7 @@ static int tg3_setup_copper_phy(struct tg3 *tp, int force_reset)
 	tw32_f(MAC_MODE, tp->mac_mode);
 	udelay(40);
 
-	if (tp->tg3_flags & (TG3_FLAG_USE_LINKCHG_REG | TG3_FLAG_POLL_SERDES)) {
+	if (tp->tg3_flags & TG3_FLAG_USE_LINKCHG_REG) {
 		/* Polled via timer. */
 		tw32_f(MAC_EVENT, 0);
 	} else {
@@ -2269,11 +2269,8 @@ static int tg3_setup_fiber_phy(struct tg3 *tp, int force_reset)
 	if (tp->phy_id == PHY_ID_BCM8002)
 		tg3_init_bcm8002(tp);
 
-	/* Enable link change interrupt unless serdes polling.  */
-	if (!(tp->tg3_flags & TG3_FLAG_POLL_SERDES))
-		tw32_f(MAC_EVENT, MAC_EVENT_LNKSTATE_CHANGED);
-	else
-		tw32_f(MAC_EVENT, 0);
+	/* Enable link change event even when serdes polling.  */
+	tw32_f(MAC_EVENT, MAC_EVENT_LNKSTATE_CHANGED);
 	udelay(40);
 
 	current_link_up = 0;
