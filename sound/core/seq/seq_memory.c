@@ -220,12 +220,14 @@ int snd_seq_cell_alloc(pool_t *pool, snd_seq_event_cell_t **cellp, int nonblock,
 	snd_seq_event_cell_t *cell;
 	unsigned long flags;
 	int err = -EAGAIN;
+	wait_queue_t wait;
 
 	if (pool == NULL)
 		return -EINVAL;
 
 	*cellp = NULL;
 
+	init_waitqueue_entry(&wait, current);
 	spin_lock_irqsave(&pool->lock, flags);
 	if (pool->ptr == NULL) {	/* not initialized */
 		snd_printd("seq: pool is not initialized\n");
@@ -234,9 +236,12 @@ int snd_seq_cell_alloc(pool_t *pool, snd_seq_event_cell_t **cellp, int nonblock,
 	}
 	while (pool->free == NULL && ! nonblock && ! pool->closing) {
 
-		spin_unlock(&pool->lock);
-		interruptible_sleep_on(&pool->output_sleep);
-		spin_lock(&pool->lock);
+		set_current_state(TASK_INTERRUPTIBLE);
+		add_wait_queue(&pool->output_sleep, &wait);
+		spin_unlock_irq(&pool->lock);
+		schedule();
+		spin_lock_irq(&pool->lock);
+		remove_wait_queue(&pool->output_sleep, &wait);
 		/* interrupted? */
 		if (signal_pending(current)) {
 			err = -ERESTARTSYS;

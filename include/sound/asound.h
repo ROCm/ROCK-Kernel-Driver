@@ -153,7 +153,7 @@ enum {
  *                                                                           *
  *****************************************************************************/
 
-#define SNDRV_PCM_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 5)
+#define SNDRV_PCM_VERSION		SNDRV_PROTOCOL_VERSION(2, 0, 6)
 
 typedef unsigned long sndrv_pcm_uframes_t;
 typedef long sndrv_pcm_sframes_t;

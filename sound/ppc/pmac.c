@@ -664,7 +664,9 @@ int __init snd_pmac_pcm_new(pmac_t *chip)
 	chip->capture.cur_freqs = chip->freqs_ok;
 
 	/* preallocate 64k buffer */
-	snd_pcm_lib_preallocate_pages_for_all(pcm, 64 * 1024, 64 * 1024, GFP_KERNEL);
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_CONTINUOUS, 
+					      snd_pcm_dma_flags(GFP_KERNEL),
+					      64 * 1024, 64 * 1024);
 
 	return 0;
 }

@@ -136,7 +136,7 @@ static int snapper_init_client(pmac_keywest_t *i2c)
 		/* normal operation, all-pass mode */
 		TAS_REG_MCS2, (1<<1),
 		/* normal output, no deemphasis, A input, power-up */
-		TAS_REG_ACS, 0,
+		TAS_REG_ACS, 2,
 		0, /* terminator */
 	};
 	return send_init_client(i2c, regs);
@@ -929,8 +929,8 @@ static void tumbler_resume(pmac_t *chip)
 		snapper_set_mix_vol(mix, VOL_IDX_PCM);
 		snapper_set_mix_vol(mix, VOL_IDX_PCM2);
 		snapper_set_mix_vol(mix, VOL_IDX_ADC);
-		tumbler_set_mono_volume(mix, &tumbler_bass_vol_info);
-		tumbler_set_mono_volume(mix, &tumbler_treble_vol_info);
+		tumbler_set_mono_volume(mix, &snapper_bass_vol_info);
+		tumbler_set_mono_volume(mix, &snapper_treble_vol_info);
 		snapper_set_drc(mix);
 	}
 	tumbler_set_master_volume(mix);

@@ -337,8 +337,7 @@ struct via_dev {
         snd_pcm_substream_t *substream;
 	int running;
 	unsigned int tbl_entries; /* # descriptors */
-	u32 *table; /* physical address + flag */
-	dma_addr_t table_addr;
+	struct snd_dma_buffer table;
 	struct snd_via_sg_table *idx_table;
 	/* for recovery from the unexpected pointer */
 	unsigned int lastpos;
@@ -346,93 +345,6 @@ struct via_dev {
 	unsigned int bufsize2;
 };
 
-
-/*
- * allocate and initialize the descriptor buffers
- * periods = number of periods
- * fragsize = period size in bytes
- */
-static int build_via_table(viadev_t *dev, snd_pcm_substream_t *substream,
-			   struct pci_dev *pci,
-			   unsigned int periods, unsigned int fragsize)
-{
-	unsigned int i, idx, ofs, rest;
-	struct snd_sg_buf *sgbuf = snd_pcm_substream_sgbuf(substream);
-
-	if (! dev->table) {
-		/* the start of each lists must be aligned to 8 bytes,
-		 * but the kernel pages are much bigger, so we don't care
-		 */
-		dev->table = (u32*)snd_malloc_pci_pages(pci, PAGE_ALIGN(VIA_TABLE_SIZE * 2 * 8), &dev->table_addr);
-		if (! dev->table)
-			return -ENOMEM;
-	}
-	if (! dev->idx_table) {
-		dev->idx_table = kmalloc(sizeof(*dev->idx_table) * VIA_TABLE_SIZE, GFP_KERNEL);
-		if (! dev->idx_table)
-			return -ENOMEM;
-	}
-
-	/* fill the entries */
-	idx = 0;
-	ofs = 0;
-	for (i = 0; i < periods; i++) {
-		rest = fragsize;
-		/* fill descriptors for a period.
-		 * a period can be split to several descriptors if it's
-		 * over page boundary.
-		 */
-		do {
-			unsigned int r;
-			unsigned int flag;
-
-			if (idx >= VIA_TABLE_SIZE) {
-				snd_printk(KERN_ERR "via82xx: too much table size!\n");
-				return -EINVAL;
-			}
-			dev->table[idx << 1] = cpu_to_le32((u32)snd_pcm_sgbuf_get_addr(sgbuf, ofs));
-			r = PAGE_SIZE - (ofs % PAGE_SIZE);
-			if (rest < r)
-				r = rest;
-			rest -= r;
-			if (! rest) {
-				if (i == periods - 1)
-					flag = VIA_TBL_BIT_EOL; /* buffer boundary */
-				else
-					flag = VIA_TBL_BIT_FLAG; /* period boundary */
-			} else
-				flag = 0; /* period continues to the next */
-			// printk("via: tbl %d: at %d  size %d (rest %d)\n", idx, ofs, r, rest);
-			dev->table[(idx<<1) + 1] = cpu_to_le32(r | flag);
-			dev->idx_table[idx].offset = ofs;
-			dev->idx_table[idx].size = r;
-			ofs += r;
-			idx++;
-		} while (rest > 0);
-	}
-	dev->tbl_entries = idx;
-	dev->bufsize = periods * fragsize;
-	dev->bufsize2 = dev->bufsize / 2;
-	return 0;
-}
-
-
-static void clean_via_table(viadev_t *dev, snd_pcm_substream_t *substream,
-			    struct pci_dev *pci)
-{
-	if (dev->table) {
-		snd_free_pci_pages(pci, PAGE_ALIGN(VIA_TABLE_SIZE * 2 * 8), dev->table, dev->table_addr);
-		dev->table = NULL;
-	}
-	if (dev->idx_table) {
-		kfree(dev->idx_table);
-		dev->idx_table = NULL;
-	}
-}
-
-
-/*
- */
 
 enum { TYPE_CARD_VIA686 = 1, TYPE_CARD_VIA8233 };
 enum { TYPE_VIA686, TYPE_VIA8233, TYPE_VIA8233A };
@@ -482,6 +394,8 @@ struct _snd_via82xx {
 	spinlock_t ac97_lock;
 	snd_info_entry_t *proc_entry;
 
+	struct snd_dma_device dma_dev;
+
 #ifdef SUPPORT_JOYSTICK
 	struct gameport gameport;
 	struct resource *res_joystick;
@@ -495,6 +409,94 @@ static struct pci_device_id snd_via82xx_ids[] = {
 };
 
 MODULE_DEVICE_TABLE(pci, snd_via82xx_ids);
+
+/*
+ */
+
+/*
+ * allocate and initialize the descriptor buffers
+ * periods = number of periods
+ * fragsize = period size in bytes
+ */
+static int build_via_table(viadev_t *dev, snd_pcm_substream_t *substream,
+			   struct pci_dev *pci,
+			   unsigned int periods, unsigned int fragsize)
+{
+	unsigned int i, idx, ofs, rest;
+	via82xx_t *chip = snd_pcm_substream_chip(substream);
+	struct snd_sg_buf *sgbuf = snd_pcm_substream_sgbuf(substream);
+
+	if (dev->table.area == NULL) {
+		/* the start of each lists must be aligned to 8 bytes,
+		 * but the kernel pages are much bigger, so we don't care
+		 */
+		if (snd_dma_alloc_pages(&chip->dma_dev, PAGE_ALIGN(VIA_TABLE_SIZE * 2 * 8), &dev->table) < 0)
+			return -ENOMEM;
+	}
+	if (! dev->idx_table) {
+		dev->idx_table = kmalloc(sizeof(*dev->idx_table) * VIA_TABLE_SIZE, GFP_KERNEL);
+		if (! dev->idx_table)
+			return -ENOMEM;
+	}
+
+	/* fill the entries */
+	idx = 0;
+	ofs = 0;
+	for (i = 0; i < periods; i++) {
+		rest = fragsize;
+		/* fill descriptors for a period.
+		 * a period can be split to several descriptors if it's
+		 * over page boundary.
+		 */
+		do {
+			unsigned int r;
+			unsigned int flag;
+
+			if (idx >= VIA_TABLE_SIZE) {
+				snd_printk(KERN_ERR "via82xx: too much table size!\n");
+				return -EINVAL;
+			}
+			((u32 *)dev->table.area)[idx << 1] = cpu_to_le32((u32)snd_pcm_sgbuf_get_addr(sgbuf, ofs));
+			r = PAGE_SIZE - (ofs % PAGE_SIZE);
+			if (rest < r)
+				r = rest;
+			rest -= r;
+			if (! rest) {
+				if (i == periods - 1)
+					flag = VIA_TBL_BIT_EOL; /* buffer boundary */
+				else
+					flag = VIA_TBL_BIT_FLAG; /* period boundary */
+			} else
+				flag = 0; /* period continues to the next */
+			// printk("via: tbl %d: at %d  size %d (rest %d)\n", idx, ofs, r, rest);
+			((u32 *)dev->table.area)[(idx<<1) + 1] = cpu_to_le32(r | flag);
+			dev->idx_table[idx].offset = ofs;
+			dev->idx_table[idx].size = r;
+			ofs += r;
+			idx++;
+		} while (rest > 0);
+	}
+	dev->tbl_entries = idx;
+	dev->bufsize = periods * fragsize;
+	dev->bufsize2 = dev->bufsize / 2;
+	return 0;
+}
+
+
+static int clean_via_table(viadev_t *dev, snd_pcm_substream_t *substream,
+			   struct pci_dev *pci)
+{
+	via82xx_t *chip = snd_pcm_substream_chip(substream);
+	if (dev->table.area) {
+		snd_dma_free_pages(&chip->dma_dev, &dev->table);
+		dev->table.area = NULL;
+	}
+	if (dev->idx_table) {
+		kfree(dev->idx_table);
+		dev->idx_table = NULL;
+	}
+	return 0;
+}
 
 /*
  *  Basic I/O
@@ -756,10 +758,10 @@ static snd_pcm_uframes_t snd_via686_pcm_pointer(snd_pcm_substream_t *substream)
 	 * so we need to calculate the index from CURR_PTR.
 	 */
 	ptr = inl(VIADEV_REG(viadev, OFFSET_CURR_PTR));
-	if (ptr <= (unsigned int)viadev->table_addr)
+	if (ptr <= (unsigned int)viadev->table.addr)
 		idx = 0;
 	else /* CURR_PTR holds the address + 8 */
-		idx = ((ptr - (unsigned int)viadev->table_addr) / 8 - 1) % viadev->tbl_entries;
+		idx = ((ptr - (unsigned int)viadev->table.addr) / 8 - 1) % viadev->tbl_entries;
 	res = calc_linear_pos(viadev, idx, count);
 	spin_unlock(&chip->reg_lock);
 
@@ -840,7 +842,7 @@ static int snd_via82xx_hw_free(snd_pcm_substream_t * substream)
 static void snd_via82xx_set_table_ptr(via82xx_t *chip, viadev_t *viadev)
 {
 	snd_via82xx_codec_ready(chip, 0);
-	outl((u32)viadev->table_addr, VIADEV_REG(viadev, OFFSET_TABLE_PTR));
+	outl((u32)viadev->table.addr, VIADEV_REG(viadev, OFFSET_TABLE_PTR));
 	udelay(20);
 	snd_via82xx_codec_ready(chip, 0);
 }
@@ -922,12 +924,10 @@ static int snd_via8233_playback_prepare(snd_pcm_substream_t *substream)
 				  chip->no_vra ? 48000 : runtime->rate);
 		snd_ac97_set_rate(chip->ac97, AC97_SPDIF, runtime->rate);
 	}
-#if 0
-	if (chip->revision == VIA_REV_8233A)
-		rbits = 0;
+	if (runtime->rate == 48000)
+		rbits = 0xfffff;
 	else
-#endif
-		rbits = (0xfffff / 48000) * runtime->rate + ((0xfffff % 48000) * runtime->rate) / 48000;
+		rbits = (0x100000 / 48000) * runtime->rate + ((0x100000 % 48000) * runtime->rate) / 48000;
 	snd_assert((rbits & ~0xfffff) == 0, return -EINVAL);
 	snd_via82xx_channel_reset(chip, viadev);
 	snd_via82xx_set_table_ptr(chip, viadev);
@@ -1290,7 +1290,8 @@ static int __devinit snd_via8233_pcm_new(via82xx_t *chip)
 	/* capture */
 	init_viadev(chip, chip->capture_devno, VIA_REG_CAPTURE_8233_STATUS, 1);
 
-	if ((err = snd_pcm_lib_preallocate_sg_pages_for_all(chip->pci, pcm, 64*1024, 128*1024)) < 0)
+	if ((err = snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV_SG,
+							 snd_dma_pci_data(chip->pci), 64*1024, 128*1024)) < 0)
 		return err;
 
 	/* PCM #1:  multi-channel playback and 2nd capture */
@@ -1306,7 +1307,8 @@ static int __devinit snd_via8233_pcm_new(via82xx_t *chip)
 	/* set up capture */
 	init_viadev(chip, chip->capture_devno + 1, VIA_REG_CAPTURE_8233_STATUS + 0x10, 1);
 
-	if ((err = snd_pcm_lib_preallocate_sg_pages_for_all(chip->pci, pcm, 64*1024, 128*1024)) < 0)
+	if ((err = snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV_SG,
+						         snd_dma_pci_data(chip->pci), 64*1024, 128*1024)) < 0)
 		return err;
 
 	return 0;
@@ -1339,7 +1341,8 @@ static int __devinit snd_via8233a_pcm_new(via82xx_t *chip)
 	/* capture */
 	init_viadev(chip, chip->capture_devno, VIA_REG_CAPTURE_8233_STATUS, 1);
 
-	if ((err = snd_pcm_lib_preallocate_sg_pages_for_all(chip->pci, pcm, 64*1024, 128*1024)) < 0)
+	if ((err = snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV_SG,
+							 snd_dma_pci_data(chip->pci), 64*1024, 128*1024)) < 0)
 		return err;
 
 	/* PCM #1:  DXS3 playback (for spdif) */
@@ -1352,7 +1355,8 @@ static int __devinit snd_via8233a_pcm_new(via82xx_t *chip)
 	/* set up playback */
 	init_viadev(chip, chip->playback_devno, 0x30, 0);
 
-	if ((err = snd_pcm_lib_preallocate_sg_pages_for_all(chip->pci, pcm, 64*1024, 128*1024)) < 0)
+	if ((err = snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV_SG,
+							 snd_dma_pci_data(chip->pci), 64*1024, 128*1024)) < 0)
 		return err;
 
 	return 0;
@@ -1381,7 +1385,8 @@ static int __devinit snd_via686_pcm_new(via82xx_t *chip)
 	init_viadev(chip, 0, VIA_REG_PLAYBACK_STATUS, 0);
 	init_viadev(chip, 1, VIA_REG_CAPTURE_STATUS, 1);
 
-	if ((err = snd_pcm_lib_preallocate_sg_pages_for_all(chip->pci, pcm, 64*1024, 128*1024)) < 0)
+	if ((err = snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV_SG,
+							 snd_dma_pci_data(chip->pci), 64*1024, 128*1024)) < 0)
 		return err;
 
 	return 0;
@@ -1559,6 +1564,18 @@ static struct ac97_quirk ac97_quirks[] = {
 		.device = 0x3059,
 		.name = "ASRock K7VM2",
 		.type = AC97_TUNE_HP_ONLY	/* VT1616 */
+	},
+	{
+		.vendor = 0x14cd,
+		.device = 0x7002,
+		.name = "Unknown",
+		.type = AC97_TUNE_ALC_JACK
+	},
+	{
+		.vendor = 0x1071,
+		.device = 0x8590,
+		.name = "Mitac Mobo",
+		.type = AC97_TUNE_ALC_JACK
 	},
 	{ } /* terminator */
 };
@@ -1913,6 +1930,10 @@ static int __devinit snd_via82xx_create(snd_card_t * card,
 	chip->pci = pci;
 	chip->irq = -1;
 
+	memset(&chip->dma_dev, 0, sizeof(chip->dma_dev));
+	chip->dma_dev.type = SNDRV_DMA_TYPE_DEV;
+	chip->dma_dev.dev = snd_dma_pci_data(pci);
+
 	pci_read_config_byte(pci, VIA_FUNC_ENABLE, &chip->old_legacy);
 	pci_read_config_byte(pci, VIA_PNP_CONTROL, &chip->old_legacy_cfg);
 
@@ -1987,13 +2008,16 @@ static int __devinit check_dxs_list(struct pci_dev *pci)
 		{ .vendor = 0x1043, .device = 0x80b0, .action = VIA_DXS_NO_VRA }, /* ASUS A7V600 & K8V*/ 
 		{ .vendor = 0x10cf, .device = 0x118e, .action = VIA_DXS_ENABLE }, /* FSC laptop */
 		{ .vendor = 0x1106, .device = 0x4161, .action = VIA_DXS_NO_VRA }, /* ASRock K7VT2 */
+		{ .vendor = 0x1106, .device = 0xaa01, .action = VIA_DXS_NO_VRA }, /* EPIA MII */
 		{ .vendor = 0x1297, .device = 0xa232, .action = VIA_DXS_ENABLE }, /* Shuttle ?? */
 		{ .vendor = 0x1297, .device = 0xc160, .action = VIA_DXS_ENABLE }, /* Shuttle SK41G */
-		{ .vendor = 0x1458, .device = 0xa002, .action = VIA_DXS_ENABLE }, /* Gigabyte GA-7VAXP */
+		{ .vendor = 0x1458, .device = 0xa002, .action = VIA_DXS_NO_VRA }, /* Gigabyte GA-7VAXP (FIXME: or DXS_ENABLE?) */
 		{ .vendor = 0x147b, .device = 0x1401, .action = VIA_DXS_ENABLE }, /* ABIT KD7(-RAID) */
 		{ .vendor = 0x14ff, .device = 0x0403, .action = VIA_DXS_ENABLE }, /* Twinhead mobo */
 		{ .vendor = 0x1462, .device = 0x3800, .action = VIA_DXS_ENABLE }, /* MSI KT266 */
 		{ .vendor = 0x1462, .device = 0x7120, .action = VIA_DXS_ENABLE }, /* MSI KT4V */
+		{ .vendor = 0x1462, .device = 0x5901, .action = VIA_DXS_NO_VRA }, /* MSI KT6 Delta-SR */
+		{ .vendor = 0x1584, .device = 0x8120, .action = VIA_DXS_ENABLE }, /* Gericom/Targa/Vobis/Uniwill laptop */
 		{ .vendor = 0x1631, .device = 0xe004, .action = VIA_DXS_ENABLE }, /* Easy Note 3174, Packard Bell */
 		{ .vendor = 0x1695, .device = 0x3005, .action = VIA_DXS_ENABLE }, /* EPoX EP-8K9A */
 		{ .vendor = 0x1849, .device = 0x3059, .action = VIA_DXS_NO_VRA }, /* ASRock K7VM2 */

@@ -644,9 +644,13 @@
 #define SOLEH			0x5d		/* Stop on loop enable high register		*/
 
 #define SPBYPASS		0x5e		/* SPDIF BYPASS mode register			*/
-#define SPBYPASS_ENABLE		0x00000001	/* Enable SPDIF bypass mode			*/
+#define SPBYPASS_SPDIF0_MASK	0x00000003	/* SPDIF 0 bypass mode				*/
+#define SPBYPASS_SPDIF1_MASK	0x0000000c	/* SPDIF 1 bypass mode				*/
+/* bypass mode: 0 - DSP; 1 - SPDIF A, 2 - SPDIF B, 3 - SPDIF C					*/
+#define SPBYPASS_FORMAT		0x00000f00      /* If 1, SPDIF XX uses 24 bit, if 0 - 20 bit	*/
 
 #define AC97SLOT		0x5f            /* additional AC97 slots enable bits		*/
+#define AC97SLOT_10K2		0x03
 #define AC97SLOT_CNTR		0x10            /* Center enable */
 #define AC97SLOT_LFE		0x20            /* LFE enable */
 
@@ -837,7 +841,7 @@ typedef struct {
 typedef struct snd_emu10k1_memblk {
 	snd_util_memblk_t mem;
 	/* private part */
-	short first_page, last_page, pages, mapped_page;
+	int first_page, last_page, pages, mapped_page;
 	unsigned int map_locked;
 	struct list_head mapped_link;
 	struct list_head mapped_order_link;
@@ -897,9 +901,7 @@ typedef struct {
 	unsigned short extout_mask;	/* used external outputs (bitmask) */
 	unsigned short pad1;
 	unsigned int itram_size;	/* internal TRAM size in samples */
-	unsigned int etram_size;	/* external TRAM size in samples */
-	void *etram_pages;		/* allocated pages for external TRAM */
-	dma_addr_t etram_pages_dmaaddr;
+	struct snd_dma_buffer etram_pages; /* external TRAM pages and size */
 	unsigned int dbg;		/* FX debugger register */
 	unsigned char name[128];
 	int gpr_size;			/* size of allocated GPR controls */
@@ -943,11 +945,10 @@ struct _snd_emu10k1 {
 	unsigned int card_type;			/* EMU10K1_CARD_* */
 	unsigned int ecard_ctrl;		/* ecard control bits */
 	unsigned long dma_mask;			/* PCI DMA mask */
+	struct snd_dma_device dma_dev;		/* DMA device description */
 	int max_cache_pages;			/* max memory size / PAGE_SIZE */
-	void *silent_page;			/* silent page */
-	dma_addr_t silent_page_dmaaddr;
-	volatile u32 *ptb_pages;		/* page table pages */
-	dma_addr_t ptb_pages_dmaaddr;
+	struct snd_dma_buffer silent_page;	/* silent page */
+	struct snd_dma_buffer ptb_pages;	/* page table pages */
 	snd_util_memhdr_t *memhdr;		/* page allocation list */
 	emu10k1_memblk_t *reserved_page;	/* reserved page */
 

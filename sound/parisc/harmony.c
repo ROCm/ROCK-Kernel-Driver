@@ -205,6 +205,7 @@ typedef struct snd_card_harmony {
 	unsigned char *silence_addr;
 	dma_addr_t silence_dma;
 	int silence_count;
+	struct snd_dma_device dma_dev;
 
 	/* alsa stuff */
 	snd_card_t *card;
@@ -844,15 +845,16 @@ static int snd_card_harmony_pcm_init(snd_card_harmony_t *harmony, int device)
 	harmony->pcm = pcm;
 	
 	/* initialize graveyard buffer */
-	harmony->graveyard_addr = snd_malloc_pci_pages(harmony->fake_pci_dev, 
+	harmony->dma_dev.type = SNDRV_DMA_TYPE_PCI;
+	harmony->dma_dev.dev = snd_dma_pci_data(harmony->fake_pci_dev); 
+	harmony->graveyard_addr = snd_dma_alloc_pages(&chip->dma_dev,
 			HARMONY_BUF_SIZE*GRAVEYARD_BUFS, &harmony->graveyard_dma);
 	harmony->graveyard_count = 0;
 	
 	/* initialize silence buffers */
-	harmony->silence_addr = snd_malloc_pci_pages(harmony->fake_pci_dev,
+	harmony->silence_addr = snd_dma_alloc_pages(&chip->dma_dev,
 			HARMONY_BUF_SIZE*SILENCE_BUFS, &harmony->silence_dma);
 	harmony->silence_count = 0;
-
 
 	harmony->ply_stopped = harmony->cap_stopped = 1;
 	
@@ -860,6 +862,10 @@ static int snd_card_harmony_pcm_init(snd_card_harmony_t *harmony, int device)
 	harmony->capture_substream = NULL;
 	harmony->graveyard_count = 0;
 	
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
+					      snd_dma_pci_data(harmony->fake_pci_dev),
+					      64 * 1024, 128 * 1024);
+
 	return 0;
 }
 
