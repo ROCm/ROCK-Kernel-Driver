@@ -24,10 +24,10 @@
 #include <linux/quotaops.h>
 #include <linux/slab.h>
 #include <linux/dnotify.h>
+#include <linux/statfs.h>
 #include <linux/security.h>
 
 #include <asm/uaccess.h>
-#include <asm/statfs.h>
 
 /* some random number */
 #define HUGETLBFS_MAGIC	0x958458f6
@@ -498,7 +498,7 @@ int hugetlbfs_set_page_dirty(struct page *page)
 	return 0;
 }
 
-static int hugetlbfs_statfs(struct super_block *sb, struct statfs *buf)
+static int hugetlbfs_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	struct hugetlbfs_sb_info *sbinfo = HUGETLBFS_SB(sb);
 
