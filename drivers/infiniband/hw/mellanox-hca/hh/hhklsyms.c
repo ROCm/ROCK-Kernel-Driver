@@ -23,7 +23,7 @@
 #include <hh.h>
 #include <hh_common.h>
 
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("Dual BSD/GPL");
 
 
 EXPORT_SYMBOL(HH_add_hca_dev);

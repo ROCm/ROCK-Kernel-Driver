@@ -59,7 +59,6 @@
 
 MODULE_AUTHOR("David Hinds <dahinds@users.sourceforge.net>");
 MODULE_DESCRIPTION("Future Domain PCMCIA SCSI driver");
-MODULE_LICENSE("Dual MPL/GPL");
 
 /* Bit map of interrupts to choose from */
 static int irq_mask = 0xdeb8;

@@ -427,4 +427,3 @@ err:
 	affs_unlock_link(inode);
 	goto done;
 }
-MODULE_LICENSE("GPL");

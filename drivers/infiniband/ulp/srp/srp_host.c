@@ -23,6 +23,7 @@
 
 #include "srp_host.h"
 
+MODULE_LICENSE("Dual BSD/GPL");
 MODULE_PARM ( dlid_conf, "i");
 MODULE_PARM_DESC (dlid_conf, "dlid_conf (nonzero value indicates that dlid is being specified in the conf file)");
 tUINT32 dlid_conf = 0;

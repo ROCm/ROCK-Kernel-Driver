@@ -198,7 +198,6 @@ HH_ret_t HHIF_dummy()
 #ifdef MT_KERNEL
 
 
-MODULE_LICENSE("GPL");
 int init_hh_driver(void)
 {
   HH_hca_dev_t*  dev = devBegin;
