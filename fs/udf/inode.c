@@ -56,8 +56,8 @@ static int udf_update_inode(struct inode *, int);
 static void udf_fill_inode(struct inode *, struct buffer_head *);
 static struct buffer_head *inode_getblk(struct inode *, long, int *,
 	long *, int *);
-static int8_t udf_insert_aext(struct inode *, lb_addr, int,
-	lb_addr, uint32_t, struct buffer_head *);
+static int8_t udf_insert_aext(struct inode *, kernel_lb_addr, int,
+	kernel_lb_addr, uint32_t, struct buffer_head *);
 static void udf_split_extents(struct inode *, int *, int, int,
 	kernel_long_ad [EXTENT_MERGE_SIZE], int *);
 static void udf_prealloc_extents(struct inode *, int, int,
