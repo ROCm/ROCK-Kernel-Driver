@@ -51,16 +51,16 @@ typedef struct {
 } mputimer_regs_t;
 
 #define mputimer_base(n) \
-    ((volatile mputimer_regs_t*)(OMAP_MPUTIMER_BASE + \
+    ((volatile mputimer_regs_t*)IO_ADDRESS(OMAP_MPUTIMER_BASE + \
 				 (n)*OMAP_MPUTIMER_OFF))
 
 static inline unsigned long timer32k_read(int reg) {
 	unsigned long val;
-	val = (inw(IO_ADDRESS((reg) + OMAP_32kHz_TIMER_BASE)));
+	val = omap_readw(reg + OMAP_32kHz_TIMER_BASE);
 	return val;
 }
 static inline void timer32k_write(int reg,int val) {
-	outw( (val), (IO_ADDRESS( (reg) + OMAP_32kHz_TIMER_BASE)));
+	omap_writew(val, reg + OMAP_32kHz_TIMER_BASE);
 }
 
 /*

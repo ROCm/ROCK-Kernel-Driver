@@ -47,66 +47,42 @@
  * I/O mapping
  * ----------------------------------------------------------------------------
  */
-#define IO_BASE			0xFFFB0000	/* Virtual */
+#define IO_PHYS			0xFFFB0000
+#define IO_OFFSET		0x01000000	/* Virtual IO = 0xfefb0000 */
+#define IO_VIRT			(IO_PHYS - IO_OFFSET)
 #define IO_SIZE			0x40000
-#define IO_START		0xFFFB0000	/* Physical */
+#define IO_ADDRESS(x)		((x) - IO_OFFSET)
 
 #define PCIO_BASE		0
 
-#define IO_ADDRESS(x)		((x))
+#define io_p2v(x)               ((x) - IO_OFFSET)
+#define io_v2p(x)               ((x) + IO_OFFSET)
 
-/*
- * ---------------------------------------------------------------------------
- * Processor differentiation
- * ---------------------------------------------------------------------------
- */
+#ifndef __ASSEMBLER__
 
-#ifdef CONFIG_ARCH_OMAP730
-#include "omap730.h"
-#define cpu_is_omap730()	(1)
+/* 16 bit uses LDRH/STRH, base +/- offset_8 */
+typedef struct { volatile u16 offset[256]; } __regbase16;
+#define __REGV16(vaddr)		((__regbase16 *)((vaddr)&~0xff)) \
+					->offset[((vaddr)&0xff)>>1]
+#define __REG16(paddr)          __REGV16(io_p2v(paddr))
+
+/* 8/32 bit uses LDR/STR, base +/- offset_12 */
+typedef struct { volatile u8 offset[4096]; } __regbase8;
+#define __REGV8(vaddr)		((__regbase8  *)((paddr)&~4095)) \
+					->offset[((paddr)&4095)>>0]
+#define __REG8(paddr)		__REGV8(io_p2v(paddr))
+
+typedef struct { volatile u32 offset[4096]; } __regbase32;
+#define __REGV32(vaddr)		((__regbase32 *)((vaddr)&~4095)) \
+					->offset[((vaddr)&4095)>>2]
+#define __REG32(paddr)		__REGV32(io_p2v(paddr))
+
 #else
-#define cpu_is_omap730()	(0)
-#endif
 
-#ifdef CONFIG_ARCH_OMAP1510
-#include "omap1510.h"
-#define cpu_is_omap1510()	(1)
-#else
-#define cpu_is_omap1510()	(0)
-#endif
+#define __REG8(paddr)		io_p2v(paddr)
+#define __REG16(paddr)		io_p2v(paddr)
+#define __REG32(paddr)		io_p2v(paddr)
 
-#ifdef CONFIG_ARCH_OMAP1610
-#include "omap1610.h"
-#define cpu_is_omap1610()	(1)
-#else
-#define cpu_is_omap1610()	(0)
-#endif
-
-/*
- * ---------------------------------------------------------------------------
- * Board differentiation
- * ---------------------------------------------------------------------------
- */
-
-#ifdef CONFIG_OMAP_INNOVATOR
-#include "omap-innovator.h"
-#define omap_is_innovator()	(1)
-#else
-#define omap_is_innovator()	(0)
-#endif
-
-#ifdef CONFIG_MACH_OMAP_H2
-#include "omap-h2.h"
-#define omap_is_h2()		(1)
-#else
-#define omap_is_h2()		(0)
-#endif
-
-#ifdef CONFIG_MACH_OMAP_PERSEUS2
-#include "omap-perseus2.h"
-#define omap_is_perseus2()	(1)
-#else
-#define omap_is_perseus2()	(0)
 #endif
 
 /*
@@ -119,33 +95,17 @@
 
 /*
  * ----------------------------------------------------------------------------
- * Base addresses
- * ----------------------------------------------------------------------------
- */
-
-/* Syntax: XX_BASE = Virtual base address, XX_START = Physical base address */
-
-#define OMAP_DSP_BASE		0xE0000000
-#define OMAP_DSP_SIZE		0x50000
-#define OMAP_DSP_START		0xE0000000
-
-#define OMAP_DSPREG_BASE	0xE1000000
-#define OMAP_DSPREG_SIZE	SZ_128K
-#define OMAP_DSPREG_START	0xE1000000
-
-/*
- * ----------------------------------------------------------------------------
  * Clocks
  * ----------------------------------------------------------------------------
  */
 #define CLKGEN_RESET_BASE	(0xfffece00)
-#define ARM_CKCTL		(volatile __u16 *)(CLKGEN_RESET_BASE + 0x0)
-#define ARM_IDLECT1		(volatile __u16 *)(CLKGEN_RESET_BASE + 0x4)
-#define ARM_IDLECT2		(volatile __u16 *)(CLKGEN_RESET_BASE + 0x8)
-#define ARM_EWUPCT		(volatile __u16 *)(CLKGEN_RESET_BASE + 0xC)
-#define ARM_RSTCT1		(volatile __u16 *)(CLKGEN_RESET_BASE + 0x10)
-#define ARM_RSTCT2		(volatile __u16 *)(CLKGEN_RESET_BASE + 0x14)
-#define ARM_SYSST		(volatile __u16 *)(CLKGEN_RESET_BASE + 0x18)
+#define ARM_CKCTL		(CLKGEN_RESET_BASE + 0x0)
+#define ARM_IDLECT1		(CLKGEN_RESET_BASE + 0x4)
+#define ARM_IDLECT2		(CLKGEN_RESET_BASE + 0x8)
+#define ARM_EWUPCT		(CLKGEN_RESET_BASE + 0xC)
+#define ARM_RSTCT1		(CLKGEN_RESET_BASE + 0x10)
+#define ARM_RSTCT2		(CLKGEN_RESET_BASE + 0x14)
+#define ARM_SYSST		(CLKGEN_RESET_BASE + 0x18)
 
 #define CK_RATEF		1
 #define CK_IDLEF		2
@@ -154,19 +114,19 @@
 #define SETARM_IDLE_SHIFT
 
 /* DPLL control registers */
-#define DPLL_CTL_REG		(volatile __u16 *)(0xfffecf00)
-#define CK_DPLL1		(volatile __u16 *)(0xfffecf00)
+#define DPLL_CTL_REG		(0xfffecf00)
+#define CK_DPLL1		(0xfffecf00)
 
 /* ULPD */
 #define ULPD_REG_BASE		(0xfffe0800)
-#define ULPD_IT_STATUS_REG	(volatile __u16 *)(ULPD_REG_BASE + 0x14)
-#define ULPD_CLOCK_CTRL_REG	(volatile __u16 *)(ULPD_REG_BASE + 0x30)
-#define ULPD_SOFT_REQ_REG	(volatile __u16 *)(ULPD_REG_BASE + 0x34)
-#define ULPD_DPLL_CTRL_REG	(volatile __u16 *)(ULPD_REG_BASE + 0x3c)
-#define ULPD_STATUS_REQ_REG	(volatile __u16 *)(ULPD_REG_BASE + 0x40)
-#define ULPD_APLL_CTRL_REG	(volatile __u16 *)(ULPD_REG_BASE + 0x4c)
-#define ULPD_POWER_CTRL_REG	(volatile __u16 *)(ULPD_REG_BASE + 0x50)
-#define ULPD_CAM_CLK_CTRL_REG	(volatile __u16 *)(ULPD_REG_BASE + 0x7c)
+#define ULPD_IT_STATUS_REG	(ULPD_REG_BASE + 0x14)
+#define ULPD_CLOCK_CTRL_REG	(ULPD_REG_BASE + 0x30)
+#define ULPD_SOFT_REQ_REG	(ULPD_REG_BASE + 0x34)
+#define ULPD_DPLL_CTRL_REG	(ULPD_REG_BASE + 0x3c)
+#define ULPD_STATUS_REQ_REG	(ULPD_REG_BASE + 0x40)
+#define ULPD_APLL_CTRL_REG	(ULPD_REG_BASE + 0x4c)
+#define ULPD_POWER_CTRL_REG	(ULPD_REG_BASE + 0x50)
+#define ULPD_CAM_CLK_CTRL_REG	(ULPD_REG_BASE + 0x7c)
 
 /*
  * ---------------------------------------------------------------------------
@@ -261,6 +221,7 @@
  * ----------------------------------------------------------------------------
  */
 #define MOD_CONF_CTRL_0		0xfffe1080
+#define MOD_CONF_CTRL_1		0xfffe1110
 
 /*
  * ----------------------------------------------------------------------------
@@ -315,13 +276,89 @@
  * ----------------------------------------------------------------------------
  */
 /*  MPUI Interface Registers */
-#define MPUI_CTRL_REG		(volatile __u32 *)(0xfffec900)
-#define MPUI_DEBUG_ADDR		(volatile __u32 *)(0xfffec904)
-#define MPUI_DEBUG_DATA		(volatile __u32 *)(0xfffec908)
-#define MPUI_DEBUG_FLAG		(volatile __u16 *)(0xfffec90c)
-#define MPUI_STATUS_REG		(volatile __u16 *)(0xfffec910)
-#define MPUI_DSP_STATUS_REG	(volatile __u16 *)(0xfffec914)
-#define MPUI_DSP_BOOT_CONFIG	(volatile __u16 *)(0xfffec918)
-#define MPUI_DSP_API_CONFIG	(volatile __u16 *)(0xfffec91c)
+#define MPUI_CTRL_REG		(0xfffec900)
+#define MPUI_DEBUG_ADDR		(0xfffec904)
+#define MPUI_DEBUG_DATA		(0xfffec908)
+#define MPUI_DEBUG_FLAG		(0xfffec90c)
+#define MPUI_STATUS_REG		(0xfffec910)
+#define MPUI_DSP_STATUS_REG	(0xfffec914)
+#define MPUI_DSP_BOOT_CONFIG	(0xfffec918)
+#define MPUI_DSP_API_CONFIG	(0xfffec91c)
+
+
+#ifndef __ASSEMBLER__
+
+/*
+ * ---------------------------------------------------------------------------
+ * Processor differentiation
+ * ---------------------------------------------------------------------------
+ */
+#define OMAP_ID_REG		__REG32(0xfffed404)
+
+#ifdef CONFIG_ARCH_OMAP730
+#include "omap730.h"
+#define cpu_is_omap730()	(((OMAP_ID_REG >> 12) & 0xffff) == 0xB55F)
+#else
+#define cpu_is_omap730()	0
+#endif
+
+#ifdef CONFIG_ARCH_OMAP1510
+#include "omap1510.h"
+#define cpu_is_omap1510()	(((OMAP_ID_REG >> 12) & 0xffff) == 0xB470)
+#else
+#define cpu_is_omap1510()	0
+#endif
+
+#ifdef CONFIG_ARCH_OMAP1610
+#include "omap1610.h"
+#define cpu_is_omap1710()       (((OMAP_ID_REG >> 12) & 0xffff) == 0xB5F7)
+/* Detect 1710 as 1610 for now */
+#define cpu_is_omap1610()	(((OMAP_ID_REG >> 12) & 0xffff) == 0xB576 || \
+				 cpu_is_omap1710())
+#else
+#define cpu_is_omap1610()	0
+#define cpu_is_omap1710()	0
+#endif
+
+#ifdef CONFIG_ARCH_OMAP5912
+#include "omap5912.h"
+#define cpu_is_omap5912()	(((OMAP_ID_REG >> 12) & 0xffff) == 0xB58C)
+#else
+#define cpu_is_omap5912()	0
+#endif
+
+/*
+ * ---------------------------------------------------------------------------
+ * Board differentiation
+ * ---------------------------------------------------------------------------
+ */
+
+#ifdef CONFIG_MACH_OMAP_INNOVATOR
+#include "board-innovator.h"
+#endif
+
+#ifdef CONFIG_MACH_OMAP_H2
+#include "board-h2.h"
+#endif
+
+#ifdef CONFIG_MACH_OMAP_PERSEUS2
+#include "board-perseus2.h"
+#endif
+
+#ifdef CONFIG_MACH_OMAP_H3
+#include "board-h3.h"
+#error "Support for H3 board not yet implemented."
+#endif
+
+#ifdef CONFIG_MACH_OMAP_H4
+#include "board-h4.h"
+#error "Support for H4 board not yet implemented."
+#endif
+
+#ifdef CONFIG_MACH_OMAP_OSK
+#include "board-osk.h"
+#endif
+
+#endif /* !__ASSEMBLER__ */
 
 #endif	/* __ASM_ARCH_OMAP_HARDWARE_H */

@@ -2225,6 +2225,16 @@ acpi_processor_get_info (
 			object.processor.pblk_address + 4;
 		pr->power.states[ACPI_STATE_C3].address =
 			object.processor.pblk_address + 5;
+
+		/*
+		 * We don't care about error returns - we just try to mark
+		 * these reserved so that nobody else is confused into thinking
+		 * that this region might be unused..
+		 *
+		 * (In particular, allocating the IO range for Cardbus)
+		 */
+		request_region(pr->throttling.address, 6, "ACPI CPU throttle");
+		request_region(acpi_fadt.xpm_tmr_blk.address, 4, "ACPI timer");
 	}
 
 	acpi_processor_get_power_info(pr);

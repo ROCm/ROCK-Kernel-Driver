@@ -1,7 +1,7 @@
 /*
  * linux/arch/arm/mach-omap/ocpi.c
  *
- * Minimal OCP bus support for OMAP-1610
+ * Minimal OCP bus support for OMAP-1610 and OMAP-5912
  *
  * Copyright (C) 2003 - 2004 Nokia Corporation
  * Written by Tony Lindgren <tony@atomide.com>
@@ -58,28 +58,40 @@ int ocpi_enable(void)
 	unsigned int val;
 
 	/* Make sure there's clock for OCPI */
-	val = __raw_readl(ARM_IDLECT3);
-	val |= EN_OCPI_CK;
-	val &= ~IDLOCPI_ARM;
-	__raw_writel(val, ARM_IDLECT3);
 
+#ifdef CONFIG_ARCH_OMAP1610
+        if (cpu_is_omap1610()) {
+		val = omap_readl(OMAP1610_ARM_IDLECT3);
+		val |= EN_OCPI_CK;
+		val &= ~IDLOCPI_ARM;
+		omap_writel(val, OMAP1610_ARM_IDLECT3);
+        }
+#endif
+#ifdef CONFIG_ARCH_OMAP5912
+        if (cpu_is_omap5912()) {
+		val = omap_readl(OMAP5912_ARM_IDLECT3);
+		val |= EN_OCPI_CK;
+		val &= ~IDLOCPI_ARM;
+		omap_writel(val, OMAP5912_ARM_IDLECT3);
+        }
+#endif
 	/* Enable access for OHCI in OCPI */
-	val = __raw_readl(OCPI_PROT);
+	val = omap_readl(OCPI_PROT);
 	val &= ~0xff;
 	//val &= (1 << 0);	/* Allow access only to EMIFS */
-	__raw_writel(val, OCPI_PROT);
+	omap_writel(val, OCPI_PROT);
 
-	val = __raw_readl(OCPI_SEC);
+	val = omap_readl(OCPI_SEC);
 	val &= ~0xff;
-	__raw_writel(val, OCPI_SEC);
+	omap_writel(val, OCPI_SEC);
 
-	val = __raw_readl(OCPI_SEC);
+	val = omap_readl(OCPI_SEC);
 	val |= 0;
-	__raw_writel(val, OCPI_SEC);
+	omap_writel(val, OCPI_SEC);
 
-	val = __raw_readl(OCPI_SINT0);
+	val = omap_readl(OCPI_SINT0);
 	val |= 0;
-	__raw_writel(val, OCPI_SINT1);
+	omap_writel(val, OCPI_SINT1);
 
 	return 0;
 }
@@ -89,8 +101,8 @@ int ocpi_status(void)
 {
 	printk("OCPI: addr: 0x%08x cmd: 0x%08x\n"
 	       "      ohci-addr: 0x%08x ohci-status: 0x%08x\n",
-	       __raw_readl(OCPI_FAULT), __raw_readl(OCPI_CMD_FAULT),
-	       __raw_readl(HOSTUEADDR), __raw_readl(HOSTUESTATUS));
+	       omap_readl(OCPI_FAULT), omap_readl(OCPI_CMD_FAULT),
+	       omap_readl(HOSTUEADDR), omap_readl(HOSTUESTATUS));
 
 	return 1;
 }

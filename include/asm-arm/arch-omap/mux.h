@@ -40,7 +40,8 @@
 #ifndef __ASM_ARCH_MUX_H
 #define __ASM_ARCH_MUX_H
 
-#define PU_PD_SEL_NA	0	/* No pu_pd reg availabe */
+#define PU_PD_SEL_NA		0	/* No pu_pd reg available */
+#define PULL_DWN_CTRL_NA	0	/* No pull-down control needed */
 
 #define DEBUG_MUX
 
@@ -278,9 +279,12 @@ typedef enum {
 	E19_1610_KBR4,
 	N19_1610_KBR5,
 
+	/* Power management */
+	T20_1610_LOW_PWR,
+
 } reg_cfg_t;
 
-#ifdef __MUX_C__
+#if defined(__MUX_C__) && defined(CONFIG_OMAP_MUX)
 
 /*
  * Table of various FUNC_MUX and PULL_DWN combinations for each device.
@@ -401,14 +405,14 @@ MUX_CFG("U18_1610_UWIRE_SDI",	 8,    0,    0,	  1,  18,   0,	  1,	 1,  1)
 MUX_CFG("W21_1610_UWIRE_SDO",	 8,    3,    0,	  1,  19,   0,	  1,	 1,  1)
 MUX_CFG("N14_1610_UWIRE_CS0",	 8,    9,    1,	  1,  21,   0,	  1,	 1,  1)
 MUX_CFG("P15_1610_UWIRE_CS3",	 8,   12,    1,	  1,  22,   0,	  1,	 1,  1)
-MUX_CFG("N15_1610_UWIRE_CS1",	 7,   18,    2,	  0,   0,   0,	  0,	 0,  0)
+MUX_CFG("N15_1610_UWIRE_CS1",	 7,   18,    2,	 NA,   0,   0,	 NA,	 0,  0)
 
 /* First MMC interface, same on 1510 and 1610 */
 MUX_CFG("MMC_CMD",		 A,   27,    0,	  2,  15,   1,	  2,	 1,  1)
 MUX_CFG("MMC_DAT1",		 A,   24,    0,	  2,  14,   1,	  2,	 1,  1)
 MUX_CFG("MMC_DAT2",		 A,   18,    0,	  2,  12,   1,	  2,	 1,  1)
 MUX_CFG("MMC_DAT0",		 B,    0,    0,	  2,  16,   1,	  2,	 1,  1)
-MUX_CFG("MMC_CLK",		 A,   21,    0,	  0,   0,   0,	  0,	 0,  1)
+MUX_CFG("MMC_CLK",		 A,   21,    0,	 NA,   0,   0,	 NA,	 0,  1)
 MUX_CFG("MMC_DAT3",		10,   15,    0,	  3,   8,   1,	  3,	 1,  1)
 
 /* OMAP-1610 USB0 alternate configuration */
@@ -422,12 +426,12 @@ MUX_CFG("V9_USB0_SPEED",	 B,  12,     5,	  2,  20,   0,	  2,	 0,  1)
 MUX_CFG("Y10_USB0_SUSP",	 B,   3,     5,	  2,  17,   0,	  2,	 0,  1)
 
 /* USB2 interface */
-MUX_CFG("W9_USB2_TXEN",		 B,   9,     1,	  0,   0,   0,	 NA,	 0,  1)
-MUX_CFG("AA9_USB2_VP",		 B,   6,     1,	  0,   0,   0,	 NA,	 0,  1)
-MUX_CFG("Y5_USB2_RCV",		 C,  21,     1,	  0,   0,   0,	 NA,	 0,  1)
-MUX_CFG("R8_USB2_VM",		 C,  18,     1,	  0,   0,   0,	 NA,	 0,  1)
-MUX_CFG("V6_USB2_TXD",		 C,  27,     2,	  0,   0,   0,	 NA,	 0,  1)
-MUX_CFG("W5_USB2_SE0",		 C,  24,     2,	  0,   0,   0,	 NA,	 0,  1)
+MUX_CFG("W9_USB2_TXEN",		 B,   9,     1,	 NA,   0,   0,	 NA,	 0,  1)
+MUX_CFG("AA9_USB2_VP",		 B,   6,     1,	 NA,   0,   0,	 NA,	 0,  1)
+MUX_CFG("Y5_USB2_RCV",		 C,  21,     1,	 NA,   0,   0,	 NA,	 0,  1)
+MUX_CFG("R8_USB2_VM",		 C,  18,     1,	 NA,   0,   0,	 NA,	 0,  1)
+MUX_CFG("V6_USB2_TXD",		 C,  27,     2,	 NA,   0,   0,	 NA,	 0,  1)
+MUX_CFG("W5_USB2_SE0",		 C,  24,     2,	 NA,   0,   0,	 NA,	 0,  1)
 
 
 /* UART1 */
@@ -437,8 +441,8 @@ MUX_CFG("R14_1610_UART1_CTS",	 9,  15,     0,	  2,   1,   0,	  2,	 1,  1)
 MUX_CFG("AA15_1610_UART1_RTS",	 9,  12,     1,	  2,   0,   0,	  2,	 0,  1)
 
 /* I2C interface */
-MUX_CFG("I2C_SCL",		 7,  24,     0,	  0,   0,   0,	  0,	 0,  0)
-MUX_CFG("I2C_SDA",		 7,  27,     0,	  0,   0,   0,	  0,	 0,  0)
+MUX_CFG("I2C_SCL",		 7,  24,     0,	 NA,   0,   0,	 NA,	 0,  0)
+MUX_CFG("I2C_SDA",		 7,  27,     0,	 NA,   0,   0,	 NA,	 0,  0)
 
 /* Keypad */
 MUX_CFG("F18_1610_KBC0",	 3,  15,     0,	  0,   5,   1,	  0,	 0,  0)
@@ -453,6 +457,8 @@ MUX_CFG("E20_1610_KBR3",	 3,   21,    0,	  0,   7,   1,	  0,	 1,  0)
 MUX_CFG("E19_1610_KBR4",	 3,   18,    0,	  0,   6,   1,	  0,	 1,  0)
 MUX_CFG("N19_1610_KBR5",	 6,  12,     1,	  1,   2,   1,	  1,	 1,  0)
 
+/* Power management */
+MUX_CFG("T20_1610_LOW_PWR",	 7,   12,    1,	  0,   0,   0,   NA,	 0,  0)
 };
 
 #endif	/* __MUX_C__ */

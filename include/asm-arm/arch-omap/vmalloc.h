@@ -30,3 +30,4 @@
 #define VMALLOC_START	  (((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
 #define VMALLOC_VMADDR(x) ((unsigned long)(x))
 #define VMALLOC_END	  (PAGE_OFFSET + 0x10000000)
+

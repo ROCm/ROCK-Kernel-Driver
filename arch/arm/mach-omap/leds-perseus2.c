@@ -14,7 +14,6 @@
 #include <asm/hardware.h>
 #include <asm/leds.h>
 #include <asm/system.h>
-#include <asm/arch/omap-perseus2.h>
 
 #include "leds.h"
 
@@ -97,7 +96,7 @@ void perseus2_leds_event(led_event_t evt)
 	/*
 	 *  Actually burn the LEDs
 	 */
-	__raw_writew(~hw_led_state & 0xffff, OMAP730_FPGA_LEDS);
+	omap_writew(~hw_led_state & 0xffff, OMAP730_FPGA_LEDS);
 
 	local_irq_restore(flags);
 }

@@ -24,6 +24,7 @@
 #include <asm/hardware.h>
 #include <asm/arch/serial.h>
 
+#define UART_OMAP_MDR1		0x08	/* mode definition register */
 
 #define check_port(base, shift) ((base[UART_OMAP_MDR1 << shift] & 7) == 0)
 
@@ -35,9 +36,12 @@ puts(const char *s)
 
 	/* Determine which serial port to use */
 	do {
-		if (machine_is_innovator()) {
+		if (machine_is_omap_innovator() || machine_is_omap_osk()) {
 			shift = 2;
-			uart = (volatile u8 *)(OMAP1510_UART1_BASE);
+			uart = (volatile u8 *)(OMAP_UART1_BASE);
+		} else if (machine_is_omap_perseus2()) {
+			shift = 0;
+			uart = (volatile u8 *)(OMAP_UART1_BASE);
 		} else {
 			/* Assume nothing for unknown machines.
 			 * Add an entry for your machine to select

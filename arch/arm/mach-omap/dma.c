@@ -61,7 +61,7 @@ static inline int get_gdma_dev(int req)
 	u32 reg = OMAP_FUNC_MUX_ARM_BASE + ((req - 1) / 5) * 4;
 	int shift = ((req - 1) % 5) * 6;
 
-	return ((__raw_readl(reg) >> shift) & 0x3f) + 1;
+	return ((omap_readl(reg) >> shift) & 0x3f) + 1;
 }
 
 static inline void set_gdma_dev(int req, int dev)
@@ -70,10 +70,10 @@ static inline void set_gdma_dev(int req, int dev)
 	int shift = ((req - 1) % 5) * 6;
 	u32 l;
 
-	l = __raw_readl(reg);
+	l = omap_readl(reg);
 	l &= ~(0x3f << shift);
 	l |= (dev - 1) << shift;
-	__raw_writel(l, reg);
+	omap_writel(l, reg);
 }
 
 static void clear_lch_regs(int lch)
@@ -82,7 +82,7 @@ static void clear_lch_regs(int lch)
 	u32 lch_base = OMAP_DMA_BASE + lch * 0x40;
 
 	for (i = 0; i < 0x2c; i += 2)
-		__raw_writew(0, lch_base + i);
+		omap_writew(0, lch_base + i);
 }
 
 void omap_set_dma_transfer_params(int lch, int data_type, int elem_count,
@@ -90,25 +90,25 @@ void omap_set_dma_transfer_params(int lch, int data_type, int elem_count,
 {
 	u16 w;
 
-	w = __raw_readw(OMAP_DMA_CSDP_REG(lch));
+	w = omap_readw(OMAP_DMA_CSDP_REG(lch));
 	w &= ~0x03;
 	w |= data_type;
-	__raw_writew(w, OMAP_DMA_CSDP_REG(lch));
+	omap_writew(w, OMAP_DMA_CSDP_REG(lch));
 
-	w = __raw_readw(OMAP_DMA_CCR_REG(lch));
+	w = omap_readw(OMAP_DMA_CCR_REG(lch));
 	w &= ~(1 << 5);
 	if (sync_mode == OMAP_DMA_SYNC_FRAME)
 		w |= 1 << 5;
-	__raw_writew(w, OMAP_DMA_CCR_REG(lch));
+	omap_writew(w, OMAP_DMA_CCR_REG(lch));
 
-	w = __raw_readw(OMAP_DMA_CCR2_REG(lch));
+	w = omap_readw(OMAP_DMA_CCR2_REG(lch));
 	w &= ~(1 << 2);
 	if (sync_mode == OMAP_DMA_SYNC_BLOCK)
 		w |= 1 << 2;
-	__raw_writew(w, OMAP_DMA_CCR2_REG(lch));
+	omap_writew(w, OMAP_DMA_CCR2_REG(lch));
 
-	__raw_writew(elem_count, OMAP_DMA_CEN_REG(lch));
-	__raw_writew(frame_count, OMAP_DMA_CFN_REG(lch));
+	omap_writew(elem_count, OMAP_DMA_CEN_REG(lch));
+	omap_writew(frame_count, OMAP_DMA_CFN_REG(lch));
 
 }
 
@@ -117,18 +117,18 @@ void omap_set_dma_src_params(int lch, int src_port, int src_amode,
 {
 	u16 w;
 
-	w = __raw_readw(OMAP_DMA_CSDP_REG(lch));
+	w = omap_readw(OMAP_DMA_CSDP_REG(lch));
 	w &= ~(0x1f << 2);
 	w |= src_port << 2;
-	__raw_writew(w, OMAP_DMA_CSDP_REG(lch));
+	omap_writew(w, OMAP_DMA_CSDP_REG(lch));
 
-	w = __raw_readw(OMAP_DMA_CCR_REG(lch));
+	w = omap_readw(OMAP_DMA_CCR_REG(lch));
 	w &= ~(0x03 << 12);
 	w |= src_amode << 12;
-	__raw_writew(w, OMAP_DMA_CCR_REG(lch));
+	omap_writew(w, OMAP_DMA_CCR_REG(lch));
 
-	__raw_writew(src_start >> 16, OMAP_DMA_CSSA_U_REG(lch));
-	__raw_writew(src_start, OMAP_DMA_CSSA_L_REG(lch));
+	omap_writew(src_start >> 16, OMAP_DMA_CSSA_U_REG(lch));
+	omap_writew(src_start, OMAP_DMA_CSSA_L_REG(lch));
 }
 
 void omap_set_dma_dest_params(int lch, int dest_port, int dest_amode,
@@ -136,18 +136,18 @@ void omap_set_dma_dest_params(int lch, int dest_port, int dest_amode,
 {
 	u16 w;
 
-	w = __raw_readw(OMAP_DMA_CSDP_REG(lch));
+	w = omap_readw(OMAP_DMA_CSDP_REG(lch));
 	w &= ~(0x1f << 9);
 	w |= dest_port << 9;
-	__raw_writew(w, OMAP_DMA_CSDP_REG(lch));
+	omap_writew(w, OMAP_DMA_CSDP_REG(lch));
 
-	w = __raw_readw(OMAP_DMA_CCR_REG(lch));
+	w = omap_readw(OMAP_DMA_CCR_REG(lch));
 	w &= ~(0x03 << 14);
 	w |= dest_amode << 14;
-	__raw_writew(w, OMAP_DMA_CCR_REG(lch));
+	omap_writew(w, OMAP_DMA_CCR_REG(lch));
 
-	__raw_writew(dest_start >> 16, OMAP_DMA_CDSA_U_REG(lch));
-	__raw_writew(dest_start, OMAP_DMA_CDSA_L_REG(lch));
+	omap_writew(dest_start >> 16, OMAP_DMA_CDSA_U_REG(lch));
+	omap_writew(dest_start, OMAP_DMA_CDSA_L_REG(lch));
 }
 
 void omap_start_dma(int lch)
@@ -155,13 +155,13 @@ void omap_start_dma(int lch)
 	u16 w;
 
 	/* Read CSR to make sure it's cleared. */
-	w = __raw_readw(OMAP_DMA_CSR_REG(lch));
+	w = omap_readw(OMAP_DMA_CSR_REG(lch));
 	/* Enable some nice interrupts. */
-	__raw_writew(dma_chan[lch].enabled_irqs, OMAP_DMA_CICR_REG(lch));
+	omap_writew(dma_chan[lch].enabled_irqs, OMAP_DMA_CICR_REG(lch));
 
-	w = __raw_readw(OMAP_DMA_CCR_REG(lch));
+	w = omap_readw(OMAP_DMA_CCR_REG(lch));
 	w |= OMAP_DMA_CCR_EN;
-	__raw_writew(w, OMAP_DMA_CCR_REG(lch));
+	omap_writew(w, OMAP_DMA_CCR_REG(lch));
 	dma_chan[lch].flags |= OMAP_DMA_ACTIVE;
 }
 
@@ -170,11 +170,11 @@ void omap_stop_dma(int lch)
 	u16 w;
 
 	/* Disable all interrupts on the channel */
-	__raw_writew(0, OMAP_DMA_CICR_REG(lch));
+	omap_writew(0, OMAP_DMA_CICR_REG(lch));
 
-	w = __raw_readw(OMAP_DMA_CCR_REG(lch));
+	w = omap_readw(OMAP_DMA_CCR_REG(lch));
 	w &= ~OMAP_DMA_CCR_EN;
-	__raw_writew(w, OMAP_DMA_CCR_REG(lch));
+	omap_writew(w, OMAP_DMA_CCR_REG(lch));
 	dma_chan[lch].flags &= ~OMAP_DMA_ACTIVE;
 }
 
@@ -196,7 +196,7 @@ static int dma_handle_ch(int ch)
 		csr = dma_chan[ch].saved_csr;
 		dma_chan[ch].saved_csr = 0;
 	} else
-		csr = __raw_readw(OMAP_DMA_CSR_REG(ch));
+		csr = omap_readw(OMAP_DMA_CSR_REG(ch));
 	if (enable_1510_mode && ch <= 2 && (csr >> 7) != 0) {
 		dma_chan[ch + 6].saved_csr = csr >> 7;
 		csr &= 0x7f;
@@ -274,7 +274,7 @@ int omap_request_dma(int dev_id, const char *dev_name,
 	chan->data = data;
 	chan->enabled_irqs = OMAP_DMA_TOUT_IRQ | OMAP_DMA_DROP_IRQ | OMAP_DMA_BLOCK_IRQ;
 
-	if (cpu_is_omap1610()) {
+	if (cpu_is_omap1610() || cpu_is_omap5912()) {
 		/* If the sync device is set, configure it dynamically. */
 		if (dev_id != 0) {
 			set_gdma_dev(free_ch + 1, dev_id);
@@ -282,9 +282,9 @@ int omap_request_dma(int dev_id, const char *dev_name,
 		}
 		/* Disable the 1510 compatibility mode and set the sync device
 		 * id. */
-		__raw_writew(dev_id | (1 << 10), OMAP_DMA_CCR_REG(free_ch));
+		omap_writew(dev_id | (1 << 10), OMAP_DMA_CCR_REG(free_ch));
 	} else {
-		__raw_writew(dev_id, OMAP_DMA_CCR_REG(free_ch));
+		omap_writew(dev_id, OMAP_DMA_CCR_REG(free_ch));
 	}
 	*dma_ch_out = free_ch;
 
@@ -305,9 +305,9 @@ void omap_free_dma(int ch)
 	spin_unlock_irqrestore(&dma_chan_lock, flags);
 
 	/* Disable all DMA interrupts for the channel. */
-	__raw_writew(0, OMAP_DMA_CICR_REG(ch));
+	omap_writew(0, OMAP_DMA_CICR_REG(ch));
 	/* Make sure the DMA transfer is stopped. */
-	__raw_writew(0, OMAP_DMA_CCR_REG(ch));
+	omap_writew(0, OMAP_DMA_CCR_REG(ch));
 }
 
 int omap_dma_in_1510_mode(void)
@@ -381,45 +381,45 @@ static void set_b1_regs(void)
 	}
 
 	if (omap_dma_in_1510_mode()) {
-		__raw_writew(top >> 16, OMAP1510_DMA_LCD_TOP_F1_U);
-		__raw_writew(top, OMAP1510_DMA_LCD_TOP_F1_L);
-		__raw_writew(bottom >> 16, OMAP1510_DMA_LCD_BOT_F1_U);
-		__raw_writew(bottom, OMAP1510_DMA_LCD_BOT_F1_L);
+		omap_writew(top >> 16, OMAP1510_DMA_LCD_TOP_F1_U);
+		omap_writew(top, OMAP1510_DMA_LCD_TOP_F1_L);
+		omap_writew(bottom >> 16, OMAP1510_DMA_LCD_BOT_F1_U);
+		omap_writew(bottom, OMAP1510_DMA_LCD_BOT_F1_L);
 
 		return;
 	}
 
 	/* 1610 regs */
-	__raw_writew(top >> 16, OMAP1610_DMA_LCD_TOP_B1_U);
-	__raw_writew(top, OMAP1610_DMA_LCD_TOP_B1_L);
-	__raw_writew(bottom >> 16, OMAP1610_DMA_LCD_BOT_B1_U);
-	__raw_writew(bottom, OMAP1610_DMA_LCD_BOT_B1_L);
+	omap_writew(top >> 16, OMAP1610_DMA_LCD_TOP_B1_U);
+	omap_writew(top, OMAP1610_DMA_LCD_TOP_B1_L);
+	omap_writew(bottom >> 16, OMAP1610_DMA_LCD_BOT_B1_U);
+	omap_writew(bottom, OMAP1610_DMA_LCD_BOT_B1_L);
 
-	__raw_writew(en, OMAP1610_DMA_LCD_SRC_EN_B1);
-	__raw_writew(fn, OMAP1610_DMA_LCD_SRC_FN_B1);
+	omap_writew(en, OMAP1610_DMA_LCD_SRC_EN_B1);
+	omap_writew(fn, OMAP1610_DMA_LCD_SRC_FN_B1);
 
-	w = __raw_readw(OMAP1610_DMA_LCD_CSDP);
+	w = omap_readw(OMAP1610_DMA_LCD_CSDP);
 	w &= ~0x03;
 	w |= lcd_dma.data_type;
-	__raw_writew(w, OMAP1610_DMA_LCD_CSDP);
+	omap_writew(w, OMAP1610_DMA_LCD_CSDP);
 
 	if (!lcd_dma.rotate)
 		return;
 
 	/* Rotation stuff */
-	l = __raw_readw(OMAP1610_DMA_LCD_CSDP);
+	l = omap_readw(OMAP1610_DMA_LCD_CSDP);
 	/* Disable burst access */
 	l &= ~(0x03 << 7);
-	__raw_writew(l, OMAP1610_DMA_LCD_CSDP);
+	omap_writew(l, OMAP1610_DMA_LCD_CSDP);
 
-	l = __raw_readw(OMAP1610_DMA_LCD_CCR);
+	l = omap_readw(OMAP1610_DMA_LCD_CCR);
 	/* Set the double-indexed addressing mode */
 	l |= (0x03 << 12);
-	__raw_writew(l, OMAP1610_DMA_LCD_CCR);
+	omap_writew(l, OMAP1610_DMA_LCD_CCR);
 
-	__raw_writew(ei, OMAP1610_DMA_LCD_SRC_EI_B1);
-	__raw_writew(fi >> 16, OMAP1610_DMA_LCD_SRC_FI_B1_U);
-	__raw_writew(fi, OMAP1610_DMA_LCD_SRC_FI_B1_L);
+	omap_writew(ei, OMAP1610_DMA_LCD_SRC_EI_B1);
+	omap_writew(fi >> 16, OMAP1610_DMA_LCD_SRC_FI_B1_U);
+	omap_writew(fi, OMAP1610_DMA_LCD_SRC_FI_B1_L);
 }
 
 void omap_set_lcd_dma_b1_rotation(int rotate)
@@ -460,7 +460,7 @@ void omap_free_lcd_dma(void)
 		return;
 	}
 	if (!enable_1510_mode)
-		__raw_writew(__raw_readw(OMAP1610_DMA_LCD_CCR) & ~1, OMAP1610_DMA_LCD_CCR);
+		omap_writew(omap_readw(OMAP1610_DMA_LCD_CCR) & ~1, OMAP1610_DMA_LCD_CCR);
 	lcd_dma.reserved = 0;
 	spin_unlock(&lcd_dma.lock);
 }
@@ -469,19 +469,19 @@ void omap_start_lcd_dma(void)
 {
 	if (!enable_1510_mode) {
 		/* Set some reasonable defaults */
-		__raw_writew(0x9102, OMAP1610_DMA_LCD_CSDP);
-		__raw_writew(0x0004, OMAP1610_DMA_LCD_LCH_CTRL);
-		__raw_writew(0x5740, OMAP1610_DMA_LCD_CCR);
+		omap_writew(0x9102, OMAP1610_DMA_LCD_CSDP);
+		omap_writew(0x0004, OMAP1610_DMA_LCD_LCH_CTRL);
+		omap_writew(0x5740, OMAP1610_DMA_LCD_CCR);
 	}
 	set_b1_regs();
 	if (!enable_1510_mode)
-		__raw_writew(__raw_readw(OMAP1610_DMA_LCD_CCR) | 1, OMAP1610_DMA_LCD_CCR);
+		omap_writew(omap_readw(OMAP1610_DMA_LCD_CCR) | 1, OMAP1610_DMA_LCD_CCR);
 }
 
 void omap_stop_lcd_dma(void)
 {
 	if (!enable_1510_mode)
-		__raw_writew(__raw_readw(OMAP1610_DMA_LCD_CCR) & ~1, OMAP1610_DMA_LCD_CCR);
+		omap_writew(omap_readw(OMAP1610_DMA_LCD_CCR) & ~1, OMAP1610_DMA_LCD_CCR);
 }
 
 static int __init omap_init_dma(void)
@@ -492,21 +492,21 @@ static int __init omap_init_dma(void)
 		printk(KERN_INFO "DMA support for OMAP1510 initialized\n");
 		dma_chan_count = 9;
 		enable_1510_mode = 1;
-	} else if (cpu_is_omap1610()) {
+	} else if (cpu_is_omap1610() || cpu_is_omap5912()) {
 		printk(KERN_INFO "OMAP DMA hardware version %d\n",
-		       __raw_readw(OMAP_DMA_HW_ID_REG));
+		       omap_readw(OMAP_DMA_HW_ID_REG));
 		printk(KERN_INFO "DMA capabilities: %08x:%08x:%04x:%04x:%04x\n",
-		       (__raw_readw(OMAP_DMA_CAPS_0_U_REG) << 16) | __raw_readw(OMAP_DMA_CAPS_0_L_REG),
-		       (__raw_readw(OMAP_DMA_CAPS_1_U_REG) << 16) | __raw_readw(OMAP_DMA_CAPS_1_L_REG),
-		       __raw_readw(OMAP_DMA_CAPS_2_REG), __raw_readw(OMAP_DMA_CAPS_3_REG),
-		       __raw_readw(OMAP_DMA_CAPS_4_REG));
+		       (omap_readw(OMAP_DMA_CAPS_0_U_REG) << 16) | omap_readw(OMAP_DMA_CAPS_0_L_REG),
+		       (omap_readw(OMAP_DMA_CAPS_1_U_REG) << 16) | omap_readw(OMAP_DMA_CAPS_1_L_REG),
+		       omap_readw(OMAP_DMA_CAPS_2_REG), omap_readw(OMAP_DMA_CAPS_3_REG),
+		       omap_readw(OMAP_DMA_CAPS_4_REG));
 		if (!enable_1510_mode) {
 			u16 w;
 
 			/* Disable OMAP 3.0/3.1 compatibility mode. */
-			w = __raw_readw(OMAP_DMA_GSCR_REG);
+			w = omap_readw(OMAP_DMA_GSCR_REG);
 			w |= 1 << 3;
-			__raw_writew(w, OMAP_DMA_GSCR_REG);
+			omap_writew(w, OMAP_DMA_GSCR_REG);
 			dma_chan_count = OMAP_LOGICAL_DMA_CH_COUNT;
 		} else
 			dma_chan_count = 9;

@@ -73,6 +73,13 @@
 		.macro	writeb, rb
 		str	\rb, [r3, #0x14]	@ UTDR
 		.endm
+#elif defined(CONFIG_ARCH_LH7A40X)
+		.macro	loadsp, rb
+		ldr	\rb, =0x80000700	@ UART2 UARTBASE
+		.endm
+		.macro	writeb, rb
+		strb	\rb, [r3, #0]
+		.endm
 #else
 #error no serial architecture defined
 #endif

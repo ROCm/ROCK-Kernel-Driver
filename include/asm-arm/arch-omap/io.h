@@ -21,4 +21,21 @@
 #define __mem_pci(a)		((unsigned long)(a))
 #define __mem_isa(a)		((unsigned long)(a))
 
+/*
+ * Functions to access the OMAP IO region
+ *
+ * NOTE: - Use omap_read/write[bwl] for physical register addresses
+ *	 - Use __raw_read/write[bwl]() for virtual register addresses
+ *	 - Use IO_ADDRESS(phys_addr) to convert registers to virtual addresses
+ *	 - DO NOT use hardcoded virtual addresses to allow changing the
+ *	   IO address space again if needed
+ */
+#define omap_readb(a)		(*(volatile unsigned char  *)IO_ADDRESS(a))
+#define omap_readw(a)		(*(volatile unsigned short *)IO_ADDRESS(a))
+#define omap_readl(a)		(*(volatile unsigned int   *)IO_ADDRESS(a))
+
+#define omap_writeb(v,a)	(*(volatile unsigned char  *)IO_ADDRESS(a) = (v))
+#define omap_writew(v,a)	(*(volatile unsigned short *)IO_ADDRESS(a) = (v))
+#define omap_writel(v,a)	(*(volatile unsigned int   *)IO_ADDRESS(a) = (v))
+
 #endif

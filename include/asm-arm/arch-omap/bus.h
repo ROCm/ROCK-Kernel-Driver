@@ -43,6 +43,7 @@ struct omap_dev {
 	void		*mapbase;	/* OMAP physical address */
 	unsigned int	irq[6];		/* OMAP interrupts */
 	u64		*dma_mask;	/* Used by USB OHCI only */
+	u64		coherent_dma_mask;	/* Used by USB OHCI only */
 };
 
 #define OMAP_DEV(_d)	container_of((_d), struct omap_dev, dev)
