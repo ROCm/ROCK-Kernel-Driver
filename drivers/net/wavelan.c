@@ -4019,7 +4019,8 @@ static int __init wavelan_config(device * dev)
 
 	dev->irq = irq;
 
-	request_region(ioaddr, sizeof(ha_t), "wavelan");
+	if (!request_region(ioaddr, sizeof(ha_t), "wavelan"))
+		return -EBUSY;
 
 	dev->mem_start = 0x0000;
 	dev->mem_end = 0x0000;

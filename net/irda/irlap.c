@@ -59,6 +59,7 @@ int sysctl_warn_noreply_time = 3;
 extern void irlap_queue_xmit(struct irlap_cb *self, struct sk_buff *skb);
 static void __irlap_close(struct irlap_cb *self);
 
+#ifdef CONFIG_IRDA_DEBUG
 static char *lap_reasons[] = {
 	"ERROR, NOT USED",
 	"LAP_DISC_INDICATION",
@@ -69,6 +70,7 @@ static char *lap_reasons[] = {
 	"LAP_PRIMARY_CONFLICT",
 	"ERROR, NOT USED",
 };
+#endif	/* CONFIG_IRDA_DEBUG */
 
 #ifdef CONFIG_PROC_FS
 int irlap_proc_read(char *, char **, off_t, int);

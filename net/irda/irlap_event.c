@@ -77,6 +77,7 @@ static int irlap_state_sclose (struct irlap_cb *self, IRLAP_EVENT event,
 static int irlap_state_reset_check(struct irlap_cb *, IRLAP_EVENT event, 
 				   struct sk_buff *, struct irlap_info *);
 
+#ifdef CONFIG_IRDA_DEBUG
 static const char *irlap_event[] = {
 	"DISCOVERY_REQUEST",
 	"CONNECT_REQUEST",
@@ -117,6 +118,7 @@ static const char *irlap_event[] = {
 	"BACKOFF_TIMER_EXPIRED",
 	"MEDIA_BUSY_TIMER_EXPIRED",
 };
+#endif	/* CONFIG_IRDA_DEBUG */
 
 const char *irlap_state[] = {
 	"LAP_NDM",
@@ -312,7 +314,6 @@ static int irlap_state_ndm(struct irlap_cb *self, IRLAP_EVENT event,
 {
 	discovery_t *discovery_rsp;
 	int ret = 0;
-	int i;
 
 	ASSERT(self != NULL, return -1;);
 	ASSERT(self->magic == LAP_MAGIC, return -1;);
@@ -478,6 +479,8 @@ static int irlap_state_ndm(struct irlap_cb *self, IRLAP_EVENT event,
 		break;
 #ifdef CONFIG_IRDA_ULTRA
 	case SEND_UI_FRAME:
+	{   
+		int i;
 		/* Only allowed to repeat an operation twice */
 		for (i=0; ((i<2) && (self->media_busy == FALSE)); i++) {
 			skb = skb_dequeue(&self->txq_ultra);
@@ -492,6 +495,7 @@ static int irlap_state_ndm(struct irlap_cb *self, IRLAP_EVENT event,
 			irda_device_set_media_busy(self->netdev, TRUE);
 		}
 		break;
+	}
 	case RECV_UI_FRAME:
 		/* Only accept broadcast frames in NDM mode */
 		if (info->caddr != CBROADCAST) {

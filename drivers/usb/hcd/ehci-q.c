@@ -39,12 +39,6 @@
  * buffer low/full speed data so the host collects it at high speed.
  */
 
-#ifdef	EHCI_SOFT_RETRIES
-static int soft_retries = EHCI_SOFT_RETRIES;
-MODULE_PARM (soft_retries, "i");
-MODULE_PARM_DESC (soft_retries, "Number of software retries for endpoint i/o");
-#endif
-
 /*-------------------------------------------------------------------------*/
 
 /* fill a qtd, returning how much of the buffer we were able to queue up */
@@ -134,8 +128,9 @@ static inline void qtd_copy_status (struct urb *urb, size_t length, u32 token)
 			urb->status = -EPIPE;
 		else	/* unknown */
 			urb->status = -EPROTO;
-		dbg ("devpath %s ep %d-%s qtd token %x --> status %d",
-			urb->dev->devpath, usb_pipeendpoint (urb->pipe),
+		dbg ("ep %d-%s qtd token %08x --> status %d",
+			/* devpath */
+			usb_pipeendpoint (urb->pipe),
 			usb_pipein (urb->pipe) ? "in" : "out",
 			token, urb->status);
 
@@ -148,8 +143,8 @@ static inline void qtd_copy_status (struct urb *urb, size_t length, u32 token)
 					usb_pipeendpoint (pipe),
 					usb_pipeout (pipe));
 			if (urb->dev->tt && !usb_pipeint (pipe)) {
-err ("must CLEAR_TT_BUFFER, hub %s port %d%s addr %d ep %d",
-    urb->dev->tt->hub->devpath, urb->dev->ttport,
+err ("must CLEAR_TT_BUFFER, hub port %d%s addr %d ep %d",
+    urb->dev->ttport, /* devpath */
     urb->dev->tt->multi ? "" : " (all-ports TT)",
     urb->dev->devnum, usb_pipeendpoint (urb->pipe));
 				// FIXME something (khubd?) should make the hub
@@ -228,12 +223,10 @@ qh_completions (
 	struct list_head	*qtd_list,
 	int			freeing
 ) {
-	struct ehci_qtd		*qtd = 0;
-	struct list_head	*next = 0;
-	u32			token;
+	struct ehci_qtd		*qtd, *last;
+	struct list_head	*next;
 	struct ehci_qh		*qh = 0;
-	struct urb		*urb = 0;
-	int			halted = 0;
+	int			unlink = 0, halted = 0;
 	unsigned long		flags;
 	int			retval = 0;
 
@@ -243,89 +236,116 @@ qh_completions (
 		return retval;
 	}
 
-	for (qtd = list_entry (qtd_list->next, struct ehci_qtd, qtd_list);
+	/* scan QTDs till end of list, or we reach an active one */
+	for (qtd = list_entry (qtd_list->next, struct ehci_qtd, qtd_list),
+			    	last = 0, next = 0;
 			next != qtd_list;
-			qtd = list_entry (next, struct ehci_qtd, qtd_list)) {
-		token = le32_to_cpu (qtd->hw_token);
-		if (!qh) {
-			urb = qtd->urb;
-			qh = (struct ehci_qh *) urb->hcpriv;
+			last = qtd, qtd = list_entry (next,
+						struct ehci_qtd, qtd_list)) {
+		struct urb	*urb = qtd->urb;
+		u32		token = 0;
+
+		/* qh is non-null iff these qtds were queued to the HC */
+		qh = (struct ehci_qh *) urb->hcpriv;
+
+		/* clean up any state from previous QTD ...*/
+		if (last) {
+			if (likely (last->urb != urb)) {
+				/* complete() can reenter this HCD */
+				spin_unlock_irqrestore (&ehci->lock, flags);
+				if (likely (freeing != 0))
+					ehci_urb_done (ehci, last->buf_dma,
+						last->urb);
+				else
+					ehci_urb_complete (ehci, last->buf_dma,
+						last->urb);
+				spin_lock_irqsave (&ehci->lock, flags);
+				retval++;
+			}
+
+			/* qh overlays can have HC's old cached copies of
+			 * next qtd ptrs, if an URB was queued afterwards.
+			 */
+			if (qh && cpu_to_le32 (last->qtd_dma) == qh->hw_current
+					&& last->hw_next != qh->hw_qtd_next) {
+				qh->hw_alt_next = last->hw_alt_next;
+				qh->hw_qtd_next = last->hw_next;
+			}
+
+			if (likely (freeing != 0))
+				ehci_qtd_free (ehci, last);
+			last = 0;
 		}
+		next = qtd->qtd_list.next;
+
+		/* if these qtds were queued to the HC, some may be active.
+		 * else we're cleaning up after a failed URB submission.
+		 */
 		if (likely (qh != 0)) {
+			int		qh_halted;
+
+			qh_halted = __constant_cpu_to_le32 (QTD_STS_HALT)
+					& qh->hw_token;
+			token = le32_to_cpu (qtd->hw_token);
 			halted = halted
+				|| qh_halted
 				|| (ehci->hcd.state == USB_STATE_HALT)
 				|| (qh->qh_state == QH_STATE_IDLE);
 
-			if (unlikely ((token & QTD_STS_HALT) != 0)) {
-#ifdef	EHCI_SOFT_RETRIES
-				/* extra soft retries for protocol errors */
-				if (!halted
-						&& qh->retries < soft_retries
-						&& (QTD_STS_HALT|QTD_STS_XACT)
-							== (token & 0xff)
-						&& QTD_CERR (token) == 0) {
-					if (qh->retries == 0)
-						dbg ("soft retry, qh %p qtd %p",
-							qh, qtd);
-					qh->retries++;
-					token &= ~0x0ff;
-					token |= QTD_STS_ACTIVE;
-					token |= (EHCI_TUNE_CERR << 10);
-					/* qtd update not needed */
-					qh->hw_token = cpu_to_le32 (token);
-					spin_unlock_irqrestore (&ehci->lock,
-						flags);
-					return;
+			/* QH halts only because of fault or unlink; in both
+			 * cases, queued URBs get unlinked.  But for unlink,
+			 * URBs at the head of the queue can stay linked.
+			 */
+			if (unlikely (halted != 0)) {
 
-				} else if (qh->retries >= soft_retries
-						&& soft_retries) {
-					dbg ("retried %d times, qh %p qtd %p",
-						qh->retries, qh, qtd);
-				}
-#endif	/* EHCI_SOFT_RETRIES */
-				halted = 1;
-			}
-
-			if (unlikely ((token & QTD_STS_ACTIVE) != 0)) {
-				/* stop scan if qtd is visible to the HC */
-				if (!halted) {
-					urb = 0;
-					break;
-				}
-
-				/* continue cleanup if HC is halted */
+				/* unlink everything because of HC shutdown? */
 				if (ehci->hcd.state == USB_STATE_HALT) {
+					freeing = unlink = 1;
 					urb->status = -ESHUTDOWN;
-					goto scrub;
-				}
 
-				/* stall? some other urb was unlinked? */
-				if (urb->status == -EINPROGRESS) {
-dbg ("?why? qh %p, qtd %p halted, urb %p, token %8x, len %d",
-	qh, qtd, urb, token, urb->actual_length);
-spin_unlock_irqrestore (&ehci->lock, flags);
-return retval;
-	    /*
-	     * FIXME: write this code.  When one queued urb is unlinked,
-	     * unlink every succeeding urb.
-	     */
+				/* explicit unlink, starting here? */
+				} else if (qh->qh_state == QH_STATE_IDLE
+					&& (urb->status == -ECONNRESET
+						|| urb->status == -ENOENT)) {
+					freeing = unlink = 1;
+
+				/* unlink everything because of error? */
+				} else if (qh_halted
+						&& !(token & QTD_STS_HALT)) {
+					freeing = unlink = 1;
+					if (urb->status == -EINPROGRESS)
+						urb->status = -ECONNRESET;
+
+				/* unlink the rest? */
+				} else if (unlink) {
+					urb->status = -ECONNRESET;
+
+				/* QH halted to unlink urbs after this?  */
+				} else if ((token & QTD_STS_ACTIVE) != 0) {
+					qtd = 0;
 					continue;
 				}
 
-				/* else stopped for some other reason */
-			} 
-scrub:
+			/* Else QH is active, so we must not modify QTDs
+			 * that HC may be working on.  Break from loop.
+			 */
+			} else if (unlikely ((token & QTD_STS_ACTIVE) != 0)) {
+				next = qtd_list;
+				qtd = 0;
+				continue;
+			}
+
 			spin_lock (&urb->lock);
 			qtd_copy_status (urb, qtd->length, token);
 			spin_unlock (&urb->lock);
 		}
-		next = qtd->qtd_list.next;
 
 		/*
 		 * NOTE:  this won't work right with interrupt urbs that
 		 * need multiple qtds ... only the first scan of qh->qtd_list
 		 * starts at the right qtd, yet multiple scans could happen
 		 * for transfers that are scheduled across multiple uframes. 
+		 * (Such schedules are not currently allowed!)
 		 */
 		if (likely (freeing != 0))
 			list_del (&qtd->qtd_list);
@@ -347,8 +367,6 @@ scrub:
 			qtd->hw_buf [0] |= cpu_to_le32 (0x0fff & qtd->buf_dma);
 		}
 
-		spin_unlock_irqrestore (&ehci->lock, flags);
-
 #if 0
 		if (urb->status == -EINPROGRESS)
 			vdbg ("  qtd %p ok, urb %p, token %8x, len %d",
@@ -364,21 +382,6 @@ scrub:
 			pci_unmap_single (ehci->hcd.pdev,
 				qtd->buf_dma, sizeof (struct usb_ctrlrequest),
 				PCI_DMA_TODEVICE);
-
-		/* another queued urb? */
-		if (unlikely (qtd->urb != urb)) {
-			if (likely (freeing != 0))
-				ehci_urb_done (ehci, qtd->buf_dma, urb);
-			else
-				ehci_urb_complete (ehci, qtd->buf_dma, urb);
-			retval++;
-			urb = qtd->urb;
-		}
-
-		if (likely (freeing != 0))
-			ehci_qtd_free (ehci, qtd);
-		spin_lock_irqsave (&ehci->lock, flags);
-		qtd = list_entry (next, struct ehci_qtd, qtd_list);
 	}
 
 	/* patch up list head? */
@@ -389,11 +392,12 @@ scrub:
 	spin_unlock_irqrestore (&ehci->lock, flags);
 
 	/* last urb's completion might still need calling */
-	if (likely (qtd && urb)) {
-		if (likely (freeing != 0))
-			ehci_urb_done (ehci, qtd->buf_dma, urb);
-		else
-			ehci_urb_complete (ehci, qtd->buf_dma, urb);
+	if (likely (last != 0)) {
+		if (likely (freeing != 0)) {
+			ehci_urb_done (ehci, last->buf_dma, last->urb);
+			ehci_qtd_free (ehci, last);
+		} else
+			ehci_urb_complete (ehci, last->buf_dma, last->urb);
 		retval++;
 	}
 	return retval;
@@ -749,7 +753,9 @@ submit_async (
 		/* is an URB is queued to this qh already? */
 		if (unlikely (!list_empty (&qh->qtd_list))) {
 			struct ehci_qtd		*last_qtd;
+			int			short_rx = 0;
 
+			/* update the last qtd's "next" pointer */
 			// dbg_qh ("non-empty qh", ehci, qh);
 			last_qtd = list_entry (qh->qtd_list.prev,
 					struct ehci_qtd, qtd_list);
@@ -760,6 +766,21 @@ submit_async (
 					&& (epnum & 0x10)) {
 				// only the last QTD for now
 				last_qtd->hw_alt_next = hw_next;
+				short_rx = 1;
+			}
+
+			/* Adjust any old copies in qh overlay too.
+			 * Interrupt code must cope with case of HC having it
+			 * cached, and clobbering these updates.
+			 * ... complicates getting rid of extra interrupts!
+			 */
+			if (qh->hw_current == cpu_to_le32 (last_qtd->qtd_dma)) {
+				wmb ();
+				qh->hw_qtd_next = hw_next;
+				if (short_rx)
+					qh->hw_alt_next = hw_next
+				    		| (qh->hw_alt_next & 0x1e);
+				vdbg ("queue to qh %p, patch", qh);
 			}
 
 		/* no URB queued */
@@ -822,8 +843,8 @@ static void end_unlink_async (struct ehci_hcd *ehci)
 
 	qh_completions (ehci, &qh->qtd_list, 1);
 
-	// FIXME unlink any urb should unlink all following urbs,
-	// so that this will never happen
+	// unlink any urb should now unlink all following urbs, so that
+	// relinking only happens for urbs before the unlinked ones.
 	if (!list_empty (&qh->qtd_list)
 			&& HCD_IS_RUNNING (ehci->hcd.state))
 		qh_link_async (ehci, qh);

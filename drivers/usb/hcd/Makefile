@@ -5,9 +5,9 @@
 
 O_TARGET	:=
 
-obj-$(CONFIG_EHCI_HCD)			+= ehci-hcd.o
-# obj-$(CONFIG_OHCI_HCD)			+= ohci-hcd.o
-# obj-$(CONFIG_UHCI_HCD)			+= uhci-hcd.o
+obj-$(CONFIG_USB_EHCI_HCD)			+= ehci-hcd.o
+# obj-$(CONFIG_USB_OHCI_HCD)			+= ohci-hcd.o
+# obj-$(CONFIG_USB_UHCI_HCD)			+= uhci-hcd.o
 
 # Extract lists of the multi-part drivers.
 # The 'int-*' lists are the intermediate files used to build the multi's.

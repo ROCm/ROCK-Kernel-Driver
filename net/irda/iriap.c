@@ -41,6 +41,7 @@
 #include <net/irda/iriap_event.h>
 #include <net/irda/iriap.h>
 
+#ifdef CONFIG_IRDA_DEBUG
 /* FIXME: This one should go in irlmp.c */
 static const char *ias_charset_types[] = {
 	"CS_ASCII",
@@ -55,6 +56,7 @@ static const char *ias_charset_types[] = {
 	"CS_ISO_8859_9",
 	"CS_UNICODE"
 };
+#endif	/* CONFIG_IRDA_DEBUG */
 
 static hashbin_t *iriap = NULL;
 static __u32 service_handle; 

@@ -160,7 +160,7 @@ int w83977af_open(int i, unsigned int iobase, unsigned int irq,
 {
 	struct net_device *dev;
         struct w83977af_ir *self;
-	int ret;
+	void *ret;
 	int err;
 
 	IRDA_DEBUG(0, __FUNCTION__ "()\n");
@@ -190,14 +190,13 @@ int w83977af_open(int i, unsigned int iobase, unsigned int irq,
         self->io.fifo_size = 32;
 
 	/* Lock the port that we need */
-	ret = check_region(self->io.fir_base, self->io.fir_ext);
-	if (ret < 0) { 
+	ret = request_region(self->io.fir_base, self->io.fir_ext, driver_name);
+	if (!ret) { 
 		IRDA_DEBUG(0, __FUNCTION__ "(), can't get iobase of 0x%03x\n",
 		      self->io.fir_base);
 		/* w83977af_cleanup( self);  */
 		return -ENODEV;
 	}
-	request_region(self->io.fir_base, self->io.fir_ext, driver_name);
 
 	/* Initialize QoS for this device */
 	irda_init_max_qos_capabilies(&self->qos);

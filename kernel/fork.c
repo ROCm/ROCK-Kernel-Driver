@@ -705,9 +705,6 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 		current->time_slice = 1;
 		expire_task(current);
 	}
-	p->sleep_timestamp = p->run_timestamp = jiffies;
-	memset(p->sleep_hist, 0, sizeof(p->sleep_hist[0])*SLEEP_HIST_SIZE);
-	p->sleep_idx = 0;
 	__restore_flags(flags);
 
 	/*

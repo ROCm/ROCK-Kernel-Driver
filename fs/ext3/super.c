@@ -429,7 +429,7 @@ void ext3_put_super (struct super_block * sb)
 	J_ASSERT(list_empty(&sbi->s_orphan));
 
 	invalidate_bdev(sb->s_bdev, 0);
-	if (sbi->journal_bdev != sb->s_bdev) {
+	if (sbi->journal_bdev && sbi->journal_bdev != sb->s_bdev) {
 		/*
 		 * Invalidate the journal device's buffers.  We don't want them
 		 * floating about in memory - the physical journal device may

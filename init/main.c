@@ -330,7 +330,6 @@ static void rest_init(void)
 {
 	kernel_thread(init, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGNAL);
 	unlock_kernel();
-	init_idle();	/* This will also wait for all other CPUs */
  	cpu_idle();
 } 
 
@@ -418,6 +417,16 @@ asmlinkage void __init start_kernel(void)
 	 *	make syscalls (and thus be locked).
 	 */
 	smp_init();
+
+	/*
+	 * Finally, we wait for all other CPU's, and initialize this
+	 * thread that will become the idle thread for the boot CPU.
+	 * After this, the scheduler is fully initialized, and we can
+	 * start creating and running new threads.
+	 */
+	init_idle();
+
+	/* Do the rest non-__init'ed, we're now alive */
 	rest_init();
 }
 

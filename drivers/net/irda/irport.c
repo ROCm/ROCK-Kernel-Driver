@@ -140,7 +140,7 @@ irport_open(int i, unsigned int iobase, unsigned int irq)
 {
 	struct net_device *dev;
 	struct irport_cb *self;
-	int ret;
+	void *ret;
 	int err;
 
 	IRDA_DEBUG(0, __FUNCTION__ "()\n");
@@ -169,13 +169,12 @@ irport_open(int i, unsigned int iobase, unsigned int irq)
         self->io.fifo_size = 16;
 
 	/* Lock the port that we need */
-	ret = check_region(self->io.sir_base, self->io.sir_ext);
-	if (ret < 0) { 
+	ret = request_region(self->io.sir_base, self->io.sir_ext, driver_name);
+	if (!ret) { 
 		IRDA_DEBUG(0, __FUNCTION__ "(), can't get iobase of 0x%03x\n",
 			   self->io.sir_base);
 		return NULL;
 	}
-	request_region(self->io.sir_base, self->io.sir_ext, driver_name);
 
 	/* Initialize QoS for this device */
 	irda_init_max_qos_capabilies(&self->qos);

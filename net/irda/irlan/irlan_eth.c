@@ -61,7 +61,16 @@ int irlan_eth_init(struct net_device *dev)
 	dev->hard_start_xmit    = irlan_eth_xmit; 
 	dev->get_stats	        = irlan_eth_get_stats;
 	dev->set_multicast_list = irlan_eth_set_multicast_list;
-	dev->features          |= NETIF_F_DYNALLOC;
+
+	/* NETIF_F_DYNALLOC feature was set by irlan_eth_init() and would
+	 * cause the unregister_netdev() to do asynch completion _and_
+	 * kfree self->dev afterwards. Which is really bad because the
+	 * netdevice was not allocated separately but is embedded in
+	 * our control block and therefore gets freed with *self.
+	 * The only reason why this would have been enabled is to hide
+	 * some netdev refcount issues. If unregister_netdev() blocks
+	 * forever, tell us about it... */
+	//dev->features          |= NETIF_F_DYNALLOC;
 
 	ether_setup(dev);
 	

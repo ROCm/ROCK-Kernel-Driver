@@ -46,8 +46,9 @@ struct prio_array {
 static struct runqueue {
 	int cpu;
 	spinlock_t lock;
-	unsigned long nr_running, nr_switches, last_rt_event;
+	unsigned long nr_running, nr_switches;
 	task_t *curr, *idle;
+	unsigned long swap_cnt;
 	prio_array_t *active, *expired, arrays[2];
 	char __pad [SMP_CACHE_BYTES];
 } runqueues [NR_CPUS] __cacheline_aligned;
@@ -91,115 +92,19 @@ static inline void enqueue_task(struct task_struct *p, prio_array_t *array)
 	p->array = array;
 }
 
-/*
- * This is the per-process load estimator. Processes that generate
- * more load than the system can handle get a priority penalty.
- *
- * The estimator uses a 4-entry load-history ringbuffer which is
- * updated whenever a task is moved to/from the runqueue. The load
- * estimate is also updated from the timer tick to get an accurate
- * estimation of currently executing tasks as well.
- */
-#define NEXT_IDX(idx) (((idx) + 1) % SLEEP_HIST_SIZE)
-
-static inline void update_sleep_avg_deactivate(task_t *p)
-{
-	unsigned int idx;
-	unsigned long j = jiffies, last_sample = p->run_timestamp / HZ,
-		curr_sample = j / HZ, delta = curr_sample - last_sample;
-
-	if (unlikely(delta)) {
-		if (delta < SLEEP_HIST_SIZE) {
-			for (idx = 0; idx < delta; idx++) {
-				p->sleep_idx++;
-				p->sleep_idx %= SLEEP_HIST_SIZE;
-				p->sleep_hist[p->sleep_idx] = 0;
-			}
-		} else {
-			for (idx = 0; idx < SLEEP_HIST_SIZE; idx++)
-				p->sleep_hist[idx] = 0;
-			p->sleep_idx = 0;
-		}
-	}
-	p->sleep_timestamp = j;
-}
-
-#if SLEEP_HIST_SIZE != 4
-# error update this code.
-#endif
-
-static inline unsigned int get_sleep_avg(task_t *p, unsigned long j)
-{
-	unsigned int sum;
-
-	sum = p->sleep_hist[0];
-	sum += p->sleep_hist[1];
-	sum += p->sleep_hist[2];
-	sum += p->sleep_hist[3];
-
-	return sum * HZ / ((SLEEP_HIST_SIZE-1)*HZ + (j % HZ));
-}
-
-static inline void update_sleep_avg_activate(task_t *p, unsigned long j)
-{
-	unsigned int idx;
-	unsigned long delta_ticks, last_sample = p->sleep_timestamp / HZ,
-		curr_sample = j / HZ, delta = curr_sample - last_sample;
-
-	if (unlikely(delta)) {
-		if (delta < SLEEP_HIST_SIZE) {
-			p->sleep_hist[p->sleep_idx] += HZ - (p->sleep_timestamp % HZ);
-			p->sleep_idx++;
-			p->sleep_idx %= SLEEP_HIST_SIZE;
-
-			for (idx = 1; idx < delta; idx++) {
-				p->sleep_idx++;
-				p->sleep_idx %= SLEEP_HIST_SIZE;
-				p->sleep_hist[p->sleep_idx] = HZ;
-			}
-		} else {
-			for (idx = 0; idx < SLEEP_HIST_SIZE; idx++)
-				p->sleep_hist[idx] = HZ;
-			p->sleep_idx = 0;
-		}
-		p->sleep_hist[p->sleep_idx] = 0;
-		delta_ticks = j % HZ;
-	} else
-		delta_ticks = j - p->sleep_timestamp;
-	p->sleep_hist[p->sleep_idx] += delta_ticks;
-	p->run_timestamp = j;
-}
-
 static inline void activate_task(task_t *p, runqueue_t *rq)
 {
 	prio_array_t *array = rq->active;
-	unsigned long j = jiffies;
-	unsigned int sleep, load;
-	int penalty;
 
-	if (likely(p->run_timestamp == j))
-		goto enqueue;
-	/*
-	 * Give the process a priority penalty if it has not slept often
-	 * enough in the past. We scale the priority penalty according
-	 * to the current load of the runqueue, and the 'load history'
-	 * this process has. Eg. if the CPU has 3 processes running
-	 * right now then a process that has slept more than two-thirds
-	 * of the time is considered to be 'interactive'. The higher
-	 * the load of the CPUs is, the easier it is for a process to
-	 * get an non-interactivity penalty.
-	 */
-#define MAX_PENALTY (MAX_USER_PRIO/3)
-	update_sleep_avg_activate(p, j);
-	sleep = get_sleep_avg(p, j);
-	load = HZ - sleep;
-	penalty = (MAX_PENALTY * load)/HZ;
 	if (!rt_task(p)) {
-		p->prio = NICE_TO_PRIO(p->__nice) + penalty;
-		if (p->prio > MAX_PRIO-1)
-			p->prio = MAX_PRIO-1;
+		unsigned long prio_bonus = rq->swap_cnt - p->swap_cnt_last;
+
+		if (prio_bonus > MAX_PRIO)
+			prio_bonus = MAX_PRIO;
+		p->prio -= prio_bonus;
+		if (p->prio < MAX_RT_PRIO)
+			p->prio = MAX_RT_PRIO;
 	}
-enqueue:
 	enqueue_task(p, array);
 	rq->nr_running++;
 }
@@ -209,7 +114,7 @@ static inline void deactivate_task(struct task_struct *p, runqueue_t *rq)
 	rq->nr_running--;
 	dequeue_task(p, p->array);
 	p->array = NULL;
-	update_sleep_avg_deactivate(p);
+	p->swap_cnt_last = rq->swap_cnt;
 }
 
 static inline void resched_task(task_t *p)
@@ -505,7 +410,8 @@ out_unlock:
 	spin_unlock(&busiest->lock);
 }
 
-#define REBALANCE_TICK (HZ/100)
+/* Rebalance every 250 msecs */
+#define REBALANCE_TICK (HZ/4)
 
 void idle_tick(void)
 {
@@ -532,39 +438,18 @@ void expire_task(task_t *p)
 	 */
 	spin_lock_irqsave(&rq->lock, flags);
 	if ((p->policy != SCHED_FIFO) && !--p->time_slice) {
+		unsigned int time_slice;
 		p->need_resched = 1;
-		if (rt_task(p))
-			p->time_slice = RT_PRIO_TO_TIMESLICE(p->prio);
-		else
-			p->time_slice = PRIO_TO_TIMESLICE(p->prio);
-
-		/*
-		 * Timeslice used up - discard any possible
-		 * priority penalty:
-		 */
 		dequeue_task(p, rq->active);
-		/*
-		 * Tasks that have nice values of -20 ... -15 are put
-		 * back into the active array. If they use up too much
-		 * CPU time then they'll get a priority penalty anyway
-		 * so this can not starve other processes accidentally.
-		 * Otherwise this is pretty handy for sysadmins ...
-		 */
-		if (p->prio <= MAX_RT_PRIO + MAX_PENALTY/2)
-			enqueue_task(p, rq->active);
-		else
-			enqueue_task(p, rq->expired);
-	} else {
-		/*
-		 * Deactivate + activate the task so that the
-		 * load estimator gets updated properly:
-		 */
+		time_slice = RT_PRIO_TO_TIMESLICE(p->prio);
 		if (!rt_task(p)) {
-			deactivate_task(p, rq);
-			activate_task(p, rq);
+			time_slice = PRIO_TO_TIMESLICE(p->prio);
+			if (++p->prio >= MAX_PRIO)
+				p->prio = MAX_PRIO - 1;
 		}
+		p->time_slice = time_slice;
+		enqueue_task(p, rq->expired);
 	}
-	load_balance(rq);
 	spin_unlock_irqrestore(&rq->lock, flags);
 }
 
@@ -616,6 +501,7 @@ pick_next_task:
 		rq->active = rq->expired;
 		rq->expired = array;
 		array = rq->active;
+		rq->swap_cnt++;
 	}
 
 	idx = sched_find_first_zero_bit(array->bitmap);
@@ -1301,6 +1187,7 @@ void __init sched_init(void)
 		rq->expired = rq->arrays + 1;
 		spin_lock_init(&rq->lock);
 		rq->cpu = i;
+		rq->swap_cnt = 0;
 
 		for (j = 0; j < 2; j++) {
 			array = rq->arrays + j;

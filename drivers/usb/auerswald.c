@@ -692,7 +692,7 @@ static int auerchain_control_msg (pauerchain_t acp, struct usb_device *dev, unsi
 	dr->bRequest = request;
 	dr->wValue  = cpu_to_le16 (value);
 	dr->wIndex  = cpu_to_le16 (index);
-	dr->wlength = cpu_to_le16 (size);
+	dr->wLength = cpu_to_le16 (size);
 
 	FILL_CONTROL_URB (urb, dev, pipe, (unsigned char*)dr, data, size,    /* build urb */
 		          (usb_complete_t)auerchain_blocking_completion,0);
@@ -891,13 +891,13 @@ static void auerswald_ctrlread_wretcomplete (urb_t * urb)
 	}
 
 	/* fill the control message */
-	bp->dr->requesttype = AUT_RREQ;
-	bp->dr->request     = AUV_RBLOCK;
-	bp->dr->length      = bp->dr->value;	/* temporary stored */
-	bp->dr->value       = cpu_to_le16 (1);	/* Retry Flag */
+	bp->dr->bRequestType = AUT_RREQ;
+	bp->dr->bRequest     = AUV_RBLOCK;
+	bp->dr->wLength      = bp->dr->wValue;	/* temporary stored */
+	bp->dr->wValue       = cpu_to_le16 (1);	/* Retry Flag */
 	/* bp->dr->index    = channel id;          remains */
 	FILL_CONTROL_URB (bp->urbp, cp->usbdev, usb_rcvctrlpipe (cp->usbdev, 0),
-                          (unsigned char*)bp->dr, bp->bufp, le16_to_cpu (bp->dr->length),
+                          (unsigned char*)bp->dr, bp->bufp, le16_to_cpu (bp->dr->wLength),
 		          (usb_complete_t)auerswald_ctrlread_complete,bp);
 
 	/* submit the control msg as next paket */
@@ -937,11 +937,11 @@ static void auerswald_ctrlread_complete (urb_t * urb)
 		bp->retries++;
 		dbg ("Retry count = %d", bp->retries);
 		/* send a long dummy control-write-message to allow device firmware to react */
-		bp->dr->requesttype = AUT_WREQ;
-		bp->dr->request     = AUV_DUMMY;
-		bp->dr->value       = bp->dr->length; /* temporary storage */
-		// bp->dr->index    channel ID remains
-		bp->dr->length      = cpu_to_le16 (32); /* >= 8 bytes */
+		bp->dr->bRequestType = AUT_WREQ;
+		bp->dr->bRequest     = AUV_DUMMY;
+		bp->dr->wValue       = bp->dr->wLength; /* temporary storage */
+		// bp->dr->wIndex    channel ID remains
+		bp->dr->wLength      = cpu_to_le16 (32); /* >= 8 bytes */
 		FILL_CONTROL_URB (bp->urbp, cp->usbdev, usb_sndctrlpipe (cp->usbdev, 0),
   			(unsigned char*)bp->dr, bp->bufp, 32,
 	   		(usb_complete_t)auerswald_ctrlread_wretcomplete,bp);
@@ -1056,11 +1056,11 @@ static void auerswald_int_complete (urb_t * urb)
         }
 
 	/* fill the control message */
-        bp->dr->requesttype = AUT_RREQ;
-	bp->dr->request     = AUV_RBLOCK;
-	bp->dr->value       = cpu_to_le16 (0);
-	bp->dr->index       = cpu_to_le16 (channelid | AUH_DIRECT | AUH_UNSPLIT);
-	bp->dr->length      = cpu_to_le16 (bytecount);
+        bp->dr->bRequestType = AUT_RREQ;
+	bp->dr->bRequest     = AUV_RBLOCK;
+	bp->dr->wValue       = cpu_to_le16 (0);
+	bp->dr->wIndex       = cpu_to_le16 (channelid | AUH_DIRECT | AUH_UNSPLIT);
+	bp->dr->wLength      = cpu_to_le16 (bytecount);
 	FILL_CONTROL_URB (bp->urbp, cp->usbdev, usb_rcvctrlpipe (cp->usbdev, 0),
                           (unsigned char*)bp->dr, bp->bufp, bytecount,
 		          (usb_complete_t)auerswald_ctrlread_complete,bp);
@@ -1773,11 +1773,11 @@ write_again:
 
 	/* Set the transfer Parameters */
 	bp->len = len+AUH_SIZE;
-        bp->dr->requesttype = AUT_WREQ;
-	bp->dr->request     = AUV_WBLOCK;
-	bp->dr->value       = cpu_to_le16 (0);
-	bp->dr->index       = cpu_to_le16 (ccp->scontext.id | AUH_DIRECT | AUH_UNSPLIT);
-	bp->dr->length      = cpu_to_le16 (len+AUH_SIZE);
+        bp->dr->bRequestType = AUT_WREQ;
+	bp->dr->bRequest     = AUV_WBLOCK;
+	bp->dr->wValue       = cpu_to_le16 (0);
+	bp->dr->wIndex       = cpu_to_le16 (ccp->scontext.id | AUH_DIRECT | AUH_UNSPLIT);
+	bp->dr->wLength      = cpu_to_le16 (len+AUH_SIZE);
 	FILL_CONTROL_URB (bp->urbp, cp->usbdev, usb_sndctrlpipe (cp->usbdev, 0),
                    (unsigned char*)bp->dr, bp->bufp, len+AUH_SIZE,
 		    auerchar_ctrlwrite_complete, bp);

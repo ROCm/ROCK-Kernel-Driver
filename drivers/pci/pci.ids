@@ -812,6 +812,7 @@
 	0074  56k Voice Modem
 		1033 8014  RCV56ACF 56k Voice Modem
 	009b  Vrc5476
+	00e0  USB 2.0
 1034  Framatome Connectors USA Inc.
 1035  Comp. & Comm. Research Lab
 1036  Future Domain Corp.
@@ -5417,6 +5418,7 @@ C 0c  Serial bus controller
 	03  USB Controller
 		00  UHCI
 		10  OHCI
+		20  EHCI
 		80  Unspecified
 		fe  USB Device
 	04  Fibre Channel

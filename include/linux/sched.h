@@ -305,11 +305,7 @@ struct task_struct {
 	prio_array_t *array;
 
 	unsigned int time_slice;
-	unsigned long sleep_timestamp, run_timestamp;
-
-	#define SLEEP_HIST_SIZE 4
-	int sleep_hist[SLEEP_HIST_SIZE];
-	int sleep_idx;
+	unsigned long swap_cnt_last;
 
 	unsigned long policy;
 	unsigned long cpus_allowed;

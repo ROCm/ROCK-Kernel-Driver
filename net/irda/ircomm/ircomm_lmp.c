@@ -103,12 +103,30 @@ int ircomm_lmp_connect_request(struct ircomm_cb *self,
  *    
  *
  */
-int ircomm_lmp_connect_response(struct ircomm_cb *self, struct sk_buff *skb)
+int ircomm_lmp_connect_response(struct ircomm_cb *self, struct sk_buff *userdata)
 {
+	struct sk_buff *skb;
 	int ret;
 
 	IRDA_DEBUG(0, __FUNCTION__"()\n");
 	
+	/* Any userdata supplied? */
+	if (userdata == NULL) {
+		skb = dev_alloc_skb(64);
+		if (!skb)
+			return -ENOMEM;
+
+		/* Reserve space for MUX and LAP header */
+		skb_reserve(skb, LMP_MAX_HEADER);
+	} else {
+		skb = userdata;
+		/*  
+		 *  Check that the client has reserved enough space for 
+		 *  headers
+		 */
+		ASSERT(skb_headroom(skb) >= LMP_MAX_HEADER, return -1;);
+	}
+
 	ret = irlmp_connect_response(self->lsap, skb);
 
 	return 0;

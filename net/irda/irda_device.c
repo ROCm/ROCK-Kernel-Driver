@@ -80,6 +80,7 @@ const char *infrared_mode[] = {
 	"TV_REMOTE",
 };
 
+#ifdef CONFIG_IRDA_DEBUG
 static const char *task_state[] = {
 	"IRDA_TASK_INIT",
 	"IRDA_TASK_DONE", 
@@ -91,6 +92,7 @@ static const char *task_state[] = {
 	"IRDA_TASK_CHILD_WAIT",
 	"IRDA_TASK_CHILD_DONE",
 };
+#endif	/* CONFIG_IRDA_DEBUG */
 
 static void irda_task_timer_expired(void *data);
 

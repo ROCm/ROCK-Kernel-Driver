@@ -49,6 +49,7 @@ const char *irlsap_state[] = {
 	"LSAP_SETUP_PEND",
 };
 
+#ifdef CONFIG_IRDA_DEBUG
 static const char *irlmp_event[] = {
 	"LM_CONNECT_REQUEST",
  	"LM_CONNECT_CONFIRM",
@@ -75,6 +76,7 @@ static const char *irlmp_event[] = {
  	"LM_LAP_DISCOVERY_CONFIRM",
 	"LM_LAP_IDLE_TIMEOUT",
 };
+#endif	/* CONFIG_IRDA_DEBUG */
 
 /* LAP Connection control proto declarations */
 static void irlmp_state_standby  (struct lap_cb *, IRLMP_EVENT, 

@@ -300,7 +300,7 @@ static void stop_recording(struct btaudio *bta)
 
 static int btaudio_mixer_open(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	struct btaudio *bta;
 
 	for (bta = btaudios; bta != NULL; bta = bta->next)
@@ -459,7 +459,7 @@ static int btaudio_dsp_open(struct inode *inode, struct file *file,
 
 static int btaudio_dsp_open_digital(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	struct btaudio *bta;
 
 	for (bta = btaudios; bta != NULL; bta = bta->next)
@@ -475,7 +475,7 @@ static int btaudio_dsp_open_digital(struct inode *inode, struct file *file)
 
 static int btaudio_dsp_open_analog(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	struct btaudio *bta;
 
 	for (bta = btaudios; bta != NULL; bta = bta->next)
