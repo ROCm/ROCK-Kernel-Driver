@@ -263,6 +263,18 @@ static __inline__ int ffs(int x)
 }
 
 /*
+ * fls: find last (most-significant) bit set.
+ * Note fls(0) = 0, fls(1) = 1, fls(0x80000000) = 32.
+ */
+static __inline__ int fls(unsigned int x)
+{
+	int lz;
+
+	asm ("cntlzw %0,%1" : "=r" (lz) : "r" (x));
+	return 32 - lz;
+}
+
+/*
  * hweightN: returns the hamming weight (i.e. the number
  * of bits set) of a N-bit word
  */

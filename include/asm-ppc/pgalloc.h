@@ -20,6 +20,7 @@ extern void pgd_free(pgd_t *pgd);
  */
 #define pmd_alloc_one(mm,address)       ({ BUG(); ((pmd_t *)2); })
 #define pmd_free(x)                     do { } while (0)
+#define pmd_free_tlb(tlb,x)		do { } while (0)
 #define pgd_populate(mm, pmd, pte)      BUG()
 
 #define pmd_populate_kernel(mm, pmd, pte)	\
@@ -31,6 +32,8 @@ extern pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr);
 extern struct page *pte_alloc_one(struct mm_struct *mm, unsigned long addr);
 extern void pte_free_kernel(pte_t *pte);
 extern void pte_free(struct page *pte);
+
+#define pte_free_tlb(tlb, pte)	pte_free((pte))
 
 #define check_pgt_cache()	do { } while (0)
 
