@@ -161,15 +161,17 @@ int dosetopt(int minor, struct psdev_opt *opt)
 		 * current presto cache.
 		 */
 		int errorval = upc_comms[minor].uc_errorval;
+		kdev_t kdev = mk_kdev(MAJOR(-errorval), MINOR(-errorval));
 		if (errorval < 0) {
 			if (newval == 0)
-				set_device_ro(-errorval, 0);
+				set_device_ro(kdev, 0);
 			else
 				printk("device %s already read only\n",
-				       kdevname(-errorval));
+				       kdevname(kdev));
 		} else {
+			kdev = mk_kdev(MAJOR(-newval), MINOR(-newval));
 			if (newval < 0)
-				set_device_ro(-newval, 1);
+				set_device_ro(kdev, 1);
 			upc_comms[minor].uc_errorval = newval;
 			CDEBUG(D_PSDEV, "setting errorval to %d\n", newval);
 		}
@@ -224,9 +226,10 @@ int dogetopt(int minor, struct psdev_opt *opt)
 #ifdef PSDEV_DEBUG
 	case PSDEV_ERRORVAL: {
 		int errorval = upc_comms[minor].uc_errorval;
-		if (errorval < 0 && is_read_only(-errorval))
+		kdev_t kdev = mk_kdev(MAJOR(-errorval), MINOR(-errorval));
+		if (errorval < 0 && is_read_only(kdev))
 			printk(KERN_INFO "device %s has been set read-only\n",
-			       kdevname(-errorval));
+			       kdevname(kdev));
 		opt->optval = upc_comms[minor].uc_errorval;
 		break;
 	}

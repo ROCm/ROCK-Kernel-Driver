@@ -5,7 +5,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br_if.c,v 1.5 2000/11/08 05:16:40 davem Exp $
+ *	$Id: br_if.c,v 1.7 2001/12/24 00:59:55 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -226,6 +226,9 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
 	if (dev->flags & IFF_LOOPBACK || dev->type != ARPHRD_ETHER)
 		return -EINVAL;
 
+	if (dev->hard_start_xmit == br_dev_xmit)
+		return -ELOOP;
+
 	dev_hold(dev);
 	write_lock_bh(&br->lock);
 	if ((p = new_nbp(br, dev)) == NULL) {
@@ -261,8 +264,6 @@ int br_get_bridge_ifindices(int *indices, int num)
 {
 	struct net_bridge *br;
 	int i;
-
-	i = 0;
 
 	br = bridge_list;
 	for (i=0;i<num;i++) {

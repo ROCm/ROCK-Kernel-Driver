@@ -1,4 +1,4 @@
-/*  $Id: process.c,v 1.122 2001/10/18 09:06:36 davem Exp $
+/*  $Id: process.c,v 1.128 2002/01/11 08:45:38 davem Exp $
  *  arch/sparc64/kernel/process.c
  *
  *  Copyright (C) 1995, 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -53,9 +53,6 @@ int cpu_idle(void)
 		return -EPERM;
 
 	/* endless idle loop with no priority at all */
-	current->nice = 20;
-	init_idle();
-
 	for (;;) {
 		/* If current->need_resched is zero we should really
 		 * setup for a system wakup event and execute a shutdown
@@ -78,13 +75,10 @@ int cpu_idle(void)
 /*
  * the idle loop on a UltraMultiPenguin...
  */
-#define idle_me_harder()	(cpu_data[current->processor].idle_volume += 1)
-#define unidle_me()		(cpu_data[current->processor].idle_volume = 0)
+#define idle_me_harder()	(cpu_data[smp_processor_id()].idle_volume += 1)
+#define unidle_me()		(cpu_data[smp_processor_id()].idle_volume = 0)
 int cpu_idle(void)
 {
-	current->nice = 20;
-	init_idle();
-
 	while(1) {
 		if (current->need_resched != 0) {
 			unidle_me();
@@ -274,7 +268,12 @@ void __show_regs(struct pt_regs * regs)
 #ifdef CONFIG_SMP
 	unsigned long flags;
 
-	spin_lock_irqsave(&regdump_lock, flags);
+	/* Protect against xcall ipis which might lead to livelock on the lock */
+	__asm__ __volatile__("rdpr      %%pstate, %0\n\t"
+			     "wrpr      %0, %1, %%pstate"
+			     : "=r" (flags)
+			     : "i" (PSTATE_IE));
+	spin_lock(&regdump_lock);
 	printk("CPU[%d]: local_irq_count[%u] irqs_running[%d]\n",
 	       smp_processor_id(),
 	       local_irq_count(smp_processor_id()),
@@ -296,7 +295,9 @@ void __show_regs(struct pt_regs * regs)
 	       regs->u_regs[15]);
 	show_regwindow(regs);
 #ifdef CONFIG_SMP
-	spin_unlock_irqrestore(&regdump_lock, flags);
+	spin_unlock(&regdump_lock);
+	__asm__ __volatile__("wrpr	%0, 0, %%pstate"
+			     : : "r" (flags));
 #endif
 }
 
@@ -462,6 +463,7 @@ static unsigned long clone_stackframe(unsigned long csp, unsigned long psp)
 		csp += STACK_BIAS;
 		psp += STACK_BIAS;
 		__get_user(fp, &(((struct reg_window *)psp)->ins[6]));
+		fp += STACK_BIAS;
 	} else
 		__get_user(fp, &(((struct reg_window32 *)psp)->ins[6]));
 
@@ -581,6 +583,11 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 {
 	struct thread_struct *t = &p->thread;
 	char *child_trap_frame;
+
+#ifdef CONFIG_DEBUG_SPINLOCK
+	t->smp_lock_count = 0;
+	t->smp_lock_pc = 0;
+#endif
 
 	/* Calculate offset to stack_frame & pt_regs */
 	child_trap_frame = ((char *)p) + (THREAD_SIZE - (TRACEREG_SZ+REGWIN_SZ));

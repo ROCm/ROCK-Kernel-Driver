@@ -43,14 +43,15 @@
 #include <linux/proc_fs.h>
 #include <linux/vmalloc.h>
 #include <linux/fs.h>
+#include <linux/tty.h>
 #include <linux/poll.h>
 #include <linux/init.h>
 #include <linux/list.h>
-#include <linux/termios.h>
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/poll.h>
 #include <asm/uaccess.h>
+#include <asm/ioctls.h>
 
 #include <linux/intermezzo_fs.h>
 #include <linux/intermezzo_upcall.h>
@@ -290,7 +291,7 @@ static int presto_psdev_ioctl(struct inode *inode, struct file *file,
                 }
 
                 len = readmount.io_len;
-                minor = MINOR(dev);
+                minor = minor(dev);
                 PRESTO_ALLOC(tmp, char *, len);
                 if (!tmp) {
                         EXIT;
@@ -627,7 +628,7 @@ static int presto_psdev_ioctl(struct inode *inode, struct file *file,
                         EXIT;
                         return error;
                 }
-                minor = MINOR(dev);
+                minor = minor(dev);
                 if (cmd == PRESTO_SETOPT)
                         error = dosetopt(minor, &kopt);
 

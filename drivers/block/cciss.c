@@ -126,6 +126,8 @@ static struct block_device_operations cciss_fops  = {
 	revalidate:		frevalidate_logvol,
 };
 
+#include "cciss_scsi.c"		/* For SCSI tape support */
+
 /*
  * Report information about this controller.
  */
@@ -160,6 +162,7 @@ static int cciss_proc_get_info(char *buffer, char **start, off_t offset,
                 h->Qdepth, h->maxQsinceinit, h->max_outstanding, h->maxSG);
 
         pos += size; len += size;
+	cciss_proc_tape_report(ctlr, buffer, &pos, &len);
 	for(i=0; i<h->num_luns; i++) {
                 drv = &h->drv[i];
                 size = sprintf(buffer+len, "cciss/c%dd%d: blksz=%d nr_blocks=%d\n",
@@ -179,20 +182,53 @@ static int cciss_proc_get_info(char *buffer, char **start, off_t offset,
         return len;
 }
 
+static int 
+cciss_proc_write(struct file *file, const char *buffer, 
+			unsigned long count, void *data)
+{
+	unsigned char cmd[80];
+	int len;
+#ifdef CONFIG_CISS_SCSI_TAPE
+	ctlr_info_t *h = (ctlr_info_t *) data;
+	int rc;
+#endif
+
+	if (count > sizeof(cmd)-1) return -EINVAL;
+	if (copy_from_user(cmd, buffer, count)) return -EFAULT;
+	cmd[count] = '\0';
+	len = strlen(cmd);	// above 3 lines ensure safety
+	if (cmd[len-1] == '\n') 
+		cmd[--len] = '\0';
+#	ifdef CONFIG_CISS_SCSI_TAPE
+		if (strcmp("engage scsi", cmd)==0) {
+			rc = cciss_engage_scsi(h->ctlr);
+			if (rc != 0) return -rc;
+			return count;
+		}
+		/* might be nice to have "disengage" too, but it's not 
+		   safely possible. (only 1 module use count, lock issues.) */
+#	endif
+	return -EINVAL;
+}
+
 /*
  * Get us a file in /proc/cciss that says something about each controller.
  * Create /proc/cciss if it doesn't exist yet.
  */
 static void __init cciss_procinit(int i)
 {
+	struct proc_dir_entry *pde;
+
         if (proc_cciss == NULL) {
                 proc_cciss = proc_mkdir("cciss", proc_root_driver);
                 if (!proc_cciss) 
 			return;
         }
 
-        create_proc_read_entry(hba[i]->devname, 0, proc_cciss,
-        		cciss_proc_get_info, hba[i]);
+	pde = create_proc_read_entry(hba[i]->devname, 
+		S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH, 
+		proc_cciss, cciss_proc_get_info, hba[i]);
+	pde->write_proc = cciss_proc_write;
 }
 #endif /* CONFIG_PROC_FS */
 
@@ -824,9 +860,12 @@ static int sendcmd(
 	int	ctlr,
 	void	*buff,
 	size_t	size,
-	unsigned int use_unit_num,
+	unsigned int use_unit_num, /* 0: address the controller,
+				      1: address logical volume log_unit, 
+				      2: periph device address is scsi3addr */
 	unsigned int log_unit,
-	__u8	page_code )
+	__u8	page_code,
+	unsigned char *scsi3addr)
 {
 	CommandList_struct *c;
 	int i;
@@ -860,15 +899,23 @@ static int sendcmd(
 				to controller so It's a physical command
 				mode = 0 target = 0.
 				So we have nothing to write. 
-				Otherwise 
-				mode = 1  target = LUNID
+				otherwise, if use_unit_num == 1, 
+				mode = 1(volume set addressing) target = LUNID
+				otherwise, if use_unit_num == 2,
+				mode = 0(periph dev addr) target = scsi3addr 
 			*/
-			if(use_unit_num != 0)
+			if(use_unit_num == 1)
 			{
 				c->Header.LUN.LogDev.VolId=
                                 	hba[ctlr]->drv[log_unit].LunID;
                         	c->Header.LUN.LogDev.Mode = 1;
 			}
+			else if (use_unit_num == 2)
+			{
+				memcpy(c->Header.LUN.LunAddrBytes,scsi3addr,8);
+                        	c->Header.LUN.LogDev.Mode = 0; // phys dev addr 
+			}
+
 			/* are we trying to read a vital product page */
 			if(page_code != 0)
 			{
@@ -884,6 +931,7 @@ static int sendcmd(
 			c->Request.CDB[4] = size  & 0xFF;  
 		break;
 		case CISS_REPORT_LOG:
+		case CISS_REPORT_PHYS:
                         /* Talking to controller so It's a physical command
                                 mode = 00 target = 0.
                                 So we have nothing to write.
@@ -893,7 +941,7 @@ static int sendcmd(
                         c->Request.Type.Attribute = ATTR_SIMPLE; 
                         c->Request.Type.Direction = XFER_READ; // Read
                         c->Request.Timeout = 0; // Don't time out
-                        c->Request.CDB[0] = CISS_REPORT_LOG;
+                        c->Request.CDB[0] = cmd;
                         c->Request.CDB[6] = (size >> 24) & 0xFF;  //MSB
                         c->Request.CDB[7] = (size >> 16) & 0xFF;
                         c->Request.CDB[8] = (size >> 8) & 0xFF;
@@ -971,6 +1019,7 @@ static int sendcmd(
 				ignore it 
 			*/
 			if (((c->Request.CDB[0] == CISS_REPORT_LOG) ||
+			     (c->Request.CDB[0] == CISS_REPORT_PHYS) ||
 			     (c->Request.CDB[0] == CISS_INQUIRY)) &&
 				((c->err_info->CommandStatus == 
 					CMD_DATA_OVERRUN) || 
@@ -1356,6 +1405,10 @@ static void do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
 				} else if (c->cmd_type == CMD_IOCTL_PEND) {
 					c->cmd_type = CMD_IOCTL_DONE;
 				}
+#				ifdef CONFIG_CISS_SCSI_TAPE
+				else if (c->cmd_type == CMD_SCSI)
+					complete_scsi_command(c, 0, a1);
+#				endif
 				continue;
 			}
 		}
@@ -1592,7 +1645,7 @@ static void cciss_getgeometry(int cntl_num)
         }
 	/* Get the firmware version */ 
 	return_code = sendcmd(CISS_INQUIRY, cntl_num, inq_buff, 
-		sizeof(InquiryData_struct), 0, 0 ,0 );
+		sizeof(InquiryData_struct), 0, 0 ,0, NULL );
 	if (return_code == IO_OK)
 	{
 		hba[cntl_num]->firm_ver[0] = inq_buff->data_byte[32];
@@ -1606,7 +1659,7 @@ static void cciss_getgeometry(int cntl_num)
 	}
 	/* Get the number of logical volumes */ 
 	return_code = sendcmd(CISS_REPORT_LOG, cntl_num, ld_buff, 
-			sizeof(ReportLunData_struct), 0, 0, 0 );
+			sizeof(ReportLunData_struct), 0, 0, 0, NULL );
 
 	if( return_code == IO_OK)
 	{
@@ -1652,7 +1705,7 @@ static void cciss_getgeometry(int cntl_num)
 
 	  	memset(size_buff, 0, sizeof(ReadCapdata_struct));
 	  	return_code = sendcmd(CCISS_READ_CAPACITY, cntl_num, size_buff, 
-				sizeof( ReadCapdata_struct), 1, i, 0 );
+				sizeof( ReadCapdata_struct), 1, i, 0, NULL );
 	  	if (return_code == IO_OK)
 		{
 			total_size = (0xff & 
@@ -1684,7 +1737,7 @@ static void cciss_getgeometry(int cntl_num)
 		/* Execute the command to read the disk geometry */
 		memset(inq_buff, 0, sizeof(InquiryData_struct));
 		return_code = sendcmd(CISS_INQUIRY, cntl_num, inq_buff,
-                	sizeof(InquiryData_struct), 1, i ,0xC1 );
+                	sizeof(InquiryData_struct), 1, i ,0xC1, NULL );
 	  	if (return_code == IO_OK)
 		{
 			if(inq_buff->data_byte[8] == 0xFF)
@@ -1860,6 +1913,8 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 
 	cciss_getgeometry(i);
 
+	cciss_find_non_disk_devices(i);	/* find our tape drives, if any */
+
 	/* Turn the interrupts on so we can service requests */
 	hba[i]->access.set_intr_mask(hba[i], CCISS_INTR_ON);
 
@@ -1901,6 +1956,8 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 			MAX_PART, &cciss_fops, 
 			hba[i]->drv[j].nr_blocks);
 
+	cciss_register_scsi(i, 1);  /* hook ourself into SCSI subsystem */
+
 	return(1);
 }
 
@@ -1927,6 +1984,7 @@ static void __devexit cciss_remove_one (struct pci_dev *pdev)
 	free_irq(hba[i]->intr, hba[i]);
 	pci_set_drvdata(pdev, NULL);
 	iounmap((void*)hba[i]->vaddr);
+	cciss_unregister_scsi(i);  /* unhook from SCSI subsystem */
 	unregister_blkdev(MAJOR_NR+i, hba[i]->devname);
 	remove_proc_entry(hba[i]->devname, proc_cciss);	
 	

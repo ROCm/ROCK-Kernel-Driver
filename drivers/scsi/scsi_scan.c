@@ -8,7 +8,6 @@
  *  clearer.
  */
 
-#define __NO_VERSION__
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>

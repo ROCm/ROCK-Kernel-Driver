@@ -24,7 +24,6 @@
  *  hosts currently present in the system.
  */
 
-#define __NO_VERSION__
 #include <linux/module.h>
 #include <linux/blk.h>
 #include <linux/kernel.h>
@@ -54,13 +53,6 @@ static const char RCSid[] = "$Header: /vger/u4/cvs/linux/drivers/scsi/hosts.c,v 
  *  They may appear in any order, as each SCSI host is told which host 
  *  number it is during detection.
  */
-
-/* This is a placeholder for controllers that are not configured into
- * the system - we do this to ensure that the controller numbering is
- * always consistent, no matter how the kernel is configured. */
-
-#define NO_CONTROLLER {NULL, NULL, NULL, NULL, NULL, NULL, NULL, \
-			   NULL, NULL, 0, 0, 0, 0, 0, 0}
 
 /*
  *  When figure is run, we don't want to link to any object code.  Since
@@ -157,17 +149,14 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template * tpnt, int j)
 	    flag_new = 0;
 	    retval->host_no = shn->host_no;
 	    shn->host_registered = 1;
-	    shn->loaded_as_module = 1;
 	    break;
 	}
     }
-    spin_lock_init(&retval->host_lock);
+    spin_lock_init(&retval->default_lock);
+    scsi_assign_lock(retval, &retval->default_lock);
     atomic_set(&retval->host_active,0);
     retval->host_busy = 0;
     retval->host_failed = 0;
-    if(j > 0xffff) panic("Too many extra bytes requested\n");
-    retval->extra_bytes = j;
-    retval->loaded_as_module = 1;
     if (flag_new) {
 	shn = (Scsi_Host_Name *) kmalloc(sizeof(Scsi_Host_Name), GFP_ATOMIC);
         if (!shn) {
@@ -181,7 +170,6 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template * tpnt, int j)
 	shn->name[hname_len] = 0;
 	shn->host_no = max_scsi_hosts++;
 	shn->host_registered = 1;
-	shn->loaded_as_module = 1;
 	shn->next = NULL;
 	if (scsi_host_no_list) {
 	    for (shn2 = scsi_host_no_list;shn2->next;shn2 = shn2->next)

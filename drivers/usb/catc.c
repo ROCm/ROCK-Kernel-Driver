@@ -39,6 +39,7 @@
 #include <linux/skbuff.h>
 #include <linux/spinlock.h>
 #include <linux/ethtool.h>
+#include <linux/crc32.h>
 #include <asm/bitops.h>
 #include <asm/uaccess.h>
 
@@ -531,13 +532,9 @@ static struct net_device_stats *catc_get_stats(struct net_device *netdev)
 
 static void catc_multicast(unsigned char *addr, u8 *multicast)
 {
-	unsigned int crc = 0xffffffff;
-	u8 byte, idx, bit;
+	u32 crc;
 
-        for (idx = 0; idx < 6; idx++)
-                for (byte = *addr++, bit = 0; bit < 8; bit++, byte >>= 1)
-                        crc = (crc >> 1) ^ (((crc ^ byte) & 1) ? 0xedb88320U : 0);
-
+	crc = ether_crc_le(6, addr);
 	multicast[(crc >> 3) & 0x3f] |= 1 << (crc & 7);
 }
 

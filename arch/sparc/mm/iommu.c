@@ -1,4 +1,4 @@
-/* $Id: iommu.c,v 1.21 2001/02/13 01:16:43 davem Exp $
+/* $Id: iommu.c,v 1.22 2001/12/17 07:05:09 davem Exp $
  * iommu.c:  IOMMU specific routines for memory management.
  *
  * Copyright (C) 1995 David S. Miller  (davem@caip.rutgers.edu)
@@ -168,7 +168,7 @@ static __u32 iommu_get_scsi_one_pflush(char *vaddr, unsigned long len, struct sb
 static void iommu_get_scsi_sgl_noflush(struct scatterlist *sg, int sz, struct sbus_bus *sbus)
 {
 	for (; sz >= 0; sz--) {
-		sg[sz].dvma_address = (__u32) (sg[sz].address);
+		sg[sz].dvma_address = (__u32) (page_address(sg[sz].page) + sg[sz].offset);
 		sg[sz].dvma_length = (__u32) (sg[sz].length);
 	}
 }
@@ -177,7 +177,7 @@ static void iommu_get_scsi_sgl_gflush(struct scatterlist *sg, int sz, struct sbu
 {
 	flush_page_for_dma(0);
 	for (; sz >= 0; sz--) {
-		sg[sz].dvma_address = (__u32) (sg[sz].address);
+		sg[sz].dvma_address = (__u32) (page_address(sg[sz].page) + sg[sz].offset);
 		sg[sz].dvma_length = (__u32) (sg[sz].length);
 	}
 }
@@ -187,14 +187,14 @@ static void iommu_get_scsi_sgl_pflush(struct scatterlist *sg, int sz, struct sbu
 	unsigned long page, oldpage = 0;
 
 	while(sz >= 0) {
-		page = ((unsigned long) sg[sz].address) & PAGE_MASK;
+		page = ((unsigned long) sg[sz].offset) & PAGE_MASK;
 		if (oldpage == page)
 			page += PAGE_SIZE; /* We flushed that page already */
-		while(page < (unsigned long)(sg[sz].address + sg[sz].length)) {
+		while(page < (unsigned long)(page_address(sg[sz].page) + sg[sz].offset + sg[sz].length)) {
 			flush_page_for_dma(page);
 			page += PAGE_SIZE;
 		}
-		sg[sz].dvma_address = (__u32) (sg[sz].address);
+		sg[sz].dvma_address = (__u32) (page_address(sg[sz].page) + sg[sz].offset);
 		sg[sz].dvma_length = (__u32) (sg[sz].length);
 		sz--;
 		oldpage = page - PAGE_SIZE;

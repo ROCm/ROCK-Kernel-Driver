@@ -26,6 +26,7 @@ extern inline void pcibios_penalize_isa_irq(int irq)
 
 /* Dynamic DMA mapping stuff.
  */
+#define PCI_DMA_BUS_IS_PHYS	(0)
 
 #include <asm/scatterlist.h>
 

@@ -199,7 +199,7 @@ struct reiserfs_super_block_v1
 */
 struct reiserfs_journal_cnode {
   struct buffer_head *bh ;		 /* real buffer head */
-  kdev_t dev ;				 /* dev of real buffer head */
+  struct super_block *sb ;		 /* dev of real buffer head */
   unsigned long blocknr ;		 /* block number of real buffer head, == 0 when buffer on disk */		 
   int state ;
   struct reiserfs_journal_list *jlist ;  /* journal list this cnode lives in */

@@ -257,6 +257,8 @@ check_udp(const struct iphdr *iph,
 #define	TH_PUSH	0x08
 #define	TH_ACK	0x10
 #define	TH_URG	0x20
+#define	TH_ECE	0x40
+#define	TH_CWR	0x80
 
 /* TCP-specific checks. */
 static int
@@ -328,9 +330,10 @@ check_tcp(const struct iphdr *iph,
 	}
 
 	/* CHECK: TCP flags. */
-	tcpflags = ((u_int8_t *)tcph)[13];
+	tcpflags = (((u_int8_t *)tcph)[13] & ~(TH_ECE|TH_CWR));
 	if (tcpflags != TH_SYN
 	    && tcpflags != (TH_SYN|TH_ACK)
+		&& tcpflags != TH_RST
 	    && tcpflags != (TH_RST|TH_ACK)
 	    && tcpflags != (TH_RST|TH_ACK|TH_PUSH)
 	    && tcpflags != (TH_FIN|TH_ACK)

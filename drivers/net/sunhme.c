@@ -33,6 +33,7 @@ static char version[] =
 #include <linux/init.h>
 #include <linux/ethtool.h>
 #include <linux/mii.h>
+#include <linux/crc32.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -1469,9 +1470,6 @@ force_link:
 	add_timer(&hp->happy_timer);
 }
 
-#define CRC_POLYNOMIAL_BE 0x04c11db7UL  /* Ethernet CRC, big endian */
-#define CRC_POLYNOMIAL_LE 0xedb88320UL  /* Ethernet CRC, little endian */
-
 static int happy_meal_init(struct happy_meal *hp, int from_irq)
 {
 	unsigned long gregs        = hp->gregs;
@@ -1583,8 +1581,8 @@ static int happy_meal_init(struct happy_meal *hp, int from_irq)
 		u16 hash_table[4];
 		struct dev_mc_list *dmi = hp->dev->mc_list;
 		char *addrs;
-		int i, j, bit, byte;
-		u32 crc, poly = CRC_POLYNOMIAL_LE;
+		int i;
+		u32 crc;
 
 		for (i = 0; i < 4; i++)
 			hash_table[i] = 0;
@@ -1596,17 +1594,7 @@ static int happy_meal_init(struct happy_meal *hp, int from_irq)
 			if (!(*addrs & 1))
 				continue;
 
-			crc = 0xffffffffU;
-			for (byte = 0; byte < 6; byte++) {
-				for (bit = *addrs++, j = 0; j < 8; j++, bit >>= 1) {
-					int test;
-
-					test = ((bit ^ crc) & 0x01);
-					crc >>= 1;
-					if (test)
-						crc = crc ^ poly;
-				}
-			}
+			crc = ether_crc_le(6, addrs);
 			crc >>= 26;
 			hash_table[crc >> 4] |= 1 << (crc & 0xf);
 		}
@@ -2385,8 +2373,8 @@ static void happy_meal_set_multicast(struct net_device *dev)
 	unsigned long bregs = hp->bigmacregs;
 	struct dev_mc_list *dmi = dev->mc_list;
 	char *addrs;
-	int i, j, bit, byte;
-	u32 crc, poly = CRC_POLYNOMIAL_LE;
+	int i;
+	u32 crc;
 
 	/* Lock out others. */
 	netif_stop_queue(dev);
@@ -2412,17 +2400,7 @@ static void happy_meal_set_multicast(struct net_device *dev)
 			if (!(*addrs & 1))
 				continue;
 
-			crc = 0xffffffffU;
-			for (byte = 0; byte < 6; byte++) {
-				for (bit = *addrs++, j = 0; j < 8; j++, bit >>= 1) {
-					int test;
-
-					test = ((bit ^ crc) & 0x01);
-					crc >>= 1;
-					if (test)
-						crc = crc ^ poly;
-				}
-			}
+			crc = ether_crc_le(6, addrs);
 			crc >>= 26;
 			hash_table[crc >> 4] |= 1 << (crc & 0xf);
 		}

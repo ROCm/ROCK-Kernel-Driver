@@ -130,6 +130,7 @@ CONFIG_BLK_DEV_FD=y
 # CONFIG_PARIDE is not set
 # CONFIG_BLK_CPQ_DA is not set
 # CONFIG_BLK_CPQ_CISS_DA is not set
+# CONFIG_CISS_SCSI_TAPE is not set
 # CONFIG_BLK_DEV_DAC960 is not set
 # CONFIG_BLK_DEV_LOOP is not set
 # CONFIG_BLK_DEV_NBD is not set
@@ -831,3 +832,8 @@ CONFIG_USB_STORAGE=y
 # Kernel hacking
 #
 # CONFIG_DEBUG_KERNEL is not set
+
+#
+# Library routines
+#
+# CONFIG_CRC32 is not set

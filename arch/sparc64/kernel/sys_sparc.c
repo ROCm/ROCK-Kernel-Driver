@@ -1,4 +1,4 @@
-/* $Id: sys_sparc.c,v 1.54 2001/10/28 20:49:13 davem Exp $
+/* $Id: sys_sparc.c,v 1.56 2001/12/21 04:56:15 davem Exp $
  * linux/arch/sparc64/kernel/sys_sparc.c
  *
  * This file contains various random system calls that
@@ -40,12 +40,15 @@ asmlinkage unsigned long sys_getpagesize(void)
 	return PAGE_SIZE;
 }
 
-#define COLOUR_ALIGN(addr)	(((addr)+SHMLBA-1)&~(SHMLBA-1))
+#define COLOUR_ALIGN(addr,pgoff)		\
+	((((addr)+SHMLBA-1)&~(SHMLBA-1)) +	\
+	 (((pgoff)<<PAGE_SHIFT) & (SHMLBA-1)))
 
 unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsigned long len, unsigned long pgoff, unsigned long flags)
 {
 	struct vm_area_struct * vmm;
 	unsigned long task_size = TASK_SIZE;
+	int do_color_align;
 
 	if (flags & MAP_FIXED) {
 		/* We do not accept a shared mapping if it would violate
@@ -63,11 +66,14 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsi
 	if (!addr)
 		addr = TASK_UNMAPPED_BASE;
 
-	if (flags & MAP_SHARED)
-		addr = COLOUR_ALIGN(addr);
+	do_color_align = 0;
+	if (filp || (flags & MAP_SHARED))
+		do_color_align = 1;
+
+	if (do_color_align)
+		addr = COLOUR_ALIGN(addr, pgoff);
 	else
 		addr = PAGE_ALIGN(addr);
-
 	task_size -= len;
 
 	for (vmm = find_vma(current->mm, addr); ; vmm = vmm->vm_next) {
@@ -81,8 +87,8 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsi
 		if (!vmm || addr + len <= vmm->vm_start)
 			return addr;
 		addr = vmm->vm_end;
-		if (flags & MAP_SHARED)
-			addr = COLOUR_ALIGN(addr);
+		if (do_color_align)
+			addr = COLOUR_ALIGN(addr, pgoff);
 	}
 }
 
@@ -255,27 +261,15 @@ extern asmlinkage long sys_personality(unsigned long);
 
 asmlinkage int sparc64_personality(unsigned long personality)
 {
-	unsigned long ret, trying, orig_ret;
+	int ret;
 
-	trying = ret = personality;
-
-	if (current->personality == PER_LINUX32 &&
-	    trying == PER_LINUX)
-		trying = ret = PER_LINUX32;
-
-	/* For PER_LINUX32 we want to retain &default_exec_domain.  */
-	if (trying == PER_LINUX32)
+	if (current->personality == PER_LINUX32 && personality == PER_LINUX)
+		personality = PER_LINUX32;
+	ret = sys_personality(personality);
+	if (ret == PER_LINUX32)
 		ret = PER_LINUX;
 
-	orig_ret = ret;
-	ret = sys_personality(ret);
-
-	if (orig_ret == PER_LINUX && trying == PER_LINUX32) {
-		current->personality = PER_LINUX32;
-		ret = PER_LINUX;
-	}
-
-	return (int) ret;
+	return ret;
 }
 
 /* Linux version of mmap */

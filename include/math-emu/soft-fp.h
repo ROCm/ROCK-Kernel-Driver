@@ -21,8 +21,8 @@
    not, write to the Free Software Foundation, Inc.,
    59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  */
 
-#ifndef SOFT_FP_H
-#define SOFT_FP_H
+#ifndef __MATH_EMU_SOFT_FP_H__
+#define __MATH_EMU_SOFT_FP_H__
 
 #include <asm/sfp-machine.h>
 
@@ -178,4 +178,4 @@ typedef USItype UHWtype;
 #include <stdlib/longlong.h>
 #endif
 
-#endif
+#endif /* __MATH_EMU_SOFT_FP_H__ */

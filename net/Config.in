@@ -61,7 +61,7 @@ tristate 'DECnet Support' CONFIG_DECNET
 if [ "$CONFIG_DECNET" != "n" ]; then
    source net/decnet/Config.in
 fi
-tristate '802.1d Ethernet Bridging' CONFIG_BRIDGE
+dep_tristate '802.1d Ethernet Bridging' CONFIG_BRIDGE $CONFIG_INET
 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
    tristate 'CCITT X.25 Packet Layer (EXPERIMENTAL)' CONFIG_X25
    tristate 'LAPB Data Link Driver (EXPERIMENTAL)' CONFIG_LAPB

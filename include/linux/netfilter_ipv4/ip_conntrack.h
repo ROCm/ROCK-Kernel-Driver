@@ -27,6 +27,21 @@ enum ip_conntrack_info
 	IP_CT_NUMBER = IP_CT_IS_REPLY * 2 - 1
 };
 
+/* Bitset representing status of connection. */
+enum ip_conntrack_status {
+	/* It's an expected connection: bit 0 set.  This bit never changed */
+	IPS_EXPECTED_BIT = 0,
+	IPS_EXPECTED = (1 << IPS_EXPECTED_BIT),
+
+	/* We've seen packets both ways: bit 1 set.  Can be set, not unset. */
+	IPS_SEEN_REPLY_BIT = 1,
+	IPS_SEEN_REPLY = (1 << IPS_SEEN_REPLY_BIT),
+
+	/* Conntrack should never be early-expired. */
+	IPS_ASSURED_BIT = 2,
+	IPS_ASSURED = (1 << IPS_ASSURED_BIT),
+};
+
 #ifdef __KERNEL__
 
 #include <linux/types.h>
@@ -46,21 +61,6 @@ do {									\
 #else
 #define IP_NF_ASSERT(x)
 #endif
-
-/* Bitset representing status of connection. */
-enum ip_conntrack_status {
-	/* It's an expected connection: bit 0 set.  This bit never changed */
-	IPS_EXPECTED_BIT = 0,
-	IPS_EXPECTED = (1 << IPS_EXPECTED_BIT),
-
-	/* We've seen packets both ways: bit 1 set.  Can be set, not unset. */
-	IPS_SEEN_REPLY_BIT = 1,
-	IPS_SEEN_REPLY = (1 << IPS_SEEN_REPLY_BIT),
-
-	/* Conntrack should never be early-expired. */
-	IPS_ASSURED_BIT = 2,
-	IPS_ASSURED = (1 << IPS_ASSURED_BIT),
-};
 
 struct ip_conntrack_expect
 {

@@ -1082,7 +1082,7 @@ void iput(struct inode *inode)
 				}
 				inodes_stat.nr_unused++;
 				spin_unlock(&inode_lock);
-				if (!sb || sb->s_flags & MS_ACTIVE)
+				if (!sb || (sb->s_flags & MS_ACTIVE))
 					return;
 				write_inode_now(inode, 1);
 				spin_lock(&inode_lock);

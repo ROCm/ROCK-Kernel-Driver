@@ -132,9 +132,6 @@ struct lance_private
 	char tx_full;
 };
 
-#define CRC_POLYNOMIAL_BE 0x04c11db7UL  /* Ethernet CRC, big endian */
-#define CRC_POLYNOMIAL_LE 0xedb88320UL  /* Ethernet CRC, little endian */
-
 /*
  *              Am7990 Control and Status Registers
  */

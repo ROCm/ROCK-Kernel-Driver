@@ -17,7 +17,6 @@
  * go through and retrofit queueing functions into all 30 some-odd drivers.
  */
 
-#define __NO_VERSION__
 #include <linux/module.h>
 
 #include <linux/sched.h>
@@ -365,7 +364,7 @@ static Scsi_Cmnd *__scsi_end_request(Scsi_Cmnd * SCpnt,
 	 * If there are blocks left over at the end, set up the command
 	 * to queue the remainder of them.
 	 */
-	if (end_that_request_first(req, 1, sectors)) {
+	if (end_that_request_first(req, uptodate, sectors)) {
 		if (!requeue)
 			return SCpnt;
 
@@ -444,7 +443,7 @@ static void scsi_release_buffers(Scsi_Cmnd * SCpnt)
 {
 	struct request *req = &SCpnt->request;
 
-	ASSERT_LOCK(&SCpnt->host->host_lock, 0);
+	ASSERT_LOCK(SCpnt->host->host_lock, 0);
 
 	/*
 	 * Free up any indirection buffers we allocated for DMA purposes. 

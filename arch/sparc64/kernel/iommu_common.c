@@ -1,4 +1,4 @@
-/* $Id: iommu_common.c,v 1.8 2001/12/11 11:13:06 davem Exp $
+/* $Id: iommu_common.c,v 1.9 2001/12/17 07:05:09 davem Exp $
  * iommu_common.c: UltraSparc SBUS/PCI common iommu code.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -66,9 +66,7 @@ static int verify_one_map(struct scatterlist *dma_sg, struct scatterlist **__sg,
 
 	daddr = dma_sg->dma_address;
 	sglen = sg->length;
-	sgaddr = (unsigned long) (sg->address ?
-				  sg->address :
-				  page_address(sg->page) + sg->offset);
+	sgaddr = (unsigned long) (page_address(sg->page) + sg->offset);
 	while (dlen > 0) {
 		unsigned long paddr;
 
@@ -118,9 +116,7 @@ static int verify_one_map(struct scatterlist *dma_sg, struct scatterlist **__sg,
 		sg++;
 		if (--nents <= 0)
 			break;
-		sgaddr = (unsigned long) (sg->address ?
-					  sg->address :
-					  page_address(sg->page) + sg->offset);
+		sgaddr = (unsigned long) (page_address(sg->page) + sg->offset);
 		sglen = sg->length;
 	}
 	if (dlen < 0) {
@@ -183,10 +179,11 @@ void verify_sglist(struct scatterlist *sg, int nents, iopte_t *iopte, int npages
 		printk("%016lx.\n", sg->dma_address & IO_PAGE_MASK);
 
 		for (i = 0; i < nents; i++) {
-			printk("sg(%d): address(%p) length(%x) "
+			printk("sg(%d): page_addr(%p) off(%x) length(%x) "
 			       "dma_address[%016lx] dma_length[%016lx]\n",
 			       i,
-			       sg[i].address, sg[i].length,
+			       page_address(sg[i].page), sg[i].offset,
+			       sg[i].length,
 			       sg[i].dma_address, sg[i].dma_length);
 		}
 	}
@@ -201,21 +198,15 @@ unsigned long prepare_sg(struct scatterlist *sg, int nents)
 	unsigned long prev;
 	u32 dent_addr, dent_len;
 
-	prev  = (unsigned long) (sg->address ?
-				 sg->address :
-				 page_address(sg->page) + sg->offset);
+	prev  = (unsigned long) (page_address(sg->page) + sg->offset);
 	prev += (unsigned long) (dent_len = sg->length);
-	dent_addr = (u32) ((unsigned long)(sg->address ?
-					   sg->address :
-					   page_address(sg->page) + sg->offset)
+	dent_addr = (u32) ((unsigned long)(page_address(sg->page) + sg->offset)
 			   & (IO_PAGE_SIZE - 1UL));
 	while (--nents) {
 		unsigned long addr;
 
 		sg++;
-		addr = (unsigned long) (sg->address ?
-					sg->address :
-					page_address(sg->page) + sg->offset);
+		addr = (unsigned long) (page_address(sg->page) + sg->offset);
 		if (! VCONTIG(prev, addr)) {
 			dma_sg->dma_address = dent_addr;
 			dma_sg->dma_length = dent_len;

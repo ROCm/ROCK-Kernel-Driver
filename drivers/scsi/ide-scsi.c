@@ -292,9 +292,9 @@ static void idescsi_end_request (byte uptodate, ide_hwgroup_t *hwgroup)
 		}
 	}
 	host = pc->scsi_cmd->host;
-	spin_lock_irqsave(&host->host_lock, flags);
+	spin_lock_irqsave(host->host_lock, flags);
 	pc->done(pc->scsi_cmd);
-	spin_unlock_irqrestore(&host->host_lock, flags);
+	spin_unlock_irqrestore(host->host_lock, flags);
 	idescsi_free_bio (rq->bio);
 	kfree(pc); kfree(rq);
 	scsi->pc = NULL;
@@ -805,9 +805,9 @@ int idescsi_queue (Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
 	rq->special = (char *) pc;
 	rq->bio = idescsi_dma_bio (drive, pc);
 	rq->flags = REQ_SPECIAL;
-	spin_unlock(&cmd->host->host_lock);
+	spin_unlock_irq(cmd->host->host_lock);
 	(void) ide_do_drive_cmd (drive, rq, ide_end);
-	spin_lock_irq(&cmd->host->host_lock);
+	spin_lock_irq(cmd->host->host_lock);
 	return 0;
 abort:
 	if (pc) kfree (pc);

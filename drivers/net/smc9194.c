@@ -51,6 +51,7 @@
  .				 allocation
  .      08/20/00  Arnaldo Melo   fix kfree(skb) in smc_hardware_send_packet
  .      12/15/00  Christian Jullien fix "Warning: kfree_skb on hard IRQ"
+ .      11/08/01 Matt Domsch     Use common crc32 function
  ----------------------------------------------------------------------------*/
 
 static const char version[] =
@@ -69,6 +70,7 @@ static const char version[] =
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/init.h>
+#include <linux/crc32.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <linux/errno.h>
@@ -223,10 +225,6 @@ static struct net_device_stats * smc_query_statistics( struct net_device *dev);
 */
 static void smc_set_multicast_list(struct net_device *dev);
 
-/*
- . CRC compute
- */
-static int crc32( char * s, int length );
 
 /*---------------------------------------------------------------
  .
@@ -436,7 +434,7 @@ static void smc_setmulticast( int ioaddr, int count, struct dev_mc_list * addrs 
 			continue;
 
 		/* only use the low order bits */
-		position = crc32( cur_addr->dmi_addr, 6 ) & 0x3f;
+		position = ether_crc_le(6, cur_addr->dmi_addr) & 0x3f;
 
 		/* do some messy swapping to put the bit in the right spot */
 		multicast_table[invert3[position&7]] |=
@@ -450,33 +448,6 @@ static void smc_setmulticast( int ioaddr, int count, struct dev_mc_list * addrs 
 		outb( multicast_table[i], ioaddr + MULTICAST1 + i );
 	}
 }
-
-/*
-  Finds the CRC32 of a set of bytes.
-  Again, from Peter Cammaert's code.
-*/
-static int crc32( char * s, int length ) {
-	/* indices */
-	int perByte;
-	int perBit;
-	/* crc polynomial for Ethernet */
-	const unsigned long poly = 0xedb88320;
-	/* crc value - preinitialized to all 1's */
-	unsigned long crc_value = 0xffffffff;
-
-	for ( perByte = 0; perByte < length; perByte ++ ) {
-		unsigned char	c;
-
-		c = *(s++);
-		for ( perBit = 0; perBit < 8; perBit++ ) {
-			crc_value = (crc_value>>1)^
-				(((crc_value^c)&0x01)?poly:0);
-			c >>= 1;
-		}
-	}
-	return	crc_value;
-}
-
 
 /*
  . Function: smc_wait_to_send_packet( struct sk_buff * skb, struct net_device * )

@@ -737,6 +737,11 @@ static int __init shaper_init(void)
 
 static void __exit shaper_exit (void)
 {
+	int i;
+
+	for (i = 0; i < shapers; i++)
+		unregister_netdev(&devs[i]);
+
 	kfree(devs);
 	devs = NULL;
 }

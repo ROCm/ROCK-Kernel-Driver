@@ -785,6 +785,9 @@ no_irq:
 		printk(KERN_INFO "rtc: %s epoch (%lu) detected\n", guess, epoch);
 #endif
 #if RTC_IRQ
+	if (rtc_has_irq == 0)
+		goto no_irq2;
+
 	init_timer(&rtc_irq_timer);
 	rtc_irq_timer.function = rtc_dropped_irq;
 	spin_lock_irq(&rtc_lock);
@@ -792,6 +795,7 @@ no_irq:
 	CMOS_WRITE(((CMOS_READ(RTC_FREQ_SELECT) & 0xF0) | 0x06), RTC_FREQ_SELECT);
 	spin_unlock_irq(&rtc_lock);
 	rtc_freq = 1024;
+no_irq2:
 #endif
 
 	printk(KERN_INFO "Real Time Clock Driver v" RTC_VERSION "\n");

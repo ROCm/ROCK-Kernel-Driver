@@ -206,6 +206,8 @@ do_redirect(struct sk_buff *skb,
 			}
 			list_prepend(&redirs, redir);
 			init_timer(&redir->destroyme);
+			redir->destroyme.expires = jiffies + 75*HZ;
+			add_timer(&redir->destroyme);
 		}
 		/* In case mangling has changed, rewrite this part. */
 		redir->core = ((struct redir_core)

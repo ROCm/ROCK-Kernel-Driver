@@ -102,6 +102,9 @@
 	version 1.0.13:
 		* ETHTOOL_[GS]EEPROM support (Tim Hockin)
 
+	version 1.0.13:
+		* crc cleanup (Matt Domsch <Matt_Domsch@dell.com>)
+
 	TODO:
 	* big endian support with CFG:BEM instead of cpu_to_le32
 	* support for an external PHY
@@ -110,7 +113,7 @@
 
 #define DRV_NAME	"natsemi"
 #define DRV_VERSION	"1.07+LK1.0.13"
-#define DRV_RELDATE	"Oct 19, 2001"
+#define DRV_RELDATE	"Nov 12, 2001"
 
 /* Updated to recommendations in pci-skeleton v2.03. */
 
@@ -1706,36 +1709,15 @@ static struct net_device_stats *get_stats(struct net_device *dev)
 	return &np->stats;
 }
 
-/* The little-endian AUTODIN II ethernet CRC calculations.
-   A big-endian version is also available.
-   This is slow but compact code.  Do not use this routine for bulk data,
-   use a table-based routine instead.
-   This is common code and should be moved to net/core/crc.c.
-   Chips may use the upper or lower CRC bits, and may reverse and/or invert
-   them.  Select the endian-ness that results in minimal calculations.
-*/
-#if 0
-static unsigned const ethernet_polynomial_le = 0xedb88320U;
-static inline unsigned ether_crc_le(int length, unsigned char *data)
-{
-	unsigned int crc = 0xffffffff;	/* Initial value. */
-	while(--length >= 0) {
-		unsigned char current_octet = *data++;
-		int bit;
-		for (bit = 8; --bit >= 0; current_octet >>= 1) {
-			if ((crc ^ current_octet) & 1) {
-				crc >>= 1;
-				crc ^= ethernet_polynomial_le;
-			} else
-				crc >>= 1;
-		}
-	}
-	return crc;
-}
-#else
+/**
+ * dp83815_crc - computer CRC for hash table entries
+ *
+ * Note - this is, for some reason, *not* the same function
+ * as ether_crc_le() or ether_crc(), though it uses the
+ * same big-endian polynomial.
+ */
 #define DP_POLYNOMIAL			0x04C11DB7
-/* dp83815_crc - computer CRC for hash table entries */
-static unsigned ether_crc_le(int length, unsigned char *data)
+static unsigned dp83815_crc(int length, unsigned char *data)
 {
     u32 crc;
     u8 cur_byte;
@@ -1759,7 +1741,7 @@ static unsigned ether_crc_le(int length, unsigned char *data)
 
     return (crc);
 }
-#endif
+
 
 void set_bit_le(int offset, unsigned char * data)
 {
@@ -1788,7 +1770,7 @@ static void __set_rx_mode(struct net_device *dev)
 		memset(mc_filter, 0, sizeof(mc_filter));
 		for (i = 0, mclist = dev->mc_list; mclist && i < dev->mc_count;
 			 i++, mclist = mclist->next) {
-			set_bit_le(ether_crc_le(ETH_ALEN, mclist->dmi_addr) & 0x1ff,
+			set_bit_le(dp83815_crc(ETH_ALEN, mclist->dmi_addr) & 0x1ff,
 					mc_filter);
 		}
 		rx_mode = RxFilterEnable | AcceptBroadcast 

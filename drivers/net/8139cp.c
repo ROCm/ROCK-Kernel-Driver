@@ -55,6 +55,7 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/ethtool.h>
+#include <linux/crc32.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
@@ -722,22 +723,6 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 
 /* Set or clear the multicast filter for this adaptor.
    This routine is not state sensitive and need not be SMP locked. */
-
-static unsigned const ethernet_polynomial = 0x04c11db7U;
-static inline u32 ether_crc (int length, unsigned char *data)
-{
-	int crc = -1;
-
-	while (--length >= 0) {
-		unsigned char current_octet = *data++;
-		int bit;
-		for (bit = 0; bit < 8; bit++, current_octet >>= 1)
-			crc = (crc << 1) ^ ((crc < 0) ^ (current_octet & 1) ?
-			     ethernet_polynomial : 0);
-	}
-
-	return crc;
-}
 
 static void __cp_set_rx_mode (struct net_device *dev)
 {

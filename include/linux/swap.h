@@ -65,8 +65,7 @@ struct swap_info_struct {
 	unsigned int flags;
 	kdev_t swap_device;
 	spinlock_t sdev_lock;
-	struct dentry * swap_file;
-	struct vfsmount *swap_vfsmnt;
+	struct file *swap_file;
 	unsigned short * swap_map;
 	unsigned int lowest_bit;
 	unsigned int highest_bit;
@@ -141,8 +140,7 @@ extern struct swap_info_struct swap_info[];
 extern int is_swap_partition(kdev_t);
 extern void si_swapinfo(struct sysinfo *);
 extern swp_entry_t get_swap_page(void);
-extern void get_swaphandle_info(swp_entry_t, unsigned long *, kdev_t *, 
-					struct inode **);
+extern void get_swaphandle_info(swp_entry_t, unsigned long *, struct inode **);
 extern int swap_duplicate(swp_entry_t);
 extern int swap_count(struct page *);
 extern int valid_swaphandles(swp_entry_t, unsigned long *);

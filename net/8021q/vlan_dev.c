@@ -1,11 +1,10 @@
 /*
- * INET		An implementation of the TCP/IP protocol suite for the LINUX
- *		operating system.  INET is implemented using the  BSD Socket
- *		interface as the means of communication with the user level.
- *
+ * INET		802.1Q VLAN
  *		Ethernet-type device handling.
  *
- * Authors:	Ben Greear <greearb@candelatech.com>, <greearb@agcs.com>
+ * Authors:	Ben Greear <greearb@candelatech.com>
+ *              Please send support related email to: vlan@scry.wanfear.com
+ *              VLAN Home Page: http://www.candelatech.com/~greear/vlan.html
  * 
  * Fixes:       Mar 22 2001: Martin Bokaemper <mbokaemper@unispherenetworks.com>
  *                - reset skb->pkt_type on incoming packets when MAC was changed
@@ -512,10 +511,6 @@ void vlan_dev_destruct(struct net_device *dev)
 			VLAN_FMEM_DBG("dev->priv free, addr: %p\n", dev->priv);
 			dev->priv = NULL;
 		}
-
-		kfree(dev);
-		VLAN_FMEM_DBG("net_device free, addr: %p\n", dev);
-		dev = NULL;
 	}
 }
 

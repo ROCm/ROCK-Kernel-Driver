@@ -11,35 +11,49 @@ extern const struct exception_table_entry __stop___ex_table[];
 
 static unsigned long
 search_one_table(const struct exception_table_entry *start,
-		 const struct exception_table_entry *last,
+		 const struct exception_table_entry *end,
 		 unsigned long value, unsigned long *g2)
 {
-	const struct exception_table_entry *first = start;
-	const struct exception_table_entry *mid;
-	long diff = 0;
-        while (first <= last) {
-		mid = (last - first) / 2 + first;
-		diff = mid->insn - value;
-                if (diff == 0) {
-                	if (!mid->fixup) {
-                		*g2 = 0;
-                		return (mid + 1)->fixup;
-                	} else
-	                        return mid->fixup;
-                } else if (diff < 0)
-                        first = mid+1;
-                else
-                        last = mid-1;
-        }
-        if (last->insn < value && !last->fixup && last[1].insn > value) {
-        	*g2 = (value - last->insn)/4;
-        	return last[1].fixup;
-        }
-        if (first > start && first[-1].insn < value
-	    && !first[-1].fixup && first->insn < value) {
-        	*g2 = (value - first[-1].insn)/4;
-        	return first->fixup;
-        }
+	const struct exception_table_entry *walk;
+
+	/* Single insn entries are encoded as:
+	 *	word 1:	insn address
+	 *	word 2:	fixup code address
+	 *
+	 * Range entries are encoded as:
+	 *	word 1: first insn address
+	 *	word 2: 0
+	 *	word 3: last insn address + 4 bytes
+	 *	word 4: fixup code address
+	 *
+	 * See asm/uaccess.h for more details.
+	 */
+
+	/* 1. Try to find an exact match. */
+	for (walk = start; walk <= end; walk++) {
+		if (walk->fixup == 0) {
+			/* A range entry, skip both parts. */
+			walk++;
+			continue;
+		}
+
+		if (walk->insn == value)
+			return walk->fixup;
+	}
+
+	/* 2. Try to find a range match. */
+	for (walk = start; walk <= (end - 1); walk++) {
+		if (walk->fixup)
+			continue;
+
+		if (walk[0].insn <= value &&
+		    walk[1].insn > value) {
+			*g2 = (value - walk[0].insn) / 4;
+			return walk[1].fixup;
+		}
+		walk++;
+	}
+
         return 0;
 }
 

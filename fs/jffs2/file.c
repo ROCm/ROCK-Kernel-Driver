@@ -40,9 +40,9 @@
 #include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/pagemap.h>
+#include <linux/crc32.h>
 #include <linux/jffs2.h>
 #include "nodelist.h"
-#include "crc32.h"
 
 extern int generic_file_open(struct inode *, struct file *) __attribute__((weak));
 extern loff_t generic_file_llseek(struct file *file, loff_t offset, int origin) __attribute__((weak));

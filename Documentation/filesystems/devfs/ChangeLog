@@ -1863,3 +1863,9 @@ Changes for patch v205
 - Defined macros for error and debug messages
 
 - Updated README from master HTML file
+===============================================================================
+Changes for patch v206
+
+- Added support for multiple Compaq cpqarray controllers
+
+- Fixed (rare, old) race in <devfs_lookup>

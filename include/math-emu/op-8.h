@@ -21,6 +21,9 @@
    not, write to the Free Software Foundation, Inc.,
    59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  */
 
+#ifndef __MATH_EMU_OP_8_H__
+#define __MATH_EMU_OP_8_H__
+
 /* We need just a few things from here for op-4, if we ever need some
    other macros, they can be added. */
 #define _FP_FRAC_DECL_8(X)	_FP_W_TYPE X##_f[8]
@@ -101,3 +104,4 @@
     X##_f[0] |= (_s != 0);						\
   } while (0)
 
+#endif

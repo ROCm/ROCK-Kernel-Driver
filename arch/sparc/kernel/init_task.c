@@ -14,6 +14,6 @@ struct mm_struct init_mm = INIT_MM(init_mm);
  * If this is not aligned on a 8k boundry, then you should change code
  * in etrap.S which assumes it.
  */
-union task_union init_task_union
-	__attribute__((__section__(".text"))) =
+__asm__(".section \".text\",#alloc\n");
+union task_union init_task_union =
 		{ INIT_TASK(init_task_union.task) };

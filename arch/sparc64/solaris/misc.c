@@ -1,4 +1,4 @@
-/* $Id: misc.c,v 1.33 2001/09/18 22:29:06 davem Exp $
+/* $Id: misc.c,v 1.35 2002/01/08 16:00:21 davem Exp $
  * misc.c: Miscelaneous syscall emulation for Solaris
  *
  * Copyright (C) 1997,1998 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
@@ -15,6 +15,7 @@
 #include <linux/mman.h>
 #include <linux/file.h>
 #include <linux/timex.h>
+#include <linux/major.h>
 
 #include <asm/uaccess.h>
 #include <asm/string.h>
@@ -74,8 +75,8 @@ static u32 do_solaris_mmap(u32 addr, u32 len, u32 prot, u32 flags, u32 fd, u64 o
 			goto out;
 		else {
 			struct inode * inode = file->f_dentry->d_inode;
-			if(MAJOR(inode->i_rdev) == MEM_MAJOR &&
-			   MINOR(inode->i_rdev) == 5) {
+			if(major(inode->i_rdev) == MEM_MAJOR &&
+			   minor(inode->i_rdev) == 5) {
 				flags |= MAP_ANONYMOUS;
 				fput(file);
 				file = NULL;

@@ -111,7 +111,7 @@ int do_check_pgt_cache(int low, int high)
 
 extern void __update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
 
-#ifdef DCFLUSH_DEBUG
+#ifdef CONFIG_DEBUG_DCFLUSH
 atomic_t dcpage_flushes = ATOMIC_INIT(0);
 #ifdef CONFIG_SMP
 atomic_t dcpage_flushes_xcall = ATOMIC_INIT(0);
@@ -120,7 +120,7 @@ atomic_t dcpage_flushes_xcall = ATOMIC_INIT(0);
 
 __inline__ void flush_dcache_page_impl(struct page *page)
 {
-#ifdef DCFLUSH_DEBUG
+#ifdef CONFIG_DEBUG_DCFLUSH
 	atomic_inc(&dcpage_flushes);
 #endif
 
@@ -152,7 +152,7 @@ static __inline__ void set_dcache_dirty(struct page *page)
 			     "casx	[%2], %%g7, %%g5\n\t"
 			     "cmp	%%g7, %%g5\n\t"
 			     "bne,pn	%%xcc, 1b\n\t"
-			     " nop"
+			     " membar	#StoreLoad | #StoreStore"
 			     : /* no outputs */
 			     : "r" (mask), "r" (non_cpu_bits), "r" (&page->flags)
 			     : "g5", "g7");
@@ -172,7 +172,7 @@ static __inline__ void clear_dcache_dirty_cpu(struct page *page, unsigned long c
 			     "casx	[%2], %%g7, %%g5\n\t"
 			     "cmp	%%g7, %%g5\n\t"
 			     "bne,pn	%%xcc, 1b\n\t"
-			     " nop\n"
+			     " membar	#StoreLoad | #StoreStore\n"
 			     "2:"
 			     : /* no outputs */
 			     : "r" (cpu), "r" (mask), "r" (&page->flags)
@@ -261,14 +261,14 @@ void mmu_info(struct seq_file *m)
 	else
 		seq_printf(m, "MMU Type\t: ???\n");
 
-#ifdef DCFLUSH_DEBUG
+#ifdef CONFIG_DEBUG_DCFLUSH
 	seq_printf(m, "DCPageFlushes\t: %d\n",
 		   atomic_read(&dcpage_flushes));
 #ifdef CONFIG_SMP
 	seq_printf(m, "DCPageFlushesXC\t: %d\n",
 		   atomic_read(&dcpage_flushes_xcall));
 #endif /* CONFIG_SMP */
-#endif /* DCFLUSH_DEBUG */
+#endif /* CONFIG_DEBUG_DCFLUSH */
 }
 
 struct linux_prom_translation {

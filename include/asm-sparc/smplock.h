@@ -3,31 +3,35 @@
  *
  * Default SMP lock implementation
  */
+#include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/spinlock.h>
 
 extern spinlock_t kernel_flag;
 
-#define kernel_locked()		spin_is_locked(&kernel_flag)
+#define kernel_locked()			\
+	(spin_is_locked(&kernel_flag) &&\
+	 (current->lock_depth >= 0))
 
 /*
  * Release global kernel lock and global interrupt lock
  */
-#define release_kernel_lock(task, cpu) \
-do { \
-	if (task->lock_depth >= 0) \
-		spin_unlock(&kernel_flag); \
-	release_irqlock(cpu); \
-	__sti(); \
+#define release_kernel_lock(task, cpu)		\
+do {						\
+	if (unlikely(task->lock_depth >= 0)) {	\
+		spin_unlock(&kernel_flag);	\
+		release_irqlock(cpu);		\
+		__sti();			\
+	}					\
 } while (0)
 
 /*
  * Re-acquire the kernel lock
  */
-#define reacquire_kernel_lock(task) \
-do { \
-	if (task->lock_depth >= 0) \
-		spin_lock(&kernel_flag); \
+#define reacquire_kernel_lock(task)		\
+do {						\
+	if (unlikely(task->lock_depth >= 0))	\
+		spin_lock(&kernel_flag);	\
 } while (0)
 
 
@@ -38,14 +42,14 @@ do { \
  * so we only need to worry about other
  * CPU's.
  */
-extern __inline__ void lock_kernel(void)
-{
-	if (!++current->lock_depth)
-		spin_lock(&kernel_flag);
-}
+#define lock_kernel()				\
+do {						\
+	if (!++current->lock_depth)		\
+		spin_lock(&kernel_flag);	\
+} while(0)
 
-extern __inline__ void unlock_kernel(void)
-{
-	if (--current->lock_depth < 0)
-		spin_unlock(&kernel_flag);
-}
+#define unlock_kernel()				\
+do {						\
+	if (--current->lock_depth < 0)		\
+		spin_unlock(&kernel_flag);	\
+} while(0)

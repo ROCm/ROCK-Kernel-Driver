@@ -624,7 +624,7 @@ clean_2:
 #ifndef __sparc__
 	sprintf (buf, "%d", dev->irq);
 #else
-	bufp = __irq_itoa(irq);
+	bufp = __irq_itoa(dev->irq);
 #endif
 	if (request_irq (dev->irq, hcd_irq, SA_SHIRQ, hcd->description, hcd)
 			!= 0) {

@@ -1,4 +1,4 @@
-/* $Id: sparc64_ksyms.c,v 1.116 2001/10/26 15:49:21 davem Exp $
+/* $Id: sparc64_ksyms.c,v 1.120 2001/12/21 04:56:15 davem Exp $
  * arch/sparc64/kernel/sparc64_ksyms.c: Sparc64 specific ksyms support.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -98,7 +98,7 @@ extern int dump_fpu (struct pt_regs * regs, elf_fpregset_t * fpregs);
 #ifdef CONFIG_SMP
 extern spinlock_t kernel_flag;
 extern int smp_num_cpus;
-#ifdef SPIN_LOCK_DEBUG
+#ifdef CONFIG_DEBUG_SPINLOCK
 extern void _do_spin_lock (spinlock_t *lock, char *str);
 extern void _do_spin_unlock (spinlock_t *lock);
 extern int _spin_trylock (spinlock_t *lock);
@@ -113,7 +113,7 @@ extern unsigned long phys_base;
 
 /* used by various drivers */
 #ifdef CONFIG_SMP
-#ifndef SPIN_LOCK_DEBUG
+#ifndef CONFIG_DEBUG_SPINLOCK
 /* Out of line rw-locking implementation. */
 EXPORT_SYMBOL(__read_lock);
 EXPORT_SYMBOL(__read_unlock);
@@ -145,7 +145,7 @@ EXPORT_SYMBOL(__cpu_number_map);
 EXPORT_SYMBOL(__cpu_logical_map);
 
 /* Spinlock debugging library, optional. */
-#ifdef SPIN_LOCK_DEBUG
+#ifdef CONFIG_DEBUG_SPINLOCK
 EXPORT_SYMBOL(_do_spin_lock);
 EXPORT_SYMBOL(_do_spin_unlock);
 EXPORT_SYMBOL(_spin_trylock);
@@ -319,7 +319,6 @@ EXPORT_SYMBOL(sparc32_open);
 EXPORT_SYMBOL(__memcpy);
 EXPORT_SYMBOL(__memset);
 EXPORT_SYMBOL(_clear_page);
-EXPORT_SYMBOL(_copy_page);
 EXPORT_SYMBOL(clear_user_page);
 EXPORT_SYMBOL(copy_user_page);
 EXPORT_SYMBOL(__bzero);
@@ -354,4 +353,8 @@ EXPORT_SYMBOL_NOVERS(memmove);
 
 void VISenter(void);
 /* RAID code needs this */
-EXPORT_SYMBOL(VISenter);
+EXPORT_SYMBOL_NOVERS(VISenter);
+
+#ifdef CONFIG_DEBUG_BUGVERBOSE
+EXPORT_SYMBOL(do_BUG);
+#endif

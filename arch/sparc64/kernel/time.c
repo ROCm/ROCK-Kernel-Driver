@@ -1,4 +1,4 @@
-/* $Id: time.c,v 1.40 2001/09/06 02:44:28 davem Exp $
+/* $Id: time.c,v 1.41 2001/11/20 18:24:55 kanoj Exp $
  * time.c: UltraSparc timer and TOD clock support.
  *
  * Copyright (C) 1997 David S. Miller (davem@caip.rutgers.edu)
@@ -609,7 +609,6 @@ void __init time_init(void)
 	unsigned long clock;
 
 	init_timers(timer_interrupt, &clock);
-	timer_tick_offset = clock / HZ;
 	timer_ticks_per_usec_quotient = ((1UL<<32) / (clock / 1000020));
 }
 

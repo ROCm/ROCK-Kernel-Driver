@@ -155,6 +155,12 @@ static void * __init __alloc_bootmem_core (bootmem_data_t *bdata,
 	if (align & (align-1))
 		BUG();
 
+	offset = 0;
+	if (align &&
+	    (bdata->node_boot_start & (align - 1UL)) != 0)
+		offset = (align - (bdata->node_boot_start & (align - 1UL)));
+	offset >>= PAGE_SHIFT;
+
 	/*
 	 * We try to allocate bootmem pages above 'goal'
 	 * first, then we try to allocate lower pages.
@@ -166,6 +172,7 @@ static void * __init __alloc_bootmem_core (bootmem_data_t *bdata,
 		preferred = 0;
 
 	preferred = ((preferred + align - 1) & ~(align - 1)) >> PAGE_SHIFT;
+	preferred += offset;
 	areasize = (size+PAGE_SIZE-1)/PAGE_SIZE;
 	incr = align >> PAGE_SHIFT ? : 1;
 
@@ -185,7 +192,7 @@ restart_scan:
 	fail_block:;
 	}
 	if (preferred) {
-		preferred = 0;
+		preferred = offset;
 		goto restart_scan;
 	}
 	return NULL;

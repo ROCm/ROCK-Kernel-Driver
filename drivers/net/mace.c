@@ -15,6 +15,7 @@
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/init.h>
+#include <linux/crc32.h>
 #include <asm/prom.h>
 #include <asm/dbdma.h>
 #include <asm/io.h>
@@ -508,17 +509,12 @@ static struct net_device_stats *mace_stats(struct net_device *dev)
     return &p->stats;
 }
 
-/*
- * CRC polynomial - used in working out multicast filter bits.
- */
-#define CRC_POLY	0xedb88320
-
 static void mace_set_multicast(struct net_device *dev)
 {
     struct mace_data *mp = (struct mace_data *) dev->priv;
     volatile struct mace *mb = mp->mace;
-    int i, j, k, b;
-    unsigned long crc;
+    int i, j;
+    u32 crc;
 
     mp->maccc &= ~PROM;
     if (dev->flags & IFF_PROMISC) {
@@ -534,17 +530,7 @@ static void mace_set_multicast(struct net_device *dev)
 	    for (i = 0; i < 8; i++)
 		multicast_filter[i] = 0;
 	    for (i = 0; i < dev->mc_count; i++) {
-		crc = ~0;
-		for (j = 0; j < 6; ++j) {
-		    b = dmi->dmi_addr[j];
-		    for (k = 0; k < 8; ++k) {
-			if ((crc ^ b) & 1)
-			    crc = (crc >> 1) ^ CRC_POLY;
-			else
-			    crc >>= 1;
-			b >>= 1;
-		    }
-		}
+	        crc = ether_crc_le(6, dmi->dmi_addr);
 		j = crc >> 26;	/* bit number in multicast_filter */
 		multicast_filter[j >> 3] |= 1 << (j & 7);
 		dmi = dmi->next;

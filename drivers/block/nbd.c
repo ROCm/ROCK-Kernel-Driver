@@ -206,7 +206,7 @@ struct request *nbd_read_stat(struct nbd_device *lo)
 	if (result <= 0)
 		HARDFAIL("Recv control failed.");
 	memcpy(&xreq, reply.handle, sizeof(xreq));
-	req = blkdev_entry_prev_request(&lo->queue_head);
+	req = blkdev_entry_to_request(lo->queue_head.prev);
 
 	if (xreq != req)
 		FAIL("Unexpected handle received.\n");
@@ -250,7 +250,7 @@ void nbd_do_it(struct nbd_device *lo)
 			goto out;
 		}
 #ifdef PARANOIA
-		if (req != blkdev_entry_prev_request(&lo->queue_head)) {
+		if (req != blkdev_entry_to_request(lo->queue_head.prev)) {
 			printk(KERN_ALERT "NBD: I have problem...\n");
 		}
 		if (lo != &nbd_dev[minor(req->rq_dev)]) {
@@ -285,7 +285,7 @@ void nbd_clear_que(struct nbd_device *lo)
 #endif
 
 	while (!list_empty(&lo->queue_head)) {
-		req = blkdev_entry_prev_request(&lo->queue_head);
+		req = blkdev_entry_to_request(lo->queue_head.prev);
 #ifdef PARANOIA
 		if (!req) {
 			printk( KERN_ALERT "NBD: panic, panic, panic\n" );

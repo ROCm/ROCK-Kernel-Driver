@@ -138,11 +138,11 @@ spinlock_t sym53c8xx_lock = SPIN_LOCK_UNLOCKED;
 #define	SYM_LOCK_DRIVER(flags)    spin_lock_irqsave(&sym53c8xx_lock, flags)
 #define	SYM_UNLOCK_DRIVER(flags)  spin_unlock_irqrestore(&sym53c8xx_lock,flags)
 
-#define SYM_INIT_LOCK_HCB(np)		spin_lock_init(&np->s.host->host_lock);
+#define SYM_INIT_LOCK_HCB(np)		spin_lock_init((np)->s.host->host_lock);
 #define	SYM_LOCK_HCB(np, flags)		\
-			spin_lock_irqsave(&np->s.host->host_lock, flags)
+			spin_lock_irqsave((np)->s.host->host_lock, flags)
 #define	SYM_UNLOCK_HCB(np, flags)	\
-			spin_unlock_irqrestore(&np->s.host->host_lock, flags)
+			spin_unlock_irqrestore((np)->s.host->host_lock, flags)
 
 /*
  *  These simple macros limit expression involving 

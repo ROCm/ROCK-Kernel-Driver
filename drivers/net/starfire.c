@@ -109,6 +109,7 @@ TODO:
 #include <linux/etherdevice.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/crc32.h>
 #include <asm/processor.h>		/* Processor type for cache alignment. */
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -1612,32 +1613,9 @@ static struct net_device_stats *get_stats(struct net_device *dev)
 }
 
 
-/* The little-endian AUTODIN II ethernet CRC calculations.
-   A big-endian version is also available.
-   This is slow but compact code.  Do not use this routine for bulk data,
-   use a table-based routine instead.
-   This is common code and should be moved to net/core/crc.c.
-   Chips may use the upper or lower CRC bits, and may reverse and/or invert
+/* Chips may use the upper or lower CRC bits, and may reverse and/or invert
    them.  Select the endian-ness that results in minimal calculations.
 */
-static unsigned const ethernet_polynomial_le = 0xedb88320U;
-static inline unsigned ether_crc_le(int length, unsigned char *data)
-{
-	unsigned int crc = 0xffffffff;	/* Initial value. */
-	while(--length >= 0) {
-		unsigned char current_octet = *data++;
-		int bit;
-		for (bit = 8; --bit >= 0; current_octet >>= 1) {
-			if ((crc ^ current_octet) & 1) {
-				crc >>= 1;
-				crc ^= ethernet_polynomial_le;
-			} else
-				crc >>= 1;
-		}
-	}
-	return crc;
-}
-
 
 static void set_rx_mode(struct net_device *dev)
 {

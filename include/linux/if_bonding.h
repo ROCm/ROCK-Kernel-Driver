@@ -79,6 +79,15 @@ typedef struct slave {
 	u32 link_failure_count;
 } slave_t;
 
+/*
+ * Here are the locking policies for the two bonding locks:
+ *
+ * 1) Get bond->lock when reading/writing slave list.
+ * 2) Get bond->ptrlock when reading/writing bond->current_slave.
+ *    (It is unnecessary when the write-lock is put with bond->lock.)
+ * 3) When we lock with bond->ptrlock, we must lock with bond->lock
+ *    beforehand.
+ */
 typedef struct bonding {
 	slave_t *next;
 	slave_t *prev;

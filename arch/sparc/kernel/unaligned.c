@@ -1,4 +1,4 @@
-/* $Id: unaligned.c,v 1.22 2000/04/29 08:05:21 anton Exp $
+/* $Id: unaligned.c,v 1.23 2001/12/21 00:54:31 davem Exp $
  * unaligned.c: Unaligned load/store trap handling with special
  *              cases for the kernel to do them more quickly.
  *
@@ -224,7 +224,7 @@ __asm__ __volatile__ (								\
 	"or	%%l1, %%g7, %%g7\n\t"						\
 	"st	%%g7, [%0 + 4]\n"						\
 "0:\n\n\t"									\
-	".section __ex_table\n\t"						\
+	".section __ex_table,#alloc\n\t"					\
 	".word	4b, " #errh "\n\t"						\
 	".word	5b, " #errh "\n\t"						\
 	".word	6b, " #errh "\n\t"						\
@@ -277,7 +277,7 @@ __asm__ __volatile__ (								\
 "16:\t"	"stb	%%l2, [%0]\n"							\
 "17:\t"	"stb	%%l1, [%0 + 1]\n"						\
 "0:\n\n\t"									\
-	".section __ex_table\n\t"						\
+	".section __ex_table,#alloc\n\t"					\
 	".word	4b, " #errh "\n\t"						\
 	".word	5b, " #errh "\n\t"						\
 	".word	6b, " #errh "\n\t"						\

@@ -42,8 +42,8 @@
 #include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/pagemap.h>
+#include <linux/crc32.h>
 #include "nodelist.h"
-#include "crc32.h"
 
 static int jffs2_garbage_collect_metadata(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb, 
 					struct inode *inode, struct jffs2_full_dnode *fd);

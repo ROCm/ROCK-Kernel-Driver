@@ -6,6 +6,10 @@
 
   Copyright (C) 2000 Emmanuel Roger <winfield@freegates.be>
 
+  Changes:
+	25 Aug 2001 Harald Welte <laforge@gnumonks.org>
+		- decrement and check TTL if not called from FORWARD hook
+
   This program is free software; you can redistribute it and/or modify it
   under the terms of the GNU General Public License as published by the
   Free Software Foundation; either version 2 of the License, or (at your
@@ -24,6 +28,7 @@
 #include <linux/skbuff.h>
 #include <linux/ip.h>
 #include <net/ip.h>
+#include <net/icmp.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
 #include <linux/netdevice.h>
 #include <linux/route.h>
@@ -100,15 +105,31 @@ static unsigned int ipt_mirror_target(struct sk_buff **pskb,
 				      const void *targinfo,
 				      void *userinfo)
 {
-	if ((*pskb)->dst != NULL) {
-		if (route_mirror(*pskb)) {
-			ip_rewrite(*pskb);
-			/* Don't let conntrack code see this packet:
-                           it will think we are starting a new
-                           connection! --RR */
-			ip_direct_send(*pskb);
-			return NF_STOLEN;
+	if (((*pskb)->dst != NULL) &&
+	    route_mirror(*pskb)) {
+
+		ip_rewrite(*pskb);
+
+		/* If we are not at FORWARD hook (INPUT/PREROUTING),
+		 * the TTL isn't decreased by the IP stack */
+		if (hooknum != NF_IP_FORWARD) {
+			struct iphdr *iph = (*pskb)->nh.iph;
+			if (iph->ttl <= 1) {
+				/* this will traverse normal stack, and 
+				 * thus call conntrack on the icmp packet */
+				icmp_send(*pskb, ICMP_TIME_EXCEEDED, 
+					  ICMP_EXC_TTL, 0);
+				return NF_DROP;
+			}
+			ip_decrease_ttl(iph);
 		}
+
+		/* Don't let conntrack code see this packet:
+                   it will think we are starting a new
+                   connection! --RR */
+		ip_direct_send(*pskb);
+
+		return NF_STOLEN;
 	}
 	return NF_DROP;
 }

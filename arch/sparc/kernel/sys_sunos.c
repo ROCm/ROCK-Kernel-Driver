@@ -1,4 +1,4 @@
-/* $Id: sys_sunos.c,v 1.135 2001/08/13 14:40:10 davem Exp $
+/* $Id: sys_sunos.c,v 1.136 2002/01/08 16:00:14 davem Exp $
  * sys_sunos.c: SunOS specific syscall compatibility support.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -90,8 +90,8 @@ asmlinkage unsigned long sunos_mmap(unsigned long addr, unsigned long len,
 	 * SunOS is so stupid some times... hmph!
 	 */
 	if (file) {
-		if(MAJOR(file->f_dentry->d_inode->i_rdev) == MEM_MAJOR &&
-		   MINOR(file->f_dentry->d_inode->i_rdev) == 5) {
+		if(major(file->f_dentry->d_inode->i_rdev) == MEM_MAJOR &&
+		   minor(file->f_dentry->d_inode->i_rdev) == 5) {
 			flags |= MAP_ANONYMOUS;
 			fput(file);
 			file = 0;

@@ -1,4 +1,4 @@
-/* $Id: display7seg.c,v 1.5 2001/10/08 22:19:51 davem Exp $
+/* $Id: display7seg.c,v 1.6 2002/01/08 16:00:16 davem Exp $
  *
  * display7seg - Driver implementation for the 7-segment display
  * present on Sun Microsystems CP1400 and CP1500
@@ -89,7 +89,7 @@ static inline int d7s_obpflipped(void)
 
 static int d7s_open(struct inode *inode, struct file *f)
 {
-	if (D7S_MINOR != MINOR(inode->i_rdev))
+	if (D7S_MINOR != minor(inode->i_rdev))
 		return -ENODEV;
 
 	MOD_INC_USE_COUNT;
@@ -98,7 +98,7 @@ static int d7s_open(struct inode *inode, struct file *f)
 
 static int d7s_release(struct inode *inode, struct file *f)
 {
-	if (D7S_MINOR != MINOR(inode->i_rdev))
+	if (D7S_MINOR != minor(inode->i_rdev))
 		return -ENODEV;
 	
 	MOD_DEC_USE_COUNT;
@@ -125,7 +125,7 @@ static int d7s_ioctl(struct inode *inode, struct file *f,
 	__u8 regs = readb(d7s_regs);
 	__u8 ireg = 0;
 
-	if (D7S_MINOR != MINOR(inode->i_rdev))
+	if (D7S_MINOR != minor(inode->i_rdev))
 		return -ENODEV;
 
 	switch (cmd) {

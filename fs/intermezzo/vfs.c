@@ -136,7 +136,7 @@ inline void presto_debug_fail_blkdev(struct presto_file_set *fset,
         if (errorval && errorval == (long)value && !is_read_only(dev)) {
                 CDEBUG(D_SUPER, "setting device %s read only\n", kdevname(dev));
                 BLKDEV_FAIL(dev, 1);
-                upc_comms[minor].uc_errorval = -dev;
+                upc_comms[minor].uc_errorval = -kdev_val(dev);
         }
 }
 #else
@@ -602,7 +602,7 @@ int presto_do_link(struct presto_file_set *fset, struct dentry *old_dentry,
                 goto exit_lock;
 
         error = -EXDEV;
-        if (dir->d_inode->i_dev != inode->i_dev)
+        if (!kdev_same(dir->d_inode->i_dev, inode->i_dev))
                 goto exit_lock;
 
         /*
@@ -1609,7 +1609,7 @@ int presto_rename_dir(struct presto_file_set *fset, struct dentry *old_parent,
         if (error)
                 return error;
 
-        if (new_dir->i_dev != old_dir->i_dev)
+        if (!kdev_same(new_dir->i_dev, old_dir->i_dev))
                 return -EXDEV;
 
         if (!new_dentry->d_inode)
@@ -1690,7 +1690,7 @@ int presto_rename_other(struct presto_file_set *fset, struct dentry *old_parent,
         if (error)
                 return error;
 
-        if (new_dir->i_dev != old_dir->i_dev)
+        if (!kdev_same(new_dir->i_dev, old_dir->i_dev))
                 return -EXDEV;
 
         if (!new_dentry->d_inode)

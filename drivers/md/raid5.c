@@ -469,6 +469,7 @@ static struct buffer_head *raid5_build_block (struct stripe_head *sh, int i)
 
 	init_buffer(bh, raid5_end_read_request, sh);
 	bh->b_dev       = conf->disks[i].dev;
+	/* FIXME - later we will need bdev here */
 	bh->b_blocknr   = block;
 
 	bh->b_state	= (1 << BH_Req) | (1 << BH_Mapped);
@@ -1137,6 +1138,7 @@ static void handle_stripe(struct stripe_head *sh)
 			else if (spare && action[i] == WRITE+1)
 				bh->b_dev = spare->dev;
 			else skip=1;
+			/* FIXME - later we will need bdev here */
 			if (!skip) {
 				PRINTK("for %ld schedule op %d on disc %d\n", sh->sector, action[i]-1, i);
 				atomic_inc(&sh->count);

@@ -401,6 +401,7 @@ err_ext:
 err_alloc:
 	brelse(ext_bh);
 	bh_result->b_state &= ~(1UL << BH_Mapped);
+	bh_result->b_bdev = NULL;
 	// unlock cache
 	affs_unlock_ext(inode);
 	return -ENOSPC;

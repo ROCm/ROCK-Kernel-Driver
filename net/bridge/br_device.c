@@ -5,7 +5,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br_device.c,v 1.5 2001/08/14 22:05:57 davem Exp $
+ *	$Id: br_device.c,v 1.6 2001/12/24 00:59:55 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -71,7 +71,7 @@ static int __br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 	return 0;
 }
 
-static int br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
+int br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct net_bridge *br;
 	int ret;

@@ -46,7 +46,7 @@ static struct list_head presto_caches[CACHES_SIZE];
 
 static inline int presto_cache_hash(kdev_t dev)
 {
-        return (CACHES_MASK) & ((0x000F & (dev)) + ((0x0F00 & (dev)) >>8));
+        return (CACHES_MASK) & ((0x000F & (kdev_val(dev))) + ((0x0F00 & (kdev_val(dev))) >>8));
 }
 
 inline void presto_cache_add(struct presto_cache *cache, kdev_t dev)
@@ -73,7 +73,7 @@ struct presto_cache *presto_find_cache(kdev_t dev)
         lh = tmp = &(presto_caches[presto_cache_hash(dev)]);
         while ( (tmp = lh->next) != lh ) {
                 cache = list_entry(tmp, struct presto_cache, cache_chain);
-                if ( cache->cache_dev == dev ) {
+                if ( kdev_same(cache->cache_dev, dev) ) {
                         return cache;
                 }
         }
@@ -90,7 +90,7 @@ struct presto_cache *presto_get_cache(struct inode *inode)
         cache = presto_find_cache(inode->i_dev);
         if ( !cache ) {
                 printk("WARNING: no presto cache for dev %x, ino %ld\n",
-                       inode->i_dev, inode->i_ino);
+                       kdev_val(inode->i_dev), inode->i_ino);
                 EXIT;
                 return NULL;
         }
@@ -174,7 +174,7 @@ int presto_ispresto(struct inode *inode)
         cache = presto_get_cache(inode);
         if ( !cache )
                 return 0;
-        return (inode->i_dev == cache->cache_dev);
+        return (kdev_same(inode->i_dev, cache->cache_dev));
 }
 
 /* setup a cache structure when we need one */

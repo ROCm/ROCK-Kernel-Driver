@@ -1,4 +1,4 @@
-/*	$Id: aurora.c,v 1.18 2001/10/26 17:59:31 davem Exp $
+/*	$Id: aurora.c,v 1.19 2002/01/08 16:00:16 davem Exp $
  *	linux/drivers/sbus/char/aurora.c -- Aurora multiport driver
  *
  *	Copyright (c) 1999 by Oliver Aldulea (oli at bv dot ro)
@@ -1427,7 +1427,7 @@ static int aurora_open(struct tty_struct * tty, struct file * filp)
 	printk("aurora_open: start\n");
 #endif
 	
-	board = AURORA_BOARD(MINOR(tty->device));
+	board = AURORA_BOARD(minor(tty->device));
 	if (board > AURORA_NBOARD ||
 	    !(aurora_board[board].flags & AURORA_BOARD_PRESENT)) {
 #ifdef AURORA_DEBUG
@@ -1438,7 +1438,7 @@ static int aurora_open(struct tty_struct * tty, struct file * filp)
 	}
 	
 	bp = &aurora_board[board];
-	port = aurora_port + board * AURORA_NPORT * AURORA_NCD180 + AURORA_PORT(MINOR(tty->device));
+	port = aurora_port + board * AURORA_NPORT * AURORA_NCD180 + AURORA_PORT(minor(tty->device));
 	if (aurora_paranoia_check(port, tty->device, "aurora_open")) {
 #ifdef AURORA_DEBUG
 		printk("aurora_open: error paranoia check\n");

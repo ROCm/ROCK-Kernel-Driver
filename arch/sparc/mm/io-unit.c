@@ -1,4 +1,4 @@
-/* $Id: io-unit.c,v 1.23 2001/02/13 01:16:43 davem Exp $
+/* $Id: io-unit.c,v 1.24 2001/12/17 07:05:09 davem Exp $
  * io-unit.c:  IO-UNIT specific routines for memory management.
  *
  * Copyright (C) 1997,1998 Jakub Jelinek    (jj@sunsite.mff.cuni.cz)
@@ -131,7 +131,7 @@ static void iounit_get_scsi_sgl(struct scatterlist *sg, int sz, struct sbus_bus 
 	/* FIXME: Cache some resolved pages - often several sg entries are to the same page */
 	spin_lock_irqsave(&iounit->lock, flags);
 	for (; sz >= 0; sz--) {
-		sg[sz].dvma_address = iounit_get_area(iounit, (unsigned long)sg[sz].address, sg[sz].length);
+		sg[sz].dvma_address = iounit_get_area(iounit, (unsigned long)page_address(sg[sz].page) + sg[sz].offset, sg[sz].length);
 		sg[sz].dvma_length = sg[sz].length;
 	}
 	spin_unlock_irqrestore(&iounit->lock, flags);

@@ -8392,8 +8392,8 @@ asc_prt_driver_conf(struct Scsi_Host *shp, char *cp, int cplen)
     ASC_PRT_NEXT();
 
     len = asc_prt_line(cp, leftlen,
-" unchecked_isa_dma %d, use_clustering %d, loaded_as_module %d\n",
-        shp->unchecked_isa_dma, shp->use_clustering, shp->loaded_as_module);
+" unchecked_isa_dma %d, use_clustering %d\n",
+        shp->unchecked_isa_dma, shp->use_clustering);
     ASC_PRT_NEXT();
 
     len = asc_prt_line(cp, leftlen,
@@ -9411,9 +9411,8 @@ asc_prt_scsi_host(struct Scsi_Host *s)
         s->dma_channel, s->this_id, s->can_queue);
 
     printk(
-" cmd_per_lun %d, sg_tablesize %d, unchecked_isa_dma %d, loaded_as_module %d\n",
-        s->cmd_per_lun, s->sg_tablesize, s->unchecked_isa_dma,
-        s->loaded_as_module);
+" cmd_per_lun %d, sg_tablesize %d, unchecked_isa_dma %d\n",
+        s->cmd_per_lun, s->sg_tablesize, s->unchecked_isa_dma);
 
     if (ASC_NARROW_BOARD(boardp)) {
         asc_prt_asc_dvc_var(&ASC_BOARDP(s)->dvc_var.asc_dvc_var);

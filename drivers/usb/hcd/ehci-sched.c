@@ -381,7 +381,7 @@ static int intr_submit (
 			vdbg ("qh %p usecs %d period %d starting frame %d.%d",
 				qh, qh->usecs, period, frame, uframe);
 			do {
-				if (unlikely ((int)ehci->pshadow [frame].ptr)) {
+				if (unlikely ((long)ehci->pshadow [frame].ptr)) {
 // FIXME -- just link to the end, before any qh with a shorter period,
 // AND handle it already being (implicitly) linked into this frame
 					BUG ();

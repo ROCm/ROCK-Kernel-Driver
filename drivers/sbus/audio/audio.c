@@ -1,4 +1,4 @@
-/* $Id: audio.c,v 1.62 2001/10/08 22:19:50 davem Exp $
+/* $Id: audio.c,v 1.63 2002/01/08 16:00:21 davem Exp $
  * drivers/sbus/audio/audio.c
  *
  * Copyright 1996 Thomas K. Dyas (tdyas@noc.rutgers.edu)
@@ -202,7 +202,7 @@ static unsigned int sparcaudio_poll(struct file *file, poll_table * wait)
 {
         unsigned int mask = 0;
         struct inode *inode = file->f_dentry->d_inode;
-        struct sparcaudio_driver *drv = drivers[(MINOR(inode->i_rdev) >>
+        struct sparcaudio_driver *drv = drivers[(minor(inode->i_rdev) >>
                                                  SPARCAUDIO_DEVICE_SHIFT)];
 
         poll_wait(file, &drv->input_read_wait, wait);
@@ -221,7 +221,7 @@ static ssize_t sparcaudio_read(struct file * file, char *buf,
                                size_t count, loff_t *ppos)
 {
         struct inode *inode = file->f_dentry->d_inode;
-        struct sparcaudio_driver *drv = drivers[(MINOR(inode->i_rdev) >>
+        struct sparcaudio_driver *drv = drivers[(minor(inode->i_rdev) >>
                                                  SPARCAUDIO_DEVICE_SHIFT)];
         int bytes_to_copy, bytes_read = 0, err;
 
@@ -296,7 +296,7 @@ static ssize_t sparcaudio_write(struct file * file, const char *buf,
                                 size_t count, loff_t *ppos)
 {
         struct inode *inode = file->f_dentry->d_inode;
-        struct sparcaudio_driver *drv = drivers[(MINOR(inode->i_rdev) >>
+        struct sparcaudio_driver *drv = drivers[(minor(inode->i_rdev) >>
                                                  SPARCAUDIO_DEVICE_SHIFT)];
         int bytes_written = 0, bytes_to_copy, err;
   
@@ -396,7 +396,7 @@ static ssize_t sparcaudio_write(struct file * file, const char *buf,
 static int sparcaudio_mixer_ioctl(struct inode * inode, struct file * file,
                                   unsigned int cmd, unsigned int *arg)
 {
-        struct sparcaudio_driver *drv = drivers[(MINOR(inode->i_rdev) >>
+        struct sparcaudio_driver *drv = drivers[(minor(inode->i_rdev) >>
                                                  SPARCAUDIO_DEVICE_SHIFT)];
         unsigned long i = 0, j = 0, l = 0, m = 0;
         unsigned int k = 0;
@@ -647,7 +647,7 @@ static int sparcaudio_ioctl(struct inode * inode, struct file * file,
 			    unsigned int cmd, unsigned long arg)
 {
 	int retval = 0, i, j, k;
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	struct audio_info ainfo;
 	audio_buf_info binfo;
 	count_info cinfo;
@@ -1701,7 +1701,7 @@ static struct file_operations sparcaudioctl_fops = {
 
 static int sparcaudio_open(struct inode * inode, struct file * file)
 {
-        int minor = MINOR(inode->i_rdev);
+        int minor = minor(inode->i_rdev);
 	struct sparcaudio_driver *drv = 
                 drivers[(minor >> SPARCAUDIO_DEVICE_SHIFT)];
 	int err;
@@ -1835,7 +1835,7 @@ static int sparcaudio_open(struct inode * inode, struct file * file)
 
 static int sparcaudio_release(struct inode * inode, struct file * file)
 {
-        struct sparcaudio_driver *drv = drivers[(MINOR(inode->i_rdev) >>
+        struct sparcaudio_driver *drv = drivers[(minor(inode->i_rdev) >>
                                                  SPARCAUDIO_DEVICE_SHIFT)];
 
 	lock_kernel();

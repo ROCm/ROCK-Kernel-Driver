@@ -21,6 +21,7 @@
 #include <linux/spinlock.h>
 
 #include <linux/sunrpc/clnt.h>
+#include <linux/sunrpc/xprt.h>
 
 #ifdef RPC_DEBUG
 #define RPCDBG_FACILITY		RPCDBG_SCHED

@@ -1,4 +1,4 @@
-/* $Id: power.c,v 1.9 2001/06/08 02:28:22 davem Exp $
+/* $Id: power.c,v 1.10 2001/12/11 01:57:16 davem Exp $
  * power.c: Power management driver.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -61,7 +61,7 @@ static int powerd(void *__unused)
 	sprintf(current->comm, "powerd");
 
 again:
-	while(button_pressed == 0) {
+	while (button_pressed == 0) {
 		spin_lock_irq(&current->sigmask_lock);
 		flush_signals(current);
 		spin_unlock_irq(&current->sigmask_lock);
@@ -98,16 +98,19 @@ void __init power_init(void)
 found:
 	power_reg = (unsigned long)ioremap(edev->resource[0].start, 0x4);
 	printk("power: Control reg at %016lx ... ", power_reg);
-	if (kernel_thread(powerd, 0, CLONE_FS) < 0) {
-		printk("Failed to start power daemon.\n");
-		return;
-	}
-	printk("powerd running.\n");
-	if (edev->irqs[0] != 0) {
+	if (edev->irqs[0] != PCI_IRQ_NONE) {
+		if (kernel_thread(powerd, 0, CLONE_FS) < 0) {
+			printk("Failed to start power daemon.\n");
+			return;
+		}
+		printk("powerd running.\n");
+
 		if (request_irq(edev->irqs[0],
 				power_handler, SA_SHIRQ, "power",
 				(void *) power_reg) < 0)
 			printk("power: Error, cannot register IRQ handler.\n");
+	} else {
+		printk("not using powerd.\n");
 	}
 }
 #endif /* CONFIG_PCI */

@@ -1,4 +1,4 @@
-/* $Id: rwsem.h,v 1.4 2001/04/26 02:36:36 davem Exp $
+/* $Id: rwsem.h,v 1.5 2001/11/18 00:12:56 davem Exp $
  * rwsem.h: R/W semaphores implemented using CAS
  *
  * Written by David S. Miller (davem@redhat.com), 2001.
@@ -59,7 +59,7 @@ static inline void __down_read(struct rw_semaphore *sem)
 		" add		%%g7, 1, %%g7\n\t"
 		"cmp		%%g7, 0\n\t"
 		"bl,pn		%%icc, 3f\n\t"
-		" membar	#StoreStore\n"
+		" membar	#StoreLoad | #StoreStore\n"
 		"2:\n\t"
 		".subsection	2\n"
 		"3:\tmov	%0, %%g5\n\t"
@@ -92,7 +92,7 @@ static inline void __down_write(struct rw_semaphore *sem)
 		"bne,pn		%%icc, 1b\n\t"
 		" cmp		%%g7, 0\n\t"
 		"bne,pn		%%icc, 3f\n\t"
-		" membar	#StoreStore\n"
+		" membar	#StoreLoad | #StoreStore\n"
 		"2:\n\t"
 		".subsection	2\n"
 		"3:\tmov	%0, %%g5\n\t"
@@ -122,7 +122,7 @@ static inline void __up_read(struct rw_semaphore *sem)
 		"bne,pn		%%icc, 1b\n\t"
 		" cmp		%%g7, 0\n\t"
 		"bl,pn		%%icc, 3f\n\t"
-		" membar	#StoreStore\n"
+		" membar	#StoreLoad | #StoreStore\n"
 		"2:\n\t"
 		".subsection	2\n"
 		"3:\tsethi	%%hi(%2), %%g1\n\t"
@@ -160,7 +160,7 @@ static inline void __up_write(struct rw_semaphore *sem)
 		" sub		%%g7, %%g1, %%g7\n\t"
 		"cmp		%%g7, 0\n\t"
 		"bl,pn		%%icc, 3f\n\t"
-		" membar	#StoreStore\n"
+		" membar	#StoreLoad | #StoreStore\n"
 		"2:\n\t"
 		".subsection 2\n"
 		"3:\tmov	%0, %%g5\n\t"
@@ -189,7 +189,7 @@ static inline int rwsem_atomic_update(int delta, struct rw_semaphore *sem)
 		"cas		[%2], %%g5, %%g7\n\t"
 		"cmp		%%g5, %%g7\n\t"
 		"bne,pn		%%icc, 1b\n\t"
-		" nop\n\t"
+		" membar	#StoreLoad | #StoreStore\n\t"
 		"mov		%%g7, %0\n\t"
 		: "=&r" (tmp)
 		: "0" (tmp), "r" (sem)
@@ -208,7 +208,7 @@ static inline __u16 rwsem_cmpxchgw(struct rw_semaphore *sem, __u16 __old, __u16 
 
 again:
 	__asm__ __volatile__("cas	[%2], %3, %0\n\t"
-			     "membar	#StoreStore | #StoreLoad"
+			     "membar	#StoreLoad | #StoreStore"
 			     : "=&r" (prev)
 			     : "0" (new), "r" (sem), "r" (old)
 			     : "memory");

@@ -11,7 +11,7 @@
  * swapper address space.
  *
  * We have to move it here, since not every user of fs.h is including
- * mm.h, but m.h is including fs.h via sched .h :-/
+ * mm.h, but mm.h is including fs.h via sched .h :-/
  */
 typedef struct {
 	unsigned long val;

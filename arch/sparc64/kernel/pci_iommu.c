@@ -1,4 +1,4 @@
-/* $Id: pci_iommu.c,v 1.16 2001/10/09 02:24:33 davem Exp $
+/* $Id: pci_iommu.c,v 1.17 2001/12/17 07:05:09 davem Exp $
  * pci_iommu.c: UltraSparc PCI controller IOM/STC support.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -425,9 +425,7 @@ void pci_unmap_single(struct pci_dev *pdev, dma_addr_t bus_addr, size_t sz, int 
 }
 
 #define SG_ENT_PHYS_ADDRESS(SG)	\
-	((SG)->address ? \
-	 __pa((SG)->address) : \
-	 (__pa(page_address((SG)->page)) + (SG)->offset))
+	(__pa(page_address((SG)->page)) + (SG)->offset)
 
 static inline void fill_sg(iopte_t *iopte, struct scatterlist *sg,
 			   int nused, int nelems, unsigned long iopte_protection)
@@ -522,9 +520,7 @@ int pci_map_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems, int
 	if (nelems == 1) {
 		sglist->dma_address =
 			pci_map_single(pdev,
-				       (sglist->address ?
-					sglist->address :
-					(page_address(sglist->page) + sglist->offset)),
+				       (page_address(sglist->page) + sglist->offset),
 				       sglist->length, direction);
 		sglist->dma_length = sglist->length;
 		return 1;

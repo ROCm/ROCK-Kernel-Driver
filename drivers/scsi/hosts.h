@@ -312,7 +312,8 @@ struct Scsi_Host
     struct Scsi_Host      * next;
     Scsi_Device           * host_queue;
 
-    spinlock_t		  host_lock;
+    spinlock_t		  default_lock;
+    spinlock_t		  *host_lock;
 
     struct task_struct    * ehandler;  /* Error recovery thread. */
     struct semaphore      * eh_wait;   /* The error recovery thread waits on
@@ -329,7 +330,6 @@ struct Scsi_Host
     volatile unsigned short host_failed; /* commands that failed. */
     
 /* public: */
-    unsigned short extra_bytes;
     unsigned short host_no;  /* Used for IOCTL_GET_IDLUN, /proc/scsi et al. */
     int resetting; /* if set, it means that last_reset is a valid value */
     unsigned long last_reset;
@@ -386,10 +386,6 @@ struct Scsi_Host
     unsigned unchecked_isa_dma:1;
     unsigned use_clustering:1;
     unsigned highmem_io:1;
-    /*
-     * True if this host was loaded as a loadable module
-     */
-    unsigned loaded_as_module:1;
 
     /*
      * Host has rejected a command because it was busy.
@@ -451,7 +447,6 @@ typedef struct SHN
     char * name;
     unsigned short host_no;
     unsigned short host_registered;
-    unsigned loaded_as_module;
     } Scsi_Host_Name;
 	
 extern Scsi_Host_Name * scsi_host_no_list;
@@ -471,9 +466,13 @@ extern int next_scsi_host;
 unsigned int scsi_init(void);
 extern struct Scsi_Host * scsi_register(Scsi_Host_Template *, int j);
 extern void scsi_unregister(struct Scsi_Host * i);
-
 extern void scsi_register_blocked_host(struct Scsi_Host * SHpnt);
 extern void scsi_deregister_blocked_host(struct Scsi_Host * SHpnt);
+
+static inline void scsi_assign_lock(struct Scsi_Host *host, spinlock_t *lock)
+{
+	host->host_lock = lock;
+}
 
 static inline void scsi_set_pci_device(struct Scsi_Host *SHpnt,
                                        struct pci_dev *pdev)

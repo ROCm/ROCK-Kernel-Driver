@@ -15,7 +15,6 @@
  * be handled all at once by a host adapter.
  */
 
-#define __NO_VERSION__
 #include <linux/config.h>
 #include <linux/module.h>
 

@@ -1,5 +1,5 @@
 /*
- * $Id: io.h,v 1.29 2001/11/10 09:28:34 davem Exp $
+ * $Id: io.h,v 1.30 2001/12/21 01:23:21 davem Exp $
  */
 #ifndef __SPARC_IO_H
 #define __SPARC_IO_H
@@ -11,8 +11,7 @@
 #include <asm/page.h>      /* IO address mapping routines need this */
 #include <asm/system.h>
 
-#define virt_to_bus virt_to_phys
-#define bus_to_virt phys_to_virt
+#define page_to_phys(page)	((page - mem_map) << PAGE_SHIFT)
 
 static __inline__ u32 flip_dword (u32 d)
 {

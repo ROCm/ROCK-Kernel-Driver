@@ -1,4 +1,4 @@
-/* $Id: processor.h,v 1.76 2001/10/08 09:32:13 davem Exp $
+/* $Id: processor.h,v 1.80 2001/11/17 00:10:48 davem Exp $
  * include/asm-sparc64/processor.h
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -66,6 +66,15 @@ struct thread_struct {
 	unsigned long gsr[7];
 	unsigned long xfsr[7];
 
+#ifdef CONFIG_DEBUG_SPINLOCK
+	/* How many spinlocks held by this thread.
+	 * Used with spin lock debugging to catch tasks
+	 * sleeping illegally with locks held.
+	 */
+	int smp_lock_count;
+	unsigned int smp_lock_pc;
+#endif
+
 	struct reg_window reg_window[NSWINS];
 	unsigned long rwbuf_stkptrs[NSWINS];
 	
@@ -88,6 +97,7 @@ struct thread_struct {
 #define FAULT_CODE_ITLB		0x04	/* Miss happened in I-TLB		*/
 #define FAULT_CODE_WINFIXUP	0x08	/* Miss happened during spill/fill	*/
 
+#ifndef CONFIG_DEBUG_SPINLOCK
 #define INIT_THREAD  {					\
 /* ksp, wstate, cwp, flags, current_ds, */ 		\
    0,   0,      0,   0,     KERNEL_DS,			\
@@ -104,6 +114,24 @@ struct thread_struct {
 /* user_cntd0, user_cndd1, kernel_cntd0, kernel_cntd0, pcr_reg */ \
    0,          0,          0,		 0,            0, \
 }
+#else /* CONFIG_DEBUG_SPINLOCK */
+#define INIT_THREAD  {					\
+/* ksp, wstate, cwp, flags, current_ds, */ 		\
+   0,   0,      0,   0,     KERNEL_DS,			\
+/* w_saved, fpdepth, fault_code, use_blkcommit, */	\
+   0,       0,       0,          0,			\
+/* fault_address, fpsaved, __pad2, kregs, */		\
+   0,             { 0 },   0,      0,			\
+/* utraps, gsr,   xfsr,  smp_lock_count, smp_lock_pc, */\
+   0,	   { 0 }, { 0 }, 0,		 0,		\
+/* reg_window */					\
+   { { { 0, }, { 0, } }, }, 				\
+/* rwbuf_stkptrs */					\
+   { 0, 0, 0, 0, 0, 0, 0, },				\
+/* user_cntd0, user_cndd1, kernel_cntd0, kernel_cntd0, pcr_reg */ \
+   0,          0,          0,		 0,            0, \
+}
+#endif /* !(CONFIG_DEBUG_SPINLOCK) */
 
 #ifdef __KERNEL__
 #if PAGE_SHIFT == 13

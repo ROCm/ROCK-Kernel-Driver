@@ -748,6 +748,7 @@ void __init setup_arch(char **cmdline_p)
 			printk(KERN_WARNING "Use a PAE enabled kernel.\n");
 		else
 			printk(KERN_WARNING "Use a HIGHMEM enabled kernel.\n");
+		max_pfn = MAXMEM_PFN;
 #else /* !CONFIG_HIGHMEM */
 #ifndef CONFIG_X86_PAE
 		if (max_pfn > MAX_NONPAE_PFN) {

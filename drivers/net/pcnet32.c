@@ -36,6 +36,7 @@ static const char *version = "pcnet32.c:v1.25kf 26.9.1999 tsbogend@alpha.franken
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/crc32.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
@@ -214,8 +215,6 @@ static int full_duplex[MAX_UNITS];
 #define PCNET32_DWIO_BDP	0x1C
 
 #define PCNET32_TOTAL_SIZE 0x20
-
-#define CRC_POLYNOMIAL_LE 0xedb88320UL	/* Ethernet CRC, little endian */
 
 /* The PCNET32 Rx and Tx ring descriptors. */
 struct pcnet32_rx_head {
@@ -1425,8 +1424,8 @@ static void pcnet32_load_multicast (struct net_device *dev)
     volatile u16 *mcast_table = (u16 *)&ib->filter;
     struct dev_mc_list *dmi=dev->mc_list;
     char *addrs;
-    int i, j, bit, byte;
-    u32 crc, poly = CRC_POLYNOMIAL_LE;
+    int i;
+    u32 crc;
 	
     /* set all multicast bits */
     if (dev->flags & IFF_ALLMULTI){ 
@@ -1447,19 +1446,7 @@ static void pcnet32_load_multicast (struct net_device *dev)
 	if (!(*addrs & 1))
 	    continue;
 	
-	crc = 0xffffffff;
-	for (byte = 0; byte < 6; byte++)
-	    for (bit = *addrs++, j = 0; j < 8; j++, bit >>= 1) {
-		int test;
-		
-		test = ((bit ^ crc) & 0x01);
-		crc >>= 1;
-		
-		if (test) {
-		    crc = crc ^ poly;
-		}
-	    }
-	
+	crc = ether_crc_le(6, addrs);
 	crc = crc >> 26;
 	mcast_table [crc >> 4] |= 1 << (crc & 0xf);
     }

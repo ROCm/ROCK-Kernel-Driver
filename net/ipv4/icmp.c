@@ -3,7 +3,7 @@
  *	
  *		Alan Cox, <alan@redhat.com>
  *
- *	Version: $Id: icmp.c,v 1.82 2001/11/01 23:44:31 davem Exp $
+ *	Version: $Id: icmp.c,v 1.83 2001/12/13 09:00:19 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -154,8 +154,8 @@ int sysctl_icmp_ignore_bogus_error_responses;
  * 	it's bit position.
  *
  *	default: 
- *	dest unreachable (0x03), source quench (0x04),
- *	time exceeded (0x11), parameter problem (0x12)
+ *	dest unreachable (3), source quench (4),
+ *	time exceeded (11), parameter problem (12)
  */
 
 int sysctl_icmp_ratelimit = 1*HZ;

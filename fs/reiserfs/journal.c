@@ -414,12 +414,15 @@ void reiserfs_check_lock_depth(char *caller) {
 }
 
 /* return a cnode with same dev, block number and size in table, or null if not found */
-static inline struct reiserfs_journal_cnode *get_journal_hash_dev(struct reiserfs_journal_cnode **table,
-                                   				  kdev_t dev,long bl,int size) {
+static inline struct reiserfs_journal_cnode *
+get_journal_hash_dev(struct super_block *sb,
+		     struct reiserfs_journal_cnode **table,
+		     long bl)
+{
   struct reiserfs_journal_cnode *cn ;
-  cn = journal_hash(table, dev, bl) ;
+  cn = journal_hash(table, sb, bl) ;
   while(cn) {
-    if ((cn->blocknr == bl) && (kdev_same(cn->dev, dev)))
+    if (cn->blocknr == bl && cn->sb == sb)
       return cn ;
     cn = cn->hnext ;
   }
@@ -430,7 +433,7 @@ static inline struct reiserfs_journal_cnode *get_journal_hash_dev(struct reiserf
 static inline struct reiserfs_journal_cnode *get_journal_hash(struct super_block *p_s_sb, struct buffer_head *bh) {
   struct reiserfs_journal_cnode *cn ;
   if (bh) {
-    cn =  get_journal_hash_dev(SB_JOURNAL(p_s_sb)->j_hash_table, bh->b_dev, bh->b_blocknr, bh->b_size) ;
+    cn =  get_journal_hash_dev(p_s_sb, SB_JOURNAL(p_s_sb)->j_hash_table, bh->b_blocknr);
   }
   else {
     return (struct reiserfs_journal_cnode *)0 ;
@@ -502,8 +505,8 @@ int dump_journal_writers(void) {
 ** reject it on the next call to reiserfs_in_journal
 **
 */
-int reiserfs_in_journal(struct super_block *p_s_sb, kdev_t dev, 
-                        unsigned long bl, int size, int search_all, 
+int reiserfs_in_journal(struct super_block *p_s_sb,
+                        unsigned long bl, int search_all, 
 			unsigned long *next_zero_bit) {
   struct reiserfs_journal_cnode *cn ;
   struct reiserfs_list_bitmap *jb ;
@@ -540,12 +543,12 @@ int reiserfs_in_journal(struct super_block *p_s_sb, kdev_t dev,
   }
 
   /* is it in any old transactions? */
-  if (search_all && (cn = get_journal_hash_dev(SB_JOURNAL(p_s_sb)->j_list_hash_table, dev,bl,size))) {
+  if (search_all && (cn = get_journal_hash_dev(p_s_sb, SB_JOURNAL(p_s_sb)->j_list_hash_table, bl))) {
     return 1; 
   }
 
   /* is it in the current transaction.  This should never happen */
-  if ((cn = get_journal_hash_dev(SB_JOURNAL(p_s_sb)->j_hash_table, dev,bl,size))) {
+  if ((cn = get_journal_hash_dev(p_s_sb, SB_JOURNAL(p_s_sb)->j_hash_table, bl))) {
     return 1; 
   }
 
@@ -559,13 +562,13 @@ int reiserfs_in_journal(struct super_block *p_s_sb, kdev_t dev,
 inline void insert_journal_hash(struct reiserfs_journal_cnode **table, struct reiserfs_journal_cnode *cn) {
   struct reiserfs_journal_cnode *cn_orig ;
 
-  cn_orig = journal_hash(table, cn->dev, cn->blocknr) ;
+  cn_orig = journal_hash(table, cn->sb, cn->blocknr) ;
   cn->hnext = cn_orig ;
   cn->hprev = NULL ;
   if (cn_orig) {
     cn_orig->hprev = cn ;
   }
-  journal_hash(table, cn->dev, cn->blocknr) =  cn ;
+  journal_hash(table, cn->sb, cn->blocknr) =  cn ;
 }
 
 /* lock the current transaction */
@@ -760,12 +763,12 @@ reiserfs_panic(s, "journal-539: flush_commit_list: BAD count(%d) > orig_commit_l
 ** returns NULL if it can't find anything 
 */
 static struct reiserfs_journal_list *find_newer_jl_for_cn(struct reiserfs_journal_cnode *cn) {
-  kdev_t dev = cn->dev;
+  struct super_block *sb = cn->sb;
   unsigned long blocknr = cn->blocknr ;
 
   cn = cn->hprev ;
   while(cn) {
-    if (kdev_same(cn->dev, dev) && cn->blocknr == blocknr && cn->jlist) {
+    if (cn->sb == sb && cn->blocknr == blocknr && cn->jlist) {
       return cn->jlist ;
     }
     cn = cn->hprev ;
@@ -773,6 +776,8 @@ static struct reiserfs_journal_list *find_newer_jl_for_cn(struct reiserfs_journa
   return NULL ;
 }
 
+void remove_journal_hash(struct super_block *, struct reiserfs_journal_cnode **,
+struct reiserfs_journal_list *, unsigned long, int);
 
 /*
 ** once all the real blocks have been flushed, it is safe to remove them from the
@@ -780,12 +785,11 @@ static struct reiserfs_journal_list *find_newer_jl_for_cn(struct reiserfs_journa
 ** block to be reallocated for data blocks if it had been deleted.
 */
 static void remove_all_from_journal_list(struct super_block *p_s_sb, struct reiserfs_journal_list *jl, int debug) {
-  struct buffer_head fake_bh ;
   struct reiserfs_journal_cnode *cn, *last ;
   cn = jl->j_realblock ;
 
   /* which is better, to lock once around the whole loop, or
-  ** to lock for each call to remove_from_journal_list?
+  ** to lock for each call to remove_journal_hash?
   */
   while(cn) {
     if (cn->blocknr != 0) {
@@ -793,10 +797,8 @@ static void remove_all_from_journal_list(struct super_block *p_s_sb, struct reis
         printk("block %lu, bh is %d, state %d\n", cn->blocknr, cn->bh ? 1: 0, 
 	        cn->state) ;
       }
-      fake_bh.b_blocknr = cn->blocknr ;
-      fake_bh.b_dev = cn->dev ;
       cn->state = 0 ;
-      remove_from_journal_list(p_s_sb, jl, &fake_bh, 1) ;
+      remove_journal_hash(p_s_sb, SB_JOURNAL(p_s_sb)->j_list_hash_table, jl, cn->blocknr, 1) ;
     }
     last = cn ;
     cn = cn->next ;
@@ -1178,7 +1180,7 @@ loop_start:
                 mark_buffer_notjournal_dirty(cn->bh) ;
                 while(walk_cn) {
                     if (walk_cn->bh && walk_cn->blocknr == blocknr && 
-                         kdev_same(walk_cn->dev, cn->dev)) {
+                         walk_cn->sb == cn->sb) {
                         if (walk_cn->jlist) {
                             atomic_dec(&(walk_cn->jlist->j_nonzerolen)) ;
                         }
@@ -1267,21 +1269,21 @@ static unsigned long reiserfs_journal_kupdate(struct super_block *s) {
 ** removes any nodes in table with name block and dev as bh.
 ** only touchs the hnext and hprev pointers.
 */
-void remove_journal_hash(struct reiserfs_journal_cnode **table, struct reiserfs_journal_list *jl,struct buffer_head *bh,
-                         int remove_freed){
+void remove_journal_hash(struct super_block *sb,
+			struct reiserfs_journal_cnode **table,
+			struct reiserfs_journal_list *jl,
+			unsigned long block, int remove_freed)
+{
   struct reiserfs_journal_cnode *cur ;
   struct reiserfs_journal_cnode **head ;
 
-  if (!bh)
-    return ;
-
-  head= &(journal_hash(table, bh->b_dev, bh->b_blocknr)) ;
+  head= &(journal_hash(table, sb, block)) ;
   if (!head) {
     return ;
   }
   cur = *head ;
   while(cur) {
-    if (cur->blocknr == bh->b_blocknr && kdev_same(cur->dev, bh->b_dev) && (jl == NULL || jl == cur->jlist) && 
+    if (cur->blocknr == block && cur->sb == sb && (jl == NULL || jl == cur->jlist) && 
         (!test_bit(BLOCK_FREED, &cur->state) || remove_freed)) {
       if (cur->hnext) {
         cur->hnext->hprev = cur->hprev ;
@@ -1292,7 +1294,7 @@ void remove_journal_hash(struct reiserfs_journal_cnode **table, struct reiserfs_
 	*head = cur->hnext ;
       }
       cur->blocknr = 0 ;
-      cur->dev = NODEV ;
+      cur->sb = NULL ;
       cur->state = 0 ;
       if (cur->bh && cur->jlist) /* anybody who clears the cur->bh will also dec the nonzerolen */
 	atomic_dec(&(cur->jlist->j_nonzerolen)) ;
@@ -2184,7 +2186,7 @@ int journal_mark_dirty(struct reiserfs_transaction_handle *th, struct super_bloc
 
     cn->bh = bh ;
     cn->blocknr = bh->b_blocknr ;
-    cn->dev = bh->b_dev ;
+    cn->sb = p_s_sb;
     cn->jlist = NULL ;
     insert_journal_hash(SB_JOURNAL(p_s_sb)->j_hash_table, cn) ;
     if (!count_already_incd) {
@@ -2215,7 +2217,7 @@ int journal_mark_dirty_nolog(struct reiserfs_transaction_handle *th, struct supe
       buffer_journal_dirty(bh)) {
     return journal_mark_dirty(th, p_s_sb, bh) ;
   }
-  if (get_journal_hash_dev(SB_JOURNAL(p_s_sb)->j_list_hash_table, bh->b_dev,bh->b_blocknr,bh->b_size)) {
+  if (get_journal_hash_dev(p_s_sb, SB_JOURNAL(p_s_sb)->j_list_hash_table, bh->b_blocknr)) {
     return journal_mark_dirty(th, p_s_sb, bh) ;
   }
   mark_buffer_dirty(bh) ;
@@ -2238,7 +2240,7 @@ int remove_from_transaction(struct super_block *p_s_sb, unsigned long blocknr, i
   struct reiserfs_journal_cnode *cn ;
   int ret = 0;
 
-  cn = get_journal_hash_dev(SB_JOURNAL(p_s_sb)->j_hash_table, p_s_sb->s_dev, blocknr, p_s_sb->s_blocksize) ;
+  cn = get_journal_hash_dev(p_s_sb, SB_JOURNAL(p_s_sb)->j_hash_table, blocknr) ;
   if (!cn || !cn->bh) {
     return ret ;
   }
@@ -2255,7 +2257,8 @@ int remove_from_transaction(struct super_block *p_s_sb, unsigned long blocknr, i
   if (cn == SB_JOURNAL(p_s_sb)->j_last) {
     SB_JOURNAL(p_s_sb)->j_last = cn->prev ;
   }
-  remove_journal_hash(SB_JOURNAL(p_s_sb)->j_hash_table, NULL, bh, 0) ; 
+  if (bh)
+	remove_journal_hash(p_s_sb, SB_JOURNAL(p_s_sb)->j_hash_table, NULL, bh->b_blocknr, 0) ; 
   mark_buffer_not_journaled(bh) ; /* don't log this one */
 
   if (!already_cleaned) {
@@ -2273,12 +2276,6 @@ int remove_from_transaction(struct super_block *p_s_sb, unsigned long blocknr, i
   return ret ;
 }
 
-/* removes from a specific journal list hash */
-int remove_from_journal_list(struct super_block *s, struct reiserfs_journal_list *jl, struct buffer_head *bh, int remove_freed) {
-  remove_journal_hash(SB_JOURNAL(s)->j_list_hash_table, jl, bh, remove_freed) ;
-  return 0 ;
-}
-
 /*
 ** for any cnode in a journal list, it can only be dirtied of all the
 ** transactions that include it are commited to disk.
@@ -2290,7 +2287,7 @@ int remove_from_journal_list(struct super_block *s, struct reiserfs_journal_list
 **
 */
 static int can_dirty(struct reiserfs_journal_cnode *cn) {
-  kdev_t dev = cn->dev ;
+  struct super_block *sb = cn->sb;
   unsigned long blocknr = cn->blocknr  ;
   struct reiserfs_journal_cnode *cur = cn->hprev ;
   int can_dirty = 1 ;
@@ -2300,7 +2297,7 @@ static int can_dirty(struct reiserfs_journal_cnode *cn) {
   ** to disk right now.
   */
   while(cur && can_dirty) {
-    if (cur->jlist && cur->bh && cur->blocknr && kdev_same(cur->dev, dev) && 
+    if (cur->jlist && cur->bh && cur->blocknr && cur->sb == sb && 
         cur->blocknr == blocknr) {
       can_dirty = 0 ;
     }
@@ -2313,7 +2310,7 @@ static int can_dirty(struct reiserfs_journal_cnode *cn) {
   while(cur && can_dirty) {
     if (cur->jlist && cur->jlist->j_len > 0 && 
         atomic_read(&(cur->jlist->j_commit_left)) > 0 && cur->bh && 
-        cur->blocknr && kdev_same(cur->dev, dev) && cur->blocknr == blocknr) {
+        cur->blocknr && cur->sb == sb && cur->blocknr == blocknr) {
       can_dirty = 0 ;
     }
     cur = cur->hnext ;
@@ -2578,9 +2575,9 @@ int journal_mark_freed(struct reiserfs_transaction_handle *th, struct super_bloc
     cleaned = remove_from_transaction(p_s_sb, blocknr, cleaned) ;
 
     /* find all older transactions with this block, make sure they don't try to write it out */
-    cn = get_journal_hash_dev(SB_JOURNAL(p_s_sb)->j_list_hash_table, p_s_sb->s_dev, blocknr, p_s_sb->s_blocksize) ;
+    cn = get_journal_hash_dev(p_s_sb,SB_JOURNAL(p_s_sb)->j_list_hash_table,  blocknr) ;
     while (cn) {
-      if (kdev_same(p_s_sb->s_dev, cn->dev) && blocknr == cn->blocknr) {
+      if (p_s_sb == cn->sb && blocknr == cn->blocknr) {
 	set_bit(BLOCK_FREED, &cn->state) ;
 	if (cn->bh) {
 	  if (!cleaned) {
@@ -2821,7 +2818,7 @@ static int do_journal_end(struct reiserfs_transaction_handle *th, struct super_b
       }
       jl_cn->blocknr = cn->bh->b_blocknr ; 
       jl_cn->state = 0 ;
-      jl_cn->dev = cn->bh->b_dev ; 
+      jl_cn->sb = p_s_sb ;
       jl_cn->bh = cn->bh ;
       jl_cn->jlist = SB_JOURNAL_LIST(p_s_sb) + SB_JOURNAL_LIST_INDEX(p_s_sb) ;
       insert_journal_hash(SB_JOURNAL(p_s_sb)->j_list_hash_table, jl_cn) ; 

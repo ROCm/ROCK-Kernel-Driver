@@ -1,10 +1,12 @@
-/* $Id: dec_and_lock.S,v 1.2 2000/08/13 18:24:12 davem Exp $
+/* $Id: dec_and_lock.S,v 1.5 2001/11/18 00:12:56 davem Exp $
  * dec_and_lock.S: Sparc64 version of "atomic_dec_and_lock()"
  *                 using cas and ldstub instructions.
  *
  * Copyright (C) 2000 David S. Miller (davem@redhat.com)
  */
+#include <linux/config.h>
 
+#ifndef CONFIG_DEBUG_SPINLOCK
 	.text
 	.align	64
 
@@ -34,13 +36,15 @@ nzero:	cas	[%o0], %g5, %g7
 	bne,pn	%icc, loop1
 	 mov	0, %g1
 
-out:	retl
+out:
+	membar	#StoreLoad | #StoreStore
+	retl
 	 mov	%g1, %o0
-to_zero:ldstub	[%o1], %g3
+to_zero:
+	ldstub	[%o1], %g3
 	brnz,pn	%g3, spin_on_lock
 	 membar	#StoreLoad | #StoreStore
 loop2:	cas	[%o0], %g5, %g7		/* ASSERT(g7 == 0) */
-	nop
 	cmp	%g5, %g7
 
 	be,pt	%icc, out
@@ -61,3 +65,5 @@ spin_on_lock:
 	ba,pt	%xcc, to_zero
 	 nop
 	nop
+
+#endif /* !(CONFIG_DEBUG_SPINLOCK) */

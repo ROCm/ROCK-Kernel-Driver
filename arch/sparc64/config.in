@@ -1,4 +1,4 @@
-# $Id: config.in,v 1.152 2001/11/12 10:20:47 davem Exp $
+# $Id: config.in,v 1.156 2001/11/30 00:17:32 davem Exp $
 # For a description of the syntax of this configuration file,
 # see the Configure script.
 #
@@ -30,6 +30,8 @@ bool 'Symmetric multi-processing support' CONFIG_SMP
 
 # Identify this as a Sparc64 build
 define_bool CONFIG_SPARC64 y
+
+bool 'Support for hot-pluggable devices' CONFIG_HOTPLUG
 
 # Global things across all Sun machines.
 define_bool CONFIG_HAVE_DEC_LOCK y
@@ -89,7 +91,6 @@ endmenu
 mainmenu_option next_comment
 comment 'Console drivers'
 bool 'PROM console' CONFIG_PROM_CONSOLE
-bool 'Support Frame buffer devices' CONFIG_FB
 source drivers/video/Config.in
 endmenu
 
@@ -191,21 +192,21 @@ if [ "$CONFIG_SCSI" != "n" ]; then
       if [ "$CONFIG_SCSI_SYM53C8XX_2" != "y" ]; then
          dep_tristate 'NCR53C8XX SCSI support' CONFIG_SCSI_NCR53C8XX $CONFIG_SCSI
          dep_tristate 'SYM53C8XX SCSI support' CONFIG_SCSI_SYM53C8XX $CONFIG_SCSI
-      fi
-      if [ "$CONFIG_SCSI_NCR53C8XX" != "n" -o "$CONFIG_SCSI_SYM53C8XX" != "n" ]; then
-	 int 'default tagged command queue depth' CONFIG_SCSI_NCR53C8XX_DEFAULT_TAGS 8
-	 int 'maximum number of queued commands' CONFIG_SCSI_NCR53C8XX_MAX_TAGS 32
-	 int 'synchronous transfers frequency in MHz' CONFIG_SCSI_NCR53C8XX_SYNC 10
-	 bool '  enable profiling' CONFIG_SCSI_NCR53C8XX_PROFILE
-         if [ "$CONFIG_SCSI_SYM53C8XX" != "n" ]; then
-	    bool '  include support for the NCR PQS/PDS SCSI card' CONFIG_SCSI_NCR53C8XX_PQS_PDS
+         if [ "$CONFIG_SCSI_NCR53C8XX" != "n" -o "$CONFIG_SCSI_SYM53C8XX" != "n" ]; then
+            int 'default tagged command queue depth' CONFIG_SCSI_NCR53C8XX_DEFAULT_TAGS 8
+            int 'maximum number of queued commands' CONFIG_SCSI_NCR53C8XX_MAX_TAGS 32
+            int 'synchronous transfers frequency in MHz' CONFIG_SCSI_NCR53C8XX_SYNC 10
+            bool '  enable profiling' CONFIG_SCSI_NCR53C8XX_PROFILE
+            if [ "$CONFIG_SCSI_SYM53C8XX" != "n" ]; then
+	       bool '  include support for the NCR PQS/PDS SCSI card' CONFIG_SCSI_NCR53C8XX_PQS_PDS
+            fi
+            if [ "$CONFIG_SCSI_NCR53C8XX_DEFAULT_TAGS" = "0" ]; then
+               bool '  not allow targets to disconnect' CONFIG_SCSI_NCR53C8XX_NO_DISCONNECT
+            fi
+            if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+               bool '  assume boards are SYMBIOS compatible (EXPERIMENTAL)' CONFIG_SCSI_NCR53C8XX_SYMBIOS_COMPAT
+            fi
          fi
-	 if [ "$CONFIG_SCSI_NCR53C8XX_DEFAULT_TAGS" = "0" ]; then
-	    bool '  not allow targets to disconnect' CONFIG_SCSI_NCR53C8XX_NO_DISCONNECT
-	 fi
-	 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
-	    bool '  assume boards are SYMBIOS compatible (EXPERIMENTAL)' CONFIG_SCSI_NCR53C8XX_SYMBIOS_COMPAT
-	 fi
       fi
       dep_tristate 'Qlogic ISP SCSI support' CONFIG_SCSI_QLOGIC_ISP $CONFIG_SCSI
       dep_tristate 'Qlogic ISP FC SCSI support' CONFIG_SCSI_QLOGIC_FC $CONFIG_SCSI
@@ -295,6 +296,15 @@ endmenu
 mainmenu_option next_comment
 comment 'Kernel hacking'
 
-bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
-#bool 'ECache flush trap support at ta 0x72' CONFIG_EC_FLUSH_TRAP
+bool 'Kernel debugging' CONFIG_DEBUG_KERNEL
+if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
+   bool '  Debug memory allocations' CONFIG_DEBUG_SLAB
+   bool '  Magic SysRq key' CONFIG_MAGIC_SYSRQ
+   bool '  Spinlock debugging' CONFIG_DEBUG_SPINLOCK
+   bool '  Verbose BUG() reporting (adds 70K)' CONFIG_DEBUG_BUGVERBOSE
+   bool '  D-cache flush debugging' CONFIG_DEBUG_DCFLUSH
+fi
+
 endmenu
+
+source lib/Config.in

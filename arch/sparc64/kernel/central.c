@@ -1,4 +1,4 @@
-/* $Id: central.c,v 1.14 2000/09/21 06:25:14 anton Exp $
+/* $Id: central.c,v 1.15 2001/12/19 00:29:51 davem Exp $
  * central.c: Central FHC driver for Sunfire/Starfire/Wildfire.
  *
  * Copyright (C) 1997, 1999 David S. Miller (davem@redhat.com)
@@ -67,6 +67,7 @@ static void adjust_regs(struct linux_prom_registers *regp, int nregs,
 		if (rngc == nranges) /* oops */
 			prom_printf("adjust_regs: Could not find range with matching bus type...\n");
 		regp[regc].which_io = rangep[rngc].ot_parent_space;
+		regp[regc].phys_addr -= rangep[rngc].ot_child_base;
 		regp[regc].phys_addr += rangep[rngc].ot_parent_base;
 	}
 }

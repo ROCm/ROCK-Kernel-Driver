@@ -771,7 +771,7 @@ void xpram_request(request_queue_t * queue)
 
 		fault=0;
 #if ( XPRAM_VERSION == 24 )
-		current_req = blkdev_entry_next_request (&queue->queue_head);
+		current_req = CURRENT;
 #endif /* V24 */
 		dev_no = DEVICE_NR(current_req->rq_dev); 
 		/* Check if the minor number is in range */

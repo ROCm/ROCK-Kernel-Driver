@@ -1,4 +1,4 @@
-/* $Id: su.c,v 1.54 2001/11/07 14:52:30 davem Exp $
+/* $Id: su.c,v 1.55 2002/01/08 16:00:16 davem Exp $
  * su.c: Small serial driver for keyboard/mouse interface on sparc32/PCI
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -2061,7 +2061,7 @@ su_open(struct tty_struct *tty, struct file * filp)
 	int 			retval, line;
 	unsigned long		page;
 
-	line = MINOR(tty->device) - tty->driver.minor_start;
+	line = minor(tty->device) - tty->driver.minor_start;
 	if ((line < 0) || (line >= NR_PORTS))
 		return -ENODEV;
 	info = su_table + line;
@@ -2252,7 +2252,7 @@ done:
  */
 static __inline__ void __init show_su_version(void)
 {
-	char *revision = "$Revision: 1.54 $";
+	char *revision = "$Revision: 1.55 $";
 	char *version, *p;
 
 	version = strchr(revision, ' ');
@@ -2857,7 +2857,7 @@ serial_console_write(struct console *co, const char *s,
 static kdev_t
 serial_console_device(struct console *c)
 {
-	return MKDEV(TTY_MAJOR, 64 + c->index);
+	return mk_kdev(TTY_MAJOR, 64 + c->index);
 }
 
 /*

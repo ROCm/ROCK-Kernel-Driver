@@ -1,8 +1,8 @@
-/* IRC extension for IP connection tracking, Version 1.19
- * (C) 2000 by Harald Welte <laforge@gnumonks.org>
+/* IRC extension for IP connection tracking, Version 1.20
+ * (C) 2000-2001 by Harald Welte <laforge@gnumonks.org>
  * based on RR's ip_conntrack_ftp.c	
  *
- * ip_conntrack_irc.c,v 1.19 2001/10/25 14:34:21 laforge Exp
+ * ip_conntrack_irc.c,v 1.20 2001/12/06 07:42:10 laforge Exp
  *
  *      This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -10,7 +10,7 @@
  *      2 of the License, or (at your option) any later version.
  **
  *	Module load syntax:
- * 	insmod ip_nat_irc.o ports=port1,port2,...port<MAX_PORTS>
+ * 	insmod ip_conntrack_irc.o ports=port1,port2,...port<MAX_PORTS>
  *	
  * 	please give the ports of all IRC servers You wish to connect to.
  *	If You don't specify ports, the default will be port 6667

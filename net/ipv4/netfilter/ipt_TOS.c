@@ -21,6 +21,17 @@ target(struct sk_buff **pskb,
 	if ((iph->tos & IPTOS_TOS_MASK) != tosinfo->tos) {
 		u_int16_t diffs[2];
 
+		/* raw socket (tcpdump) may have clone of incoming
+                   skb: don't disturb it --RR */
+		if (skb_cloned(*pskb) && !(*pskb)->sk) {
+			struct sk_buff *nskb = skb_copy(*pskb, GFP_ATOMIC);
+			if (!nskb)
+				return NF_DROP;
+			kfree_skb(*pskb);
+			*pskb = nskb;
+			iph = (*pskb)->nh.iph;
+		}
+
 		diffs[0] = htons(iph->tos) ^ 0xFFFF;
 		iph->tos = (iph->tos & IPTOS_PREC_MASK) | tosinfo->tos;
 		diffs[1] = htons(iph->tos);

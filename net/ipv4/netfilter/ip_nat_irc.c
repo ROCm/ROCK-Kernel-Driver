@@ -1,8 +1,8 @@
 /* IRC extension for TCP NAT alteration.
- * (C) 2000 by Harald Welte <laforge@gnumonks.org>
+ * (C) 2000-2001 by Harald Welte <laforge@gnumonks.org>
  * based on a copy of RR's ip_nat_ftp.c
  *
- * ip_nat_irc.c,v 1.15 2001/10/22 10:43:53 laforge Exp
+ * ip_nat_irc.c,v 1.16 2001/12/06 07:42:10 laforge Exp
  *
  *      This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -81,7 +81,7 @@ irc_nat_expected(struct sk_buff **pskb,
 	}
 
 	newdstip = master->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip;
-	newsrcip = master->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip;
+	newsrcip = ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip;
 	DEBUGP("nat_expected: DCC cmd. %u.%u.%u.%u->%u.%u.%u.%u\n",
 	       NIPQUAD(newsrcip), NIPQUAD(newdstip));
 

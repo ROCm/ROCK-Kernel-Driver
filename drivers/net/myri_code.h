@@ -6284,4 +6284,4 @@ static unsigned char lanai4_data[20472] __initdata = {
 #define MYRI_NetReceiveBadCrcs       0xB8D4
 #define MYRI_NetReceiveBytes         0xB8DC
 
-#endif SYMBOL_DEFINES_COMPILED
+#endif /* SYMBOL_DEFINES_COMPILED */

@@ -21,6 +21,9 @@
 #include <asm/mmu_context.h>
 
 #define BITMAP_SIZE ((MAX_PRIO+7)/8)
+#define PRIO_INTERACTIVE	(MAX_RT_PRIO + (MAX_PRIO - MAX_RT_PRIO) / 4)
+#define TASK_INTERACTIVE(p)	((p)->prio >= MAX_RT_PRIO && (p)->prio <= PRIO_INTERACTIVE)
+#define JSLEEP_TO_PRIO(t)	(((t) * 20) / HZ)
 
 typedef struct runqueue runqueue_t;
 
@@ -48,7 +51,6 @@ static struct runqueue {
 	spinlock_t lock;
 	unsigned long nr_running, nr_switches;
 	task_t *curr, *idle;
-	unsigned long swap_cnt;
 	prio_array_t *active, *expired, arrays[2];
 	char __pad [SMP_CACHE_BYTES];
 } runqueues [NR_CPUS] __cacheline_aligned;
@@ -97,7 +99,7 @@ static inline void activate_task(task_t *p, runqueue_t *rq)
 	prio_array_t *array = rq->active;
 
 	if (!rt_task(p)) {
-		unsigned long prio_bonus = rq->swap_cnt - p->swap_cnt_last;
+		unsigned long prio_bonus = JSLEEP_TO_PRIO(jiffies - p->sleep_jtime);
 
 		if (prio_bonus > MAX_PRIO)
 			prio_bonus = MAX_PRIO;
@@ -114,7 +116,7 @@ static inline void deactivate_task(struct task_struct *p, runqueue_t *rq)
 	rq->nr_running--;
 	dequeue_task(p, p->array);
 	p->array = NULL;
-	p->swap_cnt_last = rq->swap_cnt;
+	p->sleep_jtime = jiffies;
 }
 
 static inline void resched_task(task_t *p)
@@ -448,7 +450,10 @@ void expire_task(task_t *p)
 				p->prio = MAX_PRIO - 1;
 		}
 		p->time_slice = time_slice;
-		enqueue_task(p, rq->expired);
+		if (TASK_INTERACTIVE(p))
+			enqueue_task(p, rq->active);
+		else
+			enqueue_task(p, rq->expired);
 	}
 	spin_unlock_irqrestore(&rq->lock, flags);
 }
@@ -475,14 +480,14 @@ need_resched_back:
 	spin_lock_irq(&rq->lock);
 
 	switch (prev->state) {
-		case TASK_INTERRUPTIBLE:
-			if (unlikely(signal_pending(prev))) {
-				prev->state = TASK_RUNNING;
-				break;
-			}
-		default:
-			deactivate_task(prev, rq);
-		case TASK_RUNNING:
+	case TASK_INTERRUPTIBLE:
+		if (unlikely(signal_pending(prev))) {
+			prev->state = TASK_RUNNING;
+			break;
+		}
+	default:
+		deactivate_task(prev, rq);
+	case TASK_RUNNING:
 	}
 pick_next_task:
 	if (unlikely(!rq->nr_running)) {
@@ -501,7 +506,6 @@ pick_next_task:
 		rq->active = rq->expired;
 		rq->expired = array;
 		array = rq->active;
-		rq->swap_cnt++;
 	}
 
 	idx = sched_find_first_zero_bit(array->bitmap);
@@ -1187,7 +1191,6 @@ void __init sched_init(void)
 		rq->expired = rq->arrays + 1;
 		spin_lock_init(&rq->lock);
 		rq->cpu = i;
-		rq->swap_cnt = 0;
 
 		for (j = 0; j < 2; j++) {
 			array = rq->arrays + j;

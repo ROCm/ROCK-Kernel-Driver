@@ -1,4 +1,4 @@
-/* $Id: ultra.S,v 1.68 2001/11/09 14:59:19 davem Exp $
+/* $Id: ultra.S,v 1.70 2001/11/29 16:42:10 kanoj Exp $
  * ultra.S: Don't expand these all over the place...
  *
  * Copyright (C) 1997, 2000 David S. Miller (davem@redhat.com)
@@ -117,7 +117,7 @@ __spitfire_flush_tlb_range_constant_time: /* %o0=ctx, %o1=start, %o3=end */
 	wrpr		%g1, PSTATE_IE, %pstate
 	mov		TLB_TAG_ACCESS, %g3
 	/* XXX Spitfire dependency... */
-	mov		(62 << 3), %g2
+	mov		((SPITFIRE_HIGHEST_LOCKED_TLBENT-1) << 3), %g2
 
 	/* Spitfire Errata #32 workaround. */
 	mov		0x8, %o4
@@ -642,7 +642,7 @@ __spitfire_xcall_flush_tlb_all:
 	stx		%g0, [%g4 + %lo(errata32_hwbug)]
 
 2:	add		%g2, 1, %g2
-	cmp		%g2, 63
+	cmp		%g2, SPITFIRE_HIGHEST_LOCKED_TLBENT
 	ble,pt		%icc, 1b
 	 sll		%g2, 3, %g3
 	flush		%g6
@@ -679,20 +679,15 @@ __cheetah_xcall_flush_cache_all:
 
 	.globl		xcall_call_function
 xcall_call_function:
-	mov		TLB_TAG_ACCESS, %g5		! wheee...
-	stxa		%g1, [%g5] ASI_IMMU		! save call_data here for a bit
-	membar		#Sync
 	rdpr		%pstate, %g2
 	wrpr		%g2, PSTATE_IG | PSTATE_AG, %pstate
-	mov		TLB_TAG_ACCESS, %g2
-	ldxa		[%g2] ASI_IMMU, %g5
 	rdpr		%pil, %g2
 	wrpr		%g0, 15, %pil
 	sethi		%hi(109f), %g7
 	b,pt		%xcc, etrap_irq
 109:	 or		%g7, %lo(109b), %g7
 	call		smp_call_function_client
-	 mov		%l5, %o0
+	 nop
 	b,pt		%xcc, rtrap
 	 clr		%l6
 

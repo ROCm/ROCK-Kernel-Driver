@@ -393,3 +393,5 @@ else
 fi
 
 endmenu
+
+source lib/Config.in

@@ -1,4 +1,4 @@
-/* $Id: pci_sabre.c,v 1.40 2001/10/11 00:44:38 davem Exp $
+/* $Id: pci_sabre.c,v 1.41 2001/11/14 13:17:56 davem Exp $
  * pci_sabre.c: Sabre specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -589,6 +589,11 @@ static int __init sabre_ino_to_pil(struct pci_dev *pdev, unsigned int ino)
 {
 	int ret;
 
+	if (pdev &&
+	    pdev->vendor == PCI_VENDOR_ID_SUN &&
+	    pdev->device == PCI_DEVICE_ID_SUN_RIO_USB)
+		return 9;
+
 	ret = sabre_pil_table[ino];
 	if (ret == 0 && pdev == NULL) {
 		ret = 1;
@@ -609,6 +614,7 @@ static int __init sabre_ino_to_pil(struct pci_dev *pdev, unsigned int ino)
 		case PCI_BASE_CLASS_MULTIMEDIA:
 		case PCI_BASE_CLASS_MEMORY:
 		case PCI_BASE_CLASS_BRIDGE:
+		case PCI_BASE_CLASS_SERIAL:
 			ret = 10;
 			break;
 

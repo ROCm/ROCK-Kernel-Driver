@@ -1053,16 +1053,13 @@ static void bmac_set_multicast(struct net_device *dev)
 
 /* The version of set_multicast below was lifted from sunhme.c */
 
-#define CRC_POLYNOMIAL_BE 0x04c11db7UL  /* Ethernet CRC, big endian */
-#define CRC_POLYNOMIAL_LE 0xedb88320UL  /* Ethernet CRC, little endian */
-
 static void bmac_set_multicast(struct net_device *dev)
 {
 	struct dev_mc_list *dmi = dev->mc_list;
 	char *addrs;
 	int i, j, bit, byte;
 	unsigned short rx_cfg;
-	u32 crc, poly = CRC_POLYNOMIAL_LE;
+	u32 crc;
 
 	if((dev->flags & IFF_ALLMULTI) || (dev->mc_count > 64)) {
 		bmwrite(dev, BHASH0, 0xffff);
@@ -1089,17 +1086,7 @@ static void bmac_set_multicast(struct net_device *dev)
 			if(!(*addrs & 1))
 				continue;
 
-			crc = 0xffffffffU;
-			for(byte = 0; byte < 6; byte++) {
-				for(bit = *addrs++, j = 0; j < 8; j++, bit >>= 1) {
-					int test;
-
-					test = ((bit ^ crc) & 0x01);
-					crc >>= 1;
-					if(test)
-						crc = crc ^ poly;
-				}
-			}
+			crc = ether_crc_le(6, addrs);
 			crc >>= 26;
 			hash_table[crc >> 4] |= 1 << (crc & 0xf);
 		}

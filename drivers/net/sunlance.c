@@ -62,12 +62,15 @@
  * 	          Anton Blanchard (anton@progsoc.uts.edu.au)
  * 2.00: 11/9/99: Massive overhaul and port to new SBUS driver interfaces.
  *		  David S. Miller (davem@redhat.com)
+ * 2.01:
+ *      11/08/01: Use library crc32 functions (Matt_Domsch@dell.com)
+ *		  
  */
 
 #undef DEBUG_DRIVER
 
 static char version[] =
-	"sunlance.c:v2.00 11/Sep/99 Miguel de Icaza (miguel@nuclecu.unam.mx)\n";
+	"sunlance.c:v2.01 08/Nov/01 Miguel de Icaza (miguel@nuclecu.unam.mx)\n";
 
 static char lancestr[] = "LANCE";
 
@@ -86,6 +89,7 @@ static char lancestr[] = "LANCE";
 #include <linux/string.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/crc32.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -114,9 +118,6 @@ static char lancestr[] = "LANCE";
 #define LANCE_LOG_TX_BUFFERS 4
 #define LANCE_LOG_RX_BUFFERS 4
 #endif
-
-#define CRC_POLYNOMIAL_BE 0x04c11db7UL  /* Ethernet CRC, big endian */
-#define CRC_POLYNOMIAL_LE 0xedb88320UL  /* Ethernet CRC, little endian */
 
 #define LE_CSR0 0
 #define LE_CSR1 1
@@ -1181,7 +1182,7 @@ static void lance_load_multicast(struct net_device *dev)
 	struct dev_mc_list *dmi = dev->mc_list;
 	char *addrs;
 	int i, j, bit, byte;
-	u32 crc, poly = CRC_POLYNOMIAL_LE;
+	u32 crc;
 	
 	/* set all multicast bits */
 	if (dev->flags & IFF_ALLMULTI) {
@@ -1211,19 +1212,7 @@ static void lance_load_multicast(struct net_device *dev)
 		/* multicast address? */
 		if (!(*addrs & 1))
 			continue;
-
-		crc = 0xffffffff;
-		for (byte = 0; byte < 6; byte++) {
-			for (bit = *addrs++, j = 0; j < 8; j++, bit >>= 1) {
-				int test;
-
-				test = ((bit ^ crc) & 0x01);
-				crc >>= 1;
-
-				if (test)
-					crc = crc ^ poly;
-			}
-		}
+		crc = ether_crc_le(6, addrs);
 		crc = crc >> 26;
 		if (lp->pio_buffer) {
 			u16 tmp = sbus_readw(&mcast_table[crc>>4]);

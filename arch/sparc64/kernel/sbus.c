@@ -1,4 +1,4 @@
-/* $Id: sbus.c,v 1.17 2001/10/09 02:24:33 davem Exp $
+/* $Id: sbus.c,v 1.18 2001/12/17 07:05:09 davem Exp $
  * sbus.c: UltraSparc SBUS controller support.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -377,9 +377,7 @@ void sbus_unmap_single(struct sbus_dev *sdev, dma_addr_t dma_addr, size_t size, 
 }
 
 #define SG_ENT_PHYS_ADDRESS(SG)	\
-	((SG)->address ? \
-	 __pa((SG)->address) : \
-	 (__pa(page_address((SG)->page)) + (SG)->offset))
+	(__pa(page_address((SG)->page)) + (SG)->offset)
 
 static inline void fill_sg(iopte_t *iopte, struct scatterlist *sg, int nused, int nelems, unsigned long iopte_bits)
 {
@@ -470,9 +468,7 @@ int sbus_map_sg(struct sbus_dev *sdev, struct scatterlist *sg, int nents, int di
 	if (nents == 1) {
 		sg->dma_address =
 			sbus_map_single(sdev,
-					(sg->address ?
-					 sg->address :
-					 (page_address(sg->page) + sg->offset)),
+					(page_address(sg->page) + sg->offset),
 					sg->length, dir);
 		sg->dma_length = sg->length;
 		return 1;

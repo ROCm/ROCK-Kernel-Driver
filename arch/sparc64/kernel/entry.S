@@ -1,4 +1,4 @@
-/* $Id: entry.S,v 1.137 2001/10/18 09:06:36 davem Exp $
+/* $Id: entry.S,v 1.141 2001/12/05 23:56:32 davem Exp $
  * arch/sparc64/kernel/entry.S:  Sparc64 trap low-level entry points.
  *
  * Copyright (C) 1995,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -483,7 +483,11 @@ do_ivec_xcall:
 	ldxa		[%g7 + %g0] ASI_INTR_R, %g7
 	stxa		%g0, [%g0] ASI_INTR_RECEIVE
 	membar		#Sync
-	jmpl		%g3, %g0
+	ba,pt		%xcc, 1f
+	 nop
+
+	.align		32
+1:	jmpl		%g3, %g0
 	 nop
 
 do_ivec_spurious:
@@ -657,15 +661,15 @@ floppy_tdone:
 	stx		%g5, [%g1 + %lo(pdma_size)]
 	sethi		%hi(auxio_register), %g1
 	ldx		[%g1 + %lo(auxio_register)], %g7
-	ldub		[%g7], %g5
+	lduba		[%g7] ASI_PHYS_BYPASS_EC_E, %g5
 	or		%g5, 0xc2, %g5
-	stb		%g5, [%g7]
+	stba		%g5, [%g7] ASI_PHYS_BYPASS_EC_E
 	andn		%g5, 0x02, %g5
 
 	nop; nop;  nop; nop;  nop; nop;
 	nop; nop;  nop; nop;  nop; nop;
 
-	stb		%g5, [%g7]
+	stba		%g5, [%g7] ASI_PHYS_BYPASS_EC_E
 	sethi		%hi(doing_pdma), %g1
 	b,pt		%xcc, floppy_dosoftint
 	 st		%g0, [%g1 + %lo(doing_pdma)]
@@ -678,7 +682,12 @@ floppy_fifo_emptied:
 	sethi		%hi(irq_action), %g1
 	or		%g1, %lo(irq_action), %g1
 	ldx		[%g1 + (11 << 3)], %g3		! irqaction[floppy_irq]
-	ldx		[%g3 + 0x10], %g4		! action->mask == ino_bucket ptr
+	ldx		[%g3 + 0x08], %g4		! action->flags>>48==ino
+	sethi		%hi(ivector_table), %g3
+	srlx		%g4, 48, %g4
+	or		%g3, %lo(ivector_table), %g3
+	sllx		%g4, 5, %g4
+	ldx		[%g3 + %g4], %g4		! &ivector_table[ino]
 	ldx		[%g4 + 0x10], %g4		! bucket->iclr
 	stwa		%g0, [%g4] ASI_PHYS_BYPASS_EC_E	! ICLR_IDLE
 	membar		#Sync				! probably not needed...
@@ -1615,6 +1624,11 @@ do_gettimeofday:	/* %o0 = timevalp */
 	 *
 	 * Note with time_t changes to the timeval type, I must now use
 	 * nucleus atomic quad 128-bit loads.
+	 *
+	 * If xtime was stored recently, I've seen crap from the
+	 * quad load on Cheetah.  Putting a membar SYNC before
+	 * the quad load seems to make the problem go away. -DaveM
+	 * (we should nop out workarounds like this on spitfire)
 	 */
 	sethi	%hi(timer_tick_offset), %g3
 	sethi	%hi(xtime), %g2
@@ -1626,6 +1640,7 @@ do_gettimeofday:	/* %o0 = timevalp */
 	sethi	%hi(0x003e0014), %o1
 	srlx	%o2, 32, %o2
 	or	%o1, %lo(0x003e0014), %o1
+	membar	#Sync
 	ldda	[%g2] ASI_NUCLEUS_QUAD_LDD, %o4
 	cmp	%o2, %o1
 	bne,pt	%xcc, 2f
@@ -1634,6 +1649,7 @@ do_gettimeofday:	/* %o0 = timevalp */
 	 rd	%asr24, %o1
 2:	rd	%tick, %o1
 3:	ldx	[%g1], %g7
+	membar	#Sync
 	ldda	[%g2] ASI_NUCLEUS_QUAD_LDD, %o2
 	xor	%o4, %o2, %o2
 	xor	%o5, %o3, %o3

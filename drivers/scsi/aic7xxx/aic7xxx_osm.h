@@ -713,20 +713,20 @@ static __inline void ahc_done_unlock(struct ahc_softc *, unsigned long *flags);
 static __inline void
 ahc_lockinit(struct ahc_softc *ahc)
 {
-	spin_lock_init(&ahc->platform_data->host->host_lock);
+	spin_lock_init(ahc->platform_data->host->host_lock);
 }
 
 static __inline void
 ahc_lock(struct ahc_softc *ahc, unsigned long *flags)
 {
 	*flags = 0;
-	spin_lock_irqsave(&ahc->platform_data->host->host_lock, *flags);
+	spin_lock_irqsave(ahc->platform_data->host->host_lock, *flags);
 }
 
 static __inline void
 ahc_unlock(struct ahc_softc *ahc, unsigned long *flags)
 {
-	spin_unlock_irqrestore(&ahc->platform_data->host->host_lock, *flags);
+	spin_unlock_irqrestore(ahc->platform_data->host->host_lock, *flags);
 }
 
 static __inline void
@@ -741,7 +741,7 @@ ahc_done_lock(struct ahc_softc *ahc, unsigned long *flags)
 	struct Scsi_Host *host = ahc->platform_data->host;
 
 	*flags = 0;
-	spin_lock_irqsave(&host->host_lock, *flags);
+	spin_lock_irqsave(host->host_lock, *flags);
 }
 
 static __inline void
@@ -749,7 +749,7 @@ ahc_done_unlock(struct ahc_softc *ahc, unsigned long *flags)
 {
 	struct Scsi_Host *host = ahc->platform_data->host;
 
-	spin_unlock_irqrestore(&host->host_lock, *flags);
+	spin_unlock_irqrestore(host->host_lock, *flags);
 }
 
 #else /* LINUX_VERSION_CODE < KERNEL_VERSION(2,1,0) */

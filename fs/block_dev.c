@@ -128,6 +128,7 @@ static int blkdev_get_block(struct inode * inode, sector_t iblock, struct buffer
 		return -EIO;
 
 	bh->b_dev = inode->i_rdev;
+	bh->b_bdev = inode->i_bdev;
 	bh->b_blocknr = iblock;
 	bh->b_state |= 1UL << BH_Mapped;
 	return 0;

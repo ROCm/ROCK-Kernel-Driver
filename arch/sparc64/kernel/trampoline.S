@@ -1,4 +1,4 @@
-/* $Id: trampoline.S,v 1.22 2001/09/07 21:04:40 kanoj Exp $
+/* $Id: trampoline.S,v 1.25 2002/01/11 08:45:38 davem Exp $
  * trampoline.S: Jump start slave processors on sparc64.
  *
  * Copyright (C) 1997 David S. Miller (davem@caip.rutgers.edu)
@@ -262,7 +262,7 @@ startup_continue:
 	wrpr		%o1, PSTATE_IG, %pstate
 
 	/* Get our UPA MID. */
-	lduw		[%o2 + AOFF_task_processor], %g1
+	lduw		[%o2 + AOFF_task_cpu], %g1
 	sethi		%hi(cpu_data), %g5
 	or		%g5, %lo(cpu_data), %g5
 

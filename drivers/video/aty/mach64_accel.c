@@ -326,7 +326,7 @@ static void name(struct vc_data *conp, struct display *p, args) \
 		     fbcon_cfb##width##_clear_margins(conp, p, bottom_only), \
 		     int bottom_only) \
  \
-const struct display_switch fbcon_aty##width## = { \
+const struct display_switch fbcon_aty##width = { \
     setup:		fbcon_cfb##width##_setup, \
     bmove:		fbcon_aty_bmove, \
     clear:		fbcon_aty_clear, \

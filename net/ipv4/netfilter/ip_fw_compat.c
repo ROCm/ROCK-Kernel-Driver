@@ -84,6 +84,16 @@ fw_in(unsigned int hooknum,
 	if ((*pskb)->ip_summed == CHECKSUM_HW)
 		(*pskb)->ip_summed = CHECKSUM_NONE;
 
+	/* Firewall rules can alter TOS: raw socket (tcpdump) may have
+           clone of incoming skb: don't disturb it --RR */
+	if (skb_cloned(*pskb) && !(*pskb)->sk) {
+		struct sk_buff *nskb = skb_copy(*pskb, GFP_ATOMIC);
+		if (!nskb)
+			return NF_DROP;
+		kfree_skb(*pskb);
+		*pskb = nskb;
+	}
+
 	switch (hooknum) {
 	case NF_IP_PRE_ROUTING:
 		if (fwops->fw_acct_in)

@@ -1,4 +1,4 @@
-/* $Id: fs.c,v 1.25 2001/09/19 00:04:30 davem Exp $
+/* $Id: fs.c,v 1.26 2002/01/08 16:00:21 davem Exp $
  * fs.c: fs related syscall emulation for Solaris
  *
  * Copyright (C) 1997,1998 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
@@ -429,7 +429,7 @@ static int report_statvfs(struct vfsmount *mnt, struct inode *inode, u32 buf)
 		    __put_user (s.f_files, &ss->f_files)	||
 		    __put_user (s.f_ffree, &ss->f_ffree)	||
 		    __put_user (s.f_ffree, &ss->f_favail)	||
-		    __put_user (R4_DEV(inode->i_sb->s_dev), &ss->f_fsid) ||
+		    __put_user (R4_DEV(kdev_t_to_nr(inode->i_sb->s_dev)), &ss->f_fsid) ||
 		    __copy_to_user (ss->f_basetype,p,j)		||
 		    __put_user (0, (char *)&ss->f_basetype[j])	||
 		    __put_user (s.f_namelen, &ss->f_namemax)	||
@@ -463,7 +463,7 @@ static int report_statvfs64(struct vfsmount *mnt, struct inode *inode, u32 buf)
 		    __put_user (s.f_files, &ss->f_files)	||
 		    __put_user (s.f_ffree, &ss->f_ffree)	||
 		    __put_user (s.f_ffree, &ss->f_favail)	||
-		    __put_user (R4_DEV(inode->i_sb->s_dev), &ss->f_fsid) ||
+		    __put_user (R4_DEV(kdev_t_to_nr(inode->i_sb->s_dev)), &ss->f_fsid) ||
 		    __copy_to_user (ss->f_basetype,p,j)		||
 		    __put_user (0, (char *)&ss->f_basetype[j])	||
 		    __put_user (s.f_namelen, &ss->f_namemax)	||

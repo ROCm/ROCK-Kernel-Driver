@@ -1,4 +1,4 @@
-/* $Id: timod.c,v 1.16 2001/09/18 22:29:06 davem Exp $
+/* $Id: timod.c,v 1.18 2002/01/08 16:00:21 davem Exp $
  * timod.c: timod emulation.
  *
  * Copyright (C) 1998 Patrik Rak (prak3264@ss1000.ms.mff.cuni.cz)
@@ -921,7 +921,7 @@ asmlinkage int solaris_putmsg(unsigned int fd, u32 arg1, u32 arg2, u32 arg3)
 	if (!ino) goto out;
 
 	if (!ino->i_sock &&
-		(MAJOR(ino->i_rdev) != 30 || MINOR(ino->i_rdev) != 1))
+		(major(ino->i_rdev) != 30 || minor(ino->i_rdev) != 1))
 		goto out;
 
 	ctlptr = (struct strbuf *)A(arg1);

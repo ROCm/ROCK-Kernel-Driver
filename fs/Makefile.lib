@@ -1,0 +1,2 @@
+obj-$(CONFIG_FS_JFFS2)		+= crc32.o
+obj-$(CONFIG_EFI_PARTITION)	+= crc32.o

@@ -168,7 +168,7 @@ retry:
       block_to_try = (i * (s->s_blocksize << 3)) + j; 
 
       /* the block is not in the journal, we can proceed */
-      if (!(reiserfs_in_journal(s, s->s_dev, block_to_try, s->s_blocksize, for_unformatted, &next_block_to_try))) {
+      if (!(reiserfs_in_journal(s, block_to_try, for_unformatted, &next_block_to_try))) {
 	*bmap_nr = i;
 	*offset = j;
 	return 1;

@@ -309,13 +309,20 @@ icmp_echo_ignore_broadcasts - BOOLEAN
 	ICMP ECHO requests sent to it or just those to broadcast/multicast
 	addresses, respectively.
 
-icmp_destunreach_rate - INTEGER
-icmp_paramprob_rate - INTEGER
-icmp_timeexceed_rate - INTEGER
-icmp_echoreply_rate - INTEGER (not enabled per default)
-	Limit the maximal rates for sending ICMP packets to specific targets.
+icmp_ratelimit - INTEGER
+	Limit the maximal rates for sending ICMP packets whose type matches
+	icmp_ratemask (see below) to specific targets.
 	0 to disable any limiting, otherwise the maximal rate in jiffies(1)
-	See the source for more information.
+	Default: 1
+
+icmp_ratemask - INTEGER
+	Mask made of ICMP types for which rates are being limited.
+	Default: 6168
+	Note: 6168 = 0x1818 = 1<<ICMP_DEST_UNREACH + 1<<ICMP_SOURCE_QUENCH +
+	      1<<ICMP_TIME_EXCEEDED + 1<<ICMP_PARAMETERPROB, which means
+	      dest unreachable (3), source quench (4), time exceeded (11)
+	      and parameter problem (12) ICMP packets are rate limited
+	      (check values in icmp.h)
 
 icmp_ignore_bogus_error_responses - BOOLEAN
 	Some routers violate RFC 1122 by sending bogus responses to broadcast
@@ -511,4 +518,4 @@ IPv6 Update by:
 Pekka Savola
 pekkas@netcore.fi
 
-$Id: ip-sysctl.txt,v 1.19 2001/05/16 17:11:04 davem Exp $
+$Id: ip-sysctl.txt,v 1.20 2001/12/13 09:00:18 davem Exp $

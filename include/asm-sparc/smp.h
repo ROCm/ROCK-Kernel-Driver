@@ -190,8 +190,6 @@ extern __inline__ void smp_send_stop(void) { }
 #define MBOX_IDLECPU2         0xFD
 #define MBOX_STOPCPU2         0xFE
 
-#define PROC_CHANGE_PENALTY     15
-
 #endif /* !(CONFIG_SMP) */
 
 #define NO_PROC_ID            0xFF

@@ -156,6 +156,7 @@ struct ucred {
 #define AF_IRDA		23	/* IRDA sockets			*/
 #define AF_PPPOX	24	/* PPPoX sockets		*/
 #define AF_WANPIPE	25	/* Wanpipe API Sockets */
+#define AF_LLC		26	/* Linux LLC			*/
 #define AF_BLUETOOTH	31	/* Bluetooth sockets 		*/
 #define AF_MAX		32	/* For now.. */
 
@@ -187,6 +188,7 @@ struct ucred {
 #define PF_IRDA		AF_IRDA
 #define PF_PPPOX	AF_PPPOX
 #define PF_WANPIPE	AF_WANPIPE
+#define PF_LLC		AF_LLC
 #define PF_BLUETOOTH	AF_BLUETOOTH
 #define PF_MAX		AF_MAX
 
@@ -237,6 +239,8 @@ struct ucred {
 #define SOL_ATM		264	/* ATM layer (cell level) */
 #define SOL_AAL		265	/* ATM Adaption Layer (packet level) */
 #define SOL_IRDA        266
+#define SOL_NETBEUI	267
+#define SOL_LLC		268
 
 /* IPX options */
 #define IPX_TYPE	1

@@ -100,7 +100,7 @@ lun used to address the device.  Once this is done, the SCSI mid layer
 can be informed of changes to the virtual SCSI bus which the driver 
 presents to it in the usual way. For example: 
 
-	echo add-single-device 3 2 1 0 > /proc/scsi/scsi
+	echo scsi add-single-device 3 2 1 0 > /proc/scsi/scsi
  
 to add a device on controller 3, bus 2, target 1, lun 0.   Note that
 the driver makes an effort to preserve the devices positions

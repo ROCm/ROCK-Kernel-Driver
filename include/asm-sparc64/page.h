@@ -1,4 +1,4 @@
-/* $Id: page.h,v 1.36 2000/08/10 01:04:53 davem Exp $ */
+/* $Id: page.h,v 1.38 2001/11/30 01:04:10 davem Exp $ */
 
 #ifndef _SPARC64_PAGE_H
 #define _SPARC64_PAGE_H
@@ -18,13 +18,20 @@
 
 #ifndef __ASSEMBLY__
 
+#ifdef CONFIG_DEBUG_BUGVERBOSE
+extern void do_BUG(const char *file, int line);
+#define BUG() do {					\
+	do_BUG(__FILE__, __LINE__);			\
+	__builtin_trap();				\
+} while (0)
+#else
 #define BUG()		__builtin_trap()
+#endif
+
 #define PAGE_BUG(page)	BUG()
 
 extern void _clear_page(void *page);
-extern void _copy_page(void *to, void *from);
 #define clear_page(X)	_clear_page((void *)(X))
-#define copy_page(X,Y)	_copy_page((void *)(X), (void *)(Y))
 extern void clear_user_page(void *page, unsigned long vaddr);
 extern void copy_user_page(void *to, void *from, unsigned long vaddr);
 

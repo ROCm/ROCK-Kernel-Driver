@@ -386,3 +386,5 @@ if [ "$CONFIG_SH_STANDARD_BIOS" = "y" ]; then
    bool 'Early printk support' CONFIG_SH_EARLY_PRINTK
 fi
 endmenu
+
+source lib/Config.in

@@ -44,11 +44,22 @@ ipt_tcpmss_target(struct sk_buff **pskb,
 {
 	const struct ipt_tcpmss_info *tcpmssinfo = targinfo;
 	struct tcphdr *tcph;
-	struct iphdr *iph = (*pskb)->nh.iph;
+	struct iphdr *iph;
 	u_int16_t tcplen, newtotlen, oldval, newmss;
 	unsigned int i;
 	u_int8_t *opt;
 
+	/* raw socket (tcpdump) may have clone of incoming skb: don't
+	   disturb it --RR */
+	if (skb_cloned(*pskb) && !(*pskb)->sk) {
+		struct sk_buff *nskb = skb_copy(*pskb, GFP_ATOMIC);
+		if (!nskb)
+			return NF_DROP;
+		kfree_skb(*pskb);
+		*pskb = nskb;
+	}
+
+	iph = (*pskb)->nh.iph;
 	tcplen = (*pskb)->len - iph->ihl*4;
 
 	tcph = (void *)iph + iph->ihl*4;

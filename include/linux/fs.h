@@ -245,6 +245,7 @@ struct buffer_head {
 	unsigned short b_size;		/* block size */
 	unsigned short b_list;		/* List that this buffer appears */
 	kdev_t b_dev;			/* device (B_FREE = free) */
+	struct block_device *b_bdev;
 
 	atomic_t b_count;		/* users using this block */
 	unsigned long b_state;		/* buffer state bitmap (see above) */
@@ -1357,7 +1358,20 @@ extern void insert_inode_hash(struct inode *);
 extern void remove_inode_hash(struct inode *);
 extern struct file * get_empty_filp(void);
 extern void file_move(struct file *f, struct list_head *list);
-extern struct buffer_head * get_hash_table(kdev_t, sector_t, int);
+extern struct buffer_head * __get_hash_table(struct block_device *, sector_t, int);
+static inline struct buffer_head * get_hash_table(kdev_t dev, sector_t block, int size)
+{
+	struct block_device *bdev;
+	struct buffer_head *bh;
+	bdev = bdget(kdev_t_to_nr(dev));
+	if (!bdev) {
+		printk("No block device for %s\n", bdevname(dev));
+		BUG();
+	}
+	bh = __get_hash_table(bdev, block, size);
+	atomic_dec(&bdev->bd_count);
+	return bh;
+}
 extern struct buffer_head * __getblk(struct block_device *, sector_t, int);
 static inline struct buffer_head * getblk(kdev_t dev, sector_t block, int size)
 {
@@ -1416,11 +1430,12 @@ static inline struct buffer_head * sb_getblk(struct super_block *sb, int block)
 }
 static inline struct buffer_head * sb_get_hash_table(struct super_block *sb, int block)
 {
-	return get_hash_table(sb->s_dev, block, sb->s_blocksize);
+	return __get_hash_table(sb->s_bdev, block, sb->s_blocksize);
 }
 static inline void map_bh(struct buffer_head *bh, struct super_block *sb, int block)
 {
 	bh->b_state |= 1 << BH_Mapped;
+	bh->b_bdev = sb->s_bdev;
 	bh->b_dev = sb->s_dev;
 	bh->b_blocknr = block;
 }
@@ -1428,7 +1443,7 @@ extern void wakeup_bdflush(void);
 extern void put_unused_buffer_head(struct buffer_head * bh);
 extern struct buffer_head * get_unused_buffer_head(int async);
 
-extern int brw_page(int, struct page *, kdev_t, sector_t [], int);
+extern int brw_page(int, struct page *, struct block_device *, sector_t [], int);
 
 typedef int (get_block_t)(struct inode*,sector_t,struct buffer_head*,int);
 

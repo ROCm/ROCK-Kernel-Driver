@@ -41,10 +41,10 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/fs.h>
+#include <linux/crc32.h>
 #include <linux/mtd/mtd.h>
 #include <linux/jffs2.h>
 #include "nodelist.h"
-#include "crc32.h"
 
 
 D1(void jffs2_print_frag_list(struct jffs2_inode_info *f)

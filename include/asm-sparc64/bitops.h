@@ -1,4 +1,4 @@
-/* $Id: bitops.h,v 1.36 2001/06/14 12:34:49 davem Exp $
+/* $Id: bitops.h,v 1.38 2001/11/19 18:36:34 davem Exp $
  * bitops.h: Bit string operations on the V9.
  *
  * Copyright 1996, 1997 David S. Miller (davem@caip.rutgers.edu)
@@ -13,9 +13,9 @@ extern long ___test_and_set_bit(unsigned long nr, volatile void *addr);
 extern long ___test_and_clear_bit(unsigned long nr, volatile void *addr);
 extern long ___test_and_change_bit(unsigned long nr, volatile void *addr);
 
-#define test_and_set_bit(nr,addr)	(___test_and_set_bit(nr,addr)!=0)
-#define test_and_clear_bit(nr,addr)	(___test_and_clear_bit(nr,addr)!=0)
-#define test_and_change_bit(nr,addr)	(___test_and_change_bit(nr,addr)!=0)
+#define test_and_set_bit(nr,addr)	({___test_and_set_bit(nr,addr)!=0;})
+#define test_and_clear_bit(nr,addr)	({___test_and_clear_bit(nr,addr)!=0;})
+#define test_and_change_bit(nr,addr)	({___test_and_change_bit(nr,addr)!=0;})
 #define set_bit(nr,addr)		((void)___test_and_set_bit(nr,addr))
 #define clear_bit(nr,addr)		((void)___test_and_clear_bit(nr,addr))
 #define change_bit(nr,addr)		((void)___test_and_change_bit(nr,addr))
@@ -214,8 +214,8 @@ found_middle:
 extern long ___test_and_set_le_bit(int nr, volatile void *addr);
 extern long ___test_and_clear_le_bit(int nr, volatile void *addr);
 
-#define test_and_set_le_bit(nr,addr)	(___test_and_set_le_bit(nr,addr)!=0)
-#define test_and_clear_le_bit(nr,addr)	(___test_and_clear_le_bit(nr,addr)!=0)
+#define test_and_set_le_bit(nr,addr)	({___test_and_set_le_bit(nr,addr)!=0;})
+#define test_and_clear_le_bit(nr,addr)	({___test_and_clear_le_bit(nr,addr)!=0;})
 #define set_le_bit(nr,addr)		((void)___test_and_set_le_bit(nr,addr))
 #define clear_le_bit(nr,addr)		((void)___test_and_clear_le_bit(nr,addr))
 

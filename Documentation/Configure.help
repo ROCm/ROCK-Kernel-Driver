@@ -6301,6 +6301,18 @@ CONFIG_BLK_CPQ_CISS_DA
   boards supported by this driver, and for further information
   on the use of this driver.
 
+SCSI tape drive support for Smart Array 5xxx
+CONFIG_CISS_SCSI_TAPE
+  When enabled (Y), this option allows SCSI tape drives and SCSI medium
+  changers (tape robots) to be accessed via a Compaq 5xxx array 
+  controller.  (See Documentation/cciss.txt for more details.)
+
+  "SCSI support" and "SCSI tape support" must also be enabled for this 
+  option to work.
+
+  When this option is disabled (N), the SCSI portion of the driver 
+  is not compiled.
+
 QuickNet Internet LineJack/PhoneJack support
 CONFIG_PHONE_IXJ
   Say M if you have a telephony card manufactured by Quicknet
@@ -24028,6 +24040,13 @@ CONFIG_GDB_CONSOLE
   If you are using GDB for remote debugging over a serial port and
   would like kernel messages to be formatted into GDB $O packets so
   that GDB prints them as program output, say 'Y'.
+
+CRC32 functions
+CONFIG_CRC32
+  This option is provided for the case where no in-kernel-tree
+  modules require CRC32 functions, but a module built outside the
+  kernel tree does. Such modules that use library CRC32 functions
+  require M here.
 
 #
 # A couple of things I keep forgetting:

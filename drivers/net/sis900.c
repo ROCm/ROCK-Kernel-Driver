@@ -1,6 +1,6 @@
 /* sis900.c: A SiS 900/7016 PCI Fast Ethernet driver for Linux.
    Copyright 1999 Silicon Integrated System Corporation 
-   Revision:	1.08.01	Aug. 25 2001
+   Revision:	1.08.02	Jan. 4 2002
    
    Modified from the driver which is originally written by Donald Becker.
    
@@ -18,6 +18,7 @@
    preliminary Rev. 1.0 Jan. 18, 1998
    http://www.sis.com.tw/support/databook.htm
 
+   Rev 1.08.02 Jan. 4 2002 Matt Domsch <Matt_Domsch@dell.com> update to use library crc32 function
    Rev 1.08.01 Aug. 25 2001 Hui-Fen Hsu update for 630ET & workaround for ICS1893 PHY
    Rev 1.08.00 Jun. 11 2001 Hui-Fen Hsu workaround for RTL8201 PHY and some bug fix
    Rev 1.07.11 Apr.  2 2001 Hui-Fen Hsu updates PCI drivers to use the new pci_set_dma_mask for kernel 2.4.3
@@ -62,11 +63,12 @@
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <linux/delay.h>
+#include <linux/crc32.h>
 
 #include "sis900.h"
 
 static char version[] __devinitdata =
-KERN_INFO "sis900.c: v1.08.01  9/25/2001\n";
+KERN_INFO "sis900.c: v1.08.02  1/4/2002\n";
 
 static int max_interrupt_work = 40;
 static int multicast_filter_limit = 128;
@@ -1928,26 +1930,7 @@ static int sis900_set_config(struct net_device *dev, struct ifmap *map)
 static u16 sis900_compute_hashtable_index(u8 *addr, u8 revision)
 {
 
-/* what is the correct value of the POLYNOMIAL ??
-   Donald Becker use 0x04C11DB7U
-   Joseph Zbiciak im14u2c@primenet.com gives me the
-   correct answer, thank you Joe !! */
-#define POLYNOMIAL 0x04C11DB7L
-	u32 crc = 0xffffffff, msb;
-	int  i, j;
-	u32  byte;
-
-	for (i = 0; i < 6; i++) {
-		byte = *addr++;
-		for (j = 0; j < 8; j++) {
-			msb = crc >> 31;
-			crc <<= 1;
-			if (msb ^ (byte & 1)) {
-				crc ^= POLYNOMIAL;
-			}
-			byte >>= 1;
-		}
-	}
+	u32 crc = ether_crc(6, addr);
 
 	/* leave 8 or 7 most siginifant bits */
 	if ((revision == SIS635A_900_REV) || (revision == SIS900B_900_REV))

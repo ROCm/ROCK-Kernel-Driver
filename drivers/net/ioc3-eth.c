@@ -33,6 +33,7 @@
 #include <linux/errno.h>
 #include <linux/module.h>
 #include <linux/pci.h>
+#include <linux/crc32.h>
 
 #ifdef CONFIG_SERIAL
 #include <linux/serial.h>
@@ -1611,27 +1612,16 @@ static void ioc3_timeout(struct net_device *dev)
  * Given a multicast ethernet address, this routine calculates the
  * address's bit index in the logical address filter mask
  */
-#define CRC_MASK        0xedb88320
 
 static inline unsigned int
 ioc3_hash(const unsigned char *addr)
 {
 	unsigned int temp = 0;
 	unsigned char byte;
-	unsigned int crc;
-	int bits, len;
+	u32 crc;
+	int bits;
 
-	len = ETH_ALEN;
-	for (crc = ~0; --len >= 0; addr++) {
-		byte = *addr;
-		for (bits = 8; --bits >= 0; ) {
-			if ((byte ^ crc) & 1)
-				crc = (crc >> 1) ^ CRC_MASK;
-			else
-				crc >>= 1;
-			byte >>= 1;
-		}
-	}
+	crc = ether_crc_le(ETH_ALEN, addr);
 
 	crc &= 0x3f;    /* bit reverse lowest 6 bits for hash index */
 	for (bits = 6; --bits >= 0; ) {

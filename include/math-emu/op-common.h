@@ -21,6 +21,9 @@
    not, write to the Free Software Foundation, Inc.,
    59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  */
 
+#ifndef __MATH_EMU_OP_COMMON_H__
+#define __MATH_EMU_OP_COMMON_H__
+
 #define _FP_DECL(wc, X)			\
   _FP_I_TYPE X##_c, X##_s, X##_e;	\
   _FP_FRAC_DECL_##wc(X)
@@ -846,3 +849,4 @@ do {									\
     q = n / d, r = n % d;			\
   } while (0)
 
+#endif /* __MATH_EMU_OP_COMMON_H__ */

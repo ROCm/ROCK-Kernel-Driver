@@ -5,7 +5,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br_input.c,v 1.9 2001/08/14 22:05:57 davem Exp $
+ *	$Id: br_input.c,v 1.10 2001/12/24 04:50:20 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -46,7 +46,7 @@ static void br_pass_frame_up(struct net_bridge *br, struct sk_buff *skb)
 			br_pass_frame_up_finish);
 }
 
-static void __br_handle_frame(struct sk_buff *skb)
+static int br_handle_frame_finish(struct sk_buff *skb)
 {
 	struct net_bridge *br;
 	unsigned char *dest;
@@ -57,103 +57,112 @@ static void __br_handle_frame(struct sk_buff *skb)
 	dest = skb->mac.ethernet->h_dest;
 
 	p = skb->dev->br_port;
+	if (p == NULL)
+		goto err_nolock;
+
 	br = p->br;
+	read_lock(&br->lock);
+	if (skb->dev->br_port == NULL)
+		goto err;
+
 	passedup = 0;
-
-	if (!(br->dev.flags & IFF_UP) ||
-	    p->state == BR_STATE_DISABLED)
-		goto freeandout;
-
 	if (br->dev.flags & IFF_PROMISC) {
 		struct sk_buff *skb2;
 
 		skb2 = skb_clone(skb, GFP_ATOMIC);
-		if (skb2) {
+		if (skb2 != NULL) {
 			passedup = 1;
 			br_pass_frame_up(br, skb2);
 		}
 	}
-
-	if (skb->mac.ethernet->h_source[0] & 1)
-		goto freeandout;
-
-	if (!passedup &&
-	    (dest[0] & 1) &&
-	    (br->dev.flags & IFF_ALLMULTI || br->dev.mc_list != NULL)) {
-		struct sk_buff *skb2;
-
-		skb2 = skb_clone(skb, GFP_ATOMIC);
-		if (skb2) {
-			passedup = 1;
-			br_pass_frame_up(br, skb2);
-		}
-	}
-
-	if (br->stp_enabled &&
-	    !memcmp(dest, bridge_ula, 5) &&
-	    !(dest[5] & 0xF0))
-		goto handle_special_frame;
-
-	if (p->state == BR_STATE_LEARNING ||
-	    p->state == BR_STATE_FORWARDING)
-		br_fdb_insert(br, p, skb->mac.ethernet->h_source, 0);
-
-	if (p->state != BR_STATE_FORWARDING)
-		goto freeandout;
 
 	if (dest[0] & 1) {
-		br_flood_forward(br, skb, 1);
+		br_flood_forward(br, skb, !passedup);
 		if (!passedup)
 			br_pass_frame_up(br, skb);
-		else
-			kfree_skb(skb);
-		return;
+		goto out;
 	}
 
 	dst = br_fdb_get(br, dest);
-
 	if (dst != NULL && dst->is_local) {
 		if (!passedup)
 			br_pass_frame_up(br, skb);
 		else
 			kfree_skb(skb);
 		br_fdb_put(dst);
-		return;
+		goto out;
 	}
 
 	if (dst != NULL) {
 		br_forward(dst->dst, skb);
 		br_fdb_put(dst);
-		return;
+		goto out;
 	}
 
 	br_flood_forward(br, skb, 0);
-	return;
 
- handle_special_frame:
-	if (!dest[5]) {
-		br_stp_handle_bpdu(skb);
-		return;
-	}
-
- freeandout:
-	kfree_skb(skb);
-}
-
-static int br_handle_frame_finish(struct sk_buff *skb)
-{
-	struct net_bridge *br;
-
-	br = skb->dev->br_port->br;
-	read_lock(&br->lock);
-	__br_handle_frame(skb);
+out:
 	read_unlock(&br->lock);
+	return 0;
 
+err:
+	read_unlock(&br->lock);
+err_nolock:
+	kfree_skb(skb);
 	return 0;
 }
 
 void br_handle_frame(struct sk_buff *skb)
 {
-	NF_HOOK(PF_BRIDGE, NF_BR_PRE_ROUTING, skb, skb->dev, NULL,
+	struct net_bridge *br;
+	unsigned char *dest;
+	struct net_bridge_port *p;
+
+	dest = skb->mac.ethernet->h_dest;
+
+	p = skb->dev->br_port;
+	if (p == NULL)
+		goto err_nolock;
+
+	br = p->br;
+	read_lock(&br->lock);
+	if (skb->dev->br_port == NULL)
+		goto err;
+
+	if (!(br->dev.flags & IFF_UP) ||
+	    p->state == BR_STATE_DISABLED)
+		goto err;
+
+	if (skb->mac.ethernet->h_source[0] & 1)
+		goto err;
+
+	if (p->state == BR_STATE_LEARNING ||
+	    p->state == BR_STATE_FORWARDING)
+		br_fdb_insert(br, p, skb->mac.ethernet->h_source, 0);
+
+	if (br->stp_enabled &&
+	    !memcmp(dest, bridge_ula, 5) &&
+	    !(dest[5] & 0xF0))
+		goto handle_special_frame;
+
+	if (p->state == BR_STATE_FORWARDING) {
+		NF_HOOK(PF_BRIDGE, NF_BR_PRE_ROUTING, skb, skb->dev, NULL,
 			br_handle_frame_finish);
+		read_unlock(&br->lock);
+		return;
+	}
+
+err:
+	read_unlock(&br->lock);
+err_nolock:
+	kfree_skb(skb);
+	return;
+
+handle_special_frame:
+	if (!dest[5]) {
+		br_stp_handle_bpdu(skb);
+		return;
+	}
+
+	kfree_skb(skb);
 }

@@ -187,6 +187,7 @@
 #define TRIDENT_STATE_MAGIC	0x63657373 /* "cess" */
 
 #define TRIDENT_DMA_MASK	0x3fffffff /* DMA buffer mask for pci_alloc_consist */
+#define ALI_DMA_MASK		0xffffffff /* ALI Tridents lack the 30-bit limitation */
 
 #define NR_HW_CH		32
 
@@ -2555,7 +2556,7 @@ static int trident_ioctl(struct inode *inode, struct file *file, unsigned int cm
 static int trident_open(struct inode *inode, struct file *file)
 {
 	int i = 0;
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	struct trident_card *card = devs;
 	struct trident_state *state = NULL;
 	struct dmabuf *dmabuf = NULL;
@@ -3750,7 +3751,7 @@ static int ali_write_proc(struct file *file, const char *buffer, unsigned long c
 static int trident_open_mixdev(struct inode *inode, struct file *file)
 {
 	int i = 0;
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	struct trident_card *card = devs;
 
 	for (card = devs; card != NULL; card = card->next)
@@ -3948,13 +3949,20 @@ static int __init trident_probe(struct pci_dev *pci_dev, const struct pci_device
 	u16 temp;
 	struct pci_dev *pci_dev_m1533 = NULL;
 	int rc = -ENODEV;
+	u64 dma_mask;
 
 	if (pci_enable_device(pci_dev))
 		goto out;
 
-	if (pci_set_dma_mask(pci_dev, TRIDENT_DMA_MASK)) {
+	if (pci_dev->device == PCI_DEVICE_ID_ALI_5451)
+		dma_mask = ALI_DMA_MASK;
+	else
+		dma_mask = TRIDENT_DMA_MASK;
+	if (pci_set_dma_mask(pci_dev, dma_mask)) {
 		printk(KERN_ERR "trident: architecture does not support"
-		       " 30bit PCI busmaster DMA\n");
+		       " %s PCI busmaster DMA\n",
+		       pci_dev->device == PCI_DEVICE_ID_ALI_5451 ?
+		       "32-bit" : "30-bit");
 		goto out;
 	}
 	pci_read_config_byte(pci_dev, PCI_CLASS_REVISION, &revision);

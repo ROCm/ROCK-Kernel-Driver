@@ -1,4 +1,4 @@
-/* $Id: semaphore.c,v 1.8 2001/05/18 08:01:35 davem Exp $
+/* $Id: semaphore.c,v 1.9 2001/11/18 00:12:56 davem Exp $
  * semaphore.c: Sparc64 semaphore implementation.
  *
  * This is basically the PPC semaphore scheme ported to use
@@ -31,7 +31,7 @@ static __inline__ int __sem_update_count(struct semaphore *sem, int incr)
 "	cas	[%3], %0, %1\n"
 "	cmp	%0, %1\n"
 "	bne,pn	%%icc, 1b\n"
-"	 nop\n"
+"	 membar #StoreLoad | #StoreStore\n"
 	: "=&r" (old_count), "=&r" (tmp), "=m" (sem->count)
 	: "r" (&sem->count), "r" (incr), "m" (sem->count)
 	: "cc");

@@ -4,7 +4,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br_private.h,v 1.6 2001/06/01 09:28:28 davem Exp $
+ *	$Id: br_private.h,v 1.7 2001/12/24 00:59:55 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -121,6 +121,7 @@ extern void br_inc_use_count(void);
 
 /* br_device.c */
 extern void br_dev_setup(struct net_device *dev);
+extern int br_dev_xmit(struct sk_buff *skb, struct net_device *dev);
 
 /* br_fdb.c */
 extern void br_fdb_changeaddr(struct net_bridge_port *p,

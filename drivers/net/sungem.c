@@ -1,7 +1,15 @@
-/* $Id: sungem.c,v 1.30 2001/10/17 06:55:10 davem Exp $
+/* $Id: sungem.c,v 1.44 2001/12/08 04:06:27 davem Exp $
  * sungem.c: Sun GEM ethernet driver.
  *
  * Copyright (C) 2000, 2001 David S. Miller (davem@redhat.com)
+ * 
+ * Support for Apple GMAC and assorted PHYs by
+ * Benjamin Herrenscmidt (benh@kernel.crashing.org)
+ * 
+ * TODO: 
+ *  - Get rid of all those nasty mdelay's and replace them
+ * with schedule_timeout.
+ *  - Implement WOL
  */
 
 #include <linux/module.h>
@@ -23,11 +31,16 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/crc32.h>
+#include <linux/mii.h>
+#include <linux/ethtool.h>
 
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/byteorder.h>
+#include <asm/uaccess.h>
+#include <asm/irq.h>
 
 #ifdef __sparc__
 #include <asm/idprom.h>
@@ -45,15 +58,33 @@
 
 #include "sungem.h"
 
-static char version[] __devinitdata =
-        "sungem.c:v0.95 16/Oct/01 David S. Miller (davem@redhat.com)\n";
+#define DRV_NAME	"sungem"
+#define DRV_VERSION	"0.96"
+#define DRV_RELDATE	"11/17/01"
+#define DRV_AUTHOR	"David S. Miller (davem@redhat.com)"
 
-MODULE_AUTHOR("David S. Miller (davem@redhat.com)");
+static char version[] __devinitdata =
+        DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE " " DRV_AUTHOR "\n";
+
+MODULE_AUTHOR(DRV_AUTHOR);
 MODULE_DESCRIPTION("Sun GEM Gbit ethernet driver");
 MODULE_LICENSE("GPL");
 
 MODULE_PARM(gem_debug, "i");
 MODULE_PARM_DESC(gem_debug, "(ignored)");
+MODULE_PARM(link_mode, "i");
+
+static int link_mode;
+
+static u16 link_modes[] __devinitdata = {
+	BMCR_ANENABLE,			/* 0 : autoneg */
+	0,				/* 1 : 10bt half duplex */
+	BMCR_SPEED100,			/* 2 : 100bt half duplex */
+	BMCR_SPD2, /* verify this */	/* 3 : 1000bt half duplex */
+	BMCR_FULLDPLX,			/* 4 : 10bt full duplex */
+	BMCR_SPEED100|BMCR_FULLDPLX,	/* 5 : 100bt full duplex */
+	BMCR_SPD2|BMCR_FULLDPLX		/* 6 : 1000bt full duplex */
+};
 
 #define GEM_MODULE_NAME	"gem"
 #define PFX GEM_MODULE_NAME ": "
@@ -73,7 +104,7 @@ static struct pci_device_id gem_pci_tbl[] __devinitdata = {
 	 * they only support 10/100 speeds. -DaveM
 	 * 
 	 * Apple's GMAC does support gigabit on machines with
-	 * the BCM5400 or 5401 PHYs. -BenH
+	 * the BCM54xx PHYs. -BenH
 	 */
 	{ PCI_VENDOR_ID_SUN, PCI_DEVICE_ID_SUN_RIO_GEM,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0UL },
@@ -362,10 +393,6 @@ static int gem_pci_interrupt(struct net_device *dev, struct gem *gp, u32 gem_sta
 	return 1;
 }
 
-static void gem_stop(struct gem *, unsigned long);
-static void gem_init_rings(struct gem *, int);
-static void gem_init_hw(struct gem *);
-
 /* All non-normal interrupt conditions get serviced here.
  * Returns non-zero if we should just exit the interrupt
  * handler right now (ie. if we reset the card which invalidates
@@ -418,9 +445,9 @@ static int gem_abnormal_irq(struct net_device *dev, struct gem *gp, u32 gem_stat
 	return 0;
 
 do_reset:
-	gem_stop(gp, gp->regs);
-	gem_init_rings(gp, 1);
-	gem_init_hw(gp);
+	gp->reset_task_pending = 1;
+	schedule_task(&gp->reset_task);
+
 	return 1;
 }
 
@@ -627,6 +654,10 @@ static void gem_tx_timeout(struct net_device *dev)
 	struct gem *gp = dev->priv;
 
 	printk(KERN_ERR "%s: transmit timed out, resetting\n", dev->name);
+	if (!gp->hw_running) {
+		printk("%s: hrm.. hw not running !\n", dev->name);
+		return;
+	}
 	printk(KERN_ERR "%s: TX_STATE[%08x:%08x:%08x]\n",
 	       dev->name,
 	       readl(gp->regs + TXDMA_CFG),
@@ -640,13 +671,19 @@ static void gem_tx_timeout(struct net_device *dev)
 
 	spin_lock_irq(&gp->lock);
 
-	gem_stop(gp, gp->regs);
-	gem_init_rings(gp, 1);
-	gem_init_hw(gp);
+	gp->reset_task_pending = 1;
+	schedule_task(&gp->reset_task);
 
 	spin_unlock_irq(&gp->lock);
+}
 
-	netif_wake_queue(dev);
+static __inline__ int gem_intme(int entry)
+{
+	/* Algorithm: IRQ every 1/2 of descriptors. */
+	if (!(entry & ((TX_RING_SIZE>>1)-1)))
+		return 1;
+
+	return 0;
 }
 
 static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
@@ -690,14 +727,21 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 					~PAGE_MASK),
 				       len, PCI_DMA_TODEVICE);
 		ctrl |= TXDCTRL_SOF | TXDCTRL_EOF | len;
+		if (gem_intme(entry))
+			ctrl |= TXDCTRL_INTME;
 		txd->buffer = cpu_to_le64(mapping);
 		txd->control_word = cpu_to_le64(ctrl);
 		entry = NEXT_TX(entry);
 	} else {
 		struct gem_txd *txd;
 		u32 first_len;
+		u64 intme;
 		dma_addr_t first_mapping;
 		int frag, first_entry = entry;
+
+		intme = 0;
+		if (gem_intme(entry))
+			intme |= TXDCTRL_INTME;
 
 		/* We must give this initial chunk to the device last.
 		 * Otherwise we could race with the device.
@@ -727,11 +771,15 @@ static int gem_start_xmit(struct sk_buff *skb, struct net_device *dev)
 			txd->buffer = cpu_to_le64(mapping);
 			txd->control_word = cpu_to_le64(this_ctrl | len);
 
+			if (gem_intme(entry))
+				intme |= TXDCTRL_INTME;
+
 			entry = NEXT_TX(entry);
 		}
 		txd = &gp->init_block->txd[first_entry];
 		txd->buffer = cpu_to_le64(first_mapping);
-		txd->control_word = cpu_to_le64(ctrl | TXDCTRL_SOF | first_len);
+		txd->control_word =
+			cpu_to_le64(ctrl | TXDCTRL_SOF | intme | first_len);
 	}
 
 	gp->tx_new = entry;
@@ -761,18 +809,19 @@ static int gem_change_mtu(struct net_device *dev, int new_mtu)
 		return -EINVAL;
 
 	spin_lock_irq(&gp->lock);
-	gem_stop(gp, gp->regs);
 	dev->mtu = new_mtu;
-	gem_init_rings(gp, 1);
-	gem_init_hw(gp);
+	gp->reset_task_pending = 1;
+	schedule_task(&gp->reset_task);
 	spin_unlock_irq(&gp->lock);
+
+	flush_scheduled_tasks();
 
 	return 0;
 }
 
 #define STOP_TRIES 32
 
-static void gem_stop(struct gem *gp, unsigned long regs)
+static void gem_stop(struct gem *gp)
 {
 	int limit;
 	u32 val;
@@ -781,13 +830,13 @@ static void gem_stop(struct gem *gp, unsigned long regs)
 	writel(0xffffffff, gp->regs + GREG_IMASK);
 
 	/* Reset the chip */
-	writel(GREG_SWRST_TXRST | GREG_SWRST_RXRST, regs + GREG_SWRST);
+	writel(GREG_SWRST_TXRST | GREG_SWRST_RXRST, gp->regs + GREG_SWRST);
 
 	limit = STOP_TRIES;
 
 	do {
 		udelay(20);
-		val = readl(regs + GREG_SWRST);
+		val = readl(gp->regs + GREG_SWRST);
 		if (limit-- <= 0)
 			break;
 	} while (val & (GREG_SWRST_TXRST | GREG_SWRST_RXRST));
@@ -810,6 +859,9 @@ static void gem_start_dma(struct gem *gp)
 	val = readl(gp->regs + MAC_RXCFG);
 	writel(val | MAC_RXCFG_ENAB, gp->regs + MAC_RXCFG);
 
+	(void) readl(gp->regs + MAC_RXCFG);
+	udelay(100);
+
 	writel(GREG_STAT_TXDONE, gp->regs + GREG_IMASK);
 
 	writel(RX_RING_SIZE - 4, gp->regs + RXDMA_KICK);
@@ -828,6 +880,88 @@ static int phy_BCM5400_link_table[8][3] = {
 	{ 1, 0, 1 },	/* 1000BT */
 };
 
+static void gem_begin_auto_negotiation(struct gem *gp, struct ethtool_cmd *ep)
+{
+	u16 ctl;
+	
+	/* Setup link parameters */
+	if (!ep)
+		goto start_aneg;
+	if (ep->autoneg == AUTONEG_ENABLE) {
+		/* TODO: parse ep->advertising */
+		gp->link_advertise |= (ADVERTISE_10HALF | ADVERTISE_10FULL);
+		gp->link_advertise |= (ADVERTISE_100HALF | ADVERTISE_100FULL);
+		/* Can I advertise gigabit here ? I'd need BCM PHY docs... */
+		gp->link_cntl = BMCR_ANENABLE;
+	} else {
+		gp->link_cntl = 0;
+		if (ep->speed == SPEED_100)
+			gp->link_cntl |= BMCR_SPEED100;
+		else if (ep->speed == SPEED_1000 && gp->gigabit_capable)
+			/* Hrm... check if this is right... */
+			gp->link_cntl |= BMCR_SPD2;
+		if (ep->duplex == DUPLEX_FULL)
+			gp->link_cntl |= BMCR_FULLDPLX;
+	}
+
+start_aneg:
+	spin_lock_irq(&gp->lock);
+	if (!gp->hw_running) {
+		spin_unlock_irq(&gp->lock);
+		return;
+	}
+
+	/* Configure PHY & start aneg */
+	ctl = phy_read(gp, MII_BMCR);
+	ctl &= ~(BMCR_FULLDPLX|BMCR_SPEED100|BMCR_ANENABLE);
+	ctl |= gp->link_cntl;
+	if (ctl & BMCR_ANENABLE) {
+		ctl |= BMCR_ANRESTART;
+		gp->lstate = link_aneg;
+	} else {
+		gp->lstate = link_force_ok;
+	}
+	phy_write(gp, MII_BMCR, ctl);
+
+	gp->timer_ticks = 0;
+	gp->link_timer.expires = jiffies + ((12 * HZ) / 10);
+	add_timer(&gp->link_timer);
+	spin_unlock_irq(&gp->lock);
+}
+
+static void gem_read_mii_link_mode(struct gem *gp, int *fd, int *spd, int *pause)
+{
+	u32 val;
+
+	*fd = 0;
+	*spd = 10;
+	*pause = 0;
+	
+	if (gp->phy_mod == phymod_bcm5400 ||
+	    gp->phy_mod == phymod_bcm5401 ||
+	    gp->phy_mod == phymod_bcm5411) {
+		int link_mode;	
+
+	    	val = phy_read(gp, MII_BCM5400_AUXSTATUS);
+		link_mode = ((val & MII_BCM5400_AUXSTATUS_LINKMODE_MASK) >>
+			     MII_BCM5400_AUXSTATUS_LINKMODE_SHIFT);
+		*fd = phy_BCM5400_link_table[link_mode][0];
+		*spd = phy_BCM5400_link_table[link_mode][2] ?
+			1000 :
+			(phy_BCM5400_link_table[link_mode][1] ? 100 : 10);
+		val = phy_read(gp, MII_LPA);
+		if (val & LPA_PAUSE)
+			*pause = 1;
+	} else {
+		val = phy_read(gp, MII_LPA);
+
+		if (val & (LPA_10FULL | LPA_100FULL))
+			*fd = 1;
+		if (val & (LPA_100FULL | LPA_100HALF))
+			*spd = 100;
+	}
+}
+
 /* A link-up condition has occurred, initialize and enable the
  * rest of the chip.
  */
@@ -842,32 +976,13 @@ static void gem_set_link_modes(struct gem *gp)
 
 	if (gp->phy_type == phy_mii_mdio0 ||
 	    gp->phy_type == phy_mii_mdio1) {
-		if (gp->lstate == aneg_wait) {
-			if (gp->phy_mod == phymod_bcm5400 ||
-			    gp->phy_mod == phymod_bcm5401 ||
-			    gp->phy_mod == phymod_bcm5411) {
-				int link_mode;	
-		    		val = phy_read(gp, PHY_BCM5400_AUXSTATUS);
-		    		link_mode = (val & PHY_BCM5400_AUXSTATUS_LINKMODE_MASK) >>
-		    			PHY_BCM5400_AUXSTATUS_LINKMODE_SHIFT;
-		    		full_duplex = phy_BCM5400_link_table[link_mode][0];
-		    		speed = phy_BCM5400_link_table[link_mode][2] ? 1000
-		    			: (phy_BCM5400_link_table[link_mode][1] ? 100 : 10);
-					val = phy_read(gp, PHY_LPA);
-					if (val & PHY_LPA_PAUSE)
-						pause = 1;	
-			} else {
-				val = phy_read(gp, PHY_LPA);
-				if (val & (PHY_LPA_10FULL | PHY_LPA_100FULL))
-					full_duplex = 1;
-				if (val & (PHY_LPA_100FULL | PHY_LPA_100HALF))
-					speed = 100;
-			}
-		} else {
-			val = phy_read(gp, PHY_CTRL);
-			if (val & PHY_CTRL_FDPLX)
+		val = phy_read(gp, MII_BMCR);
+		if (val & BMCR_ANENABLE)
+			gem_read_mii_link_mode(gp, &full_duplex, &speed, &pause);
+		else {
+			if (val & BMCR_FULLDPLX)
 				full_duplex = 1;
-			if (val & PHY_CTRL_SPD100)
+			if (val & BMCR_SPEED100)
 				speed = 100;
 		}
 	} else {
@@ -944,56 +1059,142 @@ static void gem_set_link_modes(struct gem *gp)
 
 static int gem_mdio_link_not_up(struct gem *gp)
 {
-	if (gp->lstate == aneg_wait) {
-		u16 val = phy_read(gp, PHY_CTRL);
+	if (gp->lstate == link_force_ret) {
+		printk(KERN_INFO "%s: Autoneg failed again, keeping"
+			" forced mode\n", gp->dev->name);
+		phy_write(gp, MII_BMCR, gp->link_fcntl);
+		gp->timer_ticks = 5;
+		gp->lstate = link_force_ok;
+	} else if (gp->lstate == link_aneg) {
+		u16 val = phy_read(gp, MII_BMCR);
 
 		/* Try forced modes. */
-		val &= ~(PHY_CTRL_ANRES | PHY_CTRL_ANENAB);
-		val &= ~(PHY_CTRL_FDPLX);
-		val |= PHY_CTRL_SPD100;
-		phy_write(gp, PHY_CTRL, val);
-		gp->timer_ticks = 0;
-		gp->lstate = force_wait;
-		return 1;
+		val &= ~(BMCR_ANRESTART | BMCR_ANENABLE);
+		val &= ~(BMCR_FULLDPLX);
+		val |= BMCR_SPEED100;
+		phy_write(gp, MII_BMCR, val);
+		gp->timer_ticks = 5;
+		gp->lstate = link_force_try;
 	} else {
 		/* Downgrade from 100 to 10 Mbps if necessary.
 		 * If already at 10Mbps, warn user about the
 		 * situation every 10 ticks.
 		 */
-		u16 val = phy_read(gp, PHY_CTRL);
-		if (val & PHY_CTRL_SPD100) {
-			val &= ~PHY_CTRL_SPD100;
-			phy_write(gp, PHY_CTRL, val);
-			gp->timer_ticks = 0;
-			return 1;
+		u16 val = phy_read(gp, MII_BMCR);
+		if (val & BMCR_SPEED100) {
+			val &= ~BMCR_SPEED100;
+			phy_write(gp, MII_BMCR, val);
+			gp->timer_ticks = 5;
 		} else {
-			printk(KERN_ERR "%s: Link down, cable problem?\n",
-			       gp->dev->name);
-			val |= (PHY_CTRL_ANRES | PHY_CTRL_ANENAB);
-			phy_write(gp, PHY_CTRL, val);
-			gp->timer_ticks = 1;
-			gp->lstate = aneg_wait;
 			return 1;
 		}
 	}
+	return 0;
+}
+
+static void gem_init_rings(struct gem *, int);
+static void gem_init_hw(struct gem *, int);
+
+static void gem_reset_task(void *data)
+{
+	struct gem *gp = (struct gem *) data;
+
+	/* The link went down, we reset the ring, but keep
+	 * DMA stopped. Todo: Use this function for reset
+	 * on error as well.
+	 */
+	if (gp->hw_running && gp->opened) {
+		/* Make sure we don't get interrupts or tx packets */
+		spin_lock_irq(&gp->lock);
+
+		netif_stop_queue(gp->dev);
+
+		writel(0xffffffff, gp->regs + GREG_IMASK);
+
+		spin_unlock_irq(&gp->lock);
+
+		/* Reset the chip & rings */
+		gem_stop(gp);
+		gem_init_rings(gp, 0);
+		gem_init_hw(gp, 0);
+
+		netif_wake_queue(gp->dev);
+	}
+	gp->reset_task_pending = 0;
 }
 
 static void gem_link_timer(unsigned long data)
 {
 	struct gem *gp = (struct gem *) data;
-	int restart_timer = 0;
 
-	gp->timer_ticks++;
+	if (!gp->hw_running)
+		return;
+
+	/* If the link of task is still pending, we just
+	 * reschedule the link timer
+	 */
+	if (gp->reset_task_pending)
+		goto restart;
+	    	
+	spin_lock_irq(&gp->lock);
 	if (gp->phy_type == phy_mii_mdio0 ||
 	    gp->phy_type == phy_mii_mdio1) {
-		u16 val = phy_read(gp, PHY_STAT);
+		u16 val = phy_read(gp, MII_BMSR);
+		int up;
 
-		if (val & PHY_STAT_LSTAT) {
-			gem_set_link_modes(gp);
-		} else if (gp->timer_ticks < 10) {
-			restart_timer = 1;
+		/* When using autoneg, we really wait for ANEGCOMPLETE or we may
+		 * get a "transcient" incorrect link state
+		 */
+#if 0
+		{
+			u16 cntl = phy_read(gp, MII_BMCR);
+			if (cntl & BMCR_ANENABLE)
+				up = (val & (BMSR_ANEGCOMPLETE | BMSR_LSTATUS)) == (BMSR_ANEGCOMPLETE | BMSR_LSTATUS);
+			else
+				up = (val & BMSR_LSTATUS) != 0;
+		}
+#else
+		up = (val & BMSR_LSTATUS) != 0;
+#endif
+		if (up) {
+			/* Ok, here we got a link. If we had it due to a forced
+			 * fallback, and we were configured for autoneg, we do
+			 * retry a short autoneg pass. If you know your hub is
+			 * broken, use ethtool ;)
+			 */
+			if (gp->lstate == link_force_try && (gp->link_cntl & BMCR_ANENABLE)) {
+				gp->lstate = link_force_ret;
+				gp->link_fcntl = phy_read(gp, MII_BMCR);
+				gp->timer_ticks = 5;
+				printk(KERN_INFO "%s: Got link after fallback, retrying autoneg"
+				       " once...\n", gp->dev->name);
+				phy_write(gp, MII_BMCR,
+					  gp->link_fcntl | BMCR_ANENABLE | BMCR_ANRESTART);
+			} else if (gp->lstate != link_up) {
+				gp->lstate = link_up;
+				if (gp->opened)
+					gem_set_link_modes(gp);
+			}
 		} else {
-			restart_timer = gem_mdio_link_not_up(gp);
+			int restart = 0;
+
+			/* If the link was previously up, we restart the
+			 * whole process
+			 */
+			if (gp->lstate == link_up) {
+				gp->lstate = link_down;
+				printk(KERN_INFO "%s: Link down\n", gp->dev->name);
+				gp->reset_task_pending = 1;
+				schedule_task(&gp->reset_task);
+				restart = 1;
+			} else if (++gp->timer_ticks > 10)
+				restart = gem_mdio_link_not_up(gp);
+
+			if (restart) {
+				spin_unlock_irq(&gp->lock);
+				gem_begin_auto_negotiation(gp, NULL);
+				return;
+			}
 		}
 	} else {
 		u32 val = readl(gp->regs + PCS_MIISTAT);
@@ -1001,17 +1202,17 @@ static void gem_link_timer(unsigned long data)
 		if (!(val & PCS_MIISTAT_LS))
 			val = readl(gp->regs + PCS_MIISTAT);
 
-		if ((val & PCS_MIISTAT_LS) == 0) {
-			restart_timer = 1;
-		} else {
-			gem_set_link_modes(gp);
+		if ((val & PCS_MIISTAT_LS) != 0) {
+			gp->lstate = link_up;
+			if (gp->opened)
+				gem_set_link_modes(gp);
 		}
 	}
 
-	if (restart_timer) {
-		gp->link_timer.expires = jiffies + ((12 * HZ) / 10);
-		add_timer(&gp->link_timer);
-	}
+restart:
+	gp->link_timer.expires = jiffies + ((12 * HZ) / 10);
+	add_timer(&gp->link_timer);
+	spin_unlock_irq(&gp->lock);
 }
 
 static void gem_clean_rings(struct gem *gp)
@@ -1108,66 +1309,72 @@ static void gem_init_rings(struct gem *gp, int from_irq)
 	}
 }
 
-static int
-gem_reset_one_mii_phy(struct gem *gp, int phy_addr)
+static int gem_reset_one_mii_phy(struct gem *gp, int phy_addr)
 {
 	u16 val;
 	int limit = 10000;
 	
-	val = __phy_read(gp, PHY_CTRL, phy_addr);
-	val &= ~PHY_CTRL_ISO;
-	val |= PHY_CTRL_RST;
-	__phy_write(gp, PHY_CTRL, val, phy_addr);
+	val = __phy_read(gp, MII_BMCR, phy_addr);
+	val &= ~BMCR_ISOLATE;
+	val |= BMCR_RESET;
+	__phy_write(gp, MII_BMCR, val, phy_addr);
 
 	udelay(100);
 
 	while (limit--) {
-		val = __phy_read(gp, PHY_CTRL, phy_addr);
-		if ((val & PHY_CTRL_RST) == 0)
+		val = __phy_read(gp, MII_BMCR, phy_addr);
+		if ((val & BMCR_RESET) == 0)
 			break;
 		udelay(10);
 	}
-	if ((val & PHY_CTRL_ISO) && limit > 0)
-		__phy_write(gp, PHY_CTRL, val & ~PHY_CTRL_ISO, phy_addr);
+	if ((val & BMCR_ISOLATE) && limit > 0)
+		__phy_write(gp, MII_BMCR, val & ~BMCR_ISOLATE, phy_addr);
 	
 	return (limit <= 0);
 }
 
-static void
-gem_init_bcm5400_phy(struct gem *gp)
+static void gem_init_bcm5201_phy(struct gem *gp)
+{
+	u16 data;
+
+	data = phy_read(gp, MII_BCM5201_MULTIPHY);
+	data &= ~MII_BCM5201_MULTIPHY_SUPERISOLATE;
+	phy_write(gp, MII_BCM5201_MULTIPHY, data);
+}
+
+static void gem_init_bcm5400_phy(struct gem *gp)
 {
 	u16 data;
 
 	/* Configure for gigabit full duplex */
-	data = phy_read(gp, PHY_BCM5400_AUXCONTROL);
-	data |= PHY_BCM5400_AUXCONTROL_PWR10BASET;
-	phy_write(gp, PHY_BCM5400_AUXCONTROL, data);
+	data = phy_read(gp, MII_BCM5400_AUXCONTROL);
+	data |= MII_BCM5400_AUXCONTROL_PWR10BASET;
+	phy_write(gp, MII_BCM5400_AUXCONTROL, data);
 	
-	data = phy_read(gp, PHY_BCM5400_GB_CONTROL);
-	data |= PHY_BCM5400_GB_CONTROL_FULLDUPLEXCAP;
-	phy_write(gp, PHY_BCM5400_GB_CONTROL, data);
+	data = phy_read(gp, MII_BCM5400_GB_CONTROL);
+	data |= MII_BCM5400_GB_CONTROL_FULLDUPLEXCAP;
+	phy_write(gp, MII_BCM5400_GB_CONTROL, data);
 	
 	mdelay(10);
 
 	/* Reset and configure cascaded 10/100 PHY */
 	gem_reset_one_mii_phy(gp, 0x1f);
 	
-	data = __phy_read(gp, PHY_BCM5201_MULTIPHY, 0x1f);
-	data |= PHY_BCM5201_MULTIPHY_SERIALMODE;
-	__phy_write(gp, PHY_BCM5201_MULTIPHY, data, 0x1f);
+	data = __phy_read(gp, MII_BCM5201_MULTIPHY, 0x1f);
+	data |= MII_BCM5201_MULTIPHY_SERIALMODE;
+	__phy_write(gp, MII_BCM5201_MULTIPHY, data, 0x1f);
 
-	data = phy_read(gp, PHY_BCM5400_AUXCONTROL);
-	data &= ~PHY_BCM5400_AUXCONTROL_PWR10BASET;
-	phy_write(gp, PHY_BCM5400_AUXCONTROL, data);
+	data = phy_read(gp, MII_BCM5400_AUXCONTROL);
+	data &= ~MII_BCM5400_AUXCONTROL_PWR10BASET;
+	phy_write(gp, MII_BCM5400_AUXCONTROL, data);
 }
 
-static void
-gem_init_bcm5401_phy(struct gem *gp)
+static void gem_init_bcm5401_phy(struct gem *gp)
 {
 	u16 data;
 	int rev;
 
-	rev = phy_read(gp, PHY_ID1) & 0x000f;
+	rev = phy_read(gp, MII_PHYSID2) & 0x000f;
 	if (rev == 0 || rev == 3) {
 		/* Some revisions of 5401 appear to need this
 		 * initialisation sequence to disable, according
@@ -1191,22 +1398,21 @@ gem_init_bcm5401_phy(struct gem *gp)
 	}
 	
 	/* Configure for gigabit full duplex */
-	data = phy_read(gp, PHY_BCM5400_GB_CONTROL);
-	data |= PHY_BCM5400_GB_CONTROL_FULLDUPLEXCAP;
-	phy_write(gp, PHY_BCM5400_GB_CONTROL, data);
+	data = phy_read(gp, MII_BCM5400_GB_CONTROL);
+	data |= MII_BCM5400_GB_CONTROL_FULLDUPLEXCAP;
+	phy_write(gp, MII_BCM5400_GB_CONTROL, data);
 
 	mdelay(1);
 
 	/* Reset and configure cascaded 10/100 PHY */
 	gem_reset_one_mii_phy(gp, 0x1f);
 	
-	data = __phy_read(gp, PHY_BCM5201_MULTIPHY, 0x1f);
-	data |= PHY_BCM5201_MULTIPHY_SERIALMODE;
-	__phy_write(gp, PHY_BCM5201_MULTIPHY, data, 0x1f);
+	data = __phy_read(gp, MII_BCM5201_MULTIPHY, 0x1f);
+	data |= MII_BCM5201_MULTIPHY_SERIALMODE;
+	__phy_write(gp, MII_BCM5201_MULTIPHY, data, 0x1f);
 }
 
-static void
-gem_init_bcm5411_phy(struct gem *gp)
+static void gem_init_bcm5411_phy(struct gem *gp)
 {
 	u16 data;
 
@@ -1220,20 +1426,30 @@ gem_init_bcm5411_phy(struct gem *gp)
 	/* Here, Apple seems to want to reset it, do
 	 * it as well
 	 */
-	phy_write(gp, PHY_CTRL, PHY_CTRL_RST);
+	phy_write(gp, MII_BMCR, BMCR_RESET);
 
 	/* Start autoneg */
-	phy_write(gp, PHY_CTRL,
-		  (PHY_CTRL_ANENAB | PHY_CTRL_FDPLX |
-		   PHY_CTRL_ANRES | PHY_CTRL_SPD2));
+	phy_write(gp, MII_BMCR,
+		  (BMCR_ANENABLE | BMCR_FULLDPLX |
+		   BMCR_ANRESTART | BMCR_SPD2));
 
-	data = phy_read(gp, PHY_BCM5400_GB_CONTROL);
-	data |= PHY_BCM5400_GB_CONTROL_FULLDUPLEXCAP;
-	phy_write(gp, PHY_BCM5400_GB_CONTROL, data);
+	data = phy_read(gp, MII_BCM5400_GB_CONTROL);
+	data |= MII_BCM5400_GB_CONTROL_FULLDUPLEXCAP;
+	phy_write(gp, MII_BCM5400_GB_CONTROL, data);
 }
 
 static void gem_init_phy(struct gem *gp)
 {
+	u32 mifcfg;
+
+	if (!gp->wake_on_lan && gp->phy_mod == phymod_bcm5201)
+		phy_write(gp, MII_BCM5201_INTERRUPT, 0);
+
+	/* Revert MIF CFG setting done on stop_phy */
+	mifcfg = readl(gp->regs + MIF_CFG);
+	mifcfg &= ~MIF_CFG_BBMODE;
+	writel(mifcfg, gp->regs + MIF_CFG);
+	
 #ifdef CONFIG_ALL_PPC
 	if (gp->pdev->vendor == PCI_VENDOR_ID_APPLE) {
 		int i;
@@ -1241,7 +1457,7 @@ static void gem_init_phy(struct gem *gp)
 		pmac_call_feature(PMAC_FTR_GMAC_PHY_RESET, gp->of_node, 0, 0);
 		for (i = 0; i < 32; i++) {
 			gp->mii_phy_addr = i;
-			if (phy_read(gp, PHY_CTRL) != 0xffff)
+			if (phy_read(gp, MII_BMCR) != 0xffff)
 				break;
 		}
 		if (i == 32) {
@@ -1277,54 +1493,68 @@ static void gem_init_phy(struct gem *gp)
 		/* Take PHY out of isloate mode and reset it. */
 		gem_reset_one_mii_phy(gp, gp->mii_phy_addr);
 
-		phy_id = (phy_read(gp, PHY_ID0) << 16 | phy_read(gp, PHY_ID1))
+		phy_id = (phy_read(gp, MII_PHYSID1) << 16 | phy_read(gp, MII_PHYSID2))
 			 	& 0xfffffff0;
 		printk(KERN_INFO "%s: MII PHY ID: %x ", gp->dev->name, phy_id);
 		switch(phy_id) {
-			case 0x406210:
-				gp->phy_mod = phymod_bcm5201;
-				printk("BCM 5201\n");
-				break;
-			case 0x4061e0:
-				printk("BCM 5221\n");
-				gp->phy_mod = phymod_bcm5221;
-				break;
-			case 0x206040:
-				printk("BCM 5400\n");
-				gp->phy_mod = phymod_bcm5400;
-				gem_init_bcm5400_phy(gp);
-				break;
-			case 0x206050:
-				printk("BCM 5401\n");
-				gp->phy_mod = phymod_bcm5401;
-				gem_init_bcm5401_phy(gp);
-				break;
-			case 0x206070:
-				printk("BCM 5411\n");
-				gp->phy_mod = phymod_bcm5411;
-				gem_init_bcm5411_phy(gp);
-				break;
-			default:
-				printk("Generic\n");
-				gp->phy_mod = phymod_generic;
+		case 0x406210:
+			gp->phy_mod = phymod_bcm5201;
+			gem_init_bcm5201_phy(gp);
+			printk("BCM 5201\n");
+			break;
+
+		case 0x4061e0:
+			printk("BCM 5221\n");
+			gp->phy_mod = phymod_bcm5221;
+			break;
+
+		case 0x206040:
+			printk("BCM 5400\n");
+			gp->phy_mod = phymod_bcm5400;
+			gem_init_bcm5400_phy(gp);
+			gp->gigabit_capable = 1;
+			break;
+
+		case 0x206050:
+			printk("BCM 5401\n");
+			gp->phy_mod = phymod_bcm5401;
+			gem_init_bcm5401_phy(gp);
+			gp->gigabit_capable = 1;
+			break;
+
+		case 0x206070:
+			printk("BCM 5411\n");
+			gp->phy_mod = phymod_bcm5411;
+			gem_init_bcm5411_phy(gp);
+			gp->gigabit_capable = 1;
+			break;
+
+		case 0x18074c0:
+			printk("Lucent\n");
+			gp->phy_mod = phymod_generic;
+			break;
+
+		case 0x437420:
+			printk("Enable Semiconductor\n");
+			gp->phy_mod = phymod_generic;
+			break;
+
+		default:
+			printk("Unknown\n");
+			gp->phy_mod = phymod_generic;
+			break;
 		};
 
 		/* Init advertisement and enable autonegotiation. */
-		val = phy_read(gp, PHY_CTRL);
-		val &= ~PHY_CTRL_ANENAB;
-		phy_write(gp, PHY_CTRL, val);
+		val = phy_read(gp, MII_BMCR);
+		val &= ~BMCR_ANENABLE;
+		phy_write(gp, MII_BMCR, val);
 		udelay(10);
 		
-		phy_write(gp, PHY_ADV,
-			  phy_read(gp, PHY_ADV) |
-			  (PHY_ADV_10HALF | PHY_ADV_10FULL |
-			   PHY_ADV_100HALF | PHY_ADV_100FULL));
-
-		val = phy_read(gp, PHY_CTRL);
-		val |= PHY_CTRL_ANENAB;
-		phy_write(gp, PHY_CTRL, val);
-		val |= PHY_CTRL_ANRES;
-		phy_write(gp, PHY_CTRL, val);
+		phy_write(gp, MII_ADVERTISE,
+			  phy_read(gp, MII_ADVERTISE) |
+			  (ADVERTISE_10HALF | ADVERTISE_10FULL |
+			   ADVERTISE_100HALF | ADVERTISE_100FULL));
 	} else {
 		u32 val;
 		int limit;
@@ -1379,6 +1609,7 @@ static void gem_init_phy(struct gem *gp)
 		else
 			val |= PCS_SCTRL_LOOP;
 		writel(val, gp->regs + PCS_SCTRL);
+		gp->gigabit_capable = 1;
 	}
 }
 
@@ -1392,7 +1623,7 @@ static void gem_init_dma(struct gem *gp)
 
 	writel(desc_dma >> 32, gp->regs + TXDMA_DBHI);
 	writel(desc_dma & 0xffffffff, gp->regs + TXDMA_DBLOW);
-	desc_dma += (TX_RING_SIZE * sizeof(struct gem_txd));
+	desc_dma += (INIT_BLOCK_TX_RING_SIZE * sizeof(struct gem_txd));
 
 	writel(0, gp->regs + TXDMA_KICK);
 
@@ -1410,16 +1641,14 @@ static void gem_init_dma(struct gem *gp)
 	writel(val, gp->regs + RXDMA_PTHRESH);
 
 	if (readl(gp->regs + GREG_BIFCFG) & GREG_BIFCFG_M66EN)
-		writel(((6 & RXDMA_BLANK_IPKTS) |
-			((4 << 12) & RXDMA_BLANK_ITIME)),
+		writel(((5 & RXDMA_BLANK_IPKTS) |
+			((8 << 12) & RXDMA_BLANK_ITIME)),
 		       gp->regs + RXDMA_BLANK);
 	else
-		writel(((6 & RXDMA_BLANK_IPKTS) |
-			((2 << 12) & RXDMA_BLANK_ITIME)),
+		writel(((5 & RXDMA_BLANK_IPKTS) |
+			((4 << 12) & RXDMA_BLANK_ITIME)),
 		       gp->regs + RXDMA_BLANK);
 }
-
-#define CRC_POLYNOMIAL_LE 0xedb88320UL  /* Ethernet CRC, little endian */
 
 static void gem_init_mac(struct gem *gp)
 {
@@ -1484,9 +1713,9 @@ static void gem_init_mac(struct gem *gp)
 		rxcfg |= MAC_RXCFG_PROM;
 	} else {
 		u16 hash_table[16];
-		u32 crc, poly = CRC_POLYNOMIAL_LE;
+		u32 crc;
 		struct dev_mc_list *dmi = gp->dev->mc_list;
-		int i, j, bit, byte;
+		int i;
 
 		for (i = 0; i < 16; i++)
 			hash_table[i] = 0;
@@ -1499,17 +1728,7 @@ static void gem_init_mac(struct gem *gp)
 			if (!(*addrs & 1))
 				continue;
 
-			crc = 0xffffffffU;
-			for (byte = 0; byte < 6; byte++) {
-				for (bit = *addrs++, j = 0; j < 8; j++, bit >>= 1) {
-					int test;
-
-					test = ((bit ^ crc) & 0x01);
-					crc >>= 1;
-					if (test)
-						crc = crc ^ poly;
-				}
-			}
+ 			crc = ether_crc_le(6, addrs);
 			crc >>= 24;
 			hash_table[crc >> 4] |= 1 << (crc & 0xf);
 		}
@@ -1551,18 +1770,20 @@ static void gem_init_mac(struct gem *gp)
 	writel(0, gp->regs + MAC_MCCFG);
 	writel(0, gp->regs + MAC_XIFCFG);
 
-	writel((MAC_TXSTAT_URUN | MAC_TXSTAT_MPE |
-		MAC_TXSTAT_NCE | MAC_TXSTAT_ECE |
-		MAC_TXSTAT_LCE | MAC_TXSTAT_FCE |
-		MAC_TXSTAT_DTE | MAC_TXSTAT_PCE), gp->regs + MAC_TXMASK);
-	writel((MAC_RXSTAT_OFLW | MAC_RXSTAT_FCE |
-		MAC_RXSTAT_ACE | MAC_RXSTAT_CCE |
-		MAC_RXSTAT_LCE | MAC_RXSTAT_VCE), gp->regs + MAC_RXMASK);
-	writel(0, gp->regs + MAC_MCMASK);
+	/* Setup MAC interrupts.  We want to get all of the interesting
+	 * counter expiration events, but we do not want to hear about
+	 * normal rx/tx as the DMA engine tells us that.
+	 */
+	writel(MAC_TXSTAT_XMIT, gp->regs + MAC_TXMASK);
+	writel(MAC_RXSTAT_RCV, gp->regs + MAC_RXMASK);
+
+	/* Don't enable even the PAUSE interrupts for now, we
+	 * make no use of those events other than to record them.
+	 */
+	writel(0xffffffff, gp->regs + MAC_MCMASK);
 }
 
-static void
-gem_init_pause_thresholds(struct gem* gp)
+static void gem_init_pause_thresholds(struct gem *gp)
 {
 	/* Calculate pause thresholds.  Setting the OFF threshold to the
 	 * full RX fifo size effectively disables PAUSE generation which
@@ -1580,11 +1801,7 @@ gem_init_pause_thresholds(struct gem* gp)
 	}
 
 	{
-		u32 cfg = readl(gp->regs + GREG_BIFCFG);
-
-		/* XXX Why do I do this? -DaveM XXX */
-		cfg |= GREG_BIFCFG_B64DIS;
-		writel(cfg, gp->regs + GREG_BIFCFG);
+		u32 cfg;
 
 		cfg  = GREG_CFG_IBURST;
 		cfg |= ((31 << 1) & GREG_CFG_TXDMALIM);
@@ -1598,21 +1815,15 @@ static int gem_check_invariants(struct gem *gp)
 	struct pci_dev *pdev = gp->pdev;
 	u32 mif_cfg;
 
-	/* On Apple's sungem, we can't realy on registers as the chip
+	/* On Apple's sungem, we can't rely on registers as the chip
 	 * was been powered down by the firmware. We do the PHY lookup
 	 * when the interface is opened and we configure the driver
 	 * with known values.
 	 */
 	if (pdev->vendor == PCI_VENDOR_ID_APPLE) {
 		gp->phy_type = phy_mii_mdio0;
-		mif_cfg = readl(gp->regs + MIF_CFG);
-		mif_cfg &= ~MIF_CFG_PSELECT;
-		writel(mif_cfg, gp->regs + MIF_CFG);
-		writel(PCS_DMODE_MGM, gp->regs + PCS_DMODE);
-		writel(MAC_XIFCFG_OE, gp->regs + MAC_XIFCFG);
 		gp->tx_fifo_sz = readl(gp->regs + TXDMA_FSZ) * 64;
 		gp->rx_fifo_sz = readl(gp->regs + RXDMA_FSZ) * 64;
-		gem_init_pause_thresholds(gp);
 		return 0;
 	}
 
@@ -1651,7 +1862,7 @@ static int gem_check_invariants(struct gem *gp)
 
 		for (i = 0; i < 32; i++) {
 			gp->mii_phy_addr = i;
-			if (phy_read(gp, PHY_CTRL) != 0xffff)
+			if (phy_read(gp, MII_BMCR) != 0xffff)
 				break;
 		}
 		if (i == 32) {
@@ -1685,12 +1896,10 @@ static int gem_check_invariants(struct gem *gp)
 		}
 	}
 
-	gem_init_pause_thresholds(gp);
-
 	return 0;
 }
 
-static void gem_init_hw(struct gem *gp)
+static void gem_init_hw(struct gem *gp, int restart_link)
 {
 	/* On Apple's gmac, I initialize the PHY only after
 	 * setting up the chip. It appears the gigabit PHYs
@@ -1698,18 +1907,28 @@ static void gem_init_hw(struct gem *gp)
 	 * the chip is not running, I suspect it might not
 	 * be clocked at that point. --BenH
 	 */
-	if (gp->pdev->vendor == PCI_VENDOR_ID_APPLE) {
-		gem_check_invariants(gp);
-		gp->hw_running = 1;
-	}
-	gem_init_phy(gp);
+	if (restart_link)
+		gem_init_phy(gp);
 	gem_init_dma(gp);
 	gem_init_mac(gp);
+	gem_init_pause_thresholds(gp);
 
-	gp->timer_ticks = 0;
-	gp->lstate = aneg_wait;
-	gp->link_timer.expires = jiffies + ((12 * HZ) / 10);
-	add_timer(&gp->link_timer);
+	spin_lock_irq(&gp->lock);
+	if (restart_link) {
+		/* Default aneg parameters */
+		gp->timer_ticks = 0;
+		gp->lstate = link_down;
+
+		spin_unlock_irq(&gp->lock);
+
+		/* Can I advertise gigabit here ? I'd need BCM PHY docs... */
+		gem_begin_auto_negotiation(gp, NULL);
+	} else {
+		if (gp->lstate == link_up)
+			gem_set_link_modes(gp);
+
+		spin_unlock_irq(&gp->lock);
+	}
 }
 
 #ifdef CONFIG_ALL_PPC
@@ -1717,10 +1936,10 @@ static void gem_init_hw(struct gem *gp)
  * setup properly. There appear to be no need to restore the
  * base addresses.
  */
-static void
-gem_apple_powerup(struct gem* gp)
+static void gem_apple_powerup(struct gem *gp)
 {
 	u16 cmd;
+	u32 mif_cfg;
 
 	pmac_call_feature(PMAC_FTR_GMAC_ENABLE, gp->of_node, 0, 1);
 
@@ -1731,31 +1950,162 @@ gem_apple_powerup(struct gem* gp)
     	pci_write_config_word(gp->pdev, PCI_COMMAND, cmd);
     	pci_write_config_byte(gp->pdev, PCI_LATENCY_TIMER, 6);
     	pci_write_config_byte(gp->pdev, PCI_CACHE_LINE_SIZE, 8);
+
+	mdelay(1);
+	
+	mif_cfg = readl(gp->regs + MIF_CFG);
+	mif_cfg &= ~(MIF_CFG_PSELECT|MIF_CFG_POLL|MIF_CFG_BBMODE|MIF_CFG_MDI1);
+	mif_cfg |= MIF_CFG_MDI0;
+	writel(mif_cfg, gp->regs + MIF_CFG);
+	writel(PCS_DMODE_MGM, gp->regs + PCS_DMODE);
+	writel(MAC_XIFCFG_OE, gp->regs + MAC_XIFCFG);
+
+	mdelay(1);
 }
 
 /* Turn off the chip's clock */
-static void
-gem_apple_powerdown(struct gem* gp)
+static void gem_apple_powerdown(struct gem *gp)
 {
 	pmac_call_feature(PMAC_FTR_GMAC_ENABLE, gp->of_node, 0, 0);
 }
+
 #endif /* CONFIG_ALL_PPC */
+
+static void gem_stop_phy(struct gem *gp)
+{
+	u32 mifcfg;
+
+	if (!gp->wake_on_lan && gp->phy_mod == phymod_bcm5201)
+		phy_write(gp, MII_BCM5201_INTERRUPT, 0);
+
+	/* Make sure we aren't polling PHY status change. We
+	 * don't currently use that feature though
+	 */
+	mifcfg = readl(gp->regs + MIF_CFG);
+	mifcfg &= ~MIF_CFG_POLL;
+	writel(mifcfg, gp->regs + MIF_CFG);
+
+	/* Here's a strange hack used by both MacOS 9 and X */
+	phy_write(gp, MII_LPA, phy_read(gp, MII_LPA));
+
+	if (gp->wake_on_lan) {
+		/* Setup wake-on-lan */
+	} else
+		writel(0, gp->regs + MAC_RXCFG);
+	writel(0, gp->regs + MAC_TXCFG);
+	writel(0, gp->regs + MAC_XIFCFG);
+	writel(0, gp->regs + TXDMA_CFG);
+	writel(0, gp->regs + RXDMA_CFG);
+
+	if (!gp->wake_on_lan) {
+		gem_stop(gp);
+		writel(MAC_TXRST_CMD, gp->regs + MAC_TXRST);
+		writel(MAC_RXRST_CMD, gp->regs + MAC_RXRST);
+		if (gp->phy_mod == phymod_bcm5400 || gp->phy_mod == phymod_bcm5401 ||
+		    gp->phy_mod == phymod_bcm5411) {
+#if 0 /* Commented out in Darwin... someone has those dawn docs ? */
+			phy_write(gp, MII_BMCR, BMCR_PDOWN);
+#endif
+		} else if (gp->phy_mod == phymod_bcm5201 || gp->phy_mod == phymod_bcm5221) {
+#if 0 /* Commented out in Darwin... someone has those dawn docs ? */
+			u16 val = phy_read(gp, MII_BCM5201_AUXMODE2)
+			phy_write(gp, MII_BCM5201_AUXMODE2,
+				  val & ~MII_BCM5201_AUXMODE2_LOWPOWER);
+#endif				
+			phy_write(gp, MII_BCM5201_MULTIPHY, MII_BCM5201_MULTIPHY_SUPERISOLATE);
+		}
+
+		/* According to Apple, we must set the MDIO pins to this begnign
+		 * state or we may 1) eat more current, 2) damage some PHYs
+		 */
+		writel(mifcfg | MIF_CFG_BBMODE, gp->regs + MIF_CFG);
+		writel(0, gp->regs + MIF_BBCLK);
+		writel(0, gp->regs + MIF_BBDATA);
+		writel(0, gp->regs + MIF_BBOENAB);
+		writel(MAC_XIFCFG_GMII | MAC_XIFCFG_LBCK, gp->regs + MAC_XIFCFG);
+		(void) readl(gp->regs + MAC_XIFCFG);
+	}
+}
+
+/* Shut down the chip, must be called with pm_sem held.  */
+static void gem_shutdown(struct gem *gp)
+{
+	/* Make us not-running to avoid timers respawning */
+	gp->hw_running = 0;
+
+	/* Stop the link timer */
+	del_timer_sync(&gp->link_timer);
+
+	/* Stop the reset task */
+	while (gp->reset_task_pending)
+		schedule();
+	
+	/* Actually stop the chip */
+	if (gp->pdev->vendor == PCI_VENDOR_ID_APPLE)
+		gem_stop_phy(gp);
+	else
+		gem_stop(gp);
+
+#ifdef CONFIG_ALL_PPC
+	/* Power down the chip */
+	if (gp->pdev->vendor == PCI_VENDOR_ID_APPLE)
+		gem_apple_powerdown(gp);
+#endif /* CONFIG_ALL_PPC */
+}
+
+static void gem_pm_task(void *data)
+{
+	struct gem *gp = (struct gem *) data;
+
+	/* We assume if we can't lock the pm_sem, then open() was
+	 * called again (or suspend()), and we can safely ignore
+	 * the PM request
+	 */
+	if (down_trylock(&gp->pm_sem))
+		return;
+
+	/* Driver was re-opened or already shut down */
+	if (gp->opened || !gp->hw_running) {
+		up(&gp->pm_sem);
+		return;
+	}
+
+	gem_shutdown(gp);
+
+	up(&gp->pm_sem);
+}
+
+static void gem_pm_timer(unsigned long data)
+{
+	struct gem *gp = (struct gem *) data;
+
+	schedule_task(&gp->pm_task);
+}
 
 static int gem_open(struct net_device *dev)
 {
 	struct gem *gp = dev->priv;
-	unsigned long regs = gp->regs;
+	int hw_was_up = gp->hw_running;
 
-	del_timer(&gp->link_timer);
+	down(&gp->pm_sem);
 
+	/* Stop the PM timer/task */
+	del_timer(&gp->pm_timer);
+	flush_scheduled_tasks();
+
+	if (!gp->hw_running) {
 #ifdef CONFIG_ALL_PPC
-	/* First, we need to bring up the chip */
-	if (gp->pdev->vendor == PCI_VENDOR_ID_APPLE)
-		gem_apple_powerup(gp);
+		/* First, we need to bring up the chip */
+		if (gp->pdev->vendor == PCI_VENDOR_ID_APPLE) {
+			gem_apple_powerup(gp);
+			gem_check_invariants(gp);
+		}
 #endif /* CONFIG_ALL_PPC */
+		/* Reset the chip */
+		gem_stop(gp);
 
-	/* Reset the chip */
-	gem_stop(gp, regs);
+		gp->hw_running = 1;
+	}
 
 	/* We can now request the interrupt as we know it's masked
 	 * on the controller
@@ -1763,9 +2113,14 @@ static int gem_open(struct net_device *dev)
 	if (request_irq(gp->pdev->irq, gem_interrupt,
 			SA_SHIRQ, dev->name, (void *)dev)) {
 #ifdef CONFIG_ALL_PPC
-		if (gp->pdev->vendor == PCI_VENDOR_ID_APPLE)
+		if (!hw_was_up && gp->pdev->vendor == PCI_VENDOR_ID_APPLE)
 			gem_apple_powerdown(gp);
 #endif /* CONFIG_ALL_PPC */
+		/* Fire the PM timer that will shut us down in about 10 seconds */
+		gp->pm_timer.expires = jiffies + 10*HZ;
+		add_timer(&gp->pm_timer);
+		up(&gp->pm_sem);
+
 		return -EAGAIN;
 	}
 
@@ -1773,7 +2128,11 @@ static int gem_open(struct net_device *dev)
 	gem_init_rings(gp, 0);
 
 	/* Init & setup chip hardware */
-	gem_init_hw(gp);
+	gem_init_hw(gp, !hw_was_up);
+
+	gp->opened = 1;
+
+	up(&gp->pm_sem);
 
 	return 0;
 }
@@ -1782,17 +2141,110 @@ static int gem_close(struct net_device *dev)
 {
 	struct gem *gp = dev->priv;
 
-	del_timer(&gp->link_timer);
-	gem_stop(gp, gp->regs);
+	/* Make sure we don't get distracted by suspend/resume */
+	down(&gp->pm_sem);
+
+	/* Stop traffic, mark us closed */
+	spin_lock_irq(&gp->lock);
+
+	gp->opened = 0;	
+	writel(0xffffffff, gp->regs + GREG_IMASK);
+	netif_stop_queue(dev);
+
+	spin_unlock_irq(&gp->lock);
+
+	/* Stop chip */
+	gem_stop(gp);
+
+	/* Get rid of rings */
 	gem_clean_rings(gp);
-	gp->hw_running = 0;
-#ifdef CONFIG_ALL_PPC
-	if (gp->pdev->vendor == PCI_VENDOR_ID_APPLE)
-		gem_apple_powerdown(gp);
-#endif /* CONFIG_ALL_PPC */
-	free_irq(gp->pdev->irq, (void *)dev);
+
+	/* Bye, the pm timer will finish the job */
+	free_irq(gp->pdev->irq, (void *) dev);
+
+	/* Fire the PM timer that will shut us down in about 10 seconds */
+	gp->pm_timer.expires = jiffies + 10*HZ;
+	add_timer(&gp->pm_timer);
+
+	up(&gp->pm_sem);
+	
 	return 0;
 }
+
+#ifdef CONFIG_PM
+static int gem_suspend(struct pci_dev *pdev, u32 state)
+{
+	struct net_device *dev = pci_get_drvdata(pdev);
+	struct gem *gp = dev->priv;
+
+	/* We hold the PM semaphore during entire driver
+	 * sleep time
+	 */
+	down(&gp->pm_sem);
+
+	printk(KERN_INFO "%s: suspending, WakeOnLan %s\n",
+	       dev->name, gp->wake_on_lan ? "enabled" : "disabled");
+	
+	/* If the driver is opened, we stop the DMA */
+	if (gp->opened) {
+		/* Stop traffic, mark us closed */
+		netif_device_detach(dev);
+
+		spin_lock_irq(&gp->lock);
+
+		writel(0xffffffff, gp->regs + GREG_IMASK);
+
+		spin_unlock_irq(&gp->lock);
+
+		/* Stop chip */
+		gem_stop(gp);
+
+		/* Get rid of ring buffers */
+		gem_clean_rings(gp);
+
+		if (gp->pdev->vendor == PCI_VENDOR_ID_APPLE)
+			disable_irq(gp->pdev->irq);
+	}
+
+	if (gp->hw_running) {
+		/* Kill PM timer if any */
+		del_timer_sync(&gp->pm_timer);
+		flush_scheduled_tasks();
+
+		gem_shutdown(gp);
+	}
+
+	return 0;
+}
+
+static int gem_resume(struct pci_dev *pdev)
+{
+	struct net_device *dev = pci_get_drvdata(pdev);
+	struct gem *gp = dev->priv;
+
+	printk(KERN_INFO "%s: resuming\n", dev->name);
+
+	if (gp->opened) {
+#ifdef CONFIG_ALL_PPC
+		/* First, we need to bring up the chip */
+		if (gp->pdev->vendor == PCI_VENDOR_ID_APPLE) {
+			gem_apple_powerup(gp);
+			gem_check_invariants(gp);
+		}
+#endif /* CONFIG_ALL_PPC */
+		gem_stop(gp);
+		gp->hw_running = 1;
+		gem_init_rings(gp, 0);
+		gem_init_hw(gp, 1);
+		netif_device_attach(dev);
+		if (gp->pdev->vendor == PCI_VENDOR_ID_APPLE)
+			enable_irq(gp->pdev->irq);
+	}
+	up(&gp->pm_sem);
+
+	return 0;
+}
+#endif /* CONFIG_PM */
 
 static struct net_device_stats *gem_get_stats(struct net_device *dev)
 {
@@ -1861,9 +2313,9 @@ static void gem_set_multicast(struct net_device *dev)
 		writel(rxcfg, gp->regs + MAC_RXCFG);
 	} else {
 		u16 hash_table[16];
-		u32 crc, poly = CRC_POLYNOMIAL_LE;
+		u32 crc;
 		struct dev_mc_list *dmi = gp->dev->mc_list;
-		int i, j, bit, byte;
+		int i;
 
 		for (i = 0; i < 16; i++)
 			hash_table[i] = 0;
@@ -1876,17 +2328,7 @@ static void gem_set_multicast(struct net_device *dev)
 			if (!(*addrs & 1))
 				continue;
 
-			crc = 0xffffffffU;
-			for (byte = 0; byte < 6; byte++) {
-				for (bit = *addrs++, j = 0; j < 8; j++, bit >>= 1) {
-					int test;
-
-					test = ((bit ^ crc) & 0x01);
-					crc >>= 1;
-					if (test)
-						crc = crc ^ poly;
-				}
-			}
+			crc = ether_crc_le(6, addrs);
 			crc >>= 24;
 			hash_table[crc >> 4] |= 1 << (crc & 0xf);
 		}
@@ -1908,12 +2350,219 @@ static void gem_set_multicast(struct net_device *dev)
 		writel(hash_table[15], gp->regs + MAC_HASH15);
 	}
 
+	/* Hrm... we may walk on the reset task here... */
 	netif_wake_queue(dev);
+}
+
+/* Eventually add support for changing the advertisement
+ * on autoneg.
+ */
+static int gem_ethtool_ioctl(struct net_device *dev, void *ep_user)
+{
+	struct gem *gp = dev->priv;
+	u16 bmcr;
+	int full_duplex, speed, pause;
+	struct ethtool_cmd ecmd;
+
+	if (copy_from_user(&ecmd, ep_user, sizeof(ecmd)))
+		return -EFAULT;
+		
+	switch(ecmd.cmd) {
+        case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = { cmd: ETHTOOL_GDRVINFO };
+
+		strncpy(info.driver, DRV_NAME, ETHTOOL_BUSINFO_LEN);
+		strncpy(info.version, DRV_VERSION, ETHTOOL_BUSINFO_LEN);
+		info.fw_version[0] = '\0';
+		strncpy(info.bus_info, gp->pdev->slot_name, ETHTOOL_BUSINFO_LEN);
+		info.regdump_len = 0; /*SUNGEM_NREGS;*/
+
+		if (copy_to_user(ep_user, &info, sizeof(info)))
+			return -EFAULT;
+
+		return 0;
+	}
+
+	case ETHTOOL_GSET:
+		ecmd.supported =
+			(SUPPORTED_10baseT_Half | SUPPORTED_10baseT_Full |
+			 SUPPORTED_100baseT_Half | SUPPORTED_100baseT_Full |
+			 SUPPORTED_Autoneg | SUPPORTED_TP | SUPPORTED_MII);
+
+		if (gp->gigabit_capable)
+			ecmd.supported |=
+				(SUPPORTED_1000baseT_Half |
+				 SUPPORTED_1000baseT_Full);
+
+		/* XXX hardcoded stuff for now */
+		ecmd.port = PORT_MII;
+		ecmd.transceiver = XCVR_EXTERNAL;
+		ecmd.phy_address = 0; /* XXX fixed PHYAD */
+
+		/* Record PHY settings if HW is on. */
+		if (gp->hw_running) {
+			bmcr = phy_read(gp, MII_BMCR);
+			gem_read_mii_link_mode(gp, &full_duplex, &speed, &pause);
+		} else
+			bmcr = 0;
+		if (bmcr & BMCR_ANENABLE) {
+			ecmd.autoneg = AUTONEG_ENABLE;
+			ecmd.speed = speed == 10 ? SPEED_10 : (speed == 1000 ? SPEED_1000 : SPEED_100);
+			ecmd.duplex = full_duplex ? DUPLEX_FULL : DUPLEX_HALF;
+		} else {
+			ecmd.autoneg = AUTONEG_DISABLE;
+			ecmd.speed =
+				(bmcr & BMCR_SPEED100) ?
+				SPEED_100 : SPEED_10;
+			ecmd.duplex =
+				(bmcr & BMCR_FULLDPLX) ?
+				DUPLEX_FULL : DUPLEX_HALF;
+		}
+		if (copy_to_user(ep_user, &ecmd, sizeof(ecmd)))
+			return -EFAULT;
+		return 0;
+
+	case ETHTOOL_SSET:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+
+		/* Verify the settings we care about. */
+		if (ecmd.autoneg != AUTONEG_ENABLE &&
+		    ecmd.autoneg != AUTONEG_DISABLE)
+			return -EINVAL;
+
+		if (ecmd.autoneg == AUTONEG_DISABLE &&
+		    ((ecmd.speed != SPEED_100 &&
+		      ecmd.speed != SPEED_10) ||
+		     (ecmd.duplex != DUPLEX_HALF &&
+		      ecmd.duplex != DUPLEX_FULL)))
+			return -EINVAL;
+
+		/* Apply settings and restart link process */
+		if (gp->hw_running)
+			del_timer(&gp->link_timer);
+		gem_begin_auto_negotiation(gp, &ecmd);
+		return 0;
+
+	case ETHTOOL_NWAY_RST:
+		if ((gp->link_cntl & BMCR_ANENABLE) == 0)
+			return -EINVAL;
+		if (gp->hw_running)
+			del_timer(&gp->link_timer);
+		gem_begin_auto_negotiation(gp, NULL);
+		return 0;
+
+	case ETHTOOL_GWOL:
+	case ETHTOOL_SWOL:
+		break; /* todo */
+
+	/* get link status */
+	case ETHTOOL_GLINK: {
+		struct ethtool_value edata = { cmd: ETHTOOL_GLINK };
+
+		edata.data = (gp->lstate == link_up);
+		if (copy_to_user(ep_user, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+
+	/* get message-level */
+	case ETHTOOL_GMSGLVL: {
+		struct ethtool_value edata = { cmd: ETHTOOL_GMSGLVL };
+
+		edata.data = gem_debug;
+		if (copy_to_user(ep_user, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+
+	/* set message-level */
+	case ETHTOOL_SMSGLVL: {
+		struct ethtool_value edata;
+
+		if (copy_from_user(&edata, ep_user, sizeof(edata)))
+			return -EFAULT;
+		gem_debug = edata.data;
+		return 0;
+	}
+
+#if 0
+	case ETHTOOL_GREGS: {
+		struct ethtool_regs regs;
+		u32 *regbuf;
+		int r = 0;
+
+		if (copy_from_user(&regs, useraddr, sizeof(regs)))
+			return -EFAULT;
+		
+		if (regs.len > SUNGEM_NREGS) {
+			regs.len = SUNGEM_NREGS;
+		}
+		regs.version = 0;
+		if (copy_to_user(useraddr, &regs, sizeof(regs)))
+			return -EFAULT;
+
+		if (!gp->hw_running)
+			return -ENODEV;
+		useraddr += offsetof(struct ethtool_regs, data);
+
+		/* Use kmalloc to avoid bloating the stack */
+		regbuf = kmalloc(4 * SUNGEM_NREGS, GFP_KERNEL);
+		if (!regbuf)
+			return -ENOMEM;
+		spin_lock_irq(&np->lock);
+		gem_get_regs(gp, regbuf);
+		spin_unlock_irq(&np->lock);
+
+		if (copy_to_user(useraddr, regbuf, regs.len*sizeof(u32)))
+			r = -EFAULT;
+		kfree(regbuf);
+		return r;
+	}
+#endif	
+	};
+
+	return -EOPNOTSUPP;
 }
 
 static int gem_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-	return -EINVAL;
+	struct gem *gp = dev->priv;
+	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&ifr->ifr_data;
+	int rc = -EOPNOTSUPP;
+	
+	/* Hold the PM semaphore while doing ioctl's or we may collide
+	 * with open/close and power management and oops.
+	 */
+	down(&gp->pm_sem);
+	
+	switch (cmd) {
+	case SIOCETHTOOL:
+		rc = gem_ethtool_ioctl(dev, ifr->ifr_data);
+		break;
+
+	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
+		data->phy_id = gp->mii_phy_addr;
+		/* Fallthrough... */
+
+	case SIOCGMIIREG:		/* Read MII PHY register. */
+		data->val_out = __phy_read(gp, data->reg_num & 0x1f, data->phy_id & 0x1f);
+		rc = 0;
+		break;
+
+	case SIOCSMIIREG:		/* Write MII PHY register. */
+		if (!capable(CAP_NET_ADMIN)) {
+			rc = -EPERM;
+		} else {
+			__phy_write(gp, data->reg_num & 0x1f, data->val_in, data->phy_id & 0x1f);
+			rc = 0;
+		}
+		break;
+	};
+
+	up(&gp->pm_sem);
+	
+	return rc;
 }
 
 static int __devinit gem_get_device_address(struct gem *gp)
@@ -2030,6 +2679,26 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	gp->dev = dev;
 
 	spin_lock_init(&gp->lock);
+	init_MUTEX(&gp->pm_sem);
+
+	init_timer(&gp->link_timer);
+	gp->link_timer.function = gem_link_timer;
+	gp->link_timer.data = (unsigned long) gp;
+
+	init_timer(&gp->pm_timer);
+	gp->pm_timer.function = gem_pm_timer;
+	gp->pm_timer.data = (unsigned long) gp;
+
+	INIT_TQUEUE(&gp->pm_task, gem_pm_task, gp);
+	INIT_TQUEUE(&gp->reset_task, gem_reset_task, gp);
+	
+	/* Default link parameters */
+	if (link_mode >= 0 && link_mode <= 6)
+		gp->link_cntl = link_modes[link_mode];
+	else
+		gp->link_cntl = BMCR_ANENABLE;
+	gp->lstate = link_down;
+	gp->timer_ticks = 0;
 
 	gp->regs = (unsigned long) ioremap(gemreg_base, gemreg_len);
 	if (gp->regs == 0UL) {
@@ -2038,9 +2707,26 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 		goto err_out_free_mmio_res;
 	}
 
-	/* On Apple's, we might not access the hardware at that point */
+	/* On Apple, we power the chip up now in order for check
+	 * invariants to work, but also because the firmware might
+	 * not have properly shut down the PHY.
+	 */
+#ifdef CONFIG_ALL_PPC
+	if (pdev->vendor == PCI_VENDOR_ID_APPLE) {
+		gem_apple_powerup(gp);
+		if (gem_check_invariants(gp))
+			goto err_out_iounmap;
+		gem_stop(gp);
+		gp->hw_running = 1;
+		gem_init_phy(gp);
+		gem_begin_auto_negotiation(gp, NULL);
+	}
+#endif
+	/* Non Apple hardware, we just reset the chip and check
+	 * for invariants
+	 */
 	if (pdev->vendor != PCI_VENDOR_ID_APPLE) {
-		gem_stop(gp, gp->regs);
+		gem_stop(gp);
 		if (gem_check_invariants(gp))
 			goto err_out_iounmap;
 		gp->hw_running = 1;
@@ -2074,10 +2760,6 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 		       i == 5 ? ' ' : ':');
 	printk("\n");
 
-	init_timer(&gp->link_timer);
-	gp->link_timer.function = gem_link_timer;
-	gp->link_timer.data = (unsigned long) gp;
-
 	dev->open = gem_open;
 	dev->stop = gem_close;
 	dev->hard_start_xmit = gem_start_xmit;
@@ -2095,9 +2777,20 @@ static int __devinit gem_init_one(struct pci_dev *pdev,
 	if (pci_using_dac)
 		dev->features |= NETIF_F_HIGHDMA;
 
+	/* Fire the PM timer that will shut us down in about 10 seconds */
+	gp->pm_timer.expires = jiffies + 10*HZ;
+	add_timer(&gp->pm_timer);
+
 	return 0;
 
 err_out_iounmap:
+	down(&gp->pm_sem);
+	/* Stop the PM timer & task */
+	del_timer_sync(&gp->pm_timer);
+	flush_scheduled_tasks();
+	if (gp->hw_running)
+		gem_shutdown(gp);
+	up(&gp->pm_sem);
 	iounmap((void *) gp->regs);
 
 err_out_free_mmio_res:
@@ -2120,6 +2813,14 @@ static void __devexit gem_remove_one(struct pci_dev *pdev)
 
 		unregister_netdev(dev);
 
+		down(&gp->pm_sem);
+		/* Stop the PM timer & task */
+		del_timer_sync(&gp->pm_timer);
+		flush_scheduled_tasks();
+		if (gp->hw_running)
+			gem_shutdown(gp);
+		up(&gp->pm_sem);
+
 		pci_free_consistent(pdev,
 				    sizeof(struct gem_init_block),
 				    gp->init_block,
@@ -2127,9 +2828,6 @@ static void __devexit gem_remove_one(struct pci_dev *pdev)
 		iounmap((void *) gp->regs);
 		release_mem_region(pci_resource_start(pdev, 0),
 				   pci_resource_len(pdev, 0));
-#ifdef CONFIG_ALL_PPC
-		pmac_call_feature(PMAC_FTR_GMAC_ENABLE, gp->of_node, 0, 0);
-#endif		
 		kfree(dev);
 
 		pci_set_drvdata(pdev, NULL);
@@ -2140,7 +2838,11 @@ static struct pci_driver gem_driver = {
 	name:		GEM_MODULE_NAME,
 	id_table:	gem_pci_tbl,
 	probe:		gem_init_one,
-	remove:		gem_remove_one,
+	remove:		__devexit_p(gem_remove_one),
+#ifdef CONFIG_PM
+	suspend:	gem_suspend,
+	resume:		gem_resume,
+#endif /* CONFIG_PM */
 };
 
 static int __init gem_init(void)

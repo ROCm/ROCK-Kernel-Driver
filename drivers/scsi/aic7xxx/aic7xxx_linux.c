@@ -130,6 +130,7 @@
 
 #include <linux/mm.h>		/* For fetching system memory size */
 #include <linux/blk.h>
+#include <scsi/scsicam.h>
 
 /*
  * To generate the correct addresses for the controller to issue

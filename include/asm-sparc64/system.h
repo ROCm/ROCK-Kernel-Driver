@@ -1,4 +1,4 @@
-/* $Id: system.h,v 1.64 2001/08/30 03:22:00 kanoj Exp $ */
+/* $Id: system.h,v 1.68 2001/11/18 00:12:56 davem Exp $ */
 #ifndef __SPARC64_SYSTEM_H
 #define __SPARC64_SYSTEM_H
 
@@ -145,6 +145,24 @@ extern void __flushw_user(void);
 #define flush_register_windows flushw_all
 #define prepare_to_switch flushw_all
 
+#ifndef CONFIG_DEBUG_SPINLOCk
+#define CHECK_LOCKS(PREV)	do { } while(0)
+#else /* CONFIG_DEBUG_SPINLOCk */
+#define CHECK_LOCKS(PREV)						\
+if ((PREV)->thread.smp_lock_count) {					\
+	unsigned long rpc;						\
+	__asm__ __volatile__("mov %%i7, %0" : "=r" (rpc));		\
+	printk(KERN_CRIT "(%s)[%d]: Sleeping with %d locks held!\n",	\
+	       (PREV)->comm, (PREV)->pid,				\
+	       (PREV)->thread.smp_lock_count);				\
+	printk(KERN_CRIT "(%s)[%d]: Last lock at %08x\n",		\
+	       (PREV)->comm, (PREV)->pid,				\
+	       (PREV)->thread.smp_lock_pc);				\
+	printk(KERN_CRIT "(%s)[%d]: Sched caller %016lx\n",		\
+	       (PREV)->comm, (PREV)->pid, rpc);				\
+}
+#endif /* !(CONFIG_DEBUG_SPINLOCk) */
+
 	/* See what happens when you design the chip correctly?
 	 *
 	 * We tell gcc we clobber all non-fixed-usage registers except
@@ -155,7 +173,8 @@ extern void __flushw_user(void);
 	 * and 2 stores in this critical code path.  -DaveM
 	 */
 #define switch_to(prev, next, last)						\
-do {	if (current->thread.flags & SPARC_FLAG_PERFCTR) {			\
+do {	CHECK_LOCKS(prev);							\
+	if (current->thread.flags & SPARC_FLAG_PERFCTR) {			\
 		unsigned long __tmp;						\
 		read_pcr(__tmp);						\
 		current->thread.pcr_reg = __tmp;				\
@@ -276,7 +295,7 @@ extern __inline__ unsigned long
 __cmpxchg_u32(volatile int *m, int old, int new)
 {
 	__asm__ __volatile__("cas [%2], %3, %0\n\t"
-			     "membar #StoreStore | #StoreLoad"
+			     "membar #StoreLoad | #StoreStore"
 			     : "=&r" (new)
 			     : "0" (new), "r" (m), "r" (old)
 			     : "memory");
@@ -288,7 +307,7 @@ extern __inline__ unsigned long
 __cmpxchg_u64(volatile long *m, unsigned long old, unsigned long new)
 {
 	__asm__ __volatile__("casx [%2], %3, %0\n\t"
-			     "membar #StoreStore | #StoreLoad"
+			     "membar #StoreLoad | #StoreStore"
 			     : "=&r" (new)
 			     : "0" (new), "r" (m), "r" (old)
 			     : "memory");

@@ -68,6 +68,7 @@ static const char version[] =
 #include <linux/in.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/crc32.h>
 
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -885,27 +886,6 @@ static struct net_device_stats *get_stats(struct net_device *dev)
 }
 
 /*
- * Update the given Autodin II CRC value with another data byte.
- */
-
-static inline u32 update_crc(u8 byte, u32 current_crc)
-{
-	int bit;
-	u8 ah = 0;
-	for (bit=0; bit<8; bit++) 
-	{
-		u8 carry = (current_crc>>31);
-		current_crc <<= 1;
-		ah = ((ah<<1) | carry) ^ byte;
-		if (ah&1)
-			current_crc ^= 0x04C11DB7;	/* CRC polynomial */
-		ah >>= 1;
-		byte >>= 1;
-	}
-	return current_crc;
-}
-
-/*
  * Form the 64 bit 8390 multicast table from the linked list of addresses
  * associated with this dev structure.
  */
@@ -916,16 +896,13 @@ static inline void make_mc_bits(u8 *bits, struct net_device *dev)
 
 	for (dmi=dev->mc_list; dmi; dmi=dmi->next) 
 	{
-		int i;
 		u32 crc;
 		if (dmi->dmi_addrlen != ETH_ALEN) 
 		{
 			printk(KERN_INFO "%s: invalid multicast address length given.\n", dev->name);
 			continue;
 		}
-		crc = 0xffffffff;	/* initial CRC value */
-		for (i=0; i<ETH_ALEN; i++)
-			crc = update_crc(dmi->dmi_addr[i], crc);
+		crc = ether_crc(ETH_ALEN, dmi->dmi_addr);
 		/* 
 		 * The 8390 uses the 6 most significant bits of the
 		 * CRC to index the multicast table.

@@ -1019,7 +1019,7 @@ sizechange:
 	fix->type = FB_TYPE_PACKED_PIXELS;
 	fix->visual = FB_VISUAL_PSEUDOCOLOR;
 	
-	fb->info.node = -1;
+	fb->info.node = NODEV;
 	fb->info.fbops = &sbusfb_ops;
 	fb->info.disp = disp;
 	strcpy(fb->info.fontname, fontname);

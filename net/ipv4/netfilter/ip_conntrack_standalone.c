@@ -243,7 +243,7 @@ static int init_or_cleanup(int init)
 
 	ret = nf_register_hook(&ip_conntrack_in_ops);
 	if (ret < 0) {
-		printk("ip_conntrack: can't register in hook.\n");
+		printk("ip_conntrack: can't register pre-routing hook.\n");
 		goto cleanup_proc;
 	}
 	ret = nf_register_hook(&ip_conntrack_local_out_ops);

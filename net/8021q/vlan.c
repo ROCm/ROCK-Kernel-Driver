@@ -1,11 +1,10 @@
 /*
- * INET		An implementation of the TCP/IP protocol suite for the LINUX
- *		operating system.  INET is implemented using the  BSD Socket
- *		interface as the means of communication with the user level.
- *
+ * INET		802.1Q VLAN
  *		Ethernet-type device handling.
  *
- * Authors:	Ben Greear <greearb@candelatech.com>, <greearb@agcs.com>
+ * Authors:	Ben Greear <greearb@candelatech.com>
+ *              Please send support related email to: vlan@scry.wanfear.com
+ *              VLAN Home Page: http://www.candelatech.com/~greear/vlan.html
  * 
  * Fixes:
  *              Fix for packet capture - Nick Eggleston <nick@dccinc.com>;
@@ -42,7 +41,7 @@ struct vlan_group *p802_1Q_vlan_list;
 
 static char vlan_fullname[] = "802.1Q VLAN Support";
 static unsigned int vlan_version = 1;
-static unsigned int vlan_release = 5;
+static unsigned int vlan_release = 6;
 static char vlan_copyright[] = " Ben Greear <greearb@candelatech.com>";
 
 static int vlan_device_event(struct notifier_block *, unsigned long, void *);
@@ -106,6 +105,23 @@ static int __init vlan_proto_init(void)
 }
 
 /*
+ * Cleanup of groups before exit
+ */
+
+static void vlan_group_cleanup(void)
+{
+	struct vlan_group *grp = NULL;
+	struct vlan_group *nextgroup;
+
+	for (grp = p802_1Q_vlan_list; (grp != NULL);) {
+		nextgroup = grp->next;
+		kfree(grp);
+		grp = nextgroup;
+	}
+	p802_1Q_vlan_list = NULL;
+}
+
+/*
  *     Module 'remove' entry point.
  *     o delete /proc/net/router directory and static entries.
  */ 
@@ -116,7 +132,7 @@ static void __exit vlan_cleanup_module(void)
 
 	dev_remove_pack(&vlan_packet_type);
 	vlan_proc_cleanup();
-
+	vlan_group_cleanup();
 	vlan_ioctl_hook = NULL;
 }
 
@@ -328,6 +344,7 @@ struct net_device *register_802_1Q_vlan_device(const char* eth_IF_name,
 	/* set up method calls */
 	new_dev->init = vlan_dev_init;
 	new_dev->destructor = vlan_dev_destruct;
+	new_dev->features |= NETIF_F_DYNALLOC ; 
 	    
 	/* new_dev->ifindex = 0;  it will be set when added to
 	 * the global list.

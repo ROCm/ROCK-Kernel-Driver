@@ -38,9 +38,9 @@ static int rw_swap_page_base(int rw, swp_entry_t entry, struct page *page)
 	unsigned long offset;
 	sector_t zones[PAGE_SIZE/512];
 	int zones_used;
-	kdev_t dev = NODEV;
 	int block_size;
 	struct inode *swapf = 0;
+	struct block_device *bdev;
 
 	if (rw == READ) {
 		ClearPageUptodate(page);
@@ -48,12 +48,13 @@ static int rw_swap_page_base(int rw, swp_entry_t entry, struct page *page)
 	} else
 		kstat.pswpout++;
 
-	get_swaphandle_info(entry, &offset, &dev, &swapf);
-	if (!kdev_none(dev)) {
+	get_swaphandle_info(entry, &offset, &swapf);
+	bdev = swapf->i_bdev;
+	if (bdev) {
 		zones[0] = offset;
 		zones_used = 1;
 		block_size = PAGE_SIZE;
-	} else if (swapf) {
+	} else {
 		int i, j;
 		unsigned int block = offset
 			<< (PAGE_SHIFT - swapf->i_sb->s_blocksize_bits);
@@ -65,13 +66,11 @@ static int rw_swap_page_base(int rw, swp_entry_t entry, struct page *page)
 				return 0;
 			}
 		zones_used = i;
-		dev = swapf->i_dev;
-	} else {
-		return 0;
+		bdev = swapf->i_sb->s_bdev;
 	}
 
  	/* block_size == PAGE_SIZE/zones_used */
- 	brw_page(rw, page, dev, zones, block_size);
+ 	brw_page(rw, page, bdev, zones, block_size);
 
  	/* Note! For consistency we do all of the logic,
  	 * decrementing the page count, and unlocking the page in the

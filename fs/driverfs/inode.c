@@ -374,7 +374,7 @@ static int driverfs_d_delete_file (struct dentry * dentry)
 
 	entry = (struct driver_file_entry *)dentry->d_fsdata;
 	if (entry)
-		kfree(dentry);
+		kfree(entry);
 	return 0;
 }
 

@@ -29,6 +29,7 @@
 #include <linux/skbuff.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/crc32.h>
 
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -308,33 +309,13 @@ static struct net_device_stats *am79c961_getstats (struct net_device *dev)
 	return &priv->stats;
 }
 
-static inline u32 update_crc(u32 crc, u8 byte)
-{
-	int i;
-
-	for (i = 8; i != 0; i--) {
-		byte ^= crc & 1;
-		crc >>= 1;
-
-		if (byte & 1)
-			crc ^= 0xedb88320;
-
-		byte >>= 1;
-	}
-
-	return crc;
-}
-
 static void am79c961_mc_hash(struct dev_mc_list *dmi, unsigned short *hash)
 {
 	if (dmi->dmi_addrlen == ETH_ALEN && dmi->dmi_addr[0] & 0x01) {
-		int i, idx, bit;
+		int idx, bit;
 		u32 crc;
 
-		crc = 0xffffffff;
-
-		for (i = 0; i < ETH_ALEN; i++)
-			crc = update_crc(crc, dmi->dmi_addr[i]);
+		crc = ether_crc_le(ETH_ALEN, dmi->dmi_addr);
 
 		idx = crc >> 30;
 		bit = (crc >> 26) & 15;

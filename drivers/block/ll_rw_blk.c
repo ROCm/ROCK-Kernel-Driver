@@ -818,7 +818,6 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 	q->plug_tq.data		= q;
 	q->queue_flags		= (1 << QUEUE_FLAG_CLUSTER);
 	q->queue_lock		= lock;
-	q->last_merge		= NULL;
 	
 	blk_queue_segment_boundary(q, 0xffffffff);
 
@@ -962,12 +961,6 @@ static inline void add_request(request_queue_t * q, struct request * req,
 			       struct list_head *insert_here)
 {
 	drive_stat_acct(req, req->nr_sectors, 1);
-
-	/*
-	 * it's a bug to let this rq preempt an already started request
-	 */
-	if (insert_here->next != &q->queue_head)
-		BUG_ON(list_entry_rq(insert_here->next)->flags & REQ_STARTED);
 
 	/*
 	 * elevator indicated where it wants this request to be
@@ -1121,8 +1114,10 @@ again:
 	switch (el_ret) {
 		case ELEVATOR_BACK_MERGE:
 			BUG_ON(!rq_mergeable(req));
-			if (!q->back_merge_fn(q, req, bio))
+			if (!q->back_merge_fn(q, req, bio)) {
+				insert_here = &req->queuelist;
 				break;
+			}
 
 			elv_merge_cleanup(q, req, nr_sectors);
 
@@ -1135,8 +1130,10 @@ again:
 
 		case ELEVATOR_FRONT_MERGE:
 			BUG_ON(!rq_mergeable(req));
-			if (!q->front_merge_fn(q, req, bio))
+			if (!q->front_merge_fn(q, req, bio)) {
+				insert_here = req->queuelist.prev;
 				break;
+			}
 
 			elv_merge_cleanup(q, req, nr_sectors);
 

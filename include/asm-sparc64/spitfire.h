@@ -1,4 +1,4 @@
-/* $Id: spitfire.h,v 1.16 2001/09/24 21:17:57 kanoj Exp $
+/* $Id: spitfire.h,v 1.18 2001/11/29 16:42:10 kanoj Exp $
  * spitfire.h: SpitFire/BlackBird/Cheetah inline MMU operations.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -32,6 +32,8 @@
 #define VIRT_WATCHPOINT		0x0000000000000038
 #define PHYS_WATCHPOINT		0x0000000000000040
 
+#define SPITFIRE_HIGHEST_LOCKED_TLBENT	(64 - 1)
+
 #ifndef __ASSEMBLY__
 
 enum ultra_tlb_layout {
@@ -43,7 +45,6 @@ extern enum ultra_tlb_layout tlb_type;
 
 #define SPARC64_USE_STICK	(tlb_type == cheetah)
 
-#define SPITFIRE_HIGHEST_LOCKED_TLBENT	(64 - 1)
 #define CHEETAH_HIGHEST_LOCKED_TLBENT	(16 - 1)
 
 #define L1DCACHE_SIZE		0x4000
@@ -357,12 +358,17 @@ extern __inline__ void cheetah_flush_itlb_all(void)
  * 2 way assosciative, and holds 512 entries.  The fourth TLB is for
  * instruction accesses to 8K non-locked translations, is 2 way
  * assosciative, and holds 128 entries.
+ *
+ * Cheetah has some bug where bogus data can be returned from
+ * ASI_{D,I}TLB_DATA_ACCESS loads, doing the load twice fixes
+ * the problem for me. -DaveM
  */
 extern __inline__ unsigned long cheetah_get_ldtlb_data(int entry)
 {
 	unsigned long data;
 
-	__asm__ __volatile__("ldxa	[%1] %2, %0"
+	__asm__ __volatile__("ldxa	[%1] %2, %%g0\n\t"
+			     "ldxa	[%1] %2, %0"
 			     : "=r" (data)
 			     : "r" ((0 << 16) | (entry << 3)),
 			     "i" (ASI_DTLB_DATA_ACCESS));
@@ -374,7 +380,8 @@ extern __inline__ unsigned long cheetah_get_litlb_data(int entry)
 {
 	unsigned long data;
 
-	__asm__ __volatile__("ldxa	[%1] %2, %0"
+	__asm__ __volatile__("ldxa	[%1] %2, %%g0\n\t"
+			     "ldxa	[%1] %2, %0"
 			     : "=r" (data)
 			     : "r" ((0 << 16) | (entry << 3)),
 			     "i" (ASI_ITLB_DATA_ACCESS));
@@ -430,7 +437,8 @@ extern __inline__ unsigned long cheetah_get_dtlb_data(int entry)
 {
 	unsigned long data;
 
-	__asm__ __volatile__("ldxa	[%1] %2, %0"
+	__asm__ __volatile__("ldxa	[%1] %2, %%g0\n\t"
+			     "ldxa	[%1] %2, %0"
 			     : "=r" (data)
 			     : "r" ((2 << 16) | (entry << 3)), "i" (ASI_DTLB_DATA_ACCESS));
 
@@ -461,7 +469,8 @@ extern __inline__ unsigned long cheetah_get_itlb_data(int entry)
 {
 	unsigned long data;
 
-	__asm__ __volatile__("ldxa	[%1] %2, %0"
+	__asm__ __volatile__("ldxa	[%1] %2, %%g0\n\t"
+			     "ldxa	[%1] %2, %0"
 			     : "=r" (data)
 			     : "r" ((2 << 16) | (entry << 3)),
                                "i" (ASI_ITLB_DATA_ACCESS));

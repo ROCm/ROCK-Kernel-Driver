@@ -1,4 +1,4 @@
-/* $Id: pci_psycho.c,v 1.29 2001/10/11 00:44:38 davem Exp $
+/* $Id: pci_psycho.c,v 1.31 2002/01/05 07:33:16 davem Exp $
  * pci_psycho.c: PSYCHO/U2P specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -13,6 +13,7 @@
 #include <linux/slab.h>
 
 #include <asm/pbm.h>
+#include <asm/fhc.h>
 #include <asm/iommu.h>
 #include <asm/irq.h>
 #include <asm/starfire.h>
@@ -371,6 +372,7 @@ static int __init psycho_ino_to_pil(struct pci_dev *pdev, unsigned int ino)
 		case PCI_BASE_CLASS_MULTIMEDIA:
 		case PCI_BASE_CLASS_MEMORY:
 		case PCI_BASE_CLASS_BRIDGE:
+		case PCI_BASE_CLASS_SERIAL:
 			ret = 10;
 			break;
 
@@ -1479,8 +1481,7 @@ static void psycho_pbm_init(struct pci_controller_info *p,
 {
 	unsigned int busrange[2];
 	struct pci_pbm_info *pbm;
-	char namebuf[64];
-	int err, len;
+	int err;
 
 	if (is_pbm_a) {
 		pbm = &p->pbm_A;
@@ -1489,13 +1490,9 @@ static void psycho_pbm_init(struct pci_controller_info *p,
 		pbm->mem_space.start = p->controller_regs + PSYCHO_MEMSPACE_A;
 	} else {
 		pbm = &p->pbm_B;
-		pbm->pci_first_slot = 1;
-		len = prom_getproperty(prom_root_node, "name",
-				       namebuf, sizeof(namebuf));
-		if (len > 0) {
-			if (!strcmp(namebuf, "SUNW,Ultra-1-Engine"))
-				pbm->pci_first_slot = 2;
-		}
+		pbm->pci_first_slot = 2;
+		if (central_bus != NULL)
+			pbm->pci_first_slot = 1;
 		pbm->io_space.start = p->controller_regs + PSYCHO_IOSPACE_B;
 		pbm->mem_space.start = p->controller_regs + PSYCHO_MEMSPACE_B;
 	}

@@ -41,7 +41,7 @@ do { \
 static inline struct request * 
 tape_next_request( request_queue_t *queue ) 
 {
-        return blkdev_entry_next_request(&queue->queue_head);
+        return elv_next_request(queue);
 }
 static inline void 
 tape_dequeue_request( request_queue_t * q, struct request *req )

@@ -25,7 +25,7 @@ static mempool_t *page_pool, *isa_page_pool;
 
 static void *page_pool_alloc(int gfp_mask, void *data)
 {
-	int gfp = gfp_mask | (int) data;
+	int gfp = gfp_mask | (int) (long) data;
 
 	return alloc_page(gfp);
 }

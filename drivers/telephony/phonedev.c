@@ -46,7 +46,7 @@ static DECLARE_MUTEX(phone_lock);
 
 static int phone_open(struct inode *inode, struct file *file)
 {
-	unsigned int minor = MINOR(inode->i_rdev);
+	unsigned int minor = minor(inode->i_rdev);
 	int err = 0;
 	struct phone_device *p;
 	struct file_operations *old_fops, *new_fops = NULL;

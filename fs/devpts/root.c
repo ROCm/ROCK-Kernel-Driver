@@ -101,7 +101,6 @@ static struct dentry *devpts_root_lookup(struct inode * dir, struct dentry * den
 	int i;
 	const char *p;
 
-	dentry->d_inode = NULL;	/* Assume failure */
 	dentry->d_op    = &devpts_dentry_operations;
 
 	if ( dentry->d_name.len == 1 && dentry->d_name.name[0] == '0' ) {
@@ -127,11 +126,10 @@ static struct dentry *devpts_root_lookup(struct inode * dir, struct dentry * den
 	if ( entry >= sbi->max_ptys )
 		return NULL;
 
-	dentry->d_inode = sbi->inodes[entry];
-	if ( dentry->d_inode )
-		atomic_inc(&dentry->d_inode->i_count);
+	if ( sbi->inodes[entry] )
+		atomic_inc(&sbi->inodes[entry]->i_count);
 	
-	d_add(dentry, dentry->d_inode);
+	d_add(dentry, sbi->inodes[entry]);
 
 	return NULL;
 }

@@ -1,4 +1,4 @@
-/* $Id: socksys.c,v 1.18 2001/02/13 01:16:44 davem Exp $
+/* $Id: socksys.c,v 1.20 2002/01/08 16:00:21 davem Exp $
  * socksys.c: /dev/inet/ stuff for Solaris emulation.
  *
  * Copyright (C) 1997 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
@@ -61,14 +61,14 @@ static int socksys_open(struct inode * inode, struct file * filp)
 		(int (*)(int,int,int))SUNOS(97);
         struct sol_socket_struct * sock;
 	
-	family = ((MINOR(inode->i_rdev) >> 4) & 0xf);
+	family = ((minor(inode->i_rdev) >> 4) & 0xf);
 	switch (family) {
 	case AF_UNIX:
 		type = SOCK_STREAM;
 		protocol = 0;
 		break;
 	case AF_INET:
-		protocol = af_inet_protocols[MINOR(inode->i_rdev) & 0xf];
+		protocol = af_inet_protocols[minor(inode->i_rdev) & 0xf];
 		switch (protocol) {
 		case IPPROTO_TCP: type = SOCK_STREAM; break;
 		case IPPROTO_UDP: type = SOCK_DGRAM; break;

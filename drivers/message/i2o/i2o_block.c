@@ -892,13 +892,13 @@ static void i2ob_request(request_queue_t *q)
 	u32 m;
 	
 	
-	while (!list_empty(&q->queue_head)) {
+	while (!blk_queue_empty(q)) {
 		/*
 		 *	On an IRQ completion if there is an inactive
 		 *	request on the queue head it means it isnt yet
 		 *	ready to dispatch.
 		 */
-		req = blkdev_entry_next_request(&q->queue_head);
+		req = elv_next_request(q);
 
 		if(req->rq_status == RQ_INACTIVE)
 			return;

@@ -1864,6 +1864,7 @@ zap_buffer:
 	clear_bit(BH_Mapped, &bh->b_state);
 	clear_bit(BH_Req, &bh->b_state);
 	clear_bit(BH_New, &bh->b_state);
+	bh->b_bdev = NULL;
 	return may_free;
 }
 

@@ -1,4 +1,4 @@
-/* $Id: irq.c,v 1.109 2001/11/12 22:22:37 davem Exp $
+/* $Id: irq.c,v 1.114 2002/01/11 08:45:38 davem Exp $
  * irq.c: UltraSparc IRQ handling/init/registry.
  *
  * Copyright (C) 1997  David S. Miller  (davem@caip.rutgers.edu)
@@ -19,6 +19,7 @@
 #include <linux/delay.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/kbd_ll.h>
 
 #include <asm/ptrace.h>
 #include <asm/processor.h>
@@ -35,6 +36,7 @@
 #include <asm/softirq.h>
 #include <asm/starfire.h>
 #include <asm/uaccess.h>
+#include <asm/cache.h>
 
 #ifdef CONFIG_SMP
 static void distribute_irqs(void);
@@ -53,10 +55,10 @@ static void distribute_irqs(void);
  * at the same time.
  */
 
-struct ino_bucket ivector_table[NUM_IVECS] __attribute__ ((aligned (64)));
+struct ino_bucket ivector_table[NUM_IVECS] __attribute__ ((aligned (SMP_CACHE_BYTES)));
 
 #ifndef CONFIG_SMP
-unsigned int __up_workvec[16] __attribute__ ((aligned (64)));
+unsigned int __up_workvec[16] __attribute__ ((aligned (SMP_CACHE_BYTES)));
 #define irq_work(__cpu, __pil)	&(__up_workvec[(void)(__cpu), (__pil)])
 #else
 #define irq_work(__cpu, __pil)	&(cpu_data[(__cpu)].irq_worklists[(__pil)])
@@ -116,19 +118,19 @@ int show_interrupts(struct seq_file *p, void *v)
 	for(i = 0; i < (NR_IRQS + 1); i++) {
 		if(!(action = *(i + irq_action)))
 			continue;
-		seq_print(p, "%3d: ", i);
+		seq_printf(p, "%3d: ", i);
 #ifndef CONFIG_SMP
-		seq_print(p, "%10u ", kstat_irqs(i));
+		seq_printf(p, "%10u ", kstat_irqs(i));
 #else
 		for (j = 0; j < smp_num_cpus; j++)
-			seq_print(p, "%10u ",
-				       kstat.irqs[cpu_logical_map(j)][i]);
+			seq_printf(p, "%10u ",
+				   kstat.irqs[cpu_logical_map(j)][i]);
 #endif
-		seq_print(p, " %s:%lx", action->name,
-						get_ino_in_irqaction(action));
+		seq_printf(p, " %s:%lx", action->name,
+			   get_ino_in_irqaction(action));
 		for(action = action->next; action; action = action->next) {
-			seq_print(p, ", %s:%lx", action->name,
-						get_ino_in_irqaction(action));
+			seq_printf(p, ", %s:%lx", action->name,
+				   get_ino_in_irqaction(action));
 		}
 		seq_putc(p, '\n');
 	}
@@ -161,7 +163,7 @@ void enable_irq(unsigned int irq)
 		tid = ((tid & UPA_CONFIG_MID) << 9);
 		tid &= IMAP_TID_UPA;
 	} else {
-		tid = (starfire_translate(imap, current->processor) << 26);
+		tid = (starfire_translate(imap, smp_processor_id()) << 26);
 		tid &= IMAP_TID_UPA;
 	}
 
@@ -823,6 +825,11 @@ void handler_irq(int irq, struct pt_regs *regs)
 	irq_enter(cpu, irq);
 	kstat.irqs[cpu][irq]++;
 
+#ifdef CONFIG_PCI
+	if (irq == 9)
+		kbd_pt_regs = regs;
+#endif
+
 	/* Sliiiick... */
 #ifndef CONFIG_SMP
 	bp = ((irq != 0) ?
@@ -1246,19 +1253,15 @@ void enable_prom_timer(void)
 	prom_timers->count0 = 0;
 }
 
+/* Only invoked on boot processor. */
 void __init init_IRQ(void)
 {
-	static int called = 0;
-
-	if (called == 0) {
-		called = 1;
-		map_prom_timers();
-		kill_prom_timer();
-		memset(&ivector_table[0], 0, sizeof(ivector_table));
+	map_prom_timers();
+	kill_prom_timer();
+	memset(&ivector_table[0], 0, sizeof(ivector_table));
 #ifndef CONFIG_SMP
-		memset(&__up_workvec[0], 0, sizeof(__up_workvec));
+	memset(&__up_workvec[0], 0, sizeof(__up_workvec));
 #endif
-	}
 
 	/* We need to clear any IRQ's pending in the soft interrupt
 	 * registers, a spurious one could be left around from the

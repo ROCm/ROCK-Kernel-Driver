@@ -58,8 +58,6 @@ inline int bio_rq_in_between(struct bio *bio, struct request *rq,
 
 	next_rq = list_entry(next, struct request, queuelist);
 
-	BUG_ON(next_rq->flags & REQ_STARTED);
-
 	/*
 	 * not a sector based request
 	 */
@@ -147,9 +145,10 @@ inline int elv_try_last_merge(request_queue_t *q, struct request **req,
 	 */
 	if (q->last_merge) {
 		struct request *__rq = list_entry_rq(q->last_merge);
-		BUG_ON(__rq->flags & REQ_STARTED);
 
-		if ((ret = elv_try_merge(__rq, bio)))
+		if (!rq_mergeable(__rq))
+			q->last_merge = NULL;
+		else if ((ret = elv_try_merge(__rq, bio)))
 			*req = __rq;
 	}
 
@@ -230,6 +229,12 @@ void elevator_linus_add_request(request_queue_t *q, struct request *rq,
 {
 	elevator_t *e = &q->elevator;
 	int lat = 0, *latency = e->elevator_data;
+
+	/*
+	 * it's a bug to let this rq preempt an already started request
+	 */
+	if (insert_here->next != &q->queue_head)
+		BUG_ON(list_entry_rq(insert_here->next)->flags & REQ_STARTED);
 
 	if (!(rq->flags & REQ_BARRIER))
 		lat = latency[rq_data_dir(rq)];

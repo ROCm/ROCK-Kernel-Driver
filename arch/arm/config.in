@@ -709,3 +709,5 @@ dep_bool '    Kernel low-level debugging messages via footbridge serial port' CO
 dep_bool '    Kernel low-level debugging messages via UART2' CONFIG_DEBUG_CLPS711X_UART2 $CONFIG_DEBUG_LL $CONFIG_ARCH_CLPS711X
 dep_bool '    Kernel low-level debugging messages via SA1100 Ser3 (otherwise Ser1)' CONFIG_DEBUG_LL_SER3 $CONFIG_DEBUG_LL $CONFIG_ARCH_SA1100
 endmenu
+
+source lib/Config.in

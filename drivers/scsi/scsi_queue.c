@@ -10,7 +10,6 @@
  *  we attempt to remove commands from the queue and retry them.
  */
 
-#define __NO_VERSION__
 #include <linux/module.h>
 
 #include <linux/sched.h>
@@ -137,10 +136,10 @@ int scsi_mlqueue_insert(Scsi_Cmnd * cmd, int reason)
 	 * Decrement the counters, since these commands are no longer
 	 * active on the host/device.
 	 */
-	spin_lock_irqsave(&cmd->host->host_lock, flags);
+	spin_lock_irqsave(cmd->host->host_lock, flags);
 	cmd->host->host_busy--;
 	cmd->device->device_busy--;
-	spin_unlock_irqrestore(&cmd->host->host_lock, flags);
+	spin_unlock_irqrestore(cmd->host->host_lock, flags);
 
 	/*
 	 * Insert this command at the head of the queue for it's device.

@@ -436,6 +436,7 @@
                            'pb' is now only initialized if a de4x5 chip is
                            present. 
                            <france@handhelds.org>  
+      0.547  08-Nov-01    Use library crc32 functions by <Matt_Domsch@dell.com>
     =========================================================================
 */
 
@@ -457,6 +458,7 @@ static const char *version = "de4x5.c:V0.546 2001/02/22 davies@maniac.ultranet.c
 #include <linux/init.h>
 #include <linux/version.h>
 #include <linux/spinlock.h>
+#include <linux/crc32.h>
 
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -621,9 +623,6 @@ struct parameters {
 #define FAKE_FRAME_LEN  (MAX_PKT_SZ + 1)
 #define QUEUE_PKT_TIMEOUT (3*HZ)        /* 3 second timeout */
 
-
-#define CRC_POLYNOMIAL_BE 0x04c11db7UL  /* Ethernet CRC, big endian */
-#define CRC_POLYNOMIAL_LE 0xedb88320UL  /* Ethernet CRC, little endian */
 
 /*
 ** EISA bus defines
@@ -2050,7 +2049,7 @@ SetMulticastFilter(struct net_device *dev)
     u_long iobase = dev->base_addr;
     int i, j, bit, byte;
     u16 hashcode;
-    u32 omr, crc, poly = CRC_POLYNOMIAL_LE;
+    u32 omr, crc;
     char *pa;
     unsigned char *addrs;
 
@@ -2065,13 +2064,7 @@ SetMulticastFilter(struct net_device *dev)
 	    addrs=dmi->dmi_addr;
 	    dmi=dmi->next;
 	    if ((*addrs & 0x01) == 1) {      /* multicast address? */ 
-		crc = 0xffffffff;            /* init CRC for each address */
-		for (byte=0;byte<ETH_ALEN;byte++) {/* for each address byte */
-		                             /* process each address bit */ 
-		    for (bit = *addrs++,j=0;j<8;j++, bit>>=1) {
-			crc = (crc >> 1) ^ (((crc ^ bit) & 0x01) ? poly : 0);
-		    }
-		}
+		crc = ether_crc_le(ETH_ALEN, addrs);
 		hashcode = crc & HASH_BITS;  /* hashcode is 9 LSb of CRC */
 		
 		byte = hashcode >> 3;        /* bit[3-8] -> byte in filter */

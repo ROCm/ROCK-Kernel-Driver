@@ -234,6 +234,8 @@ endmenu
 
 source drivers/usb/Config.in
 
+source lib/Config.in
+
 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
    source net/bluetooth/Config.in
 fi

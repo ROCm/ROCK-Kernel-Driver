@@ -143,6 +143,23 @@ ip_nat_mangle_tcp_packet(struct sk_buff **skb,
 		}
 	}
 
+	/* Alexey says: if a hook changes _data_ ... it can break
+	   original packet sitting in tcp queue and this is fatal */
+	if (skb_cloned(*skb)) {
+		struct sk_buff *nskb = skb_copy(*skb, GFP_ATOMIC);
+		if (!nskb) {
+			if (net_ratelimit())
+				printk("Out of memory cloning TCP packet\n");
+			return 0;
+		}
+		/* Rest of kernel will get very unhappy if we pass it
+		   a suddenly-orphaned skbuff */
+		if ((*skb)->sk)
+			skb_set_owner_w(nskb, (*skb)->sk);
+		kfree_skb(*skb);
+		*skb = nskb;
+	}
+
 	/* skb may be copied !! */
 	iph = (*skb)->nh.iph;
 	tcph = (void *)iph + iph->ihl*4;

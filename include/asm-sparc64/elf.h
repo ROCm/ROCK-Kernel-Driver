@@ -1,4 +1,4 @@
-/* $Id: elf.h,v 1.30 2001/08/30 23:35:38 kanoj Exp $ */
+/* $Id: elf.h,v 1.31 2002/01/08 16:00:20 davem Exp $ */
 #ifndef __ASM_SPARC64_ELF_H
 #define __ASM_SPARC64_ELF_H
 
@@ -75,24 +75,7 @@ do {	unsigned char flags = current->thread.flags;	\
 	else						\
 		flags &= ~SPARC_FLAG_32BIT;		\
 	if (flags != current->thread.flags) {		\
-		unsigned long pgd_cache = 0UL;		\
-		if (flags & SPARC_FLAG_32BIT) {		\
-		  pgd_t *pgd0 = &current->mm->pgd[0];	\
-		  if (pgd_none (*pgd0)) {		\
-		    pmd_t *page = pmd_alloc_one_fast(NULL, 0);	\
-		    if (!page)				\
-		      page = pmd_alloc_one(NULL, 0);	\
-                    pgd_set(pgd0, page);		\
-		  }					\
-		  pgd_cache = pgd_val(*pgd0) << 11UL;	\
-		}					\
-		__asm__ __volatile__(			\
-			"stxa\t%0, [%1] %2\n\t"		\
-			"membar #Sync"			\
-			: /* no outputs */		\
-			: "r" (pgd_cache),		\
-			  "r" (TSB_REG),		\
-			  "i" (ASI_DMMU));		\
+		/* flush_thread will update pgd cache */\
 		current->thread.flags = flags;		\
 	}						\
 							\

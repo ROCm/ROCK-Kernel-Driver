@@ -1,4 +1,4 @@
-/* $Id: sbus.c,v 1.95 2001/03/15 02:11:10 davem Exp $
+/* $Id: sbus.c,v 1.98 2002/01/05 01:13:43 davem Exp $
  * sbus.c:  SBus support routines.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -231,6 +231,7 @@ static void __init __apply_ranges_to_regs(struct linux_prom_ranges *ranges,
 				return;
 			}
 			regs[regnum].which_io = ranges[rngnum].ot_parent_space;
+			regs[regnum].phys_addr -= ranges[rngnum].ot_child_base;
 			regs[regnum].phys_addr += ranges[rngnum].ot_parent_base;
 		}
 	}

@@ -305,7 +305,7 @@ struct task_struct {
 	prio_array_t *array;
 
 	unsigned int time_slice;
-	unsigned long swap_cnt_last;
+	unsigned long sleep_jtime;
 
 	unsigned long policy;
 	unsigned long cpus_allowed;

@@ -32,6 +32,7 @@
 #include <linux/blkpg.h>
 #include <linux/timer.h>
 #include <linux/proc_fs.h>
+#include <linux/devfs_fs_kernel.h>
 #include <linux/init.h>
 #include <linux/hdreg.h>
 #include <linux/spinlock.h>
@@ -70,6 +71,7 @@ MODULE_LICENSE("GPL");
 
 static int nr_ctlr;
 static ctlr_info_t *hba[MAX_CTLR];
+static devfs_handle_t de_arr[MAX_CTLR][NWD];
 
 static int eisa[8];
 
@@ -336,6 +338,7 @@ void cleanup_module(void)
 
 		del_gendisk(&ida_gendisk[i]);
 	}
+	devfs_unregister(devfs_find_handle(NULL, "ida", 0, 0, 0, 0));
 	remove_proc_entry("cpqarray", proc_root_driver);
 	kfree(ida);
 	kfree(ida_sizes);
@@ -486,6 +489,8 @@ int __init cpqarray_init(void)
 		ida_gendisk[i].part = ida + (i*256);
 		ida_gendisk[i].sizes = ida_sizes + (i*256);
 		ida_gendisk[i].nr_real = 0; 
+		ida_gendisk[i].de_arr = de_arr[i]; 
+		ida_gendisk[i].fops = &ida_fops; 
 	
 		/* Get on the disk list */
 		add_gendisk(&ida_gendisk[i]);
@@ -1794,6 +1799,14 @@ static void getgeometry(int ctlr)
                 			kfree(id_ldrive);
                 			return;
 
+				}
+				if (!de_arr[ctlr][log_unit]) {
+					char txt[16];
+
+					sprintf(txt, "ida/c%dd%d", ctlr,
+						log_unit);
+					de_arr[ctlr][log_unit] =
+						devfs_mk_dir(NULL, txt, NULL);
 				}
 				info_p->phys_drives =
 				    sense_config_buf->ctlr_phys_drv;

@@ -1,4 +1,4 @@
-/* $Id: sunserial.c,v 1.79 2001/04/18 21:06:17 davem Exp $
+/* $Id: sunserial.c,v 1.81 2002/01/05 01:13:43 davem Exp $
  * serial.c: Serial port driver infrastructure for the Sparc.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)

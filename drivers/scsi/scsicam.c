@@ -10,7 +10,6 @@
  * For more information, please consult the SCSI-CAM draft.
  */
 
-#define __NO_VERSION__
 #include <linux/module.h>
 
 #include <linux/fs.h>

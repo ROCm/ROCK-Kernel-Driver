@@ -127,7 +127,7 @@ void __init smp4d_callin(void)
 	while((unsigned long)current_set[cpuid] < PAGE_OFFSET)
 		barrier();
 		
-	while(current_set[cpuid]->processor != cpuid)
+	while(current_set[cpuid]->cpu != cpuid)
 		barrier();
 		
 	/* Fix idle thread fields. */
@@ -197,10 +197,9 @@ void __init smp4d_boot_cpus(void)
 		mid_xlate[i] = i;
 	__cpu_number_map[boot_cpu_id] = 0;
 	__cpu_logical_map[0] = boot_cpu_id;
-	current->processor = boot_cpu_id;
+	current->cpu = boot_cpu_id;
 	smp_store_cpu_info(boot_cpu_id);
 	smp_setup_percpu_timer();
-	init_idle();
 	local_flush_cache_all();
 	if(linux_num_cpus == 1)
 		return;  /* Not an MP box. */
@@ -222,14 +221,11 @@ void __init smp4d_boot_cpus(void)
 			cpucount++;
 
 			p = init_task.prev_task;
-			init_tasks[i] = p;
 
-			p->processor = i;
-			p->cpus_runnable = 1 << i; /* we schedule the first task manually */
+			p->cpu = i;
 
 			current_set[i] = p;
 
-			del_from_runqueue(p);
 			unhash_process(p);
 
 			for (no = 0; no < linux_num_cpus; no++)

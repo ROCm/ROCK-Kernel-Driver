@@ -1,4 +1,4 @@
-/* $Id: sys_sunos32.c,v 1.61 2001/08/13 14:40:07 davem Exp $
+/* $Id: sys_sunos32.c,v 1.62 2002/01/08 16:00:14 davem Exp $
  * sys_sunos32.c: SunOS binary compatability layer on sparc64.
  *
  * Copyright (C) 1995, 1996, 1997 David S. Miller (davem@caip.rutgers.edu)
@@ -68,7 +68,7 @@ asmlinkage u32 sunos_mmap(u32 addr, u32 len, u32 prot, u32 flags, u32 fd, u32 of
 	struct file *file = NULL;
 	unsigned long retval, ret_type;
 
-	if(flags & MAP_NORESERVE) {
+	if (flags & MAP_NORESERVE) {
 		static int cnt;
 		if (cnt++ < 10)
 			printk("%s:  unimplemented SunOS MAP_NORESERVE mmap() flag\n",
@@ -76,15 +76,15 @@ asmlinkage u32 sunos_mmap(u32 addr, u32 len, u32 prot, u32 flags, u32 fd, u32 of
 		flags &= ~MAP_NORESERVE;
 	}
 	retval = -EBADF;
-	if(!(flags & MAP_ANONYMOUS)) {
+	if (!(flags & MAP_ANONYMOUS)) {
 		struct inode * inode;
-		if(fd >= SUNOS_NR_OPEN)
+		if (fd >= SUNOS_NR_OPEN)
 			goto out;
  		file = fget(fd);
 		if (!file)
 			goto out;
 		inode = file->f_dentry->d_inode;
-		if(MAJOR(inode->i_rdev)==MEM_MAJOR && MINOR(inode->i_rdev)==5) {
+		if (minor(inode->i_rdev) == MEM_MAJOR && minor(inode->i_rdev) == 5) {
 			flags |= MAP_ANONYMOUS;
 			fput(file);
 			file = NULL;
@@ -92,7 +92,7 @@ asmlinkage u32 sunos_mmap(u32 addr, u32 len, u32 prot, u32 flags, u32 fd, u32 of
 	}
 
 	retval = -EINVAL;
-	if(!(flags & MAP_FIXED))
+	if (!(flags & MAP_FIXED))
 		addr = 0;
 	else if (len > 0xf0000000 || addr > 0xf0000000 - len)
 		goto out_putf;
@@ -106,7 +106,7 @@ asmlinkage u32 sunos_mmap(u32 addr, u32 len, u32 prot, u32 flags, u32 fd, u32 of
 			 (unsigned long) prot, (unsigned long) flags,
 			 (unsigned long) off);
 	up_write(&current->mm->mmap_sem);
-	if(!ret_type)
+	if (!ret_type)
 		retval = ((retval < 0xf0000000) ? 0 : retval);
 out_putf:
 	if (file)

@@ -34,6 +34,7 @@
 #include <linux/timer.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
+#include <linux/crc32.h>
 #include <asm/io.h>
 #include <asm/system.h>
 
@@ -1740,31 +1741,6 @@ static struct net_device_stats *smc91c92_get_stats(struct net_device *dev)
     return &smc->stats;
 }
 
-/*======================================================================
-
-    Compute the AUTODIN polynomial "CRC32" for ethernet packets.
-
-======================================================================*/
-
-static const u_int ethernet_polynomial = 0x04c11db7U;
-
-static u_int ether_crc(int length, u_char *data)
-{
-    int crc = 0xffffffff;	/* Initial value. */
-    
-    while (--length >= 0) {
-	u_char current_octet = *data++;
-	int bit;
-	for (bit = 0; bit < 8; bit++, current_octet >>= 1) {
-	    crc = (crc << 1) ^
-		((crc < 0) ^ (current_octet & 1) ? ethernet_polynomial : 0);
-	}
-    }
-    /* The hash index is the either the upper or lower bits of the CRC, so
-     * we return the entire CRC.
-     */
-    return crc;
-}
 
 /*======================================================================
   

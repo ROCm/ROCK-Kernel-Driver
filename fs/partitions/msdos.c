@@ -166,7 +166,7 @@ static void extended_partition(struct gendisk *hd, struct block_device *bdev,
 			add_gd_partition(hd, *current_minor, next, size);
 #if CONFIG_BLK_DEV_MD
 			if (SYS_IND(p) == LINUX_RAID_PARTITION) {
-			    md_autodetect_dev(MKDEV(hd->major,*current_minor));
+			    md_autodetect_dev(mk_kdev(hd->major,*current_minor));
 			}
 #endif
 
@@ -580,7 +580,7 @@ int msdos_partition(struct gendisk *hd, struct block_device *bdev,
 				NR_SECTS(p)*sector_size);
 #if CONFIG_BLK_DEV_MD
 		if (SYS_IND(p) == LINUX_RAID_PARTITION) {
-			md_autodetect_dev(MKDEV(hd->major,minor));
+			md_autodetect_dev(mk_kdev(hd->major,minor));
 		}
 #endif
 		if (is_extended_partition(p)) {

@@ -630,10 +630,14 @@ static int csum_partial_copy_to_page_cache(struct iovec *iov,
 			int to_move = cur_len;
 			if (to_move > copied)
 				to_move = copied;
-			if (need_csum)
-				csum = skb_copy_and_csum_bits(skb, offset, cur_ptr,
-							      to_move, csum);
-			else
+			if (need_csum) {
+				unsigned int csum2;
+
+				csum2 = skb_copy_and_csum_bits(skb, offset,
+							       cur_ptr,
+							       to_move, 0);
+				csum = csum_block_add(csum, csum2, offset);
+			} else
 				skb_copy_bits(skb, offset, cur_ptr, to_move);
 			offset += to_move;
 			copied -= to_move;
@@ -647,8 +651,12 @@ static int csum_partial_copy_to_page_cache(struct iovec *iov,
 		}
 	}
 	if (need_csum) {
-		if (slack > 0)
-			csum = skb_checksum(skb, offset, slack, csum);
+		if (slack > 0) {
+			unsigned int csum2;
+
+			csum2 = skb_checksum(skb, offset, slack, 0);
+			csum = csum_block_add(csum, csum2, offset);
+		}
 		if ((unsigned short)csum_fold(csum))
 			return -1;
 	}

@@ -228,6 +228,8 @@
 			   by <peterd@pnd-pc.demon.co.uk>
       0.53    12-Jan-01	  Release resources on failure, bss tidbits
       			   by acme@conectiva.com.br
+      0.54    08-Nov-01	  use library crc32 functions
+      			   by Matt_Domsch@dell.com
 
     =========================================================================
 */
@@ -245,6 +247,7 @@
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/crc32.h>
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -295,9 +298,6 @@ static int depca_debug = 1;
 #define NUM_TX_DESC     8               /* Number of TX descriptors */
 #define RX_BUFF_SZ	1536            /* Buffer size for each Rx buffer */
 #define TX_BUFF_SZ	1536            /* Buffer size for each Tx buffer */
-
-#define CRC_POLYNOMIAL_BE 0x04c11db7UL  /* Ethernet CRC, big endian */
-#define CRC_POLYNOMIAL_LE 0xedb88320UL  /* Ethernet CRC, little endian */
 
 /*
 ** EISA bus defines
@@ -1225,7 +1225,7 @@ static void SetMulticastFilter(struct net_device *dev)
   char *addrs;
   int i, j, bit, byte;
   u16 hashcode;
-  s32 crc, poly = CRC_POLYNOMIAL_BE;
+  u32 crc;
 
   if (dev->flags & IFF_ALLMULTI) {         /* Set all multicast bits */
     for (i=0; i<(HASH_TABLE_LEN>>3); i++) {
@@ -1240,13 +1240,7 @@ static void SetMulticastFilter(struct net_device *dev)
       addrs=dmi->dmi_addr;
       dmi=dmi->next;
       if ((*addrs & 0x01) == 1) {          /* multicast address? */ 
-	crc = 0xffffffff;                  /* init CRC for each address */
-	for (byte=0;byte<ETH_ALEN;byte++) {/* for each address byte */
-	                                   /* process each address bit */ 
-	  for (bit = *addrs++,j=0;j<8;j++, bit>>=1) {
-	    crc = (crc << 1) ^ ((((crc<0?1:0) ^ bit) & 0x01) ? poly : 0);
-	  }
-	}
+        crc = ether_crc(ETH_ALEN, addrs);
 	hashcode = (crc & 1);              /* hashcode is 6 LSb of CRC ... */
 	for (j=0;j<5;j++) {                /* ... in reverse order. */
 	  hashcode = (hashcode << 1) | ((crc>>=1) & 1);

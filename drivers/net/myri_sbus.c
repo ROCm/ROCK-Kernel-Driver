@@ -800,9 +800,6 @@ static int myri_change_mtu(struct net_device *dev, int new_mtu)
 static struct net_device_stats *myri_get_stats(struct net_device *dev)
 { return &(((struct myri_eth *)dev->priv)->enet_stats); }
 
-#define CRC_POLYNOMIAL_BE 0x04c11db7UL  /* Ethernet CRC, big endian */
-#define CRC_POLYNOMIAL_LE 0xedb88320UL  /* Ethernet CRC, little endian */
-
 static void myri_set_multicast(struct net_device *dev)
 {
 	/* Do nothing, all MyriCOM nodes transmit multicast frames

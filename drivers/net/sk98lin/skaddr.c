@@ -199,7 +199,6 @@ extern "C" {
 /* defines ********************************************************************/
 
 
-#define CRC32_POLY	0xEDB88320UL	/* CRC32-Poly - XMAC: Little Endian */
 #define HASH_BITS	6				/* #bits in hash */
 #define	SK_MC_BIT	0x01
 
@@ -534,18 +533,9 @@ int		Flags)		/* permanent/non-perm, sw-only */
 unsigned SkCrc32McHash(
 unsigned char *pMc)	/* Multicast address */
 {
-	unsigned Idx;
-	unsigned Bit;
-	unsigned Data;
-	unsigned Crc;
+	u32 Crc;
 
-	Crc = 0xFFFFFFFFUL;
-	for (Idx = 0; Idx < SK_MAC_ADDR_LEN; Idx++) {
-		Data = *pMc++;
-		for (Bit = 0; Bit < 8; Bit++, Data >>= 1) {
-			Crc = (Crc >> 1) ^ (((Crc ^ Data) & 1) ? CRC32_POLY : 0);
-		}
-	}
+	Crc = ether_crc_le(SK_MAC_ADDR_LEN, pMc);
 
 	return (Crc & ((1 << HASH_BITS) - 1));
 }	/* SkCrc32McHash */

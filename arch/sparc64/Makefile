@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.49 2001/10/17 18:26:58 davem Exp $
+# $Id: Makefile,v 1.51 2001/11/17 00:15:27 davem Exp $
 # sparc64/Makefile
 #
 # Makefile for the architecture dependent flags and dependencies on the
@@ -38,11 +38,6 @@ CC_UNDECL	= -Wa,--undeclared-regs
 AS		:= $(AS) --undeclared-regs
 endif
 
-#
-# Uncomment the first CFLAGS if you are doing kgdb source level
-# debugging of the kernel to get the proper debugging information.
-
-#CFLAGS := $(CFLAGS) -g -pipe -fcall-used-g5 -fcall-used-g7 
 ifneq ($(NEW_GCC),y)
   CFLAGS := $(CFLAGS) -pipe -mno-fpu -mtune=ultrasparc -mmedlow \
 	    -ffixed-g4 -fcall-used-g5 -fcall-used-g7 -Wno-sign-compare
@@ -51,25 +46,6 @@ else
 	    -ffixed-g4 -fcall-used-g5 -fcall-used-g7 -Wno-sign-compare \
 	    $(CC_UNDECL)
   AFLAGS += -m64 -mcpu=ultrasparc $(CC_UNDECL)
-endif
-
-# Uncomment this to get spinlock/rwlock debugging on SMP.
-# DEBUG_SPINLOCK = 1
-
-ifdef CONFIG_SMP
-  ifdef DEBUG_SPINLOCK
-    CFLAGS += -DSPIN_LOCK_DEBUG
-    AFLAGS += -DSPIN_LOCK_DEBUG
-  endif
-endif
-
-# Uncomment this to keep track of how often flush_dcache_page
-# actually flushes the caches, output via /proc/cpuinfo
-#
-# DEBUG_DCACHE_FLUSH = 1
-ifdef DEBUG_DCACHE_FLUSH
-  CFLAGS += -DDCFLUSH_DEBUG
-  AFLAGS += -DDCFLUSH_DEBUG
 endif
 
 LINKFLAGS = -T arch/sparc64/vmlinux.lds

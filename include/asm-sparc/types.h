@@ -1,4 +1,4 @@
-/* $Id: types.h,v 1.12 2000/01/29 02:23:25 anton Exp $ */
+/* $Id: types.h,v 1.13 2001/12/21 01:22:59 davem Exp $ */
 #ifndef _SPARC_TYPES_H
 #define _SPARC_TYPES_H
 
@@ -46,6 +46,7 @@ typedef unsigned long long u64;
 #define BITS_PER_LONG 32
 
 typedef u32 dma_addr_t;
+typedef u32 dma64_addr_t;
 
 #endif /* __KERNEL__ */
 

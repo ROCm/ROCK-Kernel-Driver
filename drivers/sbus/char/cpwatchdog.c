@@ -297,7 +297,7 @@ static inline int wd_opt_timeout(void)
 
 static int wd_open(struct inode *inode, struct file *f)
 {
-	switch(MINOR(inode->i_rdev))
+	switch(minor(inode->i_rdev))
 	{
 		case WD0_MINOR:
 			f->private_data = &wd_dev.watchdog[WD0_ID];

@@ -326,10 +326,6 @@ extern int * max_readahead[MAX_BLKDEV];
 #define MIN_READAHEAD	3
 
 #define blkdev_entry_to_request(entry) list_entry((entry), struct request, queuelist)
-#define blkdev_entry_next_request(entry) blkdev_entry_to_request((entry)->next)
-#define blkdev_entry_prev_request(entry) blkdev_entry_to_request((entry)->prev)
-#define blkdev_next_request(req) blkdev_entry_to_request((req)->queuelist.next)
-#define blkdev_prev_request(req) blkdev_entry_to_request((req)->queuelist.prev)
 
 extern void drive_stat_acct(struct request *, int, int);
 

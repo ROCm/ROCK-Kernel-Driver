@@ -39,8 +39,8 @@
 #include <linux/jffs2.h>
 #include <linux/mtd/mtd.h>
 #include <linux/pagemap.h>
+#include <linux/crc32.h>
 #include "nodelist.h"
-#include "crc32.h"
 
 
 #define DIRTY_SPACE(x) do { typeof(x) _x = (x); \

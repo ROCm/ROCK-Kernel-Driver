@@ -16,6 +16,8 @@
  *  - PHY updates
  * BenH <benh@kernel.crashing.org> - 08/08/2001
  * - Add more PHYs, fixes to sleep code
+ * Matt Domsch <Matt_Domsch@dell.com> - 11/12/2001
+ * - use library crc32 functions
  */
 
 #include <linux/module.h>
@@ -33,6 +35,7 @@
 #include <linux/timer.h>
 #include <linux/init.h>
 #include <linux/pci.h>
+#include <linux/crc32.h>
 #include <asm/prom.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
@@ -997,14 +1000,13 @@ gmac_stop_dma(struct gmac *gm)
  * Configure promisc mode and setup multicast hash table
  * filter
  */
-#define CRC_POLY	0xedb88320
 static void
 gmac_set_multicast(struct net_device *dev)
 {
 	struct gmac *gm = (struct gmac *) dev->priv;
 	struct dev_mc_list *dmi = dev->mc_list;
 	int i,j,k,b;
-	unsigned long crc;
+	u32 crc;
 	int multicast_hash = 0;
 	int multicast_all = 0;
 	int promisc = 0;
@@ -1027,17 +1029,7 @@ gmac_set_multicast(struct net_device *dev)
 			hash_table[i] = 0;
 
 	    	for (i = 0; i < dev->mc_count; i++) {
-			crc = ~0;
-			for (j = 0; j < 6; ++j) {
-			    b = dmi->dmi_addr[j];
-			    for (k = 0; k < 8; ++k) {
-				if ((crc ^ b) & 1)
-				    crc = (crc >> 1) ^ CRC_POLY;
-				else
-				    crc >>= 1;
-				b >>= 1;
-			    }
-			}
+			crc = ether_crc_le(6, dmi->dmi_addr);
 			j = crc >> 24;	/* bit number in multicast_filter */
 			hash_table[j >> 4] |= 1 << (15 - (j & 0xf));
 			dmi = dmi->next;

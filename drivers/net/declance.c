@@ -79,6 +79,7 @@ static char *lancestr = "LANCE";
 #include <linux/a.out.h>
 #include <linux/tty.h>
 #include <linux/delay.h>
+#include <linux/crc32.h>
 #include <asm/io.h>
 #include <linux/etherdevice.h>
 
@@ -87,9 +88,6 @@ unsigned long system_base;
 unsigned long dmaptr;
 #endif
 static int type;
-
-#define CRC_POLYNOMIAL_BE 0x04c11db7UL	/* Ethernet CRC, big endian */
-#define CRC_POLYNOMIAL_LE 0xedb88320UL	/* Ethernet CRC, little endian */
 
 #define LE_CSR0 0
 #define LE_CSR1 1
@@ -920,7 +918,7 @@ static void lance_load_multicast(struct net_device *dev)
 	struct dev_mc_list *dmi = dev->mc_list;
 	char *addrs;
 	int i, j, bit, byte;
-	u32 crc, poly = CRC_POLYNOMIAL_BE;
+	u32 crc;
 
 	/* set all multicast bits */
 	if (dev->flags & IFF_ALLMULTI) {
@@ -945,19 +943,7 @@ static void lance_load_multicast(struct net_device *dev)
 		if (!(*addrs & 1))
 			continue;
 
-		crc = 0xffffffff;
-		for (byte = 0; byte < 6; byte++)
-			for (bit = *addrs++, j = 0; j < 8; j++, bit >>= 1) {
-				int test;
-
-				test = ((bit ^ crc) & 0x01);
-				crc >>= 1;
-
-				if (test) {
-					crc = crc ^ poly;
-				}
-			}
-
+		crc = ether_crc(6, addrs);
 		crc = crc >> 26;
 		mcast_table[crc >> 3] |= 1 << (crc & 0xf);
 	}

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.67 2001/05/11 04:31:55 davem Exp $
+# $Id: Makefile,v 1.69 2001/11/19 04:09:53 davem Exp $
 # Makefile for the linux kernel.
 #
 # Note! Dependencies are done automagically by 'make dep', which also
@@ -68,7 +68,7 @@ check_asm: dummy
 	@echo "#include <linux/config.h>" > tmp.c
 	@echo "#undef CONFIG_SMP" >> tmp.c
 	@echo "#include <linux/sched.h>" >> tmp.c
-	$(CPP) $(CPPFLAGS) tmp.c -o tmp.i
+	$(CPP) $(CPPFLAGS) -P tmp.c -o tmp.i
 	@echo "/* Automatically generated. Do not edit. */" > check_asm_data.c
 	@echo "#include <linux/config.h>" >> check_asm_data.c
 	@echo "#undef CONFIG_SMP" >> check_asm_data.c
@@ -95,12 +95,12 @@ check_asm: dummy
 	./check_asm >> asm_offsets.h
 	@rm -f check_asm check_asm.c
 	@echo -e "\n#else /* CONFIG_SMP */\n" >> asm_offsets.h
-	@echo -e "#ifndef SPIN_LOCK_DEBUG\n" >>asm_offsets.h
+	@echo -e "#ifndef CONFIG_DEBUG_SPINLOCK\n" >>asm_offsets.h
 	@echo "#include <linux/config.h>" > tmp.c
 	@echo "#undef CONFIG_SMP" >> tmp.c
 	@echo "#define CONFIG_SMP 1" >> tmp.c
 	@echo "#include <linux/sched.h>" >> tmp.c
-	$(CPP) $(CPPFLAGS) tmp.c -o tmp.i
+	$(CPP) $(CPPFLAGS) -P tmp.c -o tmp.i
 	@echo "/* Automatically generated. Do not edit. */" > check_asm_data.c
 	@echo "#include <linux/config.h>" >> check_asm_data.c
 	@echo "#undef CONFIG_SMP" >> check_asm_data.c
@@ -127,9 +127,9 @@ check_asm: dummy
 	$(HOSTCC) -o check_asm check_asm.c
 	./check_asm >> asm_offsets.h
 	@rm -f check_asm check_asm.c
-	@echo -e "\n#else /* SPIN_LOCK_DEBUG */\n" >> asm_offsets.h
+	@echo -e "\n#else /* CONFIG_DEBUG_SPINLOCK */\n" >> asm_offsets.h
 	@echo "#include <linux/sched.h>" > tmp.c
-	$(CPP) $(CPPFLAGS) -DSPIN_LOCK_DEBUG tmp.c -o tmp.i
+	$(CPP) $(CPPFLAGS) -P -DCONFIG_DEBUG_SPINLOCK tmp.c -o tmp.i
 	@echo "/* Automatically generated. Do not edit. */" > check_asm_data.c
 	@echo "#include <linux/config.h>" >> check_asm_data.c
 	@echo "#undef CONFIG_SMP" >> check_asm_data.c
@@ -140,7 +140,7 @@ check_asm: dummy
 	$(SH) ./check_asm.sh -data mm tmp.i check_asm_data.c
 	$(SH) ./check_asm.sh -data thread tmp.i check_asm_data.c
 	@echo '};' >> check_asm_data.c
-	$(CC) $(CPPFLAGS) -DSPIN_LOCK_DEBUG $(CMODEL_CFLAG) -ffixed-g4 -S -o check_asm_data.s check_asm_data.c
+	$(CC) $(CPPFLAGS) -DCONFIG_DEBUG_SPINLOCK $(CMODEL_CFLAG) -ffixed-g4 -S -o check_asm_data.s check_asm_data.c
 	@echo "/* Automatically generated. Do not edit. */" > check_asm.c
 	@echo 'extern int printf(const char *fmt, ...);' >>check_asm.c
 	@echo 'unsigned int check_asm_data[] = {' >> check_asm.c
@@ -156,7 +156,7 @@ check_asm: dummy
 	$(HOSTCC) -o check_asm check_asm.c
 	./check_asm >> asm_offsets.h
 	@rm -f check_asm check_asm.c
-	@echo -e "#endif /* SPIN_LOCK_DEBUG */\n" >> asm_offsets.h
+	@echo -e "#endif /* CONFIG_DEBUG_SPINLOCK */\n" >> asm_offsets.h
 	@echo -e "#endif /* CONFIG_SMP */\n" >> asm_offsets.h
 	@echo "#endif /* __ASM_OFFSETS_H__ */" >> asm_offsets.h
 	@if test -r $(HPATH)/asm/asm_offsets.h; then \

@@ -520,3 +520,5 @@ if [ "$CONFIG_SMP" != "y" ]; then
    bool 'Run uncached' CONFIG_MIPS_UNCACHED
 fi
 endmenu
+
+source lib/Config.in

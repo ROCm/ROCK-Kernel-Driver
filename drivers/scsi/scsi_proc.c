@@ -17,7 +17,6 @@
  */
 
 #include <linux/config.h>	/* for CONFIG_PROC_FS */
-#define __NO_VERSION__
 #include <linux/module.h>
 
 #include <linux/string.h>

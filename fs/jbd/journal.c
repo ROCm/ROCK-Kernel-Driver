@@ -475,6 +475,7 @@ int journal_write_metadata_buffer(transaction_t *transaction,
 
 	new_jh->b_transaction = NULL;
 	new_bh->b_size = jh2bh(jh_in)->b_size;
+	new_bh->b_bdev = transaction->t_journal->j_dev;
 	new_bh->b_dev = to_kdev_t(transaction->t_journal->j_dev->bd_dev);
 	new_bh->b_blocknr = blocknr;
 	new_bh->b_state |= (1 << BH_Mapped) | (1 << BH_Dirty);

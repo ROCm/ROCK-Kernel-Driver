@@ -22,6 +22,9 @@
    not, write to the Free Software Foundation, Inc.,
    59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  */
 
+#ifndef __MATH_EMU_OP_4_H__
+#define __MATH_EMU_OP_4_H__
+
 #define _FP_FRAC_DECL_4(X)	_FP_W_TYPE X##_f[4]
 #define _FP_FRAC_COPY_4(D,S)			\
   (D##_f[0] = S##_f[0], D##_f[1] = S##_f[1],	\
@@ -659,3 +662,4 @@
      _FP_FRAC_SLL_4(D, (_FP_WFRACBITS_##dfs - _FP_WFRACBITS_##sfs));	\
    } while (0)
 
+#endif

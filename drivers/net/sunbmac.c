@@ -18,6 +18,7 @@
 #include <linux/string.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/crc32.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -979,9 +980,6 @@ static struct net_device_stats *bigmac_get_stats(struct net_device *dev)
 	return &bp->enet_stats;
 }
 
-#define CRC_POLYNOMIAL_BE 0x04c11db7UL  /* Ethernet CRC, big endian */
-#define CRC_POLYNOMIAL_LE 0xedb88320UL  /* Ethernet CRC, little endian */
-
 static void bigmac_set_multicast(struct net_device *dev)
 {
 	struct bigmac *bp = (struct bigmac *) dev->priv;
@@ -989,7 +987,7 @@ static void bigmac_set_multicast(struct net_device *dev)
 	struct dev_mc_list *dmi = dev->mc_list;
 	char *addrs;
 	int i, j, bit, byte;
-	u32 tmp, crc, poly = CRC_POLYNOMIAL_LE;
+	u32 tmp, crc;
 
 	/* Disable the receiver.  The bit self-clears when
 	 * the operation is complete.
@@ -1022,17 +1020,7 @@ static void bigmac_set_multicast(struct net_device *dev)
 			if (!(*addrs & 1))
 				continue;
 
-			crc = 0xffffffffU;
-			for (byte = 0; byte < 6; byte++) {
-				for (bit = *addrs++, j = 0; j < 8; j++, bit >>= 1) {
-					int test;
-
-					test = ((bit ^ crc) & 0x01);
-					crc >>= 1;
-					if (test)
-						crc = crc ^ poly;
-				}
-			}
+			crc = ether_crc_le(6, addrs);
 			crc >>= 26;
 			hash_table[crc >> 4] |= 1 << (crc & 0xf);
 		}

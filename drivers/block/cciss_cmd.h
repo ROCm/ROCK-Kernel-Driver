@@ -89,6 +89,7 @@ typedef union _u64bit
 //STRUCTURES
 //###########################################################################
 #define CISS_MAX_LUN	16	
+#define CISS_MAX_PHYS_LUN	1024
 // SCSI-3 Cmmands 
 
 #pragma pack(1)	
@@ -101,6 +102,7 @@ typedef struct _InquiryData_struct
 } InquiryData_struct;
 
 #define CISS_REPORT_LOG 0xc2    /* Report Logical LUNs */
+#define CISS_REPORT_PHYS 0xc3   /* Report Physical LUNs */
 // Data returned
 typedef struct _ReportLUNdata_struct
 {
@@ -215,6 +217,9 @@ typedef struct _ErrorInfo_struct {
 #define CMD_RWREQ       0x00
 #define CMD_IOCTL_PEND  0x01
 #define CMD_IOCTL_DONE  0x02
+#define CMD_SCSI	0x03
+#define CMD_MSG_DONE	0x04
+#define CMD_MSG_TIMEOUT 0x05
 
 typedef struct _CommandList_struct {
   CommandListHeader_struct Header;
@@ -229,6 +234,9 @@ typedef struct _CommandList_struct {
   struct _CommandList_struct *prev;
   struct _CommandList_struct *next;
   struct request *	   rq;
+#ifdef CONFIG_CISS_SCSI_TAPE
+  void * scsi_cmd;
+#endif
 } CommandList_struct;
 
 //Configuration Table Structure

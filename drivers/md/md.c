@@ -641,7 +641,7 @@ static int lock_rdev(mdk_rdev_t *rdev)
 	int err = 0;
 	struct block_device *bdev;
 
-	bdev = bdget(rdev->dev);
+	bdev = bdget(kdev_t_to_nr(rdev->dev));
 	if (!bdev)
 		return -ENOMEM;
 	err = blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_RAW);
@@ -3697,7 +3697,7 @@ struct {
  * Searches all registered partitions for autorun RAID arrays
  * at boot time.
  */
-static int detected_devices[128];
+static kdev_t detected_devices[128];
 static int dev_cnt;
 
 void md_autodetect_dev(kdev_t dev)
@@ -3738,7 +3738,7 @@ static void autostart_arrays(void)
 	}
 	dev_cnt = 0;
 
-	autorun_devices(-1);
+	autorun_devices(to_kdev_t(-1));
 }
 
 static struct {
@@ -3855,14 +3855,14 @@ void __init md_setup_drive(void)
 				*p++ = 0;
 
 			dev = name_to_kdev_t(devname);
-			handle = devfs_find_handle(NULL, devname, MAJOR (dev), MINOR (dev),
+			handle = devfs_find_handle(NULL, devname, major(dev), minor(dev),
 							DEVFS_SPECIAL_BLK, 1);
 			if (handle != 0) {
 				unsigned major, minor;
 				devfs_get_maj_min(handle, &major, &minor);
 				dev = mk_kdev(major, minor);
 			}
-			if (!dev) {
+			if (kdev_none(dev)) {
 				printk(KERN_WARNING "md: Unknown device name: %s\n", devname);
 				break;
 			}
@@ -3872,7 +3872,7 @@ void __init md_setup_drive(void)
 
 			devname = p;
 		}
-		devices[i] = 0;
+		devices[i] = to_kdev_t(0);
 
 		if (!md_setup_args.device_set[minor])
 			continue;
@@ -3908,7 +3908,10 @@ void __init md_setup_drive(void)
 			ainfo.layout = 0;
 			ainfo.chunk_size = md_setup_args.chunk[minor];
 			err = set_array_info(mddev, &ainfo);
-			for (i = 0; !err && (dev = devices[i]); i++) {
+			for (i = 0; !err && i <= MD_SB_DISKS; i++) {
+				dev = devices[i];
+				if (kdev_none(dev))
+					break;
 				dinfo.number = i;
 				dinfo.raid_disk = i;
 				dinfo.state = (1<<MD_DISK_ACTIVE)|(1<<MD_DISK_SYNC);
@@ -3922,7 +3925,10 @@ void __init md_setup_drive(void)
 			}
 		} else {
 			/* persistent */
-			for (i = 0; (dev = devices[i]); i++) {
+			for (i = 0; i <= MD_SB_DISKS; i++) {
+				dev = devices[i];
+				if (kdev_none(dev))
+					break;
 				dinfo.major = major(dev);
 				dinfo.minor = minor(dev);
 				add_new_disk (mddev, &dinfo);

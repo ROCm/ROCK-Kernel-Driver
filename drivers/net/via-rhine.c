@@ -151,6 +151,7 @@ static const int multicast_filter_limit = 32;
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/mii.h>
+#include <linux/crc32.h>
 #include <asm/processor.h>		/* Processor type for cache alignment. */
 #include <asm/bitops.h>
 #include <asm/io.h>
@@ -1517,26 +1518,6 @@ static inline void clear_tally_counters(const long ioaddr)
 	writel(0, ioaddr + RxMissed);
 	readw(ioaddr + RxCRCErrs);
 	readw(ioaddr + RxMissed);
-}
-
-
-/* The big-endian AUTODIN II ethernet CRC calculation.
-   N.B. Do not use for bulk data, use a table-based routine instead.
-   This is common code and should be moved to net/core/crc.c */
-static unsigned const ethernet_polynomial = 0x04c11db7U;
-static inline u32 ether_crc(int length, unsigned char *data)
-{
-    int crc = -1;
-
-    while(--length >= 0) {
-		unsigned char current_octet = *data++;
-		int bit;
-		for (bit = 0; bit < 8; bit++, current_octet >>= 1) {
-			crc = (crc << 1) ^
-				((crc < 0) ^ (current_octet & 1) ? ethernet_polynomial : 0);
-		}
-    }
-    return crc;
 }
 
 static void via_rhine_set_rx_mode(struct net_device *dev)

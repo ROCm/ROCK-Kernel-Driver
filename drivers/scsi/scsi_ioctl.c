@@ -4,7 +4,6 @@
  * - get rid of some verify_areas and use __copy*user and __get/put_user
  *   for the ones that remain
  */
-#define __NO_VERSION__
 #include <linux/module.h>
 
 #include <asm/io.h>

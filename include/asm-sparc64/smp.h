@@ -8,6 +8,7 @@
 
 #include <linux/config.h>
 #include <linux/threads.h>
+#include <linux/cache.h>
 #include <asm/asi.h>
 #include <asm/starfire.h>
 #include <asm/spitfire.h>
@@ -34,7 +35,7 @@ extern struct prom_cpuinfo linux_cpus[64];
 /* Per processor Sparc parameters we need. */
 
 /* Keep this a multiple of 64-bytes for cache reasons. */
-struct cpuinfo_sparc {
+typedef struct {
 	/* Dcache line 1 */
 	unsigned int	__pad0;		/* bh_count moved to irq_stat for consistency. KAO */
 	unsigned int	multiplier;
@@ -51,9 +52,9 @@ struct cpuinfo_sparc {
 
 	/* Dcache lines 3 and 4 */
 	unsigned int	irq_worklists[16];
-};
+} ____cacheline_aligned cpuinfo_sparc;
 
-extern struct cpuinfo_sparc cpu_data[NR_CPUS];
+extern cpuinfo_sparc cpu_data[NR_CPUS];
 
 /*
  *	Private routines/data
@@ -102,20 +103,22 @@ extern __inline__ int hard_smp_processor_id(void)
 	}
 }
 
-#define smp_processor_id() (current->processor)
+#define smp_processor_id() (current->cpu)
 
 /* This needn't do anything as we do not sleep the cpu
  * inside of the idler task, so an interrupt is not needed
  * to get a clean fast response.
  *
+ * XXX Reverify this assumption... -DaveM
+ *
  * Addendum: We do want it to do something for the signal
  *           delivery case, we detect that by just seeing
  *           if we are trying to send this to an idler or not.
  */
-extern __inline__ void smp_send_reschedule(int cpu)
+static __inline__ void smp_send_reschedule(int cpu)
 {
 	extern void smp_receive_signal(int);
-	if(cpu_data[cpu].idle_volume == 0)
+	if (cpu_data[cpu].idle_volume == 0)
 		smp_receive_signal(cpu);
 }
 
@@ -125,8 +128,6 @@ extern __inline__ void smp_send_reschedule(int cpu)
 extern __inline__ void smp_send_stop(void) { }
 
 #endif /* !(__ASSEMBLY__) */
-
-#define PROC_CHANGE_PENALTY	20
 
 #endif /* !(CONFIG_SMP) */
 

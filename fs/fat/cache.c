@@ -189,7 +189,7 @@ static void list_cache(void)
 
 	for (walk = fat_cache; walk; walk = walk->next) {
 		if (walk->sb)
-			printk("<%s,%d>(%d,%d) ", walk->sb->s_dev->s_id,
+			printk("<%s,%d>(%d,%d) ", walk->sb->s_id,
 			       walk->start_cluster, walk->file_cluster,
 			       walk->disk_cluster);
 		else printk("-- ");

@@ -274,6 +274,7 @@ static int multipath_make_request (mddev_t *mddev, int rw,
 	memcpy(bh_req, bh, sizeof(*bh));
 	bh_req->b_blocknr = bh->b_rsector;
 	bh_req->b_dev = multipath->dev;
+	/* FIXME - later we will need bdev here */
 	bh_req->b_rdev = multipath->dev;
 /*	bh_req->b_rsector = bh->n_rsector; */
 	bh_req->b_end_io = multipath_end_request;

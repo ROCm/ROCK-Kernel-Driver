@@ -132,6 +132,7 @@
    <kenneth@bbs.sas.ntu.ac.sg>.
    0.42    22-Apr-96      Fix alloc_device() bug <jari@markkus2.fimr.fi>
    0.43    16-Aug-96      Update alloc_device() to conform to de4x5.c
+   0.44    08-Nov-01      use library crc32 functions <Matt_Domsch@dell.com>
 
    =========================================================================
  */
@@ -148,6 +149,7 @@
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/crc32.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
@@ -206,9 +208,6 @@ static int ewrk3_debug = 1;
 #define MAX_EISA_SLOTS 16
 #define EISA_SLOT_INC 0x1000
 #endif
-
-#define CRC_POLYNOMIAL_BE 0x04c11db7UL	/* Ethernet CRC, big endian */
-#define CRC_POLYNOMIAL_LE 0xedb88320UL	/* Ethernet CRC, little endian */
 
 #define QUEUE_PKT_TIMEOUT (1*HZ)	/* Jiffies */
 
@@ -1174,10 +1173,10 @@ static void SetMulticastFilter(struct net_device *dev)
 	struct dev_mc_list *dmi = dev->mc_list;
 	u_long iobase = dev->base_addr;
 	int i;
-	char *addrs, j, bit, byte;
+	char *addrs, bit, byte;
 	short *p = (short *) lp->mctbl;
 	u16 hashcode;
-	s32 crc, poly = CRC_POLYNOMIAL_LE;
+	u32 crc;
 
 	spin_lock_irq(&lp->hw_lock);
 
@@ -1219,13 +1218,7 @@ static void SetMulticastFilter(struct net_device *dev)
 			addrs = dmi->dmi_addr;
 			dmi = dmi->next;
 			if ((*addrs & 0x01) == 1) {	/* multicast address? */
-				crc = 0xffffffff;	/* init CRC for each address */
-				for (byte = 0; byte < ETH_ALEN; byte++) {	/* for each address byte */
-					/* process each address bit */
-					for (bit = *addrs++, j = 0; j < 8; j++, bit >>= 1) {
-						crc = (crc >> 1) ^ (((crc ^ bit) & 0x01) ? poly : 0);
-					}
-				}
+				crc = ether_crc_le(ETH_ALEN, addrs);
 				hashcode = crc & ((1 << 9) - 1);	/* hashcode is 9 LSb of CRC */
 
 				byte = hashcode >> 3;	/* bit[3-8] -> byte in filter */

@@ -37,10 +37,10 @@
 
 #include <linux/kernel.h>
 #include <linux/fs.h>
+#include <linux/crc32.h>
 #include <linux/jffs2.h>
 #include <linux/mtd/mtd.h>
 #include "nodelist.h"
-#include "crc32.h"
 
 /* jffs2_new_inode: allocate a new inode and inocache, add it to the hash,
    fill in the raw_inode while you're at it. */

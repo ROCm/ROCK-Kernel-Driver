@@ -37,10 +37,10 @@
 
 #include <linux/kernel.h>
 #include <linux/slab.h>
+#include <linux/crc32.h>
 #include <linux/jffs2.h>
 #include <linux/mtd/mtd.h>
 #include "nodelist.h"
-#include "crc32.h"
 
 int jffs2_read_dnode(struct jffs2_sb_info *c, struct jffs2_full_dnode *fd, unsigned char *buf, int ofs, int len)
 {
