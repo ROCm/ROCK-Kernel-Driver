@@ -878,12 +878,20 @@ struct dc_hw_ops {
 	void   (*write_fifo) (struct IsdnCardState *, u8 *, int);
 };
 
-/* Methods provided to shared FIFO handling */
+/* Methods provided to shared B-channel FIFO handling */
 
 struct bc_l1_ops {
 	void   (*fill_fifo)  (struct BCState *);
 	int    (*open)       (struct PStack *, struct BCState *);
 	void   (*close)      (struct BCState *);
+};
+
+/* Methods provided to shared D-channel FIFO handling */
+
+struct dc_l1_ops {
+	void   (*fill_fifo)  (struct IsdnCardState *);
+	int    (*open)       (struct PStack *, struct IsdnCardState *);
+	void   (*close)      (struct IsdnCardState *);
 };
 
 #define HW_IOM1			0
@@ -945,11 +953,9 @@ struct IsdnCardState {
 	u8 *status_end;
 	struct dc_hw_ops *dc_hw_ops;
 	struct bc_hw_ops *bc_hw_ops;
+	struct dc_l1_ops *dc_l1_ops;
 	struct bc_l1_ops *bc_l1_ops;
 	int    (*cardmsg) (struct IsdnCardState *, int, void *);
-	void   (*setstack_d) (struct PStack *, struct IsdnCardState *);
-	void   (*DC_Send_Data) (struct IsdnCardState *);
-	void   (*DC_Close) (struct IsdnCardState *);
 	int    (*auxcmd) (struct IsdnCardState *, isdn_ctrl *);
 	struct Channel channel[2+MAX_WAITING_CALLS];
 	struct BCState bcs[2+MAX_WAITING_CALLS];
@@ -1365,9 +1371,6 @@ int QuickHex(char *txt, u8 * p, int cnt);
 void LogFrame(struct IsdnCardState *cs, u8 * p, int size);
 void dlogframe(struct IsdnCardState *cs, struct sk_buff *skb, int dir);
 void iecpy(u8 * dest, u8 * iestart, int ieoffset);
-#ifdef ISDN_CHIP_ISAC
-void setstack_isac(struct PStack *st, struct IsdnCardState *cs);
-#endif	/* ISDN_CHIP_ISAC */
 #endif	/* __KERNEL__ */
 
 #define HZDELAY(jiffs) {int tout = jiffs; while (tout--) udelay(1000000/HZ);}

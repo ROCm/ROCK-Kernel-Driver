@@ -824,10 +824,11 @@ HFCD_l1hw(struct PStack *st, int pr, void *arg)
 	}
 }
 
-void
+static int
 setstack_hfcd(struct PStack *st, struct IsdnCardState *cs)
 {
 	st->l1.l1hw = HFCD_l1hw;
+	return 0;
 }
 
 static void
@@ -850,17 +851,23 @@ unsigned int __init
 	return(send);
 }
 
-static struct bc_l1_ops hfcd_l1_ops = {
+static struct bc_l1_ops hfcd_bc_l1_ops = {
 	.fill_fifo = hfc_fill_fifo,
 	.open      = setstack_2b,
 	.close     = close_2bs0,
 };
 
+static struct dc_l1_ops hfcd_dc_l1_ops = {
+	.fill_fifo = hfc_fill_dfifo,
+	.open      = setstack_hfcd,
+};
+
 void __init
 init2bds0(struct IsdnCardState *cs)
 {
-	cs->bc_l1_ops = &hfcd_l1_ops;
-	cs->setstack_d = setstack_hfcd;
+
+	cs->bc_l1_ops = &hfcd_bc_l1_ops;
+	cs->dc_l1_ops = &hfcd_dc_l1_ops;
 	cs->dbusytimer.function = (void *) hfc_dbusy_timer;
 	cs->dbusytimer.data = (long) cs;
 	init_timer(&cs->dbusytimer);
@@ -871,7 +878,6 @@ init2bds0(struct IsdnCardState *cs)
 		cs->bcs[0].hw.hfc.send = init_send_hfcd(32);
 	if (!cs->bcs[1].hw.hfc.send)
 		cs->bcs[1].hw.hfc.send = init_send_hfcd(32);
-	cs->DC_Send_Data = hfc_fill_dfifo;
 	mode_2bs0(cs->bcs, 0, 0);
 	mode_2bs0(cs->bcs + 1, 0, 1);
 }

@@ -840,9 +840,9 @@ static void closecard(int cardnr)
 		dev_kfree_skb(csta->tx_skb);
 		csta->tx_skb = NULL;
 	}
-	if (csta->DC_Close != NULL) {
-		csta->DC_Close(csta);
-	}
+	if (csta->dc_l1_ops->close)
+		csta->dc_l1_ops->close(csta);
+
 	if (csta->card_ops->release)
 		csta->card_ops->release(csta);
 	if (csta->dbusytimer.function != NULL) // FIXME?

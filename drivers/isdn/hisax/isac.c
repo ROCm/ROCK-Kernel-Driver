@@ -441,13 +441,14 @@ ISAC_l1hw(struct PStack *st, int pr, void *arg)
 	}
 }
 
-void
+static int
 setstack_isac(struct PStack *st, struct IsdnCardState *cs)
 {
 	st->l1.l1hw = ISAC_l1hw;
+	return 0;
 }
 
-void 
+static void 
 DC_Close_isac(struct IsdnCardState *cs) {
 	if (cs->dc.isac.mon_rx) {
 		kfree(cs->dc.isac.mon_rx);
@@ -495,6 +496,12 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 	}
 }
 
+static struct dc_l1_ops isac_l1_ops = {
+	.fill_fifo = isac_fill_fifo,
+	.open      = setstack_isac,
+	.close     = DC_Close_isac,
+};
+
 void __devinit
 initisac(struct IsdnCardState *cs)
 {
@@ -515,10 +522,8 @@ initisac(struct IsdnCardState *cs)
 	/* Disable all IRQ */
 	isac_write(cs, ISAC_MASK, 0xFF);
 
+	cs->dc_l1_ops = &isac_l1_ops;
 	INIT_WORK(&cs->work, isac_bh, cs);
-	cs->setstack_d = setstack_isac;
-	cs->DC_Send_Data = isac_fill_fifo;
-	cs->DC_Close = DC_Close_isac;
 	cs->dc.isac.mon_tx = NULL;
 	cs->dc.isac.mon_rx = NULL;
 	cs->dbusytimer.function = (void *) dbusy_timer_handler;

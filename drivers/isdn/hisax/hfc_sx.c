@@ -839,10 +839,11 @@ HFCSX_l1hw(struct PStack *st, int pr, void *arg)
 /***********************************************/
 /* called during init setting l1 stack pointer */
 /***********************************************/
-void
+static int
 setstack_hfcsx(struct PStack *st, struct IsdnCardState *cs)
 {
 	st->l1.l1hw = HFCSX_l1hw;
+	return 0;
 }
 
 /***************************************************************/
@@ -1113,10 +1114,15 @@ hfcsx_bh(void *data)
 		DChannel_proc_xmt(cs);
 }
 
-static struct bc_l1_ops hfcsx_l1_ops = {
+static struct bc_l1_ops hfcsx_bc_l1_ops = {
 	.fill_fifo = hfcsx_fill_fifo,
 	.open      = setstack_2b,
 	.close     = close_hfcsx,
+};
+
+static struct dc_l1_ops hfcsx_dc_l1_ops = {
+	.fill_fifo = hfcsx_fill_dfifo,
+	.open      = setstack_hfcsx,
 };
 
 /********************************/
@@ -1125,13 +1131,12 @@ static struct bc_l1_ops hfcsx_l1_ops = {
 void __devinit
 inithfcsx(struct IsdnCardState *cs)
 {
-	cs->setstack_d = setstack_hfcsx;
 	cs->dbusytimer.function = (void *) hfcsx_dbusy_timer;
 	cs->dbusytimer.data = (long) cs;
 	init_timer(&cs->dbusytimer);
 	INIT_WORK(&cs->work, hfcsx_bh, cs);
-	cs->bc_l1_ops = &hfcsx_l1_ops;
-	cs->DC_Send_Data = hfcsx_fill_dfifo;
+	cs->bc_l1_ops = &hfcsx_bc_l1_ops;
+	cs->dc_l1_ops = &hfcsx_dc_l1_ops;
 	mode_hfcsx(cs->bcs, 0, 0);
 	mode_hfcsx(cs->bcs + 1, 0, 1);
 }

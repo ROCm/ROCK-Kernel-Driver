@@ -443,10 +443,11 @@ ICC_l1hw(struct PStack *st, int pr, void *arg)
 	}
 }
 
-void
+static int
 setstack_icc(struct PStack *st, struct IsdnCardState *cs)
 {
 	st->l1.l1hw = ICC_l1hw;
+	return 0;
 }
 
 void 
@@ -497,15 +498,19 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 	}
 }
 
+static struct dc_l1_ops icc_l1_ops = {
+	.fill_fifo = icc_fill_fifo,
+	.open      = setstack_icc,
+	.close     = DC_Close_icc,
+};
+
 void __init
 initicc(struct IsdnCardState *cs)
 {
 	int val, eval;
 
+	cs->dc_l1_ops = &icc_l1_ops;
 	INIT_WORK(&cs->work, icc_bh, cs);
-	cs->setstack_d = setstack_icc;
-	cs->DC_Send_Data = icc_fill_fifo;
-	cs->DC_Close = DC_Close_icc;
 	cs->dc.icc.mon_tx = NULL;
 	cs->dc.icc.mon_rx = NULL;
 	cs->dbusytimer.function = (void *) dbusy_timer_handler;

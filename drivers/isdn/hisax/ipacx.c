@@ -41,8 +41,6 @@ static void dch_bh(void *data);
 static void dch_empty_fifo(struct IsdnCardState *cs, int count);
 static void dch_fill_fifo(struct IsdnCardState *cs);
 static inline void dch_int(struct IsdnCardState *cs);
-static void __devinit dch_setstack(struct PStack *st, struct IsdnCardState *cs);
-static void __devinit dch_init(struct IsdnCardState *cs);
 static void bch_l2l1(struct PStack *st, int pr, void *arg);
 static void ipacx_bc_empty_fifo(struct BCState *bcs, int count);
 static void bch_int(struct IsdnCardState *cs, u8 hscx);
@@ -396,11 +394,17 @@ dch_int(struct IsdnCardState *cs)
 
 //----------------------------------------------------------
 //----------------------------------------------------------
-static void __devinit
+static int
 dch_setstack(struct PStack *st, struct IsdnCardState *cs)
 {
 	st->l1.l1hw = dch_l2l1;
+	return 0;
 }
+
+static struct dc_l1_ops ipacx_dc_l1_ops = {
+	.fill_fifo = dch_fill_fifo,
+	.open      = dch_setstack,
+};
 
 //----------------------------------------------------------
 //----------------------------------------------------------
@@ -409,17 +413,16 @@ dch_init(struct IsdnCardState *cs)
 {
 	printk(KERN_INFO "HiSax: IPACX ISDN driver v0.1.0\n");
 
+	cs->dc_l1_ops = &ipacx_dc_l1_ops;
 	INIT_WORK(&cs->work, dch_bh, cs);
-	cs->setstack_d      = dch_setstack;
-	cs->DC_Send_Data = dch_fill_fifo;
 	cs->dbusytimer.function = (void *) dbusy_timer_handler;
 	cs->dbusytimer.data = (long) cs;
 	init_timer(&cs->dbusytimer);
 
-  ipacx_write_reg(cs, IPACX_TR_CONF0, 0x00);  // clear LDD
-  ipacx_write_reg(cs, IPACX_TR_CONF2, 0x00);  // enable transmitter
-  ipacx_write_reg(cs, IPACX_MODED,    0xC9);  // transparent mode 0, RAC, stop/go
-  ipacx_write_reg(cs, IPACX_MON_CR,   0x00);  // disable monitor channel
+	ipacx_write_reg(cs, IPACX_TR_CONF0, 0x00);  // clear LDD
+	ipacx_write_reg(cs, IPACX_TR_CONF2, 0x00);  // enable transmitter
+	ipacx_write_reg(cs, IPACX_MODED,    0xC9);  // transparent mode 0, RAC, stop/go
+	ipacx_write_reg(cs, IPACX_MON_CR,   0x00);  // disable monitor channel
 }
 
 

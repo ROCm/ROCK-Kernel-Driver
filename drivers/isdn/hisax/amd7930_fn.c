@@ -659,7 +659,7 @@ Amd7930_l1hw(struct PStack *st, int pr, void *arg)
 	}
 }
 
-void
+static int
 setstack_Amd7930(struct PStack *st, struct IsdnCardState *cs)
 {
 
@@ -667,15 +667,8 @@ setstack_Amd7930(struct PStack *st, struct IsdnCardState *cs)
 		debugl1(cs, "Amd7930: setstack called");
 
         st->l1.l1hw = Amd7930_l1hw;
+	return 0;
 }
-
-
-void
-DC_Close_Amd7930(struct IsdnCardState *cs) {
-        if (cs->debug & L1_DEB_ISAC)
-		debugl1(cs, "Amd7930: DC_Close called");
-}
-
 
 static void
 dbusy_timer_handler(struct IsdnCardState *cs)
@@ -764,6 +757,9 @@ static u16 initAMD[] = {
 
 	0xFFFF};
 
+static struct dc_l1_ops amd7930_l1_ops = {
+	.open      = setstack_Amd7930,
+};
 
 void __devinit
 Amd7930_init(struct IsdnCardState *cs)
@@ -779,8 +775,7 @@ Amd7930_init(struct IsdnCardState *cs)
         cs->dc.amd7930.lmr1 = 0x40;
         cs->dc.amd7930.ph_command = Amd7930_ph_command;
 	INIT_WORK(&cs->work, Amd7930_bh, cs);
-	cs->setstack_d = setstack_Amd7930;
-	cs->DC_Close = DC_Close_Amd7930;
+	cs->dc_l1_ops = &amd7930_l1_ops;
 	cs->dbusytimer.function = (void *) dbusy_timer_handler;
 	cs->dbusytimer.data = (long) cs;
 	init_timer(&cs->dbusytimer);

@@ -37,6 +37,12 @@ fill_fifo_b(struct BCState *bcs)
 	bcs->cs->bc_l1_ops->fill_fifo(bcs);
 }
 
+static inline void
+fill_fifo_d(struct IsdnCardState *cs)
+{
+	cs->dc_l1_ops->fill_fifo(cs);
+}
+
 #ifdef L2FRAME_DEBUG
 extern void Logl2Frame(struct IsdnCardState *cs, struct sk_buff *skb, char *buf, int dir);
 #endif
@@ -94,7 +100,7 @@ xmit_ready_d(struct IsdnCardState *cs)
 	cs->tx_skb = skb_dequeue(&cs->sq);
 	if (cs->tx_skb) {
 		cs->tx_cnt = 0;
-		cs->DC_Send_Data(cs);
+		fill_fifo_d(cs);
 	} else {
 		sched_d_event(cs, D_XMTBUFREADY);
 	}
@@ -141,7 +147,7 @@ xmit_data_req_d(struct IsdnCardState *cs, struct sk_buff *skb)
 		if (cs->debug & L1_DEB_LAPD)
 			Logl2Frame(cs, skb, "PH_DATA", 0);
 #endif
-		cs->DC_Send_Data(cs);
+		fill_fifo_d(cs);
 	}
 	spin_unlock_irqrestore(&cs->lock, flags);
 }
@@ -183,7 +189,7 @@ xmit_pull_ind_d(struct IsdnCardState *cs, struct sk_buff *skb)
 #endif
 		cs->tx_skb = skb;
 		cs->tx_cnt = 0;
-		cs->DC_Send_Data(cs);
+		fill_fifo_d(cs);
 	}
 	spin_unlock_irqrestore(&cs->lock, flags);
 }
@@ -296,7 +302,7 @@ xmit_xpr_d(struct IsdnCardState *cs)
 	if (cs->tx_skb) {
 		/* last frame not done yet? */
 		if (cs->tx_skb->len) {
-			cs->DC_Send_Data(cs);
+			fill_fifo_d(cs);
 			return;
 		}
 		xmit_complete_d(cs);
