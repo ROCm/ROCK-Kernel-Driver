@@ -70,6 +70,8 @@ struct dial_info {
 	unsigned char *phone;
 };
 
+extern struct list_head isdn_net_devs;
+
 extern int   isdn_get_free_slot(int, int, int, int, int, char *);
 extern void  isdn_slot_free(int slot, int usage);
 extern void  isdn_slot_all_eaz(int slot);

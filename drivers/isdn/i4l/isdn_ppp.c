@@ -165,14 +165,15 @@ isdn_ppp_bind(isdn_net_local * lp)
 	save_flags(flags);
 	cli();
 	if (lp->pppbind < 0) {  /* device bounded to ippp device ? */
-		isdn_net_dev *net_dev = dev->netdev;
+		struct list_head *l;
 		char exclusive[ISDN_MAX_CHANNELS];	/* exclusive flags */
 		memset(exclusive, 0, ISDN_MAX_CHANNELS);
-		while (net_dev) {	/* step through net devices to find exclusive minors */
-			isdn_net_local *lp = &net_dev->local;
+		/* step through net devices to find exclusive minors */
+		list_for_each(l, &isdn_net_devs) {
+			isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
+			isdn_net_local *lp = &p->local;
 			if (lp->pppbind >= 0)
 				exclusive[lp->pppbind] = 1;
-			net_dev = net_dev->next;
 		}
 		/*
 		 * search a free device / slot

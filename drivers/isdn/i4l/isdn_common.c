@@ -433,7 +433,7 @@ isdn_status_callback(isdn_ctrl * c)
 	int r;
 	int retval = 0;
 	isdn_ctrl cmd;
-	isdn_net_dev *p;
+	struct list_head *l;
 
 	di = c->driver;
 	i = isdn_dc2minor(di, c->arg);
@@ -509,13 +509,15 @@ isdn_status_callback(isdn_ctrl * c)
 				case 1:
 					/* Schedule connection-setup */
 					isdn_net_dial();
-					for ( p = dev->netdev; p; p = p->next )
+					list_for_each(l, &isdn_net_devs) {
+						isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
 						if (p->local.isdn_slot == isdn_dc2minor(di, cmd.arg)) {
 							strcpy( cmd.parm.setup.eazmsn, p->local.msn );
 							isdn_slot_command(p->local.isdn_slot, ISDN_CMD_ACCEPTD, &cmd);
 							retval = 1;
 							break;
 						}
+					}
 					break;
 
 				case 2:	/* For calling back, first reject incoming call ... */

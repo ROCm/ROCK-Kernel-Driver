@@ -59,6 +59,8 @@ enum {
 	EV_NET_DIAL = 0x200,
 };
 
+LIST_HEAD(isdn_net_devs); /* Linked list of isdn_net_dev's */
+
 /*
  * Outline of new tbusy handling: 
  *
@@ -355,11 +357,12 @@ unsigned long last_jiffies = -HZ;
 void
 isdn_net_autohup()
 {
-	isdn_net_dev *p = dev->netdev;
+	struct list_head *l;
 	int anymore;
 
 	anymore = 0;
-	while (p) {
+	list_for_each(l, &isdn_net_devs) {
+		isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
 		isdn_net_local *l = &p->local;
 		if (jiffies == last_jiffies)
 			l->cps = l->transcount;
@@ -407,7 +410,6 @@ isdn_net_autohup()
 				break;
 			}
 		}
-		p = (isdn_net_dev *) p->next;
 	}
 	last_jiffies = jiffies;
 	isdn_timer_ctrl(ISDN_TIMER_NETHANGUP, anymore);
@@ -879,9 +881,10 @@ void
 isdn_net_dial(void)
 {
 	int anymore = 0;
-	isdn_net_dev *p = dev->netdev;
+	struct list_head *l;
 
-	for (p = dev->netdev; p; p = p->next) {
+	list_for_each(l, &isdn_net_devs) {
+		isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
 		isdn_net_local *lp = &p->local;
 		
 		if (lp->dialstate == ST_0)
@@ -2129,21 +2132,22 @@ isdn_net_init(struct net_device *ndev)
 static void
 isdn_net_swapbind(int drvidx)
 {
-	isdn_net_dev *p;
+	struct list_head *l;
 
 	dbg_net_icall("n_fi: swapping ch of %d\n", drvidx);
-	p = dev->netdev;
-	while (p) {
-		if (p->local.pre_device == drvidx)
-			switch (p->local.pre_channel) {
-				case 0:
-					p->local.pre_channel = 1;
-					break;
-				case 1:
-					p->local.pre_channel = 0;
-					break;
-			}
-		p = (isdn_net_dev *) p->next;
+	list_for_each(l, &isdn_net_devs) {
+		isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
+		if (p->local.pre_device != drvidx)
+			continue;
+
+		switch (p->local.pre_channel) {
+		case 0:
+			p->local.pre_channel = 1;
+			break;
+		case 1:
+			p->local.pre_channel = 0;
+			break;
+		}
 	}
 }
 
@@ -2184,7 +2188,7 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
 	int wret;
 	int swapped;
 	int sidx = 0;
-	isdn_net_dev *p;
+	struct list_head *l;
 	isdn_net_phone *n;
 	ulong flags;
 	char nr[32];
@@ -2218,13 +2222,14 @@ isdn_net_find_icall(int di, int ch, int idx, setup_parm *setup)
                 return 0;
         }
 
-n = (isdn_net_phone *) 0;
-p = dev->netdev;
+	n = (isdn_net_phone *) 0;
 	ematch = wret = swapped = 0;
 	dbg_net_icall("n_fi: di=%d ch=%d idx=%d usg=%d\n", di, ch, idx,
 	       dev->usage[idx]);
-	while (p) {
+
+	list_for_each(l, &isdn_net_devs) {
 		int matchret;
+		isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
 		isdn_net_local *lp = &p->local;
 
 		/* If last check has triggered as binding-swap, revert it */
@@ -2298,7 +2303,6 @@ p = dev->netdev;
 									swapped = 1;
 								} else {
 									/* ... else iterate next device */
-									p = (isdn_net_dev *) p->next;
 									continue;
 								}
 							} else {
@@ -2314,7 +2318,6 @@ p = dev->netdev;
 							    ((lp->pre_channel != ch) ||
 							     (lp->pre_device != di))) {
 								dbg_net_icall("n_fi: final check failed\n");
-								p = (isdn_net_dev *) p->next;
 								continue;
 							}
 						}
@@ -2378,7 +2381,6 @@ p = dev->netdev;
 					/* Found parent, if it's offline iterate next device */
 					printk(KERN_DEBUG "mlpf: %d\n", mlp->flags & ISDN_NET_CONNECTED);
 					if (!(mlp->flags & ISDN_NET_CONNECTED)) {
-						p = (isdn_net_dev *) p->next;
 						continue;
 					}
 				} 
@@ -2472,7 +2474,6 @@ p = dev->netdev;
 				}
 			}
 		}
-		p = (isdn_net_dev *) p->next;
 	}
 	/* If none of configured EAZ/MSN matched and not verbose, be silent */
 	if (!ematch || dev->net_verbose)
@@ -2487,14 +2488,14 @@ p = dev->netdev;
 isdn_net_dev *
 isdn_net_findif(char *name)
 {
-	isdn_net_dev *p = dev->netdev;
+	struct list_head *l;
 
-	while (p) {
+	list_for_each(l, &isdn_net_devs) {
+		isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
 		if (!strcmp(p->local.name, name))
 			return p;
-		p = (isdn_net_dev *) p->next;
 	}
-	return (isdn_net_dev *) NULL;
+	return NULL;
 }
 
 /*
@@ -2663,8 +2664,7 @@ isdn_net_new(char *name, struct net_device *master)
 	netdev->local.dialwait_timer = 0;  /* Jiffies of earliest next dial-start */
 
 	/* Put into to netdev-chain */
-	netdev->next = dev->netdev;
-	dev->netdev = netdev;
+	list_add(&netdev->global_list, &isdn_net_devs);
 	return netdev->dev.name;
 }
 
@@ -3158,7 +3158,7 @@ isdn_net_force_hangup(char *name)
  * Helper-function for isdn_net_rm: Do the real work.
  */
 static int
-isdn_net_realrm(isdn_net_dev * p, isdn_net_dev * q)
+isdn_net_realrm(isdn_net_dev *p)
 {
 	unsigned long flags;
 
@@ -3188,26 +3188,22 @@ isdn_net_realrm(isdn_net_dev * p, isdn_net_dev * q)
 		unregister_netdev(&p->dev);
 	}
 	/* Unlink device from chain */
-	if (q)
-		q->next = p->next;
-	else
-		dev->netdev = p->next;
+	list_del(&p->global_list);
 	if (p->local.slave) {
 		/* If this interface has a slave, remove it also */
 		char *slavename = ((isdn_net_local *) (p->local.slave->priv))->name;
-		isdn_net_dev *n = dev->netdev;
-		q = NULL;
-		while (n) {
+		struct list_head *l;
+
+		list_for_each(l, &isdn_net_devs) {
+			isdn_net_dev *n = list_entry(l, isdn_net_dev, global_list);
 			if (!strcmp(n->local.name, slavename)) {
-				isdn_net_realrm(n, q);
+				isdn_net_realrm(n);
 				break;
 			}
-			q = n;
-			n = (isdn_net_dev *) n->next;
 		}
 	}
 	/* If no more net-devices remain, disable auto-hangup timer */
-	if (dev->netdev == NULL)
+	if (list_empty(&isdn_net_devs))
 		isdn_timer_ctrl(ISDN_TIMER_NETHANGUP, 0);
 	restore_flags(flags);
 	kfree(p);
@@ -3221,21 +3217,14 @@ isdn_net_realrm(isdn_net_dev * p, isdn_net_dev * q)
 int
 isdn_net_rm(char *name)
 {
-	isdn_net_dev *p;
-	isdn_net_dev *q;
+	struct list_head *l;
 
 	/* Search name in netdev-chain */
-	p = dev->netdev;
-	q = NULL;
-	while (p) {
+	list_for_each(l, &isdn_net_devs) {
+		isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
 		if (!strcmp(p->local.name, name))
-			return (isdn_net_realrm(p, q));
-		q = p;
-		p = (isdn_net_dev *) p->next;
+			return isdn_net_realrm(p);
 	}
-	/* If no more net-devices remain, disable auto-hangup timer */
-	if (dev->netdev == NULL)
-		isdn_timer_ctrl(ISDN_TIMER_NETHANGUP, 0);
 	return -ENODEV;
 }
 
@@ -3251,16 +3240,17 @@ isdn_net_rmall(void)
 	/* Walk through netdev-chain */
 	save_flags(flags);
 	cli();
-	while (dev->netdev) {
-		if (!dev->netdev->local.master) {
-			/* Remove master-devices only, slaves get removed with their master */
-			if ((ret = isdn_net_realrm(dev->netdev, NULL))) {
+	while (!list_empty(&isdn_net_devs)) {
+		isdn_net_dev *p = list_entry(isdn_net_devs.next, isdn_net_dev, global_list);
+
+		/* Remove master-devices only, slaves get removed with their master */
+		if (!p->local.master) {
+			if ((ret = isdn_net_realrm(p))) {
 				restore_flags(flags);
 				return ret;
 			}
 		}
 	}
-	dev->netdev = NULL;
 	restore_flags(flags);
 	return 0;
 }
