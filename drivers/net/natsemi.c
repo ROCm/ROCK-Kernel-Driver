@@ -743,7 +743,7 @@ static int netdev_get_eeprom(struct net_device *dev, u8 *buf);
 
 static void move_int_phy(struct net_device *dev, int addr)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	int target = 31;
 
 	/* 
@@ -834,7 +834,7 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 	dev->base_addr = ioaddr;
 	dev->irq = irq;
 
-	np = dev->priv;
+	np = netdev_priv(dev);
 
 	np->pci_dev = pdev;
 	pci_set_drvdata(pdev, dev);
@@ -1096,7 +1096,7 @@ static void miiport_write(struct net_device *dev, int phy_id, int reg, u16 data)
 
 static int mdio_read(struct net_device *dev, int reg)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 
 	/* The 83815 series has two ports:
 	 * - an internal transceiver
@@ -1110,7 +1110,7 @@ static int mdio_read(struct net_device *dev, int reg)
 
 static void mdio_write(struct net_device *dev, int reg, u16 data)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 
 	/* The 83815 series has an internal transceiver; handle separately */
 	if (dev->if_port == PORT_TP)
@@ -1121,7 +1121,7 @@ static void mdio_write(struct net_device *dev, int reg, u16 data)
 
 static void init_phy_fixup(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int i;
 	u32 cfg;
@@ -1233,7 +1233,7 @@ static void init_phy_fixup(struct net_device *dev)
 
 static int switch_port_external(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	u32 cfg;
 
 	cfg = readl(dev->base_addr + ChipConfig);
@@ -1265,7 +1265,7 @@ static int switch_port_external(struct net_device *dev)
 
 static int switch_port_internal(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	int i;
 	u32 cfg;
 	u16 bmcr;
@@ -1316,7 +1316,7 @@ static int switch_port_internal(struct net_device *dev)
  */
 static int find_mii(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	int tmp;
 	int i;
 	int did_switch;
@@ -1365,7 +1365,7 @@ static void natsemi_reset(struct net_device *dev)
 	u32 rfcr;
 	u16 pmatch[3];
 	u16 sopass[3];
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 
 	/*
 	 * Resetting the chip causes some registers to be lost.
@@ -1435,7 +1435,7 @@ static void natsemi_reset(struct net_device *dev)
 
 static void natsemi_reload_eeprom(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	int i;
 
 	writel(EepromReload, dev->base_addr + PCIBusCfg);
@@ -1456,7 +1456,7 @@ static void natsemi_reload_eeprom(struct net_device *dev)
 static void natsemi_stop_rxtx(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	int i;
 
 	writel(RxOff | TxOff, ioaddr + ChipCmd);
@@ -1476,7 +1476,7 @@ static void natsemi_stop_rxtx(struct net_device *dev)
 
 static int netdev_open(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int i;
 
@@ -1525,7 +1525,7 @@ static int netdev_open(struct net_device *dev)
 
 static void do_cable_magic(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 
 	if (dev->if_port != PORT_TP)
 		return;
@@ -1553,7 +1553,7 @@ static void do_cable_magic(struct net_device *dev)
 		 * (these values all come from National)
 		 */
 		if (!(data & 0x80) || ((data >= 0xd8) && (data <= 0xff))) {
-			struct netdev_private *np = dev->priv;
+			struct netdev_private *np = netdev_priv(dev);
 
 			/* the bug has been triggered - fix the coefficient */
 			writew(TSTDAT_FIXED, dev->base_addr + TSTDAT);
@@ -1569,7 +1569,7 @@ static void do_cable_magic(struct net_device *dev)
 static void undo_cable_magic(struct net_device *dev)
 {
 	u16 data;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 
 	if (dev->if_port != PORT_TP)
 		return;
@@ -1587,7 +1587,7 @@ static void undo_cable_magic(struct net_device *dev)
 
 static void check_link(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int duplex;
 	u16 bmsr;
@@ -1648,7 +1648,7 @@ static void check_link(struct net_device *dev)
 
 static void init_registers(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
 	init_phy_fixup(dev);
@@ -1726,7 +1726,7 @@ static void init_registers(struct net_device *dev)
 static void netdev_timer(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	int next_tick = 5*HZ;
 
 	if (netif_msg_timer(np)) {
@@ -1791,7 +1791,7 @@ static void netdev_timer(unsigned long data)
 
 static void dump_ring(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 
 	if (netif_msg_pktdata(np)) {
 		int i;
@@ -1814,7 +1814,7 @@ static void dump_ring(struct net_device *dev)
 
 static void tx_timeout(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
 	disable_irq(dev->irq);
@@ -1845,7 +1845,7 @@ static void tx_timeout(struct net_device *dev)
 
 static int alloc_ring(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	np->rx_ring = pci_alloc_consistent(np->pci_dev,
 		sizeof(struct netdev_desc) * (RX_RING_SIZE+TX_RING_SIZE),
 		&np->ring_dma);
@@ -1857,7 +1857,7 @@ static int alloc_ring(struct net_device *dev)
 
 static void refill_rx(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 
 	/* Refill the Rx ring buffers. */
 	for (; np->cur_rx - np->dirty_rx > 0; np->dirty_rx++) {
@@ -1886,7 +1886,7 @@ static void refill_rx(struct net_device *dev)
 /* Initialize the Rx and Tx rings, along with various 'dev' bits. */
 static void init_ring(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	int i;
 
 	/* 1) TX ring */
@@ -1925,7 +1925,7 @@ static void init_ring(struct net_device *dev)
 
 static void drain_tx(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	int i;
 
 	for (i = 0; i < TX_RING_SIZE; i++) {
@@ -1942,7 +1942,7 @@ static void drain_tx(struct net_device *dev)
 
 static void drain_ring(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+ 	struct netdev_private *np = netdev_priv(dev);
 	unsigned int buflen = np->rx_buf_sz + RX_OFFSET;
 	int i;
 
@@ -1963,7 +1963,7 @@ static void drain_ring(struct net_device *dev)
 
 static void free_ring(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	pci_free_consistent(np->pci_dev,
 		sizeof(struct netdev_desc) * (RX_RING_SIZE+TX_RING_SIZE),
 		np->rx_ring, np->ring_dma);
@@ -1971,7 +1971,7 @@ static void free_ring(struct net_device *dev)
 
 static void reinit_ring(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	int i;
 
 	/* drain TX ring */
@@ -1993,7 +1993,7 @@ static void reinit_ring(struct net_device *dev)
 
 static int start_tx(struct sk_buff *skb, struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	unsigned entry;
 
 	/* Note: Ordering is important here, set the field with the
@@ -2040,7 +2040,7 @@ static int start_tx(struct sk_buff *skb, struct net_device *dev)
 
 static void netdev_tx_done(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 
 	for (; np->cur_tx - np->dirty_tx > 0; np->dirty_tx++) {
 		int entry = np->dirty_tx % TX_RING_SIZE;
@@ -2086,7 +2086,7 @@ static void netdev_tx_done(struct net_device *dev)
 static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 {
 	struct net_device *dev = dev_instance;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int boguscnt = max_interrupt_work;
 	unsigned int handled = 0;
@@ -2144,7 +2144,7 @@ static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs
    for clarity and better register allocation. */
 static void netdev_rx(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	int entry = np->cur_rx % RX_RING_SIZE;
 	int boguscnt = np->dirty_rx + RX_RING_SIZE - np->cur_rx;
 	s32 desc_status = le32_to_cpu(np->rx_head_desc->cmd_status);
@@ -2235,7 +2235,7 @@ static void netdev_rx(struct net_device *dev)
 
 static void netdev_error(struct net_device *dev, int intr_status)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
 	spin_lock(&np->lock);
@@ -2290,7 +2290,7 @@ static void netdev_error(struct net_device *dev, int intr_status)
 static void __get_stats(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 
 	/* The chip only need report frame silently dropped. */
 	np->stats.rx_crc_errors	+= readl(ioaddr + RxCRCErrs);
@@ -2299,7 +2299,7 @@ static void __get_stats(struct net_device *dev)
 
 static struct net_device_stats *get_stats(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 
 	/* The chip only need report frame silently dropped. */
 	spin_lock_irq(&np->lock);
@@ -2314,7 +2314,7 @@ static struct net_device_stats *get_stats(struct net_device *dev)
 static void __set_rx_mode(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	u8 mc_filter[64]; /* Multicast hash filter */
 	u32 rx_mode;
 
@@ -2351,7 +2351,7 @@ static void __set_rx_mode(struct net_device *dev)
 
 static void set_rx_mode(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	spin_lock_irq(&np->lock);
 	if (!np->hands_off)
 		__set_rx_mode(dev);
@@ -2360,7 +2360,7 @@ static void set_rx_mode(struct net_device *dev)
 
 static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	u32 cmd;
 
 	if (get_user(cmd, (u32 __user *)useraddr))
@@ -2531,7 +2531,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 
 static int netdev_set_wol(struct net_device *dev, u32 newval)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	u32 data = readl(dev->base_addr + WOLCmd) & ~WakeOptsSummary;
 
 	/* translate to bitmasks this chip understands */
@@ -2560,7 +2560,7 @@ static int netdev_set_wol(struct net_device *dev, u32 newval)
 
 static int netdev_get_wol(struct net_device *dev, u32 *supported, u32 *cur)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	u32 regval = readl(dev->base_addr + WOLCmd);
 
 	*supported = (WAKE_PHY | WAKE_UCAST | WAKE_MCAST | WAKE_BCAST
@@ -2595,7 +2595,7 @@ static int netdev_get_wol(struct net_device *dev, u32 *supported, u32 *cur)
 
 static int netdev_set_sopass(struct net_device *dev, u8 *newval)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	u16 *sval = (u16 *)newval;
 	u32 addr;
 
@@ -2626,7 +2626,7 @@ static int netdev_set_sopass(struct net_device *dev, u8 *newval)
 
 static int netdev_get_sopass(struct net_device *dev, u8 *data)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	u16 *sval = (u16 *)data;
 	u32 addr;
 
@@ -2654,7 +2654,7 @@ static int netdev_get_sopass(struct net_device *dev, u8 *data)
 
 static int netdev_get_ecmd(struct net_device *dev, struct ethtool_cmd *ecmd)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	u32 tmp;
 
 	ecmd->port        = dev->if_port;
@@ -2732,7 +2732,7 @@ static int netdev_get_ecmd(struct net_device *dev, struct ethtool_cmd *ecmd)
 
 static int netdev_set_ecmd(struct net_device *dev, struct ethtool_cmd *ecmd)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 
 	if (ecmd->port != PORT_TP && ecmd->port != PORT_MII && ecmd->port != PORT_FIBRE)
 		return -EINVAL;
@@ -2873,7 +2873,7 @@ static int netdev_get_eeprom(struct net_device *dev, u8 *buf)
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct mii_ioctl_data *data = if_mii(rq);
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 
 	switch(cmd) {
 	case SIOCETHTOOL:
@@ -2932,7 +2932,7 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 static void enable_wol_mode(struct net_device *dev, int enable_intr)
 {
 	long ioaddr = dev->base_addr;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 
 	if (netif_msg_wol(np))
 		printk(KERN_INFO "%s: remaining active for wake-on-lan\n",
@@ -2965,7 +2965,7 @@ static void enable_wol_mode(struct net_device *dev, int enable_intr)
 static int netdev_close(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 
 	if (netif_msg_ifdown(np))
 		printk(KERN_DEBUG
@@ -3077,7 +3077,7 @@ static void __devexit natsemi_remove1 (struct pci_dev *pdev)
 static int natsemi_suspend (struct pci_dev *pdev, u32 state)
 {
 	struct net_device *dev = pci_get_drvdata (pdev);
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
 	rtnl_lock();
@@ -3124,7 +3124,7 @@ static int natsemi_suspend (struct pci_dev *pdev, u32 state)
 static int natsemi_resume (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata (pdev);
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 
 	rtnl_lock();
 	if (netif_device_present(dev))
