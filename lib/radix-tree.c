@@ -77,7 +77,6 @@ static inline unsigned long radix_tree_maxindex(unsigned int height)
 	return index;
 }
 
-
 /*
  *	Extend a radix tree so it can store key @index.
  */
@@ -109,16 +108,15 @@ static int radix_tree_extend(struct radix_tree_root *root, unsigned long index)
 	return 0;
 }
 
-
 /**
- *	radix_tree_reserve    -    reserve space in a radix tree
+ *	radix_tree_insert    -    insert into a radix tree
  *	@root:		radix tree root
  *	@index:		index key
- *	@pslot:		pointer to reserved slot
+ *	@item:		item to insert
  *
- *	Reserve a slot in a radix tree for the key @index.
+ *	Insert an item into the radix tree at position @index.
  */
-int radix_tree_reserve(struct radix_tree_root *root, unsigned long index, void ***pslot)
+int radix_tree_insert(struct radix_tree_root *root, unsigned long index, void *item)
 {
 	struct radix_tree_node *node = NULL, *tmp, **slot;
 	unsigned int height, shift;
@@ -158,35 +156,10 @@ int radix_tree_reserve(struct radix_tree_root *root, unsigned long index, void *
 	if (node)
 		node->count++;
 
-	*pslot = (void **)slot;
-	**pslot = RADIX_TREE_SLOT_RESERVED;
+	*slot = item;
 	return 0;
 }
-
-EXPORT_SYMBOL(radix_tree_reserve);
-
-
-/**
- *	radix_tree_insert    -    insert into a radix tree
- *	@root:		radix tree root
- *	@index:		index key
- *	@item:		item to insert
- *
- *	Insert an item into the radix tree at position @index.
- */
-int radix_tree_insert(struct radix_tree_root *root, unsigned long index, void *item)
-{
-	void **slot;
-	int error;
-
-	error = radix_tree_reserve(root, index, &slot);
-	if (!error)
-		*slot = item;
-	return error;
-}
-
 EXPORT_SYMBOL(radix_tree_insert);
-
 
 /**
  *	radix_tree_lookup    -    perform lookup operation on a radix tree
@@ -267,8 +240,8 @@ __lookup(struct radix_tree_root *root, void **results, unsigned long index,
 out:
 	*next_index = index;
 	return nr_found;
-	
 }
+
 /**
  *	radix_tree_gang_lookup - perform multiple lookup on a radix tree
  *	@root:		radix tree root
@@ -371,7 +344,6 @@ int radix_tree_delete(struct radix_tree_root *root, unsigned long index)
 
 	return 0;
 }
-
 EXPORT_SYMBOL(radix_tree_delete);
 
 static void radix_tree_node_ctor(void *node, kmem_cache_t *cachep, unsigned long flags)
