@@ -52,13 +52,11 @@ struct svc_client {
 	struct svc_client *	cl_next;
 	char			cl_ident[NFSCLNT_IDMAX];
 	struct list_head	cl_export[NFSCLNT_EXPMAX];
-	struct list_head	cl_expfsid[NFSCLNT_EXPMAX];
 	struct list_head	cl_list;
 };
 
 struct svc_export {
 	struct list_head	ex_hash;
-	struct list_head	ex_fsid_hash;
 	struct list_head	ex_list;
 	struct svc_client *	ex_client;
 	int			ex_flags;
@@ -67,6 +65,20 @@ struct svc_export {
 	uid_t			ex_anon_uid;
 	gid_t			ex_anon_gid;
 	int			ex_fsid;
+};
+
+/* an "export key" (expkey) maps a filehandlefragement to an
+ * svc_export for a given client.  There can be two per export, one
+ * for type 0 (dev/ino), one for type 1 (fsid)
+ */
+struct svc_expkey {
+	struct list_head	ek_hash;
+
+	struct svc_client	*ek_client;
+	int			ek_fsidtype;
+	u32			ek_fsid[2];
+
+	struct svc_export	*ek_export;
 };
 
 #define EX_SECURE(exp)		(!((exp)->ex_flags & NFSEXP_INSECURE_PORT))
