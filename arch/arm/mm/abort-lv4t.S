@@ -21,9 +21,9 @@ ENTRY(v4t_late_abort)
 	tst	r3, #PSR_T_BIT			@ check for thumb mode
 	mrc	p15, 0, r1, c5, c0, 0		@ get FSR
 	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
-	bic	r1, r1, #1 << 11 | 1 << 10	@ clear bits 11 and 10 of FSR
-	ldreq	r8, [r2]			@ read arm instruction
 	bne	.data_thumb_abort
+	ldr	r8, [r2]			@ read arm instruction
+	bic	r1, r1, #1 << 11 | 1 << 10	@ clear bits 11 and 10 of FSR
 	tst	r8, #1 << 20			@ L = 1 -> write?
 	orreq	r1, r1, #1 << 11		@ yes.
 	and	r7, r8, #15 << 24
@@ -203,7 +203,7 @@ ENTRY(v4t_late_abort)
 	ldr	r7, [sp, #13 << 2]
 	tst	r8, #1 << 11
 	addne	r7, r7, r6, lsl #2		@ increment SP if PUSH
-	subeq	r7, r7, r6, lsr #2		@ decrement SP if POP
+	subeq	r7, r7, r6, lsl #2		@ decrement SP if POP
 	str	r7, [sp, #13 << 2]
 	mov	pc, lr
 
