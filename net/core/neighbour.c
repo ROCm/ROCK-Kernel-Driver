@@ -116,11 +116,11 @@ static int neigh_forced_gc(struct neigh_table *tbl)
 	int shrunk = 0;
 	int i;
 
+	write_lock_bh(&tbl->lock);
 	for (i = 0; i <= tbl->hash_mask; i++) {
 		struct neighbour *n, **np;
 
 		np = &tbl->hash_buckets[i];
-		write_lock_bh(&tbl->lock);
 		while ((n = *np) != NULL) {
 			/* Neighbour record may be discarded if:
 			   - nobody refers to it.
@@ -147,10 +147,12 @@ static int neigh_forced_gc(struct neigh_table *tbl)
 			write_unlock(&n->lock);
 			np = &n->next;
 		}
-		write_unlock_bh(&tbl->lock);
 	}
 
 	tbl->last_flush = jiffies;
+
+	write_unlock_bh(&tbl->lock);
+
 	return shrunk;
 }
 
@@ -295,10 +297,10 @@ static struct neighbour **neigh_hash_alloc(unsigned int entries)
 	struct neighbour **ret;
 
 	if (size <= PAGE_SIZE) {
-		ret = kmalloc(size, GFP_KERNEL);
+		ret = kmalloc(size, GFP_ATOMIC);
 	} else {
 		ret = (struct neighbour **)
-			__get_free_pages(GFP_KERNEL, get_order(size));
+			__get_free_pages(GFP_ATOMIC, get_order(size));
 	}
 	if (ret)
 		memset(ret, 0, size);
@@ -330,7 +332,6 @@ static void neigh_hash_grow(struct neigh_table *tbl, unsigned long new_entries)
 	new_hash_mask = new_entries - 1;
 	old_hash = tbl->hash_buckets;
 
-	write_lock_bh(&tbl->lock);
 	get_random_bytes(&tbl->hash_rnd, sizeof(tbl->hash_rnd));
 	for (i = 0; i < old_entries; i++) {
 		struct neighbour *n, *next;
@@ -347,7 +348,6 @@ static void neigh_hash_grow(struct neigh_table *tbl, unsigned long new_entries)
 	}
 	tbl->hash_buckets = new_hash;
 	tbl->hash_mask = new_hash_mask;
-	write_unlock_bh(&tbl->lock);
 
 	neigh_hash_free(old_hash, old_entries);
 }
@@ -400,8 +400,11 @@ struct neighbour *neigh_create(struct neigh_table *tbl, const void *pkey,
 		goto out;
 	}
 
-	if (tbl->entries > (tbl->hash_mask + 1))
+	if (tbl->entries > (tbl->hash_mask + 1)) {
+		write_lock_bh(&tbl->lock);
 		neigh_hash_grow(tbl, (tbl->hash_mask + 1) << 1);
+		write_unlock_bh(&tbl->lock);
+	}
 
 	memcpy(n->primary_key, pkey, key_len);
 	n->dev = dev;
@@ -422,9 +425,10 @@ struct neighbour *neigh_create(struct neigh_table *tbl, const void *pkey,
 
 	n->confirmed = jiffies - (n->parms->base_reachable_time << 1);
 
+	write_lock_bh(&tbl->lock);
+
 	hash_val = tbl->hash(pkey, dev) & tbl->hash_mask;
 
-	write_lock_bh(&tbl->lock);
 	if (n->parms->dead) {
 		rc = ERR_PTR(-EINVAL);
 		goto out_tbl_unlock;
@@ -514,10 +518,10 @@ int pneigh_delete(struct neigh_table *tbl, const void *pkey,
 	hash_val ^= hash_val >> 4;
 	hash_val &= PNEIGH_HASHMASK;
 
+	write_lock_bh(&tbl->lock);
 	for (np = &tbl->phash_buckets[hash_val]; (n = *np) != NULL;
 	     np = &n->next) {
 		if (!memcmp(n->key, pkey, key_len) && n->dev == dev) {
-			write_lock_bh(&tbl->lock);
 			*np = n->next;
 			write_unlock_bh(&tbl->lock);
 			if (tbl->pdestructor)
@@ -526,6 +530,7 @@ int pneigh_delete(struct neigh_table *tbl, const void *pkey,
 			return 0;
 		}
 	}
+	write_unlock_bh(&tbl->lock);
 	return -ENOENT;
 }
 
