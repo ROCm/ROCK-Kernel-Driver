@@ -384,6 +384,23 @@ static void skb_return (struct usbnet *dev, struct sk_buff *skb)
 }
 
 
+#ifdef	CONFIG_USB_ALI_M5632
+#define	HAVE_HARDWARE
+
+/*-------------------------------------------------------------------------
+ *
+ * ALi M5632 driver ... does high speed
+ *
+ *-------------------------------------------------------------------------*/
+
+static const struct driver_info	ali_m5632_info = {
+	.description =	"ALi M5632",
+};
+
+
+#endif
+
+
 #ifdef	CONFIG_USB_AN2720
 #define	HAVE_HARDWARE
 
@@ -3132,6 +3149,13 @@ out:
  */
 
 static const struct usb_device_id	products [] = {
+
+#ifdef	CONFIG_USB_ALI_M5632
+{
+	USB_DEVICE (0x0402, 0x5632),	// ALi defaults
+	.driver_info =	(unsigned long) &ali_m5632_info,
+},
+#endif
 
 #ifdef	CONFIG_USB_AN2720
 {
