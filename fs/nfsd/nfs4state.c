@@ -908,7 +908,7 @@ release_stateid_lockowner(struct nfs4_stateid *open_stp)
 }
 
 static void
-release_stateowner(struct nfs4_stateowner *sop)
+unhash_stateowner(struct nfs4_stateowner *sop)
 {
 	struct nfs4_stateid *stp;
 
@@ -916,7 +916,6 @@ release_stateowner(struct nfs4_stateowner *sop)
 	list_del(&sop->so_strhash);
 	list_del(&sop->so_perclient);
 	list_del(&sop->so_perlockowner);
-	list_del(&sop->so_close_lru);
 	del_perclient++;
 	while (!list_empty(&sop->so_perfilestate)) {
 		stp = list_entry(sop->so_perfilestate.next, 
@@ -926,6 +925,13 @@ release_stateowner(struct nfs4_stateowner *sop)
 		else
 			release_stateid(stp, LOCK_STATE);
 	}
+}
+
+static void
+release_stateowner(struct nfs4_stateowner *sop)
+{
+	unhash_stateowner(sop);
+	list_del(&sop->so_close_lru);
 	free_stateowner(sop);
 }
 
@@ -986,11 +992,8 @@ void
 move_to_close_lru(struct nfs4_stateowner *sop)
 {
 	dprintk("NFSD: move_to_close_lru nfs4_stateowner %p\n", sop);
-	/* remove stateowner from all other hash lists except perclient */
-	list_del_init(&sop->so_idhash);
-	list_del_init(&sop->so_strhash);
-	list_del_init(&sop->so_perlockowner);
 
+	unhash_stateowner(sop);
 	list_add_tail(&sop->so_close_lru, &close_lru);
 	sop->so_time = get_seconds();
 }
@@ -1456,7 +1459,8 @@ nfs4_laundromat(void)
 		}
 		dprintk("NFSD: purging unused open stateowner (so_id %d)\n",
 			sop->so_id);
-		release_stateowner(sop);
+		list_del(&sop->so_close_lru);
+		free_stateowner(sop);
 	}
 	if (clientid_val < NFSD_LAUNDROMAT_MINTIMEOUT)
 		clientid_val = NFSD_LAUNDROMAT_MINTIMEOUT;
