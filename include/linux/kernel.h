@@ -92,6 +92,15 @@ asmlinkage int printk(const char * fmt, ...)
 
 unsigned long int_sqrt(unsigned long);
 
+static inline int __attribute_pure__ long_log2(unsigned long x)
+{
+	int r = 0;
+	for (x >>= 1; x > 0; x >>= 1)
+		r++;
+	return r;
+}
+
+
 extern int printk_ratelimit(void);
 extern int __printk_ratelimit(int ratelimit_jiffies, int ratelimit_burst);
 
