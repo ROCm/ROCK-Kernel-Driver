@@ -1409,12 +1409,10 @@ static void proc_cpia_create(void)
 		LOG("Unable to initialise /proc/cpia\n");
 }
 
-#ifdef MODULE
-static void proc_cpia_destroy(void)
+static void __exit proc_cpia_destroy(void)
 {
 	remove_proc_entry("cpia", 0);
 }
-#endif /*MODULE*/
 #endif /* CONFIG_PROC_FS */
 
 /* ----------------------- debug functions ---------------------- */
