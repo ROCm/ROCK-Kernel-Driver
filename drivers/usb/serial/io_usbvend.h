@@ -619,7 +619,7 @@ struct watchport_firmware_version
 // Structure of header of download image in fw_down.h
 struct ti_i2c_image_header
 {
-	__u16	Length;
+	__le16	Length;
 	__u8	CheckSum;
 }__attribute__((packed));
 

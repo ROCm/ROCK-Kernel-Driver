@@ -377,7 +377,7 @@ static int TIReadDownloadMemory(struct usb_device *dev, int start_address,
 		status = TIReadVendorRequestSync (dev,
 						  UMPC_MEMORY_READ,	// Request
 						  (__u16)address_type,	// wValue (Address type)
-						  be_start_address,	// wIndex (Address to read)
+						  (__force __u16)be_start_address,	// wIndex (Address to read)
 						  buffer,		// TransferBuffer
 						  read_length);	// TransferBufferLength
 
@@ -491,7 +491,7 @@ static int TIWriteDownloadI2C (struct edgeport_serial *serial, int start_address
 	status = TISendVendorRequestSync (serial->serial->dev,
 					UMPC_MEMORY_WRITE,	// Request
 					(__u16)address_type,	// wValue
-					be_start_address,	// wIndex
+					(__force __u16)be_start_address,	// wIndex
 					buffer,			// TransferBuffer
 					write_length);
 	if (status) {
@@ -518,7 +518,7 @@ static int TIWriteDownloadI2C (struct edgeport_serial *serial, int start_address
 		status = TISendVendorRequestSync (serial->serial->dev,
 						UMPC_MEMORY_WRITE,	// Request
 						(__u16)address_type,	// wValue
-						be_start_address,	// wIndex
+						(__force __u16)be_start_address,	// wIndex
 						buffer,	  		// TransferBuffer
 						write_length);		// TransferBufferLength
 		if (status) {
