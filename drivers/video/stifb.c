@@ -129,12 +129,6 @@ sti_detect(void)
 {
 }
 
-static int
-sti_blank(int blank_mode, const struct fb_info *info)
-{
-	return 0;
-}
-
 /* ------------ Interfaces to hardware functions ------------ */
 
 struct fbgen_hwswitch sti_switch = {
@@ -146,8 +140,6 @@ struct fbgen_hwswitch sti_switch = {
 	set_par:	sti_set_par,
 	getcolreg:	sti_getcolreg,
 	setcolreg:	sti_setcolreg,
-	pan_display:	NULL,
-	blank:		sti_blank,
 	set_disp:	sti_set_disp
 };
 
@@ -173,7 +165,6 @@ stifb_init(void)
 	fb_info.gen.info.changevar = NULL;
 	fb_info.gen.info.switch_con = &fbgen_switch;
 	fb_info.gen.info.updatevar = &fbgen_update_var;
-	fb_info.gen.info.blank = &fbgen_blank;
 	strcpy(fb_info.gen.info.modename, "STI Generic");
 	fb_info.gen.fbhw = &sti_switch;
 	fb_info.gen.fbhw->detect();
@@ -218,13 +209,11 @@ stifb_setup(char *options)
 
 static struct fb_ops stifb_ops = {
 	owner:		THIS_MODULE,
-	fb_open:	NULL,
-	fb_release:	NULL,
 	fb_get_fix:	fbgen_get_fix,
 	fb_get_var:	fbgen_get_var,
 	fb_set_var:	fbgen_set_var,
 	fb_get_cmap:	fbgen_get_cmap,
 	fb_set_cmap:	fbgen_set_cmap,
 	fb_pan_display:	fbgen_pan_display,
-	fb_ioctl:	NULL
+	fb_blank:	fbgen_blank,
 };

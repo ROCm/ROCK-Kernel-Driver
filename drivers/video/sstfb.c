@@ -234,7 +234,6 @@ static int sstfb_ioctl(struct inode *inode, struct file *file,
 /* Interface to the low level console driver */
 static int sstfbcon_switch(int con, struct fb_info *info);
 static int sstfbcon_updatevar(int con, struct fb_info *info);
-static void sstfbcon_blank(int blank, struct fb_info *info);
 
 /* Internal routines */
 static void sstfb_install_cmap(int con, struct fb_info *info);
@@ -1804,7 +1803,6 @@ int __init sstfb_init(void)
 		fb_info.info.changevar  = NULL;
 		fb_info.info.switch_con = &sstfbcon_switch;
 		fb_info.info.updatevar  = &sstfbcon_updatevar;
-		fb_info.info.blank      = &sstfbcon_blank;
 		if ( !mode_option &&
 	             !fb_find_mode(&var, &fb_info.info, mode_option,
 		                   NULL, 0, NULL, 16)) {
@@ -1875,12 +1873,6 @@ static int sstfbcon_updatevar(int con, struct fb_info *info)
 	f_dprintk("sstfbcon_updatevar\n");
 	return -EINVAL;
 }
-
-static void sstfbcon_blank(int blank, struct fb_info *info)
-{
-	f_dprintk("sstfbcon_blank(level %d)\n", blank);
-}
-
 
 /* print some squares on the fb (presuming 16bpp)  */
 static void sstfb_test16(struct sstfb_info *sst_info)

@@ -119,7 +119,6 @@ static struct fb_ops sgivwfb_ops = {
 int sgivwfb_init(void);
 static int sgivwfbcon_switch(int con, struct fb_info *info);
 static int sgivwfbcon_updatevar(int con, struct fb_info *info);
-static void sgivwfbcon_blank(int blank, struct fb_info *info);
 
 /*
  *  Internal routines
@@ -895,7 +894,6 @@ int __init sgivwfb_init(void)
   fb_info.currcon = -1;	
   fb_info.switch_con = &sgivwfbcon_switch;
   fb_info.updatevar = &sgivwfbcon_updatevar;
-  fb_info.blank = &sgivwfbcon_blank;
   fb_info.flags = FBINFO_FLAG_DEFAULT;
 
   fbmem = ioremap_nocache((unsigned long)sgivwfb_mem_phys, sgivwfb_mem_size);
@@ -944,14 +942,6 @@ static int sgivwfbcon_updatevar(int con, struct fb_info *info)
 {
     /* Nothing */
     return 0;
-}
-
-/*
- *  Blank the display.
- */
-static void sgivwfbcon_blank(int blank, struct fb_info *info)
-{
-    /* Nothing */
 }
 
 #ifdef MODULE

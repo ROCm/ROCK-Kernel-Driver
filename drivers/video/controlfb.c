@@ -151,6 +151,7 @@ static int control_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 	struct fb_info *info);
 static int control_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 	struct fb_info *info);
+static int controlfb_blank(int blank_mode, struct fb_info *info);
 static int control_mmap(struct fb_info *info, struct file *file,
 	struct vm_area_struct *vma);
 
@@ -159,7 +160,6 @@ static int control_mmap(struct fb_info *info, struct file *file,
  */
 static int controlfb_switch(int con, struct fb_info *info);
 static int controlfb_updatevar(int con, struct fb_info *info);
-static void controlfb_blank(int blank_mode, struct fb_info *info);
 
 /*
  * low level cmap set/get ops
@@ -229,6 +229,7 @@ static struct fb_ops controlfb_ops = {
 	fb_get_cmap:	control_get_cmap,
 	fb_set_cmap:	control_set_cmap,
 	fb_pan_display:	control_pan_display,
+	fb_blank:	controlfb_blank,
 	fb_mmap:	control_mmap,
 };
 
@@ -488,7 +489,7 @@ static int controlfb_updatevar(int con, struct fb_info *info)
 }
 
 
-static void controlfb_blank(int blank_mode, struct fb_info *info)
+static int controlfb_blank(int blank_mode, struct fb_info *info)
 {
 	struct fb_info_control *p = (struct fb_info_control *) info;
 	unsigned ctrl;
@@ -517,7 +518,7 @@ static void controlfb_blank(int blank_mode, struct fb_info *info)
 	}
 	out_le32(CNTRL_REG(p,ctrl), ctrl);
 
-	return;
+	return 0;
 }
 
 
@@ -1382,7 +1383,6 @@ static void __init control_init_info(struct fb_info *info, struct fb_info_contro
 	info->changevar = NULL;
 	info->switch_con = &controlfb_switch;
 	info->updatevar = &controlfb_updatevar;
-	info->blank = &controlfb_blank;
 }
 
 

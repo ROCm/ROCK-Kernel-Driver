@@ -338,6 +338,7 @@ static struct fb_ops hitfb_ops = {
     fb_get_cmap:	fbgen_get_cmap,
     fb_set_cmap:	fbgen_set_cmap,
     fb_pan_display:	fbgen_pan_display,
+    fb_blank:		fbgen_blank,	
 };
 
 
@@ -352,7 +353,6 @@ int __init hitfb_init(void)
     fb_info.gen.info.changevar = NULL;
     fb_info.gen.info.switch_con = &fbgen_switch;
     fb_info.gen.info.updatevar = &fbgen_update_var;
-    fb_info.gen.info.blank = &fbgen_blank;
     fb_info.gen.parsize = sizeof(struct hitfb_par);
     fb_info.gen.fbhw = &hitfb_switch;
     fb_info.gen.fbhw->detect();

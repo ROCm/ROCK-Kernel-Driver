@@ -79,9 +79,9 @@ static int sun3fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			struct fb_info *info);
 static int sun3fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			struct fb_info *info);
+static int sun3fb_blank(int blank, struct fb_info *info);
 static void sun3fb_cursor(struct display *p, int mode, int x, int y);
 static void sun3fb_clear_margin(struct display *p, int s);
-			    
 
     /*
      *  Interface to the low level console driver
@@ -89,8 +89,6 @@ static void sun3fb_clear_margin(struct display *p, int s);
 
 static int sun3fbcon_switch(int con, struct fb_info *info);
 static int sun3fbcon_updatevar(int con, struct fb_info *info);
-static void sun3fbcon_blank(int blank, struct fb_info *info);
-
 
     /*
      *  Internal routines
@@ -109,6 +107,7 @@ static struct fb_ops sun3fb_ops = {
 	fb_set_var:	sun3fb_set_var,
 	fb_get_cmap:	sun3fb_get_cmap,
 	fb_set_cmap:	sun3fb_set_cmap,
+	fb_blank:	sun3fb_blank,
 };
 
 static void sun3fb_clear_margin(struct display *p, int s)
@@ -401,7 +400,7 @@ static int sun3fbcon_updatevar(int con, struct fb_info *info)
      *  Blank the display.
      */
 
-static void sun3fbcon_blank(int blank, struct fb_info *info)
+static int sun3fb_blank(int blank, struct fb_info *info)
 {
     struct fb_info_sbusfb *fb = sbusfbinfo(info);
     
@@ -580,7 +579,6 @@ sizechange:
 	fb->info.changevar = NULL;
 	fb->info.switch_con = &sun3fbcon_switch;
 	fb->info.updatevar = &sun3fbcon_updatevar;
-	fb->info.blank = &sun3fbcon_blank;
 	fb->info.flags = FBINFO_FLAG_DEFAULT;
 	
 	fb->cursor.hwsize.fbx = 32;

@@ -213,6 +213,7 @@ static int pvr2fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
                              struct fb_info *info);
 static int pvr2fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
                              struct fb_info *info);
+static int pvr2fb_blank(int blank, struct fb_info *info);
 
 	/*
 	 * Interface to the low level console driver
@@ -220,7 +221,6 @@ static int pvr2fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 
 static int pvr2fbcon_switch(int con, struct fb_info *info);
 static int pvr2fbcon_updatevar(int con, struct fb_info *info);
-static void pvr2fbcon_blank(int blank, struct fb_info *info);
 
 	/*
 	 * Internal/hardware-specific routines
@@ -260,6 +260,7 @@ static struct fb_ops pvr2fb_ops = {
 	fb_get_cmap:	pvr2fb_get_cmap,
 	fb_set_cmap:	pvr2fb_set_cmap,
 	fb_pan_display: pvr2fb_pan_display,
+	fb_blank:	pvr2fb_blank,
 };
 
 static struct fb_videomode pvr2_modedb[] __initdata = {
@@ -514,7 +515,7 @@ static int pvr2fbcon_updatevar(int con, struct fb_info *info)
 	return 0;
 }
 
-static void pvr2fbcon_blank(int blank, struct fb_info *info)
+static int pvr2fb_blank(int blank, struct fb_info *info)
 {
 	do_blank = blank ? blank : -1;
 }
@@ -1039,7 +1040,6 @@ int __init pvr2fb_init(void)
 	fb_info.currcon = -1;
 	fb_info.switch_con = &pvr2fbcon_switch;
 	fb_info.updatevar = &pvr2fbcon_updatevar;
-	fb_info.blank = &pvr2fbcon_blank;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 	memset(&var, 0, sizeof(var));
 

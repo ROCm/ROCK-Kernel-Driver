@@ -1590,7 +1590,8 @@ static int fbcon_blank(struct vc_data *conp, int blank)
 	    return 1;
 	}
     }
-    (*info->blank)(blank, info);
+    if (info->fbops->fb_blank)	
+    	(*info->fbops->fb_blank)(blank, info);
     return 0;
 }
 

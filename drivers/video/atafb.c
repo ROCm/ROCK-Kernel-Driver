@@ -2642,6 +2642,7 @@ static struct fb_ops atafb_ops = {
 	fb_get_cmap:	atafb_get_cmap,
 	fb_set_cmap:	atafb_set_cmap,
 	fb_pan_display:	atafb_pan_display,
+	fb_blank:	atafb_blank,
 	fb_ioctl:	atafb_ioctl,
 };
 
@@ -2707,13 +2708,13 @@ atafb_switch(int con, struct fb_info *info)
  * 3 = suspend hsync
  * 4 = off
  */
-static void
+static int 
 atafb_blank(int blank, struct fb_info *info)
 {
 	unsigned short black[16];
 	struct fb_cmap cmap;
 	if (fbhw->blank && !fbhw->blank(blank))
-		return;
+		return 1;
 	if (blank) {
 		memset(black, 0, 16*sizeof(unsigned short));
 		cmap.red=black;
@@ -2726,6 +2727,7 @@ atafb_blank(int blank, struct fb_info *info)
 	}
 	else
 		do_install_cmap(info->currcon, info);
+	return 0;
 }
 
 int __init atafb_init(void)
@@ -2832,7 +2834,6 @@ int __init atafb_init(void)
 	fb_info.currcon = -1;
 	fb_info.switch_con = &atafb_switch;
 	fb_info.updatevar = &fb_update_var;
-	fb_info.blank = &atafb_blank;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 	do_fb_set_var(&atafb_predefined[default_par-1], 1);
 	strcat(fb_info.modename, fb_var_names[default_par-1][0]);

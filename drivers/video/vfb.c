@@ -97,8 +97,6 @@ static int vfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 int vfb_init(void);
 static int vfbcon_switch(int con, struct fb_info *info);
 static int vfbcon_updatevar(int con, struct fb_info *info);
-static void vfbcon_blank(int blank, struct fb_info *info);
-
 
     /*
      *  Internal routines
@@ -409,7 +407,6 @@ int __init vfb_init(void)
     fb_info.currcon = -1;	
     fb_info.switch_con = &vfbcon_switch;
     fb_info.updatevar = &vfbcon_updatevar;
-    fb_info.blank = &vfbcon_blank;
     fb_info.flags = FBINFO_FLAG_DEFAULT;
 
     vfb_set_var(&vfb_default, -1, &fb_info);
@@ -445,15 +442,6 @@ static int vfbcon_updatevar(int con, struct fb_info *info)
 {
     /* Nothing */
     return 0;
-}
-
-    /*
-     *  Blank the display.
-     */
-
-static void vfbcon_blank(int blank, struct fb_info *info)
-{
-    /* Nothing */
 }
 
 static u_long get_line_length(int xres_virtual, int bpp)

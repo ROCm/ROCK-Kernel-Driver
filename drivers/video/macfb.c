@@ -874,11 +874,6 @@ static int macfb_switch(int con, struct fb_info *info)
 	return 1;
 }
 
-static void macfb_blank(int blank, struct fb_info *info)
-{
-	/* Not supported */
-}
-
 void __init macfb_init(void)
 {
 	struct nubus_dev* ndev = NULL;
@@ -1225,7 +1220,6 @@ void __init macfb_init(void)
 	fb_info.disp       = &disp;
 	fb_info.switch_con = &macfb_switch;
 	fb_info.updatevar  = &macfb_update_var;
-	fb_info.blank      = &macfb_blank;
 	fb_info.flags      = FBINFO_FLAG_DEFAULT;
 	macfb_set_disp(-1);
 	do_install_cmap(0, &fb_info);

@@ -582,7 +582,7 @@ static void cg6_setcursor (struct fb_info_sbusfb *fb)
 	spin_unlock_irqrestore(&fb->lock, flags);
 }
 
-static void cg6_blank (struct fb_info_sbusfb *fb)
+static int cg6_blank (struct fb_info_sbusfb *fb)
 {
 	unsigned long flags;
 	u32 tmp;
@@ -592,9 +592,10 @@ static void cg6_blank (struct fb_info_sbusfb *fb)
 	tmp &= ~CG6_THC_MISC_VIDEO;
 	sbus_writel(tmp, &fb->s.cg6.thc->thc_misc);
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 
-static void cg6_unblank (struct fb_info_sbusfb *fb)
+static int cg6_unblank (struct fb_info_sbusfb *fb)
 {
 	unsigned long flags;
 	u32 tmp;
@@ -604,6 +605,7 @@ static void cg6_unblank (struct fb_info_sbusfb *fb)
 	tmp |= CG6_THC_MISC_VIDEO;
 	sbus_writel(tmp, &fb->s.cg6.thc->thc_misc);
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 
 static void cg6_reset (struct fb_info_sbusfb *fb)

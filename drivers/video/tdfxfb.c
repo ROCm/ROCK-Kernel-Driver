@@ -395,7 +395,7 @@ static int  tdfxfb_switch_con(int con,
 			      struct fb_info* fb);
 static int  tdfxfb_updatevar(int con, 
 			     struct fb_info* fb);
-static void tdfxfb_blank(int blank, 
+static int tdfxfb_blank(int blank, 
 			 struct fb_info* fb);
 
 /*
@@ -474,6 +474,7 @@ static struct fb_ops tdfxfb_ops = {
 	fb_get_cmap:	tdfxfb_get_cmap,
 	fb_set_cmap:	tdfxfb_set_cmap,
 	fb_pan_display:	tdfxfb_pan_display,
+	fb_blank:	tdfxfb_blank,
 };
 
 static struct pci_device_id tdfxfb_id_table[] __devinitdata = {
@@ -1980,7 +1981,6 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 	strcpy(fb_info.fb_info.fontname, fontname);
 	fb_info.fb_info.switch_con = &tdfxfb_switch_con;
 	fb_info.fb_info.updatevar  = &tdfxfb_updatevar;
-	fb_info.fb_info.blank      = &tdfxfb_blank;
 	fb_info.fb_info.flags      = FBINFO_FLAG_DEFAULT;
       
 	memset(&var, 0, sizeof(var));
@@ -2161,8 +2161,9 @@ static int tdfxfb_switch_con(int con,
 }
 
 /* 0 unblank, 1 blank, 2 no vsync, 3 no hsync, 4 off */
-static void tdfxfb_blank(int blank, 
-			 struct fb_info *fb) {
+static int tdfxfb_blank(int blank, 
+			 struct fb_info *fb)
+{
   u32 dacmode, state = 0, vgablank = 0;
 
   dacmode = tdfx_inl(DACMODE);
@@ -2198,8 +2199,7 @@ static void tdfxfb_blank(int blank,
     vga_disable_video();
   else
     vga_enable_video();
-
-  return;
+  return 0;
 }
 
 static int  tdfxfb_updatevar(int con, 

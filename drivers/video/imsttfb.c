@@ -1567,6 +1567,60 @@ imsttfb_set_cmap (struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
 	return 0;
 }
 
+static int 
+imsttfb_blank (int blank, struct fb_info *info)
+{
+	struct fb_info_imstt *p = (struct fb_info_imstt *)info;
+	__u32 ctrl;
+
+	ctrl = in_le32(&p->dc_regs[STGCTL]);
+	if (blank > 0) {
+		switch (blank - 1) {
+			case VESA_NO_BLANKING:
+			case VESA_POWERDOWN:
+				ctrl &= ~0x00000380;
+				if (p->ramdac == IBM) {
+					p->cmap_regs[PIDXHI] = 0;	eieio();
+					p->cmap_regs[PIDXLO] = MISCTL2;	eieio();
+					p->cmap_regs[PIDXDATA] = 0x55;	eieio();
+					p->cmap_regs[PIDXLO] = MISCTL1;	eieio();
+					p->cmap_regs[PIDXDATA] = 0x11;	eieio();
+					p->cmap_regs[PIDXLO] = SYNCCTL;	eieio();
+					p->cmap_regs[PIDXDATA] = 0x0f;	eieio();
+					p->cmap_regs[PIDXLO] = PWRMNGMT;eieio();
+					p->cmap_regs[PIDXDATA] = 0x1f;	eieio();
+					p->cmap_regs[PIDXLO] = CLKCTL;	eieio();
+					p->cmap_regs[PIDXDATA] = 0xc0;
+				}
+				break;
+			case VESA_VSYNC_SUSPEND:
+				ctrl &= ~0x00000020;
+				break;
+			case VESA_HSYNC_SUSPEND:
+				ctrl &= ~0x00000010;
+				break;
+		}
+	} else {
+		if (p->ramdac == IBM) {
+			ctrl |= 0x000017b0;
+			p->cmap_regs[PIDXHI] = 0;	eieio();
+			p->cmap_regs[PIDXLO] = CLKCTL;	eieio();
+			p->cmap_regs[PIDXDATA] = 0x01;	eieio();
+			p->cmap_regs[PIDXLO] = PWRMNGMT;eieio();
+			p->cmap_regs[PIDXDATA] = 0x00;	eieio();
+			p->cmap_regs[PIDXLO] = SYNCCTL;	eieio();
+			p->cmap_regs[PIDXDATA] = 0x00;	eieio();
+			p->cmap_regs[PIDXLO] = MISCTL1;	eieio();
+			p->cmap_regs[PIDXDATA] = 0x01;	eieio();
+			p->cmap_regs[PIDXLO] = MISCTL2;	eieio();
+			p->cmap_regs[PIDXDATA] = 0x45;	eieio();
+		} else
+			ctrl |= 0x00001780;
+	}
+	out_le32(&p->dc_regs[STGCTL], ctrl);
+	return 0;
+}
+
 #define FBIMSTT_SETREG		0x545401
 #define FBIMSTT_GETREG		0x545402
 #define FBIMSTT_SETCMAPREG	0x545403
@@ -1653,6 +1707,7 @@ static struct fb_ops imsttfb_ops = {
 	fb_get_cmap:	imsttfb_get_cmap,
 	fb_set_cmap:	imsttfb_set_cmap,
 	fb_pan_display:	imsttfb_pan_display,
+	fb_blank:	imsttfb_blank,
 	fb_ioctl:	imsttfb_ioctl,
 };
 
@@ -1711,59 +1766,6 @@ imsttfbcon_updatevar (int con, struct fb_info *info)
 
 out:
 	return 0;
-}
-
-static void
-imsttfbcon_blank (int blank, struct fb_info *info)
-{
-	struct fb_info_imstt *p = (struct fb_info_imstt *)info;
-	__u32 ctrl;
-
-	ctrl = in_le32(&p->dc_regs[STGCTL]);
-	if (blank > 0) {
-		switch (blank - 1) {
-			case VESA_NO_BLANKING:
-			case VESA_POWERDOWN:
-				ctrl &= ~0x00000380;
-				if (p->ramdac == IBM) {
-					p->cmap_regs[PIDXHI] = 0;	eieio();
-					p->cmap_regs[PIDXLO] = MISCTL2;	eieio();
-					p->cmap_regs[PIDXDATA] = 0x55;	eieio();
-					p->cmap_regs[PIDXLO] = MISCTL1;	eieio();
-					p->cmap_regs[PIDXDATA] = 0x11;	eieio();
-					p->cmap_regs[PIDXLO] = SYNCCTL;	eieio();
-					p->cmap_regs[PIDXDATA] = 0x0f;	eieio();
-					p->cmap_regs[PIDXLO] = PWRMNGMT;eieio();
-					p->cmap_regs[PIDXDATA] = 0x1f;	eieio();
-					p->cmap_regs[PIDXLO] = CLKCTL;	eieio();
-					p->cmap_regs[PIDXDATA] = 0xc0;
-				}
-				break;
-			case VESA_VSYNC_SUSPEND:
-				ctrl &= ~0x00000020;
-				break;
-			case VESA_HSYNC_SUSPEND:
-				ctrl &= ~0x00000010;
-				break;
-		}
-	} else {
-		if (p->ramdac == IBM) {
-			ctrl |= 0x000017b0;
-			p->cmap_regs[PIDXHI] = 0;	eieio();
-			p->cmap_regs[PIDXLO] = CLKCTL;	eieio();
-			p->cmap_regs[PIDXDATA] = 0x01;	eieio();
-			p->cmap_regs[PIDXLO] = PWRMNGMT;eieio();
-			p->cmap_regs[PIDXDATA] = 0x00;	eieio();
-			p->cmap_regs[PIDXLO] = SYNCCTL;	eieio();
-			p->cmap_regs[PIDXDATA] = 0x00;	eieio();
-			p->cmap_regs[PIDXLO] = MISCTL1;	eieio();
-			p->cmap_regs[PIDXDATA] = 0x01;	eieio();
-			p->cmap_regs[PIDXLO] = MISCTL2;	eieio();
-			p->cmap_regs[PIDXDATA] = 0x45;	eieio();
-		} else
-			ctrl |= 0x00001780;
-	}
-	out_le32(&p->dc_regs[STGCTL], ctrl);
 }
 
 static void __init 
@@ -1872,7 +1874,6 @@ init_imstt(struct fb_info_imstt *p)
 	p->info.changevar = 0;
 	p->info.switch_con = &imsttfbcon_switch;
 	p->info.updatevar = &imsttfbcon_updatevar;
-	p->info.blank = &imsttfbcon_blank;
 	p->info.flags = FBINFO_FLAG_DEFAULT;
 
 	for (i = 0; i < 16; i++) {

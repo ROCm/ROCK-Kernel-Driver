@@ -100,6 +100,7 @@ static int g364fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			   struct fb_info *info);
 static int g364fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			   struct fb_info *info);
+static int g364fb_blank(int blank, struct fb_info *info);
 
 
 /*
@@ -108,8 +109,6 @@ static int g364fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 int g364fb_init(void);
 static int g364fbcon_switch(int con, struct fb_info *info);
 static int g364fbcon_updatevar(int con, struct fb_info *info);
-static void g364fbcon_blank(int blank, struct fb_info *info);
-
 
 /*
  *  Internal routines
@@ -129,6 +128,7 @@ static struct fb_ops g364fb_ops = {
 	fb_get_cmap:	g364fb_get_cmap,
 	fb_set_cmap:	g364fb_set_cmap,
 	fb_pan_display:	g364fb_pan_display,
+	fb_blank:	g364fb_blank,
 };
 
 
@@ -385,7 +385,6 @@ int __init g364fb_init(void)
     fb_info.changevar = NULL;
     fb_info.switch_con = &g364fbcon_switch;
     fb_info.updatevar = &g364fbcon_updatevar;
-    fb_info.blank = &g364fbcon_blank;
     fb_info.flags = FBINFO_FLAG_DEFAULT;
 
     g364fb_set_var(&fb_var, -1, &fb_info);
@@ -429,12 +428,13 @@ static int g364fbcon_updatevar(int con, struct fb_info *info)
 /*
  *  Blank the display.
  */
-static void g364fbcon_blank(int blank, struct fb_info *info)
+static int g364fb_blank(int blank, struct fb_info *info)
 {
     if (blank)
 	*(unsigned int *) CTLA_REG |= FORCE_BLANK;	
     else
 	*(unsigned int *) CTLA_REG &= ~FORCE_BLANK;	
+    return 0;	
 }
 
 /*

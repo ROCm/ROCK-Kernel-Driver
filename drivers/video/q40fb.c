@@ -38,13 +38,9 @@ static int q40fb_get_cmap(struct fb_cmap *cmap,int kspc,int con,
 			 struct fb_info *info);
 static int q40fb_set_cmap(struct fb_cmap *cmap,int kspc,int con,
 			 struct fb_info *info);
-static int q40fb_ioctl(struct inode *inode, struct file *file,
-		      unsigned int cmd, unsigned long arg, int con,
-		      struct fb_info *info);
 
 static int q40con_switch(int con, struct fb_info *info);
 static int q40con_updatevar(int con, struct fb_info *info);
-static void q40con_blank(int blank, struct fb_info *info);
 
 static void q40fb_set_disp(int con, struct fb_info *info);
 
@@ -57,7 +53,6 @@ static struct fb_ops q40fb_ops = {
 	fb_set_var:	q40fb_set_var,
 	fb_get_cmap:	q40fb_get_cmap,
 	fb_set_cmap:	q40fb_set_cmap,
-	fb_ioctl:	q40fb_ioctl,
 };
 
 static char q40fb_name[]="Q40";
@@ -248,34 +243,6 @@ static int q40fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 #endif
 }
 
-static int q40fb_ioctl(struct inode *inode, struct file *file,
-		      unsigned int cmd, unsigned long arg, int con,
-		      struct fb_info *info)
-{
-#if 0
-        unsigned long i;
-	struct display *display;
-
-	if (con>=0)
-	  display = &fb_display[con];
-	else
-	  display = &disp[0];
-
-        if (cmd == FBIOSETSCROLLMODE)
-	  {
-	    i = verify_area(VERIFY_READ, (void *)arg, sizeof(unsigned long));
-	    if (!i) 
-	      {
-		copy_from_user(&i, (void *)arg, sizeof(unsigned long));
-		display->scrollmode = i;
-	      }
-	    q40_updatescrollmode(display);
-	    return i;
-	  }
-#endif
-	return -EINVAL;
-}
-
 static void q40fb_set_disp(int con, struct fb_info *info)
 {
   struct fb_fix_screeninfo fix;
@@ -329,7 +296,6 @@ int __init q40fb_init(void)
 	fb_info.currcon = -1;
 	fb_info.switch_con=&q40con_switch;
 	fb_info.updatevar=&q40con_updatevar;
-	fb_info.blank=&q40con_blank;	
 	fb_info.node = NODEV;
 	fb_info.fbops = &q40fb_ops;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;  /* not as module for now */
@@ -359,10 +325,6 @@ static int q40con_switch(int con, struct fb_info *info)
 static int q40con_updatevar(int con, struct fb_info *info)
 {
 	return 0;
-}
-
-static void q40con_blank(int blank, struct fb_info *info)
-{
 }
 
 MODULE_LICENSE("GPL");

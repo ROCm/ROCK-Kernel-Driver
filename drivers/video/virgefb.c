@@ -305,6 +305,7 @@ static int virgefb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			    struct fb_info *info);
 static int virgefb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			    struct fb_info *info);
+static int virgefb_blank(int blank, struct fb_info *info);
 
 
 /*
@@ -314,8 +315,6 @@ static int virgefb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 int virgefb_init(void);
 static int Cyberfb_switch(int con, struct fb_info *info);
 static int Cyberfb_updatevar(int con, struct fb_info *info);
-static void Cyberfb_blank(int blank, struct fb_info *info);
-
 
 /*
  *    Text console acceleration
@@ -1064,6 +1063,15 @@ static int virgefb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 	return(0);
 }
 
+/*
+ *    Blank the display.
+ */
+
+static int virgefb_blank(int blank, struct fb_info *info)
+{
+	fbhw->blank(blank);
+	return 0;
+}
 
 static struct fb_ops virgefb_ops = {
 	owner:		THIS_MODULE,
@@ -1072,8 +1080,8 @@ static struct fb_ops virgefb_ops = {
 	fb_set_var:	virgefb_set_var,
 	fb_get_cmap:	virgefb_get_cmap,
 	fb_set_cmap:	virgefb_set_cmap,
+	fb_blank:	virgefb_blank,
 };
-
 
 int __init virgefb_setup(char *options)
 {
@@ -1173,7 +1181,6 @@ int __init virgefb_init(void)
 	    fb_info.currcon = -1;	
 	    fb_info.switch_con = &Cyberfb_switch;
 	    fb_info.updatevar = &Cyberfb_updatevar;
-	    fb_info.blank = &Cyberfb_blank;
 	    fb_info.flags = FBINFO_FLAG_DEFAULT;
 
 	    fbhw->init();
@@ -1234,11 +1241,10 @@ static int Cyberfb_updatevar(int con, struct fb_info *info)
  *    Blank the display.
  */
 
-static void Cyberfb_blank(int blank, struct fb_info *info)
+static void virgefb_blank(int blank, struct fb_info *info)
 {
 	fbhw->blank(blank);
 }
-
 
 /*
  *    Get a Video Mode

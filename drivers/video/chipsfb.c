@@ -127,6 +127,7 @@ static int chips_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info);
 static int chips_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info);
+static int chipsfb_blank(int blank, struct fb_info *info);
 
 static struct fb_ops chipsfb_ops = {
 	owner:		THIS_MODULE,
@@ -135,6 +136,7 @@ static struct fb_ops chipsfb_ops = {
 	fb_set_var:	chips_set_var,
 	fb_get_cmap:	chips_get_cmap,
 	fb_set_cmap:	chips_set_cmap,
+	fb_blank:	chipsfb_blank,
 };
 
 static int chipsfb_getcolreg(u_int regno, u_int *red, u_int *green,
@@ -239,7 +241,7 @@ static int chipsfb_updatevar(int con, struct fb_info *info)
 	return 0;
 }
 
-static void chipsfb_blank(int blank, struct fb_info *info)
+static int chipsfb_blank(int blank, struct fb_info *info)
 {
 	struct fb_info_chips *p = (struct fb_info_chips *) info;
 	int i;
@@ -277,6 +279,7 @@ static void chipsfb_blank(int blank, struct fb_info *info)
 			outb(p->palette[i].blue, 0x3c9);
 		}
 	}
+	return 0;
 }
 
 static int chipsfb_getcolreg(u_int regno, u_int *red, u_int *green,
@@ -584,7 +587,6 @@ static void __init init_chips(struct fb_info_chips *p)
 	p->info.changevar = NULL;
 	p->info.switch_con = &chipsfbcon_switch;
 	p->info.updatevar = &chipsfb_updatevar;
-	p->info.blank = &chipsfb_blank;
 	p->info.flags = FBINFO_FLAG_DEFAULT;
 
 	for (i = 0; i < 16; ++i) {

@@ -1077,7 +1077,7 @@ static int cyber2000fb_switch(int con, struct fb_info *info)
 /*
  *    (Un)Blank the display.
  */
-static void cyber2000fb_blank(int blank, struct fb_info *info)
+static int cyber2000fb_blank(int blank, struct fb_info *info)
 {
 	struct cfb_info *cfb = (struct cfb_info *)info;
 	unsigned int sync = 0;
@@ -1137,6 +1137,7 @@ static void cyber2000fb_blank(int blank, struct fb_info *info)
 		}
 		break;
 	}
+	return 0;
 }
 
 static struct fb_ops cyber2000fb_ops = {
@@ -1144,6 +1145,7 @@ static struct fb_ops cyber2000fb_ops = {
 	fb_set_var:	cyber2000fb_set_var,
 	fb_set_cmap:	cyber2000fb_set_cmap,
 	fb_pan_display:	cyber2000fb_pan_display,
+	fb_blank:	cyber2000fb_blank,
 	fb_get_fix:	gen_get_fix,
 	fb_get_var:	gen_get_var,
 	fb_get_cmap:	gen_get_cmap,
@@ -1370,7 +1372,6 @@ cyberpro_alloc_fb_info(unsigned int id, char *name)
 	cfb->fb.changevar	= NULL;
 	cfb->fb.switch_con	= cyber2000fb_switch;
 	cfb->fb.updatevar	= cyber2000fb_updatevar;
-	cfb->fb.blank		= cyber2000fb_blank;
 	cfb->fb.flags		= FBINFO_FLAG_DEFAULT;
 	cfb->fb.node		= NODEV;
 	cfb->fb.disp		= (struct display *)(cfb + 1);

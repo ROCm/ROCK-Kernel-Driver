@@ -87,7 +87,7 @@ static int s3trio_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			   struct fb_info *info);
 static int s3trio_pan_display(struct fb_var_screeninfo *var, int con,
 			      struct fb_info *info);
-
+static void s3triofb_blank(int blank, struct fb_info *info);
 
     /*
      *  Interface to the low level console driver
@@ -96,7 +96,6 @@ static int s3trio_pan_display(struct fb_var_screeninfo *var, int con,
 int s3triofb_init(void);
 static int s3triofbcon_switch(int con, struct fb_info *info);
 static int s3triofbcon_updatevar(int con, struct fb_info *info);
-static void s3triofbcon_blank(int blank, struct fb_info *info);
 #if 0
 static int s3triofbcon_setcmap(struct fb_cmap *cmap, int con);
 #endif
@@ -142,6 +141,7 @@ static struct fb_ops s3trio_ops = {
 	fb_get_cmap:	s3trio_get_cmap,
 	fb_set_cmap:	s3trio_set_cmap,
 	fb_pan_display:	s3trio_pan_display,
+	fb_blank:	s3triofb_blank,
 };
 
     /*
@@ -565,7 +565,6 @@ static void __init s3triofb_of_init(struct device_node *dp)
     fb_info.changevar = NULL;
     fb_info.switch_con = &s3triofbcon_switch;
     fb_info.updatevar = &s3triofbcon_updatevar;
-    fb_info.blank = &s3triofbcon_blank;
 #if 0
     fb_info.setcmap = &s3triofbcon_setcmap;
 #endif
@@ -621,13 +620,14 @@ static int s3triofbcon_updatevar(int con, struct fb_info *info)
      *  Blank the display.
      */
 
-static void s3triofbcon_blank(int blank, struct fb_info *info)
+static int s3triofb_blank(int blank, struct fb_info *info)
 {
     unsigned char x;
 
     mem_out8(0x1, s3trio_base+0x1008000 + 0x03c4);
     x = mem_in8(s3trio_base+0x1008000 + 0x03c5);
     mem_out8((x & (~0x20)) | (blank << 5), s3trio_base+0x1008000 + 0x03c5);
+    return 0;	
 }
 
     /*

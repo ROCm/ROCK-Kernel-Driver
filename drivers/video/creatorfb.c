@@ -589,7 +589,7 @@ static void ffb_revc(struct display *p, int xx, int yy)
 }
 
 #if 0
-static void ffb_blank(struct fb_info_sbusfb *fb)
+static int ffb_blank(struct fb_info_sbusfb *fb)
 {
 	struct ffb_dac *dac = fb->s.ffb.dac;
 	unsigned long flags;
@@ -601,10 +601,11 @@ static void ffb_blank(struct fb_info_sbusfb *fb)
 	upa_writel(0x6000, &dac->type);
 	upa_writel(tmp, &dac->value);
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 #endif
 
-static void ffb_unblank(struct fb_info_sbusfb *fb)
+static int ffb_unblank(struct fb_info_sbusfb *fb)
 {
 	struct ffb_dac *dac = fb->s.ffb.dac;
 	unsigned long flags;
@@ -616,6 +617,7 @@ static void ffb_unblank(struct fb_info_sbusfb *fb)
 	upa_writel(0x6000, &dac->type);
 	upa_writel(tmp, &dac->value);
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 
 static void ffb_loadcmap (struct fb_info_sbusfb *fb, struct display *p, int index, int count)

@@ -94,6 +94,8 @@ static int offb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			struct fb_info *info);
 static int offb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			struct fb_info *info);
+static int offb_blank(int blank, struct fb_info *info);
+
 #ifdef CONFIG_BOOTX_TEXT
 extern boot_infos_t *boot_infos;
 #endif
@@ -109,8 +111,6 @@ static void offb_init_fb(const char *name, const char *full_name, int width,
 
 static int offbcon_switch(int con, struct fb_info *info);
 static int offbcon_updatevar(int con, struct fb_info *info);
-static void offbcon_blank(int blank, struct fb_info *info);
-
 
     /*
      *  Internal routines
@@ -130,6 +130,7 @@ static struct fb_ops offb_ops = {
 	fb_set_var:	offb_set_var,
 	fb_get_cmap:	offb_get_cmap,
 	fb_set_cmap:	offb_set_cmap,
+	fb_blank:	offb_blank,
 };
 
     /*
@@ -244,6 +245,56 @@ static int offb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
     return 0;
 }
 
+    /*
+     *  Blank the display.
+     */
+
+static int offb_blank(int blank, struct fb_info *info)
+{
+    struct fb_info_offb *info2 = (struct fb_info_offb *)info;
+    int i, j;
+
+    if (!info2->cmap_adr)
+	return;
+
+    if (blank)
+	for (i = 0; i < 256; i++) {
+	    switch(info2->cmap_type) {
+	    case cmap_m64:
+	        *info2->cmap_adr = i;
+	  	mach_eieio();
+	  	for (j = 0; j < 3; j++) {
+		    *info2->cmap_data = 0;
+		    mach_eieio();
+	    	}
+	    	break;
+	    case cmap_M3A:
+	        /* Clear PALETTE_ACCESS_CNTL in DAC_CNTL */
+	    	out_le32((unsigned *)(info2->cmap_adr + 0x58),
+	    		in_le32((unsigned *)(info2->cmap_adr + 0x58)) & ~0x20);
+	    case cmap_r128:
+	    	/* Set palette index & data */
+    	        out_8(info2->cmap_adr + 0xb0, i);
+	    	out_le32((unsigned *)(info2->cmap_adr + 0xb4), 0);
+	    	break;
+	    case cmap_M3B:
+	        /* Set PALETTE_ACCESS_CNTL in DAC_CNTL */
+	    	out_le32((unsigned *)(info2->cmap_adr + 0x58),
+	    		in_le32((unsigned *)(info2->cmap_adr + 0x58)) | 0x20);
+	    	/* Set palette index & data */
+	    	out_8(info2->cmap_adr + 0xb0, i);
+	    	out_le32((unsigned *)(info2->cmap_adr + 0xb4), 0);
+	    	break;
+	    case cmap_radeon:
+    	        out_8(info2->cmap_adr + 0xb0, i);
+	    	out_le32((unsigned *)(info2->cmap_adr + 0xb4), 0);
+	    	break;
+	    }
+	}
+    else
+	do_install_cmap(info->currcon, info);
+    return 0;	
+}
 
     /*
      *  Initialisation
@@ -571,7 +622,6 @@ static void __init offb_init_fb(const char *name, const char *full_name,
     info->info.changevar = NULL;
     info->info.switch_con = &offbcon_switch;
     info->info.updatevar = &offbcon_updatevar;
-    info->info.blank = &offbcon_blank;
     info->info.flags = FBINFO_FLAG_DEFAULT;
 
     for (i = 0; i < 16; i++) {
@@ -636,56 +686,6 @@ static int offbcon_updatevar(int con, struct fb_info *info)
 {
     /* Nothing */
     return 0;
-}
-
-    /*
-     *  Blank the display.
-     */
-
-static void offbcon_blank(int blank, struct fb_info *info)
-{
-    struct fb_info_offb *info2 = (struct fb_info_offb *)info;
-    int i, j;
-
-    if (!info2->cmap_adr)
-	return;
-
-    if (blank)
-	for (i = 0; i < 256; i++) {
-	    switch(info2->cmap_type) {
-	    case cmap_m64:
-	        *info2->cmap_adr = i;
-	  	mach_eieio();
-	  	for (j = 0; j < 3; j++) {
-		    *info2->cmap_data = 0;
-		    mach_eieio();
-	    	}
-	    	break;
-	    case cmap_M3A:
-	        /* Clear PALETTE_ACCESS_CNTL in DAC_CNTL */
-	    	out_le32((unsigned *)(info2->cmap_adr + 0x58),
-	    		in_le32((unsigned *)(info2->cmap_adr + 0x58)) & ~0x20);
-	    case cmap_r128:
-	    	/* Set palette index & data */
-    	        out_8(info2->cmap_adr + 0xb0, i);
-	    	out_le32((unsigned *)(info2->cmap_adr + 0xb4), 0);
-	    	break;
-	    case cmap_M3B:
-	        /* Set PALETTE_ACCESS_CNTL in DAC_CNTL */
-	    	out_le32((unsigned *)(info2->cmap_adr + 0x58),
-	    		in_le32((unsigned *)(info2->cmap_adr + 0x58)) | 0x20);
-	    	/* Set palette index & data */
-	    	out_8(info2->cmap_adr + 0xb0, i);
-	    	out_le32((unsigned *)(info2->cmap_adr + 0xb4), 0);
-	    	break;
-	    case cmap_radeon:
-    	        out_8(info2->cmap_adr + 0xb0, i);
-	    	out_le32((unsigned *)(info2->cmap_adr + 0xb4), 0);
-	    	break;
-	    }
-	}
-    else
-	do_install_cmap(info->currcon, info);
 }
 
     /*

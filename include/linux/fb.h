@@ -379,9 +379,6 @@ struct fb_info {
 					/* tell fb to switch consoles */
    int (*updatevar)(int, struct fb_info*);
 					/* tell fb to update the vars */
-   void (*blank)(int, struct fb_info*);	/* tell fb to (un)blank the screen */
-					/* arg = 0: unblank */
-					/* arg > 0: VESA level (arg-1) */
    void *pseudo_palette;                /* Fake palette of 16 colors and 
 					   the cursor's color for non
                                            palette mode */
@@ -474,7 +471,7 @@ extern void fbgen_install_cmap(int con, struct fb_info_gen *info);
 extern int fbgen_update_var(int con, struct fb_info *info);
 extern int gen_update_var(int con, struct fb_info *info);
 extern int fbgen_switch(int con, struct fb_info *info);
-extern void fbgen_blank(int blank, struct fb_info *info);
+extern int fbgen_blank(int blank, struct fb_info *info);
 extern int gen_switch(int con, struct fb_info *info);
 
 extern void gen_set_disp(int con, struct fb_info *info);

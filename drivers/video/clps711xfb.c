@@ -236,36 +236,6 @@ clps7111fb_set_var(struct fb_var_screeninfo *var, int con,
 	return 0;
 }
 
-/*
- * Get the currently displayed virtual consoles colormap.
- */
-static int
-gen_get_cmap(struct fb_cmap *cmap, int kspc, int con, struct fb_info *info)
-{
-	fb_copy_cmap(&info->cmap, cmap, kspc ? 0 : 2);
-	return 0;
-}
-
-/*
- * Get the currently displayed virtual consoles fixed part of the display.
- */
-static int
-gen_get_fix(struct fb_fix_screeninfo *fix, int con, struct fb_info *info)
-{
-	*fix = info->fix;
-	return 0;
-}
-
-/*
- * Get the current user defined part of the display.
- */
-static int
-gen_get_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
-{
-	*var = info->var;
-	return 0;
-}
-
 static struct fb_ops clps7111fb_ops = {
 	owner:		THIS_MODULE,
 	fb_set_var:	clps7111fb_set_var,
@@ -273,6 +243,7 @@ static struct fb_ops clps7111fb_ops = {
 	fb_get_fix:	gen_get_fix,
 	fb_get_var:	gen_get_var,
 	fb_get_cmap:	gen_get_cmap,
+	fb_blank:	clps7111fb_blank,
 };
 
 static int clps7111fb_switch(int con, struct fb_info *info)
@@ -319,7 +290,7 @@ static int clps7111fb_updatevar(int con, struct fb_info *info)
 	return -EINVAL;
 }
 
-static void clps7111fb_blank(int blank, struct fb_info *info)
+static int clps7111fb_blank(int blank, struct fb_info *info)
 {
     	if (blank) {
 		if (machine_is_edb7211()) {
@@ -363,6 +334,7 @@ static void clps7111fb_blank(int blank, struct fb_info *info)
 				clps_writeb(clps_readb(PDDR) | EDB_PD3_LCDBL, PDDR);
 		}
 	}
+	return 0;
 }
 
 static int 
@@ -449,7 +421,6 @@ int __init clps711xfb_init(void)
 	cfb->changevar	= NULL;
 	cfb->switch_con	= clps7111fb_switch;
 	cfb->updatevar	= clps7111fb_updatevar;
-	cfb->blank		= clps7111fb_blank;
 	cfb->flags		= FBINFO_FLAG_DEFAULT;
 	cfb->disp		= (struct display *)(cfb + 1);
 

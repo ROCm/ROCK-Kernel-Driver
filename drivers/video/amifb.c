@@ -1094,6 +1094,7 @@ static int amifb_get_var(struct fb_var_screeninfo *var, int con,
 			 struct fb_info *info);
 static int amifb_set_var(struct fb_var_screeninfo *var, int con,
 			 struct fb_info *info);
+static int amifb_blank(int blank, struct fb_info *info);
 static int amifb_pan_display(struct fb_var_screeninfo *var, int con,
 			     struct fb_info *info);
 static int amifb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
@@ -1119,7 +1120,6 @@ int amifb_init(void);
 static void amifb_deinit(void);
 static int amifbcon_switch(int con, struct fb_info *info);
 static int amifbcon_updatevar(int con, struct fb_info *info);
-static void amifbcon_blank(int blank, struct fb_info *info);
 
 	/*
 	 * Internal routines
@@ -1175,6 +1175,7 @@ static struct fb_ops amifb_ops = {
 	fb_get_cmap:	amifb_get_cmap,
 	fb_set_cmap:	amifb_set_cmap,
 	fb_pan_display:	amifb_pan_display,
+	fb_blankL:	amifb_blank,
 	fb_ioctl:	amifb_ioctl,
 };
 
@@ -1733,7 +1734,6 @@ default_chipset:
 	fb_info.currcon = 1;
 	fb_info.switch_con = &amifbcon_switch;
 	fb_info.updatevar = &amifbcon_updatevar;
-	fb_info.blank = &amifbcon_blank;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 	memset(&var, 0, sizeof(var));
 
@@ -1842,9 +1842,10 @@ static int amifbcon_updatevar(int con, struct fb_info *info)
 	 * Blank the display.
 	 */
 
-static void amifbcon_blank(int blank, struct fb_info *info)
+static int amifb_blank(int blank, struct fb_info *info)
 {
 	do_blank = blank ? blank : -1;
+	return 0;
 }
 
 	/*

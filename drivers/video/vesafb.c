@@ -493,13 +493,6 @@ static int vesafb_switch(int con, struct fb_info *info)
 	return 1;
 }
 
-/* 0 unblank, 1 blank, 2 no vsync, 3 no hsync, 4 off */
-
-static void vesafb_blank(int blank, struct fb_info *info)
-{
-	/* Not supported */
-}
-
 int __init vesafb_init(void)
 {
 	int i,j;
@@ -653,7 +646,6 @@ int __init vesafb_init(void)
 	fb_info.currcon = -1;
 	fb_info.switch_con=&vesafb_switch;
 	fb_info.updatevar=&vesafb_update_var;
-	fb_info.blank=&vesafb_blank;
 	fb_info.flags=FBINFO_FLAG_DEFAULT;
 	vesafb_set_disp(-1);
 

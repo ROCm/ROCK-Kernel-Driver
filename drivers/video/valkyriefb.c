@@ -127,6 +127,7 @@ static int valkyrie_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info);
 static int valkyrie_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info);
+static int valkyriefb_blank(int blank_mode, struct fb_info *info);
 
 static int read_valkyrie_sense(struct fb_info_valkyrie *p);
 static inline int valkyrie_vram_reqd(int video_mode, int color_mode);
@@ -151,6 +152,7 @@ static struct fb_ops valkyriefb_ops = {
 	fb_set_var:	valkyrie_set_var,
 	fb_get_cmap:	valkyrie_get_cmap,
 	fb_set_cmap:	valkyrie_set_cmap,
+	fb_blank:	valkyriefb_blank,
 };
 
 static int valkyriefb_getcolreg(u_int regno, u_int *red, u_int *green,
@@ -301,7 +303,7 @@ static int valkyriefb_updatevar(int con, struct fb_info *info)
 	return 0;
 }
 
-static void valkyriefb_blank(int blank_mode, struct fb_info *info)
+static int valkyriefb_blank(int blank_mode, struct fb_info *info)
 {
 /*
  *  Blank the screen if blank_mode != 0, else unblank. If blank_mode == NULL
@@ -341,6 +343,7 @@ static void valkyriefb_blank(int blank_mode, struct fb_info *info)
 			break;
 		}
 	}
+	return 0;
 }
 
 static int valkyriefb_getcolreg(u_int regno, u_int *red, u_int *green,
@@ -786,7 +789,6 @@ static void __init valkyrie_init_info(struct fb_info *info, struct fb_info_valky
 	info->changevar = NULL;
 	info->switch_con = &valkyriefb_switch;
 	info->updatevar = &valkyriefb_updatevar;
-	info->blank = &valkyriefb_blank;
 	info->flags = FBINFO_FLAG_DEFAULT;
 }
 

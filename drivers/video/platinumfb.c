@@ -108,6 +108,7 @@ static int platinum_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			     struct fb_info *info);
 static int platinum_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			     struct fb_info *info);
+static int platinum_blank(int blank, struct fb_info *fb);
 
 
 /*
@@ -116,8 +117,6 @@ static int platinum_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 
 static int platinum_switch(int con, struct fb_info *fb);
 static int platinum_updatevar(int con, struct fb_info *fb);
-static void platinum_blank(int blank, struct fb_info *fb);
-
 
 /*
  * internal functions
@@ -161,6 +160,7 @@ static struct fb_ops platinumfb_ops = {
 	fb_set_var:	platinum_set_var,
 	fb_get_cmap:	platinum_get_cmap,
 	fb_set_cmap:	platinum_set_cmap,
+	fb_blank:	platinum_blank,
 };
 
 static int platinum_get_fix(struct fb_fix_screeninfo *fix, int con,
@@ -349,7 +349,7 @@ static int platinum_updatevar(int con, struct fb_info *fb)
 	return 0;
 }
 
-static void platinum_blank(int blank,  struct fb_info *fb)
+static int platinum_blank(int blank,  struct fb_info *fb)
 {
 /*
  *  Blank the screen if blank_mode != 0, else unblank. If blank == NULL
@@ -376,7 +376,7 @@ static void platinum_blank(int blank,  struct fb_info *fb)
 	out_le32(&info->platinum_regs->ctrl.r, ctrl);
 */
 /* TODO: Figure out how the heck to powerdown this thing! */
-    return;
+    return 0;
 }
 
 static int platinum_getcolreg(u_int regno, u_int *red, u_int *green,
@@ -597,7 +597,6 @@ static int __init init_platinum(struct fb_info_platinum *info)
 	info->fb_info.changevar = NULL;
 	info->fb_info.switch_con = &platinum_switch;
 	info->fb_info.updatevar = &platinum_updatevar;
-	info->fb_info.blank = &platinum_blank;
 	info->fb_info.flags = FBINFO_FLAG_DEFAULT;
 
 	for (j = 0; j < 16; j++) {

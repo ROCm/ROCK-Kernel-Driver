@@ -598,6 +598,20 @@ static int matroxfb_dh_ioctl(struct inode* inode,
 #undef m2info
 }
 
+static int matroxfb_dh_blank(int blank, struct fb_info* info) {
+#define m2info ((struct matroxfb_dh_fb_info*)info)
+	switch (blank) {
+		case 1:
+		case 2:
+		case 3:
+		case 4:
+		default:;
+	}
+	/* do something... */
+	return 0;
+#undef m2info
+}
+
 static struct fb_ops matroxfb_dh_ops = {
 	owner:		THIS_MODULE,
 	fb_open:	matroxfb_dh_open,
@@ -608,6 +622,7 @@ static struct fb_ops matroxfb_dh_ops = {
 	fb_get_cmap:	matroxfb_dh_get_cmap,
 	fb_set_cmap:	matroxfb_dh_set_cmap,
 	fb_pan_display:	matroxfb_dh_pan_display,
+	fb_blank:	matroxfb_dh_blank,
 	fb_ioctl:	matroxfb_dh_ioctl,
 };
 
@@ -638,19 +653,6 @@ static int matroxfb_dh_updatevar(int con, struct fb_info* info) {
 #define m2info ((struct matroxfb_dh_fb_info*)info)
 	matroxfb_dh_pan_var(m2info, &fb_display[con].var);
 	return 0;
-#undef m2info
-}
-
-static void matroxfb_dh_blank(int blank, struct fb_info* info) {
-#define m2info ((struct matroxfb_dh_fb_info*)info)
-	switch (blank) {
-		case 1:
-		case 2:
-		case 3:
-		case 4:
-		default:;
-	}
-	/* do something... */
 #undef m2info
 }
 
@@ -692,7 +694,6 @@ static int matroxfb_dh_regit(CPMINFO struct matroxfb_dh_fb_info* m2info) {
 	m2info->fbcon.disp = d;
 	m2info->fbcon.switch_con = &matroxfb_dh_switch;
 	m2info->fbcon.updatevar = &matroxfb_dh_updatevar;
-	m2info->fbcon.blank = &matroxfb_dh_blank;
 	m2info->fbcon.flags = FBINFO_FLAG_DEFAULT;
 	m2info->fbcon.currcon = -1;
 	m2info->currcon_display = d;

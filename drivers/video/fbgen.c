@@ -431,7 +431,7 @@ int fbgen_switch(int con, struct fb_info *info)
  *
  */
 
-void fbgen_blank(int blank, struct fb_info *info)
+int fbgen_blank(int blank, struct fb_info *info)
 {
     struct fb_info_gen *info2 = (struct fb_info_gen *)info;
     struct fbgen_hwswitch *fbhw = info2->fbhw;
@@ -439,7 +439,7 @@ void fbgen_blank(int blank, struct fb_info *info)
     struct fb_cmap cmap;
 
     if (fbhw->blank && !fbhw->blank(blank, info2))
-	return;
+	return 1;
     if (blank) {
 	memset(black, 0, 16*sizeof(u16));
 	cmap.red = black;
@@ -451,6 +451,7 @@ void fbgen_blank(int blank, struct fb_info *info)
 	fb_set_cmap(&cmap, 1, fbhw->setcolreg, info);
     } else
 	fbgen_install_cmap(info->currcon, info2);
+    return 0;	
 }
 
 EXPORT_SYMBOL(fbgen_get_fix);

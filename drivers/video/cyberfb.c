@@ -248,6 +248,7 @@ static int cyberfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			    struct fb_info *info);
 static int cyberfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			    struct fb_info *info);
+static int cyberfb_blank(int blank, struct fb_info *info);
 
 /*
  *    Interface to the low level console driver
@@ -256,7 +257,6 @@ static int cyberfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 int cyberfb_init(void);
 static int Cyberfb_switch(int con, struct fb_info *info);
 static int Cyberfb_updatevar(int con, struct fb_info *info);
-static void Cyberfb_blank(int blank, struct fb_info *info);
 
 /*
  *    Text console acceleration
@@ -579,8 +579,7 @@ static int Cyber_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
 *    blank: 1 = zero fb cmap
 *           0 = restore fb cmap from local cmap
 */
-
-void Cyberfb_blank(int blank, struct fb_info *info)
+static int cyberfb_blank(int blank, struct fb_info *info)
 {
 	volatile unsigned char *regs = CyberRegs;
 	int i;
@@ -1007,6 +1006,7 @@ static struct fb_ops cyberfb_ops = {
 	fb_set_var:	cyberfb_set_var,
 	fb_get_cmap:	cyberfb_get_cmap,
 	fb_set_cmap:	cyberfb_set_cmap,
+	fb_blank:	cyberfb_blank,
 };
 
 int __init cyberfb_setup(char *options)
@@ -1090,7 +1090,6 @@ int __init cyberfb_init(void)
 	    fb_info.currcon = -1;
 	    fb_info.switch_con = &Cyberfb_switch;
 	    fb_info.updatevar = &Cyberfb_updatevar;
-	    fb_info.blank = &Cyberfb_blank;
 
 	    Cyber_init();
 	    /* ++Andre: set cyberfb default mode */

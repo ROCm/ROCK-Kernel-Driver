@@ -1167,6 +1167,7 @@ static struct fb_ops acornfb_ops = {
 	fb_get_cmap:	acornfb_get_cmap,
 	fb_set_cmap:	acornfb_set_cmap,
 	fb_pan_display:	acornfb_pan_display,
+	fb_blank:	acornfb_blank,
 	fb_mmap:	acornfb_mmap,
 };
 
@@ -1200,7 +1201,7 @@ acornfb_switch(int con, struct fb_info *info)
 	return 0;
 }
 
-static void
+static int 
 acornfb_blank(int blank, struct fb_info *info)
 {
 	union palette p;
@@ -1232,6 +1233,7 @@ acornfb_blank(int blank, struct fb_info *info)
 			acornfb_palette_write(i, p);
 		}
 	}
+	return 0;
 }
 
 /*
@@ -1324,7 +1326,6 @@ acornfb_init_fbinfo(void)
 	fb_info.changevar	   = NULL;
 	fb_info.switch_con	   = acornfb_switch;
 	fb_info.updatevar	   = acornfb_updatevar;
-	fb_info.blank		   = acornfb_blank;
 	fb_info.flags		   = FBINFO_FLAG_DEFAULT;
 
 	global_disp.dispsw	   = &fbcon_dummy;

@@ -107,7 +107,7 @@
  *
  * ------------------------------------------------------------------------- */
 
-static void rivafb_blank(int blank, struct fb_info *info);
+static int rivafb_blank(int blank, struct fb_info *info);
 
 extern void riva_setup_accel(struct rivafb_info *rinfo);
 extern inline void wait_for_idle(struct rivafb_info *rinfo);
@@ -1699,7 +1699,7 @@ static int rivafb_updatevar(int con, struct fb_info *info)
 	return rc;
 }
 
-static void rivafb_blank(int blank, struct fb_info *info)
+static int rivafb_blank(int blank, struct fb_info *info)
 {
 	unsigned char tmp, vesa;
 	struct rivafb_info *rinfo = (struct rivafb_info *)info;
@@ -1732,6 +1732,7 @@ static void rivafb_blank(int blank, struct fb_info *info)
 	CRTCout(rinfo, 0x1a, vesa);
 
 	DPRINTK("EXIT\n");
+	return 0;
 }
 
 
@@ -1751,6 +1752,7 @@ static struct fb_ops riva_fb_ops = {
 	fb_get_cmap:	rivafb_get_cmap,
 	fb_set_cmap:	rivafb_set_cmap,
 	fb_pan_display:	rivafb_pan_display,
+	fb_blank:	rivafb_blank,
 	fb_ioctl:	rivafb_ioctl,
 	fb_rasterimg:	rivafb_rasterimg,
 };
@@ -1825,7 +1827,6 @@ static int __devinit riva_set_fbinfo(struct rivafb_info *rinfo)
 	info->changevar = NULL;
 	info->switch_con = rivafb_switch;
 	info->updatevar = rivafb_updatevar;
-	info->blank = rivafb_blank;
 
 	if (riva_init_disp(rinfo) < 0)	/* must be done last */
 		return -1;

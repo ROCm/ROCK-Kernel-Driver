@@ -608,7 +608,7 @@ static int sisfb_ioctl (struct inode *inode, struct file *file,
 int sisfb_init (void);
 static int sisfb_update_var (int con, struct fb_info *info);
 static int sisfb_switch (int con, struct fb_info *info);
-static void sisfb_blank (int blank, struct fb_info *info);
+static int sisfb_blank(int blank, struct fb_info *info);
 
 /* hardware access routines */
 void sisfb_set_reg1 (u16 port, u16 index, u16 data);

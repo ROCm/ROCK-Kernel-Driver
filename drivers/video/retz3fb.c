@@ -274,6 +274,7 @@ static int retz3fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			    struct fb_info *info);
 static int retz3fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			    struct fb_info *info);
+static int retz3fb_blank(int blank, struct fb_info *info);
 
 
 /*
@@ -283,7 +284,6 @@ static int retz3fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 int retz3fb_init(void);
 static int z3fb_switch(int con, struct fb_info *info);
 static int z3fb_updatevar(int con, struct fb_info *info);
-static void z3fb_blank(int blank, struct fb_info *info);
 
 
 /*
@@ -1327,6 +1327,32 @@ static int retz3fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 	return 0;
 }
 
+/*
+ *    Blank the display.
+ */
+
+static int retz3fb_blank(int blank, struct fb_info *info)
+{
+	struct retz3_fb_info *zinfo = retz3info(info);
+	volatile unsigned char *regs = retz3info(info)->regs;
+	short i;
+
+	if (blank)
+		for (i = 0; i < 256; i++){
+			reg_w(regs, VDAC_ADDRESS_W, i);
+			reg_w(regs, VDAC_DATA, 0);
+			reg_w(regs, VDAC_DATA, 0);
+			reg_w(regs, VDAC_DATA, 0);
+		}
+	else
+		for (i = 0; i < 256; i++){
+			reg_w(regs, VDAC_ADDRESS_W, i);
+			reg_w(regs, VDAC_DATA, zinfo->color_table[i][0]);
+			reg_w(regs, VDAC_DATA, zinfo->color_table[i][1]);
+			reg_w(regs, VDAC_DATA, zinfo->color_table[i][2]);
+		}
+	return 0;
+}
 
 static struct fb_ops retz3fb_ops = {
 	owner:		THIS_MODULE,
@@ -1335,8 +1361,8 @@ static struct fb_ops retz3fb_ops = {
 	fb_set_var:	retz3fb_set_var,
 	fb_get_cmap:	retz3fb_get_cmap,
 	fb_set_cmap:	retz3fb_set_cmap,
+	fb_blank:	retz3fb_blank,
 };
-
 
 int __init retz3fb_setup(char *options)
 {
@@ -1425,7 +1451,6 @@ int __init retz3fb_init(void)
 		fb_info->currcon = -1;
 		fb_info->switch_con = &z3fb_switch;
 		fb_info->updatevar = &z3fb_updatevar;
-		fb_info->blank = &z3fb_blank;
 		fb_info->flags = FBINFO_FLAG_DEFAULT;
 		strncpy(fb_info->fontname, fontname, 40);
 
@@ -1486,34 +1511,6 @@ static int z3fb_updatevar(int con, struct fb_info *info)
 {
 	return 0;
 }
-
-
-/*
- *    Blank the display.
- */
-
-static void z3fb_blank(int blank, struct fb_info *info)
-{
-	struct retz3_fb_info *zinfo = retz3info(info);
-	volatile unsigned char *regs = retz3info(info)->regs;
-	short i;
-
-	if (blank)
-		for (i = 0; i < 256; i++){
-			reg_w(regs, VDAC_ADDRESS_W, i);
-			reg_w(regs, VDAC_DATA, 0);
-			reg_w(regs, VDAC_DATA, 0);
-			reg_w(regs, VDAC_DATA, 0);
-		}
-	else
-		for (i = 0; i < 256; i++){
-			reg_w(regs, VDAC_ADDRESS_W, i);
-			reg_w(regs, VDAC_DATA, zinfo->color_table[i][0]);
-			reg_w(regs, VDAC_DATA, zinfo->color_table[i][1]);
-			reg_w(regs, VDAC_DATA, zinfo->color_table[i][2]);
-		}
-}
-
 
 /*
  *    Get a Video Mode

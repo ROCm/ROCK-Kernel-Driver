@@ -387,6 +387,7 @@ static struct fb_ops pm2fb_ops={
 	fb_get_cmap:	fbgen_get_cmap,
 	fb_set_cmap:	fbgen_set_cmap,
 	fb_pan_display:	fbgen_pan_display,
+	fb_blank:	fbgen_blank,
 };
 
 /***************************************************************************
@@ -2087,7 +2088,6 @@ int __init pm2fb_init(void){
 	strcpy(fb_info.gen.info.fontname, pm2fb_options.font);
 	fb_info.gen.info.switch_con=&fbgen_switch;
 	fb_info.gen.info.updatevar=&fbgen_update_var;
-	fb_info.gen.info.blank=&fbgen_blank;
 	fbgen_get_var(&fb_info.disp.var, -1, &fb_info.gen.info);
 	fbgen_do_set_var(&fb_info.disp.var, 1, &fb_info.gen);
 	fbgen_set_disp(-1, &fb_info.gen);

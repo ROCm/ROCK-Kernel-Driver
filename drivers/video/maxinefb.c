@@ -363,7 +363,6 @@ int __init maxinefb_init(void)
 	fb_info.currcon = -1;
 	fb_info.switch_con = &maxinefb_switch;
 	fb_info.updatevar = &maxinefb_fb_update_var;
-	fb_info.blank = NULL;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 	maxinefb_do_fb_set_var(&maxinefb_defined, 1);
 

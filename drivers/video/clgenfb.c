@@ -503,6 +503,7 @@ static struct fb_ops clgenfb_ops = {
 	fb_get_cmap:	fbgen_get_cmap,
 	fb_set_cmap:	fbgen_set_cmap,
 	fb_pan_display:	fbgen_pan_display,
+	fb_blank:	fbgen_blank,
 };
 
 /*--- Hardware Specific Routines -------------------------------------------*/
@@ -2785,7 +2786,6 @@ int __init clgenfb_init(void)
 	fb_info->gen.info.changevar = NULL;
 	fb_info->gen.info.switch_con = &fbgen_switch;
 	fb_info->gen.info.updatevar = &fbgen_update_var;
-	fb_info->gen.info.blank = &fbgen_blank;
 	fb_info->gen.info.flags = FBINFO_FLAG_DEFAULT;
 
 	for (j = 0; j < 256; j++) {

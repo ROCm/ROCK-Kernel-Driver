@@ -671,55 +671,6 @@ static int vga16fb_pan_display(struct fb_var_screeninfo *var, int con,
 	return 0;
 }
 
-static struct fb_ops vga16fb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	vga16fb_get_fix,
-	fb_get_var:	vga16fb_get_var,
-	fb_set_var:	vga16fb_set_var,
-	fb_get_cmap:	vga16fb_get_cmap,
-	fb_set_cmap:	vga16fb_set_cmap,
-	fb_pan_display:	vga16fb_pan_display,
-};
-
-int vga16fb_setup(char *options)
-{
-	char *this_opt;
-	
-	vga16fb.fb_info.fontname[0] = '\0';
-	
-	if (!options || !*options)
-		return 0;
-	
-	while ((this_opt = strsep(&options, ",")) != NULL) {
-		if (!*this_opt) continue;
-		
-		if (!strncmp(this_opt, "font:", 5))
-			strcpy(vga16fb.fb_info.fontname, this_opt+5);
-	}
-	return 0;
-}
-
-static int vga16fb_switch(int con, struct fb_info *fb)
-{
-	struct vga16fb_par par;
-	struct vga16fb_info *info = (struct vga16fb_info*)fb;
-
-	/* Do we have to save the colormap? */
-	if (fb_display[fb->currcon].cmap.len)
-		fb_get_cmap(&fb_display[fb->currcon].cmap, 1, vga16_getcolreg,
-			    fb);
-	
-	fb->currcon = con;
-	vga16fb_decode_var(&fb_display[con].var, &par, info);
-	vga16fb_set_par(&par, info);
-	vga16fb_set_disp(con, info);
-
-	/* Install new colormap */
-	do_install_cmap(con, fb);
-/*	vga16fb_update_var(con, fb); */
-	return 1;
-}
-
 /* The following VESA blanking code is taken from vgacon.c.  The VGA
    blanking code was originally by Huang shi chao, and modified by
    Christoph Rimek (chrimek@toppoint.de) and todd j. derr
@@ -860,7 +811,7 @@ static void vga_pal_blank(void)
 }
 
 /* 0 unblank, 1 blank, 2 no vsync, 3 no hsync, 4 off */
-static void vga16fb_blank(int blank, struct fb_info *fb_info)
+static int vga16fb_blank(int blank, struct fb_info *fb_info)
 {
 	struct vga16fb_info *info = (struct vga16fb_info*)fb_info;
 
@@ -884,6 +835,57 @@ static void vga16fb_blank(int blank, struct fb_info *fb_info)
 		info->vesa_blanked = 1;
 		break;
 	}
+	return 0;
+}
+
+static struct fb_ops vga16fb_ops = {
+	owner:		THIS_MODULE,
+	fb_get_fix:	vga16fb_get_fix,
+	fb_get_var:	vga16fb_get_var,
+	fb_set_var:	vga16fb_set_var,
+	fb_get_cmap:	vga16fb_get_cmap,
+	fb_set_cmap:	vga16fb_set_cmap,
+	fb_pan_display:	vga16fb_pan_display,
+	fb_blank:	vga16fb_blank,
+};
+
+int vga16fb_setup(char *options)
+{
+	char *this_opt;
+	
+	vga16fb.fb_info.fontname[0] = '\0';
+	
+	if (!options || !*options)
+		return 0;
+	
+	while ((this_opt = strsep(&options, ",")) != NULL) {
+		if (!*this_opt) continue;
+		
+		if (!strncmp(this_opt, "font:", 5))
+			strcpy(vga16fb.fb_info.fontname, this_opt+5);
+	}
+	return 0;
+}
+
+static int vga16fb_switch(int con, struct fb_info *fb)
+{
+	struct vga16fb_par par;
+	struct vga16fb_info *info = (struct vga16fb_info*)fb;
+
+	/* Do we have to save the colormap? */
+	if (fb_display[fb->currcon].cmap.len)
+		fb_get_cmap(&fb_display[fb->currcon].cmap, 1, vga16_getcolreg,
+			    fb);
+	
+	fb->currcon = con;
+	vga16fb_decode_var(&fb_display[con].var, &par, info);
+	vga16fb_set_par(&par, info);
+	vga16fb_set_disp(con, info);
+
+	/* Install new colormap */
+	do_install_cmap(con, fb);
+/*	vga16fb_update_var(con, fb); */
+	return 1;
 }
 
 int __init vga16fb_init(void)
@@ -930,7 +932,6 @@ int __init vga16fb_init(void)
 	vga16fb.fb_info.currcon = -1;
 	vga16fb.fb_info.switch_con=&vga16fb_switch;
 	vga16fb.fb_info.updatevar=&vga16fb_update_var;
-	vga16fb.fb_info.blank=&vga16fb_blank;
 	vga16fb.fb_info.flags=FBINFO_FLAG_DEFAULT;
 	vga16fb_set_disp(-1, &vga16fb);
 

@@ -58,7 +58,6 @@ static int tx3912fb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 int tx3912fb_init(void);
 static int tx3912fbcon_switch(int con, struct fb_info *info);
 static int tx3912fbcon_updatevar(int con, struct fb_info *info);
-static void tx3912fbcon_blank(int blank, struct fb_info *info);
 
 /*
  * Macros
@@ -402,7 +401,6 @@ int __init tx3912fb_init(void)
 	fb_info.currcon = -1;
 	fb_info.switch_con = &tx3912fbcon_switch;
 	fb_info.updatevar = &tx3912fbcon_updatevar;
-	fb_info.blank = &tx3912fbcon_blank;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
 	tx3912fb_set_var(&tx3912fb_info, -1, &fb_info);
@@ -441,15 +439,6 @@ static int tx3912fbcon_updatevar(int con, struct fb_info *info)
 {
 	/* Nothing */
 	return 0;
-}
-
-/*
- * Blank the display
- */
-static void tx3912fbcon_blank(int blank, struct fb_info *info)
-{
-	/* FIXME */
-	printk("tx3912fbcon_blank\n");
 }
 
 /*

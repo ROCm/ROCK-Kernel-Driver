@@ -190,7 +190,7 @@ static int fm2fb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info);
 static int fm2fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info);
-
+static int fm2fb_blank(int blank, struct fb_info *info);
 
     /*
      *  Interface to the low level console driver
@@ -199,8 +199,6 @@ static int fm2fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 int fm2fb_init(void);
 static int fm2fbcon_switch(int con, struct fb_info *info);
 static int fm2fbcon_updatevar(int con, struct fb_info *info);
-static void fm2fbcon_blank(int blank, struct fb_info *info);
-
 
     /*
      *  Internal routines
@@ -220,6 +218,7 @@ static struct fb_ops fm2fb_ops = {
 	fb_set_var:	fm2fb_set_var,
 	fb_get_cmap:	fm2fb_get_cmap,
 	fb_set_cmap:	fm2fb_set_cmap,
+	fb_blank:	fm2fb_blank,
 };
 
     /*
@@ -360,7 +359,7 @@ int __init fm2fb_init(void)
 	    for (x = 0; x < 96; x++) *ptr++ = 0x0000ff;	/* blue */
 	    for (x = 0; x < 96; x++) *ptr++ = 0x000000;	/* black */
 	}
-	fm2fbcon_blank(0, NULL);
+	fm2fb_blank(0, NULL);
 
 	if (fm2fb_mode == -1)
 	    fm2fb_mode = FM2FB_MODE_PAL;
@@ -408,7 +407,6 @@ int __init fm2fb_init(void)
 	fb_info.changevar = NULL;
 	fb_info.switch_con = &fm2fbcon_switch;
 	fb_info.updatevar = &fm2fbcon_updatevar;
-	fb_info.blank = &fm2fbcon_blank;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
 	fm2fb_set_var(&fb_var, -1, &fb_info);
@@ -466,13 +464,14 @@ static int fm2fbcon_updatevar(int con, struct fb_info *info)
      *  Blank the display.
      */
 
-static void fm2fbcon_blank(int blank, struct fb_info *info)
+static int fm2fb_blank(int blank, struct fb_info *info)
 {
     unsigned char t = FRAMEMASTER_ROM;
 
     if (!blank)
 	t |= FRAMEMASTER_ENABLE | FRAMEMASTER_NOLACE;
     fm2fb_reg[0] = t;
+    return 0;	
 }
 
     /*

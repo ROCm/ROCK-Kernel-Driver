@@ -110,7 +110,7 @@ static void cg3_loadcmap (struct fb_info_sbusfb *fb, struct display *p, int inde
 	spin_unlock_irqrestore(&fb->lock, flags);
 }
 
-static void cg3_blank (struct fb_info_sbusfb *fb)
+static int cg3_blank (struct fb_info_sbusfb *fb)
 {
 	unsigned long flags;
 	u8 tmp;
@@ -120,9 +120,10 @@ static void cg3_blank (struct fb_info_sbusfb *fb)
 	tmp &= ~CG3_CR_ENABLE_VIDEO;
 	sbus_writeb(tmp, &fb->s.cg3.regs->control);
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 
-static void cg3_unblank (struct fb_info_sbusfb *fb)
+static int cg3_unblank (struct fb_info_sbusfb *fb)
 {
 	unsigned long flags;
 	u8 tmp;
@@ -132,6 +133,7 @@ static void cg3_unblank (struct fb_info_sbusfb *fb)
 	tmp |= CG3_CR_ENABLE_VIDEO;
 	sbus_writeb(tmp, &fb->s.cg3.regs->control);
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 
 static void cg3_margins (struct fb_info_sbusfb *fb, struct display *p,

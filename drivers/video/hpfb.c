@@ -229,13 +229,6 @@ static int hpfb_switch(int con, struct fb_info *info)
 	return 0;
 }
 
-/* 0 unblank, 1 blank, 2 no vsync, 3 no hsync, 4 off */
-
-static void hpfb_blank(int blank, struct fb_info *info)
-{
-	/* Not supported */
-}
-
 static void hpfb_set_disp(int con)
 {
 	struct fb_fix_screeninfo fix;
@@ -333,7 +326,6 @@ int __init hpfb_init_one(unsigned long base)
 	fb_info.currcon = -1;
 	fb_info.switch_con = &hpfb_switch;
 	fb_info.updatevar = &fb_update_var;
-	fb_info.blank = &hpfb_blank;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 	do_fb_set_var(&hpfb_defined, 1);
 

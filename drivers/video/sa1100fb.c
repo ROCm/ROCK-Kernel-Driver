@@ -1266,6 +1266,7 @@ static struct fb_ops sa1100fb_ops = {
 	fb_set_var:	sa1100fb_set_var,
 	fb_get_cmap:	sa1100fb_get_cmap,
 	fb_set_cmap:	sa1100fb_set_cmap,
+	fb_blank:	sa1100fb_blank,
 };
 
 /*
@@ -1355,7 +1356,7 @@ static int sa1100fb_switch(int con, struct fb_info *info)
  * 	12 and 16 bpp modes don't really use the palette, so this will not
  *      blank the display in all modes.  
  */
-static void sa1100fb_blank(int blank, struct fb_info *info)
+static int sa1100fb_blank(int blank, struct fb_info *info)
 {
 	struct sa1100fb_info *fbi = (struct sa1100fb_info *)info;
 	int i;
@@ -1384,6 +1385,7 @@ static void sa1100fb_blank(int blank, struct fb_info *info)
 			fb_set_cmap(&fbi->fb.cmap, 1, sa1100fb_setcolreg, info);
 		sa1100fb_schedule_task(fbi, C_ENABLE);
 	}
+	return 0;
 }
 
 static int sa1100fb_updatevar(int con, struct fb_info *info)
@@ -2035,7 +2037,6 @@ static struct sa1100fb_info * __init sa1100fb_init_fbinfo(void)
 	fbi->fb.changevar	= NULL;
 	fbi->fb.switch_con	= sa1100fb_switch;
 	fbi->fb.updatevar	= sa1100fb_updatevar;
-	fbi->fb.blank		= sa1100fb_blank;
 	fbi->fb.flags		= FBINFO_FLAG_DEFAULT;
 	fbi->fb.node		= NODEV;
 	fbi->fb.monspecs	= monspecs;

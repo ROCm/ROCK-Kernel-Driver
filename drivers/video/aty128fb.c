@@ -330,8 +330,8 @@ static int aty128fb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			struct fb_info *info);
 static int aty128fb_pan_display(struct fb_var_screeninfo *var, int con,
 			   struct fb_info *fb);
+static int aty128fb_blank(int blank, struct fb_info *fb);
 static int aty128fb_rasterimg(struct fb_info *info, int start);
-
 
     /*
      *  Interface to the low level console driver
@@ -339,7 +339,6 @@ static int aty128fb_rasterimg(struct fb_info *info, int start);
 
 int aty128fb_init(void);
 static int aty128fbcon_switch(int con, struct fb_info *fb);
-static void aty128fbcon_blank(int blank, struct fb_info *fb);
 
     /*
      *  Internal routines
@@ -1709,7 +1708,6 @@ aty128_init(struct fb_info_aty128 *info, const char *name)
     info->fb_info.changevar  = NULL;
     info->fb_info.switch_con = &aty128fbcon_switch;
     info->fb_info.updatevar  = NULL;
-    info->fb_info.blank = &aty128fbcon_blank;
     info->fb_info.flags = FBINFO_FLAG_DEFAULT;
 
     var = default_var;
@@ -2140,8 +2138,8 @@ aty128fbcon_switch(int con, struct fb_info *fb)
     /*
      *  Blank the display.
      */
-static void
-aty128fbcon_blank(int blank, struct fb_info *fb)
+static int 
+aty128fb_blank(int blank, struct fb_info *fb)
 {
     struct fb_info_aty128 *info = (struct fb_info_aty128 *)fb;
     u8 state = 0;
@@ -2164,8 +2162,8 @@ aty128fbcon_blank(int blank, struct fb_info *fb)
     if ((_machine == _MACH_Pmac) && !blank)
     	set_backlight_enable(1);
 #endif /* CONFIG_PMAC_BACKLIGHT */
+    return 0;	
 }
-
 
     /*
      *  Read a single color register and split it into

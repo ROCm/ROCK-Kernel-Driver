@@ -874,6 +874,7 @@ static struct fb_ops tgafb_ops = {
 	fb_set_var:	fbgen_set_var,
 	fb_get_cmap:	fbgen_get_cmap,
 	fb_set_cmap:	tgafb_set_cmap,
+	fb_blank:	fbgen_blank,
 };
 
 
@@ -943,7 +944,6 @@ int __init tgafb_init(void)
     fb_info.gen.info.changevar = NULL;
     fb_info.gen.info.switch_con = &fbgen_switch;
     fb_info.gen.info.updatevar = &fbgen_update_var;
-    fb_info.gen.info.blank = &fbgen_blank;
     strcpy(fb_info.gen.info.fontname, default_fontname);
     fb_info.gen.parsize = sizeof (struct tgafb_par);
     fb_info.gen.fbhw = &tgafb_hwswitch;

@@ -568,11 +568,11 @@ static int radeonfb_set_cmap (struct fb_cmap *cmap, int kspc, int con,
                               struct fb_info *info);
 static int radeonfb_pan_display (struct fb_var_screeninfo *var, int con,
                                  struct fb_info *info);
+static int radeonfb_blank (int blank, struct fb_info *info);
 static int radeonfb_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
                            unsigned long arg, int con, struct fb_info *info);
 static int radeonfb_switch (int con, struct fb_info *info);
 static int radeonfb_updatevar (int con, struct fb_info *info);
-static void radeonfb_blank (int blank, struct fb_info *info);
 static int radeon_get_cmap_len (const struct fb_var_screeninfo *var);
 static int radeon_getcolreg (unsigned regno, unsigned *red, unsigned *green,
                              unsigned *blue, unsigned *transp,
@@ -610,6 +610,7 @@ static struct fb_ops radeon_fb_ops = {
 	fb_get_cmap:		radeonfb_get_cmap,
 	fb_set_cmap:		radeonfb_set_cmap,
 	fb_pan_display:		radeonfb_pan_display,
+	fb_blank:		radeonfb_blank,
 	fb_ioctl:		radeonfb_ioctl,
 };
 
@@ -1314,7 +1315,6 @@ static int __devinit radeon_set_fbinfo (struct radeonfb_info *rinfo)
         info->changevar = NULL;
         info->switch_con = radeonfb_switch;
         info->updatevar = radeonfb_updatevar;
-        info->blank = radeonfb_blank;
 
         if (radeon_init_disp (rinfo) < 0)
                 return -1;   
@@ -1831,7 +1831,7 @@ static int radeonfb_updatevar (int con, struct fb_info *info)
         return rc;
 }
 
-static void radeonfb_blank (int blank, struct fb_info *info)
+static int radeonfb_blank (int blank, struct fb_info *info)
 {
         struct radeonfb_info *rinfo = (struct radeonfb_info *) info;
         u32 val = INREG(CRTC_EXT_CNTL);
@@ -1856,9 +1856,8 @@ static void radeonfb_blank (int blank, struct fb_info *info)
         }
         
         OUTREG(CRTC_EXT_CNTL, val);
+	return 0;
 }
-
-
 
 static int radeon_get_cmap_len (const struct fb_var_screeninfo *var)
 {

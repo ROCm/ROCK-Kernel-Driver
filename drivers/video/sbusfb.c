@@ -88,6 +88,7 @@ static int sbusfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			struct fb_info *info);
 static int sbusfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 			struct fb_info *info);
+static int sbusfb_blank(int blank, struct fb_info *info);
 static int sbusfb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 			    u_long arg, int con, struct fb_info *info);
 static void sbusfb_cursor(struct display *p, int mode, int x, int y);
@@ -100,8 +101,6 @@ static void sbusfb_clear_margin(struct display *p, int s);
 
 static int sbusfbcon_switch(int con, struct fb_info *info);
 static int sbusfbcon_updatevar(int con, struct fb_info *info);
-static void sbusfbcon_blank(int blank, struct fb_info *info);
-
 
     /*
      *  Internal routines
@@ -122,6 +121,7 @@ static struct fb_ops sbusfb_ops = {
 	fb_set_var:	sbusfb_set_var,
 	fb_get_cmap:	sbusfb_get_cmap,
 	fb_set_cmap:	sbusfb_set_cmap,
+	fb_blank:	sbusfb_blank,
 	fb_ioctl:	sbusfb_ioctl,
 	fb_mmap:	sbusfb_mmap,
 };
@@ -799,7 +799,7 @@ static int sbusfbcon_updatevar(int con, struct fb_info *info)
      *  Blank the display.
      */
 
-static void sbusfbcon_blank(int blank, struct fb_info *info)
+static int sbusfb_blank(int blank, struct fb_info *info)
 {
     struct fb_info_sbusfb *fb = sbusfbinfo(info);
     
@@ -1026,7 +1026,6 @@ sizechange:
 	fb->info.changevar = NULL;
 	fb->info.switch_con = &sbusfbcon_switch;
 	fb->info.updatevar = &sbusfbcon_updatevar;
-	fb->info.blank = &sbusfbcon_blank;
 	fb->info.flags = FBINFO_FLAG_DEFAULT;
 	
 	fb->cursor.hwsize.fbx = 32;

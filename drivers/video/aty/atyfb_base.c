@@ -149,6 +149,7 @@ static int atyfb_set_var(struct fb_var_screeninfo *var, int con,
 			 struct fb_info *fb);
 static int atyfb_pan_display(struct fb_var_screeninfo *var, int con,
 			     struct fb_info *fb);
+static int atyfb_blank(int blank, struct fb_info *fb);
 static int atyfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 			  struct fb_info *info);
 static int atyfb_set_cmap(struct fb_cmap *cmap, int kspc, int con,
@@ -168,8 +169,6 @@ static int atyfb_rasterimg(struct fb_info *info, int start);
 
 static int atyfbcon_switch(int con, struct fb_info *fb);
 static int atyfbcon_updatevar(int con, struct fb_info *fb);
-static void atyfbcon_blank(int blank, struct fb_info *fb);
-
 
     /*
      *  Internal routines
@@ -232,6 +231,7 @@ static struct fb_ops atyfb_ops = {
 	fb_get_cmap:	atyfb_get_cmap,
 	fb_set_cmap:	atyfb_set_cmap,
 	fb_pan_display:	atyfb_pan_display,
+	fb_blank:	atyfb_blank,
 	fb_ioctl:	atyfb_ioctl,
 #ifdef __sparc__
 	fb_mmap:	atyfb_mmap,
@@ -1647,7 +1647,7 @@ static int aty_sleep_notify(struct pmu_sleep_notifier *self, int when)
 				       (void *)info->frame_buffer, nb);
 
 			/* Blank display and LCD */
-			atyfbcon_blank(VESA_POWERDOWN+1, (struct fb_info *)info);
+			atyfb_blank(VESA_POWERDOWN+1, (struct fb_info *)info);
 
 			/* Set chip to "suspend" mode */
 			result = aty_power_mgmt(1, info);
@@ -1665,7 +1665,7 @@ static int aty_sleep_notify(struct pmu_sleep_notifier *self, int when)
 			}
 			/* Restore display */
 			atyfb_set_par(&info->current_par, info);
-			atyfbcon_blank(0, (struct fb_info *)info);
+			atyfb_blank(0, (struct fb_info *)info);
 			break;
 		}
 	}
@@ -1991,7 +1991,6 @@ found:
     info->fb_info.changevar = NULL;
     info->fb_info.switch_con = &atyfbcon_switch;
     info->fb_info.updatevar = &atyfbcon_updatevar;
-    info->fb_info.blank = &atyfbcon_blank;
     info->fb_info.flags = FBINFO_FLAG_DEFAULT;
 
 #ifdef CONFIG_PMAC_BACKLIGHT
@@ -2656,7 +2655,7 @@ static int atyfbcon_switch(int con, struct fb_info *fb)
      *  Blank the display.
      */
 
-static void atyfbcon_blank(int blank, struct fb_info *fb)
+static int atyfb_blank(int blank, struct fb_info *fb)
 {
     struct fb_info_aty *info = (struct fb_info_aty *)fb;
     u8 gen_cntl;
@@ -2690,6 +2689,7 @@ static void atyfbcon_blank(int blank, struct fb_info *fb)
     if ((_machine == _MACH_Pmac) && !blank)
     	set_backlight_enable(1);
 #endif /* CONFIG_PMAC_BACKLIGHT */
+    return 0;	
 }
 
 

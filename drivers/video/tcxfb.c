@@ -198,7 +198,7 @@ static void tcx_setcursor (struct fb_info_sbusfb *fb)
 	spin_unlock_irqrestore(&fb->lock, flags);
 }
 
-static void tcx_blank (struct fb_info_sbusfb *fb)
+static int tcx_blank (struct fb_info_sbusfb *fb)
 {
 	unsigned long flags;
 	u32 tmp;
@@ -211,9 +211,10 @@ static void tcx_blank (struct fb_info_sbusfb *fb)
         tmp |= TCX_THC_MISC_HSYNC_DIS;
 	sbus_writel(tmp, &fb->s.tcx.thc->thc_misc);
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 
-static void tcx_unblank (struct fb_info_sbusfb *fb)
+static int tcx_unblank (struct fb_info_sbusfb *fb)
 {
 	unsigned long flags;
 	u32 tmp;
@@ -225,6 +226,7 @@ static void tcx_unblank (struct fb_info_sbusfb *fb)
 	tmp |= TCX_THC_MISC_VIDEO;
 	sbus_writel(tmp, &fb->s.tcx.thc->thc_misc);
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 
 static void tcx_reset (struct fb_info_sbusfb *fb)

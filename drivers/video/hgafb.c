@@ -591,7 +591,28 @@ int hga_pan_display(struct fb_var_screeninfo *var, int con,
 	return 0;
 }
 
-    
+/**
+ *	hgafb_blank - (un)blank the screen
+ *	@blank_mode:blanking method to use
+ *	@info:unused
+ *	
+ *	Blank the screen if blank_mode != 0, else unblank. 
+ *	Implements VESA suspend and powerdown modes on hardware that supports 
+ *	disabling hsync/vsync:
+ *		@blank_mode == 2 means suspend vsync,
+ *		@blank_mode == 3 means suspend hsync,
+ *		@blank_mode == 4 means powerdown.
+ */
+
+static int hgafb_blank(int blank_mode, struct fb_info *info)
+{
+	CHKINFO( );
+	DPRINTK("hgafb_blank: blank_mode:%d, info:%x, fb_info:%x\n", blank_mode, (unsigned)info, (unsigned)&fb_info);
+
+	hga_blank(blank_mode);
+	return 0;
+}
+
 static struct fb_ops hgafb_ops = {
 	owner:		THIS_MODULE,
 	fb_get_fix:	hga_get_fix,
@@ -600,6 +621,7 @@ static struct fb_ops hgafb_ops = {
 	fb_get_cmap:	hga_get_cmap,
 	fb_set_cmap:	hga_set_cmap,
 	fb_pan_display:	hga_pan_display,
+	fb_blank:	hgafb_blank,
 };
 		
 
@@ -672,28 +694,6 @@ static int hgafbcon_updatevar(int con, struct fb_info *info)
 	return (con < 0) ? -EINVAL : hga_pan_display(&fb_display[con].var, con, info);
 }
 
-/**
- *	hgafbcon_blank - (un)blank the screen
- *	@blank_mode:blanking method to use
- *	@info:unused
- *	
- *	Blank the screen if blank_mode != 0, else unblank. 
- *	Implements VESA suspend and powerdown modes on hardware that supports 
- *	disabling hsync/vsync:
- *		@blank_mode == 2 means suspend vsync,
- *		@blank_mode == 3 means suspend hsync,
- *		@blank_mode == 4 means powerdown.
- */
-
-static void hgafbcon_blank(int blank_mode, struct fb_info *info)
-{
-	CHKINFO( );
-	DPRINTK("hga_blank: blank_mode:%d, info:%x, fb_info:%x\n", blank_mode, (unsigned)info, (unsigned)&fb_info);
-
-	hga_blank(blank_mode);
-}
-
-
 /* ------------------------------------------------------------------------- */
     
 	/*
@@ -756,7 +756,6 @@ int __init hgafb_init(void)
 	fb_info.changevar = NULL;
 	fb_info.switch_con = hgafbcon_switch;
 	fb_info.updatevar = hgafbcon_updatevar;
-	fb_info.blank = hgafbcon_blank;
 	fb_info.pseudo_palette = NULL; /* ??? */
 	fb_info.par = NULL;
 

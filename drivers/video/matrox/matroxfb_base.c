@@ -1163,6 +1163,40 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 #undef minfo
 }
 
+/* 0 unblank, 1 blank, 2 no vsync, 3 no hsync, 4 off */
+
+static int matroxfb_blank(int blank, struct fb_info *info)
+{
+#define minfo ((struct matrox_fb_info*)info)
+	int seq;
+	int crtc;
+	CRITFLAGS
+
+	DBG("matroxfb_blank")
+
+	if (ACCESS_FBINFO(dead))
+		return;
+
+	switch (blank) {
+		case 1:  seq = 0x20; crtc = 0x00; break; /* works ??? */
+		case 2:  seq = 0x20; crtc = 0x10; break;
+		case 3:  seq = 0x20; crtc = 0x20; break;
+		case 4:  seq = 0x20; crtc = 0x30; break;
+		default: seq = 0x00; crtc = 0x00; break;
+	}
+
+	CRITBEGIN
+
+	mga_outb(M_SEQ_INDEX, 1);
+	mga_outb(M_SEQ_DATA, (mga_inb(M_SEQ_DATA) & ~0x20) | seq);
+	mga_outb(M_EXTVGA_INDEX, 1);
+	mga_outb(M_EXTVGA_DATA, (mga_inb(M_EXTVGA_DATA) & ~0x30) | crtc);
+
+	CRITEND
+	return 0;
+#undef minfo
+}
+
 static struct fb_ops matroxfb_ops = {
 	owner:		THIS_MODULE,
 	fb_open:	matroxfb_open,
@@ -1173,6 +1207,7 @@ static struct fb_ops matroxfb_ops = {
 	fb_get_cmap:	matroxfb_get_cmap,
 	fb_set_cmap:	matroxfb_set_cmap,
 	fb_pan_display:	matroxfb_pan_display,
+	fb_blank:	matroxfb_blank,
 	fb_ioctl:	matroxfb_ioctl,
 };
 
@@ -1223,40 +1258,6 @@ int matroxfb_switch(int con, struct fb_info *info)
 	}
 #endif
 	return 0;
-#undef minfo
-}
-
-/* 0 unblank, 1 blank, 2 no vsync, 3 no hsync, 4 off */
-
-static void matroxfb_blank(int blank, struct fb_info *info)
-{
-#define minfo ((struct matrox_fb_info*)info)
-	int seq;
-	int crtc;
-	CRITFLAGS
-
-	DBG("matroxfb_blank")
-
-	if (ACCESS_FBINFO(dead))
-		return;
-
-	switch (blank) {
-		case 1:  seq = 0x20; crtc = 0x00; break; /* works ??? */
-		case 2:  seq = 0x20; crtc = 0x10; break;
-		case 3:  seq = 0x20; crtc = 0x20; break;
-		case 4:  seq = 0x20; crtc = 0x30; break;
-		default: seq = 0x00; crtc = 0x00; break;
-	}
-
-	CRITBEGIN
-
-	mga_outb(M_SEQ_INDEX, 1);
-	mga_outb(M_SEQ_DATA, (mga_inb(M_SEQ_DATA) & ~0x20) | seq);
-	mga_outb(M_EXTVGA_INDEX, 1);
-	mga_outb(M_EXTVGA_DATA, (mga_inb(M_EXTVGA_DATA) & ~0x30) | crtc);
-
-	CRITEND
-
 #undef minfo
 }
 
@@ -1775,7 +1776,6 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 	ACCESS_FBINFO(fbcon.disp) = d;
 	ACCESS_FBINFO(fbcon.switch_con) = &matroxfb_switch;
 	ACCESS_FBINFO(fbcon.updatevar) = &matroxfb_updatevar;
-	ACCESS_FBINFO(fbcon.blank) = &matroxfb_blank;
 	/* after __init time we are like module... no logo */
 	ACCESS_FBINFO(fbcon.flags) = hotplug ? FBINFO_FLAG_MODULE : FBINFO_FLAG_DEFAULT;
 	ACCESS_FBINFO(video.len_usable) &= PAGE_MASK;

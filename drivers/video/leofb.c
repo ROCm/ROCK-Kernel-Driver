@@ -535,7 +535,7 @@ static void leo_setcursor (struct fb_info_sbusfb *fb)
 	spin_unlock_irqrestore(&fb->lock, flags);
 }
 
-static void leo_blank (struct fb_info_sbusfb *fb)
+static int leo_blank (struct fb_info_sbusfb *fb)
 {
 	unsigned long flags;
 	u32 tmp;
@@ -547,9 +547,10 @@ static void leo_blank (struct fb_info_sbusfb *fb)
 	tmp &= ~LEO_KRN_CSR_ENABLE;
 	sbus_writel(tmp, &fb->s.leo.lx_krn->krn_csr);
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 
-static void leo_unblank (struct fb_info_sbusfb *fb)
+static int leo_unblank (struct fb_info_sbusfb *fb)
 {
 	unsigned long flags;
 	u32 tmp;
@@ -563,6 +564,7 @@ static void leo_unblank (struct fb_info_sbusfb *fb)
 		sbus_writel(tmp, &fb->s.leo.lx_krn->krn_csr);
 	}
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 
 static int __init

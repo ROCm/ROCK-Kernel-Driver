@@ -2182,14 +2182,15 @@ static int sisfb_mmap (struct fb_info *info, struct file *file, struct vm_area_s
 }
 
 static struct fb_ops sisfb_ops = {
-	owner:THIS_MODULE,
-	fb_get_fix:sisfb_get_fix,
-	fb_get_var:sisfb_get_var,
-	fb_set_var:sisfb_set_var,
-	fb_get_cmap:sisfb_get_cmap,
-	fb_set_cmap:sisfb_set_cmap,
-	fb_ioctl:sisfb_ioctl,
-	fb_mmap:sisfb_mmap,
+	owner:		THIS_MODULE,
+	fb_get_fix:	sisfb_get_fix,
+	fb_get_var:	sisfb_get_var,
+	fb_set_var:	sisfb_set_var,
+	fb_get_cmap:	sisfb_get_cmap,
+	fb_set_cmap:	sisfb_set_cmap,
+	fb_blank:	sisfb_blank,
+	fb_ioctl:	sisfb_ioctl,
+	fb_mmap:	sisfb_mmap,
 };
 
 /* ------------ Interface to the low level console driver -------------*/
@@ -2231,7 +2232,7 @@ static int sisfb_switch (int con, struct fb_info *info)
 
 }
 
-static void sisfb_blank (int blank, struct fb_info *info)
+static int sisfb_blank(int blank, struct fb_info *info)
 {
 	u8 reg;
 
@@ -2245,6 +2246,7 @@ static void sisfb_blank (int blank, struct fb_info *info)
 
 	vgawb (CRTC_ADR, 0x17);
 	vgawb (CRTC_DATA, reg);
+	return 0;
 }
 
 int sisfb_setup (char *options)
@@ -2771,7 +2773,6 @@ sishw_ext.usExternalChip = 0;
 	fb_info.currcon = -1;
 	fb_info.switch_con = &sisfb_switch;
 	fb_info.updatevar = &sisfb_update_var;
-	fb_info.blank = &sisfb_blank;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 
 	sisfb_set_disp (-1, &default_var);

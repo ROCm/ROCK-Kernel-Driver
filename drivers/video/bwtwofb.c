@@ -83,7 +83,7 @@ static struct sbus_mmap_map bw2_mmap_map[] = {
 	{ 0,			0,			0		    }
 };
 
-static void bw2_blank (struct fb_info_sbusfb *fb)
+static int bw2_blank (struct fb_info_sbusfb *fb)
 {
 	unsigned long flags;
 	u8 tmp;
@@ -93,9 +93,10 @@ static void bw2_blank (struct fb_info_sbusfb *fb)
 	tmp &= ~BWTWO_CTL_ENABLE_VIDEO;
 	sbus_writeb(tmp, &fb->s.bw2.regs->control);
 	spin_unlock_irqrestore(&fb->lock, flags);
+	return 0;
 }
 
-static void bw2_unblank (struct fb_info_sbusfb *fb)
+static int bw2_unblank (struct fb_info_sbusfb *fb)
 {
 	unsigned long flags;
 	u8 tmp;
@@ -105,6 +106,7 @@ static void bw2_unblank (struct fb_info_sbusfb *fb)
 	tmp |= BWTWO_CTL_ENABLE_VIDEO;
 	sbus_writeb(tmp, &fb->s.bw2.regs->control);
 	spin_unlock_irqrestore(&fb->lock, flags);
+ 	return 0;
 }
 
 static void bw2_margins (struct fb_info_sbusfb *fb, struct display *p,

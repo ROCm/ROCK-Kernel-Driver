@@ -118,10 +118,10 @@ static int dn_fb_get_cmap(struct fb_cmap *cmap,int kspc,int con,
 			  struct fb_info *info);
 static int dn_fb_set_cmap(struct fb_cmap *cmap,int kspc,int con,
 			  struct fb_info *info);
+static int dn_fb_blank(int blank,struct fb_info *info);
 
 static int dnfbcon_switch(int con,struct fb_info *info);
 static int dnfbcon_updatevar(int con,struct fb_info *info);
-static void dnfbcon_blank(int blank,struct fb_info *info);
 
 static void dn_fb_set_disp(int con,struct fb_info *info);
 
@@ -134,6 +134,7 @@ static struct fb_ops dn_fb_ops = {
 	fb_set_var:	dn_fb_set_var,
 	fb_get_cmap:	dn_fb_get_cmap,
 	fb_set_cmap:	dn_fb_set_cmap,
+	fb_blank:	dn_fb_blank,
 };
 
 #define NUM_TOTAL_MODES 1
@@ -302,7 +303,6 @@ printk("dn_fb_init\n");
 	fb_info.disp=disp;
 	fb_info.switch_con=&dnfbcon_switch;
 	fb_info.updatevar=&dnfbcon_updatevar;
-	fb_info.blank=&dnfbcon_blank;	
 	fb_info.node = NODEV;
 	fb_info.fbops = &dn_fb_ops;
 	fb_info.currcon = -1;
@@ -347,17 +347,13 @@ static int dnfbcon_updatevar(int con,  struct fb_info *info) {
 
 }
 
-static void dnfbcon_blank(int blank,  struct fb_info *info) {
-
-	if(blank)  {
+static int dn_fb_blank(int blank,  struct fb_info *info)
+{
+	if (blank)
         	outb(0x0,  AP_CONTROL_3A);
-	}
-	else {
+	else 
 	        outb(0x1,  AP_CONTROL_3A);
-	}
-
-	return ;
-
+	return 0;
 }
 
 void dn_bitblt(struct display *p,int x_src,int y_src, int x_dest, int y_dest,

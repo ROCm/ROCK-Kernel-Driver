@@ -524,16 +524,6 @@ static int igafb_switch(int con, struct fb_info *fb_info)
         return 1;
 }
 
-
-
-/* 0 unblank, 1 blank, 2 no vsync, 3 no hsync, 4 off */
-
-static void igafb_blank(int blank, struct fb_info *info)
-{
-        /* Not supported */
-}
-
-
 static int __init iga_init(struct fb_info_iga *info)
 {
         char vramsz = iga_inb(info, IGA_EXT_CNTRL, IGA_IDX_EXT_BUS_CNTL) 
@@ -575,7 +565,6 @@ static int __init iga_init(struct fb_info_iga *info)
 	info->fb_info.changevar = NULL;
 	info->fb_info.switch_con = &igafb_switch;
 	info->fb_info.updatevar = &igafb_update_var;
-	info->fb_info.blank = &igafb_blank;
 	info->fb_info.flags=FBINFO_FLAG_DEFAULT;
 
 	igafb_set_disp(-1, info);
