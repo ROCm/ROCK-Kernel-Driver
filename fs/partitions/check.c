@@ -135,6 +135,8 @@ const char *bdevname(struct block_device *bdev, char *buf)
 	return disk_name(bdev->bd_disk, part, buf);
 }
 
+EXPORT_SYMBOL(bdevname);
+
 /*
  * NOTE: this cannot be called from interrupt context.
  *
@@ -157,6 +159,8 @@ const char *__bdevname(dev_t dev, char *buffer)
 
 	return buffer;
 }
+
+EXPORT_SYMBOL(__bdevname);
 
 static struct parsed_partitions *
 check_partition(struct gendisk *hd, struct block_device *bdev)
@@ -434,6 +438,8 @@ fail:
 	p->v = NULL;
 	return NULL;
 }
+
+EXPORT_SYMBOL(read_dev_sector);
 
 void del_gendisk(struct gendisk *disk)
 {

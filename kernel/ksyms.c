@@ -40,8 +40,6 @@
 #include <linux/mm.h>
 #include <linux/capability.h>
 #include <linux/highuid.h>
-#include <linux/fs.h>
-#include <linux/fs_struct.h>
 #include <linux/uio.h>
 #include <linux/tty.h>
 #include <linux/in6.h>
@@ -137,65 +135,16 @@ EXPORT_SYMBOL(page_address);
 EXPORT_SYMBOL(get_user_pages);
 
 /* filesystem internal functions */
-EXPORT_SYMBOL(get_fs_type);
-EXPORT_SYMBOL(fput);
-EXPORT_SYMBOL(fget);
-EXPORT_SYMBOL(lookup_mnt);
-EXPORT_SYMBOL(sys_close);
 EXPORT_SYMBOL(dcache_lock);
-EXPORT_SYMBOL(__mark_inode_dirty);
-EXPORT_SYMBOL(get_empty_filp);
-EXPORT_SYMBOL(open_private_file);
-EXPORT_SYMBOL(close_private_file);
-EXPORT_SYMBOL(filp_open);
-EXPORT_SYMBOL(filp_close);
-EXPORT_SYMBOL(put_filp);
-EXPORT_SYMBOL(files_lock);
 EXPORT_SYMBOL(invalidate_inode_pages);
 EXPORT_SYMBOL_GPL(invalidate_inode_pages2);
 EXPORT_SYMBOL(truncate_inode_pages);
-EXPORT_SYMBOL(inode_setattr);
-EXPORT_SYMBOL(inode_change_ok);
-EXPORT_SYMBOL(write_inode_now);
-EXPORT_SYMBOL(notify_change);
-EXPORT_SYMBOL(blockdev_direct_IO);
 EXPORT_SYMBOL(file_ra_state_init);
-EXPORT_SYMBOL(generic_ro_fops);
-EXPORT_SYMBOL(get_unused_fd);
-EXPORT_SYMBOL(vfs_read);
-EXPORT_SYMBOL(vfs_readv);
-EXPORT_SYMBOL(vfs_write);
-EXPORT_SYMBOL(vfs_writev);
-EXPORT_SYMBOL(vfs_statfs);
-EXPORT_SYMBOL(vfs_fstat);
-EXPORT_SYMBOL(vfs_stat);
-EXPORT_SYMBOL(vfs_lstat);
-EXPORT_SYMBOL(vfs_getattr);
-EXPORT_SYMBOL(inode_add_bytes);
-EXPORT_SYMBOL(inode_sub_bytes);
-EXPORT_SYMBOL(inode_get_bytes);
-EXPORT_SYMBOL(inode_set_bytes);
-EXPORT_SYMBOL(generic_fillattr);
-EXPORT_SYMBOL(generic_file_llseek);
-EXPORT_SYMBOL(remote_llseek);
-EXPORT_SYMBOL(no_llseek);
-EXPORT_SYMBOL(poll_initwait);
-EXPORT_SYMBOL(poll_freewait);
 EXPORT_SYMBOL(ROOT_DEV);
 EXPORT_SYMBOL(read_cache_pages);
 EXPORT_SYMBOL(mark_page_accessed);
-EXPORT_SYMBOL(vfs_readdir);
-EXPORT_SYMBOL(__break_lease);
-EXPORT_SYMBOL(lease_get_mtime);
-EXPORT_SYMBOL(lock_may_read);
-EXPORT_SYMBOL(lock_may_write);
-EXPORT_SYMBOL(fd_install);
-EXPORT_SYMBOL(put_unused_fd);
-EXPORT_SYMBOL(do_select);
 
 /* for stackable file systems (lofs, wrapfs, cryptfs, etc.) */
-EXPORT_SYMBOL(default_llseek);
-EXPORT_SYMBOL(dentry_open);
 EXPORT_SYMBOL(lock_page);
 
 /* device registration */
@@ -206,19 +155,11 @@ EXPORT_SYMBOL(tty_unregister_driver);
 EXPORT_SYMBOL(tty_std_termios);
 
 /* block device driver support */
-EXPORT_SYMBOL(read_dev_sector);
-EXPORT_SYMBOL(iov_shorten);
 EXPORT_SYMBOL_GPL(default_backing_dev_info);
 
 /* tty routines */
 EXPORT_SYMBOL(tty_wait_until_sent);
 EXPORT_SYMBOL(tty_flip_buffer_push);
-
-/* filesystem registration */
-EXPORT_SYMBOL(register_filesystem);
-EXPORT_SYMBOL(unregister_filesystem);
-EXPORT_SYMBOL(__mntput);
-EXPORT_SYMBOL(may_umount);
 
 /* interrupt handling */
 EXPORT_SYMBOL(request_irq);
@@ -291,8 +232,6 @@ EXPORT_SYMBOL(sscanf);
 EXPORT_SYMBOL(vsprintf);
 EXPORT_SYMBOL(vsnprintf);
 EXPORT_SYMBOL(vsscanf);
-EXPORT_SYMBOL(__bdevname);
-EXPORT_SYMBOL(bdevname);
 EXPORT_SYMBOL(simple_strtoull);
 EXPORT_SYMBOL(simple_strtoul);
 EXPORT_SYMBOL(simple_strtol);
@@ -314,10 +253,6 @@ EXPORT_SYMBOL(si_meminfo);
 
 /* Added to make file system as module */
 EXPORT_SYMBOL(sys_tz);
-EXPORT_SYMBOL(make_bad_inode);
-EXPORT_SYMBOL(is_bad_inode);
-EXPORT_SYMBOL(__inode_dir_notify);
-EXPORT_SYMBOL(generic_osync_inode);
 
 #ifdef CONFIG_UID16
 EXPORT_SYMBOL(overflowuid);
@@ -325,10 +260,6 @@ EXPORT_SYMBOL(overflowgid);
 #endif
 EXPORT_SYMBOL(fs_overflowuid);
 EXPORT_SYMBOL(fs_overflowgid);
-
-/* all busmice */
-EXPORT_SYMBOL(fasync_helper);
-EXPORT_SYMBOL(kill_fasync);
 
 /* library functions */
 EXPORT_SYMBOL(strnicmp);
@@ -346,7 +277,6 @@ EXPORT_SYMBOL(__tasklet_schedule);
 EXPORT_SYMBOL(__tasklet_hi_schedule);
 
 /* init task, for moving kthread roots - ought to export a function ?? */
-
 EXPORT_SYMBOL(init_task);
 
 EXPORT_SYMBOL(tasklist_lock);
@@ -355,9 +285,6 @@ EXPORT_SYMBOL(next_thread);
 #if defined(CONFIG_SMP) && defined(__GENERIC_PER_CPU)
 EXPORT_SYMBOL(__per_cpu_offset);
 #endif
-
-EXPORT_SYMBOL(set_fs_pwd);
-EXPORT_SYMBOL(set_fs_root);
 
 /* debug */
 EXPORT_SYMBOL(dump_stack);
