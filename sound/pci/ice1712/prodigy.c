@@ -585,6 +585,7 @@ static int __devinit prodigy_init(ice1712_t *ice)
 	printk(KERN_INFO "ice1724:   Apostolos Dimitromanolakis <apostol@cs.utoronto.ca>\n");
 
 	ice->num_total_dacs = 8;
+	ice->num_total_adcs = 8;
 
 	/* to remeber the register values */
 	ice->akm = snd_kcalloc(sizeof(akm4xxx_t), GFP_KERNEL);

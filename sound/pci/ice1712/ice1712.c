@@ -1384,7 +1384,7 @@ static int snd_ice1712_pro_mixer_volume_put(snd_kcontrol_t * kcontrol, snd_ctl_e
 }
 
 
-static snd_kcontrol_new_t snd_ice1712_multi_ctrls[] __devinitdata = {
+static snd_kcontrol_new_t snd_ice1712_multi_playback_ctrls[] __devinitdata = {
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "Multi Playback Switch",
@@ -1403,24 +1403,44 @@ static snd_kcontrol_new_t snd_ice1712_multi_ctrls[] __devinitdata = {
 		.private_value = 0,
 		.count = 10,
 	},
-	{
-		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
-		.name = "Multi Capture Switch",
-		.info = snd_ice1712_pro_mixer_switch_info,
-		.get = snd_ice1712_pro_mixer_switch_get,
-		.put = snd_ice1712_pro_mixer_switch_put,
-		.private_value = 10,
-		.count = 10,
-	},
-	{
-		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
-		.name = "Multi Capture Volume",
-		.info = snd_ice1712_pro_mixer_volume_info,
-		.get = snd_ice1712_pro_mixer_volume_get,
-		.put = snd_ice1712_pro_mixer_volume_put,
-		.private_value = 10,
-		.count = 10,
-	},
+};
+
+static snd_kcontrol_new_t snd_ice1712_multi_capture_analog_switch __devinitdata = {
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "H/W Multi Capture Switch",
+	.info = snd_ice1712_pro_mixer_switch_info,
+	.get = snd_ice1712_pro_mixer_switch_get,
+	.put = snd_ice1712_pro_mixer_switch_put,
+	.private_value = 10,
+};
+
+static snd_kcontrol_new_t snd_ice1712_multi_capture_spdif_switch __devinitdata = {
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "IEC958 Multi Capture Switch",
+	.info = snd_ice1712_pro_mixer_switch_info,
+	.get = snd_ice1712_pro_mixer_switch_get,
+	.put = snd_ice1712_pro_mixer_switch_put,
+	.private_value = 18,
+	.count = 2,
+};
+
+static snd_kcontrol_new_t snd_ice1712_multi_capture_analog_volume __devinitdata = {
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "H/W Multi Capture Volume",
+	.info = snd_ice1712_pro_mixer_volume_info,
+	.get = snd_ice1712_pro_mixer_volume_get,
+	.put = snd_ice1712_pro_mixer_volume_put,
+	.private_value = 10,
+};
+
+static snd_kcontrol_new_t snd_ice1712_multi_capture_spdif_volume __devinitdata = {
+	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+	.name = "IEC958 Multi Capture Volume",
+	.info = snd_ice1712_pro_mixer_volume_info,
+	.get = snd_ice1712_pro_mixer_volume_get,
+	.put = snd_ice1712_pro_mixer_volume_put,
+	.private_value = 18,
+	.count = 2,
 };
 
 static int __devinit snd_ice1712_build_pro_mixer(ice1712_t *ice)
@@ -1430,14 +1450,46 @@ static int __devinit snd_ice1712_build_pro_mixer(ice1712_t *ice)
 	int err;
 
 	/* multi-channel mixer */
-	for (idx = 0; idx < ARRAY_SIZE(snd_ice1712_multi_ctrls); idx++) {
-		err = snd_ctl_add(card, snd_ctl_new1(&snd_ice1712_multi_ctrls[idx], ice));
+	for (idx = 0; idx < ARRAY_SIZE(snd_ice1712_multi_playback_ctrls); idx++) {
+		err = snd_ctl_add(card, snd_ctl_new1(&snd_ice1712_multi_playback_ctrls[idx], ice));
 		if (err < 0)
 			return err;
 	}
 	
+	if (ice->num_total_adcs > 0) {
+		snd_kcontrol_new_t tmp = snd_ice1712_multi_capture_analog_switch;
+		tmp.count = ice->num_total_adcs;
+		err = snd_ctl_add(card, snd_ctl_new1(&tmp, ice));
+		if (err < 0)
+			return err;
+	}
+
+	err = snd_ctl_add(card, snd_ctl_new1(&snd_ice1712_multi_capture_spdif_switch, ice));
+	if (err < 0)
+		return err;
+
+	if (ice->num_total_adcs > 0) {
+		snd_kcontrol_new_t tmp = snd_ice1712_multi_capture_analog_volume;
+		tmp.count = ice->num_total_adcs;
+		err = snd_ctl_add(card, snd_ctl_new1(&tmp, ice));
+		if (err < 0)
+			return err;
+	}
+
+	err = snd_ctl_add(card, snd_ctl_new1(&snd_ice1712_multi_capture_spdif_volume, ice));
+	if (err < 0)
+		return err;
+
 	/* initialize volumes */
-	for (idx = 0; idx < 20; idx++) {
+	for (idx = 0; idx < 10; idx++) {
+		ice->pro_volumes[idx] = 0x80008000;	/* mute */
+		snd_ice1712_update_volume(ice, idx);
+	}
+	for (idx = 10; idx < 10 + ice->num_total_adcs; idx++) {
+		ice->pro_volumes[idx] = 0x80008000;	/* mute */
+		snd_ice1712_update_volume(ice, idx);
+	}
+	for (idx = 18; idx < 20; idx++) {
 		ice->pro_volumes[idx] = 0x80008000;	/* mute */
 		snd_ice1712_update_volume(ice, idx);
 	}

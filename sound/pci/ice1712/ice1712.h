@@ -330,6 +330,7 @@ struct _snd_ice1712 {
 	unsigned int omni: 1;		/* Delta Omni I/O */
 	unsigned int vt1724: 1;
 	unsigned int num_total_dacs;	/* total DACs */
+	unsigned int num_total_adcs;	/* total ADCs */
 	unsigned char hoontech_boxbits[4];
 	unsigned int hoontech_config;
 	unsigned short hoontech_boxconfig[4];
