@@ -8,6 +8,7 @@
 #include <linux/atmdev.h>
 #include <linux/atm_tcp.h>
 #include <linux/bitops.h>
+#include <linux/init.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
 
