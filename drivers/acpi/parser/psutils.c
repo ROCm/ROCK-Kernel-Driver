@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -208,6 +208,7 @@ acpi_ps_free_op (
 }
 
 
+#ifdef ACPI_ENABLE_OBJECT_CACHE
 /*******************************************************************************
  *
  * FUNCTION:    acpi_ps_delete_parse_cache
@@ -231,6 +232,7 @@ acpi_ps_delete_parse_cache (
 	acpi_ut_delete_generic_cache (ACPI_MEM_LIST_PSNODE_EXT);
 	return_VOID;
 }
+#endif
 
 
 /*******************************************************************************

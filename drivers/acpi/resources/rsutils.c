@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -339,6 +339,13 @@ acpi_rs_set_srs_method_data (
 	 * Execute the method, no return value
 	 */
 	status = acpi_ns_evaluate_relative ("_SRS", &info);
+	if (ACPI_SUCCESS (status)) {
+		/* Delete any return object (especially if implicit_return is enabled) */
+
+		if (info.return_object) {
+			acpi_ut_remove_reference (info.return_object);
+		}
+	}
 
 	/*
 	 * Clean up and return the status from acpi_ns_evaluate_relative

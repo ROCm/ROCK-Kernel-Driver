@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2004, R. Byron Moore
+ * Copyright (C) 2000 - 2005, R. Byron Moore
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -322,7 +322,7 @@
 #define ARGI_SLEEP_OP                   ARGI_LIST1 (ARGI_INTEGER)
 #define ARGI_STALL_OP                   ARGI_LIST1 (ARGI_INTEGER)
 #define ARGI_STATICSTRING_OP            ARGI_INVALID_OPCODE
-#define ARGI_STORE_OP                   ARGI_LIST2 (ARGI_ANYTYPE,    ARGI_TARGETREF)
+#define ARGI_STORE_OP                   ARGI_LIST2 (ARGI_DATAREFOBJ, ARGI_TARGETREF)
 #define ARGI_STRING_OP                  ARGI_INVALID_OPCODE
 #define ARGI_SUBTRACT_OP                ARGI_LIST3 (ARGI_INTEGER,    ARGI_INTEGER,       ARGI_TARGETREF)
 #define ARGI_THERMAL_ZONE_OP            ARGI_INVALID_OPCODE

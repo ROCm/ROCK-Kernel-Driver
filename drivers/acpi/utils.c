@@ -244,26 +244,34 @@ acpi_evaluate_integer (
 	unsigned long		*data)
 {
 	acpi_status             status = AE_OK;
-	union acpi_object	element;
-	struct acpi_buffer	buffer = {sizeof(union acpi_object), &element};
+	union acpi_object	*element;
+	struct acpi_buffer	buffer = {0,NULL};
 
 	ACPI_FUNCTION_TRACE("acpi_evaluate_integer");
 
 	if (!data)
 		return_ACPI_STATUS(AE_BAD_PARAMETER);
 
+	element = kmalloc(sizeof(union acpi_object), GFP_KERNEL);
+	if(!element)
+		return_ACPI_STATUS(AE_NO_MEMORY);
+
+	memset(element, 0, sizeof(union acpi_object));
+	buffer.length = sizeof(union acpi_object);
+	buffer.pointer = element;
 	status = acpi_evaluate_object(handle, pathname, arguments, &buffer);
 	if (ACPI_FAILURE(status)) {
 		acpi_util_eval_error(handle, pathname, status);
 		return_ACPI_STATUS(status);
 	}
 
-	if (element.type != ACPI_TYPE_INTEGER) {
+	if (element->type != ACPI_TYPE_INTEGER) {
 		acpi_util_eval_error(handle, pathname, AE_BAD_DATA);
 		return_ACPI_STATUS(AE_BAD_DATA);
 	}
 
-	*data = element.integer.value;
+	*data = element->integer.value;
+	kfree(element);
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Return value [%lu]\n", *data));
 
