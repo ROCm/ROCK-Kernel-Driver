@@ -961,8 +961,9 @@ static void igmp6_group_queried(struct ifmcaddr6 *ma, unsigned long resptime)
 {
 	unsigned long delay = resptime;
 
-	/* Do not start timer for addresses with link/host scope */
-	if (ipv6_addr_type(&ma->mca_addr)&(IPV6_ADDR_LINKLOCAL|IPV6_ADDR_LOOPBACK))
+	/* Do not start timer for these addresses */
+	if (ipv6_addr_is_ll_all_nodes(&ma->mca_addr) ||
+	    IPV6_ADDR_MC_SCOPE(&ma->mca_addr) < IPV6_ADDR_SCOPE_LINKLOCAL)
 		return;
 
 	if (del_timer(&ma->mca_timer)) {
