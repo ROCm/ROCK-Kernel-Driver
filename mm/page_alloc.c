@@ -72,6 +72,17 @@ static void bad_page(const char *function, struct page *page)
 	printk("flags:0x%08lx mapping:%p mapped:%d count:%d\n",
 		page->flags, page->mapping,
 		page_mapped(page), page_count(page));
+	printk("Backtrace:\n");
+	dump_stack();
+	printk("Trying to fix it up, but a reboot is needed\n");
+	page->flags &= ~(1 << PG_private	|
+			1 << PG_locked	|
+			1 << PG_lru	|
+			1 << PG_active	|
+			1 << PG_dirty	|
+			1 << PG_writeback);
+	set_page_count(page, 0);
+	page->mapping = NULL;
 }
 
 /*
