@@ -164,7 +164,7 @@ jade_interrupt(struct IsdnCardState *cs, u_char val, u_char jade)
 			}
 		}
 		bcs->hw.hscx.rcvidx = 0;
-		jade_sched_event(bcs, B_RCVBUFREADY);
+		sched_b_event(bcs, B_RCVBUFREADY);
 	}
 	if (val & 0x40) {	/* RPF */
 		jade_empty_fifo(bcs, fifo_size);
@@ -177,7 +177,7 @@ jade_interrupt(struct IsdnCardState *cs, u_char val, u_char jade)
 				skb_queue_tail(&bcs->rqueue, skb);
 			}
 			bcs->hw.hscx.rcvidx = 0;
-			jade_sched_event(bcs, B_RCVBUFREADY);
+			sched_b_event(bcs, B_RCVBUFREADY);
 		}
 	}
 	if (val & 0x10) {	/* XPR */
@@ -187,7 +187,7 @@ jade_interrupt(struct IsdnCardState *cs, u_char val, u_char jade)
 				return;
 			}
 			skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
-			jade_sched_event(bcs, B_CMPLREADY);
+			sched_b_event(bcs, B_CMPLREADY);
 			bcs->hw.hscx.count = 0;
 		}
 		if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
@@ -196,7 +196,7 @@ jade_interrupt(struct IsdnCardState *cs, u_char val, u_char jade)
 			jade_fill_fifo(bcs);
 		} else {
 			test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
-			jade_sched_event(bcs, B_XMTBUFREADY);
+			sched_b_event(bcs, B_XMTBUFREADY);
 		}
 	}
 }

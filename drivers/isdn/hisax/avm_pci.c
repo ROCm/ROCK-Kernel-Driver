@@ -191,13 +191,6 @@ struct BCState *Sel_BCS(struct IsdnCardState *cs, int channel)
 		return(NULL);
 }
 
-void inline
-hdlc_sched_event(struct BCState *bcs, int event)
-{
-	bcs->event |= 1 << event;
-	schedule_work(&bcs->work);
-}
-
 void
 write_ctrl(struct BCState *bcs, int which) {
 
@@ -252,7 +245,7 @@ modehdlc(struct BCState *bcs, int mode, int bc)
 			bcs->hw.hdlc.ctrl.sr.cmd = HDLC_CMD_XRS;
 			write_ctrl(bcs, 1);
 			bcs->hw.hdlc.ctrl.sr.cmd = 0;
-			hdlc_sched_event(bcs, B_XMTBUFREADY);
+			sched_b_event(bcs, B_XMTBUFREADY);
 			break;
 		case (L1_MODE_HDLC):
 			bcs->mode = mode;
@@ -263,7 +256,7 @@ modehdlc(struct BCState *bcs, int mode, int bc)
 			bcs->hw.hdlc.ctrl.sr.cmd = HDLC_CMD_XRS;
 			write_ctrl(bcs, 1);
 			bcs->hw.hdlc.ctrl.sr.cmd = 0;
-			hdlc_sched_event(bcs, B_XMTBUFREADY);
+			sched_b_event(bcs, B_XMTBUFREADY);
 			break;
 	}
 }
@@ -425,7 +418,7 @@ HDLC_irq(struct BCState *bcs, u_int stat) {
 						skb_queue_tail(&bcs->rqueue, skb);
 					}
 					bcs->hw.hdlc.rcvidx = 0;
-					hdlc_sched_event(bcs, B_RCVBUFREADY);
+					sched_b_event(bcs, B_RCVBUFREADY);
 				} else {
 					if (bcs->cs->debug & L1_DEB_HSCX)
 						debugl1(bcs->cs, "invalid frame");
@@ -444,7 +437,6 @@ HDLC_irq(struct BCState *bcs, u_int stat) {
 			skb_push(bcs->tx_skb, bcs->hw.hdlc.count);
 			bcs->tx_cnt += bcs->hw.hdlc.count;
 			bcs->hw.hdlc.count = 0;
-//			hdlc_sched_event(bcs, B_XMTBUFREADY);
 			if (bcs->cs->debug & L1_DEB_WARN)
 				debugl1(bcs->cs, "ch%d XDU", bcs->channel);
 		} else if (bcs->cs->debug & L1_DEB_WARN)
@@ -462,7 +454,7 @@ HDLC_irq(struct BCState *bcs, u_int stat) {
 				return;
 			}
 			skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
-			hdlc_sched_event(bcs, B_CMPLREADY);
+			sched_b_event(bcs, B_CMPLREADY);
 			bcs->hw.hdlc.count = 0;
 		}
 		if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
@@ -471,7 +463,7 @@ HDLC_irq(struct BCState *bcs, u_int stat) {
 			hdlc_fill_fifo(bcs);
 		} else {
 			test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
-			hdlc_sched_event(bcs, B_XMTBUFREADY);
+			sched_b_event(bcs, B_XMTBUFREADY);
 		}
 	}
 }

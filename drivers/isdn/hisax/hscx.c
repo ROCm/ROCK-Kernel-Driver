@@ -92,13 +92,6 @@ modehscx(struct BCState *bcs, int mode, int bc)
 }
 
 void
-hscx_sched_event(struct BCState *bcs, int event)
-{
-	bcs->event |= 1 << event;
-	schedule_work(&bcs->work);
-}
-
-void
 hscx_l2l1(struct PStack *st, int pr, void *arg)
 {
 	struct sk_buff *skb = arg;

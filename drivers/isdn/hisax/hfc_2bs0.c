@@ -82,13 +82,6 @@ ReadZReg(struct BCState *bcs, u_char reg)
 	return (val);
 }
 
-void
-hfc_sched_event(struct BCState *bcs, int event)
-{
-	bcs->event |= 1 << event;
-	schedule_work(&bcs->work);
-}
-
 static void
 hfc_clear_fifo(struct BCState *bcs)
 {
@@ -323,7 +316,7 @@ hfc_fill_fifo(struct BCState *bcs)
 			count = -1;
 
 		skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
-		hscx_sched_event(bcs, B_CMPLREADY);
+		sched_b_event(bcs, B_CMPLREADY);
 		bcs->tx_skb = NULL;
 		if (bcs->mode != L1_MODE_TRANS) {
 		  WaitForBusy(cs);
@@ -384,7 +377,7 @@ main_irq_hfc(struct BCState *bcs)
 			/*              sti(); */
 			if ((skb = hfc_empty_fifo(bcs, rcnt))) {
 				skb_queue_tail(&bcs->rqueue, skb);
-				hfc_sched_event(bcs, B_RCVBUFREADY);
+				sched_b_event(bcs, B_RCVBUFREADY);
 			}
 		}
 		receive = 1;
@@ -407,7 +400,7 @@ main_irq_hfc(struct BCState *bcs)
 				transmit = 0;
 		} else {
 			transmit = 0;
-			hfc_sched_event(bcs, B_XMTBUFREADY);
+			sched_b_event(bcs, B_XMTBUFREADY);
 		}
 	}
 	restore_flags(flags);

@@ -142,13 +142,6 @@ W6692_sched_event(struct IsdnCardState *cs, int event)
 }
 
 static void
-W6692B_sched_event(struct BCState *bcs, int event)
-{
-	bcs->event |= 1 << event;
-	schedule_work(&bcs->work);
-}
-
-static void
 W6692_empty_fifo(struct IsdnCardState *cs, int count)
 {
 	u_char *ptr;
@@ -345,7 +338,7 @@ W6692B_interrupt(struct IsdnCardState *cs, u_char bchan)
 			}
 		}
 		bcs->hw.w6692.rcvidx = 0;
-		W6692B_sched_event(bcs, B_RCVBUFREADY);
+		sched_b_event(bcs, B_RCVBUFREADY);
 	}
 	if (val & W_B_EXI_RMR) {	/* RMR */
 		W6692B_empty_fifo(bcs, W_B_FIFO_THRESH);
@@ -358,7 +351,7 @@ W6692B_interrupt(struct IsdnCardState *cs, u_char bchan)
 				skb_queue_tail(&bcs->rqueue, skb);
 			}
 			bcs->hw.w6692.rcvidx = 0;
-			W6692B_sched_event(bcs, B_RCVBUFREADY);
+			sched_b_event(bcs, B_RCVBUFREADY);
 		}
 	}
 	if (val & W_B_EXI_XFR) {	/* XFR */
@@ -368,7 +361,7 @@ W6692B_interrupt(struct IsdnCardState *cs, u_char bchan)
 				return;
 			}
 			skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
-			W6692B_sched_event(bcs, B_CMPLREADY);
+			sched_b_event(bcs, B_CMPLREADY);
 			bcs->hw.w6692.count = 0;
 		}
 		if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
@@ -377,7 +370,7 @@ W6692B_interrupt(struct IsdnCardState *cs, u_char bchan)
 			W6692B_fill_fifo(bcs);
 		} else {
 			test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
-			W6692B_sched_event(bcs, B_XMTBUFREADY);
+			sched_b_event(bcs, B_XMTBUFREADY);
 		}
 	}
 	if (val & W_B_EXI_XDUN) {	/* XDUN */

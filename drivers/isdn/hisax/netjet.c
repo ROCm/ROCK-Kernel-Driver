@@ -432,8 +432,7 @@ static void got_frame(struct BCState *bcs, int count) {
 		memcpy(skb_put(skb, count), bcs->hw.tiger.rcvbuf, count);
 		skb_queue_tail(&bcs->rqueue, skb);
 	}
-	bcs->event |= 1 << B_RCVBUFREADY;
-	schedule_work(&bcs->work);
+	sched_b_event(bcs, B_RCVBUFREADY);
 	
 	if (bcs->cs->debug & L1_DEB_RECEIVE_FRAME)
 		printframe(bcs->cs, bcs->hw.tiger.rcvbuf, count, "rec");
@@ -761,7 +760,7 @@ static void write_raw(struct BCState *bcs, u_int *buf, int cnt) {
 				debugl1(bcs->cs,"tiger write_raw: NULL skb s_cnt %d", s_cnt);
 			} else {
 				skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
-				hscx_sched_event(bcs, B_CMPLREADY);
+				sched_b_event(bcs, B_CMPLREADY);
 				bcs->tx_skb = NULL;
 			}
 			test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
@@ -786,8 +785,7 @@ static void write_raw(struct BCState *bcs, u_int *buf, int cnt) {
 						debugl1(bcs->cs, "tiger write_raw: fill rest %d",
 							cnt - s_cnt);
 				}
-				bcs->event |= 1 << B_XMTBUFREADY;
-				schedule_work(&bcs->work);
+				sched_b_event(bcs, B_XMTBUFREADY);
 			}
 		}
 	} else if (test_and_clear_bit(BC_FLG_NOFRAME, &bcs->Flag)) {

@@ -17,9 +17,13 @@
 #define D_TX_MON1	7
 #define E_RCVBUFREADY	8
 
-#define B_RCVBUFREADY 0
-#define B_XMTBUFREADY 1
-#define B_CMPLREADY   2
+#define B_RCVBUFREADY   0
+#define B_XMTBUFREADY   1
+#define B_CMPLREADY     2
+
+#define B_LL_NOCARRIER	8
+#define B_LL_CONNECT	9
+#define B_LL_OK		10
 
 extern void debugl1(struct IsdnCardState *cs, char *fmt, ...);
 extern void DChannel_proc_xmt(struct IsdnCardState *cs);

@@ -83,10 +83,6 @@ static void usb_b_out(struct st5481_bcs *bcs,int buf_nr)
 				// Frame sent
 				b_out->tx_skb = NULL;
 				B_L1L2(bcs, PH_DATA | CONFIRM, skb);
-				
-/* 				if (!(bcs->tx_skb = skb_dequeue(&bcs->sq))) { */
-/* 					st5481B_sched_event(bcs, B_XMTBUFREADY); */
-/* 				} */
 			}
 		} else {
 			if (bcs->mode == L1_MODE_TRANS) {

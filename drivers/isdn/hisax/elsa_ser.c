@@ -301,7 +301,7 @@ modem_fill(struct BCState *bcs) {
 			return;
 		}
 		skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
-		hscx_sched_event(bcs, B_CMPLREADY);
+		sched_b_event(bcs, B_CMPLREADY);
 	}
 	if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
 		bcs->hw.hscx.count = 0;
@@ -309,7 +309,7 @@ modem_fill(struct BCState *bcs) {
 		write_modem(bcs);
 	} else {
 		test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
-		hscx_sched_event(bcs, B_XMTBUFREADY);
+		sched_b_event(bcs, B_XMTBUFREADY);
 	}
 }
 
@@ -344,7 +344,7 @@ static inline void receive_chars(struct IsdnCardState *cs,
 				cs->hw.elsa.rcvcnt);
 			skb_queue_tail(& cs->hw.elsa.bcs->rqueue, skb);
 		}
-		hscx_sched_event(cs->hw.elsa.bcs, B_RCVBUFREADY);
+		sched_b_event(cs->hw.elsa.bcs, B_RCVBUFREADY);
 	} else {
 		char tmp[128];
 		char *t = tmp;

@@ -1407,3 +1407,9 @@ L4L3(struct PStack *st, int pr, void *arg)
 	st->l3.l4l3(st, pr, arg);
 }
 
+static inline void
+sched_b_event(struct BCState *bcs, int event)
+{
+	set_bit(event, &bcs->event);
+	schedule_work(&bcs->work);
+}

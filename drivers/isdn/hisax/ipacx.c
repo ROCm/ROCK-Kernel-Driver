@@ -46,7 +46,6 @@ static inline void dch_int(struct IsdnCardState *cs);
 static void __devinit dch_setstack(struct PStack *st, struct IsdnCardState *cs);
 static void __devinit dch_init(struct IsdnCardState *cs);
 static void bch_l2l1(struct PStack *st, int pr, void *arg);
-static void bch_sched_event(struct BCState *bcs, int event);
 static void bch_empty_fifo(struct BCState *bcs, int count);
 static void bch_fill_fifo(struct BCState *bcs);
 static void bch_int(struct IsdnCardState *cs, u_char hscx);
@@ -584,16 +583,6 @@ bch_l2l1(struct PStack *st, int pr, void *arg)
 }
 
 //----------------------------------------------------------
-// proceed with bottom half handler BChannel_bh()
-//----------------------------------------------------------
-static void
-bch_sched_event(struct BCState *bcs, int event)
-{
-	bcs->event |= 1 << event;
-	schedule_work(&bcs->work);
-}
-
-//----------------------------------------------------------
 // Read B channel fifo to receive buffer
 //----------------------------------------------------------
 static void
@@ -730,7 +719,7 @@ bch_int(struct IsdnCardState *cs, u_char hscx)
 			}
 		}
 		bcs->hw.hscx.rcvidx = 0;
-		bch_sched_event(bcs, B_RCVBUFREADY);
+		sched_b_event(bcs, B_RCVBUFREADY);
 	}
   
 	if (istab &0x40) {	// RPF
@@ -745,7 +734,7 @@ bch_int(struct IsdnCardState *cs, u_char hscx)
 				skb_queue_tail(&bcs->rqueue, skb);
 			}
 			bcs->hw.hscx.rcvidx = 0;
-			bch_sched_event(bcs, B_RCVBUFREADY);
+			sched_b_event(bcs, B_RCVBUFREADY);
 		}
 	}
   
@@ -762,7 +751,7 @@ bch_int(struct IsdnCardState *cs, u_char hscx)
 				goto afterXPR;
 			}
 			skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
-			bch_sched_event(bcs, B_CMPLREADY);
+			sched_b_event(bcs, B_CMPLREADY);
 			bcs->hw.hscx.count = 0; 
 		}
 		if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
@@ -771,7 +760,7 @@ bch_int(struct IsdnCardState *cs, u_char hscx)
 			bch_fill_fifo(bcs);
 		} else {
 			clear_bit(BC_FLG_BUSY, &bcs->Flag);
-			bch_sched_event(bcs, B_XMTBUFREADY);
+			sched_b_event(bcs, B_XMTBUFREADY);
 		}
 	}
   afterXPR:

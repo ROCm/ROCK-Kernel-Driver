@@ -467,16 +467,6 @@ sched_event_D_sx(struct IsdnCardState *cs, int event)
 	schedule_work(&cs->work);
 }
 
-/*********************************/
-/* schedule a new b_channel task */
-/*********************************/
-static void
-hfcsx_sched_event(struct BCState *bcs, int event)
-{
-	bcs->event |= 1 << event;
-	schedule_work(&bcs->work);
-}
-
 /************************************************/
 /* select a b-channel entry matching and active */
 /************************************************/
@@ -550,7 +540,7 @@ main_rec_hfcsx(struct BCState *bcs)
 	  cli();
 	  skb_queue_tail(&bcs->rqueue, skb);
 	  sti();
-	  hfcsx_sched_event(bcs, B_RCVBUFREADY);
+	  sched_b_event(bcs, B_RCVBUFREADY);
 	}
 
 	test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
@@ -603,7 +593,7 @@ hfcsx_fill_fifo(struct BCState *bcs)
 
 	  bcs->tx_cnt -= bcs->tx_skb->len;
 	  skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
-	  hscx_sched_event(bcs, B_CMPLREADY);
+	  sched_b_event(bcs, B_CMPLREADY);
 	  bcs->tx_skb = NULL;
 	  test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
 	}
@@ -854,7 +844,7 @@ hfcsx_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 						} else
 							debugl1(cs, "fill_data %d blocked", bcs->channel);
 					} else {
-						hfcsx_sched_event(bcs, B_XMTBUFREADY);
+						sched_b_event(bcs, B_XMTBUFREADY);
 					}
 				}
 			}
@@ -878,7 +868,7 @@ hfcsx_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 						} else
 							debugl1(cs, "fill_data %d blocked", bcs->channel);
 					} else {
-						hfcsx_sched_event(bcs, B_XMTBUFREADY);
+						sched_b_event(bcs, B_XMTBUFREADY);
 					}
 				}
 			}

@@ -1825,12 +1825,6 @@ static void hisax_bh(void *data)
 	}
 }
 
-static void hisax_b_sched_event(struct BCState *bcs, int event)
-{
-	bcs->event |= 1 << event;
-	schedule_work(&bcs->work);
-}
-
 static inline void D_L2L1(struct hisax_d_if *d_if, int pr, void *arg)
 {
 	struct hisax_if *ifc = (struct hisax_if *) d_if;
@@ -1907,13 +1901,13 @@ static void hisax_b_l1l2(struct hisax_if *ifc, int pr, void *arg)
 		break;
 	case PH_DATA | INDICATION:
 		skb_queue_tail(&bcs->rqueue, arg);
-		hisax_b_sched_event(bcs, B_RCVBUFREADY);
+		sched_b_event(bcs, B_RCVBUFREADY);
 		break;
 	case PH_DATA | CONFIRM:
 		skb = arg;
 		bcs->tx_cnt -= skb->truesize;
 		skb_queue_tail(&bcs->cmpl_queue, skb);
-		hisax_b_sched_event(bcs, B_CMPLREADY);
+		sched_b_event(bcs, B_CMPLREADY);
 		skb = skb_dequeue(&bcs->squeue);
 		if (skb) {
 			B_L2L1(b_if, PH_DATA | REQUEST, skb);

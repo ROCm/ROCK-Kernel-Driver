@@ -198,13 +198,6 @@ ReadZReg(struct IsdnCardState *cs, u_char reg)
 	return (val);
 }
 
-static void
-hfc_sched_event(struct BCState *bcs, int event)
-{
-	bcs->event |= 1 << event;
-	schedule_work(&bcs->work);
-}
-
 static struct sk_buff
 *hfc_empty_fifo(struct BCState *bcs, int count)
 {
@@ -368,7 +361,7 @@ hfc_fill_fifo(struct BCState *bcs)
 	} else {
 		bcs->tx_cnt -= bcs->tx_skb->len;
 		skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
-		hscx_sched_event(bcs, B_CMPLREADY);
+		sched_b_event(bcs, B_CMPLREADY);
 		bcs->tx_skb = NULL;
 	}
 	WaitForBusy(cs);
@@ -440,7 +433,7 @@ main_rec_2bds0(struct BCState *bcs)
 			cli();
 			skb_queue_tail(&bcs->rqueue, skb);
 			sti();
-			hfc_sched_event(bcs, B_RCVBUFREADY);
+			sched_b_event(bcs, B_RCVBUFREADY);
 		}
 		rcnt = f1 -f2;
 		if (rcnt<0)
@@ -924,7 +917,7 @@ hfc2bds0_interrupt(struct IsdnCardState *cs, u_char val)
 						} else
 							debugl1(cs,"fill_data %d blocked", bcs->channel);
 					} else {
-						hfc_sched_event(bcs, B_XMTBUFREADY);
+						sched_b_event(bcs, B_XMTBUFREADY);
 					}
 				}
 			}
@@ -948,7 +941,7 @@ hfc2bds0_interrupt(struct IsdnCardState *cs, u_char val)
 						} else
 							debugl1(cs,"fill_data %d blocked", bcs->channel);
 					} else {
-						hfc_sched_event(bcs, B_XMTBUFREADY);
+						sched_b_event(bcs, B_XMTBUFREADY);
 					}
 				}
 			}

@@ -197,16 +197,6 @@ sched_event_D_pci(struct IsdnCardState *cs, int event)
 	schedule_work(&cs->work);
 }
 
-/*********************************/
-/* schedule a new b_channel task */
-/*********************************/
-static void
-hfcpci_sched_event(struct BCState *bcs, int event)
-{
-	bcs->event |= 1 << event;
-	schedule_work(&bcs->work);
-}
-
 /************************************************/
 /* select a b-channel entry matching and active */
 /************************************************/
@@ -454,7 +444,7 @@ hfcpci_empty_fifo_trans(struct BCState *bcs, bzfifo_type * bz, u_char * bdata)
 		cli();
 		skb_queue_tail(&bcs->rqueue, skb);
 		sti();
-		hfcpci_sched_event(bcs, B_RCVBUFREADY);
+		sched_b_event(bcs, B_RCVBUFREADY);
 	}
 
 	*z2r = cpu_to_le16(new_z2);		/* new position */
@@ -513,7 +503,7 @@ main_rec_hfcpci(struct BCState *bcs)
 			cli();
 			skb_queue_tail(&bcs->rqueue, skb);
 			sti();
-			hfcpci_sched_event(bcs, B_RCVBUFREADY);
+			sched_b_event(bcs, B_RCVBUFREADY);
 		}
 		rcnt = bz->f1 - bz->f2;
 		if (rcnt < 0)
@@ -743,7 +733,7 @@ hfcpci_fill_fifo(struct BCState *bcs)
 	}
 	bcs->tx_cnt -= bcs->tx_skb->len;
 	skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
-	hscx_sched_event(bcs, B_CMPLREADY);
+	sched_b_event(bcs, B_CMPLREADY);
 
 	cli();
 	bz->za[new_f1].z1 = cpu_to_le16(new_z1);	/* for next buffer */
@@ -1055,7 +1045,7 @@ hfcpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 						} else
 							debugl1(cs, "fill_data %d blocked", bcs->channel);
 					} else {
-						hfcpci_sched_event(bcs, B_XMTBUFREADY);
+						sched_b_event(bcs, B_XMTBUFREADY);
 					}
 				}
 			}
@@ -1079,7 +1069,7 @@ hfcpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 						} else
 							debugl1(cs, "fill_data %d blocked", bcs->channel);
 					} else {
-						hfcpci_sched_event(bcs, B_XMTBUFREADY);
+						sched_b_event(bcs, B_XMTBUFREADY);
 					}
 				}
 			}
