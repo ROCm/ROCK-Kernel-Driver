@@ -180,6 +180,7 @@ EXPORT_SYMBOL(pci_bus_to_phys);
 EXPORT_SYMBOL(consistent_alloc);
 EXPORT_SYMBOL(consistent_free);
 EXPORT_SYMBOL(consistent_sync);
+EXPORT_SYMBOL(flush_dcache_all);
 #endif
 
 EXPORT_SYMBOL(open);
@@ -329,10 +330,12 @@ EXPORT_SYMBOL(debugger_fault_handler);
 #endif
 
 #ifdef  CONFIG_8xx
-EXPORT_SYMBOL(__res);
 EXPORT_SYMBOL(cpm_install_handler);
 EXPORT_SYMBOL(cpm_free_handler);
 #endif /* CONFIG_8xx */
+#if defined(CONFIG_8xx) || defined(CONFIG_4xx)
+EXPORT_SYMBOL(__res);
+#endif
 #if defined(CONFIG_8xx) || defined(CONFIG_8260)
 EXPORT_SYMBOL(request_8xxirq);
 #endif

@@ -923,6 +923,8 @@ initial_mmu:
 	ori	r3,r3,KERNELBASE@l
 	tophys(r4,r3)			/* Load the kernel physical address */
 
+	iccci	r0,r3			/* Invalidate the i-cache before use */
+
 	/* Load the kernel PID.
 	*/
 	li	r0,0

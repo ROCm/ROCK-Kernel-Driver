@@ -11,8 +11,10 @@
  * 2 of the License, or (at your option) any later version.
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <string.h>
 #include "rs6000.h"
 
 #define AOUT_MAGIC	0x010b
