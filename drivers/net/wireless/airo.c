@@ -1603,6 +1603,8 @@ void stop_airo_card( struct net_device *dev, int freeres )
 {
 	struct airo_info *ai = dev->priv;
 	flush_scheduled_work();
+	disable_interrupts(ai);
+	free_irq( dev->irq, dev );
 	if (ai->flash)
 		kfree(ai->flash);
 	if (ai->rssi)
@@ -1617,8 +1619,6 @@ void stop_airo_card( struct net_device *dev, int freeres )
 		}
 		ai->registered = 0;
 	}
-	disable_interrupts(ai);
-	free_irq( dev->irq, dev );
 	if (auto_wep) del_timer_sync(&ai->timer);
 	if (freeres) {
 		/* PCMCIA frees this stuff, so only for PCI and ISA */
