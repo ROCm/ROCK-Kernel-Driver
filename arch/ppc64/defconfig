@@ -24,9 +24,7 @@ CONFIG_SYSCTL=y
 #
 # Loadable module support
 #
-CONFIG_MODULES=y
-# CONFIG_MODVERSIONS is not set
-# CONFIG_KMOD is not set
+# CONFIG_MODULES is not set
 
 #
 # Platform support
@@ -195,7 +193,8 @@ CONFIG_NET_IPIP=y
 CONFIG_SYN_COOKIES=y
 # CONFIG_INET_AH is not set
 # CONFIG_INET_ESP is not set
-CONFIG_IPV6=m
+# CONFIG_XFRM_USER is not set
+CONFIG_IPV6=y
 
 #
 # SCTP Configuration (EXPERIMENTAL)
@@ -260,6 +259,7 @@ CONFIG_VORTEX=y
 CONFIG_NET_PCI=y
 CONFIG_PCNET32=y
 # CONFIG_ADAPTEC_STARFIRE is not set
+# CONFIG_B44 is not set
 # CONFIG_DGRS is not set
 # CONFIG_EEPRO100 is not set
 CONFIG_E100=y
@@ -299,9 +299,8 @@ CONFIG_E1000=y
 # CONFIG_NET_RADIO is not set
 
 #
-# Token Ring devices
+# Token Ring devices (depends on LLC=y)
 #
-# CONFIG_TR is not set
 # CONFIG_NET_FC is not set
 # CONFIG_RCPCI is not set
 # CONFIG_SHAPER is not set
@@ -462,7 +461,10 @@ CONFIG_RAMFS=y
 CONFIG_ISO9660_FS=y
 # CONFIG_JOLIET is not set
 # CONFIG_ZISOFS is not set
-# CONFIG_JFS_FS is not set
+CONFIG_JFS_FS=y
+# CONFIG_JFS_POSIX_ACL is not set
+# CONFIG_JFS_DEBUG is not set
+# CONFIG_JFS_STATISTICS is not set
 # CONFIG_MINIX_FS is not set
 # CONFIG_VXFS_FS is not set
 # CONFIG_NTFS_FS is not set
@@ -501,8 +503,7 @@ CONFIG_EXPORTFS=y
 CONFIG_CIFS=y
 # CONFIG_SMB_FS is not set
 # CONFIG_NCP_FS is not set
-CONFIG_AFS_FS=y
-CONFIG_RXRPC=y
+# CONFIG_AFS_FS is not set
 
 #
 # Partition Types
