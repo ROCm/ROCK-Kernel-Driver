@@ -1126,7 +1126,6 @@ static int __init rio_init(void)
   }
 
 #ifdef CONFIG_PCI
-  if (pci_present ()) {
     /* First look for the JET devices: */
 #ifndef TWO_ZERO
     while ((pdev = pci_find_device (PCI_VENDOR_ID_SPECIALIX, 
@@ -1277,7 +1276,6 @@ static int __init rio_init(void)
 #else
     }  /* Emacs from getting confused we have two closing braces too. */
 #endif
-  }
 #endif /* PCI */
 
   /* Now probe for ISA cards... */
@@ -1431,3 +1429,4 @@ module_exit(rio_exit);
  * tab-width: 8
  * End:
  */
+
