@@ -66,6 +66,8 @@
 #define URB_ZERO_PACKET 0
 #endif
 
+static int reset = 0;
+
 #ifdef CONFIG_BT_HCIUSB_SCO
 static int isoc = 2;
 #endif
@@ -963,7 +965,7 @@ static int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id 
 
 	hdev->owner = THIS_MODULE;
 
-	if (id->driver_info & HCI_RESET)
+	if (reset || id->driver_info & HCI_RESET)
 		set_bit(HCI_QUIRK_RESET_ON_INIT, &hdev->quirks);
 
 	if (hci_register_dev(hdev) < 0) {
@@ -1035,6 +1037,9 @@ static void __exit hci_usb_exit(void)
 
 module_init(hci_usb_init);
 module_exit(hci_usb_exit);
+
+module_param(reset, bool, 0644);
+MODULE_PARM_DESC(reset, "Send HCI reset command on initialization");
 
 #ifdef CONFIG_BT_HCIUSB_SCO
 module_param(isoc, int, 0644);
