@@ -35,7 +35,6 @@ struct driver_dir_entry {
 struct device;
 
 struct driver_file_entry {
-	struct driver_dir_entry * parent;
 	char			* name;
 	mode_t			mode;
 
