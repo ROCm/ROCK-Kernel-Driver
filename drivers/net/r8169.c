@@ -323,6 +323,9 @@ enum _DescStatusBit {
 	LastFrag	= (1 << 28), /* Final segment of a packet */
 
 	/* Tx private */
+	LargeSend	= (1 << 27), /* TCP Large Send Offload (TSO) */
+	MSSShift	= 16,        /* MSS value position */
+	MSSMask		= 0xfff,     /* MSS value + LargeSend bit: 12 bits */
 	IPCS		= (1 << 18), /* Calculate IP checksum */
 	UDPCS		= (1 << 17), /* Calculate UDP/IP checksum */
 	TCPCS		= (1 << 16), /* Calculate TCP/IP checksum */
@@ -844,6 +847,8 @@ static struct ethtool_ops rtl8169_ethtool_ops = {
 	.set_tx_csum		= ethtool_op_set_tx_csum,
 	.get_sg			= ethtool_op_get_sg,
 	.set_sg			= ethtool_op_set_sg,
+	.get_tso		= ethtool_op_get_tso,
+	.set_tso		= ethtool_op_set_tso,
 	.get_regs		= rtl8169_get_regs,
 };
 
@@ -1745,8 +1750,14 @@ static int rtl8169_xmit_frags(struct rtl8169_private *tp, struct sk_buff *skb,
 	return cur_frag;
 }
 
-static inline u32 rtl8169_tx_csum(struct sk_buff *skb)
+static inline u32 rtl8169_tso_csum(struct sk_buff *skb, struct net_device *dev)
 {
+	if (dev->features & NETIF_F_TSO) {
+		u32 mss = skb_shinfo(skb)->tso_size;
+
+		if (mss)
+			return LargeSend | ((mss & MSSMask) << MSSShift);
+	}
 	if (skb->ip_summed == CHECKSUM_HW) {
 		const struct iphdr *ip = skb->nh.iph;
 
@@ -1754,7 +1765,7 @@ static inline u32 rtl8169_tx_csum(struct sk_buff *skb)
 			return IPCS | TCPCS;
 		else if (ip->protocol == IPPROTO_UDP)
 			return IPCS | UDPCS;
-		BUG();
+		WARN_ON(1);	/* we need a WARN() */
 	}
 	return 0;
 }
@@ -1779,7 +1790,7 @@ static int rtl8169_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (unlikely(le32_to_cpu(txd->opts1) & DescOwn))
 		goto err_stop;
 
-	opts1 = DescOwn | rtl8169_tx_csum(skb);
+	opts1 = DescOwn | rtl8169_tso_csum(skb, dev);
 
 	frags = rtl8169_xmit_frags(tp, skb, opts1);
 	if (frags) {
