@@ -1176,9 +1176,11 @@ static int snd_mixer_oss_notify_handler(snd_card_t * card, int free_flag)
 			mixer->name[sizeof(mixer->name)-1] = 0;
 		} else
 			strcpy(mixer->name, name);
+#ifdef SNDRV_OSS_INFO_DEV_MIXERS
 		snd_oss_info_register(SNDRV_OSS_INFO_DEV_MIXERS,
 				      card->number,
 				      mixer->name);
+#endif
 		for (idx = 0; idx < SNDRV_OSS_MAX_MIXERS; idx++)
 			mixer->slots[idx].number = idx;
 		card->mixer_oss = mixer;
@@ -1188,7 +1190,9 @@ static int snd_mixer_oss_notify_handler(snd_card_t * card, int free_flag)
 		snd_mixer_oss_t *mixer = card->mixer_oss;
 		if (mixer == NULL)
 			return 0;
+#ifdef SNDRV_OSS_INFO_DEV_MIXERS
 		snd_oss_info_unregister(SNDRV_OSS_INFO_DEV_MIXERS, mixer->card->number);
+#endif
 		snd_unregister_oss_device(SNDRV_OSS_DEVICE_TYPE_MIXER, mixer->card, 0);
 		snd_mixer_oss_proc_done(mixer);
 		return snd_mixer_oss_free1(mixer);

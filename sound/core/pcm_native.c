@@ -2359,7 +2359,7 @@ static ssize_t snd_pcm_readv(struct file *file, const struct iovec *_vector,
 	snd_pcm_runtime_t *runtime;
 	snd_pcm_sframes_t result;
 	unsigned long i;
-	void *bufs;
+	void **bufs;
 	snd_pcm_uframes_t frames;
 
 	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return -ENXIO);
@@ -2393,7 +2393,7 @@ static ssize_t snd_pcm_writev(struct file *file, const struct iovec *_vector,
 	snd_pcm_runtime_t *runtime;
 	snd_pcm_sframes_t result;
 	unsigned long i;
-	void *bufs;
+	void **bufs;
 	snd_pcm_uframes_t frames;
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 3, 0)
@@ -2413,7 +2413,7 @@ static ssize_t snd_pcm_writev(struct file *file, const struct iovec *_vector,
 		goto end;
 	}
 	frames = bytes_to_samples(runtime, _vector->iov_len);
-	bufs = kcalloc(sizeof(void *) * count, GFP_KERNEL);
+	bufs = kmalloc(sizeof(void *) * count, GFP_KERNEL);
 	if (bufs == NULL)
 		return -ENOMEM;
 	for (i = 0; i < count; ++i)

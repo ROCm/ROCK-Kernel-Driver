@@ -2123,9 +2123,11 @@ static int snd_pcm_oss_register_minor(unsigned short native_minor,
 			      pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream_count && 
 			      !(pcm->info_flags & SNDRV_PCM_INFO_HALF_DUPLEX));
 		sprintf(name, "%s%s", pcm->name, duplex ? " (DUPLEX)" : "");
+#ifdef SNDRV_OSS_INFO_DEV_AUDIO
 		snd_oss_info_register(SNDRV_OSS_INFO_DEV_AUDIO,
 				      pcm->card->number,
 				      name);
+#endif
 		pcm->oss.reg++;
 	}
 	if (snd_adsp_map[pcm->card->number] == pcm->device) {
@@ -2146,7 +2148,9 @@ static int snd_pcm_oss_unregister_minor(unsigned short native_minor,
 		if (snd_dsp_map[pcm->card->number] == pcm->device) {
 			snd_unregister_oss_device(SNDRV_OSS_DEVICE_TYPE_PCM,
 						  pcm->card, 0);
+#ifdef SNDRV_OSS_INFO_DEV_AUDIO
 			snd_oss_info_unregister(SNDRV_OSS_INFO_DEV_AUDIO, pcm->card->number);
+#endif
 		}
 		if (snd_adsp_map[pcm->card->number] == pcm->device)
 			snd_unregister_oss_device(SNDRV_OSS_DEVICE_TYPE_PCM,
