@@ -985,6 +985,14 @@ config SCSI_SYM53C8XX_IOMAPPED
 	  the card.  This is significantly slower then using memory
 	  mapped IO.  Most people should answer N.
 
+config SCSI_IPR
+	tristate "IBM Power Linux RAID adapter support"
+	depends on PCI && SCSI
+	---help---
+	  This driver supports the IBM Power Linux family RAID adapters.
+	  This includes IBM pSeries 5712, 5703, 5709, and 570A, as well
+	  as IBM iSeries 5702, 5703, 5709, and 570A.
+
 config SCSI_ZALON
 	tristate "Zalon SCSI support"
 	depends on GSC && SCSI
