@@ -404,7 +404,7 @@ int ext2_new_block (struct inode * inode, unsigned long goal,
 	if (DQUOT_ALLOC_BLOCK(inode, 1))
 		goto out;
 
-	while (prealloc_goal && !DQUOT_PREALLOC_BLOCK(inode, prealloc_goal))
+	while (prealloc_goal && DQUOT_PREALLOC_BLOCK(inode, prealloc_goal))
 		prealloc_goal--;
 
 	dq_alloc = prealloc_goal + 1;
