@@ -166,9 +166,6 @@ static void prom_panic(const char *reason);
 static unsigned long copy_device_tree(unsigned long);
 static unsigned long inspect_node(phandle, struct device_node *, unsigned long,
 				  unsigned long, struct device_node ***);
-static unsigned long finish_node(struct device_node *, unsigned long,
-				 interpret_func *, int, int);
-static unsigned long finish_node_interrupts(struct device_node *, unsigned long);
 static unsigned long check_display(unsigned long);
 static int prom_next_node(phandle *);
 static struct bi_record * prom_bi_rec_verify(struct bi_record *);
@@ -1938,93 +1935,6 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	return phys;
 }
 
-
-/*
- * finish_device_tree is called once things are running normally
- * (i.e. with text and data mapped to the address they were linked at).
- * It traverses the device tree and fills in the name, type,
- * {n_}addrs and {n_}intrs fields of each node.
- */
-void __init
-finish_device_tree(void)
-{
-	unsigned long mem = klimit;
-
-	virt_irq_init();
-
-	mem = finish_node(allnodes, mem, NULL, 0, 0);
-	dev_tree_size = mem - (unsigned long) allnodes;
-
-	mem = _ALIGN(mem, PAGE_SIZE);
-	lmb_reserve(__pa(klimit), mem-klimit);
-
-	klimit = mem;
-
-	rtas.dev = of_find_node_by_name(NULL, "rtas");
-}
-
-static unsigned long __init
-finish_node(struct device_node *np, unsigned long mem_start,
-	    interpret_func *ifunc, int naddrc, int nsizec)
-{
-	struct device_node *child;
-	int *ip;
-
-	np->name = get_property(np, "name", 0);
-	np->type = get_property(np, "device_type", 0);
-
-	if (!np->name)
-		np->name = "<NULL>";
-	if (!np->type)
-		np->type = "<NULL>";
-
-	/* get the device addresses and interrupts */
-	if (ifunc != NULL)
-		mem_start = ifunc(np, mem_start, naddrc, nsizec);
-
-	mem_start = finish_node_interrupts(np, mem_start);
-
-	/* Look for #address-cells and #size-cells properties. */
-	ip = (int *) get_property(np, "#address-cells", 0);
-	if (ip != NULL)
-		naddrc = *ip;
-	ip = (int *) get_property(np, "#size-cells", 0);
-	if (ip != NULL)
-		nsizec = *ip;
-
-	/* the f50 sets the name to 'display' and 'compatible' to what we
-	 * expect for the name -- Cort
-	 */
-	if (!strcmp(np->name, "display"))
-		np->name = get_property(np, "compatible", 0);
-
-	if (!strcmp(np->name, "device-tree") || np->parent == NULL)
-		ifunc = interpret_root_props;
-	else if (np->type == 0)
-		ifunc = NULL;
-	else if (!strcmp(np->type, "pci") || !strcmp(np->type, "vci"))
-		ifunc = interpret_pci_props;
-	else if (!strcmp(np->type, "dbdma"))
-		ifunc = interpret_dbdma_props;
-	else if (!strcmp(np->type, "mac-io") || ifunc == interpret_macio_props)
-		ifunc = interpret_macio_props;
-	else if (!strcmp(np->type, "isa"))
-		ifunc = interpret_isa_props;
-	else if (!strcmp(np->name, "uni-n") || !strcmp(np->name, "u3"))
-		ifunc = interpret_root_props;
-	else if (!((ifunc == interpret_dbdma_props
-		    || ifunc == interpret_macio_props)
-		   && (!strcmp(np->type, "escc")
-		       || !strcmp(np->type, "media-bay"))))
-		ifunc = NULL;
-
-	for (child = np->child; child != NULL; child = child->sibling)
-		mem_start = finish_node(child, mem_start, ifunc,
-					naddrc, nsizec);
-
-	return mem_start;
-}
-
 /*
  * Find the interrupt parent of a node.
  */
@@ -2165,9 +2075,6 @@ map_interrupt(unsigned int **irq, struct device_node **ictrler,
 	return nintrc;
 }
 
-/*
- * New version of finish_node_interrupts.
- */
 static unsigned long __init
 finish_node_interrupts(struct device_node *np, unsigned long mem_start)
 {
@@ -2218,6 +2125,92 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start)
 	}
 
 	return mem_start;
+}
+
+static unsigned long __init
+finish_node(struct device_node *np, unsigned long mem_start,
+	    interpret_func *ifunc, int naddrc, int nsizec)
+{
+	struct device_node *child;
+	int *ip;
+
+	np->name = get_property(np, "name", 0);
+	np->type = get_property(np, "device_type", 0);
+
+	if (!np->name)
+		np->name = "<NULL>";
+	if (!np->type)
+		np->type = "<NULL>";
+
+	/* get the device addresses and interrupts */
+	if (ifunc != NULL)
+		mem_start = ifunc(np, mem_start, naddrc, nsizec);
+
+	mem_start = finish_node_interrupts(np, mem_start);
+
+	/* Look for #address-cells and #size-cells properties. */
+	ip = (int *) get_property(np, "#address-cells", 0);
+	if (ip != NULL)
+		naddrc = *ip;
+	ip = (int *) get_property(np, "#size-cells", 0);
+	if (ip != NULL)
+		nsizec = *ip;
+
+	/* the f50 sets the name to 'display' and 'compatible' to what we
+	 * expect for the name -- Cort
+	 */
+	if (!strcmp(np->name, "display"))
+		np->name = get_property(np, "compatible", 0);
+
+	if (!strcmp(np->name, "device-tree") || np->parent == NULL)
+		ifunc = interpret_root_props;
+	else if (np->type == 0)
+		ifunc = NULL;
+	else if (!strcmp(np->type, "pci") || !strcmp(np->type, "vci"))
+		ifunc = interpret_pci_props;
+	else if (!strcmp(np->type, "dbdma"))
+		ifunc = interpret_dbdma_props;
+	else if (!strcmp(np->type, "mac-io") || ifunc == interpret_macio_props)
+		ifunc = interpret_macio_props;
+	else if (!strcmp(np->type, "isa"))
+		ifunc = interpret_isa_props;
+	else if (!strcmp(np->name, "uni-n") || !strcmp(np->name, "u3"))
+		ifunc = interpret_root_props;
+	else if (!((ifunc == interpret_dbdma_props
+		    || ifunc == interpret_macio_props)
+		   && (!strcmp(np->type, "escc")
+		       || !strcmp(np->type, "media-bay"))))
+		ifunc = NULL;
+
+	for (child = np->child; child != NULL; child = child->sibling)
+		mem_start = finish_node(child, mem_start, ifunc,
+					naddrc, nsizec);
+
+	return mem_start;
+}
+
+/*
+ * finish_device_tree is called once things are running normally
+ * (i.e. with text and data mapped to the address they were linked at).
+ * It traverses the device tree and fills in the name, type,
+ * {n_}addrs and {n_}intrs fields of each node.
+ */
+void __init
+finish_device_tree(void)
+{
+	unsigned long mem = klimit;
+
+	virt_irq_init();
+
+	mem = finish_node(allnodes, mem, NULL, 0, 0);
+	dev_tree_size = mem - (unsigned long) allnodes;
+
+	mem = _ALIGN(mem, PAGE_SIZE);
+	lmb_reserve(__pa(klimit), mem-klimit);
+
+	klimit = mem;
+
+	rtas.dev = of_find_node_by_name(NULL, "rtas");
 }
 
 int
