@@ -834,7 +834,7 @@ static int __init pci_iommu_init(void)
 fs_initcall(pci_iommu_init);
 
 /* iommu=[size][,noagp][,off][,force][,noforce][,leak][,memaper[=order]][,merge]
-         [,forcesac][,fullflush][,nomerge]
+         [,forcesac][,fullflush][,nomerge][,noaperture]
    size  set size of iommu (in bytes) 
    noagp don't initialize the AGP driver and use full aperture.
    off   don't use the IOMMU
@@ -849,6 +849,7 @@ fs_initcall(pci_iommu_init);
    nofullflush Don't use IOMMU fullflush
    allowed  overwrite iommu off workarounds for specific chipsets.
    soft	 Use software bounce buffering (default for Intel machines)
+   noaperture Don't touch the aperture for AGP.
 */
 __init int iommu_setup(char *opt) 
 { 
@@ -873,7 +874,7 @@ __init int iommu_setup(char *opt)
 	    if (!memcmp(p, "memaper", 7)) { 
 		    fallback_aper_force = 1; 
 		    p += 7; 
-		    if (*p == '=' && get_option(&p, &arg))
+		    if (*p == '=' && (p++, get_option(&p, &arg)))
 			    fallback_aper_order = arg;
 	    } 
 	    if (!memcmp(p, "panic", 5))
@@ -894,6 +895,10 @@ __init int iommu_setup(char *opt)
 		    iommu_fullflush = 0;
 	    if (!memcmp(p, "soft", 4))
 		    swiotlb = 1;
+	    if (!memcmp(p, "noaperture", 10)) { 
+		    extern int fix_agp_aperture;
+		    fix_agp_aperture = 0;
+	    }
 #ifdef CONFIG_IOMMU_LEAK
 	    if (!memcmp(p,"leak", 4)) { 
 		    leak_trace = 1;
