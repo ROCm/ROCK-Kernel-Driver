@@ -19,6 +19,10 @@ ToDo:
 	  sufficient for synchronisation here. We then just need to make sure
 	  ntfs_readpage/writepage/truncate interoperate properly with us.
 
+2.1.8 - WIP.
+
+	- Use get_bh() instead of manual atomic_inc() in fs/ntfs/compress.c.
+
 2.1.7 - Enable NFS exporting of mounted NTFS volumes.
 
 	- Set i_generation in the VFS inode from the seq_no of the NTFS inode.
