@@ -38,7 +38,7 @@
 #include <linux/dis-asm.h>
 #include <asm/kdbprivate.h>
 
-#include "bfd.h"
+#include <asm/bfd.h>
 
 /*
  * Kernel Debugger Error codes.  Must not overlap with command codes.

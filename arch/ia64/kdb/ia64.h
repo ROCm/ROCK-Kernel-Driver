@@ -9,7 +9,7 @@
 #ifndef __KERNEL__
 #include <sys/types.h>
 #else
-#include <bfd.h>
+#include <asm/bfd.h>
 #endif
 
 

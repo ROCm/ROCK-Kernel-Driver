@@ -42,7 +42,7 @@ dis_abort(int line)
 #define xmalloc(size) ({ void *res = kmalloc(size, GFP_ATOMIC); if (!res) BUG(); res; })
 #define free(address) kfree(address)
 
-#include <bfd.h>
+#include <asm/bfd.h>
 
 typedef int (*fprintf_ftype) PARAMS((PTR, const char*, ...));
 
