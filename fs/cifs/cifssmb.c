@@ -2067,6 +2067,7 @@ CIFSGetDFSRefer(const int xid, struct cifsSesInfo *ses,
 	int name_len;
 	unsigned int i;
 	char * temp;
+	__u16 params, byte_count;
 	*number_of_UNC_in_array = 0;
 	*targetUNCs = NULL;
 
@@ -2103,7 +2104,7 @@ getDFSRetry:
 		strncpy(pSMB->RequestFileName, searchName, name_len);
 	}
 
-	pSMB->ParameterCount = 2 /* level */  + name_len /*includes null */ ;
+	params = 2 /* level */  + name_len /*includes null */ ;
 	pSMB->TotalDataCount = 0;
 	pSMB->DataCount = 0;
 	pSMB->DataOffset = 0;
@@ -2119,12 +2120,12 @@ getDFSRetry:
 	pSMB->SetupCount = 1;
 	pSMB->Reserved3 = 0;
 	pSMB->SubCommand = cpu_to_le16(TRANS2_GET_DFS_REFERRAL);
-	pSMB->ByteCount = pSMB->ParameterCount + 3 /* pad */ ;
-	pSMB->ParameterCount = cpu_to_le16(pSMB->ParameterCount);
+	byte_count = params + 3 /* pad */ ;
+	pSMB->ParameterCount = cpu_to_le16(params);
 	pSMB->TotalParameterCount = pSMB->ParameterCount;
 	pSMB->MaxReferralLevel = cpu_to_le16(3);
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->hdr.smb_buf_length += byte_count;
+	pSMB->ByteCount = cpu_to_le16(byte_count);
 
 	rc = SendReceive(xid, ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
@@ -2132,20 +2133,21 @@ getDFSRetry:
 		cFYI(1, ("Send error in GetDFSRefer = %d", rc));
 	} else {		/* decode response */
 /* BB Add logic to parse referrals here */
-		pSMBr->DataOffset = le16_to_cpu(pSMBr->DataOffset);
-		pSMBr->DataCount = le16_to_cpu(pSMBr->DataCount);
+		__u16 data_offset = le16_to_cpu(pSMBr->DataOffset);
+		__u16 data_count = le16_to_cpu(pSMBr->DataCount);
 		cFYI(1,
 		     ("Decoding GetDFSRefer response.  BCC: %d  Offset %d",
-		      pSMBr->ByteCount, pSMBr->DataOffset));
-		if ((pSMBr->ByteCount < 17) || (pSMBr->DataOffset > 512))	/* BB also check enough total bytes returned */
+		      pSMBr->ByteCount, data_offset));
+		if ((pSMBr->ByteCount < 17) || (data_offset > 512))	/* BB also check enough total bytes returned */
 			rc = -EIO;	/* bad smb */
 		else {
 			referrals = 
 			    (struct dfs_referral_level_3 *) 
 					(8 /* sizeof start of data block */ +
-					pSMBr->DataOffset +
+					data_offset +
 					(char *) &pSMBr->hdr.Protocol); 
-			cFYI(1,("num_referrals: %d dfs flags: 0x%x ... \nfor referral one refer size: 0x%x srv type: 0x%x refer flags: 0x%x ttl: 0x%x",pSMBr->NumberOfReferrals,pSMBr->DFSFlags, referrals->ReferralSize,referrals->ServerType,referrals->ReferralFlags,referrals->TimeToLive));
+			cFYI(1,("num_referrals: %d dfs flags: 0x%x ... \nfor referral one refer size: 0x%x srv type: 0x%x refer flags: 0x%x ttl: 0x%x",
+				le16_to_cpu(pSMBr->NumberOfReferrals),le16_to_cpu(pSMBr->DFSFlags), le16_to_cpu(referrals->ReferralSize),le16_to_cpu(referrals->ServerType),le16_to_cpu(referrals->ReferralFlags),le16_to_cpu(referrals->TimeToLive)));
 			/* BB This field is actually two bytes in from start of
 			   data block so we could do safety check that DataBlock
 			   begins at address of pSMBr->NumberOfReferrals */
@@ -2159,19 +2161,19 @@ getDFSRetry:
 			name_len = 0;
 			for(i=0;i<*number_of_UNC_in_array;i++) {
 				/* make sure that DfsPathOffset not past end */
-				referrals->DfsPathOffset = le16_to_cpu(referrals->DfsPathOffset);
-				if(referrals->DfsPathOffset > pSMBr->DataCount) {
+				__u16 offset = le16_to_cpu(referrals->DfsPathOffset);
+				if (offset > data_count) {
 					/* if invalid referral, stop here and do 
 					not try to copy any more */
 					*number_of_UNC_in_array = i;
 					break;
 				} 
-				temp = ((char *)referrals) + referrals->DfsPathOffset;
+				temp = ((char *)referrals) + offset;
 
 				if (pSMBr->hdr.Flags2 & SMBFLG2_UNICODE) {
-					name_len += UniStrnlen((wchar_t *)temp,pSMBr->DataCount);
+					name_len += UniStrnlen((wchar_t *)temp,data_count);
 				} else {
-					name_len += strnlen(temp,pSMBr->DataCount);
+					name_len += strnlen(temp,data_count);
 				}
 				referrals++;
 				/* BB add check that referral pointer does not fall off end PDU */
@@ -2188,11 +2190,11 @@ getDFSRetry:
 			referrals =  
 			    (struct dfs_referral_level_3 *) 
 					(8 /* sizeof data hdr */ +
-					pSMBr->DataOffset + 
+					data_offset + 
 					(char *) &pSMBr->hdr.Protocol);
 
 			for(i=0;i<*number_of_UNC_in_array;i++) {
-				temp = ((char *)referrals) + referrals->DfsPathOffset;
+				temp = ((char *)referrals) + le16_to_cpu(referrals->DfsPathOffset);
 				if (pSMBr->hdr.Flags2 & SMBFLG2_UNICODE) {
 					cifs_strfromUCS_le(*targetUNCs,
 						(wchar_t *) temp, name_len, nls_codepage);
