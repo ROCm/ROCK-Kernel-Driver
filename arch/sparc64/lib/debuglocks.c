@@ -35,14 +35,17 @@ static inline void show_read (char *str, rwlock_t *lock, unsigned long caller)
 static inline void show_write (char *str, rwlock_t *lock, unsigned long caller)
 {
 	int cpu = smp_processor_id();
+	int i;
 
 	printk("%s(%p) CPU#%d stuck at %08x\n",
 	       str, lock, cpu, (unsigned int) caller);
 	printk("Writer: PC(%08x):CPU(%x)\n",
 	       lock->writer_pc, lock->writer_cpu);
-	printk("Readers: 0[%08x] 1[%08x] 2[%08x] 4[%08x]\n",
-	       lock->reader_pc[0], lock->reader_pc[1],
-	       lock->reader_pc[2], lock->reader_pc[3]);
+	printk("Readers:");
+	for (i = 0; i < NR_CPUS; i++)
+		if (lock->reader_pc[i])
+			printk(" %d[%08x]", i, lock->reader_pc[i]);
+	printk("\n");
 }
 
 #undef INIT_STUCK
