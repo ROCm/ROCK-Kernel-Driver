@@ -483,7 +483,7 @@ static irqreturn_t pmz_interrupt(int irq, void *dev_id, struct pt_regs *regs)
        		if (r3 & CHBEXT)
        			pmz_status_handle(uap_b, regs);
        	       	if (r3 & CHBRxIP)
-       			pmz_receive_chars(uap_b, regs);
+       			tty = pmz_receive_chars(uap_b, regs);
        		if (r3 & CHBTxIP)
        			pmz_transmit_chars(uap_b);
 	       	rc = IRQ_HANDLED;
