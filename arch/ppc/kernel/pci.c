@@ -800,6 +800,17 @@ pci_busdev_to_OF_node(struct pci_bus *bus, int devfn)
 		return NULL;
 
 	/* Fixup bus number according to what OF think it is. */
+#ifdef CONFIG_PPC_PMAC
+	/* The G5 need a special case here. Basically, we don't remap all
+	 * busses on it so we don't create the pci-OF-map. However, we do
+	 * remap the AGP bus and so have to deal with it. A future better
+	 * fix has to be done by making the remapping per-host and always
+	 * filling the pci_to_OF map. --BenH
+	 */
+	if (_machine == _MACH_Pmac && busnr >= 0xf0)
+		busnr -= 0xf0;
+	else
+#endif
 	if (pci_to_OF_bus_map)
 		busnr = pci_to_OF_bus_map[busnr];
 	if (busnr == 0xff)
