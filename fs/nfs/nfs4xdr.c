@@ -1077,13 +1077,13 @@ decode_getattr(struct nfs4_compound *cp, int nfserr, struct nfs4_getattr *getatt
                 READ_BUF(8);
                 len += 8;
                 READ64(nfp->change_attr);
-                dprintk("read_attrs: changeid=%Ld\n", (u64)nfp->change_attr);
+                dprintk("read_attrs: changeid=%Ld\n", (long long)nfp->change_attr);
         }
         if (bmval0 & FATTR4_WORD0_SIZE) {
                 READ_BUF(8);
                 len += 8;
                 READ64(nfp->size);
-                dprintk("read_attrs: size=%Ld\n", (u64)nfp->size);
+                dprintk("read_attrs: size=%Ld\n", (long long)nfp->size);
         }
         if (bmval0 & FATTR4_WORD0_FSID) {
                 READ_BUF(16);
@@ -1091,7 +1091,8 @@ decode_getattr(struct nfs4_compound *cp, int nfserr, struct nfs4_getattr *getatt
                 READ64(nfp->fsid_u.nfs4.major);
                 READ64(nfp->fsid_u.nfs4.minor);
                 dprintk("read_attrs: fsid=0x%Lx/0x%Lx\n",
-			nfp->fsid_u.nfs4.major, nfp->fsid_u.nfs4.minor);
+			(long long)nfp->fsid_u.nfs4.major,
+			(long long)nfp->fsid_u.nfs4.minor);
         }
         if (bmval0 & FATTR4_WORD0_LEASE_TIME) {
                 READ_BUF(4);
@@ -1103,31 +1104,31 @@ decode_getattr(struct nfs4_compound *cp, int nfserr, struct nfs4_getattr *getatt
                 READ_BUF(8);
                 len += 8;
                 READ64(nfp->fileid);
-                dprintk("read_attrs: fileid=%Ld\n", nfp->fileid);
+                dprintk("read_attrs: fileid=%Ld\n", (long long) nfp->fileid);
         }
 	if (bmval0 & FATTR4_WORD0_FILES_AVAIL) {
 		READ_BUF(8);
 		len += 8;
 		READ64(fsstat->afiles);
-		dprintk("read_attrs: files_avail=0x%Lx\n", fsstat->afiles);
+		dprintk("read_attrs: files_avail=0x%Lx\n", (long long) fsstat->afiles);
 	}
         if (bmval0 & FATTR4_WORD0_FILES_FREE) {
                 READ_BUF(8);
                 len += 8;
                 READ64(fsstat->ffiles);
-                dprintk("read_attrs: files_free=0x%Lx\n", fsstat->ffiles);
+                dprintk("read_attrs: files_free=0x%Lx\n", (long long) fsstat->ffiles);
         }
         if (bmval0 & FATTR4_WORD0_FILES_TOTAL) {
                 READ_BUF(8);
                 len += 8;
                 READ64(fsstat->tfiles);
-                dprintk("read_attrs: files_tot=0x%Lx\n", fsstat->tfiles);
+                dprintk("read_attrs: files_tot=0x%Lx\n", (long long) fsstat->tfiles);
         }
         if (bmval0 & FATTR4_WORD0_MAXFILESIZE) {
                 READ_BUF(8);
                 len += 8;
                 READ64(fsinfo->maxfilesize);
-                dprintk("read_attrs: maxfilesize=0x%Lx\n", fsinfo->maxfilesize);
+                dprintk("read_attrs: maxfilesize=0x%Lx\n", (long long) fsinfo->maxfilesize);
         }
 	if (bmval0 & FATTR4_WORD0_MAXLINK) {
 		READ_BUF(4);
@@ -1214,25 +1215,25 @@ decode_getattr(struct nfs4_compound *cp, int nfserr, struct nfs4_getattr *getatt
                 READ_BUF(8);
                 len += 8;
                 READ64(fsstat->abytes);
-                dprintk("read_attrs: savail=0x%Lx\n", fsstat->abytes);
+                dprintk("read_attrs: savail=0x%Lx\n", (long long) fsstat->abytes);
         }
 	if (bmval1 & FATTR4_WORD1_SPACE_FREE) {
                 READ_BUF(8);
                 len += 8;
                 READ64(fsstat->fbytes);
-                dprintk("read_attrs: sfree=0x%Lx\n", fsstat->fbytes);
+                dprintk("read_attrs: sfree=0x%Lx\n", (long long) fsstat->fbytes);
         }
         if (bmval1 & FATTR4_WORD1_SPACE_TOTAL) {
                 READ_BUF(8);
                 len += 8;
                 READ64(fsstat->tbytes);
-                dprintk("read_attrs: stotal=0x%Lx\n", fsstat->tbytes);
+                dprintk("read_attrs: stotal=0x%Lx\n", (long long) fsstat->tbytes);
         }
         if (bmval1 & FATTR4_WORD1_SPACE_USED) {
                 READ_BUF(8);
                 len += 8;
                 READ64(nfp->du.nfs3.used);
-                dprintk("read_attrs: sused=0x%Lx\n", nfp->du.nfs3.used);
+                dprintk("read_attrs: sused=0x%Lx\n", (long long) nfp->du.nfs3.used);
         }
         if (bmval1 & FATTR4_WORD1_TIME_ACCESS) {
                 READ_BUF(12);

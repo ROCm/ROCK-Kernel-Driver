@@ -1355,7 +1355,7 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 	if (data->auth_flavourlen != 0) {
 		if (data->auth_flavourlen > 1)
 			printk(KERN_INFO "NFS: cannot yet deal with multiple auth flavours.\n");
-		if (copy_from_user(authflavour, data->auth_flavours, sizeof(authflavour))) {
+		if (copy_from_user(&authflavour, data->auth_flavours, sizeof(authflavour))) {
 			err = -EFAULT;
 			goto out_fail;
 		}
