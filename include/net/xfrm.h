@@ -562,6 +562,15 @@ secpath_put(struct sec_path *sp)
 
 extern struct sec_path *secpath_dup(struct sec_path *src);
 
+static inline void
+secpath_reset(struct sk_buff *skb)
+{
+#ifdef CONFIG_XFRM
+	secpath_put(skb->sp);
+	skb->sp = NULL;
+#endif
+}
+
 static inline int
 __xfrm4_state_addr_cmp(struct xfrm_tmpl *tmpl, struct xfrm_state *x)
 {
