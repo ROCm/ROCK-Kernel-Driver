@@ -47,5 +47,8 @@ config VIDEO_BTCX
 config VIDEO_IR
 	tristate
 
+config VIDEO_TVEEPROM
+	tristate
+
 endmenu
 
