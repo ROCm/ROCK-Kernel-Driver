@@ -2,7 +2,7 @@
 
 # The target object and module list name.
 
-O_TARGET	:= isdn.a
+O_TARGET	:= vmlinux-obj.o
 
 # Objects that export symbols.
 
