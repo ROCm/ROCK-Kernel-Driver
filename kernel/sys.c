@@ -1161,6 +1161,8 @@ struct group_info *groups_alloc(int gidsetsize)
 	int i;
 
 	nblocks = (gidsetsize + NGROUPS_PER_BLOCK - 1) / NGROUPS_PER_BLOCK;
+	if (nblocks == 0)
+		nblocks = 1;
 	group_info = kmalloc(sizeof(*group_info) + nblocks*sizeof(gid_t *),
 	    GFP_USER);
 	if (!group_info)
