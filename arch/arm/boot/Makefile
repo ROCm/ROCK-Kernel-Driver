@@ -8,6 +8,8 @@
 # Copyright (C) 1995-2002 Russell King
 #
 
+MKIMAGE         := $(srctree)/scripts/mkuboot.sh
+
 # Note: the following conditions must always be true:
 #   ZRELADDR == virt_to_phys(TEXTADDR)
 #   PARAMS_PHYS must be with 4MB of ZRELADDR
@@ -77,6 +79,16 @@ $(obj)/Image: vmlinux FORCE
 $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
 	$(call if_changed,objcopy)
 	@echo '  Kernel: $@ is ready'
+
+quite_cmd_uimage = UIMAGE $@
+      cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A arm -O linux -T kernel \
+		   -C none -a $(ZRELADDR) -e $(ZRELADDR) \
+		   -n 'Linux-$(KERNELRELEASE)' -d $< $@
+
+targets += uImage
+$(obj)/uImage:	$(obj)/zImage
+	$(call if_changed,uimage)
+	@echo '  Image $@ is ready'
 
 $(obj)/bootpImage: $(obj)/bootp/bootp FORCE
 	$(call if_changed,objcopy)
