@@ -437,7 +437,7 @@ EXPORT_SYMBOL(ide_end_drive_cmd);
  *	by read a sector's worth of data from the drive.  Of course,
  *	this may not help if the drive is *waiting* for data from *us*.
  */
-void try_to_flush_leftover_data (ide_drive_t *drive)
+static void try_to_flush_leftover_data (ide_drive_t *drive)
 {
 	int i = (drive->mult_count ? drive->mult_count : 1) * SECTOR_WORDS;
 
@@ -451,8 +451,6 @@ void try_to_flush_leftover_data (ide_drive_t *drive)
 		HWIF(drive)->ata_input_data(drive, buffer, wcount);
 	}
 }
-
-EXPORT_SYMBOL(try_to_flush_leftover_data);
 
 static ide_startstop_t ide_ata_error(ide_drive_t *drive, struct request *rq, u8 stat, u8 err)
 {
