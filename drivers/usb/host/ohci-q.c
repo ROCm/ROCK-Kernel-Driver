@@ -457,7 +457,8 @@ done:
 /* request unlinking of an endpoint from an operational HC.
  * put the ep on the rm_list
  * real work is done at the next start frame (SF) hardware interrupt
- * caller guarantees HCD is running, so hardware access is safe.
+ * caller guarantees HCD is running, so hardware access is safe,
+ * and that ed->state is ED_OPER
  */
 static void start_ed_unlink (struct ohci_hcd *ohci, struct ed *ed)
 {    
@@ -909,13 +910,6 @@ finish_unlinks (struct ohci_hcd *ohci, u16 tick, struct pt_regs *regs)
 {
 	struct ed	*ed, **last;
 
-ed = ohci->ed_rm_list;
-if (ed && ed == ed->ed_next) {
-	printk ("RM_LIST LOOP!  head %p, ed %p, ed->next %p\n",
-		ohci->ed_rm_list, ed, ed->ed_next);
-	ed->ed_next = 0;
-}
-
 rescan_all:
 	for (last = &ohci->ed_rm_list, ed = *last; ed != NULL; ed = *last) {
 		struct list_head	*entry, *tmp;
@@ -1075,7 +1069,7 @@ dl_done_list (struct ohci_hcd *ohci, struct td *td, struct pt_regs *regs)
   			finish_urb (ohci, urb, regs);
 
 		/* clean schedule:  unlink EDs that are no longer busy */
-		if (list_empty (&ed->td_list))
+		if (list_empty (&ed->td_list) && ed->state == ED_OPER)
 			start_ed_unlink (ohci, ed);
 		/* ... reenabling halted EDs only after fault cleanup */
 		else if ((ed->hwINFO & (ED_SKIP | ED_DEQUEUE)) == ED_SKIP) {
