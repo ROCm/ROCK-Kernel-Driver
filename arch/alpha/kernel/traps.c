@@ -118,7 +118,7 @@ dik_show_trace(unsigned long *sp)
 	long i = 0;
 	printk("Trace:");
 	while (0x1ff8 & (unsigned long) sp) {
-		extern unsigned long _stext, _etext;
+		extern char _stext[], _etext[];
 		unsigned long tmp = *sp;
 		sp++;
 		if (tmp < (unsigned long) &_stext)

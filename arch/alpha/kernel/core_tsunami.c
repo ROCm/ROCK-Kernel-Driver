@@ -357,7 +357,6 @@ void __init
 tsunami_init_arch(void)
 {
 #ifdef NXM_MACHINE_CHECKS_ON_TSUNAMI
-	extern asmlinkage void entInt(void);
 	unsigned long tmp;
 	
 	/* Ho hum.. init_arch is called before init_IRQ, but we need to be

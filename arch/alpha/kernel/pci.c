@@ -42,6 +42,8 @@ const char *const pci_mem_names[] = {
 
 const char pci_hae0_name[] = "HAE0";
 
+/* Indicate whether we respect the PCI setup left by console. */
+int __initdata pci_probe_only;
 
 /*
  * The PCI controller list.
@@ -270,7 +272,11 @@ pcibios_fixup_bus(struct pci_bus *bus)
 		end = hose->mem_space->start + pci_mem_end;
 		if (hose->mem_space->end > end)
 			hose->mem_space->end = end;
-	}
+ 	} else if (pci_probe_only &&
+ 		   (dev->class >> 8) == PCI_CLASS_BRIDGE_PCI) {
+ 		pci_read_bridge_bases(bus);
+ 		pcibios_fixup_device_resources(dev, bus);
+	} 
 
 	for (ln = bus->devices.next; ln != &bus->devices; ln = ln->next) {
 		struct pci_dev *dev = pci_dev_b(ln);
@@ -407,6 +413,30 @@ pcibios_set_master(struct pci_dev *dev)
 	pci_write_config_byte(dev, PCI_LATENCY_TIMER, 64);
 }
 
+static void __init
+pcibios_claim_console_setup(void)
+{
+	struct list_head *lb;
+
+	for(lb = pci_root_buses.next; lb != &pci_root_buses; lb = lb->next) {
+		struct pci_bus *b = pci_bus_b(lb);
+		struct list_head *ld;
+
+		for (ld = b->devices.next; ld != &b->devices; ld = ld->next) {
+			struct pci_dev *dev = pci_dev_b(ld);
+			int i;
+
+			for (i = 0; i < PCI_NUM_RESOURCES; i++) {
+				struct resource *r = &dev->resource[i];
+
+				if (r->parent || !r->start || !r->flags)
+					continue;
+				pci_claim_resource(dev, i);
+			}
+		}
+	}
+}
+
 void __init
 common_init_pci(void)
 {
@@ -424,7 +454,12 @@ common_init_pci(void)
 		next_busno += 1;
 	}
 
-	pci_assign_unassigned_resources();
+	if (pci_probe_only)
+		pcibios_claim_console_setup();
+	else	/* FIXME: `else' will be removed when
+		   pci_assign_unassigned_resources() is able to work
+		   correctly with [partially] allocated PCI tree. */
+		pci_assign_unassigned_resources();
 	pci_fixup_irqs(alpha_mv.pci_swizzle, alpha_mv.pci_map_irq);
 }
 
