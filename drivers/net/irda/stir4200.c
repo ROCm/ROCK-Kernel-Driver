@@ -1086,8 +1086,7 @@ static struct net_device_stats *stir_net_get_stats(struct net_device *dev)
 static int stir_setup_usb(struct stir_cb *stir, struct usb_interface *intf)
 {
 	struct usb_device *usbdev = interface_to_usbdev(intf);
-	const struct usb_host_interface *interface
-		= &intf->altsetting[intf->act_altsetting];
+	const struct usb_host_interface *interface = intf->cur_altsetting;
 	const struct usb_endpoint_descriptor *ep_in = NULL;
 	const struct usb_endpoint_descriptor *ep_out = NULL;
 	int i;
