@@ -2346,7 +2346,6 @@ static int __devinit uhci_start(struct usb_hcd *hcd)
 	/* disable legacy emulation */
 	pci_write_config_word(hcd->pdev, USBLEGSUP, USBLEGSUP_DEFAULT);
 
-	usb_connect(udev);
 	udev->speed = USB_SPEED_FULL;
 
 	if (usb_register_root_hub(udev, &hcd->pdev->dev) != 0) {

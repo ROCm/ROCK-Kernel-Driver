@@ -497,7 +497,6 @@ done2:
 	 * Before this point the HC was idle/ready.  After, khubd
 	 * and device drivers may start it running.
 	 */
-	usb_connect (udev);
 	udev->speed = USB_SPEED_HIGH;
 	if (hcd_register_root (hcd) != 0) {
 		if (hcd->state == USB_STATE_RUNNING)

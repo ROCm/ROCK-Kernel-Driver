@@ -945,25 +945,21 @@ void usb_disconnect(struct usb_device **pdev)
 }
 
 /**
- * usb_connect - pick device address (usbcore-internal)
+ * usb_choose_address - pick device address (usbcore-internal)
  * @dev: newly detected device (in DEFAULT state)
  *
  * Picks a device address.  It's up to the hub (or root hub) driver
  * to handle and manage enumeration, starting from the DEFAULT state.
- * Only hub drivers (including virtual root hub drivers for host
+ * Only hub drivers (but not virtual root hub drivers for host
  * controllers) should ever call this.
  */
-void usb_connect(struct usb_device *dev)
+void usb_choose_address(struct usb_device *dev)
 {
 	int devnum;
 	// FIXME needs locking for SMP!!
 	/* why? this is called only from the hub thread, 
 	 * which hopefully doesn't run on multiple CPU's simultaneously 8-)
-	 * ... it's also called from modprobe/rmmod/apmd threads as part
-	 * of virtual root hub init/reinit.  In the init case, the hub code 
-	 * won't have seen this, but not so for reinit ... 
 	 */
-	dev->descriptor.bMaxPacketSize0 = 8;  /* Start off at 8 bytes  */
 
 	/* Try to allocate the next devnum beginning at bus->devnum_next. */
 	devnum = find_next_zero_bit(dev->bus->devmap.devicemap, 128, dev->bus->devnum_next);
@@ -1607,7 +1603,6 @@ EXPORT_SYMBOL(usb_ifnum_to_if);
 
 EXPORT_SYMBOL(usb_new_device);
 EXPORT_SYMBOL(usb_reset_device);
-EXPORT_SYMBOL(usb_connect);
 EXPORT_SYMBOL(usb_disconnect);
 
 EXPORT_SYMBOL(__usb_get_extra_descriptor);

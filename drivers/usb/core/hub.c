@@ -932,7 +932,7 @@ static void hub_port_connect_change(struct usb_hub *hubstate, int port,
 		}
 
 		/* Find a new address for it */
-		usb_connect(dev);
+		usb_choose_address(dev);
 
 		/* Set up TT records, if needed  */
 		if (hub->tt) {
