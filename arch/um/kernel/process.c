@@ -235,7 +235,7 @@ __uml_setup("nosysemu", nosysemu_cmd_param,
 		"    SYSEMU is a performance-patch introduced by Laurent Vivier. It changes\n"
 		"    behaviour of ptrace() and helps reducing host context switch rate.\n"
 		"    To make it working, you need a kernel patch for your host, too.\n"
-		"    See http://perso.wanadoo.fr/laurent.vivier/UML/ for further information.\n");
+		"    See http://perso.wanadoo.fr/laurent.vivier/UML/ for further information.\n\n");
 
 static void __init check_sysemu(void)
 {
