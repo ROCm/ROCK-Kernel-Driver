@@ -219,6 +219,7 @@ _decode_session6(struct sk_buff *skb, struct flowi *fl)
 				fl->fl_ip_sport = ports[0];
 				fl->fl_ip_dport = ports[1];
 			}
+			fl->proto = nexthdr;
 			return;
 
 		/* XXX Why are there these headers? */
@@ -227,6 +228,7 @@ _decode_session6(struct sk_buff *skb, struct flowi *fl)
 		case IPPROTO_COMP:
 		default:
 			fl->fl_ipsec_spi = 0;
+			fl->proto = nexthdr;
 			return;
 		};
 	}
