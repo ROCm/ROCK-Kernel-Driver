@@ -1355,46 +1355,6 @@ isdn_net_rcv_skb(int idx, struct sk_buff *skb)
 	return 0;
 }
 
-static int
-my_eth_header(struct sk_buff *skb, struct net_device *dev, unsigned short type,
-	      void *daddr, void *saddr, unsigned len)
-{
-	struct ethhdr *eth = (struct ethhdr *) skb_push(skb, ETH_HLEN);
-
-	/*
-	 * Set the protocol type. For a packet of type ETH_P_802_3 we
-	 * put the length here instead. It is up to the 802.2 layer to
-	 * carry protocol information.
-	 */
-
-	if (type != ETH_P_802_3)
-		eth->h_proto = htons(type);
-	else
-		eth->h_proto = htons(len);
-
-	/*
-	 * Set the source hardware address.
-	 */
-	if (saddr)
-		memcpy(eth->h_source, saddr, dev->addr_len);
-	else
-		memcpy(eth->h_source, dev->dev_addr, dev->addr_len);
-
-	/*
-	 * Anyway, the loopback-device should never use this function...
-	 */
-
-	if (dev->flags & (IFF_LOOPBACK | IFF_NOARP)) {
-		memset(eth->h_dest, 0, dev->addr_len);
-		return ETH_HLEN /*(dev->hard_header_len)*/;
-	}
-	if (daddr) {
-		memcpy(eth->h_dest, daddr, dev->addr_len);
-		return ETH_HLEN /*dev->hard_header_len*/;
-	}
-	return -ETH_HLEN /*dev->hard_header_len*/;
-}
-
 /*
  *  build an header
  *  depends on encaps that is being used.
@@ -1409,9 +1369,6 @@ isdn_net_header(struct sk_buff *skb, struct net_device *dev, unsigned short type
 	ushort len = 0;
 
 	switch (lp->p_encap) {
-		case ISDN_NET_ENCAP_ETHER:
-			len = my_eth_header(skb, dev, type, daddr, saddr, plen);
-			break;
 		case ISDN_NET_ENCAP_SYNCPPP:
 			/* stick on a fake header to keep fragmentation code happy. */
 			len = IPPP_MAX_HEADER;
@@ -1482,12 +1439,9 @@ static int
 isdn_net_init(struct net_device *ndev)
 {
 	ushort max_hlhdr_len = 0;
-	isdn_net_local *lp = (isdn_net_local *) ndev->priv;
 	int drvidx, i;
 
 	ether_setup(ndev);
-	lp->org_hhc = ndev->hard_header_cache;
-	lp->org_hcu = ndev->header_cache_update;
 
 	/* Setup the generic properties */
 
@@ -2578,8 +2532,6 @@ isdn_net_realrm(isdn_net_dev *p)
 			((isdn_net_local *) (p->local.master->priv))->slave = p->local.slave;
 	} else {
 		/* Unregister only if it's a master-device */
-		p->dev.hard_header_cache = p->local.org_hhc;
-		p->dev.header_cache_update = p->local.org_hcu;
 		unregister_netdev(&p->dev);
 	}
 	/* Unlink device from chain */
@@ -2662,11 +2614,9 @@ isdn_rawip_setup(isdn_net_dev *p)
 static int
 isdn_ether_setup(isdn_net_dev *p)
 {
-	isdn_net_local *lp = &p->local;
-
-	p->dev.hard_header = isdn_net_header;
-	p->dev.hard_header_cache = lp->org_hhc;
-	p->dev.header_cache_update = lp->org_hcu;
+	p->dev.hard_header = eth_header;
+	p->dev.hard_header_cache = eth_header_cache;
+	p->dev.header_cache_update = eth_header_cache_update;
 	p->dev.flags = IFF_BROADCAST | IFF_MULTICAST;
 
 	return 0;
