@@ -656,6 +656,7 @@ typedef void (*fib_callback)(void *ctxt, struct fib *fibctx);
 struct aac_fib_context {
 	s16	 		type;		// used for verification of structure	
 	s16	 		size;
+	u32			unique;		// unique value representing this context
 	ulong			jiffies;	// used for cleanup - dmb changed to ulong
 	struct list_head	next;		// used to link context's into a linked list
 	struct semaphore 	wait_sem;	// this is used to wait for the next fib to arrive.
@@ -1231,11 +1232,11 @@ struct aac_delete_disk {
 	u32	disknum;
 	u32	cnum;
 };
-
+ 
 struct fib_ioctl
 {
-	char	*fibctx;
-	int	wait;
+	u32	fibctx;
+	s32	wait;
 	char	*fib;
 };
 
@@ -1276,6 +1277,7 @@ struct revision
 #define FSACTL_MINIPORT_REV_CHECK               CTL_CODE(2107, METHOD_BUFFERED)
 #define FSACTL_GET_PCI_INFO               	CTL_CODE(2119, METHOD_BUFFERED)
 #define FSACTL_FORCE_DELETE_DISK		CTL_CODE(2120, METHOD_NEITHER)
+#define FSACTL_GET_CONTAINERS			2131
 
 
 struct aac_common

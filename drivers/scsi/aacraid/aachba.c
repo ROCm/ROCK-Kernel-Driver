@@ -1176,7 +1176,7 @@ int aac_dev_ioctl(struct aac_dev *dev, int cmd, void *arg)
 		return delete_disk(dev, arg);
 	case FSACTL_FORCE_DELETE_DISK:
 		return force_delete_disk(dev, arg);
-	case 2131:
+	case FSACTL_GET_CONTAINERS:
 		return aac_get_containers(dev);
 	default:
 		return -ENOTTY;
