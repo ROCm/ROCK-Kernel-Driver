@@ -36,6 +36,7 @@
 #include <asm/arch/lm.h>
 
 #include <asm/mach/arch.h>
+#include <asm/mach/flash.h>
 #include <asm/mach/irq.h>
 #include <asm/mach/map.h>
 
@@ -49,6 +50,7 @@
  */
 #define VA_IC_BASE	IO_ADDRESS(INTEGRATOR_IC_BASE) 
 #define VA_SC_BASE	IO_ADDRESS(INTEGRATOR_SC_BASE)
+#define VA_EBI_BASE	IO_ADDRESS(INTEGRATOR_EBI_BASE)
 #define VA_CMIC_BASE	IO_ADDRESS(INTEGRATOR_HDR_BASE) + INTEGRATOR_HDR_IC_OFFSET
 
 /*
@@ -131,10 +133,84 @@ static void __init ap_init_irq(void)
 	}
 }
 
+/*
+ * Flash handling.
+ */
+#define SC_CTRLC (VA_SC_BASE + INTEGRATOR_SC_CTRLC_OFFSET)
+#define SC_CTRLS (VA_SC_BASE + INTEGRATOR_SC_CTRLS_OFFSET)
+#define EBI_CSR1 (VA_EBI_BASE + INTEGRATOR_EBI_CSR1_OFFSET)
+#define EBI_LOCK (VA_EBI_BASE + INTEGRATOR_EBI_LOCK_OFFSET)
+
+static int ap_flash_init(void)
+{
+	u32 tmp;
+
+	writel(INTEGRATOR_SC_CTRL_nFLVPPEN | INTEGRATOR_SC_CTRL_nFLWP, SC_CTRLC);
+
+	tmp = readl(EBI_CSR1) | INTEGRATOR_EBI_WRITE_ENABLE;
+	writel(tmp, EBI_CSR1);
+
+	if (!(readl(EBI_CSR1) & INTEGRATOR_EBI_WRITE_ENABLE)) {
+		writel(0xa05f, EBI_LOCK);
+		writel(tmp, EBI_CSR1);
+		writel(0, EBI_LOCK);
+	}
+	return 0;
+}
+
+static void ap_flash_exit(void)
+{
+	u32 tmp;
+
+	writel(INTEGRATOR_SC_CTRL_nFLVPPEN | INTEGRATOR_SC_CTRL_nFLWP, SC_CTRLC);
+
+	tmp = readl(EBI_CSR1) & ~INTEGRATOR_EBI_WRITE_ENABLE;
+	writel(tmp, EBI_CSR1);
+
+	if (readl(EBI_CSR1) & INTEGRATOR_EBI_WRITE_ENABLE) {
+		writel(0xa05f, EBI_LOCK);
+		writel(tmp, EBI_CSR1);
+		writel(0, EBI_LOCK);
+	}
+}
+
+static void ap_flash_set_vpp(int on)
+{
+	unsigned long reg = on ? SC_CTRLS : SC_CTRLC;
+
+	writel(INTEGRATOR_SC_CTRL_nFLVPPEN, reg);
+}
+
+static struct flash_platform_data ap_flash_data = {
+	.map_name	= "cfi_probe",
+	.width		= 4,
+	.init		= ap_flash_init,
+	.exit		= ap_flash_exit,
+	.set_vpp	= ap_flash_set_vpp,
+};
+
+static struct resource cfi_flash_resource = {
+	.start		= INTEGRATOR_FLASH_BASE,
+	.end		= INTEGRATOR_FLASH_BASE + INTEGRATOR_FLASH_SIZE - 1,
+	.flags		= IORESOURCE_MEM,
+};
+
+static struct platform_device cfi_flash_device = {
+	.name		= "armflash",
+	.id		= 0,
+	.dev		= {
+		.platform_data	= &ap_flash_data,
+	},
+	.num_resources	= 1,
+	.resource	= &cfi_flash_resource,
+};
+
 static int __init ap_init(void)
 {
 	unsigned long sc_dec;
 	int i;
+
+	platform_add_device(&cfi_flash_device);
 
 	sc_dec = readl(VA_SC_BASE + INTEGRATOR_SC_DEC_OFFSET);
 	for (i = 0; i < 4; i++) {
