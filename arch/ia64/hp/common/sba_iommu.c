@@ -1898,21 +1898,23 @@ acpi_sba_ioc_add(struct acpi_device *device)
 	struct ioc *ioc;
 	acpi_status status;
 	u64 hpa, length;
-	struct acpi_device_info dev_info;
+	struct acpi_device_info *dev_info;
+	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
 
 	status = hp_acpi_csr_space(device->handle, &hpa, &length);
 	if (ACPI_FAILURE(status))
 		return 1;
 
-	status = acpi_get_object_info(device->handle, &dev_info);
+	status = acpi_get_object_info(device->handle, &buffer);
 	if (ACPI_FAILURE(status))
 		return 1;
+	dev_info = buffer.pointer;
 
 	/*
 	 * For HWP0001, only SBA appears in ACPI namespace.  It encloses the PCI
 	 * root bridges, and its CSR space includes the IOC function.
 	 */
-	if (strncmp("HWP0001", dev_info.hardware_id, 7) == 0)
+	if (strncmp("HWP0001", dev_info->hardware_id.value, 7) == 0)
 		hpa += ZX1_IOC_OFFSET;
 
 	ioc = ioc_init(hpa, device->handle);

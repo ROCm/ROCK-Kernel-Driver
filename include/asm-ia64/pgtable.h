@@ -75,6 +75,8 @@
 #define _PAGE_SIZE_16M	24
 #define _PAGE_SIZE_64M	26
 #define _PAGE_SIZE_256M	28
+#define _PAGE_SIZE_1G	30
+#define _PAGE_SIZE_4G	32
 
 #define __ACCESS_BITS		_PAGE_ED | _PAGE_A | _PAGE_P | _PAGE_MA_WB
 #define __DIRTY_BITS_NO_ED	_PAGE_A | _PAGE_P | _PAGE_D | _PAGE_MA_WB
@@ -205,9 +207,15 @@ ia64_phys_addr_valid (unsigned long addr)
 #define RGN_MAP_LIMIT	((1UL << (4*PAGE_SHIFT - 12)) - PAGE_SIZE)	/* per region addr limit */
 #define RGN_KERNEL	7
 
-#define VMALLOC_START		(0xa000000000000000 + 3*PERCPU_PAGE_SIZE)
+#define VMALLOC_START		0xa000000200000000
 #define VMALLOC_VMADDR(x)	((unsigned long)(x))
-#define VMALLOC_END		(0xa000000000000000 + (1UL << (4*PAGE_SHIFT - 9)))
+#ifdef CONFIG_VIRTUAL_MEM_MAP
+# define VMALLOC_END_INIT	(0xa000000000000000 + (1UL << (4*PAGE_SHIFT - 9)))
+# define VMALLOC_END		vmalloc_end
+  extern unsigned long vmalloc_end;
+#else
+# define VMALLOC_END		(0xa000000000000000 + (1UL << (4*PAGE_SHIFT - 9)))
+#endif
 
 /*
  * Conversion functions: convert page frame number (pfn) and a protection value to a page
@@ -442,13 +450,20 @@ extern void paging_init (void);
  * for zero-mapped memory areas etc..
  */
 extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
-#define ZERO_PAGE(vaddr) (virt_to_page(empty_zero_page))
+extern struct page *zero_page_memmap_ptr;
+#define ZERO_PAGE(vaddr) (zero_page_memmap_ptr)
 
 /* We provide our own get_unmapped_area to cope with VA holes for userland */
 #define HAVE_ARCH_UNMAPPED_AREA
 
 typedef pte_t *pte_addr_t;
 
+#  ifdef CONFIG_VIRTUAL_MEM_MAP
+  /* arch mem_map init routine is needed due to holes in a virtual mem_map */
+#   define __HAVE_ARCH_MEMMAP_INIT
+    extern void memmap_init (struct page *start, unsigned long size, int nid, unsigned long zone,
+			     unsigned long start_pfn);
+#  endif /* CONFIG_VIRTUAL_MEM_MAP */
 # endif /* !__ASSEMBLY__ */
 
 /*
@@ -467,7 +482,6 @@ typedef pte_t *pte_addr_t;
  */
 #define KERNEL_TR_PAGE_SHIFT	_PAGE_SIZE_64M
 #define KERNEL_TR_PAGE_SIZE	(1 << KERNEL_TR_PAGE_SHIFT)
-#define KERNEL_TR_PAGE_NUM	((KERNEL_START - PAGE_OFFSET) / KERNEL_TR_PAGE_SIZE)
 
 /*
  * No page table caches to initialise

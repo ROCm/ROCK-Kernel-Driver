@@ -5,7 +5,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
 #ifndef _ASM_IA64_SN_ROUTER_H
@@ -494,7 +494,7 @@ typedef struct router_info_s {
 	slotid_t	ri_slotnum;	/* Which slot are we in?	    */
 	router_reg_t	ri_glbl_parms[GLBL_PARMS_REGS];
 					/* Global parms0&1 register contents*/
-	devfs_handle_t	ri_vertex;	/* hardware graph vertex            */
+	vertex_hdl_t	ri_vertex;	/* hardware graph vertex            */
 	router_reg_t	ri_prot_conf;	/* protection config. register	    */
 	int64_t	ri_per_minute;	/* Ticks per minute		    */
 
@@ -506,7 +506,7 @@ typedef struct router_info_s {
  	 * the bottom of the structure, below the user stuff.
 	 */
 	char		ri_hist_type;   /* histogram type		    */
-	devfs_handle_t	ri_guardian;	/* guardian node for the router	    */
+	vertex_hdl_t	ri_guardian;	/* guardian node for the router	    */
 	int64_t	ri_last_print;	/* When did we last print	    */
 	char		ri_print;	/* Should we print 		    */
 	char 		ri_just_blink;	/* Should we blink the LEDs         */
@@ -549,7 +549,7 @@ typedef struct router_info_s {
  * Router info hanging in the nodepda 
  */
 typedef struct nodepda_router_info_s {
-	devfs_handle_t 	router_vhdl;	/* vertex handle of the router 	    */
+	vertex_hdl_t 	router_vhdl;	/* vertex handle of the router 	    */
 	short		router_port;	/* port thru which we entered       */
 	short		router_portmask;
 	moduleid_t	router_module;	/* module in which router is there  */
@@ -593,9 +593,9 @@ typedef struct router_elt_s {
 		 */
 		struct {
 			/* vertex handle for the router */
-			devfs_handle_t	vhdl;
+			vertex_hdl_t	vhdl;
 			/* guardian for this router */
-			devfs_handle_t	guard;	
+			vertex_hdl_t	guard;	
 			/* vector router from the guardian to the router */
 			net_vec_t	vec;
 		} k_elt;
@@ -648,8 +648,7 @@ typedef struct router_queue_s {
 
 int router_reg_read(router_info_t *rip, int regno, router_reg_t *val);
 int router_reg_write(router_info_t *rip, int regno, router_reg_t val);
-int router_get_info(devfs_handle_t routerv, router_info_t *, int);
-int router_init(cnodeid_t cnode,int writeid, nodepda_router_info_t *npda_rip);
+int router_get_info(vertex_hdl_t routerv, router_info_t *, int);
 int router_set_leds(router_info_t *rip);
 void router_print_state(router_info_t *rip, int level,
 		   void (*pf)(int, char *, ...),int print_where);
@@ -658,7 +657,7 @@ void capture_router_stats(router_info_t *rip);
 
 int 	probe_routers(void);
 void 	get_routername(unsigned char brd_type,char *rtrname);
-void 	router_guardians_set(devfs_handle_t hwgraph_root);
+void 	router_guardians_set(vertex_hdl_t hwgraph_root);
 int 	router_hist_reselect(router_info_t *, int64_t);
 #endif /* __ASSEMBLY__ */
 

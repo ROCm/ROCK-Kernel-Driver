@@ -27,7 +27,6 @@
 #include <asm/sn/prio.h>
 #include <asm/sn/xtalk/xbow.h>
 #include <asm/sn/ioc3.h>
-#include <asm/sn/eeprom.h>
 #include <asm/sn/io.h>
 #include <asm/sn/sn_private.h>
 
@@ -38,27 +37,16 @@ extern char *bcopy(const char * src, char * dest, int count);
 
 int pic_devflag = D_MP;
 
-extern int pcibr_attach2(devfs_handle_t, bridge_t *, devfs_handle_t, int, pcibr_soft_t *);
-extern void pcibr_driver_reg_callback(devfs_handle_t, int, int, int);
-extern void pcibr_driver_unreg_callback(devfs_handle_t, int, int, int);
+extern int pcibr_attach2(vertex_hdl_t, bridge_t *, vertex_hdl_t, int, pcibr_soft_t *);
+extern void pcibr_driver_reg_callback(vertex_hdl_t, int, int, int);
+extern void pcibr_driver_unreg_callback(vertex_hdl_t, int, int, int);
 
-
-void
-pic_init(void)
-{
-	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_INIT, NULL, "pic_init()\n"));	
-
-	xwidget_driver_register(PIC_WIDGET_PART_NUM_BUS0,
-			    PIC_WIDGET_MFGR_NUM,
-			    "pic_",
-			    0);
-}
 
 /*
  * copy inventory_t from conn_v to peer_conn_v
  */
 int
-pic_bus1_inventory_dup(devfs_handle_t conn_v, devfs_handle_t peer_conn_v)
+pic_bus1_inventory_dup(vertex_hdl_t conn_v, vertex_hdl_t peer_conn_v)
 {
 	inventory_t *pinv, *peer_pinv;
 
@@ -66,7 +54,7 @@ pic_bus1_inventory_dup(devfs_handle_t conn_v, devfs_handle_t peer_conn_v)
 				(arbitrary_info_t *)&pinv) == GRAPH_SUCCESS)
  {
 		NEW(peer_pinv);
-		bcopy(pinv, peer_pinv, sizeof(inventory_t));
+		bcopy((const char *)pinv, (char *)peer_pinv, sizeof(inventory_t));
 		if (hwgraph_info_add_LBL(peer_conn_v, INFO_LBL_INVENT,
 			    (arbitrary_info_t)peer_pinv) != GRAPH_SUCCESS) {
 			DEL(peer_pinv);
@@ -75,8 +63,7 @@ pic_bus1_inventory_dup(devfs_handle_t conn_v, devfs_handle_t peer_conn_v)
 		return 1;
 	}
 
-	printk("pic_bus1_inventory_dup: cannot get INFO_LBL_INVENT from 0x%lx\n ",
-								conn_v);
+	printk("pic_bus1_inventory_dup: cannot get INFO_LBL_INVENT from 0x%lx\n ", (uint64_t)conn_v);
 	return 0;
 }
 
@@ -84,13 +71,12 @@ pic_bus1_inventory_dup(devfs_handle_t conn_v, devfs_handle_t peer_conn_v)
  * copy xwidget_info_t from conn_v to peer_conn_v
  */
 int
-pic_bus1_widget_info_dup(devfs_handle_t conn_v, devfs_handle_t peer_conn_v,
+pic_bus1_widget_info_dup(vertex_hdl_t conn_v, vertex_hdl_t peer_conn_v,
 							cnodeid_t xbow_peer)
 {
 	xwidget_info_t widget_info, peer_widget_info;
 	char peer_path[256];
-	char *p;
-	devfs_handle_t peer_hubv;
+	vertex_hdl_t peer_hubv;
 	hubinfo_t peer_hub_info;
 
 	/* get the peer hub's widgetid */
@@ -126,7 +112,7 @@ pic_bus1_widget_info_dup(devfs_handle_t conn_v, devfs_handle_t peer_conn_v,
 	}
 
 	printk("pic_bus1_widget_info_dup: "
-			"cannot get INFO_LBL_XWIDGET from 0x%lx\n", conn_v);
+			"cannot get INFO_LBL_XWIDGET from 0x%lx\n", (uint64_t)conn_v);
 	return 0;
 }
 
@@ -138,15 +124,15 @@ pic_bus1_widget_info_dup(devfs_handle_t conn_v, devfs_handle_t peer_conn_v,
  * If not successful, return zero and both buses will attach to the
  * vertex passed into pic_attach().
  */
-devfs_handle_t
-pic_bus1_redist(nasid_t nasid, devfs_handle_t conn_v)
+vertex_hdl_t
+pic_bus1_redist(nasid_t nasid, vertex_hdl_t conn_v)
 {
 	cnodeid_t cnode = NASID_TO_COMPACT_NODEID(nasid);
 	cnodeid_t xbow_peer = -1;
 	char pathname[256], peer_path[256], tmpbuf[256];
 	char *p;
 	int rc;
-	devfs_handle_t peer_conn_v;
+	vertex_hdl_t peer_conn_v;
 	int pos;
 	slabid_t slab;
 
@@ -155,7 +141,7 @@ pic_bus1_redist(nasid_t nasid, devfs_handle_t conn_v)
 		/* pcibr widget hw/module/001c11/slab/0/Pbrick/xtalk/12 */
 		/* sprintf(pathname, "%v", conn_v); */
 		xbow_peer = NASID_TO_COMPACT_NODEID(NODEPDA(cnode)->xbow_peer);
-		pos = devfs_generate_path(conn_v, tmpbuf, 256);
+		pos = hwgfs_generate_path(conn_v, tmpbuf, 256);
 		strcpy(pathname, &tmpbuf[pos]);
 		p = pathname + strlen("hw/module/001c01/slab/0/");
 
@@ -170,7 +156,7 @@ pic_bus1_redist(nasid_t nasid, devfs_handle_t conn_v)
 		rc = hwgraph_traverse(hwgraph_root, peer_path, &peer_conn_v);
 		if (GRAPH_SUCCESS == rc)
 			printk("pic_attach: found unexpected vertex: 0x%lx\n",
-								peer_conn_v);
+								(uint64_t)peer_conn_v);
 		else if (GRAPH_NOT_FOUND != rc) {
 			printk("pic_attach: hwgraph_traverse unexpectedly"
 					" returned 0x%x\n", rc);
@@ -208,13 +194,13 @@ pic_bus1_redist(nasid_t nasid, devfs_handle_t conn_v)
 
 
 int
-pic_attach(devfs_handle_t conn_v)
+pic_attach(vertex_hdl_t conn_v)
 {
 	int		rc;
 	bridge_t	*bridge0, *bridge1 = (bridge_t *)0;
-	devfs_handle_t	pcibr_vhdl0, pcibr_vhdl1 = (devfs_handle_t)0;
+	vertex_hdl_t	pcibr_vhdl0, pcibr_vhdl1 = (vertex_hdl_t)0;
 	pcibr_soft_t	bus0_soft, bus1_soft = (pcibr_soft_t)0;
-	devfs_handle_t  conn_v0, conn_v1, peer_conn_v;
+	vertex_hdl_t  conn_v0, conn_v1, peer_conn_v;
 
 	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_ATTACH, conn_v, "pic_attach()\n"));
 
@@ -229,11 +215,11 @@ pic_attach(devfs_handle_t conn_v)
 	conn_v0 = conn_v1 = conn_v;
 
 	/* If dual-ported then split the two PIC buses across both Cbricks */
-	if (peer_conn_v = pic_bus1_redist(NASID_GET(bridge0), conn_v))
+	if ((peer_conn_v = (pic_bus1_redist(NASID_GET(bridge0), conn_v))))
 		conn_v1 = peer_conn_v;
 
 	/*
-	 * Create the vertex for the PCI buses, which week
+	 * Create the vertex for the PCI buses, which we
 	 * will also use to hold the pcibr_soft and
 	 * which will be the "master" vertex for all the
 	 * pciio connection points we will hang off it.
@@ -266,7 +252,6 @@ pic_attach(devfs_handle_t conn_v)
 	/* save a pointer to the PIC's other bus's soft struct */
         bus0_soft->bs_peers_soft = bus1_soft;
         bus1_soft->bs_peers_soft = bus0_soft;
-        bus0_soft->bs_peers_soft = (pcibr_soft_t)0;
 
 	PCIBR_DEBUG_ALWAYS((PCIBR_DEBUG_ATTACH, conn_v,
 		    "pic_attach: bus0_soft=0x%x, bus1_soft=0x%x\n",
@@ -294,10 +279,8 @@ pciio_provider_t        pci_pic_provider =
     (pciio_dmamap_alloc_f *) pcibr_dmamap_alloc,
     (pciio_dmamap_free_f *) pcibr_dmamap_free,
     (pciio_dmamap_addr_f *) pcibr_dmamap_addr,
-    (pciio_dmamap_list_f *) pcibr_dmamap_list,
     (pciio_dmamap_done_f *) pcibr_dmamap_done,
     (pciio_dmatrans_addr_f *) pcibr_dmatrans_addr,
-    (pciio_dmatrans_list_f *) pcibr_dmatrans_list,
     (pciio_dmamap_drain_f *) pcibr_dmamap_drain,
     (pciio_dmaaddr_drain_f *) pcibr_dmaaddr_drain,
     (pciio_dmalist_drain_f *) pcibr_dmalist_drain,

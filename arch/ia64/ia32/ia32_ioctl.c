@@ -11,35 +11,105 @@
 #include <linux/dirent.h>
 #include <linux/fs.h>		/* argh, msdos_fs.h isn't self-contained... */
 #include <linux/signal.h>	/* argh, msdos_fs.h isn't self-contained... */
+#include <linux/compat.h>
 
 #include <asm/ia32.h>
 
-#include <linux/msdos_fs.h>
-#include <linux/mtio.h>
-#include <linux/ncp_fs.h>
-#include <linux/capi.h>
-#include <linux/videodev.h>
-#include <linux/synclink.h>
-#include <linux/atmdev.h>
-#include <linux/atm_eni.h>
-#include <linux/atm_nicstar.h>
-#include <linux/atm_zatm.h>
-#include <linux/atm_idt77105.h>
+#include <linux/config.h>
+#include <linux/kernel.h>
+#include <linux/sched.h>
+#include <linux/smp.h>
+#include <linux/smp_lock.h>
+#include <linux/ioctl.h>
+#include <linux/if.h>
+#include <linux/slab.h>
+#include <linux/hdreg.h>
+#include <linux/raid/md.h>
+#include <linux/kd.h>
+#include <linux/route.h>
+#include <linux/in6.h>
+#include <linux/ipv6_route.h>
+#include <linux/skbuff.h>
+#include <linux/netlink.h>
+#include <linux/vt.h>
+#include <linux/file.h>
+#include <linux/fd.h>
 #include <linux/ppp_defs.h>
 #include <linux/if_ppp.h>
-#include <linux/ixjuser.h>
-#include <linux/i2o-dev.h>
+#include <linux/if_pppox.h>
+#include <linux/mtio.h>
+#include <linux/cdrom.h>
+#include <linux/loop.h>
+#include <linux/auto_fs.h>
+#include <linux/auto_fs4.h>
+#include <linux/devfs_fs.h>
+#include <linux/tty.h>
+#include <linux/vt_kern.h>
+#include <linux/fb.h>
+#include <linux/ext2_fs.h>
+#include <linux/videodev.h>
+#include <linux/netdevice.h>
+#include <linux/raw.h>
+#include <linux/smb_fs.h>
+#include <linux/blkpg.h>
+#include <linux/blk.h>
+#include <linux/elevator.h>
+#include <linux/rtc.h>
+#include <linux/pci.h>
+#include <linux/rtc.h>
+#include <linux/module.h>
+#include <linux/serial.h>
+#include <linux/reiserfs_fs.h>
+#include <linux/if_tun.h>
+#include <linux/dirent.h>
+#include <linux/ctype.h>
+#include <net/bluetooth/bluetooth.h>
+#include <net/bluetooth/rfcomm.h>
+
 #include <scsi/scsi.h>
 /* Ugly hack. */
-#undef	__KERNEL__
+#undef __KERNEL__
 #include <scsi/scsi_ioctl.h>
-#define	__KERNEL__
+#define __KERNEL__
 #include <scsi/sg.h>
+
+#include <asm/types.h>
+#include <asm/uaccess.h>
+#include <linux/ethtool.h>
+#include <linux/mii.h>
+#include <linux/if_bonding.h>
+#include <linux/watchdog.h>
+
+#include <asm/module.h>
+#include <asm/ioctl32.h>
+#include <linux/soundcard.h>
+#include <linux/lp.h>
+
+#include <linux/atm.h>
+#include <linux/atmarp.h>
+#include <linux/atmclip.h>
+#include <linux/atmdev.h>
+#include <linux/atmioc.h>
+#include <linux/atmlec.h>
+#include <linux/atmmpc.h>
+#include <linux/atmsvc.h>
+#include <linux/atm_tcp.h>
+#include <linux/sonet.h>
+#include <linux/atm_suni.h>
+#include <linux/mtd/mtd.h>
+
+#include <net/bluetooth/bluetooth.h>
+#include <net/bluetooth/hci.h>
+
+#include <linux/usb.h>
+#include <linux/usbdevice_fs.h>
+#include <linux/nbd.h>
+#include <linux/random.h>
+#include <linux/filter.h>
 
 #include <../drivers/char/drm/drm.h>
 #include <../drivers/char/drm/mga_drm.h>
 #include <../drivers/char/drm/i810_drm.h>
-
 
 #define IOCTL_NR(a)	((a) & ~(_IOC_SIZEMASK << _IOC_SIZESHIFT))
 
@@ -57,6 +127,9 @@
 
 asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg);
 
+#define	VFAT_IOCTL_READDIR_BOTH32	_IOR('r', 1, struct linux32_dirent[2])
+#define	VFAT_IOCTL_READDIR_SHORT32	_IOR('r', 2, struct linux32_dirent[2])
+
 static long
 put_dirent32 (struct dirent *d, struct linux32_dirent *d32)
 {
@@ -67,6 +140,23 @@ put_dirent32 (struct dirent *d, struct linux32_dirent *d32)
 		|| put_user(d->d_reclen, &d32->d_reclen)
 		|| copy_to_user(d32->d_name, d->d_name, namelen + 1));
 }
+
+static int vfat_ioctl32(unsigned fd, unsigned cmd,  void *ptr) 
+{
+	int ret;
+	mm_segment_t oldfs = get_fs();
+	struct dirent d[2]; 
+
+	set_fs(KERNEL_DS);
+	ret = sys_ioctl(fd,cmd,(unsigned long)&d); 
+	set_fs(oldfs); 
+	if (!ret) { 
+		ret |= put_dirent32(&d[0], (struct linux32_dirent *)ptr); 
+		ret |= put_dirent32(&d[1], ((struct linux32_dirent *)ptr) + 1); 
+	}
+	return ret; 
+} 
+
 /*
  *  The transform code for the SG_IO ioctl was brazenly lifted from
  *  the Sparc64 port in the file `arch/sparc64/kernel/ioctl32.c'.
@@ -294,3 +384,83 @@ out:
 	}
 	return err;
 }
+
+static __inline__ void *alloc_user_space(long len)
+{
+	struct pt_regs	*regs = ((struct pt_regs *)((unsigned long) current +
+						    IA64_STK_OFFSET)) - 1;
+	return (void *)regs->r12 - len; 
+}
+
+struct ifmap32 {
+	u32 mem_start;
+	u32 mem_end;
+	unsigned short base_addr;
+	unsigned char irq;
+	unsigned char dma;
+	unsigned char port;
+};
+
+struct ifreq32 {
+#define IFHWADDRLEN     6
+#define IFNAMSIZ        16
+        union {
+                char    ifrn_name[IFNAMSIZ];            /* if name, e.g. "en0" */
+        } ifr_ifrn;
+        union {
+                struct  sockaddr ifru_addr;
+                struct  sockaddr ifru_dstaddr;
+                struct  sockaddr ifru_broadaddr;
+                struct  sockaddr ifru_netmask;
+                struct  sockaddr ifru_hwaddr;
+                short   ifru_flags;
+                int     ifru_ivalue;
+                int     ifru_mtu;
+                struct  ifmap32 ifru_map;
+                char    ifru_slave[IFNAMSIZ];   /* Just fits the size */
+		char	ifru_newname[IFNAMSIZ];
+                compat_caddr_t ifru_data;
+        } ifr_ifru;
+};
+
+int siocdevprivate_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	struct ifreq *u_ifreq64;
+	struct ifreq32 *u_ifreq32 = (struct ifreq32 *) arg;
+	char tmp_buf[IFNAMSIZ];
+	void *data64;
+	u32 data32;
+
+	if (copy_from_user(&tmp_buf[0], &(u_ifreq32->ifr_ifrn.ifrn_name[0]),
+			   IFNAMSIZ))
+		return -EFAULT;
+	if (__get_user(data32, &u_ifreq32->ifr_ifru.ifru_data))
+		return -EFAULT;
+	data64 = (void *) P(data32);
+
+	u_ifreq64 = alloc_user_space(sizeof(*u_ifreq64));
+
+	/* Don't check these user accesses, just let that get trapped
+	 * in the ioctl handler instead.
+	 */
+	copy_to_user(&u_ifreq64->ifr_ifrn.ifrn_name[0], &tmp_buf[0], IFNAMSIZ);
+	__put_user(data64, &u_ifreq64->ifr_ifru.ifru_data);
+
+	return sys_ioctl(fd, cmd, (unsigned long) u_ifreq64);
+}
+
+typedef int (* ioctl32_handler_t)(unsigned int, unsigned int, unsigned long, struct file *);
+
+#define COMPATIBLE_IOCTL(cmd)		HANDLE_IOCTL((cmd),sys_ioctl)
+#define HANDLE_IOCTL(cmd,handler)	{ (cmd), (ioctl32_handler_t)(handler), NULL },
+#define IOCTL_TABLE_START \
+	struct ioctl_trans ioctl_start[] = {
+#define IOCTL_TABLE_END \
+	}; struct ioctl_trans ioctl_end[0];
+
+IOCTL_TABLE_START
+#include <linux/compat_ioctl.h>
+HANDLE_IOCTL(VFAT_IOCTL_READDIR_BOTH32, vfat_ioctl32)
+HANDLE_IOCTL(VFAT_IOCTL_READDIR_SHORT32, vfat_ioctl32)
+HANDLE_IOCTL(SG_IO,sg_ioctl_trans)
+IOCTL_TABLE_END

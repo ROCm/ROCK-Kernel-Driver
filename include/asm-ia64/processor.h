@@ -17,7 +17,6 @@
 
 #include <asm/ptrace.h>
 #include <asm/kregs.h>
-#include <asm/types.h>
 
 #define IA64_NUM_DBG_REGS	8
 /*
@@ -87,9 +86,9 @@
 #include <linux/cache.h>
 #include <linux/compiler.h>
 #include <linux/threads.h>
+#include <linux/types.h>
 
 #include <asm/fpu.h>
-#include <asm/offsets.h>
 #include <asm/page.h>
 #include <asm/percpu.h>
 #include <asm/rse.h>
@@ -289,7 +288,7 @@ struct thread_struct {
 	.ksp =		0,			\
 	.map_base =	DEFAULT_MAP_BASE,	\
 	.task_size =	DEFAULT_TASK_SIZE,	\
-	.last_fph_cpu =  0,			\
+	.last_fph_cpu =  -1,			\
 	INIT_THREAD_IA32			\
 	INIT_THREAD_PM				\
 	.dbr =		{0, },			\
@@ -369,7 +368,7 @@ struct task_struct;
  * do_basic_setup() and the timing is such that free_initmem() has
  * been called already.
  */
-extern int kernel_thread (int (*fn)(void *), void *arg, unsigned long flags);
+extern pid_t kernel_thread (int (*fn)(void *), void *arg, unsigned long flags);
 
 /* Get wait channel for task P.  */
 extern unsigned long get_wchan (struct task_struct *p);
@@ -417,17 +416,28 @@ ia64_set_kr (unsigned long regnum, unsigned long r)
 	}
 }
 
-static inline struct task_struct *
-ia64_get_fpu_owner (void)
-{
-	return (struct task_struct *) ia64_get_kr(IA64_KR_FPU_OWNER);
-}
+/*
+ * The following three macros can't be inline functions because we don't have struct
+ * task_struct at this point.
+ */
 
-static inline void
-ia64_set_fpu_owner (struct task_struct *t)
-{
-	ia64_set_kr(IA64_KR_FPU_OWNER, (unsigned long) t);
-}
+/* Return TRUE if task T owns the fph partition of the CPU we're running on. */
+#define ia64_is_local_fpu_owner(t)								\
+({												\
+	struct task_struct *__ia64_islfo_task = (t);						\
+	(__ia64_islfo_task->thread.last_fph_cpu == smp_processor_id()				\
+	 && __ia64_islfo_task == (struct task_struct *) ia64_get_kr(IA64_KR_FPU_OWNER));	\
+})
+
+/* Mark task T as owning the fph partition of the CPU we're running on. */
+#define ia64_set_local_fpu_owner(t) do {						\
+	struct task_struct *__ia64_slfo_task = (t);					\
+	__ia64_slfo_task->thread.last_fph_cpu = smp_processor_id();			\
+	ia64_set_kr(IA64_KR_FPU_OWNER, (unsigned long) __ia64_slfo_task);		\
+} while (0)
+
+/* Mark the fph partition of task T as being invalid on all CPUs.  */
+#define ia64_drop_fpu(t)	((t)->thread.last_fph_cpu = -1)
 
 extern void __ia64_init_fpu (void);
 extern void __ia64_save_fpu (struct ia64_fpreg *fph);
@@ -916,6 +926,18 @@ ia64_tpa (__u64 addr)
 	__u64 result;
 	asm ("tpa %0=%1" : "=r"(result) : "r"(addr));
 	return result;
+}
+
+/*
+ * Take a mapped kernel address and return the equivalent address
+ * in the region 7 identity mapped virtual area.
+ */
+static inline void *
+ia64_imva (void *addr)
+{
+	void *result;
+	asm ("tpa %0=%1" : "=r"(result) : "r"(addr));
+	return __va(result);
 }
 
 #define ARCH_HAS_PREFETCH

@@ -239,7 +239,10 @@ get_scratch_regs (struct unw_frame_info *info)
 	if (!info->pt) {
 		/* This should not happen with valid unwind info.  */
 		UNW_DPRINT(0, "unwind.%s: bad unwind info: resetting info->pt\n", __FUNCTION__);
-		info->pt = info->sp - 16;
+		if (info->flags & UNW_FLAG_INTERRUPT_FRAME)
+			info->pt = (unsigned long) ((struct pt_regs *) info->psp - 1);
+		else
+			info->pt = info->sp - 16;
 	}
 	UNW_DPRINT(3, "unwind.%s: sp 0x%lx pt 0x%lx\n", __FUNCTION__, info->sp, info->pt);
 	return (struct pt_regs *) info->pt;

@@ -6,10 +6,10 @@
 
 #include <linux/config.h>
 #include <linux/kdev_t.h>
+#include <linux/irq.h>
 
 #include <asm/processor.h>
 #include <asm/atomic.h>
-#include <asm/hw_irq.h>
 
 /*
  * Memory barrier.

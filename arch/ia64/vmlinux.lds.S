@@ -3,8 +3,9 @@
 #include <asm/cache.h>
 #include <asm/ptrace.h>
 #include <asm/system.h>
+#include <asm/pgtable.h>
 
-#define LOAD_OFFSET PAGE_OFFSET
+#define LOAD_OFFSET KERNEL_START + KERNEL_TR_PAGE_SIZE
 #include <asm-generic/vmlinux.lds.h>
 
 OUTPUT_FORMAT("elf64-ia64-little")
@@ -23,22 +24,22 @@ SECTIONS
 	}
 
   v = PAGE_OFFSET;	/* this symbol is here to make debugging easier... */
-  phys_start = _start - PAGE_OFFSET;
+  phys_start = _start - LOAD_OFFSET;
 
   . = KERNEL_START;
 
   _text = .;
   _stext = .;
 
-  .text : AT(ADDR(.text) - PAGE_OFFSET)
+  .text : AT(ADDR(.text) - LOAD_OFFSET)
     {
 	*(.text.ivt)
 	*(.text)
     }
-  .text2 : AT(ADDR(.text2) - PAGE_OFFSET)
+  .text2 : AT(ADDR(.text2) - LOAD_OFFSET)
 	{ *(.text2) }
 #ifdef CONFIG_SMP
-  .text.lock : AT(ADDR(.text.lock) - PAGE_OFFSET)
+  .text.lock : AT(ADDR(.text.lock) - LOAD_OFFSET)
 	{ *(.text.lock) }
 #endif
   _etext = .;
@@ -47,14 +48,14 @@ SECTIONS
 
   /* Exception table */
   . = ALIGN(16);
-  __ex_table : AT(ADDR(__ex_table) - PAGE_OFFSET)
+  __ex_table : AT(ADDR(__ex_table) - LOAD_OFFSET)
 	{
 	  __start___ex_table = .;
 	  *(__ex_table)
 	  __stop___ex_table = .;
 	}
 
-  __mckinley_e9_bundles : AT(ADDR(__mckinley_e9_bundles) - PAGE_OFFSET)
+  __mckinley_e9_bundles : AT(ADDR(__mckinley_e9_bundles) - LOAD_OFFSET)
 	{
 	  __start___mckinley_e9_bundles = .;
 	  *(__mckinley_e9_bundles)
@@ -67,7 +68,7 @@ SECTIONS
 #if defined(CONFIG_IA64_GENERIC)
   /* Machine Vector */
   . = ALIGN(16);
-  .machvec : AT(ADDR(.machvec) - PAGE_OFFSET)
+  .machvec : AT(ADDR(.machvec) - LOAD_OFFSET)
 	{
 	  machvec_start = .;
 	  *(.machvec)
@@ -77,9 +78,9 @@ SECTIONS
 
   /* Unwind info & table: */
   . = ALIGN(8);
-  .IA_64.unwind_info : AT(ADDR(.IA_64.unwind_info) - PAGE_OFFSET)
+  .IA_64.unwind_info : AT(ADDR(.IA_64.unwind_info) - LOAD_OFFSET)
 	{ *(.IA_64.unwind_info*) }
-  .IA_64.unwind : AT(ADDR(.IA_64.unwind) - PAGE_OFFSET)
+  .IA_64.unwind : AT(ADDR(.IA_64.unwind) - LOAD_OFFSET)
 	{
 	  ia64_unw_start = .;
 	  *(.IA_64.unwind*)
@@ -88,24 +89,24 @@ SECTIONS
 
   RODATA
 
-  .opd : AT(ADDR(.opd) - PAGE_OFFSET)
+  .opd : AT(ADDR(.opd) - LOAD_OFFSET)
 	{ *(.opd) }
 
   /* Initialization code and data: */
 
   . = ALIGN(PAGE_SIZE);
   __init_begin = .;
-  .init.text : AT(ADDR(.init.text) - PAGE_OFFSET)
+  .init.text : AT(ADDR(.init.text) - LOAD_OFFSET)
 	{
 	  _sinittext = .;
 	  *(.init.text)
 	  _einittext = .;
 	}
 
-  .init.data : AT(ADDR(.init.data) - PAGE_OFFSET)
+  .init.data : AT(ADDR(.init.data) - LOAD_OFFSET)
 	{ *(.init.data) }
 
-  .init.ramfs : AT(ADDR(.init.ramfs) - PAGE_OFFSET)
+  .init.ramfs : AT(ADDR(.init.ramfs) - LOAD_OFFSET)
 	{
 	  __initramfs_start = .;
 	  *(.init.ramfs)
@@ -113,19 +114,19 @@ SECTIONS
 	}
 
    . = ALIGN(16);
-  .init.setup : AT(ADDR(.init.setup) - PAGE_OFFSET)
+  .init.setup : AT(ADDR(.init.setup) - LOAD_OFFSET)
         {
 	  __setup_start = .;
 	  *(.init.setup)
 	  __setup_end = .;
 	}
-  __param : AT(ADDR(__param) - PAGE_OFFSET)
+  __param : AT(ADDR(__param) - LOAD_OFFSET)
         {
 	  __start___param = .;
 	  *(__param)
 	  __stop___param = .;
 	}
-  .initcall.init : AT(ADDR(.initcall.init) - PAGE_OFFSET)
+  .initcall.init : AT(ADDR(.initcall.init) - LOAD_OFFSET)
 	{
 	  __initcall_start = .;
 	  *(.initcall1.init)
@@ -138,17 +139,17 @@ SECTIONS
 	  __initcall_end = .;
 	}
    __con_initcall_start = .;
-  .con_initcall.init : AT(ADDR(.con_initcall.init) - PAGE_OFFSET)
+  .con_initcall.init : AT(ADDR(.con_initcall.init) - LOAD_OFFSET)
 	{ *(.con_initcall.init) }
   __con_initcall_end = .;
   . = ALIGN(PAGE_SIZE);
   __init_end = .;
 
   /* The initial task and kernel stack */
-  .data.init_task : AT(ADDR(.data.init_task) - PAGE_OFFSET)
+  .data.init_task : AT(ADDR(.data.init_task) - LOAD_OFFSET)
 	{ *(.data.init_task) }
 
-  .data.page_aligned : AT(ADDR(.data.page_aligned) - PAGE_OFFSET)
+  .data.page_aligned : AT(ADDR(.data.page_aligned) - LOAD_OFFSET)
         { *(__special_page_section)
 	  __start_gate_section = .;
 	  *(.text.gate)
@@ -156,13 +157,13 @@ SECTIONS
 	}
 
   . = ALIGN(SMP_CACHE_BYTES);
-  .data.cacheline_aligned : AT(ADDR(.data.cacheline_aligned) - PAGE_OFFSET)
+  .data.cacheline_aligned : AT(ADDR(.data.cacheline_aligned) - LOAD_OFFSET)
         { *(.data.cacheline_aligned) }
 
   /* Per-cpu data: */
   . = ALIGN(PERCPU_PAGE_SIZE);
   __phys_per_cpu_start = .;
-  .data.percpu PERCPU_ADDR : AT(__phys_per_cpu_start - PAGE_OFFSET)
+  .data.percpu PERCPU_ADDR : AT(__phys_per_cpu_start - LOAD_OFFSET)
 	{
 		__per_cpu_start = .;
 		*(.data.percpu)
@@ -170,24 +171,24 @@ SECTIONS
 	}
   . = __phys_per_cpu_start + PERCPU_PAGE_SIZE;	/* ensure percpu data fits into percpu page size */
 
-  .data : AT(ADDR(.data) - PAGE_OFFSET)
+  .data : AT(ADDR(.data) - LOAD_OFFSET)
 	{ *(.data) *(.gnu.linkonce.d*) CONSTRUCTORS }
 
   . = ALIGN(16);
   __gp = . + 0x200000;	/* gp must be 16-byte aligned for exc. table */
 
-  .got : AT(ADDR(.got) - PAGE_OFFSET)
+  .got : AT(ADDR(.got) - LOAD_OFFSET)
 	{ *(.got.plt) *(.got) }
   /* We want the small data sections together, so single-instruction offsets
      can access them all, and initialized data all before uninitialized, so
      we can shorten the on-disk segment size.  */
-  .sdata : AT(ADDR(.sdata) - PAGE_OFFSET)
+  .sdata : AT(ADDR(.sdata) - LOAD_OFFSET)
 	{ *(.sdata) }
   _edata  =  .;
   _bss = .;
-  .sbss : AT(ADDR(.sbss) - PAGE_OFFSET)
+  .sbss : AT(ADDR(.sbss) - LOAD_OFFSET)
 	{ *(.sbss) *(.scommon) }
-  .bss : AT(ADDR(.bss) - PAGE_OFFSET)
+  .bss : AT(ADDR(.bss) - LOAD_OFFSET)
 	{ *(.bss) *(COMMON) }
 
   _end = .;

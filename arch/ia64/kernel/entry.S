@@ -178,15 +178,12 @@ GLOBAL_ENTRY(ia64_switch_to)
 	;;
 	st8 [r22]=sp			// save kernel stack pointer of old task
 	shr.u r26=r20,IA64_GRANULE_SHIFT
-	shr.u r17=r20,KERNEL_TR_PAGE_SHIFT
-	;;
-	cmp.ne p6,p7=KERNEL_TR_PAGE_NUM,r17
 	adds r21=IA64_TASK_THREAD_KSP_OFFSET,in0
 	;;
 	/*
 	 * If we've already mapped this task's page, we can skip doing it again.
 	 */
-(p6)	cmp.eq p7,p6=r26,r27
+	cmp.eq p7,p6=r26,r27
 (p6)	br.cond.dpnt .map
 	;;
 .done:
@@ -829,11 +826,7 @@ skip_rbs_switch:
 	ssm  psr.i		// enable interrupts
 #endif
 
-#if __GNUC__ < 3
-	br.call.spnt.many rp=invoke_schedule
-#else
 	br.call.spnt.many rp=schedule
-#endif
 .ret9:	cmp.eq p6,p0=r0,r0				// p6 <- 1
 	rsm psr.i		// disable interrupts
 	;;
@@ -891,31 +884,6 @@ GLOBAL_ENTRY(ia64_invoke_schedule_tail)
 	mov rp=loc0
 	br.ret.sptk.many rp
 END(ia64_invoke_schedule_tail)
-
-#if __GNUC__ < 3
-
-	/*
-	 * Invoke schedule() while preserving in0-in7, which may be needed
-	 * in case a system call gets restarted.  Note that declaring schedule()
-	 * with asmlinkage() is NOT enough because that will only preserve as many
-	 * registers as there are formal arguments.
-	 *
-	 * XXX fix me: with gcc 3.0, we won't need this anymore because syscall_linkage
-	 *	renders all eight input registers (in0-in7) as "untouchable".
-	 */
-ENTRY(invoke_schedule)
-	.prologue ASM_UNW_PRLG_RP|ASM_UNW_PRLG_PFS, ASM_UNW_PRLG_GRSAVE(8)
-	alloc loc1=ar.pfs,8,2,0,0
-	mov loc0=rp
-	;;
-	.body
-	br.call.sptk.many rp=schedule
-.ret14:	mov ar.pfs=loc1
-	mov rp=loc0
-	br.ret.sptk.many rp
-END(invoke_schedule)
-
-#endif /* __GNUC__ < 3 */
 
 	/*
 	 * Setup stack and call do_notify_resume_user().  Note that pSys and pNonSys need to

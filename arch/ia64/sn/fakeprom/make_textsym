@@ -7,7 +7,7 @@
 # License.  See the file "COPYING" in the main directory of this archive
 # for more details.
 #
-# Copyright (c) 2001-2002 Silicon Graphics, Inc.  All rights reserved.
+# Copyright (c) 2001-2003 Silicon Graphics, Inc.  All rights reserved.
 #
 
 help() {
@@ -37,6 +37,7 @@ while getopts "$OPTS" c ; do
 done
 shift `expr $OPTIND - 1`
 
+#OBJDUMP=/usr/bin/ia64-linux-objdump
 LINUX=${1:-vmlinux}
 TEXTSYM=${2:-${LINUX}.sym}
 TMPSYM=${2:-${LINUX}.sym.tmp}
@@ -130,6 +131,8 @@ END
 
 
 awk '
+/ _start$/ {start=1}
+/ start_ap$/ {start=1}
 /__start_gate_section/ {start=1}
 /^'${dataprefix}\|${textprefix}'/ {
 	if ($4 == ".kdb")
@@ -142,7 +145,7 @@ awk '
 			n = 0
 			s = $(NF-1)
 			while (length(s) > 0) {
-				n = n*16 + substr(s,1,1)
+				n = n*16 + (index("0123456789abcdef", substr(s,1,1)) - 1)
 				s = substr(s,2)
 			}
 			printf "GLOBAL | %s | DATA | %s | %d\n", $1, $NF, n

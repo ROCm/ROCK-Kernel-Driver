@@ -5,11 +5,9 @@ host-progs  := gen_init_cpio
 
 clean-files := initramfs_data.cpio.gz
 
-LDFLAGS_initramfs_data.o := $(LDFLAGS_BLOB) -r -T
-
-$(obj)/initramfs_data.o: $(src)/initramfs_data.scr \
-			 $(obj)/initramfs_data.cpio.gz FORCE
-	$(call if_changed,ld)
+$(obj)/initramfs_data.S: $(obj)/initramfs_data.cpio.gz
+	echo '.section ".init.ramfs", "a"' > $@
+	od -v -An -t x1 -w8 $^ | cut -c2- | sed -e s"/ /,0x/g" -e s"/^/.byte 0x"/ >> $@
 
 # initramfs-y are the programs which will be copied into the CPIO
 # archive. Currently, the filenames are hardcoded in gen_init_cpio,
