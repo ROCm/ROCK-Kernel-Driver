@@ -256,8 +256,7 @@ static unsigned int rfin(unsigned int x)
 	return (x + half) & ~(0x7fffff >> exp);
 }
 
-int
-emulate_altivec(struct pt_regs *regs)
+int emulate_altivec(struct pt_regs *regs)
 {
 	unsigned int instr, i;
 	unsigned int va, vb, vc, vd;

@@ -111,5 +111,6 @@ MACHINE_START(OMAP_PERSEUS2, "OMAP730 Perseus2")
 	BOOT_PARAMS(0x10000100)
 	MAPIO(omap_perseus2_map_io)
 	INITIRQ(omap_perseus2_init_irq)
+	INITTIME(omap_init_time)
 	INIT_MACHINE(omap_perseus2_init)
 MACHINE_END
