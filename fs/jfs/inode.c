@@ -302,7 +302,7 @@ static int jfs_readpages(struct file *file, struct address_space *mapping,
 static int jfs_prepare_write(struct file *file,
 			     struct page *page, unsigned from, unsigned to)
 {
-	return block_prepare_write(page, from, to, jfs_get_block);
+	return nobh_prepare_write(page, from, to, jfs_get_block);
 }
 
 static sector_t jfs_bmap(struct address_space *mapping, sector_t block)
@@ -327,7 +327,7 @@ struct address_space_operations jfs_aops = {
 	.writepages	= jfs_writepages,
 	.sync_page	= block_sync_page,
 	.prepare_write	= jfs_prepare_write,
-	.commit_write	= generic_commit_write,
+	.commit_write	= nobh_commit_write,
 	.bmap		= jfs_bmap,
 	.direct_IO	= jfs_direct_IO,
 };
@@ -380,7 +380,7 @@ void jfs_truncate(struct inode *ip)
 {
 	jFYI(1, ("jfs_truncate: size = 0x%lx\n", (ulong) ip->i_size));
 
-	block_truncate_page(ip->i_mapping, ip->i_size, jfs_get_block);
+	nobh_truncate_page(ip->i_mapping, ip->i_size);
 
 	IWRITE_LOCK(ip);
 	jfs_truncate_nolock(ip, ip->i_size);
