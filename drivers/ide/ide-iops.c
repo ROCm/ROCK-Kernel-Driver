@@ -983,6 +983,8 @@ EXPORT_SYMBOL(ide_config_drive_speed);
  * at the appropriate code to handle the next interrupt, and a
  * timer is started to prevent us from waiting forever in case
  * something goes wrong (see the ide_timer_expiry() handler later on).
+ *
+ * See also ide_execute_command
  */
 void ide_set_handler (ide_drive_t *drive, ide_handler_t *handler,
 		      unsigned int timeout, ide_expiry_t *expiry)
@@ -992,7 +994,7 @@ void ide_set_handler (ide_drive_t *drive, ide_handler_t *handler,
 
 	spin_lock_irqsave(&ide_lock, flags);
 	if (hwgroup->handler != NULL) {
-		printk("%s: ide_set_handler: handler not null; "
+		printk(KERN_CRIT "%s: ide_set_handler: handler not null; "
 			"old=%p, new=%p\n",
 			drive->name, hwgroup->handler, handler);
 	}
@@ -1004,6 +1006,47 @@ void ide_set_handler (ide_drive_t *drive, ide_handler_t *handler,
 }
 
 EXPORT_SYMBOL(ide_set_handler);
+
+/**
+ *	ide_execute_command	-	execute an IDE command
+ *	@drive: IDE drive to issue the command against
+ *	@command: command byte to write
+ *	@handler: handler for next phase
+ *	@timeout: timeout for command
+ *	@expiry:  handler to run on timeout
+ *
+ *	Helper function to issue an IDE command. This handles the
+ *	atomicity requirements, command timing and ensures that the 
+ *	handler and IRQ setup do not race. All IDE command kick off
+ *	should go via this function or do equivalent locking.
+ */
+ 
+void ide_execute_command(ide_drive_t *drive, task_ioreg_t cmd, ide_handler_t *handler, unsigned timeout, ide_expiry_t *expiry)
+{
+	unsigned long flags;
+	ide_hwgroup_t *hwgroup = HWGROUP(drive);
+	ide_hwif_t *hwif = HWIF(drive);
+	
+	spin_lock_irqsave(&ide_lock, flags);
+	
+	if(hwgroup->handler)
+		BUG();
+	hwgroup->handler	= handler;
+	hwgroup->expiry		= expiry;
+	hwgroup->timer.expires	= jiffies + timeout;
+	add_timer(&hwgroup->timer);
+	hwif->OUTBSYNC(cmd, IDE_COMMAND_REG);
+	/* Drive takes 400nS to respond, we must avoid the IRQ being
+	   serviced before that. 
+	   
+	   FIXME: we could skip this delay with care on non shared
+	   devices 
+	*/
+	ndelay(400);
+	spin_unlock_irqrestore(&ide_lock, flags);
+}
+
+EXPORT_SYMBOL(ide_execute_command);
 
 
 /* needed below */
