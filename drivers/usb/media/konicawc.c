@@ -488,7 +488,7 @@ static void konicawc_stop_data(struct uvd *uvd)
 }
 
 
-static void konicawc_process_isoc(struct uvd *uvd, usbvideo_frame_t *frame)
+static void konicawc_process_isoc(struct uvd *uvd, struct usbvideo_frame *frame)
 {	
 	struct konicawc *cam = (struct konicawc *)uvd->user_data;
 	int maxline = cam->maxline;
@@ -881,7 +881,7 @@ static struct usb_device_id id_table[] = {
 
 static int __init konicawc_init(void)
 {
-	usbvideo_cb_t cbTbl;
+	struct usbvideo_cb cbTbl;
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	memset(&cbTbl, 0, sizeof(cbTbl));
 	cbTbl.probe = konicawc_probe;
