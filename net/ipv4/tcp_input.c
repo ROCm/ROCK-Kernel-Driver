@@ -88,9 +88,9 @@ int sysctl_tcp_max_orphans = NR_FILE;
 int sysctl_tcp_frto;
 int sysctl_tcp_nometrics_save;
 int sysctl_tcp_westwood;
-int sysctl_tcp_vegas_cong_avoid;
+int sysctl_tcp_vegas_cong_avoid = 1;
 
-int sysctl_tcp_moderate_rcvbuf;
+int sysctl_tcp_moderate_rcvbuf = 1;
 
 /* Default values of the Vegas variables, in fixed-point representation
  * with V_PARAM_SHIFT bits to the right of the binary point.
@@ -99,7 +99,7 @@ int sysctl_tcp_moderate_rcvbuf;
 int sysctl_tcp_vegas_alpha = 1<<V_PARAM_SHIFT;
 int sysctl_tcp_vegas_beta  = 3<<V_PARAM_SHIFT;
 int sysctl_tcp_vegas_gamma = 1<<V_PARAM_SHIFT;
-int sysctl_tcp_bic;
+int sysctl_tcp_bic = 1;
 int sysctl_tcp_bic_fast_convergence = 1;
 int sysctl_tcp_bic_low_window = 14;
 
