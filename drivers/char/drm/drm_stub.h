@@ -33,25 +33,19 @@
 
 #include "drmP.h"
 
-#define DRM_STUB_MAXCARDS 16	/* Enough for one machine */
+static unsigned int cards_limit = 16;	/* Enough for one machine */
+static unsigned int debug = 0;		/* 1 to enable debug output */
 
-static struct class_simple *drm_class;
+MODULE_AUTHOR( DRIVER_AUTHOR );
+MODULE_DESCRIPTION( DRIVER_DESC );
+MODULE_LICENSE("GPL and additional rights");
+MODULE_PARM_DESC(cards_limit, "Maximum number of graphics cards");
+MODULE_PARM_DESC(debug, "Enable debug output");
 
-/** Stub list. One for each minor. */
-static struct drm_stub_list {
-	const char             *name;
-	struct file_operations *fops;	/**< file operations */
-	struct proc_dir_entry  *dev_root;	/**< proc directory entry */
-} *DRM(stub_list);
+module_param(cards_limit, int, 0444);
+module_param(debug, int, 0666);
 
-static struct proc_dir_entry *DRM(stub_root);
-
-/** Stub information */
-static struct drm_stub_info {
-	int (*info_register)(const char *name, struct file_operations *fops,
-			     drm_device_t *dev);
-	int (*info_unregister)(int minor);
-} DRM(stub_info);
+drm_global_t *DRM(global);
 
 /**
  * File \c open operation.
@@ -59,18 +53,27 @@ static struct drm_stub_info {
  * \param inode device inode.
  * \param filp file pointer.
  *
- * Puts the drm_stub_list::fops corresponding to the device minor number into
+ * Puts the dev->fops corresponding to the device minor number into
  * \p filp, call the \c open method, and restore the file operations.
  */
-static int DRM(stub_open)(struct inode *inode, struct file *filp)
+static int stub_open(struct inode *inode, struct file *filp)
 {
-	int                    minor = iminor(inode);
-	int                    err   = -ENODEV;
+	drm_device_t *dev = NULL;
+	int minor = iminor(inode);
+	int err = -ENODEV;
 	struct file_operations *old_fops;
+	
+	DRM_DEBUG("\n");
 
-	if (!DRM(stub_list) || !DRM(stub_list)[minor].fops) return -ENODEV;
-	old_fops   = filp->f_op;
-	filp->f_op = fops_get(DRM(stub_list)[minor].fops);
+	if (!((minor >= 0) && (minor < DRM(global)->cards_limit)))
+		return -ENODEV;
+
+	dev = DRM(global)->minors[minor].dev;
+	if (!dev)
+		return -ENODEV;
+
+	old_fops = filp->f_op;
+	filp->f_op = fops_get(dev->fops);
 	if (filp->f_op->open && (err = filp->f_op->open(inode, filp))) {
 		fops_put(filp->f_op);
 		filp->f_op = fops_get(old_fops);
@@ -83,48 +86,72 @@ static int DRM(stub_open)(struct inode *inode, struct file *filp)
 /** File operations structure */
 static struct file_operations DRM(stub_fops) = {
 	.owner = THIS_MODULE,
-	.open  = DRM(stub_open)
+	.open  = stub_open
 };
 
 /**
  * Get a device minor number.
  *
- * \param name driver name.
- * \param fops file operations.
- * \param dev DRM device.
- * \return minor number on success, or a negative number on failure.
+ * \param pdev PCI device structure
+ * \param ent entry from the PCI ID table with device type flags
+ * \return negative number on failure.
  *
- * Allocate and initialize ::stub_list if one doesn't exist already.  Search an
- * empty entry and initialize it to the given parameters, and create the proc
- * init entry via proc_init().
+ * Search an empty entry and initialize it to the given parameters, and 
+ * create the proc init entry via proc_init().
  */
-static int DRM(stub_getminor)(const char *name, struct file_operations *fops,
-			      drm_device_t *dev)
+static int get_minor(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
-	int i;
+	struct class_device *dev_class;
+	drm_device_t *dev;
+	int ret;
+	int minor;
+	drm_minor_t *minors = &DRM(global)->minors[0];
 
-	if (!DRM(stub_list)) {
-		DRM(stub_list) = DRM(alloc)(sizeof(*DRM(stub_list))
-					    * DRM_STUB_MAXCARDS, DRM_MEM_STUB);
-		if(!DRM(stub_list)) return -1;
-		for (i = 0; i < DRM_STUB_MAXCARDS; i++) {
-			DRM(stub_list)[i].name = NULL;
-			DRM(stub_list)[i].fops = NULL;
+	DRM_DEBUG("\n");
+
+	for (minor=0; minor<DRM(global)->cards_limit; minor++, minors++) {
+		if (minors->type == DRM_MINOR_FREE) {
+
+			DRM_DEBUG("assigning minor %d\n", minor);
+			dev = DRM(calloc)(1, sizeof(*dev), DRM_MEM_STUB);
+			if (!dev)
+				return -ENOMEM;
+
+			*minors = (drm_minor_t){.dev = dev, .type=DRM_MINOR_PRIMARY};
+			dev->minor = minor;
+			if ((ret=DRM(fill_in_dev)(dev, pdev, ent))) {
+				printk(KERN_ERR "DRM: Fill_in_dev failed.\n");
+				goto err_g1;
+			}
+			if ((ret = DRM(proc_init)(dev, minor, DRM(global)->proc_root, &dev->dev_root))) {
+				printk (KERN_ERR "DRM: Failed to initialize /proc/dri.\n");
+				goto err_g1;
+			}
+
+			pci_enable_device(pdev);
+			
+			dev_class = class_simple_device_add(DRM(global)->drm_class, 
+							    MKDEV(DRM_MAJOR, minor), &pdev->dev, "card%d", minor);
+			if (IS_ERR(dev_class)) {
+				printk(KERN_ERR "DRM: Error class_simple_device_add.\n");
+				ret = PTR_ERR(dev_class);
+				goto err_g2;
+			}
+			
+			DRM_DEBUG("new minor assigned %d\n", minor);
+			return 0;
 		}
 	}
-	for (i = 0; i < DRM_STUB_MAXCARDS; i++) {
-		if (!DRM(stub_list)[i].fops) {
-			DRM(stub_list)[i].name = name;
-			DRM(stub_list)[i].fops = fops;
-			DRM(stub_root) = DRM(proc_init)(dev, i, DRM(stub_root),
-							&DRM(stub_list)[i]
-							.dev_root);
-			class_simple_device_add(drm_class, MKDEV(DRM_MAJOR, i), NULL, name);
-			return i;
-		}
-	}
-	return -1;
+	DRM_ERROR("out of minors\n");
+	return -ENOMEM;
+err_g2:
+	DRM(proc_cleanup)(minor, DRM(global)->proc_root, minors->dev_root);
+err_g1:
+	*minors = (drm_minor_t){.dev = NULL, .type = DRM_MINOR_FREE};
+	DRM(free)(dev, sizeof(*dev), DRM_MEM_STUB);
+	return ret;
 }
+		
 
 /**
  * Put a device minor number.
@@ -136,101 +163,112 @@ static int DRM(stub_getminor)(const char *name, struct file_operations *fops,
  * "drm" data, otherwise unregisters the "drm" data, frees the stub list and
  * unregisters the character device. 
  */
-static int DRM(stub_putminor)(int minor)
+int DRM(put_minor)(drm_device_t *dev)
 {
-	if (minor < 0 || minor >= DRM_STUB_MAXCARDS) return -1;
-	DRM(stub_list)[minor].name = NULL;
-	DRM(stub_list)[minor].fops = NULL;
-	DRM(proc_cleanup)(minor, DRM(stub_root),
-			  DRM(stub_list)[minor].dev_root);
-	if (minor) {
-		class_simple_device_remove(MKDEV(DRM_MAJOR, minor));
-		inter_module_put("drm");
-	} else {
-		inter_module_unregister("drm");
-		DRM(free)(DRM(stub_list),
-			  sizeof(*DRM(stub_list)) * DRM_STUB_MAXCARDS,
-			  DRM_MEM_STUB);
-		unregister_chrdev(DRM_MAJOR, "drm");
-		class_simple_device_remove(MKDEV(DRM_MAJOR, minor));
-		class_simple_destroy(drm_class);
+	drm_minor_t *minors = &DRM(global)->minors[dev->minor];
+	int i;
+	
+	DRM_DEBUG("release minor %d\n", dev->minor);
+	
+	DRM(proc_cleanup)(dev->minor, DRM(global)->proc_root, dev->dev_root);
+	class_simple_device_remove(MKDEV(DRM_MAJOR, dev->minor));
+	
+	*minors = (drm_minor_t){.dev = NULL, .type = DRM_MINOR_FREE};
+	DRM(free)(dev, sizeof(*dev), DRM_MEM_STUB);
+	
+	/* if any device pointers are non-NULL we are not the last module */
+	for (i=0; i<DRM(global)->cards_limit; i++) {
+		if (DRM(global)->minors[i].type != DRM_MINOR_FREE) {
+			DRM_DEBUG("inter_module_put called\n");
+			inter_module_put("drm");
+			return 0;
+		}
 	}
+	DRM_DEBUG("unregistering inter_module.\n");
+	inter_module_unregister("drm");
+	remove_proc_entry("dri", NULL);
+	class_simple_destroy(DRM(global)->drm_class);
+
+	unregister_chrdev(DRM_MAJOR, "drm");
+	DRM(free)(DRM(global)->minors, sizeof(*DRM(global)->minors) * 
+		  DRM(global)->cards_limit, DRM_MEM_STUB);
+	DRM(free)(DRM(global), sizeof(*DRM(global)), DRM_MEM_STUB);
+	DRM(global) = NULL;
+
 	return 0;
 }
 
 /**
  * Register.
  *
- * \param name driver name.
- * \param fops file operations
- * \param dev DRM device.
+ * \param pdev - PCI device structure
+ * \param ent entry from the PCI ID table with device type flags
  * \return zero on success or a negative number on failure.
  *
- * Attempt to register the char device and get the foreign "drm" data. If
- * successful then another module already registered so gets the stub info,
- * otherwise use this module stub info and make it available for other modules.
- *
- * Finally calls stub_info::info_register.
+ * Attempt to gets inter module "drm" information. If we are first
+ * then register the character device and inter module information.
+ * Try and register, if we fail to register, backout previous work.
  */
-int DRM(stub_register)(const char *name, struct file_operations *fops,
-		       drm_device_t *dev)
+int DRM(probe)(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
-	struct drm_stub_info *i = NULL;
-	int ret1;
-	int ret2;
+	drm_global_t *global;
+	int ret = -ENOMEM;
 
 	DRM_DEBUG("\n");
-	ret1 = register_chrdev(DRM_MAJOR, "drm", &DRM(stub_fops));
-	if (!ret1) {
-		drm_class = class_simple_create(THIS_MODULE, "drm");
-		if (IS_ERR(drm_class)) {
-			printk (KERN_ERR "Error creating drm class.\n");
-			unregister_chrdev(DRM_MAJOR, "drm");
-			return PTR_ERR(drm_class);
-		}
-	}
-	else if (ret1 == -EBUSY)
-		i = (struct drm_stub_info *)inter_module_get("drm");
-	else
-		return -1;
 
-	if (i) {
-				/* Already registered */
-		DRM(stub_info).info_register   = i->info_register;
-		DRM(stub_info).info_unregister = i->info_unregister;
-		DRM_DEBUG("already registered\n");
-	} else if (DRM(stub_info).info_register != DRM(stub_getminor)) {
-		DRM(stub_info).info_register   = DRM(stub_getminor);
-		DRM(stub_info).info_unregister = DRM(stub_putminor);
+	/* use the inter_module_get to check - as if the same module
+		registers chrdev twice it succeeds */
+	global = (drm_global_t *)inter_module_get("drm");
+	if (global) {
+		DRM(global) = global;
+		global = NULL;
+	} else {
+		DRM_DEBUG("first probe\n");
+
+		global = DRM(calloc)(1, sizeof(*global), DRM_MEM_STUB);
+		if(!global) 
+			return -ENOMEM;
+
+		global->cards_limit = (cards_limit < DRM_MAX_MINOR + 1 ? cards_limit : DRM_MAX_MINOR + 1);
+		global->minors = DRM(calloc)(global->cards_limit, 
+					sizeof(*global->minors), DRM_MEM_STUB);
+		if(!global->minors) 
+			goto err_p1;
+
+		if (register_chrdev(DRM_MAJOR, "drm", &DRM(stub_fops)))
+			goto err_p1;
+	
+		global->drm_class = class_simple_create(THIS_MODULE, "drm");
+		if (IS_ERR(global->drm_class)) {
+			printk (KERN_ERR "DRM: Error creating drm class.\n");
+			ret = PTR_ERR(global->drm_class);
+			goto err_p2;
+		}
+
+		global->proc_root = create_proc_entry("dri", S_IFDIR, NULL);
+		if (!global->proc_root) {
+			DRM_ERROR("Cannot create /proc/dri\n");
+			ret = -1;
+			goto err_p3;
+		}
 		DRM_DEBUG("calling inter_module_register\n");
-		inter_module_register("drm", THIS_MODULE, &DRM(stub_info));
+		inter_module_register("drm", THIS_MODULE, global);
+		
+		DRM(global) = global;
 	}
-	if (DRM(stub_info).info_register) {
-		ret2 = DRM(stub_info).info_register(name, fops, dev);
-		if (ret2) {
-			if (!ret1) {
-				unregister_chrdev(DRM_MAJOR, "drm");
-				class_simple_destroy(drm_class);
-			}
-			if (!i)
-				inter_module_unregister("drm");
-		}
-		return ret2;
+	if ((ret = get_minor(pdev, ent))) {
+		if (global)
+			goto err_p3;
+		return ret;
 	}
-	return -1;
-}
-
-/**
- * Unregister.
- *
- * \param minor
- *
- * Calls drm_stub_info::unregister.
- */
-int DRM(stub_unregister)(int minor)
-{
-	DRM_DEBUG("%d\n", minor);
-	if (DRM(stub_info).info_unregister)
-		return DRM(stub_info).info_unregister(minor);
-	return -1;
+	return 0;
+err_p3:
+	class_simple_destroy(global->drm_class);
+err_p2:
+	unregister_chrdev(DRM_MAJOR, "drm");
+	DRM(free)(global->minors, sizeof(*global->minors) * global->cards_limit, DRM_MEM_STUB);
+err_p1:	
+	DRM(free)(global, sizeof(*global), DRM_MEM_STUB);
+	DRM(global) = NULL;
+	return ret;
 }
