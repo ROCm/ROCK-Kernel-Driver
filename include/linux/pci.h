@@ -645,7 +645,8 @@ void pci_release_region(struct pci_dev *, int);
 int pci_register_driver(struct pci_driver *);
 void pci_unregister_driver(struct pci_driver *);
 void pci_insert_device(struct pci_dev *, struct pci_bus *);
-void pci_remove_device(struct pci_dev *);
+void pci_remove_bus_device(struct pci_dev *);
+void pci_remove_behind_bridge(struct pci_dev *);
 struct pci_driver *pci_dev_driver(const struct pci_dev *);
 const struct pci_device_id *pci_match_device(const struct pci_device_id *ids, const struct pci_dev *dev);
 unsigned int pci_do_scan_bus(struct pci_bus *bus);
@@ -692,7 +693,6 @@ struct pci_visit {
 extern int pci_visit_dev(struct pci_visit *fn,
 			 struct pci_dev_wrapped *wrapped_dev,
 			 struct pci_bus_wrapped *wrapped_parent);
-extern int pci_is_dev_in_use(struct pci_dev *dev);
 extern int pci_remove_device_safe(struct pci_dev *dev);
 
 #endif /* CONFIG_PCI */

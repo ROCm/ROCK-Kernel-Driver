@@ -403,31 +403,8 @@ struct resource_lists {
 #define msg_button_ignore	"PCI slot #%d - button press ignored.  (action in progress...)\n"
 
 
-/* Proc functions for the hotplug controller info */
-#ifdef CONFIG_PROC_FS
-extern int cpqhp_proc_init_ctrl		(void);
-extern int cpqhp_proc_destroy_ctrl	(void);
-extern int cpqhp_proc_create_ctrl	(struct controller *ctrl);
-extern int cpqhp_proc_remove_ctrl	(struct controller *ctrl);
-#else
-static inline int cpqhp_proc_init_ctrl (void)
-{
-	return 0;
-}
-static inline int cpqhp_proc_destroy_ctrl (void)
-{
-	return 0;
-}
-static inline int cpqhp_proc_create_ctrl (struct controller *ctrl)
-{
-	return 0;
-}
-static inline int cpqhp_proc_remove_ctrl (struct controller *ctrl)
-{
-	return 0;
-}
-#endif
-
+/* sysfs functions for the hotplug controller info */
+extern void cpqhp_create_ctrl_files		(struct controller *ctrl);
 
 /* controller functions */
 extern void	cpqhp_pushbutton_thread		(unsigned long event_pointer);

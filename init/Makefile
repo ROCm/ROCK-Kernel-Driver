@@ -3,6 +3,9 @@
 #
 
 obj-y			:= main.o version.o do_mounts.o initramfs.o
+obj-$(CONFIG_DEVFS_FS)		+= do_mounts_devfs.o
+obj-$(CONFIG_BLK_DEV_RAM)	+= do_mounts_rd.o
+obj-$(CONFIG_BLK_DEV_MD)	+= do_mounts_md.o
 
 # files to be removed upon make clean
 clean-files := ../include/linux/compile.h
@@ -17,5 +20,5 @@ $(obj)/version.o: include/linux/compile.h
 # actual file if its content has changed.
 
 include/linux/compile.h: FORCE
-	@echo -n '  Generating $@'
+	@echo -n '  GEN     $@'
 	@sh $(srctree)/scripts/mkcompile_h $@ "$(UTS_MACHINE)" "$(CONFIG_SMP)" "$(CC) $(CFLAGS)"

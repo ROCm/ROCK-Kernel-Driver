@@ -90,7 +90,7 @@ static int pc_debug = PCMCIA_DEBUG;
 #define PCDATA_INDICATOR	0x0015
 
 typedef struct cb_config_t {
-	struct pci_dev dev;
+	struct pci_dev *dev[8];
 } cb_config_t;
 
 /*=====================================================================
@@ -178,7 +178,7 @@ int read_cb_mem(socket_info_t * s, int space, u_int addr, u_int len, void *ptr)
 	if (!s->cb_config)
 		goto fail;
 
-	dev = &s->cb_config[0].dev;
+	dev = s->cb_config->dev[0];
 
 	/* Config space? */
 	if (space == 0) {
@@ -248,14 +248,25 @@ int cb_alloc(socket_info_t * s)
 	}
 	s->functions = fn;
 
-	c = kmalloc(fn * sizeof(struct cb_config_t), GFP_ATOMIC);
+	c = kmalloc(sizeof(struct cb_config_t), GFP_ATOMIC);
 	if (!c)
 		return CS_OUT_OF_RESOURCE;
-	memset(c, 0, fn * sizeof(struct cb_config_t));
+ 	memset(c, 0, sizeof(struct cb_config_t));
+
+	for (i = 0; i < fn; i++) {
+		c->dev[i] = kmalloc(sizeof(struct pci_dev), GFP_ATOMIC);
+		if (!c->dev[i]) {
+			for (; i--; )
+				kfree(c->dev[i]);
+			kfree(c);
+			return CS_OUT_OF_RESOURCE;
+		}
+		memset(c->dev[i], 0, sizeof(struct pci_dev));
+	}
 
 	irq = s->cap.pci_irq;
 	for (i = 0; i < fn; i++) {
-		struct pci_dev *dev = &c[i].dev;
+		struct pci_dev *dev = c->dev[i];
 		u8 irq_pin;
 		int r;
 
@@ -309,11 +320,8 @@ void cb_free(socket_info_t * s)
 	cb_config_t *c = s->cb_config;
 
 	if (c) {
-		int i;
-
 		s->cb_config = NULL;
-		for (i = 0 ; i < s->functions ; i++)
-			pci_remove_device(&c[i].dev);
+		pci_remove_behind_bridge(s->cap.cb_dev);
 
 		kfree(c);
 		printk(KERN_INFO "cs: cb_free(bus %d)\n", s->cap.cb_dev->subordinate->number);
@@ -347,7 +355,7 @@ void cb_enable(socket_info_t * s)
 
 	/* Set up PCI interrupt and command registers */
 	for (i = 0; i < s->functions; i++) {
-		dev = &s->cb_config[i].dev;
+		dev = s->cb_config->dev[i];
 		pci_write_config_byte(dev, PCI_COMMAND, PCI_COMMAND_MASTER |
 				      PCI_COMMAND_IO | PCI_COMMAND_MEMORY);
 		pci_write_config_byte(dev, PCI_CACHE_LINE_SIZE,
@@ -356,7 +364,7 @@ void cb_enable(socket_info_t * s)
 
 	if (s->irq.AssignedIRQ) {
 		for (i = 0; i < s->functions; i++) {
-			dev = &s->cb_config[i].dev;
+			dev = s->cb_config->dev[i];
 			pci_write_config_byte(dev, PCI_INTERRUPT_LINE,
 					      s->irq.AssignedIRQ);
 		}

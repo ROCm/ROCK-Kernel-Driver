@@ -483,29 +483,6 @@ static int configure_visit_pci_dev(struct pci_dev_wrapped *wrapped_dev,
 	return 0;
 }
 
-static int unconfigure_visit_pci_dev_phase1(struct pci_dev_wrapped *wrapped_dev,
-				 struct pci_bus_wrapped *wrapped_bus)
-{
-	struct pci_dev *dev = wrapped_dev->dev;
-
-	dbg("%s - enter", __FUNCTION__);
-
-	dbg("attempting removal of driver for device %02x:%02x.%x",
-	    dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
-
-	/* Now, remove the Linux Driver representation */
-	if(dev->driver) {
-		dbg("device is attached to a driver");
-		if(dev->driver->remove) {
-			dev->driver->remove(dev);
-			dbg("driver was removed");
-		}
-		dev->driver = NULL;
-	}
-	dbg("%s - exit", __FUNCTION__);
-	return pci_is_dev_in_use(dev);
-}
-
 static int unconfigure_visit_pci_dev_phase2(struct pci_dev_wrapped *wrapped_dev,
 					    struct pci_bus_wrapped *wrapped_bus)
 {
@@ -575,10 +552,6 @@ static int unconfigure_visit_pci_bus_phase2(struct pci_bus_wrapped *wrapped_bus,
 
 static struct pci_visit configure_functions = {
 	.visit_pci_dev = configure_visit_pci_dev,
-};
-
-static struct pci_visit unconfigure_functions_phase1 = {
-	.post_visit_pci_dev = unconfigure_visit_pci_dev_phase1
 };
 
 static struct pci_visit unconfigure_functions_phase2 = {
@@ -668,13 +641,6 @@ int cpci_unconfigure_slot(struct slot* slot)
 		if(dev) {
 			wrapped_dev.dev = dev;
 			wrapped_bus.bus = dev->bus;
-			dbg("%s - unconfigure phase 1", __FUNCTION__);
-			rc = pci_visit_dev(&unconfigure_functions_phase1,
-					   &wrapped_dev, &wrapped_bus);
-			if(rc) {
-				break;
-			}
-
 			dbg("%s - unconfigure phase 2", __FUNCTION__);
 			rc = pci_visit_dev(&unconfigure_functions_phase2,
 					   &wrapped_dev, &wrapped_bus);

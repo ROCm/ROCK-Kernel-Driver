@@ -683,11 +683,6 @@ extern void ibmphp_hpc_stop_poll_thread (void);
 #define ENABLE		1
 #define DISABLE		0
 
-#define ADD		0
-#define REMOVE		1
-#define DETAIL		2
-
-#define MAX_OPS		3
 #define CARD_INFO	0x07
 #define PCIX133		0x07
 #define PCIX66		0x05
@@ -761,6 +756,7 @@ struct controller {
 
 extern int ibmphp_init_devno (struct slot **);	/* This function is called from EBDA, so we need it not be static */
 extern int ibmphp_disable_slot (struct hotplug_slot *);	/* This function is called from HPC, so we need it to not be static */
+extern int ibmphp_do_disable_slot (struct slot *slot_cur);
 extern int ibmphp_update_slot_info (struct slot *);	/* This function is called from HPC, so we need it to not be be static */
 extern int ibmphp_configure_card (struct pci_func *, u8);
 extern int ibmphp_unconfigure_card (struct slot **, int);

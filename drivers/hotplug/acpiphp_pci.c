@@ -194,133 +194,6 @@ static int init_config_space (struct acpiphp_func *func)
 	return 0;
 }
 
-
-/* enable pci_dev */
-static int configure_pci_dev (struct pci_dev_wrapped *wrapped_dev, struct pci_bus_wrapped *wrapped_bus)
-{
-	struct acpiphp_func *func;
-	struct acpiphp_bridge *bridge;
-	struct pci_dev *dev;
-
-	func = (struct acpiphp_func *)wrapped_dev->data;
-	bridge = (struct acpiphp_bridge *)wrapped_bus->data;
-	dev = wrapped_dev->dev;
-
-	/* TBD: support PCI-to-PCI bridge case */
-	if (!func || !bridge)
-		return 0;
-
-	//pci_proc_attach_device(dev);
-	//pci_announce_device_to_drivers(dev);
-	info("Device %s configured\n", dev->slot_name);
-
-	return 0;
-}
-
-
-static int is_pci_dev_in_use (struct pci_dev* dev)
-{
-	/*
-	 * dev->driver will be set if the device is in use by a new-style
-	 * driver -- otherwise, check the device's regions to see if any
-	 * driver has claimed them
-	 */
-
-	int i, inuse=0;
-
-	if (dev->driver) return 1; //assume driver feels responsible
-
-	for (i = 0; !dev->driver && !inuse && (i < 6); i++) {
-		if (!pci_resource_start(dev, i))
-			continue;
-
-		if (pci_resource_flags(dev, i) & IORESOURCE_IO)
-			inuse = check_region(pci_resource_start(dev, i),
-					     pci_resource_len(dev, i));
-		else if (pci_resource_flags(dev, i) & IORESOURCE_MEM)
-			inuse = check_mem_region(pci_resource_start(dev, i),
-						 pci_resource_len(dev, i));
-	}
-
-	return inuse;
-}
-
-
-static int pci_hp_remove_device (struct pci_dev *dev)
-{
-	if (is_pci_dev_in_use(dev)) {
-		err("***Cannot safely power down device -- "
-		       "it appears to be in use***\n");
-		return -EBUSY;
-	}
-	pci_remove_device(dev);
-	return 0;
-}
-
-
-/* remove device driver */
-static int unconfigure_pci_dev_driver (struct pci_dev_wrapped *wrapped_dev, struct pci_bus_wrapped *wrapped_bus)
-{
-	struct pci_dev *dev = wrapped_dev->dev;
-
-	dbg("attempting removal of driver for device %s\n", dev->slot_name);
-
-	/* Now, remove the Linux Driver Representation */
-	if (dev->driver) {
-		if (dev->driver->remove) {
-			dev->driver->remove(dev);
-			dbg("driver was properly removed\n");
-		}
-		dev->driver = NULL;
-	}
-
-	return is_pci_dev_in_use(dev);
-}
-
-
-/* remove pci_dev itself from system */
-static int unconfigure_pci_dev (struct pci_dev_wrapped *wrapped_dev, struct pci_bus_wrapped *wrapped_bus)
-{
-	struct pci_dev *dev = wrapped_dev->dev;
-
-	/* Now, remove the Linux Representation */
-	if (dev) {
-		if (pci_hp_remove_device(dev) == 0) {
-			info("Device %s removed\n", dev->slot_name);
-			kfree(dev); /* Now, remove */
-		} else {
-			return -1; /* problems while freeing, abort visitation */
-		}
-	}
-
-	return 0;
-}
-
-
-/* remove pci_bus itself from system */
-static int unconfigure_pci_bus (struct pci_bus_wrapped *wrapped_bus, struct pci_dev_wrapped *wrapped_dev)
-{
-	struct pci_bus *bus = wrapped_bus->bus;
-
-#ifdef CONFIG_PROC_FS
-	/* Now, remove the Linux Representation */
-	if (bus->procdir) {
-		pci_proc_detach_bus(bus);
-	}
-#endif
-	/* the cleanup code should live in the kernel ... */
-	bus->self->subordinate = NULL;
-	/* unlink from parent bus */
-	list_del(&bus->node);
-
-	/* Now, remove */
-	if (bus)
-		kfree(bus);
-
-	return 0;
-}
-
-
 /* detect_used_resource - subtract resource under dev from bridge */
 static int detect_used_resource (struct acpiphp_bridge *bridge, struct pci_dev *dev)
 {
@@ -592,22 +465,6 @@ int acpiphp_configure_slot (struct acpiphp_slot *slot)
 	return retval;
 }
 
-
-/* for pci_visit_dev() */
-static struct pci_visit configure_functions = {
-	.post_visit_pci_dev =	configure_pci_dev
-};
-
-static struct pci_visit unconfigure_functions_phase1 = {
-	.post_visit_pci_dev =	unconfigure_pci_dev_driver
-};
-
-static struct pci_visit unconfigure_functions_phase2 = {
-	.post_visit_pci_bus =	unconfigure_pci_bus,
-	.post_visit_pci_dev =	unconfigure_pci_dev
-};
-
-
 /**
  * acpiphp_configure_function - configure PCI function
  * @func: function to be configured
@@ -618,32 +475,9 @@ static struct pci_visit unconfigure_functions_phase2 = {
  */
 int acpiphp_configure_function (struct acpiphp_func *func)
 {
-	int retval = 0;
-	struct pci_dev_wrapped wrapped_dev;
-	struct pci_bus_wrapped wrapped_bus;
-	struct acpiphp_bridge *bridge;
-
-	/* if pci_dev is NULL, ignore it */
-	if (!func->pci_dev)
-		goto err_exit;
-
-	bridge = func->slot->bridge;
-
-	memset(&wrapped_dev, 0, sizeof(struct pci_dev_wrapped));
-	memset(&wrapped_bus, 0, sizeof(struct pci_bus_wrapped));
-	wrapped_dev.dev = func->pci_dev;
-	wrapped_dev.data = func;
-	wrapped_bus.bus = bridge->pci_bus;
-	wrapped_bus.data = bridge;
-
-	retval = pci_visit_dev(&configure_functions, &wrapped_dev, &wrapped_bus);
-	if (retval)
-		goto err_exit;
-
- err_exit:
-	return retval;
+	/* all handled by the pci core now */
+	return 0;
 }
-
 
 /**
  * acpiphp_unconfigure_function - unconfigure PCI function
@@ -653,28 +487,13 @@ int acpiphp_configure_function (struct acpiphp_func *func)
 int acpiphp_unconfigure_function (struct acpiphp_func *func)
 {
 	struct acpiphp_bridge *bridge;
-	struct pci_dev_wrapped wrapped_dev;
-	struct pci_bus_wrapped wrapped_bus;
 	int retval = 0;
 
 	/* if pci_dev is NULL, ignore it */
 	if (!func->pci_dev)
 		goto err_exit;
 
-	memset(&wrapped_dev, 0, sizeof(struct pci_dev_wrapped));
-	memset(&wrapped_bus, 0, sizeof(struct pci_bus_wrapped));
-	wrapped_dev.dev = func->pci_dev;
-	//wrapped_dev.data = func;
-	wrapped_bus.bus = func->slot->bridge->pci_bus;
-	//wrapped_bus.data = func->slot->bridge;
-
-	retval = pci_visit_dev(&unconfigure_functions_phase1, &wrapped_dev, &wrapped_bus);
-	if (retval)
-		goto err_exit;
-
-	retval = pci_visit_dev(&unconfigure_functions_phase2, &wrapped_dev, &wrapped_bus);
-	if (retval)
-		goto err_exit;
+	pci_remove_bus_device(func->pci_dev);
 
 	/* free all resources */
 	bridge = func->slot->bridge;

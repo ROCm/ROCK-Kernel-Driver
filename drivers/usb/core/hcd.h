@@ -255,8 +255,8 @@ extern void usb_destroy_configuration(struct usb_device *dev);
 extern int usb_set_address(struct usb_device *dev);
 
 /* use these only before the device's address has been set */
-#define usb_snddefctrl(dev)		((PIPE_CONTROL << 30) | __create_pipe(dev,0))
-#define usb_rcvdefctrl(dev)		((PIPE_CONTROL << 30) | __create_pipe(dev,0) | USB_DIR_IN)
+#define usb_snddefctrl(dev)		((PIPE_CONTROL << 30))
+#define usb_rcvdefctrl(dev)		((PIPE_CONTROL << 30) | USB_DIR_IN)
 
 /*-------------------------------------------------------------------------*/
 

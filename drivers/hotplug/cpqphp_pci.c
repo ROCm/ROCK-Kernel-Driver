@@ -44,48 +44,6 @@ u8 cpqhp_disk_irq;
 
 static u16 unused_IRQ;
 
-
-static int is_pci_dev_in_use(struct pci_dev* dev) 
-{
-	/* 
-	 * dev->driver will be set if the device is in use by a new-style 
-	 * driver -- otherwise, check the device's regions to see if any
-	 * driver has claimed them
-	 */
-
-	int i, inuse=0;
-
-	if (dev->driver) return 1; //assume driver feels responsible
-
-	for (i = 0; !dev->driver && !inuse && (i < 6); i++) {
-		if (!pci_resource_start(dev, i))
-			continue;
-
-		if (pci_resource_flags(dev, i) & IORESOURCE_IO)
-			inuse = check_region(pci_resource_start(dev, i),
-					     pci_resource_len(dev, i));
-		else if (pci_resource_flags(dev, i) & IORESOURCE_MEM)
-			inuse = check_mem_region(pci_resource_start(dev, i),
-						 pci_resource_len(dev, i));
-	}
-
-	return inuse;
-
-}
-
-
-static int pci_hp_remove_device(struct pci_dev *dev)
-{
-	if (is_pci_dev_in_use(dev)) {
-		err("***Cannot safely power down device -- "
-		       "it appears to be in use***\n");
-		return -EBUSY;
-	}
-	pci_remove_device(dev);
-	return 0;
-}
-
-
 /*
  * detect_HRT_floating_pointer
  *
@@ -122,143 +80,13 @@ static void *detect_HRT_floating_pointer(void *begin, void *end)
 	return fp;
 }
 
-static int configure_visit_pci_dev (struct pci_dev_wrapped *wrapped_dev, struct pci_bus_wrapped *wrapped_bus) 
-{
-	struct pci_bus* bus = wrapped_bus->bus;
-	struct pci_dev* dev = wrapped_dev->dev;
-	struct pci_func *temp_func;
-	int i=0;
-
-	//We need to fix up the hotplug function representation with the linux representation
-	do {
-		temp_func = cpqhp_slot_find(dev->bus->number, dev->devfn >> 3, i++);
-	} while (temp_func && (temp_func->function != (dev->devfn & 0x07)));
-
-	if (temp_func) {
-		temp_func->pci_dev = dev;
-	} else {
-		//We did not even find a hotplug rep of the function, create it
-		//This code might be taken out if we can guarantee the creation of functions
-		//in parallel (hotplug and Linux at the same time).
-		dbg("@@@@@@@@@@@ cpqhp_slot_create in %s\n", __FUNCTION__);
-		temp_func = cpqhp_slot_create(bus->number);
-		if (temp_func == NULL)
-			return -ENOMEM;
-		temp_func->pci_dev = dev;
-	}
-
-	//Create /proc/bus/pci proc entry for this device and bus device is on
-	//Notify the drivers of the change
-	if (temp_func->pci_dev) {
-//		pci_insert_device (temp_func->pci_dev, bus);
-//		pci_proc_attach_device(temp_func->pci_dev);
-//		pci_announce_device_to_drivers(temp_func->pci_dev);
-	}
-
-	return 0;
-}
-
-
-static int unconfigure_visit_pci_dev_phase2 (struct pci_dev_wrapped *wrapped_dev, struct pci_bus_wrapped *wrapped_bus) 
-{
-	struct pci_dev* dev = wrapped_dev->dev;
-
-	struct pci_func *temp_func;
-	int i=0;
-
-	//We need to remove the hotplug function representation with the linux representation
-	do {
-		temp_func = cpqhp_slot_find(dev->bus->number, dev->devfn >> 3, i++);
-		if (temp_func) {
-			dbg("temp_func->function = %d\n", temp_func->function);
-		}
-	} while (temp_func && (temp_func->function != (dev->devfn & 0x07)));
-
-	//Now, remove the Linux Representation
-	if (dev) {
-		if (pci_hp_remove_device(dev) == 0) {
-			kfree(dev); //Now, remove
-		} else {
-			return -1; // problems while freeing, abort visitation
-		}
-	}
-
-	if (temp_func) {
-		temp_func->pci_dev = NULL;
-	} else {
-		dbg("No pci_func representation for bus, devfn = %d, %x\n", dev->bus->number, dev->devfn);
-	}
-
-	return 0;
-}
-
-
-static int unconfigure_visit_pci_bus_phase2 (struct pci_bus_wrapped *wrapped_bus, struct pci_dev_wrapped *wrapped_dev) 
-{
-	struct pci_bus* bus = wrapped_bus->bus;
-
-	//The cleanup code for proc entries regarding buses should be in the kernel...
-	if (bus->procdir)
-		dbg("detach_pci_bus %s\n", bus->procdir->name);
-	pci_proc_detach_bus(bus);
-	// The cleanup code should live in the kernel...
-	bus->self->subordinate = NULL;
-	// unlink from parent bus
-	list_del(&bus->node);
-
-	// Now, remove
-	if (bus)
-		kfree(bus);
-
-	return 0;
-}
-
-
-static int unconfigure_visit_pci_dev_phase1 (struct pci_dev_wrapped *wrapped_dev, struct pci_bus_wrapped *wrapped_bus) 
-{
-	struct pci_dev* dev = wrapped_dev->dev;
-
-	dbg("attempting removal of driver for device (%x, %x, %x)\n", dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
-	//Now, remove the Linux Driver Representation 
-	if (dev->driver) {
-		if (dev->driver->remove) {
-			dev->driver->remove(dev);
-			dbg("driver was properly removed\n");
-		}
-		dev->driver = NULL;
-	}
-
-	return is_pci_dev_in_use(dev);
-}
-
-
-static struct pci_visit configure_functions = {
-	.visit_pci_dev =	configure_visit_pci_dev,
-};
-
-
-static struct pci_visit unconfigure_functions_phase1 = {
-	.post_visit_pci_dev =	unconfigure_visit_pci_dev_phase1
-};
-
-static struct pci_visit unconfigure_functions_phase2 = {
-	.post_visit_pci_bus =	unconfigure_visit_pci_bus_phase2,               
-	.post_visit_pci_dev =	unconfigure_visit_pci_dev_phase2
-};
-
 
 int cpqhp_configure_device (struct controller* ctrl, struct pci_func* func)  
 {
 	unsigned char bus;
 	struct pci_dev dev0;
 	struct pci_bus *child;
-	struct pci_dev* temp;
 	int rc = 0;
-
-	struct pci_dev_wrapped wrapped_dev;
-	struct pci_bus_wrapped wrapped_bus;
-	memset(&wrapped_dev, 0, sizeof(struct pci_dev_wrapped));
-	memset(&wrapped_bus, 0, sizeof(struct pci_bus_wrapped));
 
 	memset(&dev0, 0, sizeof(struct pci_dev));
 
@@ -287,44 +115,22 @@ int cpqhp_configure_device (struct controller* ctrl, struct pci_func* func)
 
 	}
 
-	temp = func->pci_dev;
-
-	if (temp) {
-		wrapped_dev.dev = temp;
-		wrapped_bus.bus = temp->bus;
-		rc = pci_visit_dev(&configure_functions, &wrapped_dev, &wrapped_bus);
-	}
 	return rc;
 }
 
 
 int cpqhp_unconfigure_device(struct pci_func* func) 
 {
-	int rc = 0;
 	int j;
-	struct pci_dev_wrapped wrapped_dev;
-	struct pci_bus_wrapped wrapped_bus;
 	
-	memset(&wrapped_dev, 0, sizeof(struct pci_dev_wrapped));
-	memset(&wrapped_bus, 0, sizeof(struct pci_bus_wrapped));
-
 	dbg("%s: bus/dev/func = %x/%x/%x\n", __FUNCTION__, func->bus, func->device, func->function);
 
 	for (j=0; j<8 ; j++) {
 		struct pci_dev* temp = pci_find_slot(func->bus, (func->device << 3) | j);
-		if (temp) {
-			wrapped_dev.dev = temp;
-			wrapped_bus.bus = temp->bus;
-			rc = pci_visit_dev(&unconfigure_functions_phase1, &wrapped_dev, &wrapped_bus);
-			if (rc)
-				break;
-
-			rc = pci_visit_dev(&unconfigure_functions_phase2, &wrapped_dev, &wrapped_bus);
-			if (rc)
-				break;
-		}
+		if (temp)
+			pci_remove_bus_device(temp);
 	}
-	return rc;
+	return 0;
 }
 
 static int PCI_RefinedAccessConfig(struct pci_bus *bus, unsigned int devfn, u8 offset, u32 *value)
