@@ -781,7 +781,7 @@ do_group_exit(int exit_code)
  * wait4()-ing process will get the correct exit code - even if this
  * thread is not the thread group leader.
  */
-asmlinkage long sys_exit_group(int error_code)
+asmlinkage void sys_exit_group(int error_code)
 {
 	do_group_exit((error_code & 0xff) << 8);
 }
