@@ -86,7 +86,7 @@ static int agp_find_max (void)
 {
 	long memory, index, result;
 
-	memory = virt_to_phys(high_memory) >> 20;
+	memory = (num_physpages << PAGE_SHIFT) >> 20;
 	index = 1;
 
 	while ((memory > maxes_table[index].mem) && (index < 8))
