@@ -9,7 +9,6 @@
 #include <linux/errno.h>
 #include <linux/buffer_head.h>
 #include <linux/kernel.h>
-#include <linux/reiserfs_fs.h>
 #include <linux/reiserfs_fs_sb.h>
 #include <linux/reiserfs_fs_i.h>
 
