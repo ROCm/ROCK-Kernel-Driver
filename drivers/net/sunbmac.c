@@ -1243,8 +1243,6 @@ fail_and_cleanup:
 				     bp->bmac_block,
 				     bp->bblock_dvma);
 
-	unregister_netdev(dev);
-
 	/* This also frees the co-located 'dev->priv' */
 	free_netdev(dev);
 	return -ENODEV;
