@@ -992,8 +992,9 @@ static void sbp2_remove_device(struct scsi_id_instance_data *scsi_id)
 	sbp2scsi_complete_all_commands(scsi_id, DID_NO_CONNECT);
 
 	/* Remove it from the scsi layer now */
-	if (sdev && scsi_remove_device(sdev))
-		SBP2_ERR("scsi_remove_device failed");
+	if (sdev) {
+		scsi_remove_device(sdev);
+	}
 
 	sbp2util_remove_command_orb_pool(scsi_id);
 

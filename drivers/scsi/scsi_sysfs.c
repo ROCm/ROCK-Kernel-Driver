@@ -305,7 +305,7 @@ int scsi_device_register(struct scsi_device *sdev)
 			error = attr_add(&sdev->sdev_gendev,
 					sdev->host->hostt->sdev_attrs[i]);
 			if (error)
-				scsi_device_unregister(sdev);
+				scsi_remove_device(sdev);
 		}
 	}
 	
@@ -315,7 +315,7 @@ int scsi_device_register(struct scsi_device *sdev)
 			error = device_create_file(&sdev->sdev_gendev,
 					scsi_sysfs_sdev_attrs[i]);
 			if (error)
-				scsi_device_unregister(sdev);
+				scsi_remove_device(sdev);
 		}
 	}
 
@@ -323,10 +323,10 @@ int scsi_device_register(struct scsi_device *sdev)
 }
 
 /**
- * scsi_device_unregister - unregister a device from the scsi bus
+ * scsi_remove_device - unregister a device from the scsi bus
  * @sdev:	scsi_device to unregister
  **/
-void scsi_device_unregister(struct scsi_device *sdev)
+void scsi_remove_device(struct scsi_device *sdev)
 {
 	class_device_unregister(&sdev->sdev_classdev);
 	device_unregister(&sdev->sdev_gendev);

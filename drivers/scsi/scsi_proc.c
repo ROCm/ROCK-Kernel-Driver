@@ -208,7 +208,8 @@ static int scsi_remove_single_device(uint host, uint channel, uint id, uint lun)
 	if (sdev->access_count)
 		goto out;
 
-	error = scsi_remove_device(sdev);
+	scsi_remove_device(sdev);
+	error = 0;
 out:
 	scsi_host_put(shost);
 	return error;

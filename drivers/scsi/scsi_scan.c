@@ -1074,12 +1074,6 @@ struct scsi_device *scsi_add_device(struct Scsi_Host *shost,
 	return sdev;
 }
 
-int scsi_remove_device(struct scsi_device *sdev)
-{
-	scsi_device_unregister(sdev);
-	return 0;
-}
-
 void scsi_rescan_device(struct device *dev)
 {
 	struct scsi_driver *drv = to_scsi_driver(dev->driver);

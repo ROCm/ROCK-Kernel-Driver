@@ -92,7 +92,7 @@ struct scsi_device {
 
 extern struct scsi_device *scsi_add_device(struct Scsi_Host *,
 		uint, uint, uint);
-extern int scsi_remove_device(struct scsi_device *);
+extern void scsi_remove_device(struct scsi_device *);
 extern void scsi_set_device_offline(struct scsi_device *);
 
 extern int scsi_device_get(struct scsi_device *);
