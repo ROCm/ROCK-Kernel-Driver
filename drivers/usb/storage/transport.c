@@ -414,7 +414,7 @@ int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 	us->current_urb->transfer_flags = USB_ASYNC_UNLINK;
 
 	/* submit the URB */
-	status = usb_submit_urb(us->current_urb);
+	status = usb_submit_urb(us->current_urb, GFP_NOIO);
 	if (status) {
 		/* something went wrong */
 		up(&(us->current_urb_sem));
@@ -461,7 +461,7 @@ int usb_stor_bulk_msg(struct us_data *us, void *data, int pipe,
 	us->current_urb->transfer_flags = USB_ASYNC_UNLINK;
 
 	/* submit the URB */
-	status = usb_submit_urb(us->current_urb);
+	status = usb_submit_urb(us->current_urb, GFP_NOIO);
 	if (status) {
 		/* something went wrong */
 		up(&(us->current_urb_sem));
