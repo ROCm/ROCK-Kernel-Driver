@@ -401,7 +401,6 @@ DataAccess:
 	mfspr	r4,DAR
 	stw	r4,_DAR(r11)
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-	andi.	r0,r9,MSR_PR		/* set cr0.eq if from kernel */
 	EXC_XFER_EE_LITE(0x300, do_page_fault)
 
 #ifdef CONFIG_PPC64BRIDGE
@@ -427,7 +426,6 @@ InstructionAccess:
 1:	addi	r3,r1,STACK_FRAME_OVERHEAD
 	mr	r4,r12
 	mr	r5,r9
-	andi.	r0,r9,MSR_PR		/* set cr0.eq if from kernel */
 	EXC_XFER_EE_LITE(0x400, do_page_fault)
 
 #ifdef CONFIG_PPC64BRIDGE

@@ -1192,20 +1192,17 @@ static int scsi_debug_proc_info(char *buffer, char **start, off_t offset,
 	return len;
 }
 
-static ssize_t sdebug_delay_read(struct device_driver * ddp, char * buf, 
-				 size_t count, loff_t off)
+static ssize_t sdebug_delay_read(struct device_driver * ddp, char * buf)
 {
-        return off ? 0 : snprintf(buf, count, "%d\n", scsi_debug_delay);
+        return sprintf(buf, "%d\n", scsi_debug_delay);
 }
 
 static ssize_t sdebug_delay_write(struct device_driver * ddp, 
-				  const char * buf, size_t count, loff_t off)
+				  const char * buf, size_t count)
 {
         int delay;
 	char work[20];
 
-        if (off)
-                return 0;
         if (1 == sscanf(buf, "%10s", work)) {
 		if ((1 == sscanf(work, "%d", &delay)) && (delay >= 0)) {
 			scsi_debug_delay = delay;
@@ -1217,20 +1214,17 @@ static ssize_t sdebug_delay_write(struct device_driver * ddp,
 DRIVER_ATTR(delay, S_IRUGO | S_IWUSR, sdebug_delay_read, 
 	    sdebug_delay_write)
 
-static ssize_t sdebug_opts_read(struct device_driver * ddp, char * buf, 
-				size_t count, loff_t off)
+static ssize_t sdebug_opts_read(struct device_driver * ddp, char * buf)
 {
-        return off ? 0 : snprintf(buf, count, "0x%x\n", scsi_debug_opts);
+        return sprintf(buf, "0x%x\n", scsi_debug_opts);
 }
 
 static ssize_t sdebug_opts_write(struct device_driver * ddp, 
-				 const char * buf, size_t count, loff_t off)
+				 const char * buf, size_t count)
 {
         int opts;
 	char work[20];
 
-        if (off)
-                return 0;
         if (1 == sscanf(buf, "%10s", work)) {
 		if (0 == strnicmp(work,"0x", 2)) {
 			if (1 == sscanf(&work[2], "%x", &opts))
@@ -1248,55 +1242,47 @@ opts_done:
 DRIVER_ATTR(opts, S_IRUGO | S_IWUSR, sdebug_opts_read, 
 	    sdebug_opts_write)
 
-static ssize_t sdebug_num_devs_read(struct device_driver * ddp, char * buf, 
-				    size_t count, loff_t off)
+static ssize_t sdebug_num_devs_read(struct device_driver * ddp, char * buf)
 {
-        return off ? 0 : snprintf(buf, count, "%d\n", scsi_debug_num_devs);
+        return sprintf(buf, "%d\n", scsi_debug_num_devs);
 }
 DRIVER_ATTR(num_devs, S_IRUGO, sdebug_num_devs_read, NULL) 
 
-static ssize_t sdebug_dev_size_mb_read(struct device_driver * ddp, char * buf, 
-				       size_t count, loff_t off)
+static ssize_t sdebug_dev_size_mb_read(struct device_driver * ddp, char * buf)
 {
-        return off ? 0 : snprintf(buf, count, "%d\n", scsi_debug_dev_size_mb);
+        return sprintf(buf, "%d\n", scsi_debug_dev_size_mb);
 }
 DRIVER_ATTR(dev_size_mb, S_IRUGO, sdebug_dev_size_mb_read, NULL) 
 
-static ssize_t sdebug_every_nth_read(struct device_driver * ddp, char * buf, 
-				     size_t count, loff_t off)
+static ssize_t sdebug_every_nth_read(struct device_driver * ddp, char * buf)
 {
-        return off ? 0 : snprintf(buf, count, "%d\n", scsi_debug_every_nth);
+        return sprintf(buf, "%d\n", scsi_debug_every_nth);
 }
 DRIVER_ATTR(every_nth, S_IRUGO, sdebug_every_nth_read, NULL) 
 
-static ssize_t sdebug_max_luns_read(struct device_driver * ddp, char * buf, 
-				    size_t count, loff_t off)
+static ssize_t sdebug_max_luns_read(struct device_driver * ddp, char * buf)
 {
-        return off ? 0 : snprintf(buf, count, "%d\n", scsi_debug_max_luns);
+        return sprintf(buf, "%d\n", scsi_debug_max_luns);
 }
 DRIVER_ATTR(max_luns, S_IRUGO, sdebug_max_luns_read, NULL) 
 
-static ssize_t sdebug_scsi_level_read(struct device_driver * ddp, char * buf, 
-				      size_t count, loff_t off)
+static ssize_t sdebug_scsi_level_read(struct device_driver * ddp, char * buf)
 {
-        return off ? 0 : snprintf(buf, count, "%d\n", scsi_debug_scsi_level);
+        return sprintf(buf, "%d\n", scsi_debug_scsi_level);
 }
 DRIVER_ATTR(scsi_level, S_IRUGO, sdebug_scsi_level_read, NULL) 
 
-static ssize_t sdebug_add_host_read(struct device_driver * ddp, char * buf, 
-				    size_t count, loff_t off)
+static ssize_t sdebug_add_host_read(struct device_driver * ddp, char * buf)
 {
-        return off ? 0 : snprintf(buf, count, "%d\n", scsi_debug_add_host);
+        return sprintf(buf, "%d\n", scsi_debug_add_host);
 }
 
 static ssize_t sdebug_add_host_write(struct device_driver * ddp, 
-				  const char * buf, size_t count, loff_t off)
+				  const char * buf, size_t count)
 {
         int delta_hosts, k;
 	char work[20];
 
-        if (off)
-                return 0;
         if (1 != sscanf(buf, "%10s", work))
 		return -EINVAL;
 	{	/* temporary hack around sscanf() problem with -ve nums */

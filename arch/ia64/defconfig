@@ -657,6 +657,11 @@ CONFIG_VGA_CONSOLE=y
 CONFIG_SOUND=y
 
 #
+# Advanced Linux Sound Architecture
+#
+# CONFIG_SND is not set
+
+#
 # Open Sound System
 #
 CONFIG_SOUND_PRIME=y
@@ -679,11 +684,6 @@ CONFIG_SOUND_CS4281=y
 # CONFIG_SOUND_VIA82CXXX is not set
 # CONFIG_SOUND_OSS is not set
 # CONFIG_SOUND_TVMIXER is not set
-
-#
-# Advanced Linux Sound Architecture
-#
-# CONFIG_SND is not set
 
 #
 # USB support

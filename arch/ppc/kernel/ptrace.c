@@ -35,7 +35,11 @@
 /*
  * Set of msr bits that gdb can change on behalf of a process.
  */
-#define MSR_DEBUGCHANGE	(MSR_FE0 | MSR_SE | MSR_BE | MSR_FE1)
+#ifdef CONFIG_4xx
+#define MSR_DEBUGCHANGE	0
+#else
+#define MSR_DEBUGCHANGE	(MSR_SE | MSR_BE)
+#endif
 
 /*
  * does not yet catch signals sent when the child dies.
@@ -132,8 +136,14 @@ set_single_step(struct task_struct *task)
 {
 	struct pt_regs *regs = task->thread.regs;
 
-	if (regs != NULL)
+	if (regs != NULL) {
+#ifdef CONFIG_4xx
+		task->thread.dbcr0 = DBCR0_IDM | DBCR0_IC;
+		/* MSR.DE should already be set */
+#else
 		regs->msr |= MSR_SE;
+#endif
+	}
 }
 
 static inline void
@@ -141,8 +151,13 @@ clear_single_step(struct task_struct *task)
 {
 	struct pt_regs *regs = task->thread.regs;
 
-	if (regs != NULL)
+	if (regs != NULL) {
+#ifdef CONFIG_4xx
+		task->thread.dbcr0 = 0;
+#else
 		regs->msr &= ~MSR_SE;
+#endif
+	}
 }
 
 /*

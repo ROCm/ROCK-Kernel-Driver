@@ -102,35 +102,6 @@ static int check_quotactl_valid(struct super_block *sb, int type, int cmd, qid_t
 	return security_quotactl (cmd, type, id, sb);
 }
 
-/* Resolve device pathname to superblock */
-static struct super_block *resolve_dev(const char *path)
-{
-	int ret;
-	mode_t mode;
-	struct nameidata nd;
-	struct block_device *bdev;
-	struct super_block *sb;
-
-	ret = user_path_walk(path, &nd);
-	if (ret)
-		goto out;
-
-	bdev = nd.dentry->d_inode->i_bdev;
-	mode = nd.dentry->d_inode->i_mode;
-	path_release(&nd);
-
-	ret = -ENOTBLK;
-	if (!S_ISBLK(mode))
-		goto out;
-	ret = -ENODEV;
-	sb = get_super(bdev);
-	if (!sb)
-		goto out;
-	return sb;
-out:
-	return ERR_PTR(ret);
-}
-
 /* Copy parameters and call proper function */
 static int do_quotactl(struct super_block *sb, int type, int cmd, qid_t id, caddr_t addr)
 {
@@ -249,21 +220,24 @@ asmlinkage long sys_quotactl(unsigned int cmd, const char *special, qid_t id, ca
 {
 	uint cmds, type;
 	struct super_block *sb = NULL;
-	int ret = -EINVAL;
+	struct block_device *bdev;
+	int ret = -ENODEV;
 
 	cmds = cmd >> SUBCMDSHIFT;
 	type = cmd & SUBCMDMASK;
 
-	if (IS_ERR(sb = resolve_dev(special))) {
-		ret = PTR_ERR(sb);
-		sb = NULL;
-		goto out;
-	}
-	if ((ret = check_quotactl_valid(sb, type, cmds, id)) < 0)
-		goto out;
-	ret = do_quotactl(sb, type, cmds, id, addr);
-out:
-	if (sb)
+	bdev = lookup_bdev(special);
+	if (IS_ERR(bdev))
+		return PTR_ERR(bdev);
+	sb = get_super(bdev);
+	bdput(bdev);
+
+	if (sb) {
+		ret = check_quotactl_valid(sb, type, cmds, id);
+		if (ret >= 0)
+			ret = do_quotactl(sb, type, cmds, id, addr);
 		drop_super(sb);
+	}
+
 	return ret;
 }

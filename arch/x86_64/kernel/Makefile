@@ -3,7 +3,7 @@
 #
 
 EXTRA_TARGETS 	:= head.o head64.o init_task.o
-
+EXTRA_AFLAGS  := -traditional
 export-objs     := x8664_ksyms.o pci-gart.o pci-dma.o
 
 obj-y	:= process.o semaphore.o signal.o entry.o traps.o irq.o \
@@ -32,4 +32,3 @@ $(obj)/bootflag.c:
 
 clean-files += bootflag.c
 
-EXTRA_AFLAGS := -traditional

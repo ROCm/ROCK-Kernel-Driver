@@ -58,7 +58,7 @@ static struct pci_device_id fcpci_ids[] __devinitdata = {
 };
 MODULE_DEVICE_TABLE(pci, fcpci_ids);
 
-static struct pnp_card_id fcpnp_ids[] __devinitdata = {
+static struct pnp_card_device_id fcpnp_ids[] __devinitdata = {
 	{ .id = "AVM0900", 
 	  .driver_data = (unsigned long) "Fritz!Card PnP",
 	  .devs = { { "AVM0900" } } }

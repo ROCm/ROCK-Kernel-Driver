@@ -643,14 +643,14 @@ CONFIG_FONT_8x16=y
 CONFIG_SOUND=y
 
 #
-# Open Sound System
-#
-# CONFIG_SOUND_PRIME is not set
-
-#
 # Advanced Linux Sound Architecture
 #
 # CONFIG_SND is not set
+
+#
+# Open Sound System
+#
+# CONFIG_SOUND_PRIME is not set
 
 #
 # USB support

@@ -12,8 +12,12 @@
 #define no_balance_irq (0)
 #define esr_disable (0)
 
+#define INT_DELIVERY_MODE dest_LowestPrio
+#define INT_DEST_MODE 1     /* logical delivery broadcast to all procs */
+
 #define APIC_BROADCAST_ID      0x0F
 #define check_apicid_used(bitmap, apicid) (bitmap & (1 << apicid))
+#define check_apicid_present(bit) (phys_cpu_present_map & (1 << bit))
 
 static inline int apic_id_registered(void)
 {
@@ -57,6 +61,12 @@ static inline int multi_timer_check(int apic, int irq)
 static inline int apicid_to_node(int logical_apicid)
 {
 	return 0;
+}
+
+/* Mapping from cpu number to logical apicid */
+static inline int cpu_to_logical_apicid(int cpu)
+{
+	return 1 << cpu;
 }
 
 static inline int cpu_present_to_apicid(int mps_cpu)

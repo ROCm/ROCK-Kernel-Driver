@@ -1107,20 +1107,17 @@ static int usb_bluetooth_probe (struct usb_interface *intf,
 		return -EIO;
 	}
 
-	MOD_INC_USE_COUNT;
 	info("USB Bluetooth converter detected");
 
 	for (minor = 0; minor < BLUETOOTH_TTY_MINORS && bluetooth_table[minor]; ++minor)
 		;
 	if (bluetooth_table[minor]) {
 		err("No more free Bluetooth devices");
-		MOD_DEC_USE_COUNT;
 		return -ENODEV;
 	}
 
 	if (!(bluetooth = kmalloc(sizeof(struct usb_bluetooth), GFP_KERNEL))) {
 		err("Out of memory");
-		MOD_DEC_USE_COUNT;
 		return -ENOMEM;
 	}
 
@@ -1236,7 +1233,6 @@ probe_error:
 
 	/* free up any memory that we allocated */
 	kfree (bluetooth);
-	MOD_DEC_USE_COUNT;
 	return -EIO;
 }
 
@@ -1295,13 +1291,12 @@ static void usb_bluetooth_disconnect(struct usb_interface *intf)
 	} else {
 		info("device disconnected");
 	}
-
-	MOD_DEC_USE_COUNT;
 }
 
 
 static struct tty_driver bluetooth_tty_driver = {
 	.magic =		TTY_DRIVER_MAGIC,
+	.owner =		THIS_MODULE,
 	.driver_name =		"usb-bluetooth",
 	.name =			"usb/ttub/%d",
 	.major =		BLUETOOTH_TTY_MAJOR,

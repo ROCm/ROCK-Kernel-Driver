@@ -482,6 +482,7 @@ static int __init cpufreq_gx_init(void)
 	driver->policy[0].cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 	driver->verify = &cpufreq_gx_verify;
 	driver->setpolicy = &cpufreq_gx_setpolicy;
+	strncpy(driver->name, "gx-suspmod", CPUFREQ_NAME_LEN);
 
 	gx_driver = driver;
 

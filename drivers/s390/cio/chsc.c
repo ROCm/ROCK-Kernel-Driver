@@ -616,13 +616,13 @@ chp_status_show(struct device *dev, char *buf)
 
 	switch(chp->state) {
 	case CHP_OFFLINE:
-		return snprintf(buf, count, "n/a\n");
+		return sprintf(buf, "n/a\n");
 	case CHP_LOGICALLY_OFFLINE:
-		return snprintf(buf, count, "logically offline\n");
+		return sprintf(buf, "logically offline\n");
 	case CHP_STANDBY:
-		return snprintf(buf, count, "n/a\n");
+		return sprintf(buf, "n/a\n");
 	case CHP_ONLINE:
-		return snprintf(buf, count, "online\n");
+		return sprintf(buf, "online\n");
 	default:
 		return 0;
 	}

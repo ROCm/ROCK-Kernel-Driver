@@ -24,6 +24,7 @@
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 #include <mach_ipi.h>
+#include <mach_apic.h>
 
 /*
  *	Some notes on x86 processor bugs affecting SMP operation:

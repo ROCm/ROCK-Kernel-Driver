@@ -16,7 +16,7 @@
 #include <linux/config.h>
 
 #ifndef MAX_HWIFS
-#define MAX_HWIFS	4
+#define MAX_HWIFS	CONFIG_IDE_MAX_HWIFS
 #endif
 
 static __inline__ int ide_default_irq(ide_ioreg_t base)

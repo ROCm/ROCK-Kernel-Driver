@@ -487,7 +487,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_lchown
 	.llong .sys_ni_syscall		/* old break syscall */
 	.llong .sys_ni_syscall		/* old stat syscall */
-	.llong .sys32_lseek
+	.llong .ppc32_lseek
 	.llong .sys_getpid              /* 20 */
 	.llong .sys32_mount
 	.llong .sys_oldumount
@@ -540,7 +540,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_ssetmask
 	.llong .sys_setreuid	        /* 70 */
 	.llong .sys_setregid
-	.llong .sys_sigsuspend
+	.llong .sys32_sigsuspend
 	.llong .sys32_sigpending
 	.llong .sys32_sethostname
 	.llong .sys32_setrlimit	        /* 75 */
@@ -558,7 +558,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_swapon
 	.llong .sys_reboot
 	.llong .old32_readdir
-	.llong .sys32_mmap		/* 90 */
+	.llong .sys_mmap		/* 90 */
 	.llong .sys_munmap
 	.llong .sys_truncate
 	.llong .sys_ftruncate
@@ -660,7 +660,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_vfork
 	.llong .sys32_getrlimit	        /* 190 */
 	.llong .sys32_readahead
-	.llong .ppc32_mmap2
+	.llong .sys32_mmap2
 	.llong .sys32_truncate64
 	.llong .sys32_ftruncate64
 	.llong .sys_stat64      	/* 195 */
@@ -707,7 +707,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_epoll_create
 	.llong .sys_epoll_ctl
 	.llong .sys_epoll_wait
-	.llong .ppc32_remap_file_pages
+	.llong .sys_remap_file_pages
 
 	.rept NR_syscalls-239
 		.llong .sys_ni_syscall
@@ -783,13 +783,13 @@ _GLOBAL(sys_call_table)
 	.llong .sys_getppid
 	.llong .sys_getpgrp		/* 65 */
 	.llong .sys_setsid
-	.llong .sys_sigaction
+	.llong .sys_ni_syscall		/* 32 bit only sigaction */
 	.llong .sys_sgetmask
 	.llong .sys_ssetmask
 	.llong .sys_setreuid		/* 70 */
 	.llong .sys_setregid
-	.llong .sys_sigsuspend
-	.llong .sys_sigpending
+	.llong .sys_ni_syscall		/* 32bit only sigsuspend */
+	.llong .sys_ni_syscall		/* 32bit only sigpending */
 	.llong .sys_sethostname
 	.llong .sys_setrlimit		/* 75 */
 	.llong .sys_ni_syscall		/* old getrlimit syscall */
@@ -835,14 +835,14 @@ _GLOBAL(sys_call_table)
 	.llong .sys_sysinfo
 	.llong .sys_ipc
 	.llong .sys_fsync
-	.llong .ppc64_sigreturn
+	.llong .sys_ni_syscall		/* 32bit only sigreturn */
 	.llong .sys_clone		/* 120 */
 	.llong .sys_setdomainname
 	.llong .ppc64_newuname
 	.llong .sys_ni_syscall		/* old modify_ldt syscall */
 	.llong .sys_adjtimex
 	.llong .sys_mprotect		/* 125 */
-	.llong .sys_sigprocmask
+	.llong .sys_ni_syscall		/* 32bit only sigprocmask */
 	.llong .sys_ni_syscall		/* old create_module syscall */
 	.llong .sys_init_module
 	.llong .sys_delete_module
@@ -948,10 +948,10 @@ _GLOBAL(sys_call_table)
 	.llong .sys_io_getevents
 	.llong .sys_io_submit		/* 230 */
 	.llong .sys_io_cancel
-	.llong .sys_ni_syscall		/* reserved for alloc_hugepages */
-	.llong .sys_ni_syscall		/* reserved for free_hugepages */
+	.llong .sys_ni_syscall
+	.llong .sys_ni_syscall
 	.llong .sys_exit_group
-	.llong .sys_lookup_dcookie	/* 245 */
+	.llong .sys_lookup_dcookie	/* 235 */
 	.llong .sys_epoll_create
 	.llong .sys_epoll_ctl
 	.llong .sys_epoll_wait

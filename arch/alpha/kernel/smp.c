@@ -72,37 +72,19 @@ static int smp_secondary_alive __initdata = 0;
 
 /* Which cpus ids came online.  */
 unsigned long cpu_present_mask;
+volatile unsigned long cpu_online_map;
 
 /* cpus reported in the hwrpb */
 static unsigned long hwrpb_cpu_present_mask __initdata = 0;
 
-static int max_cpus = -1;	/* Command-line limitation.  */
 int smp_num_probed;		/* Internal processor count */
 int smp_num_cpus = 1;		/* Number that came online.  */
-int smp_threads_ready;		/* True once the per process idle is forked. */
 cycles_t cacheflush_time;
 unsigned long cache_decay_ticks;
 
 extern void calibrate_delay(void);
-extern asmlinkage void entInt(void);
 
 
-static int __init nosmp(char *str)
-{
-	max_cpus = 0;
-	return 1;
-}
-
-__setup("nosmp", nosmp);
-
-static int __init maxcpus(char *str)
-{
-	get_option(&str, &max_cpus);
-	return 1;
-}
-
-__setup("maxcpus", maxcpus);
-
 
 /*
  * Called by both boot and secondaries to move global data into
@@ -151,6 +133,11 @@ smp_callin(void)
 {
 	int cpuid = hard_smp_processor_id();
 
+	if (test_and_set_bit(cpuid, &cpu_online_map)) {
+		printk("??, cpu 0x%x already present??\n", cpuid);
+		BUG();
+	}
+
 	/* Turn on machine checks.  */
 	wrmces(7);
 
@@ -162,6 +149,9 @@ smp_callin(void)
 
 	/* Get our local ticker going. */
 	smp_setup_percpu_timer(cpuid);
+
+	/* Call platform-specific callin, if specified */
+	if (alpha_mv.smp_callin) alpha_mv.smp_callin();
 
 	/* All kernel threads share the same mm context.  */
 	atomic_inc(&init_mm.mm_count);
@@ -180,10 +170,6 @@ smp_callin(void)
 	/* Allow master to continue only after we written loops_per_jiffy.  */
 	wmb();
 	smp_secondary_alive = 1;
-
-	/* Wait for the go code.  */
-	while (!smp_threads_ready)
-		barrier();
 
 	DBGS(("smp_callin: commencing CPU %d current %p active_mm %p\n",
 	      cpuid, current, current->active_mm));
@@ -432,7 +418,7 @@ fork_by_hand(void)
 	/* Don't care about the contents of regs since we'll never
 	   reschedule the forked task. */
 	struct pt_regs regs;
-	return do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL);
+	return do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
 }
 
 /*
@@ -542,13 +528,12 @@ setup_smp(void)
 }
 
 /*
- * Called by smp_init bring all the secondaries online and hold them.
+ * Called by smp_init prepare the secondaries
  */
 void __init
-smp_boot_cpus(void)
+smp_prepare_cpus(unsigned int max_cpus)
 {
 	int cpu_count, i;
-	unsigned long bogosum;
 
 	/* Take care of some initial bookkeeping.  */
 	memset(ipi_data, 0, sizeof(ipi_data));
@@ -558,6 +543,9 @@ smp_boot_cpus(void)
 	smp_store_cpu_info(boot_cpuid);
 	smp_tune_scheduling(boot_cpuid);
 	smp_setup_percpu_timer(boot_cpuid);
+
+	/* We have already have the boot CPU online.. */
+	set_bit(boot_cpuid, &cpu_online_map);
 
 	/* Nothing to do on a UP box, or when told not to.  */
 	if (smp_num_probed == 1 || max_cpus == 0) {
@@ -569,42 +557,18 @@ smp_boot_cpus(void)
 	printk(KERN_INFO "SMP starting up secondaries.\n");
 
 	cpu_count = 1;
-	for (i = 0; i < NR_CPUS; i++) {
+	for (i = 0; (i < NR_CPUS) && (cpu_count < max_cpus); i++) {
 		if (i == boot_cpuid)
 			continue;
 
 		if (((hwrpb_cpu_present_mask >> i) & 1) == 0)
 			continue;
 
-		if (smp_boot_one_cpu(i))
-			continue;
-
 		cpu_present_mask |= 1UL << i;
 		cpu_count++;
 	}
 
-	if (cpu_count == 1) {
-		printk(KERN_ERR "SMP: Only one lonely processor alive.\n");
-		return;
-	}
-
-	bogosum = 0;
-	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_present_mask & (1UL << i))
-			bogosum += cpu_data[i].loops_per_jiffy;
-	}
-	printk(KERN_INFO "SMP: Total of %d processors activated "
-	       "(%lu.%02lu BogoMIPS).\n",
-	       cpu_count, (bogosum + 2500) / (500000/HZ),
-	       ((bogosum + 2500) / (5000/HZ)) % 100);
-
 	smp_num_cpus = cpu_count;
-}
-
-void __init
-smp_prepare_cpus(unsigned int max_cpus)
-{
-	smp_boot_cpus();
 }
 
 void __devinit
@@ -616,14 +580,26 @@ smp_prepare_boot_cpu(void)
 int __devinit
 __cpu_up(unsigned int cpu)
 {
+	smp_boot_one_cpu(cpu);
+
 	return cpu_online(cpu) ? 0 : -ENOSYS;
 }
 
 void __init
 smp_cpus_done(unsigned int max_cpus)
 {
-	smp_threads_ready = 1;
-	mb();
+	int cpu;
+	unsigned long bogosum = 0;
+
+	for(cpu = 0; cpu < NR_CPUS; cpu++) 
+		if (cpu_online(cpu))
+			bogosum += cpu_data[cpu].loops_per_jiffy;
+	
+	printk(KERN_INFO "SMP: Total of %d processors activated "
+	       "(%lu.%02lu BogoMIPS).\n",
+	       num_online_cpus(), 
+	       (bogosum + 2500) / (500000/HZ),
+	       ((bogosum + 2500) / (5000/HZ)) % 100);
 }
 
 
@@ -865,11 +841,36 @@ smp_call_function_on_cpu (void (*func) (void *info), void *info, int retry,
 	       && time_before (jiffies, timeout))
 		barrier();
 
-	/* We either got one or timed out -- clear the lock.  */
+	/* If there's no response yet, log a message but allow a longer
+	 * timeout period -- if we get a response this time, log
+	 * a message saying when we got it.. 
+	 */
+	if (atomic_read(&data.unstarted_count) > 0) {
+		long start_time = jiffies;
+		printk(KERN_ERR "%s: initial timeout -- trying long wait\n",
+		       __FUNCTION__);
+		timeout = jiffies + 30 * HZ;
+		while (atomic_read(&data.unstarted_count) > 0
+		       && time_before(jiffies, timeout))
+			barrier();
+		if (atomic_read(&data.unstarted_count) <= 0) {
+			long delta = jiffies - start_time;
+			printk(KERN_ERR 
+			       "%s: response %ld.%ld seconds into long wait\n",
+			       __FUNCTION__, delta / HZ,
+			       (100 * (delta - ((delta / HZ) * HZ))) / HZ);
+		}
+	}
+
+	/* We either got one or timed out -- clear the lock. */
 	mb();
 	smp_call_function_data = 0;
-	if (atomic_read (&data.unstarted_count) > 0)
-		return -ETIMEDOUT;
+
+	/* 
+	 * If after both the initial and long timeout periods we still don't
+	 * have a response, something is very wrong...
+	 */
+	BUG_ON(atomic_read (&data.unstarted_count) > 0);
 
 	/* Wait for a complete response, if needed.  */
 	if (wait) {
@@ -884,7 +885,7 @@ int
 smp_call_function (void (*func) (void *info), void *info, int retry, int wait)
 {
 	return smp_call_function_on_cpu (func, info, retry, wait,
-					 cpu_present_mask);
+					 cpu_online_map);
 }
 
 static void

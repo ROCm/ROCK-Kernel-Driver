@@ -2513,10 +2513,6 @@ int ioctl_common(MGSLPC_INFO *info, unsigned int cmd, unsigned long arg)
 		return get_stats(info,(struct mgsl_icount*)arg);
 	case MGSL_IOCWAITEVENT:
 		return wait_events(info,(int*)arg);
-	case MGSL_IOCCLRMODCOUNT:
-		while(MOD_IN_USE)
-			MOD_DEC_USE_COUNT;
-		return 0;
 	case TIOCMIWAIT:
 		return modem_input_wait(info,(int)arg);
 	case TIOCGICOUNT:
@@ -2694,8 +2690,7 @@ cleanup:
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):mgslpc_close(%s) exit, count=%d\n", __FILE__,__LINE__,
 			tty->driver.name, info->count);
-	if(MOD_IN_USE)
-		MOD_DEC_USE_COUNT;
+	MOD_DEC_USE_COUNT;
 }
 
 /* Wait until the transmitter is empty.
@@ -3003,8 +2998,7 @@ static int mgslpc_open(struct tty_struct *tty, struct file * filp)
 	
 cleanup:			
 	if (retval) {
-		if(MOD_IN_USE)
-			MOD_DEC_USE_COUNT;
+		MOD_DEC_USE_COUNT;
 		if(info->count)
 			info->count--;
 	}

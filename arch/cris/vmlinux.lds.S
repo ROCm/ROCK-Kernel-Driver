@@ -9,7 +9,8 @@
  */	
 
 #include <linux/config.h>
-	
+#include <asm-generic/vmlinux.lds.h>
+
 jiffies = jiffies_64;
 SECTIONS
 {
@@ -31,21 +32,12 @@ SECTIONS
 	_etext = . ;                  /* End of text section */ 
 	__etext = .;
 
-	.rodata : { *(.rodata) *(.rodata.__*) }
-	.kstrtab : { *(.kstrtab) }
-
 	. = ALIGN(4);                /* Exception table */
   	__start___ex_table = .;
   	__ex_table : { *(__ex_table) }
   	__stop___ex_table = .;
 
-  	__start___ksymtab = .;        /* Kernel symbol table */
-  	__ksymtab : { *(__ksymtab) }
-  	__stop___ksymtab = .;
-
-	__start___gpl_ksymtab = .;    /* Kernel symbol table: GPL-only */
-	__gpl_ksymtab : { *(__gpl_ksymtab) }
-	__stop___gpl_ksymtab = .;
+	RODATA
 
 	. = ALIGN (4);
 	___data_start = . ;

@@ -464,7 +464,7 @@ sys_call_table:
         .long  SYSCALL(sys_ni_syscall,sys32_setreuid16_wrapper) /* old setreuid16 syscall */
         .long  SYSCALL(sys_ni_syscall,sys32_setregid16_wrapper) /* old setregid16 syscall */
         .long  SYSCALL(sys_sigsuspend_glue,sys32_sigsuspend_glue)
-        .long  SYSCALL(sys_sigpending,sys32_sigpending_wrapper)
+        .long  SYSCALL(sys_sigpending,compat_sys_sigpending_wrapper)
         .long  SYSCALL(sys_sethostname,sys32_sethostname_wrapper)
         .long  SYSCALL(sys_setrlimit,sys32_setrlimit_wrapper)   /* 75 */
         .long  SYSCALL(sys_getrlimit,sys32_old_getrlimit_wrapper) 
@@ -517,7 +517,7 @@ sys_call_table:
         .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* modify_ldt for i386 */
         .long  SYSCALL(sys_adjtimex,sys32_adjtimex_wrapper)
         .long  SYSCALL(sys_mprotect,sys32_mprotect_wrapper) /* 125 */
-        .long  SYSCALL(sys_sigprocmask,sys32_sigprocmask_wrapper)
+        .long  SYSCALL(sys_sigprocmask,compat_sys_sigprocmask_wrapper)
         .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* old "create module" */
         .long  SYSCALL(sys_init_module,sys32_init_module_wrapper)
         .long  SYSCALL(sys_delete_module,sys32_delete_module_wrapper)

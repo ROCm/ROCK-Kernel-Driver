@@ -65,6 +65,7 @@ choice
 	  LX164               AlphaPC164-LX
 	  Miata               Personal Workstation 433a, 433au, 500a,
 	  500au, 600a, or 600au
+	  Marvel              AlphaServer ES47 / ES80 / GS1280
 	  Mikasa              AS 1000
 	  Noname              AXPpci33, UDB (Multia)
 	  Noritake            AS 1000A, AS 600A, AS 800
@@ -75,7 +76,7 @@ choice
 	  Sable               AS 2000, AS 2100
 	  Shark		      DS 20L
 	  Takara              Takara
-	  Titan               Privateer
+	  Titan               AlphaServer ES45 / DS25
 	  Wildfire            AlphaServer GS 40/80/160/320
 
 	  If you don't know what to do, choose "generic".
@@ -172,6 +173,11 @@ config ALPHA_LX164
 	  A technical overview of this board is available at
 	  <http://www.unix-ag.org/Linux-Alpha/Architectures/LX164.html>.
 
+config ALPHA_MARVEL
+	bool "Marvel"
+	help
+	  AlphaServer ES47 / ES80 / GS1280 based on EV7.
+
 config ALPHA_MIATA
 	bool "Miata"
 	help
@@ -238,6 +244,8 @@ config ALPHA_TAKARA
 
 config ALPHA_TITAN
 	bool "Titan"
+	help
+	  AlphaServer ES45/DS25 SMP based on EV68 and Titan chipset.
 
 config ALPHA_WILDFIRE
 	bool "Wildfire"
@@ -300,6 +308,11 @@ config PCI
 	  <http://www.linuxdoc.org/docs.html#howto>, contains valuable
 	  information about which PCI hardware does work under Linux and which
 	  doesn't.
+
+config ALPHA_CORE_AGP
+	bool
+	depends on ALPHA_GENERIC || ALPHA_TITAN || ALPHA_MARVEL
+	default y
 
 config ALPHA_NONAME
 	bool
@@ -387,7 +400,7 @@ config ALPHA_PYXIS
 
 config ALPHA_EV6
 	bool
-	depends on ALPHA_NAUTILUS || ALPHA_WILDFIRE || ALPHA_TITAN || ALPHA_SHARK || ALPHA_DP264 || ALPHA_EIGER
+	depends on ALPHA_NAUTILUS || ALPHA_WILDFIRE || ALPHA_TITAN || ALPHA_SHARK || ALPHA_DP264 || ALPHA_EIGER || ALPHA_MARVEL
 	default y
 
 config ALPHA_TSUNAMI
@@ -397,10 +410,15 @@ config ALPHA_TSUNAMI
 
 config ALPHA_EV67
 	bool "EV67 (or later) CPU (speed > 600MHz)?" if ALPHA_DP264 || ALPHA_EIGER
-	default y if ALPHA_NAUTILUS || ALPHA_WILDFIRE || ALPHA_TITAN || ALPHA_SHARK
+	default y if ALPHA_NAUTILUS || ALPHA_WILDFIRE || ALPHA_TITAN || ALPHA_SHARK || ALPHA_MARVEL
 	help
 	  Is this a machine based on the EV67 core?  If in doubt, select N here
 	  and the machine will be treated as an EV6.
+
+config ALPHA_EV7
+	bool
+	depends on ALPHA_MARVEL
+	default y
 
 config ALPHA_MCPCIA
 	bool
@@ -419,7 +437,7 @@ config ALPHA_IRONGATE
 
 config ALPHA_SRM
 	bool "Use SRM as bootloader" if ALPHA_CABRIOLET || ALPHA_AVANTI_CH || ALPHA_EB64P || ALPHA_PC164 || ALPHA_TAKARA || ALPHA_EB164 || ALPHA_ALCOR || ALPHA_MIATA || ALPHA_LX164 || ALPHA_SX164 || ALPHA_NAUTILUS || ALPHA_NONAME
-	default y if ALPHA_JENSEN || ALPHA_MIKASA || ALPHA_SABLE || ALPHA_NORITAKE || ALPHA_DP264 || ALPHA_RAWHIDE || ALPHA_EIGER || ALPHA_WILDFIRE || ALPHA_TITAN || ALPHA_SHARK
+	default y if ALPHA_JENSEN || ALPHA_MIKASA || ALPHA_SABLE || ALPHA_NORITAKE || ALPHA_DP264 || ALPHA_RAWHIDE || ALPHA_EIGER || ALPHA_WILDFIRE || ALPHA_TITAN || ALPHA_SHARK || ALPHA_MARVEL
 	---help---
 	  There are two different types of booting firmware on Alphas: SRM,
 	  which is command line driven, and ARC, which uses menus and arrow
@@ -461,7 +479,7 @@ config ALPHA_BROKEN_IRQ_MASK
 
 config SMP
 	bool "Symmetric multi-processing support"
-	depends on ALPHA_SABLE || ALPHA_RAWHIDE || ALPHA_DP264 || ALPHA_WILDFIRE || ALPHA_TITAN || ALPHA_GENERIC || ALPHA_SHARK
+	depends on ALPHA_SABLE || ALPHA_RAWHIDE || ALPHA_DP264 || ALPHA_WILDFIRE || ALPHA_TITAN || ALPHA_GENERIC || ALPHA_SHARK || ALPHA_MARVEL
 	---help---
 	  This enables support for systems with more than one CPU. If you have
 	  a system with only one CPU, like most personal computers, say N. If
@@ -535,6 +553,7 @@ config VERBOSE_MCHECK
 	bool "Verbose Machine Checks"
 
 source "drivers/pci/Kconfig"
+source "drivers/eisa/Kconfig"
 
 config HOTPLUG
 	bool "Support for hot-pluggable devices"
@@ -771,6 +790,15 @@ config IDE
 	  For further information, please read <file:Documentation/ide.txt>.
 
 	  If unsure, say Y.
+
+config IDE_MAX_HWIFS 
+	int "Max IDE interfaces"
+	depends on IDE
+	default 4
+	help
+	  This is the maximum number of IDE hardware interfaces that will
+	  be supported by the driver. Make sure it is at least as high as
+	  the number IDE interfaces in your system.
 
 source "drivers/ide/Kconfig"
 

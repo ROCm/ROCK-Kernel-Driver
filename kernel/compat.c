@@ -4,7 +4,7 @@
  *  Kernel compatibililty routines for e.g. 32 bit syscall support
  *  on 64 bit kernels.
  *
- *  Copyright (C) 2002 Stephen Rothwell, IBM Corporation
+ *  Copyright (C) 2002-2003 Stephen Rothwell, IBM Corporation
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -15,6 +15,7 @@
 #include <linux/compat.h>
 #include <linux/errno.h>
 #include <linux/time.h>
+#include <linux/signal.h>
 
 #include <asm/uaccess.h>
 
@@ -165,4 +166,45 @@ asmlinkage long compat_sys_times(struct compat_tms *tbuf)
 			return -EFAULT;
 	}
 	return compat_jiffies_to_clock_t(jiffies);
+}
+
+/*
+ * Assumption: old_sigset_t and compat_old_sigset_t are both
+ * types that can be passed to put_user()/get_user().
+ */
+
+extern asmlinkage long sys_sigpending(old_sigset_t *);
+
+asmlinkage long compat_sys_sigpending(compat_old_sigset_t *set)
+{
+	old_sigset_t s;
+	long ret;
+	mm_segment_t old_fs = get_fs();
+
+	set_fs(KERNEL_DS);
+	ret = sys_sigpending(&s);
+	set_fs(old_fs);
+	if (ret == 0)
+		ret = put_user(s, set);
+	return ret;
+}
+
+extern asmlinkage long sys_sigprocmask(int, old_sigset_t *, old_sigset_t *);
+
+asmlinkage long compat_sys_sigprocmask(int how, compat_old_sigset_t *set,
+		compat_old_sigset_t *oset)
+{
+	old_sigset_t s;
+	long ret;
+	mm_segment_t old_fs;
+
+	if (set && get_user(s, set))
+		return -EFAULT;
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	ret = sys_sigprocmask(how, set ? &s : NULL, oset ? &s : NULL);
+	set_fs(old_fs);
+	if (ret == 0)
+		ret = put_user(s, oset);
+	return ret;
 }

@@ -217,16 +217,23 @@ EXPORT_SYMBOL(smp_call_function);
 EXPORT_SYMBOL(smp_call_function_on_cpu);
 EXPORT_SYMBOL(atomic_dec_and_lock);
 #ifdef CONFIG_DEBUG_SPINLOCK
-EXPORT_SYMBOL(spin_unlock);
+EXPORT_SYMBOL(_raw_spin_unlock);
 EXPORT_SYMBOL(debug_spin_lock);
 EXPORT_SYMBOL(debug_spin_trylock);
 #endif
 #ifdef CONFIG_DEBUG_RWLOCK
-EXPORT_SYMBOL(write_lock);
-EXPORT_SYMBOL(read_lock);
+EXPORT_SYMBOL(_raw_write_lock);
+EXPORT_SYMBOL(_raw_read_lock);
 #endif
 EXPORT_SYMBOL(cpu_present_mask);
 #endif /* CONFIG_SMP */
+
+/*
+ * NUMA specific symbols
+ */
+#ifdef CONFIG_DISCONTIGMEM
+EXPORT_SYMBOL(node_data);
+#endif /* CONFIG_DISCONTIGMEM */
 
 EXPORT_SYMBOL(rtc_lock);
 

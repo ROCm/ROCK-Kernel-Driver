@@ -1,14 +1,14 @@
 /*
+ * arch/ppc/platforms/4xx/redwood5.c
  *
- *    Copyright 2000-2001 MontaVista Software Inc.
- *      Completed implementation.
- *      Author: Armin Kuster
+ * Support for the IBM redwood5 eval board file
  *
- *    Module name: redwood5.c
+ * Author: Armin Kuster <akuster@mvista.com>
  *
- *    Description:
- *    	IBM redwood5 eval board file
- *
+ * 2000-2001 (c) MontaVista, Software, Inc.  This file is licensed under
+ * the terms of the GNU General Public License version 2.1.  This program
+ * is licensed "as is" without any warranty of any kind, whether express
+ * or implied.
  */
 
 #include <linux/config.h>

@@ -12,6 +12,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/compat.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/smp.h>
@@ -127,10 +128,10 @@ sys32_sigsuspend(struct pt_regs * regs,int history0, int history1, old_sigset_t 
 }
 
 asmlinkage int
-sys32_rt_sigsuspend(struct pt_regs * regs,sigset_t32 *unewset, size_t sigsetsize)
+sys32_rt_sigsuspend(struct pt_regs * regs,compat_sigset_t *unewset, size_t sigsetsize)
 {
 	sigset_t saveset, newset;
-	sigset_t32 set32;
+	compat_sigset_t set32;
 
 	/* XXX: Don't preclude handling different sized sigset_t's.  */
 	if (sigsetsize != sizeof(sigset_t))
@@ -169,7 +170,7 @@ sys32_sigaction(int sig, const struct old_sigaction32 *act,
         int ret;
 
         if (act) {
-		old_sigset_t32 mask;
+		compat_old_sigset_t mask;
 		if (verify_area(VERIFY_READ, act, sizeof(*act)) ||
 		    __get_user((unsigned long)new_ka.sa.sa_handler, &act->sa_handler) ||
 		    __get_user((unsigned long)new_ka.sa.sa_restorer, &act->sa_restorer))
@@ -202,16 +203,16 @@ sys32_rt_sigaction(int sig, const struct sigaction32 *act,
 {
 	struct k_sigaction new_ka, old_ka;
 	int ret;
-	sigset_t32 set32;
+	compat_sigset_t set32;
 
 	/* XXX: Don't preclude handling different sized sigset_t's.  */
-	if (sigsetsize != sizeof(sigset_t32))
+	if (sigsetsize != sizeof(compat_sigset_t))
 		return -EINVAL;
 
 	if (act) {
 		ret = get_user((unsigned long)new_ka.sa.sa_handler, &act->sa_handler);
 		ret |= __copy_from_user(&set32, &act->sa_mask,
-					sizeof(sigset_t32));
+					sizeof(compat_sigset_t));
 		switch (_NSIG_WORDS) {
 		case 4: new_ka.sa.sa_mask.sig[3] = set32.sig[6]
 				| (((long)set32.sig[7]) << 32);
@@ -247,7 +248,7 @@ sys32_rt_sigaction(int sig, const struct sigaction32 *act,
 		}
 		ret = put_user((unsigned long)old_ka.sa.sa_handler, &oact->sa_handler);
 		ret |= __copy_to_user(&oact->sa_mask, &set32,
-				      sizeof(sigset_t32));
+				      sizeof(compat_sigset_t));
 		ret |= __put_user(old_ka.sa.sa_flags, &oact->sa_flags);
 	}
 

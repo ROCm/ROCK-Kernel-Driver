@@ -1557,7 +1557,6 @@ int init_module(void)
 
 void cleanup_module(void)
 {
-	/* No need to check MOD_IN_USE, as sys_delete_module() checks. */
 	unregister_netdev(&devSMC9194);
 
 	free_irq(devSMC9194.irq, &devSMC9194);

@@ -161,8 +161,8 @@ static struct cpia_camera_ops cpia_pp_ops =
 	THIS_MODULE
 };
 
-static struct cam_data *cam_list;
-static spinlock_t cam_list_lock_pp;
+static LIST_HEAD(cam_list);
+static spinlock_t cam_list_lock_pp = SPIN_LOCK_UNLOCKED;
 
 #ifdef _CPIA_DEBUG_
 #define DEB_PORT(port) { \
@@ -566,7 +566,7 @@ static int cpia_pp_register(struct parport *port)
 		return -ENXIO;
 	}
 	spin_lock( &cam_list_lock_pp );
-	cpia_add_to_list(&cam_list, &cpia);
+	list_add( &cpia->cam_data_list, &cam_list );
 	spin_unlock( &cam_list_lock_pp );
 
 	return 0;
@@ -574,14 +574,16 @@ static int cpia_pp_register(struct parport *port)
 
 static void cpia_pp_detach (struct parport *port)
 {
+	struct list_head *tmp;
 	struct cam_data *cpia;
+	struct pp_cam_entry *cam;
 
-	for(cpia = cam_list; cpia != NULL; cpia = cpia->next) {
-		struct pp_cam_entry *cam = cpia->lowlevel_data;
+	spin_lock( &cam_list_lock_pp );
+	list_for_each (tmp, &cam_list) {
+		cpia = list_entry(tmp, struct cam_data, cam_data_list);
+		cam = cpia->lowlevel_data;
 		if (cam && cam->port->number == port->number) {
-			spin_lock( &cam_list_lock_pp );
-			cpia_remove_from_list(&cpia);
-			spin_unlock( &cam_list_lock_pp );			
+			list_del(&cpia->cam_data_list);
 			cpia_unregister_camera(cpia);
 			
 			if(cam->open_count > 0) {
@@ -595,6 +597,7 @@ static void cpia_pp_detach (struct parport *port)
 			break;
 		}
 	}
+	spin_unlock( &cam_list_lock_pp );			
 }
 
 static void cpia_pp_attach (struct parport *port)
@@ -647,9 +650,6 @@ int cpia_pp_init(void)
 		return -EIO;
 	}
 	
-	cam_list = NULL;
-	spin_lock_init( &cam_list_lock_pp );
-
 	return 0;
 }
 

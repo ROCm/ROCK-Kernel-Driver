@@ -39,7 +39,7 @@ SECTIONS
   PROVIDE (etext = .);
 
   /* Read-write section, merged into data segment: */
-  . = ALIGN(8);
+  . = ALIGN(4096);
   .data    :
   {
     *(.data)

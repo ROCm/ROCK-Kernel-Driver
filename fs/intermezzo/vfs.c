@@ -182,12 +182,13 @@ inline void presto_debug_fail_blkdev(struct presto_file_set *fset,
 {
         int minor = presto_f2m(fset);
         int errorval = izo_channels[minor].uc_errorval;
-        kdev_t dev = to_kdev_t(fset->fset_dentry->d_inode->i_sb->s_dev);
+	struct block_device *bdev = fset->fset_dentry->d_inode->i_sb->s_bdev;
 
-        if (errorval && errorval == (long)value && !is_read_only(dev)) {
-                CDEBUG(D_SUPER, "setting device %s read only\n", kdevname(dev));
-                BLKDEV_FAIL(kdev_val(dev), 1);
-                izo_channels[minor].uc_errorval = -kdev_val(dev);
+        if (errorval && errorval == (long)value && !bdev_read_only(bdev)) {
+                CDEBUG(D_SUPER, "setting device %s read only\n",
+				bdevname(bdev));
+                BLKDEV_FAIL(bdev, 1);
+                izo_channels[minor].uc_errorval = -bdev->bd_dev;
         }
 }
 #else

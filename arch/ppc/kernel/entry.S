@@ -35,6 +35,25 @@
 #undef SHOW_SYSCALLS_TASK
 
 /*
+ * MSR_KERNEL is > 0x10000 on 4xx since it include MSR_CE.
+ */
+#if MSR_KERNEL >= 0x10000
+#define LOAD_MSR_KERNEL(r, x)	lis r,(x)@h; ori r,r,(x)@l
+#else
+#define LOAD_MSR_KERNEL(r, x)	li r,(x)
+#endif
+
+#ifdef CONFIG_4xx
+	.globl	crit_transfer_to_handler
+crit_transfer_to_handler:
+	lwz	r0,crit_r10@l(0)
+	stw	r0,GPR10(r11)
+	lwz	r0,crit_r11@l(0)
+	stw	r0,GPR11(r11)
+	/* fall through */
+#endif
+
+/*
  * This code finishes saving the registers to the exception frame
  * and jumps to the appropriate handler for the exception, turning
  * on address translation.
@@ -51,6 +70,7 @@ transfer_to_handler:
 	stw	r2,GPR2(r11)
 	stw	r12,_NIP(r11)
 	stw	r9,_MSR(r11)
+	andi.	r2,r9,MSR_PR
 	mfctr	r12
 	mfspr	r2,XER
 	stw	r12,_CTR(r11)
@@ -61,6 +81,22 @@ transfer_to_handler:
 	beq	2f			/* if from user, fix up THREAD.regs */
 	addi	r11,r1,STACK_FRAME_OVERHEAD
 	stw	r11,PT_REGS(r12)
+#ifdef CONFIG_4xx
+	lwz	r12,PTRACE-THREAD(r12)
+	andi.	r12,r12,PT_PTRACED
+	beq+	3f
+	/* From user and task is ptraced - load up global dbcr0 */
+	li	r12,-1			/* clear all pending debug events */
+	mtspr	SPRN_DBSR,r12
+	lis	r11,global_dbcr0@ha
+	tophys(r11,r11)
+	addi	r11,r11,global_dbcr0@l
+	lwz	r12,0(r11)
+	mtspr	SPRN_DBCR0,r12
+	lwz	r12,4(r11)
+	addi	r12,r12,-1
+	stw	r12,4(r11)
+#endif
 	b	3f
 2:	/* if from kernel, check interrupted DOZE/NAP mode and
          * check for stack overflow
@@ -96,15 +132,19 @@ transfer_to_handler_cont:
  * and call StackOverflow(regs), which should not return.
  */
 stack_ovf:
+	/* sometimes we use a statically-allocated stack, which is OK. */
+	lis	r11,_end@h
+	ori	r11,r11,_end@l
+	cmplw	r1,r11
+	ble	3b			/* r1 <= &_end is OK */
 	SAVE_NVGPRS(r11)
 	addi	r3,r1,STACK_FRAME_OVERHEAD
-	tovirt(r2,r2)			/* set r2 to current */
 	lis	r1,init_thread_union@ha
 	addi	r1,r1,init_thread_union@l
 	addi	r1,r1,THREAD_SIZE-STACK_FRAME_OVERHEAD
 	lis	r9,StackOverflow@ha
 	addi	r9,r9,StackOverflow@l
-	li	r10,MSR_KERNEL
+	LOAD_MSR_KERNEL(r10,MSR_KERNEL)
 	FIX_SRR1(r10,r12)
 	mtspr	SRR0,r9
 	mtspr	SRR1,r10
@@ -161,7 +201,7 @@ ret_from_syscall:
 	stw	r10,_CCR(r1)
 
 	/* disable interrupts so current_thread_info()->flags can't change */
-30:	li	r10,MSR_KERNEL	/* doesn't include MSR_EE */
+30:	LOAD_MSR_KERNEL(r10,MSR_KERNEL)	/* doesn't include MSR_EE */
 	SYNC
 	MTMSRD(r10)
 	rlwinm	r12,r1,0,0,18	/* current_thread_info() */
@@ -169,6 +209,12 @@ ret_from_syscall:
 	andi.	r0,r9,(_TIF_SYSCALL_TRACE|_TIF_SIGPENDING|_TIF_NEED_RESCHED)
 	bne-	syscall_exit_work
 syscall_exit_cont:
+#ifdef CONFIG_4xx
+	/* If the process has its own DBCR0 value, load it up */
+	lwz	r0,PTRACE(r2)
+	andi.	r0,r0,PT_PTRACED
+	bnel-	load_4xx_dbcr0
+#endif
 	stwcx.	r0,0,r1			/* to clear the reservation */
 	lwz	r4,_LINK(r1)
 	lwz	r5,_CCR(r1)
@@ -215,7 +261,6 @@ syscall_exit_work:
 	stw	r3,GPR3(r1)	/* Update return value */
 	andi.	r0,r9,_TIF_SYSCALL_TRACE
 	beq	5f
-	stw	r6,GPR0(r1)	/* temporary gross hack to make strace work */
 	ori	r10,r10,MSR_EE
 	SYNC
 	MTMSRD(r10)		/* re-enable interrupts */
@@ -230,7 +275,7 @@ syscall_exit_work:
 	REST_NVGPRS(r1)
 2:
 	lwz	r3,GPR3(r1)
-	li	r10,MSR_KERNEL	/* doesn't include MSR_EE */
+	LOAD_MSR_KERNEL(r10,MSR_KERNEL)	/* doesn't include MSR_EE */
 	SYNC
 	MTMSRD(r10)		/* disable interrupts again */
 	rlwinm	r12,r1,0,0,18	/* current_thread_info() */
@@ -243,10 +288,7 @@ syscall_exit_work:
 	beq	syscall_exit_cont
 	andi.	r0,r9,_TIF_SIGPENDING
 	beq	syscall_exit_cont
-	ori	r10,r10,MSR_EE
-	SYNC
-	MTMSRD(r10)		/* re-enable interrupts */
-	b	syscall_do_signal
+	b	do_user_signal
 1:
 	ori	r10,r10,MSR_EE
 	SYNC
@@ -459,7 +501,7 @@ ret_from_except:
 	/* Hard-disable interrupts so that current_thread_info()->flags
 	 * can't change between when we test it and when we return
 	 * from the interrupt. */
-	li	r10,MSR_KERNEL	/* doesn't include EE */
+	LOAD_MSR_KERNEL(r10,MSR_KERNEL)
 	SYNC			/* Some chip revs have problems here... */
 	MTMSRD(r10)		/* disable interrupts */
 
@@ -467,23 +509,33 @@ ret_from_except:
 	andi.	r3,r3,MSR_PR
 	beq	resume_kernel
 
+user_exc_return:		/* r10 contains MSR_KERNEL here */
 	/* Check current_thread_info()->flags */
 	rlwinm	r9,r1,0,0,18
 	lwz	r9,TI_FLAGS(r9)
 	andi.	r0,r9,(_TIF_SIGPENDING|_TIF_NEED_RESCHED)
 	bne	do_work
 
+restore_user:
+#ifdef CONFIG_4xx
+	/* Check whether this process has its own DBCR0 value */
+	lwz	r0,PTRACE(r2)
+	andi.	r0,r0,PT_PTRACED
+	bnel-	load_4xx_dbcr0
+#endif
+
 #ifdef CONFIG_PREEMPT
 	b	restore
 
 resume_kernel:
-	rlwinm	r9,r1,0,0,18	/* check current_thread_info->preempt_count */
+	/* check current_thread_info->preempt_count */
+	rlwinm	r9,r1,0,0,18
 	lwz	r3,TI_PREEMPT(r9)
-	cmpwi	0,r0,0		/* if non-zero, just restore regs and return */
+	cmpwi	0,r3,0		/* if non-zero, just restore regs and return */
 	bne	restore
 	lwz	r9,TI_FLAGS(r9)
 	andi.	r0,r9,_TIF_NEED_RESCHED
-	bne	do_work
+	bne	do_resched
 #else
 resume_kernel:
 #endif /* CONFIG_PREEMPT */
@@ -522,7 +574,7 @@ restore:
 	 * can restart the exception exit path at the label
 	 * exc_exit_restart below.  -- paulus
 	 */
-	li	r10,MSR_KERNEL & ~MSR_RI
+	LOAD_MSR_KERNEL(r10,MSR_KERNEL & ~MSR_RI)
 	SYNC
 	MTMSRD(r10)		/* clear the RI bit */
 	.globl exc_exit_restart
@@ -542,18 +594,14 @@ exc_exit_restart_end:
 #else /* CONFIG_4xx */
 	/*
 	 * This is a bit different on 4xx because 4xx doesn't have
-	 * the RI bit in the MSR, and because we have critical
-	 * exceptions, for which we need to restore SRR0 and SRR1
-	 * and then use SRR2/SRR3 to return from the exception.
+	 * the RI bit in the MSR.
 	 * The TLB miss handler checks if we have interrupted
-	 * the exception exit path and restarts it if so.
+	 * the exception exit path and restarts it if so
+	 * (well maybe one day it will... :).
 	 */
-	lwz	r10,TRAP(r1)		/* check for critical exception */
 	lwz	r11,_LINK(r1)
-	andi.	r10,r10,2
 	mtlr	r11
 	lwz	r10,_CCR(r1)
-	bne	crit_exc_exit
 	mtcrf	0xff,r10
 	REST_2GPRS(9, r1)
 	.globl exc_exit_restart
@@ -570,7 +618,43 @@ exc_exit_restart_end:
 	PPC405_ERR77_SYNC
 	rfi
 	b	.			/* prevent prefetch past rfi */
-crit_exc_exit:
+
+/*
+ * Returning from a critical interrupt in user mode doesn't need
+ * to be any different from a normal exception.  For a critical
+ * interrupt in the kernel, we just return (without checking for
+ * preemption) since the interrupt may have happened at some crucial
+ * place (e.g. inside the TLB miss handler), and because we will be
+ * running with r1 pointing into critical_stack, not the current
+ * process's kernel stack (and therefore current_thread_info() will
+ * give the wrong answer).
+ * We have to restore various SPRs that may have been in use at the
+ * time of the critical interrupt.
+ */
+	.globl	ret_from_crit_exc
+ret_from_crit_exc:
+	REST_NVGPRS(r1)
+	lwz	r3,_MSR(r1)
+	andi.	r3,r3,MSR_PR
+	LOAD_MSR_KERNEL(r10,MSR_KERNEL)
+	bne	user_exc_return
+
+	lwz	r0,GPR0(r1)
+	lwz	r2,GPR2(r1)
+	REST_4GPRS(3, r1)
+	REST_2GPRS(7, r1)
+
+	lwz	r10,_XER(r1)
+	lwz	r11,_CTR(r1)
+	mtspr	XER,r10
+	mtctr	r11
+
+	PPC405_ERR77(0,r1)
+	stwcx.	r0,0,r1			/* to clear the reservation */
+
+	lwz	r11,_LINK(r1)
+	mtlr	r11
+	lwz	r10,_CCR(r1)
 	mtcrf	0xff,r10
 	/* avoid any possible TLB misses here by turning off MSR.DR, we
 	 * assume the instructions here are mapped by a pinned TLB entry */
@@ -606,40 +690,68 @@ crit_exc_exit:
 	mtspr	SRR1,r10
 	lwz	r10,crit_pid@l(0)
 	mtspr	SPRN_PID,r10
-	lwz	r10,crit_r10@l(0)
-	lwz	r11,crit_r11@l(0)
+	lwz	r10,GPR10(r1)
+	lwz	r11,GPR11(r1)
 	lwz	r1,GPR1(r1)
 	PPC405_ERR77_SYNC
 	rfci
 	b	.		/* prevent prefetch past rfci */
+
+/*
+ * Load the DBCR0 value for a task that is being ptraced,
+ * having first saved away the global DBCR0.
+ */
+load_4xx_dbcr0:
+	mfmsr	r0		/* first disable debug exceptions */
+	rlwinm	r0,r0,0,~MSR_DE
+	mtmsr	r0
+	isync
+	mfspr	r10,SPRN_DBCR0
+	lis	r11,global_dbcr0@ha
+	addi	r11,r11,global_dbcr0@l
+	lwz	r0,THREAD+THREAD_DBCR0(r2)
+	stw	r10,0(r11)
+	mtspr	SPRN_DBCR0,r0
+	lwz	r10,4(r11)
+	addi	r10,r10,1
+	stw	r10,4(r11)
+	li	r11,-1
+	mtspr	SPRN_DBSR,r11	/* clear all pending debug events */
+	blr
+
+	.comm	global_dbcr0,8
 #endif /* CONFIG_4xx */
 
+do_work:			/* r10 contains MSR_KERNEL here */
+	andi.	r0,r9,_TIF_NEED_RESCHED
+	beq	do_user_signal
+
+do_resched:			/* r10 contains MSR_KERNEL here */
+	ori	r10,r10,MSR_EE
+	SYNC
+	MTMSRD(r10)		/* hard-enable interrupts */
+	bl	schedule
 recheck:
-	li	r10,MSR_KERNEL
+	LOAD_MSR_KERNEL(r10,MSR_KERNEL)
 	SYNC
 	MTMSRD(r10)		/* disable interrupts */
 	rlwinm	r9,r1,0,0,18
 	lwz	r9,TI_FLAGS(r9)
+	andi.	r0,r9,_TIF_NEED_RESCHED
+	bne-	do_resched
+
 #ifdef CONFIG_PREEMPT
 	lwz	r0,_MSR(r1)
-	li	r11,_TIF_NEED_RESCHED
-	/* move MSR_PR bit down to TIF_SIGPENDING (0x4) bit */
-	rlwimi	r11,r0,18+TIF_SIGPENDING,31-TIF_SIGPENDING,31-TIF_SIGPENDING
-	and.	r0,r9,r11
-#else /* CONFIG_PREEMPT */
-	andi.	r0,r9,(_TIF_SIGPENDING|_TIF_NEED_RESCHED)
-#endif /* CONFIG_PREEMPT */
+	andi.	r0,r0,MSR_PR
 	beq	restore
-do_work:
+#endif
+
+	andi.	r0,r9,_TIF_SIGPENDING
+	beq	restore_user
+do_user_signal:			/* r10 contains MSR_KERNEL here */
 	ori	r10,r10,MSR_EE
 	SYNC
 	MTMSRD(r10)		/* hard-enable interrupts */
-	andi.	r0,r9,_TIF_NEED_RESCHED
-	beq	1f
-	bl	schedule
-	b	recheck
-1:
-syscall_do_signal:
 	/* save r13-r31 in the exception frame, if not already done */
 	lwz	r3,TRAP(r1)
 	andi.	r0,r3,1
@@ -715,7 +827,7 @@ _GLOBAL(enter_rtas)
 	lwz	r8,rtas_entry@l(r8)
 	mfmsr	r9
 	stw	r9,8(r1)
-	li	r0,MSR_KERNEL
+	LOAD_MSR_KERNEL(r0,MSR_KERNEL)
 	SYNC			/* disable interrupts so SRR0/1 */
 	MTMSRD(r0)		/* don't get trashed */
 	li	r9,MSR_

@@ -104,8 +104,8 @@ static struct cpia_camera_ops cpia_usb_ops = {
 	THIS_MODULE
 };
 
-static struct cam_data *cam_list;
-static spinlock_t cam_list_lock_usb;
+static LIST_HEAD(cam_list);
+static spinlock_t cam_list_lock_usb = SPIN_LOCK_UNLOCKED;
 
 static void cpia_usb_complete(struct urb *urb, struct pt_regs *regs)
 {
@@ -549,7 +549,7 @@ static int cpia_probe(struct usb_interface *intf,
 	}
 
 	spin_lock( &cam_list_lock_usb );
-	cpia_add_to_list(&cam_list, &cam);
+	list_add( &cam->cam_data_list, &cam_list );
 	spin_unlock( &cam_list_lock_usb );
 
 	usb_set_intfdata(intf, cam);
@@ -603,7 +603,7 @@ static void cpia_disconnect(struct usb_interface *intf)
 
 	ucpia = (struct usb_cpia *) cam->lowlevel_data;
 	spin_lock( &cam_list_lock_usb );
-	cpia_remove_from_list(&cam);
+	list_del(&cam->cam_data_list);
 	spin_unlock( &cam_list_lock_usb );
 	
 	/* Don't even try to reset the altsetting if we're disconnected */
@@ -647,8 +647,6 @@ static void cpia_disconnect(struct usb_interface *intf)
 
 static int __init usb_cpia_init(void)
 {
-	cam_list = NULL;
-	spin_lock_init(&cam_list_lock_usb);
 	return usb_register(&cpia_driver);
 }
 
@@ -667,4 +665,3 @@ static void __exit usb_cpia_cleanup(void)
 
 module_init (usb_cpia_init);
 module_exit (usb_cpia_cleanup);
-

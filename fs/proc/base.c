@@ -75,9 +75,7 @@ static struct pid_entry base_stuff[] = {
   E(PROC_PID_CMDLINE,	"cmdline",	S_IFREG|S_IRUGO),
   E(PROC_PID_STAT,	"stat",		S_IFREG|S_IRUGO),
   E(PROC_PID_STATM,	"statm",	S_IFREG|S_IRUGO),
-#ifdef CONFIG_MMU
   E(PROC_PID_MAPS,	"maps",		S_IFREG|S_IRUGO),
-#endif
   E(PROC_PID_MEM,	"mem",		S_IFREG|S_IRUSR|S_IWUSR),
   E(PROC_PID_CWD,	"cwd",		S_IFLNK|S_IRWXUGO),
   E(PROC_PID_ROOT,	"root",		S_IFLNK|S_IRWXUGO),
@@ -323,7 +321,6 @@ static int proc_permission(struct inode *inode, int mask)
 	return proc_check_root(inode);
 }
 
-#ifdef CONFIG_MMU
 extern ssize_t proc_pid_read_maps(struct task_struct *, struct file *,
 				  char *, size_t, loff_t *);
 static ssize_t pid_maps_read(struct file * file, char * buf,
@@ -340,7 +337,6 @@ static ssize_t pid_maps_read(struct file * file, char * buf,
 static struct file_operations proc_maps_operations = {
 	.read		= pid_maps_read,
 };
-#endif /* CONFIG_MMU */
 
 extern struct seq_operations mounts_op;
 static int mounts_open(struct inode *inode, struct file *file)
@@ -1029,11 +1025,9 @@ static struct dentry *proc_base_lookup(struct inode *dir, struct dentry *dentry)
 			inode->i_fop = &proc_info_file_operations;
 			ei->op.proc_read = proc_pid_statm;
 			break;
-#ifdef CONFIG_MMU
 		case PROC_PID_MAPS:
 			inode->i_fop = &proc_maps_operations;
 			break;
-#endif
 		case PROC_PID_MEM:
 			inode->i_op = &proc_mem_inode_operations;
 			inode->i_fop = &proc_mem_operations;

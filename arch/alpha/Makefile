@@ -97,6 +97,10 @@ core-$(CONFIG_MATHEMU)		+= arch/alpha/math-emu/
 drivers-$(CONFIG_OPROFILE)	+= arch/alpha/oprofile/
 libs-y				+= arch/alpha/lib/
 
+# export what is needed by arch/alpha/boot/Makefile
+LIBS_Y := $(patsubst %/, %/lib.a, $(libs-y))
+export LIBS_Y
+
 boot := arch/alpha/boot
 
 #Default target when executing make with no arguments

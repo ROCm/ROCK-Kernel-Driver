@@ -42,6 +42,8 @@ struct pci_controller {
 
 	struct pci_iommu_arena *sg_pci;
 	struct pci_iommu_arena *sg_isa;
+
+	void *sysdata;
 };
 
 /* Override the logic in pci_scan_bus for skipping already-configured

@@ -23,7 +23,7 @@
 #ifdef CONFIG_ALPHA_LEGACY_START_ADDRESS
 #define KERNEL_START_PHYS	0x300000 /* Old bootloaders hardcoded this.  */
 #else
-#define KERNEL_START_PHYS	0x800000 /* Wildfire has a huge console */
+#define KERNEL_START_PHYS	0x1000000 /* required: Wildfire/Titan/Marvel */
 #endif
 
 #define KERNEL_START	(PAGE_OFFSET+KERNEL_START_PHYS)

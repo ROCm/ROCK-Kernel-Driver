@@ -465,18 +465,13 @@ osf_shmat(int shmid, void *shmaddr, int shmflg)
 	unsigned long raddr;
 	long err;
 
-	lock_kernel();
 	err = sys_shmat(shmid, shmaddr, shmflg, &raddr);
-	if (err)
-		goto out;
+
 	/*
 	 * This works because all user-level addresses are
 	 * non-negative longs!
 	 */
-	err = raddr;
- out:
-	unlock_kernel();
-	return err;
+	return err ? err : (long)raddr;
 }
 
 
@@ -830,7 +825,7 @@ extern struct timezone sys_tz;
 extern int do_sys_settimeofday(struct timeval *tv, struct timezone *tz);
 extern int do_getitimer(int which, struct itimerval *value);
 extern int do_setitimer(int which, struct itimerval *, struct itimerval *);
-asmlinkage int sys_utimes(char *, struct timeval *);
+extern asmlinkage int sys_utimes(char *, struct timeval *);
 extern int do_adjtimex(struct timex *);
 
 struct timeval32

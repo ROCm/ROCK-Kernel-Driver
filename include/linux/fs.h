@@ -404,9 +404,6 @@ struct inode {
 	} u;
 };
 
-/* will die */
-#include <linux/coda_fs_i.h>
-
 struct fown_struct {
 	rwlock_t lock;          /* protects pid, uid, euid fields */
 	int pid;		/* pid or -pgrp where SIGIO should be sent */
@@ -992,8 +989,6 @@ extern struct vfsmount *kern_mount(struct file_system_type *);
 extern int may_umount(struct vfsmount *);
 extern long do_mount(char *, char *, char *, unsigned long, void *);
 
-#define kern_umount mntput
-
 extern int vfs_statfs(struct super_block *, struct statfs *);
 
 /* Return value for VFS lock functions - tells locks.c to lock conventionally
@@ -1103,6 +1098,7 @@ extern inline const char *bdevname(struct block_device *bdev)
 {
 	return __bdevname(bdev->bd_dev);
 }
+extern struct block_device *lookup_bdev(const char *);
 extern struct block_device *open_bdev_excl(const char *, int, int, void *);
 extern void close_bdev_excl(struct block_device *, int);
 

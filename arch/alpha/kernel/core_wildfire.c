@@ -442,6 +442,33 @@ struct pci_ops wildfire_pci_ops =
 	.write =	wildfire_write_config,
 };
 
+
+/*
+ * NUMA Support
+ */
+int wildfire_pa_to_nid(unsigned long pa)
+{
+	return pa >> 36;
+}
+
+int wildfire_cpuid_to_nid(int cpuid)
+{
+	/* assume 4 CPUs per node */
+	return cpuid >> 2;
+}
+
+unsigned long wildfire_node_mem_start(int nid)
+{
+	/* 64GB per node */
+	return (unsigned long)nid * (64UL * 1024 * 1024 * 1024);
+}
+
+unsigned long wildfire_node_mem_size(int nid)
+{
+	/* 64GB per node */
+	return 64UL * 1024 * 1024 * 1024;
+}
+
 #if DEBUG_DUMP_REGS
 
 static void __init

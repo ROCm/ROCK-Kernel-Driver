@@ -22,6 +22,7 @@ struct linux_hose_info;
 struct pci_dev;
 struct pci_ops;
 struct pci_controller;
+struct _alpha_agp_info;
 
 struct alpha_machine_vector
 {
@@ -80,6 +81,7 @@ struct alpha_machine_vector
 	void (*device_interrupt)(unsigned long vector, struct pt_regs *regs);
 	void (*machine_check)(u64 vector, u64 la, struct pt_regs *regs);
 
+	void (*smp_callin)(void);
 	void (*init_arch)(void);
 	void (*init_irq)(void);
 	void (*init_rtc)(void);
@@ -90,7 +92,15 @@ struct alpha_machine_vector
 	int (*pci_map_irq)(struct pci_dev *, u8, u8);
 	struct pci_ops *pci_ops;
 
+	struct _alpha_agp_info *(*agp_info)(void);
+
 	const char *vector_name;
+
+	/* NUMA information */
+	int (*pa_to_nid)(unsigned long);
+	int (*cpuid_to_nid)(int);
+	unsigned long (*node_mem_start)(int);
+	unsigned long (*node_mem_size)(int);
 
 	/* System specific parameters.  */
 	union {

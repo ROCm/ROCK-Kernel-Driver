@@ -1,6 +1,9 @@
 /* ld script to make x86-64 Linux kernel
  * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>;
  */
+
+#include <asm-generic/vmlinux.lds.h>
+
 OUTPUT_FORMAT("elf64-x86-64", "elf64-x86-64", "elf64-x86-64")
 OUTPUT_ARCH(i386:x86-64)
 ENTRY(_start)
@@ -18,25 +21,12 @@ SECTIONS
 
   _etext = .;			/* End of text section */
 
-  .rodata : { *(.rodata) *(.rodata.*) }
-  .kstrtab : { *(.kstrtab) }
-
   . = ALIGN(16);		/* Exception table */
   __start___ex_table = .;
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
 
-  . = ALIGN(64); 
-  __start___ksymtab = .;	/* Kernel symbol table */
-  __ksymtab : { *(__ksymtab) }
-  __stop___ksymtab = .;
-  __start___gpl_ksymtab = .;	/* Kernel symbol table:	GPL-only symbols */
-  __gpl_ksymtab : { *(__gpl_ksymtab) }
-  __stop___gpl_ksymtab = .;
-
-  __start___kallsyms = .;	/* All kernel symbols */
-  __kallsyms : { *(__kallsyms) }
-  __stop___kallsyms = .;
+  RODATA
 
   .data : {			/* Data */
 	*(.data)
@@ -83,11 +73,6 @@ SECTIONS
   . = ALIGN(4096); 
   .data.boot_pgt : { *(.data.boot_pgt) }
 
-  . = ALIGN(4096);
-  __initramfs_start = .;
-  .init.ramfs : { *(.init.ramfs) }
-  __initramfs_end = .;
-	
   . = ALIGN(4096);		/* Init code and data */
   __init_begin = .;
   .init.text : { *(.init.text) }
@@ -110,6 +95,10 @@ SECTIONS
 	*(.initcall7.init)
   }
   __initcall_end = .;
+  . = ALIGN(4096);
+  __initramfs_start = .;
+  .init.ramfs : { *(.init.ramfs) }
+  __initramfs_end = .;	
   . = ALIGN(32);
   __per_cpu_start = .;
   .data.percpu  : { *(.data.percpu) }

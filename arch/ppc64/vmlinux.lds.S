@@ -1,3 +1,5 @@
+#include <asm-generic/vmlinux.lds.h>
+
 OUTPUT_ARCH(powerpc:common64)
 /* Do we need any of these for elf?
    __DYNAMIC = 0;    */
@@ -37,11 +39,9 @@ SECTIONS
   . = ALIGN(4096);
   _etext = .;
   PROVIDE (etext = .);
-  .rodata    :
-  {
-    *(.rodata)
-    *(.rodata1)
-  }
+
+  RODATA
+
   .fini      : { *(.fini)    } =0
   .ctors     : { *(.ctors)   }
   .dtors     : { *(.dtors)   }
@@ -64,18 +64,6 @@ SECTIONS
   __start___ex_table = .;
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
-
-  __start___ksymtab = .;        /* Kernel symbol table */
-  __ksymtab : { *(__ksymtab) }
-  __stop___ksymtab = .;
-
-  __start___gpl_ksymtab = .;	/* Kernel symbol table:	GPL-only symbols */
-  __gpl_ksymtab : { *(__gpl_ksymtab) }
-  __stop___gpl_ksymtab = .;
-
-  __start___kallsyms = .;	/* All kernel symbols */
-  __kallsyms : { *(__kallsyms) }
-  __stop___kallsyms = .;
 
   . = ALIGN(16384);		/* init_task */
   .data.init_task : { *(.data.init_task) }

@@ -114,6 +114,43 @@ struct rt_sigframe_32 {
  *        setup_frame32
  */
 
+/*
+ * Atomically swap in the new signal mask, and wait for a signal.
+ */
+
+extern int do_signal(sigset_t *oldset, struct pt_regs *regs);
+
+long sys32_sigsuspend(old_sigset_t mask, int p2, int p3, int p4, int p6,
+		      int p7, struct pt_regs *regs)
+{
+	sigset_t saveset;
+
+	mask &= _BLOCKABLE;
+	spin_lock_irq(&current->sig->siglock);
+	saveset = current->blocked;
+	siginitset(&current->blocked, mask);
+	recalc_sigpending();
+	spin_unlock_irq(&current->sig->siglock);
+
+	regs->result = -EINTR;
+	regs->gpr[3] = EINTR;
+	regs->ccr |= 0x10000000;
+	while (1) {
+		current->state = TASK_INTERRUPTIBLE;
+		schedule();
+		if (do_signal(&saveset, regs))
+			/*
+			 * If a signal handler needs to be called,
+			 * do_signal() has set R3 to the signal number (the
+			 * first argument of the signal handler), so don't
+			 * overwrite that with EINTR !
+			 * In the other cases, do_signal() doesn't touch 
+			 * R3, so it's still set to -EINTR (see above).
+			 */
+			return regs->gpr[3];
+	}
+}
+
 long sys32_sigaction(int sig, struct old_sigaction32 *act,
 		struct old_sigaction32 *oact)
 {
@@ -799,9 +836,6 @@ long sys32_rt_sigqueueinfo(u32 pid, u32 sig, siginfo_t32 *uinfo)
 	set_fs (old_fs);
 	return ret;
 }
-
-
-extern int do_signal(sigset_t *oldset, struct pt_regs *regs);
 
 int sys32_rt_sigsuspend(sigset32_t* unewset, size_t sigsetsize, int p3,
 		int p4, int p6, int p7, struct pt_regs *regs)

@@ -126,7 +126,8 @@ VM_MASK		= 0x00020000
 	addl $4, %esp;	\
 1:	iret;		\
 .section .fixup,"ax";   \
-2:	movl $(__USER_DS), %edx; \
+2:	sti;		\
+	movl $(__USER_DS), %edx; \
 	movl %edx, %ds; \
 	movl %edx, %es; \
 	pushl $11;	\
@@ -154,17 +155,6 @@ do_lcall:
 	movl %eax,EFLAGS(%ebp)	#
 	movl %edx,EIP(%ebp)	# Now we move them to their "normal" places
 	movl %ecx,CS(%ebp)	#
-
-	#
-	# Call gates don't clear TF and NT in eflags like
-	# traps do, so we need to do it ourselves.
-	# %eax already contains eflags (but it may have
-	# DF set, clear that also)
-	#
-	andl $~(DF_MASK | TF_MASK | NT_MASK),%eax
-	pushl %eax
-	popfl
-
 	andl $-8192, %ebp	# GET_THREAD_INFO
 	movl TI_EXEC_DOMAIN(%ebp), %edx	# Get the execution domain
 	call *4(%edx)		# Call the lcall7 handler for the domain

@@ -26,16 +26,14 @@ SVGA_MODE := -DSVGA_MODE=NORMAL_VGA
 #RAMDISK := -DRAMDISK=512
 
 EXTRA_TARGETS	:= vmlinux.bin bootsect bootsect.o \
-		   setup setup.o zImage bzImage
+		   setup setup.o bzImage
 
-CFLAGS += -m32
+EXTRA_CFLAGS := -m32
 
 host-progs	:= tools/build
-subdir-		:= compressed	#Let make clean descend in compressed/
+subdir-		:= compressed/	#Let make clean descend in compressed/
 # ---------------------------------------------------------------------------
 
-$(obj)/zImage:  IMAGE_OFFSET := 0x1000
-$(obj)/zImage:  EXTRA_AFLAGS := -traditional $(SVGA_MODE) $(RAMDISK)
 $(obj)/bzImage: IMAGE_OFFSET := 0x100000
 $(obj)/bzImage: EXTRA_AFLAGS := -traditional $(SVGA_MODE) $(RAMDISK) -D__BIG_KERNEL__
 $(obj)/bzImage: BUILDFLAGS   := -b
@@ -44,7 +42,7 @@ quiet_cmd_image = BUILD   $@
 cmd_image = $(obj)/tools/build $(BUILDFLAGS) $(obj)/bootsect $(obj)/setup \
 	    $(obj)/vmlinux.bin $(ROOT_DEV) > $@
 
-$(obj)/zImage $(obj)/bzImage: $(obj)/bootsect $(obj)/setup \
+$(obj)/bzImage: $(obj)/bootsect $(obj)/setup \
 			      $(obj)/vmlinux.bin $(obj)/tools/build FORCE
 	$(call if_changed,image)
 	@echo 'Kernel: $@ is ready'

@@ -277,7 +277,9 @@ extern void usb_driver_release_interface(struct usb_driver *driver,
 const struct usb_device_id *usb_match_id(struct usb_interface *interface,
 					 const struct usb_device_id *id);
 
-struct usb_interface *usb_find_interface(struct usb_driver *drv, kdev_t kdev);
+extern struct usb_interface *usb_find_interface(struct usb_driver *drv, kdev_t kdev);
+extern struct usb_interface *usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum);
+
 
 /**
  * usb_make_path - returns stable device path in the usb tree

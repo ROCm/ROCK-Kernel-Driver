@@ -69,6 +69,12 @@ enable_kernel_fp(void)
 int
 dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpregs)
 {
+	/*
+	 * XXX temporary workaround until threaded coredumps for ppc64
+	 * are implemented - Anton
+	 */
+	if (!regs)
+		return 0;
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
 	memcpy(fpregs, &current->thread.fpr[0], sizeof(*fpregs));

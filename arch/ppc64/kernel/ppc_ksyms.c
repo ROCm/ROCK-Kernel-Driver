@@ -47,18 +47,11 @@
 #include <asm/iSeries/HvLpConfig.h>
 #endif
 
-/* Tell string.h we don't want memcpy etc. as cpp defines */
-#define EXPORT_SYMTAB_STROPS
-
 extern int sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg);
-extern int sys_sigreturn(struct pt_regs *regs);
 extern int do_signal(sigset_t *, struct pt_regs *);
 extern int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int, unsigned int, unsigned long, struct file *));
 extern int unregister_ioctl32_conversion(unsigned int cmd);
 
-long long __ashrdi3(long long, int);
-long long __ashldi3(long long, int);
-long long __lshrdi3(long long, int);
 int abs(int);
 
 extern struct pci_dev * iSeries_veth_dev;
@@ -66,7 +59,6 @@ extern struct pci_dev * iSeries_vio_dev;
 
 EXPORT_SYMBOL(do_signal);
 EXPORT_SYMBOL(sys_ioctl);
-EXPORT_SYMBOL(sys_sigreturn);
 EXPORT_SYMBOL(enable_irq);
 EXPORT_SYMBOL(disable_irq);
 EXPORT_SYMBOL(disable_irq_nosync);
@@ -81,6 +73,7 @@ EXPORT_SYMBOL(isa_io_base);
 EXPORT_SYMBOL(pci_io_base);
 
 EXPORT_SYMBOL(find_next_zero_bit);
+EXPORT_SYMBOL(find_next_zero_le_bit);
 
 EXPORT_SYMBOL(strcpy);
 EXPORT_SYMBOL(strncpy);
@@ -184,7 +177,6 @@ EXPORT_SYMBOL(giveup_fpu);
 EXPORT_SYMBOL(enable_kernel_fp);
 EXPORT_SYMBOL(flush_icache_range);
 EXPORT_SYMBOL(flush_icache_user_range);
-EXPORT_SYMBOL(flush_icache_page);
 EXPORT_SYMBOL(flush_dcache_page);
 #ifdef CONFIG_SMP
 #ifdef CONFIG_PPC_ISERIES
@@ -207,9 +199,6 @@ EXPORT_SYMBOL(find_all_nodes);
 EXPORT_SYMBOL(get_property);
 
 
-EXPORT_SYMBOL_NOVERS(__ashrdi3);
-EXPORT_SYMBOL_NOVERS(__ashldi3);
-EXPORT_SYMBOL_NOVERS(__lshrdi3);
 EXPORT_SYMBOL_NOVERS(memcpy);
 EXPORT_SYMBOL_NOVERS(memset);
 EXPORT_SYMBOL_NOVERS(memmove);

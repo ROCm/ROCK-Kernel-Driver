@@ -3,6 +3,7 @@
 
 #include <linux/config.h>
 #include <linux/threads.h>
+#include <linux/bitops.h>
 #include <asm/pal.h>
 
 /* HACK: Cabrio WHAMI return value is bogus if more than 8 bits used.. :-( */
@@ -21,7 +22,6 @@ __hard_smp_processor_id(void)
 
 #ifdef CONFIG_SMP
 
-#include <linux/threads.h>
 #include <asm/irq.h>
 
 struct cpuinfo_alpha {
@@ -45,12 +45,17 @@ extern struct cpuinfo_alpha cpu_data[NR_CPUS];
 #define smp_processor_id()	(current_thread_info()->cpu)
 
 extern unsigned long cpu_present_mask;
+extern volatile unsigned long cpu_online_map;
 extern int smp_num_cpus;
 
-#define cpu_online_map		cpu_present_mask
-#define num_online_cpus()	(smp_num_cpus)
-#define cpu_online(cpu)		(cpu_present_mask & (1<<(cpu)))
-#define cpu_possible(cpu)	cpu_online(cpu)
+#define cpu_possible(cpu)	(cpu_present_mask & (1UL << (cpu)))
+#define cpu_online(cpu)		(cpu_online_map & (1UL << (cpu)))
+
+static inline int
+num_online_cpus(void)
+{
+	return hweight64(cpu_online_map);
+}
 
 extern int smp_call_function_on_cpu(void (*func) (void *info), void *info,int retry, int wait, unsigned long cpu);
 

@@ -55,10 +55,12 @@ typedef struct {
 
 /*
  * The hardirq mask has to be large enough to have
- * space for potentially all IRQ sources in the system
- * nesting on a single CPU:
+ * space for potentially nestable IRQ sources in the system
+ * to nest on a single CPU. On Alpha, interrupts are masked at the CPU
+ * by IPL as well as at the system level. We only have 8 IPLs (UNIX PALcode)
+ * so we really only have 8 nestable IRQs, but allow some overhead
  */
-#if (1 << HARDIRQ_BITS) < NR_IRQS
+#if (1 << HARDIRQ_BITS) < 16
 #error HARDIRQ_BITS is too low!
 #endif
 

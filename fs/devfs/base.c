@@ -685,6 +685,8 @@
 #include <asm/bitops.h>
 #include <asm/atomic.h>
 
+#include "internal.h"
+
 #define DEVFS_VERSION            "1.22 (20021013)"
 
 #define DEVFS_NAME "devfs"
@@ -935,9 +937,9 @@ void devfs_put (devfs_handle_t de)
 	     de->parent ? de->parent->name : "no parent");
     if ( S_ISLNK (de->mode) ) kfree (de->u.symlink.linkname);
     if ( S_ISCHR (de->mode) && de->u.cdev.autogen )
-	devfs_dealloc_devnum (DEVFS_SPECIAL_CHR, de->u.cdev.dev);
+	devfs_dealloc_devnum (de->mode, de->u.cdev.dev);
     if ( S_ISBLK (de->mode) && de->u.bdev.autogen )
-	devfs_dealloc_devnum(DEVFS_SPECIAL_BLK, de->u.bdev.dev);
+	devfs_dealloc_devnum (de->mode, de->u.bdev.dev);
     WRITE_ENTRY_MAGIC (de, 0);
 #ifdef CONFIG_DEVFS_DEBUG
     spin_lock (&stat_lock);
@@ -1102,13 +1104,13 @@ static struct devfs_entry *_devfs_get_root_entry (void)
     /*  And create the entry for ".devfsd"  */
     if ( ( new = _devfs_alloc_entry (".devfsd", 0, S_IFCHR |S_IRUSR |S_IWUSR) )
 	 == NULL ) return NULL;
-    new->u.cdev.dev = devfs_alloc_devnum (DEVFS_SPECIAL_CHR);
+    new->u.cdev.dev = devfs_alloc_devnum (S_IFCHR |S_IRUSR |S_IWUSR);
     new->u.cdev.ops = &devfsd_fops;
     _devfs_append_entry (root_entry, new, FALSE, NULL);
 #ifdef CONFIG_DEVFS_DEBUG
     if ( ( new = _devfs_alloc_entry (".stat", 0, S_IFCHR | S_IRUGO | S_IWUGO) )
 	 == NULL ) return NULL;
-    new->u.cdev.dev = devfs_alloc_devnum (DEVFS_SPECIAL_CHR);
+    new->u.cdev.dev = devfs_alloc_devnum (S_IFCHR | S_IRUGO | S_IWUGO);
     new->u.cdev.ops = &stat_fops;
     _devfs_append_entry (root_entry, new, FALSE, NULL);
 #endif
@@ -1469,7 +1471,6 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
 			       unsigned int major, unsigned int minor,
 			       umode_t mode, void *ops, void *info)
 {
-    char devtype = S_ISCHR (mode) ? DEVFS_SPECIAL_CHR : DEVFS_SPECIAL_BLK;
     int err;
     dev_t devnum = 0, dev = MKDEV(major, minor);
     struct devfs_entry *de;
@@ -1497,7 +1498,7 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
     if ( ( S_ISCHR (mode) || S_ISBLK (mode) ) &&
 	 (flags & DEVFS_FL_AUTO_DEVNUM) )
     {
-	devnum = devfs_alloc_devnum (devtype);
+	devnum = devfs_alloc_devnum (mode);
 	if (!devnum) {
 	    PRINTK ("(%s): exhausted %s device numbers\n",
 		    name, S_ISCHR (mode) ? "char" : "block");
@@ -1508,7 +1509,7 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
     if ( ( de = _devfs_prepare_leaf (&dir, name, mode) ) == NULL )
     {
 	PRINTK ("(%s): could not prepare leaf\n", name);
-	if (devnum) devfs_dealloc_devnum (devtype, devnum);
+	if (devnum) devfs_dealloc_devnum (mode, devnum);
 	return NULL;
     }
     if (S_ISCHR (mode)) {
@@ -1544,7 +1545,7 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
     {
 	PRINTK ("(%s): could not append to parent, err: %d\n", name, err);
 	devfs_put (dir);
-	if (devnum) devfs_dealloc_devnum (devtype, devnum);
+	if (devnum) devfs_dealloc_devnum (mode, devnum);
 	return NULL;
     }
     DPRINTK (DEBUG_REGISTER, "(%s): de: %p dir: %p \"%s\"  pp: %p\n",
@@ -1953,7 +1954,6 @@ EXPORT_SYMBOL(devfs_mk_symlink);
 EXPORT_SYMBOL(devfs_mk_dir);
 EXPORT_SYMBOL(devfs_remove);
 EXPORT_SYMBOL(devfs_generate_path);
-EXPORT_SYMBOL(devfs_only);
 
 
 /**

@@ -282,26 +282,23 @@ static int bus_match(struct device * dev, struct device_driver * drv)
  *	Walk the list of drivers that the bus has and call bus_match() 
  *	for each pair. If a compatible pair is found, break out and return.
  */
-static int device_attach(struct device * dev)
+static void device_attach(struct device * dev)
 {
  	struct bus_type * bus = dev->bus;
 	struct list_head * entry;
-	int error = 0;
 
 	if (dev->driver) {
 		device_bind_driver(dev);
-		return 0;
+		return;
 	}
 
-	if (!bus->match)
-		return 0;
-
-	list_for_each(entry,&bus->drivers.list) {
-		struct device_driver * drv = to_drv(entry);
-		if (!(error = bus_match(dev,drv)))
-			break;
+	if (bus->match) {
+		list_for_each(entry,&bus->drivers.list) {
+			struct device_driver * drv = to_drv(entry);
+			if (!bus_match(dev,drv))
+				break;
+		}
 	}
-	return error;
 }
 
 
@@ -318,22 +315,21 @@ static int device_attach(struct device * dev)
  *	Note that we ignore the error from bus_match(), since it's perfectly
  *	valid for a driver not to bind to any devices.
  */
-static int driver_attach(struct device_driver * drv)
+static void driver_attach(struct device_driver * drv)
 {
 	struct bus_type * bus = drv->bus;
 	struct list_head * entry;
 
 	if (!bus->match)
-		return 0;
+		return;
 
 	list_for_each(entry,&bus->devices.list) {
 		struct device * dev = container_of(entry,struct device,bus_list);
 		if (!dev->driver) {
-			if (!bus_match(dev,drv) && dev->driver)
+			if (!bus_match(dev,drv))
 				devclass_add_device(dev);
 		}
 	}
-	return 0;
 }
 
 
@@ -393,8 +389,7 @@ int bus_add_device(struct device * dev)
 		down_write(&dev->bus->subsys.rwsem);
 		pr_debug("bus %s: add device %s\n",bus->name,dev->bus_id);
 		list_add_tail(&dev->bus_list,&dev->bus->devices.list);
-		if ((error = device_attach(dev)))
-			list_del_init(&dev->bus_list);
+		device_attach(dev);
 		up_write(&dev->bus->subsys.rwsem);
 		sysfs_create_link(&bus->devices.kobj,&dev->kobj,dev->bus_id);
 	}
@@ -446,11 +441,8 @@ int bus_add_driver(struct device_driver * drv)
 		}
 
 		down_write(&bus->subsys.rwsem);
-		if (!(error = devclass_add_driver(drv))) {
-			if ((error = driver_attach(drv))) {
-				devclass_remove_driver(drv);
-			}
-		}
+		if (!(error = devclass_add_driver(drv)))
+			driver_attach(drv);
 		up_write(&bus->subsys.rwsem);
 
 		if (error) {
