@@ -54,9 +54,34 @@ void menu_end_menu(void)
 	current_menu = current_menu->parent;
 }
 
+struct expr *menu_check_dep(struct expr *e)
+{
+	if (!e)
+		return e;
+
+	switch (e->type) {
+	case E_NOT:
+		e->left.expr = menu_check_dep(e->left.expr);
+		break;
+	case E_OR:
+	case E_AND:
+		e->left.expr = menu_check_dep(e->left.expr);
+		e->right.expr = menu_check_dep(e->right.expr);
+		break;
+	case E_SYMBOL:
+		/* change 'm' into 'm' && MODULES */
+		if (e->left.sym == &symbol_mod)
+			return expr_alloc_and(e, expr_alloc_symbol(modules_sym));
+		break;
+	default:
+		break;
+	}
+	return e;
+}
+
 void menu_add_dep(struct expr *dep)
 {
-	current_entry->dep = expr_alloc_and(current_entry->dep, dep);
+	current_entry->dep = expr_alloc_and(current_entry->dep, menu_check_dep(dep));
 }
 
 void menu_set_type(int type)
@@ -96,7 +121,7 @@ struct property *menu_add_prop(int token, char *prompt, struct symbol *def, stru
 	prop->menu = current_entry;
 	prop->text = prompt;
 	prop->def = def;
-	E_EXPR(prop->visible) = dep;
+	E_EXPR(prop->visible) = menu_check_dep(dep);
 
 	if (prompt)
 		current_entry->prompt = prop;

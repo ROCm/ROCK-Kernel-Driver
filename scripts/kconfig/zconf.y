@@ -423,6 +423,7 @@ void conf_parse(const char *name)
 
 	sym_init();
 	menu_init();
+	modules_sym = sym_lookup("MODULES", 0);
 	rootmenu.prompt = menu_add_prop(P_MENU, "Linux Kernel Configuration", NULL, NULL);
 
 	//zconfdebug = 1;
@@ -430,8 +431,6 @@ void conf_parse(const char *name)
 	if (zconfnerrs)
 		exit(1);
 	menu_finalize(&rootmenu);
-
-	modules_sym = sym_lookup("MODULES", 0);
 
 	sym_change_count = 1;
 }
