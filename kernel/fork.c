@@ -769,8 +769,6 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	p->start_time = jiffies;
 	p->security = NULL;
 
-	INIT_LIST_HEAD(&p->local_pages);
-
 	retval = -ENOMEM;
 	if (security_ops->task_alloc_security(p))
 		goto bad_fork_cleanup;

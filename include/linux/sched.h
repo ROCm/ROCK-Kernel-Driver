@@ -293,9 +293,6 @@ struct task_struct {
 	struct list_head ptrace_list;
 
 	struct mm_struct *mm, *active_mm;
-	struct list_head local_pages;
-
-	unsigned int allocation_order, nr_local_pages;
 
 /* task state */
 	struct linux_binfmt *binfmt;
@@ -411,16 +408,15 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_SIGNALED	0x00000400	/* killed by a signal */
 #define PF_MEMALLOC	0x00000800	/* Allocating memory */
 #define PF_MEMDIE	0x00001000	/* Killed for out-of-memory */
-#define PF_FREE_PAGES	0x00002000	/* per process page freeing */
-#define PF_FLUSHER	0x00004000	/* responsible for disk writeback */
-#define PF_NOWARN	0x00008000	/* debug: don't warn if alloc fails */
+#define PF_FLUSHER	0x00002000	/* responsible for disk writeback */
+#define PF_NOWARN	0x00004000	/* debug: don't warn if alloc fails */
 
-#define PF_FREEZE	0x00010000	/* this task should be frozen for suspend */
-#define PF_IOTHREAD	0x00020000	/* this thread is needed for doing I/O to swap */
-#define PF_FROZEN	0x00040000	/* frozen for system suspend */
-#define PF_SYNC		0x00080000	/* performing fsync(), etc */
-#define PF_FSTRANS	0x00100000	/* inside a filesystem transaction */
-#define PF_KSWAPD	0x00200000	/* I am kswapd */
+#define PF_FREEZE	0x00008000	/* this task should be frozen for suspend */
+#define PF_IOTHREAD	0x00010000	/* this thread is needed for doing I/O to swap */
+#define PF_FROZEN	0x00020000	/* frozen for system suspend */
+#define PF_SYNC		0x00040000	/* performing fsync(), etc */
+#define PF_FSTRANS	0x00080000	/* inside a filesystem transaction */
+#define PF_KSWAPD	0x00100000	/* I am kswapd */
 
 /*
  * Ptrace flags

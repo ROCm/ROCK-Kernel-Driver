@@ -91,49 +91,17 @@ static void bad_page(const char *function, struct page *page)
  * -- wli
  */
 
-void __free_pages_ok (struct page *page, unsigned int order)
+static inline void __free_pages_bulk (struct page *page, struct page *base,
+		struct zone *zone, struct free_area *area, unsigned long mask,
+		unsigned int order)
 {
-	unsigned long index, page_idx, mask, flags;
-	struct free_area *area;
-	struct page *base;
-	struct zone *zone;
+	unsigned long page_idx, index;
 
-	mod_page_state(pgfree, 1<<order);
-
-	if (	page_mapped(page) ||
-		page->mapping != NULL ||
-		page_count(page) != 0 ||
-		(page->flags & (
-			1 << PG_lru	|
-			1 << PG_private |
-			1 << PG_locked	|
-			1 << PG_active	|
-			1 << PG_writeback )))
-		bad_page(__FUNCTION__, page);
-
-	if (PageDirty(page))
-		ClearPageDirty(page);
-
-	if (unlikely(current->flags & PF_FREE_PAGES)) {
-		if (!current->nr_local_pages && !in_interrupt()) {
-			list_add(&page->list, &current->local_pages);
-			page->index = order;
-			current->nr_local_pages++;
-			goto out;
-		}
-	}
-
-	zone = page_zone(page);
-
-	mask = (~0UL) << order;
-	base = zone->zone_mem_map;
 	page_idx = page - base;
 	if (page_idx & ~mask)
 		BUG();
 	index = page_idx >> (1 + order);
-	area = zone->free_area + order;
 
-	spin_lock_irqsave(&zone->lock, flags);
 	zone->free_pages -= mask;
 	while (mask + (1 << (MAX_ORDER-1))) {
 		struct page *buddy1, *buddy2;
@@ -160,9 +128,58 @@ void __free_pages_ok (struct page *page, unsigned int order)
 		page_idx &= mask;
 	}
 	list_add(&(base + page_idx)->list, &area->free_list);
+}
+
+static inline void free_pages_check(const char *function, struct page *page)
+{
+	if (	page_mapped(page) ||
+		page->mapping != NULL ||
+		page_count(page) != 0 ||
+		(page->flags & (
+			1 << PG_lru	|
+			1 << PG_private |
+			1 << PG_locked	|
+			1 << PG_active	|
+			1 << PG_writeback )))
+		bad_page(function, page);
+	if (PageDirty(page))
+		ClearPageDirty(page);
+}
+
+/*
+ * Frees a list of pages. 
+ * Assumes all pages on list are in same zone, and of same order.
+ * count is the number of pages to free, or 0 for all on the list.
+ */
+static void
+free_pages_bulk(struct zone *zone, int count,
+		struct list_head *list, unsigned int order)
+{
+	unsigned long mask, flags;
+	struct free_area *area;
+	struct page *base, *page = NULL;
+
+	mask = (~0UL) << order;
+	base = zone->zone_mem_map;
+	area = zone->free_area + order;
+	spin_lock_irqsave(&zone->lock, flags);
+	while (!list_empty(list) && count--) {
+		page = list_entry(list->prev, struct page, list);
+		/* have to delete it as __free_pages_bulk list manipulates */
+		list_del(&page->list);
+		__free_pages_bulk(page, base, zone, area, mask, order);
+		mod_page_state(pgfree, count<<order);
+	}
 	spin_unlock_irqrestore(&zone->lock, flags);
-out:
-	return;
+}
+
+void __free_pages_ok(struct page *page, unsigned int order)
+{
+	LIST_HEAD(list);
+
+	free_pages_check(__FUNCTION__, page);
+	list_add(&page->list, &list);
+	free_pages_bulk(page_zone(page), 1, &list, order);
 }
 
 #define MARK_USED(index, order, area) \
@@ -323,59 +340,6 @@ int is_head_of_free_region(struct page *page)
 }
 #endif /* CONFIG_SOFTWARE_SUSPEND */
 
-static /* inline */ struct page *
-balance_classzone(struct zone* classzone, unsigned int gfp_mask,
-			unsigned int order, int * freed)
-{
-	struct page * page = NULL;
-	int __freed = 0;
-
-	BUG_ON(in_interrupt());
-
-	current->allocation_order = order;
-	current->flags |= PF_MEMALLOC | PF_FREE_PAGES;
-
-	__freed = try_to_free_pages(classzone, gfp_mask, order);
-
-	current->flags &= ~(PF_MEMALLOC | PF_FREE_PAGES);
-
-	if (current->nr_local_pages) {
-		struct list_head * entry, * local_pages;
-		struct page * tmp;
-		int nr_pages;
-
-		local_pages = &current->local_pages;
-
-		if (likely(__freed)) {
-			/* pick from the last inserted so we're lifo */
-			entry = local_pages->next;
-			do {
-				tmp = list_entry(entry, struct page, list);
-				if (tmp->index == order && memclass(page_zone(tmp), classzone)) {
-					list_del(entry);
-					page = tmp;
-					current->nr_local_pages--;
-					prep_new_page(page);
-					break;
-				}
-			} while ((entry = entry->next) != local_pages);
-		}
-
-		nr_pages = current->nr_local_pages;
-		/* free in reverse order so that the global order will be lifo */
-		while ((entry = local_pages->prev) != local_pages) {
-			list_del(entry);
-			tmp = list_entry(entry, struct page, list);
-			__free_pages_ok(tmp, tmp->index);
-			if (!nr_pages--)
-				BUG();
-		}
-		current->nr_local_pages = 0;
-	}
-	*freed = __freed;
-	return page;
-}
-
 /*
  * This is the 'heart' of the zoned buddy allocator:
  */
@@ -386,7 +350,8 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	unsigned long min;
 	struct zone **zones, *classzone;
 	struct page * page;
-	int freed, i;
+	int cflags;
+	int i;
 
 	if (gfp_mask & __GFP_WAIT)
 		might_sleep();
@@ -463,9 +428,10 @@ nopage:
 		goto nopage;
 
 	inc_page_state(allocstall);
-	page = balance_classzone(classzone, gfp_mask, order, &freed);
-	if (page)
-		return page;
+	cflags = current->flags;
+	current->flags |= PF_MEMALLOC;
+	try_to_free_pages(classzone, gfp_mask, order);
+	current->flags = cflags;
 
 	/* go through the zonelist yet one more time */
 	min = 1UL << order;
