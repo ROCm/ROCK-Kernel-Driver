@@ -27,6 +27,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/blk.h>
 
@@ -72,29 +73,9 @@ static unsigned int max_scsi_luns = MAX_SCSI_LUNS;
 static unsigned int max_scsi_luns = 1;
 #endif
 
-#ifdef MODULE
-MODULE_PARM(max_scsi_luns, "i");
+module_param(max_scsi_luns, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(max_scsi_luns,
 		 "last scsi LUN (should be between 1 and 2^32-1)");
-#else
-
-static int __init scsi_luns_setup(char *str)
-{
-	unsigned int tmp;
-
-	if (get_option(&str, &tmp) == 1) {
-		max_scsi_luns = tmp;
-		return 1;
-	} else {
-		printk(KERN_WARNING "scsi_luns_setup: usage max_scsi_luns=n "
-		       "(n should be between 1 and 2^32-1)\n");
-		return 0;
-	}
-}
-
-__setup("max_scsi_luns=", scsi_luns_setup);
-
-#endif
 
 #ifdef CONFIG_SCSI_REPORT_LUNS
 /*
@@ -106,29 +87,10 @@ __setup("max_scsi_luns=", scsi_luns_setup);
  */
 static unsigned int max_scsi_report_luns = 128;
 
-#ifdef MODULE
-MODULE_PARM(max_scsi_report_luns, "i");
+module_param(max_scsi_report_luns, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(max_scsi_report_luns,
 		 "REPORT LUNS maximum number of LUNS received (should be"
 		 " between 1 and 16384)");
-#else
-static int __init scsi_report_luns_setup(char *str)
-{
-	unsigned int tmp;
-
-	if (get_option(&str, &tmp) == 1) {
-		max_scsi_report_luns = tmp;
-		return 1;
-	} else {
-		printk(KERN_WARNING "scsi_report_luns_setup: usage"
-		       " max_scsi_report_luns=n (n should be between 1"
-		       " and 16384)\n");
-		return 0;
-	}
-}
-
-__setup("max_scsi_report_luns=", scsi_report_luns_setup);
-#endif
 #endif
 
 /**

@@ -38,6 +38,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/timer.h>
@@ -107,26 +108,6 @@ const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE] = {
 	"Unknown          ",
 	"Enclosure        ",
 };
-
-MODULE_PARM(scsi_logging_level, "i");
-MODULE_PARM_DESC(scsi_logging_level, "SCSI logging level; should be zero or nonzero");
-
-#ifndef MODULE
-static int __init scsi_logging_setup(char *str)
-{
-	int tmp;
-
-	if (get_option(&str, &tmp) == 1) {
-		scsi_logging_level = (tmp ? ~0 : 0);
-		return 1;
-	} else {
-		printk(KERN_INFO "scsi_logging_setup : usage scsi_logging_level=n "
-		       "(n should be 0 or non-zero)\n");
-		return 0;
-	}
-}
-__setup("scsi_logging=", scsi_logging_setup);
-#endif
 
 /*
  * Function:    scsi_allocate_request
@@ -982,6 +963,9 @@ void scsi_set_device_offline(struct scsi_device *sdev)
 
 MODULE_DESCRIPTION("SCSI core");
 MODULE_LICENSE("GPL");
+
+module_param(scsi_logging_level, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(scsi_logging_level, "a bit mask of logging levels");
 
 static int __init init_scsi(void)
 {
