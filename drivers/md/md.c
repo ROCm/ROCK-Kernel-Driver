@@ -7,6 +7,7 @@
    Changes:
 
    - RAID-1/RAID-5 extensions by Miguel de Icaza, Gadi Oxman, Ingo Molnar
+   - RAID-6 extensions by H. Peter Anvin <hpa@zytor.com>
    - boot support for linear and striped mode by Harald Hoyer <HarryH@Royal.Net>
    - kerneld support by Boris Tobotras <boris@xtalk.msk.su>
    - kmod support by: Cyrus Durgin
@@ -1435,11 +1436,12 @@ static int analyze_sbs(mddev_t * mddev)
 		goto abort;
 	}
 
-	if ((mddev->recovery_cp != MaxSector) && ((mddev->level == 1) ||
-			(mddev->level == 4) || (mddev->level == 5)))
+	if ((mddev->recovery_cp != MaxSector) &&
+	    ((mddev->level == 1) ||
+	     ((mddev->level >= 4) && (mddev->level <= 6))))
 		printk(KERN_ERR "md: md%d: raid array is not clean"
-			" -- starting background reconstruction\n", 
-			mdidx(mddev));
+		       " -- starting background reconstruction\n",
+		       mdidx(mddev));
 
 	return 0;
 abort:
@@ -3014,7 +3016,9 @@ static struct file_operations md_seq_fops = {
 int register_md_personality(int pnum, mdk_personality_t *p)
 {
 	if (pnum >= MAX_PERSONALITY) {
-		MD_BUG();
+		printk(KERN_ERR
+		       "md: tried to install personality %s as nr %d, but max is %lu\n",
+		       p->name, pnum, MAX_PERSONALITY-1);
 		return -EINVAL;
 	}
 
