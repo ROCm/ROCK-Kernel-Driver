@@ -540,7 +540,8 @@ int irlmp_connect_response(struct lsap_cb *self, struct sk_buff *userdata)
 	ASSERT(self->magic == LMP_LSAP_MAGIC, return -1;);
 	ASSERT(userdata != NULL, return -1;);
 
-	set_bit(0, &self->connected);	/* TRUE */
+	/* We set the connected bit and move the lsap to the connected list
+	 * in the state machine itself. Jean II */
 
 	IRDA_DEBUG(2, "%s(), slsap_sel=%02x, dlsap_sel=%02x\n",
 		   __FUNCTION__, self->slsap_sel, self->dlsap_sel);
@@ -612,13 +613,17 @@ struct lsap_cb *irlmp_dup(struct lsap_cb *orig, void *instance)
 
 	spin_lock_irqsave(&irlmp->unconnected_lsaps->hb_spinlock, flags);
 
-	/* Only allowed to duplicate unconnected LSAP's */
-	if (!hashbin_find(irlmp->unconnected_lsaps, (long) orig, NULL)) {
-		IRDA_DEBUG(0, "%s(), unable to find LSAP\n", __FUNCTION__);
+	/* Only allowed to duplicate unconnected LSAP's, and only LSAPs
+	 * that have received a connect indication. Jean II */
+	if ((!hashbin_find(irlmp->unconnected_lsaps, (long) orig, NULL)) ||
+	    (orig->lap == NULL)) {
+		IRDA_DEBUG(0, "%s(), invalid LSAP (wrong state)\n",
+			   __FUNCTION__);
 		spin_unlock_irqrestore(&irlmp->unconnected_lsaps->hb_spinlock,
 				       flags);
 		return NULL;
 	}
+
 	/* Allocate a new instance */
 	new = kmalloc(sizeof(struct lsap_cb), GFP_ATOMIC);
 	if (!new)  {
@@ -643,8 +648,8 @@ struct lsap_cb *irlmp_dup(struct lsap_cb *orig, void *instance)
 	hashbin_insert(irlmp->unconnected_lsaps, (irda_queue_t *) new,
 		       (long) new, NULL);
 
-	/* Make sure that we invalidate the cache */
 #ifdef CONFIG_IRDA_CACHE_LAST_LSAP
+	/* Make sure that we invalidate the LSAP cache */
 	new->lap->cache.valid = FALSE;
 #endif /* CONFIG_IRDA_CACHE_LAST_LSAP */
 

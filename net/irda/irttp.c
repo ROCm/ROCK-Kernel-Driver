@@ -1428,9 +1428,16 @@ struct tsap_cb *irttp_dup(struct tsap_cb *orig, void *instance)
 	/* We don't need the old instance any more */
 	spin_unlock_irqrestore(&irttp->tsaps->hb_spinlock, flags);
 
+	/* Try to dup the LSAP (may fail if we were too slow) */
+	new->lsap = irlmp_dup(orig->lsap, new);
+	if (!new->lsap) {
+		IRDA_DEBUG(0, "%s(), dup failed!\n", __FUNCTION__);
+		kfree(new);
+		return NULL;
+	}
+
 	/* Not everything should be copied */
 	new->notify.instance = instance;
-	new->lsap = irlmp_dup(orig->lsap, new);
 	init_timer(&new->todo_timer);
 
 	skb_queue_head_init(&new->rx_queue);
