@@ -24,8 +24,6 @@
 #include <linux/fb.h>
 #include <linux/init.h>
 
-#include <video/fbcon.h>
-
     /*
      *  RAM we reserve for the frame buffer. This defines the maximum screen
      *  size
@@ -42,7 +40,6 @@ static const char *mode_option __initdata = NULL;
 
 static struct fb_info fb_info;
 static u32 vfb_pseudo_palette[17];
-static struct display disp;
 
 static struct fb_var_screeninfo vfb_default __initdata = {
 	.xres =		640,
@@ -97,8 +94,6 @@ static int vfb_mmap(struct fb_info *info, struct file *file,
 
 static struct fb_ops vfb_ops = {
 	.fb_set_var	gen_set_var,
-	.fb_get_cmap	gen_set_cmap,
-	.fb_set_cmap	gen_set_cmap,
 	.fb_check_var	vfb_check_var,
 	.fb_set_par	vfb_set_par,
 	.fb_setcolreg	vfb_setcolreg,
@@ -443,13 +438,6 @@ int __init vfb_init(void)
 	fb_info.fix = vfb_fix;
 	fb_info.pseudo_palette = &vfb_pseudo_palette;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
-
-	strcpy(fb_info.modename, vfb_fix.id);
-	fb_info.changevar = NULL;
-	fb_info.currcon = -1;
-	fb_info.disp = &disp;
-	fb_info.switch_con = gen_switch;
-	fb_info.updatevar = gen_update_var;
 
 	fb_alloc_cmap(&fb_info.cmap, 256, 0);
 

@@ -28,13 +28,10 @@
 #include <linux/module.h>
 #include <asm/pgtable.h>
 
-#include <video/fbcon.h>
-
 #define Q40_PHYS_SCREEN_ADDR 0xFE800000
 
 static u32 pseudo_palette[17];
 static struct fb_info fb_info;
-static struct display display;
 
 static struct fb_fix_screeninfo q40fb_fix __initdata = {
 	.id		= "Q40",
@@ -70,8 +67,6 @@ static int q40fb_setcolreg(unsigned regno, unsigned red, unsigned green,
 static struct fb_ops q40fb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_set_var	= gen_set_var,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_setcolreg	= q40fb_setcolreg,
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
@@ -117,15 +112,8 @@ int q40fb_init(void)
    	fb_info.screen_base = (char *) q40fb_fix.smem_start;
 
 	/* The below feilds will go away !!!! */
-	fb_info.currcon		= -1;
-	strcpy(fb_info.modename, fb_info.fix.id);
-	fb_info.disp		= &display;
-	fb_info.switch_con	= gen_switch;
-	fb_info.updatevar	= gen_update_var;
 	fb_alloc_cmap(&fb_info.cmap, 16, 0);
 
-        gen_set_disp(-1, &fb_info);
-	
 	master_outb(3, DISPLAY_CONTROL_REG);
 
 	if (register_framebuffer(&fb_info) < 0) {

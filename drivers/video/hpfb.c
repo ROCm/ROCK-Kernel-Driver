@@ -19,8 +19,6 @@
 #include <asm/blinken.h>
 #include <asm/hwtest.h>
 
-#include <video/fbcon.h>
-
 static struct fb_info fb_info;
 
 unsigned long fb_regs;
@@ -67,8 +65,6 @@ static struct fb_var_screeninfo hpfb_defined = {
 	.vmode		= FB_VMODE_NONINTERLACED,
 };
 
-static struct display display;
-
 /*
  * Set the palette.  This may not work on all boards but only experimentation 
  * will tell.
@@ -106,8 +102,6 @@ void hpfb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 static struct fb_ops hpfb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_set_var	= gen_set_var,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_setcolreg	= hpfb_setcolreg,
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= hpfb_copyarea,
@@ -164,15 +158,7 @@ int __init hpfb_init_one(unsigned long base)
 	fb_info.fix   = hpfb_fix;
 	fb_info.screen_base = (char *)hpfb_fix.smem_start;	// FIXME
 
-	/* The below feilds will go away !!!! */
-	fb_info.currcon		= -1;
-        strcpy(fb_info.modename, fb_info.fix.id);
-        fb_info.disp		= &display;
-        fb_info.switch_con	= gen_switch;
-        fb_info.updatevar	= gen_update_var;
 	fb_alloc_cmap(&fb_info.cmap, 256, 0);
-
-	gen_set_disp(-1, &fb_info);
 
 	if (register_framebuffer(&fb_info) < 0)
 		return 1;

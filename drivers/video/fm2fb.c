@@ -21,8 +21,6 @@
 #include <linux/zorro.h>
 #include <asm/io.h>
 
-#include <video/fbcon.h>
-
 /*
  *	Some technical notes:
  *
@@ -133,7 +131,6 @@ static volatile unsigned char *fm2fb_reg;
 
 static struct fb_info fb_info;
 static u32 pseudo_palette[17];
-static struct display display;
 
 static struct fb_fix_screeninfo fb_fix __initdata = {
 	.smem_len =	FRAMEMASTER_REG,
@@ -177,8 +174,6 @@ static int fm2fb_blank(int blank, struct fb_info *info);
 static struct fb_ops fm2fb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_set_var	= gen_set_var,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_setcolreg	= fm2fb_setcolreg,
 	.fb_blank	= fm2fb_blank,	
 	.fb_fillrect	= cfb_fillrect,
@@ -264,7 +259,6 @@ int __init fm2fb_init(void)
 		if (fm2fb_mode == -1)
 			fm2fb_mode = FM2FB_MODE_PAL;
 
-		strcpy(fb_info.modename, fb_fix.id);
 		fb_info.node = NODEV;
 		fb_info.fbops = &fm2fb_ops;
 		fb_info.var = fb_var_modes[fm2fb_mode];
@@ -274,14 +268,7 @@ int __init fm2fb_init(void)
 		fb_info.flags = FBINFO_FLAG_DEFAULT;
 
 		/* The below feilds will go away !!!! */
-		fb_info.currcon		= -1;
-		strcpy(fb_info.modename, fb_info.fix.id);
-		fb_info.disp		= &display;
-		fb_info.switch_con	= gen_switch;
-		fb_info.updatevar	= gen_update_var;
 		fb_alloc_cmap(&fb_info.cmap, 16, 0);
-
-		gen_set_disp(-1, &fb_info);
 
 		if (register_framebuffer(&fb_info) < 0)
 			return -EINVAL;
