@@ -12,6 +12,7 @@ obj-$(CONFIG_OAK)		+= oak.o
 obj-$(CONFIG_REDWOOD_4)		+= redwood.o
 obj-$(CONFIG_REDWOOD_5)		+= redwood5.o
 obj-$(CONFIG_REDWOOD_6)		+= redwood6.o 
+obj-$(CONFIG_SYCAMORE)		+= sycamore.o
 obj-$(CONFIG_WALNUT)		+= walnut.o
 
 obj-$(CONFIG_NP405L)		+= ibmnp405l.o
