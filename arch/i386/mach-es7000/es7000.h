@@ -104,6 +104,13 @@ struct mip_reg {
 #define	MIP_SW_APIC		0x1020b
 #define	MIP_FUNC(VALUE) 	(VALUE & 0xff)
 
+#if defined(CONFIG_X86_IO_APIC) && (defined(CONFIG_ACPI_INTERPRETER) || defined(CONFIG_ACPI_BOOT))
+#define IOAPIC_GSI_BOUND(ioapic) ((ioapic+1) * (nr_ioapic_registers[ioapic]-1))
+#define MAX_GSI_MAPSIZE 32
+#endif
+
+extern unsigned long io_apic_irqs;
+
 extern int parse_unisys_oem (char *oemptr, int oem_entries);
 extern int find_unisys_acpi_oem_table(unsigned long *oem_addr, int *length);
 extern int es7000_start_cpu(int cpu, unsigned long eip);
