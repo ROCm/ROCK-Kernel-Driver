@@ -687,9 +687,12 @@ page_state_convert(
 
 	len = bh->b_size;
 	do {
-		if (!(PageUptodate(page) || buffer_uptodate(bh)) && !startio) {
-			goto next_bh;
-		}
+		if (offset >= end_offset)
+			break;
+		if (!buffer_uptodate(bh))
+			uptodate = 0;
+		if (!(PageUptodate(page) || buffer_uptodate(bh)) && !startio)
+			continue;
 
 		if (mp) {
 			mp = match_offset_to_mapping(page, &map, p_offset);
@@ -798,14 +801,8 @@ page_state_convert(
 				}
 			}
 		}
-
-next_bh:
-		if (!buffer_uptodate(bh))
-			uptodate = 0;
-		offset += len;
-		p_offset += len;
-		bh = bh->b_this_page;
-	} while (offset < end_offset);
+	} while (offset += len, p_offset += len,
+		((bh = bh->b_this_page) != head));
 
 	if (uptodate && bh == head)
 		SetPageUptodate(page);
