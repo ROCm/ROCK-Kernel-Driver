@@ -1,10 +1,23 @@
-/*
- *
+/* -*- mode: c; c-basic-offset: 8; indent-tabs-mode: nil; -*-
+ * vim:expandtab:shiftwidth=8:tabstop=8:
  *
  *  Copyright (C) 2000 Stelias Computing, Inc.
  *  Copyright (C) 2000 Red Hat, Inc.
  *
+ *   This file is part of InterMezzo, http://www.inter-mezzo.org.
  *
+ *   InterMezzo is free software; you can redistribute it and/or
+ *   modify it under the terms of version 2 of the GNU General Public
+ *   License as published by the Free Software Foundation.
+ *
+ *   InterMezzo is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU General Public License for more details.
+ *
+ *   You should have received a copy of the GNU General Public License
+ *   along with InterMezzo; if not, write to the Free Software
+ *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
 #define __NO_VERSION__
@@ -19,14 +32,14 @@
 #include <linux/ext2_fs.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
-#include <linux/time.h>
+#include <linux/sched.h>
 #include <linux/stat.h>
 #include <linux/string.h>
+#include <linux/smp_lock.h>
 #include <linux/blkdev.h>
 #include <linux/init.h>
 
 #include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_upcall.h>
 #include <linux/intermezzo_psdev.h>
 
 /*
@@ -37,24 +50,27 @@
    The methods for the cache are set up in methods.
 */
 
+extern kmem_cache_t * presto_dentry_slab;
+
 /* the intent of this hash is to have collision chains of length 1 */
 #define CACHES_BITS 8
 #define CACHES_SIZE (1 << CACHES_BITS)
 #define CACHES_MASK CACHES_SIZE - 1
 static struct list_head presto_caches[CACHES_SIZE];
 
-static inline int presto_cache_hash(struct super_block *sb)
+static inline int presto_cache_hash(kdev_t dev)
 {
-        return (CACHES_MASK) & ((unsigned long)sb / L1_CACHE_BYTES);
+        return (CACHES_MASK) & ((0x000F & (major(dev)) << 8) + (0x000F & minor(dev)));
 }
 
-inline void presto_cache_add(struct presto_cache *cache, struct super_block *sb)
+inline void presto_cache_add(struct presto_cache *cache, kdev_t dev)
 {
         list_add(&cache->cache_chain,
-                 &presto_caches[presto_cache_hash(sb)]);
+                 &presto_caches[presto_cache_hash(dev)]);
+        cache->cache_dev = dev;
 }
 
-inline void presto_init_cache_hash(void)
+inline void presto_cache_init_hash(void)
 {
         int i;
         for ( i = 0; i < CACHES_SIZE; i++ ) {
@@ -63,16 +79,17 @@ inline void presto_init_cache_hash(void)
 }
 
 /* map a device to a cache */
-struct presto_cache *presto_find_cache(struct super_block *sb)
+struct presto_cache *presto_cache_find(kdev_t dev)
 {
         struct presto_cache *cache;
         struct list_head *lh, *tmp;
 
-        lh = tmp = &(presto_caches[presto_cache_hash(sb)]);
+        lh = tmp = &(presto_caches[presto_cache_hash(dev)]);
         while ( (tmp = lh->next) != lh ) {
                 cache = list_entry(tmp, struct presto_cache, cache_chain);
-                if (cache->cache_sb == sb)
+                if ( kdev_same(cache->cache_dev, dev) ) {
                         return cache;
+                }
         }
         return NULL;
 }
@@ -82,84 +99,18 @@ struct presto_cache *presto_find_cache(struct super_block *sb)
 struct presto_cache *presto_get_cache(struct inode *inode)
 {
         struct presto_cache *cache;
-
+        ENTRY;
         /* find the correct presto_cache here, based on the device */
-        cache = presto_find_cache(inode->i_sb);
+        cache = presto_cache_find(to_kdev_t(inode->i_dev));
         if ( !cache ) {
-                printk("WARNING: no presto cache for dev %s, ino %ld\n",
-                       inode->i_sb->s_id, inode->i_ino);
+                CERROR("WARNING: no presto cache for dev %x, ino %ld\n",
+                       inode->i_dev, inode->i_ino);
                 EXIT;
                 return NULL;
         }
+        EXIT;
         return cache;
 }
-
-
-/* list cache mount points for ioctl's or /proc/fs/intermezzo/mounts */
-int presto_sprint_mounts(char *buf, int buflen, int minor)
-{
-        int len = 0;
-        int i;
-        struct list_head *head, *tmp;
-        struct presto_cache *cache;
-
-        buf[0] = '\0';
-        for (i=0 ; i<CACHES_SIZE ; i++) {
-                head = tmp = &presto_caches[i];
-                while ( (tmp = tmp->next) != head ) {
-                        cache = list_entry(tmp, struct presto_cache,
-                                            cache_chain);
-                        if ( !cache->cache_root_fileset || !cache->cache_mtpt)
-                                continue;
-                        if ((minor != -1) &&
-                            (cache->cache_psdev->uc_minor != minor))
-                                continue;
-                        if ( strlen(cache->cache_root_fileset) +
-                             strlen(cache->cache_mtpt) + 
-                             strlen(cache->cache_psdev->uc_devname) +
-                             4 > buflen - len)
-                                break;
-                        len += sprintf(buf + len, "%s %s %s\n",
-                                       cache->cache_root_fileset,
-                                       cache->cache_mtpt,
-                                       cache->cache_psdev->uc_devname);
-                }
-        }
-
-        buf[buflen-1] = '\0';
-        CDEBUG(D_SUPER, "%s\n", buf);
-        return len;
-}
-
-#ifdef CONFIG_KREINT
-/* get mount point by volname
-       Arthur Ma, 2000.12.25
- */
-int presto_get_mount (char *buf, int buflen, char *volname)
-{
-        int i;
-        struct list_head *head, *tmp;
-        struct presto_cache *cache = NULL;
-        char *path = "";
-
-        buf[0] = '\0';
-        for (i=0 ; i<CACHES_SIZE ; i++) {
-                head = tmp = &presto_caches[i];
-                while ( (tmp = tmp->next) != head ) {
-                        cache = list_entry(tmp, struct presto_cache,
-                                            cache_chain);
-                        if ( !cache->cache_root_fileset || !cache->cache_mtpt)
-                                continue;
-                        if ( strcmp(cache->cache_root_fileset, volname) == 0)
-                                break;
-                }
-        }
-        if (cache != NULL)
-                path = cache->cache_mtpt;
-        strncpy (buf, path, buflen);
-        return strlen (buf);
-}
-#endif
 
 /* another debugging routine: check fs is InterMezzo fs */
 int presto_ispresto(struct inode *inode)
@@ -171,26 +122,24 @@ int presto_ispresto(struct inode *inode)
         cache = presto_get_cache(inode);
         if ( !cache )
                 return 0;
-        return (inode->i_sb == cache->cache_sb);
+        return kdev_same(to_kdev_t(inode->i_dev), cache->cache_dev);
 }
 
 /* setup a cache structure when we need one */
-struct presto_cache *presto_init_cache(void)
+struct presto_cache *presto_cache_init(void)
 {
         struct presto_cache *cache;
 
-        /* make a presto_cache structure for the hash */
-        PRESTO_ALLOC(cache, struct presto_cache *, sizeof(struct presto_cache));
+        PRESTO_ALLOC(cache, sizeof(struct presto_cache));
         if ( cache ) {
                 memset(cache, 0, sizeof(struct presto_cache));
                 INIT_LIST_HEAD(&cache->cache_chain);
                 INIT_LIST_HEAD(&cache->cache_fset_list);
+                cache->cache_lock = SPIN_LOCK_UNLOCKED;
+                cache->cache_reserved = 0; 
         }
-	cache->cache_lock = SPIN_LOCK_UNLOCKED;
-	cache->cache_reserved = 0; 
         return cache;
 }
-
 
 /* free a cache structure and all of the memory it is pointing to */
 inline void presto_free_cache(struct presto_cache *cache)
@@ -199,12 +148,12 @@ inline void presto_free_cache(struct presto_cache *cache)
                 return;
 
         list_del(&cache->cache_chain);
-        if (cache->cache_mtpt)
-                PRESTO_FREE(cache->cache_mtpt, strlen(cache->cache_mtpt) + 1);
-        if (cache->cache_type)
-                PRESTO_FREE(cache->cache_type, strlen(cache->cache_type) + 1);
-        if (cache->cache_root_fileset)
-                PRESTO_FREE(cache->cache_root_fileset, strlen(cache->cache_root_fileset) + 1);
+        if (cache->cache_sb && cache->cache_sb->s_root &&
+                        presto_d2d(cache->cache_sb->s_root)) {
+                kmem_cache_free(presto_dentry_slab, 
+                                presto_d2d(cache->cache_sb->s_root));
+                cache->cache_sb->s_root->d_fsdata = NULL;
+        }
 
         PRESTO_FREE(cache, sizeof(struct presto_cache));
 }
@@ -213,41 +162,43 @@ int presto_reserve_space(struct presto_cache *cache, loff_t req)
 {
         struct filter_fs *filter; 
         loff_t avail; 
-	struct super_block *sb = cache->cache_sb;
+        struct super_block *sb = cache->cache_sb;
         filter = cache->cache_filter;
-	if (!filter ) {
-		EXIT;
-		return 0; 
-	}
-	if (!filter->o_trops ) {
-		EXIT;
-		return 0; 
-	}
-	if (!filter->o_trops->tr_avail ) {
-		EXIT;
-		return 0; 
-	}
+        if (!filter ) {
+                EXIT;
+                return 0; 
+        }
+        if (!filter->o_trops ) {
+                EXIT;
+                return 0; 
+        }
+        if (!filter->o_trops->tr_avail ) {
+                EXIT;
+                return 0; 
+        }
+
+        spin_lock(&cache->cache_lock);
         avail = filter->o_trops->tr_avail(cache, sb); 
         CDEBUG(D_SUPER, "ESC::%ld +++> %ld \n", (long) cache->cache_reserved,
-	         (long) (cache->cache_reserved + req)); 
+                 (long) (cache->cache_reserved + req)); 
         CDEBUG(D_SUPER, "ESC::Avail::%ld \n", (long) avail);
-	spin_lock(&cache->cache_lock);
         if (req + cache->cache_reserved > avail) {
-		spin_unlock(&cache->cache_lock);
+                spin_unlock(&cache->cache_lock);
                 EXIT;
                 return -ENOSPC;
         }
-	cache->cache_reserved += req; 
-	spin_unlock(&cache->cache_lock);
+        cache->cache_reserved += req; 
+        spin_unlock(&cache->cache_lock);
 
+        EXIT;
         return 0;
 }
 
 void presto_release_space(struct presto_cache *cache, loff_t req)
 {
         CDEBUG(D_SUPER, "ESC::%ld ---> %ld \n", (long) cache->cache_reserved,
-	         (long) (cache->cache_reserved - req)); 
-	spin_lock(&cache->cache_lock);
-	cache->cache_reserved -= req; 
-	spin_unlock(&cache->cache_lock);
+                 (long) (cache->cache_reserved - req)); 
+        spin_lock(&cache->cache_lock);
+        cache->cache_reserved -= req; 
+        spin_unlock(&cache->cache_lock);
 }

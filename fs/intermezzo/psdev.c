@@ -1,4 +1,6 @@
-/*
+/* -*- mode: c; c-basic-offset: 8; indent-tabs-mode: nil; -*-
+ * vim:expandtab:shiftwidth=8:tabstop=8:
+ *
  *              An implementation of a loadable kernel mode driver providing
  *              multiple kernel/user space bidirectional communications links.
  *
@@ -6,8 +8,7 @@
  *
  *              This program is free software; you can redistribute it and/or
  *              modify it under the terms of the GNU General Public License
- *              as published by the Free Software Foundation; either version
- *              2 of the License, or (at your option) any later version.
+ *              version 2 as published by the Free Software Foundation.
  *
  *              Adapted to become the Linux 2.0 Coda pseudo device
  *              Peter  Braam  <braam@maths.ox.ac.uk>
@@ -22,20 +23,15 @@
  *              Copyright (c) 2000 Tacitus Systems, Inc.
  *              Copyright (c) 2001 Cluster File Systems, Inc.
  *
- *		Extended attribute support
- *		Copyright (c) 2001 Shirish. H. Phatak
- *		Copyright (c) 2001 Tacit Networks, Inc.
  */
-
 
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/major.h>
-#include <linux/time.h>
+#include <linux/sched.h>
 #include <linux/lp.h>
 #include <linux/slab.h>
-#include <asm/ioctls.h>
 #include <linux/ioport.h>
 #include <linux/fcntl.h>
 #include <linux/delay.h>
@@ -43,20 +39,20 @@
 #include <linux/proc_fs.h>
 #include <linux/vmalloc.h>
 #include <linux/fs.h>
-#include <linux/tty.h>
+#include <linux/file.h>
 #include <linux/poll.h>
 #include <linux/init.h>
 #include <linux/list.h>
+#include <linux/devfs_fs_kernel.h>
 #include <asm/io.h>
+#include <asm/segment.h>
 #include <asm/system.h>
 #include <asm/poll.h>
 #include <asm/uaccess.h>
-#include <asm/ioctls.h>
+#include <linux/miscdevice.h>
 
 #include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_upcall.h>
 #include <linux/intermezzo_psdev.h>
-#include <linux/intermezzo_kml.h>
 
 
 #ifdef PRESTO_DEVEL
@@ -68,61 +64,116 @@ int  presto_debug = 0;
 #endif
 
 /* Like inode.c (presto_sym_iops), the initializer is just to prevent
-   upc_comms from appearing as a COMMON symbol (and therefore
-   interfering with other modules that use the same variable name. */
-struct upc_comm upc_comms[MAX_PRESTODEV] = {{0}};
+   izo_channels from appearing as a COMMON symbol (and therefore
+   interfering with other modules that use the same variable name). */
+struct upc_channel izo_channels[MAX_CHANNEL] = {{0}};
 
-/*
- * Device operations: map file to upcall structure
- */
-static inline struct upc_comm *presto_psdev_f2u(struct file *file)
+int izo_psdev_get_free_channel(void)
 {
-        int minor;
+        int i, result = -1;
+        
+        for (i = 0 ; i < MAX_CHANNEL ; i++ ) {
+                if (list_empty(&(izo_channels[i].uc_cache_list))) { 
+                    result = i;
+                    break;
+                }
+        }
+        return result;
+}
 
-        if ( major(file->f_dentry->d_inode->i_rdev) != PRESTO_PSDEV_MAJOR ) {
-                EXIT;
-                return NULL;
+
+int izo_psdev_setpid(int minor)
+{
+        struct upc_channel *channel; 
+        if (minor < 0 || minor >= MAX_CHANNEL) { 
+                return -EINVAL;
         }
 
-        minor = minor(file->f_dentry->d_inode->i_rdev);
-        if ( minor < 0 || minor >= MAX_PRESTODEV ) {
-                EXIT;
-                return NULL;
+        channel = &(izo_channels[minor]); 
+        /*
+         * This ioctl is performed by each Lento that starts up
+         * and wants to do further communication with presto.
+         */
+        CDEBUG(D_PSDEV, "Setting current pid to %d channel %d\n", 
+               current->pid, minor);
+        channel->uc_pid = current->pid;
+        spin_lock(&channel->uc_lock); 
+        if ( !list_empty(&channel->uc_processing) ) {
+                struct list_head *lh;
+                struct upc_req *req;
+                CERROR("WARNING: setpid & processing not empty!\n");
+                lh = &channel->uc_processing;
+                while ( (lh = lh->next) != &channel->uc_processing) {
+                        req = list_entry(lh, struct upc_req, rq_chain);
+                        /* freeing of req and data is done by the sleeper */
+                        wake_up(&req->rq_sleep);
+                }
+        }
+        if ( !list_empty(&channel->uc_processing) ) {
+                CERROR("BAD: FAILDED TO CLEAN PROCESSING LIST!\n");
+        }
+        spin_unlock(&channel->uc_lock); 
+        EXIT;
+        return 0;
+}
+
+int izo_psdev_setchannel(struct file *file, int fd)
+{
+
+        struct file *psdev_file = fget(fd); 
+        struct presto_cache *cache = presto_get_cache(file->f_dentry->d_inode);
+
+        if (!psdev_file) { 
+                CERROR("%s: no psdev_file!\n", __FUNCTION__);
+                return -EINVAL;
         }
 
-        return &(upc_comms[minor]);
+        if (!cache) { 
+                CERROR("%s: no cache!\n", __FUNCTION__);
+                fput(psdev_file); 
+                return -EINVAL;
+        } 
+
+        if (psdev_file->private_data) { 
+                CERROR("%s: channel already set!\n", __FUNCTION__);
+                fput(psdev_file); 
+                return -EINVAL;
+        }
+
+        psdev_file->private_data = cache->cache_psdev;
+        fput(psdev_file); 
+        EXIT; 
+        return 0; 
 }
 
 inline int presto_lento_up(int minor) 
 {
-        return upc_comms[minor].uc_pid;
+        return izo_channels[minor].uc_pid;
 }
 
-
 static unsigned int presto_psdev_poll(struct file *file, poll_table * wait)
-{
-        struct upc_comm *upccom;
+ {
+        struct upc_channel *channel = (struct upc_channel *)file->private_data;
         unsigned int mask = POLLOUT | POLLWRNORM;
-        /* ENTRY; this will flood you */
 
-        if ( ! (upccom = presto_psdev_f2u(file)) ) {
-                kdev_t dev = file->f_dentry->d_inode->i_rdev;
-                printk("InterMezzo: %s, bad device %s\n",
-                       __FUNCTION__, kdevname(dev));
+        /* ENTRY; this will flood you */
+        if ( ! channel ) { 
+                CERROR("%s: bad psdev file\n", __FUNCTION__);
+                return -EBADF;
         }
 
-        poll_wait(file, &(upccom->uc_waitq), wait);
+        poll_wait(file, &(channel->uc_waitq), wait);
 
-        if (!list_empty(&upccom->uc_pending)) {
+        spin_lock(&channel->uc_lock);
+        if (!list_empty(&channel->uc_pending)) {
                 CDEBUG(D_PSDEV, "Non-empty pending list.\n");
                 mask |= POLLIN | POLLRDNORM;
         }
+        spin_unlock(&channel->uc_lock);
 
         /* EXIT; will flood you */
         return mask;
 }
-
-
 
 /*
  *      Receive a message written by Lento to the psdev
@@ -130,59 +181,61 @@ static unsigned int presto_psdev_poll(struct file *file, poll_table * wait)
 static ssize_t presto_psdev_write(struct file *file, const char *buf,
                                   size_t count, loff_t *off)
 {
-        struct upc_comm *upccom;
+        struct upc_channel *channel = (struct upc_channel *)file->private_data;
         struct upc_req *req = NULL;
         struct upc_req *tmp;
         struct list_head *lh;
-        struct lento_down_hdr hdr;
+        struct izo_upcall_resp hdr;
         int error;
 
-        if ( ! (upccom = presto_psdev_f2u(file)) ) {
-                kdev_t dev = file->f_dentry->d_inode->i_rdev;
-                printk("InterMezzo: %s, bad device %s\n",
-                       __FUNCTION__, kdevname(dev));
+        if ( ! channel ) { 
+                CERROR("%s: bad psdev file\n", __FUNCTION__);
+                return -EBADF;
         }
 
         /* Peek at the opcode, uniquefier */
         if ( count < sizeof(hdr) ) {
-              printk("presto_psdev_write: Lento didn't write full hdr.\n");
+              CERROR("presto_psdev_write: Lento didn't write full hdr.\n");
                 return -EINVAL;
         }
 
-        if (copy_from_user(&hdr, buf, sizeof(hdr)))
+        error = copy_from_user(&hdr, buf, sizeof(hdr));
+        if ( error )
                 return -EFAULT;
 
         CDEBUG(D_PSDEV, "(process,opc,uniq)=(%d,%d,%d)\n",
                current->pid, hdr.opcode, hdr.unique);
 
+        spin_lock(&channel->uc_lock); 
         /* Look for the message on the processing queue. */
-        lh  = &upccom->uc_processing;
-        while ( (lh = lh->next) != &upccom->uc_processing ) {
+        lh  = &channel->uc_processing;
+        while ( (lh = lh->next) != &channel->uc_processing ) {
                 tmp = list_entry(lh, struct upc_req , rq_chain);
                 if (tmp->rq_unique == hdr.unique) {
                         req = tmp;
-                      /* unlink here: keeps search length minimal */
-                        list_del(&req->rq_chain);
-                      INIT_LIST_HEAD(&req->rq_chain);
+                        /* unlink here: keeps search length minimal */
+                        list_del_init(&req->rq_chain);
                         CDEBUG(D_PSDEV,"Eureka opc %d uniq %d!\n",
                                hdr.opcode, hdr.unique);
                         break;
                 }
         }
+        spin_unlock(&channel->uc_lock); 
         if (!req) {
-                printk("psdev_write: msg (%d, %d) not found\n",
+                CERROR("psdev_write: msg (%d, %d) not found\n",
                        hdr.opcode, hdr.unique);
                 return(-ESRCH);
         }
 
         /* move data into response buffer. */
         if (req->rq_bufsize < count) {
-                printk("psdev_write: too much cnt: %d, cnt: %Zd, "
+                CERROR("psdev_write: too much cnt: %d, cnt: %d, "
                        "opc: %d, uniq: %d.\n",
                        req->rq_bufsize, count, hdr.opcode, hdr.unique);
                 count = req->rq_bufsize; /* don't have more space! */
         }
-        if (copy_from_user(req->rq_data, buf, count))
+        error = copy_from_user(req->rq_data, buf, count);
+        if ( error )
                 return -EFAULT;
 
         /* adjust outsize: good upcalls can be aware of this */
@@ -199,40 +252,43 @@ static ssize_t presto_psdev_write(struct file *file, const char *buf,
 static ssize_t presto_psdev_read(struct file * file, char * buf,
                                  size_t count, loff_t *off)
 {
-        struct upc_comm *upccom;
+        struct upc_channel *channel = (struct upc_channel *)file->private_data;
         struct upc_req *req;
         int result = count;
 
-        if ( ! (upccom = presto_psdev_f2u(file)) ) {
-                kdev_t dev = file->f_dentry->d_inode->i_rdev;
-                printk("InterMezzo: %s, bad device %s\n",
-                       __FUNCTION__, kdevname(dev));
+        if ( ! channel ) { 
+                CERROR("%s: bad psdev file\n", __FUNCTION__);
+                return -EBADF;
         }
 
-        CDEBUG(D_PSDEV, "count %Zd\n", count);
-        if (list_empty(&(upccom->uc_pending))) {
+        spin_lock(&channel->uc_lock); 
+        if (list_empty(&(channel->uc_pending))) {
                 CDEBUG(D_UPCALL, "Empty pending list in read, not good\n");
+                spin_unlock(&channel->uc_lock); 
                 return -EINVAL;
         }
-
-        req = list_entry((upccom->uc_pending.next), struct upc_req, rq_chain);
+        req = list_entry((channel->uc_pending.next), struct upc_req, rq_chain);
         list_del(&(req->rq_chain));
-      if (! (req->rq_flags & REQ_ASYNC) ) {
-              list_add(&(req->rq_chain), upccom->uc_processing.prev);
-      }
-      req->rq_flags |= REQ_READ;
+        if (! (req->rq_flags & REQ_ASYNC) ) {
+                list_add(&(req->rq_chain), channel->uc_processing.prev);
+        }
+        spin_unlock(&channel->uc_lock); 
+
+        req->rq_flags |= REQ_READ;
 
         /* Move the input args into userspace */
+        CDEBUG(D_PSDEV, "\n");
         if (req->rq_bufsize <= count) {
                 result = req->rq_bufsize;
         }
 
         if (count < req->rq_bufsize) {
-                printk ("psdev_read: buffer too small, read %Zd of %d bytes\n",
+                CERROR ("psdev_read: buffer too small, read %d of %d bytes\n",
                         count, req->rq_bufsize);
         }
 
         if ( copy_to_user(buf, req->rq_data, result) ) {
+                BUG();
                 return -EFAULT;
         }
 
@@ -248,999 +304,16 @@ static ssize_t presto_psdev_read(struct file * file, char * buf,
         return result;
 }
 
-static int presto_psdev_ioctl(struct inode *inode, struct file *file,
-                              unsigned int cmd, unsigned long arg)
-{
-        struct upc_comm *upccom;
-        /* XXX is this rdev or dev? */
-        kdev_t dev = inode->i_rdev;
-
-        ENTRY;
-        upccom = presto_psdev_f2u(file);
-        if ( !upccom) {
-                printk("InterMezzo: %s, bad device %s\n",
-                       __FUNCTION__, kdevname(dev));
-                EXIT;
-                return -ENODEV;
-        }
-
-        switch(cmd) {
-
-        case TCGETS:
-                return -EINVAL;
-
-        case PRESTO_GETMOUNT: {
-                /* return all the mounts for this device.  */
-                int minor = 0;
-                int len, outlen;
-                struct readmount readmount;
-                struct readmount *user_readmount = (struct readmount *) arg;
-                char * tmp;
-                int error;
-
-                if (copy_from_user(&readmount, (void *)arg, sizeof(readmount)))
-                        printk("psdev: can't copy %Zd bytes from %p to %p\n",
-                                sizeof(readmount), (struct readmount *) arg,
-                                &readmount);
-                        EXIT;
-                        return -EFAULT;
-                }
-
-                len = readmount.io_len;
-                minor = minor(dev);
-                PRESTO_ALLOC(tmp, char *, len);
-                if (!tmp) {
-                        EXIT;
-                        return -ENOMEM;
-                }
-
-                outlen = presto_sprint_mounts(tmp, len, minor);
-                CDEBUG(D_PSDEV, "presto_sprint_mounts returns %d bytes\n",
-                                outlen);
-
-                /* as this came out on 1/3/2000, it could NEVER work.
-                 * So fix it ... RGM
-                 * I mean, let's let the compiler do a little work ...
-                 * gcc suggested the extra ()
-                 */
-                if (copy_to_user(readmount.io_string, tmp, outlen)) {
-                        CDEBUG(D_PSDEV, "Copy_to_user string 0x%p failed\n",
-                               readmount.io_string);
-			error = -EFAULT;
-                }
-                if (!error && copy_to_user(&(user_readmount->io_len),
-                                           &outlen, sizeof(int))) {
-                        CDEBUG(D_PSDEV, "Copy_to_user len @0x%p failed\n",
-                               &(user_readmount->io_len));
-			error = -EFAULT;
-                }
-
-                PRESTO_FREE(tmp, len);
-                EXIT;
-                return error;
-        }
-
-        case PRESTO_SETPID: {
-                /*
-                 * This ioctl is performed by each Lento that starts up
-                 * and wants to do further communication with presto.
-                 */
-                CDEBUG(D_PSDEV, "Setting current pid to %d\n", current->pid);
-                upccom->uc_pid = current->pid;
-                if ( !list_empty(&upccom->uc_processing) ) {
-                        struct list_head *lh;
-                        struct upc_req *req;
-                        printk("WARNING: setpid & processing not empty!\n");
-                        lh = &upccom->uc_processing;
-                        while ( (lh = lh->next) != &upccom->uc_processing) {
-                                req = list_entry(lh, struct upc_req, rq_chain);
-                                /* freeing of req and data is done by the sleeper */
-                                wake_up(&req->rq_sleep);
-                        }
-                }
-                if ( !list_empty(&upccom->uc_processing) ) {
-                        printk("BAD: FAILDED TO CLEAN PROCESSING LIST!\n");
-                }
-                EXIT;
-                return 0;
-        }
-
-        case PRESTO_CLEAR_FSETROOT: {
-                /*
-                 * Close KML files.
-                 */
-                int error;
-                int saved_pid = upccom->uc_pid;
-                char *path;
-                struct {
-                        char *path;
-                        int   path_len;
-                } input;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                        EXIT;
-                        return -EFAULT;
-                }
-
-                PRESTO_ALLOC(path, char *, input.path_len + 1);
-                if ( !path ) {
-                        EXIT;
-                        return -ENOMEM;
-                }
-                if (copy_from_user(path, input.path, input.path_len)) {
-                        PRESTO_FREE(path, input.path_len + 1);
-                        EXIT;
-                        return -EFAULT;
-                }
-                path[input.path_len] = '\0';
-                CDEBUG(D_PSDEV, "clear_fsetroot: path %s\n", path);
-
-                upccom->uc_pid = current->pid;
-                error = presto_clear_fsetroot(path);
-                upccom->uc_pid = saved_pid;
-                PRESTO_FREE(path, input.path_len + 1);
-                EXIT;
-                return error;
-        }
-
-
-        case PRESTO_CLEAR_ALL_FSETROOTS: {
-                /*
-                 * Close KML files.
-                 */
-                int error;
-                int saved_pid = upccom->uc_pid;
-                char *path;
-                struct {
-                        char *path;
-                        int   path_len;
-                } input;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                        EXIT;
-                        return -EFAULT;
-                }
-
-                PRESTO_ALLOC(path, char *, input.path_len + 1);
-                if ( !path ) {
-                        EXIT;
-                        return -ENOMEM;
-                }
-                if (copy_from_user(path, input.path, input.path_len)) {
-                        PRESTO_FREE(path, input.path_len + 1);
-                        EXIT;
-                        return -EFAULT;
-                }
-                path[input.path_len] = '\0';
-                CDEBUG(D_PSDEV, "clear_all_fsetroot: path %s\n", path);
-
-                upccom->uc_pid = current->pid;
-                error = presto_clear_all_fsetroots(path);
-                upccom->uc_pid = saved_pid;
-                PRESTO_FREE(path, input.path_len + 1);
-                EXIT;
-                return error;
-        }
-
-        case PRESTO_GET_KMLSIZE: {
-                int error;
-                int saved_pid = upccom->uc_pid;
-                char *path;
-                size_t size = 0;
-                struct {
-                        __u64 size;
-                        char *path;
-                        int   path_len;
-                } input;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                        EXIT;
-                        return -EFAULT;
-                }
-
-                PRESTO_ALLOC(path, char *, input.path_len + 1);
-                if ( !path ) {
-                        EXIT;
-                        return -ENOMEM;
-                }
-                if (copy_from_user(path, input.path, input.path_len)) {
-                        PRESTO_FREE(path, input.path_len + 1);
-                        EXIT;
-                        return -EFAULT;
-                }
-                path[input.path_len] = '\0';
-                CDEBUG(D_PSDEV, "get_kmlsize: len %d path %s\n", 
-                       input.path_len, path);
-
-                upccom->uc_pid = current->pid;
-                error = presto_get_kmlsize(path, &size);
-                PRESTO_FREE(path, input.path_len + 1);
-                if (error) {
-                        EXIT;
-                        return error;
-                }
-                input.size = size;
-                upccom->uc_pid = saved_pid;
-
-                CDEBUG(D_PSDEV, "get_kmlsize: size = %Zd\n", size);
-
-                EXIT;
-                if (copy_to_user((char *)arg, &input, sizeof(input)))
-			return -EFAULT;
-		return 0;
-        }
-
-        case PRESTO_GET_RECNO: {
-                int error;
-                int saved_pid = upccom->uc_pid;
-                char *path;
-                off_t recno = 0;
-                struct {
-                        __u64 recno;
-                        char *path;
-                        int   path_len;
-                } input;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                        EXIT;
-                        return -EFAULT;
-                }
-
-                PRESTO_ALLOC(path, char *, input.path_len + 1);
-                if ( !path ) {
-                        EXIT;
-                        return -ENOMEM;
-                }
-                if (copy_from_user(path, input.path, input.path_len)) {
-                        PRESTO_FREE(path, input.path_len + 1);
-                        EXIT;
-                        return -EFAULT;
-                }
-                path[input.path_len] = '\0';
-                CDEBUG(D_PSDEV, "get_recno: len %d path %s\n", 
-                       input.path_len, path);
-
-                upccom->uc_pid = current->pid;
-                error = presto_get_lastrecno(path, &recno);
-                PRESTO_FREE(path, input.path_len + 1);
-                if (error) {
-                        EXIT;
-                        return error;
-                }
-                input.recno = recno;
-                upccom->uc_pid = saved_pid;
-
-                CDEBUG(D_PSDEV, "get_recno: recno = %d\n", (int) recno);
-
-                EXIT;
-                if (copy_to_user((char *)arg, &input, sizeof(input)))
-			return -EFAULT;
-		return 0;
-        }
-
-        case PRESTO_SET_FSETROOT: {
-                /*
-                 * Save information about the cache, and initialize "special"
-                 * cache files (KML, etc).
-                 */
-                int error;
-                int saved_pid = upccom->uc_pid;
-                char *fsetname;
-                char *path;
-                struct {
-                        char *path;
-                        int   path_len;
-                        char *name;
-                        int   name_len;
-                        int   id;
-                        int   flags;
-                } input;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                        EXIT;
-                        return -EFAULT;
-                }
-
-                PRESTO_ALLOC(path, char *, input.path_len + 1);
-                if ( !path ) {
-                        EXIT;
-                        return -ENOMEM;
-                }
-                if (copy_from_user(path, input.path, input.path_len)) {
-                        EXIT;
-			error -EFAULT;
-                        goto exit_free_path;
-                }
-                path[input.path_len] = '\0';
-
-                PRESTO_ALLOC(fsetname, char *, input.name_len + 1);
-                if ( !fsetname ) {
-                        error = -ENOMEM;
-                        EXIT;
-                        goto exit_free_path;
-                }
-                if (copy_from_user(fsetname, input.name, input.name_len)) {
-                        EXIT;
-			error = -EFAULT;
-                        goto exit_free_fsetname;
-                }
-                fsetname[input.name_len] = '\0';
-
-                CDEBUG(D_PSDEV,
-                       "set_fsetroot: path %s name %s, id %d, flags %x\n",
-                       path, fsetname, input.id, input.flags);
-                upccom->uc_pid = current->pid;
-                error = presto_set_fsetroot(path, fsetname, input.id,input.flags);
-                upccom->uc_pid = saved_pid;
-                if ( error ) {
-                        EXIT;
-                        goto exit_free_fsetname;
-                }
-                /* fsetname is kept in the fset, so don't free it now */
-                PRESTO_FREE(path, input.path_len + 1);
-                EXIT;
-                return 0;
-
-        exit_free_fsetname:
-                PRESTO_FREE(fsetname, input.name_len + 1);
-        exit_free_path:
-                PRESTO_FREE(path, input.path_len + 1);
-                return error;
-        }
-
-        case PRESTO_CLOSE_JOURNALF: {
-                int saved_pid = upccom->uc_pid;
-                int error;
-
-                CDEBUG(D_SUPER, "HELLO\n");
-
-                /* pretend we are lento: we should lock something */
-                upccom->uc_pid = current->pid;
-                error = presto_close_journal_file(NULL);
-                CDEBUG(D_PSDEV, "error is %d\n", error);
-                upccom->uc_pid = saved_pid;
-                EXIT;
-                return error;
-        }
-
-        case PRESTO_GETOPT:
-        case PRESTO_SETOPT: {
-                /* return all the mounts for this device.  */
-                int dosetopt(int, struct psdev_opt *);
-                int dogetopt(int, struct psdev_opt *);
-                int minor = 0;
-                struct psdev_opt kopt;
-                struct psdev_opt *user_opt = (struct psdev_opt *) arg;
-                int error;
-
-                if (copy_from_user(&kopt, (void *)arg, sizeof(kopt))) {
-                        printk("psdev: can't copyin %Zd bytes from %p to %p\n",
-                               sizeof(kopt), (struct kopt *) arg, &kopt);
-                        EXIT;
-                        return -EFAULT;
-                }
-                minor = minor(dev);
-                if (cmd == PRESTO_SETOPT)
-                        error = dosetopt(minor, &kopt);
-
-                if ( error ) {
-                        CDEBUG(D_PSDEV,
-                               "dosetopt failed minor %d, opt %d, val %d\n",
-                               minor, kopt.optname, kopt.optval);
-                        EXIT;
-                        return error;
-                }
-
-                error = dogetopt(minor, &kopt);
-
-                if ( error ) {
-                        CDEBUG(D_PSDEV,
-                               "dogetopt failed minor %d, opt %d, val %d\n",
-                               minor, kopt.optname, kopt.optval);
-                        EXIT;
-                        return error;
-                }
-
-                if (copy_to_user(user_opt, &kopt, sizeof(kopt))) {
-                        CDEBUG(D_PSDEV, "Copy_to_user opt 0x%p failed\n",
-                               user_opt);
-                        EXIT;
-                        return -EFAULT;
-                }
-                CDEBUG(D_PSDEV, "dosetopt minor %d, opt %d, val %d return %d\n",
-                         minor, kopt.optname, kopt.optval, error);
-                EXIT;
-                return 0;
-        }
-
-        case PRESTO_VFS_SETATTR: {
-                int error;
-                struct lento_input_attr input;
-                struct iattr iattr;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                        EXIT;
-                        return -EFAULT;
-                }
-                iattr.ia_valid = input.valid;
-                iattr.ia_mode  = (umode_t)input.mode;
-                iattr.ia_uid   = (uid_t)input.uid;
-                iattr.ia_gid   = (gid_t)input.gid;
-                iattr.ia_size  = (off_t)input.size;
-                iattr.ia_atime = (time_t)input.atime;
-                iattr.ia_mtime = (time_t)input.mtime;
-                iattr.ia_ctime = (time_t)input.ctime;
-                iattr.ia_attr_flags = input.attr_flags;
-
-                error = lento_setattr(input.name, &iattr, &input.info);
-                EXIT;
-                return error;
-        }
-
-        case PRESTO_VFS_CREATE: {
-                int error;
-                struct lento_input_mode input;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                        EXIT;
-                        return -EFAULT;
-                }
-
-                error = lento_create(input.name, input.mode, &input.info);
-                EXIT;
-                return error;
-        }
-
-        case PRESTO_VFS_LINK: {
-                int error;
-                struct lento_input_old_new input;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                        EXIT;
-                        return -EFAULT;
-                }
-
-                error = lento_link(input.oldname, input.newname, &input.info);
-                EXIT;
-                return error;
-        }
-
-        case PRESTO_VFS_UNLINK: {
-                int error;
-                struct lento_input input;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                        EXIT;
-                        return -EFAULT;
-                }
-
-                error = lento_unlink(input.name, &input.info);
-                EXIT;
-                return error;
-        }
-
-        case PRESTO_VFS_SYMLINK: {
-                int error;
-                struct lento_input_old_new input;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                        EXIT;
-                        return -EFAULT;
-                }
-
-                error = lento_symlink(input.oldname, input.newname,&input.info);
-                EXIT;
-                return error;
-        }
-
-        case PRESTO_VFS_MKDIR: {
-                int error;
-                struct lento_input_mode input;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                        EXIT;
-                        return -EFAULT;
-                }
-
-                error = lento_mkdir(input.name, input.mode, &input.info);
-                EXIT;
-                return error;
-        }
-
-        case PRESTO_VFS_RMDIR: {
-                int error;
-                struct lento_input input;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                        EXIT;
-                        return -EFAULT;
-                }
-
-                error = lento_rmdir(input.name, &input.info);
-                EXIT;
-                return error;
-        }
-
-        case PRESTO_VFS_MKNOD: {
-                int error;
-                struct lento_input_dev input;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                        EXIT;
-                        return -EFAULT;
-                }
-
-                error = lento_mknod(input.name, input.mode,
-                                    mk_kdev(input.major,input.minor),&input.info);
-                EXIT;
-                return error;
-        }
-
-        case PRESTO_VFS_RENAME: {
-                int error;
-                struct lento_input_old_new input;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                        EXIT;
-                        return -EFAULT;
-                }
-
-                error = lento_rename(input.oldname, input.newname, &input.info);
-                EXIT;
-                return error;
-        }
-
-#ifdef CONFIG_FS_EXT_ATTR
-        /* IOCTL to create/modify an extended attribute */
-        case PRESTO_VFS_SETEXTATTR: {
-                int error;
-                struct lento_input_ext_attr input;
-                char *name;
-                char *buffer;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                    EXIT;
-                    return -EFAULT;
-                }
-
-                /* Now setup the input parameters */
-                PRESTO_ALLOC(name, char *, input.name_len+1);
-                /* We need null terminated strings for attr names */
-                name[input.name_len] = '\0';
-                if (copy_from_user(name, input.name, input.name_len)) {
-                    EXIT;
-                    PRESTO_FREE(name,input.name_len+1);
-                    return -EFAULT;
-                }
-
-                PRESTO_ALLOC(buffer, char *, input.buffer_len+1);
-                if (copy_from_user(buffer, input.buffer, input.buffer_len)) {
-                    EXIT;
-                    PRESTO_FREE(name,input.name_len+1);
-                    PRESTO_FREE(buffer,input.buffer_len+1);
-                    return -EFAULT;
-                }
-                /* Make null terminated for easy printing */
-                buffer[input.buffer_len]='\0';
- 
-                CDEBUG(D_PSDEV," setextattr params: name %s, valuelen %d,"
-                       " value %s, attr flags %x, mode %o, slot offset %d,"
-                       " recno %d, kml offset %lu, flags %x, time %d\n", 
-                       name, input.buffer_len, buffer, input.flags, input.mode,
-                       input.info.slot_offset, input.info.recno,
-                       (unsigned long) input.info.kml_offset, input.info.flags,
-                       input.info.updated_time);
-
-                error=lento_set_ext_attr
-                      (input.path,name,buffer,input.buffer_len,
-                       input.flags, input.mode, &input.info);
-
-                PRESTO_FREE(name,input.name_len+1);
-                PRESTO_FREE(buffer,input.buffer_len+1);
-                EXIT;
-                return error;
-        }
-
-        /* IOCTL to delete an extended attribute */
-        case PRESTO_VFS_DELEXTATTR: {
-                int error;
-                struct lento_input_ext_attr input;
-                char *name;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                    EXIT;
-                    return -EFAULT;
-                }
-
-                /* Now setup the input parameters */
-                PRESTO_ALLOC(name, char *, input.name_len+1);
-                /* We need null terminated strings for attr names */
-                name[input.name_len] = '\0';
-                if (copy_from_user(name, input.name, input.name_len)) {
-                    EXIT;
-                    PRESTO_FREE(name,input.name_len+1);
-                    return -EFAULT;
-                }
-
-                CDEBUG(D_PSDEV," delextattr params: name %s,"
-                       " attr flags %x, mode %o, slot offset %d, recno %d,"
-                       " kml offset %lu, flags %x, time %d\n", 
-                       name, input.flags, input.mode,
-                       input.info.slot_offset, input.info.recno,
-                       (unsigned long) input.info.kml_offset, input.info.flags,
-                       input.info.updated_time);
-
-                error=lento_set_ext_attr
-                      (input.path,name,NULL,0,input.flags,
-                       input.mode,&input.info);
-                PRESTO_FREE(name,input.name_len+1);
-                EXIT;
-                return error;
-        }
-#endif
-
-        case PRESTO_VFS_IOPEN: {
-                struct lento_input_iopen input;
-                int error;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                        EXIT;
-                        return -EFAULT;
-                }
-
-                input.fd = lento_iopen(input.name, (ino_t)input.ino,
-                                       input.generation, input.flags);
-                CDEBUG(D_PIOCTL, "lento_iopen file descriptor: %d\n", input.fd);
-                if (input.fd < 0) {
-                        EXIT;
-                        return input.fd;
-                }
-                EXIT;
-                if (copy_to_user((char *)arg, &input, sizeof(input)))
-			return -EFAULT;
-		return 0;
-        }
-
-        case PRESTO_VFS_CLOSE: {
-                int error;
-                struct lento_input_close input;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                        EXIT;
-                        return -EFAULT;
-                }
-
-                CDEBUG(D_PIOCTL, "lento_close file descriptor: %d\n", input.fd);
-                error = lento_close(input.fd, &input.info);
-                EXIT;
-                return error;
-        }
-
-        case PRESTO_BACKFETCH_LML: {
-                char *user_path;
-                int error;
-                struct lml_arg {
-                        char *path;
-                        __u32 path_len;
-                        __u64 remote_ino;
-                        __u32 remote_generation;
-                        __u32 remote_version;
-                        struct presto_version remote_file_version;
-                } input;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                        EXIT;
-                        return -EFAULT;
-                }
-                user_path = input.path;
-
-                PRESTO_ALLOC(input.path, char *, input.path_len + 1);
-                if ( !input.path ) {
-                        EXIT;
-                        return -ENOMEM;
-                }
-                if (copy_from_user(input.path, user_path, input.path_len)) {
-                        EXIT;
-                        PRESTO_FREE(input.path, input.path_len + 1);
-                        return -EFAULT;
-                }
-                input.path[input.path_len] = '\0';
-
-                CDEBUG(D_DOWNCALL, "lml name: %s\n", input.path);
-                
-                return lento_write_lml(input.path, 
-                                       input.remote_ino, 
-                                       input.remote_generation,
-                                       input.remote_version,
-                                       &input.remote_file_version); 
-
-        }
-                
-
-        case PRESTO_CANCEL_LML: {
-                char *user_path;
-                int error;
-                struct lml_arg {
-                        char *path;
-                        __u64 lml_offset; 
-                        __u32 path_len;
-                        __u64 remote_ino;
-                        __u32 remote_generation;
-                        __u32 remote_version;
-                        struct lento_vfs_context info;
-                } input;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                        EXIT;
-                        return -EFAULT;
-                }
-                user_path = input.path;
-
-                PRESTO_ALLOC(input.path, char *, input.path_len + 1);
-                if ( !input.path ) {
-                        EXIT;
-                        return -ENOMEM;
-                }
-                if (copy_from_user(input.path, user_path, input.path_len)) {
-                        EXIT;
-                        PRESTO_FREE(input.path, input.path_len + 1);
-                        return -EFAULT;
-                }
-                input.path[input.path_len] = '\0';
-
-                CDEBUG(D_DOWNCALL, "lml name: %s\n", input.path);
-                
-                return lento_cancel_lml(input.path, 
-                                        input.lml_offset, 
-                                        input.remote_ino, 
-                                        input.remote_generation,
-                                        input.remote_version,
-                                        &input.info); 
-
-        }
-
-        case PRESTO_COMPLETE_CLOSES: {
-                char *user_path;
-                int error;
-                struct lml_arg {
-                        char *path;
-                        __u32 path_len;
-                } input;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                        EXIT;
-                        return -EFAULT;
-                }
-                user_path = input.path;
-
-                PRESTO_ALLOC(input.path, char *, input.path_len + 1);
-                if ( !input.path ) {
-                        EXIT;
-                        return -ENOMEM;
-                }
-                if (copy_from_user(input.path, user_path, input.path_len)) {
-                        EXIT;
-                        PRESTO_FREE(input.path, input.path_len + 1);
-                        return -EFAULT;
-                }
-                input.path[input.path_len] = '\0';
-
-                CDEBUG(D_DOWNCALL, "lml name: %s\n", input.path);
-                
-                error = lento_complete_closes(input.path);
-                PRESTO_FREE(input.path, input.path_len + 1);
-                return error;
-        }
-
-        case PRESTO_RESET_FSET: {
-                char *user_path;
-                int error;
-                struct lml_arg {
-                        char *path;
-                        __u32 path_len;
-                        __u64 offset;
-                        __u32 recno;
-                } input;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                        EXIT;
-                        return -EFAULT;
-                }
-                user_path = input.path;
-
-                PRESTO_ALLOC(input.path, char *, input.path_len + 1);
-                if ( !input.path ) {
-                        EXIT;
-                        return -ENOMEM;
-                }
-                if (copy_from_user(input.path, user_path, input.path_len)) {
-                        EXIT;
-                        PRESTO_FREE(input.path, input.path_len + 1);
-                        return -EFAULT;
-                }
-                input.path[input.path_len] = '\0';
-
-                CDEBUG(D_DOWNCALL, "lml name: %s\n", input.path);
-                
-                return lento_reset_fset(input.path, input.offset, input.recno); 
-
-        }
-                
-
-        case PRESTO_MARK: {
-                char *user_path;
-                int res = 0;  /* resulting flags - returned to user */
-                int error;
-                struct {
-                        int  mark_what;
-                        int  and_flag;
-                        int  or_flag;
-                        int path_len;
-                        char *path;
-                } input;
-
-                if (copy_from_user(&input, (char *)arg, sizeof(input))) {
-                        EXIT;
-                        return -EFAULT;
-                }
-                user_path = input.path;
-
-                PRESTO_ALLOC(input.path, char *, input.path_len + 1);
-                if ( !input.path ) {
-                        EXIT;
-                        return -ENOMEM;
-                }
-                if (copy_from_user(input.path, user_path, input.path_len)) {
-                        EXIT;
-                        PRESTO_FREE(input.path, input.path_len + 1);
-                        return -EFAULT;
-                }
-                input.path[input.path_len] = '\0';
-
-                CDEBUG(D_DOWNCALL, "mark name: %s, and: %x, or: %x, what %d\n",
-                       input.path, input.and_flag, input.or_flag, 
-                       input.mark_what);
-
-                switch (input.mark_what) {
-                case MARK_DENTRY:               
-                        error = presto_mark_dentry(input.path,
-                                                   input.and_flag,
-                                                   input.or_flag, &res);
-                        break;
-                case MARK_FSET:
-                        error = presto_mark_fset(input.path,
-                                                   input.and_flag,
-                                                   input.or_flag, &res);
-                        break;
-                case MARK_CACHE:
-                        error = presto_mark_cache(input.path,
-                                                   input.and_flag,
-                                                   input.or_flag, &res);
-                        break;
-                case MARK_GETFL: {
-                        int fflags, cflags;
-                        input.and_flag = 0xffffffff;
-                        input.or_flag = 0; 
-                        error = presto_mark_dentry(input.path,
-                                                   input.and_flag,
-                                                   input.or_flag, &res);
-                        if (error) 
-                                break;
-                        error = presto_mark_fset(input.path,
-                                                   input.and_flag,
-                                                   input.or_flag, &fflags);
-                        if (error) 
-                                break;
-                        error = presto_mark_cache(input.path,
-                                                   input.and_flag,
-                                                   input.or_flag, &cflags);
-
-                        if (error) 
-                                break;
-                        input.and_flag = fflags;
-                        input.or_flag = cflags;
-                	break;
-                }
-                default:
-                        error = -EINVAL;
-                }
-
-                PRESTO_FREE(input.path, input.path_len + 1);
-                if (error == -EBUSY) {
-                        input.and_flag = error;
-                        error = 0;
-                }
-                if (error) { 
-                        EXIT;
-                        return error;
-                }
-                /* return the correct cookie to wait for */
-                input.mark_what = res;
-                if (copy_to_user((char *)arg, &input, sizeof(input)))
-			return -EFAULT;
-		return 0;
-        }
-
-#ifdef  CONFIG_KREINT
-        case PRESTO_REINT_BEGIN:
-                return begin_kml_reint (file, arg);
-        case PRESTO_DO_REINT:
-                return do_kml_reint (file, arg);
-        case PRESTO_REINT_END:
-                return end_kml_reint (file, arg);
-#endif
-
-        case PRESTO_RELEASE_PERMIT: {
-                int error;
-                char *user_path;
-                struct {
-                        int  cookie;
-                        int path_len;
-                        char *path;
-                } permit;
-                
-                if (copy_from_user(&permit, (char *)arg, sizeof(permit))) {
-                        EXIT;
-                        return -EFAULT;
-		}
-                user_path = permit.path;
-                
-                PRESTO_ALLOC(permit.path, char *, permit.path_len + 1);
-                if ( !permit.path ) {
-                        EXIT;
-                        return -ENOMEM;
-                }
-                if (copy_from_user(permit.path, user_path, permit.path_len)) {
-                        EXIT;
-                        PRESTO_FREE(permit.path, permit.path_len + 1);
-                        return -EFAULT;
-                }
-                permit.path[permit.path_len] = '\0';
-                
-                CDEBUG(D_DOWNCALL, "release permit: %s, in cookie=%d\n",
-                       permit.path, permit.cookie);
-                error = presto_permit_downcall(permit.path, &permit.cookie);
-                
-                PRESTO_FREE(permit.path, permit.path_len + 1);
-                if (error) {
-                        EXIT;
-                        return error;
-                }
-                /* return the correct cookie to wait for */
-                if (copy_to_user((char *)arg, &permit, sizeof(permit)))
-			return -EFAULT;
-		return 0;
-        }
-        
-        default:
-                CDEBUG(D_PSDEV, "bad ioctl 0x%x, \n", cmd);
-                CDEBUG(D_PSDEV, "valid are 0x%Zx - 0x%Zx, 0x%Zx - 0x%Zx \n",
-                        PRESTO_GETMOUNT, PRESTO_GET_KMLSIZE,
-                        PRESTO_VFS_SETATTR, PRESTO_VFS_IOPEN);
-                EXIT;
-        }
-
-        return -EINVAL;
-}
-
 
 static int presto_psdev_open(struct inode * inode, struct file * file)
 {
-         struct upc_comm *upccom;
-         ENTRY;
+        ENTRY;
 
-         if ( ! (upccom = presto_psdev_f2u(file)) ) {
-                 kdev_t dev = file->f_dentry->d_inode->i_rdev;
-                 printk("InterMezzo: %s, bad device %s\n",
-                        __FUNCTION__, kdevname(dev));
-                 EXIT;
-                 return -EINVAL;
-         }
+        file->private_data = NULL;  
 
         MOD_INC_USE_COUNT;
 
-        CDEBUG(D_PSDEV, "Psdev_open: uc_pid: %d, caller: %d, flags: %d\n",
-               upccom->uc_pid, current->pid, file->f_flags);
+        CDEBUG(D_PSDEV, "Psdev_open: caller: %d, flags: %d\n", current->pid, file->f_flags);
 
         EXIT;
         return 0;
@@ -1250,32 +323,25 @@ static int presto_psdev_open(struct inode * inode, struct file * file)
 
 static int presto_psdev_release(struct inode * inode, struct file * file)
 {
-        struct upc_comm *upccom;
+        struct upc_channel *channel = (struct upc_channel *)file->private_data;
         struct upc_req *req;
         struct list_head *lh;
         ENTRY;
 
-
-        if ( ! (upccom = presto_psdev_f2u(file)) ) {
-                kdev_t dev = file->f_dentry->d_inode->i_rdev;
-                printk("InterMezzo: %s, bad device %s\n",
-                       __FUNCTION__, kdevname(dev));
-        }
-
-        if ( upccom->uc_pid != current->pid ) {
-                printk("psdev_release: Not lento.\n");
-                MOD_DEC_USE_COUNT;
-                return 0;
+        if ( ! channel ) { 
+                CERROR("%s: bad psdev file\n", __FUNCTION__);
+                return -EBADF;
         }
 
         MOD_DEC_USE_COUNT;
         CDEBUG(D_PSDEV, "Lento: pid %d\n", current->pid);
-        upccom->uc_pid = 0;
+        channel->uc_pid = 0;
 
         /* Wake up clients so they can return. */
         CDEBUG(D_PSDEV, "Wake up clients sleeping for pending.\n");
-        lh = &upccom->uc_pending;
-        while ( (lh = lh->next) != &upccom->uc_pending) {
+        spin_lock(&channel->uc_lock); 
+        lh = &channel->uc_pending;
+        while ( (lh = lh->next) != &channel->uc_pending) {
                 req = list_entry(lh, struct upc_req, rq_chain);
 
                 /* Async requests stay around for a new lento */
@@ -1288,13 +354,14 @@ static int presto_psdev_release(struct inode * inode, struct file * file)
         }
 
         CDEBUG(D_PSDEV, "Wake up clients sleeping for processing\n");
-        lh = &upccom->uc_processing;
-        while ( (lh = lh->next) != &upccom->uc_processing) {
+        lh = &channel->uc_processing;
+        while ( (lh = lh->next) != &channel->uc_processing) {
                 req = list_entry(lh, struct upc_req, rq_chain);
                 /* freeing of req and data is done by the sleeper */
                 req->rq_flags |= REQ_DEAD; 
                 wake_up(&req->rq_sleep);
         }
+        spin_unlock(&channel->uc_lock); 
         CDEBUG(D_PSDEV, "Done.\n");
 
         EXIT;
@@ -1302,57 +369,46 @@ static int presto_psdev_release(struct inode * inode, struct file * file)
 }
 
 static struct file_operations presto_psdev_fops = {
-        read:    presto_psdev_read,
-        write:   presto_psdev_write,
-        poll:    presto_psdev_poll,
-        ioctl:   presto_psdev_ioctl,
-        open:    presto_psdev_open,
-        release: presto_psdev_release
+        .read    = presto_psdev_read,
+        .write   = presto_psdev_write,
+        .poll    = presto_psdev_poll,
+        .open    = presto_psdev_open,
+        .release = presto_psdev_release
 };
 
+/* modules setup */
+static struct miscdevice intermezzo_psdev = {
+        INTERMEZZO_MINOR,
+        "intermezzo",
+        &presto_psdev_fops
+};
 
 int  presto_psdev_init(void)
 {
         int i;
+        int err; 
 
-#ifdef PRESTO_DEVEL
-        if (register_chrdev(PRESTO_PSDEV_MAJOR, "intermezzo_psdev_devel",
-                           &presto_psdev_fops)) {
-                printk(KERN_ERR "presto_psdev: unable to get major %d\n",
-                       PRESTO_PSDEV_MAJOR);
+        if ( (err = misc_register(&intermezzo_psdev)) ) { 
+                CERROR("%s: cannot register %d err %d\n", 
+                       __FUNCTION__, INTERMEZZO_MINOR, err);
                 return -EIO;
         }
-#else
-        if (register_chrdev(PRESTO_PSDEV_MAJOR, "intermezzo_psdev",
-                           &presto_psdev_fops)) {
-                printk("presto_psdev: unable to get major %d\n",
-                       PRESTO_PSDEV_MAJOR);
-                return -EIO;
-        }
-#endif
 
-        memset(&upc_comms, 0, sizeof(upc_comms));
-        for ( i = 0 ; i < MAX_PRESTODEV ; i++ ) {
-                char *name;
-                struct upc_comm *psdev = &upc_comms[i];
-                INIT_LIST_HEAD(&psdev->uc_pending);
-                INIT_LIST_HEAD(&psdev->uc_processing);
-                INIT_LIST_HEAD(&psdev->uc_cache_list);
-                init_waitqueue_head(&psdev->uc_waitq);
-                psdev->uc_hard = 0;
-                psdev->uc_no_filter = 0;
-                psdev->uc_no_journal = 0;
-                psdev->uc_no_upcall = 0;
-                psdev->uc_timeout = 30;
-                psdev->uc_errorval = 0;
-                psdev->uc_minor = i;
-                PRESTO_ALLOC(name, char *, strlen(PRESTO_PSDEV_NAME "256")+1);
-                if (!name) { 
-                        printk("Unable to allocate memory for device name\n");
-                        continue;
-                }
-                sprintf(name, PRESTO_PSDEV_NAME "%d", i); 
-                psdev->uc_devname = name;
+        memset(&izo_channels, 0, sizeof(izo_channels));
+        for ( i = 0 ; i < MAX_CHANNEL ; i++ ) {
+                struct upc_channel *channel = &(izo_channels[i]);
+                INIT_LIST_HEAD(&channel->uc_pending);
+                INIT_LIST_HEAD(&channel->uc_processing);
+                INIT_LIST_HEAD(&channel->uc_cache_list);
+                init_waitqueue_head(&channel->uc_waitq);
+                channel->uc_lock = SPIN_LOCK_UNLOCKED;
+                channel->uc_hard = 0;
+                channel->uc_no_filter = 0;
+                channel->uc_no_journal = 0;
+                channel->uc_no_upcall = 0;
+                channel->uc_timeout = 30;
+                channel->uc_errorval = 0;
+                channel->uc_minor = i;
         }
         return 0;
 }
@@ -1361,25 +417,24 @@ void presto_psdev_cleanup(void)
 {
         int i;
 
-        for ( i = 0 ; i < MAX_PRESTODEV ; i++ ) {
-                struct upc_comm *psdev = &upc_comms[i];
+        misc_deregister(&intermezzo_psdev);
+
+        for ( i = 0 ; i < MAX_CHANNEL ; i++ ) {
+                struct upc_channel *channel = &(izo_channels[i]);
                 struct list_head *lh;
 
-                if ( ! list_empty(&psdev->uc_pending)) { 
-                        printk("Weird, tell Peter: module cleanup and pending list not empty dev %d\n", i);
+                spin_lock(&channel->uc_lock); 
+                if ( ! list_empty(&channel->uc_pending)) { 
+                        CERROR("Weird, tell Peter: module cleanup and pending list not empty dev %d\n", i);
                 }
-                if ( ! list_empty(&psdev->uc_processing)) { 
-                        printk("Weird, tell Peter: module cleanup and processing list not empty dev %d\n", i);
+                if ( ! list_empty(&channel->uc_processing)) { 
+                        CERROR("Weird, tell Peter: module cleanup and processing list not empty dev %d\n", i);
                 }
-                if ( ! list_empty(&psdev->uc_cache_list)) { 
-                        printk("Weird, tell Peter: module cleanup and cache listnot empty dev %d\n", i);
+                if ( ! list_empty(&channel->uc_cache_list)) { 
+                        CERROR("Weird, tell Peter: module cleanup and cache listnot empty dev %d\n", i);
                 }
-                if (psdev->uc_devname) {
-                        PRESTO_FREE(psdev->uc_devname,
-                                    strlen(PRESTO_PSDEV_NAME "256")+1);
-                }
-                lh = psdev->uc_pending.next;
-                while ( lh != &psdev->uc_pending) {
+                lh = channel->uc_pending.next;
+                while ( lh != &channel->uc_pending) {
                         struct upc_req *req;
 
                         req = list_entry(lh, struct upc_req, rq_chain);
@@ -1395,22 +450,23 @@ void presto_psdev_cleanup(void)
                                 wake_up(&req->rq_sleep);
                         }
                 }
-                lh = &psdev->uc_processing;
-                while ( (lh = lh->next) != &psdev->uc_processing ) {
+                lh = &channel->uc_processing;
+                while ( (lh = lh->next) != &channel->uc_processing ) {
                         struct upc_req *req;
                         req = list_entry(lh, struct upc_req, rq_chain);
                         list_del(&(req->rq_chain));
                         req->rq_flags |= REQ_DEAD; 
                         wake_up(&req->rq_sleep);
                 }
+                spin_unlock(&channel->uc_lock); 
         }
 }
 
 /*
  * lento_upcall and lento_downcall routines
  */
-static inline unsigned long lento_waitfor_upcall(struct upc_req *req,
-                                                 int minor)
+static inline unsigned long lento_waitfor_upcall
+            (struct upc_channel *channel, struct upc_req *req, int minor)
 {
         DECLARE_WAITQUEUE(wait, current);
         unsigned long posttime;
@@ -1419,38 +475,39 @@ static inline unsigned long lento_waitfor_upcall(struct upc_req *req,
 
         add_wait_queue(&req->rq_sleep, &wait);
         for (;;) {
-                if ( upc_comms[minor].uc_hard == 0 )
-                        current->state = TASK_INTERRUPTIBLE;
+                if ( izo_channels[minor].uc_hard == 0 )
+                        set_current_state(TASK_INTERRUPTIBLE);
                 else
-                        current->state = TASK_UNINTERRUPTIBLE;
+                        set_current_state(TASK_UNINTERRUPTIBLE);
 
                 /* got a reply */
                 if ( req->rq_flags & (REQ_WRITE | REQ_DEAD) )
                         break;
 
-                if ( !upc_comms[minor].uc_hard && signal_pending(current) ) {
+                /* these cases only apply when TASK_INTERRUPTIBLE */ 
+                if ( !izo_channels[minor].uc_hard && signal_pending(current) ) {
                         /* if this process really wants to die, let it go */
                         if (sigismember(&(current->pending.signal), SIGKILL)||
                             sigismember(&(current->pending.signal), SIGINT) )
                                 break;
                         /* signal is present: after timeout always return
                            really smart idea, probably useless ... */
-                        if ( jiffies > req->rq_posttime +
-                             upc_comms[minor].uc_timeout * HZ )
+                        if ( time_after(jiffies, req->rq_posttime +
+                             izo_channels[minor].uc_timeout * HZ) )
                                 break;
                 }
                 schedule();
-
         }
-      list_del(&req->rq_chain); 
-      INIT_LIST_HEAD(&req->rq_chain); 
+
+        spin_lock(&channel->uc_lock);
+        list_del_init(&req->rq_chain); 
+        spin_unlock(&channel->uc_lock);
         remove_wait_queue(&req->rq_sleep, &wait);
-        current->state = TASK_RUNNING;
+        set_current_state(TASK_RUNNING);
 
         CDEBUG(D_SPECIAL, "posttime: %ld, returned: %ld\n",
                posttime, jiffies-posttime);
         return  (jiffies - posttime);
-
 }
 
 /*
@@ -1466,31 +523,30 @@ static inline unsigned long lento_waitfor_upcall(struct upc_req *req,
  * is read (in presto_psdev_read), when the filesystem is unmounted, or
  * when the module is unloaded.
  */
-int lento_upcall(int minor, int bufsize, int *rep_size, union up_args *buffer,
-                 int async, struct upc_req *rq)
+int izo_upc_upcall(int minor, int *size, struct izo_upcall_hdr *buffer, 
+                   int async)
 {
         unsigned long runtime;
-        struct upc_comm *upc_commp;
-        union down_args *out;
+        struct upc_channel *channel;
+        struct izo_upcall_resp *out;
         struct upc_req *req;
         int error = 0;
 
         ENTRY;
-        upc_commp = &(upc_comms[minor]);
+        channel = &(izo_channels[minor]);
 
-        if (upc_commp->uc_no_upcall) {
+        if (channel->uc_no_upcall) {
                 EXIT;
                 goto exit_buf;
         }
-        if (!upc_commp->uc_pid && !async) {
+        if (!channel->uc_pid && !async) {
                 EXIT;
                 error = -ENXIO;
                 goto exit_buf;
         }
 
         /* Format the request message. */
-        CDEBUG(D_UPCALL, "buffer at %p, size %d\n", buffer, bufsize);
-        PRESTO_ALLOC(req, struct upc_req *, sizeof(struct upc_req));
+        PRESTO_ALLOC(req, sizeof(struct upc_req));
         if ( !req ) {
                 EXIT;
                 error = -ENOMEM;
@@ -1498,29 +554,29 @@ int lento_upcall(int minor, int bufsize, int *rep_size, union up_args *buffer,
         }
         req->rq_data = (void *)buffer;
         req->rq_flags = 0;
-        req->rq_bufsize = bufsize;
+        req->rq_bufsize = *size;
         req->rq_rep_size = 0;
-        req->rq_opcode = ((union up_args *)buffer)->uh.opcode;
-        req->rq_unique = ++upc_commp->uc_seq;
+        req->rq_opcode = buffer->u_opc;
+        req->rq_unique = ++channel->uc_seq;
         init_waitqueue_head(&req->rq_sleep);
 
         /* Fill in the common input args. */
-        ((union up_args *)buffer)->uh.unique = req->rq_unique;
+        buffer->u_uniq = req->rq_unique;
+        buffer->u_async = async;
+
+        spin_lock(&channel->uc_lock); 
         /* Append msg to pending queue and poke Lento. */
-        list_add(&req->rq_chain, upc_commp->uc_pending.prev);
+        list_add(&req->rq_chain, channel->uc_pending.prev);
+        spin_unlock(&channel->uc_lock); 
         CDEBUG(D_UPCALL,
                "Proc %d waking Lento %d for(opc,uniq) =(%d,%d) msg at %p.\n",
-               current->pid, upc_commp->uc_pid, req->rq_opcode,
+               current->pid, channel->uc_pid, req->rq_opcode,
                req->rq_unique, req);
-
-        wake_up_interruptible(&upc_commp->uc_waitq);
+        wake_up_interruptible(&channel->uc_waitq);
 
         if ( async ) {
-                req->rq_flags = REQ_ASYNC;
-                if( rq != NULL ) {
-                        *rq = *req; /* struct copying */
-                }
                 /* req, rq_data are freed in presto_psdev_read for async */
+                req->rq_flags = REQ_ASYNC;
                 EXIT;
                 return 0;
         }
@@ -1535,29 +591,29 @@ int lento_upcall(int minor, int bufsize, int *rep_size, union up_args *buffer,
          * ENODEV.  */
 
         /* Go to sleep.  Wake up on signals only after the timeout. */
-        runtime = lento_waitfor_upcall(req, minor);
+        runtime = lento_waitfor_upcall(channel, req, minor);
 
         CDEBUG(D_TIMING, "opc: %d time: %ld uniq: %d size: %d\n",
                req->rq_opcode, jiffies - req->rq_posttime,
                req->rq_unique, req->rq_rep_size);
         CDEBUG(D_UPCALL,
-               "..process %d woken up by Lento for req at 0x%p, data at %p\n",
-               current->pid, req, req->rq_data);
+               "..process %d woken up by Lento for req at 0x%x, data at %x\n",
+               current->pid, (int)req, (int)req->rq_data);
 
-        if (upc_commp->uc_pid) {      /* i.e. Lento is still alive */
+        if (channel->uc_pid) {      /* i.e. Lento is still alive */
           /* Op went through, interrupt or not we go on */
             if (req->rq_flags & REQ_WRITE) {
-                    out = (union down_args *)req->rq_data;
+                    out = (struct izo_upcall_resp *)req->rq_data;
                     /* here we map positive Lento errors to kernel errors */
-                    if ( out->dh.result < 0 ) {
-                            printk("Tell Peter: Lento returns negative error %d, for oc %d!\n",
-                                   out->dh.result, out->dh.opcode);
-                          out->dh.result = EINVAL;
+                    if ( out->result < 0 ) {
+                            CERROR("Tell Peter: Lento returns negative error %d, for oc %d!\n",
+                                   out->result, out->opcode);
+                          out->result = EINVAL;
                     }
-                    error = -out->dh.result;
+                    error = -out->result;
                     CDEBUG(D_UPCALL, "upcall: (u,o,r) (%d, %d, %d) out at %p\n",
-                           out->dh.unique, out->dh.opcode, out->dh.result, out);
-                    *rep_size = req->rq_rep_size;
+                           out->unique, out->opcode, out->result, out);
+                    *size = req->rq_rep_size;
                     EXIT;
                     goto exit_req;
             }
@@ -1574,53 +630,16 @@ int lento_upcall(int minor, int bufsize, int *rep_size, union up_args *buffer,
 
             /* interrupted after Lento did its read, send signal */
             if ( (req->rq_flags & REQ_READ) && signal_pending(current) ) {
-                    union up_args *sigargs;
-                    struct upc_req *sigreq;
-
-                    CDEBUG(D_UPCALL,"Sending for: op = %d.%d, flags = %x\n",
+                    CDEBUG(D_UPCALL,"Interrupt after read: op = %d.%d, flags = %x\n",
                            req->rq_opcode, req->rq_unique, req->rq_flags);
 
                     error = -EINTR;
-
-                    /* req, rq_data are freed in presto_psdev_read for async */
-                    PRESTO_ALLOC(sigreq, struct upc_req *,
-                                 sizeof (struct upc_req));
-                    if (!sigreq) {
-                            error = -ENOMEM;
-                            EXIT;
-                            goto exit_req;
-                    }
-                    PRESTO_ALLOC((sigreq->rq_data), char *,
-                                 sizeof(struct lento_up_hdr));
-                    if (!(sigreq->rq_data)) {
-                            PRESTO_FREE(sigreq, sizeof (struct upc_req));
-                            error = -ENOMEM;
-                            EXIT;
-                            goto exit_req;
-                    }
-
-                    sigargs = (union up_args *)sigreq->rq_data;
-                    sigargs->uh.opcode = LENTO_SIGNAL;
-                    sigargs->uh.unique = req->rq_unique;
-
-                    sigreq->rq_flags = REQ_ASYNC;
-                    sigreq->rq_opcode = sigargs->uh.opcode;
-                    sigreq->rq_unique = sigargs->uh.unique;
-                    sigreq->rq_bufsize = sizeof(struct lento_up_hdr);
-                    sigreq->rq_rep_size = 0;
-                    CDEBUG(D_UPCALL,
-                           "presto_upcall: enqueing signal msg (%d, %d)\n",
-                           sigreq->rq_opcode, sigreq->rq_unique);
-
-                    /* insert at head of queue! */
-                    list_add(&sigreq->rq_chain, &upc_commp->uc_pending);
-                    wake_up_interruptible(&upc_commp->uc_waitq);
             } else {
-                  printk("Lento: Strange interruption - tell Peter.\n");
+                  CERROR("Lento: Strange interruption - tell Peter.\n");
                     error = -EINTR;
             }
-        } else {        /* If lento died i.e. !UC_OPEN(upc_commp) */
-                printk("presto_upcall: Lento dead on (op,un) (%d.%d) flags %d\n",
+        } else {        /* If lento died i.e. !UC_OPEN(channel) */
+                CERROR("lento_upcall: Lento dead on (op,un) (%d.%d) flags %d\n",
                        req->rq_opcode, req->rq_unique, req->rq_flags);
                 error = -ENODEV;
         }
@@ -1628,8 +647,5 @@ int lento_upcall(int minor, int bufsize, int *rep_size, union up_args *buffer,
 exit_req:
         PRESTO_FREE(req, sizeof(struct upc_req));
 exit_buf:
-        PRESTO_FREE(buffer, bufsize);
         return error;
 }
-
-
