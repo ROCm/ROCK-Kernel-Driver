@@ -106,7 +106,10 @@ SECTIONS
   /* freed after init ends here */
 	
   __bss_start = .;		/* BSS */
-  .bss : { *(.bss) }
+  .bss : {
+	*(.bss.page_aligned)
+	*(.bss)
+  }
   . = ALIGN(4);
   __bss_stop = .; 
 
