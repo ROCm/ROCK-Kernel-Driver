@@ -1269,7 +1269,7 @@ static int irda_sendmsg(struct kiocb *iocb, struct socket *sock,
 	IRDA_DEBUG(4, "%s(), len=%d\n", __FUNCTION__, len);
 
 	/* Note : socket.c set MSG_EOR on SEQPACKET sockets */
-	if (msg->msg_flags & ~(MSG_DONTWAIT | MSG_EOR))
+	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_EOR|MSG_CMSG_COMPAT))
 		return -EINVAL;
 
 	if (sk->sk_shutdown & SEND_SHUTDOWN) {
@@ -1521,7 +1521,7 @@ static int irda_sendmsg_dgram(struct kiocb *iocb, struct socket *sock,
 
 	IRDA_DEBUG(4, "%s(), len=%d\n", __FUNCTION__, len);
 
-	if (msg->msg_flags & ~MSG_DONTWAIT)
+	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_CMSG_COMPAT))
 		return -EINVAL;
 
 	if (sk->sk_shutdown & SEND_SHUTDOWN) {
@@ -1593,7 +1593,7 @@ static int irda_sendmsg_ultra(struct kiocb *iocb, struct socket *sock,
 
 	IRDA_DEBUG(4, "%s(), len=%d\n", __FUNCTION__, len);
 
-	if (msg->msg_flags & ~MSG_DONTWAIT)
+	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_CMSG_COMPAT))
 		return -EINVAL;
 
 	if (sk->sk_shutdown & SEND_SHUTDOWN) {
