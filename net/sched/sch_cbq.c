@@ -1705,7 +1705,7 @@ static void cbq_destroy_filters(struct cbq_class *cl)
 
 	while ((tp = cl->filter_list) != NULL) {
 		cl->filter_list = tp->next;
-		tp->ops->destroy(tp);
+		tcf_destroy(tp);
 	}
 }
 

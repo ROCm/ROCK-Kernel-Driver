@@ -207,9 +207,8 @@ static struct ndisc_options *ndisc_parse_options(u8 *opt, int opt_len,
 		case ND_OPT_MTU:
 		case ND_OPT_REDIRECT_HDR:
 			if (ndopts->nd_opt_array[nd_opt->nd_opt_type]) {
-				ND_PRINTK2((KERN_WARNING
-					    "ndisc_parse_options(): duplicated ND6 option found: type=%d\n",
-					    nd_opt->nd_opt_type));
+				ND_PRINTK2("ndisc_parse_options(): duplicated ND6 option found: type=%d\n",
+					    nd_opt->nd_opt_type);
 			} else {
 				ndopts->nd_opt_array[nd_opt->nd_opt_type] = nd_opt;
 			}
@@ -619,6 +618,7 @@ void ndisc_send_rs(struct net_device *dev, struct in6_addr *saddr,
 				  1, &err);
 	if (skb == NULL) {
 		ND_PRINTK1("send_ns: alloc skb failed\n");
+		dst_release(dst);
 		return;
 	}
 
@@ -1166,9 +1166,7 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 				ND_PRINTK0("NDISC: router announcement with mtu = %d\n",
 					   mtu);
 			}
-		}
-
-		if (in6_dev->cnf.mtu6 != mtu) {
+		} else if (in6_dev->cnf.mtu6 != mtu) {
 			in6_dev->cnf.mtu6 = mtu;
 
 			if (rt)
