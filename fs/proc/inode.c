@@ -231,6 +231,7 @@ int proc_fill_super(struct super_block *s, void *data, int silent)
 {
 	struct inode * root_inode;
 
+	s->s_flags |= MS_NODIRATIME;
 	s->s_blocksize = 1024;
 	s->s_blocksize_bits = 10;
 	s->s_magic = PROC_SUPER_MAGIC;

@@ -171,6 +171,7 @@ static int coda_fill_super(struct super_block *sb, void *data, int silent)
 	sbi->sbi_vcomm = vc;
 
         sb->s_fs_info = sbi;
+	sb->s_flags |= MS_NODIRATIME; /* probably even noatime */
         sb->s_blocksize = 1024;	/* XXXXX  what do we put here?? */
         sb->s_blocksize_bits = 10;
         sb->s_magic = CODA_SUPER_MAGIC;
