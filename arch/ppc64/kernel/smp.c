@@ -610,10 +610,11 @@ int __devinit __cpu_up(unsigned int cpu)
 	/* create a process for the processor */
 	/* only regs.msr is actually used, and 0 is OK for it */
 	memset(&regs, 0, sizeof(struct pt_regs));
-	p = do_fork(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
+	p = copy_process(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
 	if (IS_ERR(p))
 		panic("failed fork for CPU %u: %li", cpu, PTR_ERR(p));
 
+	wake_up_forked_process(p);
 	init_idle(p, cpu);
 	unhash_process(p);
 
