@@ -279,6 +279,9 @@ static unsigned int uinput_poll(struct file *file, poll_table *wait)
 {
 	struct uinput_device *udev = file->private_data;
 
+	if (!test_bit(UIST_CREATED, &(udev->state)))
+		return -ENODEV;
+
 	poll_wait(file, &udev->waitq, wait);
 
 	if (udev->head != udev->tail)
