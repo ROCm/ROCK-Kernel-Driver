@@ -1571,7 +1571,7 @@ int snd_cs4231_pcm(cs4231_t *chip)
 #ifdef EBUS_SUPPORT
 	if (chip->flags & CS4231_FLAG_EBUS) {
 		snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
-						      snd_dma_pci_data(chip->dev_u.pdev)
+						      snd_dma_pci_data(chip->dev_u.pdev),
 						      64*1024, 128*1024);
 	} else {
 #endif
