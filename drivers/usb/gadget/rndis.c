@@ -37,7 +37,16 @@
 #include "rndis.h"
 
 
+#if 0
 #define DEBUG if (rndis_debug) printk 
+static int rndis_debug = 0;
+
+MODULE_PARM (rndis_debug, "i");
+MODULE_PARM_DESC (rndis_debug, "enable debugging");
+
+#else
+#define DEBUG(str,args...) do{}while(0)
+#endif
 
 #define RNDIS_MAX_CONFIGS	1
 
@@ -45,10 +54,6 @@ static struct proc_dir_entry *rndis_connect_dir;
 static struct proc_dir_entry *rndis_connect_state [RNDIS_MAX_CONFIGS];
 
 static rndis_params rndis_per_dev_params [RNDIS_MAX_CONFIGS];
-static int rndis_debug = 0;
-
-MODULE_PARM (rndis_debug, "i");
-MODULE_PARM_DESC (rndis_debug, "enable debugging");
 
 /* Driver Version */
 static const u32 rndis_driver_version = __constant_cpu_to_le32 (1);
@@ -1088,7 +1093,7 @@ int rndis_register (int (* rndis_control_ack) (struct net_device *))
 
 void rndis_deregister (int configNr)
 {
-	DEBUG("%s: ", __FUNCTION__ );
+	DEBUG("%s: \n", __FUNCTION__ );
 	
 	if (configNr >= RNDIS_MAX_CONFIGS) return;
 	rndis_per_dev_params [configNr].used = 0;
@@ -1099,7 +1104,7 @@ void rndis_deregister (int configNr)
 int rndis_set_param_dev (u8 configNr, struct net_device *dev, 
 			 struct net_device_stats *stats)
 {
-	DEBUG("%s: ", __FUNCTION__ );
+	DEBUG("%s:\n", __FUNCTION__ );
 	if (!dev || !stats) return -1;
 	if (configNr >= RNDIS_MAX_CONFIGS) return -1;
 	
@@ -1111,7 +1116,7 @@ int rndis_set_param_dev (u8 configNr, struct net_device *dev,
 
 int rndis_set_param_vendor (u8 configNr, u32 vendorID, const char *vendorDescr)
 {
-	DEBUG("%s: ", __FUNCTION__ );
+	DEBUG("%s:\n", __FUNCTION__ );
 	if (!vendorDescr) return -1;
 	if (configNr >= RNDIS_MAX_CONFIGS) return -1;
 	
@@ -1123,7 +1128,7 @@ int rndis_set_param_vendor (u8 configNr, u32 vendorID, const char *vendorDescr)
 
 int rndis_set_param_medium (u8 configNr, u32 medium, u32 speed)
 {
-	DEBUG("%s: ", __FUNCTION__ );
+	DEBUG("%s:\n", __FUNCTION__ );
 	if (configNr >= RNDIS_MAX_CONFIGS) return -1;
 	
 	rndis_per_dev_params [configNr].medium = medium;
@@ -1326,6 +1331,7 @@ int __init rndis_init (void)
 				sprintf (name, "%03d", i);
 				remove_proc_entry (name, rndis_connect_dir);
 			}
+			DEBUG ("\n");
 			
 			remove_proc_entry ("000", rndis_connect_dir);
 			remove_proc_entry ("rndis", NULL);

@@ -2033,7 +2033,11 @@ static int rndis_control_ack (struct net_device *net)
 	u32                     length;
 	struct usb_request      *resp;
 	
-	/* RNDIS completion function */
+	/* in case RNDIS calls this after disconnect */
+	if (!dev->status_ep) {
+		DEBUG (dev, "status ENODEV\n");
+		return -ENODEV;
+	}
 
 	/* Allocate memory for notification ie. ACK */
 	resp = usb_ep_alloc_request (dev->status_ep, GFP_ATOMIC);
