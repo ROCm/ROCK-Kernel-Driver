@@ -893,10 +893,8 @@ void dm_table_unplug_all(struct dm_table *t)
 		struct dm_dev *dd = list_entry(d, struct dm_dev, list);
 		request_queue_t *q = bdev_get_queue(dd->bdev);
 
-		if (q->unplug_fn) {
-			set_bit(QUEUE_FLAG_PLUGGED, &q->queue_flags);
+		if (q->unplug_fn)
 			q->unplug_fn(q);
-		}
 	}
 }
 
