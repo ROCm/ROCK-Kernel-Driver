@@ -30,7 +30,6 @@
 #include <linux/slab.h>
 
 #include "dvb_frontend.h"
-#include "dvb_functions.h"
 
 static int debug = 0;
 #define dprintk	if (debug) printk
@@ -112,17 +111,19 @@ static u8 init_1993_wtab[] =
 
 struct ves1x93_state {
 	fe_spectral_inversion_t inversion;
+	struct i2c_adapter *i2c;
+	struct dvb_adapter *dvb;
 };
 
 
 
-static int ves1x93_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
+static int ves1x93_writereg (struct i2c_adapter *i2c, u8 reg, u8 data)
 {
         u8 buf [] = { 0x00, reg, data };
 	struct i2c_msg msg = { .addr = 0x08, .flags = 0, .buf = buf, .len = 3 };
 	int err;
 
-        if ((err = i2c->xfer (i2c, &msg, 1)) != 1) {
+	if ((err = i2c_transfer (i2c, &msg, 1)) != 1) {
 		dprintk ("%s: writereg error (err == %i, reg == 0x%02x, data == 0x%02x)\n", __FUNCTION__, err, reg, data);
 		return -EREMOTEIO;
 	}
@@ -131,7 +132,7 @@ static int ves1x93_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 }
 
 
-static u8 ves1x93_readreg (struct dvb_i2c_bus *i2c, u8 reg)
+static u8 ves1x93_readreg (struct i2c_adapter *i2c, u8 reg)
 {
 	int ret;
 	u8 b0 [] = { 0x00, reg };
@@ -139,7 +140,7 @@ static u8 ves1x93_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 	struct i2c_msg msg [] = { { .addr = 0x08, .flags = 0, .buf = b0, .len = 2 },
 			   { .addr = 0x08, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
 
-	ret = i2c->xfer (i2c, msg, 2);
+	ret = i2c_transfer (i2c, msg, 2);
 
 	if (ret != 2)
 		dprintk("%s: readreg error (ret == %i)\n", __FUNCTION__, ret);
@@ -148,13 +149,13 @@ static u8 ves1x93_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 }
 
 
-static int tuner_write (struct dvb_i2c_bus *i2c, u8 *data, u8 len)
+static int tuner_write (struct i2c_adapter *i2c, u8 *data, u8 len)
 {
         int ret;
         struct i2c_msg msg = { .addr = 0x61, .flags = 0, .buf = data, .len = len };
 
 	ves1x93_writereg(i2c, 0x00, 0x11);
-        ret = i2c->xfer (i2c, &msg, 1);
+	ret = i2c_transfer (i2c, &msg, 1);
 	ves1x93_writereg(i2c, 0x00, 0x01);
 
         if (ret != 1)
@@ -169,7 +170,7 @@ static int tuner_write (struct dvb_i2c_bus *i2c, u8 *data, u8 len)
  *   set up the downconverter frequency divisor for a
  *   reference clock comparision frequency of 125 kHz.
  */
-static int sp5659_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq, u8 pwr)
+static int sp5659_set_tv_freq (struct i2c_adapter *i2c, u32 freq, u8 pwr)
 {
         u32 div = (freq + 479500) / 125;
 	u8 buf [4] = { (div >> 8) & 0x7f, div & 0xff, 0x95, (pwr << 5) | 0x30 };
@@ -178,7 +179,7 @@ static int sp5659_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq, u8 pwr)
 }
 
 
-static int tsa5059_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
+static int tsa5059_set_tv_freq (struct i2c_adapter *i2c, u32 freq)
 {
 	int ret;
 	u8 buf [2];
@@ -194,7 +195,7 @@ static int tsa5059_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
 }
 
 
-static int tuner_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq, u8 pwr)
+static int tuner_set_tv_freq (struct i2c_adapter *i2c, u32 freq, u8 pwr)
 {
 	if ((demod_type == DEMOD_VES1893) && (board_type == BOARD_SIEMENS_PCI))
 		return sp5659_set_tv_freq (i2c, freq, pwr);
@@ -205,7 +206,7 @@ static int tuner_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq, u8 pwr)
 }
 
 
-static int ves1x93_init (struct dvb_i2c_bus *i2c)
+static int ves1x93_init (struct i2c_adapter *i2c)
 {
 	int i;
 	int size;
@@ -249,24 +250,24 @@ static int ves1x93_init (struct dvb_i2c_bus *i2c)
 }
 
 
-static int ves1x93_clr_bit (struct dvb_i2c_bus *i2c)
+static int ves1x93_clr_bit (struct i2c_adapter *i2c)
 {
         ves1x93_writereg (i2c, 0, init_1x93_tab[0] & 0xfe);
         ves1x93_writereg (i2c, 0, init_1x93_tab[0]);
-	dvb_delay(5);
+	msleep(5);
 	return 0;
 }
 
-static int ves1x93_init_aquire (struct dvb_i2c_bus *i2c)
+static int ves1x93_init_aquire (struct i2c_adapter *i2c)
 {
         ves1x93_writereg (i2c, 3, 0x00);
 	ves1x93_writereg (i2c, 3, init_1x93_tab[3]);
-	dvb_delay(5);
+	msleep(5);
 	return 0;
 }
 
 
-static int ves1x93_set_inversion (struct dvb_i2c_bus *i2c, fe_spectral_inversion_t inversion)
+static int ves1x93_set_inversion (struct i2c_adapter *i2c, fe_spectral_inversion_t inversion)
 {
 	u8 val;
 
@@ -293,7 +294,7 @@ static int ves1x93_set_inversion (struct dvb_i2c_bus *i2c, fe_spectral_inversion
 }
 
 
-static int ves1x93_set_fec (struct dvb_i2c_bus *i2c, fe_code_rate_t fec)
+static int ves1x93_set_fec (struct i2c_adapter *i2c, fe_code_rate_t fec)
 {
 	if (fec == FEC_AUTO)
 		return ves1x93_writereg (i2c, 0x0d, 0x08);
@@ -304,13 +305,13 @@ static int ves1x93_set_fec (struct dvb_i2c_bus *i2c, fe_code_rate_t fec)
 }
 
 
-static fe_code_rate_t ves1x93_get_fec (struct dvb_i2c_bus *i2c)
+static fe_code_rate_t ves1x93_get_fec (struct i2c_adapter *i2c)
 {
 	return FEC_1_2 + ((ves1x93_readreg (i2c, 0x0d) >> 4) & 0x7);
 }
 
 
-static int ves1x93_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate)
+static int ves1x93_set_symbolrate (struct i2c_adapter *i2c, u32 srate)
 {
 	u32 BDR;
         u32 ratio;
@@ -414,7 +415,7 @@ static int ves1x93_set_symbolrate (struct dvb_i2c_bus *i2c, u32 srate)
 }
 
 
-static int ves1x93_afc (struct dvb_i2c_bus *i2c, u32 freq, u32 srate)
+static int ves1x93_afc (struct i2c_adapter *i2c, u32 freq, u32 srate)
 {
 	int afc;
 
@@ -433,7 +434,7 @@ static int ves1x93_afc (struct dvb_i2c_bus *i2c, u32 freq, u32 srate)
 	return 0;
 }
 
-static int ves1x93_set_voltage (struct dvb_i2c_bus *i2c, fe_sec_voltage_t voltage)
+static int ves1x93_set_voltage (struct i2c_adapter *i2c, fe_sec_voltage_t voltage)
 {
 	switch (voltage) {
 	case SEC_VOLTAGE_13:
@@ -450,8 +451,8 @@ static int ves1x93_set_voltage (struct dvb_i2c_bus *i2c, fe_sec_voltage_t voltag
 
 static int ves1x93_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 {
-	struct dvb_i2c_bus *i2c = fe->i2c;
 	struct ves1x93_state *state = (struct ves1x93_state*) fe->data;
+	struct i2c_adapter *i2c = state->i2c;
 
         switch (cmd) {
         case FE_GET_INFO:
@@ -578,11 +579,14 @@ static int ves1x93_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
         return 0;
 } 
 
+static struct i2c_client client_template;
 
-static int ves1x93_attach (struct dvb_i2c_bus *i2c, void **data)
+static int attach_adapter(struct i2c_adapter *adapter)
 {
-	u8 identity = ves1x93_readreg(i2c, 0x1e);
+	struct i2c_client *client;
 	struct ves1x93_state* state;
+	u8 identity = ves1x93_readreg(adapter, 0x1e);
+	int ret;
 
 	switch (identity) {
 	case 0xdc: /* VES1893A rev1 */
@@ -608,19 +612,88 @@ static int ves1x93_attach (struct dvb_i2c_bus *i2c, void **data)
 	if ((state = kmalloc(sizeof(struct ves1x93_state), GFP_KERNEL)) == NULL) {
 		return -ENOMEM;
 	}
+
+	if (NULL == (client = kmalloc(sizeof(struct i2c_client), GFP_KERNEL))) {
+		kfree(state);
+		return -ENOMEM;
+	}
+
 	state->inversion = INVERSION_OFF;
-	*data = state;
+	state->i2c = adapter;
 
-	return dvb_register_frontend (ves1x93_ioctl, i2c, (void*) state, &ves1x93_info);
+	memcpy(client, &client_template, sizeof(struct i2c_client));
+	client->adapter = adapter;
+	client->addr = (0x08>>1);
+	i2c_set_clientdata(client, (void*)state);
+
+	ret = i2c_attach_client(client);
+	if (ret) {
+		kfree(client);
+		kfree(state);
+		return -EFAULT;
+	}
+
+	BUG_ON(!state->dvb);
+
+	ret = dvb_register_frontend(ves1x93_ioctl, state->dvb, state,
+					&ves1x93_info, THIS_MODULE);
+	if (ret) {
+		i2c_detach_client(client);
+		kfree(client);
+		kfree(state);
+		return -EFAULT;
 }
 
+	return 0;
+}
 
-static void ves1x93_detach (struct dvb_i2c_bus *i2c, void *data)
+static int detach_client(struct i2c_client *client)
 {
-	kfree(data);
-	dvb_unregister_frontend (ves1x93_ioctl, i2c);
+	struct ves1x93_state *state = (struct ves1x93_state*)i2c_get_clientdata(client);
+	dvb_unregister_frontend_new(ves1x93_ioctl, state->dvb);
+	i2c_detach_client(client);
+	BUG_ON(state->dvb);
+	kfree(client);
+	kfree(state);
+	return 0;
 }
 
+static int command (struct i2c_client *client, unsigned int cmd, void *arg)
+{
+	struct ves1x93_state *state = (struct ves1x93_state*)i2c_get_clientdata(client);
+
+	dprintk ("%s\n", __FUNCTION__);
+
+	switch (cmd) {
+	case FE_REGISTER: {
+		state->dvb = (struct dvb_adapter*)arg;
+		break;
+	}
+	case FE_UNREGISTER: {
+		state->dvb = NULL;
+		break;
+	}
+	default:
+		return -EOPNOTSUPP;
+}
+	return 0;
+}
+
+static struct i2c_driver driver = {
+	.owner 		= THIS_MODULE,
+	.name 		= "ves1x93",
+	.id 		= I2C_DRIVERID_DVBFE_VES1X93,
+	.flags 		= I2C_DF_NOTIFY,
+	.attach_adapter = attach_adapter,
+	.detach_client 	= detach_client,
+	.command 	= command,
+};
+
+static struct i2c_client client_template = {
+	I2C_DEVNAME("ves1x93"),
+	.flags 		= I2C_CLIENT_ALLOW_USE,
+	.driver  	= &driver,
+};
 
 static int __init init_ves1x93 (void)
 {
@@ -638,15 +711,15 @@ static int __init init_ves1x93 (void)
 		return -EIO;
 	}
 
-	return dvb_register_i2c_device (THIS_MODULE, ves1x93_attach, ves1x93_detach);
+	return i2c_add_driver(&driver);
 }
 
 
 static void __exit exit_ves1x93 (void)
 {
-	dvb_unregister_i2c_device (ves1x93_attach);
+	if (i2c_del_driver(&driver))
+		printk("vex1x93: driver deregistration failed\n");
 }
-
 
 module_init(init_ves1x93);
 module_exit(exit_ves1x93);
