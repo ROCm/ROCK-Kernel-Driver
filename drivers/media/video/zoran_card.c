@@ -58,7 +58,6 @@
 #define I2C_NAME(x) (x)->name
 
 extern const struct zoran_format zoran_formats[];
-extern const int zoran_num_formats;
 
 static int card[BUZ_MAX] = { -1, -1, -1, -1 };
 MODULE_PARM(card, "1-" __stringify(BUZ_MAX) "i");

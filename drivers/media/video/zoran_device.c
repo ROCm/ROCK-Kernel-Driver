@@ -58,7 +58,6 @@
 		   ZR36057_ISR_JPEGRepIRQ )
 
 extern const struct zoran_format zoran_formats[];
-extern const int zoran_num_formats;
 
 extern int *zr_debug;
 
