@@ -3139,10 +3139,6 @@ static int __init init_cmpci(void)
 	struct pci_dev *pcidev = NULL;
 	int index = 0;
 
-#ifdef CONFIG_PCI
-	if (!pci_present())   /* No PCI bus in this machine! */
-#endif
-		return -ENODEV;
 	printk(KERN_INFO "cmpci: version $Revision: 5.64 $ time " __TIME__ " " __DATE__ "\n");
 
 	while (index < NR_DEVICE && (
