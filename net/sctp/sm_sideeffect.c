@@ -617,8 +617,23 @@ static void sctp_cmd_new_state(sctp_cmd_seq_t *cmds, struct sctp_association *as
 	asoc->state = state;
 	asoc->state_timestamp = jiffies;
 
+	if (SCTP_SOCKET_TCP == sp->type) {
+		/* Change the sk->state of a TCP-style socket that has 
+		 * sucessfully completed a connect() call.
+		 */
+		if ((SCTP_STATE_ESTABLISHED == asoc->state) &&
+		    (SCTP_SS_CLOSED == sk->state))
+			sk->state = SCTP_SS_ESTABLISHED;
+
+		/* Set the RCV_SHUTDOWN flag when a SHUTDOWN is received. */
+		if (SCTP_STATE_SHUTDOWN_RECEIVED == asoc->state)
+			sk->shutdown |= RCV_SHUTDOWN;
+
+	}
+
 	if ((SCTP_STATE_ESTABLISHED == asoc->state) ||
-	    (SCTP_STATE_CLOSED == asoc->state)) {
+	    (SCTP_STATE_CLOSED == asoc->state) ||
+	    (SCTP_STATE_SHUTDOWN_RECEIVED == asoc->state)) {
 		/* Wake up any processes waiting in the asoc's wait queue in
 		 * sctp_wait_for_connect() or sctp_wait_for_sndbuf().
 	 	 */
@@ -634,13 +649,6 @@ static void sctp_cmd_new_state(sctp_cmd_seq_t *cmds, struct sctp_association *as
 		if (SCTP_SOCKET_UDP != sp->type)
 			sk->state_change(sk);
 	}
-
-	/* Change the sk->state of a TCP-style socket that has sucessfully
-	 * completed a connect() call.
-	 */
-	if ((SCTP_STATE_ESTABLISHED == asoc->state) &&
-	    (SCTP_SOCKET_TCP == sp->type) && (SCTP_SS_CLOSED == sk->state))
-	    sk->state = SCTP_SS_ESTABLISHED;
 }
 
 /* These three macros allow us to pull the debugging code out of the

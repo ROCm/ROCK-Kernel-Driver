@@ -1864,11 +1864,38 @@ SCTP_STATIC int sctp_destroy_sock(struct sock *sk)
 	return 0;
 }
 
-/* FIXME: Comments needed.  */
+/* API 4.1.7 shutdown() - TCP Style Syntax
+ *     int shutdown(int socket, int how);
+ *
+ *     sd      - the socket descriptor of the association to be closed.
+ *     how     - Specifies the type of shutdown.  The  values  are
+ *               as follows:
+ *               SHUT_RD
+ *                     Disables further receive operations. No SCTP
+ *                     protocol action is taken.
+ *               SHUT_WR
+ *                     Disables further send operations, and initiates
+ *                     the SCTP shutdown sequence.
+ *               SHUT_RDWR
+ *                     Disables further send  and  receive  operations
+ *                     and initiates the SCTP shutdown sequence.
+ */
 SCTP_STATIC void sctp_shutdown(struct sock *sk, int how)
 {
-	/* UDP-style sockets do not support shutdown. */
-	/* STUB */
+	struct sctp_endpoint *ep;
+	struct sctp_association *asoc;
+
+	if (SCTP_SOCKET_TCP != sctp_sk(sk)->type)
+		return;
+
+	if (how & SEND_SHUTDOWN) {
+		ep = sctp_sk(sk)->ep;
+		if (!list_empty(&ep->asocs)) {
+			asoc = list_entry(ep->asocs.next,
+					  struct sctp_association, asocs);
+			sctp_primitive_SHUTDOWN(asoc, NULL);
+		}
+	}
 }
 
 /* 7.2.1 Association Status (SCTP_STATUS)
@@ -3145,6 +3172,9 @@ static struct sk_buff *sctp_skb_recv_datagram(struct sock *sk, int flags,
 		if (skb)
 			return skb;
 
+		if (sk->shutdown & RCV_SHUTDOWN)
+			break;
+
 		/* User doesn't want to wait.  */
 		error = -EAGAIN;
 		if (!timeo)
@@ -3379,6 +3409,8 @@ static int sctp_wait_for_connect(struct sctp_association *asoc, long *timeo_p)
 		__set_current_state(TASK_INTERRUPTIBLE);
 		if (!*timeo_p)
 			goto do_nonblock;
+		if (sk->shutdown & RCV_SHUTDOWN)
+			break;
 		if (sk->err || asoc->state >= SCTP_STATE_SHUTDOWN_PENDING ||
 		    asoc->base.dead)
 			goto do_error;
