@@ -483,7 +483,7 @@ static void rh_report_status (unsigned long ptr)
 {
 	struct urb	*urb;
 	struct usb_hcd	*hcd;
-	int		length;
+	int		length = 0;
 	unsigned long	flags;
 
 	urb = (struct urb *) ptr;
@@ -499,7 +499,9 @@ static void rh_report_status (unsigned long ptr)
 		return;
 	}
 
-	length = hcd->driver->hub_status_data (hcd, urb->transfer_buffer);
+	if (!HCD_IS_SUSPENDED (hcd->state))
+		length = hcd->driver->hub_status_data (
+					hcd, urb->transfer_buffer);
 
 	/* complete the status urb, or retrigger the timer */
 	spin_lock (&hcd_data_lock);
