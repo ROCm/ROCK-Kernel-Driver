@@ -30,7 +30,7 @@ static void simcons_write (struct console *co, const char *buf, unsigned len)
 	V850_SIM_SYSCALL (write, 1, buf, len);
 }
 
-static int simcons_read (struct console *co, const char *buf, unsigned len)
+static int simcons_read (struct console *co, char *buf, unsigned len)
 {
 	return V850_SIM_SYSCALL (read, 0, buf, len);
 }
