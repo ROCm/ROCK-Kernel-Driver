@@ -41,16 +41,6 @@ static int	nfs3_ftypes[] = {
 };
 
 /*
- * Reserve room in the send buffer
- */
-static inline void
-svcbuf_reserve(struct xdr_buf *buf, u32 **ptr, int *len, int nr)
-{
-	*ptr = (u32*)(buf->head[0].iov_base+buf->head[0].iov_len) + nr;
-	*len = ((PAGE_SIZE-buf->head[0].iov_len)>>2) - nr;
-}
-
-/*
  * NULL call.
  */
 static int
@@ -141,22 +131,17 @@ nfsd3_proc_access(struct svc_rqst *rqstp, struct nfsd3_accessargs *argp,
  * Read a symlink.
  */
 static int
-nfsd3_proc_readlink(struct svc_rqst *rqstp, struct nfsd_fhandle     *argp,
+nfsd3_proc_readlink(struct svc_rqst *rqstp, struct nfsd3_readlinkargs *argp,
 					   struct nfsd3_readlinkres *resp)
 {
-	u32		*path;
-	int		dummy, nfserr;
+	int nfserr;
 
 	dprintk("nfsd: READLINK(3) %s\n", SVCFH_fmt(&argp->fh));
-
-	/* Reserve room for status, post_op_attr, and path length */
-	svcbuf_reserve(&rqstp->rq_res, &path, &dummy,
-				1 + NFS3_POST_OP_ATTR_WORDS + 1);
 
 	/* Read the symlink. */
 	fh_copy(&resp->fh, &argp->fh);
 	resp->len = NFS3_MAXPATHLEN;
-	nfserr = nfsd_readlink(rqstp, &resp->fh, (char *) path, &resp->len);
+	nfserr = nfsd_readlink(rqstp, &resp->fh, argp->buffer, &resp->len);
 	RETURN_STATUS(nfserr);
 }
 
@@ -669,7 +654,7 @@ static struct svc_procedure		nfsd_procedures3[22] = {
   PROC(setattr,  sattr,		wccstat,	fhandle,  RC_REPLBUFF, ST+WC),
   PROC(lookup,	 dirop,		dirop,		fhandle2, RC_NOCACHE, ST+FH+pAT+pAT),
   PROC(access,	 access,	access,		fhandle,  RC_NOCACHE, ST+pAT+1),
-  PROC(readlink, fhandle,	readlink,	fhandle,  RC_NOCACHE, ST+pAT+1+NFS3_MAXPATHLEN/4),
+  PROC(readlink, readlink,	readlink,	fhandle,  RC_NOCACHE, ST+pAT+1+NFS3_MAXPATHLEN/4),
   PROC(read,	 read,		read,		fhandle,  RC_NOCACHE, ST+pAT+4+NFSSVC_MAXBLKSIZE),
   PROC(write,	 write,		write,		fhandle,  RC_REPLBUFF, ST+WC+4),
   PROC(create,	 create,	create,		fhandle2, RC_REPLBUFF, ST+(1+FH+pAT)+WC),

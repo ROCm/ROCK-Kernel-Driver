@@ -682,10 +682,9 @@ static void compute_parity(struct stripe_head *sh, int method)
 	raid5_conf_t *conf = sh->raid_conf;
 	int i, pd_idx = sh->pd_idx, disks = conf->raid_disks, count;
 	void *ptr[MAX_XOR_BLOCKS];
-	struct bio *chosen[MD_SB_DISKS];
+	struct bio *chosen;
 
 	PRINTK("compute_parity, stripe %llu, method %d\n", (unsigned long long)sh->sector, method);
-	memset(chosen, 0, sizeof(chosen));
 
 	count = 1;
 	ptr[0] = page_address(sh->dev[pd_idx].page);
@@ -699,10 +698,10 @@ static void compute_parity(struct stripe_head *sh, int method)
 			if (sh->dev[i].towrite &&
 			    test_bit(R5_UPTODATE, &sh->dev[i].flags)) {
 				ptr[count++] = page_address(sh->dev[i].page);
-				chosen[i] = sh->dev[i].towrite;
+				chosen = sh->dev[i].towrite;
 				sh->dev[i].towrite = NULL;
 				if (sh->dev[i].written) BUG();
-				sh->dev[i].written = chosen[i];
+				sh->dev[i].written = chosen;
 				check_xor();
 			}
 		}
@@ -711,10 +710,10 @@ static void compute_parity(struct stripe_head *sh, int method)
 		memset(ptr[0], 0, STRIPE_SIZE);
 		for (i= disks; i-- ;)
 			if (i!=pd_idx && sh->dev[i].towrite) {
-				chosen[i] = sh->dev[i].towrite;
+				chosen = sh->dev[i].towrite;
 				sh->dev[i].towrite = NULL;
 				if (sh->dev[i].written) BUG();
-				sh->dev[i].written = chosen[i];
+				sh->dev[i].written = chosen;
 			}
 		break;
 	case CHECK_PARITY:
@@ -726,9 +725,9 @@ static void compute_parity(struct stripe_head *sh, int method)
 	}
 	
 	for (i = disks; i--;)
-		if (chosen[i]) {
+		if (sh->dev[i].written) {
 			sector_t sector = sh->dev[i].sector;
-			copy_data(1, chosen[i], sh->dev[i].page, sector);
+			copy_data(1, sh->dev[i].written, sh->dev[i].page, sector);
 
 			set_bit(R5_LOCKED, &sh->dev[i].flags);
 			set_bit(R5_UPTODATE, &sh->dev[i].flags);
@@ -745,7 +744,7 @@ static void compute_parity(struct stripe_head *sh, int method)
 		break;
 	case READ_MODIFY_WRITE:
 		for (i = disks; i--;)
-			if (chosen[i]) {
+			if (sh->dev[i].written) {
 				ptr[count++] = page_address(sh->dev[i].page);
 				check_xor();
 			}

@@ -188,9 +188,9 @@ nfssvc_decode_void(struct svc_rqst *rqstp, u32 *p, void *dummy)
 }
 
 int
-nfssvc_decode_fhandle(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
+nfssvc_decode_fhandle(struct svc_rqst *rqstp, u32 *p, struct nfsd_fhandle *args)
 {
-	if (!(p = decode_fh(p, fhp)))
+	if (!(p = decode_fh(p, &args->fh)))
 		return 0;
 	return xdr_argsize_check(rqstp, p);
 }
@@ -305,6 +305,17 @@ nfssvc_decode_renameargs(struct svc_rqst *rqstp, u32 *p,
 }
 
 int
+nfssvc_decode_readlinkargs(struct svc_rqst *rqstp, u32 *p, struct nfsd_readlinkargs *args)
+{
+	if (!(p = decode_fh(p, &args->fh)))
+		return 0;
+	svc_take_page(rqstp);
+	args->buffer = page_address(rqstp->rq_respages[rqstp->rq_resused-1]);
+
+	return xdr_argsize_check(rqstp, p);
+}
+
+int
 nfssvc_decode_linkargs(struct svc_rqst *rqstp, u32 *p,
 					struct nfsd_linkargs *args)
 {
@@ -377,8 +388,15 @@ nfssvc_encode_readlinkres(struct svc_rqst *rqstp, u32 *p,
 					struct nfsd_readlinkres *resp)
 {
 	*p++ = htonl(resp->len);
-	p += XDR_QUADLEN(resp->len);
-	return xdr_ressize_check(rqstp, p);
+	xdr_ressize_check(rqstp, p);
+	rqstp->rq_res.page_len = resp->len;
+	if (resp->len & 3) {
+		/* need to pad the tail */
+		rqstp->rq_res.tail[0].iov_base = p;
+		*p = 0;
+		rqstp->rq_res.tail[0].iov_len = 4 - (resp->len&3);
+	}
+	return 1;
 }
 
 int
