@@ -115,10 +115,15 @@ config ACPI_SRAT
 	default y
 	depends on NUMA && (X86_SUMMIT || X86_GENERICARCH)
 
+config X86_SUMMIT_NUMA
+	bool
+	default y
+	depends on NUMA && (X86_SUMMIT || X86_GENERICARCH)
+
 config X86_CYCLONE_TIMER
-       bool 
-       default y
-       depends on X86_SUMMIT || X86_GENERICARCH
+	bool
+	default y
+	depends on X86_SUMMIT || X86_GENERICARCH
 
 config ES7000_CLUSTERED_APIC
 	bool

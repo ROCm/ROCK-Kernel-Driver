@@ -3,6 +3,12 @@
  *
  * Author : Stephen Smalley, <sds@epoch.ncsc.mil>
  */
+#include <linux/kernel.h>
+#include <linux/slab.h>
+#include <linux/spinlock.h>
+#include <linux/errno.h>
+#include "flask.h"
+#include "security.h"
 #include "sidtab.h"
 
 #define SIDTAB_HASH(sid) \

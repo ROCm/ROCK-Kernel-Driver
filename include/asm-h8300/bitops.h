@@ -23,25 +23,22 @@
  */
 static __inline__ unsigned long ffz(unsigned long word)
 {
-	register unsigned long result asm("er0");
-	register unsigned long _word asm("er1");
+	unsigned long result;
 
-	_word = word;
-	__asm__("sub.l %0,%0\n\t"
-		"dec.l #1,%0\n"
-		"1:\n\t"
-		"shlr.l %1\n\t"
+	result = -1;
+	__asm__("1:\n\t"
+		"shlr.l %2\n\t"
 		"adds #1,%0\n\t"
 		"bcs 1b"
-		: "=r" (result) : "r" (_word));
+		: "=r" (result)
+		: "0"  (result),"r" (word));
 	return result;
 }
 
 static __inline__ void set_bit(int nr, volatile unsigned long* addr)
 {
 	volatile unsigned char *b_addr;
-	b_addr = &(((volatile unsigned char *) addr)
-	          [((nr >> 3) & ~3) + 3 - ((nr >> 3) & 3)]);
+	b_addr = (volatile unsigned char *)addr + ((nr >> 3) ^ 3);
 	__asm__("mov.l %1,er0\n\t"
 		"bset r0l,%0"
 		:"+m"(*b_addr)
@@ -61,8 +58,7 @@ static __inline__ void set_bit(int nr, volatile unsigned long* addr)
 static __inline__ void clear_bit(int nr, volatile unsigned long* addr)
 {
 	volatile unsigned char *b_addr;
-	b_addr = &(((volatile unsigned char *) addr)
-	          [((nr >> 3) & ~3) + 3 - ((nr >> 3) & 3)]);
+	b_addr = (volatile unsigned char *)addr + ((nr >> 3) ^ 3);
 	__asm__("mov.l %1,er0\n\t"
 		"bclr r0l,%0"
 		:"+m"(*b_addr)
@@ -75,8 +71,7 @@ static __inline__ void clear_bit(int nr, volatile unsigned long* addr)
 static __inline__ void change_bit(int nr, volatile unsigned long* addr)
 {
 	volatile unsigned char *b_addr;
-	b_addr = &(((volatile unsigned char *) addr)
-	          [((nr >> 3) & ~3) + 3 - ((nr >> 3) & 3)]);
+	b_addr = (volatile unsigned char *)addr + ((nr >> 3) ^ 3);
 	__asm__("mov.l %1,er0\n\t"
 		"bnot r0l,%0"
 		:"+m"(*b_addr)
@@ -88,22 +83,18 @@ static __inline__ void change_bit(int nr, volatile unsigned long* addr)
 
 static __inline__ int test_bit(int nr, const unsigned long* addr)
 {
-	return ((1UL << (nr & 7)) & 
-               (((const volatile unsigned char *) addr)
-               [((nr >> 3) & ~3) + 3 - ((nr >> 3) & 3)])) != 0;
+	return (*((volatile unsigned char *)addr + ((nr >> 3) ^ 3)) & (1UL << (nr & 7))) != 0;
 }
 
 #define __test_bit(nr, addr) test_bit(nr, addr)
 
 static __inline__ int test_and_set_bit(int nr, volatile unsigned long* addr)
 {
-	register int retval __asm__("er0");
+	int retval = 0;
 	volatile unsigned char *a;
-	a = (volatile unsigned char *)addr;
 
-	a += ((nr >> 3) & ~3) + (3 - ((nr >> 3) & 3));
-	__asm__("mov.l %2,er3\n\t"
-		"sub.l %0,%0\n\t"
+	a = (volatile unsigned char *)addr += ((nr >> 3) ^ 3);             \
+	__asm__("mov.l %4,er3\n\t"
 		"stc ccr,r3h\n\t"
 		"orc #0x80,ccr\n\t"
 		"btst r3l,%1\n\t"
@@ -112,37 +103,35 @@ static __inline__ int test_and_set_bit(int nr, volatile unsigned long* addr)
 		"inc.l #1,%0\n\t"
 		"1:"
 		"ldc r3h,ccr"
-		: "=r"(retval),"+m"(*a) :"g"(nr & 7):"er3","memory");
+		: "=r"(retval),"+m"(*a)
+		: "0" (retval),"m" (*a),"g"(nr & 7):"er3","memory");
 	return retval;
 }
 
 static __inline__ int __test_and_set_bit(int nr, volatile unsigned long* addr)
 {
-	register int retval __asm__("er0");
+	int retval = 0;
 	volatile unsigned char *a;
-	a = (volatile unsigned char *)addr;
 
-	a += ((nr >> 3) & ~3) + (3 - ((nr >> 3) & 3));
-	__asm__("mov.l %2,er3\n\t"
-		"sub.l %0,%0\n\t"
+	a = (volatile unsigned char *)addr += ((nr >> 3) ^ 3);             \
+	__asm__("mov.l %4,er3\n\t"
 		"btst r3l,%1\n\t"
 		"bset r3l,%1\n\t"
 		"beq 1f\n\t"
 		"inc.l #1,%0\n\t"
 		"1:"
-		: "=r"(retval),"+m"(*a) :"g"(nr & 7):"er3","memory");
+		: "=r"(retval),"+m"(*a)
+		: "0" (retval),"m" (*a),"g"(nr & 7):"er3","memory");
 	return retval;
 }
 
 static __inline__ int test_and_clear_bit(int nr, volatile unsigned long* addr)
 {
-	register int retval __asm__("er0");
+	int retval = 0;
 	volatile unsigned char *a;
-	a = (volatile unsigned char *)addr;
 
-	a += ((nr >> 3) & ~3) + (3 - ((nr >> 3) & 3));
-	__asm__("mov.l %2,er3\n\t"
-		"sub.l %0,%0\n\t"
+	a = (volatile unsigned char *)addr += ((nr >> 3) ^ 3);             \
+	__asm__("mov.l %4,er3\n\t"
 		"stc ccr,r3h\n\t"
 		"orc #0x80,ccr\n\t"
 		"btst r3l,%1\n\t"
@@ -151,37 +140,35 @@ static __inline__ int test_and_clear_bit(int nr, volatile unsigned long* addr)
 		"inc.l #1,%0\n\t"
 		"1:"
 		"ldc r3h,ccr"
-		: "=r"(retval),"=m"(*a) :"g"(nr & 7):"er3","memory");
+		: "=r"(retval),"+m"(*a)
+		: "0" (retval),"m" (*a),"g"(nr & 7):"er3","memory");
 	return retval;
 }
 
 static __inline__ int __test_and_clear_bit(int nr, volatile unsigned long* addr)
 {
-	register int retval __asm__("er0");
+	int retval = 0;
 	volatile unsigned char *a;
-	a = (volatile unsigned char *)addr;
 
-	a += ((nr >> 3) & ~3) + (3 - ((nr >> 3) & 3));
-	__asm__("mov.l %2,er3\n\t"
-		"sub.l %0,%0\n\t"
+	a = (volatile unsigned char *)addr += ((nr >> 3) ^ 3);             \
+	__asm__("mov.l %4,er3\n\t"
 		"btst r3l,%1\n\t"
 		"bclr r3l,%1\n\t"
 		"beq 1f\n\t"
 		"inc.l #1,%0\n\t"
 		"1:"
-		: "=r"(retval),"+m"(*a) :"g"(nr & 7):"er3","memory");
+		: "=r"(retval),"+m"(*a)
+		: "0" (retval),"m" (*a),"g"(nr & 7):"er3","memory");
 	return retval;
 }
 
 static __inline__ int test_and_change_bit(int nr, volatile unsigned long* addr)
 {
-	register int retval __asm__("er0");
+	int retval = 0;
 	volatile unsigned char *a;
-	a = (volatile unsigned char *)addr;
 
-	a += ((nr >> 3) & ~3) + (3 - ((nr >> 3) & 3));
-	__asm__("mov.l %2,er3\n\t"
-		"sub.l %0,%0\n\t"
+	a = (volatile unsigned char *)addr += ((nr >> 3) ^ 3);             \
+	__asm__("mov.l %4,er3\n\t"
 		"stc ccr,r3h\n\t"
 		"orc #0x80,ccr\n\t"
 		"btst r3l,%1\n\t"
@@ -190,25 +177,25 @@ static __inline__ int test_and_change_bit(int nr, volatile unsigned long* addr)
 		"inc.l #1,%0\n\t"
 		"1:"
 		"ldc r3h,ccr"
-		: "=r"(retval),"+m"(*a) :"g"(nr & 7):"er3","memory");
+		: "=r"(retval),"+m"(*a)
+		: "0" (retval),"m" (*a),"g"(nr & 7):"er3","memory");
 	return retval;
 }
 
 static __inline__ int __test_and_change_bit(int nr, volatile unsigned long* addr)
 {
-	register int retval __asm__("er0");
+	int retval = 0;
 	volatile unsigned char *a;
-	a = (volatile unsigned char *)addr;
 
-	a += ((nr >> 3) & ~3) + (3 - ((nr >> 3) & 3));
-	__asm__("mov.l %2,er3\n\t"
-		"sub.l %0,%0\n\t"
+	a = (volatile unsigned char *)addr += ((nr >> 3) ^ 3);             \
+	__asm__("mov.l %4,er3\n\t"
 		"btst r3l,%1\n\t"
 		"bnot r3l,%1\n\t"
 		"beq 1f\n\t"
 		"inc.l #1,%0\n\t"
 		"1:"
-		: "=r"(retval),"+m"(*a) :"g"(nr & 7):"er3","memory");
+		: "=r"(retval),"+m"(*a)
+		: "0" (retval),"m" (*a),"g"(nr & 7):"er3","memory");
 	return retval;
 }
 
@@ -251,27 +238,21 @@ found_middle:
 	return result + ffz(tmp);
 }
 
-static __inline__ unsigned long ffs(unsigned long word)
+static __inline__ unsigned long __ffs(unsigned long word)
 {
-	register unsigned long result asm("er0");
-	register unsigned long _word asm("er1");
+	unsigned long result;
 
-	_word = word;
-	__asm__("sub.l %0,%0\n\t"
-		"dec.l #1,%0\n"
-		"1:\n\t"
-		"shlr.l %1\n\t"
+	result = -1;
+	__asm__("1:\n\t"
+		"shlr.l %2\n\t"
 		"adds #1,%0\n\t"
 		"bcc 1b"
-		: "=r" (result) : "r"(_word));
+		: "=r" (result)
+		: "0"(result),"r"(word));
 	return result;
 }
 
-#define __ffs(x) ffs(x)
-
-/*
- * fls: find last bit set.
- */
+#define ffs(x) generic_ffs(x)
 #define fls(x) generic_fls(x)
 
 /*
@@ -316,6 +297,7 @@ static __inline__ int ext2_set_bit(int nr, volatile void * addr)
 	local_irq_restore(flags);
 	return retval;
 }
+#define ext2_set_bit_atomic(lock, nr, addr) ext2_set_bit(nr, addr)
 
 static __inline__ int ext2_clear_bit(int nr, volatile void * addr)
 {
@@ -331,6 +313,7 @@ static __inline__ int ext2_clear_bit(int nr, volatile void * addr)
 	local_irq_restore(flags);
 	return retval;
 }
+#define ext2_clear_bit_atomic(lock, nr, addr) ext2_set_bit(nr, addr)
 
 static __inline__ int ext2_test_bit(int nr, const volatile void * addr)
 {
@@ -401,17 +384,6 @@ found_middle:
 #define minix_test_and_clear_bit(nr,addr) test_and_clear_bit(nr,addr)
 #define minix_test_bit(nr,addr) test_bit(nr,addr)
 #define minix_find_first_zero_bit(addr,size) find_first_zero_bit(addr,size)
-
-/**
- * hweightN - returns the hamming weight of a N-bit word
- * @x: the word to weigh
- *
- * The Hamming Weight of a number is the total number of bits set in it.
- */
-
-#define hweight32(x) generic_hweight32(x)
-#define hweight16(x) generic_hweight16(x)
-#define hweight8(x) generic_hweight8(x)
 
 #endif /* __KERNEL__ */
 

@@ -99,6 +99,7 @@ utf8_mbstowcs(wchar_t *pwcs, const __u8 *s, int n)
 			}
 		} else {
 			*op++ = *ip++;
+			n--;
 		}
 	}
 	return (op - pwcs);

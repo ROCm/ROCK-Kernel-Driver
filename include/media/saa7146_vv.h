@@ -149,7 +149,7 @@ struct saa7146_extension_ioctls
 };
 
 /* flags */
-#define SAA7146_EXT_SWAP_ODD_EVEN       0x1     /* needs odd/even fields swapped */
+// #define SAA7146_EXT_SWAP_ODD_EVEN	0x1     /* needs odd/even fields swapped */
 #define SAA7146_USE_PORT_B_FOR_VBI	0x2     /* use input port b for vbi hardware bug workaround */
 
 struct saa7146_ext_vv
@@ -171,12 +171,10 @@ struct saa7146_ext_vv
 
 struct saa7146_use_ops  {
         void (*init)(struct saa7146_dev *, struct saa7146_vv *);
-        void(*open)(struct saa7146_dev *, struct saa7146_fh *);
-        void (*release)(struct saa7146_dev *, struct saa7146_fh *,struct file *);
+        void(*open)(struct saa7146_dev *, struct file *);
+        void (*release)(struct saa7146_dev *, struct file *);
         void (*irq_done)(struct saa7146_dev *, unsigned long status);
 	ssize_t (*read)(struct file *, char *, size_t, loff_t *);
-        int (*capture_begin)(struct saa7146_fh *);
-        int (*capture_end)(struct saa7146_fh *);
 };
 
 /* from saa7146_fops.c */

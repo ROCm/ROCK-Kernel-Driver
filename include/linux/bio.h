@@ -162,7 +162,7 @@ struct bio {
  */
 
 #define __BVEC_END(bio)		bio_iovec_idx((bio), (bio)->bi_vcnt - 1)
-#define __BVEC_START(bio)	bio_iovec_idx((bio), 0)
+#define __BVEC_START(bio)	bio_iovec_idx((bio), (bio)->bi_idx)
 #define BIOVEC_PHYS_MERGEABLE(vec1, vec2)	\
 	((bvec_to_phys((vec1)) + (vec1)->bv_len) == bvec_to_phys((vec2)))
 #define BIOVEC_VIRT_MERGEABLE(vec1, vec2)	\

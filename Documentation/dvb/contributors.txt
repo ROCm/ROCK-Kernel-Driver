@@ -1,0 +1,54 @@
+Thanks go to the following people for patches and contributions:
+
+Michael Hunold <m.hunold@gmx.de>
+  for the initial saa7146 driver and it's recent overhaul
+
+Christian Theiss
+  for his work on the initial Linux DVB driver
+
+Marcus Metzler <mocm@metzlerbros.de>
+Ralph Metzler <rjkm@metzlerbros.de>
+  for their contining work on the DVB driver
+
+Michael Holzt <kju@debian.org>
+  for his contributions to the dvb-net driver
+
+Diego Picciani <d.picciani@novacomp.it>
+  for CyberLogin for Linux which allows logging onto EON
+  (in case you are wondering where CyberLogin is, EON changed its login 
+  procedure and CyberLogin is no longer used.)
+
+Martin Schaller <martin@smurf.franken.de>
+  for patching the cable card decoder driver
+
+Klaus Schmidinger <Klaus.Schmidinger@cadsoft.de>
+  for various fixes regarding tuning, OSD and CI stuff and his work on VDR
+
+Steve Brown <sbrown@cortland.com>
+  for his AFC kernel thread
+
+Christoph Martin <martin@uni-mainz.de>
+  for his LIRC infrared handler
+
+Andreas Oberritter <andreas@oberritter.de>
+Florian Schirmer <jolt@tuxbox.org>
+...and all the other dBox2 people
+  for many bugfixes in the generic DVB Core and their work on the 
+  dBox2 port of the DVB driver
+
+Oliver Endriss <o.endriss@gmx.de>
+  for many bugfixes
+
+Andrew de Quincey <adq_dvb@lidskialf.net>
+  for the tda1004x frontend driver, and various bugfixes
+
+Peter Schildmann <peter.schildmann@web.de>
+  for the driver for the Technisat SkyStar2 PCI DVB card
+
+Vadim Catana <skystar@moldova.cc>
+Roberto Ragusa <r.ragusa@libero.it>
+Augusto Cardoso <augusto@carhil.net>
+  for all the work for the FlexCopII chipset by B2C2,Inc.
+
+(If you think you should be in this list, but you are not, drop a
+ line to the DVB mailing list)

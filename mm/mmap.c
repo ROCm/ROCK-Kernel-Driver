@@ -1138,7 +1138,11 @@ static void unmap_region(struct mm_struct *mm,
 	tlb = tlb_gather_mmu(mm, 0);
 	unmap_vmas(&tlb, mm, vma, start, end, &nr_accounted);
 	vm_unacct_memory(nr_accounted);
-	free_pgtables(tlb, prev, start, end);
+
+	if (is_hugepage_only_range(start, end - start))
+		hugetlb_free_pgtables(tlb, prev, start, end);
+	else
+		free_pgtables(tlb, prev, start, end);
 	tlb_finish_mmu(tlb, start, end);
 }
 

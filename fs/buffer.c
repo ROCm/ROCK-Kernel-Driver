@@ -2823,7 +2823,7 @@ drop_buffers(struct page *page, struct buffer_head **buffers_to_free)
 		bh = bh->b_this_page;
 	} while (bh != head);
 
-	if (!was_uptodate && PageUptodate(page))
+	if (!was_uptodate && PageUptodate(page) && !PageError(page))
 		buffer_error();
 
 	do {

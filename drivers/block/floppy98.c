@@ -2594,7 +2594,7 @@ static void copy_buffer(int ssize, int max_sector, int max_sector_2)
 			       current_count_sectors);
 			if (CT(COMMAND) == FD_READ)
 				printk("read\n");
-			if (CT(COMMAND) == FD_READ)
+			if (CT(COMMAND) == FD_WRITE)
 				printk("write\n");
 			break;
 		}
@@ -2925,7 +2925,7 @@ static int make_raw_rw_request(void)
 			       current_count_sectors);
 			if (CT(COMMAND) == FD_READ)
 				printk("read\n");
-			if (CT(COMMAND) == FD_READ)
+			if (CT(COMMAND) == FD_WRITE)
 				printk("write\n");
 			return 0;
 		}

@@ -56,7 +56,8 @@ static void r1bio_pool_free(void *r1_bio, void *data)
 	kfree(r1_bio);
 }
 
-#define RESYNC_BLOCK_SIZE (64*1024)
+//#define RESYNC_BLOCK_SIZE (64*1024)
+#define RESYNC_BLOCK_SIZE PAGE_SIZE
 #define RESYNC_SECTORS (RESYNC_BLOCK_SIZE >> 9)
 #define RESYNC_PAGES ((RESYNC_BLOCK_SIZE + PAGE_SIZE-1) / PAGE_SIZE)
 #define RESYNC_WINDOW (2048*1024)

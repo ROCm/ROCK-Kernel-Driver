@@ -4,12 +4,7 @@
 /*
  * The MS-DOS filesystem constants/structures
  */
-#include <linux/buffer_head.h>
-#include <linux/string.h>
 #include <asm/byteorder.h>
-
-struct statfs;
-
 
 #define SECTOR_SIZE	512		/* sector size (bytes) */
 #define SECTOR_BITS	9		/* log2(SECTOR_SIZE) */
@@ -18,14 +13,15 @@ struct statfs;
 #define MSDOS_DPS	(SECTOR_SIZE / sizeof(struct msdos_dir_entry))
 #define MSDOS_DPS_BITS	4		/* log2(MSDOS_DPS) */
 
+
+#define MSDOS_SUPER_MAGIC 0x4d44 /* MD */
+
 #define MSDOS_ROOT_INO	1	/* == MINIX_ROOT_INO */
 #define MSDOS_DIR_BITS	5	/* log2(sizeof(struct msdos_dir_entry)) */
 
 /* directory limit */
 #define FAT_MAX_DIR_ENTRIES	(65536)
 #define FAT_MAX_DIR_SIZE	(FAT_MAX_DIR_ENTRIES << MSDOS_DIR_BITS)
-
-#define MSDOS_SUPER_MAGIC 0x4d44 /* MD */
 
 #define ATTR_NONE    0 /* no attribute bits */
 #define ATTR_RO      1  /* read-only */
@@ -35,10 +31,10 @@ struct statfs;
 #define ATTR_DIR     16 /* directory */
 #define ATTR_ARCH    32 /* archived */
 
+/* attribute bits that are copied "as is" */
 #define ATTR_UNUSED  (ATTR_VOLUME | ATTR_ARCH | ATTR_SYS | ATTR_HIDDEN)
-	/* attribute bits that are copied "as is" */
+/* bits that are used by the Windows 95/Windows NT extended FAT */
 #define ATTR_EXT     (ATTR_RO | ATTR_HIDDEN | ATTR_SYS | ATTR_VOLUME)
-	/* bits that are used by the Windows 95/Windows NT extended FAT */
 
 #define CASE_LOWER_BASE 8	/* base is lower case */
 #define CASE_LOWER_EXT  16	/* extension is lower case */
@@ -46,8 +42,12 @@ struct statfs;
 #define DELETED_FLAG 0xe5 /* marks file as deleted when in name[0] */
 #define IS_FREE(n) (!*(n) || *(n) == DELETED_FLAG)
 
+/* valid file mode bits */
 #define MSDOS_VALID_MODE (S_IFREG | S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO)
-	/* valid file mode bits */
+/* Convert attribute bits and a mask to the UNIX mode. */
+#define MSDOS_MKMODE(a, m) (m & (a & ATTR_RO ? S_IRUGO|S_IXUGO : S_IRWXUGO))
+/* Convert the UNIX mode to MS-DOS attribute bits. */
+#define MSDOS_MKATTR(m) ((m & S_IWUGO) ? ATTR_NONE : ATTR_RO)
 
 #define MSDOS_NAME 11 /* maximum name length */
 #define MSDOS_LONGNAME 256 /* maximum name length */
@@ -55,24 +55,29 @@ struct statfs;
 #define MSDOS_DOT    ".          " /* ".", padded to MSDOS_NAME chars */
 #define MSDOS_DOTDOT "..         " /* "..", padded to MSDOS_NAME chars */
 
-#define MSDOS_FAT12 4084 /* maximum number of clusters in a 12 bit FAT */
-
 /* media of boot sector */
 #define FAT_VALID_MEDIA(x)	((0xF8 <= (x) && (x) <= 0xFF) || (x) == 0xF0)
 #define FAT_FIRST_ENT(s, x)	((MSDOS_SB(s)->fat_bits == 32 ? 0x0FFFFF00 : \
 	MSDOS_SB(s)->fat_bits == 16 ? 0xFF00 : 0xF00) | (x))
 
+/* maximum number of clusters */
+#define MAX_FAT12 0xFF4
+#define MAX_FAT16 0xFFF4
+#define MAX_FAT32 0x0FFFFFF6
+#define MAX_FAT(s) (MSDOS_SB(s)->fat_bits == 32 ? MAX_FAT32 : \
+	MSDOS_SB(s)->fat_bits == 16 ? MAX_FAT16 : MAX_FAT12)
+
 /* bad cluster mark */
 #define BAD_FAT12 0xFF7
 #define BAD_FAT16 0xFFF7
-#define BAD_FAT32 0xFFFFFF7
+#define BAD_FAT32 0x0FFFFFF7
 #define BAD_FAT(s) (MSDOS_SB(s)->fat_bits == 32 ? BAD_FAT32 : \
 	MSDOS_SB(s)->fat_bits == 16 ? BAD_FAT16 : BAD_FAT12)
 
 /* standard EOF */
 #define EOF_FAT12 0xFFF
 #define EOF_FAT16 0xFFFF
-#define EOF_FAT32 0xFFFFFFF
+#define EOF_FAT32 0x0FFFFFFF
 #define EOF_FAT(s) (MSDOS_SB(s)->fat_bits == 32 ? EOF_FAT32 : \
 	MSDOS_SB(s)->fat_bits == 16 ? EOF_FAT16 : EOF_FAT12)
 
@@ -80,8 +85,8 @@ struct statfs;
 #define FAT_ENT_BAD	(BAD_FAT32)
 #define FAT_ENT_EOF	(EOF_FAT32)
 
-#define FAT_FSINFO_SIG1		0x41615252
-#define FAT_FSINFO_SIG2		0x61417272
+#define FAT_FSINFO_SIG1	0x41615252
+#define FAT_FSINFO_SIG2	0x61417272
 #define IS_FSINFO(x)	(CF_LE_L((x)->signature1) == FAT_FSINFO_SIG1	\
 			 && CF_LE_L((x)->signature2) == FAT_FSINFO_SIG2)
 
@@ -179,15 +184,10 @@ struct vfat_slot_info {
 	loff_t i_pos;		       /* on-disk position of directory entry */
 };
 
-/* Convert attribute bits and a mask to the UNIX mode. */
-#define MSDOS_MKMODE(a,m) (m & (a & ATTR_RO ? S_IRUGO|S_IXUGO : S_IRWXUGO))
-
-/* Convert the UNIX mode to MS-DOS attribute bits. */
-#define MSDOS_MKATTR(m) ((m & S_IWUGO) ? ATTR_NONE : ATTR_RO)
-
-
 #ifdef __KERNEL__
 
+#include <linux/buffer_head.h>
+#include <linux/string.h>
 #include <linux/nls.h>
 #include <linux/msdos_fs_i.h>
 #include <linux/msdos_fs_sb.h>

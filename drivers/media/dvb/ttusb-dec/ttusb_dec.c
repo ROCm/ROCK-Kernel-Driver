@@ -19,18 +19,134 @@
  *
  */
 
-#include <linux/version.h>
+#include <asm/semaphore.h>
+#include <linux/list.h>
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/spinlock.h>
 #include <linux/usb.h>
+#include <linux/version.h>
+#include <linux/interrupt.h>
+#include <linux/firmware.h>
 
-#include "ttusb_dec.h"
+#include "dmxdev.h"
+#include "dvb_demux.h"
+#include "dvb_i2c.h"
+#include "dvb_filter.h"
 #include "dvb_frontend.h"
+#include "dvb_net.h"
 
 static int debug = 0;
 
 #define dprintk	if (debug) printk
+
+#define DRIVER_NAME		"TechnoTrend/Hauppauge DEC USB"
+
+#define COMMAND_PIPE		0x03
+#define RESULT_PIPE		0x84
+#define STREAM_PIPE		0x88
+
+#define COMMAND_PACKET_SIZE	0x3c
+#define ARM_PACKET_SIZE		0x1000
+
+#define ISO_BUF_COUNT		0x04
+#define FRAMES_PER_ISO_BUF	0x04
+#define ISO_FRAME_SIZE		0x0380
+
+#define	MAX_AV_PES_LENGTH	6144
+
+#define LOF_HI			10600000
+#define LOF_LO			9750000
+
+enum ttusb_model {
+	TTUSB_DEC2000T,
+	TTUSB_DEC3000S
+};
+
+struct ttusb_dec {
+	enum ttusb_model		model;
+	char				*model_name;
+	char				*firmware_name;
+
+	/* DVB bits */
+	struct dvb_adapter		*adapter;
+	struct dmxdev			dmxdev;
+	struct dvb_demux		demux;
+	struct dmx_frontend		frontend;
+	struct dvb_i2c_bus		i2c_bus;
+	struct dvb_net			dvb_net;
+	struct dvb_frontend_info	*frontend_info;
+	int (*frontend_ioctl) (struct dvb_frontend *, unsigned int, void *);
+
+	u16			pid[DMX_PES_OTHER];
+	int			hi_band;
+
+	/* USB bits */
+	struct usb_device	*udev;
+	u8			trans_count;
+	unsigned int		command_pipe;
+	unsigned int		result_pipe;
+	unsigned int		stream_pipe;
+	int			interface;
+	struct semaphore	usb_sem;
+
+	void			*iso_buffer;
+	dma_addr_t		iso_dma_handle;
+	struct urb		*iso_urb[ISO_BUF_COUNT];
+	int			iso_stream_count;
+	struct semaphore	iso_sem;
+
+	u8			av_pes[MAX_AV_PES_LENGTH + 4];
+	int			av_pes_state;
+	int			av_pes_length;
+	int			av_pes_payload_length;
+
+	struct dvb_filter_pes2ts	a_pes2ts;
+	struct dvb_filter_pes2ts	v_pes2ts;
+
+	u8			v_pes[16 + MAX_AV_PES_LENGTH];
+	int			v_pes_length;
+	int			v_pes_postbytes;
+
+	struct list_head	urb_frame_list;
+	struct tasklet_struct	urb_tasklet;
+	spinlock_t		urb_frame_list_lock;
+
+	int			active; /* Loaded successfully */
+};
+
+struct urb_frame {
+	u8			data[ISO_FRAME_SIZE];
+	int			length;
+	struct list_head	urb_frame_list;
+};
+
+static struct dvb_frontend_info dec2000t_frontend_info = {
+	.name			= "TechnoTrend/Hauppauge DEC2000-t Frontend",
+	.type			= FE_OFDM,
+	.frequency_min		= 51000000,
+	.frequency_max		= 858000000,
+	.frequency_stepsize	= 62500,
+	.caps =	FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
+		FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
+		FE_CAN_QAM_16 | FE_CAN_QAM_64 | FE_CAN_QAM_AUTO |
+		FE_CAN_TRANSMISSION_MODE_AUTO | FE_CAN_GUARD_INTERVAL_AUTO |
+		FE_CAN_HIERARCHY_AUTO,
+};
+
+static struct dvb_frontend_info dec3000s_frontend_info = {
+	.name			= "TechnoTrend/Hauppauge DEC3000-s Frontend",
+	.type			= FE_QPSK,
+	.frequency_min		= 950000,
+	.frequency_max		= 2150000,
+	.frequency_stepsize	= 125,
+	.caps =	FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
+		FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
+		FE_CAN_QAM_16 | FE_CAN_QAM_64 | FE_CAN_QAM_AUTO |
+		FE_CAN_TRANSMISSION_MODE_AUTO | FE_CAN_GUARD_INTERVAL_AUTO |
+		FE_CAN_HIERARCHY_AUTO,
+};
 
 static int ttusb_dec_send_command(struct ttusb_dec *dec, const u8 command,
 				  int param_length, const u8 params[],
@@ -129,22 +245,8 @@ static void ttusb_dec_set_pids(struct ttusb_dec *dec)
 				       ttusb_dec_av_pes2ts_cb, dec->demux.feed);
 		dvb_filter_pes2ts_init(&dec->v_pes2ts, dec->pid[DMX_PES_VIDEO],
 				       ttusb_dec_av_pes2ts_cb, dec->demux.feed);
-}
-
-static int ttusb_dec_i2c_master_xfer(struct dvb_i2c_bus *i2c,
-				     const struct i2c_msg msgs[], int num)
-{
-	int result, i;
-
-	dprintk("%s\n", __FUNCTION__);
-
-	for (i = 0; i < num; i++)
-		if ((result = ttusb_dec_send_command(i2c->data, msgs[i].addr,
-						     msgs[i].len, msgs[i].buf,
-						     NULL, NULL)))
-			return result;
-
-	return 0;
+	dec->v_pes_length = 0;
+	dec->v_pes_postbytes = 0;
 }
 
 static void ttusb_dec_process_av_pes(struct ttusb_dec * dec, u8 * av_pes,
@@ -194,7 +296,8 @@ static void ttusb_dec_process_av_pes(struct ttusb_dec * dec, u8 * av_pes,
 				       &av_pes[12], prebytes);
 
 				dvb_filter_pes2ts(&dec->v_pes2ts, dec->v_pes,
-						  dec->v_pes_length + prebytes);
+						  dec->v_pes_length + prebytes,
+						  1);
 			}
 
 			if (av_pes[5] & 0x10) {
@@ -239,13 +342,14 @@ static void ttusb_dec_process_av_pes(struct ttusb_dec * dec, u8 * av_pes,
 
 			if (postbytes == 0)
 				dvb_filter_pes2ts(&dec->v_pes2ts, dec->v_pes,
-							  dec->v_pes_length);
+						  dec->v_pes_length, 1);
 
 			break;
 		}
 
 	case 0x02:		/* MainAudioStream */
-		dvb_filter_pes2ts(&dec->a_pes2ts, &av_pes[8], length - 12);
+		dvb_filter_pes2ts(&dec->a_pes2ts, &av_pes[8], length - 12,
+				  av_pes[5] & 0x10);
 		break;
 
 	default:
@@ -367,11 +471,7 @@ static void ttusb_dec_process_urb_frame_list(unsigned long data)
 	}
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-static void ttusb_dec_process_urb(struct urb *urb)
-#else
 static void ttusb_dec_process_urb(struct urb *urb, struct pt_regs *ptregs)
-#endif
 {
 	struct ttusb_dec *dec = urb->context;
 
@@ -380,6 +480,7 @@ static void ttusb_dec_process_urb(struct urb *urb, struct pt_regs *ptregs)
 
 		for (i = 0; i < FRAMES_PER_ISO_BUF; i++) {
 			struct usb_iso_packet_descriptor *d;
+
 			u8 *b;
 			int length;
 			struct urb_frame *frame;
@@ -412,10 +513,8 @@ static void ttusb_dec_process_urb(struct urb *urb, struct pt_regs *ptregs)
 				urb->status);
 	}
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 	if (dec->iso_stream_count)
 		usb_submit_urb(urb, GFP_ATOMIC);
-#endif
 }
 
 static void ttusb_dec_setup_urbs(struct ttusb_dec *dec)
@@ -433,9 +532,8 @@ static void ttusb_dec_setup_urbs(struct ttusb_dec *dec)
 		urb->complete = ttusb_dec_process_urb;
 		urb->pipe = dec->stream_pipe;
 		urb->transfer_flags = URB_ISO_ASAP;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 		urb->interval = 1;
-#endif
+
 		urb->number_of_packets = FRAMES_PER_ISO_BUF;
 		urb->transfer_buffer_length = ISO_FRAME_SIZE *
 					      FRAMES_PER_ISO_BUF;
@@ -502,8 +600,8 @@ static int ttusb_dec_start_iso_xfer(struct ttusb_dec *dec)
 		ttusb_dec_setup_urbs(dec);
 
 		for (i = 0; i < ISO_BUF_COUNT; i++) {
-			if ((result = usb_submit_urb(dec->iso_urb[i]
-						    , GFP_KERNEL))) {
+			if ((result = usb_submit_urb(dec->iso_urb[i],
+						     GFP_ATOMIC))) {
 				printk("%s: failed urb submission %d: "
 				       "error %d\n", __FUNCTION__, i, result);
 
@@ -524,10 +622,6 @@ static int ttusb_dec_start_iso_xfer(struct ttusb_dec *dec)
 	dec->iso_stream_count++;
 
 	up(&dec->iso_sem);
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	ttusb_dec_set_streaming_interface(dec);
-#endif
 
 	return 0;
 }
@@ -659,7 +753,7 @@ static int ttusb_dec_alloc_iso_urbs(struct ttusb_dec *dec)
 	for (i = 0; i < ISO_BUF_COUNT; i++) {
 		struct urb *urb;
 
-		if (!(urb = usb_alloc_urb(FRAMES_PER_ISO_BUF, GFP_KERNEL))) {
+		if (!(urb = usb_alloc_urb(FRAMES_PER_ISO_BUF, GFP_ATOMIC))) {
 			ttusb_dec_free_iso_urbs(dec);
 			return -ENOMEM;
 		}
@@ -668,13 +762,6 @@ static int ttusb_dec_alloc_iso_urbs(struct ttusb_dec *dec)
 	}
 
 	ttusb_dec_setup_urbs(dec);
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	for (i = 0; i < ISO_BUF_COUNT; i++) {
-		int next = (i + 1) % ISO_BUF_COUNT;
-		dec->iso_urb[i]->next = dec->iso_urb[next];
-	}
-#endif
 
 	return 0;
 }
@@ -711,20 +798,45 @@ static void ttusb_dec_init_usb(struct ttusb_dec *dec)
 	ttusb_dec_alloc_iso_urbs(dec);
 }
 
-#include "dsp_dec2000.h"
-
 static int ttusb_dec_boot_dsp(struct ttusb_dec *dec)
 {
 	int i, j, actual_len, result, size, trans_count;
-	u8 b0[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1b, 0xc8, 0x61,
+	u8 b0[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		    0x00 };
 	u8 b1[] = { 0x61 };
 	u8 b[ARM_PACKET_SIZE];
-	u32 dsp_length = htonl(sizeof(dsp_dec2000));
+	u8 *firmware = NULL;
+	size_t firmware_size = 0;
+	u32 firmware_csum = 0;
+	u32 firmware_size_nl;
+	u32 firmware_csum_nl;
+	const struct firmware *fw_entry = NULL;
 
 	dprintk("%s\n", __FUNCTION__);
 
-	memcpy(b0, &dsp_length, 4);
+	if (request_firmware(&fw_entry, dec->firmware_name, &dec->udev->dev)) {
+		printk(KERN_ERR "%s: Firmware (%s) unavailable.\n",
+		       __FUNCTION__, dec->firmware_name);
+		return 1;
+	}
+
+	firmware = fw_entry->data;
+	firmware_size = fw_entry->size;
+
+	switch (dec->model) {
+		case TTUSB_DEC2000T:
+			firmware_csum = 0x1bc86100;
+			break;
+
+		case TTUSB_DEC3000S:
+			firmware_csum = 0x00000000;
+			break;
+	}
+
+	firmware_size_nl = htonl(firmware_size);
+	memcpy(b0, &firmware_size_nl, 4);
+	firmware_csum_nl = htonl(firmware_csum);
+	memcpy(&b0[6], &firmware_csum_nl, 4);
 
 	result = ttusb_dec_send_command(dec, 0x41, sizeof(b0), b0, NULL, NULL);
 
@@ -734,8 +846,8 @@ static int ttusb_dec_boot_dsp(struct ttusb_dec *dec)
 	trans_count = 0;
 	j = 0;
 
-	for (i = 0; i < sizeof(dsp_dec2000); i += COMMAND_PACKET_SIZE) {
-		size = sizeof(dsp_dec2000) - i;
+	for (i = 0; i < firmware_size; i += COMMAND_PACKET_SIZE) {
+		size = firmware_size - i;
 		if (size > COMMAND_PACKET_SIZE)
 			size = COMMAND_PACKET_SIZE;
 
@@ -743,7 +855,7 @@ static int ttusb_dec_boot_dsp(struct ttusb_dec *dec)
 		b[j + 1] = trans_count++;
 		b[j + 2] = 0xf0;
 		b[j + 3] = size;
-		memcpy(&b[j + 4], &dsp_dec2000[i], size);
+		memcpy(&b[j + 4], &firmware[i], size);
 
 		j += COMMAND_PACKET_SIZE + 4;
 
@@ -764,7 +876,7 @@ static int ttusb_dec_boot_dsp(struct ttusb_dec *dec)
 	return result;
 }
 
-static void ttusb_dec_init_stb(struct ttusb_dec *dec)
+static int ttusb_dec_init_stb(struct ttusb_dec *dec)
 {
 	u8 c[COMMAND_PACKET_SIZE];
 	int c_length;
@@ -774,9 +886,14 @@ static void ttusb_dec_init_stb(struct ttusb_dec *dec)
 
 	result = ttusb_dec_send_command(dec, 0x08, 0, NULL, &c_length, c);
 
-	if (!result)
+	if (!result) {
 		if (c_length != 0x0c || (c_length == 0x0c && c[9] != 0x63))
-			ttusb_dec_boot_dsp(dec);
+			return ttusb_dec_boot_dsp(dec);
+		else
+			return 0;
+	}
+	else
+		return result;
 }
 
 static int ttusb_dec_init_dvb(struct ttusb_dec *dec)
@@ -785,20 +902,11 @@ static int ttusb_dec_init_dvb(struct ttusb_dec *dec)
 
 	dprintk("%s\n", __FUNCTION__);
 
-	if ((result = dvb_register_adapter(&dec->adapter, "dec2000")) < 0) {
+	if ((result = dvb_register_adapter(&dec->adapter, dec->model_name)) < 0) {
 		printk("%s: dvb_register_adapter failed: error %d\n",
 		       __FUNCTION__, result);
 
 		return result;
-	}
-
-	if (!(dec->i2c_bus = dvb_register_i2c_bus(ttusb_dec_i2c_master_xfer,
-						  dec, dec->adapter, 0))) {
-		printk("%s: dvb_register_i2c_bus failed\n", __FUNCTION__);
-
-		dvb_unregister_adapter(dec->adapter);
-
-		return -ENOMEM;
 	}
 
 	dec->demux.dmx.capabilities = DMX_TS_FILTERING | DMX_SECTION_FILTERING;
@@ -814,8 +922,6 @@ static int ttusb_dec_init_dvb(struct ttusb_dec *dec)
 		printk("%s: dvb_dmx_init failed: error %d\n", __FUNCTION__,
 		       result);
 
-		dvb_unregister_i2c_bus(ttusb_dec_i2c_master_xfer, dec->adapter,
-				       0);
 		dvb_unregister_adapter(dec->adapter);
 
 		return result;
@@ -830,8 +936,6 @@ static int ttusb_dec_init_dvb(struct ttusb_dec *dec)
 		       __FUNCTION__, result);
 
 		dvb_dmx_release(&dec->demux);
-		dvb_unregister_i2c_bus(ttusb_dec_i2c_master_xfer, dec->adapter,
-				       0);
 		dvb_unregister_adapter(dec->adapter);
 
 		return result;
@@ -846,8 +950,6 @@ static int ttusb_dec_init_dvb(struct ttusb_dec *dec)
 
 		dvb_dmxdev_release(&dec->dmxdev);
 		dvb_dmx_release(&dec->demux);
-		dvb_unregister_i2c_bus(ttusb_dec_i2c_master_xfer, dec->adapter,
-				       0);
 		dvb_unregister_adapter(dec->adapter);
 
 		return result;
@@ -861,8 +963,6 @@ static int ttusb_dec_init_dvb(struct ttusb_dec *dec)
 		dec->demux.dmx.remove_frontend(&dec->demux.dmx, &dec->frontend);
 		dvb_dmxdev_release(&dec->dmxdev);
 		dvb_dmx_release(&dec->demux);
-		dvb_unregister_i2c_bus(ttusb_dec_i2c_master_xfer, dec->adapter,
-				       0);
 		dvb_unregister_adapter(dec->adapter);
 
 		return result;
@@ -882,7 +982,6 @@ static void ttusb_dec_exit_dvb(struct ttusb_dec *dec)
 	dec->demux.dmx.remove_frontend(&dec->demux.dmx, &dec->frontend);
 	dvb_dmxdev_release(&dec->dmxdev);
 	dvb_dmx_release(&dec->demux);
-	dvb_unregister_i2c_bus(ttusb_dec_i2c_master_xfer, dec->adapter, 0);
 	dvb_unregister_adapter(dec->adapter);
 }
 
@@ -914,35 +1013,257 @@ static void ttusb_dec_exit_tasklet(struct ttusb_dec *dec)
 	}
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-static void *ttusb_dec_probe(struct usb_device *udev, unsigned int ifnum,
-			     const struct usb_device_id *id)
+static int ttusb_dec_2000t_frontend_ioctl(struct dvb_frontend *fe, unsigned int cmd,
+				  void *arg)
 {
-	struct ttusb_dec *dec;
+	struct ttusb_dec *dec = fe->data;
 
 	dprintk("%s\n", __FUNCTION__);
 
-	if (ifnum != 0)
-		return NULL;
+	switch (cmd) {
 
-	if (!(dec = kmalloc(sizeof(struct ttusb_dec), GFP_KERNEL))) {
-		printk("%s: couldn't allocate memory.\n", __FUNCTION__);
-		return NULL;
+	case FE_GET_INFO:
+		dprintk("%s: FE_GET_INFO\n", __FUNCTION__);
+		memcpy(arg, dec->frontend_info,
+		       sizeof (struct dvb_frontend_info));
+		break;
+
+	case FE_READ_STATUS: {
+			fe_status_t *status = (fe_status_t *)arg;
+			dprintk("%s: FE_READ_STATUS\n", __FUNCTION__);
+			*status = FE_HAS_SIGNAL | FE_HAS_VITERBI |
+				  FE_HAS_SYNC | FE_HAS_CARRIER | FE_HAS_LOCK;
+			break;
+		}
+
+	case FE_READ_BER: {
+			u32 *ber = (u32 *)arg;
+			dprintk("%s: FE_READ_BER\n", __FUNCTION__);
+			*ber = 0;
+			return -ENOSYS;
+			break;
+		}
+
+	case FE_READ_SIGNAL_STRENGTH: {
+			dprintk("%s: FE_READ_SIGNAL_STRENGTH\n", __FUNCTION__);
+			*(s32 *)arg = 0xFF;
+			return -ENOSYS;
+			break;
+		}
+
+	case FE_READ_SNR:
+		dprintk("%s: FE_READ_SNR\n", __FUNCTION__);
+		*(s32 *)arg = 0;
+		return -ENOSYS;
+		break;
+
+	case FE_READ_UNCORRECTED_BLOCKS:
+		dprintk("%s: FE_READ_UNCORRECTED_BLOCKS\n", __FUNCTION__);
+		*(u32 *)arg = 0;
+		return -ENOSYS;
+		break;
+
+	case FE_SET_FRONTEND: {
+			struct dvb_frontend_parameters *p =
+				(struct dvb_frontend_parameters *)arg;
+			u8 b[] = { 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+				   0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+				   0x00, 0xff, 0x00, 0x00, 0x00, 0xff };
+			u32 freq;
+
+			dprintk("%s: FE_SET_FRONTEND\n", __FUNCTION__);
+
+			dprintk("            frequency->%d\n", p->frequency);
+			dprintk("            symbol_rate->%d\n",
+				p->u.qam.symbol_rate);
+			dprintk("            inversion->%d\n", p->inversion);
+
+			freq = htonl(p->frequency / 1000);
+			memcpy(&b[4], &freq, sizeof (u32));
+			ttusb_dec_send_command(dec, 0x71, sizeof(b), b, NULL, NULL);
+
+			break;
+		}
+
+	case FE_GET_FRONTEND:
+		dprintk("%s: FE_GET_FRONTEND\n", __FUNCTION__);
+		break;
+
+	case FE_SLEEP:
+		dprintk("%s: FE_SLEEP\n", __FUNCTION__);
+		return -ENOSYS;
+		break;
+
+	case FE_INIT:
+		dprintk("%s: FE_INIT\n", __FUNCTION__);
+		break;
+
+	case FE_RESET:
+		dprintk("%s: FE_RESET\n", __FUNCTION__);
+		break;
+
+	default:
+		dprintk("%s: unknown IOCTL (0x%X)\n", __FUNCTION__, cmd);
+		return -EINVAL;
+
 	}
 
-	memset(dec, 0, sizeof(struct ttusb_dec));
-
-	dec->udev = udev;
-
-	ttusb_dec_init_usb(dec);
-	ttusb_dec_init_stb(dec);
-	ttusb_dec_init_dvb(dec);
-	ttusb_dec_init_v_pes(dec);
-	ttusb_dec_init_tasklet(dec);
-
-	return (void *)dec;
+	return 0;
 }
-#else
+
+static int ttusb_dec_3000s_frontend_ioctl(struct dvb_frontend *fe, unsigned int cmd,
+				  void *arg)
+{
+	struct ttusb_dec *dec = fe->data;
+
+	dprintk("%s\n", __FUNCTION__);
+
+	switch (cmd) {
+
+	case FE_GET_INFO:
+		dprintk("%s: FE_GET_INFO\n", __FUNCTION__);
+		memcpy(arg, dec->frontend_info,
+		       sizeof (struct dvb_frontend_info));
+		break;
+
+	case FE_READ_STATUS: {
+			fe_status_t *status = (fe_status_t *)arg;
+			dprintk("%s: FE_READ_STATUS\n", __FUNCTION__);
+			*status = FE_HAS_SIGNAL | FE_HAS_VITERBI |
+				  FE_HAS_SYNC | FE_HAS_CARRIER | FE_HAS_LOCK;
+			break;
+		}
+
+	case FE_READ_BER: {
+			u32 *ber = (u32 *)arg;
+			dprintk("%s: FE_READ_BER\n", __FUNCTION__);
+			*ber = 0;
+			return -ENOSYS;
+			break;
+		}
+
+	case FE_READ_SIGNAL_STRENGTH: {
+			dprintk("%s: FE_READ_SIGNAL_STRENGTH\n", __FUNCTION__);
+			*(s32 *)arg = 0xFF;
+			return -ENOSYS;
+			break;
+		}
+
+	case FE_READ_SNR:
+		dprintk("%s: FE_READ_SNR\n", __FUNCTION__);
+		*(s32 *)arg = 0;
+		return -ENOSYS;
+		break;
+
+	case FE_READ_UNCORRECTED_BLOCKS:
+		dprintk("%s: FE_READ_UNCORRECTED_BLOCKS\n", __FUNCTION__);
+		*(u32 *)arg = 0;
+		return -ENOSYS;
+		break;
+
+	case FE_SET_FRONTEND: {
+			struct dvb_frontend_parameters *p =
+				(struct dvb_frontend_parameters *)arg;
+			u8 b[] = { 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+				   0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+				   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				   0x00, 0x00, 0x00, 0x0d, 0x00, 0x00, 0x00,
+				   0x00, 0x00, 0x00, 0x00, 0x00 };
+			u32 freq;
+			u32 sym_rate;
+			u32 band;
+
+
+			dprintk("%s: FE_SET_FRONTEND\n", __FUNCTION__);
+
+			dprintk("            frequency->%d\n", p->frequency);
+			dprintk("            symbol_rate->%d\n",
+				p->u.qam.symbol_rate);
+			dprintk("            inversion->%d\n", p->inversion);
+
+			freq = htonl(p->frequency * 1000 + (dec->hi_band ? LOF_HI : LOF_LO));
+			memcpy(&b[4], &freq, sizeof(u32));
+			sym_rate = htonl(p->u.qam.symbol_rate);
+			memcpy(&b[12], &sym_rate, sizeof(u32));
+			band = htonl(dec->hi_band ? LOF_HI : LOF_LO);
+			memcpy(&b[24], &band, sizeof(u32));
+
+			ttusb_dec_send_command(dec, 0x71, sizeof(b), b, NULL, NULL);
+
+			break;
+		}
+
+	case FE_GET_FRONTEND:
+		dprintk("%s: FE_GET_FRONTEND\n", __FUNCTION__);
+		break;
+
+	case FE_SLEEP:
+		dprintk("%s: FE_SLEEP\n", __FUNCTION__);
+		return -ENOSYS;
+		break;
+
+	case FE_INIT:
+		dprintk("%s: FE_INIT\n", __FUNCTION__);
+		break;
+
+	case FE_RESET:
+		dprintk("%s: FE_RESET\n", __FUNCTION__);
+		break;
+
+	case FE_DISEQC_SEND_MASTER_CMD:
+		dprintk("%s: FE_DISEQC_SEND_MASTER_CMD\n", __FUNCTION__);
+		break;
+
+	case FE_DISEQC_SEND_BURST:
+		dprintk("%s: FE_DISEQC_SEND_BURST\n", __FUNCTION__);
+		break;
+
+	case FE_SET_TONE: {
+			fe_sec_tone_mode_t tone = (fe_sec_tone_mode_t)arg;
+			dprintk("%s: FE_SET_TONE\n", __FUNCTION__);
+			dec->hi_band = (SEC_TONE_ON == tone);
+			break;
+		}
+
+	case FE_SET_VOLTAGE:
+		dprintk("%s: FE_SET_VOLTAGE\n", __FUNCTION__);
+		break;
+
+	default:
+		dprintk("%s: unknown IOCTL (0x%X)\n", __FUNCTION__, cmd);
+		return -EINVAL;
+
+	}
+
+	return 0;
+}
+
+static void ttusb_dec_init_frontend(struct ttusb_dec *dec)
+{
+	dec->i2c_bus.adapter = dec->adapter;
+
+	switch (dec->model) {
+		case TTUSB_DEC2000T:
+			dec->frontend_info = &dec2000t_frontend_info;
+			dec->frontend_ioctl = ttusb_dec_2000t_frontend_ioctl;
+			break;
+
+		case TTUSB_DEC3000S:
+			dec->frontend_info = &dec3000s_frontend_info;
+			dec->frontend_ioctl = ttusb_dec_3000s_frontend_ioctl;
+			break;
+	}
+
+	dvb_register_frontend(dec->frontend_ioctl, &dec->i2c_bus, (void *)dec,
+			      dec->frontend_info);
+}
+
+static void ttusb_dec_exit_frontend(struct ttusb_dec *dec)
+{
+	dvb_unregister_frontend(dec->frontend_ioctl, &dec->i2c_bus);
+}
+
 static int ttusb_dec_probe(struct usb_interface *intf,
 			   const struct usb_device_id *id)
 {
@@ -958,48 +1279,65 @@ static int ttusb_dec_probe(struct usb_interface *intf,
 		return -ENOMEM;
 	}
 
+	usb_set_intfdata(intf, (void *)dec);
+
 	memset(dec, 0, sizeof(struct ttusb_dec));
+
+	switch (id->idProduct) {
+		case 0x1006:
+			dec->model = TTUSB_DEC3000S;
+			dec->model_name = "DEC3000-s";
+			dec->firmware_name = "dec3000s.bin";
+			break;
+
+		case 0x1008:
+			dec->model = TTUSB_DEC2000T;
+			dec->model_name = "DEC2000-t";
+			dec->firmware_name = "dec2000t.bin";
+			break;
+	}
 
 	dec->udev = udev;
 
 	ttusb_dec_init_usb(dec);
-	ttusb_dec_init_stb(dec);
+	if (ttusb_dec_init_stb(dec)) {
+		ttusb_dec_exit_usb(dec);
+		return 0;
+	}
 	ttusb_dec_init_dvb(dec);
+	ttusb_dec_init_frontend(dec);
 	ttusb_dec_init_v_pes(dec);
 	ttusb_dec_init_tasklet(dec);
 
-	usb_set_intfdata(intf, (void *)dec);
+	dec->active = 1;
+
 	ttusb_dec_set_streaming_interface(dec);
 
 	return 0;
 }
-#endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-static void ttusb_dec_disconnect(struct usb_device *udev, void *data)
-{
-	struct ttusb_dec *dec = data;
-#else
 static void ttusb_dec_disconnect(struct usb_interface *intf)
 {
 	struct ttusb_dec *dec = usb_get_intfdata(intf);
 
 	usb_set_intfdata(intf, NULL);
-#endif
 
 	dprintk("%s\n", __FUNCTION__);
 
+	if (dec->active) {
 	ttusb_dec_exit_tasklet(dec);
 	ttusb_dec_exit_usb(dec);
+		ttusb_dec_exit_frontend(dec);
 	ttusb_dec_exit_dvb(dec);
+	}
 
 	kfree(dec);
 }
 
 static struct usb_device_id ttusb_dec_table[] = {
-	{USB_DEVICE(0x0b48, 0x1006)},	/* Unconfirmed */
-	{USB_DEVICE(0x0b48, 0x1007)},	/* Unconfirmed */
-	{USB_DEVICE(0x0b48, 0x1008)},	/* DEC 2000 t */
+	{USB_DEVICE(0x0b48, 0x1006)},	/* DEC3000-s */
+	/*{USB_DEVICE(0x0b48, 0x1007)},	   Unconfirmed */
+	{USB_DEVICE(0x0b48, 0x1008)},	/* DEC2000-t */
 	{}
 };
 

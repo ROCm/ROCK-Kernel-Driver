@@ -447,10 +447,7 @@ static int parse_options(char *options, struct iso9660_options * popt)
 		case Opt_sb:
 			if (match_int(&args[0], &option))
 				return 0;
-			n = option;
-			if (n > 660 * 512)
-				return 0;
-			popt->sbsector = n;
+			popt->sbsector = option;
 			break;
 		case Opt_check_r:
 			popt->check = 'r';

@@ -10,6 +10,17 @@
  *	it under the terms of the GNU General Public License version 2,
  *      as published by the Free Software Foundation.
  */
+#include <linux/kernel.h>
+#include <linux/slab.h>
+#include <linux/string.h>
+#include <linux/spinlock.h>
+#include <linux/errno.h>
+#include <linux/in.h>
+#include <asm/semaphore.h>
+#include "flask.h"
+#include "avc.h"
+#include "avc_ss.h"
+#include "security.h"
 #include "context.h"
 #include "policydb.h"
 #include "sidtab.h"

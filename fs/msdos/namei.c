@@ -244,13 +244,14 @@ static int msdos_add_entry(struct inode *dir, const unsigned char *name,
 	 */
 	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	mark_inode_dirty(dir);
-	memcpy((*de)->name,name,MSDOS_NAME);
+
+	memcpy((*de)->name, name, MSDOS_NAME);
 	(*de)->attr = is_dir ? ATTR_DIR : ATTR_ARCH;
 	if (is_hid)
 		(*de)->attr |= ATTR_HIDDEN;
 	(*de)->start = 0;
 	(*de)->starthi = 0;
-	fat_date_unix2dos(dir->i_mtime.tv_sec,&(*de)->time,&(*de)->date);
+	fat_date_unix2dos(dir->i_mtime.tv_sec, &(*de)->time, &(*de)->date);
 	(*de)->size = 0;
 	mark_buffer_dirty(*bh);
 	return 0;
@@ -393,7 +394,6 @@ out_unlock:
 	return res;
 
 mkdir_error:
-	printk(KERN_WARNING "msdos_mkdir: error=%d, attempting cleanup\n", res);
 	inode->i_nlink = 0;
 	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	dir->i_nlink--;
@@ -468,13 +468,9 @@ static int do_msdos_rename(struct inode *old_dir, unsigned char *old_name,
 			if (error)
 				goto out;
 		}
-		error = fat_scan(old_inode, MSDOS_DOTDOT, &dotdot_bh,
-				&dotdot_de, &dotdot_i_pos);
-		if (error < 0) {
-			printk(KERN_WARNING
-				"MSDOS: %s/%s, get dotdot failed, ret=%d\n",
-				old_dentry->d_parent->d_name.name,
-				old_dentry->d_name.name, error);
+		if (fat_scan(old_inode, MSDOS_DOTDOT, &dotdot_bh,
+			     &dotdot_de, &dotdot_i_pos) < 0) {
+			error = -EIO;
 			goto out;
 		}
 	}

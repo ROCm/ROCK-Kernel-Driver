@@ -347,6 +347,8 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 	unsigned min;
 	unsigned orig_next_size;
 	unsigned actual;
+	int first_access=0;
+	unsigned long preoffset=0;
 
 	/*
 	 * Here we detect the case where the application is performing
@@ -370,16 +372,18 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 	min = get_min_readahead(ra);
 	orig_next_size = ra->next_size;
 
-	if (ra->next_size == 0 && offset == 0) {
+	if (ra->next_size == 0) {
 		/*
-		 * Special case - first read from first page.
+		 * Special case - first read.
 		 * We'll assume it's a whole-file read, and
 		 * grow the window fast.
 		 */
+		first_access=1;
 		ra->next_size = max / 2;
 		goto do_io;
 	}
 
+	preoffset = ra->prev_page;
 	ra->prev_page = offset;
 
 	if (offset >= ra->start && offset <= (ra->start + ra->size)) {
@@ -439,20 +443,44 @@ do_io:
 		 * ahead window and get some I/O underway for the new
 		 * current window.
 		 */
+		if (!first_access && preoffset >= ra->start &&
+				preoffset < (ra->start + ra->size)) {
+			 /* Heuristic:  If 'n' pages were
+			  * accessed in the current window, there
+			  * is a high probability that around 'n' pages
+			  * shall be used in the next current window.
+			  *
+			  * To minimize lazy-readahead triggered
+			  * in the next current window, read in
+			  * an extra page.
+			  */
+			ra->next_size = preoffset - ra->start + 2;
+		}
 		ra->start = offset;
 		ra->size = ra->next_size;
 		ra->ahead_start = 0;		/* Invalidate these */
 		ra->ahead_size = 0;
 		actual = do_page_cache_readahead(mapping, filp, offset,
 						 ra->size);
-		check_ra_success(ra, ra->size, actual, orig_next_size);
+		if(!first_access) {
+			/*
+			 * do not adjust the readahead window size the first
+			 * time, the ahead window might get closed if all
+			 * the pages are already in the cache.
+			 */
+			check_ra_success(ra, ra->size, actual, orig_next_size);
+		}
 	} else {
 		/*
 		 * This read request is within the current window.  It is time
 		 * to submit I/O for the ahead window while the application is
-		 * crunching through the current window.
+		 * about to step into the ahead window.
+		 * Heuristic: Defer reading the ahead window till we hit
+		 * the last page in the current window. (lazy readahead)
+		 * If we read in earlier we run the risk of wasting
+		 * the ahead window.
 		 */
-		if (ra->ahead_start == 0) {
+		if (ra->ahead_start == 0 && offset == (ra->start + ra->size -1)) {
 			ra->ahead_start = ra->start + ra->size;
 			ra->ahead_size = ra->next_size;
 			actual = do_page_cache_readahead(mapping, filp,
@@ -488,7 +516,7 @@ void handle_ra_miss(struct address_space *mapping,
 		const unsigned long max = get_max_readahead(ra);
 
 		if (offset != ra->prev_page + 1) {
-			ra->size = 0;			/* Not sequential */
+			ra->size = ra->size?ra->size-1:0; /* Not sequential */
 		} else {
 			ra->size++;			/* A sequential read */
 			if (ra->size >= max) {		/* Resume readahead */

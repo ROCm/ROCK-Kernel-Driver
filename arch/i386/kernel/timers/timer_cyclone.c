@@ -71,7 +71,7 @@ static void mark_offset_cyclone(void)
 	lost = delta/(1000000/HZ);
 	delay = delta%(1000000/HZ);
 	if (lost >= 2)
-		jiffies += lost-1;
+		jiffies_64 += lost-1;
 	
 	/* update the monotonic base value */
 	this_offset = ((unsigned long long)last_cyclone_high<<32)|last_cyclone_low;
@@ -88,7 +88,7 @@ static void mark_offset_cyclone(void)
 	 * usec delta is > 90% # of usecs/tick)
 	 */
 	if (lost && abs(delay - delay_at_last_interrupt) > (900000/HZ))
-		jiffies++;
+		jiffies_64++;
 }
 
 static unsigned long get_offset_cyclone(void)
