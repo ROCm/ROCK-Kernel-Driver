@@ -9,6 +9,9 @@ EXTRAVERSION = -test5
 # Comments in this file are targeted only to the developer, do not
 # expect to learn how to build the kernel reading this file.
 
+# Do not print "Entering directory ..."
+MAKEFLAGS += --no-print-directory
+
 # We are using a recursive build, so we need to do a little thinking
 # to get the ordering right.
 #
@@ -24,6 +27,86 @@ EXTRAVERSION = -test5
 # effects are thus separated out and done before the recursive
 # descending is started. They are now explicitly listed as the
 # prepare rule.
+
+# To put more focus on warnings, be less verbose as default
+# Use 'make V=1' to see the full commands
+
+ifdef V
+  ifeq ("$(origin V)", "command line")
+    KBUILD_VERBOSE = $(V)
+  endif
+endif
+ifndef KBUILD_VERBOSE
+  KBUILD_VERBOSE = 0 
+endif
+
+# Call sparse as part of compilation of C files
+# Use 'make C=1' to enable sparse checking
+
+ifdef C
+  ifeq ("$(origin C)", "command line")
+    KBUILD_CHECKSRC = $(C)
+  endif
+endif
+ifndef KBUILD_CHECKSRC
+  KBUILD_CHECKSRC = 0
+endif
+
+# kbuild supports saving output files in a separate directory.
+# To locate output files in a separate directory two syntax'es are supported.
+# In both cases the working directory must be the root of the kernel src.
+# 1) O=
+# Use "make O=dir/to/store/output/files/"
+# 
+# 2) Set KBUILD_OUTPUT
+# Set the environment variable KBUILD_OUTPUT to point to the directory
+# where the output files shall be placed.
+# export KBUILD_OUTPUT=dir/to/store/output/files/
+# make
+#
+# The O= assigment takes precedence over the KBUILD_OUTPUT environment variable.
+
+
+# KBUILD_SRC is set on invocation of make in OBJ directory
+# KBUILD_SRC is not intended to be used by the regular user (for now)
+ifeq ($(KBUILD_SRC),)
+
+# OK, Make called in directory where kernel src resides
+# Do we want to locate output files in a separate directory?
+ifdef O
+  ifeq ("$(origin O)", "command line")
+    KBUILD_OUTPUT := $(O)
+  endif
+endif
+
+ifneq ($(KBUILD_OUTPUT),)
+# Invoke a second make in the output directory, passing relevant variables
+	KBUILD_OUTPUT := $(shell cd $(KBUILD_OUTPUT); /bin/pwd)
+%:
+	@$(MAKE) -C $(KBUILD_OUTPUT)		\
+	KBUILD_SRC=$(CURDIR)			\
+	KBUILD_VERBOSE=$(KBUILD_VERBOSE)	\
+	KBUILD_CHECK=$(KBUILD_CHECK)		\
+	-f $(CURDIR)/Makefile $(MAKECMDGOALS)
+
+# Leave processing to above invocation of make
+skip-makefile := 1
+endif # ifneq ($(KBUILD_OUTPUT),)
+endif # ifeq ($(KBUILD_SRC),)
+
+# We process the rest of the Makefile if this is the final invocation of make
+ifeq ($(skip-makefile),)
+
+srctree		:= $(if $(KBUILD_SRC),$(KBUILD_SRC),.)
+TOPDIR		:= $(srctree)
+# FIXME - TOPDIR is obsolete, use srctree/objtree
+objtree		:= $(CURDIR)
+src		:= $(srctree)
+obj		:= $(objtree)
+
+VPATH		:= $(srctree)
+
+export srctree objtree VPATH TOPDIR
 
 KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 
@@ -69,7 +152,6 @@ UTS_MACHINE := $(ARCH)
 CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 	  else if [ -x /bin/bash ]; then echo /bin/bash; \
 	  else echo sh; fi ; fi)
-TOPDIR	:= $(CURDIR)
 
 HOSTCC  	= gcc
 HOSTCXX  	= g++
@@ -110,40 +192,8 @@ ifeq ($(MAKECMDGOALS),)
   KBUILD_MODULES := 1
 endif
 
-export KBUILD_MODULES KBUILD_BUILTIN KBUILD_VERBOSE KBUILD_CHECKSRC
-
-# To put more focus on warnings, less verbose as default
-# Use 'make V=1' to see the full commands
-
-ifdef V
-  ifeq ("$(origin V)", "command line")
-    KBUILD_VERBOSE = $(V)
-  endif
-endif
-ifndef KBUILD_VERBOSE
-  KBUILD_VERBOSE = 0 
-endif
-
-# Call sparse as part of compilation of C files
-# Use 'make C=1' to enable sparse checking
-
-ifdef C
-  ifeq ("$(origin C)", "command line")
-    KBUILD_CHECKSRC = $(C)
-  endif
-endif
-ifndef KBUILD_CHECKSRC
-  KBUILD_CHECKSRC = 0
-endif
-
-# Do not print 'Entering directory ...'
-
-MAKEFLAGS += --no-print-directory
-
-# For maximum performance (+ possibly random breakage, uncomment
-# the following)
-
-#MAKEFLAGS += -rR
+export KBUILD_MODULES KBUILD_BUILTIN KBUILD_VERBOSE
+export KBUILD_CHECKSRC KBUILD_SRC
 
 # Beautify output
 # ---------------------------------------------------------------------------
@@ -185,14 +235,13 @@ endif
 
 export quiet Q KBUILD_VERBOSE
 
-# Paths to obj / src tree
+# Look for make include files relative to root of kernel src
+MAKEFLAGS += --include-dir=$(srctree)
 
-src	:= .
-obj	:= .
-srctree := .
-objtree := .
+# For maximum performance (+ possibly random breakage, uncomment
+# the following)
 
-export srctree objtree
+#MAKEFLAGS += -rR
 
 # Make variables (CC, etc...)
 
@@ -222,13 +271,15 @@ AFLAGS_KERNEL	=
 
 NOSTDINC_FLAGS  = -nostdinc -iwithprefix include
 
-CPPFLAGS	:= -D__KERNEL__ -Iinclude
+CPPFLAGS        := -D__KERNEL__ -Iinclude \
+		   $(if $(KBUILD_SRC),-Iinclude2 -I$(srctree)/include)
+
 CFLAGS 		:= -Wall -Wstrict-prototypes -Wno-trigraphs -O2 \
 	  	   -fno-strict-aliasing -fno-common
 AFLAGS		:= -D__ASSEMBLY__
 
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
-	CONFIG_SHELL TOPDIR HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
+	CONFIG_SHELL HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
 	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE AWK GENKSYMS PERL UTS_MACHINE \
 	HOSTCXX HOSTCXXFLAGS LDFLAGS_BLOB LDFLAGS_MODULE CHECK
 
@@ -294,7 +345,7 @@ ifeq ($(mixed-targets),1)
 # Handle them one by one.
 
 %:: FORCE
-	$(Q)$(MAKE) $@
+	$(Q)$(MAKE) -C $(srctree) KBUILD_SRC= $@
 
 else
 ifeq ($(config-targets),1)
@@ -341,7 +392,7 @@ include/linux/autoconf.h: scripts/fixdep .config
 
 endif
 
-include arch/$(ARCH)/Makefile
+include $(srctree)/arch/$(ARCH)/Makefile
 
 # Let architecture Makefiles change CPPFLAGS if needed
 CFLAGS := $(CPPFLAGS) $(CFLAGS)
@@ -487,14 +538,34 @@ $(sort $(vmlinux-objs)) arch/$(ARCH)/kernel/vmlinux.lds.s: $(SUBDIRS) ;
 # 	Handle descending into subdirectories listed in $(SUBDIRS)
 
 .PHONY: $(SUBDIRS)
-$(SUBDIRS): prepare
+$(SUBDIRS): prepare-all
 	$(Q)$(MAKE) $(build)=$@
 
-#	Things we need done before we descend to build or make
-#	module versions are listed in "prepare"
+# Things we need to do before we recursively start building the kernel
+# or the modules are listed in "prepare-all".
+# A multi level approach is used. prepare1 is updated first, then prepare0.
+# prepare-all is the collection point for the prepare targets.
 
-.PHONY: prepare
-prepare: include/linux/version.h include/asm include/config/MARKER
+.PHONY: prepare-all prepare prepare0 prepare1
+
+# prepare1 is used to check if we are building in a separate output directory,
+# and if so do:
+# 1) Check that make has not been executed in the kernel src $(srctree)
+# 2) Create the include2 directory, used for the second asm symlink
+
+prepare1:
+ifneq ($(KBUILD_SRC),)
+	@echo '  Using $(srctree) as source for kernel'
+	$(Q)if [ -h $(srctree)/include/asm -o -f $(srctree)/.config ]; then \
+		echo "  $(srctree) is not clean, please run 'make mrproper'";\
+		echo "  in the '$(srctree)' directory.";\
+		/bin/false; \
+	fi;
+	$(Q)if [ ! -d include2 ]; then mkdir -p include2; fi;
+	$(Q)ln -fsn $(srctree)/include/asm-$(ARCH) include2/asm
+endif
+
+prepare0: prepare1 include/linux/version.h include/asm include/config/MARKER
 ifdef KBUILD_MODULES
 ifeq ($(origin SUBDIRS),file)
 	$(Q)rm -rf $(MODVERDIR)
@@ -504,6 +575,9 @@ else
 endif
 endif
 	$(if $(CONFIG_MODULES),$(Q)mkdir -p $(MODVERDIR))
+
+# All the preparing..
+prepare-all: prepare0 prepare
 
 #	Leave this as default for preprocessing vmlinux.lds.S, which is now
 #	done in arch/$(ARCH)/kernel/Makefile
@@ -533,8 +607,9 @@ export AFLAGS_vmlinux.lds.o += -P -C -U$(ARCH)
 #	before switching between archs anyway.
 
 include/asm:
-	@echo '  Making asm->asm-$(ARCH) symlink'
-	@ln -s asm-$(ARCH) $@
+	@echo '  SYMLINK $@ -> include/asm-$(ARCH)'
+	$(Q)if [ ! -d include ]; then mkdir -p include; fi;
+	@ln -fsn asm-$(ARCH) $@
 
 # 	Split autoconf.h into include/linux/config/*
 
@@ -585,7 +660,7 @@ all: modules
 .PHONY: modules
 modules: $(SUBDIRS) $(if $(KBUILD_BUILTIN),vmlinux)
 	@echo '  Building modules, stage 2.';
-	$(Q)$(MAKE) -rR -f scripts/Makefile.modpost
+	$(Q)$(MAKE) -rR -f $(srctree)/scripts/Makefile.modpost
 
 #	Install modules
 
@@ -603,7 +678,7 @@ _modinst_:
 	@rm -f $(MODLIB)/build
 	@mkdir -p $(MODLIB)/kernel
 	@ln -s $(TOPDIR) $(MODLIB)/build
-	$(Q)$(MAKE) -rR -f scripts/Makefile.modinst
+	$(Q)$(MAKE) -rR -f $(srctree)/scripts/Makefile.modinst
 
 # If System.map exists, run depmod.  This deliberately does not have a
 # dependency on System.map since that would run the dependency tree on
@@ -680,7 +755,8 @@ MRPROPER_DIRS += \
 	$(MODVERDIR) \
 	.tmp_export-objs \
 	include/config \
-	include/linux/modules
+	include/linux/modules \
+	include2
 
 # clean - Delete all intermediate files
 #
@@ -814,6 +890,7 @@ help:
 		echo '  No architecture specific help defined for $(ARCH)')
 	@echo  ''
 	@echo  '  make V=0|1 [targets] 0 => quiet build (default), 1 => verbose build'
+	@echo  '  make O=dir [targets] Locate all output files in "dir", including .config'
 	@echo  '  make C=1   [targets] Check all c source with checker tool'
 	@echo  ''
 	@echo  'Execute "make" or "make all" to build all targets marked with [*] '
@@ -849,7 +926,8 @@ endif #ifeq ($(mixed-targets),1)
 # FIXME Should go into a make.lib or something 
 # ===========================================================================
 
-a_flags = -Wp,-MD,$(depfile) $(AFLAGS) $(AFLAGS_KERNEL) $(NOSTDINC_FLAGS) \
+a_flags = -Wp,-MD,$(depfile) $(AFLAGS) $(AFLAGS_KERNEL) \
+	  $(NOSTDINC_FLAGS) $(CPPFLAGS) \
 	  $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
 
 quiet_cmd_as_o_S = AS      $@
@@ -907,6 +985,7 @@ cmd = @$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))' &&) $(cmd_$(1))
 define filechk
 	@set -e;				\
 	echo '  CHK     $@';			\
+	mkdir -p $(dir $@);			\
 	$(filechk_$(1)) < $< > $@.tmp;		\
 	if [ -r $@ ] && cmp -s $@ $@.tmp; then	\
 		rm -f $@.tmp;			\
@@ -919,16 +998,18 @@ endef
 # Shorthand for $(Q)$(MAKE) -f scripts/Makefile.build obj=dir
 # Usage:
 # $(Q)$(MAKE) $(build)=dir
-build := -f scripts/Makefile.build obj
+build := -f $(if $(KBUILD_SRC),$(srctree)/)scripts/Makefile.build obj
 
 # Shorthand for $(Q)$(MAKE) -f scripts/Makefile.clean obj=dir
 # Usage:
 # $(Q)$(MAKE) $(clean)=dir
-clean := -f scripts/Makefile.clean obj
+clean := -f $(if $(KBUILD_SRC),$(srctree)/)scripts/Makefile.clean obj
 
 #	$(call descend,<dir>,<target>)
 #	Recursively call a sub-make in <dir> with target <target>
 # Usage is deprecated, because make does not see this as an invocation of make.
-descend =$(Q)$(MAKE) -f scripts/Makefile.build obj=$(1) $(2)
+descend =$(Q)$(MAKE) -f $(if $(KBUILD_SRC),$(srctree)/)scripts/Makefile.build obj=$(1) $(2)
+
+endif	# skip-makefile
 
 FORCE:

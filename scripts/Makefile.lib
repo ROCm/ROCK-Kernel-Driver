@@ -58,6 +58,11 @@ multi-objs   := $(multi-objs-y) $(multi-objs-m)
 # in the local directory
 subdir-obj-y := $(foreach o,$(obj-y),$(if $(filter-out $(o),$(notdir $(o))),$(o)))
 
+# $(obj-dirs) is a list of directories that contain object files
+obj-dirs := $(dir $(multi-objs) $(subdir-obj-y))
+obj-dirs += $(foreach f,$(host-progs), $(if $(dir $(f)),$(dir $(f))))
+obj-dirs := $(strip $(sort $(filter-out ./,$(obj-dirs))))
+
 # Replace multi-part objects by their individual parts, look at local dir only
 real-objs-y := $(foreach m, $(filter-out $(subdir-obj-y), $(obj-y)), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))),$($(m:.o=-objs)) $($(m:.o=-y)),$(m))) $(extra-y)
 real-objs-m := $(foreach m, $(obj-m), $(if $(strip $($(m:.o=-objs)) $($(m:.o=-y))),$($(m:.o=-objs)) $($(m:.o=-y)),$(m)))
@@ -107,6 +112,7 @@ multi-used-m	:= $(addprefix $(obj)/,$(multi-used-m))
 multi-objs-y	:= $(addprefix $(obj)/,$(multi-objs-y))
 multi-objs-m	:= $(addprefix $(obj)/,$(multi-objs-m))
 subdir-ym	:= $(addprefix $(obj)/,$(subdir-ym))
+obj-dirs	:= $(addprefix $(obj)/,$(obj-dirs))
 host-progs      := $(addprefix $(obj)/,$(host-progs))
 host-csingle	:= $(addprefix $(obj)/,$(host-csingle))
 host-cmulti	:= $(addprefix $(obj)/,$(host-cmulti))
@@ -129,15 +135,46 @@ depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
 #       where foo and bar are the name of the modules.
 basename_flags = -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F)))
 modname_flags  = $(if $(filter 1,$(words $(modname))),-DKBUILD_MODNAME=$(subst $(comma),_,$(subst -,_,$(modname))))
-c_flags        = -Wp,-MD,$(depfile) $(CFLAGS) $(NOSTDINC_FLAGS) \
-	         $(modkern_cflags) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o) \
-	         $(basename_flags) $(modname_flags)
-a_flags        = -Wp,-MD,$(depfile) $(AFLAGS) $(NOSTDINC_FLAGS)\
-		 $(modkern_aflags) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
-hostc_flags    = -Wp,-MD,$(depfile) $(HOSTCFLAGS) $(HOST_EXTRACFLAGS)\
-		 $(HOSTCFLAGS_$(*F).o)
-hostcxx_flags  = -Wp,-MD,$(depfile) $(HOSTCXXFLAGS) $(HOST_EXTRACXXFLAGS)\
-		 $(HOSTCXXFLAGS_$(*F).o)
+
+
+_c_flags       = $(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$(*F).o)
+_a_flags       = $(AFLAGS) $(EXTRA_AFLAGS) $(AFLAGS_$(*F).o)
+_hostc_flags   = $(HOSTCFLAGS)   $(HOST_EXTRACFLAGS)   $(HOSTCFLAGS_$(*F).o)
+_hostcxx_flags = $(HOSTCXXFLAGS) $(HOST_EXTRACXXFLAGS) $(HOSTCXXFLAGS_$(*F).o)
+
+
+# If building the kernel in a separate objtree expand all occurrences
+# of -Idir to -Idir -I$(srctree)/dir.
+# hereby allowing gcc to locate files in both trees. Local tree first.
+
+ifeq ($(KBUILD_SRC),)
+__c_flags	= $(_c_flags)
+__a_flags	= $(_a_flags)
+__hostc_flags	= $(_hostc_flags)
+__hostcxx_flags	= $(_hostcxx_flags)
+else
+flags = $(foreach o,$($(1)),\
+	$(if $(filter -I%,$(o)),$(patsubst -I%,-I$(srctree)/%,$(o)),$(o)))
+
+# -I$(obj) locate generated .h files
+# -I$(srctree)/$(src) locate .h files in srctree, from generated .c files
+# FIXME: Replace both with specific EXTRA_CFLAGS statements
+__c_flags	= -I$(obj) -I$(srctree)/$(src) $(call flags,_c_flags)
+__a_flags	=                              $(call flags,_a_flags)
+__hostc_flags	= -I$(obj)                     $(call flags,_hostc_flags)
+__hostcxx_flags	=                              $(call flags,_hostcxx_flags)
+endif
+
+c_flags        = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(CPPFLAGS) \
+		 $(__c_flags) $(modkern_cflags) \
+		 $(basename_flags) $(modname_flags)
+
+a_flags        = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(CPPFLAGS) \
+		 $(__a_flags) $(modkern_aflags)
+
+hostc_flags    = -Wp,-MD,$(depfile) $(__hostc_flags)
+hostcxx_flags  = -Wp,-MD,$(depfile) $(__hostcxx_flags)
+
 ld_flags       = $(LDFLAGS) $(EXTRA_LDFLAGS)
 
 # Finds the multi-part object the current object will be linked into
@@ -230,9 +267,9 @@ cmd = @$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))' &&) $(cmd_$(1))
 #	$(call descend,<dir>,<target>)
 #	Recursively call a sub-make in <dir> with target <target> 
 # Usage is deprecated, because make do not see this as an invocation of make.
-descend =$(Q)$(MAKE) -f scripts/Makefile.build obj=$(1) $(2)
+descend =$(Q)$(MAKE) -f $(if $(KBUILD_SRC),$(srctree)/)scripts/Makefile.build obj=$(1) $(2)
 
 # Shorthand for $(Q)$(MAKE) -f scripts/Makefile.build obj=
 # Usage:
 # $(Q)$(MAKE) $(build)=dir
-build := -f scripts/Makefile.build obj
+build := -f $(if $(KBUILD_SRC),$(srctree)/)scripts/Makefile.build obj
