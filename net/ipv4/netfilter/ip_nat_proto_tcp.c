@@ -105,7 +105,7 @@ tcp_manip_pkt(struct sk_buff **pskb,
 		return 0;
 
 	iph = (struct iphdr *)((*pskb)->data + iphdroff);
-	hdr = (struct tcphdr *)((*pskb)->data + iph->ihl*4);
+	hdr = (struct tcphdr *)((*pskb)->data + hdroff);
 
 	if (maniptype == IP_NAT_MANIP_SRC) {
 		/* Get rid of src ip and src pt */
