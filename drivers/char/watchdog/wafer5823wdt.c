@@ -40,6 +40,7 @@
 
 static unsigned long wafwdt_is_open;
 static spinlock_t wafwdt_lock;
+static int expect_close = 0;
 
 /*
  *	You must set these - there is no sane way to probe for this board.
@@ -55,6 +56,15 @@ static spinlock_t wafwdt_lock;
 
 #define WD_TIMO 60		/* 1 minute */
 static int wd_margin = WD_TIMO;
+
+#ifdef CONFIG_WATCHDOG_NOWAYOUT
+static int nowayout = 1;
+#else
+static int nowayout = 0;
+#endif
+
+MODULE_PARM(nowayout,"i");
+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
 static void wafwdt_ping(void)
 {
@@ -86,6 +96,20 @@ static ssize_t wafwdt_write(struct file *file, const char *buf, size_t count, lo
 		return -ESPIPE;
 
 	if (count) {
+		if (!nowayout) {
+			size_t i;
+
+			/* In case it was set long ago */
+			expect_close = 0;
+
+			for (i = 0; i != count; i++) {
+				char c;
+				if (get_user(c, buf + i))
+					return -EFAULT;
+				if (c == 'V')
+					expect_close = 1;
+			}
+		}
 		wafwdt_ping();
 		return 1;
 	}
@@ -97,8 +121,9 @@ static int wafwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 {
 	int new_margin;
 	static struct watchdog_info ident = {
-		WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT,
-		1, "Wafer 5823 WDT"
+		.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
+		.firmware_version = 1,
+		.identity = "Wafer 5823 WDT"
 	};
 	int one=1;
 
@@ -148,9 +173,11 @@ static int
 wafwdt_close(struct inode *inode, struct file *file)
 {
 	clear_bit(0, &wafwdt_is_open);
-#ifndef CONFIG_WATCHDOG_NOWAYOUT
-        wafwdt_stop();
-#endif
+	if (expect_close) {   
+		wafwdt_stop();
+	} else {
+		printk(KERN_CRIT "WDT device closed unexpectedly.  WDT will not stop!\n");
+	}
 	return 0;
 }
 
