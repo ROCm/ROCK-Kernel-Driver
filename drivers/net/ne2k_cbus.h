@@ -477,5 +477,5 @@ static void __init ne2k_cbus_writemem(struct net_device *dev, int ioaddr, unsign
 }
 #endif
 
-static int ne_probe_cbus(struct net_device *dev, const struct ne2k_cbus_hwinfo *hw, int ioaddr);
+static int ne_probe_cbus(struct net_device *dev, const struct ne2k_cbus_hwinfo *hw, int ioaddr, int irq);
 /* End of ne2k_cbus.h */
