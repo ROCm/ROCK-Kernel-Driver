@@ -19,16 +19,13 @@
 #include <linux/irq.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
+#include <linux/smp_lock.h>
 
 #include <asm/page.h>
 #include <asm/semaphore.h>
 #include <asm/processor.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
-#if 0
-#include <linux/ide.h>
-#include <asm/ide.h>
-#endif
 #include <asm/atomic.h>
 #include <asm/bitops.h>
 #include <asm/checksum.h>
@@ -41,7 +38,6 @@
 #include <asm/machdep.h>
 #include <asm/hw_irq.h>
 #include <asm/abs_addr.h>
-#include <asm/smplock.h>
 #include <asm/cacheflush.h>
 #ifdef CONFIG_PPC_ISERIES
 #include <asm/iSeries/iSeries_pci.h>
