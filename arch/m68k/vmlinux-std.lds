@@ -60,7 +60,7 @@ SECTIONS
   . = ALIGN(8192);
   __init_end = .;
 
-  init_task : { *(init_task) }	/* The initial task and kernel stack */
+  .data.init_task : { *(.data.init_task) }	/* The initial task and kernel stack */
 
   _end = . ;
 
