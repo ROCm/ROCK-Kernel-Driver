@@ -116,6 +116,8 @@ static struct pci_device_id rtl8169_pci_tbl[] = {
 
 MODULE_DEVICE_TABLE(pci, rtl8169_pci_tbl);
 
+static int rx_copybreak = 200;
+
 enum RTL8169_registers {
 	MAC0 = 0,		/* Ethernet hardware address. */
 	MAR0 = 8,		/* Multicast filter. */
@@ -294,6 +296,7 @@ struct rtl8169_private {
 MODULE_AUTHOR("Realtek");
 MODULE_DESCRIPTION("RealTek RTL-8169 Gigabit Ethernet driver");
 MODULE_PARM(media, "1-" __MODULE_STRING(MAX_UNITS) "i");
+MODULE_PARM(rx_copybreak, "i");
 MODULE_LICENSE("GPL");
 
 static int rtl8169_open(struct net_device *dev);
@@ -768,6 +771,11 @@ static void rtl8169_free_rx_skb(struct pci_dev *pdev, struct sk_buff **sk_buff,
 	rtl8169_make_unusable_by_asic(desc);
 }
 
+static inline void rtl8169_return_to_asic(struct RxDesc *desc)
+{
+	desc->status |= OWNbit + RX_BUF_SIZE;
+}
+
 static inline void rtl8169_give_to_asic(struct RxDesc *desc, dma_addr_t mapping)
 {
 	desc->buf_addr = mapping;
@@ -1012,12 +1020,26 @@ rtl8169_tx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 	}
 }
 
-static inline void rtl8169_unmap_rx(struct pci_dev *pdev, struct RxDesc *desc)
+static inline int rtl8169_try_rx_copy(struct sk_buff **sk_buff, int pkt_size,
+				      struct RxDesc *desc,
+				      struct net_device *dev)
 {
-	pci_dma_sync_single(pdev, le32_to_cpu(desc->buf_addr), RX_BUF_SIZE,
-			    PCI_DMA_FROMDEVICE);
-	pci_unmap_single(pdev, le32_to_cpu(desc->buf_addr), RX_BUF_SIZE,
-			 PCI_DMA_FROMDEVICE);
+	int ret = -1;
+
+	if (pkt_size < rx_copybreak) {
+		struct sk_buff *skb;
+
+		skb = dev_alloc_skb(pkt_size + 2);
+		if (skb) {
+			skb->dev = dev;
+			skb_reserve(skb, 2);
+			eth_copy_and_sum(skb, sk_buff[0]->tail, pkt_size, 0);
+			*sk_buff = skb;
+			rtl8169_return_to_asic(desc);
+			ret = 0;
+		}
+	}
+	return ret;
 }
 
 static void
@@ -1043,16 +1065,25 @@ rtl8169_rx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 			if (status & RxCRC)
 				tp->stats.rx_crc_errors++;
 		} else {
+			struct RxDesc *desc = tp->RxDescArray + cur_rx;
 			struct sk_buff *skb = tp->Rx_skbuff[cur_rx];
 			int pkt_size = (status & 0x00001FFF) - 4;
 
-			rtl8169_unmap_rx(tp->pci_dev, tp->RxDescArray + cur_rx);
+			pci_dma_sync_single(tp->pci_dev,
+					    le32_to_cpu(desc->buf_addr),
+					    RX_BUF_SIZE, PCI_DMA_FROMDEVICE);
+
+			if (rtl8169_try_rx_copy(&skb, pkt_size, desc, dev)) {
+				pci_unmap_single(tp->pci_dev,
+						 le32_to_cpu(desc->buf_addr),
+						 RX_BUF_SIZE,
+						 PCI_DMA_FROMDEVICE);
+				tp->Rx_skbuff[cur_rx] = NULL;
+			}
 
 			skb_put(skb, pkt_size);
 			skb->protocol = eth_type_trans(skb, dev);
 			netif_rx(skb);
-
-			tp->Rx_skbuff[cur_rx] = NULL;
 
 			dev->last_rx = jiffies;
 			tp->stats.rx_bytes += pkt_size;
