@@ -101,6 +101,8 @@ sesInfoFree(struct cifsSesInfo *buf_to_free)
 		kfree(buf_to_free->serverDomain);
 	if (buf_to_free->serverNOS)
 		kfree(buf_to_free->serverNOS);
+	if (buf_to_free->password)
+		kfree(buf_to_free->password);
 	kfree(buf_to_free);
 }
 

@@ -141,12 +141,17 @@ E_md4hash(const unsigned char *passwd, unsigned char *p16)
 	__u16 wpwd[129];
 
 	/* Password cannot be longer than 128 characters */
-	len = strlen((char *) passwd);
-	if (len > 128)
-		len = 128;
-	/* Password must be converted to NT unicode */
-	_my_mbstowcs(wpwd, passwd, len);
-	wpwd[len] = 0;		/* Ensure string is null terminated */
+	if(passwd) {
+		len = strlen((char *) passwd);
+		if (len > 128) {
+			len = 128;
+		}
+		/* Password must be converted to NT unicode */
+		_my_mbstowcs(wpwd, passwd, len);
+	} else
+		len = 0;
+
+	wpwd[len] = 0;	/* Ensure string is null terminated */
 	/* Calculate length in bytes */
 	len = _my_wcslen(wpwd) * sizeof (__u16);
 
