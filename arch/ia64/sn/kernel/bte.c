@@ -125,12 +125,12 @@ bte_result_t bte_copy(u64 src, u64 dest, u64 len, u64 mode, void *notification)
 				    (BTE_LNSTAT_LOAD(bte) & BTE_ACTIVE)) {
 					/* Got the lock but BTE still busy */
 					spin_unlock(&bte->spinlock);
-					bte = NULL;
 				} else {
 					/* we got the lock and it's not busy */
 					break;
 				}
 			}
+			bte = NULL;
 		}
 
 		if (bte != NULL) {
