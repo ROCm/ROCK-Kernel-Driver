@@ -2867,16 +2867,14 @@ static int mega_findCard (Scsi_Host_Template * pHostTmpl,
 		pciDevFun = pdev->devfn;
 #endif
 		if ((flag & BOARD_QUARTZ) && (skip_id == -1)) {
-			pcibios_read_config_word (pciBus, pciDevFun,
-						  PCI_CONF_AMISIG, &magic);
+			pci_read_config_word (pdev, PCI_CONF_AMISIG, &magic);
 			if ((magic != AMI_SIGNATURE)
 			    && (magic != AMI_SIGNATURE_471)) {
 				pciIdx++;
 				continue;	/* not an AMI board */
 			}
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
-			pcibios_read_config_dword (pciBus, pciDevFun,
-						   PCI_CONF_AMISIG64, &magic64);
+			pci_read_config_dword (pdev, PCI_CONF_AMISIG64, &magic64);
 
 			if (magic64 == AMI_64BIT_SIGNATURE)
 				flag |= BOARD_64BIT;
