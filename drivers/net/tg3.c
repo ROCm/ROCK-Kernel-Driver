@@ -3321,10 +3321,16 @@ static int tg3_load_firmware_cpu(struct tg3 *tp, u32 cpu_base, u32 cpu_scratch_b
 				 int cpu_scratch_size, struct fw_info *info)
 {
 	int err, i;
+	u32 orig_tg3_flags = tp->tg3_flags;
+
+	/* Force use of PCI config space for indirect register
+	 * write calls.
+	 */
+	tp->tg3_flags |= TG3_FLAG_PCIX_TARGET_HWBUG;
 
 	err = tg3_reset_cpu(tp, cpu_base);
 	if (err)
-		return err;
+		goto out;
 
 	for (i = 0; i < cpu_scratch_size; i += sizeof(u32))
 		tg3_write_indirect_reg32(tp, cpu_scratch_base + i, 0);
@@ -3349,7 +3355,11 @@ static int tg3_load_firmware_cpu(struct tg3 *tp, u32 cpu_base, u32 cpu_scratch_b
 					 (info->data_data ?
 					  info->data_data[i] : 0));
 
-	return 0;
+	err = 0;
+
+out:
+	tp->tg3_flags = orig_tg3_flags;
+	return err;
 }
 
 /* tp->lock is held. */
