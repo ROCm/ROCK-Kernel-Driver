@@ -134,7 +134,7 @@ fail:
  *	is mounted on rootfs /sys.
  */
 
-dev_t name_to_dev_t(char *name)
+dev_t __init name_to_dev_t(char *name)
 {
 	char s[32];
 	char *p;
