@@ -75,13 +75,6 @@
 #define NS_TO_JIFFIES(TIME)	((TIME) / (1000000000 / HZ))
 #define JIFFIES_TO_NS(TIME)	((TIME) * (1000000000 / HZ))
 
-#ifndef JIFFIES_TO_MSEC
-# define JIFFIES_TO_MSEC(x) ((x) * 1000 / HZ)
-#endif
-#ifndef MSEC_TO_JIFFIES
-# define MSEC_TO_JIFFIES(x) ((x) * HZ / 1000)
-#endif
-
 /*
  * These are the 'tuning knobs' of the scheduler:
  *
@@ -1880,7 +1873,7 @@ static void rebalance_tick(int this_cpu, runqueue_t *this_rq,
 			interval *= sd->busy_factor;
 
 		/* scale ms to jiffies */
-		interval = MSEC_TO_JIFFIES(interval);
+		interval = MSECS_TO_JIFFIES(interval);
 		if (unlikely(!interval))
 			interval = 1;
 
