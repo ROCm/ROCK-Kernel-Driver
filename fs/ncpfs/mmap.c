@@ -90,7 +90,7 @@ static struct page* ncp_file_mmap_nopage(struct vm_area_struct *area,
 
 static struct vm_operations_struct ncp_file_mmap =
 {
-	nopage:	ncp_file_mmap_nopage,
+	.nopage	= ncp_file_mmap_nopage,
 };
 
 
