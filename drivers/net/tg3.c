@@ -2482,9 +2482,7 @@ static int tg3_halt(struct tg3 *);
 #ifdef CONFIG_NET_POLL_CONTROLLER
 static void tg3_poll_controller(struct net_device *dev)
 {
-	disable_irq(dev->irq);
-	tg3_interrupt (dev->irq, dev, NULL);
-	enable_irq(dev->irq);
+	tg3_interrupt(dev->irq, dev, NULL);
 }
 #endif
 
