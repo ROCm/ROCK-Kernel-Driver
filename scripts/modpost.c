@@ -487,6 +487,7 @@ add_header(struct buffer *b)
 	buf_printf(b, "\n");
 	buf_printf(b, "MODULE_INFO(vermagic, VERMAGIC_STRING);\n");
 	buf_printf(b, "\n");
+	buf_printf(b, "#undef unix\n"); /* We have a module called "unix" */
 	buf_printf(b, "struct module __this_module\n");
 	buf_printf(b, "__attribute__((section(\".gnu.linkonce.this_module\"))) = {\n");
 	buf_printf(b, " .name = __stringify(KBUILD_MODNAME),\n");
