@@ -133,6 +133,8 @@ static __inline__ void __user *compat_alloc_user_space(long len)
 
 	if (!(test_thread_flag(TIF_32BIT)))
 		usp += STACK_BIAS;
+	else
+		usp &= 0xffffffffUL;
 
 	return (void __user *) (usp - len);
 }

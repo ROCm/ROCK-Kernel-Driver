@@ -516,7 +516,7 @@ int drm_ioctl( struct inode *inode, struct file *filp,
 	
 	if (nr < DRIVER_IOCTL_COUNT)
 		ioctl = &drm_ioctls[nr];
-	else if ((nr >= DRM_COMMAND_BASE) || (nr < DRM_COMMAND_BASE + dev->driver->num_ioctls))
+	else if ((nr >= DRM_COMMAND_BASE) && (nr < DRM_COMMAND_BASE + dev->driver->num_ioctls))
 		ioctl = &dev->driver->ioctls[nr - DRM_COMMAND_BASE];
 	else
 		goto err_i1;

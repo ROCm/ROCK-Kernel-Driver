@@ -4,7 +4,9 @@
  *  Replacement code for mm functions to support CPU's that don't
  *  have any form of memory management unit (thus no virtual memory).
  *
- *  Copyright (c) 2004      David Howells <dhowells@redhat.com>
+ *  See Documentation/nommu-mmap.txt
+ *
+ *  Copyright (c) 2004-2005 David Howells <dhowells@redhat.com>
  *  Copyright (c) 2000-2003 David McCullough <davidm@snapgear.com>
  *  Copyright (c) 2000-2001 D Jeff Dionne <jeff@uClinux.org>
  *  Copyright (c) 2002      Greg Ungerer <gerg@snapgear.com>
@@ -567,12 +569,14 @@ unsigned long do_mmap_pgoff(struct file *file,
 	 * that it represents a valid section of the address space
 	 * - this is the hook for quasi-memory character devices
 	 */
-	if (file && file->f_op->get_unmapped_area)
+	if (file && file->f_op->get_unmapped_area) {
 		addr = file->f_op->get_unmapped_area(file, addr, len, pgoff, flags);
-
-	if (IS_ERR((void *) addr)) {
-		ret = addr;
-		goto error;
+		if (IS_ERR((void *) addr)) {
+			ret = addr;
+			if (ret == (unsigned long) -ENOSYS)
+				ret = (unsigned long) -ENODEV;
+			goto error;
+		}
 	}
 
 	/* we're going to need a VMA struct as well */

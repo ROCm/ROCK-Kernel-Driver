@@ -1027,25 +1027,27 @@ do {									\
 } while (0)
 
 
-#define OUT_RING_USER_TABLE( tab, sz ) do {			\
+#define OUT_RING_TABLE( tab, sz ) do {					\
 	int _size = (sz);					\
-	int __user *_tab = (tab);					\
+	int *_tab = (int *)(tab);				\
 								\
 	if (write + _size > mask) {				\
-		int i = (mask+1) - write;			\
-		if (DRM_COPY_FROM_USER_UNCHECKED( (int *)(ring+write),	\
-				      _tab, i*4 ))		\
-			return DRM_ERR(EFAULT);		\
+		int _i = (mask+1) - write;			\
+		_size -= _i;					\
+		while (_i > 0 ) {				\
+			*(int *)(ring + write) = *_tab++;	\
+			write++;				\
+			_i--;					\
+		}						\
 		write = 0;					\
-		_size -= i;					\
-		_tab += i;					\
+		_tab += _i;					\
 	}							\
 								\
-	if (_size && DRM_COPY_FROM_USER_UNCHECKED( (int *)(ring+write),	\
-			               _tab, _size*4 ))		\
-		return DRM_ERR(EFAULT);			\
-								\
-	write += _size;						\
+	while (_size > 0) {					\
+		*(ring + write) = *_tab++;			\
+		write++;					\
+		_size--;					\
+	}							\
 	write &= mask;						\
 } while (0)
 
