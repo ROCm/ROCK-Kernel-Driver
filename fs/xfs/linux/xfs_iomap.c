@@ -29,14 +29,8 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-/*
- *  fs/xfs/linux/xfs_iomap.c (Linux Read Write stuff)
- *
- */
 
 #include <xfs.h>
-#include <linux/pagemap.h>
-
 
 #define XFS_WRITEIO_ALIGN(mp,off)	(((off) >> mp->m_writeio_log) \
 						<< mp->m_writeio_log)
@@ -93,7 +87,8 @@ _xfs_imap_to_bmap(
 }
 
 int
-xfs_iomap(xfs_iocore_t	*io,
+xfs_iomap(
+	xfs_iocore_t	*io,
 	xfs_off_t	offset,
 	ssize_t		count,
 	int		flags,
@@ -111,7 +106,8 @@ xfs_iomap(xfs_iocore_t	*io,
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 
-	switch (flags & (PBF_READ|PBF_WRITE|PBF_FILE_ALLOCATE)) {
+	switch (flags &
+		(PBF_READ|PBF_WRITE|PBF_FILE_ALLOCATE|PBF_FILE_UNWRITTEN)) {
 	case PBF_READ:
 		lockmode = XFS_LCK_MAP_SHARED(mp, io);
 		bmap_flags = XFS_BMAPI_ENTIRE;
@@ -126,8 +122,13 @@ xfs_iomap(xfs_iocore_t	*io,
 		bmap_flags = XFS_BMAPI_ENTIRE;
 		XFS_ILOCK(mp, io, lockmode);
 		break;
+	case PBF_FILE_UNWRITTEN:
+		lockmode = XFS_ILOCK_EXCL|XFS_EXTSIZE_WR;
+		bmap_flags = XFS_BMAPI_ENTIRE|XFS_BMAPI_IGSTATE;
+		XFS_ILOCK(mp, io, lockmode);
+		break;
 	default:
-		ASSERT(flags & (PBF_READ|PBF_WRITE|PBF_FILE_ALLOCATE));
+		BUG();
 	}
 
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
@@ -180,7 +181,7 @@ out:
 	return XFS_ERROR(error);
 }
 
-static int
+STATIC int
 xfs_flush_space(
 	xfs_inode_t	*ip,
 	int		*fsynced,
@@ -500,7 +501,6 @@ retry:
 	return 0;
 }
 
-
 /*
  * Pass in a delayed allocate extent, convert it to real extents;
  * return to the caller the extent we create which maps on top of
@@ -732,4 +732,3 @@ error_on_bmapi_transaction:
 error0:
 	return XFS_ERROR(error);
 }
-

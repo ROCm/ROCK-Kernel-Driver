@@ -83,7 +83,7 @@ typedef enum {				/* pbm_flags values */
 	PBMF_HOLE =		0x02,	/* mapping covers a hole	*/
 	PBMF_DELAY =		0x04,	/* mapping covers delalloc region  */
 	PBMF_UNWRITTEN =	0x20	/* mapping covers allocated	*/
-					/* but uninitialized XFS data	*/
+					/* but uninitialized file data	*/
 } bmap_flags_t;
 
 typedef enum page_buf_flags_e {		/* pb_flags values */
@@ -105,19 +105,17 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 	PBF_TRYLOCK = (1 << 14), /* lock requested, but do not wait	   */
 	PBF_FILE_ALLOCATE = (1 << 15), /* allocate all file space	   */
 	PBF_DONT_BLOCK = (1 << 16), /* do not block in current thread	   */
-	PBF_DIRECT = (1 << 17),	  /* direct I/O desired			   */
+	PBF_DIRECT = (1 << 17),	/* direct I/O desired			   */
+	PBF_FILE_UNWRITTEN = (1 << 18), /* convert unwritten extent space  */
 
 	/* flags used only internally */
 	_PBF_LOCKABLE = (1 << 19), /* page_buf_t may be locked		   */
-	_PBF_ALL_PAGES_MAPPED = (1 << 21),
-				/* all pages in rage are mapped		   */
-	_PBF_ADDR_ALLOCATED = (1 << 22),
-				/* pb_addr space was allocated		   */
-	_PBF_MEM_ALLOCATED = (1 << 23),
-				/* pb_mem and underlying pages allocated   */
+	_PBF_ALL_PAGES_MAPPED = (1 << 21), /* all pages in range mapped	   */
+	_PBF_ADDR_ALLOCATED = (1 << 22), /* pb_addr space was allocated	   */
+	_PBF_MEM_ALLOCATED = (1 << 23), /* pb_mem+underlying pages alloc'd */
 
 	PBF_FORCEIO = (1 << 24),
-	PBF_FLUSH = (1 << 25),	/* flush disk write cache */
+	PBF_FLUSH = (1 << 25),	/* flush disk write cache		   */
 	PBF_READ_AHEAD = (1 << 26),
 
 } page_buf_flags_t;
