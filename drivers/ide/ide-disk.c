@@ -1636,7 +1636,6 @@ static int idedisk_cleanup (ide_drive_t *drive)
 	return ide_unregister_subdriver(drive);
 }
 
-static int idedisk_init (void);
 static int idedisk_reinit(ide_drive_t *drive);
 
 /*
@@ -1668,7 +1667,6 @@ static ide_driver_t idedisk_driver = {
 	capacity:		idedisk_capacity,
 	special:		idedisk_special,
 	proc:			idedisk_proc,
-	init:			idedisk_init,
 	reinit:			idedisk_reinit,
 	ata_prebuilder:		NULL,
 	atapi_prebuilder:	NULL,
@@ -1676,10 +1674,7 @@ static ide_driver_t idedisk_driver = {
 };
 
 static ide_module_t idedisk_module = {
-	IDE_DRIVER_MODULE,
-	idedisk_init,
-	&idedisk_driver,
-	NULL
+	info:	&idedisk_driver,
 };
 
 MODULE_DESCRIPTION("ATA DISK Driver");
@@ -1720,9 +1715,7 @@ static void __exit idedisk_exit (void)
 
 static int idedisk_init (void)
 {
-	MOD_INC_USE_COUNT;
 	ide_register_module(&idedisk_module);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

@@ -491,7 +491,6 @@ static void idescsi_ide_release (struct inode *inode, struct file *filp, ide_dri
 }
 
 static ide_drive_t *idescsi_drives[MAX_HWIFS * MAX_DRIVES];
-static int idescsi_initialized = 0;
 
 static void idescsi_add_settings(ide_drive_t *drive)
 {
@@ -570,12 +569,8 @@ static ide_driver_t idescsi_driver = {
 	drives:			LIST_HEAD_INIT(idescsi_driver.drives),
 };
 
-static int idescsi_init (void);
 static ide_module_t idescsi_module = {
-	IDE_DRIVER_MODULE,
-	idescsi_init,
-	&idescsi_driver,
-	NULL
+	info:	&idescsi_driver,
 };
 
 static int idescsi_reinit(ide_drive_t *drive)
@@ -605,24 +600,6 @@ static int idescsi_reinit(ide_drive_t *drive)
 	return 0;
 failed:
 	return 1;
-}
-
-/*
- *	idescsi_init will register the driver for each scsi.
- */
-static int idescsi_init (void)
-{
-	int i;
-
-	if (idescsi_initialized)
-		return 0;
-	idescsi_initialized = 1;
-	for (i = 0; i < MAX_HWIFS * MAX_DRIVES; i++)
-		idescsi_drives[i] = NULL;
-	MOD_INC_USE_COUNT;
-	ide_register_module(&idescsi_module);
-	MOD_DEC_USE_COUNT;
-	return 0;
 }
 
 int idescsi_detect (Scsi_Host_Template *host_template)
@@ -870,7 +847,7 @@ static Scsi_Host_Template idescsi_template = {
 
 static int __init init_idescsi_module(void)
 {
-	idescsi_init();
+	ide_register_module(&idescsi_module);
 	scsi_register_host(&idescsi_template);
 	return 0;
 }

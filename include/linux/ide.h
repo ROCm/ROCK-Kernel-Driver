@@ -915,7 +915,6 @@ typedef struct ide_driver_s {
 	unsigned long	(*capacity)(ide_drive_t *);
 	ide_startstop_t	(*special)(ide_drive_t *);
 	ide_proc_entry_t        *proc;
-	int		(*init)(void);
 	int		(*reinit)(ide_drive_t *);
 	void		(*ata_prebuilder)(ide_drive_t *);
 	void		(*atapi_prebuilder)(ide_drive_t *);
@@ -929,7 +928,6 @@ typedef struct ide_driver_s {
  */
 #define IDE_CHIPSET_MODULE		0	/* not supported yet */
 #define IDE_PROBE_MODULE		1
-#define IDE_DRIVER_MODULE		2
 
 typedef int	(ide_module_init_proc)(void);
 

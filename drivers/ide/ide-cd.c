@@ -3047,7 +3047,6 @@ int ide_cdrom_cleanup(ide_drive_t *drive)
 	return 0;
 }
 
-static int ide_cdrom_init(void);
 static int ide_cdrom_reinit (ide_drive_t *drive);
 
 static ide_driver_t ide_cdrom_driver = {
@@ -3080,7 +3079,6 @@ static ide_driver_t ide_cdrom_driver = {
 	capacity:		ide_cdrom_capacity,
 	special:		NULL,
 	proc:			NULL,
-	init:			ide_cdrom_init,
 	reinit:			ide_cdrom_reinit,
 	ata_prebuilder:		NULL,
 	atapi_prebuilder:	NULL,
@@ -3088,10 +3086,7 @@ static ide_driver_t ide_cdrom_driver = {
 };
 
 static ide_module_t ide_cdrom_module = {
-	IDE_DRIVER_MODULE,
-	ide_cdrom_init,
-	&ide_cdrom_driver,
-	NULL
+	info:	&ide_cdrom_driver,
 };
 
 /* options */
@@ -3153,9 +3148,7 @@ static void __exit ide_cdrom_exit(void)
  
 static int ide_cdrom_init(void)
 {
-	MOD_INC_USE_COUNT;
 	ide_register_module(&ide_cdrom_module);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

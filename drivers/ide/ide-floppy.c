@@ -2143,7 +2143,6 @@ static ide_proc_entry_t idefloppy_proc[] = {
 
 #endif	/* CONFIG_PROC_FS */
 
-static int idefloppy_init (void);
 static int idefloppy_reinit(ide_drive_t *drive);
 
 /*
@@ -2179,7 +2178,6 @@ static ide_driver_t idefloppy_driver = {
 	capacity:		idefloppy_capacity,
 	special:		NULL,
 	proc:			idefloppy_proc,
-	init:			idefloppy_init,
 	reinit:			idefloppy_reinit,
 	ata_prebuilder:		NULL,
 	atapi_prebuilder:	NULL,
@@ -2187,10 +2185,7 @@ static ide_driver_t idefloppy_driver = {
 };
 
 static ide_module_t idefloppy_module = {
-	IDE_DRIVER_MODULE,
-	idefloppy_init,
-	&idefloppy_driver,
-	NULL
+	info: &idefloppy_driver,
 };
 
 static int idefloppy_reinit (ide_drive_t *drive)
@@ -2240,9 +2235,7 @@ static void __exit idefloppy_exit (void)
 static int idefloppy_init (void)
 {
 	printk("ide-floppy driver " IDEFLOPPY_VERSION "\n");
-	MOD_INC_USE_COUNT;
 	ide_register_module(&idefloppy_module);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

@@ -3436,11 +3436,6 @@ static ide_startstop_t default_special (ide_drive_t *drive)
 	return ide_stopped;
 }
 
-static int default_init (void)
-{
-	return 0;
-}
-
 static int default_reinit (ide_drive_t *drive)
 {
 	printk(KERN_ERR "%s: does not support hotswap of device class !\n", drive->name);
@@ -3468,7 +3463,6 @@ static void setup_driver_defaults (ide_drive_t *drive)
 	if (d->pre_reset == NULL)	d->pre_reset = default_pre_reset;
 	if (d->capacity == NULL)	d->capacity = default_capacity;
 	if (d->special == NULL)		d->special = default_special;
-	if (d->init == NULL)		d->init = default_init;
 	if (d->reinit == NULL)		d->reinit = default_reinit;
 }
 

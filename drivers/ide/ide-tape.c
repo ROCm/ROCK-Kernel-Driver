@@ -1424,7 +1424,6 @@ typedef struct {
  *	Additional state variables are defined in our ide_drive_t structure.
  */
 static idetape_chrdev_t idetape_chrdevs[MAX_HWIFS * MAX_DRIVES];
-static int idetape_chrdev_present = 0;
 
 #if IDETAPE_DEBUG_LOG_VERBOSE
 
@@ -6300,7 +6299,6 @@ static ide_proc_entry_t idetape_proc[] = {
 
 #endif
 
-static int idetape_init (void);
 static int idetape_reinit(ide_drive_t *drive);
 
 /*
@@ -6336,7 +6334,6 @@ static ide_driver_t idetape_driver = {
 	capacity:		NULL,
 	special:		NULL,
 	proc:			idetape_proc,
-	init:			idetape_init,
 	reinit:			idetape_reinit,
 	ata_prebuilder:		NULL,
 	atapi_prebuilder:	NULL,
@@ -6344,10 +6341,7 @@ static ide_driver_t idetape_driver = {
 };
 
 static ide_module_t idetape_module = {
-	IDE_DRIVER_MODULE,
-	idetape_init,
-	&idetape_driver,
-	NULL
+	info:	&idetape_driver,
 };
 
 /*
@@ -6422,7 +6416,6 @@ static void __exit idetape_exit (void)
 {
 	ide_unregister_module(&idetape_module);
 	unregister_chrdev(IDETAPE_MAJOR, "ht");
-	idetape_chrdev_present = 0;
 }
 
 /*
@@ -6430,17 +6423,11 @@ static void __exit idetape_exit (void)
  */
 static int idetape_init (void)
 {
-	MOD_INC_USE_COUNT;
-	if (!idetape_chrdev_present) {
-		idetape_chrdev_present = 1;
-		if (register_chrdev(IDETAPE_MAJOR, "ht", &idetape_fops)) {
-			printk(KERN_ERR "ide-tape: Failed to register character device interface\n");
-			MOD_DEC_USE_COUNT;
-			return -EBUSY;
-		}
+	if (register_chrdev(IDETAPE_MAJOR, "ht", &idetape_fops)) {
+		printk(KERN_ERR "ide-tape: Failed to register character device interface\n");
+		return -EBUSY;
 	}
 	ide_register_module(&idetape_module);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
