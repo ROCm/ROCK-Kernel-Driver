@@ -32,32 +32,30 @@
 #define CISCO_SLARP_REPLY     1
 #define CISCO_SLARP_KEEPALIVE 2
 
-extern void isdn_net_init_module(void);
-
-extern int isdn_net_new(char *, isdn_net_local *);
-extern int isdn_net_newslave(char *);
-extern int isdn_net_rm(char *);
-extern int isdn_net_rmall(void);
-extern int isdn_net_stat_callback(int, isdn_ctrl *);
-extern int isdn_net_setcfg(isdn_net_ioctl_cfg *);
-extern int isdn_net_getcfg(isdn_net_ioctl_cfg *);
-extern int isdn_net_addphone(isdn_net_ioctl_phone *);
-extern int isdn_net_getphones(isdn_net_ioctl_phone *, char *);
-extern int isdn_net_getpeer(isdn_net_ioctl_phone *, isdn_net_ioctl_phone *);
-extern int isdn_net_delphone(isdn_net_ioctl_phone *);
-extern int isdn_net_find_icall(int, int, int, setup_parm *);
-extern void isdn_net_hangup(isdn_net_dev *);
+extern void isdn_net_init(void);
+extern void isdn_net_exit(void);
 extern void isdn_net_hangup_all(void);
-extern int isdn_net_force_hangup(char *);
-extern int isdn_net_force_dial(char *);
-extern isdn_net_dev *isdn_net_findif(char *);
+extern int isdn_net_ioctl(struct inode *, struct file *, uint, ulong);
+
+extern int register_isdn_netif(int encap, struct isdn_netif_ops *ops);
+extern int isdn_net_autodial(struct sk_buff *skb, struct net_device *ndev);
+extern int isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev);
+
+extern int isdn_net_stat_callback(int, isdn_ctrl *);
+extern int isdn_net_find_icall(int, int, int, setup_parm *);
+extern int isdn_net_dev_dial(isdn_net_dev *idev);
+extern void isdn_net_hangup(isdn_net_dev *);
 extern int isdn_net_rcv_skb(int, struct sk_buff *);
 extern int isdn_net_dial_req(isdn_net_dev *);
 extern void isdn_net_writebuf_skb(isdn_net_dev *, struct sk_buff *skb);
 extern void isdn_net_write_super(isdn_net_dev *, struct sk_buff *skb);
 extern int isdn_net_online(isdn_net_dev *);
-extern int isdn_net_autodial(struct sk_buff *skb, struct net_device *ndev);
-extern int isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev);
+
+enum {
+	ST_CHARGE_NULL,
+	ST_CHARGE_GOT_CINF,  /* got a first charge info */
+	ST_CHARGE_HAVE_CINT, /* got a second chare info and thus the timing */
+};
 
 #define ISDN_NET_MAX_QUEUE_LENGTH 2
 

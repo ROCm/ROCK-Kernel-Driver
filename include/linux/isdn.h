@@ -312,7 +312,6 @@ struct isdn_netif_ops {
 /* Local interface-data */
 typedef struct isdn_net_local_s {
   ulong                  magic;
-  spinlock_t             lock;
   struct net_device_stats stats;       /* Ethernet Statistics              */
   int                    flags;        /* Connection-flags                 */
   int                    dialmax;      /* Max. Number of Dial-retries      */
@@ -402,7 +401,7 @@ typedef struct isdn_net_dev_s {
   struct tasklet_struct  tlet;
 
   isdn_net_local        *mlp;          /* Ptr to master device for all devs*/
-  struct isdn_net_dev_s *slave;        /* Ptr to Slave device for masters  */
+  struct isdn_net_dev_s *slave;        /* Ptr to Slave device for masters  */ // FIXME kill
 
   struct list_head       slaves;       /* Members of local->slaves         */
   struct list_head       online;       /* Members of local->online         */

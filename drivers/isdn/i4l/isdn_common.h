@@ -52,6 +52,8 @@ do { printk(KERN_WARNING "ISDN Bug at %s:%d\n", __FILE__, __LINE__); \
 
 #define HERE printk("%s:%d (%s)\n", __FILE__, __LINE__, __FUNCTION__)
 
+extern struct list_head isdn_net_devs;
+
 /* Prototypes */
 extern void isdn_MOD_INC_USE_COUNT(void);
 extern void isdn_MOD_DEC_USE_COUNT(void);
@@ -81,8 +83,6 @@ struct dial_info {
 	unsigned char *msn;
 	unsigned char *phone;
 };
-
-extern struct list_head isdn_net_devs;
 
 extern int   isdn_get_free_slot(int, int, int, int, int, char *);
 extern void  isdn_slot_free(int slot, int usage);

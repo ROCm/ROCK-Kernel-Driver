@@ -1010,19 +1010,6 @@ static int
 isdn_status_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 {
 	int ret;
-	union iocpar {
-		char name[10];
-		char bname[22];
-		isdn_ioctl_struct iocts;
-		isdn_net_ioctl_phone phone;
-		isdn_net_ioctl_cfg cfg;
-	} iocpar;
-
-#define name  iocpar.name
-#define bname iocpar.bname
-#define iocts iocpar.iocts
-#define phone iocpar.phone
-#define cfg   iocpar.cfg
 
 	switch (cmd) {
 	case IIOCGETDVR:
@@ -1044,26 +1031,11 @@ isdn_status_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 		} else
 			return -EINVAL;
 		break;
-#ifdef CONFIG_NETDEVICES
 	case IIOCNETGPN:
-		/* Get peer phone number of a connected 
-		 * isdn network interface */
-		if (arg) {
-			if (copy_from_user((char *) &phone, (char *) arg, sizeof(phone)))
-				return -EFAULT;
-			return isdn_net_getpeer(&phone, (isdn_net_ioctl_phone *) arg);
-		} else
-			return -EINVAL;
-#endif
+		return isdn_net_ioctl(inode, file, cmd, arg);
 	default:
 		return -EINVAL;
 	}
-
-#undef name
-#undef bname
-#undef iocts
-#undef phone
-#undef cfg
 }
 
 static struct file_operations isdn_status_fops =
@@ -1221,19 +1193,15 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 	int ret;
 	int i;
 	char *p;
-	union iocpar {
-		char name[10];
+	/* save stack space */
+	union {
 		char bname[20];
 		isdn_ioctl_struct iocts;
-		isdn_net_ioctl_phone phone;
-		isdn_net_ioctl_cfg cfg;
 	} iocpar;
 
-#define name  iocpar.name
-#define bname iocpar.bname
 #define iocts iocpar.iocts
-#define phone iocpar.phone
-#define cfg   iocpar.cfg
+#define bname iocpar.bname
+
 /*
  * isdn net devices manage lots of configuration variables as linked lists.
  * Those lists must only be manipulated from user space. Some of the ioctl's
@@ -1242,134 +1210,19 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
  * are serialized by means of a semaphore.
  */
 	switch (cmd) {
-	case IIOCNETDWRSET:
-		printk(KERN_INFO "INFO: ISDN_DW_ABC_EXTENSION not enabled\n");
-		return(-EINVAL);
-	case IIOCNETLCR:
-		printk(KERN_INFO "INFO: ISDN_ABC_LCR_SUPPORT not enabled\n");
-		return -ENODEV;
-#ifdef CONFIG_NETDEVICES
 	case IIOCNETAIF:
-		/* Add a network-interface */
-		if (copy_from_user(name, (char *) arg, sizeof(name) - 1))
-			return -EFAULT;
-		name[sizeof(name)-1] = 0;
-		ret = down_interruptible(&dev->sem);
-		if (ret)
-			return ret;
-		ret = isdn_net_new(name, NULL);
-		up(&dev->sem);
-		return ret;
 	case IIOCNETASL:
-		/* Add a slave to a network-interface */
-		if (copy_from_user(bname, (char *) arg, sizeof(bname) - 1))
-			return -EFAULT;
-		bname[sizeof(bname)-1] = 0;
-		ret = down_interruptible(&dev->sem);
-		if (ret)
-			return ret;
-		ret = isdn_net_newslave(bname);
-		up(&dev->sem);
-		return ret;
 	case IIOCNETDIF:
-		/* Delete a network-interface */
-		if (arg) {
-			if (copy_from_user(name, (char *) arg, sizeof(name)))
-				return -EFAULT;
-			ret = down_interruptible(&dev->sem);
-			if( ret ) return ret;
-			ret = isdn_net_rm(name);
-			up(&dev->sem);
-			return ret;
-		} else
-			return -EINVAL;
 	case IIOCNETSCF:
-		/* Set configurable parameters of a network-interface */
-		if (arg) {
-			if (copy_from_user((char *) &cfg, (char *) arg, sizeof(cfg)))
-				return -EFAULT;
-			return isdn_net_setcfg(&cfg);
-		} else
-			return -EINVAL;
 	case IIOCNETGCF:
-		/* Get configurable parameters of a network-interface */
-		if (arg) {
-			if (copy_from_user((char *) &cfg, (char *) arg, sizeof(cfg)))
-				return -EFAULT;
-			if (!(ret = isdn_net_getcfg(&cfg))) {
-				if (copy_to_user((char *) arg, (char *) &cfg, sizeof(cfg)))
-					return -EFAULT;
-			}
-			return ret;
-		} else
-			return -EINVAL;
 	case IIOCNETANM:
-		/* Add a phone-number to a network-interface */
-		if (arg) {
-			if (copy_from_user((char *) &phone, (char *) arg, sizeof(phone)))
-				return -EFAULT;
-			ret = down_interruptible(&dev->sem);
-			if( ret ) return ret;
-			ret = isdn_net_addphone(&phone);
-			up(&dev->sem);
-			return ret;
-		} else
-			return -EINVAL;
 	case IIOCNETGNM:
-		/* Get list of phone-numbers of a network-interface */
-		if (arg) {
-			if (copy_from_user((char *) &phone, (char *) arg, sizeof(phone)))
-				return -EFAULT;
-			ret = down_interruptible(&dev->sem);
-			if( ret ) return ret;
-			ret = isdn_net_getphones(&phone, (char *) arg);
-			up(&dev->sem);
-			return ret;
-		} else
-			return -EINVAL;
 	case IIOCNETDNM:
-		/* Delete a phone-number of a network-interface */
-		if (arg) {
-			if (copy_from_user((char *) &phone, (char *) arg, sizeof(phone)))
-				return -EFAULT;
-			ret = down_interruptible(&dev->sem);
-			if( ret ) return ret;
-			ret = isdn_net_delphone(&phone);
-			up(&dev->sem);
-			return ret;
-		} else
-			return -EINVAL;
 	case IIOCNETDIL:
-		/* Force dialing of a network-interface */
-		if (arg) {
-			if (copy_from_user(name, (char *) arg, sizeof(name)))
-				return -EFAULT;
-			return isdn_net_force_dial(name);
-		} else
-			return -EINVAL;
-#ifdef CONFIG_ISDN_PPP
 	case IIOCNETALN:
-		if (!arg)
-			return -EINVAL;
-		if (copy_from_user(name, (char *) arg, sizeof(name)))
-			return -EFAULT;
-		return isdn_ppp_dial_slave(name);
 	case IIOCNETDLN:
-		if (!arg)
-			return -EINVAL;
-		if (copy_from_user(name, (char *) arg, sizeof(name)))
-			return -EFAULT;
-		return isdn_ppp_hangup_slave(name);
-#endif
 	case IIOCNETHUP:
-		/* Force hangup of a network-interface */
-		if (!arg)
-			return -EINVAL;
-		if (copy_from_user(name, (char *) arg, sizeof(name)))
-			return -EFAULT;
-		return isdn_net_force_hangup(name);
-		break;
-#endif                          /* CONFIG_NETDEVICES */
+		return isdn_net_ioctl(inode, file, cmd, arg);
 	case IIOCSETVER:
 		dev->net_verbose = arg;
 		printk(KERN_INFO "isdn: Verbose-Level is %d\n", dev->net_verbose);
@@ -1577,12 +1430,8 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 		} else
 			return -EINVAL;
 	}
-
-#undef name
-#undef bname
 #undef iocts
-#undef phone
-#undef cfg
+#undef bname
 }
 
 static struct file_operations isdn_ctrl_fops =
@@ -2430,7 +2279,7 @@ static int __init isdn_init(void)
 	printk("\n");
 #endif
 	isdn_info_update();
-	isdn_net_init_module();
+	isdn_net_init();
 	return 0;
 
  err_tty_modem:
@@ -2456,8 +2305,7 @@ static void __exit isdn_exit(void)
 #endif
 	save_flags(flags);
 	cli();
-	if (isdn_net_rmall() < 0)
-		BUG();
+	isdn_net_exit();
 
 	isdn_tty_exit();
 	if (unregister_chrdev(ISDN_MAJOR, "isdn"))
