@@ -427,8 +427,8 @@ setup_rt_frame(int usig, struct k_sigaction *ka, siginfo_t *info,
 		 * arguments for the signal handler.
 		 *   -- Peter Maydell <pmaydell@chiark.greenend.org.uk> 2000-12-06
 		 */
-		regs->ARM_r1 = (unsigned long)frame->pinfo;
-		regs->ARM_r2 = (unsigned long)frame->puc;
+		regs->ARM_r1 = (unsigned long)&frame->info;
+		regs->ARM_r2 = (unsigned long)&frame->uc;
 	}
 
 	return err;
