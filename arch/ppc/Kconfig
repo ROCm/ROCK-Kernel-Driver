@@ -84,17 +84,6 @@ config PTE_64BIT
 
 source arch/ppc/platforms/4xx/Kconfig
 
-config 8260
-	bool "MPC8260 CPM Support"
-	depends on 6xx
-	help
-	  The MPC8260 CPM (Communications Processor Module) is a typical
-	  embedded CPU made by Motorola.  Selecting this option means that
-	  you wish to build a kernel for a machine with specifically an 8260
-	  for a CPU.
-
-	  If in doubt, say N.
-
 config GENERIC_ISA_DMA
 	bool
 	depends on POWER3 || 6xx && !8260
@@ -114,59 +103,6 @@ config SERIAL_CONSOLE
 	bool
 	depends on 8xx || 8260
 	default y
-
-choice
-	prompt "Machine Type"
-	depends on 8260
-	default WILLOW_1
-
-config EST8260
-	bool "EST8260"
-	---help---
-	  EST8260:
-	  The EST8260 is a single-board computer manufactured by Wind River
-	  Systems, Inc. (formerly Embedded Support Tools Corp.) and based on
-	  the MPC8260.  Wind River Systems has a website at
-	  <http://www.windriver.com/>, but the EST8260 cannot be found on it
-	  and has probably been discontinued or rebadged.
-
-	  TQM8260:
-	  MPC8260 based module, little larger than credit card,
-	  up to 128 MB global + 64 MB local RAM, 32 MB Flash,
-	  32 kB EEPROM, 256 kB L@ Cache, 10baseT + 100baseT Ethernet,
-	  2 x serial ports, ...
-	  Manufacturer: TQ Components, www.tq-group.de
-	  Date of Release: June 2001
-	  End of Life: not yet :-)
-	  URL: <http://www.denx.de/PDF/TQM82xx_SPEC_Rev005.pdf>
-
-	  PM826:
-	  Modular system with MPC8260 CPU
-	  Manufacturer: MicroSys GmbH, <http://www.microsys.de/>
-	  Date of Release: mid 2001
-	  End of life: -
-	  URL: <http://www.microsys.de/html/pm826.html>
-
-	  CU824:
-	  VMEBus Board with PCI extension with MPC8240 CPU
-	  Manufacturer: MicroSys GmbH, http://www.microsys.de/
-	  Date of Release: early 2001 (?)
-	  End of life: -
-	  URL: <http://www.microsys.de/html/cu824.html>
-
-config SBS8260
-	bool "SBS8260"
-
-config RPX6
-	bool "RPXSUPER"
-
-config TQM8260
-	bool "TQM8260"
-
-config WILLOW_1
-	bool "Willow"
-
-endchoice
 
 config NOT_COHERENT_CACHE
 	bool
@@ -409,7 +345,7 @@ config EMBEDDEDBOOT
 
 choice
 	prompt "Machine Type"
-	depends on (6xx || POWER3) && !8260
+	depends on 6xx || POWER3
 	default PPC_MULTIPLATFORM
 	---help---
 	  Linux currently supports several different kinds of PowerPC-based
@@ -443,7 +379,7 @@ config APUS
 	  More information is available at:
 	  <http://linux-apus.sourceforge.net/>.
 
-config WILLOW_2
+config WILLOW
 	bool "Cogent-Willow"
 
 config PCORE
@@ -498,7 +434,45 @@ config GEMINI
 	  series Single Board Computer.  More information is available at:
 	  <http://www.synergymicro.com/PressRel/97_10_15.html>.
 
+config EST8260
+	bool "EST8260"
+	---help---
+	  The EST8260 is a single-board computer manufactured by Wind River
+	  Systems, Inc. (formerly Embedded Support Tools Corp.) and based on
+	  the MPC8260.  Wind River Systems has a website at
+	  <http://www.windriver.com/>, but the EST8260 cannot be found on it
+	  and has probably been discontinued or rebadged.
+
+config SBS8260
+	bool "SBS8260"
+
+config RPX6
+	bool "RPXSUPER"
+
+config TQM8260
+	bool "TQM8260"
+	---help---
+	  MPC8260 based module, little larger than credit card,
+	  up to 128 MB global + 64 MB local RAM, 32 MB Flash,
+	  32 kB EEPROM, 256 kB L@ Cache, 10baseT + 100baseT Ethernet,
+	  2 x serial ports, ...
+	  Manufacturer: TQ Components, www.tq-group.de
+	  Date of Release: June 2001
+	  End of Life: not yet :-)
+	  URL: <http://www.denx.de/PDF/TQM82xx_SPEC_Rev005.pdf>
+
 endchoice
+
+config 8260
+	bool "MPC8260 CPM Support" if WILLOW
+	depends on 6xx
+	default y if TQM8260 || RPXSUPER || EST8260 || SBS8260
+	help
+	  The MPC8260 CPM (Communications Processor Module) is a typical
+	  embedded CPU made by Motorola.  Selecting this option means that
+	  you wish to build a kernel for a machine with specifically an 8260
+	  for a CPU.
+
 
 config PPC_CHRP
 	bool
@@ -527,17 +501,12 @@ config PPC_OF
 
 config FORCE
 	bool
-	depends on 6xx && !8260 && (PCORE || POWERPMC250)
+	depends on 6xx && (PCORE || POWERPMC250)
 	default y
 
 config EPIC_SERIAL_MODE
 	bool
-	depends on 6xx && !8260 && (LOPEC || SANDPOINT)
-	default y
-
-config WILLOW
-	bool
-	depends on WILLOW_1 || WILLOW_2
+	depends on 6xx && (LOPEC || SANDPOINT)
 	default y
 
 config MPC10X_STORE_GATHERING
