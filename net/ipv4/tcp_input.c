@@ -1035,7 +1035,7 @@ tcp_sacktag_write_queue(struct sock *sk, struct sk_buff *ack_skb, u32 prior_snd_
 			if(!before(TCP_SKB_CB(skb)->seq, end_seq))
 				break;
 
-			fack_count += TCP_SKB_CB(skb)->tso_factor;
+			fack_count += tcp_skb_pcount(skb);
 
 			in_sack = !after(start_seq, TCP_SKB_CB(skb)->seq) &&
 				!before(end_seq, TCP_SKB_CB(skb)->end_seq);
@@ -1224,7 +1224,7 @@ static void tcp_enter_frto_loss(struct sock *sk)
 	tcp_set_pcount(&tp->fackets_out, 0);
 
 	sk_stream_for_retrans_queue(skb, sk) {
-		cnt += TCP_SKB_CB(skb)->tso_factor;;
+		cnt += tcp_skb_pcount(skb);
 		TCP_SKB_CB(skb)->sacked &= ~TCPCB_LOST;
 		if (!(TCP_SKB_CB(skb)->sacked&TCPCB_SACKED_ACKED)) {
 
@@ -1299,7 +1299,7 @@ void tcp_enter_loss(struct sock *sk, int how)
 		tp->undo_marker = tp->snd_una;
 
 	sk_stream_for_retrans_queue(skb, sk) {
-		cnt += TCP_SKB_CB(skb)->tso_factor;
+		cnt += tcp_skb_pcount(skb);
 		if (TCP_SKB_CB(skb)->sacked&TCPCB_RETRANS)
 			tp->undo_marker = 0;
 		TCP_SKB_CB(skb)->sacked &= (~TCPCB_TAGBITS)|TCPCB_SACKED_ACKED;
@@ -1550,7 +1550,7 @@ tcp_mark_head_lost(struct sock *sk, struct tcp_opt *tp, int packets, u32 high_se
 	BUG_TRAP(cnt <= tcp_get_pcount(&tp->packets_out));
 
 	sk_stream_for_retrans_queue(skb, sk) {
-		cnt -= TCP_SKB_CB(skb)->tso_factor;
+		cnt -= tcp_skb_pcount(skb);
 		if (cnt < 0 || after(TCP_SKB_CB(skb)->end_seq, high_seq))
 			break;
 		if (!(TCP_SKB_CB(skb)->sacked&TCPCB_TAGBITS)) {
@@ -2369,7 +2369,7 @@ static int tcp_tso_acked(struct sock *sk, struct sk_buff *skb,
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct tcp_skb_cb *scb = TCP_SKB_CB(skb); 
-	__u32 mss = scb->tso_mss;
+	__u32 mss = tcp_skb_psize(skb);
 	__u32 snd_una = tp->snd_una;
 	__u32 orig_seq, seq;
 	__u32 packets_acked = 0;
@@ -2423,7 +2423,7 @@ static int tcp_tso_acked(struct sock *sk, struct sk_buff *skb,
 		}
 		tcp_dec_pcount_explicit(&tp->packets_out, packets_acked);
 
-		BUG_ON(scb->tso_factor == 0);
+		BUG_ON(tcp_skb_pcount(skb) == 0);
 		BUG_ON(!before(scb->seq, scb->end_seq));
 	}
 
@@ -2450,7 +2450,7 @@ static int tcp_clean_rtx_queue(struct sock *sk, __s32 *seq_rtt_p)
 		 * the other end.
 		 */
 		if (after(scb->end_seq, tp->snd_una)) {
-			if (scb->tso_factor > 1)
+			if (tcp_skb_pcount(skb) > 1)
 				acked |= tcp_tso_acked(sk, skb,
 						       now, &seq_rtt);
 			break;

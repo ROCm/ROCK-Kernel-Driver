@@ -274,7 +274,7 @@ static int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb)
 		int sysctl_flags;
 		int err;
 
-		BUG_ON(!TCP_SKB_CB(skb)->tso_factor);
+		BUG_ON(!tcp_skb_pcount(skb));
 
 #define SYSCTL_FLAG_TSTAMPS	0x1
 #define SYSCTL_FLAG_WSCALE	0x2
@@ -428,21 +428,22 @@ void tcp_push_one(struct sock *sk, unsigned cur_mss)
 	}
 }
 
-void tcp_set_skb_tso_factor(struct sk_buff *skb, unsigned int mss_std)
+void tcp_set_skb_tso_segs(struct sk_buff *skb, unsigned int mss_std)
 {
 	if (skb->len <= mss_std) {
 		/* Avoid the costly divide in the normal
 		 * non-TSO case.
 		 */
-		TCP_SKB_CB(skb)->tso_factor = 1;
+		skb_shinfo(skb)->tso_segs = 1;
+		skb_shinfo(skb)->tso_size = 0;
 	} else {
 		unsigned int factor;
 
 		factor = skb->len + (mss_std - 1);
 		factor /= mss_std;
-		TCP_SKB_CB(skb)->tso_factor = factor;
+		skb_shinfo(skb)->tso_segs = factor;
+		skb_shinfo(skb)->tso_size = mss_std;
 	}
-	TCP_SKB_CB(skb)->tso_mss = mss_std;
 }
 
 /* Function to create two new TCP segments.  Shrinks the given segment
@@ -508,8 +509,8 @@ static int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len)
 	}
 
 	/* Fix up tso_factor for both original and new SKB.  */
-	tcp_set_skb_tso_factor(skb, tp->mss_cache_std);
-	tcp_set_skb_tso_factor(buff, tp->mss_cache_std);
+	tcp_set_skb_tso_segs(skb, tp->mss_cache_std);
+	tcp_set_skb_tso_segs(buff, tp->mss_cache_std);
 
 	if (TCP_SKB_CB(skb)->sacked & TCPCB_LOST) {
 		tcp_inc_pcount(&tp->lost_out, skb);
@@ -585,7 +586,7 @@ int tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
 	/* Any change of skb->len requires recalculation of tso
 	 * factor and mss.
 	 */
-	tcp_set_skb_tso_factor(skb, tp->mss_cache_std);
+	tcp_set_skb_tso_segs(skb, tp->mss_cache_std);
 
 	return 0;
 }
@@ -914,8 +915,8 @@ static void tcp_retrans_try_collapse(struct sock *sk, struct sk_buff *skb, int m
 		    ((skb_size + next_skb_size) > mss_now))
 			return;
 
-		BUG_ON(TCP_SKB_CB(skb)->tso_factor != 1 ||
-		       TCP_SKB_CB(next_skb)->tso_factor != 1);
+		BUG_ON(tcp_skb_pcount(skb) != 1 ||
+		       tcp_skb_pcount(next_skb) != 1);
 
 		/* Ok.  We will be able to collapse the packet. */
 		__skb_unlink(next_skb, next_skb->list);
@@ -1047,14 +1048,14 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 		return -EAGAIN;
 
 	if (skb->len > cur_mss) {
-		int old_factor = TCP_SKB_CB(skb)->tso_factor;
+		int old_factor = tcp_skb_pcount(skb);
 		int new_factor;
 
 		if (tcp_fragment(sk, skb, cur_mss))
 			return -ENOMEM; /* We'll try again later. */
 
 		/* New SKB created, account for it. */
-		new_factor = TCP_SKB_CB(skb)->tso_factor;
+		new_factor = tcp_skb_pcount(skb);
 		tcp_dec_pcount_explicit(&tp->packets_out,
 					old_factor - new_factor);
 		tcp_inc_pcount(&tp->packets_out, skb->next);
@@ -1081,7 +1082,8 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 	   tp->snd_una == (TCP_SKB_CB(skb)->end_seq - 1)) {
 		if (!pskb_trim(skb, 0)) {
 			TCP_SKB_CB(skb)->seq = TCP_SKB_CB(skb)->end_seq - 1;
-			TCP_SKB_CB(skb)->tso_factor = 1;
+			skb_shinfo(skb)->tso_segs = 1;
+			skb_shinfo(skb)->tso_size = 0;
 			skb->ip_summed = CHECKSUM_NONE;
 			skb->csum = 0;
 		}
@@ -1166,7 +1168,7 @@ void tcp_xmit_retransmit_queue(struct sock *sk)
 						tcp_reset_xmit_timer(sk, TCP_TIME_RETRANS, tp->rto);
 				}
 
-				packet_cnt -= TCP_SKB_CB(skb)->tso_factor;
+				packet_cnt -= tcp_skb_pcount(skb);
 				if (packet_cnt <= 0)
 					break;
 			}
@@ -1256,8 +1258,8 @@ void tcp_send_fin(struct sock *sk)
 		skb->csum = 0;
 		TCP_SKB_CB(skb)->flags = (TCPCB_FLAG_ACK | TCPCB_FLAG_FIN);
 		TCP_SKB_CB(skb)->sacked = 0;
-		TCP_SKB_CB(skb)->tso_factor = 1;
-		TCP_SKB_CB(skb)->tso_mss = tp->mss_cache_std;
+		skb_shinfo(skb)->tso_segs = 1;
+		skb_shinfo(skb)->tso_size = 0;
 
 		/* FIN eats a sequence byte, write_seq advanced by tcp_queue_skb(). */
 		TCP_SKB_CB(skb)->seq = tp->write_seq;
@@ -1289,8 +1291,8 @@ void tcp_send_active_reset(struct sock *sk, int priority)
 	skb->csum = 0;
 	TCP_SKB_CB(skb)->flags = (TCPCB_FLAG_ACK | TCPCB_FLAG_RST);
 	TCP_SKB_CB(skb)->sacked = 0;
-	TCP_SKB_CB(skb)->tso_factor = 1;
-	TCP_SKB_CB(skb)->tso_mss = tp->mss_cache_std;
+	skb_shinfo(skb)->tso_segs = 1;
+	skb_shinfo(skb)->tso_size = 0;
 
 	/* Send it off. */
 	TCP_SKB_CB(skb)->seq = tcp_acceptable_seq(sk, tp);
@@ -1371,8 +1373,8 @@ struct sk_buff * tcp_make_synack(struct sock *sk, struct dst_entry *dst,
 	TCP_SKB_CB(skb)->seq = req->snt_isn;
 	TCP_SKB_CB(skb)->end_seq = TCP_SKB_CB(skb)->seq + 1;
 	TCP_SKB_CB(skb)->sacked = 0;
-	TCP_SKB_CB(skb)->tso_factor = 1;
-	TCP_SKB_CB(skb)->tso_mss = tp->mss_cache_std;
+	skb_shinfo(skb)->tso_segs = 1;
+	skb_shinfo(skb)->tso_size = 0;
 	th->seq = htonl(TCP_SKB_CB(skb)->seq);
 	th->ack_seq = htonl(req->rcv_isn + 1);
 	if (req->rcv_wnd == 0) { /* ignored for retransmitted syns */
@@ -1474,8 +1476,8 @@ int tcp_connect(struct sock *sk)
 	TCP_SKB_CB(buff)->flags = TCPCB_FLAG_SYN;
 	TCP_ECN_send_syn(sk, tp, buff);
 	TCP_SKB_CB(buff)->sacked = 0;
-	TCP_SKB_CB(buff)->tso_factor = 1;
-	TCP_SKB_CB(buff)->tso_mss = tp->mss_cache_std;
+	skb_shinfo(buff)->tso_segs = 1;
+	skb_shinfo(buff)->tso_size = 0;
 	buff->csum = 0;
 	TCP_SKB_CB(buff)->seq = tp->write_seq++;
 	TCP_SKB_CB(buff)->end_seq = tp->write_seq;
@@ -1575,8 +1577,8 @@ void tcp_send_ack(struct sock *sk)
 		buff->csum = 0;
 		TCP_SKB_CB(buff)->flags = TCPCB_FLAG_ACK;
 		TCP_SKB_CB(buff)->sacked = 0;
-		TCP_SKB_CB(buff)->tso_factor = 1;
-		TCP_SKB_CB(buff)->tso_mss = tp->mss_cache_std;
+		skb_shinfo(buff)->tso_segs = 1;
+		skb_shinfo(buff)->tso_size = 0;
 
 		/* Send it off, this clears delayed acks for us. */
 		TCP_SKB_CB(buff)->seq = TCP_SKB_CB(buff)->end_seq = tcp_acceptable_seq(sk, tp);
@@ -1611,8 +1613,8 @@ static int tcp_xmit_probe_skb(struct sock *sk, int urgent)
 	skb->csum = 0;
 	TCP_SKB_CB(skb)->flags = TCPCB_FLAG_ACK;
 	TCP_SKB_CB(skb)->sacked = urgent;
-	TCP_SKB_CB(skb)->tso_factor = 1;
-	TCP_SKB_CB(skb)->tso_mss = tp->mss_cache_std;
+	skb_shinfo(skb)->tso_segs = 1;
+	skb_shinfo(skb)->tso_size = 0;
 
 	/* Use a previous sequence.  This should cause the other
 	 * end to send an ack.  Don't queue or clone SKB, just
@@ -1656,8 +1658,8 @@ int tcp_write_wakeup(struct sock *sk)
 					sk->sk_route_caps &= ~NETIF_F_TSO;
 					tp->mss_cache = tp->mss_cache_std;
 				}
-			} else if (!TCP_SKB_CB(skb)->tso_factor)
-				tcp_set_skb_tso_factor(skb, tp->mss_cache_std);
+			} else if (!tcp_skb_pcount(skb))
+				tcp_set_skb_tso_segs(skb, tp->mss_cache_std);
 
 			TCP_SKB_CB(skb)->flags |= TCPCB_FLAG_PSH;
 			TCP_SKB_CB(skb)->when = tcp_time_stamp;

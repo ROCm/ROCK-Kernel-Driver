@@ -1152,8 +1152,6 @@ struct tcp_skb_cb {
 
 	__u16		urg_ptr;	/* Valid w/URG flags is set.	*/
 	__u32		ack_seq;	/* Sequence number ACK'd	*/
-	__u16		tso_factor;	/* If > 1, TSO frame		*/
-	__u16		tso_mss;	/* MSS that FACTOR's in terms of*/
 };
 
 #define TCP_SKB_CB(__skb)	((struct tcp_skb_cb *)&((__skb)->cb[0]))
@@ -1165,7 +1163,13 @@ struct tcp_skb_cb {
  */
 static inline int tcp_skb_pcount(struct sk_buff *skb)
 {
-	return TCP_SKB_CB(skb)->tso_factor;
+	return skb_shinfo(skb)->tso_segs;
+}
+
+/* This is valid iff tcp_skb_pcount() > 1. */
+static inline int tcp_skb_psize(struct sk_buff *skb)
+{
+	return skb_shinfo(skb)->tso_size;
 }
 
 static inline void tcp_inc_pcount(tcp_pcount_t *count, struct sk_buff *skb)
@@ -1440,7 +1444,7 @@ tcp_nagle_check(struct tcp_opt *tp, struct sk_buff *skb, unsigned mss_now, int n
 		  tcp_minshall_check(tp))));
 }
 
-extern void tcp_set_skb_tso_factor(struct sk_buff *, unsigned int);
+extern void tcp_set_skb_tso_segs(struct sk_buff *, unsigned int);
 
 /* This checks if the data bearing packet SKB (usually sk->sk_send_head)
  * should be put on the wire right now.
@@ -1448,11 +1452,11 @@ extern void tcp_set_skb_tso_factor(struct sk_buff *, unsigned int);
 static __inline__ int tcp_snd_test(struct tcp_opt *tp, struct sk_buff *skb,
 				   unsigned cur_mss, int nonagle)
 {
-	int pkts = TCP_SKB_CB(skb)->tso_factor;
+	int pkts = tcp_skb_pcount(skb);
 
 	if (!pkts) {
-		tcp_set_skb_tso_factor(skb, tp->mss_cache_std);
-		pkts = TCP_SKB_CB(skb)->tso_factor;
+		tcp_set_skb_tso_segs(skb, tp->mss_cache_std);
+		pkts = tcp_skb_pcount(skb);
 	}
 
 	/*	RFC 1122 - section 4.2.3.4
