@@ -1481,7 +1481,9 @@ static int snd_cs4281_chip_init(cs4281_t *chip)
 {
 	unsigned int tmp;
 	int timeout;
+	int retry_count = 2;
 
+      __retry:
 	tmp = snd_cs4281_peekBA0(chip, BA0_CFLR);
 	if (tmp != BA0_CFLR_DEFAULT) {
 		snd_cs4281_pokeBA0(chip, BA0_CFLR, BA0_CFLR_DEFAULT);
@@ -1629,6 +1631,8 @@ static int snd_cs4281_chip_init(cs4281_t *chip)
 		snd_cs4281_delay_long();
 	} while (timeout-- > 0);
 
+	if (--retry_count > 0)
+		goto __retry;
 	snd_printk(KERN_ERR "never read ISV3 and ISV4 from AC'97\n");
 	return -EIO;
 
