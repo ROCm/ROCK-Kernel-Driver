@@ -123,7 +123,7 @@ static void bfusb_unlink_urbs(struct bfusb *bfusb)
 
 	while ((skb = skb_dequeue(&bfusb->pending_q))) {
 		urb = ((struct bfusb_scb *) skb->cb)->urb;
-		usb_unlink_urb(urb);
+		usb_kill_urb(urb);
 		skb_queue_tail(&bfusb->completed_q, skb);
 	}
 
