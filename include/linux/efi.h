@@ -289,6 +289,7 @@ efi_guid_unparse(efi_guid_t *guid, char *out)
 }
 
 extern void efi_init (void);
+extern void *efi_get_pal_addr (void);
 extern void efi_map_pal_code (void);
 extern void efi_map_memmap(void);
 extern void efi_memmap_walk (efi_freemem_callback_t callback, void *arg);

@@ -193,9 +193,17 @@ void foo(void)
 	DEFINE(IA64_CLONE_VM, CLONE_VM);
 
 	BLANK();
-	DEFINE(IA64_CPUINFO_NSEC_PER_CYC_OFFSET, offsetof (struct cpuinfo_ia64, nsec_per_cyc));
-	DEFINE(IA64_TIMESPEC_TV_NSEC_OFFSET, offsetof (struct timespec, tv_nsec));
-
+	DEFINE(IA64_CPUINFO_NSEC_PER_CYC_OFFSET,
+	       offsetof (struct cpuinfo_ia64, nsec_per_cyc));
+	DEFINE(IA64_CPUINFO_PTCE_BASE_OFFSET,
+	       offsetof (struct cpuinfo_ia64, ptce_base));
+	DEFINE(IA64_CPUINFO_PTCE_COUNT_OFFSET,
+	       offsetof (struct cpuinfo_ia64, ptce_count));
+	DEFINE(IA64_CPUINFO_PTCE_STRIDE_OFFSET,
+	       offsetof (struct cpuinfo_ia64, ptce_stride));
+	BLANK();
+	DEFINE(IA64_TIMESPEC_TV_NSEC_OFFSET,
+	       offsetof (struct timespec, tv_nsec));
 
 	DEFINE(CLONE_SETTLS_BIT, 19);
 #if CLONE_SETTLS != (1<<19)
@@ -203,19 +211,16 @@ void foo(void)
 #endif
 
 	BLANK();
-	/* used by arch/ia64/kernel/mca_asm.S */
-	DEFINE(IA64_CPUINFO_PERCPU_PADDR, offsetof (struct cpuinfo_ia64, percpu_paddr));
-	DEFINE(IA64_CPUINFO_PAL_PADDR, offsetof (struct cpuinfo_ia64, pal_paddr));
-	DEFINE(IA64_CPUINFO_PA_MCA_INFO, offsetof (struct cpuinfo_ia64, ia64_pa_mca_data));
-	DEFINE(IA64_MCA_PROC_STATE_DUMP, offsetof (struct ia64_mca_cpu_s, ia64_mca_proc_state_dump));
-	DEFINE(IA64_MCA_STACK, offsetof (struct ia64_mca_cpu_s, ia64_mca_stack));
-	DEFINE(IA64_MCA_STACKFRAME, offsetof (struct ia64_mca_cpu_s, ia64_mca_stackframe));
-	DEFINE(IA64_MCA_BSPSTORE, offsetof (struct ia64_mca_cpu_s, ia64_mca_bspstore));
-	DEFINE(IA64_INIT_STACK, offsetof (struct ia64_mca_cpu_s, ia64_init_stack));
-
-	/* used by head.S */
-	DEFINE(IA64_CPUINFO_NSEC_PER_CYC_OFFSET, offsetof (struct cpuinfo_ia64, nsec_per_cyc));
-
+	DEFINE(IA64_MCA_CPU_PROC_STATE_DUMP_OFFSET,
+	       offsetof (struct ia64_mca_cpu, proc_state_dump));
+	DEFINE(IA64_MCA_CPU_STACK_OFFSET,
+	       offsetof (struct ia64_mca_cpu, stack));
+	DEFINE(IA64_MCA_CPU_STACKFRAME_OFFSET,
+	       offsetof (struct ia64_mca_cpu, stackframe));
+	DEFINE(IA64_MCA_CPU_RBSTORE_OFFSET,
+	       offsetof (struct ia64_mca_cpu, rbstore));
+	DEFINE(IA64_MCA_CPU_INIT_STACK_OFFSET,
+	       offsetof (struct ia64_mca_cpu, init_stack));
 	BLANK();
 	/* used by fsys_gettimeofday in arch/ia64/kernel/fsys.S */
 	DEFINE(IA64_TIME_INTERPOLATOR_ADDRESS_OFFSET, offsetof (struct time_interpolator, addr));

@@ -60,7 +60,6 @@
 unsigned long __per_cpu_offset[NR_CPUS];
 EXPORT_SYMBOL(__per_cpu_offset);
 #endif
-unsigned long __per_cpu_mca[NR_CPUS];
 
 DEFINE_PER_CPU(struct cpuinfo_ia64, cpu_info);
 DEFINE_PER_CPU(unsigned long, local_per_cpu_offset);
@@ -388,7 +387,7 @@ setup_arch (char **cmdline_p)
 	/* enable IA-64 Machine Check Abort Handling unless disabled */
 	if (!strstr(saved_command_line, "nomca"))
 		ia64_mca_init();
-	
+
 	platform_setup(cmdline_p);
 	paging_init();
 }
@@ -602,7 +601,6 @@ void
 cpu_init (void)
 {
 	extern void __devinit ia64_mmu_init (void *);
-	extern void set_mca_pointer (struct cpuinfo_ia64 *, void *);
 	unsigned long num_phys_stacked;
 	pal_vm_info_2_u_t vmi;
 	unsigned int max_ctx;
@@ -610,6 +608,14 @@ cpu_init (void)
 	void *cpu_data;
 
 	cpu_data = per_cpu_init();
+
+	/*
+	 * We set ar.k3 so that assembly code in MCA handler can compute
+	 * physical addresses of per cpu variables with a simple:
+	 *   phys = ar.k3 + &per_cpu_var
+	 */
+	ia64_set_kr(IA64_KR_PER_CPU_DATA,
+		    ia64_tpa(cpu_data) - (long) __per_cpu_start);
 
 	get_max_cacheline_size();
 
@@ -657,7 +663,7 @@ cpu_init (void)
 		BUG();
 
 	ia64_mmu_init(ia64_imva(cpu_data));
-	set_mca_pointer(cpu_info, cpu_data);
+	ia64_mca_cpu_init(ia64_imva(cpu_data));
 
 #ifdef CONFIG_IA32_SUPPORT
 	ia32_cpu_init();
