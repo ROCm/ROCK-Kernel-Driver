@@ -123,5 +123,5 @@ static void rxrpc_cleanup(void)
 	__RXACCT(printk("Outstanding Peers      : %d\n",atomic_read(&rxrpc_peer_count)));
 	__RXACCT(printk("Outstanding Transports : %d\n",atomic_read(&rxrpc_transport_count)));
 
-	kleave();
+	kleave("");
 } /* end rxrpc_cleanup() */
