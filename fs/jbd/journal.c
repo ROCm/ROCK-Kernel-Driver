@@ -484,6 +484,13 @@ int journal_start_commit(journal_t *journal, tid_t *ptid)
 		ret = __log_start_commit(journal, tid);
 		if (ret && ptid)
 			*ptid = tid;
+	} else if (journal->j_committing_transaction && ptid) {
+		/*
+		 * If ext3_write_super() recently started a commit, then we
+		 * have to wait for completion of that transaction
+		 */
+		*ptid = journal->j_committing_transaction->t_tid;
+		ret = 1;
 	}
 	spin_unlock(&journal->j_state_lock);
 	return ret;
