@@ -189,10 +189,11 @@ psurge_smp_message_recv(struct pt_regs *regs)
 			smp_message_recv(msg, regs);
 }
 
-void __pmac
+irqreturn_t __pmac
 psurge_primary_intr(int irq, void *d, struct pt_regs *regs)
 {
 	psurge_smp_message_recv(regs);
+	return IRQ_HANDLED;
 }
 
 static void __pmac
