@@ -256,13 +256,47 @@ void snd_ctl_free_one(snd_kcontrol_t * kcontrol)
 	}
 }
 
+static unsigned int snd_ctl_hole_check(snd_card_t * card,
+				       unsigned int count)
+{
+	struct list_head *list;
+	snd_kcontrol_t *kctl;
+
+	list_for_each(list, &card->controls) {
+		kctl = snd_kcontrol(list);
+		if ((kctl->id.numid <= card->last_numid &&
+		     kctl->id.numid + kctl->count > card->last_numid) ||
+		    (kctl->id.numid <= card->last_numid + count - 1 &&
+		     kctl->id.numid + kctl->count > card->last_numid + count - 1))
+		    	return card->last_numid = kctl->id.numid + kctl->count - 1;
+	}
+	return card->last_numid;
+}
+
+static int snd_ctl_find_hole(snd_card_t * card, unsigned int count)
+{
+	unsigned int last_numid, iter = 100000;
+
+	last_numid = card->last_numid;
+	while (last_numid != snd_ctl_hole_check(card, count)) {
+		if (--iter == 0) {
+			/* this situation is very unlikely */
+			snd_printk(KERN_ERR "unable to allocate new control numid\n");
+			return -ENOMEM;
+		}
+		last_numid = card->last_numid;
+	}
+	return 0;
+}
+
 /**
  * snd_ctl_add - add the control instance to the card
  * @card: the card instance
  * @kcontrol: the control instance to add
  *
  * Adds the control instance created via snd_ctl_new() or
- * snd_ctl_new1() to the given card.
+ * snd_ctl_new1() to the given card. Assigns also an unique
+ * numid used for fast search.
  *
  * Returns zero if successful, or a negative error code on failure.
  *
@@ -280,12 +314,18 @@ int snd_ctl_add(snd_card_t * card, snd_kcontrol_t * kcontrol)
 	if (_ctl_find_id(card, &id)) {
 		up_write(&card->controls_rwsem);
 		snd_ctl_free_one(kcontrol);
+		snd_printd(KERN_ERR "control %i:%i:%i:%s:%i is already present\n",
+					id.iface,
+					id.device,
+					id.subdevice,
+					id.name,
+					id.index);
 		return -EBUSY;
 	}
-	if (card->last_numid > 0x80000000 && card->last_numid + kcontrol->count < 0x80000000) {
+	if (snd_ctl_find_hole(card, kcontrol->count) < 0) {
 		up_write(&card->controls_rwsem);
 		snd_ctl_free_one(kcontrol);
-		return -ENOMEM;	/* FIXME: find a hole */
+		return -ENOMEM;
 	}
 	list_add_tail(&kcontrol->list, &card->controls);
 	card->controls_count += kcontrol->count;
