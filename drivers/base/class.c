@@ -53,16 +53,20 @@ static void unenum_device(struct device_class * cls, struct device * dev)
 
 int devclass_add_device(struct device * dev)
 {
-	struct device_class * cls = dev->driver->devclass;
+	struct device_class * cls;
 	int error = 0;
-	if (cls) {
-		pr_debug("adding device '%s' to class '%s'\n",
-			 dev->name,cls->name);
-		if (cls->add_device) 
-			error = cls->add_device(dev);
-		if (!error) {
-			enum_device(cls,dev);
-			interface_add(cls,dev);
+
+	if (dev->driver) {
+		cls = dev->driver->devclass;
+		if (cls) {
+			pr_debug("adding device '%s' to class '%s'\n",
+				 dev->name,cls->name);
+			if (cls->add_device) 
+				error = cls->add_device(dev);
+			if (!error) {
+				enum_device(cls,dev);
+				interface_add(cls,dev);
+			}
 		}
 	}
 	return error;
