@@ -92,6 +92,7 @@ shrink_cache(int nr_pages, zone_t *classzone,
 
 		list_del(entry);
 		list_add(entry, &inactive_list);
+		KERNEL_STAT_INC(pgscan);
 
 		/*
 		 * Zero page counts can happen because we unlink the pages
@@ -142,6 +143,7 @@ shrink_cache(int nr_pages, zone_t *classzone,
 			add_page_to_active_list(page);
 			pte_chain_unlock(page);
 			unlock_page(page);
+			KERNEL_STAT_INC(pgactivate);
 			continue;
 		}
 
@@ -302,6 +304,7 @@ page_freeable:
 
 		/* effectively free the page here */
 		page_cache_release(page);
+		KERNEL_STAT_INC(pgsteal);
 		if (--nr_pages)
 			continue;
 		goto out;
@@ -315,6 +318,7 @@ page_active:
 		add_page_to_active_list(page);
 		pte_chain_unlock(page);
 		unlock_page(page);
+		KERNEL_STAT_INC(pgactivate);
 	}
 out:	spin_unlock(&pagemap_lru_lock);
 	return nr_pages;
@@ -339,6 +343,8 @@ static void refill_inactive(int nr_pages)
 		page = list_entry(entry, struct page, lru);
 		entry = entry->prev;
 
+		KERNEL_STAT_INC(pgscan);
+
 		pte_chain_lock(page);
 		if (page->pte.chain && page_referenced(page)) {
 			list_del(&page->lru);
@@ -349,6 +355,7 @@ static void refill_inactive(int nr_pages)
 		del_page_from_active_list(page);
 		add_page_to_inactive_list(page);
 		pte_chain_unlock(page);
+		KERNEL_STAT_INC(pgdeactivate);
 	}
 	spin_unlock(&pagemap_lru_lock);
 }
@@ -397,6 +404,8 @@ int try_to_free_pages(zone_t *classzone, unsigned int gfp_mask, unsigned int ord
 {
 	int priority = DEF_PRIORITY;
 	int nr_pages = SWAP_CLUSTER_MAX;
+
+	KERNEL_STAT_INC(pageoutrun);
 
 	do {
 		nr_pages = shrink_caches(classzone, priority, gfp_mask, nr_pages);

@@ -13,6 +13,7 @@
 #include <linux/slab.h>
 #include <linux/compiler.h>
 #include <linux/fs.h>
+#include <linux/kernel_stat.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/pagemap.h>
@@ -1533,6 +1534,7 @@ no_cached_page:
 	return NULL;
 
 page_not_uptodate:
+	KERNEL_STAT_INC(pgmajfault);
 	lock_page(page);
 
 	/* Did it get unhashed while we waited for it? */

@@ -13,6 +13,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/kernel_stat.h>
 #include <linux/mm.h>
 #include <linux/swap.h>
 #include <linux/interrupt.h>
@@ -85,6 +86,8 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 	free_area_t *area;
 	struct page *base;
 	zone_t *zone;
+
+	KERNEL_STAT_ADD(pgfree, 1<<order);
 
 	BUG_ON(PagePrivate(page));
 	BUG_ON(page->mapping != NULL);
@@ -324,6 +327,8 @@ struct page * __alloc_pages(unsigned int gfp_mask, unsigned int order, zonelist_
 	struct page * page;
 	int freed;
 
+	KERNEL_STAT_ADD(pgalloc, 1<<order);
+
 	zone = zonelist->zones;
 	classzone = *zone;
 	if (classzone == NULL)
@@ -393,6 +398,7 @@ nopage:
 	if (!(gfp_mask & __GFP_WAIT))
 		goto nopage;
 
+	KERNEL_STAT_INC(allocstall);
 	page = balance_classzone(classzone, gfp_mask, order, &freed);
 	if (page)
 		return page;
@@ -563,6 +569,9 @@ void get_page_state(struct page_state *ret)
 		ret->nr_pagecache += ps->nr_pagecache;
 		ret->nr_active += ps->nr_active;
 		ret->nr_inactive += ps->nr_inactive;
+		ret->nr_page_table_pages += ps->nr_page_table_pages;
+		ret->nr_pte_chain_pages += ps->nr_pte_chain_pages;
+		ret->used_pte_chains_bytes += ps->used_pte_chains_bytes;
 	}
 }
 

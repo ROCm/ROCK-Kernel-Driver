@@ -391,6 +391,7 @@ static inline struct pte_chain * pte_chain_pop(void)
 static inline void pte_chain_free(struct pte_chain * pte_chain,
 		struct pte_chain * prev_pte_chain, struct page * page)
 {
+	mod_page_state(used_pte_chains_bytes, -sizeof(struct pte_chain));
 	if (prev_pte_chain)
 		prev_pte_chain->next = pte_chain->next;
 	else if (page)
@@ -423,6 +424,7 @@ static inline struct pte_chain * pte_chain_alloc()
 
 	spin_unlock(&pte_chain_freelist_lock);
 
+	mod_page_state(used_pte_chains_bytes, sizeof(struct pte_chain));
 	return pte_chain;
 }
 
@@ -443,6 +445,7 @@ static void alloc_new_pte_chains()
 	int i = PAGE_SIZE / sizeof(struct pte_chain);
 
 	if (pte_chain) {
+		inc_page_state(nr_pte_chain_pages);
 		for (; i-- > 0; pte_chain++)
 			pte_chain_push(pte_chain);
 	} else {

@@ -27,12 +27,14 @@ static inline void pgtable_add_rmap(struct page * page, struct mm_struct * mm, u
 #endif
 	page->mapping = (void *)mm;
 	page->index = address & ~((PTRS_PER_PTE * PAGE_SIZE) - 1);
+	inc_page_state(nr_page_table_pages);
 }
 
 static inline void pgtable_remove_rmap(struct page * page)
 {
 	page->mapping = NULL;
 	page->index = 0;
+	dec_page_state(nr_page_table_pages);
 }
 
 static inline struct mm_struct * ptep_to_mm(pte_t * ptep)

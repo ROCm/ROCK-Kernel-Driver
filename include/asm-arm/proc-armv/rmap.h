@@ -17,6 +17,7 @@ static inline void pgtable_add_rmap(pte_t * ptep, struct mm_struct * mm, unsigne
 
 	page->mm = mm;
 	page->index = address & ~((PTRS_PER_PTE * PAGE_SIZE) - 1);
+	inc_page_state(nr_page_table_pages);
 }
 
 static inline void pgtable_remove_rmap(pte_t * ptep)
@@ -25,6 +26,7 @@ static inline void pgtable_remove_rmap(pte_t * ptep)
 
 	page->mm = NULL;
 	page->index = 0;
+	dec_page_state(nr_page_table_pages);
 }
 
 static inline struct mm_struct * ptep_to_mm(pte_t * ptep)

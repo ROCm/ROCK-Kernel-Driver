@@ -36,6 +36,7 @@
  *		(Gerhard.Wichert@pdb.siemens.de)
  */
 
+#include <linux/kernel_stat.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
 #include <linux/swap.h>
@@ -1177,6 +1178,7 @@ static int do_swap_page(struct mm_struct * mm,
 
 		/* Had to read the page from swap area: Major fault */
 		ret = VM_FAULT_MAJOR;
+		KERNEL_STAT_INC(pgmajfault);
 	}
 
 	lock_page(page);
@@ -1419,6 +1421,7 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
 	current->state = TASK_RUNNING;
 	pgd = pgd_offset(mm, address);
 
+	KERNEL_STAT_INC(pgfault);
 	/*
 	 * We need the page table lock to synchronize with kswapd
 	 * and the SMP-safe atomic PTE updates.
