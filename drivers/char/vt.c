@@ -1888,7 +1888,7 @@ static void do_con_trol(struct tty_struct *tty, unsigned int currcons, int c)
  * since console_init (and thus con_init) are called before any
  * kernel memory allocation is available.
  */
-char con_buf[PAGE_SIZE];
+char con_buf[CON_BUF_SIZE];
 DECLARE_MUTEX(con_buf_sem);
 
 /* acquires console_sem */
