@@ -213,7 +213,7 @@ struct mdk_personality_s
 	int (*run)(mddev_t *mddev);
 	int (*stop)(mddev_t *mddev);
 	int (*status)(char *page, mddev_t *mddev);
-	int (*error_handler)(mddev_t *mddev, kdev_t dev);
+	int (*error_handler)(mddev_t *mddev, struct block_device *bdev);
 
 /*
  * Some personalities (RAID-1, RAID-5) can have disks hot-added and

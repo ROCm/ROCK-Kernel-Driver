@@ -2924,7 +2924,7 @@ int md_error(mddev_t *mddev, struct block_device *bdev)
 	if (!rrdev || rrdev->faulty)
 		return 0;
 	if (!mddev->pers->error_handler
-			|| mddev->pers->error_handler(mddev,rdev) <= 0) {
+			|| mddev->pers->error_handler(mddev,bdev) <= 0) {
 		rrdev->faulty = 1;
 	} else
 		return 1;
@@ -3136,8 +3136,9 @@ mdp_disk_t *get_spare(mddev_t *mddev)
 }
 
 static unsigned int sync_io[DK_MAX_MAJOR][DK_MAX_DISK];
-void md_sync_acct(kdev_t dev, unsigned long nr_sectors)
+void md_sync_acct(struct block_device *bdev, unsigned long nr_sectors)
 {
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	unsigned int major = major(dev);
 	unsigned int index;
 

@@ -439,8 +439,9 @@ static void raid5_build_block (struct stripe_head *sh, int i)
 		dev->sector = compute_blocknr(sh, i);
 }
 
-static int error (mddev_t *mddev, kdev_t dev)
+static int error(mddev_t *mddev, struct block_device *bdev)
 {
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	raid5_conf_t *conf = (raid5_conf_t *) mddev->private;
 	mdp_super_t *sb = mddev->sb;
 	struct disk_info *disk;
@@ -449,33 +450,33 @@ static int error (mddev_t *mddev, kdev_t dev)
 	PRINTK("raid5: error called\n");
 
 	for (i = 0, disk = conf->disks; i < conf->raid_disks; i++, disk++) {
-		if (kdev_same(disk->dev, dev)) {
-			if (disk->operational) {
-				disk->operational = 0;
-				mark_disk_faulty(sb->disks+disk->number);
-				mark_disk_nonsync(sb->disks+disk->number);
-				mark_disk_inactive(sb->disks+disk->number);
-				sb->active_disks--;
-				sb->working_disks--;
-				sb->failed_disks++;
-				mddev->sb_dirty = 1;
-				conf->working_disks--;
-				conf->failed_disks++;
-				md_wakeup_thread(conf->thread);
-				printk (KERN_ALERT
-					"raid5: Disk failure on %s, disabling device."
-					" Operation continuing on %d devices\n",
-					partition_name (dev), conf->working_disks);
-			}
-			return 0;
+		if (disk->bdev != bdev)
+			continue;
+		if (disk->operational) {
+			disk->operational = 0;
+			mark_disk_faulty(sb->disks+disk->number);
+			mark_disk_nonsync(sb->disks+disk->number);
+			mark_disk_inactive(sb->disks+disk->number);
+			sb->active_disks--;
+			sb->working_disks--;
+			sb->failed_disks++;
+			mddev->sb_dirty = 1;
+			conf->working_disks--;
+			conf->failed_disks++;
+			md_wakeup_thread(conf->thread);
+			printk (KERN_ALERT
+				"raid5: Disk failure on %s, disabling device."
+				" Operation continuing on %d devices\n",
+				partition_name (dev), conf->working_disks);
 		}
+		return 0;
 	}
 	/*
 	 * handle errors in spares (during reconstruction)
 	 */
 	if (conf->spare) {
 		disk = conf->spare;
-		if (kdev_same(disk->dev, dev)) {
+		if (disk->bdev == bdev) {
 			printk (KERN_ALERT
 				"raid5: Disk failure on spare %s\n",
 				partition_name (dev));
@@ -1017,7 +1018,7 @@ static void handle_stripe(struct stripe_head *sh)
 					locked++;
 					PRINTK("Reading block %d (sync=%d)\n", i, syncing);
 					if (syncing)
-						md_sync_acct(conf->disks[i].dev, STRIPE_SECTORS);
+						md_sync_acct(conf->disks[i].bdev, STRIPE_SECTORS);
 				}
 			}
 		}
@@ -1156,9 +1157,9 @@ static void handle_stripe(struct stripe_head *sh)
 			locked++;
 			set_bit(STRIPE_INSYNC, &sh->state);
 			if (conf->disks[failed_num].operational)
-				md_sync_acct(conf->disks[failed_num].dev, STRIPE_SECTORS);
+				md_sync_acct(conf->disks[failed_num].bdev, STRIPE_SECTORS);
 			else if ((spare=conf->spare))
-				md_sync_acct(spare->dev, STRIPE_SECTORS);
+				md_sync_acct(spare->bdev, STRIPE_SECTORS);
 
 		}
 	}
@@ -1435,7 +1436,6 @@ static int run (mddev_t *mddev)
 			}
 			disk->number = desc->number;
 			disk->raid_disk = raid_disk;
-			disk->dev = rdev->dev;
 			disk->bdev = rdev->bdev;
 
 			disk->operational = 0;
@@ -1462,7 +1462,6 @@ static int run (mddev_t *mddev)
 	
 			disk->number = desc->number;
 			disk->raid_disk = raid_disk;
-			disk->dev = rdev->dev;
 			disk->bdev = rdev->bdev;
 			disk->operational = 1;
 			disk->used_slot = 1;
@@ -1475,7 +1474,6 @@ static int run (mddev_t *mddev)
 			printk(KERN_INFO "raid5: spare disk %s\n", partition_name(rdev->dev));
 			disk->number = desc->number;
 			disk->raid_disk = raid_disk;
-			disk->dev = rdev->dev;
 			disk->bdev = rdev->bdev;
 
 			disk->operational = 0;
@@ -1495,7 +1493,6 @@ static int run (mddev_t *mddev)
 
 			disk->number = desc->number;
 			disk->raid_disk = raid_disk;
-			disk->dev = NODEV;
 			disk->bdev = NULL;
 
 			disk->operational = 0;
@@ -1691,7 +1688,9 @@ static void print_raid5_conf (raid5_conf_t *conf)
 		printk(" disk %d, s:%d, o:%d, n:%d rd:%d us:%d dev:%s\n",
 			i, tmp->spare,tmp->operational,
 			tmp->number,tmp->raid_disk,tmp->used_slot,
-			partition_name(tmp->dev));
+			partition_name(tmp->bdev ?
+					to_kdev_t(tmp->bdev->bd_dev):
+					NODEV));
 	}
 }
 
@@ -1903,7 +1902,7 @@ static int diskop(mddev_t *mddev, mdp_disk_t **d, int state)
 
 		*d = failed_desc;
 
-		if (kdev_none(sdisk->dev))
+		if (!sdisk->bdev)
 			sdisk->used_slot = 0;
 
 		/*
@@ -1931,7 +1930,6 @@ static int diskop(mddev_t *mddev, mdp_disk_t **d, int state)
 			err = 1;
 			goto abort;
 		}
-		rdisk->dev = NODEV;
 		rdisk->bdev = NULL;
 		rdisk->used_slot = 0;
 
@@ -1949,9 +1947,8 @@ static int diskop(mddev_t *mddev, mdp_disk_t **d, int state)
 
 		adisk->number = added_desc->number;
 		adisk->raid_disk = added_desc->raid_disk;
-		adisk->dev = mk_kdev(added_desc->major,added_desc->minor);
 		/* it will be held open by rdev */
-		adisk->bdev = bdget(kdev_t_to_nr(adisk->dev));
+		adisk->bdev = bdget(MKDEV(added_desc->major,added_desc->minor));
 
 		adisk->operational = 0;
 		adisk->write_only = 0;

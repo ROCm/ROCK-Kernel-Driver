@@ -592,7 +592,7 @@ static void mark_disk_bad(mddev_t *mddev, int failed)
 	printk(DISK_FAILED, partition_name(mirror->dev), conf->working_disks);
 }
 
-static int error(mddev_t *mddev, kdev_t dev)
+static int error(mddev_t *mddev, struct block_device *bdev)
 {
 	conf_t *conf = mddev_to_conf(mddev);
 	mirror_info_t * mirrors = conf->mirrors;
@@ -607,7 +607,7 @@ static int error(mddev_t *mddev, kdev_t dev)
 	 * else mark the drive as failed
 	 */
 	for (i = 0; i < disks; i++)
-		if (kdev_same(mirrors[i].dev, dev) && mirrors[i].operational)
+		if (mirrors[i].bdev == bdev && mirrors[i].operational)
 			break;
 	if (i == disks)
 		return 0;
@@ -1045,7 +1045,7 @@ static void sync_request_write(mddev_t *mddev, r1bio_t *r1_bio)
 		if (!mbio)
 			continue;
 
-		md_sync_acct(to_kdev_t(mbio->bi_bdev->bd_dev), mbio->bi_size >> 9);
+		md_sync_acct(mbio->bi_bdev, mbio->bi_size >> 9);
 		generic_make_request(mbio);
 		atomic_inc(&conf->mirrors[i].nr_pending);
 	}
@@ -1217,7 +1217,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 		BUG();
 	r1_bio->read_bio = read_bio;
 
-	md_sync_acct(to_kdev_t(read_bio->bi_bdev->bd_dev), nr_sectors);
+	md_sync_acct(read_bio->bi_bdev, nr_sectors);
 
 	generic_make_request(read_bio);
 	atomic_inc(&conf->mirrors[conf->last_used].nr_pending);

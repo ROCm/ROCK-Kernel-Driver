@@ -320,7 +320,7 @@ static void mark_disk_bad (mddev_t *mddev, int failed)
 /*
  * Careful, this can execute in IRQ contexts as well!
  */
-static int multipath_error (mddev_t *mddev, kdev_t dev)
+static int multipath_error (mddev_t *mddev, struct block_device *bdev)
 {
 	multipath_conf_t *conf = mddev_to_conf(mddev);
 	struct multipath_info * multipaths = conf->multipaths;
@@ -345,7 +345,7 @@ static int multipath_error (mddev_t *mddev, kdev_t dev)
 		 * which has just failed.
 		 */
 		for (i = 0; i < disks; i++) {
-			if (kdev_same(multipaths[i].dev, dev) && !multipaths[i].operational)
+			if (multipaths[i].bdev == bdev && !multipaths[i].operational)
 				return 0;
 		}
 		printk (LAST_DISK);
@@ -354,7 +354,7 @@ static int multipath_error (mddev_t *mddev, kdev_t dev)
 		 * Mark disk as unusable
 		 */
 		for (i = 0; i < disks; i++) {
-			if (kdev_same(multipaths[i].dev,dev) && multipaths[i].operational) {
+			if (multipaths[i].bdev == bdev && multipaths[i].operational) {
 				mark_disk_bad(mddev, i);
 				break;
 			}
