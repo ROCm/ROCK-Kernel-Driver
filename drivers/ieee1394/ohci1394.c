@@ -164,7 +164,7 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s_%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 908 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 921 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 static int phys_dma = 1;
@@ -623,8 +623,10 @@ static void insert_packet(struct ti_ohci *ohci,
 	u32 cycleTimer;
 	int idx = d->prg_ind;
 
-	DBGMSG(ohci->id, "Inserting packet for node %d, tlabel=%d, tcode=0x%x, speed=%d",
-			packet->node_id, packet->tlabel, packet->tcode, packet->speed_code);
+	DBGMSG(ohci->id, "Inserting packet for node " NODE_BUS_FMT
+	       ", tlabel=%d, tcode=0x%x, speed=%d",
+	       NODE_BUS_ARGS(packet->node_id), packet->tlabel,
+	       packet->tcode, packet->speed_code);
 
 	d->prg_cpu[idx]->begin.address = 0;
 	d->prg_cpu[idx]->begin.branchAddress = 0;
@@ -1505,6 +1507,7 @@ static void ohci_iso_recv_release_block(struct ohci_iso_recv *recv, int block)
 	   so disable branch and enable interrupt */
 	next->branchAddress = 0;
 	next->control |= cpu_to_le32(3 << 20);
+	next->status = cpu_to_le32(recv->buf_stride);
 
 	/* link prev to next */	
 	prev->branchAddress = cpu_to_le32(dma_prog_region_offset_to_bus(&recv->prog,
@@ -2691,19 +2694,25 @@ static void dma_trm_tasklet (unsigned long data)
 
 #ifdef OHCI1394_DEBUG
 		if (datasize)
-			DBGMSG(ohci->id,
-			       "Packet sent to node %d tcode=0x%X tLabel="
-			       "0x%02X ack=0x%X spd=%d dataLength=%d ctx=%d", 
-                                (le32_to_cpu(d->prg_cpu[d->sent_ind]->data[1])
-                                        >>16)&0x3f,
-                                (le32_to_cpu(d->prg_cpu[d->sent_ind]->data[0])
-                                        >>4)&0xf,
-                                (le32_to_cpu(d->prg_cpu[d->sent_ind]->data[0])
-                                        >>10)&0x3f,
-                                status&0x1f, (status>>5)&0x3, 
-                                le32_to_cpu(d->prg_cpu[d->sent_ind]->data[3])
-                                        >>16,
-                                d->ctx);
+			if(((le32_to_cpu(d->prg_cpu[d->sent_ind]->data[0])>>4)&0xf) == 0xa)
+				DBGMSG(ohci->id,
+				       "Stream packet sent to channel %d tcode=0x%X "
+				       "ack=0x%X spd=%d dataLength=%d ctx=%d", 
+				       (le32_to_cpu(d->prg_cpu[d->sent_ind]->data[0])>>8)&0x3f,
+				       (le32_to_cpu(d->prg_cpu[d->sent_ind]->data[0])>>4)&0xf,
+				       status&0x1f, (status>>5)&0x3, 
+				       le32_to_cpu(d->prg_cpu[d->sent_ind]->data[1])>>16,
+				       d->ctx);
+			else
+				DBGMSG(ohci->id,
+				       "Packet sent to node %d tcode=0x%X tLabel="
+				       "0x%02X ack=0x%X spd=%d dataLength=%d ctx=%d", 
+				       (le32_to_cpu(d->prg_cpu[d->sent_ind]->data[1])>>16)&0x3f,
+				       (le32_to_cpu(d->prg_cpu[d->sent_ind]->data[0])>>4)&0xf,
+				       (le32_to_cpu(d->prg_cpu[d->sent_ind]->data[0])>>10)&0x3f,
+				       status&0x1f, (status>>5)&0x3,
+				       le32_to_cpu(d->prg_cpu[d->sent_ind]->data[3])>>16,
+				       d->ctx);
 		else 
 			DBGMSG(ohci->id,
 			       "Packet sent to node %d tcode=0x%X tLabel="
@@ -2888,8 +2897,8 @@ alloc_dma_rcv_ctx(struct ti_ohci *ohci, struct dma_rcv_ctx *d,
 		return -ENOMEM;
 	}
 
-	d->prg_pool = hpsb_pci_pool_create("ohci1394 rcv prg", ohci->dev,
-				sizeof(struct dma_cmd), 4, 0, SLAB_KERNEL);
+	d->prg_pool = pci_pool_create("ohci1394 rcv prg", ohci->dev,
+				sizeof(struct dma_cmd), 4, 0);
 	OHCI_DMA_ALLOC("dma_rcv prg pool");
 
 	for (i=0; i<d->num_desc; i++) {
@@ -3016,8 +3025,8 @@ alloc_dma_trm_ctx(struct ti_ohci *ohci, struct dma_trm_ctx *d,
 	memset(d->prg_cpu, 0, d->num_desc * sizeof(struct at_dma_prg*));
 	memset(d->prg_bus, 0, d->num_desc * sizeof(dma_addr_t));
 
-	d->prg_pool = hpsb_pci_pool_create("ohci1394 trm prg", ohci->dev,
-				sizeof(struct at_dma_prg), 4, 0, SLAB_KERNEL);
+	d->prg_pool = pci_pool_create("ohci1394 trm prg", ohci->dev,
+				sizeof(struct at_dma_prg), 4, 0);
 	OHCI_DMA_ALLOC("dma_rcv prg pool");
 
 	for (i = 0; i < d->num_desc; i++) {

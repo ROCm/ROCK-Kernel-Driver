@@ -18,56 +18,10 @@
 #define minor(dev) MINOR(dev)
 #endif
 
-#ifndef __devexit_p
-#define __devexit_p(x) x
-#endif
-
 #include <linux/spinlock.h>
-
-#ifndef list_for_each_safe
-#define list_for_each_safe(pos, n, head) \
-	for (pos = (head)->next, n = pos->next; pos != (head); \
-		pos = n, n = pos->next)
-
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,5)
-#define pte_offset_kernel pte_offset
-#endif
 
 #ifndef MIN
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
-#endif
-
-#ifndef MAX
-#define MAX(a,b) ((a) > (b) ? (a) : (b))
-#endif
-
-
-/* Compatibility for task/work queues */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,42)
-/* Use task queue */
-#include <linux/tqueue.h>
-#define hpsb_queue_struct tq_struct
-#define hpsb_queue_list list
-#define hpsb_schedule_work(x) schedule_task(x)
-#define HPSB_INIT_WORK(x,y,z) INIT_TQUEUE(x,y,z)
-#define HPSB_PREPARE_WORK(x,y,z) PREPARE_TQUEUE(x,y,z)
-#else
-/* Use work queue */
-#include <linux/workqueue.h>
-#define hpsb_queue_struct work_struct
-#define hpsb_queue_list entry
-#define hpsb_schedule_work(x) schedule_work(x)
-#define HPSB_INIT_WORK(x,y,z) INIT_WORK(x,y,z)
-#define HPSB_PREPARE_WORK(x,y,z) PREPARE_WORK(x,y,z)
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,44)
-/* pci_pool_create changed. does not take the flags arg any longer */
-#define hpsb_pci_pool_create(a,b,c,d,e,f) pci_pool_create(a,b,c,d,e,f)
-#else
-#define hpsb_pci_pool_create(a,b,c,d,e,f) pci_pool_create(a,b,c,d,e)
 #endif
 
 /* Transaction Label handling */
