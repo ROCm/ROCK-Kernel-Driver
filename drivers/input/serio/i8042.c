@@ -598,8 +598,10 @@ static int __init i8042_check_aux(struct i8042_values *values)
 	
 	if (i8042_command(&param, I8042_CMD_AUX_DISABLE))
 		return -1;
-	if (i8042_command(&param, I8042_CMD_CTL_RCTR) || (~param & I8042_CTR_AUXDIS))
-		return -1;	
+	if (i8042_command(&param, I8042_CMD_CTL_RCTR) || (~param & I8042_CTR_AUXDIS)) {
+		printk(KERN_WARNING "Failed to disable AUX port, but continuing anyway... Is this a SiS?\n");
+		printk(KERN_WARNING "If AUX port is really absent please use the 'i8042.noaux' option.\n");
+	}
 
 	if (i8042_command(&param, I8042_CMD_AUX_ENABLE))
 		return -1;
