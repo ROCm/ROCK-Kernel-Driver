@@ -343,6 +343,9 @@ static void make_slbe(unsigned long esid, unsigned long vsid, int large,
 	 * for the kernel stack during the first part of exception exit 
 	 * which gets invalidated due to a tlbie from another cpu at a
 	 * non recoverable point (after setting srr0/1) - Anton
+	 *
+	 * paca Ksave is always valid (even when on the interrupt stack)
+	 * so we use that.
 	 */
 	castout_entry = get_paca()->xStab_data.next_round_robin;
 	do {
@@ -356,7 +359,7 @@ static void make_slbe(unsigned long esid, unsigned long vsid, int large,
 			castout_entry = 2;
 		asm volatile("slbmfee  %0,%1" : "=r" (esid_data) : "r" (entry));
 	} while (esid_data.data.v &&
-		 esid_data.data.esid == GET_ESID(__get_SP()));
+		 esid_data.data.esid == GET_ESID(paca->xKsave));
 
 	get_paca()->xStab_data.next_round_robin = castout_entry;
 
