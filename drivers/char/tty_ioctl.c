@@ -45,7 +45,7 @@ void tty_wait_until_sent(struct tty_struct * tty, long timeout)
 	
 	printk(KERN_DEBUG "%s wait until sent...\n", tty_name(tty, buf));
 #endif
-	if (!tty->driver.chars_in_buffer)
+	if (!tty->driver->chars_in_buffer)
 		return;
 	add_wait_queue(&tty->write_wait, &wait);
 	if (!timeout)
@@ -53,17 +53,17 @@ void tty_wait_until_sent(struct tty_struct * tty, long timeout)
 	do {
 #ifdef TTY_DEBUG_WAIT_UNTIL_SENT
 		printk(KERN_DEBUG "waiting %s...(%d)\n", tty_name(tty, buf),
-		       tty->driver.chars_in_buffer(tty));
+		       tty->driver->chars_in_buffer(tty));
 #endif
 		set_current_state(TASK_INTERRUPTIBLE);
 		if (signal_pending(current))
 			goto stop_waiting;
-		if (!tty->driver.chars_in_buffer(tty))
+		if (!tty->driver->chars_in_buffer(tty))
 			break;
 		timeout = schedule_timeout(timeout);
 	} while (timeout);
-	if (tty->driver.wait_until_sent)
-		tty->driver.wait_until_sent(tty, timeout);
+	if (tty->driver->wait_until_sent)
+		tty->driver->wait_until_sent(tty, timeout);
 stop_waiting:
 	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&tty->write_wait, &wait);
@@ -131,8 +131,8 @@ static void change_termios(struct tty_struct * tty, struct termios * new_termios
 		}
 	}
 
-	if (tty->driver.set_termios)
-		(*tty->driver.set_termios)(tty, &old_termios);
+	if (tty->driver->set_termios)
+		(*tty->driver->set_termios)(tty, &old_termios);
 
 	if (tty->ldisc.set_termios)
 		(*tty->ldisc.set_termios)(tty, &old_termios);
@@ -346,13 +346,13 @@ void send_prio_char(struct tty_struct *tty, char ch)
 {
 	int	was_stopped = tty->stopped;
 
-	if (tty->driver.send_xchar) {
-		tty->driver.send_xchar(tty, ch);
+	if (tty->driver->send_xchar) {
+		tty->driver->send_xchar(tty, ch);
 		return;
 	}
 	if (was_stopped)
 		start_tty(tty);
-	tty->driver.write(tty, 0, &ch, 1);
+	tty->driver->write(tty, 0, &ch, 1);
 	if (was_stopped)
 		stop_tty(tty);
 }
@@ -363,8 +363,8 @@ int n_tty_ioctl(struct tty_struct * tty, struct file * file,
 	struct tty_struct * real_tty;
 	int retval;
 
-	if (tty->driver.type == TTY_DRIVER_TYPE_PTY &&
-	    tty->driver.subtype == PTY_TYPE_MASTER)
+	if (tty->driver->type == TTY_DRIVER_TYPE_PTY &&
+	    tty->driver->subtype == PTY_TYPE_MASTER)
 		real_tty = tty->link;
 	else
 		real_tty = tty;
@@ -450,16 +450,16 @@ int n_tty_ioctl(struct tty_struct * tty, struct file * file,
 					tty->ldisc.flush_buffer(tty);
 				/* fall through */
 			case TCOFLUSH:
-				if (tty->driver.flush_buffer)
-					tty->driver.flush_buffer(tty);
+				if (tty->driver->flush_buffer)
+					tty->driver->flush_buffer(tty);
 				break;
 			default:
 				return -EINVAL;
 			}
 			return 0;
 		case TIOCOUTQ:
-			return put_user(tty->driver.chars_in_buffer ?
-					tty->driver.chars_in_buffer(tty) : 0,
+			return put_user(tty->driver->chars_in_buffer ?
+					tty->driver->chars_in_buffer(tty) : 0,
 					(int *) arg);
 		case TIOCINQ:
 			retval = tty->read_cnt;
@@ -482,8 +482,8 @@ int n_tty_ioctl(struct tty_struct * tty, struct file * file,
 		{
 			int pktmode;
 
-			if (tty->driver.type != TTY_DRIVER_TYPE_PTY ||
-			    tty->driver.subtype != PTY_TYPE_MASTER)
+			if (tty->driver->type != TTY_DRIVER_TYPE_PTY ||
+			    tty->driver->subtype != PTY_TYPE_MASTER)
 				return -ENOTTY;
 			if (get_user(pktmode, (int *) arg))
 				return -EFAULT;

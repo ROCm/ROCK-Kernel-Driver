@@ -8,6 +8,8 @@
 #ifndef _53C700_H
 #define _53C700_H
 
+#include <linux/interrupt.h>
+
 #include <asm/io.h>
 
 /* Turn on for general debugging---too verbose for normal use */

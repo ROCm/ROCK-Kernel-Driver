@@ -48,7 +48,7 @@ config IP_NF_IRC
 	  <file:Documentation/modules.txt>.  If unsure, say `Y'.
 
 config IP_NF_TFTP
-	tristate "TFTP prtocol support"
+	tristate "TFTP protocol support"
 	depends on IP_NF_CONNTRACK
 	help
 	  TFTP connection tracking helper, this is required depending

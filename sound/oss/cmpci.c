@@ -98,7 +98,6 @@
 #include <linux/slab.h>
 #include <linux/soundcard.h>
 #include <linux/pci.h>
-#include <linux/wrapper.h>
 #include <linux/init.h>
 #include <linux/poll.h>
 #include <linux/spinlock.h>
@@ -938,7 +937,7 @@ static void dealloc_dmabuf(struct dmabuf *db)
 		/* undo marking the pages as reserved */
 		pend = virt_to_page(db->rawbuf + (PAGE_SIZE << db->buforder) - 1);
 		for (pstart = virt_to_page(db->rawbuf); pstart <= pend; pstart++)
-			mem_map_unreserve(pstart);
+			ClearPageReserved(pstart);
 		free_pages((unsigned long)db->rawbuf, db->buforder);
 	}
 	db->rawbuf = NULL;
@@ -987,7 +986,7 @@ static int prog_dmabuf(struct cm_state *s, unsigned rec)
 		/* now mark the pages as reserved; otherwise remap_page_range doesn't do what we want */
 		pend = virt_to_page(db->rawbuf + (PAGE_SIZE << db->buforder) - 1);
 		for (pstart = virt_to_page(db->rawbuf); pstart <= pend; pstart++)
-			mem_map_reserve(pstart);
+			SetPageReserved(pstart);
 	}
 	bytepersec = rate << sample_shift[fmt];
 	bufs = PAGE_SIZE << db->buforder;

@@ -729,7 +729,7 @@ static int snd_es18xx_playback_trigger(snd_pcm_substream_t *substream,
 
 static irqreturn_t snd_es18xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	es18xx_t *chip = snd_magic_cast(es18xx_t, dev_id, return);
+	es18xx_t *chip = snd_magic_cast(es18xx_t, dev_id, return IRQ_NONE);
 	unsigned char status;
 
 	if (chip->caps & ES18XX_CONTROL) {

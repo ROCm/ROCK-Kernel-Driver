@@ -206,7 +206,7 @@ pplus_power_off(void)
 }
 
 static unsigned int
-pplus_irq_cannonicalize(u_int irq)
+pplus_irq_canonicalize(u_int irq)
 {
 	if (irq == 2)
 	{
@@ -469,7 +469,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.setup_arch     = pplus_setup_arch;
 	ppc_md.show_percpuinfo = NULL;
 	ppc_md.show_cpuinfo    = pplus_show_cpuinfo;
-	ppc_md.irq_cannonicalize = pplus_irq_cannonicalize;
+	ppc_md.irq_canonicalize = pplus_irq_canonicalize;
 	ppc_md.init_IRQ       = pplus_init_IRQ;
 	/* this gets changed later on if we have an OpenPIC -- Cort */
 	ppc_md.get_irq        = i8259_irq;

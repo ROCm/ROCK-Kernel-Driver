@@ -642,9 +642,12 @@ int mga_do_cleanup_dma( drm_device_t *dev )
 	if ( dev->dev_private ) {
 		drm_mga_private_t *dev_priv = dev->dev_private;
 
-		DRM_IOREMAPFREE( dev_priv->warp );
-		DRM_IOREMAPFREE( dev_priv->primary );
-		DRM_IOREMAPFREE( dev_priv->buffers );
+		if ( dev_priv->warp != NULL )
+			DRM_IOREMAPFREE( dev_priv->warp );
+		if ( dev_priv->primary != NULL )
+			DRM_IOREMAPFREE( dev_priv->primary );
+		if ( dev_priv->buffers != NULL )
+			DRM_IOREMAPFREE( dev_priv->buffers );
 
 		if ( dev_priv->head != NULL ) {
 			mga_freelist_cleanup( dev );

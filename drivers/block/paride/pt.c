@@ -661,8 +661,6 @@ static int pt_ioctl(struct inode *inode,struct file *file,
 	int unit;
 	struct mtop mtop;
 
-        if (!inode || kdev_none(inode->i_rdev))
-		return -EINVAL;
         unit = DEVICE_NR(inode->i_rdev);
         if (unit >= PT_UNITS)
 		return -EINVAL;

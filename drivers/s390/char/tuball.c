@@ -82,7 +82,7 @@ int tub3270_init(void);
  * Can't have this driver a module & support console at the same time
  */
 #ifdef CONFIG_TN3270_CONSOLE
-static kdev_t tub3270_con_device(struct console *);
+static struct tty_driver *tub3270_con_device(struct console *, int *);
 static void tub3270_con_unblank(void);
 static void tub3270_con_write(struct console *, const char *,
 	unsigned int);
@@ -144,10 +144,11 @@ console_initcall(tub3270_con_init);
 
 #endif
 
-static kdev_t
-tub3270_con_device(struct console *conp)
+static struct tty_driver *tub3270_con_device(struct console *conp, int *index)
 {
-	return tub_mkdev(IBM_TTY3270_MAJOR, conp->index + 1);
+	*index = conp->index + 1;
+	extern struct tty_driver tty3270_driver;
+	return &tty3270_driver;
 }
 
 static void

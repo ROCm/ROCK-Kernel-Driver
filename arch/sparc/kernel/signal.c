@@ -753,7 +753,7 @@ setup_svr4_frame(struct sigaction *sa, unsigned long pc, unsigned long npc,
 
 	synchronize_user_stack();
 	sfp = (svr4_signal_frame_t __user *)
-		get_sigframe(sa, regs, SVR4_SF_ALIGNED + REGWIN_SZ);
+		get_sigframe(sa, regs, SVR4_SF_ALIGNED + sizeof(struct reg_window));
 
 	if (invalid_frame_pointer(sfp, sizeof(*sfp)))
 		goto sigill_and_return;

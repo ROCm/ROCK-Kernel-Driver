@@ -2197,16 +2197,18 @@ err_out:
 	return -ENOMEM;
 }   
    
-static void ia_int(int irq, void *dev_id, struct pt_regs *regs)  
+static irqreturn_t ia_int(int irq, void *dev_id, struct pt_regs *regs)  
 {  
    struct atm_dev *dev;  
    IADEV *iadev;  
    unsigned int status;  
+   int handled = 0;
 
    dev = dev_id;  
    iadev = INPH_IA_DEV(dev);  
    while( (status = readl(iadev->reg+IPHASE5575_BUS_STATUS_REG) & 0x7f))  
    { 
+	handled = 1;
         IF_EVENT(printk("ia_int: status = 0x%x\n", status);) 
 	if (status & STAT_REASSINT)  
 	{  
@@ -2236,7 +2238,8 @@ static void ia_int(int irq, void *dev_id, struct pt_regs *regs)
            if (status & STAT_FEINT) 
                IaFrontEndIntr(iadev);
 	}  
-   }  
+   }
+   return IRQ_RETVAL(handled);
 }  
 	  
 	  

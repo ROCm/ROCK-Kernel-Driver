@@ -11,10 +11,12 @@
 
 #ifdef __KERNEL__
 
+#include <linux/interrupt.h>
+
 /* module prototypes */
 int tms380tr_open(struct net_device *dev);
 int tms380tr_close(struct net_device *dev);
-void tms380tr_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+irqreturn_t tms380tr_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 int tmsdev_init(struct net_device *dev, unsigned long dmalimit,
 		struct pci_dev *pdev);
 void tmsdev_term(struct net_device *dev);

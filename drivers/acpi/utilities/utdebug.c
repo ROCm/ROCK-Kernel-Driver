@@ -559,8 +559,7 @@ acpi_ut_dump_buffer (
 
 			case DB_WORD_DISPLAY:
 
-				ACPI_MOVE_UNALIGNED16_TO_32 (&temp32,
-						   &buffer[i + j]);
+				ACPI_MOVE_16_TO_32 (&temp32, &buffer[i + j]);
 				acpi_os_printf ("%04X ", temp32);
 				j += 2;
 				break;
@@ -568,8 +567,7 @@ acpi_ut_dump_buffer (
 
 			case DB_DWORD_DISPLAY:
 
-				ACPI_MOVE_UNALIGNED32_TO_32 (&temp32,
-						   &buffer[i + j]);
+				ACPI_MOVE_32_TO_32 (&temp32, &buffer[i + j]);
 				acpi_os_printf ("%08X ", temp32);
 				j += 4;
 				break;
@@ -577,12 +575,10 @@ acpi_ut_dump_buffer (
 
 			case DB_QWORD_DISPLAY:
 
-				ACPI_MOVE_UNALIGNED32_TO_32 (&temp32,
-						   &buffer[i + j]);
+				ACPI_MOVE_32_TO_32 (&temp32, &buffer[i + j]);
 				acpi_os_printf ("%08X", temp32);
 
-				ACPI_MOVE_UNALIGNED32_TO_32 (&temp32,
-						   &buffer[i + j + 4]);
+				ACPI_MOVE_32_TO_32 (&temp32, &buffer[i + j + 4]);
 				acpi_os_printf ("%08X ", temp32);
 				j += 8;
 				break;

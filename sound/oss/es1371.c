@@ -126,7 +126,6 @@
 #include <linux/spinlock.h>
 #include <linux/smp_lock.h>
 #include <linux/ac97_codec.h>
-#include <linux/wrapper.h>
 #include <linux/gameport.h>
 #include <linux/wait.h>
 
@@ -887,7 +886,7 @@ static inline void dealloc_dmabuf(struct es1371_state *s, struct dmabuf *db)
 		/* undo marking the pages as reserved */
 		pend = virt_to_page(db->rawbuf + (PAGE_SIZE << db->buforder) - 1);
 		for (page = virt_to_page(db->rawbuf); page <= pend; page++)
-			mem_map_unreserve(page);
+			ClearPageReserved(page);
 		pci_free_consistent(s->dev, PAGE_SIZE << db->buforder, db->rawbuf, db->dmaaddr);
 	}
 	db->rawbuf = NULL;
@@ -913,7 +912,7 @@ static int prog_dmabuf(struct es1371_state *s, struct dmabuf *db, unsigned rate,
 		/* now mark the pages as reserved; otherwise remap_page_range doesn't do what we want */
 		pend = virt_to_page(db->rawbuf + (PAGE_SIZE << db->buforder) - 1);
 		for (page = virt_to_page(db->rawbuf); page <= pend; page++)
-			mem_map_reserve(page);
+			SetPageReserved(page);
 	}
 	fmt &= ES1371_FMT_MASK;
 	bytepersec = rate << sample_shift[fmt];

@@ -1031,9 +1031,9 @@ static struct uart_driver sunzilog_reg = {
 	.owner		=	THIS_MODULE,
 	.driver_name	=	"ttyS",
 #ifdef CONFIG_DEVFS_FS
-	.dev_name	=	"tts/%d",
+	.dev_name	=	"tts/",
 #else
-	.dev_name	=	"ttyS%d",
+	.dev_name	=	"ttyS",
 #endif
 	.major		=	TTY_MAJOR,
 };
@@ -1352,11 +1352,6 @@ sunzilog_console_write(struct console *con, const char *s, unsigned int count)
 	spin_unlock_irqrestore(&up->port.lock, flags);
 }
 
-static kdev_t sunzilog_console_device(struct console *con)
-{
-	return mk_kdev(sunzilog_reg.major, sunzilog_reg.minor + con->index);
-}
-
 static int __init sunzilog_console_setup(struct console *con, char *options)
 {
 	struct uart_sunzilog_port *up = &sunzilog_port_table[con->index];
@@ -1402,10 +1397,11 @@ static int __init sunzilog_console_setup(struct console *con, char *options)
 static struct console sunzilog_console = {
 	.name	=	"ttyS",
 	.write	=	sunzilog_console_write,
-	.device	=	sunzilog_console_device,
+	.device	=	uart_console_device,
 	.setup	=	sunzilog_console_setup,
 	.flags	=	CON_PRINTBUFFER,
 	.index	=	-1,
+	.data   =	&sunzilog_reg,
 };
 
 static int __init sunzilog_console_init(void)

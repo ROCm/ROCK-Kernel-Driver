@@ -176,15 +176,15 @@ static DECLARE_MUTEX(tmp_buf_sem);
 static void rp_start(struct tty_struct *tty);
 
 static inline int rocket_paranoia_check(struct r_port *info,
-					kdev_t device, const char *routine)
+					char *name, const char *routine)
 {
 #ifdef ROCKET_PARANOIA_CHECK
 	static const char *badmagic =
-		"Warning: bad magic number for rocketport struct (%d, %d) in %s\n";
+		"Warning: bad magic number for rocketport struct %s in %s\n";
 	if (!info)
 		return 1;
 	if (info->magic != RPORT_MAGIC) {
-		printk(badmagic, major(device), minor(device), routine);
+		printk(badmagic, name, routine);
 		return 1;
 	}
 #endif
@@ -710,7 +710,7 @@ static int block_til_ready(struct tty_struct *tty, struct file * filp,
 	 * If this is a callout device, then just make sure the normal
 	 * device isn't being used.
 	 */
-	if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) {
+	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
 		if (info->flags & ROCKET_NORMAL_ACTIVE)
 			return -EBUSY;
 		if ((info->flags & ROCKET_CALLOUT_ACTIVE) &&
@@ -822,7 +822,7 @@ static int rp_open(struct tty_struct *tty, struct file * filp)
 	CHANNEL_t	*cp;
 	unsigned long page;
 	
-	line = minor(tty->device) - tty->driver.minor_start;
+	line = tty->index;
 	if ((line < 0) || (line >= MAX_RP_PORTS))
 		return -ENODEV;
 	if (!tmp_buf) {
@@ -946,7 +946,7 @@ static int rp_open(struct tty_struct *tty, struct file * filp)
 	}
 
 	if ((info->count == 1) && (info->flags & ROCKET_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = info->normal_termios;
 		else 
 			*tty->termios = info->callout_termios;
@@ -963,7 +963,7 @@ static void rp_close(struct tty_struct *tty, struct file * filp)
 	int timeout;
 	CHANNEL_t	*cp;
 
-	if (rocket_paranoia_check(info, tty->device, "rp_close"))
+	if (rocket_paranoia_check(info, tty->name, "rp_close"))
 		return;
 
 #ifdef ROCKET_DEBUG_OPEN
@@ -1048,8 +1048,8 @@ static void rp_close(struct tty_struct *tty, struct file * filp)
 	if (C_HUPCL(tty)) {
 		sClrDTR(cp);
 	}
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 
@@ -1093,7 +1093,7 @@ static void rp_set_termios(struct tty_struct *tty, struct termios *old_termios)
 	unsigned cflag;
 	
 
-	if (rocket_paranoia_check(info, tty->device, "rp_set_termios"))
+	if (rocket_paranoia_check(info, tty->name, "rp_set_termios"))
 		return;
 
 	cflag = tty->termios->c_cflag;
@@ -1145,7 +1145,7 @@ static void rp_break(struct tty_struct *tty, int break_state)
 	struct r_port * info = (struct r_port *)tty->driver_data;
 	unsigned long flags;
 	
-	if (rocket_paranoia_check(info, tty->device, "rp_break"))
+	if (rocket_paranoia_check(info, tty->name, "rp_break"))
 		return;
 
 	save_flags(flags); cli();
@@ -1295,7 +1295,7 @@ static int rp_ioctl(struct tty_struct *tty, struct file * file,
 	struct r_port * info = (struct r_port *)tty->driver_data;
 
 	if (cmd != RCKP_GET_PORTS &&
-	    rocket_paranoia_check(info, tty->device, "rp_ioctl"))
+	    rocket_paranoia_check(info, tty->name, "rp_ioctl"))
 		return -ENODEV;
 
 	switch (cmd) {
@@ -1325,25 +1325,12 @@ static int rp_ioctl(struct tty_struct *tty, struct file * file,
 	return 0;
 }
 
-#if (defined(ROCKET_DEBUG_FLOW) || defined(ROCKET_DEBUG_THROTTLE))
-static char *rp_tty_name(struct tty_struct *tty, char *buf)
-{
-	if (tty)
-		sprintf(buf, "%s%d", tty->driver.name,
-			minor(tty->device) - tty->driver.minor_start +
-			tty->driver.name_base);
-	else
-		strcpy(buf, "NULL tty");
-	return buf;
-}
-#endif
-
 static void rp_send_xchar(struct tty_struct *tty, char ch)
 {
 	struct r_port *info = (struct r_port *)tty->driver_data;
 	CHANNEL_t *cp;
 
-	if (rocket_paranoia_check(info, tty->device, "rp_send_xchar"))
+	if (rocket_paranoia_check(info, tty->name, "rp_send_xchar"))
 		return;
 
 	cp = &info->channel;
@@ -1360,11 +1347,11 @@ static void rp_throttle(struct tty_struct * tty)
 #ifdef ROCKET_DEBUG_THROTTLE
 	char	buf[64];
 	
-	printk("throttle %s: %d....\n", rp_tty_name(tty, buf),
+	printk("throttle %s: %d....\n", tty->name,
 	       tty->ldisc.chars_in_buffer(tty));
 #endif
 
-	if (rocket_paranoia_check(info, tty->device, "rp_throttle"))
+	if (rocket_paranoia_check(info, tty->name, "rp_throttle"))
 		return;
 
 	cp = &info->channel;
@@ -1381,11 +1368,11 @@ static void rp_unthrottle(struct tty_struct * tty)
 #ifdef ROCKET_DEBUG_THROTTLE
 	char	buf[64];
 	
-	printk("unthrottle %s: %d....\n", rp_tty_name(tty, buf),
+	printk("unthrottle %s: %d....\n", tty->name,
 	       tty->ldisc.chars_in_buffer(tty));
 #endif
 
-	if (rocket_paranoia_check(info, tty->device, "rp_throttle"))
+	if (rocket_paranoia_check(info, tty->name, "rp_throttle"))
 		return;
 
 	cp = &info->channel;
@@ -1409,11 +1396,11 @@ static void rp_stop(struct tty_struct *tty)
 #ifdef ROCKET_DEBUG_FLOW
 	char	buf[64];
 	
-	printk("stop %s: %d %d....\n", rp_tty_name(tty, buf),
+	printk("stop %s: %d %d....\n", tty->name,
 	       info->xmit_cnt, info->xmit_fifo_room);
 #endif
 
-	if (rocket_paranoia_check(info, tty->device, "rp_stop"))
+	if (rocket_paranoia_check(info, tty->name, "rp_stop"))
 		return;
 
 	if (sGetTxCnt(&info->channel))
@@ -1426,11 +1413,11 @@ static void rp_start(struct tty_struct *tty)
 #ifdef ROCKET_DEBUG_FLOW
 	char	buf[64];
 	
-	printk("start %s: %d %d....\n", rp_tty_name(tty, buf),
+	printk("start %s: %d %d....\n", tty->name,
 	       info->xmit_cnt, info->xmit_fifo_room);
 #endif
 
-	if (rocket_paranoia_check(info, tty->device, "rp_stop"))
+	if (rocket_paranoia_check(info, tty->name, "rp_stop"))
 		return;
 
 	sEnTransmit(&info->channel);
@@ -1448,7 +1435,7 @@ static void rp_wait_until_sent(struct tty_struct *tty, int timeout)
 	int check_time, exit_time;
 	int txcnt;
 	
-	if (rocket_paranoia_check(info, tty->device, "rp_wait_until_sent"))
+	if (rocket_paranoia_check(info, tty->name, "rp_wait_until_sent"))
 		return;
 
 	cp = &info->channel;
@@ -1498,7 +1485,7 @@ static void rp_hangup(struct tty_struct *tty)
 	CHANNEL_t	*cp;
 	struct r_port * info = (struct r_port *)tty->driver_data;
 	
-	if (rocket_paranoia_check(info, tty->device, "rp_hangup"))
+	if (rocket_paranoia_check(info, tty->name, "rp_hangup"))
 		return;
 
 #if (defined(ROCKET_DEBUG_OPEN) || defined(ROCKET_DEBUG_HANGUP))
@@ -1553,7 +1540,7 @@ static void rp_put_char(struct tty_struct *tty, unsigned char ch)
 	struct r_port * info = (struct r_port *)tty->driver_data;
 	CHANNEL_t	*cp;
 
-	if (rocket_paranoia_check(info, tty->device, "rp_put_char"))
+	if (rocket_paranoia_check(info, tty->name, "rp_put_char"))
 		return;
 
 #ifdef ROCKET_DEBUG_WRITE
@@ -1586,7 +1573,7 @@ static int rp_write(struct tty_struct * tty, int from_user,
 	int		c, retval = 0;
 	unsigned long	flags;
 
-	if (count <= 0 || rocket_paranoia_check(info, tty->device, "rp_write"))
+	if (count <= 0 || rocket_paranoia_check(info, tty->name, "rp_write"))
 		return 0;
 
 #ifdef ROCKET_DEBUG_WRITE
@@ -1687,7 +1674,7 @@ static int rp_write_room(struct tty_struct *tty)
 	struct r_port * info = (struct r_port *)tty->driver_data;
 	int	ret;
 
-	if (rocket_paranoia_check(info, tty->device, "rp_write_room"))
+	if (rocket_paranoia_check(info, tty->name, "rp_write_room"))
 		return 0;
 
 	ret = XMIT_BUF_SIZE - info->xmit_cnt - 1;
@@ -1708,7 +1695,7 @@ static int rp_chars_in_buffer(struct tty_struct *tty)
 	struct r_port * info = (struct r_port *)tty->driver_data;
 	CHANNEL_t	*cp;
 
-	if (rocket_paranoia_check(info, tty->device, "rp_chars_in_buffer"))
+	if (rocket_paranoia_check(info, tty->name, "rp_chars_in_buffer"))
 		return 0;
 
 	cp = &info->channel;
@@ -1724,7 +1711,7 @@ static void rp_flush_buffer(struct tty_struct *tty)
 	struct r_port * info = (struct r_port *)tty->driver_data;
 	CHANNEL_t	*cp;
 
-	if (rocket_paranoia_check(info, tty->device, "rp_flush_buffer"))
+	if (rocket_paranoia_check(info, tty->name, "rp_flush_buffer"))
 		return;
 
 	cli();
@@ -2026,7 +2013,7 @@ int __init rp_init(void)
 	memset(&rocket_driver, 0, sizeof(struct tty_driver));
 	rocket_driver.magic = TTY_DRIVER_MAGIC;
 #ifdef CONFIG_DEVFS_FS
-	rocket_driver.name = "tts/R%d";
+	rocket_driver.name = "tts/R";
 #else
 	rocket_driver.name = "ttyR";
 #endif
@@ -2068,7 +2055,7 @@ int __init rp_init(void)
 	 */
 	callout_driver = rocket_driver;
 #ifdef CONFIG_DEVFS_FS
-	callout_driver.name = "cua/R%d";
+	callout_driver.name = "cua/R";
 #else
 	callout_driver.name = "cur";
 #endif

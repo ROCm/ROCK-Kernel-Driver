@@ -55,7 +55,7 @@ static struct i2c_driver driver;
 static int tea6415c_id = 0;
 
 /* this function is called by i2c_probe */
-static int tea6415c_detect(struct i2c_adapter *adapter, int address, unsigned short flags, int kind)
+static int tea6415c_detect(struct i2c_adapter *adapter, int address, int kind)
 {
 	struct	i2c_client *client = 0;
 	int err = 0;

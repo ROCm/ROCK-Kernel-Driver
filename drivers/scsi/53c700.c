@@ -1443,7 +1443,7 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 	__u32 resume_offset = 0;
 	__u8 pun = 0xff, lun = 0xff;
 	unsigned long flags;
-	irqreturn_t retval = IRQ_NONE;
+	int handled = 0;
 
 	/* Use the host lock to serialise acess to the 53c700
 	 * hardware.  Note: In future, we may need to take the queue
@@ -1459,8 +1459,7 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 		Scsi_Cmnd *SCp = hostdata->cmd;
 		enum NCR_700_Host_State state;
 
-		retval = IRQ_HANDLED;
-
+		handled = 1;
 		state = hostdata->state;
 		SCp = hostdata->cmd;
 
@@ -1701,7 +1700,7 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 	}
  out_unlock:
 	spin_unlock_irqrestore(host->host_lock, flags);
-	return retval;
+	return IRQ_RETVAL(handled);
 }
 
 /* FIXME: Need to put some proc information in and plumb it

@@ -208,7 +208,6 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/smp_lock.h>
-#include <linux/wrapper.h>
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <linux/ioport.h>
@@ -2949,7 +2948,7 @@ allocate_buffers(struct ess_state *s)
 	/* now mark the pages as reserved; otherwise remap_page_range doesn't do what we want */
 	pend = virt_to_page(rawbuf + (PAGE_SIZE << order) - 1);
 	for (page = virt_to_page(rawbuf); page <= pend; page++)
-		mem_map_reserve(page);
+		SetPageReserved(page);
 
 	return 0;
 } 
@@ -2967,7 +2966,7 @@ free_buffers(struct ess_state *s)
 
 	pend = virt_to_page(s->card->dmapages + (PAGE_SIZE << s->card->dmaorder) - 1);
 	for (page = virt_to_page(s->card->dmapages); page <= pend; page++)
-		mem_map_unreserve(page);
+		ClearPageReserved(page);
 
 	free_pages((unsigned long)s->card->dmapages,s->card->dmaorder);
 	s->card->dmapages = NULL;

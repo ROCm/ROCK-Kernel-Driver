@@ -92,7 +92,7 @@ acpi_rs_address16_resource (
 	 * Point past the Descriptor to get the number of bytes consumed
 	 */
 	buffer += 1;
-	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+	ACPI_MOVE_16_TO_16 (&temp16, buffer);
 
 	*bytes_consumed = temp16 + 3;
 	output_struct->id = ACPI_RSTYPE_ADDRESS16;
@@ -162,36 +162,31 @@ acpi_rs_address16_resource (
 	 * Get Granularity (Bytes 6-7)
 	 */
 	buffer += 1;
-	ACPI_MOVE_UNALIGNED16_TO_16 (&output_struct->data.address16.granularity,
-			 buffer);
+	ACPI_MOVE_16_TO_32 (&output_struct->data.address16.granularity, buffer);
 
 	/*
 	 * Get min_address_range (Bytes 8-9)
 	 */
 	buffer += 2;
-	ACPI_MOVE_UNALIGNED16_TO_16 (&output_struct->data.address16.min_address_range,
-			 buffer);
+	ACPI_MOVE_16_TO_32 (&output_struct->data.address16.min_address_range, buffer);
 
 	/*
 	 * Get max_address_range (Bytes 10-11)
 	 */
 	buffer += 2;
-	ACPI_MOVE_UNALIGNED16_TO_16 (&output_struct->data.address16.max_address_range,
-			 buffer);
+	ACPI_MOVE_16_TO_32 (&output_struct->data.address16.max_address_range, buffer);
 
 	/*
 	 * Get address_translation_offset (Bytes 12-13)
 	 */
 	buffer += 2;
-	ACPI_MOVE_UNALIGNED16_TO_16 (&output_struct->data.address16.address_translation_offset,
-			 buffer);
+	ACPI_MOVE_16_TO_32 (&output_struct->data.address16.address_translation_offset, buffer);
 
 	/*
 	 * Get address_length (Bytes 14-15)
 	 */
 	buffer += 2;
-	ACPI_MOVE_UNALIGNED16_TO_16 (&output_struct->data.address16.address_length,
-			 buffer);
+	ACPI_MOVE_16_TO_32 (&output_struct->data.address16.address_length, buffer);
 
 	/*
 	 * Resource Source Index (if present)
@@ -360,36 +355,31 @@ acpi_rs_address16_stream (
 	/*
 	 * Set the address space granularity
 	 */
-	ACPI_MOVE_UNALIGNED16_TO_16 (buffer,
-			   &linked_list->data.address16.granularity);
+	ACPI_MOVE_32_TO_16 (buffer, &linked_list->data.address16.granularity);
 	buffer += 2;
 
 	/*
 	 * Set the address range minimum
 	 */
-	ACPI_MOVE_UNALIGNED16_TO_16 (buffer,
-			   &linked_list->data.address16.min_address_range);
+	ACPI_MOVE_32_TO_16 (buffer, &linked_list->data.address16.min_address_range);
 	buffer += 2;
 
 	/*
 	 * Set the address range maximum
 	 */
-	ACPI_MOVE_UNALIGNED16_TO_16 (buffer,
-			   &linked_list->data.address16.max_address_range);
+	ACPI_MOVE_32_TO_16 (buffer, &linked_list->data.address16.max_address_range);
 	buffer += 2;
 
 	/*
 	 * Set the address translation offset
 	 */
-	ACPI_MOVE_UNALIGNED16_TO_16 (buffer,
-			   &linked_list->data.address16.address_translation_offset);
+	ACPI_MOVE_32_TO_16 (buffer, &linked_list->data.address16.address_translation_offset);
 	buffer += 2;
 
 	/*
 	 * Set the address length
 	 */
-	ACPI_MOVE_UNALIGNED16_TO_16 (buffer,
-			   &linked_list->data.address16.address_length);
+	ACPI_MOVE_32_TO_16 (buffer, &linked_list->data.address16.address_length);
 	buffer += 2;
 
 	/*
@@ -413,7 +403,7 @@ acpi_rs_address16_stream (
 		 * Buffer needs to be set to the length of the sting + one for the
 		 *  terminating null
 		 */
-		buffer += (ACPI_STRLEN (linked_list->data.address16.resource_source.string_ptr) + 1);
+		buffer += (acpi_size)(ACPI_STRLEN (linked_list->data.address16.resource_source.string_ptr) + 1);
 	}
 
 	/*
@@ -427,7 +417,7 @@ acpi_rs_address16_stream (
 	 * minus the header size (3 bytes)
 	 */
 	actual_bytes -= 3;
-	ACPI_MOVE_UNALIGNED16_TO_16 (length_field, &actual_bytes);
+	ACPI_MOVE_SIZE_TO_16 (length_field, &actual_bytes);
 	return_ACPI_STATUS (AE_OK);
 }
 
@@ -479,7 +469,7 @@ acpi_rs_address32_resource (
 	 * Point past the Descriptor to get the number of bytes consumed
 	 */
 	buffer += 1;
-	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+	ACPI_MOVE_16_TO_16 (&temp16, buffer);
 	*bytes_consumed = temp16 + 3;
 
 	output_struct->id = ACPI_RSTYPE_ADDRESS32;
@@ -553,36 +543,31 @@ acpi_rs_address32_resource (
 	 * Get Granularity (Bytes 6-9)
 	 */
 	buffer += 1;
-	ACPI_MOVE_UNALIGNED32_TO_32 (&output_struct->data.address32.granularity,
-			 buffer);
+	ACPI_MOVE_32_TO_32 (&output_struct->data.address32.granularity, buffer);
 
 	/*
 	 * Get min_address_range (Bytes 10-13)
 	 */
 	buffer += 4;
-	ACPI_MOVE_UNALIGNED32_TO_32 (&output_struct->data.address32.min_address_range,
-			 buffer);
+	ACPI_MOVE_32_TO_32 (&output_struct->data.address32.min_address_range, buffer);
 
 	/*
 	 * Get max_address_range (Bytes 14-17)
 	 */
 	buffer += 4;
-	ACPI_MOVE_UNALIGNED32_TO_32 (&output_struct->data.address32.max_address_range,
-			 buffer);
+	ACPI_MOVE_32_TO_32 (&output_struct->data.address32.max_address_range, buffer);
 
 	/*
 	 * Get address_translation_offset (Bytes 18-21)
 	 */
 	buffer += 4;
-	ACPI_MOVE_UNALIGNED32_TO_32 (&output_struct->data.address32.address_translation_offset,
-			 buffer);
+	ACPI_MOVE_32_TO_32 (&output_struct->data.address32.address_translation_offset, buffer);
 
 	/*
 	 * Get address_length (Bytes 22-25)
 	 */
 	buffer += 4;
-	ACPI_MOVE_UNALIGNED32_TO_32 (&output_struct->data.address32.address_length,
-			 buffer);
+	ACPI_MOVE_32_TO_32 (&output_struct->data.address32.address_length, buffer);
 
 	/*
 	 * Resource Source Index (if present)
@@ -749,36 +734,31 @@ acpi_rs_address32_stream (
 	/*
 	 * Set the address space granularity
 	 */
-	ACPI_MOVE_UNALIGNED32_TO_32 (buffer,
-			  &linked_list->data.address32.granularity);
+	ACPI_MOVE_32_TO_32 (buffer, &linked_list->data.address32.granularity);
 	buffer += 4;
 
 	/*
 	 * Set the address range minimum
 	 */
-	ACPI_MOVE_UNALIGNED32_TO_32 (buffer,
-			  &linked_list->data.address32.min_address_range);
+	ACPI_MOVE_32_TO_32 (buffer, &linked_list->data.address32.min_address_range);
 	buffer += 4;
 
 	/*
 	 * Set the address range maximum
 	 */
-	ACPI_MOVE_UNALIGNED32_TO_32 (buffer,
-			  &linked_list->data.address32.max_address_range);
+	ACPI_MOVE_32_TO_32 (buffer, &linked_list->data.address32.max_address_range);
 	buffer += 4;
 
 	/*
 	 * Set the address translation offset
 	 */
-	ACPI_MOVE_UNALIGNED32_TO_32 (buffer,
-			  &linked_list->data.address32.address_translation_offset);
+	ACPI_MOVE_32_TO_32 (buffer, &linked_list->data.address32.address_translation_offset);
 	buffer += 4;
 
 	/*
 	 * Set the address length
 	 */
-	ACPI_MOVE_UNALIGNED32_TO_32 (buffer,
-			  &linked_list->data.address32.address_length);
+	ACPI_MOVE_32_TO_32 (buffer, &linked_list->data.address32.address_length);
 	buffer += 4;
 
 	/*
@@ -802,7 +782,7 @@ acpi_rs_address32_stream (
 		 * Buffer needs to be set to the length of the sting + one for the
 		 *  terminating null
 		 */
-		buffer += (ACPI_STRLEN (linked_list->data.address32.resource_source.string_ptr) + 1);
+		buffer += (acpi_size)(ACPI_STRLEN (linked_list->data.address32.resource_source.string_ptr) + 1);
 	}
 
 	/*
@@ -866,7 +846,7 @@ acpi_rs_address64_resource (
 	 * Point past the Descriptor to get the number of bytes consumed
 	 */
 	buffer += 1;
-	ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+	ACPI_MOVE_16_TO_16 (&temp16, buffer);
 
 	*bytes_consumed = temp16 + 3;
 	output_struct->id = ACPI_RSTYPE_ADDRESS64;
@@ -941,36 +921,31 @@ acpi_rs_address64_resource (
 	 * Get Granularity (Bytes 6-13)
 	 */
 	buffer += 1;
-	ACPI_MOVE_UNALIGNED64_TO_64 (&output_struct->data.address64.granularity,
-			 buffer);
+	ACPI_MOVE_64_TO_64 (&output_struct->data.address64.granularity, buffer);
 
 	/*
 	 * Get min_address_range (Bytes 14-21)
 	 */
 	buffer += 8;
-	ACPI_MOVE_UNALIGNED64_TO_64 (&output_struct->data.address64.min_address_range,
-			 buffer);
+	ACPI_MOVE_64_TO_64 (&output_struct->data.address64.min_address_range, buffer);
 
 	/*
 	 * Get max_address_range (Bytes 22-29)
 	 */
 	buffer += 8;
-	ACPI_MOVE_UNALIGNED64_TO_64 (&output_struct->data.address64.max_address_range,
-			 buffer);
+	ACPI_MOVE_64_TO_64 (&output_struct->data.address64.max_address_range, buffer);
 
 	/*
 	 * Get address_translation_offset (Bytes 30-37)
 	 */
 	buffer += 8;
-	ACPI_MOVE_UNALIGNED64_TO_64 (&output_struct->data.address64.address_translation_offset,
-			 buffer);
+	ACPI_MOVE_64_TO_64 (&output_struct->data.address64.address_translation_offset, buffer);
 
 	/*
 	 * Get address_length (Bytes 38-45)
 	 */
 	buffer += 8;
-	ACPI_MOVE_UNALIGNED64_TO_64 (&output_struct->data.address64.address_length,
-			 buffer);
+	ACPI_MOVE_64_TO_64 (&output_struct->data.address64.address_length, buffer);
 
 	/*
 	 * Resource Source Index (if present)
@@ -1141,36 +1116,31 @@ acpi_rs_address64_stream (
 	/*
 	 * Set the address space granularity
 	 */
-	ACPI_MOVE_UNALIGNED64_TO_64 (buffer,
-			   &linked_list->data.address64.granularity);
+	ACPI_MOVE_64_TO_64 (buffer, &linked_list->data.address64.granularity);
 	buffer += 8;
 
 	/*
 	 * Set the address range minimum
 	 */
-	ACPI_MOVE_UNALIGNED64_TO_64 (buffer,
-			   &linked_list->data.address64.min_address_range);
+	ACPI_MOVE_64_TO_64 (buffer, &linked_list->data.address64.min_address_range);
 	buffer += 8;
 
 	/*
 	 * Set the address range maximum
 	 */
-	ACPI_MOVE_UNALIGNED64_TO_64 (buffer,
-			   &linked_list->data.address64.max_address_range);
+	ACPI_MOVE_64_TO_64 (buffer, &linked_list->data.address64.max_address_range);
 	buffer += 8;
 
 	/*
 	 * Set the address translation offset
 	 */
-	ACPI_MOVE_UNALIGNED64_TO_64 (buffer,
-			   &linked_list->data.address64.address_translation_offset);
+	ACPI_MOVE_64_TO_64 (buffer, &linked_list->data.address64.address_translation_offset);
 	buffer += 8;
 
 	/*
 	 * Set the address length
 	 */
-	ACPI_MOVE_UNALIGNED64_TO_64 (buffer,
-			   &linked_list->data.address64.address_length);
+	ACPI_MOVE_64_TO_64 (buffer, &linked_list->data.address64.address_length);
 	buffer += 8;
 
 	/*
@@ -1193,7 +1163,7 @@ acpi_rs_address64_stream (
 		 * Buffer needs to be set to the length of the sting + one for the
 		 *  terminating null
 		 */
-		buffer += (ACPI_STRLEN (linked_list->data.address64.resource_source.string_ptr) + 1);
+		buffer += (acpi_size)(ACPI_STRLEN (linked_list->data.address64.resource_source.string_ptr) + 1);
 	}
 
 	/*

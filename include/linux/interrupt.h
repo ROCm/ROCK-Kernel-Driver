@@ -49,7 +49,7 @@ extern void free_irq(unsigned int, void *);
 /*
  * Temporary defines for UP kernels, until all code gets fixed.
  */
-#if !CONFIG_SMP
+#ifndef CONFIG_SMP
 # define cli()			local_irq_disable()
 # define sti()			local_irq_enable()
 # define save_flags(x)		local_save_flags(x)

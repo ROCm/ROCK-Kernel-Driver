@@ -1694,6 +1694,8 @@ static void via_rhine_set_rx_mode(struct net_device *dev)
 		/* Unconditionally log net taps. */
 		printk(KERN_NOTICE "%s: Promiscuous mode enabled.\n", dev->name);
 		rx_mode = 0x1C;
+		writel(0xffffffff, ioaddr + MulticastFilter0);
+		writel(0xffffffff, ioaddr + MulticastFilter1);
 	} else if ((dev->mc_count > multicast_filter_limit)
 			   ||  (dev->flags & IFF_ALLMULTI)) {
 		/* Too many to match, or accept all multicasts. */

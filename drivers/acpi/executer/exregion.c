@@ -83,7 +83,7 @@ acpi_ex_system_memory_space_handler (
 	struct acpi_mem_space_context   *mem_info = region_context;
 	u32                             length;
 	acpi_size                       window_size;
-#ifndef _HW_ALIGNMENT_SUPPORT
+#ifndef ACPI_MISALIGNED_TRANSFERS
 	u32                             remainder;
 #endif
 
@@ -116,7 +116,7 @@ acpi_ex_system_memory_space_handler (
 	}
 
 
-#ifndef _HW_ALIGNMENT_SUPPORT
+#ifndef ACPI_MISALIGNED_TRANSFERS
 	/*
 	 * Hardware does not support non-aligned data transfers, we must verify
 	 * the request.
@@ -283,6 +283,7 @@ acpi_ex_system_io_space_handler (
 	void                            *region_context)
 {
 	acpi_status                     status = AE_OK;
+	u32                             value32;
 
 
 	ACPI_FUNCTION_TRACE ("ex_system_io_space_handler");
@@ -297,13 +298,13 @@ acpi_ex_system_io_space_handler (
 	switch (function) {
 	case ACPI_READ:
 
-		*value = 0;
-		status = acpi_os_read_port ((acpi_io_address) address, value, bit_width);
+		status = acpi_os_read_port ((acpi_io_address) address, &value32, bit_width);
+		*value = value32;
 		break;
 
 	case ACPI_WRITE:
 
-		status = acpi_os_write_port ((acpi_io_address) address, *value, bit_width);
+		status = acpi_os_write_port ((acpi_io_address) address, (u32) *value, bit_width);
 		break;
 
 	default:

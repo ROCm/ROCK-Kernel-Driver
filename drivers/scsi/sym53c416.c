@@ -248,7 +248,7 @@ static __inline__ unsigned int sym53c416_read(int base, unsigned char *buffer, u
 	unsigned int orig_len = len;
 	unsigned long flags = 0;
 	unsigned int bytes_left;
-	int i;
+	unsigned long i;
 	int timeout = READ_TIMEOUT;
 
 	/* Do transfer */
@@ -290,7 +290,7 @@ static __inline__ unsigned int sym53c416_write(int base, unsigned char *buffer, 
 	unsigned int orig_len = len;
 	unsigned long flags = 0;
 	unsigned int bufferfree;
-	unsigned int i;
+	unsigned long i;
 	unsigned int timeout = WRITE_TIMEOUT;
 
 	/* Do transfer */
@@ -540,7 +540,8 @@ static void sym53c416_init(int base, int scsi_id)
 
 static int sym53c416_probeirq(int base, int scsi_id)
 {
-	int irq, irqs, i;
+	int irq, irqs;
+	unsigned long i;
 
 	/* Clear interrupt register */
 	inb(base + INT_REG);

@@ -484,7 +484,7 @@ static int snd_es1688_capture_trigger(snd_pcm_substream_t * substream,
 
 irqreturn_t snd_es1688_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	es1688_t *chip = snd_magic_cast(es1688_t, dev_id, return);
+	es1688_t *chip = snd_magic_cast(es1688_t, dev_id, return IRQ_NONE);
 
 	if (chip->trigger_value == 0x05)	/* ok.. playback is active */
 		snd_pcm_period_elapsed(chip->playback_substream);

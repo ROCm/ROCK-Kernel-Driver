@@ -272,19 +272,16 @@ static void nb85e_uart_cons_write (struct console *co,
 	}
 }
 
-static kdev_t nb85e_uart_cons_device (struct console *c)
-{
-        return mk_kdev (TTY_MAJOR, NB85E_UART_MINOR_BASE + c->index);
-}
-
+extern struct uart_driver nb85e_uart_driver;
 static struct console nb85e_uart_cons =
 {
     .name	= "ttyS",
     .write	= nb85e_uart_cons_write,
-    .device	= nb85e_uart_cons_device,
+    .device	= uart_console_device,
     .flags	= CON_PRINTBUFFER,
     .cflag	= NB85E_UART_INIT_CFLAGS,
     .index	= -1,
+    .data	= &nb85e_uart_driver,
 };
 
 void nb85e_uart_cons_init (unsigned chan)
@@ -528,7 +525,7 @@ static struct uart_driver nb85e_uart_driver = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "nb85e_uart",
 #ifdef CONFIG_DEVFS_FS
-	.dev_name		= "tts/%d",
+	.dev_name		= "tts/",
 #else
 	.dev_name		= "ttyS",
 #endif

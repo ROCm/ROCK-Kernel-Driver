@@ -47,7 +47,7 @@
 
 /******************************************************************************
  *
- * Compile-time options
+ * Configuration options
  *
  *****************************************************************************/
 
@@ -62,21 +62,9 @@
  *
  */
 
-
-/******************************************************************************
- *
- * Subsystem Constants
- *
- *****************************************************************************/
-
-
 /* Version string */
 
-#define ACPI_CA_VERSION                 0x20030328
-
-/* Version of ACPI supported */
-
-#define ACPI_CA_SUPPORT_LEVEL           2
+#define ACPI_CA_VERSION                 0x20030418
 
 /* Maximum objects in the various object caches */
 
@@ -85,6 +73,23 @@
 #define ACPI_MAX_EXTPARSE_CACHE_DEPTH   64          /* Parse tree objects */
 #define ACPI_MAX_OBJECT_CACHE_DEPTH     64          /* Interpreter operand objects */
 #define ACPI_MAX_WALK_CACHE_DEPTH       4           /* Objects for parse tree walks */
+
+/*
+ * Should the subystem abort the loading of an ACPI table if the
+ * table checksum is incorrect?
+ */
+#define ACPI_CHECKSUM_ABORT             FALSE
+
+
+/******************************************************************************
+ *
+ * Subsystem Constants
+ *
+ *****************************************************************************/
+
+/* Version of ACPI supported */
+
+#define ACPI_CA_SUPPORT_LEVEL           2
 
 /* String size constants */
 
@@ -102,20 +107,6 @@
 /* Size of cached memory mapping for system memory operation region */
 
 #define ACPI_SYSMEM_REGION_WINDOW_SIZE  4096
-
-
-/******************************************************************************
- *
- * Configuration of subsystem behavior
- *
- *****************************************************************************/
-
-
-/*
- * Should the subystem abort the loading of an ACPI table if the
- * table checksum is incorrect?
- */
-#define ACPI_CHECKSUM_ABORT             FALSE
 
 
 /******************************************************************************
@@ -195,7 +186,6 @@
  * ACPI AML Debugger
  *
  *****************************************************************************/
-
 
 #define ACPI_DEBUGGER_MAX_ARGS          8  /* Must be max method args + 1 */
 

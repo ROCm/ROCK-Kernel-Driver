@@ -73,7 +73,6 @@ anakinfb_init(void)
 {
 	memset(&fb_info, 0, sizeof(struct fb_info));
 
-	fb_info.node = NODEV;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 	fb_info.fbops = &anakinfb_ops;
 	fb_info.var = anakinfb_var;

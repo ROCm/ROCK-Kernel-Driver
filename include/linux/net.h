@@ -140,6 +140,9 @@ struct net_proto_family {
 	struct module	*owner;
 };
 
+extern int	     net_family_get(int family);
+extern void	     net_family_put(int family);
+
 struct iovec;
 
 extern int	     sock_wake_async(struct socket *sk, int how, int band);

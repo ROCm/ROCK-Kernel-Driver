@@ -405,7 +405,7 @@ int pcxe_open(struct tty_struct *tty, struct file * filp)
 	int boardnum;
 	int retval;
 
-	line = minor(tty->device) - tty->driver.minor_start;
+	line = tty->index;
 
 	if(line < 0 || line >= nbdevs) {
 		printk("line out of range in pcxe_open\n");
@@ -482,7 +482,7 @@ int pcxe_open(struct tty_struct *tty, struct file * filp)
 	 * If this is a callout device, then just make sure the normal
 	 * device isn't being used.
 	 */
-	if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) {
+	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
 		if (ch->asyncflags & ASYNC_NORMAL_ACTIVE)
 			return -EBUSY;
 		if (ch->asyncflags & ASYNC_CALLOUT_ACTIVE) {
@@ -517,7 +517,7 @@ int pcxe_open(struct tty_struct *tty, struct file * filp)
 	save_flags(flags);
 	cli();
 	if((ch->count == 1) && (ch->asyncflags & ASYNC_SPLIT_TERMIOS)) {
-		if(tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if(tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = ch->normal_termios;
 		else 
 			*tty->termios = ch->callout_termios;
@@ -617,8 +617,8 @@ static void pcxe_close(struct tty_struct * tty, struct file * filp)
 			tty_wait_until_sent(tty, 3000); /* 30 seconds timeout */
 		}
 	
-		if(tty->driver.flush_buffer)
-			tty->driver.flush_buffer(tty);
+		if(tty->driver->flush_buffer)
+			tty->driver->flush_buffer(tty);
 		if(tty->ldisc.flush_buffer)
 			tty->ldisc.flush_buffer(tty);
 		shutdown(info);
@@ -2070,7 +2070,7 @@ static void receive_data(struct channel *ch)
 
 	if(bc->orun) {
 		bc->orun = 0;
-		printk("overrun! DigiBoard device minor=%d\n",minor(tty->device));
+		printk("overrun! DigiBoard device %s\n", tty->name);
 	}
 
 	rxwinon(ch);

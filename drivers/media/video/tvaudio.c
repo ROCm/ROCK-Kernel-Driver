@@ -1326,8 +1326,7 @@ static struct CHIPDESC chiplist[] = {
 /* ---------------------------------------------------------------------- */
 /* i2c registration                                                       */
 
-static int chip_attach(struct i2c_adapter *adap, int addr,
-		       unsigned short flags, int kind)
+static int chip_attach(struct i2c_adapter *adap, int addr, int kind)
 {
 	struct CHIPSTATE *chip;
 	struct CHIPDESC  *desc;

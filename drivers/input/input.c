@@ -22,6 +22,7 @@
 #include <linux/interrupt.h>
 #include <linux/poll.h>
 #include <linux/device.h>
+#include <linux/devfs_fs_kernel.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("Input core");

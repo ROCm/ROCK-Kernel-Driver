@@ -77,7 +77,7 @@ static int ps2esdi_out_cmd_blk(u_short * cmd_blk);
 
 static void ps2esdi_prep_dma(char *buffer, u_short length, u_char dma_xmode);
 
-static void ps2esdi_interrupt_handler(int irq, void *dev_id,
+static irqreturn_t ps2esdi_interrupt_handler(int irq, void *dev_id,
 				      struct pt_regs *regs);
 static void (*current_int_handler) (u_int) = NULL;
 static void ps2esdi_normal_interrupt_handler(u_int);
@@ -613,18 +613,21 @@ static void ps2esdi_fill_cmd_block(u_short * cmd_blk, u_short cmd,
 static int ps2esdi_out_cmd_blk(u_short * cmd_blk)
 {
 
-	int i, j;
+	int i;
+	unsigned long jif;
 	u_char status;
 
 	/* enable interrupts */
 	outb(CTRL_ENABLE_INTR, ESDI_CONTROL);
 
 	/* do not write to the controller, if it is busy */
-	for (i = jiffies + ESDI_STAT_TIMEOUT; time_after(i, jiffies) && (inb(ESDI_STATUS) &
-							  STATUS_BUSY););
+	for (jif = jiffies + ESDI_STAT_TIMEOUT;
+		time_after(jif, jiffies) &&
+			(inb(ESDI_STATUS) & STATUS_BUSY); )
+		;
 
 #if 0
-	printk("%s: i(1)=%d\n", DEVICE_NAME, i);
+	printk("%s: i(1)=%ld\n", DEVICE_NAME, jif);
 #endif
 
 	/* if device is still busy - then just time out */
@@ -642,8 +645,8 @@ static int ps2esdi_out_cmd_blk(u_short * cmd_blk)
 	/* one by one send each word out */
 	for (i = (((*cmd_blk) >> 14) + 1) << 1; i; i--) {
 		status = inb(ESDI_STATUS);
-		for (j = jiffies + ESDI_STAT_TIMEOUT;
-		     time_after(j, jiffies) && (status & STATUS_BUSY) &&
+		for (jif = jiffies + ESDI_STAT_TIMEOUT;
+		     time_after(jif, jiffies) && (status & STATUS_BUSY) &&
 		   (status & STATUS_CMD_INF); status = inb(ESDI_STATUS));
 		if ((status & (STATUS_BUSY | STATUS_CMD_INF)) == STATUS_BUSY) {
 #if 0
@@ -681,7 +684,7 @@ static void ps2esdi_prep_dma(char *buffer, u_short length, u_char dma_xmode)
 
 
 
-static void ps2esdi_interrupt_handler(int irq, void *dev_id,
+static irqreturn_t ps2esdi_interrupt_handler(int irq, void *dev_id,
 				      struct pt_regs *regs)
 {
 	u_int int_ret_code;
@@ -695,8 +698,9 @@ static void ps2esdi_interrupt_handler(int irq, void *dev_id,
 		} else
 			printk("%s: help ! No interrupt handler.\n", DEVICE_NAME);
 	} else {
-		return;
+		return IRQ_NONE;
 	}
+	return IRQ_HANDLED;
 }
 
 static void ps2esdi_initial_reset_int_handler(u_int int_ret_code)

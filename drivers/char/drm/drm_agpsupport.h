@@ -146,7 +146,7 @@ int DRM(agp_alloc)(struct inode *inode, struct file *filp,
 		return -ENOMEM;
 	}
 
-	entry->handle    = (unsigned long)memory->memory;
+	entry->handle    = (unsigned long)memory->key;
 	entry->memory    = memory;
 	entry->bound     = 0;
 	entry->pages     = pages;
@@ -186,6 +186,7 @@ int DRM(agp_unbind)(struct inode *inode, struct file *filp,
 	drm_device_t	  *dev	 = priv->dev;
 	drm_agp_binding_t request;
 	drm_agp_mem_t     *entry;
+	int ret;
 
 	if (!dev->agp || !dev->agp->acquired) return -EINVAL;
 	if (copy_from_user(&request, (drm_agp_binding_t *)arg, sizeof(request)))
@@ -193,7 +194,10 @@ int DRM(agp_unbind)(struct inode *inode, struct file *filp,
 	if (!(entry = DRM(agp_lookup_entry)(dev, request.handle)))
 		return -EINVAL;
 	if (!entry->bound) return -EINVAL;
-	return DRM(unbind_agp)(entry->memory);
+	ret = DRM(unbind_agp)(entry->memory);
+	if (ret == 0)
+	    entry->bound = 0;
+	return ret;
 }
 
 int DRM(agp_bind)(struct inode *inode, struct file *filp,

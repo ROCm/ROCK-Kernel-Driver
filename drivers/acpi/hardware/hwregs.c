@@ -654,7 +654,7 @@ acpi_hw_register_write (
 
 		/* SMI_CMD is currently always in IO space */
 
-		status = acpi_os_write_port (acpi_gbl_FADT->smi_cmd, (acpi_integer) value, 8);
+		status = acpi_os_write_port (acpi_gbl_FADT->smi_cmd, value, 8);
 		break;
 
 
@@ -812,7 +812,7 @@ acpi_hw_low_level_write (
 		mem_address = (reg->address
 				  + (acpi_physical_address) offset);
 
-		status = acpi_os_write_memory (mem_address, (acpi_integer) value, width);
+		status = acpi_os_write_memory (mem_address, value, width);
 		break;
 
 
@@ -821,7 +821,7 @@ acpi_hw_low_level_write (
 		io_address = (acpi_io_address) (reg->address
 				   + (acpi_physical_address) offset);
 
-		status = acpi_os_write_port (io_address, (acpi_integer) value, width);
+		status = acpi_os_write_port (io_address, value, width);
 		break;
 
 

@@ -1286,9 +1286,9 @@ static struct uart_driver sunsu_reg = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "serial",
 #ifdef CONFIG_DEVFS_FS
-	.dev_name		= "tts/%d",
+	.dev_name		= "tts/",
 #else
-	.dev_name		= "ttyS%d",
+	.dev_name		= "ttyS",
 #endif
 	.major			= TTY_MAJOR,
 };
@@ -1422,11 +1422,6 @@ static void sunsu_console_write(struct console *co, const char *s,
 	serial_out(up, UART_IER, ier);
 }
 
-static kdev_t sunsu_console_device(struct console *co)
-{
-	return mk_kdev(sunsu_reg.major, sunsu_reg.minor + co->index);
-}
-
 /*
  *	Setup initial baud/bits/parity. We do two things here:
  *	- construct a cflag setting for the first su_open()
@@ -1467,10 +1462,11 @@ static int __init sunsu_console_setup(struct console *co, char *options)
 static struct console sunsu_cons = {
 	.name	=	"ttyS",
 	.write	=	sunsu_console_write,
-	.device	=	sunsu_console_device,
+	.device	=	uart_console_device,
 	.setup	=	sunsu_console_setup,
 	.flags	=	CON_PRINTBUFFER,
 	.index	=	-1,
+	.data	=	&sunsu_reg,
 };
 
 /*

@@ -339,20 +339,20 @@ acpi_set_current_resources (
 }
 
 
-#define COPY_FIELD(out, in, field)  out->field = in->field
-#define COPY_ADDRESS(out, in)                      \
-	COPY_FIELD(out, in, resource_type);             \
-	COPY_FIELD(out, in, producer_consumer);         \
-	COPY_FIELD(out, in, decode);                    \
-	COPY_FIELD(out, in, min_address_fixed);         \
-	COPY_FIELD(out, in, max_address_fixed);         \
-	COPY_FIELD(out, in, attribute);                 \
-	COPY_FIELD(out, in, granularity);               \
-	COPY_FIELD(out, in, min_address_range);         \
-	COPY_FIELD(out, in, max_address_range);         \
-	COPY_FIELD(out, in, address_translation_offset); \
-	COPY_FIELD(out, in, address_length);            \
-	COPY_FIELD(out, in, resource_source);
+#define ACPI_COPY_FIELD(out, in, field)  ((out)->field = (in)->field)
+#define ACPI_COPY_ADDRESS(out, in)                      \
+	ACPI_COPY_FIELD(out, in, resource_type);             \
+	ACPI_COPY_FIELD(out, in, producer_consumer);         \
+	ACPI_COPY_FIELD(out, in, decode);                    \
+	ACPI_COPY_FIELD(out, in, min_address_fixed);         \
+	ACPI_COPY_FIELD(out, in, max_address_fixed);         \
+	ACPI_COPY_FIELD(out, in, attribute);                 \
+	ACPI_COPY_FIELD(out, in, granularity);               \
+	ACPI_COPY_FIELD(out, in, min_address_range);         \
+	ACPI_COPY_FIELD(out, in, max_address_range);         \
+	ACPI_COPY_FIELD(out, in, address_translation_offset); \
+	ACPI_COPY_FIELD(out, in, address_length);            \
+	ACPI_COPY_FIELD(out, in, resource_source);
 
 /******************************************************************************
  *
@@ -385,17 +385,17 @@ acpi_resource_to_address64 (
 	switch (resource->id) {
 	case ACPI_RSTYPE_ADDRESS16:
 		address16 = (struct acpi_resource_address16 *) &resource->data;
-		COPY_ADDRESS(out, address16);
+		ACPI_COPY_ADDRESS(out, address16);
 		break;
 
 	case ACPI_RSTYPE_ADDRESS32:
 		address32 = (struct acpi_resource_address32 *) &resource->data;
-		COPY_ADDRESS(out, address32);
+		ACPI_COPY_ADDRESS(out, address32);
 		break;
 
 	case ACPI_RSTYPE_ADDRESS64:
 		address64 = (struct acpi_resource_address64 *) &resource->data;
-		COPY_ADDRESS(out, address64);
+		ACPI_COPY_ADDRESS(out, address64);
 		break;
 
 	default:

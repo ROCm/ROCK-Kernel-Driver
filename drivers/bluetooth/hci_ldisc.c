@@ -145,7 +145,7 @@ restart:
 		int len;
 	
 		set_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
-		len = tty->driver.write(tty, 0, skb->data, skb->len);
+		len = tty->driver->write(tty, 0, skb->data, skb->len);
 		hdev->stat.byte_tx += len;
 
 		skb_pull(skb, len);
@@ -193,8 +193,8 @@ static int hci_uart_flush(struct hci_dev *hdev)
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 
 	if (test_bit(HCI_UART_PROTO_SET, &hu->flags))
 		hu->proto->flush(hu);
@@ -286,8 +286,8 @@ static int hci_uart_tty_open(struct tty_struct *tty)
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 
 	return 0;
 }
@@ -384,8 +384,8 @@ static void hci_uart_tty_receive(struct tty_struct *tty, const __u8 *data, char 
 	hu->hdev.stat.byte_rx += count;
 	spin_unlock(&hu->rx_lock);
 
-	if (test_and_clear_bit(TTY_THROTTLED,&tty->flags) && tty->driver.unthrottle)
-		tty->driver.unthrottle(tty);
+	if (test_and_clear_bit(TTY_THROTTLED,&tty->flags) && tty->driver->unthrottle)
+		tty->driver->unthrottle(tty);
 }
 
 static int hci_uart_register_dev(struct hci_uart *hu)

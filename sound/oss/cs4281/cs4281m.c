@@ -71,7 +71,6 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/poll.h>
-#include <linux/wrapper.h>
 #include <linux/fs.h>
 #include <linux/wait.h>
 
@@ -1705,7 +1704,7 @@ extern void dealloc_dmabuf(struct cs4281_state *s, struct dmabuf *db)
 		    virt_to_page(db->rawbuf + (PAGE_SIZE << db->buforder) -
 				 1);
 		for (map = virt_to_page(db->rawbuf); map <= mapend; map++)
-			cs4x_mem_map_unreserve(map);
+			ClearPageReserved(map);
 		free_dmabuf(s, db);
 	}
 	if (s->tmpbuff && (db->type == CS_TYPE_ADC)) {
@@ -1714,7 +1713,7 @@ extern void dealloc_dmabuf(struct cs4281_state *s, struct dmabuf *db)
 		    virt_to_page(s->tmpbuff +
 				 (PAGE_SIZE << s->buforder_tmpbuff) - 1);
 		for (map = virt_to_page(s->tmpbuff); map <= mapend; map++)
-			cs4x_mem_map_unreserve(map);
+			ClearPageReserved(map);
 		free_dmabuf2(s, db);
 	}
 	s->tmpbuff = NULL;
@@ -1763,7 +1762,7 @@ static int prog_dmabuf(struct cs4281_state *s, struct dmabuf *db)
 
 		// 2. mark each physical page in range as 'reserved'.
 		for (map = virt_to_page(db->rawbuf); map <= mapend; map++)
-			cs4x_mem_map_reserve(map);
+			SetPageReserved(map);
 	}
 	if (!s->tmpbuff && (db->type == CS_TYPE_ADC)) {
 		for (order = df; order >= DMABUF_MINORDER;
@@ -1786,7 +1785,7 @@ static int prog_dmabuf(struct cs4281_state *s, struct dmabuf *db)
 
 		// 2. mark each physical page in range as 'reserved'.
 		for (map = virt_to_page(s->tmpbuff); map <= mapend; map++)
-			cs4x_mem_map_reserve(map);
+			SetPageReserved(map);
 	}
 	if (db->type == CS_TYPE_DAC) {
 		if (s->prop_dac.fmt & (AFMT_S16_LE | AFMT_U16_LE))

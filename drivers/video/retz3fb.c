@@ -1403,7 +1403,6 @@ int __init retz3fb_init(void)
 
 		strcpy(fb_info->modename, retz3fb_name);
 		fb_info->changevar = NULL;
-		fb_info->node = NODEV;
 		fb_info->fbops = &retz3fb_ops;
 		fb_info->screen_base = zinfo->fbmem;
 		fb_info->disp = &zinfo->disp;
@@ -1430,7 +1429,7 @@ int __init retz3fb_init(void)
 			return -EINVAL;
 
 		printk(KERN_INFO "fb%d: %s frame buffer device, using %ldK of "
-		       "video memory\n", minor(fb_info->node),
+		       "video memory\n", fb_info->node,
 		       fb_info->modename, zinfo->fbsize>>10);
 
 		/* FIXME: This driver cannot be unloaded yet */

@@ -503,11 +503,6 @@ clps711xuart_console_write(struct console *co, const char *s,
 	clps_writel(syscon, SYSCON(port));
 }
 
-static kdev_t clps711xuart_console_device(struct console *co)
-{
-	return mk_kdev(SERIAL_CLPS711X_MAJOR, SERIAL_CLPS711X_MINOR + co->index);
-}
-
 static void __init
 clps711xuart_console_get_options(struct uart_port *port, int *baud,
 				 int *parity, int *bits)
@@ -558,13 +553,15 @@ static int __init clps711xuart_console_setup(struct console *co, char *options)
 	return uart_set_options(port, co, baud, parity, bits, flow);
 }
 
+extern struct uart_driver clps711x_reg;
 static struct console clps711x_console = {
 	.name		= "ttyCL",
 	.write		= clps711xuart_console_write,
-	.device		= clps711xuart_console_device,
+	.device		= uart_console_device,
 	.setup		= clps711xuart_console_setup,
 	.flags		= CON_PRINTBUFFER,
 	.index		= -1,
+	.data		= &clps711x_reg,
 };
 
 static int __init clps711xuart_console_init(void)
@@ -581,7 +578,7 @@ console_initcall(clps711xuart_console_init);
 
 static struct uart_driver clps711x_reg = {
 	.driver_name		= "ttyCL",
-	.dev_name		= "ttyCL%d",
+	.dev_name		= "ttyCL",
 	.major			= SERIAL_CLPS711X_MAJOR,
 	.minor			= SERIAL_CLPS711X_MINOR,
 	.nr			= UART_NR,

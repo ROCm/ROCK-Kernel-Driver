@@ -1218,7 +1218,6 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 	tdfx_fix.ypanstep	= nopan ? 0 : 1;
 	tdfx_fix.ywrapstep	= nowrap ? 0 : 1;
    
-	info->node		= NODEV;
 	info->fbops		= &tdfxfb_ops;
 	info->fix		= tdfx_fix; 	
 	info->par		= default_par;

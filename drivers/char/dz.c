@@ -1112,8 +1112,8 @@ static void dz_close(struct tty_struct *tty, struct file *filp)
 	 */
 	shutdown(info);
 
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer (tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer (tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer (tty);
 	tty->closing = 0;
@@ -1183,7 +1183,7 @@ static int block_til_ready(struct tty_struct *tty, struct file *filp,
 	 * If this is a callout device, then just make sure the normal
 	 * device isn't being used.
 	 */
-	if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) {
+	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
 		if (info->flags & DZ_NORMAL_ACTIVE)
 			return -EBUSY;
     
@@ -1271,7 +1271,7 @@ static int dz_open (struct tty_struct *tty, struct file *filp)
 	struct dz_serial *info;
 	int retval, line;
 
-	line = minor(tty->device) - tty->driver.minor_start;
+	line = tty->index;
 
 	/*
 	 * The dz lines for the mouse/keyboard must be opened using their
@@ -1301,7 +1301,7 @@ static int dz_open (struct tty_struct *tty, struct file *filp)
 		return retval;
 
 	if ((info->count == 1) && (info->flags & DZ_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = info->normal_termios;
 		else 
 			*tty->termios = info->callout_termios;
@@ -1335,7 +1335,7 @@ int __init dz_init(void)
 #if (LINUX_VERSION_CODE > 0x2032D && defined(CONFIG_DEVFS_FS))
 	serial_driver.name = "ttyS";
 #else
-	serial_driver.name = "tts/%d";
+	serial_driver.name = "tts/";
 #endif
 	serial_driver.major = TTY_MAJOR;
 	serial_driver.minor_start = 64;
@@ -1376,7 +1376,7 @@ int __init dz_init(void)
 #if (LINUX_VERSION_CODE > 0x2032D && defined(CONFIG_DEVFS_FS))
 	callout_driver.name = "cua";
 #else
-	callout_driver.name = "cua/%d";
+	callout_driver.name = "cua/";
 #endif
 	callout_driver.major = TTYAUX_MAJOR;
 	callout_driver.subtype = SERIAL_TYPE_CALLOUT;
@@ -1425,10 +1425,8 @@ int __init dz_init(void)
 		printk("ttyS%02d at 0x%08x (irq = %d)\n", info->line,
 		       info->port, SERIAL);
 
-		tty_register_device(&serial_driver,
-		                   serial_driver.minor_start + info->line);
-		tty_register_device(&callout_driver,
-		                   callout_driver.minor_start + info->line);
+		tty_register_device(&serial_driver, info->line);
+		tty_register_device(&callout_driver, info->line);
 	}
 
 	/* Reset the chip */
@@ -1504,9 +1502,10 @@ static void dz_console_print (struct console *cons,
 	}
 }
 
-static kdev_t dz_console_device(struct console *c)
+static struct tty_driver *dz_console_device(struct console *c, int *index)
 {
-	return mk_kdev(TTY_MAJOR, 64 + c->index);
+	*index = c->index;
+	return &serial_driver;
 }
 
 static int __init dz_console_setup(struct console *co, char *options)

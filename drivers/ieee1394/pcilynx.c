@@ -1175,7 +1175,7 @@ static irqreturn_t lynx_irq_handler(int irq, void *dev_id,
         intmask = reg_read(lynx, PCI_INT_STATUS);
 
         if (!(intmask & PCI_INT_INT_PEND))
-		return IRQ_HANDLED;
+		return IRQ_NONE;
 
         PRINTD(KERN_DEBUG, lynx->id, "interrupt: 0x%08x / 0x%08x", intmask,
                linkint);

@@ -87,8 +87,8 @@ acpi_ds_method_data_init (
 	/* Init the method arguments */
 
 	for (i = 0; i < ACPI_METHOD_NUM_ARGS; i++) {
-		ACPI_MOVE_UNALIGNED32_TO_32 (&walk_state->arguments[i].name,
-				 NAMEOF_ARG_NTE);
+		ACPI_MOVE_32_TO_32 (&walk_state->arguments[i].name,
+				   NAMEOF_ARG_NTE);
 		walk_state->arguments[i].name.integer |= (i << 24);
 		walk_state->arguments[i].descriptor   = ACPI_DESC_TYPE_NAMED;
 		walk_state->arguments[i].type         = ACPI_TYPE_ANY;
@@ -98,8 +98,8 @@ acpi_ds_method_data_init (
 	/* Init the method locals */
 
 	for (i = 0; i < ACPI_METHOD_NUM_LOCALS; i++) {
-		ACPI_MOVE_UNALIGNED32_TO_32 (&walk_state->local_variables[i].name,
-				 NAMEOF_LOCAL_NTE);
+		ACPI_MOVE_32_TO_32 (&walk_state->local_variables[i].name,
+				   NAMEOF_LOCAL_NTE);
 
 		walk_state->local_variables[i].name.integer |= (i << 24);
 		walk_state->local_variables[i].descriptor  = ACPI_DESC_TYPE_NAMED;

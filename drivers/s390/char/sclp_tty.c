@@ -761,7 +761,6 @@ sclp_tty_init(void)
 	sclp_tty_driver.owner = THIS_MODULE;
 	sclp_tty_driver.driver_name = "sclp_line";
 	sclp_tty_driver.name = "ttyS";
-	sclp_tty_driver.name_base = 0;
 	sclp_tty_driver.major = TTY_MAJOR;
 	sclp_tty_driver.minor_start = 64;
 	sclp_tty_driver.num = 1;

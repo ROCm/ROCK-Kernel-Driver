@@ -345,8 +345,7 @@ static int tda9887_configure(struct tda9887 *t)
 
 /* ---------------------------------------------------------------------- */
 
-static int tda9887_attach(struct i2c_adapter *adap, int addr,
-			  unsigned short flags, int kind)
+static int tda9887_attach(struct i2c_adapter *adap, int addr, int kind)
 {
 	struct tda9887 *t;
 

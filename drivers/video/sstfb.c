@@ -1474,7 +1474,6 @@ static int __devinit sstfb_probe(struct pci_dev *pdev,
 	f_ddprintk("membase_phys: %#lx\n", fix->smem_start);
 	f_ddprintk("fbbase_virt: %p\n", info->screen_base);
 
-	info->node	= NODEV;
 	info->flags	= FBINFO_FLAG_DEFAULT;
 	info->fbops	= &sstfb_ops;
 	info->currcon	= -1;
@@ -1520,7 +1519,7 @@ static int __devinit sstfb_probe(struct pci_dev *pdev,
 		sstfb_drawdebugimage(info);
 
 	printk(KERN_INFO "fb%d: %s frame buffer device at 0x%p\n",
-	       minor(info->node), fix->id, info->screen_base);
+	       info->node, fix->id, info->screen_base);
 
 	return 0;
 

@@ -14,14 +14,13 @@
 
 #include <asm/system.h>
 #include <asm/ebus.h>
+#include <asm/auxio.h>
 
 #define __KERNEL_SYSCALLS__
 #include <linux/unistd.h>
 
 #ifdef CONFIG_PCI
 static unsigned long power_reg = 0UL;
-#define POWER_SYSTEM_OFF (1 << 0)
-#define POWER_COURTESY_OFF (1 << 1)
 
 static DECLARE_WAIT_QUEUE_HEAD(powerd_wait);
 static int button_pressed;
@@ -51,7 +50,7 @@ void machine_power_off(void)
 			 * same effect, so until I figure out
 			 * what the difference is...
 			 */
-			writel(POWER_COURTESY_OFF | POWER_SYSTEM_OFF, power_reg);
+			writel(AUXIO_PCIO_CPWR_OFF | AUXIO_PCIO_SPWR_OFF, power_reg);
 		} else
 #endif /* CONFIG_PCI */
 			if (poweroff_method != NULL) {

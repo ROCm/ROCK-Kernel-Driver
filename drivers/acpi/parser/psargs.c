@@ -412,7 +412,7 @@ acpi_ps_get_next_simple_arg (
 
 		/* Get 2 bytes from the AML stream */
 
-		ACPI_MOVE_UNALIGNED16_TO_32 (&arg->common.value.integer, parser_state->aml);
+		ACPI_MOVE_16_TO_32 (&arg->common.value.integer, parser_state->aml);
 		parser_state->aml += 2;
 		break;
 
@@ -423,7 +423,7 @@ acpi_ps_get_next_simple_arg (
 
 		/* Get 4 bytes from the AML stream */
 
-		ACPI_MOVE_UNALIGNED32_TO_32 (&arg->common.value.integer, parser_state->aml);
+		ACPI_MOVE_32_TO_32 (&arg->common.value.integer, parser_state->aml);
 		parser_state->aml += 4;
 		break;
 
@@ -434,7 +434,7 @@ acpi_ps_get_next_simple_arg (
 
 		/* Get 8 bytes from the AML stream */
 
-		ACPI_MOVE_UNALIGNED64_TO_64 (&arg->common.value.integer, parser_state->aml);
+		ACPI_MOVE_64_TO_64 (&arg->common.value.integer, parser_state->aml);
 		parser_state->aml += 8;
 		break;
 
@@ -533,7 +533,7 @@ acpi_ps_get_next_field (
 
 		/* Get the 4-character name */
 
-		ACPI_MOVE_UNALIGNED32_TO_32 (&name, parser_state->aml);
+		ACPI_MOVE_32_TO_32 (&name, parser_state->aml);
 		acpi_ps_set_name (field, name);
 		parser_state->aml += ACPI_NAME_SIZE;
 
@@ -557,9 +557,9 @@ acpi_ps_get_next_field (
 		 * Get access_type and access_attrib and merge into the field Op
 		 * access_type is first operand, access_attribute is second
 		 */
-		field->common.value.integer32 = (ACPI_GET8 (parser_state->aml) << 8);
+		field->common.value.integer = (ACPI_GET8 (parser_state->aml) << 8);
 		parser_state->aml++;
-		field->common.value.integer32 |= ACPI_GET8 (parser_state->aml);
+		field->common.value.integer |= ACPI_GET8 (parser_state->aml);
 		parser_state->aml++;
 		break;
 

@@ -1,111 +1,98 @@
 /* $Id: auxio.h,v 1.3 2001/06/05 08:16:34 davem Exp $
- * auxio.h:  Definitions and code for the Auxiliary I/O register.
+ * auxio.h:  Definitions and code for the Auxiliary I/O registers.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
+ *
+ * Refactoring for unified NCR/PCIO support 2002 Eric Brower (ebrower@usa.net)
  */
 #ifndef _SPARC64_AUXIO_H
 #define _SPARC64_AUXIO_H
 
-#include <asm/system.h>
-#include <asm/io.h>
-
-/* FIXME: All of this should be checked for sun4u. It has /sbus/auxio, but
-   I don't know whether it is the same and don't have a floppy */
-
-extern unsigned long auxio_register;
-
-/* This register is an unsigned char in IO space.  It does two things.
- * First, it is used to control the front panel LED light on machines
- * that have it (good for testing entry points to trap handlers and irq's)
- * Secondly, it controls various floppy drive parameters.
+/* AUXIO implementations:
+ * sbus-based NCR89C105 "Slavio"
+ *	LED/Floppy (AUX1) register
+ *	Power (AUX2) register
+ *
+ * ebus-based auxio on PCIO 
+ *	LED Auxio Register
+ *	Power Auxio Register
+ *
+ * Register definitions from NCR _NCR89C105 Chip Specification_
+ * 
+ * SLAVIO AUX1 @ 0x1900000
+ * -------------------------------------------------
+ * | (R) | (R) |  D  | (R) |  E  |  M  |  T  |  L  |
+ * -------------------------------------------------
+ * (R) - bit 7:6,4 are reserved and should be masked in s/w
+ *  D  - Floppy Density Sense (1=high density) R/O
+ *  E  - Link Test Enable, directly reflected on AT&T 7213 LTE pin
+ *  M  - Monitor/Mouse Mux, directly reflected on MON_MSE_MUX pin
+ *  T  - Terminal Count: sends TC pulse to 82077 floppy controller
+ *  L  - System LED on front panel (0=off, 1=on) 
  */
-#define AUXIO_ORMEIN      0xf0    /* All writes must set these bits. */
-#define AUXIO_ORMEIN4M    0xc0    /* sun4m - All writes must set these bits. */
-#define AUXIO_FLPY_DENS   0x20    /* Floppy density, high if set. Read only. */
-#define AUXIO_FLPY_DCHG   0x10    /* A disk change occurred.  Read only. */
-#define AUXIO_EDGE_ON     0x10    /* sun4m - On means Jumper block is in. */
-#define AUXIO_FLPY_DSEL   0x08    /* Drive select/start-motor. Write only. */
-#define AUXIO_LINK_TEST   0x08    /* sun4m - On means TPE Carrier detect. */
+#define AUXIO_AUX1_MASK		0xc0 /* Mask bits 		*/
+#define AUXIO_AUX1_FDENS	0x20 /* Floppy Density Sense	*/
+#define AUXIO_AUX1_LTE 		0x08 /* Link Test Enable 	*/
+#define AUXIO_AUX1_MMUX		0x04 /* Monitor/Mouse Mux	*/
+#define AUXIO_AUX1_FTCNT	0x02 /* Terminal Count, 	*/
+#define AUXIO_AUX1_LED		0x01 /* System LED		*/
 
-/* Set the following to one, then zero, after doing a pseudo DMA transfer. */
-#define AUXIO_FLPY_TCNT   0x04    /* Floppy terminal count. Write only. */
+/* SLAVIO AUX2 @ 0x1910000
+ * -------------------------------------------------
+ * | (R) | (R) |  D  | (R) | (R) | (R) |  C  |  F  |
+ * -------------------------------------------------
+ * (R) - bits 7:6,4:2 are reserved and should be masked in s/w
+ *  D  - Power Failure Detect (1=power fail)
+ *  C  - Clear Power Failure Detect Int (1=clear)
+ *  F  - Power Off (1=power off)
+ */
+#define AUXIO_AUX2_MASK		0xdc /* Mask Bits		*/
+#define AUXIO_AUX2_PFAILDET	0x20 /* Power Fail Detect	*/
+#define AUXIO_AUX2_PFAILCLR 	0x02 /* Clear Pwr Fail Det Intr	*/
+#define AUXIO_AUX2_PWR_OFF	0x01 /* Power Off		*/
 
-/* Set the following to zero to eject the floppy. */
-#define AUXIO_FLPY_EJCT   0x02    /* Eject floppy disk.  Write only. */
-#define AUXIO_LED         0x01    /* On if set, off if unset. Read/Write */
+/* Register definitions from Sun Microsystems _PCIO_ p/n 802-7837
+ *
+ * PCIO LED Auxio @ 0x726000
+ * -------------------------------------------------
+ * |             31:1 Unused                 | LED |
+ * -------------------------------------------------
+ * Bits 31:1 unused
+ * LED - System LED on front panel (0=off, 1=on)
+ */
+#define AUXIO_PCIO_LED		0x01 /* System LED 		*/ 
 
-#define AUXREG   (auxio_register)
-
-/* These are available on sun4c */
-#define TURN_ON_LED   \
-do {	if (AUXREG) \
-		sbus_writeb(sbus_readb(AUXREG) | \
-			    (AUXIO_ORMEIN | AUXIO_LED), AUXREG); \
-} while(0)
-#define TURN_OFF_LED  \
-do {	if (AUXREG) \
-		sbus_writeb((sbus_readb(AUXREG) | \
-			     AUXIO_ORMEIN) & (~AUXIO_LED), \
-			    AUXREG); \
-} while(0)
-#define FLIP_LED	\
-do {	if (AUXREG)  \
-		sbus_writeb((sbus_readb(AUXREG) | \
-			     AUXIO_ORMEIN) ^ AUXIO_LEN, \
-			    AUXREG); \
-} while(0)
-#define FLPY_MOTORON	\
-do {	if (AUXREG) \
-		sbus_writeb(sbus_readb(AUXREG) | \
-			    (AUXIO_ORMEIN | AUXIO_FLPY_DSEL), \
-			    AUXREG); \
-} while(0)
-#define FLPY_MOTOROFF	\
-do {	if (AUXREG) \
-		sbus_writeb((sbus_readb(AUXREG) | \
-			     AUXIO_ORMEIN) & (~AUXIO_FLPY_DSEL), \
-			    AUXREG); \
-} while(0)
-#define FLPY_TCNTON	\
-do {	if (AUXREG) \
-		sbus_writeb((sbus_readb(AUXREG) | \
-			     AUXIO_ORMEIN) | AUXIO_FLPY_TCNT, \
-			    AUXREG); \
-} while(0)
-#define FLPY_TCNTOFF	\
-do {	if (AUXREG) \
-		sbus_writeb((sbus_readb(AUXREG) | \
-			     AUXIO_ORMEIN) & (~AUXIO_FLPY_TCNT), \
-			    AUXREG); \
-} while(0)
+/* PCIO Power Auxio @ 0x724000
+ * -------------------------------------------------
+ * |             31:2 Unused           | CPO | SPO |
+ * -------------------------------------------------
+ * Bits 31:2 unused
+ * CPO - Courtesy Power Off (1=off)
+ * SPO - System Power Off   (1=off)
+ */
+#define AUXIO_PCIO_CPWR_OFF	0x02 /* Courtesy Power Off	*/
+#define AUXIO_PCIO_SPWR_OFF	0x01 /* System Power Off	*/
 
 #ifndef __ASSEMBLY__
-static __inline__ void set_auxio(unsigned char bits_on, unsigned char bits_off)
-{
-	unsigned char regval;
-	unsigned long flags;
 
-	local_irq_save(flags);
-	if (AUXREG) {
-		unsigned char newval;
+#define AUXIO_LTE_ON	1
+#define AUXIO_LTE_OFF	0
 
-		regval = sbus_readb(AUXREG);
-		newval  = regval | bits_on;
-		newval &= ~bits_off;
-		newval |= AUXIO_ORMEIN4M;
-		sbus_writeb(newval, AUXREG);
-	}
-	local_irq_restore(flags);
-}
-#endif /* !(__ASSEMBLY__) */
+/* auxio_set_lte - Set Link Test Enable (TPE Link Detect)
+ *
+ * on - AUXIO_LTE_ON or AUXIO_LTE_OFF
+ */
+extern void auxio_set_lte(int on);
 
+#define AUXIO_LED_ON	1
+#define AUXIO_LED_OFF	0
 
-/* AUXIO2 (Power Off Control) */
-extern __volatile__ unsigned char * auxio_power_register;
+/* auxio_set_led - Set system front panel LED 
+ *
+ * on - AUXIO_LED_ON or AUXIO_LED_OFF
+ */
+extern void auxio_set_led(int on);
 
-#define	AUXIO_POWER_DETECT_FAILURE	32
-#define	AUXIO_POWER_CLEAR_FAILURE	2
-#define	AUXIO_POWER_OFF			1
+#endif /* ifndef __ASSEMBLY__ */ 
 
-
-#endif /* !(_SPARC_AUXIO_H) */
+#endif /* !(_SPARC64_AUXIO_H) */

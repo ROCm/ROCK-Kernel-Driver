@@ -99,11 +99,7 @@ int __init ircomm_tty_init(void)
 	memset(&driver, 0, sizeof(struct tty_driver));
 	driver.magic           = TTY_DRIVER_MAGIC;
 	driver.driver_name     = "ircomm";
-#ifdef CONFIG_DEVFS_FS
-	driver.name            = "ircomm%d";
-#else
 	driver.name            = "ircomm";
-#endif
 	driver.major           = IRCOMM_TTY_MAJOR;
 	driver.minor_start     = IRCOMM_TTY_MINOR;
 	driver.num             = IRCOMM_TTY_PORTS;
@@ -251,7 +247,7 @@ static int ircomm_tty_block_til_ready(struct ircomm_tty_cb *self,
 
 	tty = self->tty;
 
-	if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) {
+	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
 		/* this is a callout device */
 		/* just verify that normal device is not in use */
 		if (self->flags & ASYNC_NORMAL_ACTIVE)
@@ -306,7 +302,7 @@ static int ircomm_tty_block_til_ready(struct ircomm_tty_cb *self,
 	add_wait_queue(&self->open_wait, &wait);
 	
 	IRDA_DEBUG(2, "%s(%d):block_til_ready before block on %s open_count=%d\n",
-	      __FILE__,__LINE__, tty->driver.name, self->open_count );
+	      __FILE__,__LINE__, tty->driver->name, self->open_count );
 
 	/* As far as I can see, we protect open_count - Jean II */
 	spin_lock_irqsave(&self->spinlock, flags);
@@ -356,7 +352,7 @@ static int ircomm_tty_block_til_ready(struct ircomm_tty_cb *self,
 		}
 		
 		IRDA_DEBUG(1, "%s(%d):block_til_ready blocking on %s open_count=%d\n",
-		      __FILE__,__LINE__, tty->driver.name, self->open_count );
+		      __FILE__,__LINE__, tty->driver->name, self->open_count );
 		
 		schedule();
 	}
@@ -373,7 +369,7 @@ static int ircomm_tty_block_til_ready(struct ircomm_tty_cb *self,
 	self->blocked_open--;
 	
 	IRDA_DEBUG(1, "%s(%d):block_til_ready after blocking on %s open_count=%d\n",
-	      __FILE__,__LINE__, tty->driver.name, self->open_count);
+	      __FILE__,__LINE__, tty->driver->name, self->open_count);
 			 
 	if (!retval)
 		self->flags |= ASYNC_NORMAL_ACTIVE;
@@ -398,7 +394,7 @@ static int ircomm_tty_open(struct tty_struct *tty, struct file *filp)
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
 	MOD_INC_USE_COUNT;
-	line = minor(tty->device) - tty->driver.minor_start;
+	line = tty->index;
 	if ((line < 0) || (line >= IRCOMM_TTY_PORTS)) {
 		MOD_DEC_USE_COUNT;
 		return -ENODEV;
@@ -451,7 +447,7 @@ static int ircomm_tty_open(struct tty_struct *tty, struct file *filp)
 	self->tty = tty;
 	spin_unlock_irqrestore(&self->spinlock, flags);
 
-	IRDA_DEBUG(1, "%s(), %s%d, count = %d\n", __FUNCTION__ , tty->driver.name, 
+	IRDA_DEBUG(1, "%s(), %s%d, count = %d\n", __FUNCTION__ , tty->driver->name, 
 		   self->line, self->open_count);
 
 	/* Not really used by us, but lets do it anyway */
@@ -592,8 +588,8 @@ static void ircomm_tty_close(struct tty_struct *tty, struct file *filp)
 
 	ircomm_tty_shutdown(self);
 
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 

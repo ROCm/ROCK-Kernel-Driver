@@ -52,6 +52,7 @@
 
 #include <linux/fcntl.h>        /* O_ACCMODE */
 #include <linux/hdreg.h>  /* HDIO_GETGEO */
+#include <linux/devfs_fs_kernel.h>
 
 #include <linux/umem.h>
 

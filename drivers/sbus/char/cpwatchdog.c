@@ -325,13 +325,11 @@ static int wd_open(struct inode *inode, struct file *f)
 		wd_dev.initialized = 1;
 	}
 
-	MOD_INC_USE_COUNT;
 	return(0);
 }
 
 static int wd_release(struct inode *inode, struct file *file)
 {
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

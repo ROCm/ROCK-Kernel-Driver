@@ -623,7 +623,7 @@ static void mcd_transfer(void)
  * Just take the interrupt and clear out the status reg.
  */
 
-static void mcd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t mcd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int st;
 
@@ -635,6 +635,7 @@ static void mcd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		if ((st & 0xFF) != 0xFF)
 			mcd_error = st ? st & 0xFF : -1;
 	}
+	return IRQ_HANDLED;
 }
 
 

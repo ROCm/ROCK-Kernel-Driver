@@ -718,7 +718,7 @@ EXPORT_SYMBOL(z8530_nop);
  *	channel). c->lock for both channels points to dev->lock
  */
 
-void z8530_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+irqreturn_t z8530_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct z8530_dev *dev=dev_id;
 	u8 intr;
@@ -729,7 +729,7 @@ void z8530_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if(locker)
 	{
 		printk(KERN_ERR "IRQ re-enter\n");
-		return;
+		return IRQ_NONE;
 	}
 	locker=1;
 
@@ -775,6 +775,7 @@ void z8530_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		printk(KERN_ERR "%s: interrupt jammed - abort(0x%X)!\n", dev->name, intr);
 	/* Ok all done */
 	locker=0;
+	return IRQ_HANDLED;
 }
 
 EXPORT_SYMBOL(z8530_interrupt);

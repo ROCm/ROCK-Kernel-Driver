@@ -94,7 +94,7 @@
 #define 	UART_MCR_AFE		0x20
 #define 	UART_LSR_SPECIAL	0x1E
 
-#define PORTNO(x)		(minor((x)->device) - (x)->driver.minor_start)
+#define PORTNO(x)		((x)->index)
 
 #define RELEVANT_IFLAG(iflag)	(iflag & (IGNBRK|BRKINT|IGNPAR|PARMRK|INPCK))
 
@@ -348,7 +348,7 @@ static void mxser_set_termios(struct tty_struct *, struct termios *);
 static void mxser_stop(struct tty_struct *);
 static void mxser_start(struct tty_struct *);
 static void mxser_hangup(struct tty_struct *);
-static void mxser_interrupt(int, void *, struct pt_regs *);
+static irqreturn_t mxser_interrupt(int, void *, struct pt_regs *);
 static inline void mxser_receive_chars(struct mxser_struct *, int *);
 static inline void mxser_transmit_chars(struct mxser_struct *);
 static inline void mxser_check_modem_status(struct mxser_struct *, int);
@@ -758,7 +758,7 @@ static int mxser_open(struct tty_struct *tty, struct file *filp)
 		return (retval);
 
 	if ((info->count == 1) && (info->flags & ASYNC_SPLIT_TERMIOS)) {
-		if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+		if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 			*tty->termios = info->normal_termios;
 		else
 			*tty->termios = info->callout_termios;
@@ -862,8 +862,8 @@ static void mxser_close(struct tty_struct *tty, struct file *filp)
 		}
 	}
 	mxser_shutdown(info);
-	if (tty->driver.flush_buffer)
-		tty->driver.flush_buffer(tty);
+	if (tty->driver->flush_buffer)
+		tty->driver->flush_buffer(tty);
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 	tty->closing = 0;
@@ -1362,13 +1362,14 @@ void mxser_hangup(struct tty_struct *tty)
 /*
  * This is the serial driver's generic interrupt routine
  */
-static void mxser_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t mxser_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int status, i;
 	struct mxser_struct *info;
 	struct mxser_struct *port;
 	int max, irqbits, bits, msr;
 	int pass_counter = 0;
+	int handled = 0;
 
 	port = 0;
 	for (i = 0; i < MXSER_BOARDS; i++) {
@@ -1379,15 +1380,16 @@ static void mxser_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	if (i == MXSER_BOARDS)
-		return;
+		return IRQ_NONE;
 	if (port == 0)
-		return;
+		return IRQ_NONE;
 	max = mxser_numports[mxsercfg[i].board_type];
 
 	while (1) {
 		irqbits = inb(port->vector) & port->vectormask;
 		if (irqbits == port->vectormask)
 			break;
+		handled = 1;
 		for (i = 0, bits = 1; i < max; i++, irqbits |= bits, bits <<= 1) {
 			if (irqbits == port->vectormask)
 				break;
@@ -1417,6 +1419,7 @@ static void mxser_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			break;	/* Prevent infinite loops */
 		}
 	}
+	return IRQ_RETVAL(handled);
 }
 
 static inline void mxser_receive_chars(struct mxser_struct *info,
@@ -1574,7 +1577,7 @@ static int mxser_block_til_ready(struct tty_struct *tty, struct file *filp,
 	 * If this is a callout device, then just make sure the normal
 	 * device isn't being used.
 	 */
-	if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) {
+	if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
 		if (info->flags & ASYNC_NORMAL_ACTIVE)
 			return (-EBUSY);
 		if ((info->flags & ASYNC_CALLOUT_ACTIVE) &&

@@ -149,11 +149,6 @@
 #include <asm/dma.h>
 #include <asm/uaccess.h>
 
- /*
-  * for crizappy mmap()
-  */
-#include <linux/wrapper.h>
-
 #include "maestro3.h"
 
 #define M_DEBUG 1
@@ -1939,7 +1934,7 @@ allocate_dmabuf(struct pci_dev *pci_dev, struct dmabuf *db)
 
         pend = virt_to_page(db->rawbuf + (PAGE_SIZE << order) - 1);
         for (page = virt_to_page(db->rawbuf); page <= pend; page++)
-            mem_map_reserve(page);
+            SetPageReserved(page);
     }
 
 
@@ -1970,7 +1965,7 @@ free_dmabuf(struct pci_dev *pci_dev, struct dmabuf *db)
         struct page *page, *pend;
         pend = virt_to_page(db->rawbuf + (PAGE_SIZE << db->buforder) - 1);
         for (page = virt_to_page(db->rawbuf); page <= pend; page++)
-            mem_map_unreserve(page);
+            ClearPageReserved(page);
     }
 
 

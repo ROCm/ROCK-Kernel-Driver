@@ -146,6 +146,8 @@ static int  whiteheat_write		(struct usb_serial_port *port, int from_user, const
 static int  whiteheat_write_room	(struct usb_serial_port *port);
 static int  whiteheat_ioctl		(struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg);
 static void whiteheat_set_termios	(struct usb_serial_port *port, struct termios * old);
+static int  whiteheat_tiocmget		(struct usb_serial_port *port, struct file *file);
+static int  whiteheat_tiocmset		(struct usb_serial_port *port, struct file *file, unsigned int set, unsigned int clear);
 static void whiteheat_break_ctl		(struct usb_serial_port *port, int break_state);
 static int  whiteheat_chars_in_buffer	(struct usb_serial_port *port);
 static void whiteheat_throttle		(struct usb_serial_port *port);
@@ -184,6 +186,8 @@ static struct usb_serial_device_type whiteheat_device = {
 	.ioctl =		whiteheat_ioctl,
 	.set_termios =		whiteheat_set_termios,
 	.break_ctl =		whiteheat_break_ctl,
+	.tiocmget =		whiteheat_tiocmget,
+	.tiocmset =		whiteheat_tiocmset,
 	.chars_in_buffer =	whiteheat_chars_in_buffer,
 	.throttle =		whiteheat_throttle,
 	.unthrottle =		whiteheat_unthrottle,
@@ -646,8 +650,8 @@ static void whiteheat_close(struct usb_serial_port *port, struct file * filp)
 	}
 */
 
-	if (port->tty->driver.flush_buffer)
-		port->tty->driver.flush_buffer(port->tty);
+	if (port->tty->driver->flush_buffer)
+		port->tty->driver->flush_buffer(port->tty);
 	if (port->tty->ldisc.flush_buffer)
 		port->tty->ldisc.flush_buffer(port->tty);
 
@@ -767,73 +771,53 @@ static int whiteheat_write_room(struct usb_serial_port *port)
 }
 
 
-static int whiteheat_ioctl (struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg)
+static int whiteheat_tiocmget (struct usb_serial_port *port, struct file *file)
 {
 	struct whiteheat_private *info = usb_get_serial_port_data(port);
 	unsigned int modem_signals = 0;
+
+	dbg("%s - port %d", __FUNCTION__, port->number);
+
+	firm_get_dtr_rts(port);
+	if (info->mcr & UART_MCR_DTR)
+		modem_signals |= TIOCM_DTR;
+	if (info->mcr & UART_MCR_RTS)
+		modem_signals |= TIOCM_RTS;
+
+	return modem_signals;
+}
+
+
+static int whiteheat_tiocmset (struct usb_serial_port *port, struct file *file,
+			       unsigned int set, unsigned int clear)
+{
+	struct whiteheat_private *info = usb_get_serial_port_data(port);
+
+	dbg("%s - port %d", __FUNCTION__, port->number);
+
+	if (set & TIOCM_RTS)
+		info->mcr |= UART_MCR_RTS;
+	if (set & TIOCM_DTR)
+		info->mcr |= UART_MCR_DTR;
+
+	if (clear & TIOCM_RTS)
+		info->mcr &= ~UART_MCR_RTS;
+	if (clear & TIOCM_DTR)
+		info->mcr &= ~UART_MCR_DTR;
+
+	firm_set_dtr(port, info->mcr & UART_MCR_DTR);
+	firm_set_rts(port, info->mcr & UART_MCR_RTS);
+	return 0;
+}
+
+
+static int whiteheat_ioctl (struct usb_serial_port *port, struct file * file, unsigned int cmd, unsigned long arg)
+{
 	struct serial_struct serstruct;
 
 	dbg("%s - port %d, cmd 0x%.4x", __FUNCTION__, port->number, cmd);
 
 	switch (cmd) {
-		case TIOCMGET:
-			firm_get_dtr_rts(port);
-			if (info->mcr & UART_MCR_DTR)
-				modem_signals |= TIOCM_DTR;
-			if (info->mcr & UART_MCR_RTS)
-				modem_signals |= TIOCM_RTS;
-			
-			if (copy_to_user((unsigned int *)arg, &modem_signals, sizeof(unsigned int)))
-				return -EFAULT;
-
-			break;
-
-		case TIOCMSET:
-			if (copy_from_user(&modem_signals, (unsigned int *)arg, sizeof(unsigned int)))
-				return -EFAULT;
-
-			if (modem_signals & TIOCM_DTR)
-				info->mcr |= UART_MCR_DTR;
-			else
-				info->mcr &= ~UART_MCR_DTR;
-			if (modem_signals & TIOCM_RTS)
-				info->mcr |= UART_MCR_RTS;
-			else
-				info->mcr &= ~UART_MCR_RTS;
-
-			firm_set_dtr(port, info->mcr & UART_MCR_DTR);
-			firm_set_rts(port, info->mcr & UART_MCR_RTS);
-
-			break;
-
-		case TIOCMBIS:
-			if (copy_from_user(&modem_signals, (unsigned int *)arg, sizeof(unsigned int)))
-				return -EFAULT;
-
-			if (modem_signals & TIOCM_DTR)
-				info->mcr |= UART_MCR_DTR;
-			if (modem_signals & TIOCM_RTS)
-				info->mcr |= UART_MCR_RTS;
-
-			firm_set_dtr(port, info->mcr & UART_MCR_DTR);
-			firm_set_rts(port, info->mcr & UART_MCR_RTS);
-
-			break;
-
-		case TIOCMBIC:
-			if (copy_from_user(&modem_signals, (unsigned int *)arg, sizeof(unsigned int)))
-				return -EFAULT;
-
-			if (modem_signals & TIOCM_DTR)
-				info->mcr &= ~UART_MCR_DTR;
-			if (modem_signals & TIOCM_RTS)
-				info->mcr &= ~UART_MCR_RTS;
-
-			firm_set_dtr(port, info->mcr & UART_MCR_DTR);
-			firm_set_rts(port, info->mcr & UART_MCR_RTS);
-
-			break;
-
 		case TIOCGSERIAL:
 			memset(&serstruct, 0, sizeof(serstruct));
 			serstruct.type = PORT_16654;
@@ -864,10 +848,10 @@ static int whiteheat_ioctl (struct usb_serial_port *port, struct file * file, un
 			break;
 
 		default:
-			return -ENOIOCTLCMD;
+			break;
 	}
 
-	return 0;
+	return -ENOIOCTLCMD;
 }
 
 

@@ -19,7 +19,6 @@
 #define MAJOR_NR MTD_BLOCK_MAJOR
 #define DEVICE_NAME "mtdblock"
 #define DEVICE_NR(device) (device)
-#define LOCAL_END_REQUEST
 #include <linux/blk.h>
 #include <linux/devfs_fs_kernel.h>
 

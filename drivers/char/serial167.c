@@ -237,30 +237,30 @@ void my_udelay (long us)
 }
 
 static inline int
-serial_paranoia_check(struct cyclades_port *info, kdev_t device,
+serial_paranoia_check(struct cyclades_port *info, char *name,
 		      const char *routine)
 {
 #ifdef SERIAL_PARANOIA_CHECK
     static const char *badmagic =
-	"Warning: bad magic number for serial struct (%d, %d) in %s\n";
+	"Warning: bad magic number for serial struct (%s) in %s\n";
     static const char *badinfo =
-	"Warning: null cyclades_port for (%d, %d) in %s\n";
+	"Warning: null cyclades_port for (%s) in %s\n";
     static const char *badrange =
-	"Warning: cyclades_port out of range for (%d, %d) in %s\n";
+	"Warning: cyclades_port out of range for (%s) in %s\n";
 
     if (!info) {
-	printk(badinfo, major(device), minor(device), routine);
+	printk(badinfo, name, routine);
 	return 1;
     }
 
     if( (long)info < (long)(&cy_port[0])
     || (long)(&cy_port[NR_PORTS]) < (long)info ){
-	printk(badrange, major(device), minor(device), routine);
+	printk(badrange, name, routine);
 	return 1;
     }
 
     if (info->magic != CYCLADES_MAGIC) {
-	printk(badmagic, major(device), minor(device), routine);
+	printk(badmagic, name, routine);
 	return 1;
     }
 #endif
@@ -339,10 +339,10 @@ cy_stop(struct tty_struct *tty)
   unsigned long flags;
 
 #ifdef SERIAL_DEBUG_OTHER
-    printk("cy_stop ttyS%d\n", info->line); /* */
+    printk("cy_stop %s\n", tty->name); /* */
 #endif
 
-    if (serial_paranoia_check(info, tty->device, "cy_stop"))
+    if (serial_paranoia_check(info, tty->name, "cy_stop"))
 	return;
 	
     channel = info->line;
@@ -364,10 +364,10 @@ cy_start(struct tty_struct *tty)
   unsigned long flags;
 
 #ifdef SERIAL_DEBUG_OTHER
-    printk("cy_start ttyS%d\n", info->line); /* */
+    printk("cy_start %s\n", tty->name); /* */
 #endif
 
-    if (serial_paranoia_check(info, tty->device, "cy_start"))
+    if (serial_paranoia_check(info, tty->name, "cy_start"))
 	return;
 	
     channel = info->line;
@@ -1171,10 +1171,10 @@ cy_put_char(struct tty_struct *tty, unsigned char ch)
   unsigned long flags;
 
 #ifdef SERIAL_DEBUG_IO
-    printk("cy_put_char ttyS%d(0x%02x)\n", info->line, ch);
+    printk("cy_put_char %s(0x%02x)\n", tty->name, ch);
 #endif
 
-    if (serial_paranoia_check(info, tty->device, "cy_put_char"))
+    if (serial_paranoia_check(info, tty->name, "cy_put_char"))
 	return;
 
     if (!tty || !info->xmit_buf)
@@ -1202,10 +1202,10 @@ cy_flush_chars(struct tty_struct *tty)
   int channel;
 				
 #ifdef SERIAL_DEBUG_IO
-    printk("cy_flush_chars ttyS%d\n", info->line); /* */
+    printk("cy_flush_chars %s\n", tty->name); /* */
 #endif
 
-    if (serial_paranoia_check(info, tty->device, "cy_flush_chars"))
+    if (serial_paranoia_check(info, tty->name, "cy_flush_chars"))
 	return;
 
     if (info->xmit_cnt <= 0 || tty->stopped
@@ -1236,10 +1236,10 @@ cy_write(struct tty_struct * tty, int from_user,
   int c, total = 0;
 
 #ifdef SERIAL_DEBUG_IO
-    printk("cy_write ttyS%d\n", info->line); /* */
+    printk("cy_write %s\n", tty->name); /* */
 #endif
 
-    if (serial_paranoia_check(info, tty->device, "cy_write")){
+    if (serial_paranoia_check(info, tty->name, "cy_write")){
 	return 0;
     }
 	
@@ -1312,10 +1312,10 @@ cy_write_room(struct tty_struct *tty)
   int	ret;
 				
 #ifdef SERIAL_DEBUG_IO
-    printk("cy_write_room ttyS%d\n", info->line); /* */
+    printk("cy_write_room %s\n", tty->name); /* */
 #endif
 
-    if (serial_paranoia_check(info, tty->device, "cy_write_room"))
+    if (serial_paranoia_check(info, tty->name, "cy_write_room"))
 	return 0;
     ret = PAGE_SIZE - info->xmit_cnt - 1;
     if (ret < 0)
@@ -1330,10 +1330,10 @@ cy_chars_in_buffer(struct tty_struct *tty)
   struct cyclades_port *info = (struct cyclades_port *)tty->driver_data;
 				
 #ifdef SERIAL_DEBUG_IO
-    printk("cy_chars_in_buffer ttyS%d %d\n", info->line, info->xmit_cnt); /* */
+    printk("cy_chars_in_buffer %s %d\n", tty->name, info->xmit_cnt); /* */
 #endif
 
-    if (serial_paranoia_check(info, tty->device, "cy_chars_in_buffer"))
+    if (serial_paranoia_check(info, tty->name, "cy_chars_in_buffer"))
 	return 0;
 
     return info->xmit_cnt;
@@ -1347,10 +1347,10 @@ cy_flush_buffer(struct tty_struct *tty)
   unsigned long flags;
 				
 #ifdef SERIAL_DEBUG_IO
-    printk("cy_flush_buffer ttyS%d\n", info->line); /* */
+    printk("cy_flush_buffer %s\n", tty->name); /* */
 #endif
 
-    if (serial_paranoia_check(info, tty->device, "cy_flush_buffer"))
+    if (serial_paranoia_check(info, tty->name, "cy_flush_buffer"))
 	return;
     local_irq_save(flags);
 	info->xmit_cnt = info->xmit_head = info->xmit_tail = 0;
@@ -1379,10 +1379,10 @@ cy_throttle(struct tty_struct * tty)
 	
     printk("throttle %s: %d....\n", tty_name(tty, buf),
 	   tty->ldisc.chars_in_buffer(tty));
-    printk("cy_throttle ttyS%d\n", info->line);
+    printk("cy_throttle %s\n", tty->name);
 #endif
 
-    if (serial_paranoia_check(info, tty->device, "cy_nthrottle")){
+    if (serial_paranoia_check(info, tty->name, "cy_nthrottle")){
 	    return;
     }
 
@@ -1415,10 +1415,10 @@ cy_unthrottle(struct tty_struct * tty)
 	
     printk("throttle %s: %d....\n", tty_name(tty, buf),
 	   tty->ldisc.chars_in_buffer(tty));
-    printk("cy_unthrottle ttyS%d\n", info->line);
+    printk("cy_unthrottle %s\n", tty->name);
 #endif
 
-    if (serial_paranoia_check(info, tty->device, "cy_nthrottle")){
+    if (serial_paranoia_check(info, tty->name, "cy_nthrottle")){
 	    return;
     }
 
@@ -1743,7 +1743,7 @@ cy_ioctl(struct tty_struct *tty, struct file * file,
   int ret_val = 0;
 
 #ifdef SERIAL_DEBUG_OTHER
-    printk("cy_ioctl ttyS%d, cmd = %x arg = %lx\n", info->line, cmd, arg); /* */
+    printk("cy_ioctl %s, cmd = %x arg = %lx\n", tty->name, cmd, arg); /* */
 #endif
 
     switch (cmd) {
@@ -1836,7 +1836,7 @@ cy_set_termios(struct tty_struct *tty, struct termios * old_termios)
   struct cyclades_port *info = (struct cyclades_port *)tty->driver_data;
 
 #ifdef SERIAL_DEBUG_OTHER
-    printk("cy_set_termios ttyS%d\n", info->line);
+    printk("cy_set_termios %s\n", tty->name);
 #endif
 
     if (tty->termios->c_cflag == old_termios->c_cflag)
@@ -1865,15 +1865,15 @@ cy_close(struct tty_struct * tty, struct file * filp)
 
 /* CP('C'); */
 #ifdef SERIAL_DEBUG_OTHER
-    printk("cy_close ttyS%d\n", info->line);
+    printk("cy_close %s\n", tty->name);
 #endif
 
     if (!info
-    || serial_paranoia_check(info, tty->device, "cy_close")){
+    || serial_paranoia_check(info, tty->name, "cy_close")){
         return;
     }
 #ifdef SERIAL_DEBUG_OPEN
-    printk("cy_close ttyS%d, count = %d\n", info->line, info->count);
+    printk("cy_close %s, count = %d\n", tty->name, info->count);
 #endif
 
     if ((tty->count == 1) && (info->count != 1)) {
@@ -1913,8 +1913,8 @@ cy_close(struct tty_struct * tty, struct file * filp)
     if (info->flags & ASYNC_INITIALIZED)
 	tty_wait_until_sent(tty, 3000); /* 30 seconds timeout */
     shutdown(info);
-    if (tty->driver.flush_buffer)
-	tty->driver.flush_buffer(tty);
+    if (tty->driver->flush_buffer)
+	tty->driver->flush_buffer(tty);
     if (tty->ldisc.flush_buffer)
 	tty->ldisc.flush_buffer(tty);
     info->event = 0;
@@ -1954,10 +1954,10 @@ cy_hangup(struct tty_struct *tty)
   struct cyclades_port * info = (struct cyclades_port *)tty->driver_data;
 	
 #ifdef SERIAL_DEBUG_OTHER
-    printk("cy_hangup ttyS%d\n", info->line); /* */
+    printk("cy_hangup %s\n", tty->name); /* */
 #endif
 
-    if (serial_paranoia_check(info, tty->device, "cy_hangup"))
+    if (serial_paranoia_check(info, tty->name, "cy_hangup"))
 	return;
     
     shutdown(info);
@@ -2008,7 +2008,7 @@ block_til_ready(struct tty_struct *tty, struct file * filp,
      * If this is a callout device, then just make sure the normal
      * device isn't being used.
      */
-    if (tty->driver.subtype == SERIAL_TYPE_CALLOUT) {
+    if (tty->driver->subtype == SERIAL_TYPE_CALLOUT) {
 	if (info->flags & ASYNC_NORMAL_ACTIVE){
 	    return -EBUSY;
 	}
@@ -2048,8 +2048,8 @@ block_til_ready(struct tty_struct *tty, struct file * filp,
     retval = 0;
     add_wait_queue(&info->open_wait, &wait);
 #ifdef SERIAL_DEBUG_OPEN
-    printk("block_til_ready before block: ttyS%d, count = %d\n",
-	   info->line, info->count);/**/
+    printk("block_til_ready before block: %s, count = %d\n",
+	   tty->name, info->count);/**/
 #endif
     info->count--;
 #ifdef SERIAL_DEBUG_COUNT
@@ -2098,8 +2098,8 @@ block_til_ready(struct tty_struct *tty, struct file * filp,
 	    break;
 	}
 #ifdef SERIAL_DEBUG_OPEN
-	printk("block_til_ready blocking: ttyS%d, count = %d\n",
-	       info->line, info->count);/**/
+	printk("block_til_ready blocking: %s, count = %d\n",
+	       tty->name, info->count);/**/
 #endif
 	schedule();
     }
@@ -2113,8 +2113,8 @@ block_til_ready(struct tty_struct *tty, struct file * filp,
     }
     info->blocked_open--;
 #ifdef SERIAL_DEBUG_OPEN
-    printk("block_til_ready after blocking: ttyS%d, count = %d\n",
-	   info->line, info->count);/**/
+    printk("block_til_ready after blocking: %s, count = %d\n",
+	   tty->name, info->count);/**/
 #endif
     if (retval)
 	    return retval;
@@ -2133,7 +2133,7 @@ cy_open(struct tty_struct *tty, struct file * filp)
   int retval, line;
 
 /* CP('O'); */
-    line = minor(tty->device) - tty->driver.minor_start;
+    line = tty->index;
     if ((line < 0) || (NR_PORTS <= line)){
         return -ENODEV;
     }
@@ -2142,13 +2142,13 @@ cy_open(struct tty_struct *tty, struct file * filp)
         return -ENODEV;
     }
 #ifdef SERIAL_DEBUG_OTHER
-    printk("cy_open ttyS%d\n", info->line); /* */
+    printk("cy_open %s\n", tty->name); /* */
 #endif
-    if (serial_paranoia_check(info, tty->device, "cy_open")){
+    if (serial_paranoia_check(info, tty->name, "cy_open")){
         return -ENODEV;
     }
 #ifdef SERIAL_DEBUG_OPEN
-    printk("cy_open ttyS%d, count = %d\n", info->line, info->count);/**/
+    printk("cy_open %s, count = %d\n", tty->name, info->count);/**/
 #endif
     info->count++;
 #ifdef SERIAL_DEBUG_COUNT
@@ -2165,7 +2165,7 @@ cy_open(struct tty_struct *tty, struct file * filp)
     }
 
     if ((info->count == 1) && (info->flags & ASYNC_SPLIT_TERMIOS)) {
-	if (tty->driver.subtype == SERIAL_TYPE_NORMAL)
+	if (tty->driver->subtype == SERIAL_TYPE_NORMAL)
 	    *tty->termios = info->normal_termios;
 	else 
 	    *tty->termios = info->callout_termios;
@@ -2396,7 +2396,7 @@ scrn[1] = '\0';
     memset(&cy_serial_driver, 0, sizeof(struct tty_driver));
     cy_serial_driver.magic = TTY_DRIVER_MAGIC;
 #ifdef CONFIG_DEVFS_FS
-    cy_serial_driver.name = "tts/%d";
+    cy_serial_driver.name = "tts/";
 #else
     cy_serial_driver.name = "ttyS";
 #endif
@@ -2435,7 +2435,7 @@ scrn[1] = '\0';
      */
     cy_callout_driver = cy_serial_driver;
 #ifdef CONFIG_DEVFS_FS
-    cy_callout_driver.name = "cua/%d";
+    cy_callout_driver.name = "cua/";
 #else
     cy_callout_driver.name = "cua";
 #endif
@@ -2814,9 +2814,10 @@ void serial167_console_write(struct console *co, const char *str, unsigned count
 	local_irq_restore(flags);
 }
 
-static kdev_t serial167_console_device(struct console *c)
+static struct tty_driver *serial167_console_device(struct console *c, int *index)
 {
-	return mk_kdev(TTY_MAJOR, 64 + c->index);
+	*index = c->index;
+	return &cy_serial_driver;
 }
 
 

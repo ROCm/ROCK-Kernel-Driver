@@ -734,7 +734,6 @@ struct ff_effect {
  * In-kernel definitions.
  */
 
-#include <linux/devfs_fs_kernel.h>
 #include <linux/fs.h>
 #include <linux/timer.h>
 

@@ -89,7 +89,6 @@
 #include <linux/bitops.h>
 #include <linux/init.h>
 #include <linux/poll.h>
-#include <linux/wrapper.h>
 #include <linux/ac97_codec.h>
 
 #include <asm/io.h>
@@ -1196,7 +1195,7 @@ static int alloc_dmabuf(struct cs_state *state)
 
 	// 2. mark each physical page in range as 'reserved'.
 	for (map = virt_to_page(dmabuf->rawbuf); map <= mapend; map++)
-		cs4x_mem_map_reserve(map);
+		SetPageReserved(map);
 
 	CS_DBGOUT(CS_PARMS, 9, printk("cs46xx: alloc_dmabuf(): allocated %ld (order = %d) bytes at %p\n",
 	       PAGE_SIZE << order, order, rawbuf) );
@@ -1233,7 +1232,7 @@ static int alloc_dmabuf(struct cs_state *state)
 
 	// 2. mark each physical page in range as 'reserved'.
 	for (map = virt_to_page(dmabuf->tmpbuff); map <= mapend; map++)
-		cs4x_mem_map_reserve(map);
+		SetPageReserved(map);
 	return 0;
 }
 
@@ -1248,7 +1247,7 @@ static void dealloc_dmabuf(struct cs_state *state)
 		mapend = virt_to_page(dmabuf->rawbuf + 
 				(PAGE_SIZE << dmabuf->buforder) - 1);
 		for (map = virt_to_page(dmabuf->rawbuf); map <= mapend; map++)
-			cs4x_mem_map_unreserve(map);
+			cs4x_ClearPageReserved(map);
 		free_dmabuf(state->card, dmabuf);
 	}
 
@@ -1257,7 +1256,7 @@ static void dealloc_dmabuf(struct cs_state *state)
 		mapend = virt_to_page(dmabuf->tmpbuff +
 				(PAGE_SIZE << dmabuf->buforder_tmpbuff) - 1);
 		for (map = virt_to_page(dmabuf->tmpbuff); map <= mapend; map++)
-			cs4x_mem_map_unreserve(map);
+			cs4x_ClearPageReserved(map);
 		free_dmabuf2(state->card, dmabuf);
 	}
 

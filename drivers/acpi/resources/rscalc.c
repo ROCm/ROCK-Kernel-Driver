@@ -349,7 +349,7 @@ acpi_rs_get_list_length (
 			buffer = byte_stream_buffer;
 			++buffer;
 
-			ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+			ACPI_MOVE_16_TO_16 (&temp16, buffer);
 			bytes_consumed = temp16 + 3;
 
 			/*
@@ -390,7 +390,7 @@ acpi_rs_get_list_length (
 			buffer = byte_stream_buffer;
 
 			++buffer;
-			ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+			ACPI_MOVE_16_TO_16 (&temp16, buffer);
 
 			bytes_consumed = temp16 + 3;
 
@@ -428,7 +428,7 @@ acpi_rs_get_list_length (
 			buffer = byte_stream_buffer;
 
 			++buffer;
-			ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+			ACPI_MOVE_16_TO_16 (&temp16, buffer);
 
 			bytes_consumed = temp16 + 3;
 
@@ -466,7 +466,7 @@ acpi_rs_get_list_length (
 			buffer = byte_stream_buffer;
 
 			++buffer;
-			ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+			ACPI_MOVE_16_TO_16 (&temp16, buffer);
 
 			bytes_consumed = temp16 + 3;
 
@@ -504,7 +504,7 @@ acpi_rs_get_list_length (
 			buffer = byte_stream_buffer;
 
 			++buffer;
-			ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+			ACPI_MOVE_16_TO_16 (&temp16, buffer);
 
 			bytes_consumed = temp16 + 3;
 
@@ -573,7 +573,7 @@ acpi_rs_get_list_length (
 			/*
 			 * Look at the number of bits set
 			 */
-			ACPI_MOVE_UNALIGNED16_TO_16 (&temp16, buffer);
+			ACPI_MOVE_16_TO_16 (&temp16, buffer);
 
 			for (index = 0; index < 16; index++) {
 				if (temp16 & 0x1) {

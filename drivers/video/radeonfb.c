@@ -2237,7 +2237,6 @@ static int __devinit radeon_set_fbinfo (struct radeonfb_info *rinfo)
 	info->currcon = -1;
 	info->par = rinfo;
 	info->pseudo_palette = rinfo->pseudo_palette;
-        info->node = NODEV;
         info->flags = FBINFO_FLAG_DEFAULT;
         info->fbops = &radeonfb_ops;
         info->display_fg = NULL;

@@ -1425,7 +1425,6 @@ tgafb_pci_register(struct pci_dev *pdev, const struct pci_device_id *ent)
 	pci_read_config_byte(pdev, PCI_REVISION_ID, &all->par.tga_chip_rev);
 
 	/* Setup framebuffer.  */
-	all->info.node = NODEV;
 	all->info.flags = FBINFO_FLAG_DEFAULT;
 	all->info.fbops = &tgafb_ops;
 	all->info.screen_base = (char *) all->par.tga_fb_base;
@@ -1465,7 +1464,7 @@ tgafb_pci_register(struct pci_dev *pdev, const struct pci_device_id *ent)
 	       pdev->bus->number, PCI_SLOT(pdev->devfn),
 	       PCI_FUNC(pdev->devfn));
 	printk(KERN_INFO "fb%d: %s frame buffer device at 0x%lx\n",
-	       minor(all->info.node), all->info.fix.id, bar0_start);
+	       all->info.node, all->info.fix.id, bar0_start);
 
 	return 0;
 

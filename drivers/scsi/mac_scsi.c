@@ -253,16 +253,16 @@ int macscsi_detect(Scsi_Host_Template * tpnt)
 
     ((struct NCR5380_hostdata *)instance->hostdata)->ctrl = 0;
 
-    if (instance->irq != IRQ_NONE)
+    if (instance->irq != SCSI_IRQ_NONE)
 	if (request_irq(instance->irq, NCR5380_intr, IRQ_FLG_SLOW, 
 		"ncr5380", NCR5380_intr)) {
 	    printk(KERN_WARNING "scsi%d: IRQ%d not free, interrupts disabled\n",
 		   instance->host_no, instance->irq);
-	    instance->irq = IRQ_NONE;
+	    instance->irq = SCSI_IRQ_NONE;
 	}
 
     printk(KERN_INFO "scsi%d: generic 5380 at port %lX irq", instance->host_no, instance->io_port);
-    if (instance->irq == IRQ_NONE)
+    if (instance->irq == SCSI_IRQ_NONE)
 	printk (KERN_INFO "s disabled");
     else
 	printk (KERN_INFO " %d", instance->irq);
@@ -277,7 +277,7 @@ int macscsi_detect(Scsi_Host_Template * tpnt)
 
 int macscsi_release (struct Scsi_Host *shpnt)
 {
-	if (shpnt->irq != IRQ_NONE)
+	if (shpnt->irq != SCSI_IRQ_NONE)
 		free_irq (shpnt->irq, NCR5380_intr);
 
 	return 0;

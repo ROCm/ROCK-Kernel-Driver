@@ -460,6 +460,9 @@ static void digi_set_termios( struct usb_serial_port *port,
 static void digi_break_ctl( struct usb_serial_port *port, int break_state );
 static int digi_ioctl( struct usb_serial_port *port, struct file *file,
 	unsigned int cmd, unsigned long arg );
+static int digi_tiocmget( struct usb_serial_port *port, struct file *file );
+static int digi_tiocmset( struct usb_serial_port *port, struct file *file,
+	unsigned int set, unsigned int clear );
 static int digi_write( struct usb_serial_port *port, int from_user,
 	const unsigned char *buf, int count );
 static void digi_write_bulk_callback( struct urb *urb, struct pt_regs *regs );
@@ -526,6 +529,8 @@ static struct usb_serial_device_type digi_acceleport_2_device = {
 	.ioctl =			digi_ioctl,
 	.set_termios =			digi_set_termios,
 	.break_ctl =			digi_break_ctl,
+	.tiocmget =			digi_tiocmget,
+	.tiocmset =			digi_tiocmset,
 	.attach =			digi_startup,
 	.shutdown =			digi_shutdown,
 };
@@ -551,6 +556,8 @@ static struct usb_serial_device_type digi_acceleport_4_device = {
 	.ioctl =			digi_ioctl,
 	.set_termios =			digi_set_termios,
 	.break_ctl =			digi_break_ctl,
+	.tiocmget =			digi_tiocmget,
+	.tiocmset =			digi_tiocmset,
 	.attach =			digi_startup,
 	.shutdown =			digi_shutdown,
 };
@@ -1211,39 +1218,46 @@ static void digi_break_ctl( struct usb_serial_port *port, int break_state )
 }
 
 
+static int digi_tiocmget( struct usb_serial_port *port, struct file *file )
+{
+	struct digi_port *priv = usb_get_serial_port_data(port);
+	unsigned int val;
+	unsigned long flags;
+
+	dbg("%s: TOP: port=%d", __FUNCTION__, priv->dp_port_num);
+
+	spin_lock_irqsave( &priv->dp_port_lock, flags );
+	val = priv->dp_modem_signals;
+	spin_unlock_irqrestore( &priv->dp_port_lock, flags );
+	return val;
+}
+
+
+static int digi_tiocmset( struct usb_serial_port *port, struct file *file,
+	unsigned int set, unsigned int clear )
+{
+	struct digi_port *priv = usb_get_serial_port_data(port);
+	unsigned int val;
+	unsigned long flags;
+
+	dbg("%s: TOP: port=%d", __FUNCTION__, priv->dp_port_num);
+
+	spin_lock_irqsave( &priv->dp_port_lock, flags );
+	val = (priv->dp_modem_signals & ~clear) | set;
+	spin_unlock_irqrestore( &priv->dp_port_lock, flags );
+	return digi_set_modem_signals( port, val, 1 );
+}
+
+
 static int digi_ioctl( struct usb_serial_port *port, struct file *file,
 	unsigned int cmd, unsigned long arg )
 {
 
 	struct digi_port *priv = usb_get_serial_port_data(port);
-	unsigned int val;
-	unsigned long flags = 0;
-
 
 dbg( "digi_ioctl: TOP: port=%d, cmd=0x%x", priv->dp_port_num, cmd );
 
 	switch (cmd) {
-
-	case TIOCMGET:
-		spin_lock_irqsave( &priv->dp_port_lock, flags );
-		val = priv->dp_modem_signals;
-		spin_unlock_irqrestore( &priv->dp_port_lock, flags );
-		if( copy_to_user((unsigned int *)arg, &val, sizeof(int)) )
-			return( -EFAULT );
-		return( 0 );
-
-	case TIOCMSET:
-	case TIOCMBIS:
-	case TIOCMBIC:
-		if( copy_from_user(&val, (unsigned int *)arg, sizeof(int)) )
-			return( -EFAULT );
-		spin_lock_irqsave( &priv->dp_port_lock, flags );
-		if( cmd == TIOCMBIS )
-			val = priv->dp_modem_signals | val;
-		else if( cmd == TIOCMBIC )
-			val = priv->dp_modem_signals & ~val;
-		spin_unlock_irqrestore( &priv->dp_port_lock, flags );
-		return( digi_set_modem_signals( port, val, 1 ) );
 
 	case TIOCMIWAIT:
 		/* wait for any of the 4 modem inputs (DCD,RI,DSR,CTS)*/
@@ -1565,8 +1579,8 @@ dbg( "digi_close: TOP: port=%d, open_count=%d", priv->dp_port_num, port->open_co
 	}
 
 	/* flush driver and line discipline buffers */
-	if( tty->driver.flush_buffer )
-		tty->driver.flush_buffer( tty );
+	if( tty->driver->flush_buffer )
+		tty->driver->flush_buffer( tty );
 	if( tty->ldisc.flush_buffer )
 		tty->ldisc.flush_buffer( tty );
 

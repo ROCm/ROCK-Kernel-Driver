@@ -623,10 +623,10 @@ static int diskstats_show(struct seq_file *s, void *v)
 }
 
 struct seq_operations diskstats_op = {
-	start:	diskstats_start,
-	next:	diskstats_next,
-	stop:	diskstats_stop,
-	show:	diskstats_show
+	.start	= diskstats_start,
+	.next	= diskstats_next,
+	.stop	= diskstats_stop,
+	.show	= diskstats_show
 };
 
 

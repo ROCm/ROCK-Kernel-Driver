@@ -159,8 +159,8 @@ riotopen(struct tty_struct * tty, struct file * filp)
 	*/
 	tty->driver_data = NULL;
         
-	SysPort = rio_minor (tty->device);
-	Modem   = rio_ismodem (tty->device);
+	SysPort = rio_minor(tty);
+	Modem   = rio_ismodem(tty);
 
 	if ( p->RIOFailed ) {
 		rio_dprintk (RIO_DEBUG_TTY, "System initialisation failed\n");
@@ -549,7 +549,7 @@ riotclose(void  *ptr)
 	else 
 		end_time = jiffies + MAX_SCHEDULE_TIMEOUT;
 
-	Modem = rio_ismodem(tty->device);
+	Modem = rio_ismodem(tty);
 #if 0
 	/* What F.CKING cache? Even then, a higly idle multiprocessor,
 	   system with large caches this won't work . Better find out when 
@@ -882,11 +882,7 @@ int RIOShortCommand(struct rio_info *p, struct Port *PortP,
 ** its all about.
 */
 int
-riotioctl(p, dev, cmd, arg)
-struct rio_info *		p;
-dev_t dev;
-register int cmd;
-register caddr_t arg;
+riotioctl(struct rio_info *p, struct tty_struct *tty, int cmd, caddr_t arg)
 {
 	register struct		Port *PortP;
 	register struct		ttystatics *tp;
@@ -898,8 +894,8 @@ register caddr_t arg;
 	short				vpix_cflag;
 	short				divisor;
 	int					baud;
-	uint				SysPort = dev;
-	int					Modem = rio_ismodem(dev);
+	uint				SysPort = rio_minor(tty);
+	int				Modem = rio_ismodem(tty);
 	int					ioctl_processed;
 
 	rio_dprintk (RIO_DEBUG_TTY, "port ioctl SysPort %d command 0x%x argument 0x%x %s\n",

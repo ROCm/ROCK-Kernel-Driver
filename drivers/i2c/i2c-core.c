@@ -618,8 +618,8 @@ int i2c_control(struct i2c_client *client,
  * ----------------------------------------------------
  */
 int i2c_probe(struct i2c_adapter *adapter,
-                   struct i2c_client_address_data *address_data,
-                   i2c_client_found_addr_proc *found_proc)
+	      struct i2c_client_address_data *address_data,
+	      int (*found_proc) (struct i2c_adapter *, int, int))
 {
 	int addr,i,found,err;
 	int adap_id = i2c_adapter_id(adapter);
@@ -644,7 +644,7 @@ int i2c_probe(struct i2c_adapter *adapter,
 			     (addr == address_data->force[i+1])) {
 				DEB2(printk(KERN_DEBUG "i2c-core.o: found force parameter for adapter %d, addr %04x\n",
 				            adap_id,addr));
-				if ((err = found_proc(adapter,addr,0,0)))
+				if ((err = found_proc(adapter,addr,0)))
 					return err;
 				found = 1;
 			}
@@ -732,7 +732,7 @@ int i2c_probe(struct i2c_adapter *adapter,
 		/* OK, so we really should examine this address. First check
 		   whether there is some client here at all! */
 		if (i2c_smbus_xfer(adapter,addr,0,0,0,I2C_SMBUS_QUICK,NULL) >= 0)
-			if ((err = found_proc(adapter,addr,0,-1)))
+			if ((err = found_proc(adapter,addr,-1)))
 				return err;
 	}
 	return 0;

@@ -35,6 +35,7 @@
 #include <linux/usb.h>
 #include "hid.h"
 #include <linux/hiddev.h>
+#include <linux/devfs_fs_kernel.h>
 
 #ifdef CONFIG_USB_DYNAMIC_MINORS
 #define HIDDEV_MINOR_BASE	0

@@ -768,7 +768,7 @@ static void mld_clear_delrec(struct inet6_dev *idev)
 		psf = pmc->mca_tomb;
 		pmc->mca_tomb = 0;
 		spin_unlock_bh(&pmc->mca_lock);
-		for (psf=pmc->mca_tomb; psf; psf=psf_next) {
+		for (; psf; psf=psf_next) {
 			psf_next = psf->sf_next;
 			kfree(psf);
 		}
@@ -1042,6 +1042,8 @@ int igmp6_event_query(struct sk_buff *skb)
 		mld_clear_delrec(idev);
 	} else if (len >= 28) {
 		max_delay = MLDV2_MRC(ntohs(mlh2->mrc))*(HZ/10);
+		if (!max_delay)
+			max_delay = 1;
 		idev->mc_maxdelay = max_delay;
 		if (mlh2->qrv)
 			idev->mc_qrv = mlh2->qrv;
@@ -2096,8 +2098,6 @@ static int ip6_mcf_read_proc(char *buffer, char **start, off_t offset,
 			unsigned long icount, xcount, i;
 
 			spin_lock_bh(&imc->mca_lock);
-			icount = imc->mca_sfcount[MCAST_INCLUDE];
-			xcount = imc->mca_sfcount[MCAST_EXCLUDE];
 			for (psf=imc->mca_sources; psf; psf=psf->sf_next) {
 				if (first) {
 					len += sprintf(buffer+len, "%3s %6s "
@@ -2119,36 +2119,6 @@ static int ip6_mcf_read_proc(char *buffer, char **start, off_t offset,
 				len += sprintf(buffer+len, " %6lu %6lu\n",
 					psf->sf_count[MCAST_INCLUDE],
 					psf->sf_count[MCAST_EXCLUDE]);
-				pos = begin+len;
-				if (pos < offset) {
-					len=0;
-					begin=pos;
-				}
-				if (pos > offset+length) {
-					spin_unlock_bh(&imc->mca_lock);
-					read_unlock_bh(&idev->lock);
-					in6_dev_put(idev);
-					goto done;
-				}
-				icount -= psf->sf_count[MCAST_INCLUDE];
-				xcount -= psf->sf_count[MCAST_EXCLUDE];
-			}
-			if (icount > 0 || xcount > 0) {
-				if (first) {
-					len += sprintf(buffer+len, "%3s %6s "
-						"%32s %32s %6s %6s\n", "Idx",
-						"Device", "Multicast Address",
-						"Source Address", "INC", "EXC");
-					first = 0;
-				}
-				len += sprintf(buffer+len,"%3d %6.6s ",
-					dev->ifindex, dev->name);
-
-				for (i=0; i<16; i++)
-					len += sprintf(buffer+len, "%02x",
-						imc->mca_addr.s6_addr[i]);
-				len += sprintf(buffer+len, " %32s %6lu %6lu\n",
-					"NONE", icount, xcount);
 				pos = begin+len;
 				if (pos < offset) {
 					len=0;

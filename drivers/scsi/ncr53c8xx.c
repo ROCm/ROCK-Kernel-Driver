@@ -115,15 +115,15 @@
 **==========================================================
 */
 
-#define LinuxVersionCode(v, p, s) (((v)<<16)+((p)<<8)+(s))
+#include <linux/version.h>
 
 #include <linux/module.h>
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/system.h>
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,3,17)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,17)
 #include <linux/spinlock.h>
-#elif LINUX_VERSION_CODE >= LinuxVersionCode(2,1,93)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
 #include <asm/spinlock.h>
 #endif
 #include <linux/delay.h>
@@ -140,10 +140,9 @@
 #include <linux/timer.h>
 #include <linux/stat.h>
 
-#include <linux/version.h>
 #include <linux/blk.h>
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,1,35)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,35)
 #include <linux/init.h>
 #endif
 
@@ -154,7 +153,7 @@
 #define	__initdata
 #endif
 
-#if LINUX_VERSION_CODE <= LinuxVersionCode(2,1,92)
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,1,92)
 #include <linux/bios32.h>
 #endif
 
@@ -205,7 +204,7 @@ typedef	u_long		vm_offset_t;
 **	Donnot compile integrity checking code for Linux-2.3.0 
 **	and above since SCSI data structures are not ready yet.
 */
-/* #if LINUX_VERSION_CODE < LinuxVersionCode(2,3,0) */
+/* #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0) */
 #if 0
 #define	SCSI_NCR_INTEGRITY_CHECKING
 #endif
@@ -1049,7 +1048,7 @@ struct ncb {
 					/*  when lcb is not allocated.	*/
 	Scsi_Cmnd	*done_list;	/* Commands waiting for done()  */
 					/* callback to be invoked.      */ 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,1,93)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
 	spinlock_t	smp_lock;	/* Lock for SMP threading       */
 #endif
 
@@ -3816,7 +3815,7 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 	instance->max_id	= np->maxwide ? 16 : 8;
 	instance->max_lun	= SCSI_NCR_MAX_LUN;
 #ifndef SCSI_NCR_IOMAPPED
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,3,29)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,29)
 	instance->base		= (unsigned long) np->reg;
 #else
 	instance->base		= (char *) np->reg;
@@ -3901,7 +3900,7 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 
 	if (request_irq(device->slot.irq, ncr53c8xx_intr,
 			((driver_setup.irqm & 0x10) ? 0 : SA_SHIRQ) |
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,2,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,2,0)
 			((driver_setup.irqm & 0x20) ? 0 : SA_INTERRUPT),
 #else
 			0,
@@ -9301,7 +9300,7 @@ printk("ncr53c8xx_proc_info: hostno=%d, func=%d\n", hostno, func);
 **
 **==========================================================
 */
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,3,27)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,27)
 static struct proc_dir_entry proc_scsi_ncr53c8xx = {
     PROC_SCSI_NCR53C8XX, 9, NAME53C8XX,
     S_IFDIR | S_IRUGO | S_IXUGO, 2
@@ -9316,7 +9315,7 @@ static struct proc_dir_entry proc_scsi_ncr53c8xx = {
 */
 #ifdef	MODULE
 char *ncr53c8xx = 0;	/* command line passed by insmod */
-# if LINUX_VERSION_CODE >= LinuxVersionCode(2,1,30)
+# if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,30)
 MODULE_PARM(ncr53c8xx, "s");
 # endif
 #endif
@@ -9326,7 +9325,7 @@ int __init ncr53c8xx_setup(char *str)
 	return sym53c8xx__setup(str);
 }
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,3,13)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,13)
 #ifndef MODULE
 __setup("ncr53c8xx=", ncr53c8xx_setup);
 #endif
@@ -9435,7 +9434,7 @@ int __init ncr53c8xx_detect(Scsi_Host_Template *tpnt)
 	**    Initialize driver general stuff.
 	*/
 #ifdef SCSI_NCR_PROC_INFO_SUPPORT
-#if LINUX_VERSION_CODE < LinuxVersionCode(2,3,27)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,27)
      tpnt->proc_dir  = &proc_scsi_ncr53c8xx;
 #else
      tpnt->proc_name = NAME53C8XX;
@@ -9468,10 +9467,10 @@ const char *ncr53c8xx_info (struct Scsi_Host *host)
 */
 MODULE_LICENSE("GPL");
 
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 static
 #endif
-#if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,0) || defined(MODULE)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0) || defined(MODULE)
 #ifdef ENABLE_SCSI_ZALON
 Scsi_Host_Template driver_template =  {
 	.proc_name =		"zalon720",

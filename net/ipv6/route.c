@@ -130,10 +130,15 @@ struct fib6_node ip6_routing_table = {
 rwlock_t rt6_lock = RW_LOCK_UNLOCKED;
 
 
-/*	Dummy rt for ndisc */
-struct rt6_info *ndisc_get_dummy_rt()
+/* allocate dst with ip6_dst_ops */
+static __inline__ struct rt6_info *__ip6_dst_alloc(void)
 {
 	return dst_alloc(&ip6_dst_ops);
+}
+
+struct rt6_info *ip6_dst_alloc(void)
+{
+	return __ip6_dst_alloc();
 }
 
 /*
@@ -640,7 +645,7 @@ int ip6_route_add(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh)
 	if (rtmsg->rtmsg_metric == 0)
 		rtmsg->rtmsg_metric = IP6_RT_PRIO_USER;
 
-	rt = dst_alloc(&ip6_dst_ops);
+	rt = __ip6_dst_alloc();
 
 	if (rt == NULL)
 		return -ENOMEM;
@@ -1035,9 +1040,7 @@ out:
 
 static struct rt6_info * ip6_rt_copy(struct rt6_info *ort)
 {
-	struct rt6_info *rt;
-
-	rt = dst_alloc(&ip6_dst_ops);
+	struct rt6_info *rt = __ip6_dst_alloc();
 
 	if (rt) {
 		rt->u.dst.input = ort->u.dst.input;
@@ -1181,9 +1184,8 @@ int ip6_pkt_discard(struct sk_buff *skb)
 
 int ip6_rt_addr_add(struct in6_addr *addr, struct net_device *dev)
 {
-	struct rt6_info *rt;
+	struct rt6_info *rt = __ip6_dst_alloc();
 
-	rt = dst_alloc(&ip6_dst_ops);
 	if (rt == NULL)
 		return -ENOMEM;
 

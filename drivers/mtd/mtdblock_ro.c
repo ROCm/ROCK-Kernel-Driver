@@ -18,7 +18,6 @@
 #include <linux/buffer_head.h>
 #include <linux/genhd.h>
 
-#define LOCAL_END_REQUEST
 #define MAJOR_NR MTD_BLOCK_MAJOR
 #define DEVICE_NAME "mtdblock"
 #include <linux/blk.h>

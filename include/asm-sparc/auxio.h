@@ -9,8 +9,6 @@
 #include <asm/system.h>
 #include <asm/vaddrs.h>
 
-extern unsigned char *auxio_register;
-
 /* This register is an unsigned char in IO space.  It does two things.
  * First, it is used to control the front panel LED light on machines
  * that have it (good for testing entry points to trap handlers and irq's)
@@ -31,41 +29,52 @@ extern unsigned char *auxio_register;
 #define AUXIO_FLPY_EJCT   0x02    /* Eject floppy disk.  Write only. */
 #define AUXIO_LED         0x01    /* On if set, off if unset. Read/Write */
 
-#define AUXREG   ((volatile unsigned char *)(auxio_register))
-
-/* These are available on sun4c */
-#define TURN_ON_LED   if (AUXREG) *AUXREG = (*AUXREG | AUXIO_ORMEIN | AUXIO_LED)
-#define TURN_OFF_LED  if (AUXREG) *AUXREG = ((*AUXREG | AUXIO_ORMEIN) & (~AUXIO_LED))
-#define FLIP_LED      if (AUXREG) *AUXREG = ((*AUXREG | AUXIO_ORMEIN) ^ AUXIO_LED)
-#define FLPY_MOTORON  if (AUXREG) *AUXREG = ((*AUXREG | AUXIO_ORMEIN) | AUXIO_FLPY_DSEL)
-#define FLPY_MOTOROFF if (AUXREG) *AUXREG = ((*AUXREG | AUXIO_ORMEIN) & (~AUXIO_FLPY_DSEL))
-#define FLPY_TCNTON   if (AUXREG) *AUXREG = ((*AUXREG | AUXIO_ORMEIN) | AUXIO_FLPY_TCNT)
-#define FLPY_TCNTOFF  if (AUXREG) *AUXREG = ((*AUXREG | AUXIO_ORMEIN) & (~AUXIO_FLPY_TCNT))
-
 #ifndef __ASSEMBLY__
-#define set_auxio(bits_on, bits_off) \
+
+/* 
+ * NOTE: these routines are implementation dependent-- 
+ * understand the hardware you are querying! 
+ */
+extern void set_auxio(unsigned char bits_on, unsigned char bits_off);
+extern unsigned char get_auxio(void); /* .../asm-sparc/floppy.h */
+
+/*
+ * The following routines are provided for driver-compatibility
+ * with sparc64 (primarily sunlance.c)
+ */
+
+#define AUXIO_LTE_ON    1
+#define AUXIO_LTE_OFF   0
+
+/* auxio_set_lte - Set Link Test Enable (TPE Link Detect)
+ *
+ * on - AUXIO_LTE_ON or AUXIO_LTE_OFF
+ */
+#define auxio_set_lte(on) \
 do { \
-	unsigned char regval; \
-	unsigned long flags; \
-	save_flags(flags); cli(); \
-	switch(sparc_cpu_model) { \
-	case sun4c: \
-		regval = *AUXREG; \
-		*AUXREG = ((regval | bits_on) & ~bits_off) | AUXIO_ORMEIN; \
-		break; \
-	case sun4m: \
-		if(!AUXREG) \
-			break;     /* VME chassic sun4m, no auxio. */ \
-		regval = *AUXREG; \
-		*AUXREG = ((regval | bits_on) & ~bits_off) | AUXIO_ORMEIN4M; \
-		break; \
-	case sun4d: \
-		break; \
-	default: \
-		panic("Can't set AUXIO register on this machine."); \
-	}; \
-	restore_flags(flags); \
-} while(0)
+	if(on) { \
+		set_auxio(AUXIO_LINK_TEST, 0); \
+	} else { \
+		set_auxio(0, AUXIO_LINK_TEST); \
+	} \
+} while (0)
+
+#define AUXIO_LED_ON    1
+#define AUXIO_LED_OFF   0
+
+/* auxio_set_led - Set system front panel LED
+ *
+ * on - AUXIO_LED_ON or AUXIO_LED_OFF
+ */
+#define auxio_set_led(on) \
+do { \
+	if(on) { \
+		set_auxio(AUXIO_LED, 0); \
+	} else { \
+		set_auxio(0, AUXIO_LED); \
+	} \
+} while (0)
+
 #endif /* !(__ASSEMBLY__) */
 
 

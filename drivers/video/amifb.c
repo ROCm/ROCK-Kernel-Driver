@@ -2385,7 +2385,6 @@ default_chipset:
 	    fb_info.monspecs.vfmax = 90;
 	}
 
-	fb_info.node = NODEV;
 	fb_info.fbops = &amifb_ops;
 	fb_info.par = &currentpar;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
@@ -2453,7 +2452,7 @@ default_chipset:
 	}
 
 	printk("fb%d: %s frame buffer device, using %dK of video memory\n",
-	       minor(fb_info.node), fb_info.fix.id, fb_info.fix.smem_len>>10);
+	       fb_info.node, fb_info.fix.id, fb_info.fix.smem_len>>10);
 
 	return 0;
 

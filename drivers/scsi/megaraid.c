@@ -2063,7 +2063,8 @@ mega_cmd_done(adapter_t *adapter, u8 completed[], int nstatus, int status)
 
 		case 0x02:	/* ERROR_ABORTED, i.e.
 				   SCSI_STATUS_CHECK_CONDITION */
-
+out:
+	return IRQ_RETVAL(handled);
 			/* set sense_buffer and result fields */
 			if( mbox->cmd == MEGA_MBOXCMD_PASSTHRU ||
 				mbox->cmd == MEGA_MBOXCMD_PASSTHRU64 ) {

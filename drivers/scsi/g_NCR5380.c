@@ -337,7 +337,7 @@ int __init generic_NCR5380_detect(Scsi_Host_Template * tpnt)
 			if (pnp_irq_valid(dev, 0))
 				overrides[count].irq = pnp_irq(dev, 0);
 			else
-				overrides[count].irq = IRQ_NONE;
+				overrides[count].irq = SCSI_IRQ_NONE;
 			if (pnp_dma_valid(dev, 0))
 				overrides[count].dma = pnp_dma(dev, 0);
 			else
@@ -434,19 +434,19 @@ int __init generic_NCR5380_detect(Scsi_Host_Template * tpnt)
 		else
 			instance->irq = NCR5380_probe_irq(instance, 0xffff);
 
-		if (instance->irq != IRQ_NONE)
+		if (instance->irq != SCSI_IRQ_NONE)
 			if (request_irq(instance->irq, generic_NCR5380_intr, SA_INTERRUPT, "NCR5380", NULL)) {
 				printk(KERN_WARNING "scsi%d : IRQ%d not free, interrupts disabled\n", instance->host_no, instance->irq);
-				instance->irq = IRQ_NONE;
+				instance->irq = SCSI_IRQ_NONE;
 			}
 
-		if (instance->irq == IRQ_NONE) {
+		if (instance->irq == SCSI_IRQ_NONE) {
 			printk(KERN_INFO "scsi%d : interrupts not enabled. for better interactive performance,\n", instance->host_no);
 			printk(KERN_INFO "scsi%d : please jumper the board for a free IRQ.\n", instance->host_no);
 		}
 
 		printk(KERN_INFO "scsi%d : at " STRVAL(NCR5380_map_name) " 0x%x", instance->host_no, (unsigned int) instance->NCR5380_instance_name);
-		if (instance->irq == IRQ_NONE)
+		if (instance->irq == SCSI_IRQ_NONE)
 			printk(" interrupts disabled");
 		else
 			printk(" irq %d", instance->irq);
@@ -493,7 +493,7 @@ int generic_NCR5380_release_resources(struct Scsi_Host *instance)
 	release_mem_region(instance->NCR5380_instance_name, NCR5380_region_size);
 #endif
 
-	if (instance->irq != IRQ_NONE)
+	if (instance->irq != SCSI_IRQ_NONE)
 		free_irq(instance->irq, NULL);
 
 	return 0;
@@ -805,7 +805,7 @@ int generic_NCR5380_proc_info(char *buffer, char **start, off_t offset, int leng
 	PRINTP("NO NCR53C400 driver extensions\n");
 #endif
 	PRINTP("Using %s mapping at %s 0x%lx, " ANDP STRVAL(NCR5380_map_config) ANDP STRVAL(NCR5380_map_name) ANDP scsi_ptr->NCR5380_instance_name);
-	if (scsi_ptr->irq == IRQ_NONE)
+	if (scsi_ptr->irq == SCSI_IRQ_NONE)
 		PRINTP("no interrupt\n");
 	else
 		PRINTP("on interrupt %d\n" ANDP scsi_ptr->irq);
