@@ -56,6 +56,8 @@ computone.txt
 	- info on Computone Intelliport II/Plus Multiport Serial Driver
 cpqarray.txt
 	- info on using Compaq's SMART2 Intelligent Disk Array Controllers.
+cpufreq/
+	- info on CPU frequency and voltage scaling
 cris/
 	- directory with info about Linux on CRIS architecture.
 devices.txt
