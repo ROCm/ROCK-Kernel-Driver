@@ -571,9 +571,14 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 	       (char *)bind_info->dev_info);
 
 	p_drv = get_pcmcia_driver(&bind_info->dev_info);
-	if ((!p_drv) || (!try_module_get(p_drv->owner))) {
+	if (!p_drv) {
 		ret = -EINVAL;
 		goto err_put;
+	}
+
+	if (!try_module_get(p_drv->owner)) {
+		ret = -EINVAL;
+		goto err_put_driver;
 	}
 
 	/* Currently, the userspace pcmcia cardmgr detects pcmcia devices.
@@ -636,15 +641,20 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 		}
 	}
 
+	put_driver(&p_drv->drv);
+
 	return 0;
 
  err_unregister:
 	device_unregister(&p_dev->dev);
 	module_put(p_drv->owner);
+	put_driver(&p_drv->drv);
 	return (ret);
 
  err_put_module:
 	module_put(p_drv->owner);
+ err_put_driver:
+	put_driver(&p_drv->drv);
  err_put:
 	pcmcia_put_bus_socket(s);
 	return (ret);
@@ -1418,33 +1428,18 @@ static struct pcmcia_bus_socket * get_socket_info_by_nr(unsigned int nr)
 
 /* backwards-compatible accessing of driver --- by name! */
 
-struct cmp_data {
-	void *dev_info;
-	struct pcmcia_driver *drv;
-};
-
-static int cmp_drv_callback(struct device_driver *drv, void *data)
-{
-	struct cmp_data *cmp = data;
-	if (strncmp((char *)cmp->dev_info, (char *)drv->name,
-		    DEV_NAME_LEN) == 0) {
-		cmp->drv = container_of(drv, struct pcmcia_driver, drv);
-		return -EINVAL;
-	}
-	return 0;
-}
-
 static struct pcmcia_driver * get_pcmcia_driver (dev_info_t *dev_info)
 {
-	int ret;
-	struct cmp_data cmp = {
-		.dev_info = dev_info,
-	};
-	
-	ret = bus_for_each_drv(&pcmcia_bus_type, NULL, &cmp, cmp_drv_callback);
-	if (ret)
-		return cmp.drv;
-	return NULL;
+	struct device_driver *drv;
+	struct pcmcia_driver *p_drv;
+
+	drv = driver_find((char *) dev_info, &pcmcia_bus_type);
+	if (!drv)
+		return NULL;
+
+	p_drv = container_of(drv, struct pcmcia_driver, drv);
+
+	return (p_drv);
 }
 
 MODULE_ALIAS("ds");
