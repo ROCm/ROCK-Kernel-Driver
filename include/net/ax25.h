@@ -289,7 +289,8 @@ extern void ax25_rt_device_down(struct net_device *);
 extern int  ax25_rt_ioctl(unsigned int, void *);
 extern int  ax25_rt_get_info(char *, char **, off_t, int);
 extern int  ax25_rt_autobind(ax25_cb *, ax25_address *);
-extern ax25_route *ax25_rt_find_route(ax25_address *, struct net_device *);
+extern ax25_route *ax25_rt_find_route(ax25_route *, ax25_address *,
+	struct net_device *);
 extern struct sk_buff *ax25_rt_build_path(struct sk_buff *, ax25_address *, ax25_address *, ax25_digi *);
 extern void ax25_rt_free(void);
 

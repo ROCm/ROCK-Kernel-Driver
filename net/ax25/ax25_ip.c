@@ -112,8 +112,8 @@ int ax25_rebuild_header(struct sk_buff *skb)
 	unsigned char *bp  = skb->data;
 	struct net_device *dev;
 	ax25_address *src, *dst;
-	ax25_route *route;
 	ax25_dev *ax25_dev;
+	ax25_route _route, *route = &_route;
 
 	dst = (ax25_address *)(bp + 1);
 	src = (ax25_address *)(bp + 8);
@@ -121,7 +121,7 @@ int ax25_rebuild_header(struct sk_buff *skb)
   	if (arp_find(bp + 1, skb))
   		return 1;
 
-	route    = ax25_rt_find_route(dst, NULL);
+	route = ax25_rt_find_route(route, dst, NULL);
 	dev      = route->dev;
 
 	if (dev == NULL)

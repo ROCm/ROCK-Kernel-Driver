@@ -439,28 +439,25 @@ int ax25_rt_autobind(ax25_cb *ax25, ax25_address *addr)
 	return 0;
 }
 
-/*
- *	dl1bke 960117: build digipeater path
- *	dl1bke 960301: use the default route if it exists
- */
-ax25_route *ax25_rt_find_route(ax25_address *addr, struct net_device *dev)
+ax25_route *ax25_rt_find_route(ax25_route * route, ax25_address *addr,
+	struct net_device *dev)
 {
-	static ax25_route route;
 	ax25_route *ax25_rt;
 
-	if ((ax25_rt = ax25_find_route(addr, dev)) == NULL) {
-		route.next     = NULL;
-		route.callsign = *addr;
-		route.dev      = dev;
-		route.digipeat = NULL;
-		route.ip_mode  = ' ';
-		return &route;
-	}
+	if (ax25_rt = ax25_find_route(addr, dev))
+		return ax25_rt;
 
-	return ax25_rt;
+	route->next     = NULL;
+	route->callsign = *addr;
+	route->dev      = dev;
+	route->digipeat = NULL;
+	route->ip_mode  = ' ';
+
+	return route;
 }
 
-struct sk_buff *ax25_rt_build_path(struct sk_buff *skb, ax25_address *src, ax25_address *dest, ax25_digi *digi)
+struct sk_buff *ax25_rt_build_path(struct sk_buff *skb, ax25_address *src,
+	ax25_address *dest, ax25_digi *digi)
 {
 	struct sk_buff *skbn;
 	unsigned char *bp;
