@@ -85,14 +85,12 @@ static struct sh_machine_vector* __init get_mv_byname(const char* name);
 #define INITRD_SIZE (*(unsigned long *) (PARAM+0x014))
 /* ... */
 #define COMMAND_LINE ((char *) (PARAM+0x100))
-#define COMMAND_LINE_SIZE 256
 
 #define RAMDISK_IMAGE_START_MASK  	0x07FF
 #define RAMDISK_PROMPT_FLAG		0x8000
 #define RAMDISK_LOAD_FLAG		0x4000	
 
 static char command_line[COMMAND_LINE_SIZE] = { 0, };
-       char saved_command_line[COMMAND_LINE_SIZE];
 
 struct resource standard_io_resources[] = {
 	{ "dma1", 0x00, 0x1f },

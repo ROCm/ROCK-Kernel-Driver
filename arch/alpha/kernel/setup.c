@@ -122,7 +122,6 @@ static void get_sysnames(unsigned long, unsigned long, unsigned long,
 static void determine_cpu_caches (unsigned int);
 
 static char command_line[COMMAND_LINE_SIZE];
-char saved_command_line[COMMAND_LINE_SIZE];
 
 /*
  * The format of "screen_info" is strange, and due to early

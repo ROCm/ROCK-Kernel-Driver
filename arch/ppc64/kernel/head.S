@@ -35,6 +35,7 @@
 #include <asm/offsets.h>
 #include <asm/bug.h>
 #include <asm/cputable.h>
+#include <asm/setup.h>
 
 #ifdef CONFIG_PPC_ISERIES
 #define DO_SOFT_DISABLE
@@ -2222,4 +2223,4 @@ stab_array:
  */
 	.globl	cmd_line
 cmd_line:
-	.space	512	/* COMMAND_LINE_SIZE */
+	.space	COMMAND_LINE_SIZE

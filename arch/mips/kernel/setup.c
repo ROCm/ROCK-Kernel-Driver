@@ -71,7 +71,6 @@ EXPORT_SYMBOL(mips_machgroup);
 struct boot_mem_map boot_mem_map;
 
 static char command_line[CL_SIZE];
-       char saved_command_line[CL_SIZE];
        char arcs_cmdline[CL_SIZE]=CONFIG_CMDLINE;
 
 /*

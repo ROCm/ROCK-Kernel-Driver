@@ -82,7 +82,6 @@ unsigned long decr_overclock_proc0_set = 0;
 
 int powersave_nap;
 
-char saved_command_line[COMMAND_LINE_SIZE];
 unsigned char aux_device_present;
 
 void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
