@@ -1607,7 +1607,7 @@ static int cpu_has_cpufreq(unsigned int cpu)
 
 static int acpi_thermal_cpufreq_increase(unsigned int cpu)
 {
-	if (!cpu_has_cpufreq)
+	if (!cpu_has_cpufreq(cpu))
 		return -ENODEV;
 
 	if (cpufreq_thermal_reduction_pctg[cpu] < 60) {
@@ -1622,7 +1622,7 @@ static int acpi_thermal_cpufreq_increase(unsigned int cpu)
 
 static int acpi_thermal_cpufreq_decrease(unsigned int cpu)
 {
-	if (!cpu_has_cpufreq)
+	if (!cpu_has_cpufreq(cpu))
 		return -ENODEV;
 
 	if (cpufreq_thermal_reduction_pctg[cpu] >= 20) {
