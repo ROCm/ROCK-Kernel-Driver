@@ -44,8 +44,9 @@
 #include <asm/processor.h>
 
 extern int do_pipe(int *);
-
 extern asmlinkage unsigned long sys_brk(unsigned long);
+extern int sys_getpriority(int, int);
+extern asmlinkage unsigned long sys_create_module(char *, unsigned long);
 
 /*
  * Brk needs to return an error.  Still support Linux's brk(0) query idiom,
@@ -53,7 +54,8 @@ extern asmlinkage unsigned long sys_brk(unsigned long);
  * identical to OSF as we don't return 0 on success, but doing otherwise
  * would require changes to libc.  Hopefully this is good enough.
  */
-asmlinkage unsigned long osf_brk(unsigned long brk)
+asmlinkage unsigned long
+osf_brk(unsigned long brk)
 {
 	unsigned long retval = sys_brk(brk);
 	if (brk && brk != retval)
@@ -64,9 +66,9 @@ asmlinkage unsigned long osf_brk(unsigned long brk)
 /*
  * This is pure guess-work..
  */
-asmlinkage int osf_set_program_attributes(
-	unsigned long text_start, unsigned long text_len,
-	unsigned long bss_start, unsigned long bss_len)
+asmlinkage int
+osf_set_program_attributes(unsigned long text_start, unsigned long text_len,
+			   unsigned long bss_start, unsigned long bss_len)
 {
 	struct mm_struct *mm;
 
@@ -106,8 +108,9 @@ struct osf_dirent_callback {
 	int error;
 };
 
-static int osf_filldir(void *__buf, const char *name, int namlen, loff_t offset,
-		       ino_t ino, unsigned int d_type)
+static int
+osf_filldir(void *__buf, const char *name, int namlen, loff_t offset,
+	    ino_t ino, unsigned int d_type)
 {
 	struct osf_dirent *dirent;
 	struct osf_dirent_callback *buf = (struct osf_dirent_callback *) __buf;
@@ -134,8 +137,9 @@ static int osf_filldir(void *__buf, const char *name, int namlen, loff_t offset,
 	return 0;
 }
 
-asmlinkage int osf_getdirentries(unsigned int fd, struct osf_dirent *dirent,
-				 unsigned int count, long *basep)
+asmlinkage int
+osf_getdirentries(unsigned int fd, struct osf_dirent *dirent,
+		  unsigned int count, long *basep)
 {
 	int error;
 	struct file *file;
@@ -159,9 +163,9 @@ asmlinkage int osf_getdirentries(unsigned int fd, struct osf_dirent *dirent,
 	if (count != buf.count)
 		error = count - buf.count;
 
-out_putf:
+ out_putf:
 	fput(file);
-out:
+ out:
 	return error;
 }
 
@@ -172,8 +176,9 @@ out:
  * Alpha syscall convention has no problem returning negative
  * values:
  */
-asmlinkage int osf_getpriority(int which, int who, int a2, int a3, int a4,
-			       int a5, struct pt_regs regs)
+asmlinkage int
+osf_getpriority(int which, int who,
+		int a2, int a3, int a4, int a5, struct pt_regs regs)
 {
 	extern int sys_getpriority(int, int);
 	int prio;
@@ -194,24 +199,24 @@ asmlinkage int osf_getpriority(int which, int who, int a2, int a3, int a4,
 /*
  * No need to acquire the kernel lock, we're local..
  */
-asmlinkage unsigned long sys_getxuid(int a0, int a1, int a2, int a3, int a4,
-				     int a5, struct pt_regs regs)
+asmlinkage unsigned long
+sys_getxuid(int a0, int a1, int a2, int a3, int a4, int a5, struct pt_regs regs)
 {
 	struct task_struct * tsk = current;
 	(&regs)->r20 = tsk->euid;
 	return tsk->uid;
 }
 
-asmlinkage unsigned long sys_getxgid(int a0, int a1, int a2, int a3, int a4,
-				     int a5, struct pt_regs regs)
+asmlinkage unsigned long
+sys_getxgid(int a0, int a1, int a2, int a3, int a4, int a5, struct pt_regs regs)
 {
 	struct task_struct * tsk = current;
 	(&regs)->r20 = tsk->egid;
 	return tsk->gid;
 }
 
-asmlinkage unsigned long sys_getxpid(int a0, int a1, int a2, int a3, int a4,
-				     int a5, struct pt_regs regs)
+asmlinkage unsigned long
+sys_getxpid(int a0, int a1, int a2, int a3, int a4, int a5, struct pt_regs regs)
 {
 	struct task_struct *tsk = current;
 
@@ -226,9 +231,9 @@ asmlinkage unsigned long sys_getxpid(int a0, int a1, int a2, int a3, int a4,
 	return tsk->tgid;
 }
 
-asmlinkage unsigned long osf_mmap(unsigned long addr, unsigned long len,
-	       unsigned long prot, unsigned long flags, unsigned long fd,
-				  unsigned long off)
+asmlinkage unsigned long
+osf_mmap(unsigned long addr, unsigned long len, unsigned long prot,
+         unsigned long flags, unsigned long fd, unsigned long off)
 {
 	struct file *file = NULL;
 	unsigned long ret = -EBADF;
@@ -249,7 +254,7 @@ asmlinkage unsigned long osf_mmap(unsigned long addr, unsigned long len,
 	up_write(&current->mm->mmap_sem);
 	if (file)
 		fput(file);
-out:
+ out:
 	return ret;
 }
 
@@ -271,7 +276,9 @@ struct osf_statfs {
 	__kernel_fsid_t f_fsid;
 } *osf_stat;
 
-static int linux_to_osf_statfs(struct statfs *linux_stat, struct osf_statfs *osf_stat, unsigned long bufsiz)
+static int
+linux_to_osf_statfs(struct statfs *linux_stat, struct osf_statfs *osf_stat,
+		    unsigned long bufsiz)
 {
 	struct osf_statfs tmp_stat;
 
@@ -291,7 +298,9 @@ static int linux_to_osf_statfs(struct statfs *linux_stat, struct osf_statfs *osf
 	return copy_to_user(osf_stat, &tmp_stat, bufsiz) ? -EFAULT : 0;
 }
 
-static int do_osf_statfs(struct dentry * dentry, struct osf_statfs *buffer, unsigned long bufsiz)
+static int
+do_osf_statfs(struct dentry * dentry, struct osf_statfs *buffer,
+	      unsigned long bufsiz)
 {
 	struct statfs linux_stat;
 	int error = vfs_statfs(dentry->d_inode->i_sb, &linux_stat);
@@ -300,7 +309,8 @@ static int do_osf_statfs(struct dentry * dentry, struct osf_statfs *buffer, unsi
 	return error;	
 }
 
-asmlinkage int osf_statfs(char *path, struct osf_statfs *buffer, unsigned long bufsiz)
+asmlinkage int
+osf_statfs(char *path, struct osf_statfs *buffer, unsigned long bufsiz)
 {
 	struct nameidata nd;
 	int retval;
@@ -313,7 +323,8 @@ asmlinkage int osf_statfs(char *path, struct osf_statfs *buffer, unsigned long b
 	return retval;
 }
 
-asmlinkage int osf_fstatfs(unsigned long fd, struct osf_statfs *buffer, unsigned long bufsiz)
+asmlinkage int
+osf_fstatfs(unsigned long fd, struct osf_statfs *buffer, unsigned long bufsiz)
 {
 	struct file *file;
 	int retval;
@@ -342,10 +353,9 @@ struct cdfs_args {
 	char *devname;
 	int flags;
 	uid_t exroot;
-/*
- * This has lots more here, which Linux handles with the option block
- * but I'm too lazy to do the translation into ASCII.
- */
+
+	/* This has lots more here, which Linux handles with the option block
+	   but I'm too lazy to do the translation into ASCII.  */
 };
 
 struct procfs_args {
@@ -362,7 +372,8 @@ struct procfs_args {
  * Just how long ago was it written? OTOH our UFS driver may be still
  * unhappy with OSF UFS. [CHECKME]
  */
-static int osf_ufs_mount(char *dirname, struct ufs_args *args, int flags)
+static int
+osf_ufs_mount(char *dirname, struct ufs_args *args, int flags)
 {
 	int retval;
 	struct cdfs_args tmp;
@@ -377,11 +388,12 @@ static int osf_ufs_mount(char *dirname, struct ufs_args *args, int flags)
 		goto out;
 	retval = do_mount(devname, dirname, "ext2", flags, NULL);
 	putname(devname);
-out:
+ out:
 	return retval;
 }
 
-static int osf_cdfs_mount(char *dirname, struct cdfs_args *args, int flags)
+static int
+osf_cdfs_mount(char *dirname, struct cdfs_args *args, int flags)
 {
 	int retval;
 	struct cdfs_args tmp;
@@ -396,11 +408,12 @@ static int osf_cdfs_mount(char *dirname, struct cdfs_args *args, int flags)
 		goto out;
 	retval = do_mount(devname, dirname, "iso9660", flags, NULL);
 	putname(devname);
-out:
+ out:
 	return retval;
 }
 
-static int osf_procfs_mount(char *dirname, struct procfs_args *args, int flags)
+static int
+osf_procfs_mount(char *dirname, struct procfs_args *args, int flags)
 {
 	struct procfs_args tmp;
 
@@ -410,7 +423,8 @@ static int osf_procfs_mount(char *dirname, struct procfs_args *args, int flags)
 	return do_mount("", dirname, "proc", flags, NULL);
 }
 
-asmlinkage int osf_mount(unsigned long typenr, char *path, int flag, void *data)
+asmlinkage int
+osf_mount(unsigned long typenr, char *path, int flag, void *data)
 {
 	int retval = -EINVAL;
 	char *name;
@@ -435,12 +449,13 @@ asmlinkage int osf_mount(unsigned long typenr, char *path, int flag, void *data)
 		printk("osf_mount(%ld, %x)\n", typenr, flag);
 	}
 	putname(name);
-out:
+ out:
 	unlock_kernel();
 	return retval;
 }
 
-asmlinkage int osf_utsname(char *name)
+asmlinkage int
+osf_utsname(char *name)
 {
 	int error;
 
@@ -458,12 +473,13 @@ asmlinkage int osf_utsname(char *name)
 		goto out;
 
 	error = 0;
-out:
+ out:
 	up_read(&uts_sem);	
 	return error;
 }
 
-asmlinkage int osf_swapon(const char *path, int flags, int lowat, int hiwat)
+asmlinkage int
+osf_swapon(const char *path, int flags, int lowat, int hiwat)
 {
 	int ret;
 
@@ -474,35 +490,36 @@ asmlinkage int osf_swapon(const char *path, int flags, int lowat, int hiwat)
 	return ret;
 }
 
-asmlinkage unsigned long sys_getpagesize(void)
+asmlinkage unsigned long
+sys_getpagesize(void)
 {
 	return PAGE_SIZE;
 }
 
-asmlinkage unsigned long sys_getdtablesize(void)
+asmlinkage unsigned long
+sys_getdtablesize(void)
 {
 	return NR_OPEN;
 }
 
-asmlinkage int sys_pipe(int a0, int a1, int a2, int a3, int a4, int a5,
-			struct pt_regs regs)
+asmlinkage int
+sys_pipe(int a0, int a1, int a2, int a3, int a4, int a5, struct pt_regs regs)
 {
-	int fd[2];
-	int error;
+	int fd[2], error;
 
 	error = do_pipe(fd);
-	if (error)
-		goto out;
-	(&regs)->r20 = fd[1];
-	error = fd[0];
-out:
+	if (!error) {
+		regs.r20 = fd[1];
+		error = fd[0];
+	}
 	return error;
 }
 
 /*
  * For compatibility with OSF/1 only.  Use utsname(2) instead.
  */
-asmlinkage int osf_getdomainname(char *name, int namelen)
+asmlinkage int
+osf_getdomainname(char *name, int namelen)
 {
 	unsigned len;
 	int i, error;
@@ -522,12 +539,12 @@ asmlinkage int osf_getdomainname(char *name, int namelen)
 			break;
 	}
 	up_read(&uts_sem);
-out:
+ out:
 	return error;
 }
 
-
-asmlinkage long osf_shmat(int shmid, void *shmaddr, int shmflg)
+asmlinkage long
+osf_shmat(int shmid, void *shmaddr, int shmflg)
 {
 	unsigned long raddr;
 	long err;
@@ -541,7 +558,7 @@ asmlinkage long osf_shmat(int shmid, void *shmaddr, int shmflg)
 	 * non-negative longs!
 	 */
 	err = raddr;
-out:
+ out:
 	unlock_kernel();
 	return err;
 }
@@ -612,7 +629,8 @@ enum pl_code {
 	PL_DEL = 5, PL_FDEL = 6
 };
 
-asmlinkage long osf_proplist_syscall(enum pl_code code, union pl_args *args)
+asmlinkage long
+osf_proplist_syscall(enum pl_code code, union pl_args *args)
 {
 	long error;
 	int *min_buf_size_ptr;
@@ -655,7 +673,8 @@ asmlinkage long osf_proplist_syscall(enum pl_code code, union pl_args *args)
 	return error;
 }
 
-asmlinkage int osf_sigstack(struct sigstack *uss, struct sigstack *uoss)
+asmlinkage int
+osf_sigstack(struct sigstack *uss, struct sigstack *uoss)
 {
 	unsigned long usp = rdusp();
 	unsigned long oss_sp = current->sas_ss_sp + current->sas_ss_size;
@@ -691,7 +710,7 @@ asmlinkage int osf_sigstack(struct sigstack *uss, struct sigstack *uoss)
 	}
 
 	error = 0;
-out:
+ out:
 	return error;
 }
 
@@ -702,32 +721,28 @@ out:
  * create_module() because it's one of the few system calls
  * that return kernel addresses (which are negative).
  */
-asmlinkage unsigned long alpha_create_module(char *module_name, unsigned long size,
-					  int a3, int a4, int a5, int a6,
-					     struct pt_regs regs)
+
+asmlinkage unsigned long
+alpha_create_module(char *module_name, unsigned long size,
+		    int a3, int a4, int a5, int a6, struct pt_regs regs)
 {
-	asmlinkage unsigned long sys_create_module(char *, unsigned long);
 	long retval;
 
 	lock_kernel();
 	retval = sys_create_module(module_name, size);
-	/*
-	 * we get either a module address or an error number,
-	 * and we know the error number is a small negative
-	 * number, while the address is always negative but
-	 * much larger.
-	 */
-	if (retval + 1000 > 0)
-		goto out;
 
-	/* tell entry.S:syscall_error that this is NOT an error: */
-	regs.r0 = 0;
-out:
-	unlock_kernel();
+	/* We get either a module address or an error number, and we know
+	   the error number is a small negative number, while the address
+	   is always negative but much larger.  */
+	if (retval + 1000 < 0)
+		regs.r0 = 0;
+
+        unlock_kernel();
 	return retval;
 }
 
-asmlinkage long osf_sysinfo(int command, char *buf, long count)
+asmlinkage long
+osf_sysinfo(int command, char *buf, long count)
 {
 	static char * sysinfo_table[] = {
 		system_utsname.sysname,
@@ -761,13 +776,13 @@ asmlinkage long osf_sysinfo(int command, char *buf, long count)
 	else
 		err = 0;
 	up_read(&uts_sem);
-out:
+ out:
 	return err;
 }
 
-asmlinkage unsigned long osf_getsysinfo(unsigned long op, void *buffer,
-					unsigned long nbytes,
-					int *start, void *arg)
+asmlinkage unsigned long
+osf_getsysinfo(unsigned long op, void *buffer, unsigned long nbytes,
+	       int *start, void *arg)
 {
 	unsigned long w;
 	struct percpu_struct *cpu;
@@ -823,9 +838,9 @@ asmlinkage unsigned long osf_getsysinfo(unsigned long op, void *buffer,
 	return -EOPNOTSUPP;
 }
 
-asmlinkage unsigned long osf_setsysinfo(unsigned long op, void *buffer,
-					unsigned long nbytes,
-					int *start, void *arg)
+asmlinkage unsigned long
+osf_setsysinfo(unsigned long op, void *buffer, unsigned long nbytes,
+	       int *start, void *arg)
 {
 	switch (op) {
 	case SSI_IEEE_FP_CONTROL: {
@@ -925,21 +940,24 @@ struct itimerval32
     struct timeval32 it_value;
 };
 
-static inline long get_tv32(struct timeval *o, struct timeval32 *i)
+static inline long
+get_tv32(struct timeval *o, struct timeval32 *i)
 {
 	return (!access_ok(VERIFY_READ, i, sizeof(*i)) ||
 		(__get_user(o->tv_sec, &i->tv_sec) |
 		 __get_user(o->tv_usec, &i->tv_usec)));
 }
 
-static inline long put_tv32(struct timeval32 *o, struct timeval *i)
+static inline long
+put_tv32(struct timeval32 *o, struct timeval *i)
 {
 	return (!access_ok(VERIFY_WRITE, o, sizeof(*o)) ||
 		(__put_user(i->tv_sec, &o->tv_sec) |
 		 __put_user(i->tv_usec, &o->tv_usec)));
 }
 
-static inline long get_it32(struct itimerval *o, struct itimerval32 *i)
+static inline long
+get_it32(struct itimerval *o, struct itimerval32 *i)
 {
 	return (!access_ok(VERIFY_READ, i, sizeof(*i)) ||
 		(__get_user(o->it_interval.tv_sec, &i->it_interval.tv_sec) |
@@ -948,7 +966,8 @@ static inline long get_it32(struct itimerval *o, struct itimerval32 *i)
 		 __get_user(o->it_value.tv_usec, &i->it_value.tv_usec)));
 }
 
-static inline long put_it32(struct itimerval32 *o, struct itimerval *i)
+static inline long
+put_it32(struct itimerval32 *o, struct itimerval *i)
 {
 	return (!access_ok(VERIFY_WRITE, o, sizeof(*o)) ||
 		(__put_user(i->it_interval.tv_sec, &o->it_interval.tv_sec) |
@@ -964,7 +983,8 @@ jiffies_to_timeval32(unsigned long jiffies, struct timeval32 *value)
 	value->tv_sec = jiffies / HZ;
 }
 
-asmlinkage int osf_gettimeofday(struct timeval32 *tv, struct timezone *tz)
+asmlinkage int
+osf_gettimeofday(struct timeval32 *tv, struct timezone *tz)
 {
 	if (tv) {
 		struct timeval ktv;
@@ -979,7 +999,8 @@ asmlinkage int osf_gettimeofday(struct timeval32 *tv, struct timezone *tz)
 	return 0;
 }
 
-asmlinkage int osf_settimeofday(struct timeval32 *tv, struct timezone *tz)
+asmlinkage int
+osf_settimeofday(struct timeval32 *tv, struct timezone *tz)
 {
 	struct timeval ktv;
 	struct timezone ktz;
@@ -996,7 +1017,8 @@ asmlinkage int osf_settimeofday(struct timeval32 *tv, struct timezone *tz)
 	return do_sys_settimeofday(tv ? &ktv : NULL, tz ? &ktz : NULL);
 }
 
-asmlinkage int osf_getitimer(int which, struct itimerval32 *it)
+asmlinkage int
+osf_getitimer(int which, struct itimerval32 *it)
 {
 	struct itimerval kit;
 	int error;
@@ -1008,8 +1030,8 @@ asmlinkage int osf_getitimer(int which, struct itimerval32 *it)
 	return error;
 }
 
-asmlinkage int osf_setitimer(int which, struct itimerval32 *in,
-			     struct itimerval32 *out)
+asmlinkage int
+osf_setitimer(int which, struct itimerval32 *in, struct itimerval32 *out)
 {
 	struct itimerval kin, kout;
 	int error;
@@ -1031,7 +1053,8 @@ asmlinkage int osf_setitimer(int which, struct itimerval32 *in,
 
 }
 
-asmlinkage int osf_utimes(const char *filename, struct timeval32 *tvs)
+asmlinkage int
+osf_utimes(const char *filename, struct timeval32 *tvs)
 {
 	char *kfilename;
 	struct timeval ktvs[2];
@@ -1136,9 +1159,9 @@ osf_select(int n, fd_set *inp, fd_set *outp, fd_set *exp,
 	set_fd_set(n, outp->fds_bits, fds.res_out);
 	set_fd_set(n, exp->fds_bits, fds.res_ex);
 
-out:
+ out:
 	kfree(bits);
-out_nofds:
+ out_nofds:
 	return ret;
 }
 
@@ -1161,7 +1184,8 @@ struct rusage32 {
 	long	ru_nivcsw;		/* involuntary " */
 };
 
-asmlinkage int osf_getrusage(int who, struct rusage32 *ru)
+asmlinkage int
+osf_getrusage(int who, struct rusage32 *ru)
 {
 	struct rusage32 r;
 
@@ -1198,8 +1222,8 @@ asmlinkage int osf_getrusage(int who, struct rusage32 *ru)
 	return copy_to_user(ru, &r, sizeof(r)) ? -EFAULT : 0;
 }
 
-asmlinkage int osf_wait4(pid_t pid, int *ustatus, int options,
-			 struct rusage32 *ur)
+asmlinkage int
+osf_wait4(pid_t pid, int *ustatus, int options, struct rusage32 *ur)
 {
 	if (!ur) {
 		return sys_wait4(pid, ustatus, options, NULL);
@@ -1245,7 +1269,8 @@ asmlinkage int osf_wait4(pid_t pid, int *ustatus, int options,
  * seems to be a timeval pointer, and I suspect the second
  * one is the time remaining.. Ho humm.. No documentation.
  */
-asmlinkage int osf_usleep_thread(struct timeval32 *sleep, struct timeval32 *remain)
+asmlinkage int
+osf_usleep_thread(struct timeval32 *sleep, struct timeval32 *remain)
 {
 	struct timeval tmp;
 	unsigned long ticks;
@@ -1268,7 +1293,7 @@ asmlinkage int osf_usleep_thread(struct timeval32 *sleep, struct timeval32 *rema
 	}
 	
 	return 0;
-fault:
+ fault:
 	return -EFAULT;
 }
 
@@ -1302,7 +1327,8 @@ struct timex32 {
 	int  :32; int  :32; int  :32; int  :32;
 };
 
-asmlinkage int sys_old_adjtimex(struct timex32 *txc_p)
+asmlinkage int
+sys_old_adjtimex(struct timex32 *txc_p)
 {
         struct timex txc;
 	int ret;
