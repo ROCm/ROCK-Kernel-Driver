@@ -238,7 +238,7 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 
 static struct file_operations wdt_fops = {
 	.owner=		THIS_MODULE,
-	.llseek=		no_llseek,
+	.llseek=	no_llseek,
 	.read=		fop_read,
 	.write=		fop_write,
 	.open=		fop_open,
@@ -258,7 +258,9 @@ static struct miscdevice wdt_miscdev = {
 
 static int wdt_notify_sys(struct notifier_block *this, unsigned long code, void *unused)
 {
-	if (code==SYS_DOWN || code==SYS_HALT) wdt_turnoff();
+	if (code==SYS_DOWN || code==SYS_HALT)
+		wdt_turnoff();
+
 	if (code==SYS_RESTART) {
 		/*
 		 * Cobalt devices have no way of rebooting themselves other than
@@ -267,7 +269,7 @@ static int wdt_notify_sys(struct notifier_block *this, unsigned long code, void 
 		 */
 		wdt_change(WDT_ENABLE);
 		printk(OUR_NAME ": Watchdog timer is now enabled with no heartbeat - should reboot in ~1 second.\n");
-	};
+	}
 	return NOTIFY_DONE;
 }
  
@@ -278,9 +280,9 @@ static int wdt_notify_sys(struct notifier_block *this, unsigned long code, void 
  
 static struct notifier_block wdt_notifier=
 {
-	wdt_notify_sys,
-	0,
-	0
+	.notifier_call = wdt_notify_sys,
+	.next = 0,
+	.priority = 0
 };
 
 static void __exit alim7101_wdt_unload(void)
@@ -302,8 +304,8 @@ static int __init alim7101_wdt_init(void)
 	if (!alim7101_pmu) {
 		printk(KERN_INFO OUR_NAME ": ALi M7101 PMU not present - WDT not set\n");
 		return -EBUSY;
-	};
-	
+	}
+
 	/* Set the WDT in the PMU to 1 second */
 	pci_write_config_byte(alim7101_pmu, ALI_7101_WDT, 0x02);
 
@@ -311,17 +313,17 @@ static int __init alim7101_wdt_init(void)
 	if (!ali1543_south) {
 		printk(KERN_INFO OUR_NAME ": ALi 1543 South-Bridge not present - WDT not set\n");
 		return -EBUSY;
-	};
+	}
 	pci_read_config_byte(ali1543_south, 0x5e, &tmp);
 	if ((tmp & 0x1e) != 0x12) {
 		printk(KERN_INFO OUR_NAME ": ALi 1543 South-Bridge does not have the correct revision number (???1001?) - WDT not set\n");
 		return -EBUSY;
-	};
+	}
 
 	init_timer(&timer);
 	timer.function = wdt_timer_ping;
 	timer.data = 1;
-		
+
 	rc = misc_register(&wdt_miscdev);
 	if (rc)
 		return rc;
@@ -330,8 +332,8 @@ static int __init alim7101_wdt_init(void)
 	if (rc) {
 		misc_deregister(&wdt_miscdev);
 		return rc;
-	};
-	
+	}
+
 	printk(KERN_INFO OUR_NAME ": WDT driver for ALi M7101 initialised.\n");
 	return 0;
 }
@@ -339,6 +341,5 @@ static int __init alim7101_wdt_init(void)
 module_init(alim7101_wdt_init);
 module_exit(alim7101_wdt_unload);
 
-EXPORT_NO_SYMBOLS;
 MODULE_AUTHOR("Steve Hill");
 MODULE_LICENSE("GPL");
