@@ -9,7 +9,6 @@
 /* These are all the functions necessary to implement 
  * POSIX clocks & timers
  */
-
 #include <linux/mm.h>
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
@@ -23,6 +22,7 @@
 #include <linux/compiler.h>
 #include <linux/idr.h>
 #include <linux/posix-timers.h>
+#include <linux/wait.h>
 
 #ifndef div_long_long_rem
 #include <asm/div64.h>
@@ -56,8 +56,8 @@
    * Lets keep our timers in a slab cache :-)
  */
 static kmem_cache_t *posix_timers_cache;
-struct idr posix_timers_id;
-spinlock_t idr_lock = SPIN_LOCK_UNLOCKED;
+static struct idr posix_timers_id;
+static spinlock_t idr_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * Just because the timer is not in the timer list does NOT mean it is
@@ -130,7 +130,7 @@ spinlock_t idr_lock = SPIN_LOCK_UNLOCKED;
  *	    which we beg off on and pass to do_sys_settimeofday().
  */
 
-struct k_clock posix_clocks[MAX_CLOCKS];
+static struct k_clock posix_clocks[MAX_CLOCKS];
 
 #define if_clock_do(clock_fun, alt_fun,parms)	(! clock_fun)? alt_fun parms :\
 							      clock_fun parms
@@ -183,7 +183,7 @@ init_posix_timers(void)
 __initcall(init_posix_timers);
 
 static inline int
-tstojiffie(struct timespec *tp, int res, unsigned long *jiff)
+tstojiffie(struct timespec *tp, int res, u64 *jiff)
 {
 	unsigned long sec = tp->tv_sec;
 	long nsec = tp->tv_nsec + res - 1;
@@ -203,7 +203,7 @@ tstojiffie(struct timespec *tp, int res, unsigned long *jiff)
 	 * below.  Here it is enough to just discard the high order
 	 * bits.  
 	 */
-	*jiff = HZ * sec;
+	*jiff = (u64)sec * HZ;
 	/*
 	 * Do the res thing. (Don't forget the add in the declaration of nsec) 
 	 */
@@ -221,9 +221,12 @@ tstojiffie(struct timespec *tp, int res, unsigned long *jiff)
 static void
 tstotimer(struct itimerspec *time, struct k_itimer *timer)
 {
+	u64 result;
 	int res = posix_clocks[timer->it_clock].res;
-	tstojiffie(&time->it_value, res, &timer->it_timer.expires);
-	tstojiffie(&time->it_interval, res, &timer->it_incr);
+	tstojiffie(&time->it_value, res, &result);
+	timer->it_timer.expires = (unsigned long)result;
+	tstojiffie(&time->it_interval, res, &result);
+	timer->it_incr = (unsigned long)result;
 }
 
 static void
@@ -1020,6 +1023,9 @@ do_posix_gettime(struct k_clock *clock, struct timespec *tp)
  * Note also that the while loop assures that the sub_jiff_offset
  * will be less than a jiffie, thus no need to normalize the result.
  * Well, not really, if called with ints off :(
+
+ * HELP, this code should make an attempt at resolution beyond the 
+ * jiffie.  Trouble is this is "arch" dependent...
  */
 
 int
@@ -1127,26 +1133,14 @@ nanosleep_wake_up(unsigned long __data)
  * holds (or has held for it) a write_lock_irq( xtime_lock) and is 
  * called from the timer bh code.  Thus we need the irq save locks.
  */
-spinlock_t nanosleep_abs_list_lock = SPIN_LOCK_UNLOCKED;
 
-struct list_head nanosleep_abs_list = LIST_HEAD_INIT(nanosleep_abs_list);
+static DECLARE_WAIT_QUEUE_HEAD(nanosleep_abs_wqueue);
 
-struct abs_struct {
-	struct list_head list;
-	struct task_struct *t;
-};
 
 void
 clock_was_set(void)
 {
-	struct list_head *pos;
-	unsigned long flags;
-
-	spin_lock_irqsave(&nanosleep_abs_list_lock, flags);
-	list_for_each(pos, &nanosleep_abs_list) {
-		wake_up_process(list_entry(pos, struct abs_struct, list)->t);
-	}
-	spin_unlock_irqrestore(&nanosleep_abs_list_lock, flags);
+	wake_up_all(&nanosleep_abs_wqueue);
 }
 
 long clock_nanosleep_restart(struct restart_block *restart_block);
@@ -1201,19 +1195,19 @@ sys_clock_nanosleep(clockid_t which_clock, int flags,
 	return ret;
 
 }
-
 long
 do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 {
 	struct timespec t;
 	struct timer_list new_timer;
-	struct abs_struct abs_struct = { .list = { .next = 0 } };
+	DECLARE_WAITQUEUE(abs_wqueue, current);
+	u64 rq_time = 0;
+	s64 left;
 	int abs;
-	int rtn = 0;
-	int active;
 	struct restart_block *restart_block =
 	    &current_thread_info()->restart_block;
 
+	abs_wqueue.flags = 0;
 	init_timer(&new_timer);
 	new_timer.expires = 0;
 	new_timer.data = (unsigned long) current;
@@ -1226,54 +1220,50 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 		 * time and continue.
 		 */
 		restart_block->fn = do_no_restart_syscall;
-		if (!restart_block->arg2)
-			return -EINTR;
 
-		new_timer.expires = restart_block->arg2;
-		if (time_before(new_timer.expires, jiffies))
+		rq_time = restart_block->arg3;
+		rq_time = (rq_time << 32) + restart_block->arg2;
+		if (!rq_time)
+			return -EINTR;
+		if (rq_time <= get_jiffies_64())
 			return 0;
 	}
 
 	if (abs && (posix_clocks[which_clock].clock_get !=
 		    posix_clocks[CLOCK_MONOTONIC].clock_get)) {
-		spin_lock_irq(&nanosleep_abs_list_lock);
-		list_add(&abs_struct.list, &nanosleep_abs_list);
-		abs_struct.t = current;
-		spin_unlock_irq(&nanosleep_abs_list_lock);
+		add_wait_queue(&nanosleep_abs_wqueue, &abs_wqueue);
 	}
 	do {
 		t = *tsave;
-		if ((abs || !new_timer.expires) &&
-		    !(rtn = adjust_abs_time(&posix_clocks[which_clock],
-					    &t, abs))) {
-			/*
-			 * On error, we don't set up the timer so
-			 * we don't arm the timer so
-			 * del_timer_sync() will return 0, thus
-			 * active is zero... and so it goes.
-			 */
+		if (abs || !rq_time){
+			adjust_abs_time(&posix_clocks[which_clock], &t, abs);
 
-			tstojiffie(&t,
-				   posix_clocks[which_clock].res,
-				   &new_timer.expires);
+			tstojiffie(&t, posix_clocks[which_clock].res, &rq_time);
 		}
-		if (new_timer.expires) {
-			current->state = TASK_INTERRUPTIBLE;
-			add_timer(&new_timer);
-
-			schedule();
+#if (BITS_PER_LONG < 64)
+		if ((rq_time - get_jiffies_64()) > MAX_JIFFY_OFFSET){
+			new_timer.expires = MAX_JIFFY_OFFSET;
+		}else
+#endif
+		{
+			new_timer.expires = (long)rq_time;
 		}
-	}
-	while ((active = del_timer_sync(&new_timer)) &&
-	       !test_thread_flag(TIF_SIGPENDING));
+		current->state = TASK_INTERRUPTIBLE;
+		add_timer(&new_timer);
 
-	if (abs_struct.list.next) {
-		spin_lock_irq(&nanosleep_abs_list_lock);
-		list_del(&abs_struct.list);
-		spin_unlock_irq(&nanosleep_abs_list_lock);
+		schedule();
+
+		del_timer_sync(&new_timer);
+		left = rq_time - get_jiffies_64();
 	}
-	if (active) {
-		long jiffies_left;
+	while ( (left > 0)  &&
+		!test_thread_flag(TIF_SIGPENDING));
+
+	if( abs_wqueue.task_list.next)
+		finish_wait(&nanosleep_abs_wqueue, &abs_wqueue);
+
+	if (left > 0) {
+		unsigned long rmd;
 
 		/*
 		 * Always restart abs calls from scratch to pick up any
@@ -1282,29 +1272,19 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 		if (abs)
 			return -ERESTARTNOHAND;
 
-		jiffies_left = new_timer.expires - jiffies;
+		tsave->tv_sec = div_long_long_rem(left, HZ, &rmd);
+		tsave->tv_nsec = rmd * (NSEC_PER_SEC / HZ);
 
-		if (jiffies_left < 0)
-			return 0;
-
-		jiffies_to_timespec(jiffies_left, tsave);
-
-		while (tsave->tv_nsec < 0) {
-			tsave->tv_nsec += NSEC_PER_SEC;
-			tsave->tv_sec--;
-		}
-		if (tsave->tv_sec < 0) {
-			tsave->tv_sec = 0;
-			tsave->tv_nsec = 1;
-		}
 		restart_block->fn = clock_nanosleep_restart;
 		restart_block->arg0 = which_clock;
 		restart_block->arg1 = (unsigned long)tsave;
-		restart_block->arg2 = new_timer.expires;
+		restart_block->arg2 = rq_time & 0xffffffffLL;
+		restart_block->arg3 = rq_time >> 32;
+
 		return -ERESTART_RESTARTBLOCK;
 	}
 
-	return rtn;
+	return 0;
 }
 /*
  * This will restart either clock_nanosleep or clock_nanosleep
