@@ -42,7 +42,7 @@
 (pUStk)	addl r22=IA64_RBS_OFFSET,r1;		/* compute base of register backing store */	\
 	;;											\
 (pUStk)	mov r24=ar.rnat;									\
-(pKStk) dep r1=0,sp,61,3;				/* compute physical addr of sp	*/	\
+(pKStk) tpa r1=sp;				/* compute physical addr of sp	*/		\
 (pUStk)	addl r1=IA64_STK_OFFSET-IA64_PT_REGS_SIZE,r1;	/* compute base of memory stack */	\
 (pUStk)	mov r23=ar.bspstore;				/* save ar.bspstore */			\
 (pUStk)	dep r22=-1,r22,61,3;			/* compute kernel virtual addr of RBS */	\
