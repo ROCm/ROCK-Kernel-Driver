@@ -112,7 +112,7 @@ static struct tc_action_ops *tc_lookup_action(struct rtattr *kind)
 	if (kind) {
 		read_lock(&act_mod_lock);
 		for (a = act_base; a; a = a->next) {
-			if (strcmp((char*)RTA_DATA(kind), a->kind) == 0) {
+			if (rtattr_strcmp(kind, a->kind) == 0) {
 				if (!try_module_get(a->owner)) {
 					read_unlock(&act_mod_lock);
 					return NULL;

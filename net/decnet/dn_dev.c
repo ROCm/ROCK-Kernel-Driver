@@ -662,7 +662,7 @@ static int dn_dev_rtm_deladdr(struct sk_buff *skb, struct nlmsghdr *nlh, void *a
 	for(ifap = &dn_db->ifa_list; (ifa=*ifap) != NULL; ifap = &ifa->ifa_next) {
 		void *tmp = rta[IFA_LOCAL-1];
 		if ((tmp && memcmp(RTA_DATA(tmp), &ifa->ifa_local, 2)) ||
-				(rta[IFA_LABEL-1] && strcmp(RTA_DATA(rta[IFA_LABEL-1]), ifa->ifa_label)))
+		    (rta[IFA_LABEL-1] && rtattr_strcmp(rta[IFA_LABEL-1], ifa->ifa_label)))
 			continue;
 
 		dn_dev_del_ifa(dn_db, ifap, 1);

@@ -399,7 +399,7 @@ static int inet_rtm_deladdr(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg
 		     memcmp(RTA_DATA(rta[IFA_LOCAL - 1]),
 			    &ifa->ifa_local, 4)) ||
 		    (rta[IFA_LABEL - 1] &&
-		     strcmp(RTA_DATA(rta[IFA_LABEL - 1]), ifa->ifa_label)) ||
+		     rtattr_strcmp(rta[IFA_LABEL - 1], ifa->ifa_label)) ||
 		    (rta[IFA_ADDRESS - 1] &&
 		     (ifm->ifa_prefixlen != ifa->ifa_prefixlen ||
 		      !inet_ifa_match(*(u32*)RTA_DATA(rta[IFA_ADDRESS - 1]),
