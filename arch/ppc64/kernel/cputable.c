@@ -144,6 +144,15 @@ struct cpu_spec	cpu_specs[] = {
 	    __setup_cpu_power4,
 	    COMMON_PPC64_FW
     },
+    {	/* Power5 */
+	    0xffff0000, 0x003b0000, "POWER5 (gs)",
+	    CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE |
+	    CPU_FTR_PPCAS_ARCH_V2,
+	    COMMON_USER_PPC64,
+	    128, 128,
+	    __setup_cpu_power4,
+	    COMMON_PPC64_FW
+    },
     {	/* default match */
 	    0x00000000, 0x00000000, "POWER4 (compatible)",
   	    CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE |
