@@ -420,6 +420,8 @@ CONFIG_CLPS7500_FLASH=y
 # CONFIG_ISO9660_FS is not set
 CONFIG_MINIX_FS=y
 # CONFIG_NTFS_FS is not set
+# CONFIG_NTFS_DEBUG is not set
+# CONFIG_NTFS_RW is not set
 # CONFIG_HPFS_FS is not set
 CONFIG_PROC_FS=y
 # CONFIG_DEVFS_FS is not set
