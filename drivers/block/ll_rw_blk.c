@@ -1509,11 +1509,6 @@ void blk_put_request(struct request *req)
 	req->q = NULL;
 	req->rl = NULL;
 
-	if (q) {
-		if (q->last_merge == &req->queuelist)
-			q->last_merge = NULL;
-	}
-
 	/*
 	 * Request may not have originated from ll_rw_blk. if not,
 	 * it didn't come out of our reserved rq pools

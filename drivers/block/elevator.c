@@ -344,6 +344,16 @@ void elv_remove_request(request_queue_t *q, struct request *rq)
 {
 	elevator_t *e = &q->elevator;
 
+	/*
+	 * the main clearing point for q->last_merge is on retrieval of
+	 * request by driver (it calls elv_next_request()), but it _can_
+	 * also happen here if a request is added to the queue but later
+	 * deleted without ever being given to driver (merged with another
+	 * request).
+	 */
+	if (&rq->queuelist == q->last_merge)
+		q->last_merge = NULL;
+
 	if (e->elevator_remove_req_fn)
 		e->elevator_remove_req_fn(q, rq);
 }
