@@ -221,7 +221,7 @@ int register_chrdev(unsigned int major, const char *name,
 out:
 	kobject_put(&cdev->kobj);
 out2:
-	__unregister_chrdev_region(cd->major, 0, 256);
+	kfree(__unregister_chrdev_region(cd->major, 0, 256));
 	return err;
 }
 
@@ -366,7 +366,10 @@ int cdev_add(struct cdev *p, dev_t dev, unsigned count)
 	int err = kobject_add(&p->kobj);
 	if (err)
 		return err;
-	return kobj_map(cdev_map, dev, count, NULL, exact_match, exact_lock, p);
+	err = kobj_map(cdev_map, dev, count, NULL, exact_match, exact_lock, p);
+	if (err)
+		kobject_del(&p->kobj);
+	return err;
 }
 
 void cdev_unmap(dev_t dev, unsigned count)
