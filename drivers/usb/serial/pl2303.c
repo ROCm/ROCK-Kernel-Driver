@@ -1,7 +1,7 @@
 /*
  * Prolific PL2303 USB to serial adaptor driver
  *
- * Copyright (C) 2001-2003 Greg Kroah-Hartman (greg@kroah.com)
+ * Copyright (C) 2001-2004 Greg Kroah-Hartman (greg@kroah.com)
  * Copyright (C) 2003 IBM Corp.
  *
  * Original driver for 2.2.x by anonymous
@@ -45,6 +45,7 @@
 #include <linux/tty_flip.h>
 #include <linux/serial.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/spinlock.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
@@ -834,6 +835,6 @@ module_exit(pl2303_exit);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
 
