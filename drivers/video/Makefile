@@ -34,7 +34,11 @@ obj-$(CONFIG_FB_CYBER)            += cyberfb.o
 obj-$(CONFIG_FB_CYBER2000)        += cyber2000fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 obj-$(CONFIG_FB_GBE)              += gbefb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 obj-$(CONFIG_FB_SGIVW)            += sgivwfb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
-obj-$(CONFIG_FB_3DFX)             += tdfxfb.o cfbimgblt.o
+obj-$(CONFIG_FB_3DFX)             += tdfxfb.o tdfxfb_lib.o
+tdfxfb_lib-y                      := cfbimgblt.o
+ifneq ($(CONFIG_FB_3DFX_ACCEL),y)
+tdfxfb_lib-y                      += cfbfillrect.o cfbcopyarea.o
+endif
 obj-$(CONFIG_FB_MAC)              += macfb.o macmodes.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o 
 obj-$(CONFIG_FB_HP300)            += hpfb.o cfbfillrect.o cfbimgblt.o
 obj-$(CONFIG_FB_OF)               += offb.o cfbfillrect.o cfbimgblt.o cfbcopyarea.o
