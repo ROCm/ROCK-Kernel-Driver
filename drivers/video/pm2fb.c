@@ -112,8 +112,7 @@ static struct fb_fix_screeninfo pm2fb_fix __initdata = {
 };
 
 /*
- * Default video mode. In case the modedb doesn't work, or we're
- * a module (in which case modedb doesn't really work).
+ * Default video mode. In case the modedb doesn't work.
  */
 static struct fb_var_screeninfo pm2fb_var __initdata = {
 	/* "640x480, 8 bpp @ 60 Hz */
@@ -1153,13 +1152,11 @@ static int __devinit pm2fb_probe(struct pci_dev *pdev,
 	info->flags		= FBINFO_DEFAULT |
                                   FBINFO_HWACCEL_YPAN;
 
-#ifndef MODULE
 	if (!mode)
 		mode = "640x480@60";
 	 
 	err = fb_find_mode(&info->var, info, mode, NULL, 0, NULL, 8); 
 	if (!err || err == 4)
-#endif
 		info->var = pm2fb_var;
 
 	if (fb_alloc_cmap(&info->cmap, 256, 0) < 0)
