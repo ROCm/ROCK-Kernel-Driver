@@ -549,11 +549,10 @@ static int ds_open(struct inode *inode, struct file *file)
 
 static int ds_release(struct inode *inode, struct file *file)
 {
-    socket_t i = iminor(inode);
     struct pcmcia_bus_socket *s;
     user_info_t *user, **link;
 
-    DEBUG(0, "ds_release(socket %d)\n", i);
+    DEBUG(0, "ds_release(socket %d)\n", iminor(inode));
 
     user = file->private_data;
     if (CHECK_USER(user))
@@ -585,12 +584,11 @@ out:
 static ssize_t ds_read(struct file *file, char *buf,
 		       size_t count, loff_t *ppos)
 {
-    socket_t i = iminor(file->f_dentry->d_inode);
     struct pcmcia_bus_socket *s;
     user_info_t *user;
     int ret;
 
-    DEBUG(2, "ds_read(socket %d)\n", i);
+    DEBUG(2, "ds_read(socket %d)\n", iminor(inode));
     
     if (count < 4)
 	return -EINVAL;
@@ -615,11 +613,10 @@ static ssize_t ds_read(struct file *file, char *buf,
 static ssize_t ds_write(struct file *file, const char *buf,
 			size_t count, loff_t *ppos)
 {
-    socket_t i = iminor(file->f_dentry->d_inode);
     struct pcmcia_bus_socket *s;
     user_info_t *user;
 
-    DEBUG(2, "ds_write(socket %d)\n", i);
+    DEBUG(2, "ds_write(socket %d)\n", iminor(inode));
     
     if (count != 4)
 	return -EINVAL;
@@ -650,11 +647,10 @@ static ssize_t ds_write(struct file *file, const char *buf,
 /* No kernel lock - fine */
 static u_int ds_poll(struct file *file, poll_table *wait)
 {
-    socket_t i = iminor(file->f_dentry->d_inode);
     struct pcmcia_bus_socket *s;
     user_info_t *user;
 
-    DEBUG(2, "ds_poll(socket %d)\n", i);
+    DEBUG(2, "ds_poll(socket %d)\n", iminor(inode));
     
     user = file->private_data;
     if (CHECK_USER(user))
@@ -675,14 +671,13 @@ static u_int ds_poll(struct file *file, poll_table *wait)
 static int ds_ioctl(struct inode * inode, struct file * file,
 		    u_int cmd, u_long arg)
 {
-    socket_t i = iminor(inode);
     struct pcmcia_bus_socket *s;
     u_int size;
     int ret, err;
     ds_ioctl_arg_t buf;
     user_info_t *user;
 
-    DEBUG(2, "ds_ioctl(socket %d, %#x, %#lx)\n", i, cmd, arg);
+    DEBUG(2, "ds_ioctl(socket %d, %#x, %#lx)\n", iminor(inode), cmd, arg);
     
     user = file->private_data;
     if (CHECK_USER(user))
