@@ -360,21 +360,21 @@ int aac_sa_init(struct aac_dev *dev)
 	if((dev->regs.sa = (struct sa_registers *)ioremap((unsigned long)dev->scsi_host_ptr->base, 8192))==NULL)
 	{	
 		printk(KERN_WARNING "aacraid: unable to map ARM.\n" );
-		return -1;
+		goto error_iounmap;
 	}
 	/*
 	 *	Check to see if the board failed any self tests.
 	 */
 	if (sa_readl(dev, Mailbox7) & SELF_TEST_FAILED) {
 		printk(KERN_WARNING "%s%d: adapter self-test failed.\n", name, instance);
-		return -1;
+		goto error_iounmap;
 	}
 	/*
 	 *	Check to see if the board panic'd while booting.
 	 */
 	if (sa_readl(dev, Mailbox7) & KERNEL_PANIC) {
 		printk(KERN_WARNING "%s%d: adapter kernel panic'd.\n", name, instance);
-		return -1;
+		goto error_iounmap;
 	}
 	start = jiffies;
 	/*
@@ -384,7 +384,7 @@ int aac_sa_init(struct aac_dev *dev)
 		if (time_after(jiffies, start+180*HZ)) {
 			status = sa_readl(dev, Mailbox7) >> 16;
 			printk(KERN_WARNING "%s%d: adapter kernel failed to start, init status = %d.\n", name, instance, le32_to_cpu(status));
-			return -1;
+			goto error_iounmap;
 		}
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(1);
@@ -393,7 +393,7 @@ int aac_sa_init(struct aac_dev *dev)
 	dprintk(("ATIRQ\n"));
 	if (request_irq(dev->scsi_host_ptr->irq, aac_sa_intr, SA_SHIRQ|SA_INTERRUPT, "aacraid", (void *)dev ) < 0) {
 		printk(KERN_WARNING "%s%d: Interrupt unavailable.\n", name, instance);
-		return -1;
+		goto error_iounmap;
 	}
 
 	/*
@@ -410,7 +410,7 @@ int aac_sa_init(struct aac_dev *dev)
 	dprintk(("FUNCDONE\n"));
 
 	if(aac_init_adapter(dev) == NULL)
-		return -1;
+		goto error_irq;
 
 	dprintk(("NEWADAPTDONE\n"));
 	/*
@@ -419,7 +419,7 @@ int aac_sa_init(struct aac_dev *dev)
 	dev->thread_pid = kernel_thread((int (*)(void *))aac_command_thread, dev, 0);
 	if (dev->thread_pid < 0) {
 		printk(KERN_ERR "aacraid: Unable to create command thread.\n");
-		return -1;
+		goto error_kfree;
 	}
 
 	/*
@@ -430,5 +430,17 @@ int aac_sa_init(struct aac_dev *dev)
 	aac_sa_start_adapter(dev);
 	dprintk(("STARTED\n"));
 	return 0;
+
+
+error_kfree:
+	kfree(dev->queues);
+
+error_irq:
+	free_irq(dev->scsi_host_ptr->irq, (void *)dev);
+
+error_iounmap:
+	iounmap(dev->regs.sa);
+
+	return -1;
 }
 
