@@ -72,7 +72,7 @@ struct inode_operations nfs_file_inode_operations = {
 
 static int nfs_check_flags(int flags)
 {
-	if (flags & (O_APPEND | O_DIRECT))
+	if ((flags & (O_APPEND | O_DIRECT)) == (O_APPEND | O_DIRECT))
 		return -EINVAL;
 
 	return 0;
@@ -89,7 +89,7 @@ nfs_file_open(struct inode *inode, struct file *filp)
 	int res;
 
 	res = nfs_check_flags(filp->f_flags);
-	if (!res)
+	if (res)
 		return res;
 
 	lock_kernel();
