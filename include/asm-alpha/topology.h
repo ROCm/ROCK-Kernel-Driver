@@ -6,7 +6,7 @@
 #include <asm/machvec.h>
 
 #ifdef CONFIG_NUMA
-static inline int __cpu_to_node(int cpu)
+static inline int cpu_to_node(int cpu)
 {
 	int node;
 	
@@ -23,13 +23,13 @@ static inline int __cpu_to_node(int cpu)
 	return node;
 }
 
-static inline int __node_to_cpu_mask(int node)
+static inline int node_to_cpumask(int node)
 {
 	unsigned long node_cpu_mask = 0;
 	int cpu;
 
 	for(cpu = 0; cpu < NR_CPUS; cpu++) {
-		if (cpu_online(cpu) && (__cpu_to_node(cpu) == node))
+		if (cpu_online(cpu) && (cpu_to_node(cpu) == node))
 			node_cpu_mask |= 1UL << cpu;
 	}
 
@@ -40,8 +40,8 @@ static inline int __node_to_cpu_mask(int node)
 	return node_cpu_mask;
 }
 
-# define __node_to_memblk(node)		(node)
-# define __memblk_to_node(memblk)	(memblk)
+# define node_to_memblk(node)		(node)
+# define memblk_to_node(memblk)	(memblk)
 
 #else /* CONFIG_NUMA */
 # include <asm-generic/topology.h>

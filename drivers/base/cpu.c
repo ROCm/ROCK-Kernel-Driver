@@ -35,7 +35,7 @@ struct device_driver cpu_driver = {
  */
 int __init register_cpu(struct cpu *cpu, int num, struct node *root)
 {
-	cpu->node_id = __cpu_to_node(num);
+	cpu->node_id = cpu_to_node(num);
 	cpu->sysdev.name = "cpu";
 	cpu->sysdev.id = num;
 	if (root)

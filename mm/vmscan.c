@@ -929,7 +929,7 @@ int kswapd(void *p)
 	DEFINE_WAIT(wait);
 
 	daemonize();
-	set_cpus_allowed(tsk, __node_to_cpu_mask(pgdat->node_id));
+	set_cpus_allowed(tsk, node_to_cpumask(pgdat->node_id));
 	sprintf(tsk->comm, "kswapd%d", pgdat->node_id);
 	sigfillset(&tsk->blocked);
 	
