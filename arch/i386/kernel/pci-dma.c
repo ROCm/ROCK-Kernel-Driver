@@ -72,7 +72,7 @@ void dma_free_coherent(struct device *dev, size_t size,
 int dma_declare_coherent_memory(struct device *dev, dma_addr_t bus_addr,
 				dma_addr_t device_addr, size_t size, int flags)
 {
-	void *mem_base;
+	void __iomem *mem_base;
 	int pages = size >> PAGE_SHIFT;
 	int bitmap_size = (pages + 31)/32;
 
