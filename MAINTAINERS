@@ -768,6 +768,11 @@ L:	emu10k1-devel@lists.sourceforge.net
 W:	http://sourceforge.net/projects/emu10k1/
 S:	Maintained
 
+EPSON 1355 FRAMEBUFFER DRIVER
+P:	Christopher Hoover
+M:	ch@murgatroid.com, ch@hpl.hp.com
+S:	Maintained
+
 ETHEREXPRESS-16 NETWORK DRIVER
 P:	Philip Blundell
 M:	Philip.Blundell@pobox.com
