@@ -244,7 +244,7 @@ int agp_register_driver (struct pci_dev *dev)
 	}
 
 	inter_module_register("drm_agp", THIS_MODULE, &drm_agp);
-	
+
 	pm_register(PM_PCI_DEV, PM_PCI_ID(agp_bridge.dev), agp_power);
 
 	agp_count++;
