@@ -77,8 +77,6 @@ EXPORT_SYMBOL(vm_committed_space);
 
 int mmap_use_hugepages = 0;
 int mmap_hugepages_map_sz = 256;
-/* Enable dubious MAP_HUGETLB flag */
-int kernel_map_hugetlb = 0;
 
 /*
  * Requires inode->i_mapping->i_shared_sem
@@ -792,7 +790,7 @@ unacct_error:
 }
 
 #ifdef CONFIG_HUGETLBFS
-static int mmap_hugetlb_implicit(unsigned long len)
+static int mmap_hugetlb_implicit(unsigned long len, unsigned long flags)
 {
 	/* Are we enabled? */
 	if (!mmap_use_hugepages)
@@ -800,9 +798,11 @@ static int mmap_hugetlb_implicit(unsigned long len)
 	/* Must be HPAGE aligned */
 	if (len & ~HPAGE_MASK)
 		return 0;
+	if (! (flags & MAP_SHARED))
+		return 0;
 	/* Are we capable ? */
-	if (!capable(CAP_IPC_LOCK))
-		return -EPERM;
+	if (!can_do_mlock())
+		return 0;
 	/* Are we under the minimum size? */
 	if (mmap_hugepages_map_sz
 		&& len < (mmap_hugepages_map_sz << 20))
@@ -814,7 +814,7 @@ static int mmap_hugetlb_implicit(unsigned long len)
 	return 1;
 }
 #else
-static inline int mmap_hugetlb_implicit(unsigned long len)
+static inline int mmap_hugetlb_implicit(unsigned long len, unsigned long flags)
 {
 	return 0;
 }
@@ -830,13 +830,9 @@ unsigned long __do_mmap_pgoff(struct mm_struct *mm,
 {
 	struct file *hugetlb_file = NULL;
 	int hugetlb_implicit = 0;
-	static int warn1 = 0, warn2 = 0;
 	unsigned long result;
 
 	if (file) {
-		if (kernel_map_hugetlb && (flags & MAP_HUGETLB) && !is_file_hugepages(file))
-			return -EINVAL;
-
 		if (!file->f_op || !file->f_op->mmap)
 			return -ENODEV;
 
@@ -860,13 +856,8 @@ unsigned long __do_mmap_pgoff(struct mm_struct *mm,
 	if (current->mm->map_count > sysctl_max_map_count)
 		return -ENOMEM;
 
-	if (!file && !kernel_map_hugetlb && (flags & MAP_HUGETLB) && !(warn1++))
-	       printk("MAP_HUGETLB is non-std and disabled by default!\n");
 	/* Create an implicit hugetlb file if necessary */
-	if (!file && (((flags & MAP_HUGETLB) && kernel_map_hugetlb) ||
-			(hugetlb_implicit = mmap_hugetlb_implicit(len)))) {
-		if ((flags & MAP_HUGETLB) && !(warn2++))
-			printk(KERN_CRIT "MAP_HUGETLB is deprecated and will go away!\n");
+	if (!file && (hugetlb_implicit = mmap_hugetlb_implicit(len, flags))) {
 		file = hugetlb_file = hugetlb_zero_setup(len);
 		if (IS_ERR(file)) {
 			if (!hugetlb_implicit)
