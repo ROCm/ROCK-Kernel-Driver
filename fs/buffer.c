@@ -2472,7 +2472,8 @@ static inline int buffer_busy(struct buffer_head *bh)
 		(bh->b_state & ((1 << BH_Dirty) | (1 << BH_Lock)));
 }
 
-static /*inline*/ int drop_buffers(struct page *page)
+static inline int
+drop_buffers(struct page *page, struct buffer_head **buffers_to_free)
 {
 	struct buffer_head *head = page_buffers(page);
 	struct buffer_head *bh;
@@ -2496,9 +2497,9 @@ static /*inline*/ int drop_buffers(struct page *page)
 
 		if (!list_empty(&bh->b_assoc_buffers))
 			__remove_assoc_queue(bh);
-		free_buffer_head(bh);
 		bh = next;
 	} while (bh != head);
+	*buffers_to_free = head;
 	__clear_page_buffers(page);
 	return 1;
 failed:
@@ -2508,17 +2509,20 @@ failed:
 int try_to_free_buffers(struct page *page)
 {
 	struct address_space * const mapping = page->mapping;
+	struct buffer_head *buffers_to_free = NULL;
 	int ret = 0;
 
 	BUG_ON(!PageLocked(page));
 	if (PageWriteback(page))
 		return 0;
 
-	if (mapping == NULL)		/* swapped-in anon page */
-		return drop_buffers(page);
+	if (mapping == NULL) {		/* swapped-in anon page */
+		ret = drop_buffers(page, &buffers_to_free);
+		goto out;
+	}
 
 	spin_lock(&mapping->private_lock);
-	ret = drop_buffers(page);
+	ret = drop_buffers(page, &buffers_to_free);
 	if (ret && !PageSwapCache(page)) {
 		/*
 		 * If the filesystem writes its buffers by hand (eg ext3)
@@ -2531,6 +2535,16 @@ int try_to_free_buffers(struct page *page)
 		ClearPageDirty(page);
 	}
 	spin_unlock(&mapping->private_lock);
+out:
+	if (buffers_to_free) {
+		struct buffer_head *bh = buffers_to_free;
+
+		do {
+			struct buffer_head *next = bh->b_this_page;
+			free_buffer_head(bh);
+			bh = next;
+		} while (bh != buffers_to_free);
+	}
 	return ret;
 }
 EXPORT_SYMBOL(try_to_free_buffers);
