@@ -151,18 +151,29 @@ static int PCI_RefinedAccessConfig(struct pci_bus *bus, unsigned int devfn, u8 o
  */
 int cpqhp_set_irq (u8 bus_num, u8 dev_num, u8 int_pin, u8 irq_num)
 {
-	int rc;
-	u16 temp_word;
-	struct pci_dev fakedev;
-	struct pci_bus fakebus;
+	int rc = 0;
 
 	if (cpqhp_legacy_mode) {
-		fakedev.devfn = dev_num << 3;
-		fakedev.bus = &fakebus;
-		fakebus.number = bus_num;
+		struct pci_dev *fakedev;
+		struct pci_bus *fakebus;
+		u16 temp_word;
+
+		fakedev = kmalloc(sizeof(*fakedev), GFP_KERNEL);
+		fakebus = kmalloc(sizeof(*fakebus), GFP_KERNEL);
+		if (!fakedev || !fakebus) {
+			kfree(fakedev);
+			kfree(fakebus);
+			return -ENOMEM;
+		}
+
+		fakedev->devfn = dev_num << 3;
+		fakedev->bus = fakebus;
+		fakebus->number = bus_num;
 		dbg("%s: dev %d, bus %d, pin %d, num %d\n",
 		    __FUNCTION__, dev_num, bus_num, int_pin, irq_num);
-		rc = pcibios_set_irq_routing(&fakedev, int_pin - 0x0a, irq_num);
+		rc = pcibios_set_irq_routing(fakedev, int_pin - 0x0a, irq_num);
+		kfree(fakedev);
+		kfree(fakebus);
 		dbg("%s: rc %d\n", __FUNCTION__, rc);
 		if (!rc)
 			return !rc;
@@ -176,9 +187,10 @@ int cpqhp_set_irq (u8 bus_num, u8 dev_num, u8 int_pin, u8 irq_num)
 		// This should only be for x86 as it sets the Edge Level Control Register
 		outb((u8) (temp_word & 0xFF), 0x4d0);
 		outb((u8) ((temp_word & 0xFF00) >> 8), 0x4d1);
+		rc = 0;
 	}
 
-	return 0;
+	return rc;
 }
 
 
