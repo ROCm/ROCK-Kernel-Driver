@@ -120,9 +120,13 @@ static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned i
 /*
  * Re-write a value: to be used for read-modify-write
  * cycles where the read already set up the index register.
+ *
+ * Older SiS APIC requires we rewrite the index regiser
  */
-static inline void io_apic_modify(unsigned int apic, unsigned int value)
+static inline void io_apic_modify(unsigned int apic, unsigned int reg, unsigned int value)
 {
+	if(apic_sis_bug)
+		*IO_APIC_BASE(apic) = reg;
 	*(IO_APIC_BASE(apic)+4) = value;
 }
 
