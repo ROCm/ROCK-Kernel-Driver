@@ -1578,9 +1578,6 @@ pmac_ide_build_sglist(ide_drive_t *drive, struct request *rq)
 	struct scatterlist *sg = pmif->sg_table;
 	int nents;
 
-	if (hwif->sg_dma_active)
-		BUG();
-		
 	nents = blk_rq_map_sg(drive->queue, rq, sg);
 		
 	if (rq_data_dir(rq) == READ)
@@ -1715,7 +1712,6 @@ pmac_ide_build_dmatable(ide_drive_t *drive, struct request *rq)
 		     pmif->sg_table,
 		     pmif->sg_nents,
 		     pmif->sg_dma_direction);
-	hwif->sg_dma_active = 0;
 	return 0; /* revert to PIO for this request */
 }
 
@@ -1731,7 +1727,6 @@ pmac_ide_destroy_dmatable (ide_drive_t *drive)
 	if (nents) {
 		pci_unmap_sg(dev, sg, nents, pmif->sg_dma_direction);
 		pmif->sg_nents = 0;
-		HWIF(drive)->sg_dma_active = 0;
 	}
 }
 
