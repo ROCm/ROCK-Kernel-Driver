@@ -199,7 +199,7 @@ asmlinkage int sys_ipc (unsigned call, int first, int second, unsigned long thir
 			goto out;
 			}
 		default:
-			err = -EINVAL;
+			err = -ENOSYS;
 			goto out;
 		}
 	if (call <= MSGCTL) 
@@ -218,7 +218,7 @@ asmlinkage int sys_ipc (unsigned call, int first, int second, unsigned long thir
 			err = sys_msgctl (first, second | IPC_64, (struct msqid_ds *) ptr);
 			goto out;
 		default:
-			err = -EINVAL;
+			err = -ENOSYS;
 			goto out;
 		}
 	if (call <= SHMCTL) 
@@ -236,11 +236,11 @@ asmlinkage int sys_ipc (unsigned call, int first, int second, unsigned long thir
 			err = sys_shmctl (first, second | IPC_64, (struct shmid_ds *) ptr);
 			goto out;
 		default:
-			err = -EINVAL;
+			err = -ENOSYS;
 			goto out;
 		}
 	else
-		err = -EINVAL;
+		err = -ENOSYS;
 out:
 	return err;
 }
