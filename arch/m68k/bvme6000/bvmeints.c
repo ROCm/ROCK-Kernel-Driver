@@ -21,14 +21,14 @@
 #include <asm/irq.h>
 #include <asm/traps.h>
 
-static void bvme6000_defhand (int irq, void *dev_id, struct pt_regs *fp);
+static irqreturn_t bvme6000_defhand (int irq, void *dev_id, struct pt_regs *fp);
 
 /*
  * This should ideally be 4 elements only, for speed.
  */
 
 static struct {
-	void		(*handler)(int, void *, struct pt_regs *);
+	irqreturn_t	(*handler)(int, void *, struct pt_regs *);
 	unsigned long	flags;
 	void		*dev_id;
 	const char	*devname;
@@ -60,7 +60,7 @@ void bvme6000_init_IRQ (void)
 }
 
 int bvme6000_request_irq(unsigned int irq,
-		void (*handler)(int, void *, struct pt_regs *),
+		irqreturn_t (*handler)(int, void *, struct pt_regs *),
                 unsigned long flags, const char *devname, void *dev_id)
 {
 	if (irq > 255) {
@@ -117,14 +117,15 @@ void bvme6000_free_irq(unsigned int irq, void *dev_id)
 	irq_tab[irq].devname = NULL;
 }
 
-void bvme6000_process_int (unsigned long vec, struct pt_regs *fp)
+irqreturn_t bvme6000_process_int (unsigned long vec, struct pt_regs *fp)
 {
-	if (vec > 255)
+	if (vec > 255) {
 		printk ("bvme6000_process_int: Illegal vector %ld", vec);
-	else
-	{
+		return IRQ_NONE;
+	} else {
 		irq_tab[vec].count++;
 		irq_tab[vec].handler(vec, irq_tab[vec].dev_id, fp);
+		return IRQ_HANDLED;
 	}
 }
 
@@ -142,9 +143,10 @@ int show_bvme6000_interrupts(struct seq_file *p, void *v)
 }
 
 
-static void bvme6000_defhand (int irq, void *dev_id, struct pt_regs *fp)
+static irqreturn_t bvme6000_defhand (int irq, void *dev_id, struct pt_regs *fp)
 {
 	printk ("Unknown interrupt 0x%02x\n", irq);
+	return IRQ_NONE;
 }
 
 void bvme6000_enable_irq (unsigned int irq)
