@@ -765,19 +765,13 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	i = pci_request_regions(pdev, dev->name);
-	if (i) {
-		free_netdev(dev);
-		return i;
-	}
+	if (i)
+		goto err_pci_request_regions;
 
-	{
-		void *mmio = ioremap (ioaddr, iosize);
-		if (!mmio) {
-			pci_release_regions(pdev);
-			free_netdev(dev);
-			return -ENOMEM;
-		}
-		ioaddr = (unsigned long) mmio;
+	ioaddr = (unsigned long) ioremap (ioaddr, iosize);
+	if (!ioaddr) {
+		i = -ENOMEM;
+		goto err_ioremap;
 	}
 
 	/* Work around the dropped serial bit. */
@@ -835,13 +829,9 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 		dev->mtu = mtu;
 
 	i = register_netdev(dev);
-	if (i) {
-		pci_release_regions(pdev);
-		unregister_netdev(dev);
-		free_netdev(dev);
-		pci_set_drvdata(pdev, NULL);
-		return i;
-	}
+	if (i)
+		goto err_register_netdev;
+
 	netif_carrier_off(dev);
 
 	if (netif_msg_drv(np)) {
@@ -878,6 +868,17 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 
 
 	return 0;
+
+ err_register_netdev:
+	iounmap ((void *) dev->base_addr);
+
+ err_ioremap:
+	pci_release_regions(pdev);
+	pci_set_drvdata(pdev, NULL);
+
+ err_pci_request_regions:
+	free_netdev(dev);
+	return i;
 }
 
 

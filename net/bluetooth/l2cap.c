@@ -706,7 +706,8 @@ fail:
 	return err;
 }
 
-static int l2cap_sock_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg, int len)
+static int l2cap_sock_sendmsg(struct kiocb *iocb, struct socket *sock, 
+			      struct msghdr *msg, size_t len)
 {
 	struct sock *sk = sock->sk;
 	int err = 0;

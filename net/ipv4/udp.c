@@ -478,7 +478,7 @@ static unsigned short udp_check(struct udphdr *uh, int len, unsigned long saddr,
 }
 
 int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
-		int len)
+		size_t len)
 {
 	struct inet_opt *inet = inet_sk(sk);
 	struct udp_opt *up = udp_sk(sk);
@@ -493,18 +493,7 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	int err;
 	int corkreq = up->corkflag || msg->msg_flags&MSG_MORE;
 
-	/* This check is ONLY to check for arithmetic overflow
-	   on integer(!) len. Not more! Real check will be made
-	   in ip_append_* --ANK
-
-	   BTW socket.c -> af_*.c -> ... make multiple
-	   invalid conversions size_t -> int. We MUST repair it f.e.
-	   by replacing all of them with size_t and revise all
-	   the places sort of len += sizeof(struct iphdr)
-	   If len was ULONG_MAX-10 it would be cathastrophe  --ANK
-	 */
-
-	if (len < 0 || len > 0xFFFF)
+	if (len > 0xFFFF)
 		return -EMSGSIZE;
 
 	/* 
@@ -782,7 +771,7 @@ static __inline__ int udp_checksum_complete(struct sk_buff *skb)
  */
 
 int udp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
-		int len, int noblock, int flags, int *addr_len)
+		size_t len, int noblock, int flags, int *addr_len)
 {
 	struct inet_opt *inet = inet_sk(sk);
   	struct sockaddr_in *sin = (struct sockaddr_in *)msg->msg_name;

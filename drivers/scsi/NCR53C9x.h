@@ -652,8 +652,7 @@ extern int nesps, esps_in_use, esps_running;
 
 
 /* External functions */
-extern inline void esp_cmd(struct NCR_ESP *esp, struct ESP_regs *eregs,
-			   unchar cmd);
+extern void esp_cmd(struct NCR_ESP *esp, struct ESP_regs *eregs, unchar cmd);
 extern struct NCR_ESP *esp_allocate(Scsi_Host_Template *, void *);
 extern void esp_deallocate(struct NCR_ESP *);
 extern void esp_release(void);

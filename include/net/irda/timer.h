@@ -40,14 +40,14 @@ struct lsap_cb;
 struct lap_cb;
 
 /* 
- *  Timeout definitions, some defined in IrLAP p. 92
+ *  Timeout definitions, some defined in IrLAP 6.13.5 - p. 92
  */
 #define POLL_TIMEOUT        (450*HZ/1000)    /* Must never exceed 500 ms */
 #define FINAL_TIMEOUT       (500*HZ/1000)    /* Must never exceed 500 ms */
 
 /* 
- *  Normally twice of p-timer. Note 3, IrLAP p. 60 suggests at least twice 
- *  duration of the P-timer.
+ *  Normally twice of p-timer. Note 3, IrLAP 6.3.11.2 - p. 60 suggests
+ *  at least twice duration of the P-timer.
  */
 #define WD_TIMEOUT          (POLL_TIMEOUT*2)
 

@@ -1010,7 +1010,7 @@ int rose_rx_call_request(struct sk_buff *skb, struct net_device *dev, struct ros
 }
 
 static int rose_sendmsg(struct kiocb *iocb, struct socket *sock,
-			struct msghdr *msg, int len)
+			struct msghdr *msg, size_t len)
 {
 	struct sock *sk = sock->sk;
 	rose_cb *rose = rose_sk(sk);
@@ -1174,15 +1174,15 @@ static int rose_sendmsg(struct kiocb *iocb, struct socket *sock,
 
 
 static int rose_recvmsg(struct kiocb *iocb, struct socket *sock,
-			struct msghdr *msg, int size, int flags)
+			struct msghdr *msg, size_t size, int flags)
 {
 	struct sock *sk = sock->sk;
 	rose_cb *rose = rose_sk(sk);
 	struct sockaddr_rose *srose = (struct sockaddr_rose *)msg->msg_name;
-	int copied, qbit;
+	size_t copied;
 	unsigned char *asmptr;
 	struct sk_buff *skb;
-	int n, er;
+	int n, er, qbit;
 
 	/*
 	 * This works for seqpacket too. The receiver has ordered the queue for

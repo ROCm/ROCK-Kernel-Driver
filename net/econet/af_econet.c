@@ -113,11 +113,12 @@ static void econet_insert_socket(struct hlist_head *list, struct sock *sk)
  */
 
 static int econet_recvmsg(struct kiocb *iocb, struct socket *sock,
-			  struct msghdr *msg, int len, int flags)
+			  struct msghdr *msg, size_t len, int flags)
 {
 	struct sock *sk = sock->sk;
 	struct sk_buff *skb;
-	int copied, err;
+	size_t copied;
+	int err;
 
 	msg->msg_namelen = sizeof(struct sockaddr_ec);
 
@@ -246,7 +247,7 @@ static void ec_tx_done(struct sk_buff *skb, int result)
  */
 
 static int econet_sendmsg(struct kiocb *iocb, struct socket *sock,
-			  struct msghdr *msg, int len)
+			  struct msghdr *msg, size_t len)
 {
 	struct sock *sk = sock->sk;
 	struct sockaddr_ec *saddr=(struct sockaddr_ec *)msg->msg_name;
@@ -307,6 +308,9 @@ static int econet_sendmsg(struct kiocb *iocb, struct socket *sock,
 		if (dev == NULL)
 			return -ENETDOWN;
 	}
+
+	if (len + 15 > dev->mtu)
+		return -EMSGSIZE;
 
 	if (dev->type == ARPHRD_ECONET)
 	{

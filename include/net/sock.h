@@ -418,10 +418,10 @@ struct proto {
 					int optname, char *optval, 
 					int *option);  	 
 	int			(*sendmsg)(struct kiocb *iocb, struct sock *sk,
-					   struct msghdr *msg, int len);
+					   struct msghdr *msg, size_t len);
 	int			(*recvmsg)(struct kiocb *iocb, struct sock *sk,
 					   struct msghdr *msg,
-					int len, int noblock, int flags, 
+					size_t len, int noblock, int flags, 
 					int *addr_len);
 	int			(*sendpage)(struct sock *sk, struct page *page,
 					int offset, size_t size, int flags);
@@ -609,9 +609,9 @@ extern int			sock_no_getsockopt(struct socket *, int , int,
 extern int			sock_no_setsockopt(struct socket *, int, int,
 						   char *, int);
 extern int                      sock_no_sendmsg(struct kiocb *, struct socket *,
-						struct msghdr *, int);
+						struct msghdr *, size_t);
 extern int                      sock_no_recvmsg(struct kiocb *, struct socket *,
-						struct msghdr *, int, int);
+						struct msghdr *, size_t, int);
 extern int			sock_no_mmap(struct file *file,
 					     struct socket *sock,
 					     struct vm_area_struct *vma);
