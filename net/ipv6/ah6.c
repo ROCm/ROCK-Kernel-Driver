@@ -287,7 +287,7 @@ static int ah6_init_state(struct xfrm_state *x, void *args)
 	
 	x->props.header_len = XFRM_ALIGN8(ahp->icv_trunc_len + AH_HLEN_NOICV);
 	if (x->props.mode)
-		x->props.header_len += 40;
+		x->props.header_len += sizeof(struct ipv6hdr);
 	x->data = ahp;
 
 	return 0;
