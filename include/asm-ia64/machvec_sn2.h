@@ -47,7 +47,6 @@ extern ia64_mv_inl_t sn_inl;
 extern ia64_mv_outb_t sn_outb;
 extern ia64_mv_outw_t sn_outw;
 extern ia64_mv_outl_t sn_outl;
-extern ia64_mv_mmiob_t			sn2_mmiob;
 extern ia64_mv_pci_alloc_consistent	sn_pci_alloc_consistent;
 extern ia64_mv_pci_free_consistent	sn_pci_free_consistent;
 extern ia64_mv_pci_map_single		sn_pci_map_single;
@@ -78,7 +77,6 @@ extern ia64_mv_pci_dma_supported	sn_pci_dma_supported;
 #define platform_outb			sn_outb
 #define platform_outw			sn_outw
 #define platform_outl			sn_outl
-#define platform_mmiob			sn2_mmiob
 #define platform_irq_desc		sn_irq_desc
 #define platform_irq_to_vector		sn_irq_to_vector
 #define platform_local_vector_to_irq	sn_local_vector_to_irq

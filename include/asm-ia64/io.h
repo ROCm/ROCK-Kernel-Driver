@@ -69,22 +69,6 @@ phys_to_virt (unsigned long address)
  */
 #define __ia64_mf_a()	__asm__ __volatile__ ("mf.a" ::: "memory")
 
-/**
- * __ia64_mmiob - I/O space memory barrier
- *
- * Acts as a memory mapped I/O barrier for platforms that queue writes to
- * I/O space.  This ensures that subsequent writes to I/O space arrive after
- * all previous writes.  For most ia64 platforms, this is a simple
- * 'mf.a' instruction, so the address is ignored.  For other platforms,
- * the address may be required to ensure proper ordering of writes to I/O space
- * since a 'dummy' read might be necessary to barrier the write operation.
- */
-static inline void
-__ia64_mmiob (void)
-{
-	__ia64_mf_a();
-}
-
 static inline const unsigned long
 __ia64_get_io_port_base (void)
 {
@@ -287,7 +271,6 @@ __outsl (unsigned long port, void *src, unsigned long count)
 #define __outb		platform_outb
 #define __outw		platform_outw
 #define __outl		platform_outl
-#define __mmiob         platform_mmiob
 
 #define inb(p)		__inb(p)
 #define inw(p)		__inw(p)
@@ -301,7 +284,6 @@ __outsl (unsigned long port, void *src, unsigned long count)
 #define outsb(p,s,c)	__outsb(p,s,c)
 #define outsw(p,s,c)	__outsw(p,s,c)
 #define outsl(p,s,c)	__outsl(p,s,c)
-#define mmiob()		__mmiob()
 
 /*
  * The address passed to these functions are ioremap()ped already.

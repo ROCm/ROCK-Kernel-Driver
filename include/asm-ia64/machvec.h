@@ -61,7 +61,6 @@ typedef unsigned int ia64_mv_inl_t (unsigned long);
 typedef void ia64_mv_outb_t (unsigned char, unsigned long);
 typedef void ia64_mv_outw_t (unsigned short, unsigned long);
 typedef void ia64_mv_outl_t (unsigned int, unsigned long);
-typedef void ia64_mv_mmiob_t (void);
 
 extern void machvec_noop (void);
 
@@ -110,7 +109,6 @@ extern void machvec_noop (void);
 #  define platform_outb		ia64_mv.outb
 #  define platform_outw		ia64_mv.outw
 #  define platform_outl		ia64_mv.outl
-#  define platofrm_mmiob        ia64_mv.mmiob
 # endif
 
 /* __attribute__((__aligned__(16))) is required to make size of the
@@ -149,7 +147,6 @@ struct ia64_machine_vector {
 	ia64_mv_outb_t *outb;
 	ia64_mv_outw_t *outw;
 	ia64_mv_outl_t *outl;
-	ia64_mv_mmiob_t *mmiob;
 } __attribute__((__aligned__(16)));
 
 #define MACHVEC_INIT(name)			\
@@ -184,7 +181,6 @@ struct ia64_machine_vector {
 	platform_outb,				\
 	platform_outw,				\
 	platform_outl,				\
-        platform_mmiob                          \
 }
 
 extern struct ia64_machine_vector ia64_mv;
@@ -299,9 +295,6 @@ extern ia64_mv_pci_dma_supported swiotlb_pci_dma_supported;
 #endif
 #ifndef platform_outl
 # define platform_outl		__ia64_outl
-#endif
-#ifndef platform_mmiob
-# define platform_mmiob         __ia64_mmiob
 #endif
 
 #endif /* _ASM_IA64_MACHVEC_H */
