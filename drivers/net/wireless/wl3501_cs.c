@@ -898,6 +898,7 @@ static int wl3501_unblock_interrupt(struct wl3501_card *this)
  */
 static u16 wl3501_receive(struct wl3501_card *this, u8 *bf, u16 size)
 {
+	const int offset_addr4 = offsetof(struct wl3501_rx_hdr, addr4);
 	u16 next_addr, next_addr1;
 	u8 *data = bf + 12;
 
@@ -914,10 +915,10 @@ static u16 wl3501_receive(struct wl3501_card *this, u8 *bf, u16 size)
 						    WL3501_BLKSZ -
 						    sizeof(struct
 							   wl3501_rx_hdr));
-				size -=
-				    WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr);
-				data +=
-				    WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr);
+				size -= WL3501_BLKSZ -
+					sizeof(struct wl3501_rx_hdr);
+				data += WL3501_BLKSZ -
+					sizeof(struct wl3501_rx_hdr);
 			} else {
 				wl3501_get_from_wla(this, this->start_seg +
 						    sizeof(struct
@@ -932,36 +933,31 @@ static u16 wl3501_receive(struct wl3501_card *this, u8 *bf, u16 size)
 			data += 2;
 			if (size >
 			    WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr) + 6) {
-				wl3501_get_from_wla(this, this->start_seg +
-						    sizeof(struct wl3501_rx_hdr)
-						    - 6, data,
+				wl3501_get_from_wla(this,
+						    this->start_seg +
+							offset_addr4, data,
 						    WL3501_BLKSZ -
 						    sizeof(struct wl3501_rx_hdr)
 						    + 6);
-				size =
-				    size - (WL3501_BLKSZ -
-					    sizeof(struct wl3501_rx_hdr)) + 6;
-				data +=
-				    WL3501_BLKSZ -
-				    sizeof(struct wl3501_rx_hdr) + 6;
+				size -= WL3501_BLKSZ -
+					sizeof(struct wl3501_rx_hdr) + 6;
+				data += WL3501_BLKSZ -
+					sizeof(struct wl3501_rx_hdr) + 6;
 			} else {
 				wl3501_get_from_wla(this,
 						    this->start_seg +
-						    sizeof(struct wl3501_rx_hdr)
-						    - 6, data, size);
+							offset_addr4,
+						    data, size);
 				size = 0;
 			}
 		}
 	} else {
-		if (size > WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr) - 6) {
+		if (size > WL3501_BLKSZ - offset_addr4) {
 			wl3501_get_from_wla(this, this->start_seg +
 					    sizeof(struct wl3501_rx_hdr) + 6,
-					    data, WL3501_BLKSZ -
-					    sizeof(struct wl3501_rx_hdr) - 6);
-			size = size - (WL3501_BLKSZ -
-				       sizeof(struct wl3501_rx_hdr)) - 6;
-			data +=
-			    (WL3501_BLKSZ - sizeof(struct wl3501_rx_hdr) - 6);
+					    data, WL3501_BLKSZ - offset_addr4);
+			size -= WL3501_BLKSZ - offset_addr4;
+			data += WL3501_BLKSZ - offset_addr4;
 		} else {
 			wl3501_get_from_wla(this, this->start_seg +
 					    sizeof(struct wl3501_rx_hdr) + 6,
@@ -973,8 +969,8 @@ static u16 wl3501_receive(struct wl3501_card *this, u8 *bf, u16 size)
 		if (size > WL3501_BLKSZ - 5) {
 			wl3501_get_from_wla(this, next_addr + 5, data,
 					    WL3501_BLKSZ - 5);
-			size -= (WL3501_BLKSZ - 5);
-			data += (WL3501_BLKSZ - 5);
+			size -= WL3501_BLKSZ - 5;
+			data += WL3501_BLKSZ - 5;
 			wl3501_get_from_wla(this, next_addr + 2, &next_addr1,
 					    sizeof(next_addr1));
 			next_addr = next_addr1;
@@ -2292,6 +2288,9 @@ static void wl3501_config(dev_link_t *link)
 	this->essid[2]		= 'A';
 	this->essid[3]		= 'N';
 	this->essid[4]		= 'Y';
+	this->card_name[0]	= '\0';
+	this->firmware_date[0]	= '\0';
+	this->rssi		= 255;
 	strlcpy(this->nick, "Planet WL3501", sizeof(this->nick));
 	spin_lock_init(&this->lock);
 
