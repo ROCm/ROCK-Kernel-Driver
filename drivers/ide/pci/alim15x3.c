@@ -860,7 +860,7 @@ static int __devinit alim15x3_init_one(struct pci_dev *dev, const struct pci_dev
 {
 	ide_pci_device_t *d = &ali15x3_chipsets[id->driver_data];
 	
-	if(pci_find_device(PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RADEON_IGP, NULL))
+	if(pci_find_device(PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_RS100, NULL))
 		printk(KERN_ERR "Warning: ATI Radeon IGP Northbridge is not yet fully tested.\n");
 
 #if defined(CONFIG_SPARC64)
