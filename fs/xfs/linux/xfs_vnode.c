@@ -179,19 +179,9 @@ vn_get(struct vnode *vp, vmap_t *vmap)
 	if (inode->i_state & I_FREEING)
 		return NULL;
 
-	inode = iget_locked(vmap->v_vfsp->vfs_super, vmap->v_ino);
+	inode = ilookup(vmap->v_vfsp->vfs_super, vmap->v_ino);
 	if (inode == NULL)		/* Inode not present */
 		return NULL;
-
-	/* We do not want to create new inodes via vn_get,
-	 * returning NULL here is OK.
-	 */
-	if (inode->i_state & I_NEW) {
-		make_bad_inode(inode);
-		unlock_new_inode(inode);
-		iput(inode);
-		return NULL;
-	}
 
 	vn_trace_exit(vp, "vn_get", (inst_t *)__return_address);
 	ASSERT((vp->v_flag & VPURGE) == 0);
