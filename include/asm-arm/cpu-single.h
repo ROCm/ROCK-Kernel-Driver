@@ -27,14 +27,7 @@
 #define cpu_proc_fin			__cpu_fn(CPU_NAME,_proc_fin)
 #define cpu_reset			__cpu_fn(CPU_NAME,_reset)
 #define cpu_do_idle			__cpu_fn(CPU_NAME,_do_idle)
-#define cpu_cache_clean_invalidate_all	__cpu_fn(CPU_NAME,_cache_clean_invalidate_all)
-#define cpu_cache_clean_invalidate_range __cpu_fn(CPU_NAME,_cache_clean_invalidate_range)
-#define cpu_dcache_invalidate_range	__cpu_fn(CPU_NAME,_dcache_invalidate_range)
-#define cpu_dcache_clean_range		__cpu_fn(CPU_NAME,_dcache_clean_range)
-#define cpu_dcache_clean_page		__cpu_fn(CPU_NAME,_dcache_clean_page)
-#define cpu_dcache_clean_entry		__cpu_fn(CPU_NAME,_dcache_clean_entry)
-#define cpu_icache_invalidate_range	__cpu_fn(CPU_NAME,_icache_invalidate_range)
-#define cpu_icache_invalidate_page	__cpu_fn(CPU_NAME,_icache_invalidate_page)
+#define cpu_dcache_clean_area		__cpu_fn(CPU_NAME,_dcache_clean_area)
 #define cpu_set_pgd			__cpu_fn(CPU_NAME,_set_pgd)
 #define cpu_set_pte			__cpu_fn(CPU_NAME,_set_pte)
 
@@ -46,23 +39,11 @@
 struct mm_struct;
 
 /* declare all the functions as extern */
-extern void cpu_data_abort(unsigned long pc);
 extern void cpu_check_bugs(void);
 extern void cpu_proc_init(void);
 extern void cpu_proc_fin(void);
 extern int cpu_do_idle(void);
-
-extern void cpu_cache_clean_invalidate_all(void);
-extern void cpu_cache_clean_invalidate_range(unsigned long address, unsigned long end, int flags);
-
-extern void cpu_dcache_invalidate_range(unsigned long start, unsigned long end);
-extern void cpu_dcache_clean_range(unsigned long start, unsigned long end);
-extern void cpu_dcache_clean_page(void *virt_page);
-extern void cpu_dcache_clean_entry(unsigned long address);
-
-extern void cpu_icache_invalidate_range(unsigned long start, unsigned long end);
-extern void cpu_icache_invalidate_page(void *virt_page);
-
+extern void cpu_dcache_clean_area(void *, int);
 extern void cpu_set_pgd(unsigned long pgd_phys, struct mm_struct *mm);
 extern void cpu_set_pte(pte_t *ptep, pte_t pte);
 

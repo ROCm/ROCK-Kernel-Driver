@@ -74,6 +74,9 @@ struct cpu_tlb_fns cpu_tlb;
 #ifdef MULTI_USER
 struct cpu_user_fns cpu_user;
 #endif
+#ifdef MULTI_CACHE
+struct cpu_cache_fns cpu_cache;
+#endif
 
 unsigned char aux_device_present;
 char elf_platform[ELF_PLATFORM_SIZE];
@@ -281,6 +284,9 @@ static void __init setup_processor(void)
 #endif
 #ifdef MULTI_USER
 	cpu_user = *list->user;
+#endif
+#ifdef MULTI_CACHE
+	cpu_cache = *list->cache;
 #endif
 
 	printk("CPU: %s [%08x] revision %d (ARMv%s)\n",

@@ -46,85 +46,31 @@ extern struct processor {
 	/*
 	 * Processor architecture specific
 	 */
-	struct {	/* CACHE */
-		/*
-		 * flush all caches
-		 */
-		void (*clean_invalidate_all)(void);
-		/*
-		 * flush a specific page or pages
-		 */
-		void (*clean_invalidate_range)(unsigned long address, unsigned long end, int flags);
-	} cache;
+	/*
+	 * clean a virtual address range from the
+	 * D-cache without flushing the cache.
+	 */
+	void (*dcache_clean_area)(void *addr, int size);
 
-	struct {	/* D-cache */
-		/*
-		 * invalidate the specified data range
-		 */
-		void (*invalidate_range)(unsigned long start, unsigned long end);
-		/*
-		 * clean specified data range
-		 */
-		void (*clean_range)(unsigned long start, unsigned long end);
-		/*
-		 * obsolete flush cache entry
-		 */
-		void (*clean_page)(void *virt_page);
-		/*
-		 * clean a virtual address range from the
-		 * D-cache without flushing the cache.
-		 */
-		void (*clean_entry)(unsigned long start);
-	} dcache;
-
-	struct {	/* I-cache */
-		/*
-		 * invalidate the I-cache for the specified range
-		 */
-		void (*invalidate_range)(unsigned long start, unsigned long end);
-		/*
-		 * invalidate the I-cache for the specified virtual page
-		 */
-		void (*invalidate_page)(void *virt_page);
-	} icache;
-
-	struct {	/* PageTable */
-		/*
-		 * Set the page table
-		 */
-		void (*set_pgd)(unsigned long pgd_phys, struct mm_struct *mm);
-		/*
-		 * Set a PTE
-		 */
-		void (*set_pte)(pte_t *ptep, pte_t pte);
-	} pgtable;
+	/*
+	 * Set the page table
+	 */
+	void (*switch_mm)(unsigned long pgd_phys, struct mm_struct *mm);
+	/*
+	 * Set a PTE
+	 */
+	void (*set_pte)(pte_t *ptep, pte_t pte);
 } processor;
 
-extern const struct processor arm6_processor_functions;
-extern const struct processor arm7_processor_functions;
-extern const struct processor sa110_processor_functions;
+#define cpu_check_bugs()		processor._check_bugs()
+#define cpu_proc_init()			processor._proc_init()
+#define cpu_proc_fin()			processor._proc_fin()
+#define cpu_reset(addr)			processor.reset(addr)
+#define cpu_do_idle()			processor._do_idle()
+#define cpu_dcache_clean_area(addr,sz)	processor.dcache_clean_area(addr,sz)
+#define cpu_set_pte(ptep, pte)		processor.set_pte(ptep, pte)
 
-#define cpu_check_bugs()			processor._check_bugs()
-#define cpu_proc_init()				processor._proc_init()
-#define cpu_proc_fin()				processor._proc_fin()
-#define cpu_reset(addr)				processor.reset(addr)
-#define cpu_do_idle()				processor._do_idle()
-
-#define cpu_cache_clean_invalidate_all()	processor.cache.clean_invalidate_all()
-#define cpu_cache_clean_invalidate_range(s,e,f)	processor.cache.clean_invalidate_range(s,e,f)
-
-#define cpu_dcache_clean_page(vp)		processor.dcache.clean_page(vp)
-#define cpu_dcache_clean_entry(addr)		processor.dcache.clean_entry(addr)
-#define cpu_dcache_clean_range(s,e)		processor.dcache.clean_range(s,e)
-#define cpu_dcache_invalidate_range(s,e)	processor.dcache.invalidate_range(s,e)
-
-#define cpu_icache_invalidate_range(s,e)	processor.icache.invalidate_range(s,e)
-#define cpu_icache_invalidate_page(vp)		processor.icache.invalidate_page(vp)
-
-#define cpu_set_pgd(pgd,mm)			processor.pgtable.set_pgd(pgd,mm)
-#define cpu_set_pte(ptep, pte)			processor.pgtable.set_pte(ptep, pte)
-
-#define cpu_switch_mm(pgd,mm)			cpu_set_pgd(__virt_to_phys((unsigned long)(pgd)),mm)
+#define cpu_switch_mm(pgd,mm)	processor.switch_mm(__virt_to_phys((unsigned long)(pgd)),mm)
 
 #define cpu_get_pgd()	\
 	({						\
