@@ -426,8 +426,8 @@ static void bluetooth_close (struct tty_struct *tty, struct file * filp)
 		bluetooth->open_count = 0;
 
 		/* shutdown any in-flight urbs that we know about */
-		usb_unlink_urb (bluetooth->read_urb);
-		usb_unlink_urb (bluetooth->interrupt_in_urb);
+		usb_kill_urb (bluetooth->read_urb);
+		usb_kill_urb (bluetooth->interrupt_in_urb);
 	}
 	up(&bluetooth->lock);
 }
@@ -705,7 +705,7 @@ void btusb_disable_bulk_read(struct tty_struct *tty){
 	}
 
 	if ((bluetooth->read_urb) && (bluetooth->read_urb->actual_length))
-		usb_unlink_urb(bluetooth->read_urb);
+		usb_kill_urb(bluetooth->read_urb);
 }
 #endif
 
@@ -1187,14 +1187,14 @@ static void usb_bluetooth_disconnect(struct usb_interface *intf)
 		bluetooth->open_count = 0;
 
 		if (bluetooth->read_urb) {
-			usb_unlink_urb (bluetooth->read_urb);
+			usb_kill_urb (bluetooth->read_urb);
 			usb_free_urb (bluetooth->read_urb);
 		}
 		if (bluetooth->bulk_in_buffer)
 			kfree (bluetooth->bulk_in_buffer);
 
 		if (bluetooth->interrupt_in_urb) {
-			usb_unlink_urb (bluetooth->interrupt_in_urb);
+			usb_kill_urb (bluetooth->interrupt_in_urb);
 			usb_free_urb (bluetooth->interrupt_in_urb);
 		}
 		if (bluetooth->interrupt_in_buffer)
@@ -1204,7 +1204,7 @@ static void usb_bluetooth_disconnect(struct usb_interface *intf)
 
 		for (i = 0; i < NUM_CONTROL_URBS; ++i) {
 			if (bluetooth->control_urb_pool[i]) {
-				usb_unlink_urb (bluetooth->control_urb_pool[i]);
+				usb_kill_urb (bluetooth->control_urb_pool[i]);
 				if (bluetooth->control_urb_pool[i]->transfer_buffer)
 					kfree (bluetooth->control_urb_pool[i]->transfer_buffer);
 				usb_free_urb (bluetooth->control_urb_pool[i]);
