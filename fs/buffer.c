@@ -1784,6 +1784,7 @@ done:
 	if (err == 0)
 		return ret;
 	return err;
+
 recover:
 	/*
 	 * ENOSPC, or some other error.  We may already have added some
@@ -1795,7 +1796,8 @@ recover:
 	bh = head;
 	/* Recovery: lock and submit the mapped buffers */
 	do {
-		if (buffer_mapped(bh)) {
+		get_bh(bh);
+		if (buffer_mapped(bh) && buffer_dirty(bh)) {
 			lock_buffer(bh);
 			mark_buffer_async_write(bh);
 		} else {
@@ -1805,21 +1807,21 @@ recover:
 			 */
 			clear_buffer_dirty(bh);
 		}
-		bh = bh->b_this_page;
-	} while (bh != head);
+	} while ((bh = bh->b_this_page) != head);
+	SetPageError(page);
+	BUG_ON(PageWriteback(page));
+	SetPageWriteback(page);
+	unlock_page(page);
 	do {
 		struct buffer_head *next = bh->b_this_page;
 		if (buffer_async_write(bh)) {
-			set_buffer_uptodate(bh);
 			clear_buffer_dirty(bh);
 			submit_bh(WRITE, bh);
 			nr_underway++;
 		}
+		put_bh(bh);
 		bh = next;
 	} while (bh != head);
-	BUG_ON(PageWriteback(page));
-	SetPageWriteback(page);
-	unlock_page(page);
 	goto done;
 }
 
