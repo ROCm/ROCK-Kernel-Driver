@@ -1,2 +1,2 @@
-obj-$(CONFIG_SCSI_LPFNDD) += lpfndd.o
+obj-$(CONFIG_NET_LPFC) += lpfndd.o
 lpfndd-objs := lpfcLINUXlan.o
