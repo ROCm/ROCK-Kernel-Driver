@@ -255,6 +255,7 @@ static void __init trm290_init_channel(struct ata_channel *hwif)
 	struct pci_dev *dev = hwif->pci_dev;
 
 	hwif->chipset = ide_trm290;
+	hwif->seg_boundary_mask = 0xffffffff;
 	cfgbase = pci_resource_start(dev, 4);
 	if ((dev->class & 5) && cfgbase)
 	{

@@ -40,6 +40,7 @@
 #include <linux/hdreg.h>
 #include <linux/ide.h>
 #include <linux/atapi.h>
+#include <linux/delay.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -1067,7 +1068,8 @@ static void idetape_analyze_error(struct ata_device *drive, atapi_request_sense_
 
 	if (tape->onstream && result->sense_key == 2 && result->asc == 0x53 && result->ascq == 2) {
 		clear_bit(PC_DMA_ERROR, &pc->flags);
-		ide_stall_queue(drive, HZ / 2);
+		/* FIXME: we should use timeouts here */
+		mdelay(HZ / 2 * 1000);
 		return;
 	}
 #ifdef CONFIG_BLK_DEV_IDEDMA
@@ -1434,7 +1436,8 @@ static void idetape_postpone_request(struct ata_device *drive, struct request *r
 		printk(KERN_INFO "ide-tape: idetape_postpone_request\n");
 #endif
 	tape->postponed_rq = rq;
-	ide_stall_queue(drive, tape->dsc_polling_frequency);
+	/* FIXME: we should use timeouts here */
+	mdelay(tape->dsc_polling_frequency * 1000);
 }
 
 /*

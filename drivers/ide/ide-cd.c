@@ -1617,16 +1617,11 @@ ide_cdrom_do_request(struct ata_device *drive, struct request *rq, sector_t bloc
 
 	if (rq->flags & REQ_CMD) {
 		if (CDROM_CONFIG_FLAGS(drive)->seeking) {
-			unsigned long elpased = jiffies - info->start_seek;
-
-			if (!ata_status(drive, SEEK_STAT, 0)) {
-				if (elpased < IDECD_SEEK_TIMEOUT) {
-					ide_stall_queue(drive, IDECD_SEEK_TIMER);
-					return ATA_OP_FINISHED;
-				}
+			if (ATA_OP_READY != ata_status_poll(drive, SEEK_STAT, 0, IDECD_SEEK_TIMEOUT, rq)) {
 				printk ("%s: DSC timeout\n", drive->name);
-			}
-			CDROM_CONFIG_FLAGS(drive)->seeking = 0;
+				CDROM_CONFIG_FLAGS(drive)->seeking = 0;
+			} else
+				return ATA_OP_FINISHED;
 		}
 		if (IDE_LARGE_SEEK(info->last_block, block, IDECD_SEEK_THRESHOLD) && drive->dsc_overlap) {
 			ret = cdrom_start_seek(drive, rq, block);

@@ -176,18 +176,26 @@ static void init_hwif_data(struct ata_channel *ch, unsigned int index)
 	};
 
 	unsigned int unit;
-	hw_regs_t hw;
 
 	/* bulk initialize channel & drive info with zeros */
 	memset(ch, 0, sizeof(struct ata_channel));
-	memset(&hw, 0, sizeof(hw_regs_t));
 
 	/* fill in any non-zero initial values */
 	ch->index = index;
-	ide_init_hwif_ports(&hw, ide_default_io_base(index), 0, &ch->irq);
+	ide_init_hwif_ports(&ch->hw, ide_default_io_base(index), 0, &ch->irq);
 
-	memcpy(&ch->hw, &hw, sizeof(hw));
-	memcpy(ch->io_ports, hw.io_ports, sizeof(hw.io_ports));
+	memcpy(ch->io_ports, ch->hw.io_ports, sizeof(ch->hw.io_ports));
+
+	/* Most controllers cannot do transfers across 64kB boundaries.
+	   trm290 can do transfers within a 4GB boundary, so it changes
+	   this mask accordingly. */
+	ch->seg_boundary_mask = 0xffff;
+
+	/* Some chipsets (cs5530, any others?) think a 64kB transfer
+	   is 0 byte transfer, so set the limit one sector smaller.
+	   In the future, we may default to 64kB transfers and let
+	   invidual chipsets with this problem change ch->max_segment_size. */
+	ch->max_segment_size = (1<<16) - 512;
 
 	ch->noprobe	= !ch->io_ports[IDE_DATA_OFFSET];
 #ifdef CONFIG_BLK_DEV_HD
@@ -728,7 +736,7 @@ static int __init ata_hd_setup(char *s)
 	if (s[0] >= 'a' && s[0] <= max_drive) {
 		static const char *hd_words[] = {"none", "noprobe", "nowerr", "cdrom",
 				"serialize", "autotune", "noautotune",
-				"slow", "flash", "remap", "noremap", "scsi", NULL};
+				"slow", "flash", "scsi", NULL};
 		unit = s[0] - 'a';
 		hw   = unit / MAX_DRIVES;
 		unit = unit % MAX_DRIVES;
@@ -783,13 +791,7 @@ static int __init ata_hd_setup(char *s)
 			case -9: /* "flash" */
 				drive->ata_flash = 1;
 				goto done;
-			case -10: /* "remap" */
-				drive->remap_0_to_1 = 1;
-				goto done;
-			case -11: /* "noremap" */
-				drive->remap_0_to_1 = 2;
-				goto done;
-			case -12: /* "scsi" */
+			case -10: /* "scsi" */
 #if defined(CONFIG_BLK_DEV_IDESCSI) && defined(CONFIG_SCSI)
 				drive->scsi = 1;
 				goto done;
@@ -836,14 +838,14 @@ int __init ide_setup(char *s)
 	unsigned int hw;
 	const char max_ch  = '0' + (MAX_HWIFS - 1);
 
-	printk(KERN_INFO  "ide_setup: ide%s", s);
+	printk(KERN_INFO  "ide%s", s);
 	init_global_data();
 
 #ifdef CONFIG_BLK_DEV_IDEDOUBLER
 	if (!strcmp(s, "=doubler")) {
 		extern int ide_doubler;
 
-		printk(KERN_INFO" : Enabled support for IDE doublers\n");
+		printk(KERN_INFO" : Enabled support for ATA doublers\n");
 		ide_doubler = 1;
 		return 1;
 	}
@@ -888,7 +890,7 @@ int __init ide_setup(char *s)
 		ch = &ide_hwifs[hw];
 
 
-		switch (match_parm(s+1, ide_options, vals, 1)) {
+		switch (match_parm(s + 1, ide_options, vals, 1)) {
 			case -7: /* ata66 */
 #ifdef CONFIG_PCI
 				ch->udma_four = 1;
@@ -929,7 +931,7 @@ int __init ide_setup(char *s)
 		/*
 		 * Check for specific chipset name
 		 */
-		i = match_parm(s+1, ide_words, vals, 3);
+		i = match_parm(s + 1, ide_words, vals, 3);
 
 		/*
 		 * Cryptic check to ensure chipset not already set for a channel:
@@ -956,7 +958,7 @@ int __init ide_setup(char *s)
 #ifdef CONFIG_BLK_DEV_ALI14XX
 			case -6:  /* "ali14xx" */
 			{
-				extern void init_ali14xx (void);
+				extern void init_ali14xx(void);
 				init_ali14xx();
 				goto done;
 			}
@@ -964,7 +966,7 @@ int __init ide_setup(char *s)
 #ifdef CONFIG_BLK_DEV_UMC8672
 			case -5:  /* "umc8672" */
 			{
-				extern void init_umc8672 (void);
+				extern void init_umc8672(void);
 				init_umc8672();
 				goto done;
 			}
@@ -972,7 +974,7 @@ int __init ide_setup(char *s)
 #ifdef CONFIG_BLK_DEV_DTC2278
 			case -4:  /* "dtc2278" */
 			{
-				extern void init_dtc2278 (void);
+				extern void init_dtc2278(void);
 				init_dtc2278();
 				goto done;
 			}
@@ -988,7 +990,7 @@ int __init ide_setup(char *s)
 #ifdef CONFIG_BLK_DEV_HT6560B
 			case -2:  /* "ht6560b" */
 			{
-				extern void init_ht6560b (void);
+				extern void init_ht6560b(void);
 				init_ht6560b();
 				goto done;
 			}
@@ -996,7 +998,7 @@ int __init ide_setup(char *s)
 #if CONFIG_BLK_DEV_QD65XX
 			case -1:  /* "qd65xx" */
 			{
-				extern void init_qd65xx (void);
+				extern void init_qd65xx(void);
 				init_qd65xx();
 				goto done;
 			}
@@ -1136,7 +1138,7 @@ int register_ata_driver(struct ata_operations *driver)
 EXPORT_SYMBOL(register_ata_driver);
 
 /*
- * Unregister an ATA subdriver for a particular device type.
+ * Unregister an ATA sub-driver for a particular device type.
  */
 void unregister_ata_driver(struct ata_operations *driver)
 {

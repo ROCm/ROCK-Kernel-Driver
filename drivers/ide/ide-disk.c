@@ -723,7 +723,7 @@ static int idedisk_check_media_change(struct ata_device *drive)
 
 static sector_t idedisk_capacity(struct ata_device *drive)
 {
-	return drive->capacity - drive->sect0;
+	return drive->capacity;
 }
 
 /*
