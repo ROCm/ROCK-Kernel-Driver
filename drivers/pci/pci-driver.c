@@ -241,7 +241,7 @@ pci_device_probe_static(struct pci_driver *drv, struct pci_dev *pci_dev)
 		error = drv->probe(pci_dev, id);
 	if (error >= 0) {
 		pci_dev->driver = drv;
-		return 0;
+		error = 0;
 	}
 	return error;
 }

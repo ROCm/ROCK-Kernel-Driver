@@ -1,26 +1,32 @@
-#include <linux/pci.h>
+
+#include <linux/device.h>
+#include <linux/mm.h>
+#include <asm/io.h>		/* Needed for i386 to build */
+#include <asm/scatterlist.h>	/* Needed for i386 to build */
+#include <linux/dma-mapping.h>
+#include <linux/dmapool.h>
 #include <linux/slab.h>
 #include <linux/module.h>
 
 /*
- * Pool allocator ... wraps the pci_alloc_consistent page allocator, so
+ * Pool allocator ... wraps the dma_alloc_coherent page allocator, so
  * small blocks are easily used by drivers for bus mastering controllers.
  * This should probably be sharing the guts of the slab allocator.
  */
 
-struct pci_pool {	/* the pool */
+struct dma_pool {	/* the pool */
 	struct list_head	page_list;
 	spinlock_t		lock;
 	size_t			blocks_per_page;
 	size_t			size;
-	struct pci_dev		*dev;
+	struct device		*dev;
 	size_t			allocation;
 	char			name [32];
 	wait_queue_head_t	waitq;
 	struct list_head	pools;
 };
 
-struct pci_page {	/* cacheable header for 'allocation' bytes */
+struct dma_page {	/* cacheable header for 'allocation' bytes */
 	struct list_head	page_list;
 	void			*vaddr;
 	dma_addr_t		dma;
@@ -37,12 +43,10 @@ static DECLARE_MUTEX (pools_lock);
 static ssize_t
 show_pools (struct device *dev, char *buf)
 {
-	struct pci_dev		*pdev;
 	unsigned		temp, size;
 	char			*next;
 	struct list_head	*i, *j;
 
-	pdev = container_of (dev, struct pci_dev, dev);
 	next = buf;
 	size = PAGE_SIZE;
 
@@ -51,16 +55,16 @@ show_pools (struct device *dev, char *buf)
 	next += temp;
 
 	down (&pools_lock);
-	list_for_each (i, &pdev->pools) {
-		struct pci_pool	*pool;
+	list_for_each (i, &dev->dma_pools) {
+		struct dma_pool	*pool;
 		unsigned	pages = 0, blocks = 0;
 
-		pool = list_entry (i, struct pci_pool, pools);
+		pool = list_entry (i, struct dma_pool, pools);
 
 		list_for_each (j, &pool->page_list) {
-			struct pci_page	*page;
+			struct dma_page	*page;
 
-			page = list_entry (j, struct pci_page, page_list);
+			page = list_entry (j, struct dma_page, page_list);
 			pages++;
 			blocks += page->in_use;
 		}
@@ -80,31 +84,31 @@ show_pools (struct device *dev, char *buf)
 static DEVICE_ATTR (pools, S_IRUGO, show_pools, NULL);
 
 /**
- * pci_pool_create - Creates a pool of pci consistent memory blocks, for dma.
+ * dma_pool_create - Creates a pool of consistent memory blocks, for dma.
  * @name: name of pool, for diagnostics
- * @pdev: pci device that will be doing the DMA
+ * @dev: device that will be doing the DMA
  * @size: size of the blocks in this pool.
  * @align: alignment requirement for blocks; must be a power of two
  * @allocation: returned blocks won't cross this boundary (or zero)
  * Context: !in_interrupt()
  *
- * Returns a pci allocation pool with the requested characteristics, or
- * null if one can't be created.  Given one of these pools, pci_pool_alloc()
+ * Returns a dma allocation pool with the requested characteristics, or
+ * null if one can't be created.  Given one of these pools, dma_pool_alloc()
  * may be used to allocate memory.  Such memory will all have "consistent"
  * DMA mappings, accessible by the device and its driver without using
  * cache flushing primitives.  The actual size of blocks allocated may be
  * larger than requested because of alignment.
  *
- * If allocation is nonzero, objects returned from pci_pool_alloc() won't
+ * If allocation is nonzero, objects returned from dma_pool_alloc() won't
  * cross that size boundary.  This is useful for devices which have
  * addressing restrictions on individual DMA transfers, such as not crossing
  * boundaries of 4KBytes.
  */
-struct pci_pool *
-pci_pool_create (const char *name, struct pci_dev *pdev,
+struct dma_pool *
+dma_pool_create (const char *name, struct device *dev,
 	size_t size, size_t align, size_t allocation)
 {
-	struct pci_pool		*retval;
+	struct dma_pool		*retval;
 
 	if (align == 0)
 		align = 1;
@@ -131,7 +135,7 @@ pci_pool_create (const char *name, struct pci_dev *pdev,
 
 	strlcpy (retval->name, name, sizeof retval->name);
 
-	retval->dev = pdev;
+	retval->dev = dev;
 
 	INIT_LIST_HEAD (&retval->page_list);
 	spin_lock_init (&retval->lock);
@@ -140,12 +144,12 @@ pci_pool_create (const char *name, struct pci_dev *pdev,
 	retval->blocks_per_page = allocation / size;
 	init_waitqueue_head (&retval->waitq);
 
-	if (pdev) {
+	if (dev) {
 		down (&pools_lock);
-		if (list_empty (&pdev->pools))
-			device_create_file (&pdev->dev, &dev_attr_pools);
+		if (list_empty (&dev->dma_pools))
+			device_create_file (dev, &dev_attr_pools);
 		/* note:  not currently insisting "name" be unique */
-		list_add (&retval->pools, &pdev->pools);
+		list_add (&retval->pools, &dev->dma_pools);
 		up (&pools_lock);
 	} else
 		INIT_LIST_HEAD (&retval->pools);
@@ -154,22 +158,23 @@ pci_pool_create (const char *name, struct pci_dev *pdev,
 }
 
 
-static struct pci_page *
-pool_alloc_page (struct pci_pool *pool, int mem_flags)
+static struct dma_page *
+pool_alloc_page (struct dma_pool *pool, int mem_flags)
 {
-	struct pci_page	*page;
+	struct dma_page	*page;
 	int		mapsize;
 
 	mapsize = pool->blocks_per_page;
 	mapsize = (mapsize + BITS_PER_LONG - 1) / BITS_PER_LONG;
 	mapsize *= sizeof (long);
 
-	page = (struct pci_page *) kmalloc (mapsize + sizeof *page, mem_flags);
+	page = (struct dma_page *) kmalloc (mapsize + sizeof *page, mem_flags);
 	if (!page)
 		return 0;
-	page->vaddr = pci_alloc_consistent (pool->dev,
+	page->vaddr = dma_alloc_coherent (pool->dev,
 					    pool->allocation,
-					    &page->dma);
+					    &page->dma,
+					    mem_flags);
 	if (page->vaddr) {
 		memset (page->bitmap, 0xff, mapsize);	// bit set == free
 #ifdef	CONFIG_DEBUG_SLAB
@@ -197,44 +202,47 @@ is_page_busy (int blocks, unsigned long *bitmap)
 }
 
 static void
-pool_free_page (struct pci_pool *pool, struct pci_page *page)
+pool_free_page (struct dma_pool *pool, struct dma_page *page)
 {
 	dma_addr_t	dma = page->dma;
 
 #ifdef	CONFIG_DEBUG_SLAB
 	memset (page->vaddr, POOL_POISON_FREED, pool->allocation);
 #endif
-	pci_free_consistent (pool->dev, pool->allocation, page->vaddr, dma);
+	dma_free_coherent (pool->dev, pool->allocation, page->vaddr, dma);
 	list_del (&page->page_list);
 	kfree (page);
 }
 
 
 /**
- * pci_pool_destroy - destroys a pool of pci memory blocks.
- * @pool: pci pool that will be destroyed
+ * dma_pool_destroy - destroys a pool of dma memory blocks.
+ * @pool: dma pool that will be destroyed
  * Context: !in_interrupt()
  *
  * Caller guarantees that no more memory from the pool is in use,
  * and that nothing will try to use the pool after this call.
  */
 void
-pci_pool_destroy (struct pci_pool *pool)
+dma_pool_destroy (struct dma_pool *pool)
 {
 	down (&pools_lock);
 	list_del (&pool->pools);
-	if (pool->dev && list_empty (&pool->dev->pools))
-		device_remove_file (&pool->dev->dev, &dev_attr_pools);
+	if (pool->dev && list_empty (&pool->dev->dma_pools))
+		device_remove_file (pool->dev, &dev_attr_pools);
 	up (&pools_lock);
 
 	while (!list_empty (&pool->page_list)) {
-		struct pci_page		*page;
+		struct dma_page		*page;
 		page = list_entry (pool->page_list.next,
-				struct pci_page, page_list);
+				struct dma_page, page_list);
 		if (is_page_busy (pool->blocks_per_page, page->bitmap)) {
-			printk (KERN_ERR "pci_pool_destroy %s/%s, %p busy\n",
-				pool->dev ? pci_name(pool->dev) : NULL,
-				pool->name, page->vaddr);
+			if (pool->dev)
+				dev_err(pool->dev, "dma_pool_destroy %s, %p busy\n",
+					pool->name, page->vaddr);
+			else
+				printk (KERN_ERR "dma_pool_destroy %s, %p busy\n",
+					pool->name, page->vaddr);
 			/* leak the still-in-use consistent memory */
 			list_del (&page->page_list);
 			kfree (page);
@@ -247,9 +255,9 @@ pci_pool_destroy (struct pci_pool *pool)
 
 
 /**
- * pci_pool_alloc - get a block of consistent memory
- * @pool: pci pool that will produce the block
- * @mem_flags: SLAB_KERNEL or SLAB_ATOMIC
+ * dma_pool_alloc - get a block of consistent memory
+ * @pool: dma pool that will produce the block
+ * @mem_flags: GFP_* bitmask
  * @handle: pointer to dma address of block
  *
  * This returns the kernel virtual address of a currently unused block,
@@ -257,11 +265,11 @@ pci_pool_destroy (struct pci_pool *pool)
  * If such a memory block can't be allocated, null is returned.
  */
 void *
-pci_pool_alloc (struct pci_pool *pool, int mem_flags, dma_addr_t *handle)
+dma_pool_alloc (struct dma_pool *pool, int mem_flags, dma_addr_t *handle)
 {
 	unsigned long		flags;
 	struct list_head	*entry;
-	struct pci_page		*page;
+	struct dma_page		*page;
 	int			map, block;
 	size_t			offset;
 	void			*retval;
@@ -270,7 +278,7 @@ restart:
 	spin_lock_irqsave (&pool->lock, flags);
 	list_for_each (entry, &pool->page_list) {
 		int		i;
-		page = list_entry (entry, struct pci_page, page_list);
+		page = list_entry (entry, struct dma_page, page_list);
 		/* only cachable accesses here ... */
 		for (map = 0, i = 0;
 				i < pool->blocks_per_page;
@@ -287,7 +295,7 @@ restart:
 		}
 	}
 	if (!(page = pool_alloc_page (pool, SLAB_ATOMIC))) {
-		if (mem_flags == SLAB_KERNEL) {
+		if (mem_flags & __GFP_WAIT) {
 			DECLARE_WAITQUEUE (wait, current);
 
 			current->state = TASK_INTERRUPTIBLE;
@@ -318,16 +326,16 @@ done:
 }
 
 
-static struct pci_page *
-pool_find_page (struct pci_pool *pool, dma_addr_t dma)
+static struct dma_page *
+pool_find_page (struct dma_pool *pool, dma_addr_t dma)
 {
 	unsigned long		flags;
 	struct list_head	*entry;
-	struct pci_page		*page;
+	struct dma_page		*page;
 
 	spin_lock_irqsave (&pool->lock, flags);
 	list_for_each (entry, &pool->page_list) {
-		page = list_entry (entry, struct pci_page, page_list);
+		page = list_entry (entry, struct dma_page, page_list);
 		if (dma < page->dma)
 			continue;
 		if (dma < (page->dma + pool->allocation))
@@ -341,8 +349,8 @@ done:
 
 
 /**
- * pci_pool_free - put block back into pci pool
- * @pool: the pci pool holding the block
+ * dma_pool_free - put block back into dma pool
+ * @pool: the dma pool holding the block
  * @vaddr: virtual address of block
  * @dma: dma address of block
  *
@@ -350,16 +358,19 @@ done:
  * unless it is first re-allocated.
  */
 void
-pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t dma)
+dma_pool_free (struct dma_pool *pool, void *vaddr, dma_addr_t dma)
 {
-	struct pci_page		*page;
+	struct dma_page		*page;
 	unsigned long		flags;
 	int			map, block;
 
 	if ((page = pool_find_page (pool, dma)) == 0) {
-		printk (KERN_ERR "pci_pool_free %s/%s, %p/%lx (bad dma)\n",
-			pool->dev ? pci_name(pool->dev) : NULL,
-			pool->name, vaddr, (unsigned long) dma);
+		if (pool->dev)
+			dev_err(pool->dev, "dma_pool_free %s, %p/%lx (bad dma)\n",
+				pool->name, vaddr, (unsigned long) dma);
+		else
+			printk (KERN_ERR "dma_pool_free %s, %p/%lx (bad dma)\n",
+				pool->name, vaddr, (unsigned long) dma);
 		return;
 	}
 
@@ -370,15 +381,21 @@ pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t dma)
 
 #ifdef	CONFIG_DEBUG_SLAB
 	if (((dma - page->dma) + (void *)page->vaddr) != vaddr) {
-		printk (KERN_ERR "pci_pool_free %s/%s, %p (bad vaddr)/%Lx\n",
-			pool->dev ? pci_name(pool->dev) : NULL,
-			pool->name, vaddr, (unsigned long long) dma);
+		if (pool->dev)
+			dev_err(pool->dev, "dma_pool_free %s, %p (bad vaddr)/%Lx\n",
+				pool->name, vaddr, (unsigned long long) dma);
+		else
+			printk (KERN_ERR "dma_pool_free %s, %p (bad vaddr)/%Lx\n",
+				pool->name, vaddr, (unsigned long long) dma);
 		return;
 	}
 	if (page->bitmap [map] & (1UL << block)) {
-		printk (KERN_ERR "pci_pool_free %s/%s, dma %Lx already free\n",
-			pool->dev ? pci_name(pool->dev) : NULL,
-			pool->name, (unsigned long long)dma);
+		if (pool->dev)
+			dev_err(pool->dev, "dma_pool_free %s, dma %Lx already free\n",
+				pool->name, (unsigned long long)dma);
+		else
+			printk (KERN_ERR "dma_pool_free %s, dma %Lx already free\n",
+				pool->name, (unsigned long long)dma);
 		return;
 	}
 	memset (vaddr, POOL_POISON_FREED, pool->size);
@@ -392,13 +409,13 @@ pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t dma)
 	/*
 	 * Resist a temptation to do
 	 *    if (!is_page_busy(bpp, page->bitmap)) pool_free_page(pool, page);
-	 * it is not interrupt safe. Better have empty pages hang around.
+	 * Better have a few empty pages hang around.
 	 */
 	spin_unlock_irqrestore (&pool->lock, flags);
 }
 
 
-EXPORT_SYMBOL (pci_pool_create);
-EXPORT_SYMBOL (pci_pool_destroy);
-EXPORT_SYMBOL (pci_pool_alloc);
-EXPORT_SYMBOL (pci_pool_free);
+EXPORT_SYMBOL (dma_pool_create);
+EXPORT_SYMBOL (dma_pool_destroy);
+EXPORT_SYMBOL (dma_pool_alloc);
+EXPORT_SYMBOL (dma_pool_free);
