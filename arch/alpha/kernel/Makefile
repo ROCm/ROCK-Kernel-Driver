@@ -34,6 +34,8 @@ obj-y	 += irq_pyxis.o irq_i8259.o irq_srm.o
 
 obj-y	 += es1888.o smc37c669.o smc37c93x.o ns87312.o
 
+obj-y    += err_titan.o
+
 else
 
 # Core logic support
@@ -62,7 +64,8 @@ obj-$(CONFIG_ALPHA_PC164)	+= sys_cabriolet.o irq_i8259.o irq_srm.o \
 				   smc37c93x.o
 obj-$(CONFIG_ALPHA_DP264)	+= sys_dp264.o irq_i8259.o es1888.o smc37c669.o
 obj-$(CONFIG_ALPHA_SHARK)	+= sys_dp264.o irq_i8259.o es1888.o smc37c669.o
-obj-$(CONFIG_ALPHA_TITAN)	+= sys_titan.o irq_i8259.o smc37c669.o
+obj-$(CONFIG_ALPHA_TITAN)	+= sys_titan.o irq_i8259.o smc37c669.o \
+				   err_titan.o
 obj-$(CONFIG_ALPHA_EB64P)	+= sys_eb64p.o irq_i8259.o
 obj-$(CONFIG_ALPHA_EB66)	+= sys_eb64p.o irq_i8259.o
 obj-$(CONFIG_ALPHA_EIGER)	+= sys_eiger.o irq_i8259.o

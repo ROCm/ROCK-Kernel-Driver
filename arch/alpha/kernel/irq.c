@@ -213,7 +213,7 @@ setup_irq(unsigned int irq, struct irqaction * new)
 static struct proc_dir_entry * root_irq_dir;
 static struct proc_dir_entry * irq_dir[NR_IRQS];
 
-#ifdef CONFIG_SMP
+#ifdef CONFIG_SMP 
 static struct proc_dir_entry * smp_affinity_entry[NR_IRQS];
 static char irq_user_affinity[NR_IRQS];
 static unsigned long irq_affinity[NR_IRQS] = { [0 ... NR_IRQS-1] = ~0UL };
@@ -361,7 +361,7 @@ register_irq_proc (unsigned int irq)
 	/* create /proc/irq/1234 */
 	irq_dir[irq] = proc_mkdir(name, root_irq_dir);
 
-#ifdef CONFIG_SMP
+#ifdef CONFIG_SMP 
 	/* create /proc/irq/1234/smp_affinity */
 	entry = create_proc_entry("smp_affinity", 0600, irq_dir[irq]);
 
@@ -387,7 +387,7 @@ init_irq_proc (void)
 	/* create /proc/irq */
 	root_irq_dir = proc_mkdir("irq", 0);
 
-#ifdef CONFIG_SMP
+#ifdef CONFIG_SMP 
 	/* create /proc/irq/prof_cpu_mask */
 	entry = create_proc_entry("prof_cpu_mask", 0600, root_irq_dir);
 

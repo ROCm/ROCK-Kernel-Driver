@@ -75,7 +75,7 @@ choice
 	  Sable               AS 2000, AS 2100
 	  Shark		      DS 20L
 	  Takara              Takara
-	  Titan               Privateer
+	  Titan               AlphaServer ES45 / DS25
 	  Wildfire            AlphaServer GS 40/80/160/320
 
 	  If you don't know what to do, choose "generic".
@@ -238,6 +238,8 @@ config ALPHA_TAKARA
 
 config ALPHA_TITAN
 	bool "Titan"
+	help
+	  AlphaServer ES45/DS25 SMP based on EV68 and Titan chipset.
 
 config ALPHA_WILDFIRE
 	bool "Wildfire"

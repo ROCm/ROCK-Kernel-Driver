@@ -2,6 +2,7 @@
 #define __ALPHA_TITAN__H__
 
 #include <linux/types.h>
+#include <linux/pci.h>
 #include <asm/compiler.h>
 
 /*
@@ -293,13 +294,15 @@ union TPAchipAGPERR {
  * 		2 - pachip 0 / A Port
  *      	3 - pachip 1 / A Port
  */
-#define TITAN_HOSE(h)		(((unsigned long)(h)) << 33)
+#define TITAN_HOSE_SHIFT       (33) 
+#define TITAN_HOSE(h)		(((unsigned long)(h)) << TITAN_HOSE_SHIFT)
 #define TITAN_BASE		(IDENT_ADDR + TI_BIAS)
 #define TITAN_MEM(h)	     	(TITAN_BASE+TITAN_HOSE(h)+0x000000000UL)
 #define _TITAN_IACK_SC(h)    	(TITAN_BASE+TITAN_HOSE(h)+0x1F8000000UL)
 #define TITAN_IO(h)	     	(TITAN_BASE+TITAN_HOSE(h)+0x1FC000000UL)
 #define TITAN_CONF(h)	     	(TITAN_BASE+TITAN_HOSE(h)+0x1FE000000UL)
 
+#define TITAN_HOSE_MASK		TITAN_HOSE(3)
 #define TITAN_IACK_SC	     	_TITAN_IACK_SC(0) /* hack! */
 
 /* 
@@ -427,17 +430,8 @@ __EXTERN_INLINE void titan_outl(u32 b, unsigned long addr)
  * Memory functions.  all accesses are done through linear space.
  */
 
-__EXTERN_INLINE unsigned long titan_ioremap(unsigned long addr, 
-					    unsigned long size
-					    __attribute__((unused)))
-{
-	return addr + TITAN_MEM_BIAS;
-}
-
-__EXTERN_INLINE void titan_iounmap(unsigned long addr)
-{
-	return;
-}
+extern unsigned long titan_ioremap(unsigned long addr, unsigned long size);
+extern void titan_iounmap(unsigned long addr);
 
 __EXTERN_INLINE int titan_is_ioaddr(unsigned long addr)
 {
@@ -505,8 +499,8 @@ __EXTERN_INLINE void titan_writeq(u64 b, unsigned long addr)
 #define __writew(x,a)		titan_writew((x),(unsigned long)(a))
 #define __writel(x,a)		titan_writel((x),(unsigned long)(a))
 #define __writeq(x,a)		titan_writeq((x),(unsigned long)(a))
-#define __ioremap(a,s)		titan_ioremap((unsigned long)(a),(s))
-#define __iounmap(a)		titan_iounmap((unsigned long)(a))
+#define __ioremap(a,s)		alpha_mv.mv_ioremap((unsigned long)(a),(s))
+#define __iounmap(a)		alpha_mv.mv_iounmap((unsigned long)(a))
 #define __is_ioaddr(a)		titan_is_ioaddr((unsigned long)(a))
 
 #define inb(port) 		__inb((port))

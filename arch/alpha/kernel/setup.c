@@ -174,6 +174,7 @@ WEAK(sable_gamma_mv);
 WEAK(shark_mv);
 WEAK(sx164_mv);
 WEAK(takara_mv);
+WEAK(titan_mv);
 WEAK(webbrick_mv);
 WEAK(wildfire_mv);
 WEAK(xl_mv);
@@ -720,9 +721,9 @@ static char rawhide_names[][16] = {
 static int rawhide_indices[] = {0,0,0,1,1,2,2,3,3,4,4};
 
 static char titan_names[][16] = {
-	"0", "Privateer"
+	"DEFAULT", "Privateer", "Falcon", "Granite"
 };
-static int titan_indices[] = {0,1};
+static int titan_indices[] = {0,1,2,2,3};
 
 static char tsunami_names[][16] = {
 	"0", "DP264", "Warhol", "Windjammer", "Monet", "Clipper",
@@ -814,8 +815,10 @@ get_sysvec(unsigned long type, unsigned long variation, unsigned long cpu)
 
 	static struct alpha_machine_vector *titan_vecs[] __initdata =
 	{
-		NULL,
+		&titan_mv,		/* default   */
 		&privateer_mv,		/* privateer */
+		&titan_mv,		/* falcon    */
+		&privateer_mv,		/* granite   */
 	};
 
 	static struct alpha_machine_vector *tsunami_vecs[]  __initdata =
@@ -881,6 +884,7 @@ get_sysvec(unsigned long type, unsigned long variation, unsigned long cpu)
 				vec = eb66_vecs[eb66_indices[member]];
 			break;
 		case ST_DEC_TITAN:
+			vec = titan_vecs[0];	/* default */
 			if (member < N(titan_indices))
 				vec = titan_vecs[titan_indices[member]];
 			break;
@@ -1024,6 +1028,7 @@ get_sysnames(unsigned long type, unsigned long variation, unsigned long cpu,
 			*variation_name = rawhide_names[rawhide_indices[member]];
 		break;
 	case ST_DEC_TITAN:
+		*variation_name = titan_names[0];	/* default */
 		if (member < N(titan_indices))
 			*variation_name = titan_names[titan_indices[member]];
 		break;
