@@ -1646,6 +1646,7 @@ config SOFT_WATCHDOG
 
 endmenu
 
+source "arch/sparc64/oprofile/Kconfig"
 
 menu "Kernel hacking"
 
