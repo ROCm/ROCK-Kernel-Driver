@@ -90,6 +90,8 @@ static snd_card_t *snd_mpu401_legacy_cards[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
 
 #ifdef USE_ACPI_PNP
 
+static int acpi_driver_registered;
+
 struct mpu401_resources {
 	unsigned long port;
 	int irq;
@@ -257,28 +259,30 @@ static struct acpi_driver snd_mpu401_acpi_driver = {
 
 static int __init alsa_card_mpu401_init(void)
 {
-	int dev, cards = 0;
+	int dev, cards;
 
+#ifdef USE_ACPI_PNP
+	cards = acpi_bus_register_driver(&snd_mpu401_acpi_driver);
+	acpi_driver_registered = cards >= 0;
+#else
+	cards = 0;
+#endif
 	for (dev = 0; dev < SNDRV_CARDS; dev++) {
 		if (!enable[dev])
 			continue;
 #ifdef USE_ACPI_PNP
-		if (acpipnp[dev] && !acpi_disabled)
+		if (acpipnp[dev] && acpi_driver_registered)
 			continue;
 #endif
 		if (snd_card_mpu401_probe(dev, NULL) >= 0)
 			cards++;
 	}
-#ifdef USE_ACPI_PNP
-	if (!acpi_disabled)
-		cards += acpi_bus_register_driver(&snd_mpu401_acpi_driver);
-#endif
 	if (!cards) {
 #ifdef MODULE
 		printk(KERN_ERR "MPU-401 device not found or device busy\n");
 #endif
 #ifdef USE_ACPI_PNP
-		if (!acpi_disabled)
+		if (acpi_driver_registered)
 			acpi_bus_unregister_driver(&snd_mpu401_acpi_driver);
 #endif
 		return -ENODEV;
@@ -291,7 +295,7 @@ static void __exit alsa_card_mpu401_exit(void)
 	int idx;
 
 #ifdef USE_ACPI_PNP
-	if (!acpi_disabled)
+	if (acpi_driver_registered)
 		acpi_bus_unregister_driver(&snd_mpu401_acpi_driver);
 #endif
 	for (idx = 0; idx < SNDRV_CARDS; idx++)
