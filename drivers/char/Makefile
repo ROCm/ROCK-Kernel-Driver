@@ -13,7 +13,7 @@ obj-y	 += mem.o tty_io.o n_tty.o tty_ioctl.o pty.o misc.o random.o
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
 
 export-objs     :=	busmouse.o console.o generic_serial.o ip2main.o \
-			ite_gpio.o misc.o nvram.o random.o rtc.o \
+			ite_gpio.o keyboard.o misc.o nvram.o random.o rtc.o \
 			selection.o sonypi.o sysrq.o tty_io.o tty_ioctl.o
 
 obj-$(CONFIG_VT) += vt.o vc_screen.o consolemap.o consolemap_deftbl.o selection.o keyboard.o
