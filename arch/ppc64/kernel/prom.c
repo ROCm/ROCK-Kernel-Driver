@@ -1818,6 +1818,9 @@ int of_remove_node(struct device_node *np)
 		return -EBUSY;
 	}
 
+	if (np->iommu_table)
+		iommu_free_table(np);
+
 	write_lock(&devtree_lock);
 	OF_MARK_STALE(np);
 	remove_node_proc_entries(np);
