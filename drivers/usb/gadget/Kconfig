@@ -147,6 +147,30 @@ config USB_ETH_SA1100
 	depends on USB_ETH && USB_SA1100
 	default y
 
+config USB_GADGETFS
+	tristate "Gadget Filesystem (EXPERIMENTAL)"
+	depends on USB_GADGET && (USB_DUMMY_HCD || USB_NET2280 || USB_PXA2XX) && EXPERIMENTAL
+	help
+	  This driver provides a filesystem based API that lets user mode
+	  programs implement a single-configuration USB device, including
+	  endpoint I/O and control requests that don't relate to enumeration.
+	  All endpoints, transfer speeds, and transfer types supported by
+	  the hardware are available, through read() and write() calls.
+
+	  Say "y" to link the driver statically, or "m" to build a
+	  dynamically linked module called "gadgetfs".
+
+config USB_GADGETFS_NET2280
+	bool
+	# for now, treat the "dummy" hcd as if it were a net2280
+	depends on USB_GADGETFS && (USB_NET2280 || USB_DUMMY_HCD)
+	default y
+
+config USB_GADGETFS_PXA2XX
+	bool
+	depends on USB_GADGETFS && USB_PXA2XX
+	default y
+
 endchoice
 
 # endmenuconfig
