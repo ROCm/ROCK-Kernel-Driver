@@ -375,8 +375,10 @@ static int emu10k1_audio_ioctl(struct inode *inode, struct file *file, unsigned 
 				format = wiinst->format;
 				format.samplingrate = val;
 
-				if (emu10k1_wavein_setformat(wave_dev, &format) < 0)
+				if (emu10k1_wavein_setformat(wave_dev, &format) < 0) {
+					spin_unlock_irqrestore(&wiinst->lock, flags);
 					return -EINVAL;
+				}
 
 				val = wiinst->format.samplingrate;
 
@@ -393,8 +395,10 @@ static int emu10k1_audio_ioctl(struct inode *inode, struct file *file, unsigned 
 				format = woinst->format;
 				format.samplingrate = val;
 
-				if (emu10k1_waveout_setformat(wave_dev, &format) < 0)
+				if (emu10k1_waveout_setformat(wave_dev, &format) < 0) {
+					spin_unlock_irqrestore(&woinst->lock, flags);
 					return -EINVAL;
+				}
 
 				val = woinst->format.samplingrate;
 
@@ -430,8 +434,10 @@ static int emu10k1_audio_ioctl(struct inode *inode, struct file *file, unsigned 
 			format = wiinst->format;
 			format.channels = val ? 2 : 1;
 
-			if (emu10k1_wavein_setformat(wave_dev, &format) < 0)
+			if (emu10k1_wavein_setformat(wave_dev, &format) < 0) {
+				spin_unlock_irqrestore(&wiinst->lock, flags);
 				return -EINVAL;
+			}
 
 			val = wiinst->format.channels - 1;
 
@@ -447,8 +453,10 @@ static int emu10k1_audio_ioctl(struct inode *inode, struct file *file, unsigned 
 			format = woinst->format;
 			format.channels = val ? 2 : 1;
 
-			if (emu10k1_waveout_setformat(wave_dev, &format) < 0)
+			if (emu10k1_waveout_setformat(wave_dev, &format) < 0) {
+				spin_unlock_irqrestore(&woinst->lock, flags);
 				return -EINVAL;
+			}
 
 			val = woinst->format.channels - 1;
 
@@ -478,8 +486,10 @@ static int emu10k1_audio_ioctl(struct inode *inode, struct file *file, unsigned 
 				format = wiinst->format;
 				format.channels = val;
 
-				if (emu10k1_wavein_setformat(wave_dev, &format) < 0)
+				if (emu10k1_wavein_setformat(wave_dev, &format) < 0) {
+					spin_unlock_irqrestore(&wiinst->lock, flags);
 					return -EINVAL;
+				}
 
 				val = wiinst->format.channels;
 
@@ -495,8 +505,10 @@ static int emu10k1_audio_ioctl(struct inode *inode, struct file *file, unsigned 
 				format = woinst->format;
 				format.channels = val;
 
-				if (emu10k1_waveout_setformat(wave_dev, &format) < 0)
+				if (emu10k1_waveout_setformat(wave_dev, &format) < 0) {
+					spin_unlock_irqrestore(&woinst->lock, flags);
 					return -EINVAL;
+				}
 
 				val = woinst->format.channels;
 
@@ -542,8 +554,10 @@ static int emu10k1_audio_ioctl(struct inode *inode, struct file *file, unsigned 
 				format = wiinst->format;
 				format.bitsperchannel = val;
 
-				if (emu10k1_wavein_setformat(wave_dev, &format) < 0)
+				if (emu10k1_wavein_setformat(wave_dev, &format) < 0) {
+					spin_unlock_irqrestore(&wiinst->lock, flags);
 					return -EINVAL;
+				}
 
 				val = wiinst->format.bitsperchannel;
 
@@ -559,8 +573,10 @@ static int emu10k1_audio_ioctl(struct inode *inode, struct file *file, unsigned 
 				format = woinst->format;
 				format.bitsperchannel = val;
 
-				if (emu10k1_waveout_setformat(wave_dev, &format) < 0)
+				if (emu10k1_waveout_setformat(wave_dev, &format) < 0) {
+					spin_unlock_irqrestore(&woinst->lock, flags);
 					return -EINVAL;
+				}
 
 				val = woinst->format.bitsperchannel;
 
@@ -968,6 +984,7 @@ static int emu10k1_audio_mmap(struct file *file, struct vm_area_struct *vma)
 		for (i = 0; i < woinst->buffer.pages; i++) {
 			if (remap_page_range(vma->vm_start + (i * PAGE_SIZE), virt_to_phys(woinst->buffer.addr[i]), PAGE_SIZE, vma->vm_page_prot)) {
 				spin_unlock_irqrestore(&woinst->lock, flags);
+				unlock_kernel();
 				return -EAGAIN;
 			}
 		}

@@ -783,7 +783,10 @@ static int isapnp_set_card(char *line)
 	unsigned int id;
 	char index[16], value[32];
 
-	isapnp_info_card = NULL;
+	if (isapnp_info_card) {
+		isapnp_cfg_end();
+		isapnp_info_card = NULL;
+	}
 	line = isapnp_get_str(index, line, sizeof(index));
 	isapnp_get_str(value, line, sizeof(value));
 	idx = idx1 = simple_strtoul(index, NULL, 0);
@@ -853,10 +856,7 @@ static int isapnp_set_device(char *line)
 
 static int isapnp_autoconfigure(void)
 {
-	if (isapnp_info_device == NULL) {
-		printk("isapnp: device is not set\n");
-		return 0;
-	}
+	isapnp_cfg_end();
 	if (isapnp_info_device->active)
 		isapnp_info_device->deactivate(isapnp_info_device);
 	if (isapnp_info_device->prepare(isapnp_info_device) < 0) {
@@ -867,6 +867,13 @@ static int isapnp_autoconfigure(void)
 		printk("isapnp: cannot activate device");
 		return 0;
 	}
+	if (isapnp_cfg_begin(isapnp_info_card->number, -1)<0) {
+		printk("isapnp: configuration start sequence for card %d failed\n", isapnp_info_card->number);
+		isapnp_info_card = NULL;
+		isapnp_info_device = NULL;
+		return 1;
+	}
+	isapnp_device(isapnp_info_device->devfn);
 	return 0;
 }
 

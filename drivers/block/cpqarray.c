@@ -140,23 +140,7 @@ static int ida_release(struct inode *inode, struct file *filep);
 static int ida_ioctl(struct inode *inode, struct file *filep, unsigned int cmd, unsigned long arg);
 static int ida_ctlr_ioctl(int ctlr, int dsk, ida_ioctl_t *io);
 
-static void do_ida_request(int i);
-/*
- * This is a hack.  This driver eats a major number for each controller, and
- * sets blkdev[xxx].request_fn to each one of these so the real request
- * function knows what controller its working with.
- */
-#define DO_IDA_REQUEST(x) { do_ida_request(x); }
-
-static void do_ida_request0(request_queue_t * q) DO_IDA_REQUEST(0);
-static void do_ida_request1(request_queue_t * q) DO_IDA_REQUEST(1);
-static void do_ida_request2(request_queue_t * q) DO_IDA_REQUEST(2);
-static void do_ida_request3(request_queue_t * q) DO_IDA_REQUEST(3);
-static void do_ida_request4(request_queue_t * q) DO_IDA_REQUEST(4);
-static void do_ida_request5(request_queue_t * q) DO_IDA_REQUEST(5);
-static void do_ida_request6(request_queue_t * q) DO_IDA_REQUEST(6);
-static void do_ida_request7(request_queue_t * q) DO_IDA_REQUEST(7);
-
+static void do_ida_request(request_queue_t *q);
 static void start_io(ctlr_info_t *h);
 
 static inline void addQ(cmdlist_t **Qptr, cmdlist_t *c);
@@ -362,6 +346,50 @@ void cleanup_module(void)
 }
 #endif /* MODULE */
 
+static inline int cpq_new_segment(request_queue_t *q, struct request *rq,
+				  int max_segments)
+{
+	if (rq->nr_segments < SG_MAX) {
+		rq->nr_segments++;
+		return 1;
+	}
+	return 0;
+}
+
+static int cpq_back_merge_fn(request_queue_t *q, struct request *rq,
+			     struct buffer_head *bh, int max_segments)
+{
+	if (rq->bhtail->b_data + rq->bhtail->b_size == bh->b_data)
+		return 1;
+	return cpq_new_segment(q, rq, max_segments);
+}
+
+static int cpq_front_merge_fn(request_queue_t *q, struct request *rq,
+			     struct buffer_head *bh, int max_segments)
+{
+	if (bh->b_data + bh->b_size == rq->bh->b_data)
+		return 1;
+	return cpq_new_segment(q, rq, max_segments);
+}
+
+static int cpq_merge_requests_fn(request_queue_t *q, struct request *rq,
+				 struct request *nxt, int max_segments)
+{
+	int total_segments = rq->nr_segments + nxt->nr_segments;
+	int same_segment = 0;
+
+	if (rq->bhtail->b_data + rq->bhtail->b_size == nxt->bh->b_data) {
+		total_segments--;
+		same_segment = 1;
+	}
+
+	if (total_segments > SG_MAX)
+		return 0;
+
+	rq->nr_segments = total_segments;
+	return 1;
+}
+
 /*
  *  This is it.  Find all the controllers and register them.  I really hate
  *  stealing all these major device numbers.
@@ -369,12 +397,7 @@ void cleanup_module(void)
  */
 int __init cpqarray_init(void)
 {
-	void (*request_fns[MAX_CTLR])(request_queue_t *) = {
-		do_ida_request0, do_ida_request1,
-		do_ida_request2, do_ida_request3,
-		do_ida_request4, do_ida_request5,
-		do_ida_request6, do_ida_request7,
-	};
+	request_queue_t *q;
 	int i,j;
 	int num_cntlrs_reg = 0;
 
@@ -495,15 +518,19 @@ int __init cpqarray_init(void)
 
 		hba[i]->access.set_intr_mask(hba[i], FIFO_NOT_EMPTY);
 
-
 		ida_procinit(i);
 
-		blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR + i), 
-			request_fns[i]);		
-		blk_queue_headactive(BLK_DEFAULT_QUEUE(MAJOR_NR + i), 0);
+		q = BLK_DEFAULT_QUEUE(MAJOR_NR + i);
+		q->queuedata = hba[i];
+		blk_init_queue(q, do_ida_request);
+		blk_queue_headactive(q, 0);
 		blksize_size[MAJOR_NR+i] = ida_blocksizes + (i*256);
 		hardsect_size[MAJOR_NR+i] = ida_hardsizes + (i*256);
 		read_ahead[MAJOR_NR+i] = READ_AHEAD;
+
+		q->back_merge_fn = cpq_back_merge_fn;
+		q->front_merge_fn = cpq_front_merge_fn;
+		q->merge_requests_fn = cpq_merge_requests_fn;
 
 		ida_gendisk[i].major = MAJOR_NR + i;
 		ida_gendisk[i].major_name = "ida";
@@ -872,37 +899,34 @@ static inline cmdlist_t *removeQ(cmdlist_t **Qptr, cmdlist_t *c)
  * are in here (either via the dummy do_ida_request functions or by being
  * called from the interrupt handler
  */
-static void do_ida_request(int ctlr)
+static void do_ida_request(request_queue_t *q)
 {
-	ctlr_info_t *h = hba[ctlr];
+	ctlr_info_t *h = q->queuedata;
 	cmdlist_t *c;
 	int seg, sect;
 	char *lastdataend;
-	struct list_head * queue_head;
+	struct list_head * queue_head = &q->queue_head;
 	struct buffer_head *bh;
 	struct request *creq;
 
-	queue_head = &blk_dev[MAJOR_NR+ctlr].request_queue.queue_head;
+	if (!q)
+		BUG();
+	if (!h)
+		BUG();
 
-	if (list_empty(queue_head))
-	{
-		start_io(h);
+	if (q->plugged || list_empty(queue_head))
 		return;
-	}
 
 	creq = blkdev_entry_next_request(queue_head);
-	if (creq->rq_status == RQ_INACTIVE)
-	{	
-                start_io(h);
-                return;
-        }
+	if (creq->rq_status != RQ_ACTIVE)
+		BUG();
+	if (creq->nr_segments > SG_MAX)
+		BUG();
 
-
-	if (ctlr != MAJOR(creq->rq_dev)-MAJOR_NR ||
-		ctlr > nr_ctlr || h == NULL) 
+	if (h->ctlr != MAJOR(creq->rq_dev)-MAJOR_NR || h->ctlr > nr_ctlr)
 	{
 		printk(KERN_WARNING "doreq cmd for %d, %x at %p\n",
-				ctlr, creq->rq_dev, creq);
+				h->ctlr, creq->rq_dev, creq);
 		complete_buffers(creq->bh, 0);
 		start_io(h);
                 return;
@@ -916,12 +940,12 @@ static void do_ida_request(int ctlr)
 
 	bh = creq->bh;
 
-	c->ctlr = ctlr;
+	c->ctlr = h->ctlr;
 	c->hdr.unit = MINOR(creq->rq_dev) >> NWD_SHIFT;
 	c->hdr.size = sizeof(rblk_t) >> 2;
 	c->size += sizeof(rblk_t);
 
-	c->req.hdr.blk = ida[(ctlr<<CTLR_SHIFT) + MINOR(creq->rq_dev)].start_sect + creq->sector;
+	c->req.hdr.blk = ida[(h->ctlr<<CTLR_SHIFT) + MINOR(creq->rq_dev)].start_sect + creq->sector;
 	c->bh = bh;
 DBGPX(
 	if (bh == NULL)
@@ -933,12 +957,6 @@ DBGPX(
 	sect = 0;
 	while(bh) {
 		sect += bh->b_size/512;
-DBGPX(
-		if (bh->b_size % 512) {
-			printk("Oh damn.  %d+%d, size = %d\n", creq->sector, sect, bh->b_size);
-			panic("b_size %% 512 != 0");
-		}
-);
 		if (bh->b_data == lastdataend) {
 			c->req.sg[seg-1].size += bh->b_size;
 			lastdataend += bh->b_size;
@@ -955,29 +973,23 @@ DBGPX(	printk("Submitting %d sectors in %d segments\n", sect, seg); );
 	c->req.hdr.sg_cnt = seg;
 	c->req.hdr.blk_cnt = sect;
 
-	creq->sector += sect;
-	creq->nr_sectors -= sect;
-
-	/* Ready the next request:
-	 * Fix up creq if we still have more buffers in the buffer chain, or
-	 * mark this request as done and ready the next one.
+	/*
+	 * Since we control our own merging, we know that this request
+	 * is now fully setup and there's nothing left.
          */
-	if (creq->nr_sectors) {
-DBGPX(
-		if (bh==NULL) {
-			printk("sector=%d, nr_sectors=%d, sect=%d, seg=%d\n",
-				creq->sector, creq->nr_sectors, sect, seg);
-			panic("mother...");
-		}
-);
-		creq->bh = bh->b_reqnext;
-		bh->b_reqnext = NULL;
-DBGPX(		printk("More to do on same request %p\n", creq); );
-	} else {
-DBGPX(		printk("Done with %p\n", creq); );
-		blkdev_dequeue_request(creq);
-		end_that_request_last(creq);
+	if (creq->nr_sectors != sect) {
+		printk("ida: %ld sectors remain\n", creq->nr_sectors);
+		BUG();
 	}
+
+	blkdev_dequeue_request(creq);
+
+	/*
+	 * ehh, we can't really end the request here since it's not
+	 * even started yet. for now it shouldn't hurt though
+	 */
+DBGPX(	printk("Done with %p\n", creq); );
+	end_that_request_last(creq);
 
 	c->req.hdr.cmd = (creq->cmd == READ) ? IDA_READ : IDA_WRITE;
 	c->type = CMD_RWREQ;
@@ -1072,7 +1084,6 @@ static void do_ida_intr(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned long flags;
 	__u32 a,a1;
 
-
 	istat = h->access.intr_pending(h);
 	/* Is this interrupt for us? */
 	if (istat == 0)
@@ -1116,7 +1127,7 @@ static void do_ida_intr(int irq, void *dev_id, struct pt_regs *regs)
 	/*
 	 * See if we can queue up some more IO
 	 */
-	do_ida_request(h->ctlr);
+	do_ida_request(BLK_DEFAULT_QUEUE(MAJOR_NR + h->ctlr));
 	spin_unlock_irqrestore(&io_request_lock, flags);
 }
 

@@ -318,7 +318,7 @@ static void floppy_off(unsigned int nr);
 
 #define DEVICE_NAME "ida"
 #define TIMEOUT_VALUE (25*HZ)
-#define DEVICE_REQUEST do_ida_request0
+#define DEVICE_REQUEST do_ida_request
 #define DEVICE_NR(device) (MINOR(device) >> 4)
 
 #endif /* MAJOR_NR == whatever */

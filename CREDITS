@@ -2353,10 +2353,11 @@ E: gt8134b@prism.gatech.edu
 D: Dosemu
 
 N: Hannu Savolainen
-E: hannu@voxware.pp.fi
-D: Kernel sound drivers
-S: Hiekkalaiturintie 3 A 8
-S: 00980 Helsinki
+E: hannu@opensound.com
+D: Maintainer of the sound drivers until 2.1.x days.
+D: Original compressed boot image support.
+S: Valurink. 4A11
+S: 03600 Karkkila
 S: Finland
 
 N: Eric Schenk

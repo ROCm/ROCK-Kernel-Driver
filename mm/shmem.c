@@ -216,8 +216,6 @@ static int shmem_writepage(struct page * page)
 	swp_entry_t *entry, swap;
 
 	info = &page->mapping->host->u.shmem_i;
-	if (info->locked)
-		return 1;
 	swap = __get_swap_page(2);
 	if (!swap.val)
 		return 1;

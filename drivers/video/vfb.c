@@ -461,7 +461,7 @@ static u_long get_line_length(int xres_virtual, int bpp)
 {
     u_long length;
     
-    length = (xres_virtual+bpp-1)/bpp;
+    length = xres_virtual*bpp;
     length = (length+31)&-32;
     length >>= 3;
     return(length);

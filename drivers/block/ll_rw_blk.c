@@ -597,20 +597,9 @@ static inline void add_request(request_queue_t * q, struct request * req,
 	 */
 	list_add(&req->queue, insert_here);
 
-        /*
-	 * FIXME(eric) I don't understand why there is a need for this
-	 * special case code.  It clearly doesn't fit any more with
-	 * the new queueing architecture, and it got added in 2.3.10.
-	 * I am leaving this in here until I hear back from the COMPAQ
-	 * people.
-         */
 	major = MAJOR(req->rq_dev);
-	if (major >= COMPAQ_SMART2_MAJOR+0 && major <= COMPAQ_SMART2_MAJOR+7)
-		(q->request_fn)(q);
-	if (major >= COMPAQ_CISS_MAJOR+0 && major <= COMPAQ_CISS_MAJOR+7)
-                (q->request_fn)(q);
 	if (major >= DAC960_MAJOR+0 && major <= DAC960_MAJOR+7)
-		(q->request_fn)(q);
+		q->request_fn(q);
 }
 
 void inline blk_refill_freelist(request_queue_t *q, int rw)
