@@ -421,8 +421,8 @@ toshoboe_interrupt (int irq, void *dev_id, struct pt_regs *regs)
             }
           else
             {
-              printk (KERN_INFO __FUNCTION__
-                      "(), memory squeeze, dropping frame.\n");
+              printk (KERN_INFO
+                      "%s(), memory squeeze, dropping frame.\n", __FUNCTION__);
             }
 
           self->taskfile->recv[self->rxs].control = 0x83;
@@ -824,7 +824,7 @@ toshoboe_probe (struct pci_dev *pci_dev, const struct pci_device_id *pdid)
 
 
   if (!(dev = dev_alloc("irda%d", &err))) {
-      ERROR(__FUNCTION__ "(), dev_alloc() failed!\n");
+      ERROR("%s(), dev_alloc() failed!\n", __FUNCTION__);
       err = -ENOMEM;
       goto freebufs;
   }
@@ -843,7 +843,7 @@ toshoboe_probe (struct pci_dev *pci_dev, const struct pci_device_id *pdid)
   err = register_netdevice(dev);
   rtnl_unlock();
   if (err) {
-	  ERROR(__FUNCTION__ "(), register_netdev() failed!\n");
+	  ERROR("%s(), register_netdev() failed!\n", __FUNCTION__);
 	  /* XXX there is not freeing for dev? */
           goto freebufs;
   }
