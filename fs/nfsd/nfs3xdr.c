@@ -202,7 +202,6 @@ encode_fattr3(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 static inline u32 *
 encode_saved_post_attr(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 {
-	struct timespec  time;
 	struct inode	*inode = fhp->fh_dentry->d_inode;
 
 	/* Attributes to follow */
@@ -228,13 +227,9 @@ encode_saved_post_attr(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 	else
 		p = xdr_encode_hyper(p, (u64) inode->i_sb->s_dev);
 	p = xdr_encode_hyper(p, (u64) inode->i_ino);
-	time.tv_sec = fhp->fh_post_atime; 
-	time.tv_nsec = 0;
-	p = encode_time3(p, &time);
-	time.tv_sec = fhp->fh_post_mtime;
-	p = encode_time3(p, &time);
-	time.tv_sec = fhp->fh_post_ctime; 
-	p = encode_time3(p, &time);
+	p = encode_time3(p, &fhp->fh_post_atime);
+	p = encode_time3(p, &fhp->fh_post_mtime);
+	p = encode_time3(p, &fhp->fh_post_ctime);
 
 	return p;
 }
@@ -266,14 +261,10 @@ encode_wcc_data(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 
 	if (dentry && dentry->d_inode && fhp->fh_post_saved) {
 		if (fhp->fh_pre_saved) {
-			struct timespec time;
 			*p++ = xdr_one;
 			p = xdr_encode_hyper(p, (u64) fhp->fh_pre_size);
-			time.tv_nsec = 0;
-			time.tv_sec =  fhp->fh_pre_mtime;
-			p = encode_time3(p, &time);
-			time.tv_sec = fhp->fh_pre_ctime;
-			p = encode_time3(p, &time);
+			p = encode_time3(p, &fhp->fh_pre_mtime);
+			p = encode_time3(p, &fhp->fh_pre_ctime);
 		} else {
 			*p++ = xdr_zero;
 		}

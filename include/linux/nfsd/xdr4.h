@@ -331,9 +331,9 @@ set_change_info(struct nfsd4_change_info *cinfo, struct svc_fh *fhp)
 	BUG_ON(!fhp->fh_pre_saved || !fhp->fh_post_saved);
 	cinfo->atomic = 1;
 	cinfo->before_size = fhp->fh_pre_size;
-	cinfo->before_ctime = fhp->fh_pre_ctime;
+	cinfo->before_ctime = fhp->fh_pre_ctime.tv_sec;
 	cinfo->after_size = fhp->fh_post_size;
-	cinfo->after_ctime = fhp->fh_post_ctime;
+	cinfo->after_ctime = fhp->fh_post_ctime.tv_sec;
 }
 
 int nfs4svc_encode_voidres(struct svc_rqst *, u32 *, void *);
