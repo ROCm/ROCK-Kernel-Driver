@@ -1060,17 +1060,19 @@ static void igmp_group_dropped(struct ip_mc_list *im)
 	reporter = im->reporter;
 	igmp_stop_timer(im);
 
-	if (IGMP_V1_SEEN(in_dev))
-		goto done;
-	if (IGMP_V2_SEEN(in_dev)) {
-		if (reporter)
-			igmp_send_report(in_dev, im, IGMP_HOST_LEAVE_MESSAGE);
-		goto done;
-	}
-	/* IGMPv3 */
-	igmpv3_add_delrec(in_dev, im);
+	if (in_dev->dev->flags & IFF_UP) {
+		if (IGMP_V1_SEEN(in_dev))
+			goto done;
+		if (IGMP_V2_SEEN(in_dev)) {
+			if (reporter)
+				igmp_send_report(in_dev, im, IGMP_HOST_LEAVE_MESSAGE);
+			goto done;
+		}
+		/* IGMPv3 */
+		igmpv3_add_delrec(in_dev, im);
 
-	igmp_ifc_event(in_dev);
+		igmp_ifc_event(in_dev);
+	}
 done:
 #endif
 	ip_mc_clear_src(im);
