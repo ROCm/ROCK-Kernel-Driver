@@ -119,6 +119,7 @@ struct bio {
  * bit 1 -- rw-ahead when set
  * bit 2 -- barrier
  * bit 3 -- fail fast, don't want low level driver retries
+ * bit 4 -- synchronous I/O hint: the block layer will unplug immediately
  */
 #define BIO_RW		0
 #define BIO_RW_AHEAD	1
