@@ -128,22 +128,13 @@
       #define min(x,y) ((x) < (y) ? x : y)
    #endif
 
+   #define pci_dma_hi32(a)         ((a >> 16) >> 16)
    #define pci_dma_lo32(a)         (a & 0xffffffff)
 
    #if (BITS_PER_LONG > 32) || (defined CONFIG_HIGHMEM64G && defined IPS_HIGHIO)
       #define IPS_ENABLE_DMA64        (1)
-      #define pci_dma_hi32(a)         (a >> 32)
    #else
       #define IPS_ENABLE_DMA64        (0)
-      #define pci_dma_hi32(a)         (0)
-   #endif
-
-   #if defined(__ia64__)
-      #define IPS_ATOMIC_GFP	(GFP_DMA | GFP_ATOMIC)
-      #define IPS_INIT_GFP	GFP_DMA
-   #else
-      #define IPS_ATOMIC_GFP    GFP_ATOMIC
-      #define IPS_INIT_GFP	GFP_KERNEL
    #endif
 
    /*
@@ -1110,7 +1101,8 @@ typedef struct ips_ha {
    uint16_t           device_id;          /* PCI device ID              */
    uint8_t            slot_num;           /* PCI Slot Number            */
    uint16_t           subdevice_id;       /* Subsystem device ID        */
-   uint8_t            ioctl_order;        /* Number of pages in ioctl   */
+   int                ioctl_len;          /* size of ioctl buffer       */
+   dma_addr_t         ioctl_busaddr;      /* dma address of ioctl buffer*/
    uint8_t            bios_version[8];    /* BIOS Revision              */
    uint32_t           mem_addr;           /* Memory mapped address      */
    uint32_t           io_len;             /* Size of IO Address         */
@@ -1120,8 +1112,10 @@ typedef struct ips_ha {
    ips_hw_func_t      func;               /* hw function pointers       */
    struct pci_dev    *pcidev;             /* PCI device handle          */
    char              *flash_data;         /* Save Area for flash data   */
-   u8                 flash_order;        /* Save Area for flash size order */
+   int                flash_len;          /* length of flash buffer     */
    u32                flash_datasize;     /* Save Area for flash data size */
+   dma_addr_t         flash_busaddr;      /* dma address of flash buffer*/
+   dma_addr_t         enq_busaddr;        /* dma address of enq struct  */
    uint8_t            requires_esl;       /* Requires an EraseStripeLock */
 } ips_ha_t;
 

@@ -198,8 +198,8 @@ MODULE_PARM(ips, "s");
 #define IPS_VERSION_HIGH        "5.99"
 #define IPS_VERSION_LOW         ".01-BETA"
 
-#if !defined(__i386__) && !defined(__ia64__)
-#error "This driver has only been tested on the x86/ia64 platforms"
+#if !defined(__i386__) && !defined(__ia64__) && !defined(__x86_64__)
+#error "This driver has only been tested on the x86/ia64/x86_64 platforms"
 #endif
 
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,0)
@@ -250,8 +250,9 @@ static int ips_force_i2o = 1;	/* Always use I2O command delivery */
 static int ips_ioctlsize = IPS_IOCTL_SIZE;	/* Size of the ioctl buffer        */
 static int ips_cd_boot;			/* Booting from Manager CD         */
 static char *ips_FlashData = NULL;	/* CD Boot - Flash Data Buffer      */
+static dma_addr_t ips_flashbusaddr;
 static long ips_FlashDataInUse;		/* CD Boot - Flash Data In Use Flag */
-static uint32_t MaxLiteCmds = 32;	/* Max Active Cmds for a Lite Adapter */  
+static uint32_t MaxLiteCmds = 32;	/* Max Active Cmds for a Lite Adapter */
 static Scsi_Host_Template ips_driver_template = {
 	.detect			= ips_detect,
 	.release		= ips_release,
@@ -586,17 +587,6 @@ ips_detect(Scsi_Host_Template * SHT)
 	if (ips)
 		ips_setup(ips);
 #endif
-
-	/* If Booting from the Manager CD, Allocate a large Flash        */
-	/* Buffer ( so we won't need to allocate one for each adapter ). */
-	if (ips_cd_boot) {
-		ips_FlashData = (char *) __get_free_pages(IPS_INIT_GFP, 7);
-		if (ips_FlashData == NULL) {
-			/* The validity of this pointer is checked in ips_make_passthru() before it is used */
-			printk(KERN_WARNING
-			       "ERROR: Can't Allocate Large Buffer for Flashing\n");
-		}
-	}
 
 	for (i = 0; i < ips_num_controllers; i++) {
 		if (ips_register_scsi(i))
@@ -1628,21 +1618,20 @@ static int
 ips_alloc_passthru_buffer(ips_ha_t * ha, int length)
 {
 	void *bigger_buf;
-	int count;
-	int order;
+	dma_addr_t dma_busaddr;
 
-	if (ha->ioctl_data && length <= (PAGE_SIZE << ha->ioctl_order))
+	if (ha->ioctl_data && length <= ha->ioctl_len)
 		return 0;
 	/* there is no buffer or it's not big enough, allocate a new one */
-	for (count = PAGE_SIZE, order = 0;
-	     count < length; order++, count <<= 1) ;
-	bigger_buf = (void *) __get_free_pages(IPS_ATOMIC_GFP, order);
+	bigger_buf = pci_alloc_consistent(ha->pcidev, length, &dma_busaddr);
 	if (bigger_buf) {
 		/* free the old memory */
-		free_pages((unsigned long) ha->ioctl_data, ha->ioctl_order);
+		pci_free_consistent(ha->pcidev, ha->ioctl_len, ha->ioctl_data,
+				    ha->ioctl_busaddr);
 		/* use the new memory */
 		ha->ioctl_data = (char *) bigger_buf;
-		ha->ioctl_order = order;
+		ha->ioctl_len = length;
+		ha->ioctl_busaddr = dma_busaddr;
 	} else {
 		return -1;
 	}
@@ -1759,7 +1748,7 @@ ips_make_passthru(ips_ha_t * ha, Scsi_Cmnd * SC, ips_scb_t * scb, int intr)
 static int
 ips_flash_copperhead(ips_ha_t * ha, ips_passthru_t * pt, ips_scb_t * scb)
 {
-	int datasize, count;
+	int datasize;
 
 	/* Trombone is the only copperhead that can do packet flash, but only
 	 * for firmware. No one said it had to make sence. */
@@ -1779,24 +1768,28 @@ ips_flash_copperhead(ips_ha_t * ha, ips_passthru_t * pt, ips_scb_t * scb)
 		pt->BasicStatus = 0;
 		return ips_flash_bios(ha, pt, scb);
 	} else if (pt->CoppCP.cmd.flashfw.packet_num == 0) {
-		if (ips_FlashData && !test_and_set_bit(0, &ips_FlashDataInUse)) {
+		if (ips_FlashData && !test_and_set_bit(0, &ips_FlashDataInUse)){
 			ha->flash_data = ips_FlashData;
-			ha->flash_order = 7;
+			ha->flash_busaddr = ips_flashbusaddr;
+			ha->flash_len = PAGE_SIZE << 7;
 			ha->flash_datasize = 0;
 		} else if (!ha->flash_data) {
 			datasize = pt->CoppCP.cmd.flashfw.total_packets *
 			    pt->CoppCP.cmd.flashfw.count;
-			for (count = PAGE_SIZE, ha->flash_order = 0;
-			     count < datasize; ha->flash_order++, count <<= 1) ;
-			ha->flash_data =
-			    (char *) __get_free_pages(IPS_ATOMIC_GFP,
-						      ha->flash_order);
+			ha->flash_data = pci_alloc_consistent(ha->pcidev,
+					                      datasize,
+							      &ha->flash_busaddr);
+			if (!ha->flash_data){
+				printk(KERN_WARNING "Unable to allocate a flash buffer\n");
+				return IPS_FAILURE;
+			}
 			ha->flash_datasize = 0;
+			ha->flash_len = datasize;
 		} else
 			return IPS_FAILURE;
 	} else {
 		if (pt->CoppCP.cmd.flashfw.count + ha->flash_datasize >
-		    (PAGE_SIZE << ha->flash_order)) {
+		    ha->flash_len) {
 			ips_free_flash_copperhead(ha);
 			IPS_PRINTK(KERN_WARNING, ha->pcidev,
 				   "failed size sanity check\n");
@@ -1985,7 +1978,8 @@ ips_free_flash_copperhead(ips_ha_t * ha)
 	if (ha->flash_data == ips_FlashData)
 		test_and_clear_bit(0, &ips_FlashDataInUse);
 	else if (ha->flash_data)
-		free_pages((unsigned long) ha->flash_data, ha->flash_order);
+		pci_free_consistent(ha->pcidev, ha->flash_len, ha->flash_data,
+				    ha->flash_busaddr);
 	ha->flash_data = NULL;
 }
 
@@ -2038,12 +2032,7 @@ ips_usrcmd(ips_ha_t * ha, ips_passthru_t * pt, ips_scb_t * scb)
 
 	if (pt->CmdBSize) {
 		scb->data_len = pt->CmdBSize;
-		scb->data_busaddr = pci_map_single(ha->pcidev,
-						   ha->ioctl_data +
-						   sizeof (ips_passthru_t),
-						   pt->CmdBSize,
-						   IPS_DMA_DIR(scb));
-		scb->flags |= IPS_SCB_MAP_SINGLE;
+		scb->data_busaddr = ha->ioctl_busaddr + sizeof (ips_passthru_t);
 	} else {
 		scb->data_busaddr = 0L;
 	}
@@ -2467,9 +2456,7 @@ ips_get_bios_version(ips_ha_t * ha, int intr)
 	} else {
 		/* Morpheus Family - Send Command to the card */
 
-		buffer = kmalloc(0x1000, IPS_ATOMIC_GFP);
-		if (!buffer)
-			return;
+		buffer = ha->ioctl_data;
 
 		memset(buffer, 0, 0x1000);
 
@@ -2488,11 +2475,7 @@ ips_get_bios_version(ips_ha_t * ha, int intr)
 		scb->cmd.flashfw.total_packets = 1;
 		scb->cmd.flashfw.packet_num = 0;
 		scb->data_len = 0x1000;
-		scb->data_busaddr =
-		    pci_map_single(ha->pcidev, buffer, scb->data_len,
-				   IPS_DMA_DIR(scb));
-		scb->cmd.flashfw.buffer_addr = scb->data_busaddr;
-		scb->flags |= IPS_SCB_MAP_SINGLE;
+		scb->cmd.flashfw.buffer_addr = ha->ioctl_busaddr;
 
 		/* issue the command */
 		if (((ret =
@@ -2501,7 +2484,6 @@ ips_get_bios_version(ips_ha_t * ha, int intr)
 		    || (ret == IPS_SUCCESS_IMM)
 		    || ((scb->basic_status & IPS_GSC_STATUS_MASK) > 1)) {
 			/* Error occurred */
-			kfree(buffer);
 
 			return;
 		}
@@ -2511,11 +2493,8 @@ ips_get_bios_version(ips_ha_t * ha, int intr)
 			minor = buffer[0x1fe + 0xC0];	/* Offset 0x1fe after the header (0xc0) */
 			subminor = buffer[0x1fd + 0xC0];	/* Offset 0x1fd after the header (0xc0) */
 		} else {
-			kfree(buffer);
 			return;
 		}
-
-		kfree(buffer);
 	}
 
 	ha->bios_version[0] = hexDigits[(major & 0xF0) >> 4];
@@ -3982,11 +3961,7 @@ ips_send_cmd(ips_ha_t * ha, ips_scb_t * scb)
 			scb->cmd.basic_io.segment_4G = 0;
 			scb->cmd.basic_io.enhanced_sg = 0;
 			scb->data_len = sizeof (*ha->enq);
-			scb->data_busaddr = pci_map_single(ha->pcidev, ha->enq,
-							   scb->data_len,
-							   IPS_DMA_DIR(scb));
-			scb->cmd.basic_io.sg_addr = scb->data_busaddr;
-			scb->flags |= IPS_SCB_MAP_SINGLE;
+			scb->cmd.basic_io.sg_addr = ha->enq_busaddr;
 			ret = IPS_SUCCESS;
 			break;
 
@@ -4548,7 +4523,8 @@ ips_free(ips_ha_t * ha)
 
 	if (ha) {
 		if (ha->enq) {
-			kfree(ha->enq);
+			pci_free_consistent(ha->pcidev, sizeof(IPS_ENQ),
+					    ha->enq, ha->enq_busaddr);
 			ha->enq = NULL;
 		}
 
@@ -4576,11 +4552,11 @@ ips_free(ips_ha_t * ha)
 		}
 
 		if (ha->ioctl_data) {
-			free_pages((unsigned long) ha->ioctl_data,
-				   ha->ioctl_order);
+			pci_free_consistent(ha->pcidev, ha->ioctl_len,
+					    ha->ioctl_data, ha->ioctl_busaddr);
 			ha->ioctl_data = NULL;
 			ha->ioctl_datasize = 0;
-			ha->ioctl_order = 0;
+			ha->ioctl_len = 0;
 		}
 		ips_deallocatescbs(ha, ha->max_cmds);
 
@@ -5918,10 +5894,7 @@ ips_read_adapter_status(ips_ha_t * ha, int intr)
 	scb->cmd.basic_io.sector_count = 0;
 	scb->cmd.basic_io.log_drv = 0;
 	scb->data_len = sizeof (*ha->enq);
-	scb->data_busaddr = pci_map_single(ha->pcidev, ha->enq, scb->data_len,
-					   IPS_DMA_DIR(scb));
-	scb->cmd.basic_io.sg_addr = scb->data_busaddr;
-	scb->flags |= IPS_SCB_MAP_SINGLE;
+	scb->cmd.basic_io.sg_addr = ha->enq_busaddr;
 
 	/* send command */
 	if (((ret =
@@ -5964,10 +5937,7 @@ ips_read_subsystem_parameters(ips_ha_t * ha, int intr)
 	scb->cmd.basic_io.sector_count = 0;
 	scb->cmd.basic_io.log_drv = 0;
 	scb->data_len = sizeof (*ha->subsys);
-	scb->data_busaddr = pci_map_single(ha->pcidev, ha->subsys,
-					   scb->data_len, IPS_DMA_DIR(scb));
-	scb->cmd.basic_io.sg_addr = scb->data_busaddr;
-	scb->flags |= IPS_SCB_MAP_SINGLE;
+	scb->cmd.basic_io.sg_addr = ha->ioctl_busaddr;
 
 	/* send command */
 	if (((ret =
@@ -5976,6 +5946,7 @@ ips_read_subsystem_parameters(ips_ha_t * ha, int intr)
 	    || ((scb->basic_status & IPS_GSC_STATUS_MASK) > 1))
 		return (0);
 
+	memcpy(ha->subsys, ha->ioctl_data, sizeof(*ha->subsys));
 	return (1);
 }
 
@@ -6011,10 +5982,7 @@ ips_read_config(ips_ha_t * ha, int intr)
 	scb->cmd.basic_io.op_code = IPS_CMD_READ_CONF;
 	scb->cmd.basic_io.command_id = IPS_COMMAND_ID(ha, scb);
 	scb->data_len = sizeof (*ha->conf);
-	scb->data_busaddr = pci_map_single(ha->pcidev, ha->conf,
-					   scb->data_len, IPS_DMA_DIR(scb));
-	scb->cmd.basic_io.sg_addr = scb->data_busaddr;
-	scb->flags |= IPS_SCB_MAP_SINGLE;
+	scb->cmd.basic_io.sg_addr = ha->ioctl_busaddr;
 
 	/* send command */
 	if (((ret =
@@ -6035,7 +6003,8 @@ ips_read_config(ips_ha_t * ha, int intr)
 
 		return (0);
 	}
-
+	
+	memcpy(ha->conf, ha->ioctl_data, sizeof(*ha->conf));
 	return (1);
 }
 
@@ -6070,11 +6039,10 @@ ips_readwrite_page5(ips_ha_t * ha, int write, int intr)
 	scb->cmd.nvram.reserved = 0;
 	scb->cmd.nvram.reserved2 = 0;
 	scb->data_len = sizeof (*ha->nvram);
-	scb->data_busaddr = pci_map_single(ha->pcidev, ha->nvram,
-					   scb->data_len, IPS_DMA_DIR(scb));
-	scb->cmd.nvram.buffer_addr = scb->data_busaddr;
-	scb->flags |= IPS_SCB_MAP_SINGLE;
-
+	scb->cmd.nvram.buffer_addr = ha->ioctl_busaddr;
+	if (write)
+		memcpy(ha->ioctl_data, ha->nvram, sizeof(*ha->nvram));
+	
 	/* issue the command */
 	if (((ret =
 	      ips_send_wait(ha, scb, ips_cmd_timeout, intr)) == IPS_FAILURE)
@@ -6085,7 +6053,8 @@ ips_readwrite_page5(ips_ha_t * ha, int write, int intr)
 
 		return (0);
 	}
-
+	if (!write)
+		memcpy(ha->nvram, ha->ioctl_data, sizeof(*ha->nvram));
 	return (1);
 }
 
@@ -7240,7 +7209,6 @@ ips_init_phase1(struct pci_dev *pci_dev, int *indexPtr)
 	uint16_t subdevice_id;
 	int j;
 	int index;
-	uint32_t count;
 	dma_addr_t dma_address;
 	char *ioremap_ptr;
 	char *mem_ptr;
@@ -7365,9 +7333,13 @@ ips_init_phase1(struct pci_dev *pci_dev, int *indexPtr)
 			return ips_abort_init(ha, index);
 		}
 	}
+	if(ips_cd_boot && !ips_FlashData){
+		ips_FlashData = pci_alloc_consistent(pci_dev, PAGE_SIZE << 7,
+						     &ips_flashbusaddr);
+	}
 
-	ha->enq = kmalloc(sizeof (IPS_ENQ), IPS_INIT_GFP);
-
+	ha->enq = pci_alloc_consistent(pci_dev, sizeof (IPS_ENQ),
+				       &ha->enq_busaddr);
 	if (!ha->enq) {
 		IPS_PRINTK(KERN_WARNING, pci_dev,
 			   "Unable to allocate host inquiry structure\n");
@@ -7384,7 +7356,7 @@ ips_init_phase1(struct pci_dev *pci_dev, int *indexPtr)
 	ha->adapt->hw_status_start = dma_address;
 	ha->dummy = (void *) (ha->adapt + 1);
 
-	ha->conf = kmalloc(sizeof (IPS_CONF), IPS_INIT_GFP);
+	ha->conf = kmalloc(sizeof (IPS_CONF), GFP_KERNEL);
 
 	if (!ha->conf) {
 		IPS_PRINTK(KERN_WARNING, pci_dev,
@@ -7392,7 +7364,7 @@ ips_init_phase1(struct pci_dev *pci_dev, int *indexPtr)
 		return ips_abort_init(ha, index);
 	}
 
-	ha->nvram = kmalloc(sizeof (IPS_NVRAM_P5), IPS_INIT_GFP);
+	ha->nvram = kmalloc(sizeof (IPS_NVRAM_P5), GFP_KERNEL);
 
 	if (!ha->nvram) {
 		IPS_PRINTK(KERN_WARNING, pci_dev,
@@ -7400,7 +7372,7 @@ ips_init_phase1(struct pci_dev *pci_dev, int *indexPtr)
 		return ips_abort_init(ha, index);
 	}
 
-	ha->subsys = kmalloc(sizeof (IPS_SUBSYS), IPS_INIT_GFP);
+	ha->subsys = kmalloc(sizeof (IPS_SUBSYS), GFP_KERNEL);
 
 	if (!ha->subsys) {
 		IPS_PRINTK(KERN_WARNING, pci_dev,
@@ -7408,19 +7380,18 @@ ips_init_phase1(struct pci_dev *pci_dev, int *indexPtr)
 		return ips_abort_init(ha, index);
 	}
 
-	for (count = PAGE_SIZE, ha->ioctl_order = 0;
-	     count < ips_ioctlsize; ha->ioctl_order++, count <<= 1) ;
+	/* the ioctl buffer is now used during adapter initialization, so its
+	 * successful allocation is now required */
+	if (ips_ioctlsize < PAGE_SIZE)
+		ips_ioctlsize = PAGE_SIZE;
 
-	ha->ioctl_data =
-	    (char *) __get_free_pages(IPS_INIT_GFP, ha->ioctl_order);
-	ha->ioctl_datasize = count;
-
+	ha->ioctl_data = pci_alloc_consistent(pci_dev, ips_ioctlsize,
+					      &ha->ioctl_busaddr);
+	ha->ioctl_len = ips_ioctlsize;
 	if (!ha->ioctl_data) {
 		IPS_PRINTK(KERN_WARNING, pci_dev,
 			   "Unable to allocate IOCTL data\n");
-		ha->ioctl_data = NULL;
-		ha->ioctl_order = 0;
-		ha->ioctl_datasize = 0;
+		return ips_abort_init(ha, index);
 	}
 
 	/*
