@@ -287,6 +287,7 @@ struct net_device *__init mc32_probe(int unit)
 			
 		}
 	}
+	free_netdev(dev);
 	return ERR_PTR(-ENODEV);
 }
 
