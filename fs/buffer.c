@@ -63,7 +63,9 @@ void __buffer_error(char *file, int line)
 		return;
 	enough++;
 	printk("buffer layer error at %s:%d\n", file, line);
+#ifndef CONFIG_KALLSYMS
 	printk("Pass this trace through ksymoops for reporting\n");
+#endif
 	dump_stack();
 }
 EXPORT_SYMBOL(__buffer_error);
@@ -2633,7 +2635,7 @@ void ll_rw_block(int rw, int nr, struct buffer_head *bhs[])
  */
 static void check_ttfb_buffer(struct page *page, struct buffer_head *bh)
 {
-	if (!buffer_uptodate(bh)) {
+	if (!buffer_uptodate(bh) && !buffer_req(bh)) {
 		if (PageUptodate(page) && page->mapping
 			&& buffer_mapped(bh)	/* discard_buffer */
 			&& S_ISBLK(page->mapping->host->i_mode))
@@ -2681,7 +2683,7 @@ drop_buffers(struct page *page, struct buffer_head **buffers_to_free)
 		check_ttfb_buffer(page, bh);
 		if (buffer_busy(bh))
 			goto failed;
-		if (!buffer_uptodate(bh))
+		if (!buffer_uptodate(bh) && !buffer_req(bh))
 			was_uptodate = 0;
 		bh = bh->b_this_page;
 	} while (bh != head);
