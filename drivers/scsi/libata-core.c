@@ -377,7 +377,7 @@ void ata_tf_read(struct ata_port *ap, struct ata_taskfile *tf)
 }
 
 /**
- *	ata_check_status - Read device status reg & clear interrupt
+ *	ata_check_status_pio - Read device status reg & clear interrupt
  *	@ap: port where the device is
  *
  *	Reads ATA taskfile status register for currently-selected device
@@ -413,6 +413,27 @@ u8 ata_check_status(struct ata_port *ap)
 	if (ap->flags & ATA_FLAG_MMIO)
 		return ata_check_status_mmio(ap);
 	return ata_check_status_pio(ap);
+}
+
+u8 ata_altstatus(struct ata_port *ap)
+{
+	if (ap->ops->check_altstatus)
+		return ap->ops->check_altstatus(ap);
+
+	if (ap->flags & ATA_FLAG_MMIO)
+		return readb((void __iomem *)ap->ioaddr.altstatus_addr);
+	return inb(ap->ioaddr.altstatus_addr);
+}
+
+u8 ata_chk_err(struct ata_port *ap)
+{
+	if (ap->ops->check_err)
+		return ap->ops->check_err(ap);
+
+	if (ap->flags & ATA_FLAG_MMIO) {
+		return readb((void __iomem *) ap->ioaddr.error_addr);
+	}
+	return inb(ap->ioaddr.error_addr);
 }
 
 /**
@@ -1161,7 +1182,6 @@ err_out_nosup:
 	printk(KERN_WARNING "ata%u: dev %u not supported, ignoring\n",
 	       ap->id, device);
 err_out:
-	ata_irq_on(ap);	/* re-enable interrupts */
 	dev->class++;	/* converts ATA_DEV_xxx into ATA_DEV_xxx_UNSUP */
 	DPRINTK("EXIT, err\n");
 }
@@ -1669,7 +1689,8 @@ void ata_bus_reset(struct ata_port *ap)
 		ata_dev_try_classify(ap, 1);
 
 	/* re-enable interrupts */
-	ata_irq_on(ap);
+	if (ap->ioaddr.ctl_addr)	/* FIXME: hack. create a hook instead */
+		ata_irq_on(ap);
 
 	/* is double-select really necessary? */
 	if (ap->device[1].class != ATA_DEV_NONE)
@@ -2601,10 +2622,10 @@ static void ata_qc_timeout(struct ata_queued_cmd *qc)
 
 	case ATA_PROT_DMA:
 	case ATA_PROT_ATAPI_DMA:
-		host_stat = ata_bmdma_status(ap);
+		host_stat = ap->ops->bmdma_status(ap);
 
 		/* before we do anything else, clear DMA-Start bit */
-		ata_bmdma_stop(ap);
+		ap->ops->bmdma_stop(ap);
 
 		/* fall through */
 
@@ -2613,7 +2634,7 @@ static void ata_qc_timeout(struct ata_queued_cmd *qc)
 		drv_stat = ata_chk_status(ap);
 
 		/* ack bmdma irq events */
-		ata_bmdma_ack_irq(ap);
+		ap->ops->irq_clear(ap);
 
 		printk(KERN_ERR "ata%u: command 0x%x timeout, stat 0x%x host_stat 0x%x\n",
 		       ap->id, qc->tf.command, drv_stat, host_stat);
@@ -2749,6 +2770,24 @@ static void __ata_qc_complete(struct ata_queued_cmd *qc)
 
 	if (likely(do_clear))
 		clear_bit(tag, &ap->qactive);
+}
+
+/**
+ *	ata_qc_free - free unused ata_queued_cmd
+ *	@qc: Command to complete
+ *
+ *	Designed to free unused ata_queued_cmd object
+ *	in case something prevents using it.
+ *
+ *	LOCKING:
+ *
+ */
+void ata_qc_free(struct ata_queued_cmd *qc)
+{
+	assert(qc != NULL);	/* ata_qc_from_tag _might_ return NULL */
+	assert(qc->waiting == NULL);	/* nothing should be waiting */
+
+	__ata_qc_complete(qc);
 }
 
 /**
@@ -3042,7 +3081,43 @@ void ata_bmdma_setup(struct ata_queued_cmd *qc)
 
 void ata_bmdma_irq_clear(struct ata_port *ap)
 {
-	ata_bmdma_ack_irq(ap);
+    if (ap->flags & ATA_FLAG_MMIO) {
+        void __iomem *mmio = ((void __iomem *) ap->ioaddr.bmdma_addr) + ATA_DMA_STATUS;
+        writeb(readb(mmio), mmio);
+    } else {
+        unsigned long addr = ap->ioaddr.bmdma_addr + ATA_DMA_STATUS;
+        outb(inb(addr), addr);
+    }
+
+}
+
+u8 ata_bmdma_status(struct ata_port *ap)
+{
+	u8 host_stat;
+	if (ap->flags & ATA_FLAG_MMIO) {
+		void __iomem *mmio = (void __iomem *) ap->ioaddr.bmdma_addr;
+		host_stat = readb(mmio + ATA_DMA_STATUS);
+	} else
+	host_stat = inb(ap->ioaddr.bmdma_addr + ATA_DMA_STATUS);
+	return host_stat;
+}
+
+void ata_bmdma_stop(struct ata_port *ap)
+{
+	if (ap->flags & ATA_FLAG_MMIO) {
+		void __iomem *mmio = (void __iomem *) ap->ioaddr.bmdma_addr;
+
+		/* clear start/stop bit */
+		writeb(readb(mmio + ATA_DMA_CMD) & ~ATA_DMA_START,
+			mmio + ATA_DMA_CMD);
+	} else {
+		/* clear start/stop bit */
+		outb(inb(ap->ioaddr.bmdma_addr + ATA_DMA_CMD) & ~ATA_DMA_START,
+			ap->ioaddr.bmdma_addr + ATA_DMA_CMD);
+	}
+
+	/* one-PIO-cycle guaranteed wait, per spec, for HDMA1:0 transition */
+	ata_altstatus(ap);        /* dummy read */
 }
 
 /**
@@ -3072,7 +3147,7 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 	case ATA_PROT_ATAPI_DMA:
 	case ATA_PROT_ATAPI:
 		/* check status of DMA engine */
-		host_stat = ata_bmdma_status(ap);
+		host_stat = ap->ops->bmdma_status(ap);
 		VPRINTK("ata%u: host_stat 0x%X\n", ap->id, host_stat);
 
 		/* if it's not our irq... */
@@ -3080,7 +3155,7 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 			goto idle_irq;
 
 		/* before we do anything else, clear DMA-Start bit */
-		ata_bmdma_stop(ap);
+		ap->ops->bmdma_stop(ap);
 
 		/* fall through */
 
@@ -3099,7 +3174,7 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 			ap->id, qc->tf.protocol, status);
 
 		/* ack bmdma irq events */
-		ata_bmdma_ack_irq(ap);
+		ap->ops->irq_clear(ap);
 
 		/* complete taskfile transaction */
 		ata_qc_complete(qc, status);
@@ -3656,6 +3731,7 @@ int ata_pci_init_one (struct pci_dev *pdev, struct ata_port_info **port_info,
 	struct ata_port_info *port[2];
 	u8 tmp8, mask;
 	unsigned int legacy_mode = 0;
+	int disable_dev_on_err = 1;
 	int rc;
 
 	DPRINTK("ENTER\n");
@@ -3686,8 +3762,10 @@ int ata_pci_init_one (struct pci_dev *pdev, struct ata_port_info **port_info,
 		return rc;
 
 	rc = pci_request_regions(pdev, DRV_NAME);
-	if (rc)
+	if (rc) {
+		disable_dev_on_err = 0;
 		goto err_out;
+	}
 
 	if (legacy_mode) {
 		if (!request_region(0x1f0, 8, "libata")) {
@@ -3697,8 +3775,10 @@ int ata_pci_init_one (struct pci_dev *pdev, struct ata_port_info **port_info,
 			conflict = ____request_resource(&ioport_resource, &res);
 			if (!strcmp(conflict->name, "libata"))
 				legacy_mode |= (1 << 0);
-			else
+			else {
+				disable_dev_on_err = 0;
 				printk(KERN_WARNING "ata: 0x1f0 IDE port busy\n");
+			}
 		} else
 			legacy_mode |= (1 << 0);
 
@@ -3709,8 +3789,10 @@ int ata_pci_init_one (struct pci_dev *pdev, struct ata_port_info **port_info,
 			conflict = ____request_resource(&ioport_resource, &res);
 			if (!strcmp(conflict->name, "libata"))
 				legacy_mode |= (1 << 1);
-			else
+			else {
+				disable_dev_on_err = 0;
 				printk(KERN_WARNING "ata: 0x170 IDE port busy\n");
+			}
 		} else
 			legacy_mode |= (1 << 1);
 	}
@@ -3760,7 +3842,8 @@ err_out_regions:
 		release_region(0x170, 8);
 	pci_release_regions(pdev);
 err_out:
-	pci_disable_device(pdev);
+	if (disable_dev_on_err)
+		pci_disable_device(pdev);
 	return rc;
 }
 
@@ -3910,6 +3993,8 @@ EXPORT_SYMBOL_GPL(ata_std_dev_select);
 EXPORT_SYMBOL_GPL(ata_tf_to_fis);
 EXPORT_SYMBOL_GPL(ata_tf_from_fis);
 EXPORT_SYMBOL_GPL(ata_check_status);
+EXPORT_SYMBOL_GPL(ata_altstatus);
+EXPORT_SYMBOL_GPL(ata_chk_err);
 EXPORT_SYMBOL_GPL(ata_exec_command);
 EXPORT_SYMBOL_GPL(ata_port_start);
 EXPORT_SYMBOL_GPL(ata_port_stop);
@@ -3918,6 +4003,8 @@ EXPORT_SYMBOL_GPL(ata_qc_prep);
 EXPORT_SYMBOL_GPL(ata_bmdma_setup);
 EXPORT_SYMBOL_GPL(ata_bmdma_start);
 EXPORT_SYMBOL_GPL(ata_bmdma_irq_clear);
+EXPORT_SYMBOL_GPL(ata_bmdma_status);
+EXPORT_SYMBOL_GPL(ata_bmdma_stop);
 EXPORT_SYMBOL_GPL(ata_port_probe);
 EXPORT_SYMBOL_GPL(sata_phy_reset);
 EXPORT_SYMBOL_GPL(__sata_phy_reset);

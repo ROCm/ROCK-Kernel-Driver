@@ -628,11 +628,13 @@ int xmon_fault_handler(struct pt_regs *regs)
    (data address breakpoint register) directly. */
 static void set_controlled_dabr(unsigned long val)
 {
+#ifdef CONFIG_PPC_PSERIES
 	if (systemcfg->platform == PLATFORM_PSERIES_LPAR) {
 		int rc = plpar_hcall_norets(H_SET_DABR, val);
 		if (rc != H_Success)
 			xmon_printf("Warning: setting DABR failed (%d)\n", rc);
 	} else
+#endif
 		set_dabr(val);
 }
 

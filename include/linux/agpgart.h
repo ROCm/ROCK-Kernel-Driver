@@ -64,7 +64,7 @@ typedef struct _agp_info {
 	struct agp_version version;	/* version of the driver        */
 	__u32 bridge_id;	/* bridge vendor/device         */
 	__u32 agp_mode;		/* mode info of bridge          */
-	off_t aper_base;	/* base of aperture             */
+	unsigned long aper_base;/* base of aperture             */
 	size_t aper_size;	/* size of aperture             */
 	size_t pg_total;	/* max pages (swap + system)    */
 	size_t pg_system;	/* max pages (system)           */
@@ -118,7 +118,7 @@ struct agp_info {
 	struct agp_version version;	/* version of the driver        */
 	u32 bridge_id;		/* bridge vendor/device         */
 	u32 agp_mode;		/* mode info of bridge          */
-	off_t aper_base;	/* base of aperture             */
+	unsigned long aper_base;/* base of aperture             */
 	size_t aper_size;	/* size of aperture             */
 	size_t pg_total;	/* max pages (swap + system)    */
 	size_t pg_system;	/* max pages (system)           */
