@@ -487,7 +487,9 @@ static struct class_device_attribute input_device_class_attrs[] = {
 
 static void input_device_class_release( struct class_device *class_dev )
 {
+#if 0
 	put_device(class_dev->dev);
+#endif
 }
 
 static struct class input_device_class = {

@@ -598,7 +598,7 @@ int hidinput_connect(struct hid_device *hid)
 				hidinput->input.id.vendor = dev->descriptor.idVendor;
 				hidinput->input.id.product = dev->descriptor.idProduct;
 				hidinput->input.id.version = dev->descriptor.bcdDevice;
-				hidinput->input.dev = &hid->intf->dev;
+				hidinput->input.dev = get_device(&hid->intf->dev);
 				sprintf(hidinput->input.cdev.class_id,"usbhid%d",
 					hidinput_num++);
 			}
@@ -641,6 +641,7 @@ void hidinput_disconnect(struct hid_device *hid)
 
 	list_for_each_safe (lh, next, &hid->inputs) {
 		hidinput = list_entry(lh, struct hid_input, list);
+		put_device(hidinput->input.dev);
 		input_unregister_device(&hidinput->input);
 		list_del(&hidinput->list);
 		kfree(hidinput);
