@@ -360,8 +360,8 @@ extern int ide_irq_lock;
 
 /* Currently only Atari needs it */
 #ifndef IDE_ARCH_LOCK
-# define ide_release_lock(lock)			do {} while (0)
-# define ide_get_lock(lock, hdlr, data)		do {} while (0)
+# define ide_release_lock()			do {} while (0)
+# define ide_get_lock(hdlr, data)		do {} while (0)
 #endif /* IDE_ARCH_LOCK */
 
 /*
