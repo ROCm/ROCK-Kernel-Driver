@@ -130,8 +130,9 @@ static inline void qtd_copy_status (struct urb *urb, size_t length, u32 token)
 		else	/* unknown */
 			urb->status = -EPROTO;
 
-		dbg ("ep %d-%s qtd token %08x --> status %d",
-			/* devpath */
+		ehci_vdbg (ehci,
+			"dev%d ep%d%s qtd token %08x --> status %d\n",
+			usb_pipedev (urb->pipe),
 			usb_pipeendpoint (urb->pipe),
 			usb_pipein (urb->pipe) ? "in" : "out",
 			token, urb->status);

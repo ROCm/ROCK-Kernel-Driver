@@ -262,7 +262,7 @@ static void ehci_watchdog (unsigned long param)
 	spin_lock_irqsave (&ehci->lock, flags);
 	/* guard against lost IAA, which wedges everything */
 	ehci_irq (&ehci->hcd);
- 	/* unlink the last qh after it's idled a while */
+ 	/* stop async processing after it's idled a while */
  	if (ehci->async_idle) {
  		start_unlink_async (ehci, ehci->async);
  		ehci->async_idle = 0;
@@ -289,12 +289,13 @@ static int bios_handoff (struct ehci_hcd *ehci, int where, u32 cap)
 			pci_read_config_dword (ehci->hcd.pdev, where, &cap);
 		} while ((cap & (1 << 16)) && msec);
 		if (cap & (1 << 16)) {
-			info ("BIOS handoff failed (%d, %04x)", where, cap);
+			dev_info (*ehci->hcd.controller,
+				"BIOS handoff failed (%d, %04x)\n",
+				where, cap);
 			return 1;
 		} 
-		dbg ("BIOS handoff succeeded");
-	} else
-		dbg ("BIOS handoff not needed");
+		ehci_dbg (ehci, "BIOS handoff succeeded\n");
+	}
 	return 0;
 }
 
@@ -325,14 +326,15 @@ static int ehci_start (struct usb_hcd *hcd)
 		u32		cap;
 
 		pci_read_config_dword (ehci->hcd.pdev, temp, &cap);
-		dbg ("capability %04x at %02x", cap, temp);
+		ehci_dbg (ehci, "capability %04x at %02x\n", cap, temp);
 		switch (cap & 0xff) {
 		case 1:			/* BIOS/SMM/... handoff */
 			if (bios_handoff (ehci, temp, cap) != 0)
 				return -EOPNOTSUPP;
 			break;
 		case 0:			/* illegal reserved capability */
-			warn ("illegal capability!");
+			dev_warn (*ehci->hcd.controller,
+					"illegal capability!\n");
 			cap = 0;
 			/* FALLTHROUGH */
 		default:		/* unknown */
@@ -404,7 +406,8 @@ static int ehci_start (struct usb_hcd *hcd)
 	if (HCC_64BIT_ADDR (hcc_params)) {
 		writel (0, &ehci->regs->segment);
 		if (!pci_set_dma_mask (ehci->hcd.pdev, 0xffffffffffffffffULL))
-			info ("enabled 64bit PCI DMA (DAC)");
+			dev_info (*ehci->hcd.controller,
+				"enabled 64bit PCI DMA (DAC)\n");
 	}
 
 	/* clear interrupt enables, set irq latency */
@@ -451,10 +454,10 @@ done2:
         /* PCI Serial Bus Release Number is at 0x60 offset */
 	pci_read_config_byte (hcd->pdev, 0x60, &tempbyte);
 	temp = readw (&ehci->caps->hci_version);
-	info ("USB %x.%x support enabled, EHCI rev %x.%02x, %s %s",
-	      ((tempbyte & 0xf0)>>4), (tempbyte & 0x0f),
-	       temp >> 8, temp & 0xff,
-	       hcd_name, DRIVER_VERSION);
+	dev_info (*hcd->controller,
+		"USB %x.%x enabled, EHCI %x.%02x, driver %s\n",
+		((tempbyte & 0xf0)>>4), (tempbyte & 0x0f),
+		temp >> 8, temp & 0xff, DRIVER_VERSION);
 
 	/*
 	 * From here on, khubd concurrently accesses the root
@@ -486,13 +489,13 @@ static void ehci_stop (struct usb_hcd *hcd)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
 
-	dbg ("%s: stop", hcd_to_bus (hcd)->bus_name);
+	ehci_dbg (ehci, "stop\n");
 
 	/* no more interrupts ... */
 	if (hcd->state == USB_STATE_RUNNING)
 		ehci_ready (ehci);
 	if (in_interrupt ())		/* should not happen!! */
-		err ("stopped %s!", RUN_CONTEXT);
+		dev_err (*hcd->controller, "stopped %s!\n", RUN_CONTEXT);
 	else
 		del_timer_sync (&ehci->watchdog);
 	ehci_reset (ehci);
@@ -508,9 +511,9 @@ static void ehci_stop (struct usb_hcd *hcd)
 	ehci_mem_cleanup (ehci);
 
 #ifdef	EHCI_STATS
-	dbg ("irq normal %ld err %ld reclaim %ld",
+	ehci_dbg (ehci, "irq normal %ld err %ld reclaim %ld\n",
 		ehci->stats.normal, ehci->stats.error, ehci->stats.reclaim);
-	dbg ("complete %ld unlink %ld",
+	ehci_dbg (ehci, "complete %ld unlink %ld\n",
 		ehci->stats.complete, ehci->stats.unlink);
 #endif
 
@@ -754,8 +757,8 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 	struct ehci_qh		*qh = (struct ehci_qh *) urb->hcpriv;
 	unsigned long		flags;
 
-	dbg ("%s urb_dequeue %p qh %p state %d",
-		hcd_to_bus (hcd)->bus_name, urb, qh, qh->qh_state);
+	ehci_vdbg (ehci, "urb_dequeue %p qh %p state %d\n",
+		urb, qh, qh->qh_state);
 
 	switch (usb_pipetype (urb->pipe)) {
 	// case PIPE_CONTROL:
@@ -998,7 +1001,6 @@ MODULE_LICENSE ("GPL");
 
 static int __init init (void) 
 {
-	dbg (DRIVER_INFO);
 	if (usb_disabled())
 		return -ENODEV;
 

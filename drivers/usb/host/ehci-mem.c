@@ -103,7 +103,7 @@ static struct ehci_qh *ehci_qh_alloc (struct ehci_hcd *ehci, int flags)
 	/* dummy td enables safe urb queuing */
 	qh->dummy = ehci_qtd_alloc (ehci, flags);
 	if (qh->dummy == 0) {
-		dbg ("no dummy td");
+		ehci_dbg (ehci, "no dummy td\n");
 		pci_pool_free (ehci->qh_pool, qh, qh->qh_dma);
 		qh = 0;
 	}
@@ -113,19 +113,17 @@ static struct ehci_qh *ehci_qh_alloc (struct ehci_hcd *ehci, int flags)
 /* to share a qh (cpu threads, or hc) */
 static inline struct ehci_qh *qh_get (/* ehci, */ struct ehci_qh *qh)
 {
-	// dbg ("get %p (%d++)", qh, qh->refcount.counter);
 	atomic_inc (&qh->refcount);
 	return qh;
 }
 
 static void qh_put (struct ehci_hcd *ehci, struct ehci_qh *qh)
 {
-	// dbg ("put %p (--%d)", qh, qh->refcount.counter);
 	if (!atomic_dec_and_test (&qh->refcount))
 		return;
 	/* clean qtds first, and know this is not linked */
 	if (!list_empty (&qh->qtd_list) || qh->qh_next.ptr) {
-		dbg ("unused qh not empty!");
+		ehci_dbg (ehci, "unused qh not empty!\n");
 		BUG ();
 	}
 	if (qh->dummy)
