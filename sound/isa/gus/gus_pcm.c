@@ -32,6 +32,7 @@
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/gus.h>
+#include <sound/pcm_params.h>
 #include "gus_tables.h"
 
 #define chip_t snd_gus_card_t

@@ -32,6 +32,36 @@
 #include <sound/pcm_params.h>
 #include <sound/minors.h>
 
+/*
+ *  Compatibility
+ */
+
+struct sndrv_pcm_hw_params_old {
+	unsigned int flags;
+	unsigned int masks[SNDRV_PCM_HW_PARAM_SUBFORMAT -
+			   SNDRV_PCM_HW_PARAM_ACCESS + 1];
+	struct sndrv_interval intervals[SNDRV_PCM_HW_PARAM_TICK_TIME -
+					SNDRV_PCM_HW_PARAM_SAMPLE_BITS + 1];
+	unsigned int rmask;
+	unsigned int cmask;
+	unsigned int info;
+	unsigned int msbits;
+	unsigned int rate_num;
+	unsigned int rate_den;
+	sndrv_pcm_uframes_t fifo_size;
+	unsigned char reserved[64];
+};
+
+#define SNDRV_PCM_IOCTL_HW_REFINE_OLD _IOWR('A', 0x10, struct sndrv_pcm_hw_params_old)
+#define SNDRV_PCM_IOCTL_HW_PARAMS_OLD _IOWR('A', 0x11, struct sndrv_pcm_hw_params_old)
+
+static int snd_pcm_hw_refine_old_user(snd_pcm_substream_t * substream, struct sndrv_pcm_hw_params_old * _oparams);
+static int snd_pcm_hw_params_old_user(snd_pcm_substream_t * substream, struct sndrv_pcm_hw_params_old * _oparams);
+
+/*
+ *
+ */
+
 static rwlock_t pcm_link_lock = RW_LOCK_UNLOCKED;
 
 static inline mm_segment_t snd_enter_user(void)
@@ -51,6 +81,8 @@ static inline void dec_mod_count(struct module *module)
 	if (module)
 		__MOD_DEC_USE_COUNT(module);
 }
+
+
 
 int snd_pcm_info(snd_pcm_substream_t * substream, snd_pcm_info_t *info)
 {
@@ -121,7 +153,7 @@ int snd_pcm_hw_refine(snd_pcm_substream_t *substream,
 	snd_mask_t *m = NULL;
 	snd_pcm_hw_constraints_t *constrs = &substream->runtime->hw_constraints;
 	unsigned int rstamps[constrs->rules_num];
-	unsigned int vstamps[SNDRV_PCM_HW_PARAM_LAST + 1];
+	unsigned int vstamps[SNDRV_PCM_HW_PARAM_LAST_INTERVAL + 1];
 	unsigned int stamp = 2;
 	int changed, again;
 
@@ -187,7 +219,7 @@ int snd_pcm_hw_refine(snd_pcm_substream_t *substream,
 
 	for (k = 0; k < constrs->rules_num; k++)
 		rstamps[k] = 0;
-	for (k = 0; k <= SNDRV_PCM_HW_PARAM_LAST; k++) 
+	for (k = 0; k <= SNDRV_PCM_HW_PARAM_LAST_INTERVAL; k++) 
 		vstamps[k] = (params->rmask & (1 << k)) ? 1 : 0;
 	do {
 		again = 0;
@@ -211,7 +243,7 @@ int snd_pcm_hw_refine(snd_pcm_substream_t *substream,
 				printk("%s = ", snd_pcm_hw_param_names[r->var]);
 				if (hw_is_mask(r->var)) {
 					m = hw_param_mask(params, r->var);
-					printk("%x", *m);
+					printk("%x", *m->bits);
 				} else {
 					i = hw_param_interval(params, r->var);
 					if (i->empty)
@@ -228,7 +260,7 @@ int snd_pcm_hw_refine(snd_pcm_substream_t *substream,
 			if (r->var >= 0) {
 				printk(" -> ");
 				if (hw_is_mask(r->var))
-					printk("%x", *m);
+					printk("%x", *m->bits);
 				else {
 					if (i->empty)
 						printk("empty");
@@ -1369,16 +1401,17 @@ static int snd_pcm_hw_rule_format(snd_pcm_hw_params_t *params,
 {
 	unsigned int k;
 	snd_interval_t *i = hw_param_interval(params, rule->deps[0]);
-	unsigned int m = ~0U;
-	unsigned int *mask = hw_param_mask(params, SNDRV_PCM_HW_PARAM_FORMAT);
+	snd_mask_t m;
+	snd_mask_t *mask = hw_param_mask(params, SNDRV_PCM_HW_PARAM_FORMAT);
+	snd_mask_any(&m);
 	for (k = 0; k <= SNDRV_PCM_FORMAT_LAST; ++k) {
 		int bits;
-		if (!(*mask & (1U << k)))
+		if (! snd_mask_test(mask, k))
 			continue;
 		bits = snd_pcm_format_physical_width(k);
 		snd_assert(bits > 0, continue);
 		if ((unsigned)bits < i->min || (unsigned)bits > i->max)
-			m &= ~(1U << k);
+			snd_mask_reset(&m, k);
 	}
 	return snd_mask_refine(mask, &m);
 }
@@ -1394,7 +1427,7 @@ static int snd_pcm_hw_rule_sample_bits(snd_pcm_hw_params_t *params,
 	t.openmax = 0;
 	for (k = 0; k <= SNDRV_PCM_FORMAT_LAST; ++k) {
 		int bits;
-		if (!(*hw_param_mask(params, SNDRV_PCM_HW_PARAM_FORMAT) & (1U << k)))
+		if (! snd_mask_test(hw_param_mask(params, SNDRV_PCM_HW_PARAM_FORMAT), k))
 			continue;
 		bits = snd_pcm_format_physical_width(k);
 		snd_assert(bits > 0, continue);
@@ -1582,7 +1615,8 @@ int snd_pcm_hw_constraints_complete(snd_pcm_substream_t *substream)
 	err = snd_pcm_hw_constraint_mask(runtime, SNDRV_PCM_HW_PARAM_ACCESS, mask);
 	snd_assert(err >= 0, return -EINVAL);
 
-	err = snd_pcm_hw_constraint_mask(runtime, SNDRV_PCM_HW_PARAM_FORMAT, hw->formats);
+	err = snd_pcm_hw_constraint_mask64(runtime, SNDRV_PCM_HW_PARAM_FORMAT, hw->formats);
+	//err = snd_pcm_hw_constraint_mask(runtime, SNDRV_PCM_HW_PARAM_FORMAT, hw->formats);
 	snd_assert(err >= 0, return -EINVAL);
 
 	err = snd_pcm_hw_constraint_mask(runtime, SNDRV_PCM_HW_PARAM_SUBFORMAT, 1 << SNDRV_PCM_SUBFORMAT_STD);
@@ -1808,12 +1842,7 @@ int snd_pcm_release(struct inode *inode, struct file *file)
 	snd_assert(substream != NULL, return -ENXIO);
 	snd_assert(!atomic_read(&substream->runtime->mmap_count), );
 	pcm = substream->pcm;
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		if ((substream->ffile->f_flags & O_NONBLOCK) ||
-		    snd_pcm_playback_drain(substream) == -ERESTARTSYS)
-			snd_pcm_playback_drop(substream);
-	} else
-		snd_pcm_capture_drop(substream);
+	snd_pcm_capture_drop(substream);
 	fasync_helper(-1, file, 0, &substream->runtime->fasync);
 	down(&pcm->open_mutex);
 	snd_pcm_release_file(pcm_file);
@@ -2053,6 +2082,10 @@ static int snd_pcm_common_ioctl1(snd_pcm_substream_t *substream,
 		return snd_pcm_resume(substream);
 	case SNDRV_PCM_IOCTL_XRUN:
 		return snd_pcm_xrun(substream);
+	case SNDRV_PCM_IOCTL_HW_REFINE_OLD:
+		return snd_pcm_hw_refine_old_user(substream, (struct sndrv_pcm_hw_params_old *) arg);
+	case SNDRV_PCM_IOCTL_HW_PARAMS_OLD:
+		return snd_pcm_hw_params_old_user(substream, (struct sndrv_pcm_hw_params_old *) arg);
 	}
 	snd_printd("unknown ioctl = 0x%x\n", cmd);
 	return -ENOTTY;
@@ -2598,6 +2631,7 @@ static unsigned long snd_pcm_mmap_data_nopage(struct vm_area_struct *area, unsig
 	snd_pcm_runtime_t *runtime;
 	unsigned long offset;
 	struct page * page;
+	void *vaddr;
 	size_t dma_bytes;
 	
 	if (substream == NULL)
@@ -2613,7 +2647,13 @@ static unsigned long snd_pcm_mmap_data_nopage(struct vm_area_struct *area, unsig
 	dma_bytes = PAGE_ALIGN(runtime->dma_bytes);
 	if (offset > dma_bytes - PAGE_SIZE)
 		return NOPAGE_SIGBUS;
-	page = virt_to_page(runtime->dma_area + offset);
+	if (substream->ops->page) {
+		vaddr = substream->ops->page(substream, offset);
+		if (! vaddr)
+			return NOPAGE_OOM;
+	} else
+		vaddr = runtime->dma_area + offset;
+	page = virt_to_page(vaddr);
 	get_page(page);
 #ifndef LINUX_2_2
 	return page;
@@ -2723,6 +2763,79 @@ static int snd_pcm_fasync(int fd, struct file * file, int on)
 	if (err < 0)
 		return err;
 	return 0;
+}
+
+/*
+ *  To be removed helpers to keep binary compatibility
+ */
+
+#define __OLD_TO_NEW_MASK(x) ((x&7)|((x&0x07fffff8)<<5))
+#define __NEW_TO_OLD_MASK(x) ((x&7)|((x&0xffffff00)>>5))
+
+static void snd_pcm_hw_convert_from_old_params(snd_pcm_hw_params_t *params, struct sndrv_pcm_hw_params_old *oparams)
+{
+	unsigned int i;
+
+	memset(params, 0, sizeof(*params));
+	params->flags = oparams->flags;
+	for (i = 0; i < sizeof(oparams->masks) / sizeof(unsigned int); i++)
+		params->masks[i].bits[0] = oparams->masks[i];
+	memcpy(params->intervals, oparams->intervals, sizeof(oparams->intervals));
+	params->rmask = __OLD_TO_NEW_MASK(oparams->rmask);
+	params->cmask = __OLD_TO_NEW_MASK(oparams->cmask);
+	params->info = oparams->info;
+	params->msbits = oparams->msbits;
+	params->rate_num = oparams->rate_num;
+	params->rate_den = oparams->rate_den;
+	params->fifo_size = oparams->fifo_size;
+}
+
+static void snd_pcm_hw_convert_to_old_params(struct sndrv_pcm_hw_params_old *oparams, snd_pcm_hw_params_t *params)
+{
+	unsigned int i;
+
+	memset(oparams, 0, sizeof(*oparams));
+	oparams->flags = params->flags;
+	for (i = 0; i < sizeof(oparams->masks) / sizeof(unsigned int); i++)
+		oparams->masks[i] = params->masks[i].bits[0];
+	memcpy(oparams->intervals, params->intervals, sizeof(oparams->intervals));
+	oparams->rmask = __NEW_TO_OLD_MASK(params->rmask);
+	oparams->cmask = __NEW_TO_OLD_MASK(params->cmask);
+	oparams->info = params->info;
+	oparams->msbits = params->msbits;
+	oparams->rate_num = params->rate_num;
+	oparams->rate_den = params->rate_den;
+	oparams->fifo_size = params->fifo_size;
+}
+
+static int snd_pcm_hw_refine_old_user(snd_pcm_substream_t * substream, struct sndrv_pcm_hw_params_old * _oparams)
+{
+	snd_pcm_hw_params_t params;
+	struct sndrv_pcm_hw_params_old oparams;
+	int err;
+	if (copy_from_user(&oparams, _oparams, sizeof(oparams)))
+		return -EFAULT;
+	snd_pcm_hw_convert_from_old_params(&params, &oparams);
+	err = snd_pcm_hw_refine(substream, &params);
+	snd_pcm_hw_convert_to_old_params(&oparams, &params);
+	if (copy_to_user(_oparams, &oparams, sizeof(oparams)))
+		return -EFAULT;
+	return err;
+}
+
+static int snd_pcm_hw_params_old_user(snd_pcm_substream_t * substream, struct sndrv_pcm_hw_params_old * _oparams)
+{
+	snd_pcm_hw_params_t params;
+	struct sndrv_pcm_hw_params_old oparams;
+	int err;
+	if (copy_from_user(&oparams, _oparams, sizeof(oparams)))
+		return -EFAULT;
+	snd_pcm_hw_convert_from_old_params(&params, &oparams);
+	err = snd_pcm_hw_params(substream, &params);
+	snd_pcm_hw_convert_to_old_params(&oparams, &params);
+	if (copy_to_user(_oparams, &oparams, sizeof(oparams)))
+		return -EFAULT;
+	return err;
 }
 
 /*

@@ -517,6 +517,13 @@ ifneq ($(cmd_files),)
   include $(cmd_files)
 endif
 
+# Emacs compile mode works best with relative paths to find files (OK
+# if verbose, as it tracks the make[1] entries and exits, etc.)
+
+ifneq ($(KBUILD_VERBOSE),1)
+  filter-output = 2>&1 | sed 's \(^[^/][A-Za-z0-9_./-]*:[ 0-9]\) $(RELDIR)/\1 '
+endif
+
 # function to only execute the passed command if necessary
 
 if_changed = $(if $(strip $? \
@@ -536,7 +543,7 @@ if_changed_dep = $(if $(strip $? $(filter-out FORCE $(wildcard $^),$^)\
 			  $(filter-out $(cmd_$@),$(cmd_$(1)))),\
 	@set -e; \
 	$(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) \
-	$(cmd_$(1)); \
+	$(cmd_$(1)) $(filter-output); \
 	$(TOPDIR)/scripts/fixdep $(depfile) $@ $(TOPDIR) '$(cmd_$(1))' > $(@D)/.$(@F).tmp; \
 	rm -f $(depfile); \
 	mv -f $(@D)/.$(@F).tmp $(@D)/.$(@F).cmd)

@@ -71,8 +71,8 @@ MODULE_PARM_DESC(snd_isapnp, "ISA PnP detection for WaveFront soundcards.");
 MODULE_PARM_SYNTAX(snd_isapnp, SNDRV_ISAPNP_DESC);
 #endif
 MODULE_PARM(snd_cs4232_pcm_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_4232_port, "Port # for CS4232 PCM interface.");
-MODULE_PARM_SYNTAX(snd_cs4232_port, SNDRV_PORT12_DESC);
+MODULE_PARM_DESC(snd_cs4232_pcm_port, "Port # for CS4232 PCM interface.");
+MODULE_PARM_SYNTAX(snd_cs4232_pcm_port, SNDRV_PORT12_DESC);
 MODULE_PARM(snd_cs4232_pcm_irq, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(snd_cs4232_pcm_irq, "IRQ # for CS4232 PCM interface.");
 MODULE_PARM_SYNTAX(snd_cs4232_pcm_irq, SNDRV_ENABLED ",allows:{{5},{7},{9},{11},{12},{15}},dialog:list");

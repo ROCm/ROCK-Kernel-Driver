@@ -219,9 +219,9 @@ int freeze_processes(void)
 			/* FIXME: smp problem here: we may not access other process' flags
 			   without locking */
 			p->flags |= PF_FREEZE;
-			spin_lock_irqsave(&p->sigmask_lock, flags);
+			spin_lock_irqsave(&p->sig->siglock, flags);
 			signal_wake_up(p);
-			spin_unlock_irqrestore(&p->sigmask_lock, flags);
+			spin_unlock_irqrestore(&p->sig->siglock, flags);
 			todo++;
 		} while_each_thread(g, p);
 		read_unlock(&tasklist_lock);

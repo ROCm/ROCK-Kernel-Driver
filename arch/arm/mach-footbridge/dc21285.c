@@ -36,12 +36,11 @@ extern void pcibios_report_status(u_int status_mask, int warn);
 extern void register_isa_ports(unsigned int, unsigned int, unsigned int);
 
 static unsigned long
-dc21285_base_address(struct pci_dev *dev)
+dc21285_base_address(struct pci_bus *bus, unsigned int devfn)
 {
 	unsigned long addr = 0;
-	unsigned int devfn = dev->devfn;
 
-	if (dev->bus->number == 0) {
+	if (bus->number == 0) {
 		if (PCI_SLOT(devfn) == 0)
 			/*
 			 * For devfn 0, point at the 21285
@@ -54,54 +53,33 @@ dc21285_base_address(struct pci_dev *dev)
 				addr = PCICFG0_BASE | 0xc00000 | (devfn << 8);
 		}
 	} else
-		addr = PCICFG1_BASE | (dev->bus->number << 16) | (devfn << 8);
+		addr = PCICFG1_BASE | (bus->number << 16) | (devfn << 8);
 
 	return addr;
 }
 
 static int
-dc21285_read_config_byte(struct pci_dev *dev, int where, u8 *value)
+dc21285_read_config(struct pci_bus *bus, unsigned int devfn, int where,
+		    int size, u32 *value)
 {
-	unsigned long addr = dc21285_base_address(dev);
-	u8 v;
-
-	if (addr)
-		asm("ldr%?b	%0, [%1, %2]"
-			: "=r" (v) : "r" (addr), "r" (where));
-	else
-		v = 0xff;
-
-	*value = v;
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-dc21285_read_config_word(struct pci_dev *dev, int where, u16 *value)
-{
-	unsigned long addr = dc21285_base_address(dev);
-	u16 v;
-
-	if (addr)
-		asm("ldr%?h	%0, [%1, %2]"
-			: "=r" (v) : "r" (addr), "r" (where));
-	else
-		v = 0xffff;
-
-	*value = v;
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-dc21285_read_config_dword(struct pci_dev *dev, int where, u32 *value)
-{
-	unsigned long addr = dc21285_base_address(dev);
+	unsigned long addr = dc21285_base_address(bus, devfn);
 	u32 v;
 
 	if (addr)
-		asm("ldr%?	%0, [%1, %2]"
-			: "=r" (v) : "r" (addr), "r" (where));
+		switch (size) {
+		case 1:
+			asm("ldr%?b	%0, [%1, %2]"
+				: "=r" (v) : "r" (addr), "r" (where));
+			break;
+		case 2:
+			asm("ldr%?h	%0, [%1, %2]"
+				: "=r" (v) : "r" (addr), "r" (where));
+			break;
+		case 4:
+			asm("ldr%?	%0, [%1, %2]"
+				: "=r" (v) : "r" (addr), "r" (where));
+			break;
+		}
 	else
 		v = 0xffffffff;
 
@@ -111,48 +89,33 @@ dc21285_read_config_dword(struct pci_dev *dev, int where, u32 *value)
 }
 
 static int
-dc21285_write_config_byte(struct pci_dev *dev, int where, u8 value)
+dc21285_write_config(struct pci_bus *bus, unsigned int devfn, int where,
+		     int size, u32 value)
 {
-	unsigned long addr = dc21285_base_address(dev);
+	unsigned long addr = dc21285_base_address(bus, devfn);
 
 	if (addr)
-		asm("str%?b	%0, [%1, %2]"
-			: : "r" (value), "r" (addr), "r" (where));
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-dc21285_write_config_word(struct pci_dev *dev, int where, u16 value)
-{
-	unsigned long addr = dc21285_base_address(dev);
-
-	if (addr)
-		asm("str%?h	%0, [%1, %2]"
-			: : "r" (value), "r" (addr), "r" (where));
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-dc21285_write_config_dword(struct pci_dev *dev, int where, u32 value)
-{
-	unsigned long addr = dc21285_base_address(dev);
-
-	if (addr)
-		asm("str%?	%0, [%1, %2]"
-			: : "r" (value), "r" (addr), "r" (where));
+		switch (size) {
+		case 1:
+			asm("str%?b	%0, [%1, %2]"
+				: : "r" (value), "r" (addr), "r" (where));
+			break;
+		case 2:
+			asm("str%?h	%0, [%1, %2]"
+				: : "r" (value), "r" (addr), "r" (where));
+			break;
+		case 4:
+			asm("str%?	%0, [%1, %2]"
+				: : "r" (value), "r" (addr), "r" (where));
+			break;
+		}
 
 	return PCIBIOS_SUCCESSFUL;
 }
 
 static struct pci_ops dc21285_ops = {
-	dc21285_read_config_byte,
-	dc21285_read_config_word,
-	dc21285_read_config_dword,
-	dc21285_write_config_byte,
-	dc21285_write_config_word,
-	dc21285_write_config_dword,
+	.read	= dc21285_read_config,
+	.write	= dc21285_write_config,
 };
 
 static struct timer_list serr_timer;

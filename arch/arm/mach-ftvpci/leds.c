@@ -5,6 +5,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/init.h>
 
 #include <asm/hardware.h>
 #include <asm/leds.h>
@@ -26,6 +27,10 @@ static void ftvpci_leds_event(led_event_t ledevt)
 	}
 }
 
-void (*leds_event)(led_event_t) = ftvpci_leds_event;
+static int __init ftvpci_leds_init(void)
+{
+	leds_event = ftvpci_leds_event;
+	return 0;
+}
 
-EXPORT_SYMBOL(leds_event);
+arch_initcall(ftvpci_leds_init);

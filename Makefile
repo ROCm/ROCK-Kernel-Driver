@@ -756,7 +756,7 @@ define all-sources
 	  find arch/$(ARCH) $(RCS_FIND_IGNORE) \
 	       -name '*.[chS]' -print; \
 	  find include $(RCS_FIND_IGNORE) \
-	       \( -name config -o -name 'asm-*' \) -prune -o \
+	       \( -name config -o -name 'asm-*' \) -prune \
 	       -o -name '*.[chS]' -print; \
 	  find include/asm-$(ARCH) $(RCS_FIND_IGNORE) \
 	       -name '*.[chS]' -print; \

@@ -59,11 +59,3 @@ EXTRA_CFLAGS += -I. -DSK_USE_CSUM $(DBGDEF)
 
 include $(TOPDIR)/Rules.make
 
-clean:
-	rm -f core *.o *.a *.s
-
-
-
-
-
-

@@ -107,15 +107,6 @@ PLAT_NODE_DATA_LOCALNR(unsigned long p, int n)
 #ifdef CONFIG_NUMA_SCHED
 #define NODE_SCHEDULE_DATA(nid)	(&((PLAT_NODE_DATA(nid))->schedule_data))
 #endif
-
-#ifdef CONFIG_ALPHA_WILDFIRE
-/* With wildfire assume 4 CPUs per node */
-#define cputonode(cpu)	((cpu) >> 2)
-#else
-#define cputonode(cpu)	0
-#endif /* CONFIG_ALPHA_WILDFIRE */
-
-#define numa_node_id()	cputonode(smp_processor_id())
 #endif /* CONFIG_NUMA */
 
 #endif /* CONFIG_DISCONTIGMEM */

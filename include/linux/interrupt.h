@@ -22,25 +22,6 @@ struct irqaction {
 	struct irqaction *next;
 };
 
-
-/* Who gets which entry in bh_base.  Things which will occur most often
-   should come first */
-   
-enum {
-	TIMER_BH = 0,
-	TQUEUE_BH = 1,
-	DIGI_BH = 2,
-	SERIAL_BH = 3,
-	RISCOM8_BH = 4,
-	SPECIALIX_BH = 5,
-	AURORA_BH = 6,
-	ESP_BH = 7,
-	IMMEDIATE_BH = 9,
-	CYCLADES_BH = 10,
-	MACSERIAL_BH = 13,
-	ISICOM_BH = 14
-};
-
 #include <asm/hardirq.h>
 #include <asm/softirq.h>
 
@@ -217,23 +198,6 @@ static void name (unsigned long dummy) \
 #define SMP_TIMER_DEFINE(name, task)
 
 #endif /* CONFIG_SMP */
-
-
-/* Old BH definitions */
-
-extern struct tasklet_struct bh_task_vec[];
-
-/* It is exported _ONLY_ for wait_on_irq(). */
-extern spinlock_t global_bh_lock;
-
-static inline void mark_bh(int nr)
-{
-	tasklet_hi_schedule(bh_task_vec+nr);
-}
-
-extern void init_bh(int nr, void (*routine)(void));
-extern void remove_bh(int nr);
-
 
 /*
  * Autoprobing for irqs:

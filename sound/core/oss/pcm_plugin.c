@@ -31,6 +31,7 @@
 #include <linux/vmalloc.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
+#include <sound/pcm_params.h>
 #include "pcm_plugin.h"
 
 #define snd_pcm_plug_first(plug) ((plug)->runtime->oss.plugin_first)
@@ -280,20 +281,23 @@ snd_pcm_sframes_t snd_pcm_plug_slave_size(snd_pcm_plug_t *plug, snd_pcm_uframes_
 	return frames;
 }
 
-unsigned int snd_pcm_plug_formats(unsigned int formats)
+static int snd_pcm_plug_formats(snd_mask_t *mask, int format)
 {
-	int linfmts = (SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S8 |
+	snd_mask_t formats = *mask;
+	u64 linfmts = (SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S8 |
 		       SNDRV_PCM_FMTBIT_U16_LE | SNDRV_PCM_FMTBIT_S16_LE |
 		       SNDRV_PCM_FMTBIT_U16_BE | SNDRV_PCM_FMTBIT_S16_BE |
 		       SNDRV_PCM_FMTBIT_U24_LE | SNDRV_PCM_FMTBIT_S24_LE |
 		       SNDRV_PCM_FMTBIT_U24_BE | SNDRV_PCM_FMTBIT_S24_BE |
 		       SNDRV_PCM_FMTBIT_U32_LE | SNDRV_PCM_FMTBIT_S32_LE |
 		       SNDRV_PCM_FMTBIT_U32_BE | SNDRV_PCM_FMTBIT_S32_BE);
-	formats |= SNDRV_PCM_FMTBIT_MU_LAW;
+	snd_mask_set(&formats, SNDRV_PCM_FORMAT_MU_LAW);
 	
-	if (formats & linfmts)
-		formats |= linfmts;
-	return formats;
+	if (formats.bits[0] & (u32)linfmts)
+		formats.bits[0] |= (u32)linfmts;
+	if (formats.bits[1] & (u32)(linfmts >> 32))
+		formats.bits[1] |= (u32)(linfmts >> 32);
+	return snd_mask_test(&formats, format);
 }
 
 static int preferred_formats[] = {
@@ -313,11 +317,11 @@ static int preferred_formats[] = {
 	SNDRV_PCM_FORMAT_U8
 };
 
-int snd_pcm_plug_slave_format(int format, unsigned int format_mask)
+int snd_pcm_plug_slave_format(int format, snd_mask_t *format_mask)
 {
-	if (format_mask & (1 << format))
+	if (snd_mask_test(format_mask, format))
 		return format;
-	if ((snd_pcm_plug_formats(format_mask) & (1 << format)) == 0)
+	if (! snd_pcm_plug_formats(format_mask, format))
 		return -EINVAL;
 	if (snd_pcm_format_linear(format)) {
 		int width = snd_pcm_format_width(format);
@@ -333,7 +337,7 @@ int snd_pcm_plug_slave_format(int format, unsigned int format_mask)
 				for (sgn = 0; sgn < 2; ++sgn) {
 					format1 = snd_pcm_build_linear_format(width1, unsignd1, big1);
 					if (format1 >= 0 &&
-					    format_mask & (1 << format1))
+					    snd_mask_test(format_mask, format1))
 						goto _found;
 					unsignd1 = !unsignd1;
 				}
@@ -354,7 +358,7 @@ int snd_pcm_plug_slave_format(int format, unsigned int format_mask)
 		case SNDRV_PCM_FORMAT_MU_LAW:
 			for (i = 0; i < sizeof(preferred_formats) / sizeof(preferred_formats[0]); ++i) {
 				int format1 = preferred_formats[i];
-				if (format_mask & (1 << format1))
+				if (snd_mask_test(format_mask, format1))
 					return format1;
 			}
 		default:

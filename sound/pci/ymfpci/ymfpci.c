@@ -46,6 +46,7 @@ static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static long snd_fm_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
 static long snd_mpu_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
+static int snd_rear_switch[SNDRV_CARDS];
 
 MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(snd_index, "Index value for the Yamaha DS-XG PCI soundcard.");
@@ -62,6 +63,9 @@ MODULE_PARM_SYNTAX(snd_mpu_port, SNDRV_ENABLED);
 MODULE_PARM(snd_fm_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
 MODULE_PARM_DESC(snd_fm_port, "FM OPL-3 Port.");
 MODULE_PARM_SYNTAX(snd_fm_port, SNDRV_ENABLED);
+MODULE_PARM(snd_rear_switch, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
+MODULE_PARM_DESC(snd_rear_switch, "Enable shared rear/line-in switch");
+MODULE_PARM_SYNTAX(snd_rear_switch, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
 static struct pci_device_id snd_ymfpci_ids[] __devinitdata = {
         { 0x1073, 0x0004, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* YMF724 */
@@ -189,7 +193,7 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-	if ((err = snd_ymfpci_mixer(chip)) < 0) {
+	if ((err = snd_ymfpci_mixer(chip, snd_rear_switch[dev])) < 0) {
 		snd_card_free(card);
 		return err;
 	}

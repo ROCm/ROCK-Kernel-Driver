@@ -1499,9 +1499,9 @@ static inline void kmem_cache_free_one(kmem_cache_t *cachep, void *objp)
 		if (unlikely(!--slabp->inuse)) {
 			/* Was partial or full, now empty. */
 			list_del(&slabp->list);
-/*			list_add(&slabp->list, &cachep->slabs_free); 		*/
-			if (unlikely(list_empty(&cachep->slabs_partial)))
-				list_add(&slabp->list, &cachep->slabs_partial);
+			/* We only buffer a single page */
+			if (list_empty(&cachep->slabs_free))
+				list_add(&slabp->list, &cachep->slabs_free);
 			else
 				kmem_slab_destroy(cachep, slabp);
 		} else if (unlikely(inuse == cachep->num)) {
@@ -1977,8 +1977,7 @@ static int s_show(struct seq_file *m, void *p)
 	}
 	list_for_each(q,&cachep->slabs_partial) {
 		slabp = list_entry(q, slab_t, list);
-		if (slabp->inuse == cachep->num)
-			BUG();
+		BUG_ON(slabp->inuse == cachep->num || !slabp->inuse);
 		active_objs += slabp->inuse;
 		active_slabs++;
 	}

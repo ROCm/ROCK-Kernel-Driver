@@ -1440,8 +1440,10 @@ static int snd_ali_capture_prepare(snd_pcm_substream_t * substream)
 
 		unsigned int rate;
 		
-		if (codec->revision != ALI_5451_V02)
+		if (codec->revision != ALI_5451_V02) {
+			spin_unlock_irqrestore(&codec->reg_lock, flags);			
 			return -1;
+		}
 		rate = snd_ali_get_spdif_in_rate(codec);
 		if (rate == 0) {
 			snd_printk("ali_capture_preapre: spdif rate detect err!\n");
@@ -1968,9 +1970,10 @@ static void snd_ali_resume(struct pci_dev *dev)
 static int snd_ali_free(ali_t * codec)
 {
 	snd_ali_disable_address_interrupt(codec);
-	synchronize_irq(codec->irq);
-	if (codec->irq >=0)
+	if (codec->irq >= 0) {
+		synchronize_irq(codec->irq);
 		free_irq(codec->irq, (void *)codec);
+	}
 	if (codec->res_port) {
 		release_resource(codec->res_port);
 		kfree_nocheck(codec->res_port);

@@ -205,10 +205,10 @@ int kjournald(void *arg)
 
 	lock_kernel();
 	daemonize();
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	sigfillset(&current->blocked);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	sprintf(current->comm, "kjournald");
 

@@ -16,6 +16,7 @@
  */
 
 #include <linux/init.h>
+#include <linux/spinlock.h>
 #include "sound_config.h"
 
 #include "gus.h"
@@ -25,7 +26,7 @@ static int      midi_busy = 0, input_opened = 0;
 static int      my_dev;
 static int      output_used = 0;
 static volatile unsigned char gus_midi_control;
-
+static spinlock_t lock=SPIN_LOCK_UNLOCKED;
 static void     (*midi_input_intr) (int dev, unsigned char data);
 
 static unsigned char tmp_queue[256];
@@ -75,8 +76,7 @@ static int dump_to_midi(unsigned char midi_byte)
 
 	output_used = 1;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock, flags);
 
 	if (GUS_MIDI_STATUS() & MIDI_XMIT_EMPTY)
 	{
@@ -92,7 +92,7 @@ static int dump_to_midi(unsigned char midi_byte)
 		outb((gus_midi_control), u_MidiControl);
 	}
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock,flags);
 	return ok;
 }
 
@@ -113,16 +113,14 @@ static int gus_midi_out(int dev, unsigned char midi_byte)
 	/*
 	 * Drain the local queue first
 	 */
-
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock, flags);
 
 	while (qlen && dump_to_midi(tmp_queue[qhead]))
 	{
 		qlen--;
 		qhead++;
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock,flags);
 
 	/*
 	 *	Output the byte if the local queue is empty.
@@ -142,14 +140,13 @@ static int gus_midi_out(int dev, unsigned char midi_byte)
 		return 0;	/*
 				 * Local queue full
 				 */
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock, flags);
 
 	tmp_queue[qtail] = midi_byte;
 	qlen++;
 	qtail++;
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock,flags);
 	return 1;
 }
 
@@ -174,15 +171,14 @@ static int gus_midi_buffer_status(int dev)
 	if (!output_used)
 		return 0;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock, flags);
 
 	if (qlen && dump_to_midi(tmp_queue[qhead]))
 	{
 		qlen--;
 		qhead++;
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock,flags);
 	return (qlen > 0) | !(GUS_MIDI_STATUS() & MIDI_XMIT_EMPTY);
 }
 
@@ -226,11 +222,9 @@ void __init gus_midi_init(struct address_info *hw_config)
 void gus_midi_interrupt(int dummy)
 {
 	volatile unsigned char stat, data;
-	unsigned long flags;
 	int timeout = 10;
 
-	save_flags(flags);
-	cli();
+	spin_lock(&lock);
 
 	while (timeout-- > 0 && (stat = GUS_MIDI_STATUS()) & (MIDI_RCV_FULL | MIDI_XMIT_EMPTY))
 	{
@@ -258,5 +252,5 @@ void gus_midi_interrupt(int dummy)
 			}
 		}
 	}
-	restore_flags(flags);
+	spin_unlock(&lock);
 }

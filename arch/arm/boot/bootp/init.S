@@ -1,7 +1,7 @@
 /*
  *  linux/arch/arm/boot/bootp/init.S
  *
- *  Copyright (C) 2000 Russell King
+ *  Copyright (C) 2000-2002 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -11,8 +11,9 @@
  *  r0 through to r3 straight through.
  */
 		.section .start,#alloc,#execinstr
-		.type	_entry, #function
-_entry:		adr	r10, initdata
+		.type	_start, #function
+		.globl	_start
+_start:		adr	r10, initdata
 		ldr	r11, initdata
 		sub	r11, r10, r11		@ work out exec offset
 		b	splitify
@@ -22,14 +23,8 @@ _entry:		adr	r10, initdata
 initdata:	.word	initdata		@ compiled address of this
 		.size	initdata,. - initdata
 
-		.text
 splitify:	adr	r13, data
 		ldmia	r13!, {r4-r6}		@ move the initrd
-		add	r4, r4, r11		@ correction
-		bl	move
-
-		ldmia	r13!, {r4-r6}		@ then the kernel
-		mov	r12, r5
 		add	r4, r4, r11		@ correction
 		bl	move
 
@@ -76,6 +71,7 @@ taglist:	ldr	r9, [r8, #0]		@ tag length
 		mov	r4, #16			@ length of initrd tag
 		mov	r9, #0			@ end of tag list terminator
 		stmia	r8, {r4, r5, r6, r7, r9}
+		adr	r12, kernel_start
 		mov	pc, r12			@ call kernel
 
 /*
@@ -97,15 +93,12 @@ data:		.word	initrd_start
 		.word	initrd_addr
 		.word	initrd_len
 
-		.word	kernel_start
-		.word	kernel_addr
-		.word	kernel_len
-
 		.word	0x54410001		@ r4 = ATAG_CORE
 		.word	0x54420005		@ r5 = ATAG_INITRD
 		.word	initrd_addr		@ r6
 		.word	initrd_len		@ r7
 		.word	params			@ r8
 
-		.type	kernel_start,#object
 		.type	initrd_start,#object
+
+kernel_start:

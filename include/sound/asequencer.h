@@ -257,7 +257,7 @@ struct sndrv_seq_ev_raw32 {
 struct sndrv_seq_ev_ext {
 	unsigned int len;	/* length of data */
 	void *ptr;		/* pointer to data (note: maybe 64-bit) */
-};
+} __attribute__((packed));
 
 /* Instrument cluster type */
 typedef unsigned int sndrv_seq_instr_cluster_t;
@@ -373,7 +373,7 @@ struct sndrv_seq_ev_quote {
 	struct sndrv_seq_addr origin;		/* original sender */
 	unsigned short value;		/* optional data */
 	struct sndrv_seq_event *event;		/* quoted event */
-};
+} __attribute__((packed));
 
 
 	/* sequencer event */
@@ -483,6 +483,16 @@ struct sndrv_seq_system_info {
 	int cur_clients;		/* current clients */
 	int cur_queues;			/* current queues */
 	char reserved[24];
+};
+
+
+	/* system running information */
+struct sndrv_seq_running_info {
+	unsigned char client;		/* client id */
+	unsigned char big_endian;	/* 1 = big-endian */
+	unsigned char cpu_mode;		/* 4 = 32bit, 8 = 64bit */
+	unsigned char pad;		/* reserved */
+	unsigned char reserved[12];
 };
 
 
@@ -609,7 +619,6 @@ struct sndrv_seq_port_info {
 	int write_use;			/* R/O: subscribers for input (to this port) */
 
 	void *kernel;			/* reserved for kernel use (must be NULL) */
-
 	unsigned int flags;		/* misc. conditioning */
 	char reserved[60];		/* for future use */
 };
@@ -853,6 +862,7 @@ struct sndrv_seq_instr_cluster_get {
 #define SNDRV_SEQ_IOCTL_PVERSION	_IOR ('S', 0x00, int)
 #define SNDRV_SEQ_IOCTL_CLIENT_ID	_IOR ('S', 0x01, int)
 #define SNDRV_SEQ_IOCTL_SYSTEM_INFO	_IOWR('S', 0x02, struct sndrv_seq_system_info)
+#define SNDRV_SEQ_IOCTL_RUNNING_MODE	_IOWR('S', 0x03, struct sndrv_seq_running_info)
 
 #define SNDRV_SEQ_IOCTL_GET_CLIENT_INFO	_IOWR('S', 0x10, struct sndrv_seq_client_info)
 #define SNDRV_SEQ_IOCTL_SET_CLIENT_INFO	_IOW ('S', 0x11, struct sndrv_seq_client_info)

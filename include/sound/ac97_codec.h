@@ -127,6 +127,14 @@
 #define AC97_CSR_SPECF_DATA	0x6e	/* Special Feature Data */
 #define AC97_CSR_BDI_STATUS	0x7a	/* BDI Status */
 
+/* specific - Conexant */
+#define AC97_CXR_AUDIO_MISC	0x5c
+#define AC97_CXR_SPDIFEN	(1<<3)
+#define AC97_CXR_COPYRGT	(1<<2)
+#define AC97_CXR_SPDIF_MASK	(3<<0)
+#define AC97_CXR_SPDIF_PCM	0x0
+#define AC97_CXR_SPDIF_AC3	0x2
+
 /* ac97->scaps */
 #define AC97_SCAP_SURROUND_DAC	(1<<0)	/* surround L&R DACs are present */
 #define AC97_SCAP_CENTER_LFE_DAC (1<<1)	/* center and LFE DACs are present */
@@ -135,6 +143,7 @@
 #define AC97_HAS_PC_BEEP	(1<<0)	/* force PC Speaker usage */
 #define AC97_AD_MULTI		(1<<1)	/* Analog Devices - multi codecs */
 #define AC97_CS_SPDIF		(1<<2)	/* Cirrus Logic uses funky SPDIF */
+#define AC97_CX_SPDIF		(1<<3)	/* Conexant's spdif interface */
 
 /*
 
@@ -143,6 +152,7 @@
 typedef struct _snd_ac97 ac97_t;
 
 struct _snd_ac97 {
+	void (*reset) (ac97_t *ac97);
 	void (*write) (ac97_t *ac97, unsigned short reg, unsigned short val);
 	unsigned short (*read) (ac97_t *ac97, unsigned short reg);
 	void (*wait) (ac97_t *ac97);
@@ -169,6 +179,7 @@ struct _snd_ac97 {
 	unsigned int rates_mic_adc;
 	unsigned int spdif_status;
 	unsigned short regs[0x80]; /* register cache */
+	unsigned int limited_regs; /* allow limited registers only */
 	bitmap_member(reg_accessed,0x80); /* bit flags */
 	union {			/* vendor specific code */
 		struct {

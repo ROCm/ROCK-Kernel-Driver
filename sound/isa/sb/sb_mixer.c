@@ -195,6 +195,98 @@ static int snd_sbmixer_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 }
 
 /*
+ * DT-019x / ALS-007 capture/input switch
+ */
+
+static int snd_dt019x_input_sw_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
+{
+	static char *texts[5] = {
+		"CD", "Mic", "Line", "Synth", "Master"
+	};
+
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
+	uinfo->count = 1;
+	uinfo->value.enumerated.items = 5;
+	if (uinfo->value.enumerated.item > 4)
+		uinfo->value.enumerated.item = 4;
+	strcpy(uinfo->value.enumerated.name, texts[uinfo->value.enumerated.item]);
+	return 0;
+}
+
+static int snd_dt019x_input_sw_get(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	sb_t *sb = snd_kcontrol_chip(kcontrol);
+	unsigned long flags;
+	unsigned char oval;
+	
+	spin_lock_irqsave(&sb->mixer_lock, flags);
+	oval = snd_sbmixer_read(sb, SB_DT019X_CAPTURE_SW);
+	spin_unlock_irqrestore(&sb->mixer_lock, flags);
+	switch (oval & 0x07) {
+	case SB_DT019X_CAP_CD:
+		ucontrol->value.enumerated.item[0] = 0;
+		break;
+	case SB_DT019X_CAP_MIC:
+		ucontrol->value.enumerated.item[0] = 1;
+		break;
+	case SB_DT019X_CAP_LINE:
+		ucontrol->value.enumerated.item[0] = 2;
+		break;
+	case SB_DT019X_CAP_MAIN:
+		ucontrol->value.enumerated.item[0] = 4;
+		break;
+	/* To record the synth on these cards you must record the main.   */
+	/* Thus SB_DT019X_CAP_SYNTH == SB_DT019X_CAP_MAIN and would cause */
+	/* duplicate case labels if left uncommented. */
+	/* case SB_DT019X_CAP_SYNTH:
+	 *	ucontrol->value.enumerated.item[0] = 3;
+	 *	break;
+	 */
+	default:
+		ucontrol->value.enumerated.item[0] = 4;
+		break;
+	}
+	return 0;
+}
+
+static int snd_dt019x_input_sw_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * ucontrol)
+{
+	sb_t *sb = snd_kcontrol_chip(kcontrol);
+	unsigned long flags;
+	int change;
+	unsigned char nval, oval;
+	
+	if (ucontrol->value.enumerated.item[0] > 4)
+		return -EINVAL;
+	switch (ucontrol->value.enumerated.item[0]) {
+	case 0:
+		nval = SB_DT019X_CAP_CD;
+		break;
+	case 1:
+		nval = SB_DT019X_CAP_MIC;
+		break;
+	case 2:
+		nval = SB_DT019X_CAP_LINE;
+		break;
+	case 3:
+		nval = SB_DT019X_CAP_SYNTH;
+		break;
+	case 4:
+		nval = SB_DT019X_CAP_MAIN;
+		break;
+	default:
+		nval = SB_DT019X_CAP_MAIN;
+	}
+	spin_lock_irqsave(&sb->mixer_lock, flags);
+	oval = snd_sbmixer_read(sb, SB_DT019X_CAPTURE_SW);
+	change = nval != oval;
+	if (change)
+		snd_sbmixer_write(sb, SB_DT019X_CAPTURE_SW, nval);
+	spin_unlock_irqrestore(&sb->mixer_lock, flags);
+	return change;
+}
+
+/*
  * SBPRO input multiplexer
  */
 
@@ -422,6 +514,44 @@ static unsigned char snd_sb16_init_values[][2] = {
 	{ SB_DSP4_SPEAKER_DEV, 0 },
 };
 
+#define DT019X_CONTROLS (sizeof(snd_dt019x_controls)/sizeof(snd_kcontrol_new_t))
+
+static snd_kcontrol_new_t snd_dt019x_controls[] = {
+SB_DOUBLE("Master Playback Volume", SB_DT019X_MASTER_DEV, SB_DT019X_MASTER_DEV, 4,0, 15),
+SB_DOUBLE("PCM Playback Volume", SB_DT019X_PCM_DEV, SB_DT019X_PCM_DEV, 4,0, 15),
+SB_DOUBLE("Synth Playback Volume", SB_DT019X_SYNTH_DEV, SB_DT019X_SYNTH_DEV, 4,0, 15),
+SB_DOUBLE("CD Playback Volume", SB_DT019X_CD_DEV, SB_DT019X_CD_DEV, 4,0, 15),
+SB_SINGLE("Mic Playback Volume", SB_DT019X_MIC_DEV, 4, 7),
+SB_SINGLE("PC Speaker Volume", SB_DT019X_SPKR_DEV, 0,  7),
+SB_DOUBLE("Line Playback Volume", SB_DT019X_LINE_DEV, SB_DT019X_LINE_DEV, 4,0, 15),
+SB_SINGLE("Mic Playback Switch", SB_DT019X_OUTPUT_SW1, 0, 1),
+SB_DOUBLE("CD Playback Switch", SB_DT019X_OUTPUT_SW1, SB_DT019X_OUTPUT_SW1, 2,1, 1),
+SB_DOUBLE("Line Playback Switch", SB_DT019X_OUTPUT_SW1, SB_DT019X_OUTPUT_SW1, 4,3, 1),
+SB_DOUBLE("PCM Playback Switch", SB_DT019X_OUTPUT_SW2, SB_DT019X_OUTPUT_SW2, 2,1, 1),
+SB_DOUBLE("Synth Playback Switch", SB_DT019X_OUTPUT_SW2, SB_DT019X_OUTPUT_SW2, 4,3, 1),
+{
+	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
+	name: "Capture Source",
+	info: snd_dt019x_input_sw_info,
+	get: snd_dt019x_input_sw_get,
+	put: snd_dt019x_input_sw_put,
+},
+};
+
+#define DT019X_INIT_VALUES (sizeof(snd_dt019x_init_values)/sizeof(unsigned char)/2)
+
+static unsigned char snd_dt019x_init_values[][2] = {
+        { SB_DT019X_MASTER_DEV, 0 },
+        { SB_DT019X_PCM_DEV, 0 },
+        { SB_DT019X_SYNTH_DEV, 0 },
+        { SB_DT019X_CD_DEV, 0 },
+        { SB_DT019X_MIC_DEV, 0 },	/* Includes PC-speaker in high nibble */
+        { SB_DT019X_LINE_DEV, 0 },
+        { SB_DT019X_OUTPUT_SW1, 0 },
+        { SB_DT019X_OUTPUT_SW2, 0 },
+        { SB_DT019X_CAPTURE_SW, 0x06 },
+};
+
 static int snd_sbmixer_init(sb_t *chip,
 			    snd_kcontrol_new_t *controls,
 			    int controls_count,
@@ -489,6 +619,12 @@ int snd_sbmixer_new(sb_t *chip)
 					    snd_sb16_init_values, SB16_INIT_VALUES,
 					    "CTL1745")) < 0)
 			return err;
+		break;
+	case SB_HW_DT019X:
+		if ((err = snd_sbmixer_init(chip,
+					    snd_dt019x_controls, DT019X_CONTROLS,
+					    snd_dt019x_init_values, DT019X_INIT_VALUES,
+					    "DT019X")) < 0)
 		break;
 	default:
 		strcpy(card->mixername, "???");

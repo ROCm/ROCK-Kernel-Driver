@@ -21,6 +21,7 @@
 
 #define __NO_VERSION__
 #include <sound/driver.h>
+#include <linux/threads.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
@@ -659,7 +660,7 @@ static ssize_t snd_ctl_read(struct file *file, char *buffer, size_t count, loff_
 		snd_kctl_event_t *kev;
 		while (list_empty(&ctl->events)) {
 			wait_queue_t wait;
-			if (file->f_flags & O_NONBLOCK) {
+			if ((file->f_flags & O_NONBLOCK) != 0 || result > 0) {
 				err = -EAGAIN;
 				goto __end;
 			}

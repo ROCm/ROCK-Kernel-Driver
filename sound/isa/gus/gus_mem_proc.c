@@ -68,8 +68,8 @@ static long long snd_gf1_mem_proc_llseek(snd_info_entry_t *entry,
 	case 1:	/* SEEK_CUR */
 		file->f_pos += offset;
 		break;
-	case 2: /* SEEK_END */
-		file->f_pos = priv->size - offset;
+	case 2: /* SEEK_END, offset is negative */
+		file->f_pos = priv->size + offset;
 		break;
 	default:
 		return -EINVAL;
