@@ -435,7 +435,7 @@ static int cramfs_readpage(struct file *file, struct page * page)
 }
 
 static struct address_space_operations cramfs_aops = {
-	readpage: cramfs_readpage
+	.readpage = cramfs_readpage
 };
 
 /*
@@ -446,17 +446,17 @@ static struct address_space_operations cramfs_aops = {
  * A directory can only readdir
  */
 static struct file_operations cramfs_directory_operations = {
-	read:		generic_read_dir,
-	readdir:	cramfs_readdir,
+	.read		= generic_read_dir,
+	.readdir	= cramfs_readdir,
 };
 
 static struct inode_operations cramfs_dir_inode_operations = {
-	lookup:		cramfs_lookup,
+	.lookup		= cramfs_lookup,
 };
 
 static struct super_operations cramfs_ops = {
-	put_super:	cramfs_put_super,
-	statfs:		cramfs_statfs,
+	.put_super	= cramfs_put_super,
+	.statfs		= cramfs_statfs,
 };
 
 static struct super_block *cramfs_get_sb(struct file_system_type *fs_type,
@@ -466,11 +466,11 @@ static struct super_block *cramfs_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type cramfs_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"cramfs",
-	get_sb:		cramfs_get_sb,
-	kill_sb:	kill_block_super,
-	fs_flags:	FS_REQUIRES_DEV,
+	.owner		= THIS_MODULE,
+	.name		= "cramfs",
+	.get_sb		= cramfs_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
 };
 
 static int __init init_cramfs_fs(void)

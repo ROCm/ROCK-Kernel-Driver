@@ -1296,7 +1296,6 @@ drop:
 static int deliver_to_old_ones(struct packet_type *pt,
 			       struct sk_buff *skb, int last)
 {
-	static spinlock_t net_bh_lock = SPIN_LOCK_UNLOCKED;
 	int ret = NET_RX_DROP;
 
 	if (!last) {
@@ -1307,20 +1306,13 @@ static int deliver_to_old_ones(struct packet_type *pt,
 	if (skb_is_nonlinear(skb) && skb_linearize(skb, GFP_ATOMIC))
 		goto out_kfree;
 
-	/* The assumption (correct one) is that old protocols
-	   did not depened on BHs different of NET_BH and TIMER_BH.
+#if CONFIG_SMP
+	/* Old protocols did not depened on BHs different of NET_BH and
+	   TIMER_BH - they need to be fixed for the new assumptions.
 	 */
-
-	/* Emulate NET_BH with special spinlock */
-	spin_lock(&net_bh_lock);
-
-	/* Disable timers and wait for all timers completion */
-	tasklet_disable(bh_task_vec+TIMER_BH);
-
+	print_symbol("fix old protocol handler %s!\n", (unsigned long)pt->func);
+#endif
 	ret = pt->func(skb, skb->dev, pt);
-
-	tasklet_hi_enable(bh_task_vec+TIMER_BH);
-	spin_unlock(&net_bh_lock);
 out:
 	return ret;
 out_kfree:

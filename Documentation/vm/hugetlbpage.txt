@@ -1,0 +1,85 @@
+2002  Rohit Seth <rohit.seth@intel.com>
+
+The intent of this file is to give a brief summary of hugetlbpage support in
+the Linux kernel.  This support is built on top of multiple page size support
+that is provided by most of modern architectures.  For example, IA-32
+architecture supports 4K and 4M (2M in PAE mode) page sizes, IA-64
+architecture supports multiple page sizes 4K, 8K, 64K, 256K, 1M, 4M, 16M,
+256M.  A TLB is a cache of virtual-to-physical translations.  Typically this
+is a very scarce resource on processor.  Operating systems try to make best
+use of limited number of TLB resources.  This optimization is more critical
+now as bigger and bigger physical memories (several GBs) are more readily
+available.
+
+The current support is provided in kernel using the following two system calls:
+
+1) sys_alloc_hugepages(int key, unsigned long addr, size_t len, int prot, int flag)
+
+2) sys_free_hugepages(unsigned long addr)
+
+Arguments to these system calls are defined as follows:
+
+key: If a user application wants to share hugepages with other
+      processes then this input argument needs to be greater than 0. 
+      Different applications can use the same key to map the same physical
+      memory (mapped by hugeTLBs) in their address space.  When a process
+      forks, then children share the same physical memory with their parent.
+
+      For the cases when an application wishes to keep the huge pages
+      private, the key value of 0 is defined.  In this case kernel allocates
+      hugetlb pages to the process that are not shareable across different
+      processes.  These segments are marked private for the process.  These
+      segments are not copied to children's address space on forks.
+
+AKPM: So what is present at that address within the child?
+
+      The key manangement (and assignment) part is left to user
+      applications.
+
+addr: This is an address hint.  The kernel will perform a sanity check
+      on this address (alignment etc.) before using it.  It is possible that
+      kernel will allocates a different address (on success).
+
+len:  Length of the required segment.  Applications are expected to give
+      HPAGE_SIZE aligned length.  (Else EINVAL is returned.)
+
+prot: The prot parameter specifies the desired memory protection on the
+      requested hugepages.  The possible values are PROT_EXEC, PROT_READ,
+      PROT_WRITE.
+
+flag: This parameter can only take the value IPC_CREAT for the cases
+      when "key" value greater than zero (shared hugepage cases).  It is
+      ignored for values of "key" that are <= 0.
+
+      This parameter indicates that the kernel should create a new huge
+      page segment (corresponding to "key"), if none already exists.  If this
+      flag is not set, then sys_allochugepages() will return ENOENT if there
+      is no segment associated with corresponding "key".
+
+In case of success, sys_alloc_hugepages() return the allocated virtual address.
+
+sys_free_hugepages() frees the hugetlb resources from the calling process's
+address space.  The input argument "addr" specifies the segment that needs to
+be freed.  It is important to note that for the shared hugepage cases, the
+underlying hugepages are freed onlyafter all the users of those pages have
+either freed those hugepages or have exited.
+
+/proc/sys/vm_nr_hugepages indicates the current number of configured hugetlb
+pages in the kernel.  Super user privileges are required for modification of
+this value.  The allocation of hugetlb pages is posible only if there are
+enough physically contiguous free pages in system OR if there are enough
+hugetlb pages free that can be transfered back to regular memory pool.
+
+/proc/meminfo also gives the information about the total number of hugetlb
+pages configured in the kernel.  It also displays information about the
+number of free hugetlb pages at any time.  It also displays information about
+the configured hugepage size - this is needed for generting the proper
+alignment and size of the arguments to the above system calls.
+
+Pages that are used as hugetlb pages are marked reserved inside the kernel. 
+This allows hugetlb pages to be always locked in memory.  The user either
+needs to be super user to use these pages or one of supplementary group
+should include root.  In future there will be support to check RLIMIT_MLOCK
+for limited (number of hugetlb pages) usage to unprivileged applications.
+
+If the kernel does not support hugepages these system calls will return ENOSYS.

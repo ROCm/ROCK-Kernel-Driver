@@ -810,12 +810,26 @@ int snd_pcm_hw_rule_add(snd_pcm_runtime_t *runtime, unsigned int cond,
 }				    
 
 int snd_pcm_hw_constraint_mask(snd_pcm_runtime_t *runtime, snd_pcm_hw_param_t var,
-			       unsigned int mask)
+			       u_int32_t mask)
 {
 	snd_pcm_hw_constraints_t *constrs = &runtime->hw_constraints;
-	unsigned int *maskp = constrs_mask(constrs, var);
-	*maskp &= mask;
-	if (*maskp == 0)
+	snd_mask_t *maskp = constrs_mask(constrs, var);
+	*maskp->bits &= mask;
+	memset(maskp->bits + 1, 0, (SNDRV_MASK_MAX-32) / 8); /* clear rest */
+	if (*maskp->bits == 0)
+		return -EINVAL;
+	return 0;
+}
+
+int snd_pcm_hw_constraint_mask64(snd_pcm_runtime_t *runtime, snd_pcm_hw_param_t var,
+				 u_int64_t mask)
+{
+	snd_pcm_hw_constraints_t *constrs = &runtime->hw_constraints;
+	snd_mask_t *maskp = constrs_mask(constrs, var);
+	maskp->bits[0] &= (u_int32_t)mask;
+	maskp->bits[1] &= (u_int32_t)(mask >> 32);
+	memset(maskp->bits + 2, 0, (SNDRV_MASK_MAX-64) / 8); /* clear rest */
+	if (! maskp->bits[0] && ! maskp->bits[1])
 		return -EINVAL;
 	return 0;
 }
@@ -946,6 +960,26 @@ int snd_pcm_hw_constraint_step(snd_pcm_runtime_t *runtime,
 				   var, -1);
 }
 
+static int snd_pcm_hw_rule_pow2(snd_pcm_hw_params_t *params, snd_pcm_hw_rule_t *rule)
+{
+	static int pow2_sizes[] = {
+		1<<0, 1<<1, 1<<2, 1<<3, 1<<4, 1<<5, 1<<6, 1<<7,
+		1<<8, 1<<9, 1<<10, 1<<11, 1<<12, 1<<13, 1<<14, 1<<15,
+		1<<16, 1<<17, 1<<18, 1<<19, 1<<20, 1<<21, 1<<22, 1<<23,
+		1<<24, 1<<25, 1<<26, 1<<27, 1<<28, 1<<29, 1<<30
+	};
+	return snd_interval_list(hw_param_interval(params, rule->var),
+				 sizeof(pow2_sizes)/sizeof(int), pow2_sizes, 0);
+}		
+
+int snd_pcm_hw_constraint_pow2(snd_pcm_runtime_t *runtime,
+			       unsigned int cond,
+			       snd_pcm_hw_param_t var)
+{
+	return snd_pcm_hw_rule_add(runtime, cond, var, 
+				   snd_pcm_hw_rule_pow2, NULL,
+				   var, -1);
+}
 
 /* To use the same code we have in alsa-lib */
 #define snd_pcm_t snd_pcm_substream_t
@@ -982,7 +1016,9 @@ void _snd_pcm_hw_params_any(snd_pcm_hw_params_t *params)
 {
 	unsigned int k;
 	memset(params, 0, sizeof(*params));
-	for (k = 0; k <= SNDRV_PCM_HW_PARAM_LAST; k++)
+	for (k = SNDRV_PCM_HW_PARAM_FIRST_MASK; k <= SNDRV_PCM_HW_PARAM_LAST_MASK; k++)
+		_snd_pcm_hw_param_any(params, k);
+	for (k = SNDRV_PCM_HW_PARAM_FIRST_INTERVAL; k <= SNDRV_PCM_HW_PARAM_LAST_INTERVAL; k++)
 		_snd_pcm_hw_param_any(params, k);
 	params->info = ~0U;
 }
@@ -1883,7 +1919,7 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(snd_pcm_substream_t *substream,
 			frames = cont;
 		if (frames == 0 && runtime->status->state == SNDRV_PCM_STATE_PAUSED) {
 			err = -EPIPE;
-			goto _end;
+			goto _end_unlock;
 		}
 		snd_assert(frames != 0,
 			   spin_unlock_irq(&runtime->lock);
@@ -2348,6 +2384,7 @@ EXPORT_SYMBOL(snd_pcm_hw_constraint_ratdens);
 EXPORT_SYMBOL(snd_pcm_hw_constraint_msbits);
 EXPORT_SYMBOL(snd_pcm_hw_constraint_minmax);
 EXPORT_SYMBOL(snd_pcm_hw_constraint_integer);
+EXPORT_SYMBOL(snd_pcm_hw_constraint_pow2);
 EXPORT_SYMBOL(snd_pcm_hw_rule_add);
 EXPORT_SYMBOL(snd_pcm_set_ops);
 EXPORT_SYMBOL(snd_pcm_set_sync);

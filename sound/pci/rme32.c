@@ -23,8 +23,7 @@
  *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  * 
  * 
- *   ToDo: - ADAT (32/8)
- *         - full duplex (32, 32/8, 32Pro)
+ *   ToDo: full duplex (32, 32/8, 32Pro)
  */
 
 #include <sound/driver.h>
@@ -37,6 +36,7 @@
 #include <sound/info.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
+#include <sound/pcm_params.h>
 #include <sound/asoundef.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>
@@ -327,6 +327,54 @@ static snd_pcm_hardware_t snd_rme32_capture_spdif_info = {
 	fifo_size:	0,
 };
 
+/*
+ * Digital output capabilites (ADAT)
+ */
+static snd_pcm_hardware_t snd_rme32_playback_adat_info =
+{
+	info:		     (SNDRV_PCM_INFO_MMAP |
+			      SNDRV_PCM_INFO_MMAP_VALID |
+			      SNDRV_PCM_INFO_INTERLEAVED |
+			      SNDRV_PCM_INFO_PAUSE),
+	formats:             SNDRV_PCM_FMTBIT_S16_LE,
+	rates:	             (SNDRV_PCM_RATE_44100 | 
+			      SNDRV_PCM_RATE_48000),
+	rate_min:            44100,
+	rate_max:            48000,
+	channels_min:        8,
+	channels_max:	     8,
+	buffer_bytes_max:   RME32_BUFFER_SIZE,
+	period_bytes_min:   RME32_BLOCK_SIZE,
+	period_bytes_max:   RME32_BLOCK_SIZE,
+	periods_min:	     RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
+	periods_max:	     RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
+	fifo_size:	     0,
+};
+
+/*
+ * Digital input capabilites (ADAT)
+ */
+static snd_pcm_hardware_t snd_rme32_capture_adat_info =
+{
+	info:		     (SNDRV_PCM_INFO_MMAP |
+			      SNDRV_PCM_INFO_MMAP_VALID |
+			      SNDRV_PCM_INFO_INTERLEAVED |
+			      SNDRV_PCM_INFO_PAUSE),
+	formats:             SNDRV_PCM_FMTBIT_S16_LE,
+	rates:	             (SNDRV_PCM_RATE_44100 | 
+			      SNDRV_PCM_RATE_48000),
+	rate_min:            44100,
+	rate_max:            48000,
+	channels_min:        8,
+	channels_max:	     8,
+	buffer_bytes_max:   RME32_BUFFER_SIZE,
+	period_bytes_min:   RME32_BLOCK_SIZE,
+	period_bytes_max:   RME32_BLOCK_SIZE,
+	periods_min:	     RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
+	periods_max:	     RME32_BUFFER_SIZE / RME32_BLOCK_SIZE,
+	fifo_size:           0,
+};
+
 static void snd_rme32_reset_dac(rme32_t *rme32)
 {
         writel(rme32->wcreg | RME32_WCR_PD,
@@ -359,15 +407,20 @@ static int snd_rme32_playback_getrate(rme32_t * rme32)
 static int snd_rme32_capture_getrate(rme32_t * rme32, int *is_adat)
 {
 	int n;
-	*is_adat = 0;
 
+	*is_adat = 0;
+	if (rme32->rcreg & RME32_RCR_LOCK) { 
+                /* ADAT rate */
+                *is_adat = 1;
+	}
 	if (rme32->rcreg & RME32_RCR_ERF) {
 		return -1;
 	}
 
+        /* S/PDIF rate */
 	n = ((rme32->rcreg >> RME32_RCR_BITPOS_F0) & 1) +
-	    (((rme32->rcreg >> RME32_RCR_BITPOS_F1) & 1) << 1) +
-	    (((rme32->rcreg >> RME32_RCR_BITPOS_F2) & 1) << 2);
+		(((rme32->rcreg >> RME32_RCR_BITPOS_F1) & 1) << 1) +
+		(((rme32->rcreg >> RME32_RCR_BITPOS_F2) & 1) << 2);
 
 	if (RME32_PRO_WITH_8414(rme32))
 		switch (n) {	/* supporting the CS8414 */
@@ -388,7 +441,8 @@ static int snd_rme32_capture_getrate(rme32_t * rme32, int *is_adat)
 		default:
 			return -1;
 			break;
-	} else
+		} 
+	else
 		switch (n) {	/* supporting the CS8412 */
 		case 0:
 			return -1;
@@ -816,6 +870,62 @@ static int snd_rme32_capture_spdif_open(snd_pcm_substream_t * substream)
 	return 0;
 }
 
+static int
+snd_rme32_playback_adat_open(snd_pcm_substream_t *substream)
+{
+	unsigned long flags;
+	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	
+	snd_pcm_set_sync(substream);
+
+	spin_lock_irqsave(&rme32->lock, flags);	
+	rme32->wcreg |= RME32_WCR_ADAT;
+	writel(rme32->wcreg, rme32->iobase + RME32_IO_CONTROL_REGISTER);
+	rme32->playback_substream = substream;
+	rme32->playback_last_appl_ptr = 0;
+	rme32->playback_ptr = 0;
+	spin_unlock_irqrestore(&rme32->lock, flags);
+	
+	runtime->hw = snd_rme32_playback_adat_info;
+	snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_BUFFER_BYTES,
+				     RME32_BUFFER_SIZE, RME32_BUFFER_SIZE);
+	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_BYTES,
+				   &hw_constraints_period_bytes);
+	return 0;
+}
+
+static int
+snd_rme32_capture_adat_open(snd_pcm_substream_t *substream)
+{
+	unsigned long flags;
+	int isadat;
+	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
+	snd_pcm_runtime_t *runtime = substream->runtime;
+
+	rme32->rcreg = readl(rme32->iobase + RME32_IO_CONTROL_REGISTER);
+	if (snd_rme32_capture_getrate(rme32, &isadat) < 0) {
+		/* no input */
+		return -EIO;
+	}
+	if (!isadat) {
+		/* S/PDIF input */
+		return -EBUSY;
+	}
+	snd_pcm_set_sync(substream);
+
+	spin_lock_irqsave(&rme32->lock, flags);	
+	rme32->capture_substream = substream;
+	rme32->capture_ptr = 0;
+	spin_unlock_irqrestore(&rme32->lock, flags);
+
+	runtime->hw = snd_rme32_capture_adat_info;
+	snd_pcm_hw_constraint_minmax(runtime, SNDRV_PCM_HW_PARAM_BUFFER_BYTES,
+				     RME32_BUFFER_SIZE, RME32_BUFFER_SIZE);
+	snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_BYTES,
+				   &hw_constraints_period_bytes);
+	return 0;
+}
 
 static int snd_rme32_playback_close(snd_pcm_substream_t * substream)
 {
@@ -1004,7 +1114,31 @@ static snd_pcm_uframes_t
 snd_rme32_capture_pointer(snd_pcm_substream_t * substream)
 {
 	rme32_t *rme32 = _snd_pcm_substream_chip(substream);
-	return snd_rme32_capture_ptr(rme32);
+	snd_pcm_runtime_t *runtime = substream->runtime;
+	snd_pcm_uframes_t frameptr;
+	size_t ptr;
+
+	frameptr = snd_rme32_capture_ptr(rme32);
+	if (runtime->access == SNDRV_PCM_ACCESS_MMAP_INTERLEAVED) {
+		ptr = frameptr << rme32->capture_frlog;
+		if (ptr > rme32->capture_ptr) {
+			memcpy_fromio(runtime->dma_area + rme32->capture_ptr,
+				      rme32->iobase + RME32_IO_DATA_BUFFER +
+				      rme32->capture_ptr,
+				      ptr - rme32->capture_ptr);
+			rme32->capture_ptr += ptr - rme32->capture_ptr;
+		} else if (ptr < rme32->capture_ptr) {
+			memcpy_fromio(runtime->dma_area + rme32->capture_ptr,
+				      rme32->iobase + RME32_IO_DATA_BUFFER +
+				      rme32->capture_ptr,
+				      RME32_BUFFER_SIZE - rme32->capture_ptr);
+			memcpy_fromio(runtime->dma_area,
+				      rme32->iobase + RME32_IO_DATA_BUFFER,
+				      ptr);
+			rme32->capture_ptr = ptr;
+		}
+	}
+	return frameptr;
 }
 
 static snd_pcm_ops_t snd_rme32_playback_spdif_ops = {
@@ -1022,6 +1156,31 @@ static snd_pcm_ops_t snd_rme32_playback_spdif_ops = {
 
 static snd_pcm_ops_t snd_rme32_capture_spdif_ops = {
 	open:		snd_rme32_capture_spdif_open,
+	close:		snd_rme32_capture_close,
+	ioctl:		snd_pcm_lib_ioctl,
+	hw_params:	snd_rme32_capture_hw_params,
+	hw_free:	snd_rme32_capture_hw_free,
+	prepare:	snd_rme32_capture_prepare,
+	trigger:	snd_rme32_capture_trigger,
+	pointer:	snd_rme32_capture_pointer,
+	copy:		snd_rme32_capture_copy,
+};
+
+static snd_pcm_ops_t snd_rme32_playback_adat_ops = {
+	open:		snd_rme32_playback_adat_open,
+	close:		snd_rme32_playback_close,
+	ioctl:		snd_pcm_lib_ioctl,
+	hw_params:	snd_rme32_playback_hw_params,
+	hw_free:	snd_rme32_playback_hw_free,
+	prepare:	snd_rme32_playback_prepare,
+	trigger:	snd_rme32_playback_trigger,
+	pointer:	snd_rme32_playback_pointer,
+	copy:		snd_rme32_playback_copy,
+	silence:	snd_rme32_playback_silence,
+};
+
+static snd_pcm_ops_t snd_rme32_capture_adat_ops = {
+	open:		snd_rme32_capture_adat_open,
 	close:		snd_rme32_capture_close,
 	ioctl:		snd_pcm_lib_ioctl,
 	hw_params:	snd_rme32_capture_hw_params,
@@ -1060,6 +1219,14 @@ static void snd_rme32_free_spdif_pcm(snd_pcm_t * pcm)
 {
 	rme32_t *rme32 = (rme32_t *) pcm->private_data;
 	rme32->spdif_pcm = NULL;
+	snd_pcm_lib_preallocate_free_for_all(pcm);
+}
+
+static void
+snd_rme32_free_adat_pcm(snd_pcm_t *pcm)
+{
+	rme32_t *rme32 = (rme32_t *) pcm->private_data;
+	rme32->adat_pcm = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
 
@@ -1117,10 +1284,33 @@ static int __devinit snd_rme32_create(rme32_t * rme32)
 					      GFP_KERNEL);
 
 	/* set up ALSA pcm device for ADAT */
-	if (pci->device == PCI_DEVICE_ID_DIGI32) {
-		/* ADAT is not available on the base model */
+	if ((pci->device == PCI_DEVICE_ID_DIGI32) ||
+	    (pci->device == PCI_DEVICE_ID_DIGI32_PRO)) {
+		/* ADAT is not available on DIGI32 and DIGI32 Pro */
 		rme32->adat_pcm = NULL;
 	}
+	else {
+		if ((err = snd_pcm_new(rme32->card, "Digi32 ADAT", 1,
+				       1, 1, &rme32->adat_pcm)) < 0)
+		{
+			return err;
+		}		
+		rme32->adat_pcm->private_data = rme32;
+		rme32->adat_pcm->private_free = snd_rme32_free_adat_pcm;
+		strcpy(rme32->adat_pcm->name, "Digi32 ADAT");
+		snd_pcm_set_ops(rme32->adat_pcm, SNDRV_PCM_STREAM_PLAYBACK, 
+				&snd_rme32_playback_adat_ops);
+		snd_pcm_set_ops(rme32->adat_pcm, SNDRV_PCM_STREAM_CAPTURE, 
+				&snd_rme32_capture_adat_ops);
+		
+		rme32->adat_pcm->info_flags = 0;
+
+		snd_pcm_lib_preallocate_pages_for_all(rme32->adat_pcm, 
+						      RME32_BUFFER_SIZE, 
+						      RME32_BUFFER_SIZE, 
+						      GFP_KERNEL);
+	}
+
 
 	rme32->playback_periodsize = 0;
 	rme32->capture_periodsize = 0;
@@ -1137,8 +1327,8 @@ static int __devinit snd_rme32_create(rme32_t * rme32)
 
 	/* set default values in registers */
 	rme32->wcreg = RME32_WCR_SEL |	 /* normal playback */
-		       RME32_WCR_INP_0 | /* input select */
-		       RME32_WCR_MUTE;	 /* setting muting on */
+		RME32_WCR_INP_0 | /* input select */
+		RME32_WCR_MUTE;	 /* muting on */
 	writel(rme32->wcreg, rme32->iobase + RME32_IO_CONTROL_REGISTER);
 
 

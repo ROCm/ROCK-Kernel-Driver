@@ -88,9 +88,9 @@ CONFIG_SND_AZT2320
 CONFIG_SND_CMI8330
   Say 'Y' or 'M' to include support for C-Media CMI8330 based soundcards.
 
-CONFIG_SND_DT0197H
-  Say 'Y' or 'M' to include support for Diamond Technologies DT-0197H
-  soundcards.
+CONFIG_SND_DT019X
+  Say 'Y' or 'M' to include support for Diamond Technologies DT-019X and
+  Avance Logic ALS-007 soundcards.
 
 CONFIG_SND_OPL3SA2
   Say 'Y' or 'M' to include support for Yamaha OPL3SA2 or OPL3SA3 chips.

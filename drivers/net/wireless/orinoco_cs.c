@@ -1,4 +1,4 @@
-/* orinoco_cs.c 0.13	- (formerly known as dldwd_cs.c)
+/* orinoco_cs.c 0.13a	- (formerly known as dldwd_cs.c)
  *
  * A driver for "Hermes" chipset based PCMCIA wireless adaptors, such
  * as the Lucent WavelanIEEE/Orinoco cards and their OEM (Cabletron/
@@ -32,6 +32,7 @@
 #include <linux/if_arp.h>
 #include <linux/etherdevice.h>
 #include <linux/wireless.h>
+#include <linux/tqueue.h>
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
@@ -693,7 +694,7 @@ orinoco_cs_event(event_t event, int priority,
 
 /* Can't be declared "const" or the whole __initdata section will
  * become const */
-static char version[] __initdata = "orinoco_cs.c 0.13 (David Gibson <hermes@gibson.dropbear.id.au> and others)";
+static char version[] __initdata = "orinoco_cs.c 0.13a (David Gibson <hermes@gibson.dropbear.id.au> and others)";
 
 static int __init
 init_orinoco_cs(void)

@@ -101,11 +101,11 @@ static int nbd_xmit(int send, struct socket *sock, char *buf, int size, int msg_
 	oldfs = get_fs();
 	set_fs(get_ds());
 
-	spin_lock_irqsave(&current->sigmask_lock, flags);
+	spin_lock_irqsave(&current->sig->siglock, flags);
 	oldset = current->blocked;
 	sigfillset(&current->blocked);
 	recalc_sigpending();
-	spin_unlock_irqrestore(&current->sigmask_lock, flags);
+	spin_unlock_irqrestore(&current->sig->siglock, flags);
 
 
 	do {
@@ -137,10 +137,10 @@ static int nbd_xmit(int send, struct socket *sock, char *buf, int size, int msg_
 		buf += result;
 	} while (size > 0);
 
-	spin_lock_irqsave(&current->sigmask_lock, flags);
+	spin_lock_irqsave(&current->sig->siglock, flags);
 	current->blocked = oldset;
 	recalc_sigpending();
-	spin_unlock_irqrestore(&current->sigmask_lock, flags);
+	spin_unlock_irqrestore(&current->sig->siglock, flags);
 
 	set_fs(oldfs);
 	return result;

@@ -1265,7 +1265,6 @@ static void release_dev(struct file * filp)
 	/*
 	 * Make sure that the tty's task queue isn't activated. 
 	 */
-	run_task_queue(&tq_timer);
 	flush_scheduled_tasks();
 
 	/* 
@@ -1876,7 +1875,6 @@ static void __do_SAK(void *arg)
 
 /*
  * The tq handling here is a little racy - tty->SAK_tq may already be queued.
- * But there's no mechanism to fix that without futzing with tqueue_lock.
  * Fortunately we don't need to worry, because if ->SAK_tq is already queued,
  * the values which we write to it will be identical to the values which it
  * already has. --akpm
@@ -1902,7 +1900,7 @@ static void flush_to_ldisc(void *private_)
 	unsigned long flags;
 
 	if (test_bit(TTY_DONT_FLIP, &tty->flags)) {
-		queue_task(&tty->flip.tqueue, &tq_timer);
+		schedule_task(&tty->flip.tqueue);
 		return;
 	}
 	if (tty->flip.buf_num) {
@@ -1979,7 +1977,7 @@ void tty_flip_buffer_push(struct tty_struct *tty)
 	if (tty->low_latency)
 		flush_to_ldisc((void *) tty);
 	else
-		queue_task(&tty->flip.tqueue, &tq_timer);
+		schedule_task(&tty->flip.tqueue);
 }
 
 /*

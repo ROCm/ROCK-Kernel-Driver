@@ -1,4 +1,4 @@
-/* orinoco_pci.c 0.01
+/* orinoco_pci.c 0.13a
  * 
  * Driver for Prism II devices that have a direct PCI interface
  * (i.e., not in a Pcmcia or PLX bridge)
@@ -122,41 +122,6 @@
 #define HERMES_PCI_COR_OFFT	(500)		/* ms */
 #define HERMES_PCI_COR_BUSYT	(500)		/* ms */
 
-MODULE_AUTHOR("Jean Tourrilhes <jt@hpl.hp.com>");
-MODULE_DESCRIPTION("Driver for wireless LAN cards using direct PCI interface");
-MODULE_LICENSE("Dual MPL/GPL");
-
-static int orinoco_pci_open(struct net_device *dev)
-{
-	struct orinoco_private *priv = (struct orinoco_private *) dev->priv;
-	int err;
-
-	netif_device_attach(dev);
-
-	err = orinoco_reset(priv);
-	if (err)
-		printk(KERN_ERR "%s: orinoco_reset failed in orinoco_pci_open()",
-		       dev->name);
-	else
-		netif_start_queue(dev);
-
-	return err;
-}
-
-static int orinoco_pci_stop(struct net_device *dev)
-{
-	struct orinoco_private *priv = (struct orinoco_private *) dev->priv;
-	netif_stop_queue(dev);
-	orinoco_shutdown(priv);
-	return 0;
-}
-
-static void
-orinoco_pci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
-{
-	orinoco_interrupt(irq, (struct orinoco_private *)dev_id, regs);
-}
-
 /*
  * Do a soft reset of the PCI card using the Configuration Option Register
  * We need this to get going...
@@ -178,7 +143,6 @@ orinoco_pci_cor_reset(struct orinoco_private *priv)
 	u16	reg;
 
 	TRACE_ENTER(priv->ndev->name);
-
 
 	/* Assert the reset until the card notice */
 	hermes_write_regn(hw, PCI_COR, HERMES_PCI_COR_MASK);
@@ -235,8 +199,6 @@ static int orinoco_pci_init_one(struct pci_dev *pdev,
 	struct net_device *dev = NULL;
 	int netdev_registered = 0;
 
-	TRACE_ENTER("orinoco_pci");
-
 	err = pci_enable_device(pdev);
 	if (err)
 		return -EIO;
@@ -249,7 +211,7 @@ static int orinoco_pci_init_one(struct pci_dev *pdev,
 		goto fail;
 
 	/* Usual setup of structures */
-	dev = alloc_orinocodev(0);
+	dev = alloc_orinocodev(0, NULL);
 	if (! dev) {
 		err = -ENOMEM;
 		goto fail;
@@ -259,9 +221,6 @@ static int orinoco_pci_init_one(struct pci_dev *pdev,
 	dev->base_addr = (int) pci_ioaddr;
         dev->mem_start = (unsigned long) pci_iorange;
         dev->mem_end = ((unsigned long) pci_iorange) + pci_iolen - 1;
-	dev->open = orinoco_pci_open;
-	dev->stop = orinoco_pci_stop;
-/*  	priv->card_reset_handler = orinoco_pci_cor_reset; */
 
 	SET_MODULE_OWNER(dev);
 
@@ -270,9 +229,9 @@ static int orinoco_pci_init_one(struct pci_dev *pdev,
 	       pdev->slot_name, dev->mem_start, dev->mem_end, pci_ioaddr, pdev->irq);
 
 	hermes_struct_init(&(priv->hw), dev->base_addr, HERMES_MEM, HERMES_32BIT_REGSPACING);
-	pci_set_drvdata(pdev, priv);
+	pci_set_drvdata(pdev, dev);
 
-	err = request_irq(pdev->irq, orinoco_pci_interrupt, SA_SHIRQ, dev->name, priv);
+	err = request_irq(pdev->irq, orinoco_interrupt, SA_SHIRQ, dev->name, priv);
 	if (err) {
 		printk(KERN_ERR "orinoco_pci: Error allocating IRQ %d.\n", pdev->irq);
 		err = -EBUSY;
@@ -291,32 +250,30 @@ static int orinoco_pci_init_one(struct pci_dev *pdev,
 	priv->firmware_type = FIRMWARE_TYPE_INTERSIL;
 
 	err = register_netdev(dev);
-	if (err)
+	if (err) {
+		printk(KERN_ERR "%s: Failed to register net device\n", dev->name);
 		goto fail;
+	}
 	netdev_registered = 1;
 
-	err = orinoco_proc_dev_init(priv);
+	err = orinoco_proc_dev_init(dev);
 	if (err) {
 		printk(KERN_ERR "%s: Failed to create /proc node\n", dev->name);
 		err = -EIO;
 		goto fail;
 	}
 
-	TRACE_EXIT("orinoco_pci");
-
         return 0;               /* succeeded */
  fail:
-	printk(KERN_DEBUG "orinoco_pci: init_one(), FAIL!\n");
-
-	if (priv) {
-		orinoco_proc_dev_cleanup(priv);
+	if (dev) {
+		orinoco_proc_dev_cleanup(dev);
 		if (netdev_registered)
 			unregister_netdev(dev);
 
 		if (dev->irq)
 			free_irq(dev->irq, priv);
 
-		kfree(priv);
+		kfree(dev);
 	}
 
 	if (pci_ioaddr)
@@ -327,15 +284,13 @@ static int orinoco_pci_init_one(struct pci_dev *pdev,
 
 static void __devexit orinoco_pci_remove_one(struct pci_dev *pdev)
 {
-	struct orinoco_private *priv = pci_get_drvdata(pdev);
-	struct net_device *dev = priv->ndev;
+	struct net_device *dev = pci_get_drvdata(pdev);
+	struct orinoco_private *priv = dev->priv;
 
-	TRACE_ENTER("orinoco_pci");
-
-	if (!priv)
+	if (! dev)
 		BUG();
 
-	orinoco_proc_dev_cleanup(priv);
+	orinoco_proc_dev_cleanup(dev);
 
 	unregister_netdev(dev);
 
@@ -345,13 +300,10 @@ static void __devexit orinoco_pci_remove_one(struct pci_dev *pdev)
 	if (priv->hw.iobase)
 		iounmap((unsigned char *) priv->hw.iobase);
 
-	kfree(priv);
+	kfree(dev);
 
 	pci_disable_device(pdev);
-
-	TRACE_EXIT("orinoco_pci");
 }
-
 
 static struct pci_device_id orinoco_pci_pci_id_table[] __devinitdata = {
 	{0x1260, 0x3873, PCI_ANY_ID, PCI_ANY_ID,},
@@ -365,10 +317,18 @@ static struct pci_driver orinoco_pci_driver = {
 	.id_table	= orinoco_pci_pci_id_table,
 	.probe		= orinoco_pci_init_one,
 	.remove		= __devexit_p(orinoco_pci_remove_one),
+	.suspend	= 0,
+	.resume		= 0
 };
+
+static char version[] __initdata = "orinoco_pci.c 0.13a (Jean Tourrilhes <jt@hpl.hp.com>)";
+MODULE_AUTHOR("Jean Tourrilhes <jt@hpl.hp.com>");
+MODULE_DESCRIPTION("Driver for wireless LAN cards using direct PCI interface");
+MODULE_LICENSE("Dual MPL/GPL");
 
 static int __init orinoco_pci_init(void)
 {
+	printk(KERN_DEBUG "%s\n", version);
 	return pci_module_init(&orinoco_pci_driver);
 }
 

@@ -15,6 +15,7 @@
  * Bartlomiej Zolnierkiewicz : added __init to ics2101_mixer_init()
  */
 #include <linux/init.h>
+#include <linux/spinlock.h>
 #include "sound_config.h"
 
 #include <linux/ultrasound.h>
@@ -28,6 +29,7 @@
 
 extern int     *gus_osp;
 extern int      gus_base;
+extern spinlock_t lock;
 static int      volumes[ICS_MIXDEVS];
 static int      left_fix[ICS_MIXDEVS] =
 {1, 1, 1, 2, 1, 2};
@@ -85,13 +87,12 @@ static void write_mix(int dev, int chn, int vol)
 		attn_addr |= 0x03;
 	}
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lock, flags);
 	outb((ctrl_addr), u_MixSelect);
 	outb((selector[dev]), u_MixData);
 	outb((attn_addr), u_MixSelect);
 	outb(((unsigned char) vol), u_MixData);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&lock,flags);
 }
 
 static int set_volumes(int dev, int vol)

@@ -27,7 +27,7 @@ static struct {
 	uid_t   uid;
 	gid_t   gid;
 	umode_t mode;
-} config = {mode: 0600};
+} config = {.mode = 0600};
 
 static int devpts_remount(struct super_block *sb, int *flags, char *data)
 {
@@ -67,8 +67,8 @@ static int devpts_remount(struct super_block *sb, int *flags, char *data)
 }
 
 static struct super_operations devpts_sops = {
-	statfs:		simple_statfs,
-	remount_fs:	devpts_remount,
+	.statfs		= simple_statfs,
+	.remount_fs	= devpts_remount,
 };
 
 static int devpts_fill_super(struct super_block *s, void *data, int silent)
@@ -110,10 +110,10 @@ static struct super_block *devpts_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type devpts_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"devpts",
-	get_sb:		devpts_get_sb,
-	kill_sb:	kill_anon_super,
+	.owner		= THIS_MODULE,
+	.name		= "devpts",
+	.get_sb		= devpts_get_sb,
+	.kill_sb	= kill_anon_super,
 };
 
 /*

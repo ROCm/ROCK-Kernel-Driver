@@ -657,7 +657,7 @@ __und_invalid:	sub	sp, sp, #S_FRAME_SIZE
 
 #if defined CONFIG_FPE_NWFPE || defined CONFIG_FPE_FASTFPE
 		/* The FPE is always present */
-		.equ	fpe_not_present, 0
+		.equ	fpe_not_present, fpundefinstr
 #else
 wfs_mask_data:	.word	0x0e200110			@ WFS/RFS
 		.word	0x0fef0fff
@@ -788,15 +788,16 @@ svc_preempt:	teq	r9, #0				@ was preempt count = 0
 		.align	5
 __und_svc:	sub	sp, sp, #S_FRAME_SIZE
 		stmia	sp, {r0 - r12}			@ save r0 - r12
-		ldr	r7, .LCund
-		mov	r6, lr
-		ldmia	r7, {r7 - r9}
-		add	r5, sp, #S_FRAME_SIZE
-		add	r4, sp, #S_SP
-		stmia	r4, {r5 - r9}			@ save sp_SVC, lr_SVC, pc, cpsr, old_ro
+		ldr	r3, .LCund
+		mov	r4, lr
+		ldmia	r3, {r5 - r7}
+		add	r3, sp, #S_FRAME_SIZE
+		add	r2, sp, #S_SP
+		stmia	r2, {r3 - r7}			@ save sp_SVC, lr_SVC, pc, cpsr, old_ro
 
-		adrsvc	al, r9, 1f			@ r9  = normal FP return
-		bl	call_fpe			@ lr  = undefined instr return
+		ldr	r0, [r5, #-4]			@ r0 = instruction
+		adrsvc	al, r9, 1f			@ r9 = normal FP return
+		bl	call_fpe			@ lr = undefined instr return
 
 		mov	r0, sp				@ struct pt_regs *regs
 		bl	do_undefinstr
@@ -913,17 +914,58 @@ __und_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 		zero_fp
 		tst	r6, #PSR_T_BIT			@ Thumb mode?
 		bne	fpundefinstr			@ ignore FP
+		sub	r4, r5, #4
+1:		ldrt	r0, [r4]			@ r0  = instruction
 		adrsvc	al, r9, ret_from_exception	@ r9  = normal FP return
 		adrsvc	al, lr, fpundefinstr		@ lr  = undefined instr return
 
-call_fpe:	enable_irq r0				@ Enable interrupts
-		get_thread_info r10			@ get current thread
+/*
+ * The out of line fixup for the ldrt above.
+ */
+		.section .fixup, "ax"
+2:		mov	pc, r9
+		.previous
+		.section __ex_table,"a"
+		.long	1b, 2b
+		.previous
+
+/*
+ * r0 = instruction.
+ *
+ * Check whether the instruction is a co-processor instruction.
+ * If yes, we need to call the relevant co-processor handler.
+ *
+ * Note that we don't do a full check here for the co-processor
+ * instructions; all instructions with bit 27 set are well
+ * defined.  The only instructions that should fault are the
+ * co-processor instructions.  However, we have to watch out
+ * for the ARM6/ARM7 SWI bug.
+ *
+ * Emulators may wish to make use of the instruction value we
+ * prepared for them in r0.
+ */
+call_fpe:	enable_irq r10				@ Enable interrupts
+		tst	r0, #0x08000000			@ only CDP/CPRT/LDC/STC have bit 27
+#if defined(CONFIG_CPU_ARM610) || defined(CONFIG_CPU_ARM710)
+		and	r10, r0, #0x0f000000		@ mask out op-code bits
+		teqne	r10, #0x0f000000		@ SWI (ARM6/7 bug)?
+#endif
+		moveq	pc, lr
+do_fpe:		get_thread_info r10			@ get current thread
 		ldr	r4, [r10, #TI_TASK]		@ get current task
 		mov	r8, #1
 		strb	r8, [r4, #TSK_USED_MATH]	@ set current->used_math
 		ldr	r4, .LCfp
 		add	r10, r10, #TI_FPSTATE		@ r10 = workspace
 		ldr	pc, [r4]			@ Call FP module USR entry point
+/*
+ * The FP module is called with these registers set:
+ *  r0  = instruction
+ *  r5  = PC
+ *  r9  = normal "successful" return address
+ *  r10 = FP workspace
+ *  lr  = unrecognised FP instruction return address
+ */
 
 fpundefinstr:	mov	r0, sp
 		adrsvc	al, lr, ret_from_exception

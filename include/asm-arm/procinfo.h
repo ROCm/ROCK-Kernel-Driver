@@ -46,6 +46,8 @@ struct proc_info_list {
 	struct cpu_user_fns	*user;
 };
 
+extern unsigned int elf_hwcap;
+
 #endif	/* __ASSEMBLY__ */
 
 #define PROC_INFO_SZ	44

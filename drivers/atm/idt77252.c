@@ -1099,7 +1099,7 @@ dequeue_rx(struct idt77252_dev *card, struct rsq_entry *rsqe)
 			       cell, ATM_CELL_PAYLOAD);
 
 			ATM_SKB(sb)->vcc = vcc;
-			sb->stamp = xtime;
+			do_gettimeofday(&sb->stamp);
 			vcc->push(vcc, sb);
 			atomic_inc(&vcc->stats->rx);
 
@@ -1177,7 +1177,7 @@ dequeue_rx(struct idt77252_dev *card, struct rsq_entry *rsqe)
 
 			skb_trim(skb, len);
 			ATM_SKB(skb)->vcc = vcc;
-			skb->stamp = xtime;
+			do_gettimeofday(&skb->stamp);
 
 			vcc->push(vcc, skb);
 			atomic_inc(&vcc->stats->rx);
@@ -1199,7 +1199,7 @@ dequeue_rx(struct idt77252_dev *card, struct rsq_entry *rsqe)
 
 		skb_trim(skb, len);
 		ATM_SKB(skb)->vcc = vcc;
-		skb->stamp = xtime;
+		do_gettimeofday(&skb->stamp);
 
 		vcc->push(vcc, skb);
 		atomic_inc(&vcc->stats->rx);
@@ -1337,7 +1337,7 @@ idt77252_rx_raw(struct idt77252_dev *card)
 		       ATM_CELL_PAYLOAD);
 
 		ATM_SKB(sb)->vcc = vcc;
-		sb->stamp = xtime;
+		do_gettimeofday(&sb->stamp);
 		vcc->push(vcc, sb);
 		atomic_inc(&vcc->stats->rx);
 

@@ -27,8 +27,6 @@
 	TODO, in rough priority order:
 	* Test Tx checksumming thoroughly
 	* dev->tx_timeout
-	* Support forcing media type with a module parameter,
-	  like dl2k.c/sundance.c
 	* Constants (module parms?) for Rx work limit
 	* Complete reset on PciErr
 	* Consider Rx interrupt mitigation using TimerIntr
@@ -49,8 +47,8 @@
  */
 
 #define DRV_NAME		"8139cp"
-#define DRV_VERSION		"0.2.1"
-#define DRV_RELDATE		"Aug 9, 2002"
+#define DRV_VERSION		"0.3.0"
+#define DRV_RELDATE		"Sep 29, 2002"
 
 
 #include <linux/config.h>
@@ -106,6 +104,11 @@ MODULE_PARM (multicast_filter_limit, "i");
 MODULE_PARM_DESC (multicast_filter_limit, "8139cp: maximum number of filtered multicast addresses");
 
 #define PFX			DRV_NAME ": "
+
+#ifndef TRUE
+#define FALSE 0
+#define TRUE (!FALSE)
+#endif
 
 #define CP_DEF_MSG_ENABLE	(NETIF_MSG_DRV		| \
 				 NETIF_MSG_PROBE 	| \
@@ -678,7 +681,7 @@ static void cp_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 	if (status & (TxOK | TxErr | TxEmpty | SWInt))
 		cp_tx(cp);
 	if (status & LinkChg)
-		mii_check_media(&cp->mii_if, netif_msg_link(cp));
+		mii_check_media(&cp->mii_if, netif_msg_link(cp), FALSE);
 
 	if (status & PciErr) {
 		u16 pci_status;
@@ -988,8 +991,6 @@ static struct net_device_stats *cp_get_stats(struct net_device *dev)
 
 static void cp_stop_hw (struct cp_private *cp)
 {
-	struct net_device *dev = cp->dev;
-
 	cpw16(IntrMask, 0);
 	cpr16(IntrMask);
 	cpw8(Cmd, 0);
@@ -1195,7 +1196,7 @@ static int cp_open (struct net_device *dev)
 		goto err_out_hw;
 
 	netif_carrier_off(dev);
-	mii_check_media(&cp->mii_if, netif_msg_link(cp));
+	mii_check_media(&cp->mii_if, netif_msg_link(cp), TRUE);
 	netif_start_queue(dev);
 
 	return 0;
@@ -1654,33 +1655,18 @@ err_out_gregs:
 static int cp_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct cp_private *cp = dev->priv;
-	struct mii_ioctl_data *mii;
-	int rc = 0;
+	struct mii_ioctl_data *mii = (struct mii_ioctl_data *) &rq->ifr_data;
+	int rc;
 
-	mii = (struct mii_ioctl_data *) &rq->ifr_data;
 	if (!netif_running(dev))
 		return -EINVAL;
 
-	if (cmd != SIOCETHTOOL) 
-		mii->reg_num &= 0x1f;
-	
-	switch (cmd) {
-	case SIOCETHTOOL:
+	if (cmd == SIOCETHTOOL)
 		return cp_ethtool_ioctl(cp, (void *) rq->ifr_data);
-		
- 	case SIOCGMIIPHY:	/* Get the address of the PHY in use. */
-		mii->phy_id = CP_INTERNAL_PHY;
-		/* Fall Through */
 
-	case SIOCGMIIREG:	/* Read the specified MII register. */
-		mii->val_out = mdio_read (dev, CP_INTERNAL_PHY, mii->reg_num);
-		break;
-
-	default:
-		rc = -EOPNOTSUPP;
-		break;
-	}
-
+	spin_lock_irq(&cp->lock);
+	rc = generic_mii_ioctl(&cp->mii_if, mii, cmd, NULL);
+	spin_unlock_irq(&cp->lock);
 	return rc;
 }
 
@@ -1818,6 +1804,8 @@ static int __devinit cp_init_one (struct pci_dev *pdev,
 	cp->mii_if.mdio_read = mdio_read;
 	cp->mii_if.mdio_write = mdio_write;
 	cp->mii_if.phy_id = CP_INTERNAL_PHY;
+	cp->mii_if.phy_id_mask = 0x1f;
+	cp->mii_if.reg_num_mask = 0x1f;
 	cp_set_rxbufsize(cp);
 
 	rc = pci_enable_device(pdev);

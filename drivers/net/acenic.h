@@ -770,7 +770,7 @@ static inline void ace_unmask_irq(struct net_device *dev)
 	if (ACE_IS_TIGON_I(ap))
 		writel(0, &regs->MaskInt);
 	else
-		writel(readl(&regs->HostCtrl) &= ~MASK_INTS, &regs->HostCtrl);
+		writel(readl(&regs->HostCtrl) & ~MASK_INTS, &regs->HostCtrl);
 }
 
 

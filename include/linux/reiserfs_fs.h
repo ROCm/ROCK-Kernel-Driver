@@ -1632,9 +1632,6 @@ struct reiserfs_journal_header {
   /* 12 */ struct journal_params jh_journal;
 } ;
 
-extern task_queue reiserfs_commit_thread_tq ;
-extern wait_queue_head_t reiserfs_commit_thread_wait ;
-
 /* biggest tunable defines are right here */
 #define JOURNAL_BLOCK_COUNT 8192 /* number of blocks in the journal */
 #define JOURNAL_TRANS_MAX_DEFAULT 1024   /* biggest possible single transaction, don't change for now (8/3/99) */

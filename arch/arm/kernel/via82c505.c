@@ -15,63 +15,49 @@
 
 #define MAX_SLOTS		7
 
-#define CONFIG_CMD(dev, where)   (0x80000000 | (dev->bus->number << 16) | (dev->devfn << 8) | (where & ~3))
+#define CONFIG_CMD(bus, devfn, where)   (0x80000000 | (bus->number << 16) | (devfn << 8) | (where & ~3))
 
 static int
-via82c505_read_config_byte(struct pci_dev *dev, int where, u8 *value)
+via82c505_read_config(struct pci_bus *bus, unsigned int devfn, int where,
+		      int size, u32 *value)
 {
 	outl(CONFIG_CMD(dev,where),0xCF8);
-	*value=inb(0xCFC + (where&3));
+	switch (size) {
+	case 1:
+		*value=inb(0xCFC + (where&3));
+		break;
+	case 2:
+		*value=inw(0xCFC + (where&2));
+		break;
+	case 4:
+		*value=inl(0xCFC);
+		break;
+	}
 	return PCIBIOS_SUCCESSFUL;
 }
 
 static int
-via82c505_read_config_word(struct pci_dev *dev, int where, u16 *value)
+via82c505_write_config(struct pci_bus *bus, unsigned int devfn, int where
+		       int size, u32 value)
 {
-	outl(CONFIG_CMD(dev,where),0xCF8);
-	*value=inw(0xCFC + (where&2));
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-via82c505_read_config_dword(struct pci_dev *dev, int where, u32 *value)
-{
-	outl(CONFIG_CMD(dev,where),0xCF8);
-	*value=inl(0xCFC);
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-via82c505_write_config_byte(struct pci_dev *dev, int where, u8 value)
-{
-	outl(CONFIG_CMD(dev,where),0xCF8);
-	outb(value, 0xCFC + (where&3));
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-via82c505_write_config_word(struct pci_dev *dev, int where, u16 value)
-{
-	outl(CONFIG_CMD(dev,where),0xCF8);
-	outw(value, 0xCFC + (where&2));
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-via82c505_write_config_dword(struct pci_dev *dev, int where, u32 value)
-{
-	outl(CONFIG_CMD(dev,where),0xCF8);
-	outl(value, 0xCFC);
+	outl(CONFIG_CMD(bus,devfn,where),0xCF8);
+	switch (size) {
+	case 1:
+		outb(value, 0xCFC + (where&3));
+		break;
+	case 2:
+		outw(value, 0xCFC + (where&2));
+		break;
+	case 4:
+		outl(value, 0xCFC);
+		break;
+	}
 	return PCIBIOS_SUCCESSFUL;
 }
 
 static struct pci_ops via82c505_ops = {
-	via82c505_read_config_byte,
-	via82c505_read_config_word,
-	via82c505_read_config_dword,
-	via82c505_write_config_byte,
-	via82c505_write_config_word,
-	via82c505_write_config_dword,
+	.read	= via82c505_read_config,
+	.write	= via82c505_write_config,
 };
 
 void __init via82c505_preinit(void *sysdata)

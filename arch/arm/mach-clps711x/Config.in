@@ -1,0 +1,31 @@
+mainmenu_option next_comment
+comment 'CLPS711X/EP721X Implementations'
+dep_bool '  AUTCPU12' CONFIG_ARCH_AUTCPU12 $CONFIG_ARCH_CLPS711X
+dep_bool '  CDB89712' CONFIG_ARCH_CDB89712 $CONFIG_ARCH_CLPS711X
+dep_bool '  CEIVA' CONFIG_ARCH_CEIVA $CONFIG_ARCH_CLPS711X
+dep_bool '  CLEP7312' CONFIG_ARCH_CLEP7312 $CONFIG_ARCH_CLPS711X
+dep_bool '  EDB7211' CONFIG_ARCH_EDB7211 $CONFIG_ARCH_CLPS711X
+dep_bool '  P720T' CONFIG_ARCH_P720T $CONFIG_ARCH_CLPS711X
+dep_bool '  FORTUNET' CONFIG_ARCH_FORTUNET $CONFIG_ARCH_CLPS711X
+
+# XXX Maybe these should indicate register compatibility
+# instead of being mutually exclusive.
+if [ "$CONFIG_ARCH_EDB7211" = "y" ]; then
+   define_bool CONFIG_ARCH_EP7211 y
+else
+   define_bool CONFIG_ARCH_EP7211 n
+fi
+
+if [ "$CONFIG_ARCH_P720T" = "y" -o \
+     "$CONFIG_ARCH_CEIVA" = "y" ]; then
+   define_bool CONFIG_ARCH_EP7212 y
+else
+   define_bool CONFIG_ARCH_EP7212 n
+fi
+
+if [ "$CONFIG_ARCH_EP7211" = "y" -o \
+     "$CONFIG_ARCH_EP7212" = "y" ]; then
+   bool '  EP72xx ROM boot' CONFIG_EP72XX_ROM_BOOT
+fi
+endmenu
+

@@ -13,6 +13,7 @@ obj-y	+=	rise.o
 obj-y	+=	nexgen.o
 obj-y	+=	umc.o
 
-obj-$(CONFIG_MTRR)	+= mtrr/
+obj-$(CONFIG_MTRR)	+= 	mtrr/
+obj-$(CONFIG_CPU_FREQ)	+=	cpufreq/
 
 include $(TOPDIR)/Rules.make

@@ -131,7 +131,7 @@ static int __init cs3_init(void)
 	return 0;
 }
  
-__initcall(cs3_init);
+arch_initcall(cs3_init);
 
 #endif // CONFIG_PROC_FS
 

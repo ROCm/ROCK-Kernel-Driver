@@ -598,10 +598,10 @@ static int loop_thread(void *data)
 					   hence, it mustn't be stopped at all because it could
 					   be indirectly used during suspension */
 
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	sigfillset(&current->blocked);
 	flush_signals(current);
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	set_user_nice(current, -20);
 

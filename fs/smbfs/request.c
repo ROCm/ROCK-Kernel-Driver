@@ -332,8 +332,8 @@ int smb_add_request(struct smb_request *req)
 
 	smbiod_wake_up();
 
-	/* FIXME: replace with a timeout-able wake_event_interruptible */
-	timeleft = interruptible_sleep_on_timeout(&req->rq_wait, 30*HZ);
+	timeleft = wait_event_interruptible_timeout(req->rq_wait,
+				    req->rq_flags & SMB_REQ_RECEIVED, 30*HZ);
 	if (!timeleft || signal_pending(current)) {
 		/*
 		 * On timeout or on interrupt we want to try and remove the
@@ -346,7 +346,7 @@ int smb_add_request(struct smb_request *req)
 		}
 		smb_unlock_server(server);
 	}
-		
+
 	if (!timeleft) {
 		PARANOIA("request [%p, mid=%d] timed out!\n",
 			 req, req->rq_mid);
@@ -777,7 +777,7 @@ int smb_request_recv(struct smb_sb_info *server)
 
 	/*
 	 * Response completely read. Drop any extra bytes sent by the server.
-	 * (Yes, servers sometimes add extra bytes to requests)
+	 * (Yes, servers sometimes add extra bytes to responses)
 	 */
 	VERBOSE("smb_len: %d   smb_read: %d\n",
 		server->smb_len, server->smb_read);

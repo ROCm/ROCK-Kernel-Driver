@@ -1142,6 +1142,8 @@ static int snd_ice1712_cs8427_set_input_clock(ice1712_t *ice, int spdif_clock)
 {
 	unsigned char reg[2] = { 0x80 | 4, 0 };   /* CS8427 auto increment | register number 4 + data */
 	unsigned char val, nval;
+	int res = 0;
+	
 	snd_i2c_lock(ice->i2c);
 	if (snd_i2c_sendbytes(ice->cs8427, reg, 1) != 1) {
 		snd_i2c_unlock(ice->i2c);
@@ -1159,13 +1161,13 @@ static int snd_ice1712_cs8427_set_input_clock(ice1712_t *ice, int spdif_clock)
 	if (val != nval) {
 		reg[1] = nval;
 		if (snd_i2c_sendbytes(ice->cs8427, reg, 2) != 2) {
-			snd_i2c_unlock(ice->i2c);
-			return -EREMOTE;
+			res = -EREMOTE;
+		} else {
+			res++;
 		}
-		return 1;
 	}
 	snd_i2c_unlock(ice->i2c);
-	return 0;
+	return res;
 }
 
 /*
@@ -4070,7 +4072,7 @@ static int snd_ice1712_free(ice1712_t *ice)
 	/* --- */
       __hw_end:
 	snd_ice1712_proc_done(ice);
-	if (ice->irq) {
+	if (ice->irq >= 0) {
 		synchronize_irq(ice->irq);
 		free_irq(ice->irq, (void *) ice);
 	}
@@ -4144,7 +4146,7 @@ static int __devinit snd_ice1712_create(snd_card_t * card,
 	pci_write_config_word(ice->pci, 0x40, 0x807f);
 	pci_write_config_word(ice->pci, 0x42, 0x0006);
 	snd_ice1712_proc_init(ice);
-	synchronize_irq(ice->irq);
+	synchronize_irq(pci->irq);
 
 	if ((ice->res_port = request_region(ice->port, 32, "ICE1712 - Controller")) == NULL) {
 		snd_ice1712_free(ice);

@@ -339,7 +339,7 @@ add_breakpoint(struct task_struct *child, struct debug_info *dbg, unsigned long 
 	return res;
 }
 
-int ptrace_set_bpt(struct task_struct *child)
+void ptrace_set_bpt(struct task_struct *child)
 {
 	struct pt_regs *regs;
 	unsigned long pc, insn;
@@ -350,7 +350,7 @@ int ptrace_set_bpt(struct task_struct *child)
 
 	if (thumb_mode(regs)) {
 		printk(KERN_WARNING "ptrace: can't handle thumb mode\n");
-		return -EINVAL;
+		return;
 	}
 
 	res = read_tsk_long(child, pc, &insn);
@@ -376,8 +376,6 @@ int ptrace_set_bpt(struct task_struct *child)
 		if (!alt || predicate(insn) != PREDICATE_ALWAYS)
 			res = add_breakpoint(child, dbg, pc + 4);
 	}
-
-	return res;
 }
 
 /*

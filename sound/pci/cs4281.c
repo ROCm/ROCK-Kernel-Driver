@@ -1300,7 +1300,7 @@ static int snd_cs4281_free(cs4281_t *chip)
 	}
 #endif
 	snd_cs4281_proc_done(chip);
-	if(chip->irq >= 0)
+	if (chip->irq >= 0)
 		synchronize_irq(chip->irq);
 
 	/* Mask interrupts */

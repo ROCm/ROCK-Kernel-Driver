@@ -50,7 +50,7 @@
  */
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 4, 0)
-#if defined(__i386__) || defined(__ppc__)
+#if defined(__i386__) || defined(__ppc__) || defined(__x86_64__)
 /*
  * Here a dirty hack for 2.4 kernels.. See sound/core/memory.c.
  */

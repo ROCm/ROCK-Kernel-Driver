@@ -101,10 +101,10 @@ lockd(struct svc_rqst *rqstp)
 	sprintf(current->comm, "lockd");
 
 	/* Process request with signals blocked.  */
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	siginitsetinv(&current->blocked, sigmask(SIGKILL));
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	/* kick rpciod */
 	rpciod_up();
@@ -126,9 +126,9 @@ lockd(struct svc_rqst *rqstp)
 	{
 		long timeout = MAX_SCHEDULE_TIMEOUT;
 		if (signalled()) {
-			spin_lock_irq(&current->sigmask_lock);
+			spin_lock_irq(&current->sig->siglock);
 			flush_signals(current);
-			spin_unlock_irq(&current->sigmask_lock);
+			spin_unlock_irq(&current->sig->siglock);
 			if (nlmsvc_ops) {
 				nlmsvc_invalidate_all();
 				grace_period_expire = set_grace_period();
@@ -297,9 +297,9 @@ lockd_down(void)
 			"lockd_down: lockd failed to exit, clearing pid\n");
 		nlmsvc_pid = 0;
 	}
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 out:
 	up(&nlmsvc_sema);
 }

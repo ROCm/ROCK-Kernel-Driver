@@ -2281,7 +2281,9 @@ EXPORT_SYMBOL(isapnp_resource_change);
 EXPORT_SYMBOL(isapnp_register_driver);
 EXPORT_SYMBOL(isapnp_unregister_driver);
 
-static struct device_driver isapnp_device_driver = {};
+static struct device_driver isapnp_device_driver = {
+	.devices = LIST_HEAD_INIT(isapnp_device_driver.devices),
+};
 
 static inline int isapnp_init_device_tree(void)
 {

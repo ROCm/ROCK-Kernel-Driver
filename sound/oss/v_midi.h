@@ -3,7 +3,7 @@ typedef struct vmidi_devc {
 
 	/* State variables */
  	   int opened;
-
+	   spinlock_t lock;
 	
 	/* MIDI fields */
 	   int my_mididev;

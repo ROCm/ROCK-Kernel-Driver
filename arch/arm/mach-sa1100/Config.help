@@ -1,0 +1,189 @@
+CONFIG_SA1100_ASSABET
+  Say Y here if you are using the Intel(R) StrongARM(R) SA-1110
+  Microprocessor Development Board (also known as the Assabet).
+
+CONFIG_ASSABET_NEPONSET
+  Say Y here if you are using the Intel(R) StrongARM(R) SA-1110
+  Microprocessor Development Board (Assabet)  with the SA-1111
+  Development Board (Nepon).
+
+CONFIG_SA1100_ADSBITSY
+  Say Y here if you are using Applied Data Systems Intel(R)
+  StrongARM(R) 1110 based Bitsy, 3 x 5 inches in size, Compaq - IPAQ -
+  like platform. See
+  <http://www.applieddata.net/products_bitsySpec.asp> for more
+  information.
+
+CONFIG_SA1100_BRUTUS
+  Say Y here if you are using the Intel(R) StrongARM(R) SA-1100
+  Microprocessor Development Board (also known as the Brutus).
+
+CONFIG_SA1100_CERF
+  The Intrinsyc CerfBoard is based on the StrongARM 1110.
+  More information is available at:
+  <http://www.intrinsyc.com/products/referenceplatforms/cerfboard.html>.
+
+  Say Y if configuring for an Intrinsyc CerfBoard.
+  Say N otherwise.
+
+CONFIG_SA1100_CERF_CPLD
+  Say Y here to support the Linux CerfPDA development kit from
+  Intrinsyc. This is a StrongARM-1110-based reference platform for
+  designing custom PDAs.  Product info is at
+  <http://www.intrinsyc.com/products/referencedesigns/cerfpda.asp>.
+
+CONFIG_SA1100_H3100
+  Say Y here if you intend to run this kernel on the Compaq iPAQ
+  H3100 handheld computer.  Information about this machine and the
+  Linux port to this machine can be found at:
+
+  <http://www.handhelds.org/Compaq/index.html#iPAQ_H3100>
+  <http://www.compaq.com/products/handhelds/pocketpc/>
+
+CONFIG_SA1100_H3600
+  Say Y here if you intend to run this kernel on the Compaq iPAQ
+  H3600 handheld computer.  Information about this machine and the
+  Linux port to this machine can be found at:
+
+  <http://www.handhelds.org/Compaq/index.html#iPAQ_H3600>
+  <http://www.compaq.com/products/handhelds/pocketpc/>
+
+CONFIG_SA1100_H3800
+  Say Y here if you intend to run this kernel on the Compaq iPAQ H3800
+  series handheld computer.  Information about this machine and the
+  Linux port to this machine can be found at:
+
+  <http://www.handhelds.org/Compaq/index.html#iPAQ_H3800>
+  <http://www.compaq.com/products/handhelds/pocketpc/>
+
+CONFIG_H3600_SLEEVE
+  Choose this option to enable support for extension packs (sleeves)
+  for the Compaq iPAQ H3XXX series of handheld computers.  This option
+  is required for the CF, PCMCIA, Bluetooth and GSM/GPRS extension
+  packs.
+
+CONFIG_SA1100_FLEXANET
+  Say Y here if you intend to run this kernel on the FlexaNet
+  handheld instruments. Information about this machine can be
+  found at: <http://www.flexanet.com/>.
+
+CONFIG_SA1100_FREEBIRD
+  Support the FreeBird board used in Coventive embedded products.  See
+  Documentation/arm/SA1100/Freebird for more.
+
+CONFIG_SA1100_GRAPHICSCLIENT
+  Say Y here if you are using an Applied Data Systems Intel(R)
+  StrongARM(R) SA-1100 based Graphics Client SBC.  See
+  <http://www.flatpanels.com/> for information on this system.
+
+CONFIG_SA1100_GRAPHICSMASTER
+  Say Y here if you are using an Applied Data Systems Intel(R)
+  StrongARM(R) SA-1100 based Graphics Master SBC with SA-1111
+  StrongARM companion chip.  See
+  <http://www.applieddata.net/products_masterSpec.asp> for information
+  on this system.
+
+CONFIG_SA1100_BADGE4
+  Say Y here if you want to build a kernel for the HP Laboratories
+  BadgePAD 4.
+
+CONFIG_SA1100_JORNADA720
+  Say Y here if you want to build a kernel for the HP Jornada 720
+  handheld computer.  See <http://www.hp.com/jornada/products/720>
+  for details.
+
+CONFIG_SA1100_HUW_WEBPANEL
+  Say Y here to support the HuW Webpanel produced by Hoeft & Wessel
+  AG.  English-language website is at
+  <http://www.hoeft-wessel.de/en.htm>; credits and build instructions
+  at Documentation/arm/SA1100/HUW_WEBPANEL.
+
+CONFIG_SA1100_ITSY
+  Say Y here if you are using the Compaq Itsy experimental pocket
+  computer. See <http://research.compaq.com/wrl/projects/itsy/> for
+  more information.
+
+CONFIG_SA1100_LART
+  Say Y here if you are using the Linux Advanced Radio Terminal
+  (also known as the LART).  See <http://www.lart.tudelft.nl/> for
+  information on the LART.
+
+CONFIG_SA1100_NANOENGINE
+  The nanoEngine is a StrongARM 1110-based single board computer
+  from Bright Star Engineering. More information is available at:
+  <http://www.brightstareng.com/arm/nanoeng.htm>.
+
+  Say Y if configuring for a nanoEngine.
+  Say N otherwise.
+
+CONFIG_SA1100_OMNIMETER
+  Say Y here if you are using the inhand electronics OmniMeter.  See
+  <http://www.inhandelectronics.com/html/omni1.html> for details.
+
+CONFIG_SA1100_PANGOLIN
+  Pangolin is a StrongARM 1110-based evaluation platform produced
+  by Dialogue Technology.  It has EISA slots for ease of configuration
+  with SDRAM/Flash memory card, USB/Serial/Audio card, Compact Flash
+  card, and TFT-LCD card.
+
+  Say Y if configuring for a Pangolin.
+  Say N otherwise.
+
+CONFIG_SA1100_PLEB
+  Say Y here if you are using a Portable Linux Embedded Board
+  (also known as PLEB). See <http://www.cse.unsw.edu.au/~pleb/>
+  for more information.
+
+CONFIG_SA1100_PT_SYSTEM3
+   Say Y here if you intend to build a kernel suitable to run on
+   a Pruftechnik Digital Board. For more information see
+   <http://www.pruftechnik.com>
+
+CONFIG_SA1100_SHANNON
+  The Shannon (also known as a Tuxscreen, and also as a IS2630) was a
+  limited edition webphone produced by Philips. The Shannon is a SA1100
+  platform with a 640x480 LCD, touchscreen, CIR keyboard, PCMCIA slots,
+  and a telco interface.
+
+CONFIG_SA1100_SHERMAN
+  Say Y here to support the Blazie Engineering `Sherman' StrongARM
+  1110-based SBC, used primarily in assistance products for the
+  visually impaired.  The company is now Freedom Scientific, with
+  a website at <http://www.freedomscientific.com/index.html>. The
+  Sherman product, however, appears to have been discontinued.
+
+CONFIG_SA1100_SIMPAD
+  The SIEMENS webpad SIMpad is based on the StrongARM 1110. There
+  are two different versions CL4 and SL4. CL4 has 32MB RAM and 16MB
+  FLASH. The SL4 version got 64 MB RAM and 32 MB FLASH and a
+  PCMCIA-Slot. The version for the Germany Telecom (DTAG) is the same
+  like CL4 in additional it has a PCMCIA-Slot. For more information
+  visit <http://www.my-siemens.com or www.siemens.ch>.
+
+CONFIG_SA1100_PFS168
+  The Radisys Corp. PFS-168 (aka Tulsa) is an Intel® StrongArm® SA-1110 based
+  computer which includes the SA-1111 Microprocessor Companion Chip and other
+  custom I/O designed to add connectivity and multimedia features for vending
+  and business machine applications. Say Y here if you require support for
+  this target.
+
+CONFIG_SA1100_VICTOR
+  Say Y here if you are using a Visu Aide Intel(R) StrongARM(R)
+  SA-1100 based Victor Digital Talking Book Reader.  See
+  <http://www.visuaide.com/pagevictor.en.html> for information on
+  this system.
+
+CONFIG_SA1100_XP860
+  :: Config help missing ::
+  :: 06 August 2002 ::
+
+CONFIG_SA1100_YOPY
+  Say Y here to support the Yopy PDA.  Product information at
+  <http://www.yopy.com/>.  See Documentation/arm/SA110/Yopy
+  for more.
+
+CONFIG_SA1100_STORK
+  Say Y here if you intend to run this kernel on the Stork
+  handheld computer.
+
+

@@ -11,12 +11,12 @@
 static int efs_readdir(struct file *, void *, filldir_t);
 
 struct file_operations efs_dir_operations = {
-	read:		generic_read_dir,
-	readdir:	efs_readdir,
+	.read		= generic_read_dir,
+	.readdir	= efs_readdir,
 };
 
 struct inode_operations efs_dir_inode_operations = {
-	lookup:		efs_lookup,
+	.lookup		= efs_lookup,
 };
 
 static int efs_readdir(struct file *filp, void *dirent, filldir_t filldir) {

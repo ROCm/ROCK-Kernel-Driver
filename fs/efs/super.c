@@ -21,11 +21,11 @@ static struct super_block *efs_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type efs_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"efs",
-	get_sb:		efs_get_sb,
-	kill_sb:	kill_block_super,
-	fs_flags:	FS_REQUIRES_DEV,
+	.owner		= THIS_MODULE,
+	.name		= "efs",
+	.get_sb		= efs_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
 };
 
 static kmem_cache_t * efs_inode_cachep;
@@ -77,11 +77,11 @@ void efs_put_super(struct super_block *s)
 }
 
 static struct super_operations efs_superblock_operations = {
-	alloc_inode:	efs_alloc_inode,
-	destroy_inode:	efs_destroy_inode,
-	read_inode:	efs_read_inode,
-	put_super:	efs_put_super,
-	statfs:		efs_statfs,
+	.alloc_inode	= efs_alloc_inode,
+	.destroy_inode	= efs_destroy_inode,
+	.read_inode	= efs_read_inode,
+	.put_super	= efs_put_super,
+	.statfs		= efs_statfs,
 };
 
 static int __init init_efs_fs(void) {

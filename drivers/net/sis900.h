@@ -135,8 +135,8 @@ enum sis900_eeprom_command {
 	EEaddrMask = 0x013F, EEcmdShift = 16
 };
 
-/* For SiS962, request the eeprom software access */
-enum sis962_eeprom_command {
+/* For SiS962 or SiS963, request the eeprom software access */
+enum sis96x_eeprom_command {
 	EEREQ = 0x00000400, EEDONE = 0x00000200, EEGNT = 0x00000100
 };
 
@@ -245,7 +245,7 @@ enum sis900_revision_id {
 	SIS630A_900_REV = 0x80,		SIS630E_900_REV = 0x81,
 	SIS630S_900_REV = 0x82,		SIS630EA1_900_REV = 0x83,
 	SIS630ET_900_REV = 0x84,	SIS635A_900_REV = 0x90,
-	SIS962_900_REV = 0X91,		SIS900B_900_REV = 0x03
+	SIS96x_900_REV = 0X91,		SIS900B_900_REV = 0x03
 };
 
 enum sis630_revision_id {
