@@ -992,7 +992,7 @@ int ipv6_rcv_saddr_equal(const struct sock *sk, const struct sock *sk2)
 	    !ipv6_addr_cmp(&np->rcv_saddr,
 			   (sk2->sk_state != TCP_TIME_WAIT ?
 			    &inet6_sk(sk2)->rcv_saddr :
-			    &tcptw_sk(sk)->tw_v6_rcv_saddr)))
+			    &tcptw_sk(sk2)->tw_v6_rcv_saddr)))
 		return 1;
 
 	if (addr_type == IPV6_ADDR_MAPPED &&
