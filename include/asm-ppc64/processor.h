@@ -706,12 +706,12 @@ unsigned long get_wchan(struct task_struct *p);
 #define ARCH_HAS_PREFETCHW
 #define ARCH_HAS_SPINLOCK_PREFETCH
 
-extern inline void prefetch(const void *x)
+static inline void prefetch(const void *x)
 {
 	__asm__ __volatile__ ("dcbt 0,%0" : : "r" (x));
 }
 
-extern inline void prefetchw(const void *x)
+static inline void prefetchw(const void *x)
 {
 	__asm__ __volatile__ ("dcbtst 0,%0" : : "r" (x));
 }

@@ -25,7 +25,7 @@ extern void __flush_tlb_range(struct mm_struct *mm,
 #define flush_tlb_kernel_range(start, end) \
 	__flush_tlb_range(&init_mm, (start), (end))
 
-extern inline void flush_tlb_pgtables(struct mm_struct *mm,
+static inline void flush_tlb_pgtables(struct mm_struct *mm,
 				      unsigned long start, unsigned long end)
 {
 	/* PPC has hw page tables. */

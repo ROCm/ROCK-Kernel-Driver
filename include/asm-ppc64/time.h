@@ -87,7 +87,8 @@ static __inline__ void set_dec(int val)
 		mtspr(SPRN_DEC, val);
 }
 
-extern __inline__ unsigned long tb_ticks_since(unsigned long tstamp) {
+static inline unsigned long tb_ticks_since(unsigned long tstamp)
+{
 	return get_tb() - tstamp;
 }
 
