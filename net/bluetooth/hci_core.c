@@ -951,40 +951,6 @@ static int hci_send_frame(struct sk_buff *skb)
 	return hdev->send(skb);
 }
 
-/* Send raw HCI frame */
-int hci_send_raw(struct sk_buff *skb)
-{
-	struct hci_dev *hdev = (struct hci_dev *) skb->dev;
-
-	if (!hdev) {
-		kfree_skb(skb);
-		return -ENODEV;
-	}
-
-	BT_DBG("%s type %d len %d", hdev->name, skb->pkt_type, skb->len);
-
-	if (!test_bit(HCI_RAW, &hdev->flags)) {
-		/* Queue frame according it's type */
-		switch (skb->pkt_type) {
-		case HCI_COMMAND_PKT:
-			skb_queue_tail(&hdev->cmd_q, skb);
-			hci_sched_cmd(hdev);
-			return 0;
-
-		case HCI_ACLDATA_PKT:
-		case HCI_SCODATA_PKT:
-			/* FIXME:
-		 	 * Check header here and queue to apropriate connection.
-		 	 */
-			break;
-		}
-	}
-
-	skb_queue_tail(&hdev->raw_q, skb);
-	hci_sched_tx(hdev);
-	return 0;
-}
-
 /* Send HCI command */
 int hci_send_cmd(struct hci_dev *hdev, __u16 ogf, __u16 ocf, __u32 plen, void *param)
 {
@@ -999,7 +965,7 @@ int hci_send_cmd(struct hci_dev *hdev, __u16 ogf, __u16 ocf, __u32 plen, void *p
 		BT_ERR("%s Can't allocate memory for HCI command", hdev->name);
 		return -ENOMEM;
 	}
-	
+
 	hdr = (struct hci_command_hdr *) skb_put(skb, HCI_COMMAND_HDR_SIZE);
 	hdr->opcode = __cpu_to_le16(hci_opcode_pack(ogf, ocf));
 	hdr->plen   = plen;
