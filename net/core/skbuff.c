@@ -761,6 +761,35 @@ struct sk_buff *skb_copy_expand(const struct sk_buff *skb,
 	return n;
 }
 
+/**
+ *	skb_pad			-	zero pad the tail of an skb
+ *	@skb: buffer to pad
+ *	@pad: space to pad
+ *
+ *	Ensure that a buffer is followed by a padding area that is zero
+ *	filled. Used by network drivers which may DMA or transfer data
+ *	beyond the buffer end onto the wire.
+ *
+ *	May return NULL in out of memory cases.
+ */
+ 
+struct sk_buff *skb_pad(struct sk_buff *skb, int pad)
+{
+	struct sk_buff *nskb;
+	
+	/* If the skbuff is non linear tailroom is always zero.. */
+	if (skb_tailroom(skb) >= pad) {
+		memset(skb->data+skb->len, 0, pad);
+		return skb;
+	}
+	
+	nskb = skb_copy_expand(skb, skb_headroom(skb), skb_tailroom(skb) + pad, GFP_ATOMIC);
+	kfree_skb(skb);
+	if (nskb)
+		memset(nskb->data+nskb->len, 0, pad);
+	return nskb;
+}	
+ 
 /* Trims skb to length len. It can change skb pointers, if "realloc" is 1.
  * If realloc==0 and trimming is impossible without change of data,
  * it is BUG().
