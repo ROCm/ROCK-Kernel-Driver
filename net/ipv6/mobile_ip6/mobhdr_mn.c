@@ -17,6 +17,7 @@
 
 #include <linux/types.h>
 #include <linux/sched.h>
+#include <linux/init.h>
 #include <net/ipv6.h>
 #include <net/addrconf.h>
 #include <net/mipv6.h>
