@@ -155,6 +155,9 @@ EXPORT_SYMBOL(_outsl_ns);
 EXPORT_SYMBOL(iopa);
 EXPORT_SYMBOL(mm_ptov);
 EXPORT_SYMBOL(ioremap);
+#ifdef CONFIG_44x
+EXPORT_SYMBOL(ioremap64);
+#endif
 EXPORT_SYMBOL(__ioremap);
 EXPORT_SYMBOL(iounmap);
 EXPORT_SYMBOL(ioremap_bot);	/* aka VMALLOC_END */
@@ -353,7 +356,7 @@ EXPORT_SYMBOL(debugger_fault_handler);
 EXPORT_SYMBOL(cpm_install_handler);
 EXPORT_SYMBOL(cpm_free_handler);
 #endif /* CONFIG_8xx */
-#if defined(CONFIG_8xx) || defined(CONFIG_40x)
+#if defined(CONFIG_8xx) || defined(CONFIG_4xx)
 EXPORT_SYMBOL(__res);
 #endif
 #if defined(CONFIG_8xx)

@@ -29,7 +29,7 @@ CFLAGS += $(cflags-y)
 head-y				:= arch/ppc/kernel/head.o
 head-$(CONFIG_8xx)		:= arch/ppc/kernel/head_8xx.o
 head-$(CONFIG_4xx)		:= arch/ppc/kernel/head_4xx.o
-head-$(CONFIG_440)		:= arch/ppc/kernel/head_44x.o
+head-$(CONFIG_44x)		:= arch/ppc/kernel/head_44x.o
 
 head-$(CONFIG_6xx)		+= arch/ppc/kernel/idle_6xx.o
 

@@ -66,6 +66,9 @@ config 6xx
 config 40x
 	bool "40x"
 
+config 44x
+	bool "44x"
+
 config POWER3
 	bool "POWER3"
 
@@ -73,6 +76,11 @@ config 8xx
 	bool "8xx"
 
 endchoice
+
+config PTE_64BIT
+	bool
+	depends on 44x
+	default y
 
 source arch/ppc/platforms/4xx/Kconfig
 
@@ -766,8 +774,8 @@ config MCA
 	  RS/6000 machines are currently not supported by Linux.
 
 config PCI
-	bool "PCI support" if 4xx || 8260
-	default y if !4xx && !8260 && !8xx && !APUS
+	bool "PCI support" if 40x || 8260
+	default y if !40x && !8260 && !8xx && !APUS
 	default PCI_PERMEDIA if !4xx && !8260 && !8xx && APUS
 	default PCI_QSPAN if !4xx && !8260 && 8xx
 	help
@@ -1143,6 +1151,7 @@ config BOOT_LOAD_BOOL
 config BOOT_LOAD
 	hex "Link/load address for booting" if BOOT_LOAD_BOOL
 	default "0x00400000" if 40x || 8xx || 8260
+	default "0x01000000" if 44x
 	default "0x00800000"
 
 config PIN_TLB
