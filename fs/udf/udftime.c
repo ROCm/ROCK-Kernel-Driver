@@ -85,7 +85,7 @@ extern struct timezone sys_tz;
 #define SECS_PER_DAY	(SECS_PER_HOUR * 24)
 
 time_t *
-udf_stamp_to_time(time_t *dest, long *dest_usec, timestamp src)
+udf_stamp_to_time(time_t *dest, long *dest_usec, kernel_timestamp src)
 {
 	int yday;
 	uint8_t type = src.typeAndTimezone >> 12;
@@ -120,8 +120,8 @@ udf_stamp_to_time(time_t *dest, long *dest_usec, timestamp src)
 }
 
 
-timestamp *
-udf_time_to_stamp(timestamp *dest, struct timespec ts)
+kernel_timestamp *
+udf_time_to_stamp(kernel_timestamp *dest, struct timespec ts)
 {
 	long int days, rem, y;
 	const unsigned short int *ip;

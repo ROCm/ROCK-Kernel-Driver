@@ -26,7 +26,7 @@
 #if 0
 static uint8_t *
 udf_filead_read(struct inode *dir, uint8_t *tmpad, uint8_t ad_size,
-		lb_addr fe_loc, int *pos, int *offset,
+		kernel_lb_addr fe_loc, int *pos, int *offset,
 		struct buffer_head **bh, int *error)
 {
 	int loffset = *offset;
@@ -80,8 +80,8 @@ struct fileIdentDesc *
 udf_fileident_read(struct inode *dir, loff_t *nf_pos,
 	struct udf_fileident_bh *fibh,
 	struct fileIdentDesc *cfi,
-	lb_addr *bloc, uint32_t *extoffset, 
-	lb_addr *eloc, uint32_t *elen,
+	kernel_lb_addr *bloc, uint32_t *extoffset, 
+	kernel_lb_addr *eloc, uint32_t *elen,
 	uint32_t *offset, struct buffer_head **bh)
 {
 	struct fileIdentDesc *fi;
