@@ -38,6 +38,8 @@ ToDo/Notes:
 	- In fs/ntfs/aops.c::mark_ntfs_record_dirty(), take the
 	  mapping->private_lock around the dirtying of the buffer heads
 	  analagous to the way it is done in __set_page_dirty_buffers().
+	- Ensure the mft record size does not exceed the PAGE_CACHE_SIZE at
+	  mount time as this cannot work with the current implementation.
 
 2.1.21 - Fix some races and bugs, rewrite mft write code, add mft allocator.
 
