@@ -17,7 +17,7 @@
    the provisions above, a recipient may use your version of this
    file under either the OSL or the GPL.
    
-   Authors: 	Arjan van de Ven <arjanv@redhat.com>
+   Authors: 	Alan Cox <alan@redhat.com>
 
    This is an example codec plugin. This one switches the connections
    around to match the setups some vendors use with audio switched to

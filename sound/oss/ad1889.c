@@ -245,7 +245,6 @@ static ad1889_dev_t *ad1889_alloc_dev(struct pci_dev *pci)
 		dmabuf->ready = 0;
 		dmabuf->rate = 44100;
 	}
-out:
 	return dev;
 
 err_free_dmabuf:

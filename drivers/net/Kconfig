@@ -1153,7 +1153,7 @@ config ZNET
 
 config SEEQ8005
 	tristate "SEEQ8005 support (EXPERIMENTAL)"
-	depends on NET_ISA && OBSOLETE && EXPERIMENTAL
+	depends on NET_ISA && EXPERIMENTAL
 	help
 	  This is a driver for the SEEQ 8005 network (Ethernet) card.  If this
 	  is for you, read the Ethernet-HOWTO, available from

@@ -48,11 +48,9 @@ struct dm_table {
 	 */
 	struct io_restrictions limits;
 
-	/*
-	 * A waitqueue for processes waiting for something
-	 * interesting to happen to this table.
-	 */
-	wait_queue_head_t eventq;
+	/* events get handed up using this callback */
+	void (*event_fn)(void *);
+	void *event_context;
 };
 
 /*
@@ -222,7 +220,6 @@ int dm_table_create(struct dm_table **result, int mode)
 		return -ENOMEM;
 	}
 
-	init_waitqueue_head(&t->eventq);
 	t->mode = mode;
 	*result = t;
 	return 0;
@@ -242,9 +239,6 @@ static void free_devices(struct list_head *devices)
 void table_destroy(struct dm_table *t)
 {
 	unsigned int i;
-
-	/* destroying the table counts as an event */
-	dm_table_event(t);
 
 	/* free the indexes (see dm_table_complete) */
 	if (t->depth >= 2)
@@ -694,9 +688,22 @@ int dm_table_complete(struct dm_table *t)
 	return r;
 }
 
+static spinlock_t _event_lock = SPIN_LOCK_UNLOCKED;
+void dm_table_event_callback(struct dm_table *t,
+			     void (*fn)(void *), void *context)
+{
+	spin_lock_irq(&_event_lock);
+	t->event_fn = fn;
+	t->event_context = context;
+	spin_unlock_irq(&_event_lock);
+}
+
 void dm_table_event(struct dm_table *t)
 {
-	wake_up_interruptible(&t->eventq);
+	spin_lock(&_event_lock);
+	if (t->event_fn)
+		t->event_fn(t->event_context);
+	spin_unlock(&_event_lock);
 }
 
 sector_t dm_table_get_size(struct dm_table *t)
@@ -759,11 +766,6 @@ struct list_head *dm_table_get_devices(struct dm_table *t)
 int dm_table_get_mode(struct dm_table *t)
 {
 	return t->mode;
-}
-
-void dm_table_add_wait_queue(struct dm_table *t, wait_queue_t *wq)
-{
-	add_wait_queue(&t->eventq, wq);
 }
 
 void dm_table_suspend_targets(struct dm_table *t)

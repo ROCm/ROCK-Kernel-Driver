@@ -590,16 +590,20 @@ int dump_fpu (struct pt_regs * regs, elf_fpregset_t * fpregs)
 		put_psr(get_psr() | PSR_EF);
 		fpsave(&current->thread.float_regs[0], &current->thread.fsr,
 		       &current->thread.fpqueue[0], &current->thread.fpqdepth);
-		regs->psr &= ~(PSR_EF);
-		current->flags &= ~(PF_USEDFPU);
+		if (regs != NULL) {
+			regs->psr &= ~(PSR_EF);
+			current->flags &= ~(PF_USEDFPU);
+		}
 	}
 #else
 	if (current == last_task_used_math) {
 		put_psr(get_psr() | PSR_EF);
 		fpsave(&current->thread.float_regs[0], &current->thread.fsr,
 		       &current->thread.fpqueue[0], &current->thread.fpqdepth);
-		last_task_used_math = 0;
-		regs->psr &= ~(PSR_EF);
+		if (regs != NULL) {
+			regs->psr &= ~(PSR_EF);
+			last_task_used_math = 0;
+		}
 	}
 #endif
 	memcpy(&fpregs->pr_fr.pr_regs[0],

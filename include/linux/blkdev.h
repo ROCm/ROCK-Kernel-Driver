@@ -44,9 +44,9 @@ struct as_io_context {
 	unsigned long ttime_samples;
 	unsigned long ttime_mean;
 	/* Layout pattern */
-	long seek_samples;
+	unsigned int seek_samples;
 	sector_t last_request_pos;
-	sector_t seek_total;
+	u64 seek_total;
 	sector_t seek_mean;
 };
 
