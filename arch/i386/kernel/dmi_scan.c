@@ -163,7 +163,7 @@ enum
 static char *dmi_ident[DMI_STRING_MAX];
 
 /* print some information suitable for a blacklist entry. */
-void dmi_dump_system(void)
+static void dmi_dump_system(void)
 { 
 	printk("DMI: BIOS: %.40s, %.40s, %.40s\n",
 	       dmi_ident[DMI_BIOS_VENDOR], dmi_ident[DMI_BIOS_VERSION],
@@ -355,31 +355,6 @@ static __init int fix_broken_hp_bios_irq9(struct dmi_blacklist *d)
 	return 0;
 }
 
-/* Some BIOS / motherboard combinations require the APIC to be enabled
- * even on UP systems or will exhibit instability. */
-
-static int __init abit_apic_required(struct dmi_blacklist *d)
-{
-#ifdef CONFIG_X86_LOCAL_APIC
-#ifndef CONFIG_SMP
-	extern int enable_apic_up;
-	extern int dont_enable_local_apic;
-	extern int skip_ioapic_setup;
-
-	if (!enable_apic_up) {
-		printk(KERN_WARNING " *** %s: APIC forcibly enabled to avoid "
-				"RANDOM CRASHES.\n", d->ident);
-		printk(KERN_WARNING " *** PLEASE add 'apic' to the kernel "
-			"commandline AND enable it in the BIOS! ***\n");
-		dont_enable_local_apic=0;
-		enable_apic_up=1;
-		skip_ioapic_setup=0;
-	}
-#endif
-#endif
-	return 0;
-}
-
 /*
  *  Check for clue free BIOS implementations who use
  *  the following QA technique
@@ -541,7 +516,7 @@ static __init int print_if_true(struct dmi_blacklist *d)
 
 
 extern int acpi_disabled, acpi_force;
-extern int enable_apic_up, skip_ioapic_setup; 
+extern int skip_ioapic_setup; 
 
 static __init __attribute__((unused)) int acpi_disable(struct dmi_blacklist *d) 
 { 
@@ -587,15 +562,6 @@ static __init int disable_acpi_pci(struct dmi_blacklist *d)
 } 
 #endif
 
-#ifndef CONFIG_SMP
-static __init int force_apic(struct dmi_blacklist *d) 
-{ 
-	printk(KERN_NOTICE "%s detected: force APIC\n", d->ident); 	
-	enable_apic_up = 1; 
-	skip_ioapic_setup = 0;
-	return 0;
-} 
-#endif
 /*
  *	Process the DMI blacklists
  */
@@ -811,12 +777,6 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			NO_MATCH, NO_MATCH
 			} },
 
-	{ abit_apic_required, "ABIT KX7-333[R]", { /* Will crash randomly w/o */
-			MATCH(DMI_BOARD_VENDOR, "ABIT"),
-			MATCH(DMI_BOARD_NAME, "VT8367-8233A (KX7-333[R])"),
-			NO_MATCH, NO_MATCH,
-			} },
-
 	/* Problem Intel 440GX bioses */
 
 	{ broken_pirq, "SABR1 Bios", {			/* Bad $PIR */
@@ -916,6 +876,12 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			NO_MATCH, NO_MATCH,
 			} },
 
+#ifdef	CONFIG_ACPI_BOOT
+	/*
+	 * If your system is blacklisted here, but you find that acpi=force
+	 * works for you, please contact acpi-devel@sourceforge.net
+	 */
+
 	/*
 	 *	Boxes that need ACPI disabled
 	 */
@@ -925,7 +891,6 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_BOARD_NAME, "2629H1G"),
 			NO_MATCH, NO_MATCH }},
 
-#ifdef	CONFIG_ACPI_BOOT
 	/*
 	 *	Boxes that need acpi=ht 
 	 */
@@ -1022,16 +987,6 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_BIOS_VERSION, "ASUS A7V ACPI BIOS Revision 1007"), NO_MATCH }},
 #endif
 
-#ifndef CONFIG_SMP
-	/* 
-  	 * Enable APIC on UP kernels.
-	 */
-
-	{ force_apic, "Supermicro P4DC6", { 
-		MATCH(DMI_BOARD_VENDOR, "Supermicro"),
-		MATCH(DMI_BOARD_NAME, "P4DC6"), 
-		NO_MATCH, NO_MATCH } },
-#endif
 	{ NULL, }
 };
 	
@@ -1150,3 +1105,27 @@ void __init dmi_scan_machine(void)
 }
 
 EXPORT_SYMBOL(is_unsafe_smbus);
+
+#ifdef CONFIG_MOUNT_ROOT_FAILED_MSG
+/*
+ * mount_root_failed_msg()
+ *
+ * Called from mount_block_root() upon failure to mount root.
+ * architecture dependent to give different platforms
+ * the opportunity to print different handy messages
+ * On x86 this lives here b/c it dumps out some DMI info.
+ */
+
+void
+mount_root_failed_msg(void)
+{
+#ifdef	CONFIG_ACPI_BOOT
+	printk ("Try booting with pci=noacpi, acpi=ht, "
+		"or acpi=off on the command line.\n");
+	printk ("If one helps, please report the following lines:\n");
+
+	dmi_dump_system();
+#endif
+}
+#endif	/* CONFIG_MOUNT_ROOT_FAILED_MSG */
+
