@@ -13,6 +13,7 @@
 #include <linux/slab.h>
 #include <linux/socket.h>
 #include <linux/file.h>
+#include <linux/net.h>
 
 #include <asm/uaccess.h>
 #include <asm/string.h>
