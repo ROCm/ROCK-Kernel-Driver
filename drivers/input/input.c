@@ -482,7 +482,9 @@ static void input_device_class_release( struct class_device *class_dev )
 
 static struct class input_device_class = {
 	.name =		"input_device",
+#ifdef CONFIG_HOTPLUG
 	.hotplug = 	input_hotplug,
+#endif
 	.release = 	input_device_class_release,
 	.class_dev_attrs = input_device_class_attrs,
 };
