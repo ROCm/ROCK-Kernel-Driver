@@ -49,6 +49,7 @@
 
 #include "scsi.h"
 #include "hosts.h"
+#include "aha152x.h"
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
@@ -102,8 +103,6 @@ typedef struct scsi_info_t {
     dev_node_t		node[8];
 } scsi_info_t;
 
-extern void aha152x_setup(char *str, int *ints);
-
 static void aha152x_release_cs(u_long arg);
 static int aha152x_event(event_t event, int priority,
 			 event_callback_args_t *args);
@@ -111,11 +110,7 @@ static int aha152x_event(event_t event, int priority,
 static dev_link_t *aha152x_attach(void);
 static void aha152x_detach(dev_link_t *);
 
-#define driver_template aha152x_driver_template
-extern Scsi_Host_Template aha152x_driver_template;
-
-static dev_link_t *dev_list = NULL;
-
+static dev_link_t *dev_list;
 static dev_info_t dev_info = "aha152x_cs";
 
 /*====================================================================*/
@@ -227,11 +222,12 @@ static void aha152x_config_cs(dev_link_t *link)
 {
     client_handle_t handle = link->handle;
     scsi_info_t *info = link->priv;
+    struct aha152x_setup s;
     tuple_t tuple;
     cisparse_t parse;
-    int i, last_ret, last_fn, ints[8];
+    int i, last_ret, last_fn;
     u_char tuple_data[64];
-    Scsi_Device *dev;
+    struct scsi_device *dev;
     dev_node_t *node, **tail;
     struct Scsi_Host *host;
     
@@ -247,7 +243,6 @@ static void aha152x_config_cs(dev_link_t *link)
     link->conf.ConfigBase = parse.config.base;
 
     /* Configure card */
-    driver_template.module = &__this_module;
     link->state |= DEV_CONFIG;
 
     tuple.DesiredTuple = CISTPL_CFTABLE_ENTRY;
@@ -276,29 +271,32 @@ static void aha152x_config_cs(dev_link_t *link)
     
     /* A bad hack... */
     release_region(link->io.BasePort1, link->io.NumPorts1);
-    
+
     /* Set configuration options for the aha152x driver */
-    ints[0] = 7;
-    ints[1] = link->io.BasePort1;
-    ints[2] = link->irq.AssignedIRQ;
-    ints[3] = host_id;
-    ints[4] = reconnect;
-    ints[5] = parity;
-    ints[6] = synchronous;
-    ints[7] = reset_delay;
-    if (ext_trans) {
-	ints[8] = ext_trans; ints[0] = 8;
-    }
-    aha152x_setup("PCMCIA setup", ints);
-    
-    scsi_register_host(&driver_template);
+    memset(&s, 0, sizeof(s));
+    s.conf        = "PCMCIA setup";
+    s.io_port     = link->io.BasePort1;
+    s.irq         = link->irq.AssignedIRQ;
+    s.scsiid      = host_id;
+    s.reconnect   = reconnect;
+    s.parity      = parity;
+    s.synchronous = synchronous;
+    s.delay       = reset_delay;
+    if (ext_trans)
+        s.ext_trans = ext_trans;
 
     tail = &link->dev;
     info->ndev = 0;
-    for (host = scsi_host_get_next(NULL); host;
-	 host = scsi_host_get_next(host))
-	if (host->hostt == &driver_template)
-	    list_for_each_entry (dev, &host->my_devices, siblings) {
+
+    host = aha152x_probe_one(&s);
+    if (host == NULL) {
+	printk(KERN_INFO "aha152x_cs: no SCSI devices found\n");
+	goto cs_failed;
+    }
+
+    scsi_add_host(host, NULL);
+
+    list_for_each_entry(dev, &host->my_devices, siblings) {
 	    u_long arg[2], id;
 	    kernel_scsi_ioctl(dev, SCSI_IOCTL_GET_IDLUN, arg);
 	    id = (arg[0]&0x0f) + ((arg[0]>>4)&0xf0) +
@@ -328,11 +326,9 @@ static void aha152x_config_cs(dev_link_t *link)
 	    *tail = node; tail = &node->next;
 	    info->ndev++;
 	    info->host = dev->host;
-	}
+    }
+
     *tail = NULL;
-    if (info->ndev == 0)
-	printk(KERN_INFO "aha152x_cs: no SCSI devices found\n");
-    
     link->state &= ~DEV_CONFIG_PENDING;
     return;
     
@@ -340,41 +336,26 @@ cs_failed:
     cs_error(link->handle, last_fn, last_ret);
     aha152x_release_cs((u_long)link);
     return;
-    
-} /* aha152x_config_cs */
-
-/*====================================================================*/
+}
 
 static void aha152x_release_cs(u_long arg)
 {
-    dev_link_t *link = (dev_link_t *)arg;
+	dev_link_t *link = (dev_link_t *)arg;
+	scsi_info_t *info = link->priv;
 
-    DEBUG(0, "aha152x_release_cs(0x%p)\n", link);
-
-#warning This does not protect you.  You need some real fix for your races.
-#if 0
-    if (GET_USE_COUNT(driver_template.module) != 0) {
-	DEBUG(1, "aha152x_cs: release postponed, "
-	      "device still open\n");
-	link->state |= DEV_STALE_CONFIG;
-	return;
-    }
-#endif
-
-    scsi_unregister_host(&driver_template);
-    link->dev = NULL;
+	scsi_remove_host(info->host);
+	link->dev = NULL;
     
-    CardServices(ReleaseConfiguration, link->handle);
-    CardServices(ReleaseIO, link->handle, &link->io);
-    CardServices(ReleaseIRQ, link->handle, &link->irq);
+	CardServices(ReleaseConfiguration, link->handle);
+	CardServices(ReleaseIO, link->handle, &link->io);
+	CardServices(ReleaseIRQ, link->handle, &link->irq);
     
-    link->state &= ~DEV_CONFIG;
-    if (link->state & DEV_STALE_LINK)
-	aha152x_detach(link);
-    
-} /* aha152x_release_cs */
+	link->state &= ~DEV_CONFIG;
+	scsi_unregister(info->host);
 
-/*====================================================================*/
+	if (link->state & DEV_STALE_LINK)
+		aha152x_detach(link);
+}
 
 static int aha152x_event(event_t event, int priority,
 			 event_callback_args_t *args)
@@ -414,28 +395,29 @@ static int aha152x_event(event_t event, int priority,
 	break;
     }
     return 0;
-} /* aha152x_event */
-
-/*====================================================================*/
-
-static int __init init_aha152x_cs(void) {
-    servinfo_t serv;
-    DEBUG(0, "%s\n", version);
-    CardServices(GetCardServicesInfo, &serv);
-    if (serv.Revision != CS_RELEASE_CODE) {
-	printk(KERN_NOTICE "aha152x_cs: Card Services release "
-	       "does not match!\n");
-	return -1;
-    }
-    register_pccard_driver(&dev_info, &aha152x_attach, &aha152x_detach);
-    return 0;
 }
 
-static void __exit exit_aha152x_cs(void) {
-    DEBUG(0, "aha152x_cs: unloading\n");
-    unregister_pccard_driver(&dev_info);
-    while (dev_list != NULL)
-	aha152x_detach(dev_list);
+static struct pcmcia_driver aha152x_cs_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "aha152x_cs",
+	},
+	.attach		= aha152x_attach,
+	.detach		= aha152x_detach,
+};
+
+static int __init init_aha152x_cs(void)
+{
+	return pcmcia_register_driver(&aha152x_cs_driver);
+}
+
+static void __exit exit_aha152x_cs(void)
+{
+	pcmcia_unregister_driver(&aha152x_cs_driver);
+
+	/* XXX: this really needs to move into generic code.. */
+	while (dev_list != NULL)
+		aha152x_detach(dev_list);
 }
 
 module_init(init_aha152x_cs);

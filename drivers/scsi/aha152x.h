@@ -313,4 +313,24 @@ enum {
 };
 #endif
 
+/* for the pcmcia stub */
+struct aha152x_setup {
+	int io_port;
+	int irq;
+	int scsiid;
+	int reconnect;
+	int parity;
+	int synchronous;
+	int delay;
+	int ext_trans;
+	int tc1550;
+#if defined(AHA152X_DEBUG)
+	int debug;
+#endif
+	char *conf;
+};
+
+struct Scsi_Host *aha152x_probe_one(struct aha152x_setup *);
+int aha152x_host_reset(struct scsi_cmnd *);
+
 #endif /* _AHA152X_H */
