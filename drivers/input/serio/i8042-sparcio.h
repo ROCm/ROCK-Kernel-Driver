@@ -98,3 +98,5 @@ static inline void i8042_platform_exit(void)
 {
 	iounmap((void *)kbd_iobase);
 }
+
+#endif /* _I8042_SPARCIO_H */
