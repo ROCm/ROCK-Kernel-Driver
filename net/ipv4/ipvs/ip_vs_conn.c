@@ -507,9 +507,6 @@ static void ip_vs_conn_expire(unsigned long data)
 	 *	refcnt==1 implies I'm the only one referrer
 	 */
 	if (likely(atomic_read(&cp->refcnt) == 1)) {
-		/* make sure that there is no timer on it now */
-		del_timer_sync(&cp->timer);
-
 		/* does anybody control me? */
 		if (cp->control)
 			ip_vs_control_del(cp);
@@ -517,7 +514,6 @@ static void ip_vs_conn_expire(unsigned long data)
 		if (unlikely(cp->app != NULL))
 			ip_vs_unbind_app(cp);
 		ip_vs_unbind_dest(cp);
-		//ip_vs_timeout_detach(cp);
 		if (cp->flags & IP_VS_CONN_F_NO_CPORT)
 			atomic_dec(&ip_vs_conn_no_cport_cnt);
 		atomic_dec(&ip_vs_conn_count);
