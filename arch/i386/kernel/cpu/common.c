@@ -138,8 +138,7 @@ static char __init *table_lookup_model(struct cpuinfo_x86 *c)
 }
 
 
-
-void __init get_cpu_vendor(struct cpuinfo_x86 *c)
+void __init get_cpu_vendor(struct cpuinfo_x86 *c, int early)
 {
 	char *v = c->x86_vendor_id;
 	int i;
@@ -150,7 +149,8 @@ void __init get_cpu_vendor(struct cpuinfo_x86 *c)
 			    (cpu_devs[i]->c_ident[1] && 
 			     !strcmp(v,cpu_devs[i]->c_ident[1]))) {
 				c->x86_vendor = i;
-				this_cpu = cpu_devs[i];
+				if (!early)
+					this_cpu = cpu_devs[i];
 				break;
 			}
 		}
@@ -194,6 +194,44 @@ int __init have_cpuid_p(void)
 	return flag_is_changeable_p(X86_EFLAGS_ID);
 }
 
+/* Do minimum CPU detection early.
+   Fields really needed: vendor, cpuid_level, family, model, mask, cache alignment.
+   The others are not touched to avoid unwanted side effects. */
+void __init early_cpu_detect(void)
+{
+	struct cpuinfo_x86 *c = &boot_cpu_data;
+
+	if (!have_cpuid_p())
+		return;
+
+	/* Get vendor name */
+	cpuid(0x00000000, &c->cpuid_level,
+	      (int *)&c->x86_vendor_id[0],
+	      (int *)&c->x86_vendor_id[8],
+	      (int *)&c->x86_vendor_id[4]);
+
+	get_cpu_vendor(c, 1);
+
+	c->x86 = 4;
+	c->x86_cache_alignment = 32;
+
+	if (c->cpuid_level >= 0x00000001) {
+		u32 junk, tfms, cap0, misc;
+		cpuid(0x00000001, &tfms, &misc, &junk, &cap0);
+		c->x86 = (tfms >> 8) & 15;
+		c->x86_model = (tfms >> 4) & 15;
+		if (c->x86 == 0xf) {
+			c->x86 += (tfms >> 20) & 0xff;
+			c->x86_model += ((tfms >> 16) & 0xF) << 4;
+		}
+		c->x86_mask = tfms & 15;
+		if (cap0 & (1<<19))
+			c->x86_cache_alignment = ((misc >> 8) & 0xff) * 8;
+	}
+
+	early_intel_workaround(c);
+}
+
 void __init generic_identify(struct cpuinfo_x86 * c)
 {
 	u32 tfms, xlvl;
@@ -206,7 +244,7 @@ void __init generic_identify(struct cpuinfo_x86 * c)
 		      (int *)&c->x86_vendor_id[8],
 		      (int *)&c->x86_vendor_id[4]);
 		
-		get_cpu_vendor(c);
+		get_cpu_vendor(c, 0);
 		/* Initialize the standard set of capabilities */
 		/* Note that the vendor-specific code below might override */
 	
@@ -384,7 +422,6 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
  
 void __init dodgy_tsc(void)
 {
-	get_cpu_vendor(&boot_cpu_data);
 	if (( boot_cpu_data.x86_vendor == X86_VENDOR_CYRIX ) ||
 	    ( boot_cpu_data.x86_vendor == X86_VENDOR_NSC   ))
 		cpu_devs[X86_VENDOR_CYRIX]->c_init(&boot_cpu_data);
@@ -432,9 +469,11 @@ extern int transmeta_init_cpu(void);
 extern int rise_init_cpu(void);
 extern int nexgen_init_cpu(void);
 extern int umc_init_cpu(void);
+void early_cpu_detect(void);
 
 void __init early_cpu_init(void)
 {
+	early_cpu_detect();
 	intel_cpu_init();
 	cyrix_init_cpu();
 	nsc_init_cpu();
