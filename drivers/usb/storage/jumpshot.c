@@ -317,7 +317,7 @@ static int jumpshot_id_device(struct us_data *us,
 	}
 
 	// read the reply
-	rc = jumpshot_bulk_read(us, reply, sizeof(reply));
+	rc = jumpshot_bulk_read(us, reply, 512);
 	if (rc != USB_STOR_XFER_GOOD) {
 		rc = USB_STOR_TRANSPORT_ERROR;
 		goto leave;

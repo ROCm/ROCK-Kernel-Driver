@@ -216,12 +216,7 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 	 * fill in request structure
 	 */
 	rq->cmd_len = hdr->cmd_len;
-
-	if (copy_from_user(rq->cmd, hdr->cmdp, hdr->cmd_len)) {
-		blk_put_request(rq);
-		return -EFAULT;
-	}
-
+	memcpy(rq->cmd, hdr->cmdp, hdr->cmd_len);
 	if (sizeof(rq->cmd) != hdr->cmd_len)
 		memset(rq->cmd + hdr->cmd_len, 0, sizeof(rq->cmd) - hdr->cmd_len);
 
@@ -437,12 +432,23 @@ int scsi_cmd_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long ar
 			break;
 		case SG_IO: {
 			struct sg_io_hdr hdr;
+			unsigned char cdb[BLK_MAX_CDB], *old_cdb;
 
-			if (copy_from_user(&hdr, (struct sg_io_hdr *) arg, sizeof(hdr))) {
-				err = -EFAULT;
+			err = -EFAULT;
+			if (copy_from_user(&hdr, (struct sg_io_hdr *) arg, sizeof(hdr)))
 				break;
-			}
+			err = -EINVAL;
+			if (hdr.cmd_len > sizeof(rq->cmd))
+				break;
+			err = -EFAULT;
+			if (copy_from_user(cdb, hdr.cmdp, hdr.cmd_len))
+				break;
+
+			old_cdb = hdr.cmdp;
+			hdr.cmdp = cdb;
 			err = sg_io(q, bdev, &hdr);
+
+			hdr.cmdp = old_cdb;
 			if (copy_to_user((struct sg_io_hdr *) arg, &hdr, sizeof(hdr)))
 				err = -EFAULT;
 			break;
