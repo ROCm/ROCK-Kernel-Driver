@@ -42,6 +42,13 @@ EXPORT_SYMBOL(dcache_lock);
 static kmem_cache_t *dentry_cache; 
 
 /*
+ * The allocation size for each dentry.  It is a multiple of 16 bytes.  We
+ * leave the final 32-47 bytes for the inline name.
+ */
+#define DENTRY_STORAGE	(((sizeof(struct dentry)+32) + 15) & ~15)
+#define DNAME_INLINE_LEN (DENTRY_STORAGE - sizeof(struct dentry))
+
+/*
  * This is the single most critical data structure when it comes
  * to the dcache: the hashtable for lookups. Somebody should try
  * to make this good - I've just made it work.
@@ -665,8 +672,6 @@ static int shrink_dcache_memory(int nr, unsigned int gfp_mask)
 	return dentry_stat.nr_unused;
 }
 
-#define NAME_ALLOC_LEN(len)	((len+16) & ~15)
-
 /**
  * d_alloc	-	allocate a dcache entry
  * @parent: parent of entry to allocate
@@ -688,8 +693,7 @@ struct dentry * d_alloc(struct dentry * parent, const struct qstr *name)
 		return NULL;
 
 	if (name->len > DNAME_INLINE_LEN-1) {
-		qstr = kmalloc(sizeof(*qstr) + NAME_ALLOC_LEN(name->len), 
-				GFP_KERNEL);  
+		qstr = kmalloc(sizeof(*qstr) + name->len + 1, GFP_KERNEL);
 		if (!qstr) {
 			kmem_cache_free(dentry_cache, dentry); 
 			return NULL;
@@ -1563,7 +1567,7 @@ static void __init dcache_init(unsigned long mempages)
 	 * of the dcache. 
 	 */
 	dentry_cache = kmem_cache_create("dentry_cache",
-					 sizeof(struct dentry),
+					 DENTRY_STORAGE,
 					 0,
 					 SLAB_RECLAIM_ACCOUNT,
 					 NULL, NULL);

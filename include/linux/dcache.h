@@ -74,8 +74,6 @@ full_name_hash(const unsigned char *name, unsigned int len)
 	return end_name_hash(hash);
 }
 
-#define DNAME_INLINE_LEN_MIN 24
-
 struct dcookie_struct;
  
 struct dentry {
@@ -101,11 +99,9 @@ struct dentry {
 	struct qstr d_name;
 	struct hlist_node d_hash;	/* lookup hash list */	
 	struct hlist_head * d_bucket;	/* lookup hash bucket */
-	unsigned char d_iname[DNAME_INLINE_LEN_MIN]; /* small names */
+	unsigned char d_iname[0];	/* small names */
 };
 
-#define DNAME_INLINE_LEN	(sizeof(struct dentry)-offsetof(struct dentry,d_iname))
- 
 struct dentry_operations {
 	int (*d_revalidate)(struct dentry *, struct nameidata *);
 	int (*d_hash) (struct dentry *, struct qstr *);
