@@ -131,7 +131,7 @@ static int reiserfs_sync_file(
   reiserfs_write_lock(p_s_inode->i_sb);
   barrier_done = reiserfs_commit_for_inode(p_s_inode);
   reiserfs_write_unlock(p_s_inode->i_sb);
-  if (barrier_done != 1)
+  if (barrier_done != 1 && reiserfs_barrier_flush(p_s_inode->i_sb))
       blkdev_issue_flush(p_s_inode->i_sb->s_bdev, NULL);
   if (barrier_done < 0)
     return barrier_done;
@@ -575,7 +575,7 @@ error_exit:
     if (th->t_trans_id) {
         int err;
         // update any changes we made to blk count
-        reiserfs_update_sd(th, inode);
+        mark_inode_dirty(inode);
         err = journal_end(th, inode->i_sb, JOURNAL_PER_BALANCE_CNT * 3 + 1);
         if (err)
             res = err;
@@ -762,7 +762,8 @@ int reiserfs_submit_file_region_for_write(
 
 	if (th->t_trans_id) {
 	    reiserfs_write_lock(inode->i_sb);
-	    reiserfs_update_sd(th, inode); // And update on-disk metadata
+	    // this sets the proper flags for O_SYNC to trigger a commit
+	    mark_inode_dirty(inode);
 	    reiserfs_write_unlock(inode->i_sb);
 	} else
 	    inode->i_sb->s_op->dirty_inode(inode);
@@ -772,7 +773,7 @@ int reiserfs_submit_file_region_for_write(
     if (th->t_trans_id) {
 	reiserfs_write_lock(inode->i_sb);
 	if (!sd_update)
-	    reiserfs_update_sd(th, inode);
+	    mark_inode_dirty(inode);
 	status = journal_end(th, th->t_super, th->t_blocks_allocated);
         if (status)
             retval = status;
@@ -1166,6 +1167,23 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
     struct reiserfs_transaction_handle th;
     th.t_trans_id = 0;
 
+    /* If a filesystem is converted from 3.5 to 3.6, we'll have v3.5 items
+     * lying around (most of the disk, in fact). Despite the filesystem
+     * now being a v3.6 format, the old items still can't support large
+     * file sizes. Catch this case here, as the rest of the VFS layer is
+     * oblivious to the different limitations between old and new items.
+     * reiserfs_setattr catches this for truncates. This chunk is lifted
+     * from generic_write_checks. */
+    if (get_inode_item_key_version (inode) == KEY_FORMAT_3_5 && 
+            *ppos + count > MAX_NON_LFS) {
+            if (*ppos >= MAX_NON_LFS) {
+                send_sig(SIGXFSZ, current, 0);
+                return -EFBIG;
+            }
+            if (count > MAX_NON_LFS - (unsigned long)*ppos)
+                count = MAX_NON_LFS - (unsigned long)*ppos;
+    }
+
     if ( file->f_flags & O_DIRECT) { // Direct IO needs treatment
 	ssize_t result, after_file_end = 0;
 	if ( (*ppos + count >= inode->i_size) || (file->f_flags & O_APPEND) ) {
@@ -1197,7 +1215,7 @@ ssize_t reiserfs_file_write( struct file *file, /* the file we are going to writ
                 return err;
             }
 	    reiserfs_update_inode_transaction(inode);
-	    reiserfs_update_sd(&th, inode);
+	    mark_inode_dirty(inode);
 	    err = journal_end(&th, inode->i_sb, 1);
             if (err) {
                 reiserfs_write_unlock (inode->i_sb);
