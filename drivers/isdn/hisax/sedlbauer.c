@@ -38,7 +38,6 @@
  * For example: hisaxctrl <DriverID> 9 ISAR.BIN
 */
 
-#define __NO_VERSION__
 #include <linux/init.h>
 #include <linux/config.h>
 #include "hisax.h"

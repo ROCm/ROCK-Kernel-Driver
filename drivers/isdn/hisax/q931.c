@@ -17,7 +17,6 @@
  */
 
 
-#define __NO_VERSION__
 #include "hisax.h"
 #include "l3_1tr6.h"
 

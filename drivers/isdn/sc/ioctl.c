@@ -6,7 +6,6 @@
  *
  */
 
-#define __NO_VERSION__
 #include "includes.h"
 #include "hardware.h"
 #include "message.h"
