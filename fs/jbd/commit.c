@@ -68,6 +68,14 @@ void journal_commit_transaction(journal_t *journal)
 	spin_unlock(&journal->j_list_lock);
 #endif
 
+	/* Do we need to erase the effects of a prior journal_flush? */
+	if (journal->j_flags & JFS_FLUSHED) {
+		jbd_debug(3, "super block updated\n");
+		journal_update_superblock(journal, 1);
+	} else {
+		jbd_debug(3, "superblock not updated\n");
+	}
+
 	J_ASSERT(journal->j_running_transaction != NULL);
 	J_ASSERT(journal->j_committing_transaction == NULL);
 
@@ -77,17 +85,20 @@ void journal_commit_transaction(journal_t *journal)
 	jbd_debug(1, "JBD: starting commit of transaction %d\n",
 			commit_transaction->t_tid);
 
+	spin_lock(&journal->j_state_lock);
 	commit_transaction->t_state = T_LOCKED;
 
 	spin_lock(&commit_transaction->t_handle_lock);
-	while (commit_transaction->t_updates != 0) {
+	while (commit_transaction->t_updates) {
 		DEFINE_WAIT(wait);
 
 		prepare_to_wait(&journal->j_wait_updates, &wait,
 					TASK_UNINTERRUPTIBLE);
 		if (commit_transaction->t_updates) {
 			spin_unlock(&commit_transaction->t_handle_lock);
+			spin_unlock(&journal->j_state_lock);
 			schedule();
+			spin_lock(&journal->j_state_lock);
 			spin_lock(&commit_transaction->t_handle_lock);
 		}
 		finish_wait(&journal->j_wait_updates, &wait);
@@ -96,14 +107,6 @@ void journal_commit_transaction(journal_t *journal)
 
 	J_ASSERT (commit_transaction->t_outstanding_credits <=
 			journal->j_max_transaction_buffers);
-
-	/* Do we need to erase the effects of a prior journal_flush? */
-	if (journal->j_flags & JFS_FLUSHED) {
-		jbd_debug(3, "super block updated\n");
-		journal_update_superblock(journal, 1);
-	} else {
-		jbd_debug(3, "superblock not updated\n");
-	}
 
 	/*
 	 * First thing we are allowed to do is to discard any remaining
@@ -121,7 +124,6 @@ void journal_commit_transaction(journal_t *journal)
 	 * that multiple journal_get_write_access() calls to the same
 	 * buffer are perfectly permissable.
 	 */
-
 	while (commit_transaction->t_reserved_list) {
 		jh = commit_transaction->t_reserved_list;
 		JBUFFER_TRACE(jh, "reserved, unused: refile");
@@ -137,17 +139,6 @@ void journal_commit_transaction(journal_t *journal)
 	__journal_clean_checkpoint_list(journal);
 	spin_unlock(&journal->j_list_lock);
 
-	/* First part of the commit: force the revoke list out to disk.
-	 * The revoke code generates its own metadata blocks on disk for this.
-	 *
-	 * It is important that we do this while the transaction is
-	 * still locked.  Generating the revoke records should not
-	 * generate any IO stalls, so this should be quick; and doing
-	 * the work while we have the transaction locked means that we
-	 * only ever have to maintain the revoke list for one
-	 * transaction at a time.
-	 */
-
 	jbd_debug (3, "JBD: commit phase 1\n");
 
 	/*
@@ -155,7 +146,6 @@ void journal_commit_transaction(journal_t *journal)
 	 */
 	journal_switch_revoke_table(journal);
 
-	spin_lock(&journal->j_state_lock);
 	commit_transaction->t_state = T_FLUSH;
 	journal->j_committing_transaction = commit_transaction;
 	journal->j_running_transaction = NULL;
