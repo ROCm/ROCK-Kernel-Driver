@@ -1134,7 +1134,7 @@ static int __init inet_init(void)
 		printk(KERN_CRIT "inet_init: Cannot add TCP protocol\n");
 #ifdef CONFIG_IP_MULTICAST
 	if (inet_add_protocol(&igmp_protocol, IPPROTO_IGMP) < 0)
-		printk(KERN_CRIT "inet_init: Cannot add TCP protocol\n");
+		printk(KERN_CRIT "inet_init: Cannot add IGMP protocol\n");
 #endif
 
 	/* Register the socket-side information for inet_create. */
