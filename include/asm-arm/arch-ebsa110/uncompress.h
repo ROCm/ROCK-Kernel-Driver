@@ -13,26 +13,26 @@
  */
 static void puts(const char *s)
 {
-	__asm__ __volatile__("
-	ldrb	%0, [%2], #1
-	teq	%0, #0
-	beq	3f
-1:	strb	%0, [%3]
-2:	ldrb	%1, [%3, #0x14]
-	and	%1, %1, #0x60
-	teq	%1, #0x60
-	bne	2b
-	teq	%0, #'\n'
-	moveq	%0, #'\r'
-	beq	1b
-	ldrb	%0, [%2], #1
-	teq	%0, #0
-	bne	1b
-3:	ldrb	%1, [%3, #0x14]
-	and	%1, %1, #0x60
-	teq	%1, #0x60
-	bne	3b
-	" : : "r" (0), "r" (0), "r" (s), "r" (0xf0000be0) : "cc");
+	__asm__ __volatile__(
+	"ldrb	%0, [%2], #1\n"
+"	teq	%0, #0\n"
+"	beq	3f\n"
+"1:	strb	%0, [%3]\n"
+"2:	ldrb	%1, [%3, #0x14]\n"
+"	and	%1, %1, #0x60\n"
+"	teq	%1, #0x60\n"
+"	bne	2b\n"
+"	teq	%0, #'\n'\n"
+"	moveq	%0, #'\r'\n"
+"	beq	1b\n"
+"	ldrb	%0, [%2], #1\n"
+"	teq	%0, #0\n"
+"	bne	1b\n"
+"3:	ldrb	%1, [%3, #0x14]\n"
+"	and	%1, %1, #0x60\n"
+"	teq	%1, #0x60\n"
+"	bne	3b"
+	: : "r" (0), "r" (0), "r" (s), "r" (0xf0000be0) : "cc");
 }
 
 /*

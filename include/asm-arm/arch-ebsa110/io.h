@@ -50,7 +50,7 @@ void __writel(u32 val, void *addr);
 #define writew(v,b)		__writew(v,b)
 #define writel(v,b)		__writel(v,b)
 
-#define __arch_ioremap(cookie,sz,c)	((void *)(cookie))
+#define __arch_ioremap(cookie,sz,c,a)	((void *)(cookie))
 #define __arch_iounmap(cookie)		do { } while (0)
 
 #endif
