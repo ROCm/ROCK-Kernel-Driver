@@ -1114,10 +1114,10 @@ _pagebuf_wait_unpin(
 	add_wait_queue(&pb->pb_waiters, &wait);
 	for (;;) {
 		current->state = TASK_UNINTERRUPTIBLE;
-		if (atomic_read(&pb->pb_pin_count) == 0) {
+		if (atomic_read(&pb->pb_pin_count) == 0)
 			break;
-		}
-		pagebuf_run_queues(pb);
+		if (atomic_read(&pb->pb_io_remaining))
+			blk_run_queues();
 		schedule();
 	}
 	remove_wait_queue(&pb->pb_waiters, &wait);
@@ -1224,26 +1224,27 @@ pagebuf_iostart(			/* start I/O on a buffer	  */
 		return status;
 	}
 
-	pb->pb_flags &=
-		~(PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_DELWRI|PBF_READ_AHEAD);
-	pb->pb_flags |= flags &
-		(PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_SYNC|PBF_READ_AHEAD);
+	pb->pb_flags &= ~(PBF_READ | PBF_WRITE | PBF_ASYNC | \
+			PBF_DELWRI | PBF_READ_AHEAD | PBF_RUN_QUEUES);
+	pb->pb_flags |= flags & (PBF_READ | PBF_WRITE | PBF_ASYNC | \
+			PBF_SYNC | PBF_READ_AHEAD | PBF_RUN_QUEUES);
 
 	BUG_ON(pb->pb_bn == PAGE_BUF_DADDR_NULL);
 
-	/* For writes call internal function which checks for
-	 * filesystem specific callout function and execute it.
+	/* For writes allow an alternate strategy routine to precede
+	 * the actual I/O request (which may not be issued at all in
+	 * a shutdown situation, for example).
 	 */
-	if (flags & PBF_WRITE) {
-		status = __pagebuf_iorequest(pb);
-	} else {
-		status = pagebuf_iorequest(pb);
-	}
+	status = (flags & PBF_WRITE) ?
+		pagebuf_iostrategy(pb) : pagebuf_iorequest(pb);
 
-	/* Wait for I/O if we are not an async request */
-	if ((status == 0) && (flags & PBF_ASYNC) == 0) {
+	/* Wait for I/O if we are not an async request.
+	 * Note: async I/O request completion will release the buffer,
+	 * and that can already be done by this point.  So using the
+	 * buffer pointer from here on, after async I/O, is invalid.
+	 */
+	if (!status && !(flags & PBF_ASYNC))
 		status = pagebuf_iowait(pb);
-	}
 
 	return status;
 }
@@ -1381,8 +1382,6 @@ next_chunk:
 		nr_pages = total_nr_pages;
 
 	bio = bio_alloc(GFP_NOIO, nr_pages);
-
-	BUG_ON(bio == NULL);
 	bio->bi_bdev = pb->pb_target->pbr_bdev;
 	bio->bi_sector = sector;
 	bio->bi_end_io = bio_end_io_pagebuf;
@@ -1417,6 +1416,12 @@ submit_io:
 			goto next_chunk;
 	} else {
 		pagebuf_ioerror(pb, EIO);
+	}
+
+	if (pb->pb_flags & PBF_RUN_QUEUES) {
+		pb->pb_flags &= ~PBF_RUN_QUEUES;
+		if (atomic_read(&pb->pb_io_remaining) > 1)
+			blk_run_queues();
 	}
 }
 
@@ -1453,6 +1458,8 @@ pagebuf_iorequest(			/* start real I/O		*/
 		_pagebuf_wait_unpin(pb);
 	}
 
+	pagebuf_hold(pb);
+
 	/* Set the count to 1 initially, this will stop an I/O
 	 * completion callout which happens before we have started
 	 * all the I/O from calling pagebuf_iodone too early.
@@ -1460,6 +1467,8 @@ pagebuf_iorequest(			/* start real I/O		*/
 	atomic_set(&pb->pb_io_remaining, 1);
 	_pagebuf_ioapply(pb);
 	_pagebuf_iodone(pb, 0);
+
+	pagebuf_rele(pb);
 	return 0;
 }
 
@@ -1475,7 +1484,8 @@ pagebuf_iowait(
 	page_buf_t		*pb)
 {
 	PB_TRACE(pb, PB_TRACE_REC(iowait), 0);
-	pagebuf_run_queues(pb);
+	if (atomic_read(&pb->pb_io_remaining))
+		blk_run_queues();
 	down(&pb->pb_iodonesema);
 	PB_TRACE(pb, PB_TRACE_REC(iowaited), (int)pb->pb_error);
 	return pb->pb_error;
@@ -1553,6 +1563,7 @@ pagebuf_iomove(
 		data += csize;
 	}
 }
+
 
 /*
  * Pagebuf delayed write buffer handling
@@ -1683,13 +1694,13 @@ pagebuf_daemon(
 			pb->pb_flags &= ~PBF_DELWRI;
 			pb->pb_flags |= PBF_WRITE;
 
-			__pagebuf_iorequest(pb);
+			pagebuf_iostrategy(pb);
 		}
 
 		if (as_list_len > 0)
 			purge_addresses();
 		if (count)
-			pagebuf_run_queues(NULL);
+			blk_run_queues();
 
 		force_flush = 0;
 	} while (pbd_active == 1);
@@ -1756,9 +1767,9 @@ pagebuf_delwri_flush(
 		pb->pb_flags &= ~PBF_DELWRI;
 		pb->pb_flags |= PBF_WRITE;
 
-		__pagebuf_iorequest(pb);
+		pagebuf_iostrategy(pb);
 		if (++flush_cnt > 32) {
-			pagebuf_run_queues(NULL);
+			blk_run_queues();
 			flush_cnt = 0;
 		}
 
@@ -1767,7 +1778,7 @@ pagebuf_delwri_flush(
 
 	spin_unlock(&pbd_delwrite_lock);
 
-	pagebuf_run_queues(NULL);
+	blk_run_queues();
 
 	if (pinptr)
 		*pinptr = pincount;

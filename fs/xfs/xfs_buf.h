@@ -215,21 +215,16 @@ extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, size_t offset)
 
 static inline int	xfs_bawrite(void *mp, page_buf_t *bp)
 {
-	int ret;
-
 	bp->pb_fspriv3 = mp;
 	bp->pb_strat = xfs_bdstrat_cb;
 	xfs_buf_undelay(bp);
-	if ((ret = pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC)) == 0)
-		pagebuf_run_queues(bp);
-	return ret;
+	return pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC | PBF_RUN_QUEUES);
 }
 
 static inline void	xfs_buf_relse(page_buf_t *bp)
 {
 	if ((bp->pb_flags & _PBF_LOCKABLE) && !bp->pb_relse)
 		pagebuf_unlock(bp);
-
 	pagebuf_rele(bp);
 }
 
@@ -263,23 +258,19 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
 
 static inline int	XFS_bwrite(page_buf_t *pb)
 {
-	int	sync = (pb->pb_flags & PBF_ASYNC) == 0;
-	int	error;
+	int	iowait = (pb->pb_flags & PBF_ASYNC) == 0;
+	int	error = 0;
 
 	pb->pb_flags |= PBF_SYNC;
+	if (!iowait)
+		pb->pb_flags |= PBF_RUN_QUEUES;
 
 	xfs_buf_undelay(pb);
-
-	__pagebuf_iorequest(pb);
-
-	if (sync) {
+	pagebuf_iostrategy(pb);
+	if (iowait) {
 		error = pagebuf_iowait(pb);
 		xfs_buf_relse(pb);
-	} else {
-		pagebuf_run_queues(pb);
-		error = 0;
 	}
-
 	return error;
 }
 
@@ -320,4 +311,4 @@ static inline int xfs_bdwrite(void *mp, page_buf_t *bp)
 #define xfs_buf_get_noaddr(len, target)	pagebuf_get_no_daddr((len), (target))
 #define xfs_buf_free(bp)		pagebuf_free(bp)
 
-#endif
+#endif	/* __XFS_BUF_H__ */
