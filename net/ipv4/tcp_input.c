@@ -601,7 +601,7 @@ void tcp_update_metrics(struct sock *sk)
 /* Numbers are taken from RFC2414.  */
 __u32 tcp_init_cwnd(struct tcp_opt *tp, struct dst_entry *dst)
 {
-	__u32 cwnd = dst_metric(dst, RTAX_INITCWND);
+	__u32 cwnd = (dst ? dst_metric(dst, RTAX_INITCWND) : 0);
 
 	if (!cwnd) {
 		if (tp->mss_cache > 1460)
