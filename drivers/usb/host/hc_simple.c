@@ -106,7 +106,7 @@ static int hcs_return_urb (hci_t * hci, struct urb * urb, int resub_ok)
 	urb->dev = urb->hcpriv = NULL;
 
 	if (urb->complete) {
-		urb->complete (urb);	/* call complete */
+		urb->complete (urb, NULL);	/* call complete */
 	}
 
 	if (resubmit) {
@@ -254,7 +254,7 @@ static int hci_unlink_urb (struct urb * urb)
 		if (urb->complete && (urb->transfer_flags & URB_ASYNC_UNLINK)) {
 			urb->status = -ENOENT;
 			urb->actual_length = 0;
-			urb->complete (urb);
+			urb->complete (urb, NULL);
 			urb->status = 0;
 		} else {
 			urb->status = -ENOENT;

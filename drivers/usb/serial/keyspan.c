@@ -383,7 +383,7 @@ static int keyspan_write(struct usb_serial_port *port, int from_user,
 	return count - left;
 }
 
-static void	usa26_indat_callback(struct urb *urb)
+static void	usa26_indat_callback(struct urb *urb, struct pt_regs *regs)
 {
 	int			i, err;
 	int			endpoint;
@@ -438,7 +438,7 @@ static void	usa26_indat_callback(struct urb *urb)
 }
 
 	/* Outdat handling is common for usa26, usa28 and usa49 messages */
-static void	usa2x_outdat_callback(struct urb *urb)
+static void	usa2x_outdat_callback(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port;
 	struct keyspan_port_private *p_priv;
@@ -451,13 +451,13 @@ static void	usa2x_outdat_callback(struct urb *urb)
 		schedule_work(&port->work);
 }
 
-static void	usa26_inack_callback(struct urb *urb)
+static void	usa26_inack_callback(struct urb *urb, struct pt_regs *regs)
 {
 	dbg ("%s", __FUNCTION__); 
 	
 }
 
-static void	usa26_outcont_callback(struct urb *urb)
+static void	usa26_outcont_callback(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port;
 	struct keyspan_port_private *p_priv;
@@ -471,7 +471,7 @@ static void	usa26_outcont_callback(struct urb *urb)
 	}
 }
 
-static void	usa26_instat_callback(struct urb *urb)
+static void	usa26_instat_callback(struct urb *urb, struct pt_regs *regs)
 {
 	unsigned char 				*data = urb->transfer_buffer;
 	struct keyspan_usa26_portStatusMessage	*msg;
@@ -533,14 +533,14 @@ static void	usa26_instat_callback(struct urb *urb)
 exit: ;
 }
 
-static void	usa26_glocont_callback(struct urb *urb)
+static void	usa26_glocont_callback(struct urb *urb, struct pt_regs *regs)
 {
 	dbg ("%s", __FUNCTION__);
 	
 }
 
 
-static void     usa28_indat_callback(struct urb *urb)
+static void     usa28_indat_callback(struct urb *urb, struct pt_regs *regs)
 {
 	int                     i, err;
 	struct usb_serial_port  *port;
@@ -588,12 +588,12 @@ static void     usa28_indat_callback(struct urb *urb)
 	} while (urb->status != -EINPROGRESS);
 }
 
-static void	usa28_inack_callback(struct urb *urb)
+static void	usa28_inack_callback(struct urb *urb, struct pt_regs *regs)
 {
 	dbg ("%s", __FUNCTION__);
 }
 
-static void	usa28_outcont_callback(struct urb *urb)
+static void	usa28_outcont_callback(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port;
 	struct keyspan_port_private *p_priv;
@@ -607,7 +607,7 @@ static void	usa28_outcont_callback(struct urb *urb)
 	}
 }
 
-static void	usa28_instat_callback(struct urb *urb)
+static void	usa28_instat_callback(struct urb *urb, struct pt_regs *regs)
 {
 	int					err;
 	unsigned char 				*data = urb->transfer_buffer;
@@ -668,13 +668,13 @@ static void	usa28_instat_callback(struct urb *urb)
 exit: ;
 }
 
-static void	usa28_glocont_callback(struct urb *urb)
+static void	usa28_glocont_callback(struct urb *urb, struct pt_regs *regs)
 {
 	dbg ("%s", __FUNCTION__);
 }
 
 
-static void	usa49_glocont_callback(struct urb *urb)
+static void	usa49_glocont_callback(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial *serial;
 	struct usb_serial_port *port;
@@ -698,7 +698,7 @@ static void	usa49_glocont_callback(struct urb *urb)
 
 	/* This is actually called glostat in the Keyspan
 	   doco */
-static void	usa49_instat_callback(struct urb *urb)
+static void	usa49_instat_callback(struct urb *urb, struct pt_regs *regs)
 {
 	int					err;
 	unsigned char 				*data = urb->transfer_buffer;
@@ -761,12 +761,12 @@ static void	usa49_instat_callback(struct urb *urb)
 exit:	;
 }
 
-static void	usa49_inack_callback(struct urb *urb)
+static void	usa49_inack_callback(struct urb *urb, struct pt_regs *regs)
 {
 	dbg ("%s", __FUNCTION__);
 }
 
-static void	usa49_indat_callback(struct urb *urb)
+static void	usa49_indat_callback(struct urb *urb, struct pt_regs *regs)
 {
 	int			i, err;
 	int			endpoint;
@@ -819,7 +819,7 @@ static void	usa49_indat_callback(struct urb *urb)
 }
 
 /* not used, usa-49 doesn't have per-port control endpoints */
-static void	usa49_outcont_callback(struct urb *urb)
+static void	usa49_outcont_callback(struct urb *urb, struct pt_regs *regs)
 {
 	dbg ("%s", __FUNCTION__);
 }
@@ -1070,7 +1070,7 @@ static int keyspan_fake_startup (struct usb_serial *serial)
 /* Helper functions used by keyspan_setup_urbs */
 static struct urb *keyspan_setup_urb (struct usb_serial *serial, int endpoint,
 				      int dir, void *ctx, char *buf, int len,
-				      void (*callback)(struct urb *))
+				      void (*callback)(struct urb *, struct pt_regs *regs))
 {
 	struct urb *urb;
 
@@ -1093,12 +1093,12 @@ static struct urb *keyspan_setup_urb (struct usb_serial *serial, int endpoint,
 }
 
 static struct callbacks {
-	void	(*instat_callback)(struct urb *);
-	void	(*glocont_callback)(struct urb *);
-	void	(*indat_callback)(struct urb *);
-	void	(*outdat_callback)(struct urb *);
-	void	(*inack_callback)(struct urb *);
-	void	(*outcont_callback)(struct urb *);
+	void	(*instat_callback)(struct urb *, struct pt_regs *regs);
+	void	(*glocont_callback)(struct urb *, struct pt_regs *regs);
+	void	(*indat_callback)(struct urb *, struct pt_regs *regs);
+	void	(*outdat_callback)(struct urb *, struct pt_regs *regs);
+	void	(*inack_callback)(struct urb *, struct pt_regs *regs);
+	void	(*outcont_callback)(struct urb *, struct pt_regs *regs);
 } keyspan_callbacks[] = {
 	{
 		/* msg_usa26 callbacks */

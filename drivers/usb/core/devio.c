@@ -255,7 +255,7 @@ extern __inline__ struct async *async_getpending(struct dev_state *ps, void *use
         return NULL;
 }
 
-static void async_completed(struct urb *urb)
+static void async_completed(struct urb *urb, struct pt_regs *regs)
 {
         struct async *as = (struct async *)urb->context;
         struct dev_state *ps = as->ps;

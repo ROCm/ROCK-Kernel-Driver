@@ -287,7 +287,7 @@ typedef struct
 
 /*-------------------------------------------------------------------*/
 /* Forwards */
-static void auerswald_ctrlread_complete (struct urb * urb);
+static void auerswald_ctrlread_complete (struct urb * urb, struct pt_regs *regs);
 static void auerswald_removeservice (pauerswald_t cp, pauerscon_t scp);
 extern struct usb_driver auerswald_driver;
 
@@ -297,7 +297,7 @@ extern struct usb_driver auerswald_driver;
 /* --------------------------                                        */
 
 /* completion function for chained urbs */
-static void auerchain_complete (struct urb * urb)
+static void auerchain_complete (struct urb * urb, struct pt_regs *regs)
 {
 	unsigned long flags;
         int result;
@@ -316,7 +316,7 @@ static void auerchain_complete (struct urb * urb)
            NOTE: this function may lead to more urbs submitted into the chain.
                  (no chain lock at calling complete()!)
                  acp->active != NULL is protecting us against recursion.*/
-        urb->complete (urb);
+        urb->complete (urb, regs);
 
         /* detach element from chain data structure */
 	spin_lock_irqsave (&acp->lock, flags);
@@ -351,7 +351,7 @@ static void auerchain_complete (struct urb * urb)
                         urb->status = result;
                         dbg("auerchain_complete: usb_submit_urb with error code %d", result);
                         /* and do error handling via *this* completion function (recursive) */
-                        auerchain_complete( urb);
+                        auerchain_complete( urb, NULL);
                 }
         } else {
                 /* simple return without submitting a new urb.
@@ -428,7 +428,7 @@ static int auerchain_submit_urb_list (pauerchain_t acp, struct urb * urb, int ea
                         urb->status = result;
                         dbg("auerchain_submit_urb: usb_submit_urb with error code %d", result);
                         /* and do error handling via completion function */
-                        auerchain_complete( urb);
+                        auerchain_complete( urb, NULL);
                 }
         }
 
@@ -468,7 +468,7 @@ static int auerchain_unlink_urb (pauerchain_t acp, struct urb * urb)
                         spin_unlock_irqrestore (&acp->lock, flags);
                         dbg ("unlink waiting urb");
                         urb->status = -ENOENT;
-                        urb->complete (urb);
+                        urb->complete (urb, NULL);
                         return 0;
                 }
         }
@@ -525,7 +525,7 @@ static void auerchain_unlink_all (pauerchain_t acp)
                 spin_unlock_irqrestore (&acp->lock, flags);
                 dbg ("unlink waiting urb");
                 urbp->status = -ENOENT;
-                urbp->complete (urbp);
+                urbp->complete (urbp, NULL);
                 spin_lock_irqsave (&acp->lock, flags);
         }
         spin_unlock_irqrestore (&acp->lock, flags);
@@ -612,7 +612,7 @@ ac_fail:/* free the elements */
 
 
 /* completion handler for synchronous chained URBs */
-static void auerchain_blocking_completion (struct urb *urb)
+static void auerchain_blocking_completion (struct urb *urb, struct pt_regs *regs)
 {
 	pauerchain_chs_t pchs = (pauerchain_chs_t)urb->context;
 	pchs->done = 1;
@@ -718,7 +718,7 @@ static int auerchain_control_msg (pauerchain_t acp, struct usb_device *dev, unsi
 	dr->wLength = cpu_to_le16 (size);
 
 	usb_fill_control_urb (urb, dev, pipe, (unsigned char*)dr, data, size,    /* build urb */
-		          (usb_complete_t)auerchain_blocking_completion,0);
+		          auerchain_blocking_completion,0);
 	ret = auerchain_start_wait_urb (acp, urb, timeout, &length);
 
 	usb_free_urb (urb);
@@ -881,7 +881,7 @@ static int auerswald_status_retry (int status)
 }
 
 /* Completion of asynchronous write block */
-static void auerchar_ctrlwrite_complete (struct urb * urb)
+static void auerchar_ctrlwrite_complete (struct urb * urb, struct pt_regs *regs)
 {
 	pauerbuf_t bp = (pauerbuf_t) urb->context;
 	pauerswald_t cp = ((pauerswald_t)((char *)(bp->list)-(unsigned long)(&((pauerswald_t)0)->bufctl)));
@@ -894,7 +894,7 @@ static void auerchar_ctrlwrite_complete (struct urb * urb)
 }
 
 /* Completion handler for dummy retry packet */
-static void auerswald_ctrlread_wretcomplete (struct urb * urb)
+static void auerswald_ctrlread_wretcomplete (struct urb * urb, struct pt_regs *regs)
 {
         pauerbuf_t bp = (pauerbuf_t) urb->context;
         pauerswald_t cp;
@@ -921,19 +921,19 @@ static void auerswald_ctrlread_wretcomplete (struct urb * urb)
 	/* bp->dr->index    = channel id;          remains */
 	usb_fill_control_urb (bp->urbp, cp->usbdev, usb_rcvctrlpipe (cp->usbdev, 0),
                           (unsigned char*)bp->dr, bp->bufp, le16_to_cpu (bp->dr->wLength),
-		          (usb_complete_t)auerswald_ctrlread_complete,bp);
+		          auerswald_ctrlread_complete,bp);
 
 	/* submit the control msg as next paket */
 	ret = auerchain_submit_urb_list (&cp->controlchain, bp->urbp, 1);
         if (ret) {
         	dbg ("auerswald_ctrlread_complete: nonzero result of auerchain_submit_urb_list %d", ret);
         	bp->urbp->status = ret;
-        	auerswald_ctrlread_complete (bp->urbp);
+        	auerswald_ctrlread_complete (bp->urbp, NULL);
     	}
 }
 
 /* completion handler for receiving of control messages */
-static void auerswald_ctrlread_complete (struct urb * urb)
+static void auerswald_ctrlread_complete (struct urb * urb, struct pt_regs *regs)
 {
         unsigned int  serviceid;
         pauerswald_t  cp;
@@ -969,14 +969,14 @@ static void auerswald_ctrlread_complete (struct urb * urb)
 		bp->dr->wLength      = cpu_to_le16 (32); /* >= 8 bytes */
 		usb_fill_control_urb (bp->urbp, cp->usbdev, usb_sndctrlpipe (cp->usbdev, 0),
   			(unsigned char*)bp->dr, bp->bufp, 32,
-	   		(usb_complete_t)auerswald_ctrlread_wretcomplete,bp);
+	   		auerswald_ctrlread_wretcomplete,bp);
 
 		/* submit the control msg as next paket */
        		ret = auerchain_submit_urb_list (&cp->controlchain, bp->urbp, 1);
        		if (ret) {
                		dbg ("auerswald_ctrlread_complete: nonzero result of auerchain_submit_urb_list %d", ret);
                		bp->urbp->status = ret;
-               		auerswald_ctrlread_wretcomplete (bp->urbp);
+               		auerswald_ctrlread_wretcomplete (bp->urbp, regs);
 		}
                 return;
         }
@@ -1005,7 +1005,7 @@ static void auerswald_ctrlread_complete (struct urb * urb)
    messages from the USB device.
 */
 /* int completion handler. */
-static void auerswald_int_complete (struct urb * urb)
+static void auerswald_int_complete (struct urb * urb, struct pt_regs *regs)
 {
         unsigned long flags;
         unsigned  int channelid;
@@ -1097,14 +1097,14 @@ static void auerswald_int_complete (struct urb * urb)
 	bp->dr->wLength      = cpu_to_le16 (bytecount);
 	usb_fill_control_urb (bp->urbp, cp->usbdev, usb_rcvctrlpipe (cp->usbdev, 0),
                           (unsigned char*)bp->dr, bp->bufp, bytecount,
-		          (usb_complete_t)auerswald_ctrlread_complete,bp);
+		          auerswald_ctrlread_complete,bp);
 
         /* submit the control msg */
         ret = auerchain_submit_urb (&cp->controlchain, bp->urbp);
         if (ret) {
                 dbg ("auerswald_int_complete: nonzero result of auerchain_submit_urb %d", ret);
                 bp->urbp->status = ret;
-                auerswald_ctrlread_complete( bp->urbp);
+                auerswald_ctrlread_complete( bp->urbp, NULL);
 		/* here applies the same problem as above: device locking! */
         }
 exit:

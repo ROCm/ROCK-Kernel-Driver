@@ -250,7 +250,7 @@ static void ehci_ready (struct ehci_hcd *ehci)
 
 static void ehci_tasklet (unsigned long param);
 
-static void ehci_irq (struct usb_hcd *hcd);
+static void ehci_irq (struct usb_hcd *hcd, struct pt_regs *regs);
 
 static void ehci_watchdog (unsigned long param)
 {
@@ -259,7 +259,7 @@ static void ehci_watchdog (unsigned long param)
 
 	spin_lock_irqsave (&ehci->lock, flags);
 	/* guard against lost IAA, which wedges everything */
-	ehci_irq (&ehci->hcd);
+	ehci_irq (&ehci->hcd, NULL);
  	/* unlink the last qh after it's idled a while */
  	if (ehci->async_idle) {
  		start_unlink_async (ehci, ehci->async);
@@ -616,7 +616,7 @@ static void ehci_tasklet (unsigned long param)
 
 /*-------------------------------------------------------------------------*/
 
-static void ehci_irq (struct usb_hcd *hcd)
+static void ehci_irq (struct usb_hcd *hcd, struct pt_regs *regs)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
 	u32			status = readl (&ehci->regs->status);

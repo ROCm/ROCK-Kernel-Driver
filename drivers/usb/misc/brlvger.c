@@ -118,7 +118,7 @@ static int brlvger_ioctl(struct inode *inode, struct file *file,
 			 unsigned cmd, unsigned long arg);
 static unsigned brlvger_poll(struct file *file, poll_table *wait);
 static loff_t brlvger_llseek(struct file * file, loff_t offset, int orig);
-static void intr_callback(struct urb *urb);
+static void intr_callback(struct urb *urb, struct pt_regs *regs);
 struct brlvger_priv;
 static int brlvger_get_hw_version(struct brlvger_priv *priv,
 				  unsigned char *verbuf);
@@ -842,7 +842,7 @@ brlvger_poll(struct file *file, poll_table *wait)
 }
 
 static void
-intr_callback(struct urb *urb)
+intr_callback(struct urb *urb, struct pt_regs *regs)
 {
 	struct brlvger_priv *priv = urb->context;
 	int intr_idx, read_idx;

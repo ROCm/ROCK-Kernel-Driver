@@ -216,10 +216,10 @@ static void bluetooth_unthrottle	(struct tty_struct *tty);
 static int  bluetooth_ioctl		(struct tty_struct *tty, struct file *file, unsigned int cmd, unsigned long arg);
 static void bluetooth_set_termios	(struct tty_struct *tty, struct termios *old);
 
-static void bluetooth_int_callback		(struct urb *urb);
-static void bluetooth_ctrl_callback		(struct urb *urb);
-static void bluetooth_read_bulk_callback	(struct urb *urb);
-static void bluetooth_write_bulk_callback	(struct urb *urb);
+static void bluetooth_int_callback		(struct urb *urb, struct pt_regs *regs);
+static void bluetooth_ctrl_callback		(struct urb *urb, struct pt_regs *regs);
+static void bluetooth_read_bulk_callback	(struct urb *urb, struct pt_regs *regs);
+static void bluetooth_write_bulk_callback	(struct urb *urb, struct pt_regs *regs);
 
 static int usb_bluetooth_probe (struct usb_interface *intf, 
 				const struct usb_device_id *id);
@@ -760,7 +760,7 @@ void btusb_disable_bulk_read(struct tty_struct *tty){
  *****************************************************************************/
 
 
-static void bluetooth_int_callback (struct urb *urb)
+static void bluetooth_int_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_bluetooth *bluetooth = get_usb_bluetooth ((struct usb_bluetooth *)urb->context, __FUNCTION__);
 	unsigned char *data = urb->transfer_buffer;
@@ -871,7 +871,7 @@ exit:
 }
 
 
-static void bluetooth_ctrl_callback (struct urb *urb)
+static void bluetooth_ctrl_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_bluetooth *bluetooth = get_usb_bluetooth ((struct usb_bluetooth *)urb->context, __FUNCTION__);
 
@@ -889,7 +889,7 @@ static void bluetooth_ctrl_callback (struct urb *urb)
 }
 
 
-static void bluetooth_read_bulk_callback (struct urb *urb)
+static void bluetooth_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_bluetooth *bluetooth = get_usb_bluetooth ((struct usb_bluetooth *)urb->context, __FUNCTION__);
 	unsigned char *data = urb->transfer_buffer;
@@ -1006,7 +1006,7 @@ exit:
 }
 
 
-static void bluetooth_write_bulk_callback (struct urb *urb)
+static void bluetooth_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_bluetooth *bluetooth = get_usb_bluetooth ((struct usb_bluetooth *)urb->context, __FUNCTION__);
 
