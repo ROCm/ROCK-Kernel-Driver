@@ -872,6 +872,9 @@ struct sctp_outq {
 
 	unsigned out_qlen;	/* Total length of queued data chunks. */
 
+	/* Error of send failed, may used in SCTP_SEND_FAILED event. */
+	unsigned error;
+
 	/* These are control chunks we want to send.  */
 	struct sk_buff_head control;
 

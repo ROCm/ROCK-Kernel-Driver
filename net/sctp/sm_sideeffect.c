@@ -133,7 +133,7 @@ static void sctp_do_ecn_cwr_work(sctp_association_t *asoc,
 }
 
 /* Generate SACK if necessary.  We call this at the end of a packet.  */
-int sctp_gen_sack(struct sctp_association *asoc, int force, 
+int sctp_gen_sack(struct sctp_association *asoc, int force,
 		  sctp_cmd_seq_t *commands)
 {
 	__u32 ctsn, max_tsn_seen;
@@ -410,7 +410,8 @@ static void sctp_do_8_2_transport_strike(sctp_association_t *asoc,
 
 /* Worker routine to handle INIT command failure.  */
 static void sctp_cmd_init_failed(sctp_cmd_seq_t *commands,
-				 sctp_association_t *asoc)
+				 sctp_association_t *asoc,
+				 unsigned error)
 {
 	struct sctp_ulpevent *event;
 
@@ -421,46 +422,27 @@ static void sctp_cmd_init_failed(sctp_cmd_seq_t *commands,
 		sctp_add_cmd_sf(commands, SCTP_CMD_EVENT_ULP,
 				SCTP_ULPEVENT(event));
 
-	/* FIXME:  We need to handle data possibly either
-	 * sent via COOKIE-ECHO bundling or just waiting in
-	 * the transmit queue, if the user has enabled
-	 * SEND_FAILED notifications.
-	 */
+	/* SEND_FAILED sent later when cleaning up the association. */
+	asoc->outqueue.error = error;
 	sctp_add_cmd_sf(commands, SCTP_CMD_DELETE_TCB, SCTP_NULL());
 }
 
 /* Worker routine to handle SCTP_CMD_ASSOC_FAILED.  */
 static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *commands,
-				  sctp_association_t *asoc,
+				  struct sctp_association *asoc,
 				  sctp_event_t event_type,
 				  sctp_subtype_t subtype,
-				  sctp_chunk_t *chunk)
+				  struct sctp_chunk *chunk,
+				  unsigned error)
 {
 	struct sctp_ulpevent *event;
-	__u16 error = 0;
-
-	switch(event_type) {
-	case SCTP_EVENT_T_PRIMITIVE:
-		if (SCTP_PRIMITIVE_ABORT == subtype.primitive)
-			error = SCTP_ERROR_USER_ABORT;
-		break;
-	case SCTP_EVENT_T_CHUNK:
-		if (chunk && (SCTP_CID_ABORT == chunk->chunk_hdr->type) &&
-	    	    (ntohs(chunk->chunk_hdr->length) >=
-			(sizeof(struct sctp_chunkhdr) +
-				sizeof(struct sctp_errhdr)))) {
-			error = ((sctp_errhdr_t *)chunk->skb->data)->cause;
-		}
-		break;
-	default:
-		break;
-	}
 
 	/* Cancel any partial delivery in progress. */
 	sctp_ulpq_abort_pd(&asoc->ulpq, GFP_ATOMIC);
 
 	event = sctp_ulpevent_make_assoc_change(asoc, 0, SCTP_COMM_LOST,
-						error, 0, 0, GFP_ATOMIC);
+						(__u16)error, 0, 0,
+						GFP_ATOMIC);
 	if (event)
 		sctp_add_cmd_sf(commands, SCTP_CMD_EVENT_ULP,
 				SCTP_ULPEVENT(event));
@@ -468,9 +450,8 @@ static void sctp_cmd_assoc_failed(sctp_cmd_seq_t *commands,
 	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
 			SCTP_STATE(SCTP_STATE_CLOSED));
 
-	/* FIXME:  We need to handle data that could not be sent or was not
-	 * acked, if the user has enabled SEND_FAILED notifications.
-	 */
+	/* SEND_FAILED sent later when cleaning up the association. */
+	asoc->outqueue.error = error;
 	sctp_add_cmd_sf(commands, SCTP_CMD_DELETE_TCB, SCTP_NULL());
 }
 
@@ -640,9 +621,9 @@ static void sctp_cmd_new_state(sctp_cmd_seq_t *cmds, sctp_association_t *asoc,
 	asoc->state_timestamp = jiffies;
 
 	if ((SCTP_STATE_ESTABLISHED == asoc->state) ||
-	    (SCTP_STATE_CLOSED == asoc->state)) { 
+	    (SCTP_STATE_CLOSED == asoc->state)) {
 		/* Wake up any processes waiting in the asoc's wait queue in
-		 * sctp_wait_for_connect() or sctp_wait_for_sndbuf(). 
+		 * sctp_wait_for_connect() or sctp_wait_for_sndbuf().
 	 	 */
 		if (waitqueue_active(&asoc->wait))
 			wake_up_interruptible(&asoc->wait);
@@ -1077,12 +1058,12 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			break;
 
 		case SCTP_CMD_INIT_FAILED:
-			sctp_cmd_init_failed(commands, asoc);
+			sctp_cmd_init_failed(commands, asoc, cmd->obj.u32);
 			break;
 
 		case SCTP_CMD_ASSOC_FAILED:
 			sctp_cmd_assoc_failed(commands, asoc, event_type,
-					      subtype, chunk);
+					      subtype, chunk, cmd->obj.u32);
 			break;
 
 		case SCTP_CMD_COUNTER_INC:
@@ -1094,7 +1075,7 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			break;
 
 		case SCTP_CMD_REPORT_DUP:
-			sctp_tsnmap_mark_dup(&asoc->peer.tsn_map, 
+			sctp_tsnmap_mark_dup(&asoc->peer.tsn_map,
 					     cmd->obj.u32);
 			break;
 

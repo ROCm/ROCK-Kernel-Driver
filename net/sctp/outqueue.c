@@ -138,13 +138,13 @@ void sctp_outq_init(sctp_association_t *asoc, struct sctp_outq *q)
 }
 
 /* Free the outqueue structure and any related pending chunks.
- * FIXME: Add SEND_FAILED support.
  */
 void sctp_outq_teardown(struct sctp_outq *q)
 {
 	struct sctp_transport *transport;
 	struct list_head *lchunk, *pos, *temp;
 	sctp_chunk_t *chunk;
+	struct sctp_ulpevent *ev;
 
 	/* Throw away unacknowledged chunks. */
 	list_for_each(pos, &q->asoc->peer.transport_addr_list) {
@@ -152,6 +152,14 @@ void sctp_outq_teardown(struct sctp_outq *q)
 		while ((lchunk = sctp_list_dequeue(&transport->transmitted))) {
 			chunk = list_entry(lchunk, sctp_chunk_t,
 					   transmitted_list);
+
+			/* Generate a SEND FAILED event. */
+			ev = sctp_ulpevent_make_send_failed(q->asoc,
+					chunk, SCTP_DATA_SENT,
+					q->error, GFP_ATOMIC);
+			if (ev)
+				sctp_ulpq_tail_event(&q->asoc->ulpq, ev);
+
 			sctp_free_chunk(chunk);
 		}
 	}
@@ -171,8 +179,19 @@ void sctp_outq_teardown(struct sctp_outq *q)
 	}
 
 	/* Throw away any leftover data chunks. */
-	while ((chunk = sctp_outq_dequeue_data(q)))
+	while ((chunk = sctp_outq_dequeue_data(q))) {
+
+		/* Generate a SEND FAILED event. */
+		ev = sctp_ulpevent_make_send_failed(q->asoc,
+				chunk, SCTP_DATA_UNSENT,
+				q->error, GFP_ATOMIC);
+		if (ev)
+			sctp_ulpq_tail_event(&q->asoc->ulpq, ev);
+
 		sctp_free_chunk(chunk);
+	}
+
+	q->error = 0;
 
 	/* Throw away any leftover control chunks. */
 	while ((chunk = (sctp_chunk_t *) skb_dequeue(&q->control)))
