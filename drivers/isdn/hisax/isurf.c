@@ -190,8 +190,8 @@ static struct pnp_card *pnp_surf __devinitdata = NULL;
 int __init
 setup_isurf(struct IsdnCard *card)
 {
-	int ver;
 	struct IsdnCardState *cs = card->cs;
+	unsigned long phymem;
 	char tmp[64];
 
 	strcpy(tmp, ISurf_revision);
@@ -199,6 +199,7 @@ setup_isurf(struct IsdnCard *card)
 	
 	if (card->para[1] && card->para[2]) {
 		cs->hw.isurf.reset = card->para[1];
+		phymem = card->para[2];
 		cs->irq = card->para[0];
 	} else {
 #ifdef __ISAPNP__
@@ -234,7 +235,7 @@ setup_isurf(struct IsdnCard *card)
 					return(0);
 				}
 				cs->hw.isurf.reset = pnp_port_start(pd, 0);
-				cs->hw.isurf.phymem = pnp_port_start(pd, 1);
+				phymem = pnp_port_start(pd, 1);
 				cs->irq = pnp_irq(pd, 0);
 			} else {
 				printk(KERN_INFO "ISurfPnP: no ISAPnP card found\n");
@@ -252,7 +253,7 @@ setup_isurf(struct IsdnCard *card)
 	}
 	if (!request_io(&cs->rs, cs->hw.isurf.reset, 1, "isurf isdn"))
 		goto err;
-	cs->hw.isurf.isar = request_mmio(&cs->rs, card->para[2], ISURF_IOMEM_SIZE, "isurf iomem");
+	cs->hw.isurf.isar = request_mmio(&cs->rs, phymem, ISURF_IOMEM_SIZE, "isurf iomem");
 	if (!cs->hw.isurf.isar)
 		goto err;
 
