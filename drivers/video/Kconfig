@@ -76,10 +76,6 @@ config FB_ACORN
 	  hardware found in Acorn RISC PCs and other ARM-based machines.  If
 	  unsure, say N.
 
-config FB_ANAKIN
-	bool "Anakin LCD support"
-	depends on FB && ARM && ARCH_ANAKIN
-
 config FB_CLPS711X
 	bool "CLPS711X LCD support"
 	depends on FB && ARM && ARCH_CLPS711X

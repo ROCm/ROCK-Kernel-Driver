@@ -174,32 +174,6 @@ config SERIAL_8250_ACORN
 	  system, say Y to this option.  The driver can handle 1, 2, or 3 port
 	  cards.  If unsure, say N.
 
-config SERIAL_ANAKIN
-	bool "Anakin serial port support"
-	depends on ARM && ARCH_ANAKIN
-	select SERIAL_CORE
-	help
-	  ::: To be written :::
-
-config SERIAL_ANAKIN_CONSOLE
-	bool "Console on Anakin serial port"
-	depends on SERIAL_ANAKIN
-	select SERIAL_CORE_CONSOLE
-	help
-	  Even if you say Y here, the currently visible virtual console
-	  (/dev/tty0) will still be used as the system console by default, but
-	  you can alter that using a kernel command line option such as
-	  "console=ttyAN0". (Try "man bootparam" or see the documentation of
-	  your boot loader (lilo or loadlin) about how to pass options to the
-	  kernel at boot time.)
-
-config ANAKIN_DEFAULT_BAUDRATE
-	int "Default Anakin serial baudrate"
-	depends on SERIAL_ANAKIN
-	default "9600"
-	help
-	  ::: To be written :::
-
 config SERIAL_AMBA
 	tristate "ARM AMBA serial port support"
 	depends on ARM_AMBA

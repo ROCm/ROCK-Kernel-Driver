@@ -652,6 +652,13 @@ sn_dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nelems
 }
 EXPORT_SYMBOL(sn_dma_sync_sg_for_device);
 
+int
+sn_dma_mapping_error(dma_addr_t dma_addr)
+{
+	return 0;
+}
+
+EXPORT_SYMBOL(sn_dma_mapping_error);
 EXPORT_SYMBOL(sn_pci_unmap_single);
 EXPORT_SYMBOL(sn_pci_map_single);
 EXPORT_SYMBOL(sn_pci_dma_sync_single_for_cpu);

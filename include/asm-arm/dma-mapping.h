@@ -352,5 +352,13 @@ dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nents,
 	}
 }
 
+/*
+ * DMA errors are defined by all-bits-set in the DMA address.
+ */
+static inline int dma_mapping_error(dma_addr_t dma_addr)
+{
+	return dma_addr == ~0;
+}
+
 #endif /* __KERNEL__ */
 #endif

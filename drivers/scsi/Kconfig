@@ -443,7 +443,7 @@ config SCSI_SATA_PROMISE
 
 config SCSI_SATA_SIL
 	tristate "Silicon Image SATA support"
-	depends on SCSI_SATA && PCI && BROKEN
+	depends on SCSI_SATA && PCI && EXPERIMENTAL
 	help
 	  This option enables support for Silicon Image Serial ATA.
 

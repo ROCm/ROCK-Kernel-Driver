@@ -35,7 +35,6 @@ CONFIG_KMOD=y
 # CONFIG_ARCH_RPC is not set
 CONFIG_ARCH_SA1100=y
 # CONFIG_ARCH_CLPS711X is not set
-# CONFIG_ARCH_ANAKIN is not set
 
 #
 # Archimedes/A5000 Implementations

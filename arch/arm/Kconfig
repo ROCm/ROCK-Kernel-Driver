@@ -75,28 +75,6 @@ choice
 config ARCH_ADIFCC
 	bool "ADIFCC-based"
 
-config ARCH_ANAKIN
-	bool "Anakin"
-	---help---
-	  The Anakin is a StrongArm based SA110 - 2 DIN Vehicle Telematics Platform.
-	  64MB SDRAM - 4 Mb Flash - Compact Flash Interface - 1 MB VRAM
-
-	  On board peripherals:
-	  * Front display: 400x234 16 bit TFT touchscreen
-	  * External independent second screen interface
-	  * CAN controller SJA1000
-	  * USB host controller
-	  * 6 channel video codec with hardware overlay
-	  * Smartcard reader
-	  * IrDa
-
-	  Modules interfaced over the Multi Media Extension slots:
-	  * A communication card
-	  Wavecom GPRS modem
-	  uBlock GPS
-	  Bosch DAB module
-	  * An audio card ( 4 * 40W, AC97 Codec, I2S)
-
 config ARCH_CLPS7500
 	bool "Cirrus-CL-PS7500FE"
 

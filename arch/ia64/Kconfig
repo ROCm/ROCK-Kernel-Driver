@@ -214,15 +214,6 @@ config FORCE_MAX_ZONEORDER
 	int
 	default "18"
 
-config IA64_PAL_IDLE
-	bool "Use PAL_HALT_LIGHT in idle loop"
-	help
-	  Say Y here to enable use of PAL_HALT_LIGHT in the cpu_idle loop.
-	  This allows the CPU to enter a low power state when idle.  You
-	  can enable CONFIG_IA64_PALINFO and check /proc/pal/cpu0/power_info
-	  to see the power consumption and latency for this state.  If you're
-	  unsure your firmware supports it, answer N.
-
 config SMP
 	bool "Symmetric multi-processing support"
 	help
@@ -344,47 +335,6 @@ config ACPI
 	bool
 	depends on !IA64_HP_SIM
 	default y
-	help
-	  ACPI/OSPM support for Linux is currently under development. As such,
-	  this support is preliminary and EXPERIMENTAL.  Configuring ACPI
-	  support enables kernel interfaces that allow higher level software
-	  (OSPM) to manipulate ACPI defined hardware and software interfaces,
-	  including the evaluation of ACPI control methods.  If unsure, choose
-	  N here.  Note, this option will enlarge your kernel by about 120K.
-
-	  This support requires an ACPI compliant platform (hardware/firmware).
-	  If both ACPI and Advanced Power Management (APM) support are
-	  configured, whichever is loaded first shall be used.
-
-	  This code DOES NOT currently provide a complete OSPM implementation
-	  -- it has not yet reached APM's level of functionality.  When fully
-	  implemented, Linux ACPI/OSPM will provide a more robust functional
-	  replacement for legacy configuration and power management
-	  interfaces, including the Plug-and-Play BIOS specification (PnP
-	  BIOS), the Multi-Processor Specification (MPS), and the Advanced
-	  Power Management specification (APM).
-
-	  Linux support for ACPI/OSPM is based on Intel Corporation's ACPI
-	  Component Architecture (ACPI CA). The latest ACPI CA source code,
-	  documentation, debug builds, and implementation status information
-	  can be downloaded from:
-	  <http://developer.intel.com/technology/iapc/acpi/downloads.htm>.
-
-	  The ACPI Sourceforge project may also be of interest:
-	  <http://sf.net/projects/acpi/>
-
-config ACPI_INTERPRETER
-	bool
-	depends on !IA64_HP_SIM
-	default y
-
-config ACPI_KERNEL_CONFIG
-	bool
-	depends on !IA64_HP_SIM
-	default y
-	help
-	  If you say `Y' here, Linux's ACPI support will use the
-	  hardware-level system descriptions found on IA-64 systems.
 
 if !IA64_HP_SIM
 

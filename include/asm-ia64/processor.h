@@ -148,9 +148,25 @@ struct cpuinfo_ia64 {
 	__u32 softirq_pending;
 	__u64 itm_delta;	/* # of clock cycles between clock ticks */
 	__u64 itm_next;		/* interval timer mask value to use for next clock tick */
+	__u64 nsec_per_cyc;	/* (1000000000<<IA64_NSEC_PER_CYC_SHIFT)/itc_freq */
+	__u64 unimpl_va_mask;	/* mask of unimplemented virtual address bits (from PAL) */
+	__u64 unimpl_pa_mask;	/* mask of unimplemented physical address bits (from PAL) */
 	__u64 *pgd_quick;
 	__u64 *pmd_quick;
 	__u64 pgtable_cache_sz;
+	__u64 itc_freq;		/* frequency of ITC counter */
+	__u64 proc_freq;	/* frequency of processor */
+	__u64 cyc_per_usec;	/* itc_freq/1000000 */
+	__u64 ptce_base;
+	__u32 ptce_count[2];
+	__u32 ptce_stride[2];
+	struct task_struct *ksoftirqd;	/* kernel softirq daemon for this CPU */
+
+#ifdef CONFIG_SMP
+	__u64 loops_per_jiffy;
+	int cpu;
+#endif
+
 	/* CPUID-derived information: */
 	__u64 ppn;
 	__u64 features;
@@ -160,23 +176,7 @@ struct cpuinfo_ia64 {
 	__u8 family;
 	__u8 archrev;
 	char vendor[16];
-	__u64 itc_freq;		/* frequency of ITC counter */
-	__u64 proc_freq;	/* frequency of processor */
-	__u64 cyc_per_usec;	/* itc_freq/1000000 */
-	__u64 nsec_per_cyc;	/* (1000000000<<IA64_NSEC_PER_CYC_SHIFT)/itc_freq */
-	__u64 unimpl_va_mask;	/* mask of unimplemented virtual address bits (from PAL) */
-	__u64 unimpl_pa_mask;	/* mask of unimplemented physical address bits (from PAL) */
-	__u64 ptce_base;
-	__u32 ptce_count[2];
-	__u32 ptce_stride[2];
-	struct task_struct *ksoftirqd;	/* kernel softirq daemon for this CPU */
-#ifdef CONFIG_SMP
-	int cpu;
-	__u64 loops_per_jiffy;
-	__u64 ipi_count;
-	__u64 prof_counter;
-	__u64 prof_multiplier;
-#endif
+
 #ifdef CONFIG_NUMA
 	struct ia64_node_data *node_data;
 #endif
@@ -678,7 +678,7 @@ ia64_imva (void *addr)
 #define ARCH_HAS_PREFETCH
 #define ARCH_HAS_PREFETCHW
 #define ARCH_HAS_SPINLOCK_PREFETCH
-#define PREFETCH_STRIDE 256
+#define PREFETCH_STRIDE			L1_CACHE_BYTES
 
 static inline void
 prefetch (const void *x)

@@ -171,9 +171,10 @@ _GLOBAL(DoSyscall)
 	bl	do_show_syscall
 #endif /* SHOW_SYSCALLS */
 	rlwinm	r10,r1,0,0,18	/* current_thread_info() */
+	lwz	r11,TI_LOCAL_FLAGS(r10)
+	rlwinm	r11,r11,0,~_TIFL_FORCE_NOERROR
+	stw	r11,TI_LOCAL_FLAGS(r10)
 	lwz	r11,TI_FLAGS(r10)
-	rlwinm	r11,r11,0,~_TIF_FORCE_NOERROR
-	stw	r11,TI_FLAGS(r10)
 	andi.	r11,r11,_TIF_SYSCALL_TRACE
 	bne-	syscall_dotrace
 syscall_dotrace_cont:
@@ -196,8 +197,8 @@ ret_from_syscall:
 	cmpl	0,r3,r11
 	rlwinm	r12,r1,0,0,18	/* current_thread_info() */
 	blt+	30f
-	lwz	r11,TI_FLAGS(r12)
-	andi.	r11,r11,_TIF_FORCE_NOERROR
+	lwz	r11,TI_LOCAL_FLAGS(r12)
+	andi.	r11,r11,_TIFL_FORCE_NOERROR
 	bne	30f
 	neg	r3,r3
 	lwz	r10,_CCR(r1)	/* Set SO bit in CR */
