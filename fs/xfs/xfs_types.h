@@ -308,13 +308,9 @@ extern struct xfsstats xfsstats;
 #endif	/* !CONFIG_PROC_FS */
 
 
-
-/* juggle IRIX device numbers - still used in ondisk structures */
-
-#ifndef __KERNEL__
-#define MKDEV(major, minor)	makedev(major, minor)
-#endif
-
+/*
+ * Juggle IRIX device numbers - still used in ondisk structures
+ */
 #define XFS_DEV_BITSMAJOR	14
 #define XFS_DEV_BITSMINOR	18
 #define XFS_DEV_MAXMAJ		0x1ff
