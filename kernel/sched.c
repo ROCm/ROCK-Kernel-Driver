@@ -1685,12 +1685,20 @@ static int load_balance(int this_cpu, runqueue_t *this_rq,
 		goto out_balanced;
 	}
 
-	/* Attempt to move tasks */
-	double_lock_balance(this_rq, busiest);
-
-	nr_moved = move_tasks(this_rq, this_cpu, busiest, imbalance, sd, idle);
+	nr_moved = 0;
+	if (busiest->nr_running > 1) {
+		/*
+		 * Attempt to move tasks. If find_busiest_group has found
+		 * an imbalance but busiest->nr_running <= 1, the group is
+		 * still unbalanced. nr_moved simply stays zero, so it is
+		 * correctly treated as an imbalance.
+		 */
+		double_lock_balance(this_rq, busiest);
+		nr_moved = move_tasks(this_rq, this_cpu, busiest,
+						imbalance, sd, idle);
+		spin_unlock(&busiest->lock);
+	}
 	spin_unlock(&this_rq->lock);
-	spin_unlock(&busiest->lock);
 
 	if (!nr_moved) {
 		sd->nr_balance_failed++;
