@@ -138,7 +138,7 @@ static void ray_update_parm(struct net_device *dev, UCHAR objid, UCHAR *value, i
 static void verify_dl_startup(u_long);
 
 /* Prototypes for interrpt time functions **********************************/
-static void ray_interrupt (int reg, void *dev_id, struct pt_regs *regs);
+static irqreturn_t ray_interrupt (int reg, void *dev_id, struct pt_regs *regs);
 static void clear_interrupt(ray_dev_t *local);
 static void rx_deauthenticate(ray_dev_t *local, struct rcs *prcs, 
                        unsigned int pkt_addr, int rx_len);
@@ -2050,7 +2050,7 @@ static void set_multicast_list(struct net_device *dev)
 /*=============================================================================
  * All routines below here are run at interrupt time.
 =============================================================================*/
-static void ray_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t ray_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
     struct net_device *dev = (struct net_device *)dev_id;
     dev_link_t *link;
@@ -2063,7 +2063,7 @@ static void ray_interrupt(int irq, void *dev_id, struct pt_regs * regs)
     UCHAR status;
 
     if (dev == NULL) /* Note that we want interrupts with dev->start == 0 */
-    return;
+	return IRQ_NONE;
 
     DEBUG(4,"ray_cs: interrupt for *dev=%p\n",dev);
 
@@ -2071,7 +2071,7 @@ static void ray_interrupt(int irq, void *dev_id, struct pt_regs * regs)
     link = (dev_link_t *)local->finder;
     if ( ! (link->state & DEV_PRESENT) || link->state & DEV_SUSPEND ) {
         DEBUG(2,"ray_cs interrupt from device not present or suspended.\n");
-        return;
+        return IRQ_NONE;
     }
     rcsindex = readb(&((struct scb *)(local->sram))->rcs_index);
 
@@ -2079,7 +2079,7 @@ static void ray_interrupt(int irq, void *dev_id, struct pt_regs * regs)
     {
         DEBUG(1,"ray_cs interrupt bad rcsindex = 0x%x\n",rcsindex);
         clear_interrupt(local);
-        return;
+        return IRQ_HANDLED;
     }
     if (rcsindex < NUMBER_OF_CCS) /* If it's a returned CCS */
     {
@@ -2235,6 +2235,7 @@ static void ray_interrupt(int irq, void *dev_id, struct pt_regs * regs)
         writeb(CCS_BUFFER_FREE, &prcs->buffer_status);
     }
     clear_interrupt(local);
+    return IRQ_HANDLED;
 } /* ray_interrupt */
 /*===========================================================================*/
 static void ray_rx(struct net_device *dev, ray_dev_t *local, struct rcs *prcs)
