@@ -104,8 +104,8 @@ APISOURCES :=	$(TOPDIR)/drivers/media/video/videodev.c \
 		$(TOPDIR)/sound/sound_firmware.c \
 		$(TOPDIR)/drivers/net/wan/syncppp.c \
 		$(TOPDIR)/drivers/net/wan/z85230.c \
-		$(TOPDIR)/drivers/usb/hcd.c \
-		$(TOPDIR)/drivers/usb/usb.c \
+		$(TOPDIR)/drivers/usb/core/hcd.c \
+		$(TOPDIR)/drivers/usb/core/usb.c \
 		$(TOPDIR)/drivers/video/fbmem.c \
 		$(TOPDIR)/drivers/video/fbcmap.c \
 		$(TOPDIR)/drivers/video/fbcon.c \

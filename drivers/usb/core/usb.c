@@ -197,6 +197,28 @@ void usb_deregister(struct usb_driver *driver)
 }
 
 /**
+ * usb_ifnum_to_ifpos - convert the interface number to the interface position
+ * @dev: the device to use
+ * @ifnum: the interface number (bInterfaceNumber); not interface position
+ *
+ * This is used to convert the interface _number_ (as in
+ * interface.bInterfaceNumber) to the interface _position_ (as in
+ * dev->actconfig->interface + position).  Note that the number is the same as
+ * the position for all interfaces _except_ devices with interfaces not
+ * sequentially numbered (e.g., 0, 2, 3, etc).
+ */
+int usb_ifnum_to_ifpos(struct usb_device *dev, unsigned ifnum)
+{
+	int i;
+
+	for (i = 0; i < dev->actconfig->bNumInterfaces; i++)
+		if (dev->actconfig->interface[i].altsetting[0].bInterfaceNumber == ifnum)
+			return i;
+
+	return -EINVAL;
+}
+
+/**
  * usb_ifnum_to_if - get the interface object with a given interface number
  * @dev: the device whose current configuration is considered
  * @ifnum: the desired interface
@@ -570,6 +592,24 @@ out_err:
 	return -1;
 }
 
+/**
+ * usb_find_interface_driver_for_ifnum - finds a usb interface driver for the specified ifnum
+ * @dev: the device to use
+ * @ifnum: the interface number (bInterfaceNumber); not interface position!
+ *
+ * This converts a ifnum to ifpos via a call to usb_ifnum_to_ifpos and then
+ * calls usb_find_interface_driver() with the found ifpos.  Note
+ * usb_find_interface_driver's ifnum parameter is actually interface position.
+ */
+int usb_find_interface_driver_for_ifnum(struct usb_device *dev, unsigned ifnum)
+{
+	int ifpos = usb_ifnum_to_ifpos(dev, ifnum);
+
+	if (0 > ifpos)
+		return -EINVAL;
+
+	return usb_find_interface_driver(dev, ifpos);
+}
 
 #ifdef	CONFIG_HOTPLUG
 
@@ -789,49 +829,31 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 	return dev;
 }
 
-// usbcore-internal ...
-// but usb_dec_dev_use() is #defined to this, and that's public!!
-// FIXME the public call should BUG() whenever count goes to zero,
-// the usbcore-internal one should do so _unless_ it does so...
+/**
+ * usb_free_dev - free a usb device structure (usbcore-internal)
+ * @dev: device that's been disconnected
+ * Context: !in_interrupt ()
+ *
+ * Used by hub and virtual root hub drivers.  The device is completely
+ * gone, everything is cleaned up, so it's time to get rid of these last
+ * records of this device.
+ */
 void usb_free_dev(struct usb_device *dev)
 {
-	if (atomic_dec_and_test(&dev->refcnt)) {
-		/* Normally only goes to zero in usb_disconnect(), from
-		 * khubd or from roothub shutdown (rmmod/apmd/... thread).
-		 * Abnormally, roothub init errors can happen, so HCDs
-		 * call this directly.
-		 *
-		 * Otherwise this is a nasty device driver bug, often in
-		 * disconnect processing.
+	if (in_interrupt ())
+		BUG ();
+	if (!atomic_dec_and_test (&dev->refcnt)) {
+		/* MUST go to zero here, else someone's hanging on to
+		 * a device that's supposed to have been cleaned up!!
 		 */
-		if (in_interrupt ())
-			BUG ();
-
-		dev->bus->op->deallocate(dev);
-		usb_destroy_configuration(dev);
-
-		usb_bus_put(dev->bus);
-
-		kfree(dev);
+		BUG ();
 	}
-}
 
-/**
- * usb_inc_dev_use - record another reference to a device
- * @dev: the device being referenced
- *
- * Each live reference to a device should be refcounted.
- *
- * Device drivers should normally record such references in their
- * open() methods.
- * Drivers should then release them, using usb_dec_dev_use(), in their
- * close() methods.
- */
-void usb_inc_dev_use(struct usb_device *dev)
-{
-	atomic_inc(&dev->refcnt);
+	dev->bus->op->deallocate (dev);
+	usb_destroy_configuration (dev);
+	usb_bus_put (dev->bus);
+	kfree (dev);
 }
-
 
 /**
  * usb_alloc_urb - creates a new urb for a USB driver to use
@@ -2636,6 +2658,7 @@ module_exit(usb_exit);
  * into the kernel, and other device drivers are built as modules,
  * then these symbols need to be exported for the modules to use.
  */
+EXPORT_SYMBOL(usb_ifnum_to_ifpos);
 EXPORT_SYMBOL(usb_ifnum_to_if);
 EXPORT_SYMBOL(usb_epnum_to_ep_desc);
 
@@ -2647,6 +2670,7 @@ EXPORT_SYMBOL(usb_alloc_dev);
 EXPORT_SYMBOL(usb_free_dev);
 EXPORT_SYMBOL(usb_inc_dev_use);
 
+EXPORT_SYMBOL(usb_find_interface_driver_for_ifnum);
 EXPORT_SYMBOL(usb_driver_claim_interface);
 EXPORT_SYMBOL(usb_interface_claimed);
 EXPORT_SYMBOL(usb_driver_release_interface);

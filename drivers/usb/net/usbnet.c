@@ -1,6 +1,6 @@
 /*
  * USB Host-to-Host Links
- * Copyright (C) 2000-2001 by David Brownell <dbrownell@users.sourceforge.net>
+ * Copyright (C) 2000-2002 by David Brownell <dbrownell@users.sourceforge.net>
  */
 
 /*
@@ -62,6 +62,7 @@
  * 18-dec-2000	(db) tx watchdog, "net1080" renaming to "usbnet", device_info
  *		and prolific support, isolate net1080-specific bits, cleanup.
  *		fix unlink_urbs oops in D3 PM resume code path.
+ *
  * 02-feb-2001	(db) fix tx skb sharing, packet length, match_flags, ...
  * 08-feb-2001	stubbed in "linuxdev", maybe the SA-1100 folk can use it;
  *		AnchorChips 2720 support (from spec) for testing;
@@ -83,6 +84,11 @@
  *		tie mostly to (sub)driver info.  Workaround some PL-2302
  *		chips that seem to reject SET_INTERFACE requests.
  *
+ * 06-apr-2002	Added ethtool support, based on a patch from Brad Hards.
+ *		Level of diagnostics is more configurable; they use device
+ *		location (usb_device->devpath) instead of address (2.5).
+ *		For tx_fixup, memflags can't be NOIO.
+ *
  *-------------------------------------------------------------------------*/
 
 #include <linux/config.h>
@@ -93,6 +99,8 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/random.h>
+#include <linux/ethtool.h>
+#include <asm/uaccess.h>
 #include <asm/unaligned.h>
 
 // #define	DEBUG			// error path messages, extra info
@@ -112,6 +120,8 @@
 #define	CONFIG_USB_NET1080
 #define	CONFIG_USB_PL2301
 
+
+#define DRIVER_VERSION		"06-Apr-2002"
 
 /*-------------------------------------------------------------------------*/
 
@@ -164,6 +174,7 @@ struct usbnet {
 	// protocol/interface state
 	struct net_device	net;
 	struct net_device_stats	stats;
+	int			msg_level;
 
 #ifdef CONFIG_USB_NET1080
 	u16			packet_id;
@@ -224,6 +235,13 @@ struct skb_data {	// skb->cb is one of these
 	size_t			length;
 };
 
+static const char driver_name [] = "usbnet";
+
+/* use ethtool to change the level for any given device */
+static int msg_level = 1;
+MODULE_PARM (msg_level, "i");
+MODULE_PARM_DESC (msg_level, "Initial message level (default = 1)");
+
 
 #define	mutex_lock(x)	down(x)
 #define	mutex_unlock(x)	up(x)
@@ -241,7 +259,9 @@ struct skb_data {	// skb->cb is one of these
 #endif
 
 #define devinfo(usbnet, fmt, arg...) \
-	printk(KERN_INFO "%s: " fmt "\n" , (usbnet)->net.name, ## arg)
+	do { if ((usbnet)->msg_level >= 1) \
+	printk(KERN_INFO "%s: " fmt "\n" , (usbnet)->net.name, ## arg); \
+	} while (0)
 
 
 #ifdef	CONFIG_USB_AN2720
@@ -948,10 +968,11 @@ static int net1080_reset (struct usbnet *dev)
 			MK_TTL (NC_READ_TTL_MS, TTL_OTHER (ttl)) );
 	dbg ("%s: assigned TTL, %d ms", dev->net.name, NC_READ_TTL_MS);
 
-	devdbg (dev, "port %c, peer %sconnected",
-		(status & STATUS_PORT_A) ? 'A' : 'B',
-		(status & STATUS_CONN_OTHER) ? "" : "dis"
-		);
+	if (dev->msg_level >= 2)
+		devinfo (dev, "port %c, peer %sconnected",
+			(status & STATUS_PORT_A) ? 'A' : 'B',
+			(status & STATUS_CONN_OTHER) ? "" : "dis"
+			);
 	retval = 0;
 
 done:
@@ -1441,10 +1462,11 @@ static int usbnet_stop (struct net_device *net)
 	mutex_lock (&dev->mutex);
 	netif_stop_queue (net);
 
-	devdbg (dev, "stop stats: rx/tx %ld/%ld, errs %ld/%ld",
-		dev->stats.rx_packets, dev->stats.tx_packets, 
-		dev->stats.rx_errors, dev->stats.tx_errors
-		);
+	if (dev->msg_level >= 2)
+		devinfo (dev, "stop stats: rx/tx %ld/%ld, errs %ld/%ld",
+			dev->stats.rx_packets, dev->stats.tx_packets, 
+			dev->stats.rx_errors, dev->stats.tx_errors
+			);
 
 	// ensure there are no more active urbs
 	add_wait_queue (&unlink_wakeup, &wait);
@@ -1482,9 +1504,10 @@ static int usbnet_open (struct net_device *net)
 
 	// put into "known safe" state
 	if (info->reset && (retval = info->reset (dev)) < 0) {
-		devinfo (dev, "open reset fail (%d) usbnet %03d/%03d, %s",
+		devinfo (dev, "open reset fail (%d) usbnet bus%d%s, %s",
 			retval,
-			dev->udev->bus->busnum, dev->udev->devnum,
+			// FIXME busnum is unstable
+			dev->udev->bus->busnum, dev->udev->devpath,
 			info->description);
 		goto done;
 	}
@@ -1496,20 +1519,96 @@ static int usbnet_open (struct net_device *net)
 	}
 
 	netif_start_queue (net);
-	devdbg (dev, "open: enable queueing (rx %d, tx %d) mtu %d %s framing",
-		RX_QLEN, TX_QLEN, dev->net.mtu,
-		(info->flags & (FLAG_FRAMING_NC | FLAG_FRAMING_GL))
-		    ? ((info->flags & FLAG_FRAMING_NC)
-			? "NetChip"
-			: "GeneSys")
-		    : "raw"
-		);
+	if (dev->msg_level >= 2)
+		devinfo (dev, "open: enable queueing "
+				"(rx %d, tx %d) mtu %d %s framing",
+			RX_QLEN, TX_QLEN, dev->net.mtu,
+			(info->flags & (FLAG_FRAMING_NC | FLAG_FRAMING_GL))
+			    ? ((info->flags & FLAG_FRAMING_NC)
+				? "NetChip"
+				: "GeneSys")
+			    : "raw"
+			);
 
 	// delay posting reads until we're fully open
 	tasklet_schedule (&dev->bh);
 done:
 	mutex_unlock (&dev->mutex);
 	return retval;
+}
+
+/*-------------------------------------------------------------------------*/
+
+static int usbnet_ethtool_ioctl (struct net_device *net, void *useraddr)
+{
+	struct usbnet	*dev = (struct usbnet *) net->priv;
+	u32		cmd;
+
+	if (get_user (cmd, (u32 *)useraddr))
+		return -EFAULT;
+	switch (cmd) {
+
+	case ETHTOOL_GDRVINFO: {	/* get driver info */
+		struct ethtool_drvinfo		info;
+
+		memset (&info, 0, sizeof info);
+		info.cmd = ETHTOOL_GDRVINFO;
+		strncpy (info.driver, driver_name, sizeof info.driver);
+		strncpy (info.version, DRIVER_VERSION, sizeof info.version);
+		strncpy (info.fw_version, dev->driver_info->description,
+			sizeof info.fw_version);
+		snprintf (info.bus_info, sizeof info.bus_info, "USB bus%d%s",
+			/* FIXME busnums are bogus/unstable IDs */
+			dev->udev->bus->busnum, dev->udev->devpath);
+		if (copy_to_user (useraddr, &info, sizeof (info)))
+			return -EFAULT;
+		return 0;
+		}
+
+	case ETHTOOL_GLINK: 		/* get link status */
+		if (dev->driver_info->check_connect) {
+			struct ethtool_value	edata = { ETHTOOL_GLINK };
+
+			edata.data = dev->driver_info->check_connect (dev);
+			if (copy_to_user (useraddr, &edata, sizeof (edata)))
+				return -EFAULT;
+			return 0;
+		}
+		break;
+
+	case ETHTOOL_GMSGLVL: {		/* get message-level */
+		struct ethtool_value	edata = {ETHTOOL_GMSGLVL};
+
+		edata.data = dev->msg_level;
+		if (copy_to_user (useraddr, &edata, sizeof (edata)))
+			return -EFAULT;
+		return 0;
+		}
+
+	case ETHTOOL_SMSGLVL: {		/* set message-level */
+		struct ethtool_value	edata;
+
+		if (copy_from_user (&edata, useraddr, sizeof (edata)))
+			return -EFAULT;
+		dev->msg_level = edata.data;
+		return 0;
+		}
+	
+	/* could also map RINGPARAM to RX/TX QLEN */
+
+	}
+        /* Note that the ethtool user space code requires EOPNOTSUPP */
+	return -EOPNOTSUPP;
+}
+
+static int usbnet_ioctl (struct net_device *net, struct ifreq *rq, int cmd)
+{
+	switch (cmd) {
+	case SIOCETHTOOL:
+		return usbnet_ethtool_ioctl (net, (void *)rq->ifr_data);
+	default:
+		return -EOPNOTSUPP;
+	}
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1576,12 +1675,10 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 	struct nc_trailer	*trailer = 0;
 #endif	/* CONFIG_USB_NET1080 */
 
-	flags = in_interrupt () ? GFP_ATOMIC : GFP_NOIO; /* might be used for nfs */
-
 	// some devices want funky USB-level framing, for
 	// win32 driver (usually) and/or hardware quirks
 	if (info->tx_fixup) {
-		skb = info->tx_fixup (dev, skb, flags);
+		skb = info->tx_fixup (dev, skb, GFP_ATOMIC);
 		if (!skb) {
 			dbg ("can't tx_fixup skb");
 			goto drop;
@@ -1750,8 +1847,9 @@ static void usbnet_disconnect (struct usb_device *udev, void *ptr)
 {
 	struct usbnet	*dev = (struct usbnet *) ptr;
 
-	devinfo (dev, "unregister usbnet %03d/%03d, %s",
-		udev->bus->busnum, udev->devnum,
+	devinfo (dev, "unregister usbnet bus%d%s, %s",
+		// FIXME busnum is unstable
+		udev->bus->busnum, udev->devpath,
 		dev->driver_info->description);
 	
 	unregister_netdev (&dev->net);
@@ -1811,6 +1909,7 @@ usbnet_probe (struct usb_device *udev, unsigned ifnum,
 	usb_inc_dev_use (udev);
 	dev->udev = udev;
 	dev->driver_info = info;
+	dev->msg_level = msg_level;
 	INIT_LIST_HEAD (&dev->dev_list);
 	skb_queue_head_init (&dev->rxq);
 	skb_queue_head_init (&dev->txq);
@@ -1836,10 +1935,12 @@ usbnet_probe (struct usb_device *udev, unsigned ifnum,
 	net->stop = usbnet_stop;
 	net->watchdog_timeo = TX_TIMEOUT_JIFFIES;
 	net->tx_timeout = usbnet_tx_timeout;
+	net->do_ioctl = usbnet_ioctl;
 
 	register_netdev (&dev->net);
-	devinfo (dev, "register usbnet %03d/%03d, %s",
-		udev->bus->busnum, udev->devnum,
+	devinfo (dev, "register usbnet bus%d%s, %s",
+		// FIXME busnum is unstable
+		udev->bus->busnum, udev->devpath,
 		dev->driver_info->description);
 
 	// ok, it's ready to go.
@@ -1936,7 +2037,7 @@ static const struct usb_device_id	products [] = {
 MODULE_DEVICE_TABLE (usb, products);
 
 static struct usb_driver usbnet_driver = {
-	name:		"usbnet",
+	name:		driver_name,
 	id_table:	products,
 	probe:		usbnet_probe,
 	disconnect:	usbnet_disconnect,

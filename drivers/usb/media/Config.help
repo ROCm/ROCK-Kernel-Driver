@@ -1,0 +1,148 @@
+CONFIG_USB_DABUSB
+  A Digital Audio Broadcasting (DAB) Receiver for USB and Linux
+  brought to you by the DAB-Team (<http://dab.in.tum.de/>).  This
+  driver can be taken as an example for URB-based bulk, control, and
+  isochronous transactions. URB's are explained in
+  <file:Documentation/usb/URB.txt>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called dabusb.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_DSBR
+  Say Y here if you want to connect this type of radio to your
+  computer's USB port. Note that the audio is not digital, and
+  you must connect the line out connector to a sound card or a
+  set of speakers.
+
+  This driver uses the Video For Linux API.  You must enable
+  (Y or M in config) Video For Linux (under Character Devices)
+  to use this driver.  Information on this API and pointers to
+  "v4l" programs may be found on the WWW at
+  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called dsbr100.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_IBMCAM
+  Say Y here if you want to connect a IBM "C-It" camera, also known as
+  "Xirlink PC Camera" to your computer's USB port.  For more
+  information, read <file:Documentation/usb/ibmcam.txt>.
+
+  This driver uses the Video For Linux API.  You must enable
+  (Y or M in config) Video For Linux (under Character Devices)
+  to use this driver.  Information on this API and pointers to
+  "v4l" programs may be found on the WWW at
+  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ibmcam.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>. This
+  camera has several configuration options which can be specified when
+  you load the module.  Read <file:Documentation/usb/ibmcam.txt> to
+  learn more.
+
+CONFIG_USB_KONICAWC
+  Say Y here if you want support for webcams based on a Konica
+  chipset. This is known to work with the Intel YC76 webcam.
+
+  This driver uses the Video For Linux API.  You must enable
+  (Y or M in config) Video For Linux (under Character Devices)
+  to use this driver.  Information on this API and pointers to
+  "v4l" programs may be found on the WWW at
+  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called konicawc.o. If you want to compile it as
+  a module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_OV511
+  Say Y here if you want to connect this type of camera to your
+  computer's USB port. See <file:Documentation/usb/ov511.txt> for more
+  information and for a list of supported cameras.
+
+  This driver uses the Video For Linux API. You must say Y or M to
+  "Video For Linux" (under Character Devices) to use this driver.
+  Information on this API and pointers to "v4l" programs may be found
+  on the WWW at <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called ov511.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_PWC
+  Say Y or M here if you want to use one of these Philips USB webcams:
+  PCA645, PCA646, PCVC675, PCVC680, PCVC690, PCVC730, PCVC740, or
+  the Askey VC010. The PCA635, PCVC665 and PCVC720 are not supported
+  by this driver and never will be.
+
+  This driver has an optional plugin, which is distributed as a binary
+  module only.  It contains code that allow you to use higher
+  resolutions and framerates but may not be distributed as source.
+  But even without this plugin you can these cams for most
+  applications.
+
+  See <file:Documentation/usb/philips.txt> for more information and
+  installation instructions.
+
+  The built-in microphone is enabled by selecting USB Audio support.
+
+  This driver uses the Video For Linux API. You must say Y or M to
+  "Video For Linux" (under Character Devices) to use this driver.
+  Information on this API and pointers to "v4l" programs may be found
+  on the WWW at <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called pwc.o.  If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_SE401
+  Say Y here if you want to connect this type of camera to your
+  computer's USB port. See <file:Documentation/usb/se401.txt> for more
+  information and for a list of supported cameras.
+
+  This driver uses the Video For Linux API. You must say Y or M to
+  "Video For Linux" (under Multimedia Devices) to use this driver.
+  Information on this API and pointers to "v4l" programs may be found
+  on the WWW at <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called se401.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_STV680
+  Say Y here if you want to connect this type of camera to your
+  computer's USB port. This includes the Pencam line of cameras.
+  See <file:Documentation/usb/stv680.txt> for more information and for
+  a list of supported cameras.
+
+  This driver uses the Video For Linux API. You must say Y or M to
+  "Video For Linux" (under Multimedia Devices) to use this driver.
+  Information on this API and pointers to "v4l" programs may be found
+  on the WWW at <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called stv680.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
+
+CONFIG_USB_VICAM
+  Say Y here if you have 3com homeconnect camera (vicam).
+
+  This driver uses the Video For Linux API. You must say Y or M to
+  "Video For Linux" (under Multimedia Devices) to use this driver.
+  Information on this API and pointers to "v4l" programs may be found
+  on the WWW at <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
+
+  This code is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called vicam.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.
