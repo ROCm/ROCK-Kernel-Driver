@@ -895,8 +895,6 @@ void kick_process(task_t *p)
 	preempt_enable();
 }
 
-EXPORT_SYMBOL_GPL(kick_process);
-
 /*
  * Return a low guess at the load of a migration-source cpu.
  *
