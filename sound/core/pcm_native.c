@@ -33,6 +33,7 @@
 #include <sound/pcm_params.h>
 #include <sound/timer.h>
 #include <sound/minors.h>
+#include <asm/io.h>
 
 /*
  *  Compatibility
