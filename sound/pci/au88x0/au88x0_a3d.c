@@ -567,7 +567,7 @@ static int Vort3DRend_Initialize(vortex_t * v, unsigned short mode)
 	v->xt_mode = mode;	/* this_14 */
 
 	vortex_XtalkHw_init(v);
-	vortex_XtalkHw_SetGains(v, vortex_asXtalkGainsAllChan);
+	vortex_XtalkHw_SetGainsAllChan(v);
 	switch (v->xt_mode) {
 	case XT_SPEAKER0:
 		vortex_XtalkHw_ProgramXtalkNarrow(v);

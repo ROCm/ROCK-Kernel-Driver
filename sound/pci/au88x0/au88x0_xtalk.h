@@ -45,10 +45,9 @@ typedef short xtalk_instate_t[XTINST_SZ];
 typedef short xtalk_coefs_t[5][5];
 typedef short xtalk_state_t[5][4];
 
-extern xtalk_gains_t const vortex_asXtalkGainsAllChan;
-
 static void vortex_XtalkHw_SetGains(vortex_t * vortex,
 				    xtalk_gains_t const gains);
+static void vortex_XtalkHw_SetGainsAllChan(vortex_t * vortex);
 static void vortex_XtalkHw_SetSampleRate(vortex_t * vortex, int sr);
 static void vortex_XtalkHw_ProgramPipe(vortex_t * vortex);
 static void vortex_XtalkHw_ProgramPipe(vortex_t * vortex);
