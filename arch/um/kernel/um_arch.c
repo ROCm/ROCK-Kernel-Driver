@@ -439,8 +439,7 @@ void __init setup_arch(char **cmdline_p)
  	*cmdline_p = command_line;
 	setup_hostinfo();
 #if defined(CONFIG_DUMMY_CONSOLE)
-	printk("%s: console_use_vt=0\n",__FUNCTION__);
-	console_use_vt = 0;
+	conswitchp = &dummy_con;
 #endif  
 }
 

@@ -126,6 +126,8 @@ static int open_proc_mm(struct inode *inode, struct file *file)
 
 	init_new_empty_context(mm);
 	arch_pick_mmap_layout(mm);
+	mm->dumpable = current->mm->dumpable;
+	wmb();
 
 	file->private_data = mm;
 
