@@ -227,7 +227,7 @@ sysc_do_restart:
 	larl    %r10,sys_call_table_emu  # use 31 bit emulation system calls
 sysc_noemu:
 #endif
-	tm	__TI_flags+7(%r9),_TIF_SYSCALL_TRACE
+	tm	__TI_flags+7(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
         lgf     %r8,0(%r7,%r10)   # load address of system call routine
         jo      sysc_tracesys
         basr    %r14,%r8          # call sys_xxxx
@@ -299,6 +299,8 @@ __critical_end:
 # special linkage: %r12 contains the return address for trace_svc
 #
 sysc_tracesys:
+	la	%r2,SP_PTREGS(%r15)    # load pt_regs
+	la	%r3,0
 	srl	%r7,2
 	stg     %r7,SP_R2(%r15)
         brasl   %r14,syscall_trace
@@ -314,8 +316,10 @@ sysc_tracego:
         basr    %r14,%r8            # call sys_xxx
         stg     %r2,SP_R2(%r15)     # store return value
 sysc_tracenogo:
-	tm	__TI_flags+7(%r9),_TIF_SYSCALL_TRACE
+	tm	__TI_flags+7(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
         jno     sysc_return
+	la	%r2,SP_PTREGS(%r15)    # load pt_regs
+	la	%r3,1
 	larl	%r14,sysc_return    # return point is sysc_return
 	jg	syscall_trace
 
@@ -541,7 +545,7 @@ pgm_svcstd:
 	larl    %r10,sys_call_table_emu # use 31 bit emulation system calls
 pgm_svcper_noemu:
 #endif
-	tm	__TI_flags+7(%r9),_TIF_SYSCALL_TRACE
+	tm	__TI_flags+7(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
         lgf     %r8,0(%r7,%r10)   # load address of system call routine
         jo      pgm_tracesys
         basr    %r14,%r8          # call sys_xxxx
@@ -566,6 +570,8 @@ pgm_svcper_nosig:
 # call trace before and after sys_call
 #
 pgm_tracesys:
+	la	%r2,SP_PTREGS(%r15)    # load pt_regs
+	la	%r3,0
 	srlg	%r7,%r7,2
 	stg	%r7,SP_R2(%r15)
         brasl   %r14,syscall_trace
@@ -581,8 +587,10 @@ pgm_svc_go:
         basr    %r14,%r8            # call sys_xxx
         stg     %r2,SP_R2(%r15)     # store return value
 pgm_svc_nogo:
-	tm	__TI_flags+7(%r9),_TIF_SYSCALL_TRACE
+	tm	__TI_flags+7(%r9),(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT)
         jno     pgm_svcret
+	la	%r2,SP_PTREGS(%r15)    # load pt_regs
+	la	%r3,1
 	larl	%r14,pgm_svcret     # return point is sysc_return
 	jg	syscall_trace
 
