@@ -1303,7 +1303,6 @@ static void init_gendisk (ide_hwif_t *hwif)
 				(hwif->channel && hwif->mate) ?
 				hwif->mate->index : hwif->index,
 				hwif->channel, unit, drive->lun);
-			drive->de = devfs_mk_dir(drive->devfs_name);
 		}
 	}
 	blk_register_region(MKDEV(hwif->major, 0), MAX_DRIVES << PARTN_BITS,

@@ -16,7 +16,6 @@
 #define _SCSI_H
 
 #include <linux/config.h>	    /* for CONFIG_SCSI_LOGGING */
-#include <linux/devfs_fs_kernel.h>  /* some morons don't know struct pointers */
 #include <scsi/scsi.h>
 
 
@@ -589,7 +588,6 @@ struct scsi_device {
 
 	void *hostdata;		/* available to low-level driver */
 	char devfs_name[256];	/* devfs junk */
-	devfs_handle_t de;	/* will go away soon */
 	char type;
 	char scsi_level;
 	unsigned char inquiry_len;	/* valid bytes in 'inquiry' */

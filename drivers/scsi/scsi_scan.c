@@ -1247,7 +1247,6 @@ static int scsi_add_lun(Scsi_Device *sdev, Scsi_Request *sreq,
 	sprintf(sdev->devfs_name, "scsi/host%d/bus%d/target%d/lun%d",
 				sdev->host->host_no, sdev->channel,
 				sdev->id, sdev->lun);
-	sdev->de = devfs_mk_dir(sdev->devfs_name);
 
 	/*
 	 * End driverfs/devfs code.

@@ -5645,7 +5645,6 @@ int __init __sbpcd_init(void)
 int __init sbpcd_init(void)
 #endif
 {
-	char nbuff[16];
 	int i=0, j=0;
 	int addr[2]={1, CDROM_PORT};
 	int port_index;
@@ -5869,8 +5868,7 @@ int __init sbpcd_init(void)
 		disk->fops = &sbpcd_bdops;
 		strcpy(disk->disk_name, sbpcd_infop->name);
 		disk->flags = GENHD_FL_CD;
-		sprintf(nbuff, "sbp/c0t%d", p->drv_id);
-		disk->de = devfs_mk_dir(NULL, nbuff, NULL);
+		sprintf(disk->devfs_name, "sbp/c0t%d", p->drv_id);
 		p->disk = disk;
 		if (register_cdrom(sbpcd_infop))
 		{

@@ -37,7 +37,9 @@ extern void devfs_unregister_tape(int num);
 extern void devfs_create_partitions(struct gendisk *dev);
 extern void devfs_create_cdrom(struct gendisk *dev);
 extern void devfs_remove_partitions(struct gendisk *dev);
-extern void mount_devfs_fs (void);
+extern void devfs_remove_cdrom(struct gendisk *dev);
+extern void devfs_register_partition(struct gendisk *dev, int part);
+extern void mount_devfs_fs(void);
 #else  /*  CONFIG_DEVFS_FS  */
 static inline devfs_handle_t devfs_register (devfs_handle_t dir,
 					     const char *name,
@@ -83,6 +85,12 @@ static inline void devfs_create_cdrom(struct gendisk *dev)
 {
 }
 static inline void devfs_remove_partitions(struct gendisk *dev)
+{
+}
+static inline void devfs_remove_cdrom(struct gendisk *dev)
+{
+}
+static inline void devfs_register_partition(struct gendisk *dev, int part)
 {
 }
 static inline void mount_devfs_fs (void)

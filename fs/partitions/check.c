@@ -94,25 +94,26 @@ static int (*check_part[])(struct parsed_partitions *, struct block_device *) = 
 
 char *disk_name(struct gendisk *hd, int part, char *buf)
 {
-	int pos;
 	if (!part) {
-		if (hd->disk_de) {
-			pos = devfs_generate_path(hd->disk_de, buf, 64);
-			if (pos >= 0)
-				return buf + pos;
-		}
-		sprintf(buf, "%s", hd->disk_name);
+#ifdef CONFIG_DEVFS_FS
+		if (hd->devfs_name)
+			sprintf(buf, "%s/%s", hd->devfs_name,
+				(hd->flags & GENHD_FL_CD) ? "cd" : "disc");
+		else
+#endif
+			sprintf(buf, "%s", hd->disk_name);
 	} else {
-		if (hd->part[part-1].de) {
-			pos = devfs_generate_path(hd->part[part-1].de, buf, 64);
-			if (pos >= 0)
-				return buf + pos;
-		}
+#ifdef CONFIG_DEVFS_FS
+		if (hd->devfs_name)
+			sprintf(buf, "%s/part%d", hd->devfs_name, part);
+		else
+#endif
 		if (isdigit(hd->disk_name[strlen(hd->disk_name)-1]))
 			sprintf(buf, "%sp%d", hd->disk_name, part);
 		else
 			sprintf(buf, "%s%d", hd->disk_name, part);
 	}
+
 	return buf;
 }
 
@@ -120,21 +121,19 @@ static struct parsed_partitions *
 check_partition(struct gendisk *hd, struct block_device *bdev)
 {
 	struct parsed_partitions *state;
-	devfs_handle_t de = NULL;
-	char buf[64];
 	int i, res;
 
 	state = kmalloc(sizeof(struct parsed_partitions), GFP_KERNEL);
 	if (!state)
 		return NULL;
 
-	if (hd->flags & GENHD_FL_DEVFS)
-		de = hd->de;
-	i = devfs_generate_path (de, buf, sizeof buf);
-	if (i >= 0) {
-		printk(KERN_INFO " /dev/%s:", buf + i);
+#ifdef CONFIG_DEVFS_FS
+	if (hd->devfs_name) {
+		printk(KERN_INFO " /dev/%s:", hd->devfs_name);
 		sprintf(state->name, "p");
-	} else {
+	}
+#endif
+	else {
 		disk_name(hd, 0, state->name);
 		printk(KERN_INFO " %s:", state->name);
 		if (isdigit(state->name[strlen(state->name)-1]))
@@ -154,26 +153,6 @@ check_partition(struct gendisk *hd, struct block_device *bdev)
 		printk(" unable to read partition table\n");
 	kfree(state);
 	return NULL;
-}
-
-static void devfs_register_partition(struct gendisk *dev, int part)
-{
-#ifdef CONFIG_DEVFS_FS
-	devfs_handle_t dir;
-	struct hd_struct *p = dev->part;
-	char devname[16];
-
-	if (p[part-1].de)
-		return;
-	dir = dev->de;
-	if (!dir)
-		return;
-	sprintf(devname, "part%d", part);
-	p[part-1].de = devfs_register (dir, devname, 0,
-				    dev->major, dev->first_minor + part,
-				    S_IFBLK | S_IRUSR | S_IWUSR,
-				    dev->fops, NULL);
-#endif
 }
 
 /*
@@ -261,8 +240,7 @@ void delete_partition(struct gendisk *disk, int part)
 	p->start_sect = 0;
 	p->nr_sects = 0;
 	p->reads = p->writes = p->read_sectors = p->write_sectors = 0;
-	devfs_unregister(p->de);
-	p->de = NULL;
+	devfs_remove("%s/part%d", disk->devfs_name, part);
 	kobject_unregister(&p->kobj);
 }
 
@@ -414,7 +392,10 @@ void del_gendisk(struct gendisk *disk)
 	unlink_gendisk(disk);
 	disk_stat_set_all(disk, 0);
 	disk->stamp = disk->stamp_idle = 0;
-	devfs_remove_partitions(disk);
+	if (disk->flags & GENHD_FL_CD)
+		devfs_remove_cdrom(disk);
+	else
+		devfs_remove_partitions(disk);
 	if (disk->driverfs_dev) {
 		sysfs_remove_link(&disk->kobj, "device");
 		sysfs_remove_link(&disk->driverfs_dev->kobj, "block");

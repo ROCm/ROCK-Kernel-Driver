@@ -569,7 +569,7 @@ static int sr_attach(struct scsi_device *sdev)
 	get_capabilities(cd);
 	sr_vendor_init(cd);
 
-	disk->de = sdev->de;
+	strcpy(disk->devfs_name, sdev->devfs_name);
 	disk->driverfs_dev = &sdev->sdev_driverfs_dev;
 	register_cdrom(&cd->cdi);
 	set_capacity(disk, cd->capacity);

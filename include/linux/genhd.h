@@ -55,12 +55,13 @@ struct partition {
 } __attribute__((packed));
 
 #ifdef __KERNEL__
-#  include <linux/devfs_fs_kernel.h>
-
+#include <linux/devfs_fs_kernel.h>	/* we don't need any devfs crap
+					   here, but some of the implicitly
+					   included headers.   will clean
+					   this mess up later.	--hch */
 struct hd_struct {
 	sector_t start_sect;
 	sector_t nr_sects;
-	devfs_handle_t de;              /* primary (master) devfs entry  */
 	struct kobject kobj;
 	unsigned reads, read_sectors, writes, write_sectors;
 	int policy;
@@ -68,7 +69,6 @@ struct hd_struct {
 
 #define GENHD_FL_REMOVABLE  1
 #define GENHD_FL_DRIVERFS  2
-#define GENHD_FL_DEVFS	4
 #define GENHD_FL_CD	8
 #define GENHD_FL_UP	16
 
@@ -96,9 +96,8 @@ struct gendisk {
 	sector_t capacity;
 
 	int flags;
-	int number;			/* devfs crap */
-	devfs_handle_t de;		/* more of the same */
-	devfs_handle_t disk_de;		/* piled higher and deeper */
+	char devfs_name[64];		/* devfs crap */
+	int number;			/* more of the same */
 	struct device *driverfs_dev;
 	struct kobject kobj;
 

@@ -137,7 +137,6 @@ dasd_gendisk_alloc(int devindex)
 	gdp->major = mi->major;
 	gdp->first_minor = index << DASD_PARTN_BITS;
 	gdp->fops = &dasd_device_operations;
-	gdp->flags |= GENHD_FL_DEVFS;
 
 	/*
 	 * Set device name.
