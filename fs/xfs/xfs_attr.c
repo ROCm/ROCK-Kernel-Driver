@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -63,6 +63,7 @@
 #include "xfs_quota.h"
 #include "xfs_rw.h"
 #include "xfs_trans_space.h"
+#include "xfs_acl.h"
 
 /*
  * xfs_attr.c
@@ -2357,3 +2358,307 @@ xfs_attr_trace_enter(int type, char *where,
 					 (void *)a14, (void *)a15);
 }
 #endif	/* XFS_ATTR_TRACE */
+
+
+/*========================================================================
+ * System (pseudo) namespace attribute interface routines.
+ *========================================================================*/
+
+STATIC int
+posix_acl_access_set(
+	vnode_t	*vp, char *name, void *data, size_t size, int xflags)
+{
+	return xfs_acl_vset(vp, data, size, _ACL_TYPE_ACCESS);
+}
+
+STATIC int
+posix_acl_access_remove(
+	struct vnode *vp, char *name, int xflags)
+{
+	return xfs_acl_vremove(vp, _ACL_TYPE_ACCESS);
+}
+
+STATIC int
+posix_acl_access_get(
+	vnode_t *vp, char *name, void *data, size_t size, int xflags)
+{
+	return xfs_acl_vget(vp, data, size, _ACL_TYPE_ACCESS);
+}
+
+STATIC int
+posix_acl_access_exists(
+	vnode_t *vp)
+{
+	return xfs_acl_vhasacl_access(vp);
+}
+
+STATIC int
+posix_acl_default_set(
+	vnode_t	*vp, char *name, void *data, size_t size, int xflags)
+{
+	return xfs_acl_vset(vp, data, size, _ACL_TYPE_DEFAULT);
+}
+
+STATIC int
+posix_acl_default_get(
+	vnode_t *vp, char *name, void *data, size_t size, int xflags)
+{
+	return xfs_acl_vget(vp, data, size, _ACL_TYPE_DEFAULT);
+}
+
+STATIC int
+posix_acl_default_remove(
+	struct vnode *vp, char *name, int xflags)
+{
+	return xfs_acl_vremove(vp, _ACL_TYPE_DEFAULT);
+}
+
+STATIC int
+posix_acl_default_exists(
+	vnode_t *vp)
+{
+	return xfs_acl_vhasacl_default(vp);
+}
+
+struct attrnames posix_acl_access = {
+	.attr_name	= "posix_acl_access",
+	.attr_namelen	= sizeof("posix_acl_access") - 1,
+	.attr_get	= posix_acl_access_get,
+	.attr_set	= posix_acl_access_set,
+	.attr_remove	= posix_acl_access_remove,
+	.attr_exists	= posix_acl_access_exists,
+};
+
+struct attrnames posix_acl_default = {
+	.attr_name	= "posix_acl_default",
+	.attr_namelen	= sizeof("posix_acl_default") - 1,
+	.attr_get	= posix_acl_default_get,
+	.attr_set	= posix_acl_default_set,
+	.attr_remove	= posix_acl_default_remove,
+	.attr_exists	= posix_acl_default_exists,
+};
+
+struct attrnames *attr_system_names[] =
+	{ &posix_acl_access, &posix_acl_default };
+
+
+/*========================================================================
+ * Namespace-prefix-style attribute name interface routines.
+ *========================================================================*/
+
+STATIC int
+attr_generic_set(
+	struct vnode *vp, char *name, void *data, size_t size, int xflags)
+{
+	int 	error;
+
+	VOP_ATTR_SET(vp, name, data, size, xflags, NULL, error);
+	return -error;
+}
+
+STATIC int
+attr_generic_get(
+	struct vnode *vp, char *name, void *data, size_t size, int xflags)
+{
+	int	error, asize = size;
+
+	VOP_ATTR_GET(vp, name, data, &asize, xflags, NULL, error);
+	if (!error)
+		return asize;
+	return -error;
+}
+
+STATIC int
+attr_generic_remove(
+	struct vnode *vp, char *name, int xflags)
+{
+	int	error;
+
+	VOP_ATTR_REMOVE(vp, name, xflags, NULL, error);
+	return -error;
+}
+
+STATIC int
+attr_generic_listadd(
+	attrnames_t		*prefix,
+	attrnames_t		*namesp,
+	void			*data,
+	size_t			size,
+	ssize_t			*result)
+{
+	char			*p = data + *result;
+
+	*result += prefix->attr_namelen;
+	*result += namesp->attr_namelen + 1;
+	if (!size)
+		return 0;
+	if (*result > size)
+		return -ERANGE;
+	strcpy(p, prefix->attr_name);
+	p += prefix->attr_namelen;
+	strcpy(p, namesp->attr_name);
+	p += namesp->attr_namelen + 1;
+	return 0;
+}
+
+STATIC int
+attr_system_list(
+	struct vnode		*vp,
+	void			*data,
+	size_t			size,
+	ssize_t			*result)
+{
+	attrnames_t		*namesp;
+	int			i, error = 0;
+
+	for (i = 0; i < ATTR_SYSCOUNT; i++) {
+		namesp = attr_system_names[i];
+		if (!namesp->attr_exists || !namesp->attr_exists(vp))
+			continue;
+		error = attr_generic_listadd(&attr_system, namesp,
+						data, size, result);
+		if (error)
+			break;
+	}
+	return error;
+}
+
+int
+attr_generic_list(
+	struct vnode *vp, void *data, size_t size, int xflags, ssize_t *result)
+{
+	attrlist_cursor_kern_t	cursor = { 0 };
+	int			error;
+
+	VOP_ATTR_LIST(vp, data, size, xflags, &cursor, NULL, error);
+	if (error > 0)
+		return -error;
+	*result = -error;
+	return attr_system_list(vp, data, size, result);
+}
+
+attrnames_t *
+attr_lookup_namespace(
+	char			*name,
+	struct attrnames	**names,
+	int			nnames)
+{
+	int			i;
+
+	for (i = 0; i < nnames; i++)
+		if (!strncmp(name, names[i]->attr_name, names[i]->attr_namelen))
+			return names[i];
+	return NULL;
+}
+
+/*
+ * Some checks to prevent people abusing EAs to get over quota:
+ * - Don't allow modifying user EAs on devices/symlinks;
+ * - Don't allow modifying user EAs if sticky bit set;
+ */
+STATIC int
+attr_user_capable(
+	struct vnode	*vp,
+	cred_t		*cred)
+{
+	struct inode	*inode = LINVFS_GET_IP(vp);
+
+	if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
+		return -EPERM;
+	if (!S_ISREG(inode->i_mode) && !S_ISDIR(inode->i_mode) &&
+	    !capable(CAP_SYS_ADMIN))
+		return -EPERM;
+	if (S_ISDIR(inode->i_mode) && (inode->i_mode & S_ISVTX) &&
+	    (current_fsuid(cred) != inode->i_uid) && !capable(CAP_FOWNER))
+		return -EPERM;
+	return 0;
+}
+
+STATIC int
+attr_trusted_capable(
+	struct vnode	*vp,
+	cred_t		*cred)
+{
+	struct inode	*inode = LINVFS_GET_IP(vp);
+
+	if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
+		return -EPERM;
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+	return 0;
+}
+
+STATIC int
+attr_system_set(
+	struct vnode *vp, char *name, void *data, size_t size, int xflags)
+{
+	attrnames_t	*namesp;
+	int		error;
+
+	if (xflags & ATTR_CREATE)
+		return -EINVAL;
+
+	namesp = attr_lookup_namespace(name, attr_system_names, ATTR_SYSCOUNT);
+	if (!namesp)
+		return -EOPNOTSUPP;
+	error = namesp->attr_set(vp, name, data, size, xflags);
+	if (!error)
+		error = vn_revalidate(vp);
+	return error;
+}
+
+STATIC int
+attr_system_get(
+	struct vnode *vp, char *name, void *data, size_t size, int xflags)
+{
+	attrnames_t	*namesp;
+
+	namesp = attr_lookup_namespace(name, attr_system_names, ATTR_SYSCOUNT);
+	if (!namesp)
+		return -EOPNOTSUPP;
+	return namesp->attr_get(vp, name, data, size, xflags);
+}
+
+STATIC int
+attr_system_remove(
+	struct vnode *vp, char *name, int xflags)
+{
+	attrnames_t	*namesp;
+
+	namesp = attr_lookup_namespace(name, attr_system_names, ATTR_SYSCOUNT);
+	if (!namesp)
+		return -EOPNOTSUPP;
+	return namesp->attr_remove(vp, name, xflags);
+}
+
+struct attrnames attr_system = {
+	.attr_name	= "system.",
+	.attr_namelen	= sizeof("system.") - 1,
+	.attr_flag	= ATTR_SYSTEM,
+	.attr_get	= attr_system_get,
+	.attr_set	= attr_system_set,
+	.attr_remove	= attr_system_remove,
+	.attr_capable	= (attrcapable_t)fs_noerr,
+};
+
+struct attrnames attr_trusted = {
+	.attr_name	= "trusted.",
+	.attr_namelen	= sizeof("trusted.") - 1,
+	.attr_flag	= ATTR_ROOT,
+	.attr_get	= attr_generic_get,
+	.attr_set	= attr_generic_set,
+	.attr_remove	= attr_generic_remove,
+	.attr_capable	= attr_trusted_capable,
+};
+
+struct attrnames attr_user = {
+	.attr_name	= "user.",
+	.attr_namelen	= sizeof("user.") - 1,
+	.attr_get	= attr_generic_get,
+	.attr_set	= attr_generic_set,
+	.attr_remove	= attr_generic_remove,
+	.attr_capable	= attr_user_capable,
+};
+
+struct attrnames *attr_namespaces[] =
+	{ &attr_system, &attr_trusted, &attr_user };

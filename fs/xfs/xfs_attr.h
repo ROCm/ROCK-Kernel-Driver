@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000, 2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000, 2002-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -49,9 +49,46 @@
  * External interfaces
  *========================================================================*/
 
-#define ATTR_ROOT	0x0002	/* use attrs in root namespace, not user */
+struct cred;
+struct vnode;
+
+typedef int (*attrset_t)(struct vnode *, char *, void *, size_t, int);
+typedef int (*attrget_t)(struct vnode *, char *, void *, size_t, int);
+typedef int (*attrremove_t)(struct vnode *, char *, int);
+typedef int (*attrexists_t)(struct vnode *);
+typedef int (*attrcapable_t)(struct vnode *, struct cred *);
+
+typedef struct attrnames {
+	char *		attr_name;
+	unsigned int	attr_namelen;
+	unsigned int	attr_flag;
+	attrget_t	attr_get;
+	attrset_t	attr_set;
+	attrremove_t	attr_remove;
+	attrexists_t	attr_exists;
+	attrcapable_t	attr_capable;
+} attrnames_t;
+
+#define ATTR_NAMECOUNT	3
+extern struct attrnames attr_user;
+extern struct attrnames attr_system;
+extern struct attrnames attr_trusted;
+extern struct attrnames *attr_namespaces[ATTR_NAMECOUNT];
+
+#define ATTR_SYSCOUNT	2
+extern struct attrnames posix_acl_access;
+extern struct attrnames posix_acl_default;
+extern struct attrnames *attr_system_names[ATTR_SYSCOUNT];
+
+extern attrnames_t *attr_lookup_namespace(char *, attrnames_t **, int);
+extern int attr_generic_list(struct vnode *, void *, size_t, int, ssize_t *);
+
+#define ATTR_DONTFOLLOW	0x0001	/* -- unused, from IRIX -- */
+#define ATTR_ROOT	0x0002	/* use attrs in root (trusted) namespace */
+#define ATTR_TRUST	0x0004	/* -- unused, from IRIX -- */
 #define ATTR_CREATE	0x0010	/* pure create: fail if attr already exists */
 #define ATTR_REPLACE	0x0020	/* pure set: fail if attr does not exist */
+#define ATTR_SYSTEM	0x0100	/* use attrs in system (pseudo) namespace */
 #define ATTR_KERNOTIME	0x1000	/* [kernel] don't update inode timestamps */
 #define ATTR_KERNOVAL	0x2000	/* [kernel] get attr size only, not value */
 #define ATTR_KERNAMELS	0x4000	/* [kernel] list attr names (simple list) */
@@ -126,11 +163,8 @@ typedef struct attrlist_cursor_kern {
  * Function prototypes for the kernel.
  *========================================================================*/
 
-struct cred;
-struct vnode;
 struct xfs_inode;
 struct attrlist_cursor_kern;
-struct xfs_ext_attr;
 struct xfs_da_args;
 
 /*

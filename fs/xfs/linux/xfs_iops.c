@@ -110,7 +110,7 @@ linvfs_mknod(
 	vattr_t		va;
 	vnode_t		*vp = NULL, *dvp = LINVFS_GET_VP(dir);
 	xfs_acl_t	*default_acl = NULL;
-	xattr_exists_t	test_default_acl = _ACL_DEFAULT_EXISTS;
+	attrexists_t	test_default_acl = _ACL_DEFAULT_EXISTS;
 	int		error;
 
 	/*
@@ -552,61 +552,6 @@ linvfs_truncate(
 	block_truncate_page(inode->i_mapping, inode->i_size, linvfs_get_block);
 }
 
-
-
-/*
- * Extended attributes interfaces
- */
-
-#define SYSTEM_NAME	"system."	/* VFS shared names/values */
-#define ROOT_NAME	"trusted."	/* root's own names/values */
-#define USER_NAME	"user."		/* user's own names/values */
-STATIC xattr_namespace_t xfs_namespace_array[] = {
-	{ .name= SYSTEM_NAME,	.namelen= sizeof(SYSTEM_NAME)-1,.exists= NULL },
-	{ .name= ROOT_NAME,	.namelen= sizeof(ROOT_NAME)-1,	.exists= NULL },
-	{ .name= USER_NAME,	.namelen= sizeof(USER_NAME)-1,	.exists= NULL },
-	{ .name= NULL }
-};
-xattr_namespace_t *xfs_namespaces = &xfs_namespace_array[0];
-
-#define POSIXACL_ACCESS		"posix_acl_access"
-#define POSIXACL_ACCESS_SIZE	(sizeof(POSIXACL_ACCESS)-1)
-#define POSIXACL_DEFAULT	"posix_acl_default"
-#define POSIXACL_DEFAULT_SIZE	(sizeof(POSIXACL_DEFAULT)-1)
-#define POSIXCAP		"posix_capabilities"
-#define POSIXCAP_SIZE		(sizeof(POSIXCAP)-1)
-#define POSIXMAC		"posix_mac"
-#define POSIXMAC_SIZE		(sizeof(POSIXMAC)-1)
-STATIC xattr_namespace_t sys_namespace_array[] = {
-	{ .name= POSIXACL_ACCESS,
-		.namelen= POSIXACL_ACCESS_SIZE,	 .exists= _ACL_ACCESS_EXISTS },
-	{ .name= POSIXACL_DEFAULT,
-		.namelen= POSIXACL_DEFAULT_SIZE, .exists= _ACL_DEFAULT_EXISTS },
-	{ .name= POSIXCAP,
-		.namelen= POSIXCAP_SIZE,	 .exists= _CAP_EXISTS },
-	{ .name= POSIXMAC,
-		.namelen= POSIXMAC_SIZE,	 .exists= _MAC_EXISTS },
-	{ .name= NULL }
-};
-
-/*
- * Some checks to prevent people abusing EAs to get over quota:
- * - Don't allow modifying user EAs on devices/symlinks;
- * - Don't allow modifying user EAs if sticky bit set;
- */
-STATIC int
-capable_user_xattr(
-	struct inode	*inode)
-{
-	if (!S_ISREG(inode->i_mode) && !S_ISDIR(inode->i_mode) &&
-	    !capable(CAP_SYS_ADMIN))
-		return 0;
-	if (S_ISDIR(inode->i_mode) && (inode->i_mode & S_ISVTX) &&
-	    (current->fsuid != inode->i_uid) && !capable(CAP_FOWNER))
-		return 0;
-	return 1;
-}
-
 STATIC int
 linvfs_setxattr(
 	struct dentry	*dentry,
@@ -615,59 +560,27 @@ linvfs_setxattr(
 	size_t		size,
 	int		flags)
 {
-	struct inode	*inode = dentry->d_inode;
-	vnode_t		*vp = LINVFS_GET_VP(inode);
-	char		*p = (char *)name;
+	vnode_t		*vp = LINVFS_GET_VP(dentry->d_inode);
+	char		*attr = (char *)name;
+	attrnames_t	*namesp;
 	int		xflags = 0;
 	int		error;
 
-	if (strncmp(name, xfs_namespaces[SYSTEM_NAMES].name,
-			xfs_namespaces[SYSTEM_NAMES].namelen) == 0) {
-		error = -EINVAL;
-		if (flags & XATTR_CREATE)
-			 return error;
-		error = -EOPNOTSUPP;
-		p += xfs_namespaces[SYSTEM_NAMES].namelen;
-		if (strcmp(p, POSIXACL_ACCESS) == 0)
-			error = xfs_acl_vset(vp, (void *) data, size,
-						_ACL_TYPE_ACCESS);
-		else if (strcmp(p, POSIXACL_DEFAULT) == 0)
-			error = xfs_acl_vset(vp, (void *) data, size,
-						_ACL_TYPE_DEFAULT);
-		else if (strcmp(p, POSIXCAP) == 0)
-			error = xfs_cap_vset(vp, (void *) data, size);
-		if (!error)
-			error = vn_revalidate(vp);
+	namesp = attr_lookup_namespace(attr, attr_namespaces, ATTR_NAMECOUNT);
+	if (!namesp)
+		return -EOPNOTSUPP;
+	attr += namesp->attr_namelen;
+	error = namesp->attr_capable(vp, NULL);
+	if (error)
 		return error;
-	}
-
-	if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
-		return -EPERM;
 
 	/* Convert Linux syscall to XFS internal ATTR flags */
 	if (flags & XATTR_CREATE)
 		xflags |= ATTR_CREATE;
 	if (flags & XATTR_REPLACE)
 		xflags |= ATTR_REPLACE;
-
-	if (strncmp(name, xfs_namespaces[ROOT_NAMES].name,
-			xfs_namespaces[ROOT_NAMES].namelen) == 0) {
-		if (!capable(CAP_SYS_ADMIN))
-			return -EPERM;
-		xflags |= ATTR_ROOT;
-		p += xfs_namespaces[ROOT_NAMES].namelen;
-		VOP_ATTR_SET(vp, p, (void *) data, size, xflags, NULL, error);
-		return -error;
-	}
-	if (strncmp(name, xfs_namespaces[USER_NAMES].name,
-			xfs_namespaces[USER_NAMES].namelen) == 0) {
-		if (!capable_user_xattr(inode))
-			return -EPERM;
-		p += xfs_namespaces[USER_NAMES].namelen;
-		VOP_ATTR_SET(vp, p, (void *) data, size, xflags, NULL, error);
-		return -error;
-	}
-	return -EOPNOTSUPP;
+	xflags |= namesp->attr_flag;
+	return namesp->attr_set(vp, attr, (void *)data, size, xflags);
 }
 
 STATIC ssize_t
@@ -677,53 +590,27 @@ linvfs_getxattr(
 	void		*data,
 	size_t		size)
 {
-	struct inode	*inode = dentry->d_inode;
-	vnode_t		*vp = LINVFS_GET_VP(inode);
-	char		*p = (char *)name;
+	vnode_t		*vp = LINVFS_GET_VP(dentry->d_inode);
+	char		*attr = (char *)name;
+	attrnames_t	*namesp;
 	int		xflags = 0;
 	ssize_t		error;
 
-	if (strncmp(name, xfs_namespaces[SYSTEM_NAMES].name,
-			xfs_namespaces[SYSTEM_NAMES].namelen) == 0) {
-		error = -EOPNOTSUPP;
-		p += xfs_namespaces[SYSTEM_NAMES].namelen;
-		if (strcmp(p, POSIXACL_ACCESS) == 0)
-			error = xfs_acl_vget(vp, data, size, _ACL_TYPE_ACCESS);
-		else if (strcmp(p, POSIXACL_DEFAULT) == 0)
-			error = xfs_acl_vget(vp, data, size, _ACL_TYPE_DEFAULT);
-		else if (strcmp(p, POSIXCAP) == 0)
-			error = xfs_cap_vget(vp, data, size);
+	namesp = attr_lookup_namespace(attr, attr_namespaces, ATTR_NAMECOUNT);
+	if (!namesp)
+		return -EOPNOTSUPP;
+	attr += namesp->attr_namelen;
+	error = namesp->attr_capable(vp, NULL);
+	if (error)
 		return error;
-	}
 
 	/* Convert Linux syscall to XFS internal ATTR flags */
 	if (!size) {
 		xflags |= ATTR_KERNOVAL;
 		data = NULL;
 	}
-
-	if (strncmp(name, xfs_namespaces[ROOT_NAMES].name,
-			xfs_namespaces[ROOT_NAMES].namelen) == 0) {
-		if (!capable(CAP_SYS_ADMIN))
-			return -EPERM;
-		xflags |= ATTR_ROOT;
-		p += xfs_namespaces[ROOT_NAMES].namelen;
-		VOP_ATTR_GET(vp, p, data, (int *)&size, xflags, NULL, error);
-		if (!error)
-			error = -size;
-		return -error;
-	}
-	if (strncmp(name, xfs_namespaces[USER_NAMES].name,
-			xfs_namespaces[USER_NAMES].namelen) == 0) {
-		p += xfs_namespaces[USER_NAMES].namelen;
-		if (!capable_user_xattr(inode))
-			return -EPERM;
-		VOP_ATTR_GET(vp, p, data, (int *)&size, xflags, NULL, error);
-		if (!error)
-			error = -size;
-		return -error;
-	}
-	return -EOPNOTSUPP;
+	xflags |= namesp->attr_flag;
+	return namesp->attr_get(vp, attr, (void *)data, size, xflags);
 }
 
 STATIC ssize_t
@@ -732,40 +619,18 @@ linvfs_listxattr(
 	char			*data,
 	size_t			size)
 {
-	attrlist_cursor_kern_t	cursor;
-	xattr_namespace_t	*sys;
 	vnode_t			*vp = LINVFS_GET_VP(dentry->d_inode);
-	char			*k = data;
-	int			xflags = ATTR_KERNAMELS;
-	int			result = 0;
-	ssize_t			error;
+	int			error, xflags = ATTR_KERNAMELS;
+	ssize_t			result;
 
 	if (!size)
 		xflags |= ATTR_KERNOVAL;
 	if (capable(CAP_SYS_ADMIN))
 		xflags |= ATTR_KERNFULLS;
 
-	memset(&cursor, 0, sizeof(cursor));
-	VOP_ATTR_LIST(vp, data, size, xflags, &cursor, NULL, error);
-	if (error > 0)
-		return -error;
-	result += -error;
-
-	k += result;		/* advance start of our buffer */
-	for (sys = &sys_namespace_array[0]; sys->name != NULL; sys++) {
-		if (sys->exists == NULL || !sys->exists(vp))
-			continue;
-		result += xfs_namespaces[SYSTEM_NAMES].namelen;
-		result += sys->namelen + 1;
-		if (size) {
-			if (result > size)
-				return -ERANGE;
-			strcpy(k, xfs_namespaces[SYSTEM_NAMES].name);
-			k += xfs_namespaces[SYSTEM_NAMES].namelen;
-			strcpy(k, sys->name);
-			k += sys->namelen + 1;
-		}
-	}
+	error = attr_generic_list(vp, data, size, xflags, &result);
+	if (error < 0)
+		return error;
 	return result;
 }
 
@@ -774,51 +639,25 @@ linvfs_removexattr(
 	struct dentry	*dentry,
 	const char	*name)
 {
-	struct inode	*inode = dentry->d_inode;
-	vnode_t		*vp = LINVFS_GET_VP(inode);
-	char		*p = (char *)name;
+	vnode_t		*vp = LINVFS_GET_VP(dentry->d_inode);
+	char		*attr = (char *)name;
+	attrnames_t	*namesp;
 	int		xflags = 0;
 	int		error;
 
-	if (strncmp(name, xfs_namespaces[SYSTEM_NAMES].name,
-			xfs_namespaces[SYSTEM_NAMES].namelen) == 0) {
-		error = -EOPNOTSUPP;
-		p += xfs_namespaces[SYSTEM_NAMES].namelen;
-		if (strcmp(p, POSIXACL_ACCESS) == 0)
-			error = xfs_acl_vremove(vp, _ACL_TYPE_ACCESS);
-		else if (strcmp(p, POSIXACL_DEFAULT) == 0)
-			error = xfs_acl_vremove(vp, _ACL_TYPE_DEFAULT);
-		else if (strcmp(p, POSIXCAP) == 0)
-			error = xfs_cap_vremove(vp);
+	namesp = attr_lookup_namespace(attr, attr_namespaces, ATTR_NAMECOUNT);
+	if (!namesp)
+		return -EOPNOTSUPP;
+	attr += namesp->attr_namelen;
+	error = namesp->attr_capable(vp, NULL);
+	if (error)
 		return error;
-	}
-
-        if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
-		return -EPERM;
-
-	if (strncmp(name, xfs_namespaces[ROOT_NAMES].name,
-			xfs_namespaces[ROOT_NAMES].namelen) == 0) {
-		if (!capable(CAP_SYS_ADMIN))
-			return -EPERM;
-		xflags |= ATTR_ROOT;
-		p += xfs_namespaces[ROOT_NAMES].namelen;
-		VOP_ATTR_REMOVE(vp, p, xflags, NULL, error);
-		return -error;
-	}
-	if (strncmp(name, xfs_namespaces[USER_NAMES].name,
-			xfs_namespaces[USER_NAMES].namelen) == 0) {
-		p += xfs_namespaces[USER_NAMES].namelen;
-		if (!capable_user_xattr(inode))
-			return -EPERM;
-		VOP_ATTR_REMOVE(vp, p, xflags, NULL, error);
-		return -error;
-	}
-	return -EOPNOTSUPP;
+	xflags |= namesp->attr_flag;
+	return namesp->attr_remove(vp, attr, xflags);
 }
 
 
-struct inode_operations linvfs_file_inode_operations =
-{
+struct inode_operations linvfs_file_inode_operations = {
 	.permission		= linvfs_permission,
 	.truncate		= linvfs_truncate,
 	.getattr		= linvfs_getattr,
@@ -829,8 +668,7 @@ struct inode_operations linvfs_file_inode_operations =
 	.removexattr		= linvfs_removexattr,
 };
 
-struct inode_operations linvfs_dir_inode_operations =
-{
+struct inode_operations linvfs_dir_inode_operations = {
 	.create			= linvfs_create,
 	.lookup			= linvfs_lookup,
 	.link			= linvfs_link,
@@ -849,8 +687,7 @@ struct inode_operations linvfs_dir_inode_operations =
 	.removexattr		= linvfs_removexattr,
 };
 
-struct inode_operations linvfs_symlink_inode_operations =
-{
+struct inode_operations linvfs_symlink_inode_operations = {
 	.readlink		= linvfs_readlink,
 	.follow_link		= linvfs_follow_link,
 	.permission		= linvfs_permission,
