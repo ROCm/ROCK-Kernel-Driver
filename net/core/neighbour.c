@@ -1334,22 +1334,11 @@ void neigh_table_init(struct neigh_table *tbl)
 		panic("cannot create neighbour cache statistics");
 	
 #ifdef CONFIG_PROC_FS
-#define NC_STAT_SUFFIX "_stat"
-	{
-	char *proc_stat_name;
-	proc_stat_name = kmalloc(strlen(tbl->id) + 
-				 strlen(NC_STAT_SUFFIX) + 1, GFP_KERNEL);
-	if (!proc_stat_name)
-		panic("cannot allocate neighbour cache proc name buffer");
-	strcpy(proc_stat_name, tbl->id);
-	strcat(proc_stat_name, NC_STAT_SUFFIX);
-
-	tbl->pde = create_proc_entry(proc_stat_name, 0, proc_net);
+	tbl->pde = create_proc_entry(tbl->id, 0, proc_net_stat);
 	if (!tbl->pde) 
 		panic("cannot create neighbour proc dir entry");
 	tbl->pde->proc_fops = &neigh_stat_seq_fops;
 	tbl->pde->data = tbl;
-	}
 #endif
 
 	tbl->hash_mask = 1;
