@@ -475,6 +475,8 @@ void __release_region(struct resource *parent, unsigned long start, unsigned lon
 	p = &parent->child;
 	end = start + n - 1;
 
+	write_lock(&resource_lock);
+
 	for (;;) {
 		struct resource *res = *p;
 
@@ -488,11 +490,15 @@ void __release_region(struct resource *parent, unsigned long start, unsigned lon
 			if (res->start != start || res->end != end)
 				break;
 			*p = res->sibling;
+			write_unlock(&resource_lock);
 			kfree(res);
 			return;
 		}
 		p = &res->sibling;
 	}
+
+	write_unlock(&resource_lock);
+
 	printk(KERN_WARNING "Trying to free nonexistent resource <%08lx-%08lx>\n", start, end);
 }
 
