@@ -2332,7 +2332,7 @@ int __init radeonfb_setup (char *options)
 			continue;
 
 		if (!strncmp(this_opt, "noaccel", 7)) {
-			radeonfb_noaccel = 1;
+			noaccel = radeonfb_noaccel = 1;
 		} else if (!strncmp(this_opt, "mirror", 6)) {
 			mirror = 1;
 		} else if (!strncmp(this_opt, "force_dfp", 9)) {
