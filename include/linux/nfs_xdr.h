@@ -607,9 +607,13 @@ struct nfs4_readlink {
 };
 
 struct nfs4_remove {
-	u32				rm_namelen;       /* request */
-	const char *			rm_name;          /* request */
+	struct qstr *			name;          /* request */
 	struct nfs4_change_info *	rm_cinfo;         /* response */
+};
+
+struct nfs4_remove_arg {
+	const struct nfs_fh *		fh;
+	const struct qstr *		name;
 };
 
 struct nfs4_rename {

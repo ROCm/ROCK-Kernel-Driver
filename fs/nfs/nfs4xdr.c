@@ -111,6 +111,8 @@ static int nfs_stat_to_errno(int);
 				(op_decode_hdr_maxsz)
 #define encode_lookup_maxsz	(op_encode_hdr_maxsz + \
 				1 + ((3 + NFS4_FHSIZE) >> 2))
+#define encode_remove_maxsz	(op_encode_hdr_maxsz + \
+				1 + ((3 + NFS4_MAXNAMLEN) >> 2))
 #define NFS4_enc_compound_sz	(1024)  /* XXX: large enough? */
 #define NFS4_dec_compound_sz	(1024)  /* XXX: large enough? */
 #define NFS4_enc_read_sz	(compound_encode_hdr_maxsz + \
@@ -270,6 +272,12 @@ static int nfs_stat_to_errno(int);
 				decode_putrootfh_maxsz + \
 				decode_getattr_maxsz + \
 				decode_getfh_maxsz)
+#define NFS4_enc_remove_sz	(compound_encode_hdr_maxsz + \
+				encode_putfh_maxsz + \
+				encode_remove_maxsz)
+#define NFS4_dec_remove_sz	(compound_decode_hdr_maxsz + \
+				decode_putfh_maxsz + \
+				op_decode_hdr_maxsz + 5)
 
 
 
@@ -927,15 +935,14 @@ encode_readlink(struct xdr_stream *xdr, struct nfs4_readlink *readlink, struct r
 	return 0;
 }
 
-static int
-encode_remove(struct xdr_stream *xdr, struct nfs4_remove *remove)
+static int encode_remove(struct xdr_stream *xdr, const struct qstr *name)
 {
 	uint32_t *p;
 
-	RESERVE_SPACE(8 + remove->rm_namelen);
+	RESERVE_SPACE(8 + name->len);
 	WRITE32(OP_REMOVE);
-	WRITE32(remove->rm_namelen);
-	WRITEMEM(remove->rm_name, remove->rm_namelen);
+	WRITE32(name->len);
+	WRITEMEM(name->name, name->len);
 
 	return 0;
 }
@@ -1106,7 +1113,7 @@ encode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 			status = encode_readlink(xdr, &cp->ops[i].u.readlink, req);
 			break;
 		case OP_REMOVE:
-			status = encode_remove(xdr, &cp->ops[i].u.remove);
+			status = encode_remove(xdr, cp->ops[i].u.remove.name);
 			break;
 		case OP_RENAME:
 			status = encode_rename(xdr, &cp->ops[i].u.rename);
@@ -1205,6 +1212,24 @@ static int nfs4_xdr_enc_lookup_root(struct rpc_rqst *req, uint32_t *p, const str
 	if ((status = encode_getfh(&xdr)) == 0)
 		status = encode_getfattr(&xdr, args->bitmask);
 out:
+	return status;
+}
+
+/*
+ * Encode REMOVE request
+ */
+static int nfs4_xdr_enc_remove(struct rpc_rqst *req, uint32_t *p, const struct nfs4_remove_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 2,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr);
+	if ((status = encode_putfh(&xdr, args->fh)) == 0)
+		status = encode_remove(&xdr, args->name);
 	return status;
 }
 
@@ -2763,15 +2788,14 @@ decode_restorefh(struct xdr_stream *xdr)
 	return decode_op_hdr(xdr, OP_RESTOREFH);
 }
 
-static int
-decode_remove(struct xdr_stream *xdr, struct nfs4_remove *remove)
+static int decode_remove(struct xdr_stream *xdr, struct nfs4_change_info *cinfo)
 {
 	int status;
 
 	status = decode_op_hdr(xdr, OP_REMOVE);
 	if (status)
 		goto out;
-	status = decode_change_info(xdr, remove->rm_cinfo);
+	status = decode_change_info(xdr, cinfo);
 out:
 	return status;
 }
@@ -2938,7 +2962,7 @@ decode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 			status = decode_restorefh(xdr);
 			break;
 		case OP_REMOVE:
-			status = decode_remove(xdr, &op->u.remove);
+			status = decode_remove(xdr, op->u.remove.rm_cinfo);
 			break;
 		case OP_RENAME:
 			status = decode_rename(xdr, &op->u.rename);
@@ -3061,6 +3085,24 @@ static int nfs4_xdr_dec_lookup_root(struct rpc_rqst *rqstp, uint32_t *p, struct 
 		goto out;
 	if ((status = decode_getfh(&xdr, res->fh)) == 0)
 		status = decode_getfattr(&xdr, res->fattr, res->server);
+out:
+	return status;
+}
+
+/*
+ * Decode REMOVE response
+ */
+static int nfs4_xdr_dec_remove(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_change_info *cinfo)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+	
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		goto out;
+	if ((status = decode_putfh(&xdr)) == 0)
+		status = decode_remove(&xdr, cinfo);
 out:
 	return status;
 }
@@ -3576,6 +3618,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(GETATTR,		enc_getattr,	dec_getattr),
   PROC(LOOKUP,		enc_lookup,	dec_lookup),
   PROC(LOOKUP_ROOT,	enc_lookup_root,	dec_lookup_root),
+  PROC(REMOVE,		enc_remove,	dec_remove),
 };
 
 struct rpc_version		nfs_version4 = {

@@ -340,8 +340,7 @@ nfs4_setup_remove(struct nfs4_compound *cp, struct qstr *name, struct nfs4_chang
 {
 	struct nfs4_remove *remove = GET_OP(cp, remove);
 
-	remove->rm_namelen = name->len;
-	remove->rm_name = name->name;
+	remove->name = name;
 	remove->rm_cinfo = cinfo;
 
 	OPNUM(cp) = OP_REMOVE;
@@ -441,6 +440,14 @@ process_cinfo(struct nfs4_change_info *info, struct nfs_fattr *fattr)
 		fattr->valid |= NFS_ATTR_PRE_CHANGE;
 		fattr->timestamp = jiffies;
 	}
+}
+
+static void update_changeattr(struct inode *inode, struct nfs4_change_info *cinfo)
+{
+	struct nfs_inode *nfsi = NFS_I(inode);
+
+	if (cinfo->before == nfsi->change_attr && cinfo->atomic)
+		nfsi->change_attr = cinfo->after;
 }
 
 /*
@@ -1218,26 +1225,23 @@ nfs4_proc_create(struct inode *dir, struct qstr *name, struct iattr *sattr,
 	return inode;
 }
 
-static int
-nfs4_proc_remove(struct inode *dir, struct qstr *name)
+static int nfs4_proc_remove(struct inode *dir, struct qstr *name)
 {
-	struct nfs4_compound	compound;
-	struct nfs4_op		ops[3];
-	struct nfs4_change_info	dir_cinfo;
-	struct nfs_fattr	dir_attr;
+	struct nfs4_remove_arg args = {
+		.fh = NFS_FH(dir),
+		.name = name,
+	};
+	struct nfs4_change_info	res;
+	struct rpc_message msg = {
+		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_REMOVE],
+		.rpc_argp	= &args,
+		.rpc_resp	= &res,
+	};
 	int			status;
 
-	dir_attr.valid = 0;
-	nfs4_setup_compound(&compound, ops, NFS_SERVER(dir), "remove");
-	nfs4_setup_putfh(&compound, NFS_FH(dir));
-	nfs4_setup_remove(&compound, name, &dir_cinfo);
-	nfs4_setup_getattr(&compound, &dir_attr);
-	status = nfs4_call_compound(&compound, NULL, 0);
-
-	if (!status) {
-		process_cinfo(&dir_cinfo, &dir_attr);
-		nfs_refresh_inode(dir, &dir_attr);
-	}
+	status = rpc_call_sync(NFS_CLIENT(dir), &msg, 0);
+	if (status == 0)
+		update_changeattr(dir, &res);
 	return nfs4_map_errors(status);
 }
 
