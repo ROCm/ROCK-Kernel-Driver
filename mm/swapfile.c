@@ -786,6 +786,8 @@ asmlinkage long sys_swapoff(const char * specialfile)
 	swap_device_unlock(p);
 	swap_list_unlock();
 	vfree(swap_map);
+	if (S_ISBLK(swap_file->f_dentry->d_inode->i_mode))
+		bd_release(swap_file->f_dentry->d_inode->i_bdev);
 	filp_close(swap_file, NULL);
 	err = 0;
 
@@ -833,19 +835,6 @@ int get_swaparea_info(char *buf)
 	return len;
 }
 
-int is_swap_partition(kdev_t dev) {
-	struct swap_info_struct *ptr = swap_info;
-	int i;
-
-	for (i = 0 ; i < nr_swapfiles ; i++, ptr++) {
-		if ((ptr->flags & SWP_USED) &&
-		    (ptr->flags & SWP_BLOCKDEV) &&
-		    (kdev_same(ptr->swap_file->f_dentry->d_inode->i_rdev, dev)))
-			return 1;
-	}
-	return 0;
-}
-
 /*
  * Written 01/25/92 by Simmule Turner, heavily changed by Linus.
  *
@@ -855,6 +844,7 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 {
 	struct swap_info_struct * p;
 	char *name;
+	struct block_device *bdev = NULL;
 	struct file *swap_file = NULL;
 	struct address_space *mapping;
 	unsigned int type;
@@ -905,13 +895,21 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 	swap_file = filp_open(name, O_RDWR, 0);
 	putname(name);
 	error = PTR_ERR(swap_file);
-	if (IS_ERR(swap_file))
+	if (IS_ERR(swap_file)) {
+		swap_file = NULL;
 		goto bad_swap_2;
+	}
 
 	p->swap_file = swap_file;
 
 	error = -EINVAL;
 	if (S_ISBLK(swap_file->f_dentry->d_inode->i_mode)) {
+		bdev = swap_file->f_dentry->d_inode->i_bdev;
+		error = bd_claim(bdev, sys_swapon);
+		if (error < 0) {
+			bdev = NULL;
+			goto bad_swap;
+		}
 		error = set_blocksize(swap_file->f_dentry->d_inode->i_rdev,
 				      PAGE_SIZE);
 		if (error < 0)
@@ -1066,6 +1064,8 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 	error = 0;
 	goto out;
 bad_swap:
+	if (bdev)
+		bd_release(bdev);
 bad_swap_2:
 	swap_list_lock();
 	swap_map = p->swap_map;

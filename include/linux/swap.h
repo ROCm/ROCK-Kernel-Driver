@@ -151,7 +151,6 @@ extern void out_of_memory(void);
 extern int total_swap_pages;
 extern unsigned int nr_swapfiles;
 extern struct swap_info_struct swap_info[];
-extern int is_swap_partition(kdev_t);
 extern void si_swapinfo(struct sysinfo *);
 extern swp_entry_t get_swap_page(void);
 extern void get_swaphandle_info(swp_entry_t, unsigned long *, struct inode **);

@@ -34,7 +34,6 @@
 #include <linux/blk.h>			/* for set_device_ro() */
 #include <linux/blkpg.h>
 #include <linux/genhd.h>
-#include <linux/swap.h>			/* for is_swap_partition() */
 #include <linux/module.h>               /* for EXPORT_SYMBOL */
 
 #include <asm/uaccess.h>
@@ -132,7 +131,9 @@ int del_partition(struct block_device *bdev, struct blkpg_partition *p)
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	struct gendisk *g;
 	kdev_t devp;
+	struct block_device *bdevp;
 	int drive, first_minor, minor;
+	int holder;
 
 	/* find the drive major */
 	g = get_gendisk(dev);
@@ -155,17 +156,24 @@ int del_partition(struct block_device *bdev, struct blkpg_partition *p)
 
 	/* partition in use? Incomplete check for now. */
 	devp = mk_kdev(major(dev), minor);
-	if (is_mounted(devp) || is_swap_partition(devp))
+	bdevp = bdget(kdev_t_to_nr(devp));
+	if (!bdevp)
+		return -ENOMEM;
+	if (bd_claim(bdevp, &holder) < 0) {
+		bdput(bdevp);
 		return -EBUSY;
+	}
 
 	/* all seems OK */
-	fsync_dev(devp);
-	invalidate_buffers(devp);
+	fsync_bdev(bdevp);
+	invalidate_bdev(bdevp, 0);
 
 	g->part[minor].start_sect = 0;
 	g->part[minor].nr_sects = 0;
 	if (g->sizes)
 		g->sizes[minor] = 0;
+	bd_release(bdevp);
+	bdput(bdevp);
 
 	return 0;
 }
@@ -210,6 +218,7 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 	int intval;
 	unsigned short usval;
 	kdev_t dev = to_kdev_t(bdev->bd_dev);
+	int holder;
 
 	intval = block_ioctl(dev, cmd, arg);
 	if (intval != -ENOTTY)
@@ -290,9 +299,10 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 			if (intval > PAGE_SIZE || intval < 512 ||
 			    (intval & (intval - 1)))
 				return -EINVAL;
-			if (is_mounted(dev) || is_swap_partition(dev))
+			if (bd_claim(bdev, &holder) < 0)
 				return -EBUSY;
 			set_blocksize(dev, intval);
+			bd_release(bdev);
 			return 0;
 
 		default:

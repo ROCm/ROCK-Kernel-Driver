@@ -645,8 +645,14 @@ static int lock_rdev(mdk_rdev_t *rdev)
 	if (!bdev)
 		return -ENOMEM;
 	err = blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_RAW);
-	if (!err)
-		rdev->bdev = bdev;
+	if (err)
+		return err;
+	err = bd_claim(bdev, lock_rdev);
+	if (err) {
+		blkdev_put(bdev, BDEV_RAW);
+		return err;
+	}
+	rdev->bdev = bdev;
 	return err;
 }
 
@@ -656,6 +662,7 @@ static void unlock_rdev(mdk_rdev_t *rdev)
 	rdev->bdev = NULL;
 	if (!bdev)
 		MD_BUG();
+	bd_release(bdev);
 	blkdev_put(bdev, BDEV_RAW);
 }
 
@@ -1085,13 +1092,6 @@ static int md_import_device(kdev_t newdev, int on_disk)
 		return -ENOMEM;
 	}
 	memset(rdev, 0, sizeof(*rdev));
-
-	if (is_mounted(newdev)) {
-		printk(KERN_WARNING "md: can not import %s, has active inodes!\n",
-			partition_name(newdev));
-		err = -EBUSY;
-		goto abort_free;
-	}
 
 	if ((err = alloc_disk_sb(rdev)))
 		goto abort_free;

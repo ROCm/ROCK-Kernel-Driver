@@ -198,6 +198,8 @@ EXPORT_SYMBOL(cdget);
 EXPORT_SYMBOL(cdput);
 EXPORT_SYMBOL(bdget);
 EXPORT_SYMBOL(bdput);
+EXPORT_SYMBOL(bd_claim);
+EXPORT_SYMBOL(bd_release);
 EXPORT_SYMBOL(__bread);
 EXPORT_SYMBOL(__brelse);
 EXPORT_SYMBOL(__bforget);
