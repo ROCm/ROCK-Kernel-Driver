@@ -26,7 +26,7 @@
  * The largest-sized BIO which this code will assemble, in bytes.  Set this
  * to PAGE_SIZE if your drivers are broken.
  */
-#define DIO_BIO_MAX_SIZE BIO_MAX_SIZE
+#define DIO_BIO_MAX_SIZE (16*1024)
 
 /*
  * How many user pages to map in one call to get_user_pages().  This determines
