@@ -16,13 +16,21 @@ static __u8 root_hub_hub_des[] =
 	0x09,			/*  __u8  bLength; */
 	0x29,			/*  __u8  bDescriptorType; Hub-descriptor */
 	0x02,			/*  __u8  bNbrPorts; */
-	0x00,			/* __u16  wHubCharacteristics; */
-	0x00,
+	0x0a,			/* __u16  wHubCharacteristics; */
+	0x00,			/*   (per-port OC, no power switching) */
 	0x01,			/*  __u8  bPwrOn2pwrGood; 2ms */
 	0x00,			/*  __u8  bHubContrCurrent; 0 mA */
 	0x00,			/*  __u8  DeviceRemovable; *** 7 Ports max *** */
 	0xff			/*  __u8  PortPwrCtrlMask; *** 7 ports max *** */
 };
+
+#define	UHCI_RH_MAXCHILD	7
+
+/* must write as zeroes */
+#define WZ_BITS		(USBPORTSC_RES2 | USBPORTSC_RES3 | USBPORTSC_RES4)
+
+/* status change bits:  nonzero writes will clear */
+#define RWC_BITS	(USBPORTSC_OCC | USBPORTSC_PEC | USBPORTSC_CSC)
 
 static int uhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 {
@@ -32,7 +40,9 @@ static int uhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 
 	*buf = 0;
 	for (i = 0; i < uhci->rh_numports; i++) {
-		*buf |= ((inw(io_addr + USBPORTSC1 + i * 2) & 0xa) > 0 ? (1 << (i + 1)) : 0);
+		*buf |= (inw(io_addr + USBPORTSC1 + i * 2) & RWC_BITS) != 0
+				? (1 << (i + 1))
+				: 0;
 		len = (i + 1) / 8 + 1;
 	}
 
@@ -43,12 +53,15 @@ static int uhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 
 #define CLR_RH_PORTSTAT(x) \
 	status = inw(io_addr + USBPORTSC1 + 2 * (wIndex-1)); \
-	status = (status & 0xfff5) & ~(x); \
+	status &= ~(RWC_BITS|WZ_BITS); \
+	status &= ~(x); \
+	status |= RWC_BITS & (x); \
 	outw(status, io_addr + USBPORTSC1 + 2 * (wIndex-1))
 
 #define SET_RH_PORTSTAT(x) \
 	status = inw(io_addr + USBPORTSC1 + 2 * (wIndex-1)); \
-	status = (status & 0xfff5) | (x); \
+	status |= (x); \
+	status &= ~(RWC_BITS|WZ_BITS); \
 	outw(status, io_addr + USBPORTSC1 + 2 * (wIndex-1))
 
 
@@ -57,13 +70,9 @@ static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			u16 wIndex, char *buf, u16 wLength)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
-	int i, status, retval = 0, len = 0;
+	int status, retval = 0, len = 0;
 	unsigned int io_addr = uhci->io_addr;
-	__u16 cstatus;
-	char c_p_r[8];
-
-	for (i = 0; i < 8; i++)
-		c_p_r[i] = 0;
+	u16 wPortChange, wPortStatus;
 
 	switch (typeReq) {
 		/* Request Destination:
@@ -79,18 +88,39 @@ static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 		OK(4);		/* hub power */
 	case GetPortStatus:
 		status = inw(io_addr + USBPORTSC1 + 2 * (wIndex - 1));
-		cstatus = ((status & USBPORTSC_CSC) >> (1 - 0)) |
-			((status & USBPORTSC_PEC) >> (3 - 1)) |
-			(c_p_r[wIndex - 1] << (0 + 4));
-			status = (status & USBPORTSC_CCS) |
-			((status & USBPORTSC_PE) >> (2 - 1)) |
-			((status & USBPORTSC_SUSP) >> (12 - 2)) |
-			((status & USBPORTSC_PR) >> (9 - 4)) |
-			(1 << 8) |      /* power on */
-			((status & USBPORTSC_LSDA) << (-8 + 9));
 
-		*(__u16 *)buf = cpu_to_le16(status);
-		*(__u16 *)(buf + 2) = cpu_to_le16(cstatus);
+		/* C_SUSPEND and C_RESET are always false */
+		wPortChange = 0;
+		if (status & USBPORTSC_CSC)
+			wPortChange |= 1 << (USB_PORT_FEAT_C_CONNECTION - 16);
+		if (status & USBPORTSC_PEC)
+			wPortChange |= 1 << (USB_PORT_FEAT_C_ENABLE - 16);
+		if (status & USBPORTSC_OCC)
+			wPortChange |= 1 << (USB_PORT_FEAT_C_OVER_CURRENT - 16);
+
+		/* UHCI has no power switching (always on) */
+		wPortStatus = 1 << USB_PORT_FEAT_POWER;
+		if (status & USBPORTSC_CCS)
+			wPortStatus |= 1 << USB_PORT_FEAT_CONNECTION;
+		if (status & USBPORTSC_PE) {
+			wPortStatus |= 1 << USB_PORT_FEAT_ENABLE;
+			if (status & (USBPORTSC_SUSP | USBPORTSC_RD))
+				wPortStatus |= 1 << USB_PORT_FEAT_SUSPEND;
+		}
+		if (status & USBPORTSC_OC)
+			wPortStatus |= 1 << USB_PORT_FEAT_OVER_CURRENT;
+		if (status & USBPORTSC_PR)
+			wPortStatus |= 1 << USB_PORT_FEAT_RESET;
+		if (status & USBPORTSC_LSDA)
+			wPortStatus |= 1 << USB_PORT_FEAT_LOWSPEED;
+
+		if (wPortChange)
+			dev_dbg (uhci->hcd.self.controller,
+				"port %d portsc %04x\n",
+				wIndex, status);
+
+		*(__u16 *)buf = cpu_to_le16(wPortStatus);
+		*(__u16 *)(buf + 2) = cpu_to_le16(wPortChange);
 		OK(4);
 	case SetHubFeature:
 		switch (wValue) {
@@ -104,6 +134,7 @@ static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 	case ClearHubFeature:
 		switch (wValue) {
 		case C_HUB_OVER_CURRENT:
+		case C_HUB_LOCAL_POWER:
 			OK(0);	/* hub power over current */
 		default:
 			goto err;
@@ -120,18 +151,15 @@ static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 		case USB_PORT_FEAT_RESET:
 			SET_RH_PORTSTAT(USBPORTSC_PR);
 			mdelay(50);	/* USB v1.1 7.1.7.3 */
-			c_p_r[wIndex - 1] = 1;
 			CLR_RH_PORTSTAT(USBPORTSC_PR);
 			udelay(10);
 			SET_RH_PORTSTAT(USBPORTSC_PE);
 			mdelay(10);
-			SET_RH_PORTSTAT(0xa);
+			CLR_RH_PORTSTAT(USBPORTSC_PEC|USBPORTSC_CSC);
 			OK(0);
 		case USB_PORT_FEAT_POWER:
+			/* UHCI has no power switching */
 			OK(0); /* port power ** */
-		case USB_PORT_FEAT_ENABLE:
-			SET_RH_PORTSTAT(USBPORTSC_PE);
-			OK(0);
 		default:
 			goto err;
 		}
@@ -145,23 +173,25 @@ static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			CLR_RH_PORTSTAT(USBPORTSC_PE);
 			OK(0);
 		case USB_PORT_FEAT_C_ENABLE:
-			SET_RH_PORTSTAT(USBPORTSC_PEC);
+			CLR_RH_PORTSTAT(USBPORTSC_PEC);
 			OK(0);
 		case USB_PORT_FEAT_SUSPEND:
 			CLR_RH_PORTSTAT(USBPORTSC_SUSP);
 			OK(0);
 		case USB_PORT_FEAT_C_SUSPEND:
-			/*** WR_RH_PORTSTAT(RH_PS_PSSC); */
+			/* this driver won't report these */
 			OK(0);
 		case USB_PORT_FEAT_POWER:
-			OK(0);	/* port power */
+			/* UHCI has no power switching */
+			goto err;
 		case USB_PORT_FEAT_C_CONNECTION:
-			SET_RH_PORTSTAT(USBPORTSC_CSC);
+			CLR_RH_PORTSTAT(USBPORTSC_CSC);
 			OK(0);
 		case USB_PORT_FEAT_C_OVER_CURRENT:
+			CLR_RH_PORTSTAT(USBPORTSC_OCC);
 			OK(0);	/* port power over current */
 		case USB_PORT_FEAT_C_RESET:
-			c_p_r[wIndex - 1] = 0;
+			/* this driver won't report these */
 			OK(0);
 		default:
 			goto err;

@@ -27,6 +27,11 @@
  */
 
 #include <linux/config.h>
+#ifdef CONFIG_USB_DEBUG
+#define DEBUG
+#else
+#undef DEBUG
+#endif
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/kernel.h>
@@ -43,11 +48,6 @@
 #include <linux/proc_fs.h>
 #include <linux/dmapool.h>
 #include <linux/dma-mapping.h>
-#ifdef CONFIG_USB_DEBUG
-#define DEBUG
-#else
-#undef DEBUG
-#endif
 #include <linux/usb.h>
 
 #include <asm/bitops.h>
@@ -2276,7 +2276,7 @@ static int uhci_start(struct usb_hcd *hcd)
 
 	/* This is experimental so anything less than 2 or greater than 8 is */
 	/*  something weird and we'll ignore it */
-	if (port < 2 || port > 8) {
+	if (port < 2 || port > UHCI_RH_MAXCHILD) {
 		info("port count misdetected? forcing to 2 ports");
 		port = 2;
 	}

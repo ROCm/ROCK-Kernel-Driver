@@ -49,12 +49,19 @@
 #define   USBPORTSC_CSC		0x0002	/* Connect Status Change */
 #define   USBPORTSC_PE		0x0004	/* Port Enable */
 #define   USBPORTSC_PEC		0x0008	/* Port Enable Change */
-#define   USBPORTSC_LS		0x0030	/* Line Status */
+#define   USBPORTSC_DPLUS	0x0010	/* D+ high (line status) */
+#define   USBPORTSC_DMINUS	0x0020	/* D- high (line status) */
 #define   USBPORTSC_RD		0x0040	/* Resume Detect */
+#define   USBPORTSC_RES1	0x0080	/* reserved, always 1 */
 #define   USBPORTSC_LSDA	0x0100	/* Low Speed Device Attached */
 #define   USBPORTSC_PR		0x0200	/* Port Reset */
+/* OC and OCC from Intel 430TX and later (not UHCI 1.1d spec) */
 #define   USBPORTSC_OC		0x0400	/* Over Current condition */
+#define   USBPORTSC_OCC		0x0800	/* Over Current Change R/WC */
 #define   USBPORTSC_SUSP	0x1000	/* Suspend */
+#define   USBPORTSC_RES2	0x2000	/* reserved, write zeroes */
+#define   USBPORTSC_RES3	0x4000	/* reserved, write zeroes */
+#define   USBPORTSC_RES4	0x8000	/* reserved, write zeroes */
 
 /* Legacy support register */
 #define USBLEGSUP		0xc0
