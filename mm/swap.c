@@ -81,15 +81,18 @@ void __page_cache_release(struct page *page)
 		unsigned long flags;
 
 		spin_lock_irqsave(&_pagemap_lru_lock, flags);
-		if (!TestClearPageLRU(page))
-			BUG();
-		if (PageActive(page))
-			del_page_from_active_list(page);
-		else
-			del_page_from_inactive_list(page);
+		if (TestClearPageLRU(page)) {
+			if (PageActive(page))
+				del_page_from_active_list(page);
+			else
+				del_page_from_inactive_list(page);
+		}
+		if (page_count(page) != 0)
+			page = NULL;
 		spin_unlock_irqrestore(&_pagemap_lru_lock, flags);
 	}
-	__free_pages_ok(page, 0);
+	if (page)
+		__free_pages_ok(page, 0);
 }
 
 /*
