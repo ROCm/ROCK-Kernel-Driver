@@ -14,7 +14,7 @@
 .insw_bad_alignment:
 		adr	r0, .insw_bad_align_msg
 		mov	r2, lr
-		b	SYMBOL_NAME(panic)
+		b	panic
 .insw_bad_align_msg:
 		.asciz	"insw: bad buffer alignment (0x%p, lr=0x%08lX)\n"
 		.align

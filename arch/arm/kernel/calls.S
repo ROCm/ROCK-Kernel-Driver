@@ -14,248 +14,248 @@
 #else
 
 __syscall_start:
-/* 0 */		.long	SYMBOL_NAME(sys_ni_syscall)
-		.long	SYMBOL_NAME(sys_exit)
-		.long	SYMBOL_NAME(sys_fork_wrapper)
-		.long	SYMBOL_NAME(sys_read)
-		.long	SYMBOL_NAME(sys_write)
-/* 5 */		.long	SYMBOL_NAME(sys_open)
-		.long	SYMBOL_NAME(sys_close)
-		.long	SYMBOL_NAME(sys_ni_syscall)		/* was sys_waitpid */
-		.long	SYMBOL_NAME(sys_creat)
-		.long	SYMBOL_NAME(sys_link)
-/* 10 */	.long	SYMBOL_NAME(sys_unlink)
-		.long	SYMBOL_NAME(sys_execve_wrapper)
-		.long	SYMBOL_NAME(sys_chdir)
-		.long	SYMBOL_NAME(sys_time)			/* used by libc4 */
-		.long	SYMBOL_NAME(sys_mknod)
-/* 15 */	.long	SYMBOL_NAME(sys_chmod)
-		.long	SYMBOL_NAME(sys_lchown16)
-		.long	SYMBOL_NAME(sys_ni_syscall)		/* was sys_break */
-		.long	SYMBOL_NAME(sys_ni_syscall)		/* was sys_stat */
-		.long	SYMBOL_NAME(sys_lseek)
-/* 20 */	.long	SYMBOL_NAME(sys_getpid)
-		.long	SYMBOL_NAME(sys_mount)
-		.long	SYMBOL_NAME(sys_oldumount)		/* used by libc4 */
-		.long	SYMBOL_NAME(sys_setuid16)
-		.long	SYMBOL_NAME(sys_getuid16)
-/* 25 */	.long	SYMBOL_NAME(sys_stime)
-		.long	SYMBOL_NAME(sys_ptrace)
-		.long	SYMBOL_NAME(sys_alarm)			/* used by libc4 */
-		.long	SYMBOL_NAME(sys_ni_syscall)		/* was sys_fstat */
-		.long	SYMBOL_NAME(sys_pause)
-/* 30 */	.long	SYMBOL_NAME(sys_utime)			/* used by libc4 */
-		.long	SYMBOL_NAME(sys_ni_syscall)		/* was sys_stty */
-		.long	SYMBOL_NAME(sys_ni_syscall)		/* was sys_getty */
-		.long	SYMBOL_NAME(sys_access)
-		.long	SYMBOL_NAME(sys_nice)
-/* 35 */	.long	SYMBOL_NAME(sys_ni_syscall)		/* was sys_ftime */
-		.long	SYMBOL_NAME(sys_sync)
-		.long	SYMBOL_NAME(sys_kill)
-		.long	SYMBOL_NAME(sys_rename)
-		.long	SYMBOL_NAME(sys_mkdir)
-/* 40 */	.long	SYMBOL_NAME(sys_rmdir)
-		.long	SYMBOL_NAME(sys_dup)
-		.long	SYMBOL_NAME(sys_pipe)
-		.long	SYMBOL_NAME(sys_times)
-		.long	SYMBOL_NAME(sys_ni_syscall)		/* was sys_prof */
-/* 45 */	.long	SYMBOL_NAME(sys_brk)
-		.long	SYMBOL_NAME(sys_setgid16)
-		.long	SYMBOL_NAME(sys_getgid16)
-		.long	SYMBOL_NAME(sys_ni_syscall)		/* was sys_signal */
-		.long	SYMBOL_NAME(sys_geteuid16)
-/* 50 */	.long	SYMBOL_NAME(sys_getegid16)
-		.long	SYMBOL_NAME(sys_acct)
-		.long	SYMBOL_NAME(sys_umount)
-		.long	SYMBOL_NAME(sys_ni_syscall)		/* was sys_lock */
-		.long	SYMBOL_NAME(sys_ioctl)
-/* 55 */	.long	SYMBOL_NAME(sys_fcntl)
-		.long	SYMBOL_NAME(sys_ni_syscall)		/* was sys_mpx */
-		.long	SYMBOL_NAME(sys_setpgid)
-		.long	SYMBOL_NAME(sys_ni_syscall)		/* was sys_ulimit */
-		.long	SYMBOL_NAME(sys_ni_syscall)		/* was sys_olduname */
-/* 60 */	.long	SYMBOL_NAME(sys_umask)
-		.long	SYMBOL_NAME(sys_chroot)
-		.long	SYMBOL_NAME(sys_ustat)
-		.long	SYMBOL_NAME(sys_dup2)
-		.long	SYMBOL_NAME(sys_getppid)
-/* 65 */	.long	SYMBOL_NAME(sys_getpgrp)
-		.long	SYMBOL_NAME(sys_setsid)
-		.long	SYMBOL_NAME(sys_sigaction)
-		.long	SYMBOL_NAME(sys_ni_syscall)		/* was sys_sgetmask */
-		.long	SYMBOL_NAME(sys_ni_syscall)		/* was sys_ssetmask */
-/* 70 */	.long	SYMBOL_NAME(sys_setreuid16)
-		.long	SYMBOL_NAME(sys_setregid16)
-		.long	SYMBOL_NAME(sys_sigsuspend_wrapper)
-		.long	SYMBOL_NAME(sys_sigpending)
-		.long	SYMBOL_NAME(sys_sethostname)
-/* 75 */	.long	SYMBOL_NAME(sys_setrlimit)
-		.long	SYMBOL_NAME(sys_old_getrlimit)		/* used by libc4 */
-		.long	SYMBOL_NAME(sys_getrusage)
-		.long	SYMBOL_NAME(sys_gettimeofday)
-		.long	SYMBOL_NAME(sys_settimeofday)
-/* 80 */	.long	SYMBOL_NAME(sys_getgroups16)
-		.long	SYMBOL_NAME(sys_setgroups16)
-		.long	SYMBOL_NAME(old_select)			/* used by libc4 */
-		.long	SYMBOL_NAME(sys_symlink)
-		.long	SYMBOL_NAME(sys_ni_syscall)		/* was sys_lstat */
-/* 85 */	.long	SYMBOL_NAME(sys_readlink)
-		.long	SYMBOL_NAME(sys_uselib)
-		.long	SYMBOL_NAME(sys_swapon)
-		.long	SYMBOL_NAME(sys_reboot)
-		.long	SYMBOL_NAME(old_readdir)		/* used by libc4 */
-/* 90 */	.long	SYMBOL_NAME(old_mmap)			/* used by libc4 */
-		.long	SYMBOL_NAME(sys_munmap)
-		.long	SYMBOL_NAME(sys_truncate)
-		.long	SYMBOL_NAME(sys_ftruncate)
-		.long	SYMBOL_NAME(sys_fchmod)
-/* 95 */	.long	SYMBOL_NAME(sys_fchown16)
-		.long	SYMBOL_NAME(sys_getpriority)
-		.long	SYMBOL_NAME(sys_setpriority)
-		.long	SYMBOL_NAME(sys_ni_syscall)		/* was sys_profil */
-		.long	SYMBOL_NAME(sys_statfs)
-/* 100 */	.long	SYMBOL_NAME(sys_fstatfs)
-		.long	SYMBOL_NAME(sys_ni_syscall)
-		.long	SYMBOL_NAME(sys_socketcall)
-		.long	SYMBOL_NAME(sys_syslog)
-		.long	SYMBOL_NAME(sys_setitimer)
-/* 105 */	.long	SYMBOL_NAME(sys_getitimer)
-		.long	SYMBOL_NAME(sys_newstat)
-		.long	SYMBOL_NAME(sys_newlstat)
-		.long	SYMBOL_NAME(sys_newfstat)
-		.long	SYMBOL_NAME(sys_ni_syscall)		/* was sys_uname */
-/* 110 */	.long	SYMBOL_NAME(sys_ni_syscall)		/* was sys_iopl */
-		.long	SYMBOL_NAME(sys_vhangup)
-		.long	SYMBOL_NAME(sys_ni_syscall)
-		.long	SYMBOL_NAME(sys_syscall)		/* call a syscall */
-		.long	SYMBOL_NAME(sys_wait4)
-/* 115 */	.long	SYMBOL_NAME(sys_swapoff)
-		.long	SYMBOL_NAME(sys_sysinfo)
-		.long	SYMBOL_NAME(sys_ipc)
-		.long	SYMBOL_NAME(sys_fsync)
-		.long	SYMBOL_NAME(sys_sigreturn_wrapper)
-/* 120 */	.long	SYMBOL_NAME(sys_clone_wapper)
-		.long	SYMBOL_NAME(sys_setdomainname)
-		.long	SYMBOL_NAME(sys_newuname)
-		.long	SYMBOL_NAME(sys_ni_syscall)
-		.long	SYMBOL_NAME(sys_adjtimex)
-/* 125 */	.long	SYMBOL_NAME(sys_mprotect)
-		.long	SYMBOL_NAME(sys_sigprocmask)
-		.long	SYMBOL_NAME(sys_create_module)
-		.long	SYMBOL_NAME(sys_init_module)
-		.long	SYMBOL_NAME(sys_delete_module)
-/* 130 */	.long	SYMBOL_NAME(sys_get_kernel_syms)
-		.long	SYMBOL_NAME(sys_quotactl)
-		.long	SYMBOL_NAME(sys_getpgid)
-		.long	SYMBOL_NAME(sys_fchdir)
-		.long	SYMBOL_NAME(sys_bdflush)
-/* 135 */	.long	SYMBOL_NAME(sys_sysfs)
-		.long	SYMBOL_NAME(sys_personality)
-		.long	SYMBOL_NAME(sys_ni_syscall)		/* .long	_sys_afs_syscall */
-		.long	SYMBOL_NAME(sys_setfsuid16)
-		.long	SYMBOL_NAME(sys_setfsgid16)
-/* 140 */	.long	SYMBOL_NAME(sys_llseek)
-		.long	SYMBOL_NAME(sys_getdents)
-		.long	SYMBOL_NAME(sys_select)
-		.long	SYMBOL_NAME(sys_flock)
-		.long	SYMBOL_NAME(sys_msync)
-/* 145 */	.long	SYMBOL_NAME(sys_readv)
-		.long	SYMBOL_NAME(sys_writev)
-		.long	SYMBOL_NAME(sys_getsid)
-		.long	SYMBOL_NAME(sys_fdatasync)
-		.long	SYMBOL_NAME(sys_sysctl)
-/* 150 */	.long	SYMBOL_NAME(sys_mlock)
-		.long	SYMBOL_NAME(sys_munlock)
-		.long	SYMBOL_NAME(sys_mlockall)
-		.long	SYMBOL_NAME(sys_munlockall)
-		.long	SYMBOL_NAME(sys_sched_setparam)
-/* 155 */	.long	SYMBOL_NAME(sys_sched_getparam)
-		.long	SYMBOL_NAME(sys_sched_setscheduler)
-		.long	SYMBOL_NAME(sys_sched_getscheduler)
-		.long	SYMBOL_NAME(sys_sched_yield)
-		.long	SYMBOL_NAME(sys_sched_get_priority_max)
-/* 160 */	.long	SYMBOL_NAME(sys_sched_get_priority_min)
-		.long	SYMBOL_NAME(sys_sched_rr_get_interval)
-		.long	SYMBOL_NAME(sys_nanosleep)
-		.long	SYMBOL_NAME(sys_arm_mremap)
-		.long	SYMBOL_NAME(sys_setresuid16)
-/* 165 */	.long	SYMBOL_NAME(sys_getresuid16)
-		.long	SYMBOL_NAME(sys_ni_syscall)
-		.long	SYMBOL_NAME(sys_query_module)
-		.long	SYMBOL_NAME(sys_poll)
-		.long	SYMBOL_NAME(sys_nfsservctl)
-/* 170 */	.long	SYMBOL_NAME(sys_setresgid16)
-		.long	SYMBOL_NAME(sys_getresgid16)
-		.long	SYMBOL_NAME(sys_prctl)
-		.long	SYMBOL_NAME(sys_rt_sigreturn_wrapper)
-		.long	SYMBOL_NAME(sys_rt_sigaction)
-/* 175 */	.long	SYMBOL_NAME(sys_rt_sigprocmask)
-		.long	SYMBOL_NAME(sys_rt_sigpending)
-		.long	SYMBOL_NAME(sys_rt_sigtimedwait)
-		.long	SYMBOL_NAME(sys_rt_sigqueueinfo)
-		.long	SYMBOL_NAME(sys_rt_sigsuspend_wrapper)
-/* 180 */	.long	SYMBOL_NAME(sys_pread)
-		.long	SYMBOL_NAME(sys_pwrite)
-		.long	SYMBOL_NAME(sys_chown16)
-		.long	SYMBOL_NAME(sys_getcwd)
-		.long	SYMBOL_NAME(sys_capget)
-/* 185 */	.long	SYMBOL_NAME(sys_capset)
-		.long	SYMBOL_NAME(sys_sigaltstack_wrapper)
-		.long	SYMBOL_NAME(sys_sendfile)
-		.long	SYMBOL_NAME(sys_ni_syscall)
-		.long	SYMBOL_NAME(sys_ni_syscall)
-/* 190 */	.long	SYMBOL_NAME(sys_vfork_wrapper)
-		.long	SYMBOL_NAME(sys_getrlimit)
-		.long	SYMBOL_NAME(sys_mmap2)
-		.long	SYMBOL_NAME(sys_truncate64)
-		.long	SYMBOL_NAME(sys_ftruncate64)
-/* 195 */	.long	SYMBOL_NAME(sys_stat64)
-		.long	SYMBOL_NAME(sys_lstat64)
-		.long	SYMBOL_NAME(sys_fstat64)
-		.long	SYMBOL_NAME(sys_lchown)
-		.long	SYMBOL_NAME(sys_getuid)
-/* 200 */	.long	SYMBOL_NAME(sys_getgid)
-		.long	SYMBOL_NAME(sys_geteuid)
-		.long	SYMBOL_NAME(sys_getegid)
-		.long	SYMBOL_NAME(sys_setreuid)
-		.long	SYMBOL_NAME(sys_setregid)
-/* 205 */	.long	SYMBOL_NAME(sys_getgroups)
-		.long	SYMBOL_NAME(sys_setgroups)
-		.long	SYMBOL_NAME(sys_fchown)
-		.long	SYMBOL_NAME(sys_setresuid)
-		.long	SYMBOL_NAME(sys_getresuid)
-/* 210 */	.long	SYMBOL_NAME(sys_setresgid)
-		.long	SYMBOL_NAME(sys_getresgid)
-		.long	SYMBOL_NAME(sys_chown)
-		.long	SYMBOL_NAME(sys_setuid)
-		.long	SYMBOL_NAME(sys_setgid)
-/* 215 */	.long	SYMBOL_NAME(sys_setfsuid)
-		.long	SYMBOL_NAME(sys_setfsgid)
-		.long	SYMBOL_NAME(sys_getdents64)
-		.long	SYMBOL_NAME(sys_pivot_root)
-		.long	SYMBOL_NAME(sys_mincore)
-/* 220 */	.long	SYMBOL_NAME(sys_madvise)
-		.long	SYMBOL_NAME(sys_fcntl64)
-		.long	SYMBOL_NAME(sys_ni_syscall) /* TUX */
-		.long	SYMBOL_NAME(sys_ni_syscall) /* Security */
-		.long	SYMBOL_NAME(sys_gettid)
-/* 225 */	.long	SYMBOL_NAME(sys_readahead)
-		.long	SYMBOL_NAME(sys_setxattr)
-		.long	SYMBOL_NAME(sys_lsetxattr)
-		.long	SYMBOL_NAME(sys_fsetxattr)
-		.long	SYMBOL_NAME(sys_getxattr)
-/* 230 */	.long	SYMBOL_NAME(sys_lgetxattr)
-		.long	SYMBOL_NAME(sys_fgetxattr)
-		.long	SYMBOL_NAME(sys_listxattr)
-		.long	SYMBOL_NAME(sys_llistxattr)
-		.long	SYMBOL_NAME(sys_flistxattr)
-/* 235 */	.long	SYMBOL_NAME(sys_removexattr)
-		.long	SYMBOL_NAME(sys_lremovexattr)
-		.long	SYMBOL_NAME(sys_fremovexattr)
-		.long	SYMBOL_NAME(sys_tkill)
+/* 0 */		.long	sys_ni_syscall
+		.long	sys_exit
+		.long	sys_fork_wrapper
+		.long	sys_read
+		.long	sys_write
+/* 5 */		.long	sys_open
+		.long	sys_close
+		.long	sys_ni_syscall		/* was sys_waitpid */
+		.long	sys_creat
+		.long	sys_link
+/* 10 */	.long	sys_unlink
+		.long	sys_execve_wrapper
+		.long	sys_chdir
+		.long	sys_time		/* used by libc4 */
+		.long	sys_mknod
+/* 15 */	.long	sys_chmod
+		.long	sys_lchown16
+		.long	sys_ni_syscall		/* was sys_break */
+		.long	sys_ni_syscall		/* was sys_stat */
+		.long	sys_lseek
+/* 20 */	.long	sys_getpid
+		.long	sys_mount
+		.long	sys_oldumount		/* used by libc4 */
+		.long	sys_setuid16
+		.long	sys_getuid16
+/* 25 */	.long	sys_stime
+		.long	sys_ptrace
+		.long	sys_alarm		/* used by libc4 */
+		.long	sys_ni_syscall		/* was sys_fstat */
+		.long	sys_pause
+/* 30 */	.long	sys_utime		/* used by libc4 */
+		.long	sys_ni_syscall		/* was sys_stty */
+		.long	sys_ni_syscall		/* was sys_getty */
+		.long	sys_access
+		.long	sys_nice
+/* 35 */	.long	sys_ni_syscall		/* was sys_ftime */
+		.long	sys_sync
+		.long	sys_kill
+		.long	sys_rename
+		.long	sys_mkdir
+/* 40 */	.long	sys_rmdir
+		.long	sys_dup
+		.long	sys_pipe
+		.long	sys_times
+		.long	sys_ni_syscall		/* was sys_prof */
+/* 45 */	.long	sys_brk
+		.long	sys_setgid16
+		.long	sys_getgid16
+		.long	sys_ni_syscall		/* was sys_signal */
+		.long	sys_geteuid16
+/* 50 */	.long	sys_getegid16
+		.long	sys_acct
+		.long	sys_umount
+		.long	sys_ni_syscall		/* was sys_lock */
+		.long	sys_ioctl
+/* 55 */	.long	sys_fcntl
+		.long	sys_ni_syscall		/* was sys_mpx */
+		.long	sys_setpgid
+		.long	sys_ni_syscall		/* was sys_ulimit */
+		.long	sys_ni_syscall		/* was sys_olduname */
+/* 60 */	.long	sys_umask
+		.long	sys_chroot
+		.long	sys_ustat
+		.long	sys_dup2
+		.long	sys_getppid
+/* 65 */	.long	sys_getpgrp
+		.long	sys_setsid
+		.long	sys_sigaction
+		.long	sys_ni_syscall		/* was sys_sgetmask */
+		.long	sys_ni_syscall		/* was sys_ssetmask */
+/* 70 */	.long	sys_setreuid16
+		.long	sys_setregid16
+		.long	sys_sigsuspend_wrapper
+		.long	sys_sigpending
+		.long	sys_sethostname
+/* 75 */	.long	sys_setrlimit
+		.long	sys_old_getrlimit	/* used by libc4 */
+		.long	sys_getrusage
+		.long	sys_gettimeofday
+		.long	sys_settimeofday
+/* 80 */	.long	sys_getgroups16
+		.long	sys_setgroups16
+		.long	old_select		/* used by libc4 */
+		.long	sys_symlink
+		.long	sys_ni_syscall		/* was sys_lstat */
+/* 85 */	.long	sys_readlink
+		.long	sys_uselib
+		.long	sys_swapon
+		.long	sys_reboot
+		.long	old_readdir		/* used by libc4 */
+/* 90 */	.long	old_mmap		/* used by libc4 */
+		.long	sys_munmap
+		.long	sys_truncate
+		.long	sys_ftruncate
+		.long	sys_fchmod
+/* 95 */	.long	sys_fchown16
+		.long	sys_getpriority
+		.long	sys_setpriority
+		.long	sys_ni_syscall		/* was sys_profil */
+		.long	sys_statfs
+/* 100 */	.long	sys_fstatfs
+		.long	sys_ni_syscall
+		.long	sys_socketcall
+		.long	sys_syslog
+		.long	sys_setitimer
+/* 105 */	.long	sys_getitimer
+		.long	sys_newstat
+		.long	sys_newlstat
+		.long	sys_newfstat
+		.long	sys_ni_syscall		/* was sys_uname */
+/* 110 */	.long	sys_ni_syscall		/* was sys_iopl */
+		.long	sys_vhangup
+		.long	sys_ni_syscall
+		.long	sys_syscall		/* call a syscall */
+		.long	sys_wait4
+/* 115 */	.long	sys_swapoff
+		.long	sys_sysinfo
+		.long	sys_ipc
+		.long	sys_fsync
+		.long	sys_sigreturn_wrapper
+/* 120 */	.long	sys_clone_wapper
+		.long	sys_setdomainname
+		.long	sys_newuname
+		.long	sys_ni_syscall
+		.long	sys_adjtimex
+/* 125 */	.long	sys_mprotect
+		.long	sys_sigprocmask
+		.long	sys_create_module
+		.long	sys_init_module
+		.long	sys_delete_module
+/* 130 */	.long	sys_get_kernel_syms
+		.long	sys_quotactl
+		.long	sys_getpgid
+		.long	sys_fchdir
+		.long	sys_bdflush
+/* 135 */	.long	sys_sysfs
+		.long	sys_personality
+		.long	sys_ni_syscall		/* .long	_sys_afs_syscall */
+		.long	sys_setfsuid16
+		.long	sys_setfsgid16
+/* 140 */	.long	sys_llseek
+		.long	sys_getdents
+		.long	sys_select
+		.long	sys_flock
+		.long	sys_msync
+/* 145 */	.long	sys_readv
+		.long	sys_writev
+		.long	sys_getsid
+		.long	sys_fdatasync
+		.long	sys_sysctl
+/* 150 */	.long	sys_mlock
+		.long	sys_munlock
+		.long	sys_mlockall
+		.long	sys_munlockall
+		.long	sys_sched_setparam
+/* 155 */	.long	sys_sched_getparam
+		.long	sys_sched_setscheduler
+		.long	sys_sched_getscheduler
+		.long	sys_sched_yield
+		.long	sys_sched_get_priority_max
+/* 160 */	.long	sys_sched_get_priority_min
+		.long	sys_sched_rr_get_interval
+		.long	sys_nanosleep
+		.long	sys_arm_mremap
+		.long	sys_setresuid16
+/* 165 */	.long	sys_getresuid16
+		.long	sys_ni_syscall
+		.long	sys_query_module
+		.long	sys_poll
+		.long	sys_nfsservctl
+/* 170 */	.long	sys_setresgid16
+		.long	sys_getresgid16
+		.long	sys_prctl
+		.long	sys_rt_sigreturn_wrapper
+		.long	sys_rt_sigaction
+/* 175 */	.long	sys_rt_sigprocmask
+		.long	sys_rt_sigpending
+		.long	sys_rt_sigtimedwait
+		.long	sys_rt_sigqueueinfo
+		.long	sys_rt_sigsuspend_wrapper
+/* 180 */	.long	sys_pread
+		.long	sys_pwrite
+		.long	sys_chown16
+		.long	sys_getcwd
+		.long	sys_capget
+/* 185 */	.long	sys_capset
+		.long	sys_sigaltstack_wrapper
+		.long	sys_sendfile
+		.long	sys_ni_syscall
+		.long	sys_ni_syscall
+/* 190 */	.long	sys_vfork_wrapper
+		.long	sys_getrlimit
+		.long	sys_mmap2
+		.long	sys_truncate64
+		.long	sys_ftruncate64
+/* 195 */	.long	sys_stat64
+		.long	sys_lstat64
+		.long	sys_fstat64
+		.long	sys_lchown
+		.long	sys_getuid
+/* 200 */	.long	sys_getgid
+		.long	sys_geteuid
+		.long	sys_getegid
+		.long	sys_setreuid
+		.long	sys_setregid
+/* 205 */	.long	sys_getgroups
+		.long	sys_setgroups
+		.long	sys_fchown
+		.long	sys_setresuid
+		.long	sys_getresuid
+/* 210 */	.long	sys_setresgid
+		.long	sys_getresgid
+		.long	sys_chown
+		.long	sys_setuid
+		.long	sys_setgid
+/* 215 */	.long	sys_setfsuid
+		.long	sys_setfsgid
+		.long	sys_getdents64
+		.long	sys_pivot_root
+		.long	sys_mincore
+/* 220 */	.long	sys_madvise
+		.long	sys_fcntl64
+		.long	sys_ni_syscall /* TUX */
+		.long	sys_ni_syscall /* Security */
+		.long	sys_gettid
+/* 225 */	.long	sys_readahead
+		.long	sys_setxattr
+		.long	sys_lsetxattr
+		.long	sys_fsetxattr
+		.long	sys_getxattr
+/* 230 */	.long	sys_lgetxattr
+		.long	sys_fgetxattr
+		.long	sys_listxattr
+		.long	sys_llistxattr
+		.long	sys_flistxattr
+/* 235 */	.long	sys_removexattr
+		.long	sys_lremovexattr
+		.long	sys_fremovexattr
+		.long	sys_tkill
 __syscall_end:
 
 		.rept	NR_syscalls - (__syscall_end - __syscall_start) / 4
-			.long	SYMBOL_NAME(sys_ni_syscall)
+			.long	sys_ni_syscall
 		.endr
 #endif

@@ -189,7 +189,7 @@ clear_tables:	ldr	r1, _arm3_set_pgd - 4
  * Params  : pgd	New page tables/MEMC mapping
  * Purpose : update MEMC hardware with new mapping
  */
-		.word	SYMBOL_NAME(page_nr)
+		.word	page_nr
 _arm3_set_pgd:	mcr	p15, 0, r1, c1, c0, 0		@ flush cache
 _arm2_set_pgd:	stmfd	sp!, {lr}
 		ldr	r1, _arm3_set_pgd - 4
@@ -285,8 +285,8 @@ _arm3_name:	.asciz	"ARM 3"
  * Purpose : Function pointers used to access above functions - all calls
  *	     come through these
  */
-		.globl	SYMBOL_NAME(arm2_processor_functions)
-SYMBOL_NAME(arm2_processor_functions):
+		.globl	arm2_processor_functions
+arm2_processor_functions:
 		.word	_arm2_3_check_bugs
 		.word	_arm2_proc_init
 		.word	_arm2_proc_fin
@@ -298,8 +298,8 @@ cpu_arm2_info:
 		.long	armvlsi_name
 		.long	_arm2_name
 
-		.globl	SYMBOL_NAME(arm250_processor_functions)
-SYMBOL_NAME(arm250_processor_functions):
+		.globl	arm250_processor_functions
+arm250_processor_functions:
 		.word	_arm2_3_check_bugs
 		.word	_arm2_proc_init
 		.word	_arm2_proc_fin
@@ -311,8 +311,8 @@ cpu_arm250_info:
 		.long	armvlsi_name
 		.long	_arm250_name
 
-		.globl	SYMBOL_NAME(arm3_processor_functions)
-SYMBOL_NAME(arm3_processor_functions):
+		.globl	arm3_processor_functions
+arm3_processor_functions:
 		.word	_arm2_3_check_bugs
 		.word	_arm3_proc_init
 		.word	_arm3_proc_fin
@@ -340,7 +340,7 @@ arm3_elf_name:	.asciz	"v2"
 		.long	arm2_elf_name
 		.long	0
 		.long	cpu_arm2_info
-		.long	SYMBOL_NAME(arm2_processor_functions)
+		.long	arm2_processor_functions
 		.long	0
 		.long	0
 
@@ -352,7 +352,7 @@ arm3_elf_name:	.asciz	"v2"
 		.long	arm3_elf_name
 		.long	0
 		.long	cpu_arm250_info
-		.long	SYMBOL_NAME(arm250_processor_functions)
+		.long	arm250_processor_functions
 		.long	0
 		.long	0
 
@@ -364,7 +364,7 @@ arm3_elf_name:	.asciz	"v2"
 		.long	arm3_elf_name
 		.long	0
 		.long	cpu_arm3_info
-		.long	SYMBOL_NAME(arm3_processor_functions)
+		.long	arm3_processor_functions
 		.long	0
 		.long	0
 

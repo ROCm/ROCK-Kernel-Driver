@@ -185,7 +185,7 @@ not_relocated:	mov	r0, #0
 		mov	r5, r2			@ decompress after malloc space
 		mov	r0, r5
 		mov	r3, r7
-		bl	SYMBOL_NAME(decompress_kernel)
+		bl	decompress_kernel
 
 		add	r0, r0, #127
 		bic	r0, r0, #127		@ align the kernel length
@@ -219,7 +219,7 @@ not_relocated:	mov	r0, #0
  */
 wont_overwrite:	mov	r0, r4
 		mov	r3, r7
-		bl	SYMBOL_NAME(decompress_kernel)
+		bl	decompress_kernel
 		b	call_kernel
 
 		.type	LC0, #object

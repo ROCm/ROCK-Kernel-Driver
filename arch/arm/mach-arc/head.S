@@ -13,8 +13,8 @@
 #include <linux/linkage.h>
 #include <asm/mach-types.h>
 
-		.globl	SYMBOL_NAME(swapper_pg_dir)
-		.equ	SYMBOL_NAME(swapper_pg_dir),	0x0207d000
+		.globl	swapper_pg_dir
+		.equ	swapper_pg_dir,	0x0207d000
 
 /*
  * Entry point.
@@ -38,14 +38,14 @@ __entry:	cmp	pc, #0x02000000
 		str	r0, [r5]
 
 		mov	fp, #0
-		b	SYMBOL_NAME(start_kernel)
+		b	start_kernel
 
-LC0:		.word	SYMBOL_NAME(_stext)
-		.word	SYMBOL_NAME(__bss_start)		@ r2
-		.word	SYMBOL_NAME(_end)			@ r3
-		.word	SYMBOL_NAME(processor_id)		@ r4
-		.word	SYMBOL_NAME(__machine_arch_type)	@ r5
-		.word	SYMBOL_NAME(init_task_union)+8192	@ sp
+LC0:		.word	_stext
+		.word	__bss_start		@ r2
+		.word	_end			@ r3
+		.word	processor_id		@ r4
+		.word	__machine_arch_type	@ r5
+		.word	init_task_union+8192	@ sp
 arm2_id:	.long	0x41560200
 arm250_id:	.long	0x41560250
 		.align
