@@ -154,7 +154,7 @@ static struct tunertype tuners[] = {
 	  16*137.25,16*385.25,0x01,0x02,0x08,0x8e,732},
         { "Alps TSBE1",TEMIC,PAL,
 	  16*137.25,16*385.25,0x01,0x02,0x08,0x8e,732},
-        { "Alps TSBB5", Alps, PAL_I, /* tested (UK UHF) with Modtec MM205 */
+        { "Alps TSBB5", Alps, PAL_I, /* tested (UK UHF) with Modulartech MM205 */
 	  16*133.25,16*351.25,0x01,0x02,0x08,0x8e,632},
 
         { "Alps TSBE5", Alps, PAL, /* untested - data sheet guess. Only IF differs. */
@@ -175,7 +175,7 @@ static struct tunertype tuners[] = {
         { "Temic PAL* auto (4006 FN5)", TEMIC, PAL,
           16*169.00, 16*454.00, 0xa0,0x90,0x30,0x8e,623},
 
-        { "Temic PAL (4009 FR5)", TEMIC, PAL,
+        { "Temic PAL_BG (4009 FR5) or PAL_I (4069 FR5)", TEMIC, PAL,
           16*141.00, 16*464.00, 0xa0,0x90,0x30,0x8e,623},
         { "Temic NTSC (4039 FR5)", TEMIC, NTSC,
           16*158.00, 16*453.00, 0xa0,0x90,0x30,0x8e,732},
@@ -271,7 +271,7 @@ static int tuner_mode (struct i2c_client *c)
 }
 #endif
 // Initalization as described in "MT203x Programming Procedures", Rev 1.2, Feb.2001
-int mt2032_init(struct i2c_client *c)
+static int mt2032_init(struct i2c_client *c)
 {
         unsigned char buf[21];
         int ret,xogc,xok=0;
@@ -345,7 +345,7 @@ int mt2032_init(struct i2c_client *c)
 
 
 // IsSpurInBand()?
-int mt2032_spurcheck(int f1, int f2, int spectrum_from,int spectrum_to)
+static int mt2032_spurcheck(int f1, int f2, int spectrum_from,int spectrum_to)
 {
 	int n1=1,n2,f;
 
@@ -373,7 +373,7 @@ int mt2032_spurcheck(int f1, int f2, int spectrum_from,int spectrum_to)
 	return 1;
 }
 
-int mt2032_compute_freq(int rfin, int if1, int if2, int spectrum_from,
+static int mt2032_compute_freq(int rfin, int if1, int if2, int spectrum_from,
 	int spectrum_to, unsigned char *buf, int *ret_sel, int xogc) //all in Hz
 {
         int fref,lo1,lo1n,lo1a,s,sel,lo1freq, desired_lo1,
@@ -449,7 +449,7 @@ int mt2032_compute_freq(int rfin, int if1, int if2, int spectrum_from,
 	return 0;
 }
 
-int mt2032_check_lo_lock(struct i2c_client *c)
+static int mt2032_check_lo_lock(struct i2c_client *c)
 {
 	int try,lock=0;
 	unsigned char buf[2];
@@ -469,7 +469,7 @@ int mt2032_check_lo_lock(struct i2c_client *c)
         return lock;
 }
 
-int mt2032_optimize_vco(struct i2c_client *c,int sel,int lock)
+static int mt2032_optimize_vco(struct i2c_client *c,int sel,int lock)
 {
 	unsigned char buf[2];
 	int tad1;
@@ -505,7 +505,7 @@ int mt2032_optimize_vco(struct i2c_client *c,int sel,int lock)
 }
 
 
-void mt2032_set_if_freq(struct i2c_client *c,int rfin, int if1, int if2, int from, int to)
+static void mt2032_set_if_freq(struct i2c_client *c,int rfin, int if1, int if2, int from, int to)
 {
 	unsigned char buf[21];
 	int lint_try,ret,sel,lock=0;
@@ -560,7 +560,7 @@ void mt2032_set_if_freq(struct i2c_client *c,int rfin, int if1, int if2, int fro
 }
 
 
-void mt2032_set_tv_freq(struct i2c_client *c, int freq, int norm)
+static void mt2032_set_tv_freq(struct i2c_client *c, int freq, int norm)
 {
 	int if2,from,to;
 
@@ -815,14 +815,27 @@ static int tuner_attach(struct i2c_adapter *adap, int addr,
 
 static int tuner_probe(struct i2c_adapter *adap)
 {
+	int rc;
+
 	if (0 != addr) {
 		normal_i2c_range[0] = addr;
 		normal_i2c_range[1] = addr;
 	}
 	this_adap = 0;
-	if (adap->id == (I2C_ALGO_BIT | I2C_HW_B_BT848))
-		return i2c_probe(adap, &addr_data, tuner_attach);
-	return 0;
+	switch (adap->id) {
+	case I2C_ALGO_BIT | I2C_HW_B_BT848:
+	case I2C_ALGO_SAA7134:
+		printk("tuner: probing %s i2c adapter [id=0x%x]\n",
+		       adap->name,adap->id);
+		rc = i2c_probe(adap, &addr_data, tuner_attach);
+		break;
+	default:
+		printk("tuner: ignoring %s i2c adapter [id=0x%x]\n",
+		       adap->name,adap->id);
+		rc = 0;
+		/* nothing */
+	}
+	return rc;
 }
 
 static int tuner_detach(struct i2c_client *client)
@@ -948,39 +961,34 @@ tuner_command(struct i2c_client *client, unsigned int cmd, void *arg)
 /* ----------------------------------------------------------------------- */
 
 static struct i2c_driver driver = {
-        "i2c TV tuner driver",
-        I2C_DRIVERID_TUNER,
-        I2C_DF_NOTIFY,
-        tuner_probe,
-        tuner_detach,
-        tuner_command,
+        name:           "i2c TV tuner driver",
+        id:             I2C_DRIVERID_TUNER,
+        flags:          I2C_DF_NOTIFY,
+        attach_adapter: tuner_probe,
+        detach_client:  tuner_detach,
+        command:        tuner_command,
 };
-
 static struct i2c_client client_template =
 {
-        "(unset)",		/* name       */
-        -1,
-        0,
-        0,
-        NULL,
-        &driver
+        name:   "(unset)",
+	flags:  I2C_CLIENT_ALLOW_USE,
+        driver: &driver,
 };
 
-EXPORT_NO_SYMBOLS;
-
-int tuner_init_module(void)
+static int tuner_init_module(void)
 {
 	i2c_add_driver(&driver);
 	return 0;
 }
 
-void tuner_cleanup_module(void)
+static void tuner_cleanup_module(void)
 {
 	i2c_del_driver(&driver);
 }
 
 module_init(tuner_init_module);
 module_exit(tuner_cleanup_module);
+EXPORT_NO_SYMBOLS;
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
