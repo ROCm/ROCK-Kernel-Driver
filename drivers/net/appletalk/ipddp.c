@@ -116,7 +116,7 @@ static int ipddp_xmit(struct sk_buff *skb, struct net_device *dev)
 	u32 paddr = ((struct rtable*)skb->dst)->rt_gateway;
         struct ddpehdr *ddp;
         struct ipddp_route *rt;
-        struct at_addr *our_addr;
+        struct atalk_addr *our_addr;
 
 	/*
          * Find appropriate route to use, based only on IP number.
