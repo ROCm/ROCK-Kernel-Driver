@@ -2,7 +2,7 @@
  *  linux/drivers/ide/ide-disk.c	Version 1.18	Mar 05, 2003
  *
  *  Copyright (C) 1994-1998  Linus Torvalds & authors (see below)
- *  Copyright (C) 1998-2002  Linux ATA Developemt
+ *  Copyright (C) 1998-2002  Linux ATA Development
  *				Andre Hedrick <andre@linux-ide.org>
  *  Copyright (C) 2003	     Red Hat <alan@redhat.com>
  */
@@ -69,7 +69,7 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
-/* FIXME: some day we shouldnt need to look in here! */
+/* FIXME: some day we shouldn't need to look in here! */
 
 #include "legacy/pdc4030.h"
 
@@ -179,7 +179,7 @@ read_next:
 	if (((long)(rq->current_nr_sectors -= nsect)) <= 0)
 		ide_end_request(drive, 1, rq->hard_cur_sectors);
 	/*
-	 * Another BH Page walker and DATA INTERGRITY Questioned on ERROR.
+	 * Another BH Page walker and DATA INTEGRITY Questioned on ERROR.
 	 * If passed back up on multimode read, BAD DATA could be ACKED
 	 * to FILE SYSTEMS above ...
 	 */

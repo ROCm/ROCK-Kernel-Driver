@@ -283,7 +283,7 @@ err_misc:
 /**
  *	actual_try_to_identify	-	send ata/atapi identify
  *	@drive: drive to identify
- *	@cmd: comamnd to use
+ *	@cmd: command to use
  *
  *	try_to_identify() sends an ATA(PI) IDENTIFY request to a drive
  *	and waits for a response.  It also monitors irqs while this is
@@ -371,7 +371,7 @@ static int actual_try_to_identify (ide_drive_t *drive, u8 cmd)
 /**
  *	try_to_identify	-	try to identify a drive
  *	@drive: drive to probe
- *	@cmd: comamnd to use
+ *	@cmd: command to use
  *
  *	Issue the identify command and then do IRQ probing to
  *	complete the identification when needed by finding the
