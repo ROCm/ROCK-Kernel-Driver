@@ -155,7 +155,7 @@ sim710_probe_common(struct device *dev, unsigned long base_addr,
 static __devexit int
 sim710_device_remove(struct device *dev)
 {
-	struct Scsi_Host *host = to_scsi_host(dev);
+	struct Scsi_Host *host = dev_to_shost(dev);
 	struct NCR_700_Host_Parameters *hostdata =
 		(struct NCR_700_Host_Parameters *)host->hostdata[0];
 
