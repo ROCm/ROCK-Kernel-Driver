@@ -55,7 +55,7 @@ extern struct ata_timing ata_timing[];
 #define IDE_TIMING_UDMA		0x80
 #define IDE_TIMING_ALL		0xff
 
-#define FIT(v,x,y)	max_t(int,min_t(int,v,x),y)
+#define FIT(v,x,y)	max_t(int,min_t(int,v,y),x)
 #define ENOUGH(v,unit)	(((v)-1)/(unit)+1)
 #define EZ(v,unit)	((v)?ENOUGH(v,unit):0)
 
