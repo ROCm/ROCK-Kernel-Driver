@@ -2,7 +2,7 @@
  * NES, SNES, N64, MultiSystem, PSX gamepad driver for Linux
  *
  *  Copyright (c) 1999-2004 	Vojtech Pavlik <vojtech@suse.cz>
- *  Copyright (c) 2004 		Peter Nelson <pnelson@andrew.cmu.edu>
+ *  Copyright (c) 2004 		Peter Nelson <rufus-kernel@hackish.org>
  *
  *  Based on the work of:
  *  	Andree Borrmann		John Dahlstrom
