@@ -1484,6 +1484,7 @@ out:
 		np->cork.opt = NULL;
 	}
 	if (np->cork.rt) {
+		dst_release(&np->cork.rt->u.dst);
 		np->cork.rt = NULL;
 	}
 	if (np->cork.fl) {
@@ -1510,6 +1511,7 @@ void ip6_flush_pending_frames(struct sock *sk)
 		np->cork.opt = NULL;
 	}
 	if (np->cork.rt) {
+		dst_release(&np->cork.rt->u.dst);
 		np->cork.rt = NULL;
 	}
 	if (np->cork.fl) {
