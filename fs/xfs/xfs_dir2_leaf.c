@@ -1059,6 +1059,9 @@ xfs_dir2_leaf_getdents(
 					XFS_DIR2_DB_OFF_TO_BYTE(mp,
 					    XFS_DIR2_BYTE_TO_DB(mp, curoff),
 					    (char *)ptr - (char *)data);
+				if (ptr >= (char *)data + mp->m_dirblksize) {
+					continue;
+				}
 			}
 		}
 		/*
