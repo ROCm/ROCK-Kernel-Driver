@@ -68,7 +68,8 @@
  */
 static unsigned int	cpu_max_freq[NR_CPUS];
 static unsigned int	cpu_min_freq[NR_CPUS];
-static unsigned int	cpu_cur_freq[NR_CPUS];
+static unsigned int	cpu_cur_freq[NR_CPUS]; /* current CPU freq */
+static unsigned int	cpu_set_freq[NR_CPUS]; /* CPU freq desired by userspace */
 static unsigned int	cpu_is_managed[NR_CPUS];
 static struct cpufreq_policy current_policy[NR_CPUS];
 
@@ -81,13 +82,6 @@ userspace_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
                        void *data)
 {
         struct cpufreq_freqs *freq = data;
-
-	/* Don't update cur_freq if CPU is managed and we're
-	 * waking up: else we won't remember what frequency 
-	 * we need to set the CPU to.
-	 */
-	if (cpu_is_managed[freq->cpu] && (val == CPUFREQ_RESUMECHANGE))
-		return 0;
 
 	cpu_cur_freq[freq->cpu] = freq->new;
 
@@ -113,6 +107,8 @@ int cpufreq_set(unsigned int freq, unsigned int cpu)
 	down(&userspace_sem);
 	if (!cpu_is_managed[cpu])
 		goto err;
+
+	cpu_set_freq[cpu] = freq;
 
 	if (freq < cpu_min_freq[cpu])
 		freq = cpu_min_freq[cpu];
@@ -523,6 +519,7 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 		cpu_min_freq[cpu] = policy->min;
 		cpu_max_freq[cpu] = policy->max;
 		cpu_cur_freq[cpu] = policy->cur;
+		cpu_set_freq[cpu] = policy->cur;
 		sysfs_create_file (&policy->kobj, &freq_attr_scaling_setspeed.attr);
 		memcpy (&current_policy[cpu], policy, sizeof(struct cpufreq_policy));
 		up(&userspace_sem);
@@ -532,6 +529,7 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 		cpu_is_managed[cpu] = 0;
 		cpu_min_freq[cpu] = 0;
 		cpu_max_freq[cpu] = 0;
+		cpu_set_freq[cpu] = 0;
 		sysfs_remove_file (&policy->kobj, &freq_attr_scaling_setspeed.attr);
 		up(&userspace_sem);
 		break;
@@ -539,15 +537,16 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 		down(&userspace_sem);
 		cpu_min_freq[cpu] = policy->min;
 		cpu_max_freq[cpu] = policy->max;
-		if (policy->max < cpu_cur_freq[cpu])
+		if (policy->max < cpu_set_freq[cpu]) {
 			__cpufreq_driver_target(&current_policy[cpu], policy->max, 
 			      CPUFREQ_RELATION_H);
-		else if (policy->min > cpu_cur_freq[cpu])
+		} else if (policy->min > cpu_set_freq[cpu]) {
 			__cpufreq_driver_target(&current_policy[cpu], policy->min, 
 			      CPUFREQ_RELATION_L);
-		else
-			__cpufreq_driver_target(&current_policy[cpu], cpu_cur_freq[cpu],
+		} else {
+			__cpufreq_driver_target(&current_policy[cpu], cpu_set_freq[cpu],
 			      CPUFREQ_RELATION_L);
+		}
 		memcpy (&current_policy[cpu], policy, sizeof(struct cpufreq_policy));
 		up(&userspace_sem);
 		break;
