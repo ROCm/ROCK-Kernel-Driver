@@ -1,12 +1,16 @@
 /*
- * Copyright (C) 2002, 2004 Hewlett-Packard Co.
- *	Khalid Aziz <khalid_aziz@hp.com>
- *	Bjorn Helgaas <bjorn.helgaas@hp.com>
- *
  * Definitions for PCDP-defined console devices
  *
  * v1.0a: http://www.dig64.org/specifications/DIG64_HCDPv10a_01.pdf
  * v2.0:  http://www.dig64.org/specifications/DIG64_HCDPv20_042804.pdf
+ *
+ * (c) Copyright 2002, 2004 Hewlett-Packard Development Company, L.P.
+ *	Khalid Aziz <khalid.aziz@hp.com>
+ *	Bjorn Helgaas <bjorn.helgaas@hp.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
 
 #define PCDP_CONSOLE			0
