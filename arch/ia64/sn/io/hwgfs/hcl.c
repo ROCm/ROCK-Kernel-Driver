@@ -128,7 +128,6 @@ int __init init_hcl(void)
 {
 	extern void string_table_init(struct string_table *);
 	extern struct string_table label_string_table;
-	extern int init_ifconfig_net(void);
 	extern int init_ioconfig_bus(void);
 	extern int init_hwgfs_fs(void);
 	int rv = 0;
@@ -183,7 +182,6 @@ int __init init_hcl(void)
 	 * Initialize the ifconfgi_net driver that does network devices 
 	 * Persistent Naming.
 	 */
-	init_ifconfig_net();
 	init_ioconfig_bus();
 
 	return(0);
@@ -557,7 +555,7 @@ hwgraph_edge_add(vertex_hdl_t from, vertex_hdl_t to, char *name)
 	 * In this case the vertex was previous created with a REAL pathname.
 	 */
 	rv = hwgfs_mk_symlink (from, (const char *)name,
-			       DEVFS_FL_DEFAULT, link,
+			       0, link,
 			       &handle, NULL);
 	kfree(path);
 	kfree(link);

@@ -587,7 +587,7 @@ sn_dma_set_mask(struct device *dev, u64 dma_mask)
 {
 	BUG_ON(dev->bus != &pci_bus_type);
 
-	if (!sn_dma_supported(to_pci_dev(dev), dma_mask))
+	if (!sn_dma_supported(dev, dma_mask))
 		return 0;
 
 	dev->dma_mask = dma_mask;
