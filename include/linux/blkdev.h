@@ -59,6 +59,12 @@ struct io_context {
 	atomic_t refcount;
 	pid_t pid;
 
+	/*
+	 * For request batching
+	 */
+	unsigned long last_waited; /* Time last woken after wait for request */
+	int nr_batch_requests;     /* Number of requests left in the batch */
+
 	struct as_io_context *aic;
 };
 

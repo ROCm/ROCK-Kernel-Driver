@@ -51,10 +51,11 @@ static struct workqueue_struct *kblockd_workqueue;
 
 unsigned long blk_max_low_pfn, blk_max_pfn;
 
-static inline int batch_requests(struct request_queue *q)
-{
-	return q->nr_requests - min(q->nr_requests / 8, 8UL) - 1;
-}
+/* Amount of time in which a process may batch requests */
+#define BLK_BATCH_TIME	(HZ/50UL)
+
+/* Number of requests a "batching" process may submit */
+#define BLK_BATCH_REQ	32
 
 /*
  * Return the threshold (number of used requests) at which the queue is
@@ -1305,24 +1306,76 @@ static inline struct request *blk_alloc_request(request_queue_t *q,int gfp_mask)
 	return NULL;
 }
 
+/*
+ * ioc_batching returns true if the ioc is a valid batching request and
+ * should be given priority access to a request.
+ */
+static inline int ioc_batching(struct io_context *ioc)
+{
+	if (!ioc)
+		return 0;
+
+	return ioc->nr_batch_requests == BLK_BATCH_REQ ||
+		(ioc->nr_batch_requests > 0
+		&& time_before(jiffies, ioc->last_waited + BLK_BATCH_TIME));
+}
+
+/*
+ * ioc_set_batching sets ioc to be a new "batcher" if it is not one
+ */
+void ioc_set_batching(struct io_context *ioc)
+{
+	if (!ioc || ioc_batching(ioc))
+		return;
+
+	ioc->nr_batch_requests = BLK_BATCH_REQ;
+	ioc->last_waited = jiffies;
+}
+
+/*
+ * A request has just been released.  Account for it, update the full and
+ * congestion status, wake up any waiters.   Called under q->queue_lock.
+ */
+static void freed_request(request_queue_t *q, int rw)
+{
+	struct request_list *rl = &q->rq;
+
+	rl->count[rw]--;
+	if (rl->count[rw] < queue_congestion_off_threshold(q))
+		clear_queue_congested(q, rw);
+	if (rl->count[rw]+1 <= q->nr_requests) {
+		smp_mb();
+		if (waitqueue_active(&rl->wait[rw]))
+			wake_up(&rl->wait[rw]);
+		if (!waitqueue_active(&rl->wait[rw]))
+			blk_clear_queue_full(q, rw);
+	}
+}
+
 #define blkdev_free_rq(list) list_entry((list)->next, struct request, queuelist)
 /*
  * Get a free request, queue_lock must not be held
  */
-static struct request *
-get_request(request_queue_t *q, int rw, int gfp_mask, int force)
+static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 {
 	struct request *rq = NULL;
 	struct request_list *rl = &q->rq;
+	struct io_context *ioc = get_io_context();
 
 	spin_lock_irq(q->queue_lock);
-	if (rl->count[rw] == q->nr_requests)
-		blk_set_queue_full(q, rw);
+	if (rl->count[rw]+1 >= q->nr_requests) {
+		if (!blk_queue_full(q, rw)) {
+			ioc_set_batching(ioc);
+			blk_set_queue_full(q, rw);
+		}
+	}
 
-	if (blk_queue_full(q, rw) && !force && !elv_may_queue(q, rw)) {
+	if (blk_queue_full(q, rw)
+			&& !ioc_batching(ioc) && !elv_may_queue(q, rw)) {
 		spin_unlock_irq(q->queue_lock);
 		goto out;
 	}
+
 	rl->count[rw]++;
 	if (rl->count[rw] >= queue_congestion_on_threshold(q))
 		set_queue_congested(q, rw);
@@ -1331,20 +1384,13 @@ get_request(request_queue_t *q, int rw, int gfp_mask, int force)
 	rq = blk_alloc_request(q, gfp_mask);
 	if (!rq) {
 		spin_lock_irq(q->queue_lock);
-		rl->count[rw]--;
-		if (rl->count[rw] < queue_congestion_off_threshold(q))
-                        clear_queue_congested(q, rw);
-
-		if (rl->count[rw] <= batch_requests(q)) {
-			if (waitqueue_active(&rl->wait[rw]))
-				wake_up(&rl->wait[rw]);
-			else
-				blk_clear_queue_full(q, rw);
-		}
-
+		freed_request(q, rw);
 		spin_unlock_irq(q->queue_lock);
 		goto out;
 	}
+
+	if (ioc_batching(ioc))
+		ioc->nr_batch_requests--;
 	
 	INIT_LIST_HEAD(&rq->queuelist);
 
@@ -1367,6 +1413,7 @@ get_request(request_queue_t *q, int rw, int gfp_mask, int force)
 	rq->sense = NULL;
 
 out:
+	put_io_context(ioc);
 	return rq;
 }
 
@@ -1378,7 +1425,6 @@ static struct request *get_request_wait(request_queue_t *q, int rw)
 {
 	DEFINE_WAIT(wait);
 	struct request *rq;
-	int waited = 0;
 
 	generic_unplug_device(q);
 	do {
@@ -1387,11 +1433,15 @@ static struct request *get_request_wait(request_queue_t *q, int rw)
 		prepare_to_wait_exclusive(&rl->wait[rw], &wait,
 				TASK_UNINTERRUPTIBLE);
 
-		rq = get_request(q, rw, GFP_NOIO, waited);
+		rq = get_request(q, rw, GFP_NOIO);
 
 		if (!rq) {
+			struct io_context *ioc;
+
 			io_schedule();
-			waited = 1;
+			ioc = get_io_context();
+			ioc_set_batching(ioc);
+			put_io_context(ioc);
 		}
 		finish_wait(&rl->wait[rw], &wait);
 	} while (!rq);
@@ -1408,7 +1458,7 @@ struct request *blk_get_request(request_queue_t *q, int rw, int gfp_mask)
 	if (gfp_mask & __GFP_WAIT)
 		rq = get_request_wait(q, rw);
 	else
-		rq = get_request(q, rw, gfp_mask, 0);
+		rq = get_request(q, rw, gfp_mask);
 
 	return rq;
 }
@@ -1555,17 +1605,7 @@ void __blk_put_request(request_queue_t *q, struct request *req)
 		BUG_ON(!list_empty(&req->queuelist));
 
 		blk_free_request(q, req);
-
-		rl->count[rw]--;
-		if (rl->count[rw] < queue_congestion_off_threshold(q))
-			clear_queue_congested(q, rw);
-
-		if (rl->count[rw] <= batch_requests(q)) {
-			if (waitqueue_active(&rl->wait[rw]))
-				wake_up(&rl->wait[rw]);
-			else
-				blk_clear_queue_full(q, rw);
-		}
+		freed_request(q, rw);
 	}
 }
 
@@ -1808,7 +1848,7 @@ get_rq:
 		freereq = NULL;
 	} else {
 		spin_unlock_irq(q->queue_lock);
-		if ((freereq = get_request(q, rw, GFP_ATOMIC, 0)) == NULL) {
+		if ((freereq = get_request(q, rw, GFP_ATOMIC)) == NULL) {
 			/*
 			 * READA bit set
 			 */
@@ -1852,20 +1892,18 @@ out:
 		__blk_put_request(q, freereq);
 
 	if (blk_queue_plugged(q)) {
-		int nr_queued = q->rq.count[0] + q->rq.count[1];
+		int nr_queued = q->rq.count[READ] + q->rq.count[WRITE];
 
 		if (nr_queued == q->unplug_thresh)
 			__generic_unplug_device(q);
 	}
 	spin_unlock_irq(q->queue_lock);
-
 	return 0;
 
 end_io:
 	bio_endio(bio, nr_sectors << 9, -EWOULDBLOCK);
 	return 0;
 }
-
 
 /*
  * If bio->bi_dev is a partition, remap the location
@@ -2378,6 +2416,7 @@ int __init blk_dev_init(void)
 	return 0;
 }
 
+static atomic_t nr_io_contexts = ATOMIC_INIT(0);
 
 /*
  * IO Context helper functions
@@ -2393,6 +2432,7 @@ void put_io_context(struct io_context *ioc)
 		if (ioc->aic && ioc->aic->dtor)
 			ioc->aic->dtor(ioc->aic);
 		kfree(ioc);
+		atomic_dec(&nr_io_contexts);
 	}
 }
 
@@ -2409,7 +2449,8 @@ void exit_io_context(void)
 			ioc->aic->exit(ioc->aic);
 		put_io_context(ioc);
 		current->io_context = NULL;
-	}
+	} else
+		WARN_ON(1);
 	local_irq_restore(flags);
 }
 
@@ -2432,8 +2473,11 @@ struct io_context *get_io_context(void)
 	if (ret == NULL) {
 		ret = kmalloc(sizeof(*ret), GFP_ATOMIC);
 		if (ret) {
+			atomic_inc(&nr_io_contexts);
 			atomic_set(&ret->refcount, 1);
 			ret->pid = tsk->pid;
+			ret->last_waited = jiffies; /* doesn't matter... */
+			ret->nr_batch_requests = 0; /* because this is 0 */
 			ret->aic = NULL;
 			tsk->io_context = ret;
 		}
@@ -2515,16 +2559,16 @@ queue_requests_store(struct request_queue *q, const char *page, size_t count)
 
 	if (rl->count[READ] >= q->nr_requests) {
 		blk_set_queue_full(q, READ);
-	} else if (rl->count[READ] <= batch_requests(q)) {
+	} else if (rl->count[READ]+1 <= q->nr_requests) {
 		blk_clear_queue_full(q, READ);
-		wake_up_all(&rl->wait[READ]);
+		wake_up(&rl->wait[READ]);
 	}
 
 	if (rl->count[WRITE] >= q->nr_requests) {
 		blk_set_queue_full(q, WRITE);
-	} else if (rl->count[WRITE] <= batch_requests(q)) {
+	} else if (rl->count[WRITE]+1 <= q->nr_requests) {
 		blk_clear_queue_full(q, WRITE);
-		wake_up_all(&rl->wait[WRITE]);
+		wake_up(&rl->wait[WRITE]);
 	}
 	return ret;
 }
