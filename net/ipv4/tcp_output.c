@@ -408,6 +408,16 @@ static void tcp_queue_skb(struct sock *sk, struct sk_buff *skb)
 		sk->sk_send_head = skb;
 }
 
+static inline void tcp_tso_set_push(struct sk_buff *skb)
+{
+	/* Force push to be on for any TSO frames to workaround
+	 * problems with busted implementations like Mac OS-X that
+	 * hold off socket receive wakeups until push is seen.
+	 */
+	if (tcp_skb_pcount(skb) > 1)
+		TCP_SKB_CB(skb)->flags |= TCPCB_FLAG_PSH;
+}
+
 /* Send _single_ skb sitting at the send head. This function requires
  * true push pending frames to setup probe timer etc.
  */
@@ -419,6 +429,7 @@ void tcp_push_one(struct sock *sk, unsigned cur_mss)
 	if (tcp_snd_test(tp, skb, cur_mss, TCP_NAGLE_PUSH)) {
 		/* Send it out now. */
 		TCP_SKB_CB(skb)->when = tcp_time_stamp;
+		tcp_tso_set_push(skb);
 		if (!tcp_transmit_skb(sk, skb_clone(skb, sk->sk_allocation))) {
 			sk->sk_send_head = NULL;
 			tp->snd_nxt = TCP_SKB_CB(skb)->end_seq;
@@ -755,6 +766,7 @@ int tcp_write_xmit(struct sock *sk, int nonagle)
 			}
 
 			TCP_SKB_CB(skb)->when = tcp_time_stamp;
+			tcp_tso_set_push(skb);
 			if (tcp_transmit_skb(sk, skb_clone(skb, GFP_ATOMIC)))
 				break;
 
@@ -1096,6 +1108,7 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 	 * is still in somebody's hands, else make a clone.
 	 */
 	TCP_SKB_CB(skb)->when = tcp_time_stamp;
+	tcp_tso_set_push(skb);
 
 	err = tcp_transmit_skb(sk, (skb_cloned(skb) ?
 				    pskb_copy(skb, GFP_ATOMIC):
@@ -1668,6 +1681,7 @@ int tcp_write_wakeup(struct sock *sk)
 
 			TCP_SKB_CB(skb)->flags |= TCPCB_FLAG_PSH;
 			TCP_SKB_CB(skb)->when = tcp_time_stamp;
+			tcp_tso_set_push(skb);
 			err = tcp_transmit_skb(sk, skb_clone(skb, GFP_ATOMIC));
 			if (!err) {
 				update_send_head(sk, tp, skb);
