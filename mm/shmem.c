@@ -117,11 +117,43 @@ shmem_truncate_part (swp_entry_t * dir, unsigned long size,
 	return 0;
 }
 
+/*
+ * shmem_recalc_inode - recalculate the size of an inode
+ *
+ * @inode: inode to recalc
+ *
+ * We have to calculate the free blocks since the mm can drop pages
+ * behind our back
+ *
+ * But we know that normally
+ * inodes->i_blocks == inode->i_mapping->nrpages + info->swapped
+ *
+ * So the mm freed 
+ * inodes->i_blocks - (inode->i_mapping->nrpages + info->swapped)
+ *
+ * It has to be called with the spinlock held.
+ */
+
+static void shmem_recalc_inode(struct inode * inode)
+{
+	unsigned long freed;
+
+	freed = inode->i_blocks -
+		(inode->i_mapping->nrpages + inode->u.shmem_i.swapped);
+	if (freed){
+		struct shmem_sb_info * info = &inode->i_sb->u.shmem_sb;
+		inode->i_blocks -= freed;
+		spin_lock (&info->stat_lock);
+		info->free_blocks += freed;
+		spin_unlock (&info->stat_lock);
+	}
+}
+
 static void shmem_truncate (struct inode * inode)
 {
 	int clear_base;
 	unsigned long start;
-	unsigned long mmfreed, freed = 0;
+	unsigned long freed = 0;
 	swp_entry_t **base, **ptr;
 	struct shmem_inode_info * info = &inode->u.shmem_i;
 
@@ -154,26 +186,9 @@ static void shmem_truncate (struct inode * inode)
 	info->i_indirect = 0;
 
 out:
-
-	/*
-	 * We have to calculate the free blocks since we do not know
-	 * how many pages the mm discarded
-	 *
-	 * But we know that normally
-	 * inodes->i_blocks == inode->i_mapping->nrpages + info->swapped
-	 *
-	 * So the mm freed 
-	 * inodes->i_blocks - (inode->i_mapping->nrpages + info->swapped)
-	 */
-
-	mmfreed = inode->i_blocks - (inode->i_mapping->nrpages + info->swapped);
 	info->swapped -= freed;
-	inode->i_blocks -= freed + mmfreed;
+	shmem_recalc_inode(inode);
 	spin_unlock (&info->lock);
-
-	spin_lock (&inode->i_sb->u.shmem_sb.stat_lock);
-	inode->i_sb->u.shmem_sb.free_blocks += freed + mmfreed;
-	spin_unlock (&inode->i_sb->u.shmem_sb.stat_lock);
 }
 
 static void shmem_delete_inode(struct inode * inode)
@@ -208,6 +223,7 @@ static int shmem_writepage(struct page * page)
 		return 1;
 
 	spin_lock(&info->lock);
+	shmem_recalc_inode(page->mapping->host);
 	entry = shmem_swp_entry (info, page->index);
 	if (!entry)	/* this had been allocted on page allocation */
 		BUG();
@@ -269,6 +285,9 @@ struct page * shmem_nopage(struct vm_area_struct * vma, unsigned long address, i
 	entry = shmem_swp_entry (info, idx);
 	if (!entry)
 		goto oom;
+	spin_lock (&info->lock);
+	shmem_recalc_inode(inode);
+	spin_unlock (&info->lock);
 	if (entry->val) {
 		unsigned long flags;
 

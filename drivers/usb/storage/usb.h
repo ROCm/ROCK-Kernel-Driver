@@ -1,7 +1,7 @@
 /* Driver for USB Mass Storage compliant devices
  * Main Header File
  *
- * $Id: usb.h,v 1.11 2000/11/13 22:38:55 mdharm Exp $
+ * $Id: usb.h,v 1.12 2000/12/05 03:33:49 mdharm Exp $
  *
  * Current development and maintenance by:
  *   (c) 1999, 2000 Matthew Dharm (mdharm-usb@one-eyed-alien.net)
@@ -84,13 +84,6 @@ struct us_data;
  */
 
 struct us_unusual_dev {
-	/* we search the list based on these parameters */
-	__u16 idVendor;
-	__u16 idProduct;
-	__u16 bcdDeviceMin;
-	__u16 bcdDeviceMax;
-
-	/* the list specifies these parameters */
 	const char* vendorName;
 	const char* productName;
 	__u8  useProtocol;

@@ -1,4 +1,4 @@
-USB HOTPLUGGING
+LINUX HOTPLUGGING
 
 In hotpluggable busses like USB (and Cardbus PCI), end-users plug devices
 into the bus with power on.  In most cases, users expect the devices to become
@@ -8,7 +8,7 @@ immediately usable.  That means the system must do many things, including:
       loading a kernel module; newer drivers can use modutils to
       publish their device (and class) support to user utilities.
 
-    - Bind a driver to that device.  That's done using the USB
+    - Bind a driver to that device.  Bus frameworks do that using a
       device driver's probe() routine.
     
     - Tell other subsystems to configure the new device.  Print
@@ -26,6 +26,10 @@ Those triggered actions must support a system's administrative policies;
 such programs are called "policy agents" here.  Typically they involve
 shell scripts that dispatch to more familiar administration tools.
 
+Because some of those actions rely on information about drivers (metadata)
+that is currently available only when the drivers are dynamically linked,
+you get the best hotplugging when you configure a highly modular system.
+
 
 KERNEL HOTPLUG HELPER (/sbin/hotplug)
 
@@ -40,9 +44,14 @@ some kernel event.  That name is used as the first key for further event
 dispatch; any other argument and environment parameters are specified by
 the subsystem making that invocation.
 
-A reference implementation of a /sbin/hotplug script is available at the
-http://www.linux-usb.org website, which works USB for but also knows how to
-delegate to any /etc/hotplug/$TYPE.agent policy agent present.
+Hotplug software and other resources is available at:
+
+	http://linux-hotplug.sourceforge.net
+
+Mailing list information is also available at that site.
+
+
+--------------------------------------------------------------------------
 
 
 USB POLICY AGENT

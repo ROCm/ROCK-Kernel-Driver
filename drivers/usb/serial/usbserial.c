@@ -14,8 +14,14 @@
  * based on a driver by Brad Keryan)
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
- * 
- * (12/29/2000) gkh
+ *
+ * (12/12/2000) gkh
+ *	Removed MOD_INC and MOD_DEC from poll and disconnect functions, and
+ *	moved them to the serial_open and serial_close functions.
+ *	Also fixed bug with there not being a MOD_DEC for the generic driver
+ *	(thanks to Gary Brubaker for finding this.)
+ *
+ * (11/29/2000) gkh
  *	Small NULL pointer initialization cleanup which saves a bit of disk image
  *
  * (11/01/2000) Adam J. Richter
@@ -471,6 +477,8 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 		return -ENODEV;
 	}
 
+	MOD_INC_USE_COUNT;
+	
 	/* set up our port structure making the tty driver remember our port object, and us it */
 	portNumber = MINOR(tty->device) - serial->minor;
 	port = &serial->port[portNumber];
@@ -508,6 +516,8 @@ static void serial_close(struct tty_struct *tty, struct file * filp)
 	} else {
 		generic_close(port, filp);
 	}
+
+	MOD_DEC_USE_COUNT;
 }	
 
 
@@ -721,12 +731,13 @@ static int generic_open (struct usb_serial_port *port, struct file *filp)
 	if (port_paranoia_check (port, __FUNCTION__))
 		return -ENODEV;
 
+	MOD_INC_USE_COUNT;
+
 	dbg(__FUNCTION__ " - port %d", port->number);
 
 	spin_lock_irqsave (&port->port_lock, flags);
 	
 	++port->open_count;
-	MOD_INC_USE_COUNT;
 	
 	if (!port->active) {
 		port->active = 1;
@@ -776,6 +787,7 @@ static void generic_close (struct usb_serial_port *port, struct file * filp)
 	}
 
 	spin_unlock_irqrestore (&port->port_lock, flags);
+	MOD_DEC_USE_COUNT;
 }
 
 
@@ -1069,7 +1081,6 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 	}
 
 	/* found all that we need */
-	MOD_INC_USE_COUNT;
 	info("%s converter detected", type->name);
 
 #ifdef CONFIG_USB_SERIAL_GENERIC
@@ -1077,7 +1088,6 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 		num_ports = num_bulk_out;
 		if (num_ports == 0) {
 			err("Generic device with no bulk out, not allowed.");
-			MOD_DEC_USE_COUNT;
 			return NULL;
 		}
 	} else
@@ -1087,7 +1097,6 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 	serial = get_free_serial (num_ports, &minor);
 	if (serial == NULL) {
 		err("No more free serial devices");
-		MOD_DEC_USE_COUNT;
 		return NULL;
 	}
 	
@@ -1233,7 +1242,6 @@ probe_error:
 
 	/* free up any memory that we allocated */
 	kfree (serial);
-	MOD_DEC_USE_COUNT;
 	return NULL;
 }
 
@@ -1300,7 +1308,6 @@ static void usb_serial_disconnect(struct usb_device *dev, void *ptr)
 		info("device disconnected");
 	}
 	
-	MOD_DEC_USE_COUNT;
 }
 
 

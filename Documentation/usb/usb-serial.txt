@@ -223,7 +223,7 @@ Generic Serial driver
   
   To enable the generic driver to recognize your device, build the driver
   as a module and load it by the following invocation:
-	insmod usb-serial vendor=0x#### product=0x####
+	insmod usbserial vendor=0x#### product=0x####
   where the #### is replaced with the hex representation of your device's
   vendor id and product id.
 

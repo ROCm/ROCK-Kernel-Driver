@@ -386,6 +386,7 @@ extern void clear_page_tables(struct mm_struct *, unsigned long, int);
 
 struct page * shmem_nopage(struct vm_area_struct * vma, unsigned long address, int no_share);
 struct file *shmem_file_setup(char * name, loff_t size);
+extern void shmem_lock(struct file * file, int lock);
 extern int shmem_zero_setup(struct vm_area_struct *);
 
 extern void zap_page_range(struct mm_struct *mm, unsigned long address, unsigned long size);

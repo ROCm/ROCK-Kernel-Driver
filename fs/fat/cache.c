@@ -24,6 +24,7 @@
 #endif
 
 static struct fat_cache *fat_cache,cache[FAT_CACHE];
+static spinlock_t fat_cache_lock = SPIN_LOCK_UNLOCKED;
 
 /* Returns the this'th FAT entry, -1 if it is an end-of-file entry. If
    new_value is != -1, that FAT entry is replaced by it. */
@@ -133,13 +134,16 @@ int default_fat_access(struct super_block *sb,int nr,int new_value)
 	return next;
 }
 
-
 void fat_cache_init(void)
 {
 	static int initialized = 0;
 	int count;
 
-	if (initialized) return;
+	spin_lock(&fat_cache_lock);
+	if (initialized) {
+		spin_unlock(&fat_cache_lock);
+		return;
+		}
 	fat_cache = &cache[0];
 	for (count = 0; count < FAT_CACHE; count++) {
 		cache[count].device = 0;
@@ -147,6 +151,7 @@ void fat_cache_init(void)
 		    &cache[count+1];
 	}
 	initialized = 1;
+	spin_unlock(&fat_cache_lock);
 }
 
 
@@ -157,6 +162,7 @@ void fat_cache_lookup(struct inode *inode,int cluster,int *f_clu,int *d_clu)
 
 	if (!first)
 		return;
+	spin_lock(&fat_cache_lock);
 	for (walk = fat_cache; walk; walk = walk->next)
 		if (inode->i_dev == walk->device
 		    && walk->start_cluster == first
@@ -166,8 +172,12 @@ void fat_cache_lookup(struct inode *inode,int cluster,int *f_clu,int *d_clu)
 #ifdef DEBUG
 printk("cache hit: %d (%d)\n",walk->file_cluster,*d_clu);
 #endif
-			if ((*f_clu = walk->file_cluster) == cluster) return;
+			if ((*f_clu = walk->file_cluster) == cluster) { 
+				spin_unlock(&fat_cache_lock);
+				return;
+			}
 		}
+	spin_unlock(&fat_cache_lock);
 #ifdef DEBUG
 printk("cache miss\n");
 #endif
@@ -197,6 +207,7 @@ void fat_cache_add(struct inode *inode,int f_clu,int d_clu)
 	int first = MSDOS_I(inode)->i_start;
 
 	last = NULL;
+	spin_lock(&fat_cache_lock);
 	for (walk = fat_cache; walk->next; walk = (last = walk)->next)
 		if (inode->i_dev == walk->device
 		    && walk->start_cluster == first
@@ -204,17 +215,22 @@ void fat_cache_add(struct inode *inode,int f_clu,int d_clu)
 			if (walk->disk_cluster != d_clu) {
 				printk("FAT cache corruption inode=%ld\n",
 					inode->i_ino);
+				spin_unlock(&fat_cache_lock);
 				fat_cache_inval_inode(inode);
 				return;
 			}
 			/* update LRU */
-			if (last == NULL) return;
+			if (last == NULL) {
+				spin_unlock(&fat_cache_lock);
+				return;
+			}
 			last->next = walk->next;
 			walk->next = fat_cache;
 			fat_cache = walk;
 #ifdef DEBUG
 list_cache();
 #endif
+			spin_unlock(&fat_cache_lock);
 			return;
 		}
 	walk->device = inode->i_dev;
@@ -224,6 +240,7 @@ list_cache();
 	last->next = NULL;
 	walk->next = fat_cache;
 	fat_cache = walk;
+	spin_unlock(&fat_cache_lock);
 #ifdef DEBUG
 list_cache();
 #endif
@@ -238,10 +255,12 @@ void fat_cache_inval_inode(struct inode *inode)
 	struct fat_cache *walk;
 	int first = MSDOS_I(inode)->i_start;
 
+	spin_lock(&fat_cache_lock);
 	for (walk = fat_cache; walk; walk = walk->next)
 		if (walk->device == inode->i_dev
 		    && walk->start_cluster == first)
 			walk->device = 0;
+	spin_unlock(&fat_cache_lock);
 }
 
 
@@ -249,9 +268,11 @@ void fat_cache_inval_dev(kdev_t device)
 {
 	struct fat_cache *walk;
 
+	spin_lock(&fat_cache_lock);
 	for (walk = fat_cache; walk; walk = walk->next)
 		if (walk->device == device)
 			walk->device = 0;
+	spin_unlock(&fat_cache_lock);
 }
 
 

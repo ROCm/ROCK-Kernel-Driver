@@ -1853,6 +1853,7 @@ static int reiserfs_commit_write(struct file *f, struct page *page,
     struct reiserfs_transaction_handle th ;
     
     reiserfs_wait_on_write_block(inode->i_sb) ;
+    lock_kernel();
     prevent_flush_page_lock(page, inode) ;
     ret = generic_commit_write(f, page, from, to) ;
     /* we test for O_SYNC here so we can commit the transaction
@@ -1866,6 +1867,7 @@ static int reiserfs_commit_write(struct file *f, struct page *page,
 	journal_end_sync(&th, inode->i_sb, 1) ;
     }
     allow_flush_page_lock(page, inode) ;
+    unlock_kernel();
     return ret ;
 }
 

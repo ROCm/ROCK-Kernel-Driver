@@ -10,6 +10,10 @@
  *	(at your option) any later version.
  *
  * See Documentation/usb/usb-serial.txt for more information on using this driver
+ *
+ * (12/12/2000) gkh
+ *	Moved MOD_DEC to end of visor_close to be nicer, as the final write 
+ *	message can sleep.
  * 
  * (11/12/2000) gkh
  *	Fixed bug with data being dropped on the floor by forcing tty->low_latency
@@ -214,7 +218,6 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 	spin_lock_irqsave (&port->port_lock, flags);
 
 	--port->open_count;
-	MOD_DEC_USE_COUNT;
 
 	if (port->open_count <= 0) {
 		transfer_buffer =  kmalloc (0x12, GFP_KERNEL);
@@ -237,6 +240,8 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 
 	/* Uncomment the following line if you want to see some statistics in your syslog */
 	/* info ("Bytes In = %d  Bytes Out = %d", bytes_in, bytes_out); */
+
+	MOD_DEC_USE_COUNT;
 }
 
 

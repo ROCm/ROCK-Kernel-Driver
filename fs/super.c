@@ -54,6 +54,7 @@ extern void wait_for_keypress(void);
 extern int root_mountflags;
 
 static int do_remount_sb(struct super_block *sb, int flags, char * data);
+static int do_remount(const char *dir, int flags, char * data);
 
 /* this is initialized in init/main.c */
 kdev_t ROOT_DEV;
@@ -1025,15 +1026,12 @@ static int do_umount(struct vfsmount *mnt, int umount_root, int flags)
 	 * call reboot(9). Then init(8) could umount root and exec /reboot.
 	 */
 	if (mnt == current->fs->rootmnt && !umount_root) {
-		int retval = 0;
 		/*
 		 * Special case for "unmounting" root ...
 		 * we just try to remount it readonly.
 		 */
 		mntput(mnt);
-		if (!(sb->s_flags & MS_RDONLY))
-			retval = do_remount_sb(sb, MS_RDONLY, 0);
-		return retval;
+		return do_remount("/", MS_RDONLY, NULL);
 	}
 
 	spin_lock(&dcache_lock);

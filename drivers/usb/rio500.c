@@ -247,6 +247,7 @@ ioctl_rio(struct inode *inode, struct file *file, unsigned int cmd,
 	return 0;
 
 err_out:
+	up(&(rio->lock));
 	return retval;
 }
 
@@ -389,7 +390,7 @@ read_rio(struct file *file, char *buffer, size_t count, loff_t * ppos)
 			     result, partial, this_read);
 			return -EIO;
 		} else {
-			unlock_kernel();
+			up(&(rio->lock));
 			return (0);
 		}
 
