@@ -2,7 +2,7 @@
 #define __LINUX_COMPILER_H
 
 #ifdef __CHECKER__
-  #define __user	__attribute__((address_space(1)))
+  #define __user	__attribute__((noderef, address_space(1)))
   #define __kernel	/* default address space */
 #else
   #define __user
