@@ -2096,7 +2096,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 static int speedo_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct speedo_private *sp = netdev_priv(dev);
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
+	struct mii_ioctl_data *data = if_mii(rq);
 	int phy = sp->phy[0] & 0x1f;
 	int saved_acpi;
 	int t;

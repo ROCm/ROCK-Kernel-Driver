@@ -1937,7 +1937,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct hamachi_private *np = dev->priv;
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
+	struct mii_ioctl_data *data = if_mii(rq);
 	int rc;
 
 	if (!netif_running(dev))

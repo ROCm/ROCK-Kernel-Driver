@@ -4484,11 +4484,11 @@ qeth_do_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		return 0;
 		break;
 	case SIOCGMIIPHY:
-		mii_data = (struct mii_ioctl_data *) &rq->ifr_ifru.ifru_data;
+		mii_data = if_mii(rq);
 		mii_data->phy_id = 0;
 		break;
 	case SIOCGMIIREG:
-		mii_data = (struct mii_ioctl_data *) &rq->ifr_ifru.ifru_data;
+		mii_data = if_mii(rq);
 		if (mii_data->phy_id != 0)
 			rc = -EINVAL;
 		else
@@ -4503,7 +4503,7 @@ qeth_do_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 			rc = -EPERM;
 			break;
 		}
-		mii_data = (struct mii_ioctl_data *) &rq->ifr_ifru.ifru_data;
+		mii_data = if_mii(rq);
 		if (mii_data->phy_id != 0)
 			rc = -EINVAL;
 		else

@@ -2079,7 +2079,6 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct netdev_private *np = dev->priv;
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
 	int rc;
 
 	if (!netif_running(dev))
@@ -2089,6 +2088,7 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		rc = netdev_ethtool_ioctl(dev, rq->ifr_data);
 
 	else {
+		struct mii_ioctl_data *data = if_mii(rq);
 		spin_lock_irq(&np->lock);
 		rc = generic_mii_ioctl(&np->mii_if, data, cmd, NULL);
 		spin_unlock_irq(&np->lock);
