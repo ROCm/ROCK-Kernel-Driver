@@ -458,6 +458,13 @@ void nmi_watchdog_tick (struct pt_regs * regs)
 			wrmsr(MSR_P4_IQ_CCCR0, P4_NMI_IQ_CCCR0, 0);
 			apic_write(APIC_LVTPC, APIC_DM_NMI);
 		}
+		else if (nmi_perfctr_msr == MSR_P6_PERFCTR0) {
+			/* Only P6 based Pentium M need to re-unmask
+			 * the apic vector but it doesn't hurt
+			 * other P6 variant */
+			apic_write(APIC_LVTPC,
+				   apic_read(APIC_LVTPC) & ~APIC_LVT_MASKED);
+		}
 		wrmsr(nmi_perfctr_msr, -(cpu_khz/nmi_hz*1000), -1);
 	}
 }
