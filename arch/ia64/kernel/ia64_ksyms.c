@@ -103,20 +103,22 @@ EXPORT_SYMBOL(ia64_save_scratch_fpregs);
 #include <asm/unwind.h>
 EXPORT_SYMBOL(unw_init_running);
 
-#ifdef CONFIG_SMP
-# if __GNUC__ < 3 || (__GNUC__ == 3 && __GNUC_MINOR__ < 3)
+#ifdef ASM_SUPPORTED
+# ifdef CONFIG_SMP
+#  if __GNUC__ < 3 || (__GNUC__ == 3 && __GNUC_MINOR__ < 3)
 /*
  * This is not a normal routine and we don't want a function descriptor for it, so we use
  * a fake declaration here.
  */
 extern char ia64_spinlock_contention_pre3_4;
 EXPORT_SYMBOL(ia64_spinlock_contention_pre3_4);
-# else
+#  else
 /*
  * This is not a normal routine and we don't want a function descriptor for it, so we use
  * a fake declaration here.
  */
 extern char ia64_spinlock_contention;
 EXPORT_SYMBOL(ia64_spinlock_contention);
+#  endif
 # endif
 #endif
