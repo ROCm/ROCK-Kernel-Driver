@@ -1669,8 +1669,15 @@ ioc_init(u64 hpa, void *handle)
 		}
 	}
 
-	if (!ioc->name)
-		ioc->name = "Unknown";
+	if (!ioc->name) {
+		ioc->name = kmalloc(24, GFP_KERNEL);
+		if (ioc->name)
+			sprintf(ioc->name, "Unknown (%04x:%04x)",
+				ioc->func_id & 0xFFFF,
+				(ioc->func_id >> 16) & 0xFFFF);
+		else
+			ioc->name = "Unknown";
+	}
 
 	ioc_iova_init(ioc);
 	ioc_resource_init(ioc);
