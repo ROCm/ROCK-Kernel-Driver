@@ -1001,7 +1001,7 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 	spin_lock_irqsave (&hcd_data_lock, flags);
 	if (HCD_IS_RUNNING (hcd->state) && hcd->state != USB_STATE_QUIESCING) {
 		usb_get_dev (urb->dev);
-		list_add (&urb->urb_list, &dev->urb_list);
+		list_add_tail (&urb->urb_list, &dev->urb_list);
 		status = 0;
 	} else {
 		INIT_LIST_HEAD (&urb->urb_list);
