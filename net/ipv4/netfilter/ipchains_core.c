@@ -723,6 +723,7 @@ ip_fw_check(struct iphdr *ip,
 						      src_port, dst_port,
 						      count, tcpsyn)) {
 					ret = FW_BLOCK;
+					cleanup(chain, 0, slot);
 					goto out;
 				}
 				break;
