@@ -861,6 +861,7 @@ acpi_ut_init_globals (
 
 	acpi_gbl_system_notify.handler      = NULL;
 	acpi_gbl_device_notify.handler      = NULL;
+	acpi_gbl_exception_handler          = NULL;
 	acpi_gbl_init_handler               = NULL;
 
 	/* Global "typed" ACPI table pointers */

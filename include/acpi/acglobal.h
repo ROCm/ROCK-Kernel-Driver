@@ -180,6 +180,7 @@ ACPI_EXTERN struct acpi_mutex_info              acpi_gbl_mutex_info[NUM_MUTEX];
 ACPI_EXTERN struct acpi_memory_list             acpi_gbl_memory_lists[ACPI_NUM_MEM_LISTS];
 ACPI_EXTERN struct acpi_object_notify_handler   acpi_gbl_device_notify;
 ACPI_EXTERN struct acpi_object_notify_handler   acpi_gbl_system_notify;
+ACPI_EXTERN acpi_exception_handler              acpi_gbl_exception_handler;
 ACPI_EXTERN acpi_init_handler                   acpi_gbl_init_handler;
 ACPI_EXTERN struct acpi_walk_state             *acpi_gbl_breakpoint_walk;
 ACPI_EXTERN acpi_handle                         acpi_gbl_global_lock_semaphore;

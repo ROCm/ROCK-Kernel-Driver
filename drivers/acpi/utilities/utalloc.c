@@ -265,7 +265,7 @@ acpi_ut_validate_buffer (
  * RETURN:      Status
  *
  * DESCRIPTION: Validate that the buffer is of the required length or
- *              allocate a new buffer.
+ *              allocate a new buffer.  Returned buffer is always zeroed.
  *
  ******************************************************************************/
 
@@ -305,24 +305,25 @@ acpi_ut_initialize_buffer (
 
 		/* Allocate a new buffer with local interface to allow tracking */
 
-		buffer->pointer = ACPI_MEM_ALLOCATE (required_length);
+		buffer->pointer = ACPI_MEM_CALLOCATE (required_length);
 		if (!buffer->pointer) {
 			return (AE_NO_MEMORY);
 		}
-
-		/* Clear the buffer */
-
-		ACPI_MEMSET (buffer->pointer, 0, required_length);
 		break;
 
 
 	default:
 
-		/* Validate the size of the buffer */
+		/* Existing buffer: Validate the size of the buffer */
 
 		if (buffer->length < required_length) {
 			status = AE_BUFFER_OVERFLOW;
+			break;
 		}
+
+		/* Clear the buffer */
+
+		ACPI_MEMSET (buffer->pointer, 0, required_length);
 		break;
 	}
 

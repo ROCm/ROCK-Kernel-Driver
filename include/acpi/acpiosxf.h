@@ -217,9 +217,12 @@ acpi_os_wait_events_complete(
 	void * context);
 
 void
+acpi_os_wait_events_complete (
+	void                            *context);
+
+void
 acpi_os_sleep (
-	u32                             seconds,
-	u32                             milliseconds);
+	acpi_integer                    milliseconds);
 
 void
 acpi_os_stall (

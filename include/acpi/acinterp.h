@@ -388,7 +388,7 @@ acpi_ex_system_do_notify_op (
 
 acpi_status
 acpi_ex_system_do_suspend(
-	u32                             time);
+	acpi_integer                    time);
 
 acpi_status
 acpi_ex_system_do_stall (

@@ -53,6 +53,51 @@
 
 /*******************************************************************************
  *
+ * FUNCTION:    acpi_install_exception_handler
+ *
+ * PARAMETERS:  Handler         - Pointer to the handler function for the
+ *                                event
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Saves the pointer to the handler function
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_install_exception_handler (
+	acpi_exception_handler          handler)
+{
+	acpi_status                     status;
+
+
+	ACPI_FUNCTION_TRACE ("acpi_install_exception_handler");
+
+
+	status = acpi_ut_acquire_mutex (ACPI_MTX_EVENTS);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
+
+	/* Don't allow two handlers. */
+
+	if (acpi_gbl_exception_handler) {
+		status = AE_ALREADY_EXISTS;
+		goto cleanup;
+	}
+
+	/* Install the handler */
+
+	acpi_gbl_exception_handler = handler;
+
+cleanup:
+	(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
+	return_ACPI_STATUS (status);
+}
+
+
+/*******************************************************************************
+ *
  * FUNCTION:    acpi_install_fixed_event_handler
  *
  * PARAMETERS:  Event           - Event type to enable.

@@ -650,6 +650,17 @@ acpi_ds_exec_end_op (
 
 
 cleanup:
+
+	/* Invoke exception handler on error */
+
+	if (ACPI_FAILURE (status) &&
+		acpi_gbl_exception_handler &&
+		!(status & AE_CODE_CONTROL)) {
+		acpi_ex_exit_interpreter ();
+		status = acpi_gbl_exception_handler (status);
+		acpi_ex_enter_interpreter ();
+	}
+
 	if (walk_state->result_obj) {
 		/* Break to debugger to display result */
 

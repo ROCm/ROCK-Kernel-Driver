@@ -185,20 +185,26 @@ acpi_ex_store (
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "**** Write to Debug Object: ****:\n\n"));
 
 		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "[ACPI Debug] %s: ",
-				  acpi_ut_get_object_type_name (source_desc)));
+			acpi_ut_get_object_type_name (source_desc)));
 
 		switch (ACPI_GET_OBJECT_TYPE (source_desc)) {
 		case ACPI_TYPE_INTEGER:
 
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "0x%8.8X%8.8X\n",
+			if (acpi_gbl_integer_byte_width == 4) {
+				ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "0x%8.8X\n",
+					(u32) source_desc->integer.value));
+			}
+			else {
+				ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "0x%8.8X%8.8X\n",
 					ACPI_FORMAT_UINT64 (source_desc->integer.value)));
+			}
 			break;
 
 
 		case ACPI_TYPE_BUFFER:
 
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "Length 0x%.2X",
-					(u32) source_desc->buffer.length));
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "[0x%.2X]",
+				(u32) source_desc->buffer.length));
 			ACPI_DUMP_BUFFER (source_desc->buffer.pointer,
 				(source_desc->buffer.length < 32) ? source_desc->buffer.length : 32);
 			break;
@@ -206,22 +212,22 @@ acpi_ex_store (
 
 		case ACPI_TYPE_STRING:
 
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "Length 0x%.2X, \"%s\"\n",
-					source_desc->string.length, source_desc->string.pointer));
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "[0x%.2X] \"%s\"\n",
+				source_desc->string.length, source_desc->string.pointer));
 			break;
 
 
 		case ACPI_TYPE_PACKAGE:
 
-			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "Size 0x%.2X Elements Ptr - %p\n",
-					source_desc->package.count, source_desc->package.elements));
+			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "[0x%.2X] Elements Ptr - %p\n",
+				source_desc->package.count, source_desc->package.elements));
 			break;
 
 
 		default:
 
 			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_DEBUG_OBJECT, "%p\n",
-					source_desc));
+				source_desc));
 			break;
 		}
 

@@ -124,7 +124,7 @@ acpi_ex_opcode_1A_0T_0R (
 
 	case AML_SLEEP_OP:      /*  Sleep (msec_time) */
 
-		status = acpi_ex_system_do_suspend ((u32) operand[0]->integer.value);
+		status = acpi_ex_system_do_suspend (operand[0]->integer.value);
 		break;
 
 
@@ -543,7 +543,13 @@ acpi_ex_opcode_1A_0T_1R (
 			goto cleanup;
 		}
 
-		return_desc->integer.value = !operand[0]->integer.value;
+		/*
+		 * Set result to ONES (TRUE) if Value == 0.  Note:
+		 * return_desc->Integer.Value is initially == 0 (FALSE) from above.
+		 */
+		if (!operand[0]->integer.value) {
+			return_desc->integer.value = ACPI_INTEGER_MAX;
+		}
 		break;
 
 

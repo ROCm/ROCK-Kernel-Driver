@@ -836,6 +836,10 @@ acpi_status (*acpi_init_handler) (
 
 #define ACPI_INIT_DEVICE_INI        1
 
+typedef
+acpi_status (*acpi_exception_handler) (
+	acpi_status                         status);
+
 
 /* Address Spaces (For Operation Regions) */
 
