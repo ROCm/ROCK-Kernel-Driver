@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -32,16 +32,9 @@
 #ifndef	__XFS_RW_H__
 #define	__XFS_RW_H__
 
-struct bhv_desc;
-struct bmapval;
 struct xfs_buf;
-struct cred;
-struct uio;
-struct vnode;
 struct xfs_inode;
-struct xfs_iocore;
 struct xfs_mount;
-struct xfs_trans;
 
 /*
  * Maximum count of bmaps used by read and write paths.
@@ -91,44 +84,6 @@ xfs_daddr_t xfs_fsb_to_db(struct xfs_inode *ip, xfs_fsblock_t fsb);
 		 XFS_FSB_TO_DADDR((io)->io_mount, (fsb)))
 
 /*
- * Defines for the trace mechanisms in xfs_rw.c.
- */
-#define	XFS_RW_KTRACE_SIZE	64
-#define	XFS_STRAT_KTRACE_SIZE	64
-#define	XFS_STRAT_GTRACE_SIZE	512
-
-#define	XFS_READ_ENTER		1
-#define	XFS_WRITE_ENTER		2
-#define XFS_IOMAP_READ_ENTER	3
-#define	XFS_IOMAP_WRITE_ENTER	4
-#define	XFS_IOMAP_READ_MAP	5
-#define	XFS_IOMAP_WRITE_MAP	6
-#define	XFS_IOMAP_WRITE_NOSPACE	7
-#define	XFS_ITRUNC_START	8
-#define	XFS_ITRUNC_FINISH1	9
-#define	XFS_ITRUNC_FINISH2	10
-#define	XFS_CTRUNC1		11
-#define	XFS_CTRUNC2		12
-#define	XFS_CTRUNC3		13
-#define	XFS_CTRUNC4		14
-#define	XFS_CTRUNC5		15
-#define	XFS_CTRUNC6		16
-#define	XFS_BUNMAPI		17
-#define	XFS_INVAL_CACHED	18
-#define	XFS_DIORD_ENTER		19
-#define	XFS_DIOWR_ENTER		20
-
-#if defined(XFS_ALL_TRACE)
-#define	XFS_RW_TRACE
-#define	XFS_STRAT_TRACE
-#endif
-
-#if !defined(DEBUG)
-#undef XFS_RW_TRACE
-#undef XFS_STRAT_TRACE
-#endif
-
-/*
  * Prototypes for functions in xfs_rw.c.
  */
 
@@ -140,14 +95,6 @@ int
 xfs_bwrite(
 	struct xfs_mount	*mp,
 	struct xfs_buf		*bp);
-
-void
-xfs_inval_cached_pages(
-	struct vnode		*vp,
-	struct xfs_iocore	*io,
-	xfs_off_t		offset,
-	int			write,
-	int			relock);
 
 int
 xfs_bioerror(

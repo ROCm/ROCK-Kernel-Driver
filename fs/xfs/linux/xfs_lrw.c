@@ -75,6 +75,71 @@
 #include <linux/capability.h>
 
 
+#if defined(XFS_RW_TRACE)
+void
+xfs_rw_enter_trace(
+	int			tag,
+	xfs_iocore_t		*io,
+	const struct iovec	*iovp,
+	size_t			segs,
+	loff_t			offset,
+	int			ioflags)
+{
+	xfs_inode_t	*ip = XFS_IO_INODE(io);
+
+	if (ip->i_rwtrace == NULL)
+		return;
+	ktrace_enter(ip->i_rwtrace,
+		(void *)(unsigned long)tag,
+		(void *)ip,
+		(void *)((unsigned long)((ip->i_d.di_size >> 32) & 0xffffffff)),
+		(void *)((unsigned long)(ip->i_d.di_size & 0xffffffff)),
+		(void *)(__psint_t)iovp,
+		(void *)((unsigned long)segs),
+		(void *)((unsigned long)((offset >> 32) & 0xffffffff)),
+		(void *)((unsigned long)(offset & 0xffffffff)),
+		(void *)((unsigned long)ioflags),
+		(void *)((unsigned long)((io->io_new_size >> 32) & 0xffffffff)),
+		(void *)((unsigned long)(io->io_new_size & 0xffffffff)),
+		(void *)NULL,
+		(void *)NULL,
+		(void *)NULL,
+		(void *)NULL,
+		(void *)NULL);
+}
+
+void
+xfs_inval_cached_trace(
+	xfs_iocore_t	*io,
+	xfs_off_t	offset,
+	xfs_off_t	len,
+	xfs_off_t	first,
+	xfs_off_t	last)
+{
+	xfs_inode_t	*ip = XFS_IO_INODE(io);
+
+	if (ip->i_rwtrace == NULL)
+		return;
+	ktrace_enter(ip->i_rwtrace,
+		(void *)(__psint_t)XFS_INVAL_CACHED,
+		(void *)ip,
+		(void *)((unsigned long)((offset >> 32) & 0xffffffff)),
+		(void *)((unsigned long)(offset & 0xffffffff)),
+		(void *)((unsigned long)((len >> 32) & 0xffffffff)),
+		(void *)((unsigned long)(len & 0xffffffff)),
+		(void *)((unsigned long)((first >> 32) & 0xffffffff)),
+		(void *)((unsigned long)(first & 0xffffffff)),
+		(void *)((unsigned long)((last >> 32) & 0xffffffff)),
+		(void *)((unsigned long)(last & 0xffffffff)),
+		(void *)NULL,
+		(void *)NULL,
+		(void *)NULL,
+		(void *)NULL,
+		(void *)NULL,
+		(void *)NULL);
+}
+#endif
+
 /*
  *	xfs_iozero
  *
@@ -140,6 +205,59 @@ unlock:
 	} while (count);
 
 	return (-status);
+}
+
+/*
+ * xfs_inval_cached_pages
+ * 
+ * This routine is responsible for keeping direct I/O and buffered I/O
+ * somewhat coherent.  From here we make sure that we're at least
+ * temporarily holding the inode I/O lock exclusively and then call
+ * the page cache to flush and invalidate any cached pages.  If there
+ * are no cached pages this routine will be very quick.
+ */
+void
+xfs_inval_cached_pages(
+	vnode_t		*vp,
+	xfs_iocore_t	*io,
+	xfs_off_t	offset,
+	int		write,
+	int		relock)
+{
+	xfs_mount_t	*mp;
+
+	if (!VN_CACHED(vp)) {
+		return;
+	}
+
+	mp = io->io_mount;
+
+	/*
+	 * We need to get the I/O lock exclusively in order
+	 * to safely invalidate pages and mappings.
+	 */
+	if (relock) {
+		XFS_IUNLOCK(mp, io, XFS_IOLOCK_SHARED);
+		XFS_ILOCK(mp, io, XFS_IOLOCK_EXCL);
+	}
+
+	/* Writing beyond EOF creates a hole that must be zeroed */
+	if (write && (offset > XFS_SIZE(mp, io))) {
+		xfs_fsize_t	isize;
+
+		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
+		isize = XFS_SIZE(mp, io);
+		if (offset > isize) {
+			xfs_zero_eof(vp, io, offset, isize, offset);
+		}
+		XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
+	}
+
+	xfs_inval_cached_trace(io, offset, -1, ctooff(offtoct(offset)), -1);
+	VOP_FLUSHINVAL_PAGES(vp, ctooff(offtoct(offset)), -1, FI_REMAPF_LOCKED);
+	if (relock) {
+		XFS_ILOCK_DEMOTE(mp, io, XFS_IOLOCK_EXCL);
+	}
 }
 
 ssize_t			/* bytes read, or (-)  error */
@@ -684,9 +802,13 @@ start:
 
 retry:
 	if (ioflags & IO_ISDIRECT) {
-		xfs_inval_cached_pages(vp, &xip->i_iocore, *offset, 1, 1);
+		xfs_inval_cached_pages(vp, io, *offset, 1, 1);
+		xfs_rw_enter_trace(XFS_DIOWR_ENTER,
+				io, iovp, segs, *offset, ioflags);
+	} else {
+		xfs_rw_enter_trace(XFS_WRITE_ENTER,
+				io, iovp, segs, *offset, ioflags);
 	}
-
 	ret = generic_file_aio_write_nolock(iocb, iovp, segs, offset);
 
 	if ((ret == -ENOSPC) &&
@@ -702,7 +824,6 @@ retry:
 		xfs_rwlock(bdp, locktype);
 		*offset = xip->i_d.di_size;
 		goto retry;
-
 	}
 
 	if (*offset > xip->i_d.di_size) {
