@@ -721,7 +721,7 @@ static int mpeg_release(struct inode *inode, struct file *file)
 }
 
 static ssize_t
-mpeg_read(struct file *file, char *data, size_t count, loff_t *ppos)
+mpeg_read(struct file *file, char __user *data, size_t count, loff_t *ppos)
 {
 	struct cx8802_fh *fh = file->private_data;
 

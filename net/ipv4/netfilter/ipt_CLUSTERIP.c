@@ -664,7 +664,7 @@ static int clusterip_proc_release(struct inode *inode, struct file *file)
 	return ret;
 }
 
-static ssize_t clusterip_proc_write(struct file *file, const char *input,
+static ssize_t clusterip_proc_write(struct file *file, const char __user *input,
 				size_t size, loff_t *ofs)
 {
 #define PROC_WRITELEN	10
