@@ -662,6 +662,7 @@ static void soc_pcmcia_cpufreq_unregister(void)
 int soc_common_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, int first, int nr)
 {
 	struct skt_dev_info *sinfo;
+	struct soc_pcmcia_socket *skt;
 	int ret, i;
 
 	down(&soc_pcmcia_sockets_lock);
@@ -679,7 +680,7 @@ int soc_common_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops
 	 * Initialise the per-socket structure.
 	 */
 	for (i = 0; i < nr; i++) {
-		struct soc_pcmcia_socket *skt = &sinfo->skt[i];
+		skt = &sinfo->skt[i];
 
 		skt->socket.ops = &soc_common_pcmcia_operations;
 		skt->socket.owner = ops->owner;
@@ -777,7 +778,7 @@ int soc_common_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops
 	goto out;
 
 	do {
-		struct soc_pcmcia_socket *skt = &sinfo->skt[i];
+		skt = &sinfo->skt[i];
 
 		del_timer_sync(&skt->poll_timer);
 		pcmcia_unregister_socket(&skt->socket);
