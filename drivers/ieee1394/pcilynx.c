@@ -748,10 +748,11 @@ loff_t mem_llseek(struct file *file, loff_t offs, int orig)
         }
 
         if (newoffs < 0 || newoffs > PCILYNX_MAX_MEMORY + 1) {
-                lock_kernel();
+                unlock_kernel();
                 return -EINVAL;
         }
 
+        unlock_kernel();
         file->f_pos = newoffs;
         return newoffs;
 }
