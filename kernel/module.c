@@ -592,20 +592,26 @@ static void *copy_section(const char *name,
 {
 	void *dest;
 	unsigned long *use;
+	unsigned long max;
 
 	/* Only copy to init section if there is one */
 	if (strstr(name, ".init") && mod->module_init) {
 		dest = mod->module_init;
 		use = &used->init_size;
+		max = mod->init_size;
 	} else {
 		dest = mod->module_core;
 		use = &used->core_size;
+		max = mod->core_size;
 	}
 
 	/* Align up */
 	*use = ALIGN(*use, sechdr->sh_addralign);
 	dest += *use;
 	*use += sechdr->sh_size;
+
+	if (*use > max)
+		return ERR_PTR(-ENOEXEC);
 
 	/* May not actually be in the file (eg. bss). */
 	if (sechdr->sh_type != SHT_NOBITS)
@@ -773,9 +779,10 @@ static void simplify_symbols(Elf_Shdr *sechdrs,
 /* Get the total allocation size of the init and non-init sections */
 static struct sizes get_sizes(const Elf_Ehdr *hdr,
 			      const Elf_Shdr *sechdrs,
-			      const char *secstrings)
+			      const char *secstrings,
+			      unsigned long common_length)
 {
-	struct sizes ret = { 0, 0 };
+	struct sizes ret = { 0, common_length };
 	unsigned i;
 
 	/* Everything marked ALLOC (this includes the exported
@@ -933,10 +940,9 @@ static struct module *load_module(void *umod,
 	mod->live = 0;
 	module_unload_init(mod);
 
-	/* How much space will we need?  (Common area in core) */
-	sizes = get_sizes(hdr, sechdrs, secstrings);
+	/* How much space will we need?  (Common area in first) */
 	common_length = read_commons(hdr, &sechdrs[symindex]);
-	sizes.core_size += common_length;
+	sizes = get_sizes(hdr, sechdrs, secstrings, common_length);
 
 	/* Set these up, and allow archs to manipulate them. */
 	mod->core_size = sizes.core_size;
@@ -963,7 +969,7 @@ static struct module *load_module(void *umod,
 	mod->module_core = ptr;
 
 	ptr = module_alloc(mod->init_size);
-	if (!ptr) {
+	if (!ptr && mod->init_size) {
 		err = -ENOMEM;
 		goto free_core;
 	}

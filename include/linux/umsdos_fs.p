@@ -82,7 +82,7 @@ int UMSDOS_mkdir (struct inode *dir,
 int UMSDOS_mknod (struct inode *dir,
 		  struct dentry *dentry,
 		  int mode,
-		  int rdev);
+		  dev_t rdev);
 int UMSDOS_rmdir (struct inode *dir,struct dentry *dentry);
 int UMSDOS_unlink (struct inode *dir, struct dentry *dentry);
 int UMSDOS_rename (struct inode *old_dir,

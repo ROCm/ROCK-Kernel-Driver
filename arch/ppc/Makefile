@@ -36,19 +36,13 @@ ifdef CONFIG_MORE_COMPILE_OPTIONS
   CFLAGS += $(shell echo $(CONFIG_COMPILE_OPTIONS) | sed -e 's/"//g')
 endif
 
-ifdef CONFIG_4xx
-  HEAD := arch/ppc/kernel/head_4xx.o
-else
-  ifdef CONFIG_8xx
-    HEAD := arch/ppc/kernel/head_8xx.o
-  else
-    ifdef CONFIG_PPC_ISERIES
-      HEAD := arch/ppc/kernel/iSeries_head.o
-    else
-      HEAD := arch/ppc/kernel/head.o
-    endif
-  endif
-endif
+head-y				:= head.o
+head-$(CONFIG_PPC_ISERIES)	:= iSeries_head.o
+head-$(CONFIG_8xx)		:= head_8xx.o
+head-$(CONFIG_4xx)		:= head_4xx.o
+head-$(CONFIG_440)		:= head_44x.o
+
+HEAD := arch/ppc/kernel/$(head-y)
 
 core-y				+= arch/ppc/kernel/ arch/ppc/platforms/ \
 				   arch/ppc/mm/ arch/ppc/lib/ arch/ppc/syslib/
@@ -80,7 +74,7 @@ $(BOOT_TARGETS): vmlinux
 	cp -f arch/ppc/configs/$(@:config=defconfig) .config
 
 archclean:
-	$(MAKE) -f scripts/Makefile.clean obj=arch/ppc/boot
+	+$(MAKE) -f scripts/Makefile.clean obj=arch/ppc/boot
 
 archmrproper:
 

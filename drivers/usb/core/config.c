@@ -109,7 +109,8 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 	interface->num_altsetting = 0;
 	interface->max_altsetting = USB_ALTSETTINGALLOC;
 
-	interface->altsetting = kmalloc(sizeof(struct usb_interface_descriptor) * interface->max_altsetting, GFP_KERNEL);
+	interface->altsetting = kmalloc(sizeof(*interface->altsetting) * interface->max_altsetting,
+					GFP_KERNEL);
 	
 	if (!interface->altsetting) {
 		err("couldn't kmalloc interface->altsetting");
@@ -118,29 +119,27 @@ static int usb_parse_interface(struct usb_interface *interface, unsigned char *b
 
 	while (size > 0) {
 		struct usb_interface_descriptor	*d;
-
+	
 		if (interface->num_altsetting >= interface->max_altsetting) {
-			void *ptr;
+			struct usb_host_interface *ptr;
 			int oldmas;
 
 			oldmas = interface->max_altsetting;
 			interface->max_altsetting += USB_ALTSETTINGALLOC;
 			if (interface->max_altsetting > USB_MAXALTSETTING) {
-				warn("too many alternate settings (max %d)",
-					USB_MAXALTSETTING);
+				warn("too many alternate settings (incr %d max %d)\n",
+					USB_ALTSETTINGALLOC, USB_MAXALTSETTING);
 				return -1;
 			}
 
-			ptr = interface->altsetting;
-			interface->altsetting = kmalloc(sizeof(struct usb_interface_descriptor) * interface->max_altsetting, GFP_KERNEL);
-			if (!interface->altsetting) {
+			ptr = kmalloc(sizeof(*ptr) * interface->max_altsetting, GFP_KERNEL);
+			if (ptr == NULL) {
 				err("couldn't kmalloc interface->altsetting");
-				interface->altsetting = ptr;
 				return -1;
 			}
-			memcpy(interface->altsetting, ptr, sizeof(struct usb_interface_descriptor) * oldmas);
-
-			kfree(ptr);
+			memcpy(ptr, interface->altsetting, sizeof(*interface->altsetting) * oldmas);
+			kfree(interface->altsetting);
+			interface->altsetting = ptr;
 		}
 
 		ifp = interface->altsetting + interface->num_altsetting;

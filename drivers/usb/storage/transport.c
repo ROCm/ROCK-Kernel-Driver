@@ -479,7 +479,7 @@ int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 			 usb_stor_blocking_completion, NULL);
 	status = usb_stor_msg_common(us);
 
-	/* return the actual length of the data transferred if no error*/
+	/* return the actual length of the data transferred if no error */
 	if (status >= 0)
 		status = us->current_urb->actual_length;
 	return status;
@@ -543,6 +543,65 @@ int usb_stor_clear_halt(struct us_data *us, unsigned int pipe)
 	return 0;
 }
 
+
+/*
+ * Interpret the results of a URB transfer
+ *
+ * This function prints appropriate debugging messages, clears halts on
+ * bulk endpoints, and translates the status to the corresponding
+ * USB_STOR_XFER_xxx return code.
+ */
+static int interpret_urb_result(struct us_data *us, unsigned int pipe,
+		unsigned int length, int result, unsigned int partial) {
+
+	US_DEBUGP("Status code %d; transferred %u/%u\n",
+			result, partial, length);
+
+	/* stalled */
+	if (result == -EPIPE) {
+
+		/* for non-bulk (i.e., control) endpoints, a stall indicates
+		 * a protocol error */
+		if (!usb_pipebulk(pipe)) {
+			US_DEBUGP("-- stall on control pipe\n");
+			return USB_STOR_XFER_ERROR;
+		}
+
+		/* for a bulk endpoint, clear the stall */
+		US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
+		if (usb_stor_clear_halt(us, pipe) < 0)
+			return USB_STOR_XFER_ERROR;
+		return USB_STOR_XFER_STALLED;
+	}
+
+	/* NAK - that means we've retried this a few times already */
+	if (result == -ETIMEDOUT) {
+		US_DEBUGP("-- device NAKed\n");
+		return USB_STOR_XFER_ERROR;
+	}
+
+	/* the transfer was cancelled, presumably by an abort */
+	if (result == -ENODEV) {
+		US_DEBUGP("-- transfer cancelled\n");
+		return USB_STOR_XFER_ERROR;
+	}
+
+	/* the catch-all error case */
+	if (result < 0) {
+		US_DEBUGP("-- unknown error\n");
+		return USB_STOR_XFER_ERROR;
+	}
+
+	/* no error code; did we send all the data? */
+	if (partial != length) {
+		US_DEBUGP("-- transferred only %u bytes\n", partial);
+		return USB_STOR_XFER_SHORT;
+	}
+
+	US_DEBUGP("-- transfer complete\n");
+	return USB_STOR_XFER_GOOD;
+}
+
 /*
  * Transfer one control message
  *
@@ -554,34 +613,19 @@ int usb_stor_ctrl_transfer(struct us_data *us, unsigned int pipe,
 		u8 request, u8 requesttype, u16 value, u16 index,
 		void *data, u16 size) {
 	int result;
+	unsigned int partial = 0;
 
 	US_DEBUGP("usb_stor_ctrl_transfer(): rq=%02x rqtype=%02x "
-			"value=%04x index=%02x len=%d\n",
+			"value=%04x index=%02x len=%u\n",
 			request, requesttype, value, index, size);
 	result = usb_stor_control_msg(us, pipe, request, requesttype,
 			value, index, data, size);
-	US_DEBUGP("usb_stor_control_msg returned %d\n", result);
 
-	/* a stall indicates a protocol error */
-	if (result == -EPIPE) {
-		US_DEBUGP("-- stall on control pipe\n");
-		return USB_STOR_XFER_ERROR;
+	if (result > 0) {	/* Separate out the amount transferred */
+		partial = result;
+		result = 0;
 	}
-
-	/* some other serious problem here */
-	if (result < 0) {
-		US_DEBUGP("-- unknown error\n");
-		return USB_STOR_XFER_ERROR;
-	}
-
-	/* was the entire command transferred? */
-	if (result < size) {
-		US_DEBUGP("-- transferred only %d bytes\n", result);
-		return USB_STOR_XFER_SHORT;
-	}
-
-	US_DEBUGP("-- transfer completed successfully\n");
-	return USB_STOR_XFER_GOOD;
+	return interpret_urb_result(us, pipe, size, result, partial);
 }
 
 /*
@@ -596,50 +640,17 @@ int usb_stor_ctrl_transfer(struct us_data *us, unsigned int pipe,
  *	    urb status or transfer length.
  */
 int usb_stor_bulk_transfer_buf(struct us_data *us, unsigned int pipe,
-	char *buf, unsigned int length, unsigned int *act_len)
+	void *buf, unsigned int length, unsigned int *act_len)
 {
 	int result;
-	int partial;
+	unsigned int partial;
 
 	/* transfer the data */
-	US_DEBUGP("usb_stor_bulk_transfer_buf(): xfer %d bytes\n", length);
+	US_DEBUGP("usb_stor_bulk_transfer_buf(): xfer %u bytes\n", length);
 	result = usb_stor_bulk_msg(us, buf, pipe, length, &partial);
-	US_DEBUGP("usb_stor_bulk_msg() returned %d xferred %d/%d\n",
-		  result, partial, length);
 	if (act_len)
 		*act_len = partial;
-
-	/* if we stall, we need to clear it before we go on */
-	if (result == -EPIPE) {
-		US_DEBUGP("clearing endpoint halt for pipe 0x%x,"
-				" stalled at %d bytes\n", pipe, partial);
-		if (usb_stor_clear_halt(us, pipe) < 0)
-			return USB_STOR_XFER_ERROR;
-		return USB_STOR_XFER_STALLED;
-	}
-
-	/* NAK - that means we've retried a few times already */
-	if (result == -ETIMEDOUT) {
-		US_DEBUGP("-- device NAKed\n");
-		return USB_STOR_XFER_ERROR;
-	}
-
-	/* the catch-all error case */
-	if (result) {
-		US_DEBUGP("-- unknown error\n");
-		return USB_STOR_XFER_ERROR;
-	}
-
-	/* did we send all the data? */
-	if (partial == length) {
-		US_DEBUGP("-- transfer complete\n");
-		return USB_STOR_XFER_GOOD;
-	}
-
-	/* no error code, so we must have transferred some data, 
-	 * just not all of it */
-	US_DEBUGP("-- transferred only %d bytes\n", partial);
-	return USB_STOR_XFER_SHORT;
+	return interpret_urb_result(us, pipe, length, result, partial);
 }
 
 /*
@@ -653,10 +664,10 @@ int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
 		unsigned int *act_len)
 {
 	int result;
-	int partial;
+	unsigned int partial;
 
 	/* initialize the scatter-gather request block */
-	US_DEBUGP("usb_stor_bulk_transfer_sglist(): xfer %d bytes, "
+	US_DEBUGP("usb_stor_bulk_transfer_sglist(): xfer %u bytes, "
 			"%d entries\n", length, num_sg);
 	result = usb_sg_init(us->current_sg, us->pusb_dev, pipe, 0,
 			sg, num_sg, length, SLAB_NOIO);
@@ -685,55 +696,22 @@ int usb_stor_bulk_transfer_sglist(struct us_data *us, unsigned int pipe,
 
 	result = us->current_sg->status;
 	partial = us->current_sg->bytes;
-	US_DEBUGP("usb_sg_wait() returned %d xferred %d/%d\n",
-			result, partial, length);
 	if (act_len)
 		*act_len = partial;
-
-	/* if we stall, we need to clear it before we go on */
-	if (result == -EPIPE) {
-		US_DEBUGP("clearing endpoint halt for pipe 0x%x, "
-				"stalled at %d bytes\n", pipe, partial);
-		if (usb_stor_clear_halt(us, pipe) < 0)
-			return USB_STOR_XFER_ERROR;
-		return USB_STOR_XFER_STALLED;
-	}
-
-	/* NAK - that means we've retried this a few times already */
-	if (result == -ETIMEDOUT) {
-		US_DEBUGP("-- device NAKed\n");
-		return USB_STOR_XFER_ERROR;
-	}
-
-	/* the catch-all error case */
-	if (result) {
-		US_DEBUGP("-- unknown error\n");
-		return USB_STOR_XFER_ERROR;
-	}
-
-	/* did we send all the data? */
-	if (partial == length) {
-		US_DEBUGP("-- transfer complete\n");
-		return USB_STOR_XFER_GOOD;
-	}
-
-	/* no error code, so we must have transferred some data,
-	 * just not all of it */
-	US_DEBUGP("-- transferred only %d bytes\n", partial);
-	return USB_STOR_XFER_SHORT;
+	return interpret_urb_result(us, pipe, length, result, partial);
 }
 
 /*
  * Transfer an entire SCSI command's worth of data payload over the bulk
  * pipe.
  *
- * Nore that this uses usb_stor_bulk_transfer_buf() and
+ * Note that this uses usb_stor_bulk_transfer_buf() and
  * usb_stor_bulk_transfer_sglist() to achieve its goals --
  * this function simply determines whether we're going to use
  * scatter-gather or not, and acts appropriately.
  */
 int usb_stor_bulk_transfer_sg(struct us_data* us, unsigned int pipe,
-		char *buf, unsigned int length_left, int use_sg, int *residual)
+		void *buf, unsigned int length_left, int use_sg, int *residual)
 {
 	int result;
 	unsigned int partial;
@@ -1278,7 +1256,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 		  (bcb.Lun >> 4), (bcb.Lun & 0x0F), 
 		  le32_to_cpu(bcb.DataTransferLength), bcb.Flags, bcb.Length);
 	result = usb_stor_bulk_transfer_buf(us, us->send_bulk_pipe,
-				(char *) &bcb, US_BULK_CB_WRAP_LEN, NULL);
+				&bcb, US_BULK_CB_WRAP_LEN, NULL);
 	US_DEBUGP("Bulk command transfer result=%d\n", result);
 	if (result != USB_STOR_XFER_GOOD)
 		return USB_STOR_TRANSPORT_ERROR;
@@ -1302,7 +1280,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	/* get CSW for device status */
 	US_DEBUGP("Attempting to get CSW...\n");
 	result = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
-				(char *) &bcs, US_BULK_CS_WRAP_LEN, NULL);
+				&bcs, US_BULK_CS_WRAP_LEN, NULL);
 
 	/* did the attempt to read the CSW fail? */
 	if (result == USB_STOR_XFER_STALLED) {
@@ -1310,7 +1288,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 		/* get the status again */
 		US_DEBUGP("Attempting to get CSW (2nd try)...\n");
 		result = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
-				(char *) &bcs, US_BULK_CS_WRAP_LEN, NULL);
+				&bcs, US_BULK_CS_WRAP_LEN, NULL);
 	}
 
 	/* if we still have a failure at this point, we're in trouble */

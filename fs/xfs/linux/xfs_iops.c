@@ -69,7 +69,7 @@ linvfs_mknod(
 	struct inode	*dir,
 	struct dentry	*dentry,
 	int		mode,
-	int		rdev)
+	dev_t		rdev)
 {
 	struct inode	*ip;
 	vattr_t		va;

@@ -578,7 +578,7 @@ extern int posix_lock_file(struct file *, struct file_lock *);
 extern void posix_block_lock(struct file_lock *, struct file_lock *);
 extern void posix_unblock_lock(struct file *, struct file_lock *);
 extern int posix_locks_deadlock(struct file_lock *, struct file_lock *);
-extern int __get_lease(struct inode *inode, unsigned int flags);
+extern int __break_lease(struct inode *inode, unsigned int flags);
 extern void lease_get_mtime(struct inode *, struct timespec *time);
 extern int lock_may_read(struct inode *, loff_t start, unsigned long count);
 extern int lock_may_write(struct inode *, loff_t start, unsigned long count);
@@ -773,7 +773,7 @@ struct inode_operations {
 	int (*symlink) (struct inode *,struct dentry *,const char *);
 	int (*mkdir) (struct inode *,struct dentry *,int);
 	int (*rmdir) (struct inode *,struct dentry *);
-	int (*mknod) (struct inode *,struct dentry *,int,int);
+	int (*mknod) (struct inode *,struct dentry *,int,dev_t);
 	int (*rename) (struct inode *, struct dentry *,
 			struct inode *, struct dentry *);
 	int (*readlink) (struct dentry *, char *,int);
@@ -1052,10 +1052,10 @@ static inline int locks_verify_truncate(struct inode *inode,
 	return 0;
 }
 
-static inline int get_lease(struct inode *inode, unsigned int mode)
+static inline int break_lease(struct inode *inode, unsigned int mode)
 {
-	if (inode->i_flock && (inode->i_flock->fl_flags & FL_LEASE))
-		return __get_lease(inode, mode);
+	if (inode->i_flock)
+		return __break_lease(inode, mode);
 	return 0;
 }
 
@@ -1109,7 +1109,7 @@ extern inline const char *bdevname(struct block_device *bdev)
 }
 extern const char * cdevname(kdev_t);
 extern const char * kdevname(kdev_t);
-extern void init_special_inode(struct inode *, umode_t, int);
+extern void init_special_inode(struct inode *, umode_t, dev_t);
 
 /* Invalid inode operations -- fs/bad_inode.c */
 extern void make_bad_inode(struct inode *);

@@ -29,24 +29,26 @@
 #define BusLogic_DriverVersion		"2.1.16"
 #define BusLogic_DriverDate		"18 July 2002"
 
+#include <linux/config.h>
 #include <linux/version.h>
 #include <linux/module.h>
-#include <linux/config.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/types.h>
 #include <linux/blk.h>
 #include <linux/blkdev.h>
 #include <linux/delay.h>
 #include <linux/ioport.h>
 #include <linux/mm.h>
-#include <linux/sched.h>
 #include <linux/stat.h>
 #include <linux/pci.h>
 #include <linux/spinlock.h>
+/* #include <scsi/scsicam.h> This include file is currently busted */
+
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/system.h>
-/* #include <scsi/scsicam.h> This include file is currently busted */
+
 #include "scsi.h"
 #include "hosts.h"
 #include "BusLogic.h"
