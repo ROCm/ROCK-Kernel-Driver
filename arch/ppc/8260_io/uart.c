@@ -161,7 +161,7 @@ static struct serial_state rs_table[] = {
 #ifndef CONFIG_SCC1_ENET
 	{ 0,     0, PROFF_SCC1, SIU_INT_SCC1,   0, SCC_NUM_BASE},    /* SCC1 ttyS2 */
 #endif
-#if !defined(CONFIG_SBC82xx) && !defined(CONFIG_SCC2_ENET)
+#ifndef CONFIG_SCC2_ENET
 	{ 0,     0, PROFF_SCC2, SIU_INT_SCC2,   0, SCC_NUM_BASE + 1},    /* SCC2 ttyS3 */
 #endif
 };
