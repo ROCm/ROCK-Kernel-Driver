@@ -52,14 +52,6 @@
 #define up_write up
 #endif
 
-#ifndef LockPage
-#define LockPage(page)		set_bit(PG_locked, &(page)->flags)
-#endif
-#ifndef UnlockPage
-#define UnlockPage(page)	unlock_page(page)
-#endif
-
-
 static inline void i830_print_status_page(drm_device_t *dev)
 {
    	drm_device_dma_t *dma = dev->dma;
@@ -176,10 +168,10 @@ static int i830_map_buffer(drm_buf_t *buf, struct file *filp)
 					    buf->bus_address);
 	dev_priv->mmap_buffer = NULL;
 	filp->f_op = old_fops;
-	if ((unsigned long)buf_priv->virtual > -1024UL) {
+	if (IS_ERR(buf_priv->virtual)) {
 		/* Real error */
 		DRM_ERROR("mmap error\n");
-		retcode = (signed int)buf_priv->virtual;
+		retcode = PTR_ERR(buf_priv->virtual);
 		buf_priv->virtual = 0;
 	}
 	up_write( &current->mm->mmap_sem );
@@ -454,7 +446,7 @@ static int i830_dma_initialize(drm_device_t *dev,
    	memset((void *) dev_priv->hw_status_page, 0, PAGE_SIZE);
 	DRM_DEBUG("hw status page @ %lx\n", dev_priv->hw_status_page);
    
-   	I830_WRITE(0x02080, virt_to_bus((void *)dev_priv->hw_status_page));
+   	I830_WRITE(0x02080, dev_priv->dma_status_page);
 	DRM_DEBUG("Enabled hardware status page\n");
    
    	/* Now we need to init our freelist */
