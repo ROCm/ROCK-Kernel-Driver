@@ -404,7 +404,7 @@ xfrm6_state_find(struct in6_addr *daddr, struct in6_addr *saddr, struct flowi *f
 			memcpy(&x->id.daddr, daddr, sizeof(x->sel.daddr));
 		memcpy(&x->props.saddr, &tmpl->saddr, sizeof(x->props.saddr));
 		if (ipv6_addr_any((struct in6_addr*)&x->props.saddr))
-			memcpy(&x->props.saddr, &saddr, sizeof(x->sel.saddr));
+			memcpy(&x->props.saddr, saddr, sizeof(x->props.saddr));
 		x->props.mode = tmpl->mode;
 		x->props.reqid = tmpl->reqid;
 		x->props.family = AF_INET6;
