@@ -191,7 +191,7 @@ extern void tomatillo_init(int, char *);
 static struct {
 	char *model_name;
 	void (*init)(int, char *);
-} pci_controller_table[] = {
+} pci_controller_table[] __initdata = {
 	{ "SUNW,sabre", sabre_init },
 	{ "pci108e,a000", sabre_init },
 	{ "pci108e,a001", sabre_init },
@@ -207,7 +207,7 @@ static struct {
 #define PCI_NUM_CONTROLLER_TYPES (sizeof(pci_controller_table) / \
 				  sizeof(pci_controller_table[0]))
 
-static int pci_controller_init(char *model_name, int namelen, int node)
+static int __init pci_controller_init(char *model_name, int namelen, int node)
 {
 	int i;
 
@@ -226,7 +226,7 @@ static int pci_controller_init(char *model_name, int namelen, int node)
 	return 0;
 }
 
-static int pci_is_controller(char *model_name, int namelen, int node)
+static int __init pci_is_controller(char *model_name, int namelen, int node)
 {
 	int i;
 
@@ -240,8 +240,7 @@ static int pci_is_controller(char *model_name, int namelen, int node)
 	return 0;
 }
 
-
-static int pci_controller_scan(int (*handler)(char *, int, int))
+static int __init pci_controller_scan(int (*handler)(char *, int, int))
 {
 	char namebuf[64];
 	int node;
@@ -278,7 +277,7 @@ static int pci_controller_scan(int (*handler)(char *, int, int))
 
 
 /* Is there some PCI controller in the system?  */
-int pcic_present(void)
+int __init pcic_present(void)
 {
 	return pci_controller_scan(pci_is_controller);
 }
@@ -288,14 +287,14 @@ int pcic_present(void)
  * pci_controller_root.  Setup the controller enough such
  * that bus scanning can be done.
  */
-static void pci_controller_probe(void)
+static void __init pci_controller_probe(void)
 {
 	printk("PCI: Probing for controllers.\n");
 
 	pci_controller_scan(pci_controller_init);
 }
 
-static void pci_scan_each_controller_bus(void)
+static void __init pci_scan_each_controller_bus(void)
 {
 	struct pci_controller_info *p;
 	unsigned long flags;
