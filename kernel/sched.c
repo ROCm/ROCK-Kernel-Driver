@@ -1844,6 +1844,8 @@ static void active_load_balance(runqueue_t *busiest, int busiest_cpu)
  		}
 
 		rq = cpu_rq(push_cpu);
+		if (busiest == rq)
+			goto next_group;
 		double_lock_balance(busiest, rq);
 		move_tasks(rq, push_cpu, busiest, 1, sd, IDLE);
 		spin_unlock(&rq->lock);
