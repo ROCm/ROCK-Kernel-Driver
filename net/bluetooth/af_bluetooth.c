@@ -51,13 +51,13 @@
 #define BT_DBG(D...)
 #endif
 
-#define VERSION "2.5"
+#define VERSION "2.6"
 
 struct proc_dir_entry *proc_bt;
 EXPORT_SYMBOL(proc_bt);
 
 /* Bluetooth sockets */
-#define BT_MAX_PROTO	7
+#define BT_MAX_PROTO	8
 static struct net_proto_family *bt_proto[BT_MAX_PROTO];
 
 static kmem_cache_t *bt_sock_cache;
