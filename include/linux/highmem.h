@@ -56,8 +56,7 @@ static inline void memclear_highpage_flush(struct page *page, unsigned int offse
 {
 	void *kaddr;
 
-	if (offset + size > PAGE_SIZE)
-		BUG();
+	BUG_ON(offset + size > PAGE_SIZE);
 
 	kaddr = kmap_atomic(page, KM_USER0);
 	memset((char *)kaddr + offset, 0, size);

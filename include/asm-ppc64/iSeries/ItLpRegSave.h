@@ -16,6 +16,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
+#ifndef _ITLPREGSAVE_H
+#define _ITLPREGSAVE_H
 
 //=====================================================================================
 //
@@ -23,9 +25,6 @@
 //	and the OS
 //    
 //
-
-#ifndef _ITLPREGSAVE_H
-#define _ITLPREGSAVE_H
 
 struct ItLpRegSave
 {
@@ -84,4 +83,5 @@ struct ItLpRegSave
 
 	u8	xRsvd3[176];	// Reserved			350-3FF
 };
-#endif // _ITLPREGSAVE_H
+
+#endif /* _ITLPREGSAVE_H */

@@ -26,11 +26,6 @@
 #include <asm/page.h>
 #include <asm/pgtable.h>
 
-#ifndef TryLockPage
-# include "linux/page-flags.h"
-# define TryLockPage TestSetPageLocked
-#endif
-
 #include <media/video-buf.h>
 
 static int debug = 0;
@@ -41,7 +36,7 @@ MODULE_LICENSE("GPL");
 MODULE_PARM(debug,"i");
 
 #define dprintk(level, fmt, arg...)	if (debug >= level) \
-	printk(KERN_DEBUG "vbuf: " fmt, ## arg)
+	printk(KERN_DEBUG "vbuf: " fmt , ## arg)
 
 struct scatterlist*
 videobuf_vmalloc_to_sg(unsigned char *virt, int nr_pages)
@@ -110,36 +105,6 @@ videobuf_pages_to_sg(struct page **pages, int nr_pages, int offset)
 	dprintk(2,"sgl: oops - highmem page\n");
 	kfree(sglist);
 	return NULL;
-}
-
-int videobuf_lock(struct page **pages, int nr_pages)
-{
-	int i;
-
-	dprintk(2,"lock start ...\n");
-	for (i = 0; i < nr_pages; i++)
-		if (TryLockPage(pages[i]))
-			goto err;
-	dprintk(2,"lock ok [%d pages]\n",nr_pages);
-	return 0;
-
- err:
-	dprintk(2,"lock failed, unlock ...\n");
-	while (i > 0)
-		unlock_page(pages[--i]);
-	dprintk(2,"lock quit\n");
-	return -EINVAL;
-}
-
-int videobuf_unlock(struct page **pages, int nr_pages)
-{
-	int i;
-
-	dprintk(2,"unlock start ...\n");
-	for (i = 0; i < nr_pages; i++)
-		unlock_page(pages[i]);
-	dprintk(2,"unlock ok [%d pages]\n",nr_pages);
-	return 0;
 }
 
 /* --------------------------------------------------------------------- */
@@ -213,20 +178,12 @@ int videobuf_dma_init_overlay(struct videobuf_dmabuf *dma, int direction,
 
 int videobuf_dma_pci_map(struct pci_dev *dev, struct videobuf_dmabuf *dma)
 {
-	int err;
-
 	if (0 == dma->nr_pages)
 		BUG();
 	
 	if (dma->pages) {
-		if (0 != (err = videobuf_lock(dma->pages, dma->nr_pages))) {
-			dprintk(1,"videobuf_lock: %d\n",err);
-			return err;
-		}
 		dma->sglist = videobuf_pages_to_sg(dma->pages, dma->nr_pages,
 						   dma->offset);
-		if (NULL == dma->sglist)
-			videobuf_unlock(dma->pages, dma->nr_pages);
 	}
 	if (dma->vmalloc) {
 		dma->sglist = videobuf_vmalloc_to_sg
@@ -236,8 +193,8 @@ int videobuf_dma_pci_map(struct pci_dev *dev, struct videobuf_dmabuf *dma)
 		dma->sglist = kmalloc(sizeof(struct scatterlist), GFP_KERNEL);
 		if (NULL != dma->sglist) {
 			dma->sglen  = 1;
-			sg_dma_address(&dma->sglist[0]) = dma->bus_addr & ~PAGE_MASK;
-			dma->sglist[0].offset           = dma->bus_addr & PAGE_MASK;
+			sg_dma_address(&dma->sglist[0]) = dma->bus_addr & PAGE_MASK;
+			dma->sglist[0].offset           = dma->bus_addr & ~PAGE_MASK;
 			sg_dma_len(&dma->sglist[0])     = dma->nr_pages * PAGE_SIZE;
 		}
 	}
@@ -272,8 +229,6 @@ int videobuf_dma_pci_unmap(struct pci_dev *dev, struct videobuf_dmabuf *dma)
 	kfree(dma->sglist);
 	dma->sglist = NULL;
 	dma->sglen = 0;
-	if (dma->pages)
-		videobuf_unlock(dma->pages, dma->nr_pages);
 	return 0;
 }
 
@@ -325,8 +280,8 @@ int videobuf_waiton(struct videobuf_buffer *vb, int non_blocking, int intr)
 			retval = -EAGAIN;
 			break;
 		}
-		set_current_state(intr ? TASK_INTERRUPTIBLE :
-					TASK_UNINTERRUPTIBLE);
+		set_current_state(intr  ? TASK_INTERRUPTIBLE
+					: TASK_UNINTERRUPTIBLE);
 		if (vb->state == STATE_ACTIVE || vb->state == STATE_QUEUED)
 			schedule();
 		set_current_state(TASK_RUNNING);
@@ -969,8 +924,10 @@ ssize_t videobuf_read_stream(struct file *file, struct videobuf_queue *q,
 			retval      += bytes;
 			q->read_off += bytes;
 		} else {
-			/* some error -- skip buffer */
+			/* some error */
 			q->read_off = q->read_buf->size;
+			if (0 == retval)
+				retval = -EIO;
 		}
 
 		/* requeue buffer when done with copying */
@@ -982,6 +939,8 @@ ssize_t videobuf_read_stream(struct file *file, struct videobuf_queue *q,
 			spin_unlock_irqrestore(q->irqlock,flags);
 			q->read_buf = NULL;
 		}
+		if (retval < 0)
+			break;
 	}
 
  done:
@@ -1078,7 +1037,7 @@ videobuf_vm_close(struct vm_area_struct *vma)
  */
 static struct page*
 videobuf_vm_nopage(struct vm_area_struct *vma, unsigned long vaddr,
-		  int *type)
+		   int *type)
 {
 	struct page *page;
 
@@ -1232,8 +1191,6 @@ int videobuf_mmap_mapper(struct vm_area_struct *vma,
 /* --------------------------------------------------------------------- */
 
 EXPORT_SYMBOL_GPL(videobuf_vmalloc_to_sg);
-EXPORT_SYMBOL_GPL(videobuf_lock);
-EXPORT_SYMBOL_GPL(videobuf_unlock);
 
 EXPORT_SYMBOL_GPL(videobuf_dma_init_user);
 EXPORT_SYMBOL_GPL(videobuf_dma_init_kernel);

@@ -47,7 +47,7 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/stat.h>
 #include <linux/init.h>
-
+#include <linux/device.h>
 #include <linux/tty.h>
 #include <linux/kmod.h>
 
@@ -180,6 +180,13 @@ fail:
 	return err;
 }
 
+/* 
+ * TODO for 2.7:
+ *  - add a struct class_device to struct miscdevice and make all usages of
+ *    them dynamic.
+ */
+static struct class_simple *misc_class;
+
 static struct file_operations misc_fops = {
 	.owner		= THIS_MODULE,
 	.open		= misc_open,
@@ -234,6 +241,8 @@ int misc_register(struct miscdevice * misc)
 				"misc/%s", misc->name);
 	}
 
+	class_simple_device_add(misc_class, MKDEV(MISC_MAJOR, misc->minor),
+				misc->dev, misc->name);
 	devfs_mk_cdev(MKDEV(MISC_MAJOR, misc->minor),
 			S_IFCHR|S_IRUSR|S_IWUSR|S_IRGRP, misc->devfs_name);
 
@@ -265,6 +274,7 @@ int misc_deregister(struct miscdevice * misc)
 
 	down(&misc_sem);
 	list_del(&misc->list);
+	class_simple_device_remove(MKDEV(MISC_MAJOR, misc->minor));
 	devfs_remove(misc->devfs_name);
 	if (i < DYNAMIC_MINORS && i>0) {
 		misc_minors[i>>3] &= ~(1 << (misc->minor & 7));
@@ -285,6 +295,9 @@ static int __init misc_init(void)
 	if (ent)
 		ent->proc_fops = &misc_proc_fops;
 #endif
+	misc_class = class_simple_create(THIS_MODULE, "misc");
+	if (IS_ERR(misc_class))
+		return PTR_ERR(misc_class);
 #ifdef CONFIG_MVME16x
 	rtc_MK48T08_init();
 #endif
@@ -319,4 +332,4 @@ static int __init misc_init(void)
 	}
 	return 0;
 }
-module_init(misc_init);
+subsys_initcall(misc_init);

@@ -31,6 +31,7 @@
 #include <linux/smp_lock.h>
 #include <linux/buffer_head.h>
 #include <linux/vfs.h>
+#include <linux/random.h>
 #include <asm/uaccess.h>
 #include "xattr.h"
 #include "acl.h"
@@ -1287,6 +1288,8 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		goto failed_mount2;
 	}
 	sbi->s_gdb_count = db_count;
+	get_random_bytes(&sbi->s_next_generation, sizeof(u32));
+	spin_lock_init(&sbi->s_next_gen_lock);
 	/*
 	 * set up enough so that it can read an inode
 	 */

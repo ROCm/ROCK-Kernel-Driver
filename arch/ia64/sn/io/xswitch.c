@@ -1,5 +1,4 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -12,7 +11,6 @@
 #include <asm/sn/sgi.h>
 #include <asm/sn/driver.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/xtalk/xtalk.h>
@@ -65,7 +63,7 @@ xswitch_info_vhdl_set(xswitch_info_t xswitch_info,
     if (port > XSWITCH_CENSUS_PORT_MAX)
 	return;
 
-    xswitch_info->vhdl[port] = xwidget;
+    xswitch_info->vhdl[(int)port] = xwidget;
 }
 
 vertex_hdl_t
@@ -75,7 +73,7 @@ xswitch_info_vhdl_get(xswitch_info_t xswitch_info,
     if (port > XSWITCH_CENSUS_PORT_MAX)
 	return GRAPH_VERTEX_NONE;
 
-    return xswitch_info->vhdl[port];
+    return xswitch_info->vhdl[(int)port];
 }
 
 /*
@@ -91,7 +89,7 @@ xswitch_info_master_assignment_set(xswitch_info_t xswitch_info,
     if (port > XSWITCH_CENSUS_PORT_MAX)
 	return;
 
-    xswitch_info->master_vhdl[port] = master_vhdl;
+    xswitch_info->master_vhdl[(int)port] = master_vhdl;
 }
 
 vertex_hdl_t
@@ -101,7 +99,7 @@ xswitch_info_master_assignment_get(xswitch_info_t xswitch_info,
     if (port > XSWITCH_CENSUS_PORT_MAX)
 	return GRAPH_VERTEX_NONE;
 
-    return xswitch_info->master_vhdl[port];
+    return xswitch_info->master_vhdl[(int)port];
 }
 
 void

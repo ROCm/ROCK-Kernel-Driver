@@ -249,6 +249,8 @@ sysc_sigpending:
         l       %r1,BASED(.Ldo_signal)
 	basr	%r14,%r1               # call do_signal
         stnsm   24(%r15),0xfc          # disable I/O and ext. interrupts
+	tm	__TI_flags+3(%r9),_TIF_RESTART_SVC
+	bo	BASED(sysc_restart)
 	b	BASED(sysc_leave)      # out of here, do NOT recheck
 
 #
@@ -258,7 +260,7 @@ sysc_restart:
 	ni	__TI_flags+3(%r9),255-_TIF_RESTART_SVC # clear TIF_RESTART_SVC
 	stosm	24(%r15),0x03          # reenable interrupts
 	l	%r7,SP_R2(%r15)        # load new svc number
-	sla	%r2,2
+	sla	%r7,2
 	mvc	SP_R2(4,%r15),SP_ORIG_R2(%r15) # restore first argument
 	lm	%r2,%r6,SP_R2(%r15)    # load svc arguments
 	b	BASED(sysc_do_restart) # restart svc
@@ -541,7 +543,7 @@ io_preempt:
 io_resume_loop:
 	tm	__TI_flags+3(%r9),_TIF_NEED_RESCHED
 	bno	BASED(io_leave)
-	mvc     __TI_precount(4,%r9),.Lc_pactive
+	mvc     __TI_precount(4,%r9),BASED(.Lc_pactive)
 	# hmpf, we are on the async. stack but to call schedule
 	# we have to move the interrupt frame to the process stack
 	l	%r1,SP_R15(%r15)

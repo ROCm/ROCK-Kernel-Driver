@@ -378,10 +378,9 @@ int show_stat(struct seq_file *p, void *v)
 	jif = ((u64)now.tv_sec * HZ) + (now.tv_usec/(1000000/HZ)) - jif;
 	do_div(jif, HZ);
 
-	for (i = 0; i < NR_CPUS; i++) {
+	for_each_cpu(i) {
 		int j;
 
-		if (!cpu_online(i)) continue;
 		user += kstat_cpu(i).cpustat.user;
 		nice += kstat_cpu(i).cpustat.nice;
 		system += kstat_cpu(i).cpustat.system;
@@ -401,8 +400,7 @@ int show_stat(struct seq_file *p, void *v)
 		jiffies_to_clock_t(iowait),
 		jiffies_to_clock_t(irq),
 		jiffies_to_clock_t(softirq));
-	for (i = 0; i < NR_CPUS; i++){
-		if (!cpu_online(i)) continue;
+	for_each_online_cpu(i) {
 		seq_printf(p, "cpu%d %u %u %u %u %u %u %u\n",
 			i,
 			jiffies_to_clock_t(kstat_cpu(i).cpustat.user),

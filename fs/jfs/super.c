@@ -1,5 +1,5 @@
 /*
- *   Copyright (C) International Business Machines Corp., 2000-2003
+ *   Copyright (C) International Business Machines Corp., 2000-2004
  *   Portions Copyright (C) Christoph Hellwig, 2001-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
@@ -203,7 +203,7 @@ static void jfs_put_super(struct super_block *sb)
 
 enum {
 	Opt_integrity, Opt_nointegrity, Opt_iocharset, Opt_resize,
-	Opt_errors, Opt_ignore, Opt_err,
+	Opt_resize_nosize, Opt_errors, Opt_ignore, Opt_err,
 };
 
 static match_table_t tokens = {
@@ -211,6 +211,7 @@ static match_table_t tokens = {
 	{Opt_nointegrity, "nointegrity"},
 	{Opt_iocharset, "iocharset=%s"},
 	{Opt_resize, "resize=%u"},
+	{Opt_resize_nosize, "resize"},
 	{Opt_errors, "errors=%s"},
 	{Opt_ignore, "noquota"},
 	{Opt_ignore, "quota"},
@@ -261,14 +262,16 @@ static int parse_options(char *options, struct super_block *sb, s64 *newLVSize,
 		case Opt_resize:
 		{
 			char *resize = args[0].from;
-			if (!resize || !*resize) {
-				*newLVSize = sb->s_bdev->bd_inode->i_size >>
-					sb->s_blocksize_bits;
-				if (*newLVSize == 0)
-					printk(KERN_ERR
-					"JFS: Cannot determine volume size\n");
-			} else
-				*newLVSize = simple_strtoull(resize, &resize, 0);
+			*newLVSize = simple_strtoull(resize, &resize, 0);
+			break;
+		}
+		case Opt_resize_nosize:
+		{
+			*newLVSize = sb->s_bdev->bd_inode->i_size >>
+				sb->s_blocksize_bits;
+			if (*newLVSize == 0)
+				printk(KERN_ERR
+				       "JFS: Cannot determine volume size\n");
 			break;
 		}
 		case Opt_errors:

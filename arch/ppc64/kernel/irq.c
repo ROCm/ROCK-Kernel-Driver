@@ -59,7 +59,6 @@
 extern void iSeries_smp_message_recv( struct pt_regs * );
 #endif
 
-volatile unsigned char *chrp_int_ack_special;
 static void register_irq_proc (unsigned int irq);
 
 irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned = {
@@ -300,7 +299,7 @@ void enable_irq(unsigned int irq)
 	spin_lock_irqsave(&desc->lock, flags);
 	switch (desc->depth) {
 	case 1: {
-		unsigned int status = desc->status & ~(IRQ_DISABLED | IRQ_INPROGRESS);
+		unsigned int status = desc->status & ~IRQ_DISABLED;
 		desc->status = status;
 		if ((status & (IRQ_PENDING | IRQ_REPLAY)) == IRQ_PENDING) {
 			desc->status = status | IRQ_REPLAY;
@@ -561,17 +560,14 @@ out:
 	spin_unlock(&desc->lock);
 }
 
+#ifdef CONFIG_PPC_ISERIES
 int do_IRQ(struct pt_regs *regs)
 {
-	int irq, first = 1;
-#ifdef CONFIG_PPC_ISERIES
 	struct paca_struct *lpaca;
 	struct ItLpQueue *lpq;
-#endif
 
 	irq_enter();
 
-#ifdef CONFIG_PPC_ISERIES
 	lpaca = get_paca();
 #ifdef CONFIG_SMP
 	if (lpaca->xLpPaca.xIntDword.xFields.xIpiCnt) {
@@ -582,7 +578,26 @@ int do_IRQ(struct pt_regs *regs)
 	lpq = lpaca->lpQueuePtr;
 	if (lpq && ItLpQueue_isLpIntPending(lpq))
 		lpEvent_count += ItLpQueue_process(lpq, regs);
-#else
+
+	irq_exit();
+
+	if (lpaca->xLpPaca.xIntDword.xFields.xDecrInt) {
+		lpaca->xLpPaca.xIntDword.xFields.xDecrInt = 0;
+		/* Signal a fake decrementer interrupt */
+		timer_interrupt(regs);
+	}
+
+	return 1; /* lets ret_from_int know we can do checks */
+}
+
+#else	/* CONFIG_PPC_ISERIES */
+
+int do_IRQ(struct pt_regs *regs)
+{
+	int irq, first = 1;
+
+	irq_enter();
+
 	/*
 	 * Every arch is required to implement ppc_md.get_irq.
 	 * This function will either return an irq number or -1 to
@@ -598,20 +613,12 @@ int do_IRQ(struct pt_regs *regs)
 	if (irq != -2 && first)
 		/* That's not SMP safe ... but who cares ? */
 		ppc_spurious_interrupts++;
-#endif
 
 	irq_exit();
 
-#ifdef CONFIG_PPC_ISERIES
-	if (lpaca->xLpPaca.xIntDword.xFields.xDecrInt) {
-		lpaca->xLpPaca.xIntDword.xFields.xDecrInt = 0;
-		/* Signal a fake decrementer interrupt */
-		timer_interrupt(regs);
-	}
-#endif
-
 	return 1; /* lets ret_from_int know we can do checks */
 }
+#endif	/* CONFIG_PPC_ISERIES */
 
 unsigned long probe_irq_on (void)
 {
@@ -636,10 +643,10 @@ void __init init_IRQ(void)
 {
 	static int once = 0;
 
-	if ( once )
+	if (once)
 		return;
-	else
-		once++;
+
+	once++;
 	
 	ppc_md.init_IRQ();
 }

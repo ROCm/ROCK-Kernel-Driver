@@ -707,3 +707,4 @@ module_exit(bnep_cleanup_module);
 MODULE_DESCRIPTION("Bluetooth BNEP ver " VERSION);
 MODULE_AUTHOR("David Libault <david.libault@inventel.fr>, Maxim Krasnyanskiy <maxk@qualcomm.com>");
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("bt-proto-4");

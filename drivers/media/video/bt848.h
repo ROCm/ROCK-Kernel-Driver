@@ -158,6 +158,9 @@
 #define BT848_ADC_C_SLEEP      (1<<1)
 #define BT848_ADC_CRUSH        (1<<0)
 
+#define BT848_WC_UP            0x044
+#define BT848_WC_DOWN          0x078
+
 #define BT848_E_VTC            0x06C
 #define BT848_O_VTC            0x0EC
 #define BT848_VTC_HSFMT        (1<<7)

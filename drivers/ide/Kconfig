@@ -97,7 +97,7 @@ comment "Please see Documentation/ide.txt for help/info on IDE drives"
 
 config BLK_DEV_HD_IDE
 	bool "Use old disk-only driver on primary interface"
-	depends on X86 && X86_PC9800!=y
+	depends on ((X86 && X86_PC9800!=y) || SH_MPC1211)
 	---help---
 	  There are two drivers for MFM/RLL/IDE disks.  Most people use just
 	  the new enhanced driver by itself.  This option however installs the
@@ -734,10 +734,10 @@ config BLK_DEV_PDC202XX_NEW
 
 # FIXME - probably wants to be one for old and for new
 config PDC202XX_FORCE
-	bool "Special FastTrak Feature"
+	bool "Enable controller even if disabled by BIOS"
 	depends on BLK_DEV_PDC202XX_NEW=y
 	help
-	  For FastTrak enable overriding BIOS.
+	  Enable the PDC202xx controller even if it has been disabled in the BIOS setup.
 
 config BLK_DEV_SVWKS
 	tristate "ServerWorks OSB4/CSB5/CSB6 chipsets support"
@@ -747,7 +747,7 @@ config BLK_DEV_SVWKS
 
 config BLK_DEV_SGIIOC4
 	tristate "Silicon Graphics IOC4 chipset support"
-	depends on IA64_SGI_SN2
+	depends on IA64_SGI_SN2 || IA64_GENERIC
 	help
 	  This driver adds PIO & MultiMode DMA-2 support for the SGI IOC4
 	  chipset, which has one channel and can support two devices.
@@ -899,12 +899,16 @@ config BLK_DEV_GAYLE
 	bool "Amiga Gayle IDE interface support"
 	depends on AMIGA
 	help
-	  This is the IDE driver for the builtin IDE interface on some Amiga
-	  models. It supports both the `A1200 style' (used in A600 and A1200)
-	  and `A4000 style' (used in A4000 and A4000T) of the Gayle IDE
-	  interface. Say Y if you have such an Amiga model and want to use IDE
-	  devices (hard disks, CD-ROM drives, etc.) that are connected to the
-	  builtin IDE interface.
+	  This is the IDE driver for the Amiga Gayle IDE interface. It supports
+	  both the `A1200 style' and `A4000 style' of the Gayle IDE interface,
+	  This includes builtin IDE interfaces on some Amiga models (A600,
+	  A1200, A4000, and A4000T), and IDE interfaces on the Zorro expansion
+	  bus (M-Tech E-Matrix 530 expansion card).
+	  Say Y if you have an Amiga with a Gayle IDE interface and want to use
+	  IDE devices (hard disks, CD-ROM drives, etc.) that are connected to
+	  it.
+	  Note that you also have to enable Zorro bus support if you want to
+	  use Gayle IDE interfaces on the Zorro expansion bus.
 
 config BLK_DEV_IDEDOUBLER
 	bool "Amiga IDE Doubler support (EXPERIMENTAL)"

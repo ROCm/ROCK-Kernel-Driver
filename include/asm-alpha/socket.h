@@ -48,6 +48,8 @@
 #define SO_TIMESTAMP		29
 #define SCM_TIMESTAMP		SO_TIMESTAMP
 
+#define SO_PEERSEC		30
+
 /* Security levels - as per NRL IPv6 - don't actually do anything */
 #define SO_SECURITY_AUTHENTICATION		19
 #define SO_SECURITY_ENCRYPTION_TRANSPORT	20

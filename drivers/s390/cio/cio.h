@@ -98,6 +98,7 @@ struct subchannel {
 
 	__u8 vpm;		/* verified path mask */
 	__u8 lpm;		/* logical path mask */
+	__u8 opm;               /* operational path mask */
 	struct schib schib;	/* subchannel information block */
 	struct orb orb;		/* operation request block */
 	struct ccw1 sense_ccw;	/* static ccw for sense command */
@@ -117,14 +118,16 @@ extern int cio_cancel (struct subchannel *);
 extern int cio_clear (struct subchannel *);
 extern int cio_resume (struct subchannel *);
 extern int cio_halt (struct subchannel *);
-extern int cio_start (struct subchannel *, struct ccw1 *, unsigned int, __u8);
+extern int cio_start (struct subchannel *, struct ccw1 *, __u8);
 extern int cio_cancel (struct subchannel *);
 extern int cio_set_options (struct subchannel *, int);
 extern int cio_get_options (struct subchannel *);
-
+extern int cio_modify (struct subchannel *);
 /* Use with care. */
 extern struct subchannel *cio_probe_console(void);
 extern void cio_release_console(void);
+extern int cio_is_console(int irq);
+extern struct subchannel *cio_get_console_subchannel(void);
 
 extern int cio_show_msg;
 

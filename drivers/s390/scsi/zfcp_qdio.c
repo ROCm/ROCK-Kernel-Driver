@@ -27,7 +27,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_QDIO_C_REVISION "$Revision: 1.7 $"
+#define ZFCP_QDIO_C_REVISION "$Revision: 1.10 $"
 
 #include "zfcp_ext.h"
 
@@ -214,7 +214,7 @@ zfcp_qdio_handler_error_check(struct zfcp_adapter *adapter,
 				       " QDIO_STATUS_OUTBOUND_INT \n");
 		}
 	}			// if (ZFCP_LOG_CHECK(ZFCP_LOG_LEVEL_TRACE))
-	if (status & QDIO_STATUS_LOOK_FOR_ERROR) {
+	if (unlikely(status & QDIO_STATUS_LOOK_FOR_ERROR)) {
 		retval = -EIO;
 
 		ZFCP_LOG_FLAGS(1, "QDIO_STATUS_LOOK_FOR_ERROR \n");
@@ -261,7 +261,17 @@ zfcp_qdio_handler_error_check(struct zfcp_adapter *adapter,
 		}
 		/* Restarting IO on the failed adapter from scratch */
 		debug_text_event(adapter->erp_dbf, 1, "qdio_err");
-		zfcp_erp_adapter_reopen(adapter, 0);
+               /*
+                * Since we have been using this adapter, it is save to assume
+                * that it is not failed but recoverable. The card seems to
+                * report link-up events by self-initiated queue shutdown.
+                * That is why we need to clear the the link-down flag
+                * which is set again in case we have missed by a mile.
+                */
+               zfcp_erp_adapter_reopen(
+                       adapter, 
+                       ZFCP_STATUS_ADAPTER_LINK_UNPLUGGED |
+                       ZFCP_STATUS_COMMON_ERP_FAILED);
 	}
 	return retval;
 }
@@ -293,8 +303,8 @@ zfcp_qdio_request_handler(struct ccw_device *ccw_device,
 		       zfcp_get_busid_by_adapter(adapter),
 		       first_element, elements_processed);
 
-	if (zfcp_qdio_handler_error_check(adapter, status, qdio_error,
-					  siga_error))
+	if (unlikely(zfcp_qdio_handler_error_check(adapter, status, qdio_error,
+					           siga_error)))
 		goto out;
 	/*
 	 * we stored address of struct zfcp_adapter  data structure
@@ -345,8 +355,8 @@ zfcp_qdio_response_handler(struct ccw_device *ccw_device,
 	adapter = (struct zfcp_adapter *) int_parm;
 	queue = &adapter->response_queue;
 
-	if (zfcp_qdio_handler_error_check(adapter, status, qdio_error,
-					  siga_error))
+	if (unlikely(zfcp_qdio_handler_error_check(adapter, status, qdio_error,
+					           siga_error)))
 		goto out;
 
 	/*
@@ -394,11 +404,17 @@ zfcp_qdio_response_handler(struct ccw_device *ccw_device,
 				ZFCP_HEX_DUMP(ZFCP_LOG_LEVEL_NORMAL,
 					      (char *) buffer, SBAL_SIZE);
 			}
-			if (buffere->flags & SBAL_FLAGS_LAST_ENTRY)
+			/*
+			 * A single used SBALE per inbound SBALE has been
+			 * implemented by QDIO so far. Hope they will
+			 * do some optimisation. Will need to change to
+			 * unlikely() then.
+			 */
+			if (likely(buffere->flags & SBAL_FLAGS_LAST_ENTRY))
 				break;
 		};
 
-		if (!buffere->flags & SBAL_FLAGS_LAST_ENTRY) {
+		if (unlikely(!(buffere->flags & SBAL_FLAGS_LAST_ENTRY))) {
 			ZFCP_LOG_NORMAL("bug: End of inbound data "
 					"not marked!\n");
 		}
@@ -421,7 +437,7 @@ zfcp_qdio_response_handler(struct ccw_device *ccw_device,
 			 QDIO_FLAG_SYNC_INPUT | QDIO_FLAG_UNDER_INTERRUPT,
 			 0, start, count, NULL);
 
-	if (retval) {
+	if (unlikely(retval)) {
 		atomic_set(&queue->free_count, count);
 		ZFCP_LOG_DEBUG("Inbound data regions could not be cleared "
 			       "Transfer queues may be down. "
@@ -458,7 +474,7 @@ zfcp_qdio_reqid_check(struct zfcp_adapter *adapter, void *sbale_addr)
 #endif				/* ZFCP_DEBUG_REQUESTS */
 
 	/* invalid (per convention used in this driver) */
-	if (!sbale_addr) {
+	if (unlikely(!sbale_addr)) {
 		ZFCP_LOG_NORMAL
 		    ("bug: Inbound data faulty, contains null-pointer!\n");
 		retval = -EINVAL;
@@ -468,8 +484,8 @@ zfcp_qdio_reqid_check(struct zfcp_adapter *adapter, void *sbale_addr)
 	/* valid request id and thus (hopefully :) valid fsf_req address */
 	fsf_req = (struct zfcp_fsf_req *) sbale_addr;
 
-	if ((fsf_req->common_magic != ZFCP_MAGIC) ||
-	    (fsf_req->specific_magic != ZFCP_MAGIC_FSFREQ)) {
+	if (unlikely((fsf_req->common_magic != ZFCP_MAGIC) ||
+	             (fsf_req->specific_magic != ZFCP_MAGIC_FSFREQ))) {
 		ZFCP_LOG_NORMAL("bug: An inbound FSF acknowledgement was "
 				"faulty (debug info 0x%x, 0x%x, 0x%lx)\n",
 				fsf_req->common_magic,
@@ -479,7 +495,7 @@ zfcp_qdio_reqid_check(struct zfcp_adapter *adapter, void *sbale_addr)
 		goto out;
 	}
 
-	if (adapter != fsf_req->adapter) {
+	if (unlikely(adapter != fsf_req->adapter)) {
 		ZFCP_LOG_NORMAL("bug: An inbound FSF acknowledgement was not "
 				"correct (debug info 0x%lx, 0x%lx, 0%lx) \n",
 				(unsigned long) fsf_req,
@@ -490,7 +506,7 @@ zfcp_qdio_reqid_check(struct zfcp_adapter *adapter, void *sbale_addr)
 	}
 #ifdef ZFCP_DEBUG_REQUESTS
 	/* debug feature stuff (test for QTCB: remember new unsol. status!) */
-	if (fsf_req->qtcb) {
+	if (likely(fsf_req->qtcb)) {
 		debug_event(adapter->req_dbf, 1,
 			    &fsf_req->qtcb->prefix.req_seq_no, sizeof (u32));
 	}
@@ -498,7 +514,7 @@ zfcp_qdio_reqid_check(struct zfcp_adapter *adapter, void *sbale_addr)
 
 	ZFCP_LOG_TRACE("fsf_req at 0x%lx, QTCB at 0x%lx\n",
 		       (unsigned long) fsf_req, (unsigned long) fsf_req->qtcb);
-	if (fsf_req->qtcb) {
+	if (likely(fsf_req->qtcb)) {
 		ZFCP_LOG_TRACE("HEX DUMP OF 1ST BUFFERE PAYLOAD (QTCB):\n");
 		ZFCP_HEX_DUMP(ZFCP_LOG_LEVEL_TRACE,
 			      (char *) fsf_req->qtcb, ZFCP_QTCB_SIZE);
@@ -518,8 +534,8 @@ zfcp_qdio_determine_pci(struct zfcp_qdio_queue *req_queue,
 	int pci_pos;
 
 	new_distance_from_int = req_queue->distance_from_int +
-	    fsf_req->sbal_count;
-	if (new_distance_from_int >= ZFCP_QDIO_PCI_INTERVAL) {
+				fsf_req->sbal_count;
+	if (unlikely(new_distance_from_int >= ZFCP_QDIO_PCI_INTERVAL)) {
 		new_distance_from_int %= ZFCP_QDIO_PCI_INTERVAL;
 		pci_pos = fsf_req->sbal_index;
 		pci_pos += fsf_req->sbal_count;

@@ -130,7 +130,11 @@ peek_user(struct task_struct *child, addr_t addr, addr_t data)
 	struct user *dummy = NULL;
 	addr_t offset, tmp;
 
-	if ((addr & __ADDR_MASK) || addr > sizeof(struct user) - __ADDR_MASK)
+	/*
+	 * Stupid gdb peeks/pokes the access registers in 64 bit with
+	 * an alignment of 4. Programmers from hell...
+	 */
+	if ((addr & 3) || addr > sizeof(struct user) - __ADDR_MASK)
 		return -EIO;
 
 	if (addr <= (addr_t) &dummy->regs.orig_gpr2) {
@@ -138,6 +142,9 @@ peek_user(struct task_struct *child, addr_t addr, addr_t data)
 		 * psw, gprs, acrs and orig_gpr2 are stored on the stack
 		 */
 		tmp = *(addr_t *)((addr_t) __KSTK_PTREGS(child) + addr);
+		if (addr == (addr_t) &dummy->regs.psw.mask)
+			/* Remove per bit from user psw. */
+			tmp &= ~PSW_MASK_PER;
 
 	} else if (addr >= (addr_t) &dummy->regs.fp_regs &&
 		   addr < (addr_t) (&dummy->regs.fp_regs + 1)) {
@@ -173,7 +180,11 @@ poke_user(struct task_struct *child, addr_t addr, addr_t data)
 	struct user *dummy = NULL;
 	addr_t offset;
 
-	if ((addr & __ADDR_MASK) || addr > sizeof(struct user) - __ADDR_MASK)
+	/*
+	 * Stupid gdb peeks/pokes the access registers in 64 bit with
+	 * an alignment of 4. Programmers from hell indeed...
+	 */
+	if ((addr & 3) || addr > sizeof(struct user) - __ADDR_MASK)
 		return -EIO;
 
 	if (addr <= (addr_t) &dummy->regs.orig_gpr2) {
@@ -258,7 +269,7 @@ do_ptrace_normal(struct task_struct *child, long request, long addr, long data)
 
 	case PTRACE_PEEKUSR_AREA:
 	case PTRACE_POKEUSR_AREA:
-		if (!copy_from_user(&parea, (void *) addr, sizeof(parea)))
+		if (copy_from_user(&parea, (void *) addr, sizeof(parea)))
 			return -EFAULT;
 		addr = parea.kernel_addr;
 		data = parea.process_addr;
@@ -266,8 +277,12 @@ do_ptrace_normal(struct task_struct *child, long request, long addr, long data)
 		while (copied < parea.len) {
 			if (request == PTRACE_PEEKUSR_AREA)
 				ret = peek_user(child, addr, data);
-			else
-				ret = poke_user(child, addr, data);
+			else {
+				addr_t tmp;
+				if (get_user (tmp, (addr_t *) data))
+					return -EFAULT;
+				ret = poke_user(child, addr, tmp);
+			}
 			if (ret)
 				return ret;
 			addr += sizeof(unsigned long);
@@ -390,7 +405,7 @@ poke_user_emu31(struct task_struct *child, addr_t addr, addr_t data)
 			if ((tmp & ~PSW32_MASK_CC) != PSW32_USER_BITS)
 				/* Invalid psw mask. */
 				return -EINVAL;
-			__KSTK_PTREGS(child)->psw.mask = PSW_USER_BITS |
+			__KSTK_PTREGS(child)->psw.mask = PSW_USER32_BITS |
 				((tmp & PSW32_MASK_CC) << 32);
 		} else if (addr == (addr_t) &dummy32->regs.psw.addr) {
 			/* Build a 64 bit psw address from 31 bit address. */
@@ -484,7 +499,7 @@ do_ptrace_emu31(struct task_struct *child, long request, long addr, long data)
 
 	case PTRACE_PEEKUSR_AREA:
 	case PTRACE_POKEUSR_AREA:
-		if (!copy_from_user(&parea, (void *) addr, sizeof(parea)))
+		if (copy_from_user(&parea, (void *) addr, sizeof(parea)))
 			return -EFAULT;
 		addr = parea.kernel_addr;
 		data = parea.process_addr;
@@ -492,8 +507,12 @@ do_ptrace_emu31(struct task_struct *child, long request, long addr, long data)
 		while (copied < parea.len) {
 			if (request == PTRACE_PEEKUSR_AREA)
 				ret = peek_user_emu31(child, addr, data);
-			else
-				ret = poke_user_emu31(child, addr, data);
+			else {
+				__u32 tmp;
+				if (get_user (tmp, (__u32 *) data))
+					return -EFAULT;
+				ret = poke_user_emu31(child, addr, tmp);
+			}
 			if (ret)
 				return ret;
 			addr += sizeof(unsigned int);

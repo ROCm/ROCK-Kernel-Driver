@@ -168,13 +168,13 @@ static int saa6752hs_chip_command(struct i2c_client* client,
 		}
 	
 		// wait a bit
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(1);
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(HZ/100);
 	}
 
 	// delay a bit to let encoder settle
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(5);
+	set_current_state(TASK_INTERRUPTIBLE);
+	schedule_timeout(HZ/20);
 	
 	// done
   	return status;
@@ -230,6 +230,7 @@ static int saa6752hs_set_bitrate(struct i2c_client* client,
 static int saa6752hs_init(struct i2c_client* client, struct mpeg_params* params)
 {  
 	unsigned char buf[3];
+	void *data;
 
 	// check the bitrate parameters first
 	if (params != NULL) {
@@ -281,12 +282,13 @@ static int saa6752hs_init(struct i2c_client* client, struct mpeg_params* params)
 	i2c_master_send(client,buf,3);
   
         // setup bitrate settings
+	data = i2c_get_clientdata(client);
 	if (params) {
 		saa6752hs_set_bitrate(client, params);
-		memcpy(client->data, params, sizeof(struct mpeg_params));
+		memcpy(data, params, sizeof(struct mpeg_params));
 	} else {
 		// parameters were not supplied. use the previous set
-   		saa6752hs_set_bitrate(client, (struct mpeg_params*) client->data);
+   		saa6752hs_set_bitrate(client, (struct mpeg_params*) data);
 	}
 	  
 	// Send SI tables
@@ -324,7 +326,7 @@ static int saa6752hs_attach(struct i2c_adapter *adap, int addr, int kind)
 	if (NULL == (params = kmalloc(sizeof(struct mpeg_params), GFP_KERNEL)))
 		return -ENOMEM;
 	memcpy(params,&mpeg_params_template,sizeof(struct mpeg_params));
-	client->data = params;
+	i2c_set_clientdata(client, params);
 
         i2c_attach_client(client);
   
@@ -341,8 +343,11 @@ static int saa6752hs_probe(struct i2c_adapter *adap)
 
 static int saa6752hs_detach(struct i2c_client *client)
 {
+	void *data;
+
+	data = i2c_get_clientdata(client);
 	i2c_detach_client(client);
-	kfree(client->data);
+	kfree(data);
 	kfree(client);
 	return 0;
 }

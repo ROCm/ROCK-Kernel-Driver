@@ -25,6 +25,10 @@
 #define IF_RA_RCVD	0x20
 #define IF_RS_SENT	0x10
 
+/* prefix flags */
+#define IF_PREFIX_ONLINK	0x01
+#define IF_PREFIX_AUTOCONF	0x02
+
 #ifdef __KERNEL__
 
 struct inet6_ifaddr 
@@ -183,6 +187,7 @@ struct inet6_dev
 	struct inet6_dev	*next;
 	struct ipv6_devconf	cnf;
 	struct ipv6_devstat	stats;
+	unsigned long		tstamp; /* ipv6InterfaceTable update timestamp */
 };
 
 extern struct ipv6_devconf ipv6_devconf;

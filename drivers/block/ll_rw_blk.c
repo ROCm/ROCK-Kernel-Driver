@@ -173,9 +173,11 @@ EXPORT_SYMBOL(blk_queue_prep_rq);
  * are dynamic, and thus we have to query the queue whether it is ok to
  * add a new bio_vec to a bio at a given offset or not. If the block device
  * has such limitations, it needs to register a merge_bvec_fn to control
- * the size of bio's sent to it. Per default now merge_bvec_fn is defined for
- * a queue, and only the fixed limits are honored.
- *
+ * the size of bio's sent to it. Note that a block device *must* allow a
+ * single page to be added to an empty bio. The block device driver may want
+ * to use the bio_split() function to deal with these bio's. By default
+ * no merge_bvec_fn is defined for a queue, and only the fixed limits are
+ * honored.
  */
 void blk_queue_merge_bvec(request_queue_t *q, merge_bvec_fn *mbfn)
 {
@@ -1834,8 +1836,6 @@ void __blk_put_request(request_queue_t *q, struct request *req)
 	if (unlikely(--req->ref_count))
 		return;
 
-	elv_completed_request(req->q, req);
-
 	req->rq_status = RQ_INACTIVE;
 	req->q = NULL;
 	req->rl = NULL;
@@ -1847,6 +1847,8 @@ void __blk_put_request(request_queue_t *q, struct request *req)
 	if (rl) {
 		int rw = rq_data_dir(req);
 
+		elv_completed_request(q, req);
+
 		BUG_ON(!list_empty(&req->queuelist));
 
 		blk_free_request(q, req);
@@ -1856,14 +1858,13 @@ void __blk_put_request(request_queue_t *q, struct request *req)
 
 void blk_put_request(struct request *req)
 {
-	request_queue_t *q = req->q;
-	
 	/*
-	 * if req->q isn't set, this request didnt originate from the
+	 * if req->rl isn't set, this request didnt originate from the
 	 * block layer, so it's safe to just disregard it
 	 */
-	if (q) {
+	if (req->rl) {
 		unsigned long flags;
+		request_queue_t *q = req->q;
 
 		spin_lock_irqsave(q->queue_lock, flags);
 		__blk_put_request(q, req);
@@ -2489,8 +2490,6 @@ static int __end_that_request_first(struct request *req, int uptodate,
 			 * not a complete bvec done
 			 */
 			if (unlikely(nbytes > nr_bytes)) {
-				bio_iovec_idx(bio, idx)->bv_offset += nr_bytes;
-				bio_iovec_idx(bio, idx)->bv_len -= nr_bytes;
 				bio_nbytes += nr_bytes;
 				total_bytes += nr_bytes;
 				break;
@@ -2526,7 +2525,9 @@ static int __end_that_request_first(struct request *req, int uptodate,
 	 */
 	if (bio_nbytes) {
 		bio_endio(bio, bio_nbytes, error);
-		req->bio->bi_idx += next_idx;
+		bio->bi_idx += next_idx;
+		bio_iovec(bio)->bv_offset += nr_bytes;
+		bio_iovec(bio)->bv_len -= nr_bytes;
 	}
 
 	blk_recalc_rq_sectors(req, total_bytes >> 9);
@@ -2897,7 +2898,7 @@ int blk_register_queue(struct gendisk *disk)
 
 	request_queue_t *q = disk->queue;
 
-	if (!q)
+	if (!q || !q->request_fn)
 		return -ENXIO;
 
 	q->kobj.parent = kobject_get(&disk->kobj);
@@ -2924,7 +2925,7 @@ void blk_unregister_queue(struct gendisk *disk)
 {
 	request_queue_t *q = disk->queue;
 
-	if (q) {
+	if (q && q->request_fn) {
 		elv_unregister_queue(q);
 
 		kobject_unregister(&q->kobj);

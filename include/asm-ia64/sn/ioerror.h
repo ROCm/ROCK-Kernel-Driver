@@ -1,5 +1,4 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -185,13 +184,9 @@ typedef enum {
 typedef int             error_handler_f(void *, int, ioerror_mode_t, ioerror_t *);
 typedef void           *error_handler_arg_t;
 
-extern void             ioerror_dump(char *, int, int, ioerror_t *);
-
 #ifdef	ERROR_DEBUG
-#define	IOERROR_DUMP(x, y, z, t)	ioerror_dump((x), (y), (z), (t))
 #define	IOERR_PRINTF(x)	(x)
 #else
-#define	IOERROR_DUMP(x, y, z, t)
 #define	IOERR_PRINTF(x)
 #endif				/* ERROR_DEBUG */
 

@@ -2591,6 +2591,7 @@ static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
 			break;
 		}
 	}
+	card->dev = &pci->dev;
 
 	if ((err = snd_intel8x0_create(card, pci, pci_id->driver_data, &chip)) < 0) {
 		snd_card_free(card);

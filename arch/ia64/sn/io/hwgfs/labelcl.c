@@ -16,7 +16,6 @@
 #include <linux/smp_lock.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/hwgfs.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 

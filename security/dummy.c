@@ -24,6 +24,7 @@
 #include <linux/skbuff.h>
 #include <linux/netlink.h>
 #include <net/sock.h>
+#include <linux/xattr.h>
 
 static int dummy_ptrace (struct task_struct *parent, struct task_struct *child)
 {
@@ -387,6 +388,10 @@ static void dummy_inode_delete (struct inode *ino)
 static int dummy_inode_setxattr (struct dentry *dentry, char *name, void *value,
 				size_t size, int flags)
 {
+	if (!strncmp(name, XATTR_SECURITY_PREFIX,
+		     sizeof(XATTR_SECURITY_PREFIX) - 1) &&
+	    !capable(CAP_SYS_ADMIN))
+		return -EPERM;
 	return 0;
 }
 
@@ -407,6 +412,10 @@ static int dummy_inode_listxattr (struct dentry *dentry)
 
 static int dummy_inode_removexattr (struct dentry *dentry, char *name)
 {
+	if (!strncmp(name, XATTR_SECURITY_PREFIX,
+		     sizeof(XATTR_SECURITY_PREFIX) - 1) &&
+	    !capable(CAP_SYS_ADMIN))
+		return -EPERM;
 	return 0;
 }
 
@@ -793,6 +802,21 @@ static int dummy_socket_sock_rcv_skb (struct sock *sk, struct sk_buff *skb)
 {
 	return 0;
 }
+
+static int dummy_socket_getpeersec(struct socket *sock, char __user *optval,
+				   int __user *optlen, unsigned len)
+{
+	return -ENOPROTOOPT;
+}
+
+static inline int dummy_sk_alloc_security (struct sock *sk, int family, int priority)
+{
+	return 0;
+}
+
+static inline void dummy_sk_free_security (struct sock *sk)
+{
+}
 #endif	/* CONFIG_SECURITY_NETWORK */
 
 static int dummy_register_security (const char *name, struct security_operations *ops)
@@ -969,6 +993,9 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, socket_getsockopt);
 	set_to_dummy_if_null(ops, socket_shutdown);
 	set_to_dummy_if_null(ops, socket_sock_rcv_skb);
+	set_to_dummy_if_null(ops, socket_getpeersec);
+	set_to_dummy_if_null(ops, sk_alloc_security);
+	set_to_dummy_if_null(ops, sk_free_security);
 #endif	/* CONFIG_SECURITY_NETWORK */
 }
 

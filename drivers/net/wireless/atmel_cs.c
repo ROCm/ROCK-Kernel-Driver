@@ -246,7 +246,7 @@ static dev_link_t *atmel_attach(void)
 	client_reg.event_handler = &atmel_event;
 	client_reg.Version = 0x0210;
 	client_reg.event_callback_args.client_data = link;
-	ret = CardServices(RegisterClient, &link->handle, &client_reg);
+	ret = pcmcia_register_client(&link->handle, &client_reg);
 	if (ret != 0) {
 		cs_error(link->handle, RegisterClient, ret);
 		atmel_detach(link);
@@ -282,7 +282,7 @@ static void atmel_detach(dev_link_t *link)
 		
 	/* Break the link with Card Services */
 	if (link->handle)
-		CardServices(DeregisterClient, link->handle);
+		pcmcia_deregister_client(link->handle);
 
 	/* Unlink device structure, free pieces */
 	*linkp = link->next;
@@ -299,11 +299,8 @@ static void atmel_detach(dev_link_t *link)
   
   ======================================================================*/
 
-#define CS_CHECK(fn, args...) \
-while ((last_ret=CardServices(last_fn=(fn),args))!=0) goto cs_failed
-
-#define CFG_CHECK(fn, args...) \
-if (CardServices(fn, args) != 0) goto next_entry
+#define CS_CHECK(fn, ret) \
+do { last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; } while (0)
 
 /* Call-back function to interrogate PCMCIA-specific information
    about the current existance of the card */
@@ -372,11 +369,11 @@ static void atmel_config(dev_link_t *link)
 	tuple.TupleOffset = 0;
 	
 	tuple.DesiredTuple = CISTPL_MANFID;
-	if (CardServices(GetFirstTuple, handle, &tuple) == 0) {
+	if (pcmcia_get_first_tuple(handle, &tuple) == 0) {
 		int i;
 		cistpl_manfid_t *manfid;
-		CS_CHECK(GetTupleData, handle, &tuple);
-		CS_CHECK(ParseTuple, handle, &tuple, &parse);
+		CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
+		CS_CHECK(ParseTuple, pcmcia_parse_tuple(handle, &tuple, &parse));
 		manfid = &(parse.manfid);
 		for (i = 0; i < sizeof(card_table)/sizeof(card_table[0]); i++) {
 			if (!card_table[i].ver1 &&
@@ -389,11 +386,11 @@ static void atmel_config(dev_link_t *link)
 	}
 
 	tuple.DesiredTuple = CISTPL_VERS_1;
-	if (!done && (CardServices(GetFirstTuple, handle, &tuple) == 0)) {
+	if (!done && (pcmcia_get_first_tuple(handle, &tuple) == 0)) {
 		int i, j, k;
 		cistpl_vers_1_t *ver1;
-		CS_CHECK(GetTupleData, handle, &tuple);
-		CS_CHECK(ParseTuple, handle, &tuple, &parse);
+		CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
+		CS_CHECK(ParseTuple, pcmcia_parse_tuple(handle, &tuple, &parse));
 		ver1 = &(parse.version_1);
 		
 		for (i = 0; i < sizeof(card_table)/sizeof(card_table[0]); i++) {
@@ -429,9 +426,9 @@ static void atmel_config(dev_link_t *link)
 	  registers.
 	*/
 	tuple.DesiredTuple = CISTPL_CONFIG;
-	CS_CHECK(GetFirstTuple, handle, &tuple);
-	CS_CHECK(GetTupleData, handle, &tuple);
-	CS_CHECK(ParseTuple, handle, &tuple, &parse);
+	CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
+	CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
+	CS_CHECK(ParseTuple, pcmcia_parse_tuple(handle, &tuple, &parse));
 	link->conf.ConfigBase = parse.config.base;
 	link->conf.Present = parse.config.rmask[0];
 	
@@ -451,12 +448,13 @@ static void atmel_config(dev_link_t *link)
 	  will only use the CIS to fill in implementation-defined details.
 	*/
 	tuple.DesiredTuple = CISTPL_CFTABLE_ENTRY;
-	CS_CHECK(GetFirstTuple, handle, &tuple);
+	CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
 	while (1) {
 		cistpl_cftable_entry_t dflt = { 0 };
 		cistpl_cftable_entry_t *cfg = &(parse.cftable_entry);
-		CFG_CHECK(GetTupleData, handle, &tuple);
-		CFG_CHECK(ParseTuple, handle, &tuple, &parse);
+		if (pcmcia_get_tuple_data(handle, &tuple) != 0 ||
+				pcmcia_parse_tuple(handle, &tuple, &parse) != 0)
+			goto next_entry;
 		
 		if (cfg->flags & CISTPL_CFTABLE_DEFAULT) dflt = *cfg;
 		if (cfg->index == 0) goto next_entry;
@@ -505,12 +503,14 @@ static void atmel_config(dev_link_t *link)
 		}
 		
 		/* This reserves IO space but doesn't actually enable it */
-		CFG_CHECK(RequestIO, link->handle, &link->io); 
+		if (pcmcia_request_io(link->handle, &link->io) != 0)
+			goto next_entry;
+
 		/* If we got this far, we're cool! */
 		break;
 		
 	next_entry:
-		CS_CHECK(GetNextTuple, handle, &tuple);
+		CS_CHECK(GetNextTuple, pcmcia_get_next_tuple(handle, &tuple));
 	}
 	
 	/*
@@ -519,14 +519,14 @@ static void atmel_config(dev_link_t *link)
 	  irq structure is initialized.
 	*/
 	if (link->conf.Attributes & CONF_ENABLE_IRQ)
-		CS_CHECK(RequestIRQ, link->handle, &link->irq);
+		CS_CHECK(RequestIRQ, pcmcia_request_irq(link->handle, &link->irq));
 	
 	/*
 	  This actually configures the PCMCIA socket -- setting up
 	  the I/O windows and the interrupt mapping, and putting the
 	  card and host interface into "Memory and IO" mode.
 	*/
-	CS_CHECK(RequestConfiguration, link->handle, &link->conf);
+	CS_CHECK(RequestConfiguration, pcmcia_request_configuration(link->handle, &link->conf));
 	
 	if (link->irq.AssignedIRQ == 0) {
 		printk(KERN_ALERT 
@@ -602,11 +602,11 @@ static void atmel_release(dev_link_t *link)
 	((local_info_t*)link->priv)->eth_dev = 0; 
 	
 	/* Don't bother checking to see if these succeed or not */
-	CardServices(ReleaseConfiguration, link->handle);
+	pcmcia_release_configuration(link->handle);
 	if (link->io.NumPorts1)
-		CardServices(ReleaseIO, link->handle, &link->io);
+		pcmcia_release_io(link->handle, &link->io);
 	if (link->irq.AssignedIRQ)
-		CardServices(ReleaseIRQ, link->handle, &link->irq);
+		pcmcia_release_irq(link->handle, &link->irq);
 	link->state &= ~DEV_CONFIG;
 }
 
@@ -648,7 +648,7 @@ static int atmel_event(event_t event, int priority,
 	case CS_EVENT_RESET_PHYSICAL:
 		if (link->state & DEV_CONFIG) {
 			netif_device_detach(local->eth_dev);
-			CardServices(ReleaseConfiguration, link->handle);
+			pcmcia_release_configuration(link->handle);
 		}
 		break;
 	case CS_EVENT_PM_RESUME:
@@ -656,7 +656,7 @@ static int atmel_event(event_t event, int priority,
 		/* Fall through... */
 	case CS_EVENT_CARD_RESET:
 		if (link->state & DEV_CONFIG) {
-			CardServices(RequestConfiguration, link->handle, &link->conf);
+			pcmcia_request_configuration(link->handle, &link->conf);
 			reset_atmel_card(local->eth_dev);
 			netif_device_attach(local->eth_dev);
 		}

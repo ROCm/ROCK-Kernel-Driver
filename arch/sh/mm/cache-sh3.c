@@ -1,4 +1,4 @@
-/* $Id: cache-sh3.c,v 1.5 2003/05/06 23:28:48 lethal Exp $
+/* $Id: cache-sh3.c,v 1.7 2003/08/28 16:16:09 lethal Exp $
  *
  *  linux/arch/sh/mm/cache-sh3.c
  *
@@ -70,6 +70,8 @@ detect_cpu_and_cache_system(void)
 		cpu_data->dcache.entry_mask	= 0x7f0;
 		cpu_data->dcache.sets		= 128;
 		cpu_data->type = CPU_SH7708;
+
+		set_bit(CPU_HAS_MMU_PAGE_ASSOC, &(cpu_data->flags));
 	} else {				/* 7709A or 7729  */
 		cpu_data->dcache.way_shift	= 12;
 		cpu_data->dcache.entry_mask	= 0xff0;
@@ -77,9 +79,9 @@ detect_cpu_and_cache_system(void)
 		cpu_data->type = CPU_SH7729;
 	}
 
-		/*
+	/*
 	 * SH-3 doesn't have separate caches
-		 */
+	 */
 	cpu_data->dcache.flags |= SH_CACHE_COMBINED;
 	cpu_data->icache = cpu_data->dcache;
 

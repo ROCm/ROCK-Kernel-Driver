@@ -606,7 +606,13 @@ static int bpq_device_event(struct notifier_block *this,unsigned long event, voi
  */
 static int __init bpq_init_driver(void)
 {
-	struct net_device *dev;
+#ifdef CONFIG_PROC_FS
+	if (!proc_net_fops_create("bpqether", S_IRUGO, &bpq_info_fops)) {
+		printk(KERN_ERR
+			"bpq: cannot create /proc/net/bpqether entry.\n");
+		return -ENOENT;
+	}
+#endif  /* CONFIG_PROC_FS */
 
 	dev_add_pack(&bpq_packet_type);
 
@@ -614,25 +620,6 @@ static int __init bpq_init_driver(void)
 
 	printk(banner);
 
-#ifdef CONFIG_PROC_FS
-	if (!proc_net_fops_create("bpqether", S_IRUGO, &bpq_info_fops)) {
-		printk(KERN_ERR
-			"bpq: cannot create /proc/net/bpqether entry.\n");
-		unregister_netdevice_notifier(&bpq_dev_notifier);
-		dev_remove_pack(&bpq_packet_type);
-		return -ENOENT;
-	}
-#endif  /* CONFIG_PROC_FS */
-
-	rtnl_lock();
-	for (dev = dev_base; dev != NULL; dev = dev->next) {
-		if (dev_is_ethdev(dev) && bpq_new_device(dev)) {
-			printk(KERN_ERR
-			       "bpq: cannot setup dev for '%s'\n",
-			       dev->name);
-		}
-	}
-	rtnl_unlock();
 	return 0;
 }
 

@@ -11,12 +11,15 @@
  * changed to eliminate RPXLite references.
  */
 
+#include <linux/config.h>
+#ifdef CONFIG_I2C_DEBUG_BUS
+#define DEBUG	1
+#endif
+
 #include <linux/kernel.h>
-#include <linux/ioport.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/stddef.h>
-#include <linux/parport.h>
 #include <linux/i2c.h>
 #include <linux/i2c-algo-8xx.h>
 #include <asm/mpc8xx.h>
@@ -84,7 +87,7 @@ int __init i2c_rpx_init(void)
 	rpx_iic_init(&rpx_data);
 
 	if (i2c_8xx_add_bus(&rpx_ops) < 0) {
-		printk("i2c-rpx: Unable to register with I2C\n");
+		printk(KERN_ERR "i2c-rpx: Unable to register with I2C\n");
 		return -ENODEV;
 	}
 

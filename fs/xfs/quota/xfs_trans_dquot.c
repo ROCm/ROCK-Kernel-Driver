@@ -835,13 +835,6 @@ xfs_trans_reserve_quota_nblks(
 	ASSERT(ip->i_ino != mp->m_sb.sb_uquotino);
 	ASSERT(ip->i_ino != mp->m_sb.sb_gquotino);
 
-#ifdef QUOTADEBUG
-	if (ip->i_udquot)
-		ASSERT(! XFS_DQ_IS_LOCKED(ip->i_udquot));
-	if (ip->i_gdquot)
-		ASSERT(! XFS_DQ_IS_LOCKED(ip->i_gdquot));
-#endif
-
 	ASSERT(XFS_ISLOCKED_INODE_EXCL(ip));
 	ASSERT(XFS_IS_QUOTA_RUNNING(ip->i_mount));
 	ASSERT((type & ~XFS_QMOPT_FORCE_RES) == XFS_TRANS_DQ_RES_RTBLKS ||

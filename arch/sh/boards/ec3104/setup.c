@@ -24,16 +24,38 @@
 
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/ec3104/ec3104.h>
+#include <asm/machvec.h>
+#include <asm/mach/ec3104.h>
 
-int __init setup_ec3104(void)
+const char *get_system_type(void)
+{
+	return "EC3104";
+}
+
+/*
+ * The Machine Vector
+ */
+
+struct sh_machine_vector mv_ec3104 __initmv = {
+	.mv_nr_irqs	= 96,
+
+	.mv_inb		= ec3104_inb,
+	.mv_inw		= ec3104_inw,
+	.mv_inl		= ec3104_inl,
+	.mv_outb	= ec3104_outb,
+	.mv_outw	= ec3104_outw,
+	.mv_outl	= ec3104_outl,
+
+	.mv_irq_demux	= ec3104_irq_demux,
+};
+
+ALIAS_MV(ec3104)
+
+int __init platform_setup(void)
 {
 	char str[8];
 	int i;
 	
-	if (!MACH_EC3104)
-		printk("!MACH_EC3104\n");
-
 	if (0)
 		return 0;
 
@@ -54,4 +76,3 @@ int __init setup_ec3104(void)
 	return 0;
 }
 
-module_init(setup_ec3104);

@@ -509,6 +509,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 			return -EINVAL;
 
 		hid_submit_report(hid, report, USB_DIR_IN);
+		hid_wait_io(hid);
 
 		return 0;
 

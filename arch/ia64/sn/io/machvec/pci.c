@@ -1,5 +1,4 @@
 /* 
- *
  * SNI64 specific PCI support for SNI IO.
  *
  * This file is subject to the terms and conditions of the GNU General Public
@@ -8,33 +7,15 @@
  *
  * Copyright (c) 1997, 1998, 2000-2003 Silicon Graphics, Inc.  All rights reserved.
  */
-#include <linux/init.h>
-#include <linux/types.h>
-#include <linux/config.h>
-#include <linux/pci.h>
-#include <asm/sn/types.h>
-#include <asm/sn/sgi.h>
-#include <asm/sn/io.h>
-#include <asm/sn/driver.h>
-#include <asm/sn/iograph.h>
-#include <asm/param.h>
-#include <asm/sn/pio.h>
-#include <asm/sn/xtalk/xwidget.h>
-#include <asm/sn/sn_private.h>
-#include <asm/sn/addrs.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
-#include <asm/sn/hcl_util.h>
-#include <asm/sn/pci/pciio.h>
-#include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pcibr_private.h>
-#include <asm/sn/pci/bridge.h>
 
 /*
  * These routines are only used during sn_pci_init for probing each bus, and
  * can probably be removed with a little more cleanup now that the SAL routines
  * work on sn2.
  */
+
 extern vertex_hdl_t devfn_to_vertex(unsigned char bus, unsigned char devfn);
 
 int sn_read_config(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *val)

@@ -39,7 +39,8 @@ static void afs_rxvl_aemap(struct rxrpc_call *call)
 {
 	int err;
 
-	_enter("{%u,%u,%d}",call->app_err_state,call->app_abort_code,call->app_errno);
+	_enter("{%u,%u,%d}",
+	       call->app_err_state, call->app_abort_code, call->app_errno);
 
 	switch (call->app_err_state) {
 	case RXRPC_ESTATE_LOCAL_ABORT:
@@ -92,10 +93,8 @@ static void afs_rxvl_aemap(struct rxrpc_call *call)
 /*
  * probe a volume location server to see if it is still alive
  */
-int afs_rxvl_probe(afs_server_t *server, int alloc_flags)
+int afs_rxvl_probe(struct afs_server *server, int alloc_flags)
 {
-	DECLARE_WAITQUEUE(myself,current);
-
 	struct rxrpc_connection *conn;
 	struct rxrpc_call *call;
 	struct iovec piov[1];
@@ -103,21 +102,23 @@ int afs_rxvl_probe(afs_server_t *server, int alloc_flags)
 	int ret;
 	u32 param[1];
 
+	DECLARE_WAITQUEUE(myself, current);
+
 	/* get hold of the vlserver connection */
-	ret = afs_server_get_vlconn(server,&conn);
-	if (ret<0)
+	ret = afs_server_get_vlconn(server, &conn);
+	if (ret < 0)
 		goto out;
 
 	/* create a call through that connection */
-	ret = rxrpc_create_call(conn,NULL,NULL,afs_rxvl_aemap,&call);
-	if (ret<0) {
-		printk("kAFS: Unable to create call: %d\n",ret);
+	ret = rxrpc_create_call(conn, NULL, NULL, afs_rxvl_aemap, &call);
+	if (ret < 0) {
+		printk("kAFS: Unable to create call: %d\n", ret);
 		goto out_put_conn;
 	}
 	call->app_opcode = VLPROBE;
 
 	/* we want to get event notifications from the call */
-	add_wait_queue(&call->waitq,&myself);
+	add_wait_queue(&call->waitq, &myself);
 
 	/* marshall the parameters */
 	param[0] = htonl(VLPROBE);
@@ -125,14 +126,15 @@ int afs_rxvl_probe(afs_server_t *server, int alloc_flags)
 	piov[0].iov_base = param;
 
 	/* send the parameters to the server */
-	ret = rxrpc_call_write_data(call,1,piov,RXRPC_LAST_PACKET,alloc_flags,0,&sent);
-	if (ret<0)
+	ret = rxrpc_call_write_data(call, 1, piov, RXRPC_LAST_PACKET,
+				    alloc_flags, 0, &sent);
+	if (ret < 0)
 		goto abort;
 
 	/* wait for the reply to completely arrive */
 	for (;;) {
 		set_current_state(TASK_INTERRUPTIBLE);
-		if (call->app_call_state!=RXRPC_CSTATE_CLNT_RCV_REPLY ||
+		if (call->app_call_state != RXRPC_CSTATE_CLNT_RCV_REPLY ||
 		    signal_pending(current))
 			break;
 		schedule();
@@ -158,12 +160,12 @@ int afs_rxvl_probe(afs_server_t *server, int alloc_flags)
 
  abort:
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	rxrpc_call_abort(call,ret);
+	rxrpc_call_abort(call, ret);
 	schedule();
 
  out_unwait:
 	set_current_state(TASK_RUNNING);
-	remove_wait_queue(&call->waitq,&myself);
+	remove_wait_queue(&call->waitq, &myself);
 	rxrpc_put_call(call);
  out_put_conn:
 	rxrpc_put_connection(conn);
@@ -176,10 +178,12 @@ int afs_rxvl_probe(afs_server_t *server, int alloc_flags)
 /*
  * look up a volume location database entry by name
  */
-int afs_rxvl_get_entry_by_name(afs_server_t *server, const char *volname, unsigned volnamesz,
+int afs_rxvl_get_entry_by_name(struct afs_server *server,
+			       const char *volname,
+			       unsigned volnamesz,
 			       struct afs_cache_vlocation *entry)
 {
-	DECLARE_WAITQUEUE(myself,current);
+	DECLARE_WAITQUEUE(myself, current);
 
 	struct rxrpc_connection *conn;
 	struct rxrpc_call *call;
@@ -195,7 +199,7 @@ int afs_rxvl_get_entry_by_name(afs_server_t *server, const char *volname, unsign
 
 	/* get hold of the vlserver connection */
 	ret = afs_server_get_vlconn(server, &conn);
-	if (ret<0)
+	if (ret < 0)
 		goto out;
 
 	/* create a call through that connection */
@@ -211,7 +215,7 @@ int afs_rxvl_get_entry_by_name(afs_server_t *server, const char *volname, unsign
 
 	/* marshall the parameters */
 	piov[1].iov_len = volnamesz;
-	piov[1].iov_base = (char*) volname;
+	piov[1].iov_base = (char *) volname;
 
 	zero = 0;
 	piov[2].iov_len = (4 - (piov[1].iov_len & 3)) & 3;
@@ -224,14 +228,17 @@ int afs_rxvl_get_entry_by_name(afs_server_t *server, const char *volname, unsign
 	piov[0].iov_base = param;
 
 	/* send the parameters to the server */
-	ret = rxrpc_call_write_data(call, 3, piov, RXRPC_LAST_PACKET, GFP_NOFS, 0, &sent);
-	if (ret<0)
+	ret = rxrpc_call_write_data(call, 3, piov, RXRPC_LAST_PACKET, GFP_NOFS,
+				    0, &sent);
+	if (ret < 0)
 		goto abort;
 
 	/* wait for the reply to completely arrive */
 	bp = rxrpc_call_alloc_scratch(call, 384);
 
-	ret = rxrpc_call_read_data(call, bp, 384, RXRPC_CALL_READ_BLOCK|RXRPC_CALL_READ_ALL);
+	ret = rxrpc_call_read_data(call, bp, 384,
+				   RXRPC_CALL_READ_BLOCK |
+				   RXRPC_CALL_READ_ALL);
 	if (ret < 0) {
 		if (ret == -ECONNABORTED) {
 			ret = call->app_errno;
@@ -241,23 +248,26 @@ int afs_rxvl_get_entry_by_name(afs_server_t *server, const char *volname, unsign
 	}
 
 	/* unmarshall the reply */
-	for (loop=0; loop<64; loop++)
+	for (loop = 0; loop < 64; loop++)
 		entry->name[loop] = ntohl(*bp++);
 	bp++; /* final NUL */
 
 	bp++; /* type */
 	entry->nservers = ntohl(*bp++);
 
-	for (loop=0; loop<8; loop++)
+	for (loop = 0; loop < 8; loop++)
 		entry->servers[loop].s_addr = *bp++;
 
 	bp += 8; /* partition IDs */
 
-	for (loop=0; loop<8; loop++) {
+	for (loop = 0; loop < 8; loop++) {
 		tmp = ntohl(*bp++);
-		if (tmp & AFS_VLSF_RWVOL  ) entry->srvtmask[loop] |= AFS_VOL_VTM_RW;
-		if (tmp & AFS_VLSF_ROVOL  ) entry->srvtmask[loop] |= AFS_VOL_VTM_RO;
-		if (tmp & AFS_VLSF_BACKVOL) entry->srvtmask[loop] |= AFS_VOL_VTM_BAK;
+		if (tmp & AFS_VLSF_RWVOL)
+			entry->srvtmask[loop] |= AFS_VOL_VTM_RW;
+		if (tmp & AFS_VLSF_ROVOL)
+			entry->srvtmask[loop] |= AFS_VOL_VTM_RO;
+		if (tmp & AFS_VLSF_BACKVOL)
+			entry->srvtmask[loop] |= AFS_VOL_VTM_BAK;
 	}
 
 	entry->vid[0] = ntohl(*bp++);
@@ -267,9 +277,12 @@ int afs_rxvl_get_entry_by_name(afs_server_t *server, const char *volname, unsign
 	bp++; /* clone ID */
 
 	tmp = ntohl(*bp++); /* flags */
-	if (tmp & AFS_VLF_RWEXISTS  ) entry->vidmask |= AFS_VOL_VTM_RW;
-	if (tmp & AFS_VLF_ROEXISTS  ) entry->vidmask |= AFS_VOL_VTM_RO;
-	if (tmp & AFS_VLF_BACKEXISTS) entry->vidmask |= AFS_VOL_VTM_BAK;
+	if (tmp & AFS_VLF_RWEXISTS)
+		entry->vidmask |= AFS_VOL_VTM_RW;
+	if (tmp & AFS_VLF_ROEXISTS)
+		entry->vidmask |= AFS_VOL_VTM_RO;
+	if (tmp & AFS_VLF_BACKEXISTS)
+		entry->vidmask |= AFS_VOL_VTM_BAK;
 
 	ret = -ENOMEDIUM;
 	if (!entry->vidmask)
@@ -291,7 +304,7 @@ int afs_rxvl_get_entry_by_name(afs_server_t *server, const char *volname, unsign
 
  abort:
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	rxrpc_call_abort(call,ret);
+	rxrpc_call_abort(call, ret);
 	schedule();
 	goto out_unwait;
 } /* end afs_rxvl_get_entry_by_name() */
@@ -300,12 +313,12 @@ int afs_rxvl_get_entry_by_name(afs_server_t *server, const char *volname, unsign
 /*
  * look up a volume location database entry by ID
  */
-int afs_rxvl_get_entry_by_id(afs_server_t *server,
+int afs_rxvl_get_entry_by_id(struct afs_server *server,
 			     afs_volid_t volid,
 			     afs_voltype_t voltype,
 			     struct afs_cache_vlocation *entry)
 {
-	DECLARE_WAITQUEUE(myself,current);
+	DECLARE_WAITQUEUE(myself, current);
 
 	struct rxrpc_connection *conn;
 	struct rxrpc_call *call;
@@ -315,25 +328,25 @@ int afs_rxvl_get_entry_by_id(afs_server_t *server,
 	int ret, loop;
 	u32 *bp, param[3];
 
-	_enter(",%x,%d,",volid,voltype);
+	_enter(",%x,%d,", volid, voltype);
 
-	memset(entry,0,sizeof(*entry));
+	memset(entry, 0, sizeof(*entry));
 
 	/* get hold of the vlserver connection */
-	ret = afs_server_get_vlconn(server,&conn);
-	if (ret<0)
+	ret = afs_server_get_vlconn(server, &conn);
+	if (ret < 0)
 		goto out;
 
 	/* create a call through that connection */
-	ret = rxrpc_create_call(conn,NULL,NULL,afs_rxvl_aemap,&call);
-	if (ret<0) {
-		printk("kAFS: Unable to create call: %d\n",ret);
+	ret = rxrpc_create_call(conn, NULL, NULL, afs_rxvl_aemap, &call);
+	if (ret < 0) {
+		printk("kAFS: Unable to create call: %d\n", ret);
 		goto out_put_conn;
 	}
 	call->app_opcode = VLGETENTRYBYID;
 
 	/* we want to get event notifications from the call */
-	add_wait_queue(&call->waitq,&myself);
+	add_wait_queue(&call->waitq, &myself);
 
 	/* marshall the parameters */
 	param[0] = htonl(VLGETENTRYBYID);
@@ -344,16 +357,19 @@ int afs_rxvl_get_entry_by_id(afs_server_t *server,
 	piov[0].iov_base = param;
 
 	/* send the parameters to the server */
-	ret = rxrpc_call_write_data(call,1,piov,RXRPC_LAST_PACKET,GFP_NOFS,0,&sent);
-	if (ret<0)
+	ret = rxrpc_call_write_data(call, 1, piov, RXRPC_LAST_PACKET, GFP_NOFS,
+				    0, &sent);
+	if (ret < 0)
 		goto abort;
 
 	/* wait for the reply to completely arrive */
-	bp = rxrpc_call_alloc_scratch(call,384);
+	bp = rxrpc_call_alloc_scratch(call, 384);
 
-	ret = rxrpc_call_read_data(call,bp,384,RXRPC_CALL_READ_BLOCK|RXRPC_CALL_READ_ALL);
-	if (ret<0) {
-		if (ret==-ECONNABORTED) {
+	ret = rxrpc_call_read_data(call, bp, 384,
+				   RXRPC_CALL_READ_BLOCK |
+				   RXRPC_CALL_READ_ALL);
+	if (ret < 0) {
+		if (ret == -ECONNABORTED) {
 			ret = call->app_errno;
 			goto out_unwait;
 		}
@@ -361,23 +377,26 @@ int afs_rxvl_get_entry_by_id(afs_server_t *server,
 	}
 
 	/* unmarshall the reply */
-	for (loop=0; loop<64; loop++)
+	for (loop = 0; loop < 64; loop++)
 		entry->name[loop] = ntohl(*bp++);
 	bp++; /* final NUL */
 
 	bp++; /* type */
 	entry->nservers = ntohl(*bp++);
 
-	for (loop=0; loop<8; loop++)
+	for (loop = 0; loop < 8; loop++)
 		entry->servers[loop].s_addr = *bp++;
 
 	bp += 8; /* partition IDs */
 
-	for (loop=0; loop<8; loop++) {
+	for (loop = 0; loop < 8; loop++) {
 		tmp = ntohl(*bp++);
-		if (tmp & AFS_VLSF_RWVOL  ) entry->srvtmask[loop] |= AFS_VOL_VTM_RW;
-		if (tmp & AFS_VLSF_ROVOL  ) entry->srvtmask[loop] |= AFS_VOL_VTM_RO;
-		if (tmp & AFS_VLSF_BACKVOL) entry->srvtmask[loop] |= AFS_VOL_VTM_BAK;
+		if (tmp & AFS_VLSF_RWVOL)
+			entry->srvtmask[loop] |= AFS_VOL_VTM_RW;
+		if (tmp & AFS_VLSF_ROVOL)
+			entry->srvtmask[loop] |= AFS_VOL_VTM_RO;
+		if (tmp & AFS_VLSF_BACKVOL)
+			entry->srvtmask[loop] |= AFS_VOL_VTM_BAK;
 	}
 
 	entry->vid[0] = ntohl(*bp++);
@@ -387,9 +406,12 @@ int afs_rxvl_get_entry_by_id(afs_server_t *server,
 	bp++; /* clone ID */
 
 	tmp = ntohl(*bp++); /* flags */
-	if (tmp & AFS_VLF_RWEXISTS  ) entry->vidmask |= AFS_VOL_VTM_RW;
-	if (tmp & AFS_VLF_ROEXISTS  ) entry->vidmask |= AFS_VOL_VTM_RO;
-	if (tmp & AFS_VLF_BACKEXISTS) entry->vidmask |= AFS_VOL_VTM_BAK;
+	if (tmp & AFS_VLF_RWEXISTS)
+		entry->vidmask |= AFS_VOL_VTM_RW;
+	if (tmp & AFS_VLF_ROEXISTS)
+		entry->vidmask |= AFS_VOL_VTM_RO;
+	if (tmp & AFS_VLF_BACKEXISTS)
+		entry->vidmask |= AFS_VOL_VTM_BAK;
 
 	ret = -ENOMEDIUM;
 	if (!entry->vidmask)
@@ -412,17 +434,17 @@ int afs_rxvl_get_entry_by_id(afs_server_t *server,
 
  out_unwait:
 	set_current_state(TASK_RUNNING);
-	remove_wait_queue(&call->waitq,&myself);
+	remove_wait_queue(&call->waitq, &myself);
 	rxrpc_put_call(call);
  out_put_conn:
 	rxrpc_put_connection(conn);
  out:
-	_leave(" = %d",ret);
+	_leave(" = %d", ret);
 	return ret;
 
  abort:
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	rxrpc_call_abort(call,ret);
+	rxrpc_call_abort(call, ret);
 	schedule();
 	goto out_unwait;
 } /* end afs_rxvl_get_entry_by_id() */
@@ -431,7 +453,7 @@ int afs_rxvl_get_entry_by_id(afs_server_t *server,
 /*
  * look up a volume location database entry by ID asynchronously
  */
-int afs_rxvl_get_entry_by_id_async(afs_async_op_t *op,
+int afs_rxvl_get_entry_by_id_async(struct afs_async_op *op,
 				   afs_volid_t volid,
 				   afs_voltype_t voltype)
 {
@@ -442,12 +464,12 @@ int afs_rxvl_get_entry_by_id_async(afs_async_op_t *op,
 	int ret;
 	u32 param[3];
 
-	_enter(",%x,%d,",volid,voltype);
+	_enter(",%x,%d,", volid, voltype);
 
 	/* get hold of the vlserver connection */
-	ret = afs_server_get_vlconn(op->server,&conn);
-	if (ret<0) {
-		_leave(" = %d",ret);
+	ret = afs_server_get_vlconn(op->server, &conn);
+	if (ret < 0) {
+		_leave(" = %d", ret);
 		return ret;
 	}
 
@@ -459,9 +481,9 @@ int afs_rxvl_get_entry_by_id_async(afs_async_op_t *op,
 				&op->call);
 	rxrpc_put_connection(conn);
 
-	if (ret<0) {
-		printk("kAFS: Unable to create call: %d\n",ret);
-		_leave(" = %d",ret);
+	if (ret < 0) {
+		printk("kAFS: Unable to create call: %d\n", ret);
+		_leave(" = %d", ret);
 		return ret;
 	}
 
@@ -483,18 +505,19 @@ int afs_rxvl_get_entry_by_id_async(afs_async_op_t *op,
 	piov[0].iov_base = param;
 
 	/* allocate result read buffer in scratch space */
-	call->app_scr_ptr = rxrpc_call_alloc_scratch(op->call,384);
+	call->app_scr_ptr = rxrpc_call_alloc_scratch(op->call, 384);
 
 	/* send the parameters to the server */
-	ret = rxrpc_call_write_data(call,1,piov,RXRPC_LAST_PACKET,GFP_NOFS,0,&sent);
-	if (ret<0) {
-		rxrpc_call_abort(call,ret); /* handle from kafsasyncd */
+	ret = rxrpc_call_write_data(call, 1, piov, RXRPC_LAST_PACKET, GFP_NOFS,
+				    0, &sent);
+	if (ret < 0) {
+		rxrpc_call_abort(call, ret); /* handle from kafsasyncd */
 		ret = 0;
 		goto out;
 	}
 
 	/* wait for the reply to completely arrive */
-	ret = rxrpc_call_read_data(call,call->app_scr_ptr,384,0);
+	ret = rxrpc_call_read_data(call, call->app_scr_ptr, 384, 0);
 	switch (ret) {
 	case 0:
 	case -EAGAIN:
@@ -503,14 +526,14 @@ int afs_rxvl_get_entry_by_id_async(afs_async_op_t *op,
 		break;	/* all handled by kafsasyncd */
 
 	default:
-		rxrpc_call_abort(call,ret); /* force kafsasyncd to handle it */
+		rxrpc_call_abort(call, ret); /* make kafsasyncd handle it */
 		ret = 0;
 		break;
 	}
 
  out:
 	rxrpc_put_call(call);
-	_leave(" = %d",ret);
+	_leave(" = %d", ret);
 	return ret;
 
 } /* end afs_rxvl_get_entry_by_id_async() */
@@ -519,40 +542,43 @@ int afs_rxvl_get_entry_by_id_async(afs_async_op_t *op,
 /*
  * attend to the asynchronous get VLDB entry by ID
  */
-int afs_rxvl_get_entry_by_id_async2(afs_async_op_t *op,
+int afs_rxvl_get_entry_by_id_async2(struct afs_async_op *op,
 				    struct afs_cache_vlocation *entry)
 {
 	unsigned *bp, tmp;
 	int loop, ret;
 
-	_enter("{op=%p cst=%u}",op,op->call->app_call_state);
+	_enter("{op=%p cst=%u}", op, op->call->app_call_state);
 
-	memset(entry,0,sizeof(*entry));
+	memset(entry, 0, sizeof(*entry));
 
-	if (op->call->app_call_state==RXRPC_CSTATE_COMPLETE) {
+	if (op->call->app_call_state == RXRPC_CSTATE_COMPLETE) {
 		/* operation finished */
 		afs_kafsasyncd_terminate_op(op);
 
 		bp = op->call->app_scr_ptr;
 
 		/* unmarshall the reply */
-		for (loop=0; loop<64; loop++)
+		for (loop = 0; loop < 64; loop++)
 			entry->name[loop] = ntohl(*bp++);
 		bp++; /* final NUL */
 
 		bp++; /* type */
 		entry->nservers = ntohl(*bp++);
 
-		for (loop=0; loop<8; loop++)
+		for (loop = 0; loop < 8; loop++)
 			entry->servers[loop].s_addr = *bp++;
 
 		bp += 8; /* partition IDs */
 
-		for (loop=0; loop<8; loop++) {
+		for (loop = 0; loop < 8; loop++) {
 			tmp = ntohl(*bp++);
-			if (tmp & AFS_VLSF_RWVOL  ) entry->srvtmask[loop] |= AFS_VOL_VTM_RW;
-			if (tmp & AFS_VLSF_ROVOL  ) entry->srvtmask[loop] |= AFS_VOL_VTM_RO;
-			if (tmp & AFS_VLSF_BACKVOL) entry->srvtmask[loop] |= AFS_VOL_VTM_BAK;
+			if (tmp & AFS_VLSF_RWVOL)
+				entry->srvtmask[loop] |= AFS_VOL_VTM_RW;
+			if (tmp & AFS_VLSF_ROVOL)
+				entry->srvtmask[loop] |= AFS_VOL_VTM_RO;
+			if (tmp & AFS_VLSF_BACKVOL)
+				entry->srvtmask[loop] |= AFS_VOL_VTM_BAK;
 		}
 
 		entry->vid[0] = ntohl(*bp++);
@@ -562,13 +588,16 @@ int afs_rxvl_get_entry_by_id_async2(afs_async_op_t *op,
 		bp++; /* clone ID */
 
 		tmp = ntohl(*bp++); /* flags */
-		if (tmp & AFS_VLF_RWEXISTS  ) entry->vidmask |= AFS_VOL_VTM_RW;
-		if (tmp & AFS_VLF_ROEXISTS  ) entry->vidmask |= AFS_VOL_VTM_RO;
-		if (tmp & AFS_VLF_BACKEXISTS) entry->vidmask |= AFS_VOL_VTM_BAK;
+		if (tmp & AFS_VLF_RWEXISTS)
+			entry->vidmask |= AFS_VOL_VTM_RW;
+		if (tmp & AFS_VLF_ROEXISTS)
+			entry->vidmask |= AFS_VOL_VTM_RO;
+		if (tmp & AFS_VLF_BACKEXISTS)
+			entry->vidmask |= AFS_VOL_VTM_BAK;
 
 		ret = -ENOMEDIUM;
 		if (!entry->vidmask) {
-			rxrpc_call_abort(op->call,ret);
+			rxrpc_call_abort(op->call, ret);
 			goto done;
 		}
 
@@ -589,7 +618,7 @@ int afs_rxvl_get_entry_by_id_async2(afs_async_op_t *op,
 		goto done;
 	}
 
-	if (op->call->app_call_state==RXRPC_CSTATE_ERROR) {
+	if (op->call->app_call_state == RXRPC_CSTATE_ERROR) {
 		/* operation error */
 		ret = op->call->app_errno;
 		goto done;
@@ -601,7 +630,7 @@ int afs_rxvl_get_entry_by_id_async2(afs_async_op_t *op,
  done:
 	rxrpc_put_call(op->call);
 	op->call = NULL;
-	_leave(" = %d",ret);
+	_leave(" = %d", ret);
 	return ret;
 } /* end afs_rxvl_get_entry_by_id_async2() */
 
@@ -612,9 +641,9 @@ int afs_rxvl_get_entry_by_id_async2(afs_async_op_t *op,
  */
 static void afs_rxvl_get_entry_by_id_attn(struct rxrpc_call *call)
 {
-	afs_async_op_t *op = call->app_user;
+	struct afs_async_op *op = call->app_user;
 
-	_enter("{op=%p cst=%u}",op,call->app_call_state);
+	_enter("{op=%p cst=%u}", op, call->app_call_state);
 
 	switch (call->app_call_state) {
 	case RXRPC_CSTATE_COMPLETE:
@@ -624,7 +653,7 @@ static void afs_rxvl_get_entry_by_id_attn(struct rxrpc_call *call)
 		if (call->app_async_read)
 			break;
 	case RXRPC_CSTATE_CLNT_GOT_REPLY:
-		if (call->app_read_count==0)
+		if (call->app_read_count == 0)
 			break;
 		printk("kAFS: Reply bigger than expected"
 		       " {cst=%u asyn=%d mark=%Zu rdy=%Zu pr=%u%s}",
@@ -635,7 +664,7 @@ static void afs_rxvl_get_entry_by_id_attn(struct rxrpc_call *call)
 		       call->pkt_rcv_count,
 		       call->app_last_rcv ? " last" : "");
 
-		rxrpc_call_abort(call,-EBADMSG);
+		rxrpc_call_abort(call, -EBADMSG);
 		break;
 	default:
 		BUG();
@@ -652,9 +681,9 @@ static void afs_rxvl_get_entry_by_id_attn(struct rxrpc_call *call)
  */
 static void afs_rxvl_get_entry_by_id_error(struct rxrpc_call *call)
 {
-	afs_async_op_t *op = call->app_user;
+	struct afs_async_op *op = call->app_user;
 
-	_enter("{op=%p cst=%u}",op,call->app_call_state);
+	_enter("{op=%p cst=%u}", op, call->app_call_state);
 
 	afs_kafsasyncd_attend_op(op);
 

@@ -21,6 +21,7 @@
 #define MMU_PAGE_ASSOC_BIT	0x80
 
 #define MMU_NTLB_ENTRIES	128	/* for 7708 */
+#define MMU_NTLB_WAYS		4
 #define MMU_CONTROL_INIT	0x007	/* SV=0, TF=1, IX=1, AT=1 */
 
 #endif /* __ASM_CPU_SH3_MMU_CONTEXT_H */

@@ -19,6 +19,7 @@
 
 #include <linux/delay.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
@@ -35,12 +36,21 @@ MODULE_PARM(atkbd_softrepeat, "1i");
 MODULE_LICENSE("GPL");
 
 static int atkbd_set = 2;
+module_param_named(set, atkbd_set, int, 0);
+MODULE_PARM_DESC(set, "Select keyboard code set (2 = default, 3, 4)");
 #if defined(__i386__) || defined (__x86_64__)
 static int atkbd_reset;
 #else
 static int atkbd_reset = 1;
 #endif
 static int atkbd_softrepeat;
+
+module_param_named(reset, atkbd_reset, bool, 0);
+MODULE_PARM_DESC(reset, "Reset keyboard during initialization");
+
+static int atkbd_softrepeat;
+module_param_named(softrepeat, atkbd_softrepeat, bool, 0);
+MODULE_PARM_DESC(softrepeat, "Use software keyboard repeat");
 
 /*
  * Scancode to keycode tables. These are just the default setting, and
@@ -759,34 +769,6 @@ static struct serio_dev atkbd_dev = {
 	.disconnect =	atkbd_disconnect,
 	.cleanup =	atkbd_cleanup,
 };
-
-#ifndef MODULE
-static int __init atkbd_setup_set(char *str)
-{
-        int ints[4];
-        str = get_options(str, ARRAY_SIZE(ints), ints);
-        if (ints[0] > 0) atkbd_set = ints[1];
-        return 1;
-}
-static int __init atkbd_setup_reset(char *str)
-{
-        int ints[4];
-        str = get_options(str, ARRAY_SIZE(ints), ints);
-        if (ints[0] > 0) atkbd_reset = ints[1];
-        return 1;
-}
-static int __init atkbd_setup_softrepeat(char *str)
-{
-        int ints[4];
-        str = get_options(str, ARRAY_SIZE(ints), ints);
-        if (ints[0] > 0) atkbd_softrepeat = ints[1];
-        return 1;
-}
-
-__setup("atkbd_set=", atkbd_setup_set);
-__setup("atkbd_reset", atkbd_setup_reset);
-__setup("atkbd_softrepeat=", atkbd_setup_softrepeat);
-#endif
 
 int __init atkbd_init(void)
 {

@@ -19,18 +19,18 @@
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 
-static inline int zap_pte(struct mm_struct *mm, struct vm_area_struct *vma,
+static inline void zap_pte(struct mm_struct *mm, struct vm_area_struct *vma,
 			unsigned long addr, pte_t *ptep)
 {
 	pte_t pte = *ptep;
 
 	if (pte_none(pte))
-		return 0;
+		return;
 	if (pte_present(pte)) {
 		unsigned long pfn = pte_pfn(pte);
 
 		flush_cache_page(vma, addr);
-		pte = ptep_get_and_clear(ptep);
+		pte = ptep_clear_flush(vma, addr, ptep);
 		if (pfn_valid(pfn)) {
 			struct page *page = pfn_to_page(pfn);
 			if (!PageReserved(page)) {
@@ -41,12 +41,10 @@ static inline int zap_pte(struct mm_struct *mm, struct vm_area_struct *vma,
 				mm->rss--;
 			}
 		}
-		return 1;
 	} else {
 		if (!pte_file(pte))
 			free_swap_and_cache(pte_to_swp_entry(pte));
 		pte_clear(ptep);
-		return 0;
 	}
 }
 
@@ -57,7 +55,7 @@ static inline int zap_pte(struct mm_struct *mm, struct vm_area_struct *vma,
 int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		unsigned long addr, struct page *page, pgprot_t prot)
 {
-	int err = -ENOMEM, flush;
+	int err = -ENOMEM;
 	pte_t *pte;
 	pgd_t *pgd;
 	pmd_t *pmd;
@@ -78,7 +76,7 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (!pte)
 		goto err_unlock;
 
-	flush = zap_pte(mm, vma, addr, pte);
+	zap_pte(mm, vma, addr, pte);
 
 	mm->rss++;
 	flush_icache_page(vma, page);
@@ -86,8 +84,6 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	pte_chain = page_add_rmap(page, pte, pte_chain);
 	pte_val = *pte;
 	pte_unmap(pte);
-	if (flush)
-		flush_tlb_page(vma, addr);
 	update_mmu_cache(vma, addr, pte_val);
 	spin_unlock(&mm->page_table_lock);
 	pte_chain_free(pte_chain);
@@ -109,7 +105,7 @@ EXPORT_SYMBOL(install_page);
 int install_file_pte(struct mm_struct *mm, struct vm_area_struct *vma,
 		unsigned long addr, unsigned long pgoff, pgprot_t prot)
 {
-	int err = -ENOMEM, flush;
+	int err = -ENOMEM;
 	pte_t *pte;
 	pgd_t *pgd;
 	pmd_t *pmd;
@@ -126,13 +122,11 @@ int install_file_pte(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (!pte)
 		goto err_unlock;
 
-	flush = zap_pte(mm, vma, addr, pte);
+	zap_pte(mm, vma, addr, pte);
 
 	set_pte(pte, pgoff_to_pte(pgoff));
 	pte_val = *pte;
 	pte_unmap(pte);
-	if (flush)
-		flush_tlb_page(vma, addr);
 	update_mmu_cache(vma, addr, pte_val);
 	spin_unlock(&mm->page_table_lock);
 	return 0;

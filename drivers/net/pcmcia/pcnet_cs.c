@@ -303,7 +303,7 @@ static dev_link_t *pcnet_attach(void)
     client_reg.event_handler = &pcnet_event;
     client_reg.Version = 0x0210;
     client_reg.event_callback_args.client_data = link;
-    ret = CardServices(RegisterClient, &link->handle, &client_reg);
+    ret = pcmcia_register_client(&link->handle, &client_reg);
     if (ret != CS_SUCCESS) {
 	cs_error(link->handle, RegisterClient, ret);
 	pcnet_detach(link);
@@ -342,7 +342,7 @@ static void pcnet_detach(dev_link_t *link)
     }
 
     if (link->handle)
-	CardServices(DeregisterClient, link->handle);
+	pcmcia_deregister_client(link->handle);
 
     /* Unlink device structure, free bits */
     *linkp = link->next;
@@ -373,8 +373,7 @@ static hw_info_t *get_hwinfo(dev_link_t *link)
     req.Attributes = WIN_DATA_WIDTH_8|WIN_MEMORY_TYPE_AM|WIN_ENABLE;
     req.Base = 0; req.Size = 0;
     req.AccessSpeed = 0;
-    link->win = (window_handle_t)link->handle;
-    i = CardServices(RequestWindow, &link->win, &req);
+    i = pcmcia_request_window(&link->handle, &req, &link->win);
     if (i != CS_SUCCESS) {
 	cs_error(link->handle, RequestWindow, i);
 	return NULL;
@@ -384,7 +383,7 @@ static hw_info_t *get_hwinfo(dev_link_t *link)
     mem.Page = 0;
     for (i = 0; i < NR_INFO; i++) {
 	mem.CardOffset = hw_info[i].offset & ~(req.Size-1);
-	CardServices(MapMemPage, link->win, &mem);
+	pcmcia_map_mem_page(link->win, &mem);
 	base = &virt[hw_info[i].offset & (req.Size-1)];
 	if ((readb(base+0) == hw_info[i].a0) &&
 	    (readb(base+2) == hw_info[i].a1) &&
@@ -397,7 +396,7 @@ static hw_info_t *get_hwinfo(dev_link_t *link)
     }
     
     iounmap(virt);
-    j = CardServices(ReleaseWindow, link->win);
+    j = pcmcia_release_window(link->win);
     if (j != CS_SUCCESS)
 	cs_error(link->handle, ReleaseWindow, j);
     return (i < NR_INFO) ? hw_info+i : NULL;
@@ -544,11 +543,8 @@ static hw_info_t *get_hwired(dev_link_t *link)
 
 ======================================================================*/
 
-#define CS_CHECK(fn, args...) \
-while ((last_ret=CardServices(last_fn=(fn), args))!=0) goto cs_failed
-
-#define CFG_CHECK(fn, args...) \
-if (CardServices(fn, args) != 0) goto next_entry
+#define CS_CHECK(fn, ret) \
+do { last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; } while (0)
 
 static int try_io_port(dev_link_t *link)
 {
@@ -571,12 +567,12 @@ static int try_io_port(dev_link_t *link)
 	for (j = 0; j < 0x400; j += 0x20) {
 	    link->io.BasePort1 = j ^ 0x300;
 	    link->io.BasePort2 = (j ^ 0x300) + 0x10;
-	    ret = CardServices(RequestIO, link->handle, &link->io);
+	    ret = pcmcia_request_io(link->handle, &link->io);
 	    if (ret == CS_SUCCESS) return ret;
 	}
 	return ret;
     } else {
-	return CardServices(RequestIO, link->handle, &link->io);
+	return pcmcia_request_io(link->handle, &link->io);
     }
 }
 
@@ -600,9 +596,9 @@ static void pcnet_config(dev_link_t *link)
     tuple.TupleDataMax = sizeof(buf);
     tuple.TupleOffset = 0;
     tuple.DesiredTuple = CISTPL_CONFIG;
-    CS_CHECK(GetFirstTuple, handle, &tuple);
-    CS_CHECK(GetTupleData, handle, &tuple);
-    CS_CHECK(ParseTuple, handle, &tuple, &parse);
+    CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
+    CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
+    CS_CHECK(ParseTuple, pcmcia_parse_tuple(handle, &tuple, &parse));
     link->conf.ConfigBase = parse.config.base;
     link->conf.Present = parse.config.rmask[0];
 
@@ -610,28 +606,28 @@ static void pcnet_config(dev_link_t *link)
     link->state |= DEV_CONFIG;
 
     /* Look up current Vcc */
-    CS_CHECK(GetConfigurationInfo, handle, &conf);
+    CS_CHECK(GetConfigurationInfo, pcmcia_get_configuration_info(handle, &conf));
     link->conf.Vcc = conf.Vcc;
 
     tuple.DesiredTuple = CISTPL_MANFID;
     tuple.Attributes = TUPLE_RETURN_COMMON;
-    if ((CardServices(GetFirstTuple, handle, &tuple) == CS_SUCCESS) &&
- 	(CardServices(GetTupleData, handle, &tuple) == CS_SUCCESS)) {
+    if ((pcmcia_get_first_tuple(handle, &tuple) == CS_SUCCESS) &&
+ 	(pcmcia_get_tuple_data(handle, &tuple) == CS_SUCCESS)) {
 	manfid = le16_to_cpu(buf[0]);
 	prodid = le16_to_cpu(buf[1]);
     }
     
     tuple.DesiredTuple = CISTPL_CFTABLE_ENTRY;
     tuple.Attributes = 0;
-    CS_CHECK(GetFirstTuple, handle, &tuple);
+    CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
     while (last_ret == CS_SUCCESS) {
 	cistpl_cftable_entry_t *cfg = &(parse.cftable_entry);
 	cistpl_io_t *io = &(parse.cftable_entry.io);
 	
-	CFG_CHECK(GetTupleData, handle, &tuple);
-	CFG_CHECK(ParseTuple, handle, &tuple, &parse);
-	if ((cfg->index == 0) || (cfg->io.nwin == 0))
-	    goto next_entry;
+	if (pcmcia_get_tuple_data(handle, &tuple) != 0 ||
+			pcmcia_parse_tuple(handle, &tuple, &parse) != 0 ||
+			cfg->index == 0 || cfg->io.nwin == 0)
+		goto next_entry;
 	
 	link->conf.ConfigIndex = cfg->index;
 	/* For multifunction cards, by convention, we configure the
@@ -653,14 +649,14 @@ static void pcnet_config(dev_link_t *link)
 	    if (last_ret == CS_SUCCESS) break;
 	}
     next_entry:
-	last_ret = CardServices(GetNextTuple, handle, &tuple);
+	last_ret = pcmcia_get_next_tuple(handle, &tuple);
     }
     if (last_ret != CS_SUCCESS) {
 	cs_error(handle, RequestIO, last_ret);
 	goto failed;
     }
 
-    CS_CHECK(RequestIRQ, handle, &link->irq);
+    CS_CHECK(RequestIRQ, pcmcia_request_irq(handle, &link->irq));
     
     if (link->io.NumPorts2 == 8) {
 	link->conf.Attributes |= CONF_ENABLE_SPKR;
@@ -670,7 +666,7 @@ static void pcnet_config(dev_link_t *link)
 	(prodid == PRODID_IBM_HOME_AND_AWAY))
 	link->conf.ConfigIndex |= 0x10;
     
-    CS_CHECK(RequestConfiguration, handle, &link->conf);
+    CS_CHECK(RequestConfiguration, pcmcia_request_configuration(handle, &link->conf));
     dev->irq = link->irq.AssignedIRQ;
     dev->base_addr = link->io.BasePort1;
     if (info->flags & HAS_MISC_REG) {
@@ -799,11 +795,11 @@ static void pcnet_release(dev_link_t *link)
 
     if (info->flags & USE_SHMEM) {
 	iounmap(info->base);
-	CardServices(ReleaseWindow, link->win);
+	pcmcia_release_window(link->win);
     }
-    CardServices(ReleaseConfiguration, link->handle);
-    CardServices(ReleaseIO, link->handle, &link->io);
-    CardServices(ReleaseIRQ, link->handle, &link->irq);
+    pcmcia_release_configuration(link->handle);
+    pcmcia_release_io(link->handle, &link->io);
+    pcmcia_release_irq(link->handle, &link->irq);
 
     link->state &= ~DEV_CONFIG;
 
@@ -847,7 +843,7 @@ static int pcnet_event(event_t event, int priority,
 	if (link->state & DEV_CONFIG) {
 	    if (link->open)
 		netif_device_detach(&info->dev);
-	    CardServices(ReleaseConfiguration, link->handle);
+	    pcmcia_release_configuration(link->handle);
 	}
 	break;
     case CS_EVENT_PM_RESUME:
@@ -855,7 +851,7 @@ static int pcnet_event(event_t event, int priority,
 	/* Fall through... */
     case CS_EVENT_CARD_RESET:
 	if (link->state & DEV_CONFIG) {
-	    CardServices(RequestConfiguration, link->handle, &link->conf);
+	    pcmcia_request_configuration(link->handle, &link->conf);
 	    if (link->open) {
 		pcnet_reset_8390(&info->dev);
 		NS8390_init(&info->dev, 1);
@@ -1620,14 +1616,13 @@ static int setup_shmem_window(dev_link_t *link, int start_pg,
     req.Attributes |= WIN_USE_WAIT;
     req.Base = 0; req.Size = window_size;
     req.AccessSpeed = mem_speed;
-    link->win = (window_handle_t)link->handle;
-    CS_CHECK(RequestWindow, &link->win, &req);
+    CS_CHECK(RequestWindow, pcmcia_request_window(&link->handle, &req, &link->win));
 
     mem.CardOffset = (start_pg << 8) + cm_offset;
     offset = mem.CardOffset % window_size;
     mem.CardOffset -= offset;
     mem.Page = 0;
-    CS_CHECK(MapMemPage, link->win, &mem);
+    CS_CHECK(MapMemPage, pcmcia_map_mem_page(link->win, &mem));
 
     /* Try scribbling on the buffer */
     info->base = ioremap(req.Base, window_size);
@@ -1639,7 +1634,7 @@ static int setup_shmem_window(dev_link_t *link, int start_pg,
     pcnet_reset_8390(dev);
     if (i != (TX_PAGES<<8)) {
 	iounmap(info->base);
-	CardServices(ReleaseWindow, link->win);
+	pcmcia_release_window(link->win);
 	info->base = NULL; link->win = NULL;
 	goto failed;
     }

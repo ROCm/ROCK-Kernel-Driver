@@ -67,7 +67,8 @@ MODULE_PARM(xa_test, "i");	/* see sr_ioctl.c */
 	(CDC_CLOSE_TRAY|CDC_OPEN_TRAY|CDC_LOCK|CDC_SELECT_SPEED| \
 	 CDC_SELECT_DISC|CDC_MULTI_SESSION|CDC_MCN|CDC_MEDIA_CHANGED| \
 	 CDC_PLAY_AUDIO|CDC_RESET|CDC_IOCTLS|CDC_DRIVE_STATUS| \
-	 CDC_CD_R|CDC_CD_RW|CDC_DVD|CDC_DVD_R|CDC_DVD_RAM|CDC_GENERIC_PACKET)
+	 CDC_CD_R|CDC_CD_RW|CDC_DVD|CDC_DVD_R|CDC_DVD_RAM|CDC_GENERIC_PACKET| \
+	 CDC_MRW|CDC_MRW_W|CDC_RAM)
 
 static int sr_probe(struct device *);
 static int sr_remove(struct device *);
@@ -692,7 +693,7 @@ Enomem:
 static void get_capabilities(struct scsi_cd *cd)
 {
 	unsigned char *buffer;
-	int rc, n;
+	int rc, n, mrw_write = 0, mrw = 1;
 	struct scsi_mode_data data;
 	struct scsi_request *SRpnt;
 	unsigned char cmd[MAX_COMMAND_SIZE];
@@ -765,6 +766,15 @@ static void get_capabilities(struct scsi_cd *cd)
 		printk("%s: scsi-1 drive\n", cd->cdi.name);
 		return;
 	}
+
+	if (cdrom_is_mrw(&cd->cdi, &mrw_write)) {
+		mrw = 0;
+		cd->cdi.mask |= CDC_MRW;
+		cd->cdi.mask |= CDC_MRW_W;
+	}
+	if (!mrw_write)
+		cd->cdi.mask |= CDC_MRW_W;
+
 	n = data.header_length + data.block_descriptor_length;
 	cd->cdi.speed = ((buffer[n + 8] << 8) + buffer[n + 9]) / 176;
 	cd->readcd_known = 1;
@@ -788,9 +798,7 @@ static void get_capabilities(struct scsi_cd *cd)
 	if ((buffer[n + 3] & 0x20) == 0) {
 		/* can't write DVD-RAM media */
 		cd->cdi.mask |= CDC_DVD_RAM;
-	} else {
-		cd->device->writeable = 1;
-	}
+	} else
 	if ((buffer[n + 3] & 0x10) == 0)
 		/* can't write DVD-R media */
 		cd->cdi.mask |= CDC_DVD_R;
@@ -813,6 +821,12 @@ static void get_capabilities(struct scsi_cd *cd)
 		cd->cdi.mask |= CDC_SELECT_DISC;
 	/*else    I don't think it can close its tray
 		cd->cdi.mask |= CDC_CLOSE_TRAY; */
+
+	/*
+	 * if DVD-RAM of MRW-W, we are randomly writeable
+	 */
+	if ((cd->cdi.mask & (CDC_DVD_RAM | CDC_MRW_W)) != (CDC_DVD_RAM | CDC_MRW_W))
+		cd->device->writeable = 1;
 
 	scsi_release_request(SRpnt);
 	kfree(buffer);

@@ -389,6 +389,26 @@ extern long __copy_from_user_asm(void *to, long n, const void *from);
         err;                                                    \
 })
 
+extern long __copy_in_user_asm(const void *from, long n, void *to);
+
+#define __copy_in_user(to, from, n)				\
+({								\
+	__copy_in_user_asm(from, n, to);			\
+})
+
+#define copy_in_user(to, from, n)				\
+({								\
+	long err = 0;						\
+	__typeof__(n) __n = (n);				\
+	might_sleep();						\
+	if (__access_ok(from,__n) && __access_ok(to,__n)) {	\
+		err = __copy_in_user_asm(from, __n, to);	\
+	}							\
+	else							\
+		err = __n;					\
+	err;							\
+})
+
 /*
  * Copy a null terminated string from userspace.
  */
@@ -594,5 +614,4 @@ clear_user(void *to, unsigned long n)
 	return n;
 }
 
-
-#endif				       /* _S390_UACCESS_H		   */
+#endif /* __S390_UACCESS_H */

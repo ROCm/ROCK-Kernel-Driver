@@ -406,6 +406,7 @@ int hci_inquiry(unsigned long arg)
 
 	hci_dev_lock_bh(hdev);
 	if (inquiry_cache_age(hdev) > INQUIRY_CACHE_AGE_MAX || 
+					inquiry_cache_empty(hdev) ||
 					ir.flags & IREQ_CACHE_FLUSH) {
 		inquiry_cache_flush(hdev);
 		do_inquiry = 1;

@@ -1,5 +1,4 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -7,114 +6,10 @@
  * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
-#include <linux/init.h>
-#include <linux/types.h>
-#include <linux/pci.h>
-#include <linux/pci_ids.h>
-#include <linux/sched.h>
-#include <linux/ioport.h>
-#include <linux/slab.h>
-#include <linux/module.h>
-#include <asm/sn/sgi.h>
-#include <asm/sn/xtalk/xbow.h>	/* Must be before iograph.h to get MAX_PORT_NUM */
-#include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
-#include <asm/sn/hcl.h>
-#include <asm/sn/hcl_util.h>
-#include <asm/sn/labelcl.h>
-#include <asm/sn/pci/bridge.h>
-#include <asm/sn/ioerror_handling.h>
-#include <asm/sn/pci/pciio.h>
-#include <asm/sn/pci/pciio_private.h>
-#include <asm/sn/sn_sal.h>
-#include <asm/sn/io.h>
 #include <asm/sn/pci/pci_bus_cvlink.h>
 #include <asm/sn/simulator.h>
 
-#define DEBUG_PCIIO
-#undef DEBUG_PCIIO	/* turn this on for yet more console output */
-
-
 char                    pciio_info_fingerprint[] = "pciio_info";
-
-int
-badaddr_val(volatile void *addr, int len, volatile void *ptr)
-{
-	int ret = 0;
-	volatile void *new_addr;
-
-	switch (len) {
-		case 4:
-			new_addr = (void *) addr;
-			ret = ia64_sn_probe_io_slot((long)new_addr, len, (void *)ptr);
-			break;
-		default:
-			printk(KERN_WARNING "badaddr_val given len %x but supports len of 4 only\n", len);
-	}
-
-	if (ret < 0)
-		panic("badaddr_val: unexpected status (%d) in probing", ret);
-	return(ret);
-
-}
-
-
-nasid_t
-get_console_nasid(void)
-{
-	extern nasid_t console_nasid;
-	extern nasid_t master_baseio_nasid;
-
-	if (console_nasid < 0) {
-		console_nasid = ia64_sn_get_console_nasid();
-		if (console_nasid < 0) {
-// ZZZ What do we do if we don't get a console nasid on the hardware????
-			if (IS_RUNNING_ON_SIMULATOR() )
-				console_nasid = master_baseio_nasid;
-		}
-	} 
-	return console_nasid;
-}
-
-nasid_t
-get_master_baseio_nasid(void)
-{
-	extern nasid_t master_baseio_nasid;
-	extern char master_baseio_wid;
-
-	if (master_baseio_nasid < 0) {
-		master_baseio_nasid = ia64_sn_get_master_baseio_nasid();
-
-		if ( master_baseio_nasid >= 0 ) {
-        		master_baseio_wid = WIDGETID_GET(KL_CONFIG_CH_CONS_INFO(master_baseio_nasid)->memory_base);
-		}
-	} 
-	return master_baseio_nasid;
-}
-
-int
-hub_dma_enabled(vertex_hdl_t xconn_vhdl)
-{
-	return(0);
-}
-
-int
-hub_error_devenable(vertex_hdl_t xconn_vhdl, int devnum, int error_code)
-{
-	return(0);
-}
-
-void
-ioerror_dump(char *name, int error_code, int error_mode, ioerror_t *ioerror)
-{
-}
-
-/******
- ****** end hack defines ......
- ******/
-
-
-
 
 /* =====================================================================
  *    PCI Generic Bus Provider
@@ -122,111 +17,6 @@ ioerror_dump(char *name, int error_code, int error_mode, ioerror_t *ioerror)
  * platform-independent interface for PCI devices.  This layer
  * switches among the possible implementations of a PCI adapter.
  */
-
-/* =====================================================================
- *    Provider Function Location SHORTCUT
- *
- * On platforms with only one possible PCI provider, macros can be
- * set up at the top that cause the table lookups and indirections to
- * completely disappear.
- */
-
-
-/* =====================================================================
- *    Function Table of Contents
- */
-
-#if !defined(DEV_FUNC)
-static pciio_provider_t *pciio_to_provider_fns(vertex_hdl_t dev);
-#endif
-
-pciio_piomap_t          pciio_piomap_alloc(vertex_hdl_t, device_desc_t, pciio_space_t, iopaddr_t, size_t, size_t, unsigned);
-void                    pciio_piomap_free(pciio_piomap_t);
-caddr_t                 pciio_piomap_addr(pciio_piomap_t, iopaddr_t, size_t);
-
-void                    pciio_piomap_done(pciio_piomap_t);
-caddr_t                 pciio_piotrans_addr(vertex_hdl_t, device_desc_t, pciio_space_t, iopaddr_t, size_t, unsigned);
-caddr_t			pciio_pio_addr(vertex_hdl_t, device_desc_t, pciio_space_t, iopaddr_t, size_t, pciio_piomap_t *, unsigned);
-
-iopaddr_t               pciio_piospace_alloc(vertex_hdl_t, device_desc_t, pciio_space_t, size_t, size_t);
-void                    pciio_piospace_free(vertex_hdl_t, pciio_space_t, iopaddr_t, size_t);
-
-pciio_dmamap_t          pciio_dmamap_alloc(vertex_hdl_t, device_desc_t, size_t, unsigned);
-void                    pciio_dmamap_free(pciio_dmamap_t);
-iopaddr_t               pciio_dmamap_addr(pciio_dmamap_t, paddr_t, size_t);
-void                    pciio_dmamap_done(pciio_dmamap_t);
-iopaddr_t               pciio_dmatrans_addr(vertex_hdl_t, device_desc_t, paddr_t, size_t, unsigned);
-void			pciio_dmamap_drain(pciio_dmamap_t);
-void			pciio_dmaaddr_drain(vertex_hdl_t, paddr_t, size_t);
-void			pciio_dmalist_drain(vertex_hdl_t, alenlist_t);
-iopaddr_t               pciio_dma_addr(vertex_hdl_t, device_desc_t, paddr_t, size_t, pciio_dmamap_t *, unsigned);
-
-pciio_intr_t            pciio_intr_alloc(vertex_hdl_t, device_desc_t, pciio_intr_line_t, vertex_hdl_t);
-void                    pciio_intr_free(pciio_intr_t);
-int                     pciio_intr_connect(pciio_intr_t, intr_func_t, intr_arg_t);
-void                    pciio_intr_disconnect(pciio_intr_t);
-vertex_hdl_t            pciio_intr_cpu_get(pciio_intr_t);
-
-void			pciio_slot_func_to_name(char *, pciio_slot_t, pciio_function_t);
-
-void                    pciio_provider_startup(vertex_hdl_t);
-void                    pciio_provider_shutdown(vertex_hdl_t);
-
-pciio_endian_t          pciio_endian_set(vertex_hdl_t, pciio_endian_t, pciio_endian_t);
-pciio_priority_t        pciio_priority_set(vertex_hdl_t, pciio_priority_t);
-vertex_hdl_t            pciio_intr_dev_get(pciio_intr_t);
-
-vertex_hdl_t            pciio_pio_dev_get(pciio_piomap_t);
-pciio_slot_t            pciio_pio_slot_get(pciio_piomap_t);
-pciio_space_t           pciio_pio_space_get(pciio_piomap_t);
-iopaddr_t               pciio_pio_pciaddr_get(pciio_piomap_t);
-ulong                   pciio_pio_mapsz_get(pciio_piomap_t);
-caddr_t                 pciio_pio_kvaddr_get(pciio_piomap_t);
-
-vertex_hdl_t            pciio_dma_dev_get(pciio_dmamap_t);
-pciio_slot_t            pciio_dma_slot_get(pciio_dmamap_t);
-
-pciio_info_t            pciio_info_chk(vertex_hdl_t);
-pciio_info_t            pciio_info_get(vertex_hdl_t);
-void                    pciio_info_set(vertex_hdl_t, pciio_info_t);
-vertex_hdl_t            pciio_info_dev_get(pciio_info_t);
-pciio_slot_t            pciio_info_slot_get(pciio_info_t);
-pciio_function_t        pciio_info_function_get(pciio_info_t);
-pciio_vendor_id_t       pciio_info_vendor_id_get(pciio_info_t);
-pciio_device_id_t       pciio_info_device_id_get(pciio_info_t);
-vertex_hdl_t            pciio_info_master_get(pciio_info_t);
-arbitrary_info_t        pciio_info_mfast_get(pciio_info_t);
-pciio_provider_t       *pciio_info_pops_get(pciio_info_t);
-error_handler_f	       *pciio_info_efunc_get(pciio_info_t);
-error_handler_arg_t    *pciio_info_einfo_get(pciio_info_t);
-pciio_space_t		pciio_info_bar_space_get(pciio_info_t, int);
-iopaddr_t		pciio_info_bar_base_get(pciio_info_t, int);
-size_t			pciio_info_bar_size_get(pciio_info_t, int);
-iopaddr_t		pciio_info_rom_base_get(pciio_info_t);
-size_t			pciio_info_rom_size_get(pciio_info_t);
-
-int                     pciio_attach(vertex_hdl_t);
-
-void                    pciio_provider_register(vertex_hdl_t, pciio_provider_t *pciio_fns);
-void                    pciio_provider_unregister(vertex_hdl_t);
-pciio_provider_t       *pciio_provider_fns_get(vertex_hdl_t);
-
-int                     pciio_driver_register(pciio_vendor_id_t, pciio_device_id_t, char *driver_prefix, unsigned);
-
-vertex_hdl_t            pciio_device_register(vertex_hdl_t, vertex_hdl_t, pciio_slot_t, pciio_function_t, pciio_vendor_id_t, pciio_device_id_t);
-
-void			pciio_device_unregister(vertex_hdl_t);
-pciio_info_t		pciio_device_info_new(pciio_info_t, vertex_hdl_t, pciio_slot_t, pciio_function_t, pciio_vendor_id_t, pciio_device_id_t);
-void			pciio_device_info_free(pciio_info_t);
-vertex_hdl_t		pciio_device_info_register(vertex_hdl_t, pciio_info_t);
-void			pciio_device_info_unregister(vertex_hdl_t, pciio_info_t);
-int                     pciio_device_attach(vertex_hdl_t, int);
-int			pciio_device_detach(vertex_hdl_t, int);
-void                    pciio_error_register(vertex_hdl_t, error_handler_f *, error_handler_arg_t);
-
-int                     pciio_reset(vertex_hdl_t);
-int                     pciio_write_gather_flush(vertex_hdl_t);
-int                     pciio_slot_inuse(vertex_hdl_t);
 
 /* =====================================================================
  *    Provider Function Location
@@ -238,9 +28,7 @@ int                     pciio_slot_inuse(vertex_hdl_t);
  *      appropriately named member.
  */
 
-#if !defined(DEV_FUNC)
-
-static pciio_provider_t *
+pciio_provider_t *
 pciio_to_provider_fns(vertex_hdl_t dev)
 {
     pciio_info_t            card_info;
@@ -261,13 +49,10 @@ pciio_to_provider_fns(vertex_hdl_t dev)
 	}
     }
 
-    if (provider_fns == NULL)
-#if defined(SUPPORT_PRINTING_V_FORMAT)
-	PRINT_PANIC("%v: provider_fns == NULL", dev);
-#else
-	PRINT_PANIC("0x%p: provider_fns == NULL", (void *)dev);
-#endif
-
+    if (provider_fns == NULL) {
+	char devname[MAXDEVNAME];
+	panic("%s: provider_fns == NULL", vertex_to_name(dev, devname, MAXDEVNAME));
+    }
     return provider_fns;
 
 }
@@ -276,7 +61,6 @@ pciio_to_provider_fns(vertex_hdl_t dev)
 #define CAST_PIOMAP(x)		((pciio_piomap_t)(x))
 #define CAST_DMAMAP(x)		((pciio_dmamap_t)(x))
 #define CAST_INTR(x)		((pciio_intr_t)(x))
-#endif
 
 /*
  * Many functions are not passed their vertex
@@ -396,8 +180,8 @@ pciio_piospace_alloc(vertex_hdl_t dev,	/* Device requiring space */
 		     size_t byte_count,	/* Size of mapping */
 		     size_t align)
 {					/* Alignment needed */
-    if (align < NBPP)
-	align = NBPP;
+    if (align < PAGE_SIZE)
+	align = PAGE_SIZE;
     return DEV_FUNC(dev, piospace_alloc)
 	(dev, dev_desc, space, byte_count, align);
 }
@@ -753,50 +537,6 @@ pciio_provider_shutdown(vertex_hdl_t pciio_provider)
 }
 
 /*
- * Specify endianness constraints.  The driver tells us what the device
- * does and how it would like to see things in memory.  We reply with
- * how things will actually appear in memory.
- */
-pciio_endian_t
-pciio_endian_set(vertex_hdl_t dev,
-		 pciio_endian_t device_end,
-		 pciio_endian_t desired_end)
-{
-    ASSERT((device_end == PCIDMA_ENDIAN_BIG) || (device_end == PCIDMA_ENDIAN_LITTLE));
-    ASSERT((desired_end == PCIDMA_ENDIAN_BIG) || (desired_end == PCIDMA_ENDIAN_LITTLE));
-
-#if DEBUG
-#if defined(SUPPORT_PRINTING_V_FORMAT)
-    printk(KERN_ALERT  "%v: pciio_endian_set is going away.\n"
-	    "\tplease use PCIIO_BYTE_STREAM or PCIIO_WORD_VALUES in your\n"
-	    "\tpciio_dmamap_alloc and pciio_dmatrans calls instead.\n",
-	    dev);
-#else
-    printk(KERN_ALERT  "0x%x: pciio_endian_set is going away.\n"
-	    "\tplease use PCIIO_BYTE_STREAM or PCIIO_WORD_VALUES in your\n"
-	    "\tpciio_dmamap_alloc and pciio_dmatrans calls instead.\n",
-	    dev);
-#endif
-#endif
-
-    return DEV_FUNC(dev, endian_set)
-	(dev, device_end, desired_end);
-}
-
-/*
- * Specify PCI arbitration priority.
- */
-pciio_priority_t
-pciio_priority_set(vertex_hdl_t dev,
-		   pciio_priority_t device_prio)
-{
-    ASSERT((device_prio == PCI_PRIO_HIGH) || (device_prio == PCI_PRIO_LOW));
-
-    return DEV_FUNC(dev, priority_set)
-	(dev, device_prio);
-}
-
-/*
  * Read value of configuration register
  */
 uint64_t
@@ -865,71 +605,6 @@ pciio_reset(vertex_hdl_t dev)
     return DEV_FUNC(dev, reset) (dev);
 }
 
-/*
- * flush write gather buffers
- */
-int
-pciio_write_gather_flush(vertex_hdl_t dev)
-{
-    return DEV_FUNC(dev, write_gather_flush) (dev);
-}
-
-vertex_hdl_t
-pciio_intr_dev_get(pciio_intr_t pciio_intr)
-{
-    return (pciio_intr->pi_dev);
-}
-
-/****** Generic crosstalk pio interfaces ******/
-vertex_hdl_t
-pciio_pio_dev_get(pciio_piomap_t pciio_piomap)
-{
-    return (pciio_piomap->pp_dev);
-}
-
-pciio_slot_t
-pciio_pio_slot_get(pciio_piomap_t pciio_piomap)
-{
-    return (pciio_piomap->pp_slot);
-}
-
-pciio_space_t
-pciio_pio_space_get(pciio_piomap_t pciio_piomap)
-{
-    return (pciio_piomap->pp_space);
-}
-
-iopaddr_t
-pciio_pio_pciaddr_get(pciio_piomap_t pciio_piomap)
-{
-    return (pciio_piomap->pp_pciaddr);
-}
-
-ulong
-pciio_pio_mapsz_get(pciio_piomap_t pciio_piomap)
-{
-    return (pciio_piomap->pp_mapsz);
-}
-
-caddr_t
-pciio_pio_kvaddr_get(pciio_piomap_t pciio_piomap)
-{
-    return (pciio_piomap->pp_kvaddr);
-}
-
-/****** Generic crosstalk dma interfaces ******/
-vertex_hdl_t
-pciio_dma_dev_get(pciio_dmamap_t pciio_dmamap)
-{
-    return (pciio_dmamap->pd_dev);
-}
-
-pciio_slot_t
-pciio_dma_slot_get(pciio_dmamap_t pciio_dmamap)
-{
-    return (pciio_dmamap->pd_slot);
-}
-
 /****** Generic pci slot information interfaces ******/
 
 pciio_info_t
@@ -979,6 +654,13 @@ pciio_info_dev_get(pciio_info_t pciio_info)
     return (pciio_info->c_vertex);
 }
 
+/*ARGSUSED*/
+pciio_bus_t
+pciio_info_bus_get(pciio_info_t pciio_info)
+{
+    return (pciio_info->c_bus);
+}
+
 pciio_slot_t
 pciio_info_slot_get(pciio_info_t pciio_info)
 {
@@ -1021,48 +703,29 @@ pciio_info_pops_get(pciio_info_t pciio_info)
     return (pciio_info->c_pops);
 }
 
-error_handler_f	       *
-pciio_info_efunc_get(pciio_info_t pciio_info)
+int
+pciio_businfo_multi_master_get(pciio_businfo_t businfo)
 {
-    return (pciio_info->c_efunc);
+    return businfo->bi_multi_master;
 }
 
-error_handler_arg_t    *
-pciio_info_einfo_get(pciio_info_t pciio_info)
+pciio_asic_type_t
+pciio_businfo_asic_type_get(pciio_businfo_t businfo)
 {
-    return (pciio_info->c_einfo);
+    return businfo->bi_asic_type;
 }
 
-pciio_space_t
-pciio_info_bar_space_get(pciio_info_t info, int win)
+pciio_bus_type_t
+pciio_businfo_bus_type_get(pciio_businfo_t businfo)
 {
-    return info->c_window[win].w_space;
+    return businfo->bi_bus_type;
 }
 
-iopaddr_t
-pciio_info_bar_base_get(pciio_info_t info, int win)
+pciio_bus_speed_t
+pciio_businfo_bus_speed_get(pciio_businfo_t businfo)
 {
-    return info->c_window[win].w_base;
+    return businfo->bi_bus_speed;
 }
-
-size_t
-pciio_info_bar_size_get(pciio_info_t info, int win)
-{
-    return info->c_window[win].w_size;
-}
-
-iopaddr_t
-pciio_info_rom_base_get(pciio_info_t info)
-{
-    return info->c_rbase;
-}
-
-size_t
-pciio_info_rom_size_get(pciio_info_t info)
-{
-    return info->c_rsize;
-}
-
 
 /* =====================================================================
  *          GENERIC PCI INITIALIZATION FUNCTIONS
@@ -1077,11 +740,8 @@ int
 pciio_attach(vertex_hdl_t pciio)
 {
 #if DEBUG && ATTACH_DEBUG
-#if defined(SUPPORT_PRINTING_V_FORMAT)
-    printk("%v: pciio_attach\n", pciio);
-#else
-    printk("0x%x: pciio_attach\n", pciio);
-#endif
+    char devname[MAXDEVNAME];
+    printk("%s: pciio_attach\n", vertex_to_name(pciio, devname, MAXDEVNAME));
 #endif
     return 0;
 }
@@ -1119,37 +779,6 @@ pciio_provider_fns_get(vertex_hdl_t provider)
     return (pciio_provider_t *) ainfo;
 }
 
-/*ARGSUSED4 */
-int
-pciio_driver_register(
-			 pciio_vendor_id_t vendor_id,
-			 pciio_device_id_t device_id,
-			 char *driver_prefix,
-			 unsigned flags)
-{
-	return(0);
-}
-
-vertex_hdl_t
-pciio_device_register(
-		vertex_hdl_t connectpt,	/* vertex for /hw/.../pciio/%d */
-		vertex_hdl_t master,	/* card's master ASIC (PCI provider) */
-		pciio_slot_t slot,	/* card's slot */
-		pciio_function_t func,	/* card's func */
-		pciio_vendor_id_t vendor_id,
-		pciio_device_id_t device_id)
-{
-    return pciio_device_info_register
-	(connectpt, pciio_device_info_new (NULL, master, slot, func,
-					   vendor_id, device_id));
-}
-
-void
-pciio_device_unregister(vertex_hdl_t pconn)
-{
-    DEV_FUNC(pconn,device_unregister)(pconn);
-}
-
 pciio_info_t
 pciio_device_info_new(
 		pciio_info_t pciio_info,
@@ -1159,8 +788,11 @@ pciio_device_info_new(
 		pciio_vendor_id_t vendor_id,
 		pciio_device_id_t device_id)
 {
-    if (!pciio_info)
-	NEW(pciio_info);
+    if (!pciio_info) {
+	pciio_info = kmalloc(sizeof (*(pciio_info)), GFP_KERNEL);
+	if ( pciio_info )
+		memset(pciio_info, 0, sizeof (*(pciio_info)));
+    }
     ASSERT(pciio_info != NULL);
 
     pciio_info->c_slot = slot;
@@ -1182,7 +814,7 @@ pciio_device_info_free(pciio_info_t pciio_info)
     /* NOTE : pciio_info is a structure within the pcibr_info
      *	      and not a pointer to memory allocated on the heap !!
      */
-    BZERO((char *)pciio_info,sizeof(pciio_info));
+    memset((char *)pciio_info, 0, sizeof(pciio_info));
 }
 
 vertex_hdl_t
@@ -1293,14 +925,26 @@ pciio_device_win_alloc(struct resource *root_resource,
 {
 
 	struct resource *new_res;
-	int status = 0;
+	int status;
 
-	new_res = (struct resource *) kmalloc( sizeof(struct resource), KM_NOSLEEP);
+	new_res = (struct resource *) kmalloc( sizeof(struct resource), GFP_KERNEL);
+	if (!new_res)
+		return 0;
 
-	status = allocate_resource( root_resource, new_res,
+	if (start > 0) {
+		status = allocate_resource( root_resource, new_res,
+			size, start /* Min start addr. */,
+			(start + size) - 1, 1,
+			NULL, NULL);
+	} else {
+		if (size > align)
+			align = size;
+		status = allocate_resource( root_resource, new_res,
 				    size, align /* Min start addr. */,
 				    root_resource->end, align,
 				    NULL, NULL);
+	}
+
 	if (status) {
 		kfree(new_res);
 		return((iopaddr_t) NULL);
@@ -1326,8 +970,7 @@ pciio_device_win_alloc(struct resource *root_resource,
 void
 pciio_device_win_free(pciio_win_alloc_t win_alloc)
 {
-
-	int status = 0;
+	int status;
 
 	if (win_alloc->wa_resource) {
 		status = release_resource(win_alloc->wa_resource);
@@ -1389,47 +1032,16 @@ pciio_slot_inuse(vertex_hdl_t pconn_vhdl)
 }
 
 int
-pciio_dma_enabled(vertex_hdl_t pconn_vhdl)
-{
-	return DEV_FUNC(pconn_vhdl, dma_enabled)(pconn_vhdl);
-}
-
-int
 pciio_info_type1_get(pciio_info_t pci_info)
 {
-	return(0);
+	return (pci_info->c_type1);
 }
 
-/*
- *  XXX: should probably be called __sn2_pci_rrb_alloc
- */
-/* used by qla1280 */
-int
-snia_pcibr_rrb_alloc(struct pci_dev *pci_dev,
-	int *count_vchan0,
-	int *count_vchan1)
+pciio_businfo_t
+pciio_businfo_get(vertex_hdl_t conn)
 {
-	vertex_hdl_t dev = PCIDEV_VERTEX(pci_dev);
+	pciio_info_t		info;
 
-	return pcibr_rrb_alloc(dev, count_vchan0, count_vchan1);
+	info = pciio_info_get(conn);
+	return DEV_FUNC(conn, businfo_get)(conn);
 }
-EXPORT_SYMBOL(snia_pcibr_rrb_alloc);
-
-/* 
- * XXX: interface should be more like
- *
- *	int __sn2_pci_enable_bwswap(struct pci_dev *dev);
- *	void __sn2_pci_disable_bswap(struct pci_dev *dev);
- */
-/* used by ioc4 ide */
-pciio_endian_t
-snia_pciio_endian_set(struct pci_dev *pci_dev,
-	pciio_endian_t device_end,
-	pciio_endian_t desired_end)
-{
-	vertex_hdl_t dev = PCIDEV_VERTEX(pci_dev);
-	
-	return DEV_FUNC(dev, endian_set)
-		(dev, device_end, desired_end);
-}
-EXPORT_SYMBOL(snia_pciio_endian_set);

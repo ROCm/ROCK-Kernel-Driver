@@ -2156,6 +2156,7 @@ pfm_alloc_fd(struct file **cfile)
 
 	d_add(file->f_dentry, inode);
 	file->f_vfsmnt = mntget(pfmfs_mnt);
+	file->f_mapping = inode->i_mapping;
 
 	file->f_op    = &pfm_file_ops;
 	file->f_mode  = FMODE_READ;

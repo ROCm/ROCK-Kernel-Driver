@@ -120,6 +120,7 @@ int open_private_file(struct file *filp, struct dentry *dentry, int flags)
 	filp->f_mode   = (flags+1) & O_ACCMODE;
 	atomic_set(&filp->f_count, 1);
 	filp->f_dentry = dentry;
+	filp->f_mapping = dentry->d_inode->i_mapping;
 	filp->f_uid    = current->fsuid;
 	filp->f_gid    = current->fsgid;
 	filp->f_op     = dentry->d_inode->i_fop;

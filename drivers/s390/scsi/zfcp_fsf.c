@@ -28,7 +28,7 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_FSF_C_REVISION "$Revision: 1.12 $"
+#define ZFCP_FSF_C_REVISION "$Revision: 1.16 $"
 
 #include "zfcp_ext.h"
 
@@ -101,7 +101,8 @@ zfcp_fsf_req_alloc(struct zfcp_adapter *adapter, u32 fsf_cmd, int kmalloc_flags)
 	case FSF_QTCB_ABORT_FCP_CMND:
 		fsf_req = zfcp_fsf_req_get(kmalloc_flags,
 					   adapter->pool.fcp_command_fsf);
-		if (fsf_req && (fsf_req->status & ZFCP_STATUS_FSFREQ_POOL)) {
+		if (unlikely(fsf_req &&
+		             (fsf_req->status & ZFCP_STATUS_FSFREQ_POOL))) {
 			/*
 			 * watch low mem buffer
 			 * Note: If the command is reset or aborted, two
@@ -116,7 +117,8 @@ zfcp_fsf_req_alloc(struct zfcp_adapter *adapter, u32 fsf_cmd, int kmalloc_flags)
 		}
 #ifdef ZFCP_DEBUG_REQUESTS
 		debug_text_event(adapter->req_dbf, 5, "fsfa_fcp");
-		if (fsf_req && (fsf_req->status & ZFCP_STATUS_FSFREQ_POOL))
+		if (unlikely(fsf_req &&
+		             (fsf_req->status & ZFCP_STATUS_FSFREQ_POOL)))
 			debug_text_event(adapter->req_dbf, 5, "fsfa_pl");
 #endif /* ZFCP_DEBUG_REQUESTS */
 		break;
@@ -158,7 +160,7 @@ zfcp_fsf_req_alloc(struct zfcp_adapter *adapter, u32 fsf_cmd, int kmalloc_flags)
 				"(debug info 0x%x)\n", fsf_cmd);
 	}			//switch(fsf_cmd)
 
-	if (!fsf_req) {
+	if (unlikely(!fsf_req)) {
 		ZFCP_LOG_DEBUG("error: Out of memory. Allocation of FSF "
 			       "request structure failed\n");
 	} else {
@@ -171,7 +173,7 @@ zfcp_fsf_req_alloc(struct zfcp_adapter *adapter, u32 fsf_cmd, int kmalloc_flags)
 
 #ifdef ZFCP_DEBUG_REQUESTS
 	debug_event(adapter->req_dbf, 5, &fsf_req, sizeof (unsigned long));
-	if (fsf_req->qtcb)
+	if (likely(fsf_req->qtcb))
 		debug_event(adapter->req_dbf, 5, &fsf_req->qtcb,
 			    sizeof (unsigned long));
 #endif				/* ZFCP_DEBUG_REQUESTS */
@@ -198,7 +200,7 @@ zfcp_fsf_req_free(struct zfcp_fsf_req *fsf_req)
 
 	case FSF_QTCB_FCP_CMND:
 	case FSF_QTCB_ABORT_FCP_CMND:
-		if (fsf_req->status & ZFCP_STATUS_FSFREQ_POOL) {
+		if (unlikely(fsf_req->status & ZFCP_STATUS_FSFREQ_POOL)) {
 			del_timer(&adapter->pool.fcp_command_fsf_timer);
 			mempool_free(fsf_req, adapter->pool.fcp_command_fsf);
 		} else
@@ -299,7 +301,7 @@ zfcp_fsf_req_complete(struct zfcp_fsf_req *fsf_req)
 	/* do some statistics */
 	atomic_dec(&adapter->fsf_reqs_active);
 
-	if (fsf_req->fsf_command == FSF_QTCB_UNSOLICITED_STATUS) {
+	if (unlikely(fsf_req->fsf_command == FSF_QTCB_UNSOLICITED_STATUS)) {
 		ZFCP_LOG_DEBUG("Status read response received\n");
 		/*
 		 * Note: all cleanup handling is done in the callchain of
@@ -314,7 +316,7 @@ zfcp_fsf_req_complete(struct zfcp_fsf_req *fsf_req)
 	 * fsf_req may be deleted due to waking up functions, so 
 	 * cleanup is saved here and used later 
 	 */
-	if (fsf_req->status & ZFCP_STATUS_FSFREQ_CLEANUP)
+	if (likely(fsf_req->status & ZFCP_STATUS_FSFREQ_CLEANUP))
 		cleanup = 1;
 	else
 		cleanup = 0;
@@ -322,7 +324,7 @@ zfcp_fsf_req_complete(struct zfcp_fsf_req *fsf_req)
 	fsf_req->status |= ZFCP_STATUS_FSFREQ_COMPLETED;
 
 	/* cleanup request if requested by initiator */
-	if (cleanup) {
+	if (likely(cleanup)) {
 		ZFCP_LOG_TRACE("removing FSF request 0x%lx\n",
 			       (unsigned long) fsf_req);
 		/*
@@ -334,6 +336,16 @@ zfcp_fsf_req_complete(struct zfcp_fsf_req *fsf_req)
 		/* notify initiator waiting for the requests completion */
 		ZFCP_LOG_TRACE("waking initiator of FSF request 0x%lx\n",
 			       (unsigned long) fsf_req);
+		/*
+		 * FIXME: Race! We must not access fsf_req here as it might have been
+		 * cleaned up already due to the set ZFCP_STATUS_FSFREQ_COMPLETED
+		 * flag. It's an improbable case. But, we have the same paranoia for
+		 * the cleanup flag already.
+		 * Might better be handled using complete()?
+		 * (setting the flag and doing wakeup ought to be atomic
+		 *  with regard to checking the flag as long as waitqueue is
+		 *  part of the to be released structure)
+		 */
 		wake_up(&fsf_req->completion_wq);
 	}
 
@@ -372,7 +384,7 @@ zfcp_fsf_protstatus_eval(struct zfcp_fsf_req *fsf_req)
 	}
 
 	/* log additional information provided by FSF (if any) */
-	if (fsf_req->qtcb->header.log_length) {
+	if (unlikely(fsf_req->qtcb->header.log_length)) {
 		/* do not trust them ;-) */
 		if (fsf_req->qtcb->header.log_start > ZFCP_QTCB_SIZE) {
 			ZFCP_LOG_NORMAL
@@ -686,7 +698,7 @@ zfcp_fsf_fsfstatus_eval(struct zfcp_fsf_req *fsf_req)
 {
 	int retval = 0;
 
-	if (fsf_req->status & ZFCP_STATUS_FSFREQ_ERROR) {
+	if (unlikely(fsf_req->status & ZFCP_STATUS_FSFREQ_ERROR)) {
 		goto skip_fsfstatus;
 	}
 
@@ -835,7 +847,7 @@ zfcp_fsf_req_dispatch(struct zfcp_fsf_req *fsf_req)
 {
 	int retval = 0;
 
-	if (fsf_req->status & ZFCP_STATUS_FSFREQ_ERROR) {
+	if (unlikely(fsf_req->status & ZFCP_STATUS_FSFREQ_ERROR)) {
 		ZFCP_LOG_TRACE("fsf_req=0x%lx, QTCB=0x%lx\n",
 			       (unsigned long) fsf_req,
 			       (unsigned long) (fsf_req->qtcb));
@@ -1996,6 +2008,20 @@ zfcp_fsf_open_port_handler(struct zfcp_fsf_req *fsf_req)
 				ZFCP_STATUS_PORT_PHYS_OPEN, &port->status);
 		retval = 0;
 		/* check whether D_ID has changed during open */
+		/*
+		 * FIXME: This check is not airtight, as the FCP channel does
+		 * not monitor closures of target port connections caused on
+		 * the remote side. Thus, they might miss out on invalidating
+		 * locally cached WWPNs (and other N_Port parameters) of gone
+		 * target ports. So, our heroic attempt to make things safe
+		 * could be undermined by 'open port' response data tagged with
+		 * obsolete WWPNs. Another reason to monitor potential
+		 * connection closures ourself at least (by interpreting
+		 * incoming ELS' and unsolicited status). It just crosses my
+		 * mind that one should be able to cross-check by means of
+		 * another GID_PN straight after a port has been opened.
+		 * Alternately, an ADISC/PDISC ELS should suffice, as well.
+		 */
 		plogi = (struct fsf_plogi *) fsf_req->qtcb->bottom.support.els;
 		if (!atomic_test_mask(ZFCP_STATUS_PORT_NO_WWPN, &port->status))
 		{
@@ -2398,9 +2424,9 @@ zfcp_fsf_open_unit(struct zfcp_erp_action *erp_action)
 	}
 
 	erp_action->fsf_req->qtcb->header.port_handle =
-	    erp_action->port->handle;
-	*(fcp_lun_t *) & (erp_action->fsf_req->qtcb->bottom.support.fcp_lun)
-	    = erp_action->unit->fcp_lun;
+		erp_action->port->handle;
+	erp_action->fsf_req->qtcb->bottom.support.fcp_lun =
+		erp_action->unit->fcp_lun;
 	atomic_set_mask(ZFCP_STATUS_COMMON_OPENING, &erp_action->unit->status);
 	erp_action->fsf_req->data.open_unit.unit = erp_action->unit;
 	erp_action->fsf_req->erp_action = erp_action;
@@ -2835,7 +2861,7 @@ zfcp_fsf_send_fcp_command_task(struct zfcp_adapter *adapter,
 	retval = zfcp_fsf_req_create(adapter,
 				     FSF_QTCB_FCP_CMND,
 				     &lock_flags, req_flags, &(fsf_req));
-	if (retval < 0) {
+	if (unlikely(retval < 0)) {
 		ZFCP_LOG_DEBUG("error: Out of resources. Could not create an "
 			       "FCP command request for FCP-LUN 0x%Lx "
 			       "connected to the port with WWPN 0x%Lx "
@@ -2928,7 +2954,7 @@ zfcp_fsf_send_fcp_command_task(struct zfcp_adapter *adapter,
 	fcp_cmnd_iu->fcp_lun = unit->fcp_lun;
 
 	/* set task attributes in FCP_CMND IU in QTCB */
-	if (scsi_cmnd->device->simple_tags) {
+	if (likely(scsi_cmnd->device->simple_tags)) {
 		fcp_cmnd_iu->task_attribute = SIMPLE_Q;
 		ZFCP_LOG_TRACE("setting SIMPLE_Q task attribute\n");
 	} else {
@@ -2937,7 +2963,7 @@ zfcp_fsf_send_fcp_command_task(struct zfcp_adapter *adapter,
 	}
 
 	/* set additional length of FCP_CDB in FCP_CMND IU in QTCB, if needed */
-	if (scsi_cmnd->cmd_len > FCP_CDB_LENGTH) {
+	if (unlikely(scsi_cmnd->cmd_len > FCP_CDB_LENGTH)) {
 		fcp_cmnd_iu->add_fcp_cdb_length
 		    = (scsi_cmnd->cmd_len - FCP_CDB_LENGTH) >> 2;
 		ZFCP_LOG_TRACE("SCSI CDB length is 0x%x, "
@@ -2965,9 +2991,9 @@ zfcp_fsf_send_fcp_command_task(struct zfcp_adapter *adapter,
 	/* Note: >= and not = because the combined scatter-gather entries
 	 * may be larger than request_bufflen according to the mailing list
 	 */
-	if (real_bytes >= scsi_cmnd->request_bufflen) {
+	if (likely(real_bytes >= scsi_cmnd->request_bufflen)) {
 		ZFCP_LOG_TRACE("Data fits\n");
-	} else if (real_bytes == 0) {
+	} else if (likely(real_bytes == 0)) {
 		ZFCP_LOG_DEBUG("Data did not fit into available buffer(s), "
 			       "waiting for more...\n");
 		retval = -EIO;
@@ -2996,7 +3022,7 @@ zfcp_fsf_send_fcp_command_task(struct zfcp_adapter *adapter,
 	 *  covered by an SBALE)
 	 */
 	retval = zfcp_fsf_req_send(fsf_req, NULL);
-	if (retval < 0) {
+	if (unlikely(retval < 0)) {
 		ZFCP_LOG_INFO("error: Could not send an FCP command request "
 			      "for a command on the adapter %s, "
 			      "port WWPN 0x%Lx and unit LUN 0x%Lx\n",
@@ -3139,12 +3165,12 @@ zfcp_fsf_send_fcp_command_handler(struct zfcp_fsf_req *fsf_req)
 	int retval = -EINVAL;
 	struct zfcp_unit *unit;
 
-	if (fsf_req->status & ZFCP_STATUS_FSFREQ_TASK_MANAGEMENT)
+	if (unlikely(fsf_req->status & ZFCP_STATUS_FSFREQ_TASK_MANAGEMENT))
 		unit = fsf_req->data.send_fcp_command_task_management.unit;
 	else
 		unit = fsf_req->data.send_fcp_command_task.unit;
 
-	if (fsf_req->status & ZFCP_STATUS_FSFREQ_ERROR) {
+	if (unlikely(fsf_req->status & ZFCP_STATUS_FSFREQ_ERROR)) {
 		/* go directly to calls of special handlers */
 		goto skip_fsfstatus;
 	}
@@ -3445,7 +3471,6 @@ static int
 zfcp_fsf_send_fcp_command_task_handler(struct zfcp_fsf_req *fsf_req)
 {
 	int retval = 0;
-	struct zfcp_adapter *adapter = fsf_req->adapter;
 
 	Scsi_Cmnd *scpnt;
 	struct fcp_rsp_iu *fcp_rsp_iu = (struct fcp_rsp_iu *)
@@ -3459,14 +3484,14 @@ zfcp_fsf_send_fcp_command_task_handler(struct zfcp_fsf_req *fsf_req)
 
 	read_lock_irqsave(&fsf_req->adapter->abort_lock, flags);
 	scpnt = fsf_req->data.send_fcp_command_task.scsi_cmnd;
-	if (!scpnt) {
+	if (unlikely(!scpnt)) {
 		ZFCP_LOG_DEBUG
 		    ("Command with fsf_req 0x%lx is not associated to "
 		     "a scsi command anymore. Aborted?\n",
 		     (unsigned long) fsf_req);
 		goto out;
 	}
-	if (fsf_req->status & ZFCP_STATUS_FSFREQ_ABORTED) {
+	if (unlikely(fsf_req->status & ZFCP_STATUS_FSFREQ_ABORTED)) {
 		/* FIXME: (design) mid-layer should handle DID_ABORT like
 		 *        DID_SOFT_ERROR by retrying the request for devices
 		 *        that allow retries.
@@ -3477,7 +3502,7 @@ zfcp_fsf_send_fcp_command_task_handler(struct zfcp_fsf_req *fsf_req)
 		goto skip_fsfstatus;
 	}
 
-	if (fsf_req->status & ZFCP_STATUS_FSFREQ_ERROR) {
+	if (unlikely(fsf_req->status & ZFCP_STATUS_FSFREQ_ERROR)) {
 		ZFCP_LOG_DEBUG("Setting DID_ERROR\n");
 		set_host_byte(&scpnt->result, DID_ERROR);
 		goto skip_fsfstatus;
@@ -3491,7 +3516,7 @@ zfcp_fsf_send_fcp_command_task_handler(struct zfcp_fsf_req *fsf_req)
 	 * of result in SCSI command
 	 */
 	scpnt->result |= fcp_rsp_iu->scsi_status;
-	if (fcp_rsp_iu->scsi_status) {
+	if (unlikely(fcp_rsp_iu->scsi_status)) {
 		/* DEBUG */
 		ZFCP_LOG_NORMAL("status for SCSI Command:\n");
 		ZFCP_HEX_DUMP(ZFCP_LOG_LEVEL_NORMAL,
@@ -3507,7 +3532,7 @@ zfcp_fsf_send_fcp_command_task_handler(struct zfcp_fsf_req *fsf_req)
 	}
 
 	/* check FCP_RSP_INFO */
-	if (fcp_rsp_iu->validity.bits.fcp_rsp_len_valid) {
+	if (unlikely(fcp_rsp_iu->validity.bits.fcp_rsp_len_valid)) {
 		ZFCP_LOG_DEBUG("rsp_len is valid\n");
 		switch (fcp_rsp_info[3]) {
 		case RSP_CODE_GOOD:
@@ -3600,7 +3625,7 @@ zfcp_fsf_send_fcp_command_task_handler(struct zfcp_fsf_req *fsf_req)
 	}
 
 	/* check for sense data */
-	if (fcp_rsp_iu->validity.bits.fcp_sns_len_valid) {
+	if (unlikely(fcp_rsp_iu->validity.bits.fcp_sns_len_valid)) {
 		sns_len = FSF_FCP_RSP_SIZE -
 		    sizeof (struct fcp_rsp_iu) + fcp_rsp_iu->fcp_rsp_len;
 		ZFCP_LOG_TRACE("room for %i bytes sense data in QTCB\n",
@@ -3623,7 +3648,7 @@ zfcp_fsf_send_fcp_command_task_handler(struct zfcp_fsf_req *fsf_req)
 	}
 
 	/* check for overrun */
-	if (fcp_rsp_iu->validity.bits.fcp_resid_over) {
+	if (unlikely(fcp_rsp_iu->validity.bits.fcp_resid_over)) {
 		ZFCP_LOG_INFO("A data overrun was detected for a command. "
 			      "This happened for a command to the unit "
 			      "with FCP LUN 0x%Lx connected to the "
@@ -3638,7 +3663,7 @@ zfcp_fsf_send_fcp_command_task_handler(struct zfcp_fsf_req *fsf_req)
 	}
 
 	/* check for underrun */
-	if (fcp_rsp_iu->validity.bits.fcp_resid_under) {
+	if (unlikely(fcp_rsp_iu->validity.bits.fcp_resid_under)) {
 		ZFCP_LOG_DEBUG("A data underrun was detected for a command. "
 			       "This happened for a command to the unit "
 			       "with FCP LUN 0x%Lx connected to the "
@@ -3755,9 +3780,6 @@ zfcp_fsf_send_fcp_command_task_handler(struct zfcp_fsf_req *fsf_req)
 	 * the new eh
 	 */
 	/* always call back */
-	(scpnt->scsi_done) (scpnt);
-	atomic_dec(&adapter->scsi_reqs_active);
-	wake_up(&adapter->scsi_reqs_active_wq);
 #ifdef ZFCP_DEBUG_REQUESTS
 	debug_text_event(fsf_req->adapter->req_dbf, 2, "ok_done:");
 	debug_event(fsf_req->adapter->req_dbf, 2, &scpnt,
@@ -3768,8 +3790,6 @@ zfcp_fsf_send_fcp_command_task_handler(struct zfcp_fsf_req *fsf_req)
 		    sizeof (unsigned long));
 #endif /* ZFCP_DEBUG_REQUESTS */
 	(scpnt->scsi_done) (scpnt);
-	atomic_dec(&adapter->scsi_reqs_active);
-	wake_up(&adapter->scsi_reqs_active_wq);
 	/*
 	 * We must hold this lock until scsi_done has been called.
 	 * Otherwise we may call scsi_done after abort regarding this
@@ -3904,7 +3924,7 @@ zfcp_fsf_req_create_sbal_check(unsigned long *flags,
 			       struct zfcp_qdio_queue *queue, int needed)
 {
 	write_lock_irqsave(&queue->queue_lock, *flags);
-	if (atomic_read(&queue->free_count) >= needed)
+	if (likely(atomic_read(&queue->free_count) >= needed))
 		return 1;
 	write_unlock_irqrestore(&queue->queue_lock, *flags);
 	return 0;
@@ -3942,7 +3962,7 @@ zfcp_fsf_req_create(struct zfcp_adapter *adapter,
 
 	/* allocate new FSF request */
 	fsf_req = zfcp_fsf_req_alloc(adapter, fsf_cmd, GFP_ATOMIC);
-	if (!fsf_req) {
+	if (unlikely(!fsf_req)) {
 		ZFCP_LOG_DEBUG("error: Could not put an FSF request into"
 			       "the outbound (send) queue.\n");
 		retval = -ENOMEM;
@@ -3960,11 +3980,11 @@ zfcp_fsf_req_create(struct zfcp_adapter *adapter,
 	fsf_req->specific_magic = ZFCP_MAGIC_FSFREQ;
 
 	fsf_req->fsf_command = fsf_cmd;
-	if (req_flags & ZFCP_REQ_AUTO_CLEANUP)
+	if (likely(req_flags & ZFCP_REQ_AUTO_CLEANUP))
 		fsf_req->status |= ZFCP_STATUS_FSFREQ_CLEANUP;
 
 	/* initialize QTCB */
-	if (fsf_cmd != FSF_QTCB_UNSOLICITED_STATUS) {
+	if (likely(fsf_cmd != FSF_QTCB_UNSOLICITED_STATUS)) {
 		ZFCP_LOG_TRACE("fsf_req->qtcb=0x%lx\n",
 			       (unsigned long) fsf_req->qtcb);
 		fsf_req->qtcb->prefix.req_id = (unsigned long) fsf_req;
@@ -3983,7 +4003,7 @@ zfcp_fsf_req_create(struct zfcp_adapter *adapter,
 	 * try to get needed SBALs in request queue (get queue lock on success)
 	 */
 	ZFCP_LOG_TRACE("try to get free BUFFER in request queue\n");
-	if (req_flags & ZFCP_WAIT_FOR_SBAL) {
+	if (unlikely(req_flags & ZFCP_WAIT_FOR_SBAL)) {
 		timeout = ZFCP_SBAL_TIMEOUT;
 		ZFCP_WAIT_EVENT_TIMEOUT(adapter->request_wq,
 					timeout,
@@ -4009,7 +4029,7 @@ zfcp_fsf_req_create(struct zfcp_adapter *adapter,
 	/* setup common SBALE fields */
 	buffere[0].addr = fsf_req;
 	buffere[0].flags |= SBAL_FLAGS0_COMMAND;
-	if (fsf_cmd != FSF_QTCB_UNSOLICITED_STATUS) {
+	if (likely(fsf_cmd != FSF_QTCB_UNSOLICITED_STATUS)) {
 		buffere[1].addr = (void *) fsf_req->qtcb;
 		buffere[1].length = ZFCP_QTCB_SIZE;
 	}
@@ -4116,7 +4136,7 @@ zfcp_fsf_req_send(struct zfcp_fsf_req *fsf_req, struct timer_list *timer)
 		      buffere->length);
 
 	/* set sequence counter in QTCB */
-	if (fsf_req->qtcb) {
+	if (likely(fsf_req->qtcb)) {
 		fsf_req->qtcb->prefix.req_seq_no = adapter->fsf_req_seq_no;
 		fsf_req->seq_no = adapter->fsf_req_seq_no;
 		ZFCP_LOG_TRACE("FSF request 0x%lx of adapter 0x%lx gets "
@@ -4133,7 +4153,7 @@ zfcp_fsf_req_send(struct zfcp_fsf_req *fsf_req, struct timer_list *timer)
 	write_unlock_irqrestore(&adapter->fsf_req_list_lock, flags);
 
 	/* figure out expiration time of timeout and start timeout */
-	if (timer) {
+	if (unlikely(timer)) {
 		timer->expires += jiffies;
 		add_timer(timer);
 	}
@@ -4167,7 +4187,7 @@ zfcp_fsf_req_send(struct zfcp_fsf_req *fsf_req, struct timer_list *timer)
 			 QDIO_FLAG_SYNC_OUTPUT,
 			 0, fsf_req->sbal_index, fsf_req->sbal_count, NULL);
 
-	if (retval) {
+	if (unlikely(retval)) {
 		/* Queues are down..... */
 		retval = -EIO;
 		/*
@@ -4198,7 +4218,7 @@ zfcp_fsf_req_send(struct zfcp_fsf_req *fsf_req, struct timer_list *timer)
 		debug_text_event(adapter->req_dbf, 1, "o:a/seq");
 		debug_event(adapter->req_dbf, 1, &fsf_req,
 			    sizeof (unsigned long));
-		if (inc_seq_no) {
+		if (likely(inc_seq_no)) {
 			debug_event(adapter->req_dbf, 1,
 				    &adapter->fsf_req_seq_no, sizeof (u32));
 		} else {
@@ -4213,7 +4233,7 @@ zfcp_fsf_req_send(struct zfcp_fsf_req *fsf_req, struct timer_list *timer)
 		 * otherwise,
 		 */
 		/* Don't increase for unsolicited status */
-		if (inc_seq_no) {
+		if (likely(inc_seq_no)) {
 			adapter->fsf_req_seq_no++;
 			ZFCP_LOG_TRACE
 			    ("FSF sequence counter value of adapter 0x%lx "
@@ -4263,16 +4283,16 @@ zfcp_fsf_req_get(int kmalloc_flags, mempool_t * pool)
 	struct zfcp_fsf_req *fsf_req;
 
 	fsf_req = kmalloc(ZFCP_QTCB_AND_REQ_SIZE, kmalloc_flags);
-	if (fsf_req) {
+	if (likely(fsf_req)) {
 		memset(fsf_req, 0, ZFCP_QTCB_AND_REQ_SIZE);
 	} else {
 		fsf_req = mempool_alloc(pool, kmalloc_flags);
-		if (fsf_req) {
+		if (likely(fsf_req)) {
 			memset(fsf_req, 0, ZFCP_QTCB_AND_REQ_SIZE);
 			fsf_req->status |= ZFCP_STATUS_FSFREQ_POOL;
 		}
 	}
-	if (fsf_req)
+	if (likely(fsf_req))
 		fsf_req->qtcb =
 		    (struct fsf_qtcb *) ((unsigned long) fsf_req +
 					 sizeof (struct zfcp_fsf_req));

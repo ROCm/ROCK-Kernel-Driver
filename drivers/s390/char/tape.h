@@ -12,17 +12,31 @@
 #ifndef _TAPE_H
 #define _TAPE_H
 
+#include <asm/ccwdev.h>
+#include <asm/debug.h>
+#include <asm/idals.h>
 #include <linux/config.h>
 #include <linux/blkdev.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mtio.h>
 #include <linux/interrupt.h>
-#include <asm/ccwdev.h>
-#include <asm/debug.h>
-#include <asm/idals.h>
+#include <linux/workqueue.h>
 
 struct gendisk;
+
+/*
+ * Define DBF_LIKE_HELL for lots of messages in the debug feature.
+ */
+#define DBF_LIKE_HELL
+#ifdef  DBF_LIKE_HELL
+#define DBF_LH(level, str, ...) \
+do { \
+	debug_sprintf_event(tape_dbf_area, level, str, ## __VA_ARGS__); \
+} while (0)
+#else
+#define DBF_LH(level, str, ...) do {} while(0)
+#endif
 
 /*
  * macros s390 debug feature (dbf)
@@ -46,7 +60,11 @@ do { \
 #define TAPEBLOCK_HSEC_S2B	2
 #define TAPEBLOCK_RETRIES	5
 
-#define TAPE_BUSY(td) (td->treq != NULL)
+/* Event types for hotplug */
+#define TAPE_HOTPLUG_CHAR_ADD     1
+#define TAPE_HOTPLUG_BLOCK_ADD    2
+#define TAPE_HOTPLUG_CHAR_REMOVE  3
+#define TAPE_HOTPLUG_BLOCK_REMOVE 4
 
 enum tape_medium_state {
 	MS_UNKNOWN,
@@ -58,6 +76,7 @@ enum tape_medium_state {
 enum tape_state {
 	TS_UNUSED=0,
 	TS_IN_USE,
+	TS_BLKUSE,
 	TS_INIT,
 	TS_NOT_OPER,
 	TS_SIZE
@@ -130,8 +149,6 @@ struct tape_discipline {
 	struct module *owner;
 	int  (*setup_device)(struct tape_device *);
 	void (*cleanup_device)(struct tape_device *);
-	int (*assign)(struct tape_device *);
-	int (*unassign)(struct tape_device *);
 	int (*irq)(struct tape_device *, struct tape_request *, struct irb *);
 	struct tape_request *(*read_block)(struct tape_device *, size_t);
 	struct tape_request *(*write_block)(struct tape_device *, size_t);
@@ -168,48 +185,60 @@ struct tape_char_data {
 struct tape_blk_data
 {
 	/* Block device request queue. */
-	request_queue_t *request_queue;
-	spinlock_t request_queue_lock;
-	/* Block frontend tasklet */
-	struct tasklet_struct tasklet;
+	request_queue_t *	request_queue;
+	spinlock_t		request_queue_lock;
+
+	/* Task to move entries from block request to CCS request queue. */
+	struct work_struct	requeue_task;
+	atomic_t		requeue_scheduled;
+
 	/* Current position on the tape. */
-	long block_position;
-	struct gendisk *disk;
+	long			block_position;
+	int			medium_changed;
+	struct gendisk *	disk;
 };
 #endif
 
 /* Tape Info */
 struct tape_device {
 	/* entry in tape_device_list */
-	struct list_head node;
+	struct list_head		node;
 
-	struct ccw_device *cdev;
+	struct ccw_device *		cdev;
 
 	/* Device discipline information. */
-	struct tape_discipline *discipline;
-	void *discdata;
+	struct tape_discipline *	discipline;
+	void *				discdata;
 
 	/* Generic status flags */
-	long                    tape_generic_status;
+	long				tape_generic_status;
 
 	/* Device state information. */
-	wait_queue_head_t       state_change_wq;
-	enum tape_state         tape_state;
-	enum tape_medium_state  medium_state;
-	unsigned char          *modeset_byte;
+	wait_queue_head_t		state_change_wq;
+	enum tape_state			tape_state;
+	enum tape_medium_state		medium_state;
+	unsigned char *			modeset_byte;
 
 	/* Reference count. */
-	atomic_t ref_count;
+	atomic_t			ref_count;
 
 	/* Request queue. */
-	struct list_head req_queue;
+	struct list_head		req_queue;
 
-	int first_minor;	       /* each tape device has two minors */
+	/* Each tape device has (currently) two minor numbers. */
+	int				first_minor;
+
+	/* Number of tapemarks required for correct termination. */
+	int				required_tapemarks;
+
+	/* Block ID of the BOF */
+	unsigned int			bof;
+
 	/* Character device frontend data */
-	struct tape_char_data char_data;
+	struct tape_char_data		char_data;
 #ifdef CONFIG_S390_TAPE_BLOCK
 	/* Block dev frontend data */
-	struct tape_blk_data blk_data;
+	struct tape_blk_data		blk_data;
 #endif
 };
 
@@ -219,6 +248,7 @@ extern void tape_free_request(struct tape_request *);
 extern int tape_do_io(struct tape_device *, struct tape_request *);
 extern int tape_do_io_async(struct tape_device *, struct tape_request *);
 extern int tape_do_io_interruptible(struct tape_device *, struct tape_request *);
+void tape_hotplug_event(struct tape_device *, int major, int action);
 
 static inline int
 tape_do_io_free(struct tape_device *device, struct tape_request *request)
@@ -234,19 +264,19 @@ extern int tape_oper_handler(int irq, int status);
 extern void tape_noper_handler(int irq, int status);
 extern int tape_open(struct tape_device *);
 extern int tape_release(struct tape_device *);
-extern int tape_assign(struct tape_device *);
-extern int tape_unassign(struct tape_device *);
 extern int tape_mtop(struct tape_device *, int, int);
+extern void tape_state_set(struct tape_device *, enum tape_state);
 
 extern int tape_enable_device(struct tape_device *, struct tape_discipline *);
 extern void tape_disable_device(struct tape_device *device);
 
 /* Externals from tape_devmap.c */
 extern int tape_generic_probe(struct ccw_device *);
-extern int tape_generic_remove(struct ccw_device *);
+extern void tape_generic_remove(struct ccw_device *);
 
 extern struct tape_device *tape_get_device(int devindex);
-extern void tape_put_device(struct tape_device *);
+extern struct tape_device *tape_get_device_reference(struct tape_device *);
+extern struct tape_device *tape_put_device(struct tape_device *);
 
 /* Externals from tape_char.c */
 extern int tapechar_init(void);

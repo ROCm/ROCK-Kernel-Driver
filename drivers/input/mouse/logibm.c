@@ -36,6 +36,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/delay.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
@@ -70,9 +71,10 @@ MODULE_LICENSE("GPL");
 
 #define LOGIBM_IRQ		5
 
-MODULE_PARM(logibm_irq, "i");
-
 static int logibm_irq = LOGIBM_IRQ;
+module_param_named(irq, logibm_irq, uint, 0);
+MODULE_PARM_DESC(irq, "IRQ number (5=default)");
+
 static int logibm_used = 0;
 
 static irqreturn_t logibm_interrupt(int irq, void *dev_id, struct pt_regs *regs);
@@ -141,17 +143,6 @@ static irqreturn_t logibm_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	outb(LOGIBM_ENABLE_IRQ, LOGIBM_CONTROL_PORT);
 	return IRQ_HANDLED;
 }
-
-#ifndef MODULE
-static int __init logibm_setup(char *str)
-{
-        int ints[4];
-        str = get_options(str, ARRAY_SIZE(ints), ints);
-        if (ints[0] > 0) logibm_irq = ints[1];
-        return 1;
-}
-__setup("logibm_irq=", logibm_setup);
-#endif
 
 static int __init logibm_init(void)
 {

@@ -81,7 +81,8 @@ proc_dodebug(ctl_table *table, int write, struct file *file,
 
 		if (left > sizeof(tmpbuf) - 1)
 			return -EINVAL;
-		copy_from_user(tmpbuf, p, left);
+		if (copy_from_user(tmpbuf, p, left))
+			return -EFAULT;
 		tmpbuf[left] = '\0';
 
 		for (p = tmpbuf, value = 0; '0' <= *p && *p <= '9'; p++, left--)
@@ -101,9 +102,11 @@ proc_dodebug(ctl_table *table, int write, struct file *file,
 		len = sprintf(tmpbuf, "%d", *(unsigned int *) table->data);
 		if (len > left)
 			len = left;
-		__copy_to_user(buffer, tmpbuf, len);
+		if (__copy_to_user(buffer, tmpbuf, len))
+			return -EFAULT;
 		if ((left -= len) > 0) {
-			put_user('\n', (char *)buffer + len);
+			if (put_user('\n', (char *)buffer + len))
+				return -EFAULT;
 			left--;
 		}
 	}

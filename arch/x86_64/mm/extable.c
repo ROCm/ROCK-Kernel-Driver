@@ -36,10 +36,9 @@ search_extable(const struct exception_table_entry *first,
 
 /* When an exception handler is in an non standard section (like __init)
    the fixup table can end up unordered. Fix that here. */
-static __init int check_extable(void)
+void sort_extable(struct exception_table_entry *start,
+		  struct exception_table_entry *finish)
 {
-	extern struct exception_table_entry __start___ex_table[];
-	extern struct exception_table_entry  __stop___ex_table[];
 	struct exception_table_entry *e;
 	int change;
 
@@ -47,7 +46,7 @@ static __init int check_extable(void)
 	   best (and simplest) sort algorithm. */
 	do {
 		change = 0;
-		for (e = __start___ex_table+1; e < __stop___ex_table; e++) {
+		for (e = start+1; e < finish; e++) {
 			if (e->insn < e[-1].insn) {
 				struct exception_table_entry tmp = e[-1];
 				e[-1] = e[0];
@@ -58,4 +57,3 @@ static __init int check_extable(void)
 	} while (change != 0);
 	return 0;
 }
-core_initcall(check_extable);

@@ -27,9 +27,10 @@ utils	:= $(boot)/utils
 bootlib	:= $(boot)/lib
 images	:= $(boot)/images
 simple	:= $(boot)/simple
+of1275	:= $(boot)/of1275
 
 OBJCOPYFLAGS	:= -O elf32-powerpc
-LIBS 		:= $(common)/lib.a $(bootlib)/lib.a
+LIBS 		:= $(common)/lib.a $(bootlib)/lib.a $(of1275)/lib.a
 
 targets		:= $(boot-y) dummy.o ../simple/legacy.o
 OBJS		:= $(addprefix $(obj)/,$(boot-y)) $(simple)/legacy.o

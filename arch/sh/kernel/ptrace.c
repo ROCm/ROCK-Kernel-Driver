@@ -1,4 +1,4 @@
-/* $Id: ptrace.c,v 1.9 2003/05/06 23:28:47 lethal Exp $
+/* $Id: ptrace.c,v 1.14 2003/11/28 23:05:43 kkojima Exp $
  *
  * linux/arch/sh/kernel/ptrace.c
  *
@@ -41,7 +41,12 @@ static inline int get_stack_long(struct task_struct *task, int offset)
 {
 	unsigned char *stack;
 
-	stack = (unsigned char *)task->thread_info + THREAD_SIZE - sizeof(struct pt_regs);
+	stack = (unsigned char *)
+		task->thread_info + THREAD_SIZE	- sizeof(struct pt_regs)
+#ifdef CONFIG_SH_DSP
+		- sizeof(struct pt_dspregs)
+#endif
+		- sizeof(unsigned long);
 	stack += offset;
 	return (*((int *)stack));
 }
@@ -54,95 +59,15 @@ static inline int put_stack_long(struct task_struct *task, int offset,
 {
 	unsigned char *stack;
 
-	stack = (unsigned char *)task->thread_info + THREAD_SIZE - sizeof(struct pt_regs);
+	stack = (unsigned char *)
+		task->thread_info + THREAD_SIZE - sizeof(struct pt_regs)
+#ifdef CONFIG_SH_DSP
+		- sizeof(struct pt_dspregs)
+#endif
+		- sizeof(unsigned long);
 	stack += offset;
 	*(unsigned long *) stack = data;
 	return 0;
-}
-
-static void
-compute_next_pc(struct pt_regs *regs, unsigned short inst,
-		unsigned long *pc1, unsigned long *pc2)
-{
-	int nib[4]
-		= { (inst >> 12) & 0xf,
-		    (inst >> 8) & 0xf,
-		    (inst >> 4) & 0xf,
-		    inst & 0xf};
-
-	/* bra & bsr */
-	if (nib[0] == 0xa || nib[0] == 0xb) {
-		*pc1 = regs->pc + 4 + ((short) ((inst & 0xfff) << 4) >> 3);
-		*pc2 = (unsigned long) -1;
-		return;
-	}
-
-	/* bt & bf */
-	if (nib[0] == 0x8 && (nib[1] == 0x9 || nib[1] == 0xb)) {
-		*pc1 = regs->pc + 4 + ((char) (inst & 0xff) << 1);
-		*pc2 = regs->pc + 2;
-		return;
-	}
-
-	/* bt/s & bf/s */
-	if (nib[0] == 0x8 && (nib[1] == 0xd || nib[1] == 0xf)) {
-		*pc1 = regs->pc + 4 + ((char) (inst & 0xff) << 1);
-		*pc2 = regs->pc + 4;
-		return;
-	}
-
-	/* jmp & jsr */
-	if (nib[0] == 0x4 && nib[3] == 0xb
-	    && (nib[2] == 0x0 || nib[2] == 0x2)) {
-		*pc1 = regs->regs[nib[1]];
-		*pc2 = (unsigned long) -1;
-		return;
-	}
-
-	/* braf & bsrf */
-	if (nib[0] == 0x0 && nib[3] == 0x3
-	    && (nib[2] == 0x0 || nib[2] == 0x2)) {
-		*pc1 = regs->pc + 4 + regs->regs[nib[1]];
-		*pc2 = (unsigned long) -1;
-		return;
-	}
-
-	if (inst == 0x000b) {
-		*pc1 = regs->pr;
-		*pc2 = (unsigned long) -1;
-		return;
-	}
-
-	*pc1 = regs->pc + 2;
-	*pc2 = (unsigned long) -1;
-	return;
-}
-
-/* Tracing by user break controller.  */
-static void
-ubc_set_tracing(int asid, unsigned long nextpc1, unsigned nextpc2)
-{
-	ctrl_outl(nextpc1, UBC_BARA);
-	ctrl_outb(asid, UBC_BASRA);
-	ctrl_outl(0, UBC_BAMRA);
-	if(UBC_TYPE_SH7729)
-		ctrl_outw(BBR_INST | BBR_READ | BBR_CPU, UBC_BBRA);
-	else
-		ctrl_outw(BBR_INST | BBR_READ, UBC_BBRA);
-
-	if (nextpc2 != (unsigned long) -1) {
-		ctrl_outl(nextpc2, UBC_BARB);
-		ctrl_outb(asid, UBC_BASRB);
-		ctrl_outl(0, UBC_BAMRB);
-		if(UBC_TYPE_SH7729)
-			ctrl_outw(BBR_INST | BBR_READ | BBR_CPU, UBC_BBRB);
-		else
-			ctrl_outw(BBR_INST | BBR_READ, UBC_BBRB);
-	}
-	if(UBC_TYPE_SH7729)
-		ctrl_outl(BRCR_PCTE, UBC_BRCR);
-	else
-		ctrl_outw(0, UBC_BRCR);
 }
 
 /*
@@ -300,11 +225,8 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 	}
 
 	case PTRACE_SINGLESTEP: {  /* set the trap flag. */
-		long tmp, pc;
+		long pc;
 		struct pt_regs *dummy = NULL;
-		struct pt_regs *regs;
-		unsigned long nextpc1, nextpc2;
-		unsigned short insn;
 
 		ret = -EIO;
 		if ((unsigned long) data > _NSIG)
@@ -315,34 +237,12 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			child->ptrace |= PT_DTRACE;
 		}
 
-		/* Compute next pc.  */
 		pc = get_stack_long(child, (long)&dummy->pc);
-		regs = (struct pt_regs *)(THREAD_SIZE + (unsigned long)child->thread_info) - 1;
-		if (access_process_vm(child, pc&~3, &tmp, sizeof(tmp), 0) != sizeof(tmp))
-			break;
- 
-#ifdef  __LITTLE_ENDIAN__
-		if (pc & 3)
-			insn = tmp >> 16;
-		else
-			insn = tmp & 0xffff;
-#else
-		if (pc & 3)
-			insn = tmp & 0xffff;
-		else
-			insn = tmp >> 16;
-#endif
-		compute_next_pc(regs, insn, &nextpc1, &nextpc2);
 
-		if (nextpc1 & 0x80000000)
-			break;
-		if (nextpc2 != (unsigned long) -1 && (nextpc2 & 0x80000000))
-			break;
-
-#ifdef CONFIG_MMU
-		ubc_set_tracing(child->mm->context & MMU_CONTEXT_ASID_MASK,
-				nextpc1, nextpc2);
-#endif
+		/* Next scheduling will set up UBC */
+		if (child->thread.ubc_pc == 0)
+			ubc_usercnt += 1;
+		child->thread.ubc_pc = pc;
 
 		child->exit_code = data;
 		/* give it a chance to run. */
@@ -362,7 +262,36 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			child->ptrace &= ~PT_TRACESYSGOOD;
 		ret = 0;
 		break;
+#ifdef CONFIG_SH_DSP
+	case PTRACE_GETDSPREGS: {
+		unsigned long dp;
 
+		ret = -EIO;
+		dp = ((unsigned long) child) + THREAD_SIZE -
+			 sizeof(struct pt_dspregs);
+		if (*((int *) (dp - 4)) == SR_FD) {
+			copy_to_user(addr, (void *) dp,
+				sizeof(struct pt_dspregs));
+			ret = 0;
+		}
+		break;
+	}
+
+	case PTRACE_SETDSPREGS: {
+		unsigned long dp;
+		int i;
+
+		ret = -EIO;
+		dp = ((unsigned long) child) + THREAD_SIZE -
+			 sizeof(struct pt_dspregs);
+		if (*((int *) (dp - 4)) == SR_FD) {
+			copy_from_user((void *) dp, addr,
+				sizeof(struct pt_dspregs));
+			ret = 0;
+		}
+		break;
+	}
+#endif
 	default:
 		ret = ptrace_request(child, request, addr, data);
 		break;

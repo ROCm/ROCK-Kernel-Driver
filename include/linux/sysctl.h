@@ -127,6 +127,8 @@ enum
 	KERN_PANIC_ON_OOPS=57,  /* int: whether we will panic on an oops */
 	KERN_HPPA_PWRSW=58,	/* int: hppa soft-power enable */
 	KERN_HPPA_UNALIGNED=59,	/* int: hppa unaligned-trap enable */
+	KERN_PRINTK_RATELIMIT=60, /* int: tune printk ratelimiting */
+	KERN_PRINTK_RATELIMIT_BURST=61,	/* int: tune printk ratelimiting */
 };
 
 
@@ -418,7 +420,8 @@ enum {
 	NET_IPV6_TEMP_VALID_LFT=12,
 	NET_IPV6_TEMP_PREFERED_LFT=13,
 	NET_IPV6_REGEN_MAX_RETRY=14,
-	NET_IPV6_MAX_DESYNC_FACTOR=15
+	NET_IPV6_MAX_DESYNC_FACTOR=15,
+	NET_IPV6_MAX_ADDRESSES=16
 };
 
 /* /proc/sys/net/ipv6/icmp */
@@ -577,6 +580,7 @@ enum {
 	NET_SCTP_HB_INTERVAL             = 10,
 	NET_SCTP_PRESERVE_ENABLE         = 11,
 	NET_SCTP_MAX_BURST               = 12,
+	NET_SCTP_ADDIP_ENABLE		 = 13,
 };
 
 /* /proc/sys/net/bridge */
@@ -734,6 +738,8 @@ extern int proc_dointvec_minmax(ctl_table *, int, struct file *,
 				void __user *, size_t *);
 extern int proc_dointvec_jiffies(ctl_table *, int, struct file *,
 				 void __user *, size_t *);
+extern int proc_dointvec_userhz_jiffies(ctl_table *, int, struct file *,
+					void __user *, size_t *);
 extern int proc_doulongvec_minmax(ctl_table *, int, struct file *,
 				  void __user *, size_t *);
 extern int proc_doulongvec_ms_jiffies_minmax(ctl_table *table, int,

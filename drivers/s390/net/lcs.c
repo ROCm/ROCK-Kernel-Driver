@@ -11,7 +11,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Martin Schwidefsky <schwidefsky@de.ibm.com>
  *
- *    $Revision: 1.58 $	 $Date: 2003/09/22 13:33:56 $
+ *    $Revision: 1.61 $	 $Date: 2003/12/02 15:18:50 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,7 +58,7 @@
 /**
  * initialization string for output
  */
-#define VERSION_LCS_C  "$Revision: 1.58 $"
+#define VERSION_LCS_C  "$Revision: 1.61 $"
 
 static char version[] __initdata = "LCS driver ("VERSION_LCS_C "/" VERSION_LCS_H ")";
 
@@ -1168,7 +1168,6 @@ __lcs_start_xmit(struct lcs_card *card, struct sk_buff *skb,
 		return -EIO;
 	}
 	if (card->state != DEV_STATE_UP) {
-		dst_link_failure(skb);
 		dev_kfree_skb(skb);
 		card->stats.tx_dropped++;
 		card->stats.tx_errors++;
@@ -1891,7 +1890,7 @@ lcs_shutdown_device(struct ccwgroup_device *ccwgdev)
 /**
  * lcs_remove_device, free buffers and card
  */
-static int
+static void
 lcs_remove_device(struct ccwgroup_device *ccwgdev)
 {
 	struct lcs_card *card;
@@ -1899,12 +1898,18 @@ lcs_remove_device(struct ccwgroup_device *ccwgdev)
 	LCS_DBF_TEXT(3, setup, "remdev");
 	card = (struct lcs_card *)ccwgdev->dev.driver_data;
 	if (!card)
-		return 0;
+		return;
+	if (ccwgdev->state == CCWGROUP_ONLINE) {
+		lcs_stop_device(card->dev); /* Ignore rc. */
+		sysfs_remove_link(&card->dev->class_dev.kobj,
+				  ccwgdev->dev.bus_id);
+		sysfs_remove_link(&ccwgdev->dev.kobj, card->dev->name);
+		unregister_netdev(card->dev);
+	}
 	sysfs_remove_group(&ccwgdev->dev.kobj, &lcs_attr_group);
 	lcs_cleanup_card(card);
 	lcs_free_card(card);
 	put_device(&ccwgdev->dev);
-	return 0;
 }
 
 /**

@@ -3914,5 +3914,7 @@ static Scsi_Host_Template aha152x_driver_template = {
 	.use_clustering			= DISABLE_CLUSTERING,
 };
 
+#ifndef PCMCIA
 module_init(aha152x_init);
 module_exit(aha152x_exit);
+#endif

@@ -50,10 +50,6 @@
 #include <asm/semaphore.h>
 #include <asm/pgtable.h>
 
-/* kernel_thread */
-#define __KERNEL_SYSCALLS__
-#include <linux/unistd.h>
-
 #include <media/audiochip.h>
 #include "msp3400.h"
 
@@ -194,7 +190,7 @@ msp3400c_read(struct i2c_client *client, int dev, int addr)
 		err++;
 		printk(KERN_WARNING "msp34xx: I/O error #%d (read 0x%02x/0x%02x)\n",
 		       err, dev, addr);
-		current->state = TASK_INTERRUPTIBLE;
+		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(HZ/10);
 	}
 	if (3 == err) {
@@ -223,7 +219,7 @@ msp3400c_write(struct i2c_client *client, int dev, int addr, int val)
 		err++;
 		printk(KERN_WARNING "msp34xx: I/O error #%d (write 0x%02x/0x%02x)\n",
 		       err, dev, addr);
-		current->state = TASK_INTERRUPTIBLE;
+		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(HZ/10);
 	}
 	if (3 == err) {
@@ -804,7 +800,7 @@ static int msp3400c_thread(void *data)
 		}
 
 		/* some time for the tuner to sync */
-		current->state   = TASK_INTERRUPTIBLE;
+		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(HZ/5);
 		if (signal_pending(current))
 			goto done;
@@ -839,7 +835,7 @@ static int msp3400c_thread(void *data)
 		for (this = 0; this < count; this++) {
 			msp3400c_setcarrier(client, cd[this].cdo,cd[this].cdo);
 
-			current->state   = TASK_INTERRUPTIBLE;
+			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(HZ/10);
 			if (signal_pending(current))
 				goto done;
@@ -876,7 +872,7 @@ static int msp3400c_thread(void *data)
 		for (this = 0; this < count; this++) {
 			msp3400c_setcarrier(client, cd[this].cdo,cd[this].cdo);
 
-			current->state   = TASK_INTERRUPTIBLE;
+			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(HZ/10);
 			if (signal_pending(current))
 				goto done;
@@ -1052,7 +1048,7 @@ static int msp3410d_thread(void *data)
 		}
 	
 		/* some time for the tuner to sync */
-		current->state   = TASK_INTERRUPTIBLE;
+		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(HZ/5);
 		if (signal_pending(current))
 			goto done;
@@ -1113,7 +1109,7 @@ static int msp3410d_thread(void *data)
 		} else {
 			/* triggered autodetect */
 			for (;;) {
-				current->state   = TASK_INTERRUPTIBLE;
+				set_current_state(TASK_INTERRUPTIBLE);
 				schedule_timeout(HZ/10);
 				if (signal_pending(current))
 					goto done;
@@ -1204,6 +1200,8 @@ static int msp3410d_thread(void *data)
 #endif
 			break;
 		case 0x0003:
+		case 0x0004:
+		case 0x0005:
 			msp->mode   = MSP_MODE_FM_TERRA;
 			msp->stereo = VIDEO_SOUND_MONO;
 			msp->nicam_on = 0;
@@ -1262,7 +1260,7 @@ static int msp_attach(struct i2c_adapter *adap, int addr, int kind)
 	DECLARE_MUTEX_LOCKED(sem);
 	struct msp3400c *msp;
         struct i2c_client *c;
-	int i;
+	int i, rc;
 
         client_template.adapter = adap;
         client_template.addr = addr;
@@ -1316,7 +1314,7 @@ static int msp_attach(struct i2c_adapter *adap, int addr, int kind)
 #endif
 	msp3400c_setvolume(c,msp->muted,msp->left,msp->right);
 
-	snprintf(c->name, I2C_NAME_SIZE, "MSP34%02d%c-%c%d",
+	snprintf(c->name, sizeof(c->name), "MSP34%02d%c-%c%d",
 		 (msp->rev2>>8)&0xff, (msp->rev1&0xff)+'@',
 		 ((msp->rev1>>8)&0xff)+'@', msp->rev2&0x1f);
 
@@ -1345,9 +1343,12 @@ static int msp_attach(struct i2c_adapter *adap, int addr, int kind)
 
 	/* startup control thread */
 	msp->notify = &sem;
-	kernel_thread(msp->simple ? msp3410d_thread : msp3400c_thread,
-		      (void *)c, 0);
-	down(&sem);
+	rc = kernel_thread(msp->simple ? msp3410d_thread : msp3400c_thread,
+			   (void *)c, 0);
+	if (rc < 0)
+		printk(KERN_WARNING "msp34xx: kernel_thread() failed\n");
+	else
+		down(&sem);
 	msp->notify = NULL;
 	wake_up_interruptible(&msp->wq);
 
@@ -1398,8 +1399,13 @@ static int msp_detach(struct i2c_client *client)
 
 static int msp_probe(struct i2c_adapter *adap)
 {
+#ifdef I2C_ADAP_CLASS_TV_ANALOG
 	if (adap->class & I2C_ADAP_CLASS_TV_ANALOG)
 		return i2c_probe(adap, &addr_data, msp_attach);
+#else
+	if (adap->id == (I2C_ALGO_BIT | I2C_HW_B_BT848))
+		return i2c_probe(adap, &addr_data, msp_attach);
+#endif
 	return 0;
 }
 

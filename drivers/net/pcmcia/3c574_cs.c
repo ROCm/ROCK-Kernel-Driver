@@ -330,7 +330,7 @@ static dev_link_t *tc574_attach(void)
 	client_reg.event_handler = &tc574_event;
 	client_reg.Version = 0x0210;
 	client_reg.event_callback_args.client_data = link;
-	ret = CardServices(RegisterClient, &link->handle, &client_reg);
+	ret = pcmcia_register_client(&link->handle, &client_reg);
 	if (ret != 0) {
 		cs_error(link->handle, RegisterClient, ret);
 		tc574_detach(link);
@@ -369,7 +369,7 @@ static void tc574_detach(dev_link_t *link)
 	}
 
 	if (link->handle)
-		CardServices(DeregisterClient, link->handle);
+		pcmcia_deregister_client(link->handle);
 
 	/* Unlink device structure, free bits */
 	*linkp = link->next;
@@ -387,8 +387,8 @@ static void tc574_detach(dev_link_t *link)
 	ethernet device available to the system.
 */
 
-#define CS_CHECK(fn, args...) \
-while ((last_ret=CardServices(last_fn=(fn), args))!=0) goto cs_failed
+#define CS_CHECK(fn, ret) \
+  do { last_fn = (fn); if ((last_ret = (ret)) != 0) goto cs_failed; } while (0)
 
 static void tc574_config(dev_link_t *link)
 {
@@ -409,12 +409,12 @@ static void tc574_config(dev_link_t *link)
 
 	tuple.Attributes = 0;
 	tuple.DesiredTuple = CISTPL_CONFIG;
-	CS_CHECK(GetFirstTuple, handle, &tuple);
+	CS_CHECK(GetFirstTuple, pcmcia_get_first_tuple(handle, &tuple));
 	tuple.TupleData = (cisdata_t *)buf;
 	tuple.TupleDataMax = 64;
 	tuple.TupleOffset = 0;
-	CS_CHECK(GetTupleData, handle, &tuple);
-	CS_CHECK(ParseTuple, handle, &tuple, &parse);
+	CS_CHECK(GetTupleData, pcmcia_get_tuple_data(handle, &tuple));
+	CS_CHECK(ParseTuple, pcmcia_parse_tuple(handle, &tuple, &parse));
 	link->conf.ConfigBase = parse.config.base;
 	link->conf.Present = parse.config.rmask[0];
 
@@ -424,15 +424,15 @@ static void tc574_config(dev_link_t *link)
 	link->io.IOAddrLines = 16;
 	for (i = j = 0; j < 0x400; j += 0x20) {
 		link->io.BasePort1 = j ^ 0x300;
-		i = CardServices(RequestIO, link->handle, &link->io);
+		i = pcmcia_request_io(link->handle, &link->io);
 		if (i == CS_SUCCESS) break;
 	}
 	if (i != CS_SUCCESS) {
 		cs_error(link->handle, RequestIO, i);
 		goto failed;
 	}
-	CS_CHECK(RequestIRQ, link->handle, &link->irq);
-	CS_CHECK(RequestConfiguration, link->handle, &link->conf);
+	CS_CHECK(RequestIRQ, pcmcia_request_irq(link->handle, &link->irq));
+	CS_CHECK(RequestConfiguration, pcmcia_request_configuration(link->handle, &link->conf));
 
 	dev->irq = link->irq.AssignedIRQ;
 	dev->base_addr = link->io.BasePort1;
@@ -451,8 +451,8 @@ static void tc574_config(dev_link_t *link)
 	   the hardware address.  The future products may include a modem chip
 	   and put the address in the CIS. */
 	tuple.DesiredTuple = 0x88;
-	if (CardServices(GetFirstTuple, handle, &tuple) == CS_SUCCESS) {
-		CardServices(GetTupleData, handle, &tuple);
+	if (pcmcia_get_first_tuple(handle, &tuple) == CS_SUCCESS) {
+		pcmcia_get_tuple_data(handle, &tuple);
 		for (i = 0; i < 3; i++)
 			phys_addr[i] = htons(buf[i]);
 	} else {
@@ -466,9 +466,9 @@ static void tc574_config(dev_link_t *link)
 		}
 	}
 	tuple.DesiredTuple = CISTPL_VERS_1;
-	if (CardServices(GetFirstTuple, handle, &tuple) == CS_SUCCESS &&
-		CardServices(GetTupleData, handle, &tuple) == CS_SUCCESS &&
-		CardServices(ParseTuple, handle, &tuple, &parse) == CS_SUCCESS) {
+	if (pcmcia_get_first_tuple(handle, &tuple) == CS_SUCCESS &&
+		pcmcia_get_tuple_data(handle, &tuple) == CS_SUCCESS &&
+		pcmcia_parse_tuple(handle, &tuple, &parse) == CS_SUCCESS) {
 		cardname = parse.version_1.str + parse.version_1.ofs[1];
 	} else
 		cardname = "3Com 3c574";
@@ -564,9 +564,9 @@ static void tc574_release(dev_link_t *link)
 		return;
 	}
 
-	CardServices(ReleaseConfiguration, link->handle);
-	CardServices(ReleaseIO, link->handle, &link->io);
-	CardServices(ReleaseIRQ, link->handle, &link->irq);
+	pcmcia_release_configuration(link->handle);
+	pcmcia_release_io(link->handle, &link->io);
+	pcmcia_release_irq(link->handle, &link->irq);
 
 	link->state &= ~DEV_CONFIG;
 
@@ -608,7 +608,7 @@ static int tc574_event(event_t event, int priority,
 		if (link->state & DEV_CONFIG) {
 			if (link->open)
 				netif_device_detach(dev);
-			CardServices(ReleaseConfiguration, link->handle);
+			pcmcia_release_configuration(link->handle);
 		}
 		break;
 	case CS_EVENT_PM_RESUME:
@@ -616,7 +616,7 @@ static int tc574_event(event_t event, int priority,
 		/* Fall through... */
 	case CS_EVENT_CARD_RESET:
 		if (link->state & DEV_CONFIG) {
-			CardServices(RequestConfiguration, link->handle, &link->conf);
+			pcmcia_request_configuration(link->handle, &link->conf);
 			if (link->open) {
 				tc574_reset(dev);
 				netif_device_attach(dev);

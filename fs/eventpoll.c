@@ -93,6 +93,8 @@
 #define EPI_SLAB_DEBUG 0
 #endif /* #if DEBUG_EPI != 0 */
 
+/* Epoll private bits inside the event mask */
+#define EP_PRIVATE_BITS (EPOLLONESHOT | EPOLLET)
 
 /* Maximum number of poll wake up nests we are allowing */
 #define EP_MAX_POLLWAKE_NESTS 4
@@ -740,6 +742,7 @@ static int ep_getfd(int *efd, struct inode **einode, struct file **efile)
 	d_add(dentry, inode);
 	file->f_vfsmnt = mntget(eventpoll_mnt);
 	file->f_dentry = dget(dentry);
+	file->f_mapping = inode->i_mapping;
 
 	file->f_pos = 0;
 	file->f_flags = O_RDONLY;
@@ -1305,6 +1308,15 @@ static int ep_poll_callback(wait_queue_t *wait, unsigned mode, int sync)
 
 	write_lock_irqsave(&ep->lock, flags);
 
+	/*
+	 * If the event mask does not contain any poll(2) event, we consider the
+	 * descriptor to be disabled. This condition is likely the effect of the
+	 * EPOLLONESHOT bit that disables the descriptor when an event is received,
+	 * until the next EPOLL_CTL_MOD will be issued.
+	 */
+	if (!(epi->event.events & ~EP_PRIVATE_BITS))
+		goto is_disabled;
+
 	/* If this file is already in the ready list we exit soon */
 	if (EP_IS_LINKED(&epi->rdllink))
 		goto is_linked;
@@ -1321,6 +1333,7 @@ is_linked:
 	if (waitqueue_active(&ep->poll_wait))
 		pwake++;
 
+is_disabled:
 	write_unlock_irqrestore(&ep->lock, flags);
 
 	/* We have to call this outside the lock */
@@ -1457,6 +1470,8 @@ static int ep_send_events(struct eventpoll *ep, struct list_head *txlist,
 				eventcnt += eventbuf;
 				eventbuf = 0;
 			}
+			if (epi->event.events & EPOLLONESHOT)
+				epi->event.events &= EP_PRIVATE_BITS;
 		}
 	}
 

@@ -189,9 +189,12 @@ void end_buffer_write_sync(struct buffer_head *bh, int uptodate)
 	if (uptodate) {
 		set_buffer_uptodate(bh);
 	} else {
-		buffer_io_error(bh);
-		printk(KERN_WARNING "lost page write due to I/O error on %s\n",
-		       bdevname(bh->b_bdev, b));
+		if (printk_ratelimit()) {
+			buffer_io_error(bh);
+			printk(KERN_WARNING "lost page write due to "
+					"I/O error on %s\n",
+				       bdevname(bh->b_bdev, b));
+		}
 		set_buffer_write_io_error(bh);
 		clear_buffer_uptodate(bh);
 	}
@@ -314,8 +317,7 @@ int file_fsync(struct file *filp, struct dentry *dentry, int datasync)
 asmlinkage long sys_fsync(unsigned int fd)
 {
 	struct file * file;
-	struct dentry * dentry;
-	struct inode * inode;
+	struct address_space *mapping;
 	int ret, err;
 
 	ret = -EBADF;
@@ -323,8 +325,7 @@ asmlinkage long sys_fsync(unsigned int fd)
 	if (!file)
 		goto out;
 
-	dentry = file->f_dentry;
-	inode = dentry->d_inode;
+	mapping = file->f_mapping;
 
 	ret = -EINVAL;
 	if (!file->f_op || !file->f_op->fsync) {
@@ -333,17 +334,17 @@ asmlinkage long sys_fsync(unsigned int fd)
 	}
 
 	/* We need to protect against concurrent writers.. */
-	down(&inode->i_sem);
+	down(&mapping->host->i_sem);
 	current->flags |= PF_SYNCWRITE;
-	ret = filemap_fdatawrite(inode->i_mapping);
-	err = file->f_op->fsync(file, dentry, 0);
+	ret = filemap_fdatawrite(mapping);
+	err = file->f_op->fsync(file, file->f_dentry, 0);
 	if (!ret)
 		ret = err;
-	err = filemap_fdatawait(inode->i_mapping);
+	err = filemap_fdatawait(mapping);
 	if (!ret)
 		ret = err;
 	current->flags &= ~PF_SYNCWRITE;
-	up(&inode->i_sem);
+	up(&mapping->host->i_sem);
 
 out_putf:
 	fput(file);
@@ -354,8 +355,7 @@ out:
 asmlinkage long sys_fdatasync(unsigned int fd)
 {
 	struct file * file;
-	struct dentry * dentry;
-	struct inode * inode;
+	struct address_space *mapping;
 	int ret, err;
 
 	ret = -EBADF;
@@ -363,24 +363,23 @@ asmlinkage long sys_fdatasync(unsigned int fd)
 	if (!file)
 		goto out;
 
-	dentry = file->f_dentry;
-	inode = dentry->d_inode;
-
 	ret = -EINVAL;
 	if (!file->f_op || !file->f_op->fsync)
 		goto out_putf;
 
-	down(&inode->i_sem);
+	mapping = file->f_mapping;
+
+	down(&mapping->host->i_sem);
 	current->flags |= PF_SYNCWRITE;
-	ret = filemap_fdatawrite(inode->i_mapping);
-	err = file->f_op->fsync(file, dentry, 1);
+	ret = filemap_fdatawrite(mapping);
+	err = file->f_op->fsync(file, file->f_dentry, 1);
 	if (!ret)
 		ret = err;
-	err = filemap_fdatawait(inode->i_mapping);
+	err = filemap_fdatawait(mapping);
 	if (!ret)
 		ret = err;
 	current->flags &= ~PF_SYNCWRITE;
-	up(&inode->i_sem);
+	up(&mapping->host->i_sem);
 
 out_putf:
 	fput(file);
@@ -487,7 +486,7 @@ void invalidate_bdev(struct block_device *bdev, int destroy_dirty_buffers)
  */
 static void free_more_memory(void)
 {
-	struct zone *zone;
+	struct zone **zones;
 	pg_data_t *pgdat;
 
 	wakeup_bdflush(1024);
@@ -495,9 +494,9 @@ static void free_more_memory(void)
 	yield();
 
 	for_each_pgdat(pgdat) {
-		zone = pgdat->node_zonelists[GFP_NOFS&GFP_ZONEMASK].zones[0];
-		if (zone)
-			try_to_free_pages(zone, GFP_NOFS, 0);
+		zones = pgdat->node_zonelists[GFP_NOFS&GFP_ZONEMASK].zones;
+		if (*zones)
+			try_to_free_pages(zones, GFP_NOFS, 0);
 	}
 }
 
@@ -576,9 +575,12 @@ void end_buffer_async_write(struct buffer_head *bh, int uptodate)
 	if (uptodate) {
 		set_buffer_uptodate(bh);
 	} else {
-		buffer_io_error(bh);
-		printk(KERN_WARNING "lost page write due to I/O error on %s\n",
-		       bdevname(bh->b_bdev, b));
+		if (printk_ratelimit()) {
+			buffer_io_error(bh);
+			printk(KERN_WARNING "lost page write due to "
+					"I/O error on %s\n",
+			       bdevname(bh->b_bdev, b));
+		}
 		set_bit(AS_EIO, &page->mapping->flags);
 		clear_buffer_uptodate(bh);
 		SetPageError(page);
@@ -2944,10 +2946,8 @@ static void recalc_bh_state(void)
 	if (__get_cpu_var(bh_accounting).ratelimit++ < 4096)
 		return;
 	__get_cpu_var(bh_accounting).ratelimit = 0;
-	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_online(i))
-			tot += per_cpu(bh_accounting, i).nr;
-	}
+	for_each_cpu(i)
+		tot += per_cpu(bh_accounting, i).nr;
 	buffer_heads_over_limit = (tot > max_buffer_heads);
 }
 	

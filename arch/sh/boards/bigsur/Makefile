@@ -6,7 +6,5 @@
 # unless it's something special (ie not a .c file).
 #
 
-obj-y	 := mach.o setup.o io.o irq.o led.o
-
-obj-$(CONFIG_PCI) += pci.o
+obj-y	 := setup.o io.o irq.o led.o
 

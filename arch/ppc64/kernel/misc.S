@@ -66,32 +66,31 @@ _GLOBAL(get_sp)
 	blr
 		
 #ifdef CONFIG_PPC_ISERIES
-/* unsigned long __no_use_save_flags(void) */
-_GLOBAL(__no_use_save_flags)
-#warning FIX ISERIES
-	mfspr	r4,SPRG3
-	lbz	r3,PACAPROCENABLED(r4)
+/* unsigned long local_save_flags(void) */
+_GLOBAL(local_get_flags)
+	lbz	r3,PACAPROCENABLED(r13)
 	blr
 
-/* void __no_use_restore_flags(unsigned long flags) */	
-_GLOBAL(__no_use_restore_flags)
-/*
- * Just set/clear the MSR_EE bit through restore/flags but do not
- * change anything else.  This is needed by the RT system and makes
- * sense anyway.
- *    -- Cort
- */
-#warning FIX ISERIES
-	mfspr	r6,SPRG3
-	lbz	r5,PACAPROCENABLED(r6)
+/* unsigned long local_irq_disable(void) */
+_GLOBAL(local_irq_disable)
+	lbz	r3,PACAPROCENABLED(r13)
+	li	r4,0
+	stb	r4,PACAPROCENABLED(r13)
+	blr			/* Done */
+
+/* void local_irq_restore(unsigned long flags) */	
+_GLOBAL(local_irq_restore)
+	lbz	r5,PACAPROCENABLED(r13)
 	 /* Check if things are setup the way we want _already_. */
 	cmpw	0,r3,r5
 	beqlr
 	/* are we enabling interrupts? */
 	cmpi	0,r3,0
-	stb	r3,PACAPROCENABLED(r6)
+	stb	r3,PACAPROCENABLED(r13)
 	beqlr
 	/* Check pending interrupts */
+	/*   A decrementer, IPI or PMC interrupt may have occurred
+	 *   while we were in the hypervisor (which enables) */
 	CHECKANYINT(r4,r5)
 	beqlr
 
@@ -101,35 +100,8 @@ _GLOBAL(__no_use_restore_flags)
 	li	r0,0x5555
 	sc
 	blr
+#endif /* CONFIG_PPC_ISERIES */
 
-_GLOBAL(__no_use_cli)
-#warning FIX ISERIES
-	mfspr	r5,SPRG3
-	lbz	r3,PACAPROCENABLED(r5)
-	li	r4,0
-	stb	r4,PACAPROCENABLED(r5)
-	blr			/* Done */
-
-_GLOBAL(__no_use_sti)
-#warning FIX ISERIES
-	mfspr	r6,SPRG3
-	li	r3,1
-	stb	r3,PACAPROCENABLED(r6)
-
-	/* Check for pending interrupts
-	 *   A decrementer, IPI or PMC interrupt may have occurred
-	 *   while we were in the hypervisor (which enables)
-	 */
-	CHECKANYINT(r4,r5)
-	beqlr
-
-	/* 
-	 * Handle pending interrupts in interrupt context
-	 */
-	li	r0,0x5555
-	sc	
-	blr
-#endif
 /*
  * Flush instruction cache.
  */
@@ -446,7 +418,7 @@ _GLOBAL(cvt_df)
 	blr
 
 /*
- * identify_cpu,
+ * identify_cpu and calls setup_cpu
  * In:	r3 = base of the cpu_specs array
  *	r4 = address of cur_cpu_spec
  *	r5 = relocation offset
@@ -462,9 +434,17 @@ _GLOBAL(identify_cpu)
 	addi	r3,r3,CPU_SPEC_ENTRY_SIZE
 	b	1b
 1:
-	add	r3,r3,r5
-	std	r3,0(r4)
-	blr
+	add	r0,r3,r5
+	std	r0,0(r4)
+	ld	r4,CPU_SPEC_SETUP(r3)
+	sub	r4,r4,r5
+	ld	r4,0(r4)
+	sub	r4,r4,r5
+	mtctr	r4
+	/* Calling convention for cpu setup is r3=offset, r4=cur_cpu_spec */
+	mr	r4,r3
+	mr	r3,r5
+	bctr
 
 /*
  * do_cpu_ftr_fixups - goes through the list of CPU feature fixups
@@ -513,25 +493,6 @@ _GLOBAL(do_cpu_ftr_fixups)
 	sync			/* additional sync needed on g4 */
 	isync
 	b	1b
-
-/*
- * call_setup_cpu - call the setup_cpu function for this cpu
- * r3 = data offset
- *
- * Setup function is called with:
- *   r3 = data offset
- *   r4 = ptr to CPU spec (relocated)
- */
-_GLOBAL(call_setup_cpu)
-	LOADADDR(r4, cur_cpu_spec)
-	sub	r4,r4,r3
-	lwz	r4,0(r4)		# load pointer to cpu_spec
-	sub	r4,r4,r3		# relocate
-	lwz	r6,CPU_SPEC_SETUP(r4)	# load function pointer
-	sub	r6,r6,r3
-	mtctr	r6
-	bctr
-
 
 
 /*
@@ -594,6 +555,10 @@ SYSCALL(close)
 SYSCALL(dup)
 SYSCALL(execve)
 SYSCALL(waitpid)
+
+#ifdef CONFIG_PPC_ISERIES	/* hack hack hack */
+#define ppc_rtas	sys_ni_syscall
+#endif
 
 /* Why isn't this a) automatic, b) written in 'C'? */	
 	.balign 8
@@ -825,10 +790,10 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_ni_syscall
 	.llong .sys_ni_syscall		/* 225 - reserved for tux */
 	.llong .sys32_sendfile64
-	.llong .sys32_io_setup
+	.llong .compat_sys_io_setup
 	.llong .sys_io_destroy
-	.llong .sys32_io_getevents
-	.llong .sys32_io_submit
+	.llong .compat_sys_io_getevents
+	.llong .compat_sys_io_submit
 	.llong .sys_io_cancel
 	.llong .sys_set_tid_address
 	.llong .ppc32_fadvise64
@@ -838,20 +803,22 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_epoll_ctl
 	.llong .sys_epoll_wait
 	.llong .sys_remap_file_pages
-	.llong .sys_ni_syscall		/* 240 */
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall		/* 245 */
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
+	.llong .ppc32_timer_create	/* 240 */
+	.llong .compat_timer_settime
+	.llong .compat_timer_gettime
+	.llong .sys_timer_getoverrun
+	.llong .sys_timer_delete
+	.llong .compat_clock_settime	/* 245 */
+	.llong .compat_clock_gettime
+	.llong .compat_clock_getres
+	.llong .compat_clock_nanosleep
+	.llong .ppc32_swapcontext
 	.llong .sys32_tgkill		/* 250 */
 	.llong .sys32_utimes
-	.llong .sys_statfs64
-	.llong .sys_fstatfs64
+	.llong .compat_statfs64
+	.llong .compat_fstatfs64
+	.llong .ppc32_fadvise64_64	/* 32bit only fadvise64_64 */
+	.llong .ppc_rtas		/* 255 */
 
 	.balign 8
 _GLOBAL(sys_call_table)
@@ -1104,8 +1071,10 @@ _GLOBAL(sys_call_table)
 	.llong .sys_clock_gettime
 	.llong .sys_clock_getres
 	.llong .sys_clock_nanosleep
-	.llong .sys_ni_syscall
+	.llong .ppc64_swapcontext
 	.llong .sys_tgkill		/* 250 */
 	.llong .sys_utimes
 	.llong .sys_statfs64
 	.llong .sys_fstatfs64
+	.llong .sys_ni_syscall		/* 32bit only fadvise64_64 */
+	.llong .ppc_rtas		/* 255 */

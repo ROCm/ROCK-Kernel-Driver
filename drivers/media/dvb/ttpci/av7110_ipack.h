@@ -1,7 +1,7 @@
 #ifndef _AV7110_IPACK_H_
 #define _AV7110_IPACK_H_
 
-extern void av7110_ipack_init(struct ipack *p, int size,
+extern int av7110_ipack_init(struct ipack *p, int size,
 			      void (*func)(u8 *buf,  int size, void *priv));
 
 extern void av7110_ipack_reset(struct ipack *p);

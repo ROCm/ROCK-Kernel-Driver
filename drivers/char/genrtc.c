@@ -375,67 +375,12 @@ static int gen_rtc_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int gen_rtc_read_proc(char *page, char **start, off_t off,
-			     int count, int *eof, void *data);
-
-
-/*
- *	The various file operations we support.
- */
-
-static struct file_operations gen_rtc_fops = {
-	.owner		= THIS_MODULE,
-#ifdef CONFIG_GEN_RTC_X
-	.read		= gen_rtc_read,
-	.poll		= gen_rtc_poll,
-#endif
-	.ioctl		= gen_rtc_ioctl,
-	.open		= gen_rtc_open,
-	.release	= gen_rtc_release,
-};
-
-static struct miscdevice rtc_gen_dev =
-{
-	.minor		= RTC_MINOR,
-	.name		= "rtc",
-	.fops		= &gen_rtc_fops,
-};
-
-static int __init rtc_generic_init(void)
-{
-	int retval;
-
-	printk(KERN_INFO "Generic RTC Driver v%s\n", RTC_VERSION);
-
-	retval = misc_register(&rtc_gen_dev);
-	if(retval < 0)
-		return retval;
 
 #ifdef CONFIG_PROC_FS
-	if((create_proc_read_entry ("driver/rtc", 0, 0, gen_rtc_read_proc, NULL)) == NULL){
-		misc_deregister(&rtc_gen_dev);
-		return -ENOMEM;
-	}
-#endif
-
-	return 0;
-}
-
-static void __exit rtc_generic_exit(void)
-{
-	remove_proc_entry ("driver/rtc", NULL);
-	misc_deregister(&rtc_gen_dev);
-}
-
-module_init(rtc_generic_init);
-module_exit(rtc_generic_exit);
-
 
 /*
  *	Info exported via "/proc/rtc".
  */
-
-#ifdef CONFIG_PROC_FS
 
 static int gen_rtc_proc_output(char *buf)
 {
@@ -523,6 +468,58 @@ static int gen_rtc_read_proc(char *page, char **start, off_t off,
 
 #endif /* CONFIG_PROC_FS */
 
+
+/*
+ *	The various file operations we support.
+ */
+
+static struct file_operations gen_rtc_fops = {
+	.owner		= THIS_MODULE,
+#ifdef CONFIG_GEN_RTC_X
+	.read		= gen_rtc_read,
+	.poll		= gen_rtc_poll,
+#endif
+	.ioctl		= gen_rtc_ioctl,
+	.open		= gen_rtc_open,
+	.release	= gen_rtc_release,
+};
+
+static struct miscdevice rtc_gen_dev =
+{
+	.minor		= RTC_MINOR,
+	.name		= "rtc",
+	.fops		= &gen_rtc_fops,
+};
+
+static int __init rtc_generic_init(void)
+{
+	int retval;
+
+	printk(KERN_INFO "Generic RTC Driver v%s\n", RTC_VERSION);
+
+	retval = misc_register(&rtc_gen_dev);
+	if(retval < 0)
+		return retval;
+
+#ifdef CONFIG_PROC_FS
+	if((create_proc_read_entry ("driver/rtc", 0, 0, gen_rtc_read_proc, NULL)) == NULL){
+		misc_deregister(&rtc_gen_dev);
+		return -ENOMEM;
+	}
+#endif
+
+	return 0;
+}
+
+static void __exit rtc_generic_exit(void)
+{
+	remove_proc_entry ("driver/rtc", NULL);
+	misc_deregister(&rtc_gen_dev);
+}
+
+
+module_init(rtc_generic_init);
+module_exit(rtc_generic_exit);
 
 MODULE_AUTHOR("Richard Zidlicky");
 MODULE_LICENSE("GPL");

@@ -395,17 +395,35 @@ static inline void dvb_dmx_swfilter_packet_type(struct dvb_demux_feed *feed, con
 	}
 }
 
+#define DVR_FEED(f)							\
+	(((f)->type == DMX_TYPE_TS) &&					\
+	((f)->feed.ts.is_filtering) &&					\
+	(((f)->ts_type & (TS_PACKET|TS_PAYLOAD_ONLY)) == TS_PACKET))
 
 void dvb_dmx_swfilter_packet(struct dvb_demux *demux, const u8 *buf)
 {
 	struct dvb_demux_feed *feed;
 	struct list_head *pos, *head=&demux->feed_list;
 	u16 pid = ts_pid(buf);
+	int dvr_done = 0;
 
 	list_for_each(pos, head) {
 		feed = list_entry(pos, struct dvb_demux_feed, list_head);
-		if (feed->pid == pid)
+
+		if ((feed->pid != pid) && (feed->pid != 0x2000))
+			continue;
+
+		/* copy each packet only once to the dvr device, even
+		 * if a PID is in multiple filters (e.g. video + PCR) */
+		if ((DVR_FEED(feed)) && (dvr_done++))
+			continue;
+
+		if (feed->pid == pid) {
 			dvb_dmx_swfilter_packet_type (feed, buf);
+			if (DVR_FEED(feed))
+				continue;
+		}
+
 		if (feed->pid == 0x2000)
 			feed->cb.ts(buf, 188, 0, 0, &feed->feed.ts, DMX_OK);
 	}

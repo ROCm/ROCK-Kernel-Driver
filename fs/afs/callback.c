@@ -24,28 +24,28 @@
 /*
  * allow the fileserver to request callback state (re-)initialisation
  */
-int SRXAFSCM_InitCallBackState(afs_server_t *server)
+int SRXAFSCM_InitCallBackState(struct afs_server *server)
 {
 	struct list_head callbacks;
 
-	_enter("%p",server);
+	_enter("%p", server);
 
 	INIT_LIST_HEAD(&callbacks);
 
 	/* transfer the callback list from the server to a temp holding area */
 	spin_lock(&server->cb_lock);
 
-	list_add(&callbacks,&server->cb_promises);
+	list_add(&callbacks, &server->cb_promises);
 	list_del_init(&server->cb_promises);
 
-	/* munch our way through the list, grabbing the inode, dropping all the locks and regetting
-	 * them in the right order
+	/* munch our way through the list, grabbing the inode, dropping all the
+	 * locks and regetting them in the right order
 	 */
 	while (!list_empty(&callbacks)) {
+		struct afs_vnode *vnode;
 		struct inode *inode;
-		afs_vnode_t *vnode;
 
-		vnode = list_entry(callbacks.next,afs_vnode_t,cb_link);
+		vnode = list_entry(callbacks.next, struct afs_vnode, cb_link);
 		list_del_init(&vnode->cb_link);
 
 		/* try and grab the inode - may fail */
@@ -56,7 +56,7 @@ int SRXAFSCM_InitCallBackState(afs_server_t *server)
 			spin_unlock(&server->cb_lock);
 			spin_lock(&vnode->lock);
 
-			if (vnode->cb_server==server) {
+			if (vnode->cb_server == server) {
 				vnode->cb_server = NULL;
 				afs_kafstimod_del_timer(&vnode->cb_timeout);
 				spin_lock(&afs_cb_hash_lock);
@@ -84,15 +84,14 @@ int SRXAFSCM_InitCallBackState(afs_server_t *server)
 /*
  * allow the fileserver to break callback promises
  */
-int SRXAFSCM_CallBack(afs_server_t *server, size_t count, afs_callback_t callbacks[])
+int SRXAFSCM_CallBack(struct afs_server *server, size_t count,
+		      struct afs_callback callbacks[])
 {
-	struct list_head *_p;
+	_enter("%p,%u,", server, count);
 
-	_enter("%p,%u,",server,count);
-
-	for (; count>0; callbacks++, count--) {
+	for (; count > 0; callbacks++, count--) {
+		struct afs_vnode *vnode = NULL;
 		struct inode *inode = NULL;
-		afs_vnode_t *vnode = NULL;
 		int valid = 0;
 
 		_debug("- Fid { vl=%08x n=%u u=%u }  CB { v=%u x=%u t=%u }",
@@ -107,14 +106,15 @@ int SRXAFSCM_CallBack(afs_server_t *server, size_t count, afs_callback_t callbac
 		/* find the inode for this fid */
 		spin_lock(&afs_cb_hash_lock);
 
-		list_for_each(_p,&afs_cb_hash(server,&callbacks->fid)) {
-			vnode = list_entry(_p,afs_vnode_t,cb_hash_link);
-
-			if (memcmp(&vnode->fid,&callbacks->fid,sizeof(afs_fid_t))!=0)
+		list_for_each_entry(vnode,
+				    &afs_cb_hash(server, &callbacks->fid),
+				    cb_hash_link) {
+			if (memcmp(&vnode->fid, &callbacks->fid,
+				   sizeof(struct afs_fid)) != 0)
 				continue;
 
 			/* right vnode, but is it same server? */
-			if (vnode->cb_server!=server)
+			if (vnode->cb_server != server)
 				break; /* no */
 
 			/* try and nail the inode down */
@@ -127,7 +127,7 @@ int SRXAFSCM_CallBack(afs_server_t *server, size_t count, afs_callback_t callbac
 		if (inode) {
 			/* we've found the record for this vnode */
 			spin_lock(&vnode->lock);
-			if (vnode->cb_server==server) {
+			if (vnode->cb_server == server) {
 				/* the callback _is_ on the calling server */
 				vnode->cb_server = NULL;
 				valid = 1;
@@ -161,8 +161,8 @@ int SRXAFSCM_CallBack(afs_server_t *server, size_t count, afs_callback_t callbac
 /*
  * allow the fileserver to see if the cache manager is still alive
  */
-int SRXAFSCM_Probe(afs_server_t *server)
+int SRXAFSCM_Probe(struct afs_server *server)
 {
-	_debug("SRXAFSCM_Probe(%p)\n",server);
+	_debug("SRXAFSCM_Probe(%p)\n", server);
 	return 0;
 } /* end SRXAFSCM_Probe() */

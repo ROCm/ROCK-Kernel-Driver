@@ -41,11 +41,6 @@ static inline unsigned long virt_irq_to_real(unsigned long virt_irq) {
 	return virt_irq_to_real_map[virt_irq];
 }
 
-/*
- * This gets called from serial.c, which is now used on
- * powermacs as well as prep/chrp boxes.
- * Prep and chrp both have cascaded 8259 PICs.
- */
 static __inline__ int irq_canonicalize(int irq)
 {
 	return irq;

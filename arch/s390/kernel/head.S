@@ -569,6 +569,19 @@ startup:basr  %r13,0                     # get base
        oi     3(%r12),16                # set MVPG flag
 .Lchkmvpg:
 
+#
+# find out if we have the IDTE instruction
+#
+	mvc	__LC_PGM_NEW_PSW(8),.Lpcidte-.LPG1(%r13)
+	.long	0xb2b10000		# store facility list
+	tm	0xc8,0x08		# check bit for clearing-by-ASCE
+	bno	.Lchkidte-.LPG1(%r13)
+	lhi	%r1,2094
+	lhi	%r2,0
+	.long	0xb98e2001
+	oi	3(%r12),0x80		# set IDTE flag
+.Lchkidte:
+
         lpsw  .Lentry-.LPG1(13)         # jump to _stext in primary-space,
                                         # virtual and never return ...
         .align 8
@@ -593,6 +606,7 @@ startup:basr  %r13,0                     # get base
 .Lpcfpu:.long  0x00080000,0x80000000 + .Lchkfpu
 .Lpccsp:.long  0x00080000,0x80000000 + .Lchkcsp
 .Lpcmvpg:.long 0x00080000,0x80000000 + .Lchkmvpg
+.Lpcidte:.long 0x00080000,0x80000000 + .Lchkidte
 .Lmemsize:.long memory_size
 .Lmchunk:.long memory_chunk
 .Lmflags:.long machine_flags

@@ -1,15 +1,13 @@
 #ifndef _ASM_IA64_SN_HWGFS_H
 #define _ASM_IA64_SN_HWGFS_H
 
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
  * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
-
 typedef struct dentry *hwgfs_handle_t;
 
 extern hwgfs_handle_t hwgfs_register(hwgfs_handle_t dir, const char *name,
@@ -32,4 +30,4 @@ extern int hwgfs_generate_path(hwgfs_handle_t de, char *path, int buflen);
 extern void *hwgfs_get_info(hwgfs_handle_t de);
 extern int hwgfs_set_info(hwgfs_handle_t de, void *info);
 
-#endif
+#endif	/* _ASM_IA64_SN_HWGFS_H */

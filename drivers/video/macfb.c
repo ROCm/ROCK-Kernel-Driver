@@ -592,7 +592,7 @@ static struct fb_ops macfb_ops = {
 	.fb_cursor	= soft_cursor,
 };
 
-void __init macfb_setup(char *options, int *ints)
+void __init macfb_setup(char *options)
 {
 	char *this_opt;
 	

@@ -23,7 +23,6 @@
 asmlinkage long sys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice)
 {
 	struct file *file = fget(fd);
-	struct inode *inode;
 	struct address_space *mapping;
 	struct backing_dev_info *bdi;
 	pgoff_t start_index;
@@ -33,8 +32,7 @@ asmlinkage long sys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice)
 	if (!file)
 		return -EBADF;
 
-	inode = file->f_dentry->d_inode;
-	mapping = inode->i_mapping;
+	mapping = file->f_mapping;
 	if (!mapping) {
 		ret = -EINVAL;
 		goto out;

@@ -143,3 +143,10 @@ int mpc1211_rtc_settimeofday(const struct timeval *tv)
 
 	return set_rtc_mmss(nowtime);
 }
+
+void mpc1211_time_init(void)
+{
+	rtc_get_time = mpc1211_rtc_gettimeofday;
+	rtc_set_time = mpc1211_rtc_settimeofday;
+}
+

@@ -56,16 +56,6 @@ struct sh_machine_vector mv_se __initmv = {
 	.mv_outsw		= se_outsw,
 	.mv_outsl		= se_outsl,
 
-	.mv_readb		= se_readb,
-	.mv_readw		= se_readw,
-	.mv_readl		= se_readl,
-	.mv_writeb		= se_writeb,
-	.mv_writew		= se_writew,
-	.mv_writel		= se_writel,
-
-	.mv_ioremap		= generic_ioremap,
-	.mv_iounmap		= generic_iounmap,
-
 	.mv_isa_port2addr	= se_isa_port2addr,
 
 	.mv_init_irq		= init_se_IRQ,

@@ -2208,28 +2208,3 @@ ide_startstop_t flagged_task_mulout_intr (ide_drive_t *drive)
 
 	return ide_started;
 }
-
-/*
- * Beginning of Taskfile OPCODE Library and feature sets.
- */
-
-#ifdef CONFIG_PKT_TASK_IOCTL
-
-int pkt_taskfile_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
-{
-#if 0
-	switch(req_task->data_phase) {
-		case TASKFILE_P_OUT_DMAQ:
-		case TASKFILE_P_IN_DMAQ:
-		case TASKFILE_P_OUT_DMA:
-		case TASKFILE_P_IN_DMA:
-		case TASKFILE_P_OUT:
-		case TASKFILE_P_IN:
-	}
-#endif
-	return -ENOMSG;
-}
-
-EXPORT_SYMBOL(pkt_taskfile_ioctl);
-
-#endif /* CONFIG_PKT_TASK_IOCTL */

@@ -1093,10 +1093,10 @@ void
 xfs_dir_trace_g_du(char *where, xfs_inode_t *dp, uio_t *uio)
 {
 	xfs_dir_trace_enter(XFS_DIR_KTRACE_G_DU, where,
-		     (__psunsigned_t)dp, (__psunsigned_t)dp->i_mount,
-		     (__psunsigned_t)(uio->uio_offset >> 32),
-		     (__psunsigned_t)(uio->uio_offset & 0xFFFFFFFF),
-		     (__psunsigned_t)uio->uio_resid,
+		     (void *)dp, (void *)dp->i_mount,
+		     (void *)((unsigned long)(uio->uio_offset >> 32)),
+		     (void *)((unsigned long)(uio->uio_offset & 0xFFFFFFFF)),
+		     (void *)(unsigned long)uio->uio_resid,
 		     NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 }
 
@@ -1107,11 +1107,11 @@ void
 xfs_dir_trace_g_dub(char *where, xfs_inode_t *dp, uio_t *uio, xfs_dablk_t bno)
 {
 	xfs_dir_trace_enter(XFS_DIR_KTRACE_G_DUB, where,
-		     (__psunsigned_t)dp, (__psunsigned_t)dp->i_mount,
-		     (__psunsigned_t)(uio->uio_offset >> 32),
-		     (__psunsigned_t)(uio->uio_offset & 0xFFFFFFFF),
-		     (__psunsigned_t)uio->uio_resid,
-		     (__psunsigned_t)bno,
+		     (void *)dp, (void *)dp->i_mount,
+		     (void *)((unsigned long)(uio->uio_offset >> 32)),
+		     (void *)((unsigned long)(uio->uio_offset & 0xFFFFFFFF)),
+		     (void *)(unsigned long)uio->uio_resid,
+		     (void *)(unsigned long)bno,
 		     NULL, NULL, NULL, NULL, NULL, NULL);
 }
 
@@ -1122,15 +1122,21 @@ void
 xfs_dir_trace_g_dun(char *where, xfs_inode_t *dp, uio_t *uio,
 			xfs_da_intnode_t *node)
 {
+	int	last = INT_GET(node->hdr.count, ARCH_CONVERT) - 1;
+
 	xfs_dir_trace_enter(XFS_DIR_KTRACE_G_DUN, where,
-		     (__psunsigned_t)dp, (__psunsigned_t)dp->i_mount,
-		     (__psunsigned_t)(uio->uio_offset >> 32),
-		     (__psunsigned_t)(uio->uio_offset & 0xFFFFFFFF),
-		     (__psunsigned_t)uio->uio_resid,
-		     (__psunsigned_t)INT_GET(node->hdr.info.forw, ARCH_CONVERT),
-		     (__psunsigned_t)INT_GET(node->hdr.count, ARCH_CONVERT),
-		     (__psunsigned_t)INT_GET(node->btree[0].hashval, ARCH_CONVERT),
-		     (__psunsigned_t)INT_GET(node->btree[INT_GET(node->hdr.count, ARCH_CONVERT)-1].hashval, ARCH_CONVERT),
+		     (void *)dp, (void *)dp->i_mount,
+		     (void *)((unsigned long)(uio->uio_offset >> 32)),
+		     (void *)((unsigned long)(uio->uio_offset & 0xFFFFFFFF)),
+		     (void *)(unsigned long)uio->uio_resid,
+		     (void *)(unsigned long)
+			INT_GET(node->hdr.info.forw, ARCH_CONVERT),
+		     (void *)(unsigned long)
+			INT_GET(node->hdr.count, ARCH_CONVERT),
+		     (void *)(unsigned long)
+			INT_GET(node->btree[0].hashval, ARCH_CONVERT),
+		     (void *)(unsigned long)
+			INT_GET(node->btree[last].hashval, ARCH_CONVERT),
 		     NULL, NULL, NULL);
 }
 
@@ -1141,15 +1147,21 @@ void
 xfs_dir_trace_g_dul(char *where, xfs_inode_t *dp, uio_t *uio,
 			xfs_dir_leafblock_t *leaf)
 {
+	int	last = INT_GET(leaf->hdr.count, ARCH_CONVERT) - 1;
+
 	xfs_dir_trace_enter(XFS_DIR_KTRACE_G_DUL, where,
-		     (__psunsigned_t)dp, (__psunsigned_t)dp->i_mount,
-		     (__psunsigned_t)(uio->uio_offset >> 32),
-		     (__psunsigned_t)(uio->uio_offset & 0xFFFFFFFF),
-		     (__psunsigned_t)uio->uio_resid,
-		     (__psunsigned_t)INT_GET(leaf->hdr.info.forw, ARCH_CONVERT),
-		     (__psunsigned_t)INT_GET(leaf->hdr.count, ARCH_CONVERT),
-		     (__psunsigned_t)INT_GET(leaf->entries[0].hashval, ARCH_CONVERT),
-		     (__psunsigned_t)INT_GET(leaf->entries[ INT_GET(leaf->hdr.count, ARCH_CONVERT)-1 ].hashval, ARCH_CONVERT),
+		     (void *)dp, (void *)dp->i_mount,
+		     (void *)((unsigned long)(uio->uio_offset >> 32)),
+		     (void *)((unsigned long)(uio->uio_offset & 0xFFFFFFFF)),
+		     (void *)(unsigned long)uio->uio_resid,
+		     (void *)(unsigned long)
+			INT_GET(leaf->hdr.info.forw, ARCH_CONVERT),
+		     (void *)(unsigned long)
+			INT_GET(leaf->hdr.count, ARCH_CONVERT),
+		     (void *)(unsigned long)
+			INT_GET(leaf->entries[0].hashval, ARCH_CONVERT),
+		     (void *)(unsigned long)
+			INT_GET(leaf->entries[last].hashval, ARCH_CONVERT),
 		     NULL, NULL, NULL);
 }
 
@@ -1161,11 +1173,12 @@ xfs_dir_trace_g_due(char *where, xfs_inode_t *dp, uio_t *uio,
 			xfs_dir_leaf_entry_t *entry)
 {
 	xfs_dir_trace_enter(XFS_DIR_KTRACE_G_DUE, where,
-		     (__psunsigned_t)dp, (__psunsigned_t)dp->i_mount,
-		     (__psunsigned_t)(uio->uio_offset >> 32),
-		     (__psunsigned_t)(uio->uio_offset & 0xFFFFFFFF),
-		     (__psunsigned_t)uio->uio_resid,
-		     (__psunsigned_t)INT_GET(entry->hashval, ARCH_CONVERT),
+		     (void *)dp, (void *)dp->i_mount,
+		     (void *)((unsigned long)(uio->uio_offset >> 32)),
+		     (void *)((unsigned long)(uio->uio_offset & 0xFFFFFFFF)),
+		     (void *)(unsigned long)uio->uio_resid,
+		     (void *)(unsigned long)
+			INT_GET(entry->hashval, ARCH_CONVERT),
 		     NULL, NULL, NULL, NULL, NULL, NULL);
 }
 
@@ -1176,12 +1189,12 @@ void
 xfs_dir_trace_g_duc(char *where, xfs_inode_t *dp, uio_t *uio, xfs_off_t cookie)
 {
 	xfs_dir_trace_enter(XFS_DIR_KTRACE_G_DUC, where,
-		     (__psunsigned_t)dp, (__psunsigned_t)dp->i_mount,
-		     (__psunsigned_t)(uio->uio_offset >> 32),
-		     (__psunsigned_t)(uio->uio_offset & 0xFFFFFFFF),
-		     (__psunsigned_t)uio->uio_resid,
-		     (__psunsigned_t)(cookie >> 32),
-		     (__psunsigned_t)(cookie & 0xFFFFFFFF),
+		     (void *)dp, (void *)dp->i_mount,
+		     (void *)((unsigned long)(uio->uio_offset >> 32)),
+		     (void *)((unsigned long)(uio->uio_offset & 0xFFFFFFFF)),
+		     (void *)(unsigned long)uio->uio_resid,
+		     (void *)((unsigned long)(cookie >> 32)),
+		     (void *)((unsigned long)(cookie & 0xFFFFFFFF)),
 		     NULL, NULL, NULL, NULL, NULL);
 }
 
@@ -1191,15 +1204,15 @@ xfs_dir_trace_g_duc(char *where, xfs_inode_t *dp, uio_t *uio, xfs_off_t cookie)
  */
 void
 xfs_dir_trace_enter(int type, char *where,
-			__psunsigned_t a0, __psunsigned_t a1,
-			__psunsigned_t a2, __psunsigned_t a3,
-			__psunsigned_t a4, __psunsigned_t a5,
-			__psunsigned_t a6, __psunsigned_t a7,
-			__psunsigned_t a8, __psunsigned_t a9,
-			__psunsigned_t a10, __psunsigned_t a11)
+			void * a0, void * a1,
+			void * a2, void * a3,
+			void * a4, void * a5,
+			void * a6, void * a7,
+			void * a8, void * a9,
+			void * a10, void * a11)
 {
 	ASSERT(xfs_dir_trace_buf);
-	ktrace_enter(xfs_dir_trace_buf, (void *)((__psunsigned_t)type),
+	ktrace_enter(xfs_dir_trace_buf, (void *)(unsigned long)type,
 					(void *)where,
 					(void *)a0, (void *)a1, (void *)a2,
 					(void *)a3, (void *)a4, (void *)a5,

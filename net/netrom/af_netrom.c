@@ -1101,7 +1101,12 @@ static int nr_sendmsg(struct kiocb *iocb, struct socket *sock,
 	SOCK_DEBUG(sk, "NET/ROM: Appending user data\n");
 
 	/* User data follows immediately after the NET/ROM transport header */
-	memcpy_fromiovec(asmptr, msg->msg_iov, len);
+	if (memcpy_fromiovec(asmptr, msg->msg_iov, len)) {
+		kfree_skb(skb);
+		err = -EFAULT;
+		goto out;
+	}
+
 	SOCK_DEBUG(sk, "NET/ROM: Transmitting buffer\n");
 
 	if (sk->sk_state != TCP_ESTABLISHED) {

@@ -57,8 +57,7 @@ void smp_stop_cpu(void);
  */
 
 extern cpumask_t cpu_callout_map;
-
-#define cpu_possible(cpu) cpu_isset(cpu, cpu_callout_map)
+#define cpu_possible_map cpu_callout_map
 #define cpu_online(cpu) cpu_isset(cpu, cpu_online_map)
 
 static inline int num_booting_cpus(void)

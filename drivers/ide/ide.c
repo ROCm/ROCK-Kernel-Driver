@@ -1620,12 +1620,6 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 			switch(drive->media) {
 				case ide_disk:
 					return ide_taskfile_ioctl(drive, cmd, arg);
-#ifdef CONFIG_PKT_TASK_IOCTL
-				case ide_cdrom:
-				case ide_tape:
-				case ide_floppy:
-					return pkt_taskfile_ioctl(drive, cmd, arg);
-#endif /* CONFIG_PKT_TASK_IOCTL */
 				default:
 					return -ENOMSG;
 			}

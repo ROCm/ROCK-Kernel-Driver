@@ -322,7 +322,7 @@ sclp_tty_timeout(unsigned long data)
  * Write a string to the sclp tty.
  */
 static void
-sclp_tty_write_string(const unsigned char *str, int count, int from_user)
+sclp_tty_write_string(const unsigned char *str, int count)
 {
 	unsigned long flags;
 	void *page;
@@ -348,8 +348,8 @@ sclp_tty_write_string(const unsigned char *str, int count, int from_user)
 						       sclp_ioctls.htab);
 		}
 		/* try to write the string to the current output buffer */
-		written = sclp_write(sclp_ttybuf, str, count, from_user);
-		if (written == -EFAULT || written == count)
+		written = sclp_write(sclp_ttybuf, str, count);
+		if (written == count)
 			break;
 		/*
 		 * Not all characters could be written to the current
@@ -389,12 +389,32 @@ static int
 sclp_tty_write(struct tty_struct *tty, int from_user,
 	       const unsigned char *buf, int count)
 {
+	int length, ret;
+
 	if (sclp_tty_chars_count > 0) {
-		sclp_tty_write_string(sclp_tty_chars, sclp_tty_chars_count, 0);
+		sclp_tty_write_string(sclp_tty_chars, sclp_tty_chars_count);
 		sclp_tty_chars_count = 0;
 	}
-	sclp_tty_write_string(buf, count, from_user);
-	return count;
+	if (!from_user) {
+		sclp_tty_write_string(buf, count);
+		return count;
+	}
+	ret = 0;
+	while (count > 0) {
+		length = count < SCLP_TTY_BUF_SIZE ?
+			count : SCLP_TTY_BUF_SIZE;
+		length -= copy_from_user(sclp_tty_chars, buf, length);
+		if (length == 0) {
+			if (!ret)
+				ret = -EFAULT;
+			break;
+		}
+		sclp_tty_write_string(sclp_tty_chars, length);
+		buf += length;
+		count -= length;
+		ret += length;
+	}
+	return ret;
 }
 
 /*
@@ -412,7 +432,7 @@ sclp_tty_put_char(struct tty_struct *tty, unsigned char ch)
 {
 	sclp_tty_chars[sclp_tty_chars_count++] = ch;
 	if (ch == '\n' || sclp_tty_chars_count >= SCLP_TTY_BUF_SIZE) {
-		sclp_tty_write_string(sclp_tty_chars, sclp_tty_chars_count, 0);
+		sclp_tty_write_string(sclp_tty_chars, sclp_tty_chars_count);
 		sclp_tty_chars_count = 0;
 	}
 }
@@ -425,7 +445,7 @@ static void
 sclp_tty_flush_chars(struct tty_struct *tty)
 {
 	if (sclp_tty_chars_count > 0) {
-		sclp_tty_write_string(sclp_tty_chars, sclp_tty_chars_count, 0);
+		sclp_tty_write_string(sclp_tty_chars, sclp_tty_chars_count);
 		sclp_tty_chars_count = 0;
 	}
 }
@@ -464,7 +484,7 @@ static void
 sclp_tty_flush_buffer(struct tty_struct *tty)
 {
 	if (sclp_tty_chars_count > 0) {
-		sclp_tty_write_string(sclp_tty_chars, sclp_tty_chars_count, 0);
+		sclp_tty_write_string(sclp_tty_chars, sclp_tty_chars_count);
 		sclp_tty_chars_count = 0;
 	}
 }

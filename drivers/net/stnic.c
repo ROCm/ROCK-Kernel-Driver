@@ -306,12 +306,12 @@ stnic_init (struct net_device *dev)
 }
 
 /* Hardware interrupt handler.  */
-extern void ei_interrupt (int irq, void *dev_id, struct pt_regs *regs);
+irqreturn_t ei_interrupt (int irq, void *dev_id, struct pt_regs *regs);
 
-void
+irqreturn_t
 do_stnic_intr (int irq, void *dev_id, struct pt_regs *regs)
 {
-  ei_interrupt (0, stnic_dev, regs);
+  return ei_interrupt (0, stnic_dev, regs);
 }
 
 module_init(stnic_probe);

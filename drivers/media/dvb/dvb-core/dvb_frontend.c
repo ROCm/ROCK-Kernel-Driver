@@ -67,6 +67,7 @@ struct dvb_frontend_data {
 	pid_t thread_pid;
 	unsigned long release_jiffies;
 	unsigned long lost_sync_jiffies;
+	int aquire_signal;
 	int bending;
 	int lnb_drift;
 	int timeout_count;
@@ -305,6 +306,7 @@ static int dvb_frontend_set_parameters (struct dvb_frontend_data *fe,
 		fe->lost_sync_count = 0;
 		fe->lost_sync_jiffies = jiffies;
 		fe->lnb_drift = 0;
+		fe->aquire_signal = 1;
 		if (fe->status & ~FE_TIMEDOUT)
 			dvb_frontend_add_event (fe, 0);
 		memcpy (&fe->parameters, param,
@@ -364,6 +366,9 @@ static void update_delay (int *quality, int *delay, int locked)
  */
 static void dvb_frontend_recover (struct dvb_frontend_data *fe)
 {
+	int j = fe->lost_sync_count;
+	int stepsize;
+
 	dprintk ("%s\n", __FUNCTION__);
 
 #if 0
@@ -383,10 +388,6 @@ static void dvb_frontend_recover (struct dvb_frontend_data *fe)
 	/**
 	 *  let's start a zigzag scan to compensate LNB drift...
 	 */
-	{
-		int j = fe->lost_sync_count;
-		int stepsize;
-		
 		if (fe->info->type == FE_QPSK)
 			stepsize = fe->parameters.u.qpsk.symbol_rate / 16000;
 		else if (fe->info->type == FE_QAM)
@@ -403,7 +404,6 @@ static void dvb_frontend_recover (struct dvb_frontend_data *fe)
 		}
 
 		dvb_frontend_set_parameters (fe, &fe->parameters, 0);
-	}
 
 	dvb_frontend_internal_ioctl (&fe->frontend, FE_RESET, NULL);
 }
@@ -467,12 +467,18 @@ static int dvb_frontend_thread (void *data)
 		if (s & FE_HAS_LOCK) {
 			fe->timeout_count = 0;
 			fe->lost_sync_count = 0;
+			fe->aquire_signal = 0;
 		} else {
 			fe->lost_sync_count++;
 			if (!(fe->info->caps & FE_CAN_RECOVER)) {
 				if (!(fe->info->caps & FE_CAN_CLEAN_SETUP)) {
-					if (fe->lost_sync_count < 10)
+					if (fe->lost_sync_count < 10) {
+						if (fe->aquire_signal)
+							dvb_frontend_internal_ioctl(
+									&fe->frontend,
+									FE_RESET, NULL);
 						continue;
+				}
 				}
 				dvb_frontend_recover (fe);
 				delay = HZ/5;
@@ -589,6 +595,9 @@ static int dvb_frontend_ioctl (struct inode *inode, struct file *file,
 		break;
 	case FE_SET_FRONTEND:
 		err = dvb_frontend_set_parameters (fe, parg, 1);
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(1);
+		wake_up_interruptible(&fe->wait_queue);
 		break;
 	case FE_GET_EVENT:
 		err = dvb_frontend_get_event (fe, parg, file->f_flags);

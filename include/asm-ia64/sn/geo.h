@@ -1,5 +1,4 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -7,8 +6,8 @@
  * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
-#ifndef __SYS_GEO_H__
-#define __SYS_GEO_H__
+#ifndef _ASM_IA64_SN_GEO_H
+#define _ASM_IA64_SN_GEO_H
 
 /* Include a platform-specific geo.h.  It must define at least:
  *   geoid_t:		Geographic identifier data type
@@ -43,4 +42,4 @@ extern void hwcfg_format_geoid_compt(char *buffer, geoid_t m, int compt);
 extern geoid_t hwcfg_geo_get_self(geo_type_t type);
 extern geoid_t hwcfg_geo_get_by_nasid(geo_type_t type, nasid_t nasid);
 
-#endif /* __SYS_GEO_H__ */
+#endif /* _ASM_IA64_SN_GEO_H */

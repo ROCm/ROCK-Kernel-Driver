@@ -1,7 +1,7 @@
 /***************************************************************************
  * Video4Linux driver for W996[87]CF JPEG USB Dual Mode Camera Chip.       *
  *                                                                         *
- * Copyright (C) 2002 2003 by Luca Risolia <luca_ing@libero.it>            *
+ * Copyright (C) 2002-2004 by Luca Risolia <luca.risolia@studio.unibo.it>  *
  *                                                                         *
  * This program is free software; you can redistribute it and/or modify    *
  * it under the terms of the GNU General Public License as published by    *
@@ -28,6 +28,7 @@
 #include <linux/list.h>
 #include <linux/wait.h>
 #include <linux/config.h>
+#include <linux/param.h>
 #include <asm/semaphore.h>
 #include <asm/types.h>
 
@@ -105,7 +106,7 @@ static const struct w9968cf_format w9968cf_formatlist[] = {
 #define W9968CF_LARGEVIEW      1 /* 0 disable, 1 enable */
 #define W9968CF_UPSCALING      0 /* 0 disable, 1 enable */
 
-#define W9968CF_SENSOR_MONO    0 /* 0 not monochrome, 1 monochrome sensor */
+#define W9968CF_MONOCHROME     0 /* 0 not monochrome, 1 monochrome sensor */
 #define W9968CF_BRIGHTNESS     31000 /* from 0 to 65535 */
 #define W9968CF_HUE            32768 /* from 0 to 65535 */
 #define W9968CF_COLOUR         32768 /* from 0 to 65535 */
@@ -129,9 +130,10 @@ static const struct w9968cf_format w9968cf_formatlist[] = {
 
 #define W9968CF_MODULE_NAME     "V4L driver for W996[87]CF JPEG USB " \
                                 "Dual Mode Camera Chip"
-#define W9968CF_MODULE_VERSION  "v1.22"
-#define W9968CF_MODULE_AUTHOR   "(C) 2002 2003 Luca Risolia"
-#define W9968CF_AUTHOR_EMAIL    "<luca_ing@libero.it>"
+#define W9968CF_MODULE_VERSION  "v1.25-basic"
+#define W9968CF_MODULE_AUTHOR   "(C) 2002-2004 Luca Risolia"
+#define W9968CF_AUTHOR_EMAIL    "<luca.risolia@studio.unibo.it>"
+#define W9968CF_MODULE_LICENSE  "GPL"
 
 static u8 w9968cf_vppmod_present; /* status flag: yes=1, no=0 */
 
@@ -171,6 +173,7 @@ enum w9968cf_frame_status {
 };
 
 struct w9968cf_frame_t {
+	#define W9968CF_HW_BUF_SIZE 640*480*2 /* buf.size of original frames */
 	void* buffer;
 	u32 length;
 	enum w9968cf_frame_status status;
@@ -194,8 +197,8 @@ struct semaphore w9968cf_devlist_sem; /* semaphore for list traversal */
 struct w9968cf_device {
 	enum w9968cf_model_id id;   /* private device identifier */
 
-	struct video_device v4ldev; /* V4L structure */
-	struct list_head v4llist;   /* entry of the list of V4L cameras */
+	struct video_device* v4ldev; /* -> V4L structure */
+	struct list_head v4llist;    /* entry of the list of V4L cameras */
 
 	struct usb_device* usbdev;           /* -> main USB structure */
 	struct urb* urb[W9968CF_URBS];       /* -> USB request block structs */
@@ -207,9 +210,9 @@ struct w9968cf_device {
 	struct w9968cf_frame_t frame_tmp;  /* temporary frame */
 	struct w9968cf_frame_t* frame_current; /* -> frame being grabbed */
 	struct w9968cf_frame_t* requested_frame[W9968CF_MAX_BUFFERS];
-	void* vpp_buffer; /* -> helper buffer for post-processing routines */
+	void* vpp_buffer; /*-> helper buf.for video post-processing routines */
 
-	u8 max_buffers,   /* number of requested buffers */	   
+	u8 max_buffers,   /* number of requested buffers */
 	   force_palette, /* yes=1/no=0 */
 	   force_rgb,     /* read RGB instead of BGR, yes=1, no=0 */
 	   double_buffer, /* hardware double buffering yes=1/no=0 */
@@ -220,15 +223,17 @@ struct w9968cf_device {
 	   decompression, /* 0=disabled, 1=forced, 2=allowed */
 	   upscaling;     /* software image scaling, 0=enabled, 1=disabled */
 
-	struct video_picture picture; /* current window settings */
-	struct video_window window;   /* current picture settings */
+	struct video_picture picture; /* current picture settings */
+	struct video_window window;   /* current window settings */
 
 	u16 hw_depth,    /* depth (used by the chip) */
 	    hw_palette,  /* palette (used by the chip) */
 	    hw_width,    /* width (used by the chip) */
 	    hw_height,   /* height (used by the chip) */
 	    hs_polarity, /* 0=negative sync pulse, 1=positive sync pulse */
-	    vs_polarity; /* 0=negative sync pulse, 1=positive sync pulse */
+	    vs_polarity, /* 0=negative sync pulse, 1=positive sync pulse */
+	    start_cropx, /* pixels from HS inactive edge to 1st cropped pixel*/
+	    start_cropy; /* pixels from VS incative edge to 1st cropped pixel*/
 
 	enum w9968cf_vpp_flag vpp_flag; /* post-processing routines in use */
 
@@ -239,16 +244,15 @@ struct w9968cf_device {
 	   users,         /* flag: number of users holding the device */
 	   streaming;     /* flag: yes=1, no=0 */
 
-	int sensor; /* type of image CMOS sensor chip (CC_*) */
+	u8 sensor_initialized; /* flag: yes=1, no=0 */
 
-	/* Determined by CMOS sensor type */
-	u16 maxwidth,
-	    maxheight,
-	    minwidth,
-	    minheight,
-	    start_cropx,
-	    start_cropy;
-
+	/* Determined by CMOS sensor type: */
+	int sensor,       /* type of image sensor chip (CC_*) */
+	    monochrome;   /* CMOS sensor is (probably) monochrome */
+	u16 maxwidth,     /* maximum width supported by the CMOS sensor */
+	    maxheight,    /* maximum height supported by the CMOS sensor */
+	    minwidth,     /* minimum width supported by the CMOS sensor */
+	    minheight;    /* minimum height supported by the CMOS sensor */
 	u8  auto_brt,     /* auto brightness enabled flag */
 	    auto_exp,     /* auto exposure enabled flag */
 	    backlight,    /* backlight exposure algorithm flag */
@@ -256,7 +260,6 @@ struct w9968cf_device {
 	    lightfreq,    /* power (lighting) frequency */
 	    bandfilt;     /* banding filter enabled flag */
 	s8  clockdiv;     /* clock divisor */
-	int sensor_mono;  /* CMOS sensor is (probably) monochrome */
 
 	/* I2C interface to kernel */
 	struct i2c_adapter i2c_adapter;
@@ -271,14 +274,9 @@ struct w9968cf_device {
 	wait_queue_head_t open, wait_queue;
 };
 
-#define W9968CF_HW_BUF_SIZE 640*480*2 /* buf. size for original video frames */
-
-#define SENSOR_FORMAT          VIDEO_PALETTE_UYVY
-#define SENSOR_FATAL_ERROR(rc) ((rc) < 0 && (rc) != -EPERM)
-
 
 /****************************************************************************
- * Macros and other constants                                               *
+ * Macros for debugging                                                     *
  ****************************************************************************/
 
 #undef DBG
@@ -294,7 +292,7 @@ if ( ((specific_debug) && (debug == (level))) || \
 	else if ((level) == 4) \
 		warn(fmt, ## args); \
 	else if ((level) >= 5) \
-		info("[%s,%d] " fmt, \
+		info("[%s:%d] " fmt, \
 		     __PRETTY_FUNCTION__, __LINE__ , ## args); \
 } \
 }
@@ -305,7 +303,7 @@ if ( ((specific_debug) && (debug == (level))) || \
 
 #undef PDBG
 #undef PDBGG
-#define PDBG(fmt, args...) info("[%s, %d] "fmt, \
+#define PDBG(fmt, args...) info("[%s:%d] "fmt, \
 	                        __PRETTY_FUNCTION__, __LINE__ , ## args);
 #define PDBGG(fmt, args...) do {;} while(0); /* nothing: it's a placeholder */
 

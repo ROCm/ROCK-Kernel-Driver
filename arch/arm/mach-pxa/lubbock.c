@@ -29,6 +29,7 @@
 #include <asm/mach/irq.h>
 
 #include <asm/arch/irq.h>
+#include <asm/arch/udc.h>
 #include <asm/hardware/sa1111.h>
 
 #include "generic.h"
@@ -88,6 +89,16 @@ static void __init lubbock_init_irq(void)
 	set_irq_type(IRQ_GPIO(0), IRQT_FALLING);
 }
 
+static int lubbock_udc_is_connected(void)
+{
+	return (LUB_MISC_RD & (1 << 9)) == 0;
+}
+
+static struct pxa2xx_udc_mach_info udc_info __initdata = {
+	.udc_is_connected	= lubbock_udc_is_connected,
+	// no D+ pullup; lubbock can't connect/disconnect in software
+};
+
 static struct resource sa1111_resources[] = {
 	[0] = {
 		.start	= 0x10000000,
@@ -112,12 +123,11 @@ static struct platform_device *devices[] __initdata = {
 	&sa1111_device,
 };
 
-static int __init lubbock_init(void)
+static void __init lubbock_init(void)
 {
-	return platform_add_devices(devices, ARRAY_SIZE(devices));
+	pxa_set_udc_info(&udc_info);
+	(void) platform_add_devices(devices, ARRAY_SIZE(devices));
 }
-
-subsys_initcall(lubbock_init);
 
 static struct map_desc lubbock_io_desc[] __initdata = {
  /* virtual     physical    length      type */
@@ -157,4 +167,5 @@ MACHINE_START(LUBBOCK, "Intel DBPXA250 Development Platform")
 	BOOT_MEM(0xa0000000, 0x40000000, io_p2v(0x40000000))
 	MAPIO(lubbock_map_io)
 	INITIRQ(lubbock_init_irq)
+	INIT_MACHINE(lubbock_init)
 MACHINE_END

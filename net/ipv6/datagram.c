@@ -265,6 +265,8 @@ int datagram_send_ctl(struct msghdr *msg, struct flowi *fl,
 	int err = 0;
 
 	for (cmsg = CMSG_FIRSTHDR(msg); cmsg; cmsg = CMSG_NXTHDR(msg, cmsg)) {
+		int addr_type;
+		struct net_device *dev = NULL;
 
 		if (cmsg->cmsg_len < sizeof(struct cmsghdr) ||
 		    (unsigned long)(((char*)cmsg - (char*)msg->msg_control)
@@ -291,16 +293,30 @@ int datagram_send_ctl(struct msghdr *msg, struct flowi *fl,
 				fl->oif = src_info->ipi6_ifindex;
 			}
 
-			if (!ipv6_addr_any(&src_info->ipi6_addr)) {
-				if (!ipv6_chk_addr(&src_info->ipi6_addr, NULL)) {
-					err = -EINVAL;
-					goto exit_f;
+			addr_type = ipv6_addr_type(&src_info->ipi6_addr);
+
+			if (ipv6_addr_type == IPV6_ADDR_ANY)
+				break;
+			
+			if (addr_type & IPV6_ADDR_LINKLOCAL) {
+				if (!src_info->ipi6_ifindex)
+					return -EINVAL;
+				else {
+					dev = dev_get_by_index(src_info->ipi6_ifindex);
+					if (!dev)
+						return -ENODEV;
 				}
-
-				ipv6_addr_copy(&fl->fl6_src,
-					       &src_info->ipi6_addr);
 			}
+			if (!ipv6_chk_addr(&src_info->ipi6_addr, dev)) {
+				if (dev)
+					dev_put(dev);
+				err = -EINVAL;
+				goto exit_f;
+			}
+			if (dev)
+				dev_put(dev);
 
+			ipv6_addr_copy(&fl->fl6_src, &src_info->ipi6_addr);
 			break;
 
 		case IPV6_FLOWINFO:

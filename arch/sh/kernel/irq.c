@@ -1,4 +1,4 @@
-/* $Id: irq.c,v 1.12 2003/06/28 15:34:55 lethal Exp $
+/* $Id: irq.c,v 1.19 2004/01/10 01:25:32 lethal Exp $
  *
  * linux/arch/sh/kernel/irq.c
  *
@@ -30,6 +30,7 @@
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/seq_file.h>
+#include <linux/kallsyms.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -45,6 +46,7 @@
 irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned = {
 	[0 ... NR_IRQS-1] = {
 		.handler = &no_irq_type,
+		.lock = SPIN_LOCK_UNLOCKED
 	}
 };
 
@@ -150,23 +152,88 @@ int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction *
 		add_interrupt_randomness(irq);
 
 	local_irq_disable();
+	return retval;
+}
 
-	if (retval != 1) {
-		static int count = 100;
+static void __report_bad_irq(int irq, irq_desc_t *desc, irqreturn_t action_ret)
+{
+	struct irqaction *action;
 
-		if (count) {
-			count--;
+	if (action_ret != IRQ_HANDLED && action_ret != IRQ_NONE) {
+		printk(KERN_ERR "irq event %d: bogus return value %x\n",
+				irq, action_ret);
+	} else {
+		printk(KERN_ERR "irq %d: nobody cared!\n", irq);
+	}
+	dump_stack();
+	printk(KERN_ERR "handlers:\n");
+	action = desc->action;
+	do {
+		printk(KERN_ERR "[<%p>]", action->handler);
+		print_symbol(" (%s)",
+			(unsigned long)action->handler);
+		printk("\n");
+		action = action->next;
+	} while (action);
+}
 
-			if (retval) {
-				printk("irq event %d: bogus retval mask %x\n",
-					irq, retval);
-			} else {
-				printk("irq %d: nobody cared\n", irq);
-			}
-		}
+static void report_bad_irq(int irq, irq_desc_t *desc, irqreturn_t action_ret)
+{
+	static int count = 100;
+
+	if (count) {
+		count--;
+		__report_bad_irq(irq, desc, action_ret);
+	}
+}
+
+static int noirqdebug;
+
+static int __init noirqdebug_setup(char *str)
+{
+	noirqdebug = 1;
+	printk("IRQ lockup detection disabled\n");
+	return 1;
+}
+
+__setup("noirqdebug", noirqdebug_setup);
+
+/*
+ * If 99,900 of the previous 100,000 interrupts have not been handled then
+ * assume that the IRQ is stuck in some manner.  Drop a diagnostic and try to
+ * turn the IRQ off.
+ *
+ * (The other 100-of-100,000 interrupts may have been a correctly-functioning
+ *  device sharing an IRQ with the failing one)
+ *
+ * Called under desc->lock
+ */
+static void note_interrupt(int irq, irq_desc_t *desc, irqreturn_t action_ret)
+{
+	if (action_ret != IRQ_HANDLED) {
+		desc->irqs_unhandled++;
+		if (action_ret != IRQ_NONE)
+			report_bad_irq(irq, desc, action_ret);
 	}
 
-	return status;
+	desc->irq_count++;
+	if (desc->irq_count < 100000)
+		return;
+
+	desc->irq_count = 0;
+	if (desc->irqs_unhandled > 99900) {
+		/*
+		 * The interrupt is stuck
+		 */
+		__report_bad_irq(irq, desc, action_ret);
+		/*
+		 * Now kill the IRQ
+		 */
+		printk(KERN_EMERG "Disabling IRQ #%d\n", irq);
+		desc->status |= IRQ_DISABLED;
+		desc->handler->disable(irq);
+	}
+	desc->irqs_unhandled = 0;
 }
 
 /*
@@ -194,8 +261,10 @@ inline void disable_irq_nosync(unsigned int irq)
  */
 void disable_irq(unsigned int irq)
 {
+	irq_desc_t *desc = irq_desc + irq;
 	disable_irq_nosync(irq);
-	synchronize_irq(irq);
+	if (desc->action)
+		synchronize_irq(irq);
 }
 
 void enable_irq(unsigned int irq)
@@ -206,7 +275,7 @@ void enable_irq(unsigned int irq)
 	spin_lock_irqsave(&desc->lock, flags);
 	switch (desc->depth) {
 	case 1: {
-		unsigned int status = desc->status & ~IRQ_DISABLED;
+		unsigned int status = desc->status & ~(IRQ_DISABLED | IRQ_INPROGRESS);
 		desc->status = status;
 		if ((status & (IRQ_PENDING | IRQ_REPLAY)) == IRQ_PENDING) {
 			desc->status = status | IRQ_REPLAY;
@@ -243,7 +312,6 @@ asmlinkage int do_IRQ(unsigned long r4, unsigned long r5,
 	 * handled by some other CPU. (or is disabled)
 	 */
 	int irq;
-	int cpu = smp_processor_id();
 	irq_desc_t *desc;
 	struct irqaction * action;
 	unsigned int status;
@@ -259,7 +327,7 @@ asmlinkage int do_IRQ(unsigned long r4, unsigned long r5,
 		     :"=z" (irq));
 	irq = irq_demux(irq);
 
-	kstat_cpu(cpu).irqs[irq]++;
+	kstat_this_cpu.irqs[irq]++;
 	desc = irq_desc + irq;
 	spin_lock(&desc->lock);
 	desc->handler->ack(irq);
@@ -302,10 +370,13 @@ asmlinkage int do_IRQ(unsigned long r4, unsigned long r5,
 	 * SMP environment.
 	 */
 	for (;;) {
-		spin_unlock(&desc->lock);
-		handle_IRQ_event(irq, &regs, action);
-		spin_lock(&desc->lock);
+		irqreturn_t action_ret;
 
+		spin_unlock(&desc->lock);
+		action_ret = handle_IRQ_event(irq, &regs, action);
+		spin_lock(&desc->lock);
+		if (!noirqdebug)
+			note_interrupt(irq, desc, action_ret);
 		if (likely(!(desc->status & IRQ_PENDING)))
 			break;
 		desc->status &= ~IRQ_PENDING;
@@ -454,15 +525,16 @@ unsigned long probe_irq_on(void)
 	 * Wait for spurious interrupts to trigger
 	 */
 	for (delay = jiffies + HZ/10; time_after(delay, jiffies); )
-		/* about 100ms delay */ synchronize_irq();
+		/* about 100ms delay */ barrier();
 
 	/*
 	 * Now filter out any obviously spurious interrupts
 	 */
 	val = 0;
 	for (i=0; i<NR_IRQS; i++) {
-		desc = irq_desc + i;
 		unsigned int status;
+
+		desc = irq_desc + i;
 
 		spin_lock_irq(&desc->lock);
 		status = desc->status;

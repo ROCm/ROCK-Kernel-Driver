@@ -172,6 +172,7 @@ static int kbtab_probe(struct usb_interface *intf, const struct usb_device_id *i
 	kbtab->dev.id.vendor = dev->descriptor.idVendor;
 	kbtab->dev.id.product = dev->descriptor.idProduct;
 	kbtab->dev.id.version = dev->descriptor.bcdDevice;
+	kbtab->dev.dev = &intf->dev;
 	kbtab->usbdev = dev;
 
 	endpoint = &intf->altsetting[0].endpoint[0].desc;

@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/cio.c
  *   S/390 common I/O routines -- low level i/o calls
- *   $Revision: 1.105 $
+ *   $Revision: 1.114 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -147,7 +147,7 @@ cio_tpi(void)
 	if (tsch (tpi_info->irq, irb) != 0)
 		/* Not status pending or not operational. */
 		return 1;
-	sch = ioinfo[tpi_info->irq];
+	sch = (struct subchannel *)(unsigned long)tpi_info->intparm;
 	if (!sch)
 		return 1;
 	irq_enter ();
@@ -184,22 +184,22 @@ cio_start_handle_notoper(struct subchannel *sch, __u8 lpm)
 int
 cio_start (struct subchannel *sch,	/* subchannel structure */
 	   struct ccw1 * cpa,		/* logical channel prog addr */
-	   unsigned int intparm,	/* interruption parameter */
 	   __u8 lpm)			/* logical path mask */
 {
 	char dbf_txt[15];
 	int ccode;
 
-	sprintf (dbf_txt, "stIO%x", sch->irq);
-	CIO_TRACE_EVENT (4, dbf_txt);
+	CIO_TRACE_EVENT (4, "stIO");
+	CIO_TRACE_EVENT (4, sch->dev.bus_id);
 
-	sch->orb.intparm = intparm;
+	/* sch is always under 2G. */
+	sch->orb.intparm = (__u32)(unsigned long)sch;
 	sch->orb.fmt = 1;
 
 	sch->orb.pfch = sch->options.prefetch == 0;
 	sch->orb.spnd = sch->options.suspend;
 	sch->orb.ssic = sch->options.suspend && sch->options.inter;
-	sch->orb.lpm = (lpm != 0) ? lpm : sch->lpm;
+	sch->orb.lpm = (lpm != 0) ? (lpm & sch->opm) : sch->lpm;
 #ifdef CONFIG_ARCH_S390X
 	/*
 	 * for 64 bit we always support 64 bit IDAWs with 4k page size only
@@ -240,8 +240,8 @@ cio_resume (struct subchannel *sch)
 	char dbf_txt[15];
 	int ccode;
 
-	sprintf (dbf_txt, "resIO%x", sch->irq);
-	CIO_TRACE_EVENT (4, dbf_txt);
+	CIO_TRACE_EVENT (4, "resIO");
+	CIO_TRACE_EVENT (4, sch->dev.bus_id);
 
 	ccode = rsch (sch->irq);
 
@@ -277,8 +277,8 @@ cio_halt(struct subchannel *sch)
 	if (!sch)
 		return -ENODEV;
 
-	sprintf (dbf_txt, "haltIO%x", sch->irq);
-	CIO_TRACE_EVENT (2, dbf_txt);
+	CIO_TRACE_EVENT (2, "haltIO");
+	CIO_TRACE_EVENT (2, sch->dev.bus_id);
 
 	/*
 	 * Issue "Halt subchannel" and process condition code
@@ -312,8 +312,8 @@ cio_clear(struct subchannel *sch)
 	if (!sch)
 		return -ENODEV;
 
-	sprintf (dbf_txt, "clearIO%x", sch->irq);
-	CIO_TRACE_EVENT (2, dbf_txt);
+	CIO_TRACE_EVENT (2, "clearIO");
+	CIO_TRACE_EVENT (2, sch->dev.bus_id);
 
 	/*
 	 * Issue "Clear subchannel" and process condition code
@@ -348,8 +348,8 @@ cio_cancel (struct subchannel *sch)
 	if (!sch)
 		return -ENODEV;
 
-	sprintf (dbf_txt, "cancelIO%x", sch->irq);
-	CIO_TRACE_EVENT (2, dbf_txt);
+	CIO_TRACE_EVENT (2, "cancelIO");
+	CIO_TRACE_EVENT (2, sch->dev.bus_id);
 
 	ccode = xsch (sch->irq);
 
@@ -374,7 +374,7 @@ cio_cancel (struct subchannel *sch)
  * Function: cio_modify
  * Issues a "Modify Subchannel" on the specified subchannel
  */
-static int
+int
 cio_modify (struct subchannel *sch)
 {
 	int ccode, retry, ret;
@@ -411,8 +411,8 @@ cio_enable_subchannel (struct subchannel *sch, unsigned int isc)
 	int retry;
 	int ret;
 
-	sprintf (dbf_txt, "ensch%x", sch->irq);
-	CIO_TRACE_EVENT (2, dbf_txt);
+	CIO_TRACE_EVENT (2, "ensch");
+	CIO_TRACE_EVENT (2, sch->dev.bus_id);
 
 	ccode = stsch (sch->irq, &sch->schib);
 	if (ccode)
@@ -420,6 +420,7 @@ cio_enable_subchannel (struct subchannel *sch, unsigned int isc)
 
 	sch->schib.pmcw.ena = 1;
 	sch->schib.pmcw.isc = isc;
+	sch->schib.pmcw.intparm = (__u32)(unsigned long)sch;
 	for (retry = 5, ret = 0; retry > 0; retry--) {
 		ret = cio_modify(sch);
 		if (ret == -ENODEV)
@@ -457,8 +458,8 @@ cio_disable_subchannel (struct subchannel *sch)
 	int retry;
 	int ret;
 
-	sprintf (dbf_txt, "dissch%x", sch->irq);
-	CIO_TRACE_EVENT (2, dbf_txt);
+	CIO_TRACE_EVENT (2, "dissch");
+	CIO_TRACE_EVENT (2, sch->dev.bus_id);
 
 	ccode = stsch (sch->irq, &sch->schib);
 	if (ccode == 3)		/* Not operational. */
@@ -476,6 +477,13 @@ cio_disable_subchannel (struct subchannel *sch)
 	for (retry = 5, ret = 0; retry > 0; retry--) {
 		ret = cio_modify(sch);
 		if (ret == -ENODEV)
+			break;
+		if (ret == -EBUSY)
+			/*
+			 * The subchannel is busy or status pending.
+			 * We'll disable when the next interrupt was delivered
+			 * via the state machine.
+			 */
 			break;
 		if (ret == 0) {
 			stsch (sch->irq, &sch->schib);
@@ -511,6 +519,11 @@ cio_validate_subchannel (struct subchannel *sch, unsigned int irq)
 
 	/* Nuke all fields. */
 	memset(sch, 0, sizeof(struct subchannel));
+
+	spin_lock_init(&sch->lock);
+
+	/* Set a name for the subchannel */
+	snprintf (sch->dev.bus_id, BUS_ID_SIZE, "0.0.%04x", irq);
 
 	/*
 	 * The first subchannel that is not-operational (ccode==3)
@@ -551,12 +564,12 @@ cio_validate_subchannel (struct subchannel *sch, unsigned int irq)
 			      "at devno %04X\n", sch->schib.pmcw.dev);
 		return -ENODEV;
 	}
-
+	sch->opm = 0xff;
+	chsc_validate_chpids(sch);
 	sch->lpm = sch->schib.pmcw.pim &
 		sch->schib.pmcw.pam &
-		sch->schib.pmcw.pom;
-
-	chsc_validate_chpids(sch);
+		sch->schib.pmcw.pom &
+		sch->opm;
 
 	CIO_DEBUG(KERN_INFO, 0,
 		  "Detected device %04X on subchannel %s"
@@ -575,7 +588,6 @@ cio_validate_subchannel (struct subchannel *sch, unsigned int irq)
 	sch->schib.pmcw.isc = 3;	/* could be smth. else */
 	sch->schib.pmcw.csense = 1;	/* concurrent sense */
 	sch->schib.pmcw.ena = 0;
-	sch->schib.pmcw.intparm = sch->schib.pmcw.dev;
 	if ((sch->lpm & (sch->lpm - 1)) != 0)
 		sch->schib.pmcw.mp = 1;	/* multipath mode */
 	return 0;
@@ -612,7 +624,7 @@ do_IRQ (struct pt_regs *regs)
 			do_adapter_IO();
 			continue;
 		}
-		sch = ioinfo[tpi_info->irq];
+		sch = (struct subchannel *)(unsigned long)tpi_info->intparm;
 		if (sch)
 			spin_lock(&sch->lock);
 		/* Store interrupt response block to lowcore. */
@@ -733,16 +745,40 @@ cio_probe_console(void)
 	 */
 	ctl_set_bit(6, 24);
 	console_subchannel.schib.pmcw.isc = 7;
-	ioinfo[irq] = &console_subchannel;
+	console_subchannel.schib.pmcw.intparm =
+		(__u32)(unsigned long)&console_subchannel;
+	ret = cio_modify(&console_subchannel);
+	if (ret) {
+		console_subchannel_in_use = 0;
+		return ERR_PTR(ret);
+	}
 	return &console_subchannel;
 }
 
 void
 cio_release_console(void)
 {
-	ioinfo[console_subchannel.irq] = NULL;
+	console_subchannel.schib.pmcw.intparm = 0;
+	cio_modify(&console_subchannel);
 	ctl_clear_bit(6, 24);
 	console_subchannel_in_use = 0;
+}
+
+/* Bah... hack to catch console special sausages. */
+int
+cio_is_console(int irq)
+{
+	if (!console_subchannel_in_use)
+		return 0;
+	return (irq == console_subchannel.irq);
+}
+
+struct subchannel *
+cio_get_console_subchannel(void)
+{
+	if (!console_subchannel_in_use)
+		return 0;
+	return &console_subchannel;
 }
 
 #endif

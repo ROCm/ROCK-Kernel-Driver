@@ -1526,7 +1526,12 @@ static int ax25_sendmsg(struct kiocb *iocb, struct socket *sock,
 	SOCK_DEBUG(sk, "AX.25: Appending user data\n");
 
 	/* User data follows immediately after the AX.25 data */
-	memcpy_fromiovec(skb_put(skb, len), msg->msg_iov, len);
+	if (memcpy_fromiovec(skb_put(skb, len), msg->msg_iov, len)) {
+		err = -EFAULT;
+		kfree_skb(skb);
+		goto out;
+	}
+
 	skb->nh.raw = skb->data;
 
 	/* Add the PID if one is not supplied by the user in the skb */

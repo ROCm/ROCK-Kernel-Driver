@@ -62,6 +62,15 @@ config SERIAL_8250_CONSOLE
 
 	  If unsure, say N.
 
+config SERIAL_8250_HCDP
+	bool "Console device discovery via EFI HCDP table"
+	depends on IA64
+	depends on SERIAL_8250_CONSOLE=y
+	---help---
+	  If you wish to make the serial console port described by the EFI
+	  HCDP table available for use as serial console, say Y here.  See
+	  <http://www.dig64.org/specifications/DIG64_HCDPv10a_01.pdf>.
+
 config SERIAL_8250_CS
 	tristate "8250/16550 PCMCIA device support"
 	depends on PCMCIA && SERIAL_8250
@@ -83,15 +92,6 @@ config SERIAL_8250_ACPI
 	---help---
 	  If you wish to enable serial port discovery via the ACPI
 	  namespace, say Y here.  If unsure, say N.
-
-config SERIAL_8250_HCDP
-	bool "8250/16550 device discovery support via EFI HCDP table"
-	depends on IA64 && SERIAL_8250
-	---help---
-	  If you wish to make the serial console port described by the EFI
-	  HCDP table available for use as serial console or general
-	  purpose port, say Y here. See
-	  <http://www.dig64.org/specifications/DIG64_HCDPv10a_01.pdf>.
 
 config SERIAL_8250_NR_UARTS
 	int "Maximum number of non-legacy 8250/16550 serial ports"

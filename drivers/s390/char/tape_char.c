@@ -19,8 +19,9 @@
 #include <asm/uaccess.h>
 
 #include "tape.h"
+#include "tape_std.h"
 
-#define PRINTK_HEADER "TCHAR:"
+#define PRINTK_HEADER "TAPE_CHAR: "
 
 #define TAPECHAR_MAJOR		0	/* get dynamic major */
 
@@ -52,12 +53,14 @@ static int tapechar_major = TAPECHAR_MAJOR;
 int
 tapechar_setup_device(struct tape_device * device)
 {
+	tape_hotplug_event(device, tapechar_major, TAPE_HOTPLUG_CHAR_ADD);
 	return 0;
 }
 
 void
 tapechar_cleanup_device(struct tape_device *device)
 {
+	tape_hotplug_event(device, tapechar_major, TAPE_HOTPLUG_CHAR_REMOVE);
 }
 
 /*
@@ -81,15 +84,27 @@ tapechar_check_idalbuffer(struct tape_device *device, size_t block_size)
 	struct idal_buffer *new;
 
 	if (device->char_data.idal_buf != NULL &&
-	    device->char_data.idal_buf->size >= block_size)
+	    device->char_data.idal_buf->size == block_size)
 		return 0;
-	/* The current idal buffer is not big enough. Allocate a new one. */
+
+	if (block_size > MAX_BLOCKSIZE) {
+		DBF_EVENT(3, "Invalid blocksize (%zd > %d)\n",
+			block_size, MAX_BLOCKSIZE);
+		PRINT_ERR("Invalid blocksize (%zd> %d)\n",
+			block_size, MAX_BLOCKSIZE);
+		return -EINVAL;
+	}
+
+	/* The current idal buffer is not correct. Allocate a new one. */
 	new = idal_buffer_alloc(block_size, 0);
 	if (new == NULL)
 		return -ENOMEM;
+
 	if (device->char_data.idal_buf != NULL)
 		idal_buffer_free(device->char_data.idal_buf);
+
 	device->char_data.idal_buf = new;
+
 	return 0;
 }
 
@@ -116,6 +131,16 @@ tapechar_read (struct file *filp, char *data, size_t count, loff_t *ppos)
 		DBF_EVENT(6, "TCHAR:ppos wrong\n");
 		return -EOVERFLOW;
 	}
+
+	/*
+	 * If the tape isn't terminated yet, do it now. And since we then
+	 * are at the end of the tape there wouldn't be anything to read
+	 * anyways. So we return immediatly.
+	 */
+	if(device->required_tapemarks) {
+		return tape_std_terminate_write(device);
+	}
+
 	/* Find out block size to use */
 	if (device->char_data.block_size != 0) {
 		if (count < device->char_data.block_size) {
@@ -126,10 +151,17 @@ tapechar_read (struct file *filp, char *data, size_t count, loff_t *ppos)
 		block_size = device->char_data.block_size;
 	} else {
 		block_size = count;
-		rc = tapechar_check_idalbuffer(device, block_size);
-		if (rc)
-			return rc;
 	}
+
+	rc = tapechar_check_idalbuffer(device, block_size);
+	if (rc)
+		return rc;
+
+#ifdef CONFIG_S390_TAPE_BLOCK
+	/* Changes position. */
+	device->blk_data.medium_changed = 1;
+#endif
+
 	DBF_EVENT(6, "TCHAR:nbytes: %lx\n", block_size);
 	/* Let the discipline build the ccw chain. */
 	request = device->discipline->read_block(device, block_size);
@@ -182,11 +214,18 @@ tapechar_write(struct file *filp, const char *data, size_t count, loff_t *ppos)
 		nblocks = count / block_size;
 	} else {
 		block_size = count;
-		rc = tapechar_check_idalbuffer(device, block_size);
-		if (rc)
-			return rc;
 		nblocks = 1;
 	}
+
+	rc = tapechar_check_idalbuffer(device, block_size);
+	if (rc)
+		return rc;
+
+#ifdef CONFIG_S390_TAPE_BLOCK
+	/* Changes position. */
+	device->blk_data.medium_changed = 1;
+#endif
+
 	DBF_EVENT(6,"TCHAR:nbytes: %lx\n", block_size);
 	DBF_EVENT(6, "TCHAR:nblocks: %x\n", nblocks);
 	/* Let the discipline build the ccw chain. */
@@ -225,6 +264,17 @@ tapechar_write(struct file *filp, const char *data, size_t count, loff_t *ppos)
 			rc = 0;
 
 	}
+
+	/*
+	 * After doing a write we always need two tapemarks to correctly
+	 * terminate the tape (one to terminate the file, the second to
+	 * flag the end of recorded data.
+	 * Since process_eov positions the tape in front of the written
+	 * tapemark it doesn't hurt to write two marks again.
+	 */
+	if (!rc)
+		device->required_tapemarks = 2;
+
 	return rc ? rc : written;
 }
 
@@ -237,24 +287,28 @@ tapechar_open (struct inode *inode, struct file *filp)
 	struct tape_device *device;
 	int minor, rc;
 
+	DBF_EVENT(6, "TCHAR:open: %i:%i\n",
+		imajor(filp->f_dentry->d_inode),
+		iminor(filp->f_dentry->d_inode));
+
 	if (imajor(filp->f_dentry->d_inode) != tapechar_major)
 		return -ENODEV;
+
 	minor = iminor(filp->f_dentry->d_inode);
 	device = tape_get_device(minor / TAPE_MINORS_PER_DEV);
 	if (IS_ERR(device)) {
+		DBF_EVENT(3, "TCHAR:open: tape_get_device() failed\n");
 		return PTR_ERR(device);
 	}
-	DBF_EVENT(6, "TCHAR:open: %x\n", iminor(inode));
+
+
 	rc = tape_open(device);
 	if (rc == 0) {
-		rc = tape_assign(device);
-		if (rc == 0) {
-			filp->private_data = device;
-			return 0;
-		}
-		tape_release(device);
+		filp->private_data = device;
+		return 0;
 	}
 	tape_put_device(device);
+
 	return rc;
 }
 
@@ -267,29 +321,32 @@ tapechar_release(struct inode *inode, struct file *filp)
 {
 	struct tape_device *device;
 
-	device = (struct tape_device *) filp->private_data;
 	DBF_EVENT(6, "TCHAR:release: %x\n", iminor(inode));
-#if 0
-	// FIXME: this is broken. Either MTWEOF/MTWEOF/MTBSR is done
-	// EVERYTIME the user switches from write to something different
-	// or it is not done at all. The second is IMHO better because
-	// we should NEVER do something the user didn't request.
-	if (device->last_op == TO_WRI)
-		tapechar_terminate_write(device);
-#endif
+	device = (struct tape_device *) filp->private_data;
+
 	/*
-	 * If this is the rewinding tape minor then rewind.
+	 * If this is the rewinding tape minor then rewind. In that case we
+	 * write all required tapemarks. Otherwise only one to terminate the
+	 * file.
 	 */
-	if ((iminor(inode) & 1) != 0)
+	if ((iminor(inode) & 1) != 0) {
+		if (device->required_tapemarks)
+			tape_std_terminate_write(device);
 		tape_mtop(device, MTREW, 1);
+	} else {
+		if (device->required_tapemarks > 1) {
+			if (tape_mtop(device, MTWEOF, 1) == 0)
+				device->required_tapemarks--;
+		}
+	}
+
 	if (device->char_data.idal_buf != NULL) {
 		idal_buffer_free(device->char_data.idal_buf);
 		device->char_data.idal_buf = NULL;
 	}
-	device->char_data.block_size = 0;
 	tape_release(device);
-	tape_unassign(device);
-	tape_put_device(device);
+	filp->private_data = tape_put_device(device);
+
 	return 0;
 }
 
@@ -314,7 +371,40 @@ tapechar_ioctl(struct inode *inp, struct file *filp,
 			return -EFAULT;
 		if (op.mt_count < 0)
 			return -EINVAL;
-		return tape_mtop(device, op.mt_op, op.mt_count);
+
+		/*
+		 * Operations that change tape position should write final
+		 * tapemarks.
+		 */
+		switch (op.mt_op) {
+			case MTFSF:
+			case MTBSF:
+			case MTFSR:
+			case MTBSR:
+			case MTREW:
+			case MTOFFL:
+			case MTEOM:
+			case MTRETEN:
+			case MTBSFM:
+			case MTFSFM:
+			case MTSEEK:
+#ifdef CONFIG_S390_TAPE_BLOCK
+				device->blk_data.medium_changed = 1;
+#endif
+				if (device->required_tapemarks)
+					tape_std_terminate_write(device);
+			default:
+				;
+		}
+		rc = tape_mtop(device, op.mt_op, op.mt_count);
+
+		if (op.mt_op == MTWEOF && rc == 0) {
+			if (op.mt_count > device->required_tapemarks)
+				device->required_tapemarks = 0;
+			else
+				device->required_tapemarks -= op.mt_count;
+		}
+		return rc;
 	}
 	if (no == MTIOCPOS) {
 		/* MTIOCPOS: query the tape position. */
@@ -333,19 +423,30 @@ tapechar_ioctl(struct inode *inp, struct file *filp,
 		struct mtget get;
 
 		memset(&get, 0, sizeof(get));
-		rc = tape_mtop(device, MTTELL, 1);
-		if (rc < 0)
-			return rc;
 		get.mt_type = MT_ISUNKNOWN;
+		get.mt_resid = 0 /* device->devstat.rescnt */;
 		get.mt_dsreg = device->tape_state;
 		/* FIXME: mt_gstat, mt_erreg, mt_fileno */
-		get.mt_resid = 0 /* device->devstat.rescnt */;
 		get.mt_gstat = 0;
 		get.mt_erreg = 0;
 		get.mt_fileno = 0;
-		get.mt_blkno = rc;
+		get.mt_gstat  = device->tape_generic_status;
+
+		if (device->medium_state == MS_LOADED) {
+			rc = tape_mtop(device, MTTELL, 1);
+
+			if (rc < 0)
+				return rc;
+
+			if (rc == 0)
+				get.mt_gstat |= GMT_BOT(~0);
+
+			get.mt_blkno = rc;
+		}
+
 		if (copy_to_user((char *) data, &get, sizeof(get)) != 0)
 			return -EFAULT;
+
 		return 0;
 	}
 	/* Try the discipline ioctl function. */

@@ -11,6 +11,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/mm.h>
 #include <linux/tty.h>
@@ -267,6 +268,7 @@ void __init config_mac(void)
  */
  
 struct mac_model *macintosh_config;
+EXPORT_SYMBOL(macintosh_config);
 
 static struct mac_model mac_data_table[]=
 {

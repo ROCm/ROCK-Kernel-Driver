@@ -338,33 +338,62 @@ L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
 BLUETOOTH SUBSYSTEM
+P:	Marcel Holtmann
+M:	marcel@holtmann.org
 P:	Maxim Krasnyansky
 M:	maxk@qualcomm.com
+L:	bluez-devel@lists.sf.net
 W:	http://bluez.sf.net
 S:	Maintained
 
 BLUETOOTH RFCOMM LAYER
+P:	Marcel Holtmann
+M:	marcel@holtmann.org
 P:	Maxim Krasnyansky
 M:	maxk@qualcomm.com
 W:	http://bluez.sf.net
 S:	Maintained
 
 BLUETOOTH BNEP LAYER
+P:	Marcel Holtmann
+M:	marcel@holtmann.org
 P:	Maxim Krasnyansky
 M:	maxk@qualcomm.com
 W:	http://bluez.sf.net
 S:	Maintained
 
+BLUETOOTH CMTP LAYER
+P:	Marcel Holtmann
+M:	marcel@holtmann.org
+W:	http://www.holtmann.org/linux/bluetooth/
+S:	Maintained
+
 BLUETOOTH HCI USB DRIVER
+P:	Marcel Holtmann
+M:	marcel@holtmann.org
 P:	Maxim Krasnyansky
 M:	maxk@qualcomm.com
 W:	http://bluez.sf.net
 S:	Maintained
 
 BLUETOOTH HCI UART DRIVER
+P:	Marcel Holtmann
+M:	marcel@holtmann.org
 P:	Maxim Krasnyansky
 M:	maxk@qualcomm.com
 W:	http://bluez.sf.net
+S:	Maintained
+
+BLUETOOTH HCI BCM203X DRIVER
+P:	Marcel Holtmann
+M:	marcel@holtmann.org
+W:	http://www.holtmann.org/linux/bluetooth/
+S:	Maintained
+
+BLUETOOTH HCI BFUSB DRIVER
+P:	Marcel Holtmann
+M:	marcel@holtmann.org
+W:	http://www.holtmann.org/linux/bluetooth/
 S:	Maintained
 
 BLUETOOTH HCI DTL1 DRIVER
@@ -608,8 +637,8 @@ W:	http://www.sistina.com/lvm
 S:	Maintained
 
 DEVICE NUMBER REGISTRY
-P:	H. Peter Anvin
-M:	hpa@zytor.com
+P:	John Cagle
+M:	device@lanana.org
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
@@ -1135,7 +1164,7 @@ KERNEL AUTOMOUNTER (AUTOFS)
 P:	H. Peter Anvin
 M:	hpa@zytor.com
 L:	autofs@linux.kernel.org
-S:	Maintained
+S:	Odd Fixes
 
 KERNEL AUTOMOUNTER v4 (AUTOFS4)
 P:	Jeremy Fitzhardinge
@@ -1143,11 +1172,11 @@ M:	jeremy@goop.org
 L:	autofs@linux.kernel.org
 S:	Maintained
 
-KERNEL BUILD (Makefile, Rules.make, scripts/*)
-P:	Michael Elizabeth Chastain
-M:	mec@shout.net
-L:	kbuild-devel@lists.sourceforge.net
-W:	http://kbuild.sourceforge.net
+KERNEL BUILD (kbuild: Makefile, scripts/Makefile.*)
+P:	Kai Germaschewski
+M:	kai@germaschewski.name
+P:	Sam Ravnborg
+M:	sam@ravnborg.org
 S:	Maintained 
 
 KERNEL JANITORS
@@ -1482,8 +1511,8 @@ L:	linux-sound@vger.kernel.org
 S:	Maintained
 
 OPROFILE
-P:	John Levon
-M:	levon@movementarian.org
+P:	Philippe Elie
+M:	phil.el@wanadoo.fr
 L:	oprofile-list@lists.sf.net
 S:	Maintained
 
@@ -2223,7 +2252,7 @@ S:	Maintained
 
 USB W996[87]CF DRIVER
 P:	Luca Risolia
-M:	luca_ing@libero.it
+M:	luca.risolia@studio.unibo.it
 L:	linux-usb-devel@lists.sourceforge.net
 W:	http://go.lamarinapunto.com
 S:	Maintained

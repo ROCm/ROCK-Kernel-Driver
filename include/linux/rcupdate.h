@@ -55,7 +55,7 @@ struct rcu_head {
 };
 
 #define RCU_HEAD_INIT(head) \
-		{ list: LIST_HEAD_INIT(head.list), func: NULL, arg: NULL }
+		{ .list = LIST_HEAD_INIT(head.list), .func = NULL, .arg = NULL }
 #define RCU_HEAD(head) struct rcu_head head = RCU_HEAD_INIT(head)
 #define INIT_RCU_HEAD(ptr) do { \
        INIT_LIST_HEAD(&(ptr)->list); (ptr)->func = NULL; (ptr)->arg = NULL; \

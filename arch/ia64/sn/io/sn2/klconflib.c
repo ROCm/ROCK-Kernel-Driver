@@ -1,5 +1,4 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -15,7 +14,6 @@
 #include <asm/sn/io.h>
 #include <asm/sn/sn_cpuid.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/klconfig.h>
@@ -23,10 +21,8 @@
 #include <asm/sn/module.h>
 #include <asm/sn/router.h>
 #include <asm/sn/xtalk/xbow.h>
+#include <asm/sn/ksys/l1.h>
 
-
-#define LDEBUG 0
-#define NIC_UNKNOWN ((nic_t) -1)
 
 #undef DEBUG_KLGRAPH
 #ifdef DEBUG_KLGRAPH
@@ -35,11 +31,11 @@
 #define DBG(x...)
 #endif /* DEBUG_KLGRAPH */
 
-u64 klgraph_addr[MAX_COMPACT_NODES];
+lboard_t *root_lboard[MAX_COMPACT_NODES];
 static int hasmetarouter;
 
 
-char brick_types[MAX_BRICK_TYPES + 1] = "crikxdpn%#=012345";
+char brick_types[MAX_BRICK_TYPES + 1] = "crikxdpn%#=vo^34567890123456789...";
 
 lboard_t *
 find_lboard(lboard_t *start, unsigned char brd_type)
@@ -270,17 +266,11 @@ board_to_path(lboard_t *brd, char *path)
 				board_name = EDGE_LBL_PXBRICK;
 			else if (brd->brd_type == KLTYPE_IXBRICK)
 				board_name = EDGE_LBL_IXBRICK;
-			else if (brd->brd_type == KLTYPE_PBRICK)
-				board_name = EDGE_LBL_PBRICK;
-			else if (brd->brd_type == KLTYPE_IBRICK)
-				board_name = EDGE_LBL_IBRICK;
-			else if (brd->brd_type == KLTYPE_XBRICK)
-				board_name = EDGE_LBL_XBRICK;
-			else if (brd->brd_type == KLTYPE_PEBRICK)
-				board_name = EDGE_LBL_PEBRICK;
+			else if (brd->brd_type == KLTYPE_OPUSBRICK)
+				board_name = EDGE_LBL_OPUSBRICK;
 			else if (brd->brd_type == KLTYPE_CGBRICK)
 				board_name = EDGE_LBL_CGBRICK;
-			else
+			else 
 				board_name = EDGE_LBL_IOBRICK;
 			break;
 		default:
@@ -292,23 +282,6 @@ board_to_path(lboard_t *brd, char *path)
 	format_module_id(buffer, modnum, MODULE_FORMAT_BRIEF);
 	sprintf(path, EDGE_LBL_MODULE "/%s/" EDGE_LBL_SLAB "/%d/%s", buffer, geo_slab(brd->brd_geoid), board_name);
 }
-
-/*
- * Get the module number for a NASID.
- */
-moduleid_t
-get_module_id(nasid_t nasid)
-{
-	lboard_t *brd;
-
-	brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
-
-	if (!brd)
-		return INVALID_MODULE;
-	else
-		return geo_module(brd->brd_geoid);
-}
-
 
 #define MHZ	1000000
 
@@ -440,71 +413,24 @@ board_serial_number_get(lboard_t *board,char *serial_number)
 		break;
 	}
 	case KLCLASS_IO: {	/* IO board */
-		if (KLTYPE(board->brd_type) == KLTYPE_TPU) {
-		/* Special case for TPU boards */
-			kltpu_t *tpu;	
+	     	klbri_t	*bridge;
 		
-			/* Get the tpu component information */
-			tpu = (kltpu_t *)find_first_component(board,
-						      KLSTRUCT_TPU);
-			/* If we don't have a tpu component on a tpu board
-			 * then we have a weird klconfig.
-			 */
-			if (!tpu)
-				return(1);
-			/* Get the serial number information from
-			 * the tpu's manufacturing nic info
-			 */
-			if (component_serial_number_get(board,
-						tpu->tpu_mfg_nic,
-						serial_number,
-						""))
-				return(1);
-			break;
-		} else  if ((KLTYPE(board->brd_type) == KLTYPE_GSN_A) ||
-		            (KLTYPE(board->brd_type) == KLTYPE_GSN_B)) {
-		/* Special case for GSN boards */
-			klgsn_t *gsn;	
-		
-			/* Get the gsn component information */
-			gsn = (klgsn_t *)find_first_component(board,
-			      ((KLTYPE(board->brd_type) == KLTYPE_GSN_A) ?
-					KLSTRUCT_GSN_A : KLSTRUCT_GSN_B));
-			/* If we don't have a gsn component on a gsn board
-			 * then we have a weird klconfig.
-			 */
-			if (!gsn)
-				return(1);
-			/* Get the serial number information from
-			 * the gsn's manufacturing nic info
-			 */
-			if (component_serial_number_get(board,
-						gsn->gsn_mfg_nic,
-						serial_number,
-						""))
-				return(1);
-			break;
-		} else {
-		     	klbri_t	*bridge;
-		
-			/* Get the bridge component information */
-			bridge = (klbri_t *)find_first_component(board,
+		/* Get the bridge component information */
+		bridge = (klbri_t *)find_first_component(board,
 							 KLSTRUCT_BRI);
-			/* If we don't have a bridge component on an IO board
-			 * then we have a weird klconfig.
-			 */
-			if (!bridge)
-				return(1);
-			/* Get the serial number information from
-		 	 * the bridge's manufacturing nic info
-			 */
-			if (component_serial_number_get(board,
-						bridge->bri_mfg_nic,
-						serial_number,
-						""))
-				return(1);
-			break;
-		}
+		/* If we don't have a bridge component on an IO board
+		 * then we have a weird klconfig.
+		 */
+		if (!bridge)
+			return(1);
+		/* Get the serial number information from
+	 	 * the bridge's manufacturing nic info
+		 */
+		if (component_serial_number_get(board,
+					bridge->bri_mfg_nic,
+					serial_number, ""))
+			return(1);
+		break;
 	}
 	case KLCLASS_ROUTER: {	/* Router board */
 		klrou_t *router;	
@@ -558,6 +484,23 @@ board_serial_number_get(lboard_t *board,char *serial_number)
 
 /*
  * Format a module id for printing.
+ *
+ * There are three possible formats:
+ *
+ *   MODULE_FORMAT_BRIEF	is the brief 6-character format, including
+ *				the actual brick-type as recorded in the 
+ *				moduleid_t, eg. 002c15 for a C-brick, or
+ *				101#17 for a PX-brick.
+ *
+ *   MODULE_FORMAT_LONG		is the hwgraph format, eg. rack/002/bay/15
+ *				of rack/101/bay/17 (note that the brick
+ *				type does not appear in this format).
+ *
+ *   MODULE_FORMAT_LCD		is like MODULE_FORMAT_BRIEF, except that it
+ *				ensures that the module id provided appears
+ *				exactly as it would on the LCD display of
+ *				the corresponding brick, eg. still 002c15
+ *				for a C-brick, but 101p17 for a PX-brick.
  */
 void
 format_module_id(char *buffer, moduleid_t m, int fmt)
@@ -569,9 +512,25 @@ format_module_id(char *buffer, moduleid_t m, int fmt)
 	ASSERT(MODULE_GET_BTYPE(m) < MAX_BRICK_TYPES);
 	brickchar = MODULE_GET_BTCHAR(m);
 
+	if (fmt == MODULE_FORMAT_LCD) {
+	    /* Be sure we use the same brick type character as displayed
+	     * on the brick's LCD
+	     */
+	    switch (brickchar) 
+	    {
+	    case L1_BRICKTYPE_PX:
+		brickchar = L1_BRICKTYPE_P;
+		break;
+
+	    case L1_BRICKTYPE_IX:
+		brickchar = L1_BRICKTYPE_I;
+		break;
+	    }
+	}
+
 	position = MODULE_GET_BPOS(m);
 
-	if (fmt == MODULE_FORMAT_BRIEF) {
+	if ((fmt == MODULE_FORMAT_BRIEF) || (fmt == MODULE_FORMAT_LCD)) {
 	    /* Brief module number format, eg. 002c15 */
 
 	    /* Decompress the rack number */
@@ -685,4 +644,28 @@ parse_module_id(char *buffer)
 
 	/* avoid sign extending the moduleid_t */
 	return (int)(unsigned short)m;
+}
+
+int
+cbrick_type_get_nasid(nasid_t nasid)
+{
+	lboard_t *brd;
+	moduleid_t module;
+	uint type;
+	int t;
+
+	brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
+	module = geo_module(brd->brd_geoid);
+	type = (module & MODULE_BTYPE_MASK) >> MODULE_BTYPE_SHFT;
+	/* convert brick_type to lower case */
+	if ((type >= 'A') && (type <= 'Z'))
+		type = type - 'A' + 'a';
+    
+	/* convert to a module.h brick type */
+	for( t = 0; t < MAX_BRICK_TYPES; t++ ) {
+		if( brick_types[t] == type ) {
+			return t;
+		}
+	} 
+	return -1;
 }

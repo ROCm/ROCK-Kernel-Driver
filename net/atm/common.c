@@ -476,9 +476,8 @@ int vcc_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
 		return -EOPNOTSUPP;
 	vcc = ATM_SD(sock);
 	if (test_bit(ATM_VF_RELEASED,&vcc->flags) ||
-	    test_bit(ATM_VF_CLOSE,&vcc->flags))
-		return -sk->sk_err;
-	if (!test_bit(ATM_VF_READY, &vcc->flags))
+	    test_bit(ATM_VF_CLOSE,&vcc->flags) ||
+	    !test_bit(ATM_VF_READY, &vcc->flags))
 		return 0;
 
 	skb = skb_recv_datagram(sk, flags, flags & MSG_DONTWAIT, &error);
@@ -530,12 +529,10 @@ int vcc_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 	size = m->msg_iov->iov_len;
 	vcc = ATM_SD(sock);
 	if (test_bit(ATM_VF_RELEASED, &vcc->flags) ||
-	    test_bit(ATM_VF_CLOSE, &vcc->flags)) {
-		error = -sk->sk_err;
-		goto out;
-	}
-	if (!test_bit(ATM_VF_READY, &vcc->flags)) {
+	    test_bit(ATM_VF_CLOSE, &vcc->flags) ||
+	    !test_bit(ATM_VF_READY, &vcc->flags)) {
 		error = -EPIPE;
+		send_sig(SIGPIPE, current, 0);
 		goto out;
 	}
 	if (!size) {
@@ -561,12 +558,10 @@ int vcc_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *m,
 			break;
 		}
 		if (test_bit(ATM_VF_RELEASED,&vcc->flags) ||
-		    test_bit(ATM_VF_CLOSE,&vcc->flags)) {
-			error = -sk->sk_err;
-			break;
-		}
-		if (!test_bit(ATM_VF_READY,&vcc->flags)) {
+		    test_bit(ATM_VF_CLOSE,&vcc->flags) ||
+		    !test_bit(ATM_VF_READY,&vcc->flags)) {
 			error = -EPIPE;
+			send_sig(SIGPIPE, current, 0);
 			break;
 		}
 		prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);

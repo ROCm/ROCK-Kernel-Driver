@@ -47,6 +47,7 @@
 #include <linux/skbuff.h>
 
 #include <linux/err.h>
+#include <linux/sysctl.h>
 
 #define NUD_IN_TIMER	(NUD_INCOMPLETE|NUD_DELAY|NUD_PROBE)
 #define NUD_VALID	(NUD_PERMANENT|NUD_NOARP|NUD_REACHABLE|NUD_PROBE|NUD_STALE|NUD_DELAY)
@@ -206,8 +207,11 @@ extern int neigh_add(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg);
 extern int neigh_delete(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg);
 extern void neigh_app_ns(struct neighbour *n);
 
-extern int			neigh_sysctl_register(struct net_device *dev, struct neigh_parms *p,
-						      int p_id, int pdev_id, char *p_name);
+extern int			neigh_sysctl_register(struct net_device *dev, 
+						      struct neigh_parms *p,
+						      int p_id, int pdev_id,
+						      char *p_name,
+						      proc_handler *proc_handler);
 extern void			neigh_sysctl_unregister(struct neigh_parms *p);
 
 /*

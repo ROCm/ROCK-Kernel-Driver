@@ -421,12 +421,6 @@ enum service {
     GetFirstWindow, GetNextWindow, GetMemPage
 };
 
-#ifdef IN_CARD_SERVICES
-extern int CardServices(int func, void *a1, void *a2, void *a3);
-#else
-extern int CardServices(int func, ...);
-#endif
-
 int pcmcia_access_configuration_register(client_handle_t handle, conf_reg_t *reg);
 int pcmcia_bind_device(bind_req_t *req);
 int pcmcia_bind_mtd(mtd_bind_t *req);

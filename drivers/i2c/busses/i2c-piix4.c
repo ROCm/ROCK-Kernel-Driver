@@ -28,9 +28,13 @@
    Note: we assume there can only be one device, with one SMBus interface.
 */
 
-/* #define DEBUG 1 */
+#include <linux/config.h>
+#ifdef CONFIG_I2C_DEBUG_BUS
+#define DEBUG	1
+#endif
 
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/config.h>
 #include <linux/pci.h>
 #include <linux/kernel.h>
@@ -88,13 +92,13 @@ struct sd {
 /* If force is set to anything different from 0, we forcibly enable the
    PIIX4. DANGEROUS! */
 static int force = 0;
-MODULE_PARM(force, "i");
+module_param (force, int, 0);
 MODULE_PARM_DESC(force, "Forcibly enable the PIIX4. DANGEROUS!");
 
 /* If force_addr is set to anything different from 0, we forcibly enable
    the PIIX4 at the given address. VERY DANGEROUS! */
 static int force_addr = 0;
-MODULE_PARM(force_addr, "i");
+module_param (force_addr, int, 0);
 MODULE_PARM_DESC(force_addr,
 		 "Forcibly enable the PIIX4 at the given address. "
 		 "EXTREMELY DANGEROUS!");
@@ -102,7 +106,7 @@ MODULE_PARM_DESC(force_addr,
 /* If fix_hstcfg is set to anything different from 0, we reset one of the
    registers to be a valid value. */
 static int fix_hstcfg = 0;
-MODULE_PARM(fix_hstcfg, "i");
+module_param (fix_hstcfg, int, 0);
 MODULE_PARM_DESC(fix_hstcfg,
 		"Fix config register. Needed on some boards (Force CPCI735).");
 

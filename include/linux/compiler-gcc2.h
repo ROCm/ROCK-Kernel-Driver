@@ -20,4 +20,5 @@
  */
 #if __GNUC_MINOR__ >= 96
 # define __attribute_pure__	__attribute__((pure))
+# define __attribute_const__	__attribute__((__const__))
 #endif

@@ -22,6 +22,11 @@
 */
 
 #include <linux/config.h>
+#ifdef CONFIG_I2C_DEBUG_BUS
+#define DEBUG	1
+#endif
+
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
@@ -88,15 +93,14 @@ static struct i2c_adapter scx200_i2c_ops = {
 
 int scx200_i2c_init(void)
 {
-	printk(KERN_DEBUG NAME ": NatSemi SCx200 I2C Driver\n");
+	pr_debug(NAME ": NatSemi SCx200 I2C Driver\n");
 
 	if (!scx200_gpio_present()) {
 		printk(KERN_ERR NAME ": no SCx200 gpio pins available\n");
 		return -ENODEV;
 	}
 
-	printk(KERN_DEBUG NAME ": SCL=GPIO%02u, SDA=GPIO%02u\n", 
-	       scl, sda);
+	pr_debug(NAME ": SCL=GPIO%02u, SDA=GPIO%02u\n", scl, sda);
 
 	if (scl == -1 || sda == -1 || scl == sda) {
 		printk(KERN_ERR NAME ": scl and sda must be specified\n");

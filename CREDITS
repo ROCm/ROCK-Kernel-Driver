@@ -1394,7 +1394,9 @@ S: USA
 N: Marcel Holtmann
 E: marcel@holtmann.org
 W: http://www.holtmann.org
+D: Maintainer of the Linux Bluetooth Subsystem
 D: Author and maintainer of the various Bluetooth HCI drivers
+D: Author and maintainer of the CAPI message transport protocol driver
 D: Various other Bluetooth related patches, cleanups and fixes
 S: Germany
 
@@ -2670,9 +2672,9 @@ S: 70110 Kuopio
 S: Finland
 
 N: Luca Risolia
-E: luca_ing@libero.it
-D: V4L driver for W996[87]CF JPEG USB Dual Mode Camera Chip
-S: Via Libertà 41/a
+E: luca.risolia@studio.unibo.it
+D: V4L driver for W996[87]CF JPEG USB Dual Mode Camera Chips
+S: Via Liberta' 41/A
 S: Osio Sotto, 24046, Bergamo
 S: Italy
 

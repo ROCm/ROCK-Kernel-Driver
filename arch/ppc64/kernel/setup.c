@@ -58,6 +58,9 @@ extern void iSeries_init_early( void );
 extern void pSeries_init_early( void );
 extern void pSeriesLP_init_early(void);
 extern void mm_init_ppc64( void ); 
+extern void pseries_secondary_smp_init(unsigned long); 
+extern int  idle_setup(void);
+extern void vpa_init(int cpu);
 
 unsigned long decr_overclock = 1;
 unsigned long decr_overclock_proc0 = 1;
@@ -137,12 +140,16 @@ void __init disable_early_printk(void)
 }
 
 /*
- * Do some initial setup of the system.  The paramters are those which 
+ * Do some initial setup of the system.  The parameters are those which 
  * were passed in from the bootloader.
  */
 void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 		  unsigned long r6, unsigned long r7)
 {
+#ifdef CONFIG_PPC_PSERIES
+        unsigned int ret, i;
+#endif
+
 #ifdef CONFIG_XMON_DEFAULT
 	debugger = xmon;
 	debugger_bpt = xmon_bpt;
@@ -183,10 +190,33 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif
 	}
 
+#ifdef CONFIG_PPC_PSERIES
 	if (systemcfg->platform & PLATFORM_PSERIES) {
 		early_console_initialized = 1;
 		register_console(&udbg_console);
+		finish_device_tree();
+		chrp_init(r3, r4, r5, r6, r7);
+
+#ifdef CONFIG_SMP
+		/* Start secondary threads on SMT systems */
+		for (i = 0; i < NR_CPUS; i++) {
+			if(cpu_available(i)  && !cpu_possible(i)) {
+				printk("%16.16x : starting thread\n", i);
+				rtas_call(rtas_token("start-cpu"), 3, 1, 
+					  (void *)&ret,
+					  get_hard_smp_processor_id(i), 
+					  *((unsigned long *)pseries_secondary_smp_init), i);
+				cpu_set(i, cpu_possible_map);
+				systemcfg->processorCount++;
+			}
+		}
+#endif
 	}
+#endif
+	/* Finish initializing the hash table (do the dynamic
+	 * patching for the fast-path hashtable.S code)
+	 */
+	htab_finish_init();
 
 	printk("Starting Linux PPC64 %s\n", UTS_RELEASE);
 
@@ -204,12 +234,16 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	printk("htab_data.num_ptegs           = 0x%lx\n", htab_data.htab_num_ptegs);
 	printk("-----------------------------------------------------\n");
 
-	if (systemcfg->platform & PLATFORM_PSERIES) {
-		finish_device_tree();
-		chrp_init(r3, r4, r5, r6, r7);
-	}
-
 	mm_init_ppc64();
+
+#if defined(CONFIG_SMP) && defined(CONFIG_PPC_PSERIES)
+	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
+		vpa_init(boot_cpuid);
+	}
+#endif
+
+	/* Select the correct idle loop for the platform. */
+	idle_setup();
 
 	switch (systemcfg->platform) {
 #ifdef CONFIG_PPC_ISERIES
@@ -277,36 +311,19 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	seq_printf(m, "processor\t: %lu\n", cpu_id);
 	seq_printf(m, "cpu\t\t: ");
 
-	switch (PVR_VER(pvr)) {
-	case PV_NORTHSTAR:
-		seq_printf(m, "RS64-II (northstar)\n");
-		break;
-	case PV_PULSAR:
-		seq_printf(m, "RS64-III (pulsar)\n");
-		break;
-	case PV_POWER4:
-		seq_printf(m, "POWER4 (gp)\n");
-		break;
-	case PV_ICESTAR:
-		seq_printf(m, "RS64-III (icestar)\n");
-		break;
-	case PV_SSTAR:
-		seq_printf(m, "RS64-IV (sstar)\n");
-		break;
-	case PV_POWER4p:
-		seq_printf(m, "POWER4+ (gq)\n");
-		break;
-	case PV_630:
-		seq_printf(m, "POWER3 (630)\n");
-		break;
-	case PV_630p:
-		seq_printf(m, "POWER3 (630+)\n");
-		break;
-	default:
-		seq_printf(m, "Unknown (%08x)\n", pvr);
-		break;
-	}
+	if (cur_cpu_spec->pvr_mask)
+		seq_printf(m, "%s", cur_cpu_spec->cpu_name);
+	else
+		seq_printf(m, "unknown (%08x)", pvr);
 
+#ifdef CONFIG_ALTIVEC
+	if (cur_cpu_spec->cpu_features & CPU_FTR_ALTIVEC)
+		seq_printf(m, ", altivec supported");
+#endif /* CONFIG_ALTIVEC */
+
+	seq_printf(m, "\n");
+
+#ifdef CONFIG_PPC_PSERIES
 	/*
 	 * Assume here that all clock rates are the same in a
 	 * smp system.  -- Cort
@@ -315,15 +332,17 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		struct device_node *cpu_node;
 		int *fp;
 
-		cpu_node = find_type_devices("cpu");
+		cpu_node = of_find_node_by_type(NULL, "cpu");
 		if (cpu_node) {
 			fp = (int *) get_property(cpu_node, "clock-frequency",
 						  NULL);
 			if (fp)
 				seq_printf(m, "clock\t\t: %dMHz\n",
 					   *fp / 1000000);
+			of_node_put(cpu_node);
 		}
 	}
+#endif
 
 	if (ppc_md.setup_residual != NULL)
 		ppc_md.setup_residual(m, cpu_id);
@@ -353,13 +372,11 @@ struct seq_operations cpuinfo_op = {
 };
 
 /*
- * Fetch the cmd_line from open firmware. */
+ * Fetch the cmd_line from open firmware. 
+ */
 void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 		  unsigned long r6, unsigned long r7)
 {
-	struct device_node *chosen;
-	char *p;
-
 #ifdef CONFIG_BLK_DEV_INITRD
 	if ((initrd_start == 0) && r3 && r4 && r4 != 0xdeadbeef) {
 		initrd_start = (r3 >= KERNELBASE) ? r3 : (unsigned long)__va(r3);
@@ -375,12 +392,20 @@ void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 	strlcpy(cmd_line, CONFIG_CMDLINE, sizeof(cmd_line));
 #endif /* CONFIG_CMDLINE */
 
-	chosen = find_devices("chosen");
+#ifdef CONFIG_PPC_PSERIES
+	{
+	struct device_node *chosen;
+
+	chosen = of_find_node_by_name(NULL, "chosen");
 	if (chosen != NULL) {
+		char *p;
 		p = get_property(chosen, "bootargs", NULL);
 		if (p != NULL && p[0] != 0)
 			strlcpy(cmd_line, p, sizeof(cmd_line));
+		of_node_put(chosen);
 	}
+	}
+#endif
 
 	/* Look for mem= option on command line */
 	if (strstr(cmd_line, "mem=")) {
@@ -406,28 +431,7 @@ void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 }
 
 
-char *bi_tag2str(unsigned long tag)
-{
-	switch (tag) {
-	case BI_FIRST:
-		return "BI_FIRST";
-	case BI_LAST:
-		return "BI_LAST";
-	case BI_CMD_LINE:
-		return "BI_CMD_LINE";
-	case BI_BOOTLOADER_ID:
-		return "BI_BOOTLOADER_ID";
-	case BI_INITRD:
-		return "BI_INITRD";
-	case BI_SYSMAP:
-		return "BI_SYSMAP";
-	case BI_MACHTYPE:
-		return "BI_MACHTYPE";
-	default:
-		return "BI_UNKNOWN";
-	}
-}
-
+#ifdef CONFIG_PPC_PSERIES
 int parse_bootinfo(void)
 {
 	struct bi_record *rec;
@@ -445,8 +449,7 @@ int parse_bootinfo(void)
 			memcpy(cmd_line, (void *)rec->data, rec->size);
 			break;
 		case BI_SYSMAP:
-			sysmap = (char *)((rec->data[0] >= (KERNELBASE))
-					? rec->data[0] : (unsigned long)__va(rec->data[0]));
+			sysmap = __va(rec->data[0]);
 			sysmap_size = rec->data[1];
 			break;
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -462,6 +465,7 @@ int parse_bootinfo(void)
 
 	return 0;
 }
+#endif
 
 int __init ppc_init(void)
 {
@@ -486,7 +490,6 @@ void __init ppc64_calibrate_delay(void)
 }	
 
 extern void (*calibrate_delay)(void);
-extern void sort_exception_table(void);
 
 /*
  * Called into from start_kernel, after lock_kernel has been called.
@@ -534,7 +537,6 @@ void __init setup_arch(char **cmdline_p)
 	ppc_md.setup_arch();
 
 	paging_init();
-	sort_exception_table();
 	ppc64_boot_msg(0x15, "Setup Done");
 }
 

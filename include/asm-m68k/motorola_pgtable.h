@@ -41,10 +41,14 @@ extern int m68k_pgtable_cachemode;
  * processors >= '040. It is used in pte_mkcache(), and the variable is
  * defined and initialized in head.S */
 
-#if defined(CONFIG_060_WRITETHROUGH)
-extern int m68k_supervisor_cachemode;
-#else
+#if defined(CPU_M68060_ONLY) && defined(CONFIG_060_WRITETHROUGH)
+#define m68k_supervisor_cachemode _PAGE_CACHE040W
+#elif defined(CPU_M68040_OR_M68060_ONLY)
 #define m68k_supervisor_cachemode _PAGE_CACHE040
+#elif defined(CPU_M68020_OR_M68030_ONLY)
+#define m68k_supervisor_cachemode 0
+#else
+extern int m68k_supervisor_cachemode;
 #endif
 
 #if defined(CPU_M68040_OR_M68060_ONLY)
@@ -96,10 +100,13 @@ extern unsigned long mm_cachebits;
  */
 #define mk_pte(page, pgprot) pfn_pte(page_to_pfn(page), (pgprot))
 
-extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
-{ pte_val(pte) = (pte_val(pte) & _PAGE_CHG_MASK) | pgprot_val(newprot); return pte; }
+static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
+{
+	pte_val(pte) = (pte_val(pte) & _PAGE_CHG_MASK) | pgprot_val(newprot);
+	return pte;
+}
 
-extern inline void pmd_set(pmd_t * pmdp, pte_t * ptep)
+static inline void pmd_set(pmd_t *pmdp, pte_t *ptep)
 {
 	unsigned long ptbl = virt_to_phys(ptep) | _PAGE_TABLE | _PAGE_ACCESSED;
 	unsigned long *ptr = pmdp->pmd;
@@ -110,8 +117,10 @@ extern inline void pmd_set(pmd_t * pmdp, pte_t * ptep)
 	}
 }
 
-extern inline void pgd_set(pgd_t * pgdp, pmd_t * pmdp)
-{ pgd_val(*pgdp) = _PAGE_TABLE | _PAGE_ACCESSED | __pa(pmdp); }
+static inline void pgd_set(pgd_t *pgdp, pmd_t *pmdp)
+{
+	pgd_val(*pgdp) = _PAGE_TABLE | _PAGE_ACCESSED | __pa(pmdp);
+}
 
 #define __pte_page(pte) ((unsigned long)__va(pte_val(pte) & PAGE_MASK))
 #define __pmd_page(pmd) ((unsigned long)__va(pmd_val(pmd) & _TABLE_MASK))
@@ -155,36 +164,40 @@ extern inline void pgd_set(pgd_t * pgdp, pmd_t * pmdp)
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..
  */
-extern inline int pte_read(pte_t pte)		{ return 1; }
-extern inline int pte_write(pte_t pte)		{ return !(pte_val(pte) & _PAGE_RONLY); }
-extern inline int pte_exec(pte_t pte)		{ return 1; }
-extern inline int pte_dirty(pte_t pte)		{ return pte_val(pte) & _PAGE_DIRTY; }
-extern inline int pte_young(pte_t pte)		{ return pte_val(pte) & _PAGE_ACCESSED; }
+static inline int pte_read(pte_t pte)		{ return 1; }
+static inline int pte_write(pte_t pte)		{ return !(pte_val(pte) & _PAGE_RONLY); }
+static inline int pte_exec(pte_t pte)		{ return 1; }
+static inline int pte_dirty(pte_t pte)		{ return pte_val(pte) & _PAGE_DIRTY; }
+static inline int pte_young(pte_t pte)		{ return pte_val(pte) & _PAGE_ACCESSED; }
 static inline int pte_file(pte_t pte)		{ return pte_val(pte) & _PAGE_FILE; }
 
-extern inline pte_t pte_wrprotect(pte_t pte)	{ pte_val(pte) |= _PAGE_RONLY; return pte; }
-extern inline pte_t pte_rdprotect(pte_t pte)	{ return pte; }
-extern inline pte_t pte_exprotect(pte_t pte)	{ return pte; }
-extern inline pte_t pte_mkclean(pte_t pte)	{ pte_val(pte) &= ~_PAGE_DIRTY; return pte; }
-extern inline pte_t pte_mkold(pte_t pte)	{ pte_val(pte) &= ~_PAGE_ACCESSED; return pte; }
-extern inline pte_t pte_mkwrite(pte_t pte)	{ pte_val(pte) &= ~_PAGE_RONLY; return pte; }
-extern inline pte_t pte_mkread(pte_t pte)	{ return pte; }
-extern inline pte_t pte_mkexec(pte_t pte)	{ return pte; }
-extern inline pte_t pte_mkdirty(pte_t pte)	{ pte_val(pte) |= _PAGE_DIRTY; return pte; }
-extern inline pte_t pte_mkyoung(pte_t pte)	{ pte_val(pte) |= _PAGE_ACCESSED; return pte; }
-extern inline pte_t pte_mknocache(pte_t pte)
+static inline pte_t pte_wrprotect(pte_t pte)	{ pte_val(pte) |= _PAGE_RONLY; return pte; }
+static inline pte_t pte_rdprotect(pte_t pte)	{ return pte; }
+static inline pte_t pte_exprotect(pte_t pte)	{ return pte; }
+static inline pte_t pte_mkclean(pte_t pte)	{ pte_val(pte) &= ~_PAGE_DIRTY; return pte; }
+static inline pte_t pte_mkold(pte_t pte)	{ pte_val(pte) &= ~_PAGE_ACCESSED; return pte; }
+static inline pte_t pte_mkwrite(pte_t pte)	{ pte_val(pte) &= ~_PAGE_RONLY; return pte; }
+static inline pte_t pte_mkread(pte_t pte)	{ return pte; }
+static inline pte_t pte_mkexec(pte_t pte)	{ return pte; }
+static inline pte_t pte_mkdirty(pte_t pte)	{ pte_val(pte) |= _PAGE_DIRTY; return pte; }
+static inline pte_t pte_mkyoung(pte_t pte)	{ pte_val(pte) |= _PAGE_ACCESSED; return pte; }
+static inline pte_t pte_mknocache(pte_t pte)
 {
 	pte_val(pte) = (pte_val(pte) & _CACHEMASK040) | m68k_pgtable_cachemode;
 	return pte;
 }
-extern inline pte_t pte_mkcache(pte_t pte)	{ pte_val(pte) = (pte_val(pte) & _CACHEMASK040) | m68k_supervisor_cachemode; return pte; }
+static inline pte_t pte_mkcache(pte_t pte)
+{
+	pte_val(pte) = (pte_val(pte) & _CACHEMASK040) | m68k_supervisor_cachemode;
+	return pte;
+}
 
 #define PAGE_DIR_OFFSET(tsk,address) pgd_offset((tsk),(address))
 
 #define pgd_index(address)     ((address) >> PGDIR_SHIFT)
 
 /* to find an entry in a page-table-directory */
-extern inline pgd_t * pgd_offset(struct mm_struct * mm, unsigned long address)
+static inline pgd_t *pgd_offset(struct mm_struct *mm, unsigned long address)
 {
 	return mm->pgd + pgd_index(address);
 }
@@ -192,20 +205,20 @@ extern inline pgd_t * pgd_offset(struct mm_struct * mm, unsigned long address)
 #define swapper_pg_dir kernel_pg_dir
 extern pgd_t kernel_pg_dir[128];
 
-extern inline pgd_t * pgd_offset_k(unsigned long address)
+static inline pgd_t *pgd_offset_k(unsigned long address)
 {
 	return kernel_pg_dir + (address >> PGDIR_SHIFT);
 }
 
 
 /* Find an entry in the second-level page table.. */
-extern inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
+static inline pmd_t *pmd_offset(pgd_t *dir, unsigned long address)
 {
 	return (pmd_t *)__pgd_page(*dir) + ((address >> PMD_SHIFT) & (PTRS_PER_PMD-1));
 }
 
 /* Find an entry in the third-level page table.. */ 
-extern inline pte_t * pte_offset_kernel(pmd_t * pmdp, unsigned long address)
+static inline pte_t *pte_offset_kernel(pmd_t *pmdp, unsigned long address)
 {
 	return (pte_t *)__pmd_page(*pmdp) + ((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1));
 }

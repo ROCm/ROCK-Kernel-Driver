@@ -272,6 +272,9 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.1.6:
+	- Fix minor bug in handling of compressed directories that fixes the
+	  erroneous "du" and "stat" output people reported.
 2.1.5:
 	- Minor bug fix in attribute list attribute handling that fixes the
 	  I/O errors on "ls" of certain fragmented files found by at least two

@@ -29,6 +29,7 @@ CONFIG_EPOLL=y
 CONFIG_IOSCHED_NOOP=y
 CONFIG_IOSCHED_AS=y
 CONFIG_IOSCHED_DEADLINE=y
+# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
 
 #
 # Loadable module support
@@ -109,8 +110,8 @@ CONFIG_SCSI_LOGGING=y
 #
 # SCSI low-level drivers
 #
-# CONFIG_SCSI_AIC7XXX is not set
 # CONFIG_SCSI_AIC7XXX_OLD is not set
+# CONFIG_SCSI_SATA is not set
 # CONFIG_SCSI_EATA_PIO is not set
 # CONFIG_SCSI_DEBUG is not set
 CONFIG_ZFCP=y
@@ -158,7 +159,8 @@ CONFIG_UNIX98_PTY_COUNT=2048
 #
 # S/390 character device drivers
 #
-# CONFIG_TN3270 is not set
+CONFIG_TN3270=y
+CONFIG_TN3270_CONSOLE=y
 CONFIG_TN3215=y
 CONFIG_TN3215_CONSOLE=y
 CONFIG_CCW_CONSOLE=y
@@ -318,6 +320,21 @@ CONFIG_QETH=y
 CONFIG_CCWGROUP=y
 
 #
+# Amateur Radio support
+#
+# CONFIG_HAMRADIO is not set
+
+#
+# IrDA (infrared) support
+#
+# CONFIG_IRDA is not set
+
+#
+# Bluetooth support
+#
+# CONFIG_BT is not set
+
+#
 # File systems
 #
 CONFIG_EXT2_FS=y
@@ -358,8 +375,7 @@ CONFIG_PROC_KCORE=y
 # CONFIG_DEVFS_FS is not set
 CONFIG_DEVPTS_FS=y
 # CONFIG_DEVPTS_FS_XATTR is not set
-# CONFIG_TMPFS is not set
-# CONFIG_HUGETLBFS is not set
+CONFIG_TMPFS=y
 # CONFIG_HUGETLB_PAGE is not set
 CONFIG_RAMFS=y
 
@@ -385,6 +401,7 @@ CONFIG_RAMFS=y
 CONFIG_NFS_FS=y
 CONFIG_NFS_V3=y
 # CONFIG_NFS_V4 is not set
+# CONFIG_NFS_DIRECTIO is not set
 CONFIG_NFSD=y
 CONFIG_NFSD_V3=y
 # CONFIG_NFSD_V4 is not set
@@ -422,6 +439,11 @@ CONFIG_MSDOS_PARTITION=y
 # CONFIG_ULTRIX_PARTITION is not set
 # CONFIG_SUN_PARTITION is not set
 # CONFIG_EFI_PARTITION is not set
+
+#
+# Native Language Support
+#
+# CONFIG_NLS is not set
 
 #
 # Kernel hacking

@@ -1,4 +1,4 @@
-/* $Id: traps.c,v 1.7 2003/05/04 19:29:53 lethal Exp $
+/* $Id: traps.c,v 1.14 2003/11/14 18:40:10 lethal Exp $
  *
  *  linux/arch/sh/traps.c
  *
@@ -26,12 +26,14 @@
 #include <linux/delay.h>
 #include <linux/spinlock.h>
 #include <linux/module.h>
+#include <linux/kallsyms.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/atomic.h>
 #include <asm/processor.h>
+#include <asm/sections.h>
 
 #ifdef CONFIG_SH_KGDB
 #include <asm/kgdb.h>
@@ -46,21 +48,36 @@
 #define CHK_REMOTE_DEBUG(regs)
 #endif
 
-#define DO_ERROR(trapnr, signr, str, name, tsk) \
-asmlinkage void do_##name(unsigned long r4, unsigned long r5, \
-			  unsigned long r6, unsigned long r7, \
-			  struct pt_regs regs) \
-{ \
-	unsigned long error_code; \
- \
-	asm volatile("stc	r2_bank, %0": "=r" (error_code)); \
-	local_irq_enable(); \
-	tsk->thread.error_code = error_code; \
-	tsk->thread.trap_no = trapnr; \
-        CHK_REMOTE_DEBUG(&regs); \
-	force_sig(signr, tsk); \
-	die_if_no_fixup(str,&regs,error_code); \
+#define DO_ERROR(trapnr, signr, str, name, tsk)				\
+asmlinkage void do_##name(unsigned long r4, unsigned long r5,		\
+			  unsigned long r6, unsigned long r7,		\
+			  struct pt_regs regs)				\
+{									\
+	unsigned long error_code;					\
+ 									\
+	/* Check if it's a DSP instruction */				\
+ 	if (is_dsp_inst(&regs)) {					\
+		/* Enable DSP mode, and restart instruction. */		\
+		regs.sr |= SR_DSP;					\
+		return;							\
+	}								\
+									\
+	asm volatile("stc	r2_bank, %0": "=r" (error_code));	\
+	local_irq_enable();						\
+	tsk->thread.error_code = error_code;				\
+	tsk->thread.trap_no = trapnr;					\
+        CHK_REMOTE_DEBUG(&regs);					\
+	force_sig(signr, tsk);						\
+	die_if_no_fixup(str,&regs,error_code);				\
 }
+
+#ifdef CONFIG_CPU_SH2
+#define TRAP_RESERVED_INST	4
+#define TRAP_ILLEGAL_SLOT_INST	6
+#else
+#define TRAP_RESERVED_INST	12
+#define TRAP_ILLEGAL_SLOT_INST	13
+#endif
 
 /*
  * These constants are for searching for possible module text
@@ -530,8 +547,37 @@ asmlinkage void do_address_error(struct pt_regs *regs,
 	}
 }
 
-DO_ERROR(12, SIGILL,  "reserved instruction", reserved_inst, current)
-DO_ERROR(13, SIGILL,  "illegal slot instruction", illegal_slot_inst, current)
+#ifdef CONFIG_SH_DSP
+/*
+ *	SH-DSP support gerg@snapgear.com.
+ */
+int is_dsp_inst(struct pt_regs *regs)
+{
+	unsigned short inst;
+
+	/* 
+	 * Safe guard if DSP mode is already enabled or we're lacking
+	 * the DSP altogether.
+	 */
+	if (!test_bit(CPU_HAS_DSP, &(cpu_data->flags)) || (regs->sr & SR_DSP))
+		return 0;
+
+	get_user(inst, ((unsigned short *) regs->pc));
+
+	inst &= 0xf000;
+
+	/* Check for any type of DSP or support instruction */
+	if ((inst == 0xf000) || (inst == 0x4000))
+		return 1;
+
+	return 0;
+}
+#else
+#define is_dsp_inst(regs)	(0)
+#endif /* CONFIG_SH_DSP */
+
+DO_ERROR(TRAP_RESERVED_INST, SIGILL, "reserved instruction", reserved_inst, current)
+DO_ERROR(TRAP_ILLEGAL_SLOT_INST, SIGILL, "illegal slot instruction", illegal_slot_inst, current)
 
 asmlinkage void do_exception_error(unsigned long r4, unsigned long r5,
 				   unsigned long r6, unsigned long r7,
@@ -547,18 +593,18 @@ void *gdb_vbr_vector;
 
 static inline void __init gdb_vbr_init(void)
 {
-    	/*
+	register unsigned long vbr;
+
+	/*
 	 * Read the old value of the VBR register to initialise
 	 * the vector through which debug and BIOS traps are
 	 * delegated by the Linux trap handler.
 	 */
-	{
-	    register unsigned long vbr;
-	    asm volatile("stc vbr, %0" : "=r" (vbr));
-	    gdb_vbr_vector = (void *)(vbr + 0x100);
-	    printk("Setting GDB trap vector to 0x%08lx\n",
-	    	(unsigned long)gdb_vbr_vector);
-	}
+	asm volatile("stc vbr, %0" : "=r" (vbr));
+
+	gdb_vbr_vector = (void *)(vbr + 0x100);
+	printk("Setting GDB trap vector to 0x%08lx\n",
+	       (unsigned long)gdb_vbr_vector);
 }
 #endif
 
@@ -582,11 +628,24 @@ void __init per_cpu_trap_init(void)
 
 void __init trap_init(void)
 {
-	extern void *exception_handling_table[14];
+	extern void *exception_handling_table[];
 
-	exception_handling_table[12] = (void *)do_reserved_inst;
-	exception_handling_table[13] = (void *)do_illegal_slot_inst;
+	exception_handling_table[TRAP_RESERVED_INST]
+		= (void *)do_reserved_inst;
+	exception_handling_table[TRAP_ILLEGAL_SLOT_INST]
+		= (void *)do_illegal_slot_inst;
 
+#ifdef CONFIG_CPU_SH4
+	if (!test_bit(CPU_HAS_FPU, &(cpu_data->flags))) {
+		/* For SH-4 lacking an FPU, treat floating point instructions
+		   as reserved. */
+		/* entry 64 corresponds to EXPEVT=0x800 */
+		exception_handling_table[64] = (void *)do_reserved_inst;
+		exception_handling_table[65] = (void *)do_illegal_slot_inst;
+	}
+#endif
+		
+	/* Setup VBR for boot cpu */
 	per_cpu_trap_init();
 }
 
@@ -595,7 +654,6 @@ void show_stack(struct task_struct *tsk, unsigned long *sp)
 	unsigned long *stack, addr;
 	unsigned long module_start = VMALLOC_START;
 	unsigned long module_end = VMALLOC_END;
-	extern long _text, _etext;
 	int i = 1;
 
 	if (!sp) {
@@ -612,19 +670,25 @@ void show_stack(struct task_struct *tsk, unsigned long *sp)
 	stack = sp;
 
 	printk("\nCall trace: ");
+#ifdef CONFIG_KALLSYMS
+	printk("\n");
+#endif
 
-	while (((long)stack & (THREAD_SIZE - 1))) {
+	while (!kstack_end(stack)) {
 		addr = *stack++;
-		if (((addr >= (unsigned long)&_text) &&
-		     (addr <= (unsigned long)&_etext)) ||
+		if (((addr >= (unsigned long)_text) &&
+		     (addr <= (unsigned long)_etext)) ||
 		    ((addr >= module_start) && (addr <= module_end))) {
 			/*
 			 * For 80-columns display, 6 entry is maximum.
 			 * NOTE: '[<8c00abcd>] ' consumes 13 columns .
 			 */
+#ifndef CONFIG_KALLSYMS
 			if (i && ((i % 6) == 0))
 				printk("\n       ");
+#endif
 			printk("[<%08lx>] ", addr);
+			print_symbol("%s\n", addr);
 			i++;
 		}
 	}

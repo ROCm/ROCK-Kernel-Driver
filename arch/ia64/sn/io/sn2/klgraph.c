@@ -1,5 +1,4 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -15,196 +14,26 @@
 
 #include <linux/types.h>
 #include <linux/slab.h>
+#include <linux/init.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/sn_sal.h>
-#include <asm/sn/io.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
-#include <asm/sn/labelcl.h>
-#include <asm/sn/kldir.h>
-#include <asm/sn/klconfig.h>
-#include <asm/sn/router.h>
-#include <asm/sn/xtalk/xbow.h>
 #include <asm/sn/hcl_util.h>
-
-// #define KLGRAPH_DEBUG 1
-#ifdef KLGRAPH_DEBUG
-#define GRPRINTF(x)	printk x
-#define CE_GRPANIC	CE_PANIC
-#else
-#define GRPRINTF(x)
-#define CE_GRPANIC	CE_PANIC
-#endif
-
 #include <asm/sn/sn_private.h>
 
-extern char arg_maxnodes[];
-extern u64 klgraph_addr[];
+/* #define KLGRAPH_DEBUG 1 */
+#ifdef KLGRAPH_DEBUG
+#define GRPRINTF(x)	printk x
+#else
+#define GRPRINTF(x)
+#endif
+
 void mark_cpuvertex_as_cpu(vertex_hdl_t vhdl, cpuid_t cpuid);
 
 
-/*
- * Support for verbose inventory via hardware graph. 
- * klhwg_invent_alloc allocates the necessary size of inventory information
- * and fills in the generic information.
- */
-invent_generic_t *
-klhwg_invent_alloc(cnodeid_t cnode, int class, int size)
-{
-	invent_generic_t *invent;
-
-	invent = kern_malloc(size);
-	if (!invent) return NULL;
-	
-	invent->ig_module = NODE_MODULEID(cnode);
-	invent->ig_slot = SLOTNUM_GETSLOT(NODE_SLOTID(cnode));
-	invent->ig_invclass = class;
-
-	return invent;
-}
-
-/*
- * Add detailed disabled cpu inventory info to the hardware graph.
- */
-void
-klhwg_disabled_cpu_invent_info(vertex_hdl_t cpuv,
-                               cnodeid_t cnode,
-                               klcpu_t *cpu, slotid_t slot)
-{
-	invent_cpuinfo_t *cpu_invent;
-	diag_inv_t       *diag_invent;
-
-	cpu_invent = (invent_cpuinfo_t *)
-	klhwg_invent_alloc(cnode, INV_PROCESSOR, sizeof(invent_cpuinfo_t));
-	if (!cpu_invent)
-		return;
-
-	/* Diag information on this processor */
-	diag_invent = (diag_inv_t *)
-	klhwg_invent_alloc(cnode, INV_CPUDIAGVAL, sizeof(diag_inv_t));
-
-	if (!diag_invent)
-		return;
-
-
-	/* Disabled CPU */
-	cpu_invent->ic_gen.ig_flag = 0x0;
-	cpu_invent->ic_gen.ig_slot = slot;
-	cpu_invent->ic_cpu_info.cpuflavor = cpu->cpu_prid;
-	cpu_invent->ic_cpu_info.cpufq = cpu->cpu_speed;
-	cpu_invent->ic_cpu_info.sdfreq = cpu->cpu_scachespeed;
-
-	cpu_invent->ic_cpu_info.sdsize = cpu->cpu_scachesz;
-	cpu_invent->ic_cpuid = cpu->cpu_info.virtid;
-	cpu_invent->ic_slice = cpu->cpu_info.physid;
-
-	/* Disabled CPU label */
-	hwgraph_info_add_LBL(cpuv, INFO_LBL_DETAIL_INVENT,
-			(arbitrary_info_t) cpu_invent);
-	hwgraph_info_export_LBL(cpuv, INFO_LBL_DETAIL_INVENT,
-			sizeof(invent_cpuinfo_t));
-
-	/* Diagval label - stores reason for disable +{virt,phys}id +diagval*/
-	hwgraph_info_add_LBL(cpuv, INFO_LBL_DIAGVAL,
-			(arbitrary_info_t) diag_invent);
-
-	hwgraph_info_export_LBL(cpuv, INFO_LBL_DIAGVAL,
-			sizeof(diag_inv_t));
-}
-
-/*
- * Add detailed cpu inventory info to the hardware graph.
- */
-void
-klhwg_cpu_invent_info(vertex_hdl_t cpuv,
-			cnodeid_t cnode,
-			klcpu_t *cpu)
-{
-	invent_cpuinfo_t *cpu_invent;
-
-	cpu_invent = (invent_cpuinfo_t *)
-		klhwg_invent_alloc(cnode, INV_PROCESSOR, sizeof(invent_cpuinfo_t));
-	if (!cpu_invent)
-		return;
-
-	if (KLCONFIG_INFO_ENABLED((klinfo_t *)cpu))
-		cpu_invent->ic_gen.ig_flag = INVENT_ENABLED;
-	else
-		cpu_invent->ic_gen.ig_flag = 0x0;
-
-	cpu_invent->ic_cpu_info.cpuflavor = cpu->cpu_prid;
-	cpu_invent->ic_cpu_info.cpufq = cpu->cpu_speed;
-	cpu_invent->ic_cpu_info.sdfreq = cpu->cpu_scachespeed;
-
-	cpu_invent->ic_cpu_info.sdsize = cpu->cpu_scachesz;
-	cpu_invent->ic_cpuid = cpu->cpu_info.virtid;
-	cpu_invent->ic_slice = cpu_physical_id_to_slice(cpu->cpu_info.virtid);
-
-	hwgraph_info_add_LBL(cpuv, INFO_LBL_DETAIL_INVENT,
-			(arbitrary_info_t) cpu_invent);
-	hwgraph_info_export_LBL(cpuv, INFO_LBL_DETAIL_INVENT,
-			sizeof(invent_cpuinfo_t));
-}
-
-/* 
- * Add information about the baseio prom version number
- * as a part of detailed inventory info in the hwgraph.
- */
-void
-klhwg_baseio_inventory_add(vertex_hdl_t baseio_vhdl,cnodeid_t cnode)
-{
-	invent_miscinfo_t	*baseio_inventory;
-	unsigned char		version = 0,revision = 0;
-
-	/* Allocate memory for the "detailed inventory" info
-	 * for the baseio
-	 */
-	baseio_inventory = (invent_miscinfo_t *) 
-		klhwg_invent_alloc(cnode, INV_PROM, sizeof(invent_miscinfo_t));
-	baseio_inventory->im_type = INV_IO6PROM;
-	/* Store the revision info  in the inventory */
-	baseio_inventory->im_version = version;
-	baseio_inventory->im_rev = revision;
-	/* Put the inventory info in the hardware graph */
-	hwgraph_info_add_LBL(baseio_vhdl, INFO_LBL_DETAIL_INVENT, 
-			     (arbitrary_info_t) baseio_inventory);
-	/* Make the information available to the user programs
-	 * thru hwgfs.
-	 */
-        hwgraph_info_export_LBL(baseio_vhdl, INFO_LBL_DETAIL_INVENT,
-				sizeof(invent_miscinfo_t));
-}
-
-/*
- * Add detailed cpu inventory info to the hardware graph.
- */
-void
-klhwg_hub_invent_info(vertex_hdl_t hubv,
-		      cnodeid_t cnode, 
-		      klhub_t *hub)
-{
-	invent_miscinfo_t *hub_invent;
-
-	hub_invent = (invent_miscinfo_t *) 
-	    klhwg_invent_alloc(cnode, INV_MISC, sizeof(invent_miscinfo_t));
-	if (!hub_invent)
-	    return;
-
-	if (KLCONFIG_INFO_ENABLED((klinfo_t *)hub))
-	    hub_invent->im_gen.ig_flag = INVENT_ENABLED;
-
-	hub_invent->im_type = INV_HUB;
-	hub_invent->im_rev = hub->hub_info.revision;
-	hub_invent->im_speed = hub->hub_speed;
-	hwgraph_info_add_LBL(hubv, INFO_LBL_DETAIL_INVENT, 
-			     (arbitrary_info_t) hub_invent);
-        hwgraph_info_export_LBL(hubv, INFO_LBL_DETAIL_INVENT,
-				sizeof(invent_miscinfo_t));
-}
-
 /* ARGSUSED */
-void
+static void __init
 klhwg_add_hub(vertex_hdl_t node_vertex, klhub_t *hub, cnodeid_t cnode)
 {
 	vertex_hdl_t myhubv;
@@ -212,18 +41,23 @@ klhwg_add_hub(vertex_hdl_t node_vertex, klhub_t *hub, cnodeid_t cnode)
 	int rc;
 	extern struct file_operations shub_mon_fops;
 
-	GRPRINTF(("klhwg_add_hub: adding %s\n", EDGE_LBL_HUB));
-	(void) hwgraph_path_add(node_vertex, EDGE_LBL_HUB, &myhubv);
+	hwgraph_path_add(node_vertex, EDGE_LBL_HUB, &myhubv);
+
+	HWGRAPH_DEBUG((__FILE__, __FUNCTION__,__LINE__, myhubv, NULL, "Created path for hub vertex for Shub node.\n"));
+
 	rc = device_master_set(myhubv, node_vertex);
+	if (rc) {
+		printk("klhwg_add_hub: Unable to create hub vertex.\n");
+		return;
+	}
 	hub_mon = hwgraph_register(myhubv, EDGE_LBL_PERFMON,
-		0, 0,
-		0, 0,
+		0, 0, 0, 0,
 		S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP, 0, 0,
 		&shub_mon_fops, (void *)(long)cnode);
 }
 
 /* ARGSUSED */
-void
+static void __init
 klhwg_add_disabled_cpu(vertex_hdl_t node_vertex, cnodeid_t cnode, klcpu_t *cpu, slotid_t slot)
 {
         vertex_hdl_t my_cpu;
@@ -234,19 +68,19 @@ klhwg_add_disabled_cpu(vertex_hdl_t node_vertex, cnodeid_t cnode, klcpu_t *cpu, 
 	nasid = COMPACT_TO_NASID_NODEID(cnode);
         cpu_id = nasid_slice_to_cpuid(nasid, cpu->cpu_info.physid);
         if(cpu_id != -1){
-		sprintf(name, "%s/%s/%c", EDGE_LBL_DISABLED, EDGE_LBL_CPU, 'a' + cpu->cpu_info.physid);
+		snprintf(name, 120, "%s/%s/%c", EDGE_LBL_DISABLED, EDGE_LBL_CPU, 'a' + cpu->cpu_info.physid);
 		(void) hwgraph_path_add(node_vertex, name, &my_cpu);
+
+		HWGRAPH_DEBUG((__FILE__, __FUNCTION__,__LINE__, my_cpu, NULL, "Created path for disabled cpu slice.\n"));
 
 		mark_cpuvertex_as_cpu(my_cpu, cpu_id);
 		device_master_set(my_cpu, node_vertex);
-
-		klhwg_disabled_cpu_invent_info(my_cpu, cnode, cpu, slot);
 		return;
         }
 }
 
 /* ARGSUSED */
-void
+static void __init
 klhwg_add_cpu(vertex_hdl_t node_vertex, cnodeid_t cnode, klcpu_t *cpu)
 {
         vertex_hdl_t my_cpu, cpu_dir;
@@ -257,27 +91,28 @@ klhwg_add_cpu(vertex_hdl_t node_vertex, cnodeid_t cnode, klcpu_t *cpu)
 	nasid = COMPACT_TO_NASID_NODEID(cnode);
         cpu_id = nasid_slice_to_cpuid(nasid, cpu->cpu_info.physid);
 
-        sprintf(name, "%s/%d/%c",
+        snprintf(name, 120, "%s/%d/%c",
                 EDGE_LBL_CPUBUS,
                 0,
                 'a' + cpu->cpu_info.physid);
 
-        GRPRINTF(("klhwg_add_cpu: adding %s to vertex 0x%p\n", name, node_vertex));
         (void) hwgraph_path_add(node_vertex, name, &my_cpu);
-        mark_cpuvertex_as_cpu(my_cpu, cpu_id);
+
+	HWGRAPH_DEBUG((__FILE__, __FUNCTION__,__LINE__, my_cpu, NULL, "Created path for active cpu slice.\n"));
+
+	mark_cpuvertex_as_cpu(my_cpu, cpu_id);
         device_master_set(my_cpu, node_vertex);
 
         /* Add an alias under the node's CPU directory */
         if (hwgraph_edge_get(node_vertex, EDGE_LBL_CPU, &cpu_dir) == GRAPH_SUCCESS) {
-                sprintf(name, "%c", 'a' + cpu->cpu_info.physid);
+                snprintf(name, 120, "%c", 'a' + cpu->cpu_info.physid);
                 (void) hwgraph_edge_add(cpu_dir, my_cpu, name);
+		HWGRAPH_DEBUG((__FILE__, __FUNCTION__,__LINE__, cpu_dir, my_cpu, "Created % from vhdl1 to vhdl2.\n", name));
         }
-
-        klhwg_cpu_invent_info(my_cpu, cnode, cpu);
 }
 
 
-void
+static void __init
 klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
 {
 	lboard_t *brd;
@@ -295,9 +130,6 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
 	if (KL_CONFIG_DUPLICATE_BOARD(brd))
 	    return;
 
-	GRPRINTF(("klhwg_add_xbow: adding cnode %d nasid %d xbow edges\n",
-			cnode, nasid));
-
 	if ((xbow_p = (klxbow_t *)find_component(brd, NULL, KLSTRUCT_XBOW))
 	    == NULL)
 	    return;
@@ -314,7 +146,7 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
 
 		hub_cnode = NASID_TO_COMPACT_NODEID(hub_nasid);
 
-		if (is_specified(arg_maxnodes) && hub_cnode == INVALID_CNODEID) {
+		if (hub_cnode == INVALID_CNODEID) {
 			continue;
 		}
 			
@@ -326,11 +158,15 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
                                 printk(KERN_WARNING  "klhwg_add_xbow: Check for "
                                         "working routers and router links!");
 
-                        PRINT_PANIC("klhwg_add_xbow: Failed to add "
+                        printk("klhwg_add_xbow: Failed to add "
                                 "edge: vertex 0x%p to vertex 0x%p,"
                                 "error %d\n",
                                 (void *)hubv, (void *)xbow_v, err);
+			return;
                 }
+
+		HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, xbow_v, NULL, "Created path for xtalk.\n"));
+
 		xswitch_vertex_init(xbow_v); 
 
 		NODEPDA(hub_cnode)->xbow_vhdl = xbow_v;
@@ -344,15 +180,12 @@ klhwg_add_xbow(cnodeid_t cnode, nasid_t nasid)
 			NODEPDA(NASID_TO_COMPACT_NODEID(nasid))->xbow_peer =
 				hub_nasid;
 		}
-
-		GRPRINTF(("klhwg_add_xbow: adding port nasid %d %s to vertex 0x%p\n",
-			hub_nasid, EDGE_LBL_XTALK, hubv));
 	}
 }
 
 
 /* ARGSUSED */
-void
+static void __init
 klhwg_add_node(vertex_hdl_t hwgraph_root, cnodeid_t cnode)
 {
 	nasid_t nasid;
@@ -364,98 +197,78 @@ klhwg_add_node(vertex_hdl_t hwgraph_root, cnodeid_t cnode)
 	char *s;
 	int board_disabled = 0;
 	klcpu_t *cpu;
+	vertex_hdl_t cpu_dir;
 
 	nasid = COMPACT_TO_NASID_NODEID(cnode);
 	brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
-	GRPRINTF(("klhwg_add_node: Adding cnode %d, nasid %d, brd 0x%p\n",
-                cnode, nasid, brd));
 	ASSERT(brd);
 
-	do {
-		vertex_hdl_t cpu_dir;
+	/* Generate a hardware graph path for this board. */
+	board_to_path(brd, path_buffer);
+	rv = hwgraph_path_add(hwgraph_root, path_buffer, &node_vertex);
+	if (rv != GRAPH_SUCCESS) {
+		printk("Node vertex creation failed.  Path == %s", path_buffer);
+		return;
+	}
 
-		/* Generate a hardware graph path for this board. */
-		board_to_path(brd, path_buffer);
-
-		GRPRINTF(("klhwg_add_node: adding %s to vertex 0x%p\n",
-			path_buffer, hwgraph_root));
-		rv = hwgraph_path_add(hwgraph_root, path_buffer, &node_vertex);
-
-		if (rv != GRAPH_SUCCESS)
-			PRINT_PANIC("Node vertex creation failed.  "
-					  "Path == %s",
-				path_buffer);
-
-		hub = (klhub_t *)find_first_component(brd, KLSTRUCT_HUB);
-		ASSERT(hub);
-		if(hub->hub_info.flags & KLINFO_ENABLE)
-			board_disabled = 0;
-		else
-			board_disabled = 1;
+	HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, node_vertex, NULL, "Created path for SHUB node.\n"));
+	hub = (klhub_t *)find_first_component(brd, KLSTRUCT_HUB);
+	ASSERT(hub);
+	if(hub->hub_info.flags & KLINFO_ENABLE)
+		board_disabled = 0;
+	else
+		board_disabled = 1;
 		
-		if(!board_disabled) {
-			mark_nodevertex_as_node(node_vertex,
-					    cnode + board_disabled * numnodes);
-
-			s = dev_to_name(node_vertex, path_buffer, sizeof(path_buffer));
-			NODEPDA(cnode)->hwg_node_name =
-						kmalloc(strlen(s) + 1,
-						GFP_KERNEL);
-			ASSERT_ALWAYS(NODEPDA(cnode)->hwg_node_name != NULL);
-			strcpy(NODEPDA(cnode)->hwg_node_name, s);
-
-			hubinfo_set(node_vertex, NODEPDA(cnode)->pdinfo);
-
-			/* Set up node board's slot */
-			NODEPDA(cnode)->slotdesc = brd->brd_slot;
-
-			/* Set up the module we're in */
-			NODEPDA(cnode)->geoid = brd->brd_geoid;
-			NODEPDA(cnode)->module = module_lookup(geo_module(brd->brd_geoid));
+	if(!board_disabled) {
+		mark_nodevertex_as_node(node_vertex, cnode);
+		s = dev_to_name(node_vertex, path_buffer, sizeof(path_buffer));
+		NODEPDA(cnode)->hwg_node_name =
+					kmalloc(strlen(s) + 1, GFP_KERNEL);
+		if (NODEPDA(cnode)->hwg_node_name <= 0) {
+			printk("%s: no memory\n", __FUNCTION__);
+			return;
 		}
+		strcpy(NODEPDA(cnode)->hwg_node_name, s);
+		hubinfo_set(node_vertex, NODEPDA(cnode)->pdinfo);
+		NODEPDA(cnode)->slotdesc = brd->brd_slot;
+		NODEPDA(cnode)->geoid = brd->brd_geoid;
+		NODEPDA(cnode)->module = module_lookup(geo_module(brd->brd_geoid));
+		klhwg_add_hub(node_vertex, hub, cnode);
+	}
 
-		/* Get the first CPU structure */
-		cpu = (klcpu_t *)find_first_component(brd, KLSTRUCT_CPU);
+	/*
+	 * If there's at least 1 CPU, add a "cpu" directory to represent
+	 * the collection of all CPUs attached to this node.
+	 */
+	cpu = (klcpu_t *)find_first_component(brd, KLSTRUCT_CPU);
+	if (cpu) {
+		graph_error_t rv;
 
-		/*
-		* If there's at least 1 CPU, add a "cpu" directory to represent
-		* the collection of all CPUs attached to this node.
-		*/
-		if (cpu) {
-			graph_error_t rv;
-
-			rv = hwgraph_path_add(node_vertex, EDGE_LBL_CPU, &cpu_dir);
-			if (rv != GRAPH_SUCCESS)
-				panic("klhwg_add_node: Cannot create CPU directory\n");
+		rv = hwgraph_path_add(node_vertex, EDGE_LBL_CPU, &cpu_dir);
+		if (rv != GRAPH_SUCCESS) {
+			printk("klhwg_add_node: Cannot create CPU directory\n");
+			return;
 		}
+		HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, cpu_dir, NULL, "Created cpu directiry on SHUB node.\n"));
 
-		/* Add each CPU */
-		while (cpu) {
-			cpuid_t cpu_id;
-			cpu_id = nasid_slice_to_cpuid(nasid,cpu->cpu_info.physid);
-			if (cpu_online(cpu_id))
-				klhwg_add_cpu(node_vertex, cnode, cpu);
-			else
-				klhwg_add_disabled_cpu(node_vertex, cnode, cpu, brd->brd_slot);
+	}
 
-			cpu = (klcpu_t *)
-				find_component(brd, (klinfo_t *)cpu, KLSTRUCT_CPU);
-		} /* while */
-
-		if(!board_disabled)
-			klhwg_add_hub(node_vertex, hub, cnode);
-		
-		brd = KLCF_NEXT(brd);
-		if (brd)
-			brd = find_lboard(brd, KLTYPE_SNIA);
+	while (cpu) {
+		cpuid_t cpu_id;
+		cpu_id = nasid_slice_to_cpuid(nasid,cpu->cpu_info.physid);
+		if (cpu_online(cpu_id))
+			klhwg_add_cpu(node_vertex, cnode, cpu);
 		else
-			break;
-	} while(brd);
+			klhwg_add_disabled_cpu(node_vertex, cnode, cpu, brd->brd_slot);
+
+		cpu = (klcpu_t *)
+			find_component(brd, (klinfo_t *)cpu, KLSTRUCT_CPU);
+	}
 }
 
 
 /* ARGSUSED */
-void
+static void __init
 klhwg_add_all_routers(vertex_hdl_t hwgraph_root)
 {
 	nasid_t nasid;
@@ -467,10 +280,6 @@ klhwg_add_all_routers(vertex_hdl_t hwgraph_root)
 
 	for (cnode = 0; cnode < numnodes; cnode++) {
 		nasid = COMPACT_TO_NASID_NODEID(cnode);
-
-		GRPRINTF(("klhwg_add_all_routers: adding router on cnode %d\n",
-			cnode));
-
 		brd = find_lboard_class((lboard_t *)KL_CONFIG_INFO(nasid),
 				KLTYPE_ROUTER);
 
@@ -480,41 +289,32 @@ klhwg_add_all_routers(vertex_hdl_t hwgraph_root)
 
 		do {
 			ASSERT(brd);
-			GRPRINTF(("Router board struct is %p\n", brd));
 
 			/* Don't add duplicate boards. */
 			if (brd->brd_flags & DUPLICATE_BOARD)
 				continue;
 
-			GRPRINTF(("Router 0x%p module number is %d\n", brd, brd->brd_geoid));
 			/* Generate a hardware graph path for this board. */
 			board_to_path(brd, path_buffer);
 
-			GRPRINTF(("Router path is %s\n", path_buffer));
-
 			/* Add the router */
-			GRPRINTF(("klhwg_add_all_routers: adding %s to vertex 0x%p\n",
-				path_buffer, hwgraph_root));
 			rv = hwgraph_path_add(hwgraph_root, path_buffer, &node_vertex);
+			if (rv != GRAPH_SUCCESS) {
+				printk("Router vertex creation "
+						  "failed.  Path == %s", path_buffer);
+				return;
+			}
+			HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, node_vertex, NULL, "Created router path.\n"));
 
-			if (rv != GRAPH_SUCCESS)
-				PRINT_PANIC("Router vertex creation "
-						  "failed.  Path == %s",
-					path_buffer);
-
-			GRPRINTF(("klhwg_add_all_routers: get next board from 0x%p\n",
-					brd));
 		/* Find the rest of the routers stored on this node. */
 		} while ( (brd = find_lboard_class(KLCF_NEXT(brd),
 			 KLTYPE_ROUTER)) );
-
-		GRPRINTF(("klhwg_add_all_routers: Done.\n"));
 	}
 
 }
 
 /* ARGSUSED */
-void
+static void __init
 klhwg_connect_one_router(vertex_hdl_t hwgraph_root, lboard_t *brd,
 			 cnodeid_t cnode, nasid_t nasid)
 {
@@ -527,13 +327,8 @@ klhwg_connect_one_router(vertex_hdl_t hwgraph_root, lboard_t *brd,
 	int port;
 	lboard_t *dest_brd;
 
-	GRPRINTF(("klhwg_connect_one_router: Connecting router on cnode %d\n",
-			cnode));
-
 	/* Don't add duplicate boards. */
 	if (brd->brd_flags & DUPLICATE_BOARD) {
-		GRPRINTF(("klhwg_connect_one_router: Duplicate router 0x%p on cnode %d\n",
-			brd, cnode));
 		return;
 	}
 
@@ -542,7 +337,7 @@ klhwg_connect_one_router(vertex_hdl_t hwgraph_root, lboard_t *brd,
 
 	rc = hwgraph_traverse(hwgraph_root, path_buffer, &router_hndl);
 
-	if (rc != GRAPH_SUCCESS && is_specified(arg_maxnodes))
+	if (rc != GRAPH_SUCCESS)
 			return;
 
 	if (rc != GRAPH_SUCCESS)
@@ -550,7 +345,7 @@ klhwg_connect_one_router(vertex_hdl_t hwgraph_root, lboard_t *brd,
 
 	/* We don't know what to do with multiple router components */
 	if (brd->brd_numcompts != 1) {
-		PRINT_PANIC("klhwg_connect_one_router: %d cmpts on router\n",
+		printk("klhwg_connect_one_router: %d cmpts on router\n",
 			brd->brd_numcompts);
 		return;
 	}
@@ -567,7 +362,7 @@ klhwg_connect_one_router(vertex_hdl_t hwgraph_root, lboard_t *brd,
 				 port));
 			continue;
 		}
-		if (is_specified(arg_maxnodes) && NASID_TO_COMPACT_NODEID(router->rou_port[port].port_nasid) 
+		if (NASID_TO_COMPACT_NODEID(router->rou_port[port].port_nasid) 
 		    == INVALID_CNODEID) {
 			continue;
 		}
@@ -582,12 +377,11 @@ klhwg_connect_one_router(vertex_hdl_t hwgraph_root, lboard_t *brd,
 		rc = hwgraph_traverse(hwgraph_root, dest_path, &dest_hndl);
 
 		if (rc != GRAPH_SUCCESS) {
-			if (is_specified(arg_maxnodes) && KL_CONFIG_DUPLICATE_BOARD(dest_brd))
+			if (KL_CONFIG_DUPLICATE_BOARD(dest_brd))
 				continue;
-			PRINT_PANIC("Can't find router: %s", dest_path);
+			printk("Can't find router: %s", dest_path);
+			return;
 		}
-		GRPRINTF(("klhwg_connect_one_router: Link from %s/%d to %s\n",
-			  path_buffer, port, dest_path));
 
 		sprintf(dest_path, "%d", port);
 
@@ -600,15 +394,18 @@ klhwg_connect_one_router(vertex_hdl_t hwgraph_root, lboard_t *brd,
 			continue;
 		}
 
-		if (rc != GRAPH_SUCCESS && !is_specified(arg_maxnodes))
-			PRINT_PANIC("Can't create edge: %s/%s to vertex 0x%p error 0x%x\n",
+		if (rc != GRAPH_SUCCESS) {
+			printk("Can't create edge: %s/%s to vertex 0x%p error 0x%x\n",
 				path_buffer, dest_path, (void *)dest_hndl, rc);
+			return;
+		}
+		HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, router_hndl, dest_hndl, "Created edge %s from vhdl1 to vhdl2.\n", dest_path));
 		
 	}
 }
 
 
-void
+static void __init
 klhwg_connect_routers(vertex_hdl_t hwgraph_root)
 {
 	nasid_t nasid;
@@ -617,10 +414,6 @@ klhwg_connect_routers(vertex_hdl_t hwgraph_root)
 
 	for (cnode = 0; cnode < numnodes; cnode++) {
 		nasid = COMPACT_TO_NASID_NODEID(cnode);
-
-		GRPRINTF(("klhwg_connect_routers: Connecting routers on cnode %d\n",
-			cnode));
-
 		brd = find_lboard_class((lboard_t *)KL_CONFIG_INFO(nasid),
 				KLTYPE_ROUTER);
 
@@ -641,7 +434,7 @@ klhwg_connect_routers(vertex_hdl_t hwgraph_root)
 
 
 
-void
+static void __init
 klhwg_connect_hubs(vertex_hdl_t hwgraph_root)
 {
 	nasid_t nasid;
@@ -656,11 +449,8 @@ klhwg_connect_hubs(vertex_hdl_t hwgraph_root)
 	graph_error_t rc;
 	int port;
 
-	for (cnode = 0; cnode < numnodes; cnode++) {
+	for (cnode = 0; cnode < numionodes; cnode++) {
 		nasid = COMPACT_TO_NASID_NODEID(cnode);
-
-		GRPRINTF(("klhwg_connect_hubs: Connecting hubs on cnode %d\n",
-			cnode));
 
 		brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
 		ASSERT(brd);
@@ -669,19 +459,15 @@ klhwg_connect_hubs(vertex_hdl_t hwgraph_root)
 		ASSERT(hub);
 
 		for (port = 1; port <= MAX_NI_PORTS; port++) {
-			/* See if the port's active */
 			if (hub->hub_port[port].port_nasid == INVALID_NASID) {
-				GRPRINTF(("klhwg_connect_hubs: port inactive.\n"));
-				continue;
+				continue; /* Port not active */
 			}
 
-			if (is_specified(arg_maxnodes) && NASID_TO_COMPACT_NODEID(hub->hub_port[port].port_nasid) == INVALID_CNODEID)
+			if (NASID_TO_COMPACT_NODEID(hub->hub_port[port].port_nasid) == INVALID_CNODEID)
 				continue;
 
 			/* Generate a hardware graph path for this board. */
 			board_to_path(brd, path_buffer);
-
-			GRPRINTF(("klhwg_connect_hubs: Hub path is %s.\n", path_buffer));
 			rc = hwgraph_traverse(hwgraph_root, path_buffer, &hub_hndl);
 
 			if (rc != GRAPH_SUCCESS)
@@ -697,26 +483,29 @@ klhwg_connect_hubs(vertex_hdl_t hwgraph_root)
 			rc = hwgraph_traverse(hwgraph_root, dest_path, &dest_hndl);
 
 			if (rc != GRAPH_SUCCESS) {
-				if (is_specified(arg_maxnodes) && KL_CONFIG_DUPLICATE_BOARD(dest_brd))
+				if (KL_CONFIG_DUPLICATE_BOARD(dest_brd))
 					continue;
-				PRINT_PANIC("Can't find board: %s", dest_path);
+				printk("Can't find board: %s", dest_path);
+				return;
 			} else {
 				char buf[1024];
-		
-
-				GRPRINTF(("klhwg_connect_hubs: Link from %s to %s.\n",
-			  	path_buffer, dest_path));
 
 				rc = hwgraph_path_add(hub_hndl, EDGE_LBL_INTERCONNECT, &hub_hndl);
+
+				HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, hub_hndl, NULL, "Created link path.\n"));
+
 				sprintf(buf,"%s/%s",path_buffer,EDGE_LBL_INTERCONNECT);
 				rc = hwgraph_traverse(hwgraph_root, buf, &hub_hndl);
 				sprintf(buf,"%d",port);
 				rc = hwgraph_edge_add(hub_hndl, dest_hndl, buf);
 
-				if (rc != GRAPH_SUCCESS)
-					PRINT_PANIC("Can't create edge: %s/%s to vertex 0x%p, error 0x%x\n",
-					path_buffer, dest_path, (void *)dest_hndl, rc);
+				HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, hub_hndl, dest_hndl, "Created edge %s from vhdl1 to vhdl2.\n", buf));
 
+				if (rc != GRAPH_SUCCESS) {
+					printk("Can't create edge: %s/%s to vertex 0x%p, error 0x%x\n",
+							path_buffer, dest_path, (void *)dest_hndl, rc);
+					return;
+				}
 			}
 		}
 	}
@@ -726,7 +515,7 @@ klhwg_connect_hubs(vertex_hdl_t hwgraph_root)
  * hints which can later be used by the drivers using the device/driver
  * admin interface. 
  */
-void
+static void __init
 klhwg_device_disable_hints_add(void)
 {
 	cnodeid_t	cnode; 		/* node we are looking at */
@@ -785,7 +574,7 @@ klhwg_device_disable_hints_add(void)
 	}
 }
 
-void
+void __init
 klhwg_add_all_modules(vertex_hdl_t hwgraph_root)
 {
 	cmoduleid_t	cm;
@@ -807,6 +596,7 @@ klhwg_add_all_modules(vertex_hdl_t hwgraph_root)
 		rc = hwgraph_path_add(hwgraph_root, name, &module_vhdl);
 		ASSERT(rc == GRAPH_SUCCESS);
 		rc = rc;
+		HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, module_vhdl, NULL, "Created module path.\n"));
 
 		hwgraph_fastinfo_set(module_vhdl, (arbitrary_info_t) modules[cm]);
 
@@ -818,24 +608,24 @@ klhwg_add_all_modules(vertex_hdl_t hwgraph_root)
 		rc = hwgraph_path_add(hwgraph_root, name, &vhdl);
 		ASSERT_ALWAYS(rc == GRAPH_SUCCESS); 
 		rc = rc;
+		HWGRAPH_DEBUG((__FILE__, __FUNCTION__, __LINE__, vhdl, NULL, "Created L1 path.\n"));
 
-		hwgraph_info_add_LBL(vhdl,
-				     INFO_LBL_ELSC,
-				     (arbitrary_info_t) (__psint_t) 1);
+		hwgraph_info_add_LBL(vhdl, INFO_LBL_ELSC,
+				     (arbitrary_info_t)1);
 
 	}
 }
 
-void
+void __init
 klhwg_add_all_nodes(vertex_hdl_t hwgraph_root)
 {
 	cnodeid_t	cnode;
 
-	for (cnode = 0; cnode < numnodes; cnode++) {
+	for (cnode = 0; cnode < numionodes; cnode++) {
 		klhwg_add_node(hwgraph_root, cnode);
 	}
 
-	for (cnode = 0; cnode < numnodes; cnode++) {
+	for (cnode = 0; cnode < numionodes; cnode++) {
 		klhwg_add_xbow(cnode, cnodeid_to_nasid(cnode));
 	}
 

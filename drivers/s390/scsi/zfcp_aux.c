@@ -28,7 +28,7 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_AUX_REVISION "$Revision: 1.65 $"
+#define ZFCP_AUX_REVISION "$Revision: 1.79 $"
 
 /********************** INCLUDES *********************************************/
 
@@ -63,6 +63,7 @@
 
 /* accumulated log level (module parameter) */
 static u32 loglevel = ZFCP_LOG_LEVEL_DEFAULTS;
+static char *device;
 /*********************** FUNCTION PROTOTYPES *********************************/
 
 /* written against the module interface */
@@ -94,13 +95,14 @@ MODULE_AUTHOR("Heiko Carstens <heiko.carstens@de.ibm.com>, "
 	      "Wolfgang Taphorn <taphorn@de.ibm.com>, "
 	      "Aron Zeh <arzeh@de.ibm.com>, "
 	      "IBM Deutschland Entwicklung GmbH");
-/* what this driver module is about */
 MODULE_DESCRIPTION
     ("FCP (SCSI over Fibre Channel) HBA driver for IBM eServer zSeries");
 MODULE_LICENSE("GPL");
-/* log level may be provided as a module parameter */
+
+module_param(device, charp, 0);
+MODULE_PARM_DESC(device, "specify initial device");
+
 module_param(loglevel, uint, 0);
-/* short explaination of the previous module parameter */
 MODULE_PARM_DESC(loglevel,
 		 "log levels, 8 nibbles: "
 		 "(unassigned) ERP QDIO DIO Config FSF SCSI Other, "
@@ -285,7 +287,7 @@ zfcp_cmd_dbf_event_scsi(const char *text, Scsi_Cmnd * scsi_cmnd)
 	debug_event(adapter->cmd_dbf, level, &scsi_cmnd->result, sizeof (u32));
 	debug_event(adapter->cmd_dbf, level, &scsi_cmnd,
 		    sizeof (unsigned long));
-	if (fsf_req) {
+	if (likely(fsf_req)) {
 		debug_event(adapter->cmd_dbf, level, &fsf_req,
 			    sizeof (unsigned long));
 		debug_event(adapter->cmd_dbf, level, &fsf_req->seq_no,
@@ -314,6 +316,84 @@ zfcp_in_els_dbf_event(struct zfcp_adapter *adapter, const char *text,
 			    (char *) status_buffer->payload + i,
 			    min(ZFCP_IN_ELS_DBF_LENGTH, length - i));
 #endif
+}
+
+/**
+ * zfcp_device_setup - setup function
+ * @str: pointer to parameter string
+ *
+ * Parse "device=..." parameter string.
+ */
+static int __init
+zfcp_device_setup(char *str)
+{
+	char *tmp;
+
+	if (!str)
+		return 0;
+
+	tmp = strchr(str, ',');
+	if (!tmp)
+		goto err_out;
+	*tmp++ = '\0';
+	strncpy(zfcp_data.init_busid, str, BUS_ID_SIZE);
+	zfcp_data.init_busid[BUS_ID_SIZE-1] = '\0';
+
+	zfcp_data.init_wwpn = simple_strtoull(tmp, &tmp, 0);
+	if (*tmp++ != ',')
+		goto err_out;
+	if (*tmp == '\0')
+		goto err_out;
+
+	zfcp_data.init_fcp_lun = simple_strtoull(tmp, &tmp, 0);
+	if (*tmp != '\0')
+		goto err_out;
+	return 1;
+
+ err_out:
+	ZFCP_LOG_NORMAL("Parse error for device parameter string %s\n", str);
+	return 0;
+}
+
+static void __init
+zfcp_init_device_configure(void)
+{
+	int found = 0;
+	unsigned long flags;
+	struct zfcp_adapter *adapter;
+	struct zfcp_port *port;
+	struct zfcp_unit *unit;
+
+	down(&zfcp_data.config_sema);
+	read_lock_irqsave(&zfcp_data.config_lock, flags);
+	list_for_each_entry(adapter, &zfcp_data.adapter_list_head, list)
+		if (strcmp(zfcp_data.init_busid,
+			   zfcp_get_busid_by_adapter(adapter)) == 0) {
+			zfcp_adapter_get(adapter);
+			found = 1;
+			break;
+		}
+	read_unlock_irqrestore(&zfcp_data.config_lock, flags);
+	if (!found)
+		goto out_adapter;
+	port = zfcp_port_enqueue(adapter, zfcp_data.init_wwpn, 0);
+	if (!port)
+		goto out_port;
+	unit = zfcp_unit_enqueue(port, zfcp_data.init_fcp_lun);
+	if (!unit)
+		goto out_unit;
+	up(&zfcp_data.config_sema);
+	ccw_device_set_online(adapter->ccw_device);
+	down(&zfcp_data.config_sema);
+	wait_event(unit->scsi_add_wq, atomic_read(&unit->scsi_add_work) == 0);
+	zfcp_unit_put(unit);
+ out_unit:
+	zfcp_port_put(port);
+ out_port:
+	zfcp_adapter_put(adapter);
+ out_adapter:
+	up(&zfcp_data.config_sema);
+	return;
 }
 
 static int __init
@@ -357,9 +437,14 @@ zfcp_module_init(void)
 		ZFCP_LOG_NORMAL("Registering with common I/O layer failed.\n");
 		goto out_ccw_register;
 	}
+
+	if (zfcp_device_setup(device))
+		zfcp_init_device_configure();
+
 	goto out;
 
  out_ccw_register:
+	unregister_reboot_notifier(&zfcp_data.reboot_notifier);
 #ifdef ZFCP_STAT_REQSIZES
 	zfcp_statistics_clear_all();
 #endif
@@ -391,13 +476,8 @@ int
 zfcp_reboot_handler(struct notifier_block *notifier, unsigned long code,
 		    void *ptr)
 {
-	int retval = NOTIFY_DONE;
-
-	/* block access to config (for rest of lifetime of this Linux) */
-	down(&zfcp_data.config_sema);
-	zfcp_erp_adapter_shutdown_all();
-
-	return retval;
+	zfcp_ccw_unregister();
+	return NOTIFY_DONE;
 }
 
 #undef ZFCP_LOG_AREA
@@ -409,19 +489,6 @@ zfcp_reboot_handler(struct notifier_block *notifier, unsigned long code,
 
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_CONFIG
 #define ZFCP_LOG_AREA_PREFIX		ZFCP_LOG_AREA_PREFIX_CONFIG
-
-#ifndef MODULE
-/* zfcp_loglevel boot_parameter */
-static int __init
-zfcp_loglevel_setup(char *str)
-{
-	loglevel = simple_strtoul(str, NULL, 0);
-	ZFCP_LOG_TRACE("loglevel is 0x%x\n", loglevel);
-	return 1;		/* why just 1? */
-}
-
-__setup("zfcp_loglevel=", zfcp_loglevel_setup);
-#endif				/* not MODULE */
 
 /**
  * zfcp_get_unit_by_lun - find unit in unit list of port by fcp lun
@@ -503,6 +570,7 @@ zfcp_unit_enqueue(struct zfcp_port *port, fcp_lun_t fcp_lun)
 		return NULL;
 	memset(unit, 0, sizeof (struct zfcp_unit));
 
+	init_waitqueue_head(&unit->scsi_add_wq);
 	/* initialise reference count stuff */
 	atomic_set(&unit->refcount, 0);
 	init_waitqueue_head(&unit->remove_wq);
@@ -571,6 +639,7 @@ zfcp_unit_enqueue(struct zfcp_port *port, fcp_lun_t fcp_lun)
 	write_unlock_irq(&zfcp_data.config_lock);
 
 	port->units++;
+	zfcp_port_get(port);
 
 	return unit;
 }
@@ -763,16 +832,9 @@ zfcp_adapter_enqueue(struct ccw_device *ccw_device)
 	/* initialize abort lock */
 	rwlock_init(&adapter->abort_lock);
 
-	/* initialise scsi faking structures */
-	rwlock_init(&adapter->fake_list_lock);
-	init_timer(&adapter->fake_scsi_timer);
-
 	/* initialise some erp stuff */
 	init_waitqueue_head(&adapter->erp_thread_wqh);
 	init_waitqueue_head(&adapter->erp_done_wqh);
-
-	/* notification when there are no outstanding SCSI commands */
-	init_waitqueue_head(&adapter->scsi_reqs_active_wq);
 
 	/* initialize lock of associated request queue */
 	rwlock_init(&adapter->request_queue.queue_lock);
@@ -904,7 +966,6 @@ zfcp_adapter_enqueue(struct ccw_device *ccw_device)
 	/* put allocated adapter at list tail */
 	write_lock_irq(&zfcp_data.config_lock);
 	atomic_clear_mask(ZFCP_STATUS_COMMON_REMOVE, &adapter->status);
-	atomic_set_mask(ZFCP_STATUS_COMMON_RUNNING, &adapter->status);
 	list_add_tail(&adapter->list, &zfcp_data.adapter_list_head);
 	write_unlock_irq(&zfcp_data.config_lock);
 
@@ -1149,6 +1210,7 @@ zfcp_port_enqueue(struct zfcp_adapter *adapter, wwn_t wwpn, u32 status)
 	write_unlock_irq(&zfcp_data.config_lock);
 
 	adapter->ports++;
+	zfcp_adapter_get(adapter);
 
 	return port;
 }
@@ -1193,7 +1255,6 @@ zfcp_nameserver_enqueue(struct zfcp_adapter *adapter)
 	/* set special D_ID */
 	port->d_id = ZFCP_DID_NAMESERVER;
 	adapter->nameserver_port = port;
-	zfcp_adapter_get(adapter);
 	zfcp_port_put(port);
 
 	return 0;
@@ -1216,9 +1277,9 @@ zfcp_fsf_incoming_els_rscn(struct zfcp_adapter *adapter,
 	struct fcp_rscn_head *fcp_rscn_head;
 	struct fcp_rscn_element *fcp_rscn_element;
 	struct zfcp_port *port;
-	int i;
-	int reopen_unknown = 0;
-	int no_entries;
+	u16 i;
+	u16 no_entries;
+	u32 range_mask;
 	unsigned long flags;
 
 	fcp_rscn_head = (struct fcp_rscn_head *) status_buffer->payload;
@@ -1232,56 +1293,57 @@ zfcp_fsf_incoming_els_rscn(struct zfcp_adapter *adapter,
 
 	debug_text_event(adapter->erp_dbf, 1, "unsol_els_rscn:");
 	for (i = 1; i < no_entries; i++) {
-		int known;
-		int range_mask;
-		int no_notifications;
-
-		range_mask = 0;
-		no_notifications = 0;
-		known = 0;
 		/* skip head and start with 1st element */
 		fcp_rscn_element++;
 		switch (fcp_rscn_element->addr_format) {
 		case ZFCP_PORT_ADDRESS:
 			ZFCP_LOG_FLAGS(1, "ZFCP_PORT_ADDRESS\n");
 			range_mask = ZFCP_PORTS_RANGE_PORT;
-			no_notifications = 1;
 			break;
 		case ZFCP_AREA_ADDRESS:
 			ZFCP_LOG_FLAGS(1, "ZFCP_AREA_ADDRESS\n");
-			/* skip head and start with 1st element */
 			range_mask = ZFCP_PORTS_RANGE_AREA;
-			no_notifications = ZFCP_NO_PORTS_PER_AREA;
 			break;
 		case ZFCP_DOMAIN_ADDRESS:
 			ZFCP_LOG_FLAGS(1, "ZFCP_DOMAIN_ADDRESS\n");
 			range_mask = ZFCP_PORTS_RANGE_DOMAIN;
-			no_notifications = ZFCP_NO_PORTS_PER_DOMAIN;
 			break;
 		case ZFCP_FABRIC_ADDRESS:
 			ZFCP_LOG_FLAGS(1, "ZFCP_FABRIC_ADDRESS\n");
 			range_mask = ZFCP_PORTS_RANGE_FABRIC;
-			no_notifications = ZFCP_NO_PORTS_PER_FABRIC;
 			break;
 		default:
-			/* cannot happen */
-			break;
+			ZFCP_LOG_INFO("Received RSCN with unknown "
+				      "address format.\n");
+			continue;
 		}
 		read_lock_irqsave(&zfcp_data.config_lock, flags);
 		list_for_each_entry(port, &adapter->port_list_head, list) {
+			if (atomic_test_mask
+			    (ZFCP_STATUS_PORT_NAMESERVER, &port->status))
+				continue;
 			/* Do we know this port? If not skip it. */
 			if (!atomic_test_mask
-			    (ZFCP_STATUS_PORT_DID_DID, &port->status))
+			    (ZFCP_STATUS_PORT_DID_DID, &port->status)) {
+				ZFCP_LOG_INFO
+					("Received state change notification."
+					 "Trying to open the port with wwpn "
+					 "0x%Lx. Hope it's there now.\n",
+					 port->wwpn);
+				debug_text_event(adapter->erp_dbf, 1,
+						 "unsol_els_rscnu:");
+				zfcp_erp_port_reopen(port,
+						     ZFCP_STATUS_COMMON_ERP_FAILED);
 				continue;
+			}
+
 			/*
 			 * FIXME: race: d_id might being invalidated
 			 * (...DID_DID reset)
 			 */
 			if ((port->d_id & range_mask)
 			    == (fcp_rscn_element->nport_did & range_mask)) {
-				known++;
-				ZFCP_LOG_TRACE("known=%d, reopen did 0x%x\n",
-					       known,
+				ZFCP_LOG_TRACE("reopen did 0x%x\n",
 					       fcp_rscn_element->nport_did);
 				/*
 				 * Unfortunately, an RSCN does not specify the
@@ -1300,36 +1362,6 @@ zfcp_fsf_incoming_els_rscn(struct zfcp_adapter *adapter,
 				debug_text_event(adapter->erp_dbf, 1,
 						 "unsol_els_rscnk:");
 				zfcp_erp_port_reopen(port, 0);
-			}
-		}
-		read_unlock_irqrestore(&zfcp_data.config_lock, flags);
-		ZFCP_LOG_TRACE("known %d, no_notifications %d\n",
-			       known, no_notifications);
-		if (known < no_notifications) {
-			ZFCP_LOG_DEBUG
-			    ("At least one unknown port changed state. "
-			     "Unknown ports need to be reopened.\n");
-			reopen_unknown = 1;
-		}
-	}			// for (i=1; i < no_entries; i++)
-
-	if (reopen_unknown) {
-		ZFCP_LOG_DEBUG("At least one unknown did "
-			       "underwent a state change.\n");
-		read_lock_irqsave(&zfcp_data.config_lock, flags);
-		list_for_each_entry(port, &adapter->port_list_head, list) {
-			if (!atomic_test_mask((ZFCP_STATUS_PORT_DID_DID
-					       | ZFCP_STATUS_PORT_NAMESERVER),
-					      &port->status)) {
-				ZFCP_LOG_INFO
-				    ("Received state change notification."
-				     "Trying to open the port with wwpn "
-				     "0x%Lx. Hope it's there now.\n",
-				     port->wwpn);
-				debug_text_event(adapter->erp_dbf, 1,
-						 "unsol_els_rscnu:");
-				zfcp_erp_port_reopen(port,
-						     ZFCP_STATUS_COMMON_ERP_FAILED);
 			}
 		}
 		read_unlock_irqrestore(&zfcp_data.config_lock, flags);
@@ -1469,7 +1501,7 @@ zfcp_get_nameserver_buffers(struct zfcp_fsf_req *fsf_req)
 	struct zfcp_adapter *adapter = fsf_req->adapter;
 	int retval = 0;
 
-	data->outbuf = kmalloc(2 * sizeof (struct fc_ct_iu), GFP_KERNEL);
+	data->outbuf = kmalloc(2 * sizeof (struct fc_ct_iu), GFP_ATOMIC);
 	if (data->outbuf) {
 		memset(data->outbuf, 0, 2 * sizeof (struct fc_ct_iu));
 	} else {
@@ -1479,7 +1511,7 @@ zfcp_get_nameserver_buffers(struct zfcp_fsf_req *fsf_req)
 			       "adapter %s directly.. trying emergency pool\n",
 			       zfcp_get_busid_by_adapter(adapter));
 		data->outbuf =
-		    mempool_alloc(adapter->pool.nameserver, GFP_KERNEL);
+		    mempool_alloc(adapter->pool.nameserver, GFP_ATOMIC);
 		if (!data->outbuf) {
 			ZFCP_LOG_DEBUG
 				("Out of memory. Could not get emergency "

@@ -45,6 +45,7 @@
 #include <linux/pagemap.h>
 #include <linux/rmap-locking.h>
 #include <linux/module.h>
+#include <linux/init.h>
 
 #include <asm/pgalloc.h>
 #include <asm/rmap.h>
@@ -651,14 +652,19 @@ follow_page(struct mm_struct *mm, unsigned long address, int write)
 	pte = *ptep;
 	pte_unmap(ptep);
 	if (pte_present(pte)) {
-		if (!write || (pte_write(pte) && pte_dirty(pte))) {
-			pfn = pte_pfn(pte);
-			if (pfn_valid(pfn)) {
-				struct page *page = pfn_to_page(pfn);
-
-				mark_page_accessed(page);
-				return page;
-			}
+		if (write && !pte_write(pte))
+			goto out;
+		if (write && !pte_dirty(pte)) {
+			struct page *page = pte_page(pte);
+			if (!PageDirty(page))
+				set_page_dirty(page);
+		}
+		pfn = pte_pfn(pte);
+		if (pfn_valid(pfn)) {
+			struct page *page = pfn_to_page(pfn);
+			
+			mark_page_accessed(page);
+			return page;
 		}
 	}
 
@@ -699,25 +705,13 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 		struct vm_area_struct *	vma;
 
 		vma = find_extend_vma(mm, start);
-
-#ifdef FIXADDR_USER_START
-		if (!vma &&
-		    start >= FIXADDR_USER_START && start < FIXADDR_USER_END) {
-			static struct vm_area_struct fixmap_vma = {
-				/* Catch users - if there are any valid
-				   ones, we can make this be "&init_mm" or
-				   something.  */
-				.vm_mm = NULL,
-				.vm_start = FIXADDR_USER_START,
-				.vm_end = FIXADDR_USER_END,
-				.vm_page_prot = PAGE_READONLY,
-				.vm_flags = VM_READ | VM_EXEC,
-			};
+		if (!vma && in_gate_area(tsk, start)) {
 			unsigned long pg = start & PAGE_MASK;
+			struct vm_area_struct *gate_vma = get_gate_vma(tsk);
 			pgd_t *pgd;
 			pmd_t *pmd;
 			pte_t *pte;
-			if (write) /* user fixmap pages are read-only */
+			if (write) /* user gate pages are read-only */
 				return i ? : -EFAULT;
 			pgd = pgd_offset_k(pg);
 			if (!pgd)
@@ -733,13 +727,12 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 				get_page(pages[i]);
 			}
 			if (vmas)
-				vmas[i] = &fixmap_vma;
+				vmas[i] = gate_vma;
 			i++;
 			start += PAGE_SIZE;
 			len--;
 			continue;
 		}
-#endif
 
 		if (!vma || (pages && (vma->vm_flags & VM_IO))
 				|| !(flags & vma->vm_flags))
@@ -863,6 +856,9 @@ int zeromap_page_range(struct vm_area_struct *vma, unsigned long address, unsign
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	} while (address && (address < end));
+	/*
+	 * Why flush? zeromap_pte_range has a BUG_ON for !pte_none()
+	 */
 	flush_tlb_range(vma, beg, end);
 	spin_unlock(&mm->page_table_lock);
 	return error;
@@ -944,6 +940,9 @@ int remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned lo
 		from = (from + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	} while (from && (from < end));
+	/*
+	 * Why flush? remap_pte_range has a BUG_ON for !pte_none()
+	 */
 	flush_tlb_range(vma, beg, end);
 	spin_unlock(&mm->page_table_lock);
 	return error;
@@ -952,28 +951,17 @@ int remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned lo
 EXPORT_SYMBOL(remap_page_range);
 
 /*
- * Establish a new mapping:
- *  - flush the old one
- *  - update the page tables
- *  - inform the TLB about the new one
- *
- * We hold the mm semaphore for reading and vma->vm_mm->page_table_lock
- */
-static inline void establish_pte(struct vm_area_struct * vma, unsigned long address, pte_t *page_table, pte_t entry)
-{
-	set_pte(page_table, entry);
-	flush_tlb_page(vma, address);
-	update_mmu_cache(vma, address, entry);
-}
-
-/*
  * We hold the mm semaphore for reading and vma->vm_mm->page_table_lock
  */
 static inline void break_cow(struct vm_area_struct * vma, struct page * new_page, unsigned long address, 
 		pte_t *page_table)
 {
+	pte_t entry;
+
 	flush_cache_page(vma, address);
-	establish_pte(vma, address, page_table, pte_mkwrite(pte_mkdirty(mk_pte(new_page, vma->vm_page_prot))));
+	entry = pte_mkwrite(pte_mkdirty(mk_pte(new_page, vma->vm_page_prot)));
+	ptep_establish(vma, address, page_table, entry);
+	update_mmu_cache(vma, address, entry);
 }
 
 /*
@@ -1002,6 +990,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	struct page *old_page, *new_page;
 	unsigned long pfn = pte_pfn(pte);
 	struct pte_chain *pte_chain;
+	pte_t entry;
 
 	if (unlikely(!pfn_valid(pfn))) {
 		/*
@@ -1022,8 +1011,9 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 		unlock_page(old_page);
 		if (reuse) {
 			flush_cache_page(vma, address);
-			establish_pte(vma, address, page_table,
-				pte_mkyoung(pte_mkdirty(pte_mkwrite(pte))));
+			entry = pte_mkyoung(pte_mkdirty(pte_mkwrite(pte)));
+			ptep_establish(vma, address, page_table, entry);
+			update_mmu_cache(vma, address, entry);
 			pte_unmap(page_table);
 			spin_unlock(&mm->page_table_lock);
 			return VM_FAULT_MINOR;
@@ -1409,7 +1399,7 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	spin_unlock(&mm->page_table_lock);
 
 	if (vma->vm_file) {
-		mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
+		mapping = vma->vm_file->f_mapping;
 		sequence = atomic_read(&mapping->truncate_count);
 	}
 	smp_rmb();  /* Prevent CPU from reordering lock-free ->nopage() */
@@ -1431,10 +1421,8 @@ retry:
 	 */
 	if (write_access && !(vma->vm_flags & VM_SHARED)) {
 		struct page * page = alloc_page(GFP_HIGHUSER);
-		if (!page) {
-			page_cache_release(new_page);
+		if (!page)
 			goto oom;
-		}
 		copy_user_highpage(page, new_page, address);
 		page_cache_release(new_page);
 		lru_cache_add_active(page);
@@ -1491,6 +1479,7 @@ retry:
 	spin_unlock(&mm->page_table_lock);
 	goto out;
 oom:
+	page_cache_release(new_page);
 	ret = VM_FAULT_OOM;
 out:
 	pte_chain_free(pte_chain);
@@ -1580,7 +1569,8 @@ static inline int handle_pte_fault(struct mm_struct *mm,
 		entry = pte_mkdirty(entry);
 	}
 	entry = pte_mkyoung(entry);
-	establish_pte(vma, address, pte, entry);
+	ptep_establish(vma, address, pte, entry);
+	update_mmu_cache(vma, address, entry);
 	pte_unmap(pte);
 	spin_unlock(&mm->page_table_lock);
 	return VM_FAULT_MINOR;
@@ -1697,3 +1687,18 @@ struct page * vmalloc_to_page(void * vmalloc_addr)
 }
 
 EXPORT_SYMBOL(vmalloc_to_page);
+
+#if !defined(CONFIG_ARCH_GATE_AREA) && defined(AT_SYSINFO_EHDR)
+struct vm_area_struct gate_vma;
+
+static int __init gate_vma_init(void)
+{
+	gate_vma.vm_mm = NULL;
+	gate_vma.vm_start = FIXADDR_USER_START;
+	gate_vma.vm_end = FIXADDR_USER_END;
+	gate_vma.vm_page_prot = PAGE_READONLY;
+	gate_vma.vm_flags = 0;
+	return 0;
+}
+__initcall(gate_vma_init);
+#endif

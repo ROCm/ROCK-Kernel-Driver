@@ -66,6 +66,8 @@ To add: #define SO_REUSEPORT 0x0200	/* Allow local address and port reuse.  */
 #define SO_TIMESTAMP		29
 #define SCM_TIMESTAMP		SO_TIMESTAMP
 
+#define SO_PEERSEC             30
+
 /* Nast libc5 fixup - bletch */
 #if defined(__KERNEL__)
 /* Socket types. */

@@ -11,10 +11,15 @@ Only PCI/AGP based cards are supported, none of the older Tridents.
 
 How to use it?
 ==============
-Just do your usual console work :)
 
-When booting you can pass the following parameters
-==================================================
+When booting you can pass the video parameter.
+video=tridentfb
+
+The parameters for tridentfb are concatenated with a ':' as in this example.
+
+video=tridentfb:800x600,bpp=16,noaccel
+
+The second level parameters that tridentfb understands are:
 
 noaccel - turns off acceleration (when it doesn't work for your card)
 accel - force text acceleration (for boards which by default are noacceled)

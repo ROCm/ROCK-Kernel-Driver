@@ -228,10 +228,16 @@
    3.12 Oct 18, 2000 - Jens Axboe <axboe@suse.de>
   -- Use quiet bit on packet commands not known to work
 
+   3.20 Dec 17, 2003 - Jens Axboe <axboe@suse.de>
+  -- Various fixes and lots of cleanups not listed :-)
+  -- Locking fixes
+  -- Mt Rainier support
+  -- DVD-RAM write open fixes
+
 -------------------------------------------------------------------------*/
 
-#define REVISION "Revision: 3.12"
-#define VERSION "Id: cdrom.c 3.12 2000/10/18"
+#define REVISION "Revision: 3.20"
+#define VERSION "Id: cdrom.c 3.20 2003/12/17"
 
 /* I use an error-log mask to give fine grain control over the type of
    messages dumped to the system logs.  The available masks include: */
@@ -282,11 +288,25 @@ static int autoeject;
 static int lockdoor = 1;
 /* will we ever get to use this... sigh. */
 static int check_media_type;
+/* automatically restart mrw format */
+static int mrw_format_restart = 1;
 MODULE_PARM(debug, "i");
 MODULE_PARM(autoclose, "i");
 MODULE_PARM(autoeject, "i");
 MODULE_PARM(lockdoor, "i");
 MODULE_PARM(check_media_type, "i");
+MODULE_PARM(mrw_format_restart, "i");
+
+static spinlock_t cdrom_lock = SPIN_LOCK_UNLOCKED;
+
+static const char *mrw_format_status[] = {
+	"not mrw",
+	"bgformat inactive",
+	"bgformat active",
+	"mrw complete",
+};
+
+static const char *mrw_address_space[] = { "DMA", "GAA" };
 
 #if (ERRLOGMASK!=CD_NOTHING)
 #define cdinfo(type, fmt, args...) \
@@ -325,6 +345,10 @@ int cdrom_get_last_written(struct cdrom_device_info *, long *);
 static int cdrom_get_next_writable(struct cdrom_device_info *, long *);
 static void cdrom_count_tracks(struct cdrom_device_info *, tracktype*);
 
+static int cdrom_mrw_exit(struct cdrom_device_info *cdi);
+
+static int cdrom_get_disc_info(struct cdrom_device_info *cdi, disc_information *di);
+
 #ifdef CONFIG_SYSCTL
 static void cdrom_sysctl_register(void);
 #endif /* CONFIG_SYSCTL */ 
@@ -347,13 +371,14 @@ int register_cdrom(struct cdrom_device_info *cdi)
 
 	if (cdo->open == NULL || cdo->release == NULL)
 		return -2;
-	if ( !banner_printed ) {
+	if (!banner_printed) {
 		printk(KERN_INFO "Uniform CD-ROM driver " REVISION "\n");
 		banner_printed = 1;
 #ifdef CONFIG_SYSCTL
 		cdrom_sysctl_register();
 #endif /* CONFIG_SYSCTL */ 
 	}
+
 	ENSURE(drive_status, CDC_DRIVE_STATUS );
 	ENSURE(media_changed, CDC_MEDIA_CHANGED);
 	ENSURE(tray_move, CDC_CLOSE_TRAY | CDC_OPEN_TRAY);
@@ -378,9 +403,14 @@ int register_cdrom(struct cdrom_device_info *cdi)
 	if (check_media_type==1)
 		cdi->options |= (int) CDO_CHECK_TYPE;
 
+	if (CDROM_CAN(CDC_MRW_W))
+		cdi->exit = cdrom_mrw_exit;
+
 	cdinfo(CD_REG_UNREG, "drive \"/dev/%s\" registered\n", cdi->name);
+	spin_lock(&cdrom_lock);
 	cdi->next = topCdromPtr; 	
 	topCdromPtr = cdi;
+	spin_unlock(&cdrom_lock);
 	return 0;
 }
 #undef ENSURE
@@ -391,21 +421,308 @@ int unregister_cdrom(struct cdrom_device_info *unreg)
 	cdinfo(CD_OPEN, "entering unregister_cdrom\n"); 
 
 	prev = NULL;
+	spin_lock(&cdrom_lock);
 	cdi = topCdromPtr;
 	while (cdi && cdi != unreg) {
 		prev = cdi;
 		cdi = cdi->next;
 	}
 
-	if (cdi == NULL)
+	if (cdi == NULL) {
+		spin_unlock(&cdrom_lock);
 		return -2;
+	}
 	if (prev)
 		prev->next = cdi->next;
 	else
 		topCdromPtr = cdi->next;
+
+	spin_unlock(&cdrom_lock);
+
+	if (cdi->exit)
+		cdi->exit(cdi);
+
 	cdi->ops->n_minors--;
 	cdinfo(CD_REG_UNREG, "drive \"/dev/%s\" unregistered\n", cdi->name);
 	return 0;
+}
+
+int cdrom_get_media_event(struct cdrom_device_info *cdi,
+			  struct media_event_desc *med)
+{
+	struct cdrom_generic_command cgc;
+	unsigned char buffer[8];
+	struct event_header *eh = (struct event_header *) buffer;
+
+	init_cdrom_command(&cgc, buffer, sizeof(buffer), CGC_DATA_READ);
+	cgc.cmd[0] = GPCMD_GET_EVENT_STATUS_NOTIFICATION;
+	cgc.cmd[1] = 1;		/* IMMED */
+	cgc.cmd[4] = 1 << 4;	/* media event */
+	cgc.cmd[8] = sizeof(buffer);
+	cgc.quiet = 1;
+
+	if (cdi->ops->generic_packet(cdi, &cgc))
+		return 1;
+
+	if (be16_to_cpu(eh->data_len) < sizeof(*med))
+		return 1;
+
+	memcpy(med, &buffer[sizeof(*eh)], sizeof(*med));
+	return 0;
+}
+
+/*
+ * the first prototypes used 0x2c as the page code for the mrw mode page,
+ * subsequently this was changed to 0x03. probe the one used by this drive
+ */
+int cdrom_mrw_probe_pc(struct cdrom_device_info *cdi)
+{
+	struct cdrom_generic_command cgc;
+	char buffer[16];
+
+	init_cdrom_command(&cgc, buffer, sizeof(buffer), CGC_DATA_READ);
+
+	cgc.timeout = HZ;
+	cgc.quiet = 1;
+
+	if (!cdrom_mode_sense(cdi, &cgc, MRW_MODE_PC, 0)) {
+		cdi->mrw_mode_page = MRW_MODE_PC;
+		return 0;
+	} else if (!cdrom_mode_sense(cdi, &cgc, MRW_MODE_PC_PRE1, 0)) {
+		cdi->mrw_mode_page = MRW_MODE_PC_PRE1;
+		return 0;
+	}
+
+	printk(KERN_ERR "cdrom: %s: unknown mrw mode page\n", cdi->name);
+	return 1;
+}
+
+int cdrom_is_mrw(struct cdrom_device_info *cdi, int *write)
+{
+	struct cdrom_generic_command cgc;
+	struct mrw_feature_desc *mfd;
+	unsigned char buffer[16];
+	int ret;
+
+	init_cdrom_command(&cgc, buffer, sizeof(buffer), CGC_DATA_READ);
+
+	cgc.cmd[0] = GPCMD_GET_CONFIGURATION;
+	cgc.cmd[3] = CDF_MRW;
+	cgc.cmd[8] = sizeof(buffer);
+	cgc.quiet = 1;
+
+	if ((ret = cdi->ops->generic_packet(cdi, &cgc)))
+		return ret;
+
+	mfd = (struct mrw_feature_desc *)&buffer[sizeof(struct feature_header)];
+	*write = mfd->write;
+
+	if ((ret = cdrom_mrw_probe_pc(cdi)))
+		return ret;
+
+	return 0;
+}
+
+static int cdrom_mrw_bgformat(struct cdrom_device_info *cdi, int cont)
+{
+	struct cdrom_generic_command cgc;
+	unsigned char buffer[12];
+	int ret;
+
+	printk(KERN_INFO "cdrom: %sstarting format\n", cont ? "Re" : "");
+
+	/*
+	 * FmtData bit set (bit 4), format type is 1
+	 */
+	init_cdrom_command(&cgc, buffer, sizeof(buffer), CGC_DATA_WRITE);
+	cgc.cmd[0] = GPCMD_FORMAT_UNIT;
+	cgc.cmd[1] = (1 << 4) | 1;
+
+	cgc.timeout = 5 * 60 * HZ;
+
+	/*
+	 * 4 byte format list header, 8 byte format list descriptor
+	 */
+	buffer[1] = 1 << 1;
+	buffer[3] = 8;
+
+	/*
+	 * nr_blocks field
+	 */
+	buffer[4] = 0xff;
+	buffer[5] = 0xff;
+	buffer[6] = 0xff;
+	buffer[7] = 0xff;
+
+	buffer[8] = 0x24 << 2;
+	buffer[11] = cont;
+
+	ret = cdi->ops->generic_packet(cdi, &cgc);
+	if (ret)
+		printk(KERN_INFO "cdrom: bgformat failed\n");
+
+	return ret;
+}
+
+static int cdrom_mrw_bgformat_susp(struct cdrom_device_info *cdi, int immed)
+{
+	struct cdrom_generic_command cgc;
+
+	init_cdrom_command(&cgc, NULL, 0, CGC_DATA_NONE);
+	cgc.cmd[0] = GPCMD_CLOSE_TRACK;
+
+	/*
+	 * Session = 1, Track = 0
+	 */
+	cgc.cmd[1] = !!immed;
+	cgc.cmd[2] = 1 << 1;
+
+	cgc.timeout = 5 * 60 * HZ;
+
+	return cdi->ops->generic_packet(cdi, &cgc);
+}
+
+static int cdrom_flush_cache(struct cdrom_device_info *cdi)
+{
+	struct cdrom_generic_command cgc;
+
+	init_cdrom_command(&cgc, NULL, 0, CGC_DATA_NONE);
+	cgc.cmd[0] = GPCMD_FLUSH_CACHE;
+
+	cgc.timeout = 5 * 60 * HZ;
+
+	return cdi->ops->generic_packet(cdi, &cgc);
+}
+
+static int cdrom_mrw_exit(struct cdrom_device_info *cdi)
+{
+	disc_information di;
+	int ret = 0;
+
+	if (cdrom_get_disc_info(cdi, &di))
+		return 1;
+
+	if (di.mrw_status == CDM_MRW_BGFORMAT_ACTIVE) {
+		printk(KERN_INFO "cdrom: issuing MRW back ground format suspend\n");
+		ret = cdrom_mrw_bgformat_susp(cdi, 0);
+	}
+
+	if (!ret)
+		ret = cdrom_flush_cache(cdi);
+
+	return ret;
+}
+
+static int cdrom_mrw_set_lba_space(struct cdrom_device_info *cdi, int space)
+{
+	struct cdrom_generic_command cgc;
+	struct mode_page_header *mph;
+	char buffer[16];
+	int ret, offset, size;
+
+	init_cdrom_command(&cgc, buffer, sizeof(buffer), CGC_DATA_READ);
+
+	cgc.buffer = buffer;
+	cgc.buflen = sizeof(buffer);
+
+	if ((ret = cdrom_mode_sense(cdi, &cgc, cdi->mrw_mode_page, 0)))
+		return ret;
+
+	mph = (struct mode_page_header *) buffer;
+	offset = be16_to_cpu(mph->desc_length);
+	size = be16_to_cpu(mph->mode_data_length) + 2;
+
+	buffer[offset + 3] = space;
+	cgc.buflen = size;
+
+	if ((ret = cdrom_mode_select(cdi, &cgc)))
+		return ret;
+
+	printk(KERN_INFO "cdrom: %s: mrw address space %s selected\n", cdi->name, mrw_address_space[space]);
+	return 0;
+}
+
+static int cdrom_media_erasable(struct cdrom_device_info *cdi)
+{
+	disc_information di;
+
+	if (cdrom_get_disc_info(cdi, &di))
+		return 0;
+
+	return di.erasable;
+}
+
+/*
+ * FIXME: check RO bit
+ */
+static int cdrom_dvdram_open_write(struct cdrom_device_info *cdi)
+{
+	return !cdrom_media_erasable(cdi);
+}
+
+static int cdrom_mrw_open_write(struct cdrom_device_info *cdi)
+{
+	disc_information di;
+	int ret;
+
+	/*
+	 * always reset to DMA lba space on open
+	 */
+	if (cdrom_mrw_set_lba_space(cdi, MRW_LBA_DMA)) {
+		printk(KERN_ERR "cdrom: failed setting lba address space\n");
+		return 1;
+	}
+
+	if (cdrom_get_disc_info(cdi, &di))
+		return 1;
+
+	if (!di.erasable)
+		return 1;
+
+	/*
+	 * mrw_status
+	 * 0	-	not MRW formatted
+	 * 1	-	MRW bgformat started, but not running or complete
+	 * 2	-	MRW bgformat in progress
+	 * 3	-	MRW formatting complete
+	 */
+	ret = 0;
+	printk(KERN_INFO "cdrom open: mrw_status '%s'\n", mrw_format_status[di.mrw_status]);
+	if (!di.mrw_status)
+		ret = 1;
+	else if (di.mrw_status == CDM_MRW_BGFORMAT_INACTIVE && mrw_format_restart)
+		ret = cdrom_mrw_bgformat(cdi, 1);
+
+	return ret;
+}
+
+/*
+ * returns 0 for ok to open write, non-0 to disallow
+ */
+static int cdrom_open_write(struct cdrom_device_info *cdi)
+{
+	int ret = 1;
+
+	if (CDROM_CAN(CDC_MRW_W))
+		ret = cdrom_mrw_open_write(cdi);
+	else if (CDROM_CAN(CDC_DVD_RAM))
+		ret = cdrom_dvdram_open_write(cdi);
+	/*
+	 * needs to really check whether media is writeable
+	 */
+	else if (CDROM_CAN(CDC_MO_DRIVE))
+		ret = 0;
+
+	return ret;
+}
+
+static int cdrom_close_write(struct cdrom_device_info *cdi)
+{
+#if 0
+	return cdrom_flush_cache(cdi);
+#else
+	return 0;
+#endif
 }
 
 /* We use the open-option O_NONBLOCK to indicate that the
@@ -421,23 +738,34 @@ int cdrom_open(struct cdrom_device_info *cdi, struct inode *ip, struct file *fp)
 	int ret;
 
 	cdinfo(CD_OPEN, "entering cdrom_open\n"); 
+
 	/* if this was a O_NONBLOCK open and we should honor the flags,
 	 * do a quick open without drive/disc integrity checks. */
-	if ((fp->f_flags & O_NONBLOCK) && (cdi->options & CDO_USE_FFLAGS))
+	cdi->use_count++;
+	if ((fp->f_flags & O_NONBLOCK) && (cdi->options & CDO_USE_FFLAGS)) {
 		ret = cdi->ops->open(cdi, 1);
-	else {
-		if ((fp->f_mode & FMODE_WRITE) && !CDROM_CAN(CDC_DVD_RAM))
-			return -EROFS;
-
+	} else {
+		if (fp->f_mode & FMODE_WRITE) {
+			ret = -EROFS;
+			if (!CDROM_CAN(CDC_RAM))
+				goto err;
+			if (cdrom_open_write(cdi))
+				goto err;
+		}
 		ret = open_for_data(cdi);
 	}
 
-	if (!ret) cdi->use_count++;
+	if (ret)
+		goto err;
 
-	cdinfo(CD_OPEN, "Use count for \"/dev/%s\" now %d\n", cdi->name, cdi->use_count);
+	cdinfo(CD_OPEN, "Use count for \"/dev/%s\" now %d\n",
+			cdi->name, cdi->use_count);
 	/* Do this on open.  Don't wait for mount, because they might
 	    not be mounting, but opening with O_NONBLOCK */
 	check_disk_change(ip->i_bdev);
+	return 0;
+err:
+	cdi->use_count--;
 	return ret;
 }
 
@@ -525,7 +853,7 @@ int open_for_data(struct cdrom_device_info * cdi)
 		cdinfo(CD_OPEN, "open device failed.\n"); 
 		goto clean_up_and_return;
 	}
-	if (CDROM_CAN(CDC_LOCK) && cdi->options & CDO_LOCK) {
+	if (CDROM_CAN(CDC_LOCK) && (cdi->options & CDO_LOCK)) {
 			cdo->lock_door(cdi, 1);
 			cdinfo(CD_OPEN, "door locked.\n");
 	}
@@ -603,7 +931,6 @@ int check_for_audio_disc(struct cdrom_device_info * cdi,
 	return 0;
 }
 
-
 /* Admittedly, the logic below could be performed in a nicer way. */
 int cdrom_release(struct cdrom_device_info *cdi, struct file *fp)
 {
@@ -617,12 +944,19 @@ int cdrom_release(struct cdrom_device_info *cdi, struct file *fp)
 	if (cdi->use_count == 0)
 		cdinfo(CD_CLOSE, "Use count for \"/dev/%s\" now zero\n", cdi->name);
 	if (cdi->use_count == 0 &&
-	    cdo->capability & CDC_LOCK && !keeplocked) {
+	    (cdo->capability & CDC_LOCK) && !keeplocked) {
 		cdinfo(CD_CLOSE, "Unlocking door!\n");
 		cdo->lock_door(cdi, 0);
 	}
 	opened_for_data = !(cdi->options & CDO_USE_FFLAGS) ||
 		!(fp && fp->f_flags & O_NONBLOCK);
+
+	/*
+	 * flush cache on last write release
+	 */
+	if (CDROM_CAN(CDC_RAM) && !cdi->use_count && cdi->for_data)
+		cdrom_close_write(cdi);
+
 	cdo->release(cdi);
 	if (cdi->use_count == 0) {      /* last process that closes dev*/
 		if (opened_for_data &&
@@ -2203,7 +2537,6 @@ static int cdrom_get_disc_info(struct cdrom_device_info *cdi, disc_information *
 	return cdo->generic_packet(cdi, &cgc);
 }
 
-
 /* return the last written block on the CD-R media. this is for the udf
    file system. */
 int cdrom_get_last_written(struct cdrom_device_info *cdi, long *last_written)
@@ -2310,6 +2643,8 @@ EXPORT_SYMBOL(cdrom_number_of_slots);
 EXPORT_SYMBOL(cdrom_mode_select);
 EXPORT_SYMBOL(cdrom_mode_sense);
 EXPORT_SYMBOL(init_cdrom_command);
+EXPORT_SYMBOL(cdrom_get_media_event);
+EXPORT_SYMBOL(cdrom_is_mrw);
 
 #ifdef CONFIG_SYSCTL
 
@@ -2405,6 +2740,14 @@ int cdrom_sysctl_info(ctl_table *ctl, int write, struct file * filp,
 	pos += sprintf(info+pos, "\nCan write DVD-RAM:");
 	for (cdi=topCdromPtr;cdi!=NULL;cdi=cdi->next)
 	    pos += sprintf(info+pos, "\t%d", CDROM_CAN(CDC_DVD_RAM) != 0);
+
+	pos += sprintf(info+pos, "\nCan read MRW:");
+	for (cdi=topCdromPtr;cdi!=NULL;cdi=cdi->next)
+	    pos += sprintf(info+pos, "\t\t%d", CDROM_CAN(CDC_MRW) != 0);
+
+	pos += sprintf(info+pos, "\nCan write MRW:");
+	for (cdi=topCdromPtr;cdi!=NULL;cdi=cdi->next)
+	    pos += sprintf(info+pos, "\t\t%d", CDROM_CAN(CDC_MRW_W) != 0);
 
 	strcpy(info+pos,"\n\n");
 		

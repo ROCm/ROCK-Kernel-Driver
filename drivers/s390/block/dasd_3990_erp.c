@@ -5,7 +5,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 2000, 2001
  *
- * $Revision: 1.25 $
+ * $Revision: 1.26 $
  */
 
 #include <linux/timer.h>
@@ -312,7 +312,8 @@ dasd_3990_erp_alternate_path(struct dasd_ccw_req * erp)
 			    erp->lpm, erp->dstat->esw.esw0.sublog.lpum, opm);
 
 		/* reset status to queued to handle the request again... */
-		erp->status = DASD_CQR_QUEUED;
+		if (erp->status > DASD_CQR_QUEUED)
+			erp->status = DASD_CQR_QUEUED;
 		erp->retries = 1;
 	} else {
 		DEV_MESSAGE(KERN_ERR, device,
@@ -321,7 +322,8 @@ dasd_3990_erp_alternate_path(struct dasd_ccw_req * erp)
 			    erp->dstat->esw.esw0.sublog.lpum, opm);
 
 		/* post request with permanent error */
-		erp->status = DASD_CQR_FAILED;
+		if (erp->status > DASD_CQR_QUEUED)
+			erp->status = DASD_CQR_FAILED;
 	}
 }				/* end dasd_3990_erp_alternate_path */
 

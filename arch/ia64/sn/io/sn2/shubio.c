@@ -1,5 +1,4 @@
-/* $Id: shubio.c,v 1.1 2002/02/28 17:31:25 marcelo Exp $
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
@@ -14,7 +13,6 @@
 #include <asm/sn/sgi.h>
 #include <asm/sn/io.h>
 #include <asm/sn/iograph.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/labelcl.h>
 #include <asm/sn/sn_private.h>
@@ -160,8 +158,6 @@ hub_ioerror_handler(
 	iopaddr_t 	p;
 	caddr_t 	cp;
 
-	IOERROR_DUMP("hub_ioerror_handler", error_code, mode, ioerror);
-
 	hubinfo_get(hub_v, &hinfo);
 
 	if (!hinfo){
@@ -287,8 +283,6 @@ hub_ioerror_handler(
 			IOERROR_SETVALUE(ioerror,widgetnum,widgetnum);
 			IOERROR_SETVALUE(ioerror,xtalkaddr,xtalkaddr);
 		} else {
-			IOERROR_DUMP("hub_ioerror_handler", error_code, 
-						mode, ioerror);
 			IOERR_PRINTF(printk(
 				"hub_ioerror_handler: Invalid address passed"));
 
@@ -308,11 +302,6 @@ hub_ioerror_handler(
 			 * widget is enabled.
 			 */
 			if (!is_widget_pio_enabled(ioerror)) {
-				if (error_state_get(hub_v) == 
-				    ERROR_STATE_ACTION)
-					ioerror_dump("No outbound widget"
-						     " access - ", 
-						     error_code, mode, ioerror);
 				return(IOERROR_HANDLED);
 			}
 		  
@@ -350,11 +339,6 @@ hub_ioerror_handler(
 			 */
 
 			if (!is_widget_pio_enabled(ioerror)) {
-				if (error_state_get(hub_v) == 
-				    ERROR_STATE_ACTION)
-					ioerror_dump("No outbound widget"
-						     " access - ", 
-						     error_code, mode, ioerror);
 				return(IOERROR_HANDLED);
 			}
 		  
@@ -478,7 +462,7 @@ error_return_code_t
 error_state_set(vertex_hdl_t v,error_state_t new_state)
 {
         error_state_t   old_state;
-        boolean_t       replace = B_TRUE;
+        int       replace = 1;
 
         /* Check if we have a valid hwgraph vertex */
         if ( v == (vertex_hdl_t)0 )
@@ -497,7 +481,7 @@ error_state_set(vertex_hdl_t v,error_state_t new_state)
          * for this vertex.
          */
         if (v_error_state_get(v,old_state) != GRAPH_SUCCESS)
-                replace = B_FALSE;
+                replace = 0;
 
         if (v_error_state_set(v,new_state,replace) != GRAPH_SUCCESS) {
                 return(ERROR_RETURN_CODE_CANNOT_SET_STATE);

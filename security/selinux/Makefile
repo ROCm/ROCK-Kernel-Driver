@@ -4,7 +4,9 @@
 
 obj-$(CONFIG_SECURITY_SELINUX) := selinux.o ss/
 
-selinux-objs := avc.o hooks.o selinuxfs.o
+selinux-y := avc.o hooks.o selinuxfs.o
+
+selinux-$(CONFIG_SECURITY_NETWORK) += netif.o
 
 EXTRA_CFLAGS += -Isecurity/selinux/include
 

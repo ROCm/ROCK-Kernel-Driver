@@ -72,6 +72,21 @@ config PPC64
 	bool
 	default y
 
+# VMX is pSeries only for now until somebody writes the iSeries
+# exception vectors for it
+config ALTIVEC
+	bool "Support for VMX (Altivec) vector unit"
+	depends on PPC_PSERIES
+	default y
+
+config POWER4_ONLY
+	bool "Optimize for POWER4"
+	default n
+	---help---
+	  Cause the compiler to optimize for POWER4 processors. The resulting
+	  binary will not work on POWER3 or RS64 processors when compiled with
+	  binutils 2.15 or later.
+
 config SMP
 	bool "Symmetric multi-processing support"
 	---help---
@@ -97,6 +112,7 @@ config IRQ_ALL_CPUS
 
 config NR_CPUS
 	int "Maximum number of CPUs (2-128)"
+	range 2 128
 	depends on SMP
 	default "32"
 
@@ -130,17 +146,24 @@ config MSCHUNKS
 	depends on PPC_ISERIES
 	default y
 
-config RTAS_FLASH
-	tristate "Firmware flash interface"
-	depends on !PPC_ISERIES
-
-config SCANLOG
-	tristate "Scanlog dump interface"
-	depends on !PPC_ISERIES
 
 config PPC_RTAS
 	bool "Proc interface to RTAS"
 	depends on !PPC_ISERIES
+
+config RTAS_FLASH
+	tristate "Firmware flash interface"
+	depends on PPC_RTAS
+
+config SCANLOG
+	tristate "Scanlog dump interface"
+	depends on PPC_RTAS
+
+config LPARCFG
+	bool "LPAR Configuration Data"
+	help
+	Provide system capacity information via human readable 
+	<key word>=<value> pairs through a /proc/ppc64/lparcfg interface.
 
 endmenu
 
@@ -318,7 +341,7 @@ endmenu
 
 config VIOPATH
 	bool
-	depends on PPC_ISERIES
+	depends on VIOCONS || VIODASD || VIOCD || VIOTAPE || VETH
 	default y
 
 source "arch/ppc64/oprofile/Kconfig"

@@ -197,31 +197,44 @@ static int rawv6_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	if (sk->sk_state != TCP_CLOSE)
 		goto out;
 
-	if (addr_type & IPV6_ADDR_LINKLOCAL) {
-		if (addr_len >= sizeof(struct sockaddr_in6) &&
-		    addr->sin6_scope_id) {
-			/* Override any existing binding, if another one
-			 * is supplied by user.
-			 */
-			sk->sk_bound_dev_if = addr->sin6_scope_id;
-		}
-
-		/* Binding to link-local address requires an interface */
-		if (!sk->sk_bound_dev_if)
-			goto out;
-	}
-
 	/* Check if the address belongs to the host. */
 	if (addr_type != IPV6_ADDR_ANY) {
+		struct net_device *dev = NULL;
+
+		if (addr_type & IPV6_ADDR_LINKLOCAL) {
+			if (addr_len >= sizeof(struct sockaddr_in6) &&
+			    addr->sin6_scope_id) {
+				/* Override any existing binding, if another
+				 * one is supplied by user.
+				 */
+				sk->sk_bound_dev_if = addr->sin6_scope_id;
+			}
+			
+			/* Binding to link-local address requires an interface */
+			if (!sk->sk_bound_dev_if)
+				goto out;
+
+			dev = dev_get_by_index(sk->sk_bound_dev_if);
+			if (!dev) {
+				err = -ENODEV;
+				goto out;
+			}
+		}
+		
 		/* ipv4 addr of the socket is invalid.  Only the
 		 * unpecified and mapped address have a v4 equivalent.
 		 */
 		v4addr = LOOPBACK4_IPV6;
 		if (!(addr_type & IPV6_ADDR_MULTICAST))	{
 			err = -EADDRNOTAVAIL;
-			if (!ipv6_chk_addr(&addr->sin6_addr, NULL))
+			if (!ipv6_chk_addr(&addr->sin6_addr, dev)) {
+				if (dev)
+					dev_put(dev);
 				goto out;
+			}
 		}
+		if (dev)
+			dev_put(dev);
 	}
 
 	inet->rcv_saddr = inet->saddr = v4addr;

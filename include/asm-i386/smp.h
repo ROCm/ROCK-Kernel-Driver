@@ -53,8 +53,7 @@ extern void zap_low_mappings (void);
 #define smp_processor_id() (current_thread_info()->cpu)
 
 extern cpumask_t cpu_callout_map;
-
-#define cpu_possible(cpu) cpu_isset(cpu, cpu_callout_map)
+#define cpu_possible_map cpu_callout_map
 
 /* We don't mark CPUs online until __cpu_up(), so we need another measure */
 static inline int num_booting_cpus(void)

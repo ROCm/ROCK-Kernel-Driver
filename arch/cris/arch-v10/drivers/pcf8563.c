@@ -219,6 +219,7 @@ pcf8563_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned
 				unsigned long flags;
 				struct rtc_time tm;
 
+				memset(&tm, 0, sizeof (struct rtc_time));
 				if (!capable(CAP_SYS_TIME))
 					return -EPERM;
 

@@ -85,10 +85,10 @@ unsigned int openpic_vec_spurious;
  */
 #ifdef CONFIG_SMP
 #define THIS_CPU		Processor[cpu]
-#define DECL_THIS_CPU		int cpu = smp_processor_id()
+#define DECL_THIS_CPU		int cpu = hard_smp_processor_id()
 #define CHECK_THIS_CPU		check_arg_cpu(cpu)
 #else
-#define THIS_CPU		Processor[smp_processor_id()]
+#define THIS_CPU		Processor[hard_smp_processor_id()]
 #define DECL_THIS_CPU
 #define CHECK_THIS_CPU
 #endif /* CONFIG_SMP */
@@ -142,7 +142,7 @@ void __init openpic_init_IRQ(void)
         struct device_node *kbd;
 #endif
 
-        if (!(np = find_devices("pci"))
+        if (!(np = of_find_node_by_name(NULL, "pci"))
             || !(addrp = (unsigned int *)
                  get_property(np, "8259-interrupt-acknowledge", NULL)))
                 printk(KERN_ERR "Cannot find pci to get ack address\n");
@@ -158,6 +158,7 @@ void __init openpic_init_IRQ(void)
         openpic_init(1, NUM_8259_INTERRUPTS, chrp_int_ack_special, nmi_irq);
         for ( i = 0 ; i < NUM_8259_INTERRUPTS  ; i++ )
                 irq_desc[i].handler = &i8259_pic;
+	of_node_put(np);
 }
 
 static inline u_int openpic_read(volatile u_int *addr)
@@ -354,7 +355,7 @@ void __init openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
 	/* SIOint (8259 cascade) is special */
 	if (offset) {
 		openpic_initirq(0, 8, offset, 1, 1);
-		openpic_mapirq(0, 1 << boot_cpuid);
+		openpic_mapirq(0, 1 << get_hard_smp_processor_id(boot_cpuid));
 	}
 
 	/* Init all external sources */
@@ -372,7 +373,7 @@ void __init openpic_init(int main_pic, int offset, unsigned char* chrp_ack,
 		/* Enabled, Priority 8 or 9 */
 		openpic_initirq(i, pri, i+offset, !sense, sense);
 		/* Processor 0 */
-		openpic_mapirq(i, 1 << boot_cpuid);
+		openpic_mapirq(i, 1 << get_hard_smp_processor_id(boot_cpuid));
 	}
 
 	/* Init descriptors */
@@ -513,10 +514,23 @@ static void openpic_set_spurious(u_int vec)
 			   vec);
 }
 
+/*
+ * Convert a cpu mask from logical to physical cpu numbers.
+ */
+static inline u32 physmask(u32 cpumask)
+{
+	int i;
+	u32 mask = 0;
+
+	for (i = 0; i < NR_CPUS; ++i, cpumask >>= 1)
+		mask |= (cpumask & 1) << get_hard_smp_processor_id(i);
+	return mask;
+}
+
 void openpic_init_processor(u_int cpumask)
 {
 	openpic_write(&OpenPIC->Global.Processor_Initialization,
-		      cpumask & cpus_coerce(cpu_online_map));
+		      physmask(cpumask & cpus_coerce(cpu_online_map)));
 }
 
 #ifdef CONFIG_SMP
@@ -550,7 +564,7 @@ void openpic_cause_IPI(u_int ipi, u_int cpumask)
 	CHECK_THIS_CPU;
 	check_arg_ipi(ipi);
 	openpic_write(&OpenPIC->THIS_CPU.IPI_Dispatch(ipi),
-		      cpumask & cpus_coerce(cpu_online_map));
+		      physmask(cpumask & cpus_coerce(cpu_online_map)));
 }
 
 void openpic_request_IPIs(void)
@@ -591,7 +605,7 @@ void __devinit do_openpic_setup_cpu(void)
 {
 #ifdef CONFIG_IRQ_ALL_CPUS
  	int i;
-	u32 msk = 1 << smp_processor_id();
+	u32 msk = 1 << hard_smp_processor_id();
 #endif
 
 	spin_lock(&openpic_setup_lock);
@@ -636,7 +650,7 @@ static void __init openpic_maptimer(u_int timer, u_int cpumask)
 {
 	check_arg_timer(timer);
 	openpic_write(&OpenPIC->Global.Timer[timer].Destination,
-		      cpumask & cpus_coerce(cpu_online_map));
+		      physmask(cpumask & cpus_coerce(cpu_online_map)));
 }
 
 
@@ -762,7 +776,7 @@ static void openpic_set_affinity(unsigned int irq_nr, cpumask_t cpumask)
 	cpumask_t tmp;
 
 	cpus_and(tmp, cpumask, cpu_online_map);
-	openpic_mapirq(irq_nr - open_pic_irq_offset, cpus_coerce(tmp));
+	openpic_mapirq(irq_nr - open_pic_irq_offset, physmask(cpus_coerce(tmp)));
 }
 
 #ifdef CONFIG_SMP

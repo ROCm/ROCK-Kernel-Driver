@@ -1955,15 +1955,9 @@ static int devfs_notify_change (struct dentry *dentry, struct iattr *iattr)
     return 0;
 }   /*  End Function devfs_notify_change  */
 
-static void devfs_clear_inode (struct inode *inode)
-{
-    if ( S_ISBLK (inode->i_mode) ) bdput (inode->i_bdev);
-}   /*  End Function devfs_clear_inode  */
-
 static struct super_operations devfs_sops =
 { 
     .drop_inode    = generic_delete_inode,
-    .clear_inode   = devfs_clear_inode,
     .statfs        = simple_statfs,
 };
 
@@ -2015,11 +2009,7 @@ static struct inode *_devfs_get_vfs_inode (struct super_block *sb,
 	inode->i_rdev = de->u.cdev.dev;
     }
     else if ( S_ISBLK (de->mode) )
-    {
-	inode->i_rdev = de->u.bdev.dev;
-	if (bd_acquire (inode) != 0)
-		PRINTK ("(%d): no block device from bdget()\n",(int)inode->i_ino);
-    }
+	init_special_inode(inode, de->mode, de->u.bdev.dev);
     else if ( S_ISFIFO (de->mode) )
     	inode->i_fop = &def_fifo_fops;
     else if ( S_ISDIR (de->mode) )
@@ -2118,11 +2108,7 @@ static int devfs_open (struct inode *inode, struct file *file)
     if (de == NULL) return -ENODEV;
     if ( S_ISDIR (de->mode) ) return 0;
     file->private_data = de->info;
-    if ( S_ISBLK (inode->i_mode) )
-    {
-	file->f_op = &def_blk_fops;
-	err = def_blk_fops.open (inode, file); /* Module refcount unchanged */
-    } else if (S_ISCHR(inode->i_mode)) {
+    if (S_ISCHR(inode->i_mode)) {
 	ops = devfs_get_ops (de);  /*  Now have module refcount  */
 	file->f_op = ops;
 	if (file->f_op)

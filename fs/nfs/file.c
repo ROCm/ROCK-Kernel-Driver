@@ -266,7 +266,7 @@ out_swapfile:
 int
 nfs_lock(struct file *filp, int cmd, struct file_lock *fl)
 {
-	struct inode * inode = filp->f_dentry->d_inode;
+	struct inode * inode = filp->f_mapping->host;
 	int	status = 0;
 	int	status2;
 
@@ -309,13 +309,13 @@ nfs_lock(struct file *filp, int cmd, struct file_lock *fl)
 	 * Flush all pending writes before doing anything
 	 * with locks..
 	 */
-	status = filemap_fdatawrite(inode->i_mapping);
+	status = filemap_fdatawrite(filp->f_mapping);
 	down(&inode->i_sem);
 	status2 = nfs_wb_all(inode);
 	if (!status)
 		status = status2;
 	up(&inode->i_sem);
-	status2 = filemap_fdatawait(inode->i_mapping);
+	status2 = filemap_fdatawait(filp->f_mapping);
 	if (!status)
 		status = status2;
 	if (status < 0)
@@ -335,11 +335,11 @@ nfs_lock(struct file *filp, int cmd, struct file_lock *fl)
 	 */
  out_ok:
 	if ((IS_SETLK(cmd) || IS_SETLKW(cmd)) && fl->fl_type != F_UNLCK) {
-		filemap_fdatawrite(inode->i_mapping);
+		filemap_fdatawrite(filp->f_mapping);
 		down(&inode->i_sem);
 		nfs_wb_all(inode);      /* we may have slept */
 		up(&inode->i_sem);
-		filemap_fdatawait(inode->i_mapping);
+		filemap_fdatawait(filp->f_mapping);
 		nfs_zap_caches(inode);
 	}
 	return status;

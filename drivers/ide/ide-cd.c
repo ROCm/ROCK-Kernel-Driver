@@ -291,10 +291,13 @@
  *			- Use extended sense on drives that support it for
  *			  correctly reporting tray status -- from
  *			  Michael D Johnson <johnsom@orst.edu>
+ * 4.60  Dec 17, 2003	- Add mt rainier support
+ *			- Bump timeout for packet commands, matches sr
+ *			- Odd stuff
  *
  *************************************************************************/
  
-#define IDECD_VERSION "4.59-ac1"
+#define IDECD_VERSION "4.60"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -774,11 +777,36 @@ static int cdrom_decode_status(ide_drive_t *drive, int good_stat, int *stat_ret)
 
 		if (sense_key == NOT_READY) {
 			/* Tray open. */
-			cdrom_saw_media_change (drive);
+			if (rq_data_dir(rq) == READ) {
+				cdrom_saw_media_change (drive);
 
-			/* Fail the request. */
-			printk ("%s: tray open\n", drive->name);
-			do_end_request = 1;
+				/* Fail the request. */
+				printk ("%s: tray open\n", drive->name);
+				do_end_request = 1;
+			} else {
+				struct cdrom_info *info = drive->driver_data;
+
+				/* allow the drive 5 seconds to recover, some
+				 * devices will return this error while flushing
+				 * data from cache */
+				if (!rq->errors)
+					info->write_timeout = jiffies + ATAPI_WAIT_WRITE_BUSY;
+				rq->errors = 1;
+				if (time_after(jiffies, info->write_timeout))
+					do_end_request = 1;
+				else {
+					unsigned long flags;
+
+					/*
+					 * take a breather relying on the
+					 * unplug timer to kick us again
+					 */
+					spin_lock_irqsave(&ide_lock, flags);
+					blk_plug_device(drive->queue);
+					spin_unlock_irqrestore(&ide_lock,flags);
+					return 1;
+				}
+			}
 		} else if (sense_key == UNIT_ATTENTION) {
 			/* Media change. */
 			cdrom_saw_media_change (drive);
@@ -844,9 +872,13 @@ static int cdrom_timer_expiry(ide_drive_t *drive)
 		case GPCMD_BLANK:
 		case GPCMD_FORMAT_UNIT:
 		case GPCMD_RESERVE_RZONE_TRACK:
-			wait = WAIT_CMD;
+		case GPCMD_CLOSE_TRACK:
+		case GPCMD_FLUSH_CACHE:
+			wait = ATAPI_WAIT_PC;
 			break;
 		default:
+			if (!(rq->flags & REQ_QUIET))
+				printk(KERN_INFO "ide-cd: cmd 0x%x timed out\n", rq->cmd[0]);
 			wait = 0;
 			break;
 	}
@@ -894,7 +926,7 @@ static ide_startstop_t cdrom_start_packet_command(ide_drive_t *drive,
  
 	if (CDROM_CONFIG_FLAGS (drive)->drq_interrupt) {
 		/* packet command */
-		ide_execute_command(drive, WIN_PACKETCMD, handler, WAIT_CMD, cdrom_timer_expiry);
+		ide_execute_command(drive, WIN_PACKETCMD, handler, ATAPI_WAIT_PC, cdrom_timer_expiry);
 		return ide_started;
 	} else {
 		/* packet command */
@@ -1167,7 +1199,7 @@ static ide_startstop_t cdrom_read_intr (ide_drive_t *drive)
 	}
 
 	/* Done moving data!  Wait for another interrupt. */
-	ide_set_handler(drive, &cdrom_read_intr, WAIT_CMD, NULL);
+	ide_set_handler(drive, &cdrom_read_intr, ATAPI_WAIT_PC, NULL);
 	return ide_started;
 }
 
@@ -1277,7 +1309,7 @@ static ide_startstop_t cdrom_start_read_continuation (ide_drive_t *drive)
 		(65534 / CD_FRAMESIZE) : 65535);
 
 	/* Set up the command */
-	rq->timeout = WAIT_CMD;
+	rq->timeout = ATAPI_WAIT_PC;
 
 	/* Send the command to the drive and return. */
 	return cdrom_transfer_packet_command(drive, rq, &cdrom_read_intr);
@@ -1286,7 +1318,7 @@ static ide_startstop_t cdrom_start_read_continuation (ide_drive_t *drive)
 
 #define IDECD_SEEK_THRESHOLD	(1000)			/* 1000 blocks */
 #define IDECD_SEEK_TIMER	(5 * WAIT_MIN_SLEEP)	/* 100 ms */
-#define IDECD_SEEK_TIMEOUT     WAIT_CMD			/* 10 sec */
+#define IDECD_SEEK_TIMEOUT	(2 * WAIT_CMD)		/* 20 sec */
 
 static ide_startstop_t cdrom_seek_intr (ide_drive_t *drive)
 {
@@ -1326,7 +1358,7 @@ static ide_startstop_t cdrom_start_seek_continuation (ide_drive_t *drive)
 	rq->cmd[0] = GPCMD_SEEK;
 	put_unaligned(cpu_to_be32(frame), (unsigned int *) &rq->cmd[2]);
 
-	rq->timeout = WAIT_CMD;
+	rq->timeout = ATAPI_WAIT_PC;
 	return cdrom_transfer_packet_command(drive, rq, &cdrom_seek_intr);
 }
 
@@ -1502,7 +1534,7 @@ confused:
 	}
 
 	/* Now we wait for another interrupt. */
-	ide_set_handler(drive, &cdrom_pc_intr, WAIT_CMD, cdrom_timer_expiry);
+	ide_set_handler(drive, &cdrom_pc_intr, ATAPI_WAIT_PC, cdrom_timer_expiry);
 	return ide_started;
 }
 
@@ -1511,7 +1543,7 @@ static ide_startstop_t cdrom_do_pc_continuation (ide_drive_t *drive)
 	struct request *rq = HWGROUP(drive)->rq;
 
 	if (!rq->timeout)
-		rq->timeout = WAIT_CMD;
+		rq->timeout = ATAPI_WAIT_PC;
 
 	/* Send the command to the drive and return. */
 	return cdrom_transfer_packet_command(drive, rq, &cdrom_pc_intr);
@@ -1716,11 +1748,8 @@ static ide_startstop_t cdrom_newpc_intr(ide_drive_t *drive)
 	/*
 	 * If DRQ is clear, the command has completed.
 	 */
-	if ((stat & DRQ_STAT) == 0) {
-		if (rq->data_len)
-			printk("%s: %u residual after xfer\n", __FUNCTION__, rq->data_len);
+	if ((stat & DRQ_STAT) == 0)
 		goto end_request;
-	}
 
 	/*
 	 * check which way to transfer data
@@ -1826,10 +1855,8 @@ static ide_startstop_t cdrom_write_intr(ide_drive_t *drive)
 		}
 	}
 
-	if (cdrom_decode_status(drive, 0, &stat)) {
-		printk("ide-cd: write_intr decode_status bad\n");
+	if (cdrom_decode_status(drive, 0, &stat))
 		return ide_stopped;
-	}
 
 	/*
 	 * using dma, transfer is complete now
@@ -1904,7 +1931,7 @@ static ide_startstop_t cdrom_write_intr(ide_drive_t *drive)
 	}
 
 	/* re-arm handler */
-	ide_set_handler(drive, &cdrom_write_intr, 5 * WAIT_CMD, NULL);
+	ide_set_handler(drive, &cdrom_write_intr, ATAPI_WAIT_PC, NULL);
 	return ide_started;
 }
 
@@ -1915,7 +1942,7 @@ static ide_startstop_t cdrom_start_write_cont(ide_drive_t *drive)
 #if 0	/* the immediate bit */
 	rq->cmd[1] = 1 << 3;
 #endif
-	rq->timeout = 2 * WAIT_CMD;
+	rq->timeout = ATAPI_WAIT_PC;
 
 	return cdrom_transfer_packet_command(drive, rq, cdrom_write_intr);
 }
@@ -1956,7 +1983,7 @@ static ide_startstop_t cdrom_do_newpc_cont(ide_drive_t *drive)
 	struct request *rq = HWGROUP(drive)->rq;
 
 	if (!rq->timeout)
-		rq->timeout = WAIT_CMD;
+		rq->timeout = ATAPI_WAIT_PC;
 
 	return cdrom_transfer_packet_command(drive, rq, cdrom_newpc_intr);
 }
@@ -2242,6 +2269,7 @@ static int cdrom_read_toc(ide_drive_t *drive, struct request_sense *sense)
 		struct atapi_toc_header hdr;
 		struct atapi_toc_entry  ent;
 	} ms_tmp;
+	long last_written;
 
 	if (toc == NULL) {
 		/* Try to allocate space. */
@@ -2260,6 +2288,13 @@ static int cdrom_read_toc(ide_drive_t *drive, struct request_sense *sense)
 
 	if (CDROM_STATE_FLAGS(drive)->toc_valid)
 		return 0;
+
+	/* Try to get the total cdrom capacity. */
+	stat = cdrom_read_capacity(drive, &toc->capacity, sense);
+	if (stat)
+		toc->capacity = 0x1fffff;
+
+	set_capacity(drive->disk, toc->capacity * SECTORS_PER_FRAME);
 
 	/* First read just the header, so we know how long the TOC is. */
 	stat = cdrom_read_tocentry(drive, 0, 1, 0, (char *) &toc->hdr,
@@ -2368,13 +2403,11 @@ static int cdrom_read_toc(ide_drive_t *drive, struct request_sense *sense)
 	toc->xa_flag = (ms_tmp.hdr.first_track != ms_tmp.hdr.last_track);
 
 	/* Now try to get the total cdrom capacity. */
-	stat = cdrom_get_last_written(cdi, (long *) &toc->capacity);
-	if (stat || !toc->capacity)
-		stat = cdrom_read_capacity(drive, &toc->capacity, sense);
-	if (stat)
-		toc->capacity = 0x1fffff;
-
-	set_capacity(drive->disk, toc->capacity * SECTORS_PER_FRAME);
+	stat = cdrom_get_last_written(cdi, &last_written);
+	if (!stat && last_written) {
+		toc->capacity = last_written;
+		set_capacity(drive->disk, toc->capacity * SECTORS_PER_FRAME);
+	}
 
 	/* Remember that we've read this stuff. */
 	CDROM_STATE_FLAGS(drive)->toc_valid = 1;
@@ -2483,7 +2516,7 @@ static int ide_cdrom_packet(struct cdrom_device_info *cdi,
 	ide_drive_t *drive = (ide_drive_t*) cdi->handle;
 
 	if (cgc->timeout <= 0)
-		cgc->timeout = WAIT_CMD;
+		cgc->timeout = ATAPI_WAIT_PC;
 
 	/* here we queue the commands from the uniform CD-ROM
 	   layer. the packet must be complete, as we do not
@@ -2688,37 +2721,49 @@ int ide_cdrom_select_speed (struct cdrom_device_info *cdi, int speed)
         return 0;
 }
 
+/*
+ * add logic to try GET_EVENT command first to check for media and tray
+ * status. this should be supported by newer cd-r/w and all DVD etc
+ * drives
+ */
 static
 int ide_cdrom_drive_status (struct cdrom_device_info *cdi, int slot_nr)
 {
 	ide_drive_t *drive = (ide_drive_t*) cdi->handle;
+	struct media_event_desc med;
+	struct request_sense sense;
+	int stat;
 
-	if (slot_nr == CDSL_CURRENT) {
-		struct request_sense sense;
-		int stat = cdrom_check_status(drive, &sense);
-		if (stat == 0 || sense.sense_key == UNIT_ATTENTION)
+	if (slot_nr != CDSL_CURRENT)
+		return -EINVAL;
+
+	stat = cdrom_check_status(drive, &sense);
+	if (!stat || sense.sense_key == UNIT_ATTENTION)
+		return CDS_DISC_OK;
+
+	if (!cdrom_get_media_event(cdi, &med)) {
+		if (med.media_present)
 			return CDS_DISC_OK;
-
-		if (sense.sense_key == NOT_READY && sense.asc == 0x04 &&
-		    sense.ascq == 0x04)
-			return CDS_DISC_OK;
-
-
-		/*
-		 * If not using Mt Fuji extended media tray reports,
-		 * just return TRAY_OPEN since ATAPI doesn't provide
-		 * any other way to detect this...
-		 */
-		if (sense.sense_key == NOT_READY) {
-			if (sense.asc == 0x3a && sense.ascq == 1)
-				return CDS_NO_DISC;
-			else
-				return CDS_TRAY_OPEN;
-		}
-
-		return CDS_DRIVE_NOT_READY;
+		if (med.door_open)
+			return CDS_TRAY_OPEN;
 	}
-	return -EINVAL;
+
+	if (sense.sense_key == NOT_READY && sense.asc == 0x04 && sense.ascq == 0x04)
+		return CDS_DISC_OK;
+
+	/*
+	 * If not using Mt Fuji extended media tray reports,
+	 * just return TRAY_OPEN since ATAPI doesn't provide
+	 * any other way to detect this...
+	 */
+	if (sense.sense_key == NOT_READY) {
+		if (sense.asc == 0x3a && sense.ascq == 1)
+			return CDS_NO_DISC;
+		else
+			return CDS_TRAY_OPEN;
+	}
+
+	return CDS_DRIVE_NOT_READY;
 }
 
 static
@@ -2826,7 +2871,8 @@ static struct cdrom_device_ops ide_cdrom_dops = {
 				CDC_MEDIA_CHANGED | CDC_PLAY_AUDIO | CDC_RESET |
 				CDC_IOCTLS | CDC_DRIVE_STATUS | CDC_CD_R |
 				CDC_CD_RW | CDC_DVD | CDC_DVD_R| CDC_DVD_RAM |
-				CDC_GENERIC_PACKET | CDC_MO_DRIVE,
+				CDC_GENERIC_PACKET | CDC_MO_DRIVE | CDC_MRW |
+				CDC_MRW_W | CDC_RAM,
 	.generic_packet		= ide_cdrom_packet,
 };
 
@@ -2861,6 +2907,10 @@ static int ide_cdrom_register (ide_drive_t *drive, int nslots)
 		devinfo->mask |= CDC_CLOSE_TRAY;
 	if (!CDROM_CONFIG_FLAGS(drive)->mo_drive)
 		devinfo->mask |= CDC_MO_DRIVE;
+	if (!CDROM_CONFIG_FLAGS(drive)->mrw)
+		devinfo->mask |= CDC_MRW;
+	if (!CDROM_CONFIG_FLAGS(drive)->mrw_w)
+		devinfo->mask |= CDC_MRW_W;
 
 	return register_cdrom(devinfo);
 }
@@ -2881,14 +2931,6 @@ int ide_cdrom_get_capabilities(ide_drive_t *drive, struct atapi_capabilities_pag
 	    !strcmp(drive->id->model, "WPI CDS-32X")))
 		size -= sizeof(cap->pad);
 
-	/* we have to cheat a little here. the packet will eventually
-	 * be queued with ide_cdrom_packet(), which extracts the
-	 * drive from cdi->handle. Since this device hasn't been
-	 * registered with the Uniform layer yet, it can't do this.
-	 * Same goes for cdi->ops.
-	 */
-	cdi->handle = (ide_drive_t *) drive;
-	cdi->ops = &ide_cdrom_dops;
 	init_cdrom_command(&cgc, cap, size, CGC_DATA_UNKNOWN);
 	do { /* we seem to get stat=0x01,err=0x00 the first time (??) */
 		stat = cdrom_mode_sense(cdi, &cgc, GPMODE_CAPABILITIES_PAGE, 0);
@@ -2904,22 +2946,42 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
 	struct cdrom_info *info = drive->driver_data;
 	struct cdrom_device_info *cdi = &info->devinfo;
 	struct atapi_capabilities_page cap;
-	int nslots = 1;
+	int nslots = 1, mrw_write = 0;
 
 	if (drive->media == ide_optical) {
 		CDROM_CONFIG_FLAGS(drive)->mo_drive = 1;
+		CDROM_CONFIG_FLAGS(drive)->ram = 1;
 		printk("%s: ATAPI magneto-optical drive\n", drive->name);
 		return nslots;
 	}
 
-	if (CDROM_CONFIG_FLAGS(drive)->nec260) {
-		CDROM_CONFIG_FLAGS(drive)->no_eject = 0;                       
-		CDROM_CONFIG_FLAGS(drive)->audio_play = 1;       
+	if (CDROM_CONFIG_FLAGS(drive)->nec260 ||
+	    !strcmp(drive->id->model,"STINGRAY 8422 IDE 8X CD-ROM 7-27-95")) {
+		CDROM_CONFIG_FLAGS(drive)->no_eject = 0;
+		CDROM_CONFIG_FLAGS(drive)->audio_play = 1;
 		return nslots;
 	}
 
+	/*
+	 * we have to cheat a little here. the packet will eventually
+	 * be queued with ide_cdrom_packet(), which extracts the
+	 * drive from cdi->handle. Since this device hasn't been
+	 * registered with the Uniform layer yet, it can't do this.
+	 * Same goes for cdi->ops.
+	 */
+	cdi->handle = (ide_drive_t *) drive;
+	cdi->ops = &ide_cdrom_dops;
+
 	if (ide_cdrom_get_capabilities(drive, &cap))
 		return 0;
+
+	if (!cdrom_is_mrw(cdi, &mrw_write)) {
+		CDROM_CONFIG_FLAGS(drive)->mrw = 1;
+		if (mrw_write) {
+			CDROM_CONFIG_FLAGS(drive)->mrw_w = 1;
+			CDROM_CONFIG_FLAGS(drive)->ram = 1;
+		}
+	}
 
 	if (cap.lock == 0)
 		CDROM_CONFIG_FLAGS(drive)->no_doorlock = 1;
@@ -2933,8 +2995,10 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
 		CDROM_CONFIG_FLAGS(drive)->test_write = 1;
 	if (cap.dvd_ram_read || cap.dvd_r_read || cap.dvd_rom)
 		CDROM_CONFIG_FLAGS(drive)->dvd = 1;
-	if (cap.dvd_ram_write)
+	if (cap.dvd_ram_write) {
 		CDROM_CONFIG_FLAGS(drive)->dvd_ram = 1;
+		CDROM_CONFIG_FLAGS(drive)->ram = 1;
+	}
 	if (cap.dvd_r_write)
 		CDROM_CONFIG_FLAGS(drive)->dvd_r = 1;
 	if (cap.audio_play)
@@ -2997,6 +3061,9 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
         	printk(" CD%s%s", 
         	(CDROM_CONFIG_FLAGS(drive)->cd_r)? "-R" : "", 
         	(CDROM_CONFIG_FLAGS(drive)->cd_rw)? "/RW" : "");
+
+	if (CDROM_CONFIG_FLAGS(drive)->mrw || CDROM_CONFIG_FLAGS(drive)->mrw_w)
+		printk(" CD-MR%s", CDROM_CONFIG_FLAGS(drive)->mrw_w ? "W" : "");
 
         if (CDROM_CONFIG_FLAGS(drive)->is_changer) 
         	printk(" changer w/%d slots", nslots);
@@ -3105,14 +3172,11 @@ int ide_cdrom_setup (ide_drive_t *drive)
 	struct cdrom_device_info *cdi = &info->devinfo;
 	int nslots;
 
-	/*
-	 * default to read-only always and fix latter at the bottom
-	 */
-	set_disk_ro(drive->disk, 1);
-	blk_queue_hardsect_size(drive->queue, CD_FRAMESIZE);
-
 	blk_queue_prep_rq(drive->queue, ide_cdrom_prep_fn);
 	blk_queue_dma_alignment(drive->queue, 3);
+	drive->queue->unplug_delay = (1 * HZ) / 1000;
+	if (!drive->queue->unplug_delay)
+		drive->queue->unplug_delay = 1;
 
 	drive->special.all	= 0;
 	drive->ready_stat	= 0;
@@ -3215,8 +3279,11 @@ int ide_cdrom_setup (ide_drive_t *drive)
 
 	nslots = ide_cdrom_probe_capabilities (drive);
 
-	if (CDROM_CONFIG_FLAGS(drive)->dvd_ram)
-		set_disk_ro(drive->disk, 0);
+	/*
+	 * set correct block size and read-only for non-ram media
+	 */
+	set_disk_ro(drive->disk, !CDROM_CONFIG_FLAGS(drive)->ram);
+	blk_queue_hardsect_size(drive->queue, CD_FRAMESIZE);
 
 #if 0
 	drive->dsc_overlap = (HWIF(drive)->no_dsc) ? 0 : 1;

@@ -294,6 +294,7 @@ out:
 	return t;
 
 error:
+	t->km.state = XFRM_STATE_DEAD;
 	xfrm_state_put(t);
 	t = NULL;
 	goto out;

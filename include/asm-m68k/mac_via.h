@@ -255,7 +255,8 @@ extern volatile __u8 *via1,*via2;
 extern int rbv_present,via_alt_mapping;
 extern __u8 rbv_clear;
 
-extern __inline__ int rbv_set_video_bpp(int bpp) {
+static inline int rbv_set_video_bpp(int bpp)
+{
 	char val = (bpp==1)?0:(bpp==2)?1:(bpp==4)?2:(bpp==8)?3:-1;
 	if (!rbv_present || val<0) return -1;
 	via2[rMonP] = (via2[rMonP] & ~RBV_DEPTH) | val;

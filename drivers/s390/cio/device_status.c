@@ -62,8 +62,8 @@ ccw_device_path_notoper(struct ccw_device *cdev)
 	sch = to_subchannel(cdev->dev.parent);
 	stsch (sch->irq, &sch->schib);
 
-	CIO_MSG_EVENT(0, "%s(%04X) - path(s) %02x are "
-		      "not operational \n", __FUNCTION__, sch->irq,
+	CIO_MSG_EVENT(0, "%s(%s) - path(s) %02x are "
+		      "not operational \n", __FUNCTION__, sch->dev.bus_id,
 		      sch->schib.pmcw.pnom);
 
 	sch->lpm &= ~sch->schib.pmcw.pnom;
@@ -321,8 +321,7 @@ ccw_device_do_sense(struct ccw_device *cdev, struct irb *irb)
 	sch->sense_ccw.count = SENSE_MAX_COUNT;
 	sch->sense_ccw.flags = CCW_FLAG_SLI;
 
-	/* 0xe2C5D5E2 == "SENS" in ebcdic */
-	return cio_start (sch, &sch->sense_ccw, 0xE2C5D5E2, 0xff);
+	return cio_start (sch, &sch->sense_ccw, 0xff);
 }
 
 /*

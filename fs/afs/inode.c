@@ -26,15 +26,15 @@
 #include "internal.h"
 
 struct afs_iget_data {
-	afs_fid_t		fid;
-	afs_volume_t		*volume;	/* volume on which resides */
+	struct afs_fid		fid;
+	struct afs_volume	*volume;	/* volume on which resides */
 };
 
 /*****************************************************************************/
 /*
  * map the AFS file status to the inode member variables
  */
-static int afs_inode_map_status(afs_vnode_t *vnode)
+static int afs_inode_map_status(struct afs_vnode *vnode)
 {
 	struct inode *inode = AFS_VNODE_TO_I(vnode);
 
@@ -97,7 +97,7 @@ static int afs_inode_map_status(afs_vnode_t *vnode)
  */
 int afs_inode_fetch_status(struct inode *inode)
 {
-	afs_vnode_t *vnode;
+	struct afs_vnode *vnode;
 	int ret;
 
 	vnode = AFS_FS_I(inode);
@@ -130,7 +130,7 @@ static int afs_iget5_test(struct inode *inode, void *opaque)
 static int afs_iget5_set(struct inode *inode, void *opaque)
 {
 	struct afs_iget_data *data = opaque;
-	afs_vnode_t *vnode = AFS_FS_I(inode);
+	struct afs_vnode *vnode = AFS_FS_I(inode);
 
 	inode->i_ino = data->fid.vnode;
 	inode->i_version = data->fid.unique;
@@ -144,7 +144,7 @@ static int afs_iget5_set(struct inode *inode, void *opaque)
 /*
  * inode retrieval
  */
-inline int afs_iget(struct super_block *sb, afs_fid_t *fid,
+inline int afs_iget(struct super_block *sb, struct afs_fid *fid,
 		    struct inode **_inode)
 {
 	struct afs_iget_data data = { fid: *fid };
@@ -197,12 +197,10 @@ inline int afs_iget(struct super_block *sb, afs_fid_t *fid,
 	unlock_new_inode(inode);
 
 	*_inode = inode;
-	_leave(" = 0 [CB { v=%u x=%lu t=%u } c=%p]",
+	_leave(" = 0 [CB { v=%u x=%lu t=%u }]",
 	       vnode->cb_version,
 	       vnode->cb_timeout.timo_jif,
-	       vnode->cb_type,
-	       vnode->cache
-	       );
+	       vnode->cb_type);
 	return 0;
 
 	/* failure */
@@ -222,8 +220,8 @@ inline int afs_iget(struct super_block *sb, afs_fid_t *fid,
 int afs_inode_getattr(struct vfsmount *mnt, struct dentry *dentry,
 		      struct kstat *stat)
 {
+	struct afs_vnode *vnode;
 	struct inode *inode;
-	afs_vnode_t *vnode;
 	int ret;
 
 	inode = dentry->d_inode;
@@ -262,7 +260,7 @@ int afs_inode_getattr(struct vfsmount *mnt, struct dentry *dentry,
  */
 void afs_clear_inode(struct inode *inode)
 {
-	afs_vnode_t *vnode;
+	struct afs_vnode *vnode;
 
 	vnode = AFS_FS_I(inode);
 

@@ -1420,6 +1420,7 @@ static int chip_attach(struct i2c_adapter *adap, int addr, int kind)
 {
 	struct CHIPSTATE *chip;
 	struct CHIPDESC  *desc;
+	int rc;
 
 	chip = kmalloc(sizeof(*chip),GFP_KERNEL);
 	if (!chip)
@@ -1487,8 +1488,12 @@ static int chip_attach(struct i2c_adapter *adap, int addr, int kind)
 		chip->wt.function = chip_thread_wake;
 		chip->wt.data     = (unsigned long)chip;
 		init_waitqueue_head(&chip->wq);
-		kernel_thread(chip_thread,(void *)chip,0);
-		down(&sem);
+		rc = kernel_thread(chip_thread,(void *)chip,0);
+		if (rc < 0)
+			printk(KERN_WARNING "%s: kernel_thread() failed\n",
+			       i2c_clientname(&chip->c));
+		else
+			down(&sem);
 		chip->notify = NULL;
 		wake_up_interruptible(&chip->wq);
 	}
@@ -1497,8 +1502,17 @@ static int chip_attach(struct i2c_adapter *adap, int addr, int kind)
 
 static int chip_probe(struct i2c_adapter *adap)
 {
+#ifdef I2C_ADAP_CLASS_TV_ANALOG
 	if (adap->class & I2C_ADAP_CLASS_TV_ANALOG)
 		return i2c_probe(adap, &addr_data, chip_attach);
+#else
+	switch (adap->id) {
+	case I2C_ALGO_BIT | I2C_HW_B_BT848:
+	case I2C_ALGO_BIT | I2C_HW_B_RIVA:
+	case I2C_ALGO_SAA7134:
+		return i2c_probe(adap, &addr_data, chip_attach);
+	}
+#endif
 	return 0;
 }
 

@@ -1,4 +1,4 @@
-/* $Id: entry.S,v 1.19 2003/05/06 23:28:47 lethal Exp $
+/* $Id: entry.S,v 1.33 2003/11/22 15:39:51 lethal Exp $
  *
  *  linux/arch/sh/entry.S
  *
@@ -24,6 +24,15 @@
 #if !defined(CONFIG_MMU)
 #define sys_madvise		sys_ni_syscall
 #define sys_readahead		sys_ni_syscall
+#define sys_mprotect		sys_ni_syscall
+#define sys_msync		sys_ni_syscall
+#define sys_mlock		sys_ni_syscall
+#define sys_munlock		sys_ni_syscall
+#define sys_mlockall		sys_ni_syscall
+#define sys_munlockall		sys_ni_syscall
+#define sys_mremap		sys_ni_syscall
+#define sys_mincore		sys_ni_syscall
+#define sys_remap_file_pages	sys_ni_syscall
 #endif
 
 ! NOTE:
@@ -137,6 +146,11 @@ OFF_TRA	=  (16*4+6*4)
 ! this first version depends *much* on C implementation.
 !
 
+#define CLI()				\
+	stc	sr, r0;			\
+	or	#0xf0, r0;		\
+	ldc	r0, sr
+
 #define STI()				\
 	mov.l	__INV_IMASK, r11;	\
 	stc	sr, r10;		\
@@ -145,29 +159,36 @@ OFF_TRA	=  (16*4+6*4)
 	or	r11, r10;		\
 	ldc	r10, sr
 
+#if defined(CONFIG_PREEMPT)
+#  define preempt_stop()	CLI()
+#else
+#  define preempt_stop()
+#  define resume_kernel		restore_all
+#endif
+
 #if defined(CONFIG_MMU)
 	.align	2
-tlb_miss_load:
+ENTRY(tlb_miss_load)
 	bra	call_dpf
 	 mov	#0, r5
 
 	.align	2
-tlb_miss_store:
+ENTRY(tlb_miss_store)
 	bra	call_dpf
 	 mov	#1, r5
 
 	.align	2
-initial_page_write:
+ENTRY(initial_page_write)
 	bra	call_dpf
 	 mov	#1, r5
 
 	.align	2
-tlb_protection_violation_load:
+ENTRY(tlb_protection_violation_load)
 	bra	call_dpf
 	 mov	#0, r5
 
 	.align	2
-tlb_protection_violation_store:
+ENTRY(tlb_protection_violation_store)
 	bra	call_dpf
 	 mov	#1, r5
 
@@ -199,12 +220,12 @@ call_dpf:
 3:	.long	do_page_fault
 
 	.align	2
-address_error_load:
+ENTRY(address_error_load)
 	bra	call_dae
 	 mov	#0,r5		! writeaccess = 0
 
 	.align	2
-address_error_store:
+ENTRY(address_error_store)
 	bra	call_dae
 	 mov	#1,r5		! writeaccess = 1
 
@@ -244,7 +265,7 @@ debug_kernel_sw:
 	jmp	@r0
 	 mov	r15, r4
 	.align	2
-3:	.long	SYMBOL_NAME(kgdb_handle_exception)
+3:	.long	kgdb_handle_exception
 #endif /* CONFIG_SH_KGDB */
 
 #if defined(CONFIG_SH_STANDARD_BIOS)
@@ -305,7 +326,7 @@ debug_trap:
 	 nop
 
 	.align	2
-error:	
+ENTRY(exception_error)
 	!
 	STI()
 	mov.l	2f, r0
@@ -318,22 +339,53 @@ error:
 2:	.long	do_exception_error
 
 	.align	2
-ret_from_irq:
 ret_from_exception:
+	preempt_stop()
+ret_from_irq:
+	!
 	mov	#OFF_SR, r0
 	mov.l	@(r0,r15), r0	! get status register
 	shll	r0
 	shll	r0		! kernel space?
-	bt/s	restore_all	! Yes, it's from kernel, go back soon
+	bt/s	resume_kernel	! Yes, it's from kernel, go back soon
 	 GET_THREAD_INFO(r8)
+
+#ifdef CONFIG_PREEMPT
+ENTRY(resume_kernel)
+	mov.l	@(TI_PRE_COUNT,r8), r0	! current_thread_info->preempt_count
+	tst	r0, r0
+	bf	restore_all
+need_resched:
+	mov.l	@(TI_FLAGS,r8), r0	! current_thread_info->flags
+	tst	#_TIF_NEED_RESCHED, r0	! need_resched set?
+	bt	restore_all
+
+	stc	sr, r0			! interrupts disabled?
+	tst	#0xf0, r0
+	bf	restore_all
+
+	mov.l	1f, r0
+	mov.l	r0, @(TI_PRE_COUNT,r8)
+
+	STI()
+	mov.l	2f, r0
+	jsr	@r0
+	 nop
+	mov	#0, r0
+	mov.l	r0, @(TI_PRE_COUNT,r8)
+	CLI()
+
+	bra need_resched
+	 nop
+
+	.align 2
+1:	.long	PREEMPT_ACTIVE
+2:	.long	schedule
+#endif
 
 ENTRY(resume_userspace)
 	! r8: current_thread_info
-	/* CLI */
-	stc	sr, r0
-	or	#0xf0, r0
-	ldc	r0, sr
-	!
+	CLI()
 	mov.l	@(TI_FLAGS,r8), r0		! current_thread_info->flags
 	tst	#_TIF_WORK_MASK, r0
 	bt/s	restore_all
@@ -377,10 +429,7 @@ work_resched:
 	mov.l	1f, r1
 	jsr	@r1				! schedule
 	 nop
-	/* CLI */
-	stc	sr, r0
-	or	#0xf0, r0
-	ldc	r0, sr
+	CLI()
 	!
 	mov.l	@(TI_FLAGS,r8), r0		! current_thread_info->flags
 	tst	#_TIF_WORK_MASK, r0
@@ -469,7 +518,7 @@ ret_from_fork:
 	.align	2
 1:	.long	schedule_tail
 	!
-system_call:
+ENTRY(system_call)
 	mov.l	1f, r9
 	mov.l	@r9, r8		! Read from TRA (Trap Address) Register
 	!
@@ -510,10 +559,7 @@ syscall_call:
 	mov.l	r0, @(OFF_R0,r15)		! save the return value
 	!
 syscall_exit:
-	/* CLI */
-	stc	sr, r0
-	or	#0xf0, r0
-	ldc	r0, sr
+	CLI()
 	!
 	GET_THREAD_INFO(r8)
 	mov.l	@(TI_FLAGS,r8), r0		! current_thread_info->flags
@@ -550,6 +596,40 @@ restore_all:
 	lds.l	@r15+, macl
 	add	#4, r15			! Skip syscall number
 	!
+#ifdef CONFIG_SH_DSP
+	mov.l	@r15+, k0		! DSP mode marker
+	mov.l	5f, k1
+	cmp/eq	k0, k1			! Do we have a DSP stack frame?
+	bf	skip_restore
+
+	stc	sr, k0			! Enable CPU DSP mode
+	or	k1, k0			! (within kernel it may be disabled)
+	ldc	k0, sr
+	mov	r2, k0			! Backup r2
+
+	! Restore DSP registers from stack
+	mov	r15, r2
+	movs.l	@r2+, a1
+	movs.l	@r2+, a0g
+	movs.l	@r2+, a1g
+	movs.l	@r2+, m0
+	movs.l	@r2+, m1
+	mov	r2, r15
+
+	lds.l	@r15+, a0
+	lds.l	@r15+, x0
+	lds.l	@r15+, x1
+	lds.l	@r15+, y0
+	lds.l	@r15+, y1
+	lds.l	@r15+, dsr
+	ldc.l	@r15+, rs
+	ldc.l	@r15+, re
+	ldc.l	@r15+, mod
+
+	mov	k0, r2			! Restore r2
+skip_restore:
+#endif
+	!
 	! Calculate new SR value
 	mov	k3, k2			! original SR value
 	mov.l	8f, k1
@@ -576,6 +656,7 @@ restore_all:
 	mov	#0, k1
 	mov.b	k1, @k0
 #endif
+	mov.l	@r15+, k2		! restore EXPEVT
 	mov	k4, r15
 	rte
 	 nop
@@ -585,14 +666,12 @@ restore_all:
 2:	.long	NR_syscalls
 3:	.long	sys_call_table
 4:	.long	do_syscall_trace
+5:	.long	0x00001000	! DSP
 7:	.long	0x30000000
 8:	.long	0x00008000	! FD
 9:	.long	0xffff7f0f	! ~(IMASK+FD)
 __INV_IMASK:
 	.long	0xffffff0f	! ~(IMASK)
-#if defined(CONFIG_KGDB_NMI)
-10:	.long	in_nmi
-#endif
 
 ! Exception Vector Base
 !
@@ -637,7 +716,7 @@ interrupt:
 	 nop
 	.align	2
 5:	.long	NMI_VEC
-6:	.long	SYMBOL_NAME(in_nmi)
+6:	.long	in_nmi
 0:
 #endif /* defined(CONFIG_KGDB_NMI) */
 	bra	handle_exception
@@ -669,7 +748,50 @@ handle_exception:
 	!
 1:  	mov	#-1, k4
 	mov.l	2f, k1
+	!
+#ifdef CONFIG_SH_DSP
+	mov.l	r2, @-r15		! Save r2, we need another reg
+	stc	sr, k4
+	mov.l	1f, r2
+	tst	r2, k4			! Check if in DSP mode
+	mov.l	@r15+, r2		! Restore r2 now
+	bt/s	skip_save
+	 mov	#0, k4			! Set marker for no stack frame
+
+	mov	r2, k4			! Backup r2 (in k4) for later
+
+	! Save DSP registers on stack
+	stc.l	mod, @-r15
+	stc.l	re, @-r15
+	stc.l	rs, @-r15
+	sts.l	dsr, @-r15
+	sts.l	y1, @-r15
+	sts.l	y0, @-r15
+	sts.l	x1, @-r15
+	sts.l	x0, @-r15
+	sts.l	a0, @-r15
+
+	! GAS is broken, does not generate correct "movs.l Ds,@-As" instr.
+
+	! FIXME: Make sure that this is still the case with newer toolchains,
+	! as we're not at all interested in supporting ancient toolchains at
+	! this point. -- PFM.
+
+	mov	r15, r2
+	.word	0xf653			! movs.l	a1, @-r2
+	.word	0xf6f3			! movs.l	a0g, @-r2
+	.word	0xf6d3			! movs.l	a1g, @-r2
+	.word	0xf6c3			! movs.l	m0, @-r2
+	.word	0xf6e3			! movs.l	m1, @-r2
+	mov	r2, r15
+
+	mov	k4, r2			! Restore r2
+	mov.l	1f, k4			! Force DSP stack frame
+skip_save:
+	mov.l	k4, @-r15		! Push DSP mode marker onto stack
+#endif
 	! Save the user registers on the stack.
+	mov.l	k2, @-r15	! EXPEVT
 	mov.l	k4, @-r15	! set TRA (default: -1)
 	!
 	sts.l	macl, @-r15
@@ -715,264 +837,17 @@ handle_exception:
 	 nop
 
 	.align	2
+1:	.long	0x00001000	! DSP=1
 2:	.long	0x000000f0	! FD=0, IMASK=15
 3:	.long	0xcfffffff	! RB=0, BL=0
 4:	.long	exception_handling_table
 
 	.align	2
-none:
+ENTRY(exception_none)
 	rts
 	 nop
 
-.data
-ENTRY(exception_handling_table)
-	.long	error
-	.long	error
-#if defined(CONFIG_MMU)
-	.long	tlb_miss_load
-	.long	tlb_miss_store
-	.long	initial_page_write
-	.long	tlb_protection_violation_load
-	.long	tlb_protection_violation_store
-	.long	address_error_load
-	.long	address_error_store
-#else
-	.long	error	! tlb miss load
-	.long	error	! tlb miss store
-	.long	error	! initial page write
-	.long	error	! tlb prot violation load
-	.long	error	! tlb prot violation store
-	.long	error	! address error load
-	.long	error	! address error store
-#endif
-
-#if defined(CONFIG_CPU_SH4)
-	.long	do_fpu_error
-#else
-	.long	error	! fpu_exception
-#endif
-	.long	error
-	.long	system_call			! Unconditional Trap
-	.long	error	! reserved_instruction      (filled by trap_init)
-	.long	error	! illegal_slot_instruction  (filled by trap_init)
-ENTRY(nmi_slot)
-#if defined (CONFIG_KGDB_NMI)
-	.long	debug_enter			! Allow trap to debugger
-#else
-	.long	none				! Not implemented yet
-#endif
-ENTRY(user_break_point_trap)
-	.long	break_point_trap
-ENTRY(interrupt_table)
-	! external hardware
-	.long	do_IRQ	! 0000
-	.long	do_IRQ	! 0001
-	.long	do_IRQ	! 0010
-	.long	do_IRQ	! 0011
-	.long	do_IRQ	! 0100
-	.long	do_IRQ	! 0101
-	.long	do_IRQ	! 0110
-	.long	do_IRQ	! 0111
-	.long	do_IRQ	! 1000
-	.long	do_IRQ	! 1001
-	.long	do_IRQ	! 1010
-	.long	do_IRQ	! 1011
-	.long	do_IRQ	! 1100
-	.long	do_IRQ	! 1101
-	.long	do_IRQ	! 1110
-	.long	error
-	! Internal hardware
-	.long	do_IRQ	! TMU0 tuni0
-	.long	do_IRQ	! TMU1 tuni1
-	.long	do_IRQ	! TMU2 tuni2
-	.long	do_IRQ	!      ticpi2
-	.long	do_IRQ	! RTC  ati
-	.long	do_IRQ	!      pri
-	.long	do_IRQ	!      cui
-	.long	do_IRQ	! SCI  eri
-	.long	do_IRQ	!      rxi
-	.long	do_IRQ	!      txi
-	.long	do_IRQ	!      tei
-	.long	do_IRQ	! WDT  iti
-	.long	do_IRQ	! REF  rcmi
-	.long	do_IRQ	!      rovi
-	.long	do_IRQ
-	.long	do_IRQ
-#if  defined(CONFIG_CPU_SUBTYPE_SH7707) || defined(CONFIG_CPU_SUBTYPE_SH7709)
-	.long	do_IRQ	! 32 IRQ  irq0
-	.long	do_IRQ	! 33      irq1
-	.long	do_IRQ	! 34      irq2
-	.long	do_IRQ	! 35      irq3
-	.long	do_IRQ	! 36      irq4
-	.long	do_IRQ	! 37      irq5
-	.long	do_IRQ	! 38
-	.long	do_IRQ	! 39
-	.long	do_IRQ	! 40 PINT pint0-7
-	.long	do_IRQ	! 41      pint8-15
-	.long	do_IRQ	! 42
-	.long	do_IRQ	! 43
-	.long	do_IRQ	! 44
-	.long	do_IRQ	! 45
-	.long	do_IRQ	! 46
-	.long	do_IRQ	! 47
-	.long	do_IRQ	! 48 DMAC dei0
-	.long	do_IRQ	! 49      dei1
-	.long	do_IRQ	! 50      dei2
-	.long	do_IRQ	! 51      dei3
-	.long	do_IRQ	! 52 IrDA eri1
-	.long	do_IRQ	! 53      rxi1
-	.long	do_IRQ	! 54      bri1
-	.long	do_IRQ	! 55      txi1
-	.long	do_IRQ	! 56 SCIF eri2
-	.long	do_IRQ	! 57      rxi2
-	.long	do_IRQ	! 58      bri2
-	.long	do_IRQ	! 59      txi2
-	.long	do_IRQ	! 60 ADC  adi
-#if defined(CONFIG_CPU_SUBTYPE_SH7707)
-	.long   do_IRQ	! 61 LCDC lcdi
-	.long   do_IRQ	! 62 PCC  pcc0i
-	.long   do_IRQ	! 63      pcc1i
-#endif
-#elif defined(CONFIG_CPU_SH4)
-	.long	do_IRQ	! 32 Hitachi UDI
-	.long	do_IRQ	! 33 GPIO
-	.long	do_IRQ	! 34 DMAC dmte0
-	.long	do_IRQ	! 35      dmte1
-	.long	do_IRQ	! 36      dmte2
-	.long	do_IRQ	! 37      dmte3
-	.long	do_IRQ	! 38      dmae
-	.long	error			! 39
-	.long	do_IRQ	! 40 SCIF eri
-	.long	do_IRQ	! 41      rxi
-	.long	do_IRQ	! 42      bri
-	.long	do_IRQ	! 43      txi
-	.long	error			! 44
-	.long	error			! 45
-	.long	error			! 46
-	.long	error			! 47
-	.long	do_fpu_state_restore	! 48
-	.long	do_fpu_state_restore	! 49
-#endif
-#if defined(CONFIG_CPU_SUBTYPE_SH7751)
-	.long	error
-	.long	error
-	.long	error
-	.long	error
-	.long	error
-	.long	error
-	.long	error
-	.long	error
-	.long	error
-	.long	error
-	.long	error
-	.long	error
-	.long	error
-	.long	error
-	.long	do_IRQ	! PCI serr
-	.long	do_IRQ	!     dma3
-	.long	do_IRQ	!     dma2
-	.long	do_IRQ	!     dma1
-	.long	do_IRQ	!     dma0
-	.long	do_IRQ	!     pwon
-	.long	do_IRQ	!     pwdwn
-	.long	do_IRQ	!     err
-#elif defined(CONFIG_CPU_SUBTYPE_ST40STB1)
-	.long	error			!  50 0x840
-	.long	error			!  51 0x860
-	.long	error			!  52 0x880
-	.long	error			!  53 0x8a0
-	.long	error			!  54 0x8c0
-	.long	error			!  55 0x8e0
-	.long	error			!  56 0x900
-	.long	error			!  57 0x920
-	.long	error			!  58 0x940
-	.long	error			!  59 0x960
-	.long	error			!  60 0x980
-	.long	error			!  61 0x9a0
-	.long	error			!  62 0x9c0
-	.long	error			!  63 0x9e0
-	.long	do_IRQ	!  64 0xa00 PCI serr
-	.long	do_IRQ	!  65 0xa20     err
-	.long	do_IRQ	!  66 0xa40     ad
-	.long	do_IRQ	!  67 0xa60     pwr_dwn
-	.long	error			!  68 0xa80
-	.long	error			!  69 0xaa0
-	.long	error			!  70 0xac0
-	.long	error			!  71 0xae0
-	.long	do_IRQ	!  72 0xb00 DMA INT0
-	.long	do_IRQ	!  73 0xb20     INT1
-	.long	do_IRQ	!  74 0xb40     INT2
-	.long	do_IRQ	!  75 0xb60     INT3
-	.long	do_IRQ	!  76 0xb80     INT4
-	.long	error			!  77 0xba0
-	.long	do_IRQ	!  78 0xbc0 DMA ERR
-	.long	error			!  79 0xbe0
-	.long	do_IRQ	!  80 0xc00 PIO0
-	.long	do_IRQ	!  81 0xc20 PIO1
-	.long	do_IRQ	!  82 0xc40 PIO2
-	.long	error			!  83 0xc60
-	.long	error			!  84 0xc80
-	.long	error			!  85 0xca0
-	.long	error			!  86 0xcc0
-	.long	error			!  87 0xce0
-	.long	error			!  88 0xd00
-	.long	error			!  89 0xd20
-	.long	error			!  90 0xd40
-	.long	error			!  91 0xd60
-	.long	error			!  92 0xd80
-	.long	error			!  93 0xda0
-	.long	error			!  94 0xdc0
-	.long	error			!  95 0xde0
-	.long	error			!  96 0xe00
-	.long	error			!  97 0xe20
-	.long	error			!  98 0xe40
-	.long	error			!  99 0xe60
-	.long	error			! 100 0xe80
-	.long	error			! 101 0xea0
-	.long	error			! 102 0xec0
-	.long	error			! 103 0xee0
-	.long	error			! 104 0xf00
-	.long	error			! 105 0xf20
-	.long	error			! 106 0xf40
-	.long	error			! 107 0xf60
-	.long	error			! 108 0xf80
-	.long	error			! 109 0xfa0
-	.long	error			! 110 0xfc0
-	.long	error			! 111 0xfe0
-	.long	do_IRQ	! 112 0x1000 Mailbox
-	.long	error			! 113 0x1020
-	.long	error			! 114 0x1040
-	.long	error			! 115 0x1060
-	.long	error			! 116 0x1080
-	.long	error			! 117 0x10a0
-	.long	error			! 118 0x10c0
-	.long	error			! 119 0x10e0
-	.long	error			! 120 0x1100
-	.long	error			! 121 0x1120
-	.long	error			! 122 0x1140
-	.long	error			! 123 0x1160
-	.long	error			! 124 0x1180
-	.long	error			! 125 0x11a0
-	.long	error			! 126 0x11c0
-	.long	error			! 127 0x11e0
-	.long	error			! 128 0x1200
-	.long	error			! 129 0x1220
-	.long	error			! 130 0x1240
-	.long	error			! 131 0x1260
-	.long	error			! 132 0x1280
-	.long	error			! 133 0x12a0
-	.long	error			! 134 0x12c0
-	.long	error			! 135 0x12e0
-	.long	error			! 136 0x1300
-	.long	error			! 137 0x1320
-	.long	error			! 138 0x1340
-	.long	error			! 139 0x1360
-	.long	do_IRQ	! 140 0x1380 EMPI INV_ADDR
-	.long	error			! 141 0x13a0
-	.long	error			! 142 0x13c0
-	.long	error			! 143 0x13e0
-#endif
-
+	.data
 ENTRY(sys_call_table)
 	.long sys_ni_syscall	/* 0  -  old "setup()" system call*/
 	.long sys_exit
@@ -1242,6 +1117,12 @@ ENTRY(sys_call_table)
  	.long sys_clock_gettime		/* 265 */
  	.long sys_clock_getres
  	.long sys_clock_nanosleep
+	.long sys_statfs64
+	.long sys_fstatfs64     
+	.long sys_tgkill		/* 270 */
+	.long sys_utimes
+ 	.long sys_fadvise64_64_wrapper
+	.long sys_ni_syscall	/* Reserved for vserver */
 
 	.rept NR_syscalls-(.-sys_call_table)/4
 		.long sys_ni_syscall

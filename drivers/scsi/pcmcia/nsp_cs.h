@@ -457,7 +457,7 @@ static inline struct Scsi_Host *scsi_host_hn_get(unsigned short hostno)
 static void cs_error(client_handle_t handle, int func, int ret)
 {
 	error_info_t err = { func, ret };
-	CardServices(ReportError, handle, &err);
+	pcmcia_report_error(handle, &err);
 }
 
 /* scatter-gather table */

@@ -14,6 +14,12 @@
 #define __ARCH_SI_PREAMBLE_SIZE (4 * sizeof(int))
 #endif
 
+#ifdef CONFIG_ARCH_S390X
+#define SIGEV_PAD_SIZE ((SIGEV_MAX_SIZE/sizeof(int)) - 4)
+#else
+#define SIGEV_PAD_SIZE ((SIGEV_MAX_SIZE/sizeof(int)) - 3)
+#endif
+
 #include <asm-generic/siginfo.h>
 
 /*

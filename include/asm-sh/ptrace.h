@@ -37,13 +37,13 @@
 
 #define REG_SYSCALL	22
 
-#define REG_FPUL	23
+#define REG_FPREG0	23
+#define REG_FPREG15	38
+#define REG_XFREG0	39
+#define REG_XFREG15	54
 
-#define REG_FPREG0	24
-#define REG_FPREG15	39
-#define REG_XDREG0	40
-#define REG_XDREG14	47
-#define REG_FPSCR	48
+#define REG_FPSCR	55
+#define REG_FPUL	56
 
 /* options set using PTRACE_SETOPTIONS */
 #define PTRACE_O_TRACESYSGOOD     0x00000001
@@ -62,6 +62,30 @@ struct pt_regs {
 	unsigned long macl;
 	long tra;
 };
+
+/*
+ * This struct defines the way the DSP registers are stored on the
+ * kernel stack during a system call or other kernel entry.
+ */
+struct pt_dspregs {
+	unsigned long	a1;
+	unsigned long	a0g;
+	unsigned long	a1g;
+	unsigned long	m0;
+	unsigned long	m1;
+	unsigned long	a0;
+	unsigned long	x0;
+	unsigned long	x1;
+	unsigned long	y0;
+	unsigned long	y1;
+	unsigned long	dsr;
+	unsigned long	rs;
+	unsigned long	re;
+	unsigned long	mod;
+};
+
+#define	PTRACE_GETDSPREGS	55
+#define	PTRACE_SETDSPREGS	56
 
 #ifdef __KERNEL__
 #define user_mode(regs) (((regs)->sr & 0x40000000)==0)

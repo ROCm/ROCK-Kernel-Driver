@@ -1,13 +1,12 @@
-/* $Id$
- *
+/*
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
  * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
-#ifndef _ASM_SN_PCI_CVLINK_H
-#define _ASM_SN_PCI_CVLINK_H
+#ifndef _ASM_IA64_SN_PCI_CVLINK_H
+#define _ASM_IA64_SN_PCI_CVLINK_H
 
 #include <asm/sn/types.h>
 #include <asm/sn/sgi.h>
@@ -18,7 +17,6 @@
 #include <asm/sn/xtalk/xwidget.h>
 #include <asm/sn/sn_private.h>
 #include <asm/sn/addrs.h>
-#include <asm/sn/invent.h>
 #include <asm/sn/hcl.h>
 #include <asm/sn/hcl_util.h>
 #include <asm/sn/intr.h>
@@ -40,8 +38,6 @@
 #define IS_PCI32G(dev)	((dev)->dma_mask >= 0xffffffff)
 #define IS_PCI32L(dev)	((dev)->dma_mask < 0xffffffff)
 
-#define IS_PIC_DEVICE(dev) ((struct sn_device_sysdata *)dev->sysdata)->isPIC
-
 #define PCIDEV_VERTEX(pci_dev) \
 	(((struct sn_device_sysdata *)((pci_dev)->sysdata))->vhdl)
 
@@ -55,9 +51,9 @@ struct sn_widget_sysdata {
 struct sn_device_sysdata {
         vertex_hdl_t  vhdl;
 	int		isa64;
-	int		isPIC;
 	volatile unsigned int *dma_buf_sync;
 	volatile unsigned int *xbow_buf_sync;
+	pciio_provider_t	*pci_provider;
 };
 
 struct ioports_to_tlbs_s {
@@ -74,4 +70,4 @@ struct ioports_to_tlbs_s {
 			ig:11;
 };
 
-#endif				/* _ASM_SN_PCI_CVLINK_H */
+#endif				/* _ASM_IA64_SN_PCI_CVLINK_H */

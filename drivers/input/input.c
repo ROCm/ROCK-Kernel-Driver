@@ -720,15 +720,13 @@ static int __init input_proc_init(void)
 static inline int input_proc_init(void) { return 0; }
 #endif
 
-struct class input_class = {
-	.name		= "input",
-};
+struct class_simple *input_class;
 
 static int __init input_init(void)
 {
 	int retval = -ENOMEM;
 
-	class_register(&input_class);
+	input_class = class_simple_create(THIS_MODULE, "input");
 	input_proc_init();
 	retval = register_chrdev(INPUT_MAJOR, "input", &input_fops);
 	if (retval) {
@@ -757,7 +755,7 @@ static void __exit input_exit(void)
 
 	devfs_remove("input");
 	unregister_chrdev(INPUT_MAJOR, "input");
-	class_unregister(&input_class);
+	class_simple_destroy(input_class);
 }
 
 subsys_initcall(input_init);

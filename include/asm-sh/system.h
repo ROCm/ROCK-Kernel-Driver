@@ -14,7 +14,7 @@
  */
 
 #define switch_to(prev, next, last) do {				\
- register unsigned long __dummy;					\
+ task_t *__last;							\
  register unsigned long *__ts1 __asm__ ("r1") = &prev->thread.sp;	\
  register unsigned long *__ts2 __asm__ ("r2") = &prev->thread.pc;	\
  register unsigned long *__ts4 __asm__ ("r4") = (unsigned long *)prev;	\
@@ -51,10 +51,11 @@
 		       "mov.l	@r15+, r8\n\t"				\
 		       "lds.l	@r15+, pr\n\t"				\
 		       "ldc.l	@r15+, gbr\n\t"				\
-		       : "=z" (__dummy)					\
+		       : "=z" (__last)					\
 		       : "r" (__ts1), "r" (__ts2), "r" (__ts4), 	\
 			 "r" (__ts5), "r" (__ts6), "r" (__ts7) 		\
 		       : "r3", "t");					\
+	last = __last;							\
 } while (0)
 
 #define nop() __asm__ __volatile__ ("nop")

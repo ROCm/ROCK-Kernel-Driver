@@ -582,6 +582,20 @@ startup:basr  %r13,0                     # get base
 	mvc    __LC_DIAG44_OPCODE(8),.Ldiag44-.LPG1(%r13)
 0:	
 
+#
+# find out if we have the IDTE instruction
+#
+	la     %r1,0f-.LPG1(%r13)	# set program check address
+	stg    %r1,__LC_PGM_NEW_PSW+8
+	.long	0xb2b10000		# store facility list
+	tm	0xc8,0x08		# check bit for clearing-by-ASCE
+	bno	0f-.LPG1(%r13)
+	lhi	%r1,2094
+	lhi	%r2,0
+	.long	0xb98e2001
+	oi	7(%r12),0x80		# set IDTE flag
+0:
+
         lpswe .Lentry-.LPG1(13)         # jump to _stext in primary-space,
                                         # virtual and never return ...
         .align 16

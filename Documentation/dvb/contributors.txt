@@ -8,7 +8,7 @@ Christian Theiss
 
 Marcus Metzler <mocm@metzlerbros.de>
 Ralph Metzler <rjkm@metzlerbros.de>
-  for their contining work on the DVB driver
+  for their continuing work on the DVB driver
 
 Michael Holzt <kju@debian.org>
   for his contributions to the dvb-net driver
@@ -58,5 +58,9 @@ Davor Emard <emard@softhome.net>
   for his work on the budget drivers, the demux code,
   the module unloading problems, ...
   
+Hans-Frieder Vogt <hfvogt@arcor.de>
+  for his work on calculating and checking the crc's for the
+  TechnoTrend/Hauppauge DEC driver firmware
+
 (If you think you should be in this list, but you are not, drop a
  line to the DVB mailing list)

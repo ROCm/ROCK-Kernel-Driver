@@ -23,25 +23,16 @@
 //	drive the hypervisor from the OS.
 //
 //===========================================================================
+#ifndef _HVCALL_H
+#define _HVCALL_H
 
 //-------------------------------------------------------------------
 // Standard Includes
 //-------------------------------------------------------------------
-#ifndef  _HVCALLSC_H
-#include "HvCallSc.h"
-#endif
-
-#ifndef  _HVTYPES_H
+#include <asm/iSeries/HvCallSc.h>
 #include <asm/iSeries/HvTypes.h>
-#endif
-
 #include <asm/paca.h>
 
-//-------------------------------------------------------------------
-// Constants
-//-------------------------------------------------------------------
-#ifndef _HVCALL_H
-#define _HVCALL_H
 /*
 enum HvCall_ReturnCode
 {
@@ -211,5 +202,4 @@ static inline void HvCall_setDebugBus(unsigned long val)
 	HvCall1(HvCallBaseSetDebugBus, val);
 }
 
-#endif // _HVCALL_H
-
+#endif /* _HVCALL_H */

@@ -65,8 +65,7 @@ static inline void pci_dma_sync_single(struct pci_dev *hwdev,
 				       dma_addr_t dma_handle,
 				       size_t size, int direction)
 {
-	if (direction == PCI_DMA_NONE)
-		BUG();
+	BUG_ON(direction == PCI_DMA_NONE);
 	/* nothing to do */
 }
 
@@ -74,8 +73,7 @@ static inline void pci_dma_sync_sg(struct pci_dev *hwdev,
 				   struct scatterlist *sg,
 				   int nelems, int direction)
 {
-	if (direction == PCI_DMA_NONE)
-		BUG();
+	BUG_ON(direction == PCI_DMA_NONE);
 	/* nothing to do */
 }
 
@@ -134,6 +132,17 @@ int pci_mmap_page_range(struct pci_dev *pdev, struct vm_area_struct *vma,
 extern void
 pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
 			struct resource *res);
+
+extern int
+unmap_bus_range(struct pci_bus *bus);
+
+extern int
+remap_bus_range(struct pci_bus *bus);
+
+extern void
+pcibios_fixup_device_resources(struct pci_dev *dev, struct pci_bus *bus);
+
+extern int pci_read_irq_line(struct pci_dev *dev);
 
 #endif	/* __KERNEL__ */
 

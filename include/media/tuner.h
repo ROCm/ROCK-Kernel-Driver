@@ -65,14 +65,16 @@
 #define TUNER_PHILIPS_FM1216ME_MK3  38
 #define TUNER_LG_NTSC_NEW_TAPC   39
 #define TUNER_HITACHI_NTSC       40
-
-
+#define TUNER_PHILIPS_PAL_MK     41
+#define TUNER_PHILIPS_ATSC       42
+#define TUNER_PHILIPS_FM1236_MK3  43
 
 #define NOTUNER 0
 #define PAL     1	/* PAL_BG */
 #define PAL_I   2
 #define NTSC    3
 #define SECAM   4
+#define ATSC    5
 
 #define NoTuner 0
 #define Philips 1

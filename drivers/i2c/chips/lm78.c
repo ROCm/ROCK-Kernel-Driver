@@ -18,6 +18,11 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
+#include <linux/config.h>
+#ifdef CONFIG_I2C_DEBUG_CHIP
+#define DEBUG	1
+#endif
+
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -615,7 +620,7 @@ int lm78_detect(struct i2c_adapter *adapter, int address, int kind)
 			kind = lm79;
 		else {
 			if (kind == 0)
-				printk(KERN_WARNING "lm78.o: Ignoring 'force' "
+				dev_warn(&adapter->dev, "Ignoring 'force' "
 					"parameter for unknown chip at "
 					"adapter %d, address 0x%02x\n",
 					i2c_adapter_id(adapter), address);

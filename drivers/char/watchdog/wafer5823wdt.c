@@ -109,7 +109,7 @@ static ssize_t wafwdt_write(struct file *file, const char *buf, size_t count, lo
 			/* In case it was set long ago */
 			expect_close = 0;
 
-			/* scan to see wether or not we got the magic character */
+			/* scan to see whether or not we got the magic character */
 			for (i = 0; i != count; i++) {
 				char c;
 				if (get_user(c, buf + i))
@@ -182,7 +182,7 @@ static int wafwdt_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	}
 
 	default:
-		return -ENOTTY;
+		return -ENOIOCTLCMD;
 	}
 	return 0;
 }

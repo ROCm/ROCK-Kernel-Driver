@@ -217,7 +217,7 @@ typedef struct {
 
 extern inline int _raw_write_trylock(rwlock_t *rw)
 {
-	unsigned int result, reg;
+	unsigned long result, reg;
 	
 	__asm__ __volatile__(
 #ifndef __s390x__

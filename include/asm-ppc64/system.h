@@ -85,6 +85,9 @@ extern int _get_PVR(void);
 extern void giveup_fpu(struct task_struct *);
 extern void disable_kernel_fp(void);
 extern void enable_kernel_fp(void);
+extern void giveup_altivec(struct task_struct *);
+extern void disable_kernel_altivec(void);
+extern void enable_kernel_altivec(void);
 extern void cvt_fd(float *from, double *to, unsigned long *fpscr);
 extern void cvt_df(double *from, float *to, unsigned long *fpscr);
 extern int abs(int);
@@ -100,13 +103,6 @@ extern struct task_struct * _switch(struct thread_struct *prev,
 
 struct pt_regs;
 extern void dump_regs(struct pt_regs *);
-
-#define irqs_disabled()				\
-({						\
-	unsigned long flags;			\
-	local_save_flags(flags);		\
-	!(flags & MSR_EE);			\
-})
 
 static inline int __is_processor(unsigned long pv)
 {

@@ -763,3 +763,45 @@ void tty_write_message(struct tty_struct *tty, char *msg)
 		tty->driver->write(tty, 0, msg, strlen(msg));
 	return;
 }
+
+/* minimum time in jiffies between messages */
+int printk_ratelimit_jiffies = 5*HZ;
+
+/* number of messages we send before ratelimiting */
+int printk_ratelimit_burst = 10;
+
+/*
+ * printk rate limiting, lifted from the networking subsystem.
+ *
+ * This enforces a rate limit: not more than one kernel message
+ * every printk_ratelimit_jiffies to make a denial-of-service
+ * attack impossible.
+ */
+int printk_ratelimit(void)
+{
+	static spinlock_t ratelimit_lock = SPIN_LOCK_UNLOCKED;
+	static unsigned long toks = 10*5*HZ;
+	static unsigned long last_msg;
+	static int missed;
+	unsigned long flags;
+	unsigned long now = jiffies;
+
+	spin_lock_irqsave(&ratelimit_lock, flags);
+	toks += now - last_msg;
+	last_msg = now;
+	if (toks > (printk_ratelimit_burst * printk_ratelimit_jiffies))
+		toks = printk_ratelimit_burst * printk_ratelimit_jiffies;
+	if (toks >= printk_ratelimit_jiffies) {
+		int lost = missed;
+		missed = 0;
+		toks -= printk_ratelimit_jiffies;
+		spin_unlock_irqrestore(&ratelimit_lock, flags);
+		if (lost)
+			printk(KERN_WARNING "printk: %d messages suppressed.\n", lost);
+		return 1;
+	}
+	missed++;
+	spin_unlock_irqrestore(&ratelimit_lock, flags);
+	return 0;
+}
+EXPORT_SYMBOL(printk_ratelimit);

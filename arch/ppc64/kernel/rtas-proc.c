@@ -20,6 +20,7 @@
 #include <linux/ctype.h>
 #include <linux/time.h>
 #include <linux/string.h>
+#include <linux/init.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -27,6 +28,7 @@
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/rtas.h>
+#include <asm/proc_fs.h>
 #include <asm/machdep.h> /* for ppc_md */
 #include <asm/time.h>
 
@@ -161,6 +163,8 @@ static ssize_t ppc_rtas_tone_volume_write(struct file * file, const char * buf,
 		size_t count, loff_t *ppos);
 static ssize_t ppc_rtas_tone_volume_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos);
+static ssize_t ppc_rtas_rmo_buf_read(struct file *file, char *buf,
+				    size_t count, loff_t *ppos);
 
 struct file_operations ppc_rtas_poweron_operations = {
 	.read =		ppc_rtas_poweron_read,
@@ -185,6 +189,10 @@ struct file_operations ppc_rtas_tone_volume_operations = {
 	.write =	ppc_rtas_tone_volume_write
 };
 
+static struct file_operations ppc_rtas_rmo_buf_ops = {
+	.read =		ppc_rtas_rmo_buf_read,
+};
+
 int ppc_rtas_find_all_sensors (void);
 int ppc_rtas_process_sensor(struct individual_sensor s, int state, 
 		int error, char * buf);
@@ -200,39 +208,42 @@ void proc_rtas_init(void)
 {
 	struct proc_dir_entry *entry;
 
-	rtas_node = find_devices("rtas");
+	rtas_node = of_find_node_by_name(NULL, "rtas");
 	if ((rtas_node == NULL) || (systemcfg->platform == PLATFORM_ISERIES_LPAR)) {
 		return;
 	}
 	
-	if (proc_rtas == NULL) {
-		proc_rtas = proc_mkdir("rtas", 0);
+	if (proc_ppc64.rtas == NULL) {
+		proc_ppc64_init();
 	}
 
-	if (proc_rtas == NULL) {
+	if (proc_ppc64.rtas == NULL) {
 		printk(KERN_ERR "Failed to create /proc/rtas in proc_rtas_init\n");
 		return;
 	}
 
 	/* /proc/rtas entries */
 
-	entry = create_proc_entry("progress", S_IRUGO|S_IWUSR, proc_rtas);
+	entry = create_proc_entry("progress", S_IRUGO|S_IWUSR, proc_ppc64.rtas);
 	if (entry) entry->proc_fops = &ppc_rtas_progress_operations;
 
-	entry = create_proc_entry("clock", S_IRUGO|S_IWUSR, proc_rtas); 
+	entry = create_proc_entry("clock", S_IRUGO|S_IWUSR, proc_ppc64.rtas); 
 	if (entry) entry->proc_fops = &ppc_rtas_clock_operations;
 
-	entry = create_proc_entry("poweron", S_IWUSR|S_IRUGO, proc_rtas); 
+	entry = create_proc_entry("poweron", S_IWUSR|S_IRUGO, proc_ppc64.rtas); 
 	if (entry) entry->proc_fops = &ppc_rtas_poweron_operations;
 
-	create_proc_read_entry("sensors", S_IRUGO, proc_rtas, 
+	create_proc_read_entry("sensors", S_IRUGO, proc_ppc64.rtas, 
 			ppc_rtas_sensor_read, NULL);
 	
-	entry = create_proc_entry("frequency", S_IWUSR|S_IRUGO, proc_rtas); 
+	entry = create_proc_entry("frequency", S_IWUSR|S_IRUGO, proc_ppc64.rtas); 
 	if (entry) entry->proc_fops = &ppc_rtas_tone_freq_operations;
 
-	entry = create_proc_entry("volume", S_IWUSR|S_IRUGO, proc_rtas); 
+	entry = create_proc_entry("volume", S_IWUSR|S_IRUGO, proc_ppc64.rtas); 
 	if (entry) entry->proc_fops = &ppc_rtas_tone_volume_operations;
+
+	entry = create_proc_entry("rmo_buffer", S_IRUSR, proc_ppc64.rtas);
+	if (entry) entry->proc_fops = &ppc_rtas_rmo_buf_ops;
 }
 
 /* ****************************************************************** */
@@ -917,5 +928,30 @@ static ssize_t ppc_rtas_tone_volume_read(struct file * file, char * buf,
 		return -EFAULT;
 	}
 	*ppos += n;
+	return n;
+}
+
+#define RMO_READ_BUF_MAX 30
+
+/* RTAS Userspace access */
+static ssize_t ppc_rtas_rmo_buf_read(struct file *file, char __user *buf,
+				    size_t count, loff_t *ppos)
+{
+	char kbuf[RMO_READ_BUF_MAX];
+	int n;
+
+	n = sprintf(kbuf, "%016lx %x\n", rtas_rmo_buf, RTAS_RMOBUF_MAX);
+	if (n > count)
+		n = count;
+
+	if (ppos && *ppos != 0)
+		return 0;
+
+	if (copy_to_user(buf, kbuf, n))
+		return -EFAULT;
+
+	if (ppos)
+		*ppos = n;
+	
 	return n;
 }
