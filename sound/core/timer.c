@@ -306,14 +306,31 @@ int snd_timer_close(snd_timer_instance_t * timeri)
 
 	snd_assert(timeri != NULL, return -ENXIO);
 
-	snd_timer_stop(timeri); /* force to stop the timer */
+	/* force to stop the timer */
+	snd_timer_stop(timeri);
 
 	if (timeri->flags & SNDRV_TIMER_IFLG_SLAVE) {
+		/* wait, until the active callback is finished */
+		spin_lock_irq(&slave_active_lock);
+		while (timeri->flags & SNDRV_TIMER_IFLG_CALLBACK) {
+			spin_unlock_irq(&slave_active_lock);
+			udelay(10);
+			spin_lock_irq(&slave_active_lock);
+		}
+		spin_unlock_irq(&slave_active_lock);
 		down(&register_mutex);
 		list_del(&timeri->open_list);
 		up(&register_mutex);
 	} else {
 		timer = timeri->timer;
+		/* wait, until the active callback is finished */
+		spin_lock_irq(&timer->lock);
+		while (timeri->flags & SNDRV_TIMER_IFLG_CALLBACK) {
+			spin_unlock_irq(&timer->lock);
+			udelay(10);
+			spin_lock_irq(&timer->lock);
+		}
+		spin_unlock_irq(&timer->lock);
 		down(&register_mutex);
 		list_del(&timeri->open_list);
 		if (timer && list_empty(&timer->open_list_head) && timer->hw.close)
@@ -391,12 +408,15 @@ static int snd_timer_start1(snd_timer_t *timer, snd_timer_instance_t *timeri, un
 	list_del(&timeri->active_list);
 	list_add_tail(&timeri->active_list, &timer->active_list_head);
 	if (timer->running) {
+		if (timer->hw.flags & SNDRV_TIMER_HW_SLAVE)
+			goto __start_now;
 		timer->flags |= SNDRV_TIMER_FLG_RESCHED;
 		timeri->flags |= SNDRV_TIMER_IFLG_START;
 		return 1;	/* delayed start */
 	} else {
 		timer->sticks = sticks;
 		timer->hw.start(timer);
+	      __start_now:
 		timer->running++;
 		timeri->flags |= SNDRV_TIMER_IFLG_RUNNING;
 		return 0;
@@ -450,22 +470,21 @@ static int _snd_timer_stop(snd_timer_instance_t * timeri, int keep_flag, enum sn
 
 	snd_assert(timeri != NULL, return -ENXIO);
 
+	if (timeri->flags & SNDRV_TIMER_IFLG_SLAVE) {
+		if (!keep_flag) {
+			spin_lock_irqsave(&slave_active_lock, flags);
+			timeri->flags &= ~SNDRV_TIMER_IFLG_RUNNING;
+			spin_unlock_irqrestore(&slave_active_lock, flags);
+		}
+		goto __end;
+	}
 	timer = timeri->timer;
-	if (! timer)
+	if (!timer)
 		return -EINVAL;
 	spin_lock_irqsave(&timer->lock, flags);
 	list_del_init(&timeri->ack_list);
-#if 0   /* FIXME: this causes dead lock with the sequencer timer */
-	/* wait until the callback is finished */
-	while (timeri->flags & SNDRV_TIMER_IFLG_CALLBACK) {
-		spin_unlock_irqrestore(&timer->lock, flags);
-		udelay(10);
-		spin_lock_irqsave(&timer->lock, flags);
-	}
-#endif
 	list_del_init(&timeri->active_list);
 	if ((timeri->flags & SNDRV_TIMER_IFLG_RUNNING) &&
-	    !(timeri->flags & SNDRV_TIMER_IFLG_SLAVE) &&
 	    !(--timer->running)) {
 		timer->hw.stop(timer);
 		if (timer->flags & SNDRV_TIMER_FLG_RESCHED) {
@@ -480,6 +499,7 @@ static int _snd_timer_stop(snd_timer_instance_t * timeri, int keep_flag, enum sn
 	if (!keep_flag)
 		timeri->flags &= ~(SNDRV_TIMER_IFLG_RUNNING|SNDRV_TIMER_IFLG_START);
 	spin_unlock_irqrestore(&timer->lock, flags);
+      __end:
 	if (event != SNDRV_TIMER_EVENT_RESOLUTION)
 		snd_timer_notify1(timeri, event);
 	return 0;
