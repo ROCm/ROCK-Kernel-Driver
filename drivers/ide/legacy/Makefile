@@ -10,6 +10,5 @@ obj-$(CONFIG_BLK_DEV_IDECS)		+= ide-cs.o
 
 # Last of all
 obj-$(CONFIG_BLK_DEV_HD)		+= hd.o
-obj-$(CONFIG_BLK_DEV_HD98)		+= hd98.o
 
 EXTRA_CFLAGS	:= -Idrivers/ide
