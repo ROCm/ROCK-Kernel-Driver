@@ -1958,6 +1958,18 @@ int ext3_statfs (struct super_block * sb, struct kstatfs * buf)
 #define EXT3_V0_QFMT_BLOCKS 27
 
 static int (*old_write_dquot)(struct dquot *dquot);
+static void (*old_drop_dquot)(struct inode *inode);
+
+static int fmt_to_blocks(int fmt)
+{
+	switch (fmt) {
+		case QFMT_VFS_OLD:
+			return  EXT3_OLD_QFMT_BLOCKS;
+		case QFMT_VFS_V0:
+			return EXT3_V0_QFMT_BLOCKS;
+	}
+	return EXT3_MAX_TRANS_DATA;
+}
 
 static int ext3_write_dquot(struct dquot *dquot)
 {
@@ -1965,20 +1977,11 @@ static int ext3_write_dquot(struct dquot *dquot)
 	int ret;
 	int err;
 	handle_t *handle;
-	struct quota_info *dqops = sb_dqopt(dquot->dq_sb);
+	struct quota_info *dqopt = sb_dqopt(dquot->dq_sb);
 	struct inode *qinode;
 
-	switch (dqops->info[dquot->dq_type].dqi_format->qf_fmt_id) {
-		case QFMT_VFS_OLD:
-			nblocks = EXT3_OLD_QFMT_BLOCKS;
-			break;
-		case QFMT_VFS_V0:
-			nblocks = EXT3_V0_QFMT_BLOCKS;
-			break;
-		default:
-			nblocks = EXT3_MAX_TRANS_DATA;
-	}
-	qinode = dqops->files[dquot->dq_type]->f_dentry->d_inode;
+	nblocks = fmt_to_blocks(dqopt->info[dquot->dq_type].dqi_format->qf_fmt_id);
+	qinode = dqopt->files[dquot->dq_type]->f_dentry->d_inode;
 	handle = ext3_journal_start(qinode, nblocks);
 	if (IS_ERR(handle)) {
 		ret = PTR_ERR(handle);
@@ -1990,6 +1993,28 @@ static int ext3_write_dquot(struct dquot *dquot)
 		ret = err;
 out:
 	return ret;
+}
+
+static void ext3_drop_dquot(struct inode *inode)
+{
+	int nblocks, type;
+	struct quota_info *dqopt = sb_dqopt(inode->i_sb);
+	handle_t *handle;
+
+	for (type = 0; type < MAXQUOTAS; type++) {
+		if (sb_has_quota_enabled(inode->i_sb, type))
+			break;
+	}
+	if (type < MAXQUOTAS)
+		nblocks = fmt_to_blocks(dqopt->info[type].dqi_format->qf_fmt_id);
+	else
+		nblocks = 0;	/* No quota => no drop */
+	handle = ext3_journal_start(inode, 2*nblocks);
+	if (IS_ERR(handle))
+		return;
+	old_drop_dquot(inode);
+	ext3_journal_stop(handle);
+	return;
 }
 #endif
 
@@ -2018,7 +2043,9 @@ static int __init init_ext3_fs(void)
 #ifdef CONFIG_QUOTA
 	init_dquot_operations(&ext3_qops);
 	old_write_dquot = ext3_qops.write_dquot;
+	old_drop_dquot = ext3_qops.drop;
 	ext3_qops.write_dquot = ext3_write_dquot;
+	ext3_qops.drop = ext3_drop_dquot;
 #endif
         err = register_filesystem(&ext3_fs_type);
 	if (err)

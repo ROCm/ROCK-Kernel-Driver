@@ -417,7 +417,7 @@ config QFMT_V1
 	tristate "Old quota format support"
 	depends on QUOTA
 	help
-	  This quota format was (is) used by kernels earlier than 2.4.??. If
+	  This quota format was (is) used by kernels earlier than 2.4.22. If
 	  you have quota working and you don't want to convert to new quota
 	  format say Y here.
 
@@ -426,8 +426,8 @@ config QFMT_V2
 	depends on QUOTA
 	help
 	  This quota format allows using quotas with 32-bit UIDs/GIDs. If you
-	  need this functionality say Y here. Note that you will need latest
-	  quota utilities for new quota format with this kernel.
+	  need this functionality say Y here. Note that you will need recent
+	  quota utilities (>= 3.01) for new quota format with this kernel.
 
 config QUOTACTL
 	bool
