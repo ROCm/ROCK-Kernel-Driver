@@ -21,8 +21,6 @@ const char *svwks_bad_ata100[] = {
 	NULL
 };
 
-#define DISPLAY_SVWKS_TIMINGS	1
-
 static void init_setup_svwks(struct pci_dev *, ide_pci_device_t *);
 static void init_setup_csb6(struct pci_dev *, ide_pci_device_t *);
 static unsigned int init_chipset_svwks(struct pci_dev *, const char *);
