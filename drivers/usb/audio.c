@@ -917,7 +917,7 @@ static void usbin_completed(struct urb *urb)
 	if (!usbin_retire_desc(u, urb) &&
 	    u->flags & FLG_RUNNING &&
 	    !usbin_prepare_desc(u, urb) && 
-	    (suret = usb_submit_urb(urb)) == 0) {
+	    (suret = usb_submit_urb(urb, GFP_KERNEL)) == 0) {
 		u->flags |= mask;
 	} else {
 		u->flags &= ~(mask | FLG_RUNNING);
@@ -982,7 +982,7 @@ static void usbin_sync_completed(struct urb *urb)
 	if (!usbin_sync_retire_desc(u, urb) &&
 	    u->flags & FLG_RUNNING &&
 	    !usbin_sync_prepare_desc(u, urb) && 
-	    (suret = usb_submit_urb(urb)) == 0) {
+	    (suret = usb_submit_urb(urb, GFP_KERNEL)) == 0) {
 		u->flags |= mask;
 	} else {
 		u->flags &= ~(mask | FLG_RUNNING);
@@ -1055,7 +1055,7 @@ static int usbin_start(struct usb_audiodev *as)
 		urb->number_of_packets = DESCFRAMES;
 		urb->context = as;
 		urb->complete = usbin_completed;
-		if (!usbin_prepare_desc(u, urb) && !usb_submit_urb(urb))
+		if (!usbin_prepare_desc(u, urb) && !usb_submit_urb(urb, GFP_KERNEL))
 			u->flags |= FLG_URB0RUNNING;
 		else
 			u->flags &= ~FLG_RUNNING;
@@ -1068,7 +1068,7 @@ static int usbin_start(struct usb_audiodev *as)
 		urb->number_of_packets = DESCFRAMES;
 		urb->context = as;
 		urb->complete = usbin_completed;
-		if (!usbin_prepare_desc(u, urb) && !usb_submit_urb(urb))
+		if (!usbin_prepare_desc(u, urb) && !usb_submit_urb(urb, GFP_KERNEL))
 			u->flags |= FLG_URB1RUNNING;
 		else
 			u->flags &= ~FLG_RUNNING;
@@ -1083,7 +1083,7 @@ static int usbin_start(struct usb_audiodev *as)
 			urb->context = as;
 			urb->complete = usbin_sync_completed;
 			/* stride: u->syncinterval */
-			if (!usbin_sync_prepare_desc(u, urb) && !usb_submit_urb(urb))
+			if (!usbin_sync_prepare_desc(u, urb) && !usb_submit_urb(urb, GFP_KERNEL))
 				u->flags |= FLG_SYNC0RUNNING;
 			else
 				u->flags &= ~FLG_RUNNING;
@@ -1097,7 +1097,7 @@ static int usbin_start(struct usb_audiodev *as)
 			urb->context = as;
 			urb->complete = usbin_sync_completed;
 			/* stride: u->syncinterval */
-			if (!usbin_sync_prepare_desc(u, urb) && !usb_submit_urb(urb))
+			if (!usbin_sync_prepare_desc(u, urb) && !usb_submit_urb(urb, GFP_KERNEL))
 				u->flags |= FLG_SYNC1RUNNING;
 			else
 				u->flags &= ~FLG_RUNNING;
@@ -1275,7 +1275,7 @@ static void usbout_completed(struct urb *urb)
 	if (!usbout_retire_desc(u, urb) &&
 	    u->flags & FLG_RUNNING &&
 	    !usbout_prepare_desc(u, urb) && 
-	    (suret = usb_submit_urb(urb)) == 0) {
+	    (suret = usb_submit_urb(urb, GFP_KERNEL)) == 0) {
 		u->flags |= mask;
 	} else {
 		u->flags &= ~(mask | FLG_RUNNING);
@@ -1347,7 +1347,7 @@ static void usbout_sync_completed(struct urb *urb)
 	if (!usbout_sync_retire_desc(u, urb) &&
 	    u->flags & FLG_RUNNING &&
 	    !usbout_sync_prepare_desc(u, urb) && 
-	    (suret = usb_submit_urb(urb)) == 0) {
+	    (suret = usb_submit_urb(urb, GFP_KERNEL)) == 0) {
 		u->flags |= mask;
 	} else {
 		u->flags &= ~(mask | FLG_RUNNING);
@@ -1420,7 +1420,7 @@ static int usbout_start(struct usb_audiodev *as)
 		urb->number_of_packets = DESCFRAMES;
 		urb->context = as;
 		urb->complete = usbout_completed;
-		if (!usbout_prepare_desc(u, urb) && !usb_submit_urb(urb))
+		if (!usbout_prepare_desc(u, urb) && !usb_submit_urb(urb, GFP_KERNEL))
 			u->flags |= FLG_URB0RUNNING;
 		else
 			u->flags &= ~FLG_RUNNING;
@@ -1433,7 +1433,7 @@ static int usbout_start(struct usb_audiodev *as)
 		urb->number_of_packets = DESCFRAMES;
 		urb->context = as;
 		urb->complete = usbout_completed;
-		if (!usbout_prepare_desc(u, urb) && !usb_submit_urb(urb))
+		if (!usbout_prepare_desc(u, urb) && !usb_submit_urb(urb, GFP_KERNEL))
 			u->flags |= FLG_URB1RUNNING;
 		else
 			u->flags &= ~FLG_RUNNING;
@@ -1448,7 +1448,7 @@ static int usbout_start(struct usb_audiodev *as)
 			urb->context = as;
 			urb->complete = usbout_sync_completed;
 			/* stride: u->syncinterval */
-			if (!usbout_sync_prepare_desc(u, urb) && !usb_submit_urb(urb))
+			if (!usbout_sync_prepare_desc(u, urb) && !usb_submit_urb(urb, GFP_KERNEL))
 				u->flags |= FLG_SYNC0RUNNING;
 			else
 				u->flags &= ~FLG_RUNNING;
@@ -1462,7 +1462,7 @@ static int usbout_start(struct usb_audiodev *as)
 			urb->context = as;
 			urb->complete = usbout_sync_completed;
 			/* stride: u->syncinterval */
-			if (!usbout_sync_prepare_desc(u, urb) && !usb_submit_urb(urb))
+			if (!usbout_sync_prepare_desc(u, urb) && !usb_submit_urb(urb, GFP_KERNEL))
 				u->flags |= FLG_SYNC1RUNNING;
 			else
 				u->flags &= ~FLG_RUNNING;

@@ -120,11 +120,11 @@ int hci_usb_open(struct hci_dev *hdev)
 	DBG("%s", hdev->name);
 
 	husb->read_urb->dev = husb->udev;
-	if ((status = usb_submit_urb(husb->read_urb)))
+	if ((status = usb_submit_urb(husb->read_urb, GFP_KERNEL)))
 		DBG("read submit failed. %d", status);
 
 	husb->intr_urb->dev = husb->udev;
-	if ((status = usb_submit_urb(husb->intr_urb)))
+	if ((status = usb_submit_urb(husb->intr_urb, GFP_KERNEL)))
 		DBG("interrupt submit failed. %d", status);
 
 	hdev->flags |= HCI_RUNNING;
@@ -428,7 +428,7 @@ static void hci_usb_bulk_read(struct urb *urb)
 
 resubmit:
 	husb->read_urb->dev = husb->udev;
-	if ((status = usb_submit_urb(husb->read_urb)))
+	if ((status = usb_submit_urb(husb->read_urb, GFP_KERNEL)))
 		DBG("%s read URB submit failed %d", husb->hdev.name, status);
 
 	DBG("%s read URB re-submited", husb->hdev.name);
@@ -453,7 +453,7 @@ static int hci_usb_ctrl_msg(struct hci_usb *husb, struct sk_buff *skb)
 	FILL_CONTROL_URB(urb, husb->udev, pipe, (void*)dr, skb->data, skb->len,
 	                 hci_usb_ctrl, skb);
 
-	if ((status = usb_submit_urb(urb))) {
+	if ((status = usb_submit_urb(urb, GFP_KERNEL))) {
 		DBG("%s control URB submit failed %d", husb->hdev.name, status);
 		return status;
 	}
@@ -474,7 +474,7 @@ static int hci_usb_write_msg(struct hci_usb *husb, struct sk_buff *skb)
 	              hci_usb_bulk_write, skb);
 	urb->transfer_flags |= USB_QUEUE_BULK;
 
-	if ((status = usb_submit_urb(urb))) {
+	if ((status = usb_submit_urb(urb, GFP_KERNEL))) {
 		DBG("%s write URB submit failed %d", husb->hdev.name, status);
 		return status;
 	}

@@ -217,14 +217,14 @@ static int  belkin_sa_open (struct usb_serial_port *port, struct file *filp)
 		 *       enhance buffering.  Win trace shows 16 initial read URBs.
 		 */
 		port->read_urb->dev = port->serial->dev;
-		retval = usb_submit_urb(port->read_urb);
+		retval = usb_submit_urb(port->read_urb, GFP_KERNEL);
 		if (retval) {
 			err("usb_submit_urb(read bulk) failed");
 			goto exit;
 		}
 
 		port->interrupt_in_urb->dev = port->serial->dev;
-		retval = usb_submit_urb(port->interrupt_in_urb);
+		retval = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
 		if (retval)
 			err(" usb_submit_urb(read int) failed");
 	}

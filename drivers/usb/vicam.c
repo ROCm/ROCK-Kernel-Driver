@@ -350,7 +350,7 @@ static void params_changed(struct usb_vicam *vicam)
 	synchronize(vicam);
 	mdelay(10);
 	vicam_parameters(vicam);
-	printk("Submiting urb: %d\n", usb_submit_urb(vicam->readurb));
+	printk(KERN_DEBUG "Submiting urb: %d\n", usb_submit_urb(vicam->readurb, GFP_KERNEL));
 #endif
 }
 
@@ -765,7 +765,7 @@ static void vicam_bulk(struct urb *urb)
 		memcpy(vicam->fbuf, buf+64, 0x1e480);
 
 	if (!change_pending) {
-		if (usb_submit_urb(urb))
+		if (usb_submit_urb(urb, GFP_ATOMIC))
 			dbg("failed resubmitting read urb");
 	} else {
 		change_pending = 0;
@@ -849,7 +849,7 @@ static int vicam_init(struct usb_vicam *vicam)
 
 	FILL_BULK_URB(vicam->readurb, vicam->udev, usb_rcvbulkpipe(vicam->udev, 0x81),
 		      buf, 0x1e480, vicam_bulk, vicam);
-	printk("Submiting urb: %d\n", usb_submit_urb(vicam->readurb));
+	printk(KERN_DEBUG "Submiting urb: %d\n", usb_submit_urb(vicam->readurb, GFP_KERNEL));
 
 	return 0;
 error:

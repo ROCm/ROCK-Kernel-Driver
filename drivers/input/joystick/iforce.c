@@ -204,7 +204,7 @@ static void send_packet(struct iforce *iforce, u16 cmd, unsigned char* data)
 			set_current_state(TASK_INTERRUPTIBLE);
 			add_wait_queue(&iforce->wait, &wait);
 
-			if (usb_submit_urb(iforce->out)) {
+			if (usb_submit_urb(iforce->out, GFP_ATOMIC)) {
 				set_current_state(TASK_RUNNING);
 				remove_wait_queue(&iforce->wait, &wait);
 				return;
@@ -289,7 +289,7 @@ static int get_id_packet(struct iforce *iforce, char *packet)
 			set_current_state(TASK_INTERRUPTIBLE);
 			add_wait_queue(&iforce->wait, &wait);
 
-			if (usb_submit_urb(iforce->ctrl)) {
+			if (usb_submit_urb(iforce->ctrl, GFP_ATOMIC)) {
 				set_current_state(TASK_RUNNING);
 				remove_wait_queue(&iforce->wait, &wait);
 				return -1;
@@ -345,7 +345,7 @@ static int iforce_open(struct input_dev *dev)
 			if (iforce->open++)
 				break;
 			iforce->irq->dev = iforce->usbdev;
-			if (usb_submit_urb(iforce->irq))
+			if (usb_submit_urb(iforce->irq, GFP_KERNEL))
 					return -EIO;
 			break;
 #endif

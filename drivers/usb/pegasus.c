@@ -157,7 +157,8 @@ static int get_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 	add_wait_queue( &pegasus->ctrl_wait, &wait );
 	set_current_state( TASK_UNINTERRUPTIBLE );
 
-	if ( (ret = usb_submit_urb( pegasus->ctrl_urb )) ) {
+	/* using ATOMIC, we'd never wake up if we slept */
+	if ( (ret = usb_submit_urb( pegasus->ctrl_urb, GFP_ATOMIC )) ) {
 		err("%s: BAD CTRLs %d", __FUNCTION__, ret);
 		goto out;
 	}
@@ -207,7 +208,7 @@ static int set_registers(pegasus_t *pegasus, __u16 indx, __u16 size, void *data)
 	add_wait_queue( &pegasus->ctrl_wait, &wait );
 	set_current_state( TASK_UNINTERRUPTIBLE );
 
-	if ( (ret = usb_submit_urb( pegasus->ctrl_urb )) ) {
+	if ( (ret = usb_submit_urb( pegasus->ctrl_urb, GFP_ATOMIC )) ) {
 		err("%s: BAD CTRL %d", __FUNCTION__, ret);
 		goto out;
 	}
@@ -257,7 +258,7 @@ static int set_register( pegasus_t *pegasus, __u16 indx, __u8 data )
 	add_wait_queue( &pegasus->ctrl_wait, &wait );
 	set_current_state( TASK_UNINTERRUPTIBLE );
 
-	if ( (ret = usb_submit_urb( pegasus->ctrl_urb )) ) {
+	if ( (ret = usb_submit_urb( pegasus->ctrl_urb, GFP_ATOMIC )) ) {
 		err("%s: BAD CTRL %d", __FUNCTION__, ret);
 		goto out;
 	}
@@ -287,7 +288,7 @@ static int update_eth_regs_async( pegasus_t *pegasus )
 			  (char *)&pegasus->dr,
 			  pegasus->eth_regs, 3, ctrl_callback, pegasus );
 
-	if ( (ret = usb_submit_urb( pegasus->ctrl_urb )) )
+	if ( (ret = usb_submit_urb( pegasus->ctrl_urb, GFP_ATOMIC )) )
 		err("%s: BAD CTRL %d, flgs %x",__FUNCTION__,ret,pegasus->flags);
 
 	return	ret;
@@ -573,7 +574,7 @@ goon:
 			usb_rcvbulkpipe(pegasus->usb, 1),
 			pegasus->rx_buff, PEGASUS_MAX_MTU, 
 			read_bulk_callback, pegasus );
-	if ( (res = usb_submit_urb(pegasus->rx_urb)) )
+	if ( (res = usb_submit_urb(pegasus->rx_urb, GFP_ATOMIC)) )
 		warn("%s: failed submint rx_urb %d", __FUNCTION__, res);
 	pegasus->flags &= ~PEGASUS_RX_BUSY;
 }
@@ -661,7 +662,7 @@ static int pegasus_start_xmit( struct sk_buff *skb, struct net_device *net )
 			pegasus->tx_buff, PEGASUS_MAX_MTU, 
 			write_bulk_callback, pegasus );
 	pegasus->tx_urb->transfer_buffer_length = count;
-	if ((res = usb_submit_urb(pegasus->tx_urb))) {
+	if ((res = usb_submit_urb(pegasus->tx_urb, GFP_ATOMIC))) {
 		warn("failed tx_urb %d", res);
 		pegasus->stats.tx_errors++;
 		netif_start_queue( net );
@@ -721,14 +722,14 @@ static int pegasus_open(struct net_device *net)
 			usb_rcvbulkpipe(pegasus->usb, 1),
 			pegasus->rx_buff, PEGASUS_MAX_MTU, 
 			read_bulk_callback, pegasus );
-	if ( (res = usb_submit_urb(pegasus->rx_urb)) )
+	if ( (res = usb_submit_urb(pegasus->rx_urb, GFP_KERNEL)) )
 		warn("%s: failed rx_urb %d", __FUNCTION__, res);
 #ifdef	PEGASUS_USE_INTR
 	FILL_INT_URB( pegasus->intr_urb, pegasus->usb,
 			usb_rcvintpipe(pegasus->usb, 3),
 			pegasus->intr_buff, sizeof(pegasus->intr_buff),
 			intr_callback, pegasus, pegasus->intr_interval );
-	if ( (res = usb_submit_urb(pegasus->intr_urb)) )
+	if ( (res = usb_submit_urb(pegasus->intr_urb, GFP_KERNEL)) )
 		warn("%s: failed intr_urb %d", __FUNCTION__, res);
 #endif
 	netif_start_queue( net );

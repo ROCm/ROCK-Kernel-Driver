@@ -409,10 +409,10 @@ struct st5481_adapter {
  * Submit an URB with error reporting. This is a macro so
  * the __FUNCTION__ returns the caller function name.
  */
-#define SUBMIT_URB(urb) \
+#define SUBMIT_URB(urb, mem_flags) \
 ({ \
 	int status; \
-	if ((status = usb_submit_urb(urb)) < 0) { \
+	if ((status = usb_submit_urb(urb, mem_flags)) < 0) { \
 		WARN("usb_submit_urb failed,status=%d", status); \
 	} \
         status; \

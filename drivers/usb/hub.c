@@ -312,7 +312,7 @@ static int usb_hub_configure(struct usb_hub *hub,
 
 	FILL_INT_URB(hub->urb, dev, pipe, hub->buffer, maxp, hub_irq,
 		hub, endpoint->bInterval);
-	ret = usb_submit_urb(hub->urb);
+	ret = usb_submit_urb(hub->urb, GFP_KERNEL);
 	if (ret) {
 		err("usb_submit_urb failed (%d)", ret);
 		kfree(hub->descriptor);
@@ -498,7 +498,7 @@ static int usb_hub_reset(struct usb_hub *hub)
 		return -1;
 
 	hub->urb->dev = dev;                                                    
-	if (usb_submit_urb(hub->urb))
+	if (usb_submit_urb(hub->urb, GFP_KERNEL))
 		return -1;
 
 	usb_hub_power_on(hub);

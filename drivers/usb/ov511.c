@@ -4457,7 +4457,7 @@ ov511_init_isoc(struct usb_ov511 *ov511)
 
 	for (n = 0; n < OV511_NUMSBUF; n++) {
 		ov511->sbuf[n].urb->dev = ov511->dev;
-		err = usb_submit_urb(ov511->sbuf[n].urb);
+		err = usb_submit_urb(ov511->sbuf[n].urb, GFP_KERNEL);
 		if (err)
 			err("init isoc: usb_submit_urb(%d) ret %d", n, err);
 	}

@@ -992,7 +992,7 @@ static int hid_submit_out(struct hid_device *hid)
 	hid->urbout.setup_packet = (void *) &(hid->out[hid->outtail].dr);
 	hid->urbout.dev = hid->dev;
 
-	if (usb_submit_urb(&hid->urbout)) {
+	if (usb_submit_urb(&hid->urbout, GFP_KERNEL)) {
 		err("usb_submit_urb(out) failed");
 		return -1;
 	}
@@ -1036,7 +1036,7 @@ int hid_open(struct hid_device *hid)
 
 	hid->urb.dev = hid->dev;
 
-	if (usb_submit_urb(&hid->urb))
+	if (usb_submit_urb(&hid->urb, GFP_KERNEL))
 		return -EIO;
 
 	return 0;

@@ -195,7 +195,7 @@ static int pl2303_write (struct usb_serial_port *port, int from_user,  const uns
 
 	port->write_urb->transfer_buffer_length = count;
 	port->write_urb->dev = port->serial->dev;
-	result = usb_submit_urb (port->write_urb);
+	result = usb_submit_urb (port->write_urb, GFP_KERNEL);
 	if (result)
 		err(__FUNCTION__ " - failed submitting write urb, error %d", result);
 	else
@@ -404,7 +404,7 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 
 		dbg (__FUNCTION__ " - submitting read urb");
 		port->read_urb->dev = serial->dev;
-		result = usb_submit_urb (port->read_urb);
+		result = usb_submit_urb (port->read_urb, GFP_KERNEL);
 		if (result) {
 			err(__FUNCTION__ " - failed submitting read urb, error %d", result);
 			up (&port->sem);
@@ -414,7 +414,7 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 
 		dbg (__FUNCTION__ " - submitting interrupt urb");
 		port->interrupt_in_urb->dev = serial->dev;
-		result = usb_submit_urb (port->interrupt_in_urb);
+		result = usb_submit_urb (port->interrupt_in_urb, GFP_KERNEL);
 		if (result) {
 			err(__FUNCTION__ " - failed submitting interrupt urb, error %d", result);
 			up (&port->sem);
@@ -652,7 +652,7 @@ static void pl2303_read_bulk_callback (struct urb *urb)
 			dbg (__FUNCTION__ " - caught -EPROTO, resubmitting the urb");
 			urb->status = 0;
 			urb->dev = serial->dev;
-			result = usb_submit_urb(urb);
+			result = usb_submit_urb(urb, GFP_KERNEL);
 			if (result)
 				err(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
 			return;
@@ -677,7 +677,7 @@ static void pl2303_read_bulk_callback (struct urb *urb)
 	/* Schedule the next read _if_ we are still open */
 	if (port->open_count) {
 		urb->dev = serial->dev;
-		result = usb_submit_urb(urb);
+		result = usb_submit_urb(urb, GFP_KERNEL);
 		if (result)
 			err(__FUNCTION__ " - failed resubmitting read urb, error %d", result);
 	}
@@ -706,7 +706,7 @@ static void pl2303_write_bulk_callback (struct urb *urb)
 		dbg (__FUNCTION__ " - nonzero write bulk status received: %d", urb->status);
 		port->write_urb->transfer_buffer_length = 1;
 		port->write_urb->dev = port->serial->dev;
-		result = usb_submit_urb (port->write_urb);
+		result = usb_submit_urb (port->write_urb, GFP_KERNEL);
 		if (result)
 			err(__FUNCTION__ " - failed resubmitting write urb, error %d", result);
 

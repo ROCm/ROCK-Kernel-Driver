@@ -129,7 +129,7 @@ int usb_kbd_event(struct input_dev *dev, unsigned int type, unsigned int code, i
 
 	kbd->leds = kbd->newleds;
 	kbd->led->dev = kbd->usbdev;
-	if (usb_submit_urb(kbd->led))
+	if (usb_submit_urb(kbd->led, GFP_KERNEL))
 		err("usb_submit_urb(leds) failed");
 
 	return 0;
@@ -147,7 +147,7 @@ static void usb_kbd_led(struct urb *urb)
 
 	kbd->leds = kbd->newleds;
 	kbd->led->dev = kbd->usbdev;
-	if (usb_submit_urb(kbd->led))
+	if (usb_submit_urb(kbd->led, GFP_KERNEL))
 		err("usb_submit_urb(leds) failed");
 }
 
@@ -159,7 +159,7 @@ static int usb_kbd_open(struct input_dev *dev)
 		return 0;
 
 	kbd->irq->dev = kbd->usbdev;
-	if (usb_submit_urb(kbd->irq))
+	if (usb_submit_urb(kbd->irq, GFP_KERNEL))
 		return -EIO;
 
 	return 0;

@@ -916,14 +916,13 @@ static void hc_died (struct usb_hcd *hcd)
 /* may be called in any context with a valid urb->dev usecount */
 /* caller surrenders "ownership" of urb (and chain at urb->next).  */
 
-static int hcd_submit_urb (struct urb *urb)
+static int hcd_submit_urb (struct urb *urb, int mem_flags)
 {
 	int			status;
 	struct usb_hcd		*hcd;
 	struct hcd_dev		*dev;
 	unsigned long		flags;
 	int			pipe;
-	int			mem_flags;
 
 	if (!urb || urb->hcpriv || !urb->complete)
 		return -EINVAL;
@@ -946,11 +945,6 @@ static int hcd_submit_urb (struct urb *urb)
 	if (usb_endpoint_halted (urb->dev, usb_pipeendpoint (pipe),
 			usb_pipeout (pipe)))
 		return -EPIPE;
-
-	// FIXME paging/swapping requests over USB should not use GFP_KERNEL
-	// and might even need to use GFP_NOIO ... that flag actually needs
-	// to be passed from the higher level.
-	mem_flags = in_interrupt () ? GFP_ATOMIC : GFP_KERNEL;
 
 #ifdef DEBUG
 	{
@@ -1316,7 +1310,7 @@ void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb)
 	else if (urb->next) {
 		int 	status;
 
-		status = usb_submit_urb (urb->next);
+		status = usb_submit_urb (urb->next, GFP_ATOMIC);
 		if (status) {
 			dbg ("urb %p chain fail, %d", urb->next, status);
 			urb->next->status = -ENOTCONN;
