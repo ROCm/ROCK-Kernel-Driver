@@ -918,20 +918,24 @@ int ipv6_chk_mcast_addr(struct net_device *dev, struct in6_addr *group,
 				break;
 		}
 		if (mc) {
-			struct ip6_sf_list *psf;
+			if (!ipv6_addr_any(src_addr)) {
+				struct ip6_sf_list *psf;
 
-			spin_lock_bh(&mc->mca_lock);
-			for (psf=mc->mca_sources; psf; psf=psf->sf_next) {
-				if (ipv6_addr_cmp(&psf->sf_addr, src_addr) == 0)
-					break;
-			}
-			if (psf)
-				rv = psf->sf_count[MCAST_INCLUDE] ||
-					psf->sf_count[MCAST_EXCLUDE] !=
-					mc->mca_sfcount[MCAST_EXCLUDE];
-			else
-				rv = mc->mca_sfcount[MCAST_EXCLUDE] != 0;
-			spin_unlock_bh(&mc->mca_lock);
+				spin_lock_bh(&mc->mca_lock);
+				for (psf=mc->mca_sources;psf;psf=psf->sf_next) {
+					if (ipv6_addr_cmp(&psf->sf_addr,
+					    src_addr) == 0)
+						break;
+				}
+				if (psf)
+					rv = psf->sf_count[MCAST_INCLUDE] ||
+						psf->sf_count[MCAST_EXCLUDE] !=
+						mc->mca_sfcount[MCAST_EXCLUDE];
+				else
+					rv = mc->mca_sfcount[MCAST_EXCLUDE] !=0;
+				spin_unlock_bh(&mc->mca_lock);
+			} else
+				rv = 1; /* don't filter unspecified source */
 		}
 		read_unlock_bh(&idev->lock);
 		in6_dev_put(idev);

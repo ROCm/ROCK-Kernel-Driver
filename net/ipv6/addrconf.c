@@ -1338,7 +1338,7 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len)
 	 *	2) Configure prefixes with the auto flag set
 	 */
 
-	/* Avoid arithemtic overflow. Really, we could
+	/* Avoid arithmetic overflow. Really, we could
 	   save rt_expires in seconds, likely valid_lft,
 	   but it would require division in fib gc, that it
 	   not good.
