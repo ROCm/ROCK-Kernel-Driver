@@ -44,13 +44,17 @@ static unsigned int psmouse_rate = 100;
 module_param_named(rate, psmouse_rate, uint, 0);
 MODULE_PARM_DESC(rate, "Report rate, in reports per second.");
 
-int psmouse_smartscroll = 1;
+static unsigned int psmouse_smartscroll = 1;
 module_param_named(smartscroll, psmouse_smartscroll, bool, 0);
 MODULE_PARM_DESC(smartscroll, "Logitech Smartscroll autorepeat, 1 = enabled (default), 0 = disabled.");
 
 static unsigned int psmouse_resetafter;
 module_param_named(resetafter, psmouse_resetafter, uint, 0);
 MODULE_PARM_DESC(resetafter, "Reset device after so many bad packets (0 = never).");
+
+PSMOUSE_DEFINE_ATTR(rate);
+PSMOUSE_DEFINE_ATTR(resolution);
+PSMOUSE_DEFINE_ATTR(resetafter);
 
 __obsolete_setup("psmouse_noext");
 __obsolete_setup("psmouse_resolution=");
@@ -209,7 +213,7 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 				psmouse->name, psmouse->phys, psmouse->pktcnt);
 			psmouse->pktcnt = 0;
 
-			if (++psmouse->out_of_sync == psmouse_resetafter) {
+			if (++psmouse->out_of_sync == psmouse->resetafter) {
 				psmouse->state = PSMOUSE_IGNORE;
 				printk(KERN_NOTICE "psmouse.c: issuing reconnect request\n");
 				serio_reconnect(psmouse->ps2dev.serio);
@@ -638,6 +642,10 @@ static void psmouse_disconnect(struct serio *serio)
 {
 	struct psmouse *psmouse, *parent;
 
+	device_remove_file(&serio->dev, &psmouse_attr_rate);
+	device_remove_file(&serio->dev, &psmouse_attr_resolution);
+	device_remove_file(&serio->dev, &psmouse_attr_resetafter);
+
 	psmouse = serio->private;
 	psmouse_set_state(psmouse, PSMOUSE_CMD_MODE);
 
@@ -706,6 +714,8 @@ static void psmouse_connect(struct serio *serio, struct serio_driver *drv)
 
 	psmouse->rate = psmouse_rate;
 	psmouse->resolution = psmouse_resolution;
+	psmouse->resetafter = psmouse_resetafter;
+	psmouse->smartscroll = psmouse_smartscroll;
 	psmouse->type = psmouse_extensions(psmouse, psmouse_max_proto, 1);
 	if (!psmouse->vendor)
 		psmouse->vendor = "Generic";
@@ -740,6 +750,10 @@ static void psmouse_connect(struct serio *serio, struct serio_driver *drv)
 
 	if (parent && parent->pt_activate)
 		parent->pt_activate(parent);
+
+	device_create_file(&serio->dev, &psmouse_attr_rate);
+	device_create_file(&serio->dev, &psmouse_attr_resolution);
+	device_create_file(&serio->dev, &psmouse_attr_resetafter);
 
 	if (serio->child) {
 		/*
@@ -817,6 +831,115 @@ static struct serio_driver psmouse_drv = {
 	.disconnect	= psmouse_disconnect,
 	.cleanup	= psmouse_cleanup,
 };
+
+ssize_t psmouse_attr_show_helper(struct device *dev, char *buf,
+				 ssize_t (*handler)(struct psmouse *, char *))
+{
+	struct serio *serio = to_serio_port(dev);
+	int retval;
+
+	retval = serio_pin_driver(serio);
+	if (retval)
+		return retval;
+
+	if (serio->drv != &psmouse_drv) {
+		retval = -ENODEV;
+		goto out;
+	}
+
+	retval = handler(serio->private, buf);
+
+out:
+	serio_unpin_driver(serio);
+	return retval;
+}
+
+ssize_t psmouse_attr_set_helper(struct device *dev, const char *buf, size_t count,
+				ssize_t (*handler)(struct psmouse *, const char *, size_t))
+{
+	struct serio *serio = to_serio_port(dev);
+	struct psmouse *psmouse = serio->private, *parent = NULL;
+	int retval;
+
+	retval = serio_pin_driver(serio);
+	if (retval)
+		return retval;
+
+	if (serio->drv != &psmouse_drv) {
+		retval = -ENODEV;
+		goto out;
+	}
+
+	if (serio->parent && (serio->type & SERIO_TYPE) == SERIO_PS_PSTHRU) {
+		parent = serio->parent->private;
+		psmouse_deactivate(parent);
+	}
+	psmouse_deactivate(psmouse);
+
+	retval = handler(psmouse, buf, count);
+
+	psmouse_activate(psmouse);
+	if (parent)
+		psmouse_activate(parent);
+
+out:
+	serio_unpin_driver(serio);
+	return retval;
+}
+
+static ssize_t psmouse_attr_show_rate(struct psmouse *psmouse, char *buf)
+{
+	return sprintf(buf, "%d\n", psmouse->rate);
+}
+
+static ssize_t psmouse_attr_set_rate(struct psmouse *psmouse, const char *buf, size_t count)
+{
+	unsigned long value;
+	char *rest;
+
+	value = simple_strtoul(buf, &rest, 10);
+	if (*rest)
+		return -EINVAL;
+
+	psmouse->set_rate(psmouse, value);
+	return count;
+}
+
+static ssize_t psmouse_attr_show_resolution(struct psmouse *psmouse, char *buf)
+{
+	return sprintf(buf, "%d\n", psmouse->resolution);
+}
+
+static ssize_t psmouse_attr_set_resolution(struct psmouse *psmouse, const char *buf, size_t count)
+{
+	unsigned long value;
+	char *rest;
+
+	value = simple_strtoul(buf, &rest, 10);
+	if (*rest)
+		return -EINVAL;
+
+	psmouse->set_resolution(psmouse, value);
+	return count;
+}
+
+static ssize_t psmouse_attr_show_resetafter(struct psmouse *psmouse, char *buf)
+{
+	return sprintf(buf, "%d\n", psmouse->resetafter);
+}
+
+static ssize_t psmouse_attr_set_resetafter(struct psmouse *psmouse, const char *buf, size_t count)
+{
+	unsigned long value;
+	char *rest;
+
+	value = simple_strtoul(buf, &rest, 10);
+	if (*rest)
+		return -EINVAL;
+
+	psmouse->resetafter = value;
+	return count;
+}
 
 static inline void psmouse_parse_proto(void)
 {

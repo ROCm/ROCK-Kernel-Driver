@@ -109,13 +109,16 @@ static int ps2pp_cmd(struct psmouse *psmouse, unsigned char *param, unsigned cha
  * enabled if we do nothing to it. Of course I put this in because I want it
  * disabled :P
  * 1 - enabled (if previously disabled, also default)
- * 0/2 - disabled
+ * 0 - disabled
  */
 
-static void ps2pp_set_smartscroll(struct psmouse *psmouse)
+static void ps2pp_set_smartscroll(struct psmouse *psmouse, unsigned int smartscroll)
 {
 	struct ps2dev *ps2dev = &psmouse->ps2dev;
 	unsigned char param[4];
+
+	if (smartscroll > 1)
+		smartscroll = 1;
 
 	ps2pp_cmd(psmouse, param, 0x32);
 
@@ -124,12 +127,30 @@ static void ps2pp_set_smartscroll(struct psmouse *psmouse)
 	ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES);
 	ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES);
 
-	if (psmouse_smartscroll < 2) {
-		/* 0 - disabled, 1 - enabled */
-		param[0] = psmouse_smartscroll;
-		ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES);
-	}
+	param[0] = smartscroll;
+	ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES);
 }
+
+static ssize_t psmouse_attr_show_smartscroll(struct psmouse *psmouse, char *buf)
+{
+	return sprintf(buf, "%d\n", psmouse->smartscroll ? 1 : 0);
+}
+
+static ssize_t psmouse_attr_set_smartscroll(struct psmouse *psmouse, const char *buf, size_t count)
+{
+	unsigned long value;
+	char *rest;
+
+	value = simple_strtoul(buf, &rest, 10);
+	if (*rest || value > 1)
+		return -EINVAL;
+
+	ps2pp_set_smartscroll(psmouse, value);
+	psmouse->smartscroll = value;
+	return count;
+}
+
+PSMOUSE_DEFINE_ATTR(smartscroll);
 
 /*
  * Support 800 dpi resolution _only_ if the user wants it (there are good
@@ -150,6 +171,11 @@ static void ps2pp_set_resolution(struct psmouse *psmouse, unsigned int resolutio
 		psmouse->resolution = 800;
 	} else
 		psmouse_set_resolution(psmouse, resolution);
+}
+
+static void ps2pp_disconnect(struct psmouse *psmouse)
+{
+	device_remove_file(&psmouse->ps2dev.serio->dev, &psmouse_attr_smartscroll);
 }
 
 static struct ps2pp_info *get_model_info(unsigned char model)
@@ -295,7 +321,7 @@ int ps2pp_init(struct psmouse *psmouse, int set_properties)
 			if ((param[0] & 0x78) == 0x48 &&
 			    (param[1] & 0xf3) == 0xc2 &&
 			    (param[2] & 0x03) == ((param[1] >> 2) & 3)) {
-				ps2pp_set_smartscroll(psmouse);
+				ps2pp_set_smartscroll(psmouse, psmouse->smartscroll);
 				protocol = PSMOUSE_PS2PP;
 			}
 		}
@@ -303,8 +329,12 @@ int ps2pp_init(struct psmouse *psmouse, int set_properties)
 		if (set_properties) {
 			psmouse->vendor = "Logitech";
 			psmouse->model = model;
-			if (protocol == PSMOUSE_PS2PP)
+			if (protocol == PSMOUSE_PS2PP) {
 				psmouse->set_resolution = ps2pp_set_resolution;
+				psmouse->disconnect = ps2pp_disconnect;
+
+				device_create_file(&psmouse->ps2dev.serio->dev, &psmouse_attr_smartscroll);
+			}
 
 			if (buttons < 3)
 				clear_bit(BTN_MIDDLE, psmouse->dev.keybit);
