@@ -64,12 +64,6 @@ extern void destroy_8023_client(struct datalink_proto *);
 /* Socket layer support routines */
 EXPORT_SYMBOL(memcpy_fromiovec);
 EXPORT_SYMBOL(memcpy_tokerneliovec);
-EXPORT_SYMBOL(skb_recv_datagram);
-EXPORT_SYMBOL(skb_free_datagram);
-EXPORT_SYMBOL(skb_copy_datagram);
-EXPORT_SYMBOL(skb_copy_datagram_iovec);
-EXPORT_SYMBOL(skb_copy_and_csum_datagram_iovec);
-EXPORT_SYMBOL(datagram_poll);
 EXPORT_SYMBOL(put_cmsg);
 
 EXPORT_SYMBOL(sk_run_filter);
@@ -152,7 +146,6 @@ EXPORT_SYMBOL(memcpy_fromiovecend);
 EXPORT_SYMBOL(csum_partial_copy_fromiovecend);
 /* UDP/TCP exported functions for TCPv6 */
 EXPORT_SYMBOL(net_statistics); 
-
 #endif
 
 /* Used by at least ipip.c.  */
@@ -189,7 +182,6 @@ EXPORT_SYMBOL(dev_mc_delete);
 EXPORT_SYMBOL(dev_mc_upload);
 EXPORT_SYMBOL(__kill_fasync);
 
-
 #ifdef CONFIG_HIPPI
 EXPORT_SYMBOL(hippi_type_trans);
 #endif
@@ -215,7 +207,5 @@ EXPORT_SYMBOL(unregister_tcf_proto_ops);
 
 EXPORT_PER_CPU_SYMBOL(softnet_data);
 
-
 EXPORT_SYMBOL(linkwatch_fire_event);
-
 #endif  /* CONFIG_NET */
