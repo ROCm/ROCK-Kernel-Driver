@@ -94,8 +94,6 @@ acpi_parse_slit (unsigned long phys_addr, unsigned long size)
 	/* downcast just for %llu vs %lu for i386/ia64  */
 	localities = (u32) slit->localities;
 
-	printk(KERN_INFO PREFIX "SLIT localities %ux%u\n", localities, localities);
-
 	acpi_numa_slit_init(slit);
 
 	return 0;
@@ -147,8 +145,6 @@ acpi_parse_srat (unsigned long phys_addr, unsigned long size)
 		return -EINVAL;
 
 	srat = (struct acpi_table_srat *) __va(phys_addr);
-
-	printk(KERN_INFO PREFIX "SRAT revision %d\n", srat->table_revision);
 
 	return 0;
 }
