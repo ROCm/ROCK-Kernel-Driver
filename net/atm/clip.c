@@ -47,8 +47,8 @@
 #endif
 
 
-struct net_device *clip_devs = NULL;
-struct atm_vcc *atmarpd = NULL;
+static struct net_device *clip_devs;
+static struct atm_vcc *atmarpd;
 static struct neigh_table clip_tbl;
 static struct timer_list idle_timer;
 static int start_timer = 1;

@@ -12,9 +12,6 @@
 #include <linux/netdevice.h>
 #include <linux/atmdev.h>
 
-
-extern struct net_device *clip_devs;
-
 /*
  * Appends all skbs from "from" to "to". The operation is atomic with respect
  * to all other skb operations on "from" or "to".
