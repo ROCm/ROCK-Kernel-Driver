@@ -598,6 +598,10 @@ acpi_early_init (void)
 
 	ACPI_FUNCTION_TRACE("acpi_bus_init");
 
+	/* enable workarounds, unless strict ACPI spec. compliance */
+	if (!acpi_strict)
+		acpi_gbl_enable_interpreter_slack = TRUE;
+
 	status = acpi_initialize_subsystem();
 	if (ACPI_FAILURE(status)) {
 		printk(KERN_ERR PREFIX "Unable to initialize the ACPI Interpreter\n");
