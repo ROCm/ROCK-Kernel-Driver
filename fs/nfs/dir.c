@@ -198,7 +198,7 @@ int find_dirent_page(nfs_readdir_descriptor_t *desc)
 
 	dfprintk(VFS, "NFS: find_dirent_page() searching directory page %ld\n", desc->page_index);
 
-	page = read_cache_page(&inode->i_data, desc->page_index,
+	page = read_cache_page(inode->i_mapping, desc->page_index,
 			       (filler_t *)nfs_readdir_filler, desc);
 	if (IS_ERR(page)) {
 		status = PTR_ERR(page);
@@ -566,7 +566,6 @@ static int nfs_lookup_revalidate(struct dentry * dentry, int flags)
 			goto out_valid;
 		shrink_dcache_parent(dentry);
 	}
-	d_drop(dentry);
 	unlock_kernel();
 	dput(parent);
 	return 0;
@@ -639,7 +638,7 @@ static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry)
 			nfs_renew_times(dentry);
 			error = 0;
 		}
-		goto out;
+		goto out_unlock;
 	}
 
 	error = NFS_PROTO(dir)->lookup(dir, &dentry->d_name, &fhandle, &fattr);
@@ -655,8 +654,10 @@ static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry)
 		}
 		nfs_renew_times(dentry);
 	}
+out_unlock:
 	unlock_kernel();
 out:
+	BUG_ON(error > 0);
 	return ERR_PTR(error);
 }
 
@@ -712,7 +713,7 @@ int nfs_cached_lookup(struct inode *dir, struct dentry *dentry,
 	desc.page_index = 0;
 	desc.plus = 1;
 
-	for(;(page = find_get_page(&dir->i_data, desc.page_index)); desc.page_index++) {
+	for(;(page = find_get_page(dir->i_mapping, desc.page_index)); desc.page_index++) {
 
 		res = -EIO;
 		if (PageUptodate(page)) {
