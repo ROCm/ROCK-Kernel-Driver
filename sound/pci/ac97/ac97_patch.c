@@ -1403,7 +1403,7 @@ static const snd_kcontrol_new_t snd_ac97_controls_alc650[] = {
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "Mic As Center/LFE",
-		.info = snd_ac97_info_single,
+		.info = snd_ac97_info_volsw,
 		.get = snd_ac97_alc650_mic_get,
 		.put = snd_ac97_alc650_mic_put,
 		.private_value = AC97_SINGLE_VALUE(0, 0, 1, 0) /* only mask needed */
@@ -1515,7 +1515,7 @@ static const snd_kcontrol_new_t snd_ac97_controls_alc655[] = {
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "Mic As Center/LFE",
-		.info = snd_ac97_info_single,
+		.info = snd_ac97_info_volsw,
 		.get = snd_ac97_alc655_mic_get,
 		.put = snd_ac97_alc655_mic_put,
 		.private_value = AC97_SINGLE_VALUE(0, 0, 1, 0) /* only mask needed */
@@ -1668,7 +1668,7 @@ static const snd_kcontrol_new_t snd_ac97_controls_alc850[] = {
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "Line-In As Surround",
-		.info = snd_ac97_info_single,
+		.info = snd_ac97_info_volsw,
 		.get = ac97_alc850_surround_get,
 		.put = ac97_alc850_surround_put,
 		.private_value = AC97_SINGLE_VALUE(0, 0, 1, 0) /* only mask needed */
@@ -1676,7 +1676,7 @@ static const snd_kcontrol_new_t snd_ac97_controls_alc850[] = {
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "Mic As Center/LFE",
-		.info = snd_ac97_info_single,
+		.info = snd_ac97_info_volsw,
 		.get = ac97_alc850_mic_get,
 		.put = ac97_alc850_mic_put,
 		.private_value = AC97_SINGLE_VALUE(0, 0, 1, 0) /* only mask needed */
@@ -1831,7 +1831,7 @@ static const snd_kcontrol_new_t snd_ac97_cm9739_controls[] = {
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "Mic As Center/LFE",
-		.info = snd_ac97_info_single,
+		.info = snd_ac97_info_volsw,
 		.get = snd_ac97_cm9739_center_mic_get,
 		.put = snd_ac97_cm9739_center_mic_put,
 		.private_value = AC97_SINGLE_VALUE(0, 0, 1, 0) /* only mask needed */
@@ -1945,7 +1945,7 @@ static const snd_kcontrol_new_t snd_ac97_cm9761_controls[] = {
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "Line-In As Surround",
-		.info = snd_ac97_info_single,
+		.info = snd_ac97_info_volsw,
 		.get = snd_ac97_cm9761_linein_rear_get,
 		.put = snd_ac97_cm9761_linein_rear_put,
 		.private_value = AC97_SINGLE_VALUE(0, 0, 1, 0) /* only mask needed */
@@ -1953,7 +1953,7 @@ static const snd_kcontrol_new_t snd_ac97_cm9761_controls[] = {
 	{
 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 		.name = "Mic As Center/LFE",
-		.info = snd_ac97_info_single,
+		.info = snd_ac97_info_volsw,
 		.get = snd_ac97_cm9761_center_mic_get,
 		.put = snd_ac97_cm9761_center_mic_put,
 		.private_value = AC97_SINGLE_VALUE(0, 0, 1, 0) /* only mask needed */
