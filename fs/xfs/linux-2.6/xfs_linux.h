@@ -142,6 +142,7 @@ static inline void set_buffer_unwritten_io(struct buffer_head *bh)
 #define xfs_buf_timer_centisecs	xfs_params.xfs_buf_timer.val
 #define xfs_buf_age_centisecs	xfs_params.xfs_buf_age.val
 #define xfs_inherit_nosymlinks	xfs_params.inherit_nosym.val
+#define xfs_rotorstep		xfs_params.rotorstep.val
 
 #define current_cpu()		smp_processor_id()
 #define current_pid()		(current->pid)
