@@ -41,9 +41,9 @@ static void autofs_put_super(struct super_block *sb)
 static void autofs_read_inode(struct inode *inode);
 
 static struct super_operations autofs_sops = {
-	read_inode:	autofs_read_inode,
-	put_super:	autofs_put_super,
-	statfs:		simple_statfs,
+	.read_inode	= autofs_read_inode,
+	.put_super	= autofs_put_super,
+	.statfs		= simple_statfs,
 };
 
 static int parse_options(char *options, int *pipefd, uid_t *uid, gid_t *gid, pid_t *pgrp, int *minproto, int *maxproto)
