@@ -1,4 +1,6 @@
 /*
+ * $Id: bttv.h,v 1.9 2004/09/15 16:15:24 kraxel Exp $
+ *
  *  bttv - Bt848 frame grabber driver
  *
  *  card ID's and external interfaces of the bttv driver
@@ -130,6 +132,7 @@
 #define BTTV_MATRIX_VISIONSQ  0x7d
 #define BTTV_MATRIX_VISIONSLC 0x7e
 #define BTTV_APAC_VIEWCOMP  0x7f
+#define BTTV_DVICO_DVBT_LITE  0x80
 
 /* i2c address list */
 #define I2C_TSA5522        0xc2

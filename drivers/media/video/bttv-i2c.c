@@ -1,4 +1,6 @@
 /*
+    $Id: bttv-i2c.c,v 1.10 2004/10/06 17:30:51 kraxel Exp $
+
     bttv-i2c.c  --  all the i2c code is here
 
     bttv - Bt848 frame grabber driver
@@ -44,8 +46,11 @@ static int detach_inform(struct i2c_client *client);
 
 static int i2c_debug = 0;
 static int i2c_hw = 0;
+static int i2c_scan = 0;
 MODULE_PARM(i2c_debug,"i");
 MODULE_PARM(i2c_hw,"i");
+MODULE_PARM(i2c_scan,"i");
+MODULE_PARM_DESC(i2c_scan,"scan i2c bus at insmod time");
 
 /* ----------------------------------------------------------------------- */
 /* I2C functions - bitbanging adapter (software i2c)                       */
@@ -139,10 +144,8 @@ bttv_i2c_wait_done(struct bttv *btv)
 	int rc = 0;
 	
 	add_wait_queue(&btv->i2c_queue, &wait);
-	set_current_state(TASK_INTERRUPTIBLE);
 	if (0 == btv->i2c_done)
-		schedule_timeout(HZ/50+1);
-	set_current_state(TASK_RUNNING);
+		msleep_interruptible(20);
 	remove_wait_queue(&btv->i2c_queue, &wait);
 
 	if (0 == btv->i2c_done)
@@ -423,6 +426,30 @@ void __devinit bttv_readee(struct bttv *btv, unsigned char *eedata, int addr)
 	}
 }
 
+static char *i2c_devs[128] = {
+	[ 0x30 >> 1 ] = "IR (hauppauge)",
+	[ 0x80 >> 1 ] = "msp34xx",
+	[ 0x86 >> 1 ] = "tda9887",
+	[ 0xa0 >> 1 ] = "eeprom",
+	[ 0xc0 >> 1 ] = "tuner (analog)",
+	[ 0xc2 >> 1 ] = "tuner (analog)",
+};
+
+static void do_i2c_scan(char *name, struct i2c_client *c)
+{
+	unsigned char buf;
+	int i,rc;
+
+	for (i = 0; i < 128; i++) {
+		c->addr = i;
+		rc = i2c_master_recv(c,&buf,0);
+		if (rc < 0)
+			continue;
+		printk("%s: i2c scan: found device @ 0x%x  [%s]\n",
+		       name, i << 1, i2c_devs[i] ? i2c_devs[i] : "???");
+	}
+}
+
 /* init + register i2c algo-bit adapter */
 int __devinit init_bttv_i2c(struct bttv *btv)
 {
@@ -453,6 +480,13 @@ int __devinit init_bttv_i2c(struct bttv *btv)
         i2c_set_adapdata(&btv->c.i2c_adap, btv);
         btv->i2c_client.adapter = &btv->c.i2c_adap;
 
+#ifdef I2C_CLASS_TV_ANALOG
+	if (bttv_tvcards[btv->c.type].no_video)
+		btv->c.i2c_adap.class &= ~I2C_CLASS_TV_ANALOG;
+	if (bttv_tvcards[btv->c.type].has_dvb)
+		btv->c.i2c_adap.class |= I2C_CLASS_TV_DIGITAL;
+#endif
+
 	if (btv->use_i2c_hw) {
 		btv->i2c_rc = i2c_add_adapter(&btv->c.i2c_adap);
 	} else {
@@ -460,6 +494,8 @@ int __devinit init_bttv_i2c(struct bttv *btv)
 		bttv_bit_setsda(btv,1);
 		btv->i2c_rc = i2c_bit_add_bus(&btv->c.i2c_adap);
 	}
+	if (0 == btv->i2c_rc && i2c_scan)
+		do_i2c_scan(btv->c.name,&btv->i2c_client);
 	return btv->i2c_rc;
 }
 

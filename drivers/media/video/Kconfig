@@ -9,7 +9,7 @@ comment "Video Adapters"
 
 config VIDEO_BT848
 	tristate "BT848 Video For Linux"
-	depends on VIDEO_DEV && PCI && I2C && SOUND
+	depends on VIDEO_DEV && PCI && I2C && FW_LOADER
 	select I2C_ALGOBIT
 	---help---
 	  Support for BT848 based frame grabber/overlay boards. This includes
