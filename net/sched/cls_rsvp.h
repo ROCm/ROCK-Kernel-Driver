@@ -242,14 +242,12 @@ static int rsvp_init(struct tcf_proto *tp)
 {
 	struct rsvp_head *data;
 
-	MOD_INC_USE_COUNT;
 	data = kmalloc(sizeof(struct rsvp_head), GFP_KERNEL);
 	if (data) {
 		memset(data, 0, sizeof(struct rsvp_head));
 		tp->root = data;
 		return 0;
 	}
-	MOD_DEC_USE_COUNT;
 	return -ENOBUFS;
 }
 
@@ -289,7 +287,6 @@ static void rsvp_destroy(struct tcf_proto *tp)
 		}
 	}
 	kfree(data);
-	MOD_DEC_USE_COUNT;
 }
 
 static int rsvp_delete(struct tcf_proto *tp, unsigned long arg)
@@ -668,18 +665,18 @@ rtattr_failure:
 }
 
 struct tcf_proto_ops RSVP_OPS = {
-	NULL,
-	RSVP_ID,
-	rsvp_classify,
-	rsvp_init,
-	rsvp_destroy,
-
-	rsvp_get,
-	rsvp_put,
-	rsvp_change,
-	rsvp_delete,
-	rsvp_walk,
-	rsvp_dump
+	.next		=	NULL,
+	.kind		=	RSVP_ID,
+	.classify	=	rsvp_classify,
+	.init		=	rsvp_init,
+	.destroy	=	rsvp_destroy,
+	.get		=	rsvp_get,
+	.put		=	rsvp_put,
+	.change		=	rsvp_change,
+	.delete		=	rsvp_delete,
+	.walk		=	rsvp_walk,
+	.dump		=	rsvp_dump,
+	.owner		=	THIS_MODULE,
 };
 
 #ifdef MODULE

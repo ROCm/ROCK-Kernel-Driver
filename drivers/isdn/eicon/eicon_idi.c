@@ -3097,7 +3097,7 @@ eicon_idi_manage(eicon_card *card, eicon_manifbuf *mb)
 {
 	int l = 0;
 	int ret = 0;
-	int timeout;
+	unsigned long timeout;
 	int i;
         struct sk_buff *skb;
         struct sk_buff *skb2;

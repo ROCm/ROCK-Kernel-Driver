@@ -477,7 +477,7 @@ void sparc64_do_profile(struct pt_regs *regs)
 	}
 }
 
-static void timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	unsigned long ticks, pstate;
 
@@ -509,6 +509,8 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	timer_check_rtc();
 
 	write_sequnlock(&xtime_lock);
+
+	return IRQ_HANDLED;
 }
 
 #ifdef CONFIG_SMP
@@ -925,7 +927,7 @@ try_isa_clock:
 }
 
 /* This is gets the master TICK_INT timer going. */
-static unsigned long sparc64_init_timers(void (*cfunc)(int, void *, struct pt_regs *))
+static unsigned long sparc64_init_timers(irqreturn_t (*cfunc)(int, void *, struct pt_regs *))
 {
 	unsigned long pstate, clock;
 	int node, err;

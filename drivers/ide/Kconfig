@@ -22,7 +22,7 @@ config BLK_DEV_IDE
 	  topics, is contained in <file:Documentation/ide.txt>. For detailed
 	  information about hard drives, consult the Disk-HOWTO and the
 	  Multi-Disk-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  To fine-tune ATA/IDE drive/interface parameters for improved
 	  performance, look for the hdparm package at
@@ -1017,7 +1017,7 @@ config BLK_DEV_HD_ONLY
 	  If you are unsure, then just choose the Enhanced IDE/MFM/RLL driver
 	  instead of this one. For more detailed information, read the
 	  Disk-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 config IDEDMA_AUTO
 	bool

@@ -356,7 +356,7 @@ static snd_pcm_uframes_t snd_als4000_playback_pointer(snd_pcm_substream_t * subs
 	return bytes_to_frames( substream->runtime, result );
 }
 
-static void snd_als4000_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_als4000_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	sb_t *chip = snd_magic_cast(sb_t, dev_id, return);
 	unsigned long flags;
@@ -387,6 +387,7 @@ static void snd_als4000_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		inb(chip->mpu_port);
 	if (sb_status & 0x20)
 		inb(SBP(chip, RESET));
+	return IRQ_HANDLED;
 }
 
 /*****************************************************************/

@@ -24,6 +24,7 @@
 
 #include "control.h"
 #include "pcm.h"
+#include <linux/interrupt.h>
 
 #define ES1688_HW_AUTO		0x0000
 #define ES1688_HW_688		0x0001
@@ -109,7 +110,7 @@ typedef struct _snd_es1688 es1688_t;
 void snd_es1688_mixer_write(es1688_t *chip, unsigned char reg, unsigned char data);
 unsigned char snd_es1688_mixer_read(es1688_t *chip, unsigned char reg);
 
-void snd_es1688_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+irqreturn_t snd_es1688_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 int snd_es1688_create(snd_card_t * card,
 		      unsigned long port,

@@ -31,6 +31,7 @@
 #include <linux/root_dev.h>
 #include <linux/interrupt.h>
 #include <linux/cpu.h>
+#include <linux/initrd.h>
 
 #include <asm/segment.h>
 #include <asm/system.h>

@@ -18,7 +18,7 @@ config NET
 
 	  For a general introduction to Linux networking, it is highly
 	  recommended to read the NET-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 menu "Networking options"
 	depends on NET
@@ -162,7 +162,7 @@ config INET
 
 	  For an excellent introduction to Linux networking, please read the
 	  NET-3-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  This option is also necessary if you want to use the full power of
 	  term (term is a program which gives you almost full Internet
@@ -294,7 +294,7 @@ config IPX
 	  Novell client ncpfs (available from
 	  <ftp://platan.vc.cvut.cz/pub/linux/ncpfs/>) or from
 	  within the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO,
-	  available from <http://www.linuxdoc.org/docs.html#howto>).  In order
+	  available from <http://www.tldp.org/docs.html#howto>).  In order
 	  to do the former, you'll also have to say Y to "NCP file system
 	  support", below.
 
@@ -307,7 +307,7 @@ config IPX
 	  <ftp://ibiblio.org/pub/Linux/system/network/daemons/> or
 	  mars_nwe from <ftp://www.compu-art.de/mars_nwe/>. For more
 	  information, read the IPX-HOWTO available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  General information about how to connect Linux, Windows machines and
 	  Macs is on the WWW at <http://www.eats.com/linux_mac_win.html>.
@@ -339,7 +339,7 @@ config ATALK
 	  General information about how to connect Linux, Windows machines and
 	  Macs is on the WWW at <http://www.eats.com/linux_mac_win.html>.  The
 	  NET-3-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>, contains valuable
+	  <http://www.tldp.org/docs.html#howto>, contains valuable
 	  information as well.
 
 	  This driver is also available as a module ( = code which can be

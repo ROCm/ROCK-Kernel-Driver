@@ -17,6 +17,7 @@
 #include <linux/isdnif.h>
 #include <linux/init.h>
 #include <linux/workqueue.h>
+#include <linux/interrupt.h>
 
 /* Maximum number of channels for this board */
 #define TPAM_NBCHANNEL		30
@@ -197,7 +198,7 @@ extern int parse_U3DataInd(struct sk_buff *, u32 *, u8 **, u16 *);
 /* Function prototypes from tpam_queues.c */
 extern void tpam_enqueue(tpam_card *, struct sk_buff *);
 extern void tpam_enqueue_data(tpam_channel *, struct sk_buff *);
-extern void tpam_irq(int, void *, struct pt_regs *);
+extern irqreturn_t tpam_irq(int, void *, struct pt_regs *);
 extern void tpam_recv_tq(tpam_card *);
 extern void tpam_send_tq(tpam_card *);
 

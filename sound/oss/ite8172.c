@@ -727,7 +727,7 @@ static inline int prog_dmabuf_dac(struct it8172_state *s)
 
 /* hold spinlock for the following! */
 
-static void it8172_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t it8172_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     struct it8172_state *s = (struct it8172_state *)dev_id;
     struct dmabuf* dac = &s->dma_dac;
@@ -741,8 +741,10 @@ static void it8172_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     isc = inb(s->io+IT_AC_ISC);
 
     /* fastpath out, to ease interrupt sharing */
-    if (!(isc & (ISC_VCI | ISC_CCI | ISC_PCI)))
-	return;
+    if (!(isc & (ISC_VCI | ISC_CCI | ISC_PCI))) {
+	spin_unlock(&s->lock);
+	return IRQ_NONE;
+    }
 
     /* clear audio interrupts first */
     outb(isc | ISC_VCI | ISC_CCI | ISC_PCI, s->io+IT_AC_ISC);
@@ -819,6 +821,7 @@ static void it8172_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     }
     
     spin_unlock(&s->lock);
+    return IRQ_HANDLED;
 }
 
 /* --------------------------------------------------------------------- */

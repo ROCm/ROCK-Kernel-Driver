@@ -129,6 +129,8 @@ static struct task_struct * select_bad_process(void)
 				chosen = p;
 				maxpoints = points;
 			}
+			if (p->flags & PF_SWAPOFF)
+				return p;
 		}
 	while_each_thread(g, p);
 	return chosen;

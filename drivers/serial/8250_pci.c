@@ -23,6 +23,7 @@
 #include <linux/tty.h>
 #include <linux/serial.h>
 #include <linux/serial_core.h>
+#include <linux/8250_pci.h>
 
 #include <asm/bitops.h>
 #include <asm/byteorder.h>

@@ -298,7 +298,7 @@
 #include "sbp2.h"
 
 static char version[] __devinitdata =
-	"$Rev: 884 $ James Goodwin <jamesg@filanet.com>";
+	"$Rev: 896 $ James Goodwin <jamesg@filanet.com>";
 
 /*
  * Module load parameter definitions
@@ -3040,10 +3040,10 @@ static int sbp2scsi_proc_info(char *buffer, char **start, off_t offset,
 	SPRINTF("Driver version         : %s\n", version);
 
 	SPRINTF("\nModule options         :\n");
-	SPRINTF("  max_speed       : %s\n", hpsb_speedto_str[max_speed]);
-	SPRINTF("  max_sectors     : %d\n", max_sectors);
-	SPRINTF("  serialize_io    : %s\n", serialize_io ? "yes" : "no");
-	SPRINTF("  exclusive_login : %s\n", exclusive_login ? "yes" : "no");
+	SPRINTF("  max_speed            : %s\n", hpsb_speedto_str[max_speed]);
+	SPRINTF("  max_sectors          : %d\n", max_sectors);
+	SPRINTF("  serialize_io         : %s\n", serialize_io ? "yes" : "no");
+	SPRINTF("  exclusive_login      : %s\n", exclusive_login ? "yes" : "no");
 
 	SPRINTF("\nAttached devices       : %s\n", !list_empty(&host->my_devices) ?
 		"" : "none");

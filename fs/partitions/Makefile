@@ -4,6 +4,7 @@
 
 obj-y := check.o
 
+obj-$(CONFIG_DEVFS_FS) += devfs.o
 obj-$(CONFIG_ACORN_PARTITION) += acorn.o
 obj-$(CONFIG_AMIGA_PARTITION) += amiga.o
 obj-$(CONFIG_ATARI_PARTITION) += atari.o

@@ -1389,7 +1389,7 @@ static void i810_channel_interrupt(struct i810_card *card)
 #endif
 }
 
-static void i810_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t i810_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct i810_card *card = (struct i810_card *)dev_id;
 	u32 status;
@@ -1401,7 +1401,7 @@ static void i810_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if(!(status & INT_MASK)) 
 	{
 		spin_unlock(&card->lock);
-		return;  /* not for us */
+		return IRQ_NONE;  /* not for us */
 	}
 
 	if(status & (INT_PO|INT_PI|INT_MC))
@@ -1410,6 +1410,7 @@ static void i810_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  	/* clear 'em */
 	outl(status & INT_MASK, card->iobase + GLOB_STA);
 	spin_unlock(&card->lock);
+	return IRQ_HANDLED;
 }
 
 /* in this loop, dmabuf.count signifies the amount of data that is

@@ -14,6 +14,7 @@ struct hpsb_highlevel {
 
 	/* Used by the highlevel drivers to store data per host */
 	struct list_head host_info_list;
+	rwlock_t host_info_lock;
 };
 
 
@@ -154,7 +155,7 @@ int hpsb_unregister_addrspace(struct hpsb_highlevel *hl, u64 start);
  * iso_receive op.
  */
 int hpsb_listen_channel(struct hpsb_highlevel *hl, struct hpsb_host *host, 
-			unsigned int channel);
+                         unsigned int channel);
 void hpsb_unlisten_channel(struct hpsb_highlevel *hl, struct hpsb_host *host,
                            unsigned int channel);
 
@@ -175,6 +176,5 @@ void *hpsb_get_hostinfo_bykey(struct hpsb_highlevel *hl, unsigned long key);
 /* Set the hostinfo pointer to something useful. Usually follows a call to
  * hpsb_create_hostinfo, where the size is 0. */
 int hpsb_set_hostinfo(struct hpsb_highlevel *hl, struct hpsb_host *host, void *data);
-
 
 #endif /* IEEE1394_HIGHLEVEL_H */

@@ -755,7 +755,7 @@ static void es1370_handle_midi(struct es1370_state *s)
 	outb((s->midi.ocnt > 0) ? UCTRL_RXINTEN | UCTRL_ENA_TXINT : UCTRL_RXINTEN, s->io+ES1370_REG_UART_CONTROL);
 }
 
-static void es1370_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t es1370_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
         struct es1370_state *s = (struct es1370_state *)dev_id;
 	unsigned int intsrc, sctl;
@@ -763,7 +763,7 @@ static void es1370_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/* fastpath out, to ease interrupt sharing */
 	intsrc = inl(s->io+ES1370_REG_STATUS);
 	if (!(intsrc & 0x80000000))
-		return;
+		return IRQ_NONE;
 	spin_lock(&s->lock);
 	/* clear audio interrupts first */
 	sctl = s->sctrl;
@@ -778,6 +778,7 @@ static void es1370_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	es1370_update_ptr(s);
 	es1370_handle_midi(s);
 	spin_unlock(&s->lock);
+	return IRQ_HANDLED;
 }
 
 /* --------------------------------------------------------------------- */

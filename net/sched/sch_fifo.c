@@ -10,6 +10,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/bitops.h>
@@ -168,42 +169,36 @@ rtattr_failure:
 	return -1;
 }
 
-struct Qdisc_ops pfifo_qdisc_ops =
-{
-	.next		= NULL,
-	.cl_ops		= NULL,
-	.id		= "pfifo",
-	.priv_size	= sizeof(struct fifo_sched_data),
-
-	.enqueue	= pfifo_enqueue,
-	.dequeue	= pfifo_dequeue,
-	.requeue	= pfifo_requeue,
-	.drop		= fifo_drop,
-
-	.init		= fifo_init,
-	.reset		= fifo_reset,
-	.destroy	= NULL,
-	.change		= fifo_init,
-
-	.dump		= fifo_dump,
+struct Qdisc_ops pfifo_qdisc_ops = {
+	.next		=	NULL,
+	.cl_ops		=	NULL,
+	.id		=	"pfifo",
+	.priv_size	=	sizeof(struct fifo_sched_data),
+	.enqueue	=	pfifo_enqueue,
+	.dequeue	=	pfifo_dequeue,
+	.requeue	=	pfifo_requeue,
+	.drop		=	fifo_drop,
+	.init		=	fifo_init,
+	.reset		=	fifo_reset,
+	.destroy	=	NULL,
+	.change		=	fifo_init,
+	.dump		=	fifo_dump,
+	.owner		=	THIS_MODULE,
 };
 
-struct Qdisc_ops bfifo_qdisc_ops =
-{
-	.next		= NULL,
-	.cl_ops		= NULL,
-	.id		= "bfifo",
-	.priv_size	= sizeof(struct fifo_sched_data),
-
-	.enqueue	= bfifo_enqueue,
-	.dequeue	= bfifo_dequeue,
-	.requeue	= bfifo_requeue,
-	.drop		= fifo_drop,
-
-	.init		= fifo_init,
-	.reset		= fifo_reset,
-	.destroy	= NULL,
-	.change		= fifo_init,
-
-	.dump		= fifo_dump,
+struct Qdisc_ops bfifo_qdisc_ops = {
+	.next		=	NULL,
+	.cl_ops		=	NULL,
+	.id		=	"bfifo",
+	.priv_size	=	sizeof(struct fifo_sched_data),
+	.enqueue	=	bfifo_enqueue,
+	.dequeue	=	bfifo_dequeue,
+	.requeue	=	bfifo_requeue,
+	.drop		=	fifo_drop,
+	.init		=	fifo_init,
+	.reset		=	fifo_reset,
+	.destroy	=	NULL,
+	.change		=	fifo_init,
+	.dump		=	fifo_dump,
+	.owner		=	THIS_MODULE,
 };

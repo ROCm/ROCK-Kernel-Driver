@@ -539,7 +539,7 @@ ack_tx_int:
 	ZS_WSYNC(channel);
 }
 
-static void sunzilog_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sunzilog_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct uart_sunzilog_port *up = dev_id;
 
@@ -587,6 +587,8 @@ static void sunzilog_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 		up = up->next;
 	}
+
+	return IRQ_HANDLED;
 }
 
 /* A convenient way to quickly get R0 status.  The caller must _not_ hold the

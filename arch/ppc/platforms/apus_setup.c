@@ -17,7 +17,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/init.h>
-#include <linux/blk.h>
+#include <linux/initrd.h>
 #include <linux/seq_file.h>
 
 /* Needs INITSERIAL call in head.S! */

@@ -2085,7 +2085,6 @@ out:
 void smb_decode_unix_basic(struct smb_fattr *fattr, char *p)
 {
 	/* FIXME: verify nls support. all is sent as utf8? */
-	__u64 devmajor, devminor;
 
 	fattr->f_unix = 1;
 	fattr->f_mode = 0;
@@ -2112,9 +2111,10 @@ void smb_decode_unix_basic(struct smb_fattr *fattr, char *p)
 	fattr->f_mode |= smb_filetype_to_mode(WVAL(p, 56));
 
 	if (S_ISBLK(fattr->f_mode) || S_ISCHR(fattr->f_mode)) {
-		devmajor = LVAL(p, 60);
-		devminor = LVAL(p, 68);
-		fattr->f_rdev = ((devmajor & 0xFF) << 8) | (devminor & 0xFF);
+		__u64 major = LVAL(p, 60);
+		__u64 minor = LVAL(p, 68);
+
+		fattr->f_rdev = MKDEV(major & 0xffffffff, minor & 0xffffffff);
 	}
 	fattr->f_mode |= LVAL(p, 84);
 }
@@ -3008,7 +3008,7 @@ out:
  */
 int
 smb_proc_setattr_unix(struct dentry *d, struct iattr *attr,
-		      int major, int minor)
+		      unsigned int major, unsigned int minor)
 {
 	struct smb_sb_info *server = server_from_dentry(d);
 	u64 nttime;

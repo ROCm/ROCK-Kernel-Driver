@@ -2133,7 +2133,6 @@ struct nfsctl_arg32 {
 #define ca32_export	u.u32_export
 #define ca32_getfd	u.u32_getfd
 #define ca32_getfs	u.u32_getfs
-#define ca32_authd	u.u32_authd
 };
 
 union nfsctl_res32 {

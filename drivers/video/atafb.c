@@ -1522,7 +1522,7 @@ static void falcon_set_par( struct atafb_par *par )
 }
 
 
-static void falcon_vbl_switcher( int irq, void *dummy, struct pt_regs *fp )
+static irqreturn_t falcon_vbl_switcher( int irq, void *dummy, struct pt_regs *fp )
 {
 	struct falcon_hw *hw = &f_new_mode;
 
@@ -1579,6 +1579,7 @@ static void falcon_vbl_switcher( int irq, void *dummy, struct pt_regs *fp )
 		videl.xoffset = current_par.hw.falcon.xoffset;
 		shifter_f030.off_next = current_par.hw.falcon.line_offset;
 	}
+	return IRQ_HANDLED;
 }
 
 

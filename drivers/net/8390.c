@@ -421,7 +421,7 @@ static int ei_start_xmit(struct sk_buff *skb, struct net_device *dev)
  * needed.
  */
 
-void ei_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+irqreturn_t ei_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct net_device *dev = dev_id;
 	long e8390_base;
@@ -431,7 +431,7 @@ void ei_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	if (dev == NULL) 
 	{
 		printk ("net_interrupt(): irq %d for unknown device.\n", irq);
-		return;
+		return IRQ_NONE;
 	}
     
 	e8390_base = dev->base_addr;
@@ -454,7 +454,7 @@ void ei_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 			   inb_p(e8390_base + EN0_IMR));
 #endif
 		spin_unlock(&ei_local->page_lock);
-		return;
+		return IRQ_NONE;
 	}
     
 	/* Change to page 0 and read the intr status reg. */
@@ -520,7 +520,7 @@ void ei_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		}
 	}
 	spin_unlock(&ei_local->page_lock);
-	return;
+	return IRQ_HANDLED;
 }
 
 /**

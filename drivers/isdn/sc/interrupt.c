@@ -19,6 +19,7 @@
 #include "hardware.h"
 #include "message.h"
 #include "card.h"
+#include <linux/interrupt.h>
 
 extern int indicate_status(int, int, ulong, char *);
 extern void check_phystat(unsigned long);
@@ -44,7 +45,8 @@ int get_card_from_irq(int irq)
 /*
  * 
  */
-void interrupt_handler(int interrupt, void * cardptr, struct pt_regs *regs ) {
+irqreturn_t interrupt_handler(int interrupt, void *cardptr, struct pt_regs *regs)
+{
 
 	RspMessage rcvmsg;
 	int channel;
@@ -54,7 +56,7 @@ void interrupt_handler(int interrupt, void * cardptr, struct pt_regs *regs ) {
 
 	if(!IS_VALID_CARD(card)) {
 		pr_debug("Invalid param: %d is not a valid card id\n", card);
-		return;
+		return IRQ_NONE;
 	}
 
 	pr_debug("%s: Entered Interrupt handler\n", adapter[card]->devicename);
@@ -242,4 +244,5 @@ void interrupt_handler(int interrupt, void * cardptr, struct pt_regs *regs ) {
 	}	/* while */
 
 	pr_debug("%s: Exiting Interrupt Handler\n", adapter[card]->devicename);
+	return IRQ_HANDLED;
 }

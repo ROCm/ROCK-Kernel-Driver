@@ -354,8 +354,8 @@ wf_mpu_input_scanner (int devno, int synthdev, unsigned char midic)
 	return 1;
 }
 
-void
-wf_mpuintr (int irq, void *dev_id, struct pt_regs *dummy)
+static irqreturn_t
+wf_mpuintr(int irq, void *dev_id, struct pt_regs *dummy)
 
 {
 	struct wf_mpu_config *physical_dev = dev_id;
@@ -364,10 +364,11 @@ wf_mpuintr (int irq, void *dev_id, struct pt_regs *dummy)
 	int n;
 
 	if (!input_avail()) { /* not for us */
-		return;
+		return IRQ_NONE;
 	}
 
-	if (mi->m_busy) return;
+	if (mi->m_busy)
+		return IRQ_HANDLED;
 	spin_lock(&lock);
 	mi->m_busy = 1;
 
@@ -410,6 +411,7 @@ wf_mpuintr (int irq, void *dev_id, struct pt_regs *dummy)
 
 	mi->m_busy = 0;
 	spin_unlock(&lock);
+	return IRQ_HANDLED;
 }
 
 static int

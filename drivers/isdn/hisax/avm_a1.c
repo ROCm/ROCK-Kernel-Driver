@@ -113,14 +113,16 @@ static struct bc_hw_ops hscx_ops = {
 	.write_fifo = hscx_write_fifo,
 };
 
-static void
+static irqreturn_t
 avm_a1_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u8 val, sval;
+	int handled = 0;
 
 	spin_lock(&cs->lock);
 	while (((sval = bytein(cs->hw.avm.cfg_reg)) & 0xf) != 0x7) {
+		handled = 1;
 		if (!(sval & AVM_A1_STAT_TIMER)) {
 			byteout(cs->hw.avm.cfg_reg, 0x1E);
 			sval = bytein(cs->hw.avm.cfg_reg);
@@ -144,6 +146,7 @@ avm_a1_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	hscx_write(cs, 0, HSCX_MASK, 0x0);
 	hscx_write(cs, 1, HSCX_MASK, 0x0);
 	spin_unlock(&cs->lock);
+	return IRQ_RETVAL(handled);
 }
 
 static void

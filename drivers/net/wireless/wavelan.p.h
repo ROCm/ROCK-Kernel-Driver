@@ -650,7 +650,7 @@ static int
 	wv_check_ioaddr(u_long,		/* ioaddr */
 			u_char *);	/* mac address (read) */
 /* ---------------------- INTERRUPT HANDLING ---------------------- */
-static void
+static irqreturn_t
 	wavelan_interrupt(int,		/* interrupt handler */
 			  void *,
 			  struct pt_regs *);

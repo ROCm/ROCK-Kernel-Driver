@@ -79,13 +79,13 @@ struct hpsb_tlabel_pool {
 	struct semaphore count;
 };
 
-#define HPSB_TPOOL_INIT(_tp)            	\
-do {                                    	\
+#define HPSB_TPOOL_INIT(_tp)			\
+do {						\
 	CLEAR_BITMAP((_tp)->pool, 64);		\
-	spin_lock_init(&(_tp)->lock);   	\
-	(_tp)->next = 0;                	\
+	spin_lock_init(&(_tp)->lock);		\
+	(_tp)->next = 0;			\
 	(_tp)->allocations = 0;			\
-	sema_init(&(_tp)->count, 63);   	\
+	sema_init(&(_tp)->count, 63);		\
 } while(0)
 
 

@@ -21,6 +21,7 @@
 int tsc_disable __initdata = 0;
 
 extern spinlock_t i8253_lock;
+extern unsigned long jiffies;
 
 static int use_tsc;
 /* Number of usecs that the last interrupt was delayed */
@@ -117,6 +118,8 @@ static unsigned long long monotonic_clock_tsc(void)
 
 static void mark_offset_tsc(void)
 {
+	unsigned long lost,delay;
+	unsigned long delta = last_tsc_low;
 	int count;
 	int countmp;
 	static int count1 = 0;
@@ -161,6 +164,23 @@ static void mark_offset_tsc(void)
 		}
 	}
 
+	/* lost tick compensation */
+	delta = last_tsc_low - delta;
+	{
+		register unsigned long eax, edx;
+		eax = delta;
+		__asm__("mull %2"
+		:"=a" (eax), "=d" (edx)
+		:"rm" (fast_gettimeoffset_quotient),
+		 "0" (eax));
+		delta = edx;
+	}
+	delta += delay_at_last_interrupt;
+	lost = delta/(1000000/HZ);
+	delay = delta%(1000000/HZ);
+	if(lost >= 2)
+		jiffies += lost-1;
+
 	/* update the monotonic base value */
 	this_offset = ((unsigned long long)last_tsc_high<<32)|last_tsc_low;
 	monotonic_base += cycles_2_ns(this_offset - last_offset);
@@ -169,6 +189,12 @@ static void mark_offset_tsc(void)
 	/* calculate delay_at_last_interrupt */
 	count = ((LATCH-1) - count) * TICK_SIZE;
 	delay_at_last_interrupt = (count + LATCH/2) / LATCH;
+
+	/* catch corner case where tick rollover 
+	 * occured between tsc and pit reads
+	 */
+	if(abs(delay - delay_at_last_interrupt) > 900)
+		jiffies++;
 }
 
 static void delay_tsc(unsigned long loops)

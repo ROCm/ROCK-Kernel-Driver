@@ -234,7 +234,7 @@ static void smc_set_multicast_list(struct net_device *dev);
 /*
  . Handles the actual interrupt
 */
-static void smc_interrupt(int irq, void *, struct pt_regs *regs);
+static irqreturn_t smc_interrupt(int irq, void *, struct pt_regs *regs);
 /*
  . This is a separate procedure to handle the receipt of a packet, to
  . leave the interrupt code looking slightly cleaner
@@ -1133,7 +1133,7 @@ static void smc_timeout(struct net_device *dev)
  .
  ---------------------------------------------------------------------*/
 
-static void smc_interrupt(int irq, void * dev_id,  struct pt_regs * regs)
+static irqreturn_t smc_interrupt(int irq, void * dev_id,  struct pt_regs * regs)
 {
 	struct net_device *dev 	= dev_id;
 	int ioaddr 		= dev->base_addr;
@@ -1146,7 +1146,7 @@ static void smc_interrupt(int irq, void * dev_id,  struct pt_regs * regs)
 	/* state registers */
 	word	saved_bank;
 	word	saved_pointer;
-
+	int handled = 0;
 
 
 	PRINTK3((CARDNAME": SMC interrupt started \n"));
@@ -1170,6 +1170,8 @@ static void smc_interrupt(int irq, void * dev_id,  struct pt_regs * regs)
 		status = inb( ioaddr + INTERRUPT ) & mask;
 		if (!status )
 			break;
+
+		handled = 1;
 
 		PRINTK3((KERN_WARNING CARDNAME
 			": Handling interrupt status %x \n", status ));
@@ -1242,7 +1244,7 @@ static void smc_interrupt(int irq, void * dev_id,  struct pt_regs * regs)
 	SMC_SELECT_BANK( saved_bank );
 
 	PRINTK3((CARDNAME ": Interrupt done\n"));
-	return;
+	return IRQ_RETVAL(handled);
 }
 
 /*-------------------------------------------------------------

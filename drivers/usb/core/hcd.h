@@ -239,7 +239,7 @@ void hcd_buffer_free (struct usb_bus *bus, size_t size,
 
 /* generic bus glue, needed for host controllers that don't use PCI */
 extern struct usb_operations usb_hcd_operations;
-extern void usb_hcd_irq (int irq, void *__hcd, struct pt_regs *r);
+extern irqreturn_t usb_hcd_irq (int irq, void *__hcd, struct pt_regs *r);
 extern void usb_hc_died (struct usb_hcd *hcd);
 
 /* -------------------------------------------------------------------------- */

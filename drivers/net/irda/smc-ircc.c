@@ -86,7 +86,7 @@ static void ircc_dma_receive_complete(struct ircc_cb *self, int iobase);
 static int  ircc_hard_xmit(struct sk_buff *skb, struct net_device *dev);
 static void ircc_dma_xmit(struct ircc_cb *self, int iobase, int bofs);
 static void ircc_change_speed(void *priv, u32 speed);
-static void ircc_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t ircc_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static int  ircc_net_open(struct net_device *dev);
 static int  ircc_net_close(struct net_device *dev);
 static int  ircc_pmproc(struct pm_dev *dev, pm_request_t rqst, void *data);
@@ -979,7 +979,7 @@ static void ircc_dma_receive_complete(struct ircc_cb *self, int iobase)
  *    An interrupt from the chip has arrived. Time to do some work
  *
  */
-static void ircc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t ircc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct irport_cb *irport;
@@ -989,7 +989,7 @@ static void ircc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (dev == NULL) {
 		printk(KERN_WARNING "%s: irq %d for unknown device.\n", 
 		       driver_name, irq);
-		return;
+		return IRQ_NONE;
 	}
 	irport = (struct irport_cb *) dev->priv;
 	ASSERT(irport != NULL, return;);
@@ -1000,7 +1000,7 @@ static void ircc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (self->io->speed < 576000) {
 		/* Will spinlock itself - Jean II */
 		irport_interrupt(irq, dev_id, regs);
-		return;
+		return IRQ_HANDLED;
 	}
 	iobase = self->io->fir_base;
 
@@ -1028,6 +1028,7 @@ static void ircc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	outb(IRCC_IER_ACTIVE_FRAME|IRCC_IER_EOM, iobase+IRCC_IER);
 
 	spin_unlock(&self->irport->lock);
+	return IRQ_HANDLED;
 }
 
 #if 0 /* unused */

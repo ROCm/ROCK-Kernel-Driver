@@ -741,7 +741,7 @@ static void snd_ymfpci_irq_wait(ymfpci_t *chip)
 	}
 }
 
-static void snd_ymfpci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_ymfpci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	ymfpci_t *chip = snd_magic_cast(ymfpci_t, dev_id, return);
 	u32 status, nvoice, mode;
@@ -787,6 +787,8 @@ static void snd_ymfpci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (chip->rawmidi)
 		snd_mpu401_uart_interrupt(irq, chip->rawmidi->private_data, regs);
+
+	return IRQ_HANDLED;
 }
 
 static snd_pcm_hardware_t snd_ymfpci_playback =

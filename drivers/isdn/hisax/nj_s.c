@@ -17,7 +17,7 @@
 
 const char *NETjet_S_revision = "$Revision: 2.7.6.6 $";
 
-static void
+static irqreturn_t
 nj_s_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
@@ -70,6 +70,7 @@ nj_s_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	}
 */
 	spin_unlock(&cs->lock);
+	return IRQ_HANDLED;
 }
 
 static int

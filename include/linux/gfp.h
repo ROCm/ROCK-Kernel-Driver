@@ -11,13 +11,26 @@
 #define __GFP_DMA	0x01
 #define __GFP_HIGHMEM	0x02
 
-/* Action modifiers - doesn't change the zoning */
+/*
+ * Action modifiers - doesn't change the zoning
+ *
+ * __GFP_REPEAT: Try hard to allocate the memory, but the allocation attempt
+ * _might_ fail.  This depends upon the particular VM implementation.
+ *
+ * __GFP_NOFAIL: The VM implementation _must_ retry infinitely: the caller
+ * cannot handle allocation failures.
+ *
+ * __GFP_NORETRY: The VM implementation must not retry indefinitely.
+ */
 #define __GFP_WAIT	0x10	/* Can wait and reschedule? */
 #define __GFP_HIGH	0x20	/* Should access emergency pools? */
 #define __GFP_IO	0x40	/* Can start physical IO? */
 #define __GFP_FS	0x80	/* Can call down to low-level FS? */
 #define __GFP_COLD	0x100	/* Cache-cold page required */
 #define __GFP_NOWARN	0x200	/* Suppress page allocation failure warning */
+#define __GFP_REPEAT	0x400	/* Retry the allocation.  Might fail */
+#define __GFP_NOFAIL	0x800	/* Retry for ever.  Cannot fail */
+#define __GFP_NORETRY	0x1000	/* Do not retry.  Might fail */
 
 #define GFP_ATOMIC	(__GFP_HIGH)
 #define GFP_NOIO	(__GFP_WAIT)

@@ -161,7 +161,7 @@ static int wdtpci_status(void)
  *	a failure condition occurring.
  */
  
-static void wdtpci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t wdtpci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	/*
 	 *	Read the status register see what is up and
@@ -193,7 +193,8 @@ static void wdtpci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 #endif		
 #else
 		printk(KERN_CRIT "Reset in 5ms.\n");
-#endif		
+#endif
+	return IRQ_HANDLED;
 }
 
 

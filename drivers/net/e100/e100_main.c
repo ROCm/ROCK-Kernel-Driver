@@ -190,7 +190,7 @@ static unsigned char e100_init(struct e100_private *);
 static int e100_set_mac(struct net_device *, void *);
 struct net_device_stats *e100_get_stats(struct net_device *);
 
-static void e100intr(int, void *, struct pt_regs *);
+static irqreturn_t e100intr(int, void *, struct pt_regs *);
 static void e100_print_brd_conf(struct e100_private *);
 static void e100_set_multi(struct net_device *);
 void e100_set_speed_duplex(struct e100_private *);
@@ -1837,7 +1837,7 @@ e100_manage_adaptive_ifs(struct e100_private *bdp)
  * the RX & TX queues & starts the RU if it has stopped due
  * to no resources.
  */
-void
+irqreturn_t
 e100intr(int irq, void *dev_inst, struct pt_regs *regs)
 {
 	struct net_device *dev;
@@ -1850,7 +1850,7 @@ e100intr(int irq, void *dev_inst, struct pt_regs *regs)
 	intr_status = readw(&bdp->scb->scb_status);
 	/* If not my interrupt, just return */
 	if (!(intr_status & SCB_STATUS_ACK_MASK) || (intr_status == 0xffff)) {
-		return;
+		return IRQ_NONE;
 	}
 
 	/* disable and ack intr */
@@ -1859,7 +1859,7 @@ e100intr(int irq, void *dev_inst, struct pt_regs *regs)
 	/* the device is closed, don't continue or else bad things may happen. */
 	if (!netif_running(dev)) {
 		e100_set_intr_mask(bdp);
-		return;
+		return IRQ_NONE;
 	}
 
 	/* SWI intr (triggered by watchdog) is signal to allocate new skb buffers */
@@ -1877,6 +1877,7 @@ e100intr(int irq, void *dev_inst, struct pt_regs *regs)
 		e100_tx_srv(bdp);
 
 	e100_set_intr_mask(bdp);
+	return IRQ_HANDLED;
 }
 
 /**

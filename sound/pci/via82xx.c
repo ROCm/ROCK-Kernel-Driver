@@ -574,7 +574,7 @@ static void snd_via82xx_channel_reset(via82xx_t *chip, viadev_t *viadev)
  *  Interrupt handler
  */
 
-static void snd_via82xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_via82xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	via82xx_t *chip = snd_magic_cast(via82xx_t, dev_id, return);
 	unsigned int status;
@@ -591,8 +591,8 @@ static void snd_via82xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		spin_unlock(&chip->reg_lock);
 		if (chip->rmidi)
 			/* check mpu401 interrupt */
-			snd_mpu401_uart_interrupt(irq, chip->rmidi->private_data, regs);
-		return;
+			return snd_mpu401_uart_interrupt(irq, chip->rmidi->private_data, regs);
+		return IRQ_NONE;
 	}
 // _skip_sgd:
 
@@ -611,6 +611,7 @@ static void snd_via82xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		outb(c_status, VIADEV_REG(viadev, OFFSET_STATUS)); /* ack */
 	}
 	spin_unlock(&chip->reg_lock);
+	return IRQ_HANDLED;
 }
 
 /*

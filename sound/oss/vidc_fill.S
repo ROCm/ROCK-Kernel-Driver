@@ -133,6 +133,10 @@ ENTRY(vidc_clear)
  *  ip = corrupted
  */
 
+%%%%%%%%%%%%%%%%%%%
+fixme!  This funtion needs to return IRQ_HANDLED
+%%%%%%%%%%%%%%%%%%%
+
 ENTRY(vidc_sound_dma_irq)
 		stmfd	sp!, {r4 - r8, lr}
 		ldr	r8, =dma_start

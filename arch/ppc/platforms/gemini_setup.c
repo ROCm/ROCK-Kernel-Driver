@@ -19,7 +19,7 @@
 #include <linux/kdev_t.h>
 #include <linux/types.h>
 #include <linux/major.h>
-#include <linux/blk.h>
+#include <linux/initrd.h>
 #include <linux/console.h>
 #include <linux/irq.h>
 #include <linux/seq_file.h>

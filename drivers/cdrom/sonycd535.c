@@ -125,7 +125,6 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/init.h>
-#include <linux/devfs_fs_kernel.h>
 
 #define REALLY_SLOW_IO
 #include <asm/system.h>
@@ -1579,6 +1578,7 @@ static int __init sony535_init(void)
 	cdu_disk->first_minor = 0;
 	cdu_disk->fops = &cdu_fops;
 	sprintf(cdu_disk->disk_name, "cdu");
+	sprintf(cdu_disk->devfs_name, "cdu535");
 
 	if (!request_region(sony535_cd_base_io, 4, CDU535_HANDLE)) {
 		printk(KERN_WARNING"sonycd535: Unable to request region 0x%x\n",
@@ -1587,10 +1587,6 @@ static int __init sony535_init(void)
 	}
 	cdu_disk->queue = &sonycd535_queue;
 	add_disk(cdu_disk);
-	devfs_register (NULL, CDU535_HANDLE, DEVFS_FL_DEFAULT,
-			cdu_disk->major, cdu_disk->first_minor,
-			S_IFBLK | S_IRUGO | S_IWUGO,
-			cdu_disk->fops, NULL);
 	return 0;
 
 out7:
@@ -1666,7 +1662,6 @@ sony535_exit(void)
 	kfree(sony_buffer);
 	kfree(last_sony_subcode);
 	kfree(sony_toc);
-	devfs_remove(CDU535_HANDLE);
 	del_gendisk(cdu_disk);
 	put_disk(cdu_disk);
 	blk_cleanup_queue(&sonycd535_queue);

@@ -3863,7 +3863,7 @@ ahc_linux_run_device_queue(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 /*
  * SCSI controller interrupt handler.
  */
-void
+irqreturn_t
 ahc_linux_isr(int irq, void *dev_id, struct pt_regs * regs)
 {
 	struct	ahc_softc *ahc;
@@ -3883,6 +3883,8 @@ ahc_linux_isr(int irq, void *dev_id, struct pt_regs * regs)
 			ahc_schedule_completeq(ahc, acmd);
 	}
 	ahc_unlock(ahc, &flags);
+	/* FIXME! Was it really ours? */
+	return IRQ_HANDLED;
 }
 
 void

@@ -1631,7 +1631,7 @@ static inline unsigned get_dmac(struct ess_state *s)
  *	Meet Bob, the timer...
  */
 
-static void ess_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t ess_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 static void stop_bob(struct ess_state *s)
 {
@@ -1900,7 +1900,7 @@ ess_update_ptr(struct ess_state *s)
 	}
 }
 
-static void 
+static irqreturn_t
 ess_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
         struct ess_state *s;
@@ -1908,7 +1908,8 @@ ess_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	int i;
 	u32 event;
 
-	if ( ! (event = inb(c->iobase+0x1A)) ) return;
+	if ( ! (event = inb(c->iobase+0x1A)) )
+		return IRQ_NONE;
 
 	outw(inw(c->iobase+4)&1, c->iobase+4);
 
@@ -1972,6 +1973,7 @@ ess_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		ess_update_ptr(s);
 		spin_unlock(&s->lock);
 	}
+	return IRQ_HANDLED;
 }
 
 

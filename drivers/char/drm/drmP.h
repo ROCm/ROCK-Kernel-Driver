@@ -837,7 +837,7 @@ extern int           DRM(control)( struct inode *inode, struct file *filp,
 				   unsigned int cmd, unsigned long arg );
 extern int           DRM(irq_install)( drm_device_t *dev, int irq );
 extern int           DRM(irq_uninstall)( drm_device_t *dev );
-extern void          DRM(dma_service)( int irq, void *device,
+extern irqreturn_t   DRM(dma_service)( int irq, void *device,
 				       struct pt_regs *regs );
 extern void          DRM(driver_irq_preinstall)( drm_device_t *dev );
 extern void          DRM(driver_irq_postinstall)( drm_device_t *dev );

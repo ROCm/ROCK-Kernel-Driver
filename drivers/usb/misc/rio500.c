@@ -65,7 +65,6 @@
 
 struct rio_usb_data {
         struct usb_device *rio_dev;     /* init: probe_rio */
-        devfs_handle_t devfs;           /* devfs device */
         unsigned int ifnum;             /* Interface number of the USB device */
         int isopen;                     /* nz if open */
         int present;                    /* Device is present on the bus */
@@ -476,13 +475,11 @@ static int probe_rio(struct usb_interface *intf,
 	}
 	dbg("probe_rio: ibuf address:%p", rio->ibuf);
 
-	rio->devfs = devfs_register(NULL, "usb/rio500",
+	devfs_register(NULL, "usb/rio500",
 				    DEVFS_FL_DEFAULT, USB_MAJOR,
 				    RIO_MINOR,
 				    S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP |
 				    S_IWGRP, &usb_rio_fops, NULL);
-	if (rio->devfs == NULL)
-		dbg("probe_rio: device node registration failed");
 
 	init_MUTEX(&(rio->lock));
 
@@ -496,7 +493,7 @@ static void disconnect_rio(struct usb_interface *intf)
 
 	usb_set_intfdata (intf, NULL);
 	if (rio) {
-		devfs_unregister(rio->devfs);
+		devfs_remove("usb/rio500");
 		usb_deregister_dev(1, rio->minor);
 
 		down(&(rio->lock));

@@ -26,7 +26,7 @@
 #include <linux/a.out.h>
 #include <linux/tty.h>
 #include <linux/bootmem.h>
-#include <linux/blk.h>
+#include <linux/initrd.h>
 #include <linux/ide.h>
 #include <linux/timex.h>
 #include <linux/root_dev.h>

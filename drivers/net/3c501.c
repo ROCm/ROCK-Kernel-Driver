@@ -510,7 +510,7 @@ static int el_start_xmit(struct sk_buff *skb, struct net_device *dev)
  * TCP window.
  */
 
-static void el_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t el_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct net_local *lp;
@@ -558,7 +558,7 @@ static void el_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			}
 			lp->loading=2;		/* Force a reload */
 			spin_unlock(&lp->lock);
-			return;
+			goto out;
 		}
 
 		if (el_debug > 6)
@@ -606,7 +606,7 @@ static void el_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			outb(AX_XMIT, AX_CMD);
 			lp->stats.collisions++;
 			spin_unlock(&lp->lock);
-			return;
+			goto out;
 		}
 		else
 		{
@@ -675,7 +675,8 @@ static void el_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	inb(RX_STATUS);		/* Be certain that interrupts are cleared. */
 	inb(TX_STATUS);
 	spin_unlock(&lp->lock);
-	return;
+out:
+	return IRQ_HANDLED;
 }
 
 

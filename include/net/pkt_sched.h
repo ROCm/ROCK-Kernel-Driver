@@ -49,6 +49,8 @@ struct Qdisc_class_ops
 	int			(*dump)(struct Qdisc *, unsigned long, struct sk_buff *skb, struct tcmsg*);
 };
 
+struct module;
+
 struct Qdisc_ops
 {
 	struct Qdisc_ops	*next;
@@ -67,6 +69,8 @@ struct Qdisc_ops
 	int			(*change)(struct Qdisc *, struct rtattr *arg);
 
 	int			(*dump)(struct Qdisc *, struct sk_buff *);
+
+	struct module		*owner;
 };
 
 extern rwlock_t qdisc_tree_lock;

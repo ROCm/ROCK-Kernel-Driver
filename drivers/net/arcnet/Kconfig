@@ -18,7 +18,7 @@ config ARCNET
 	  support" below.
 
 	  You might also want to have a look at the Ethernet-HOWTO, available
-	  from <http://www.linuxdoc.org/docs.html#howto>(even though ARCnet
+	  from <http://www.tldp.org/docs.html#howto>(even though ARCnet
 	  is not really Ethernet).
 
 	  This driver is also available as a module ( = code which can be

@@ -3040,7 +3040,6 @@ struct nfsctl_arg32 {
 #define ca32_svc	u.u32_svc
 #define ca32_client	u.u32_client
 #define ca32_export	u.u32_export
-#define ca32_authd	u.u32_authd
 #define ca32_debug	u.u32_debug
 };
 

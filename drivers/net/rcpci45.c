@@ -29,6 +29,8 @@
 **  along with this program; if not, write to the Free Software
 **  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 **
+**  Francois Romieu, Apr 2003: Converted to pci DMA mapping API.
+**
 **  Pete Popov, Oct 2001: Fixed a few bugs to make the driver functional
 **  again. Note that this card is not supported or manufactured by 
 **  RedCreek anymore.
@@ -47,8 +49,6 @@
 **
 ***************************************************************************/
 
-#error Please convert me to Documentation/DMA-mapping.txt
-
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
@@ -66,7 +66,7 @@
 #include <asm/uaccess.h>
 
 static char version[] __initdata =
-    "RedCreek Communications PCI linux driver version 2.20\n";
+    "RedCreek Communications PCI linux driver version 2.21\n";
 
 #define RC_LINUX_MODULE
 #include "rclanmtl.h"
@@ -95,13 +95,19 @@ static char version[] __initdata =
  */
 #define MSG_BUF_SIZE  16384
 
+/* 2003/04/20: I don't know about the hardware ability but the driver won't
+ * play safe with 64 bit addressing and DAC without NETIF_F_HIGHDMA doesn't
+ * really make sense anyway. Let's play safe - romieu.
+ */
+#define RCPCI45_DMA_MASK	((u64) 0xffffffff)
+
 static U32 DriverControlWord;
 
 static void rc_timer (unsigned long);
 
 static int RCopen (struct net_device *);
 static int RC_xmit_packet (struct sk_buff *, struct net_device *);
-static void RCinterrupt (int, void *, struct pt_regs *);
+static irqreturn_t RCinterrupt (int, void *, struct pt_regs *);
 static int RCclose (struct net_device *dev);
 static struct net_device_stats *RCget_stats (struct net_device *);
 static int RCioctl (struct net_device *, struct ifreq *, int);
@@ -136,8 +142,8 @@ rcpci45_remove_one (struct pci_dev *pdev)
 	free_irq (dev->irq, dev);
 	iounmap ((void *) dev->base_addr);
 	pci_release_regions (pdev);
-	if (pDpa->msgbuf)
-		kfree (pDpa->msgbuf);
+	pci_free_consistent (pdev, MSG_BUF_SIZE, pDpa->msgbuf,
+			     pDpa->msgbuf_dma);
 	if (pDpa->pPab)
 		kfree (pDpa->pPab);
 	kfree (dev);
@@ -172,6 +178,7 @@ rcpci45_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 		error = -ENOMEM;
 		goto err_out;
 	}
+	SET_MODULE_OWNER(dev);
 
 	error = pci_enable_device (pdev);
 	if (error) {
@@ -180,7 +187,6 @@ rcpci45_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 			card_idx);
 		goto err_out;
 	}
-	error = -ENOMEM;
 	pci_start = pci_resource_start (pdev, 0);
 	pci_len = pci_resource_len (pdev, 0);
 	printk("pci_start %lx pci_len %lx\n", pci_start, pci_len);
@@ -189,6 +195,7 @@ rcpci45_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	pDpa = dev->priv;
 	pDpa->id = card_idx;
+	pDpa->pci_dev = pdev;
 	pDpa->pci_addr = pci_start;
 
 	if (!pci_start || !(pci_resource_flags (pdev, 0) & IORESOURCE_MEM)) {
@@ -200,23 +207,20 @@ rcpci45_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	/*
 	 * pDpa->msgbuf is where the card will dma the I2O 
-	 * messages. Thus, we need contiguous physical pages of
-	 * memory.
-	 */
-	pDpa->msgbuf = kmalloc (MSG_BUF_SIZE, GFP_DMA | GFP_KERNEL);
+	 * messages. Thus, we need contiguous physical pages of memory.
+	 * 2003/04/20:  pci_alloc_consistent() provides well over the needed
+	 * alignment on a 256 bytes boundary for the LAN API private area.
+	 * Thus it isn't needed anymore to align it by hand.
+         */
+	pDpa->msgbuf = pci_alloc_consistent (pdev, MSG_BUF_SIZE,
+					     &pDpa->msgbuf_dma);
 	if (!pDpa->msgbuf) {
 		printk (KERN_ERR "(rcpci45 driver:) \
 			Could not allocate %d byte memory for the \
 				private msgbuf!\n", MSG_BUF_SIZE);
+		error = -ENOMEM;
 		goto err_out_free_dev;
 	}
-
-	/*
-	 * Save the starting address of the LAN API private area.  We'll
-	 * pass that to RCInitI2OMsgLayer().
-	 *
-	 */
-	pDpa->PLanApiPA = (void *) (((long) pDpa->msgbuf + 0xff) & ~0xff);
 
 	/* The adapter is accessible through memory-access read/write, not
 	 * I/O read/write.  Thus, we need to map it to some virtual address
@@ -226,12 +230,20 @@ rcpci45_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (error)
 		goto err_out_free_msgbuf;
 
+	error = pci_set_dma_mask (pdev, RCPCI45_DMA_MASK);
+	if (error) {
+		printk (KERN_ERR
+			"(rcpci45 driver:) pci_set_dma_mask failed!\n");
+		goto err_out_free_region;
+	}
+
 	vaddr = (ulong *) ioremap (pci_start, pci_len);
 	if (!vaddr) {
 		printk (KERN_ERR
 			"(rcpci45 driver:) \
 			Unable to remap address range from %lu to %lu\n",
 			pci_start, pci_start + pci_len);
+		error = -EIO;
 		goto err_out_free_region;
 	}
 
@@ -249,13 +261,14 @@ rcpci45_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 err_out_free_region:
 	pci_release_regions (pdev);
 err_out_free_msgbuf:
-	kfree (pDpa->msgbuf);
+	pci_free_consistent (pdev, MSG_BUF_SIZE, pDpa->msgbuf,
+			     pDpa->msgbuf_dma);
 err_out_free_dev:
 	unregister_netdev (dev);
 	kfree (dev);
 err_out:
 	card_idx--;
-	return -ENODEV;
+	return error;
 }
 
 static struct pci_driver rcpci45_driver = {
@@ -283,7 +296,6 @@ RCopen (struct net_device *dev)
 	int requested = 0;
 	int error;
 
-	MOD_INC_USE_COUNT;
 	if (pDpa->nexus) {
 		/* This is not the first time RCopen is called.  Thus,
 		 * the interface was previously opened and later closed
@@ -365,7 +377,6 @@ RCopen (struct net_device *dev)
 err_out_free_irq:
 	free_irq (dev->irq, dev);
 err_out:
-	MOD_DEC_USE_COUNT;
 	return error;
 }
 
@@ -402,7 +413,8 @@ RC_xmit_packet (struct sk_buff *skb, struct net_device *dev)
 	ptcb->b.context = (U32) skb;
 	ptcb->b.scount = 1;
 	ptcb->b.size = skb->len;
-	ptcb->b.addr = virt_to_bus ((void *) skb->data);
+	ptcb->b.addr = pci_map_single(pDpa->pci_dev, skb->data, skb->len,
+				      PCI_DMA_TODEVICE);
 
 	if ((status = RCI2OSendPacket (dev, (U32) NULL, (PRCTCB) ptcb))
 	    != RC_RTN_NO_ERROR) {
@@ -451,6 +463,8 @@ RCxmit_callback (U32 Status,
 	while (PcktCount--) {
 		skb = (struct sk_buff *) (BufferContext[0]);
 		BufferContext++;
+		pci_unmap_single(pDpa->pci_dev, BufferContext[1], skb->len,
+				 PCI_DMA_TODEVICE);
 		dev_kfree_skb_irq (skb);
 	}
 	netif_wake_queue (dev);
@@ -621,7 +635,7 @@ RCrecv_callback (U32 Status,
  * RCProcI2OMsgQ(), which in turn process the message and
  * calls one of our callback functions.
  */
-static void
+static irqreturn_t
 RCinterrupt (int irq, void *dev_id, struct pt_regs *regs)
 {
 
@@ -634,7 +648,7 @@ RCinterrupt (int irq, void *dev_id, struct pt_regs *regs)
 		printk (KERN_DEBUG "%s: shutdown, service irq\n",
 				dev->name);
 
-	RCProcI2OMsgQ (dev);
+	return RCProcI2OMsgQ (dev);
 }
 
 #define REBOOT_REINIT_RETRY_LIMIT 4
@@ -706,6 +720,7 @@ rc_timer (unsigned long data)
 			RCDisableI2OInterrupts (dev);
 			dev->flags &= ~IFF_UP;
 			MOD_DEC_USE_COUNT;
+			/* FIXME: kill MOD_DEC_USE_COUNT, use dev_put */
 		} else {
 			printk (KERN_INFO "%s: rescheduling timer...\n",
 					dev->name);
@@ -731,7 +746,6 @@ RCclose (struct net_device *dev)
 		printk (KERN_INFO "%s skipping reset -- adapter already in reboot mode\n", dev->name);
 		dev->flags &= ~IFF_UP;
 		pDpa->shutdown = 1;
-		MOD_DEC_USE_COUNT;
 		return 0;
 	}
 
@@ -749,7 +763,6 @@ RCclose (struct net_device *dev)
 			   (PFNCALLBACK) RCreset_callback);
 
 	dev->flags &= ~IFF_UP;
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -984,8 +997,9 @@ RC_allocate_and_post_buffers (struct net_device *dev, int numBuffers)
 	PU32 p;
 	psingleB pB;
 	struct sk_buff *skb;
+	PDPA pDpa = dev->priv;
 	RC_RETURN status;
-	U32 res;
+	U32 res = 0;
 
 	if (!numBuffers)
 		return 0;
@@ -1001,7 +1015,7 @@ RC_allocate_and_post_buffers (struct net_device *dev, int numBuffers)
 	if (!p) {
 		printk (KERN_WARNING "%s unable to allocate TCB\n",
 				dev->name);
-		return 0;
+		goto out;
 	}
 
 	p[0] = 0;		/* Buffer Count */
@@ -1013,18 +1027,14 @@ RC_allocate_and_post_buffers (struct net_device *dev, int numBuffers)
 			printk (KERN_WARNING 
 					"%s: unable to allocate enough skbs!\n",
 					dev->name);
-			if (*p != 0) {	/* did we allocate any buffers */
-				break;
-			} else {
-				kfree (p);	/* Free the TCB */
-				return 0;
-			}
+			goto err_out_unmap;
 		}
 		skb_reserve (skb, 2);	/* Align IP on 16 byte boundaries */
 		pB->context = (U32) skb;
 		pB->scount = 1;	/* segment count */
 		pB->size = MAX_ETHER_SIZE;
-		pB->addr = virt_to_bus ((void *) skb->data);
+		pB->addr = pci_map_single(pDpa->pci_dev, skb->data, 
+					  MAX_ETHER_SIZE, PCI_DMA_FROMDEVICE);
 		p[0]++;
 		pB++;
 	}
@@ -1032,16 +1042,21 @@ RC_allocate_and_post_buffers (struct net_device *dev, int numBuffers)
 	if ((status = RCPostRecvBuffers (dev, (PRCTCB) p)) != RC_RTN_NO_ERROR) {
 		printk (KERN_WARNING "%s: Post buffer failed, error 0x%x\n",
 				dev->name, status);
-		/* point to the first buffer */
-		pB = (psingleB) ((U32) p + sizeof (U32));
-		while (p[0]) {
-			skb = (struct sk_buff *) pB->context;
-			dev_kfree_skb (skb);
-			p[0]--;
-			pB++;
-		}
+		goto err_out_unmap;
 	}
+out_free:
 	res = p[0];
 	kfree (p);
+out:
 	return (res);		/* return the number of posted buffers */
+
+err_out_unmap:
+	for (; p[0] > 0; p[0]--) {
+		--pB;
+		skb = (struct sk_buff *) pB->context;
+		pci_unmap_single(pDpa->pci_dev, pB->addr, MAX_ETHER_SIZE,
+				 PCI_DMA_FROMDEVICE);
+		dev_kfree_skb (skb);
+	}
+	goto out_free;
 }

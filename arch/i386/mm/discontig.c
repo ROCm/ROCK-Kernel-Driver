@@ -27,9 +27,7 @@
 #include <linux/bootmem.h>
 #include <linux/mmzone.h>
 #include <linux/highmem.h>
-#ifdef CONFIG_BLK_DEV_RAM
-#include <linux/blk.h>
-#endif
+#include <linux/initrd.h>
 #include <asm/e820.h>
 #include <asm/setup.h>
 

@@ -111,7 +111,7 @@ MODULE_PARM(cycle_time, "i");
 
 /*====================================================================*/
 
-static void tcic_interrupt(int irq, void *dev, struct pt_regs *regs);
+static irqreturn_t tcic_interrupt(int irq, void *dev, struct pt_regs *regs);
 static void tcic_timer(u_long data);
 static struct pccard_operations tcic_operations;
 
@@ -229,9 +229,10 @@ static int to_cycles(int ns)
 
 static volatile u_int irq_hits;
 
-static void __init tcic_irq_count(int irq, void *dev, struct pt_regs *regs)
+static irqreturn_t __init tcic_irq_count(int irq, void *dev, struct pt_regs *regs)
 {
     irq_hits++;
+    return IRQ_HANDLED;
 }
 
 static u_int __init try_irq(int irq)
@@ -565,7 +566,7 @@ static void tcic_bh(void *dummy)
 
 static DECLARE_WORK(tcic_task, tcic_bh, NULL);
 
-static void tcic_interrupt(int irq, void *dev, struct pt_regs *regs)
+static irqreturn_t tcic_interrupt(int irq, void *dev, struct pt_regs *regs)
 {
     int i, quick = 0;
     u_char latch, sstat;
@@ -575,7 +576,7 @@ static void tcic_interrupt(int irq, void *dev, struct pt_regs *regs)
 
     if (active) {
 	printk(KERN_NOTICE "tcic: reentered interrupt handler!\n");
-	return;
+	return IRQ_NONE;
     } else
 	active = 1;
 
@@ -620,7 +621,7 @@ static void tcic_interrupt(int irq, void *dev, struct pt_regs *regs)
     active = 0;
     
     DEBUG(2, "tcic: interrupt done\n");
-    
+    return IRQ_HANDLED;
 } /* tcic_interrupt */
 
 static void tcic_timer(u_long data)

@@ -154,7 +154,7 @@ static int e1000_set_mac(struct net_device *netdev, void *p);
 static void e1000_update_stats(struct e1000_adapter *adapter);
 static inline void e1000_irq_disable(struct e1000_adapter *adapter);
 static inline void e1000_irq_enable(struct e1000_adapter *adapter);
-static void e1000_intr(int irq, void *data, struct pt_regs *regs);
+static irqreturn_t e1000_intr(int irq, void *data, struct pt_regs *regs);
 #ifdef CONFIG_E1000_NAPI
 static int e1000_clean(struct net_device *netdev, int *budget);
 static boolean_t e1000_clean_rx_irq(struct e1000_adapter *adapter,
@@ -1981,7 +1981,7 @@ e1000_irq_enable(struct e1000_adapter *adapter)
  * @pt_regs: CPU registers structure
  **/
 
-static void
+static irqreturn_t
 e1000_intr(int irq, void *data, struct pt_regs *regs)
 {
 	struct net_device *netdev = data;
@@ -1992,7 +1992,7 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 #endif
 
 	if(!icr)
-		return;  /* Not our interrupt */
+		return IRQ_NONE;  /* Not our interrupt */
 
 	if(icr & (E1000_ICR_RXSEQ | E1000_ICR_LSC)) {
 		adapter->hw.get_link_status = 1;
@@ -2016,6 +2016,7 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 		   !e1000_clean_tx_irq(adapter))
 			break;
 #endif
+	return IRQ_HANDLED;
 }
 
 #ifdef CONFIG_E1000_NAPI

@@ -12,6 +12,7 @@
 #include <linux/linkage.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
+#include <linux/interrupt.h>
 #include <asm/pil.h>
 #include <asm/ptrace.h>
 
@@ -128,7 +129,7 @@ extern void set_irq_udt(int);
 #endif
 
 extern int request_fast_irq(unsigned int irq,
-			    void (*handler)(int, void *, struct pt_regs *),
+			    irqreturn_t (*handler)(int, void *, struct pt_regs *),
 			    unsigned long flags, __const__ char *devname,
 			    void *dev_id);
 

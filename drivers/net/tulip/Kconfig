@@ -21,7 +21,7 @@ config DE2104X
 	  (smc9332dst), you can also try the driver for "Generic DECchip"
 	  cards, above.  However, most people with a network card of this type
 	  will say Y here.) Do read the Ethernet-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.  More specific
+	  <http://www.tldp.org/docs.html#howto>.  More specific
 	  information is contained in
 	  <file:Documentation/DocBook/tulip-user.tmpl>.
 
@@ -42,7 +42,7 @@ config TULIP
 	  (smc9332dst), you can also try the driver for "Generic DECchip"
 	  cards, above.  However, most people with a network card of this type
 	  will say Y here.) Do read the Ethernet-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.  More specific
+	  <http://www.tldp.org/docs.html#howto>.  More specific
 	  information is contained in 
 	  <file:Documentation/networking/tulip.txt>.
 
@@ -80,7 +80,7 @@ config DE4X5
 	  These include the DE425, DE434, DE435, DE450 and DE500 models.  If
 	  you have a network card of this type, say Y and read the
 	  Ethernet-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>. More specific
+	  <http://www.tldp.org/docs.html#howto>. More specific
 	  information is contained in
 	  <file:Documentation/networking/de4x5.txt>.
 

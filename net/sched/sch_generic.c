@@ -15,6 +15,7 @@
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -222,45 +223,40 @@ noop_requeue(struct sk_buff *skb, struct Qdisc* qdisc)
 	return NET_XMIT_CN;
 }
 
-struct Qdisc_ops noop_qdisc_ops =
-{
-	.next		= NULL,
-	.cl_ops		= NULL,
-	.id		= "noop",
-	.priv_size	= 0,
-
-	.enqueue	= noop_enqueue,
-	.dequeue	= noop_dequeue,
-	.requeue	= noop_requeue,
+struct Qdisc_ops noop_qdisc_ops = {
+	.next		=	NULL,
+	.cl_ops		=	NULL,
+	.id		=	"noop",
+	.priv_size	=	0,
+	.enqueue	=	noop_enqueue,
+	.dequeue	=	noop_dequeue,
+	.requeue	=	noop_requeue,
+	.owner		=	THIS_MODULE,
 };
 
-struct Qdisc noop_qdisc =
-{
-	.enqueue	= noop_enqueue,
-	.dequeue	= noop_dequeue,
-	.flags		= TCQ_F_BUILTIN,
-	.ops		= &noop_qdisc_ops,	
+struct Qdisc noop_qdisc = {
+	.enqueue	=	noop_enqueue,
+	.dequeue	=	noop_dequeue,
+	.flags		=	TCQ_F_BUILTIN,
+	.ops		=	&noop_qdisc_ops,	
 };
 
-
-struct Qdisc_ops noqueue_qdisc_ops =
-{
-	.next		= NULL,
-	.cl_ops		= NULL,
-	.id		= "noqueue",
-	.priv_size	= 0,
-
-	.enqueue	= noop_enqueue,
-	.dequeue	= noop_dequeue,
-	.requeue	= noop_requeue,
+struct Qdisc_ops noqueue_qdisc_ops = {
+	.next		=	NULL,
+	.cl_ops		=	NULL,
+	.id		=	"noqueue",
+	.priv_size	=	0,
+	.enqueue	=	noop_enqueue,
+	.dequeue	=	noop_dequeue,
+	.requeue	=	noop_requeue,
+	.owner		=	THIS_MODULE,
 };
 
-struct Qdisc noqueue_qdisc =
-{
-	.enqueue	= NULL,
-	.dequeue	= noop_dequeue,
-	.flags		= TCQ_F_BUILTIN,
-	.ops		= &noqueue_qdisc_ops,
+struct Qdisc noqueue_qdisc = {
+	.enqueue	=	NULL,
+	.dequeue	=	noop_dequeue,
+	.flags		=	TCQ_F_BUILTIN,
+	.ops		=	&noqueue_qdisc_ops,
 };
 
 
@@ -343,19 +339,17 @@ static int pfifo_fast_init(struct Qdisc *qdisc, struct rtattr *opt)
 	return 0;
 }
 
-static struct Qdisc_ops pfifo_fast_ops =
-{
-	.next		= NULL,
-	.cl_ops		= NULL,
-	.id		= "pfifo_fast",
-	.priv_size	= 3 * sizeof(struct sk_buff_head),
-
-	.enqueue	= pfifo_fast_enqueue,
-	.dequeue	= pfifo_fast_dequeue,
-	.requeue	= pfifo_fast_requeue,
-
-	.init		= pfifo_fast_init,
-	.reset		= pfifo_fast_reset,
+static struct Qdisc_ops pfifo_fast_ops = {
+	.next		=	NULL,
+	.cl_ops		=	NULL,
+	.id		=	"pfifo_fast",
+	.priv_size	=	3 * sizeof(struct sk_buff_head),
+	.enqueue	=	pfifo_fast_enqueue,
+	.dequeue	=	pfifo_fast_dequeue,
+	.requeue	=	pfifo_fast_requeue,
+	.init		=	pfifo_fast_init,
+	.reset		=	pfifo_fast_reset,
+	.owner		=	THIS_MODULE,
 };
 
 struct Qdisc * qdisc_create_dflt(struct net_device *dev, struct Qdisc_ops *ops)
@@ -422,6 +416,7 @@ void qdisc_destroy(struct Qdisc *qdisc)
 		ops->reset(qdisc);
 	if (ops->destroy)
 		ops->destroy(qdisc);
+	module_put(ops->owner);
 	if (!(qdisc->flags&TCQ_F_BUILTIN))
 		kfree(qdisc);
 }

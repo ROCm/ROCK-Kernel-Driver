@@ -290,7 +290,7 @@ static void check_status(struct uart_sunsab_port *up,
 	wake_up_interruptible(&up->port.info->delta_msr_wait);
 }
 
-static void sunsab_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t sunsab_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct uart_sunsab_port *up = dev_id;
 	union sab82532_irq_status status;
@@ -339,6 +339,8 @@ static void sunsab_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	spin_unlock_irqrestore(&up->port.lock, flags);
+
+	return IRQ_HANDLED;
 }
 
 /* port->lock is not held.  */

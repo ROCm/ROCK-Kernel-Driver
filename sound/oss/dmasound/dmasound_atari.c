@@ -134,7 +134,7 @@ static int FalconSetFormat(int format);
 static int FalconSetVolume(int volume);
 static void AtaPlayNextFrame(int index);
 static void AtaPlay(void);
-static void AtaInterrupt(int irq, void *dummy, struct pt_regs *fp);
+static irqreturn_t AtaInterrupt(int irq, void *dummy, struct pt_regs *fp);
 
 /*** Mid level stuff *********************************************************/
 
@@ -1250,7 +1250,7 @@ static void AtaPlay(void)
 }
 
 
-static void AtaInterrupt(int irq, void *dummy, struct pt_regs *fp)
+static irqreturn_t AtaInterrupt(int irq, void *dummy, struct pt_regs *fp)
 {
 #if 0
 	/* ++TeSche: if you should want to test this... */
@@ -1259,7 +1259,7 @@ static void AtaInterrupt(int irq, void *dummy, struct pt_regs *fp)
 		if (++cnt == 10) {
 			/* simulate losing an interrupt */
 			cnt = 0;
-			return;
+			return IRQ_HANDLED;
 		}
 #endif
 	spin_lock(&dmasound.lock);
@@ -1269,7 +1269,7 @@ static void AtaInterrupt(int irq, void *dummy, struct pt_regs *fp)
 		 * (almost) like on the TT.
 		 */
 		write_sq_ignore_int = 0;
-		return;
+		return IRQ_HANDLED;
 	}
 
 	if (!write_sq.active) {
@@ -1277,7 +1277,7 @@ static void AtaInterrupt(int irq, void *dummy, struct pt_regs *fp)
 		 * the sq variables, so better don't do anything here.
 		 */
 		WAKE_UP(write_sq.sync_queue);
-		return;
+		return IRQ_HANDLED;
 	}
 
 	/* Probably ;) one frame is finished. Well, in fact it may be that a
@@ -1315,6 +1315,7 @@ static void AtaInterrupt(int irq, void *dummy, struct pt_regs *fp)
 	   is nothing to play any more. Wake up a process
 	   waiting for audio output to drain. */
 	spin_unlock(&dmasound.lock);
+	return IRQ_HANDLED;
 }
 
 

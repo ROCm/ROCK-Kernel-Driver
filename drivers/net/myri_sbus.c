@@ -533,7 +533,7 @@ static void myri_rx(struct myri_eth *mp, struct net_device *dev)
 	}
 }
 
-static void myri_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t myri_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev		= (struct net_device *) dev_id;
 	struct myri_eth *mp		= (struct myri_eth *) dev->priv;
@@ -567,6 +567,8 @@ static void myri_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	DIRQ(("\n"));
 
 	spin_unlock_irqrestore(&mp->irq_lock, flags);
+
+	return IRQ_HANDLED;
 }
 
 static int myri_open(struct net_device *dev)

@@ -5020,7 +5020,6 @@ wavelan_open(device *	dev)
 
   /* Mark the device as used */
   link->open++;
-  MOD_INC_USE_COUNT;
 
 #ifdef WAVELAN_ROAMING
   if(do_roaming)
@@ -5065,7 +5064,6 @@ wavelan_close(device *	dev)
 #endif	/* WAVELAN_ROAMING */
 
   link->open--;
-  MOD_DEC_USE_COUNT;
 
   /* If the card is still present */
   if(netif_running(dev))
@@ -5186,6 +5184,7 @@ wavelan_attach(void)
   ether_setup(dev);
 
   /* wavelan NET3 callbacks */
+  SET_MODULE_OWNER(dev);
   dev->open = &wavelan_open;
   dev->stop = &wavelan_close;
   dev->hard_start_xmit = &wavelan_packet_xmit;

@@ -376,7 +376,7 @@ struct arlan_private {
       volatile int txNew;
       volatile int txOffset;
       volatile char ReTransmitRequested;
-      volatile long long tx_done_delayed;
+      volatile unsigned long tx_done_delayed;
       volatile long long registrationLastSeen;
       volatile char under_command;
       volatile char under_toggle;

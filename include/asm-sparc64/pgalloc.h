@@ -71,7 +71,7 @@ static __inline__ pgd_t *get_pgd_fast(void)
 		struct page *page;
 
 		preempt_enable();
-		page = alloc_page(GFP_KERNEL);
+		page = alloc_page(GFP_KERNEL|__GFP_REPEAT);
 		if (page) {
 			ret = (struct page *)page_address(page);
 			clear_page(ret);
@@ -110,7 +110,7 @@ static __inline__ pgd_t *get_pgd_fast(void)
 		preempt_enable();
 	} else {
 		preempt_enable();
-		ret = (unsigned long *) __get_free_page(GFP_KERNEL);
+		ret = (unsigned long *) __get_free_page(GFP_KERNEL|__GFP_REPEAT);
 		if(ret)
 			memset(ret, 0, PAGE_SIZE);
 	}
@@ -159,7 +159,7 @@ static __inline__ pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addre
 
 	pmd = pmd_alloc_one_fast(mm, address);
 	if (!pmd) {
-		pmd = (pmd_t *)__get_free_page(GFP_KERNEL);
+		pmd = (pmd_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
 		if (pmd)
 			memset(pmd, 0, PAGE_SIZE);
 	}

@@ -599,9 +599,12 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
  		luninfo.num_opens = drv->usage_count;
  		luninfo.num_parts = 0;
  		/* count partitions 1 to 15 with sizes > 0 */
- 		for(i=1; i <MAX_PART; i++)
- 			if (disk->part[i].nr_sects != 0)
- 				luninfo.num_parts++;
+ 		for(i=1; i <MAX_PART; i++) {
+			if (!disk->part[i])
+				continue;
+			if (disk->part[i]->nr_sects != 0)
+				luninfo.num_parts++;
+		}
  		if (copy_to_user((void *) arg, &luninfo,
  				sizeof(LogvolInfo_struct)))
  			return -EFAULT;
@@ -1962,7 +1965,7 @@ startio:
 	start_io(h);
 }
 
-static void do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	ctlr_info_t *h = dev_id;
 	CommandList_struct *c;
@@ -1972,7 +1975,7 @@ static void do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 	/* Is this interrupt for us? */
 	if ( h->access.intr_pending(h) == 0)
-		return;
+		return IRQ_NONE;
 
 	/*
 	 * If there are completed commands in the completion queue,
@@ -2020,6 +2023,7 @@ static void do_cciss_intr(int irq, void *dev_id, struct pt_regs *regs)
 	 */
 	spin_unlock_irqrestore(CCISS_LOCK(h->ctlr), flags);
 	blk_start_queue(&h->queue);
+	return IRQ_HANDLED;
 }
 /* 
  *  We cannot read the structure directly, for portablity we must use 

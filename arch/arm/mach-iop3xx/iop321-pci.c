@@ -212,13 +212,13 @@ int iop321_setup(int nr, struct pci_sys_data *sys)
 
 	switch (nr) {
 	case 0:
-		res[0].start = IOP321_PCI_LOWER_IO + 0x6e000000;
-		res[0].end   = IOP321_PCI_LOWER_IO + 0x6e00ffff;
+		res[0].start = IOP321_PCI_IO_BASE + 0x6e000000;
+		res[0].end   = IOP321_PCI_IO_BASE + IOP321_PCI_IO_SIZE-1 + 0x6e000000;
 		res[0].name  = "PCI IO Primary";
 		res[0].flags = IORESOURCE_IO;
 
-		res[1].start = IOP321_PCI_LOWER_MEM;
-		res[1].end   = IOP321_PCI_LOWER_MEM + IOP321_PCI_WINDOW_SIZE;
+		res[1].start = IOP321_PCI_MEM_BASE;
+		res[1].end   = IOP321_PCI_MEM_BASE + IOP321_PCI_MEM_SIZE;
 		res[1].name  = "PCI Memory Primary";
 		res[1].flags = IORESOURCE_MEM;
 		break;

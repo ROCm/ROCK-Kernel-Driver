@@ -24,6 +24,7 @@
 #include <linux/init.h>
 #include <linux/smp_lock.h>
 #include <linux/blk.h>
+#include <linux/initrd.h>
 #include <linux/hdreg.h>
 #include <linux/bootmem.h>
 #include <linux/tty.h>

@@ -524,7 +524,7 @@ pcbit_firmware_bug(struct pcbit_dev *dev)
 	}
 }
 
-void
+irqreturn_t
 pcbit_irq_handler(int interrupt, void *devptr, struct pt_regs *regs)
 {
 	struct pcbit_dev *dev;
@@ -536,11 +536,11 @@ pcbit_irq_handler(int interrupt, void *devptr, struct pt_regs *regs)
 
 	if (!dev) {
 		printk(KERN_WARNING "pcbit_irq_handler: wrong device\n");
-		return;
+		return IRQ_NONE;
 	}
 	if (dev->interrupt) {
 		printk(KERN_DEBUG "pcbit: reentering interrupt hander\n");
-		return;
+		return IRQ_HANDLED;
 	}
 	dev->interrupt = 1;
 
@@ -549,7 +549,7 @@ pcbit_irq_handler(int interrupt, void *devptr, struct pt_regs *regs)
 	if (dev->l2_state == L2_STARTING || dev->l2_state == L2_ERROR) {
 		pcbit_l2_active_conf(dev, info);
 		dev->interrupt = 0;
-		return;
+		return IRQ_HANDLED;
 	}
 	if (info & 0x40U) {     /* E bit set */
 #ifdef DEBUG
@@ -557,11 +557,11 @@ pcbit_irq_handler(int interrupt, void *devptr, struct pt_regs *regs)
 #endif
 		pcbit_l2_error(dev);
 		dev->interrupt = 0;
-		return;
+		return IRQ_HANDLED;
 	}
 	if (dev->l2_state != L2_RUNNING && dev->l2_state != L2_LOADING) {
 		dev->interrupt = 0;
-		return;
+		return IRQ_HANDLED;
 	}
 	ack_seq = (info >> 3) & 0x07U;
 	read_seq = (info & 0x07U);
@@ -582,6 +582,7 @@ pcbit_irq_handler(int interrupt, void *devptr, struct pt_regs *regs)
 	info |= dev->send_seq;
 
 	writeb(info, dev->sh_mem + BANK4);
+	return IRQ_HANDLED;
 }
 
 

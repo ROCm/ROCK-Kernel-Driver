@@ -165,7 +165,7 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s_%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 866 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 897 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 static int phys_dma = 1;
@@ -2214,7 +2214,7 @@ static void ohci_schedule_iso_tasklets(struct ti_ohci *ohci,
 
 }
 
-static void ohci_irq_handler(int irq, void *dev_id,
+static irqreturn_t ohci_irq_handler(int irq, void *dev_id,
                              struct pt_regs *regs_are_unused)
 {
 	quadlet_t event, node_id;
@@ -2231,7 +2231,8 @@ static void ohci_irq_handler(int irq, void *dev_id,
 	reg_write(ohci, OHCI1394_IntEventClear, event & ~OHCI1394_busReset);
 	spin_unlock_irqrestore(&ohci->event_lock, flags);
 
-	if (!event) return;
+	if (!event)
+		return IRQ_NONE;
 
 	DBGMSG(ohci->id, "IntEvent: %08x", event);
 
@@ -2462,7 +2463,7 @@ selfid_not_valid:
 		PRINT(KERN_ERR, ohci->id, "Unhandled interrupt(s) 0x%08x",
 		      event);
 
-	return;
+	return IRQ_HANDLED;
 }
 
 /* Put the buffer back into the dma context */

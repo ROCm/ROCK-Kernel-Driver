@@ -869,7 +869,7 @@ receive_emsg(struct IsdnCardState *cs)
 /*********************/
 /* Interrupt handler */
 /*********************/
-static void
+static irqreturn_t
 hfcpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
@@ -880,17 +880,17 @@ hfcpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 
 	if (!cs) {
 		printk(KERN_WARNING "HFC-PCI: Spurious interrupt!\n");
-		return;
+		return IRQ_NONE;
 	}
 	if (!(cs->hw.hfcpci.int_m2 & 0x08))
-		return;		/* not initialised */
+		return IRQ_NONE;		/* not initialised */
 
 	if (HFCPCI_ANYINT & (stat = Read_hfc(cs, HFCPCI_STATUS))) {
 		val = Read_hfc(cs, HFCPCI_INT_S1);
 		if (cs->debug & L1_DEB_ISAC)
 			debugl1(cs, "HFC-PCI: stat(%02x) s1(%02x)", stat, val);
 	} else
-		return;
+		return IRQ_NONE;
 
 	if (cs->debug & L1_DEB_ISAC)
 		debugl1(cs, "HFC-PCI irq %x", val);
@@ -964,6 +964,7 @@ hfcpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		} else
 			val = 0;
 	}
+	return IRQ_HANDLED;
 }
 
 /********************************************************************/

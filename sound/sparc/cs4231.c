@@ -1228,7 +1228,7 @@ static void snd_cs4231_generic_interrupt(cs4231_t *chip)
 }
 
 #ifdef SBUS_SUPPORT
-static void snd_cs4231_sbus_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t snd_cs4231_sbus_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	cs4231_t *chip = snd_magic_cast(cs4231_t, dev_id, return);
 	u32 csr;
@@ -1240,12 +1240,14 @@ static void snd_cs4231_sbus_interrupt(int irq, void *dev_id, struct pt_regs *reg
 		     APC_GENL_INT |
 		     APC_XINT_PEMP |
 		     APC_XINT_CEMP)))
-		return;
+		return IRQ_NONE;
 
 	/* ACK the APC interrupt. */
 	sbus_writel(csr, chip->port + APCCSR);
 
 	snd_cs4231_generic_interrupt(chip);
+
+	return IRQ_HANDLED;
 }
 #endif
 

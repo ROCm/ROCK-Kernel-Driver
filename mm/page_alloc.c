@@ -536,6 +536,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	struct page *page;
 	int i;
 	int cold;
+	int do_retry;
 
 	if (wait)
 		might_sleep();
@@ -626,10 +627,21 @@ rebalance:
 	}
 
 	/*
-	 * Don't let big-order allocations loop.  Yield for kswapd, try again.
+	 * Don't let big-order allocations loop unless the caller explicitly
+	 * requests that.  Wait for some write requests to complete then retry.
+	 *
+	 * In this implementation, __GFP_REPEAT means __GFP_NOFAIL, but that
+	 * may not be true in other implementations.
 	 */
-	if (order <= 3) {
-		yield();
+	do_retry = 0;
+	if (!(gfp_mask & __GFP_NORETRY)) {
+		if ((order <= 3) || (gfp_mask & __GFP_REPEAT))
+			do_retry = 1;
+		if (gfp_mask & __GFP_NOFAIL)
+			do_retry = 1;
+	}
+	if (do_retry) {
+		blk_congestion_wait(WRITE, HZ/50);
 		goto rebalance;
 	}
 

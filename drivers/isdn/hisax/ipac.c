@@ -47,7 +47,7 @@ ipac_init(struct IsdnCardState *cs)
 	inithscxisac(cs);
 }
 
-void
+irqreturn_t
 ipac_irq(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
@@ -90,6 +90,7 @@ Start_IPAC:
 	ipac_write(cs, IPAC_MASK, 0xFF);
 	ipac_write(cs, IPAC_MASK, 0xC0);
 	spin_unlock(&cs->lock);
+	return IRQ_HANDLED;
 }
 
 int
@@ -102,4 +103,5 @@ ipac_setup(struct IsdnCardState *cs, struct dc_hw_ops *ipac_dc_ops,
 	cs->bc_hw_ops = ipac_bc_ops;
 	val = ipac_read(cs, IPAC_ID);
 	printk(KERN_INFO "HiSax: IPAC version %#x\n", val);
+	return 0;
 }

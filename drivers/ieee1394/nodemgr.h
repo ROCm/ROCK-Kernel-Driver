@@ -163,10 +163,6 @@ struct node_entry *hpsb_guid_get_entry(u64 guid);
  * fool-proof by itself, since the nodeid can change.  */
 struct node_entry *hpsb_nodeid_get_entry(struct hpsb_host *host, nodeid_t nodeid);
 
-/* Same as above except that it will not block waiting for the nodemgr
- * serialize semaphore.  */
-struct node_entry *hpsb_check_nodeid(struct hpsb_host *host, nodeid_t nodeid);
-
 /*
  * If the entry refers to a local host, this function will return the pointer
  * to the hpsb_host structure.  It will return NULL otherwise.  Once you have

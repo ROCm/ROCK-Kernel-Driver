@@ -26,12 +26,15 @@ static unsigned long power_reg = 0UL;
 static DECLARE_WAIT_QUEUE_HEAD(powerd_wait);
 static int button_pressed;
 
-static void power_handler(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t power_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
 	if (button_pressed == 0) {
 		wake_up(&powerd_wait);
 		button_pressed = 1;
 	}
+
+	/* FIXME: Check registers for status... */
+	return IRQ_HANDLED;
 }
 #endif /* CONFIG_PCI */
 

@@ -23,6 +23,7 @@
 #include <linux/bootmem.h>
 #include <linux/seq_file.h>
 #include <linux/module.h>
+#include <linux/initrd.h>
 
 #include <asm/bootinfo.h>
 #include <asm/setup.h>
@@ -39,10 +40,6 @@
 #ifdef CONFIG_SUN3X
 #include <asm/dvma.h>
 extern void sun_serial_setup(void);
-#endif
-
-#ifdef CONFIG_BLK_DEV_INITRD
-#include <linux/blk.h>
 #endif
 
 unsigned long m68k_machtype;

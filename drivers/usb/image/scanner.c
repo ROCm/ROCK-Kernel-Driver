@@ -397,6 +397,7 @@
  */
 
 
+#include <linux/devfs_fs_kernel.h>
 #include <asm/byteorder.h>
 
 /* 
@@ -843,7 +844,7 @@ static void destroy_scanner (struct kobject *kobj)
 	kfree(scn->obuf);
 
 	dbg("%s: De-allocating minor:%d", __FUNCTION__, scn->scn_minor);
-	devfs_unregister(scn->devfs);
+	devfs_remove("usb/scanner%d", scn->scn_minor - SCN_BASE_MNR);
 	usb_deregister_dev(1, scn->scn_minor);
 	usb_free_urb(scn->scn_irq);
 	usb_put_dev(scn->scn_dev);
@@ -1105,13 +1106,11 @@ probe_scanner(struct usb_interface *intf,
 
 	sprintf(name, "usb/scanner%d", scn->scn_minor - SCN_BASE_MNR);
 	
-	scn->devfs = devfs_register(NULL, name,
+	devfs_register(NULL, name,
 				    DEVFS_FL_DEFAULT, USB_MAJOR,
 				    scn->scn_minor,
 				    S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP |
 				    S_IWGRP | S_IROTH | S_IWOTH, &usb_scanner_fops, NULL);
-	if (scn->devfs == NULL)
-		dbg("scanner%d: device node registration failed", scn_minor);
 
 	info ("USB scanner device (0x%04x/0x%04x) now attached to %s",
 	      dev->descriptor.idVendor, dev->descriptor.idProduct, name);

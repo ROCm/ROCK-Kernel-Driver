@@ -2148,7 +2148,7 @@ static inline unsigned int tg3_has_work(struct net_device *dev, struct tg3 *tp)
 	return work_exists;
 }
 
-static void tg3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t tg3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct tg3 *tp = dev->priv;
@@ -2187,6 +2187,8 @@ static void tg3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	spin_unlock_irqrestore(&tp->lock, flags);
+
+	return IRQ_HANDLED;
 }
 
 static void tg3_init_rings(struct tg3 *);

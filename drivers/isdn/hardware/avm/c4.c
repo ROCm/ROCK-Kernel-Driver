@@ -659,7 +659,7 @@ static void c4_handle_rx(avmcard *card)
 
 /* ------------------------------------------------------------- */
 
-static void c4_handle_interrupt(avmcard *card)
+static irqreturn_t c4_handle_interrupt(avmcard *card)
 {
 	u32 status = c4inmeml(card->mbase+DOORBELL);
 
@@ -667,7 +667,7 @@ static void c4_handle_interrupt(avmcard *card)
 		int i;
 		c4outmeml(card->mbase+PCI_OUT_INT_MASK, 0x0c);
 		if (card->nlogcontr == 0)
-			return;
+			return IRQ_HANDLED;
 		printk(KERN_ERR "%s: unexpected reset\n", card->name);
                 for (i=0; i < card->nr_controllers; i++) {
 			avmctrl_info *cinfo = &card->ctrlinfo[i];
@@ -676,12 +676,12 @@ static void c4_handle_interrupt(avmcard *card)
 			capi_ctr_reseted(&cinfo->capi_ctrl);
 		}
 		card->nlogcontr = 0;
-		return;
+		return IRQ_HANDLED;
 	}
 
 	status &= (DBELL_UP_HOST | DBELL_DOWN_HOST);
 	if (!status)
-		return;
+		return IRQ_HANDLED;
 	c4outmeml(card->mbase+DOORBELL, status);
 
 	if ((status & DBELL_UP_HOST) != 0) {
@@ -702,13 +702,14 @@ static void c4_handle_interrupt(avmcard *card)
 			c4_dispatch_tx(card);
 		}
 	}
+	return IRQ_HANDLED;
 }
 
-static void c4_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
+static irqreturn_t c4_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
 {
 	avmcard *card = devptr;
 
-	c4_handle_interrupt(card);
+	return c4_handle_interrupt(card);
 }
 
 /* ------------------------------------------------------------- */

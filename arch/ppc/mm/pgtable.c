@@ -76,15 +76,11 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 	extern void *early_get_page(void);
 	int timeout = 0;
 
-	if (mem_init_done) {
-		while ((pte = (pte_t *) __get_free_page(GFP_KERNEL)) == NULL
-		       && ++timeout < 10) {
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(HZ);
-		}
-	} else
-		pte = (pte_t *) early_get_page();
-	if (pte != NULL)
+	if (mem_init_done)
+		pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
+	else
+		pte = (pte_t *)early_get_page();
+	if (pte)
 		clear_page(pte);
 	return pte;
 }
@@ -92,20 +88,16 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
 	struct page *pte;
-	int timeout = 0;
+
 #ifdef CONFIG_HIGHPTE
-	int flags = GFP_KERNEL | __GFP_HIGHMEM;
+	int flags = GFP_KERNEL | __GFP_HIGHMEM | __GFP_REPEAT;
 #else
-	int flags = GFP_KERNEL;
+	int flags = GFP_KERNEL | __GFP_REPEAT;
 #endif
 
-	while ((pte = alloc_pages(flags, 0)) == NULL) {
-		if (++timeout >= 10)
-			return NULL;
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ);
-	}
-	clear_highpage(pte);
+	pte = alloc_pages(flags, 0);
+	if (pte)
+		clear_highpage(pte);
 	return pte;
 }
 

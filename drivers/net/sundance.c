@@ -495,7 +495,7 @@ static void tx_timeout(struct net_device *dev);
 static void init_ring(struct net_device *dev);
 static int  start_tx(struct sk_buff *skb, struct net_device *dev);
 static int reset_tx (struct net_device *dev);
-static void intr_handler(int irq, void *dev_instance, struct pt_regs *regs);
+static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *regs);
 static void rx_poll(unsigned long data);
 static void tx_poll(unsigned long data);
 static void refill_rx (struct net_device *dev);
@@ -951,7 +951,7 @@ static void tx_timeout(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
-	long flag;
+	unsigned long flag;
 	
 	netif_stop_queue(dev);
 	tasklet_disable(&np->tx_tasklet);
@@ -1152,7 +1152,7 @@ reset_tx (struct net_device *dev)
 
 /* The interrupt handler cleans up after the Tx thread, 
    and schedule a Rx thread work */
-static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
+static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 {
 	struct net_device *dev = (struct net_device *)dev_instance;
 	struct netdev_private *np;
@@ -1161,6 +1161,7 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 	int hw_frame_id;
 	int tx_cnt;
 	int tx_status;
+	int handled = 0;
 
 	ioaddr = dev->base_addr;
 	np = dev->priv;
@@ -1175,6 +1176,8 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 
 		if (!(intr_status & DEFAULT_INTR))
 			break;
+
+		handled = 1;
 
 		if (intr_status & (IntrRxDMADone)) {
 			writew(DEFAULT_INTR & ~(IntrRxDone|IntrRxDMADone),
@@ -1284,7 +1287,7 @@ static void intr_handler(int irq, void *dev_instance, struct pt_regs *rgs)
 		printk(KERN_DEBUG "%s: exiting interrupt, status=%#4.4x.\n",
 			   dev->name, readw(ioaddr + IntrStatus));
 	writel(5000, ioaddr + DownCounter);
-
+	return IRQ_RETVAL(handled);
 }
 
 static void rx_poll(unsigned long data)

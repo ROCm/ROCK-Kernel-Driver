@@ -28,8 +28,6 @@
 #endif
 #include <linux/usb.h>
 
-static devfs_handle_t usb_devfs_handle;	/* /dev/usb dir. */
-
 #define MAX_USB_MINORS	256
 static struct file_operations *usb_minors[MAX_USB_MINORS];
 static spinlock_t minor_lock = SPIN_LOCK_UNLOCKED;
@@ -75,14 +73,13 @@ int usb_major_init(void)
 		return -EBUSY;
 	}
 
-	usb_devfs_handle = devfs_mk_dir("usb");
-
+	devfs_mk_dir("usb");
 	return 0;
 }
 
 void usb_major_cleanup(void)
 {
-	devfs_unregister(usb_devfs_handle);
+	devfs_remove("usb");
 	unregister_chrdev(USB_MAJOR, "usb");
 }
 

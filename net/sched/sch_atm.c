@@ -575,7 +575,6 @@ static int atm_tc_init(struct Qdisc *sch,struct rtattr *opt)
 	p->link.ref = 1;
 	p->link.next = NULL;
 	tasklet_init(&p->task,sch_atm_dequeue,(unsigned long) sch);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -612,7 +611,6 @@ static void atm_tc_destroy(struct Qdisc *sch)
 		}
 	}
 	tasklet_kill(&p->task);
-	MOD_DEC_USE_COUNT;
 }
 
 
@@ -663,41 +661,35 @@ static int atm_tc_dump(struct Qdisc *sch, struct sk_buff *skb)
 	return 0;
 }
 
-static struct Qdisc_class_ops atm_class_ops =
-{
-	.graft		= atm_tc_graft,
-	.leaf		= atm_tc_leaf,
-	.get		= atm_tc_get,
-	.put		= atm_tc_put,
-	.change		= atm_tc_change,
-	.delete		= atm_tc_delete,
-	.walk		= atm_tc_walk,
-
-	.tcf_chain	= atm_tc_find_tcf,
-	.bind_tcf	= atm_tc_bind_filter,
-	.unbind_tcf	= atm_tc_put,
-
-	.dump		= atm_tc_dump_class,
+static struct Qdisc_class_ops atm_class_ops = {
+	.graft		=	atm_tc_graft,
+	.leaf		=	atm_tc_leaf,
+	.get		=	atm_tc_get,
+	.put		=	atm_tc_put,
+	.change		=	atm_tc_change,
+	.delete		=	atm_tc_delete,
+	.walk		=	atm_tc_walk,
+	.tcf_chain	=	atm_tc_find_tcf,
+	.bind_tcf	=	atm_tc_bind_filter,
+	.unbind_tcf	=	atm_tc_put,
+	.dump		=	atm_tc_dump_class,
 };
 
-struct Qdisc_ops atm_qdisc_ops =
-{
-	.next		= NULL,
-	.cl_ops		= &atm_class_ops,
-	.id		= "atm",
-	.priv_size	= sizeof(struct atm_qdisc_data),
-
-	.enqueue	= atm_tc_enqueue,
-	.dequeue	= atm_tc_dequeue,
-	.requeue	= atm_tc_requeue,
-	.drop		= atm_tc_drop,
-
-	.init		= atm_tc_init,
-	.reset		= atm_tc_reset,
-	.destroy	= atm_tc_destroy,
-	.change		= NULL,
-
-	.dump		= atm_tc_dump
+struct Qdisc_ops atm_qdisc_ops = {
+	.next		=	NULL,
+	.cl_ops		=	&atm_class_ops,
+	.id		=	"atm",
+	.priv_size	=	sizeof(struct atm_qdisc_data),
+	.enqueue	=	atm_tc_enqueue,
+	.dequeue	=	atm_tc_dequeue,
+	.requeue	=	atm_tc_requeue,
+	.drop		=	atm_tc_drop,
+	.init		=	atm_tc_init,
+	.reset		=	atm_tc_reset,
+	.destroy	=	atm_tc_destroy,
+	.change		=	NULL,
+	.dump		=	atm_tc_dump,
+	.owner		=	THIS_MODULE,
 };
 
 

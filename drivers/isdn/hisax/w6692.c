@@ -287,7 +287,7 @@ W6692B_interrupt(struct IsdnCardState *cs, u8 bchan)
 	}
 }
 
-static void
+static irqreturn_t
 w6692_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
@@ -395,6 +395,7 @@ w6692_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		w6692_write_reg(cs, W_IMASK, 0xff);
 	}
 	spin_unlock(&cs->lock);
+	return IRQ_HANDLED;
 }
 
 static void

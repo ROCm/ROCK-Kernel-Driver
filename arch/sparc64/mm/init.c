@@ -14,7 +14,7 @@
 #include <linux/mm.h>
 #include <linux/hugetlb.h>
 #include <linux/slab.h>
-#include <linux/blk.h>
+#include <linux/initrd.h>
 #include <linux/swap.h>
 #include <linux/pagemap.h>
 #include <linux/fs.h>
@@ -1173,7 +1173,7 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 	}
 
 	color = VPTE_COLOR(address);
-	page = alloc_pages(GFP_KERNEL, DC_ALIAS_SHIFT);
+	page = alloc_pages(GFP_KERNEL|__GFP_REPEAT, DC_ALIAS_SHIFT);
 	if (page) {
 		unsigned long *to_free;
 		unsigned long paddr;

@@ -16,7 +16,7 @@ config TR
 	  connected to such a Token Ring network and want to use your Token
 	  Ring card under Linux, say Y here and to the driver for your
 	  particular card below and read the Token-Ring mini-HOWTO, available
-	  from <http://www.linuxdoc.org/docs.html#howto>. Most people can
+	  from <http://www.tldp.org/docs.html#howto>. Most people can
 	  say N here.
 
 config IBMTR
@@ -25,7 +25,7 @@ config IBMTR
 	---help---
 	  This is support for all IBM Token Ring cards that don't use DMA. If
 	  you have such a beast, say Y and read the Token-Ring mini-HOWTO,
-	  available from <http://www.linuxdoc.org/docs.html#howto>.
+	  available from <http://www.tldp.org/docs.html#howto>.
 
 	  Warning: this driver will almost definitely fail if more than one
 	  active Token Ring card is present.
@@ -44,7 +44,7 @@ config IBMOL
 	  Wake On Lan, and PCI 100/16/4 adapters.
 
 	  If you have such an adapter, say Y and read the Token-Ring
-	  mini-HOWTO, available from <http://www.linuxdoc.org/docs.html#howto>.
+	  mini-HOWTO, available from <http://www.tldp.org/docs.html#howto>.
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
@@ -62,7 +62,7 @@ config IBMLS
 	  This is support for IBM Lanstreamer PCI Token Ring Cards.
 
 	  If you have such an adapter, say Y and read the Token-Ring
-	  mini-HOWTO, available from <http://www.linuxdoc.org/docs.html#howto>.
+	  mini-HOWTO, available from <http://www.tldp.org/docs.html#howto>.
 
 	  This driver is also available as a modules ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
@@ -78,7 +78,7 @@ config 3C359
 	  should use the tms380 driver instead.
 
 	  If you have such an adapter, say Y and read the Token-Ring
-	  mini-HOWTO, available from <http://www.linuxdoc.org/docs.html#howto>.
+	  mini-HOWTO, available from <http://www.tldp.org/docs.html#howto>.
 
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
@@ -104,7 +104,7 @@ config TMS380TR
 
 	  If you have such an adapter and would like to use it, say Y and
 	  read the Token-Ring mini-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>.
+	  <http://www.tldp.org/docs.html#howto>.
 
 	  Also read the file <file:Documentation/networking/tms380tr.txt> or
 	  check <http://www.auk.cx/tms380tr/>.
@@ -194,7 +194,7 @@ config SMCTR
 
 	  If you have such an adapter and would like to use it, say Y or M and
 	  read the Token-Ring mini-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto> and the file
+	  <http://www.tldp.org/docs.html#howto> and the file
 	  <file:Documentation/networking/smctr.txt>.
 
 	  This driver is also available as a module ( = code which can be

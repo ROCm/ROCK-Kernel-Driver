@@ -63,7 +63,6 @@
 #include <linux/major.h>
 #include <linux/string.h>
 #include <linux/init.h>
-#include <linux/devfs_fs_kernel.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -883,7 +882,6 @@ static void __exit gscd_exit(void)
 {
 	CLEAR_TIMER;
 
-	devfs_remove("gscd");
 	del_gendisk(gscd_disk);
 	put_disk(gscd_disk);
 	if ((unregister_blkdev(MAJOR_NR, "gscd") == -EINVAL)) {
@@ -958,14 +956,12 @@ static int __init gscd_init(void)
 	gscd_disk->first_minor = 0;
 	gscd_disk->fops = &gscd_fops;
 	sprintf(gscd_disk->disk_name, "gscd");
+	sprintf(gscd_disk->devfs_name, "gscd");
 
 	if (register_blkdev(MAJOR_NR, "gscd")) {
 		ret = -EIO;
 		goto err_out2;
 	}
-
-	devfs_register(NULL, "gscd", DEVFS_FL_DEFAULT, MAJOR_NR, 0,
-		       S_IFBLK | S_IRUGO | S_IWUGO, &gscd_fops, NULL);
 
 	blk_init_queue(&gscd_queue, do_gscd_request, &gscd_lock);
 

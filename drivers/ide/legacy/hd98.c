@@ -655,11 +655,8 @@ static int hd_ioctl(struct inode * inode, struct file * file,
 	unsigned int cmd, unsigned long arg)
 {
 	struct hd_geometry *loc = (struct hd_geometry *) arg;
-	int dev;
+	int dev = DEVICE_NR(inode->i_rdev);
 
-	if ((!inode) || kdev_none(inode->i_rdev))
-		return -EINVAL;
-	dev = DEVICE_NR(inode->i_rdev);
 	if (dev >= NR_HD)
 		return -EINVAL;
 	switch (cmd) {

@@ -123,10 +123,10 @@ struct sigstack {
 };
 
 /* Sigvec flags */
-#define SV_SSTACK    1u    /* This signal handler should use sig-stack */
-#define SV_INTR      2u    /* Sig return should not restart system call */
-#define SV_RESET     4u    /* Set handler to SIG_DFL upon taken signal */
-#define SV_IGNCHILD  8u    /* Do not send SIGCHLD */
+#define _SV_SSTACK    1u    /* This signal handler should use sig-stack */
+#define _SV_INTR      2u    /* Sig return should not restart system call */
+#define _SV_RESET     4u    /* Set handler to SIG_DFL upon taken signal */
+#define _SV_IGNCHILD  8u    /* Do not send SIGCHLD */
 
 /*
  * sa_flags values: SA_STACK is not currently supported, but will allow the
@@ -137,11 +137,11 @@ struct sigstack {
  * SA_RESTART flag to get restarting signals (which were the default long ago)
  * SA_SHIRQ flag is for shared interrupt support on PCI and EISA.
  */
-#define SA_NOCLDSTOP	SV_IGNCHILD
-#define SA_STACK	SV_SSTACK
-#define SA_ONSTACK	SV_SSTACK
-#define SA_RESTART	SV_INTR
-#define SA_ONESHOT	SV_RESET
+#define SA_NOCLDSTOP	_SV_IGNCHILD
+#define SA_STACK	_SV_SSTACK
+#define SA_ONSTACK	_SV_SSTACK
+#define SA_RESTART	_SV_INTR
+#define SA_ONESHOT	_SV_RESET
 #define SA_INTERRUPT	0x10u
 #define SA_NOMASK	0x20u
 #define SA_SHIRQ	0x40u

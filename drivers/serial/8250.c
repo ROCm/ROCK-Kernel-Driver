@@ -984,7 +984,7 @@ serial8250_handle_port(struct uart_8250_port *up, struct pt_regs *regs)
  * This means we need to loop through all ports. checking that they
  * don't have an interrupt pending.
  */
-static void serial8250_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t serial8250_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct irq_info *i = dev_id;
 	struct list_head *l, *end = NULL;
@@ -1024,6 +1024,8 @@ static void serial8250_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	spin_unlock(&i->lock);
 
 	DEBUG_INTR("end.\n");
+	/* FIXME! Was it really ours? */
+	return IRQ_HANDLED;
 }
 
 /*

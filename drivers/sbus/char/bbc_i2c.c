@@ -331,7 +331,7 @@ EXPORT_SYMBOL(bbc_i2c_readb);
 EXPORT_SYMBOL(bbc_i2c_write_buf);
 EXPORT_SYMBOL(bbc_i2c_read_buf);
 
-static void bbc_i2c_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t bbc_i2c_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct bbc_i2c_bus *bp = dev_id;
 
@@ -341,6 +341,8 @@ static void bbc_i2c_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (bp->waiting &&
 	    !(readb(bp->i2c_control_regs + 0x0) & I2C_PCF_PIN))
 		wake_up(&bp->wq);
+
+	return IRQ_HANDLED;
 }
 
 static void __init reset_one_i2c(struct bbc_i2c_bus *bp)

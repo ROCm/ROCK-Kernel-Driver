@@ -6484,7 +6484,7 @@ aic7xxx_isr(int irq, void *dev_id, struct pt_regs *regs)
  *   above.  Please, children, do not try this at home, and if you ever see
  *   anything like it, please inform the Gross Hack Police immediately
  *-F*************************************************************************/
-static void
+static irqreturn_t
 do_aic7xxx_isr(int irq, void *dev_id, struct pt_regs *regs)
 {
   unsigned long cpu_flags;
@@ -6492,7 +6492,7 @@ do_aic7xxx_isr(int irq, void *dev_id, struct pt_regs *regs)
   
   p = (struct aic7xxx_host *)dev_id;
   if(!p)
-    return;
+    return IRQ_NONE;
   spin_lock_irqsave(p->host->host_lock, cpu_flags);
   p->flags |= AHC_IN_ISR;
   do
@@ -6503,6 +6503,8 @@ do_aic7xxx_isr(int irq, void *dev_id, struct pt_regs *regs)
   aic7xxx_run_waiting_queues(p);
   p->flags &= ~AHC_IN_ISR;
   spin_unlock_irqrestore(p->host->host_lock, cpu_flags);
+
+  return IRQ_HANDLED;
 }
 
 /*+F*************************************************************************

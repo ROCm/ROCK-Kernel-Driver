@@ -27,7 +27,6 @@ struct evdev{
 	char name[16];
 	struct input_handle handle;
 	wait_queue_head_t wait;
-	devfs_handle_t devfs;
 	struct list_head list;
 };
 
@@ -76,6 +75,13 @@ static int evdev_flush(struct file * file)
 	return input_flush_device(&list->evdev->handle, file);
 }
 
+static void evdev_free(struct evdev *evdev)
+{
+	devfs_remove("input/event%d", evdev->minor);
+	evdev_table[evdev->minor] = NULL;
+	kfree(evdev);
+}
+
 static int evdev_release(struct inode * inode, struct file * file)
 {
 	struct evdev_list *list = file->private_data;
@@ -84,17 +90,13 @@ static int evdev_release(struct inode * inode, struct file * file)
 	list_del(&list->node);
 
 	if (!--list->evdev->open) {
-		if (list->evdev->exist) {
+		if (list->evdev->exist)
 			input_close_device(&list->evdev->handle);
-		} else {
-			input_unregister_minor(list->evdev->devfs);
-			evdev_table[list->evdev->minor] = NULL;
-			kfree(list->evdev);
-		}
+		else
+			evdev_free(list->evdev);
 	}
 
 	kfree(list);
-
 	return 0;
 }
 
@@ -397,7 +399,7 @@ static struct input_handle *evdev_connect(struct input_handler *handler, struct 
 	sprintf(evdev->name, "event%d", minor);
 
 	evdev_table[minor] = evdev;
-	evdev->devfs = input_register_minor("input/event%d", minor, EVDEV_MINOR_BASE);
+	input_register_minor("input/event%d", minor, EVDEV_MINOR_BASE);
 
 	return &evdev->handle;
 }
@@ -411,11 +413,8 @@ static void evdev_disconnect(struct input_handle *handle)
 	if (evdev->open) {
 		input_close_device(handle);
 		wake_up_interruptible(&evdev->wait);
-	} else {
-		input_unregister_minor(evdev->devfs);
-		evdev_table[evdev->minor] = NULL;
-		kfree(evdev);
-	}
+	} else
+		evdev_free(evdev);
 }
 
 static struct input_device_id evdev_ids[] = {
