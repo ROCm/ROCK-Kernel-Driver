@@ -1177,7 +1177,7 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 		} else if (IS_QLA2200(ha)) {
 			nv->firmware_options[0] = BIT_2 | BIT_1;
 			nv->firmware_options[1] = BIT_7 | BIT_5;
-			nv->add_firmware_options[0] = BIT_5 | BIT_4;
+			nv->add_firmware_options[0] = BIT_5;
 			nv->add_firmware_options[1] = BIT_5 | BIT_4;
 			nv->frame_payload_size = __constant_cpu_to_le16(1024);
 		} else if (IS_QLA2100(ha)) {
@@ -1275,6 +1275,16 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 		}
 	} else if (IS_QLA2200(ha)) {
 		nv->firmware_options[0] |= BIT_2;
+		/*
+		 * 'Point-to-point preferred, else loop' is not a safe
+		 * connection mode setting.
+		 */
+		if ((nv->add_firmware_options[0] & (BIT_6 | BIT_5 | BIT_4)) ==
+		    (BIT_5 | BIT_4)) {
+			/* Force 'loop preferred, else point-to-point'. */
+			nv->add_firmware_options[0] &= ~(BIT_6 | BIT_5 | BIT_4);
+			nv->add_firmware_options[0] = BIT_5;
+		}
 		strcpy(ha->model_number, "QLA22xx");
 	} else /*if (IS_QLA2100(ha))*/ {
 		strcpy(ha->model_number, "QLA2100");
