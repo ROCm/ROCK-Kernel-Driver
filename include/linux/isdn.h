@@ -329,6 +329,7 @@ typedef struct isdn_net_local_s {
   int                    onum;         /* Flag: at least 1 outgoing number */
   int                    cps;          /* current speed of this interface  */
   int                    transcount;   /* byte-counter for cps-calculation */
+  int                    last_jiffies; /* when transcount was reset        */
   int                    sqfull;       /* Flag: netdev-queue overloaded    */
   ulong                  sqfull_stamp; /* Start-Time of overload           */
   ulong                  slavedelay;   /* Dynamic bundling delaytime       */

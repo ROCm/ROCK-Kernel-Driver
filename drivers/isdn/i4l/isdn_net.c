@@ -366,17 +366,10 @@ isdn_net_autohup()
 	list_for_each(l, &isdn_net_devs) {
 		isdn_net_dev *p = list_entry(l, isdn_net_dev, global_list);
 		isdn_net_local *l = &p->local;
-		if (jiffies == last_jiffies)
-			l->cps = l->transcount;
-		else
-			l->cps = (l->transcount * HZ) / (jiffies - last_jiffies);
-		l->transcount = 0;
-		if (dev->net_verbose > 3)
-			printk(KERN_DEBUG "%s: %d bogocps\n", l->name, l->cps);
 		if ((l->flags & ISDN_NET_CONNECTED) && (l->dialstate == ST_ACTIVE)) {
 			anymore = 1;
 			l->huptimer++;
-			printk("huptimer %d, onhtime %d, chargetime %d, chargeint %d\n", l->huptimer, l->onhtime, l->chargetime, l->chargeint);
+			printk("huptimer %d, onhtime %d, chargetime %ld, chargeint %d\n", l->huptimer, l->onhtime, l->chargetime, l->chargeint);
 			/*
 			 * if there is some dialmode where timeout-hangup
 			 * should _not_ be done, check for that here
@@ -453,6 +446,10 @@ static void isdn_net_connected(isdn_net_local *lp)
 	lp->dialstarted = 0;
 	lp->dialwait_timer = 0;
 	
+	lp->transcount = 0;
+	lp->cps = 0;
+	lp->last_jiffies = jiffies;
+
 #ifdef CONFIG_ISDN_PPP
 	if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
 		isdn_ppp_wakeup_daemon(lp);
@@ -1054,7 +1051,7 @@ isdn_net_xmit(struct net_device *ndev, struct sk_buff *skb)
 	int retv = 0;
 
 	if (((isdn_net_local *) (ndev->priv))->master) {
-		printk("isdn BUG at %s:%d!\n", __FILE__, __LINE__);
+		isdn_BUG();
 		dev_kfree_skb(skb);
 		return 0;
 	}
@@ -1083,6 +1080,14 @@ isdn_net_xmit(struct net_device *ndev, struct sk_buff *skb)
 	 * should move to userspace and get based on an overall cps
 	 * calculation
 	 */
+	if (jiffies != lp->last_jiffies) {
+		lp->cps = lp->transcount * HZ / (jiffies - lp->last_jiffies);
+		lp->last_jiffies = jiffies;
+		lp->transcount = 0;
+	}
+	if (dev->net_verbose > 3)
+		printk(KERN_DEBUG "%s: %d bogocps\n", lp->name, lp->cps);
+
 	if (lp->cps > lp->triggercps) {
 		if (lp->slave) {
 			if (!lp->sqfull) {
