@@ -22,6 +22,7 @@
 #include <linux/delay.h>
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
+#include <linux/tqueue.h>
 #include <linux/kernel_stat.h>
 
 #include <asm/uaccess.h>

@@ -16,6 +16,7 @@
 #include <linux/init.h>
 #include <linux/highuid.h>
 #include <linux/fs.h>
+#include <linux/tqueue.h>
 #include <linux/device.h>
 
 #include <asm/uaccess.h>

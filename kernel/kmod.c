@@ -28,6 +28,7 @@
 #include <linux/namespace.h>
 #include <linux/completion.h>
 #include <linux/file.h>
+#include <linux/tqueue.h>
 
 #include <asm/uaccess.h>
 
