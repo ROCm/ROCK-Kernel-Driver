@@ -95,13 +95,13 @@ dump_xlog_buffer (PISDN_ADAPTER IoAdapter, Xdesc *xlogDesc)
  DBG_FTL(("Microcode: %s", &IoAdapter->ProtocolIdString[0]))
  for ( ; logCnt > 0 ; --logCnt )
  {
-  if ( !READ_WORD(&Xlog[logOut]) )
+  if ( !GET_WORD(&Xlog[logOut]) )
   {
    if ( --logCnt == 0 )
     break ;
    logOut = 0 ;
   }
-  if ( READ_WORD(&Xlog[logOut]) <= (logOut * sizeof(*Xlog)) )
+  if ( GET_WORD(&Xlog[logOut]) <= (logOut * sizeof(*Xlog)) )
   {
    if ( logCnt > 2 )
    {
@@ -110,9 +110,9 @@ dump_xlog_buffer (PISDN_ADAPTER IoAdapter, Xdesc *xlogDesc)
    }
    break ;
   }
-  logLen = (dword)(READ_WORD(&Xlog[logOut]) - (logOut * sizeof(*Xlog))) ;
+  logLen = (dword)(GET_WORD(&Xlog[logOut]) - (logOut * sizeof(*Xlog))) ;
   DBG_FTL_MXLOG(( (char *)&Xlog[logOut + 1], (dword)(logLen - 2) ))
-  logOut = (READ_WORD(&Xlog[logOut]) + 1) / sizeof(*Xlog) ;
+  logOut = (GET_WORD(&Xlog[logOut]) + 1) / sizeof(*Xlog) ;
  }
  DBG_FTL(("%s: ***************** end of XLOG *****************",
           &IoAdapter->Name[0]))
