@@ -151,6 +151,7 @@ ENTRY(v6_dma_inv_range)
 	add	r0, r0, #D_CACHE_LINE_SIZE
 	cmp	r0, r1
 	blo	1b
+	mov	r0, #0
 	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
 	mov	pc, lr
 
@@ -188,6 +189,7 @@ ENTRY(v6_dma_flush_range)
 	mcr	p15, 0, r0, c7, c15, 1		@ clean & invalidate line
 #endif
 	add	r0, r0, #D_CACHE_LINE_SIZE
+	cmp	r0, r1
 	blo	1b
 	mov	r0, #0
 	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
