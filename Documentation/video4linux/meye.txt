@@ -15,8 +15,16 @@ Grabbing is supported in packed YUV colorspace only.
 
 MJPEG hardware grabbing is supported via a private API (see below).
 
-Module options:
+Driver options:
 ---------------
+
+Several options can be passed to the meye driver, either by adding them
+to /etc/modules.conf file, when the driver is compiled as a module, or
+by adding the following to the kernel command line (in your bootloader):
+
+	meye=gbuffers[,gbufsize[,video_nr]]
+
+where:
 
 	gbuffers:	number of capture buffers, default is 2 (32 max)
 
