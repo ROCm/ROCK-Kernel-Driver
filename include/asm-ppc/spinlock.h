@@ -65,7 +65,7 @@ static inline void _raw_spin_unlock(spinlock_t *lock)
 	lock->lock = 0;
 }
 
-#define _raw_spin_trylock(lock) (!test_and_set_bit(0,(lock)))
+#define _raw_spin_trylock(l) (!test_and_set_bit(0,&(l)->lock))
 
 #else
 
