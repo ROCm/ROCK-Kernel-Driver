@@ -44,28 +44,8 @@
 
 #include "usb_atm.h"
 
-/*
-#define DEBUG
-#define VERBOSE_DEBUG
-*/
-
-#if !defined (DEBUG) && defined (CONFIG_USB_DEBUG)
-#	define DEBUG
-#endif
-
-#include <linux/usb.h>
-
 #if defined(CONFIG_FW_LOADER) || defined(CONFIG_FW_LOADER_MODULE)
 #	define USE_FW_LOADER
-#endif
-
-#ifdef VERBOSE_DEBUG
-static int udsl_print_packet(const unsigned char *data, int len);
-#define PACKETDEBUG(arg...)	udsl_print_packet (arg)
-#define vdbg(arg...)		dbg (arg)
-#else
-#define PACKETDEBUG(arg...)
-#define vdbg(arg...)
 #endif
 
 #define DRIVER_AUTHOR	"Johan Verrept, Duncan Sands <duncan.sands@free.fr>"
