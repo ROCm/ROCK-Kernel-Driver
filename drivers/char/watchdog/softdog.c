@@ -27,9 +27,13 @@
  *  19980911 Alan Cox
  *	Made SMP safe for 2.3.x
  *
- *  20011214 Matt Domsch <Matt_Domsch@dell.com>
- *      Added nowayout module option to override CONFIG_WATCHDOG_NOWAYOUT
- *      Didn't add timeout option, as soft_margin option already exists.
+ *  20011127 Joel Becker (jlbec@evilplan.org>
+ *	Added soft_noboot; Allows testing the softdog trigger without 
+ *	requiring a recompile.
+ *	Added WDIOC_GETTIMEOUT and WDIOC_SETTIMOUT.
+ *
+ *  20020530 Joel Becker <joel.becker@oracle.com>
+ *  	Added Matt Domsch's nowayout module option.
  */
  
 #include <linux/module.h>
@@ -45,8 +49,15 @@
 
 static int expect_close = 0;
 static int soft_margin = TIMER_MARGIN;	/* in seconds */
+#ifdef ONLY_TESTING
+static int soft_noboot = 1;
+#else
+static int soft_noboot = 0;
+#endif  /* ONLY_TESTING */
 
 MODULE_PARM(soft_margin,"i");
+MODULE_PARM(soft_noboot,"i");
+MODULE_LICENSE("GPL");
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
 static int nowayout = 1;
@@ -56,7 +67,6 @@ static int nowayout = 0;
 
 MODULE_PARM(nowayout,"i");
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
-MODULE_LICENSE("GPL");
 
 /*
  *	Our timer
@@ -66,7 +76,7 @@ static void watchdog_fire(unsigned long);
 
 static struct timer_list watchdog_ticktock =
 		TIMER_INITIALIZER(watchdog_fire, 0, 0);
-static int timer_alive;
+static unsigned long timer_alive;
 
 
 /*
@@ -75,13 +85,14 @@ static int timer_alive;
  
 static void watchdog_fire(unsigned long data)
 {
-#ifdef ONLY_TESTING
-	printk(KERN_CRIT "SOFTDOG: Would Reboot.\n");
-#else
-	printk(KERN_CRIT "SOFTDOG: Initiating system reboot.\n");
-	machine_restart(NULL);
-	printk("WATCHDOG: Reboot didn't ?????\n");
-#endif
+	if (soft_noboot)
+		printk(KERN_CRIT "SOFTDOG: Triggered - Reboot ignored.\n");
+	else
+	{
+		printk(KERN_CRIT "SOFTDOG: Initiating system reboot.\n");
+		machine_restart(NULL);
+		printk("SOFTDOG: Reboot didn't ?????\n");
+	}
 }
 
 /*
@@ -90,7 +101,7 @@ static void watchdog_fire(unsigned long data)
  
 static int softdog_open(struct inode *inode, struct file *file)
 {
-	if(timer_alive)
+	if(test_and_set_bit(0, &timer_alive))
 		return -EBUSY;
 	if (nowayout) {
 		MOD_INC_USE_COUNT;
@@ -99,7 +110,6 @@ static int softdog_open(struct inode *inode, struct file *file)
 	 *	Activate timer
 	 */
 	mod_timer(&watchdog_ticktock, jiffies+(soft_margin*HZ));
-	timer_alive=1;
 	return 0;
 }
 
@@ -109,12 +119,12 @@ static int softdog_release(struct inode *inode, struct file *file)
 	 *	Shut off the timer.
 	 * 	Lock it in if it's a module and we set nowayout
 	 */
-	if(!nowayout) {
+	if (expect_close) {
 		del_timer(&watchdog_ticktock);
 	} else {
 		printk(KERN_CRIT "SOFTDOG: WDT device closed unexpectedly.  WDT will not stop!\n");
 	}
-	timer_alive=0;
+	clear_bit(0, &timer_alive);
 	return 0;
 }
 
@@ -152,6 +162,7 @@ static ssize_t softdog_write(struct file *file, const char *data, size_t len, lo
 static int softdog_ioctl(struct inode *inode, struct file *file,
 	unsigned int cmd, unsigned long arg)
 {
+	int new_margin;
 	static struct watchdog_info ident = {
 		.options = WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
 		.identity = "Software Watchdog",
@@ -169,6 +180,16 @@ static int softdog_ioctl(struct inode *inode, struct file *file,
 		case WDIOC_KEEPALIVE:
 			mod_timer(&watchdog_ticktock, jiffies+(soft_margin*HZ));
 			return 0;
+		case WDIOC_SETTIMEOUT:
+			if (get_user(new_margin, (int *)arg))
+				return -EFAULT;
+			if (new_margin < 1)
+				return -EINVAL;
+			soft_margin = new_margin;
+			mod_timer(&watchdog_ticktock, jiffies+(soft_margin*HZ));
+			/* Fall */
+		case WDIOC_GETTIMEOUT:
+			return put_user(soft_margin, (int *)arg);
 	}
 }
 
