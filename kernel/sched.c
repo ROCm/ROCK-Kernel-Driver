@@ -2426,7 +2426,7 @@ __init int migration_init(void)
 
 #endif
 
-#if CONFIG_SMP
+#if CONFIG_SMP || CONFIG_PREEMPT
 /*
  * The 'big kernel lock'
  *
