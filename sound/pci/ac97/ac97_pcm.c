@@ -275,7 +275,7 @@ int snd_ac97_set_rate(ac97_t *ac97, int reg, unsigned short rate)
 	return 0;
 }
 
-static unsigned short get_pslots(ac97_t *ac97, unsigned char *rate_table)
+static unsigned short get_pslots(ac97_t *ac97, unsigned char *rate_table, unsigned short *spdif_slots)
 {
 	if (!ac97_is_audio(ac97))
 		return 0;
@@ -301,11 +301,11 @@ static unsigned short get_pslots(ac97_t *ac97, unsigned char *rate_table)
 				slots |= (1<<AC97_SLOT_PCM_CENTER)|(1<<AC97_SLOT_LFE);
 			if (ac97->ext_id & AC97_EI_SPDIF) {
 				if (!(ac97->scaps & AC97_SCAP_SURROUND_DAC))
-					slots |= (1<<AC97_SLOT_SPDIF_LEFT)|(1<<AC97_SLOT_SPDIF_RIGHT);
+					*spdif_slots = (1<<AC97_SLOT_SPDIF_LEFT)|(1<<AC97_SLOT_SPDIF_RIGHT);
 				else if (!(ac97->scaps & AC97_SCAP_CENTER_LFE_DAC))
-					slots |= (1<<AC97_SLOT_SPDIF_LEFT1)|(1<<AC97_SLOT_SPDIF_RIGHT1);
+					*spdif_slots = (1<<AC97_SLOT_SPDIF_LEFT1)|(1<<AC97_SLOT_SPDIF_RIGHT1);
 				else
-					slots |= (1<<AC97_SLOT_SPDIF_LEFT2)|(1<<AC97_SLOT_SPDIF_RIGHT2);
+					*spdif_slots = (1<<AC97_SLOT_SPDIF_LEFT2)|(1<<AC97_SLOT_SPDIF_RIGHT2);
 			}
 			*rate_table = 0;
 			break;
@@ -316,16 +316,16 @@ static unsigned short get_pslots(ac97_t *ac97, unsigned char *rate_table)
 				slots |= (1<<AC97_SLOT_PCM_CENTER)|(1<<AC97_SLOT_LFE);
 			if (ac97->ext_id & AC97_EI_SPDIF) {
 				if (!(ac97->scaps & AC97_SCAP_SURROUND_DAC))
-					slots |= (1<<AC97_SLOT_SPDIF_LEFT1)|(1<<AC97_SLOT_SPDIF_RIGHT1);
+					*spdif_slots = (1<<AC97_SLOT_SPDIF_LEFT1)|(1<<AC97_SLOT_SPDIF_RIGHT1);
 				else
-					slots |= (1<<AC97_SLOT_SPDIF_LEFT2)|(1<<AC97_SLOT_SPDIF_RIGHT2);
+					*spdif_slots = (1<<AC97_SLOT_SPDIF_LEFT2)|(1<<AC97_SLOT_SPDIF_RIGHT2);
 			}
 			*rate_table = 1;
 			break;
 		case 3:
 			slots |= (1<<AC97_SLOT_PCM_CENTER)|(1<<AC97_SLOT_LFE);
 			if (ac97->ext_id & AC97_EI_SPDIF)
-				slots |= (1<<AC97_SLOT_SPDIF_LEFT2)|(1<<AC97_SLOT_SPDIF_RIGHT2);
+				*spdif_slots = (1<<AC97_SLOT_SPDIF_LEFT2)|(1<<AC97_SLOT_SPDIF_RIGHT2);
 			*rate_table = 2;
 			break;
 		}
@@ -339,11 +339,11 @@ static unsigned short get_pslots(ac97_t *ac97, unsigned char *rate_table)
 			slots |= (1<<AC97_SLOT_PCM_CENTER)|(1<<AC97_SLOT_LFE);
 		if (ac97->ext_id & AC97_EI_SPDIF) {
 			if (!(ac97->scaps & AC97_SCAP_SURROUND_DAC))
-				slots |= (1<<AC97_SLOT_SPDIF_LEFT)|(1<<AC97_SLOT_SPDIF_RIGHT);
+				*spdif_slots = (1<<AC97_SLOT_SPDIF_LEFT)|(1<<AC97_SLOT_SPDIF_RIGHT);
 			else if (!(ac97->scaps & AC97_SCAP_CENTER_LFE_DAC))
-				slots |= (1<<AC97_SLOT_SPDIF_LEFT1)|(1<<AC97_SLOT_SPDIF_RIGHT1);
+				*spdif_slots = (1<<AC97_SLOT_SPDIF_LEFT1)|(1<<AC97_SLOT_SPDIF_RIGHT1);
 			else
-				slots |= (1<<AC97_SLOT_SPDIF_LEFT2)|(1<<AC97_SLOT_SPDIF_RIGHT2);
+				*spdif_slots = (1<<AC97_SLOT_SPDIF_LEFT2)|(1<<AC97_SLOT_SPDIF_RIGHT2);
 		}
 		*rate_table = 0;
 		return slots;
@@ -404,6 +404,7 @@ int snd_ac97_pcm_assign(ac97_bus_t *bus,
 	unsigned short avail_slots[2][4];
 	unsigned char rate_table[2][4];
 	unsigned short tmp, slots;
+	unsigned short spdif_slots[4];
 	unsigned int rates;
 	ac97_t *codec;
 
@@ -412,11 +413,12 @@ int snd_ac97_pcm_assign(ac97_bus_t *bus,
 		return -ENOMEM;
 	memset(avail_slots, 0, sizeof(avail_slots));
 	memset(rate_table, 0, sizeof(rate_table));
+	memset(spdif_slots, 0, sizeof(spdif_slots));
 	for (i = 0; i < 4; i++) {
 		codec = bus->codec[i];
 		if (!codec)
 			continue;
-		avail_slots[0][i] = get_pslots(codec, &rate_table[0][i]);
+		avail_slots[0][i] = get_pslots(codec, &rate_table[0][i], &spdif_slots[i]);
 		avail_slots[1][i] = get_cslots(codec);
 		if (!(codec->scaps & AC97_SCAP_INDEP_SDIN)) {
 			for (j = 0; j < i; j++) {
@@ -446,29 +448,28 @@ int snd_ac97_pcm_assign(ac97_bus_t *bus,
 			if (!bus->codec[j])
 				continue;
 			rates = ~0;
+			if (pcm->spdif && pcm->stream == 0)
+				tmp = spdif_slots[j];
+			else
+				tmp = avail_slots[pcm->stream][j];
 			if (pcm->exclusive) {
 				/* exclusive access */
-				tmp = avail_slots[pcm->stream][j] & slots;
+				tmp &= slots;
 				for (k = 0; k < i; k++) {
 					if (rpcm->stream == rpcms[k].stream)
 						tmp &= ~rpcms[k].r[0].rslots[j];
 				}
-				if (tmp) {
-					rpcm->r[0].rslots[j] = tmp;
-					rpcm->r[0].codec[j] = bus->codec[j];
-					rpcm->r[0].rate_table[j] = rate_table[pcm->stream][j];
-					rates = get_rates(rpcm, j, tmp, 0);
-					avail_slots[pcm->stream][j] &= ~tmp;
-				}
 			} else {
 				/* non-exclusive access */
-				tmp = avail_slots[pcm->stream][j] & pcm->r[0].slots;
-				if (tmp) {
-					rpcm->r[0].rslots[j] = tmp;
-					rpcm->r[0].codec[j] = bus->codec[j];
-					rpcm->r[0].rate_table[j] = rate_table[0][j];
-					rates = get_rates(rpcm, j, tmp, 0);
-				}
+				tmp &= pcm->r[0].slots;
+			}
+			if (tmp) {
+				rpcm->r[0].rslots[j] = tmp;
+				rpcm->r[0].codec[j] = bus->codec[j];
+				rpcm->r[0].rate_table[j] = rate_table[pcm->stream][j];
+				rates = get_rates(rpcm, j, tmp, 0);
+				if (pcm->exclusive)
+					avail_slots[pcm->stream][j] &= ~tmp;
 			}
 			slots &= ~tmp;
 			rpcm->r[0].slots |= tmp;
@@ -548,9 +549,10 @@ int snd_ac97_pcm_open(struct ac97_pcm *pcm, unsigned int rate,
 				}
 				if (reg_ok & (1 << (reg - AC97_PCM_FRONT_DAC_RATE)))
 					continue;
+				printk(KERN_DEBUG "setting ac97 reg 0x%x to rate %d\n", reg, rate);
 				err = snd_ac97_set_rate(pcm->r[r].codec[cidx], reg, rate);
 				if (err < 0)
-					snd_printk(KERN_ERR "error in snd_ac97_set_rate: cidx=%d, reg=0x%x, rate=%d\n, err=%d", cidx, reg, rate, err);
+					snd_printk(KERN_ERR "error in snd_ac97_set_rate: cidx=%d, reg=0x%x, rate=%d, err=%d\n", cidx, reg, rate, err);
 				else
 					reg_ok |= (1 << (reg - AC97_PCM_FRONT_DAC_RATE));
 			}
