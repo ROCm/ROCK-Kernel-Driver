@@ -152,7 +152,7 @@ unsigned long __init zone_sizes_init(void)
 		zholes_size[ZONE_DMA] = mp->holes;
 		holes += zholes_size[ZONE_DMA];
 
-		free_area_init_node(nid, NODE_DATA(nid), NULL, zones_size,
+		free_area_init_node(nid, NODE_DATA(nid), zones_size,
 			start_pfn, zholes_size);
 	}
 
