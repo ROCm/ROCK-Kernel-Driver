@@ -789,6 +789,29 @@ static void __init quirk_sis_96x_compatible(struct pci_dev *dev)
 	sis_96x_compatible = 1;
 }
 
+#ifdef CONFIG_X86_IO_APIC
+static void __init quirk_alder_ioapic(struct pci_dev *pdev)
+{
+	int i;
+
+	if ((pdev->class >> 8) != 0xff00)
+		return;
+
+	/* the first BAR is the location of the IO APIC...we must
+	 * not touch this (and it's already covered by the fixmap), so
+	 * forcibly insert it into the resource tree */
+	if(pci_resource_start(pdev, 0) && pci_resource_len(pdev, 0))
+		insert_resource(&iomem_resource, &pdev->resource[0]);
+
+	/* The next five BARs all seem to be rubbish, so just clean
+	 * them out */
+	for(i=1; i < 6; i++) {
+		memset(&pdev->resource[i], 0, sizeof(pdev->resource[i]));
+	}
+
+}
+#endif
+
 #ifdef CONFIG_SCSI_SATA
 static void __init quirk_intel_ide_combined(struct pci_dev *pdev)
 {
@@ -914,6 +937,7 @@ static struct pci_fixup pci_fixups[] __devinitdata = {
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_SI,	PCI_ANY_ID,			quirk_ioapic_rmw },
         { PCI_FIXUP_FINAL,      PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_8131_APIC,
           quirk_amd_8131_ioapic }, 
+	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_EESSC,	quirk_alder_ioapic },
 #endif
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_3,	quirk_via_acpi },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_4,	quirk_via_acpi },
