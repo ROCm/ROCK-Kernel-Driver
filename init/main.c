@@ -108,9 +108,7 @@ extern void time_init(void);
 void (*late_time_init)(void) = NULL;
 extern void softirq_init(void);
 
-int rows, cols;
-
-char *execute_command;
+static char *execute_command;
 
 /* Setup configured maximum number of CPUs to activate */
 static unsigned int max_cpus = NR_CPUS;
@@ -474,7 +472,7 @@ asmlinkage void __init start_kernel(void)
 	rest_init();
 }
 
-int __initdata initcall_debug;
+static int __initdata initcall_debug;
 
 static int __init initcall_debug_setup(char *str)
 {
