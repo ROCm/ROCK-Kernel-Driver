@@ -234,7 +234,7 @@ static void irlan_client_ctrl_disconnect_indication(void *instance, void *sap,
 	ASSERT(tsap == self->client.tsap_ctrl, return;);
 
        	/* Remove frames queued on the control channel */
-	while ((skb = skb_dequeue(&self->client.txq))) {
+	while ((skb = skb_dequeue(&self->client.txq)) != NULL) {
 		dev_kfree_skb(skb);
 	}
 	self->client.tx_busy = FALSE;
