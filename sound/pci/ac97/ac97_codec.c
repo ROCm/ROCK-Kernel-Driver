@@ -1808,7 +1808,7 @@ static void snd_ac97_get_name(ac97_t *ac97, unsigned int id, char *name)
  */
 static int ac97_reset_wait(ac97_t *ac97, int timeout, int with_modem)
 {
-	signed long end_time;
+	unsigned long end_time;
 	end_time = jiffies + timeout;
 	do {
 		unsigned short ext_mid;
@@ -1866,7 +1866,7 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 	int err;
 	ac97_t *ac97;
 	char name[64];
-	signed long end_time;
+	unsigned long end_time;
 	static snd_device_ops_t ops = {
 		.dev_free =	snd_ac97_dev_free,
 	};
