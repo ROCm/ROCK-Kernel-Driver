@@ -538,7 +538,7 @@ int netpoll_setup(struct netpoll *np)
 
 	if (!(ndev->flags & IFF_UP)) {
 		unsigned short oflags;
-		unsigned long jiff;
+		unsigned long atmost, atleast;
 
 		printk(KERN_INFO "%s: device %s not up yet, forcing it\n",
 		       np->name, np->dev_name);
@@ -554,9 +554,10 @@ int netpoll_setup(struct netpoll *np)
 		}
 		rtnl_shunlock();
 
-		jiff = jiffies + 6*HZ;
-		while(!netif_carrier_ok(ndev)) {
-			if (!time_before(jiffies, jiff)) {
+		atleast = jiffies + HZ/10;
+ 		atmost = jiffies + 10*HZ;
+		while (!netif_carrier_ok(ndev)) {
+			if (time_after(jiffies, atmost)) {
 				printk(KERN_NOTICE
 				       "%s: timeout waiting for carrier\n",
 				       np->name);
@@ -565,6 +566,13 @@ int netpoll_setup(struct netpoll *np)
 			cond_resched();
 		}
 
+		if (time_before(jiffies, atleast)) {
+			printk(KERN_NOTICE "%s: carrier detect appears flaky,"
+			       " waiting 10 seconds\n",
+			       np->name, np->dev_name);
+			while (time_before(jiffies, atmost))
+				cond_resched();
+		}
 	}
 
 	if (!memcmp(np->local_mac, "\0\0\0\0\0\0", 6) && ndev->dev_addr)
