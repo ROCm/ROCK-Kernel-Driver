@@ -73,6 +73,8 @@ struct sndrv_timer_status32 {
 DEFINE_ALSA_IOCTL(timer_info);
 DEFINE_ALSA_IOCTL(timer_status);
 
+DEFINE_ALSA_IOCTL_ENTRY(timer_info, timer_info, SNDRV_TIMER_IOCTL_INFO);
+DEFINE_ALSA_IOCTL_ENTRY(timer_status, timer_status, SNDRV_TIMER_IOCTL_STATUS);
 
 /*
  */

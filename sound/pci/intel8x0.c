@@ -293,7 +293,7 @@ static struct pci_device_id snd_intel8x0_ids[] __devinitdata = {
 	{ 0x8086, 0x7195, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* 440MX */
 	{ 0x1039, 0x7012, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_SIS },	/* SI7012 */
 	{ 0x10de, 0x01b1, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* NFORCE */
-	{ 0x1022, 0x764d, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* AMD8111 */
+	{ 0x1022, 0x746d, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* AMD8111 */
 	{ 0x1022, 0x7445, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DEVICE_INTEL },	/* AMD768 */
 	{ 0, }
 };
@@ -1233,7 +1233,10 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 	chip->playback.substream = NULL; /* don't process interrupts */
 
 	/* set rate */
-	snd_ac97_set_rate(chip->ac97, AC97_PCM_FRONT_DAC_RATE, 48000);
+	if (snd_ac97_set_rate(chip->ac97, AC97_PCM_FRONT_DAC_RATE, 48000) < 0) {
+		snd_printk(KERN_ERR "cannot set ac97 rate: clock = %d\n", chip->ac97->clock);
+		return;
+	}
 	snd_intel8x0_setup_periods(chip, &chip->playback);
 	port = chip->bmport + chip->playback.reg_offset;
 	spin_lock_irqsave(&chip->reg_lock, flags);
@@ -1412,7 +1415,7 @@ static struct shortname_table {
 	{ PCI_DEVICE_ID_INTEL_ICH4, "Intel 82801DB-ICH4" },
 	{ PCI_DEVICE_ID_SI_7012, "SiS SI7012" },
 	{ PCI_DEVICE_ID_NVIDIA_MCP_AUDIO, "NVidia NForce" },
-	{ 0x764d, "AMD AMD8111" },
+	{ 0x746d, "AMD AMD8111" },
 	{ 0x7445, "AMD AMD768" },
 	{ 0, 0 },
 };

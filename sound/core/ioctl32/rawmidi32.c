@@ -30,9 +30,9 @@ struct sndrv_rawmidi_params32 {
 	s32 stream;
 	u32 buffer_size;
 	u32 avail_min;
-	unsigned int no_active_sensing: 1;
+	unsigned int no_active_sensing; /* avoid bit-field */
 	unsigned char reserved[16];
-};
+} __attribute__((packed));
 
 #define CVT_sndrv_rawmidi_params()\
 {\
@@ -45,7 +45,7 @@ struct sndrv_rawmidi_params32 {
 struct timeval32 {
 	s32 tv_sec;
 	s32 tv_usec;
-};
+} __attribute__((packed));
 
 struct sndrv_rawmidi_status32 {
 	s32 stream;
@@ -53,7 +53,7 @@ struct sndrv_rawmidi_status32 {
 	u32 avail;
 	u32 xruns;
 	unsigned char reserved[16];
-};
+} __attribute__((packed));
 
 #define CVT_sndrv_rawmidi_status()\
 {\
@@ -67,6 +67,8 @@ struct sndrv_rawmidi_status32 {
 DEFINE_ALSA_IOCTL(rawmidi_params);
 DEFINE_ALSA_IOCTL(rawmidi_status);
 
+DEFINE_ALSA_IOCTL_ENTRY(rawmidi_params, rawmidi_params, SNDRV_RAWMIDI_IOCTL_PARAMS);
+DEFINE_ALSA_IOCTL_ENTRY(rawmidi_status, rawmidi_status, SNDRV_RAWMIDI_IOCTL_STATUS);
 
 #define AP(x) snd_ioctl32_##x
 

@@ -54,7 +54,7 @@ struct sndrv_interval32 {
 
 struct sndrv_pcm_hw_params32 {
 	u32 flags;
-	u32 masks[SNDRV_PCM_HW_PARAM_LAST_MASK - SNDRV_PCM_HW_PARAM_FIRST_MASK + 1];
+	struct sndrv_mask masks[SNDRV_PCM_HW_PARAM_LAST_MASK - SNDRV_PCM_HW_PARAM_FIRST_MASK + 1]; /* this must be identical */
 	struct sndrv_interval32 intervals[SNDRV_PCM_HW_PARAM_LAST_INTERVAL - SNDRV_PCM_HW_PARAM_FIRST_INTERVAL + 1];
 	u32 rmask;
 	u32 cmask;
@@ -64,7 +64,7 @@ struct sndrv_pcm_hw_params32 {
 	u32 rate_den;
 	u32 fifo_size;
 	unsigned char reserved[64];
-};
+} __attribute__((packed));
 
 #define numberof(array)  (sizeof(array)/sizeof(array[0]))
 
@@ -103,7 +103,7 @@ struct sndrv_pcm_sw_params32 {
 	u32 silence_size;
 	u32 boundary;
 	unsigned char reserved[64];
-};
+} __attribute__((packed));
 
 #define CVT_sndrv_pcm_sw_params()\
 {\
@@ -124,7 +124,7 @@ struct sndrv_pcm_channel_info32 {
 	u32 offset;
 	u32 first;
 	u32 step;
-};
+} __attribute__((packed));
 
 #define CVT_sndrv_pcm_channel_info()\
 {\
@@ -137,7 +137,7 @@ struct sndrv_pcm_channel_info32 {
 struct timeval32 {
 	s32 tv_sec;
 	s32 tv_usec;
-};
+} __attribute__((packed));
 
 struct sndrv_pcm_status32 {
 	s32 state;
@@ -151,7 +151,7 @@ struct sndrv_pcm_status32 {
 	u32 overrange;
 	s32 suspended_state;
 	unsigned char reserved[60];
-};
+} __attribute__((packed));
 
 #define CVT_sndrv_pcm_status()\
 {\
@@ -169,33 +169,58 @@ struct sndrv_pcm_status32 {
 	COPY(suspended_state);\
 }
 
-struct sndrv_xferi32 {
-	s32 result;
-	u32 buf;
-	u32 frames;
-};
-
-#define CVT_sndrv_xferi()\
-{\
-	COPY(result);\
-	CPTR(buf);\
-	COPY(frames);\
-}
-
 DEFINE_ALSA_IOCTL(pcm_uframes_str);
 DEFINE_ALSA_IOCTL(pcm_sframes_str);
 DEFINE_ALSA_IOCTL(pcm_hw_params);
 DEFINE_ALSA_IOCTL(pcm_sw_params);
 DEFINE_ALSA_IOCTL(pcm_channel_info);
 DEFINE_ALSA_IOCTL(pcm_status);
-DEFINE_ALSA_IOCTL(xferi);
+
+/*
+ */
+struct sndrv_xferi32 {
+	s32 result;
+	u32 buf;
+	u32 frames;
+} __attribute__((packed));
+
+static int _snd_ioctl32_xferi(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
+{
+	struct sndrv_xferi32 data32;
+	struct sndrv_xferi data;
+	mm_segment_t oldseg = get_fs();
+	int err;
+
+	set_fs(KERNEL_DS);
+	if (copy_from_user(&data32, (void*)arg, sizeof(data32))) {
+		err = -EFAULT;
+		goto __err;
+	}
+	memset(&data, 0, sizeof(data));
+	data.result = data32.result;
+	data.buf = A(data32.buf);
+	data.frames = data32.frames;
+	err = file->f_op->ioctl(file->f_dentry->d_inode, file, native_ctl, (unsigned long)&data);
+	if (err < 0)
+		goto __err;
+	/* copy the result */
+	data32.result = data.result;
+	if (copy_to_user((void*)arg, &data32, sizeof(data32))) {
+		err = -EFAULT;
+		goto __err;
+	}
+ __err:
+	set_fs(oldseg);
+	return err;
+}
+
 
 /* snd_xfern needs remapping of bufs */
 struct sndrv_xfern32 {
 	s32 result;
 	u32 bufs;  /* this is void **; */
 	u32 frames;
-};
+} __attribute__((packed));
 
 /*
  * xfern ioctl nees to copy (up to) 128 pointers on stack.
@@ -203,7 +228,7 @@ struct sndrv_xfern32 {
  * handler there expands again the same 128 pointers on stack, so it is better
  * to handle the function (calling pcm_readv/writev) directly in this handler.
  */
-static int snd_ioctl32_xfern(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file)
+static int _snd_ioctl32_xfern(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
 {
 	snd_pcm_file_t *pcm_file;
 	snd_pcm_substream_t *substream;
@@ -211,6 +236,9 @@ static int snd_ioctl32_xfern(unsigned int fd, unsigned int cmd, unsigned long ar
 	void *bufs[128];
 	int err = 0, ch, i;
 	u32 *bufptr;
+	mm_segment_t oldseg = get_fs();
+
+	set_fs(KERNEL_DS);
 
 	/* FIXME: need to check whether fop->ioctl is sane */
 
@@ -219,31 +247,44 @@ static int snd_ioctl32_xfern(unsigned int fd, unsigned int cmd, unsigned long ar
 	snd_assert(substream != NULL && substream->runtime, return -ENXIO);
 
 	/* check validty of the command */
-	switch (cmd) {
+	switch (native_ctl) {
 	case SNDRV_PCM_IOCTL_WRITEN_FRAMES:
-		if (substream->stream  != SNDRV_PCM_STREAM_PLAYBACK)
-			return -EINVAL;
-		if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN)
-			return -EBADFD;
+		if (substream->stream  != SNDRV_PCM_STREAM_PLAYBACK) {
+			err = -EINVAL;
+			goto __err;
+		}
+		if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN) {
+			err = -EBADFD;
+			goto __err;
+		}
+		break;
 	case SNDRV_PCM_IOCTL_READN_FRAMES:
-		if (substream->stream  != SNDRV_PCM_STREAM_CAPTURE)
-			return -EINVAL;
+		if (substream->stream  != SNDRV_PCM_STREAM_CAPTURE) {
+			err = -EINVAL;
+			goto __err;
+		}
 		break;
 	}
-	if ((ch = substream->runtime->channels) > 128)
-		return -EINVAL;
-	if (get_user(data32.frames, &srcptr->frames))
-		return -EFAULT;
+	if ((ch = substream->runtime->channels) > 128) {
+		err = -EINVAL;
+		goto __err;
+	}
+	if (get_user(data32.frames, &srcptr->frames)) {
+		err = -EFAULT;
+		goto __err;
+	}
 	__get_user(data32.bufs, &srcptr->bufs);
 	bufptr = (u32*)TO_PTR(data32.bufs);
 	for (i = 0; i < ch; i++) {
 		u32 ptr;
-		if (get_user(ptr, bufptr))
-			return -EFAULT;
+		if (get_user(ptr, bufptr)) {
+			err = -EFAULT;
+			goto __err;
+		}
 		bufs[ch] = (void*)TO_PTR(ptr);
 		bufptr++;
 	}
-	switch (cmd) {
+	switch (native_ctl) {
 	case SNDRV_PCM_IOCTL_WRITEN_FRAMES:
 		err = snd_pcm_lib_writev(substream, bufs, data32.frames);
 		break;
@@ -253,13 +294,33 @@ static int snd_ioctl32_xfern(unsigned int fd, unsigned int cmd, unsigned long ar
 	}
 	
 	if (err < 0)
-		return err;
+		goto __err;
 	if (put_user(err, &srcptr->result))
-		return -EFAULT;
+		err = -EFAULT;
+ __err:
+	set_fs(oldseg);
 	return err < 0 ? err : 0;
 }
 
 
+/*
+ */
+
+DEFINE_ALSA_IOCTL_ENTRY(pcm_hw_refine, pcm_hw_params, SNDRV_PCM_IOCTL_HW_REFINE);
+DEFINE_ALSA_IOCTL_ENTRY(pcm_sw_params, pcm_sw_params, SNDRV_PCM_IOCTL_SW_PARAMS);
+DEFINE_ALSA_IOCTL_ENTRY(pcm_hw_params, pcm_hw_params, SNDRV_PCM_IOCTL_HW_PARAMS);
+DEFINE_ALSA_IOCTL_ENTRY(pcm_status, pcm_status, SNDRV_PCM_IOCTL_STATUS);
+DEFINE_ALSA_IOCTL_ENTRY(pcm_delay, pcm_sframes_str, SNDRV_PCM_IOCTL_DELAY);
+DEFINE_ALSA_IOCTL_ENTRY(pcm_channel_info, pcm_channel_info, SNDRV_PCM_IOCTL_CHANNEL_INFO);
+DEFINE_ALSA_IOCTL_ENTRY(pcm_rewind, pcm_uframes_str, SNDRV_PCM_IOCTL_REWIND);
+DEFINE_ALSA_IOCTL_ENTRY(pcm_readi, xferi, SNDRV_PCM_IOCTL_READI_FRAMES);
+DEFINE_ALSA_IOCTL_ENTRY(pcm_writei, xferi, SNDRV_PCM_IOCTL_WRITEI_FRAMES);
+DEFINE_ALSA_IOCTL_ENTRY(pcm_readn, xfern, SNDRV_PCM_IOCTL_READN_FRAMES);
+DEFINE_ALSA_IOCTL_ENTRY(pcm_writen, xfern, SNDRV_PCM_IOCTL_WRITEN_FRAMES);
+
+
+/*
+ */
 #define AP(x) snd_ioctl32_##x
 
 enum {
@@ -279,12 +340,12 @@ enum {
 struct ioctl32_mapper pcm_mappers[] = {
 	{ SNDRV_PCM_IOCTL_PVERSION, NULL },
 	{ SNDRV_PCM_IOCTL_INFO, NULL },
-	{ SNDRV_PCM_IOCTL_HW_REFINE32, AP(pcm_hw_params) },
+	{ SNDRV_PCM_IOCTL_HW_REFINE32, AP(pcm_hw_refine) },
 	{ SNDRV_PCM_IOCTL_HW_PARAMS32, AP(pcm_hw_params) },
 	{ SNDRV_PCM_IOCTL_HW_FREE, NULL },
 	{ SNDRV_PCM_IOCTL_SW_PARAMS32, AP(pcm_sw_params) },
 	{ SNDRV_PCM_IOCTL_STATUS32, AP(pcm_status) },
-	{ SNDRV_PCM_IOCTL_DELAY32, AP(pcm_sframes_str) },
+	{ SNDRV_PCM_IOCTL_DELAY32, AP(pcm_delay) },
 	{ SNDRV_PCM_IOCTL_CHANNEL_INFO32, AP(pcm_channel_info) },
 	{ SNDRV_PCM_IOCTL_PREPARE, NULL },
 	{ SNDRV_PCM_IOCTL_RESET, NULL },
@@ -292,13 +353,13 @@ struct ioctl32_mapper pcm_mappers[] = {
 	{ SNDRV_PCM_IOCTL_DROP, NULL },
 	{ SNDRV_PCM_IOCTL_DRAIN, NULL },
 	{ SNDRV_PCM_IOCTL_PAUSE, NULL },
-	{ SNDRV_PCM_IOCTL_REWIND32, AP(pcm_uframes_str) },
+	{ SNDRV_PCM_IOCTL_REWIND32, AP(pcm_rewind) },
 	{ SNDRV_PCM_IOCTL_RESUME, NULL },
 	{ SNDRV_PCM_IOCTL_XRUN, NULL },
-	{ SNDRV_PCM_IOCTL_WRITEI_FRAMES32, AP(xferi) },
-	{ SNDRV_PCM_IOCTL_READI_FRAMES32, AP(xferi) },
-	{ SNDRV_PCM_IOCTL_WRITEN_FRAMES32, AP(xfern) },
-	{ SNDRV_PCM_IOCTL_READN_FRAMES32, AP(xfern) },
+	{ SNDRV_PCM_IOCTL_WRITEI_FRAMES32, AP(pcm_writei) },
+	{ SNDRV_PCM_IOCTL_READI_FRAMES32, AP(pcm_readi) },
+	{ SNDRV_PCM_IOCTL_WRITEN_FRAMES32, AP(pcm_writen) },
+	{ SNDRV_PCM_IOCTL_READN_FRAMES32, AP(pcm_readn) },
 	{ SNDRV_PCM_IOCTL_LINK, NULL },
 	{ SNDRV_PCM_IOCTL_UNLINK, NULL },
 
