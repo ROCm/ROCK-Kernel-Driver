@@ -134,13 +134,13 @@ static inline void set_buffer_unwritten_io(struct buffer_head *bh)
 #define irix_symlink_mode	xfs_params.symlink_mode.val
 #define xfs_panic_mask		xfs_params.panic_mask.val
 #define xfs_error_level		xfs_params.error_level.val
-#define xfs_syncd_interval	xfs_params.sync_interval.val
+#define xfs_syncd_interval	(xfs_params.sync_interval.val * HZ / USER_HZ)
 #define xfs_stats_clear		xfs_params.stats_clear.val
 #define xfs_inherit_sync	xfs_params.inherit_sync.val
 #define xfs_inherit_nodump	xfs_params.inherit_nodump.val
 #define xfs_inherit_noatime	xfs_params.inherit_noatim.val
-#define xfs_flush_interval	xfs_params.flush_interval.val
-#define xfs_age_buffer		xfs_params.age_buffer.val
+#define xfs_flush_interval	(xfs_params.flush_interval.val * HZ / USER_HZ)
+#define xfs_age_buffer		(xfs_params.age_buffer.val * HZ / USER_HZ)
 
 #define current_cpu()		smp_processor_id()
 #define current_pid()		(current->pid)

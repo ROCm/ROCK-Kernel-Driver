@@ -51,18 +51,18 @@ unsigned long xfs_physmem;
 
 xfs_param_t xfs_params = {
 			  /*	MIN	DFLT	MAX	*/
-	.restrict_chown	= {	0,	1,	1	},
-	.sgid_inherit	= {	0,	0,	1	},
-	.symlink_mode	= {	0,	0,	1	},
-	.panic_mask	= {	0,	0,	127	},
-	.error_level	= {	0,	3,	11	},
-	.sync_interval	= {	HZ,	30*HZ,	60*HZ	},
-	.stats_clear	= {	0,	0,	1	},
-	.inherit_sync	= {	0,	1,	1	},
-	.inherit_nodump	= {	0,	1,	1	},
-	.inherit_noatim = {	0,	1,	1	},
-	.flush_interval	= {	HZ/2,	HZ,	30*HZ	},
-	.age_buffer	= {	1*HZ,	15*HZ,	300*HZ	},
+	.restrict_chown	= {	0,		1,		1	},
+	.sgid_inherit	= {	0,		0,		1	},
+	.symlink_mode	= {	0,		0,		1	},
+	.panic_mask	= {	0,		0,		127	},
+	.error_level	= {	0,		3,		11	},
+	.sync_interval	= {	USER_HZ,	30*USER_HZ,	60*USER_HZ },
+	.stats_clear	= {	0,		0,		1	},
+	.inherit_sync	= {	0,		1,		1	},
+	.inherit_nodump	= {	0,		1,		1	},
+	.inherit_noatim = {	0,		1,		1	},
+	.flush_interval	= {	USER_HZ/2,	USER_HZ,	30*USER_HZ },
+	.age_buffer	= {	1*USER_HZ,	15*USER_HZ,	7200*USER_HZ },
 };
 
 /*
