@@ -266,7 +266,7 @@ struct tty_struct {
 	char name[64];
 	int pgrp;
 	int session;
-	kdev_t	device;
+	dev_t	device;
 	unsigned long flags;
 	int count;
 	struct winsize winsize;

@@ -303,7 +303,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 		atomic_inc(&mm->mm_users);
 	if (task->tty) {
 		tty_pgrp = task->tty->pgrp;
-		tty_nr = kdev_t_to_nr(task->tty->device);
+		tty_nr = task->tty->device;
 	}
 	task_unlock(task);
 	if (mm) {

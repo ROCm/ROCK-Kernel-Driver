@@ -722,7 +722,7 @@ static void sl_sync(void)
 
 /* Find a free SLIP channel, and link in this `tty' line. */
 static struct slip *
-sl_alloc(kdev_t line)
+sl_alloc(dev_t line)
 {
 	struct slip *sl;
 	slip_ctrl_t *slp = NULL;
@@ -739,7 +739,7 @@ sl_alloc(kdev_t line)
 			break;
 
 		if (slp->ctrl.leased) {
-			if (!kdev_same(slp->ctrl.line, line))
+			if (slp->ctrl.line != line)
 				continue;
 			if (slp->ctrl.tty)
 				return NULL;
@@ -753,7 +753,7 @@ sl_alloc(kdev_t line)
 			continue;
 
 		if (current->pid == slp->ctrl.pid) {
-			if (kdev_same(slp->ctrl.line, line) && score < 3) {
+			if (slp->ctrl.line == line && score < 3) {
 				sel = i;
 				score = 3;
 				continue;
@@ -764,7 +764,7 @@ sl_alloc(kdev_t line)
 			}
 			continue;
 		}
-		if (kdev_same(slp->ctrl.line, line) && score < 1) {
+		if (slp->ctrl.line == line && score < 1) {
 			sel = i;
 			score = 1;
 			continue;
@@ -941,7 +941,7 @@ slip_close(struct tty_struct *tty)
 	tty->disc_data = 0;
 	sl->tty = NULL;
 	if (!sl->leased)
-		sl->line = NODEV;
+		sl->line = 0;
 
 	/* VSV = very important to remove timers */
 #ifdef CONFIG_SLIP_SMART

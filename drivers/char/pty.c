@@ -88,7 +88,7 @@ static void pty_close(struct tty_struct * tty, struct file * filp)
 		set_bit(TTY_OTHER_CLOSED, &tty->flags);
 #ifdef CONFIG_UNIX98_PTYS
 		{
-			unsigned int major = major(tty->device) - UNIX98_PTY_MASTER_MAJOR;
+			unsigned int major = MAJOR(tty->device) - UNIX98_PTY_MASTER_MAJOR;
 			if ( major < UNIX98_NR_MAJORS ) {
 				devpts_pty_kill( tty->index + tty->driver->name_base );
 			}
