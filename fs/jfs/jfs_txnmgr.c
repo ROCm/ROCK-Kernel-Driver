@@ -1240,8 +1240,21 @@ int txCommit(tid_t tid,		/* transaction identifier */
 	 * Ensure that inode isn't reused before
 	 * lazy commit thread finishes processing
 	 */
-	if (tblk->xflag & (COMMIT_CREATE | COMMIT_DELETE))
+	if (tblk->xflag & (COMMIT_CREATE | COMMIT_DELETE)) {
 		atomic_inc(&tblk->ip->i_count);
+		/*
+		 * Avoid a rare deadlock
+		 *
+		 * If the inode is locked, we may be blocked in
+		 * jfs_commit_inode.  If so, we don't want the
+		 * lazy_commit thread doing the last iput() on the inode
+		 * since that may block on the locked inode.  Instead,
+		 * commit the transaction synchronously, so the last iput
+		 * will be done by the calling thread (or later)
+		 */
+		if (tblk->ip->i_state & I_LOCK)
+			tblk->xflag &= ~COMMIT_LAZY;
+	}
 
 	ASSERT((!(tblk->xflag & COMMIT_DELETE)) ||
 	       ((tblk->ip->i_nlink == 0) &&

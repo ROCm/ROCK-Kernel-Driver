@@ -1264,7 +1264,7 @@ dcpe_icpe_tl1_common:
 	 * because corrupt data may have been placed there and we don't
 	 * want to reference it.
 	 *
-	 * %g1 is one if this trap occured at %tl >= 1.
+	 * %g1 is one if this trap occurred at %tl >= 1.
 	 *
 	 * Next, we turn off error reporting so that we don't recurse.
 	 */
