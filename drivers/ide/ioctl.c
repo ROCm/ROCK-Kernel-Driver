@@ -34,30 +34,6 @@
 #include "ioctl.h"
 
 /*
- * Invoked on completion of a special DRIVE_CMD.
- */
-static ide_startstop_t drive_cmd_intr(struct ata_device *drive, struct request *rq)
-{
-	struct ata_taskfile *ar = rq->special;
-
-	ide__sti();	/* local CPU only */
-	if (!ata_status(drive, 0, DRQ_STAT) && ar->taskfile.sector_number) {
-		int retries = 10;
-
-		ata_read(drive, rq->buffer, ar->taskfile.sector_number * SECTOR_WORDS);
-
-		while (!ata_status(drive, 0, BUSY_STAT) && retries--)
-			udelay(100);
-	}
-
-	if (!ata_status(drive, READY_STAT, BAD_STAT))
-		return ata_error(drive, rq, __FUNCTION__); /* already calls ide_end_drive_cmd */
-	ide_end_drive_cmd(drive, rq);
-
-	return ide_stopped;
-}
-
-/*
  * Implement generic ioctls invoked from userspace to imlpement specific
  * functionality.
  *
@@ -79,7 +55,7 @@ static int do_cmd_ioctl(struct ata_device *drive, unsigned long arg)
 		return -EFAULT;
 
 	memset(&rq, 0, sizeof(rq));
-	rq.flags = REQ_DRIVE_ACB;
+	rq.flags = REQ_SPECIAL;
 
 	memset(&args, 0, sizeof(args));
 
@@ -107,7 +83,7 @@ static int do_cmd_ioctl(struct ata_device *drive, unsigned long arg)
 
 	/* Issue ATA command and wait for completion.
 	 */
-	args.handler = drive_cmd_intr;
+	args.handler = ata_special_intr;
 
 	rq.buffer = argbuf + 4;
 	rq.special = &args;
