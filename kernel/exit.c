@@ -592,6 +592,12 @@ repeat:
 				if (!(options & WUNTRACED) && !(p->ptrace & PT_PTRACED))
 					continue;
 				read_unlock(&tasklist_lock);
+
+				/* move to end of parent's list to avoid starvation */
+				write_lock_irq(&tasklist_lock);
+				remove_parent(p);
+				add_parent(p, p->parent);
+				write_unlock_irq(&tasklist_lock);
 				retval = ru ? getrusage(p, RUSAGE_BOTH, ru) : 0; 
 				if (!retval && stat_addr) 
 					retval = put_user((p->exit_code << 8) | 0x7f, stat_addr);
