@@ -611,6 +611,13 @@ work_done:
 out:	return 0;
 }
 
+static inline int compare_keys(struct flowi *fl1, struct flowi *fl2)
+{
+	return memcmp(&fl1->nl_u.ip4_u, &fl2->nl_u.ip4_u, sizeof(fl1->nl_u.ip4_u)) == 0 &&
+	       fl1->oif     == fl2->oif &&
+	       fl1->iif     == fl2->iif;
+}
+
 static int rt_intern_hash(unsigned hash, struct rtable *rt, struct rtable **rp)
 {
 	struct rtable	*rth, **rthp;
@@ -622,7 +629,7 @@ restart:
 
 	write_lock_bh(&rt_hash_table[hash].lock);
 	while ((rth = *rthp) != NULL) {
-		if (memcmp(&rth->fl, &rt->fl, sizeof(rt->fl)) == 0) {
+		if (compare_keys(&rth->fl, &rt->fl)) {
 			/* Put it first */
 			*rthp = rth->u.rt_next;
 			rth->u.rt_next = rt_hash_table[hash].chain;
