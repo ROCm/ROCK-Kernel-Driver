@@ -125,22 +125,14 @@ static int __init probe_list(struct net_device *dev, struct devprobe *plist)
 {
 	struct devprobe *p = plist;
 	unsigned long base_addr = dev->base_addr;
-	int ret;
 
 	while (p->probe != NULL) {
-		if (base_addr && p->probe(dev) == 0) {	/* probe given addr */
-			ret = alloc_divert_blk(dev);
-			if (ret)
-				return ret;
+		if (base_addr && p->probe(dev) == 0) 	/* probe given addr */
 			return 0;
-		} else if (p->status == 0) {		/* has autoprobe failed yet? */
+		else if (p->status == 0) {		/* has autoprobe failed yet? */
 			p->status = p->probe(dev);	/* no, try autoprobe */
-			if (p->status == 0) {
-				ret = alloc_divert_blk(dev);
-				if (ret)
-					return ret;
+			if (p->status == 0)
 				return 0;
-			}
 		}
 		p++;
 	}
