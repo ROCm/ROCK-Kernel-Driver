@@ -14,22 +14,6 @@
 #ifndef _IP_CONNTRACK_IRC_H
 #define _IP_CONNTRACK_IRC_H
 
-#ifndef __KERNEL__
-#error Only in kernel.
-#endif
-
-#include <linux/netfilter_ipv4/lockhelp.h>
-
-#define IRC_PORT	6667
-
-struct dccproto {
-	char* match;
-	int matchlen;
-};
-
-/* Protects irc part of conntracks */
-DECLARE_LOCK_EXTERN(ip_irc_lock);
-
 /* We record seq number and length of irc ip/port text here: all in
    host order. */
 
@@ -45,5 +29,22 @@ struct ip_ct_irc_expect
 /* This structure exists only once per master */
 struct ip_ct_irc_master {
 };
+
+
+#ifdef __KERNEL__
+
+#include <linux/netfilter_ipv4/lockhelp.h>
+
+#define IRC_PORT	6667
+
+struct dccproto {
+	char* match;
+	int matchlen;
+};
+
+/* Protects irc part of conntracks */
+DECLARE_LOCK_EXTERN(ip_irc_lock);
+
+#endif /* __KERNEL__ */
 
 #endif /* _IP_CONNTRACK_IRC_H */

@@ -18,6 +18,7 @@ struct notifier_block;
 
 /* Theoretically, we could one day use 2.4 helpers, but for now it
    just confuses depmod --RR */
+EXPORT_NO_SYMBOLS;
 
 static struct firewall_ops *fwops;
 

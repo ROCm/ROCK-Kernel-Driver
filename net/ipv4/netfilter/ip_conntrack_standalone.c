@@ -68,8 +68,8 @@ print_expect(char *buffer, const struct ip_conntrack_expect *expect)
 			      ? (expect->timeout.expires - jiffies)/HZ : 0);
 	else
 		len = sprintf(buffer, "EXPECTING: - ");
-	len += sprintf(buffer + len, "proto=%u ",
-		      expect->tuple.dst.protonum);
+	len += sprintf(buffer + len, "use=%u proto=%u ",
+		      atomic_read(&expect->use), expect->tuple.dst.protonum);
 	len += print_tuple(buffer + len, &expect->tuple,
 			   __find_proto(expect->tuple.dst.protonum));
 	len += sprintf(buffer + len, "\n");
@@ -153,7 +153,8 @@ list_conntracks(char *buffer, char **start, off_t offset, int length)
 	}
 
 	/* Now iterate through expecteds. */
-	for (e = expect_list.next; e != &expect_list; e = e->next) {
+	for (e = ip_conntrack_expect_list.next; 
+	     e != &ip_conntrack_expect_list; e = e->next) {
 		unsigned int last_len;
 		struct ip_conntrack_expect *expect
 			= (struct ip_conntrack_expect *)e;
@@ -364,7 +365,13 @@ EXPORT_SYMBOL(ip_ct_find_helper);
 EXPORT_SYMBOL(ip_conntrack_expect_related);
 EXPORT_SYMBOL(ip_conntrack_change_expect);
 EXPORT_SYMBOL(ip_conntrack_unexpect_related);
+EXPORT_SYMBOL_GPL(ip_conntrack_expect_find_get);
+EXPORT_SYMBOL_GPL(ip_conntrack_expect_put);
 EXPORT_SYMBOL(ip_conntrack_tuple_taken);
 EXPORT_SYMBOL(ip_ct_gather_frags);
 EXPORT_SYMBOL(ip_conntrack_htable_size);
+EXPORT_SYMBOL(ip_conntrack_expect_list);
 EXPORT_SYMBOL(ip_conntrack_lock);
+EXPORT_SYMBOL(ip_conntrack_hash);
+EXPORT_SYMBOL_GPL(ip_conntrack_find_get);
+EXPORT_SYMBOL_GPL(ip_conntrack_put);

@@ -23,13 +23,13 @@
 #include <net/llc_pdu.h>
 #include <linux/if_tr.h>
 
-static void llc_sap_free_ev(struct llc_sap *sap, struct llc_sap_state_ev *ev);
-static int llc_sap_next_state(struct llc_sap *sap, struct llc_sap_state_ev *ev);
+static void llc_sap_free_ev(struct llc_sap *sap, struct sk_buff *skb);
+static int llc_sap_next_state(struct llc_sap *sap, struct sk_buff *skb);
 static int llc_exec_sap_trans_actions(struct llc_sap *sap,
 				      struct llc_sap_state_trans *trans,
-				      struct llc_sap_state_ev *ev);
+				      struct sk_buff *skb);
 static struct llc_sap_state_trans *llc_find_sap_trans(struct llc_sap *sap,
-						  struct llc_sap_state_ev *ev);
+						      struct sk_buff *skb);
 
 /**
  *	llc_sap_assign_sock - adds a connection to a SAP
@@ -64,49 +64,34 @@ void llc_sap_unassign_sock(struct llc_sap *sap, struct sock *sk)
 }
 
 /**
- *	llc_sap_alloc_ev - allocates sap event
- *	@sap: pointer to SAP
- *	@ev: allocated event (output argument)
- *
- *	Returns the allocated sap event or %NULL when out of memory.
- */
-struct llc_sap_state_ev *llc_sap_alloc_ev(struct llc_sap *sap)
-{
-	struct llc_sap_state_ev *ev = kmalloc(sizeof(*ev), GFP_ATOMIC);
-
-	if (ev)
-		memset(ev, 0, sizeof(*ev));
-	return ev;
-}
-
-/**
  *	llc_sap_send_ev - sends event to SAP state machine
  *	@sap: pointer to SAP
- *	@ev: pointer to occurred event
+ *	@skb: pointer to occurred event
  *
  *	After executing actions of the event, upper layer will be indicated
  *	if needed(on receiving an UI frame).
  */
-void llc_sap_send_ev(struct llc_sap *sap, struct llc_sap_state_ev *ev)
+void llc_sap_send_ev(struct llc_sap *sap, struct sk_buff *skb)
 {
-	llc_sap_next_state(sap, ev);
+	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
+
+	llc_sap_next_state(sap, skb);
 	if (ev->ind_cfm_flag == LLC_IND) {
-		skb_get(ev->data.pdu.skb);
+		skb_get(skb);
 		sap->ind(ev->prim);
 	}
-	llc_sap_free_ev(sap, ev);
+	llc_sap_free_ev(sap, skb);
 }
 
 /**
  *	llc_sap_rtn_pdu - Informs upper layer on rx of an UI, XID or TEST pdu.
  *	@sap: pointer to SAP
  *	@skb: received pdu
- *	@ev: pointer to occurred event
  */
-void llc_sap_rtn_pdu(struct llc_sap *sap, struct sk_buff *skb,
-		     struct llc_sap_state_ev *ev)
+void llc_sap_rtn_pdu(struct llc_sap *sap, struct sk_buff *skb)
 {
 	struct llc_pdu_un *pdu;
+	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 	struct llc_prim_if_block *prim = &sap->llc_ind_prim;
 	union llc_u_prim_data *prim_data = prim->data;
 	u8 lfb;
@@ -160,37 +145,38 @@ void llc_sap_send_pdu(struct llc_sap *sap, struct sk_buff *skb)
 /**
  *	llc_sap_free_ev - frees an sap event
  *	@sap: pointer to SAP
- *	@ev: released event
+ *	@skb: released event
  */
-static void llc_sap_free_ev(struct llc_sap *sap, struct llc_sap_state_ev *ev)
+static void llc_sap_free_ev(struct llc_sap *sap, struct sk_buff *skb)
 {
+	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
+
 	if (ev->type == LLC_SAP_EV_TYPE_PDU)
-		kfree_skb(ev->data.pdu.skb);
-	kfree(ev);
+		kfree_skb(skb);
 }
 
 /**
  *	llc_sap_next_state - finds transition, execs actions & change SAP state
  *	@sap: pointer to SAP
- *	@ev: happened event
+ *	@skb: happened event
  *
  *	This function finds transition that matches with happened event, then
  *	executes related actions and finally changes state of SAP. It returns
  *	0 on success and 1 for failure.
  */
-static int llc_sap_next_state(struct llc_sap *sap, struct llc_sap_state_ev *ev)
+static int llc_sap_next_state(struct llc_sap *sap, struct sk_buff *skb)
 {
 	int rc = 1;
 	struct llc_sap_state_trans *trans;
 
-	if (sap->state <= LLC_NBR_SAP_STATES) {
-		trans = llc_find_sap_trans(sap, ev);
+	if (sap->state <= LLC_NR_SAP_STATES) {
+		trans = llc_find_sap_trans(sap, skb);
 		if (trans) {
 			/* got the state to which we next transition; perform
 			 * the actions associated with this transition before
 			 * actually transitioning to the next state
 			 */
-			rc = llc_exec_sap_trans_actions(sap, trans, ev);
+			rc = llc_exec_sap_trans_actions(sap, trans, skb);
 			if (!rc)
 				/* transition SAP to next state if all actions
 				 * execute successfully
@@ -204,14 +190,14 @@ static int llc_sap_next_state(struct llc_sap *sap, struct llc_sap_state_ev *ev)
 /**
  *	llc_find_sap_trans - finds transition for event
  *	@sap: pointer to SAP
- *	@ev: happened event
+ *	@skb: happened event
  *
  *	This function finds transition that matches with happened event.
  *	Returns the pointer to found transition on success or %NULL for
  *	failure.
  */
 static struct llc_sap_state_trans *llc_find_sap_trans(struct llc_sap *sap,
-						    struct llc_sap_state_ev* ev)
+						      struct sk_buff* skb)
 {
 	int i = 0;
 	struct llc_sap_state_trans *rc = NULL;
@@ -221,7 +207,7 @@ static struct llc_sap_state_trans *llc_find_sap_trans(struct llc_sap *sap,
 	 * its obvious the event is not valid for the current state
 	 */
 	for (next_trans = curr_state->transitions; next_trans [i]->ev; i++)
-		if (!next_trans[i]->ev(sap, ev)) {
+		if (!next_trans[i]->ev(sap, skb)) {
 			/* got event match; return it */
 			rc = next_trans[i];
 			break;
@@ -233,21 +219,20 @@ static struct llc_sap_state_trans *llc_find_sap_trans(struct llc_sap *sap,
  *	llc_exec_sap_trans_actions - execute actions related to event
  *	@sap: pointer to SAP
  *	@trans: pointer to transition that it's actions must be performed
- *	@ev: happened event.
+ *	@skb: happened event.
  *
  *	This function executes actions that is related to happened event.
  *	Returns 0 for success and 1 for failure of at least one action.
  */
 static int llc_exec_sap_trans_actions(struct llc_sap *sap,
 				      struct llc_sap_state_trans *trans,
-				      struct llc_sap_state_ev *ev)
+				      struct sk_buff *skb)
 {
 	int rc = 0;
-	llc_sap_action_t *next_action;
+	llc_sap_action_t *next_action = trans->ev_actions;
 
-	for (next_action = trans->ev_actions;
-	     next_action && *next_action; next_action++)
-		if ((*next_action)(sap, ev))
+	for (; next_action && *next_action; next_action++)
+		if ((*next_action)(sap, skb))
 			rc = 1;
 	return rc;
 }

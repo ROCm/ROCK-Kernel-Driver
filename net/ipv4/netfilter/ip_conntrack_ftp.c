@@ -16,7 +16,7 @@ struct module *ip_conntrack_ftp = THIS_MODULE;
 
 #define MAX_PORTS 8
 static int ports[MAX_PORTS];
-static int ports_c;
+static int ports_c = 0;
 #ifdef MODULE_PARM
 MODULE_PARM(ports, "1-" __MODULE_STRING(MAX_PORTS) "i");
 #endif
@@ -389,7 +389,7 @@ static char ftp_names[MAX_PORTS][10];
 static void fini(void)
 {
 	int i;
-	for (i = 0; (i < MAX_PORTS) && ports[i]; i++) {
+	for (i = 0; i < ports_c; i++) {
 		DEBUGP("ip_ct_ftp: unregistering helper for port %d\n",
 				ports[i]);
 		ip_conntrack_helper_unregister(&ftp[i]);

@@ -15,7 +15,8 @@
 
 #define LLC_SAP_STATE_INACTIVE	1
 #define LLC_SAP_STATE_ACTIVE	2
-#define LLC_NBR_SAP_STATES	2       /* size of state table */
+#define LLC_NR_SAP_STATES	2       /* size of state table */
+
 /* structures and types */
 /* SAP state table structure */
 struct llc_sap_state_trans {
@@ -25,10 +26,10 @@ struct llc_sap_state_trans {
 };
 
 struct llc_sap_state {
-    u8				 curr_state;
-    struct llc_sap_state_trans **transitions;
+	u8			   curr_state;
+	struct llc_sap_state_trans **transitions;
 };
 
 /* only access to SAP state table */
-extern struct llc_sap_state llc_sap_state_table[LLC_NBR_SAP_STATES];
+extern struct llc_sap_state llc_sap_state_table[LLC_NR_SAP_STATES];
 #endif /* LLC_S_ST_H */

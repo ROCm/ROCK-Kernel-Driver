@@ -3337,8 +3337,10 @@ static int tg3_reset_hw(struct tg3 *tp)
 	/* Clear statistics/status block in chip, and status block in ram. */
 	for (i = NIC_SRAM_STATS_BLK;
 	     i < NIC_SRAM_STATUS_BLK + TG3_HW_STATUS_SIZE;
-	     i += sizeof(u32))
+	     i += sizeof(u32)) {
 		tg3_write_mem(tp, i, 0);
+		udelay(40);
+	}
 	memset(tp->hw_status, 0, TG3_HW_STATUS_SIZE);
 
 	/* This value is determined during the probe time DMA
