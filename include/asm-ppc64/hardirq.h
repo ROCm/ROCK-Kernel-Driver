@@ -112,4 +112,6 @@ do {						\
 		print_backtrace(_get_SP());	\
 } while (0)
 
+#define dump_stack()	show_stack()
+
 #endif /* __ASM_HARDIRQ_H */

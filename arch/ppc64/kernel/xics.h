@@ -12,8 +12,6 @@
 #ifndef _PPC_KERNEL_XICS_H
 #define _PPC_KERNEL_XICS_H
 
-#include "local_irq.h"
-
 extern struct hw_interrupt_type xics_pic;
 extern struct hw_interrupt_type xics_8259_pic;
 

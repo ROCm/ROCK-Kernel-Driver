@@ -55,7 +55,6 @@ extern int    global_phb_number;
 extern int    panic_timeout;
 
 extern struct device_node *allnodes;
-extern unsigned long phb_tce_table_init(struct pci_controller *phb);
 extern unsigned long iSeries_Base_Io_Memory;    
 
 extern struct pci_ops iSeries_pci_ops;

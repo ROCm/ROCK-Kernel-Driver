@@ -23,7 +23,6 @@
 
 #include <asm/machdep.h>
 
-#include "local_irq.h"
 #include "open_pic.h"
 #include "open_pic_defs.h"
 #include "i8259.h"

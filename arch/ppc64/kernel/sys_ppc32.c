@@ -213,7 +213,7 @@ asmlinkage long sys32_readv(u32 fd, struct iovec32 *vector, u32 count)
 		goto bad_file;
 
 	if (file->f_op && (file->f_mode & FMODE_READ) &&
-     (file->f_op->readv || file->f_op->read))
+	    (file->f_op->readv || file->f_op->read))
 		ret = do_readv_writev32(VERIFY_WRITE, file, vector, count);
 	fput(file);
 
@@ -237,8 +237,6 @@ asmlinkage long sys32_writev(u32 fd, struct iovec32 *vector, u32 count)
 bad_file:
 	return ret;
 }
-
-
 
 static inline int get_flock(struct flock *kfl, struct flock32 *ufl)
 {
@@ -656,8 +654,8 @@ asmlinkage long sys32_select(int n, u32 *inp, u32 *outp, u32 *exp, u32 tvp_x)
 	char *bits;
 	unsigned long nn;
 	long timeout;
-	int ret, size;
-	
+	int ret, size, max_fdset;
+
 	timeout = MAX_SCHEDULE_TIMEOUT;
 	if (tvp) {
 		time_t sec, usec;
@@ -679,8 +677,11 @@ asmlinkage long sys32_select(int n, u32 *inp, u32 *outp, u32 *exp, u32 tvp_x)
 	ret = -EINVAL;
 	if (n < 0)
 		goto out_nofds;
-	if (n > current->files->max_fdset)
-		n = current->files->max_fdset;
+
+	/* max_fdset can increase, so grab it once to avoid race */
+	max_fdset = current->files->max_fdset;
+	if (n > max_fdset)
+		n = max_fdset;
 
 	/*
 	 * We need 6 bitmaps (in/out/ex for both incoming and outgoing),
@@ -4285,6 +4286,32 @@ asmlinkage int sys32_sched_getaffinity(__kernel_pid_t32 pid, unsigned int len,
 	return ret;
 }
 
+int sys32_olduname(struct oldold_utsname * name)
+{
+	int error;
+	
+	if (!name)
+		return -EFAULT;
+	if (!access_ok(VERIFY_WRITE,name,sizeof(struct oldold_utsname)))
+		return -EFAULT;
+  
+	down_read(&uts_sem);
+	error = __copy_to_user(&name->sysname,&system_utsname.sysname,__OLD_UTS_LEN);
+	error -= __put_user(0,name->sysname+__OLD_UTS_LEN);
+	error -= __copy_to_user(&name->nodename,&system_utsname.nodename,__OLD_UTS_LEN);
+	error -= __put_user(0,name->nodename+__OLD_UTS_LEN);
+	error -= __copy_to_user(&name->release,&system_utsname.release,__OLD_UTS_LEN);
+	error -= __put_user(0,name->release+__OLD_UTS_LEN);
+	error -= __copy_to_user(&name->version,&system_utsname.version,__OLD_UTS_LEN);
+	error -= __put_user(0,name->version+__OLD_UTS_LEN);
+	error -= __copy_to_user(&name->machine,&system_utsname.machine,__OLD_UTS_LEN);
+	error = __put_user(0,name->machine+__OLD_UTS_LEN);
+	up_read(&uts_sem);
+
+	error = error ? -EFAULT : 0;
+	
+	return error;
+}
 extern unsigned long sys_mmap(unsigned long addr, size_t len,
 			      unsigned long prot, unsigned long flags,
 			      unsigned long fd, off_t offset);

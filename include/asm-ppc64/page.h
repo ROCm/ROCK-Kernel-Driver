@@ -207,13 +207,15 @@ static inline int get_order(unsigned long size)
 #ifdef CONFIG_DISCONTIGMEM
 #define page_to_pfn(page)	discontigmem_page_to_pfn(page)
 #define pfn_to_page(pfn)	discontigmem_pfn_to_page(pfn)
+#define pfn_valid(pfn)		discontigmem_pfn_valid(pfn)
 #else
 #define pfn_to_page(pfn)	(mem_map + (pfn))
 #define page_to_pfn(page)	((unsigned long)((page) - mem_map))
+#define pfn_valid(pfn)		((pfn) < max_mapnr)
 #endif
+
 #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
 
-#define pfn_valid(pfn)		((pfn) < max_mapnr)
 #define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
 
 #define VM_DATA_DEFAULT_FLAGS	(VM_READ | VM_WRITE | VM_EXEC | \

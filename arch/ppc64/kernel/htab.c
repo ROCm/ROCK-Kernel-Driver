@@ -43,6 +43,7 @@
 #include <asm/lmb.h>
 #include <asm/abs_addr.h>
 #include <asm/tlbflush.h>
+#include <asm/io.h>
 #include <asm/eeh.h>
 #include <asm/tlb.h>
 

@@ -8,10 +8,11 @@
 #define _ASM_MMZONE_H_
 
 #include <linux/config.h>
+#include <asm/smp.h>
 
 #ifdef CONFIG_DISCONTIGMEM
 
-extern struct pglist_data *node_data[];
+extern struct pglist_data node_data[];
 
 /*
  * Following are specific to this numa platform.
@@ -21,51 +22,54 @@ extern int numa_node_exists[];
 extern int numa_cpu_lookup_table[];
 extern int numa_memory_lookup_table[];
 
-#define MAX_NUMNODES 16
 #define MAX_MEMORY (1UL << 41)
 /* 256MB regions */
 #define MEMORY_INCREMENT_SHIFT 28
 #define MEMORY_INCREMENT (1UL << MEMORY_INCREMENT_SHIFT)
 
-#undef DEBUG_NUMA
+#define DEBUG_NUMA
 
 static inline int pa_to_nid(unsigned long pa)
 {
-        int nid;
+	int nid;
 
-        nid = numa_memory_lookup_table[pa >> MEMORY_INCREMENT_SHIFT];
+	nid = numa_memory_lookup_table[pa >> MEMORY_INCREMENT_SHIFT];
 
 #ifdef DEBUG_NUMA
-        /* the physical address passed in is not in the map for the system */
-        if (nid == -1) {
-                printk("bad address: %lx\n", pa);
-                BUG();
-        }
+	/* the physical address passed in is not in the map for the system */
+	if (nid == -1) {
+		printk("bad address: %lx\n", pa);
+		BUG();
+	}
 #endif
 
-        return nid;
+	return nid;
 }
 
 #define pfn_to_nid(pfn)		pa_to_nid((pfn) << PAGE_SHIFT)
 
-#define node_startnr(nid)	(node_data[nid]->node_start_mapnr)
-#define node_size(nid)		(node_data[nid]->node_size)
-#define node_localnr(pfn, nid)	((pfn) - node_data[nid]->node_start_pfn)
+/*
+ * Return a pointer to the node data for node n.
+ */
+#define NODE_DATA(nid)		(&node_data[nid])
+
+#define node_size(nid)		(NODE_DATA(nid)->node_size)
+#define node_localnr(pfn, nid)	((pfn) - NODE_DATA(nid)->node_start_pfn)
 
 #ifdef CONFIG_NUMA
 
 static inline int __cpu_to_node(int cpu)
 {
-        int node;
+	int node;
 
-        node = numa_cpu_lookup_table[cpu];
+	node = numa_cpu_lookup_table[cpu];
 
 #ifdef DEBUG_NUMA
-        if (node == -1)
-                BUG();
+	if (node == -1)
+		BUG();
 #endif
 
-        return node;
+	return node;
 }
 
 #define numa_node_id()	__cpu_to_node(smp_processor_id())
@@ -80,13 +84,9 @@ static inline int __cpu_to_node(int cpu)
  */
 #define kvaddr_to_nid(kaddr)	pa_to_nid(__pa(kaddr))
 
-/*
- * Return a pointer to the node data for node n.
- */
-#define NODE_DATA(nid)		(node_data[nid])
-
 #define node_mem_map(nid)	(NODE_DATA(nid)->node_mem_map)
 #define node_start_pfn(nid)	(NODE_DATA(nid)->node_start_pfn)
+#define node_end_pfn(nid)	(NODE_DATA(nid)->node_end_pfn)
 
 #define local_mapnr(kvaddr) \
 	( (__pa(kvaddr) >> PAGE_SHIFT) - node_start_pfn(kvaddr_to_nid(kvaddr)) 
@@ -105,12 +105,15 @@ static inline int __cpu_to_node(int cpu)
 	 node_localnr(__tmp, pfn_to_nid(__tmp))); \
 })
 
-#define discontigmem_page_to_pfn(p)	\
+#define discontigmem_page_to_pfn(p) \
 ({ \
 	struct page *__tmp = p; \
 	(((__tmp) - page_zone(__tmp)->zone_mem_map) + \
 	 page_zone(__tmp)->zone_start_pfn); \
 })
+
+/* XXX fix for discontiguous physical memory */
+#define discontigmem_pfn_valid(pfn)		((pfn) < num_physpages)
 
 #endif /* CONFIG_DISCONTIGMEM */
 #endif /* _ASM_MMZONE_H_ */

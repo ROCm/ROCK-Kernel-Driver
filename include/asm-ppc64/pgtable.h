@@ -35,12 +35,7 @@
 #define PTRS_PER_PMD	(1 << PMD_INDEX_SIZE)
 #define PTRS_PER_PGD	(1 << PGD_INDEX_SIZE)
 
-#if 0
-/* DRENG / PPPBBB This is a compiler bug!!! */
-#define USER_PTRS_PER_PGD	(TASK_SIZE / PGDIR_SIZE)
-#else
-#define USER_PTRS_PER_PGD	(1024)
-#endif
+#define USER_PTRS_PER_PGD	(TASK_SIZE_USER64 / PGDIR_SIZE)
 #define FIRST_USER_PGD_NR	0
 
 #define EADDR_SIZE (PTE_INDEX_SIZE + PMD_INDEX_SIZE + \

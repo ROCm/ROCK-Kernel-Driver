@@ -99,23 +99,26 @@ mmu_gather_t     mmu_gathers[NR_CPUS];
 
 void show_mem(void)
 {
-	int pfn, total = 0, reserved = 0;
+	int total = 0, reserved = 0;
 	int shared = 0, cached = 0;
 	struct page *page;
+	pg_data_t *pgdat;
+	unsigned long i;
 
 	printk("Mem-info:\n");
 	show_free_areas();
 	printk("Free swap:       %6dkB\n",nr_swap_pages<<(PAGE_SHIFT-10));
-	pfn = max_mapnr;
-	while (pfn-- > 0) {
-		page = pfn_to_page(pfn);
-		total++;
-		if (PageReserved(page))
-			reserved++;
-		else if (PageSwapCache(page))
-			cached++;
-		else if (page_count(page))
-			shared += page_count(page) - 1;
+	for_each_pgdat(pgdat) {
+		for (i = 0; i < pgdat->node_size; i++) {
+			page = pgdat->node_mem_map + i;
+			total++;
+			if (PageReserved(page))
+				reserved++;
+			else if (PageSwapCache(page))
+				cached++;
+			else if (page_count(page))
+				shared += page_count(page) - 1;
+		}
 	}
 	printk("%d pages of RAM\n",total);
 	printk("%d reserved pages\n",reserved);
@@ -382,7 +385,7 @@ void free_initmem(void)
 		free_page(addr);
 		totalram_pages++;
 	}
-	printk ("Freeing unused kernel memory: %dk freed\n",
+	printk ("Freeing unused kernel memory: %luk freed\n",
 		(&__init_end - &__init_begin) >> 10);
 }
 
@@ -498,13 +501,6 @@ void __init paging_init(void)
 }
 #endif
 
-extern unsigned long prof_shift;
-extern unsigned long prof_len;
-extern unsigned int * prof_buffer;
-extern unsigned long dprof_shift;
-extern unsigned long dprof_len;
-extern unsigned int * dprof_buffer;
-
 void initialize_paca_hardware_interrupt_stack(void);
 
 void __init mem_init(void)
@@ -518,9 +514,8 @@ void __init mem_init(void)
 	int datapages = 0;
 	int initpages = 0;
 
-	max_mapnr = max_low_pfn;
+	num_physpages = max_low_pfn;	/* RAM is assumed contiguous */
 	high_memory = (void *) __va(max_low_pfn * PAGE_SIZE);
-	num_physpages = max_mapnr;	/* RAM is assumed contiguous */
 	max_pfn = max_low_pfn;
 
 #ifdef CONFIG_DISCONTIGMEM
@@ -542,6 +537,8 @@ void __init mem_init(void)
 	       PAGE_OFFSET, (unsigned long)__va(lmb_end_of_DRAM()));
 }
 #else
+	max_mapnr = num_physpages;
+
 	totalram_pages += free_all_bootmem();
 
 	if ( sysmap_size )
@@ -577,10 +574,6 @@ void __init mem_init(void)
 
 #ifdef CONFIG_PPC_ISERIES
 	create_virtual_bus_tce_table();
-	/* HACK HACK This allows the iSeries profiling to use /proc/profile */
-	prof_shift = dprof_shift;
-	prof_len = dprof_len;
-	prof_buffer = dprof_buffer;
 #endif
 }
 
