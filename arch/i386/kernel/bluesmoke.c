@@ -280,6 +280,7 @@ static void mce_checkregs (void *info)
 	u32 low, high;
 	int i;
 
+	preempt_disable(); 
 	for (i=0; i<banks; i++) {
 		rdmsr(MSR_IA32_MC0_STATUS+i*4, low, high);
 
@@ -294,16 +295,13 @@ static void mce_checkregs (void *info)
 			wmb();
 		}
 	}
+	preempt_enable();
 }
 
 static void do_mce_timer(void *data)
 { 
-	preempt_disable(); 
 	mce_checkregs(NULL);
 	smp_call_function (mce_checkregs, NULL, 1, 1);
-	preempt_enable();
-	mce_timer.expires = jiffies + MCE_RATE;
-	add_timer (&mce_timer);
 } 
 
 static DECLARE_WORK(mce_work, do_mce_timer, NULL);
@@ -311,12 +309,11 @@ static DECLARE_WORK(mce_work, do_mce_timer, NULL);
 static void mce_timerfunc (unsigned long data)
 {
 #ifdef CONFIG_SMP
-	if (num_online_cpus() > 1) { 
+	if (num_online_cpus() > 1) 
 		schedule_work(&mce_work); 
-		return;
-	}
-#endif
+#else
 	mce_checkregs(NULL);
+#endif
 	mce_timer.expires = jiffies + MCE_RATE;
 	add_timer (&mce_timer);
 }	
