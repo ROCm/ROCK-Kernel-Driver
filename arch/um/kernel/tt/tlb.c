@@ -132,7 +132,7 @@ static void flush_kernel_vm_range(unsigned long start, unsigned long end,
 	if(updated && update_seq) atomic_inc(&vmchange_seq);
 }
 
-void flush_tlb_kernel_range(unsigned long start, unsigned long end)
+void flush_tlb_kernel_range_tt(unsigned long start, unsigned long end)
 {
         flush_kernel_vm_range(start, end, 1);
 }

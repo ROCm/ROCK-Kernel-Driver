@@ -46,31 +46,6 @@ void add_arg(char *cmd_line, char *arg)
 	strcat(cmd_line, arg);
 }
 
-void remap_data(void *segment_start, void *segment_end, int w)
-{
-	void *addr;
-	unsigned long size;
-	int data, prot;
-
-	if(w) prot = PROT_WRITE;
-	else prot = 0;
-	prot |= PROT_READ | PROT_EXEC;
-	size = (unsigned long) segment_end - 
-		(unsigned long) segment_start;
-	data = create_mem_file(size);
-	if((addr = mmap(NULL, size, PROT_WRITE | PROT_READ, 
-			MAP_SHARED, data, 0)) < 0){
-		perror("mapping new data segment");
-		exit(1);
-	}
-	memcpy(addr, segment_start, size);
-	if(switcheroo(data, prot, addr, segment_start, 
-		      size) < 0){
-		printf("switcheroo failed\n");
-		exit(1);
-	}
-}
-
 void stop(void)
 {
 	while(1) sleep(1000000);
