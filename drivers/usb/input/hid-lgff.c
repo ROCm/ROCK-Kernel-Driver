@@ -6,7 +6,7 @@
  * - WingMan Cordless RumblePad
  * - WingMan Force 3D
  *
- *  Copyright (c) 2002 Johann Deneux
+ *  Copyright (c) 2002-2004 Johann Deneux
  */
 
 /*
@@ -25,13 +25,13 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  * Should you need to contact me, the author, you can do so by
- * e-mail - mail your message to <deneux@ifrance.com>
+ * e-mail - mail your message to <johann.deneux@it.uu.se>
  */
 
 #include <linux/input.h>
 #include <linux/sched.h>
 
-#define DEBUG
+//#define DEBUG
 #include <linux/usb.h>
 
 #include <linux/circ_buf.h>
@@ -179,8 +179,7 @@ int hid_lgff_init(struct hid_device* hid)
 		kfree(private);
 		return -1;
 	}
-	private->rumble->field[0]->value[0] = 0x03;
-	private->rumble->field[0]->value[1] = 0x42;
+	private->rumble->field[0]->value[0] = 0x42;
 
 
 	private->condition = hid_lgff_duplicate_report(report);
@@ -207,7 +206,7 @@ int hid_lgff_init(struct hid_device* hid)
 	add_timer(&private->timer);  /*TODO: only run the timer when at least
 				       one effect is playing */
 
-	printk(KERN_INFO "Force feedback for Logitech force feedback devices by Johann Deneux <deneux@ifrance.com>\n");
+	printk(KERN_INFO "Force feedback for Logitech force feedback devices by Johann Deneux <johann.deneux@it.uu.se>\n");
 
 	return 0;
 }
@@ -254,7 +253,7 @@ static void hid_lgff_input_init(struct hid_device* hid)
 	signed short* ff;
 	u16 idVendor = hid->dev->descriptor.idVendor;
 	u16 idProduct = hid->dev->descriptor.idProduct;
-	struct hid_input *hidinput = list_entry(&hid->inputs, struct hid_input, list);
+	struct hid_input *hidinput = list_entry(hid->inputs.next, struct hid_input, list);
 
 	while (dev->idVendor && (idVendor != dev->idVendor || idProduct != dev->idProduct))
 		dev++;
@@ -511,10 +510,10 @@ static void hid_lgff_timer(unsigned long timer_data)
 		hid_submit_report(hid, lgff->constant, USB_DIR_OUT);
 	}
 
-	if (left != lgff->rumble->field[0]->value[3]
-	    || right != lgff->rumble->field[0]->value[4]) {
-		lgff->rumble->field[0]->value[3] = left;
-		lgff->rumble->field[0]->value[4] = right;
+	if (left != lgff->rumble->field[0]->value[2]
+	    || right != lgff->rumble->field[0]->value[3]) {
+		lgff->rumble->field[0]->value[2] = left;
+		lgff->rumble->field[0]->value[3] = right;
 		dbg("(left,right)=(%04x, %04x)", left, right);
 		hid_submit_report(hid, lgff->rumble, USB_DIR_OUT);
 	}

@@ -1529,9 +1529,9 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 				continue;
 			if (!(hid->urbout = usb_alloc_urb(0, GFP_KERNEL)))
 				goto fail;
-			pipe = usb_sndbulkpipe(dev, endpoint->bEndpointAddress);
-			usb_fill_bulk_urb(hid->urbout, dev, pipe, hid->outbuf, 0,
-					  hid_irq_out, hid);
+			pipe = usb_sndintpipe(dev, endpoint->bEndpointAddress);
+			usb_fill_int_urb(hid->urbout, dev, pipe, hid->outbuf, 0,
+					  hid_irq_out, hid, 1);
 			hid->urbout->transfer_dma = hid->outbuf_dma;
 			hid->urbout->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 		}
