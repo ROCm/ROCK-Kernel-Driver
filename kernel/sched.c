@@ -2580,13 +2580,13 @@ static void show_task(task_t * p)
 	else
 		printk("?");
 #if (BITS_PER_LONG == 32)
-	if (p == current)
-		printk(" current  ");
+	if (state == TASK_RUNNING)
+		printk(" running ");
 	else
 		printk(" %08lX ", thread_saved_pc(p));
 #else
-	if (p == current)
-		printk("   current task   ");
+	if (state == TASK_RUNNING)
+		printk("  running task   ");
 	else
 		printk(" %016lx ", thread_saved_pc(p));
 #endif
@@ -2608,7 +2608,8 @@ static void show_task(task_t * p)
 	else
 		printk(" (NOTLB)\n");
 
-	show_stack(p, NULL);
+	if (state != TASK_RUNNING)
+		show_stack(p, NULL);
 }
 
 void show_state(void)
