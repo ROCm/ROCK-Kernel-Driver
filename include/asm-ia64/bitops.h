@@ -2,7 +2,7 @@
 #define _ASM_IA64_BITOPS_H
 
 /*
- * Copyright (C) 1998-2002 Hewlett-Packard Co
+ * Copyright (C) 1998-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * 02/06/02 find_next_bit() and find_first_bit() added from Erich Focht's ia64 O(1)
@@ -320,7 +320,7 @@ __ffs (unsigned long x)
 static inline unsigned long
 ia64_fls (unsigned long x)
 {
-	double d = x;
+	long double d = x;
 	long exp;
 
 	__asm__ ("getf.exp %0=%1" : "=r"(exp) : "f"(d));
