@@ -620,13 +620,11 @@ generic_direct_IO(int rw, struct inode *inode, const struct iovec *iov,
 	int seg;
 	size_t size;
 	unsigned long addr;
-	struct address_space *mapping = inode->i_mapping;
 	unsigned blocksize_mask = (1 << inode->i_blkbits) - 1;
 	ssize_t retval = -EINVAL;
 
-	if (offset & blocksize_mask) {
+	if (offset & blocksize_mask)
 		goto out;
-	}
 
 	/* Check the memory alignment.  Blocks cannot straddle pages */
 	for (seg = 0; seg < nr_segs; seg++) {
@@ -634,14 +632,6 @@ generic_direct_IO(int rw, struct inode *inode, const struct iovec *iov,
 		size = iov[seg].iov_len;
 		if ((addr & blocksize_mask) || (size & blocksize_mask)) 
 			goto out;	
-	}
-
-	if (mapping->nrpages) {
-		retval = filemap_fdatawrite(mapping);
-		if (retval == 0)
-			retval = filemap_fdatawait(mapping);
-		if (retval)
-			goto out;
 	}
 
 	retval = direct_io_worker(rw, inode, iov, offset, nr_segs, get_blocks);
@@ -656,8 +646,17 @@ generic_file_direct_IO(int rw, struct inode *inode, const struct iovec *iov,
 	struct address_space *mapping = inode->i_mapping;
 	ssize_t retval;
 
+	if (mapping->nrpages) {
+		retval = filemap_fdatawrite(mapping);
+		if (retval == 0)
+			retval = filemap_fdatawait(mapping);
+		if (retval)
+			goto out;
+	}
+
 	retval = mapping->a_ops->direct_IO(rw, inode, iov, offset, nr_segs);
 	if (inode->i_mapping->nrpages)
 		invalidate_inode_pages2(inode->i_mapping);
+out:
 	return retval;
 }
