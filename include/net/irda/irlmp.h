@@ -132,6 +132,7 @@ struct lap_cb {
 
 	struct irlap_cb *irlap;   /* Instance of IrLAP layer */
 	hashbin_t *lsaps;         /* LSAP associated with this link */
+	struct lsap_cb *flow_next;	/* Next lsap to be polled for Tx */
 
 	__u8  caddr;  /* Connection address */
  	__u32 saddr;  /* Source device address */
@@ -235,6 +236,7 @@ void irlmp_connless_data_indication(struct lsap_cb *, struct sk_buff *);
 
 void irlmp_status_request(void);
 void irlmp_status_indication(struct lap_cb *, LINK_STATUS link, LOCK_STATUS lock);
+void irlmp_flow_indication(struct lap_cb *self, LOCAL_FLOW flow);
 
 int  irlmp_slsap_inuse(__u8 slsap);
 __u8 irlmp_find_free_slsap(void);
@@ -252,7 +254,9 @@ extern struct irlmp_cb *irlmp;
 
 static inline hashbin_t *irlmp_get_cachelog(void) { return irlmp->cachelog; }
 
-static inline int irlmp_get_lap_tx_queue_len(struct lsap_cb *self)
+/* Check if LAP queue is full.
+ * Used by IrTTP for low control, see comments in irlap.h - Jean II */
+static inline int irlmp_lap_tx_queue_full(struct lsap_cb *self)
 {
 	if (self == NULL)
 		return 0;
@@ -261,7 +265,7 @@ static inline int irlmp_get_lap_tx_queue_len(struct lsap_cb *self)
 	if (self->lap->irlap == NULL)
 		return 0;
 
-	return IRLAP_GET_TX_QUEUE_LEN(self->lap->irlap);
+	return(IRLAP_GET_TX_QUEUE_LEN(self->lap->irlap) >= LAP_HIGH_THRESHOLD);
 }
 
 /* After doing a irlmp_dup(), this get one of the two socket back into
