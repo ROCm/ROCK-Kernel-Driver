@@ -115,10 +115,12 @@
 	
 #define MCI_FIFOHALFSIZE (MCI_FIFOSIZE / 2)
 
+#define NR_SG		16
+
 struct clk;
 
 struct mmci_host {
-	void			*base;
+	void __iomem		*base;
 	struct mmc_request	*mrq;
 	struct mmc_command	*cmd;
 	struct mmc_data		*data;
@@ -137,7 +139,41 @@ struct mmci_host {
 	struct timer_list	timer;
 	unsigned int		oldstat;
 
+	unsigned int		sg_len;
+
 	/* pio stuff */
-	unsigned int		offset;
+	struct scatterlist	*sg_ptr;
+	unsigned int		sg_off;
 	unsigned int		size;
 };
+
+static inline void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
+{
+	/*
+	 * Ideally, we want the higher levels to pass us a scatter list.
+	 */
+	host->sg_len = data->sg_len;
+	host->sg_ptr = data->sg;
+	host->sg_off = 0;
+}
+
+static inline int mmci_next_sg(struct mmci_host *host)
+{
+	host->sg_ptr++;
+	host->sg_off = 0;
+	return --host->sg_len;
+}
+
+static inline char *mmci_kmap_atomic(struct mmci_host *host, unsigned long *flags)
+{
+	struct scatterlist *sg = host->sg_ptr;
+
+	local_irq_save(*flags);
+	return kmap_atomic(sg->page, KM_BIO_SRC_IRQ) + sg->offset;
+}
+
+static inline void mmci_kunmap_atomic(struct mmci_host *host, unsigned long *flags)
+{
+	kunmap_atomic(host->sg_ptr->page, KM_BIO_SRC_IRQ);
+	local_irq_restore(*flags);
+}

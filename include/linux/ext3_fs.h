@@ -33,11 +33,11 @@ struct statfs;
 #undef EXT3FS_DEBUG
 
 /*
- * Define EXT3_PREALLOCATE to preallocate data blocks for expanding files
+ * Define EXT3_RESERVATION to reserve data blocks for expanding files
  */
-#undef  EXT3_PREALLOCATE /* @@@ Fix this! */
-#define EXT3_DEFAULT_PREALLOC_BLOCKS	8
-
+#define EXT3_DEFAULT_RESERVE_BLOCKS     8
+#define EXT3_MAX_RESERVE_BLOCKS         1024
+#define EXT3_RESERVE_WINDOW_NOT_ALLOCATED 0
 /*
  * Always enable hashed directories
  */
@@ -129,14 +129,14 @@ struct statfs;
  */
 struct ext3_group_desc
 {
-	__u32	bg_block_bitmap;		/* Blocks bitmap block */
-	__u32	bg_inode_bitmap;		/* Inodes bitmap block */
-	__u32	bg_inode_table;		/* Inodes table block */
-	__u16	bg_free_blocks_count;	/* Free blocks count */
-	__u16	bg_free_inodes_count;	/* Free inodes count */
-	__u16	bg_used_dirs_count;	/* Directories count */
+	__le32	bg_block_bitmap;		/* Blocks bitmap block */
+	__le32	bg_inode_bitmap;		/* Inodes bitmap block */
+	__le32	bg_inode_table;		/* Inodes table block */
+	__le16	bg_free_blocks_count;	/* Free blocks count */
+	__le16	bg_free_inodes_count;	/* Free inodes count */
+	__le16	bg_used_dirs_count;	/* Directories count */
 	__u16	bg_pad;
-	__u32	bg_reserved[3];
+	__le32	bg_reserved[3];
 };
 
 /*
@@ -196,6 +196,31 @@ struct ext3_group_desc
 #define EXT3_STATE_JDATA		0x00000001 /* journaled data exists */
 #define EXT3_STATE_NEW			0x00000002 /* inode is newly created */
 
+
+/* Used to pass group descriptor data when online resize is done */
+struct ext3_new_group_input {
+	__u32 group;            /* Group number for this data */
+	__u32 block_bitmap;     /* Absolute block number of block bitmap */
+	__u32 inode_bitmap;     /* Absolute block number of inode bitmap */
+	__u32 inode_table;      /* Absolute block number of inode table start */
+	__u32 blocks_count;     /* Total number of blocks in this group */
+	__u16 reserved_blocks;  /* Number of reserved blocks in this group */
+	__u16 unused;
+};
+
+/* The struct ext3_new_group_input in kernel space, with free_blocks_count */
+struct ext3_new_group_data {
+	__u32 group;
+	__u32 block_bitmap;
+	__u32 inode_bitmap;
+	__u32 inode_table;
+	__u32 blocks_count;
+	__u16 reserved_blocks;
+	__u16 unused;
+	__u32 free_blocks_count;
+};
+
+
 /*
  * ioctl commands
  */
@@ -203,27 +228,31 @@ struct ext3_group_desc
 #define	EXT3_IOC_SETFLAGS		_IOW('f', 2, long)
 #define	EXT3_IOC_GETVERSION		_IOR('f', 3, long)
 #define	EXT3_IOC_SETVERSION		_IOW('f', 4, long)
+#define EXT3_IOC_GROUP_EXTEND		_IOW('f', 7, unsigned long)
+#define EXT3_IOC_GROUP_ADD		_IOW('f', 8,struct ext3_new_group_input)
 #define	EXT3_IOC_GETVERSION_OLD		_IOR('v', 1, long)
 #define	EXT3_IOC_SETVERSION_OLD		_IOW('v', 2, long)
 #ifdef CONFIG_JBD_DEBUG
 #define EXT3_IOC_WAIT_FOR_READONLY	_IOR('f', 99, long)
 #endif
+#define EXT3_IOC_GETRSVSZ		_IOR('f', 5, long)
+#define EXT3_IOC_SETRSVSZ		_IOW('f', 6, long)
 
 /*
  * Structure of an inode on the disk
  */
 struct ext3_inode {
-	__u16	i_mode;		/* File mode */
-	__u16	i_uid;		/* Low 16 bits of Owner Uid */
-	__u32	i_size;		/* Size in bytes */
-	__u32	i_atime;	/* Access time */
-	__u32	i_ctime;	/* Creation time */
-	__u32	i_mtime;	/* Modification time */
-	__u32	i_dtime;	/* Deletion Time */
-	__u16	i_gid;		/* Low 16 bits of Group Id */
-	__u16	i_links_count;	/* Links count */
-	__u32	i_blocks;	/* Blocks count */
-	__u32	i_flags;	/* File flags */
+	__le16	i_mode;		/* File mode */
+	__le16	i_uid;		/* Low 16 bits of Owner Uid */
+	__le32	i_size;		/* Size in bytes */
+	__le32	i_atime;	/* Access time */
+	__le32	i_ctime;	/* Creation time */
+	__le32	i_mtime;	/* Modification time */
+	__le32	i_dtime;	/* Deletion Time */
+	__le16	i_gid;		/* Low 16 bits of Group Id */
+	__le16	i_links_count;	/* Links count */
+	__le32	i_blocks;	/* Blocks count */
+	__le32	i_flags;	/* File flags */
 	union {
 		struct {
 			__u32  l_i_reserved1;
@@ -235,18 +264,18 @@ struct ext3_inode {
 			__u32  m_i_reserved1;
 		} masix1;
 	} osd1;				/* OS dependent 1 */
-	__u32	i_block[EXT3_N_BLOCKS];/* Pointers to blocks */
-	__u32	i_generation;	/* File version (for NFS) */
-	__u32	i_file_acl;	/* File ACL */
-	__u32	i_dir_acl;	/* Directory ACL */
-	__u32	i_faddr;	/* Fragment address */
+	__le32	i_block[EXT3_N_BLOCKS];/* Pointers to blocks */
+	__le32	i_generation;	/* File version (for NFS) */
+	__le32	i_file_acl;	/* File ACL */
+	__le32	i_dir_acl;	/* Directory ACL */
+	__le32	i_faddr;	/* Fragment address */
 	union {
 		struct {
 			__u8	l_i_frag;	/* Fragment number */
 			__u8	l_i_fsize;	/* Fragment size */
 			__u16	i_pad1;
-			__u16	l_i_uid_high;	/* these 2 fields    */
-			__u16	l_i_gid_high;	/* were reserved2[0] */
+			__le16	l_i_uid_high;	/* these 2 fields    */
+			__le16	l_i_gid_high;	/* were reserved2[0] */
 			__u32	l_i_reserved2;
 		} linux2;
 		struct {
@@ -306,25 +335,26 @@ struct ext3_inode {
 /*
  * Mount flags
  */
-#define EXT3_MOUNT_CHECK		0x0001	/* Do mount-time checks */
-#define EXT3_MOUNT_OLDALLOC		0x0002  /* Don't use the new Orlov allocator */
-#define EXT3_MOUNT_GRPID		0x0004	/* Create files with directory's group */
-#define EXT3_MOUNT_DEBUG		0x0008	/* Some debugging messages */
-#define EXT3_MOUNT_ERRORS_CONT		0x0010	/* Continue on errors */
-#define EXT3_MOUNT_ERRORS_RO		0x0020	/* Remount fs ro on errors */
-#define EXT3_MOUNT_ERRORS_PANIC		0x0040	/* Panic on errors */
-#define EXT3_MOUNT_MINIX_DF		0x0080	/* Mimics the Minix statfs */
-#define EXT3_MOUNT_NOLOAD		0x0100	/* Don't use existing journal*/
-#define EXT3_MOUNT_ABORT		0x0200	/* Fatal error detected */
-#define EXT3_MOUNT_DATA_FLAGS		0x0C00	/* Mode for data writes: */
-  #define EXT3_MOUNT_JOURNAL_DATA	0x0400	/* Write data to journal */
-  #define EXT3_MOUNT_ORDERED_DATA	0x0800	/* Flush data before commit */
-  #define EXT3_MOUNT_WRITEBACK_DATA	0x0C00	/* No data ordering */
-#define EXT3_MOUNT_UPDATE_JOURNAL	0x1000	/* Update the journal format */
-#define EXT3_MOUNT_NO_UID32		0x2000  /* Disable 32-bit UIDs */
-#define EXT3_MOUNT_XATTR_USER		0x4000	/* Extended user attributes */
-#define EXT3_MOUNT_POSIX_ACL		0x8000	/* POSIX Access Control Lists */
-#define EXT3_MOUNT_BARRIER		0x10000 /* Use block barriers */
+#define EXT3_MOUNT_CHECK		0x00001	/* Do mount-time checks */
+#define EXT3_MOUNT_OLDALLOC		0x00002  /* Don't use the new Orlov allocator */
+#define EXT3_MOUNT_GRPID		0x00004	/* Create files with directory's group */
+#define EXT3_MOUNT_DEBUG		0x00008	/* Some debugging messages */
+#define EXT3_MOUNT_ERRORS_CONT		0x00010	/* Continue on errors */
+#define EXT3_MOUNT_ERRORS_RO		0x00020	/* Remount fs ro on errors */
+#define EXT3_MOUNT_ERRORS_PANIC		0x00040	/* Panic on errors */
+#define EXT3_MOUNT_MINIX_DF		0x00080	/* Mimics the Minix statfs */
+#define EXT3_MOUNT_NOLOAD		0x00100	/* Don't use existing journal*/
+#define EXT3_MOUNT_ABORT		0x00200	/* Fatal error detected */
+#define EXT3_MOUNT_DATA_FLAGS		0x00C00	/* Mode for data writes: */
+#define EXT3_MOUNT_JOURNAL_DATA		0x00400	/* Write data to journal */
+#define EXT3_MOUNT_ORDERED_DATA		0x00800	/* Flush data before commit */
+#define EXT3_MOUNT_WRITEBACK_DATA	0x00C00	/* No data ordering */
+#define EXT3_MOUNT_UPDATE_JOURNAL	0x01000	/* Update the journal format */
+#define EXT3_MOUNT_NO_UID32		0x02000  /* Disable 32-bit UIDs */
+#define EXT3_MOUNT_XATTR_USER		0x04000	/* Extended user attributes */
+#define EXT3_MOUNT_POSIX_ACL		0x08000	/* POSIX Access Control Lists */
+#define EXT3_MOUNT_RESERVATION		0x10000	/* Preallocation */
+#define EXT3_MOUNT_BARRIER		0x20000 /* Use block barriers */
 
 /* Compatibility, for having both ext2_fs.h and ext3_fs.h included at once */
 #ifndef _LINUX_EXT2_FS_H
@@ -364,31 +394,31 @@ struct ext3_inode {
  * Structure of the super block
  */
 struct ext3_super_block {
-/*00*/	__u32	s_inodes_count;		/* Inodes count */
-	__u32	s_blocks_count;		/* Blocks count */
-	__u32	s_r_blocks_count;	/* Reserved blocks count */
-	__u32	s_free_blocks_count;	/* Free blocks count */
-/*10*/	__u32	s_free_inodes_count;	/* Free inodes count */
-	__u32	s_first_data_block;	/* First Data Block */
-	__u32	s_log_block_size;	/* Block size */
-	__s32	s_log_frag_size;	/* Fragment size */
-/*20*/	__u32	s_blocks_per_group;	/* # Blocks per group */
-	__u32	s_frags_per_group;	/* # Fragments per group */
-	__u32	s_inodes_per_group;	/* # Inodes per group */
-	__u32	s_mtime;		/* Mount time */
-/*30*/	__u32	s_wtime;		/* Write time */
-	__u16	s_mnt_count;		/* Mount count */
-	__s16	s_max_mnt_count;	/* Maximal mount count */
-	__u16	s_magic;		/* Magic signature */
-	__u16	s_state;		/* File system state */
-	__u16	s_errors;		/* Behaviour when detecting errors */
-	__u16	s_minor_rev_level;	/* minor revision level */
-/*40*/	__u32	s_lastcheck;		/* time of last check */
-	__u32	s_checkinterval;	/* max. time between checks */
-	__u32	s_creator_os;		/* OS */
-	__u32	s_rev_level;		/* Revision level */
-/*50*/	__u16	s_def_resuid;		/* Default uid for reserved blocks */
-	__u16	s_def_resgid;		/* Default gid for reserved blocks */
+/*00*/	__le32	s_inodes_count;		/* Inodes count */
+	__le32	s_blocks_count;		/* Blocks count */
+	__le32	s_r_blocks_count;	/* Reserved blocks count */
+	__le32	s_free_blocks_count;	/* Free blocks count */
+/*10*/	__le32	s_free_inodes_count;	/* Free inodes count */
+	__le32	s_first_data_block;	/* First Data Block */
+	__le32	s_log_block_size;	/* Block size */
+	__le32	s_log_frag_size;	/* Fragment size */
+/*20*/	__le32	s_blocks_per_group;	/* # Blocks per group */
+	__le32	s_frags_per_group;	/* # Fragments per group */
+	__le32	s_inodes_per_group;	/* # Inodes per group */
+	__le32	s_mtime;		/* Mount time */
+/*30*/	__le32	s_wtime;		/* Write time */
+	__le16	s_mnt_count;		/* Mount count */
+	__le16	s_max_mnt_count;	/* Maximal mount count */
+	__le16	s_magic;		/* Magic signature */
+	__le16	s_state;		/* File system state */
+	__le16	s_errors;		/* Behaviour when detecting errors */
+	__le16	s_minor_rev_level;	/* minor revision level */
+/*40*/	__le32	s_lastcheck;		/* time of last check */
+	__le32	s_checkinterval;	/* max. time between checks */
+	__le32	s_creator_os;		/* OS */
+	__le32	s_rev_level;		/* Revision level */
+/*50*/	__le16	s_def_resuid;		/* Default uid for reserved blocks */
+	__le16	s_def_resgid;		/* Default gid for reserved blocks */
 	/*
 	 * These fields are for EXT3_DYNAMIC_REV superblocks only.
 	 *
@@ -402,36 +432,36 @@ struct ext3_super_block {
 	 * feature set, it must abort and not try to meddle with
 	 * things it doesn't understand...
 	 */
-	__u32	s_first_ino;		/* First non-reserved inode */
-	__u16   s_inode_size;		/* size of inode structure */
-	__u16	s_block_group_nr;	/* block group # of this superblock */
-	__u32	s_feature_compat;	/* compatible feature set */
-/*60*/	__u32	s_feature_incompat;	/* incompatible feature set */
-	__u32	s_feature_ro_compat;	/* readonly-compatible feature set */
+	__le32	s_first_ino;		/* First non-reserved inode */
+	__le16   s_inode_size;		/* size of inode structure */
+	__le16	s_block_group_nr;	/* block group # of this superblock */
+	__le32	s_feature_compat;	/* compatible feature set */
+/*60*/	__le32	s_feature_incompat;	/* incompatible feature set */
+	__le32	s_feature_ro_compat;	/* readonly-compatible feature set */
 /*68*/	__u8	s_uuid[16];		/* 128-bit uuid for volume */
 /*78*/	char	s_volume_name[16];	/* volume name */
 /*88*/	char	s_last_mounted[64];	/* directory where last mounted */
-/*C8*/	__u32	s_algorithm_usage_bitmap; /* For compression */
+/*C8*/	__le32	s_algorithm_usage_bitmap; /* For compression */
 	/*
 	 * Performance hints.  Directory preallocation should only
 	 * happen if the EXT3_FEATURE_COMPAT_DIR_PREALLOC flag is on.
 	 */
 	__u8	s_prealloc_blocks;	/* Nr of blocks to try to preallocate*/
 	__u8	s_prealloc_dir_blocks;	/* Nr to preallocate for dirs */
-	__u16	s_padding1;
+	__u16	s_reserved_gdt_blocks;	/* Per group desc for online growth */
 	/*
 	 * Journaling support valid if EXT3_FEATURE_COMPAT_HAS_JOURNAL set.
 	 */
 /*D0*/	__u8	s_journal_uuid[16];	/* uuid of journal superblock */
-/*E0*/	__u32	s_journal_inum;		/* inode number of journal file */
-	__u32	s_journal_dev;		/* device number of journal file */
-	__u32	s_last_orphan;		/* start of list of inodes to delete */
-	__u32	s_hash_seed[4];		/* HTREE hash seed */
+/*E0*/	__le32	s_journal_inum;		/* inode number of journal file */
+	__le32	s_journal_dev;		/* device number of journal file */
+	__le32	s_last_orphan;		/* start of list of inodes to delete */
+	__le32	s_hash_seed[4];		/* HTREE hash seed */
 	__u8	s_def_hash_version;	/* Default hash version to use */
 	__u8	s_reserved_char_pad;
 	__u16	s_reserved_word_pad;
-	__u32	s_default_mount_opts;
-	__u32	s_first_meta_bg; 	/* First metablock block group */
+	__le32	s_default_mount_opts;
+	__le32	s_first_meta_bg; 	/* First metablock block group */
 	__u32	s_reserved[190];	/* Padding to the end of the block */
 };
 
@@ -546,9 +576,9 @@ static inline struct ext3_inode_info *EXT3_I(struct inode *inode)
 #define EXT3_NAME_LEN 255
 
 struct ext3_dir_entry {
-	__u32	inode;			/* Inode number */
-	__u16	rec_len;		/* Directory entry length */
-	__u16	name_len;		/* Name length */
+	__le32	inode;			/* Inode number */
+	__le16	rec_len;		/* Directory entry length */
+	__le16	name_len;		/* Name length */
 	char	name[EXT3_NAME_LEN];	/* File name */
 };
 
@@ -559,8 +589,8 @@ struct ext3_dir_entry {
  * file_type field.
  */
 struct ext3_dir_entry_2 {
-	__u32	inode;			/* Inode number */
-	__u16	rec_len;		/* Directory entry length */
+	__le32	inode;			/* Inode number */
+	__le16	rec_len;		/* Directory entry length */
 	__u8	name_len;		/* Name length */
 	__u8	file_type;
 	char	name[EXT3_NAME_LEN];	/* File name */
@@ -681,16 +711,18 @@ struct dir_private_info {
 /* balloc.c */
 extern int ext3_bg_has_super(struct super_block *sb, int group);
 extern unsigned long ext3_bg_num_gdb(struct super_block *sb, int group);
-extern int ext3_new_block (handle_t *, struct inode *, unsigned long,
-					    __u32 *, __u32 *, int *);
+extern int ext3_new_block (handle_t *, struct inode *, unsigned long, int *);
 extern void ext3_free_blocks (handle_t *, struct inode *, unsigned long,
 			      unsigned long);
+extern void ext3_free_blocks_sb (handle_t *, struct super_block *,
+				 unsigned long, unsigned long, int *);
 extern unsigned long ext3_count_free_blocks (struct super_block *);
 extern void ext3_check_blocks_bitmap (struct super_block *);
 extern struct ext3_group_desc * ext3_get_group_desc(struct super_block * sb,
 						    unsigned int block_group,
 						    struct buffer_head ** bh);
 extern int ext3_should_retry_alloc(struct super_block *sb, int *retries);
+extern void ext3_rsv_window_add(struct super_block *sb, struct ext3_reserve_window_node *rsv);
 
 /* dir.c */
 extern int ext3_check_dir_entry(const char *, struct inode *,
@@ -724,12 +756,12 @@ extern struct buffer_head * ext3_getblk (handle_t *, struct inode *, long, int, 
 extern struct buffer_head * ext3_bread (handle_t *, struct inode *, int, int, int *);
 
 extern void ext3_read_inode (struct inode *);
-extern void ext3_write_inode (struct inode *, int);
+extern int  ext3_write_inode (struct inode *, int);
 extern int  ext3_setattr (struct dentry *, struct iattr *);
 extern void ext3_put_inode (struct inode *);
 extern void ext3_delete_inode (struct inode *);
 extern int  ext3_sync_inode (handle_t *, struct inode *);
-extern void ext3_discard_prealloc (struct inode *);
+extern void ext3_discard_reservation (struct inode *);
 extern void ext3_dirty_inode(struct inode *);
 extern int ext3_change_inode_journal_flag(struct inode *, int);
 extern void ext3_truncate (struct inode *);
@@ -745,6 +777,13 @@ extern int ext3_orphan_add(handle_t *, struct inode *);
 extern int ext3_orphan_del(handle_t *, struct inode *);
 extern int ext3_htree_fill_tree(struct file *dir_file, __u32 start_hash,
 				__u32 start_minor_hash, __u32 *next_hash);
+
+/* resize.c */
+extern int ext3_group_add(struct super_block *sb,
+				struct ext3_new_group_data *input);
+extern int ext3_group_extend(struct super_block *sb,
+				struct ext3_super_block *es,
+				unsigned long n_blocks_count);
 
 /* super.c */
 extern void ext3_error (struct super_block *, const char *, const char *, ...)

@@ -38,6 +38,7 @@
 #include <linux/input.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
+#include <linux/pci.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -49,34 +50,16 @@ MODULE_LICENSE("GPL");
 #define PC110PAD_OFF	0x30
 #define PC110PAD_ON	0x38
 
-static int pc110pad_open(struct input_dev *dev);
-static void pc110pad_close(struct input_dev *dev);
-
 static int pc110pad_irq = 10;
 static int pc110pad_io = 0x15e0;
 
-static struct input_dev pc110pad_dev = {
-	.evbit	= { BIT(EV_KEY) | BIT(EV_ABS) },
-	.absbit = { BIT(ABS_X) | BIT(ABS_Y) },
-	.keybit = { [LONG(BTN_TOUCH)] = BIT(BTN_TOUCH) },
-	.open	= pc110pad_open,
-	.close	= pc110pad_close,
-	.name	= "IBM PC110 TouchPad",
-	.phys	= "isa15e0/input0",
-	.id	= {
-		.bustype = BUS_ISA,
-		.vendor = 0x0003,
-		.product = 0x0001,
-		.version = 0x0100,
-	},
-	.cdev	= {
-		.class_id	= "pc110pad",
-	},
-};
-
+static struct input_dev pc110pad_dev;
 static int pc110pad_data[3];
 static int pc110pad_count;
 static int pc110pad_used;
+
+static char *pc110pad_name = "IBM PC110 TouchPad";
+static char *pc110pad_phys = "isa15e0/input0";
 
 static irqreturn_t pc110pad_interrupt(int irq, void *ptr, struct pt_regs *regs)
 {
@@ -125,11 +108,25 @@ static int pc110pad_open(struct input_dev *dev)
 	return 0;
 }
 
+/*
+ * We try to avoid enabling the hardware if it's not
+ * there, but we don't know how to test. But we do know
+ * that the PC110 is not a PCI system. So if we find any
+ * PCI devices in the machine, we don't have a PC110.
+ */
 static int __init pc110pad_init(void)
 {
-	if (request_region(pc110pad_io, 4, "pc110pad"))
-	{
-		printk(KERN_ERR "pc110pad: I/O area %#x-%#x in use.\n", pc110pad_io, pc110pad_io + 4);
+	struct pci_dev *dev;
+
+	dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, NULL);
+	if (dev) {
+		pci_dev_put(dev);
+		return -ENOENT;
+	}
+
+	if (!request_region(pc110pad_io, 4, "pc110pad")) {
+		printk(KERN_ERR "pc110pad: I/O area %#x-%#x in use.\n",
+				pc110pad_io, pc110pad_io + 4);
 		return -EBUSY;
 	}
 
@@ -142,13 +139,27 @@ static int __init pc110pad_init(void)
 		return -EBUSY;
 	}
 
+        pc110pad_dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
+        pc110pad_dev.absbit[0] = BIT(ABS_X) | BIT(ABS_Y);
+        pc110pad_dev.keybit[LONG(BTN_TOUCH)] = BIT(BTN_TOUCH);
+
 	pc110pad_dev.absmax[ABS_X] = 0x1ff;
 	pc110pad_dev.absmax[ABS_Y] = 0x0ff;
+        
+	pc110pad_dev.open = pc110pad_open;
+        pc110pad_dev.close = pc110pad_close;
+
+	pc110pad_dev.name = pc110pad_name;
+	pc110pad_dev.phys = pc110pad_phys;
+	pc110pad_dev.id.bustype = BUS_ISA;
+	pc110pad_dev.id.vendor = 0x0003;
+	pc110pad_dev.id.product = 0x0001;
+	pc110pad_dev.id.version = 0x0100;
 
 	input_register_device(&pc110pad_dev);	
 
 	printk(KERN_INFO "input: %s at %#x irq %d\n",
-		pc110pad_dev.name, pc110pad_io, pc110pad_irq);
+		pc110pad_name, pc110pad_io, pc110pad_irq);
 	
 	return 0;
 }

@@ -16,7 +16,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/types.h>
@@ -36,6 +36,7 @@
 #include <linux/kmod.h>
 #include <net/sock.h>
 #include <net/pkt_sched.h>
+#include <net/pkt_cls.h>
 
 #if 0 /* control */
 #define DPRINTK(format,args...) printk(KERN_DEBUG format,##args)
@@ -52,15 +53,18 @@ static rwlock_t cls_mod_lock = RW_LOCK_UNLOCKED;
 
 /* Find classifier type by string name */
 
-struct tcf_proto_ops * tcf_proto_lookup_ops(struct rtattr *kind)
+static struct tcf_proto_ops * tcf_proto_lookup_ops(struct rtattr *kind)
 {
 	struct tcf_proto_ops *t = NULL;
 
 	if (kind) {
 		read_lock(&cls_mod_lock);
 		for (t = tcf_proto_base; t; t = t->next) {
-			if (rtattr_strcmp(kind, t->kind) == 0)
+			if (rtattr_strcmp(kind, t->kind) == 0) {
+				if (!try_module_get(t->owner))
+					t = NULL;
 				break;
+			}
 		}
 		read_unlock(&cls_mod_lock);
 	}
@@ -139,7 +143,7 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 	struct tcf_proto_ops *tp_ops;
 	struct Qdisc_class_ops *cops;
 	unsigned long cl = 0;
-	unsigned long fh, fh_s;
+	unsigned long fh;
 	int err;
 
 	if (prio == 0) {
@@ -230,9 +234,8 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 		tp->q = q;
 		tp->classify = tp_ops->classify;
 		tp->classid = parent;
-		err = -EBUSY;
-		if (!try_module_get(tp_ops->owner) ||
-		    (err = tp_ops->init(tp)) != 0) {
+		if ((err = tp_ops->init(tp)) != 0) {
+			module_put(tp_ops->owner);
 			kfree(tp);
 			goto errout;
 		}
@@ -245,7 +248,7 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 	} else if (tca[TCA_KIND-1] && rtattr_strcmp(tca[TCA_KIND-1], tp->ops->kind))
 		goto errout;
 
-	fh_s = fh = tp->ops->get(tp, t->tcm_handle);
+	fh = tp->ops->get(tp, t->tcm_handle);
 
 	if (fh == 0) {
 		if (n->nlmsg_type == RTM_DELTFILTER && t->tcm_handle == 0) {
@@ -253,7 +256,7 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 			*back = tp->next;
 			qdisc_unlock_tree(dev);
 
-			tfilter_notify(skb, n, tp, fh_s, RTM_DELTFILTER);
+			tfilter_notify(skb, n, tp, fh, RTM_DELTFILTER);
 			tcf_destroy(tp);
 			err = 0;
 			goto errout;
@@ -272,7 +275,7 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 		case RTM_DELTFILTER:
 			err = tp->ops->delete(tp, fh);
 			if (err == 0)
-				tfilter_notify(skb, n, tp, fh_s, RTM_DELTFILTER);
+				tfilter_notify(skb, n, tp, fh, RTM_DELTFILTER);
 			goto errout;
 		case RTM_GETTFILTER:
 			err = tfilter_notify(skb, n, tp, fh, RTM_NEWTFILTER);
@@ -292,19 +295,6 @@ errout:
 		cops->put(q, cl);
 	return err;
 }
-
-unsigned long tcf_set_class(struct tcf_proto *tp, unsigned long *clp, 
-			    unsigned long cl)
-{
-	unsigned long old_cl;
-
-	tcf_tree_lock(tp);
-	old_cl = __cls_set_class(clp, cl);
-	tcf_tree_unlock(tp);
-
-	return old_cl;
-}
-
 
 static int
 tcf_fill_node(struct sk_buff *skb, struct tcf_proto *tp, unsigned long fh,
@@ -471,4 +461,3 @@ subsys_initcall(tc_filter_init);
 
 EXPORT_SYMBOL(register_tcf_proto_ops);
 EXPORT_SYMBOL(unregister_tcf_proto_ops);
-EXPORT_SYMBOL(tcf_set_class);

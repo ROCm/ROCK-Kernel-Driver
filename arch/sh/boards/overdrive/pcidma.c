@@ -25,7 +25,7 @@ void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
 
         printk("BUG: pci_alloc_consistent() called - not yet supported\n");
 	/* We ALWAYS need DMA memory on the overdrive hardware,
-	 * due to it's extreme wierdness
+	 * due to it's extreme weirdness
 	 * Need to flush the cache here as well, since the memory
 	 * can still be seen through the cache!
 	 */

@@ -31,11 +31,13 @@
 #include <linux/time.h>
 #include <linux/jiffies.h>
 #include <linux/cpu.h>
+#include <linux/syscalls.h>
 
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
 #include <asm/div64.h>
 #include <asm/timex.h>
+#include <asm/io.h>
 
 #ifdef CONFIG_TIME_INTERPOLATION
 static void time_interpolator_update(long delta_nsec);
@@ -239,7 +241,6 @@ void add_timer_on(struct timer_list *timer, int cpu)
 	spin_unlock_irqrestore(&base->lock, flags);
 }
 
-EXPORT_SYMBOL(add_timer_on);
 
 /***
  * mod_timer - modify a timer's timeout
@@ -307,6 +308,8 @@ repeat:
 		goto repeat;
 	}
 	list_del(&timer->entry);
+	/* Need to make sure that anybody who sees a NULL base also sees the list ops */
+	smp_wmb();
 	timer->base = NULL;
 	spin_unlock_irqrestore(&base->lock, flags);
 
@@ -788,13 +791,12 @@ static void update_wall_time(unsigned long ticks)
 	do {
 		ticks--;
 		update_wall_time_one_tick();
+		if (xtime.tv_nsec >= 1000000000) {
+			xtime.tv_nsec -= 1000000000;
+			xtime.tv_sec++;
+			second_overflow();
+		}
 	} while (ticks);
-
-	if (xtime.tv_nsec >= 1000000000) {
-	    xtime.tv_nsec -= 1000000000;
-	    xtime.tv_sec++;
-	    second_overflow();
-	}
 }
 
 static inline void do_process_times(struct task_struct *p,
@@ -804,12 +806,13 @@ static inline void do_process_times(struct task_struct *p,
 
 	psecs = (p->utime += user);
 	psecs += (p->stime += system);
-	if (psecs / HZ >= p->rlim[RLIMIT_CPU].rlim_cur) {
+	if (p->signal && !unlikely(p->state & (EXIT_DEAD|EXIT_ZOMBIE)) &&
+	    psecs / HZ >= p->signal->rlim[RLIMIT_CPU].rlim_cur) {
 		/* Send SIGXCPU every second.. */
 		if (!(psecs % HZ))
 			send_sig(SIGXCPU, p, 1);
 		/* and SIGKILL when we go over max.. */
-		if (psecs / HZ >= p->rlim[RLIMIT_CPU].rlim_max)
+		if (psecs / HZ >= p->signal->rlim[RLIMIT_CPU].rlim_max)
 			send_sig(SIGKILL, p, 1);
 	}
 }
@@ -957,11 +960,6 @@ static inline void update_times(void)
 void do_timer(struct pt_regs *regs)
 {
 	jiffies_64++;
-#ifndef CONFIG_SMP
-	/* SMP process accounting uses the local APIC timer */
-
-	update_process_times(user_mode(regs));
-#endif
 	update_times();
 }
 
@@ -1442,7 +1440,7 @@ struct time_interpolator *time_interpolator;
 static struct time_interpolator *time_interpolator_list;
 static spinlock_t time_interpolator_lock = SPIN_LOCK_UNLOCKED;
 
-static inline unsigned long time_interpolator_get_cycles(unsigned int src)
+static inline u64 time_interpolator_get_cycles(unsigned int src)
 {
 	unsigned long (*x)(void);
 
@@ -1457,23 +1455,25 @@ static inline unsigned long time_interpolator_get_cycles(unsigned int src)
 
 		case TIME_SOURCE_MMIO32	:
 			return readl(time_interpolator->addr);
+
 		default: return get_cycles();
 	}
 }
 
-static inline unsigned long time_interpolator_get_counter(void)
+static inline u64 time_interpolator_get_counter(void)
 {
 	unsigned int src = time_interpolator->source;
 
 	if (time_interpolator->jitter)
 	{
-		unsigned long lcycle;
-		unsigned long now;
+		u64 lcycle;
+		u64 now;
 
 		do {
 			lcycle = time_interpolator->last_cycle;
 			now = time_interpolator_get_cycles(src);
-			if (lcycle && time_after(lcycle, now)) return lcycle;
+			if (lcycle && time_after(lcycle, now))
+				return lcycle;
 			/* Keep track of the last timer value returned. The use of cmpxchg here
 			 * will cause contention in an SMP environment.
 			 */
@@ -1490,23 +1490,29 @@ void time_interpolator_reset(void)
 	time_interpolator->last_counter = time_interpolator_get_counter();
 }
 
-unsigned long time_interpolator_resolution(void)
-{
-	return NSEC_PER_SEC / time_interpolator->frequency;
-}
-
-#define GET_TI_NSECS(count,i) ((((count) - i->last_counter) * i->nsec_per_cyc) >> i->shift)
+#define GET_TI_NSECS(count,i) (((((count) - i->last_counter) & (i)->mask) * (i)->nsec_per_cyc) >> (i)->shift)
 
 unsigned long time_interpolator_get_offset(void)
 {
+	/* If we do not have a time interpolator set up then just return zero */
+	if (!time_interpolator)
+		return 0;
+
 	return time_interpolator->offset +
 		GET_TI_NSECS(time_interpolator_get_counter(), time_interpolator);
 }
 
+#define INTERPOLATOR_ADJUST 65536
+#define INTERPOLATOR_MAX_SKIP 10*INTERPOLATOR_ADJUST
+
 static void time_interpolator_update(long delta_nsec)
 {
-	unsigned long counter = time_interpolator_get_counter();
-	unsigned long offset = time_interpolator->offset + GET_TI_NSECS(counter, time_interpolator);
+	u64 counter;
+	unsigned long offset;
+
+	/* If there is no time interpolator set up then do nothing */
+	if (!time_interpolator)
+		return;
 
 	/* The interpolator compensates for late ticks by accumulating
          * the late time in time_interpolator->offset. A tick earlier than
@@ -1515,6 +1521,9 @@ static void time_interpolator_update(long delta_nsec)
 	 * interpolator clock is running slightly slower than the regular clock
 	 * and the tuning logic insures that.
          */
+
+	counter = time_interpolator_get_counter();
+	offset = time_interpolator->offset + GET_TI_NSECS(counter, time_interpolator);
 
 	if (delta_nsec < 0 || (unsigned long) delta_nsec < offset)
 		time_interpolator->offset = offset - delta_nsec;
@@ -1554,7 +1563,11 @@ register_time_interpolator(struct time_interpolator *ti)
 {
 	unsigned long flags;
 
-	ti->nsec_per_cyc = (NSEC_PER_SEC << ti->shift) / ti->frequency;
+	/* Sanity check */
+	if (ti->frequency == 0 || ti->mask == 0)
+		BUG();
+
+	ti->nsec_per_cyc = ((u64)NSEC_PER_SEC << ti->shift) / ti->frequency;
 	spin_lock(&time_interpolator_lock);
 	write_seqlock_irqsave(&xtime_lock, flags);
 	if (is_better_time_interpolator(ti)) {
@@ -1605,7 +1618,7 @@ unregister_time_interpolator(struct time_interpolator *ti)
  */
 void msleep(unsigned int msecs)
 {
-	unsigned long timeout = msecs_to_jiffies(msecs);
+	unsigned long timeout = msecs_to_jiffies(msecs) + 1;
 
 	while (timeout) {
 		set_current_state(TASK_UNINTERRUPTIBLE);
@@ -1621,13 +1634,13 @@ EXPORT_SYMBOL(msleep);
  */
 unsigned long msleep_interruptible(unsigned int msecs)
 {
-       unsigned long timeout = msecs_to_jiffies(msecs);
+	unsigned long timeout = msecs_to_jiffies(msecs) + 1;
 
-       while (timeout && !signal_pending(current)) {
-               set_current_state(TASK_INTERRUPTIBLE);
-               timeout = schedule_timeout(timeout);
-       }
-       return jiffies_to_msecs(timeout);
+	while (timeout && !signal_pending(current)) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		timeout = schedule_timeout(timeout);
+	}
+	return jiffies_to_msecs(timeout);
 }
 
 EXPORT_SYMBOL(msleep_interruptible);

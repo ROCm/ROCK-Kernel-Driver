@@ -40,6 +40,7 @@
 #include <linux/config.h>
 #ifndef __ASSEMBLER__
 #include <asm/types.h>
+#include <asm/arch/cpu.h>
 #endif
 #include <asm/arch/io.h>
 
@@ -64,6 +65,7 @@
 #define ARM_RSTCT1		(CLKGEN_REG_BASE + 0x10)
 #define ARM_RSTCT2		(CLKGEN_REG_BASE + 0x14)
 #define ARM_SYSST		(CLKGEN_REG_BASE + 0x18)
+#define ARM_IDLECT3		(CLKGEN_REG_BASE + 0x24)
 
 #define CK_RATEF		1
 #define CK_IDLEF		2
@@ -140,12 +142,12 @@
 #define MPUTIM_AR		(1<<1)
 #define MPUTIM_ST		(1<<0)
 
-/* Watchdog */
-#define OMAP_WATCHDOG_BASE	(0xfffec800)
-#define OMAP_WDT_TIMER		(OMAP_WATCHDOG_BASE + 0x0)
-#define OMAP_WDT_LOAD_TIM	(OMAP_WATCHDOG_BASE + 0x4)
-#define OMAP_WDT_READ_TIM	(OMAP_WATCHDOG_BASE + 0x4)
-#define OMAP_WDT_TIMER_MODE	(OMAP_WATCHDOG_BASE + 0x8)
+/* Watchdog timer within the OMAP3.2 gigacell */
+#define OMAP_MPU_WATCHDOG_BASE	(0xfffec800)
+#define OMAP_WDT_TIMER		(OMAP_MPU_WATCHDOG_BASE + 0x0)
+#define OMAP_WDT_LOAD_TIM	(OMAP_MPU_WATCHDOG_BASE + 0x4)
+#define OMAP_WDT_READ_TIM	(OMAP_MPU_WATCHDOG_BASE + 0x4)
+#define OMAP_WDT_TIMER_MODE	(OMAP_MPU_WATCHDOG_BASE + 0x8)
 
 /*
  * ---------------------------------------------------------------------------
@@ -186,22 +188,22 @@
  * ---------------------------------------------------------------------------
  */
 #define TCMIF_BASE		0xfffecc00
-#define IMIF_PRIO_REG		__REG32(TCMIF_BASE + 0x00)
-#define EMIFS_PRIO_REG		__REG32(TCMIF_BASE + 0x04)
-#define EMIFF_PRIO_REG		__REG32(TCMIF_BASE + 0x08)
-#define EMIFS_CONFIG_REG	__REG32(TCMIF_BASE + 0x0c)
-#define EMIFS_CS0_CONFIG_REG	__REG32(TCMIF_BASE + 0x10)
-#define EMIFS_CS1_CONFIG_REG	__REG32(TCMIF_BASE + 0x14)
-#define EMIFS_CS2_CONFIG_REG	__REG32(TCMIF_BASE + 0x18)
-#define EMIFS_CS3_CONFIG_REG	__REG32(TCMIF_BASE + 0x1c)
-#define EMIFF_SDRAM_CONFIG_REG	__REG32(TCMIF_BASE + 0x20)
-#define EMIFF_MRS_REG		__REG32(TCMIF_BASE + 0x24)
-#define TC_TIMEOUT1_REG		__REG32(TCMIF_BASE + 0x28)
-#define TC_TIMEOUT2_REG		__REG32(TCMIF_BASE + 0x2c)
-#define TC_TIMEOUT3_REG		__REG32(TCMIF_BASE + 0x30)
-#define TC_ENDIANISM_REG	__REG32(TCMIF_BASE + 0x34)
-#define EMIFF_SDRAM_CONFIG_2_REG __REG32(TCMIF_BASE + 0x3c)
-#define EMIF_CFG_DYNAMIC_WS_REG	__REG32(TCMIF_BASE + 0x40)
+#define IMIF_PRIO		(TCMIF_BASE + 0x00)
+#define EMIFS_PRIO		(TCMIF_BASE + 0x04)
+#define EMIFF_PRIO		(TCMIF_BASE + 0x08)
+#define EMIFS_CONFIG		(TCMIF_BASE + 0x0c)
+#define EMIFS_CS0_CONFIG	(TCMIF_BASE + 0x10)
+#define EMIFS_CS1_CONFIG	(TCMIF_BASE + 0x14)
+#define EMIFS_CS2_CONFIG	(TCMIF_BASE + 0x18)
+#define EMIFS_CS3_CONFIG	(TCMIF_BASE + 0x1c)
+#define EMIFF_SDRAM_CONFIG	(TCMIF_BASE + 0x20)
+#define EMIFF_MRS		(TCMIF_BASE + 0x24)
+#define TC_TIMEOUT1		(TCMIF_BASE + 0x28)
+#define TC_TIMEOUT2		(TCMIF_BASE + 0x2c)
+#define TC_TIMEOUT3		(TCMIF_BASE + 0x30)
+#define TC_ENDIANISM		(TCMIF_BASE + 0x34)
+#define EMIFF_SDRAM_CONFIG_2	(TCMIF_BASE + 0x3c)
+#define EMIF_CFG_DYNAMIC_WS	(TCMIF_BASE + 0x40)
 
 /*
  * ----------------------------------------------------------------------------
@@ -235,6 +237,7 @@
 #define PULL_DWN_CTRL_1		0xfffe1044
 #define PULL_DWN_CTRL_2		0xfffe1048
 #define PULL_DWN_CTRL_3		0xfffe104c
+#define PULL_DWN_CTRL_4		0xfffe10ac
 
 /* OMAP-1610 specific multiplexing registers */
 #define FUNC_MUX_CTRL_E		0xfffe1090
@@ -247,6 +250,9 @@
 #define PU_PD_SEL_2		0xfffe10bc
 #define PU_PD_SEL_3		0xfffe10c0
 #define PU_PD_SEL_4		0xfffe10c4
+
+/* Timer32K for 1610 and 1710*/
+#define OMAP_TIMER32K_BASE	0xFFFBC400
 
 /*
  * ---------------------------------------------------------------------------
@@ -277,62 +283,44 @@
 
 /*
  * ---------------------------------------------------------------------------
- * Processor differentiation
+ * Serial ports
  * ---------------------------------------------------------------------------
  */
-#define OMAP_ID_BASE		(0xfffed400)
-#define OMAP_ID_REG		__REG32(OMAP_ID_BASE +  0x04)
+#define OMAP_UART1_BASE		(unsigned char *)0xfffb0000
+#define OMAP_UART2_BASE		(unsigned char *)0xfffb0800
+#define OMAP_UART3_BASE		(unsigned char *)0xfffb9800
+#define OMAP_MAX_NR_PORTS	3
+#define OMAP1510_BASE_BAUD	(12000000/16)
+#define OMAP16XX_BASE_BAUD	(48000000/16)
 
-#define ID_SHIFT		12
-#define ID_MASK			0x7fff
+#define is_omap_port(p)	({int __ret = 0;				\
+			if (p == (char*)IO_ADDRESS(OMAP_UART1_BASE) ||	\
+			    p == (char*)IO_ADDRESS(OMAP_UART2_BASE) ||	\
+			    p == (char*)IO_ADDRESS(OMAP_UART3_BASE))	\
+				__ret = 1;				\
+			__ret;						\
+			})
 
-/* See also uncompress.h */
-#define OMAP_ID_730		0x355F
-#define OMAP_ID_1510		0x3470
-#define OMAP_ID_1610		0x3576
-#define OMAP_ID_1710		0x35F7
-#define OMAP_ID_5912		0x358C
-#define OMAP_ID_1611            0x358C
-
+/*
+ * ---------------------------------------------------------------------------
+ * Processor specific defines
+ * ---------------------------------------------------------------------------
+ */
 #ifdef CONFIG_ARCH_OMAP730
 #include "omap730.h"
-#define cpu_is_omap730()	(((OMAP_ID_REG >> ID_SHIFT) & ID_MASK) == OMAP_ID_730)
-#else
-#define cpu_is_omap730()	0
 #endif
 
 #ifdef CONFIG_ARCH_OMAP1510
 #include "omap1510.h"
-#define cpu_is_omap1510()	(((OMAP_ID_REG >> ID_SHIFT) & ID_MASK) == OMAP_ID_1510)
-#else
-#define cpu_is_omap1510()	0
 #endif
 
-#ifdef CONFIG_ARCH_OMAP1610
-#include "omap1610.h"
-#define cpu_is_omap1610()	(((OMAP_ID_REG >> ID_SHIFT) & ID_MASK) == OMAP_ID_1610) || \
-				(((OMAP_ID_REG >> ID_SHIFT) & ID_MASK) == OMAP_ID_1611)
-#else
-#define cpu_is_omap1610()	0
-#endif
-
-#ifdef CONFIG_ARCH_OMAP1710
-#include "omap1610.h"
-#define cpu_is_omap1710()       (((OMAP_ID_REG >> ID_SHIFT) & ID_MASK) == OMAP_ID_1710)
-#else
-#define cpu_is_omap1710()	0
-#endif
-
-#ifdef CONFIG_ARCH_OMAP5912
-#include "omap5912.h"
-#define cpu_is_omap5912()	(((OMAP_ID_REG >> ID_SHIFT) & ID_MASK) == OMAP_ID_5912)
-#else
-#define cpu_is_omap5912()	0
+#ifdef CONFIG_ARCH_OMAP16XX
+#include "omap16xx.h"
 #endif
 
 /*
  * ---------------------------------------------------------------------------
- * Board differentiation
+ * Board specific defines
  * ---------------------------------------------------------------------------
  */
 

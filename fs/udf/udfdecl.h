@@ -99,7 +99,7 @@ extern void udf_read_inode(struct inode *);
 extern void udf_put_inode(struct inode *);
 extern void udf_delete_inode(struct inode *);
 extern void udf_clear_inode(struct inode *);
-extern void udf_write_inode(struct inode *, int);
+extern int udf_write_inode(struct inode *, int);
 extern long udf_block_map(struct inode *, long);
 extern int8_t inode_bmap(struct inode *, int, kernel_lb_addr *, uint32_t *, kernel_lb_addr *, uint32_t *, uint32_t *, struct buffer_head **);
 extern int8_t udf_add_aext(struct inode *, kernel_lb_addr *, int *, kernel_lb_addr, uint32_t, struct buffer_head **, int);

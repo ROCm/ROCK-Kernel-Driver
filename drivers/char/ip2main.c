@@ -112,11 +112,11 @@
 #include <linux/cdk.h>
 #include <linux/comstats.h>
 #include <linux/delay.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/bitops.h>
 
 #include <linux/vmalloc.h>
 #include <linux/init.h>
@@ -1632,8 +1632,7 @@ ip2_close( PTTY tty, struct file *pFile )
 
 	if (pCh->wopen) {
 		if (pCh->ClosingDelay) {
-			current->state = TASK_INTERRUPTIBLE;
-			schedule_timeout(pCh->ClosingDelay);
+			msleep_interruptible(jiffies_to_msecs(pCh->ClosingDelay));
 		}
 		wake_up_interruptible(&pCh->open_wait);
 	}

@@ -32,6 +32,15 @@ config SENSORS_ADM1025
 	  This driver can also be built as a module.  If so, the module
 	  will be called adm1025.
 
+config SENSORS_ADM1026
+	tristate "Analog Devices ADM1026 and compatibles"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for Analog Devices ADM1026
+	  This driver can also be built as a module.  If so, the module
+	  will be called adm1026.
+
 config SENSORS_ADM1031
 	tristate "Analog Devices ADM1031 and compatibles"
 	depends on I2C && EXPERIMENTAL
@@ -96,6 +105,19 @@ config SENSORS_IT87
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called it87.
+
+config SENSORS_LM63
+	tristate "National Semiconductor LM63"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for the National Semiconductor
+	  LM63 remote diode digital temperature sensor with integrated fan
+	  control.  Such chips are found on the Tyan S4882 (Thunder K8QS Pro)
+	  motherboard, among others.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called lm63.
 
 config SENSORS_LM75
 	tristate "National Semiconductor LM75 and compatibles"
@@ -169,6 +191,17 @@ config SENSORS_LM85
 	  This driver can also be built as a module.  If so, the module
 	  will be called lm85.
 
+config SENSORS_LM87
+	tristate "National Semiconductor LM87"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	help
+	  If you say yes here you get support for National Semiconductor LM87
+	  sensor chips.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called lm87.
+
 config SENSORS_LM90
 	tristate "National Semiconductor LM90 and compatibles"
 	depends on I2C
@@ -190,6 +223,21 @@ config SENSORS_MAX1619
 	  
 	  This driver can also be built as a module.  If so, the module
 	  will be called max1619.
+
+config SENSORS_PC87360
+	tristate "National Semiconductor PC87360 family"
+	depends on I2C && EXPERIMENTAL
+	select I2C_SENSOR
+	select I2C_ISA
+	help
+	  If you say yes here you get access to the hardware monitoring
+	  functions of the National Semiconductor PC8736x Super-I/O chips.
+	  The PC87360, PC87363 and PC87364 only have fan monitoring and
+	  control.  The PC87365 and PC87366 additionally have voltage and
+	  temperature monitoring.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called pc87360.
 
 config SENSORS_SMSC47M1
 	tristate "SMSC LPC47M10x and compatibles"

@@ -104,6 +104,13 @@ static int dummy_syslog (int type)
 	return 0;
 }
 
+static int dummy_settime(struct timespec *ts, struct timezone *tz)
+{
+	if (!capable(CAP_SYS_TIME))
+		return -EPERM;
+	return 0;
+}
+
 /*
  * Check that a process has enough memory to allocate a new virtual
  * mapping. 0 means there is enough memory for the allocation to
@@ -121,10 +128,10 @@ static int dummy_vm_enough_memory(long pages)
 	/*
 	 * Sometimes we want to use more memory than we have
 	 */
-	if (sysctl_overcommit_memory == 1)
+	if (sysctl_overcommit_memory == OVERCOMMIT_ALWAYS)
 		return 0;
 
-	if (sysctl_overcommit_memory == 0) {
+	if (sysctl_overcommit_memory == OVERCOMMIT_GUESS) {
 		free = get_page_cache_size();
 		free += nr_free_pages();
 		free += nr_swap_pages;
@@ -447,17 +454,17 @@ static int dummy_inode_removexattr (struct dentry *dentry, char *name)
 	return 0;
 }
 
-static int dummy_inode_getsecurity(struct dentry *dentry, const char *name, void *buffer, size_t size)
+static int dummy_inode_getsecurity(struct inode *inode, const char *name, void *buffer, size_t size)
 {
 	return -EOPNOTSUPP;
 }
 
-static int dummy_inode_setsecurity(struct dentry *dentry, const char *name, const void *value, size_t size, int flags) 
+static int dummy_inode_setsecurity(struct inode *inode, const char *name, const void *value, size_t size, int flags)
 {
 	return -EOPNOTSUPP;
 }
 
-static int dummy_inode_listsecurity(struct dentry *dentry, char *buffer)
+static int dummy_inode_listsecurity(struct inode *inode, char *buffer, size_t buffer_size)
 {
 	return 0;
 }
@@ -511,8 +518,7 @@ static int dummy_file_set_fowner (struct file *file)
 }
 
 static int dummy_file_send_sigiotask (struct task_struct *tsk,
-				      struct fown_struct *fown, int fd,
-				      int reason)
+				      struct fown_struct *fown, int sig)
 {
 	return 0;
 }
@@ -873,6 +879,9 @@ static int dummy_setprocattr(struct task_struct *p, char *name, void *value, siz
 	return -EINVAL;
 }
 
+
+struct security_operations dummy_security_ops;
+
 #define set_to_dummy_if_null(ops, function)				\
 	do {								\
 		if (!ops->function) {					\
@@ -894,6 +903,7 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, quota_on);
 	set_to_dummy_if_null(ops, sysctl);
 	set_to_dummy_if_null(ops, syslog);
+	set_to_dummy_if_null(ops, settime);
 	set_to_dummy_if_null(ops, vm_enough_memory);
 	set_to_dummy_if_null(ops, bprm_alloc_security);
 	set_to_dummy_if_null(ops, bprm_free_security);

@@ -99,17 +99,14 @@ static int linear_issue_flush(request_queue_t *q, struct gendisk *disk,
 	linear_conf_t *conf = mddev_to_conf(mddev);
 	int i, ret = 0;
 
-	for (i=0; i < mddev->raid_disks; i++) {
+	for (i=0; i < mddev->raid_disks && ret == 0; i++) {
 		struct block_device *bdev = conf->disks[i].rdev->bdev;
 		request_queue_t *r_queue = bdev_get_queue(bdev);
 
-		if (!r_queue->issue_flush_fn) {
+		if (!r_queue->issue_flush_fn)
 			ret = -EOPNOTSUPP;
-			break;
-		}
-		ret = r_queue->issue_flush_fn(r_queue, bdev->bd_disk, error_sector);
-		if (ret)
-			break;
+		else
+			ret = r_queue->issue_flush_fn(r_queue, bdev->bd_disk, error_sector);
 	}
 	return ret;
 }
@@ -119,8 +116,9 @@ static int linear_run (mddev_t *mddev)
 	linear_conf_t *conf;
 	struct linear_hash *table;
 	mdk_rdev_t *rdev;
-	int size, i, nb_zone, cnt;
-	unsigned int curr_offset;
+	int i, nb_zone, cnt;
+	sector_t start;
+	sector_t curr_offset;
 	struct list_head *tmp;
 
 	conf = kmalloc (sizeof (*conf) + mddev->raid_disks*sizeof(dev_info_t),
@@ -157,7 +155,7 @@ static int linear_run (mddev_t *mddev)
 		 */
 		if (rdev->bdev->bd_disk->queue->merge_bvec_fn &&
 		    mddev->queue->max_sectors > (PAGE_SIZE>>9))
-			mddev->queue->max_sectors = (PAGE_SIZE>>9);
+			blk_queue_max_sectors(mddev->queue, PAGE_SIZE>>9);
 
 		disk->size = rdev->size;
 		mddev->array_size += rdev->size;
@@ -195,23 +193,24 @@ static int linear_run (mddev_t *mddev)
 	 * Here we generate the linear hash table
 	 */
 	table = conf->hash_table;
-	size = 0;
+	start = 0;
 	curr_offset = 0;
 	for (i = 0; i < cnt; i++) {
 		dev_info_t *disk = conf->disks + i;
 
+		if (start > curr_offset)
+			table[-1].dev1 = disk;
+
 		disk->offset = curr_offset;
 		curr_offset += disk->size;
 
-		if (size < 0) {
-			table[-1].dev1 = disk;
-		}
-		size += disk->size;
-
-		while (size>0) {
+		/* 'curr_offset' is the end of this disk
+		 * 'start' is the start of table
+		 */
+		while (start < curr_offset) {
 			table->dev0 = disk;
 			table->dev1 = NULL;
-			size -= conf->smallest->size;
+			start += conf->smallest->size;
 			table++;
 		}
 	}
@@ -233,6 +232,7 @@ static int linear_stop (mddev_t *mddev)
 {
 	linear_conf_t *conf = mddev_to_conf(mddev);
   
+	blk_sync_queue(mddev->queue); /* the unplug fn references 'conf'*/
 	kfree(conf->hash_table);
 	kfree(conf);
 
@@ -268,10 +268,11 @@ static int linear_make_request (request_queue_t *q, struct bio *bio)
 		char b[BDEVNAME_SIZE];
 
 		printk("linear_make_request: Block %llu out of bounds on "
-			"dev %s size %ld offset %ld\n",
+			"dev %s size %llu offset %llu\n",
 			(unsigned long long)block,
 			bdevname(tmp_dev->rdev->bdev, b),
-			tmp_dev->size, tmp_dev->offset);
+			(unsigned long long)tmp_dev->size,
+		        (unsigned long long)tmp_dev->offset);
 		bio_io_error(bio, bio->bi_size);
 		return 0;
 	}

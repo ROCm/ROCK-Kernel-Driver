@@ -24,10 +24,10 @@ LDFLAGS_vmlinux	:= -Ttext $(KERNELLOAD) -Bstatic
 CPPFLAGS	+= -Iarch/$(ARCH)
 AFLAGS		+= -Iarch/$(ARCH)
 CFLAGS		+= -Iarch/$(ARCH) -msoft-float -pipe \
-		-ffixed-r2 -Wno-uninitialized -mmultiple
+		-ffixed-r2 -mmultiple
 CPP		= $(CC) -E $(CFLAGS)
 
-CHECKFLAGS	+= -D__powerpc__=1
+CHECKFLAGS	+= -D__powerpc__
 
 ifndef CONFIG_E500
 CFLAGS		+= -mstring
@@ -130,7 +130,7 @@ ifneq ($(AS_ALTIVEC),0)
 endif
 	@true
 
-CLEAN_FILES += arch/$(ARCH)/kernel/asm-offsets.s \
+CLEAN_FILES +=	include/asm-$(ARCH)/offsets.h \
+		arch/$(ARCH)/kernel/asm-offsets.s \
 		$(TOUT)
-MRPROPER_FILES += include/asm-$(ARCH)/offsets.h
 

@@ -36,7 +36,7 @@
 /*
  * Video4linux 1/2 integration by Justin Schoeman
  * <justin@suntiger.ee.up.ac.za>
- * 2.4 PROCFS support ported from 2.4 kernels by 
+ * 2.4 PROCFS support ported from 2.4 kernels by
  *  Iñaki García Etxebarria <garetxe@euskalnet.net>
  * Makefile fix by "W. Michael Petullo" <mike@flyn.org>
  * 2.4 devfs support ported from 2.4 kernels by
@@ -84,17 +84,20 @@ MODULE_LICENSE("GPL");
  *  Video Standard Operations (contributed by Michael Schimek)
  */
 
-/* This is the recommended method to deal with the framerate fields. More 
+#if 0 /* seems to have no users */
+/* This is the recommended method to deal with the framerate fields. More
    sophisticated drivers will access the fields directly. */
 unsigned int
 v4l2_video_std_fps(struct v4l2_standard *vs)
-{ 
+{
 	if (vs->frameperiod.numerator > 0)
-		return (((vs->frameperiod.denominator << 8) / 
-			 vs->frameperiod.numerator) + 
+		return (((vs->frameperiod.denominator << 8) /
+			 vs->frameperiod.numerator) +
 			(1 << 7)) / (1 << 8);
 	return 0;
 }
+EXPORT_SYMBOL(v4l2_video_std_fps);
+#endif
 
 /* Fill in the fields of a v4l2_standard structure according to the
    'id' and 'transmission' parameters.  Returns negative on error.  */
@@ -132,7 +135,7 @@ int v4l2_prio_init(struct v4l2_prio_state *global)
 	memset(global,0,sizeof(*global));
 	return 0;
 }
-	
+
 int v4l2_prio_change(struct v4l2_prio_state *global, enum v4l2_priority *local,
 		     enum v4l2_priority new)
 {
@@ -259,7 +262,6 @@ char *v4l2_ioctl_names[256] = {
 
 /* ----------------------------------------------------------------- */
 
-EXPORT_SYMBOL(v4l2_video_std_fps);
 EXPORT_SYMBOL(v4l2_video_std_construct);
 
 EXPORT_SYMBOL(v4l2_prio_init);

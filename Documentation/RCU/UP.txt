@@ -50,8 +50,8 @@ this case?
 
 Summary
 
-Permitting call_rcu() to immediatly invoke its arguments or permitting
-synchronize_kernel() to immediatly return breaks RCU, even on a UP system.
+Permitting call_rcu() to immediately invoke its arguments or permitting
+synchronize_kernel() to immediately return breaks RCU, even on a UP system.
 So do not do it!  Even on a UP system, the RCU infrastructure -must-
 respect grace periods.
 

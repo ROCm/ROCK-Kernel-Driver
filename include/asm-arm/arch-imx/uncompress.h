@@ -40,7 +40,7 @@
  * This does not append a newline
  */
 static void
-puts(const char *s)
+putstr(const char *s)
 {
 	unsigned long serial_port;
 

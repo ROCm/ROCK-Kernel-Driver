@@ -71,9 +71,10 @@ void hci_acl_connect(struct hci_conn *conn)
 
 	if ((ie = hci_inquiry_cache_lookup(hdev, &conn->dst)) &&
 			inquiry_entry_age(ie) <= INQUIRY_ENTRY_AGE_MAX) {
-		cp.pscan_rep_mode = ie->info.pscan_rep_mode;
-		cp.pscan_mode     = ie->info.pscan_mode;
-		cp.clock_offset   = ie->info.clock_offset | __cpu_to_le16(0x8000);
+		cp.pscan_rep_mode = ie->data.pscan_rep_mode;
+		cp.pscan_mode     = ie->data.pscan_mode;
+		cp.clock_offset   = ie->data.clock_offset | __cpu_to_le16(0x8000);
+		memcpy(conn->dev_class, ie->data.dev_class, 3);
 	}
 
 	cp.pkt_type = __cpu_to_le16(hdev->pkt_type & ACL_PTYPE_MASK);
@@ -163,11 +164,12 @@ struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type, bdaddr_t *dst)
 	hci_dev_hold(hdev);
 
 	tasklet_disable(&hdev->tx_task);
-	hci_conn_hash_add(hdev, conn);
-	tasklet_enable(&hdev->tx_task);
 
+	hci_conn_hash_add(hdev, conn);
 	if (hdev->notify)
 		hdev->notify(hdev, HCI_NOTIFY_CONN_ADD);
+
+	tasklet_enable(&hdev->tx_task);
 
 	return conn;
 }
@@ -195,11 +197,12 @@ int hci_conn_del(struct hci_conn *conn)
 		hdev->acl_cnt += conn->sent;
 	}
 
+	tasklet_disable(&hdev->tx_task);
+
+	hci_conn_hash_del(hdev, conn);
 	if (hdev->notify)
 		hdev->notify(hdev, HCI_NOTIFY_CONN_DEL);
 
-	tasklet_disable(&hdev->tx_task);
-	hci_conn_hash_del(hdev, conn);
 	tasklet_enable(&hdev->tx_task);
 
 	skb_queue_purge(&conn->data_q);
@@ -330,6 +333,20 @@ int hci_conn_encrypt(struct hci_conn *conn)
 	return 0;
 }
 EXPORT_SYMBOL(hci_conn_encrypt);
+
+/* Change link key */
+int hci_conn_change_link_key(struct hci_conn *conn)
+{
+	BT_DBG("conn %p", conn);
+
+	if (!test_and_set_bit(HCI_CONN_AUTH_PEND, &conn->pend)) {
+		struct hci_cp_change_conn_link_key cp;
+		cp.handle = __cpu_to_le16(conn->handle);
+		hci_send_cmd(conn->hdev, OGF_LINK_CTL, OCF_CHANGE_CONN_LINK_KEY, sizeof(cp), &cp);
+	}
+	return 0;
+}
+EXPORT_SYMBOL(hci_conn_change_link_key);
 
 /* Drop all connection on the device */
 void hci_conn_hash_flush(struct hci_dev *hdev)

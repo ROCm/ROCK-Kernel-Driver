@@ -57,7 +57,7 @@ void vcc_insert_socket(struct sock *sk)
 	write_unlock_irq(&vcc_sklist_lock);
 }
 
-void vcc_remove_socket(struct sock *sk)
+static void vcc_remove_socket(struct sock *sk)
 {
 	write_lock_irq(&vcc_sklist_lock);
 	sk_del_node_init(sk);
@@ -86,7 +86,6 @@ static struct sk_buff *alloc_tx(struct atm_vcc *vcc,unsigned int size)
 EXPORT_SYMBOL(vcc_hash);
 EXPORT_SYMBOL(vcc_sklist_lock);
 EXPORT_SYMBOL(vcc_insert_socket);
-EXPORT_SYMBOL(vcc_remove_socket);
 
 static void vcc_sock_destruct(struct sock *sk)
 {
@@ -178,6 +177,7 @@ static void vcc_destroy_socket(struct sock *sk)
 	struct atm_vcc *vcc = atm_sk(sk);
 	struct sk_buff *skb;
 
+	set_bit(ATM_VF_CLOSE, &vcc->flags);
 	clear_bit(ATM_VF_READY, &vcc->flags);
 	if (vcc->dev) {
 		if (vcc->dev->ops->close)
@@ -216,6 +216,7 @@ int vcc_release(struct socket *sock)
 void vcc_release_async(struct atm_vcc *vcc, int reply)
 {
 	set_bit(ATM_VF_CLOSE, &vcc->flags);
+	vcc->sk->sk_shutdown |= RCV_SHUTDOWN;
 	vcc->sk->sk_err = -reply;
 	clear_bit(ATM_VF_WAITING, &vcc->flags);
 	vcc->sk->sk_state_change(vcc->sk);

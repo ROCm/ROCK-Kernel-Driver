@@ -55,8 +55,6 @@ static unsigned char hid_keyboard[256] = {
 	150,158,159,128,136,177,178,176,142,152,173,140,unk,unk,unk,unk
 };
 
-static int hidinput_num;
-
 static struct {
 	__s32 x;
 	__s32 y;
@@ -598,9 +596,7 @@ int hidinput_connect(struct hid_device *hid)
 				hidinput->input.id.vendor = dev->descriptor.idVendor;
 				hidinput->input.id.product = dev->descriptor.idProduct;
 				hidinput->input.id.version = dev->descriptor.bcdDevice;
-				hidinput->input.dev = get_device(&hid->intf->dev);
-				sprintf(hidinput->input.cdev.class_id,"usbhid%d",
-					hidinput_num++);
+				hidinput->input.dev = &hid->intf->dev;
 			}
 
 			for (i = 0; i < report->maxfield; i++)
@@ -641,7 +637,6 @@ void hidinput_disconnect(struct hid_device *hid)
 
 	list_for_each_safe (lh, next, &hid->inputs) {
 		hidinput = list_entry(lh, struct hid_input, list);
-		put_device(hidinput->input.dev);
 		input_unregister_device(&hidinput->input);
 		list_del(&hidinput->list);
 		kfree(hidinput);

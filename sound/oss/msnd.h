@@ -183,7 +183,7 @@ typedef u8			BYTE;
 typedef u16			USHORT;
 typedef u16			WORD;
 typedef u32			DWORD;
-typedef unsigned long		LPDAQD;
+typedef void __iomem *		LPDAQD;
 
 /* Generic FIFO */
 typedef struct {
@@ -203,12 +203,12 @@ typedef struct multisound_dev {
 	int memid, irqid;
 	int irq, irq_ref;
 	unsigned char info;
-	unsigned long base;
+	void __iomem *base;
 
 	/* Motorola 56k DSP SMA */
-	unsigned long SMA;
-	unsigned long DAPQ, DARQ, MODQ, MIDQ, DSPQ;
-	unsigned long pwDSPQData, pwMIDQData, pwMODQData;
+	void __iomem *SMA;
+	void __iomem *DAPQ, *DARQ, *MODQ, *MIDQ, *DSPQ;
+	void __iomem *pwDSPQData, *pwMIDQData, *pwMODQData;
 	int dspq_data_buff, dspq_buff_size;
 
 	/* State variables */
@@ -258,20 +258,18 @@ typedef struct multisound_dev {
 
 int				msnd_register(multisound_dev_t *dev);
 void				msnd_unregister(multisound_dev_t *dev);
-int				msnd_get_num_devs(void);
-multisound_dev_t *		msnd_get_dev(int i);
 
-void				msnd_init_queue(unsigned long, int start, int size);
+void				msnd_init_queue(void __iomem *, int start, int size);
 
 void				msnd_fifo_init(msnd_fifo *f);
 void				msnd_fifo_free(msnd_fifo *f);
 int				msnd_fifo_alloc(msnd_fifo *f, size_t n);
 void				msnd_fifo_make_empty(msnd_fifo *f);
+int				msnd_fifo_write_io(msnd_fifo *f, char __iomem *buf, size_t len);
+int				msnd_fifo_read_io(msnd_fifo *f, char __iomem *buf, size_t len);
 int				msnd_fifo_write(msnd_fifo *f, const char *buf, size_t len);
 int				msnd_fifo_read(msnd_fifo *f, char *buf, size_t len);
 
-int				msnd_wait_TXDE(multisound_dev_t *dev);
-int				msnd_wait_HC0(multisound_dev_t *dev);
 int				msnd_send_dsp_cmd(multisound_dev_t *dev, BYTE cmd);
 int				msnd_send_word(multisound_dev_t *dev, unsigned char high,
 					       unsigned char mid, unsigned char low);

@@ -91,10 +91,10 @@ acpi_ns_dump_one_device (
 			ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, " "));
 		}
 
-		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES, "    HID: %s, ADR: %8.8X%8.8X, Status: %X\n",
-				  info->hardware_id.value,
-				  ACPI_FORMAT_UINT64 (info->address),
-				  info->current_status));
+		ACPI_DEBUG_PRINT_RAW ((ACPI_DB_TABLES,
+			"    HID: %s, ADR: %8.8X%8.8X, Status: %X\n",
+			info->hardware_id.value, ACPI_FORMAT_UINT64 (info->address),
+			info->current_status));
 		ACPI_MEM_FREE (info);
 	}
 
@@ -133,7 +133,8 @@ acpi_ns_dump_root_devices (void)
 		return;
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_TABLES, "Display of all devices in the namespace:\n"));
+	ACPI_DEBUG_PRINT ((ACPI_DB_TABLES,
+		"Display of all devices in the namespace:\n"));
 
 	status = acpi_ns_walk_namespace (ACPI_TYPE_DEVICE, sys_bus_handle,
 			 ACPI_UINT32_MAX, ACPI_NS_WALK_NO_UNLOCK,

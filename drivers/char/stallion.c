@@ -42,6 +42,7 @@
 #include <linux/smp_lock.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/device.h>
+#include <linux/delay.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -481,7 +482,7 @@ static unsigned long stl_atol(char *str);
 int		stl_init(void);
 static int	stl_open(struct tty_struct *tty, struct file *filp);
 static void	stl_close(struct tty_struct *tty, struct file *filp);
-static int	stl_write(struct tty_struct *tty, int from_user, const unsigned char *buf, int count);
+static int	stl_write(struct tty_struct *tty, const unsigned char *buf, int count);
 static void	stl_putchar(struct tty_struct *tty, unsigned char ch);
 static void	stl_flushchars(struct tty_struct *tty);
 static int	stl_writeroom(struct tty_struct *tty);
@@ -512,7 +513,6 @@ static int	stl_clrportstats(stlport_t *portp, comstats_t __user *cp);
 static int	stl_getportstruct(stlport_t __user *arg);
 static int	stl_getbrdstruct(stlbrd_t __user *arg);
 static int	stl_waitcarrier(stlport_t *portp, struct file *filp);
-static void	stl_delay(int len);
 static void	stl_eiointr(stlbrd_t *brdp);
 static void	stl_echatintr(stlbrd_t *brdp);
 static void	stl_echmcaintr(stlbrd_t *brdp);
@@ -1197,15 +1197,14 @@ static void stl_close(struct tty_struct *tty, struct file *filp)
 		portp->tx.tail = (char *) NULL;
 	}
 	set_bit(TTY_IO_ERROR, &tty->flags);
-	if (tty->ldisc.flush_buffer)
-		(tty->ldisc.flush_buffer)(tty);
+	tty_ldisc_flush(tty);
 
 	tty->closing = 0;
 	portp->tty = (struct tty_struct *) NULL;
 
 	if (portp->openwaitcnt) {
 		if (portp->close_delay)
-			stl_delay(portp->close_delay);
+			msleep_interruptible(jiffies_to_msecs(portp->close_delay));
 		wake_up_interruptible(&portp->open_wait);
 	}
 
@@ -1217,30 +1216,11 @@ static void stl_close(struct tty_struct *tty, struct file *filp)
 /*****************************************************************************/
 
 /*
- *	Wait for a specified delay period, this is not a busy-loop. It will
- *	give up the processor while waiting. Unfortunately this has some
- *	rather intimate knowledge of the process management stuff.
- */
-
-static void stl_delay(int len)
-{
-#ifdef DEBUG
-	printk("stl_delay(len=%d)\n", len);
-#endif
-	if (len > 0) {
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(len);
-	}
-}
-
-/*****************************************************************************/
-
-/*
  *	Write routine. Take data and stuff it in to the TX ring queue.
  *	If transmit interrupts are not running then start them.
  */
 
-static int stl_write(struct tty_struct *tty, int from_user, const unsigned char *buf, int count)
+static int stl_write(struct tty_struct *tty, const unsigned char *buf, int count)
 {
 	stlport_t	*portp;
 	unsigned int	len, stlen;
@@ -1248,8 +1228,8 @@ static int stl_write(struct tty_struct *tty, int from_user, const unsigned char 
 	char		*head, *tail;
 
 #ifdef DEBUG
-	printk("stl_write(tty=%x,from_user=%d,buf=%x,count=%d)\n",
-		(int) tty, from_user, (int) buf, count);
+	printk("stl_write(tty=%x,buf=%x,count=%d)\n",
+		(int) tty, (int) buf, count);
 #endif
 
 	if ((tty == (struct tty_struct *) NULL) ||
@@ -1268,18 +1248,6 @@ static int stl_write(struct tty_struct *tty, int from_user, const unsigned char 
  *	copy it into the TX buffer.
  */
 	chbuf = (unsigned char *) buf;
-	if (from_user) {
-		head = portp->tx.head;
-		tail = portp->tx.tail;
-		len = (head >= tail) ? (STL_TXBUFSIZE - (head - tail) - 1) :
-			(tail - head - 1);
-		count = MIN(len, count);
-		
-		down(&stl_tmpwritesem);
-		if (copy_from_user(stl_tmpwritebuf, chbuf, count)) 
-			return -EFAULT;
-		chbuf = &stl_tmpwritebuf[0];
-	}
 
 	head = portp->tx.head;
 	tail = portp->tx.tail;
@@ -1309,9 +1277,6 @@ static int stl_write(struct tty_struct *tty, int from_user, const unsigned char 
 
 	clear_bit(ASYI_TXLOW, &portp->istate);
 	stl_startrxtx(portp, -1, 1);
-
-	if (from_user)
-		up(&stl_tmpwritesem);
 
 	return(count);
 }
@@ -1809,10 +1774,7 @@ static void stl_flushbuffer(struct tty_struct *tty)
 		return;
 
 	stl_flush(portp);
-	wake_up_interruptible(&tty->write_wait);
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
+	tty_wakeup(tty);
 }
 
 /*****************************************************************************/
@@ -1858,7 +1820,7 @@ static void stl_waituntilsent(struct tty_struct *tty, int timeout)
 	while (stl_datastate(portp)) {
 		if (signal_pending(current))
 			break;
-		stl_delay(2);
+		msleep_interruptible(20);
 		if (time_after_eq(jiffies, tend))
 			break;
 	}
@@ -2193,10 +2155,7 @@ static void stl_offintr(void *private)
 
 	lock_kernel();
 	if (test_bit(ASYI_TXLOW, &portp->istate)) {
-		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-		    tty->ldisc.write_wakeup)
-			(tty->ldisc.write_wakeup)(tty);
-		wake_up_interruptible(&tty->write_wait);
+		tty_wakeup(tty);
 	}
 	if (test_bit(ASYI_DCDCHANGE, &portp->istate)) {
 		clear_bit(ASYI_DCDCHANGE, &portp->istate);

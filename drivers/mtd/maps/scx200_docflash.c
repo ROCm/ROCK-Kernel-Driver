@@ -2,7 +2,7 @@
 
    Copyright (c) 2001,2002 Christer Weinigel <wingel@nano-system.com>
 
-   $Id: scx200_docflash.c,v 1.6 2004/07/12 21:59:45 dwmw2 Exp $ 
+   $Id: scx200_docflash.c,v 1.9 2004/11/16 18:29:02 dwmw2 Exp $ 
 
    National Semiconductor SCx200 flash mapped with DOCCS
 */
@@ -81,7 +81,7 @@ static struct map_info scx200_docflash_map = {
 	.name      = "NatSemi SCx200 DOCCS Flash",
 };
 
-int __init init_scx200_docflash(void)
+static int __init init_scx200_docflash(void)
 {
 	unsigned u;
 	unsigned base;
@@ -190,7 +190,7 @@ int __init init_scx200_docflash(void)
 	mymtd = do_map_probe(flashtype, &scx200_docflash_map);
 	if (!mymtd) {
 		printk(KERN_ERR NAME ": unable to detect flash\n");
-		iounmap((void *)scx200_docflash_map.virt);
+		iounmap(scx200_docflash_map.virt);
 		release_resource(&docmem);
 		return -ENXIO;
 	}
@@ -221,7 +221,7 @@ static void __exit cleanup_scx200_docflash(void)
 		map_destroy(mymtd);
 	}
 	if (scx200_docflash_map.virt) {
-		iounmap((void *)scx200_docflash_map.virt);
+		iounmap(scx200_docflash_map.virt);
 		release_resource(&docmem);
 	}
 }

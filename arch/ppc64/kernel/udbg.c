@@ -11,6 +11,8 @@
 
 #include <stdarg.h>
 #define WANT_PPCDBG_TAB /* Only defined here */
+#include <linux/config.h>
+#include <linux/types.h>
 #include <asm/ppcdebug.h>
 #include <asm/processor.h>
 #include <asm/naca.h>
@@ -19,6 +21,9 @@
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/pmac_feature.h>
+
+extern u8 real_readb(volatile u8 __iomem  *addr);
+extern void real_writeb(u8 data, volatile u8 __iomem *addr);
 
 struct NS16550 {
 	/* this struct must be packed */
@@ -47,21 +52,25 @@ struct NS16550 {
 #define LSR_TEMT 0x40  /* Xmitter empty */
 #define LSR_ERR  0x80  /* Error */
 
-static volatile struct NS16550 *udbg_comport;
+static volatile struct NS16550 __iomem *udbg_comport;
 
-void udbg_init_uart(void *comport)
+void udbg_init_uart(void __iomem *comport, unsigned int speed)
 {
+	u16 dll = speed ? (115200 / speed) : 12;
+
 	if (comport) {
-		udbg_comport = (struct NS16550 *)comport;
-		udbg_comport->lcr = 0x00; eieio();
-		udbg_comport->ier = 0xFF; eieio();
-		udbg_comport->ier = 0x00; eieio();
-		udbg_comport->lcr = 0x80; eieio();	/* Access baud rate */
-		udbg_comport->dll = 12;   eieio();	/* 1 = 115200,  2 = 57600, 3 = 38400, 12 = 9600 baud */
-		udbg_comport->dlm = 0;    eieio();	/* dll >> 8 which should be zero for fast rates; */
-		udbg_comport->lcr = 0x03; eieio();	/* 8 data, 1 stop, no parity */
-		udbg_comport->mcr = 0x03; eieio();	/* RTS/DTR */
-		udbg_comport->fcr = 0x07; eieio();	/* Clear & enable FIFOs */
+		udbg_comport = (struct NS16550 __iomem *)comport;
+		out_8(&udbg_comport->lcr, 0x00);
+		out_8(&udbg_comport->ier, 0xff);
+		out_8(&udbg_comport->ier, 0x00);
+		out_8(&udbg_comport->lcr, 0x80);	/* Access baud rate */
+		out_8(&udbg_comport->dll, dll & 0xff);	/* 1 = 115200,  2 = 57600,
+							   3 = 38400, 12 = 9600 baud */
+		out_8(&udbg_comport->dlm, dll >> 8);	/* dll >> 8 which should be zero
+							   for fast rates; */
+		out_8(&udbg_comport->lcr, 0x03);	/* 8 data, 1 stop, no parity */
+		out_8(&udbg_comport->mcr, 0x03);	/* RTS/DTR */
+		out_8(&udbg_comport->fcr ,0x07);	/* Clear & enable FIFOs */
 	}
 }
 
@@ -70,7 +79,8 @@ void udbg_init_uart(void *comport)
 #define	SCC_TXRDY	4
 #define SCC_RXRDY	1
 
-static volatile u8 *sccc, *sccd;
+static volatile u8 __iomem *sccc;
+static volatile u8 __iomem *sccd;
 
 static unsigned char scc_inittab[] = {
     13, 0,		/* set baud rate divisor */
@@ -84,31 +94,44 @@ static unsigned char scc_inittab[] = {
 
 void udbg_init_scc(struct device_node *np)
 {
+	u32 *reg;
 	unsigned long addr;
 	int i, x;
 
 	if (np == NULL)
 		np = of_find_node_by_name(NULL, "escc");
-	if (np == NULL)
+	if (np == NULL || np->parent == NULL)
 		return;
-	
-	/* Lock-enable the SCC channel */
-	pmac_call_feature(PMAC_FTR_SCC_ENABLE, np, PMAC_SCC_ASYNC | PMAC_SCC_FLAG_XMON, 1);
+
+	udbg_printf("found SCC...\n");
+	/* Get address within mac-io ASIC */ 
+	reg = (u32 *)get_property(np, "reg", NULL);
+	if (reg == NULL)
+		return;
+	addr = reg[0];
+	udbg_printf("local addr: %lx\n", addr);
+	/* Get address of mac-io PCI itself */
+	reg = (u32 *)get_property(np->parent, "assigned-addresses", NULL);
+	if (reg == NULL)
+		return;
+	addr += reg[2];
+	udbg_printf("final addr: %lx\n", addr);
 
 	/* Setup for 57600 8N1 */
-	addr = np->addrs[0].address + 0x20;
-	sccc = (volatile u8 *) ioremap(addr & PAGE_MASK, PAGE_SIZE) ;
+	addr += 0x20;
+	sccc = (volatile u8 * __iomem) ioremap(addr & PAGE_MASK, PAGE_SIZE) ;
 	sccc += addr & ~PAGE_MASK;
 	sccd = sccc + 0x10;
 
+	udbg_printf("ioremap result sccc: %p\n", sccc);
+	mb();
+
 	for (i = 20000; i != 0; --i)
-		x = *sccc; eieio();
-	*sccc = 9; eieio();		/* reset A or B side */
-	*sccc = 0xc0; eieio();
-	for (i = 0; i < sizeof(scc_inittab); ++i) {
-		*sccc = scc_inittab[i];
-		eieio();
-	}
+		x = in_8(sccc);
+	out_8(sccc, 0x09);		/* reset A or B side */
+	out_8(sccc, 0xc0);
+	for (i = 0; i < sizeof(scc_inittab); ++i)
+		out_8(sccc, scc_inittab[i]);
 
 	ppc_md.udbg_putc = udbg_putc;
 	ppc_md.udbg_getc = udbg_getc;
@@ -119,25 +142,71 @@ void udbg_init_scc(struct device_node *np)
 
 #endif /* CONFIG_PPC_PMAC */
 
+#if CONFIG_PPC_PMAC
+static void udbg_real_putc(unsigned char c)
+{
+	while ((real_readb(sccc) & SCC_TXRDY) == 0)
+		;
+	real_writeb(c, sccd);
+	if (c == '\n')
+		udbg_real_putc('\r');
+}
+
+void udbg_init_pmac_realmode(void)
+{
+	sccc = (volatile u8 __iomem *)0x80013020ul;
+	sccd = (volatile u8 __iomem *)0x80013030ul;
+
+	ppc_md.udbg_putc = udbg_real_putc;
+	ppc_md.udbg_getc = NULL;
+	ppc_md.udbg_getc_poll = NULL;
+}
+#endif /* CONFIG_PPC_PMAC */
+
+#ifdef CONFIG_PPC_MAPLE
+void udbg_maple_real_putc(unsigned char c)
+{
+	if (udbg_comport) {
+		while ((real_readb(&udbg_comport->lsr) & LSR_THRE) == 0)
+			/* wait for idle */;
+		real_writeb(c, &udbg_comport->thr); eieio();
+		if (c == '\n') {
+			/* Also put a CR.  This is for convenience. */
+			while ((real_readb(&udbg_comport->lsr) & LSR_THRE) == 0)
+				/* wait for idle */;
+			real_writeb('\r', &udbg_comport->thr); eieio();
+		}
+	}
+}
+
+void udbg_init_maple_realmode(void)
+{
+	udbg_comport = (volatile struct NS16550 __iomem *)0xf40003f8;
+
+	ppc_md.udbg_putc = udbg_maple_real_putc;
+	ppc_md.udbg_getc = NULL;
+	ppc_md.udbg_getc_poll = NULL;
+}
+#endif /* CONFIG_PPC_MAPLE */
+
 void udbg_putc(unsigned char c)
 {
 	if (udbg_comport) {
-		while ((udbg_comport->lsr & LSR_THRE) == 0)
+		while ((in_8(&udbg_comport->lsr) & LSR_THRE) == 0)
 			/* wait for idle */;
-		udbg_comport->thr = c; eieio();
+		out_8(&udbg_comport->thr, c);
 		if (c == '\n') {
 			/* Also put a CR.  This is for convenience. */
-			while ((udbg_comport->lsr & LSR_THRE) == 0)
-				/* wait for idle */;
-			udbg_comport->thr = '\r'; eieio();
+			while ((in_8(&udbg_comport->lsr) & LSR_THRE) == 0)
+				/* wait for idle */; 
+			out_8(&udbg_comport->thr, '\r');
 		}
 	}
 #ifdef CONFIG_PPC_PMAC
 	else if (sccc) {
-		while ((*sccc & SCC_TXRDY) == 0)
-			eieio();
-		*sccd = c;		
-		eieio();
+		while ((in_8(sccc) & SCC_TXRDY) == 0)
+			;
+		out_8(sccd,  c);		
 		if (c == '\n')
 			udbg_putc('\r');
 	}
@@ -147,16 +216,15 @@ void udbg_putc(unsigned char c)
 int udbg_getc_poll(void)
 {
 	if (udbg_comport) {
-		if ((udbg_comport->lsr & LSR_DR) != 0)
-			return udbg_comport->rbr;
+		if ((in_8(&udbg_comport->lsr) & LSR_DR) != 0)
+			return in_8(&udbg_comport->rbr);
 		else
 			return -1;
 	}
 #ifdef CONFIG_PPC_PMAC
 	else if (sccc) {
-		eieio();
-		if ((*sccc & SCC_RXRDY) != 0)
-			return *sccd;
+		if ((in_8(sccc) & SCC_RXRDY) != 0)
+			return in_8(sccd);
 		else
 			return -1;
 	}
@@ -167,16 +235,15 @@ int udbg_getc_poll(void)
 unsigned char udbg_getc(void)
 {
 	if (udbg_comport) {
-		while ((udbg_comport->lsr & LSR_DR) == 0)
+		while ((in_8(&udbg_comport->lsr) & LSR_DR) == 0)
 			/* wait for char */;
-		return udbg_comport->rbr;
+		return in_8(&udbg_comport->rbr);
 	}
 #ifdef CONFIG_PPC_PMAC
 	else if (sccc) {
-		eieio();
-		while ((*sccc & SCC_RXRDY) == 0)
-			eieio();
-		return *sccd;
+		while ((in_8(sccc) & SCC_RXRDY) == 0)
+			;
+		return in_8(sccd);
 	}
 #endif /* CONFIG_PPC_PMAC */
 	return 0;
@@ -191,9 +258,12 @@ void udbg_puts(const char *s)
 			while ((c = *s++) != '\0')
 				ppc_md.udbg_putc(c);
 		}
-	} else {
+	}
+#if 0
+	else {
 		printk("%s", s);
 	}
+#endif
 }
 
 int udbg_write(const char *s, int n)
@@ -218,7 +288,7 @@ int udbg_read(char *buf, int buflen)
 	char c, *p = buf;
 	int i;
 
-	if (!ppc_md.udbg_putc)
+	if (!ppc_md.udbg_getc)
 		return 0;
 
 	for (i = 0; i < buflen; ++i) {

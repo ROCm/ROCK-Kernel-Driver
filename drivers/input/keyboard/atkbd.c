@@ -175,8 +175,6 @@ static unsigned char atkbd_scroll_keys[5][2] = {
 #define ATKBD_FLAG_CMD1		2	/* First byte of command response */
 #define ATKBD_FLAG_ENABLED	3	/* Waining for init to finish */
 
-static int atkbd_num;
-
 /*
  * The atkbd control structure
  */
@@ -804,7 +802,6 @@ static void atkbd_disconnect(struct serio *serio)
 	flush_scheduled_work();
 
 	input_unregister_device(&atkbd->dev);
-	put_device(&serio->dev);
 	serio_close(serio);
 	kfree(atkbd);
 }
@@ -928,8 +925,6 @@ static void atkbd_connect(struct serio *serio, struct serio_driver *drv)
 	atkbd->dev.id.vendor = 0x0001;
 	atkbd->dev.id.product = atkbd->translated ? 1 : atkbd->set;
 	atkbd->dev.id.version = atkbd->id;
-	atkbd->dev.dev = get_device(&serio->dev);
-	sprintf(atkbd->dev.cdev.class_id,"atkbd%d",atkbd_num++);
 
 	for (i = 0; i < 512; i++)
 		if (atkbd->keycode[i] && atkbd->keycode[i] < ATKBD_SPECIAL)

@@ -7,7 +7,7 @@
 
 #include <linux/mman.h>
 #include <linux/mm.h>
-#include <linux/module.h>
+#include <linux/syscalls.h>
 
 
 static int mlock_fixup(struct vm_area_struct * vma, 
@@ -47,14 +47,8 @@ static int mlock_fixup(struct vm_area_struct * vma,
 	pages = (end - start) >> PAGE_SHIFT;
 	if (newflags & VM_LOCKED) {
 		pages = -pages;
-		ret = make_pages_present(start, end);
-		/* Ran into a hole. This should be an error, but 
-		   some users specify too long lengths e.g. for 
-		   file maps. Ignore it for now.
-		   RED-PEN can locked_vm become negative when this happens? 
-		   Hopefully not. */
-		if (ret == -1) 
-			ret = 0;
+		if (!(newflags & VM_IO))
+			ret = make_pages_present(start, end);
 	}
 
 	vma->vm_mm->locked_vm -= pages;
@@ -68,8 +62,6 @@ static int do_mlock(unsigned long start, size_t len, int on)
 	struct vm_area_struct * vma, * next;
 	int error;
 
-	if (on && !can_do_mlock())
-		return -EPERM;
 	len = PAGE_ALIGN(len);
 	end = start + len;
 	if (end < start)
@@ -115,6 +107,9 @@ asmlinkage long sys_mlock(unsigned long start, size_t len)
 	unsigned long lock_limit;
 	int error = -ENOMEM;
 
+	if (!can_do_mlock())
+		return -EPERM;
+
 	down_write(&current->mm->mmap_sem);
 	len = PAGE_ALIGN(len + (start & ~PAGE_MASK));
 	start &= PAGE_MASK;
@@ -122,16 +117,15 @@ asmlinkage long sys_mlock(unsigned long start, size_t len)
 	locked = len >> PAGE_SHIFT;
 	locked += current->mm->locked_vm;
 
-	lock_limit = current->rlim[RLIMIT_MEMLOCK].rlim_cur;
+	lock_limit = current->signal->rlim[RLIMIT_MEMLOCK].rlim_cur;
 	lock_limit >>= PAGE_SHIFT;
 
 	/* check against resource limits */
-	if ( (locked <= lock_limit) || capable(CAP_IPC_LOCK))
+	if ((locked <= lock_limit) || capable(CAP_IPC_LOCK))
 		error = do_mlock(start, len, 1);
 	up_write(&current->mm->mmap_sem);
 	return error;
 }
-EXPORT_SYMBOL(sys_mlock);
 
 asmlinkage long sys_munlock(unsigned long start, size_t len)
 {
@@ -144,23 +138,18 @@ asmlinkage long sys_munlock(unsigned long start, size_t len)
 	up_write(&current->mm->mmap_sem);
 	return ret;
 }
-EXPORT_SYMBOL(sys_munlock);
 
 static int do_mlockall(int flags)
 {
-	int error;
-	unsigned int def_flags;
 	struct vm_area_struct * vma;
+	unsigned int def_flags = 0;
 
-	if (!can_do_mlock())
-		return -EPERM;
-
-	def_flags = 0;
 	if (flags & MCL_FUTURE)
 		def_flags = VM_LOCKED;
 	current->mm->def_flags = def_flags;
+	if (flags == MCL_FUTURE)
+		goto out;
 
-	error = 0;
 	for (vma = current->mm->mmap; vma ; vma = vma->vm_next) {
 		unsigned int newflags;
 
@@ -171,7 +160,8 @@ static int do_mlockall(int flags)
 		/* Ignore errors */
 		mlock_fixup(vma, vma->vm_start, vma->vm_end, newflags);
 	}
-	return error;
+out:
+	return 0;
 }
 
 asmlinkage long sys_mlockall(int flags)
@@ -179,18 +169,24 @@ asmlinkage long sys_mlockall(int flags)
 	unsigned long lock_limit;
 	int ret = -EINVAL;
 
-	down_write(&current->mm->mmap_sem);
 	if (!flags || (flags & ~(MCL_CURRENT | MCL_FUTURE)))
 		goto out;
 
-	lock_limit = current->rlim[RLIMIT_MEMLOCK].rlim_cur;
+	ret = -EPERM;
+	if (!can_do_mlock())
+		goto out;
+
+	down_write(&current->mm->mmap_sem);
+
+	lock_limit = current->signal->rlim[RLIMIT_MEMLOCK].rlim_cur;
 	lock_limit >>= PAGE_SHIFT;
 
 	ret = -ENOMEM;
-	if ((current->mm->total_vm <= lock_limit) || capable(CAP_IPC_LOCK))
+	if (!(flags & MCL_CURRENT) || (current->mm->total_vm <= lock_limit) ||
+	    capable(CAP_IPC_LOCK))
 		ret = do_mlockall(flags);
-out:
 	up_write(&current->mm->mmap_sem);
+out:
 	return ret;
 }
 
@@ -215,10 +211,10 @@ int user_shm_lock(size_t size, struct user_struct *user)
 	unsigned long lock_limit, locked;
 	int allowed = 0;
 
-	spin_lock(&shmlock_user_lock);
-	locked = size >> PAGE_SHIFT;
-	lock_limit = current->rlim[RLIMIT_MEMLOCK].rlim_cur;
+	locked = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	lock_limit = current->signal->rlim[RLIMIT_MEMLOCK].rlim_cur;
 	lock_limit >>= PAGE_SHIFT;
+	spin_lock(&shmlock_user_lock);
 	if (locked + user->locked_shm > lock_limit && !capable(CAP_IPC_LOCK))
 		goto out;
 	get_uid(user);
@@ -232,7 +228,7 @@ out:
 void user_shm_unlock(size_t size, struct user_struct *user)
 {
 	spin_lock(&shmlock_user_lock);
-	user->locked_shm -= (size >> PAGE_SHIFT);
+	user->locked_shm -= (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	spin_unlock(&shmlock_user_lock);
 	free_uid(user);
 }

@@ -2,7 +2,6 @@
  * PS/2 mouse driver
  *
  * Copyright (c) 1999-2002 Vojtech Pavlik
- * Copyright (c) 2003-2004 Dmitry Torokhov
  */
 
 /*
@@ -22,7 +21,6 @@
 #include "psmouse.h"
 #include "synaptics.h"
 #include "logips2pp.h"
-#include "alps.h"
 
 #define DRIVER_DESC	"PS/2 mouse driver"
 
@@ -57,9 +55,7 @@ __obsolete_setup("psmouse_smartscroll=");
 __obsolete_setup("psmouse_resetafter=");
 __obsolete_setup("psmouse_rate=");
 
-static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "PS2T++", "GenPS/2", "ImPS/2", "ImExPS/2", "SynPS/2", "AlpsPS/2" };
-
-static int psmouse_num;
+static char *psmouse_protocols[] = { "None", "PS/2", "PS2++", "PS2T++", "GenPS/2", "ImPS/2", "ImExPS/2", "SynPS/2"};
 
 /*
  * psmouse_process_byte() analyzes the PS/2 data stream and reports
@@ -214,20 +210,6 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 		printk(KERN_WARNING "psmouse.c: %s at %s lost synchronization, throwing %d bytes away.\n",
 		       psmouse->name, psmouse->phys, psmouse->pktcnt);
 		psmouse->pktcnt = 0;
-		psmouse->error++;
-		/*
-		 * this maybe come from a internal resetted mouse e.g. a IMPS2 mouse
-		 * which falled back into PS2 mode, so if resetafter parameter is set
-		 * try a reconnect
-		 */
-		if (psmouse_resetafter && (psmouse->error >= psmouse_resetafter)) {
-			psmouse->error = 0;
-			psmouse->state = PSMOUSE_IGNORE;
-			printk(KERN_NOTICE "psmouse.c: %s at %s issuing reconnect request\n",
-				psmouse->name, psmouse->phys);
-			serio_reconnect(psmouse->serio);
-			goto out;
-		}
 	}
 
 	psmouse->last = jiffies;
@@ -512,26 +494,6 @@ static int psmouse_extensions(struct psmouse *psmouse,
 		synaptics_reset(psmouse);
 	}
 
-/*
- * Try ALPS TouchPad
- */
-	if (max_proto > PSMOUSE_PS2 && alps_detect(psmouse)) {
-
-		if (set_properties) {
-			psmouse->vendor = "ALPS";
-			psmouse->name = "TouchPad";
-		}
-
-		if (max_proto > PSMOUSE_IMEX)
-			if (!set_properties || alps_init(psmouse) == 0)
-				return PSMOUSE_ALPS;
-
-/*
- * Don't try anything fancy, just basic Intellimouse/Explorer protocols
- */
-		max_proto = PSMOUSE_IMEX;
-	}
-
 	if (max_proto > PSMOUSE_IMEX && genius_detect(psmouse)) {
 
 		if (set_properties) {
@@ -763,7 +725,6 @@ static void psmouse_disconnect(struct serio *serio)
 	psmouse_set_state(psmouse, PSMOUSE_IGNORE);
 
 	input_unregister_device(&psmouse->dev);
-	put_device(&serio->dev);
 	serio_close(serio);
 	kfree(psmouse);
 }
@@ -836,8 +797,6 @@ static void psmouse_connect(struct serio *serio, struct serio_driver *drv)
 	psmouse->dev.id.vendor = 0x0002;
 	psmouse->dev.id.product = psmouse->type;
 	psmouse->dev.id.version = psmouse->model;
-	psmouse->dev.dev = get_device(&serio->dev);
-	sprintf(psmouse->dev.cdev.class_id,"psmouse%d", psmouse_num++);
 
 	input_register_device(&psmouse->dev);
 

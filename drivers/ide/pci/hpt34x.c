@@ -42,66 +42,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "hpt34x.h"
-
-#if defined(DISPLAY_HPT34X_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 hpt34x_proc = 0;
-
-#define HPT34X_MAX_DEVS		8
-static struct pci_dev *hpt34x_devs[HPT34X_MAX_DEVS];
-static int n_hpt34x_devs;
-
-static int hpt34x_get_info (char *buffer, char **addr, off_t offset, int count)
-{
-	char *p = buffer;
-	int i, len;
-
-	p += sprintf(p, "\n                             "
-			"HPT34X Chipset.\n");
-	for (i = 0; i < n_hpt34x_devs; i++) {
-		struct pci_dev *dev = hpt34x_devs[i];
-		unsigned long bibma = pci_resource_start(dev, 4);
-		u8  c0 = 0, c1 = 0;
-
-		/*
-		 * at that point bibma+0x2 et bibma+0xa are byte registers
-		 * to investigate:
-		 */
-		c0 = inb_p((u16)bibma + 0x02);
-		c1 = inb_p((u16)bibma + 0x0a);
-		p += sprintf(p, "\nController: %d\n", i);
-		p += sprintf(p, "--------------- Primary Channel "
-				"---------------- Secondary Channel "
-				"-------------\n");
-		p += sprintf(p, "                %sabled "
-				"                        %sabled\n",
-				(c0&0x80) ? "dis" : " en",
-				(c1&0x80) ? "dis" : " en");
-		p += sprintf(p, "--------------- drive0 --------- drive1 "
-				"-------- drive0 ---------- drive1 ------\n");
-		p += sprintf(p, "DMA enabled:    %s              %s"
-				"             %s               %s\n",
-				(c0&0x20) ? "yes" : "no ",
-				(c0&0x40) ? "yes" : "no ",
-				(c1&0x20) ? "yes" : "no ",
-				(c1&0x40) ? "yes" : "no " );
-
-		p += sprintf(p, "UDMA\n");
-		p += sprintf(p, "DMA\n");
-		p += sprintf(p, "PIO\n");
-	}
-	p += sprintf(p, "\n");
-
-	/* p - buffer must be less than 4k! */
-	len = (p - buffer) - offset;
-	*addr = buffer + offset;
-	
-	return len > count ? count : len;
-}
-#endif  /* defined(DISPLAY_HPT34X_TIMINGS) && defined(CONFIG_PROC_FS) */
+#define HPT343_DEBUG_DRIVE_INFO		0
 
 static u8 hpt34x_ratemask (ide_drive_t *drive)
 {
@@ -128,7 +69,8 @@ static int hpt34x_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	u32 reg1= 0, tmp1 = 0, reg2 = 0, tmp2 = 0;
 	u8			hi_speed, lo_speed;
 
-	SPLIT_BYTE(speed, hi_speed, lo_speed);
+	hi_speed = speed >> 4;
+	lo_speed = speed & 0x0f;
 
 	if (hi_speed & 7) {
 		hi_speed = (hi_speed & 4) ? 0x01 : 0x10;
@@ -189,40 +131,20 @@ static int hpt34x_config_drive_xfer_rate (ide_drive_t *drive)
 	drive->init_speed = 0;
 
 	if (id && (id->capability & 1) && drive->autodma) {
-		/* Consult the list of known "bad" drives */
-		if (__ide_dma_bad_drive(drive))
-			goto fast_ata_pio;
-		if (id->field_valid & 4) {
-			if (id->dma_ultra & hwif->ultra_mask) {
-				/* Force if Capable UltraDMA */
-				int dma = config_chipset_for_dma(drive);
-				if ((id->field_valid & 2) && dma)
-					goto try_dma_modes;
-			}
-		} else if (id->field_valid & 2) {
-try_dma_modes:
-			if ((id->dma_mword & hwif->mwdma_mask) ||
-			    (id->dma_1word & hwif->swdma_mask)) {
-				/* Force if Capable regular DMA modes */
-				if (!config_chipset_for_dma(drive))
-					goto no_dma_set;
-			}
-		} else if (__ide_dma_good_drive(drive) &&
-			   (id->eide_dma_time < 150)) {
-			/* Consult the list of known "good" drives */
-			if (!config_chipset_for_dma(drive))
-				goto no_dma_set;
-		} else {
-			goto fast_ata_pio;
-		}
+
+		if (ide_use_dma(drive)) {
+			if (config_chipset_for_dma(drive))
 #ifndef CONFIG_HPT34X_AUTODMA
-		return hwif->ide_dma_off_quietly(drive);
+				return hwif->ide_dma_off_quietly(drive);
 #else
-		return hwif->ide_dma_on(drive);
+				return hwif->ide_dma_on(drive);
 #endif
+		}
+
+		goto fast_ata_pio;
+
 	} else if ((id->capability & 8) || (id->field_valid & 2)) {
 fast_ata_pio:
-no_dma_set:
 		hpt34x_tune_drive(drive, 255);
 		return hwif->ide_dma_off_quietly(drive);
 	}
@@ -277,15 +199,6 @@ static unsigned int __devinit init_chipset_hpt34x(struct pci_dev *dev, const cha
 
 	local_irq_restore(flags);
 
-#if defined(DISPLAY_HPT34X_TIMINGS) && defined(CONFIG_PROC_FS)
-	hpt34x_devs[n_hpt34x_devs++] = dev;
-
-	if (!hpt34x_proc) {
-		hpt34x_proc = 1;
-		ide_pci_create_host_proc("hpt34x", hpt34x_get_info);
-	}
-#endif /* DISPLAY_HPT34X_TIMINGS && CONFIG_PROC_FS */
-
 	return dev->irq;
 }
 
@@ -317,9 +230,19 @@ static void __devinit init_hwif_hpt34x(ide_hwif_t *hwif)
 	hwif->drives[1].autodma = hwif->autodma;
 }
 
+static ide_pci_device_t hpt34x_chipset __devinitdata = {
+	.name		= "HPT34X",
+	.init_chipset	= init_chipset_hpt34x,
+	.init_hwif	= init_hwif_hpt34x,
+	.channels	= 2,
+	.autodma	= NOAUTODMA,
+	.bootable	= NEVER_BOARD,
+	.extra		= 16
+};
+
 static int __devinit hpt34x_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &hpt34x_chipsets[id->driver_data];
+	ide_pci_device_t *d = &hpt34x_chipset;
 	static char *chipset_names[] = {"HPT343", "HPT345"};
 	u16 pcicmd = 0;
 

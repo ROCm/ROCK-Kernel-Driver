@@ -43,7 +43,6 @@ struct dc_kbd {
 	int open;
 };
 
-static int dc_kbd_num;
 
 static void dc_scan_kbd(struct dc_kbd *kbd)
 {
@@ -140,7 +139,6 @@ static int dc_kbd_connect(struct maple_device *dev)
 
 	kbd->dev.name = dev->product_name;
 	kbd->dev.id.bustype = BUS_MAPLE;
-	sprintf(kbd->dev.cdev.class_id,"dckbd%d",dc_kdb_num++);
 
 	input_register_device(&kbd->dev);
 

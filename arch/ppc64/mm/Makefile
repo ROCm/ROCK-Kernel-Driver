@@ -8,3 +8,4 @@ obj-y := fault.o init.o imalloc.o hash_utils.o hash_low.o tlb.o \
 	slb_low.o slb.o stab.o mmap.o
 obj-$(CONFIG_DISCONTIGMEM) += numa.o
 obj-$(CONFIG_HUGETLB_PAGE) += hugetlbpage.o
+obj-$(CONFIG_PPC_MULTIPLATFORM) += hash_native.o

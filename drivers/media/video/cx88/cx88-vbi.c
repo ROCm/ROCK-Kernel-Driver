@@ -1,5 +1,5 @@
 /*
- * $Id: cx88-vbi.c,v 1.9 2004/09/15 16:15:24 kraxel Exp $
+ * $Id: cx88-vbi.c,v 1.14 2004/11/07 13:17:15 kraxel Exp $
  */
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -9,11 +9,11 @@
 #include "cx88.h"
 
 static unsigned int vbibufs = 4;
-MODULE_PARM(vbibufs,"i");
+module_param(vbibufs,int,0644);
 MODULE_PARM_DESC(vbibufs,"number of vbi buffers, range 2-32");
 
 static unsigned int vbi_debug = 0;
-MODULE_PARM(vbi_debug,"i");
+module_param(vbi_debug,int,0644);
 MODULE_PARM_DESC(vbi_debug,"enable debug messages [vbi]");
 
 #define dprintk(level,fmt, arg...)	if (vbi_debug >= level) \
@@ -66,14 +66,30 @@ int cx8800_start_vbi_dma(struct cx8800_dev    *dev,
 	/* enable irqs */
 	cx_set(MO_PCI_INTMSK, 0x00fc01);
 	cx_set(MO_VID_INTMSK, 0x0f0088);
-	
+
 	/* enable capture */
 	cx_set(VID_CAPTURE_CONTROL,0x18);
-	
+
 	/* start dma */
 	cx_set(MO_DEV_CNTRL2, (1<<5));
 	cx_set(MO_VID_DMACNTRL, 0x88);
 
+	return 0;
+}
+
+int cx8800_stop_vbi_dma(struct cx8800_dev *dev)
+{
+	struct cx88_core *core = dev->core;
+
+	/* stop dma */
+	cx_clear(MO_VID_DMACNTRL, 0x88);
+
+	/* disable capture */
+	cx_clear(VID_CAPTURE_CONTROL,0x18);
+
+	/* disable irqs */
+	cx_clear(MO_PCI_INTMSK, 0x000001);
+	cx_clear(MO_VID_INTMSK, 0x0f0088);
 	return 0;
 }
 
@@ -82,7 +98,7 @@ int cx8800_restart_vbi_queue(struct cx8800_dev    *dev,
 {
 	struct cx88_buffer *buf;
 	struct list_head *item;
-	
+
 	if (list_empty(&q->active))
 		return 0;
 
@@ -107,7 +123,7 @@ void cx8800_vbi_timeout(unsigned long data)
 	unsigned long flags;
 
 	cx88_sram_channel_dump(dev->core, &cx88_sram_channels[SRAM_CH24]);
-	
+
 	cx_clear(MO_VID_DMACNTRL, 0x88);
 	cx_clear(VID_CAPTURE_CONTROL, 0x18);
 
@@ -127,7 +143,7 @@ void cx8800_vbi_timeout(unsigned long data)
 /* ------------------------------------------------------------------ */
 
 static int
-vbi_setup(struct file *file, unsigned int *count, unsigned int *size)
+vbi_setup(struct videobuf_queue *q, unsigned int *count, unsigned int *size)
 {
 	*size = VBI_LINE_COUNT * VBI_LINE_LENGTH * 2;
 	if (0 == *count)
@@ -140,12 +156,12 @@ vbi_setup(struct file *file, unsigned int *count, unsigned int *size)
 }
 
 static int
-vbi_prepare(struct file *file, struct videobuf_buffer *vb,
+vbi_prepare(struct videobuf_queue *q, struct videobuf_buffer *vb,
 	    enum v4l2_field field)
 {
-	struct cx8800_fh   *fh  = file->private_data;
+	struct cx8800_fh   *fh  = q->priv_data;
 	struct cx8800_dev  *dev = fh->dev;
-	struct cx88_buffer *buf = (struct cx88_buffer*)vb;
+	struct cx88_buffer *buf = container_of(vb,struct cx88_buffer,vb);
 	unsigned int size;
 	int rc;
 
@@ -164,7 +180,7 @@ vbi_prepare(struct file *file, struct videobuf_buffer *vb,
 		cx88_risc_buffer(dev->pci, &buf->risc,
 				 buf->vb.dma.sglist,
 				 0, buf->vb.width * buf->vb.height,
-				 buf->vb.width, 0, 
+				 buf->vb.width, 0,
 				 buf->vb.height);
 	}
 	buf->vb.state = STATE_PREPARED;
@@ -176,11 +192,11 @@ vbi_prepare(struct file *file, struct videobuf_buffer *vb,
 }
 
 static void
-vbi_queue(struct file *file, struct videobuf_buffer *vb)
+vbi_queue(struct videobuf_queue *vq, struct videobuf_buffer *vb)
 {
-	struct cx88_buffer    *buf  = (struct cx88_buffer*)vb;
+	struct cx88_buffer    *buf = container_of(vb,struct cx88_buffer,vb);
 	struct cx88_buffer    *prev;
-	struct cx8800_fh      *fh   = file->private_data;
+	struct cx8800_fh      *fh   = vq->priv_data;
 	struct cx8800_dev     *dev  = fh->dev;
 	struct cx88_dmaqueue  *q    = &dev->vbiq;
 
@@ -208,10 +224,10 @@ vbi_queue(struct file *file, struct videobuf_buffer *vb)
 	}
 }
 
-static void vbi_release(struct file *file, struct videobuf_buffer *vb)
+static void vbi_release(struct videobuf_queue *q, struct videobuf_buffer *vb)
 {
-	struct cx88_buffer *buf = (struct cx88_buffer*)vb;
-	struct cx8800_fh   *fh  = file->private_data;
+	struct cx88_buffer *buf = container_of(vb,struct cx88_buffer,vb);
+	struct cx8800_fh   *fh  = q->priv_data;
 
 	cx88_free_buffer(fh->dev->pci,buf);
 }

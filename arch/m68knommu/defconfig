@@ -35,8 +35,9 @@ CONFIG_LOG_BUF_SHIFT=14
 # CONFIG_M5206 is not set
 # CONFIG_M5206e is not set
 # CONFIG_M5249 is not set
+# CONFIG_M527x is not set
 CONFIG_M5272=y
-# CONFIG_M5282 is not set
+# CONFIG_M528x is not set
 # CONFIG_M5307 is not set
 # CONFIG_M5407 is not set
 CONFIG_COLDFIRE=y
@@ -55,7 +56,10 @@ CONFIG_COLDFIRE=y
 # CONFIG_CLOCK_60MHz is not set
 CONFIG_CLOCK_66MHz=y
 # CONFIG_CLOCK_70MHz is not set
+# CONFIG_CLOCK_100MHz is not set
 # CONFIG_CLOCK_140MHz is not set
+# CONFIG_CLOCK_150MHz is not set
+# CONFIG_CLOCK_166MHz is not set
 
 #
 # Platform

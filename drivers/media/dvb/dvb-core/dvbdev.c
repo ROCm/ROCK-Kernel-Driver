@@ -49,6 +49,7 @@ static const char * const dnames[] = {
 	"net", "osd"
 };
 
+
 #define DVB_MAX_IDS              4
 #define nums2minor(num,type,id)  ((num << 6) | (id << 4) | type)
 
@@ -107,6 +108,7 @@ static struct file_operations dvb_device_fops =
 	.open =		dvb_device_open,
 };
 
+
 int dvb_generic_open(struct inode *inode, struct file *file)
 {
         struct dvb_device *dvbdev = file->private_data;
@@ -130,6 +132,7 @@ int dvb_generic_open(struct inode *inode, struct file *file)
 	dvbdev->users--;
 	return 0;
 }
+EXPORT_SYMBOL(dvb_generic_open);
 
 
 int dvb_generic_release(struct inode *inode, struct file *file)
@@ -144,10 +147,11 @@ int dvb_generic_release(struct inode *inode, struct file *file)
 	} else {
 		dvbdev->writers++;
 	}
-	
+
 	dvbdev->users++;
 	return 0;
 }
+EXPORT_SYMBOL(dvb_generic_release);
 
 
 int dvb_generic_ioctl(struct inode *inode, struct file *file,
@@ -163,6 +167,7 @@ int dvb_generic_ioctl(struct inode *inode, struct file *file,
 
 	return dvb_usercopy (inode, file, cmd, arg, dvbdev->kernel_ioctl);
 }
+EXPORT_SYMBOL(dvb_generic_ioctl);
 
 
 static int dvbdev_get_free_id (struct dvb_adapter *adap, int type)
@@ -221,7 +226,7 @@ int dvb_register_device(struct dvb_adapter *adap, struct dvb_device **pdvbdev,
 	list_add_tail (&dvbdev->list_head, &adap->device_list);
 
 	devfs_mk_cdev(MKDEV(DVB_MAJOR, nums2minor(adap->num, type, id)),
- 			S_IFCHR | S_IRUSR | S_IWUSR,
+			S_IFCHR | S_IRUSR | S_IWUSR,
 			"dvb/adapter%d/%s%d", adap->num, dnames[type], id);
 
 	class_simple_device_add(dvb_class, MKDEV(DVB_MAJOR, nums2minor(adap->num, type, id)),
@@ -229,10 +234,11 @@ int dvb_register_device(struct dvb_adapter *adap, struct dvb_device **pdvbdev,
 
 	dprintk("DVB: register adapter%d/%s%d @ minor: %i (0x%02x)\n",
 		adap->num, dnames[type], id, nums2minor(adap->num, type, id),
- 		nums2minor(adap->num, type, id));
+		nums2minor(adap->num, type, id));
 
 	return 0;
 }
+EXPORT_SYMBOL(dvb_register_device);
 
 
 void dvb_unregister_device(struct dvb_device *dvbdev)
@@ -240,15 +246,16 @@ void dvb_unregister_device(struct dvb_device *dvbdev)
 	if (!dvbdev)
 		return;
 
-	devfs_remove("dvb/adapter%d/%s%d", dvbdev->adapter->num,
-			dnames[dvbdev->type], dvbdev->id);
+		devfs_remove("dvb/adapter%d/%s%d", dvbdev->adapter->num,
+				dnames[dvbdev->type], dvbdev->id);
 
 	class_simple_device_remove(MKDEV(DVB_MAJOR, nums2minor(dvbdev->adapter->num,
 					dvbdev->type, dvbdev->id)));
 
-	list_del (&dvbdev->list_head);
-	kfree (dvbdev);
-}
+		list_del(&dvbdev->list_head);
+		kfree(dvbdev);
+	}
+EXPORT_SYMBOL(dvb_unregister_device);
 
 
 static int dvbdev_get_free_adapter_num (void)
@@ -296,6 +303,7 @@ int dvb_register_adapter(struct dvb_adapter **padap, const char *name, struct mo
 	printk ("DVB: registering new adapter (%s).\n", name);
 	
 	devfs_mk_dir("dvb/adapter%d", num);
+
 	adap->num = num;
 	adap->name = name;
 	adap->module = module;
@@ -306,6 +314,7 @@ int dvb_register_adapter(struct dvb_adapter **padap, const char *name, struct mo
 
 	return num;
 }
+EXPORT_SYMBOL(dvb_register_adapter);
 
 
 int dvb_unregister_adapter(struct dvb_adapter *adap)
@@ -319,6 +328,7 @@ int dvb_unregister_adapter(struct dvb_adapter *adap)
 	kfree (adap);
 	return 0;
 }
+EXPORT_SYMBOL(dvb_unregister_adapter);
 
 /* if the miracle happens and "generic_usercopy()" is included into
    the kernel, then this can vanish. please don't make the mistake and

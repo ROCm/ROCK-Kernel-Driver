@@ -5,7 +5,7 @@
  *
  * This code is GPL
  *
- * $Id: pnc2000.c,v 1.15 2004/07/12 21:59:44 dwmw2 Exp $
+ * $Id: pnc2000.c,v 1.17 2004/11/16 18:29:02 dwmw2 Exp $
  */
 
 #include <linux/module.h>
@@ -18,7 +18,7 @@
 #include <linux/mtd/partitions.h>
 
 
-#define WINDOW_ADDR (void __iomem *)0xbf000000
+#define WINDOW_ADDR 0xbf000000
 #define WINDOW_SIZE 0x00400000
 
 /* 
@@ -26,12 +26,12 @@
  */
 
 
-struct map_info pnc_map = {
+static struct map_info pnc_map = {
 	.name = "PNC-2000",
 	.size = WINDOW_SIZE,
 	.bankwidth = 4,
 	.phys = 0xFFFFFFFF,
-	.virt = WINDOW_ADDR,
+	.virt = (void __iomem *)WINDOW_ADDR,
 };
 
 
@@ -62,9 +62,9 @@ static struct mtd_partition pnc_partitions[3] = {
  */
 static struct mtd_info *mymtd;
 
-int __init init_pnc2000(void)
+static int __init init_pnc2000(void)
 {
-	printk(KERN_NOTICE "Photron PNC-2000 flash mapping: %x at %p\n", WINDOW_SIZE, WINDOW_ADDR);
+	printk(KERN_NOTICE "Photron PNC-2000 flash mapping: %x at %x\n", WINDOW_SIZE, WINDOW_ADDR);
 
 	simple_map_init(&pnc_map);
 

@@ -96,7 +96,7 @@ void bad_trap(struct pt_regs *regs, long lvl)
 	siginfo_t info;
 
 	if (notify_die(DIE_TRAP, "bad trap", regs,
-		       0, lvl, SIGTRAP) == NOTIFY_OK)
+		       0, lvl, SIGTRAP) == NOTIFY_STOP)
 		return;
 
 	if (lvl < 0x100) {
@@ -126,7 +126,7 @@ void bad_trap_tl1(struct pt_regs *regs, long lvl)
 	char buffer[32];
 	
 	if (notify_die(DIE_TRAP_TL1, "bad trap tl1", regs,
-		       0, lvl, SIGTRAP) == NOTIFY_OK)
+		       0, lvl, SIGTRAP) == NOTIFY_STOP)
 		return;
 
 	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
@@ -149,7 +149,7 @@ void instruction_access_exception(struct pt_regs *regs,
 	siginfo_t info;
 
 	if (notify_die(DIE_TRAP, "instruction access exception", regs,
-		       0, 0x8, SIGTRAP) == NOTIFY_OK)
+		       0, 0x8, SIGTRAP) == NOTIFY_STOP)
 		return;
 
 	if (regs->tstate & TSTATE_PRIV) {
@@ -173,7 +173,7 @@ void instruction_access_exception_tl1(struct pt_regs *regs,
 				      unsigned long sfsr, unsigned long sfar)
 {
 	if (notify_die(DIE_TRAP_TL1, "instruction access exception tl1", regs,
-		       0, 0x8, SIGTRAP) == NOTIFY_OK)
+		       0, 0x8, SIGTRAP) == NOTIFY_STOP)
 		return;
 
 	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
@@ -186,7 +186,7 @@ void data_access_exception(struct pt_regs *regs,
 	siginfo_t info;
 
 	if (notify_die(DIE_TRAP, "data access exception", regs,
-		       0, 0x30, SIGTRAP) == NOTIFY_OK)
+		       0, 0x30, SIGTRAP) == NOTIFY_STOP)
 		return;
 
 	if (regs->tstate & TSTATE_PRIV) {
@@ -260,7 +260,7 @@ void do_iae(struct pt_regs *regs)
 	spitfire_clean_and_reenable_l1_caches();
 
 	if (notify_die(DIE_TRAP, "instruction access exception", regs,
-		       0, 0x8, SIGTRAP) == NOTIFY_OK)
+		       0, 0x8, SIGTRAP) == NOTIFY_STOP)
 		return;
 
 	info.si_signo = SIGBUS;
@@ -292,7 +292,7 @@ void do_dae(struct pt_regs *regs)
 	spitfire_clean_and_reenable_l1_caches();
 
 	if (notify_die(DIE_TRAP, "data access exception", regs,
-		       0, 0x30, SIGTRAP) == NOTIFY_OK)
+		       0, 0x30, SIGTRAP) == NOTIFY_STOP)
 		return;
 
 	info.si_signo = SIGBUS;
@@ -1695,7 +1695,7 @@ void do_fpe_common(struct pt_regs *regs)
 void do_fpieee(struct pt_regs *regs)
 {
 	if (notify_die(DIE_TRAP, "fpu exception ieee", regs,
-		       0, 0x24, SIGFPE) == NOTIFY_OK)
+		       0, 0x24, SIGFPE) == NOTIFY_STOP)
 		return;
 
 	do_fpe_common(regs);
@@ -1709,7 +1709,7 @@ void do_fpother(struct pt_regs *regs)
 	int ret = 0;
 
 	if (notify_die(DIE_TRAP, "fpu exception other", regs,
-		       0, 0x25, SIGFPE) == NOTIFY_OK)
+		       0, 0x25, SIGFPE) == NOTIFY_STOP)
 		return;
 
 	switch ((current_thread_info()->xfsr[0] & 0x1c000)) {
@@ -1728,7 +1728,7 @@ void do_tof(struct pt_regs *regs)
 	siginfo_t info;
 
 	if (notify_die(DIE_TRAP, "tagged arithmetic overflow", regs,
-		       0, 0x26, SIGEMT) == NOTIFY_OK)
+		       0, 0x26, SIGEMT) == NOTIFY_STOP)
 		return;
 
 	if (regs->tstate & TSTATE_PRIV)
@@ -1750,7 +1750,7 @@ void do_div0(struct pt_regs *regs)
 	siginfo_t info;
 
 	if (notify_die(DIE_TRAP, "integer division by zero", regs,
-		       0, 0x28, SIGFPE) == NOTIFY_OK)
+		       0, 0x28, SIGFPE) == NOTIFY_STOP)
 		return;
 
 	if (regs->tstate & TSTATE_PRIV)
@@ -1843,6 +1843,37 @@ void dump_stack(void)
 
 EXPORT_SYMBOL(dump_stack);
 
+static inline int is_kernel_stack(struct task_struct *task,
+				  struct reg_window *rw)
+{
+	unsigned long rw_addr = (unsigned long) rw;
+	unsigned long thread_base, thread_end;
+
+	if (rw_addr < PAGE_OFFSET) {
+		if (task != &init_task)
+			return 0;
+	}
+
+	thread_base = (unsigned long) task->thread_info;
+	thread_end = thread_base + sizeof(union thread_union);
+	if (rw_addr >= thread_base &&
+	    rw_addr < thread_end &&
+	    !(rw_addr & 0x7UL))
+		return 1;
+
+	return 0;
+}
+
+static inline struct reg_window *kernel_stack_up(struct reg_window *rw)
+{
+	unsigned long fp = rw->ins[6];
+
+	if (!fp)
+		return NULL;
+
+	return (struct reg_window *) (fp + STACK_BIAS);
+}
+
 void die_if_kernel(char *str, struct pt_regs *regs)
 {
 	static int die_counter;
@@ -1868,17 +1899,14 @@ void die_if_kernel(char *str, struct pt_regs *regs)
 		/* Stop the back trace when we hit userland or we
 		 * find some badly aligned kernel stack.
 		 */
-		while (rw					&&
-		       count++ < 30				&&
-		       (((unsigned long) rw) >= PAGE_OFFSET)	&&
-		       (char *) rw < ((char *) current)
-		       + sizeof (union thread_union) 		&&
-		       !(((unsigned long) rw) & 0x7)) {
+		while (rw &&
+		       count++ < 30&&
+		       is_kernel_stack(current, rw)) {
 			printk("Caller[%016lx]", rw->ins[7]);
 			print_symbol(": %s", rw->ins[7]);
 			printk("\n");
-			rw = (struct reg_window *)
-				(rw->ins[6] + STACK_BIAS);
+
+			rw = kernel_stack_up(rw);
 		}
 		instruction_dump ((unsigned int *) regs->tpc);
 	} else {
@@ -1908,7 +1936,7 @@ void do_illegal_instruction(struct pt_regs *regs)
 	siginfo_t info;
 
 	if (notify_die(DIE_TRAP, "illegal instruction", regs,
-		       0, 0x10, SIGILL) == NOTIFY_OK)
+		       0, 0x10, SIGILL) == NOTIFY_STOP)
 		return;
 
 	if (tstate & TSTATE_PRIV)
@@ -1937,7 +1965,7 @@ void mem_address_unaligned(struct pt_regs *regs, unsigned long sfar, unsigned lo
 	siginfo_t info;
 
 	if (notify_die(DIE_TRAP, "memory address unaligned", regs,
-		       0, 0x34, SIGSEGV) == NOTIFY_OK)
+		       0, 0x34, SIGSEGV) == NOTIFY_STOP)
 		return;
 
 	if (regs->tstate & TSTATE_PRIV) {
@@ -1963,7 +1991,7 @@ void do_privop(struct pt_regs *regs)
 	siginfo_t info;
 
 	if (notify_die(DIE_TRAP, "privileged operation", regs,
-		       0, 0x11, SIGILL) == NOTIFY_OK)
+		       0, 0x11, SIGILL) == NOTIFY_STOP)
 		return;
 
 	if (test_thread_flag(TIF_32BIT)) {

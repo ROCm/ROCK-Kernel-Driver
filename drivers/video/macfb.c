@@ -614,8 +614,11 @@ void __init macfb_init(void)
 {
 	int video_cmap_len, video_is_nubus = 0;
 	struct nubus_dev* ndev = NULL;
+	char *option = NULL;
 
-	macfb_setup(fb_get_options("macfb"));
+	if (fb_get_options("macfb", &option))
+		return -ENODEV;
+	macfb_setup(option);
 
 	if (!MACH_IS_MAC) 
 		return;

@@ -18,13 +18,14 @@
 #include <linux/mii.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/pci.h>
 #include "tulip.h"
 
 
 /* The maximum data clock rate is 2.5 Mhz.  The minimum timing is usually
    met by back-to-back PCI I/O cycles, but we insert a delay to avoid
    "overclocking" issues or future 66Mhz PCI. */
-#define mdio_delay() inl(mdio_addr)
+#define mdio_delay() ioread32(mdio_addr)
 
 /* Read and write the MII registers using software-generated serial
    MDIO protocol.  It is just different enough from the EEPROM protocol
@@ -52,8 +53,8 @@ int tulip_mdio_read(struct net_device *dev, int phy_id, int location)
 	int i;
 	int read_cmd = (0xf6 << 10) | ((phy_id & 0x1f) << 5) | location;
 	int retval = 0;
-	long ioaddr = dev->base_addr;
-	long mdio_addr = ioaddr + CSR9;
+	void __iomem *ioaddr = tp->base_addr;
+	void __iomem *mdio_addr = ioaddr + CSR9;
 	unsigned long flags;
 
 	if (location & ~0x1f)
@@ -61,19 +62,19 @@ int tulip_mdio_read(struct net_device *dev, int phy_id, int location)
 
 	if (tp->chip_id == COMET  &&  phy_id == 30) {
 		if (comet_miireg2offset[location])
-			return inl(ioaddr + comet_miireg2offset[location]);
+			return ioread32(ioaddr + comet_miireg2offset[location]);
 		return 0xffff;
 	}
 
 	spin_lock_irqsave(&tp->mii_lock, flags);
 	if (tp->chip_id == LC82C168) {
 		int i = 1000;
-		outl(0x60020000 + (phy_id<<23) + (location<<18), ioaddr + 0xA0);
-		inl(ioaddr + 0xA0);
-		inl(ioaddr + 0xA0);
+		iowrite32(0x60020000 + (phy_id<<23) + (location<<18), ioaddr + 0xA0);
+		ioread32(ioaddr + 0xA0);
+		ioread32(ioaddr + 0xA0);
 		while (--i > 0) {
 			barrier();
-			if ( ! ((retval = inl(ioaddr + 0xA0)) & 0x80000000))
+			if ( ! ((retval = ioread32(ioaddr + 0xA0)) & 0x80000000))
 				break;
 		}
 		spin_unlock_irqrestore(&tp->mii_lock, flags);
@@ -82,26 +83,26 @@ int tulip_mdio_read(struct net_device *dev, int phy_id, int location)
 
 	/* Establish sync by sending at least 32 logic ones. */
 	for (i = 32; i >= 0; i--) {
-		outl(MDIO_ENB | MDIO_DATA_WRITE1, mdio_addr);
+		iowrite32(MDIO_ENB | MDIO_DATA_WRITE1, mdio_addr);
 		mdio_delay();
-		outl(MDIO_ENB | MDIO_DATA_WRITE1 | MDIO_SHIFT_CLK, mdio_addr);
+		iowrite32(MDIO_ENB | MDIO_DATA_WRITE1 | MDIO_SHIFT_CLK, mdio_addr);
 		mdio_delay();
 	}
 	/* Shift the read command bits out. */
 	for (i = 15; i >= 0; i--) {
 		int dataval = (read_cmd & (1 << i)) ? MDIO_DATA_WRITE1 : 0;
 
-		outl(MDIO_ENB | dataval, mdio_addr);
+		iowrite32(MDIO_ENB | dataval, mdio_addr);
 		mdio_delay();
-		outl(MDIO_ENB | dataval | MDIO_SHIFT_CLK, mdio_addr);
+		iowrite32(MDIO_ENB | dataval | MDIO_SHIFT_CLK, mdio_addr);
 		mdio_delay();
 	}
 	/* Read the two transition, 16 data, and wire-idle bits. */
 	for (i = 19; i > 0; i--) {
-		outl(MDIO_ENB_IN, mdio_addr);
+		iowrite32(MDIO_ENB_IN, mdio_addr);
 		mdio_delay();
-		retval = (retval << 1) | ((inl(mdio_addr) & MDIO_DATA_READ) ? 1 : 0);
-		outl(MDIO_ENB_IN | MDIO_SHIFT_CLK, mdio_addr);
+		retval = (retval << 1) | ((ioread32(mdio_addr) & MDIO_DATA_READ) ? 1 : 0);
+		iowrite32(MDIO_ENB_IN | MDIO_SHIFT_CLK, mdio_addr);
 		mdio_delay();
 	}
 
@@ -114,8 +115,8 @@ void tulip_mdio_write(struct net_device *dev, int phy_id, int location, int val)
 	struct tulip_private *tp = netdev_priv(dev);
 	int i;
 	int cmd = (0x5002 << 16) | ((phy_id & 0x1f) << 23) | (location<<18) | (val & 0xffff);
-	long ioaddr = dev->base_addr;
-	long mdio_addr = ioaddr + CSR9;
+	void __iomem *ioaddr = tp->base_addr;
+	void __iomem *mdio_addr = ioaddr + CSR9;
 	unsigned long flags;
 
 	if (location & ~0x1f)
@@ -123,17 +124,17 @@ void tulip_mdio_write(struct net_device *dev, int phy_id, int location, int val)
 
 	if (tp->chip_id == COMET && phy_id == 30) {
 		if (comet_miireg2offset[location])
-			outl(val, ioaddr + comet_miireg2offset[location]);
+			iowrite32(val, ioaddr + comet_miireg2offset[location]);
 		return;
 	}
 
 	spin_lock_irqsave(&tp->mii_lock, flags);
 	if (tp->chip_id == LC82C168) {
 		int i = 1000;
-		outl(cmd, ioaddr + 0xA0);
+		iowrite32(cmd, ioaddr + 0xA0);
 		do {
 			barrier();
-			if ( ! (inl(ioaddr + 0xA0) & 0x80000000))
+			if ( ! (ioread32(ioaddr + 0xA0) & 0x80000000))
 				break;
 		} while (--i > 0);
 		spin_unlock_irqrestore(&tp->mii_lock, flags);
@@ -142,24 +143,24 @@ void tulip_mdio_write(struct net_device *dev, int phy_id, int location, int val)
 
 	/* Establish sync by sending 32 logic ones. */
 	for (i = 32; i >= 0; i--) {
-		outl(MDIO_ENB | MDIO_DATA_WRITE1, mdio_addr);
+		iowrite32(MDIO_ENB | MDIO_DATA_WRITE1, mdio_addr);
 		mdio_delay();
-		outl(MDIO_ENB | MDIO_DATA_WRITE1 | MDIO_SHIFT_CLK, mdio_addr);
+		iowrite32(MDIO_ENB | MDIO_DATA_WRITE1 | MDIO_SHIFT_CLK, mdio_addr);
 		mdio_delay();
 	}
 	/* Shift the command bits out. */
 	for (i = 31; i >= 0; i--) {
 		int dataval = (cmd & (1 << i)) ? MDIO_DATA_WRITE1 : 0;
-		outl(MDIO_ENB | dataval, mdio_addr);
+		iowrite32(MDIO_ENB | dataval, mdio_addr);
 		mdio_delay();
-		outl(MDIO_ENB | dataval | MDIO_SHIFT_CLK, mdio_addr);
+		iowrite32(MDIO_ENB | dataval | MDIO_SHIFT_CLK, mdio_addr);
 		mdio_delay();
 	}
 	/* Clear out extra bits. */
 	for (i = 2; i > 0; i--) {
-		outl(MDIO_ENB_IN, mdio_addr);
+		iowrite32(MDIO_ENB_IN, mdio_addr);
 		mdio_delay();
-		outl(MDIO_ENB_IN | MDIO_SHIFT_CLK, mdio_addr);
+		iowrite32(MDIO_ENB_IN | MDIO_SHIFT_CLK, mdio_addr);
 		mdio_delay();
 	}
 
@@ -170,8 +171,8 @@ void tulip_mdio_write(struct net_device *dev, int phy_id, int location, int val)
 /* Set up the transceiver control registers for the selected media type. */
 void tulip_select_media(struct net_device *dev, int startup)
 {
-	long ioaddr = dev->base_addr;
 	struct tulip_private *tp = netdev_priv(dev);
+	void __iomem *ioaddr = tp->base_addr;
 	struct mediatable *mtable = tp->mtable;
 	u32 new_csr6;
 	int i;
@@ -187,8 +188,8 @@ void tulip_select_media(struct net_device *dev, int startup)
 					   dev->name, p[1]);
 			dev->if_port = p[0];
 			if (startup)
-				outl(mtable->csr12dir | 0x100, ioaddr + CSR12);
-			outl(p[1], ioaddr + CSR12);
+				iowrite32(mtable->csr12dir | 0x100, ioaddr + CSR12);
+			iowrite32(p[1], ioaddr + CSR12);
 			new_csr6 = 0x02000000 | ((p[2] & 0x71) << 18);
 			break;
 		case 2: case 4: {
@@ -208,7 +209,7 @@ void tulip_select_media(struct net_device *dev, int startup)
 					printk(KERN_DEBUG "%s: Resetting the transceiver.\n",
 						   dev->name);
 				for (i = 0; i < rst[0]; i++)
-					outl(get_u16(rst + 1 + (i<<1)) << 16, ioaddr + CSR15);
+					iowrite32(get_u16(rst + 1 + (i<<1)) << 16, ioaddr + CSR15);
 			}
 			if (tulip_debug > 1)
 				printk(KERN_DEBUG "%s: 21143 non-MII %s transceiver control "
@@ -219,11 +220,11 @@ void tulip_select_media(struct net_device *dev, int startup)
 				csr14val = setup[1];
 				csr15dir = (setup[3]<<16) | setup[2];
 				csr15val = (setup[4]<<16) | setup[2];
-				outl(0, ioaddr + CSR13);
-				outl(csr14val, ioaddr + CSR14);
-				outl(csr15dir, ioaddr + CSR15);	/* Direction */
-				outl(csr15val, ioaddr + CSR15);	/* Data */
-				outl(csr13val, ioaddr + CSR13);
+				iowrite32(0, ioaddr + CSR13);
+				iowrite32(csr14val, ioaddr + CSR14);
+				iowrite32(csr15dir, ioaddr + CSR15);	/* Direction */
+				iowrite32(csr15val, ioaddr + CSR15);	/* Data */
+				iowrite32(csr13val, ioaddr + CSR13);
 			} else {
 				csr13val = 1;
 				csr14val = 0;
@@ -232,12 +233,12 @@ void tulip_select_media(struct net_device *dev, int startup)
 				if (dev->if_port <= 4)
 					csr14val = t21142_csr14[dev->if_port];
 				if (startup) {
-					outl(0, ioaddr + CSR13);
-					outl(csr14val, ioaddr + CSR14);
+					iowrite32(0, ioaddr + CSR13);
+					iowrite32(csr14val, ioaddr + CSR14);
 				}
-				outl(csr15dir, ioaddr + CSR15);	/* Direction */
-				outl(csr15val, ioaddr + CSR15);	/* Data */
-				if (startup) outl(csr13val, ioaddr + CSR13);
+				iowrite32(csr15dir, ioaddr + CSR15);	/* Direction */
+				iowrite32(csr15val, ioaddr + CSR15);	/* Data */
+				if (startup) iowrite32(csr13val, ioaddr + CSR13);
 			}
 			if (tulip_debug > 1)
 				printk(KERN_DEBUG "%s:  Setting CSR15 to %8.8x/%8.8x.\n",
@@ -262,21 +263,21 @@ void tulip_select_media(struct net_device *dev, int startup)
 				misc_info = reset_sequence + reset_length;
 				if (startup)
 					for (i = 0; i < reset_length; i++)
-						outl(get_u16(&reset_sequence[i]) << 16, ioaddr + CSR15);
+						iowrite32(get_u16(&reset_sequence[i]) << 16, ioaddr + CSR15);
 				for (i = 0; i < init_length; i++)
-					outl(get_u16(&init_sequence[i]) << 16, ioaddr + CSR15);
+					iowrite32(get_u16(&init_sequence[i]) << 16, ioaddr + CSR15);
 			} else {
 				u8 *init_sequence = p + 2;
 				u8 *reset_sequence = p + 3 + init_length;
 				int reset_length = p[2 + init_length];
 				misc_info = (u16*)(reset_sequence + reset_length);
 				if (startup) {
-					outl(mtable->csr12dir | 0x100, ioaddr + CSR12);
+					iowrite32(mtable->csr12dir | 0x100, ioaddr + CSR12);
 					for (i = 0; i < reset_length; i++)
-						outl(reset_sequence[i], ioaddr + CSR12);
+						iowrite32(reset_sequence[i], ioaddr + CSR12);
 				}
 				for (i = 0; i < init_length; i++)
-					outl(init_sequence[i], ioaddr + CSR12);
+					iowrite32(init_sequence[i], ioaddr + CSR12);
 			}
 			tmp_info = get_u16(&misc_info[1]);
 			if (tmp_info)
@@ -306,7 +307,7 @@ void tulip_select_media(struct net_device *dev, int startup)
 					printk(KERN_DEBUG "%s: Resetting the transceiver.\n",
 						   dev->name);
 				for (i = 0; i < rst[0]; i++)
-					outl(get_u16(rst + 1 + (i<<1)) << 16, ioaddr + CSR15);
+					iowrite32(get_u16(rst + 1 + (i<<1)) << 16, ioaddr + CSR15);
 			}
 
 			break;
@@ -319,32 +320,32 @@ void tulip_select_media(struct net_device *dev, int startup)
 		if (tulip_debug > 1)
 			printk(KERN_DEBUG "%s: Using media type %s, CSR12 is %2.2x.\n",
 				   dev->name, medianame[dev->if_port],
-				   inl(ioaddr + CSR12) & 0xff);
+				   ioread32(ioaddr + CSR12) & 0xff);
 	} else if (tp->chip_id == LC82C168) {
 		if (startup && ! tp->medialock)
 			dev->if_port = tp->mii_cnt ? 11 : 0;
 		if (tulip_debug > 1)
 			printk(KERN_DEBUG "%s: PNIC PHY status is %3.3x, media %s.\n",
-				   dev->name, inl(ioaddr + 0xB8), medianame[dev->if_port]);
+				   dev->name, ioread32(ioaddr + 0xB8), medianame[dev->if_port]);
 		if (tp->mii_cnt) {
 			new_csr6 = 0x810C0000;
-			outl(0x0001, ioaddr + CSR15);
-			outl(0x0201B07A, ioaddr + 0xB8);
+			iowrite32(0x0001, ioaddr + CSR15);
+			iowrite32(0x0201B07A, ioaddr + 0xB8);
 		} else if (startup) {
 			/* Start with 10mbps to do autonegotiation. */
-			outl(0x32, ioaddr + CSR12);
+			iowrite32(0x32, ioaddr + CSR12);
 			new_csr6 = 0x00420000;
-			outl(0x0001B078, ioaddr + 0xB8);
-			outl(0x0201B078, ioaddr + 0xB8);
+			iowrite32(0x0001B078, ioaddr + 0xB8);
+			iowrite32(0x0201B078, ioaddr + 0xB8);
 		} else if (dev->if_port == 3  ||  dev->if_port == 5) {
-			outl(0x33, ioaddr + CSR12);
+			iowrite32(0x33, ioaddr + CSR12);
 			new_csr6 = 0x01860000;
 			/* Trigger autonegotiation. */
-			outl(startup ? 0x0201F868 : 0x0001F868, ioaddr + 0xB8);
+			iowrite32(startup ? 0x0201F868 : 0x0001F868, ioaddr + 0xB8);
 		} else {
-			outl(0x32, ioaddr + CSR12);
+			iowrite32(0x32, ioaddr + CSR12);
 			new_csr6 = 0x00420000;
-			outl(0x1F078, ioaddr + 0xB8);
+			iowrite32(0x1F078, ioaddr + 0xB8);
 		}
 	} else {					/* Unknown chip type with no media table. */
 		if (tp->default_port == 0)
@@ -359,7 +360,7 @@ void tulip_select_media(struct net_device *dev, int startup)
 			printk(KERN_DEBUG "%s: No media description table, assuming "
 				   "%s transceiver, CSR12 %2.2x.\n",
 				   dev->name, medianame[dev->if_port],
-				   inl(ioaddr + CSR12));
+				   ioread32(ioaddr + CSR12));
 	}
 
 	tp->csr6 = new_csr6 | (tp->csr6 & 0xfdff) | (tp->full_duplex ? 0x0200 : 0);

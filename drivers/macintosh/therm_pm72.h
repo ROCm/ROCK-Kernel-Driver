@@ -119,17 +119,32 @@ static char * critical_overtemp_path = "/sbin/critical_overtemp";
 #define ADC_CPU_CURRENT_SCALE	0x1f40	/* _AD4 */
 
 /*
- * PID factors for the U3/Backside fan control loop
+ * PID factors for the U3/Backside fan control loop. We have 2 sets
+ * of values here, one set for U3 and one set for U3H
  */
-#define BACKSIDE_FAN_PWM_ID		1
-#define BACKSIDE_PID_G_d		0x02800000
+#define BACKSIDE_FAN_PWM_DEFAULT_ID	1
+#define BACKSIDE_FAN_PWM_INDEX		0
+#define BACKSIDE_PID_U3_G_d		0x02800000
+#define BACKSIDE_PID_U3H_G_d		0x01400000
 #define BACKSIDE_PID_G_p		0x00500000
 #define BACKSIDE_PID_G_r		0x00000000
-#define BACKSIDE_PID_INPUT_TARGET	0x00410000
+#define BACKSIDE_PID_U3_INPUT_TARGET	0x00410000
+#define BACKSIDE_PID_U3H_INPUT_TARGET	0x004b0000
 #define BACKSIDE_PID_INTERVAL		5
 #define BACKSIDE_PID_OUTPUT_MAX		100
-#define BACKSIDE_PID_OUTPUT_MIN		20
+#define BACKSIDE_PID_U3_OUTPUT_MIN	20
+#define BACKSIDE_PID_U3H_OUTPUT_MIN	30
 #define BACKSIDE_PID_HISTORY_SIZE	2
+
+struct basckside_pid_params
+{
+	s32			G_d;
+	s32			G_p;
+	s32			G_r;
+	s32			input_target;
+	s32			output_min;
+	s32			output_max;
+};
 
 struct backside_pid_state
 {
@@ -146,7 +161,8 @@ struct backside_pid_state
 /*
  * PID factors for the Drive Bay fan control loop
  */
-#define DRIVES_FAN_RPM_ID      		2
+#define DRIVES_FAN_RPM_DEFAULT_ID	2
+#define DRIVES_FAN_RPM_INDEX		1
 #define DRIVES_PID_G_d			0x01e00000
 #define DRIVES_PID_G_p			0x00500000
 #define DRIVES_PID_G_r			0x00000000
@@ -168,7 +184,8 @@ struct drives_pid_state
 	int			first;
 };
 
-#define SLOTS_FAN_PWM_ID       		2
+#define SLOTS_FAN_PWM_DEFAULT_ID	2
+#define SLOTS_FAN_PWM_INDEX		2
 #define	SLOTS_FAN_DEFAULT_PWM		50 /* Do better here ! */
 
 /*
@@ -191,16 +208,26 @@ struct drives_pid_state
  * CPU B FAKE POWER	49	(I_V_inputs: 18, 19)
  */
 
-#define CPUA_INTAKE_FAN_RPM_ID		3
-#define CPUA_EXHAUST_FAN_RPM_ID		4
-#define CPUB_INTAKE_FAN_RPM_ID		5
-#define CPUB_EXHAUST_FAN_RPM_ID		6
+#define CPUA_INTAKE_FAN_RPM_DEFAULT_ID	3
+#define CPUA_EXHAUST_FAN_RPM_DEFAULT_ID	4
+#define CPUB_INTAKE_FAN_RPM_DEFAULT_ID	5
+#define CPUB_EXHAUST_FAN_RPM_DEFAULT_ID	6
+
+#define CPUA_INTAKE_FAN_RPM_INDEX	3
+#define CPUA_EXHAUST_FAN_RPM_INDEX	4
+#define CPUB_INTAKE_FAN_RPM_INDEX	5
+#define CPUB_EXHAUST_FAN_RPM_INDEX	6
 
 #define CPU_INTAKE_SCALE		0x0000f852
 #define CPU_TEMP_HISTORY_SIZE		2
 #define CPU_POWER_HISTORY_SIZE		10
 #define CPU_PID_INTERVAL		1
 #define CPU_MAX_OVERTEMP		30
+
+#define CPUA_PUMP_RPM_INDEX		7
+#define CPUB_PUMP_RPM_INDEX		8
+#define CPU_PUMP_OUTPUT_MAX		3700
+#define CPU_PUMP_OUTPUT_MIN		1000
 
 struct cpu_pid_state
 {
@@ -219,6 +246,7 @@ struct cpu_pid_state
 	s32			voltage;
 	s32			current_a;
 	s32			last_temp;
+	s32			last_power;
 	int			first;
 	u8			adc_config;
 };

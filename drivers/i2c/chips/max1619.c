@@ -34,11 +34,11 @@
 #include <linux/i2c-sensor.h>
 
 
-static unsigned short normal_i2c[] = { I2C_CLIENT_END };
-static unsigned short normal_i2c_range[] = { 0x18, 0x1a, 0x29, 0x2b,
-						0x4c, 0x4e, I2C_CLIENT_END };
+static unsigned short normal_i2c[] = { 0x18, 0x19, 0x1a,
+					0x29, 0x2a, 0x2b,
+					0x4c, 0x4d, 0x4e,
+					I2C_CLIENT_END };
 static unsigned int normal_isa[] = { I2C_CLIENT_ISA_END };
-static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 
 /*
  * Insmod parameters
@@ -120,7 +120,7 @@ struct max1619_data {
  * Internal variables
  */
 
-static int max1619_id = 0;
+static int max1619_id;
 
 /*
  * Sysfs stuff
@@ -145,7 +145,8 @@ static ssize_t set_##value(struct device *dev, const char *buf, \
 { \
 	struct i2c_client *client = to_i2c_client(dev); \
 	struct max1619_data *data = i2c_get_clientdata(client); \
-	data->value = TEMP_TO_REG(simple_strtol(buf, NULL, 10)); \
+	long val = simple_strtol(buf, NULL, 10); \
+	data->value = TEMP_TO_REG(val); \
 	i2c_smbus_write_byte_data(client, reg, data->value); \
 	return count; \
 }

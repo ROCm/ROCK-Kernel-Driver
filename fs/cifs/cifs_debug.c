@@ -126,26 +126,28 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 	i = 0;
 	read_lock(&GlobalSMBSeslock);
 	list_for_each(tmp, &GlobalTreeConnectionList) {
+		__u32 dev_type;
 		i++;
 		tcon = list_entry(tmp, struct cifsTconInfo, cifsConnectionList);
+		dev_type = le32_to_cpu(tcon->fsDevInfo.DeviceType);
 		length =
 		    sprintf(buf,
 			    "\n%d) %s Uses: %d Type: %s Characteristics: 0x%x Attributes: 0x%x\nPathComponentMax: %d Status: %d",
 			    i, tcon->treeName,
 			    atomic_read(&tcon->useCount),
 			    tcon->nativeFileSystem,
-			    tcon->fsDevInfo.DeviceCharacteristics,
-			    tcon->fsAttrInfo.Attributes,
-			    tcon->fsAttrInfo.MaxPathNameComponentLength,tcon->tidStatus);
+			    le32_to_cpu(tcon->fsDevInfo.DeviceCharacteristics),
+			    le32_to_cpu(tcon->fsAttrInfo.Attributes),
+			    le32_to_cpu(tcon->fsAttrInfo.MaxPathNameComponentLength),
+			    tcon->tidStatus);
 		buf += length;        
-		if (tcon->fsDevInfo.DeviceType == FILE_DEVICE_DISK)
+		if (dev_type == FILE_DEVICE_DISK)
 			length = sprintf(buf, " type: DISK ");
-		else if (tcon->fsDevInfo.DeviceType == FILE_DEVICE_CD_ROM)
+		else if (dev_type == FILE_DEVICE_CD_ROM)
 			length = sprintf(buf, " type: CDROM ");
 		else
 			length =
-			    sprintf(buf, " type: %d ",
-				    tcon->fsDevInfo.DeviceType);
+			    sprintf(buf, " type: %d ", dev_type);
 		buf += length;
 		if(tcon->tidStatus == CifsNeedReconnect) {
 			buf += sprintf(buf, "\tDISCONNECTED ");
@@ -199,7 +201,12 @@ cifs_stats_read(char *buf, char **beginBuffer, off_t offset,
 		sprintf(buf,"SMB Request/Response Buffer: %d\n",
 			bufAllocCount.counter);
 	length += item_length;
-	buf += item_length;      
+	buf += item_length;
+	item_length = 
+		sprintf(buf,"SMB Small Req/Resp Buffer: %d\n",
+			smBufAllocCount.counter);
+	length += item_length;
+	buf += item_length;
 	item_length = 
 		sprintf(buf,"Operations (MIDs): %d\n",
 			midCount.counter);
@@ -335,7 +342,7 @@ cifs_proc_init(void)
 	if (pde)
 		pde->write_proc = oplockEnabled_write;
 
-	pde = create_proc_read_entry("QuotaEnabled", 0, proc_fs_cifs,
+	pde = create_proc_read_entry("ReenableOldCifsReaddirCode", 0, proc_fs_cifs,
 				quotaEnabled_read, NULL);
 	if (pde)
 		pde->write_proc = quotaEnabled_write;
@@ -394,7 +401,7 @@ cifs_proc_clean(void)
 	remove_proc_entry("ExtendedSecurity",proc_fs_cifs);
 	remove_proc_entry("PacketSigningEnabled",proc_fs_cifs);
 	remove_proc_entry("LinuxExtensionsEnabled",proc_fs_cifs);
-	remove_proc_entry("QuotaEnabled",proc_fs_cifs);
+	remove_proc_entry("ReenableOldCifsReaddirCode",proc_fs_cifs);
 	remove_proc_entry("LookupCacheEnabled",proc_fs_cifs);
 	remove_proc_entry("cifs", proc_root_fs);
 }
@@ -483,7 +490,7 @@ quotaEnabled_read(char *page, char **start, off_t off,
 {
         int len;
 
-        len = sprintf(page, "%d\n", quotaEnabled);
+        len = sprintf(page, "%d\n", experimEnabled);
 /* could also check if quotas are enabled in kernel
 	as a whole first */
         len -= off;
@@ -510,9 +517,9 @@ quotaEnabled_write(struct file *file, const char __user *buffer,
         if (rc)
                 return rc;
         if (c == '0' || c == 'n' || c == 'N')
-                quotaEnabled = 0;
+                experimEnabled = 0;
         else if (c == '1' || c == 'y' || c == 'Y')
-                quotaEnabled = 1;
+                experimEnabled = 1;
 
         return count;
 }

@@ -98,16 +98,6 @@ static inline void sctp_outq_tail_data(struct sctp_outq *q,
 	return;
 }
 
-/* Insert a chunk behind chunk 'pos'. */
-static inline void sctp_outq_insert_data(struct sctp_outq *q,
-					 struct sctp_chunk *ch,
-					 struct sctp_chunk *pos)
-{
-	__skb_insert((struct sk_buff *)ch, (struct sk_buff *)pos->prev,
-		     (struct sk_buff *)pos, pos->list);
-	q->out_qlen += ch->skb->len;
-}
-
 /*
  * SFR-CACC algorithm:
  * D) If count_of_newacks is greater than or equal to 2
@@ -706,10 +696,19 @@ int sctp_outq_flush(struct sctp_outq *q, int rtx_timeout)
 		if (!new_transport) {
 			new_transport = asoc->peer.active_path;
 		} else if (!new_transport->active) {
-			/* If the chunk is Heartbeat, send it to
-			 * chunk->transport, even it's inactive.
+			/* If the chunk is Heartbeat or Heartbeat Ack, 
+			 * send it to chunk->transport, even if it's 
+			 * inactive.
+			 *
+			 * 3.3.6 Heartbeat Acknowledgement:
+			 * ...  
+			 * A HEARTBEAT ACK is always sent to the source IP
+			 * address of the IP datagram containing the
+			 * HEARTBEAT chunk to which this ack is responding.
+			 * ...  
 			 */
-			if (chunk->chunk_hdr->type != SCTP_CID_HEARTBEAT)
+			if (chunk->chunk_hdr->type != SCTP_CID_HEARTBEAT &&
+			    chunk->chunk_hdr->type != SCTP_CID_HEARTBEAT_ACK)
 				new_transport = asoc->peer.active_path;
 		}
 

@@ -100,6 +100,7 @@ extern char ignore_fpu_irq;
 
 extern void identify_cpu(struct cpuinfo_x86 *);
 extern void print_cpu_info(struct cpuinfo_x86 *);
+extern unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c);
 extern void dodgy_tsc(void);
 
 /*
@@ -295,8 +296,7 @@ extern unsigned int mca_pentium_flag;
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
  */
-#define TASK_UNMAPPED_BASE	(current->map_base)
-#define __TASK_UNMAPPED_BASE PAGE_ALIGN(TASK_SIZE/3)
+#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 3))
 
 #define HAVE_ARCH_PICK_MMAP_LAYOUT
 
@@ -308,6 +308,7 @@ extern unsigned int mca_pentium_flag;
 #define IO_BITMAP_LONGS (IO_BITMAP_BYTES/sizeof(long))
 #define IO_BITMAP_OFFSET offsetof(struct tss_struct,io_bitmap)
 #define INVALID_IO_BITMAP_OFFSET 0x8000
+#define INVALID_IO_BITMAP_OFFSET_LAZY 0x9000
 
 struct i387_fsave_struct {
 	long	cwd;
@@ -361,6 +362,8 @@ typedef struct {
 	unsigned long seg;
 } mm_segment_t;
 
+struct thread_struct;
+
 struct tss_struct {
 	unsigned short	back_link,__blh;
 	unsigned long	esp0;
@@ -393,9 +396,14 @@ struct tss_struct {
 	 */
 	unsigned long	io_bitmap[IO_BITMAP_LONGS + 1];
 	/*
+	 * Cache the current maximum and the last task that used the bitmap:
+	 */
+	unsigned long io_bitmap_max;
+	struct thread_struct *io_bitmap_owner;
+	/*
 	 * pads the TSS to be cacheline-aligned (size is 0x100)
 	 */
-	unsigned long __cacheline_filler[37];
+	unsigned long __cacheline_filler[35];
 	/*
 	 * .. and then another 0x100 bytes for emergency kernel stack
 	 */
@@ -427,7 +435,7 @@ struct thread_struct {
 /* IO permissions */
 	unsigned long	*io_bitmap_ptr;
 /* max allowed port in the bitmap, in bytes: */
-	unsigned int	io_bitmap_max;
+	unsigned long	io_bitmap_max;
 };
 
 #define INIT_THREAD  {							\
@@ -447,7 +455,7 @@ struct thread_struct {
 	.ss0		= __KERNEL_DS,					\
 	.ss1		= __KERNEL_CS,					\
 	.ldt		= GDT_ENTRY_LDT,				\
-	.io_bitmap_base	= offsetof(struct tss_struct,io_bitmap),	\
+	.io_bitmap_base	= INVALID_IO_BITMAP_OFFSET,			\
 	.io_bitmap	= { [ 0 ... IO_BITMAP_LONGS] = ~0 },		\
 }
 
@@ -649,5 +657,7 @@ extern inline void prefetchw(const void *x)
 extern void select_idle_routine(const struct cpuinfo_x86 *c);
 
 #define cache_line_size() (boot_cpu_data.x86_cache_alignment)
+
+extern unsigned long boot_option_idle_override;
 
 #endif /* __ASM_I386_PROCESSOR_H */

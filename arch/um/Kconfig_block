@@ -43,6 +43,10 @@ config BLK_DEV_NBD
 config BLK_DEV_RAM
 	tristate "RAM disk support"
 
+config BLK_DEV_RAM_COUNT
+	int "Default number of RAM disks" if BLK_DEV_RAM
+	default "16"
+
 config BLK_DEV_RAM_SIZE
 	int "Default RAM disk size"
 	depends on BLK_DEV_RAM
@@ -52,8 +56,36 @@ config BLK_DEV_INITRD
 	bool "Initial RAM disk (initrd) support"
 	depends on BLK_DEV_RAM=y
 
+#Copied directly from drivers/block/Kconfig
+config INITRAMFS_SOURCE
+	string "Source directory of cpio_list"
+	default ""
+	help
+	  This can be set to either a directory containing files, etc to be
+	  included in the initramfs archive, or a file containing newline
+	  separated entries.
+
+	  If it is a file, it should be in the following format:
+	    # a comment
+	    file <name> <location> <mode> <uid> <gid>
+	    dir <name> <mode> <uid> <gid>
+	    nod <name> <mode> <uid> <gid> <dev_type> <maj> <min>
+
+	  Where:
+	    <name>      name of the file/dir/nod in the archive
+	    <location>  location of the file in the current filesystem
+	    <mode>      mode/permissions of the file
+	    <uid>       user id (0=root)
+	    <gid>       group id (0=root)
+	    <dev_type>  device type (b=block, c=character)
+	    <maj>       major number of nod
+	    <min>       minor number of nod
+
+	  If you are not sure, leave it blank.
+
 config MMAPPER
 	tristate "Example IO memory driver"
+	depends on BROKEN
 	help
         The User-Mode Linux port can provide support for IO Memory
         emulation with this option.  This allows a host file to be
@@ -68,5 +100,6 @@ config MMAPPER
         If you'd like to be able to provide a simulated IO port space for
         User-Mode Linux processes, say Y.  If unsure, say N.
 
-endmenu
+source "drivers/block/Kconfig.iosched"
 
+endmenu

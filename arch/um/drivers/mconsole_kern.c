@@ -52,27 +52,26 @@ static struct notifier_block reboot_notifier = {
 
 LIST_HEAD(mc_requests);
 
-void mc_work_proc(void *unused)
+static void mc_work_proc(void *unused)
 {
 	struct mconsole_entry *req;
 	unsigned long flags;
-	int done;
 
-	do {
+	while(!list_empty(&mc_requests)){
 		local_save_flags(flags);
 		req = list_entry(mc_requests.next, struct mconsole_entry, 
 				 list);
 		list_del(&req->list);
-		done = list_empty(&mc_requests);
 		local_irq_restore(flags);
 		req->request.cmd->handler(&req->request);
 		kfree(req);
-	} while(!done);
+	}
 }
 
 DECLARE_WORK(mconsole_work, mc_work_proc, NULL);
 
-irqreturn_t mconsole_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t mconsole_interrupt(int irq, void *dev_id,
+				      struct pt_regs *regs)
 {
 	int fd;
 	struct mconsole_entry *new;
@@ -92,7 +91,8 @@ irqreturn_t mconsole_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 			}
 		}
 	}
-	if(!list_empty(&mc_requests)) schedule_work(&mconsole_work);
+	if(!list_empty(&mc_requests))
+		schedule_work(&mconsole_work);
 	reactivate_fd(fd, MCONSOLE_IRQ);
 	return(IRQ_HANDLED);
 }
@@ -119,12 +119,98 @@ void mconsole_log(struct mc_request *req)
 	mconsole_reply(req, "", 0, 0);
 }
 
+/* This is a more convoluted version of mconsole_proc, which has some stability
+ * problems; however, we need it fixed, because it is expected that UML users
+ * mount HPPFS instead of procfs on /proc. And we want mconsole_proc to still
+ * show the real procfs content, not the ones from hppfs.*/
+#if 0
+void mconsole_proc(struct mc_request *req)
+{
+	struct nameidata nd;
+	struct file_system_type *proc;
+	struct super_block *super;
+	struct file *file;
+	int n, err;
+	char *ptr = req->request.data, *buf;
+
+	ptr += strlen("proc");
+	while(isspace(*ptr)) ptr++;
+
+	proc = get_fs_type("proc");
+	if(proc == NULL){
+		mconsole_reply(req, "procfs not registered", 1, 0);
+		goto out;
+	}
+
+	super = (*proc->get_sb)(proc, 0, NULL, NULL);
+	put_filesystem(proc);
+	if(super == NULL){
+		mconsole_reply(req, "Failed to get procfs superblock", 1, 0);
+		goto out;
+	}
+	up_write(&super->s_umount);
+
+	nd.dentry = super->s_root;
+	nd.mnt = NULL;
+	nd.flags = O_RDONLY + 1;
+	nd.last_type = LAST_ROOT;
+
+	/* START: it was experienced that the stability problems are closed
+	 * if commenting out these two calls + the below read cycle. To
+	 * make UML crash again, it was enough to readd either one.*/
+	err = link_path_walk(ptr, &nd);
+	if(err){
+		mconsole_reply(req, "Failed to look up file", 1, 0);
+		goto out_kill;
+	}
+
+	file = dentry_open(nd.dentry, nd.mnt, O_RDONLY);
+	if(IS_ERR(file)){
+		mconsole_reply(req, "Failed to open file", 1, 0);
+		goto out_kill;
+	}
+	/*END*/
+
+	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	if(buf == NULL){
+		mconsole_reply(req, "Failed to allocate buffer", 1, 0);
+		goto out_fput;
+	}
+
+	if((file->f_op != NULL) && (file->f_op->read != NULL)){
+		do {
+			n = (*file->f_op->read)(file, buf, PAGE_SIZE - 1,
+						&file->f_pos);
+			if(n >= 0){
+				buf[n] = '\0';
+				mconsole_reply(req, buf, 0, (n > 0));
+			}
+			else {
+				mconsole_reply(req, "Read of file failed",
+					       1, 0);
+				goto out_free;
+			}
+		} while(n > 0);
+	}
+	else mconsole_reply(req, "", 0, 0);
+
+ out_free:
+	kfree(buf);
+ out_fput:
+	fput(file);
+ out_kill:
+	deactivate_super(super);
+ out: ;
+}
+#endif
+
 void mconsole_proc(struct mc_request *req)
 {
 	char path[64];
 	char *buf;
 	int len;
 	int fd;
+	int first_chunk = 1;
 	char *ptr = req->request.data;
 
 	ptr += strlen("proc");
@@ -149,7 +235,13 @@ void mconsole_proc(struct mc_request *req)
 		if (len < 0) {
 			mconsole_reply(req, "Read of file failed", 1, 0);
 			goto out_free;
-		} else if (len == PAGE_SIZE-1) {
+		}
+		/*Begin the file content on his own line.*/
+		if (first_chunk) {
+			mconsole_reply(req, "\n", 0, 1);
+			first_chunk = 0;
+		}
+		if (len == PAGE_SIZE-1) {
 			buf[len] = '\0';
 			mconsole_reply(req, buf, 0, 1);
 		} else {
@@ -348,8 +440,8 @@ void mconsole_sysrq(struct mc_request *req)
 	ptr += strlen("sysrq");
 	while(isspace(*ptr)) ptr++;
 
-	handle_sysrq(*ptr, &current->thread.regs, NULL);
 	mconsole_reply(req, "", 0, 0);
+	handle_sysrq(*ptr, &current->thread.regs, NULL);
 }
 #else
 void mconsole_sysrq(struct mc_request *req)

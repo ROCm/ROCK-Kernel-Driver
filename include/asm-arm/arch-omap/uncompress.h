@@ -20,18 +20,21 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/serial_reg.h>
-#include <asm/hardware.h>
-#include <asm/arch/serial.h>
+#include <asm/arch/hardware.h>
+
+unsigned int system_rev;
 
 #define UART_OMAP_MDR1		0x08	/* mode definition register */
+#define OMAP_ID_730		0x355F
+#define ID_MASK			0x7fff
 #define check_port(base, shift) ((base[UART_OMAP_MDR1 << shift] & 7) == 0)
 #define omap_get_id() ((*(volatile unsigned int *)(0xfffed404)) >> 12) & ID_MASK
 
 static void
-puts(const char *s)
+putstr(const char *s)
 {
 	volatile u8 * uart = 0;
-	int shift = 0;
+	int shift;
 
 #ifdef	CONFIG_OMAP_LL_DEBUG_UART3
 	uart = (volatile u8 *)(OMAP_UART3_BASE);
@@ -46,21 +49,11 @@ puts(const char *s)
 		/* MMU is not on, so cpu_is_omapXXXX() won't work here */
 		unsigned int omap_id = omap_get_id();
 
-		if (omap_id == OMAP_ID_1510 || omap_id == OMAP_ID_1610 ||
-		    omap_id == OMAP_ID_1710 || omap_id == OMAP_ID_5912) {
-			shift = 2;
-		} else if (omap_id == OMAP_ID_730) {
+		if (omap_id == OMAP_ID_730)
 			shift = 0;
-		} else {
-			/* Assume nothing for unknown OMAP processors.
-			 * Add an entry for your OMAP type to select
-			 * the default serial console here. If the
-			 * serial port is enabled, we'll use it to
-			 * display status messages. Else we'll be
-			 * quiet.
-			 */
-			return;
-		}
+		else
+			shift = 2;
+
 		if (check_port(uart, shift))
 			break;
 		/* Silent boot if no serial ports are enabled. */

@@ -147,7 +147,6 @@ EXPORT_SYMBOL(enable_kernel_altivec);
  */
 void flush_altivec_to_thread(struct task_struct *tsk)
 {
-#ifdef CONFIG_ALTIVEC
 	if (tsk->thread.regs) {
 		preempt_disable();
 		if (tsk->thread.regs->msr & MSR_VEC) {
@@ -158,7 +157,6 @@ void flush_altivec_to_thread(struct task_struct *tsk)
 		}
 		preempt_enable();
 	}
-#endif
 }
 
 int dump_task_altivec(struct pt_regs *regs, elf_vrregset_t *vrregs)
@@ -223,8 +221,8 @@ void show_regs(struct pt_regs * regs)
 
 	printk("NIP: %016lX XER: %016lX LR: %016lX\n",
 	       regs->nip, regs->xer, regs->link);
-	printk("REGS: %p TRAP: %04lx   %s  (%s %s)\n",
-	       regs, regs->trap, print_tainted(), UTS_RELEASE, OOPS_TIMESTAMP);
+	printk("REGS: %p TRAP: %04lx   %s  (%s)\n",
+	       regs, regs->trap, print_tainted(), UTS_RELEASE);
 	printk("MSR: %016lx EE: %01x PR: %01x FP: %01x ME: %01x IR/DR: %01x%01x\n",
 	       regs->msr, regs->msr&MSR_EE ? 1 : 0, regs->msr&MSR_PR ? 1 : 0,
 	       regs->msr & MSR_FP ? 1 : 0,regs->msr&MSR_ME ? 1 : 0,
@@ -317,8 +315,6 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	extern void ret_from_fork(void);
 	unsigned long sp = (unsigned long)p->thread_info + THREAD_SIZE;
 
-	p->set_child_tid = p->clear_child_tid = NULL;
-
 	/* Copy registers */
 	sp -= sizeof(struct pt_regs);
 	childregs = (struct pt_regs *) sp;
@@ -397,9 +393,20 @@ void start_thread(struct pt_regs *regs, unsigned long fdptr, unsigned long sp)
 	/* Check whether the e_entry function descriptor entries
 	 * need to be relocated before we can use them.
 	 */
-	if ( load_addr != 0 ) {
+	if (load_addr != 0) {
 		entry += load_addr;
 		toc   += load_addr;
+	}
+
+	/*
+	 * If we exec out of a kernel thread then thread.regs will not be
+	 * set. Do it now.
+	 */
+	if (!current->thread.regs) {
+		unsigned long childregs = (unsigned long)current->thread_info +
+						THREAD_SIZE;
+		childregs -= sizeof(struct pt_regs);
+		current->thread.regs = (struct pt_regs *)childregs;
 	}
 
 	regs->nip = entry;
@@ -503,8 +510,11 @@ int sys_execve(unsigned long a0, unsigned long a1, unsigned long a2,
 	error = do_execve(filename, (char __user * __user *) a1,
 				    (char __user * __user *) a2, regs);
   
-	if (error == 0)
+	if (error == 0) {
+		task_lock(current);
 		current->ptrace &= ~PT_DTRACE;
+		task_unlock(current);
+	}
 	putname(filename);
 
 out:

@@ -57,6 +57,7 @@
 #include <net/xfrm.h>
 #include <net/addrconf.h>
 #include <net/snmp.h>
+#include <net/dsfield.h>
 
 #include <asm/uaccess.h>
 
@@ -261,7 +262,7 @@ static struct sock *tcp_v6_lookup_listener(struct in6_addr *daddr, unsigned shor
 			
 			score = 1;
 			if (!ipv6_addr_any(&np->rcv_saddr)) {
-				if (ipv6_addr_cmp(&np->rcv_saddr, daddr))
+				if (!ipv6_addr_equal(&np->rcv_saddr, daddr))
 					continue;
 				score++;
 			}
@@ -320,8 +321,8 @@ static inline struct sock *__tcp_v6_lookup_established(struct in6_addr *saddr, u
 
 		if(*((__u32 *)&(tw->tw_dport))	== ports	&&
 		   sk->sk_family		== PF_INET6) {
-			if(!ipv6_addr_cmp(&tw->tw_v6_daddr, saddr)	&&
-			   !ipv6_addr_cmp(&tw->tw_v6_rcv_saddr, daddr)	&&
+			if(ipv6_addr_equal(&tw->tw_v6_daddr, saddr)	&&
+			   ipv6_addr_equal(&tw->tw_v6_rcv_saddr, daddr)	&&
 			   (!sk->sk_bound_dev_if || sk->sk_bound_dev_if == dif))
 				goto hit;
 		}
@@ -363,6 +364,8 @@ inline struct sock *tcp_v6_lookup(struct in6_addr *saddr, u16 sport,
 	return sk;
 }
 
+EXPORT_SYMBOL_GPL(tcp_v6_lookup);
+
 
 /*
  * Open request hash tables.
@@ -403,8 +406,8 @@ static struct open_request *tcp_v6_search_req(struct tcp_opt *tp,
 	     prev = &req->dl_next) {
 		if (req->rmt_port == rport &&
 		    req->class->family == AF_INET6 &&
-		    !ipv6_addr_cmp(&req->af.v6_req.rmt_addr, raddr) &&
-		    !ipv6_addr_cmp(&req->af.v6_req.loc_addr, laddr) &&
+		    ipv6_addr_equal(&req->af.v6_req.rmt_addr, raddr) &&
+		    ipv6_addr_equal(&req->af.v6_req.loc_addr, laddr) &&
 		    (!req->af.v6_req.iif || req->af.v6_req.iif == iif)) {
 			BUG_TRAP(req->sk == NULL);
 			*prevp = prev;
@@ -460,8 +463,8 @@ static int tcp_v6_check_established(struct sock *sk)
 
 		if(*((__u32 *)&(tw->tw_dport))	== ports	&&
 		   sk2->sk_family		== PF_INET6	&&
-		   !ipv6_addr_cmp(&tw->tw_v6_daddr, saddr)	&&
-		   !ipv6_addr_cmp(&tw->tw_v6_rcv_saddr, daddr)	&&
+		   ipv6_addr_equal(&tw->tw_v6_daddr, saddr)	&&
+		   ipv6_addr_equal(&tw->tw_v6_rcv_saddr, daddr)	&&
 		   sk2->sk_bound_dev_if == sk->sk_bound_dev_if) {
 			struct tcp_opt *tp = tcp_sk(sk);
 
@@ -607,7 +610,7 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 	}
 
 	if (tp->ts_recent_stamp &&
-	    ipv6_addr_cmp(&np->daddr, &usin->sin6_addr)) {
+	    !ipv6_addr_equal(&np->daddr, &usin->sin6_addr)) {
 		tp->ts_recent = 0;
 		tp->ts_recent_stamp = 0;
 		tp->write_seq = 0;
@@ -620,7 +623,7 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 	 *	TCP over IPv4
 	 */
 
-	if (addr_type & IPV6_ADDR_MAPPED) {
+	if (addr_type == IPV6_ADDR_MAPPED) {
 		u32 exthdrlen = tp->ext_header_len;
 		struct sockaddr_in sin;
 
@@ -1002,11 +1005,12 @@ static void tcp_v6_send_reset(struct sk_buff *skb)
 	 * and then put it into the queue to be sent.
 	 */
 
-	buff = alloc_skb(MAX_HEADER + sizeof(struct ipv6hdr), GFP_ATOMIC);
+	buff = alloc_skb(MAX_HEADER + sizeof(struct ipv6hdr) + sizeof(struct tcphdr),
+			 GFP_ATOMIC);
 	if (buff == NULL) 
 	  	return;
 
-	skb_reserve(buff, MAX_HEADER + sizeof(struct ipv6hdr));
+	skb_reserve(buff, MAX_HEADER + sizeof(struct ipv6hdr) + sizeof(struct tcphdr));
 
 	t1 = (struct tcphdr *) skb_push(buff,sizeof(struct tcphdr));
 
@@ -1064,14 +1068,15 @@ static void tcp_v6_send_ack(struct sk_buff *skb, u32 seq, u32 ack, u32 win, u32 
 	struct flowi fl;
 	int tot_len = sizeof(struct tcphdr);
 
-	buff = alloc_skb(MAX_HEADER + sizeof(struct ipv6hdr), GFP_ATOMIC);
+	if (ts)
+		tot_len += 3*4;
+
+	buff = alloc_skb(MAX_HEADER + sizeof(struct ipv6hdr) + tot_len,
+			 GFP_ATOMIC);
 	if (buff == NULL)
 		return;
 
-	skb_reserve(buff, MAX_HEADER + sizeof(struct ipv6hdr));
-
-	if (ts)
-		tot_len += 3*4;
+	skb_reserve(buff, MAX_HEADER + sizeof(struct ipv6hdr) + tot_len);
 
 	t1 = (struct tcphdr *) skb_push(buff,tot_len);
 
@@ -1646,7 +1651,7 @@ static int tcp_v6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 				    skb->len - th->doff*4);
 	TCP_SKB_CB(skb)->ack_seq = ntohl(th->ack_seq);
 	TCP_SKB_CB(skb)->when = 0;
-	TCP_SKB_CB(skb)->flags = ip6_get_dsfield(skb->nh.ipv6h);
+	TCP_SKB_CB(skb)->flags = ipv6_get_dsfield(skb->nh.ipv6h);
 	TCP_SKB_CB(skb)->sacked = 0;
 
 	sk = __tcp_v6_lookup(&skb->nh.ipv6h->saddr, th->source,
@@ -1799,6 +1804,7 @@ static int tcp_v6_xmit(struct sk_buff *skb, int ipfragok)
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct flowi fl;
 	struct dst_entry *dst;
+	struct in6_addr *final_p = NULL, final;
 
 	memset(&fl, 0, sizeof(fl));
 	fl.proto = IPPROTO_TCP;
@@ -1812,7 +1818,9 @@ static int tcp_v6_xmit(struct sk_buff *skb, int ipfragok)
 
 	if (np->opt && np->opt->srcrt) {
 		struct rt0_hdr *rt0 = (struct rt0_hdr *) np->opt->srcrt;
+		ipv6_addr_copy(&final, &fl.fl6_dst);
 		ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
+		final_p = &final;
 	}
 
 	dst = __sk_dst_check(sk, np->dst_cookie);
@@ -1824,6 +1832,9 @@ static int tcp_v6_xmit(struct sk_buff *skb, int ipfragok)
 			sk->sk_err_soft = -err;
 			return err;
 		}
+
+		if (final_p)
+			ipv6_addr_copy(&fl.fl6_dst, final_p);
 
 		if ((err = xfrm_lookup(&dst, &fl, sk, 0)) < 0) {
 			sk->sk_route_caps = 0;
@@ -2104,40 +2115,24 @@ static struct tcp_seq_afinfo tcp6_seq_afinfo = {
 	.owner		= THIS_MODULE,
 	.name		= "tcp6",
 	.family		= AF_INET6,
-	.seq_start	= tcp_seq_start,
-	.seq_next	= tcp_seq_next,
 	.seq_show	= tcp6_seq_show,
 	.seq_fops	= &tcp6_seq_fops,
 };
 
-static struct file_operations tcp6_listen_seq_fops;
-static struct tcp_seq_afinfo tcp6_listen_seq_afinfo = {
-	.owner		= THIS_MODULE,
-	.name		= "tcp6_listen",
-	.family		= AF_INET6,
-	.seq_start	= tcp_listen_seq_start,
-	.seq_next	= tcp_listen_seq_next,
-	.seq_show	= tcp6_seq_show,
-	.seq_fops	= &tcp6_listen_seq_fops,
-};
-
 int __init tcp6_proc_init(void)
 {
-	int err = tcp_proc_register(&tcp6_seq_afinfo);
-	if (err)
-		return err;
-	return tcp_proc_register(&tcp6_listen_seq_afinfo);
+	return tcp_proc_register(&tcp6_seq_afinfo);
 }
 
 void tcp6_proc_exit(void)
 {
 	tcp_proc_unregister(&tcp6_seq_afinfo);
-	tcp_proc_unregister(&tcp6_listen_seq_afinfo);
 }
 #endif
 
 struct proto tcpv6_prot = {
 	.name			= "TCPv6",
+	.owner			= THIS_MODULE,
 	.close			= tcp_close,
 	.connect		= tcp_v6_connect,
 	.disconnect		= tcp_disconnect,
@@ -2162,6 +2157,7 @@ struct proto tcpv6_prot = {
 	.sysctl_wmem		= sysctl_tcp_wmem,
 	.sysctl_rmem		= sysctl_tcp_rmem,
 	.max_header		= MAX_TCP_HEADER,
+	.slab_obj_size		= sizeof(struct tcp6_sock),
 };
 
 static struct inet6_protocol tcpv6_protocol = {

@@ -45,8 +45,8 @@ int msp_writereg(struct av7110 *av7110, u8 dev, u16 reg, u16 val)
 	struct i2c_msg msgs = { .flags = 0, .addr = 0x40, .len = 5, .buf = msg };
 
 	if (i2c_transfer(&av7110->i2c_adap, &msgs, 1) != 1) {
-		printk("av7110(%d): %s(%u = %u) failed\n",
-		       av7110->dvb_adapter->num, __FUNCTION__, reg, val);
+		dprintk(1, "dvb-ttpci: failed @ card %d, %u = %u\n",
+		       av7110->dvb_adapter->num, reg, val);
 		return -EIO;
 	}
 	return 0;
@@ -62,13 +62,15 @@ int msp_readreg(struct av7110 *av7110, u8 dev, u16 reg, u16 *val)
 	};
 
 	if (i2c_transfer(&av7110->i2c_adap, &msgs[0], 2) != 2) {
-		printk("av7110(%d): %s(%u) failed\n",
-		       av7110->dvb_adapter->num, __FUNCTION__, reg);
+		dprintk(1, "dvb-ttpci: failed @ card %d, %u\n",
+		       av7110->dvb_adapter->num, reg);
 		return -EIO;
 	}
 	*val = (msg2[0] << 8) | msg2[1];
 	return 0;
 }
+
+
 
 static struct v4l2_input inputs[2] = {
 	{
@@ -90,43 +92,47 @@ static struct v4l2_input inputs[2] = {
 	}
 };
 
-/* for Siemens DVB-C analog module: (taken from ves1820.c) */
-static int ves1820_writereg(struct saa7146_dev *dev, u8 reg, u8 data)
+static int ves1820_writereg(struct saa7146_dev *dev, u8 addr, u8 reg, u8 data)
 {
-	u8 addr = 0x09;
 	u8 buf[] = { 0x00, reg, data };
 	struct i2c_msg msg = { .addr = addr, .flags = 0, .buf = buf, .len = 3 };
 
-	DEB_EE(("av7710: dev: %p\n", dev));
+	dprintk(4, "dev: %p\n", dev);
 
 	if (1 != saa7146_i2c_transfer(dev, &msg, 1, 1))
 		return -1;
 	return 0;
 }
+
+static int stv0297_writereg(struct saa7146_dev *dev, u8 addr, u8 reg, u8 data)
+{
+        u8 buf [] = { reg, data };
+        struct i2c_msg msg = { .addr = addr, .flags = 0, .buf = buf, .len = 2 };
+
+	if (1 != saa7146_i2c_transfer(dev, &msg, 1, 1))
+		return -1;
+	return 0;
+}
+
 
 static int tuner_write(struct saa7146_dev *dev, u8 addr, u8 data [4])
 {
 	struct i2c_msg msg = { .addr = addr, .flags = 0, .buf = data, .len = 4 };
 
-	DEB_EE(("av7710: dev: %p\n", dev));
+	dprintk(4, "dev: %p\n", dev);
 
 	if (1 != saa7146_i2c_transfer(dev, &msg, 1, 1))
 		return -1;
 	return 0;
 }
 
-
-/**
- *   set up the downconverter frequency divisor for a
- *   reference clock comparision frequency of 62.5 kHz.
- */
-static int tuner_set_tv_freq(struct saa7146_dev *dev, u32 freq)
+static int ves1820_set_tv_freq(struct saa7146_dev *dev, u32 freq)
 {
 	u32 div;
 	u8 config;
 	u8 buf[4];
 
-	DEB_EE(("av7710: freq: 0x%08x\n", freq));
+	dprintk(4, "freq: 0x%08x\n", freq);
 
 	/* magic number: 614. tuning with the frequency given by v4l2
 	   is always off by 614*62.5 = 38375 kHz...*/
@@ -149,6 +155,34 @@ static int tuner_set_tv_freq(struct saa7146_dev *dev, u32 freq)
 	return tuner_write(dev, 0x61, buf);
 }
 
+static int stv0297_set_tv_freq(struct saa7146_dev *dev, u32 freq)
+{
+	u32 div;
+	u8 data[4];
+
+	div = (freq + 38900000 + 31250) / 62500;
+
+	data[0] = (div >> 8) & 0x7f;
+	data[1] = div & 0xff;
+	data[2] = 0xce;
+
+	if (freq < 45000000)
+		return -EINVAL;
+	else if (freq < 137000000)
+		data[3] = 0x01;
+	else if (freq < 403000000)
+		data[3] = 0x02;
+	else if (freq < 860000000)
+		data[3] = 0x04;
+	else
+		return -EINVAL;
+
+	stv0297_writereg(dev, 0x1C, 0x87, 0x78);
+	stv0297_writereg(dev, 0x1C, 0x86, 0xc8);
+	return tuner_write(dev, 0x63, data);
+}
+
+
 
 static struct saa7146_standard analog_standard[];
 static struct saa7146_standard dvb_standard[];
@@ -160,60 +194,71 @@ static struct v4l2_audio msp3400_v4l2_audio = {
 	.capability = V4L2_AUDCAP_STEREO
 };
 
-int av7110_dvb_c_switch(struct saa7146_fh *fh)
+static int av7110_dvb_c_switch(struct saa7146_fh *fh)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
 	struct av7110 *av7110 = (struct av7110*)dev->ext_priv;
 	u16 adswitch;
-	u8 band = 0;
 	int source, sync, err;
 
-	DEB_EE(("av7110: %p\n", av7110));
+	dprintk(4, "%p\n", av7110);
 
 	if ((vv->video_status & STATUS_OVERLAY) != 0) {
 		vv->ov_suspend = vv->video_fh;
 		err = saa7146_stop_preview(vv->video_fh); /* side effect: video_status is now 0, video_fh is NULL */
 		if (err != 0) {
-			DEB_D(("warning: suspending video failed\n"));
+			dprintk(2, "suspending video failed\n");
 			vv->ov_suspend = NULL;
 		}
 	}
-	
+
 	if (0 != av7110->current_input) {
 		adswitch = 1;
-		band = 0x60; /* analog band */
 		source = SAA7146_HPS_SOURCE_PORT_B;
 		sync = SAA7146_HPS_SYNC_PORT_B;
 		memcpy(standard, analog_standard, sizeof(struct saa7146_standard) * 2);
-		printk("av7110: switching to analog TV\n");
+		dprintk(1, "switching to analog TV\n");
 		msp_writereg(av7110, MSP_WR_DSP, 0x0008, 0x0000); // loudspeaker source
 		msp_writereg(av7110, MSP_WR_DSP, 0x0009, 0x0000); // headphone source
 		msp_writereg(av7110, MSP_WR_DSP, 0x000a, 0x0000); // SCART 1 source
 		msp_writereg(av7110, MSP_WR_DSP, 0x000e, 0x3000); // FM matrix, mono
 		msp_writereg(av7110, MSP_WR_DSP, 0x0000, 0x4f00); // loudspeaker + headphone
 		msp_writereg(av7110, MSP_WR_DSP, 0x0007, 0x4f00); // SCART 1 volume
+
+		if (av7110->analog_tuner_flags & ANALOG_TUNER_VES1820) {
+			if (ves1820_writereg(dev, 0x09, 0x0f, 0x60))
+				dprintk(1, "setting band in demodulator failed.\n");
+		} else if (av7110->analog_tuner_flags & ANALOG_TUNER_STV0297) {
+			saa7146_setgpio(dev, 1, SAA7146_GPIO_OUTHI); // TDA9198 pin9(STD)
+			saa7146_setgpio(dev, 3, SAA7146_GPIO_OUTHI); // TDA9198 pin30(VIF)
+		}
 	} else {
 		adswitch = 0;
-		band = 0x20; /* digital band */
 		source = SAA7146_HPS_SOURCE_PORT_A;
 		sync = SAA7146_HPS_SYNC_PORT_A;
 		memcpy(standard, dvb_standard, sizeof(struct saa7146_standard) * 2);
-		printk("av7110: switching DVB mode\n");
+		dprintk(1, "switching DVB mode\n");
 		msp_writereg(av7110, MSP_WR_DSP, 0x0008, 0x0220); // loudspeaker source
 		msp_writereg(av7110, MSP_WR_DSP, 0x0009, 0x0220); // headphone source
 		msp_writereg(av7110, MSP_WR_DSP, 0x000a, 0x0220); // SCART 1 source
 		msp_writereg(av7110, MSP_WR_DSP, 0x000e, 0x3000); // FM matrix, mono
 		msp_writereg(av7110, MSP_WR_DSP, 0x0000, 0x7f00); // loudspeaker + headphone
 		msp_writereg(av7110, MSP_WR_DSP, 0x0007, 0x7f00); // SCART 1 volume
+
+		if (av7110->analog_tuner_flags & ANALOG_TUNER_VES1820) {
+			if (ves1820_writereg(dev, 0x09, 0x0f, 0x20))
+				dprintk(1, "setting band in demodulator failed.\n");
+		} else if (av7110->analog_tuner_flags & ANALOG_TUNER_STV0297) {
+			saa7146_setgpio(dev, 1, SAA7146_GPIO_OUTHI); // TDA9198 pin9(STD)
+			saa7146_setgpio(dev, 3, SAA7146_GPIO_OUTLO); // TDA9198 pin30(VIF)
+		}
 	}
 
 	/* hmm, this does not do anything!? */
 	if (av7110_fw_cmd(av7110, COMTYPE_AUDIODAC, ADSwitch, 1, adswitch))
-		printk("ADSwitch error\n");
+		dprintk(1, "ADSwitch error\n");
 
-	if (ves1820_writereg(dev, 0x0f, band))
-		printk("setting band in demodulator failed.\n");
 	saa7146_set_hps_source_and_sync(dev, source, sync);
 
 	if (vv->ov_suspend != NULL) {
@@ -224,11 +269,11 @@ int av7110_dvb_c_switch(struct saa7146_fh *fh)
 	return 0;
 }
 
-int av7110_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg)
+static int av7110_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct av7110 *av7110 = (struct av7110*) dev->ext_priv;
-	DEB_EE(("saa7146_dev: %p\n", dev));
+	dprintk(4, "saa7146_dev: %p\n", dev);
 
 	switch (cmd) {
 	case VIDIOC_G_TUNER:
@@ -237,9 +282,9 @@ int av7110_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg)
 		u16 stereo_det;
 		s8 stereo;
 
-		DEB_EE(("VIDIOC_G_TUNER: %d\n", t->index));
+		dprintk(2, "VIDIOC_G_TUNER: %d\n", t->index);
 
-		if (!av7110->has_analog_tuner || t->index != 0)
+		if (!av7110->analog_tuner_flags || t->index != 0)
 			return -EINVAL;
 
 		memset(t, 0, sizeof(*t));
@@ -254,12 +299,12 @@ int av7110_ioctl(struct saa7146_fh *fh, unsigned int cmd, void *arg)
 		t->signal = 0xffff;
 		t->afc = 0;
 
-// FIXME: standard / stereo detection is still broken
-msp_readreg(av7110, MSP_RD_DEM, 0x007e, &stereo_det);
-printk("VIDIOC_G_TUNER: msp3400 TV standard detection: 0x%04x\n", stereo_det);
+		// FIXME: standard / stereo detection is still broken
+		msp_readreg(av7110, MSP_RD_DEM, 0x007e, &stereo_det);
+		dprintk(1, "VIDIOC_G_TUNER: msp3400 TV standard detection: 0x%04x\n", stereo_det);
 
 		msp_readreg(av7110, MSP_RD_DSP, 0x0018, &stereo_det);
-		printk("VIDIOC_G_TUNER: msp3400 stereo detection: 0x%04x\n", stereo_det);
+		dprintk(1, "VIDIOC_G_TUNER: msp3400 stereo detection: 0x%04x\n", stereo_det);
 		stereo = (s8)(stereo_det >> 8);
 		if (stereo > 0x10) {
 			/* stereo */
@@ -280,29 +325,29 @@ printk("VIDIOC_G_TUNER: msp3400 TV standard detection: 0x%04x\n", stereo_det);
 	{
 		struct v4l2_tuner *t = arg;
 		u16 fm_matrix, src;
-		DEB_EE(("VIDIOC_S_TUNER: %d\n", t->index));
+		dprintk(2, "VIDIOC_S_TUNER: %d\n", t->index);
 
-		if (!av7110->has_analog_tuner || av7110->current_input != 1)
+		if (!av7110->analog_tuner_flags || av7110->current_input != 1)
 			return -EINVAL;
 
 		switch (t->audmode) {
 		case V4L2_TUNER_MODE_STEREO:
-			DEB_D(("VIDIOC_S_TUNER: V4L2_TUNER_MODE_STEREO\n"));
+			dprintk(2, "VIDIOC_S_TUNER: V4L2_TUNER_MODE_STEREO\n");
 			fm_matrix = 0x3001; // stereo
 			src = 0x0020;
 			break;
 		case V4L2_TUNER_MODE_LANG1:
-			DEB_D(("VIDIOC_S_TUNER: V4L2_TUNER_MODE_LANG1\n"));
+			dprintk(2, "VIDIOC_S_TUNER: V4L2_TUNER_MODE_LANG1\n");
 			fm_matrix = 0x3000; // mono
 			src = 0x0000;
 			break;
 		case V4L2_TUNER_MODE_LANG2:
-			DEB_D(("VIDIOC_S_TUNER: V4L2_TUNER_MODE_LANG2\n"));
+			dprintk(2, "VIDIOC_S_TUNER: V4L2_TUNER_MODE_LANG2\n");
 			fm_matrix = 0x3000; // mono
 			src = 0x0010;
 			break;
 		default: /* case V4L2_TUNER_MODE_MONO: {*/
-			DEB_D(("VIDIOC_S_TUNER: TDA9840_SET_MONO\n"));
+			dprintk(2, "VIDIOC_S_TUNER: TDA9840_SET_MONO\n");
 			fm_matrix = 0x3000; // mono
 			src = 0x0030;
 			break;
@@ -317,9 +362,9 @@ printk("VIDIOC_G_TUNER: msp3400 TV standard detection: 0x%04x\n", stereo_det);
 	{
 		struct v4l2_frequency *f = arg;
 
-		DEB_EE(("VIDIOC_G_FREQ: freq:0x%08x.\n", f->frequency));
+		dprintk(2, "VIDIOC_G_FREQ: freq:0x%08x.\n", f->frequency);
 
-		if (!av7110->has_analog_tuner || av7110->current_input != 1)
+		if (!av7110->analog_tuner_flags || av7110->current_input != 1)
 			return -EINVAL;
 
 		memset(f, 0, sizeof(*f));
@@ -331,9 +376,9 @@ printk("VIDIOC_G_TUNER: msp3400 TV standard detection: 0x%04x\n", stereo_det);
 	{
 		struct v4l2_frequency *f = arg;
 
-		DEB_EE(("VIDIOC_S_FREQUENCY: freq:0x%08x.\n", f->frequency));
+		dprintk(2, "VIDIOC_S_FREQUENCY: freq:0x%08x.\n", f->frequency);
 
-		if (!av7110->has_analog_tuner || av7110->current_input != 1)
+		if (!av7110->analog_tuner_flags || av7110->current_input != 1)
 			return -EINVAL;
 
 		if (V4L2_TUNER_ANALOG_TV != f->type)
@@ -343,7 +388,11 @@ printk("VIDIOC_G_TUNER: msp3400 TV standard detection: 0x%04x\n", stereo_det);
 		msp_writereg(av7110, MSP_WR_DSP, 0x0007, 0xffe0);
 
 		/* tune in desired frequency */
-		tuner_set_tv_freq(dev, f->frequency);
+		if (av7110->analog_tuner_flags & ANALOG_TUNER_VES1820) {
+			ves1820_set_tv_freq(dev, f->frequency);
+		} else if (av7110->analog_tuner_flags & ANALOG_TUNER_STV0297) {
+			stv0297_set_tv_freq(dev, f->frequency);
+		}
 		av7110->current_freq = f->frequency;
 
 		msp_writereg(av7110, MSP_WR_DSP, 0x0015, 0x003f); // start stereo detection
@@ -356,9 +405,9 @@ printk("VIDIOC_G_TUNER: msp3400 TV standard detection: 0x%04x\n", stereo_det);
 	{
 		struct v4l2_input *i = arg;
 
-		DEB_EE(("VIDIOC_ENUMINPUT: %d\n", i->index));
+		dprintk(2, "VIDIOC_ENUMINPUT: %d\n", i->index);
 
-		if (av7110->has_analog_tuner ) {
+		if (av7110->analog_tuner_flags) {
 			if (i->index < 0 || i->index >= 2)
 				return -EINVAL;
 		} else {
@@ -374,16 +423,16 @@ printk("VIDIOC_G_TUNER: msp3400 TV standard detection: 0x%04x\n", stereo_det);
 	{
 		int *input = (int *)arg;
 		*input = av7110->current_input;
-		DEB_EE(("VIDIOC_G_INPUT: %d\n", *input));
+		dprintk(2, "VIDIOC_G_INPUT: %d\n", *input);
 		return 0;
 	}
 	case VIDIOC_S_INPUT:
 	{
 		int input = *(int *)arg;
 
-		DEB_EE(("VIDIOC_S_INPUT: %d\n", input));
+		dprintk(2, "VIDIOC_S_INPUT: %d\n", input);
 
-		if (!av7110->has_analog_tuner )
+		if (!av7110->analog_tuner_flags)
 			return 0;
 
 		if (input < 0 || input >= 2)
@@ -397,7 +446,7 @@ printk("VIDIOC_G_TUNER: msp3400 TV standard detection: 0x%04x\n", stereo_det);
 	{
 		struct v4l2_audio *a = arg;
 
-		DEB_EE(("VIDIOC_G_AUDIO: %d\n", a->index));
+		dprintk(2, "VIDIOC_G_AUDIO: %d\n", a->index);
 		if (a->index != 0)
 			return -EINVAL;
 		memcpy(a, &msp3400_v4l2_audio, sizeof(struct v4l2_audio));
@@ -406,7 +455,7 @@ printk("VIDIOC_G_TUNER: msp3400 TV standard detection: 0x%04x\n", stereo_det);
 	case VIDIOC_S_AUDIO:
 	{
 		struct v4l2_audio *a = arg;
-		DEB_EE(("VIDIOC_S_AUDIO: %d\n", a->index));
+		dprintk(2, "VIDIOC_S_AUDIO: %d\n", a->index);
 		break;
 	}
 	default:
@@ -421,7 +470,7 @@ printk("VIDIOC_G_TUNER: msp3400 TV standard detection: 0x%04x\n", stereo_det);
  * INITIALIZATION
  ****************************************************************************/
 
-struct saa7146_extension_ioctls ioctls[] = {
+static struct saa7146_extension_ioctls ioctls[] = {
 	{ VIDIOC_ENUMINPUT,	SAA7146_EXCLUSIVE },
 	{ VIDIOC_G_INPUT,	SAA7146_EXCLUSIVE },
 	{ VIDIOC_S_INPUT,	SAA7146_EXCLUSIVE },
@@ -504,13 +553,13 @@ int av7110_init_analog_module(struct av7110 *av7110)
 	    || i2c_writereg(av7110, 0x80, 0x0, 0) != 1)
 		return -ENODEV;
 
-	printk("av7110(%d): DVB-C analog module detected, initializing MSP3400\n",
+	printk("dvb-ttpci: DVB-C analog module @ card %d detected, initializing MSP3400\n",
 		av7110->dvb_adapter->num);
 	av7110->adac_type = DVB_ADAC_MSP;
 	msleep(100); // the probing above resets the msp...
 	msp_readreg(av7110, MSP_RD_DSP, 0x001e, &version1);
 	msp_readreg(av7110, MSP_RD_DSP, 0x001f, &version2);
-	printk("av7110(%d): MSP3400 version 0x%04x 0x%04x\n",
+	dprintk(1, "dvb-ttpci: @ card %d MSP3400 version 0x%04x 0x%04x\n",
 		av7110->dvb_adapter->num, version1, version2);
 	msp_writereg(av7110, MSP_WR_DSP, 0x0013, 0x0c00);
 	msp_writereg(av7110, MSP_WR_DSP, 0x0000, 0x7f00); // loudspeaker + headphone
@@ -525,12 +574,31 @@ int av7110_init_analog_module(struct av7110 *av7110)
 		INFO(("saa7113 not accessible.\n"));
 	} else {
 		u8 *i = saa7113_init_regs;
-		av7110->has_analog_tuner = 1;
+
+		if ((av7110->dev->pci->subsystem_vendor == 0x110a) && (av7110->dev->pci->subsystem_device == 0x0000)) {
+			/* Fujitsu/Siemens DVB-Cable */
+			av7110->analog_tuner_flags |= ANALOG_TUNER_VES1820;
+		} else if ((av7110->dev->pci->subsystem_vendor == 0x13c2) && (av7110->dev->pci->subsystem_device == 0x0002)) {
+			/* Hauppauge/TT DVB-C premium */
+			av7110->analog_tuner_flags |= ANALOG_TUNER_VES1820;
+		} else if ((av7110->dev->pci->subsystem_vendor == 0x13c2) && (av7110->dev->pci->subsystem_device == 0x000A)) {
+			/* Hauppauge/TT DVB-C premium */
+			av7110->analog_tuner_flags |= ANALOG_TUNER_STV0297;
+		}
+
+		/* setup for DVB by default */
+		if (av7110->analog_tuner_flags & ANALOG_TUNER_VES1820) {
+			if (ves1820_writereg(av7110->dev, 0x09, 0x0f, 0x20))
+				dprintk(1, "setting band in demodulator failed.\n");
+		} else if (av7110->analog_tuner_flags & ANALOG_TUNER_STV0297) {
+			saa7146_setgpio(av7110->dev, 1, SAA7146_GPIO_OUTHI); // TDA9198 pin9(STD)
+			saa7146_setgpio(av7110->dev, 3, SAA7146_GPIO_OUTLO); // TDA9198 pin30(VIF)
+		}
+
 		/* init the saa7113 */
 		while (*i != 0xff) {
 			if (i2c_writereg(av7110, 0x48, i[0], i[1]) != 1) {
-				printk("av7110(%d): saa7113 initialization failed",
-						av7110->dvb_adapter->num);
+				dprintk(1, "saa7113 initialization failed @ card %d", av7110->dvb_adapter->num);
 				break;
 			}
 			i += 2;
@@ -577,7 +645,7 @@ int av7110_init_v4l(struct av7110 *av7110)
 	/* special case DVB-C: these cards have an analog tuner
 	   plus need some special handling, so we have separate
 	   saa7146_ext_vv data for these... */
-	if (av7110->has_analog_tuner)
+	if (av7110->analog_tuner_flags)
 		ret = saa7146_vv_init(dev, &av7110_vv_data_c);
 	else
 		ret = saa7146_vv_init(dev, &av7110_vv_data_st);
@@ -592,12 +660,12 @@ int av7110_init_v4l(struct av7110 *av7110)
 		saa7146_vv_release(dev);
 		return -ENODEV;
 	}
-	if (av7110->has_analog_tuner) {
+	if (av7110->analog_tuner_flags) {
 		if (saa7146_register_device(&av7110->vbi_dev, dev, "av7110", VFL_TYPE_VBI)) {
 			ERR(("cannot register vbi v4l2 device. skipping.\n"));
-		} else
-			/* we use this to remember that this dvb-c card can do vbi */
-			av7110->has_analog_tuner = 2;
+		} else {
+			av7110->analog_tuner_flags |= ANALOG_TUNER_VBI;
+		}
 	}
 	return 0;
 }
@@ -605,7 +673,7 @@ int av7110_init_v4l(struct av7110 *av7110)
 int av7110_exit_v4l(struct av7110 *av7110)
 {
 	saa7146_unregister_device(&av7110->v4l_dev, av7110->dev);
-	if (2 == av7110->has_analog_tuner)
+	if (av7110->analog_tuner_flags & ANALOG_TUNER_VBI)
 		saa7146_unregister_device(&av7110->vbi_dev, av7110->dev);
 	return 0;
 }
@@ -682,7 +750,7 @@ static struct saa7146_ext_vv av7110_vv_data_st = {
 	.flags		= 0,
 
 	.stds		= &standard[0],
-	.num_stds	= sizeof(standard) / sizeof(struct saa7146_standard),
+	.num_stds	= ARRAY_SIZE(standard),
 	.std_callback	= &std_callback,
 
 	.ioctls		= &ioctls[0],
@@ -696,7 +764,7 @@ static struct saa7146_ext_vv av7110_vv_data_c = {
 	.flags		= SAA7146_USE_PORT_B_FOR_VBI,
 
 	.stds		= &standard[0],
-	.num_stds	= sizeof(standard) / sizeof(struct saa7146_standard),
+	.num_stds	= ARRAY_SIZE(standard),
 	.std_callback	= &std_callback,
 
 	.ioctls		= &ioctls[0],

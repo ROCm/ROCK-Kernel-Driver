@@ -1,7 +1,7 @@
 /* linux/arch/arm/mach-s3c2410/s3c2410.c
  *
  * Copyright (c) 2003,2004 Simtec Electronics
- * Ben Dooks <ben@simtec.co.uk>
+ *	Ben Dooks <ben@simtec.co.uk>
  *
  * http://www.simtec.co.uk/products/EB2410ITX/
  *
@@ -15,6 +15,8 @@
  *     05-Sep-2003 BJD  Moved to kernel v2.6
  *     18-Jan-2004 BJD  Added serial port configuration
  *     21-Aug-2004 BJD  Added new struct s3c2410_board handler
+ *     28-Sep-2004 BJD  Updates for new serial port bits
+ *     04-Nov-2004 BJD  Updated UART configuration process
 */
 
 #include <linux/kernel.h>
@@ -38,18 +40,11 @@
 
 #include "s3c2410.h"
 #include "cpu.h"
+#include "clock.h"
 
 int s3c2410_clock_tick_rate = 12*1000*1000;  /* current timers at 12MHz */
 
-/* serial port setup */
-
-struct s3c2410_uartcfg *s3c2410_uartcfgs;
-
-/* clock info */
-
-unsigned long s3c2410_fclk;
-unsigned long s3c2410_hclk;
-unsigned long s3c2410_pclk;
+/* Initial IO mappings */
 
 static struct map_desc s3c2410_iodesc[] __initdata = {
 	IODESC_ENT(USBHOST),
@@ -131,6 +126,37 @@ static struct platform_device *uart_devices[] __initdata = {
 	&s3c_uart2
 };
 
+/* store our uart devices for the serial driver console */
+struct platform_device *s3c2410_uart_devices[3];
+
+static int s3c2410_uart_count = 0;
+
+/* uart registration process */
+
+void __init s3c2410_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+{
+	struct platform_device *platdev;
+	int uart;
+
+	for (uart = 0; uart < no; uart++, cfg++) {
+		platdev = uart_devices[cfg->hwport];
+
+		s3c24xx_uart_devs[uart] = platdev;
+		platdev->dev.platform_data = cfg;
+	}
+
+	s3c2410_uart_count = uart;
+}
+
+/* s3c2410_map_io
+ *
+ * register the standard cpu IO areas, and any passed in from the
+ * machine specific initialisation.
+ *
+ * this function also sets the initial clock frequencies from the
+ * settings passed in
+*/
+
 void __init s3c2410_map_io(struct map_desc *mach_desc, int mach_size)
 {
 	unsigned long tmp;
@@ -140,63 +166,35 @@ void __init s3c2410_map_io(struct map_desc *mach_desc, int mach_size)
 	iotable_init(s3c2410_iodesc, ARRAY_SIZE(s3c2410_iodesc));
 	iotable_init(mach_desc, mach_size);
 
-	printk("machine_initted %p,%d\n", mach_desc, mach_size);
-
 	/* now we've got our machine bits initialised, work out what
 	 * clocks we've got */
 
-	s3c2410_fclk = s3c2410_get_pll(__raw_readl(S3C2410_MPLLCON), 12*MHZ);
+	s3c24xx_fclk = s3c2410_get_pll(__raw_readl(S3C2410_MPLLCON),
+				       s3c24xx_xtal);
 
 	tmp = __raw_readl(S3C2410_CLKDIVN);
-	//printk("tmp=%08x, fclk=%d\n", tmp, s3c2410_fclk);
 
 	/* work out clock scalings */
 
-	s3c2410_hclk = s3c2410_fclk / ((tmp & S3C2410_CLKDIVN_HDIVN) ? 2 : 1);
-	s3c2410_pclk = s3c2410_hclk / ((tmp & S3C2410_CLKDIVN_PDIVN) ? 2 : 1);
+	s3c24xx_hclk = s3c24xx_fclk / ((tmp & S3C2410_CLKDIVN_HDIVN) ? 2 : 1);
+	s3c24xx_pclk = s3c24xx_hclk / ((tmp & S3C2410_CLKDIVN_PDIVN) ? 2 : 1);
 
 	/* print brieft summary of clocks, etc */
 
 	printk("S3C2410: core %ld.%03ld MHz, memory %ld.%03ld MHz, peripheral %ld.%03ld MHz\n",
-	       print_mhz(s3c2410_fclk), print_mhz(s3c2410_hclk),
-	       print_mhz(s3c2410_pclk));
-}
+	       print_mhz(s3c24xx_fclk), print_mhz(s3c24xx_hclk),
+	       print_mhz(s3c24xx_pclk));
 
-static struct s3c2410_board *board;
+	/* initialise the clocks here, to allow other things like the
+	 * console to use them
+	 */
 
-void s3c2410_set_board(struct s3c2410_board *b)
-{
-	board = b;
-}
-
-void s3c2410_init_uarts(struct s3c2410_uartcfg *cfg, int no)
-{
-	s3c2410_uartcfgs = cfg;
+	s3c2410_init_clocks();
 }
 
 int __init s3c2410_init(void)
 {
-	int ret;
-
 	printk("S3C2410: Initialising architecture\n");
 
-	ret = platform_add_devices(uart_devices, ARRAY_SIZE(uart_devices));
-	if (ret)
-		return ret;
-
-	if (board != NULL) {
-		if (board->devices != NULL) {
-			ret = platform_add_devices(board->devices,
-						   board->devices_count);
-
-			if (ret) {
-				printk(KERN_ERR "s3c2410: failed to add board devices (%d)\n", ret);
-			}
-		}
-
-		/* not adding board devices may not be fatal */
-		ret = 0;
-	}
-
-	return ret;
+	return platform_add_devices(s3c24xx_uart_devs, s3c2410_uart_count);
 }

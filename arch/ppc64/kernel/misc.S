@@ -115,18 +115,59 @@ _GLOBAL(call_do_softirq)
 	mtlr	r0
 	blr
 
-_GLOBAL(call_handle_irq_event)
+_GLOBAL(call_handle_IRQ_event)
 	mflr	r0
 	std	r0,16(r1)
 	stdu	r1,THREAD_SIZE-112(r6)
 	mr	r1,r6
-	bl	.handle_irq_event
+	bl	.handle_IRQ_event
 	ld	r1,0(r1)
 	ld	r0,16(r1)
 	mtlr	r0
 	blr
 #endif /* CONFIG_IRQSTACKS */
 
+	/*
+ * To be called by C code which needs to do some operations with MMU
+ * disabled. Note that interrupts have to be disabled by the caller
+ * prior to calling us. The code called _MUST_ be in the RMO of course
+ * and part of the linear mapping as we don't attempt to translate the
+ * stack pointer at all. The function is called with the stack switched
+ * to this CPU emergency stack
+ *
+ * prototype is void *call_with_mmu_off(void *func, void *data);
+ *
+ * the called function is expected to be of the form
+ *
+ * void *called(void *data); 
+ */
+_GLOBAL(call_with_mmu_off)
+	mflr	r0			/* get link, save it on stackframe */
+	std	r0,16(r1)
+	mr	r1,r5			/* save old stack ptr */
+	ld	r1,PACAEMERGSP(r13)	/* get emerg. stack */
+	subi	r1,r1,STACK_FRAME_OVERHEAD
+	std	r0,16(r1)		/* save link on emerg. stack */
+	std	r5,0(r1)		/* save old stack ptr in backchain */
+	ld	r3,0(r3)		/* get to real function ptr (assume same TOC) */
+	bl	2f			/* we need LR to return, continue at label 2 */
+
+	ld	r0,16(r1)		/* we return here from the call, get LR and */
+	ld	r1,0(r1)		/* .. old stack ptr */
+	mtspr	SPRN_SRR0,r0		/* and get back to virtual mode with these */
+	mfmsr	r4
+	ori	r4,r4,MSR_IR|MSR_DR
+	mtspr	SPRN_SRR1,r4
+	rfid
+
+2:	mtspr	SPRN_SRR0,r3		/* coming from above, enter real mode */
+	mr	r3,r4			/* get parameter */
+	mfmsr	r0
+	ori	r0,r0,MSR_IR|MSR_DR
+	xori	r0,r0,MSR_IR|MSR_DR
+	mtspr	SPRN_SRR1,r0
+	rfid
+	
 /*
  * Flush instruction cache.
  */
@@ -454,17 +495,6 @@ _GLOBAL(_outsl_ns)
 	sync
 	blr	
 
-_GLOBAL(_get_PVR)
-	mfspr	r3,PVR
-	blr
-
-_GLOBAL(_get_PIR)
-	mfspr	r3,PIR
-	blr
-
-_GLOBAL(_get_HID0)
-	mfspr	r3,HID0
-	blr
 
 _GLOBAL(cvt_fd)
 	lfd	0,0(r5)		/* load up fpscr value */
@@ -561,6 +591,69 @@ _GLOBAL(do_cpu_ftr_fixups)
 	isync
 	b	1b
 
+#if defined(CONFIG_PPC_PMAC) || defined(CONFIG_PPC_MAPLE)
+/*
+ * Do an IO access in real mode
+ */
+_GLOBAL(real_readb)
+	mfmsr	r7
+	ori	r0,r7,MSR_DR
+	xori	r0,r0,MSR_DR
+	sync
+	mtmsrd	r0
+	sync
+	isync
+	mfspr	r6,SPRN_HID4
+	rldicl	r5,r6,32,0
+	ori	r5,r5,0x100
+	rldicl	r5,r5,32,0
+	sync
+	mtspr	SPRN_HID4,r5
+	isync
+	slbia
+	isync
+	lbz	r3,0(r3)
+	sync
+	mtspr	SPRN_HID4,r6
+	isync
+	slbia
+	isync
+	mtmsrd	r7
+	sync
+	isync
+	blr
+
+	/*
+ * Do an IO access in real mode
+ */
+_GLOBAL(real_writeb)
+	mfmsr	r7
+	ori	r0,r7,MSR_DR
+	xori	r0,r0,MSR_DR
+	sync
+	mtmsrd	r0
+	sync
+	isync
+	mfspr	r6,SPRN_HID4
+	rldicl	r5,r6,32,0
+	ori	r5,r5,0x100
+	rldicl	r5,r5,32,0
+	sync
+	mtspr	SPRN_HID4,r5
+	isync
+	slbia
+	isync
+	stb	r3,0(r4)
+	sync
+	mtspr	SPRN_HID4,r6
+	isync
+	slbia
+	isync
+	mtmsrd	r7
+	sync
+	isync
+	blr
+#endif /* defined(CONFIG_PPC_PMAC) || defined(CONFIG_PPC_MAPLE) */
 
 /*
  * Create a kernel thread
@@ -577,7 +670,7 @@ _GLOBAL(kernel_thread)
 	li	r4,0		/* new sp (unused) */
 	li	r0,__NR_clone
 	sc
-	cmpi	0,r3,0		/* parent or child? */
+	cmpdi	0,r3,0		/* parent or child? */
 	bne	1f		/* return if parent */
 	li	r0,0
 	stdu	r0,-STACK_FRAME_OVERHEAD(r1)
@@ -594,7 +687,7 @@ _GLOBAL(kernel_thread)
 	ld	r30,-16(r1)
 	blr
 
-#ifdef CONFIG_PPC_ISERIES	/* hack hack hack */
+#ifndef CONFIG_PPC_PSERIES	/* hack hack hack */
 #define ppc_rtas	sys_ni_syscall
 #endif
 
@@ -842,27 +935,27 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_epoll_wait
 	.llong .sys_remap_file_pages
 	.llong .ppc32_timer_create	/* 240 */
-	.llong .compat_timer_settime
-	.llong .compat_timer_gettime
+	.llong .compat_sys_timer_settime
+	.llong .compat_sys_timer_gettime
 	.llong .sys_timer_getoverrun
 	.llong .sys_timer_delete
-	.llong .compat_clock_settime	/* 245 */
-	.llong .compat_clock_gettime
-	.llong .compat_clock_getres
-	.llong .compat_clock_nanosleep
+	.llong .compat_sys_clock_settime	/* 245 */
+	.llong .compat_sys_clock_gettime
+	.llong .compat_sys_clock_getres
+	.llong .compat_sys_clock_nanosleep
 	.llong .ppc32_swapcontext
 	.llong .sys32_tgkill		/* 250 */
 	.llong .sys32_utimes
-	.llong .compat_statfs64
-	.llong .compat_fstatfs64
+	.llong .compat_sys_statfs64
+	.llong .compat_sys_fstatfs64
 	.llong .ppc32_fadvise64_64	/* 32bit only fadvise64_64 */
 	.llong .ppc_rtas		/* 255 */
 	.llong .sys_ni_syscall		/* 256 reserved for sys_debug_setcontext */
 	.llong .sys_ni_syscall		/* 257 reserved for vserver */
 	.llong .sys_ni_syscall		/* 258 reserved for new sys_remap_file_pages */
-	.llong .sys_ni_syscall		/* 259 reserved for new sys_mbind */
-	.llong .sys_ni_syscall		/* 260 reserved for new sys_get_mempolicy */
-	.llong .sys_ni_syscall		/* 261 reserved for new sys_set_mempolicy */
+	.llong .compat_sys_mbind
+	.llong .compat_sys_get_mempolicy	/* 260 */
+	.llong .compat_sys_set_mempolicy
 	.llong .compat_sys_mq_open
 	.llong .sys_mq_unlink
 	.llong .compat_sys_mq_timedsend
@@ -870,6 +963,9 @@ _GLOBAL(sys_call_table32)
 	.llong .compat_sys_mq_notify
 	.llong .compat_sys_mq_getsetattr
 	.llong .sys_ni_syscall		/* 268 reserved for sys_kexec_load */
+	.llong .sys32_add_key
+	.llong .sys32_request_key
+	.llong .compat_sys_keyctl
 
 	.balign 8
 _GLOBAL(sys_call_table)
@@ -1132,9 +1228,9 @@ _GLOBAL(sys_call_table)
 	.llong .sys_ni_syscall		/* 256 reserved for sys_debug_setcontext */
 	.llong .sys_ni_syscall		/* 257 reserved for vserver */
 	.llong .sys_ni_syscall		/* 258 reserved for new sys_remap_file_pages */
-	.llong .sys_ni_syscall		/* 259 reserved for new sys_mbind */
-	.llong .sys_ni_syscall		/* 260 reserved for new sys_get_mempolicy */
-	.llong .sys_ni_syscall		/* 261 reserved for new sys_set_mempolicy */
+	.llong .sys_mbind
+	.llong .sys_get_mempolicy	/* 260 */
+	.llong .sys_set_mempolicy
 	.llong .sys_mq_open
 	.llong .sys_mq_unlink
 	.llong .sys_mq_timedsend
@@ -1142,3 +1238,6 @@ _GLOBAL(sys_call_table)
 	.llong .sys_mq_notify
 	.llong .sys_mq_getsetattr
 	.llong .sys_ni_syscall		/* 268 reserved for sys_kexec_load */
+	.llong .sys_add_key
+	.llong .sys_request_key		/* 270 */
+	.llong .sys_keyctl

@@ -5,15 +5,13 @@
 #include <linux/pci.h>
 #include <linux/ide.h>
 
-#define DISPLAY_AEC62XX_TIMINGS
-
 struct chipset_bus_clock_list_entry {
 	byte		xfer_speed;
 	byte		chipset_settings;
 	byte		ultra_settings;
 };
 
-struct chipset_bus_clock_list_entry aec6xxx_33_base [] = {
+static struct chipset_bus_clock_list_entry aec6xxx_33_base [] = {
 	{	XFER_UDMA_6,	0x31,	0x07	},
 	{	XFER_UDMA_5,	0x31,	0x06	},
 	{	XFER_UDMA_4,	0x31,	0x05	},
@@ -33,7 +31,7 @@ struct chipset_bus_clock_list_entry aec6xxx_33_base [] = {
 	{	0,		0x00,	0x00	}
 };
 
-struct chipset_bus_clock_list_entry aec6xxx_34_base [] = {
+static struct chipset_bus_clock_list_entry aec6xxx_34_base [] = {
 	{	XFER_UDMA_6,	0x41,	0x06	},
 	{	XFER_UDMA_5,	0x41,	0x05	},
 	{	XFER_UDMA_4,	0x41,	0x04	},
@@ -53,13 +51,6 @@ struct chipset_bus_clock_list_entry aec6xxx_34_base [] = {
 	{	0,		0x00,	0x00	}
 };
 
-
-#ifndef HIGH_4
-#define HIGH_4(H)		((H)=(H>>4))
-#endif
-#ifndef LOW_4
-#define LOW_4(L)		((L)=(L-((L>>4)<<4)))
-#endif
 #ifndef SPLIT_BYTE
 #define SPLIT_BYTE(B,H,L)	((H)=(B>>4), (L)=(B-((B>>4)<<4)))
 #endif

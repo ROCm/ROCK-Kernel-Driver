@@ -11,7 +11,7 @@
 #include <linux/module.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -96,14 +96,14 @@ teql_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 
 	__skb_queue_tail(&q->q, skb);
 	if (q->q.qlen <= dev->tx_queue_len) {
-		sch->stats.bytes += skb->len;
-		sch->stats.packets++;
+		sch->bstats.bytes += skb->len;
+		sch->bstats.packets++;
 		return 0;
 	}
 
 	__skb_unlink(skb, &q->q);
 	kfree_skb(skb);
-	sch->stats.drops++;
+	sch->qstats.drops++;
 	return NET_XMIT_DROP;
 }
 
@@ -113,6 +113,7 @@ teql_requeue(struct sk_buff *skb, struct Qdisc* sch)
 	struct teql_sched_data *q = qdisc_priv(sch);
 
 	__skb_queue_head(&q->q, skb);
+	sch->qstats.requeues++;
 	return 0;
 }
 

@@ -364,6 +364,9 @@ int __init clps711xfb_init(void)
 {
 	int err = -ENOMEM;
 
+	if (fb_get_options("clps711xfb", NULL))
+		return -ENODEV;
+
 	cfb = kmalloc(sizeof(*cfb), GFP_KERNEL);
 	if (!cfb)
 		goto out;

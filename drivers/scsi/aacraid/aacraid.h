@@ -7,7 +7,6 @@
  *----------------------------------------------------------------------------*/
 
 #define MAXIMUM_NUM_CONTAINERS	32
-#define MAXIMUM_NUM_ADAPTERS	8
 
 #define AAC_NUM_FIB		(256 + 64)
 #define AAC_NUM_IO_FIB		100
@@ -57,6 +56,7 @@ struct diskparm
 #define		CT_VOLUME_OF_MIRRORS	12	/* volume of mirror */
 #define		CT_PSEUDO_RAID		13	/* really raid4 */
 #define		CT_LAST_VOLUME_TYPE	14
+#define 	CT_OK        		218
 
 /*
  *	Types of objects addressable in some fashion by the client.
@@ -421,8 +421,6 @@ struct adapter_ops
 {
 	void (*adapter_interrupt)(struct aac_dev *dev);
 	void (*adapter_notify)(struct aac_dev *dev, u32 event);
-	void (*adapter_enable_int)(struct aac_dev *dev, u32 event);
-	void (*adapter_disable_int)(struct aac_dev *dev, u32 event);
 	int  (*adapter_sync_cmd)(struct aac_dev *dev, u32 command, u32 p1, u32 *status);
 	int  (*adapter_check_health)(struct aac_dev *dev);
 };
@@ -662,14 +660,53 @@ struct aac_fib_context {
 	struct list_head	fib_list;	// this holds fibs and their attachd hw_fibs
 };
 
-struct fsa_scsi_hba {
-	u32		size[MAXIMUM_NUM_CONTAINERS];
-	u32		type[MAXIMUM_NUM_CONTAINERS];
-	u8		valid[MAXIMUM_NUM_CONTAINERS];
-	u8		ro[MAXIMUM_NUM_CONTAINERS];
-	u8		locked[MAXIMUM_NUM_CONTAINERS];
-	u8		deleted[MAXIMUM_NUM_CONTAINERS];
-	char		devname[MAXIMUM_NUM_CONTAINERS][8];
+struct sense_data {
+	u8 error_code;		/* 70h (current errors), 71h(deferred errors) */
+	u8 valid:1;		/* A valid bit of one indicates that the information  */
+				/* field contains valid information as defined in the
+				 * SCSI-2 Standard.
+				 */
+	u8 segment_number;	/* Only used for COPY, COMPARE, or COPY AND VERIFY Commands */
+	u8 sense_key:4;		/* Sense Key */
+	u8 reserved:1;
+	u8 ILI:1;		/* Incorrect Length Indicator */
+	u8 EOM:1;		/* End Of Medium - reserved for random access devices */
+	u8 filemark:1;		/* Filemark - reserved for random access devices */
+
+	u8 information[4];	/* for direct-access devices, contains the unsigned 
+				 * logical block address or residue associated with 
+				 * the sense key 
+				 */
+	u8 add_sense_len;	/* number of additional sense bytes to follow this field */
+	u8 cmnd_info[4];	/* not used */
+	u8 ASC;			/* Additional Sense Code */
+	u8 ASCQ;		/* Additional Sense Code Qualifier */
+	u8 FRUC;		/* Field Replaceable Unit Code - not used */
+	u8 bit_ptr:3;		/* indicates which byte of the CDB or parameter data
+				 * was in error
+				 */
+	u8 BPV:1;		/* bit pointer valid (BPV): 1- indicates that 
+				 * the bit_ptr field has valid value
+				 */
+	u8 reserved2:2;
+	u8 CD:1;		/* command data bit: 1- illegal parameter in CDB.
+				 * 0- illegal parameter in data.
+				 */
+	u8 SKSV:1;
+	u8 field_ptr[2];	/* byte of the CDB or parameter data in error */
+};
+
+struct fsa_dev_info {
+	u64		last;
+	u64		size;
+	u32		type;
+	u16		queue_depth;
+	u8		valid;
+	u8		ro;
+	u8		locked;
+	u8		deleted;
+	char		devname[8];
+	struct sense_data sense_data;
 };
 
 struct fib {
@@ -768,10 +805,12 @@ struct aac_adapter_info
 #define AAC_OPT_SGMAP_HOST64		cpu_to_le32(1<<10)
 #define AAC_OPT_ALARM			cpu_to_le32(1<<11)
 #define AAC_OPT_NONDASD			cpu_to_le32(1<<12)
+#define AAC_OPT_SCSI_MANAGED    	cpu_to_le32(1<<13)
+#define AAC_OPT_RAID_SCSI_MODE		cpu_to_le32(1<<14)
 
 struct aac_dev
 {
-	struct aac_dev		*next;
+	struct list_head	entry;
 	const char		*name;
 	int			id;
 
@@ -814,7 +853,8 @@ struct aac_dev
 	size_t			comm_size;
 
 	struct Scsi_Host	*scsi_host_ptr;
-	struct fsa_scsi_hba	fsa_dev;
+	int			maximum_num_containers;
+	struct fsa_dev_info	*fsa_dev;
 	pid_t			thread_pid;
 	int			cardtype;
 	
@@ -823,9 +863,9 @@ struct aac_dev
 	 */
 	union
 	{
-		struct sa_registers *sa;
-		struct rx_registers *rx;
-		struct rkt_registers *rkt;
+		struct sa_registers __iomem *sa;
+		struct rx_registers __iomem *rx;
+		struct rkt_registers __iomem *rkt;
 	} regs;
 	u32			OIMR; /* Mask Register Cache */
 	/*
@@ -839,13 +879,8 @@ struct aac_dev
 	 */
 	u8			nondasd_support; 
 	u8			dac_support;
+	u8			raid_scsi_mode;
 };
-
-#define AllocateAndMapFibSpace(dev, MapFibContext) \
-	(dev)->a_ops.AllocateAndMapFibSpace(dev, MapFibContext)
-
-#define UnmapAndFreeFibSpace(dev, MapFibContext) \
-	(dev)->a_ops.UnmapAndFreeFibSpace(dev, MapFibContext)
 
 #define aac_adapter_interrupt(dev) \
 	(dev)->a_ops.adapter_interrupt(dev)
@@ -853,11 +888,6 @@ struct aac_dev
 #define aac_adapter_notify(dev, event) \
 	(dev)->a_ops.adapter_notify(dev, event)
 
-#define aac_adapter_enable_int(dev, event) \
-	(dev)->a_ops.adapter_enable_int(dev, event)
-
-#define aac_adapter_disable_int(dev, event) \
-	dev->a_ops.adapter_disable_int(dev, event)
 
 #define aac_adapter_check_health(dev) \
 	(dev)->a_ops.adapter_check_health(dev)
@@ -1169,6 +1199,71 @@ union aac_contentinfo {
 };
 
 /*
+ *	Query for Container Configuration Status
+ */
+
+#define CT_GET_CONFIG_STATUS 147
+struct aac_get_config_status {
+	u32		command;	/* VM_ContainerConfig */
+	u32		type;		/* CT_GET_CONFIG_STATUS */
+	u32		parm1;
+	u32		parm2;
+	u32		parm3;
+	u32		parm4;
+	u32		parm5;
+	u32		count;	/* sizeof(((struct aac_get_config_status_resp *)NULL)->data) */
+};
+
+#define CFACT_CONTINUE 0
+#define CFACT_PAUSE    1
+#define CFACT_ABORT    2
+struct aac_get_config_status_resp {
+	u32		response; /* ST_OK */
+	u32		dummy0;
+	u32		status;	/* CT_OK */
+	u32		parm1;
+	u32		parm2;
+	u32		parm3;
+	u32		parm4;
+	u32		parm5;
+	struct {
+		u32	action; /* CFACT_CONTINUE, CFACT_PAUSE or CFACT_ABORT */
+		u16	flags;
+		s16	count;
+	}		data;
+};
+
+/*
+ *	Accept the configuration as-is
+ */
+
+#define CT_COMMIT_CONFIG 152
+
+struct aac_commit_config {
+	u32		command;	/* VM_ContainerConfig */
+	u32		type;		/* CT_COMMIT_CONFIG */
+};
+
+/*
+ *	Query for Container Configuration Count
+ */
+
+#define CT_GET_CONTAINER_COUNT 4
+struct aac_get_container_count {
+	u32		command;	/* VM_ContainerConfig */
+	u32		type;		/* CT_GET_CONTAINER_COUNT */
+};
+
+struct aac_get_container_count_resp {
+	u32		response; /* ST_OK */
+	u32		dummy0;
+	u32		MaxContainers;
+	u32		ContainerSwitchEntries;
+	u32		MaxPartitions;
+};
+
+
+/*
  *	Query for "mountable" objects, ie, objects that are typically
  *	associated with a drive letter on the client (host) side.
  */
@@ -1200,6 +1295,31 @@ struct aac_mount {
 	u32	   	type;           /* should be same as that requested */
 	u32		count;
 	struct aac_mntent mnt[1];
+};
+
+#define CT_READ_NAME 130
+struct aac_get_name {
+	u32		command;	/* VM_ContainerConfig */
+	u32		type;		/* CT_READ_NAME */
+	u32		cid;
+	u32		parm1;
+	u32		parm2;
+	u32		parm3;
+	u32		parm4;
+	u32		count;	/* sizeof(((struct aac_get_name_resp *)NULL)->data) */
+};
+
+#define CT_OK        218
+struct aac_get_name_resp {
+	u32		dummy0;
+	u32		dummy1;
+	u32		status;	/* CT_OK */
+	u32		parm1;
+	u32		parm2;
+	u32		parm3;
+	u32		parm4;
+	u32		parm5;
+	u8		data[16];
 };
 
 /*
@@ -1443,6 +1563,7 @@ void aac_consumer_free(struct aac_dev * dev, struct aac_queue * q, u32 qnum);
 int fib_complete(struct fib * context);
 #define fib_data(fibctx) ((void *)(fibctx)->hw_fib->data)
 struct aac_dev *aac_init_adapter(struct aac_dev *dev);
+int aac_get_config_status(struct aac_dev *dev);
 int aac_get_containers(struct aac_dev *dev);
 int aac_scsi_cmd(struct scsi_cmnd *cmd);
 int aac_dev_ioctl(struct aac_dev *dev, int cmd, void __user *arg);

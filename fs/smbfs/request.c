@@ -112,7 +112,6 @@ struct smb_request *smb_alloc_request(struct smb_sb_info *server, int bufsize)
 #else
 		/* FIXME: we want something like nfs does above, but that
 		   requires changes to all callers and can wait. */
-		atomic_dec(&server->nr_requests);
 		break;
 #endif
 	}
@@ -317,7 +316,7 @@ int smb_add_request(struct smb_request *req)
 	if (server->state == CONN_VALID) {
 		if (list_empty(&server->xmitq))
 			result = smb_request_send_req(req);
-		if (result < 0 && result != -EAGAIN) {
+		if (result < 0) {
 			/* Connection lost? */
 			server->conn_error = result;
 			server->state = CONN_INVALID;
@@ -395,6 +394,7 @@ int smb_request_send_req(struct smb_request *req)
 	if (result < 0 && result != -EAGAIN)
 		goto out;
 
+	result = 0;
 	if (!(req->rq_flags & SMB_REQ_TRANSMITTED))
 		goto out;
 
@@ -431,7 +431,7 @@ int smb_request_send_server(struct smb_sb_info *server)
 		return 0;
 
 	result = smb_request_send_req(req);
-	if (result < 0 && result != -EAGAIN) {
+	if (result < 0) {
 		server->conn_error = result;
 		list_del_init(&req->rq_queue);
 		list_add(&req->rq_queue, &server->xmitq);
@@ -588,10 +588,6 @@ static int smb_recv_trans2(struct smb_sb_info *server, struct smb_request *req)
 	data_count  = WVAL(inbuf, smb_drcnt);
 
 	/* Modify offset for the split header/buffer we use */
-	if (data_offset < hdrlen)
-		goto out_bad_data;
-	if (parm_offset < hdrlen)
-		goto out_bad_parm;
 	data_offset -= hdrlen;
 	parm_offset -= hdrlen;
 
@@ -611,10 +607,6 @@ static int smb_recv_trans2(struct smb_sb_info *server, struct smb_request *req)
 		req->rq_lparm = parm_count;
 		req->rq_data = req->rq_buffer + data_offset;
 		req->rq_parm = req->rq_buffer + parm_offset;
-		if (parm_offset + parm_count > req->rq_rlen)
-			goto out_bad_parm;
-		if (data_offset + data_count > req->rq_rlen)
-			goto out_bad_data;
 		return 0;
 	}
 
@@ -652,11 +644,7 @@ static int smb_recv_trans2(struct smb_sb_info *server, struct smb_request *req)
 
 	if (parm_disp + parm_count > req->rq_total_parm)
 		goto out_bad_parm;
-	if (parm_offset + parm_count > req->rq_rlen)
-		goto out_bad_parm;
 	if (data_disp + data_count > req->rq_total_data)
-		goto out_bad_data;
-	if (data_offset + data_count > req->rq_rlen)
 		goto out_bad_data;
 
 	inbuf = req->rq_buffer;
@@ -692,13 +680,13 @@ out_data_grew:
 	req->rq_errno = -EIO;
 	goto out;
 out_bad_parm:
-	printk(KERN_ERR "smb_trans2: invalid parms, disp=%d, cnt=%d, tot=%d, ofs=%d\n",
-	       parm_disp, parm_count, parm_tot, parm_offset);
+	printk(KERN_ERR "smb_trans2: invalid parms, disp=%d, cnt=%d, tot=%d\n",
+	       parm_disp, parm_count, parm_tot);
 	req->rq_errno = -EIO;
 	goto out;
 out_bad_data:
-	printk(KERN_ERR "smb_trans2: invalid data, disp=%d, cnt=%d, tot=%d, ofs=%d\n",
-	       data_disp, data_count, data_tot, data_offset);
+	printk(KERN_ERR "smb_trans2: invalid data, disp=%d, cnt=%d, tot=%d\n",
+	       data_disp, data_count, data_tot);
 	req->rq_errno = -EIO;
 out:
 	return req->rq_errno;

@@ -65,10 +65,6 @@ struct inode_operations nfs_file_inode_operations = {
 	.permission	= nfs_permission,
 	.getattr	= nfs_getattr,
 	.setattr	= nfs_setattr,
-	.listxattr	= nfs_listxattr,
-	.getxattr	= nfs_getxattr,
-	.setxattr	= nfs_setxattr,
-	.removexattr	= nfs_removexattr,
 };
 
 /* Hack for future NFS swap support */
@@ -401,9 +397,11 @@ nfs_lock(struct file *filp, int cmd, struct file_lock *fl)
 		return -ENOLCK;
 
 	if (NFS_PROTO(inode)->version != 4) {
-		/* If mounted NONLM, tell VFS to use local locking only. */
+		/* Fake OK code if mounted without NLM support */
 		if (NFS_SERVER(inode)->flags & NFS_MOUNT_NONLM) {
-			return LOCK_USE_CLNT;
+			if (IS_GETLK(cmd))
+				return LOCK_USE_CLNT;
+			return 0;
 		}
 	}
 

@@ -46,7 +46,8 @@ struct pt_regs {
 #ifdef __KERNEL__
 
 /* XXX should we use iaoq[1] or iaoq[0] ? */
-#define user_mode(regs)			(((regs)->iaoq[0] &  3) ? 1 : 0)
+#define user_mode(regs)			(((regs)->iaoq[0] & 3) ? 1 : 0)
+#define user_space(regs)		(((regs)->iasq[0] != 0) ? 1 : 0)
 #define instruction_pointer(regs)	((regs)->iaoq[0] & ~3)
 #define profile_pc(regs) instruction_pointer(regs)
 extern void show_regs(struct pt_regs *);

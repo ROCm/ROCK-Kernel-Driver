@@ -31,6 +31,9 @@
 #include <linux/timex.h>
 #include <linux/errno.h>
 #include <linux/smp_lock.h>
+#include <linux/syscalls.h>
+#include <linux/security.h>
+
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
 
@@ -77,13 +80,17 @@ asmlinkage long sys_time(int __user * tloc)
 asmlinkage long sys_stime(time_t __user *tptr)
 {
 	struct timespec tv;
+	int err;
 
-	if (!capable(CAP_SYS_TIME))
-		return -EPERM;
 	if (get_user(tv.tv_sec, tptr))
 		return -EFAULT;
 
 	tv.tv_nsec = 0;
+
+	err = security_settime(&tv, NULL);
+	if (err)
+		return err;
+
 	do_settimeofday(&tv);
 	return 0;
 }
@@ -145,10 +152,12 @@ inline static void warp_clock(void)
 int do_sys_settimeofday(struct timespec *tv, struct timezone *tz)
 {
 	static int firsttime = 1;
+	int error = 0;
 
-	if (!capable(CAP_SYS_TIME))
-		return -EPERM;
-		
+	error = security_settime(tv, tz);
+	if (error)
+		return error;
+
 	if (tz) {
 		/* SMP safe, global irq locking makes it work. */
 		sys_tz = *tz;
@@ -478,8 +487,6 @@ int do_settimeofday (struct timespec *tv)
 	return 0;
 }
 
-EXPORT_SYMBOL(do_settimeofday);
-
 void do_gettimeofday (struct timeval *tv)
 {
 	unsigned long seq, nsec, usec, sec, offset;
@@ -518,8 +525,6 @@ void getnstimeofday(struct timespec *tv)
 	tv->tv_nsec = x.tv_usec * NSEC_PER_USEC;
 }
 #endif
-
-EXPORT_SYMBOL(getnstimeofday);
 
 #if (BITS_PER_LONG < 64)
 u64 get_jiffies_64(void)

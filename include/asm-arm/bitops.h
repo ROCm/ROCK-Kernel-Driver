@@ -342,10 +342,10 @@ static inline unsigned long __ffs(unsigned long word)
  * the clz instruction for much better code efficiency.
  */
 
-extern __inline__ int generic_fls(int x);
+static __inline__ int generic_fls(int x);
 #define fls(x) \
 	( __builtin_constant_p(x) ? generic_fls(x) : \
-	  ({ int __r; asm("clz%?\t%0, %1" : "=r"(__r) : "r"(x)); 32-__r; }) )
+	  ({ int __r; asm("clz\t%0, %1" : "=r"(__r) : "r"(x) : "cc"); 32-__r; }) )
 #define ffs(x) ({ unsigned long __t = (x); fls(__t & -__t); })
 #define __ffs(x) (ffs(x) - 1)
 #define ffz(x) __ffs( ~(x) )

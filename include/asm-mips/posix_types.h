@@ -28,8 +28,8 @@ typedef unsigned int	__kernel_nlink_t;
 typedef long		__kernel_off_t;
 typedef int		__kernel_pid_t;
 typedef int		__kernel_ipc_pid_t;
-typedef int		__kernel_uid_t;
-typedef int		__kernel_gid_t;
+typedef unsigned int	__kernel_uid_t;
+typedef unsigned int	__kernel_gid_t;
 #if (_MIPS_SZLONG == 32)
 typedef unsigned int	__kernel_size_t;
 typedef int		__kernel_ssize_t;
@@ -50,8 +50,8 @@ typedef char *		__kernel_caddr_t;
 
 typedef unsigned short	__kernel_uid16_t;
 typedef unsigned short	__kernel_gid16_t;
-typedef int		__kernel_uid32_t;
-typedef int		__kernel_gid32_t;
+typedef unsigned int	__kernel_uid32_t;
+typedef unsigned int	__kernel_gid32_t;
 typedef __kernel_uid_t	__kernel_old_uid_t;
 typedef __kernel_gid_t	__kernel_old_gid_t;
 typedef unsigned int	__kernel_old_dev_t;

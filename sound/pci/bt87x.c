@@ -27,8 +27,8 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/moduleparam.h>
+#include <linux/bitops.h>
 #include <asm/io.h>
-#include <asm/bitops.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -45,15 +45,14 @@ static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int digital_rate[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = 0 }; /* digital input rate */
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for Bt87x soundcard");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for Bt87x soundcard");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable Bt87x soundcard");
-module_param_array(digital_rate, int, boot_devs, 0444);
+module_param_array(digital_rate, int, NULL, 0444);
 MODULE_PARM_DESC(digital_rate, "Digital input rate for Bt87x soundcard");
 
 
@@ -139,6 +138,14 @@ MODULE_PARM_DESC(digital_rate, "Digital input rate for Bt87x soundcard");
 /* SYNC status bits values */
 #define RISC_SYNC_FM1	0x6
 #define RISC_SYNC_VRO	0xc
+
+#define ANALOG_CLOCK 1792000
+#ifdef CONFIG_SND_BT87X_OVERCLOCK
+#define CLOCK_DIV_MIN 1
+#else
+#define CLOCK_DIV_MIN 4
+#endif
+#define CLOCK_DIV_MAX 15
 
 #define ERROR_INTERRUPTS (INT_FBUS | INT_FTRGT | INT_PPERR | \
 			  INT_RIPERR | INT_PABORT | INT_OCERR)
@@ -264,9 +271,8 @@ static irqreturn_t snd_bt87x_interrupt(int irq, void *dev_id, struct pt_regs *re
 			snd_printk(KERN_ERR "Aieee - PCI error! status %#08x, PCI status %#04x\n",
 				   status, pci_status);
 		}
-		if (chip->reg_control & CTL_ACAP_EN)
-			snd_pcm_stop(chip->substream, SNDRV_PCM_STATE_XRUN);
-	} else if ((status & INT_RISCI) && (chip->reg_control & CTL_ACAP_EN)) {
+	}
+	if ((status & INT_RISCI) && (chip->reg_control & CTL_ACAP_EN)) {
 		int current_block, irq_block;
 
 		/* assume that exactly one line has been recorded */
@@ -305,8 +311,8 @@ static snd_pcm_hardware_t snd_bt87x_analog_hw = {
 		SNDRV_PCM_INFO_MMAP_VALID,
 	.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S8,
 	.rates = SNDRV_PCM_RATE_KNOT,
-	.rate_min = 119466,
-	.rate_max = 448000,
+	.rate_min = ANALOG_CLOCK / CLOCK_DIV_MAX,
+	.rate_max = ANALOG_CLOCK / CLOCK_DIV_MIN,
 	.channels_min = 1,
 	.channels_max = 1,
 	.buffer_bytes_max = 255 * 4092,
@@ -348,9 +354,9 @@ static int snd_bt87x_set_digital_hw(bt87x_t *chip, snd_pcm_runtime_t *runtime)
 static int snd_bt87x_set_analog_hw(bt87x_t *chip, snd_pcm_runtime_t *runtime)
 {
 	static ratnum_t analog_clock = {
-		.num = 1792000,
-		.den_min = 4,
-		.den_max = 15,
+		.num = ANALOG_CLOCK,
+		.den_min = CLOCK_DIV_MIN,
+		.den_max = CLOCK_DIV_MAX,
 		.den_step = 1
 	};
 	static snd_pcm_hw_constraint_ratnums_t constraint_rates = {
@@ -435,7 +441,7 @@ static int snd_bt87x_prepare(snd_pcm_substream_t *substream)
 
 	spin_lock_irq(&chip->reg_lock);
 	chip->reg_control &= ~(CTL_DA_SDR_MASK | CTL_DA_SBR);
-	decimation = (1792000 + runtime->rate / 4) / runtime->rate;
+	decimation = (ANALOG_CLOCK + runtime->rate / 4) / runtime->rate;
 	chip->reg_control |= decimation << CTL_DA_SDR_SHIFT;
 	if (runtime->format == SNDRV_PCM_FORMAT_S8)
 		chip->reg_control |= CTL_DA_SBR;
@@ -642,6 +648,7 @@ static int snd_bt87x_free(bt87x_t *chip)
 	if (chip->irq >= 0)
 		free_irq(chip->irq, chip);
 	pci_release_regions(chip->pci);
+	pci_disable_device(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -687,8 +694,10 @@ static int __devinit snd_bt87x_create(snd_card_t *card,
 		return err;
 
 	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
-	if (!chip)
+	if (!chip) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	chip->card = card;
 	chip->pci = pci;
 	chip->irq = -1;
@@ -696,6 +705,7 @@ static int __devinit snd_bt87x_create(snd_card_t *card,
 
 	if ((err = pci_request_regions(pci, "Bt87x audio")) < 0) {
 		kfree(chip);
+		pci_disable_device(pci);
 		return err;
 	}
 	chip->mmio = ioremap_nocache(pci_resource_start(pci, 0),

@@ -10,6 +10,8 @@
  * Authors:
  *      Martin Peschke <mpeschke@de.ibm.com>
  *	Heiko Carstens <heiko.carstens@de.ibm.com>
+ *      Andreas Herrmann <aherrman@de.ibm.com>
+ *      Volker Sameske <sameske@de.ibm.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,7 +28,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_SYSFS_PORT_C_REVISION "$Revision: 1.44 $"
+#define ZFCP_SYSFS_PORT_C_REVISION "$Revision: 1.47 $"
 
 #include "zfcp_ext.h"
 
@@ -68,6 +70,8 @@ ZFCP_DEFINE_PORT_ATTR(d_id, "0x%06x\n", port->d_id);
 ZFCP_DEFINE_PORT_ATTR(scsi_id, "0x%x\n", port->scsi_id);
 ZFCP_DEFINE_PORT_ATTR(in_recovery, "%d\n", atomic_test_mask
 		      (ZFCP_STATUS_COMMON_ERP_INUSE, &port->status));
+ZFCP_DEFINE_PORT_ATTR(access_denied, "%d\n", atomic_test_mask
+		      (ZFCP_STATUS_COMMON_ACCESS_DENIED, &port->status));
 
 /**
  * zfcp_sysfs_unit_add_store - add a unit to sysfs tree
@@ -244,6 +248,7 @@ static struct attribute *zfcp_port_common_attrs[] = {
 	&dev_attr_status.attr,
 	&dev_attr_wwnn.attr,
 	&dev_attr_d_id.attr,
+	&dev_attr_access_denied.attr,
 	NULL
 };
 

@@ -134,8 +134,6 @@ struct adi_port {
 	int used;
 };
 
-static int adi_num;
-
 /*
  * adi_read_packet() reads a Logitech ADI packet.
  */
@@ -426,7 +424,6 @@ static void adi_init_input(struct adi *adi, struct adi_port *port, int half)
 	adi->dev.id.vendor = GAMEPORT_ID_VENDOR_LOGITECH;
 	adi->dev.id.product = adi->id;
 	adi->dev.id.version = 0x0100;
-	sprintf(adi->dev.cdev.class_id,"adi%d",adi_num++);
 
 	adi->dev.private = port;
 	adi->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);

@@ -32,6 +32,8 @@ static ssize_t store_online(struct sys_device *dev, const char *buf,
 	switch (buf[0]) {
 	case '0':
 		ret = cpu_down(cpu->sysdev.id);
+		if (!ret)
+			kobject_hotplug(&dev->kobj, KOBJ_OFFLINE);
 		break;
 	case '1':
 		ret = cpu_up(cpu->sysdev.id);

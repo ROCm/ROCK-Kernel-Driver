@@ -55,7 +55,7 @@
 #include <linux/types.h>
 #include <linux/socket.h>
 
-typedef void * sctp_assoc_t;
+typedef __s32 sctp_assoc_t;
 
 /* The following symbols come from the Sockets API Extensions for
  * SCTP <draft-ietf-tsvwg-sctpsocket-07.txt>.
@@ -338,8 +338,8 @@ struct sctp_adaption_event {
 /*
  * 5.3.1.7 SCTP_PARTIAL_DELIVERY_EVENT
  *
- *   When a reciever is engaged in a partial delivery of a
- *   message this notification will be used to inidicate
+ *   When a receiver is engaged in a partial delivery of a
+ *   message this notification will be used to indicate
  *   various events.
  */
 struct sctp_pdapi_event {

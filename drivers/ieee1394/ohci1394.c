@@ -94,7 +94,6 @@
 #include <linux/pci.h>
 #include <linux/fs.h>
 #include <linux/poll.h>
-#include <linux/irq.h>
 #include <asm/byteorder.h>
 #include <asm/atomic.h>
 #include <asm/uaccess.h>
@@ -103,6 +102,7 @@
 
 #include <asm/pgtable.h>
 #include <asm/page.h>
+#include <asm/irq.h>
 #include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/vmalloc.h>
@@ -2933,8 +2933,8 @@ alloc_dma_rcv_ctx(struct ti_ohci *ohci, struct dma_rcv_ctx *d,
 	d->ctrlClear = 0;
 	d->cmdPtr = 0;
 
-	d->buf_cpu = kmalloc(d->num_desc * sizeof(quadlet_t*), GFP_KERNEL);
-	d->buf_bus = kmalloc(d->num_desc * sizeof(dma_addr_t), GFP_KERNEL);
+	d->buf_cpu = kmalloc(d->num_desc * sizeof(quadlet_t*), GFP_ATOMIC);
+	d->buf_bus = kmalloc(d->num_desc * sizeof(dma_addr_t), GFP_ATOMIC);
 
 	if (d->buf_cpu == NULL || d->buf_bus == NULL) {
 		PRINT(KERN_ERR, "Failed to allocate dma buffer");
@@ -2945,8 +2945,8 @@ alloc_dma_rcv_ctx(struct ti_ohci *ohci, struct dma_rcv_ctx *d,
 	memset(d->buf_bus, 0, d->num_desc * sizeof(dma_addr_t));
 
 	d->prg_cpu = kmalloc(d->num_desc * sizeof(struct dma_cmd*),
-			     GFP_KERNEL);
-	d->prg_bus = kmalloc(d->num_desc * sizeof(dma_addr_t), GFP_KERNEL);
+				GFP_ATOMIC);
+	d->prg_bus = kmalloc(d->num_desc * sizeof(dma_addr_t), GFP_ATOMIC);
 
 	if (d->prg_cpu == NULL || d->prg_bus == NULL) {
 		PRINT(KERN_ERR, "Failed to allocate dma prg");
@@ -2956,7 +2956,7 @@ alloc_dma_rcv_ctx(struct ti_ohci *ohci, struct dma_rcv_ctx *d,
 	memset(d->prg_cpu, 0, d->num_desc * sizeof(struct dma_cmd*));
 	memset(d->prg_bus, 0, d->num_desc * sizeof(dma_addr_t));
 
-	d->spb = kmalloc(d->split_buf_size, GFP_KERNEL);
+	d->spb = kmalloc(d->split_buf_size, GFP_ATOMIC);
 
 	if (d->spb == NULL) {
 		PRINT(KERN_ERR, "Failed to allocate split buffer");

@@ -21,13 +21,12 @@
 #include <linux/timex.h>
 #include <linux/jiffies.h>
 
-int sysctl_no_oomkill;
-
 /* #define DEBUG */
 
 /**
  * oom_badness - calculate a numeric value for how bad this task has been
  * @p: task struct of which task we should calculate
+ * @p: current uptime in seconds
  *
  * The formula used is relatively simple and documented inline in the
  * function. The main rationale is that we want to select a good task
@@ -43,7 +42,7 @@ int sysctl_no_oomkill;
  *    of least surprise ... (be careful when you change it)
  */
 
-unsigned long badness(struct task_struct *p)
+static unsigned long badness(struct task_struct *p, unsigned long uptime)
 {
 	unsigned long points, cpu_time, run_time, s;
 
@@ -58,12 +57,16 @@ unsigned long badness(struct task_struct *p)
 	points = p->mm->total_vm;
 
 	/*
-	 * CPU time is in seconds and run time is in minutes. There is no
-	 * particular reason for this other than that it turned out to work
-	 * very well in practice.
+	 * CPU time is in tens of seconds and run time is in thousands
+         * of seconds. There is no particular reason for this other than
+         * that it turned out to work very well in practice.
 	 */
 	cpu_time = (p->utime + p->stime) >> (SHIFT_HZ + 3);
-	run_time = (get_jiffies_64() - p->start_time) >> (SHIFT_HZ + 10);
+
+	if (uptime >= p->start_time.tv_sec)
+		run_time = (uptime - p->start_time.tv_sec) >> 10;
+	else
+		run_time = 0;
 
 	s = int_sqrt(cpu_time);
 	if (s)
@@ -95,21 +98,6 @@ unsigned long badness(struct task_struct *p)
 	 */
 	if (cap_t(p->cap_effective) & CAP_TO_MASK(CAP_SYS_RAWIO))
 		points /= 4;
-
-	/* 
-	 * Adjust the score by oomkilladj.
-	 */
-	if (p->oomkilladj) {
-		if (p->oomkilladj > 0)
-			points <<= p->oomkilladj;
-		else
-			points >>= -(p->oomkilladj);
-	}
-	/* 
-	 * One point for already having received a warning 
-	 */
-	points += p->rcvd_sigterm;
-		
 #ifdef DEBUG
 	printk(KERN_DEBUG "OOMkill: task %d (%s) got %d points\n",
 	p->pid, p->comm, points);
@@ -128,10 +116,12 @@ static struct task_struct * select_bad_process(void)
 	unsigned long maxpoints = 0;
 	struct task_struct *g, *p;
 	struct task_struct *chosen = NULL;
+	struct timespec uptime;
 
+	do_posix_clock_monotonic_gettime(&uptime);
 	do_each_thread(g, p)
 		if (p->pid) {
-			unsigned long points = badness(p);
+			unsigned long points = badness(p, uptime.tv_sec);
 			if (points > maxpoints) {
 				chosen = p;
 				maxpoints = points;
@@ -169,13 +159,11 @@ static void __oom_kill_task(task_t *p)
 	p->flags |= PF_MEMALLOC | PF_MEMDIE;
 
 	/* This process has hardware access, be more careful. */
-	if (cap_t(p->cap_effective) & CAP_TO_MASK(CAP_SYS_RAWIO))
+	if (cap_t(p->cap_effective) & CAP_TO_MASK(CAP_SYS_RAWIO)) {
 		force_sig(SIGTERM, p);
-	else if (p->rcvd_sigterm++)
+	} else {
 		force_sig(SIGKILL, p);
-	else
-		force_sig(SIGTERM, p);
-
+	}
 }
 
 static struct mm_struct *oom_kill_task(task_t *p)
@@ -248,10 +236,6 @@ void out_of_memory(int gfp_mask)
 	static spinlock_t oom_lock = SPIN_LOCK_UNLOCKED;
 	static unsigned long first, last, count, lastkill;
 	unsigned long now, since;
-
-	WARN_ON(1);
-	if (sysctl_no_oomkill)
-		return;
 
 	spin_lock(&oom_lock);
 	now = jiffies;

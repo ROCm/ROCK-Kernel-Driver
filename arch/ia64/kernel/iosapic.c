@@ -104,7 +104,7 @@ static spinlock_t iosapic_lock = SPIN_LOCK_UNLOCKED;
 /* These tables map IA-64 vectors to the IOSAPIC pin that generates this vector. */
 
 static struct iosapic_intr_info {
-	char		*addr;		/* base address of IOSAPIC */
+	char __iomem	*addr;		/* base address of IOSAPIC */
 	u32		low32;		/* current value of low word of Redirection table entry */
 	unsigned int	gsi_base;	/* first GSI assigned to this IOSAPIC */
 	char		rte_index;	/* IOSAPIC RTE index (-1 => not an IOSAPIC interrupt) */
@@ -114,9 +114,12 @@ static struct iosapic_intr_info {
 } iosapic_intr_info[IA64_NUM_VECTORS];
 
 static struct iosapic {
-	char		*addr;		/* base address of IOSAPIC */
+	char __iomem	*addr;		/* base address of IOSAPIC */
 	unsigned int 	gsi_base;	/* first GSI assigned to this IOSAPIC */
 	unsigned short 	num_rte;	/* number of RTE in this IOSAPIC */
+#ifdef CONFIG_NUMA
+	unsigned short	node;		/* numa node association via pxm */
+#endif
 } iosapic_lists[NR_IOSAPICS];
 
 static int num_iosapic;
@@ -176,7 +179,7 @@ set_rte (unsigned int vector, unsigned int dest, int mask)
 {
 	unsigned long pol, trigger, dmode, flags;
 	u32 low32, high32;
-	char *addr;
+	char __iomem *addr;
 	int rte_index;
 	char redir;
 
@@ -234,7 +237,7 @@ static void
 mask_irq (unsigned int irq)
 {
 	unsigned long flags;
-	char *addr;
+	char __iomem *addr;
 	u32 low32;
 	int rte_index;
 	ia64_vector vec = irq_to_vector(irq);
@@ -258,7 +261,7 @@ static void
 unmask_irq (unsigned int irq)
 {
 	unsigned long flags;
-	char *addr;
+	char __iomem *addr;
 	u32 low32;
 	int rte_index;
 	ia64_vector vec = irq_to_vector(irq);
@@ -284,7 +287,7 @@ iosapic_set_affinity (unsigned int irq, cpumask_t mask)
 	unsigned long flags;
 	u32 high32, low32;
 	int dest, rte_index;
-	char *addr;
+	char __iomem *addr;
 	int redir = (irq & IA64_IRQ_REDIRECTED) ? 1 : 0;
 	ia64_vector vec;
 
@@ -409,7 +412,7 @@ struct hw_interrupt_type irq_type_iosapic_edge = {
 };
 
 unsigned int
-iosapic_version (char *addr)
+iosapic_version (char __iomem *addr)
 {
 	/*
 	 * IOSAPIC Version Register return 32 bit structure like:
@@ -454,7 +457,7 @@ register_intr (unsigned int gsi, int vector, unsigned char delivery,
 	int rte_index;
 	int index;
 	unsigned long gsi_base;
-	char *iosapic_address;
+	void __iomem *iosapic_address;
 
 	index = find_iosapic(gsi);
 	if (index < 0) {
@@ -488,7 +491,7 @@ register_intr (unsigned int gsi, int vector, unsigned char delivery,
 }
 
 static unsigned int
-get_target_cpu (void)
+get_target_cpu (unsigned int gsi, int vector)
 {
 #ifdef CONFIG_SMP
 	static int cpu = -1;
@@ -507,6 +510,39 @@ get_target_cpu (void)
 	if (!cpu_online(smp_processor_id()))
 		return hard_smp_processor_id();
 
+#ifdef CONFIG_NUMA
+	{
+		int num_cpus, cpu_index, iosapic_index, numa_cpu, i = 0;
+		cpumask_t cpu_mask;
+
+		iosapic_index = find_iosapic(gsi);
+		if (iosapic_index < 0 ||
+		    iosapic_lists[iosapic_index].node == MAX_NUMNODES)
+			goto skip_numa_setup;
+
+		cpu_mask = node_to_cpumask(iosapic_lists[iosapic_index].node);
+
+		for_each_cpu_mask(numa_cpu, cpu_mask) {
+			if (!cpu_online(numa_cpu))
+				cpu_clear(numa_cpu, cpu_mask);
+		}
+
+		num_cpus = cpus_weight(cpu_mask);
+
+		if (!num_cpus)
+			goto skip_numa_setup;
+
+		/* Use vector assigment to distribute across cpus in node */
+		cpu_index = vector % num_cpus;
+
+		for (numa_cpu = first_cpu(cpu_mask) ; i < cpu_index ; i++)
+			numa_cpu = next_cpu(numa_cpu, cpu_mask);
+
+		if (numa_cpu != NR_CPUS)
+			return cpu_physical_id(numa_cpu);
+	}
+skip_numa_setup:
+#endif
 	/*
 	 * Otherwise, round-robin interrupt vectors across all the
 	 * processors.  (It'd be nice if we could be smarter in the
@@ -550,7 +586,7 @@ iosapic_register_intr (unsigned int gsi,
 		}
 
 		vector = assign_irq_vector(AUTO_ASSIGN);
-		dest = get_target_cpu();
+		dest = get_target_cpu(gsi, vector);
 		register_intr(gsi, vector, IOSAPIC_LOWEST_PRIORITY,
 			polarity, trigger);
 	}
@@ -665,7 +701,7 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base)
 {
 	int num_rte;
 	unsigned int isa_irq, ver;
-	char *addr;
+	char __iomem *addr;
 
 	addr = ioremap(phys_addr, 0);
 	ver = iosapic_version(addr);
@@ -680,6 +716,9 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base)
 	iosapic_lists[num_iosapic].addr = addr;
 	iosapic_lists[num_iosapic].gsi_base = gsi_base;
 	iosapic_lists[num_iosapic].num_rte = num_rte;
+#ifdef CONFIG_NUMA
+	iosapic_lists[num_iosapic].node = MAX_NUMNODES;
+#endif
 	num_iosapic++;
 
 	if ((gsi_base == 0) && pcat_compat) {
@@ -692,3 +731,20 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base)
 			iosapic_override_isa_irq(isa_irq, isa_irq, IOSAPIC_POL_HIGH, IOSAPIC_EDGE);
 	}
 }
+
+#ifdef CONFIG_NUMA
+void __init
+map_iosapic_to_node(unsigned int gsi_base, int node)
+{
+	int index;
+
+	index = find_iosapic(gsi_base);
+	if (index < 0) {
+		printk(KERN_WARNING "%s: No IOSAPIC for GSI %u\n",
+		       __FUNCTION__, gsi_base);
+		return;
+	}
+	iosapic_lists[index].node = node;
+	return;
+}
+#endif

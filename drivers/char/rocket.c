@@ -91,7 +91,7 @@
 #include <linux/pci.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/spinlock.h>
 #include <asm/semaphore.h>
 #include <linux/init.h>
@@ -123,7 +123,7 @@ static unsigned long board2;
 static unsigned long board3;
 static unsigned long board4;
 static unsigned long controller;
-static unsigned long support_low_speed;
+static int support_low_speed;
 static unsigned long modem1;
 static unsigned long modem2;
 static unsigned long modem3;
@@ -181,33 +181,33 @@ static void rp_start(struct tty_struct *tty);
 #ifdef MODULE
 MODULE_AUTHOR("Theodore Ts'o");
 MODULE_DESCRIPTION("Comtrol RocketPort driver");
-MODULE_PARM(board1, "i");
+module_param(board1, ulong, 0);
 MODULE_PARM_DESC(board1, "I/O port for (ISA) board #1");
-MODULE_PARM(board2, "i");
+module_param(board2, ulong, 0);
 MODULE_PARM_DESC(board2, "I/O port for (ISA) board #2");
-MODULE_PARM(board3, "i");
+module_param(board3, ulong, 0);
 MODULE_PARM_DESC(board3, "I/O port for (ISA) board #3");
-MODULE_PARM(board4, "i");
+module_param(board4, ulong, 0);
 MODULE_PARM_DESC(board4, "I/O port for (ISA) board #4");
-MODULE_PARM(controller, "i");
+module_param(controller, ulong, 0);
 MODULE_PARM_DESC(controller, "I/O port for (ISA) rocketport controller");
-MODULE_PARM(support_low_speed, "i");
+module_param(support_low_speed, bool, 0);
 MODULE_PARM_DESC(support_low_speed, "1 means support 50 baud, 0 means support 460400 baud");
-MODULE_PARM(modem1, "i");
+module_param(modem1, ulong, 0);
 MODULE_PARM_DESC(modem1, "1 means (ISA) board #1 is a RocketModem");
-MODULE_PARM(modem2, "i");
+module_param(modem2, ulong, 0);
 MODULE_PARM_DESC(modem2, "1 means (ISA) board #2 is a RocketModem");
-MODULE_PARM(modem3, "i");
+module_param(modem3, ulong, 0);
 MODULE_PARM_DESC(modem3, "1 means (ISA) board #3 is a RocketModem");
-MODULE_PARM(modem4, "i");
+module_param(modem4, ulong, 0);
 MODULE_PARM_DESC(modem4, "1 means (ISA) board #4 is a RocketModem");
-MODULE_PARM(pc104_1, "1-8i");
+module_param_array(pc104_1, ulong, NULL, 0);
 MODULE_PARM_DESC(pc104_1, "set interface types for ISA(PC104) board #1 (e.g. pc104_1=232,232,485,485,...");
-MODULE_PARM(pc104_2, "1-8i");
+module_param_array(pc104_2, ulong, NULL, 0);
 MODULE_PARM_DESC(pc104_2, "set interface types for ISA(PC104) board #2 (e.g. pc104_2=232,232,485,485,...");
-MODULE_PARM(pc104_3, "1-8i");
+module_param_array(pc104_3, ulong, NULL, 0);
 MODULE_PARM_DESC(pc104_3, "set interface types for ISA(PC104) board #3 (e.g. pc104_3=232,232,485,485,...");
-MODULE_PARM(pc104_4, "1-8i");
+module_param_array(pc104_4, ulong, NULL, 0);
 MODULE_PARM_DESC(pc104_4, "set interface types for ISA(PC104) board #4 (e.g. pc104_4=232,232,485,485,...");
 
 int rp_init(void);
@@ -250,12 +250,16 @@ static void rp_do_receive(struct r_port *info,
 			  CHANNEL_t * cp, unsigned int ChanStatus)
 {
 	unsigned int CharNStat;
-	int ToRecv, wRecv, space, count;
+	int ToRecv, wRecv, space = 0, count;
 	unsigned char *cbuf;
 	char *fbuf;
+	struct tty_ldisc *ld;
+
+	ld = tty_ldisc_ref(tty);
 
 	ToRecv = sGetRxCnt(cp);
-	space = tty->ldisc.receive_room(tty);
+	if (ld)
+		space = ld->receive_room(tty);
 	if (space > 2 * TTY_FLIPBUF_SIZE)
 		space = 2 * TTY_FLIPBUF_SIZE;
 	cbuf = tty->flip.char_buf;
@@ -354,7 +358,8 @@ static void rp_do_receive(struct r_port *info,
 		count += ToRecv;
 	}
 	/*  Push the data up to the tty layer */
-	tty->ldisc.receive_buf(tty, tty->flip.char_buf, tty->flip.flag_buf, count);
+	ld->receive_buf(tty, tty->flip.char_buf, tty->flip.flag_buf, count);
+	tty_ldisc_deref(ld);
 }
 
 /*
@@ -408,8 +413,7 @@ static void rp_do_transmit(struct r_port *info)
 		clear_bit((info->aiop * 8) + info->chan, (void *) &xmit_flags[info->board]);
 
 	if (info->xmit_cnt < WAKEUP_CHARS) {
-		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && tty->ldisc.write_wakeup)
-			(tty->ldisc.write_wakeup) (tty);
+		tty_wakeup(tty);
 		wake_up_interruptible(&tty->write_wait);
 #ifdef ROCKETPORT_HAVE_POLL_WAIT
 		wake_up_interruptible(&tty->poll_wait);
@@ -1022,7 +1026,7 @@ static void rp_close(struct tty_struct *tty, struct file *filp)
 	unsigned long flags;
 	int timeout;
 	CHANNEL_t *cp;
-
+	
 	if (rocket_paranoia_check(info, "rp_close"))
 		return;
 
@@ -1101,15 +1105,14 @@ static void rp_close(struct tty_struct *tty, struct file *filp)
 
 	if (TTY_DRIVER_FLUSH_BUFFER_EXISTS(tty))
 		TTY_DRIVER_FLUSH_BUFFER(tty);
-	if (tty->ldisc.flush_buffer)
-		tty->ldisc.flush_buffer(tty);
+		
+	tty_ldisc_flush(tty);
 
 	clear_bit((info->aiop * 8) + info->chan, (void *) &xmit_flags[info->board]);
 
 	if (info->blocked_open) {
 		if (info->close_delay) {
-			current->state = TASK_INTERRUPTIBLE;
-			schedule_timeout(info->close_delay);
+			msleep_interruptible(jiffies_to_msecs(info->close_delay));
 		}
 		wake_up_interruptible(&info->open_wait);
 	} else {
@@ -1534,8 +1537,7 @@ static void rp_wait_until_sent(struct tty_struct *tty, int timeout)
 #ifdef ROCKET_DEBUG_WAIT_UNTIL_SENT
 		printk(KERN_INFO "txcnt = %d (jiff=%lu,check=%d)...", txcnt, jiffies, check_time);
 #endif
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(check_time);
+		msleep_interruptible(jiffies_to_msecs(check_time));
 		if (signal_pending(current))
 			break;
 	}
@@ -1631,7 +1633,7 @@ static void rp_put_char(struct tty_struct *tty, unsigned char ch)
  *  or get control of the CPU if the copy_from_user() blocks due to a page fault (swapped out). 
  *  Spinlocks protect the info xmit members.
  */
-static int rp_write(struct tty_struct *tty, int from_user,
+static int rp_write(struct tty_struct *tty,
 		    const unsigned char *buf, int count)
 {
 	struct r_port *info = (struct r_port *) tty->driver_data;
@@ -1660,16 +1662,6 @@ static int rp_write(struct tty_struct *tty, int from_user,
 	if (!tty->stopped && !tty->hw_stopped && info->xmit_cnt == 0 && info->xmit_fifo_room > 0) {
 		c = min(count, info->xmit_fifo_room);
 		b = buf;
-		if (from_user) {
-			if (copy_from_user(info->xmit_buf, buf, c)) {
-				retval = -EFAULT;
-				goto end;
-			}
-			if (info->tty == 0)
-				goto end;
-			b = info->xmit_buf;
-			c = min(c, info->xmit_fifo_room);
-		}
 
 		/*  Push data into FIFO, 2 bytes at a time */
 		sOutStrW(sGetTxRxDataIO(cp), (unsigned short *) b, c / 2);
@@ -1701,14 +1693,7 @@ static int rp_write(struct tty_struct *tty, int from_user,
 			break;
 
 		b = buf;
-		if (from_user) {
-			if (copy_from_user(info->xmit_buf + info->xmit_head, b, c)) {
-				retval = -EFAULT;
-				goto end_intr;
-			} else {
-				memcpy(info->xmit_buf + info->xmit_head, b, c);
-			}
-		}
+		memcpy(info->xmit_buf + info->xmit_head, b, c);
 
 		spin_lock_irqsave(&info->slock, flags);
 		info->xmit_head =
@@ -1721,14 +1706,12 @@ static int rp_write(struct tty_struct *tty, int from_user,
 		retval += c;
 	}
 
-end_intr:
 	if ((retval > 0) && !tty->stopped && !tty->hw_stopped)
 		set_bit((info->aiop * 8) + info->chan, (void *) &xmit_flags[info->board]);
 	
 end:
  	if (info->xmit_cnt < WAKEUP_CHARS) {
-		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP))  && tty->ldisc.write_wakeup)
-			(tty->ldisc.write_wakeup) (tty);
+ 		tty_wakeup(tty);
 		wake_up_interruptible(&tty->write_wait);
 #ifdef ROCKETPORT_HAVE_POLL_WAIT
 		wake_up_interruptible(&tty->poll_wait);
@@ -1802,8 +1785,7 @@ static void rp_flush_buffer(struct tty_struct *tty)
 #ifdef ROCKETPORT_HAVE_POLL_WAIT
 	wake_up_interruptible(&tty->poll_wait);
 #endif
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup) (tty);
+	tty_wakeup(tty);
 
 	cp = &info->channel;
 	sFlushTxFIFO(cp);
@@ -2470,30 +2452,6 @@ static void rp_cleanup_module(void)
 		release_region(controller, 4);
 }
 #endif
-
-/***********************************************************************
-		Copyright 1994 Comtrol Corporation.
-			All Rights Reserved.
-
-The following source code is subject to Comtrol Corporation's
-Developer's License Agreement.
-
-This source code is protected by United States copyright law and 
-international copyright treaties.
-
-This source code may only be used to develop software products that
-will operate with Comtrol brand hardware.
-
-You may not reproduce nor distribute this source code in its original
-form but must produce a derivative work which includes portions of
-this source code only.
-
-The portions of this source code which you use in your derivative
-work must bear Comtrol's copyright notice:
-
-		Copyright 1994 Comtrol Corporation.
-
-***********************************************************************/
 
 #ifndef TRUE
 #define TRUE 1

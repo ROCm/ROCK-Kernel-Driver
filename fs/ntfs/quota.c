@@ -22,9 +22,10 @@
 
 #ifdef NTFS_RW
 
-#include "ntfs.h"
 #include "index.h"
 #include "quota.h"
+#include "debug.h"
+#include "ntfs.h"
 
 /**
  * ntfs_mark_quotas_out_of_date - mark the quotas out of date on an ntfs volume
@@ -37,7 +38,7 @@ BOOL ntfs_mark_quotas_out_of_date(ntfs_volume *vol)
 {
 	ntfs_index_context *ictx;
 	QUOTA_CONTROL_ENTRY *qce;
-	const u32 qid = QUOTA_DEFAULTS_ID;
+	const le32 qid = QUOTA_DEFAULTS_ID;
 	int err;
 
 	ntfs_debug("Entering.");
@@ -51,7 +52,7 @@ BOOL ntfs_mark_quotas_out_of_date(ntfs_volume *vol)
 	ictx = ntfs_index_ctx_get(NTFS_I(vol->quota_q_ino));
 	if (!ictx) {
 		ntfs_error(vol->sb, "Failed to get index context.");
-		return FALSE;
+		goto err_out;
 	}
 	err = ntfs_index_lookup(&qid, sizeof(qid), ictx);
 	if (err) {
@@ -107,7 +108,8 @@ done:
 	ntfs_debug("Done.");
 	return TRUE;
 err_out:
-	ntfs_index_ctx_put(ictx);
+	if (ictx)
+		ntfs_index_ctx_put(ictx);
 	up(&vol->quota_q_ino->i_sem);
 	return FALSE;
 }

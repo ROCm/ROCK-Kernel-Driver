@@ -69,7 +69,8 @@ struct atm_flow_data {
 	struct socket		*sock;		/* for closing */
 	u32			classid;	/* x:y type ID */
 	int			ref;		/* reference count */
-	struct tc_stats		stats;
+	struct gnet_stats_basic	bstats;
+	struct gnet_stats_queue	qstats;
 	spinlock_t		*stats_lock;
 	struct atm_flow_data	*next;
 	struct atm_flow_data	*excess;	/* flow for excess traffic;
@@ -449,14 +450,14 @@ static int atm_tc_enqueue(struct sk_buff *skb,struct Qdisc *sch)
 	    result == TC_POLICE_SHOT ||
 #endif
 	    (ret = flow->q->enqueue(skb,flow->q)) != 0) {
-		sch->stats.drops++;
-		if (flow) flow->stats.drops++;
+		sch->qstats.drops++;
+		if (flow) flow->qstats.drops++;
 		return ret;
 	}
-	sch->stats.bytes += skb->len;
-	sch->stats.packets++;
-	flow->stats.bytes += skb->len;
-	flow->stats.packets++;
+	sch->bstats.bytes += skb->len;
+	sch->bstats.packets++;
+	flow->bstats.bytes += skb->len;
+	flow->bstats.packets++;
 	/*
 	 * Okay, this may seem weird. We pretend we've dropped the packet if
 	 * it goes via ATM. The reason for this is that the outer qdisc
@@ -545,10 +546,12 @@ static int atm_tc_requeue(struct sk_buff *skb,struct Qdisc *sch)
 
 	D2PRINTK("atm_tc_requeue(skb %p,sch %p,[qdisc %p])\n",skb,sch,p);
 	ret = p->link.q->ops->requeue(skb,p->link.q);
-	if (!ret) sch->q.qlen++;
-	else {
-		sch->stats.drops++;
-		p->link.stats.drops++;
+	if (!ret) {
+        sch->q.qlen++;
+        sch->qstats.requeues++;
+    } else {
+		sch->qstats.drops++;
+		p->link.qstats.drops++;
 	}
 	return ret;
 }
@@ -664,6 +667,20 @@ rtattr_failure:
 	skb_trim(skb,b-skb->data);
 	return -1;
 }
+static int
+atm_tc_dump_class_stats(struct Qdisc *sch, unsigned long arg,
+	struct gnet_dump *d)
+{
+	struct atm_flow_data *flow = (struct atm_flow_data *) arg;
+
+	flow->qstats.qlen = flow->q->q.qlen;
+
+	if (gnet_stats_copy_basic(d, &flow->bstats) < 0 ||
+	    gnet_stats_copy_queue(d, &flow->qstats) < 0)
+		return -1;
+
+	return 0;
+}
 
 static int atm_tc_dump(struct Qdisc *sch, struct sk_buff *skb)
 {
@@ -682,6 +699,7 @@ static struct Qdisc_class_ops atm_class_ops = {
 	.bind_tcf	=	atm_tc_bind_filter,
 	.unbind_tcf	=	atm_tc_put,
 	.dump		=	atm_tc_dump_class,
+	.dump_stats	=	atm_tc_dump_class_stats,
 };
 
 static struct Qdisc_ops atm_qdisc_ops = {

@@ -44,6 +44,20 @@ struct modversion_info
 	char name[MODULE_NAME_LEN];
 };
 
+struct module;
+
+struct module_attribute {
+        struct attribute attr;
+        ssize_t (*show)(struct module *, char *);
+        ssize_t (*store)(struct module *, const char *, size_t count);
+};
+
+struct module_kobject
+{
+	struct kobject kobj;
+	struct module *mod;
+};
+
 /* These are either module local, or the kernel's dummy ones. */
 extern int init_module(void);
 extern void cleanup_module(void);
@@ -58,6 +72,8 @@ search_extable(const struct exception_table_entry *first,
 void sort_extable(struct exception_table_entry *start,
 		  struct exception_table_entry *finish);
 void sort_main_extable(void);
+
+extern struct subsystem module_subsys;
 
 #ifdef MODULE
 #define ___module_cat(a,b) __mod_ ## a ## b
@@ -206,23 +222,6 @@ enum module_state
 	MODULE_STATE_GOING,
 };
 
-/* sysfs stuff */
-struct module_attribute
-{
-	struct attribute attr;
-	struct kernel_param *param;
-};
-
-struct module_kobject
-{
-	/* Everyone should have one of these. */
-	struct kobject kobj;
-
-	/* We always have refcnt, we may have others from module_param(). */
-	unsigned int num_attributes;
-	struct module_attribute attr[0];
-};
-
 /* Similar stuff for section attributes. */
 #define MODULE_SECT_NAME_LEN 32
 struct module_sect_attr
@@ -238,6 +237,7 @@ struct module_sections
 	struct module_sect_attr attrs[0];
 };
 
+struct param_kobject;
 
 struct module
 {
@@ -251,6 +251,7 @@ struct module
 
 	/* Sysfs stuff. */
 	struct module_kobject *mkobj;
+	struct param_kobject *params_kobject;
 
 	/* Exported symbols */
 	const struct kernel_symbol *syms;
@@ -302,9 +303,6 @@ struct module
 
 	/* Destruction function. */
 	void (*exit)(void);
-
-	/* Fake kernel param for refcnt. */
-	struct kernel_param refcnt_param;
 #endif
 
 #ifdef CONFIG_KALLSYMS
@@ -443,6 +441,11 @@ int register_module_notifier(struct notifier_block * nb);
 int unregister_module_notifier(struct notifier_block * nb);
 
 extern void print_modules(void);
+
+struct device_driver;
+void module_add_driver(struct module *, struct device_driver *);
+void module_remove_driver(struct device_driver *);
+
 #else /* !CONFIG_MODULES... */
 #define EXPORT_SYMBOL(sym)
 #define EXPORT_SYMBOL_GPL(sym)
@@ -532,6 +535,18 @@ static inline int unregister_module_notifier(struct notifier_block * nb)
 static inline void print_modules(void)
 {
 }
+
+struct device_driver;
+struct module;
+
+static inline void module_add_driver(struct module *module, struct device_driver *driver)
+{
+}
+
+static inline void module_remove_driver(struct device_driver *driver)
+{
+}
+
 #endif /* CONFIG_MODULES */
 
 #define symbol_request(x) try_then_request_module(symbol_get(x), "symbol:" #x)
@@ -543,45 +558,27 @@ struct obsolete_modparm {
 	char type[64-sizeof(void *)];
 	void *addr;
 };
+
+static inline void MODULE_PARM_(void) { }
 #ifdef MODULE
 /* DEPRECATED: Do not use. */
 #define MODULE_PARM(var,type)						    \
 struct obsolete_modparm __parm_##var __attribute__((section("__obsparm"))) = \
-{ __stringify(var), type };
-
-static inline void __deprecated MOD_INC_USE_COUNT(struct module *module)
-{
-	__unsafe(module);
-
-#if defined(CONFIG_MODULE_UNLOAD) && defined(MODULE)
-	local_inc(&module->ref[get_cpu()].count);
-	put_cpu();
+{ __stringify(var), type, &MODULE_PARM_ };
 #else
-	(void)try_module_get(module);
-#endif
-}
-
-static inline void __deprecated MOD_DEC_USE_COUNT(struct module *module)
-{
-	module_put(module);
-}
-
-#define MOD_INC_USE_COUNT	MOD_INC_USE_COUNT(THIS_MODULE)
-#define MOD_DEC_USE_COUNT	MOD_DEC_USE_COUNT(THIS_MODULE)
-#else
-#define MODULE_PARM(var,type)
-#define MOD_INC_USE_COUNT	do { } while (0)
-#define MOD_DEC_USE_COUNT	do { } while (0)
+#define MODULE_PARM(var,type) static void __attribute__((__unused__)) *__parm_##var = &MODULE_PARM_;
 #endif
 
 #define __MODULE_STRING(x) __stringify(x)
 
 /* Use symbol_get and symbol_put instead.  You'll thank me. */
 #define HAVE_INTER_MODULE
-extern void inter_module_register(const char *, struct module *, const void *);
-extern void inter_module_unregister(const char *);
-extern const void *inter_module_get(const char *);
-extern const void *inter_module_get_request(const char *, const char *);
-extern void inter_module_put(const char *);
+extern void __deprecated inter_module_register(const char *,
+		struct module *, const void *);
+extern void __deprecated inter_module_unregister(const char *);
+extern const void * __deprecated inter_module_get(const char *);
+extern const void * __deprecated inter_module_get_request(const char *,
+		const char *);
+extern void __deprecated inter_module_put(const char *);
 
 #endif /* _LINUX_MODULE_H */

@@ -38,6 +38,7 @@
 #include <linux/kernelcapi.h>
 #include <linux/init.h>
 #include <linux/device.h>
+#include <linux/moduleparam.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/isdn/capiutil.h>
 #include <linux/isdn/capicmd.h>
@@ -67,10 +68,10 @@ int capi_ttymajor = 191;
 int capi_ttyminors = CAPINC_NR_PORTS;
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
 
-MODULE_PARM(capi_major, "i");
+module_param_named(major, capi_major, uint, 0);
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
-MODULE_PARM(capi_ttymajor, "i");
-MODULE_PARM(capi_ttyminors, "i");
+module_param_named(ttymajor, capi_ttymajor, uint, 0);
+module_param_named(ttyminors, capi_ttyminors, uint, 0);
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
 
 /* -------- defines ------------------------------------------------- */
@@ -436,51 +437,62 @@ static int handle_recv_skb(struct capiminor *mp, struct sk_buff *skb)
 	struct sk_buff *nskb;
 	int datalen;
 	u16 errcode, datahandle;
-
+	struct tty_ldisc *ld;
+	
 	datalen = skb->len - CAPIMSG_LEN(skb->data);
-	if (mp->tty) {
-		if (mp->tty->ldisc.receive_buf == 0) {
-			printk(KERN_ERR "capi: ldisc has no receive_buf function\n");
-			return -1;
-		}
-		if (mp->ttyinstop) {
-#if defined(_DEBUG_DATAFLOW) || defined(_DEBUG_TTYFUNCS)
-			printk(KERN_DEBUG "capi: recv tty throttled\n");
-#endif
-			return -1;
-		}
-		if (mp->tty->ldisc.receive_room &&
-		    mp->tty->ldisc.receive_room(mp->tty) < datalen) {
-#if defined(_DEBUG_DATAFLOW) || defined(_DEBUG_TTYFUNCS)
-			printk(KERN_DEBUG "capi: no room in tty\n");
-#endif
-			return -1;
-		}
-		if ((nskb = gen_data_b3_resp_for(mp, skb)) == 0) {
-			printk(KERN_ERR "capi: gen_data_b3_resp failed\n");
-			return -1;
-		}
-		datahandle = CAPIMSG_U16(skb->data,CAPIMSG_BASELEN+4);
-		errcode = capi20_put_message(mp->ap, nskb);
-		if (errcode != CAPI_NOERROR) {
-			printk(KERN_ERR "capi: send DATA_B3_RESP failed=%x\n",
-					errcode);
-			kfree_skb(nskb);
-			return -1;
-		}
-		(void)skb_pull(skb, CAPIMSG_LEN(skb->data));
+	if (mp->tty == NULL)
+	{
 #ifdef _DEBUG_DATAFLOW
-		printk(KERN_DEBUG "capi: DATA_B3_RESP %u len=%d => ldisc\n",
-					datahandle, skb->len);
+		printk(KERN_DEBUG "capi: currently no receiver\n");
 #endif
-		mp->tty->ldisc.receive_buf(mp->tty, skb->data, NULL, skb->len);
-		kfree_skb(skb);
-		return 0;
-
+		return -1;
 	}
-#ifdef _DEBUG_DATAFLOW
-	printk(KERN_DEBUG "capi: currently no receiver\n");
+	
+	ld = tty_ldisc_ref(mp->tty);
+	if (ld == NULL)
+		return -1;
+	if (ld->receive_buf == NULL) {
+#if defined(_DEBUG_DATAFLOW) || defined(_DEBUG_TTYFUNCS)
+		printk(KERN_DEBUG "capi: ldisc has no receive_buf function\n");
 #endif
+		goto bad;
+	}
+	if (mp->ttyinstop) {
+#if defined(_DEBUG_DATAFLOW) || defined(_DEBUG_TTYFUNCS)
+		printk(KERN_DEBUG "capi: recv tty throttled\n");
+#endif
+		goto bad;
+	}
+	if (ld->receive_room &&
+	    ld->receive_room(mp->tty) < datalen) {
+#if defined(_DEBUG_DATAFLOW) || defined(_DEBUG_TTYFUNCS)
+		printk(KERN_DEBUG "capi: no room in tty\n");
+#endif
+		goto bad;
+	}
+	if ((nskb = gen_data_b3_resp_for(mp, skb)) == 0) {
+		printk(KERN_ERR "capi: gen_data_b3_resp failed\n");
+		goto bad;
+	}
+	datahandle = CAPIMSG_U16(skb->data,CAPIMSG_BASELEN+4);
+	errcode = capi20_put_message(mp->ap, nskb);
+	if (errcode != CAPI_NOERROR) {
+		printk(KERN_ERR "capi: send DATA_B3_RESP failed=%x\n",
+				errcode);
+		kfree_skb(nskb);
+		goto bad;
+	}
+	(void)skb_pull(skb, CAPIMSG_LEN(skb->data));
+#ifdef _DEBUG_DATAFLOW
+	printk(KERN_DEBUG "capi: DATA_B3_RESP %u len=%d => ldisc\n",
+				datahandle, skb->len);
+#endif
+	ld->receive_buf(mp->tty, skb->data, NULL, skb->len);
+	kfree_skb(skb);
+	tty_ldisc_deref(ld);
+	return 0;
+bad:
+	tty_ldisc_deref(ld);
 	return -1;
 }
 
@@ -614,6 +626,7 @@ static void capi_recv_message(struct capi20_appl *ap, struct sk_buff *skb)
 
 
 	if (CAPIMSG_SUBCOMMAND(skb->data) == CAPI_IND) {
+		
 		datahandle = CAPIMSG_U16(skb->data, CAPIMSG_BASELEN+4+4+2);
 #ifdef _DEBUG_DATAFLOW
 		printk(KERN_DEBUG "capi_signal: DATA_B3_IND %u len=%d\n",
@@ -633,10 +646,8 @@ static void capi_recv_message(struct capi20_appl *ap, struct sk_buff *skb)
 #endif
 		kfree_skb(skb);
 		(void)capiminor_del_ack(mp, datahandle);
-		if (mp->tty) {
-			if (mp->tty->ldisc.write_wakeup)
-				mp->tty->ldisc.write_wakeup(mp->tty);
-		}
+		if (mp->tty)
+			tty_wakeup(mp->tty);
 		(void)handle_minor_send(mp);
 
 	} else {
@@ -1034,16 +1045,14 @@ static void capinc_tty_close(struct tty_struct * tty, struct file * file)
 #endif
 }
 
-static int capinc_tty_write(struct tty_struct * tty, int from_user,
+static int capinc_tty_write(struct tty_struct * tty,
 			    const unsigned char *buf, int count)
 {
 	struct capiminor *mp = (struct capiminor *)tty->driver_data;
 	struct sk_buff *skb;
-	int retval;
 
 #ifdef _DEBUG_TTYFUNCS
-	printk(KERN_DEBUG "capinc_tty_write(from_user=%d,count=%d)\n",
-				from_user, count);
+	printk(KERN_DEBUG "capinc_tty_write(count=%d)\n", count);
 #endif
 
 	if (!mp || !mp->nccip) {
@@ -1067,18 +1076,7 @@ static int capinc_tty_write(struct tty_struct * tty, int from_user,
 	}
 
 	skb_reserve(skb, CAPI_DATA_B3_REQ_LEN);
-	if (from_user) {
-		retval = copy_from_user(skb_put(skb, count), buf, count);
-		if (retval) {
-			kfree_skb(skb);
-#ifdef _DEBUG_TTYFUNCS
-			printk(KERN_DEBUG "capinc_tty_write: copy_from_user=%d\n", retval);
-#endif
-			return -EFAULT;
-		}
-	} else {
-		memcpy(skb_put(skb, count), buf, count);
-	}
+	memcpy(skb_put(skb, count), buf, count);
 
 	skb_queue_tail(&mp->outqueue, skb);
 	mp->outbytes += skb->len;

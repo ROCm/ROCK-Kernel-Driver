@@ -1,7 +1,6 @@
 #ifndef _SCSI_SCSI_CMND_H
 #define _SCSI_SCSI_CMND_H
 
-#include <linux/device.h>
 #include <linux/dma-mapping.h>
 #include <linux/list.h>
 #include <linux/types.h>

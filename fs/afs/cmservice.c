@@ -424,7 +424,7 @@ static void _SRXAFSCM_CallBack(struct rxrpc_call *call)
 		{
 			struct afs_callback *cb, *pcb;
 			int loop;
-			u32 *fp, *bp;
+			__be32 *fp, *bp;
 
 			fp = rxrpc_call_alloc_scratch(call, qty);
 

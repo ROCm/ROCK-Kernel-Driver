@@ -138,14 +138,12 @@ void nf_log_packet(int pf,
 /* This is gross, but inline doesn't cut it for avoiding the function
    call in fast path: gcc doesn't inline (needs value tracking?). --RR */
 #ifdef CONFIG_NETFILTER_DEBUG
-#define NF_HOOK_COND(pf, hook, skb, indev, outdev, okfn, cond)		\
-(!(cond)								\
- ? (okfn)(skb) 								\
- : nf_hook_slow((pf), (hook), (skb), (indev), (outdev), (okfn), INT_MIN))
+#define NF_HOOK(pf, hook, skb, indev, outdev, okfn)			\
+ nf_hook_slow((pf), (hook), (skb), (indev), (outdev), (okfn), INT_MIN)
 #define NF_HOOK_THRESH nf_hook_slow
 #else
-#define NF_HOOK_COND(pf, hook, skb, indev, outdev, okfn, cond)		\
-(!(cond) || list_empty(&nf_hooks[(pf)][(hook)])				\
+#define NF_HOOK(pf, hook, skb, indev, outdev, okfn)			\
+(list_empty(&nf_hooks[(pf)][(hook)])					\
  ? (okfn)(skb)								\
  : nf_hook_slow((pf), (hook), (skb), (indev), (outdev), (okfn), INT_MIN))
 #define NF_HOOK_THRESH(pf, hook, skb, indev, outdev, okfn, thresh)	\
@@ -153,8 +151,6 @@ void nf_log_packet(int pf,
  ? (okfn)(skb)								\
  : nf_hook_slow((pf), (hook), (skb), (indev), (outdev), (okfn), (thresh)))
 #endif
-#define NF_HOOK(pf, hook, skb, indev, outdev, okfn)			\
- NF_HOOK_COND((pf), (hook), (skb), (indev), (outdev), (okfn), 1)
 
 int nf_hook_slow(int pf, unsigned int hook, struct sk_buff *skb,
 		 struct net_device *indev, struct net_device *outdev,
@@ -176,17 +172,8 @@ extern void nf_reinject(struct sk_buff *skb,
 			struct nf_info *info,
 			unsigned int verdict);
 
-extern inline struct ipt_target *
-ipt_find_target_lock(const char *name, int *error, struct semaphore *mutex);
-extern inline struct ip6t_target *
-ip6t_find_target_lock(const char *name, int *error, struct semaphore *mutex);
-extern inline struct arpt_target *
-arpt_find_target_lock(const char *name, int *error, struct semaphore *mutex);
-extern void (*ip_ct_attach)(struct sk_buff *, struct nf_ct_info *);
-
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-extern void (*ip6_ct_attach)(struct sk_buff *, struct nf_ct_info *);
-#endif
+extern void (*ip_ct_attach)(struct sk_buff *, struct sk_buff *);
+extern void nf_ct_attach(struct sk_buff *, struct sk_buff *);
 
 #ifdef CONFIG_NETFILTER_DEBUG
 extern void nf_dump_skb(int pf, struct sk_buff *skb);
@@ -197,24 +184,8 @@ extern void nf_invalidate_cache(int pf);
 
 #else /* !CONFIG_NETFILTER */
 #define NF_HOOK(pf, hook, skb, indev, outdev, okfn) (okfn)(skb)
-#define NF_HOOK_COND(pf, hook, skb, indev, outdev, okfn, cond) (okfn)(skb)
+static inline void nf_ct_attach(struct sk_buff *new, struct sk_buff *skb) {}
 #endif /*CONFIG_NETFILTER*/
-
-#ifdef CONFIG_XFRM
-#ifdef CONFIG_IP_NF_NAT_NEEDED
-struct flowi;
-extern void nf_nat_decode_session4(struct sk_buff *skb, struct flowi *fl);
-
-static inline void
-nf_nat_decode_session(struct sk_buff *skb, struct flowi *fl, int family)
-{
-	if (family == AF_INET)
-		nf_nat_decode_session4(skb, fl);
-}
-#else /* CONFIG_IP_NF_NAT_NEEDED */
-#define nf_nat_decode_session(skb,fl,family)
-#endif /* CONFIG_IP_NF_NAT_NEEDED */
-#endif /* CONFIG_XFRM */
 
 #endif /*__KERNEL__*/
 #endif /*__LINUX_NETFILTER_H*/

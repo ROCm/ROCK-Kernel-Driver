@@ -122,8 +122,9 @@ int post_read_mst_fixup(NTFS_RECORD *b, const u32 size)
  */
 int pre_write_mst_fixup(NTFS_RECORD *b, const u32 size)
 {
+	le16 *usa_pos, *data_pos;
 	u16 usa_ofs, usa_count, usn;
-	u16 *usa_pos, *data_pos;
+	le16 le_usn;
 
 	/* Sanity check + only fixup if it makes sense. */
 	if (!b || ntfs_is_baad_record(b->magic) ||
@@ -140,7 +141,7 @@ int pre_write_mst_fixup(NTFS_RECORD *b, const u32 size)
 	     (size >> NTFS_BLOCK_SIZE_BITS) != usa_count)
 		return -EINVAL;
 	/* Position of usn in update sequence array. */
-	usa_pos = (u16*)((u8*)b + usa_ofs);
+	usa_pos = (le16*)((u8*)b + usa_ofs);
 	/*
 	 * Cyclically increment the update sequence number
 	 * (skipping 0 and -1, i.e. 0xffff).
@@ -148,10 +149,10 @@ int pre_write_mst_fixup(NTFS_RECORD *b, const u32 size)
 	usn = le16_to_cpup(usa_pos) + 1;
 	if (usn == 0xffff || !usn)
 		usn = 1;
-	usn = cpu_to_le16(usn);
-	*usa_pos = usn;
+	le_usn = cpu_to_le16(usn);
+	*usa_pos = le_usn;
 	/* Position in data of first u16 that needs fixing up. */
-	data_pos = (u16*)b + NTFS_BLOCK_SIZE/sizeof(u16) - 1;
+	data_pos = (le16*)b + NTFS_BLOCK_SIZE/sizeof(le16) - 1;
 	/* Fixup all sectors. */
 	while (usa_count--) {
 		/*
@@ -160,9 +161,9 @@ int pre_write_mst_fixup(NTFS_RECORD *b, const u32 size)
 		 */
 		*(++usa_pos) = *data_pos;
 		/* Apply fixup to data. */
-		*data_pos = usn;
+		*data_pos = le_usn;
 		/* Increment position in data as well. */
-		data_pos += NTFS_BLOCK_SIZE/sizeof(u16);
+		data_pos += NTFS_BLOCK_SIZE/sizeof(le16);
 	}
 	return 0;
 }
@@ -177,16 +178,16 @@ int pre_write_mst_fixup(NTFS_RECORD *b, const u32 size)
  */
 void post_write_mst_fixup(NTFS_RECORD *b)
 {
-	u16 *usa_pos, *data_pos;
+	le16 *usa_pos, *data_pos;
 
 	u16 usa_ofs = le16_to_cpu(b->usa_ofs);
 	u16 usa_count = le16_to_cpu(b->usa_count) - 1;
 
 	/* Position of usn in update sequence array. */
-	usa_pos = (u16*)b + usa_ofs/sizeof(u16);
+	usa_pos = (le16*)b + usa_ofs/sizeof(le16);
 
 	/* Position in protected data of first u16 that needs fixing up. */
-	data_pos = (u16*)b + NTFS_BLOCK_SIZE/sizeof(u16) - 1;
+	data_pos = (le16*)b + NTFS_BLOCK_SIZE/sizeof(le16) - 1;
 
 	/* Fixup all sectors. */
 	while (usa_count--) {
@@ -197,6 +198,6 @@ void post_write_mst_fixup(NTFS_RECORD *b)
 		*data_pos = *(++usa_pos);
 
 		/* Increment position in data as well. */
-		data_pos += NTFS_BLOCK_SIZE/sizeof(u16);
+		data_pos += NTFS_BLOCK_SIZE/sizeof(le16);
 	}
 }

@@ -1,10 +1,13 @@
 /***************************************************************************
- * Driver for PAS202BCB image sensor connected to the SN9C10[12] PC Camera *
+ * Plug-in for PAS202BCB image sensor connected to the SN9C10x PC Camera   *
  * Controllers                                                             *
  *                                                                         *
  * Copyright (C) 2004 by Carlos Eduardo Medaglia Dyonisio                  *
  *                       <medaglia@undl.org.br>                            *
  *                       http://cadu.homelinux.com:8080/                   *
+ *                                                                         *
+ * DAC Magnitude, DAC sign, exposure and green gain controls added by      *
+ * Luca Risolia <luca.risolia@studio.unibo.it>                             *
  *                                                                         *
  * This program is free software; you can redistribute it and/or modify    *
  * it under the terms of the GNU General Public License as published by    *
@@ -36,18 +39,15 @@ static int pas202bcb_init(struct sn9c102_device* cam)
 	err += sn9c102_write_reg(cam, 0x00, 0x11);
 	err += sn9c102_write_reg(cam, 0x00, 0x14);
 	err += sn9c102_write_reg(cam, 0x20, 0x17);
-	err += sn9c102_write_reg(cam, 0x20, 0x19);
+	err += sn9c102_write_reg(cam, 0x30, 0x19);
 	err += sn9c102_write_reg(cam, 0x09, 0x18);
 
-	err += sn9c102_i2c_write(cam, 0x02, 0x0c);
+	err += sn9c102_i2c_write(cam, 0x02, 0x14);
 	err += sn9c102_i2c_write(cam, 0x03, 0x40);
-	err += sn9c102_i2c_write(cam, 0x04, 0x07);
-	err += sn9c102_i2c_write(cam, 0x05, 0x25);
 	err += sn9c102_i2c_write(cam, 0x0d, 0x2c);
 	err += sn9c102_i2c_write(cam, 0x0e, 0x01);
 	err += sn9c102_i2c_write(cam, 0x0f, 0xa9);
-	err += sn9c102_i2c_write(cam, 0x08, 0x01);
-	err += sn9c102_i2c_write(cam, 0x0b, 0x01);
+	err += sn9c102_i2c_write(cam, 0x10, 0x08);
 	err += sn9c102_i2c_write(cam, 0x13, 0x63);
 	err += sn9c102_i2c_write(cam, 0x15, 0x70);
 	err += sn9c102_i2c_write(cam, 0x11, 0x01);
@@ -62,6 +62,15 @@ static int pas202bcb_get_ctrl(struct sn9c102_device* cam,
                               struct v4l2_control* ctrl)
 {
 	switch (ctrl->id) {
+	case V4L2_CID_EXPOSURE:
+		{
+			int r1 = sn9c102_i2c_read(cam, 0x04),
+			    r2 = sn9c102_i2c_read(cam, 0x05);
+			if (r1 < 0 || r2 < 0)
+				return -EIO;
+			ctrl->value = (r1 << 6) | (r2 & 0x3f);
+		}
+		return 0;
 	case V4L2_CID_RED_BALANCE:
 		if ((ctrl->value = sn9c102_i2c_read(cam, 0x09)) < 0)
 			return -EIO;
@@ -77,10 +86,19 @@ static int pas202bcb_get_ctrl(struct sn9c102_device* cam,
 			return -EIO;
 		ctrl->value &= 0x1f;
 		return 0;
-	case V4L2_CID_BRIGHTNESS:
-		if ((ctrl->value = sn9c102_i2c_read(cam, 0x06)) < 0)
+	case SN9C102_V4L2_CID_GREEN_BALANCE:
+		if ((ctrl->value = sn9c102_i2c_read(cam, 0x08)) < 0)
 			return -EIO;
 		ctrl->value &= 0x0f;
+		return 0;
+	case SN9C102_V4L2_CID_DAC_MAGNITUDE:
+		if ((ctrl->value = sn9c102_i2c_read(cam, 0x0c)) < 0)
+			return -EIO;
+		return 0;
+	case SN9C102_V4L2_CID_DAC_SIGN:
+		if ((ctrl->value = sn9c102_i2c_read(cam, 0x0b)) < 0)
+			return -EIO;
+		ctrl->value &= 0x01;
 		return 0;
 	default:
 		return -EINVAL;
@@ -94,24 +112,38 @@ static int pas202bcb_set_ctrl(struct sn9c102_device* cam,
 	int err = 0;
 
 	switch (ctrl->id) {
+	case V4L2_CID_EXPOSURE:
+		err += sn9c102_i2c_write(cam, 0x04, ctrl->value >> 6);
+		err += sn9c102_i2c_write(cam, 0x05, ctrl->value & 0x3f);
+		break;
 	case V4L2_CID_RED_BALANCE:
-		err += sn9c102_i2c_write(cam, 0x09, ctrl->value & 0x0f);
+		err += sn9c102_i2c_write(cam, 0x09, ctrl->value);
 		break;
 	case V4L2_CID_BLUE_BALANCE:
-		err += sn9c102_i2c_write(cam, 0x07, ctrl->value & 0x0f);
+		err += sn9c102_i2c_write(cam, 0x07, ctrl->value);
 		break;
 	case V4L2_CID_GAIN:
-		err += sn9c102_i2c_write(cam, 0x10, ctrl->value & 0x1f);
+		err += sn9c102_i2c_write(cam, 0x10, ctrl->value);
 		break;
-	case V4L2_CID_BRIGHTNESS:
-		err += sn9c102_i2c_write(cam, 0x06, 0x0f-(ctrl->value & 0x0f));
+	case SN9C102_V4L2_CID_GREEN_BALANCE:
+		err += sn9c102_i2c_write(cam, 0x08, ctrl->value);
+		break;
+	case SN9C102_V4L2_CID_DAC_MAGNITUDE:
+		err += sn9c102_i2c_write(cam, 0x0c, ctrl->value);
+		break;
+	case SN9C102_V4L2_CID_DAC_SIGN:
+		{
+			int r;
+			err += (r = sn9c102_i2c_read(cam, 0x0b)) < 0 ? r : 0;
+			err += sn9c102_i2c_write(cam, 0x0b, r | ctrl->value);
+		}
 		break;
 	default:
 		return -EINVAL;
 	}
 	err += sn9c102_i2c_write(cam, 0x11, 0x01);
 
-	return err;
+	return err ? -EIO : 0;
 }
 
 
@@ -141,6 +173,26 @@ static struct sn9c102_sensor pas202bcb = {
 	.init = &pas202bcb_init,
 	.qctrl = {
 		{
+			.id = V4L2_CID_EXPOSURE,
+			.type = V4L2_CTRL_TYPE_INTEGER,
+			.name = "exposure",
+			.minimum = 0x01e5,
+			.maximum = 0x3fff,
+			.step = 0x01,
+			.default_value = 0x01e5,
+			.flags = 0,
+		},
+		{
+			.id = V4L2_CID_GAIN,
+			.type = V4L2_CTRL_TYPE_INTEGER,
+			.name = "global gain",
+			.minimum = 0x00,
+			.maximum = 0x1f,
+			.step = 0x01,
+			.default_value = 0x0c,
+			.flags = 0,
+		},
+		{
 			.id = V4L2_CID_RED_BALANCE,
 			.type = V4L2_CTRL_TYPE_INTEGER,
 			.name = "red balance",
@@ -161,23 +213,33 @@ static struct sn9c102_sensor pas202bcb = {
 			.flags = 0,
 		},
 		{
-			.id = V4L2_CID_GAIN,
+			.id = SN9C102_V4L2_CID_GREEN_BALANCE,
 			.type = V4L2_CTRL_TYPE_INTEGER,
-			.name = "global gain",
-			.minimum = 0x00,
-			.maximum = 0x1f,
-			.step = 0x01,
-			.default_value = 0x0c,
-			.flags = 0,
-		},
-		{
-			.id = V4L2_CID_BRIGHTNESS,
-			.type = V4L2_CTRL_TYPE_INTEGER,
-			.name = "brightness",
+			.name = "green balance",
 			.minimum = 0x00,
 			.maximum = 0x0f,
 			.step = 0x01,
-			.default_value = 0x0f,
+			.default_value = 0x00,
+			.flags = 0,
+		},
+		{
+			.id = SN9C102_V4L2_CID_DAC_MAGNITUDE,
+			.type = V4L2_CTRL_TYPE_INTEGER,
+			.name = "DAC magnitude",
+			.minimum = 0x00,
+			.maximum = 0xff,
+			.step = 0x01,
+			.default_value = 0x04,
+			.flags = 0,
+		},
+		{
+			.id = SN9C102_V4L2_CID_DAC_SIGN,
+			.type = V4L2_CTRL_TYPE_BOOLEAN,
+			.name = "DAC sign",
+			.minimum = 0x00,
+			.maximum = 0x01,
+			.step = 0x01,
+			.default_value = 0x01,
 			.flags = 0,
 		},
 	},
@@ -217,7 +279,7 @@ int sn9c102_probe_pas202bcb(struct sn9c102_device* cam)
 	 *  NOTE: do NOT change the values!
 	 */
 	err += sn9c102_write_reg(cam, 0x01, 0x01); /* sensor power down */
-	err += sn9c102_write_reg(cam, 0x00, 0x01); /* sensor power on */
+	err += sn9c102_write_reg(cam, 0x40, 0x01); /* sensor power on */
 	err += sn9c102_write_reg(cam, 0x28, 0x17); /* sensor clock at 24 MHz */
 	if (err)
 		return -EIO;

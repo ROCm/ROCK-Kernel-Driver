@@ -76,8 +76,8 @@
 
 
 
-#include "tulip.h"
 #include <linux/pci.h>
+#include "tulip.h"
 #include <linux/delay.h>
 
 
@@ -85,12 +85,12 @@ void pnic2_timer(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
 	struct tulip_private *tp = netdev_priv(dev);
-	long ioaddr = dev->base_addr;
+	void __iomem *ioaddr = tp->base_addr;
 	int next_tick = 60*HZ;
 
 	if (tulip_debug > 3)
 		printk(KERN_INFO"%s: PNIC2 negotiation status %8.8x.\n",
-                    dev->name,inl(ioaddr + CSR12));
+                    dev->name,ioread32(ioaddr + CSR12));
 
 	if (next_tick) {
 		mod_timer(&tp->timer, RUN_AT(next_tick));
@@ -101,7 +101,7 @@ void pnic2_timer(unsigned long data)
 void pnic2_start_nway(struct net_device *dev)
 {
 	struct tulip_private *tp = netdev_priv(dev);
-	long ioaddr = dev->base_addr;
+	void __iomem *ioaddr = tp->base_addr;
         int csr14;
         int csr12;
 
@@ -110,7 +110,7 @@ void pnic2_start_nway(struct net_device *dev)
         /* load in csr14  and mask off bits not to touch
          * comment at top of file explains mask value
          */
-	csr14 = (inl(ioaddr + CSR14) & 0xfff0ee39);
+	csr14 = (ioread32(ioaddr + CSR14) & 0xfff0ee39);
 
         /* bit 17 - advetise 100baseTx-FD */
         if (tp->sym_advertise & 0x0100) csr14 |= 0x00020000;
@@ -137,7 +137,7 @@ void pnic2_start_nway(struct net_device *dev)
 
         /* now we have to set up csr6 for NWAY state */
 
-	tp->csr6 = inl(ioaddr + CSR6);
+	tp->csr6 = ioread32(ioaddr + CSR6);
 	if (tulip_debug > 1)
 		printk(KERN_DEBUG "%s: On Entry to Nway, "
                       "csr6=%8.8x.\n", dev->name, tp->csr6);
@@ -156,8 +156,8 @@ void pnic2_start_nway(struct net_device *dev)
          * and "Stop" - reset both Transmit (bit 13) and Receive (bit 1)
          */
         tp->csr6 |= 0x01000000;
-	outl(csr14, ioaddr + CSR14);
-	outl(tp->csr6, ioaddr + CSR6);
+	iowrite32(csr14, ioaddr + CSR14);
+	iowrite32(tp->csr6, ioaddr + CSR6);
         udelay(100);
 
         /* all set up so now force the negotiation to begin */
@@ -166,9 +166,9 @@ void pnic2_start_nway(struct net_device *dev)
 	 * Autonegotiation bits 14:12.  Writing a 001 to those bits
          * should start the autonegotiation
          */
-        csr12 = (inl(ioaddr + CSR12) & 0xffff8fff);
+        csr12 = (ioread32(ioaddr + CSR12) & 0xffff8fff);
         csr12 |= 0x1000;
-	outl(csr12, ioaddr + CSR12);
+	iowrite32(csr12, ioaddr + CSR12);
 }
 
 
@@ -176,16 +176,16 @@ void pnic2_start_nway(struct net_device *dev)
 void pnic2_lnk_change(struct net_device *dev, int csr5)
 {
 	struct tulip_private *tp = netdev_priv(dev);
-	long ioaddr = dev->base_addr;
+	void __iomem *ioaddr = tp->base_addr;
         int csr14;
 
         /* read the staus register to find out what is up */
-	int csr12 = inl(ioaddr + CSR12);
+	int csr12 = ioread32(ioaddr + CSR12);
 
 	if (tulip_debug > 1)
 		printk(KERN_INFO"%s: PNIC2 link status interrupt %8.8x, "
                        " CSR5 %x, %8.8x.\n", dev->name, csr12,
-                       csr5, inl(ioaddr + CSR14));
+                       csr5, ioread32(ioaddr + CSR14));
 
 	/* If NWay finished and we have a negotiated partner capability.
          * check bits 14:12 for bit pattern 101 - all is good
@@ -243,8 +243,8 @@ void pnic2_lnk_change(struct net_device *dev, int csr5)
                          * enable so we can properly end nway mode and
                          * set duplex (ie. use csr6<9> again)
                          */
-	                csr14 = (inl(ioaddr + CSR14) & 0xffffff7f);
-                        outl(csr14,ioaddr + CSR14);
+	                csr14 = (ioread32(ioaddr + CSR14) & 0xffffff7f);
+                        iowrite32(csr14,ioaddr + CSR14);
 
 
                         /* now set the data port and operating mode
@@ -255,7 +255,7 @@ void pnic2_lnk_change(struct net_device *dev, int csr5)
 			/* get current csr6 and mask off bits not to touch */
 			/* see comment at top of file */
 
-			tp->csr6 = (inl(ioaddr + CSR6) & 0xfe3bd1fd);
+			tp->csr6 = (ioread32(ioaddr + CSR6) & 0xfe3bd1fd);
 
 			/* so if using if_port 3 or 5 then select the 100baseT
 			 * port else select the 10baseT port.
@@ -269,12 +269,12 @@ void pnic2_lnk_change(struct net_device *dev, int csr5)
 			/* now set the full duplex bit appropriately */
 			if (tp->full_duplex) tp->csr6 |= 0x00000200;
 
-			outl(1, ioaddr + CSR13);
+			iowrite32(1, ioaddr + CSR13);
 
 			if (tulip_debug > 2)
 			        printk(KERN_DEBUG "%s:  Setting CSR6 %8.8x/%x CSR12 "
                                       "%8.8x.\n", dev->name, tp->csr6,
-                                      inl(ioaddr + CSR6), inl(ioaddr + CSR12));
+                                      ioread32(ioaddr + CSR6), ioread32(ioaddr + CSR12));
 
 			/* now the following actually writes out the
 			 * new csr6 values
@@ -291,8 +291,8 @@ void pnic2_lnk_change(struct net_device *dev, int csr5)
                         /* remember to turn off bit 7 - autonegotiate
                          * enable so we don't forget
                          */
-	                csr14 = (inl(ioaddr + CSR14) & 0xffffff7f);
-                        outl(csr14,ioaddr + CSR14);
+	                csr14 = (ioread32(ioaddr + CSR14) & 0xffffff7f);
+                        iowrite32(csr14,ioaddr + CSR14);
 
                         /* what should we do when autonegotiate fails?
                          * should we try again or default to baseline
@@ -308,7 +308,7 @@ void pnic2_lnk_change(struct net_device *dev, int csr5)
                          /* set to 10baseTx-HD - see Data Port Selection
                           * comment given at the top of the file
                           */
-	                 tp->csr6 = (inl(ioaddr + CSR6) & 0xfe3bd1fd);
+	                 tp->csr6 = (ioread32(ioaddr + CSR6) & 0xfe3bd1fd);
                          tp->csr6 |= 0x00400000;
 
 	                 tulip_restart_rxtx(tp);
@@ -393,13 +393,13 @@ void pnic2_lnk_change(struct net_device *dev, int csr5)
 	dev->if_port = 0;
 
         /* make sure autonegotiate enable is off */
-	csr14 = (inl(ioaddr + CSR14) & 0xffffff7f);
-        outl(csr14,ioaddr + CSR14);
+	csr14 = (ioread32(ioaddr + CSR14) & 0xffffff7f);
+        iowrite32(csr14,ioaddr + CSR14);
 
         /* set to 10baseTx-HD - see Data Port Selection
          * comment given at the top of the file
          */
-	tp->csr6 = (inl(ioaddr + CSR6) & 0xfe3bd1fd);
+	tp->csr6 = (ioread32(ioaddr + CSR6) & 0xfe3bd1fd);
         tp->csr6 |= 0x00400000;
 
 	tulip_restart_rxtx(tp);

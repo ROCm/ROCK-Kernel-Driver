@@ -457,8 +457,8 @@ void rxrpc_trans_receive_packet(struct rxrpc_transport *trans)
 	struct rxrpc_peer *peer;
 	struct sk_buff *pkt;
 	int ret;
-	u32 addr;
-	u16 port;
+	__be32 addr;
+	__be16 port;
 
 	LIST_HEAD(msgq);
 
@@ -612,7 +612,7 @@ int rxrpc_trans_immediate_abort(struct rxrpc_transport *trans,
 	struct sockaddr_in sin;
 	struct msghdr msghdr;
 	struct kvec iov[2];
-	uint32_t _error;
+	__be32 _error;
 	int len, ret;
 
 	_enter("%p,%p,%d", trans, msg, error);
@@ -655,8 +655,8 @@ int rxrpc_trans_immediate_abort(struct rxrpc_transport *trans,
 	_net("Sending message type %d of %d bytes to %08x:%d",
 	     ahdr.type,
 	     len,
-	     htonl(sin.sin_addr.s_addr),
-	     htons(sin.sin_port));
+	     ntohl(sin.sin_addr.s_addr),
+	     ntohs(sin.sin_port));
 
 	/* send the message */
 	ret = kernel_sendmsg(trans->socket, &msghdr, iov, 2, len);
@@ -678,7 +678,7 @@ static void rxrpc_trans_receive_error_report(struct rxrpc_transport *trans)
 	struct list_head connq, *_p;
 	struct errormsg emsg;
 	struct msghdr msg;
-	uint16_t port;
+	__be16 port;
 	int local, err;
 
 	_enter("%p", trans);

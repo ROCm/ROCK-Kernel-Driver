@@ -18,8 +18,8 @@
 #include <linux/init.h>
 #include <linux/idr.h>
 #include <linux/namei.h>
+#include <linux/bitops.h>
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 
 static ssize_t proc_file_read(struct file *file, char __user *buf,
 			      size_t nbytes, loff_t *ppos);
@@ -34,7 +34,7 @@ int proc_match(int len, const char *name, struct proc_dir_entry *de)
 	return !memcmp(name, de->name, len);
 }
 
-struct file_operations proc_file_operations = {
+static struct file_operations proc_file_operations = {
 	.llseek		= proc_file_lseek,
 	.read		= proc_file_read,
 	.write		= proc_file_write,

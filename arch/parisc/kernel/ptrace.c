@@ -303,7 +303,7 @@ long sys_ptrace(long request, pid_t pid, long addr, long data)
 		 * that it wants to exit.
 		 */
 		DBG(("sys_ptrace(KILL)\n"));
-		if (child->state == TASK_ZOMBIE)	/* already dead */
+		if (child->exit_state == EXIT_ZOMBIE)	/* already dead */
 			goto out_tsk;
 		child->exit_code = SIGKILL;
 		goto out_wake_notrap;
@@ -377,6 +377,10 @@ long sys_ptrace(long request, pid_t pid, long addr, long data)
 
 	case PTRACE_DETACH:
 		ret = ptrace_detach(child, data);
+		goto out_tsk;
+
+	case PTRACE_GETEVENTMSG:
+                ret = put_user(child->ptrace_message, (unsigned int __user *) data);
 		goto out_tsk;
 
 	default:

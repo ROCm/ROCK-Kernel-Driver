@@ -31,6 +31,8 @@
 #include <linux/i2c-sensor.h>
 #include <asm/uaccess.h>
 
+static unsigned short empty[] = {I2C_CLIENT_END};
+static unsigned int empty_isa[] = {I2C_CLIENT_ISA_END};
 
 /* Very inefficient for ISA detects, and won't work for 10-bit addresses! */
 int i2c_detect(struct i2c_adapter *adapter,
@@ -42,11 +44,27 @@ int i2c_detect(struct i2c_adapter *adapter,
 	int is_isa = i2c_is_isa_adapter(adapter);
 	int adapter_id =
 	    is_isa ? ANY_I2C_ISA_BUS : i2c_adapter_id(adapter);
+	unsigned short *normal_i2c;
+	unsigned int *normal_isa;
+	unsigned short *probe;
+	unsigned short *ignore;
 
 	/* Forget it if we can't probe using SMBUS_QUICK */
 	if ((!is_isa) &&
 	    !i2c_check_functionality(adapter, I2C_FUNC_SMBUS_QUICK))
 		return -1;
+	
+	/* Use default "empty" list if the adapter doesn't specify any */
+	normal_i2c = probe = ignore = empty;
+	normal_isa = empty_isa;
+	if (address_data->normal_i2c)
+		normal_i2c = address_data->normal_i2c;
+	if (address_data->normal_isa)
+		normal_isa = address_data->normal_isa;
+	if (address_data->probe)
+		probe = address_data->probe;
+	if (address_data->ignore)
+		ignore = address_data->ignore;
 
 	for (addr = 0x00; addr <= (is_isa ? 0xffff : 0x7f); addr++) {
 		if (!is_isa && i2c_check_addr(adapter, addr))
@@ -72,22 +90,12 @@ int i2c_detect(struct i2c_adapter *adapter,
 
 		/* If this address is in one of the ignores, we can forget about it
 		   right now */
-		for (i = 0; !found && (address_data->ignore[i] != I2C_CLIENT_END); i += 2) {
-			if ( ((adapter_id == address_data->ignore[i]) ||
-			      ((address_data->ignore[i] == ANY_I2C_BUS) &&
+		for (i = 0; !found && (ignore[i] != I2C_CLIENT_END); i += 2) {
+			if ( ((adapter_id == ignore[i]) ||
+			      ((ignore[i] == ANY_I2C_BUS) &&
 			       !is_isa)) &&
-			      (addr == address_data->ignore[i + 1])) {
+			      (addr == ignore[i + 1])) {
 				dev_dbg(&adapter->dev, "found ignore parameter for adapter %d, addr %04x\n", adapter_id, addr);
-				found = 1;
-			}
-		}
-		for (i = 0; !found && (address_data->ignore_range[i] != I2C_CLIENT_END); i += 3) {
-			if ( ((adapter_id == address_data->ignore_range[i]) ||
-			      ((address_data-> ignore_range[i] == ANY_I2C_BUS) & 
-			       !is_isa)) &&
-			     (addr >= address_data->ignore_range[i + 1]) &&
-			     (addr <= address_data->ignore_range[i + 2])) {
-				dev_dbg(&adapter->dev,  "found ignore_range parameter for adapter %d, addr %04x\n", adapter_id, addr);
 				found = 1;
 			}
 		}
@@ -97,54 +105,29 @@ int i2c_detect(struct i2c_adapter *adapter,
 		/* Now, we will do a detection, but only if it is in the normal or 
 		   probe entries */
 		if (is_isa) {
-			for (i = 0; !found && (address_data->normal_isa[i] != I2C_CLIENT_ISA_END); i += 1) {
-				if (addr == address_data->normal_isa[i]) {
+			for (i = 0; !found && (normal_isa[i] != I2C_CLIENT_ISA_END); i += 1) {
+				if (addr == normal_isa[i]) {
 					dev_dbg(&adapter->dev, "found normal isa entry for adapter %d, addr %04x\n", adapter_id, addr);
 					found = 1;
 				}
 			}
-			for (i = 0; !found && (address_data->normal_isa_range[i] != I2C_CLIENT_ISA_END); i += 3) {
-				if ((addr >= address_data->normal_isa_range[i]) &&
-				    (addr <= address_data->normal_isa_range[i + 1]) &&
-				    ((addr - address_data->normal_isa_range[i]) % address_data->normal_isa_range[i + 2] == 0)) {
-					dev_dbg(&adapter->dev, "found normal isa_range entry for adapter %d, addr %04x", adapter_id, addr);
-					found = 1;
-				}
-			}
 		} else {
-			for (i = 0; !found && (address_data->normal_i2c[i] != I2C_CLIENT_END); i += 1) {
-				if (addr == address_data->normal_i2c[i]) {
+			for (i = 0; !found && (normal_i2c[i] != I2C_CLIENT_END); i += 1) {
+				if (addr == normal_i2c[i]) {
 					found = 1;
-					dev_dbg(&adapter->dev, "found normal i2c entry for adapter %d, addr %02x", adapter_id, addr);
-				}
-			}
-			for (i = 0; !found && (address_data->normal_i2c_range[i] != I2C_CLIENT_END); i += 2) {
-				if ((addr >= address_data->normal_i2c_range[i]) &&
-				    (addr <= address_data->normal_i2c_range[i + 1])) {
-					dev_dbg(&adapter->dev, "found normal i2c_range entry for adapter %d, addr %04x\n", adapter_id, addr);
-					found = 1;
+					dev_dbg(&adapter->dev, "found normal i2c entry for adapter %d, addr %02x\n", adapter_id, addr);
 				}
 			}
 		}
 
 		for (i = 0;
-		     !found && (address_data->probe[i] != I2C_CLIENT_END);
+		     !found && (probe[i] != I2C_CLIENT_END);
 		     i += 2) {
-			if (((adapter_id == address_data->probe[i]) ||
-			     ((address_data->
-			       probe[i] == ANY_I2C_BUS) && !is_isa))
-			    && (addr == address_data->probe[i + 1])) {
+			if (((adapter_id == probe[i]) ||
+			     ((probe[i] == ANY_I2C_BUS) && !is_isa))
+			    && (addr == probe[i + 1])) {
 				dev_dbg(&adapter->dev, "found probe parameter for adapter %d, addr %04x\n", adapter_id, addr);
 				found = 1;
-			}
-		}
-		for (i = 0; !found && (address_data->probe_range[i] != I2C_CLIENT_END); i += 3) {
-			if ( ((adapter_id == address_data->probe_range[i]) ||
-			      ((address_data->probe_range[i] == ANY_I2C_BUS) && !is_isa)) &&
-			     (addr >= address_data->probe_range[i + 1]) &&
-			     (addr <= address_data->probe_range[i + 2])) {
-				found = 1;
-				dev_dbg(&adapter->dev, "found probe_range parameter for adapter %d, addr %04x\n", adapter_id, addr);
 			}
 		}
 		if (!found)

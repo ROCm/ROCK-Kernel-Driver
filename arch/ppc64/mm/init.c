@@ -36,6 +36,7 @@
 #include <linux/delay.h>
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
+#include <linux/idr.h>
 
 #include <asm/pgalloc.h>
 #include <asm/page.h>
@@ -62,8 +63,6 @@
 #include <asm/iommu.h>
 #include <asm/abs_addr.h>
 
-
-struct mmu_context_queue_t mmu_context_queue;
 int mem_init_done;
 unsigned long ioremap_bot = IMALLOC_BASE;
 static unsigned long phbs_io_bot = PHBS_IO_BASE;
@@ -204,10 +203,7 @@ static void __iomem * __ioremap_com(unsigned long addr, unsigned long pa,
 void __iomem *
 ioremap(unsigned long addr, unsigned long size)
 {
-	void __iomem *ret = __ioremap(addr, size, _PAGE_NO_CACHE);
-	if(mem_init_done)
-		return eeh_ioremap(addr, ret);	/* may remap the addr */
-	return ret;
+	return __ioremap(addr, size, _PAGE_NO_CACHE);
 }
 
 void __iomem *
@@ -267,9 +263,10 @@ int __ioremap_explicit(unsigned long pa, unsigned long ea,
 		 */
 		;
 	} else {
-		area = im_get_area(ea, size, IM_REGION_UNUSED|IM_REGION_SUBSET);
+		area = im_get_area(ea, size,
+			IM_REGION_UNUSED|IM_REGION_SUBSET|IM_REGION_EXISTS);
 		if (area == NULL) {
-			printk(KERN_ERR "could not obtain imalloc area for ea 0x%lx\n", ea);
+			/* Expected when PHB-dlpar is in play */
 			return 1;
 		}
 		if (ea != (unsigned long) area->addr) {
@@ -364,9 +361,7 @@ void iounmap(volatile void __iomem *token)
 		return;
 	}
 	
-	/* addr could be in EEH or IO region, map it to IO region regardless.
-	 */
-	addr = (void *) (IO_TOKEN_TO_ADDR(token) & PAGE_MASK);
+	addr = (void *) ((unsigned long __force) token & PAGE_MASK);
 	
 	if ((size = im_free(addr)) == 0) {
 		return;
@@ -416,9 +411,7 @@ int iounmap_explicit(volatile void __iomem *start, unsigned long size)
 	unsigned long addr;
 	int rc;
 	
-	/* addr could be in EEH or IO region, map it to IO region regardless.
-	 */
-	addr = (IO_TOKEN_TO_ADDR(start) & PAGE_MASK);
+	addr = (unsigned long __force) start & PAGE_MASK;
 
 	/* Verify that the region either exists or is a subset of an existing
 	 * region.  In the latter case, split the parent region to create 
@@ -477,25 +470,64 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 }
 #endif
 
+static spinlock_t mmu_context_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_IDR(mmu_context_idr);
+
+int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
+{
+	int index;
+	int err;
+
+#ifdef CONFIG_HUGETLB_PAGE
+	/* We leave htlb_segs as it was, but for a fork, we need to
+	 * clear the huge_pgdir. */
+	mm->context.huge_pgdir = NULL;
+#endif
+
+again:
+	if (!idr_pre_get(&mmu_context_idr, GFP_KERNEL))
+		return -ENOMEM;
+
+	spin_lock(&mmu_context_lock);
+	err = idr_get_new_above(&mmu_context_idr, NULL, 1, &index);
+	spin_unlock(&mmu_context_lock);
+
+	if (err == -EAGAIN)
+		goto again;
+	else if (err)
+		return err;
+
+	if (index > MAX_CONTEXT) {
+		idr_remove(&mmu_context_idr, index);
+		return -ENOMEM;
+	}
+
+	mm->context.id = index;
+
+	return 0;
+}
+
+void destroy_context(struct mm_struct *mm)
+{
+	spin_lock(&mmu_context_lock);
+	idr_remove(&mmu_context_idr, mm->context.id);
+	spin_unlock(&mmu_context_lock);
+
+	mm->context.id = NO_CONTEXT;
+
+	hugetlb_mm_free_pgd(mm);
+}
+
 /*
  * Do very early mm setup.
  */
 void __init mm_init_ppc64(void)
 {
+#ifndef CONFIG_PPC_ISERIES
 	unsigned long i;
+#endif
 
 	ppc64_boot_msg(0x100, "MM Init");
-
-	/* Reserve all contexts < FIRST_USER_CONTEXT for kernel use.
-	 * The range of contexts [FIRST_USER_CONTEXT, NUM_USER_CONTEXT)
-	 * are stored on a stack/queue for easy allocation and deallocation.
-	 */
-	mmu_context_queue.lock = SPIN_LOCK_UNLOCKED;
-	mmu_context_queue.head = 0;
-	mmu_context_queue.tail = NUM_USER_CONTEXT-1;
-	mmu_context_queue.size = NUM_USER_CONTEXT;
-	for (i = 0; i < NUM_USER_CONTEXT; i++)
-		mmu_context_queue.elements[i] = i + FIRST_USER_CONTEXT;
 
 	/* This is the story of the IO hole... please, keep seated,
 	 * unfortunately, we are out of oxygen masks at the moment.
@@ -837,14 +869,14 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 	local_irq_restore(flags);
 }
 
-void * reserve_phb_iospace(unsigned long size)
+void __iomem * reserve_phb_iospace(unsigned long size)
 {
-	void *virt_addr;
+	void __iomem *virt_addr;
 		
 	if (phbs_io_bot >= IMALLOC_BASE) 
 		panic("reserve_phb_iospace(): phb io space overflow\n");
 			
-	virt_addr = (void *) phbs_io_bot;
+	virt_addr = (void __iomem *) phbs_io_bot;
 	phbs_io_bot += size;
 
 	return virt_addr;

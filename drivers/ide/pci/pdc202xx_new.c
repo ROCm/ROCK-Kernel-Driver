@@ -41,61 +41,6 @@
 
 #define PDC202_DEBUG_CABLE	0
 
-#if defined(DISPLAY_PDC202XX_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 pdcnew_proc = 0;
-#define PDC202_MAX_DEVS		5
-static struct pci_dev *pdc202_devs[PDC202_MAX_DEVS];
-static int n_pdc202_devs;
-
-static char * pdcnew_info(char *buf, struct pci_dev *dev)
-{
-	char *p = buf;
-
-	p += sprintf(p, "\n                                ");
-	switch(dev->device) {
-		case PCI_DEVICE_ID_PROMISE_20277:
-			p += sprintf(p, "SBFastTrak 133 Lite"); break;
-		case PCI_DEVICE_ID_PROMISE_20276:
-			p += sprintf(p, "MBFastTrak 133 Lite"); break;
-		case PCI_DEVICE_ID_PROMISE_20275:
-			p += sprintf(p, "MBUltra133"); break;
-		case PCI_DEVICE_ID_PROMISE_20271:
-			p += sprintf(p, "FastTrak TX2000"); break;
-		case PCI_DEVICE_ID_PROMISE_20270:
-			p += sprintf(p, "FastTrak LP/TX2/TX4"); break;
-		case PCI_DEVICE_ID_PROMISE_20269:
-			p += sprintf(p, "Ultra133 TX2"); break;
-		case PCI_DEVICE_ID_PROMISE_20268:
-			p += sprintf(p, "Ultra100 TX2"); break;
-		default:
-			p += sprintf(p, "Ultra series"); break;
-			break;
-	}
-	p += sprintf(p, " Chipset.\n");
-	return (char *)p;
-}
-
-static int pdcnew_get_info (char *buffer, char **addr, off_t offset, int count)
-{
-	char *p = buffer;
-	int i, len;
-
-	for (i = 0; i < n_pdc202_devs; i++) {
-		struct pci_dev *dev	= pdc202_devs[i];
-		p = pdcnew_info(buffer, dev);
-	}
-	/* p - buffer must be less than 4k! */
-	len = (p - buffer) - offset;
-	*addr = buffer + offset;
-	
-	return len > count ? count : len;
-}
-#endif  /* defined(DISPLAY_PDC202XX_TIMINGS) && defined(CONFIG_PROC_FS) */
-
-
 static u8 pdcnew_ratemask (ide_drive_t *drive)
 {
 	u8 mode;
@@ -244,37 +189,16 @@ static int pdcnew_config_drive_xfer_rate (ide_drive_t *drive)
 	drive->init_speed = 0;
 
 	if (id && (id->capability & 1) && drive->autodma) {
-		/* Consult the list of known "bad" drives */
-		if (__ide_dma_bad_drive(drive))
-			goto fast_ata_pio;
-		if (id->field_valid & 4) {
-			if (id->dma_ultra & hwif->ultra_mask) {
-				/* Force if Capable UltraDMA */
-				int dma = config_chipset_for_dma(drive);
-				if ((id->field_valid & 2) && !dma)
-					goto try_dma_modes;
-			}
-		} else if (id->field_valid & 2) {
-try_dma_modes:
-			if ((id->dma_mword & hwif->mwdma_mask) ||
-			    (id->dma_1word & hwif->swdma_mask)) {
-				/* Force if Capable regular DMA modes */
-				if (!config_chipset_for_dma(drive))
-					goto no_dma_set;
-			}
-		} else if (__ide_dma_good_drive(drive) &&
-			    (id->eide_dma_time < 150)) {
-				goto no_dma_set;
-			/* Consult the list of known "good" drives */
-			if (!config_chipset_for_dma(drive))
-				goto no_dma_set;
-		} else {
-			goto fast_ata_pio;
+
+		if (ide_use_dma(drive)) {
+			if (config_chipset_for_dma(drive))
+				return hwif->ide_dma_on(drive);
 		}
-		return hwif->ide_dma_on(drive);
+
+		goto fast_ata_pio;
+
 	} else if ((id->capability & 8) || (id->field_valid & 2)) {
 fast_ata_pio:
-no_dma_set:
 		hwif->tuneproc(drive, 5);
 		return hwif->ide_dma_off_quietly(drive);
 	}
@@ -310,68 +234,12 @@ static void pdcnew_new_reset (ide_drive_t *drive)
 		HWIF(drive)->channel ? "Secondary" : "Primary");
 }
 
-static void pdcnew_reset_host (ide_hwif_t *hwif)
-{
-//	unsigned long high_16	= hwif->dma_base - (8*(hwif->channel));
-	unsigned long high_16	= hwif->dma_master;
-	u8 udma_speed_flag	= hwif->INB(high_16|0x001f);
-
-	hwif->OUTB((udma_speed_flag | 0x10), (high_16|0x001f));
-	mdelay(100);
-	hwif->OUTB((udma_speed_flag & ~0x10), (high_16|0x001f));
-	mdelay(2000);	/* 2 seconds ?! */
-
-	printk(KERN_WARNING "PDC202XX: %s channel reset.\n",
-		hwif->channel ? "Secondary" : "Primary");
-}
-
-void pdcnew_reset (ide_drive_t *drive)
-{
-	ide_hwif_t *hwif	= HWIF(drive);
-	ide_hwif_t *mate	= hwif->mate;
-	
-	pdcnew_reset_host(hwif);
-	pdcnew_reset_host(mate);
-#if 0
-	/*
-	 * FIXME: Have to kick all the drives again :-/
-	 * What a pain in the ACE!
-	 */
-	if (hwif->present) {
-		u16 hunit = 0;
-		for (hunit = 0; hunit < MAX_DRIVES; ++hunit) {
-			ide_drive_t *hdrive = &hwif->drives[hunit];
-			if (hdrive->present) {
-				if (hwif->ide_dma_check)
-					hwif->ide_dma_check(hdrive);
-				else
-					hwif->tuneproc(hdrive, 5);
-			}
-		}
-	}
-	if (mate->present) {
-		u16 munit = 0;
-		for (munit = 0; munit < MAX_DRIVES; ++munit) {
-			ide_drive_t *mdrive = &mate->drives[munit];
-			if (mdrive->present) {
-				if (mate->ide_dma_check) 
-					mate->ide_dma_check(mdrive);
-				else
-					mate->tuneproc(mdrive, 5);
-			}
-		}
-	}
-#else
-	hwif->tuneproc(drive, 5);
-#endif
-}
-
 #ifdef CONFIG_PPC_PMAC
 static void __devinit apple_kiwi_init(struct pci_dev *pdev)
 {
 	struct device_node *np = pci_device_to_OF_node(pdev);
 	unsigned int class_rev = 0;
-	unsigned long mmio;
+	void __iomem *mmio;
 	u8 conf;
 
 	if (np == NULL || !device_is_compatible(np, "kiwi-root"))
@@ -385,7 +253,7 @@ static void __devinit apple_kiwi_init(struct pci_dev *pdev)
 		pci_read_config_byte(pdev, 0x40, &conf);
 		pci_write_config_byte(pdev, 0x40, conf | 0x01);
 	}
-	mmio = (unsigned long)ioremap(pci_resource_start(pdev, 5),
+	mmio = ioremap(pci_resource_start(pdev, 5),
 				      pci_resource_len(pdev, 5));
 
 	/* Setup some PLL stuffs */
@@ -400,7 +268,7 @@ static void __devinit apple_kiwi_init(struct pci_dev *pdev)
 		break;
 	}
 
-	iounmap((void *)mmio);
+	iounmap(mmio);
 }
 #endif /* CONFIG_PPC_PMAC */
 
@@ -416,15 +284,6 @@ static unsigned int __devinit init_chipset_pdcnew(struct pci_dev *dev, const cha
 #ifdef CONFIG_PPC_PMAC
 	apple_kiwi_init(dev);
 #endif
-
-#if defined(DISPLAY_PDC202XX_TIMINGS) && defined(CONFIG_PROC_FS)
-	pdc202_devs[n_pdc202_devs++] = dev;
-
-	if (!pdcnew_proc) {
-		pdcnew_proc = 1;
-		ide_pci_create_host_proc("pdcnew", pdcnew_get_info);
-	}
-#endif /* DISPLAY_PDC202XX_TIMINGS && CONFIG_PROC_FS */
 
 	return dev->irq;
 }

@@ -1075,7 +1075,7 @@ static int dn_accept(struct socket *sock, struct socket *newsock, int flags)
 		skb = dn_wait_for_connect(sk, &timeo);
 		if (IS_ERR(skb)) {
 			release_sock(sk);
-			return PTR_ERR(sk);
+			return PTR_ERR(skb);
 		}
 	}
 
@@ -1723,7 +1723,7 @@ static int dn_recvmsg(struct kiocb *iocb, struct socket *sock,
 			goto out;
 
 		if (signal_pending(current)) {
-			rv = -ERESTARTSYS;
+			rv = sock_intr_errno(timeo);
 			goto out;
 		}
 
@@ -1957,7 +1957,7 @@ static int dn_sendmsg(struct kiocb *iocb, struct socket *sock,
 			goto out;
 
 		if (signal_pending(current)) {
-			err = -ERESTARTSYS;
+			err = sock_intr_errno(timeo);
 			goto out;
 		}
 
@@ -1992,7 +1992,7 @@ static int dn_sendmsg(struct kiocb *iocb, struct socket *sock,
 		/*
 		 * Get a suitably sized skb.
 		 */
-		skb = dn_alloc_send_skb(sk, &len, flags & MSG_DONTWAIT, &err);
+		skb = dn_alloc_send_skb(sk, &len, flags & MSG_DONTWAIT, timeo, &err);
 
 		if (err)
 			break;

@@ -16,6 +16,7 @@
 #include <linux/bootmem.h>
 #include <linux/acpi.h>
 #include <linux/efi.h>
+#include <linux/nodemask.h>
 #include <asm/pgalloc.h>
 #include <asm/tlb.h>
 #include <asm/meminit.h>
@@ -53,11 +54,12 @@ static struct early_node_data mem_data[NR_NODES] __initdata;
 static void __init reassign_cpu_only_nodes(void)
 {
 	struct node_memblk_s *p;
-	int i, j, k, nnode, nid, cpu, cpunid;
+	int i, j, k, nnode, nid, cpu, cpunid, pxm;
 	u8 cslit, slit;
 	static DECLARE_BITMAP(nodes_with_mem, NR_NODES) __initdata;
 	static u8 numa_slit_fix[MAX_NUMNODES * MAX_NUMNODES] __initdata;
 	static int node_flip[NR_NODES] __initdata;
+	static int old_nid_map[NR_CPUS] __initdata;
 
 	for (nnode = 0, p = &node_memblk[0]; p < &node_memblk[num_node_memblks]; p++)
 		if (!test_bit(p->nid, (void *) nodes_with_mem)) {
@@ -104,9 +106,14 @@ static void __init reassign_cpu_only_nodes(void)
 
 		for (cpu = 0; cpu < NR_CPUS; cpu++)
 			if (node_cpuid[cpu].nid == i) {
-				/* For nodes not being reassigned just fix the cpu's nid. */
+				/*
+				 * For nodes not being reassigned just
+				 * fix the cpu's nid and reverse pxm map
+				 */
 				if (cpunid < numnodes) {
-					node_cpuid[cpu].nid = cpunid;
+					pxm = nid_to_pxm_map[i];
+					pxm_to_nid_map[pxm] =
+					          node_cpuid[cpu].nid = cpunid;
 					continue;
 				}
 
@@ -126,6 +133,8 @@ static void __init reassign_cpu_only_nodes(void)
 						}
 					}
 
+				/* save old nid map so we can update the pxm */
+				old_nid_map[cpu] = node_cpuid[cpu].nid;
 				node_cpuid[cpu].nid = k;
 			}
 	}
@@ -134,14 +143,19 @@ static void __init reassign_cpu_only_nodes(void)
 	 * Fixup temporary nid values for CPU-only nodes.
 	 */
 	for (cpu = 0; cpu < NR_CPUS; cpu++)
-		if (node_cpuid[cpu].nid == (numnodes + numnodes))
-			node_cpuid[cpu].nid = nnode - 1;
-		else
-			for (i = 0; i < nnode; i++)
-				if (node_flip[i] == (node_cpuid[cpu].nid - numnodes)) {
-					node_cpuid[cpu].nid = i;
-					break;
-				}
+		if (node_cpuid[cpu].nid == (numnodes + numnodes)) {
+			pxm = nid_to_pxm_map[old_nid_map[cpu]];
+			pxm_to_nid_map[pxm] = node_cpuid[cpu].nid = nnode - 1;
+		} else {
+			for (i = 0; i < nnode; i++) {
+				if (node_flip[i] != (node_cpuid[cpu].nid - numnodes))
+					continue;
+
+				pxm = nid_to_pxm_map[old_nid_map[cpu]];
+				pxm_to_nid_map[pxm] = node_cpuid[cpu].nid = i;
+				break;
+			}
+		}
 
 	/*
 	 * Fix numa_slit by compressing from larger
@@ -588,7 +602,7 @@ void call_pernode_memory(unsigned long start, unsigned long len, void *arg)
  * for each piece of usable memory and will setup these values for each node.
  * Very similar to build_maps().
  */
-static int count_node_pages(unsigned long start, unsigned long len, int node)
+static __init int count_node_pages(unsigned long start, unsigned long len, int node)
 {
 	unsigned long end = start + len;
 
@@ -613,17 +627,15 @@ static int count_node_pages(unsigned long start, unsigned long len, int node)
  * paging_init() sets up the page tables for each node of the system and frees
  * the bootmem allocator memory for general use.
  */
-void paging_init(void)
+void __init paging_init(void)
 {
 	unsigned long max_dma;
 	unsigned long zones_size[MAX_NR_ZONES];
 	unsigned long zholes_size[MAX_NR_ZONES];
-	unsigned long max_gap, pfn_offset = 0;
+	unsigned long pfn_offset = 0;
 	int node;
 
 	max_dma = virt_to_phys((void *) MAX_DMA_ADDRESS) >> PAGE_SHIFT;
-	max_gap = 0;
-	efi_memmap_walk(find_largest_hole, &max_gap);
 
 	/* so min() will work in count_node_pages */
 	for (node = 0; node < numnodes; node++)
@@ -669,7 +681,7 @@ void paging_init(void)
 				PAGE_ALIGN(max_low_pfn * sizeof(struct page));
 			vmem_map = (struct page *) vmalloc_end;
 
-			efi_memmap_walk(create_mem_map_page_table, 0);
+			efi_memmap_walk(create_mem_map_page_table, NULL);
 			printk("Virtual mem_map starts at 0x%p\n", vmem_map);
 		}
 

@@ -23,17 +23,17 @@ unsigned int __machine_arch_type;
 #include <asm/arch/uncompress.h>
 
 #ifdef STANDALONE_DEBUG
-#define puts printf
+#define putstr printf
 #endif
 
 #ifdef CONFIG_DEBUG_ICEDCC
-#define puts icedcc_puts
+#define putstr icedcc_putstr
 #define putc icedcc_putc
 
 extern void idedcc_putc(int ch);
 
 static void
-icedcc_puts(const char *ptr)
+icedcc_putstr(const char *ptr)
 {
 	for (; *ptr != '\0'; ptr++) {
 		icedcc_putc(*ptr);
@@ -191,7 +191,7 @@ static void error(char *m);
 static void gzip_mark(void **);
 static void gzip_release(void **);
 
-static void puts(const char *);
+static void putstr(const char *);
 
 extern int end;
 static ulg free_mem_ptr;
@@ -280,14 +280,14 @@ void flush_window(void)
 	bytes_out += (ulg)outcnt;
 	output_ptr += (ulg)outcnt;
 	outcnt = 0;
-	puts(".");
+	putstr(".");
 }
 
 static void error(char *x)
 {
-	puts("\n\n");
-	puts(x);
-	puts("\n\n -- System halted");
+	putstr("\n\n");
+	putstr(x);
+	putstr("\n\n -- System halted");
 
 	while(1);	/* Halt */
 }
@@ -306,9 +306,9 @@ decompress_kernel(ulg output_start, ulg free_mem_ptr_p, ulg free_mem_ptr_end_p,
 	arch_decomp_setup();
 
 	makecrc();
-	puts("Uncompressing Linux...");
+	putstr("Uncompressing Linux...");
 	gunzip();
-	puts(" done, booting the kernel.\n");
+	putstr(" done, booting the kernel.\n");
 	return output_ptr;
 }
 #else
@@ -320,9 +320,9 @@ int main()
 	output_data = output_buffer;
 
 	makecrc();
-	puts("Uncompressing Linux...");
+	putstr("Uncompressing Linux...");
 	gunzip();
-	puts("done.\n");
+	putstr("done.\n");
 	return 0;
 }
 #endif

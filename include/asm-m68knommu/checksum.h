@@ -1,6 +1,8 @@
 #ifndef _M68K_CHECKSUM_H
 #define _M68K_CHECKSUM_H
 
+#include <linux/in6.h>
+
 /*
  * computes the checksum of a memory block at buff, length len,
  * and adds in "sum" (32-bit)

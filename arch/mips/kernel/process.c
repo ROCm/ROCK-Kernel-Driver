@@ -5,6 +5,7 @@
  *
  * Copyright (C) 1994 - 1999, 2000 by Ralf Baechle and others.
  * Copyright (C) 1999, 2000 Silicon Graphics, Inc.
+ * Copyright (C) 2004 Thiemo Seufer
  */
 #include <linux/config.h>
 #include <linux/errno.h>
@@ -99,9 +100,13 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 
 	childksp = (unsigned long)ti + THREAD_SIZE - 32;
 
+	preempt_disable();
+
 	if (is_fpu_owner()) {
 		save_fp(p);
 	}
+
+	preempt_enable();
 
 	/* set up new TSS. */
 	childregs = (struct pt_regs *) childksp - 1;
@@ -140,7 +145,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	p->thread.cp0_status = read_c0_status() & ~(ST0_CU2|ST0_CU1);
 	childregs->cp0_status &= ~(ST0_CU2|ST0_CU1);
 	clear_tsk_thread_flag(p, TIF_USEDFPU);
-	p->set_child_tid = p->clear_child_tid = NULL;
 
 	return 0;
 }
@@ -155,39 +159,30 @@ int dump_fpu(struct pt_regs *regs, elf_fpregset_t *r)
 /*
  * Create a kernel thread
  */
+ATTRIB_NORET void kernel_thread_helper(void *arg, int (*fn)(void *))
+{
+	do_exit(fn(arg));
+}
+
 long kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 {
-	long retval;
+	struct pt_regs regs;
 
-	__asm__ __volatile__(
-		"	move	$6, $sp		\n"
-		"	move	$4, %5		\n"
-		"	li	$2, %1		\n"
-		"	syscall			\n"
-		"	beq	$6, $sp, 1f	\n"
-#ifdef CONFIG_MIPS32	/* On o32 the caller has to create the stackframe */
-		"	subu	$sp, 32		\n"
-#endif
-		"	move	$4, %3		\n"
-		"	jalr	%4		\n"
-		"	move	$4, $2		\n"
-		"	li	$2, %2		\n"
-		"	syscall			\n"
-#ifdef CONFIG_MIPS32	/* On o32 the caller has to deallocate the stackframe */
-		"	addiu	$sp, 32		\n"
-#endif
-		"1:	move	%0, $2"
-		: "=r" (retval)
-		: "i" (__NR_clone), "i" (__NR_exit), "r" (arg), "r" (fn),
-		  "r" (flags | CLONE_VM | CLONE_UNTRACED)
-		 /*
-		  * The called subroutine might have destroyed any of the
-		  * at, result, argument or temporary registers ...
-		  */
-		: "$2", "$3", "$4", "$5", "$6", "$7", "$8",
-		  "$9","$10","$11","$12","$13","$14","$15","$24","$25","$31");
+	memset(&regs, 0, sizeof(regs));
 
-	return retval;
+	regs.regs[4] = (unsigned long) arg;
+	regs.regs[5] = (unsigned long) fn;
+	regs.cp0_epc = (unsigned long) kernel_thread_helper;
+	regs.cp0_status = read_c0_status();
+#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX)
+	regs.cp0_status &= ~(ST0_KUP | ST0_IEC);
+	regs.cp0_status |= ST0_IEP;
+#else
+	regs.cp0_status |= ST0_EXL;
+#endif
+
+	/* Ok, create the new process.. */
+	return do_fork(flags | CLONE_VM | CLONE_UNTRACED, 0, &regs, 0, NULL, NULL);
 }
 
 struct mips_frame_info {

@@ -17,6 +17,7 @@
 #include <asm/smp.h>
 #include <asm/io_apic.h>
 #include <asm/hw_irq.h>
+#include <linux/acpi.h>
 
 #include "pci.h"
 
@@ -127,8 +128,15 @@ void eisa_set_level_irq(unsigned int irq)
 {
 	unsigned char mask = 1 << (irq & 7);
 	unsigned int port = 0x4d0 + (irq >> 3);
-	unsigned char val = inb(port);
+	unsigned char val;
+	static u16 eisa_irq_mask;
 
+	if (irq >= 16 || (1 << irq) & eisa_irq_mask)
+		return;
+
+	eisa_irq_mask |= (1 << irq);
+	printk("PCI: setting IRQ %u as level-triggered\n", irq);
+	val = inb(port);
 	if (!(val & mask)) {
 		DBG(" -> edge");
 		outb(val | mask, port);
@@ -452,14 +460,16 @@ static int pirq_bios_set(struct pci_dev *router, struct pci_dev *dev, int pirq, 
 
 #endif
 
-
 static __init int intel_router_probe(struct irq_router *r, struct pci_dev *router, u16 device)
 {
+	static struct pci_device_id pirq_440gx[] = {
+		{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82443GX_0) },
+		{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82443GX_2) },
+		{ },
+	};
+
 	/* 440GX has a proprietary PIRQ router -- don't use it */
-	if (	pci_find_device(PCI_VENDOR_ID_INTEL,
-				PCI_DEVICE_ID_INTEL_82443GX_0, NULL) ||
-		pci_find_device(PCI_VENDOR_ID_INTEL,
-				PCI_DEVICE_ID_INTEL_82443GX_2, NULL))
+	if (pci_dev_present(pirq_440gx))
 		return 0;
 
 	switch(device)
@@ -804,7 +814,7 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 	printk(KERN_INFO "PCI: %s IRQ %d for device %s\n", msg, irq, pci_name(dev));
 
 	/* Update IRQ for all devices with the same pirq value */
-	while ((dev2 = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev2)) != NULL) {
+	while ((dev2 = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev2)) != NULL) {
 		pci_read_config_byte(dev2, PCI_INTERRUPT_PIN, &pin);
 		if (!pin)
 			continue;
@@ -838,7 +848,7 @@ static void __init pcibios_fixup_irqs(void)
 	u8 pin;
 
 	DBG("PCI: IRQ fixup\n");
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
+	while ((dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		/*
 		 * If the BIOS has set an out of range IRQ number, just ignore it.
 		 * Also keep track of which IRQ's are already in use.
@@ -854,7 +864,7 @@ static void __init pcibios_fixup_irqs(void)
 	}
 
 	dev = NULL;
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
+	while ((dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
 #ifdef CONFIG_X86_IO_APIC
 		/*
@@ -989,13 +999,24 @@ static int __init pcibios_irq_init(void)
 subsys_initcall(pcibios_irq_init);
 
 
-void pcibios_penalize_isa_irq(int irq)
+static void pirq_penalize_isa_irq(int irq)
 {
 	/*
 	 *  If any ISAPnP device reports an IRQ in its list of possible
 	 *  IRQ's, we try to avoid assigning it to PCI devices.
 	 */
-	pirq_penalty[irq] += 100;
+	if (irq < 16)
+		pirq_penalty[irq] += 100;
+}
+
+void pcibios_penalize_isa_irq(int irq)
+{
+#ifdef CONFIG_ACPI_PCI
+	if (!acpi_noirq)
+		acpi_penalize_isa_irq(irq);
+	else
+#endif
+		pirq_penalize_isa_irq(irq);
 }
 
 int pirq_enable_irq(struct pci_dev *dev)

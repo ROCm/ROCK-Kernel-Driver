@@ -21,6 +21,7 @@
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
 #include <linux/vmalloc.h>
+#include <linux/delay.h>
 #include <asm/io.h>
 
 #include "hysdn_defs.h"
@@ -246,8 +247,7 @@ ergo_writebootimg(struct HYSDN_CARD *card, uchar * buf, ulong offs)
 		/* the interrupts are still masked */
 
 		sti();
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout((20 * HZ) / 1000);	/* Timeout 20ms */
+		msleep_interruptible(20);		/* Timeout 20ms */
 
 		if (((tDpramBootSpooler *) card->dpram)->Len != DPRAM_SPOOLER_DATA_SIZE) {
 			if (card->debug_flags & LOG_POF_CARD)
@@ -386,8 +386,7 @@ ergo_waitpofready(struct HYSDN_CARD *card)
 			return (0);	/* success */
 		}		/* data has arrived */
 		sti();
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout((50 * HZ) / 1000);	/* Timeout 50ms */
+		msleep_interruptible(50);		/* Timeout 50ms */
 	}			/* wait until timeout */
 
 	if (card->debug_flags & LOG_POF_CARD)

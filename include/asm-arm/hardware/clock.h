@@ -64,7 +64,7 @@ int clk_use(struct clk *clk);
 void clk_unuse(struct clk *clk);
 
 /**
- * clk_get_rate - obtain the current clock rate for a clock source.
+ * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
  *		  This is only valid once the clock source has been enabled.
  * @clk: clock source
  */
@@ -85,16 +85,16 @@ void clk_put(struct clk *clk);
 /**
  * clk_round_rate - adjust a rate to the exact rate a clock can provide
  * @clk: clock source
- * @rate: desired clock rate in kHz
+ * @rate: desired clock rate in Hz
  *
- * Returns rounded clock rate, or negative errno.
+ * Returns rounded clock rate in Hz, or negative errno.
  */
 long clk_round_rate(struct clk *clk, unsigned long rate);
  
 /**
  * clk_set_rate - set the clock rate for a clock source
  * @clk: clock source
- * @rate: desired clock rate in kHz
+ * @rate: desired clock rate in Hz
  *
  * Returns success (0) or negative errno.
  */

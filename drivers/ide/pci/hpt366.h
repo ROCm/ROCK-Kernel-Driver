@@ -5,14 +5,12 @@
 #include <linux/pci.h>
 #include <linux/ide.h>
 
-#define DISPLAY_HPT366_TIMINGS
-
 /* various tuning parameters */
 #define HPT_RESET_STATE_ENGINE
 #undef HPT_DELAY_INTERRUPT
 #undef HPT_SERIALIZE_IO
 
-const char *quirk_drives[] = {
+static const char *quirk_drives[] = {
 	"QUANTUM FIREBALLlct08 08",
 	"QUANTUM FIREBALLP KA6.4",
 	"QUANTUM FIREBALLP LM20.4",
@@ -20,7 +18,7 @@ const char *quirk_drives[] = {
         NULL
 };
 
-const char *bad_ata100_5[] = {
+static const char *bad_ata100_5[] = {
 	"IBM-DTLA-307075",
 	"IBM-DTLA-307060",
 	"IBM-DTLA-307045",
@@ -39,7 +37,7 @@ const char *bad_ata100_5[] = {
 	NULL
 };
 
-const char *bad_ata66_4[] = {
+static const char *bad_ata66_4[] = {
 	"IBM-DTLA-307075",
 	"IBM-DTLA-307060",
 	"IBM-DTLA-307045",
@@ -58,12 +56,12 @@ const char *bad_ata66_4[] = {
 	NULL
 };
 
-const char *bad_ata66_3[] = {
+static const char *bad_ata66_3[] = {
 	"WDC AC310200R",
 	NULL
 };
 
-const char *bad_ata33[] = {
+static const char *bad_ata33[] = {
 	"Maxtor 92720U8", "Maxtor 92040U6", "Maxtor 91360U4", "Maxtor 91020U3", "Maxtor 90845U3", "Maxtor 90650U2",
 	"Maxtor 91360D8", "Maxtor 91190D7", "Maxtor 91020D6", "Maxtor 90845D5", "Maxtor 90680D4", "Maxtor 90510D3", "Maxtor 90340D2",
 	"Maxtor 91152D8", "Maxtor 91008D7", "Maxtor 90845D6", "Maxtor 90840D6", "Maxtor 90720D5", "Maxtor 90648D5", "Maxtor 90576D4",
@@ -101,7 +99,7 @@ struct chipset_bus_clock_list_entry {
  *        PIO.
  * 31     FIFO enable.
  */
-struct chipset_bus_clock_list_entry forty_base_hpt366[] = {
+static struct chipset_bus_clock_list_entry forty_base_hpt366[] = {
 	{	XFER_UDMA_4,	0x900fd943	},
 	{	XFER_UDMA_3,	0x900ad943	},
 	{	XFER_UDMA_2,	0x900bd943	},
@@ -120,7 +118,7 @@ struct chipset_bus_clock_list_entry forty_base_hpt366[] = {
 	{	0,		0x0120d9d9	}
 };
 
-struct chipset_bus_clock_list_entry thirty_three_base_hpt366[] = {
+static struct chipset_bus_clock_list_entry thirty_three_base_hpt366[] = {
 	{	XFER_UDMA_4,	0x90c9a731	},
 	{	XFER_UDMA_3,	0x90cfa731	},
 	{	XFER_UDMA_2,	0x90caa731	},
@@ -139,7 +137,7 @@ struct chipset_bus_clock_list_entry thirty_three_base_hpt366[] = {
 	{	0,		0x0120a7a7	}
 };
 
-struct chipset_bus_clock_list_entry twenty_five_base_hpt366[] = {
+static struct chipset_bus_clock_list_entry twenty_five_base_hpt366[] = {
 
 	{	XFER_UDMA_4,	0x90c98521	},
 	{	XFER_UDMA_3,	0x90cf8521	},
@@ -160,7 +158,7 @@ struct chipset_bus_clock_list_entry twenty_five_base_hpt366[] = {
 };
 
 /* from highpoint documentation. these are old values */
-struct chipset_bus_clock_list_entry thirty_three_base_hpt370[] = {
+static struct chipset_bus_clock_list_entry thirty_three_base_hpt370[] = {
 /*	{	XFER_UDMA_5,	0x1A85F442,	0x16454e31	}, */
 	{	XFER_UDMA_5,	0x16454e31	},
 	{	XFER_UDMA_4,	0x16454e31	},
@@ -181,7 +179,7 @@ struct chipset_bus_clock_list_entry thirty_three_base_hpt370[] = {
 	{	0,		0x06514e57	}
 };
 
-struct chipset_bus_clock_list_entry sixty_six_base_hpt370[] = {
+static struct chipset_bus_clock_list_entry sixty_six_base_hpt370[] = {
 	{       XFER_UDMA_5,    0x14846231      },
 	{       XFER_UDMA_4,    0x14886231      },
 	{       XFER_UDMA_3,    0x148c6231      },
@@ -202,7 +200,7 @@ struct chipset_bus_clock_list_entry sixty_six_base_hpt370[] = {
 };
 
 /* these are the current (4 sep 2001) timings from highpoint */
-struct chipset_bus_clock_list_entry thirty_three_base_hpt370a[] = {
+static struct chipset_bus_clock_list_entry thirty_three_base_hpt370a[] = {
         {       XFER_UDMA_5,    0x12446231      },
         {       XFER_UDMA_4,    0x12446231      },
         {       XFER_UDMA_3,    0x126c6231      },
@@ -223,7 +221,7 @@ struct chipset_bus_clock_list_entry thirty_three_base_hpt370a[] = {
 };
 
 /* 2x 33MHz timings */
-struct chipset_bus_clock_list_entry sixty_six_base_hpt370a[] = {
+static struct chipset_bus_clock_list_entry sixty_six_base_hpt370a[] = {
 	{       XFER_UDMA_5,    0x1488e673       },
 	{       XFER_UDMA_4,    0x1488e673       },
 	{       XFER_UDMA_3,    0x1498e673       },
@@ -243,7 +241,7 @@ struct chipset_bus_clock_list_entry sixty_six_base_hpt370a[] = {
 	{       0,              0x0d02bf5f       }
 };
 
-struct chipset_bus_clock_list_entry fifty_base_hpt370a[] = {
+static struct chipset_bus_clock_list_entry fifty_base_hpt370a[] = {
 	{       XFER_UDMA_5,    0x12848242      },
 	{       XFER_UDMA_4,    0x12ac8242      },
 	{       XFER_UDMA_3,    0x128c8242      },
@@ -263,7 +261,7 @@ struct chipset_bus_clock_list_entry fifty_base_hpt370a[] = {
 	{       0,              0x0ac1f48a      }
 };
 
-struct chipset_bus_clock_list_entry thirty_three_base_hpt372[] = {
+static struct chipset_bus_clock_list_entry thirty_three_base_hpt372[] = {
 	{	XFER_UDMA_6,	0x1c81dc62	},
 	{	XFER_UDMA_5,	0x1c6ddc62	},
 	{	XFER_UDMA_4,	0x1c8ddc62	},
@@ -284,7 +282,7 @@ struct chipset_bus_clock_list_entry thirty_three_base_hpt372[] = {
 	{	0,		0x0d029d5e	}
 };
 
-struct chipset_bus_clock_list_entry fifty_base_hpt372[] = {
+static struct chipset_bus_clock_list_entry fifty_base_hpt372[] = {
 	{	XFER_UDMA_5,	0x12848242	},
 	{	XFER_UDMA_4,	0x12ac8242	},
 	{	XFER_UDMA_3,	0x128c8242	},
@@ -304,7 +302,7 @@ struct chipset_bus_clock_list_entry fifty_base_hpt372[] = {
 	{	0,		0x0a81f443	}
 };
 
-struct chipset_bus_clock_list_entry sixty_six_base_hpt372[] = {
+static struct chipset_bus_clock_list_entry sixty_six_base_hpt372[] = {
 	{	XFER_UDMA_6,	0x1c869c62	},
 	{	XFER_UDMA_5,	0x1cae9c62	},
 	{	XFER_UDMA_4,	0x1c8a9c62	},
@@ -325,7 +323,7 @@ struct chipset_bus_clock_list_entry sixty_six_base_hpt372[] = {
 	{	0,		0x0d029d26	}
 };
 
-struct chipset_bus_clock_list_entry thirty_three_base_hpt374[] = {
+static struct chipset_bus_clock_list_entry thirty_three_base_hpt374[] = {
 	{	XFER_UDMA_6,	0x12808242	},
 	{	XFER_UDMA_5,	0x12848242	},
 	{	XFER_UDMA_4,	0x12ac8242	},
@@ -347,7 +345,7 @@ struct chipset_bus_clock_list_entry thirty_three_base_hpt374[] = {
 };
 
 #if 0
-struct chipset_bus_clock_list_entry fifty_base_hpt374[] = {
+static struct chipset_bus_clock_list_entry fifty_base_hpt374[] = {
 	{	XFER_UDMA_6,	},
 	{	XFER_UDMA_5,	},
 	{	XFER_UDMA_4,	},
@@ -367,7 +365,7 @@ struct chipset_bus_clock_list_entry fifty_base_hpt374[] = {
 };
 #endif
 #if 0
-struct chipset_bus_clock_list_entry sixty_six_base_hpt374[] = {
+static struct chipset_bus_clock_list_entry sixty_six_base_hpt374[] = {
 	{	XFER_UDMA_6,	0x12406231	},	/* checkme */
 	{	XFER_UDMA_5,	0x12446231	},
 				0x14846231

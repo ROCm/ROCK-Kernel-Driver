@@ -82,13 +82,12 @@ MODULE_SUPPORTED_DEVICE("{{ESS,ES1938},"
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for ESS Solo-1 soundcard.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for ESS Solo-1 soundcard.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable ESS Solo-1 soundcard.");
 
 #define SLIO_REG(chip, x) ((chip)->io_port + ESSIO_REG_##x)
@@ -1395,6 +1394,7 @@ static int es1938_suspend(snd_card_t *card, unsigned int state)
 
 	outb(0x00, SLIO_REG(chip, IRQCONTROL)); /* disable irqs */
 
+	pci_disable_device(chip->pci);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
@@ -1433,6 +1433,7 @@ static int snd_es1938_free(es1938_t *chip)
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
 	pci_release_regions(chip->pci);
+	pci_disable_device(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -1462,18 +1463,22 @@ static int __devinit snd_es1938_create(snd_card_t * card,
 	if (pci_set_dma_mask(pci, 0x00ffffff) < 0 ||
 	    pci_set_consistent_dma_mask(pci, 0x00ffffff) < 0) {
                 snd_printk("architecture does not support 24bit PCI busmaster DMA\n");
+		pci_disable_device(pci);
                 return -ENXIO;
         }
 
 	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
-	if (chip == NULL)
+	if (chip == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	spin_lock_init(&chip->reg_lock);
 	spin_lock_init(&chip->mixer_lock);
 	chip->card = card;
 	chip->pci = pci;
 	if ((err = pci_request_regions(pci, "ESS Solo-1")) < 0) {
 		kfree(chip);
+		pci_disable_device(pci);
 		return err;
 	}
 	chip->io_port = pci_resource_start(pci, 0);

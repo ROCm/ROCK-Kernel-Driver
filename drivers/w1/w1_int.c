@@ -21,6 +21,7 @@
 
 #include <linux/kernel.h>
 #include <linux/list.h>
+#include <linux/delay.h>
 
 #include "w1.h"
 #include "w1_log.h"
@@ -32,12 +33,13 @@ extern struct device_driver w1_driver;
 extern struct bus_type w1_bus_type;
 extern struct device w1_device;
 extern int w1_max_slave_count;
+extern int w1_max_slave_ttl;
 extern struct list_head w1_masters;
 extern spinlock_t w1_mlock;
 
 extern int w1_process(void *);
 
-struct w1_master * w1_alloc_dev(u32 id, int slave_count,
+struct w1_master * w1_alloc_dev(u32 id, int slave_count, int slave_ttl,
 	      struct device_driver *driver, struct device *device)
 {
 	struct w1_master *dev;
@@ -65,6 +67,7 @@ struct w1_master * w1_alloc_dev(u32 id, int slave_count,
 	dev->kpid 		= -1;
 	dev->initialized 	= 0;
 	dev->id 		= id;
+	dev->slave_ttl		= slave_ttl;
 
 	atomic_set(&dev->refcnt, 2);
 
@@ -86,17 +89,14 @@ struct w1_master * w1_alloc_dev(u32 id, int slave_count,
 	dev->seq = 1;
 	dev->nls = netlink_kernel_create(NETLINK_NFLOG, NULL);
 	if (!dev->nls) {
-		printk(KERN_ERR "Failed to create new netlink socket(%u).\n",
-			NETLINK_NFLOG);
-		memset(dev, 0, sizeof(struct w1_master));
-		kfree(dev);
-		dev = NULL;
+		printk(KERN_ERR "Failed to create new netlink socket(%u) for w1 master %s.\n",
+			NETLINK_NFLOG, dev->dev.bus_id);
 	}
 
 	err = device_register(&dev->dev);
 	if (err) {
 		printk(KERN_ERR "Failed to register master device. err=%d\n", err);
-		if (dev->nls->sk_socket)
+		if (dev->nls && dev->nls->sk_socket)
 			sock_release(dev->nls->sk_socket);
 		memset(dev, 0, sizeof(struct w1_master));
 		kfree(dev);
@@ -109,7 +109,7 @@ struct w1_master * w1_alloc_dev(u32 id, int slave_count,
 void w1_free_dev(struct w1_master *dev)
 {
 	device_unregister(&dev->dev);
-	if (dev->nls->sk_socket)
+	if (dev->nls && dev->nls->sk_socket)
 		sock_release(dev->nls->sk_socket);
 	memset(dev, 0, sizeof(struct w1_master) + sizeof(struct w1_bus_master));
 	kfree(dev);
@@ -121,7 +121,7 @@ int w1_add_master_device(struct w1_bus_master *master)
 	int retval = 0;
 	struct w1_netlink_msg msg;
 
-	dev = w1_alloc_dev(w1_ids++, w1_max_slave_count, &w1_driver, &w1_device);
+	dev = w1_alloc_dev(w1_ids++, w1_max_slave_count, w1_max_slave_ttl, &w1_driver, &w1_device);
 	if (!dev)
 		return -ENOMEM;
 
@@ -179,8 +179,13 @@ void __w1_remove_master_device(struct w1_master *dev)
 			 "%s: Failed to send signal to w1 kernel thread %d.\n",
 			 __func__, dev->kpid);
 
-	while (atomic_read(&dev->refcnt))
-		schedule_timeout(10);
+	while (atomic_read(&dev->refcnt)) {
+		printk(KERN_INFO "Waiting for %s to become free: refcnt=%d.\n",
+				dev->name, atomic_read(&dev->refcnt));
+
+		if (msleep_interruptible(1000))
+			flush_signals(current);
+	}
 
 	msg.id.mst.id = dev->id;
 	msg.id.mst.pid = dev->kpid;

@@ -146,11 +146,14 @@ struct omap_ep {
 	u8				bmAttributes;
 	unsigned			double_buf:1;
 	unsigned			stopped:1;
-	unsigned			ackwait:1;
+	unsigned			fnf:1;
 	unsigned			has_dma:1;
+	u8				ackwait;
 	u8				dma_channel;
+	u16				dma_counter;
 	int				lch;
 	struct omap_udc			*udc;
+	struct timer_list		timer;
 };
 
 struct omap_udc {
@@ -168,7 +171,6 @@ struct omap_udc {
 	unsigned			ep0_set_config:1;
 	unsigned			ep0_reset_config:1;
 	unsigned			ep0_setup:1;
-	unsigned			hmc:6;
 
 	struct completion		*done;
 };
@@ -193,7 +195,14 @@ struct omap_udc {
 
 /*-------------------------------------------------------------------------*/
 
-// #define	HMC_1510	((MOD_CONF_CTRL_0_REG >> 1) & 0x3f)
+#define	MOD_CONF_CTRL_0_REG	__REG32(MOD_CONF_CTRL_0)
+#define	VBUS_W2FC_1510		(1 << 17)	/* 0 gpio0, 1 dvdd2 pin */
+
+#define	FUNC_MUX_CTRL_0_REG	__REG32(FUNC_MUX_CTRL_0)
+#define	VBUS_CTRL_1510		(1 << 19)	/* 1 connected (software) */
+#define	VBUS_MODE_1510		(1 << 18)	/* 0 hardware, 1 software */
+
+#define	HMC_1510	((MOD_CONF_CTRL_0_REG >> 1) & 0x3f)
 #define	HMC_1610	(OTG_SYSCON_2_REG & 0x3f)
-#define	HMC		 HMC_1610
+#define	HMC		(cpu_is_omap15xx() ? HMC_1510 : HMC_1610)
 

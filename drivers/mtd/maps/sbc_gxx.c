@@ -17,7 +17,7 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
 
-   $Id: sbc_gxx.c,v 1.29 2004/07/12 22:38:29 dwmw2 Exp $
+   $Id: sbc_gxx.c,v 1.32 2004/11/16 18:29:02 dwmw2 Exp $
 
 The SBC-MediaGX / SBC-GXx has up to 16 MiB of 
 Intel StrataFlash (28F320/28F640) in x8 mode.  
@@ -84,7 +84,7 @@ separate MTD devices.
 // Globals
 
 static volatile int page_in_window = -1; // Current page in window.
-static void __iomem * iomapadr;
+static void __iomem *iomapadr;
 static spinlock_t sbc_gxx_spin = SPIN_LOCK_UNLOCKED;
 
 /* partition_info gives details on the logical partitions that the split the 
@@ -189,11 +189,11 @@ static void cleanup_sbc_gxx(void)
 		map_destroy( all_mtd );
 	}
 
-	iounmap((void *)iomapadr);
+	iounmap(iomapadr);
 	release_region(PAGE_IO,PAGE_IO_SIZE);
 }
 
-int __init init_sbc_gxx(void)
+static int __init init_sbc_gxx(void)
 {
   	iomapadr = ioremap(WINDOW_START, WINDOW_LENGTH);
 	if (!iomapadr) {
@@ -206,7 +206,7 @@ int __init init_sbc_gxx(void)
 		printk( KERN_ERR"%s: IO ports 0x%x-0x%x in use\n",
 			sbc_gxx_map.name,
 			PAGE_IO, PAGE_IO+PAGE_IO_SIZE-1 );
-		iounmap((void *)iomapadr);
+		iounmap(iomapadr);
 		return -EAGAIN;
 	}
 		

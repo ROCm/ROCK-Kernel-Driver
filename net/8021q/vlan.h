@@ -66,6 +66,8 @@ int vlan_dev_ioctl(struct net_device* dev, struct ifreq *ifr, int cmd);
 int vlan_dev_set_ingress_priority(char* dev_name, __u32 skb_prio, short vlan_prio);
 int vlan_dev_set_egress_priority(char* dev_name, __u32 skb_prio, short vlan_prio);
 int vlan_dev_set_vlan_flag(char* dev_name, __u32 flag, short flag_val);
+int vlan_dev_get_realdev_name(const char* dev_name, char* result);
+int vlan_dev_get_vid(const char* dev_name, unsigned short* result);
 void vlan_dev_set_multicast_list(struct net_device *vlan_dev);
 
 #endif /* !(__BEN_VLAN_802_1Q_INC__) */

@@ -48,7 +48,7 @@ static unsigned int rtas_error_log_buffer_max;
 
 static int full_rtas_msgs = 0;
 
-extern volatile int no_more_logging;
+extern int no_logging;
 
 volatile int error_log_cnt = 0;
 
@@ -106,7 +106,7 @@ static char *rtas_event_type(int type)
 static void printk_log_rtas(char *buf, int len)
 {
 
-	int i,j,n;
+	int i,j,n = 0;
 	int perline = 16;
 	char buffer[64];
 	char * str = "RTAS event";
@@ -213,19 +213,20 @@ void pSeries_log_error(char *buf, unsigned int err_type, int fatal)
 	}
 
 	/* Write error to NVRAM */
-	if (!no_more_logging && !(err_type & ERR_FLAG_BOOT))
+	if (!no_logging && !(err_type & ERR_FLAG_BOOT))
 		nvram_write_error_log(buf, len, err_type);
 
-	/* rtas errors can occur during boot, and we do want to capture
+	/*
+	 * rtas errors can occur during boot, and we do want to capture
 	 * those somewhere, even if nvram isn't ready (why not?), and even
-	 * if rtasd isn't ready. Put them into the boot log, at least.  */
-	if ((err_type & ERR_TYPE_MASK) == ERR_TYPE_RTAS_LOG) {
+	 * if rtasd isn't ready. Put them into the boot log, at least.
+	 */
+	if ((err_type & ERR_TYPE_MASK) == ERR_TYPE_RTAS_LOG)
 		printk_log_rtas(buf, len);
-	}
 
 	/* Check to see if we need to or have stopped logging */
-	if (fatal || no_more_logging) {
-		no_more_logging = 1;
+	if (fatal || no_logging) {
+		no_logging = 1;
 		spin_unlock_irqrestore(&rtasd_log_lock, s);
 		return;
 	}
@@ -233,9 +234,6 @@ void pSeries_log_error(char *buf, unsigned int err_type, int fatal)
 	/* call type specific method for error */
 	switch (err_type & ERR_TYPE_MASK) {
 	case ERR_TYPE_RTAS_LOG:
-		/* put into syslog and error_log file */
-		printk_log_rtas(buf, len);
-
 		offset = rtas_error_log_buffer_max *
 			((rtas_log_start+rtas_log_size) & LOG_NUMBER_MASK);
 
@@ -277,7 +275,7 @@ static int rtas_log_release(struct inode * inode, struct file * file)
  * know that we can safely clear the events in NVRAM.
  * Next we'll sit and wait for something else to log.
  */
-static ssize_t rtas_log_read(struct file * file, char * buf,
+static ssize_t rtas_log_read(struct file * file, char __user * buf,
 			 size_t count, loff_t *ppos)
 {
 	int error;
@@ -301,7 +299,7 @@ static ssize_t rtas_log_read(struct file * file, char * buf,
 
 	spin_lock_irqsave(&rtasd_log_lock, s);
 	/* if it's 0, then we know we got the last one (the one in NVRAM) */
-	if (rtas_log_size == 0 && !no_more_logging)
+	if (rtas_log_size == 0 && !no_logging)
 		nvram_clear_error_log();
 	spin_unlock_irqrestore(&rtasd_log_lock, s);
 
@@ -419,9 +417,6 @@ static int rtasd(void *unused)
 		goto error;
 	}
 
-	/* We can use rtas_log_buf now */
-	no_more_logging = 0;
-
 	printk(KERN_ERR "RTAS daemon started\n");
 
 	DEBUG("will sleep for %d jiffies\n", (HZ*60/rtas_event_scan_rate) / 2);
@@ -430,6 +425,10 @@ static int rtasd(void *unused)
 	memset(logdata, 0, rtas_error_log_max);
 
 	rc = nvram_read_error_log(logdata, rtas_error_log_max, &err_type);
+
+	/* We can use rtas_log_buf now */
+	no_logging = 0;
+
 	if (!rc) {
 		if (err_type != ERR_FLAG_ALREADY_LOGGED) {
 			pSeries_log_error(logdata, err_type | ERR_FLAG_BOOT, 0);

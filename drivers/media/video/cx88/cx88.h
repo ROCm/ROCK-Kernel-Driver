@@ -1,5 +1,5 @@
 /*
- * $Id: cx88.h,v 1.33 2004/09/17 11:49:52 kraxel Exp $
+ * $Id: cx88.h,v 1.40 2004/11/03 09:04:51 kraxel Exp $
  *
  * v4l2 device driver for cx2388x based TV cards
  *
@@ -26,15 +26,10 @@
 #include <linux/videodev.h>
 #include <linux/kdev_t.h>
 
-#include <dvbdev.h>
-#include <dmxdev.h>
-#include <dvb_demux.h>
-#include <dvb_net.h>
-#include <dvb_frontend.h>
-
-#include <media/video-buf.h>
 #include <media/tuner.h>
 #include <media/audiochip.h>
+#include <media/video-buf.h>
+#include <media/video-buf-dvb.h>
 
 #include "btcx-risc.h"
 #include "cx88-reg.h"
@@ -51,12 +46,6 @@
 #define UNSET (-1U)
 
 #define CX88_MAXBOARDS 8
-
-/* temporary here until new dvb-kernel code is merged ... */
-#ifndef FE_REGISTER
-# define FE_REGISTER           _IO  ('v', 84)
-# define FE_UNREGISTER         _IO  ('v', 85)
-#endif
 
 /* ----------------------------------------------------------- */
 /* defines and enums                                           */
@@ -165,6 +154,8 @@ extern struct sram_channel cx88_sram_channels[];
 #define CX88_BOARD_DVICO_FUSIONHDTV_3_GOLD 17
 #define CX88_BOARD_HAUPPAUGE_DVB_T1        18
 #define CX88_BOARD_CONEXANT_DVB_T1         19
+#define CX88_BOARD_PROVIDEO_PV259          20
+#define CX88_BOARD_DVICO_FUSIONHDTV_DVB_T_PLUS 21
 
 enum cx88_itype {
 	CX88_VMUX_COMPOSITE1 = 1,
@@ -244,8 +235,8 @@ struct cx88_core {
 	/* pci stuff */
 	int                        pci_bus;
 	int                        pci_slot;
-        u32                        *lmmio;
-        u8                         *bmmio;
+        u32                        __iomem *lmmio;
+        u8                         __iomem *bmmio;
 	u32                        shadow[SHADOW_MAX];
 
 	/* i2c i/o */
@@ -254,11 +245,16 @@ struct cx88_core {
 	struct i2c_client          i2c_client;
 	u32                        i2c_state, i2c_rc;
 
-	/* config info */
+	/* config info -- analog */
 	unsigned int               board;
 	unsigned int               tuner_type;
 	unsigned int               tda9887_conf;
 	unsigned int               has_radio;
+
+	/* config info -- dvb */
+	unsigned int               pll_type;
+	unsigned int               pll_addr;
+	unsigned int               demod_addr;
 
 	/* state info */
 	struct task_struct         *kthread;
@@ -266,9 +262,6 @@ struct cx88_core {
 	u32                        tvaudio;
 	u32                        input;
 	u32                        astat;
-
-	/* used by cx88-dvb -- i2c code needs access to this for FE register */
-	struct dvb_adapter         *dvb_adapter;
 };
 
 struct cx8800_dev;
@@ -298,7 +291,6 @@ struct cx8800_fh {
 };
 
 struct cx8800_suspend_state {
-	u32                        pci_cfg[64 / sizeof(u32)];
 	int                        disabled;
 };
 
@@ -354,6 +346,10 @@ struct cx8802_fh {
 	struct videobuf_queue      mpegq;
 };
 
+struct cx8802_suspend_state {
+	int                        disabled;
+};
+
 struct cx8802_dev {
 	struct cx88_core           *core;
         struct semaphore           lock;
@@ -368,10 +364,8 @@ struct cx8802_dev {
 	u32                        ts_packet_size;
 	u32                        ts_packet_count;
 
-	/* error stats */
-	u32                        stopper_count;
-	u32                        error_count;
-	u32                        timeout_count;
+	/* other global state info */
+	struct cx8802_suspend_state state;
 
 	/* for blackbird only */
 	struct list_head           devlist;
@@ -379,14 +373,9 @@ struct cx8802_dev {
 	u32                        mailbox;
 
 	/* for dvb only */
-	struct videobuf_queue      dvbq;
-	struct task_struct         *dvb_thread;
-	struct dvb_demux           demux;
-	struct dmxdev              dmxdev;
-	struct dmx_frontend        fe_hw;
-	struct dmx_frontend        fe_mem;
-	struct dvb_net             dvbnet;
-	int                        nfeeds;
+	struct videobuf_dvb        dvb;
+	void*                      fe_handle;
+	int                        (*fe_release)(void *handle);
 };
 
 /* ----------------------------------------------------------- */
@@ -470,6 +459,7 @@ void cx8800_vbi_fmt(struct cx8800_dev *dev, struct v4l2_format *f);
 int cx8800_start_vbi_dma(struct cx8800_dev    *dev,
 			 struct cx88_dmaqueue *q,
 			 struct cx88_buffer   *buf);
+int cx8800_stop_vbi_dma(struct cx8800_dev *dev);
 int cx8800_restart_vbi_queue(struct cx8800_dev    *dev,
 			     struct cx88_dmaqueue *q);
 void cx8800_vbi_timeout(unsigned long data);
@@ -526,6 +516,9 @@ void cx8802_cancel_buffers(struct cx8802_dev *dev);
 
 int cx8802_init_common(struct cx8802_dev *dev);
 void cx8802_fini_common(struct cx8802_dev *dev);
+
+int cx8802_suspend_common(struct pci_dev *pci_dev, u32 state);
+int cx8802_resume_common(struct pci_dev *pci_dev);
 
 /*
  * Local variables:

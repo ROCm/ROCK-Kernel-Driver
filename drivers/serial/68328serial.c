@@ -34,12 +34,13 @@
 #include <linux/keyboard.h>
 #include <linux/init.h>
 #include <linux/pm.h>
+#include <linux/bitops.h>
+#include <linux/delay.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/system.h>
 #include <asm/segment.h>
-#include <asm/bitops.h>
 #include <asm/delay.h>
 #include <asm/uaccess.h>
 
@@ -435,10 +436,7 @@ static void do_softint(void *private)
 		return;
 #if 0
 	if (clear_bit(RS_EVENT_WRITE_WAKEUP, &info->event)) {
-		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-		    tty->ldisc.write_wakeup)
-			(tty->ldisc.write_wakeup)(tty);
-		wake_up_interruptible(&tty->write_wait);
+		tty_wakeup(tty);
 	}
 #endif   
 }
@@ -760,7 +758,7 @@ static void rs_flush_chars(struct tty_struct *tty)
 
 extern void console_printn(const char * b, int count);
 
-static int rs_write(struct tty_struct * tty, int from_user,
+static int rs_write(struct tty_struct * tty,
 		    const unsigned char *buf, int count)
 {
 	int	c, total = 0;
@@ -782,15 +780,7 @@ static int rs_write(struct tty_struct * tty, int from_user,
 		if (c <= 0)
 			break;
 
-		if (from_user) {
-			down(&tmp_buf_sem);
-			copy_from_user(tmp_buf, buf, c);
-			c = min_t(int, c, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-				       SERIAL_XMIT_SIZE - info->xmit_head));
-			memcpy(info->xmit_buf + info->xmit_head, tmp_buf, c);
-			up(&tmp_buf_sem);
-		} else
-			memcpy(info->xmit_buf + info->xmit_head, buf, c);
+		memcpy(info->xmit_buf + info->xmit_head, buf, c);
 		info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
 		info->xmit_cnt += c;
 		restore_flags(flags);
@@ -858,10 +848,7 @@ static void rs_flush_buffer(struct tty_struct *tty)
 	cli();
 	info->xmit_cnt = info->xmit_head = info->xmit_tail = 0;
 	sti();
-	wake_up_interruptible(&tty->write_wait);
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
+	tty_wakeup(tty);
 }
 
 /*
@@ -1011,7 +998,7 @@ static void send_break(	struct m68k_serial * info, int duration)
         unsigned long flags;
         if (!info->port)
                 return;
-        current->state = TASK_INTERRUPTIBLE;
+        set_current_state(TASK_INTERRUPTIBLE);
         save_flags(flags);
         cli();
 #ifdef USE_INTS	
@@ -1185,11 +1172,13 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	shutdown(info);
 	if (tty->driver->flush_buffer)
 		tty->driver->flush_buffer(tty);
-	if (tty->ldisc.flush_buffer)
-		tty->ldisc.flush_buffer(tty);
+		
+	tty_ldisc_flush(tty);
 	tty->closing = 0;
 	info->event = 0;
 	info->tty = 0;
+#warning "This is not and has never been valid so fix it"	
+#if 0
 	if (tty->ldisc.num != ldiscs[N_TTY].num) {
 		if (tty->ldisc.close)
 			(tty->ldisc.close)(tty);
@@ -1198,10 +1187,10 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 		if (tty->ldisc.open)
 			(tty->ldisc.open)(tty);
 	}
+#endif	
 	if (info->blocked_open) {
 		if (info->close_delay) {
-			current->state = TASK_INTERRUPTIBLE;
-			schedule_timeout(info->close_delay);
+			msleep_interruptible(jiffies_to_msecs(info->close_delay));
 		}
 		wake_up_interruptible(&info->open_wait);
 	}

@@ -49,7 +49,7 @@ SECTIONS
 
   /* writeable */
   .data : {			/* Data */
-    . = . + MAPPED_OFFSET;	/* for CONFIG_MAPPED_KERNEL */
+    . = . + DATAOFFSET;		/* for CONFIG_MAPPED_KERNEL */
     *(.data.init_task)
 
     *(.data)
@@ -85,8 +85,6 @@ SECTIONS
   /* will be freed after init */
   . = ALIGN(4096);		/* Init code and data */
   __init_begin = .;
-  /* /DISCARD/ doesn't work for .reginfo */
-  .reginfo : { *(.reginfo) }
   .init.text : {
 	_sinittext = .;
 	*(.init.text)
@@ -150,6 +148,14 @@ SECTIONS
         *(.exit.text)
         *(.exit.data)
         *(.exitcall.exit)
+
+	/* ABI crap starts here */
+	*(.comment)
+	*(.MIPS.options)
+	*(.note)
+	*(.options)
+	*(.pdr)
+	*(.reginfo)
   }
 
   /* This is the MIPS specific mdebug section.  */

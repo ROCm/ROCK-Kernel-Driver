@@ -101,6 +101,8 @@
 #undef REALLY_SLOW_IO		/* most systems can safely undef this */
 #define CMD640_PREFETCH_MASKS 1
 
+//#define CMD640_DUMP_REGS
+
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -748,7 +750,7 @@ int __init ide_probe_for_cmd640x (void)
 	put_cmd640_reg(0x5b, 0);
 
 #ifdef CMD640_DUMP_REGS
-	CMD640_DUMP_REGS;
+	cmd640_dump_regs();
 #endif
 
 	/*
@@ -870,7 +872,7 @@ int __init ide_probe_for_cmd640x (void)
 	}
 
 #ifdef CMD640_DUMP_REGS
-	CMD640_DUMP_REGS;
+	cmd640_dump_regs();
 #endif
 	return 1;
 }

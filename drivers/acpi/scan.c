@@ -4,6 +4,7 @@
 
 #include <linux/init.h>
 #include <linux/acpi.h>
+#include <linux/module.h>
 
 #include <acpi/acpi_drivers.h>
 #include <acpi/acinterp.h>	/* for acpi_ex_eisa_id_to_string() */
@@ -158,10 +159,10 @@ acpi_bus_get_power_flags (
 
 	device->power.state = ACPI_STATE_UNKNOWN;
 
-	return 0;
+	return_VALUE(0);
 }
 
-static int
+int
 acpi_match_ids (
 	struct acpi_device	*device,
 	char			*ids)
@@ -204,6 +205,8 @@ acpi_bus_extract_wakeup_device_power_package (
 		return AE_BAD_PARAMETER;
 
 	element = &(package->package.elements[0]);
+	if (!element)
+		return AE_BAD_PARAMETER;
 	if (element->type == ACPI_TYPE_PACKAGE) {
 		if ((element->package.count < 2) ||
 			(element->package.elements[0].type != ACPI_TYPE_LOCAL_REFERENCE) ||
@@ -278,7 +281,7 @@ acpi_bus_get_wakeup_device_flags (
 end:
 	if (ACPI_FAILURE(status))
 		device->flags.wake_capable = 0;
-	return 0;
+	return_VALUE(0);
 }
 
 /* --------------------------------------------------------------------------
@@ -312,6 +315,8 @@ acpi_bus_match (
 	struct acpi_device	*device,
 	struct acpi_driver	*driver)
 {
+	if (driver && driver->ops.match)
+		return driver->ops.match(device, driver);
 	return acpi_match_ids(device, driver->ids);
 }
 
@@ -449,6 +454,7 @@ acpi_bus_register_driver (
 
 	return_VALUE(count);
 }
+EXPORT_SYMBOL(acpi_bus_register_driver);
 
 
 /**
@@ -477,6 +483,7 @@ acpi_bus_unregister_driver (
 		error = -EINVAL;
 	return_VALUE(error);
 }
+EXPORT_SYMBOL(acpi_bus_unregister_driver);
 
 /**
  * acpi_bus_find_driver 
@@ -492,9 +499,6 @@ acpi_bus_find_driver (
 	struct list_head	* node, *next;
 
 	ACPI_FUNCTION_TRACE("acpi_bus_find_driver");
-
-	if (!device->flags.hardware_id && !device->flags.compatible_ids)
-		goto Done;
 
 	spin_lock(&acpi_device_lock);
 	list_for_each_safe(node,next,&acpi_bus_drivers) {
@@ -760,7 +764,7 @@ void acpi_device_get_debug_info(struct acpi_device * device, acpi_handle handle,
 #endif /*CONFIG_ACPI_DEBUG_OUTPUT*/
 }
 
-static int 
+int 
 acpi_bus_add (
 	struct acpi_device	**child,
 	struct acpi_device	*parent,
@@ -904,7 +908,7 @@ end:
 
 	return_VALUE(result);
 }
-
+EXPORT_SYMBOL(acpi_bus_add);
 
 
 static int acpi_bus_scan (struct acpi_device	*start)
@@ -1008,6 +1012,7 @@ static int acpi_bus_scan (struct acpi_device	*start)
 
 	return_VALUE(0);
 }
+EXPORT_SYMBOL(acpi_bus_scan);
 
 
 static int

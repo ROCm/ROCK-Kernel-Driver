@@ -43,6 +43,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
+#include <linux/module.h>
 
 #include <acpi/acpi.h>
 #include <acpi/acnamesp.h>
@@ -211,6 +212,7 @@ acpi_get_sleep_type_data (
 	acpi_ut_remove_reference (info.return_object);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_get_sleep_type_data);
 
 
 /*******************************************************************************
@@ -249,8 +251,8 @@ acpi_hw_get_bit_register_info (
  *              return_value    - Value that was read from the register
  *              Flags           - Lock the hardware or not
  *
- * RETURN:      Value is read from specified Register.  Value returned is
- *              normalized to bit0 (is shifted all the way right)
+ * RETURN:      Status and the value read from specified Register.  Value
+ *              returned is normalized to bit0 (is shifted all the way right)
  *
  * DESCRIPTION: ACPI bit_register read function.
  *
@@ -284,6 +286,8 @@ acpi_get_register (
 		}
 	}
 
+	/* Read from the register */
+
 	status = acpi_hw_register_read (ACPI_MTX_DO_NOT_LOCK,
 			  bit_reg_info->parent_register, &register_value);
 
@@ -305,6 +309,7 @@ acpi_get_register (
 
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_get_register);
 
 
 /*******************************************************************************
@@ -313,10 +318,10 @@ acpi_get_register (
  *
  * PARAMETERS:  register_id     - ID of ACPI bit_register to access
  *              Value           - (only used on write) value to write to the
- *                                Register, NOT pre-normalized to the bit pos.
+ *                                Register, NOT pre-normalized to the bit pos
  *              Flags           - Lock the hardware or not
  *
- * RETURN:      None
+ * RETURN:      Status
  *
  * DESCRIPTION: ACPI Bit Register write function.
  *
@@ -455,16 +460,18 @@ unlock_and_exit:
 			value, register_value, bit_reg_info->parent_register));
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_set_register);
 
 
 /******************************************************************************
  *
  * FUNCTION:    acpi_hw_register_read
  *
- * PARAMETERS:  use_lock               - Mutex hw access.
- *              register_id            - register_iD + Offset.
+ * PARAMETERS:  use_lock            - Mutex hw access
+ *              register_id         - register_iD + Offset
+ *              return_value        - Value that was read from the register
  *
- * RETURN:      Value read or written.
+ * RETURN:      Status and the value read.
  *
  * DESCRIPTION: Acpi register read function.  Registers are read at the
  *              given offset.
@@ -572,10 +579,11 @@ unlock_and_exit:
  *
  * FUNCTION:    acpi_hw_register_write
  *
- * PARAMETERS:  use_lock               - Mutex hw access.
- *              register_id            - register_iD + Offset.
+ * PARAMETERS:  use_lock            - Mutex hw access
+ *              register_id         - register_iD + Offset
+ *              Value               - The value to write
  *
- * RETURN:      Value read or written.
+ * RETURN:      Status
  *
  * DESCRIPTION: Acpi register Write function.  Registers are written at the
  *              given offset.
@@ -691,11 +699,11 @@ unlock_and_exit:
  *
  * PARAMETERS:  Width               - 8, 16, or 32
  *              Value               - Where the value is returned
- *              Register            - GAS register structure
+ *              Reg                 - GAS register structure
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Read from either memory, IO, or PCI config space.
+ * DESCRIPTION: Read from either memory or IO space.
  *
  ******************************************************************************/
 
@@ -705,8 +713,7 @@ acpi_hw_low_level_read (
 	u32                             *value,
 	struct acpi_generic_address     *reg)
 {
-	struct acpi_pci_id              pci_id;
-	u16                             pci_register;
+	u64                             address;
 	acpi_status                     status;
 
 
@@ -718,41 +725,34 @@ acpi_hw_low_level_read (
 	 * a non-zero address within. However, don't return an error
 	 * because the PM1A/B code must not fail if B isn't present.
 	 */
-	if ((!reg) ||
-		(!reg->address)) {
+	if (!reg) {
+		return (AE_OK);
+	}
+
+	/* Get a local copy of the address.  Handles possible alignment issues */
+
+	ACPI_MOVE_64_TO_64 (&address, &reg->address);
+	if (!address) {
 		return (AE_OK);
 	}
 	*value = 0;
 
 	/*
-	 * Three address spaces supported:
-	 * Memory, IO, or PCI_Config.
+	 * Two address spaces supported: Memory or IO.
+	 * PCI_Config is not supported here because the GAS struct is insufficient
 	 */
 	switch (reg->address_space_id) {
 	case ACPI_ADR_SPACE_SYSTEM_MEMORY:
 
 		status = acpi_os_read_memory (
-				 (acpi_physical_address) reg->address,
+				 (acpi_physical_address) address,
 				 value, width);
 		break;
 
 
 	case ACPI_ADR_SPACE_SYSTEM_IO:
 
-		status = acpi_os_read_port ((acpi_io_address) reg->address,
-				 value, width);
-		break;
-
-
-	case ACPI_ADR_SPACE_PCI_CONFIG:
-
-		pci_id.segment = 0;
-		pci_id.bus     = 0;
-		pci_id.device  = ACPI_PCI_DEVICE (reg->address);
-		pci_id.function = ACPI_PCI_FUNCTION (reg->address);
-		pci_register   = (u16) ACPI_PCI_REGISTER (reg->address);
-
-		status = acpi_os_read_pci_configuration (&pci_id, pci_register,
+		status = acpi_os_read_port ((acpi_io_address) address,
 				 value, width);
 		break;
 
@@ -765,7 +765,7 @@ acpi_hw_low_level_read (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_IO, "Read:  %8.8X width %2d from %8.8X%8.8X (%s)\n",
 			*value, width,
-			ACPI_FORMAT_UINT64 (reg->address),
+			ACPI_FORMAT_UINT64 (address),
 			acpi_ut_get_region_name (reg->address_space_id)));
 
 	return (status);
@@ -778,11 +778,11 @@ acpi_hw_low_level_read (
  *
  * PARAMETERS:  Width               - 8, 16, or 32
  *              Value               - To be written
- *              Register            - GAS register structure
+ *              Reg                 - GAS register structure
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Write to either memory, IO, or PCI config space.
+ * DESCRIPTION: Write to either memory or IO space.
  *
  ******************************************************************************/
 
@@ -792,8 +792,7 @@ acpi_hw_low_level_write (
 	u32                             value,
 	struct acpi_generic_address     *reg)
 {
-	struct acpi_pci_id              pci_id;
-	u16                             pci_register;
+	u64                             address;
 	acpi_status                     status;
 
 
@@ -805,41 +804,34 @@ acpi_hw_low_level_write (
 	 * a non-zero address within. However, don't return an error
 	 * because the PM1A/B code must not fail if B isn't present.
 	 */
-	if ((!reg) ||
-		(!reg->address)) {
+	if (!reg) {
+		return (AE_OK);
+	}
+
+	/* Get a local copy of the address.  Handles possible alignment issues */
+
+	ACPI_MOVE_64_TO_64 (&address, &reg->address);
+	if (!address) {
 		return (AE_OK);
 	}
 
 	/*
-	 * Three address spaces supported:
-	 * Memory, IO, or PCI_Config.
+	 * Two address spaces supported: Memory or IO.
+	 * PCI_Config is not supported here because the GAS struct is insufficient
 	 */
 	switch (reg->address_space_id) {
 	case ACPI_ADR_SPACE_SYSTEM_MEMORY:
 
 		status = acpi_os_write_memory (
-				 (acpi_physical_address) reg->address,
+				 (acpi_physical_address) address,
 				 value, width);
 		break;
 
 
 	case ACPI_ADR_SPACE_SYSTEM_IO:
 
-		status = acpi_os_write_port ((acpi_io_address) reg->address,
+		status = acpi_os_write_port ((acpi_io_address) address,
 				 value, width);
-		break;
-
-
-	case ACPI_ADR_SPACE_PCI_CONFIG:
-
-		pci_id.segment = 0;
-		pci_id.bus     = 0;
-		pci_id.device  = ACPI_PCI_DEVICE (reg->address);
-		pci_id.function = ACPI_PCI_FUNCTION (reg->address);
-		pci_register   = (u16) ACPI_PCI_REGISTER (reg->address);
-
-		status = acpi_os_write_pci_configuration (&pci_id, pci_register,
-				 (acpi_integer) value, width);
 		break;
 
 
@@ -851,7 +843,7 @@ acpi_hw_low_level_write (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_IO, "Wrote: %8.8X width %2d   to %8.8X%8.8X (%s)\n",
 			value, width,
-			ACPI_FORMAT_UINT64 (reg->address),
+			ACPI_FORMAT_UINT64 (address),
 			acpi_ut_get_region_name (reg->address_space_id)));
 
 	return (status);

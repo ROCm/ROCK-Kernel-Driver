@@ -83,9 +83,9 @@ struct scsi_cmnd;
 
 /* command block wrapper */
 struct bulk_cb_wrap {
-	__u32	Signature;		/* contains 'USBC' */
+	__le32	Signature;		/* contains 'USBC' */
 	__u32	Tag;			/* unique per command id */
-	__u32	DataTransferLength;	/* size of data */
+	__le32	DataTransferLength;	/* size of data */
 	__u8	Flags;			/* direction in bit 0 */
 	__u8	Lun;			/* LUN normally 0 */
 	__u8	Length;			/* of of the CDB */
@@ -99,9 +99,9 @@ struct bulk_cb_wrap {
 
 /* command status wrapper */
 struct bulk_cs_wrap {
-	__u32	Signature;		/* should = 'USBS' */
+	__le32	Signature;		/* should = 'USBS' */
 	__u32	Tag;			/* same as original command */
-	__u32	Residue;		/* amount not transferred */
+	__le32	Residue;		/* amount not transferred */
 	__u8	Status;			/* see below */
 	__u8	Filler[18];
 };

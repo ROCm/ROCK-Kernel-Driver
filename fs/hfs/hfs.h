@@ -91,45 +91,45 @@ struct hfs_name {
 } __packed;
 
 struct hfs_point {
-	u16 v;
-	u16 h;
+	__be16 v;
+	__be16 h;
 } __packed;
 
 struct hfs_rect {
-	u16 top;
-	u16 left;
-	u16 bottom;
-	u16 right;
+	__be16 top;
+	__be16 left;
+	__be16 bottom;
+	__be16 right;
 } __packed;
 
 struct hfs_finfo {
-	u32 fdType;
-	u32 fdCreator;
-	u16 fdFlags;
+	__be32 fdType;
+	__be32 fdCreator;
+	__be16 fdFlags;
 	struct hfs_point fdLocation;
-	u16 fdFldr;
+	__be16 fdFldr;
 } __packed;
 
 struct hfs_fxinfo {
-	u16 fdIconID;
+	__be16 fdIconID;
 	u8 fdUnused[8];
-	u16 fdComment;
-	u32 fdPutAway;
+	__be16 fdComment;
+	__be32 fdPutAway;
 } __packed;
 
 struct hfs_dinfo {
 	struct hfs_rect frRect;
-	u16 frFlags;
+	__be16 frFlags;
 	struct hfs_point frLocation;
-	u16 frView;
+	__be16 frView;
 } __packed;
 
 struct hfs_dxinfo {
 	struct hfs_point frScroll;
-	u32 frOpenChain;
-	u16 frUnused;
-	u16 frComment;
-	u32 frPutAway;
+	__be32 frOpenChain;
+	__be16 frUnused;
+	__be16 frComment;
+	__be32 frPutAway;
 } __packed;
 
 union hfs_finder_info {
@@ -150,7 +150,7 @@ union hfs_finder_info {
 struct hfs_cat_key {
 	u8 key_len;		/* number of bytes in the key */
 	u8 reserved;		/* padding */
-	u32 ParID;		/* CNID of the parent dir */
+	__be32 ParID;		/* CNID of the parent dir */
 	struct hfs_name	CName;	/* The filename of the entry */
 } __packed;
 
@@ -158,8 +158,8 @@ struct hfs_cat_key {
 struct hfs_ext_key {
 	u8 key_len;		/* number of bytes in the key */
 	u8 FkType;		/* HFS_FK_{DATA,RSRC} */
-	u32 FNum;		/* The File ID of the file */
-	u16 FABN;		/* allocation blocks number*/
+	__be32 FNum;		/* The File ID of the file */
+	__be16 FABN;		/* allocation blocks number*/
 } __packed;
 
 typedef union hfs_btree_key {
@@ -171,8 +171,8 @@ typedef union hfs_btree_key {
 typedef union hfs_btree_key btree_key;
 
 struct hfs_extent {
-	u16 block;
-	u16 count;
+	__be16 block;
+	__be16 count;
 };
 typedef struct hfs_extent hfs_extent_rec[3];
 
@@ -183,18 +183,18 @@ struct hfs_cat_file {
 	u8 Flags;			/* Flags such as read-only */
 	s8 Typ;				/* file version number = 0 */
 	struct hfs_finfo UsrWds;	/* data used by the Finder */
-	u32 FlNum;			/* The CNID */
-	u16 StBlk;			/* obsolete */
-	u32 LgLen;			/* The logical EOF of the data fork*/
-	u32 PyLen;			/* The physical EOF of the data fork */
-	u16 RStBlk;			/* obsolete */
-	u32 RLgLen;			/* The logical EOF of the rsrc fork */
-	u32 RPyLen;			/* The physical EOF of the rsrc fork */
-	u32 CrDat;			/* The creation date */
-	u32 MdDat;			/* The modified date */
-	u32 BkDat;			/* The last backup date */
+	__be32 FlNum;			/* The CNID */
+	__be16 StBlk;			/* obsolete */
+	__be32 LgLen;			/* The logical EOF of the data fork*/
+	__be32 PyLen;			/* The physical EOF of the data fork */
+	__be16 RStBlk;			/* obsolete */
+	__be32 RLgLen;			/* The logical EOF of the rsrc fork */
+	__be32 RPyLen;			/* The physical EOF of the rsrc fork */
+	__be32 CrDat;			/* The creation date */
+	__be32 MdDat;			/* The modified date */
+	__be32 BkDat;			/* The last backup date */
 	struct hfs_fxinfo FndrInfo;	/* more data for the Finder */
-	u16 ClpSize;			/* number of bytes to allocate
+	__be16 ClpSize;			/* number of bytes to allocate
 					   when extending files */
 	hfs_extent_rec ExtRec;		/* first extent record
 					   for the data fork */
@@ -207,13 +207,13 @@ struct hfs_cat_file {
 struct hfs_cat_dir {
 	s8 type;			/* The type of entry */
 	u8 reserved;
-	u16 Flags;			/* flags */
-	u16 Val;			/* Valence: number of files and
+	__be16 Flags;			/* flags */
+	__be16 Val;			/* Valence: number of files and
 					   dirs in the directory */
-	u32 DirID;			/* The CNID */
-	u32 CrDat;			/* The creation date */
-	u32 MdDat;			/* The modification date */
-	u32 BkDat;			/* The last backup date */
+	__be32 DirID;			/* The CNID */
+	__be32 CrDat;			/* The creation date */
+	__be32 MdDat;			/* The modification date */
+	__be32 BkDat;			/* The last backup date */
 	struct hfs_dinfo UsrInfo;	/* data used by the Finder */
 	struct hfs_dxinfo FndrInfo;	/* more data used by Finder */
 	u8 Resrv[16];			/* reserved by Apple */
@@ -223,7 +223,7 @@ struct hfs_cat_dir {
 struct hfs_cat_thread {
 	s8 type;			/* The type of entry */
 	u8 reserved[9];			/* reserved by Apple */
-	u32 ParID;			/* CNID of parent directory */
+	__be32 ParID;			/* CNID of parent directory */
 	struct hfs_name CName;		/* The name of this entry */
 }  __packed;
 
@@ -236,43 +236,43 @@ typedef union hfs_cat_rec {
 } hfs_cat_rec;
 
 struct hfs_mdb {
-	u16 drSigWord;			/* Signature word indicating fs type */
-	u32 drCrDate;			/* fs creation date/time */
-	u32 drLsMod;			/* fs modification date/time */
-	u16 drAtrb;			/* fs attributes */
-	u16 drNmFls;			/* number of files in root directory */
-	u16 drVBMSt;			/* location (in 512-byte blocks)
+	__be16 drSigWord;		/* Signature word indicating fs type */
+	__be32 drCrDate;		/* fs creation date/time */
+	__be32 drLsMod;			/* fs modification date/time */
+	__be16 drAtrb;			/* fs attributes */
+	__be16 drNmFls;			/* number of files in root directory */
+	__be16 drVBMSt;			/* location (in 512-byte blocks)
 					   of the volume bitmap */
-	u16 drAllocPtr;			/* location (in allocation blocks)
+	__be16 drAllocPtr;		/* location (in allocation blocks)
 					   to begin next allocation search */
-	u16 drNmAlBlks;			/* number of allocation blocks */
-	u32 drAlBlkSiz;			/* bytes in an allocation block */
-	u32 drClpSiz;			/* clumpsize, the number of bytes to
+	__be16 drNmAlBlks;		/* number of allocation blocks */
+	__be32 drAlBlkSiz;		/* bytes in an allocation block */
+	__be32 drClpSiz;		/* clumpsize, the number of bytes to
 					   allocate when extending a file */
-	u16 drAlBlSt;			/* location (in 512-byte blocks)
+	__be16 drAlBlSt;		/* location (in 512-byte blocks)
 					   of the first allocation block */
-	u32 drNxtCNID;			/* CNID to assign to the next
+	__be32 drNxtCNID;		/* CNID to assign to the next
 					   file or directory created */
-	u16 drFreeBks;			/* number of free allocation blocks */
+	__be16 drFreeBks;		/* number of free allocation blocks */
 	u8 drVN[28];			/* the volume label */
-	u32 drVolBkUp;			/* fs backup date/time */
-	u16 drVSeqNum;			/* backup sequence number */
-	u32 drWrCnt;			/* fs write count */
-	u32 drXTClpSiz;			/* clumpsize for the extents B-tree */
-	u32 drCTClpSiz;			/* clumpsize for the catalog B-tree */
-	u16 drNmRtDirs;			/* number of directories in
+	__be32 drVolBkUp;		/* fs backup date/time */
+	__be16 drVSeqNum;		/* backup sequence number */
+	__be32 drWrCnt;			/* fs write count */
+	__be32 drXTClpSiz;		/* clumpsize for the extents B-tree */
+	__be32 drCTClpSiz;		/* clumpsize for the catalog B-tree */
+	__be16 drNmRtDirs;		/* number of directories in
 					   the root directory */
-	u32 drFilCnt;			/* number of files in the fs */
-	u32 drDirCnt;			/* number of directories in the fs */
+	__be32 drFilCnt;		/* number of files in the fs */
+	__be32 drDirCnt;		/* number of directories in the fs */
 	u8 drFndrInfo[32];		/* data used by the Finder */
-	u16 drEmbedSigWord;		/* embedded volume signature */
-	u32 drEmbedExtent;		/* starting block number (xdrStABN)
+	__be16 drEmbedSigWord;		/* embedded volume signature */
+	__be32 drEmbedExtent;		/* starting block number (xdrStABN)
 					   and number of allocation blocks
 					   (xdrNumABlks) occupied by embedded
 					   volume */
-	u32 drXTFlSize;			/* bytes in the extents B-tree */
+	__be32 drXTFlSize;		/* bytes in the extents B-tree */
 	hfs_extent_rec drXTExtRec;	/* extents B-tree's first 3 extents */
-	u32 drCTFlSize;			/* bytes in the catalog B-tree */
+	__be32 drCTFlSize;		/* bytes in the catalog B-tree */
 	hfs_extent_rec drCTExtRec;	/* catalog B-tree's first 3 extents */
 } __packed;
 

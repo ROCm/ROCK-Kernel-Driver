@@ -364,24 +364,6 @@
 
 #define ACPI_IS_OCTAL_DIGIT(d)               (((char)(d) >= '0') && ((char)(d) <= '7'))
 
-/* Macros for GAS addressing */
-
-#if ACPI_MACHINE_WIDTH != 16
-
-#define ACPI_PCI_DEVICE(a)              (u16) ((ACPI_HIDWORD ((a))) & 0x0000FFFF)
-#define ACPI_PCI_FUNCTION(a)            (u16) ((ACPI_LODWORD ((a))) >> 16)
-#define ACPI_PCI_REGISTER(a)            (u16) ((ACPI_LODWORD ((a))) & 0x0000FFFF)
-
-#else
-
-/* No support for GAS and PCI IDs in 16-bit mode  */
-
-#define ACPI_PCI_FUNCTION(a)            (u16) ((a) & 0xFFFF0000)
-#define ACPI_PCI_DEVICE(a)              (u16) ((a) & 0x0000FFFF)
-#define ACPI_PCI_REGISTER(a)            (u16) ((a) & 0x0000FFFF)
-
-#endif
-
 
 /* Bitfields within ACPI registers */
 
@@ -551,12 +533,16 @@
 
 /* Stack and buffer dumping */
 
-#define ACPI_DUMP_STACK_ENTRY(a)        acpi_ex_dump_operand(a)
+#define ACPI_DUMP_STACK_ENTRY(a)        acpi_ex_dump_operand((a),0)
 #define ACPI_DUMP_OPERANDS(a,b,c,d,e)   acpi_ex_dump_operands(a,b,c,d,e,_THIS_MODULE,__LINE__)
 
 
 #define ACPI_DUMP_ENTRY(a,b)            acpi_ns_dump_entry (a,b)
+
+#ifdef ACPI_FUTURE_USAGE
 #define ACPI_DUMP_TABLES(a,b)           acpi_ns_dump_tables(a,b)
+#endif
+
 #define ACPI_DUMP_PATHNAME(a,b,c,d)     acpi_ns_dump_pathname(a,b,c,d)
 #define ACPI_DUMP_RESOURCE_LIST(a)      acpi_rs_dump_resource_list(a)
 #define ACPI_DUMP_BUFFER(a,b)           acpi_ut_dump_buffer((u8 *)a,b,DB_BYTE_DISPLAY,_COMPONENT)
@@ -609,7 +595,11 @@
 #define ACPI_DUMP_STACK_ENTRY(a)
 #define ACPI_DUMP_OPERANDS(a,b,c,d,e)
 #define ACPI_DUMP_ENTRY(a,b)
+
+#ifdef ACPI_FUTURE_USAGE
 #define ACPI_DUMP_TABLES(a,b)
+#endif
+
 #define ACPI_DUMP_PATHNAME(a,b,c,d)
 #define ACPI_DUMP_RESOURCE_LIST(a)
 #define ACPI_DUMP_BUFFER(a,b)

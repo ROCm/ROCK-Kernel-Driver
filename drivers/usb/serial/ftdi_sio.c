@@ -368,6 +368,10 @@ static struct usb_device_id id_table_8U232AM [] = {
 	{ USB_DEVICE_VER(INTREPID_VID, INTREPID_NEOVI_PID, 0, 0x3ff) },
 	{ USB_DEVICE_VER(FALCOM_VID, FALCOM_TWIST_PID, 0, 0x3ff) },
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_SUUNTO_SPORTS_PID, 0, 0x3ff) },
+	{ USB_DEVICE_VER(FTDI_RM_VID, FTDI_RMCANVIEW_PID, 0, 0x3ff) },
+	{ USB_DEVICE_VER(BANDB_VID, BANDB_USOTL4_PID, 0, 0x3ff) },
+	{ USB_DEVICE_VER(BANDB_VID, BANDB_USTL4_PID, 0, 0x3ff) },
+	{ USB_DEVICE_VER(BANDB_VID, BANDB_USO9ML2_PID, 0, 0x3ff) },
 	{ }						/* Terminating entry */
 };
 
@@ -478,6 +482,10 @@ static struct usb_device_id id_table_FT232BM [] = {
 	{ USB_DEVICE_VER(INTREPID_VID, INTREPID_NEOVI_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(FALCOM_VID, FALCOM_TWIST_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_SUUNTO_SPORTS_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(FTDI_RM_VID, FTDI_RMCANVIEW_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(BANDB_VID, BANDB_USOTL4_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(BANDB_VID, BANDB_USTL4_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(BANDB_VID, BANDB_USO9ML2_PID, 0x400, 0xffff) },
 	{ }						/* Terminating entry */
 };
 
@@ -528,6 +536,7 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_MTXORB_5_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_MTXORB_6_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_PERLE_ULTRAPORT_PID, 0x400, 0xffff) },
+	{ USB_DEVICE(FTDI_VID, FTDI_PIEGROUP_PID) },
 	{ USB_DEVICE(SEALEVEL_VID, SEALEVEL_2101_PID) },
 	{ USB_DEVICE(SEALEVEL_VID, SEALEVEL_2102_PID) },
 	{ USB_DEVICE(SEALEVEL_VID, SEALEVEL_2103_PID) },
@@ -595,6 +604,10 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(INTREPID_VID, INTREPID_NEOVI_PID) },
 	{ USB_DEVICE(FALCOM_VID, FALCOM_TWIST_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_SUUNTO_SPORTS_PID) },
+	{ USB_DEVICE(FTDI_RM_VID, FTDI_RMCANVIEW_PID) },
+	{ USB_DEVICE(BANDB_VID, BANDB_USOTL4_PID) },
+	{ USB_DEVICE(BANDB_VID, BANDB_USTL4_PID) },
+	{ USB_DEVICE(BANDB_VID, BANDB_USO9ML2_PID) },
 	{ }						/* Terminating entry */
 };
 
@@ -657,7 +670,7 @@ static int  ftdi_HE_TIRA1_startup	(struct usb_serial *serial);
 static void ftdi_shutdown		(struct usb_serial *serial);
 static int  ftdi_open			(struct usb_serial_port *port, struct file *filp);
 static void ftdi_close			(struct usb_serial_port *port, struct file *filp);
-static int  ftdi_write			(struct usb_serial_port *port, int from_user, const unsigned char *buf, int count);
+static int  ftdi_write			(struct usb_serial_port *port, const unsigned char *buf, int count);
 static int  ftdi_write_room		(struct usb_serial_port *port);
 static int  ftdi_chars_in_buffer	(struct usb_serial_port *port);
 static void ftdi_write_bulk_callback	(struct urb *urb, struct pt_regs *regs);
@@ -1479,16 +1492,8 @@ static void ftdi_close (struct usb_serial_port *port, struct file *filp)
 	} /* Note change no line if hupcl is off */
 	
 	/* shutdown our bulk read */
-	if (port->read_urb) {
-		if (usb_unlink_urb (port->read_urb) < 0) {
-			/* Generally, this isn't an error.  If the previous
-			   read bulk callback occurred (or is about to occur)
-			   while the port was being closed or was throtted
-			   (and is still throttled), the read urb will not
-			   have been submitted. */
-			dbg("%s - failed to unlink read urb (generally not an error)", __FUNCTION__);
-		}
-	}
+	if (port->read_urb)
+		usb_kill_urb(port->read_urb);
 } /* ftdi_close */
 
 
@@ -1500,7 +1505,7 @@ static void ftdi_close (struct usb_serial_port *port, struct file *filp)
  *
  * The new devices do not require this byte
  */
-static int ftdi_write (struct usb_serial_port *port, int from_user,
+static int ftdi_write (struct usb_serial_port *port,
 			   const unsigned char *buf, int count)
 { /* ftdi_write */
 	struct ftdi_private *priv = usb_get_serial_port_data(port);
@@ -1557,17 +1562,8 @@ static int ftdi_write (struct usb_serial_port *port, int from_user,
 			/* Write the control byte at the front of the packet*/
 			*first_byte = 1 | ((user_pktsz) << 2); 
 			/* Copy data for packet */
-			if (from_user) {
-				if (copy_from_user (first_byte + data_offset,
-						    current_position, user_pktsz)){
-					kfree (buffer);
-					usb_free_urb (urb);
-					return -EFAULT;
-				}
-			} else {
-				memcpy (first_byte + data_offset,
-					current_position, user_pktsz);
-			}
+			memcpy (first_byte + data_offset,
+				current_position, user_pktsz);
 			first_byte += user_pktsz + data_offset;
 			current_position += user_pktsz;
 			todo -= user_pktsz;
@@ -1575,15 +1571,7 @@ static int ftdi_write (struct usb_serial_port *port, int from_user,
 	} else {
 		/* No control byte required. */
 		/* Copy in the data to send */
-		if (from_user) {
-			if (copy_from_user (buffer, buf, count)) {
-				kfree (buffer);
-				usb_free_urb (urb);
-				return -EFAULT;
-			}
-		} else {
-			memcpy (buffer, buf, count);
-		}
+		memcpy (buffer, buf, count);
 	}
 
 	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, transfer_size, buffer);

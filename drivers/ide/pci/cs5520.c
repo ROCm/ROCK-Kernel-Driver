@@ -51,57 +51,6 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#define DISPLAY_CS5520_TIMINGS
-
-#if defined(DISPLAY_CS5520_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 cs5520_proc = 0;
-static struct pci_dev *bmide_dev;
-
-static int cs5520_get_info(char *buffer, char **addr, off_t offset, int count)
-{
-	char *p = buffer;
-	unsigned long bmiba = pci_resource_start(bmide_dev, 2);
-	int len;
-	u8 c0 = 0, c1 = 0;
-	u16 reg16;
-	u32 reg32;
-
-	/*
-	 * at that point bibma+0x2 et bibma+0xa are byte registers
-	 * to investigate:
-	 */
-	c0 = inb(bmiba + 0x02);
-	c1 = inb(bmiba + 0x0a);
-	
-	p += sprintf(p, "\nCyrix CS55x0 IDE\n");
-	p += sprintf(p, "--------------- Primary Channel "
-			"---------------- Secondary Channel "
-			"-------------\n");
-	p += sprintf(p, "                %sabled "
-			"                        %sabled\n",
-			(c0&0x80) ? "dis" : " en",
-			(c1&0x80) ? "dis" : " en");
-			
-	p += sprintf(p, "\n\nTimings: \n");
-	
-	pci_read_config_word(bmide_dev, 0x62, &reg16);
-	p += sprintf(p, "8bit CAT/CRT   : %04x\n", reg16);
-	pci_read_config_dword(bmide_dev, 0x64, &reg32);
-	p += sprintf(p, "16bit Primary  : %08x\n", reg32);
-	pci_read_config_dword(bmide_dev, 0x68, &reg32);
-	p += sprintf(p, "16bit Secondary: %08x\n", reg32);
-	
-	len = (p - buffer) - offset;
-	*addr = buffer + offset;
-	
-	return len > count ? count : len;
-}
-
-#endif
-
 struct pio_clocks
 {
 	int address;
@@ -109,7 +58,7 @@ struct pio_clocks
 	int recovery;
 };
 
-struct pio_clocks cs5520_pio_clocks[]={
+static struct pio_clocks cs5520_pio_clocks[]={
 	{3, 6, 11},
 	{2, 5, 6},
 	{1, 4, 3},
@@ -144,12 +93,14 @@ static int cs5520_tune_chipset(ide_drive_t *drive, u8 xferspeed)
 	printk("PIO clocking = %d\n", pio);
 	
 	/* FIXME: if DMA = 1 do we need to set the DMA bit here ? */
-	
-	/* 8bit command timing for channel */
+
+	/* 8bit CAT/CRT - 8bit command timing for channel */
 	pci_write_config_byte(pdev, 0x62 + controller, 
 		(cs5520_pio_clocks[pio].recovery << 4) |
 		(cs5520_pio_clocks[pio].assert));
-		
+
+	/* 0x64 - 16bit Primary, 0x68 - 16bit Secondary */
+
 	/* FIXME: should these use address ? */
 	/* Data read timing */
 	pci_write_config_byte(pdev, 0x64 + 4*controller + (drive->dn&1),
@@ -187,19 +138,6 @@ static int cs5520_config_drive_xfer_rate(ide_drive_t *drive)
 	cs5520_tune_drive(drive, 4);
 	/* Then tell the core to use DMA operations */
 	return hwif->ide_dma_on(drive);
-}
-	
-	
-static unsigned int __devinit init_chipset_cs5520(struct pci_dev *dev, const char *name)
-{
-#if defined(DISPLAY_CS5520_TIMINGS) && defined(CONFIG_PROC_FS)
-	if (!cs5520_proc) {
-		cs5520_proc = 1;
-		bmide_dev = dev;
-		ide_pci_create_host_proc("cs5520", cs5520_get_info);
-	}
-#endif /* DISPLAY_CS5520_TIMINGS && CONFIG_PROC_FS */
-	return 0;
 }
 
 /*
@@ -255,7 +193,6 @@ static void __devinit init_hwif_cs5520(ide_hwif_t *hwif)
 #define DECLARE_CS_DEV(name_str)				\
 	{							\
 		.name		= name_str,			\
-		.init_chipset	= init_chipset_cs5520,		\
 		.init_setup_dma = cs5520_init_setup_dma,	\
 		.init_hwif	= init_hwif_cs5520,		\
 		.channels	= 2,				\
@@ -294,7 +231,6 @@ static int __devinit cs5520_init_one(struct pci_dev *dev, const struct pci_devic
 		printk(KERN_WARNING "cs5520: No suitable DMA available.\n");
 		return -ENODEV;
 	}
-	init_chipset_cs5520(dev, d->name);
 
 	index.all = 0xf0f0;
 
@@ -303,10 +239,8 @@ static int __devinit cs5520_init_one(struct pci_dev *dev, const struct pci_devic
 	 *	do all the device setup for us
 	 */
 
-	ide_pci_setup_ports(dev, d, 1, 14, &index);
+	ide_pci_setup_ports(dev, d, 14, &index);
 
-	printk("Index.b %d %d\n", index.b.low, index.b.high);
-	mdelay(2000);
 	if((index.b.low & 0xf0) != 0xf0)
 		probe_hwif_init(&ide_hwifs[index.b.low]);
 	if((index.b.high & 0xf0) != 0xf0)

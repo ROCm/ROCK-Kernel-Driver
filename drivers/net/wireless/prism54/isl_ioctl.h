@@ -48,6 +48,8 @@ size_t prism54_wpa_ie_get(islpci_private *priv, u8 *bssid, u8 *wpa_ie);
 int prism54_set_mac_address(struct net_device *, void *);
 
 int prism54_ioctl(struct net_device *, struct ifreq *, int);
+int prism54_set_wpa(struct net_device *, struct iw_request_info *, 
+			__u32 *, char *);
 
 extern const struct iw_handler_def prism54_handler_def;
 

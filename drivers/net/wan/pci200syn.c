@@ -90,9 +90,9 @@ typedef struct port_s {
 
 
 typedef struct card_s {
-	u8* rambase;		/* buffer memory base (virtual) */
-	u8* scabase;		/* SCA memory base (virtual) */
-	plx9052* plxbase;	/* PLX registers memory base (virtual) */
+	u8 __iomem *rambase;	/* buffer memory base (virtual) */
+	u8 __iomem *scabase;	/* SCA memory base (virtual) */
+	plx9052 __iomem *plxbase;/* PLX registers memory base (virtual) */
 	u16 rx_ring_buffers;	/* number of buffers in a ring */
 	u16 tx_ring_buffers;
 	u16 buff_offset;	/* offset of first buffer of first channel */
@@ -116,7 +116,7 @@ typedef struct card_s {
 #define get_port(card, port)	     (&card->ports[port])
 #define sca_flush(card)		     (sca_in(IER0, card));
 
-static inline void new_memcpy_toio(char *dest, char *src, int length)
+static inline void new_memcpy_toio(char __iomem *dest, char *src, int length)
 {
 	int len;
 	do {
@@ -295,7 +295,7 @@ static int __devinit pci200_pci_init_one(struct pci_dev *pdev,
 {
 	card_t *card;
 	u8 rev_id;
-	u32 *p;
+	u32 __iomem *p;
 	int i;
 	u32 ramsize;
 	u32 ramphys;		/* buffer memory base */

@@ -40,9 +40,9 @@
 typedef int (*initcall_t)(void);
 typedef void (*exitcall_t)(void);
 
-#define __init          __attribute__ ((used,__section__ (".text.init")))
+#define __init          __attribute__ ((__section__ (".text.init")))
 #define __exit          __attribute__ ((unused, __section__(".text.exit")))
-#define __initdata      __attribute__ ((used,__section__ (".data.init")))
+#define __initdata      __attribute__ ((__section__ (".data.init")))
 
 #endif
 
@@ -94,11 +94,11 @@ extern struct uml_param __uml_setup_start, __uml_setup_end;
  * Mark functions and data as being only used at initialization
  * or exit time.
  */
-#define __uml_init_setup	__attribute__ ((used,__section__ (".uml.setup.init")))
-#define __uml_setup_help	__attribute__ ((used,__section__ (".uml.help.init")))
-#define __uml_init_call		__attribute__ ((used,__section__ (".uml.initcall.init")))
-#define __uml_postsetup_call	__attribute__ ((used,__section__ (".uml.postsetup.init")))
-#define __uml_exit_call		__attribute__ ((used,__section__ (".uml.exitcall.exit")))
+#define __uml_init_setup	__attribute__ ((unused,__section__ (".uml.setup.init")))
+#define __uml_setup_help	__attribute__ ((unused,__section__ (".uml.help.init")))
+#define __uml_init_call		__attribute__ ((unused,__section__ (".uml.initcall.init")))
+#define __uml_postsetup_call	__attribute__ ((unused,__section__ (".uml.postsetup.init")))
+#define __uml_exit_call		__attribute__ ((unused,__section__ (".uml.exitcall.exit")))
 
 #endif /* _LINUX_UML_INIT_H */
 

@@ -17,12 +17,21 @@
  */
 #define NR_IRQS		512
 
-extern void disable_irq(unsigned int);
-extern void disable_irq_nosync(unsigned int);
-extern void enable_irq(unsigned int);
-
 /* this number is used when no interrupt has been assigned */
 #define NO_IRQ			(-1)
+
+/*
+ * These constants are used for passing information about interrupt
+ * signal polarity and level/edge sensing to the low-level PIC chip
+ * drivers.
+ */
+#define IRQ_SENSE_MASK		0x1
+#define IRQ_SENSE_LEVEL		0x1	/* interrupt on active level */
+#define IRQ_SENSE_EDGE		0x0	/* interrupt triggered by edge */
+
+#define IRQ_POLARITY_MASK	0x2
+#define IRQ_POLARITY_POSITIVE	0x2	/* high level or low->high edge */
+#define IRQ_POLARITY_NEGATIVE	0x0	/* low level or high->low edge */
 
 #define get_irq_desc(irq) (&irq_desc[(irq)])
 
@@ -80,7 +89,6 @@ static __inline__ int irq_canonicalize(int irq)
 
 struct irqaction;
 struct pt_regs;
-int handle_irq_event(int, struct pt_regs *, struct irqaction *);
 
 #ifdef CONFIG_IRQSTACKS
 /*
@@ -91,7 +99,7 @@ extern struct thread_info *softirq_ctx[NR_CPUS];
 
 extern void irq_ctx_init(void);
 extern void call_do_softirq(struct thread_info *tp);
-extern int call_handle_irq_event(int irq, struct pt_regs *regs,
+extern int call_handle_IRQ_event(int irq, struct pt_regs *regs,
 			struct irqaction *action, struct thread_info *tp);
 
 #define __ARCH_HAS_DO_SOFTIRQ

@@ -1,11 +1,11 @@
 /*
- *  linux/drivers/s390/misc/z90hardware.c
+ *  linux/drivers/s390/crypto/z90hardware.c
  *
- *  z90crypt 1.3.1
+ *  z90crypt 1.3.2
  *
  *  Copyright (C)  2001, 2004 IBM Corporation
  *  Author(s): Robert Burroughs (burrough@us.ibm.com)
- *	       Eric Rossman (edrossma@us.ibm.com)
+ *             Eric Rossman (edrossma@us.ibm.com)
  *
  *  Hotplug & misc device support: Jochen Roehrig (roehrig@de.ibm.com)
  *
@@ -16,7 +16,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
@@ -32,9 +32,9 @@
 #include "z90crypt.h"
 #include "z90common.h"
 
-#define VERSION_Z90HARDWARE_C "$Revision: 1.19 $"
+#define VERSION_Z90HARDWARE_C "$Revision: 1.33 $"
 
-char z90chardware_version[] __initdata =
+char z90hardware_version[] __initdata =
 	"z90hardware.o (" VERSION_Z90HARDWARE_C "/"
 	                  VERSION_Z90COMMON_H "/" VERSION_Z90CRYPT_H ")";
 
@@ -224,7 +224,7 @@ struct type6_hdr {
 	unsigned char right[4];
 	unsigned char reserved3[2];
 	unsigned char reserved4[2];
-	unsigned char pfs[4];
+	unsigned char apfs[4];
 	unsigned int  offset1;
 	unsigned int  offset2;
 	unsigned int  offset3;
@@ -278,39 +278,6 @@ struct CPRB {
 	unsigned char svr_name[8];
 };
 
-struct CPRBX {
-	unsigned short cprb_len;
-	unsigned char  cprb_ver_id;
-	unsigned char  pad_000[3];
-	unsigned char  func_id[2];
-	unsigned char  cprb_flags[4];
-	unsigned int   req_parml;
-	unsigned int   req_datal;
-	unsigned int   rpl_msgbl;
-	unsigned int   rpld_parml;
-	unsigned int   rpl_datal;
-	unsigned int   rpld_datal;
-	unsigned int   req_extbl;
-	unsigned char  pad_001[4];
-	unsigned int   rpld_extbl;
-	unsigned char  req_parmb[16];
-	unsigned char  req_datab[16];
-	unsigned char  rpl_parmb[16];
-	unsigned char  rpl_datab[16];
-	unsigned char  req_extb[16];
-	unsigned char  rpl_extb[16];
-	unsigned short ccp_rtcode;
-	unsigned short ccp_rscode;
-	unsigned int   mac_data_len;
-	unsigned char  logon_id[8];
-	unsigned char  mac_value[8];
-	unsigned char  mac_content_flgs;
-	unsigned char  pad_002;
-	unsigned short domain;
-	unsigned char  pad_003[12];
-	unsigned char  pad_004[36];
-};
-
 struct type6_msg {
 	struct type6_hdr header;
 	struct CPRB	 CPRB;
@@ -347,12 +314,13 @@ struct type82_hdr {
 #define REPLY_ERROR_FORMAT_FIELD     0x29
 #define REPLY_ERROR_INVALID_COMMAND  0x30
 #define REPLY_ERROR_MALFORMED_MSG    0x40
-#define REPLY_ERROR_RESERVED_FIELD   0x50
+#define REPLY_ERROR_RESERVED_FIELDO  0x50
 #define REPLY_ERROR_WORD_ALIGNMENT   0x60
 #define REPLY_ERROR_MESSAGE_LENGTH   0x80
 #define REPLY_ERROR_OPERAND_INVALID  0x82
 #define REPLY_ERROR_OPERAND_SIZE     0x84
 #define REPLY_ERROR_EVEN_MOD_IN_OPND 0x85
+#define REPLY_ERROR_RESERVED_FIELD   0x88
 #define REPLY_ERROR_TRANSPORT_FAIL   0x90
 #define REPLY_ERROR_PACKET_TRUNCATED 0xA0
 #define REPLY_ERROR_ZERO_BUFFER_LEN  0xB0
@@ -379,7 +347,7 @@ struct type86_fmt2_msg {
 	unsigned int	  offset2;
 	unsigned int	  count3;
 	unsigned int	  offset3;
-	unsigned int	  ount4;
+	unsigned int	  count4;
 	unsigned int	  offset4;
 };
 
@@ -546,16 +514,28 @@ static struct CPRBX static_cprbx = {
 	 0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00}
 };
 
-static struct function_and_rules_block static_pkd_function_and_rulesX = {
+static struct function_and_rules_block static_pkd_function_and_rulesX_MCL2 = {
 	{0x50,0x44},
 	{0x00,0x0A},
 	{'P','K','C','S','-','1','.','2'}
 };
 
-static struct function_and_rules_block static_pke_function_and_rulesX = {
+static struct function_and_rules_block static_pke_function_and_rulesX_MCL2 = {
 	{0x50,0x4B},
 	{0x00,0x0A},
 	{'Z','E','R','O','-','P','A','D'}
+};
+
+static struct function_and_rules_block static_pkd_function_and_rulesX = {
+	{0x50,0x44},
+	{0x00,0x0A},
+	{'Z','E','R','O','-','P','A','D'}
+};
+
+static struct function_and_rules_block static_pke_function_and_rulesX = {
+	{0x50,0x4B},
+	{0x00,0x0A},
+	{'M','R','P',' ',' ',' ',' ',' '}
 };
 
 struct T6_keyBlock_hdrX {
@@ -701,11 +681,9 @@ static struct cca_public_sec static_cca_pub_sec = {
 
 #define FIXED_TYPE6_CR_LENX 0x000001E3
 
-#ifndef MAX_RESPONSE_SIZE
 #define MAX_RESPONSE_SIZE 0x00000710
 
 #define MAX_RESPONSEX_SIZE 0x0000077C
-#endif
 
 #define RESPONSE_CPRB_SIZE  0x000006B8
 #define RESPONSE_CPRBX_SIZE 0x00000724
@@ -1063,7 +1041,6 @@ query_online(int deviceNr, int cdx, int resetNr, int *q_depth, int *dev_type)
 			*q_depth = t_depth + 1;
 			switch (t_dev_type) {
 			case OTHER_HW:
-			case OTHER2_HW:
 				stat = HD_NOT_THERE;
 				*dev_type = NILDEV;
 				break;
@@ -1074,7 +1051,10 @@ query_online(int deviceNr, int cdx, int resetNr, int *q_depth, int *dev_type)
 				*dev_type = PCICC;
 				break;
 			case PCIXCC_HW:
-				*dev_type = PCIXCC;
+				*dev_type = PCIXCC_UNK;
+				break;
+			case CEX2C_HW:
+				*dev_type = CEX2C;
 				break;
 			default:
 				*dev_type = NILDEV;
@@ -1133,6 +1113,7 @@ query_online(int deviceNr, int cdx, int resetNr, int *q_depth, int *dev_type)
 		default:
 			stat = HD_NOT_THERE;
 			break_out = 1;
+			break;
 		}
 		if (break_out)
 			break;
@@ -1170,18 +1151,11 @@ reset_device(int deviceNr, int cdx, int resetNr)
 			switch (stat_word.response_code) {
 			case AP_RESPONSE_NORMAL:
 				stat = DEV_ONLINE;
-				if (stat_word.q_stat_flags &
-				    AP_Q_STATUS_EMPTY)
+				if (stat_word.q_stat_flags & AP_Q_STATUS_EMPTY)
 					break_out = 1;
 				break;
 			case AP_RESPONSE_Q_NOT_AVAIL:
-				stat = DEV_GONE;
-				break_out = 1;
-				break;
 			case AP_RESPONSE_DECONFIGURED:
-				stat = DEV_GONE;
-				break_out = 1;
-				break;
 			case AP_RESPONSE_CHECKSTOPPED:
 				stat = DEV_GONE;
 				break_out = 1;
@@ -1195,6 +1169,7 @@ reset_device(int deviceNr, int cdx, int resetNr)
 		default:
 			stat = DEV_GONE;
 			break_out = 1;
+			break;
 		}
 		if (break_out == 1)
 			break;
@@ -1251,7 +1226,7 @@ send_to_AP(int dev_nr, int cdx, int msg_len, unsigned char *msg_ext)
 	       msg_ext[0], msg_ext[1], msg_ext[2], msg_ext[3],
 	       msg_ext[4], msg_ext[5], msg_ext[6], msg_ext[7],
 	       msg_ext[8], msg_ext[9], msg_ext[10], msg_ext[11]);
-	print_buffer(msg_ext+12, msg_len);
+	print_buffer(msg_ext+CALLER_HEADER, msg_len);
 #endif
 
 	ccode = sen(msg_len, msg_ext, &stat_word);
@@ -1283,14 +1258,15 @@ send_to_AP(int dev_nr, int cdx, int msg_len, unsigned char *msg_ext)
 		break;
 	default:
 		stat = DEV_GONE;
+		break;
 	}
 
 	return stat;
 }
 
 enum devstat
-receive_from_AP(int dev_nr, int cdx, int resplen,
-		unsigned char *resp, unsigned char *psmid)
+receive_from_AP(int dev_nr, int cdx, int resplen, unsigned char *resp,
+		unsigned char *psmid)
 {
 	int ccode;
 	struct ap_status_word stat_word;
@@ -1543,6 +1519,7 @@ ICAMEX_msg_to_type6MEX_de_msg(struct ica_rsa_modexpo *icaMsg_p, int cdx,
 	struct type6_hdr *tp6Hdr_p;
 	struct CPRB *cprb_p;
 	struct cca_private_ext_ME *key_p;
+	static int deprecated_msg_count = 0;
 
 	mod_len = icaMsg_p->inputdatalength;
 	tmp_size = FIXED_TYPE6_ME_LEN + mod_len;
@@ -1593,13 +1570,19 @@ ICAMEX_msg_to_type6MEX_de_msg(struct ica_rsa_modexpo *icaMsg_p, int cdx,
 		return SEN_USER_ERROR;
 
 	if (is_common_public_key(temp, mod_len)) {
-		PRINTK("Common public key used for modex decrypt\n");
+		if (deprecated_msg_count < 20) {
+			PRINTK("Common public key used for modex decrypt\n");
+			deprecated_msg_count++;
+			if (deprecated_msg_count == 20)
+				PRINTK("No longer issuing messages about common"
+				       " public key for modex decrypt.\n");
+		}
 		return SEN_NOT_AVAIL;
 	}
 
 	temp = key_p->pvtMESec.modulus + sizeof(key_p->pvtMESec.modulus)
 	       - mod_len;
-	if (copy_from_user(temp, icaMsg_p->n_modulus, mod_len) != 0)
+	if (copy_from_user(temp, icaMsg_p->n_modulus, mod_len))
 		return SEN_RELEASED;
 	if (is_empty(temp, mod_len))
 		return SEN_USER_ERROR;
@@ -1617,24 +1600,33 @@ ICAMEX_msg_to_type6MEX_en_msg(struct ica_rsa_modexpo *icaMsg_p, int cdx,
 {
 	int mod_len, vud_len, exp_len, key_len;
 	int pad_len, tmp_size, total_CPRB_len, parmBlock_l, i;
-	unsigned char temp_exp[256], *exp_p, *temp;
+	unsigned char *temp_exp, *exp_p, *temp;
 	struct type6_hdr *tp6Hdr_p;
 	struct CPRB *cprb_p;
 	struct cca_public_key *key_p;
 	struct T6_keyBlock_hdr *keyb_p;
 
+	temp_exp = kmalloc(256, GFP_KERNEL);
+	if (!temp_exp)
+		return EGETBUFF;
 	mod_len = icaMsg_p->inputdatalength;
-	if (copy_from_user(temp_exp, icaMsg_p->b_key, mod_len))
+	if (copy_from_user(temp_exp, icaMsg_p->b_key, mod_len)) {
+		kfree(temp_exp);
 		return SEN_RELEASED;
-	if (is_empty(temp_exp, mod_len))
+	}
+	if (is_empty(temp_exp, mod_len)) {
+		kfree(temp_exp);
 		return SEN_USER_ERROR;
+	}
 
 	exp_p = temp_exp;
 	for (i = 0; i < mod_len; i++)
 		if (exp_p[i])
 			break;
-	if (i >= mod_len)
+	if (i >= mod_len) {
+		kfree(temp_exp);
 		return SEN_USER_ERROR;
+	}
 
 	exp_len = mod_len - i;
 	exp_p += i;
@@ -1665,17 +1657,25 @@ ICAMEX_msg_to_type6MEX_en_msg(struct ica_rsa_modexpo *icaMsg_p, int cdx,
 		 sizeof(struct function_and_rules_block));
 	temp += sizeof(struct function_and_rules_block);
 	temp += 2;
-	if (copy_from_user(temp, icaMsg_p->inputdata, mod_len))
+	if (copy_from_user(temp, icaMsg_p->inputdata, mod_len)) {
+		kfree(temp_exp);
 		return SEN_RELEASED;
-	if (is_empty(temp, mod_len))
+	}
+	if (is_empty(temp, mod_len)) {
+		kfree(temp_exp);
 		return SEN_USER_ERROR;
-	if (temp[0] != 0x00 || temp[1] != 0x02)
+	}
+	if ((temp[0] != 0x00) || (temp[1] != 0x02)) {
+		kfree(temp_exp);
 		return SEN_NOT_AVAIL;
+	}
 	for (i = 2; i < mod_len; i++)
 		if (temp[i] == 0x00)
 			break;
-	if ((i < 9) || (i > (mod_len - 2)))
+	if ((i < 9) || (i > (mod_len - 2))) {
+		kfree(temp_exp);
 		return SEN_NOT_AVAIL;
+	}
 	pad_len = i + 1;
 	vud_len = mod_len - pad_len;
 	memmove(temp, temp+pad_len, vud_len);
@@ -1689,6 +1689,7 @@ ICAMEX_msg_to_type6MEX_en_msg(struct ica_rsa_modexpo *icaMsg_p, int cdx,
 	key_p = (struct cca_public_key *)temp;
 	temp = key_p->pubSec.exponent;
 	memcpy(temp, exp_p, exp_len);
+	kfree(temp_exp);
 	temp += exp_len;
 	if (copy_from_user(temp, icaMsg_p->n_modulus, mod_len))
 		return SEN_RELEASED;
@@ -1697,7 +1698,7 @@ ICAMEX_msg_to_type6MEX_en_msg(struct ica_rsa_modexpo *icaMsg_p, int cdx,
 	key_p->pubSec.modulus_bit_len = 8 * mod_len;
 	key_p->pubSec.modulus_byte_len = mod_len;
 	key_p->pubSec.exponent_len = exp_len;
-	key_p->pubSec.section_length = 12 + mod_len + exp_len;
+	key_p->pubSec.section_length = CALLER_HEADER + mod_len + exp_len;
 	key_len = key_p->pubSec.section_length + sizeof(struct cca_token_hdr);
 	key_p->pubHdr.token_length = key_len;
 	key_len += 4;
@@ -1824,27 +1825,37 @@ ICACRT_msg_to_type6CRT_msg(struct ica_rsa_modexpo_crt *icaMsg_p, int cdx,
 
 static int
 ICAMEX_msg_to_type6MEX_msgX(struct ica_rsa_modexpo *icaMsg_p, int cdx,
-			    int *z90cMsg_l_p, struct type6_msg *z90cMsg_p)
+			    int *z90cMsg_l_p, struct type6_msg *z90cMsg_p,
+			    int dev_type)
 {
 	int mod_len, exp_len, vud_len, tmp_size, total_CPRB_len, parmBlock_l;
 	int key_len, i;
-	unsigned char temp_exp[256], *tgt_p, *temp, *exp_p;
+	unsigned char *temp_exp, *tgt_p, *temp, *exp_p;
 	struct type6_hdr *tp6Hdr_p;
 	struct CPRBX *cprbx_p;
 	struct cca_public_key *key_p;
 	struct T6_keyBlock_hdrX *keyb_p;
 
+	temp_exp = kmalloc(256, GFP_KERNEL);
+	if (!temp_exp)
+		return EGETBUFF;
 	mod_len = icaMsg_p->inputdatalength;
-	if (copy_from_user(temp_exp, icaMsg_p->b_key, mod_len))
+	if (copy_from_user(temp_exp, icaMsg_p->b_key, mod_len)) {
+		kfree(temp_exp);
 		return SEN_RELEASED;
-	if (is_empty(temp_exp, mod_len))
+	}
+	if (is_empty(temp_exp, mod_len)) {
+		kfree(temp_exp);
 		return SEN_USER_ERROR;
+	}
 	exp_p = temp_exp;
 	for (i = 0; i < mod_len; i++)
 		if (exp_p[i])
 			break;
-	if (i >= mod_len)
+	if (i >= mod_len) {
+		kfree(temp_exp);
 		return SEN_USER_ERROR;
+	}
 	exp_len = mod_len - i;
 	exp_p += i;
 	PDEBUG("exp_len after computation: %08x\n", exp_len);
@@ -1867,15 +1878,23 @@ ICAMEX_msg_to_type6MEX_msgX(struct ica_rsa_modexpo *icaMsg_p, int cdx,
 	cprbx_p->domain = (unsigned short)cdx;
 	cprbx_p->rpl_msgbl = RESPONSE_CPRBX_SIZE;
 	tgt_p += sizeof(struct CPRBX);
-	memcpy(tgt_p, &static_pke_function_and_rulesX,
-	       sizeof(struct function_and_rules_block));
+	if (dev_type == PCIXCC_MCL2)
+		memcpy(tgt_p, &static_pke_function_and_rulesX_MCL2,
+		       sizeof(struct function_and_rules_block));
+	else
+		memcpy(tgt_p, &static_pke_function_and_rulesX,
+		       sizeof(struct function_and_rules_block));
 	tgt_p += sizeof(struct function_and_rules_block);
 
 	tgt_p += 2;
-	if (copy_from_user(tgt_p, icaMsg_p->inputdata, mod_len))
-	      return SEN_RELEASED;
-	if (is_empty(tgt_p, mod_len))
-	      return SEN_USER_ERROR;
+	if (copy_from_user(tgt_p, icaMsg_p->inputdata, mod_len)) {
+		kfree(temp_exp);
+		return SEN_RELEASED;
+	}
+	if (is_empty(tgt_p, mod_len)) {
+		kfree(temp_exp);
+		return SEN_USER_ERROR;
+	}
 	tgt_p -= 2;
 	*((short *)tgt_p) = (short) vud_len;
 	tgt_p += vud_len;
@@ -1885,15 +1904,16 @@ ICAMEX_msg_to_type6MEX_msgX(struct ica_rsa_modexpo *icaMsg_p, int cdx,
 	key_p = (struct cca_public_key *)tgt_p;
 	temp = key_p->pubSec.exponent;
 	memcpy(temp, exp_p, exp_len);
+	kfree(temp_exp);
 	temp += exp_len;
 	if (copy_from_user(temp, icaMsg_p->n_modulus, mod_len))
-	      return SEN_RELEASED;
+		return SEN_RELEASED;
 	if (is_empty(temp, mod_len))
-	      return SEN_USER_ERROR;
+		return SEN_USER_ERROR;
 	key_p->pubSec.modulus_bit_len = 8 * mod_len;
 	key_p->pubSec.modulus_byte_len = mod_len;
 	key_p->pubSec.exponent_len = exp_len;
-	key_p->pubSec.section_length = 12 + mod_len + exp_len;
+	key_p->pubSec.section_length = CALLER_HEADER + mod_len + exp_len;
 	key_len = key_p->pubSec.section_length + sizeof(struct cca_token_hdr);
 	key_p->pubHdr.token_length = key_len;
 	key_len += 4;
@@ -1908,7 +1928,8 @@ ICAMEX_msg_to_type6MEX_msgX(struct ica_rsa_modexpo *icaMsg_p, int cdx,
 
 static int
 ICACRT_msg_to_type6CRT_msgX(struct ica_rsa_modexpo_crt *icaMsg_p, int cdx,
-			    int *z90cMsg_l_p, struct type6_msg *z90cMsg_p)
+			    int *z90cMsg_l_p, struct type6_msg *z90cMsg_p,
+			    int dev_type)
 {
 	int mod_len, vud_len, tmp_size, total_CPRB_len, parmBlock_l, short_len;
 	int long_len, pad_len, keyPartsLen, tmp_l;
@@ -1943,8 +1964,12 @@ ICACRT_msg_to_type6CRT_msgX(struct ica_rsa_modexpo_crt *icaMsg_p, int cdx,
 	cprbx_p->req_parml = parmBlock_l;
 	cprbx_p->rpl_msgbl = parmBlock_l;
 	tgt_p += sizeof(struct CPRBX);
-	memcpy(tgt_p, &static_pkd_function_and_rulesX,
-	       sizeof(struct function_and_rules_block));
+	if (dev_type == PCIXCC_MCL2)
+		memcpy(tgt_p, &static_pkd_function_and_rulesX_MCL2,
+		       sizeof(struct function_and_rules_block));
+	else
+		memcpy(tgt_p, &static_pkd_function_and_rulesX,
+		       sizeof(struct function_and_rules_block));
 	tgt_p += sizeof(struct function_and_rules_block);
 	*((short *)tgt_p) = (short) vud_len;
 	tgt_p += 2;
@@ -2043,18 +2068,35 @@ convert_request(unsigned char *buffer, int func, unsigned short function,
 				(struct ica_rsa_modexpo *) buffer,
 				cdx, msg_l_p, (struct type6_msg *) msg_p);
 	}
-	if (dev_type == PCIXCC) {
+	if ((dev_type == PCIXCC_MCL2) ||
+	    (dev_type == PCIXCC_MCL3) ||
+	    (dev_type == CEX2C)) {
 		if (func == ICARSACRT)
 			return ICACRT_msg_to_type6CRT_msgX(
 				(struct ica_rsa_modexpo_crt *) buffer,
-				cdx, msg_l_p, (struct type6_msg *) msg_p);
+				cdx, msg_l_p, (struct type6_msg *) msg_p,
+				dev_type);
 		else
 			return ICAMEX_msg_to_type6MEX_msgX(
 				(struct ica_rsa_modexpo *) buffer,
-				cdx, msg_l_p, (struct type6_msg *) msg_p);
+				cdx, msg_l_p, (struct type6_msg *) msg_p,
+				dev_type);
 	}
 
 	return 0;
+}
+
+int ext_bitlens_msg_count = 0;
+static inline void
+unset_ext_bitlens(void)
+{
+	if (!ext_bitlens_msg_count) {
+		PRINTK("Unable to use coprocessors for extended bitlengths. "
+		       "Using PCICAs (if present) for extended bitlengths. "
+		       "This is not an error.\n");
+		ext_bitlens_msg_count++;
+	}
+	ext_bitlens = 0;
 }
 
 int
@@ -2064,8 +2106,8 @@ convert_response(unsigned char *response, unsigned char *buffer,
 	struct ica_rsa_modexpo *icaMsg_p = (struct ica_rsa_modexpo *) buffer;
 	struct type82_hdr *t82h_p = (struct type82_hdr *) response;
 	struct type84_hdr *t84h_p = (struct type84_hdr *) response;
-	struct type86_hdr *t86h_p = (struct type86_hdr *) response;
-	int rv, reply_code, service_rc, service_rs, src_l;
+	struct type86_fmt2_msg *t86m_p =  (struct type86_fmt2_msg *) response;
+	int reply_code, service_rc, service_rs, src_l;
 	unsigned char *src_p, *tgt_p;
 	struct CPRB *cprb_p;
 	struct CPRBX *cprbx_p;
@@ -2075,11 +2117,9 @@ convert_response(unsigned char *response, unsigned char *buffer,
 	service_rc = 0;
 	service_rs = 0;
 	src_l = 0;
-	rv = 0;
 	switch (t82h_p->type) {
 	case TYPE82_RSP_CODE:
 		reply_code = t82h_p->reply_code;
-		rv = 4;
 		src_p = (unsigned char *)t82h_p;
 		PRINTK("Hardware error: Type 82 Message Header: "
 		       "%02x%02x%02x%02x%02x%02x%02x%02x\n",
@@ -2091,15 +2131,9 @@ convert_response(unsigned char *response, unsigned char *buffer,
 		src_p = response + (int)t84h_p->len - src_l;
 		break;
 	case TYPE86_RSP_CODE:
-		reply_code = t86h_p->reply_code;
-		if (t86h_p->format != TYPE86_FMT2) {
-			rv = 4;
+		reply_code = t86m_p->hdr.reply_code;
+		if (reply_code != 0)
 			break;
-		}
-		if (reply_code != 0) {
-			rv = 4;
-			break;
-		}
 		cprb_p = (struct CPRB *)
 			(response + sizeof(struct type86_fmt2_msg));
 		cprbx_p = (struct CPRBX *) cprb_p;
@@ -2108,11 +2142,22 @@ convert_response(unsigned char *response, unsigned char *buffer,
 			if (service_rc != 0) {
 				le2toI(cprb_p->ccp_rscode, &service_rs);
 				if ((service_rc == 8) && (service_rs == 66))
-					PDEBUG("8/66 on PCICC\n");
+					PDEBUG("Bad block format on PCICC\n");
+				else if ((service_rc == 8) && (service_rs == 770)) {
+					PDEBUG("Invalid key length on PCICC\n");
+					unset_ext_bitlens();
+					return REC_USE_PCICA;
+				}
+				else if ((service_rc == 8) && (service_rs == 783)) {
+					PDEBUG("Extended bitlengths not enabled"
+					       "on PCICC\n");
+					unset_ext_bitlens();
+					return REC_USE_PCICA;
+				}
 				else
 					PRINTK("service rc/rs: %d/%d\n",
 					       service_rc, service_rs);
-				rv = 8;
+				return REC_OPERAND_INV;
 			}
 			src_p = (unsigned char *)cprb_p + sizeof(struct CPRB);
 			src_p += 4;
@@ -2124,11 +2169,22 @@ convert_response(unsigned char *response, unsigned char *buffer,
 			if (service_rc != 0) {
 				service_rs = (int) cprbx_p->ccp_rscode;
 				if ((service_rc == 8) && (service_rs == 66))
-					PDEBUG("8/66 on PCIXCC\n");
+					PDEBUG("Bad block format on PCXICC\n");
+				else if ((service_rc == 8) && (service_rs == 770)) {
+					PDEBUG("Invalid key length on PCIXCC\n");
+					unset_ext_bitlens();
+					return REC_USE_PCICA;
+				}
+				else if ((service_rc == 8) && (service_rs == 783)) {
+					PDEBUG("Extended bitlengths not enabled"
+					       "on PCIXCC\n");
+					unset_ext_bitlens();
+					return REC_USE_PCICA;
+				}
 				else
 					PRINTK("service rc/rs: %d/%d\n",
 					       service_rc, service_rs);
-				rv = 8;
+				return REC_OPERAND_INV;
 			}
 			src_p = (unsigned char *)
 				cprbx_p + sizeof(struct CPRBX);
@@ -2139,12 +2195,10 @@ convert_response(unsigned char *response, unsigned char *buffer,
 		}
 		break;
 	default:
-		break;
+		return REC_BAD_MESSAGE;
 	}
 
-	if (rv == 8)
-		return 8;
-	if (rv == 4)
+	if (reply_code)
 		switch (reply_code) {
 		case REPLY_ERROR_OPERAND_INVALID:
 			return REC_OPERAND_INV;
@@ -2154,8 +2208,14 @@ convert_response(unsigned char *response, unsigned char *buffer,
 			return REC_EVEN_MOD;
 		case REPLY_ERROR_MESSAGE_TYPE:
 			return WRONG_DEVICE_TYPE;
+		case REPLY_ERROR_TRANSPORT_FAIL:
+			PRINTKW("Transport failed (APFS = %02X%02X%02X%02X)\n",
+				t86m_p->apfs[0], t86m_p->apfs[1],
+				t86m_p->apfs[2], t86m_p->apfs[3]);
+			return REC_HARDWAR_ERR;
 		default:
-			return 12;
+			PRINTKW("reply code = %d\n", reply_code);
+			return REC_HARDWAR_ERR;
 		}
 
 	if (service_rc != 0)
@@ -2171,14 +2231,13 @@ convert_response(unsigned char *response, unsigned char *buffer,
 	memcpy(tgt_p, src_p, src_l);
 	if ((t82h_p->type == TYPE86_RSP_CODE) && (resp_buff < tgt_p)) {
 		memset(resp_buff, 0, icaMsg_p->outputdatalength - src_l);
-		rv = pad_msg(resp_buff, icaMsg_p->outputdatalength, src_l);
-		if (rv != 0)
-			return rv;
+		if (pad_msg(resp_buff, icaMsg_p->outputdatalength, src_l))
+			return REC_INVALID_PAD;
 	}
 	*respbufflen_p = icaMsg_p->outputdatalength;
 	if (*respbufflen_p == 0)
 		PRINTK("Zero *respbufflen_p\n");
 
-	return rv;
+	return 0;
 }
 

@@ -16,6 +16,7 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/initrd.h>
+#include <linux/root_dev.h>
 #include <linux/seq_file.h>
 #include <linux/irq.h>
 
@@ -241,9 +242,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		strcpy(cmd_line, (char *)(r6+KERNELBASE));
 	}
 
-	/* Call back for board-specific settings. */
-	m82xx_board_init();
-
 	ppc_md.setup_arch		= m8260_setup_arch;
 	ppc_md.show_cpuinfo		= m8260_show_cpuinfo;
 	ppc_md.init_IRQ			= m8260_init_IRQ;
@@ -259,4 +257,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.find_end_of_memory	= m8260_find_end_of_memory;
 	ppc_md.setup_io_mappings	= m8260_map_io;
+
+	/* Call back for board-specific settings and overrides. */
+	m82xx_board_init();
 }

@@ -1,7 +1,7 @@
 /*
  * Sony Programmable I/O Control Device driver for VAIO
  *
- * Copyright (C) 2001-2003 Stelian Pop <stelian@popies.net>
+ * Copyright (C) 2001-2004 Stelian Pop <stelian@popies.net>
  *
  * Copyright (C) 2001-2002 Alcôve <www.alcove.com>
  *
@@ -19,12 +19,12 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -44,84 +44,89 @@
 #include <linux/wait.h>
 #include <linux/acpi.h>
 #include <linux/dmi.h>
-#include <linux/sysdev.h>
+#include <linux/err.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/system.h>
 
-static int verbose; /* = 0 */
-
 #include "sonypi.h"
 #include <linux/sonypi.h>
 
-static struct sonypi_device sonypi_device;
+MODULE_AUTHOR("Stelian Pop <stelian@popies.net>");
+MODULE_DESCRIPTION("Sony Programmable I/O Control Device driver");
+MODULE_LICENSE("GPL");
+MODULE_VERSION(SONYPI_DRIVER_VERSION);
+
 static int minor = -1;
-static int fnkeyinit; /* = 0 */
-static int camera; /* = 0 */
-static int compat; /* = 0 */
-static int useinput = 1;
+module_param(minor, int, 0);
+MODULE_PARM_DESC(minor,
+		 "minor number of the misc device, default is -1 (automatic)");
+
+static int verbose;		/* = 0 */
+module_param(verbose, int, 0644);
+MODULE_PARM_DESC(verbose, "be verbose, default is 0 (no)");
+
+static int fnkeyinit;		/* = 0 */
+module_param(fnkeyinit, int, 0444);
+MODULE_PARM_DESC(fnkeyinit,
+		 "set this if your Fn keys do not generate any event");
+
+static int camera;		/* = 0 */
+module_param(camera, int, 0444);
+MODULE_PARM_DESC(camera,
+		 "set this if you have a MotionEye camera (PictureBook series)");
+
+static int compat;		/* = 0 */
+module_param(compat, int, 0444);
+MODULE_PARM_DESC(compat,
+		 "set this if you want to enable backward compatibility mode");
+
 static unsigned long mask = 0xffffffff;
+module_param(mask, ulong, 0644);
+MODULE_PARM_DESC(mask,
+		 "set this to the mask of event you want to enable (see doc)");
 
-/* Inits the queue */
-static inline void sonypi_initq(void) {
-        sonypi_device.queue.head = sonypi_device.queue.tail = 0;
-	sonypi_device.queue.len = 0;
-	sonypi_device.queue.s_lock = SPIN_LOCK_UNLOCKED;
-	init_waitqueue_head(&sonypi_device.queue.proc_list);
+static int useinput = 1;
+module_param(useinput, int, 0444);
+MODULE_PARM_DESC(useinput,
+		 "set this if you would like sonypi to feed events to the input subsystem");
+
+static struct sonypi_device sonypi_device;
+
+static int sonypi_ec_write(u8 addr, u8 value)
+{
+#ifdef CONFIG_ACPI_EC
+	if (SONYPI_ACPI_ACTIVE)
+		return ec_write(addr, value);
+#endif
+	wait_on_command(1, inb_p(SONYPI_CST_IOPORT) & 3, ITERATIONS_LONG);
+	outb_p(0x81, SONYPI_CST_IOPORT);
+	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2, ITERATIONS_LONG);
+	outb_p(addr, SONYPI_DATA_IOPORT);
+	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2, ITERATIONS_LONG);
+	outb_p(value, SONYPI_DATA_IOPORT);
+	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2, ITERATIONS_LONG);
+	return 0;
 }
 
-/* Pulls an event from the queue */
-static inline unsigned char sonypi_pullq(void) {
-        unsigned char result;
-	unsigned long flags;
-
-	spin_lock_irqsave(&sonypi_device.queue.s_lock, flags);
-	if (!sonypi_device.queue.len) {
-		spin_unlock_irqrestore(&sonypi_device.queue.s_lock, flags);
-		return 0;
-	}
-	result = sonypi_device.queue.buf[sonypi_device.queue.head];
-        sonypi_device.queue.head++;
-	sonypi_device.queue.head &= (SONYPI_BUF_SIZE - 1);
-	sonypi_device.queue.len--;
-	spin_unlock_irqrestore(&sonypi_device.queue.s_lock, flags);
-        return result;
+static int sonypi_ec_read(u8 addr, u8 *value)
+{
+#ifdef CONFIG_ACPI_EC
+	if (SONYPI_ACPI_ACTIVE)
+		return ec_read(addr, value);
+#endif
+	wait_on_command(1, inb_p(SONYPI_CST_IOPORT) & 3, ITERATIONS_LONG);
+	outb_p(0x80, SONYPI_CST_IOPORT);
+	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2, ITERATIONS_LONG);
+	outb_p(addr, SONYPI_DATA_IOPORT);
+	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2, ITERATIONS_LONG);
+	*value = inb_p(SONYPI_DATA_IOPORT);
+	return 0;
 }
 
-/* Pushes an event into the queue */
-static inline void sonypi_pushq(unsigned char event) {
-	unsigned long flags;
-
-	spin_lock_irqsave(&sonypi_device.queue.s_lock, flags);
-	if (sonypi_device.queue.len == SONYPI_BUF_SIZE) {
-		/* remove the first element */
-        	sonypi_device.queue.head++;
-		sonypi_device.queue.head &= (SONYPI_BUF_SIZE - 1);
-		sonypi_device.queue.len--;
-	}
-	sonypi_device.queue.buf[sonypi_device.queue.tail] = event;
-	sonypi_device.queue.tail++;
-	sonypi_device.queue.tail &= (SONYPI_BUF_SIZE - 1);
-	sonypi_device.queue.len++;
-
-	kill_fasync(&sonypi_device.queue.fasync, SIGIO, POLL_IN);
-	wake_up_interruptible(&sonypi_device.queue.proc_list);
-	spin_unlock_irqrestore(&sonypi_device.queue.s_lock, flags);
-}
-
-/* Tests if the queue is empty */
-static inline int sonypi_emptyq(void) {
-        int result;
-	unsigned long flags;
-
-	spin_lock_irqsave(&sonypi_device.queue.s_lock, flags);
-        result = (sonypi_device.queue.len == 0);
-	spin_unlock_irqrestore(&sonypi_device.queue.s_lock, flags);
-        return result;
-}
-
-static int ec_read16(u8 addr, u16 *value) {
+static int ec_read16(u8 addr, u16 *value)
+{
 	u8 val_lb, val_hb;
 	if (sonypi_ec_read(addr, &val_lb))
 		return -1;
@@ -132,21 +137,22 @@ static int ec_read16(u8 addr, u16 *value) {
 }
 
 /* Initializes the device - this comes from the AML code in the ACPI bios */
-static void sonypi_type1_srs(void) {
+static void sonypi_type1_srs(void)
+{
 	u32 v;
 
 	pci_read_config_dword(sonypi_device.dev, SONYPI_G10A, &v);
-	v = (v & 0xFFFF0000) | ((u32)sonypi_device.ioport1);
+	v = (v & 0xFFFF0000) | ((u32) sonypi_device.ioport1);
 	pci_write_config_dword(sonypi_device.dev, SONYPI_G10A, v);
 
 	pci_read_config_dword(sonypi_device.dev, SONYPI_G10A, &v);
-	v = (v & 0xFFF0FFFF) | 
-	    (((u32)sonypi_device.ioport1 ^ sonypi_device.ioport2) << 16);
+	v = (v & 0xFFF0FFFF) |
+	    (((u32) sonypi_device.ioport1 ^ sonypi_device.ioport2) << 16);
 	pci_write_config_dword(sonypi_device.dev, SONYPI_G10A, v);
 
 	v = inl(SONYPI_IRQ_PORT);
-	v &= ~(((u32)0x3) << SONYPI_IRQ_SHIFT);
-	v |= (((u32)sonypi_device.bits) << SONYPI_IRQ_SHIFT);
+	v &= ~(((u32) 0x3) << SONYPI_IRQ_SHIFT);
+	v |= (((u32) sonypi_device.bits) << SONYPI_IRQ_SHIFT);
 	outl(v, SONYPI_IRQ_PORT);
 
 	pci_read_config_dword(sonypi_device.dev, SONYPI_G10A, &v);
@@ -154,18 +160,20 @@ static void sonypi_type1_srs(void) {
 	pci_write_config_dword(sonypi_device.dev, SONYPI_G10A, v);
 }
 
-static void sonypi_type2_srs(void) {
+static void sonypi_type2_srs(void)
+{
 	if (sonypi_ec_write(SONYPI_SHIB, (sonypi_device.ioport1 & 0xFF00) >> 8))
 		printk(KERN_WARNING "ec_write failed\n");
-	if (sonypi_ec_write(SONYPI_SLOB,  sonypi_device.ioport1 & 0x00FF))
+	if (sonypi_ec_write(SONYPI_SLOB, sonypi_device.ioport1 & 0x00FF))
 		printk(KERN_WARNING "ec_write failed\n");
-	if (sonypi_ec_write(SONYPI_SIRQ,  sonypi_device.bits))
+	if (sonypi_ec_write(SONYPI_SIRQ, sonypi_device.bits))
 		printk(KERN_WARNING "ec_write failed\n");
 	udelay(10);
 }
 
 /* Disables the device - this comes from the AML code in the ACPI bios */
-static void sonypi_type1_dis(void) {
+static void sonypi_type1_dis(void)
+{
 	u32 v;
 
 	pci_read_config_dword(sonypi_device.dev, SONYPI_G10A, &v);
@@ -177,7 +185,8 @@ static void sonypi_type1_dis(void) {
 	outl(v, SONYPI_IRQ_PORT);
 }
 
-static void sonypi_type2_dis(void) {
+static void sonypi_type2_dis(void)
+{
 	if (sonypi_ec_write(SONYPI_SHIB, 0))
 		printk(KERN_WARNING "ec_write failed\n");
 	if (sonypi_ec_write(SONYPI_SLOB, 0))
@@ -186,7 +195,8 @@ static void sonypi_type2_dis(void) {
 		printk(KERN_WARNING "ec_write failed\n");
 }
 
-static u8 sonypi_call1(u8 dev) {
+static u8 sonypi_call1(u8 dev)
+{
 	u8 v1, v2;
 
 	wait_on_command(0, inb_p(sonypi_device.ioport2) & 2, ITERATIONS_LONG);
@@ -196,7 +206,8 @@ static u8 sonypi_call1(u8 dev) {
 	return v2;
 }
 
-static u8 sonypi_call2(u8 dev, u8 fn) {
+static u8 sonypi_call2(u8 dev, u8 fn)
+{
 	u8 v1;
 
 	wait_on_command(0, inb_p(sonypi_device.ioport2) & 2, ITERATIONS_LONG);
@@ -207,7 +218,8 @@ static u8 sonypi_call2(u8 dev, u8 fn) {
 	return v1;
 }
 
-static u8 sonypi_call3(u8 dev, u8 fn, u8 v) {
+static u8 sonypi_call3(u8 dev, u8 fn, u8 v)
+{
 	u8 v1;
 
 	wait_on_command(0, inb_p(sonypi_device.ioport2) & 2, ITERATIONS_LONG);
@@ -220,7 +232,10 @@ static u8 sonypi_call3(u8 dev, u8 fn, u8 v) {
 	return v1;
 }
 
-static u8 sonypi_read(u8 fn) {
+#if 0
+/* Get brightness, hue etc. Unreliable... */
+static u8 sonypi_read(u8 fn)
+{
 	u8 v1, v2;
 	int n = 100;
 
@@ -232,15 +247,17 @@ static u8 sonypi_read(u8 fn) {
 	}
 	return 0xff;
 }
+#endif
 
 /* Set brightness, hue etc */
-static void sonypi_set(u8 fn, u8 v) {
-	
+static void sonypi_set(u8 fn, u8 v)
+{
 	wait_on_command(0, sonypi_call3(0x90, fn, v), ITERATIONS_SHORT);
 }
 
 /* Tests if the camera is ready */
-static int sonypi_camera_ready(void) {
+static int sonypi_camera_ready(void)
+{
 	u8 v;
 
 	v = sonypi_call2(0x8f, SONYPI_CAMERA_STATUS);
@@ -248,19 +265,20 @@ static int sonypi_camera_ready(void) {
 }
 
 /* Turns the camera off */
-static void sonypi_camera_off(void) {
-
+static void sonypi_camera_off(void)
+{
 	sonypi_set(SONYPI_CAMERA_PICTURE, SONYPI_CAMERA_MUTE_MASK);
 
 	if (!sonypi_device.camera_power)
 		return;
 
-	sonypi_call2(0x91, 0); 
+	sonypi_call2(0x91, 0);
 	sonypi_device.camera_power = 0;
 }
 
 /* Turns the camera on */
-static void sonypi_camera_on(void) {
+static void sonypi_camera_on(void)
+{
 	int i, j;
 
 	if (sonypi_device.camera_power)
@@ -283,7 +301,7 @@ static void sonypi_camera_on(void) {
 		if (i)
 			break;
 	}
-	
+
 	if (j == 0) {
 		printk(KERN_WARNING "sonypi: failed to power on camera\n");
 		return;
@@ -294,19 +312,42 @@ static void sonypi_camera_on(void) {
 }
 
 /* sets the bluetooth subsystem power state */
-static void sonypi_setbluetoothpower(u8 state) {
-
+static void sonypi_setbluetoothpower(u8 state)
+{
 	state = !!state;
-	if (sonypi_device.bluetooth_power == state) 
+
+	if (sonypi_device.bluetooth_power == state)
 		return;
-	
+
 	sonypi_call2(0x96, state);
 	sonypi_call1(0x82);
 	sonypi_device.bluetooth_power = state;
 }
 
+static void input_keyrelease(void *data)
+{
+	struct input_dev *input_dev;
+	int key;
+
+	while (1) {
+		if (kfifo_get(sonypi_device.input_fifo,
+			      (unsigned char *)&input_dev,
+			      sizeof(input_dev)) != sizeof(input_dev))
+			return;
+		if (kfifo_get(sonypi_device.input_fifo,
+			      (unsigned char *)&key,
+			      sizeof(key)) != sizeof(key))
+			return;
+
+		msleep(10);
+		input_report_key(input_dev, key, 0);
+		input_sync(input_dev);
+	}
+}
+
 /* Interrupt handler: some event is available */
-static irqreturn_t sonypi_irq(int irq, void *dev_id, struct pt_regs *regs) {
+static irqreturn_t sonypi_irq(int irq, void *dev_id, struct pt_regs *regs)
+{
 	u8 v1, v2, event = 0;
 	int i, j;
 
@@ -316,9 +357,10 @@ static irqreturn_t sonypi_irq(int irq, void *dev_id, struct pt_regs *regs) {
 	for (i = 0; sonypi_eventtypes[i].model; i++) {
 		if (sonypi_device.model != sonypi_eventtypes[i].model)
 			continue;
-		if ((v2 & sonypi_eventtypes[i].data) != sonypi_eventtypes[i].data)
+		if ((v2 & sonypi_eventtypes[i].data) !=
+		    sonypi_eventtypes[i].data)
 			continue;
-		if (! (mask & sonypi_eventtypes[i].mask))
+		if (!(mask & sonypi_eventtypes[i].mask))
 			continue;
 		for (j = 0; sonypi_eventtypes[i].events[j].event; j++) {
 			if (v1 == sonypi_eventtypes[i].events[j].data) {
@@ -329,124 +371,131 @@ static irqreturn_t sonypi_irq(int irq, void *dev_id, struct pt_regs *regs) {
 	}
 
 	if (verbose)
-		printk(KERN_WARNING 
-		       "sonypi: unknown event port1=0x%02x,port2=0x%02x\n",v1,v2);
+		printk(KERN_WARNING
+		       "sonypi: unknown event port1=0x%02x,port2=0x%02x\n",
+		       v1, v2);
 	/* We need to return IRQ_HANDLED here because there *are*
-	 * events belonging to the sonypi device we don't know about, 
+	 * events belonging to the sonypi device we don't know about,
 	 * but we still don't want those to pollute the logs... */
 	return IRQ_HANDLED;
 
 found:
 	if (verbose > 1)
-		printk(KERN_INFO 
+		printk(KERN_INFO
 		       "sonypi: event port1=0x%02x,port2=0x%02x\n", v1, v2);
 
-#ifdef SONYPI_USE_INPUT
 	if (useinput) {
-		struct input_dev *jog_dev = &sonypi_device.jog_dev;
-		if (event == SONYPI_EVENT_JOGDIAL_PRESSED)
-			input_report_key(jog_dev, BTN_MIDDLE, 1);
-		else if (event == SONYPI_EVENT_ANYBUTTON_RELEASED)
-			input_report_key(jog_dev, BTN_MIDDLE, 0);
-		else if ((event == SONYPI_EVENT_JOGDIAL_UP) ||
-			 (event == SONYPI_EVENT_JOGDIAL_UP_PRESSED))
-			input_report_rel(jog_dev, REL_WHEEL, 1);
-		else if ((event == SONYPI_EVENT_JOGDIAL_DOWN) ||
-			 (event == SONYPI_EVENT_JOGDIAL_DOWN_PRESSED))
-			input_report_rel(jog_dev, REL_WHEEL, -1);
-		input_sync(jog_dev);
+		struct input_dev *input_jog_dev = &sonypi_device.input_jog_dev;
+		struct input_dev *input_key_dev = &sonypi_device.input_key_dev;
+		switch (event) {
+		case SONYPI_EVENT_JOGDIAL_UP:
+		case SONYPI_EVENT_JOGDIAL_UP_PRESSED:
+			input_report_rel(input_jog_dev, REL_WHEEL, 1);
+			break;
+		case SONYPI_EVENT_JOGDIAL_DOWN:
+		case SONYPI_EVENT_JOGDIAL_DOWN_PRESSED:
+			input_report_rel(input_jog_dev, REL_WHEEL, -1);
+			break;
+		case SONYPI_EVENT_JOGDIAL_PRESSED: {
+			int key = BTN_MIDDLE;
+			input_report_key(input_jog_dev, key, 1);
+			kfifo_put(sonypi_device.input_fifo,
+				  (unsigned char *)&input_jog_dev,
+				  sizeof(input_jog_dev));
+			kfifo_put(sonypi_device.input_fifo,
+				  (unsigned char *)&key, sizeof(key));
+			break;
+		}
+		case SONYPI_EVENT_FNKEY_RELEASED:
+			/* Nothing, not all VAIOs generate this event */
+			break;
+		}
+		input_sync(input_jog_dev);
+
+		for (i = 0; sonypi_inputkeys[i].sonypiev; i++) {
+			int key;
+
+			if (event != sonypi_inputkeys[i].sonypiev)
+				continue;
+
+			key = sonypi_inputkeys[i].inputev;
+			input_report_key(input_key_dev, key, 1);
+			kfifo_put(sonypi_device.input_fifo,
+				  (unsigned char *)&input_key_dev,
+				  sizeof(input_key_dev));
+			kfifo_put(sonypi_device.input_fifo,
+				  (unsigned char *)&key, sizeof(key));
+		}
+		input_sync(input_key_dev);
+		schedule_work(&sonypi_device.input_work);
 	}
-#endif /* SONYPI_USE_INPUT */
-	sonypi_pushq(event);
+
+	kfifo_put(sonypi_device.fifo, (unsigned char *)&event, sizeof(event));
+	kill_fasync(&sonypi_device.fifo_async, SIGIO, POLL_IN);
+	wake_up_interruptible(&sonypi_device.fifo_proc_list);
+
 	return IRQ_HANDLED;
 }
 
 /* External camera command (exported to the motion eye v4l driver) */
-u8 sonypi_camera_command(int command, u8 value) {
-	u8 ret = 0;
-
+int sonypi_camera_command(int command, u8 value)
+{
 	if (!camera)
-		return 0;
+		return -EIO;
 
 	down(&sonypi_device.lock);
 
-	switch(command) {
-		case SONYPI_COMMAND_GETCAMERA:
-			ret = sonypi_camera_ready();
-			break;
-		case SONYPI_COMMAND_SETCAMERA:
-			if (value)
-				sonypi_camera_on();
-			else
-				sonypi_camera_off();
-			break;
-		case SONYPI_COMMAND_GETCAMERABRIGHTNESS:
-			ret = sonypi_read(SONYPI_CAMERA_BRIGHTNESS);
-			break;
-		case SONYPI_COMMAND_SETCAMERABRIGHTNESS:
-			sonypi_set(SONYPI_CAMERA_BRIGHTNESS, value);
-			break;
-		case SONYPI_COMMAND_GETCAMERACONTRAST:
-			ret = sonypi_read(SONYPI_CAMERA_CONTRAST);
-			break;
-		case SONYPI_COMMAND_SETCAMERACONTRAST:
-			sonypi_set(SONYPI_CAMERA_CONTRAST, value);
-			break;
-		case SONYPI_COMMAND_GETCAMERAHUE:
-			ret = sonypi_read(SONYPI_CAMERA_HUE);
-			break;
-		case SONYPI_COMMAND_SETCAMERAHUE:
-			sonypi_set(SONYPI_CAMERA_HUE, value);
-			break;
-		case SONYPI_COMMAND_GETCAMERACOLOR:
-			ret = sonypi_read(SONYPI_CAMERA_COLOR);
-			break;
-		case SONYPI_COMMAND_SETCAMERACOLOR:
-			sonypi_set(SONYPI_CAMERA_COLOR, value);
-			break;
-		case SONYPI_COMMAND_GETCAMERASHARPNESS:
-			ret = sonypi_read(SONYPI_CAMERA_SHARPNESS);
-			break;
-		case SONYPI_COMMAND_SETCAMERASHARPNESS:
-			sonypi_set(SONYPI_CAMERA_SHARPNESS, value);
-			break;
-		case SONYPI_COMMAND_GETCAMERAPICTURE:
-			ret = sonypi_read(SONYPI_CAMERA_PICTURE);
-			break;
-		case SONYPI_COMMAND_SETCAMERAPICTURE:
-			sonypi_set(SONYPI_CAMERA_PICTURE, value);
-			break;
-		case SONYPI_COMMAND_GETCAMERAAGC:
-			ret = sonypi_read(SONYPI_CAMERA_AGC);
-			break;
-		case SONYPI_COMMAND_SETCAMERAAGC:
-			sonypi_set(SONYPI_CAMERA_AGC, value);
-			break;
-		case SONYPI_COMMAND_GETCAMERADIRECTION:
-			ret = sonypi_read(SONYPI_CAMERA_STATUS);
-			ret &= SONYPI_DIRECTION_BACKWARDS;
-			break;
-		case SONYPI_COMMAND_GETCAMERAROMVERSION:
-			ret = sonypi_read(SONYPI_CAMERA_ROMVERSION);
-			break;
-		case SONYPI_COMMAND_GETCAMERAREVISION:
-			ret = sonypi_read(SONYPI_CAMERA_REVISION);
-			break;
+	switch (command) {
+	case SONYPI_COMMAND_SETCAMERA:
+		if (value)
+			sonypi_camera_on();
+		else
+			sonypi_camera_off();
+		break;
+	case SONYPI_COMMAND_SETCAMERABRIGHTNESS:
+		sonypi_set(SONYPI_CAMERA_BRIGHTNESS, value);
+		break;
+	case SONYPI_COMMAND_SETCAMERACONTRAST:
+		sonypi_set(SONYPI_CAMERA_CONTRAST, value);
+		break;
+	case SONYPI_COMMAND_SETCAMERAHUE:
+		sonypi_set(SONYPI_CAMERA_HUE, value);
+		break;
+	case SONYPI_COMMAND_SETCAMERACOLOR:
+		sonypi_set(SONYPI_CAMERA_COLOR, value);
+		break;
+	case SONYPI_COMMAND_SETCAMERASHARPNESS:
+		sonypi_set(SONYPI_CAMERA_SHARPNESS, value);
+		break;
+	case SONYPI_COMMAND_SETCAMERAPICTURE:
+		sonypi_set(SONYPI_CAMERA_PICTURE, value);
+		break;
+	case SONYPI_COMMAND_SETCAMERAAGC:
+		sonypi_set(SONYPI_CAMERA_AGC, value);
+		break;
+	default:
+		printk(KERN_ERR "sonypi: sonypi_camera_command invalid: %d\n",
+		       command);
+		break;
 	}
 	up(&sonypi_device.lock);
-	return ret;
+	return 0;
 }
 
-static int sonypi_misc_fasync(int fd, struct file *filp, int on) {
+EXPORT_SYMBOL(sonypi_camera_command);
+
+static int sonypi_misc_fasync(int fd, struct file *filp, int on)
+{
 	int retval;
 
-	retval = fasync_helper(fd, filp, on, &sonypi_device.queue.fasync);
+	retval = fasync_helper(fd, filp, on, &sonypi_device.fifo_async);
 	if (retval < 0)
 		return retval;
 	return 0;
 }
 
-static int sonypi_misc_release(struct inode * inode, struct file * file) {
+static int sonypi_misc_release(struct inode *inode, struct file *file)
+{
 	sonypi_misc_fasync(-1, file, 0);
 	down(&sonypi_device.lock);
 	sonypi_device.open_count--;
@@ -454,59 +503,56 @@ static int sonypi_misc_release(struct inode * inode, struct file * file) {
 	return 0;
 }
 
-static int sonypi_misc_open(struct inode * inode, struct file * file) {
+static int sonypi_misc_open(struct inode *inode, struct file *file)
+{
 	down(&sonypi_device.lock);
 	/* Flush input queue on first open */
 	if (!sonypi_device.open_count)
-		sonypi_initq();
+		kfifo_reset(sonypi_device.fifo);
 	sonypi_device.open_count++;
 	up(&sonypi_device.lock);
 	return 0;
 }
 
-static ssize_t sonypi_misc_read(struct file * file, char __user * buf,
-			size_t count, loff_t *pos)
+static ssize_t sonypi_misc_read(struct file *file, char __user *buf,
+				size_t count, loff_t *pos)
 {
-	DECLARE_WAITQUEUE(wait, current);
-	ssize_t i = count;
+	ssize_t ret;
 	unsigned char c;
 
-	if (sonypi_emptyq()) {
-		if (file->f_flags & O_NONBLOCK)
-			return -EAGAIN;
-		add_wait_queue(&sonypi_device.queue.proc_list, &wait);
-repeat:
-		set_current_state(TASK_INTERRUPTIBLE);
-		if (sonypi_emptyq() && !signal_pending(current)) {
-			schedule();
-			goto repeat;
-		}
-		current->state = TASK_RUNNING;
-		remove_wait_queue(&sonypi_device.queue.proc_list, &wait);
+	if ((kfifo_len(sonypi_device.fifo) == 0) &&
+	    (file->f_flags & O_NONBLOCK))
+		return -EAGAIN;
+
+	ret = wait_event_interruptible(sonypi_device.fifo_proc_list,
+				       kfifo_len(sonypi_device.fifo) != 0);
+	if (ret)
+		return ret;
+
+	while (ret < count &&
+	       (kfifo_get(sonypi_device.fifo, &c, sizeof(c)) == sizeof(c))) {
+		if (put_user(c, buf++))
+			return -EFAULT;
+		ret++;
 	}
-	while (i > 0 && !sonypi_emptyq()) {
-		c = sonypi_pullq();
-		put_user(c, buf++);
-		i--;
-        }
-	if (count - i) {
+
+	if (ret > 0)
 		file->f_dentry->d_inode->i_atime = CURRENT_TIME;
-		return count-i;
-	}
-	if (signal_pending(current))
-		return -ERESTARTSYS;
-	return 0;
+
+	return ret;
 }
 
-static unsigned int sonypi_misc_poll(struct file *file, poll_table * wait) {
-	poll_wait(file, &sonypi_device.queue.proc_list, wait);
-	if (!sonypi_emptyq())
+static unsigned int sonypi_misc_poll(struct file *file, poll_table *wait)
+{
+	poll_wait(file, &sonypi_device.fifo_proc_list, wait);
+	if (kfifo_len(sonypi_device.fifo))
 		return POLLIN | POLLRDNORM;
 	return 0;
 }
 
-static int sonypi_misc_ioctl(struct inode *ip, struct file *fp, 
-			     unsigned int cmd, unsigned long arg) {
+static int sonypi_misc_ioctl(struct inode *ip, struct file *fp,
+			     unsigned int cmd, unsigned long arg)
+{
 	int ret = 0;
 	void __user *argp = (void __user *)arg;
 	u8 val8;
@@ -601,99 +647,119 @@ static struct file_operations sonypi_misc_fops = {
 };
 
 struct miscdevice sonypi_misc_device = {
-	-1, "sonypi", &sonypi_misc_fops
+	.minor		= -1,
+	.name		= "sonypi",
+	.fops		= &sonypi_misc_fops,
 };
 
-#ifdef CONFIG_PM
-static int old_camera_power;
-
-static int sonypi_suspend(struct sys_device *dev, u32 state) {
-	sonypi_call2(0x81, 0); /* make sure we don't get any more events */
-	if (camera) {
-		old_camera_power = sonypi_device.camera_power;
-		sonypi_camera_off();
-	}
-	if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2)
-		sonypi_type2_dis();
-	else
-		sonypi_type1_dis();
-	/* disable ACPI mode */
-	if (!SONYPI_ACPI_ACTIVE && fnkeyinit)
-		outb(0xf1, 0xb2);
-	return 0;
-}
-
-static int sonypi_resume(struct sys_device *dev) {
-	/* Enable ACPI mode to get Fn key events */
-	if (!SONYPI_ACPI_ACTIVE && fnkeyinit)
-		outb(0xf0, 0xb2);
+static void sonypi_enable(unsigned int camera_on)
+{
 	if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2)
 		sonypi_type2_srs();
 	else
 		sonypi_type1_srs();
+
 	sonypi_call1(0x82);
 	sonypi_call2(0x81, 0xff);
-	if (compat)
-		sonypi_call1(0x92); 
-	else
-		sonypi_call1(0x82);
-	if (camera && old_camera_power)
+	sonypi_call1(compat ? 0x92 : 0x82);
+
+	/* Enable ACPI mode to get Fn key events */
+	if (!SONYPI_ACPI_ACTIVE && fnkeyinit)
+		outb(0xf0, 0xb2);
+
+	if (camera && camera_on)
 		sonypi_camera_on();
+}
+
+static int sonypi_disable(void)
+{
+	sonypi_call2(0x81, 0);	/* make sure we don't get any more events */
+	if (camera)
+		sonypi_camera_off();
+
+	/* disable ACPI mode */
+	if (!SONYPI_ACPI_ACTIVE && fnkeyinit)
+		outb(0xf1, 0xb2);
+
+	if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2)
+		sonypi_type2_dis();
+	else
+		sonypi_type1_dis();
 	return 0;
 }
 
-/* Old PM scheme */
-static int sonypi_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data) {
+#ifdef CONFIG_PM
+static int old_camera_power;
 
-	switch (rqst) {
-		case PM_SUSPEND:
-			sonypi_suspend(NULL, 0);
-			break;
-		case PM_RESUME:
-			sonypi_resume(NULL);
-			break;
+static int sonypi_suspend(struct device *dev, u32 state, u32 level)
+{
+	if (level == SUSPEND_DISABLE) {
+		old_camera_power = sonypi_device.camera_power;
+		sonypi_disable();
 	}
 	return 0;
 }
 
-/* New PM scheme (device model) */
-static struct sysdev_class sonypi_sysclass = {
-	set_kset_name("sonypi"),
-	.suspend = sonypi_suspend,
-	.resume = sonypi_resume,
-};
-
-static struct sys_device sonypi_sysdev = {
-	.id = 0,
-	.cls = &sonypi_sysclass,
-};
+static int sonypi_resume(struct device *dev, u32 level)
+{
+	if (level == RESUME_ENABLE)
+		sonypi_enable(old_camera_power);
+	return 0;
+}
 #endif
 
-static int __devinit sonypi_probe(struct pci_dev *pcidev) {
+static void sonypi_shutdown(struct device *dev)
+{
+	sonypi_disable();
+}
+
+static struct device_driver sonypi_driver = {
+	.name		= "sonypi",
+	.bus		= &platform_bus_type,
+#ifdef CONFIG_PM
+	.suspend	= sonypi_suspend,
+	.resume		= sonypi_resume,
+#endif
+	.shutdown	= sonypi_shutdown,
+};
+
+static int __devinit sonypi_probe(void)
+{
 	int i, ret;
 	struct sonypi_ioport_list *ioport_list;
 	struct sonypi_irq_list *irq_list;
+	struct pci_dev *pcidev;
+
+	pcidev = pci_get_device(PCI_VENDOR_ID_INTEL,
+				PCI_DEVICE_ID_INTEL_82371AB_3, NULL);
 
 	sonypi_device.dev = pcidev;
-	if (pcidev)
-		sonypi_device.model = SONYPI_DEVICE_MODEL_TYPE1;
-	else
-		sonypi_device.model = SONYPI_DEVICE_MODEL_TYPE2;
-	sonypi_initq();
+	sonypi_device.model = pcidev ?
+		SONYPI_DEVICE_MODEL_TYPE1 : SONYPI_DEVICE_MODEL_TYPE2;
+
+	sonypi_device.fifo_lock = SPIN_LOCK_UNLOCKED;
+	sonypi_device.fifo = kfifo_alloc(SONYPI_BUF_SIZE, GFP_KERNEL,
+					 &sonypi_device.fifo_lock);
+	if (IS_ERR(sonypi_device.fifo)) {
+		printk(KERN_ERR "sonypi: kfifo_alloc failed\n");
+		ret = PTR_ERR(sonypi_device.fifo);
+		goto out_fifo;
+	}
+
+	init_waitqueue_head(&sonypi_device.fifo_proc_list);
 	init_MUTEX(&sonypi_device.lock);
-	sonypi_device.bluetooth_power = 0;
-	
+	sonypi_device.bluetooth_power = -1;
+
 	if (pcidev && pci_enable_device(pcidev)) {
 		printk(KERN_ERR "sonypi: pci_enable_device failed\n");
 		ret = -EIO;
-		goto out1;
+		goto out_pcienable;
 	}
 
-	sonypi_misc_device.minor = (minor == -1) ? 
-		MISC_DYNAMIC_MINOR : minor;
+	sonypi_misc_device.minor = (minor == -1) ? MISC_DYNAMIC_MINOR : minor;
 	if ((ret = misc_register(&sonypi_misc_device))) {
 		printk(KERN_ERR "sonypi: misc_register failed\n");
-		goto out1;
+		goto out_miscreg;
 	}
 
 	if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2) {
@@ -701,8 +767,7 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 		sonypi_device.region_size = SONYPI_TYPE2_REGION_SIZE;
 		sonypi_device.evtype_offset = SONYPI_TYPE2_EVTYPE_OFFSET;
 		irq_list = sonypi_type2_irq_list;
-	}
-	else {
+	} else {
 		ioport_list = sonypi_type1_ioport_list;
 		sonypi_device.region_size = SONYPI_TYPE1_REGION_SIZE;
 		sonypi_device.evtype_offset = SONYPI_TYPE1_EVTYPE_OFFSET;
@@ -710,8 +775,8 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 	}
 
 	for (i = 0; ioport_list[i].port1; i++) {
-		if (request_region(ioport_list[i].port1, 
-				   sonypi_device.region_size, 
+		if (request_region(ioport_list[i].port1,
+				   sonypi_device.region_size,
 				   "Sony Programable I/O Device")) {
 			/* get the ioport */
 			sonypi_device.ioport1 = ioport_list[i].port1;
@@ -722,7 +787,7 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 	if (!sonypi_device.ioport1) {
 		printk(KERN_ERR "sonypi: request_region failed\n");
 		ret = -ENODEV;
-		goto out2;
+		goto out_reqreg;
 	}
 
 	for (i = 0; irq_list[i].irq; i++) {
@@ -730,59 +795,85 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 		sonypi_device.irq = irq_list[i].irq;
 		sonypi_device.bits = irq_list[i].bits;
 
-		/* Enable sonypi IRQ settings */
-		if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2)
-			sonypi_type2_srs();
-		else
-			sonypi_type1_srs();
-
-		sonypi_call1(0x82);
-		sonypi_call2(0x81, 0xff);
-		if (compat)
-			sonypi_call1(0x92); 
-		else
-			sonypi_call1(0x82);
-
-		/* Now try requesting the irq from the system */
-		if (!request_irq(sonypi_device.irq, sonypi_irq, 
+		if (!request_irq(sonypi_device.irq, sonypi_irq,
 				 SA_SHIRQ, "sonypi", sonypi_irq))
 			break;
-
-		/* If request_irq failed, disable sonypi IRQ settings */
-		if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2)
-			sonypi_type2_dis();
-		else
-			sonypi_type1_dis();
 	}
 
 	if (!irq_list[i].irq) {
 		printk(KERN_ERR "sonypi: request_irq failed\n");
 		ret = -ENODEV;
-		goto out3;
+		goto out_reqirq;
 	}
 
-#ifdef CONFIG_PM
-	sonypi_device.pm = pm_register(PM_PCI_DEV, 0, sonypi_pm_callback);
+	if (useinput) {
+		/* Initialize the Input Drivers: jogdial */
+		int i;
+		sonypi_device.input_jog_dev.evbit[0] =
+			BIT(EV_KEY) | BIT(EV_REL);
+		sonypi_device.input_jog_dev.keybit[LONG(BTN_MOUSE)] =
+			BIT(BTN_MIDDLE);
+		sonypi_device.input_jog_dev.relbit[0] = BIT(REL_WHEEL);
+		sonypi_device.input_jog_dev.name =
+			kmalloc(sizeof(SONYPI_JOG_INPUTNAME), GFP_KERNEL);
+		if (!sonypi_device.input_jog_dev.name) {
+			printk(KERN_ERR "sonypi: kmalloc failed\n");
+			ret = -ENOMEM;
+			goto out_inkmallocinput1;
+		}
+		sprintf(sonypi_device.input_jog_dev.name, SONYPI_JOG_INPUTNAME);
+		sonypi_device.input_jog_dev.id.bustype = BUS_ISA;
+		sonypi_device.input_jog_dev.id.vendor = PCI_VENDOR_ID_SONY;
 
-	if (sysdev_class_register(&sonypi_sysclass) != 0) {
-		printk(KERN_ERR "sonypi: sysdev_class_register failed\n");
-		ret = -ENODEV;
-		goto out4;
+		input_register_device(&sonypi_device.input_jog_dev);
+		printk(KERN_INFO "%s input method installed.\n",
+		       sonypi_device.input_jog_dev.name);
+
+		/* Initialize the Input Drivers: special keys */
+		sonypi_device.input_key_dev.evbit[0] = BIT(EV_KEY);
+		for (i = 0; sonypi_inputkeys[i].sonypiev; i++)
+			if (sonypi_inputkeys[i].inputev)
+				set_bit(sonypi_inputkeys[i].inputev,
+					sonypi_device.input_key_dev.keybit);
+		sonypi_device.input_key_dev.name =
+			kmalloc(sizeof(SONYPI_KEY_INPUTNAME), GFP_KERNEL);
+		if (!sonypi_device.input_key_dev.name) {
+			printk(KERN_ERR "sonypi: kmalloc failed\n");
+			ret = -ENOMEM;
+			goto out_inkmallocinput2;
+		}
+		sprintf(sonypi_device.input_key_dev.name, SONYPI_KEY_INPUTNAME);
+		sonypi_device.input_key_dev.id.bustype = BUS_ISA;
+		sonypi_device.input_key_dev.id.vendor = PCI_VENDOR_ID_SONY;
+
+		input_register_device(&sonypi_device.input_key_dev);
+		printk(KERN_INFO "%s input method installed.\n",
+		       sonypi_device.input_key_dev.name);
+
+		sonypi_device.input_fifo_lock = SPIN_LOCK_UNLOCKED;
+		sonypi_device.input_fifo =
+			kfifo_alloc(SONYPI_BUF_SIZE, GFP_KERNEL,
+				    &sonypi_device.input_fifo_lock);
+		if (IS_ERR(sonypi_device.input_fifo)) {
+			printk(KERN_ERR "sonypi: kfifo_alloc failed\n");
+			ret = PTR_ERR(sonypi_device.input_fifo);
+			goto out_infifo;
+		}
+
+		INIT_WORK(&sonypi_device.input_work, input_keyrelease, NULL);
 	}
-	if (sysdev_register(&sonypi_sysdev) != 0) {
-		printk(KERN_ERR "sonypi: sysdev_register failed\n");
-		ret = -ENODEV;
-		goto out5;
+
+	sonypi_device.pdev = platform_device_register_simple("sonypi", -1,
+							     NULL, 0);
+	if (IS_ERR(sonypi_device.pdev)) {
+		ret = PTR_ERR(sonypi_device.pdev);
+		goto out_platformdev;
 	}
-#endif
 
-	/* Enable ACPI mode to get Fn key events */
-	if (!SONYPI_ACPI_ACTIVE && fnkeyinit)
-		outb(0xf0, 0xb2);
+	sonypi_enable(0);
 
-	printk(KERN_INFO "sonypi: Sony Programmable I/O Controller Driver v%d.%d.\n",
-	       SONYPI_DRIVER_MAJORVERSION,
-	       SONYPI_DRIVER_MINORVERSION);
+	printk(KERN_INFO "sonypi: Sony Programmable I/O Controller Driver"
+	       "v%s.\n", SONYPI_DRIVER_VERSION);
 	printk(KERN_INFO "sonypi: detected %s model, "
 	       "verbose = %d, fnkeyinit = %s, camera = %s, "
 	       "compat = %s, mask = 0x%08lx, useinput = %s, acpi = %s\n",
@@ -796,77 +887,60 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 	       useinput ? "on" : "off",
 	       SONYPI_ACPI_ACTIVE ? "on" : "off");
 	printk(KERN_INFO "sonypi: enabled at irq=%d, port1=0x%x, port2=0x%x\n",
-	       sonypi_device.irq, 
+	       sonypi_device.irq,
 	       sonypi_device.ioport1, sonypi_device.ioport2);
 
 	if (minor == -1)
 		printk(KERN_INFO "sonypi: device allocated minor is %d\n",
 		       sonypi_misc_device.minor);
 
-#ifdef SONYPI_USE_INPUT
-	if (useinput) {
-		/* Initialize the Input Drivers: */
-		sonypi_device.jog_dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REL);
-		sonypi_device.jog_dev.keybit[LONG(BTN_MOUSE)] = BIT(BTN_MIDDLE);
-		sonypi_device.jog_dev.relbit[0] = BIT(REL_WHEEL);
-		sonypi_device.jog_dev.name = (char *) kmalloc(
-			sizeof(SONYPI_INPUTNAME), GFP_KERNEL);
-		sprintf(sonypi_device.jog_dev.name, SONYPI_INPUTNAME);
-		sonypi_device.jog_dev.id.bustype = BUS_ISA;
-		sonypi_device.jog_dev.id.vendor = PCI_VENDOR_ID_SONY;
-		sprintf(sonypi_device.jog_dev.cdev.class_id,"sonypi-jogdial");
-	  
-		input_register_device(&sonypi_device.jog_dev);
-		printk(KERN_INFO "%s installed.\n", sonypi_device.jog_dev.name);
-	}
-#endif /* SONYPI_USE_INPUT */
-
 	return 0;
 
-#ifdef CONFIG_PM
-out5:
-	sysdev_class_unregister(&sonypi_sysclass);
-out4:
+out_platformdev:
+	kfifo_free(sonypi_device.input_fifo);
+out_infifo:
+	input_unregister_device(&sonypi_device.input_key_dev);
+	kfree(sonypi_device.input_key_dev.name);
+out_inkmallocinput2:
+	input_unregister_device(&sonypi_device.input_jog_dev);
+	kfree(sonypi_device.input_jog_dev.name);
+out_inkmallocinput1:
 	free_irq(sonypi_device.irq, sonypi_irq);
-#endif
-out3:
+out_reqirq:
 	release_region(sonypi_device.ioport1, sonypi_device.region_size);
-out2:
+out_reqreg:
 	misc_deregister(&sonypi_misc_device);
-out1:
+out_miscreg:
+	if (pcidev)
+		pci_disable_device(pcidev);
+out_pcienable:
+	kfifo_free(sonypi_device.fifo);
+out_fifo:
+	pci_dev_put(sonypi_device.dev);
 	return ret;
 }
 
-static void __devexit sonypi_remove(void) {
+static void __devexit sonypi_remove(void)
+{
+	sonypi_disable();
 
-#ifdef CONFIG_PM
-	pm_unregister(sonypi_device.pm);
+	platform_device_unregister(sonypi_device.pdev);
 
-	sysdev_unregister(&sonypi_sysdev);
-	sysdev_class_unregister(&sonypi_sysclass);
-#endif
-
-	sonypi_call2(0x81, 0); /* make sure we don't get any more events */
-	
-#ifdef SONYPI_USE_INPUT
 	if (useinput) {
-		input_unregister_device(&sonypi_device.jog_dev);
-		kfree(sonypi_device.jog_dev.name);
+		input_unregister_device(&sonypi_device.input_key_dev);
+		kfree(sonypi_device.input_key_dev.name);
+		input_unregister_device(&sonypi_device.input_jog_dev);
+		kfree(sonypi_device.input_jog_dev.name);
+		kfifo_free(sonypi_device.input_fifo);
 	}
-#endif /* SONYPI_USE_INPUT */
 
-	if (camera)
-		sonypi_camera_off();
-	if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2)
-		sonypi_type2_dis();
-	else
-		sonypi_type1_dis();
-	/* disable ACPI mode */
-	if (!SONYPI_ACPI_ACTIVE && fnkeyinit)
-		outb(0xf1, 0xb2);
 	free_irq(sonypi_device.irq, sonypi_irq);
 	release_region(sonypi_device.ioport1, sonypi_device.region_size);
 	misc_deregister(&sonypi_misc_device);
+	if (sonypi_device.dev)
+		pci_disable_device(sonypi_device.dev);
+	kfifo_free(sonypi_device.fifo);
+	pci_dev_put(sonypi_device.dev);
 	printk(KERN_INFO "sonypi: removed.\n");
 }
 
@@ -888,78 +962,29 @@ static struct dmi_system_id __initdata sonypi_dmi_table[] = {
 	{ }
 };
 
-static int __init sonypi_init_module(void)
+static int __init sonypi_init(void)
 {
-	struct pci_dev *pcidev = NULL;
-	if (dmi_check_system(sonypi_dmi_table)) {
-		pcidev = pci_find_device(PCI_VENDOR_ID_INTEL, 
-					 PCI_DEVICE_ID_INTEL_82371AB_3, 
-					 NULL);
-		return sonypi_probe(pcidev);
-	}
-	else
+	int ret;
+
+	if (!dmi_check_system(sonypi_dmi_table))
 		return -ENODEV;
+
+	ret = driver_register(&sonypi_driver);
+	if (ret)
+		return ret;
+
+	ret = sonypi_probe();
+	if (ret)
+		driver_unregister(&sonypi_driver);
+
+	return ret;
 }
 
-static void __exit sonypi_cleanup_module(void) {
+static void __exit sonypi_exit(void)
+{
+	driver_unregister(&sonypi_driver);
 	sonypi_remove();
 }
 
-#ifndef MODULE
-static int __init sonypi_setup(char *str)  {
-	int ints[8];
-
-	str = get_options(str, ARRAY_SIZE(ints), ints);
-	if (ints[0] <= 0) 
-		goto out;
-	minor = ints[1];
-	if (ints[0] == 1)
-		goto out;
-	verbose = ints[2];
-	if (ints[0] == 2)
-		goto out;
-	fnkeyinit = ints[3];
-	if (ints[0] == 3)
-		goto out;
-	camera = ints[4];
-	if (ints[0] == 4)
-		goto out;
-	compat = ints[5];
-	if (ints[0] == 5)
-		goto out;
-	mask = ints[6];
-	if (ints[0] == 6)
-		goto out;
-	useinput = ints[7];
-out:
-	return 1;
-}
-
-__setup("sonypi=", sonypi_setup);
-#endif /* !MODULE */
-	
-/* Module entry points */
-module_init(sonypi_init_module);
-module_exit(sonypi_cleanup_module);
-
-MODULE_AUTHOR("Stelian Pop <stelian@popies.net>");
-MODULE_DESCRIPTION("Sony Programmable I/O Control Device driver");
-MODULE_LICENSE("GPL");
-
-
-MODULE_PARM(minor,"i");
-MODULE_PARM_DESC(minor, "minor number of the misc device, default is -1 (automatic)");
-MODULE_PARM(verbose,"i");
-MODULE_PARM_DESC(verbose, "be verbose, default is 0 (no)");
-MODULE_PARM(fnkeyinit,"i");
-MODULE_PARM_DESC(fnkeyinit, "set this if your Fn keys do not generate any event");
-MODULE_PARM(camera,"i");
-MODULE_PARM_DESC(camera, "set this if you have a MotionEye camera (PictureBook series)");
-MODULE_PARM(compat,"i");
-MODULE_PARM_DESC(compat, "set this if you want to enable backward compatibility mode");
-MODULE_PARM(mask, "i");
-MODULE_PARM_DESC(mask, "set this to the mask of event you want to enable (see doc)");
-MODULE_PARM(useinput, "i");
-MODULE_PARM_DESC(useinput, "if you have a jogdial, set this if you would like it to use the modern Linux Input Driver system");
-
-EXPORT_SYMBOL(sonypi_camera_command);
+module_init(sonypi_init);
+module_exit(sonypi_exit);

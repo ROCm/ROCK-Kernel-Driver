@@ -33,6 +33,8 @@
 #include <asm/sections.h>
 #include <asm/cputable.h>
 #include <asm/time.h>
+#include <asm/system.h>
+#include <asm/open_pic.h>
 
 /* WARNING !!! This will cause calibrate_delay() to be called,
  * but this is an __init function ! So you MUST go edit
@@ -51,10 +53,6 @@
 extern void low_choose_7447a_dfs(int dfs);
 extern void low_choose_750fx_pll(int pll);
 extern void low_sleep_handler(void);
-extern void openpic_suspend(struct sys_device *sysdev, u32 state);
-extern void openpic_resume(struct sys_device *sysdev);
-extern void enable_kernel_altivec(void);
-extern void enable_kernel_fp(void);
 
 /*
  * Currently, PowerMac cpufreq supports only high & low frequencies
@@ -140,11 +138,8 @@ static int __pmac dfs_set_cpu_speed(int low_speed)
 	if (low_speed == 0) {
 		/* ramping up, set voltage first */
 		pmac_call_feature(PMAC_FTR_WRITE_GPIO, NULL, voltage_gpio, 0x05);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ/1000);
-	} else {
-		/* ramping down, enable aack delay first */
-		pmac_call_feature(PMAC_FTR_AACK_DELAY_ENABLE, NULL, 1, 0);
+		/* Make sure we sleep for at least 1ms */
+		msleep(1);
 	}
 
 	/* set frequency */
@@ -153,11 +148,7 @@ static int __pmac dfs_set_cpu_speed(int low_speed)
 	if (low_speed == 1) {
 		/* ramping down, set voltage last */
 		pmac_call_feature(PMAC_FTR_WRITE_GPIO, NULL, voltage_gpio, 0x04);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ/1000);
-	} else {
-		/* ramping up, disable aack delay last */
-		pmac_call_feature(PMAC_FTR_AACK_DELAY_ENABLE, NULL, 0, 0);
+		msleep(1);
 	}
 
 	return 0;
@@ -174,8 +165,7 @@ static int __pmac gpios_set_cpu_speed(int low_speed)
 	if (low_speed == 0) {
 		pmac_call_feature(PMAC_FTR_WRITE_GPIO, NULL, voltage_gpio, 0x05);
 		/* Delay is way too big but it's ok, we schedule */
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ/100);
+		msleep(10);
 	}
 
 	/* Set frequency */
@@ -192,8 +182,7 @@ static int __pmac gpios_set_cpu_speed(int low_speed)
 	if (low_speed == 1) {
 		pmac_call_feature(PMAC_FTR_WRITE_GPIO, NULL, voltage_gpio, 0x04);
 		/* Delay is way too big but it's ok, we schedule */
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ/100);
+		msleep(10);
 	}
 
 #ifdef DEBUG_FREQ
@@ -217,7 +206,7 @@ static int __pmac pmu_set_cpu_speed(int low_speed)
 	printk(KERN_DEBUG "HID1, before: %x\n", mfspr(SPRN_HID1));
 #endif
 	/* Disable all interrupt sources on openpic */
-	openpic_suspend(NULL, 1);
+ 	openpic_set_priority(0xf);
 
 	/* Make sure the decrementer won't interrupt us */
 	asm volatile("mtdec %0" : : "r" (0x7fffffff));
@@ -284,7 +273,7 @@ static int __pmac pmu_set_cpu_speed(int low_speed)
 	wakeup_decrementer();
 
 	/* Restore interrupts */
-	openpic_resume(NULL);
+ 	openpic_set_priority(0);
 
 	/* Let interrupts flow again ... */
 	local_irq_enable();
@@ -301,7 +290,6 @@ static int __pmac pmu_set_cpu_speed(int low_speed)
 static int __pmac do_set_cpu_speed(int speed_mode)
 {
 	struct cpufreq_freqs freqs;
-	int rc;
 
 	freqs.old = cur_freq;
 	freqs.new = (speed_mode == PMAC_CPU_HIGH_SPEED) ? hi_freq : low_freq;
@@ -315,7 +303,7 @@ static int __pmac do_set_cpu_speed(int speed_mode)
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 	cur_freq = (speed_mode == PMAC_CPU_HIGH_SPEED) ? hi_freq : low_freq;
 
-	return rc;
+	return 0;
 }
 
 static int __pmac pmac_cpufreq_verify(struct cpufreq_policy *policy)
@@ -498,7 +486,7 @@ static int __pmac pmac_cpufreq_init_7447A(struct device_node *cpunode)
  *  - Titanium PowerBook 800 (PMU based, 667Mhz & 800Mhz)
  *  - Titanium PowerBook 400 (PMU based, 300Mhz & 400Mhz)
  *  - Titanium PowerBook 500 (PMU based, 300Mhz & 500Mhz)
- *  - iBook2 500 (PMU based, 400Mhz & 500Mhz)
+ *  - iBook2 500/600 (PMU based, 400Mhz & 500/600Mhz)
  *  - iBook2 700 (CPU based, 400Mhz & 700Mhz, support low voltage)
  *  - Recent MacRISC3 laptops
  *  - iBook G4s and PowerBook G4s with 7447A CPUs
@@ -533,11 +521,8 @@ static int __init pmac_cpufreq_setup(void)
 		   machine_is_compatible("PowerBook3,5") ||
 		   machine_is_compatible("MacRISC3")) {
 		pmac_cpufreq_init_MacRISC3(cpunode);
-	/* Else check for iBook2 500 */
+	/* Else check for iBook2 500/600 */
 	} else if (machine_is_compatible("PowerBook4,1")) {
-		/* We only know about 500Mhz model */
-		if (cur_freq < 450000 || cur_freq > 550000)
-			goto out;
 		hi_freq = cur_freq;
 		low_freq = 400000;
 		set_speed_proc = pmu_set_cpu_speed;

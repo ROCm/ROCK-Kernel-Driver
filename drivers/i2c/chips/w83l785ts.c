@@ -47,9 +47,7 @@
  */
 
 static unsigned short normal_i2c[] = { 0x2e, I2C_CLIENT_END };
-static unsigned short normal_i2c_range[] = { I2C_CLIENT_END };
 static unsigned int normal_isa[] = { I2C_CLIENT_ISA_END };
-static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 
 /*
  * Insmod parameters
@@ -282,14 +280,17 @@ static u8 w83l785ts_read_value(struct i2c_client *client, u8 reg, u8 defval)
 	 * default value requested by the caller. */
 	for (i = 1; i <= MAX_RETRIES; i++) {
 		value = i2c_smbus_read_byte_data(client, reg);
-		if (value >= 0)
+		if (value >= 0) {
+			dev_dbg(&client->dev, "Read 0x%02x from register "
+				"0x%02x.\n", value, reg);
 			return value;
+		}
 		dev_dbg(&client->dev, "Read failed, will retry in %d.\n", i);
 		msleep(i);
 	}
 
-	dev_err(&client->dev, "Couldn't read value from register. "
-		"Please report.\n");
+	dev_err(&client->dev, "Couldn't read value from register 0x%02x. "
+		"Please report.\n", reg);
 	return defval;
 }
 

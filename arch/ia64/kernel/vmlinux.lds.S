@@ -24,7 +24,6 @@ SECTIONS
 	*(.exit.text)
 	*(.exit.data)
 	*(.exitcall.exit)
-	*(.kdb_exitcall.exit)
 	*(.IA_64.unwind.exit.text)
 	*(.IA_64.unwind_info.exit.text)
 	}
@@ -136,12 +135,6 @@ SECTIONS
 	  __setup_start = .;
 	  *(.init.setup)
 	  __setup_end = .;
-	}
-  .kdb_initcall.init : AT(ADDR(.kdb_initcall.init) - LOAD_OFFSET)
-	{
-	  __kdb_initcall_start = .;
-	  *(.kdb_initcall.init)
-	  __kdb_initcall_end = .;
 	}
   .initcall.init : AT(ADDR(.initcall.init) - LOAD_OFFSET)
 	{

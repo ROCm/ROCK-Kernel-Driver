@@ -308,14 +308,12 @@ pci_set_power_state(struct pci_dev *dev, int state)
  * (>= 64 bytes).
  */
 int
-pci_save_state(struct pci_dev *dev, u32 *buffer)
+pci_save_state(struct pci_dev *dev)
 {
 	int i;
-	if (buffer) {
-		/* XXX: 100% dword access ok here? */
-		for (i = 0; i < 16; i++)
-			pci_read_config_dword(dev, i * 4,&buffer[i]);
-	}
+	/* XXX: 100% dword access ok here? */
+	for (i = 0; i < 16; i++)
+		pci_read_config_dword(dev, i * 4,&dev->saved_config_space[i]);
 	return 0;
 }
 
@@ -326,27 +324,12 @@ pci_save_state(struct pci_dev *dev, u32 *buffer)
  *
  */
 int 
-pci_restore_state(struct pci_dev *dev, u32 *buffer)
+pci_restore_state(struct pci_dev *dev)
 {
 	int i;
 
-	if (buffer) {
-		for (i = 0; i < 16; i++)
-			pci_write_config_dword(dev,i * 4, buffer[i]);
-	}
-	/*
-	 * otherwise, write the context information we know from bootup.
-	 * This works around a problem where warm-booting from Windows
-	 * combined with a D3(hot)->D0 transition causes PCI config
-	 * header data to be forgotten.
-	 */	
-	else {
-		for (i = 0; i < 6; i ++)
-			pci_write_config_dword(dev,
-					       PCI_BASE_ADDRESS_0 + (i * 4),
-					       dev->resource[i].start);
-		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
-	}
+	for (i = 0; i < 16; i++)
+		pci_write_config_dword(dev,i * 4, dev->saved_config_space[i]);
 	return 0;
 }
 
@@ -382,9 +365,24 @@ pci_enable_device_bars(struct pci_dev *dev, int bars)
 int
 pci_enable_device(struct pci_dev *dev)
 {
+	int err;
+
 	dev->is_enabled = 1;
-	return pci_enable_device_bars(dev, (1 << PCI_NUM_RESOURCES) - 1);
+	if ((err = pci_enable_device_bars(dev, (1 << PCI_NUM_RESOURCES) - 1)))
+		return err;
+	pci_fixup_device(pci_fixup_enable, dev);
+	return 0;
 }
+
+/**
+ * pcibios_disable_device - disable arch specific PCI resources for device dev
+ * @dev: the PCI device to disable
+ *
+ * Disables architecture specific PCI resources for the device. This
+ * is the default implementation. Architecture implementations can
+ * override this.
+ */
+void __attribute__ ((weak)) pcibios_disable_device (struct pci_dev *dev) {}
 
 /**
  * pci_disable_device - Disable PCI device after use
@@ -406,6 +404,8 @@ pci_disable_device(struct pci_dev *dev)
 		pci_command &= ~PCI_COMMAND_MASTER;
 		pci_write_config_word(dev, PCI_COMMAND, pci_command);
 	}
+
+	pcibios_disable_device(dev);
 }
 
 /**
@@ -744,7 +744,7 @@ static int __devinit pci_init(void)
 {
 	struct pci_dev *dev = NULL;
 
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
+	while ((dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		pci_fixup_device(pci_fixup_final, dev);
 	}
 	return 0;

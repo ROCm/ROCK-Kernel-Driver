@@ -23,34 +23,6 @@
     *    low-level frame buffer device
     */
 
-#ifdef CONFIG_BOOTSPLASH
-struct splash_data {
-    int splash_state;			/* show splash? */
-    int splash_color;			/* transparent color */
-    int splash_fg_color;		/* foreground color */
-    int splash_width;			/* width of image */
-    int splash_height;			/* height of image */
-    int splash_text_xo;			/* text area origin */
-    int splash_text_yo;
-    int splash_text_wi;			/* text area size */ 
-    int splash_text_he;
-    int splash_showtext;		/* silent/verbose mode */
-    int splash_boxcount;
-    int splash_percent;
-    int splash_overpaintok;		/* is it ok to overpaint boxes */
-    int splash_palcnt;
-    char *oldscreen_base;		/* pointer to top of virtual screen */
-    unsigned char *splash_boxes;
-    unsigned char *splash_jpeg;		/* jpeg */
-    unsigned char *splash_palette;	/* palette for 8-bit */
-
-    int splash_dosilent;		/* show silent jpeg */
-    unsigned char *splash_silentjpeg;
-    unsigned char *splash_sboxes;
-    int splash_sboxcount;
-};
-#endif
-    
 struct display {
     /* Filled in by the frame buffer device */
     u_short inverse;                /* != 0 text black on white as default */
@@ -76,6 +48,26 @@ struct display {
     struct fb_videomode *mode;
 };
 
+struct fbcon_ops {
+	void (*bmove)(struct vc_data *vc, struct fb_info *info, int sy,
+		      int sx, int dy, int dx, int height, int width);
+	void (*clear)(struct vc_data *vc, struct fb_info *info, int sy,
+		      int sx, int height, int width);
+	void (*putcs)(struct vc_data *vc, struct fb_info *info,
+		      const unsigned short *s, int count, int yy, int xx,
+		      int fg, int bg);
+	void (*clear_margins)(struct vc_data *vc, struct fb_info *info,
+			      int bottom_only);
+	void (*cursor)(struct vc_data *vc, struct fb_info *info,
+		       struct display *p, int mode, int fg, int bg);
+
+	struct timer_list cursor_timer; /* Cursor timer */
+	struct fb_cursor cursor_state;
+        int    currcon;	                /* Current VC. */
+	int    cursor_flash;
+	int    cursor_reset;
+	char  *cursor_data;
+};
     /*
      *  Attribute Decoding
      */
@@ -100,6 +92,13 @@ struct display {
 #define attr_blink(s) \
 	((s) & 0x8000)
 	
+/* Font */
+#define REFCOUNT(fd)	(((int *)(fd))[-1])
+#define FNTSIZE(fd)	(((int *)(fd))[-2])
+#define FNTCHARCNT(fd)	(((int *)(fd))[-3])
+#define FNTSUM(fd)	(((int *)(fd))[-4])
+#define FONT_EXTRA_WORDS 4
+
     /*
      *  Scroll Method
      */
@@ -157,5 +156,9 @@ struct display {
 #define SCROLL_PAN_REDRAW  0x005
 
 extern int fb_console_init(void);
-
+#ifdef CONFIG_FB_TILEBLITTING
+extern void fbcon_set_tileops(struct vc_data *vc, struct fb_info *info,
+			      struct display *p, struct fbcon_ops *ops);
+#endif
+extern void fbcon_set_bitops(struct fbcon_ops *ops);
 #endif /* _VIDEO_FBCON_H */

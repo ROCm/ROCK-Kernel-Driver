@@ -89,42 +89,41 @@ static int csp[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 #ifdef SNDRV_SBAWE_EMU8000
 static int seq_ports[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 4};
 #endif
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for SoundBlaster 16 soundcard.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for SoundBlaster 16 soundcard.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable SoundBlaster 16 soundcard.");
 #ifdef CONFIG_PNP
-module_param_array(isapnp, bool, boot_devs, 0444);
+module_param_array(isapnp, bool, NULL, 0444);
 MODULE_PARM_DESC(isapnp, "PnP detection for specified soundcard.");
 #endif
-module_param_array(port, long, boot_devs, 0444);
+module_param_array(port, long, NULL, 0444);
 MODULE_PARM_DESC(port, "Port # for SB16 driver.");
-module_param_array(mpu_port, long, boot_devs, 0444);
+module_param_array(mpu_port, long, NULL, 0444);
 MODULE_PARM_DESC(mpu_port, "MPU-401 port # for SB16 driver.");
-module_param_array(fm_port, long, boot_devs, 0444);
+module_param_array(fm_port, long, NULL, 0444);
 MODULE_PARM_DESC(fm_port, "FM port # for SB16 PnP driver.");
 #ifdef SNDRV_SBAWE_EMU8000
-module_param_array(awe_port, long, boot_devs, 0444);
+module_param_array(awe_port, long, NULL, 0444);
 MODULE_PARM_DESC(awe_port, "AWE port # for SB16 PnP driver.");
 #endif
-module_param_array(irq, int, boot_devs, 0444);
+module_param_array(irq, int, NULL, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for SB16 driver.");
-module_param_array(dma8, int, boot_devs, 0444);
+module_param_array(dma8, int, NULL, 0444);
 MODULE_PARM_DESC(dma8, "8-bit DMA # for SB16 driver.");
-module_param_array(dma16, int, boot_devs, 0444);
+module_param_array(dma16, int, NULL, 0444);
 MODULE_PARM_DESC(dma16, "16-bit DMA # for SB16 driver.");
-module_param_array(mic_agc, int, boot_devs, 0444);
+module_param_array(mic_agc, int, NULL, 0444);
 MODULE_PARM_DESC(mic_agc, "Mic Auto-Gain-Control switch.");
 #ifdef CONFIG_SND_SB16_CSP
-module_param_array(csp, int, boot_devs, 0444);
+module_param_array(csp, int, NULL, 0444);
 MODULE_PARM_DESC(csp, "ASP/CSP chip support.");
 #endif
 #ifdef SNDRV_SBAWE_EMU8000
-module_param_array(seq_ports, int, boot_devs, 0444);
+module_param_array(seq_ports, int, NULL, 0444);
 MODULE_PARM_DESC(seq_ports, "Number of sequencer ports for WaveTable synth.");
 #endif
 

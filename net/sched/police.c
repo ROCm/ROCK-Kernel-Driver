@@ -12,7 +12,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/types.h>
@@ -31,7 +31,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/init.h>
 #include <net/sock.h>
-#include <net/pkt_sched.h>
+#include <net/act_api.h>
 
 #define L2T(p,L)   ((p)->R_tab->data[(L)>>(p)->R_tab->rate.cell_log])
 #define L2T_P(p,L) ((p)->P_tab->data[(L)>>(p)->P_tab->rate.cell_log])
@@ -149,7 +149,7 @@ void tcf_police_destroy(struct tcf_police *p)
 			*p1p = p->next;
 			write_unlock_bh(&police_lock);
 #ifdef CONFIG_NET_ESTIMATOR
-			qdisc_kill_estimator(&p->stats);
+			gen_kill_estimator(&p->bstats, &p->rate_est);
 #endif
 			if (p->R_tab)
 				qdisc_put_rtab(p->R_tab);
@@ -245,7 +245,7 @@ override:
 	p->index = parm->index ? : tcf_police_new_index();
 #ifdef CONFIG_NET_ESTIMATOR
 	if (est)
-		qdisc_new_estimator(&p->stats, p->stats_lock, est);
+		gen_new_estimator(&p->bstats, &p->rate_est, p->stats_lock, est);
 #endif
 	h = tcf_police_hash(p->index);
 	write_lock_bh(&police_lock);
@@ -275,16 +275,6 @@ int tcf_act_police_cleanup(struct tc_action *a, int bind)
 	return 0;
 }
 
-int tcf_act_police_stats(struct sk_buff *skb, struct tc_action *a)
-{
-	struct tcf_police *p;
-	p = PRIV(a);
-	if (NULL != p) 
-		return qdisc_copy_stats(skb, &p->stats, p->stats_lock);
-
-	return 1;
-}
-
 int tcf_act_police(struct sk_buff **pskb, struct tc_action *a)
 {
 	psched_time_t now;
@@ -302,12 +292,12 @@ int tcf_act_police(struct sk_buff **pskb, struct tc_action *a)
 
 	spin_lock(&p->lock);
 
-	p->stats.bytes += skb->len;
-	p->stats.packets++;
+	p->bstats.bytes += skb->len;
+	p->bstats.packets++;
 
 #ifdef CONFIG_NET_ESTIMATOR
-	if (p->ewma_rate && p->stats.bps >= p->ewma_rate) {
-		p->stats.overlimits++;
+	if (p->ewma_rate && p->rate_est.bps >= p->ewma_rate) {
+		p->qstats.overlimits++;
 		spin_unlock(&p->lock);
 		return p->action;
 	}
@@ -343,7 +333,7 @@ int tcf_act_police(struct sk_buff **pskb, struct tc_action *a)
 		}
 	}
 
-	p->stats.overlimits++;
+	p->qstats.overlimits++;
 	spin_unlock(&p->lock);
 	return p->action;
 }
@@ -400,7 +390,6 @@ static struct tc_action_ops act_police_ops = {
 	.capab		=	TCA_CAP_NONE, 
 	.owner		=	THIS_MODULE,
 	.act		=	tcf_act_police,
-	.get_stats	=	tcf_act_police_stats,
 	.dump		=	tcf_act_police_dump,
 	.cleanup	=	tcf_act_police_cleanup,
 	.lookup		=	tcf_hash_search,
@@ -480,7 +469,7 @@ struct tcf_police * tcf_police_locate(struct rtattr *rta, struct rtattr *est)
 	p->action = parm->action;
 #ifdef CONFIG_NET_ESTIMATOR
 	if (est)
-		qdisc_new_estimator(&p->stats, p->stats_lock, est);
+		gen_new_estimator(&p->bstats, &p->rate_est, p->stats_lock, est);
 #endif
 	h = tcf_police_hash(p->index);
 	write_lock_bh(&police_lock);
@@ -504,12 +493,12 @@ int tcf_police(struct sk_buff *skb, struct tcf_police *p)
 
 	spin_lock(&p->lock);
 
-	p->stats.bytes += skb->len;
-	p->stats.packets++;
+	p->bstats.bytes += skb->len;
+	p->bstats.packets++;
 
 #ifdef CONFIG_NET_ESTIMATOR
-	if (p->ewma_rate && p->stats.bps >= p->ewma_rate) {
-		p->stats.overlimits++;
+	if (p->ewma_rate && p->rate_est.bps >= p->ewma_rate) {
+		p->qstats.overlimits++;
 		spin_unlock(&p->lock);
 		return p->action;
 	}
@@ -545,7 +534,7 @@ int tcf_police(struct sk_buff *skb, struct tcf_police *p)
 		}
 	}
 
-	p->stats.overlimits++;
+	p->qstats.overlimits++;
 	spin_unlock(&p->lock);
 	return p->action;
 }
@@ -581,9 +570,35 @@ rtattr_failure:
 	return -1;
 }
 
+int tcf_police_dump_stats(struct sk_buff *skb, struct tcf_police *p)
+{
+	struct gnet_dump d;
+	
+	if (gnet_stats_start_copy_compat(skb, TCA_STATS2, TCA_STATS,
+			TCA_XSTATS, p->stats_lock, &d) < 0)
+		goto errout;
+	
+	if (gnet_stats_copy_basic(&d, &p->bstats) < 0 ||
+#ifdef CONFIG_NET_ESTIMATOR
+	    gnet_stats_copy_rate_est(&d, &p->rate_est) < 0 ||
+#endif
+	    gnet_stats_copy_queue(&d, &p->qstats) < 0)
+		goto errout;
+
+	if (gnet_stats_finish_copy(&d) < 0)
+		goto errout;
+
+	return 0;
+
+errout:
+	return -1;
+}
+
+
 EXPORT_SYMBOL(tcf_police);
 EXPORT_SYMBOL(tcf_police_destroy);
 EXPORT_SYMBOL(tcf_police_dump);
+EXPORT_SYMBOL(tcf_police_dump_stats);
 EXPORT_SYMBOL(tcf_police_hash);
 EXPORT_SYMBOL(tcf_police_ht);
 EXPORT_SYMBOL(tcf_police_locate);

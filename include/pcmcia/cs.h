@@ -348,7 +348,6 @@ typedef struct mtd_bind_t {
 #define CS_EVENT_RESET_PHYSICAL		0x000200
 #define CS_EVENT_CARD_RESET		0x000400
 #define CS_EVENT_REGISTRATION_COMPLETE	0x000800
-#define CS_EVENT_RESET_COMPLETE		0x001000
 #define CS_EVENT_PM_SUSPEND		0x002000
 #define CS_EVENT_PM_RESUME		0x004000
 #define CS_EVENT_INSERTION_REQUEST	0x008000
@@ -425,16 +424,12 @@ int pcmcia_access_configuration_register(client_handle_t handle, conf_reg_t *reg
 int pcmcia_deregister_client(client_handle_t handle);
 int pcmcia_get_configuration_info(client_handle_t handle, config_info_t *config);
 int pcmcia_get_card_services_info(servinfo_t *info);
-int pcmcia_get_first_client(client_handle_t *handle, client_req_t *req);
-int pcmcia_get_next_client(client_handle_t *handle, client_req_t *req);
-int pcmcia_get_window(window_handle_t *handle, int idx, win_req_t *req);
 int pcmcia_get_first_window(window_handle_t *win, win_req_t *req);
 int pcmcia_get_next_window(window_handle_t *win, win_req_t *req);
 int pcmcia_get_status(client_handle_t handle, cs_status_t *status);
 int pcmcia_get_mem_page(window_handle_t win, memreq_t *req);
 int pcmcia_map_mem_page(window_handle_t win, memreq_t *req);
 int pcmcia_modify_configuration(client_handle_t handle, modconf_t *mod);
-int pcmcia_modify_window(window_handle_t win, modwin_t *req);
 int pcmcia_register_client(client_handle_t *handle, client_reg_t *req);
 int pcmcia_release_configuration(client_handle_t handle);
 int pcmcia_release_io(client_handle_t handle, io_req_t *req);
@@ -449,12 +444,14 @@ int pcmcia_suspend_card(struct pcmcia_socket *skt);
 int pcmcia_resume_card(struct pcmcia_socket *skt);
 int pcmcia_eject_card(struct pcmcia_socket *skt);
 int pcmcia_insert_card(struct pcmcia_socket *skt);
-int pcmcia_set_event_mask(client_handle_t handle, eventmask_t *mask);
 int pcmcia_report_error(client_handle_t handle, error_info_t *err);
-struct pci_bus *pcmcia_lookup_bus(client_handle_t handle);
 
-/* rsrc_mgr.c */
-int pcmcia_adjust_resource_info(client_handle_t handle, adjust_t *adj);
+#ifdef CONFIG_PCMCIA_OBSOLETE
+int pcmcia_get_first_client(client_handle_t *handle, client_req_t *req);
+int pcmcia_get_next_client(client_handle_t *handle, client_req_t *req);
+int pcmcia_modify_window(window_handle_t win, modwin_t *req);
+int pcmcia_set_event_mask(client_handle_t handle, eventmask_t *mask);
+#endif
 
 #endif /* __KERNEL__ */
 

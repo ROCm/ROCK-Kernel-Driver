@@ -73,7 +73,7 @@ static int  kobil_startup (struct usb_serial *serial);
 static void kobil_shutdown (struct usb_serial *serial);
 static int  kobil_open (struct usb_serial_port *port, struct file *filp);
 static void kobil_close (struct usb_serial_port *port, struct file *filp);
-static int  kobil_write (struct usb_serial_port *port, int from_user, 
+static int  kobil_write (struct usb_serial_port *port, 
 			 const unsigned char *buf, int count);
 static int  kobil_write_room(struct usb_serial_port *port);
 static int  kobil_ioctl(struct usb_serial_port *port, struct file *file,
@@ -350,14 +350,13 @@ static void kobil_close (struct usb_serial_port *port, struct file *filp)
 {
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
-	if (port->write_urb){
-		usb_unlink_urb( port->write_urb );
+	if (port->write_urb) {
+		usb_kill_urb(port->write_urb);
 		usb_free_urb( port->write_urb );
 		port->write_urb = NULL;
 	}
-	if (port->interrupt_in_urb){
-		usb_unlink_urb (port->interrupt_in_urb);
-	}
+	if (port->interrupt_in_urb)
+		usb_kill_urb(port->interrupt_in_urb);
 }
 
 
@@ -419,7 +418,7 @@ static void kobil_write_callback( struct urb *purb, struct pt_regs *regs )
 }
 
 
-static int kobil_write (struct usb_serial_port *port, int from_user, 
+static int kobil_write (struct usb_serial_port *port, 
 			const unsigned char *buf, int count)
 {
 	int length = 0;
@@ -440,13 +439,7 @@ static int kobil_write (struct usb_serial_port *port, int from_user,
 	}
 
 	// Copy data to buffer
-	if (from_user) {
-		if (copy_from_user(priv->buf + priv->filled, buf, count)) {
-			return -EFAULT;
-		}
-	} else {
-		memcpy (priv->buf + priv->filled, buf, count);
-	}
+	memcpy (priv->buf + priv->filled, buf, count);
 
 	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, count, priv->buf + priv->filled);
 
@@ -458,9 +451,8 @@ static int kobil_write (struct usb_serial_port *port, int from_user,
 	     ((priv->device_type == KOBIL_ADAPTER_B_PRODUCT_ID) && (priv->filled > 3) && (priv->filled >= (priv->buf[2] + 4))) ) {
 		
 		// stop reading (except TWIN and KAAN SIM)
-		if ( (priv->device_type == KOBIL_ADAPTER_B_PRODUCT_ID) || (priv->device_type == KOBIL_ADAPTER_K_PRODUCT_ID) ) {
-			usb_unlink_urb( port->interrupt_in_urb );
-		}
+		if ( (priv->device_type == KOBIL_ADAPTER_B_PRODUCT_ID) || (priv->device_type == KOBIL_ADAPTER_K_PRODUCT_ID) )
+			usb_kill_urb(port->interrupt_in_urb);
 
 		todo = priv->filled - priv->cur_pos;
 

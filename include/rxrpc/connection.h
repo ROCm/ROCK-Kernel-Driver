@@ -45,18 +45,18 @@ struct rxrpc_connection
 	rxrpc_serial_t		serial_counter;	/* packet serial number counter */
 
 	/* the following should all be in net order */
-	uint32_t		in_epoch;	/* peer's epoch */
-	uint32_t		out_epoch;	/* my epoch */
-	uint32_t		conn_id;	/* connection ID, appropriately shifted */
-	uint16_t		service_id;	/* service ID */
+	__be32			in_epoch;	/* peer's epoch */
+	__be32			out_epoch;	/* my epoch */
+	__be32			conn_id;	/* connection ID, appropriately shifted */
+	__be16			service_id;	/* service ID */
 	uint8_t			security_ix;	/* security ID */
 	uint8_t			in_clientflag;	/* RXRPC_CLIENT_INITIATED if we are server */
 	uint8_t			out_clientflag;	/* RXRPC_CLIENT_INITIATED if we are client */
 };
 
 extern int rxrpc_create_connection(struct rxrpc_transport *trans,
-				   uint16_t port,
-				   uint32_t addr,
+				   __be16 port,
+				   __be32 addr,
 				   uint16_t service_id,
 				   void *security,
 				   struct rxrpc_connection **_conn);

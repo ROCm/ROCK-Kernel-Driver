@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.147 $
+ * $Revision: 1.151 $
  */
 
 #include <linux/config.h>
@@ -1103,13 +1103,16 @@ static void
 dasd_end_request_cb(struct dasd_ccw_req * cqr, void *data)
 {
 	struct request *req;
+	struct dasd_device *device;
+	int status;
 
 	req = (struct request *) data;
-	dasd_profile_end(cqr->device, cqr, req);
-	spin_lock_irq(&cqr->device->request_queue_lock);
-	dasd_end_request(req, (cqr->status == DASD_CQR_DONE));
-	spin_unlock_irq(&cqr->device->request_queue_lock);
-	dasd_sfree_request(cqr, cqr->device);
+	device = cqr->device;
+	dasd_profile_end(device, cqr, req);
+	status = cqr->device->discipline->free_cp(cqr,req);
+	spin_lock_irq(&device->request_queue_lock);
+	dasd_end_request(req, status);
+	spin_unlock_irq(&device->request_queue_lock);
 }
 
 
@@ -1595,8 +1598,8 @@ dasd_alloc_queue(struct dasd_device * device)
 
 	device->request_queue->queuedata = device;
 #if 0
-	elevator_exit(device->request_queue);
-	rc = elevator_init(device->request_queue, &elevator_noop);
+	elevator_exit(device->request_queue->elevator);
+	rc = elevator_init(device->request_queue, "noop");
 	if (rc) {
 		blk_cleanup_queue(device->request_queue);
 		return rc;
@@ -1906,8 +1909,10 @@ dasd_generic_notify(struct ccw_device *cdev, int event)
 			dasd_schedule_bh(device);
 		} else {
 			list_for_each_entry(cqr, &device->ccw_queue, list)
-				if (cqr->status == DASD_CQR_IN_IO)
+				if (cqr->status == DASD_CQR_IN_IO) {
 					cqr->status = DASD_CQR_QUEUED;
+					cqr->retries++;
+				}
 			device->stopped |= DASD_STOPPED_DC_WAIT;
 			dasd_set_timer(device, 0);
 		}

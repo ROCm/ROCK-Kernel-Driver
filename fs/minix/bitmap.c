@@ -14,7 +14,7 @@
 #include "minix.h"
 #include <linux/smp_lock.h>
 #include <linux/buffer_head.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 
 static int nibblemap[] = { 4,3,3,2,3,2,2,1,3,2,2,1,2,1,1,0 };
 
@@ -160,7 +160,8 @@ minix_V2_raw_inode(struct super_block *sb, ino_t ino, struct buffer_head **bh)
 
 static void minix_clear_inode(struct inode *inode)
 {
-	struct buffer_head *bh;
+	struct buffer_head *bh = NULL;
+
 	if (INODE_VERSION(inode) == MINIX_V1) {
 		struct minix_inode *raw_inode;
 		raw_inode = minix_V1_raw_inode(inode->i_sb, inode->i_ino, &bh);
@@ -188,24 +189,26 @@ void minix_free_inode(struct inode * inode)
 	struct buffer_head * bh;
 	unsigned long ino;
 
-	if (inode->i_ino < 1 || inode->i_ino > sbi->s_ninodes) {
-		printk("free_inode: inode 0 or nonexistent inode\n");
-		return;
-	}
 	ino = inode->i_ino;
+	if (ino < 1 || ino > sbi->s_ninodes) {
+		printk("minix_free_inode: inode 0 or nonexistent inode\n");
+		goto out;
+	}
 	if ((ino >> 13) >= sbi->s_imap_blocks) {
-		printk("free_inode: nonexistent imap in superblock\n");
-		return;
+		printk("minix_free_inode: nonexistent imap in superblock\n");
+		goto out;
 	}
 
+	minix_clear_inode(inode);	/* clear on-disk copy */
+
 	bh = sbi->s_imap[ino >> 13];
-	minix_clear_inode(inode);
-	clear_inode(inode);
 	lock_kernel();
 	if (!minix_test_and_clear_bit(ino & 8191, bh->b_data))
-		printk("free_inode: bit %lu already cleared.\n",ino);
+		printk("minix_free_inode: bit %lu already cleared.\n", ino);
 	unlock_kernel();
 	mark_buffer_dirty(bh);
+ out:
+	clear_inode(inode);		/* clear in-memory copy */
 }
 
 struct inode * minix_new_inode(const struct inode * dir, int * error)

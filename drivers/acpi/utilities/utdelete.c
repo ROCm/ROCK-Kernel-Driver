@@ -621,6 +621,10 @@ acpi_ut_add_reference (
 		return_VOID;
 	}
 
+	ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS,
+		"Obj %p Current Refs=%X [To Be Incremented]\n",
+		object, object->common.reference_count));
+
 	/* Increment the reference count */
 
 	(void) acpi_ut_update_object_reference (object, REF_INCREMENT);
@@ -664,8 +668,9 @@ acpi_ut_remove_reference (
 		return_VOID;
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS, "Obj %p Refs=%X\n",
-			object, object->common.reference_count));
+	ACPI_DEBUG_PRINT ((ACPI_DB_ALLOCATIONS,
+		"Obj %p Current Refs=%X [To Be Decremented]\n",
+		object, object->common.reference_count));
 
 	/*
 	 * Decrement the reference count, and only actually delete the object

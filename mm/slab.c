@@ -327,6 +327,7 @@ struct kmem_cache_s {
 	unsigned long		reaped;
 	unsigned long 		errors;
 	unsigned long		max_freeable;
+	unsigned long		node_allocs;
 	atomic_t		allochit;
 	atomic_t		allocmiss;
 	atomic_t		freehit;
@@ -361,6 +362,7 @@ struct kmem_cache_s {
 					(x)->high_mark = (x)->num_active; \
 				} while (0)
 #define	STATS_INC_ERR(x)	((x)->errors++)
+#define	STATS_INC_NODEALLOCS(x)	((x)->node_allocs++)
 #define	STATS_SET_FREEABLE(x, i) \
 				do { if ((x)->max_freeable < i) \
 					(x)->max_freeable = i; \
@@ -378,6 +380,7 @@ struct kmem_cache_s {
 #define	STATS_INC_REAPED(x)	do { } while (0)
 #define	STATS_SET_HIGH(x)	do { } while (0)
 #define	STATS_INC_ERR(x)	do { } while (0)
+#define	STATS_INC_NODEALLOCS(x)	do { } while (0)
 #define	STATS_SET_FREEABLE(x, i) \
 				do { } while (0)
 
@@ -506,7 +509,7 @@ static struct cache_names __initdata cache_names[] = {
 
 static struct arraycache_init initarray_cache __initdata =
 	{ { 0, BOOT_CPUCACHE_ENTRIES, 1, 0} };
-static struct arraycache_init initarray_generic __initdata =
+static struct arraycache_init initarray_generic =
 	{ { 0, BOOT_CPUCACHE_ENTRIES, 1, 0} };
 
 /* internal cache of cache description objs */
@@ -560,6 +563,22 @@ static inline void ** ac_entry(struct array_cache *ac)
 static inline struct array_cache *ac_data(kmem_cache_t *cachep)
 {
 	return cachep->array[smp_processor_id()];
+}
+
+static kmem_cache_t * kmem_find_general_cachep (size_t size, int gfpflags)
+{
+	struct cache_sizes *csizep = malloc_sizes;
+
+	/* This function could be moved to the header file, and
+	 * made inline so consumers can quickly determine what
+	 * cache pointer they require.
+	 */
+	for ( ; csizep->cs_size; csizep++) {
+		if (size > csizep->cs_size)
+			continue;
+		break;
+	}
+	return (gfpflags & GFP_DMA) ? csizep->cs_dmacachep : csizep->cs_cachep;
 }
 
 /* Cal the num objs, wastage, and bytes left over for a given slab size. */
@@ -1731,7 +1750,7 @@ static void set_slab_attr(kmem_cache_t *cachep, struct slab *slabp, void *objp)
  * Grow (by 1) the number of slabs within a cache.  This is called by
  * kmem_cache_alloc() when there are no active objs left in a cache.
  */
-static int cache_grow (kmem_cache_t * cachep, int flags)
+static int cache_grow (kmem_cache_t * cachep, int flags, int nodeid)
 {
 	struct slab	*slabp;
 	void		*objp;
@@ -1782,7 +1801,7 @@ static int cache_grow (kmem_cache_t * cachep, int flags)
 
 
 	/* Get mem for the objs. */
-	if (!(objp = kmem_getpages(cachep, flags, -1)))
+	if (!(objp = kmem_getpages(cachep, flags, nodeid)))
 		goto failed;
 
 	/* Get slab management. */
@@ -2016,7 +2035,7 @@ alloc_done:
 
 	if (unlikely(!ac->avail)) {
 		int x;
-		x = cache_grow(cachep, flags);
+		x = cache_grow(cachep, flags, -1);
 		
 		// cache_grow can reenable interrupts, then ac could change.
 		ac = ac_data(cachep);
@@ -2297,6 +2316,7 @@ out:
 	return 0;
 }
 
+#ifdef CONFIG_NUMA
 /**
  * kmem_cache_alloc_node - Allocate an object on the specified node
  * @cachep: The cache to allocate from.
@@ -2309,68 +2329,79 @@ out:
  */
 void *kmem_cache_alloc_node(kmem_cache_t *cachep, int nodeid)
 {
-	size_t offset;
+	int loop;
 	void *objp;
 	struct slab *slabp;
 	kmem_bufctl_t next;
 
-	/* The main algorithms are not node aware, thus we have to cheat:
-	 * We bypass all caches and allocate a new slab.
-	 * The following code is a streamlined copy of cache_grow().
-	 */
+	for (loop = 0;;loop++) {
+		struct list_head *q;
 
-	/* Get colour for the slab, and update the next value. */
-	spin_lock_irq(&cachep->spinlock);
-	offset = cachep->colour_next;
-	cachep->colour_next++;
-	if (cachep->colour_next >= cachep->colour)
-		cachep->colour_next = 0;
-	offset *= cachep->colour_off;
-	spin_unlock_irq(&cachep->spinlock);
+		objp = NULL;
+		check_irq_on();
+		spin_lock_irq(&cachep->spinlock);
+		/* walk through all partial and empty slab and find one
+		 * from the right node */
+		list_for_each(q,&cachep->lists.slabs_partial) {
+			slabp = list_entry(q, struct slab, list);
 
-	/* Get mem for the objs. */
-	if (!(objp = kmem_getpages(cachep, GFP_KERNEL, nodeid)))
-		goto failed;
+			if (page_to_nid(virt_to_page(slabp->s_mem)) == nodeid ||
+					loop > 2)
+				goto got_slabp;
+		}
+		list_for_each(q, &cachep->lists.slabs_free) {
+			slabp = list_entry(q, struct slab, list);
 
-	/* Get slab management. */
-	if (!(slabp = alloc_slabmgmt(cachep, objp, offset, GFP_KERNEL)))
-		goto opps1;
+			if (page_to_nid(virt_to_page(slabp->s_mem)) == nodeid ||
+					loop > 2)
+				goto got_slabp;
+		}
+		spin_unlock_irq(&cachep->spinlock);
 
-	set_slab_attr(cachep, slabp, objp);
-	cache_init_objs(cachep, slabp, SLAB_CTOR_CONSTRUCTOR);
+		local_irq_disable();
+		if (!cache_grow(cachep, GFP_KERNEL, nodeid)) {
+			local_irq_enable();
+			return NULL;
+		}
+		local_irq_enable();
+	}
+got_slabp:
+	/* found one: allocate object */
+	check_slabp(cachep, slabp);
+	check_spinlock_acquired(cachep);
 
-	/* The first object is ours: */
+	STATS_INC_ALLOCED(cachep);
+	STATS_INC_ACTIVE(cachep);
+	STATS_SET_HIGH(cachep);
+	STATS_INC_NODEALLOCS(cachep);
+
 	objp = slabp->s_mem + slabp->free*cachep->objsize;
+
 	slabp->inuse++;
 	next = slab_bufctl(slabp)[slabp->free];
 #if DEBUG
 	slab_bufctl(slabp)[slabp->free] = BUFCTL_FREE;
 #endif
 	slabp->free = next;
-
-	/* add the remaining objects into the cache */
-	spin_lock_irq(&cachep->spinlock);
 	check_slabp(cachep, slabp);
-	STATS_INC_GROWN(cachep);
-	/* Make slab active. */
-	if (slabp->free == BUFCTL_END) {
-		list_add_tail(&slabp->list, &(list3_data(cachep)->slabs_full));
-	} else {
-		list_add_tail(&slabp->list,
-				&(list3_data(cachep)->slabs_partial));
-		list3_data(cachep)->free_objects += cachep->num-1;
-	}
+
+	/* move slabp to correct slabp list: */
+	list_del(&slabp->list);
+	if (slabp->free == BUFCTL_END)
+		list_add(&slabp->list, &cachep->lists.slabs_full);
+	else
+		list_add(&slabp->list, &cachep->lists.slabs_partial);
+
+	list3_data(cachep)->free_objects--;
 	spin_unlock_irq(&cachep->spinlock);
+
 	objp = cache_alloc_debugcheck_after(cachep, GFP_KERNEL, objp,
 					__builtin_return_address(0));
 	return objp;
-opps1:
-	kmem_freepages(cachep, objp);
-failed:
-	return NULL;
-
 }
 EXPORT_SYMBOL(kmem_cache_alloc_node);
+
+#endif
 
 /**
  * kmalloc - allocate memory
@@ -2419,8 +2450,7 @@ EXPORT_SYMBOL(__kmalloc);
 /**
  * __alloc_percpu - allocate one copy of the object for every present
  * cpu in the system, zeroing them.
- * Objects should be dereferenced using per_cpu_ptr/get_cpu_ptr
- * macros only.
+ * Objects should be dereferenced using the per_cpu_ptr macro only.
  *
  * @size: how many bytes of memory are required.
  * @align: the alignment, which can't be greater than SMP_CACHE_BYTES.
@@ -2554,24 +2584,6 @@ unsigned int kmem_cache_size(kmem_cache_t *cachep)
 }
 
 EXPORT_SYMBOL(kmem_cache_size);
-
-kmem_cache_t * kmem_find_general_cachep (size_t size, int gfpflags)
-{
-	struct cache_sizes *csizep = malloc_sizes;
-
-	/* This function could be moved to the header file, and
-	 * made inline so consumers can quickly determine what
-	 * cache pointer they require.
-	 */
-	for ( ; csizep->cs_size; csizep++) {
-		if (size > csizep->cs_size)
-			continue;
-		break;
-	}
-	return (gfpflags & GFP_DMA) ? csizep->cs_dmacachep : csizep->cs_cachep;
-}
-
-EXPORT_SYMBOL(kmem_find_general_cachep);
 
 struct ccupdate_struct {
 	kmem_cache_t *cachep;
@@ -2815,15 +2827,16 @@ static void *s_start(struct seq_file *m, loff_t *pos)
 		 * without _too_ many complaints.
 		 */
 #if STATS
-		seq_puts(m, "slabinfo - version: 2.0 (statistics)\n");
+		seq_puts(m, "slabinfo - version: 2.1 (statistics)\n");
 #else
-		seq_puts(m, "slabinfo - version: 2.0\n");
+		seq_puts(m, "slabinfo - version: 2.1\n");
 #endif
 		seq_puts(m, "# name            <active_objs> <num_objs> <objsize> <objperslab> <pagesperslab>");
 		seq_puts(m, " : tunables <batchcount> <limit> <sharedfactor>");
 		seq_puts(m, " : slabdata <active_slabs> <num_slabs> <sharedavail>");
 #if STATS
-		seq_puts(m, " : globalstat <listallocs> <maxobjs> <grown> <reaped> <error> <maxfreeable> <freelimit>");
+		seq_puts(m, " : globalstat <listallocs> <maxobjs> <grown> <reaped>"
+				" <error> <maxfreeable> <freelimit> <nodeallocs>");
 		seq_puts(m, " : cpustat <allochit> <allocmiss> <freehit> <freemiss>");
 #endif
 		seq_putc(m, '\n');
@@ -2914,10 +2927,11 @@ static int s_show(struct seq_file *m, void *p)
 		unsigned long errors = cachep->errors;
 		unsigned long max_freeable = cachep->max_freeable;
 		unsigned long free_limit = cachep->free_limit;
+		unsigned long node_allocs = cachep->node_allocs;
 
-		seq_printf(m, " : globalstat %7lu %6lu %5lu %4lu %4lu %4lu %4lu",
+		seq_printf(m, " : globalstat %7lu %6lu %5lu %4lu %4lu %4lu %4lu %4lu",
 				allocs, high, grown, reaped, errors, 
-				max_freeable, free_limit);
+				max_freeable, free_limit, node_allocs);
 	}
 	/* cpu stats */
 	{

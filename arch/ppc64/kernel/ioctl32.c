@@ -22,9 +22,7 @@
 
 #define INCLUDES
 #include "compat_ioctl.c"
-#include <linux/ncp_fs.h>
 #include <linux/syscalls.h>
-#include <asm/ppc32.h>
 
 #define CODE
 #include "compat_ioctl.c"
@@ -41,6 +39,7 @@ IOCTL_TABLE_START
 #include <linux/compat_ioctl.h>
 #define DECLARES
 #include "compat_ioctl.c"
+COMPATIBLE_IOCTL(TCSBRKP)
 COMPATIBLE_IOCTL(TIOCSTART)
 COMPATIBLE_IOCTL(TIOCSTOP)
 COMPATIBLE_IOCTL(TIOCSLTC)

@@ -6,7 +6,6 @@ obj-$(CONFIG_HOTPLUG_PCI)		+= pci_hotplug.o
 obj-$(CONFIG_HOTPLUG_PCI_FAKE)		+= fakephp.o 
 obj-$(CONFIG_HOTPLUG_PCI_COMPAQ)	+= cpqphp.o
 obj-$(CONFIG_HOTPLUG_PCI_IBM)		+= ibmphp.o
-obj-$(CONFIG_HOTPLUG_PCI_AMD)		+= amdshpc.o
 obj-$(CONFIG_HOTPLUG_PCI_ACPI)		+= acpiphp.o
 obj-$(CONFIG_HOTPLUG_PCI_ACPI_IBM)	+= acpiphp_ibm.o
 obj-$(CONFIG_HOTPLUG_PCI_CPCI_ZT5550)	+= cpcihp_zt5550.o
@@ -36,16 +35,6 @@ ibmphp-objs		:=	ibmphp_core.o	\
 				ibmphp_res.o	\
 				ibmphp_hpc.o
 
-amdshpc-objs		:=	amdshpc_core.o	\
-				amdshpc_ctrl.o	\
-				amdshpc_pci.o	\
-				amdshpc_pcix.o	\
-				amdshpc_ddi.o	\
-				amdshpc_dsb.o	\
-				amdshpc_enb.o	\
-				amdshpc_int.o	\
-				amdshpc_led.o
-
 acpiphp-objs		:=	acpiphp_core.o	\
 				acpiphp_glue.o	\
 				acpiphp_pci.o	\
@@ -62,7 +51,6 @@ rpadlpar_io-objs	:=	rpadlpar_core.o \
 pciehp-objs		:=	pciehp_core.o	\
 				pciehp_ctrl.o	\
 				pciehp_pci.o	\
-				pciehp_sysfs.o	\
 				pciehp_hpc.o
 ifdef CONFIG_ACPI_BUS
 	pciehp-objs += pciehprm_acpi.o

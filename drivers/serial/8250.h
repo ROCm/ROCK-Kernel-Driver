@@ -17,7 +17,8 @@
 
 #include <linux/config.h>
 
-void serial8250_get_irq_map(unsigned int *map);
+int serial8250_register_port(struct uart_port *);
+void serial8250_unregister_port(int line);
 void serial8250_suspend_port(int line);
 void serial8250_resume_port(int line);
 
@@ -38,14 +39,16 @@ struct old_serial_port {
  */
 struct serial8250_config {
 	const char	*name;
-	unsigned int	fifo_size;
-	unsigned int	tx_loadsz;
+	unsigned short	fifo_size;
+	unsigned short	tx_loadsz;
+	unsigned char	fcr;
 	unsigned int	flags;
 };
 
 #define UART_CAP_FIFO	(1 << 8)	/* UART has FIFO */
 #define UART_CAP_EFR	(1 << 9)	/* UART has EFR */
 #define UART_CAP_SLEEP	(1 << 10)	/* UART has IER sleep */
+#define UART_CAP_AFE	(1 << 11)	/* MCR-based hw flow control */
 
 #undef SERIAL_DEBUG_PCI
 
@@ -68,4 +71,15 @@ struct serial8250_config {
 #define SERIAL8250_SHARE_IRQS 1
 #else
 #define SERIAL8250_SHARE_IRQS 0
+#endif
+
+#if defined(__alpha__) && !defined(CONFIG_PCI)
+/*
+ * Digital did something really horribly wrong with the OUT1 and OUT2
+ * lines on at least some ALPHA's.  The failure mode is that if either
+ * is cleared, the machine locks up with endless interrupts.
+ */
+#define ALPHA_KLUDGE_MCR  (UART_MCR_OUT2 | UART_MCR_OUT1)
+#else
+#define ALPHA_KLUDGE_MCR 0
 #endif

@@ -212,7 +212,7 @@ static __inline__ unsigned long __ffs(unsigned long word)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-static __inline__ unsigned long find_next_bit(unsigned long *addr,
+static __inline__ unsigned long find_next_bit(const unsigned long *addr,
 	unsigned long size, unsigned long offset)
 {
 	unsigned int *p = ((unsigned int *) addr) + (offset >> 5);
@@ -344,7 +344,7 @@ static inline int sched_find_first_bit(unsigned long *b)
 #define ext2_test_bit(nr, addr) test_bit((nr), (addr))
 #define ext2_find_first_zero_bit(addr, size) find_first_zero_bit((addr), (size))
 #define ext2_find_next_zero_bit(addr, size, offset) \
-                find_next_zero_bit((addr), (size), (offset))
+                find_next_zero_bit((unsigned long *)(addr), (size), (offset))
 #else
 static __inline__ int ext2_set_bit(int nr, volatile void * addr)
 {

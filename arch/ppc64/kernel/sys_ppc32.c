@@ -72,7 +72,6 @@
 #include <asm/semaphore.h>
 #include <asm/ppcdebug.h>
 #include <asm/time.h>
-#include <asm/ppc32.h>
 #include <asm/mmu_context.h>
 
 #include "pci.h"
@@ -622,8 +621,11 @@ long sys32_execve(unsigned long a0, unsigned long a1, unsigned long a2,
 
 	error = compat_do_execve(filename, compat_ptr(a1), compat_ptr(a2), regs);
 
-	if (error == 0)
+	if (error == 0) {
+		task_lock(current);
 		current->ptrace &= ~PT_DTRACE;
+		task_unlock(current);
+	}
 	putname(filename);
 
 out:
@@ -634,8 +636,24 @@ out:
 void start_thread32(struct pt_regs* regs, unsigned long nip, unsigned long sp)
 {
 	set_fs(USER_DS);
-	memset(regs->gpr, 0, sizeof(regs->gpr));
-	memset(&regs->ctr, 0, 4 * sizeof(regs->ctr));
+
+	/*
+	 * If we exec out of a kernel thread then thread.regs will not be
+	 * set. Do it now.
+	 */
+	if (!current->thread.regs) {
+		unsigned long childregs = (unsigned long)current->thread_info +
+						THREAD_SIZE;
+		childregs -= sizeof(struct pt_regs);
+		current->thread.regs = (struct pt_regs *)childregs;
+	}
+
+	/*
+	 * ELF_PLAT_INIT already clears all registers but it also sets r2.
+	 * So just clear r2 here.
+	 */
+	regs->gpr[2] = 0;
+
 	regs->nip = nip;
 	regs->gpr[1] = sp;
 	regs->msr = MSR_USER32;
@@ -700,7 +718,7 @@ asmlinkage int sys32_pciconfig_read(u32 bus, u32 dfn, u32 off, u32 len, u32 ubuf
 				  (unsigned long) dfn,
 				  (unsigned long) off,
 				  (unsigned long) len,
-				  (unsigned char __user *)AA(ubuf));
+				  compat_ptr(ubuf));
 }
 
 asmlinkage int sys32_pciconfig_write(u32 bus, u32 dfn, u32 off, u32 len, u32 ubuf)
@@ -709,7 +727,7 @@ asmlinkage int sys32_pciconfig_write(u32 bus, u32 dfn, u32 off, u32 len, u32 ubu
 				   (unsigned long) dfn,
 				   (unsigned long) off,
 				   (unsigned long) len,
-				   (unsigned char __user *)AA(ubuf));
+				   compat_ptr(ubuf));
 }
 
 #define IOBASE_BRIDGE_NUMBER	0
@@ -1095,7 +1113,7 @@ struct __sysctl_args32 {
 	u32 __unused[4];
 };
 
-extern asmlinkage long sys32_sysctl(struct __sysctl_args32 __user *args)
+asmlinkage long sys32_sysctl(struct __sysctl_args32 __user *args)
 {
 	struct __sysctl_args32 tmp;
 	int error;
@@ -1114,19 +1132,20 @@ extern asmlinkage long sys32_sysctl(struct __sysctl_args32 __user *args)
 		   glibc's __sysctl uses rw memory for the structure
 		   anyway.  */
 		oldlenp = (size_t __user *)addr;
-		if (get_user(oldlen, (u32 __user *)A(tmp.oldlenp)) ||
+		if (get_user(oldlen, (compat_size_t __user *)compat_ptr(tmp.oldlenp)) ||
 		    put_user(oldlen, oldlenp))
 			return -EFAULT;
 	}
 
 	lock_kernel();
-	error = do_sysctl((int __user *)A(tmp.name), tmp.nlen, (void __user *)A(tmp.oldval),
-			  oldlenp, (void __user *)A(tmp.newval), tmp.newlen);
+	error = do_sysctl(compat_ptr(tmp.name), tmp.nlen,
+			  compat_ptr(tmp.oldval), oldlenp,
+			  compat_ptr(tmp.newval), tmp.newlen);
 	unlock_kernel();
 	if (oldlenp) {
 		if (!error) {
 			if (get_user(oldlen, oldlenp) ||
-			    put_user(oldlen, (u32 __user *)A(tmp.oldlenp)))
+			    put_user(oldlen, (compat_size_t __user *)compat_ptr(tmp.oldlenp)))
 				error = -EFAULT;
 		}
 		copy_to_user(args->__unused, tmp.__unused, sizeof(tmp.__unused));
@@ -1309,3 +1328,21 @@ long ppc32_timer_create(clockid_t clock,
 
 	return err;
 }
+
+asmlinkage long sys32_add_key(const char __user *_type,
+			      const char __user *_description,
+			      const void __user *_payload,
+			      u32 plen,
+			      u32 ringid)
+{
+	return sys_add_key(_type, _description, _payload, plen, ringid);
+}
+
+asmlinkage long sys32_request_key(const char __user *_type,
+				  const char __user *_description,
+				  const char __user *_callout_info,
+				  u32 destringid)
+{
+	return sys_request_key(_type, _description, _callout_info, destringid);
+}
+

@@ -237,11 +237,17 @@ extern void dmac_flush_range(unsigned long, unsigned long);
  * space" model to handle this.
  */
 #define copy_to_user_page(vma, page, vaddr, dst, src, len) \
-do { memcpy(dst, src, len); \
-     flush_icache_user_range(vma, page, vaddr, len); \
-} while (0)
+	do {					\
+		flush_cache_page(vma, vaddr);	\
+		memcpy(dst, src, len);		\
+		flush_dcache_page(page);	\
+	} while (0)
+
 #define copy_from_user_page(vma, page, vaddr, dst, src, len) \
-	memcpy(dst, src, len)
+	do {					\
+		flush_cache_page(vma, vaddr);	\
+		memcpy(dst, src, len);		\
+	} while (0)
 
 /*
  * Convert calls to our calling convention.
@@ -250,14 +256,14 @@ do { memcpy(dst, src, len); \
 
 static inline void flush_cache_mm(struct mm_struct *mm)
 {
-	if (current->active_mm == mm)
+	if (cpu_isset(smp_processor_id(), mm->cpu_vm_mask))
 		__cpuc_flush_user_all();
 }
 
 static inline void
 flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long end)
 {
-	if (current->active_mm == vma->vm_mm)
+	if (cpu_isset(smp_processor_id(), vma->vm_mm->cpu_vm_mask))
 		__cpuc_flush_user_range(start & PAGE_MASK, PAGE_ALIGN(end),
 					vma->vm_flags);
 }
@@ -265,7 +271,7 @@ flush_cache_range(struct vm_area_struct *vma, unsigned long start, unsigned long
 static inline void
 flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr)
 {
-	if (current->active_mm == vma->vm_mm) {
+	if (cpu_isset(smp_processor_id(), vma->vm_mm->cpu_vm_mask)) {
 		unsigned long addr = user_addr & PAGE_MASK;
 		__cpuc_flush_user_range(addr, addr + PAGE_SIZE, vma->vm_flags);
 	}
@@ -306,9 +312,9 @@ flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr)
 extern void flush_dcache_page(struct page *);
 
 #define flush_dcache_mmap_lock(mapping) \
-	write_lock_irq(&(mapping)->tree_lock)
+	spin_lock_irq(&(mapping)->tree_lock)
 #define flush_dcache_mmap_unlock(mapping) \
-	write_unlock_irq(&(mapping)->tree_lock)
+	spin_unlock_irq(&(mapping)->tree_lock)
 
 #define flush_icache_user_range(vma,page,addr,len) \
 	flush_dcache_page(page)
@@ -318,5 +324,64 @@ extern void flush_dcache_page(struct page *);
  * duplicate cache flushing elsewhere performed by flush_dcache_page().
  */
 #define flush_icache_page(vma,page)	do { } while (0)
+
+#define __cacheid_present(val)		(val != read_cpuid(CPUID_ID))
+#define __cacheid_vivt(val)		((val & (15 << 25)) != (14 << 25))
+#define __cacheid_vipt(val)		((val & (15 << 25)) == (14 << 25))
+#define __cacheid_vipt_nonaliasing(val)	((val & (15 << 25 | 1 << 23)) == (14 << 25))
+#define __cacheid_vipt_aliasing(val)	((val & (15 << 25 | 1 << 23)) == (14 << 25 | 1 << 23))
+
+#if defined(CONFIG_CPU_CACHE_VIVT) && !defined(CONFIG_CPU_CACHE_VIPT)
+
+#define cache_is_vivt()			1
+#define cache_is_vipt()			0
+#define cache_is_vipt_nonaliasing()	0
+#define cache_is_vipt_aliasing()	0
+
+#elif defined(CONFIG_CPU_CACHE_VIPT)
+
+#define cache_is_vivt()			0
+#define cache_is_vipt()			1
+#define cache_is_vipt_nonaliasing()					\
+	({								\
+		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
+		__cacheid_vipt_nonaliasing(__val);			\
+	})
+
+#define cache_is_vipt_aliasing()					\
+	({								\
+		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
+		__cacheid_vipt_aliasing(__val);				\
+	})
+
+#else
+
+#define cache_is_vivt()							\
+	({								\
+		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
+		(!__cacheid_present(__val)) || __cacheid_vivt(__val);	\
+	})
+		
+#define cache_is_vipt()							\
+	({								\
+		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
+		__cacheid_present(__val) && __cacheid_vipt(__val);	\
+	})
+
+#define cache_is_vipt_nonaliasing()					\
+	({								\
+		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
+		__cacheid_present(__val) &&				\
+		 __cacheid_vipt_nonaliasing(__val);			\
+	})
+
+#define cache_is_vipt_aliasing()					\
+	({								\
+		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
+		__cacheid_present(__val) &&				\
+		 __cacheid_vipt_aliasing(__val);			\
+	})
+
+#endif
 
 #endif

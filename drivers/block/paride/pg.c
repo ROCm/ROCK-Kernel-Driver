@@ -262,7 +262,7 @@ static void pg_init_units(void)
 		int *parm = *drives[unit];
 		struct pg *dev = &devices[unit];
 		dev->pi = &dev->pia;
-		set_bit(0, &dev->access);
+		clear_bit(0, &dev->access);
 		dev->busy = 0;
 		dev->present = 0;
 		dev->bufptr = NULL;

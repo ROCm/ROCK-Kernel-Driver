@@ -109,7 +109,8 @@ static int putreg32(struct task_struct *child, unsigned regno, u32 val)
 
 	case offsetof(struct user32, u_debugreg[7]):
 		val &= ~DR_CONTROL_RESERVED;
-		/* You are not expected to understand this ... I don't neither. */
+		/* See arch/i386/kernel/ptrace.c for an explanation of
+		 * this awkward check.*/
 		for(i=0; i<4; i++)
 			if ((0x5454 >> ((val >> (16 + 4*i)) & 0xf)) & 1)
 			       return -EIO;

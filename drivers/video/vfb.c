@@ -430,7 +430,7 @@ static int __init vfb_probe(struct device *device)
 	if (!info)
 		goto err;
 
-	info->screen_base = videomemory;
+	info->screen_base = (char __iomem *)videomemory;
 	info->fbops = &vfb_ops;
 
 	retval = fb_find_mode(&info->var, info, NULL,
@@ -497,7 +497,11 @@ int __init vfb_init(void)
 	int ret = 0;
 
 #ifndef MODULE
-	vfb_setup(fb_get_options("vfb"));
+	char *option = NULL;
+
+	if (fb_get_options("vfb", &option))
+		return -ENODEV;
+	vfb_setup(option);
 #endif
 
 	if (!vfb_enable)

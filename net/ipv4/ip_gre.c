@@ -36,6 +36,7 @@
 #include <net/ipip.h>
 #include <net/arp.h>
 #include <net/checksum.h>
+#include <net/dsfield.h>
 #include <net/inet_ecn.h>
 #include <net/xfrm.h>
 
@@ -547,7 +548,7 @@ ipgre_ecn_encapsulate(u8 tos, struct iphdr *old_iph, struct sk_buff *skb)
 	if (skb->protocol == htons(ETH_P_IP))
 		inner = old_iph->tos;
 	else if (skb->protocol == htons(ETH_P_IPV6))
-		inner = ip6_get_dsfield((struct ipv6hdr*)old_iph);
+		inner = ipv6_get_dsfield((struct ipv6hdr *)old_iph);
 	return INET_ECN_encapsulate(tos, inner);
 }
 
@@ -603,13 +604,24 @@ int ipgre_rcv(struct sk_buff *skb)
 	if ((tunnel = ipgre_tunnel_lookup(iph->saddr, iph->daddr, key)) != NULL) {
 		secpath_reset(skb);
 
+		skb->protocol = *(u16*)(h + 2);
+		/* WCCP version 1 and 2 protocol decoding.
+		 * - Change protocol to IP
+		 * - When dealing with WCCPv2, Skip extra 4 bytes in GRE header
+		 */
+		if (flags == 0 &&
+		    skb->protocol == __constant_htons(ETH_P_WCCP)) {
+			skb->protocol = __constant_htons(ETH_P_IP);
+			if ((*(h + offset) & 0xF0) != 0x40) 
+				offset += 4;
+		}
+
 		skb->mac.raw = skb->nh.raw;
 		skb->nh.raw = __pskb_pull(skb, offset);
 		memset(&(IPCB(skb)->opt), 0, sizeof(struct ip_options));
 		if (skb->ip_summed == CHECKSUM_HW)
 			skb->csum = csum_sub(skb->csum,
 					     csum_partial(skb->mac.raw, skb->nh.raw-skb->mac.raw, 0));
-		skb->protocol = *(u16*)(h + 2);
 		skb->pkt_type = PACKET_HOST;
 #ifdef CONFIG_NET_IPGRE_BROADCAST
 		if (MULTICAST(iph->daddr)) {
@@ -1238,7 +1250,7 @@ static struct net_protocol ipgre_protocol = {
 
 static int __init ipgre_init(void)
 {
-	int err = -EINVAL;
+	int err;
 
 	printk(KERN_INFO "GRE over IPv4 tunneling driver\n");
 
@@ -1251,18 +1263,19 @@ static int __init ipgre_init(void)
 					   ipgre_tunnel_setup);
 	if (!ipgre_fb_tunnel_dev) {
 		err = -ENOMEM;
-		goto fail;
+		goto err1;
 	}
 
 	ipgre_fb_tunnel_dev->init = ipgre_fb_tunnel_init;
 
 	if ((err = register_netdev(ipgre_fb_tunnel_dev)))
-		goto fail;
+		goto err2;
 out:
 	return err;
-fail:
-	inet_del_protocol(&ipgre_protocol, IPPROTO_GRE);
+err2:
 	free_netdev(ipgre_fb_tunnel_dev);
+err1:
+	inet_del_protocol(&ipgre_protocol, IPPROTO_GRE);
 	goto out;
 }
 

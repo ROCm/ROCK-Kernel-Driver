@@ -19,6 +19,8 @@
 #include <linux/errno.h>
 #include <linux/cpufreq.h>
 #include <linux/serial_core.h>
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/partitions.h>
 
 #include <asm/hardware.h>
 #include <asm/mach-types.h>
@@ -28,6 +30,7 @@
 #include <asm/irq.h>
 
 #include <asm/mach/arch.h>
+#include <asm/mach/flash.h>
 #include <asm/mach/map.h>
 #include <asm/mach/irq.h>
 #include <asm/mach/serial_sa1100.h>
@@ -39,8 +42,6 @@
  */
 
 /* init funcs */
-static int __init hackkit_init(void);
-static void __init hackkit_init_irq(void);
 static void __init hackkit_map_io(void);
 
 static u_int hackkit_get_mctrl(struct uart_port *port);
@@ -81,11 +82,6 @@ static void __init hackkit_map_io(void)
 	sa1100_register_uart(2, 3);	/* radio module */
 
 	Ser1SDCR0 |= SDCR0_SUS;
-}
-
-static void __init hackkit_init_irq(void)
-{
-	/* none used yet */
 }
 
 /**
@@ -144,35 +140,61 @@ static u_int hackkit_get_mctrl(struct uart_port *port)
 	return ret;
 }
 
-static int __init hackkit_init(void)
-{
-	int ret = 0;
-
-	if ( !machine_is_hackkit() ) {
-		ret = -EINVAL;
-		goto DONE;
+static struct mtd_partition hackkit_partitions[] = {
+	{
+		.name		= "BLOB",
+		.size		= 0x00040000,
+		.offset		= 0x00000000,
+		.mask_flags	= MTD_WRITEABLE,  /* force read-only */
+	}, {
+		.name		= "config",
+		.size		= 0x00040000,
+		.offset		= MTDPART_OFS_APPEND,
+	}, {
+		.name		= "kernel",
+		.size		= 0x00100000,
+		.offset		= MTDPART_OFS_APPEND,
+	}, {
+		.name		= "initrd",
+		.size		= 0x00180000,
+		.offset		= MTDPART_OFS_APPEND,
+	}, {
+		.name		= "rootfs",
+		.size		= 0x700000,
+		.offset		= MTDPART_OFS_APPEND,
+	}, {
+		.name		= "data",
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= MTDPART_OFS_APPEND,
 	}
+};
 
-	hackkit_init_irq();
+static struct flash_platform_data hackkit_flash_data = {
+	.map_name	= "cfi_probe",
+	.parts		= hackkit_partitions,
+	.nr_parts	= ARRAY_SIZE(hackkit_partitions),
+};
 
-	ret = 0;
-DONE:
-	return ret;
+static struct resource hackkit_flash_resource = {
+	.start		= SA1100_CS0_PHYS,
+	.end		= SA1100_CS0_PHYS + SZ_32M,
+	.flags		= IORESOURCE_MEM,
+};
+
+static void __init hackkit_init(void)
+{
+	sa11x0_set_flash_data(&hackkit_flash_data, &hackkit_flash_resource, 1);
 }
 
 /**********************************************************************
  *  Exported Functions
  */
 
-/**********************************************************************
- *  kernel magic macros
- */
-arch_initcall(hackkit_init);
-
 MACHINE_START(HACKKIT, "HackKit Cpu Board")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	BOOT_PARAMS(0xc0000100)
 	MAPIO(hackkit_map_io)
 	INITIRQ(sa1100_init_irq)
-	INITTIME(sa1100_init_time)
+	.timer		= &sa1100_timer,
+	.init_machine	= hackkit_init,
 MACHINE_END

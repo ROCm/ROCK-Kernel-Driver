@@ -34,10 +34,10 @@ static int vbi_workaround(struct saa7146_dev *dev)
 	saa7146_write(dev, NUM_LINE_BYTE3, (2<<16)|((vbi_pixel_to_capture)<<0));
 	saa7146_write(dev, MC2, MASK_04|MASK_20);
 
-	/* load brs-control register */
-	WRITE_RPS1(CMD_WR_REG | (1 << 8) | (BRS_CTRL/4));
-	/* BXO = 1h, BRS to outbound */
-	WRITE_RPS1(0xc000008c);   
+		/* load brs-control register */
+		WRITE_RPS1(CMD_WR_REG | (1 << 8) | (BRS_CTRL/4));
+		/* BXO = 1h, BRS to outbound */
+		WRITE_RPS1(0xc000008c);   
 	/* wait for vbi_a or vbi_b*/
 	if ( 0 != (SAA7146_USE_PORT_B_FOR_VBI & dev->ext_vv_data->flags)) {
 		DEB_D(("...using port b\n"));
@@ -50,35 +50,35 @@ static int vbi_workaround(struct saa7146_dev *dev)
 		DEB_D(("...using port a\n"));
 		WRITE_RPS1(CMD_PAUSE | MASK_10);
 	}
-	/* upload brs */
-	WRITE_RPS1(CMD_UPLOAD | MASK_08);
-	/* load brs-control register */
-	WRITE_RPS1(CMD_WR_REG | (1 << 8) | (BRS_CTRL/4));
-	/* BYO = 1, BXO = NQBIL (=1728 for PAL, for NTSC this is 858*2) - NumByte3 (=1440) = 288 */
-	WRITE_RPS1(((1728-(vbi_pixel_to_capture)) << 7) | MASK_19);
-	/* wait for brs_done */
-	WRITE_RPS1(CMD_PAUSE | MASK_08);
-	/* upload brs */
-	WRITE_RPS1(CMD_UPLOAD | MASK_08);
-	/* load video-dma3 NumLines3 and NumBytes3 */
-	WRITE_RPS1(CMD_WR_REG | (1 << 8) | (NUM_LINE_BYTE3/4));
-	/* dev->vbi_count*2 lines, 720 pixel (= 1440 Bytes) */
-	WRITE_RPS1((2 << 16) | (vbi_pixel_to_capture));
-	/* load brs-control register */
-	WRITE_RPS1(CMD_WR_REG | (1 << 8) | (BRS_CTRL/4));
-	/* Set BRS right: note: this is an experimental value for BXO (=> PAL!) */
-	WRITE_RPS1((540 << 7) | (5 << 19));  // 5 == vbi_start  
-	/* wait for brs_done */
-	WRITE_RPS1(CMD_PAUSE | MASK_08);
-	/* upload brs and video-dma3*/
-	WRITE_RPS1(CMD_UPLOAD | MASK_08 | MASK_04);
-	/* load mc2 register: enable dma3 */
-	WRITE_RPS1(CMD_WR_REG | (1 << 8) | (MC1/4));
-	WRITE_RPS1(MASK_20 | MASK_04);
-	/* generate interrupt */
-	WRITE_RPS1(CMD_INTERRUPT);
-	/* stop rps1 */
-	WRITE_RPS1(CMD_STOP);
+		/* upload brs */
+		WRITE_RPS1(CMD_UPLOAD | MASK_08);
+		/* load brs-control register */
+		WRITE_RPS1(CMD_WR_REG | (1 << 8) | (BRS_CTRL/4));
+		/* BYO = 1, BXO = NQBIL (=1728 for PAL, for NTSC this is 858*2) - NumByte3 (=1440) = 288 */
+		WRITE_RPS1(((1728-(vbi_pixel_to_capture)) << 7) | MASK_19);
+		/* wait for brs_done */
+		WRITE_RPS1(CMD_PAUSE | MASK_08);
+		/* upload brs */
+		WRITE_RPS1(CMD_UPLOAD | MASK_08);
+		/* load video-dma3 NumLines3 and NumBytes3 */
+		WRITE_RPS1(CMD_WR_REG | (1 << 8) | (NUM_LINE_BYTE3/4));
+		/* dev->vbi_count*2 lines, 720 pixel (= 1440 Bytes) */
+		WRITE_RPS1((2 << 16) | (vbi_pixel_to_capture));
+		/* load brs-control register */
+		WRITE_RPS1(CMD_WR_REG | (1 << 8) | (BRS_CTRL/4));
+		/* Set BRS right: note: this is an experimental value for BXO (=> PAL!) */
+		WRITE_RPS1((540 << 7) | (5 << 19));  // 5 == vbi_start  
+		/* wait for brs_done */
+		WRITE_RPS1(CMD_PAUSE | MASK_08);
+		/* upload brs and video-dma3*/
+		WRITE_RPS1(CMD_UPLOAD | MASK_08 | MASK_04);
+		/* load mc2 register: enable dma3 */
+		WRITE_RPS1(CMD_WR_REG | (1 << 8) | (MC1/4));
+		WRITE_RPS1(MASK_20 | MASK_04);
+		/* generate interrupt */
+		WRITE_RPS1(CMD_INTERRUPT);
+		/* stop rps1 */
+		WRITE_RPS1(CMD_STOP);
 	
 	/* we have to do the workaround twice to be sure that
 	   everything is ok */
@@ -91,7 +91,7 @@ static int vbi_workaround(struct saa7146_dev *dev)
 		saa7146_write(dev, MC2, MASK_04|MASK_20);
 	
 		/* enable rps1 irqs */
-		IER_ENABLE(dev,MASK_28);
+		SAA7146_IER_ENABLE(dev,MASK_28);
 
 		/* prepare to wait to be woken up by the irq-handler */
 		add_wait_queue(&vv->vbi_wq, &wait);
@@ -109,7 +109,7 @@ static int vbi_workaround(struct saa7146_dev *dev)
 		current->state = TASK_RUNNING;
 
 		/* disable rps1 irqs */
-		IER_DISABLE(dev,MASK_28);
+		SAA7146_IER_DISABLE(dev,MASK_28);
 
 		/* stop video-dma3 */
 		saa7146_write(dev, MC1, MASK_20);
@@ -130,7 +130,7 @@ static int vbi_workaround(struct saa7146_dev *dev)
 	return 0;
 }
 
-void saa7146_set_vbi_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, struct saa7146_buf *next)
+static void saa7146_set_vbi_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, struct saa7146_buf *next)
 {
 	struct saa7146_vv *vv = dev->vv_data;
 
@@ -154,7 +154,6 @@ void saa7146_set_vbi_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, s
 	vdma3.pitch	= vbi_pixel_to_capture;
 	vdma3.base_page	= buf->pt[2].dma | ME1;
 	vdma3.num_line_byte = (16 << 16) | vbi_pixel_to_capture;
-
 	saa7146_write_out_dma(dev, 3, &vdma3);
 
 	/* write beginning of rps-program */
@@ -191,7 +190,7 @@ void saa7146_set_vbi_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, s
 	WRITE_RPS1(CMD_STOP);					
 
 	/* enable rps1 irqs */
-	IER_ENABLE(dev, MASK_28);
+	SAA7146_IER_ENABLE(dev, MASK_28);
 
 	/* write the address of the rps-program */
 	saa7146_write(dev, RPS_ADDR1, dev->d_rps1.dma_handle);
@@ -214,8 +213,9 @@ static int buffer_activate(struct saa7146_dev *dev,
 	return 0;
 }
 
-static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,enum v4l2_field field)
+static int buffer_prepare(struct videobuf_queue *q, struct videobuf_buffer *vb,enum v4l2_field field)
 {
+	struct file *file = q->priv_data;
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_buf *buf = (struct saa7146_buf *)vb;
@@ -246,7 +246,7 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,enum v4l
 		saa7146_pgtable_free(dev->pci, &buf->pt[2]);
 		saa7146_pgtable_alloc(dev->pci, &buf->pt[2]);
 
-		err = videobuf_iolock(dev->pci,&buf->vb, NULL);
+		err = videobuf_iolock(dev->pci,&buf->vb,NULL);
 		if (err)
 			goto oops;
 		err = saa7146_pgtable_build_single(dev->pci, &buf->pt[2], buf->vb.dma.sglist, buf->vb.dma.sglen);
@@ -265,7 +265,7 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,enum v4l
 	return err;
 }
 
-static int buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
+static int buffer_setup(struct videobuf_queue *q, unsigned int *count, unsigned int *size)
 {
 	int llength,lines;
 	
@@ -280,8 +280,9 @@ static int buffer_setup(struct file *file, unsigned int *count, unsigned int *si
 	return 0;
 }
 
-static void buffer_queue(struct file *file, struct videobuf_buffer *vb)
+static void buffer_queue(struct videobuf_queue *q, struct videobuf_buffer *vb)
 {
+	struct file *file = q->priv_data;
 	struct saa7146_fh *fh = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
@@ -291,8 +292,9 @@ static void buffer_queue(struct file *file, struct videobuf_buffer *vb)
 	saa7146_buffer_queue(dev,&vv->vbi_q,buf);
 }
 
-static void buffer_release(struct file *file, struct videobuf_buffer *vb)
+static void buffer_release(struct videobuf_queue *q, struct videobuf_buffer *vb)
 {
+	struct file *file = q->priv_data;
 	struct saa7146_fh *fh   = file->private_data;
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_buf *buf = (struct saa7146_buf *)vb;
@@ -316,14 +318,14 @@ static void vbi_stop(struct saa7146_fh *fh, struct file *file)
 	struct saa7146_vv *vv = dev->vv_data;
 	unsigned long flags;
 	DEB_VBI(("dev:%p, fh:%p\n",dev, fh));
-
+	
 	spin_lock_irqsave(&dev->slock,flags);
 
 	/* disable rps1  */
 	saa7146_write(dev, MC1, MASK_29);
 
 	/* disable rps1 irqs */
-	IER_DISABLE(dev, MASK_28);
+	SAA7146_IER_DISABLE(dev, MASK_28);
 
 	/* shut down dma 3 transfers */
 	saa7146_write(dev, MC1, MASK_20);
@@ -332,7 +334,7 @@ static void vbi_stop(struct saa7146_fh *fh, struct file *file)
 		saa7146_buffer_finish(dev,&vv->vbi_q,STATE_DONE);
 	}
 
-	videobuf_queue_cancel(file,&fh->vbi_q);
+	videobuf_queue_cancel(&fh->vbi_q);
 
 	vv->vbi_streaming = NULL;
 
@@ -405,7 +407,8 @@ static int vbi_open(struct saa7146_dev *dev, struct file *file)
 			    dev->pci, &dev->slock,
 			    V4L2_BUF_TYPE_VBI_CAPTURE,
 			    V4L2_FIELD_SEQ_TB, // FIXME: does this really work?
-			    sizeof(struct saa7146_buf));
+			    sizeof(struct saa7146_buf),
+			    file);
 	init_MUTEX(&fh->vbi_q.lock);
 
 	init_timer(&fh->vbi_read_timeout);
@@ -425,8 +428,8 @@ static int vbi_open(struct saa7146_dev *dev, struct file *file)
 	}
 
 	/* upload brs register */
-	saa7146_write(dev, MC2, (MASK_08|MASK_24));
-	return 0;		
+	saa7146_write(dev, MC2, (MASK_08|MASK_24));		
+	return 0;
 }
 
 static void vbi_close(struct saa7146_dev *dev, struct file *file)
@@ -481,7 +484,8 @@ static ssize_t vbi_read(struct file *file, char __user *data, size_t count, loff
 	}
 
 	mod_timer(&fh->vbi_read_timeout, jiffies+BUFFER_TIMEOUT);
-	ret = videobuf_read_stream(file, &fh->vbi_q, data, count, ppos, 1);
+	ret = videobuf_read_stream(&fh->vbi_q, data, count, ppos, 1,
+				   file->f_flags & O_NONBLOCK);
 /*
 	printk("BASE_ODD3:      0x%08x\n", saa7146_read(dev, BASE_ODD3));
 	printk("BASE_EVEN3:     0x%08x\n", saa7146_read(dev, BASE_EVEN3));

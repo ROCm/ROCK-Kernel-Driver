@@ -40,7 +40,7 @@
 #include "sata_promise.h"
 
 #define DRV_NAME	"sata_sx4"
-#define DRV_VERSION	"0.50"
+#define DRV_VERSION	"0.7"
 
 
 enum {
@@ -193,9 +193,10 @@ static Scsi_Host_Template pdc_sata_sht = {
 static struct ata_port_operations pdc_20621_ops = {
 	.port_disable		= ata_port_disable,
 	.tf_load		= pdc_tf_load_mmio,
-	.tf_read		= ata_tf_read_mmio,
-	.check_status		= ata_check_status_mmio,
+	.tf_read		= ata_tf_read,
+	.check_status		= ata_check_status,
 	.exec_command		= pdc_exec_command_mmio,
+	.dev_select		= ata_std_dev_select,
 	.phy_reset		= pdc_20621_phy_reset,
 	.qc_prep		= pdc20621_qc_prep,
 	.qc_issue		= pdc20621_qc_issue_prot,
@@ -247,7 +248,7 @@ static void pdc20621_host_stop(struct ata_host_set *host_set)
 
 static int pdc_port_start(struct ata_port *ap)
 {
-	struct pci_dev *pdev = ap->host_set->pdev;
+	struct device *dev = ap->host_set->dev;
 	struct pdc_port_priv *pp;
 	int rc;
 
@@ -262,7 +263,7 @@ static int pdc_port_start(struct ata_port *ap)
 	}
 	memset(pp, 0, sizeof(*pp));
 
-	pp->pkt = pci_alloc_consistent(pdev, 128, &pp->pkt_dma);
+	pp->pkt = dma_alloc_coherent(dev, 128, &pp->pkt_dma, GFP_KERNEL);
 	if (!pp->pkt) {
 		rc = -ENOMEM;
 		goto err_out_kfree;
@@ -282,11 +283,11 @@ err_out:
 
 static void pdc_port_stop(struct ata_port *ap)
 {
-	struct pci_dev *pdev = ap->host_set->pdev;
+	struct device *dev = ap->host_set->dev;
 	struct pdc_port_priv *pp = ap->private_data;
 
 	ap->private_data = NULL;
-	pci_free_consistent(pdev, 128, pp->pkt, pp->pkt_dma);
+	dma_free_coherent(dev, 128, pp->pkt, pp->pkt_dma);
 	kfree(pp);
 	ata_port_stop(ap);
 }
@@ -533,7 +534,7 @@ static void pdc20621_nodata_prep(struct ata_queued_cmd *qc)
 
 	readl(dimm_mmio);	/* MMIO PCI posting flush */
 
-	VPRINTK("ata pkt buf ofs %u, prd size %u, mmio copied\n", i, sgt_len);
+	VPRINTK("ata pkt buf ofs %u, mmio copied\n", i);
 }
 
 static void pdc20621_qc_prep(struct ata_queued_cmd *qc)
@@ -887,7 +888,7 @@ static void pdc_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 {
 	WARN_ON (tf->protocol == ATA_PROT_DMA ||
 		 tf->protocol == ATA_PROT_NODATA);
-	ata_tf_load_mmio(ap, tf);
+	ata_tf_load(ap, tf);
 }
 
 
@@ -895,7 +896,7 @@ static void pdc_exec_command_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 {
 	WARN_ON (tf->protocol == ATA_PROT_DMA ||
 		 tf->protocol == ATA_PROT_NODATA);
-	ata_exec_command_mmio(ap, tf);
+	ata_exec_command(ap, tf);
 }
 
 
@@ -1189,8 +1190,7 @@ static unsigned int pdc20621_prog_dimm_global(struct ata_probe_ent *pe)
 	   		error = 0;
 	   		break;     
 		}
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((i * 100) * HZ / 1000 + 1);
+		msleep(i*100);
    	}
    	return error;
 }
@@ -1223,8 +1223,7 @@ static unsigned int pdc20621_dimm_init(struct ata_probe_ent *pe)
 	readl(mmio + PDC_TIME_CONTROL);
 
 	/* Wait 3 seconds */
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(3 * HZ);
+	msleep(3000);
 
 	/* 
 	   When timer is enabled, counter is decreased every internal
@@ -1398,7 +1397,7 @@ static int pdc_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *
 	}
 
 	memset(probe_ent, 0, sizeof(*probe_ent));
-	probe_ent->pdev = pdev;
+	probe_ent->dev = pci_dev_to_dev(pdev);
 	INIT_LIST_HEAD(&probe_ent->node);
 
 	mmio_base = ioremap(pci_resource_start(pdev, 3),
@@ -1493,6 +1492,7 @@ MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("Promise SATA low-level driver");
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, pdc_sata_pci_tbl);
+MODULE_VERSION(DRV_VERSION);
 
 module_init(pdc_sata_init);
 module_exit(pdc_sata_exit);

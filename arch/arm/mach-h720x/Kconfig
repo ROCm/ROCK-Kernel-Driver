@@ -1,0 +1,31 @@
+if ARCH_H720X
+
+menu "h720x Implementations"
+
+config ARCH_H7201
+	bool "gms30c7201"
+	depends on ARCH_H720X
+	select CPU_H7201
+	help
+	  Say Y here if you are using the Hynix GMS30C7201 Reference Board
+
+config ARCH_H7202
+	bool "hms30c7202"
+	select CPU_H7202
+	depends on ARCH_H720X
+	help
+	  Say Y here if you are using the Hynix HMS30C7202 Reference Board
+
+endmenu
+
+config CPU_H7201
+	bool
+	help
+	  Select code specific to h7201 variants
+
+config CPU_H7202
+	bool
+	help
+	  Select code specific to h7202 variants
+
+endif

@@ -21,6 +21,7 @@
 #include <linux/moduleparam.h>
 #include <linux/vmalloc.h>
 #include <linux/smp_lock.h>
+#include <linux/delay.h>
 
 #include <scsi/scsi_tcq.h>
 #include <scsi/scsicam.h>
@@ -235,67 +236,6 @@ static __inline__ void sp_get(struct scsi_qla_host * ha, srb_t *sp);
 static __inline__ void
 qla2x00_delete_from_done_queue(scsi_qla_host_t *, srb_t *); 
 
-/**************************************************************************
-* sp_put
-*
-* Description:
-*   Decrement reference count and call the callback if we're the last
-*   owner of the specified sp. Will get the host_lock before calling
-*   the callback.
-*
-* Input:
-*   ha - pointer to the scsi_qla_host_t where the callback is to occur.
-*   sp - pointer to srb_t structure to use.
-*
-* Returns:
-*
-**************************************************************************/
-static inline void
-sp_put(struct scsi_qla_host * ha, srb_t *sp)
-{
-        if (atomic_read(&sp->ref_count) == 0) {
-		qla_printk(KERN_INFO, ha,
-			"%s(): **** SP->ref_count not zero\n",
-			__func__);
-                DEBUG2(BUG();)
-
-                return;
-	}
-
-        if (!atomic_dec_and_test(&sp->ref_count)) {
-                return;
-        }
-
-        qla2x00_callback(ha, sp->cmd);
-}
-
-/**************************************************************************
-* sp_get
-*
-* Description:
-*   Increment reference count of the specified sp.
-*
-* Input:
-*   sp - pointer to srb_t structure to use.
-*
-* Returns:
-*
-**************************************************************************/
-static inline void
-sp_get(struct scsi_qla_host * ha, srb_t *sp)
-{
-        atomic_inc(&sp->ref_count);
-
-        if (atomic_read(&sp->ref_count) > 2) {
-		qla_printk(KERN_INFO, ha,
-			"%s(): **** SP->ref_count greater than two\n",
-			__func__);
-                DEBUG2(BUG();)
-
-		return;
-	}
-}
-
 /*
 * qla2x00_callback
 *      Returns the completed SCSI command to LINUX.
@@ -364,6 +304,67 @@ qla2x00_callback(scsi_qla_host_t *ha, struct scsi_cmnd *cmd)
 
 	/* Call the mid-level driver interrupt handler */
 	(*(cmd)->scsi_done)(cmd);
+}
+
+/**************************************************************************
+* sp_put
+*
+* Description:
+*   Decrement reference count and call the callback if we're the last
+*   owner of the specified sp. Will get the host_lock before calling
+*   the callback.
+*
+* Input:
+*   ha - pointer to the scsi_qla_host_t where the callback is to occur.
+*   sp - pointer to srb_t structure to use.
+*
+* Returns:
+*
+**************************************************************************/
+static inline void
+sp_put(struct scsi_qla_host * ha, srb_t *sp)
+{
+        if (atomic_read(&sp->ref_count) == 0) {
+		qla_printk(KERN_INFO, ha,
+			"%s(): **** SP->ref_count not zero\n",
+			__func__);
+                DEBUG2(BUG();)
+
+                return;
+	}
+
+        if (!atomic_dec_and_test(&sp->ref_count)) {
+                return;
+        }
+
+        qla2x00_callback(ha, sp->cmd);
+}
+
+/**************************************************************************
+* sp_get
+*
+* Description:
+*   Increment reference count of the specified sp.
+*
+* Input:
+*   sp - pointer to srb_t structure to use.
+*
+* Returns:
+*
+**************************************************************************/
+static inline void
+sp_get(struct scsi_qla_host * ha, srb_t *sp)
+{
+        atomic_inc(&sp->ref_count);
+
+        if (atomic_read(&sp->ref_count) > 2) {
+		qla_printk(KERN_INFO, ha,
+			"%s(): **** SP->ref_count greater than two\n",
+			__func__);
+                DEBUG2(BUG();)
+
+		return;
+	}
 }
 
 static inline void 
@@ -753,7 +754,7 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 	cmd->host_scribble = (unsigned char *)handle;
 
 	/* Bookkeeping information */
-	sp->r_start = jiffies;       /* time the request was recieved */
+	sp->r_start = jiffies;       /* time the request was received */
 	sp->u_start = 0;
 
 	/* Setup device queue pointers. */
@@ -844,11 +845,9 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 		was_empty = add_to_pending_queue(ha, sp);
 
 	if ((IS_QLA2100(ha) || IS_QLA2200(ha)) && ha->flags.online) {
-		unsigned long flags;
-		device_reg_t *reg;
-		reg = ha->iobase;
-		
 		if (ha->response_ring_ptr->signature != RESPONSE_PROCESSED) {
+			unsigned long flags;
+
 			spin_lock_irqsave(&ha->hardware_lock, flags);	
 			qla2x00_process_response_queue(ha);
 			spin_unlock_irqrestore(&ha->hardware_lock, flags);
@@ -969,8 +968,7 @@ qla2x00_wait_for_hba_online(scsi_qla_host_t *ha)
 	    test_bit(ISP_ABORT_RETRY, &ha->dpc_flags) ||
 	    ha->dpc_active) && time_before(jiffies, wait_online)) {
 
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ);
+		msleep(1000);
 	}
 	if (ha->flags.online) 
 		return_status = QLA_SUCCESS; 
@@ -1011,8 +1009,7 @@ qla2x00_wait_for_loop_ready(scsi_qla_host_t *ha)
 	    atomic_read(&ha->loop_state) == LOOP_DOWN) ||
 	    test_bit(CFG_ACTIVE, &ha->cfg_flags) ||
 	    atomic_read(&ha->loop_state) != LOOP_READY) {
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ);
+		msleep(1000);
 		if (time_after_eq(jiffies, loop_timeout)) {
 			return_status = QLA_FUNCTION_FAILED;
 			break;
@@ -1583,14 +1580,10 @@ qla2xxx_eh_bus_reset(struct scsi_cmnd *cmd)
 	if (rval == FAILED)
 		goto out;
 
-	/*
-	 * Blocking Call. It goes to sleep waiting for cmd to get to done q
-	 *
-	 * XXX(hch): really?  We're under host_lock here..
-	 */
 	/* Waiting for our command in done_queue to be returned to OS.*/
-	if (!qla2x00_eh_wait_for_pending_commands(ha))
-		rval = FAILED;
+	if (cmd->device->host->eh_active)
+		if (!qla2x00_eh_wait_for_pending_commands(ha))
+			rval = FAILED;
 
  out:
 	qla_printk(KERN_INFO, ha, "%s: reset %s\n", __func__,
@@ -1819,28 +1812,27 @@ qla2x00_config_dma_addressing(scsi_qla_host_t *ha)
 	 * assist in setting the proper dma mask.
 	 */
 	if (sizeof(dma_addr_t) > 4) {
-		/* Update our PCI device dma_mask for full 64 bits */
-		if (pci_set_dma_mask(ha->pdev, 0xffffffffffffffffULL) == 0) {
+		if (pci_set_dma_mask(ha->pdev, DMA_64BIT_MASK) == 0) {
 			ha->flags.enable_64bit_addressing = 1;
 			ha->calc_request_entries = qla2x00_calc_iocbs_64;
 			ha->build_scsi_iocbs = qla2x00_build_scsi_iocbs_64;
 
 			if (pci_set_consistent_dma_mask(ha->pdev,
-			    0xffffffffffffffffULL)) {
+			    DMA_64BIT_MASK)) {
 				qla_printk(KERN_DEBUG, ha, 
 				    "Failed to set 64 bit PCI consistent mask; "
 				    "using 32 bit.\n");
 				pci_set_consistent_dma_mask(ha->pdev,
-				    0xffffffffULL);
+				    DMA_32BIT_MASK);
 			}
 		} else {
 			qla_printk(KERN_DEBUG, ha,
 			    "Failed to set 64 bit PCI DMA mask, falling back "
 			    "to 32 bit MASK.\n");
-			pci_set_dma_mask(ha->pdev, 0xffffffff);
+			pci_set_dma_mask(ha->pdev, DMA_32BIT_MASK);
 		}
 	} else {
-		pci_set_dma_mask(ha->pdev, 0xffffffff);
+		pci_set_dma_mask(ha->pdev, DMA_32BIT_MASK);
 	}
 }
 
@@ -1896,15 +1888,13 @@ qla2x00_iospace_config(scsi_qla_host_t *ha)
 
 	ha->pio_address = pio;
 	ha->pio_length = pio_len;
-	ha->mmio_address = ioremap(mmio, MIN_IOBASE_LEN);
-	if (!ha->mmio_address) {
+	ha->iobase = ioremap(mmio, MIN_IOBASE_LEN);
+	if (!ha->iobase) {
 		qla_printk(KERN_ERR, ha,
 		    "cannot remap MMIO (%s), aborting\n", ha->pdev->slot_name);
 
 		goto iospace_error_exit;
 	}
-	ha->mmio_length = mmio_len;
-	ha->iobase = (device_reg_t *) ha->mmio_address;
 
 	return (0);
 
@@ -1918,7 +1908,7 @@ iospace_error_exit:
 int qla2x00_probe_one(struct pci_dev *pdev, struct qla_board_info *brd_info)
 {
 	int	ret;
-	device_reg_t *reg;
+	device_reg_t __iomem *reg;
 	struct Scsi_Host *host;
 	scsi_qla_host_t *ha;
 	unsigned long	flags = 0;
@@ -1934,7 +1924,7 @@ int qla2x00_probe_one(struct pci_dev *pdev, struct qla_board_info *brd_info)
 	if (host == NULL) {
 		printk(KERN_WARNING
 		    "qla2xxx: Couldn't allocate host from scsi layer!\n");
-		return -1;
+		goto probe_disable_device;
 	}
 
 	/* Clear our data area */
@@ -2068,8 +2058,13 @@ int qla2x00_probe_one(struct pci_dev *pdev, struct qla_board_info *brd_info)
 	host->unique_id = ha->instance;
 	host->max_id = ha->max_targets;
 
-	if (request_irq(host->irq, qla2x00_intr_handler, SA_INTERRUPT|SA_SHIRQ,
-	    ha->brd_info->drv_name, ha)) {
+	if (IS_QLA2100(ha) || IS_QLA2200(ha))
+		ret = request_irq(host->irq, qla2100_intr_handler,
+		    SA_INTERRUPT|SA_SHIRQ, ha->brd_info->drv_name, ha);
+	else
+		ret = request_irq(host->irq, qla2300_intr_handler,
+		    SA_INTERRUPT|SA_SHIRQ, ha->brd_info->drv_name, ha);
+	if (ret != 0) {
 		qla_printk(KERN_WARNING, ha,
 		    "Failed to reserve interrupt %d already in use.\n",
 		    host->irq);
@@ -2120,8 +2115,7 @@ int qla2x00_probe_one(struct pci_dev *pdev, struct qla_board_info *brd_info)
 
 		qla2x00_check_fabric_devices(ha);
 
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ/100);
+		msleep(10);
 	}
 
 	pci_set_drvdata(pdev, ha);
@@ -2157,6 +2151,9 @@ probe_failed:
 	qla2x00_free_device(ha);
 
 	scsi_host_put(host);
+
+probe_disable_device:
+	pci_disable_device(pdev);
 
 	return -1;
 }
@@ -2224,12 +2221,11 @@ qla2x00_free_device(scsi_qla_host_t *ha)
 		free_irq(ha->pdev->irq, ha);
 
 	/* release io space registers  */
+	if (ha->iobase)
+		iounmap(ha->iobase);
 	pci_release_regions(ha->pdev);
 
-#if MEMORY_MAPPED_IO
-	if (ha->mmio_address)
-		iounmap(ha->mmio_address);
-#endif
+	pci_disable_device(ha->pdev);
 }
 
 
@@ -2815,6 +2811,7 @@ qla2x00_mark_all_devices_lost(scsi_qla_host_t *ha)
 static uint8_t
 qla2x00_mem_alloc(scsi_qla_host_t *ha)
 {
+	char	name[16];
 	uint8_t   status = 1;
 	int	retry= 10;
 
@@ -2825,48 +2822,97 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 		 * bug where available mem is not allocated until after a
 		 * little delay and a retry.
 		 */
-		ha->request_ring = pci_alloc_consistent(ha->pdev,
-		    ((ha->request_q_length + 1) * (sizeof(request_t))),
-		    &ha->request_dma);
+		ha->request_ring = dma_alloc_coherent(&ha->pdev->dev,
+		    (ha->request_q_length + 1) * sizeof(request_t),
+		    &ha->request_dma, GFP_KERNEL);
 		if (ha->request_ring == NULL) {
 			qla_printk(KERN_WARNING, ha,
 			    "Memory Allocation failed - request_ring\n");
 
 			qla2x00_mem_free(ha);
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(HZ/10);
+			msleep(100);
 
 			continue;
 		}
 
-		ha->response_ring = pci_alloc_consistent(ha->pdev,
-		    ((ha->response_q_length + 1) * (sizeof(response_t))),
-		    &ha->response_dma);
+		ha->response_ring = dma_alloc_coherent(&ha->pdev->dev,
+		    (ha->response_q_length + 1) * sizeof(response_t),
+		    &ha->response_dma, GFP_KERNEL);
 		if (ha->response_ring == NULL) {
 			qla_printk(KERN_WARNING, ha,
 			    "Memory Allocation failed - response_ring\n");
 
 			qla2x00_mem_free(ha);
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(HZ/10);
+			msleep(100);
+
+			continue;
+		}
+
+		ha->gid_list = dma_alloc_coherent(&ha->pdev->dev, GID_LIST_SIZE,
+		    &ha->gid_list_dma, GFP_KERNEL);
+		if (ha->gid_list == NULL) {
+			qla_printk(KERN_WARNING, ha,
+			    "Memory Allocation failed - gid_list\n");
+
+			qla2x00_mem_free(ha);
+			msleep(100);
+
+			continue;
+		}
+
+		ha->rlc_rsp = dma_alloc_coherent(&ha->pdev->dev,
+		    sizeof(rpt_lun_cmd_rsp_t), &ha->rlc_rsp_dma, GFP_KERNEL);
+		if (ha->rlc_rsp == NULL) {
+			qla_printk(KERN_WARNING, ha,
+				"Memory Allocation failed - rlc");
+
+			qla2x00_mem_free(ha);
+			msleep(100);
+
+			continue;
+		}
+
+		snprintf(name, sizeof(name), "qla2xxx_%ld", ha->host_no);
+		ha->s_dma_pool = dma_pool_create(name, &ha->pdev->dev,
+		    DMA_POOL_SIZE, 8, 0);
+		if (ha->s_dma_pool == NULL) {
+			qla_printk(KERN_WARNING, ha,
+			    "Memory Allocation failed - s_dma_pool\n");
+
+			qla2x00_mem_free(ha);
+			msleep(100);
 
 			continue;
 		}
 
 		/* get consistent memory allocated for init control block */
-		ha->init_cb = pci_alloc_consistent(ha->pdev,
-		    sizeof(init_cb_t), &ha->init_cb_dma);
+		ha->init_cb = dma_pool_alloc(ha->s_dma_pool, GFP_KERNEL,
+		    &ha->init_cb_dma);
 		if (ha->init_cb == NULL) {
 			qla_printk(KERN_WARNING, ha,
 			    "Memory Allocation failed - init_cb\n");
 
 			qla2x00_mem_free(ha);
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(HZ/10);
+			msleep(100);
 
 			continue;
 		}
 		memset(ha->init_cb, 0, sizeof(init_cb_t));
+
+		/* Get consistent memory allocated for Get Port Database cmd */
+		ha->iodesc_pd = dma_pool_alloc(ha->s_dma_pool, GFP_KERNEL,
+		    &ha->iodesc_pd_dma);
+		if (ha->iodesc_pd == NULL) {
+			/* error */
+			qla_printk(KERN_WARNING, ha,
+			    "Memory Allocation failed - iodesc_pd\n");
+
+			qla2x00_mem_free(ha);
+			msleep(100);
+
+			continue;
+		}
+		memset(ha->iodesc_pd, 0, PORT_DATABASE_SIZE);
 
 		/* Allocate ioctl related memory. */
 		if (qla2x00_alloc_ioctl_mem(ha)) {
@@ -2874,8 +2920,7 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 			    "Memory Allocation failed - ioctl_mem\n");
 
 			qla2x00_mem_free(ha);
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(HZ/10);
+			msleep(100);
 
 			continue;
 		}
@@ -2886,8 +2931,7 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 			    "qla2x00_allocate_sp_pool()\n");
 
 			qla2x00_mem_free(ha);
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(HZ/10);
+			msleep(100);
 
 			continue;
 		}
@@ -2895,32 +2939,31 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 		/* Allocate memory for SNS commands */
 		if (IS_QLA2100(ha) || IS_QLA2200(ha)) {
 			/* Get consistent memory allocated for SNS commands */
-			ha->sns_cmd = pci_alloc_consistent(ha->pdev,
-			    sizeof(struct sns_cmd_pkt), &ha->sns_cmd_dma);
+			ha->sns_cmd = dma_alloc_coherent(&ha->pdev->dev,
+			    sizeof(struct sns_cmd_pkt), &ha->sns_cmd_dma,
+			    GFP_KERNEL);
 			if (ha->sns_cmd == NULL) {
 				/* error */
 				qla_printk(KERN_WARNING, ha,
 				    "Memory Allocation failed - sns_cmd\n");
 
 				qla2x00_mem_free(ha);
-				set_current_state(TASK_UNINTERRUPTIBLE);
-				schedule_timeout(HZ/10);
+				msleep(100);
 
 				continue;
 			}
 			memset(ha->sns_cmd, 0, sizeof(struct sns_cmd_pkt));
 		} else {
 			/* Get consistent memory allocated for MS IOCB */
-			ha->ms_iocb = pci_alloc_consistent(ha->pdev,
-			    sizeof(ms_iocb_entry_t), &ha->ms_iocb_dma);
+			ha->ms_iocb = dma_pool_alloc(ha->s_dma_pool, GFP_KERNEL,
+			    &ha->ms_iocb_dma);
 			if (ha->ms_iocb == NULL) {
 				/* error */
 				qla_printk(KERN_WARNING, ha,
 				    "Memory Allocation failed - ms_iocb\n");
 
 				qla2x00_mem_free(ha);
-				set_current_state(TASK_UNINTERRUPTIBLE);
-				schedule_timeout(HZ/10);
+				msleep(100);
 
 				continue;
 			}
@@ -2930,37 +2973,21 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 			 * Get consistent memory allocated for CT SNS
 			 * commands
 			 */
-			ha->ct_sns = pci_alloc_consistent(ha->pdev,
-			    sizeof(struct ct_sns_pkt), &ha->ct_sns_dma);
+			ha->ct_sns = dma_alloc_coherent(&ha->pdev->dev,
+			    sizeof(struct ct_sns_pkt), &ha->ct_sns_dma,
+			    GFP_KERNEL);
 			if (ha->ct_sns == NULL) {
 				/* error */
 				qla_printk(KERN_WARNING, ha,
 				    "Memory Allocation failed - ct_sns\n");
 
 				qla2x00_mem_free(ha);
-				set_current_state(TASK_UNINTERRUPTIBLE);
-				schedule_timeout(HZ/10);
+				msleep(100);
 
 				continue;
 			}
 			memset(ha->ct_sns, 0, sizeof(struct ct_sns_pkt));
 		}
-
-		/* Get consistent memory allocated for Get Port Database cmd */
-		ha->iodesc_pd = pci_alloc_consistent(ha->pdev,
-		    PORT_DATABASE_SIZE, &ha->iodesc_pd_dma);
-		if (ha->iodesc_pd == NULL) {
-			/* error */
-			qla_printk(KERN_WARNING, ha,
-			    "Memory Allocation failed - iodesc_pd\n");
-
-			qla2x00_mem_free(ha);
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(HZ/10);
-
-			continue;
-		}
-		memset(ha->iodesc_pd, 0, PORT_DATABASE_SIZE);
 
 		/* Done all allocations without any error. */
 		status = 0;
@@ -3016,52 +3043,67 @@ qla2x00_mem_free(scsi_qla_host_t *ha)
 	/* free sp pool */
 	qla2x00_free_sp_pool(ha);
 
-	if (ha->iodesc_pd) {
-		pci_free_consistent(ha->pdev, PORT_DATABASE_SIZE,
-		    ha->iodesc_pd, ha->iodesc_pd_dma);
-	}
+	if (ha->sns_cmd)
+		dma_free_coherent(&ha->pdev->dev, sizeof(struct sns_cmd_pkt),
+		    ha->sns_cmd, ha->sns_cmd_dma);
 
-	if (ha->sns_cmd) {
-		pci_free_consistent(ha->pdev,
-		    sizeof(struct sns_cmd_pkt), ha->sns_cmd, ha->sns_cmd_dma);
-	}
+	if (ha->ct_sns)
+		dma_free_coherent(&ha->pdev->dev, sizeof(struct ct_sns_pkt),
+		    ha->ct_sns, ha->ct_sns_dma);
 
-	if (ha->ct_sns) {
-		pci_free_consistent(ha->pdev,
-		    sizeof(struct ct_sns_pkt), ha->ct_sns, ha->ct_sns_dma);
-	}
-	if (ha->ms_iocb) {
-		pci_free_consistent(ha->pdev,
-		    sizeof(ms_iocb_entry_t), ha->ms_iocb, ha->ms_iocb_dma);
-	}
+	if (ha->ms_iocb)
+		dma_pool_free(ha->s_dma_pool, ha->ms_iocb, ha->ms_iocb_dma);
 
-	if (ha->init_cb) {
-		pci_free_consistent(ha->pdev,
-		    sizeof(init_cb_t), ha->init_cb, ha->init_cb_dma);
-	}
+	if (ha->iodesc_pd)
+		dma_pool_free(ha->s_dma_pool, ha->iodesc_pd, ha->iodesc_pd_dma);
 
-	if (ha->request_ring) {
-		pci_free_consistent(ha->pdev,
-		    ((ha->request_q_length + 1) * (sizeof(request_t))),
-		    ha->request_ring, ha->request_dma);
-	}
+	if (ha->init_cb)
+		dma_pool_free(ha->s_dma_pool, ha->init_cb, ha->init_cb_dma);
 
-	if (ha->response_ring) {
-		pci_free_consistent(ha->pdev,
-		    ((ha->response_q_length + 1) * (sizeof(response_t))),
+	if (ha->s_dma_pool)
+		dma_pool_destroy(ha->s_dma_pool);
+
+	if (ha->rlc_rsp)
+		dma_free_coherent(&ha->pdev->dev,
+		    sizeof(rpt_lun_cmd_rsp_t), ha->rlc_rsp,
+		    ha->rlc_rsp_dma);
+
+	if (ha->gid_list)
+		dma_free_coherent(&ha->pdev->dev, GID_LIST_SIZE, ha->gid_list,
+		    ha->gid_list_dma);
+
+	if (ha->response_ring)
+		dma_free_coherent(&ha->pdev->dev,
+		    (ha->response_q_length + 1) * sizeof(response_t),
 		    ha->response_ring, ha->response_dma);
-	}
 
+	if (ha->request_ring)
+		dma_free_coherent(&ha->pdev->dev,
+		    (ha->request_q_length + 1) * sizeof(request_t),
+		    ha->request_ring, ha->request_dma);
+
+	ha->sns_cmd = NULL;
+	ha->sns_cmd_dma = 0;
+	ha->ct_sns = NULL;
+	ha->ct_sns_dma = 0;
+	ha->ms_iocb = NULL;
+	ha->ms_iocb_dma = 0;
 	ha->iodesc_pd = NULL;
 	ha->iodesc_pd_dma = 0;
-	ha->ct_sns = NULL;
-	ha->ms_iocb = NULL;
-
 	ha->init_cb = NULL;
-	ha->request_ring = NULL;
-	ha->request_dma = 0;
+	ha->init_cb_dma = 0;
+
+	ha->s_dma_pool = NULL;
+
+	ha->rlc_rsp = NULL;
+	ha->rlc_rsp_dma = 0;
+	ha->gid_list = NULL;
+	ha->gid_list_dma = 0;
+
 	ha->response_ring = NULL;
 	ha->response_dma = 0;
+	ha->request_ring = NULL;
+	ha->request_dma = 0;
 
 	list_for_each_safe(fcpl, fcptemp, &ha->fcports) {
 		fcport = list_entry(fcpl, fc_port_t, list);
@@ -3080,16 +3122,15 @@ qla2x00_mem_free(scsi_qla_host_t *ha)
 	}
 	INIT_LIST_HEAD(&ha->fcports);
 
-	if (ha->fw_dump) {
+	if (ha->fw_dump)
 		free_pages((unsigned long)ha->fw_dump, ha->fw_dump_order);
-		ha->fw_dump = NULL;
-	}
 
-	if (ha->fw_dump_buffer) {
+	if (ha->fw_dump_buffer)
 		vfree(ha->fw_dump_buffer);
-		ha->fw_dump_reading = 0;
-		ha->fw_dump_buffer = NULL;
-	}
+
+	ha->fw_dump = NULL;
+	ha->fw_dump_reading = 0;
+	ha->fw_dump_buffer = NULL;
 }
 
 /*
@@ -3187,9 +3228,6 @@ qla2x00_do_dpc(void *data)
 		if (ha->dpc_should_die)
 			break;
 
-		if (!list_empty(&ha->done_queue))
-			qla2x00_done(ha);
-
 		DEBUG3(printk("qla2x00: DPC handler waking up\n"));
 
 		/* Initialization not yet finished. Don't do anything yet. */
@@ -3199,6 +3237,9 @@ qla2x00_do_dpc(void *data)
 		DEBUG3(printk("scsi(%ld): DPC handler\n", ha->host_no));
 
 		ha->dpc_active = 1;
+
+		if (!list_empty(&ha->done_queue))
+			qla2x00_done(ha);
 
 		/* Process commands in retry queue */
 		if (test_and_clear_bit(PORT_RESTART_NEEDED, &ha->dpc_flags)) {
@@ -4403,61 +4444,64 @@ qla2x00_down_timeout(struct semaphore *sema, unsigned long timeout)
 }
 
 static void
-qla2xxx_get_port_id(struct scsi_device *sdev)
+qla2xxx_get_port_id(struct scsi_target *starget)
 {
-	scsi_qla_host_t *ha = to_qla_host(sdev->host);
+	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
+	scsi_qla_host_t *ha = to_qla_host(shost);
 	struct fc_port *fc;
 
 	list_for_each_entry(fc, &ha->fcports, list) {
-		if (fc->os_target_id == sdev->id) {
-			fc_port_id(sdev) = fc->d_id.b.domain << 16 |
+		if (fc->os_target_id == starget->id) {
+			fc_starget_port_id(starget) = fc->d_id.b.domain << 16 |
 				fc->d_id.b.area << 8 | 
 				fc->d_id.b.al_pa;
 			return;
 		}
 	}
-	fc_port_id(sdev) = -1;
+	fc_starget_port_id(starget) = -1;
 }
 
 static void
-qla2xxx_get_port_name(struct scsi_device *sdev)
+qla2xxx_get_port_name(struct scsi_target *starget)
 {
-	scsi_qla_host_t *ha = to_qla_host(sdev->host);
+	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
+	scsi_qla_host_t *ha = to_qla_host(shost);
 	struct fc_port *fc;
 
 	list_for_each_entry(fc, &ha->fcports, list) {
-		if (fc->os_target_id == sdev->id) {
-			fc_port_name(sdev) =
+		if (fc->os_target_id == starget->id) {
+			fc_starget_port_name(starget) =
 				__be64_to_cpu(*(uint64_t *)fc->port_name);
 			return;
 		}
 	}
-	fc_port_name(sdev) = -1;
+	fc_starget_port_name(starget) = -1;
 }
 
 static void
-qla2xxx_get_node_name(struct scsi_device *sdev)
+qla2xxx_get_node_name(struct scsi_target *starget)
 {
-	scsi_qla_host_t *ha = to_qla_host(sdev->host);
+	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
+	scsi_qla_host_t *ha = to_qla_host(shost);
 	struct fc_port *fc;
 
 	list_for_each_entry(fc, &ha->fcports, list) {
-		if (fc->os_target_id == sdev->id) {
-			fc_node_name(sdev) =
+		if (fc->os_target_id == starget->id) {
+			fc_starget_node_name(starget) =
 				__be64_to_cpu(*(uint64_t *)fc->node_name);
 			return;
 		}
 	}
-	fc_node_name(sdev) = -1;
+	fc_starget_node_name(starget) = -1;
 }
 
 static struct fc_function_template qla2xxx_transport_functions = {
-	.get_port_id = qla2xxx_get_port_id,
-	.show_port_id = 1,
-	.get_port_name = qla2xxx_get_port_name,
-	.show_port_name = 1,
-	.get_node_name = qla2xxx_get_node_name,
-	.show_node_name = 1,
+	.get_starget_port_id = qla2xxx_get_port_id,
+	.show_starget_port_id = 1,
+	.get_starget_port_name = qla2xxx_get_port_name,
+	.show_starget_port_name = 1,
+	.get_starget_node_name = qla2xxx_get_node_name,
+	.show_starget_node_name = 1,
 };
 
 /**

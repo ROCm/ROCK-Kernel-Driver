@@ -97,8 +97,8 @@ struct pm2fb_par
 {
 	pm2type_t	type;		/* Board type */
 	u32		fb_size;	/* framebuffer memory size */
-	unsigned char*	v_fb;		/* virtual address of frame buffer */
-	unsigned char*	v_regs;		/* virtual address of p_regs */
+	unsigned char	__iomem *v_fb;  /* virtual address of frame buffer */
+	unsigned char	__iomem *v_regs;/* virtual address of p_regs */
 	u32 	   	memclock;	/* memclock */
 	u32		video;		/* video flags before blanking */
 };
@@ -149,12 +149,12 @@ static struct fb_var_screeninfo pm2fb_var __initdata = {
  * Utility functions
  */
 
-inline static u32 RD32(unsigned char* base, s32 off)
+inline static u32 RD32(unsigned char __iomem *base, s32 off)
 {
 	return fb_readl(base + off);
 }
 
-inline static void WR32(unsigned char* base, s32 off, u32 v)
+inline static void WR32(unsigned char __iomem *base, s32 off, u32 v)
 {
 	fb_writel(v, base + off);
 }
@@ -877,7 +877,6 @@ static int pm2fb_setcolreg(unsigned regno, unsigned red, unsigned green,
 		green = CNVT_TOHW(green, info->var.green.length);
 		blue = CNVT_TOHW(blue, info->var.blue.length);
 		transp = CNVT_TOHW(transp, info->var.transp.length);
-		set_color(par, regno, red, green, blue);
 		break;
 	case FB_VISUAL_DIRECTCOLOR:
 		/* example here assumes 8 bit DAC. Might be different 
@@ -904,12 +903,8 @@ static int pm2fb_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 		switch (info->var.bits_per_pixel) {
 		case 8:
-			/* Yes some hand held devices have this. */ 
-           		((u8*)(info->pseudo_palette))[regno] = v;
 			break;	
    		case 16:
-           		((u16*)(info->pseudo_palette))[regno] = v;
-			break;
 		case 24:
 		case 32:	
            		((u32*)(info->pseudo_palette))[regno] = v;
@@ -917,7 +912,9 @@ static int pm2fb_setcolreg(unsigned regno, unsigned red, unsigned green,
 		}
 		return 0;
 	}
-	/* ... */
+	else if (info->fix.visual == FB_VISUAL_PSEUDOCOLOR)
+		set_color(par, regno, red, green, blue);
+
 	return 0;
 }
 
@@ -973,24 +970,26 @@ static int pm2fb_blank(int blank_mode, struct fb_info *info)
 
 	DPRINTK("blank_mode %d\n", blank_mode);
 
-	/* Turn everything on, then disable as requested. */
-	video |= (PM2F_VIDEO_ENABLE | PM2F_HSYNC_MASK | PM2F_VSYNC_MASK);
-
 	switch (blank_mode) {
-	case 0: 	/* Screen: On; HSync: On, VSync: On */
+	case FB_BLANK_UNBLANK:
+		/* Screen: On */
+		video |= PM2F_VIDEO_ENABLE;
 		break;
-	case 1: 	/* Screen: Off; HSync: On, VSync: On */
+	case FB_BLANK_NORMAL:
+		/* Screen: Off */
 		video &= ~PM2F_VIDEO_ENABLE;
 		break;
-	case 2: /* Screen: Off; HSync: On, VSync: Off */
-		video &= ~(PM2F_VIDEO_ENABLE | PM2F_VSYNC_MASK | PM2F_BLANK_LOW );
+	case FB_BLANK_VSYNC_SUSPEND:
+		/* VSync: Off */
+		video &= ~(PM2F_VSYNC_MASK | PM2F_BLANK_LOW );
 		break;
-	case 3: /* Screen: Off; HSync: Off, VSync: On */
-		video &= ~(PM2F_VIDEO_ENABLE | PM2F_HSYNC_MASK | PM2F_BLANK_LOW );
+	case FB_BLANK_HSYNC_SUSPEND:
+		/* HSync: Off */
+		video &= ~(PM2F_HSYNC_MASK | PM2F_BLANK_LOW );
 		break;
-	case 4: /* Screen: Off; HSync: Off, VSync: Off */
-		video &= ~(PM2F_VIDEO_ENABLE | PM2F_VSYNC_MASK | PM2F_HSYNC_MASK|
-			   PM2F_BLANK_LOW);
+	case FB_BLANK_POWERDOWN:
+		/* HSync: Off, VSync: Off */
+		video &= ~(PM2F_VSYNC_MASK | PM2F_HSYNC_MASK| PM2F_BLANK_LOW);
 		break;
 	}
 	set_video(par, video);
@@ -1155,10 +1154,10 @@ static int __devinit pm2fb_probe(struct pci_dev *pdev,
  err_exit_all:
 	fb_dealloc_cmap(&info->cmap);	
  err_exit_both:    
-	iounmap((void*) pm2fb_fix.smem_start);
+	iounmap(info->screen_base);
 	release_mem_region(pm2fb_fix.smem_start, pm2fb_fix.smem_len);
  err_exit_mmio:
-	iounmap((void*) pm2fb_fix.mmio_start);
+	iounmap(default_par->v_regs);
 	release_mem_region(pm2fb_fix.mmio_start, pm2fb_fix.mmio_len);
  err_exit_neither:
 	framebuffer_release(info);
@@ -1176,12 +1175,13 @@ static void __devexit pm2fb_remove(struct pci_dev *pdev)
 {
 	struct fb_info* info = pci_get_drvdata(pdev);
 	struct fb_fix_screeninfo* fix = &info->fix;
-    
+	struct pm2fb_par *par = info->par;
+
 	unregister_framebuffer(info);
     
-	iounmap((void*) fix->smem_start);
+	iounmap(info->screen_base);
 	release_mem_region(fix->smem_start, fix->smem_len);
-	iounmap((void*) fix->mmio_start);
+	iounmap(par->v_regs);
 	release_mem_region(fix->mmio_start, fix->mmio_len);
 
 	pci_set_drvdata(pdev, NULL);
@@ -1220,7 +1220,11 @@ int __init pm2fb_setup(char *options);
 int __init pm2fb_init(void)
 {
 #ifndef MODULE
-	pm2fb_setup(fb_get_options("pm2fb"));
+	char *option = NULL;
+
+	if (fb_get_options("pm2fb", &option))
+		return -ENODEV;
+	pm2fb_setup(option);
 #endif
 
 	return pci_module_init(&pm2fb_driver);

@@ -157,7 +157,7 @@ static int serio_raw_fetch_byte(struct serio_raw *serio_raw, char *c)
 	return !empty;
 }
 
-static ssize_t serio_raw_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
+static ssize_t serio_raw_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct serio_raw_list *list = file->private_data;
 	struct serio_raw *serio_raw = list->serio_raw;
@@ -187,7 +187,7 @@ static ssize_t serio_raw_read(struct file *file, char *buffer, size_t count, lof
 	return retval;
 }
 
-static ssize_t serio_raw_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
+static ssize_t serio_raw_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct serio_raw_list *list = file->private_data;
 	ssize_t written = 0;

@@ -238,8 +238,54 @@
 #define __NR_lremovexattr	233
 #define __NR_fremovexattr	234
 #define __NR_futex		235
+#define __NR_sendfile64		236
+#define __NR_mincore		237
+#define __NR_madvise		238
+#define __NR_fcntl64		239
+#define __NR_readahead		240
+#define __NR_io_setup		241
+#define __NR_io_destroy		242
+#define __NR_io_getevents	243
+#define __NR_io_submit		244
+#define __NR_io_cancel		245
+#define __NR_fadvise64		246
+#define __NR_exit_group		247
+#define __NR_lookup_dcookie	248
+#define __NR_epoll_create	249
+#define __NR_epoll_ctl		250
+#define __NR_epoll_wait		251
+#define __NR_remap_file_pages	252
+#define __NR_set_tid_address	253
+#define __NR_timer_create	254
+#define __NR_timer_settime	255
+#define __NR_timer_gettime	256
+#define __NR_timer_getoverrun	257
+#define __NR_timer_delete	258
+#define __NR_clock_settime	259
+#define __NR_clock_gettime	260
+#define __NR_clock_getres	261
+#define __NR_clock_nanosleep	262
+#define __NR_statfs64		263
+#define __NR_fstatfs64		264
+#define __NR_tgkill		265
+#define __NR_utimes		266
+#define __NR_fadvise64_64	267
+#define __NR_mbind		268
+#define __NR_get_mempolicy	269
+#define __NR_set_mempolicy	270
+#define __NR_mq_open		271
+#define __NR_mq_unlink		272
+#define __NR_mq_timedsend	273
+#define __NR_mq_timedreceive	274
+#define __NR_mq_notify		275
+#define __NR_mq_getsetattr	276
+#define __NR_waitid		277
+#define __NR_vserver		278
+#define __NR_add_key		279
+#define __NR_request_key	280
+#define __NR_keyctl		281
 
-#define NR_syscalls		236
+#define NR_syscalls		282
 
 /* user-visible error numbers are in the range -1 - -124: see
    <asm-m68k/errno.h> */

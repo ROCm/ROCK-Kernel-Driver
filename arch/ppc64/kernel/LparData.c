@@ -6,16 +6,15 @@
  * as published by the Free Software Foundation; either version
  * 2 of the License, or (at your option) any later version.
  */
-#include <asm/types.h>
-#include <asm/page.h>
-#include <stddef.h>
+#include <linux/config.h>
+#include <linux/types.h>
 #include <linux/threads.h>
 #include <linux/module.h>
+#include <linux/bitops.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/naca.h>
 #include <asm/abs_addr.h>
-#include <asm/bitops.h>
 #include <asm/iSeries/ItLpNaca.h>
 #include <asm/iSeries/ItLpPaca.h>
 #include <asm/iSeries/ItLpRegSave.h>

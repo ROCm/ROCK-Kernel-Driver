@@ -128,8 +128,8 @@ nfsd_proc_read(struct svc_rqst *rqstp, struct nfsd_readargs *argp,
 
 	if (NFSSVC_MAXBLKSIZE < argp->count) {
 		printk(KERN_NOTICE
-			"oversized read request from %08x:%d (%d bytes)\n",
-				ntohl(rqstp->rq_addr.sin_addr.s_addr),
+			"oversized read request from %u.%u.%u.%u:%d (%d bytes)\n",
+				NIPQUAD(rqstp->rq_addr.sin_addr.s_addr),
 				ntohs(rqstp->rq_addr.sin_port),
 				argp->count);
 		argp->count = NFSSVC_MAXBLKSIZE;
@@ -591,8 +591,6 @@ nfserrno (int errno)
 		{ nfserr_dropit, -EAGAIN },
 		{ nfserr_dropit, -ENOMEM },
 		{ nfserr_badname, -ESRCH },
-		{ nfserr_notsupp, -ENOTSUPP },
-		{ nfserr_notsupp, -EOPNOTSUPP },
 		{ -1, -EIO }
 	};
 	int	i;

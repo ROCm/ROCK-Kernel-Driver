@@ -810,16 +810,3 @@ void audit_log(struct audit_context *ctx, const char *fmt, ...)
 		audit_log_end(ab);
 	}
 }
-
-EXPORT_SYMBOL_GPL(audit_set_rate_limit);
-EXPORT_SYMBOL_GPL(audit_set_backlog_limit);
-EXPORT_SYMBOL_GPL(audit_set_enabled);
-EXPORT_SYMBOL_GPL(audit_set_failure);
-
-EXPORT_SYMBOL_GPL(audit_log_start);
-EXPORT_SYMBOL_GPL(audit_log_format);
-EXPORT_SYMBOL_GPL(audit_log_end_irq);
-EXPORT_SYMBOL_GPL(audit_log_end_fast);
-EXPORT_SYMBOL_GPL(audit_log_end);
-EXPORT_SYMBOL_GPL(audit_log);
-EXPORT_SYMBOL_GPL(audit_log_d_path);

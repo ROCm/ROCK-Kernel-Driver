@@ -126,9 +126,9 @@ int xterm_open(int input, int output, int primary, void *d, char **dev_out)
 
 	if(data->stack == 0) free_stack(stack, 0);
 
-	if (data->direct_rcv) {
+	if(data->direct_rcv)
 		new = os_rcv_fd(fd, &data->helper_pid);
-	} else {
+	else {
 		err = os_set_fd_block(fd, 0);
 		if(err < 0){
 			printk("xterm_open : failed to set descriptor "
@@ -142,8 +142,19 @@ int xterm_open(int input, int output, int primary, void *d, char **dev_out)
 		goto out;
 	}
 
-	tcgetattr(new, &data->tt);
-	if(data->raw) raw(new, 0);
+	CATCH_EINTR(err = tcgetattr(new, &data->tt));
+	if(err){
+		new = err;
+		goto out;
+	}
+
+	if(data->raw){
+		err = raw(new);
+		if(err){
+			new = err;
+			goto out;
+		}
+	}
 
 	data->pid = pid;
 	*dev_out = NULL;
@@ -157,10 +168,10 @@ void xterm_close(int fd, void *d)
 	struct xterm_chan *data = d;
 	
 	if(data->pid != -1) 
-		os_kill_process(data->pid, 1, 0);
+		os_kill_process(data->pid, 1);
 	data->pid = -1;
 	if(data->helper_pid != -1) 
-		os_kill_process(data->helper_pid, 0, 0);
+		os_kill_process(data->helper_pid, 0);
 	data->helper_pid = -1;
 	os_close_file(fd);
 }

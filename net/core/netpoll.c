@@ -378,7 +378,7 @@ int netpoll_rx(struct sk_buff *skb)
 		return 1;
 	}
 
-	proto = ntohs(skb->mac.ethernet->h_proto);
+	proto = ntohs(eth_hdr(skb)->h_proto);
 	if (proto != ETH_P_IP)
 		goto out;
 	if (skb->pkt_type == PACKET_OTHERHOST)
@@ -565,7 +565,7 @@ int netpoll_setup(struct netpoll *np)
 		goto release;
 	}
 
-	if (!(ndev->flags & IFF_UP)) {
+	if (!netif_running(ndev)) {
 		unsigned short oflags;
 		unsigned long atmost, atleast;
 
@@ -611,7 +611,7 @@ int netpoll_setup(struct netpoll *np)
 		rcu_read_lock();
 		in_dev = __in_dev_get(ndev);
 
-		if (!in_dev) {
+		if (!in_dev || !in_dev->ifa_list) {
 			rcu_read_unlock();
 			printk(KERN_ERR "%s: no IP address for %s, aborting\n",
 			       np->name, np->dev_name);

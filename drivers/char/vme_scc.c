@@ -544,12 +544,8 @@ static irqreturn_t scc_tx_int(int irq, void *data, struct pt_regs *fp)
 		SCCwrite(COMMAND_REG, CR_TX_PENDING_RESET);   /* disable tx_int on next tx underrun? */
 		port->gs.flags &= ~GS_TX_INTEN;
 	}
-	if (port->gs.tty && port->gs.xmit_cnt <= port->gs.wakeup_chars) {
-		if ((port->gs.tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-				port->gs.tty->ldisc.write_wakeup)
-			(port->gs.tty->ldisc.write_wakeup)(port->gs.tty);
-		wake_up_interruptible(&port->gs.tty->write_wait);
-	}
+	if (port->gs.tty && port->gs.xmit_cnt <= port->gs.wakeup_chars)
+		tty_wakeup(port->gs.tty);
 
 	SCCwrite_NB(COMMAND_REG, CR_HIGHEST_IUS_RESET);
 	return IRQ_HANDLED;

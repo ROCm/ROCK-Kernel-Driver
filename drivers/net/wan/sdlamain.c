@@ -976,7 +976,7 @@ static int ioctl_dump (sdla_t* card, sdla_dump_t* u_dump)
 
                         dump.length     -= len;
                         dump.offset     += len;
-                        (char*)dump.ptr += len;
+                        dump.ptr         = (char*)dump.ptr + len;
                 }
 		
                 sdla_mapmem(&card->hw, oldvec);/* restore DPM window position */

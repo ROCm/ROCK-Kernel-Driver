@@ -1,7 +1,7 @@
 /* linux/arch/arm/mach-s3c2410/irq.c
  *
  * Copyright (c) 2003,2004 Simtec Electronics
- * Ben Dooks <ben@simtec.co.uk>
+ *	Ben Dooks <ben@simtec.co.uk>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,8 +27,19 @@
  *
  *   21-Jul-2004  Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org>
  *                Addition of ADC/TC demux
- */
-
+ *
+ *   04-Oct-2004  Klaus Fetscher <k.fetscher@fetron.de>
+ *		  Fix for set_irq_type() on low EINT numbers
+ *
+ *   05-Oct-2004  Ben Dooks <ben@simtec.co.uk>
+ *		  Tidy up KF's patch and sort out new release
+ *
+ *   05-Oct-2004  Ben Dooks <ben@simtec.co.uk>
+ *		  Add support for power management controls
+ *
+ *   04-Nov-2004  Ben Dooks
+ *		  Fix standard IRQ wake for EINT0..4 and RTC
+*/
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -46,12 +57,72 @@
 #include <asm/arch/regs-irq.h>
 #include <asm/arch/regs-gpio.h>
 
-#if 0
-#include <asm/debug-ll.h>
-#endif
+#include "pm.h"
 
 #define irqdbf(x...)
 #define irqdbf2(x...)
+
+#define EXTINT_OFF (IRQ_EINT4 - 4)
+
+/* wakeup irq control */
+
+#ifdef CONFIG_PM
+
+/* state for IRQs over sleep */
+
+/* default is to allow for EINT0..EINT15, and IRQ_RTC as wakeup sources
+ *
+ * set bit to 1 in allow bitfield to enable the wakeup settings on it
+*/
+
+unsigned long s3c_irqwake_intallow	= 1L << (IRQ_RTC - IRQ_EINT0) | 0xfL;
+unsigned long s3c_irqwake_intmask	= 0xffffffffL;
+unsigned long s3c_irqwake_eintallow	= 0x0000fff0L;
+unsigned long s3c_irqwake_eintmask	= 0xffffffffL;
+
+static int
+s3c_irq_wake(unsigned int irqno, unsigned int state)
+{
+	unsigned long irqbit = 1 << (irqno - IRQ_EINT0);
+
+	if (!(s3c_irqwake_intallow & irqbit))
+		return -ENOENT;
+
+	printk(KERN_INFO "wake %s for irq %d\n",
+	       state ? "enabled" : "disabled", irqno);
+
+	if (!state)
+		s3c_irqwake_intmask |= irqbit;
+	else
+		s3c_irqwake_intmask &= ~irqbit;
+
+	return 0;
+}
+
+static int
+s3c_irqext_wake(unsigned int irqno, unsigned int state)
+{
+	unsigned long bit = 1L << (irqno - EXTINT_OFF);
+
+	if (!(s3c_irqwake_eintallow & bit))
+		return -ENOENT;
+
+	printk(KERN_INFO "wake %s for irq %d\n",
+	       state ? "enabled" : "disabled", irqno);
+
+	if (!state)
+		s3c_irqwake_eintmask |= bit;
+	else
+		s3c_irqwake_eintmask &= ~bit;
+
+	return 0;
+}
+
+#else
+#define s3c_irqext_wake NULL
+#define s3c_irq_wake NULL
+#endif
+
 
 static void
 s3c_irq_mask(unsigned int irqno)
@@ -106,20 +177,20 @@ s3c_irq_unmask(unsigned int irqno)
 static struct irqchip s3c_irq_level_chip = {
 	.ack	   = s3c_irq_maskack,
 	.mask	   = s3c_irq_mask,
-	.unmask	   = s3c_irq_unmask
+	.unmask	   = s3c_irq_unmask,
+	.wake	   = s3c_irq_wake
 };
 
 static struct irqchip s3c_irq_chip = {
 	.ack	   = s3c_irq_ack,
 	.mask	   = s3c_irq_mask,
-	.unmask	   = s3c_irq_unmask
+	.unmask	   = s3c_irq_unmask,
+	.wake	   = s3c_irq_wake
 };
 
 /* S3C2410_EINTMASK
  * S3C2410_EINTPEND
  */
-
-#define EXTINT_OFF (IRQ_EINT4 - 4)
 
 static void
 s3c_irqext_mask(unsigned int irqno)
@@ -195,12 +266,19 @@ s3c_irqext_type(unsigned int irq, unsigned int type)
 	unsigned long gpcon_offset, extint_offset;
 	unsigned long newvalue = 0, value;
 
-	if ((irq >= IRQ_EINT0) && (irq <= IRQ_EINT7))
+	if ((irq >= IRQ_EINT0) && (irq <= IRQ_EINT3))
 	{
 		gpcon_reg = S3C2410_GPFCON;
 		extint_reg = S3C2410_EXTINT0;
 		gpcon_offset = (irq - IRQ_EINT0) * 2;
 		extint_offset = (irq - IRQ_EINT0) * 4;
+	}
+	else if ((irq >= IRQ_EINT4) && (irq <= IRQ_EINT7))
+	{
+		gpcon_reg = S3C2410_GPFCON;
+		extint_reg = S3C2410_EXTINT0;
+		gpcon_offset = (irq - (EXTINT_OFF)) * 2;
+		extint_offset = (irq - (EXTINT_OFF)) * 4;
 	}
 	else if ((irq >= IRQ_EINT8) && (irq <= IRQ_EINT15))
 	{
@@ -266,7 +344,16 @@ static struct irqchip s3c_irqext_chip = {
 	.mask	    = s3c_irqext_mask,
 	.unmask	    = s3c_irqext_unmask,
 	.ack	    = s3c_irqext_ack,
-	.type	    = s3c_irqext_type
+	.type	    = s3c_irqext_type,
+	.wake	    = s3c_irqext_wake
+};
+
+static struct irqchip s3c_irq_eint0t4 = {
+	.ack	   = s3c_irq_ack,
+	.mask	   = s3c_irq_mask,
+	.unmask	   = s3c_irq_unmask,
+	.wake	   = s3c_irq_wake,
+	.type	   = s3c_irqext_type,
 };
 
 /* mask values for the parent registers for each of the interrupt types */
@@ -549,6 +636,7 @@ s3c_irq_demux_uart2(unsigned int irq,
 void __init s3c2410_init_irq(void)
 {
 	unsigned long pend;
+	unsigned long last;
 	int irqno;
 	int i;
 
@@ -556,48 +644,51 @@ void __init s3c2410_init_irq(void)
 
 	/* first, clear all interrupts pending... */
 
+	last = 0;
 	for (i = 0; i < 4; i++) {
 		pend = __raw_readl(S3C2410_EINTPEND);
-		if (pend == 0)
+
+		if (pend == 0 || pend == last)
 			break;
+
 		__raw_writel(pend, S3C2410_EINTPEND);
 		printk("irq: clearing pending ext status %08x\n", (int)pend);
+		last = pend;
 	}
 
+	last = 0;
 	for (i = 0; i < 4; i++) {
 		pend = __raw_readl(S3C2410_INTPND);
-		if (pend == 0)
+
+		if (pend == 0 || pend == last)
 			break;
+
 		__raw_writel(pend, S3C2410_SRCPND);
 		__raw_writel(pend, S3C2410_INTPND);
 		printk("irq: clearing pending status %08x\n", (int)pend);
+		last = pend;
 	}
 
+	last = 0;
 	for (i = 0; i < 4; i++) {
 		pend = __raw_readl(S3C2410_SUBSRCPND);
 
-		if (pend == 0)
+		if (pend == 0 || pend == last)
 			break;
 
 		printk("irq: clearing subpending status %08x\n", (int)pend);
 		__raw_writel(pend, S3C2410_SUBSRCPND);
+		last = pend;
 	}
 
 	/* register the main interrupts */
 
 	irqdbf("s3c2410_init_irq: registering s3c2410 interrupt handlers\n");
 
-	for (irqno = IRQ_EINT0; irqno <= IRQ_ADCPARENT; irqno++) {
+	for (irqno = IRQ_BATT_FLT; irqno <= IRQ_ADCPARENT; irqno++) {
 		/* set all the s3c2410 internal irqs */
 
 		switch (irqno) {
-
-		case IRQ_EINT4t7:
-		case IRQ_EINT8t23:
-			/* these are already dealt with, so should never
-			 * appear */
-			break;
-
 			/* deal with the special IRQs (cascaded) */
 
 		case IRQ_UART0:
@@ -631,6 +722,13 @@ void __init s3c2410_init_irq(void)
 
 
 	/* external interrupts */
+
+	for (irqno = IRQ_EINT0; irqno <= IRQ_EINT3; irqno++) {
+		irqdbf("registering irq %d (ext int)\n", irqno);
+		set_irq_chip(irqno, &s3c_irq_eint0t4);
+		set_irq_handler(irqno, do_edge_IRQ);
+		set_irq_flags(irqno, IRQF_VALID);
+	}
 
 	for (irqno = IRQ_EINT4; irqno <= IRQ_EINT23; irqno++) {
 		irqdbf("registering irq %d (extended s3c irq)\n", irqno);

@@ -439,6 +439,7 @@ extern struct acpi_prt_list	acpi_prt;
 struct pci_dev;
 
 int acpi_pci_irq_enable (struct pci_dev *dev);
+void acpi_penalize_isa_irq(int irq);
 
 struct acpi_pci_driver {
 	struct acpi_pci_driver *next;
@@ -453,14 +454,15 @@ void acpi_pci_unregister_driver(struct acpi_pci_driver *driver);
 
 #ifdef CONFIG_ACPI_EC
 
-int ec_read(u8 addr, u8 *val);
-int ec_write(u8 addr, u8 val);
+extern int ec_read(u8 addr, u8 *val);
+extern int ec_write(u8 addr, u8 val);
 
 #endif /*CONFIG_ACPI_EC*/
 
 #ifdef CONFIG_ACPI_INTERPRETER
 
-int acpi_blacklisted(void);
+extern int acpi_blacklisted(void);
+extern void acpi_bios_year(char *s);
 
 #else /*!CONFIG_ACPI_INTERPRETER*/
 
@@ -470,5 +472,31 @@ static inline int acpi_blacklisted(void)
 }
 
 #endif /*!CONFIG_ACPI_INTERPRETER*/
+
+#define	ACPI_CSTATE_LIMIT_DEFINED	/* for driver builds */
+#ifdef	CONFIG_ACPI
+
+/*
+ * Set highest legal C-state
+ * 0: C0 okay, but not C1
+ * 1: C1 okay, but not C2
+ * 2: C2 okay, but not C3 etc.
+ */
+
+extern unsigned int max_cstate;
+
+static inline unsigned int acpi_get_cstate_limit(void)
+{
+	return max_cstate;
+}
+static inline void acpi_set_cstate_limit(unsigned int new_limit)
+{
+	max_cstate = new_limit;
+	return;
+}
+#else
+static inline unsigned int acpi_get_cstate_limit(void) { return 0; }
+static inline void acpi_set_cstate_limit(unsigned int new_limit) { return; }
+#endif
 
 #endif /*_LINUX_ACPI_H*/

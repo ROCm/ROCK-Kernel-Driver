@@ -122,7 +122,7 @@ SystemCall_common:
 	andi.	r11,r10,_TIF_SYSCALL_T_OR_A
 	bne-	syscall_dotrace
 syscall_dotrace_cont:
-	cmpli	0,r0,NR_syscalls
+	cmpldi	0,r0,NR_syscalls
 	bge-	syscall_enosys
 
 system_call:			/* label this so stack traces look sane */
@@ -204,7 +204,7 @@ syscall_enosys:
 
 syscall_error:
 	lbz	r11,TI_SC_NOERR(r12)
-	cmpi	0,r11,0
+	cmpwi	0,r11,0
 	bne-	syscall_error_cont
 	neg	r3,r3
 	oris	r5,r5,0x1000	/* Set SO bit in CR */
@@ -497,10 +497,11 @@ restore:
 
 	li	r3,0
 	stb	r3,PACAPROCENABLED(r13)	/* ensure we are soft-disabled */
+	ori	r10,r10,MSR_EE
 	mtmsrd	r10			/* hard-enable again */
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	.do_IRQ
-	b	.ret_from_except		/* loop back and handle more */
+	b	.ret_from_except_lite		/* loop back and handle more */
 
 4:	stb	r5,PACAPROCENABLED(r13)
 #endif
@@ -574,6 +575,7 @@ do_work:
 	li	r0,1
 	stb	r0,PACAPROCENABLED(r13)
 #endif
+	ori	r10,r10,MSR_EE
 	mtmsrd	r10,1		/* reenable interrupts */
 	bl	.schedule
 	mfmsr	r10
@@ -591,6 +593,7 @@ do_work:
 user_work:
 #endif
 	/* Enable interrupts */
+	ori	r10,r10,MSR_EE
 	mtmsrd	r10,1
 
 	andi.	r0,r4,_TIF_NEED_RESCHED
@@ -746,6 +749,10 @@ _STATIC(rtas_restore_regs)
 	mtlr    r0
         blr				/* return to caller */
 
+#endif /* CONFIG_PPC_PSERIES */
+
+#ifdef CONFIG_PPC_MULTIPLATFORM
+
 _GLOBAL(enter_prom)
 	mflr	r0
 	std	r0,16(r1)
@@ -777,11 +784,8 @@ _GLOBAL(enter_prom)
 	std	r11,_MSR(r1)
 
 	/* Get the PROM entrypoint */
-        bl      .reloc_offset
-	LOADADDR(r12,prom)
-	sub	r12,r12,r3
-	ld	r12,PROMENTRY(r12)
-	mtlr	r12
+	ld	r0,GPR4(r1)
+	mtlr	r0
 
 	/* Switch MSR to 32 bits mode
 	 */
@@ -834,4 +838,4 @@ _GLOBAL(enter_prom)
 	mtlr    r0
         blr
 	
-#endif	/* defined(CONFIG_PPC_PSERIES) */
+#endif	/* CONFIG_PPC_MULTIPLATFORM */

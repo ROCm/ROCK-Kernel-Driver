@@ -311,7 +311,7 @@ ia32_syscall_table:
 	data8 sys_ni_syscall	  /* old profil syscall holder */
 	data8 compat_sys_statfs
 	data8 compat_sys_fstatfs	  /* 100 */
-	data8 sys32_ioperm
+	data8 sys_ni_syscall	/* ioperm */
 	data8 compat_sys_socketcall
 	data8 sys_syslog
 	data8 compat_sys_setitimer
@@ -320,7 +320,7 @@ ia32_syscall_table:
 	data8 compat_sys_newlstat
 	data8 compat_sys_newfstat
 	data8 sys_ni_syscall
-	data8 sys32_iopl		  /* 110 */
+	data8 sys_ni_syscall	/* iopl */	/* 110 */
 	data8 sys_vhangup
 	data8 sys_ni_syscall		/* used to be sys_idle */
 	data8 sys_ni_syscall
@@ -470,16 +470,16 @@ ia32_syscall_table:
 	data8 sys_remap_file_pages
 	data8 sys_set_tid_address
  	data8 sys32_timer_create
- 	data8 compat_timer_settime	/* 260 */
- 	data8 compat_timer_gettime
+ 	data8 compat_sys_timer_settime	/* 260 */
+ 	data8 compat_sys_timer_gettime
  	data8 sys_timer_getoverrun
  	data8 sys_timer_delete
- 	data8 compat_clock_settime
- 	data8 compat_clock_gettime /* 265 */
- 	data8 compat_clock_getres
- 	data8 compat_clock_nanosleep
-	data8 compat_statfs64
-	data8 compat_fstatfs64
+ 	data8 compat_sys_clock_settime
+ 	data8 compat_sys_clock_gettime /* 265 */
+ 	data8 compat_sys_clock_getres
+ 	data8 compat_sys_clock_nanosleep
+	data8 compat_sys_statfs64
+	data8 compat_sys_fstatfs64
  	data8 sys_tgkill	/* 270 */
  	data8 compat_sys_utimes
  	data8 sys32_fadvise64_64
@@ -493,6 +493,8 @@ ia32_syscall_table:
   	data8 compat_sys_mq_timedreceive	/* 280 */
   	data8 compat_sys_mq_notify
   	data8 compat_sys_mq_getsetattr
+	data8 sys_ni_syscall		/* reserved for kexec */
+	data8 sys32_waitid
 
 	// guard against failures to increase IA32_NR_syscalls
 	.org ia32_syscall_table + 8*IA32_NR_syscalls

@@ -22,10 +22,10 @@
 #include <linux/module.h>
 #include <linux/topology.h>
 #include <linux/interrupt.h>
+#include <linux/bitops.h>
 #include <asm/atomic.h>
 #include <asm/io.h>
 #include <asm/mtrr.h>
-#include <asm/bitops.h>
 #include <asm/pgtable.h>
 #include <asm/proto.h>
 #include <asm/cacheflush.h>
@@ -81,7 +81,7 @@ static u32 gart_unmapped_entry;
 
 #define for_all_nb(dev) \
 	dev = NULL;	\
-	while ((dev = pci_find_device(PCI_VENDOR_ID_AMD, 0x1103, dev))!=NULL)\
+	while ((dev = pci_get_device(PCI_VENDOR_ID_AMD, 0x1103, dev))!=NULL)\
 	     if (dev->bus->number == 0 && 				     \
 		    (PCI_SLOT(dev->devfn) >= 24) && (PCI_SLOT(dev->devfn) <= 31))
 
@@ -236,11 +236,21 @@ dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle,
 			mmu = 1;
 		if (no_iommu || dma_mask < 0xffffffffUL) { 
 			if (high) {
+				free_pages((unsigned long)memory,
+					   get_order(size));
+
+				if (swiotlb) {
+					return
+					swiotlb_alloc_coherent(dev, size,
+							       dma_handle,
+							       gfp);
+				}
+
 				if (!(gfp & GFP_DMA)) { 
 					gfp |= GFP_DMA; 
 					goto again;
 				}
-				goto free;
+				return NULL;
 			}
 			mmu = 0; 
 		} 	
@@ -260,9 +270,7 @@ dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle,
 error:
 	if (panic_on_overflow)
 		panic("dma_alloc_coherent: IOMMU overflow by %lu bytes\n", size);
-free:
 	free_pages((unsigned long)memory, get_order(size)); 
-	/* XXX Could use the swiotlb pool here too */
 	return NULL; 
 }
 
@@ -273,6 +281,11 @@ free:
 void dma_free_coherent(struct device *dev, size_t size,
 			 void *vaddr, dma_addr_t bus)
 {
+	if (swiotlb) {
+		swiotlb_free_coherent(dev, size, vaddr, bus);
+		return;
+	}
+
 	dma_unmap_single(dev, bus, size, 0);
 	free_pages((unsigned long)vaddr, get_order(size)); 		
 }

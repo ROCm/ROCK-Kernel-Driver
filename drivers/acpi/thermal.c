@@ -60,7 +60,7 @@
 #define ACPI_THERMAL_NOTIFY_HOT		0xF1
 #define ACPI_THERMAL_MODE_ACTIVE	0x00
 #define ACPI_THERMAL_MODE_PASSIVE	0x01
-#define ACPI_THERMAL_MODE_CRT   	0xff
+#define ACPI_THERMAL_MODE_CRITICAL   	0xff
 #define ACPI_THERMAL_PATH_POWEROFF	"/sbin/poweroff"
 
 #define ACPI_THERMAL_MAX_ACTIVE	10
@@ -76,7 +76,7 @@ MODULE_DESCRIPTION(ACPI_THERMAL_DRIVER_NAME);
 MODULE_LICENSE("GPL");
 
 static int tzp;
-MODULE_PARM(tzp, "i");
+module_param(tzp, int, 0);
 MODULE_PARM_DESC(tzp, "Thermal zone polling frequency, in 1/10 seconds.\n");
 
 
@@ -161,6 +161,7 @@ struct acpi_thermal {
 	unsigned long		last_temperature;
 	unsigned long		polling_frequency;
 	u8			cooling_mode;
+	volatile u8		zombie;
 	struct acpi_thermal_flags flags;
 	struct acpi_thermal_state state;
 	struct acpi_thermal_trips trips;
@@ -225,7 +226,7 @@ acpi_thermal_get_temperature (
 
 	status = acpi_evaluate_integer(tz->handle, "_TMP", NULL, &tz->temperature);
 	if (ACPI_FAILURE(status))
-		return -ENODEV;
+		return_VALUE(-ENODEV);
 
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Temperature is %lu dK\n", tz->temperature));
 
@@ -327,7 +328,7 @@ acpi_thermal_get_trip_points (
 	if (ACPI_FAILURE(status)) {
 		tz->trips.critical.flags.valid = 0;
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "No critical threshold\n"));
-		return -ENODEV;
+		return_VALUE(-ENODEV);
 	}
 	else {
 		tz->trips.critical.flags.valid = 1;
@@ -647,7 +648,10 @@ static void
 acpi_thermal_run (
 	unsigned long		data)
 {
-	acpi_os_queue_for_execution(OSD_PRIORITY_GPE,  acpi_thermal_check, (void *) data);
+	struct acpi_thermal *tz = (struct acpi_thermal *)data;
+	if (!tz->zombie)
+		acpi_os_queue_for_execution(OSD_PRIORITY_GPE,  
+			acpi_thermal_check, (void *) data);
 }
 
 
@@ -797,7 +801,7 @@ static int acpi_thermal_state_seq_show(struct seq_file *seq, void *offset)
 	}
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_thermal_state_open_fs(struct inode *inode, struct file *file)
@@ -824,7 +828,7 @@ static int acpi_thermal_temp_seq_show(struct seq_file *seq, void *offset)
 		KELVIN_TO_CELSIUS(tz->temperature));
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_thermal_temp_open_fs(struct inode *inode, struct file *file)
@@ -877,7 +881,7 @@ static int acpi_thermal_trip_seq_show(struct seq_file *seq, void *offset)
 	}
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_thermal_trip_open_fs(struct inode *inode, struct file *file)
@@ -949,14 +953,14 @@ static int acpi_thermal_cooling_seq_show(struct seq_file *seq, void *offset)
 		seq_puts(seq, "<setting not supported>\n");
 	}
 
-	if ( tz->cooling_mode == ACPI_THERMAL_MODE_CRT )
+	if ( tz->cooling_mode == ACPI_THERMAL_MODE_CRITICAL )
 		seq_printf(seq, "cooling mode:	critical\n");
 	else
 		seq_printf(seq, "cooling mode:	%s\n",
 			tz->cooling_mode?"passive":"active");
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_thermal_cooling_open_fs(struct inode *inode, struct file *file)
@@ -1019,7 +1023,7 @@ static int acpi_thermal_polling_seq_show(struct seq_file *seq, void *offset)
 		(tz->polling_frequency / 10));
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_thermal_polling_open_fs(struct inode *inode, struct file *file)
@@ -1258,7 +1262,7 @@ acpi_thermal_get_info (
 			tz->cooling_mode = ACPI_THERMAL_MODE_ACTIVE;
 		} else {
 			/* _ACx and _PSV are optional, but _CRT is required */
-			tz->cooling_mode = ACPI_THERMAL_MODE_CRT;
+			tz->cooling_mode = ACPI_THERMAL_MODE_CRITICAL;
 		}
 	}
 
@@ -1351,8 +1355,14 @@ acpi_thermal_remove (
 
 	tz = (struct acpi_thermal *) acpi_driver_data(device);
 
-	if (timer_pending(&(tz->timer)))
-		del_timer(&(tz->timer));
+	/* avoid timer adding new defer task */
+	tz->zombie = 1;
+	/* wait for running timer (on other CPUs) finish */
+	del_timer_sync(&(tz->timer));
+	/* synchronize deferred task */
+	acpi_os_wait_events_complete(NULL);
+	/* deferred task may reinsert timer */
+	del_timer_sync(&(tz->timer));
 
 	status = acpi_remove_notify_handler(tz->handle,
 		ACPI_DEVICE_NOTIFY, acpi_thermal_notify);
@@ -1374,6 +1384,7 @@ acpi_thermal_remove (
 
 	acpi_thermal_remove_fs(device);
 
+	kfree(tz);
 	return_VALUE(0);
 }
 

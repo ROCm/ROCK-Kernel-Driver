@@ -32,7 +32,13 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
+#include <asm/arch/regs-serial.h>
+
 #include "devs.h"
+
+/* Serial port registrations */
+
+struct platform_device *s3c24xx_uart_devs[3];
 
 /* USB Host Controller */
 
@@ -53,7 +59,7 @@ static u64 s3c_device_usb_dmamask = 0xffffffffUL;
 
 struct platform_device s3c_device_usb = {
 	.name		  = "s3c2410-ohci",
-	.id		  = 0,
+	.id		  = -1,
 	.num_resources	  = ARRAY_SIZE(s3c_usb_resource),
 	.resource	  = s3c_usb_resource,
 	.dev              = {
@@ -102,13 +108,7 @@ static struct resource s3c_nand_resource[] = {
 		.start = S3C2410_PA_NAND,
 		.end   = S3C2410_PA_NAND + S3C2410_SZ_NAND,
 		.flags = IORESOURCE_MEM,
-	},
-	[1] = {
-		.start = IRQ_S3CUART_RX0,
-		.end   = IRQ_S3CUART_ERR0,
-		.flags = IORESOURCE_IRQ,
 	}
-
 };
 
 struct platform_device s3c_device_nand = {

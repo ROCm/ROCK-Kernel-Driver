@@ -62,7 +62,6 @@ void __init ipc_init_ids(struct ipc_ids* ids, int size)
 
 	if(size > IPCMNI)
 		size = IPCMNI;
-	ids->size = size;
 	ids->in_use = 0;
 	ids->max_id = -1;
 	ids->seq = 0;
@@ -74,14 +73,17 @@ void __init ipc_init_ids(struct ipc_ids* ids, int size)
 		 	ids->seq_max = seq_limit;
 	}
 
-	ids->entries = ipc_rcu_alloc(sizeof(struct ipc_id)*size);
+	ids->entries = ipc_rcu_alloc(sizeof(struct kern_ipc_perm *)*size +
+				     sizeof(struct ipc_id_ary));
 
 	if(ids->entries == NULL) {
 		printk(KERN_ERR "ipc_init_ids() failed, ipc service disabled.\n");
-		ids->size = 0;
+		size = 0;
+		ids->entries = &ids->nullentry;
 	}
-	for(i=0;i<ids->size;i++)
-		ids->entries[i].p = NULL;
+	ids->entries->size = size;
+	for(i=0;i<size;i++)
+		ids->entries->p[i] = NULL;
 }
 
 /**
@@ -104,7 +106,7 @@ int ipc_findkey(struct ipc_ids* ids, key_t key)
 	 * since ipc_ids.sem is held
 	 */
 	for (id = 0; id <= max_id; id++) {
-		p = ids->entries[id].p;
+		p = ids->entries->p[id];
 		if(p==NULL)
 			continue;
 		if (key == p->key)
@@ -118,36 +120,36 @@ int ipc_findkey(struct ipc_ids* ids, key_t key)
  */
 static int grow_ary(struct ipc_ids* ids, int newsize)
 {
-	struct ipc_id* new;
-	struct ipc_id* old;
+	struct ipc_id_ary* new;
+	struct ipc_id_ary* old;
 	int i;
+	int size = ids->entries->size;
 
 	if(newsize > IPCMNI)
 		newsize = IPCMNI;
-	if(newsize <= ids->size)
+	if(newsize <= size)
 		return newsize;
 
-	new = ipc_rcu_alloc(sizeof(struct ipc_id)*newsize);
+	new = ipc_rcu_alloc(sizeof(struct kern_ipc_perm *)*newsize +
+			    sizeof(struct ipc_id_ary));
 	if(new == NULL)
-		return ids->size;
-	memcpy(new, ids->entries, sizeof(struct ipc_id)*ids->size);
-	for(i=ids->size;i<newsize;i++) {
-		new[i].p = NULL;
+		return size;
+	new->size = newsize;
+	memcpy(new->p, ids->entries->p, sizeof(struct kern_ipc_perm *)*size +
+					sizeof(struct ipc_id_ary));
+	for(i=size;i<newsize;i++) {
+		new->p[i] = NULL;
 	}
 	old = ids->entries;
 
 	/*
-	 * before setting the ids->entries to the new array, there must be a
-	 * smp_wmb() to make sure the memcpyed contents of the new array are
-	 * visible before the new array becomes visible.
+	 * Use rcu_assign_pointer() to make sure the memcpyed contents
+	 * of the new array are visible before the new array becomes visible.
 	 */
-	smp_wmb();	/* prevent seeing new array uninitialized. */
-	ids->entries = new;
-	smp_wmb();	/* prevent indexing into old array based on new size. */
-	ids->size = newsize;
+	rcu_assign_pointer(ids->entries, new);
 
 	ipc_rcu_putref(old);
-	return ids->size;
+	return newsize;
 }
 
 /**
@@ -175,7 +177,7 @@ int ipc_addid(struct ipc_ids* ids, struct kern_ipc_perm* new, int size)
 	 * ipc_ids.sem is held
 	 */
 	for (id = 0; id < size; id++) {
-		if(ids->entries[id].p == NULL)
+		if(ids->entries->p[id] == NULL)
 			goto found;
 	}
 	return -1;
@@ -191,11 +193,11 @@ found:
 	if(ids->seq > ids->seq_max)
 		ids->seq = 0;
 
-	new->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&new->lock);
 	new->deleted = 0;
 	rcu_read_lock();
 	spin_lock(&new->lock);
-	ids->entries[id].p = new;
+	ids->entries->p[id] = new;
 	return id;
 }
 
@@ -216,15 +218,15 @@ struct kern_ipc_perm* ipc_rmid(struct ipc_ids* ids, int id)
 {
 	struct kern_ipc_perm* p;
 	int lid = id % SEQ_MULTIPLIER;
-	if(lid >= ids->size)
+	if(lid >= ids->entries->size)
 		BUG();
 
 	/* 
 	 * do not need a rcu_dereference()() here to force ordering
 	 * on Alpha, since the ipc_ids.sem is held.
 	 */	
-	p = ids->entries[lid].p;
-	ids->entries[lid].p = NULL;
+	p = ids->entries->p[lid];
+	ids->entries->p[lid] = NULL;
 	if(p==NULL)
 		BUG();
 	ids->in_use--;
@@ -234,7 +236,7 @@ struct kern_ipc_perm* ipc_rmid(struct ipc_ids* ids, int id)
 			lid--;
 			if(lid == -1)
 				break;
-		} while (ids->entries[lid].p == NULL);
+		} while (ids->entries->p[lid] == NULL);
 		ids->max_id = lid;
 	}
 	p->deleted = 1;
@@ -493,9 +495,9 @@ struct kern_ipc_perm* ipc_get(struct ipc_ids* ids, int id)
 {
 	struct kern_ipc_perm* out;
 	int lid = id % SEQ_MULTIPLIER;
-	if(lid >= ids->size)
+	if(lid >= ids->entries->size)
 		return NULL;
-	out = ids->entries[lid].p;
+	out = ids->entries->p[lid];
 	return out;
 }
 
@@ -503,25 +505,15 @@ struct kern_ipc_perm* ipc_lock(struct ipc_ids* ids, int id)
 {
 	struct kern_ipc_perm* out;
 	int lid = id % SEQ_MULTIPLIER;
-	struct ipc_id* entries;
+	struct ipc_id_ary* entries;
 
 	rcu_read_lock();
-	if(lid >= ids->size) {
+	entries = rcu_dereference(ids->entries);
+	if(lid >= entries->size) {
 		rcu_read_unlock();
 		return NULL;
 	}
-
-	/* 
-	 * Note: The following two read barriers are corresponding
-	 * to the two write barriers in grow_ary(). They guarantee 
-	 * the writes are seen in the same order on the read side. 
-	 * smp_rmb() has effect on all CPUs.  rcu_dereference()
-	 * is used if there are data dependency between two reads, and 
-	 * has effect only on Alpha.
-	 */
-	smp_rmb(); /* prevent indexing old array with new size */
-	entries = rcu_dereference(ids->entries);
-	out = entries[lid].p;
+	out = entries->p[lid];
 	if(out == NULL) {
 		rcu_read_unlock();
 		return NULL;

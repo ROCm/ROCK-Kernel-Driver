@@ -16,6 +16,8 @@
  *      2 of the License, or (at your option) any later version.
  */
  
+#undef DEBUG
+
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/threads.h>
@@ -53,6 +55,15 @@
 #include <asm/iSeries/IoHriMainStore.h>
 #include <asm/iSeries/iSeries_proc.h>
 #include <asm/iSeries/mf.h>
+#include <asm/iSeries/HvLpEvent.h>
+
+extern void hvlog(char *fmt, ...);
+
+#ifdef DEBUG
+#define DBG(fmt...) hvlog(fmt)
+#else
+#define DBG(fmt...)
+#endif
 
 /* Function Prototypes */
 extern void ppcdbg_initialize(void);
@@ -74,8 +85,6 @@ static unsigned long tbFreqMhz;
 static unsigned long tbFreqMhzHundreths;
 
 int piranha_simulator;
-
-int boot_cpuid;
 
 extern int rd_size;		/* Defined in drivers/block/rd.c */
 extern unsigned long klimit;
@@ -275,8 +284,28 @@ unsigned long iSeries_process_mainstore_vpd(struct MemoryBlock *mb_array,
 	return mem_blocks;
 }
 
-void __init iSeries_init_early(void)
+static void __init iSeries_parse_cmdline(void)
 {
+	char *p, *q;
+
+	/* copy the command line parameter from the primary VSP  */
+	HvCallEvent_dmaToSp(cmd_line, 2 * 64* 1024, 256,
+			HvLpDma_Direction_RemoteToLocal);
+
+	p = cmd_line;
+	q = cmd_line + 255;
+	while(p < q) {
+		if (!*p || *p == '\n')
+			break;
+		++p;
+	}
+	*p = 0;
+}
+
+/*static*/ void __init iSeries_init_early(void)
+{
+	DBG(" -> iSeries_init_early()\n");
+
 	ppcdbg_initialize();
 
 #if defined(CONFIG_BLK_DEV_INITRD)
@@ -300,25 +329,20 @@ void __init iSeries_init_early(void)
 	iSeries_recal_tb = get_tb();
 	iSeries_recal_titan = HvCallXm_loadTod();
 
-	ppc_md.setup_arch = iSeries_setup_arch;
-	ppc_md.get_cpuinfo = iSeries_get_cpuinfo;
-	ppc_md.init_IRQ = iSeries_init_IRQ;
-	ppc_md.get_irq = iSeries_get_irq;
-	ppc_md.init = NULL;
+	/*
+	 * Cache sizes must be initialized before hpte_init_iSeries is called
+	 * as the later need them for flush_icache_range()
+	 */
+	setup_iSeries_cache_sizes();
 
-	ppc_md.pcibios_fixup  = iSeries_pci_final_fixup;
-
-	ppc_md.restart = iSeries_restart;
-	ppc_md.power_off = iSeries_power_off;
-	ppc_md.halt = iSeries_halt;
-
-	ppc_md.get_boot_time = iSeries_get_boot_time;
-	ppc_md.set_rtc_time = iSeries_set_rtc_time;
-	ppc_md.get_rtc_time = iSeries_get_rtc_time;
-	ppc_md.calibrate_decr = iSeries_calibrate_decr;
-	ppc_md.progress = iSeries_progress;
-
+	/*
+	 * Initialize the hash table management pointers
+	 */
 	hpte_init_iSeries();
+
+	/*
+	 * Initialize the DMA/TCE management
+	 */
 	tce_init_iSeries();
 
 	/*
@@ -326,39 +350,36 @@ void __init iSeries_init_early(void)
 	 * AS/400 absolute addresses
 	 */
 	build_iSeries_Memory_Map();
-	setup_iSeries_cache_sizes();
+
 	/* Initialize machine-dependency vectors */
 #ifdef CONFIG_SMP
 	smp_init_iSeries();
 #endif
 	if (itLpNaca.xPirEnvironMode == 0) 
 		piranha_simulator = 1;
-}
-
-void __init iSeries_init(unsigned long r3, unsigned long r4, unsigned long r5, 
-	   unsigned long r6, unsigned long r7)
-{
-	char *p, *q;
 
 	/* Associate Lp Event Queue 0 with processor 0 */
 	HvCallEvent_setLpEventQueueInterruptProc(0, 0);
 
-	/* copy the command line parameter from the primary VSP  */
-	HvCallEvent_dmaToSp(cmd_line, 2 * 64* 1024, 256,
-			HvLpDma_Direction_RemoteToLocal);
-
-	p = cmd_line;
-	q = cmd_line + 255;
-	while( p < q ) {
-		if (!*p || *p == '\n')
-			break;
-		++p;
-	}
-	*p = 0;
-
 	mf_init();
 	mf_initialized = 1;
 	mb();
+
+	/* If we were passed an initrd, set the ROOT_DEV properly if the values
+	 * look sensible. If not, clear initrd reference.
+	 */
+#ifdef CONFIG_BLK_DEV_INITRD
+	if (initrd_start >= KERNELBASE && initrd_end >= KERNELBASE &&
+	    initrd_end > initrd_start)
+		ROOT_DEV = Root_RAM0;
+	else
+		initrd_start = initrd_end = 0;
+#endif /* CONFIG_BLK_DEV_INITRD */
+
+
+	iSeries_parse_cmdline();
+
+	DBG(" <- iSeries_init_early()\n");
 }
 
 /*
@@ -712,7 +733,7 @@ void iSeries_restart(char *cmd)
  */
 void iSeries_power_off(void)
 {
-	mf_powerOff();
+	mf_power_off();
 }
 
 /*
@@ -720,7 +741,7 @@ void iSeries_power_off(void)
  */
 void iSeries_halt(void)
 {
-	mf_powerOff();
+	mf_power_off();
 }
 
 /* JDH Hack */
@@ -776,13 +797,13 @@ void __init iSeries_progress(char * st, unsigned short code)
 	printk("Progress: [%04x] - %s\n", (unsigned)code, st);
 	if (!piranha_simulator && mf_initialized) {
 		if (code != 0xffff)
-			mf_displayProgress(code);
+			mf_display_progress(code);
 		else
-			mf_clearSrc();
+			mf_clear_src();
 	}
 }
 
-void iSeries_fixup_klimit(void)
+static void __init iSeries_fixup_klimit(void)
 {
 	/*
 	 * Change klimit to take into account any ram disk
@@ -811,3 +832,27 @@ int __init iSeries_src_init(void)
 }
 
 late_initcall(iSeries_src_init);
+
+void __init iSeries_early_setup(void)
+{
+	iSeries_fixup_klimit();
+
+	ppc_md.setup_arch = iSeries_setup_arch;
+	ppc_md.get_cpuinfo = iSeries_get_cpuinfo;
+	ppc_md.init_IRQ = iSeries_init_IRQ;
+	ppc_md.get_irq = iSeries_get_irq;
+	ppc_md.init_early = iSeries_init_early,
+
+	ppc_md.pcibios_fixup  = iSeries_pci_final_fixup;
+
+	ppc_md.restart = iSeries_restart;
+	ppc_md.power_off = iSeries_power_off;
+	ppc_md.halt = iSeries_halt;
+
+	ppc_md.get_boot_time = iSeries_get_boot_time;
+	ppc_md.set_rtc_time = iSeries_set_rtc_time;
+	ppc_md.get_rtc_time = iSeries_get_rtc_time;
+	ppc_md.calibrate_decr = iSeries_calibrate_decr;
+	ppc_md.progress = iSeries_progress;
+}
+

@@ -48,14 +48,14 @@ static ssize_t show_inquiry_cache(struct class_device *cdev, char *buf)
 	hci_dev_lock_bh(hdev);
 
 	for (e = cache->list; e; e = e->next) {
-		struct inquiry_info *info = &e->info;
+		struct inquiry_data *data = &e->data;
 		bdaddr_t bdaddr;
-		baswap(&bdaddr, &info->bdaddr);
-		n += sprintf(buf + n, "%s %d %d %d 0x%.2x%.2x%.2x 0x%.4x 0x%.2x %u\n",
+		baswap(&bdaddr, &data->bdaddr);
+		n += sprintf(buf + n, "%s %d %d %d 0x%.2x%.2x%.2x 0x%.4x %d %u\n",
 				batostr(&bdaddr),
-				info->pscan_rep_mode, info->pscan_period_mode, info->pscan_mode,
-				info->dev_class[2], info->dev_class[1], info->dev_class[0],
-				info->clock_offset, 0, e->timestamp);
+				data->pscan_rep_mode, data->pscan_period_mode, data->pscan_mode,
+				data->dev_class[2], data->dev_class[1], data->dev_class[0],
+				data->clock_offset, data->rssi, e->timestamp);
 	}
 
 	hci_dev_unlock_bh(hdev);
@@ -114,7 +114,8 @@ static struct class bt_class = {
 int hci_register_sysfs(struct hci_dev *hdev)
 {
 	struct class_device *cdev = &hdev->class_dev;
-	int i, err;
+	unsigned int i;
+	int err;
 
 	BT_DBG("%p name %s type %d", hdev, hdev->name, hdev->type);
 

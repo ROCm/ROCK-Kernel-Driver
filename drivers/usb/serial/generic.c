@@ -147,9 +147,9 @@ static void generic_cleanup (struct usb_serial_port *port)
 	if (serial->dev) {
 		/* shutdown any bulk reads that might be going on */
 		if (serial->num_bulk_out)
-			usb_unlink_urb (port->write_urb);
+			usb_kill_urb(port->write_urb);
 		if (serial->num_bulk_in)
-			usb_unlink_urb (port->read_urb);
+			usb_kill_urb(port->read_urb);
 	}
 }
 
@@ -159,7 +159,7 @@ void usb_serial_generic_close (struct usb_serial_port *port, struct file * filp)
 	generic_cleanup (port);
 }
 
-int usb_serial_generic_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)
+int usb_serial_generic_write(struct usb_serial_port *port, const unsigned char *buf, int count)
 {
 	struct usb_serial *serial = port->serial;
 	int result;
@@ -181,13 +181,7 @@ int usb_serial_generic_write (struct usb_serial_port *port, int from_user, const
 
 		count = (count > port->bulk_out_size) ? port->bulk_out_size : count;
 
-		if (from_user) {
-			if (copy_from_user(port->write_urb->transfer_buffer, buf, count))
-				return -EFAULT;
-		}
-		else {
-			memcpy (port->write_urb->transfer_buffer, buf, count);
-		}
+		memcpy (port->write_urb->transfer_buffer, buf, count);
 		data = port->write_urb->transfer_buffer;
 		usb_serial_debug_data(debug, &port->dev, __FUNCTION__, count, data);
 

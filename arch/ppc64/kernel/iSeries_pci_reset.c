@@ -65,7 +65,8 @@ int iSeries_Device_ToggleReset(struct pci_dev *PciDev, int AssertTime,
 		AssertDelay = (5 * HZ) / 10;
 	else
 		AssertDelay = (AssertTime * HZ) / 10;
-	if (WaitDelay == 0)
+
+	if (DelayTime == 0)
 		WaitDelay = (30 * HZ) / 10;
 	else
 		WaitDelay = (DelayTime * HZ) / 10;

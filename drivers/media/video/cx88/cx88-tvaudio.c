@@ -1,6 +1,6 @@
 /*
-    $Id: cx88-tvaudio.c,v 1.20 2004/09/17 11:49:52 kraxel Exp $
-    
+    $Id: cx88-tvaudio.c,v 1.24 2004/10/25 11:51:00 kraxel Exp $
+
     cx88x-audio.c - Conexant CX23880/23881 audio downstream driver driver
 
      (c) 2001 Michael Eskin, Tom Zakrajsek [Windows version]
@@ -18,9 +18,9 @@
 
     Some comes from the dscaler sources, one of the dscaler driver guy works
     for Conexant ...
-    
+
     -----------------------------------------------------------------------
-    
+
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
@@ -57,7 +57,7 @@
 #include "cx88.h"
 
 static unsigned int audio_debug = 1;
-MODULE_PARM(audio_debug,"i");
+module_param(audio_debug,int,0644);
 MODULE_PARM_DESC(audio_debug,"enable debug messages [audio]");
 
 #define dprintk(fmt, arg...)	if (audio_debug) \
@@ -246,7 +246,7 @@ static void set_audio_standard_BTSC(struct cx88_core *core, unsigned int sap)
 		{ AUD_POLYPH80SCALEFAC,        0x00000003 },
                 { /* end of list */ },
 	};
-	
+
 	// dscaler: exactly taken from driver,
 	// dscaler: don't know why to set EN_FMRADIO_EN_RDS
 	if (sap) {
@@ -280,7 +280,7 @@ static void set_audio_standard_NICAM(struct cx88_core *core)
 		{ AUD_DEEMPHNUMER2_R,      0x0003023e },
 		{ AUD_DEEMPHDENOM1_R,      0x0000f3d0 },
 		{ AUD_DEEMPHDENOM2_R,      0x00000000 },
-		
+
 #if 0
 		// Deemphasis 2: (other tv norm?)
 		{ AUD_DEEMPHGAIN_R,        0x0000c600 },
@@ -338,7 +338,7 @@ static void set_audio_standard_NICAM(struct cx88_core *core)
 
 static void set_audio_standard_NICAM_L(struct cx88_core *core)
 {
-	/* This is officially wierd.. register dumps indicate windows
+	/* This is officially weird.. register dumps indicate windows
 	 * uses audio mode 4.. A2. Let's operate and find out. */
 
 	static const struct rlist nicam_l[] = {
@@ -351,104 +351,104 @@ static void set_audio_standard_NICAM_L(struct cx88_core *core)
 		{ AUD_PHACC_FREQ_8LSB,             0x4a },
 
 		{ AUD_POLY0_DDS_CONSTANT,          0x000e4db2 },
-		{ AUD_IIR1_0_SEL,                  0x00000000 },                
-		{ AUD_IIR1_1_SEL,                  0x00000002 },                
-		{ AUD_IIR1_2_SEL,                  0x00000023 },                
-		{ AUD_IIR1_3_SEL,                  0x00000004 },                
-		{ AUD_IIR1_4_SEL,                  0x00000005 },                
-		{ AUD_IIR1_5_SEL,                  0x00000007 },                
-		{ AUD_IIR1_0_SHIFT,                0x00000007 },                
-		{ AUD_IIR1_1_SHIFT,                0x00000000 },              
-		{ AUD_IIR1_2_SHIFT,                0x00000000 },                
-		{ AUD_IIR1_3_SHIFT,                0x00000007 },              
-		{ AUD_IIR1_4_SHIFT,                0x00000007 },              
-		{ AUD_IIR1_5_SHIFT,                0x00000007 },              
-		{ AUD_IIR2_0_SEL,                  0x00000002 },              
+		{ AUD_IIR1_0_SEL,                  0x00000000 },
+		{ AUD_IIR1_1_SEL,                  0x00000002 },
+		{ AUD_IIR1_2_SEL,                  0x00000023 },
+		{ AUD_IIR1_3_SEL,                  0x00000004 },
+		{ AUD_IIR1_4_SEL,                  0x00000005 },
+		{ AUD_IIR1_5_SEL,                  0x00000007 },
+		{ AUD_IIR1_0_SHIFT,                0x00000007 },
+		{ AUD_IIR1_1_SHIFT,                0x00000000 },
+		{ AUD_IIR1_2_SHIFT,                0x00000000 },
+		{ AUD_IIR1_3_SHIFT,                0x00000007 },
+		{ AUD_IIR1_4_SHIFT,                0x00000007 },
+		{ AUD_IIR1_5_SHIFT,                0x00000007 },
+		{ AUD_IIR2_0_SEL,                  0x00000002 },
 		{ AUD_IIR2_1_SEL,                  0x00000003 },
 		{ AUD_IIR2_2_SEL,                  0x00000004 },
-		{ AUD_IIR2_3_SEL,                  0x00000005 },         
-		{ AUD_IIR3_0_SEL,                  0x00000007 },         
-		{ AUD_IIR3_1_SEL,                  0x00000023 },         
-		{ AUD_IIR3_2_SEL,                  0x00000016 },         
-		{ AUD_IIR4_0_SHIFT,                0x00000000 },         
-		{ AUD_IIR4_1_SHIFT,                0x00000000 },         
-		{ AUD_IIR3_2_SHIFT,                0x00000002 },         
-		{ AUD_IIR4_0_SEL,                  0x0000001d },         
-		{ AUD_IIR4_1_SEL,                  0x00000019 },         
-		{ AUD_IIR4_2_SEL,                  0x00000008 },         
-		{ AUD_IIR4_0_SHIFT,                0x00000000 },         
-		{ AUD_IIR4_1_SHIFT,                0x00000007 },         
-		{ AUD_IIR4_2_SHIFT,                0x00000007 },         
-		{ AUD_IIR4_0_CA0,                  0x0003e57e },         
-		{ AUD_IIR4_0_CA1,                  0x00005e11 },         
-		{ AUD_IIR4_0_CA2,                  0x0003a7cf },         
-		{ AUD_IIR4_0_CB0,                  0x00002368 },     
-		{ AUD_IIR4_0_CB1,                  0x0003bf1b },         
-		{ AUD_IIR4_1_CA0,                  0x00006349 },         
-		{ AUD_IIR4_1_CA1,                  0x00006f27 },         
-		{ AUD_IIR4_1_CA2,                  0x0000e7a3 },         
+		{ AUD_IIR2_3_SEL,                  0x00000005 },
+		{ AUD_IIR3_0_SEL,                  0x00000007 },
+		{ AUD_IIR3_1_SEL,                  0x00000023 },
+		{ AUD_IIR3_2_SEL,                  0x00000016 },
+		{ AUD_IIR4_0_SHIFT,                0x00000000 },
+		{ AUD_IIR4_1_SHIFT,                0x00000000 },
+		{ AUD_IIR3_2_SHIFT,                0x00000002 },
+		{ AUD_IIR4_0_SEL,                  0x0000001d },
+		{ AUD_IIR4_1_SEL,                  0x00000019 },
+		{ AUD_IIR4_2_SEL,                  0x00000008 },
+		{ AUD_IIR4_0_SHIFT,                0x00000000 },
+		{ AUD_IIR4_1_SHIFT,                0x00000007 },
+		{ AUD_IIR4_2_SHIFT,                0x00000007 },
+		{ AUD_IIR4_0_CA0,                  0x0003e57e },
+		{ AUD_IIR4_0_CA1,                  0x00005e11 },
+		{ AUD_IIR4_0_CA2,                  0x0003a7cf },
+		{ AUD_IIR4_0_CB0,                  0x00002368 },
+		{ AUD_IIR4_0_CB1,                  0x0003bf1b },
+		{ AUD_IIR4_1_CA0,                  0x00006349 },
+		{ AUD_IIR4_1_CA1,                  0x00006f27 },
+		{ AUD_IIR4_1_CA2,                  0x0000e7a3 },
 		{ AUD_IIR4_1_CB0,                  0x00005653 },
-		{ AUD_IIR4_1_CB1,                  0x0000cf97 },         
-		{ AUD_IIR4_2_CA0,                  0x00006349 },         
-		{ AUD_IIR4_2_CA1,                  0x00006f27 },         
-		{ AUD_IIR4_2_CA2,                  0x0000e7a3 },         
-		{ AUD_IIR4_2_CB0,                  0x00005653 },         
-		{ AUD_IIR4_2_CB1,                  0x0000cf97 },         
-		{ AUD_HP_MD_IIR4_1,                0x00000001 },           
-		{ AUD_HP_PROG_IIR4_1,              0x0000001a },         
+		{ AUD_IIR4_1_CB1,                  0x0000cf97 },
+		{ AUD_IIR4_2_CA0,                  0x00006349 },
+		{ AUD_IIR4_2_CA1,                  0x00006f27 },
+		{ AUD_IIR4_2_CA2,                  0x0000e7a3 },
+		{ AUD_IIR4_2_CB0,                  0x00005653 },
+		{ AUD_IIR4_2_CB1,                  0x0000cf97 },
+		{ AUD_HP_MD_IIR4_1,                0x00000001 },
+		{ AUD_HP_PROG_IIR4_1,              0x0000001a },
 		{ AUD_DN0_FREQ,                    0x00000000 },
-		{ AUD_DN1_FREQ,                    0x00003318 },         
-		{ AUD_DN1_SRC_SEL,                 0x00000017 },         
-		{ AUD_DN1_SHFT,                    0x00000007 },         
-		{ AUD_DN1_AFC,                     0x00000000 },         
-		{ AUD_DN1_FREQ_SHIFT,              0x00000000 },         
-		{ AUD_DN2_FREQ,                    0x00003551 },         
-		{ AUD_DN2_SRC_SEL,                 0x00000001 },         
-		{ AUD_DN2_SHFT,                    0x00000000 },         
-		{ AUD_DN2_AFC,                     0x00000002 },         
-		{ AUD_DN2_FREQ_SHIFT,              0x00000000 },         
-		{ AUD_PDET_SRC,                    0x00000014 },         
-		{ AUD_PDET_SHIFT,                  0x00000000 },         
-		{ AUD_DEEMPH0_SRC_SEL,             0x00000011 },         
-		{ AUD_DEEMPH1_SRC_SEL,             0x00000011 },         
-		{ AUD_DEEMPH0_SHIFT,               0x00000000 },         
-		{ AUD_DEEMPH1_SHIFT,               0x00000000 },         
-		{ AUD_DEEMPH0_G0,                  0x00007000 },         
-		{ AUD_DEEMPH0_A0,                  0x00000000 },         
-		{ AUD_DEEMPH0_B0,                  0x00000000 },         
-		{ AUD_DEEMPH0_A1,                  0x00000000 },         
-		{ AUD_DEEMPH0_B1,                  0x00000000 },         
-		{ AUD_DEEMPH1_G0,                  0x00007000 },         
-		{ AUD_DEEMPH1_A0,                  0x00000000 },         
-		{ AUD_DEEMPH1_B0,                  0x00000000 },         
-		{ AUD_DEEMPH1_A1,                  0x00000000 },         
-		{ AUD_DEEMPH1_B1,                  0x00000000 },         
-		{ AUD_DMD_RA_DDS,                  0x00f5c285 },         
-		{ AUD_RATE_ADJ1,                   0x00000100 },         
-		{ AUD_RATE_ADJ2,                   0x00000200 },         
-		{ AUD_RATE_ADJ3,                   0x00000300 },         
-		{ AUD_RATE_ADJ4,                   0x00000400 },         
-		{ AUD_RATE_ADJ5,                   0x00000500 },              
-		{ AUD_C2_UP_THR,                   0x00005400 },              
-		{ AUD_C2_LO_THR,                   0x00003000 },              
-		{ AUD_C1_UP_THR,                   0x00007000 },              
-		{ AUD_C2_LO_THR,                   0x00005400 },              
-		{ AUD_CTL,                         0x0000100c },    
-		{ AUD_DCOC_0_SRC,                  0x00000021 },        
-		{ AUD_DCOC_1_SRC,                  0x00000003 },      
-		{ AUD_DCOC1_SHIFT,                 0x00000000 },      
-		{ AUD_DCOC_1_SHIFT_IN0,            0x0000000a },          
-		{ AUD_DCOC_1_SHIFT_IN1,            0x00000008 },         
-		{ AUD_DCOC_PASS_IN,                0x00000000 },           
-		{ AUD_DCOC_2_SRC,                  0x0000001b },             
-		{ AUD_IIR4_0_SEL,                  0x0000001d },            
-		{ AUD_POLY0_DDS_CONSTANT,          0x000e4db2 },         
-		{ AUD_PHASE_FIX_CTL,               0x00000000 },        
+		{ AUD_DN1_FREQ,                    0x00003318 },
+		{ AUD_DN1_SRC_SEL,                 0x00000017 },
+		{ AUD_DN1_SHFT,                    0x00000007 },
+		{ AUD_DN1_AFC,                     0x00000000 },
+		{ AUD_DN1_FREQ_SHIFT,              0x00000000 },
+		{ AUD_DN2_FREQ,                    0x00003551 },
+		{ AUD_DN2_SRC_SEL,                 0x00000001 },
+		{ AUD_DN2_SHFT,                    0x00000000 },
+		{ AUD_DN2_AFC,                     0x00000002 },
+		{ AUD_DN2_FREQ_SHIFT,              0x00000000 },
+		{ AUD_PDET_SRC,                    0x00000014 },
+		{ AUD_PDET_SHIFT,                  0x00000000 },
+		{ AUD_DEEMPH0_SRC_SEL,             0x00000011 },
+		{ AUD_DEEMPH1_SRC_SEL,             0x00000011 },
+		{ AUD_DEEMPH0_SHIFT,               0x00000000 },
+		{ AUD_DEEMPH1_SHIFT,               0x00000000 },
+		{ AUD_DEEMPH0_G0,                  0x00007000 },
+		{ AUD_DEEMPH0_A0,                  0x00000000 },
+		{ AUD_DEEMPH0_B0,                  0x00000000 },
+		{ AUD_DEEMPH0_A1,                  0x00000000 },
+		{ AUD_DEEMPH0_B1,                  0x00000000 },
+		{ AUD_DEEMPH1_G0,                  0x00007000 },
+		{ AUD_DEEMPH1_A0,                  0x00000000 },
+		{ AUD_DEEMPH1_B0,                  0x00000000 },
+		{ AUD_DEEMPH1_A1,                  0x00000000 },
+		{ AUD_DEEMPH1_B1,                  0x00000000 },
+		{ AUD_DMD_RA_DDS,                  0x00f5c285 },
+		{ AUD_RATE_ADJ1,                   0x00000100 },
+		{ AUD_RATE_ADJ2,                   0x00000200 },
+		{ AUD_RATE_ADJ3,                   0x00000300 },
+		{ AUD_RATE_ADJ4,                   0x00000400 },
+		{ AUD_RATE_ADJ5,                   0x00000500 },
+		{ AUD_C2_UP_THR,                   0x00005400 },
+		{ AUD_C2_LO_THR,                   0x00003000 },
+		{ AUD_C1_UP_THR,                   0x00007000 },
+		{ AUD_C2_LO_THR,                   0x00005400 },
+		{ AUD_CTL,                         0x0000100c },
+		{ AUD_DCOC_0_SRC,                  0x00000021 },
+		{ AUD_DCOC_1_SRC,                  0x00000003 },
+		{ AUD_DCOC1_SHIFT,                 0x00000000 },
+		{ AUD_DCOC_1_SHIFT_IN0,            0x0000000a },
+		{ AUD_DCOC_1_SHIFT_IN1,            0x00000008 },
+		{ AUD_DCOC_PASS_IN,                0x00000000 },
+		{ AUD_DCOC_2_SRC,                  0x0000001b },
+		{ AUD_IIR4_0_SEL,                  0x0000001d },
+		{ AUD_POLY0_DDS_CONSTANT,          0x000e4db2 },
+		{ AUD_PHASE_FIX_CTL,               0x00000000 },
 		{ AUD_CORDIC_SHIFT_1,              0x00000007 },
-		{ AUD_PLL_EN,                      0x00000000 },        
+		{ AUD_PLL_EN,                      0x00000000 },
 		{ AUD_PLL_PRESCALE,                0x00000002 },
-		{ AUD_PLL_INT,                     0x0000001e },            
-		{ AUD_OUT1_SHIFT,                  0x00000000 },          
+		{ AUD_PLL_INT,                     0x0000001e },
+		{ AUD_OUT1_SHIFT,                  0x00000000 },
 
 		{ /* end of list */ },
 	};
@@ -470,7 +470,7 @@ static void set_audio_standard_A2(struct cx88_core *core)
 		{ AUD_QAM_MODE,		      0x05 },
 		{ AUD_PHACC_FREQ_8MSB,	      0x34 },
 		{ AUD_PHACC_FREQ_8LSB,	      0x4c },
-		
+
 		{ AUD_RATE_ADJ1,	0x00001000 },
 		{ AUD_RATE_ADJ2,	0x00002000 },
 		{ AUD_RATE_ADJ3,	0x00003000 },
@@ -515,7 +515,7 @@ static void set_audio_standard_A2(struct cx88_core *core)
 
 		{ /* end of list */ },
 	};
-	
+
 	static const struct rlist a2_table1[] = {
 		// PAL-BG
 		{ AUD_DMD_RA_DDS,	0x002a73bd },
@@ -553,6 +553,13 @@ static void set_audio_standard_A2(struct cx88_core *core)
 	set_audio_start(core, 0x0004, EN_DMTRX_SUMDIFF | EN_A2_AUTO_STEREO);
 	set_audio_registers(core, a2_common);
 	switch (core->tvaudio) {
+	case WW_NICAM_I:
+		/* gives at least mono according to the dscaler guys */
+		/* so use use that while nicam is broken ...         */
+		dprintk("%s PAL-I mono (status: unknown)\n",__FUNCTION__);
+		set_audio_registers(core, a2_table1);
+		cx_write(AUD_CTL, EN_A2_FORCE_MONO1);
+		break;
 	case WW_A2_BG:
 		dprintk("%s PAL-BG A2 (status: known-good)\n",__FUNCTION__);
 		set_audio_registers(core, a2_table1);
@@ -601,7 +608,7 @@ static void set_audio_standard_FM(struct cx88_core *core)
 			cx_write(AUD_DEEMPH1_B0, 0x1C29);
 			cx_write(AUD_DEEMPH1_A1, 0x3FC66);
 			cx_write(AUD_DEEMPH1_B1, 0x399A);
-			
+
 			break;
 
 		case WW_FM_DEEMPH_75:
@@ -639,10 +646,11 @@ void cx88_set_tvaudio(struct cx88_core *core)
 	case WW_BTSC:
 		set_audio_standard_BTSC(core,0);
 		break;
-	case WW_NICAM_I:
+	// case WW_NICAM_I:
 	case WW_NICAM_BGDKL:
 		set_audio_standard_NICAM(core);
 		break;
+	case WW_NICAM_I:
 	case WW_A2_BG:
 	case WW_A2_DK:
 	case WW_A2_M:
@@ -732,7 +740,7 @@ void cx88_set_stereo(struct cx88_core *core, u32 mode)
 	switch (core->tvaudio) {
 	case WW_BTSC:
 		switch (mode) {
-		case V4L2_TUNER_MODE_MONO:   
+		case V4L2_TUNER_MODE_MONO:
 			ctl  = EN_BTSC_FORCE_MONO;
 			mask = 0x3f;
 			break;
@@ -750,7 +758,7 @@ void cx88_set_stereo(struct cx88_core *core, u32 mode)
 	case WW_A2_DK:
 	case WW_A2_M:
 		switch (mode) {
-		case V4L2_TUNER_MODE_MONO:   
+		case V4L2_TUNER_MODE_MONO:
 		case V4L2_TUNER_MODE_LANG1:
 			ctl  = EN_A2_FORCE_MONO1;
 			mask = 0x3f;
@@ -767,7 +775,7 @@ void cx88_set_stereo(struct cx88_core *core, u32 mode)
 		break;
 	case WW_NICAM_BGDKL:
 		switch (mode) {
-		case V4L2_TUNER_MODE_MONO:   
+		case V4L2_TUNER_MODE_MONO:
 			ctl  = EN_NICAM_FORCE_MONO1;
 			mask = 0x3f;
 			break;
@@ -780,10 +788,10 @@ void cx88_set_stereo(struct cx88_core *core, u32 mode)
 			mask = 0x93f;
 			break;
 		}
-		break;	
+		break;
 	case WW_FM:
 		switch (mode) {
-		case V4L2_TUNER_MODE_MONO:   
+		case V4L2_TUNER_MODE_MONO:
 			ctl  = EN_FMRADIO_FORCE_MONO;
 			mask = 0x3f;
 			break;
@@ -792,7 +800,7 @@ void cx88_set_stereo(struct cx88_core *core, u32 mode)
 			mask = 0x3f;
 			break;
 		}
-		break;	
+		break;
 	}
 
 	if (UNSET != ctl) {
@@ -811,7 +819,7 @@ int cx88_audio_thread(void *data)
 {
 	struct cx88_core *core = data;
 	struct v4l2_tuner t;
-	
+
 	dprintk("cx88: tvaudio thread started\n");
 	for (;;) {
 		if (kthread_should_stop())
@@ -820,7 +828,7 @@ int cx88_audio_thread(void *data)
 		/* just monitor the audio status for now ... */
 		memset(&t,0,sizeof(t));
 		cx88_get_stereo(core,&t);
-		msleep(1000);
+		msleep_interruptible(1000);
 	}
 
 	dprintk("cx88: tvaudio thread exiting\n");

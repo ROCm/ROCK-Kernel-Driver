@@ -812,12 +812,6 @@ static int lance_open(struct net_device *dev)
 	}
 
 	status = init_restart_lance(lp);
-
-	/*
-	 * if (!status)
-	 *      MOD_INC_USE_COUNT;
-	 */
-
 	return status;
 }
 
@@ -849,9 +843,6 @@ static int lance_close(struct net_device *dev)
 		free_irq(lp->dma_irq, dev);
 	}
 	free_irq(dev->irq, dev);
-	/*
-	   MOD_DEC_USE_COUNT;
-	 */
 	return 0;
 }
 

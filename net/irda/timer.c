@@ -34,6 +34,8 @@
 #include <net/irda/irlap.h>
 #include <net/irda/irlmp.h>
 
+extern int  sysctl_slot_timeout;
+
 static void irlap_slot_timer_expired(void* data);
 static void irlap_query_timer_expired(void* data);
 static void irlap_final_timer_expired(void* data);
@@ -47,8 +49,25 @@ void irlap_start_slot_timer(struct irlap_cb *self, int timeout)
 			 irlap_slot_timer_expired);
 }
 
-void irlap_start_query_timer(struct irlap_cb *self, int timeout)
+void irlap_start_query_timer(struct irlap_cb *self, int S, int s)
 {
+	int timeout;
+
+	/* Calculate when the peer discovery should end. Normally, we
+	 * get the end-of-discovery frame, so this is just in case
+	 * we miss it.
+	 * Basically, we multiply the number of remaining slots by our
+	 * slot time, plus add some extra time to properly receive the last
+	 * discovery packet (which is longer due to extra discovery info),
+	 * to avoid messing with for incomming connections requests and
+	 * to accomodate devices that perform discovery slower than us.
+	 * Jean II */
+	timeout = ((sysctl_slot_timeout * HZ / 1000) * (S - s)
+		   + XIDEXTRA_TIMEOUT + SMALLBUSY_TIMEOUT);
+
+	/* Set or re-set the timer. We reset the timer for each received
+	 * discovery query, which allow us to automatically adjust to
+	 * the speed of the peer discovery (faster or slower). Jean II */
 	irda_start_timer( &self->query_timer, timeout, (void *) self, 
 			  irlap_query_timer_expired);
 }

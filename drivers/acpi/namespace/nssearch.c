@@ -96,8 +96,10 @@ acpi_ns_search_node (
 
 		scope_name = acpi_ns_get_external_pathname (node);
 		if (scope_name) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Searching %s (%p) For [%4.4s] (%s)\n",
-				scope_name, node, (char *) &target_name, acpi_ut_get_type_name (type)));
+			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
+				"Searching %s (%p) For [%4.4s] (%s)\n",
+				scope_name, node, (char *) &target_name,
+				acpi_ut_get_type_name (type)));
 
 			ACPI_MEM_FREE (scope_name);
 		}
@@ -164,7 +166,7 @@ acpi_ns_search_node (
  * PARAMETERS:  *target_name        - Ascii ACPI name to search for
  *              *Node               - Starting node where search will begin
  *              Type                - Object type to match
- *              **return_node       - Where the matched Named Obj is returned
+ *              **return_node       - Where the matched Node is returned
  *
  * RETURN:      Status
  *
@@ -199,13 +201,13 @@ acpi_ns_search_parent_tree (
 	parent_node = acpi_ns_get_parent_node (node);
 
 	/*
-	 * If there is no parent (i.e., we are at the root) or
-	 * type is "local", we won't be searching the parent tree.
+	 * If there is no parent (i.e., we are at the root) or type is "local",
+	 * we won't be searching the parent tree.
 	 */
 	if (!parent_node) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "[%4.4s] has no parent\n",
 			(char *) &target_name));
-		 return_ACPI_STATUS (AE_NOT_FOUND);
+		return_ACPI_STATUS (AE_NOT_FOUND);
 	}
 
 	if (acpi_ns_local (type)) {
@@ -217,11 +219,12 @@ acpi_ns_search_parent_tree (
 
 	/* Search the parent tree */
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Searching parent for %4.4s\n", (char *) &target_name));
+	ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
+		"Searching parent [%4.4s] for [%4.4s]\n",
+		acpi_ut_get_node_name (parent_node), (char *) &target_name));
 
 	/*
-	 * Search parents until found the target or we have backed up to
-	 * the root
+	 * Search parents until target is found or we have backed up to the root
 	 */
 	while (parent_node) {
 		/*
@@ -230,7 +233,7 @@ acpi_ns_search_parent_tree (
 		 * the actual name we are searching for.  Typechecking comes later.
 		 */
 		status = acpi_ns_search_node (target_name, parent_node,
-				   ACPI_TYPE_ANY, return_node);
+				  ACPI_TYPE_ANY, return_node);
 		if (ACPI_SUCCESS (status)) {
 			return_ACPI_STATUS (status);
 		}
@@ -293,7 +296,8 @@ acpi_ns_search_and_enter (
 	/* Parameter validation */
 
 	if (!node || !target_name || !return_node) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null param: Node %p Name %X return_node %p\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			"Null param: Node %p Name %X return_node %p\n",
 			node, target_name, return_node));
 
 		ACPI_REPORT_ERROR (("ns_search_and_enter: Null parameter\n"));
@@ -330,22 +334,20 @@ acpi_ns_search_and_enter (
 	}
 
 	/*
-	 * The name was not found.  If we are NOT performing the
-	 * first pass (name entry) of loading the namespace, search
-	 * the parent tree (all the way to the root if necessary.)
-	 * We don't want to perform the parent search when the
-	 * namespace is actually being loaded.  We want to perform
-	 * the search when namespace references are being resolved
-	 * (load pass 2) and during the execution phase.
+	 * The name was not found.  If we are NOT performing the first pass
+	 * (name entry) of loading the namespace, search the parent tree (all the
+	 * way to the root if necessary.) We don't want to perform the parent
+	 * search when the namespace is actually being loaded.  We want to perform
+	 * the search when namespace references are being resolved (load pass 2)
+	 * and during the execution phase.
 	 */
 	if ((interpreter_mode != ACPI_IMODE_LOAD_PASS1) &&
 		(flags & ACPI_NS_SEARCH_PARENT)) {
 		/*
-		 * Not found at this level - search parent tree according
-		 * to ACPI specification
+		 * Not found at this level - search parent tree according to the
+		 * ACPI specification
 		 */
-		status = acpi_ns_search_parent_tree (target_name, node,
-				 type, return_node);
+		status = acpi_ns_search_parent_tree (target_name, node, type, return_node);
 		if (ACPI_SUCCESS (status)) {
 			return_ACPI_STATUS (status);
 		}
@@ -355,7 +357,8 @@ acpi_ns_search_and_enter (
 	 * In execute mode, just search, never add names.  Exit now.
 	 */
 	if (interpreter_mode == ACPI_IMODE_EXECUTE) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "%4.4s Not found in %p [Not adding]\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
+			"%4.4s Not found in %p [Not adding]\n",
 			(char *) &target_name, node));
 
 		return_ACPI_STATUS (AE_NOT_FOUND);

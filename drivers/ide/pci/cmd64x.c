@@ -38,8 +38,6 @@ static u8 cmd64x_proc = 0;
 static struct pci_dev *cmd_devs[CMD_MAX_DEVS];
 static int n_cmd_devs;
 
-#undef DEBUG_CMD_REGS
-
 static char * print_cmd64x_get_info (char *buf, struct pci_dev *dev, int index)
 {
 	char *p = buf;
@@ -49,9 +47,6 @@ static char * print_cmd64x_get_info (char *buf, struct pci_dev *dev, int index)
 	u8 reg72 = 0, reg73 = 0;			/* primary */
 	u8 reg7a = 0, reg7b = 0;			/* secondary */
 	u8 reg50 = 0, reg71 = 0;			/* extra */
-#ifdef DEBUG_CMD_REGS
-	u8 hi_byte = 0, lo_byte = 0;
-#endif /* DEBUG_CMD_REGS */
 
 	p += sprintf(p, "\nController: %d\n", index);
 	p += sprintf(p, "CMD%x Chipset.\n", dev->device);
@@ -126,18 +121,6 @@ static char * print_cmd64x_get_info (char *buf, struct pci_dev *dev, int index)
 	p += sprintf(p, "                %s                          %s\n",
 		(reg71 & MRDMODE_BLK_CH0) ? "blocked" : "enabled",
 		(reg71 & MRDMODE_BLK_CH1) ? "blocked" : "enabled");
-
-#ifdef DEBUG_CMD_REGS
-	SPLIT_BYTE(reg50, hi_byte, lo_byte);
-	p += sprintf(p, "CFR       = 0x%02x, HI = 0x%02x, "
-			"LOW = 0x%02x\n", reg50, hi_byte, lo_byte);
-	SPLIT_BYTE(reg57, hi_byte, lo_byte);
-	p += sprintf(p, "ARTTIM23  = 0x%02x, HI = 0x%02x, "
-			"LOW = 0x%02x\n", reg57, hi_byte, lo_byte);
-	SPLIT_BYTE(reg71, hi_byte, lo_byte);
-	p += sprintf(p, "MRDMODE   = 0x%02x, HI = 0x%02x, "
-			"LOW = 0x%02x\n", reg71, hi_byte, lo_byte);
-#endif /* DEBUG_CMD_REGS */
 
 	return (char *)p;
 }
@@ -458,36 +441,16 @@ static int cmd64x_config_drive_for_dma (ide_drive_t *drive)
 	struct hd_driveid *id	= drive->id;
 
 	if ((id != NULL) && ((id->capability & 1) != 0) && drive->autodma) {
-		/* Consult the list of known "bad" drives */
-		if (__ide_dma_bad_drive(drive))
-			goto fast_ata_pio;
-		if ((id->field_valid & 4) && cmd64x_ratemask(drive)) {
-			if (id->dma_ultra & hwif->ultra_mask) {
-				/* Force if Capable UltraDMA */
-				int dma = config_chipset_for_dma(drive);
-				if ((id->field_valid & 2) && !dma)
-					goto try_dma_modes;
-			}
-		} else if (id->field_valid & 2) {
-try_dma_modes:
-			if ((id->dma_mword & hwif->mwdma_mask) ||
-			    (id->dma_1word & hwif->swdma_mask)) {
-				/* Force if Capable regular DMA modes */
-				if (!config_chipset_for_dma(drive))
-					goto no_dma_set;
-			}
-		} else if (__ide_dma_good_drive(drive) &&
-			   (id->eide_dma_time < 150)) {
-			/* Consult the list of known "good" drives */
-			if (!config_chipset_for_dma(drive))
-				goto no_dma_set;
-		} else {
-			goto fast_ata_pio;
+
+		if (ide_use_dma(drive)) {
+			if (config_chipset_for_dma(drive))
+				return hwif->ide_dma_on(drive);
 		}
-		return hwif->ide_dma_on(drive);
+
+		goto fast_ata_pio;
+
 	} else if ((id->capability & 8) || (id->field_valid & 2)) {
 fast_ata_pio:
-no_dma_set:
 		config_chipset_for_pio(drive, 1);
 		return hwif->ide_dma_off_quietly(drive);
 	}

@@ -125,7 +125,7 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 
 	/* Initialize the bind addr area.  */
 	sctp_bind_addr_init(&asoc->base.bind_addr, ep->base.bind_addr.port);
-	asoc->base.addr_lock = RW_LOCK_UNLOCKED;
+	rwlock_init(&asoc->base.addr_lock);
 
 	asoc->state = SCTP_STATE_CLOSED;
 
@@ -271,7 +271,7 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 
 	asoc->need_ecne = 0;
 
-	asoc->assoc_id = (sctp_assoc_t)-1L;
+	asoc->assoc_id = 0;
 
 	/* Assume that peer would support both address types unless we are
 	 * told otherwise.
@@ -374,9 +374,9 @@ static void sctp_association_destroy(struct sctp_association *asoc)
 	sctp_endpoint_put(asoc->ep);
 	sock_put(asoc->base.sk);
 
-	if ((long)asoc->assoc_id != -1L) {
+	if (asoc->assoc_id != 0) {
 		spin_lock_bh(&sctp_assocs_id_lock);
-		idr_remove(&sctp_assocs_id, (long)asoc->assoc_id);
+		idr_remove(&sctp_assocs_id, asoc->assoc_id);
 		spin_unlock_bh(&sctp_assocs_id_lock);
 	}
 
@@ -482,14 +482,15 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 
 	/* 7.2.1 Slow-Start
 	 *
-	 * o The initial cwnd before data transmission or after a
-	 *   sufficiently long idle period MUST be <= 2*MTU.
+	 * o The initial cwnd before DATA transmission or after a sufficiently
+	 *   long idle period MUST be set to
+	 *      min(4*MTU, max(2*MTU, 4380 bytes))
 	 *
 	 * o The initial value of ssthresh MAY be arbitrarily high
 	 *   (for example, implementations MAY use the size of the
 	 *   receiver advertised window).
 	 */
-	peer->cwnd = asoc->pmtu * 2;
+	peer->cwnd = min(4*asoc->pmtu, max_t(__u32, 2*asoc->pmtu, 4380));
 
 	/* At this point, we may not have the receiver's advertised window,
 	 * so initialize ssthresh to the default value and it will be set

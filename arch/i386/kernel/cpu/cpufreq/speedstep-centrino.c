@@ -35,13 +35,8 @@
 #define PFX		"speedstep-centrino: "
 #define MAINTAINER	"Jeremy Fitzhardinge <jeremy@goop.org>"
 
-/*#define CENTRINO_DEBUG*/
+#define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, "speedstep-centrino", msg)
 
-#ifdef CENTRINO_DEBUG
-#define dprintk(msg...) printk(msg)
-#else
-#define dprintk(msg...) do { } while(0)
-#endif
 
 struct cpu_id
 {
@@ -77,7 +72,7 @@ static int centrino_verify_cpu_id(const struct cpuinfo_x86 *c, const struct cpu_
 
 /* Operating points for current CPU */
 static struct cpu_model *centrino_model;
-static int centrino_cpu;
+static const struct cpu_id *centrino_cpu;
 
 #ifdef CONFIG_X86_SPEEDSTEP_CENTRINO_TABLE
 
@@ -254,13 +249,15 @@ static int centrino_cpu_init_table(struct cpufreq_policy *policy)
 		/* Matched a non-match */
 		printk(KERN_INFO PFX "no table support for CPU model \"%s\": \n",
 		       cpu->x86_model_id);
+#ifdef CONFIG_X86_SPEEDSTEP_CENTRINO_ACPI
 		printk(KERN_INFO PFX "try compiling with CONFIG_X86_SPEEDSTEP_CENTRINO_ACPI enabled\n");
+#endif
 		return -ENOENT;
 	}
 
 	centrino_model = model;
 
-	printk(KERN_INFO PFX "found \"%s\": max frequency: %dkHz\n",
+	dprintk("found \"%s\": max frequency: %dkHz\n",
 	       model->model_name, model->max_freq);
 
 	return 0;
@@ -289,7 +286,9 @@ static unsigned extract_clock(unsigned msr)
 	 * for centrino, as some DSDTs are buggy.
 	 * Ideally, this can be done using the acpi_data structure.
 	 */
-	if (centrino_cpu) {
+	if ((centrino_cpu == &cpu_ids[CPU_BANIAS]) ||
+	    (centrino_cpu == &cpu_ids[CPU_DOTHAN_A1]) ||
+	    (centrino_cpu == &cpu_ids[CPU_DOTHAN_B0])) {
 		msr = (msr >> 8) & 0xff;
 		return msr * 100000;
 	}
@@ -342,47 +341,52 @@ static int centrino_cpu_init_acpi(struct cpufreq_policy *policy)
 	int				result = 0, i;
 
 	/* _PDC settings */
-        arg0.buffer.length = 12;
-        arg0.buffer.pointer = (u8 *) arg0_buf;
-        arg0_buf[0] = ACPI_PDC_REVISION_ID;
-        arg0_buf[1] = 1;
-        arg0_buf[2] = ACPI_PDC_EST_CAPABILITY_SMP | ACPI_PDC_EST_CAPABILITY_MSR;
+	arg0.buffer.length = 12;
+	arg0.buffer.pointer = (u8 *) arg0_buf;
+	arg0_buf[0] = ACPI_PDC_REVISION_ID;
+	arg0_buf[1] = 1;
+	arg0_buf[2] = ACPI_PDC_EST_CAPABILITY_SMP | ACPI_PDC_EST_CAPABILITY_MSR;
 
 	p.pdc = &arg_list;
 
 	/* register with ACPI core */
-        if (acpi_processor_register_performance(&p, policy->cpu))
-                return -EIO;
+	if (acpi_processor_register_performance(&p, policy->cpu)) {
+		printk(KERN_INFO PFX "obtaining ACPI data failed\n");
+		return -EIO;
+	}
 
 	/* verify the acpi_data */
 	if (p.state_count <= 1) {
-                printk(KERN_DEBUG "No P-States\n");
-                result = -ENODEV;
-                goto err_unreg;
+		dprintk("No P-States\n");
+		result = -ENODEV;
+		goto err_unreg;
 	}
 
 	if ((p.control_register.space_id != ACPI_ADR_SPACE_FIXED_HARDWARE) ||
 	    (p.status_register.space_id != ACPI_ADR_SPACE_FIXED_HARDWARE)) {
-		printk(KERN_DEBUG "Invalid control/status registers\n");
+		dprintk("Invalid control/status registers (%x - %x)\n",
+			p.control_register.space_id, p.status_register.space_id);
 		result = -EIO;
 		goto err_unreg;
 	}
 
 	for (i=0; i<p.state_count; i++) {
 		if (p.states[i].control != p.states[i].status) {
-			printk(KERN_DEBUG "Different control and status values\n");
+			dprintk("Different control (%x) and status values (%x)\n",
+				p.states[i].control, p.states[i].status);
 			result = -EINVAL;
 			goto err_unreg;
 		}
 
 		if (!p.states[i].core_frequency) {
-			printk(KERN_DEBUG "Zero core frequency\n");
+			dprintk("Zero core frequency for state %u\n", i);
 			result = -EINVAL;
 			goto err_unreg;
 		}
 
 		if (p.states[i].core_frequency > p.states[0].core_frequency) {
-			printk(KERN_DEBUG "P%u has larger frequency than P0, skipping\n", i);
+			dprintk("P%u has larger frequency (%u) than P0 (%u), skipping\n", i,
+				p.states[i].core_frequency, p.states[0].core_frequency);
 			p.states[i].core_frequency = 0;
 			continue;
 		}
@@ -407,24 +411,35 @@ static int centrino_cpu_init_acpi(struct cpufreq_policy *policy)
         for (i=0; i<p.state_count; i++) {
 		centrino_model->op_points[i].index = p.states[i].control;
 		centrino_model->op_points[i].frequency = p.states[i].core_frequency * 1000;
+		dprintk("adding state %i with frequency %u and control value %04x\n", 
+			i, centrino_model->op_points[i].frequency, centrino_model->op_points[i].index);
 	}
 	centrino_model->op_points[p.state_count].frequency = CPUFREQ_TABLE_END;
 
 	cur_freq = get_cur_freq(policy->cpu);
 
 	for (i=0; i<p.state_count; i++) {
+		if (!p.states[i].core_frequency) {
+			dprintk("skipping state %u\n", i);
+			centrino_model->op_points[i].frequency = CPUFREQ_ENTRY_INVALID;
+			continue;
+		}
+		
 		if (extract_clock(centrino_model->op_points[i].index) !=
 		    (centrino_model->op_points[i].frequency)) {
-			printk(KERN_DEBUG "Invalid encoded frequency\n");
+			dprintk("Invalid encoded frequency (%u vs. %u)\n",
+				extract_clock(centrino_model->op_points[i].index),
+				centrino_model->op_points[i].frequency);
 			result = -EINVAL;
 			goto err_kfree_all;
 		}
 
 		if (cur_freq == centrino_model->op_points[i].frequency)
 			p.state = i;
-		if (!p.states[i].core_frequency)
-			centrino_model->op_points[i].frequency = CPUFREQ_ENTRY_INVALID;
 	}
+
+	/* notify BIOS that we exist */
+	acpi_processor_notify_smm(THIS_MODULE);
 
 	return 0;
 
@@ -434,6 +449,7 @@ static int centrino_cpu_init_acpi(struct cpufreq_policy *policy)
 	kfree(centrino_model);
  err_unreg:
 	acpi_processor_unregister_performance(&p, policy->cpu);
+	printk(KERN_INFO PFX "invalid ACPI data\n");
 	return (result);
 }
 #else
@@ -457,7 +473,7 @@ static int centrino_cpu_init(struct cpufreq_policy *policy)
 			break;
 
 	if (i != N_IDS)
-		centrino_cpu = 1;
+		centrino_cpu = &cpu_ids[i];
 
 	if (centrino_cpu_init_acpi(policy)) {
 		if (policy->cpu != 0)
@@ -481,6 +497,7 @@ static int centrino_cpu_init(struct cpufreq_policy *policy)
 
 	if (!(l & (1<<16))) {
 		l |= (1<<16);
+		dprintk("trying to enable Enhanced SpeedStep (%x)\n", l);
 		wrmsr(MSR_IA32_MISC_ENABLE, l, h);
 
 		/* check to see if it stuck */
@@ -497,8 +514,7 @@ static int centrino_cpu_init(struct cpufreq_policy *policy)
 	policy->cpuinfo.transition_latency = 10000; /* 10uS transition latency */
 	policy->cur = freq;
 
-	dprintk(KERN_INFO PFX "centrino_cpu_init: policy=%d cur=%dkHz\n",
-		policy->policy, policy->cur);
+	dprintk("centrino_cpu_init: cur=%dkHz\n", policy->cur);
 
 	ret = cpufreq_frequency_table_cpuinfo(policy, centrino_model->op_points);
 	if (ret)
@@ -518,6 +534,7 @@ static int centrino_cpu_exit(struct cpufreq_policy *policy)
 
 #ifdef CONFIG_X86_SPEEDSTEP_CENTRINO_ACPI
 	if (!centrino_model->model_name) {
+		dprintk("unregistering and freeing ACPI data\n");
 		acpi_processor_unregister_performance(&p, policy->cpu);
 		kfree(centrino_model->op_points);
 		kfree(centrino_model);
@@ -567,8 +584,9 @@ static int centrino_target (struct cpufreq_policy *policy,
 	 * Make sure we are running on the CPU that wants to change frequency
 	 */
 	saved_mask = current->cpus_allowed;
-	set_cpus_allowed(current, cpumask_of_cpu(policy->cpu));
+	set_cpus_allowed(current, policy->cpus);
 	if (smp_processor_id() != policy->cpu) {
+		dprintk("couldn't limit to CPUs in this domain\n");
 		return(-EAGAIN);
 	}
 
@@ -583,26 +601,15 @@ static int centrino_target (struct cpufreq_policy *policy,
 
 	if (msr == (oldmsr & 0xffff)) {
 		retval = 0;
+		dprintk("no change needed - msr was and needs to be %x\n", oldmsr);
 		goto migrate_end;
 	}
 
-	/* Hm, old frequency can either be the last value we put in
-	   PERF_CTL, or whatever it is now. The trouble is that TM2
-	   can change it behind our back, which means we never get to
-	   see the speed change.  Reading back the current speed would
-	   tell us something happened, but it may leave the things on
-	   the notifier chain confused; we therefore stick to using
-	   the last programmed speed rather than the current speed for
-	   "old".
-
-	   TODO: work out how the TCC interrupts work, and try to
-	   catch the CPU changing things under us.
-	*/
 	freqs.cpu = policy->cpu;
 	freqs.old = extract_clock(oldmsr);
 	freqs.new = extract_clock(msr);
 
-	dprintk(KERN_INFO PFX "target=%dkHz old=%d new=%d msr=%04x\n",
+	dprintk("target=%dkHz old=%d new=%d msr=%04x\n",
 		target_freq, freqs.old, freqs.new, msr);
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);

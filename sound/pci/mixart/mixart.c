@@ -47,13 +47,12 @@ MODULE_SUPPORTED_DEVICE("{{Digigram," CARD_NAME "}}");
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;             /* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;              /* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;     /* Enable this card */
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for Digigram " CARD_NAME " soundcard.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for Digigram " CARD_NAME " soundcard.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable Digigram " CARD_NAME " soundcard.");
 
 /*
@@ -620,7 +619,10 @@ static int snd_mixart_hw_params(snd_pcm_substream_t *subs,
 		bufferinfo[i].available_length = subs->runtime->dma_bytes;
 		/* bufferinfo[i].buffer_id  is already defined */
 
-		snd_printdd("snd_mixart_hw_params(pcm %d) : dma_addr(%x) dma_bytes(%x) subs-number(%d)\n", i, subs->runtime->dma_addr, subs->runtime->dma_bytes, subs->number);
+		snd_printdd("snd_mixart_hw_params(pcm %d) : dma_addr(%x) dma_bytes(%x) subs-number(%d)\n", i,
+				bufferinfo[i].buffer_address,
+				bufferinfo[i].available_length,
+				subs->number);
 	}
 	up(&mgr->setup_mutex);
 
@@ -1090,6 +1092,7 @@ static int snd_mixart_free(mixart_mgr_t *mgr)
 		mgr->bufferinfo.area = NULL;
 	}
 
+	pci_disable_device(mgr->pci);
 	kfree(mgr);
 	return 0;
 }
@@ -1288,17 +1291,19 @@ static int __devinit snd_mixart_probe(struct pci_dev *pci,
 	pci_set_master(pci);
 
 	/* check if we can restrict PCI DMA transfers to 32 bits */
-	if (!pci_dma_supported(pci, 0xffffffff)) {
+	if (pci_set_dma_mask(pci, 0xffffffff) < 0) {
 		snd_printk(KERN_ERR "architecture does not support 32bit PCI busmaster DMA\n");
+		pci_disable_device(pci);
 		return -ENXIO;
 	}
-	pci_set_dma_mask(pci, 0xffffffff);
 
 	/*
 	 */
 	mgr = kcalloc(1, sizeof(*mgr), GFP_KERNEL);
-	if (! mgr)
+	if (! mgr) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 
 	mgr->pci = pci;
 	mgr->irq = -1;
@@ -1306,6 +1311,7 @@ static int __devinit snd_mixart_probe(struct pci_dev *pci,
 	/* resource assignment */
 	if ((err = pci_request_regions(pci, CARD_NAME)) < 0) {
 		kfree(mgr);
+		pci_disable_device(pci);
 		return err;
 	}
 	for (i = 0; i < 2; i++) {

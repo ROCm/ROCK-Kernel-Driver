@@ -46,8 +46,7 @@ MODULE_DESCRIPTION("Driver for Amiga joysticks");
 MODULE_LICENSE("GPL");
 
 static int amijoy[2] = { 0, 1 };
-static int amijoy_nargs;
-module_param_array_named(map, amijoy, uint, amijoy_nargs, 0);
+module_param_array_named(map, amijoy, uint, NULL, 0);
 MODULE_PARM_DESC(map, "Map of attached joysticks in form of <a>,<b> (default is 0,1)");
 
 __obsolete_setup("amijoy=");
@@ -138,7 +137,6 @@ static int __init amijoy_init(void)
 			amijoy_dev[i].id.vendor = 0x0001;
 			amijoy_dev[i].id.product = 0x0003;
 			amijoy_dev[i].id.version = 0x0100;
-			sprintf(amijoy[i].cdev.class_id,"amijoy%d",i);
 
 			amijoy_dev[i].private = amijoy_used + i;
 

@@ -46,7 +46,7 @@ static DECLARE_LOCK(irc_buffer_lock);
 MODULE_AUTHOR("Harald Welte <laforge@netfilter.org>");
 MODULE_DESCRIPTION("IRC (DCC) connection tracking helper");
 MODULE_LICENSE("GPL");
-module_param_array(ports, int, ports_c, 0400);
+module_param_array(ports, int, &ports_c, 0400);
 MODULE_PARM_DESC(ports, "port numbers of IRC servers");
 module_param(max_dcc_channels, int, 0400);
 MODULE_PARM_DESC(max_dcc_channels, "max number of expected DCC channels per IRC session");
@@ -65,8 +65,8 @@ struct module *ip_conntrack_irc = THIS_MODULE;
 #define DEBUGP(format, args...)
 #endif
 
-int parse_dcc(char *data, char *data_end, u_int32_t * ip, u_int16_t * port,
-	      char **ad_beg_p, char **ad_end_p)
+static int parse_dcc(char *data, char *data_end, u_int32_t *ip,
+		     u_int16_t *port, char **ad_beg_p, char **ad_end_p)
 /* tries to get the ip_addr and port out of a dcc command
    return value: -1 on failure, 0 on success 
 	data		pointer to first byte of DCC command data

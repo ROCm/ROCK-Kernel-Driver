@@ -64,9 +64,9 @@ struct mousedev {
 	int open;
 	int minor;
 	char name[16];
-	struct input_handle handle;
 	wait_queue_head_t wait;
 	struct list_head list;
+	struct input_handle handle;
 
 	struct mousedev_hw_data packet;
 	unsigned int pkt_count;
@@ -115,26 +115,20 @@ static struct mousedev mousedev_mix;
 #define fx(i)  (mousedev->old_x[(mousedev->pkt_count - (i)) & 03])
 #define fy(i)  (mousedev->old_y[(mousedev->pkt_count - (i)) & 03])
 
-static void mousedev_touchpad_event(struct input_dev *dev, struct mousedev *mousedev, unsigned int code, int value)
+static void mousedev_touchpad_event(struct mousedev *mousedev, unsigned int code, int value)
 {
-	int size;
-
 	if (mousedev->touch) {
 		switch (code) {
 			case ABS_X:
-				size = dev->absmax[ABS_X] - dev->absmin[ABS_X];
-				if (size == 0) size = xres;
 				fx(0) = value;
 				if (mousedev->pkt_count >= 2)
-					mousedev->packet.dx = ((fx(0) - fx(1)) / 2 + (fx(1) - fx(2)) / 2) * xres / (size * 2);
+					mousedev->packet.dx = ((fx(0) - fx(1)) / 2 + (fx(1) - fx(2)) / 2) / 8;
 				break;
 
 			case ABS_Y:
-				size = dev->absmax[ABS_Y] - dev->absmin[ABS_Y];
-				if (size == 0) size = yres;
 				fy(0) = value;
 				if (mousedev->pkt_count >= 2)
-					mousedev->packet.dy = -((fy(0) - fy(1)) / 2 + (fy(1) - fy(2)) / 2) * yres / (size * 2);
+					mousedev->packet.dy = -((fy(0) - fy(1)) / 2 + (fy(1) - fy(2)) / 2) / 8;
 				break;
 		}
 	}
@@ -285,7 +279,7 @@ static void mousedev_event(struct input_handle *handle, unsigned int type, unsig
 				return;
 
 			if (test_bit(BTN_TOOL_FINGER, handle->dev->keybit))
-				mousedev_touchpad_event(handle->dev, mousedev, code, value);
+				mousedev_touchpad_event(mousedev, code, value);
 			else
 				mousedev_abs_event(handle->dev, mousedev, code, value);
 
@@ -336,7 +330,7 @@ static int mousedev_fasync(int fd, struct file *file, int on)
 static void mousedev_free(struct mousedev *mousedev)
 {
 	devfs_remove("input/mouse%d", mousedev->minor);
-	input_class_remove_handle(&mousedev->handle);
+	class_simple_device_remove(MKDEV(INPUT_MAJOR, MOUSEDEV_MINOR_BASE + mousedev->minor));
 	mousedev_table[mousedev->minor] = NULL;
 	kfree(mousedev);
 }
@@ -626,7 +620,6 @@ static struct input_handle *mousedev_connect(struct input_handler *handler, stru
 	mousedev->handle.name = mousedev->name;
 	mousedev->handle.handler = handler;
 	mousedev->handle.private = mousedev;
-	mousedev->handle.minor_base = MOUSEDEV_MINOR_BASE;
 	sprintf(mousedev->name, "mouse%d", minor);
 
 	if (mousedev_mix.open)
@@ -636,8 +629,9 @@ static struct input_handle *mousedev_connect(struct input_handler *handler, stru
 
 	devfs_mk_cdev(MKDEV(INPUT_MAJOR, MOUSEDEV_MINOR_BASE + minor),
 			S_IFCHR|S_IRUGO|S_IWUSR, "input/mouse%d", minor);
-
-	input_class_add_handle(&mousedev->handle);
+	class_simple_device_add(input_class,
+				MKDEV(INPUT_MAJOR, MOUSEDEV_MINOR_BASE + minor),
+				dev->dev, "mouse%d", minor);
 
 	return &mousedev->handle;
 }
@@ -714,14 +708,12 @@ static int __init mousedev_init(void)
 	mousedev_table[MOUSEDEV_MIX] = &mousedev_mix;
 	mousedev_mix.exist = 1;
 	mousedev_mix.minor = MOUSEDEV_MIX;
-	mousedev_mix.handle.minor_base = MOUSEDEV_MINOR_BASE;
-	mousedev_mix.handle.name = mousedev_mix.name;
-	sprintf(mousedev_mix.name,"mice");
 
 	devfs_mk_cdev(MKDEV(INPUT_MAJOR, MOUSEDEV_MINOR_BASE + MOUSEDEV_MIX),
 			S_IFCHR|S_IRUGO|S_IWUSR, "input/mice");
+	class_simple_device_add(input_class, MKDEV(INPUT_MAJOR, MOUSEDEV_MINOR_BASE + MOUSEDEV_MIX),
+				NULL, "mice");
 
-	input_class_add_handle(&mousedev_mix.handle);
 #ifdef CONFIG_INPUT_MOUSEDEV_PSAUX
 	if (!(psaux_registered = !misc_register(&psaux_mouse)))
 		printk(KERN_WARNING "mice: could not misc_register the device\n");
@@ -739,7 +731,7 @@ static void __exit mousedev_exit(void)
 		misc_deregister(&psaux_mouse);
 #endif
 	devfs_remove("input/mice");
-	input_class_remove_handle(&mousedev_mix.handle);
+	class_simple_device_remove(MKDEV(INPUT_MAJOR, MOUSEDEV_MINOR_BASE + MOUSEDEV_MIX));
 	input_unregister_handler(&mousedev_handler);
 }
 

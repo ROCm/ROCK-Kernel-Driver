@@ -219,6 +219,10 @@ source "net/bridge/netfilter/Kconfig"
 
 endif
 
+config XFRM
+       bool
+       depends on NET
+
 source "net/xfrm/Kconfig"
 
 source "net/sctp/Kconfig"
@@ -563,24 +567,6 @@ config WAN_ROUTER
 	  module will be called wanrouter.
 
 	  If unsure, say N.
-
-config NET_HW_FLOWCONTROL
-	bool "Forwarding between high speed interfaces"
-	depends on EXPERIMENTAL
-	---help---
-	  This option enables NIC (Network Interface Card) hardware throttling
-	  during periods of extreme congestion. At the moment only a couple
-	  of device drivers support it (really only one -- tulip, a modified
-	  8390 driver can be found at
-	  <ftp://ftp.tux.org/pub/net/ip-routing/fastroute/fastroute-8390.tar.gz>).
-
-	  Really, this option is applicable to any machine attached to a fast
-	  enough network, and even a 10 Mb NIC is able to kill a not very slow
-	  box, such as a 120MHz Pentium.
-
-	  However, do not say Y here if you did not experience any serious
-	  problems.
-
 
 menu "QoS and/or fair queueing"
 

@@ -20,9 +20,9 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/binfmts.h>	/* do_coredum */
+#include <linux/bitops.h>
 
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 #include <asm/ptrace.h>
 #include <asm/svr4.h>
 #include <asm/pgalloc.h>

@@ -51,16 +51,16 @@
 /*
  * KNOWN BUGS:
  *
-	 * - may run into JK-JK bug and deadlock
-	 * - should allocate UBR channel first
-	 * - buffer space allocation algorithm is stupid
-	 *   (RX: should be maxSDU+maxdelay*rate
-	 *    TX: should be maxSDU+min(maxSDU,maxdelay*rate) )
-	 * - doesn't support OAM cells
-	 * - eni_put_free may hang if not putting memory fragments that _complete_
-	 *   2^n block (never happens in real life, though)
-	 * - keeps IRQ even if initialization fails
-	 */
+ * - may run into JK-JK bug and deadlock
+ * - should allocate UBR channel first
+ * - buffer space allocation algorithm is stupid
+ *   (RX: should be maxSDU+maxdelay*rate
+ *    TX: should be maxSDU+min(maxSDU,maxdelay*rate) )
+ * - doesn't support OAM cells
+ * - eni_put_free may hang if not putting memory fragments that _complete_
+ *   2^n block (never happens in real life, though)
+ * - keeps IRQ even if initialization fails
+ */
 
 
 #if 0
@@ -84,819 +84,819 @@
 #define EVENT(s,a,b)
 
 
-	static void event_dump(void)
-	{
-	}
+static void event_dump(void)
+{
+}
 
 
 #else
 
 
-	/* 
-	 * NULL pointer checking
-	 */
+/* 
+ * NULL pointer checking
+ */
 
 #define NULLCHECK(x) \
-		if ((unsigned long) (x) < 0x30) \
-			printk(KERN_CRIT #x "==0x%lx\n",(unsigned long) (x))
+	if ((unsigned long) (x) < 0x30) \
+		printk(KERN_CRIT #x "==0x%lx\n",(unsigned long) (x))
 
-	/*
-	 * Very extensive activity logging. Greatly improves bug detection speed but
-	 * costs a few Mbps if enabled.
-	 */
+/*
+ * Very extensive activity logging. Greatly improves bug detection speed but
+ * costs a few Mbps if enabled.
+ */
 
 #define EV 64
 
-	static const char *ev[EV];
-	static unsigned long ev_a[EV],ev_b[EV];
-	static int ec = 0;
+static const char *ev[EV];
+static unsigned long ev_a[EV],ev_b[EV];
+static int ec = 0;
 
 
-	static void EVENT(const char *s,unsigned long a,unsigned long b)
-	{
-		ev[ec] = s; 
-		ev_a[ec] = a;
-		ev_b[ec] = b;
-		ec = (ec+1) % EV;
+static void EVENT(const char *s,unsigned long a,unsigned long b)
+{
+	ev[ec] = s; 
+	ev_a[ec] = a;
+	ev_b[ec] = b;
+	ec = (ec+1) % EV;
+}
+
+
+static void event_dump(void)
+{
+	int n,i;
+
+	for (n = 0; n < EV; n++) {
+		i = (ec+n) % EV;
+		printk(KERN_NOTICE);
+		printk(ev[i] ? ev[i] : "(null)",ev_a[i],ev_b[i]);
 	}
-
-
-	static void event_dump(void)
-	{
-		int n,i;
-
-		for (n = 0; n < EV; n++) {
-			i = (ec+n) % EV;
-			printk(KERN_NOTICE);
-			printk(ev[i] ? ev[i] : "(null)",ev_a[i],ev_b[i]);
-		}
-	}
+}
 
 
 #endif /* CONFIG_ATM_ENI_DEBUG */
 
 
-	/*
-	 * NExx   must not be equal at end
-	 * EExx   may be equal at end
-	 * xxPJOK verify validity of pointer jumps
-	 * xxPMOK operating on a circular buffer of "c" words
-	 */
+/*
+ * NExx   must not be equal at end
+ * EExx   may be equal at end
+ * xxPJOK verify validity of pointer jumps
+ * xxPMOK operating on a circular buffer of "c" words
+ */
 
 #define NEPJOK(a0,a1,b) \
-	    ((a0) < (a1) ? (b) <= (a0) || (b) > (a1) : (b) <= (a0) && (b) > (a1))
+    ((a0) < (a1) ? (b) <= (a0) || (b) > (a1) : (b) <= (a0) && (b) > (a1))
 #define EEPJOK(a0,a1,b) \
-	    ((a0) < (a1) ? (b) < (a0) || (b) >= (a1) : (b) < (a0) && (b) >= (a1))
+    ((a0) < (a1) ? (b) < (a0) || (b) >= (a1) : (b) < (a0) && (b) >= (a1))
 #define NEPMOK(a0,d,b,c) NEPJOK(a0,(a0+d) & (c-1),b)
 #define EEPMOK(a0,d,b,c) EEPJOK(a0,(a0+d) & (c-1),b)
 
 
-	static int tx_complete = 0,dma_complete = 0,queued = 0,requeued = 0,
-	  backlogged = 0,rx_enqueued = 0,rx_dequeued = 0,pushed = 0,submitted = 0,
-	  putting = 0;
+static int tx_complete = 0,dma_complete = 0,queued = 0,requeued = 0,
+  backlogged = 0,rx_enqueued = 0,rx_dequeued = 0,pushed = 0,submitted = 0,
+  putting = 0;
 
-	static struct atm_dev *eni_boards = NULL;
+static struct atm_dev *eni_boards = NULL;
 
-	static u32 *cpu_zeroes = NULL; /* aligned "magic" zeroes */
-	static dma_addr_t zeroes;
+static u32 *cpu_zeroes = NULL; /* aligned "magic" zeroes */
+static dma_addr_t zeroes;
 
-	/* Read/write registers on card */
+/* Read/write registers on card */
 #define eni_in(r)	readl(eni_dev->reg+(r)*4)
 #define eni_out(v,r)	writel((v),eni_dev->reg+(r)*4)
 
 
-	/*-------------------------------- utilities --------------------------------*/
+/*-------------------------------- utilities --------------------------------*/
 
 
-	static void dump_mem(struct eni_dev *eni_dev)
-	{
-		int i;
+static void dump_mem(struct eni_dev *eni_dev)
+{
+	int i;
 
-		for (i = 0; i < eni_dev->free_len; i++)
-			printk(KERN_DEBUG "  %d: 0x%p %d\n",i,
-			    eni_dev->free_list[i].start,
-			    1 << eni_dev->free_list[i].order);
-	}
-
-
-	static void dump(struct atm_dev *dev)
-	{
-		struct eni_dev *eni_dev;
-
-		int i;
-
-		eni_dev = ENI_DEV(dev);
-		printk(KERN_NOTICE "Free memory\n");
-		dump_mem(eni_dev);
-		printk(KERN_NOTICE "TX buffers\n");
-		for (i = 0; i < NR_CHAN; i++)
-			if (eni_dev->tx[i].send)
-				printk(KERN_NOTICE "  TX %d @ 0x%p: %ld\n",i,
-				    eni_dev->tx[i].send,eni_dev->tx[i].words*4);
-		printk(KERN_NOTICE "RX buffers\n");
-		for (i = 0; i < 1024; i++)
-			if (eni_dev->rx_map[i] && ENI_VCC(eni_dev->rx_map[i])->rx)
-				printk(KERN_NOTICE "  RX %d @ 0x%p: %ld\n",i,
-				    ENI_VCC(eni_dev->rx_map[i])->recv,
-				    ENI_VCC(eni_dev->rx_map[i])->words*4);
-		printk(KERN_NOTICE "----\n");
-	}
+	for (i = 0; i < eni_dev->free_len; i++)
+		printk(KERN_DEBUG "  %d: %p %d\n",i,
+		    eni_dev->free_list[i].start,
+		    1 << eni_dev->free_list[i].order);
+}
 
 
-	static void eni_put_free(struct eni_dev *eni_dev, void __iomem *start,
-				 unsigned long size)
-	{
-		struct eni_free *list;
-		int len,order;
+static void dump(struct atm_dev *dev)
+{
+	struct eni_dev *eni_dev;
 
-		DPRINTK("init 0x%p+%ld(0x%lx)\n",start,size,size);
-		start += eni_dev->base_diff;
-		list = eni_dev->free_list;
-		len = eni_dev->free_len;
-		while (size) {
-			if (len >= eni_dev->free_list_size) {
-				printk(KERN_CRIT "eni_put_free overflow (0x%p,%ld)\n",
-				    start,size);
-				break;
-			}
-			for (order = 0; !(((unsigned long)start | size) & (1 << order)); order++);
-			if (MID_MIN_BUF_SIZE > (1 << order)) {
-				printk(KERN_CRIT "eni_put_free: order %d too small\n",
-				    order);
-				break;
-			}
-			list[len].start = start;
-			list[len].order = order;
-			len++;
-			start += 1 << order;
-			size -= 1 << order;
-		}
-		eni_dev->free_len = len;
-		/*dump_mem(eni_dev);*/
-	}
+	int i;
+
+	eni_dev = ENI_DEV(dev);
+	printk(KERN_NOTICE "Free memory\n");
+	dump_mem(eni_dev);
+	printk(KERN_NOTICE "TX buffers\n");
+	for (i = 0; i < NR_CHAN; i++)
+		if (eni_dev->tx[i].send)
+			printk(KERN_NOTICE "  TX %d @ %p: %ld\n",i,
+			    eni_dev->tx[i].send,eni_dev->tx[i].words*4);
+	printk(KERN_NOTICE "RX buffers\n");
+	for (i = 0; i < 1024; i++)
+		if (eni_dev->rx_map[i] && ENI_VCC(eni_dev->rx_map[i])->rx)
+			printk(KERN_NOTICE "  RX %d @ %p: %ld\n",i,
+			    ENI_VCC(eni_dev->rx_map[i])->recv,
+			    ENI_VCC(eni_dev->rx_map[i])->words*4);
+	printk(KERN_NOTICE "----\n");
+}
 
 
-	static void __iomem *eni_alloc_mem(struct eni_dev *eni_dev,unsigned long *size)
-	{
-		struct eni_free *list;
-		void __iomem *start;
-		int len,i,order,best_order,index;
+static void eni_put_free(struct eni_dev *eni_dev, void __iomem *start,
+    unsigned long size)
+{
+	struct eni_free *list;
+	int len,order;
 
-		list = eni_dev->free_list;
-		len = eni_dev->free_len;
-		if (*size < MID_MIN_BUF_SIZE) *size = MID_MIN_BUF_SIZE;
-		if (*size > MID_MAX_BUF_SIZE) return 0;
-		for (order = 0; (1 << order) < *size; order++);
-		DPRINTK("trying: %ld->%d\n",*size,order);
-		best_order = 65; /* we don't have more than 2^64 of anything ... */
-		index = 0; /* silence GCC */
-		for (i = 0; i < len; i++)
-			if (list[i].order == order) {
-				best_order = order;
-				index = i;
-				break;
-			}
-			else if (best_order > list[i].order && list[i].order > order) {
-					best_order = list[i].order;
-					index = i;
-				}
-		if (best_order == 65) return 0;
-		start = list[index].start-eni_dev->base_diff;
-		list[index] = list[--len];
-		eni_dev->free_len = len;
-		*size = 1 << order;
-		eni_put_free(eni_dev,start+*size,(1 << best_order)-*size);
-		DPRINTK("%ld bytes (order %d) at 0x%lx\n",*size,order,start);
-		memset_io(start,0,*size);       /* never leak data */
-		/*dump_mem(eni_dev);*/
-		return start;
-	}
-
-
-	static void eni_free_mem(struct eni_dev *eni_dev, void __iomem *start,
-	    unsigned long size)
-	{
-		struct eni_free *list;
-		int len,i,order;
-
-		start += eni_dev->base_diff;
-		list = eni_dev->free_list;
-		len = eni_dev->free_len;
-		for (order = -1; size; order++) size >>= 1;
-		DPRINTK("eni_free_mem: 0x%p+0x%lx (order %d)\n",start,size,order);
-		for (i = 0; i < len; i++) 
-			if ((unsigned long)list[i].start == ((unsigned long)start^(1 << order)) &&
-			    list[i].order == order) {
-				DPRINTK("match[%d]: 0x%p/0x%p(0x%x), %d/%d\n",i,
-				    list[i].start,start,1 << order,list[i].order,order);
-				list[i] = list[--len];
-				start = (void __iomem *) (((unsigned long)start) & ~ (1 << order));
-				order++;
-				i = -1;
-				continue;
-			}
+	DPRINTK("init 0x%lx+%ld(0x%lx)\n",start,size,size);
+	start += eni_dev->base_diff;
+	list = eni_dev->free_list;
+	len = eni_dev->free_len;
+	while (size) {
 		if (len >= eni_dev->free_list_size) {
-			printk(KERN_ALERT "eni_free_mem overflow (0x%p,x%d)\n",start,
-			    order);
-			return;
+			printk(KERN_CRIT "eni_put_free overflow (%p,%ld)\n",
+			    start,size);
+			break;
 		}
-		list[len].start = start;
+		for (order = 0; !(((unsigned long)start | size) & (1 << order)); order++);
+		if (MID_MIN_BUF_SIZE > (1 << order)) {
+			printk(KERN_CRIT "eni_put_free: order %d too small\n",
+			    order);
+			break;
+		}
+		list[len].start = (void __iomem *) start;
 		list[len].order = order;
-		eni_dev->free_len = len+1;
-		/*dump_mem(eni_dev);*/
+		len++;
+		start += 1 << order;
+		size -= 1 << order;
 	}
+	eni_dev->free_len = len;
+	/*dump_mem(eni_dev);*/
+}
 
 
-	/*----------------------------------- RX ------------------------------------*/
+static void __iomem *eni_alloc_mem(struct eni_dev *eni_dev, unsigned long *size)
+{
+	struct eni_free *list;
+	void __iomem *start;
+	int len,i,order,best_order,index;
+
+	list = eni_dev->free_list;
+	len = eni_dev->free_len;
+	if (*size < MID_MIN_BUF_SIZE) *size = MID_MIN_BUF_SIZE;
+	if (*size > MID_MAX_BUF_SIZE) return NULL;
+	for (order = 0; (1 << order) < *size; order++);
+	DPRINTK("trying: %ld->%d\n",*size,order);
+	best_order = 65; /* we don't have more than 2^64 of anything ... */
+	index = 0; /* silence GCC */
+	for (i = 0; i < len; i++)
+		if (list[i].order == order) {
+			best_order = order;
+			index = i;
+			break;
+		}
+		else if (best_order > list[i].order && list[i].order > order) {
+				best_order = list[i].order;
+				index = i;
+			}
+	if (best_order == 65) return NULL;
+	start = list[index].start-eni_dev->base_diff;
+	list[index] = list[--len];
+	eni_dev->free_len = len;
+	*size = 1 << order;
+	eni_put_free(eni_dev,start+*size,(1 << best_order)-*size);
+	DPRINTK("%ld bytes (order %d) at 0x%lx\n",*size,order,start);
+	memset_io(start,0,*size);       /* never leak data */
+	/*dump_mem(eni_dev);*/
+	return start;
+}
+
+
+static void eni_free_mem(struct eni_dev *eni_dev, void __iomem *start,
+    unsigned long size)
+{
+	struct eni_free *list;
+	int len,i,order;
+
+	start += eni_dev->base_diff;
+	list = eni_dev->free_list;
+	len = eni_dev->free_len;
+	for (order = -1; size; order++) size >>= 1;
+	DPRINTK("eni_free_mem: %p+0x%lx (order %d)\n",start,size,order);
+	for (i = 0; i < len; i++)
+		if (((unsigned long) list[i].start) == ((unsigned long)start^(1 << order)) &&
+		    list[i].order == order) {
+			DPRINTK("match[%d]: 0x%lx/0x%lx(0x%x), %d/%d\n",i,
+			    list[i].start,start,1 << order,list[i].order,order);
+			list[i] = list[--len];
+			start = (void __iomem *) ((unsigned long) start & ~(unsigned long) (1 << order));
+			order++;
+			i = -1;
+			continue;
+		}
+	if (len >= eni_dev->free_list_size) {
+		printk(KERN_ALERT "eni_free_mem overflow (%p,%d)\n",start,
+		    order);
+		return;
+	}
+	list[len].start = start;
+	list[len].order = order;
+	eni_dev->free_len = len+1;
+	/*dump_mem(eni_dev);*/
+}
+
+
+/*----------------------------------- RX ------------------------------------*/
 
 
 #define ENI_VCC_NOS ((struct atm_vcc *) 1)
 
 
-	static void rx_ident_err(struct atm_vcc *vcc)
-	{
-		struct atm_dev *dev;
-		struct eni_dev *eni_dev;
-		struct eni_vcc *eni_vcc;
+static void rx_ident_err(struct atm_vcc *vcc)
+{
+	struct atm_dev *dev;
+	struct eni_dev *eni_dev;
+	struct eni_vcc *eni_vcc;
 
-		dev = vcc->dev;
-		eni_dev = ENI_DEV(dev);
-		/* immediately halt adapter */
-		eni_out(eni_in(MID_MC_S) &
-		    ~(MID_DMA_ENABLE | MID_TX_ENABLE | MID_RX_ENABLE),MID_MC_S);
-		/* dump useful information */
-		eni_vcc = ENI_VCC(vcc);
-		printk(KERN_ALERT DEV_LABEL "(itf %d): driver error - RX ident "
-		    "mismatch\n",dev->number);
-		printk(KERN_ALERT "  VCI %d, rxing %d, words %ld\n",vcc->vci,
-		    eni_vcc->rxing,eni_vcc->words);
-		printk(KERN_ALERT "  host descr 0x%lx, rx pos 0x%lx, descr value "
-		    "0x%x\n",eni_vcc->descr,eni_vcc->rx_pos,
-		    (unsigned) readl(eni_vcc->recv+eni_vcc->descr*4));
-		printk(KERN_ALERT "  last 0x%p, servicing %d\n",eni_vcc->last,
-		    eni_vcc->servicing);
-		EVENT("---dump ends here---\n",0,0);
-		printk(KERN_NOTICE "---recent events---\n");
-		event_dump();
-		ENI_DEV(dev)->fast = NULL; /* really stop it */
-		ENI_DEV(dev)->slow = NULL;
-		skb_queue_head_init(&ENI_DEV(dev)->rx_queue);
+	dev = vcc->dev;
+	eni_dev = ENI_DEV(dev);
+	/* immediately halt adapter */
+	eni_out(eni_in(MID_MC_S) &
+	    ~(MID_DMA_ENABLE | MID_TX_ENABLE | MID_RX_ENABLE),MID_MC_S);
+	/* dump useful information */
+	eni_vcc = ENI_VCC(vcc);
+	printk(KERN_ALERT DEV_LABEL "(itf %d): driver error - RX ident "
+	    "mismatch\n",dev->number);
+	printk(KERN_ALERT "  VCI %d, rxing %d, words %ld\n",vcc->vci,
+	    eni_vcc->rxing,eni_vcc->words);
+	printk(KERN_ALERT "  host descr 0x%lx, rx pos 0x%lx, descr value "
+	    "0x%x\n",eni_vcc->descr,eni_vcc->rx_pos,
+	    (unsigned) readl(eni_vcc->recv+eni_vcc->descr*4));
+	printk(KERN_ALERT "  last %p, servicing %d\n",eni_vcc->last,
+	    eni_vcc->servicing);
+	EVENT("---dump ends here---\n",0,0);
+	printk(KERN_NOTICE "---recent events---\n");
+	event_dump();
+	ENI_DEV(dev)->fast = NULL; /* really stop it */
+	ENI_DEV(dev)->slow = NULL;
+	skb_queue_head_init(&ENI_DEV(dev)->rx_queue);
+}
+
+
+static int do_rx_dma(struct atm_vcc *vcc,struct sk_buff *skb,
+    unsigned long skip,unsigned long size,unsigned long eff)
+{
+	struct eni_dev *eni_dev;
+	struct eni_vcc *eni_vcc;
+	u32 dma_rd,dma_wr;
+	u32 dma[RX_DMA_BUF*2];
+	dma_addr_t paddr;
+	unsigned long here;
+	int i,j;
+
+	eni_dev = ENI_DEV(vcc->dev);
+	eni_vcc = ENI_VCC(vcc);
+	paddr = 0; /* GCC, shut up */
+	if (skb) {
+		paddr = pci_map_single(eni_dev->pci_dev,skb->data,skb->len,
+		    PCI_DMA_FROMDEVICE);
+		ENI_PRV_PADDR(skb) = paddr;
+		if (paddr & 3)
+			printk(KERN_CRIT DEV_LABEL "(itf %d): VCI %d has "
+			    "mis-aligned RX data (0x%lx)\n",vcc->dev->number,
+			    vcc->vci,(unsigned long) paddr);
+		ENI_PRV_SIZE(skb) = size+skip;
+		    /* PDU plus descriptor */
+		ATM_SKB(skb)->vcc = vcc;
 	}
+	j = 0;
+	if ((eff && skip) || 1) { /* @@@ actually, skip is always == 1 ... */
+		here = (eni_vcc->descr+skip) & (eni_vcc->words-1);
+		dma[j++] = (here << MID_DMA_COUNT_SHIFT) | (vcc->vci
+		    << MID_DMA_VCI_SHIFT) | MID_DT_JK;
+		j++;
+	}
+	here = (eni_vcc->descr+size+skip) & (eni_vcc->words-1);
+	if (!eff) size += skip;
+	else {
+		unsigned long words;
 
-
-	static int do_rx_dma(struct atm_vcc *vcc,struct sk_buff *skb,
-	    unsigned long skip,unsigned long size,unsigned long eff)
-	{
-		struct eni_dev *eni_dev;
-		struct eni_vcc *eni_vcc;
-		u32 dma_rd,dma_wr;
-		u32 dma[RX_DMA_BUF*2];
-		dma_addr_t paddr;
-		unsigned long here;
-		int i,j;
-
-		eni_dev = ENI_DEV(vcc->dev);
-		eni_vcc = ENI_VCC(vcc);
-		paddr = 0; /* GCC, shut up */
-		if (skb) {
-			paddr = pci_map_single(eni_dev->pci_dev,skb->data,skb->len,
-			    PCI_DMA_FROMDEVICE);
-			ENI_PRV_PADDR(skb) = paddr;
-			if (paddr & 3)
-				printk(KERN_CRIT DEV_LABEL "(itf %d): VCI %d has "
-				    "mis-aligned RX data (0x%lx)\n",vcc->dev->number,
-				    vcc->vci,(unsigned long) paddr);
-			ENI_PRV_SIZE(skb) = size+skip;
-			    /* PDU plus descriptor */
-			ATM_SKB(skb)->vcc = vcc;
+		if (!size) {
+			DPRINTK("strange things happen ...\n");
+			EVENT("strange things happen ... (skip=%ld,eff=%ld)\n",
+			    size,eff);
 		}
-		j = 0;
-		if ((eff && skip) || 1) { /* @@@ actually, skip is always == 1 ... */
-			here = (eni_vcc->descr+skip) & (eni_vcc->words-1);
-			dma[j++] = (here << MID_DMA_COUNT_SHIFT) | (vcc->vci
-			    << MID_DMA_VCI_SHIFT) | MID_DT_JK;
-			j++;
+		words = eff;
+		if (paddr & 15) {
+			unsigned long init;
+
+			init = 4-((paddr & 15) >> 2);
+			if (init > words) init = words;
+			dma[j++] = MID_DT_WORD | (init << MID_DMA_COUNT_SHIFT) |
+			    (vcc->vci << MID_DMA_VCI_SHIFT);
+			dma[j++] = paddr;
+			paddr += init << 2;
+			words -= init;
 		}
-		here = (eni_vcc->descr+size+skip) & (eni_vcc->words-1);
-		if (!eff) size += skip;
-		else {
-			unsigned long words;
-
-			if (!size) {
-				DPRINTK("strange things happen ...\n");
-				EVENT("strange things happen ... (skip=%ld,eff=%ld)\n",
-				    size,eff);
-			}
-			words = eff;
-			if (paddr & 15) {
-				unsigned long init;
-
-				init = 4-((paddr & 15) >> 2);
-				if (init > words) init = words;
-				dma[j++] = MID_DT_WORD | (init << MID_DMA_COUNT_SHIFT) |
-				    (vcc->vci << MID_DMA_VCI_SHIFT);
-				dma[j++] = paddr;
-				paddr += init << 2;
-				words -= init;
-			}
 #ifdef CONFIG_ATM_ENI_BURST_RX_16W /* may work with some PCI chipsets ... */
-			if (words & ~15) {
-				dma[j++] = MID_DT_16W | ((words >> 4) <<
-				    MID_DMA_COUNT_SHIFT) | (vcc->vci <<
-				    MID_DMA_VCI_SHIFT);
-				dma[j++] = paddr;
-				paddr += (words & ~15) << 2;
-				words &= 15;
-			}
+		if (words & ~15) {
+			dma[j++] = MID_DT_16W | ((words >> 4) <<
+			    MID_DMA_COUNT_SHIFT) | (vcc->vci <<
+			    MID_DMA_VCI_SHIFT);
+			dma[j++] = paddr;
+			paddr += (words & ~15) << 2;
+			words &= 15;
+		}
 #endif
 #ifdef CONFIG_ATM_ENI_BURST_RX_8W  /* works only with *some* PCI chipsets ... */
-			if (words & ~7) {
-				dma[j++] = MID_DT_8W | ((words >> 3) <<
-				    MID_DMA_COUNT_SHIFT) | (vcc->vci <<
-				    MID_DMA_VCI_SHIFT);
-				dma[j++] = paddr;
-				paddr += (words & ~7) << 2;
-				words &= 7;
-			}
+		if (words & ~7) {
+			dma[j++] = MID_DT_8W | ((words >> 3) <<
+			    MID_DMA_COUNT_SHIFT) | (vcc->vci <<
+			    MID_DMA_VCI_SHIFT);
+			dma[j++] = paddr;
+			paddr += (words & ~7) << 2;
+			words &= 7;
+		}
 #endif
 #ifdef CONFIG_ATM_ENI_BURST_RX_4W /* recommended */
-			if (words & ~3) {
-				dma[j++] = MID_DT_4W | ((words >> 2) <<
-				    MID_DMA_COUNT_SHIFT) | (vcc->vci <<
-				    MID_DMA_VCI_SHIFT);
-				dma[j++] = paddr;
-				paddr += (words & ~3) << 2;
-				words &= 3;
-			}
+		if (words & ~3) {
+			dma[j++] = MID_DT_4W | ((words >> 2) <<
+			    MID_DMA_COUNT_SHIFT) | (vcc->vci <<
+			    MID_DMA_VCI_SHIFT);
+			dma[j++] = paddr;
+			paddr += (words & ~3) << 2;
+			words &= 3;
+		}
 #endif
 #ifdef CONFIG_ATM_ENI_BURST_RX_2W /* probably useless if RX_4W, RX_8W, ... */
-			if (words & ~1) {
-				dma[j++] = MID_DT_2W | ((words >> 1) <<
-				    MID_DMA_COUNT_SHIFT) | (vcc->vci <<
-				    MID_DMA_VCI_SHIFT);
-				dma[j++] = paddr;
-				paddr += (words & ~1) << 2;
-				words &= 1;
-			}
+		if (words & ~1) {
+			dma[j++] = MID_DT_2W | ((words >> 1) <<
+			    MID_DMA_COUNT_SHIFT) | (vcc->vci <<
+			    MID_DMA_VCI_SHIFT);
+			dma[j++] = paddr;
+			paddr += (words & ~1) << 2;
+			words &= 1;
+		}
 #endif
-			if (words) {
-				dma[j++] = MID_DT_WORD | (words << MID_DMA_COUNT_SHIFT)
-				    | (vcc->vci << MID_DMA_VCI_SHIFT);
-				dma[j++] = paddr;
-			}
+		if (words) {
+			dma[j++] = MID_DT_WORD | (words << MID_DMA_COUNT_SHIFT)
+			    | (vcc->vci << MID_DMA_VCI_SHIFT);
+			dma[j++] = paddr;
 		}
-		if (size != eff) {
-			dma[j++] = (here << MID_DMA_COUNT_SHIFT) |
-			    (vcc->vci << MID_DMA_VCI_SHIFT) | MID_DT_JK;
-			j++;
-		}
-		if (!j || j > 2*RX_DMA_BUF) {
-			printk(KERN_CRIT DEV_LABEL "!j or j too big!!!\n");
-			goto trouble;
-		}
-		dma[j-2] |= MID_DMA_END;
-		j = j >> 1;
-		dma_wr = eni_in(MID_DMA_WR_RX);
-		dma_rd = eni_in(MID_DMA_RD_RX);
-		/*
-		 * Can I move the dma_wr pointer by 2j+1 positions without overwriting
-		 * data that hasn't been read (position of dma_rd) yet ?
-		 */
-		if (!NEPMOK(dma_wr,j+j+1,dma_rd,NR_DMA_RX)) { /* @@@ +1 is ugly */
-			printk(KERN_WARNING DEV_LABEL "(itf %d): RX DMA full\n",
-			    vcc->dev->number);
-			goto trouble;
-		}
-		for (i = 0; i < j; i++) {
-			writel(dma[i*2],eni_dev->rx_dma+dma_wr*8);
-			writel(dma[i*2+1],eni_dev->rx_dma+dma_wr*8+4);
-			dma_wr = (dma_wr+1) & (NR_DMA_RX-1);
-		}
-		if (skb) {
-			ENI_PRV_POS(skb) = eni_vcc->descr+size+1;
-			skb_queue_tail(&eni_dev->rx_queue,skb);
-			eni_vcc->last = skb;
-	rx_enqueued++;
-		}
-		eni_vcc->descr = here;
-		eni_out(dma_wr,MID_DMA_WR_RX);
-		return 0;
-
-	trouble:
-		if (paddr)
-			pci_unmap_single(eni_dev->pci_dev,paddr,skb->len,
-			    PCI_DMA_FROMDEVICE);
-		if (skb) dev_kfree_skb_irq(skb);
-		return -1;
 	}
-
-
-	static void discard(struct atm_vcc *vcc,unsigned long size)
-	{
-		struct eni_vcc *eni_vcc;
-
-		eni_vcc = ENI_VCC(vcc);
-		EVENT("discard (size=%ld)\n",size,0);
-		while (do_rx_dma(vcc,NULL,1,size,0)) EVENT("BUSY LOOP",0,0);
-		    /* could do a full fallback, but that might be more expensive */
-		if (eni_vcc->rxing) ENI_PRV_POS(eni_vcc->last) += size+1;
-		else eni_vcc->rx_pos = (eni_vcc->rx_pos+size+1) & (eni_vcc->words-1);
+	if (size != eff) {
+		dma[j++] = (here << MID_DMA_COUNT_SHIFT) |
+		    (vcc->vci << MID_DMA_VCI_SHIFT) | MID_DT_JK;
+		j++;
 	}
-
-
+	if (!j || j > 2*RX_DMA_BUF) {
+		printk(KERN_CRIT DEV_LABEL "!j or j too big!!!\n");
+		goto trouble;
+	}
+	dma[j-2] |= MID_DMA_END;
+	j = j >> 1;
+	dma_wr = eni_in(MID_DMA_WR_RX);
+	dma_rd = eni_in(MID_DMA_RD_RX);
 	/*
-	 * TODO: should check whether direct copies (without DMA setup, dequeuing on
-	 * interrupt, etc.) aren't much faster for AAL0
+	 * Can I move the dma_wr pointer by 2j+1 positions without overwriting
+	 * data that hasn't been read (position of dma_rd) yet ?
 	 */
+	if (!NEPMOK(dma_wr,j+j+1,dma_rd,NR_DMA_RX)) { /* @@@ +1 is ugly */
+		printk(KERN_WARNING DEV_LABEL "(itf %d): RX DMA full\n",
+		    vcc->dev->number);
+		goto trouble;
+	}
+        for (i = 0; i < j; i++) {
+		writel(dma[i*2],eni_dev->rx_dma+dma_wr*8);
+		writel(dma[i*2+1],eni_dev->rx_dma+dma_wr*8+4);
+		dma_wr = (dma_wr+1) & (NR_DMA_RX-1);
+        }
+	if (skb) {
+		ENI_PRV_POS(skb) = eni_vcc->descr+size+1;
+		skb_queue_tail(&eni_dev->rx_queue,skb);
+		eni_vcc->last = skb;
+rx_enqueued++;
+	}
+	eni_vcc->descr = here;
+	eni_out(dma_wr,MID_DMA_WR_RX);
+	return 0;
 
-	static int rx_aal0(struct atm_vcc *vcc)
-	{
-		struct eni_vcc *eni_vcc;
-		unsigned long descr;
-		unsigned long length;
-		struct sk_buff *skb;
+trouble:
+	if (paddr)
+		pci_unmap_single(eni_dev->pci_dev,paddr,skb->len,
+		    PCI_DMA_FROMDEVICE);
+	if (skb) dev_kfree_skb_irq(skb);
+	return -1;
+}
 
-		DPRINTK(">rx_aal0\n");
-		eni_vcc = ENI_VCC(vcc);
-		descr = readl(eni_vcc->recv+eni_vcc->descr*4);
-		if ((descr & MID_RED_IDEN) != (MID_RED_RX_ID << MID_RED_SHIFT)) {
-			rx_ident_err(vcc);
-			return 1;
-		}
+
+static void discard(struct atm_vcc *vcc,unsigned long size)
+{
+	struct eni_vcc *eni_vcc;
+
+	eni_vcc = ENI_VCC(vcc);
+	EVENT("discard (size=%ld)\n",size,0);
+	while (do_rx_dma(vcc,NULL,1,size,0)) EVENT("BUSY LOOP",0,0);
+	    /* could do a full fallback, but that might be more expensive */
+	if (eni_vcc->rxing) ENI_PRV_POS(eni_vcc->last) += size+1;
+	else eni_vcc->rx_pos = (eni_vcc->rx_pos+size+1) & (eni_vcc->words-1);
+}
+
+
+/*
+ * TODO: should check whether direct copies (without DMA setup, dequeuing on
+ * interrupt, etc.) aren't much faster for AAL0
+ */
+
+static int rx_aal0(struct atm_vcc *vcc)
+{
+	struct eni_vcc *eni_vcc;
+	unsigned long descr;
+	unsigned long length;
+	struct sk_buff *skb;
+
+	DPRINTK(">rx_aal0\n");
+	eni_vcc = ENI_VCC(vcc);
+	descr = readl(eni_vcc->recv+eni_vcc->descr*4);
+	if ((descr & MID_RED_IDEN) != (MID_RED_RX_ID << MID_RED_SHIFT)) {
+		rx_ident_err(vcc);
+		return 1;
+	}
+	if (descr & MID_RED_T) {
+		DPRINTK(DEV_LABEL "(itf %d): trashing empty cell\n",
+		    vcc->dev->number);
+		length = 0;
+		atomic_inc(&vcc->stats->rx_err);
+	}
+	else {
+		length = ATM_CELL_SIZE-1; /* no HEC */
+	}
+	skb = length ? atm_alloc_charge(vcc,length,GFP_ATOMIC) : NULL;
+	if (!skb) {
+		discard(vcc,length >> 2);
+		return 0;
+	}
+	skb_put(skb,length);
+	skb->stamp = eni_vcc->timestamp;
+	DPRINTK("got len %ld\n",length);
+	if (do_rx_dma(vcc,skb,1,length >> 2,length >> 2)) return 1;
+	eni_vcc->rxing++;
+	return 0;
+}
+
+
+static int rx_aal5(struct atm_vcc *vcc)
+{
+	struct eni_vcc *eni_vcc;
+	unsigned long descr;
+	unsigned long size,eff,length;
+	struct sk_buff *skb;
+
+	EVENT("rx_aal5\n",0,0);
+	DPRINTK(">rx_aal5\n");
+	eni_vcc = ENI_VCC(vcc);
+	descr = readl(eni_vcc->recv+eni_vcc->descr*4);
+	if ((descr & MID_RED_IDEN) != (MID_RED_RX_ID << MID_RED_SHIFT)) {
+		rx_ident_err(vcc);
+		return 1;
+	}
+	if (descr & (MID_RED_T | MID_RED_CRC_ERR)) {
 		if (descr & MID_RED_T) {
+			EVENT("empty cell (descr=0x%lx)\n",descr,0);
 			DPRINTK(DEV_LABEL "(itf %d): trashing empty cell\n",
 			    vcc->dev->number);
-			length = 0;
-			atomic_inc(&vcc->stats->rx_err);
+			size = 0;
 		}
 		else {
-			length = ATM_CELL_SIZE-1; /* no HEC */
-		}
-		skb = length ? atm_alloc_charge(vcc,length,GFP_ATOMIC) : NULL;
-		if (!skb) {
-			discard(vcc,length >> 2);
-			return 0;
-		}
-		skb_put(skb,length);
-		skb->stamp = eni_vcc->timestamp;
-		DPRINTK("got len %ld\n",length);
-		if (do_rx_dma(vcc,skb,1,length >> 2,length >> 2)) return 1;
-		eni_vcc->rxing++;
-		return 0;
-	}
+			static unsigned long silence = 0;
 
-
-	static int rx_aal5(struct atm_vcc *vcc)
-	{
-		struct eni_vcc *eni_vcc;
-		unsigned long descr;
-		unsigned long size,eff,length;
-		struct sk_buff *skb;
-
-		EVENT("rx_aal5\n",0,0);
-		DPRINTK(">rx_aal5\n");
-		eni_vcc = ENI_VCC(vcc);
-		descr = readl(eni_vcc->recv+eni_vcc->descr*4);
-		if ((descr & MID_RED_IDEN) != (MID_RED_RX_ID << MID_RED_SHIFT)) {
-			rx_ident_err(vcc);
-			return 1;
-		}
-		if (descr & (MID_RED_T | MID_RED_CRC_ERR)) {
-			if (descr & MID_RED_T) {
-				EVENT("empty cell (descr=0x%lx)\n",descr,0);
-				DPRINTK(DEV_LABEL "(itf %d): trashing empty cell\n",
+			if (time_after(jiffies, silence) || silence == 0) {
+				printk(KERN_WARNING DEV_LABEL "(itf %d): "
+				    "discarding PDU(s) with CRC error\n",
 				    vcc->dev->number);
-				size = 0;
+				silence = (jiffies+2*HZ)|1;
 			}
-			else {
-				static unsigned long silence = 0;
-
-				if (time_after(jiffies, silence) || silence == 0) {
-					printk(KERN_WARNING DEV_LABEL "(itf %d): "
-					    "discarding PDU(s) with CRC error\n",
-					    vcc->dev->number);
-					silence = (jiffies+2*HZ)|1;
-				}
-				size = (descr & MID_RED_COUNT)*(ATM_CELL_PAYLOAD >> 2);
-				EVENT("CRC error (descr=0x%lx,size=%ld)\n",descr,
-				    size);
-			}
-			eff = length = 0;
+			size = (descr & MID_RED_COUNT)*(ATM_CELL_PAYLOAD >> 2);
+			EVENT("CRC error (descr=0x%lx,size=%ld)\n",descr,
+			    size);
+		}
+		eff = length = 0;
+		atomic_inc(&vcc->stats->rx_err);
+	}
+	else {
+		size = (descr & MID_RED_COUNT)*(ATM_CELL_PAYLOAD >> 2);
+		DPRINTK("size=%ld\n",size);
+		length = readl(eni_vcc->recv+(((eni_vcc->descr+size-1) &
+		    (eni_vcc->words-1)))*4) & 0xffff;
+				/* -trailer(2)+header(1) */
+		if (length && length <= (size << 2)-8 && length <=
+		  ATM_MAX_AAL5_PDU) eff = (length+3) >> 2;
+		else {				 /* ^ trailer length (8) */
+			EVENT("bad PDU (descr=0x08%lx,length=%ld)\n",descr,
+			    length);
+			printk(KERN_ERR DEV_LABEL "(itf %d): bad AAL5 PDU "
+			    "(VCI=%d,length=%ld,size=%ld (descr 0x%lx))\n",
+			    vcc->dev->number,vcc->vci,length,size << 2,descr);
+			length = eff = 0;
 			atomic_inc(&vcc->stats->rx_err);
 		}
+	}
+	skb = eff ? atm_alloc_charge(vcc,eff << 2,GFP_ATOMIC) : NULL;
+	if (!skb) {
+		discard(vcc,size);
+		return 0;
+	}
+	skb_put(skb,length);
+	DPRINTK("got len %ld\n",length);
+	if (do_rx_dma(vcc,skb,1,size,eff)) return 1;
+	eni_vcc->rxing++;
+	return 0;
+}
+
+
+static inline int rx_vcc(struct atm_vcc *vcc)
+{
+	void __iomem *vci_dsc;
+	unsigned long tmp;
+	struct eni_vcc *eni_vcc;
+
+	eni_vcc = ENI_VCC(vcc);
+	vci_dsc = ENI_DEV(vcc->dev)->vci+vcc->vci*16;
+	EVENT("rx_vcc(1)\n",0,0);
+	while (eni_vcc->descr != (tmp = (readl(vci_dsc+4) & MID_VCI_DESCR) >>
+	    MID_VCI_DESCR_SHIFT)) {
+		EVENT("rx_vcc(2: host dsc=0x%lx, nic dsc=0x%lx)\n",
+		    eni_vcc->descr,tmp);
+		DPRINTK("CB_DESCR %ld REG_DESCR %d\n",ENI_VCC(vcc)->descr,
+		    (((unsigned) readl(vci_dsc+4) & MID_VCI_DESCR) >>
+		    MID_VCI_DESCR_SHIFT));
+		if (ENI_VCC(vcc)->rx(vcc)) return 1;
+	}
+	/* clear IN_SERVICE flag */
+	writel(readl(vci_dsc) & ~MID_VCI_IN_SERVICE,vci_dsc);
+	/*
+	 * If new data has arrived between evaluating the while condition and
+	 * clearing IN_SERVICE, we wouldn't be notified until additional data
+	 * follows. So we have to loop again to be sure.
+	 */
+	EVENT("rx_vcc(3)\n",0,0);
+	while (ENI_VCC(vcc)->descr != (tmp = (readl(vci_dsc+4) & MID_VCI_DESCR)
+	    >> MID_VCI_DESCR_SHIFT)) {
+		EVENT("rx_vcc(4: host dsc=0x%lx, nic dsc=0x%lx)\n",
+		    eni_vcc->descr,tmp);
+		DPRINTK("CB_DESCR %ld REG_DESCR %d\n",ENI_VCC(vcc)->descr,
+		    (((unsigned) readl(vci_dsc+4) & MID_VCI_DESCR) >>
+		    MID_VCI_DESCR_SHIFT));
+		if (ENI_VCC(vcc)->rx(vcc)) return 1;
+	}
+	return 0;
+}
+
+
+static void poll_rx(struct atm_dev *dev)
+{
+	struct eni_dev *eni_dev;
+	struct atm_vcc *curr;
+
+	eni_dev = ENI_DEV(dev);
+	while ((curr = eni_dev->fast)) {
+		EVENT("poll_rx.fast\n",0,0);
+		if (rx_vcc(curr)) return;
+		eni_dev->fast = ENI_VCC(curr)->next;
+		ENI_VCC(curr)->next = ENI_VCC_NOS;
+		barrier();
+		ENI_VCC(curr)->servicing--;
+	}
+	while ((curr = eni_dev->slow)) {
+		EVENT("poll_rx.slow\n",0,0);
+		if (rx_vcc(curr)) return;
+		eni_dev->slow = ENI_VCC(curr)->next;
+		ENI_VCC(curr)->next = ENI_VCC_NOS;
+		barrier();
+		ENI_VCC(curr)->servicing--;
+	}
+}
+
+
+static void get_service(struct atm_dev *dev)
+{
+	struct eni_dev *eni_dev;
+	struct atm_vcc *vcc;
+	unsigned long vci;
+
+	DPRINTK(">get_service\n");
+	eni_dev = ENI_DEV(dev);
+	while (eni_in(MID_SERV_WRITE) != eni_dev->serv_read) {
+		vci = readl(eni_dev->service+eni_dev->serv_read*4);
+		eni_dev->serv_read = (eni_dev->serv_read+1) & (NR_SERVICE-1);
+		vcc = eni_dev->rx_map[vci & 1023];
+		if (!vcc) {
+			printk(KERN_CRIT DEV_LABEL "(itf %d): VCI %ld not "
+			    "found\n",dev->number,vci);
+			continue; /* nasty but we try to go on anyway */
+			/* @@@ nope, doesn't work */
+		}
+		EVENT("getting from service\n",0,0);
+		if (ENI_VCC(vcc)->next != ENI_VCC_NOS) {
+			EVENT("double service\n",0,0);
+			DPRINTK("Grr, servicing VCC %ld twice\n",vci);
+			continue;
+		}
+		do_gettimeofday(&ENI_VCC(vcc)->timestamp);
+		ENI_VCC(vcc)->next = NULL;
+		if (vcc->qos.rxtp.traffic_class == ATM_CBR) {
+			if (eni_dev->fast)
+				ENI_VCC(eni_dev->last_fast)->next = vcc;
+			else eni_dev->fast = vcc;
+			eni_dev->last_fast = vcc;
+		}
 		else {
-			size = (descr & MID_RED_COUNT)*(ATM_CELL_PAYLOAD >> 2);
-			DPRINTK("size=%ld\n",size);
-			length = readl(eni_vcc->recv+(((eni_vcc->descr+size-1) &
-			    (eni_vcc->words-1)))*4) & 0xffff;
-					/* -trailer(2)+header(1) */
-			if (length && length <= (size << 2)-8 && length <=
-			  ATM_MAX_AAL5_PDU) eff = (length+3) >> 2;
-			else {				 /* ^ trailer length (8) */
-				EVENT("bad PDU (descr=0x08%lx,length=%ld)\n",descr,
-				    length);
-				printk(KERN_ERR DEV_LABEL "(itf %d): bad AAL5 PDU "
-				    "(VCI=%d,length=%ld,size=%ld (descr 0x%lx))\n",
-				    vcc->dev->number,vcc->vci,length,size << 2,descr);
-				length = eff = 0;
-				atomic_inc(&vcc->stats->rx_err);
-			}
+			if (eni_dev->slow)
+				ENI_VCC(eni_dev->last_slow)->next = vcc;
+			else eni_dev->slow = vcc;
+			eni_dev->last_slow = vcc;
 		}
-		skb = eff ? atm_alloc_charge(vcc,eff << 2,GFP_ATOMIC) : NULL;
+putting++;
+		ENI_VCC(vcc)->servicing++;
+	}
+}
+
+
+static void dequeue_rx(struct atm_dev *dev)
+{
+	struct eni_dev *eni_dev;
+	struct eni_vcc *eni_vcc;
+	struct atm_vcc *vcc;
+	struct sk_buff *skb;
+	void __iomem *vci_dsc;
+	int first;
+
+	eni_dev = ENI_DEV(dev);
+	first = 1;
+	while (1) {
+		skb = skb_dequeue(&eni_dev->rx_queue);
 		if (!skb) {
-			discard(vcc,size);
-			return 0;
+			if (first) {
+				DPRINTK(DEV_LABEL "(itf %d): RX but not "
+				    "rxing\n",dev->number);
+				EVENT("nothing to dequeue\n",0,0);
+			}
+			break;
 		}
-		skb_put(skb,length);
-		DPRINTK("got len %ld\n",length);
-		if (do_rx_dma(vcc,skb,1,size,eff)) return 1;
-		eni_vcc->rxing++;
-		return 0;
-	}
-
-
-	static inline int rx_vcc(struct atm_vcc *vcc)
-	{
-		unsigned long tmp;
-		void __iomem *vci_dsc;
-		struct eni_vcc *eni_vcc;
-
+		EVENT("dequeued (size=%ld,pos=0x%lx)\n",ENI_PRV_SIZE(skb),
+		    ENI_PRV_POS(skb));
+rx_dequeued++;
+		vcc = ATM_SKB(skb)->vcc;
 		eni_vcc = ENI_VCC(vcc);
-		vci_dsc = ENI_DEV(vcc->dev)->vci+vcc->vci*16;
-		EVENT("rx_vcc(1)\n",0,0);
-		while (eni_vcc->descr != (tmp = (readl(vci_dsc+4) & MID_VCI_DESCR) >>
-		    MID_VCI_DESCR_SHIFT)) {
-			EVENT("rx_vcc(2: host dsc=0x%lx, nic dsc=0x%lx)\n",
-			    eni_vcc->descr,tmp);
-			DPRINTK("CB_DESCR %ld REG_DESCR %d\n",ENI_VCC(vcc)->descr,
-			    (((unsigned) readl(vci_dsc+4) & MID_VCI_DESCR) >>
-			    MID_VCI_DESCR_SHIFT));
-			if (ENI_VCC(vcc)->rx(vcc)) return 1;
+		first = 0;
+		vci_dsc = eni_dev->vci+vcc->vci*16;
+		if (!EEPMOK(eni_vcc->rx_pos,ENI_PRV_SIZE(skb),
+		    (readl(vci_dsc+4) & MID_VCI_READ) >> MID_VCI_READ_SHIFT,
+		    eni_vcc->words)) {
+			EVENT("requeuing\n",0,0);
+			skb_queue_head(&eni_dev->rx_queue,skb);
+			break;
 		}
-		/* clear IN_SERVICE flag */
-		writel(readl(vci_dsc) & ~MID_VCI_IN_SERVICE,vci_dsc);
-		/*
-		 * If new data has arrived between evaluating the while condition and
-		 * clearing IN_SERVICE, we wouldn't be notified until additional data
-		 * follows. So we have to loop again to be sure.
-		 */
-		EVENT("rx_vcc(3)\n",0,0);
-		while (ENI_VCC(vcc)->descr != (tmp = (readl(vci_dsc+4) & MID_VCI_DESCR)
-		    >> MID_VCI_DESCR_SHIFT)) {
-			EVENT("rx_vcc(4: host dsc=0x%lx, nic dsc=0x%lx)\n",
-			    eni_vcc->descr,tmp);
-			DPRINTK("CB_DESCR %ld REG_DESCR %d\n",ENI_VCC(vcc)->descr,
-			    (((unsigned) readl(vci_dsc+4) & MID_VCI_DESCR) >>
-			    MID_VCI_DESCR_SHIFT));
-			if (ENI_VCC(vcc)->rx(vcc)) return 1;
+		eni_vcc->rxing--;
+		eni_vcc->rx_pos = ENI_PRV_POS(skb) & (eni_vcc->words-1);
+		pci_unmap_single(eni_dev->pci_dev,ENI_PRV_PADDR(skb),skb->len,
+		    PCI_DMA_TODEVICE);
+		if (!skb->len) dev_kfree_skb_irq(skb);
+		else {
+			EVENT("pushing (len=%ld)\n",skb->len,0);
+			if (vcc->qos.aal == ATM_AAL0)
+				*(unsigned long *) skb->data =
+				    ntohl(*(unsigned long *) skb->data);
+			memset(skb->cb,0,sizeof(struct eni_skb_prv));
+			vcc->push(vcc,skb);
+			pushed++;
 		}
-		return 0;
+		atomic_inc(&vcc->stats->rx);
 	}
+	wake_up(&eni_dev->rx_wait);
+}
 
 
-	static void poll_rx(struct atm_dev *dev)
-	{
-		struct eni_dev *eni_dev;
-		struct atm_vcc *curr;
+static int open_rx_first(struct atm_vcc *vcc)
+{
+	struct eni_dev *eni_dev;
+	struct eni_vcc *eni_vcc;
+	unsigned long size;
 
-		eni_dev = ENI_DEV(dev);
-		while ((curr = eni_dev->fast)) {
-			EVENT("poll_rx.fast\n",0,0);
-			if (rx_vcc(curr)) return;
-			eni_dev->fast = ENI_VCC(curr)->next;
-			ENI_VCC(curr)->next = ENI_VCC_NOS;
-			barrier();
-			ENI_VCC(curr)->servicing--;
-		}
-		while ((curr = eni_dev->slow)) {
-			EVENT("poll_rx.slow\n",0,0);
-			if (rx_vcc(curr)) return;
-			eni_dev->slow = ENI_VCC(curr)->next;
-			ENI_VCC(curr)->next = ENI_VCC_NOS;
-			barrier();
-			ENI_VCC(curr)->servicing--;
-		}
-	}
-
-
-	static void get_service(struct atm_dev *dev)
-	{
-		struct eni_dev *eni_dev;
-		struct atm_vcc *vcc;
-		unsigned long vci;
-
-		DPRINTK(">get_service\n");
-		eni_dev = ENI_DEV(dev);
-		while (eni_in(MID_SERV_WRITE) != eni_dev->serv_read) {
-			vci = readl(eni_dev->service+eni_dev->serv_read*4);
-			eni_dev->serv_read = (eni_dev->serv_read+1) & (NR_SERVICE-1);
-			vcc = eni_dev->rx_map[vci & 1023];
-			if (!vcc) {
-				printk(KERN_CRIT DEV_LABEL "(itf %d): VCI %ld not "
-				    "found\n",dev->number,vci);
-				continue; /* nasty but we try to go on anyway */
-				/* @@@ nope, doesn't work */
-			}
-			EVENT("getting from service\n",0,0);
-			if (ENI_VCC(vcc)->next != ENI_VCC_NOS) {
-				EVENT("double service\n",0,0);
-				DPRINTK("Grr, servicing VCC %ld twice\n",vci);
-				continue;
-			}
-			do_gettimeofday(&ENI_VCC(vcc)->timestamp);
-			ENI_VCC(vcc)->next = NULL;
-			if (vcc->qos.rxtp.traffic_class == ATM_CBR) {
-				if (eni_dev->fast)
-					ENI_VCC(eni_dev->last_fast)->next = vcc;
-				else eni_dev->fast = vcc;
-				eni_dev->last_fast = vcc;
-			}
-			else {
-				if (eni_dev->slow)
-					ENI_VCC(eni_dev->last_slow)->next = vcc;
-				else eni_dev->slow = vcc;
-				eni_dev->last_slow = vcc;
-			}
-	putting++;
-			ENI_VCC(vcc)->servicing++;
-		}
-	}
+	DPRINTK("open_rx_first\n");
+	eni_dev = ENI_DEV(vcc->dev);
+	eni_vcc = ENI_VCC(vcc);
+	eni_vcc->rx = NULL;
+	if (vcc->qos.rxtp.traffic_class == ATM_NONE) return 0;
+	size = vcc->qos.rxtp.max_sdu*eni_dev->rx_mult/100;
+	if (size > MID_MAX_BUF_SIZE && vcc->qos.rxtp.max_sdu <=
+	    MID_MAX_BUF_SIZE)
+		size = MID_MAX_BUF_SIZE;
+	eni_vcc->recv = eni_alloc_mem(eni_dev,&size);
+	DPRINTK("rx at 0x%lx\n",eni_vcc->recv);
+	eni_vcc->words = size >> 2;
+	if (!eni_vcc->recv) return -ENOBUFS;
+	eni_vcc->rx = vcc->qos.aal == ATM_AAL5 ? rx_aal5 : rx_aal0;
+	eni_vcc->descr = 0;
+	eni_vcc->rx_pos = 0;
+	eni_vcc->rxing = 0;
+	eni_vcc->servicing = 0;
+	eni_vcc->next = ENI_VCC_NOS;
+	return 0;
+}
 
 
-	static void dequeue_rx(struct atm_dev *dev)
-	{
-		struct eni_dev *eni_dev;
-		struct eni_vcc *eni_vcc;
-		struct atm_vcc *vcc;
-		struct sk_buff *skb;
-		void __iomem *vci_dsc;
-		int first;
+static int open_rx_second(struct atm_vcc *vcc)
+{
+	void __iomem *here;
+	struct eni_dev *eni_dev;
+	struct eni_vcc *eni_vcc;
+	unsigned long size;
+	int order;
 
-		eni_dev = ENI_DEV(dev);
-		first = 1;
-		while (1) {
-			skb = skb_dequeue(&eni_dev->rx_queue);
-			if (!skb) {
-				if (first) {
-					DPRINTK(DEV_LABEL "(itf %d): RX but not "
-					    "rxing\n",dev->number);
-					EVENT("nothing to dequeue\n",0,0);
-				}
-				break;
-			}
-			EVENT("dequeued (size=%ld,pos=0x%lx)\n",ENI_PRV_SIZE(skb),
-			    ENI_PRV_POS(skb));
-	rx_dequeued++;
-			vcc = ATM_SKB(skb)->vcc;
-			eni_vcc = ENI_VCC(vcc);
-			first = 0;
-			vci_dsc = eni_dev->vci+vcc->vci*16;
-			if (!EEPMOK(eni_vcc->rx_pos,ENI_PRV_SIZE(skb),
-			    (readl(vci_dsc+4) & MID_VCI_READ) >> MID_VCI_READ_SHIFT,
-			    eni_vcc->words)) {
-				EVENT("requeuing\n",0,0);
-				skb_queue_head(&eni_dev->rx_queue,skb);
-				break;
-			}
-			eni_vcc->rxing--;
-			eni_vcc->rx_pos = ENI_PRV_POS(skb) & (eni_vcc->words-1);
-			pci_unmap_single(eni_dev->pci_dev,ENI_PRV_PADDR(skb),skb->len,
-			    PCI_DMA_TODEVICE);
-			if (!skb->len) dev_kfree_skb_irq(skb);
-			else {
-				EVENT("pushing (len=%ld)\n",skb->len,0);
-				if (vcc->qos.aal == ATM_AAL0)
-					*(unsigned long *) skb->data =
-					    ntohl(*(unsigned long *) skb->data);
-				memset(skb->cb,0,sizeof(struct eni_skb_prv));
-				vcc->push(vcc,skb);
-				pushed++;
-			}
-			atomic_inc(&vcc->stats->rx);
-		}
-		wake_up(&eni_dev->rx_wait);
-	}
+	DPRINTK("open_rx_second\n");
+	eni_dev = ENI_DEV(vcc->dev);
+	eni_vcc = ENI_VCC(vcc);
+	if (!eni_vcc->rx) return 0;
+	/* set up VCI descriptor */
+	here = eni_dev->vci+vcc->vci*16;
+	DPRINTK("loc 0x%x\n",(unsigned) (eni_vcc->recv-eni_dev->ram)/4);
+	size = eni_vcc->words >> 8;
+	for (order = -1; size; order++) size >>= 1;
+	writel(0,here+4); /* descr, read = 0 */
+	writel(0,here+8); /* write, state, count = 0 */
+	if (eni_dev->rx_map[vcc->vci])
+		printk(KERN_CRIT DEV_LABEL "(itf %d): BUG - VCI %d already "
+		    "in use\n",vcc->dev->number,vcc->vci);
+	eni_dev->rx_map[vcc->vci] = vcc; /* now it counts */
+	writel(((vcc->qos.aal != ATM_AAL5 ? MID_MODE_RAW : MID_MODE_AAL5) <<
+	    MID_VCI_MODE_SHIFT) | MID_VCI_PTI_MODE |
+	    (((eni_vcc->recv-eni_dev->ram) >> (MID_LOC_SKIP+2)) <<
+	    MID_VCI_LOCATION_SHIFT) | (order << MID_VCI_SIZE_SHIFT),here);
+	return 0;
+}
 
 
-	static int open_rx_first(struct atm_vcc *vcc)
-	{
-		struct eni_dev *eni_dev;
-		struct eni_vcc *eni_vcc;
-		unsigned long size;
+static void close_rx(struct atm_vcc *vcc)
+{
+	DECLARE_WAITQUEUE(wait,current);
+	void __iomem *here;
+	struct eni_dev *eni_dev;
+	struct eni_vcc *eni_vcc;
 
-		DPRINTK("open_rx_first\n");
-		eni_dev = ENI_DEV(vcc->dev);
-		eni_vcc = ENI_VCC(vcc);
-		eni_vcc->rx = NULL;
-		if (vcc->qos.rxtp.traffic_class == ATM_NONE) return 0;
-		size = vcc->qos.rxtp.max_sdu*eni_dev->rx_mult/100;
-		if (size > MID_MAX_BUF_SIZE && vcc->qos.rxtp.max_sdu <=
-		    MID_MAX_BUF_SIZE)
-			size = MID_MAX_BUF_SIZE;
-		eni_vcc->recv = eni_alloc_mem(eni_dev,&size);
-		DPRINTK("rx at 0x%lx\n",eni_vcc->recv);
-		eni_vcc->words = size >> 2;
-		if (!eni_vcc->recv) return -ENOBUFS;
-		eni_vcc->rx = vcc->qos.aal == ATM_AAL5 ? rx_aal5 : rx_aal0;
-		eni_vcc->descr = 0;
-		eni_vcc->rx_pos = 0;
-		eni_vcc->rxing = 0;
-		eni_vcc->servicing = 0;
-		eni_vcc->next = ENI_VCC_NOS;
-		return 0;
-	}
-
-
-	static int open_rx_second(struct atm_vcc *vcc)
-	{
-		void __iomem * here;
-		struct eni_dev *eni_dev;
-		struct eni_vcc *eni_vcc;
-		unsigned long size;
-		int order;
-
-		DPRINTK("open_rx_second\n");
-		eni_dev = ENI_DEV(vcc->dev);
-		eni_vcc = ENI_VCC(vcc);
-		if (!eni_vcc->rx) return 0;
-		/* set up VCI descriptor */
+	eni_vcc = ENI_VCC(vcc);
+	if (!eni_vcc->rx) return;
+	eni_dev = ENI_DEV(vcc->dev);
+	if (vcc->vpi != ATM_VPI_UNSPEC && vcc->vci != ATM_VCI_UNSPEC) {
 		here = eni_dev->vci+vcc->vci*16;
-		DPRINTK("loc 0x%x\n",(unsigned) (eni_vcc->recv-eni_dev->ram)/4);
-		size = eni_vcc->words >> 8;
-		for (order = -1; size; order++) size >>= 1;
-		writel(0,here+4); /* descr, read = 0 */
-		writel(0,here+8); /* write, state, count = 0 */
-		if (eni_dev->rx_map[vcc->vci])
-			printk(KERN_CRIT DEV_LABEL "(itf %d): BUG - VCI %d already "
-			    "in use\n",vcc->dev->number,vcc->vci);
-		eni_dev->rx_map[vcc->vci] = vcc; /* now it counts */
-		writel(((vcc->qos.aal != ATM_AAL5 ? MID_MODE_RAW : MID_MODE_AAL5) <<
-		    MID_VCI_MODE_SHIFT) | MID_VCI_PTI_MODE |
-		    (((unsigned long)(eni_vcc->recv-eni_dev->ram) >> (MID_LOC_SKIP+2)) <<
-		    MID_VCI_LOCATION_SHIFT) | (order << MID_VCI_SIZE_SHIFT), here);
-		return 0;
-	}
-
-
-	static void close_rx(struct atm_vcc *vcc)
-	{
-		DECLARE_WAITQUEUE(wait,current);
-		void __iomem *here;
-		struct eni_dev *eni_dev;
-		struct eni_vcc *eni_vcc;
-
-		eni_vcc = ENI_VCC(vcc);
-		if (!eni_vcc->rx) return;
-		eni_dev = ENI_DEV(vcc->dev);
-		if (vcc->vpi != ATM_VPI_UNSPEC && vcc->vci != ATM_VCI_UNSPEC) {
-			here = eni_dev->vci+vcc->vci*16;
-			/* block receiver */
-			writel((readl(here) & ~MID_VCI_MODE) | (MID_MODE_TRASH <<
-			    MID_VCI_MODE_SHIFT),here);
-			/* wait for receiver to become idle */
-			udelay(27);
-			/* discard pending cell */
-			writel(readl(here) & ~MID_VCI_IN_SERVICE,here);
-			/* don't accept any new ones */
-			eni_dev->rx_map[vcc->vci] = NULL;
-			/* wait for RX queue to drain */
-			DPRINTK("eni_close: waiting for RX ...\n");
-			EVENT("RX closing\n",0,0);
-			add_wait_queue(&eni_dev->rx_wait,&wait);
+		/* block receiver */
+		writel((readl(here) & ~MID_VCI_MODE) | (MID_MODE_TRASH <<
+		    MID_VCI_MODE_SHIFT),here);
+		/* wait for receiver to become idle */
+		udelay(27);
+		/* discard pending cell */
+		writel(readl(here) & ~MID_VCI_IN_SERVICE,here);
+		/* don't accept any new ones */
+		eni_dev->rx_map[vcc->vci] = NULL;
+		/* wait for RX queue to drain */
+		DPRINTK("eni_close: waiting for RX ...\n");
+		EVENT("RX closing\n",0,0);
+		add_wait_queue(&eni_dev->rx_wait,&wait);
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		barrier();
+		for (;;) {
+			/* transition service->rx: rxing++, servicing-- */
+			if (!eni_vcc->servicing) {
+				barrier();
+				if (!eni_vcc->rxing) break;
+			}
+			EVENT("drain PDUs (rx %ld, serv %ld)\n",eni_vcc->rxing,
+			    eni_vcc->servicing);
+			printk(KERN_INFO "%d+%d RX left\n",eni_vcc->servicing,
+			    eni_vcc->rxing);
+			schedule();
 			set_current_state(TASK_UNINTERRUPTIBLE);
-			barrier();
-			for (;;) {
-				/* transition service->rx: rxing++, servicing-- */
-				if (!eni_vcc->servicing) {
-					barrier();
-					if (!eni_vcc->rxing) break;
-				}
-				EVENT("drain PDUs (rx %ld, serv %ld)\n",eni_vcc->rxing,
-				    eni_vcc->servicing);
-				printk(KERN_INFO "%d+%d RX left\n",eni_vcc->servicing,
-				    eni_vcc->rxing);
-				schedule();
-				set_current_state(TASK_UNINTERRUPTIBLE);
-			}
-			for (;;) {
-				int at_end;
-				u32 tmp;
-
-				tasklet_disable(&eni_dev->task);
-				tmp = readl(eni_dev->vci+vcc->vci*16+4) & MID_VCI_READ;
-				at_end = eni_vcc->rx_pos == tmp >> MID_VCI_READ_SHIFT;
-				tasklet_enable(&eni_dev->task);
-				if (at_end) break;
-				EVENT("drain discard (host 0x%lx, nic 0x%lx)\n",
-				    eni_vcc->rx_pos,tmp);
-				printk(KERN_INFO "draining RX: host 0x%lx, nic 0x%x\n",
-				    eni_vcc->rx_pos,tmp);
-				schedule();
-				set_current_state(TASK_UNINTERRUPTIBLE);
-			}
-			set_current_state(TASK_RUNNING);
-			remove_wait_queue(&eni_dev->rx_wait,&wait);
 		}
+		for (;;) {
+			int at_end;
+			u32 tmp;
+
+			tasklet_disable(&eni_dev->task);
+			tmp = readl(eni_dev->vci+vcc->vci*16+4) & MID_VCI_READ;
+			at_end = eni_vcc->rx_pos == tmp >> MID_VCI_READ_SHIFT;
+			tasklet_enable(&eni_dev->task);
+			if (at_end) break;
+			EVENT("drain discard (host 0x%lx, nic 0x%lx)\n",
+			    eni_vcc->rx_pos,tmp);
+			printk(KERN_INFO "draining RX: host 0x%lx, nic 0x%x\n",
+			    eni_vcc->rx_pos,tmp);
+			schedule();
+			set_current_state(TASK_UNINTERRUPTIBLE);
+		}
+		set_current_state(TASK_RUNNING);
+		remove_wait_queue(&eni_dev->rx_wait,&wait);
+	}
 	eni_free_mem(eni_dev,eni_vcc->recv,eni_vcc->words << 2);
 	eni_vcc->rx = NULL;
 }
@@ -1315,12 +1315,11 @@ static int reserve_or_set_tx(struct atm_vcc *vcc,struct atm_trafprm *txtp,
 		size = UBR_BUFFER;
 	}
 	new_tx = !eni_vcc->tx;
-	mem = 0; /* for gcc */
+	mem = NULL; /* for gcc */
 	if (!new_tx) tx = eni_vcc->tx;
 	else {
 		mem = eni_alloc_mem(eni_dev,&size);
-		if (!mem) 
-			return -ENOBUFS;
+		if (!mem) return -ENOBUFS;
 		tx = alloc_tx(eni_dev,unlimited);
 		if (!tx) {
 			eni_free_mem(eni_dev,mem,size);
@@ -1350,7 +1349,7 @@ static int reserve_or_set_tx(struct atm_vcc *vcc,struct atm_trafprm *txtp,
 		error = -EINVAL;
 	if (error) {
 		if (new_tx) {
-			tx->send = 0;
+			tx->send = NULL;
 			eni_free_mem(eni_dev,mem,size);
 		}
 		return error;
@@ -1424,7 +1423,7 @@ static void close_tx(struct atm_vcc *vcc)
 		    eni_in(MID_TX_DESCRSTART(eni_vcc->tx->index)))
 			schedule();
 		eni_free_mem(eni_dev,eni_vcc->tx->send,eni_vcc->tx->words << 2);
-		eni_vcc->tx->send = 0;
+		eni_vcc->tx->send = NULL;
 		eni_dev->tx_bw += eni_vcc->tx->reserved;
 	}
 	eni_vcc->tx = NULL;
@@ -1445,7 +1444,7 @@ static int start_tx(struct atm_dev *dev)
 	skb_queue_head_init(&eni_dev->tx_queue);
 	eni_out(0,MID_DMA_WR_TX);
 	for (i = 0; i < NR_CHAN; i++) {
-		eni_dev->tx[i].send = 0;
+		eni_dev->tx[i].send = NULL;
 		eni_dev->tx[i].index = i;
 	}
 	return 0;
@@ -1703,11 +1702,11 @@ static int __devinit get_esi_fpga(struct atm_dev *dev, void __iomem *base)
 
 static int __devinit eni_do_init(struct atm_dev *dev)
 {
-	struct midway_eprom *eprom;
+	struct midway_eprom __iomem *eprom;
 	struct eni_dev *eni_dev;
 	struct pci_dev *pci_dev;
-	void __iomem *base;
 	unsigned long real_base;
+	void __iomem *base;
 	unsigned char revision;
 	int error,i,last;
 
@@ -1740,11 +1739,10 @@ static int __devinit eni_do_init(struct atm_dev *dev)
 		    "mapping\n",dev->number);
 		return error;
 	}
-	eni_dev->base_diff = real_base - (unsigned long)base;
+	eni_dev->base_diff = real_base - (unsigned long) base;
 	/* id may not be present in ASIC Tonga boards - check this @@@ */
 	if (!eni_dev->asic) {
-		eprom = (struct midway_eprom *) (base+EPROM_SIZE-sizeof(struct
-		    midway_eprom));
+		eprom = (base+EPROM_SIZE-sizeof(struct midway_eprom));
 		if (readl(&eprom->magic) != ENI155_MAGIC) {
 			printk("\n");
 			printk(KERN_ERR KERN_ERR DEV_LABEL "(itf %d): bad "
@@ -1794,6 +1792,7 @@ static int __devinit eni_do_init(struct atm_dev *dev)
 static int __devinit eni_start(struct atm_dev *dev)
 {
 	struct eni_dev *eni_dev;
+	
 	void __iomem *buf;
 	unsigned long buffer_mem;
 	int error;
@@ -2141,9 +2140,9 @@ static int eni_proc_read(struct atm_dev *dev,loff_t *pos,char *page)
 
 		if (!tx->send) continue;
 		if (!--left) {
-			return sprintf(page,"tx[%d]:    0x%06d-0x%06ild "
+			return sprintf(page,"tx[%d]:    0x%ld-0x%ld "
 			    "(%6ld bytes), rsv %d cps, shp %d cps%s\n",i,
-			    tx->send-eni_dev->ram,
+			    (unsigned long) (tx->send - eni_dev->ram),
 			    tx->send-eni_dev->ram+tx->words*4-1,tx->words*4,
 			    tx->reserved,tx->shaping,
 			    tx == eni_dev->ubr ? " (UBR)" : "");
@@ -2167,9 +2166,9 @@ static int eni_proc_read(struct atm_dev *dev,loff_t *pos,char *page)
 			if (--left) continue;
 			length = sprintf(page,"vcc %4d: ",vcc->vci);
 			if (eni_vcc->rx) {
-				length += sprintf(page+length,"0x%06d-0x%06ld "
+				length += sprintf(page+length,"0x%ld-0x%ld "
 				    "(%6ld bytes)",
-				    eni_vcc->recv-eni_dev->ram,
+				    (unsigned long) (eni_vcc->recv - eni_dev->ram),
 				    eni_vcc->recv-eni_dev->ram+eni_vcc->words*4-1,
 				    eni_vcc->words*4);
 				if (eni_vcc->tx) length += sprintf(page+length,", ");
@@ -2185,11 +2184,11 @@ static int eni_proc_read(struct atm_dev *dev,loff_t *pos,char *page)
 	read_unlock(&vcc_sklist_lock);
 	for (i = 0; i < eni_dev->free_len; i++) {
 		struct eni_free *fe = eni_dev->free_list+i;
-		void __iomem *offset;
+		unsigned long offset;
 
 		if (--left) continue;
-		offset = eni_dev->ram+eni_dev->base_diff;
-		return sprintf(page,"free      0x%06ld-0x%06ld (%6d bytes)\n",
+		offset = (unsigned long) eni_dev->ram+eni_dev->base_diff;
+		return sprintf(page,"free      %p-%p (%6d bytes)\n",
 		    fe->start-offset,fe->start-offset+(1 << fe->order)-1,
 		    1 << fe->order);
 	}
@@ -2290,9 +2289,7 @@ static int __init eni_init(void)
 		    sizeof(skb->cb),sizeof(struct eni_skb_prv));
 		return -EIO;
 	}
-	if (pci_register_driver(&eni_driver) > 0) return 0;
-	pci_unregister_driver (&eni_driver);
-	return -ENODEV;
+	return pci_register_driver(&eni_driver);
 }
 
 

@@ -372,11 +372,12 @@ static long bytes_out;
 #define Tracecv(c,x)
 
 #define STATIC static
+#define INIT __init
 
-static void flush_window(void);
-static void error(char *m);
-static void gzip_mark(void **);
-static void gzip_release(void **);
+static void __init flush_window(void);
+static void __init error(char *m);
+static void __init gzip_mark(void **);
+static void __init gzip_release(void **);
 
 #include "../lib/inflate.c"
 
@@ -445,8 +446,7 @@ char * __init unpack_to_rootfs(char *buf, unsigned len, int check_only)
 		bytes_out = 0;
 		crc = (ulg)0xffffffffL; /* shift register contents */
 		makecrc();
-		if (gunzip())
-			message = "ungzip failed";
+		gunzip();
 		if (state != Reset)
 			error("junk in gzipped archive");
 		this_header = saved_offset + inptr;

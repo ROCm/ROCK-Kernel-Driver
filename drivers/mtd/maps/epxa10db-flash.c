@@ -5,7 +5,7 @@
  *  Copyright (C) 2001 Altera Corporation
  *  Copyright (C) 2001 Red Hat, Inc.
  *
- * $Id: epxa10db-flash.c,v 1.11 2004/07/12 21:59:44 dwmw2 Exp $ 
+ * $Id: epxa10db-flash.c,v 1.13 2004/11/04 13:24:14 gleixner Exp $ 
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -62,7 +62,7 @@ static int __init epxa_mtd_init(void)
 	
 	printk(KERN_NOTICE "%s flash device: 0x%x at 0x%x\n", BOARD_NAME, FLASH_SIZE, FLASH_START);
 
-	epxa_map.virt = (unsigned long)ioremap(FLASH_START, FLASH_SIZE);
+	epxa_map.virt = ioremap(FLASH_START, FLASH_SIZE);
 	if (!epxa_map.virt) {
 		printk("Failed to ioremap %s flash\n",BOARD_NAME);
 		return -EIO;

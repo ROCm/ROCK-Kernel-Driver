@@ -6,5 +6,3 @@ makefiles.txt
 	- developer information for linux kernel makefiles
 modules.txt
 	- how to build modules and to install them
-extmodules.txt
-	- specific information about external modules

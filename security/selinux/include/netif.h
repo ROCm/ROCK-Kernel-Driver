@@ -15,16 +15,7 @@
 #ifndef _SELINUX_NETIF_H_
 #define _SELINUX_NETIF_H_
 
-struct sel_netif
-{
-	struct list_head list;
-	atomic_t users;
-	struct netif_security_struct nsec;
-	struct rcu_head rcu_head;
-};
-
-struct sel_netif *sel_netif_lookup(struct net_device *dev);
-void sel_netif_put(struct sel_netif *netif);
+int sel_netif_sids(struct net_device *dev, u32 *if_sid, u32 *msg_sid);
 
 #endif	/* _SELINUX_NETIF_H_ */
 

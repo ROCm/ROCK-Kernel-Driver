@@ -36,7 +36,7 @@
  * device of the previous section.
  * Thus there are (near_copies*far_copies) of each chunk, and each is on a different
  * drive.
- * near_copies and far_copies must be at least one, and there product is at most
+ * near_copies and far_copies must be at least one, and their product is at most
  * raid_disks.
  */
 
@@ -498,7 +498,7 @@ static int read_balance(conf_t *conf, r10bio_t *r10_bio)
 	sector_t new_distance, current_distance;
 
 	raid10_find_phys(conf, r10_bio);
-	spin_lock_irq(&conf->device_lock);
+	rcu_read_lock();
 	/*
 	 * Check if we can balance. We can balance on the whole
 	 * device if no resync is going on, or below the resync window.
@@ -570,7 +570,7 @@ rb_out:
 
 	if (disk >= 0 && conf->mirrors[disk].rdev)
 		atomic_inc(&conf->mirrors[disk].rdev->nr_pending);
-	spin_unlock_irq(&conf->device_lock);
+	rcu_read_unlock();
 
 	return disk;
 }
@@ -579,26 +579,26 @@ static void unplug_slaves(mddev_t *mddev)
 {
 	conf_t *conf = mddev_to_conf(mddev);
 	int i;
-	unsigned long flags;
 
-	spin_lock_irqsave(&conf->device_lock, flags);
+	rcu_read_lock();
 	for (i=0; i<mddev->raid_disks; i++) {
 		mdk_rdev_t *rdev = conf->mirrors[i].rdev;
-		if (rdev && atomic_read(&rdev->nr_pending)) {
+		if (rdev && !rdev->faulty && atomic_read(&rdev->nr_pending)) {
 			request_queue_t *r_queue = bdev_get_queue(rdev->bdev);
 
 			atomic_inc(&rdev->nr_pending);
-			spin_unlock_irqrestore(&conf->device_lock, flags);
+			rcu_read_unlock();
 
 			if (r_queue->unplug_fn)
 				r_queue->unplug_fn(r_queue);
 
-			spin_lock_irqsave(&conf->device_lock, flags);
-			atomic_dec(&rdev->nr_pending);
+			rdev_dec_pending(rdev, mddev);
+			rcu_read_lock();
 		}
 	}
-	spin_unlock_irqrestore(&conf->device_lock, flags);
+	rcu_read_unlock();
 }
+
 static void raid10_unplug(request_queue_t *q)
 {
 	unplug_slaves(q->queuedata);
@@ -609,24 +609,28 @@ static int raid10_issue_flush(request_queue_t *q, struct gendisk *disk,
 {
 	mddev_t *mddev = q->queuedata;
 	conf_t *conf = mddev_to_conf(mddev);
-	unsigned long flags;
 	int i, ret = 0;
 
-	spin_lock_irqsave(&conf->device_lock, flags);
-	for (i=0; i<mddev->raid_disks; i++) {
+	rcu_read_lock();
+	for (i=0; i<mddev->raid_disks && ret == 0; i++) {
 		mdk_rdev_t *rdev = conf->mirrors[i].rdev;
 		if (rdev && !rdev->faulty) {
 			struct block_device *bdev = rdev->bdev;
 			request_queue_t *r_queue = bdev_get_queue(bdev);
 
-			if (r_queue->issue_flush_fn) {
-				ret = r_queue->issue_flush_fn(r_queue, bdev->bd_disk, error_sector);
-				if (ret)
-					break;
+			if (!r_queue->issue_flush_fn)
+				ret = -EOPNOTSUPP;
+			else {
+				atomic_inc(&rdev->nr_pending);
+				rcu_read_unlock();
+				ret = r_queue->issue_flush_fn(r_queue, bdev->bd_disk,
+							      error_sector);
+				rdev_dec_pending(rdev, mddev);
+				rcu_read_lock();
 			}
 		}
 	}
-	spin_unlock_irqrestore(&conf->device_lock, flags);
+	rcu_read_unlock();
 	return ret;
 }
 
@@ -757,7 +761,7 @@ static int make_request(request_queue_t *q, struct bio * bio)
 	 * bios[x] to bio
 	 */
 	raid10_find_phys(conf, r10_bio);
-	spin_lock_irq(&conf->device_lock);
+	rcu_read_lock();
 	for (i = 0;  i < conf->copies; i++) {
 		int d = r10_bio->devs[i].devnum;
 		if (conf->mirrors[d].rdev &&
@@ -767,7 +771,7 @@ static int make_request(request_queue_t *q, struct bio * bio)
 		} else
 			r10_bio->devs[i].bio = NULL;
 	}
-	spin_unlock_irq(&conf->device_lock);
+	rcu_read_unlock();
 
 	atomic_set(&r10_bio->remaining, 1);
 	md_write_start(mddev);
@@ -900,7 +904,6 @@ static int raid10_spare_active(mddev_t *mddev)
 	conf_t *conf = mddev->private;
 	mirror_info_t *tmp;
 
-	spin_lock_irq(&conf->device_lock);
 	/*
 	 * Find all non-in_sync disks within the RAID10 configuration
 	 * and mark them in_sync
@@ -915,7 +918,6 @@ static int raid10_spare_active(mddev_t *mddev)
 			tmp->rdev->in_sync = 1;
 		}
 	}
-	spin_unlock_irq(&conf->device_lock);
 
 	print_conf(conf);
 	return 0;
@@ -934,10 +936,9 @@ static int raid10_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 		 * very different from resync
 		 */
 		return 0;
-	spin_lock_irq(&conf->device_lock);
+
 	for (mirror=0; mirror < mddev->raid_disks; mirror++)
 		if ( !(p=conf->mirrors+mirror)->rdev) {
-			p->rdev = rdev;
 
 			blk_queue_stack_limits(mddev->queue,
 					       rdev->bdev->bd_disk->queue);
@@ -952,9 +953,9 @@ static int raid10_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 			p->head_position = 0;
 			rdev->raid_disk = mirror;
 			found = 1;
+			p->rdev = rdev;
 			break;
 		}
-	spin_unlock_irq(&conf->device_lock);
 
 	print_conf(conf);
 	return found;
@@ -963,24 +964,27 @@ static int raid10_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 static int raid10_remove_disk(mddev_t *mddev, int number)
 {
 	conf_t *conf = mddev->private;
-	int err = 1;
+	int err = 0;
+	mdk_rdev_t *rdev;
 	mirror_info_t *p = conf->mirrors+ number;
 
 	print_conf(conf);
-	spin_lock_irq(&conf->device_lock);
-	if (p->rdev) {
-		if (p->rdev->in_sync ||
-		    atomic_read(&p->rdev->nr_pending)) {
+	rdev = p->rdev;
+	if (rdev) {
+		if (rdev->in_sync ||
+		    atomic_read(&rdev->nr_pending)) {
 			err = -EBUSY;
 			goto abort;
 		}
 		p->rdev = NULL;
-		err = 0;
+		synchronize_kernel();
+		if (atomic_read(&rdev->nr_pending)) {
+			/* lost the race, try later */
+			err = -EBUSY;
+			p->rdev = rdev;
+		}
 	}
-	if (err)
-		MD_BUG();
 abort:
-	spin_unlock_irq(&conf->device_lock);
 
 	print_conf(conf);
 	return err;
@@ -1145,6 +1149,8 @@ static void sync_request_write(mddev_t *mddev, r10bio_t *r10_bio)
 		atomic_inc(&r10_bio->remaining);
 		md_sync_acct(conf->mirrors[d].rdev->bdev, tbio->bi_size >> 9);
 
+		tbio->bi_sector += conf->mirrors[d].rdev->data_offset;
+		tbio->bi_bdev = conf->mirrors[d].rdev->bdev;
 		generic_make_request(tbio);
 	}
 
@@ -1233,8 +1239,8 @@ static void raid10d(mddev_t *mddev)
 			int mirror;
 			bio = r10_bio->devs[r10_bio->read_slot].bio;
 			r10_bio->devs[r10_bio->read_slot].bio = NULL;
+			bio_put(bio);
 			mirror = read_balance(conf, r10_bio);
-			r10_bio->devs[r10_bio->read_slot].bio = bio;
 			if (mirror == -1) {
 				printk(KERN_ALERT "raid10: %s: unrecoverable I/O"
 				       " read error for block %llu\n",
@@ -1248,15 +1254,14 @@ static void raid10d(mddev_t *mddev)
 					       " another mirror\n",
 					       bdevname(rdev->bdev,b),
 					       (unsigned long long)r10_bio->sector);
-				bio->bi_bdev = rdev->bdev;
+				bio = bio_clone(r10_bio->master_bio, GFP_NOIO);
+				r10_bio->devs[r10_bio->read_slot].bio = bio;
 				bio->bi_sector = r10_bio->devs[r10_bio->read_slot].addr
 					+ rdev->data_offset;
-				bio->bi_next = NULL;
-				bio->bi_flags &= (1<<BIO_CLONED);
-				bio->bi_flags |= 1 << BIO_UPTODATE;
-				bio->bi_idx = 0;
-				bio->bi_size = r10_bio->sectors << 9;
+				bio->bi_bdev = rdev->bdev;
 				bio->bi_rw = READ;
+				bio->bi_private = r10_bio;
+				bio->bi_end_io = raid10_end_read_request;
 				unplug = 1;
 				generic_make_request(bio);
 			}
@@ -1358,7 +1363,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 	 * put in a delay to throttle resync.
 	 */
 	if (!go_faster && waitqueue_active(&conf->wait_resume))
-		schedule_timeout(HZ);
+		msleep_interruptible(1000);
 	device_barrier(conf, sector_nr + RESYNC_SECTORS);
 
 	/* Again, very different code for resync and recovery.
@@ -1468,7 +1473,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 		set_bit(R10BIO_IsSync, &r10_bio->state);
 		raid10_find_phys(conf, r10_bio);
 		r10_bio->sectors = (sector_nr | conf->chunk_mask) - sector_nr +1;
-		spin_lock_irq(&conf->device_lock);
+
 		for (i=0; i<conf->copies; i++) {
 			int d = r10_bio->devs[i].devnum;
 			bio = r10_bio->devs[i].bio;
@@ -1488,14 +1493,15 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 			bio->bi_bdev = conf->mirrors[d].rdev->bdev;
 			count++;
 		}
-		spin_unlock_irq(&conf->device_lock);
+
 		if (count < 2) {
 			for (i=0; i<conf->copies; i++) {
 				int d = r10_bio->devs[i].devnum;
 				if (r10_bio->devs[i].bio->bi_end_io)
-					atomic_dec(&conf->mirrors[d].rdev->nr_pending);
+					rdev_dec_pending(conf->mirrors[d].rdev, mddev);
 			}
 			put_buf(r10_bio);
+			biolist = NULL;
 			goto giveup;
 		}
 	}
@@ -1557,7 +1563,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 		}
 	}
 
-	return nr_sectors;
+	return sectors_skipped + nr_sectors;
  giveup:
 	/* There is nowhere to write, so all non-sync
 	 * drives must be failed, so try the next chunk...
@@ -1739,6 +1745,7 @@ static int stop(mddev_t *mddev)
 
 	md_unregister_thread(mddev->thread);
 	mddev->thread = NULL;
+	blk_sync_queue(mddev->queue); /* the unplug fn references 'conf'*/
 	if (conf->r10bio_pool)
 		mempool_destroy(conf->r10bio_pool);
 	if (conf->mirrors)

@@ -47,10 +47,11 @@ warn(const char *fmt, ...)
 	va_end(arglist);
 }
 
-void *do_nofail(void *ptr, const char *expr)
+void *do_nofail(void *ptr, const char *file, int line, const char *expr)
 {
 	if (!ptr) {
-		fatal("Memory allocation failure: %s.\n", expr);
+		fatal("Memory allocation failure %s line %d: %s.\n",
+		      file, line, expr);
 	}
 	return ptr;
 }
@@ -103,6 +104,7 @@ struct symbol {
 	struct module *module;
 	unsigned int crc;
 	int crc_valid;
+	unsigned int weak:1;
 	char name[0];
 };
 
@@ -125,12 +127,13 @@ static inline unsigned int tdb_hash(const char *name)
  * the list of unresolved symbols per module */
 
 struct symbol *
-alloc_symbol(const char *name, struct symbol *next)
+alloc_symbol(const char *name, unsigned int weak, struct symbol *next)
 {
 	struct symbol *s = NOFAIL(malloc(sizeof(*s) + strlen(name) + 1));
 
 	memset(s, 0, sizeof(*s));
 	strcpy(s->name, name);
+	s->weak = weak;
 	s->next = next;
 	return s;
 }
@@ -144,7 +147,7 @@ new_symbol(const char *name, struct module *module, unsigned int *crc)
 	struct symbol *new;
 
 	hash = tdb_hash(name) % SYMBOL_HASH_SIZE;
-	new = symbolhash[hash] = alloc_symbol(name, symbolhash[hash]);
+	new = symbolhash[hash] = alloc_symbol(name, 0, symbolhash[hash]);
 	new->module = module;
 	if (crc) {
 		new->crc = *crc;
@@ -216,7 +219,7 @@ get_next_line(unsigned long *pos, void *file, unsigned long size)
 	static char line[4096];
 	int skip = 1;
 	size_t len = 0;
-	char *p = (char *)file + *pos;
+	signed char *p = (signed char *)file + *pos;
 	char *s = line;
 
 	for (; *pos < size ; (*pos)++)
@@ -348,7 +351,8 @@ handle_modversions(struct module *mod, struct elf_info *info,
 		break;
 	case SHN_UNDEF:
 		/* undefined symbol */
-		if (ELF_ST_BIND(sym->st_info) != STB_GLOBAL)
+		if (ELF_ST_BIND(sym->st_info) != STB_GLOBAL &&
+		    ELF_ST_BIND(sym->st_info) != STB_WEAK)
 			break;
 		/* ignore global offset table */
 		if (strcmp(symname, "_GLOBAL_OFFSET_TABLE_") == 0)
@@ -369,6 +373,7 @@ handle_modversions(struct module *mod, struct elf_info *info,
 			   strlen(MODULE_SYMBOL_PREFIX)) == 0)
 			mod->unres = alloc_symbol(symname +
 						  strlen(MODULE_SYMBOL_PREFIX),
+						  ELF_ST_BIND(sym->st_info) == STB_WEAK,
 						  mod->unres);
 		break;
 	default:
@@ -396,50 +401,6 @@ is_vmlinux(const char *modname)
 		myname = modname;
 
 	return strcmp(myname, "vmlinux") == 0;
-}
-
-static struct {
-	void *file;
-	unsigned long size;
-} supp;
-
-const char *
-supported(struct module *mod)
-{
-	unsigned long pos = 0;
-	char *line;
-
-	/* In a first shot, do a simple linear scan. */
-	while ((line = get_next_line(&pos, supp.file, supp.size))) {
-		const char *basename, *how = "yes";
-		char *l = line;
-
-		/* optional type-of-support flag */
-		for (l = line; *l != '\0'; l++) {
-			if (*l == ' ' || *l == '\t') {
-				*l = '\0';
-				how = l + 1;
-				break;
-			}
-		}
-
-		/* skip directory components */
-		if ((l = strrchr(line, '/')))
-			line = l + 1;
-		/* strip .ko extension */
-		l = line + strlen(line);
-		if (l - line > 3 && !strcmp(l-3, ".ko"))
-			*(l-3) = '\0';
-
-		/* skip directory components */
-		if ((basename = strrchr(mod->name, '/')))
-			basename++;
-		else
-			basename = mod->name;
-		if (!strcmp(basename, line))
-			return how;
-	}
-	return NULL;
 }
 
 /* Parse tag=value strings from .modinfo section */
@@ -519,7 +480,7 @@ read_symbols(char *modname)
 	 * the automatic versioning doesn't pick it up, but it's really
 	 * important anyhow */
 	if (modversions)
-		mod->unres = alloc_symbol("struct_module", mod->unres);
+		mod->unres = alloc_symbol("struct_module", 0, mod->unres);
 }
 
 #define SZ 500
@@ -581,14 +542,6 @@ add_header(struct buffer *b, struct module *mod)
 	buf_printf(b, "};\n");
 }
 
-void
-add_supported_flag(struct buffer *b, struct module *mod)
-{
-	const char *how = supported(mod);
-	if (how)
-		buf_printf(b, "\nMODULE_INFO(supported, \"%s\");\n", how);
-}
-
 /* Record CRCs for unresolved symbols */
 
 void
@@ -599,7 +552,7 @@ add_versions(struct buffer *b, struct module *mod)
 	for (s = mod->unres; s; s = s->next) {
 		exp = find_symbol(s->name);
 		if (!exp || exp->module == mod) {
-			if (have_vmlinux)
+			if (have_vmlinux && !s->weak)
 				fprintf(stderr, "*** Warning: \"%s\" [%s.ko] "
 				"undefined!\n",	s->name, mod->name);
 			continue;
@@ -720,14 +673,6 @@ write_if_changed(struct buffer *b, const char *fname)
 }
 
 void
-read_supported(const char *fname)
-{
-	supp.file = grab_file(fname, &supp.size);
-	if (!supp.file)
-		; /* ignore error */
-}
-
-void
 read_dump(const char *fname)
 {
 	unsigned long size, pos = 0;
@@ -801,10 +746,9 @@ main(int argc, char **argv)
 	struct buffer buf = { };
 	char fname[SZ];
 	char *dump_read = NULL, *dump_write = NULL;
-	char *supp = NULL;
 	int opt;
 
-	while ((opt = getopt(argc, argv, "i:mo:s:a")) != -1) {
+	while ((opt = getopt(argc, argv, "i:mo:a")) != -1) {
 		switch(opt) {
 			case 'i':
 				dump_read = optarg;
@@ -815,9 +759,6 @@ main(int argc, char **argv)
 			case 'o':
 				dump_write = optarg;
 				break;
-			case 's':
-				supp = optarg;
-				break;
 			case 'a':
 				all_versions = 1;
 				break;
@@ -825,9 +766,6 @@ main(int argc, char **argv)
 				exit(1);
 		}
 	}
-
-	if (supp)
-		read_supported(supp);
 
 	if (dump_read)
 		read_dump(dump_read);
@@ -843,7 +781,6 @@ main(int argc, char **argv)
 		buf.pos = 0;
 
 		add_header(&buf, mod);
-		add_supported_flag(&buf, mod);
 		add_versions(&buf, mod);
 		add_depends(&buf, mod, modules);
 		add_moddevtable(&buf, mod);

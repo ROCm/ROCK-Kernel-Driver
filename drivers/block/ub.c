@@ -8,13 +8,11 @@
  * and is not licensed separately. See file COPYING for details.
  *
  * TODO (sorted by decreasing priority)
- *  -- ZIP does "ub: resid 18 len 0 act 0" and whole transport quits (toggles?)
+ *  -- Do resets with usb_device_reset (needs a thread context, use khubd)
  *  -- set readonly flag for CDs, set removable flag for CF readers
  *  -- do inquiry and verify we got a disk and not a tape (for LUN mismatch)
  *  -- support pphaneuf's SDDR-75 with two LUNs (also broken capacity...)
  *  -- special case some senses, e.g. 3a/0 -> no media present, reduce retries
- *  -- do something about spin-down devices, they are extremely dangerous
- *     (ZIP is one. Needs spin-up command as well.)
  *  -- verify the 13 conditions and do bulk resets
  *  -- normal pool of commands instead of cmdv[]?
  *  -- kill last_pipe and simply do two-state clearing on both pipes
@@ -25,6 +23,7 @@
  *  -- prune comments, they are too volumnous
  *  -- Exterminate P3 printks
  *  -- Resove XXX's
+ *  -- Redo "benh's retries", perhaps have spin-up code to handle them. V:D=?
  */
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -37,7 +36,7 @@
 #define DRV_NAME "ub"
 #define DEVFS_NAME DRV_NAME
 
-#define UB_MAJOR 125	/* Stolen from Experimental range for a week - XXX */
+#define UB_MAJOR 180
 
 /*
  * Definitions which have to be scattered once we understand the layout better.
@@ -62,9 +61,9 @@
 
 /* command block wrapper */
 struct bulk_cb_wrap {
-	u32	Signature;		/* contains 'USBC' */
+	__le32	Signature;		/* contains 'USBC' */
 	u32	Tag;			/* unique per command id */
-	u32	DataTransferLength;	/* size of data */
+	__le32	DataTransferLength;	/* size of data */
 	u8	Flags;			/* direction in bit 0 */
 	u8	Lun;			/* LUN normally 0 */
 	u8	Length;			/* of of the CDB */
@@ -78,9 +77,9 @@ struct bulk_cb_wrap {
 
 /* command status wrapper */
 struct bulk_cs_wrap {
-	u32	Signature;		/* should = 'USBS' */
+	__le32	Signature;		/* should = 'USBS' */
 	u32	Tag;			/* same as original command */
-	u32	Residue;		/* amount not transferred */
+	__le32	Residue;		/* amount not transferred */
 	u8	Status;			/* see below */
 };
 
@@ -104,13 +103,11 @@ struct ub_dev;
 #define UB_MAX_SECTORS 64
 
 /*
- * A second ought to be enough for a 32K transfer (UB_MAX_SECTORS)
- * even if a webcam hogs the bus (famous last words).
- * Some CDs need a second to spin up though.
- * ZIP drive rejects commands when it's not spinning,
- * so it does not need long timeouts either.
+ * A second is more than enough for a 32K transfer (UB_MAX_SECTORS)
+ * even if a webcam hogs the bus, but some devices need time to spin up.
  */
 #define UB_URB_TIMEOUT	(HZ*2)
+#define UB_DATA_TIMEOUT	(HZ*5)	/* ZIP does spin-ups in the data phase */
 #define UB_CTRL_TIMEOUT	(HZ/2) /* 500ms ought to be enough to clear a stall */
 
 /*
@@ -157,7 +154,8 @@ struct ub_scsi_cmd {
 	struct ub_scsi_cmd *next;
 
 	int error;			/* Return code - valid upon done */
-	int act_len;			/* Return size */
+	unsigned int act_len;		/* Return size */
+	unsigned char key, asc, ascq;	/* May be valid if error==-EIO */
 
 	int stat_count;			/* Retries getting status. */
 
@@ -186,7 +184,7 @@ struct ub_capacity {
  */
 
 #define SCMD_ST_HIST_SZ   8
-#define SCMD_TRACE_SZ    15	/* No more than 256 (trace_index) */
+#define SCMD_TRACE_SZ    63		/* Less than 4KB of 61-byte lines */
 
 struct ub_scsi_cmd_trace {
 	int hcur;
@@ -265,6 +263,7 @@ struct ub_dev {
 	int changed;			/* Media was changed */
 	int removable;
 	int readonly;
+	int first_open;			/* Kludge. See ub_bd_open. */
 	char name[8];
 	struct usb_device *dev;
 	struct usb_interface *intf;
@@ -490,6 +489,18 @@ static void ub_id_put(int id)
  */
 static void ub_cleanup(struct ub_dev *sc)
 {
+
+	/*
+	 * If we zero disk->private_data BEFORE put_disk, we have to check
+	 * for NULL all over the place in open, release, check_media and
+	 * revalidate, because the block level semaphore is well inside the
+	 * put_disk. But we cannot zero after the call, because *disk is gone.
+	 * The sd.c is blatantly racy in this area.
+	 */
+	/* disk->private_data = NULL; */
+	put_disk(sc->disk);
+	sc->disk = NULL;
+
 	ub_id_put(sc->id);
 	kfree(sc);
 }
@@ -661,9 +672,12 @@ static inline int ub_bd_rq_fn_1(request_queue_t *q)
 
 	/*
 	 * build the command
+	 *
+	 * The call to blk_queue_hardsect_size() guarantees that request
+	 * is aligned, but it is given in terms of 512 byte units, always.
 	 */
-	block = rq->sector;
-	nblks = rq->nr_sectors;
+	block = rq->sector >> sc->capacity.bshift;
+	nblks = rq->nr_sectors >> sc->capacity.bshift;
 
 	memset(cmd, 0, sizeof(struct ub_scsi_cmd));
 	cmd->cdb[0] = (ub_dir == UB_DIR_READ)? READ_10: WRITE_10;
@@ -678,7 +692,7 @@ static inline int ub_bd_rq_fn_1(request_queue_t *q)
 	cmd->dir = ub_dir;
 	cmd->state = UB_CMDST_INIT;
 	cmd->data = rq->buffer;
-	cmd->len = nblks * 512;
+	cmd->len = rq->nr_sectors * 512;
 	cmd->done = ub_rw_cmd_done;
 	cmd->back = rq;
 
@@ -786,16 +800,15 @@ static int ub_scsi_cmd_start(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 	sc->work_urb.error_count = 0;
 	sc->work_urb.status = 0;
 
-	sc->work_timer.expires = jiffies + UB_URB_TIMEOUT;
-	add_timer(&sc->work_timer);
-
 	if ((rc = usb_submit_urb(&sc->work_urb, GFP_ATOMIC)) != 0) {
 		/* XXX Clear stalls */
 		printk("ub: cmd #%d start failed (%d)\n", cmd->tag, rc); /* P3 */
-		del_timer(&sc->work_timer);
 		ub_complete(&sc->work_done);
 		return rc;
 	}
+
+	sc->work_timer.expires = jiffies + UB_URB_TIMEOUT;
+	add_timer(&sc->work_timer);
 
 	cmd->state = UB_CMDST_CMD;
 	ub_cmdtr_state(sc, cmd);
@@ -836,6 +849,7 @@ static void ub_scsi_action(unsigned long _dev)
 	unsigned long flags;
 
 	spin_lock_irqsave(&sc->lock, flags);
+	del_timer(&sc->work_timer);
 	ub_scsi_dispatch(sc);
 	spin_unlock_irqrestore(&sc->lock, flags);
 }
@@ -870,9 +884,6 @@ static void ub_scsi_urb_compl(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 	struct bulk_cs_wrap *bcs;
 	int pipe;
 	int rc;
-
-/* P3 */ /** printk("ub: urb status %d pipe 0x%08x len %d act %d\n",
- urb->status, urb->pipe, urb->transfer_buffer_length, urb->actual_length); **/
 
 	if (atomic_read(&sc->poison)) {
 		/* A little too simplistic, I feel... */
@@ -942,9 +953,12 @@ static void ub_scsi_urb_compl(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 			ub_cmdtr_state(sc, cmd);
 			return;
 		}
-		if (urb->status != 0)
+		if (urb->status != 0) {
+			printk("ub: cmd #%d cmd status (%d)\n", cmd->tag, urb->status); /* P3 */
 			goto Bad_End;
+		}
 		if (urb->actual_length != US_BULK_CB_WRAP_LEN) {
+			printk("ub: cmd #%d xferred %d\n", cmd->tag, urb->actual_length); /* P3 */
 			/* XXX Must do reset here to unconfuse the device */
 			goto Bad_End;
 		}
@@ -968,17 +982,16 @@ static void ub_scsi_urb_compl(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 		sc->work_urb.error_count = 0;
 		sc->work_urb.status = 0;
 
-		sc->work_timer.expires = jiffies + UB_URB_TIMEOUT;
-		add_timer(&sc->work_timer);
-
 		if ((rc = usb_submit_urb(&sc->work_urb, GFP_ATOMIC)) != 0) {
 			/* XXX Clear stalls */
 			printk("ub: data #%d submit failed (%d)\n", cmd->tag, rc); /* P3 */
-			del_timer(&sc->work_timer);
 			ub_complete(&sc->work_done);
 			ub_state_done(sc, cmd, rc);
 			return;
 		}
+
+		sc->work_timer.expires = jiffies + UB_DATA_TIMEOUT;
+		add_timer(&sc->work_timer);
 
 		cmd->state = UB_CMDST_DATA;
 		ub_cmdtr_state(sc, cmd);
@@ -1063,19 +1076,18 @@ static void ub_scsi_urb_compl(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 			sc->work_urb.error_count = 0;
 			sc->work_urb.status = 0;
 
-			sc->work_timer.expires = jiffies + UB_URB_TIMEOUT;
-			add_timer(&sc->work_timer);
-
 			rc = usb_submit_urb(&sc->work_urb, GFP_ATOMIC);
 			if (rc != 0) {
 				/* XXX Clear stalls */
 				printk("%s: CSW #%d submit failed (%d)\n",
 				   sc->name, cmd->tag, rc); /* P3 */
-				del_timer(&sc->work_timer);
 				ub_complete(&sc->work_done);
 				ub_state_done(sc, cmd, rc);
 				return;
 			}
+
+			sc->work_timer.expires = jiffies + UB_URB_TIMEOUT;
+			add_timer(&sc->work_timer);
 			return;
 		}
 
@@ -1132,16 +1144,8 @@ static void ub_scsi_urb_compl(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 		(*cmd->done)(sc, cmd);
 
 	} else if (cmd->state == UB_CMDST_SENSE) {
-		/* 
-		 * We do not look at sense, because even if there was no sense,
-		 * we get into UB_CMDST_SENSE from a STALL or CSW FAIL only.
-		 * We request sense because we want to clear CHECK CONDITION
-		 * on devices with delusions of SCSI, and not because we
-		 * are curious in any way about the sense itself.
-		 */
-		/* if ((cmd->top_sense[2] & 0x0F) == NO_SENSE) { foo } */
-
 		ub_state_done(sc, cmd, -EIO);
+
 	} else {
 		printk(KERN_WARNING "%s: "
 		    "wrong command state %d on device %u\n",
@@ -1186,17 +1190,16 @@ static void ub_state_stat(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 	sc->work_urb.error_count = 0;
 	sc->work_urb.status = 0;
 
-	sc->work_timer.expires = jiffies + UB_URB_TIMEOUT;
-	add_timer(&sc->work_timer);
-
 	if ((rc = usb_submit_urb(&sc->work_urb, GFP_ATOMIC)) != 0) {
 		/* XXX Clear stalls */
 		printk("ub: CSW #%d submit failed (%d)\n", cmd->tag, rc); /* P3 */
-		del_timer(&sc->work_timer);
 		ub_complete(&sc->work_done);
 		ub_state_done(sc, cmd, rc);
 		return;
 	}
+
+	sc->work_timer.expires = jiffies + UB_URB_TIMEOUT;
+	add_timer(&sc->work_timer);
 
 	cmd->stat_count = 0;
 	cmd->state = UB_CMDST_STAT;
@@ -1217,9 +1220,17 @@ static void ub_state_sense(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 		goto error;
 	}
 
+	/*
+	 * ``If the allocation length is eighteen or greater, and a device
+	 * server returns less than eithteen bytes of data, the application
+	 * client should assume that the bytes not transferred would have been
+	 * zeroes had the device server returned those bytes.''
+	 */
 	memset(&sc->top_sense, 0, UB_SENSE_SIZE);
+
 	scmd = &sc->top_rqs_cmd;
 	scmd->cdb[0] = REQUEST_SENSE;
+	scmd->cdb[4] = UB_SENSE_SIZE;
 	scmd->cdb_len = 6;
 	scmd->dir = UB_DIR_READ;
 	scmd->state = UB_CMDST_INIT;
@@ -1271,14 +1282,13 @@ static int ub_submit_clear_stall(struct ub_dev *sc, struct ub_scsi_cmd *cmd,
 	sc->work_urb.error_count = 0;
 	sc->work_urb.status = 0;
 
-	sc->work_timer.expires = jiffies + UB_CTRL_TIMEOUT;
-	add_timer(&sc->work_timer);
-
 	if ((rc = usb_submit_urb(&sc->work_urb, GFP_ATOMIC)) != 0) {
-		del_timer(&sc->work_timer);
 		ub_complete(&sc->work_done);
 		return rc;
 	}
+
+	sc->work_timer.expires = jiffies + UB_CTRL_TIMEOUT;
+	add_timer(&sc->work_timer);
 	return 0;
 }
 
@@ -1289,8 +1299,15 @@ static void ub_top_sense_done(struct ub_dev *sc, struct ub_scsi_cmd *scmd)
 	unsigned char *sense = scmd->data;
 	struct ub_scsi_cmd *cmd;
 
+	/*
+	 * Ignoring scmd->act_len, because the buffer was pre-zeroed.
+	 */
 	ub_cmdtr_sense(sc, scmd, sense);
 
+	/*
+	 * Find the command which triggered the unit attention or a check,
+	 * save the sense into it, and advance its state machine.
+	 */
 	if ((cmd = ub_cmdq_peek(sc)) == NULL) {
 		printk(KERN_WARNING "%s: sense done while idle\n", sc->name);
 		return;
@@ -1307,6 +1324,10 @@ static void ub_top_sense_done(struct ub_dev *sc, struct ub_scsi_cmd *scmd)
 		    sc->name, cmd->state, sc->dev->devnum);
 		return;
 	}
+
+	cmd->key = sense[2] & 0x0F;
+	cmd->asc = sense[12];
+	cmd->ascq = sense[13];
 
 	ub_scsi_urb_compl(sc, cmd);
 }
@@ -1355,12 +1376,7 @@ static void ub_revalidate(struct ub_dev *sc)
 
 	sc->readonly = 0;	/* XXX Query this from the device */
 
-	/*
-	 * XXX sd.c sets capacity to zero in such case. However, it doesn't
-	 * work for us. In case of zero capacity, block layer refuses to
-	 * have the /dev/uba opened (why?) Set capacity to some random value.
-	 */
-	sc->capacity.nsec = 50;
+	sc->capacity.nsec = 0;
 	sc->capacity.bsize = 512;
 	sc->capacity.bshift = 0;
 
@@ -1375,7 +1391,7 @@ static void ub_revalidate(struct ub_dev *sc)
 		 * We keep this because sd.c has retries for capacity.
 		 */
 		if (ub_sync_read_cap(sc, &sc->capacity) != 0) {
-			sc->capacity.nsec = 100;
+			sc->capacity.nsec = 0;
 			sc->capacity.bsize = 512;
 			sc->capacity.bshift = 0;
 		}
@@ -1404,10 +1420,38 @@ static int ub_bd_open(struct inode *inode, struct file *filp)
 	sc->openc++;
 	spin_unlock_irqrestore(&ub_lock, flags);
 
+	/*
+	 * This is a workaround for a specific problem in our block layer.
+	 * In 2.6.9, register_disk duplicates the code from rescan_partitions.
+	 * However, if we do add_disk with a device which persistently reports
+	 * a changed media, add_disk calls register_disk, which does do_open,
+	 * which will call rescan_paritions for changed media. After that,
+	 * register_disk attempts to do it all again and causes double kobject
+	 * registration and a eventually an oops on module removal.
+	 *
+	 * The bottom line is, Al Viro says that we should not allow
+	 * bdev->bd_invalidated to be set when doing add_disk no matter what.
+	 */
+	if (sc->first_open) {
+		if (sc->changed) {
+			sc->first_open = 0;
+			rc = -ENOMEDIUM;
+			goto err_open;
+		}
+	}
+
 	if (sc->removable || sc->readonly)
 		check_disk_change(inode->i_bdev);
 
-	/* XXX sd.c and floppy.c bail on open if media is not present. */
+	/*
+	 * The sd.c considers ->media_present and ->changed not equivalent,
+	 * under some pretty murky conditions (a failure of READ CAPACITY).
+	 * We may need it one day.
+	 */
+	if (sc->removable && sc->changed && !(filp->f_flags & O_NDELAY)) {
+		rc = -ENOMEDIUM;
+		goto err_open;
+	}
 
 	if (sc->readonly && (filp->f_mode & FMODE_WRITE)) {
 		rc = -EROFS;
@@ -1435,6 +1479,8 @@ static int ub_bd_release(struct inode *inode, struct file *filp)
 
 	spin_lock_irqsave(&ub_lock, flags);
 	--sc->openc;
+	if (sc->openc == 0)
+		sc->first_open = 0;
 	if (sc->openc == 0 && atomic_read(&sc->poison))
 		ub_cleanup(sc);
 	spin_unlock_irqrestore(&ub_lock, flags);
@@ -1489,11 +1535,17 @@ static int ub_bd_revalidate(struct gendisk *disk)
 
 	ub_revalidate(sc);
 	/* This is pretty much a long term P3 */
-	printk(KERN_INFO "%s: device %u capacity nsec %ld bsize %u\n",
-	    sc->name, sc->dev->devnum, sc->capacity.nsec, sc->capacity.bsize);
+	if (!atomic_read(&sc->poison)) {		/* Cover sc->dev */
+		printk(KERN_INFO "%s: device %u capacity nsec %ld bsize %u\n",
+		    sc->name, sc->dev->devnum,
+		    sc->capacity.nsec, sc->capacity.bsize);
+	}
 
+	/* XXX Support sector size switching like in sr.c */
+	blk_queue_hardsect_size(disk->queue, sc->capacity.bsize);
 	set_capacity(disk, sc->capacity.nsec);
 	// set_disk_ro(sdkp->disk, sc->readonly);
+
 	return 0;
 }
 
@@ -1524,13 +1576,9 @@ static int ub_bd_media_changed(struct gendisk *disk)
 	 */
 	if (ub_sync_tur(sc) != 0) {
 		sc->changed = 1;
-		/* P3 */ printk("%s: made changed\n", sc->name);
 		return 1;
 	}
 
-	/* The sd.c clears this before returning (one-shot flag). Why? */
-	/* P3 */ printk("%s: %s changed\n", sc->name,
-	    sc->changed? "is": "was not");
 	return sc->changed;
 }
 
@@ -1591,6 +1639,9 @@ static int ub_sync_tur(struct ub_dev *sc)
 	wait_for_completion(&compl);
 
 	rc = cmd->error;
+
+	if (rc == -EIO && cmd->key != 0)	/* Retries for benh's key */
+		rc = cmd->key;
 
 err_submit:
 	kfree(cmd);
@@ -1654,8 +1705,8 @@ static int ub_sync_read_cap(struct ub_dev *sc, struct ub_capacity *ret)
 	}
 
 	/* sd.c special-cases sector size of 0 to mean 512. Needed? Safe? */
-	nsec = be32_to_cpu(*(u32 *)p) + 1;
-	bsize = be32_to_cpu(*(u32 *)(p + 4));
+	nsec = be32_to_cpu(*(__be32 *)p) + 1;
+	bsize = be32_to_cpu(*(__be32 *)(p + 4));
 	switch (bsize) {
 	case 512:	shift = 0;	break;
 	case 1024:	shift = 1;	break;
@@ -1725,28 +1776,22 @@ static int ub_probe_clear_stall(struct ub_dev *sc, int stalled_pipe)
 	sc->work_urb.error_count = 0;
 	sc->work_urb.status = 0;
 
+	if ((rc = usb_submit_urb(&sc->work_urb, GFP_KERNEL)) != 0) {
+		printk(KERN_WARNING
+		     "%s: Unable to submit a probe clear (%d)\n", sc->name, rc);
+		return rc;
+	}
+
 	init_timer(&timer);
 	timer.function = ub_probe_timeout;
 	timer.data = (unsigned long) &compl;
 	timer.expires = jiffies + UB_CTRL_TIMEOUT;
 	add_timer(&timer);
 
-	if ((rc = usb_submit_urb(&sc->work_urb, GFP_KERNEL)) != 0) {
-		printk(KERN_WARNING
-		     "%s: Unable to submit a probe clear (%d)\n", sc->name, rc);
-		del_timer_sync(&timer);
-		return rc;
-	}
-
 	wait_for_completion(&compl);
 
 	del_timer_sync(&timer);
-	/*
-	 * Most of the time, URB was done and dev set to NULL, and so
-	 * the unlink bounces out with ENODEV. We do not call usb_kill_urb
-	 * because we still think about a backport to 2.4.
-	 */
-	usb_unlink_urb(&sc->work_urb);
+	usb_kill_urb(&sc->work_urb);
 
 	/* reset the endpoint toggle */
 	usb_settoggle(sc->dev, endp, usb_pipeout(sc->last_pipe), 0);
@@ -1813,6 +1858,7 @@ static int ub_probe(struct usb_interface *intf,
 	request_queue_t *q;
 	struct gendisk *disk;
 	int rc;
+	int i;
 
 	rc = -ENOMEM;
 	if ((sc = kmalloc(sizeof(struct ub_dev), GFP_KERNEL)) == NULL)
@@ -1879,9 +1925,15 @@ static int ub_probe(struct usb_interface *intf,
 	 * has to succeed, so we clear checks with an additional one here.
 	 * In any case it's not our business how revaliadation is implemented.
 	 */
-	ub_sync_tur(sc);
+	for (i = 0; i < 3; i++) {	/* Retries for benh's key */
+		if ((rc = ub_sync_tur(sc)) <= 0) break;
+		if (rc != 0x6) break;
+		msleep(10);
+	}
 
 	sc->removable = 1;		/* XXX Query this from the device */
+	sc->changed = 1;		/* ub_revalidate clears only */
+	sc->first_open = 1;
 
 	ub_revalidate(sc);
 	/* This is pretty much a long term P3 */
@@ -1915,7 +1967,7 @@ static int ub_probe(struct usb_interface *intf,
 	blk_queue_max_phys_segments(q, UB_MAX_REQ_SG);
 	// blk_queue_segment_boundary(q, CARM_SG_BOUNDARY);
 	blk_queue_max_sectors(q, UB_MAX_SECTORS);
-	// blk_queue_hardsect_size(q, xxxxx);
+	blk_queue_hardsect_size(q, sc->capacity.bsize);
 
 	/*
 	 * This is a serious infraction, caused by a deficiency in the
@@ -2006,17 +2058,6 @@ static void ub_disconnect(struct usb_interface *intf)
 		blk_cleanup_queue(q);
 
 	/*
-	 * If we zero disk->private_data BEFORE put_disk, we have to check
-	 * for NULL all over the place in open, release, check_media and
-	 * revalidate, because the block level semaphore is well inside the
-	 * put_disk. But we cannot zero after the call, because *disk is gone.
-	 * The sd.c is blatantly racy in this area.
-	 */
-	/* disk->private_data = NULL; */
-	put_disk(disk);
-	sc->disk = NULL;
-
-	/*
 	 * We really expect blk_cleanup_queue() to wait, so no amount
 	 * of paranoya is too much.
 	 *
@@ -2033,6 +2074,13 @@ static void ub_disconnect(struct usb_interface *intf)
 		    "URB is active after disconnect\n", sc->name);
 	}
 	spin_unlock_irqrestore(&sc->lock, flags);
+
+	/*
+	 * There is virtually no chance that other CPU runs times so long
+	 * after ub_urb_complete should have called del_timer, but only if HCD
+	 * didn't forget to deliver a callback on unlink.
+	 */
+	del_timer_sync(&sc->work_timer);
 
 	/*
 	 * At this point there must be no commands coming from anyone

@@ -145,14 +145,11 @@ static struct { const char name[8]; uint mode; uint bpp; } palette2fmt[] = {
 static
 void __init handle_chipset(void)
 {
-	struct pci_dev *dev = NULL;
-
 	/* Just in case some nut set this to something dangerous */
 	if (triton1)
 		triton1 = ZORAN_VDC_TRICOM;
 
-	while ((dev = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82437, dev)))
-	{
+	if (pci_pci_problems & PCIPCI_TRITON) {
 		printk(KERN_INFO "zoran: Host bridge 82437FX Triton PIIX\n");
 		triton1 = ZORAN_VDC_TRICOM;
 	}
@@ -819,8 +816,7 @@ void zoran_close(struct video_device* dev)
          *      be sure its safe to free the buffer. We wait 5-6 fields
          *      which is more than sufficient to be sure.
          */
-        current->state = TASK_UNINTERRUPTIBLE;
-        schedule_timeout(HZ/10);        /* Wait 1/10th of a second */
+        msleep(100);			/* Wait 1/10th of a second */
 
 	/* free the allocated framebuffer */
 	if (ztv->fbuffer)
@@ -1475,8 +1471,8 @@ int zoran_mmap(struct vm_area_struct *vma, struct video_device* dev, const char*
 	/* start mapping the whole shabang to user memory */
 	pos = (unsigned long)ztv->fbuffer;
 	while (size>0) {
-		unsigned long page = virt_to_phys((void*)pos);
-		if (remap_page_range(vma, start, page, PAGE_SIZE, PAGE_SHARED))
+		unsigned long pfn = virt_to_phys((void*)pos) >> PAGE_SHIFT;
+		if (remap_pfn_range(vma, start, pfn, PAGE_SIZE, PAGE_SHARED))
 			return -EAGAIN;
 		start += PAGE_SIZE;
 		pos += PAGE_SIZE;
@@ -1568,8 +1564,7 @@ void vbi_close(struct video_device *dev)
          *      be sure its safe to free the buffer. We wait 5-6 fields
          *      which is more than sufficient to be sure.
          */
-        current->state = TASK_UNINTERRUPTIBLE;
-        schedule_timeout(HZ/10);        /* Wait 1/10th of a second */
+        msleep(100);			/* Wait 1/10th of a second */
 
 	for (item=ztv->readinfo; item!=ztv->readinfo+ZORAN_VBI_BUFFERS; item++)
 	{

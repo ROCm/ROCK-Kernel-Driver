@@ -104,7 +104,7 @@ struct btaudio {
 	struct pci_dev *pci;
 	unsigned int   irq;
 	unsigned long  mem;
-	unsigned long  *mmio;
+	unsigned long  __iomem *mmio;
 
 	/* locking */
 	int            users;

@@ -111,7 +111,7 @@ typedef struct port_s {
 
 
 typedef struct card_s {
-	u8 *winbase;		/* ISA window base address */
+	u8 __iomem *winbase;		/* ISA window base address */
 	u32 phy_winbase;	/* ISA physical base address */
 	u32 ram_size;		/* number of bytes */
 	u16 io;			/* IO Base address */

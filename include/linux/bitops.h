@@ -42,7 +42,7 @@ static inline int generic_ffs(int x)
  * fls: find last bit set.
  */
 
-extern __inline__ int generic_fls(int x)
+static __inline__ int generic_fls(int x)
 {
 	int r = 32;
 
@@ -71,7 +71,7 @@ extern __inline__ int generic_fls(int x)
 	return r;
 }
 
-extern __inline__ int get_bitmask_order(unsigned int count)
+static __inline__ int get_bitmask_order(unsigned int count)
 {
 	int order;
 	

@@ -60,12 +60,12 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/bitops.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/oplib.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/kdebug.h>
 #include <asm/sbus.h>
 #include <asm/uaccess.h>
@@ -1531,8 +1531,7 @@ static void aurora_close(struct tty_struct * tty, struct file * filp)
 	aurora_shutdown_port(bp, port);
 	if (tty->driver->flush_buffer)
 		tty->driver->flush_buffer(tty);
-	if (tty->ldisc.flush_buffer)
-		tty->ldisc.flush_buffer(tty);
+	tty_ldisc_flush(tty);
 	tty->closing = 0;
 	port->event = 0;
 	port->tty = 0;
@@ -1551,7 +1550,7 @@ static void aurora_close(struct tty_struct * tty, struct file * filp)
 #endif
 }
 
-static int aurora_write(struct tty_struct * tty, int from_user, 
+static int aurora_write(struct tty_struct * tty, 
 			const unsigned char *buf, int count)
 {
 	struct Aurora_port *port = (struct Aurora_port *) tty->driver_data;
@@ -1574,51 +1573,22 @@ static int aurora_write(struct tty_struct * tty, int from_user,
 		return 0;
 
 	save_flags(flags);
-	if (from_user) {
-		down(&tmp_buf_sem);
-		while (1) {
-			c = MIN(count, MIN(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
-					   SERIAL_XMIT_SIZE - port->xmit_head));
-			if (c <= 0)
-				break;
-
-			c -= copy_from_user(tmp_buf, buf, c);
-			if (!c) {
-				if (!total)
-					total = -EFAULT;
-				break;
-			}
-			cli();
-			c = MIN(c, MIN(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
-				       SERIAL_XMIT_SIZE - port->xmit_head));
-			memcpy(port->xmit_buf + port->xmit_head, tmp_buf, c);
-			port->xmit_head = (port->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
-			port->xmit_cnt += c;
+	while (1) {
+		cli();
+		c = MIN(count, MIN(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
+				   SERIAL_XMIT_SIZE - port->xmit_head));
+		if (c <= 0) {
 			restore_flags(flags);
-
-			buf += c;
-			count -= c;
-			total += c;
+			break;
 		}
-		up(&tmp_buf_sem);
-	} else {
-		while (1) {
-			cli();
-			c = MIN(count, MIN(SERIAL_XMIT_SIZE - port->xmit_cnt - 1,
-					   SERIAL_XMIT_SIZE - port->xmit_head));
-			if (c <= 0) {
-				restore_flags(flags);
-				break;
-			}
-			memcpy(port->xmit_buf + port->xmit_head, buf, c);
-			port->xmit_head = (port->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
-			port->xmit_cnt += c;
-			restore_flags(flags);
+		memcpy(port->xmit_buf + port->xmit_head, buf, c);
+		port->xmit_head = (port->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
+		port->xmit_cnt += c;
+		restore_flags(flags);
 
-			buf += c;
-			count -= c;
-			total += c;
-		}
+		buf += c;
+		count -= c;
+		total += c;
 	}
 
 	cli();
@@ -1743,10 +1713,7 @@ static void aurora_flush_buffer(struct tty_struct *tty)
 	port->xmit_cnt = port->xmit_head = port->xmit_tail = 0;
 	restore_flags(flags);
 	
-	wake_up_interruptible(&tty->write_wait);
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
+	tty_wakeup(tty);
 #ifdef AURORA_DEBUG
 	printk("aurora_flush_buffer: end\n");
 #endif
@@ -2223,10 +2190,7 @@ static void do_softint(void *private_)
 		return;
 
 	if (test_and_clear_bit(RS_EVENT_WRITE_WAKEUP, &port->event)) {
-		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-		    tty->ldisc.write_wakeup)
-			(tty->ldisc.write_wakeup)(tty);
-		wake_up_interruptible(&tty->write_wait);
+		tty_wakeup(tty);
 	}
 #ifdef AURORA_DEBUG
 	printk("do_softint: end\n");
@@ -2375,10 +2339,10 @@ int irq  = 0;
 int irq1 = 0;
 int irq2 = 0;
 int irq3 = 0;
-MODULE_PARM(irq , "i");
-MODULE_PARM(irq1, "i");
-MODULE_PARM(irq2, "i");
-MODULE_PARM(irq3, "i");
+module_param(irq , int, 0);
+module_param(irq1, int, 0);
+module_param(irq2, int, 0);
+module_param(irq3, int, 0);
 
 static int __init aurora_init(void) 
 {

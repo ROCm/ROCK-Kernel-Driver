@@ -28,7 +28,7 @@
 #include <linux/a.out.h>
 #include <linux/interrupt.h>
 #include <linux/config.h>
-#include <linux/version.h>
+#include <linux/utsname.h>
 #include <linux/delay.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
@@ -56,6 +56,9 @@
 asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
 
 int hlt_counter;
+
+unsigned long boot_option_idle_override = 0;
+EXPORT_SYMBOL(boot_option_idle_override);
 
 /*
  * Return saved PC of a blocked thread.
@@ -96,6 +99,8 @@ void default_idle(void)
 			safe_halt();
 		else
 			local_irq_enable();
+	} else {
+		cpu_relax();
 	}
 }
 
@@ -142,13 +147,21 @@ void cpu_idle (void)
 	/* endless idle loop with no priority at all */
 	while (1) {
 		while (!need_resched()) {
-			void (*idle)(void) = pm_idle;
+			void (*idle)(void);
+			/*
+			 * Mark this as an RCU critical section so that
+			 * synchronize_kernel() in the unload path waits
+			 * for our completion.
+			 */
+			rcu_read_lock();
+			idle = pm_idle;
 
 			if (!idle)
 				idle = default_idle;
 
 			irq_stat[smp_processor_id()].idle_timestamp = jiffies;
 			idle();
+			rcu_read_unlock();
 		}
 		schedule();
 	}
@@ -206,6 +219,7 @@ static int __init idle_setup (char *str)
 		pm_idle = default_idle;
 	}
 
+	boot_option_idle_override = 1;
 	return 1;
 }
 
@@ -222,8 +236,8 @@ void show_regs(struct pt_regs * regs)
 
 	if (regs->xcs & 3)
 		printk(" ESP: %04x:%08lx",0xffff & regs->xss,regs->esp);
-	printk(" EFLAGS: %08lx    %s  (%s %s)\n",regs->eflags, print_tainted(),
-		UTS_RELEASE, OOPS_TIMESTAMP);
+	printk(" EFLAGS: %08lx    %s  (%s)\n",
+	       regs->eflags, print_tainted(), system_utsname.release);
 	printk("EAX: %08lx EBX: %08lx ECX: %08lx EDX: %08lx\n",
 		regs->eax,regs->ebx,regs->ecx,regs->edx);
 	printk("ESI: %08lx EDI: %08lx EBP: %08lx",
@@ -302,8 +316,11 @@ void exit_thread(void)
 		/*
 		 * Careful, clear this in the TSS too:
 		 */
-		memset(tss->io_bitmap, 0xff, t->io_bitmap_max);
+		memset(tss->io_bitmap, 0xff, tss->io_bitmap_max);
 		t->io_bitmap_max = 0;
+		tss->io_bitmap_owner = NULL;
+		tss->io_bitmap_max = 0;
+		tss->io_bitmap_base = INVALID_IO_BITMAP_OFFSET;
 		put_cpu();
 	}
 }
@@ -334,7 +351,7 @@ void release_thread(struct task_struct *dead_task)
 		}
 	}
 
-	release_x86_irqs(dead_task);
+	release_vm86_irqs(dead_task);
 }
 
 /*
@@ -358,7 +375,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	*childregs = *regs;
 	childregs->eax = 0;
 	childregs->esp = esp;
-	p->set_child_tid = p->clear_child_tid = NULL;
 
 	p->thread.esp = (unsigned long) childregs;
 	p->thread.esp0 = (unsigned long) (childregs+1);
@@ -473,6 +489,37 @@ int dump_task_regs(struct task_struct *tsk, elf_gregset_t *regs)
 	return 1;
 }
 
+static inline void
+handle_io_bitmap(struct thread_struct *next, struct tss_struct *tss)
+{
+	if (!next->io_bitmap_ptr) {
+		/*
+		 * Disable the bitmap via an invalid offset. We still cache
+		 * the previous bitmap owner and the IO bitmap contents:
+		 */
+		tss->io_bitmap_base = INVALID_IO_BITMAP_OFFSET;
+		return;
+	}
+	if (likely(next == tss->io_bitmap_owner)) {
+		/*
+		 * Previous owner of the bitmap (hence the bitmap content)
+		 * matches the next task, we dont have to do anything but
+		 * to set a valid offset in the TSS:
+		 */
+		tss->io_bitmap_base = IO_BITMAP_OFFSET;
+		return;
+	}
+	/*
+	 * Lazy TSS's I/O bitmap copy. We set an invalid offset here
+	 * and we let the task to get a GPF in case an I/O instruction
+	 * is performed.  The handler of the GPF will verify that the
+	 * faulting task has a valid I/O bitmap and, it true, does the
+	 * real copy and restart the instruction.  This will save us
+	 * redundant copies when the currently switched task does not
+	 * perform any I/O during its timeslice.
+	 */
+	tss->io_bitmap_base = INVALID_IO_BITMAP_OFFSET_LAZY;
+}
 /*
  * This special macro can be used to load a debugging register
  */
@@ -557,20 +604,9 @@ struct task_struct fastcall * __switch_to(struct task_struct *prev_p, struct tas
 		loaddebug(next, 7);
 	}
 
-	if (unlikely(prev->io_bitmap_ptr || next->io_bitmap_ptr)) {
-		if (next->io_bitmap_ptr)
-			/*
-			 * Copy the relevant range of the IO bitmap.
-			 * Normally this is 128 bytes or less:
-			 */
-			memcpy(tss->io_bitmap, next->io_bitmap_ptr,
-				max(prev->io_bitmap_max, next->io_bitmap_max));
-		else
-			/*
-			 * Clear any possible leftover bits:
-			 */
-			memset(tss->io_bitmap, 0xff, prev->io_bitmap_max);
-	}
+	if (unlikely(prev->io_bitmap_ptr || next->io_bitmap_ptr))
+		handle_io_bitmap(next, tss);
+
 	return prev_p;
 }
 
@@ -626,7 +662,9 @@ asmlinkage int sys_execve(struct pt_regs regs)
 			(char __user * __user *) regs.edx,
 			&regs);
 	if (error == 0) {
+		task_lock(current);
 		current->ptrace &= ~PT_DTRACE;
+		task_unlock(current);
 		/* Make sure we don't return using sysenter.. */
 		set_thread_flag(TIF_IRET);
 	}

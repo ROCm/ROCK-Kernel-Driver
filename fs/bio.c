@@ -137,33 +137,29 @@ inline void bio_init(struct bio *bio)
  **/
 struct bio *bio_alloc(int gfp_mask, int nr_iovecs)
 {
-	struct bio_vec *bvl = NULL;
-	unsigned long idx;
-	struct bio *bio;
+	struct bio *bio = mempool_alloc(bio_pool, gfp_mask);
 
-	bio = mempool_alloc(bio_pool, gfp_mask);
-	if (unlikely(!bio))
-		goto out;
+	if (likely(bio)) {
+		struct bio_vec *bvl = NULL;
 
-	bio_init(bio);
+		bio_init(bio);
+		if (likely(nr_iovecs)) {
+			unsigned long idx;
 
-	if (unlikely(!nr_iovecs))
-		goto noiovec;
-
-	bvl = bvec_alloc(gfp_mask, nr_iovecs, &idx);
-	if (bvl) {
-		bio->bi_flags |= idx << BIO_POOL_OFFSET;
-		bio->bi_max_vecs = bvec_array[idx].nr_vecs;
-noiovec:
+			bvl = bvec_alloc(gfp_mask, nr_iovecs, &idx);
+			if (unlikely(!bvl)) {
+				mempool_free(bio, bio_pool);
+				bio = NULL;
+				goto out;
+			}
+			bio->bi_flags |= idx << BIO_POOL_OFFSET;
+			bio->bi_max_vecs = bvec_array[idx].nr_vecs;
+		}
 		bio->bi_io_vec = bvl;
 		bio->bi_destructor = bio_destructor;
-out:
-		return bio;
 	}
-
-	mempool_free(bio, bio_pool);
-	bio = NULL;
-	goto out;
+out:
+	return bio;
 }
 
 /**
@@ -465,11 +461,10 @@ struct bio *bio_copy_user(request_queue_t *q, unsigned long uaddr,
 
 	bmd->userptr = (void __user *) uaddr;
 
+	ret = -ENOMEM;
 	bio = bio_alloc(GFP_KERNEL, end - start);
-	if (!bio) {
-		bio_free_map_data(bmd);
-		return ERR_PTR(-ENOMEM);
-	}
+	if (!bio)
+		goto out_bmd;
 
 	bio->bi_rw |= (!write_to_vm << BIO_RW);
 
@@ -501,7 +496,7 @@ struct bio *bio_copy_user(request_queue_t *q, unsigned long uaddr,
 	 * success
 	 */
 	if (!write_to_vm) {
-		unsigned long p = uaddr;
+		char __user *p = (char __user *) uaddr;
 
 		/*
 		 * for a write, copy in data to kernel pages
@@ -510,7 +505,7 @@ struct bio *bio_copy_user(request_queue_t *q, unsigned long uaddr,
 		bio_for_each_segment(bvec, bio, i) {
 			char *addr = page_address(bvec->bv_page);
 
-			if (copy_from_user(addr, (char *) p, bvec->bv_len))
+			if (copy_from_user(addr, p, bvec->bv_len))
 				goto cleanup;
 			p += bvec->bv_len;
 		}
@@ -523,6 +518,8 @@ cleanup:
 		__free_page(bvec->bv_page);
 
 	bio_put(bio);
+out_bmd:
+	bio_free_map_data(bmd);
 	return ERR_PTR(ret);
 }
 
@@ -831,15 +828,6 @@ void bio_endio(struct bio *bio, unsigned int bytes_done, int error)
 	bio->bi_size -= bytes_done;
 	bio->bi_sector += (bytes_done >> 9);
 
-	if (bio_data_dir(bio) == READ)
-		/*
-		 * If the current cpu has written to the page by hand
-		 * without dma, we must enforce ordering to be sure
-		 * this written data will be visible before we expose
-		 * the page contents to other cpus (for example with
-		 * a set_pte).
-		 */
-		smp_wmb();
 	if (bio->bi_end_io)
 		bio->bi_end_io(bio, bytes_done, error);
 }

@@ -10,7 +10,6 @@
  * published by the Free Software Foundation.
  */
 
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/smp.h>
@@ -26,7 +25,6 @@
 #include <linux/kmod.h>
 #include <linux/workqueue.h>
 #include <linux/jiffies.h>
-#include <linux/config.h>
 #include <linux/kernel_stat.h>
 #include <linux/percpu.h>
 
@@ -59,7 +57,7 @@ static unsigned int 				def_sampling_rate;
 #define DEF_SAMPLING_RATE_LATENCY_MULTIPLIER	(1000)
 #define DEF_SAMPLING_DOWN_FACTOR		(10)
 #define TRANSITION_LATENCY_LIMIT		(10 * 1000)
-#define sampling_rate_in_HZ(x)			((x * HZ) / (1000 * 1000))
+#define sampling_rate_in_HZ(x)			(((x * HZ) < (1000 * 1000))?1:((x * HZ) / (1000 * 1000)))
 
 static void do_dbs_timer(void *data);
 
@@ -83,7 +81,7 @@ struct dbs_tuners {
 	unsigned int		down_threshold;
 };
 
-struct dbs_tuners dbs_tuners_ins = {
+static struct dbs_tuners dbs_tuners_ins = {
 	.up_threshold 		= DEF_FREQUENCY_UP_THRESHOLD,
 	.down_threshold 	= DEF_FREQUENCY_DOWN_THRESHOLD,
 	.sampling_down_factor 	= DEF_SAMPLING_DOWN_FACTOR,
@@ -101,10 +99,8 @@ static ssize_t show_sampling_rate_min(struct cpufreq_policy *policy, char *buf)
 }
 
 #define define_one_ro(_name) 					\
-static struct freq_attr _name = { 				\
-	.attr = { .name = __stringify(_name), .mode = 0444 }, 	\
-	.show = show_##_name, 					\
-}
+static struct freq_attr _name =  				\
+__ATTR(_name, 0444, show_##_name, NULL)
 
 define_one_ro(sampling_rate_max);
 define_one_ro(sampling_rate_min);
@@ -127,13 +123,13 @@ static ssize_t store_sampling_down_factor(struct cpufreq_policy *unused,
 	unsigned int input;
 	int ret;
 	ret = sscanf (buf, "%u", &input);
-	down(&dbs_sem);
 	if (ret != 1 )
-		goto out;
+		return -EINVAL;
 
+	down(&dbs_sem);
 	dbs_tuners_ins.sampling_down_factor = input;
-out:
 	up(&dbs_sem);
+
 	return count;
 }
 
@@ -143,13 +139,16 @@ static ssize_t store_sampling_rate(struct cpufreq_policy *unused,
 	unsigned int input;
 	int ret;
 	ret = sscanf (buf, "%u", &input);
+
 	down(&dbs_sem);
-	if (ret != 1 || input > MAX_SAMPLING_RATE || input < MIN_SAMPLING_RATE)
-		goto out;
+	if (ret != 1 || input > MAX_SAMPLING_RATE || input < MIN_SAMPLING_RATE) {
+		up(&dbs_sem);
+		return -EINVAL;
+	}
 
 	dbs_tuners_ins.sampling_rate = input;
-out:
 	up(&dbs_sem);
+
 	return count;
 }
 
@@ -159,15 +158,18 @@ static ssize_t store_up_threshold(struct cpufreq_policy *unused,
 	unsigned int input;
 	int ret;
 	ret = sscanf (buf, "%u", &input);
+
 	down(&dbs_sem);
 	if (ret != 1 || input > MAX_FREQUENCY_UP_THRESHOLD || 
 			input < MIN_FREQUENCY_UP_THRESHOLD ||
-			input <= dbs_tuners_ins.down_threshold)
-		goto out;
+			input <= dbs_tuners_ins.down_threshold) {
+		up(&dbs_sem);
+		return -EINVAL;
+	}
 
 	dbs_tuners_ins.up_threshold = input;
-out:
 	up(&dbs_sem);
+
 	return count;
 }
 
@@ -177,24 +179,24 @@ static ssize_t store_down_threshold(struct cpufreq_policy *unused,
 	unsigned int input;
 	int ret;
 	ret = sscanf (buf, "%u", &input);
+
 	down(&dbs_sem);
 	if (ret != 1 || input > MAX_FREQUENCY_DOWN_THRESHOLD || 
 			input < MIN_FREQUENCY_DOWN_THRESHOLD ||
-			input >= dbs_tuners_ins.up_threshold)
-		goto out;
+			input >= dbs_tuners_ins.up_threshold) {
+		up(&dbs_sem);
+		return -EINVAL;
+	}
 
 	dbs_tuners_ins.down_threshold = input;
-out:
 	up(&dbs_sem);
+
 	return count;
 }
 
-#define define_one_rw(_name) 					\
-static struct freq_attr _name = { 				\
-	.attr = { .name = __stringify(_name), .mode = 0644 }, 	\
-	.show = show_##_name, 					\
-	.store = store_##_name, 				\
-}
+#define define_one_rw(_name) \
+static struct freq_attr _name = \
+__ATTR(_name, 0644, show_##_name, store_##_name)
 
 define_one_rw(sampling_rate);
 define_one_rw(sampling_down_factor);
@@ -221,6 +223,7 @@ static struct attribute_group dbs_attr_group = {
 static void dbs_check_cpu(int cpu)
 {
 	unsigned int idle_ticks, up_idle_ticks, down_idle_ticks;
+	unsigned int total_idle_ticks;
 	unsigned int freq_down_step;
 	unsigned int freq_down_sampling_rate;
 	static int down_skip[NR_CPUS];
@@ -244,19 +247,23 @@ static void dbs_check_cpu(int cpu)
 	 * 5% of max_frequency 
 	 */
 	/* Check for frequency increase */
-	idle_ticks = kstat_cpu(cpu).cpustat.idle - 
+	total_idle_ticks = kstat_cpu(cpu).cpustat.idle +
+		kstat_cpu(cpu).cpustat.iowait;
+	idle_ticks = total_idle_ticks -
 		this_dbs_info->prev_cpu_idle_up;
-	this_dbs_info->prev_cpu_idle_up = kstat_cpu(cpu).cpustat.idle;
+	this_dbs_info->prev_cpu_idle_up = total_idle_ticks;
 
+	/* Scale idle ticks by 100 and compare with up and down ticks */
+	idle_ticks *= 100;
 	up_idle_ticks = (100 - dbs_tuners_ins.up_threshold) *
-			sampling_rate_in_HZ(dbs_tuners_ins.sampling_rate) / 100;
+			sampling_rate_in_HZ(dbs_tuners_ins.sampling_rate);
 
 	if (idle_ticks < up_idle_ticks) {
 		__cpufreq_driver_target(this_dbs_info->cur_policy,
 			this_dbs_info->cur_policy->max, 
 			CPUFREQ_RELATION_H);
 		down_skip[cpu] = 0;
-		this_dbs_info->prev_cpu_idle_down = kstat_cpu(cpu).cpustat.idle;
+		this_dbs_info->prev_cpu_idle_down = total_idle_ticks;
 		return;
 	}
 
@@ -265,18 +272,25 @@ static void dbs_check_cpu(int cpu)
 	if (down_skip[cpu] < dbs_tuners_ins.sampling_down_factor)
 		return;
 
-	idle_ticks = kstat_cpu(cpu).cpustat.idle - 
+	idle_ticks = total_idle_ticks -
 		this_dbs_info->prev_cpu_idle_down;
+	/* Scale idle ticks by 100 and compare with up and down ticks */
+	idle_ticks *= 100;
 	down_skip[cpu] = 0;
-	this_dbs_info->prev_cpu_idle_down = kstat_cpu(cpu).cpustat.idle;
+	this_dbs_info->prev_cpu_idle_down = total_idle_ticks;
 
 	freq_down_sampling_rate = dbs_tuners_ins.sampling_rate *
 		dbs_tuners_ins.sampling_down_factor;
 	down_idle_ticks = (100 - dbs_tuners_ins.down_threshold) *
-			sampling_rate_in_HZ(freq_down_sampling_rate) / 100;
+			sampling_rate_in_HZ(freq_down_sampling_rate);
 
 	if (idle_ticks > down_idle_ticks ) {
 		freq_down_step = (5 * this_dbs_info->cur_policy->max) / 100;
+
+		/* max freq cannot be less than 100. But who knows.... */
+		if (unlikely(freq_down_step == 0))
+			freq_down_step = 5;
+
 		__cpufreq_driver_target(this_dbs_info->cur_policy,
 			this_dbs_info->cur_policy->cur - freq_down_step, 
 			CPUFREQ_RELATION_H);
@@ -333,9 +347,11 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		this_dbs_info->cur_policy = policy;
 		
 		this_dbs_info->prev_cpu_idle_up = 
-				kstat_cpu(cpu).cpustat.idle;
+				kstat_cpu(cpu).cpustat.idle +
+				kstat_cpu(cpu).cpustat.iowait;
 		this_dbs_info->prev_cpu_idle_down = 
-				kstat_cpu(cpu).cpustat.idle;
+				kstat_cpu(cpu).cpustat.idle +
+				kstat_cpu(cpu).cpustat.iowait;
 		this_dbs_info->enable = 1;
 		sysfs_create_group(&policy->kobj, &dbs_attr_group);
 		dbs_enable++;
@@ -344,8 +360,14 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		 * is used for first time
 		 */
 		if (dbs_enable == 1) {
+			unsigned int latency;
 			/* policy latency is in nS. Convert it to uS first */
-			def_sampling_rate = (policy->cpuinfo.transition_latency / 1000) *
+
+			latency = policy->cpuinfo.transition_latency;
+			if (latency < 1000)
+				latency = 1000;
+
+			def_sampling_rate = (latency / 1000) *
 					DEF_SAMPLING_RATE_LATENCY_MULTIPLIER;
 			dbs_tuners_ins.sampling_rate = def_sampling_rate;
 

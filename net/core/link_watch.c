@@ -22,7 +22,7 @@
 #include <linux/list.h>
 #include <linux/slab.h>
 #include <linux/workqueue.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/types.h>
 
 

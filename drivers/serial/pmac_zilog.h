@@ -47,17 +47,18 @@ struct uart_pmac_port {
 #define PMACZILOG_FLAG_IS_OPEN		0x00002000
 #define PMACZILOG_FLAG_IS_IRQ_ON	0x00004000
 #define PMACZILOG_FLAG_IS_EXTCLK	0x00008000
+#define PMACZILOG_FLAG_BREAK		0x00010000
 
 	unsigned char			parity_mask;
 	unsigned char			prev_status;
 
-	volatile u8			*control_reg;
-	volatile u8			*data_reg;
+	volatile u8			__iomem *control_reg;
+	volatile u8			__iomem *data_reg;
 
 	unsigned int			tx_dma_irq;
 	unsigned int			rx_dma_irq;
-	volatile struct dbdma_regs	*tx_dma_regs;
-	volatile struct dbdma_regs	*rx_dma_regs;
+	volatile struct dbdma_regs	__iomem *tx_dma_regs;
+	volatile struct dbdma_regs	__iomem *rx_dma_regs;
 
 	struct termios			termios_cache;
 };

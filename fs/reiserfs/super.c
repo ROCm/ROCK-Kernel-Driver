@@ -106,7 +106,7 @@ void reiserfs_unlockfs(struct super_block *s) {
   reiserfs_allow_writes(s) ;
 }
 
-extern const struct key  MAX_KEY;
+extern const struct reiserfs_key  MAX_KEY;
 
 
 /* this is used to delete "save link" when there are no items of a
@@ -116,7 +116,7 @@ extern const struct key  MAX_KEY;
    protecting unlink is bigger that a key lf "save link" which
    protects truncate), so there left no items to make truncate
    completion on */
-static int remove_save_link_only (struct super_block * s, struct key * key, int oid_free)
+static int remove_save_link_only (struct super_block * s, struct reiserfs_key * key, int oid_free)
 {
     struct reiserfs_transaction_handle th;
     int err;
@@ -140,7 +140,7 @@ static int finish_unfinished (struct super_block * s)
 {
     INITIALIZE_PATH (path);
     struct cpu_key max_cpu_key, obj_key;
-    struct key save_link_key;
+    struct reiserfs_key save_link_key;
     int retval = 0;
     struct item_head * ih;
     struct buffer_head * bh;
@@ -335,7 +335,7 @@ void add_save_link (struct reiserfs_transaction_handle * th,
 int remove_save_link (struct inode * inode, int truncate)
 {
     struct reiserfs_transaction_handle th;
-    struct key key;
+    struct reiserfs_key key;
     int err;
  
     /* we are going to do one balancing only */
@@ -611,8 +611,11 @@ static const arg_desc_t error_actions[] = {
     {NULL, 0, 0},
 };
 
-int reiserfs_default_io_size = PAGE_SIZE;  /* FIXME: RPM breaks with the
-						     previous value of 128k! */
+int reiserfs_default_io_size = 128 * 1024; /* Default recommended I/O size is 128k.
+					      There might be broken applications that are
+					      confused by this. Use nolargeio mount option
+					      to get usual i/o size = PAGE_SIZE.
+					    */
 
 /* proceed only one option from a list *cur - string containing of mount options
    opts - array of options which are accepted
@@ -659,8 +662,14 @@ static int reiserfs_getopt ( struct super_block * s, char ** cur, opt_desc_t * o
     for (opt = opts; opt->option_name; opt ++) {
 	if (!strncmp (p, opt->option_name, strlen (opt->option_name))) {
 	    if (bit_flags) {
-		*bit_flags &= ~opt->clrmask;
-		*bit_flags |= opt->setmask;
+                if (opt->clrmask == (1 << REISERFS_UNSUPPORTED_OPT))
+                    reiserfs_warning (s, "%s not supported.", p);
+                else
+                    *bit_flags &= ~opt->clrmask;
+                if (opt->setmask == (1 << REISERFS_UNSUPPORTED_OPT))
+                    reiserfs_warning (s, "%s not supported.", p);
+                else
+                    *bit_flags |= opt->setmask;
 	    }
 	    break;
 	}
@@ -741,11 +750,19 @@ static int reiserfs_parse_options (struct super_block * s, char * options, /* st
 	{"conv",	.setmask = 1<<REISERFS_CONVERT},
 	{"attrs",	.setmask = 1<<REISERFS_ATTRS},
 	{"noattrs",	.clrmask = 1<<REISERFS_ATTRS},
+#ifdef CONFIG_REISERFS_FS_XATTR
 	{"user_xattr",	.setmask = 1<<REISERFS_XATTRS_USER},
 	{"nouser_xattr",.clrmask = 1<<REISERFS_XATTRS_USER},
+#else
+	{"user_xattr",	.setmask = 1<<REISERFS_UNSUPPORTED_OPT},
+	{"nouser_xattr",.clrmask = 1<<REISERFS_UNSUPPORTED_OPT},
+#endif
 #ifdef CONFIG_REISERFS_FS_POSIX_ACL
 	{"acl",		.setmask = 1<<REISERFS_POSIXACL},
 	{"noacl",	.clrmask = 1<<REISERFS_POSIXACL},
+#else
+	{"acl",		.setmask = 1<<REISERFS_UNSUPPORTED_OPT},
+	{"noacl",	.clrmask = 1<<REISERFS_UNSUPPORTED_OPT},
 #endif
 	{"nolog",},	 /* This is unsupported */
 	{"replayonly",	.setmask = 1<<REPLAYONLY},
@@ -1491,12 +1508,9 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
     } else {
         reiserfs_info (s, "using writeback data mode\n");
     }
-    /* make barrer=flush the default */
-
-    if (!reiserfs_barrier_none(s))
-	REISERFS_SB(s)->s_mount_opt |= (1 << REISERFS_BARRIER_FLUSH);
-    if (reiserfs_barrier_flush(s))
+    if (reiserfs_barrier_flush(s)) {
     	printk("reiserfs: using flush barriers\n");
+    }
 
     // set_device_ro(s->s_dev, 1) ;
     if( journal_init(s, jdev_name, old_format, commit_max_age) ) {

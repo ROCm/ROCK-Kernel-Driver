@@ -29,7 +29,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/devpts_fs.h>
 
 /* These are global because they are accessed in tty_io.c */
@@ -85,10 +85,7 @@ static void pty_unthrottle(struct tty_struct * tty)
 	if (!o_tty)
 		return;
 
-	if ((o_tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    o_tty->ldisc.write_wakeup)
-		(o_tty->ldisc.write_wakeup)(o_tty);
-	wake_up_interruptible(&o_tty->write_wait);
+	tty_wakeup(o_tty);
 	set_bit(TTY_THROTTLED, &tty->flags);
 }
 
@@ -101,52 +98,23 @@ static void pty_unthrottle(struct tty_struct * tty)
  *   (2) avoid redundant copying for cases where count >> receive_room
  * N.B. Calls from user space may now return an error code instead of
  * a count.
+ *
+ * FIXME: Our pty_write method is called with our ldisc lock held but
+ * not our partners. We can't just take the other one blindly without
+ * risking deadlocks.  There is also the small matter of TTY_DONT_FLIP
  */
-static int pty_write(struct tty_struct * tty, int from_user,
-		       const unsigned char *buf, int count)
+static int pty_write(struct tty_struct * tty, const unsigned char *buf, int count)
 {
 	struct tty_struct *to = tty->link;
-	int	c=0, n, room;
-	char	*temp_buffer;
+	int	c;
 
 	if (!to || tty->stopped)
 		return 0;
 
-	if (from_user) {
-		down(&tty->flip.pty_sem);
-		temp_buffer = &tty->flip.char_buf[0];
-		while (count > 0) {
-			/* check space so we don't copy needlessly */ 
-			n = to->ldisc.receive_room(to);
-			if (n > count)
-				n = count;
-			if (!n) break;
-
-			n  = min(n, PTY_BUF_SIZE);
-			n -= copy_from_user(temp_buffer, buf, n);
-			if (!n) {
-				if (!c)
-					c = -EFAULT;
-				break;
-			}
-
-			/* check again in case the buffer filled up */
-			room = to->ldisc.receive_room(to);
-			if (n > room)
-				n = room;
-			if (!n) break;
-			buf   += n; 
-			c     += n;
-			count -= n;
-			to->ldisc.receive_buf(to, temp_buffer, NULL, n);
-		}
-		up(&tty->flip.pty_sem);
-	} else {
-		c = to->ldisc.receive_room(to);
-		if (c > count)
-			c = count;
-		to->ldisc.receive_buf(to, buf, NULL, c);
-	}
+	c = to->ldisc.receive_room(to);
+	if (c > count)
+		c = count;
+	to->ldisc.receive_buf(to, buf, NULL, c);
 	
 	return c;
 }

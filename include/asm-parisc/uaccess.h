@@ -8,6 +8,7 @@
 #include <asm/page.h>
 #include <asm/system.h>
 #include <asm/cache.h>
+#include <asm-generic/uaccess.h>
 
 #define VERIFY_READ 0
 #define VERIFY_WRITE 1
@@ -54,16 +55,22 @@ extern int __put_user_bad(void);
 /*
  * The exception table contains two values: the first is an address
  * for an instruction that is allowed to fault, and the second is
- * the number of bytes to skip if a fault occurs. We also support in
- * two bit flags: 0x2 tells the exception handler to clear register
- * r9 and 0x1 tells the exception handler to put -EFAULT in r8.
- * This allows us to handle the simple cases for put_user and
- * get_user without having to have .fixup sections.
+ * the address to the fixup routine. 
  */
 
 struct exception_table_entry {
 	unsigned long insn;  /* address of insn that is allowed to fault.   */
-	long skip;           /* pcoq skip | r9 clear flag | r8 -EFAULT flag */
+	long fixup;          /* fixup routine */
+};
+
+/*
+ * The page fault handler stores, in a per-cpu area, the following information
+ * if a fixup routine is available.
+ */
+struct exception_data {
+	unsigned long fault_ip;
+	unsigned long fault_space;
+	unsigned long fault_addr;
 };
 
 #define __get_user(x,ptr)                               \
@@ -97,48 +104,44 @@ struct exception_table_entry {
 #ifdef __LP64__
 #define __get_kernel_asm(ldx,ptr)                       \
 	__asm__("\n1:\t" ldx "\t0(%2),%0\n"             \
-		"2:\n"					\
-		"\t.section __ex_table,\"aw\"\n"         \
-		 "\t.dword\t1b\n"                       \
-		 "\t.dword\t(2b-1b)+3\n"                \
-		 "\t.previous"                          \
+		"\t.section __ex_table,\"aw\"\n"        \
+		"\t.dword\t1b,fixup_get_user_skip_1\n"	\
+		"\t.previous"                          	\
 		: "=r"(__gu_val), "=r"(__gu_err)        \
-		: "r"(ptr), "1"(__gu_err));
+		: "r"(ptr), "1"(__gu_err)		\
+		: "r1");
 
 #define __get_user_asm(ldx,ptr)                         \
 	__asm__("\n1:\t" ldx "\t0(%%sr3,%2),%0\n"       \
-		"2:\n"					\
-		"\t.section __ex_table,\"aw\"\n"         \
-		 "\t.dword\t1b\n"                       \
-		 "\t.dword\t(2b-1b)+3\n"                \
-		 "\t.previous"                          \
+		"\t.section __ex_table,\"aw\"\n"	\
+		"\t.dword\t1b,fixup_get_user_skip_1\n"	\
+		"\t.previous"				\
 		: "=r"(__gu_val), "=r"(__gu_err)        \
-		: "r"(ptr), "1"(__gu_err));
+		: "r"(ptr), "1"(__gu_err)		\
+		: "r1");
 #else
 #define __get_kernel_asm(ldx,ptr)                       \
 	__asm__("\n1:\t" ldx "\t0(%2),%0\n"             \
-		"2:\n"					\
-		"\t.section __ex_table,\"aw\"\n"         \
-		 "\t.word\t1b\n"                        \
-		 "\t.word\t(2b-1b)+3\n"                 \
-		 "\t.previous"                          \
+		"\t.section __ex_table,\"aw\"\n"        \
+		"\t.word\t1b,fixup_get_user_skip_1\n"	\
+		"\t.previous"                          	\
 		: "=r"(__gu_val), "=r"(__gu_err)        \
-		: "r"(ptr), "1"(__gu_err));
+		: "r"(ptr), "1"(__gu_err)		\
+		: "r1");
 
 #define __get_user_asm(ldx,ptr)                         \
 	__asm__("\n1:\t" ldx "\t0(%%sr3,%2),%0\n"       \
-		"2:\n"					\
-		"\t.section __ex_table,\"aw\"\n"         \
-		 "\t.word\t1b\n"                        \
-		 "\t.word\t(2b-1b)+3\n"                 \
+		"\t.section __ex_table,\"aw\"\n"	\
+		 "\t.word\t1b,fixup_get_user_skip_1\n"	\
 		 "\t.previous"                          \
 		: "=r"(__gu_val), "=r"(__gu_err)        \
-		: "r"(ptr), "1"(__gu_err));
+		: "r"(ptr), "1"(__gu_err)		\
+		: "r1");
 #endif /* !__LP64__ */
 
 #define __put_user(x,ptr)                                       \
 ({								\
-	register long __pu_err __asm__ ("r8") = 0;		\
+	register long __pu_err __asm__ ("r8") = 0;      	\
 								\
 	if (segment_eq(get_fs(),KERNEL_DS)) {                   \
 	    switch (sizeof(*(ptr))) {                           \
@@ -172,82 +175,73 @@ struct exception_table_entry {
 #define __put_kernel_asm(stx,x,ptr)                         \
 	__asm__ __volatile__ (                              \
 		"\n1:\t" stx "\t%2,0(%1)\n"                 \
-		"2:\n"					    \
-		"\t.section __ex_table,\"aw\"\n"             \
-		 "\t.dword\t1b\n"                           \
-		 "\t.dword\t(2b-1b)+1\n"                    \
-		 "\t.previous"                              \
+		"\t.section __ex_table,\"aw\"\n"            \
+		"\t.dword\t1b,fixup_put_user_skip_1\n"	    \
+		"\t.previous"                               \
 		: "=r"(__pu_err)                            \
 		: "r"(ptr), "r"(x), "0"(__pu_err))
 
 #define __put_user_asm(stx,x,ptr)                           \
 	__asm__ __volatile__ (                              \
 		"\n1:\t" stx "\t%2,0(%%sr3,%1)\n"           \
-		"2:\n"					    \
-		"\t.section __ex_table,\"aw\"\n"             \
-		 "\t.dword\t1b\n"                           \
-		 "\t.dword\t(2b-1b)+1\n"                    \
+		"\t.section __ex_table,\"aw\"\n"            \
+		 "\t.dword\t1b,fixup_put_user_skip_1\n"	    \
 		 "\t.previous"                              \
 		: "=r"(__pu_err)                            \
-		: "r"(ptr), "r"(x), "0"(__pu_err))
+		: "r"(ptr), "r"(x), "0"(__pu_err)	    \
+		: "r1")
 #else
 #define __put_kernel_asm(stx,x,ptr)                         \
 	__asm__ __volatile__ (                              \
 		"\n1:\t" stx "\t%2,0(%1)\n"                 \
-		"2:\n"					    \
-		"\t.section __ex_table,\"aw\"\n"             \
-		 "\t.word\t1b\n"                            \
-		 "\t.word\t(2b-1b)+1\n"                     \
+		"\t.section __ex_table,\"aw\"\n"            \
+		 "\t.word\t1b,fixup_put_user_skip_1\n"	    \
 		 "\t.previous"                              \
 		: "=r"(__pu_err)                            \
-		: "r"(ptr), "r"(x), "0"(__pu_err))
+		: "r"(ptr), "r"(x), "0"(__pu_err)	    \
+		: "r1")
 
 #define __put_user_asm(stx,x,ptr)                           \
 	__asm__ __volatile__ (                              \
 		"\n1:\t" stx "\t%2,0(%%sr3,%1)\n"           \
-		"2:\n"					    \
-		"\t.section __ex_table,\"aw\"\n"             \
-		 "\t.word\t1b\n"                            \
-		 "\t.word\t(2b-1b)+1\n"                     \
+		"\t.section __ex_table,\"aw\"\n"            \
+		 "\t.word\t1b,fixup_put_user_skip_1\n"      \
 		 "\t.previous"                              \
 		: "=r"(__pu_err)                            \
-		: "r"(ptr), "r"(x), "0"(__pu_err))
+		: "r"(ptr), "r"(x), "0"(__pu_err)	    \
+		: "r1")
 
-static inline void __put_kernel_asm64(u64 x, void *ptr)
-{
-	u32 hi = x>>32;
-	u32 lo = x&0xffffffff;
-	__asm__ __volatile__ (
-		"\n1:\tstw %1,0(%0)\n"
-		"\n2:\tstw %2,4(%0)\n"
-		"3:\n"
-		"\t.section __ex_table,\"aw\"\n"
-		 "\t.word\t1b\n"
-		 "\t.word\t(3b-1b)+1\n"
-		 "\t.word\t2b\n"
-		 "\t.word\t(3b-2b)+1\n"
-		 "\t.previous"
-		: : "r"(ptr), "r"(hi), "r"(lo));
+#define __put_kernel_asm64(__val,ptr) do {		    	    \
+	u64 __val64 = (u64)(__val);				    \
+	u32 hi = (__val64) >> 32;					    \
+	u32 lo = (__val64) & 0xffffffff;				    \
+	__asm__ __volatile__ (				    \
+		"\n1:\tstw %2,0(%1)\n"			    \
+		"\n2:\tstw %3,4(%1)\n"			    \
+		"\t.section __ex_table,\"aw\"\n"	    \
+		 "\t.word\t1b,fixup_put_user_skip_2\n"	    \
+		 "\t.word\t2b,fixup_put_user_skip_1\n"	    \
+		 "\t.previous"				    \
+		: "=r"(__pu_err)                            \
+		: "r"(ptr), "r"(hi), "r"(lo), "0"(__pu_err) \
+		: "r1");				    \
+} while (0)
 
-}
-
-static inline void __put_user_asm64(u64 x, void *ptr)
-{
-	u32 hi = x>>32;
-	u32 lo = x&0xffffffff;
-	__asm__ __volatile__ (
-		"\n1:\tstw %1,0(%%sr3,%0)\n"
-		"\n2:\tstw %2,4(%%sr3,%0)\n"
-		"3:\n"
-		"\t.section __ex_table,\"aw\"\n"
-		 "\t.word\t1b\n"
-		 "\t.word\t(3b-1b)+1\n"
-		 "\t.word\t2b\n"
-		 "\t.word\t(3b-2b)+1\n"
-		 "\t.previous"
-		: : "r"(ptr), "r"(hi), "r"(lo));
-
-}
+#define __put_user_asm64(__val,ptr) do {		    	    \
+	u64 __val64 = (u64)__val;				    \
+	u32 hi = (__val64) >> 32;					    \
+	u32 lo = (__val64) & 0xffffffff;				    \
+	__asm__ __volatile__ (				    \
+		"\n1:\tstw %2,0(%%sr3,%1)\n"		    \
+		"\n2:\tstw %3,4(%%sr3,%1)\n"		    \
+		"\t.section __ex_table,\"aw\"\n"	    \
+		 "\t.word\t1b,fixup_get_user_skip_2\n"	    \
+		 "\t.word\t2b,fixup_get_user_skip_1\n"	    \
+		 "\t.previous"				    \
+		: "=r"(__pu_err)                            \
+		: "r"(ptr), "r"(hi), "r"(lo), "0"(__pu_err) \
+		: "r1");				    \
+} while (0)
 
 #endif /* !__LP64__ */
 
@@ -273,12 +267,12 @@ extern long lstrnlen_user(const char __user *,long);
 #define clear_user lclear_user
 #define __clear_user lclear_user
 
-#define copy_from_user lcopy_from_user
-#define __copy_from_user lcopy_from_user
-#define copy_to_user lcopy_to_user
-#define __copy_to_user lcopy_to_user
-#define copy_in_user lcopy_in_user
-#define __copy_in_user lcopy_in_user
+unsigned long copy_to_user(void __user *dst, const void *src, unsigned long len);
+#define __copy_to_user copy_to_user
+unsigned long copy_from_user(void *dst, const void __user *src, unsigned long len);
+#define __copy_from_user copy_from_user
+unsigned long copy_in_user(void __user *dst, const void __user *src, unsigned long len);
+#define __copy_in_user copy_in_user
 #define __copy_to_user_inatomic __copy_to_user
 #define __copy_from_user_inatomic __copy_from_user
 

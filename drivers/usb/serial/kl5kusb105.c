@@ -79,7 +79,6 @@ static int  klsi_105_open	         (struct usb_serial_port *port,
 static void klsi_105_close	         (struct usb_serial_port *port,
 					  struct file *filp);
 static int  klsi_105_write	         (struct usb_serial_port *port,
-					  int from_user,
 					  const unsigned char *buf,
 					  int count);
 static void klsi_105_write_bulk_callback (struct urb *urb, struct pt_regs *regs);
@@ -336,12 +335,12 @@ static void klsi_105_shutdown (struct usb_serial *serial)
 			for (j = 0; j < NUM_URBS; j++) {
 				if (write_urbs[j]) {
 					/* FIXME - uncomment the following
-					 * usb_unlink_urb call when the host
+					 * usb_kill_urb call when the host
 					 * controllers get fixed to set
 					 * urb->dev = NULL after the urb is
 					 * finished.  Otherwise this call
 					 * oopses. */
-					/* usb_unlink_urb(write_urbs[j]); */
+					/* usb_kill_urb(write_urbs[j]); */
 					if (write_urbs[j]->transfer_buffer)
 						    kfree(write_urbs[j]->transfer_buffer);
 					usb_free_urb (write_urbs[j]);
@@ -467,12 +466,12 @@ static void klsi_105_close (struct usb_serial_port *port, struct file *filp)
 		    err("Disabling read failed (error = %d)", rc);
 
 	/* shutdown our bulk reads and writes */
-	usb_unlink_urb (port->write_urb);
-	usb_unlink_urb (port->read_urb);
+	usb_kill_urb(port->write_urb);
+	usb_kill_urb(port->read_urb);
 	/* unlink our write pool */
 	/* FIXME */
 	/* wgg - do I need this? I think so. */
-	usb_unlink_urb (port->interrupt_in_urb);
+	usb_kill_urb(port->interrupt_in_urb);
 	info("kl5kusb105 port stats: %ld bytes in, %ld bytes out", priv->bytes_in, priv->bytes_out);
 } /* klsi_105_close */
 
@@ -484,7 +483,7 @@ static void klsi_105_close (struct usb_serial_port *port, struct file *filp)
 #define KLSI_105_DATA_OFFSET	2   /* in the bulk urb data block */
 
 
-static int klsi_105_write (struct usb_serial_port *port, int from_user,
+static int klsi_105_write (struct usb_serial_port *port,
 			   const unsigned char *buf, int count)
 {
 	struct klsi_105_private *priv = usb_get_serial_port_data(port);
@@ -525,15 +524,7 @@ static int klsi_105_write (struct usb_serial_port *port, int from_user,
 		size = min (count, port->bulk_out_size - KLSI_105_DATA_OFFSET);
 		size = min (size, URB_TRANSFER_BUFFER_SIZE - KLSI_105_DATA_OFFSET);
 
-		if (from_user) {
-			if (copy_from_user(urb->transfer_buffer
-					   + KLSI_105_DATA_OFFSET, buf, size)) {
-				return -EFAULT;
-			}
-		} else {
-			memcpy (urb->transfer_buffer + KLSI_105_DATA_OFFSET,
-			       	buf, size);
-		}
+		memcpy (urb->transfer_buffer + KLSI_105_DATA_OFFSET, buf, size);
 
 		/* write payload size into transfer buffer */
 		((__u8 *)urb->transfer_buffer)[0] = (__u8) (size & 0xFF);
@@ -782,9 +773,11 @@ static void klsi_105_set_termios (struct usb_serial_port *port,
 		switch (cflag & CSIZE) {
 		case CS5:
 			dbg("%s - 5 bits/byte not supported", __FUNCTION__);
+			spin_unlock_irqrestore (&priv->lock, flags);
 			return ;
 		case CS6:
 			dbg("%s - 6 bits/byte not supported", __FUNCTION__);
+			spin_unlock_irqrestore (&priv->lock, flags);
 			return ;
 		case CS7:
 			priv->cfg.databits = kl5kusb105a_dtb_7;
@@ -994,7 +987,7 @@ static int klsi_105_ioctl (struct usb_serial_port *port, struct file * file,
 static void klsi_105_throttle (struct usb_serial_port *port)
 {
 	dbg("%s - port %d", __FUNCTION__, port->number);
-	usb_unlink_urb (port->read_urb);
+	usb_kill_urb(port->read_urb);
 }
 
 static void klsi_105_unthrottle (struct usb_serial_port *port)

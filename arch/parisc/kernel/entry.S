@@ -440,8 +440,17 @@
 	mfctl		%cr25,\reg
 	.endm
 
-	/* Only allow faults on different spaces from the
-	 * currently active one if we're the kernel */
+	/* 
+		space_check(spc,tmp,fault)
+
+		spc - The space we saw the fault with.
+		tmp - The place to store the current space.
+		fault - Function to call on failure.
+
+		Only allow faults on different spaces from the
+		currently active one if we're the kernel 
+
+	*/
 	.macro		space_check	spc,tmp,fault
 	mfsp		%sr7,\tmp
 	or,COND(<>)	%r0,\spc,%r0	/* user may execute gateway page
@@ -774,7 +783,7 @@ __kernel_thread:
 #ifdef __LP64__
 	ldo	-16(%r30),%r29		/* Reference param save area */
 #endif
-	bl	do_fork, %r2
+	BL	do_fork, %r2
 	copy	%r1, %r24		/* pt_regs */
 
 	/* Parent Returns here */
@@ -827,7 +836,7 @@ __execve:
 #ifdef __LP64__
 	ldo	-16(%r30),%r29		/* Reference param save area */
 #endif
-	bl	sys_execve, %r2
+	BL	sys_execve, %r2
 	copy	%r16, %r26
 
 	cmpib,=,n 0,%r28,intr_return    /* forward */
@@ -939,6 +948,7 @@ syscall_exit_rfi:
 	STREG   %r19,PT_SR7(%r16)
 
 intr_return:
+	/* NOTE: Need to enable interrupts incase we schedule. */
 	ssm     PSW_SM_I, %r0
 
 	/* Check for software interrupts */
@@ -982,6 +992,8 @@ intr_restore:
 	ldo             PT_FR31(%r29),%r1
 	rest_fp         %r1
 	rest_general    %r29
+
+	/* Create a "relied upon translation" PA 2.0 Arch. F-5 */
 	ssm		0,%r0
 	nop
 	nop
@@ -992,8 +1004,15 @@ intr_restore:
 	nop
 	tophys_r1       %r29
 	rsm             (PSW_SM_Q|PSW_SM_P|PSW_SM_D|PSW_SM_I),%r0
+
+	/* Restore space id's and special cr's from PT_REGS
+	 * structure pointed to by r29 */
 	rest_specials	%r29
+
+	/* Important: Note that rest_stack restores r29
+	 * last (we are using it)! It also restores r1 and r30. */
 	rest_stack
+
 	rfi
 	nop
 	nop
@@ -1036,7 +1055,14 @@ intr_do_resched:
 
 	.import do_signal,code
 intr_do_signal:
-	/* Only do signals if we are returning to user space */
+	/* 
+		This check is critical to having LWS
+		working. The IASQ is zero on the gateway
+		page and we cannot deliver any signals until
+		we get off the gateway page.
+
+		Only do signals if we are returning to user space 
+	*/
 	LDREG	PT_IASQ0(%r16), %r20
 	CMPIB= 0,%r20,intr_restore /* backward */
 	nop
@@ -1050,7 +1076,7 @@ intr_do_signal:
 	ldo	-16(%r30),%r29			/* Reference param save area */
 #endif
 
-	bl	do_signal,%r2
+	BL	do_signal,%r2
 	copy	%r0, %r26			/* sigset_t *oldset = NULL */
 
 	b	intr_restore
@@ -1443,15 +1469,20 @@ nadtlb_emulate:
 	 * of the instruction. Since we don't insert a translation
 	 * we can get a lot of faults during a flush loop, so it makes
 	 * sense to try to do it here with minimum overhead. We only
-	 * emulate fdc,fic & pdc instructions whose base and index
-	 * registers are not shadowed. We defer everything else to the
-	 * "slow" path.
+	 * emulate fdc,fic,pdc,probew,prober instructions whose base 
+	 * and index registers are not shadowed. We defer everything 
+	 * else to the "slow" path.
 	 */
 
 	mfctl           %cr19,%r9 /* Get iir */
+
+	/* PA 2.0 Arch Ref. Book pg 382 has a good description of the insn bits.
+	   Checks for fdc,fdce,pdc,"fic,4f",prober,probeir,probew, probeiw */
+
+	/* Checks for fdc,fdce,pdc,"fic,4f" only */
 	ldi             0x280,%r16
 	and             %r9,%r16,%r17
-	cmpb,<>,n       %r16,%r17,nadtlb_fault /* Not fdc,fic,pdc */
+	cmpb,<>,n       %r16,%r17,nadtlb_probe_check
 	bb,>=,n         %r9,26,nadtlb_nullify  /* m bit not set, just nullify */
 	BL		get_register,%r25
 	extrw,u         %r9,15,5,%r8           /* Get index register # */
@@ -1471,6 +1502,32 @@ nadtlb_nullify:
 
 	rfir
 	nop
+
+	/* 
+		When there is no translation for the probe address then we
+		must nullify the insn and return zero in the target regsiter.
+		This will indicate to the calling code that it does not have 
+		write/read privileges to this address.
+
+		This should technically work for prober and probew in PA 1.1,
+		and also probe,r and probe,w in PA 2.0
+
+		WARNING: USE ONLY NON-SHADOW REGISTERS WITH PROBE INSN!
+		THE SLOW-PATH EMULATION HAS NOT BEEN WRITTEN YET.
+
+	*/
+nadtlb_probe_check:
+	ldi             0x80,%r16
+	and             %r9,%r16,%r17
+	cmpb,<>,n       %r16,%r17,nadtlb_fault /* Must be probe,[rw]*/
+	BL              get_register,%r25      /* Find the target register */
+	extrw,u         %r9,31,5,%r8           /* Get target register */
+	CMPIB=,n        -1,%r1,nadtlb_fault    /* have to use slow path */
+	BL		set_register,%r25
+	copy            %r0,%r1                /* Write zero to target register */
+	b nadtlb_nullify                       /* Nullify return insn */
+	nop
+
 
 #ifdef __LP64__
 itlb_miss_20w:
@@ -1762,7 +1819,7 @@ sys_fork_wrapper:
 
 	LDREG	PT_GR30(%r1),%r25
 	copy	%r1,%r24
-	bl	sys_clone,%r2
+	BL	sys_clone,%r2
 	ldi	SIGCHLD,%r26
 
 	LDREG	-RP_OFFSET-FRAME_SIZE(%r30),%r2
@@ -1782,7 +1839,7 @@ wrapper_exit:
 
 	/* Set the return value for the child */
 child_return:
-	bl	schedule_tail, %r2
+	BL	schedule_tail, %r2
 	nop
 
 	LDREG	TI_TASK-THREAD_SZ_ALGN-FRAME_SIZE-FRAME_SIZE(%r30), %r1
@@ -1807,7 +1864,7 @@ sys_clone_wrapper:
 
 	STREG	%r2,PT_GR19(%r1)	/* save for child */
 	STREG	%r30,PT_GR21(%r1)
-	bl	sys_clone,%r2
+	BL	sys_clone,%r2
 	copy	%r1,%r24
 
 	b	wrapper_exit
@@ -1830,7 +1887,7 @@ sys_vfork_wrapper:
 	STREG	%r2,PT_GR19(%r1)	/* save for child */
 	STREG	%r30,PT_GR21(%r1)
 
-	bl	sys_vfork,%r2
+	BL	sys_vfork,%r2
 	copy	%r1,%r26
 
 	b	wrapper_exit
@@ -1893,10 +1950,10 @@ sys_rt_sigreturn_wrapper:
 	STREG	%r2, -RP_OFFSET(%r30)
 #ifdef __LP64__
 	ldo	FRAME_SIZE(%r30), %r30
-	bl	sys_rt_sigreturn,%r2
+	BL	sys_rt_sigreturn,%r2
 	ldo	-16(%r30),%r29		/* Reference param save area */
 #else
-	bl	sys_rt_sigreturn,%r2
+	BL	sys_rt_sigreturn,%r2
 	ldo	FRAME_SIZE(%r30), %r30
 #endif
 
@@ -1924,7 +1981,7 @@ sys_sigaltstack_wrapper:
 	STREG	%r2, -RP_OFFSET(%r30)
 #ifdef __LP64__
 	ldo	FRAME_SIZE(%r30), %r30
-	bl	do_sigaltstack,%r2
+	b,l	do_sigaltstack,%r2
 	ldo	-16(%r30),%r29		/* Reference param save area */
 #else
 	bl	do_sigaltstack,%r2
@@ -1944,7 +2001,7 @@ sys32_sigaltstack_wrapper:
 	LDREG	TASK_PT_GR30(%r24),%r24
 	STREG	%r2, -RP_OFFSET(%r30)
 	ldo	FRAME_SIZE(%r30), %r30
-	bl	do_sigaltstack32,%r2
+	b,l	do_sigaltstack32,%r2
 	ldo	-16(%r30),%r29		/* Reference param save area */
 
 	ldo	-FRAME_SIZE(%r30), %r30
@@ -1962,7 +2019,7 @@ sys_rt_sigsuspend_wrapper:
 	STREG	%r2, -RP_OFFSET(%r30)
 #ifdef __LP64__
 	ldo	FRAME_SIZE(%r30), %r30
-	bl	sys_rt_sigsuspend,%r2
+	b,l	sys_rt_sigsuspend,%r2
 	ldo	-16(%r30),%r29		/* Reference param save area */
 #else
 	bl	sys_rt_sigsuspend,%r2
@@ -1981,9 +2038,11 @@ sys_rt_sigsuspend_wrapper:
 
 	.export syscall_exit
 syscall_exit:
+
 	/* NOTE: HP-UX syscalls also come through here
-	   after hpux_syscall_exit fixes up return
-	   values. */
+	 * after hpux_syscall_exit fixes up return
+	 * values. */
+
 	/* NOTE: Not all syscalls exit this way.  rt_sigreturn will exit
 	 * via syscall_exit_rfi if the signal was received while the process
 	 * was running.
@@ -2082,11 +2141,15 @@ syscall_restore:
 	LDREG	TASK_PT_GR29(%r1),%r29
 	LDREG	TASK_PT_GR31(%r1),%r31	   /* restore syscall rp */
 
+	/* NOTE: We use rsm/ssm pair to make this operation atomic */
 	rsm     PSW_SM_I, %r0
 	LDREG   TASK_PT_GR30(%r1),%r30             /* restore user sp */
 	mfsp	%sr3,%r1			   /* Get users space id */
 	mtsp    %r1,%sr7                           /* Restore sr7 */
 	ssm     PSW_SM_I, %r0
+
+	/* Set sr2 to zero for userspace syscalls to work. */
+	mtsp	%r0,%sr2 
 	mtsp	%r1,%sr4			   /* Restore sr4 */
 	mtsp	%r1,%sr5			   /* Restore sr5 */
 	mtsp	%r1,%sr6			   /* Restore sr6 */
@@ -2154,12 +2217,18 @@ syscall_restore_rfi:
 	bb,<	%r2,30,pt_regs_ok		   /* Branch if D set */
 	ldo	TASK_REGS(%r1),%r25
 	reg_save %r25				   /* Save r3 to r18 */
+
+	/* Save the current sr */
 	mfsp	%sr0,%r2
 	STREG	%r2,TASK_PT_SR0(%r1)
+
+	/* Save the scratch sr */
 	mfsp	%sr1,%r2
 	STREG	%r2,TASK_PT_SR1(%r1)
-	mfsp	%sr2,%r2
-	STREG	%r2,TASK_PT_SR2(%r1)
+
+	/* sr2 should be set to zero for userspace syscalls */
+	STREG	%r0,TASK_PT_SR2(%r1)
+
 pt_regs_ok:
 	LDREG	TASK_PT_GR31(%r1),%r2
 	depi	3,31,2,%r2			   /* ensure return to user mode. */
@@ -2174,12 +2243,15 @@ pt_regs_ok:
 syscall_do_softirq:
 	bl      do_softirq,%r2
 	nop
+	/* NOTE: We enable I-bit incase we schedule later,
+	 * and we might be going back to userspace if we were
+	 * traced. */
 	b       syscall_check_resched
 	ssm     PSW_SM_I, %r0  /* do_softirq returns with I bit off */
 
 	.import schedule,code
 syscall_do_resched:
-	bl	schedule,%r2
+	BL	schedule,%r2
 #ifdef __LP64__
 	ldo	-16(%r30),%r29		/* Reference param save area */
 #else
@@ -2203,7 +2275,7 @@ syscall_do_signal:
 #ifdef __LP64__
 	ldo	-16(%r30),%r29			/* Reference param save area */
 #endif
-	bl	do_signal,%r2
+	BL	do_signal,%r2
 	copy	%r0, %r26			/* sigset_t *oldset = NULL */
 
 	LDREG	TI_TASK-THREAD_SZ_ALGN-FRAME_SIZE(%r30),%r1

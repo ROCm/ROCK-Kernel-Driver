@@ -36,18 +36,13 @@
 #define NR_IRQ_VECTORS NR_IRQS
 #else
 #define NR_IRQS 224
-#define NR_IRQ_VECTORS NR_IRQS
+#define NR_IRQ_VECTORS 1024
 #endif
 
 static __inline__ int irq_canonicalize(int irq)
 {
 	return ((irq == 2) ? 9 : irq);
 }
-
-extern void disable_irq(unsigned int);
-extern void disable_irq_nosync(unsigned int);
-extern void enable_irq(unsigned int);
-extern int can_request_irq(unsigned int, unsigned long flags);
 
 #ifdef CONFIG_X86_LOCAL_APIC
 #define ARCH_HAS_NMI_WATCHDOG		/* See include/linux/nmi.h */

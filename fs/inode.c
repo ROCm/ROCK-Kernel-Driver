@@ -81,7 +81,6 @@ static struct hlist_head *inode_hashtable;
  * the i_state of an inode while it is in use..
  */
 spinlock_t inode_lock = SPIN_LOCK_UNLOCKED;
-EXPORT_SYMBOL(inode_lock);
 
 /*
  * iprune_sem provides exclusion between the kswapd or try_to_free_pages
@@ -97,7 +96,6 @@ DECLARE_MUTEX(iprune_sem);
  * Statistics gathering..
  */
 struct inodes_stat_t inodes_stat;
-EXPORT_SYMBOL(inodes_stat);
 
 static kmem_cache_t * inode_cachep;
 
@@ -182,7 +180,7 @@ void destroy_inode(struct inode *inode)
 	else
 		kmem_cache_free(inode_cachep, (inode));
 }
-EXPORT_SYMBOL(destroy_inode);
+
 
 /*
  * These are initializations that only need to be done
@@ -198,7 +196,7 @@ void inode_init_once(struct inode *inode)
 	sema_init(&inode->i_sem, 1);
 	init_rwsem(&inode->i_alloc_sem);
 	INIT_RADIX_TREE(&inode->i_data.page_tree, GFP_ATOMIC);
-	rwlock_init(&inode->i_data.tree_lock);
+	spin_lock_init(&inode->i_data.tree_lock);
 	spin_lock_init(&inode->i_data.i_mmap_lock);
 	atomic_set(&inode->i_data.truncate_count, 0);
 	INIT_LIST_HEAD(&inode->i_data.private_list);
@@ -234,7 +232,6 @@ void __iget(struct inode * inode)
 		list_move(&inode->i_list, &inode_in_use);
 	inodes_stat.nr_unused--;
 }
-EXPORT_SYMBOL(__iget);
 
 /**
  * clear_inode - clear an inode
@@ -299,7 +296,7 @@ static void dispose_list(struct list_head *head)
 /*
  * Invalidate all inodes for a device.
  */
-static int invalidate_list(struct list_head *head, struct list_head *dispose)
+static int invalidate_list(struct list_head *head, struct super_block * sb, struct list_head * dispose)
 {
 	struct list_head *next;
 	int busy = 0, count = 0;
@@ -312,11 +309,12 @@ static int invalidate_list(struct list_head *head, struct list_head *dispose)
 		next = next->next;
 		if (tmp == head)
 			break;
-		inode = list_entry(tmp, struct inode, i_sb_list);
+		inode = list_entry(tmp, struct inode, i_list);
+		if (inode->i_sb != sb)
+			continue;
 		invalidate_inode_buffers(inode);
 		if (!atomic_read(&inode->i_count)) {
 			hlist_del_init(&inode->i_hash);
-			list_del(&inode->i_sb_list);
 			list_move(&inode->i_list, dispose);
 			inode->i_state |= I_FREEING;
 			count++;
@@ -352,7 +350,10 @@ int invalidate_inodes(struct super_block * sb)
 
 	down(&iprune_sem);
 	spin_lock(&inode_lock);
-	busy = invalidate_list(&sb->s_inodes, &throw_away);
+	busy = invalidate_list(&inode_in_use, sb, &throw_away);
+	busy |= invalidate_list(&inode_unused, sb, &throw_away);
+	busy |= invalidate_list(&sb->s_dirty, sb, &throw_away);
+	busy |= invalidate_list(&sb->s_io, sb, &throw_away);
 	spin_unlock(&inode_lock);
 
 	dispose_list(&throw_away);
@@ -452,7 +453,6 @@ static void prune_icache(int nr_to_scan)
 				continue;
 		}
 		hlist_del_init(&inode->i_hash);
-		list_del_init(&inode->i_sb_list);
 		list_move(&inode->i_list, &freeable);
 		inode->i_state |= I_FREEING;
 		nr_pruned++;
@@ -564,7 +564,6 @@ struct inode *new_inode(struct super_block *sb)
 		spin_lock(&inode_lock);
 		inodes_stat.nr_inodes++;
 		list_add(&inode->i_list, &inode_in_use);
-		list_add(&inode->i_sb_list, &sb->s_inodes);
 		inode->i_ino = ++last_ino;
 		inode->i_state = 0;
 		spin_unlock(&inode_lock);
@@ -613,7 +612,6 @@ static struct inode * get_new_inode(struct super_block *sb, struct hlist_head *h
 
 			inodes_stat.nr_inodes++;
 			list_add(&inode->i_list, &inode_in_use);
-			list_add(&inode->i_sb_list, &sb->s_inodes);
 			hlist_add_head(&inode->i_hash, head);
 			inode->i_state = I_LOCK|I_NEW;
 			spin_unlock(&inode_lock);
@@ -662,7 +660,6 @@ static struct inode * get_new_inode_fast(struct super_block *sb, struct hlist_he
 			inode->i_ino = ino;
 			inodes_stat.nr_inodes++;
 			list_add(&inode->i_list, &inode_in_use);
-			list_add(&inode->i_sb_list, &sb->s_inodes);
 			hlist_add_head(&inode->i_hash, head);
 			inode->i_state = I_LOCK|I_NEW;
 			spin_unlock(&inode_lock);
@@ -999,7 +996,6 @@ void generic_delete_inode(struct inode *inode)
 	struct super_operations *op = inode->i_sb->s_op;
 
 	list_del_init(&inode->i_list);
-	list_del_init(&inode->i_sb_list);
 	inode->i_state|=I_FREEING;
 	inodes_stat.nr_inodes--;
 	spin_unlock(&inode_lock);
@@ -1028,7 +1024,7 @@ void generic_delete_inode(struct inode *inode)
 
 EXPORT_SYMBOL(generic_delete_inode);
 
-void generic_forget_inode(struct inode *inode)
+static void generic_forget_inode(struct inode *inode)
 {
 	struct super_block *sb = inode->i_sb;
 
@@ -1045,7 +1041,6 @@ void generic_forget_inode(struct inode *inode)
 		hlist_del_init(&inode->i_hash);
 	}
 	list_del_init(&inode->i_list);
-	list_del_init(&inode->i_sb_list);
 	inode->i_state|=I_FREEING;
 	inodes_stat.nr_inodes--;
 	spin_unlock(&inode_lock);
@@ -1054,7 +1049,6 @@ void generic_forget_inode(struct inode *inode)
 	clear_inode(inode);
 	destroy_inode(inode);
 }
-EXPORT_SYMBOL(generic_forget_inode);
 
 /*
  * Normal UNIX filesystem behaviour: delete the
@@ -1235,59 +1229,45 @@ EXPORT_SYMBOL(inode_needs_sync);
 /* Function back in dquot.c */
 int remove_inode_dquot_ref(struct inode *, int, struct list_head *);
 
-void remove_dquot_ref(struct super_block *sb, int type,
-			struct list_head *tofree_head)
+void remove_dquot_ref(struct super_block *sb, int type, struct list_head *tofree_head)
 {
 	struct inode *inode;
+	struct list_head *act_head;
 
 	if (!sb->dq_op)
 		return;	/* nothing to do */
 	spin_lock(&inode_lock);	/* This lock is for inodes code */
 
-	/*
-	 * We don't have to lock against quota code - test IS_QUOTAINIT is
-	 * just for speedup...
-	 */
-	list_for_each_entry(inode, &sb->s_inodes, i_sb_list)
+	/* We hold dqptr_sem so we are safe against the quota code */
+	list_for_each(act_head, &inode_in_use) {
+		inode = list_entry(act_head, struct inode, i_list);
+		if (inode->i_sb == sb && !IS_NOQUOTA(inode))
+			remove_inode_dquot_ref(inode, type, tofree_head);
+	}
+	list_for_each(act_head, &inode_unused) {
+		inode = list_entry(act_head, struct inode, i_list);
+		if (inode->i_sb == sb && !IS_NOQUOTA(inode))
+			remove_inode_dquot_ref(inode, type, tofree_head);
+	}
+	list_for_each(act_head, &sb->s_dirty) {
+		inode = list_entry(act_head, struct inode, i_list);
 		if (!IS_NOQUOTA(inode))
 			remove_inode_dquot_ref(inode, type, tofree_head);
-
+	}
+	list_for_each(act_head, &sb->s_io) {
+		inode = list_entry(act_head, struct inode, i_list);
+		if (!IS_NOQUOTA(inode))
+			remove_inode_dquot_ref(inode, type, tofree_head);
+	}
 	spin_unlock(&inode_lock);
 }
 
 #endif
 
-/*
- * Hashed waitqueues for wait_on_inode().  The table is pretty small - the
- * kernel doesn't lock many inodes at the same time.
- */
-#define I_WAIT_TABLE_ORDER	3
-static struct i_wait_queue_head {
-	wait_queue_head_t wqh;
-} ____cacheline_aligned_in_smp i_wait_queue_heads[1<<I_WAIT_TABLE_ORDER];
-
-/*
- * Return the address of the waitqueue_head to be used for this inode
- */
-static wait_queue_head_t *i_waitq_head(struct inode *inode)
+int inode_wait(void *word)
 {
-	return &i_wait_queue_heads[hash_ptr(inode, I_WAIT_TABLE_ORDER)].wqh;
-}
-
-void __wait_on_inode(struct inode *inode)
-{
-	DECLARE_WAITQUEUE(wait, current);
-	wait_queue_head_t *wq = i_waitq_head(inode);
-
-	add_wait_queue(wq, &wait);
-repeat:
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	if (inode->i_state & I_LOCK) {
-		schedule();
-		goto repeat;
-	}
-	remove_wait_queue(wq, &wait);
-	__set_current_state(TASK_RUNNING);
+	schedule();
+	return 0;
 }
 
 /*
@@ -1296,38 +1276,40 @@ repeat:
  * that it isn't found.  This is because iget will immediately call
  * ->read_inode, and we want to be sure that evidence of the deletion is found
  * by ->read_inode.
- *
- * This call might return early if an inode which shares the waitq is woken up.
- * This is most easily handled by the caller which will loop around again
- * looking for the inode.
- *
  * This is called with inode_lock held.
  */
 static void __wait_on_freeing_inode(struct inode *inode)
 {
-	DECLARE_WAITQUEUE(wait, current);
-	wait_queue_head_t *wq = i_waitq_head(inode);
+	wait_queue_head_t *wq;
+	DEFINE_WAIT_BIT(wait, &inode->i_state, __I_LOCK);
 
-	add_wait_queue(wq, &wait);
-	set_current_state(TASK_UNINTERRUPTIBLE);
+	/*
+	 * I_FREEING and I_CLEAR are cleared in process context under
+	 * inode_lock, so we have to give the tasks who would clear them
+	 * a chance to run and acquire inode_lock.
+	 */
+	if (!(inode->i_state & I_LOCK)) {
+		spin_unlock(&inode_lock);
+		yield();
+		spin_lock(&inode_lock);
+		return;
+	}
+	wq = bit_waitqueue(&inode->i_state, __I_LOCK);
+	prepare_to_wait(wq, &wait.wait, TASK_UNINTERRUPTIBLE);
 	spin_unlock(&inode_lock);
 	schedule();
-	remove_wait_queue(wq, &wait);
+	finish_wait(wq, &wait.wait);
 	spin_lock(&inode_lock);
 }
 
 void wake_up_inode(struct inode *inode)
 {
-	wait_queue_head_t *wq = i_waitq_head(inode);
-
 	/*
 	 * Prevent speculative execution through spin_unlock(&inode_lock);
 	 */
 	smp_mb();
-	if (waitqueue_active(wq))
-		wake_up_all(wq);
+	wake_up_bit(&inode->i_state, __I_LOCK);
 }
-EXPORT_SYMBOL(wake_up_inode);
 
 static __initdata unsigned long ihash_entries;
 static int __init set_ihash_entries(char *str)
@@ -1361,11 +1343,6 @@ void __init inode_init_early(void)
 
 void __init inode_init(unsigned long mempages)
 {
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(i_wait_queue_heads); i++)
-		init_waitqueue_head(&i_wait_queue_heads[i].wqh);
-
 	/* inode slab cache */
 	inode_cachep = kmem_cache_create("inode_cache", sizeof(struct inode),
 				0, SLAB_PANIC, init_once, NULL);

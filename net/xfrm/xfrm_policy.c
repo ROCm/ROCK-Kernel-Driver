@@ -21,7 +21,6 @@
 #include <linux/workqueue.h>
 #include <linux/notifier.h>
 #include <linux/netdevice.h>
-#include <linux/netfilter.h>
 #include <net/xfrm.h>
 #include <net/ip.h>
 
@@ -40,6 +39,9 @@ static struct work_struct xfrm_policy_gc_work;
 static struct list_head xfrm_policy_gc_list =
 	LIST_HEAD_INIT(xfrm_policy_gc_list);
 static spinlock_t xfrm_policy_gc_lock = SPIN_LOCK_UNLOCKED;
+
+static struct xfrm_policy_afinfo *xfrm_policy_get_afinfo(unsigned short family);
+static void xfrm_policy_put_afinfo(struct xfrm_policy_afinfo *afinfo);
 
 int xfrm_register_type(struct xfrm_type *type, unsigned short family)
 {
@@ -225,7 +227,7 @@ struct xfrm_policy *xfrm_policy_alloc(int gfp)
 	if (policy) {
 		memset(policy, 0, sizeof(struct xfrm_policy));
 		atomic_set(&policy->refcnt, 1);
-		policy->lock = RW_LOCK_UNLOCKED;
+		rwlock_init(&policy->lock);
 		init_timer(&policy->timer);
 		policy->timer.data = (unsigned long)policy;
 		policy->timer.function = xfrm_policy_timer;
@@ -287,7 +289,7 @@ static void xfrm_policy_gc_task(void *data)
  * entry dead. The rule must be unlinked from lists to the moment.
  */
 
-void xfrm_policy_kill(struct xfrm_policy *policy)
+static void xfrm_policy_kill(struct xfrm_policy *policy)
 {
 	write_lock_bh(&policy->lock);
 	if (policy->dead)
@@ -333,7 +335,7 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 	struct xfrm_policy **newpos = NULL;
 
 	write_lock_bh(&xfrm_policy_lock);
-	for (p = &xfrm_policy_list[dir]; (pol=*p)!=NULL; p = &pol->next) {
+	for (p = &xfrm_policy_list[dir]; (pol=*p)!=NULL;) {
 		if (!delpol && memcmp(&policy->selector, &pol->selector, sizeof(pol->selector)) == 0) {
 			if (excl) {
 				write_unlock_bh(&xfrm_policy_lock);
@@ -343,12 +345,15 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 			delpol = pol;
 			if (policy->priority > pol->priority)
 				continue;
-		} else if (policy->priority >= pol->priority)
+		} else if (policy->priority >= pol->priority) {
+			p = &pol->next;
 			continue;
+		}
 		if (!newpos)
 			newpos = p;
 		if (delpol)
 			break;
+		p = &pol->next;
 	}
 	if (newpos)
 		p = newpos;
@@ -712,25 +717,11 @@ int xfrm_lookup(struct dst_entry **dst_p, struct flowi *fl,
 {
 	struct xfrm_policy *policy;
 	struct xfrm_state *xfrm[XFRM_MAX_DEPTH];
-	struct rtable *rt = (struct rtable*)*dst_p;
-	struct dst_entry *dst;
+	struct dst_entry *dst, *dst_orig = *dst_p;
 	int nx = 0;
 	int err;
 	u32 genid;
-	u16 family = (*dst_p)->ops->family;
-
-	switch (family) {
-	case AF_INET:
-		if (!fl->fl4_src)
-			fl->fl4_src = rt->rt_src;
-		if (!fl->fl4_dst)
-			fl->fl4_dst = rt->rt_dst;
-	case AF_INET6:
-		/* Still not clear... */
-	default:
-		/* nothing */;
-	}
-
+	u16 family = dst_orig->ops->family;
 restart:
 	genid = atomic_read(&flow_cache_genid);
 	policy = NULL;
@@ -739,7 +730,7 @@ restart:
 
 	if (!policy) {
 		/* To accelerate a bit...  */
-		if ((rt->u.dst.flags & DST_NOXFRM) || !xfrm_policy_list[XFRM_POLICY_OUT])
+		if ((dst_orig->flags & DST_NOXFRM) || !xfrm_policy_list[XFRM_POLICY_OUT])
 			return 0;
 
 		policy = flow_cache_lookup(fl, family,
@@ -814,7 +805,7 @@ restart:
 			return 0;
 		}
 
-		dst = &rt->u.dst;
+		dst = dst_orig;
 		err = xfrm_bundle_create(policy, xfrm, nx, fl, &dst, family);
 
 		if (unlikely(err)) {
@@ -844,12 +835,12 @@ restart:
 		write_unlock_bh(&policy->lock);
 	}
 	*dst_p = dst;
-	ip_rt_put(rt);
+	dst_release(dst_orig);
 	xfrm_pol_put(policy);
 	return 0;
 
 error:
-	ip_rt_put(rt);
+	dst_release(dst_orig);
 	xfrm_pol_put(policy);
 	*dst_p = NULL;
 	return err;
@@ -908,6 +899,16 @@ _decode_session(struct sk_buff *skb, struct flowi *fl, unsigned short family)
 	return 0;
 }
 
+static inline int secpath_has_tunnel(struct sec_path *sp, int k)
+{
+	for (; k < sp->len; k++) {
+		if (sp->x[k].xvec->props.mode)
+			return 1;
+	}
+
+	return 0;
+}
+
 int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb, 
 			unsigned short family)
 {
@@ -916,7 +917,6 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb,
 
 	if (_decode_session(skb, &fl, family) < 0)
 		return 0;
-	nf_nat_decode_session(skb, &fl, family);
 
 	/* First, check used SA against their selectors. */
 	if (skb->sp) {
@@ -946,7 +946,7 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb,
 					xfrm_policy_lookup);
 
 	if (!pol)
-		return !skb->sp;
+		return !skb->sp || !secpath_has_tunnel(skb->sp, 0);
 
 	pol->curlft.use_time = (unsigned long)xtime.tv_sec;
 
@@ -970,10 +970,8 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb,
 				goto reject;
 		}
 
-		for (; k < sp->len; k++) {
-			if (sp->x[k].xvec->props.mode)
-				goto reject;
-		}
+		if (secpath_has_tunnel(sp, k))
+			goto reject;
 
 		xfrm_pol_put(pol);
 		return 1;
@@ -1193,7 +1191,7 @@ int xfrm_policy_unregister_afinfo(struct xfrm_policy_afinfo *afinfo)
 	return err;
 }
 
-struct xfrm_policy_afinfo *xfrm_policy_get_afinfo(unsigned short family)
+static struct xfrm_policy_afinfo *xfrm_policy_get_afinfo(unsigned short family)
 {
 	struct xfrm_policy_afinfo *afinfo;
 	if (unlikely(family >= NPROTO))
@@ -1206,7 +1204,7 @@ struct xfrm_policy_afinfo *xfrm_policy_get_afinfo(unsigned short family)
 	return afinfo;
 }
 
-void xfrm_policy_put_afinfo(struct xfrm_policy_afinfo *afinfo)
+static void xfrm_policy_put_afinfo(struct xfrm_policy_afinfo *afinfo)
 {
 	if (unlikely(afinfo == NULL))
 		return;

@@ -22,12 +22,18 @@ LD              := $(LD) -m elf64ppc
 CC		:= $(CC) -m64
 endif
 
-CHECKFLAGS	+= -m64 -D__powerpc__=1
+new_nm := $(shell if $(NM) --help 2>&1 | grep -- '--synthetic' > /dev/null; then echo y; else echo n; fi)
+
+ifeq ($(new_nm),y)
+NM		:= $(NM) --synthetic
+endif
+
+CHECKFLAGS	+= -m64 -D__powerpc__
 
 LDFLAGS		:= -m elf64ppc
 LDFLAGS_vmlinux	:= -Bstatic -e $(KERNELLOAD) -Ttext $(KERNELLOAD)
-CFLAGS		+= -msoft-float -pipe -Wno-uninitialized -mminimal-toc \
-		   -mtraceback=none
+CFLAGS		+= -msoft-float -pipe -mminimal-toc -mtraceback=none \
+		   -mcall-aixdesc
 
 ifeq ($(CONFIG_POWER4_ONLY),y)
 	CFLAGS += $(call cc-option,-mcpu=power4)
@@ -50,11 +56,13 @@ drivers-$(CONFIG_OPROFILE)	+= arch/ppc64/oprofile/
 boot := arch/ppc64/boot
 
 boottarget-$(CONFIG_PPC_PSERIES) := zImage zImage.initrd
+boottarget-$(CONFIG_PPC_MAPLE) := zImage zImage.initrd
 boottarget-$(CONFIG_PPC_ISERIES) := vmlinux.sminitrd vmlinux.initrd vmlinux.sm
 $(boottarget-y): vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
 bootimage-$(CONFIG_PPC_PSERIES) := zImage
+bootimage-$(CONFIG_PPC_MAPLE) := zImage
 bootimage-$(CONFIG_PPC_ISERIES) := vmlinux
 BOOTIMAGE := $(bootimage-y)
 install: vmlinux
@@ -80,4 +88,4 @@ define archhelp
   echo  '		   (arch/$(ARCH)/boot/zImage.initrd)'
 endef
 
-MRPROPER_FILES += include/asm-ppc64/offsets.h
+CLEAN_FILES += include/asm-ppc64/offsets.h

@@ -3,6 +3,7 @@
 
 #include <linux/config.h>
 #include <linux/mm.h>
+#include <asm/compiler.h>
 
 #ifndef __EXTERN_INLINE
 #define __EXTERN_INLINE extern inline
@@ -86,7 +87,7 @@ flush_tlb(void)
 static inline void
 flush_tlb_other(struct mm_struct *mm)
 {
-	long *mmc = &mm->context[smp_processor_id()];
+	unsigned long *mmc = &mm->context[smp_processor_id()];
 	/* Check it's not zero first to avoid cacheline ping pong
 	   when possible.  */
 	if (*mmc) *mmc = 0;

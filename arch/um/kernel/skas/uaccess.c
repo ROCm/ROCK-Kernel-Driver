@@ -107,7 +107,7 @@ static int buffer_op(unsigned long addr, int len, int is_write,
 {
 	int faulted, res;
 
-	faulted = setjmp_wrapper(do_buffer_op, addr, len, is_write, op, arg, 
+	faulted = setjmp_wrapper(do_buffer_op, addr, len, is_write, op, arg,
 				 &res);
 	if(!faulted)
 		return(res);

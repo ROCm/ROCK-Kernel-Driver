@@ -56,8 +56,6 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
-extern int ide_wait_ms;
-
 /**
  *	generic_id		-	add a generic drive id
  *	@drive:	drive to make an ID block for
@@ -182,12 +180,6 @@ static inline void do_identify (ide_drive_t *drive, u8 cmd)
 	if (cmd == WIN_PIDENTIFY) {
 		u8 type = (id->config >> 8) & 0x1f;
 		printk("ATAPI ");
-#ifdef CONFIG_BLK_DEV_PDC4030
-		if (hwif->channel == 1 && hwif->chipset == ide_pdc4030) {
-			printk(" -- not supported on 2nd Promise port\n");
-			goto err_misc;
-		}
-#endif /* CONFIG_BLK_DEV_PDC4030 */
 		switch (type) {
 			case ide_floppy:
 				if (!strstr(id->model, "CD-ROM")) {
@@ -275,7 +267,7 @@ static int actual_try_to_identify (ide_drive_t *drive, u8 cmd)
 	u8 s = 0, a = 0;
 
 	/* take a deep breath */
-	msleep(ide_wait_ms);
+	msleep(50);
 
 	if (IDE_CONTROL_REG) {
 		a = hwif->INB(IDE_ALTSTATUS_REG);
@@ -299,13 +291,9 @@ static int actual_try_to_identify (ide_drive_t *drive, u8 cmd)
 		/* disable dma & overlap */
 		hwif->OUTB(0, IDE_FEATURE_REG);
 
-	if (hwif->identify != NULL) {
-		if (hwif->identify(drive))
-			return 1;
-	} else {
-		/* ask drive for ID */
-		hwif->OUTB(cmd, IDE_COMMAND_REG);
-	}
+	/* ask drive for ID */
+	hwif->OUTB(cmd, IDE_COMMAND_REG);
+
 	timeout = ((cmd == WIN_IDENTIFY) ? WAIT_WORSTCASE : WAIT_PIDENTIFY) / 2;
 	timeout += jiffies;
 	do {
@@ -314,11 +302,11 @@ static int actual_try_to_identify (ide_drive_t *drive, u8 cmd)
 			return 1;
 		}
 		/* give drive a breather */
-		msleep(ide_wait_ms);
+		msleep(50);
 	} while ((hwif->INB(hd_status)) & BUSY_STAT);
 
 	/* wait for IRQ and DRQ_STAT */
-	msleep(ide_wait_ms);
+	msleep(50);
 	if (OK_STAT((hwif->INB(IDE_STATUS_REG)), DRQ_STAT, BAD_R_STAT)) {
 		unsigned long flags;
 
@@ -391,15 +379,6 @@ static int try_to_identify (ide_drive_t *drive, u8 cmd)
 				 */
 				printk("%s: IRQ probe failed (0x%lx)\n",
 					drive->name, cookie);
-#ifdef CONFIG_BLK_DEV_CMD640
-#ifdef CMD640_DUMP_REGS
-				if (hwif->chipset == ide_cmd640) {
-					printk("%s: Hmmm.. probably a driver "
-						"problem.\n", drive->name);
-					CMD640_DUMP_REGS;
-				}
-#endif /* CMD640_DUMP_REGS */
-#endif /* CONFIG_BLK_DEV_CMD640 */
 			}
 		}
 	}
@@ -447,15 +426,15 @@ static int do_probe (ide_drive_t *drive, u8 cmd)
 	/* needed for some systems
 	 * (e.g. crw9624 as drive0 with disk as slave)
 	 */
-	msleep(ide_wait_ms);
+	msleep(50);
 	SELECT_DRIVE(drive);
-	msleep(ide_wait_ms);
+	msleep(50);
 	if (hwif->INB(IDE_SELECT_REG) != drive->select.all && !drive->present) {
 		if (drive->select.b.unit != 0) {
 			/* exit with drive0 selected */
 			SELECT_DRIVE(&hwif->drives[0]);
 			/* allow BUSY_STAT to assert & clear */
-			msleep(ide_wait_ms);
+			msleep(50);
 		}
 		/* no i/f present: mmm.. this should be a 4 -ml */
 		return 3;
@@ -478,14 +457,14 @@ static int do_probe (ide_drive_t *drive, u8 cmd)
 			printk("%s: no response (status = 0x%02x), "
 				"resetting drive\n", drive->name,
 				hwif->INB(IDE_STATUS_REG));
-			msleep(ide_wait_ms);
+			msleep(50);
 			hwif->OUTB(drive->select.all, IDE_SELECT_REG);
-			msleep(ide_wait_ms);
+			msleep(50);
 			hwif->OUTB(WIN_SRST, IDE_COMMAND_REG);
 			timeout = jiffies;
 			while (((hwif->INB(IDE_STATUS_REG)) & BUSY_STAT) &&
 			       time_before(jiffies, timeout + WAIT_WORSTCASE))
-				msleep(ide_wait_ms);
+				msleep(50);
 			rc = try_to_identify(drive, cmd);
 		}
 		if (rc == 1)
@@ -500,7 +479,7 @@ static int do_probe (ide_drive_t *drive, u8 cmd)
 	if (drive->select.b.unit != 0) {
 		/* exit with drive0 selected */
 		SELECT_DRIVE(&hwif->drives[0]);
-		msleep(ide_wait_ms);
+		msleep(50);
 		/* ensure drive irq is clear */
 		(void) hwif->INB(IDE_STATUS_REG);
 	}
@@ -517,7 +496,7 @@ static void enable_nest (ide_drive_t *drive)
 
 	printk("%s: enabling %s -- ", hwif->name, drive->id->model);
 	SELECT_DRIVE(drive);
-	msleep(ide_wait_ms);
+	msleep(50);
 	hwif->OUTB(EXABYTE_ENABLE_NEST, IDE_COMMAND_REG);
 	timeout = jiffies + WAIT_WORSTCASE;
 	do {
@@ -525,10 +504,10 @@ static void enable_nest (ide_drive_t *drive)
 			printk("failed (timeout)\n");
 			return;
 		}
-		msleep(ide_wait_ms);
+		msleep(50);
 	} while ((hwif->INB(IDE_STATUS_REG)) & BUSY_STAT);
 
-	msleep(ide_wait_ms);
+	msleep(50);
 
 	if (!OK_STAT((hwif->INB(IDE_STATUS_REG)), 0, BAD_STAT)) {
 		printk("failed (status = 0x%02x)\n", hwif->INB(IDE_STATUS_REG));
@@ -673,6 +652,43 @@ static int wait_hwif_ready(ide_hwif_t *hwif)
 	return rc;
 }
 
+/**
+ *	ide_undecoded_slave	-	look for bad CF adapters
+ *	@hwif: interface
+ *
+ *	Analyse the drives on the interface and attempt to decide if we
+ *	have the same drive viewed twice. This occurs with crap CF adapters
+ *	and PCMCIA sometimes.
+ */
+
+void ide_undecoded_slave(ide_hwif_t *hwif)
+{
+	ide_drive_t *drive0 = &hwif->drives[0];
+	ide_drive_t *drive1 = &hwif->drives[1];
+
+	if (drive0->present == 0 || drive1->present == 0)
+		return;
+
+	/* If the models don't match they are not the same product */
+	if (strcmp(drive0->id->model, drive1->id->model))
+		return;
+
+	/* Serial numbers do not match */
+	if (strncmp(drive0->id->serial_no, drive1->id->serial_no, 20))
+		return;
+
+	/* No serial number, thankfully very rare for CF */
+	if (drive0->id->serial_no[0] == 0)
+		return;
+
+	/* Appears to be an IDE flash adapter with decode bugs */
+	printk(KERN_WARNING "ide-probe: ignoring undecoded slave\n");
+
+	drive1->present = 0;
+}
+
+EXPORT_SYMBOL_GPL(ide_undecoded_slave);
+
 /*
  * This routine only knows how to look for drive units 0 and 1
  * on an interface, so any setting of MAX_DRIVES > 2 won't work here.
@@ -687,9 +703,6 @@ static void probe_hwif(ide_hwif_t *hwif)
 		return;
 
 	if ((hwif->chipset != ide_4drives || !hwif->mate || !hwif->mate->present) &&
-#ifdef CONFIG_BLK_DEV_PDC4030
-	    (hwif->chipset != ide_pdc4030 || hwif->channel == 0) &&
-#endif /* CONFIG_BLK_DEV_PDC4030 */
 	    (ide_hwif_request_regions(hwif))) {
 		u16 msgout = 0;
 		for (unit = 0; unit < MAX_DRIVES; ++unit) {
@@ -747,18 +760,6 @@ static void probe_hwif(ide_hwif_t *hwif)
 		ide_drive_t *drive = &hwif->drives[unit];
 		drive->dn = (hwif->channel ? 2 : 0) + unit;
 		(void) probe_for_drive(drive);
-		if (drive->present && hwif->present && unit == 1) {
-			if (strcmp(hwif->drives[0].id->model, drive->id->model) == 0 &&
-			    /* Don't do this for noprobe or non ATA */
-			    strcmp(drive->id->model, "UNKNOWN") &&
-			    /* And beware of confused Maxtor drives that go "M0000000000"
-			      "The SN# is garbage in the ID block..." [Eric] */
-			    strncmp(drive->id->serial_no, "M0000000000000000000", 20) &&
-			    strncmp(hwif->drives[0].id->serial_no, drive->id->serial_no, 20) == 0) {
-				printk(KERN_WARNING "ide-probe: ignoring undecoded slave\n");
-				drive->present = 0;
-			}
-		}
 		if (drive->present && !hwif->present) {
 			hwif->present = 1;
 			if (hwif->chipset != ide_4drives ||
@@ -777,7 +778,7 @@ static void probe_hwif(ide_hwif_t *hwif)
 		udelay(10);
 		hwif->OUTB(8, hwif->io_ports[IDE_CONTROL_OFFSET]);
 		do {
-			msleep(ide_wait_ms);
+			msleep(50);
 			stat = hwif->INB(hwif->io_ports[IDE_STATUS_OFFSET]);
 		} while ((stat & BUSY_STAT) && time_after(timeout, jiffies));
 
@@ -832,9 +833,14 @@ static void probe_hwif(ide_hwif_t *hwif)
 }
 
 static int hwif_init(ide_hwif_t *hwif);
-int probe_hwif_init (ide_hwif_t *hwif)
+
+int probe_hwif_init_with_fixup(ide_hwif_t *hwif, void (*fixup)(ide_hwif_t *hwif))
 {
 	probe_hwif(hwif);
+
+	if (fixup)
+		fixup(hwif);
+
 	hwif_init(hwif);
 
 	if (hwif->present) {
@@ -850,6 +856,11 @@ int probe_hwif_init (ide_hwif_t *hwif)
 		}
 	}
 	return 0;
+}
+
+int probe_hwif_init(ide_hwif_t *hwif)
+{
+	return probe_hwif_init_with_fixup(hwif, NULL);
 }
 
 EXPORT_SYMBOL(probe_hwif_init);
@@ -1138,7 +1149,7 @@ static int ata_lock(dev_t dev, void *data)
 
 extern ide_driver_t idedefault_driver;
 
-struct kobject *ata_probe(dev_t dev, int *part, void *data)
+static struct kobject *ata_probe(dev_t dev, int *part, void *data)
 {
 	ide_hwif_t *hwif = data;
 	int unit = *part >> PARTN_BITS;
@@ -1257,6 +1268,16 @@ static int hwif_init(ide_hwif_t *hwif)
 	if (register_blkdev(hwif->major, hwif->name))
 		return 0;
 
+	if (!hwif->sg_max_nents)
+		hwif->sg_max_nents = PRD_ENTRIES;
+
+	hwif->sg_table = kmalloc(sizeof(struct scatterlist)*hwif->sg_max_nents,
+				 GFP_KERNEL);
+	if (!hwif->sg_table) {
+		printk(KERN_ERR "%s: unable to allocate SG table.\n", hwif->name);
+		goto out;
+	}
+
 	if (alloc_disks(hwif) < 0)
 		goto out;
 	
@@ -1306,9 +1327,6 @@ int ideprobe_init (void)
 	for (index = 0; index < MAX_HWIFS; ++index)
 		probe[index] = !ide_hwifs[index].present;
 
-	/*
-	 * Probe for drives in the usual way.. CMOS/BIOS, then poke at ports
-	 */
 	for (index = 0; index < MAX_HWIFS; ++index)
 		if (probe[index])
 			probe_hwif(&ide_hwifs[index]);

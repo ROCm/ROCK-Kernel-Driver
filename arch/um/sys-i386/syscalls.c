@@ -65,10 +65,10 @@ int sys_clone(unsigned long clone_flags, unsigned long newsp, int *parent_tid,
 {
 	long ret;
 
-	/* XXX: normal arch do here this pass, and also pass the regs to 
-	 * do_fork, instead of NULL. Currently the arch-independent code 
-	 * ignores these values, while the UML code (actually it's 
-	 * copy_thread) does the right thing. But this should change, 
+	/* XXX: normal arch do here this pass, and also pass the regs to
+	 * do_fork, instead of NULL. Currently the arch-independent code
+	 * ignores these values, while the UML code (actually it's
+	 * copy_thread) does the right thing. But this should change,
 	 probably. */
 	/*if (!newsp)
 		newsp = UPT_SP(current->thread.regs);*/

@@ -611,121 +611,6 @@ marvel_pci_tbi(struct pci_controller *hose, dma_addr_t start, dma_addr_t end)
 }
 
 
-/*
- * IO map support.
- */
-unsigned long
-marvel_ioremap(unsigned long addr, unsigned long size)
-{
-	struct pci_controller *hose;
-	unsigned long baddr, last;
-	struct vm_struct *area;
-	unsigned long vaddr;
-	unsigned long *ptes;
-	unsigned long pfn;
-
-	/*
-	 * Adjust the addr.
-	 */ 
-#ifdef CONFIG_VGA_HOSE
-	if (pci_vga_hose && __marvel_is_mem_vga(addr)) {
-		addr += pci_vga_hose->mem_space->start;
-	}
-#endif
-
-	if (!marvel_is_ioaddr(addr)) return 0UL;
-
-	/*
-	 * Find the hose.
-	 */
-	for (hose = hose_head; hose; hose = hose->next) {
-		if ((addr >> 32) == (hose->mem_space->start >> 32))
-			break; 
-	}
-	if (!hose)
-		return 0UL;
-
-	/*
-	 * We have the hose - calculate the bus limits.
-	 */
-	baddr = addr - hose->mem_space->start;
-	last = baddr + size - 1;
-
-	/*
-	 * Is it direct-mapped?
-	 */
-	if ((baddr >= __direct_map_base) && 
-	    ((baddr + size - 1) < __direct_map_base + __direct_map_size)) 
-		return IDENT_ADDR | (baddr - __direct_map_base);
-
-	/* 
-	 * Check the scatter-gather arena.
-	 */
-	if (hose->sg_pci &&
-	    baddr >= (unsigned long)hose->sg_pci->dma_base &&
-	    last < (unsigned long)hose->sg_pci->dma_base + hose->sg_pci->size){
-
-		/*
-		 * Adjust the limits (mappings must be page aligned)
-		 */
-		baddr -= hose->sg_pci->dma_base;
-		last -= hose->sg_pci->dma_base;
-		baddr &= PAGE_MASK;
-		size = PAGE_ALIGN(last) - baddr;
-
-		/*
-		 * Map it.
-		 */
-		area = get_vm_area(size, VM_IOREMAP);
-		if (!area) return (unsigned long)NULL;
-		ptes = hose->sg_pci->ptes;
-		for (vaddr = (unsigned long)area->addr; 
-		    baddr <= last; 
-		    baddr += PAGE_SIZE, vaddr += PAGE_SIZE) {
-			pfn = ptes[baddr >> PAGE_SHIFT];
-			if (!(pfn & 1)) {
-				printk("ioremap failed... pte not valid...\n");
-				vfree(area->addr);
-				return 0UL;
-			}
-			pfn >>= 1;	/* make it a true pfn */
-			
-			if (__alpha_remap_area_pages(vaddr,
-						     pfn << PAGE_SHIFT, 
-						     PAGE_SIZE, 0)) {
-				printk("FAILED to map...\n");
-				vfree(area->addr);
-				return 0UL;
-			}
-		}
-
-		flush_tlb_all();
-
-		vaddr = (unsigned long)area->addr + (addr & ~PAGE_MASK);
-
-		return vaddr;
-	}
-
-	/*
-	 * Not found - assume legacy ioremap.
-	 */
-	return addr;
-}
-
-void
-marvel_iounmap(unsigned long addr)
-{
-	if (((long)addr >> 41) == -2)
-		return;	/* kseg map, nothing to do */
-	if (addr)
-		vfree((void *)(PAGE_MASK & addr)); 
-}
-
-#ifndef CONFIG_ALPHA_GENERIC
-EXPORT_SYMBOL(marvel_ioremap);
-EXPORT_SYMBOL(marvel_iounmap);
-#endif
-
 
 /*
  * RTC Support
@@ -755,11 +640,12 @@ __marvel_access_rtc(void *info)
 	rtc_access->data = __r0;
 }
 
-u8
-__marvel_rtc_io(int write, u8 b, unsigned long addr)
+static u8
+__marvel_rtc_io(u8 b, unsigned long addr, int write)
 {
-	struct marvel_rtc_access_info rtc_access = {0, };
 	static u8 index = 0;
+
+	struct marvel_rtc_access_info rtc_access;
 	u8 ret = 0;
 
 	switch(addr) {
@@ -771,23 +657,19 @@ __marvel_rtc_io(int write, u8 b, unsigned long addr)
 	case 0x71:					/* RTC_PORT(1) */
 		rtc_access.index = index;
 		rtc_access.data = BCD_TO_BIN(b);
-		rtc_access.function = 0x49;		/* GET_TOY */
-		if (write) rtc_access.function = 0x48;	/* PUT_TOY */
+		rtc_access.function = 0x48 + !write;	/* GET/PUT_TOY */
 
 #ifdef CONFIG_SMP
 		if (smp_processor_id() != boot_cpuid)
 			smp_call_function_on_cpu(__marvel_access_rtc,
-						 &rtc_access,
-						 1,	/* retry */
-						 1,	/* wait  */
-						 1UL << boot_cpuid);
+						 &rtc_access, 1, 1,
+						 cpumask_of_cpu(boot_cpuid));
 		else
 			__marvel_access_rtc(&rtc_access);
 #else
 		__marvel_access_rtc(&rtc_access);
 #endif
 		ret = BIN_TO_BCD(rtc_access.data);
-		
 		break;
 
 	default:
@@ -798,6 +680,179 @@ __marvel_rtc_io(int write, u8 b, unsigned long addr)
 	return ret;
 }
 
+
+/*
+ * IO map support.
+ */
+
+#define __marvel_is_mem_vga(a)	(((a) >= 0xa0000) && ((a) <= 0xc0000))
+
+void __iomem *
+marvel_ioremap(unsigned long addr, unsigned long size)
+{
+	struct pci_controller *hose;
+	unsigned long baddr, last;
+	struct vm_struct *area;
+	unsigned long vaddr;
+	unsigned long *ptes;
+	unsigned long pfn;
+
+	/*
+	 * Adjust the addr.
+	 */ 
+#ifdef CONFIG_VGA_HOSE
+	if (pci_vga_hose && __marvel_is_mem_vga(addr)) {
+		addr += pci_vga_hose->mem_space->start;
+	}
+#endif
+
+	/*
+	 * Find the hose.
+	 */
+	for (hose = hose_head; hose; hose = hose->next) {
+		if ((addr >> 32) == (hose->mem_space->start >> 32))
+			break; 
+	}
+	if (!hose)
+		return NULL;
+
+	/*
+	 * We have the hose - calculate the bus limits.
+	 */
+	baddr = addr - hose->mem_space->start;
+	last = baddr + size - 1;
+
+	/*
+	 * Is it direct-mapped?
+	 */
+	if ((baddr >= __direct_map_base) && 
+	    ((baddr + size - 1) < __direct_map_base + __direct_map_size)) {
+		addr = IDENT_ADDR | (baddr - __direct_map_base);
+		return (void __iomem *) addr;
+	}
+
+	/* 
+	 * Check the scatter-gather arena.
+	 */
+	if (hose->sg_pci &&
+	    baddr >= (unsigned long)hose->sg_pci->dma_base &&
+	    last < (unsigned long)hose->sg_pci->dma_base + hose->sg_pci->size) {
+
+		/*
+		 * Adjust the limits (mappings must be page aligned)
+		 */
+		baddr -= hose->sg_pci->dma_base;
+		last -= hose->sg_pci->dma_base;
+		baddr &= PAGE_MASK;
+		size = PAGE_ALIGN(last) - baddr;
+
+		/*
+		 * Map it.
+		 */
+		area = get_vm_area(size, VM_IOREMAP);
+		if (!area)
+			return NULL;
+
+		ptes = hose->sg_pci->ptes;
+		for (vaddr = (unsigned long)area->addr; 
+		    baddr <= last; 
+		    baddr += PAGE_SIZE, vaddr += PAGE_SIZE) {
+			pfn = ptes[baddr >> PAGE_SHIFT];
+			if (!(pfn & 1)) {
+				printk("ioremap failed... pte not valid...\n");
+				vfree(area->addr);
+				return NULL;
+			}
+			pfn >>= 1;	/* make it a true pfn */
+			
+			if (__alpha_remap_area_pages(vaddr,
+						     pfn << PAGE_SHIFT, 
+						     PAGE_SIZE, 0)) {
+				printk("FAILED to map...\n");
+				vfree(area->addr);
+				return NULL;
+			}
+		}
+
+		flush_tlb_all();
+
+		vaddr = (unsigned long)area->addr + (addr & ~PAGE_MASK);
+
+		return (void __iomem *) vaddr;
+	}
+
+	return NULL;
+}
+
+void
+marvel_iounmap(volatile void __iomem *xaddr)
+{
+	unsigned long addr = (unsigned long) xaddr;
+	if (addr >= VMALLOC_START)
+		vfree((void *)(PAGE_MASK & addr)); 
+}
+
+int
+marvel_is_mmio(const volatile void __iomem *xaddr)
+{
+	unsigned long addr = (unsigned long) xaddr;
+
+	if (addr >= VMALLOC_START)
+		return 1;
+	else
+		return (addr & 0xFF000000UL) == 0;
+}
+
+#define __marvel_is_port_vga(a)	\
+  (((a) >= 0x3b0) && ((a) < 0x3e0) && ((a) != 0x3b3) && ((a) != 0x3d3))
+#define __marvel_is_port_kbd(a)	(((a) == 0x60) || ((a) == 0x64))
+#define __marvel_is_port_rtc(a)	(((a) == 0x70) || ((a) == 0x71))
+
+void __iomem *marvel_ioportmap (unsigned long addr)
+{
+	if (__marvel_is_port_rtc (addr) || __marvel_is_port_kbd(addr))
+		;
+#ifdef CONFIG_VGA_HOSE
+	else if (__marvel_is_port_vga (addr) && pci_vga_hose)
+		addr += pci_vga_hose->io_space->start;
+#endif
+	else
+		return NULL;
+	return (void __iomem *)addr;
+}
+
+unsigned int
+marvel_ioread8(void __iomem *xaddr)
+{
+	unsigned long addr = (unsigned long) xaddr;
+	if (__marvel_is_port_kbd(addr))
+		return 0;
+	else if (__marvel_is_port_rtc(addr))
+		return __marvel_rtc_io(0, addr, 0);
+	else
+		return __kernel_ldbu(*(vucp)addr);
+}
+
+void
+marvel_iowrite8(u8 b, void __iomem *xaddr)
+{
+	unsigned long addr = (unsigned long) xaddr;
+	if (__marvel_is_port_kbd(addr))
+		return;
+	else if (__marvel_is_port_rtc(addr)) 
+		__marvel_rtc_io(b, addr, 1);
+	else
+		__kernel_stb(b, *(vucp)addr);
+}
+
+#ifndef CONFIG_ALPHA_GENERIC
+EXPORT_SYMBOL(marvel_ioremap);
+EXPORT_SYMBOL(marvel_iounmap);
+EXPORT_SYMBOL(marvel_is_mmio);
+EXPORT_SYMBOL(marvel_ioportmap);
+EXPORT_SYMBOL(marvel_ioread8);
+EXPORT_SYMBOL(marvel_iowrite8);
+#endif
 
 /*
  * NUMA Support

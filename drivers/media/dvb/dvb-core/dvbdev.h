@@ -49,6 +49,7 @@ struct dvb_adapter {
 	struct list_head device_list;
 	const char *name;
 	u8 proposed_mac [6];
+	void* priv;
 
 	struct module *module;
 };
@@ -57,6 +58,9 @@ struct dvb_adapter {
 struct dvb_device {
 	struct list_head list_head;
 	struct file_operations *fops;
+ 
+ 
+ 
 	struct dvb_adapter *adapter;
 	int type;
 	u32 id;
@@ -99,6 +103,6 @@ extern int dvb_usercopy(struct inode *inode, struct file *file,
 	                    unsigned int cmd, unsigned long arg,
 			    int (*func)(struct inode *inode, struct file *file,
 			    unsigned int cmd, void *arg));
-			      
+
 #endif /* #ifndef _DVBDEV_H_ */
 

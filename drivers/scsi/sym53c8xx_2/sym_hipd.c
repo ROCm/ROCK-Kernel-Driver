@@ -3,6 +3,7 @@
  * of PCI-SCSI IO processors.
  *
  * Copyright (C) 1999-2001  Gerard Roudier <groudier@free.fr>
+ * Copyright (c) 2003-2004  Matthew Wilcox <matthew@wil.cx>
  *
  * This driver is derived from the Linux sym53c8xx driver.
  * Copyright (C) 1998-2000  Gerard Roudier
@@ -22,32 +23,19 @@
  *
  *-----------------------------------------------------------------------------
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- * Where this Software is combined with software released under the terms of 
- * the GNU Public License ("GPL") and the terms of the GPL would require the 
- * combined work to also be released under the terms of the GPL, the terms
- * and conditions of this License will apply in addition to those of the
- * GPL with the exception of any terms or conditions of this License that
- * conflict with, or are expressly prohibited by, the GPL.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHORS AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 #include "sym_glue.h"
 #include "sym_nvram.h"
@@ -299,7 +287,6 @@ int sym_reset_scsi_bus(hcb_p np, int enab_int)
 	}
 out:
 	OUTB (nc_scntl1, 0);
-	/* MDELAY(100); */
 	return retv;
 }
 
@@ -1516,6 +1503,7 @@ static void sym_check_goals(struct scsi_device *sdev)
 		if (st->period > np->maxsync_dt)
 			st->period = np->maxsync_dt;
 	} else {
+		st->options &= ~PPR_OPT_MASK;
 		if (st->offset > np->maxoffs)
 			st->offset = np->maxoffs;
 		if (st->period < np->minsync)
@@ -1523,7 +1511,7 @@ static void sym_check_goals(struct scsi_device *sdev)
 		if (st->period > np->maxsync)
 			st->period = np->maxsync;
 	}
-}		
+}
 
 /*
  *  Prepare the next negotiation message if needed.
@@ -1588,7 +1576,7 @@ static int sym_prepare_nego(hcb_p np, ccb_p cp, int nego, u_char *msgptr)
 		msgptr[msglen++] = 0;
 		msgptr[msglen++] = tp->tinfo.goal.offset;
 		msgptr[msglen++] = tp->tinfo.goal.width;
-		msgptr[msglen++] = tp->tinfo.goal.options & PPR_OPT_DT;
+		msgptr[msglen++] = tp->tinfo.goal.options & PPR_OPT_MASK;
 		break;
 	};
 
@@ -1955,7 +1943,7 @@ void sym_start_up (hcb_p np, int reason)
 	if (np->features & (FE_ULTRA2|FE_ULTRA3)) {
 		OUTONW (nc_sien, SBMC);
 		if (reason == 0) {
-			MDELAY(100);
+			mdelay(100);
 			INW (nc_sist);
 		}
 		np->scsi_mode = INB (nc_stest4) & SMODE;
@@ -2022,7 +2010,7 @@ void sym_start_up (hcb_p np, int reason)
 /*
  *  Switch trans mode for current job and it's target.
  */
-static void sym_settrans(hcb_p np, int target, u_char dt, u_char ofs,
+static void sym_settrans(hcb_p np, int target, u_char opts, u_char ofs,
 			 u_char per, u_char wide, u_char div, u_char fak)
 {
 	SYM_QUEHEAD *qp;
@@ -2073,7 +2061,7 @@ static void sym_settrans(hcb_p np, int target, u_char dt, u_char ofs,
 	 */
 	if (np->features & FE_C10) {
 		uval = uval & ~(U3EN|AIPCKEN);
-		if (dt)	{
+		if (opts)	{
 			assert(np->features & FE_U3EN);
 			uval |= U3EN;
 		}
@@ -2176,17 +2164,17 @@ sym_setsync(hcb_p np, int target,
  *  Let everything be aware of the changes.
  */
 static void 
-sym_setpprot(hcb_p np, int target, u_char dt, u_char ofs,
+sym_setpprot(hcb_p np, int target, u_char opts, u_char ofs,
              u_char per, u_char wide, u_char div, u_char fak)
 {
 	tcb_p tp = &np->target[target];
 
-	sym_settrans(np, target, dt, ofs, per, wide, div, fak);
+	sym_settrans(np, target, opts, ofs, per, wide, div, fak);
 
 	tp->tinfo.goal.width	= tp->tinfo.curr.width  = wide;
 	tp->tinfo.goal.period	= tp->tinfo.curr.period = per;
 	tp->tinfo.goal.offset	= tp->tinfo.curr.offset = ofs;
-	tp->tinfo.goal.options	= tp->tinfo.curr.options = dt;
+	tp->tinfo.goal.options	= tp->tinfo.curr.options = opts;
 
 	sym_xpt_async_nego_ppr(np, target);
 }
@@ -2747,7 +2735,7 @@ unexpected_phase:
 		if	(dsp == SCRIPTA_BA (np, send_ident)) {
 			if (cp->tag != NO_TAG && olen - rest <= 3) {
 				cp->host_status = HS_BUSY;
-				np->msgout[0] = M_IDENTIFY | cp->lun;
+				np->msgout[0] = IDENTIFY(0, cp->lun);
 				nxtdsp = SCRIPTB_BA (np, ident_break_atn);
 			}
 			else
@@ -3176,10 +3164,7 @@ static void sym_sir_bad_scsi_status(hcb_p np, int num, ccb_p cp)
 		 *  requesting sense data.
 		 */
 
-		/*
-		 *  identify message
-		 */
-		cp->scsi_smsg2[0] = M_IDENTIFY | cp->lun;
+		cp->scsi_smsg2[0] = IDENTIFY(0, cp->lun);
 		msglen = 1;
 
 		/*
@@ -3538,8 +3523,8 @@ static void sym_sir_task_recovery(hcb_p np, int num)
 		 */
 		if (lun != -1) {
 			lcb_p lp = sym_lp(np, tp, lun);
-			lp->to_clear = 0; /* We donnot expect to fail here */
-			np->abrt_msg[0] = M_IDENTIFY | lun;
+			lp->to_clear = 0; /* We don't expect to fail here */
+			np->abrt_msg[0] = IDENTIFY(0, lun);
 			np->abrt_msg[1] = M_ABORT;
 			np->abrt_tbl.size = 2;
 			break;
@@ -3580,7 +3565,7 @@ static void sym_sir_task_recovery(hcb_p np, int num)
 		 *  We have some task to abort.
 		 *  Set the IDENTIFY(lun)
 		 */
-		np->abrt_msg[0] = M_IDENTIFY | cp->lun;
+		np->abrt_msg[0] = IDENTIFY(0, cp->lun);
 
 		/*
 		 *  If we want to abort an untagged command, we 
@@ -3591,8 +3576,7 @@ static void sym_sir_task_recovery(hcb_p np, int num)
 		if (cp->tag == NO_TAG) {
 			np->abrt_msg[1] = M_ABORT;
 			np->abrt_tbl.size = 2;
-		}
-		else {
+		} else {
 			np->abrt_msg[1] = cp->scsi_smsg[1];
 			np->abrt_msg[2] = cp->scsi_smsg[2];
 			np->abrt_msg[3] = M_ABORT_TAG;
@@ -4152,20 +4136,17 @@ static int
 sym_ppr_nego_check(hcb_p np, int req, int target)
 {
 	tcb_p tp = &np->target[target];
-	u_char	chg, ofs, per, fak, dt, div, wide;
+	unsigned char fak, div;
+	int dt, chg = 0;
+
+	unsigned char per = np->msgin[3];
+	unsigned char ofs = np->msgin[5];
+	unsigned char wide = np->msgin[6];
+	unsigned char opts = np->msgin[7] & PPR_OPT_MASK;
 
 	if (DEBUG_FLAGS & DEBUG_NEGO) {
 		sym_print_nego_msg(np, target, "ppr msgin", np->msgin);
-	};
-
-	/*
-	 *  Get requested values.
-	 */
-	chg  = 0;
-	per  = np->msgin[3];
-	ofs  = np->msgin[5];
-	wide = np->msgin[6];
-	dt   = np->msgin[7] & PPR_OPT_DT;
+	}
 
 	/*
 	 *  Check values against our limits.
@@ -4175,29 +4156,30 @@ sym_ppr_nego_check(hcb_p np, int req, int target)
 		wide = np->maxwide;
 	}
 	if (!wide || !(np->features & FE_ULTRA3))
-		dt &= ~PPR_OPT_DT;
+		opts = 0;
 
 	if (!(np->features & FE_U3EN))	/* Broken U3EN bit not supported */
-		dt &= ~PPR_OPT_DT;
+		opts = 0;
 
-	if (dt != (np->msgin[7] & PPR_OPT_MASK)) chg = 1;
+	if (opts != (np->msgin[7] & PPR_OPT_MASK))
+		chg = 1;
+
+	dt = opts & PPR_OPT_DT;
 
 	if (ofs) {
-		if (dt) {
-			if (ofs > np->maxoffs_dt)
-				{chg = 1; ofs = np->maxoffs_dt;}
+		unsigned char maxoffs = dt ? np->maxoffs_dt : np->maxoffs;
+		if (ofs > maxoffs) {
+			chg = 1;
+			ofs = maxoffs;
 		}
-		else if (ofs > np->maxoffs)
-			{chg = 1; ofs = np->maxoffs;}
 	}
 
 	if (ofs) {
-		if (dt) {
-			if (per < np->minsync_dt)
-				{chg = 1; per = np->minsync_dt;}
+		unsigned char minsync = dt ? np->minsync_dt : np->minsync;
+		if (per < np->minsync_dt) {
+			chg = 1;
+			per = minsync;
 		}
-		else if (per < np->minsync)
-			{chg = 1; per = np->minsync;}
 	}
 
 	/*
@@ -4217,7 +4199,7 @@ sym_ppr_nego_check(hcb_p np, int req, int target)
 	/*
 	 *  Apply new values.
 	 */
-	sym_setpprot (np, target, dt, ofs, per, wide, div, fak);
+	sym_setpprot(np, target, opts, ofs, per, wide, div, fak);
 
 	/*
 	 *  It was an answer. We are done.
@@ -4235,7 +4217,7 @@ sym_ppr_nego_check(hcb_p np, int req, int target)
 	np->msgout[4] = 0;
 	np->msgout[5] = ofs;
 	np->msgout[6] = wide;
-	np->msgout[7] = dt;
+	np->msgout[7] = opts;
 
 	if (DEBUG_FLAGS & DEBUG_NEGO) {
 		sym_print_nego_msg(np, target, "ppr msgout", np->msgout);
@@ -4251,7 +4233,7 @@ reject_it:
 	 *  If it is a device response that should result in  
 	 *  ST, we may want to try a legacy negotiation later.
 	 */
-	if (!req && !dt) {
+	if (!req && !opts) {
 		tp->tinfo.goal.options = 0;
 		tp->tinfo.goal.width   = wide;
 		tp->tinfo.goal.period  = per;
@@ -5284,8 +5266,9 @@ int sym_queue_scsiio(hcb_p np, cam_scsiio_p csio, ccb_p cp)
 {
 	tcb_p	tp;
 	lcb_p	lp;
-	u_char	idmsg, *msgptr;
+	u_char	*msgptr;
 	u_int   msglen;
+	int can_disconnect;
 
 	/*
 	 *  Keep track of the IO in our CCB.
@@ -5293,25 +5276,21 @@ int sym_queue_scsiio(hcb_p np, cam_scsiio_p csio, ccb_p cp)
 	cp->cam_ccb = (cam_ccb_p) csio;
 
 	/*
-	 *  Retreive the target descriptor.
+	 *  Retrieve the target descriptor.
 	 */
 	tp = &np->target[cp->target];
 
 	/*
-	 *  Retreive the lun descriptor.
+	 *  Retrieve the lun descriptor.
 	 */
 	lp = sym_lp(np, tp, cp->lun);
 
-	/*
-	 *  Build the IDENTIFY message.
-	 */
-	idmsg = M_IDENTIFY | cp->lun;
-	if (cp->tag != NO_TAG || (lp && (lp->curr_flags & SYM_DISC_ENABLED)))
-		idmsg |= 0x40;
+	can_disconnect = (cp->tag != NO_TAG) ||
+		(lp && (lp->curr_flags & SYM_DISC_ENABLED));
 
 	msgptr = cp->scsi_smsg;
 	msglen = 0;
-	msgptr[msglen++] = idmsg;
+	msgptr[msglen++] = IDENTIFY(can_disconnect, cp->lun);
 
 	/*
 	 *  Build the tag message if present.
@@ -5518,7 +5497,6 @@ void sym_complete_error (hcb_p np, ccb_p cp)
 		printf ("CCB=%lx STAT=%x/%x/%x DEV=%d/%d\n", (unsigned long)cp,
 			cp->host_status, cp->ssss_status, cp->host_flags,
 			cp->target, cp->lun);
-		MDELAY(100);
 	}
 
 	/*
@@ -5746,15 +5724,8 @@ if (resid)
 /*
  *  Soft-attach the controller.
  */
-#ifdef SYM_OPT_NVRAM_PRE_READ
 int sym_hcb_attach(hcb_p np, struct sym_fw *fw, struct sym_nvram *nvram)
-#else
-int sym_hcb_attach(hcb_p np, struct sym_fw *fw)
-#endif
 {
-#ifndef SYM_OPT_NVRAM_PRE_READ
-	struct sym_nvram nvram_buf, *nvram = &nvram_buf;
-#endif
 	int i;
 
 	/*
@@ -5779,13 +5750,6 @@ int sym_hcb_attach(hcb_p np, struct sym_fw *fw)
 	 *  if the chip is currently active.
 	 */
 	sym_chip_reset (np);
-
-	/*
-	 *  Try to read the user set-up.
-	 */
-#ifndef SYM_OPT_NVRAM_PRE_READ
-	(void) sym_read_nvram(np, nvram);
-#endif
 
 	/*
 	 *  Prepare controller and devices settings, according 

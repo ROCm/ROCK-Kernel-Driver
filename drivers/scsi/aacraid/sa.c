@@ -82,68 +82,6 @@ static irqreturn_t aac_sa_intr(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 /**
- *	aac_sa_enable_interrupt	-	enable an interrupt event
- *	@dev: Which adapter to enable.
- *	@event: Which adapter event.
- *
- *	This routine will enable the corresponding adapter event to cause an interrupt on 
- * 	the host.
- */
- 
-void aac_sa_enable_interrupt(struct aac_dev *dev, u32 event)
-{
-	switch (event) {
-
-	case HostNormCmdQue:
-		sa_writew(dev, SaDbCSR.PRICLEARIRQMASK, DOORBELL_1);
-		break;
-
-	case HostNormRespQue:
-		sa_writew(dev, SaDbCSR.PRICLEARIRQMASK, DOORBELL_2);
-		break;
-
-	case AdapNormCmdNotFull:
-		sa_writew(dev, SaDbCSR.PRICLEARIRQMASK, DOORBELL_3);
-		break;
-
-	case AdapNormRespNotFull:
-		sa_writew(dev, SaDbCSR.PRICLEARIRQMASK, DOORBELL_4);
-		break;
-	}
-}
-
-/**
- *	aac_sa_disable_interrupt	-	disable an interrupt event
- *	@dev: Which adapter to enable.
- *	@event: Which adapter event.
- *
- *	This routine will enable the corresponding adapter event to cause an interrupt on 
- * 	the host.
- */
-
-void aac_sa_disable_interrupt (struct aac_dev *dev, u32 event)
-{
-	switch (event) {
-
-	case HostNormCmdQue:
-		sa_writew(dev, SaDbCSR.PRISETIRQMASK, DOORBELL_1);
-		break;
-
-	case HostNormRespQue:
-		sa_writew(dev, SaDbCSR.PRISETIRQMASK, DOORBELL_2);
-		break;
-
-	case AdapNormCmdNotFull:
-		sa_writew(dev, SaDbCSR.PRISETIRQMASK, DOORBELL_3);
-		break;
-
-	case AdapNormRespNotFull:
-		sa_writew(dev, SaDbCSR.PRISETIRQMASK, DOORBELL_4);
-		break;
-	}
-}
-
-/**
  *	aac_sa_notify_adapter		-	handle adapter notification
  *	@dev:	Adapter that notification is for
  *	@event:	Event to notidy
@@ -357,7 +295,7 @@ int aac_sa_init(struct aac_dev *dev)
 	 */
 	dprintk(("PREMAP\n"));
 
-	if((dev->regs.sa = (struct sa_registers *)ioremap((unsigned long)dev->scsi_host_ptr->base, 8192))==NULL)
+	if((dev->regs.sa = ioremap((unsigned long)dev->scsi_host_ptr->base, 8192))==NULL)
 	{	
 		printk(KERN_WARNING "aacraid: unable to map ARM.\n" );
 		goto error_iounmap;
@@ -401,8 +339,6 @@ int aac_sa_init(struct aac_dev *dev)
 	 */
 
 	dev->a_ops.adapter_interrupt = aac_sa_interrupt_adapter;
-	dev->a_ops.adapter_enable_int = aac_sa_enable_interrupt;
-	dev->a_ops.adapter_disable_int = aac_sa_disable_interrupt;
 	dev->a_ops.adapter_notify = aac_sa_notify_adapter;
 	dev->a_ops.adapter_sync_cmd = sa_sync_cmd;
 	dev->a_ops.adapter_check_health = aac_sa_check_health;

@@ -228,7 +228,7 @@ mvme5100_init_IRQ(void)
 	for (i = 0; i < NUM_8259_INTERRUPTS; i++)
 		irq_desc[i].handler = &i8259_pic;
 
-	i8259_init(NULL);
+	i8259_init(0);
 #else
 	openpic_init(0);
 #endif

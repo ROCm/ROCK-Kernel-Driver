@@ -65,8 +65,8 @@ void *switch_to_tt(void *prev, void *next, void *last)
 		panic("write of switch_pipe failed, err = %d", -err);
 
 	reading = 1;
-	if((from->state == TASK_ZOMBIE) || (from->state == TASK_DEAD))
-		os_kill_process(os_getpid(), 0, 0);
+	if((from->exit_state == EXIT_ZOMBIE) || (from->exit_state == EXIT_DEAD))
+		os_kill_process(os_getpid(), 0);
 
 	err = os_read_file(from->thread.mode.tt.switch_pipe[0], &c, sizeof(c));
 	if(err != sizeof(c))
@@ -80,9 +80,9 @@ void *switch_to_tt(void *prev, void *next, void *last)
 	 * in case it has not already killed itself.
 	 */
 	prev_sched = current->thread.prev_sched;
-	if((prev_sched->state == TASK_ZOMBIE) || 
-	   (prev_sched->state == TASK_DEAD))
-		os_kill_process(prev_sched->thread.mode.tt.extern_pid, 1, 1);
+	if((prev_sched->exit_state == EXIT_ZOMBIE) ||
+	   (prev_sched->exit_state == EXIT_DEAD))
+		os_kill_ptraced_process(prev_sched->thread.mode.tt.extern_pid, 1);
 
 	/* This works around a nasty race with 'jail'.  If we are switching
 	 * between two threads of a threaded app and the incoming process 
@@ -119,7 +119,7 @@ void release_thread_tt(struct task_struct *task)
 	int pid = task->thread.mode.tt.extern_pid;
 
 	if(os_getpid() != pid)
-		os_kill_process(pid, 0, 0);
+		os_kill_process(pid, 0);
 }
 
 void exit_thread_tt(void)
@@ -173,7 +173,7 @@ static void new_thread_handler(int sig)
 	local_irq_enable();
 	if(!run_kernel_thread(fn, arg, &current->thread.exec_buf))
 		do_exit(0);
-	
+
 	/* XXX No set_user_mode here because a newly execed process will
 	 * immediately segfault on its non-existent IP, coming straight back
 	 * to the signal handler, which will call set_user_mode on its way
@@ -305,7 +305,6 @@ int copy_thread_tt(int nr, unsigned long clone_flags, unsigned long sp,
 
 	change_sig(SIGUSR1, 0);
 	err = 0;
- out:
 	return(err);
 }
 
@@ -331,10 +330,10 @@ void kill_off_processes_tt(void)
 	me = os_getpid();
         for_each_process(p){
 		if(p->thread.mode.tt.extern_pid != me) 
-			os_kill_process(p->thread.mode.tt.extern_pid, 0, 0);
+			os_kill_process(p->thread.mode.tt.extern_pid, 0);
 	}
 	if(init_task.thread.mode.tt.extern_pid != me) 
-		os_kill_process(init_task.thread.mode.tt.extern_pid, 0, 0);
+		os_kill_process(init_task.thread.mode.tt.extern_pid, 0);
 }
 
 void initial_thread_cb_tt(void (*proc)(void *), void *arg)
@@ -524,29 +523,13 @@ void set_init_pid(int pid)
 		      -err);
 }
 
-int singlestepping_tt(void *t)
-{
-	struct task_struct *task = t;
-
-	if(task->thread.mode.tt.singlestep_syscall)
-		return(0);
-	return(task->ptrace & PT_DTRACE);
-}
-
-void clear_singlestep(void *t)
-{
-	struct task_struct *task = t;
-
-	task->ptrace &= ~PT_DTRACE;
-}
-
 int start_uml_tt(void)
 {
 	void *sp;
 	int pages;
 
 	pages = (1 << CONFIG_KERNEL_STACK_ORDER);
-	sp = (void *) ((unsigned long) init_task.thread_info) + 
+	sp = (void *) ((unsigned long) init_task.thread_info) +
 		pages * PAGE_SIZE - sizeof(unsigned long);
 	return(tracer(start_kernel_proc, sp));
 }

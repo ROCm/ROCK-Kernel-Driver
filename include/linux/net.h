@@ -21,6 +21,7 @@
 #include <linux/config.h>
 #include <linux/wait.h>
 #include <linux/stringify.h>
+#include <asm/socket.h>
 
 struct poll_table_struct;
 struct inode;
@@ -61,8 +62,13 @@ typedef enum {
 #define SOCK_ASYNC_WAITDATA	1
 #define SOCK_NOSPACE		2
 
+#ifndef ARCH_HAS_SOCKET_TYPES
 /** sock_type - Socket types
- *
+ * 
+ * When adding some new socket type please
+ * grep ARCH_HAS_SOCKET_TYPE include/asm-* /socket.h, at least MIPS
+ * overrides this enum for binary compat reasons.
+ * 
  * @SOCK_STREAM - stream (connection) socket
  * @SOCK_DGRAM - datagram (conn.less) socket
  * @SOCK_RAW - raw socket
@@ -81,6 +87,8 @@ enum sock_type {
 };
 
 #define SOCK_MAX (SOCK_PACKET + 1)
+
+#endif /* ARCH_HAS_SOCKET_TYPES */
 
 /**
  *  struct socket - general BSD socket
@@ -168,7 +176,6 @@ struct kvec;
 extern int	     sock_wake_async(struct socket *sk, int how, int band);
 extern int	     sock_register(struct net_proto_family *fam);
 extern int	     sock_unregister(int family);
-extern struct socket *sock_alloc(void);
 extern int	     sock_create(int family, int type, int proto,
 				 struct socket **res);
 extern int	     sock_create_kern(int family, int type, int proto,

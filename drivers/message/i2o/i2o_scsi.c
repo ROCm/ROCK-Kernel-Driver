@@ -274,53 +274,6 @@ static const char *i2o_scsi_info(struct Scsi_Host *SChost)
 	return hostdata->iop->name;
 }
 
-#if 0
-/**
- *	i2o_retry_run		-	retry on timeout
- *	@f: unused
- *
- *	Retry congested frames. This actually needs pushing down into
- *	i2o core. We should only bother the OSM with this when we can't
- *	queue and retry the frame. Or perhaps we should call the OSM
- *	and its default handler should be this in the core, and this
- *	call a 2nd "I give up" handler in the OSM ?
- */
-
-static void i2o_retry_run(unsigned long f)
-{
-	int i;
-	unsigned long flags;
-
-	spin_lock_irqsave(&retry_lock, flags);
-	for (i = 0; i < retry_ct; i++)
-		i2o_post_message(retry_ctrl[i], virt_to_bus(retry[i]));
-	retry_ct = 0;
-	spin_unlock_irqrestore(&retry_lock, flags);
-}
-
-/**
- *	flush_pending		-	empty the retry queue
- *
- *	Turn each of the pending commands into a NOP and post it back
- *	to the controller to clear it.
- */
-
-static void flush_pending(void)
-{
-	int i;
-	unsigned long flags;
-
-	spin_lock_irqsave(&retry_lock, flags);
-	for (i = 0; i < retry_ct; i++) {
-		retry[i][0] &= ~0xFFFFFF;
-		retry[i][0] |= I2O_CMD_UTIL_NOP << 24;
-		i2o_post_message(retry_ctrl[i], virt_to_bus(retry[i]));
-	}
-	retry_ct = 0;
-	spin_unlock_irqrestore(&retry_lock, flags);
-}
-#endif
-
 /**
  *	i2o_scsi_reply - SCSI OSM message reply handler
  *	@c: controller issuing the reply
@@ -343,38 +296,41 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
 	struct device *dev;
 	u8 as, ds, st;
 
-	cmd = i2o_cntxt_list_get(c, readl(&msg->u.s.tcntxt));
+	cmd = i2o_cntxt_list_get(c, le32_to_cpu(msg->u.s.tcntxt));
 
 	if (msg->u.head[0] & (1 << 13)) {
-		struct i2o_message *pmsg;	/* preserved message */
+		struct i2o_message __iomem *pmsg;	/* preserved message */
 		u32 pm;
+		int err = DID_ERROR;
 
-		pm = readl(&msg->body[3]);
+		pm = le32_to_cpu(msg->body[3]);
 
-		pmsg = c->in_queue.virt + pm;
+		pmsg = i2o_msg_in_to_virt(c, pm);
 
-		printk("IOP fail.\n");
-		printk("From %d To %d Cmd %d.\n",
+		printk(KERN_ERR "IOP fail.\n");
+		printk(KERN_ERR "From %d To %d Cmd %d.\n",
 		       (msg->u.head[1] >> 12) & 0xFFF,
 		       msg->u.head[1] & 0xFFF, msg->u.head[1] >> 24);
-		printk("Failure Code %d.\n", msg->body[0] >> 24);
+		printk(KERN_ERR "Failure Code %d.\n", msg->body[0] >> 24);
 		if (msg->body[0] & (1 << 16))
-			printk("Format error.\n");
+			printk(KERN_ERR "Format error.\n");
 		if (msg->body[0] & (1 << 17))
-			printk("Path error.\n");
+			printk(KERN_ERR "Path error.\n");
 		if (msg->body[0] & (1 << 18))
-			printk("Path State.\n");
+			printk(KERN_ERR "Path State.\n");
 		if (msg->body[0] & (1 << 18))
-			printk("Congestion.\n");
+		{
+			printk(KERN_ERR "Congestion.\n");
+			err = DID_BUS_BUSY;
+		}
 
-		printk("Failing message is %p.\n", pmsg);
+		printk(KERN_DEBUG "Failing message is %p.\n", pmsg);
 
 		cmd = i2o_cntxt_list_get(c, readl(&pmsg->u.s.tcntxt));
 		if (!cmd)
 			return 1;
 
-		printk("Aborted %ld\n", cmd->serial_number);
-		cmd->result = DID_ERROR << 16;
+		cmd->result = err << 16;
 		cmd->scsi_done(cmd);
 
 		/* Now flush the message by making it a NOP */
@@ -387,9 +343,9 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
 	 *      Low byte is device status, next is adapter status,
 	 *      (then one byte reserved), then request status.
 	 */
-	ds = (u8) readl(&msg->body[0]);
-	as = (u8) (readl(&msg->body[0]) >> 8);
-	st = (u8) (readl(&msg->body[0]) >> 24);
+	ds = (u8) le32_to_cpu(msg->body[0]);
+	as = (u8) (le32_to_cpu(msg->body[0]) >> 8);
+	st = (u8) (le32_to_cpu(msg->body[0]) >> 24);
 
 	/*
 	 *      Is this a control request coming back - eg an abort ?
@@ -398,7 +354,7 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
 	if (!cmd) {
 		if (st)
 			printk(KERN_WARNING "SCSI abort: %08X",
-			       readl(&msg->body[0]));
+			       le32_to_cpu(msg->body[0]));
 		printk(KERN_INFO "SCSI abort completed.\n");
 		return -EFAULT;
 	}
@@ -411,21 +367,22 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
 
 		switch (st) {
 		case 0x06:
-			count = readl(&msg->body[1]);
+			count = le32_to_cpu(msg->body[1]);
 			if (count < cmd->underflow) {
 				int i;
 				printk(KERN_ERR "SCSI: underflow 0x%08X 0x%08X"
 				       "\n", count, cmd->underflow);
-				printk("Cmd: ");
+				printk(KERN_DEBUG "Cmd: ");
 				for (i = 0; i < 15; i++)
-					printk("%02X ", cmd->cmnd[i]);
-				printk(".\n");
+					printk(KERN_DEBUG "%02X ",
+					       cmd->cmnd[i]);
+				printk(KERN_DEBUG ".\n");
 				cmd->result = (DID_ERROR << 16);
 			}
 			break;
 
 		default:
-			error = readl(&msg->body[0]);
+			error = le32_to_cpu(msg->body[0]);
 
 			printk(KERN_ERR "scsi-osm: SCSI error %08x\n", error);
 
@@ -503,7 +460,7 @@ static int i2o_scsi_reply(struct i2o_controller *c, u32 m,
  *	If a I2O controller is added, we catch the notification to add a
  *	corresponding Scsi_Host.
  */
-void i2o_scsi_notify_controller_add(struct i2o_controller *c)
+static void i2o_scsi_notify_controller_add(struct i2o_controller *c)
 {
 	struct i2o_scsi_host *i2o_shost;
 	int rc;
@@ -517,8 +474,7 @@ void i2o_scsi_notify_controller_add(struct i2o_controller *c)
 
 	rc = scsi_add_host(i2o_shost->scsi_host, &c->device);
 	if (rc) {
-		printk(KERN_ERR "scsi-osm: Could not add SCSI "
-		       "host\n");
+		printk(KERN_ERR "scsi-osm: Could not add SCSI " "host\n");
 		scsi_host_put(i2o_shost->scsi_host);
 		return;
 	}
@@ -536,7 +492,7 @@ void i2o_scsi_notify_controller_add(struct i2o_controller *c)
  *	If a I2O controller is removed, we catch the notification to remove the
  *	corresponding Scsi_Host.
  */
-void i2o_scsi_notify_controller_remove(struct i2o_controller *c)
+static void i2o_scsi_notify_controller_remove(struct i2o_controller *c)
 {
 	struct i2o_scsi_host *i2o_shost;
 	i2o_shost = i2o_scsi_get_host(c);
@@ -585,10 +541,11 @@ static int i2o_scsi_queuecommand(struct scsi_cmnd *SCpnt,
 	struct i2o_device *i2o_dev;
 	struct device *dev;
 	int tid;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	u32 scsi_flags, sg_flags;
-	u32 *mptr, *lenptr;
+	u32 __iomem *mptr;
+	u32 __iomem *lenptr;
 	u32 len, reqlen;
 	int i;
 
@@ -761,11 +718,11 @@ static int i2o_scsi_queuecommand(struct scsi_cmnd *SCpnt,
  *	Returns 0 if the command is successfully aborted or negative error code
  *	on failure.
  */
-int i2o_scsi_abort(struct scsi_cmnd *SCpnt)
+static int i2o_scsi_abort(struct scsi_cmnd *SCpnt)
 {
 	struct i2o_device *i2o_dev;
 	struct i2o_controller *c;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	int tid;
 	int status = FAILED;

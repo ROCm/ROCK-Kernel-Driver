@@ -30,6 +30,7 @@
 #include "volume.h"
 #include "attrib.h"
 #include "malloc.h"
+#include "aops.h"
 #include "ntfs.h"
 
 /**
@@ -46,7 +47,7 @@
  * Locking: - The volume lcn bitmap must be locked for writing on entry and is
  *	      left locked on return.
  */
-static int ntfs_cluster_free_from_rl_nolock(ntfs_volume *vol,
+int ntfs_cluster_free_from_rl_nolock(ntfs_volume *vol,
 		const runlist_element *rl)
 {
 	struct inode *lcnbmp_vi = vol->lcnbmp_ino;
@@ -855,7 +856,7 @@ s64 __ntfs_cluster_free(struct inode *vi, const VCN start_vcn, s64 count,
 		err = PTR_ERR(rl);
 		goto err_out;
 	}
-	if (unlikely(rl->lcn < (LCN)LCN_HOLE)) {
+	if (unlikely(rl->lcn < LCN_HOLE)) {
 		if (!is_rollback)
 			ntfs_error(vol->sb, "First runlist element has "
 					"invalid lcn, aborting.");
@@ -895,15 +896,15 @@ s64 __ntfs_cluster_free(struct inode *vi, const VCN start_vcn, s64 count,
 	 * free them.
 	 */
 	for (; rl->length && count != 0; ++rl) {
-		if (unlikely(rl->lcn < (LCN)LCN_HOLE)) {
+		if (unlikely(rl->lcn < LCN_HOLE)) {
 			VCN vcn;
 
 			/*
 			 * Attempt to map runlist, dropping runlist lock for
 			 * the duration.
 			 */
-			up_read(&ni->runlist.lock);
 			vcn = rl->vcn;
+			up_read(&ni->runlist.lock);
 			err = ntfs_map_runlist(ni, vcn);
 			if (err) {
 				if (!is_rollback)
@@ -926,7 +927,7 @@ s64 __ntfs_cluster_free(struct inode *vi, const VCN start_vcn, s64 count,
 							"element.");
 				goto err_out;
 			}
-			if (unlikely(rl->lcn < (LCN)LCN_HOLE)) {
+			if (unlikely(rl->lcn < LCN_HOLE)) {
 				if (!is_rollback)
 					ntfs_error(vol->sb, "Runlist element "
 							"has invalid lcn "

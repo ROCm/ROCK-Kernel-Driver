@@ -69,21 +69,24 @@ static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 static int ac97_quirk[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = AC97_TUNE_DEFAULT};
 static int buggy_irq[SNDRV_CARDS];
 static int xbox[SNDRV_CARDS];
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+#ifdef SUPPORT_MIDI
+static int mpu_port[SNDRV_CARDS]; /* disabled */
+#endif
+
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for Intel i8x0 soundcard.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for Intel i8x0 soundcard.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable Intel i8x0 soundcard.");
-module_param_array(ac97_clock, int, boot_devs, 0444);
+module_param_array(ac97_clock, int, NULL, 0444);
 MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (0 = auto-detect).");
-module_param_array(ac97_quirk, int, boot_devs, 0444);
+module_param_array(ac97_quirk, int, NULL, 0444);
 MODULE_PARM_DESC(ac97_quirk, "AC'97 workaround for strange hardware.");
-module_param_array(buggy_irq, bool, boot_devs, 0444);
+module_param_array(buggy_irq, bool, NULL, 0444);
 MODULE_PARM_DESC(buggy_irq, "Enable workaround for buggy interrupts on some motherboards.");
-module_param_array(xbox, bool, boot_devs, 0444);
+module_param_array(xbox, bool, NULL, 0444);
 MODULE_PARM_DESC(xbox, "Set to 1 for Xbox, if you have problems with the AC'97 codec detection.");
 
 /*
@@ -377,7 +380,6 @@ typedef struct {
 	unsigned int ali_slot;			/* ALI DMA slot */
 	struct ac97_pcm *pcm;
 	int pcm_open_flag;
-	unsigned int page_attr_changed: 1;
 } ichdev_t;
 
 typedef struct _snd_intel8x0 intel8x0_t;
@@ -401,16 +403,17 @@ struct _snd_intel8x0 {
 	snd_pcm_t *pcm[6];
 	ichdev_t ichd[6];
 
-	int multi4: 1,
-	    multi6: 1,
-	    dra: 1,
-	    smp20bit: 1;
-	int in_ac97_init: 1,
-	    in_sdin_init: 1;
-	int in_measurement: 1; /* during ac97 clock measurement */
-	int fix_nocache: 1; /* workaround for 440MX */
-	int buggy_irq: 1; /* workaround for buggy mobos */
-	int xbox: 1;	  /* workaround for Xbox AC'97 detection */
+	unsigned multi4: 1,
+		 multi6: 1,
+		 dra: 1,
+		 smp20bit: 1;
+	unsigned in_ac97_init: 1,
+		 in_sdin_init: 1;
+	unsigned in_measurement: 1;	/* during ac97 clock measurement */
+	unsigned fix_nocache: 1; 	/* workaround for 440MX */
+	unsigned buggy_irq: 1;		/* workaround for buggy mobos */
+	unsigned xbox: 1;		/* workaround for Xbox AC'97 detection */
+
 	int spdif_idx;	/* SPDIF BAR index; *_SPBAR or -1 if use PCMOUT */
 
 	ac97_bus_t *ac97_bus;
@@ -943,19 +946,13 @@ static int snd_intel8x0_hw_params(snd_pcm_substream_t * substream,
 	int dbl = params_rate(hw_params) > 48000;
 	int err;
 
-	if (chip->fix_nocache && ichdev->page_attr_changed) {
+	if (chip->fix_nocache && runtime->dma_area && runtime->dma_bytes < size)
 		fill_nocache(runtime->dma_area, runtime->dma_bytes, 0); /* clear */
-		ichdev->page_attr_changed = 0;
-	}
 	err = snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
 	if (err < 0)
 		return err;
-	if (chip->fix_nocache) {
-		if (runtime->dma_area && ! ichdev->page_attr_changed) {
-			fill_nocache(runtime->dma_area, runtime->dma_bytes, 1);
-			ichdev->page_attr_changed = 1;
-		}
-	}
+	if (chip->fix_nocache && err > 0)
+		fill_nocache(runtime->dma_area, runtime->dma_bytes, 1);
 	if (ichdev->pcm_open_flag) {
 		snd_ac97_pcm_close(ichdev->pcm);
 		ichdev->pcm_open_flag = 0;
@@ -981,10 +978,8 @@ static int snd_intel8x0_hw_free(snd_pcm_substream_t * substream)
 		snd_ac97_pcm_close(ichdev->pcm);
 		ichdev->pcm_open_flag = 0;
 	}
-	if (chip->fix_nocache && ichdev->page_attr_changed) {
+	if (chip->fix_nocache && substream->runtime->dma_area)
 		fill_nocache(substream->runtime->dma_area, substream->runtime->dma_bytes, 0);
-		ichdev->page_attr_changed = 0;
-	}
 	return snd_pcm_lib_free_pages(substream);
 }
 
@@ -1025,7 +1020,9 @@ static void snd_intel8x0_setup_pcm_out(intel8x0_t *chip,
 			 */
 			if (cnt & ICH_PCM_246_MASK) {
 				iputdword(chip, ICHREG(GLOB_CNT), cnt & ~ICH_PCM_246_MASK);
+				spin_unlock_irq(&chip->reg_lock);
 				msleep(50); /* grrr... */
+				spin_lock_irq(&chip->reg_lock);
 			}
 		} else if (chip->device_type == DEVICE_INTEL_ICH4) {
 			if (runtime->sample_bits > 16)
@@ -2266,6 +2263,7 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 	if (chip->remap_bmaddr)
 		iounmap(chip->remap_bmaddr);
 	pci_release_regions(chip->pci);
+	pci_disable_device(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -2281,20 +2279,10 @@ static int intel8x0_suspend(snd_card_t *card, unsigned int state)
 
 	for (i = 0; i < chip->pcm_devs; i++)
 		snd_pcm_suspend_all(chip->pcm[i]);
-	/* clear nocache */
-	if (chip->fix_nocache) {
-		for (i = 0; i < chip->bdbars_count; i++) {
-			ichdev_t *ichdev = &chip->ichd[i];
-			if (ichdev->substream && ichdev->page_attr_changed) {
-				snd_pcm_runtime_t *runtime = ichdev->substream->runtime;
-				if (runtime->dma_area)
-					fill_nocache(runtime->dma_area, runtime->dma_bytes, 0);
-			}
-		}
-	}
 	for (i = 0; i < 3; i++)
 		if (chip->ac97[i])
 			snd_ac97_suspend(chip->ac97[i]);
+	pci_disable_device(chip->pci);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
@@ -2320,7 +2308,7 @@ static int intel8x0_resume(snd_card_t *card, unsigned int state)
 	if (chip->fix_nocache) {
 		for (i = 0; i < chip->bdbars_count; i++) {
 			ichdev_t *ichdev = &chip->ichd[i];
-			if (ichdev->substream && ichdev->page_attr_changed) {
+			if (ichdev->substream) {
 				snd_pcm_runtime_t *runtime = ichdev->substream->runtime;
 				if (runtime->dma_area)
 					fill_nocache(runtime->dma_area, runtime->dma_bytes, 1);
@@ -2512,8 +2500,10 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 		return err;
 
 	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
-	if (chip == NULL)
+	if (chip == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	spin_lock_init(&chip->reg_lock);
 	spin_lock_init(&chip->ac97_lock);
 	chip->device_type = device_type;
@@ -2533,6 +2523,7 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 
 	if ((err = pci_request_regions(pci, card->shortname)) < 0) {
 		kfree(chip);
+		pci_disable_device(pci);
 		return err;
 	}
 

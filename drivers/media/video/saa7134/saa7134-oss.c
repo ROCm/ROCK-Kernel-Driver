@@ -1,4 +1,6 @@
 /*
+ * $Id: saa7134-oss.c,v 1.11 2004/11/07 13:17:15 kraxel Exp $
+ *
  * device driver for philips saa7134 based TV cards
  * oss dsp interface
  *
@@ -32,11 +34,11 @@
 /* ------------------------------------------------------------------ */
 
 static unsigned int oss_debug  = 0;
-MODULE_PARM(oss_debug,"i");
+module_param(oss_debug, int, 0644);
 MODULE_PARM_DESC(oss_debug,"enable debug messages [oss]");
 
 static unsigned int oss_rate  = 0;
-MODULE_PARM(oss_rate,"i");
+module_param(oss_rate, int, 0444);
 MODULE_PARM_DESC(oss_rate,"sample rate (valid are: 32000,48000)");
 
 #define dprintk(fmt, arg...)	if (oss_debug) \
@@ -138,7 +140,7 @@ static int dsp_rec_start(struct saa7134_dev *dev)
 	}
 
 	switch (dev->oss.afmt) {
-	case AFMT_S8:     
+	case AFMT_S8:
 	case AFMT_S16_LE:
 	case AFMT_S16_BE: sign = 1; break;
 	default:          sign = 0; break;
@@ -159,7 +161,7 @@ static int dsp_rec_start(struct saa7134_dev *dev)
 		if (sign)
 			fmt |= 0x04;
 		fmt |= (TV == dev->oss.input) ? 0xc0 : 0x80;
-		
+
 		saa_writeb(SAA7134_NUM_SAMPLES0, (dev->oss.blksize & 0x0000ff));
 		saa_writeb(SAA7134_NUM_SAMPLES1, (dev->oss.blksize & 0x00ff00) >>  8);
 		saa_writeb(SAA7134_NUM_SAMPLES2, (dev->oss.blksize & 0xff0000) >> 16);
@@ -191,7 +193,7 @@ static int dsp_rec_start(struct saa7134_dev *dev)
 	saa_writel(SAA7134_RS_BA2(6),dev->oss.blksize);
 	saa_writel(SAA7134_RS_PITCH(6),0);
 	saa_writel(SAA7134_RS_CONTROL(6),control);
-	
+
 	/* start dma */
 	dev->oss.recording_on = 1;
 	spin_lock_irqsave(&dev->slock,flags);
@@ -367,7 +369,7 @@ static int dsp_ioctl(struct inode *inode, struct file *file,
 	void __user *argp = (void __user *) arg;
 	int __user *p = argp;
 	int val = 0;
-	
+
 	if (oss_debug > 1)
 		saa7134_print_ioctl(dev->name,cmd);
         switch (cmd) {
@@ -410,7 +412,7 @@ static int dsp_ioctl(struct inode *inode, struct file *file,
 		/* fall through */
         case SOUND_PCM_READ_CHANNELS:
 		return put_user(dev->oss.channels, p);
-		
+
         case SNDCTL_DSP_GETFMTS: /* Returns a mask */
 		return put_user(AFMT_U8     | AFMT_S8     |
 				AFMT_U16_LE | AFMT_U16_BE |
@@ -533,7 +535,7 @@ static int
 mixer_recsrc_7134(struct saa7134_dev *dev)
 {
 	int analog_io,rate;
-	
+
 	switch (dev->oss.input) {
 	case TV:
 		saa_andorb(SAA7134_AUDIO_FORMAT_CTRL, 0xc0, 0xc0);
@@ -555,7 +557,7 @@ static int
 mixer_recsrc_7133(struct saa7134_dev *dev)
 {
 	u32 value = 0xbbbbbb;
-	
+
 	switch (dev->oss.input) {
 	case TV:
 		value = 0xbbbb10;  /* MAIN */
@@ -653,7 +655,7 @@ static int mixer_ioctl(struct inode *inode, struct file *file,
 	int val,ret;
 	void __user *argp = (void __user *) arg;
 	int __user *p = argp;
-	
+
 	if (oss_debug > 1)
 		saa7134_print_ioctl(dev->name,cmd);
         switch (cmd) {
@@ -784,7 +786,7 @@ int saa7134_oss_init1(struct saa7134_dev *dev)
 	mixer_level(dev,LINE1,dev->oss.line1);
 	mixer_level(dev,LINE2,dev->oss.line2);
 	mixer_recsrc(dev, (dev->oss.rate == 32000) ? TV : LINE2);
-	
+
 	return 0;
 }
 
@@ -838,7 +840,7 @@ void saa7134_irq_oss_done(struct saa7134_dev *dev, unsigned long status)
 	dev->oss.dma_blk = (dev->oss.dma_blk + 1) % dev->oss.blocks;
 	dev->oss.read_count += dev->oss.blksize;
 	wake_up(&dev->oss.wq);
-	
+
  done:
 	spin_unlock(&dev->slock);
 }

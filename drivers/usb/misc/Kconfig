@@ -121,17 +121,15 @@ config USB_CYTHERM
 	  To compile this driver as a module, choose M here: the
 	  module will be called cytherm.
 
-config USB_SPEEDTOUCH
-	tristate "Alcatel Speedtouch USB support"
-	depends on USB && ATM
-	select CRC32
+config USB_PHIDGETKIT
+	tristate "USB PhidgetKit support"
+	depends on USB
 	help
-	  Say Y here if you have an Alcatel SpeedTouch USB or SpeedTouch 330
-	  modem.  In order to use your modem you will need to install some user
-	  space tools, see <http://www.linux-usb.org/SpeedTouch/> for details.
+	  Say Y here if you want to connect a PhidgetKit USB device from
+	  Phidgets Inc.
 
 	  To compile this driver as a module, choose M here: the
-	  module will be called speedtch.
+	  module will be called phidgetkit.
 
 config USB_PHIDGETSERVO
 	tristate "USB PhidgetServo support"

@@ -996,18 +996,18 @@ typedef struct _SUNI_STATS_
 
 typedef struct iadev_t {  
 	/*-----base pointers into (i)chipSAR+ address space */   
-	u32 *phy;			/* base pointer into phy(SUNI) */  
-	u32 *dma;			/* base pointer into DMA control   
+	u32 __iomem *phy;		/* base pointer into phy(SUNI) */  
+	u32 __iomem *dma;		/* base pointer into DMA control   
 						registers */  
-	u32 *reg;			/* base pointer to SAR registers  
+	u32 __iomem *reg;		/* base pointer to SAR registers  
 					   - Bus Interface Control Regs */  
-	u32 *seg_reg;			/* base pointer to segmentation engine  
+	u32 __iomem *seg_reg;		/* base pointer to segmentation engine  
 						internal registers */  
-	u32 *reass_reg;			/* base pointer to reassemble engine  
+	u32 __iomem *reass_reg;		/* base pointer to reassemble engine  
 						internal registers */  
-	u32 *ram;			/* base pointer to SAR RAM */  
-	void __iomem *seg_ram;
-	void __iomem *reass_ram;
+	u32 __iomem *ram;		/* base pointer to SAR RAM */  
+	void __iomem *seg_ram;  
+	void __iomem *reass_ram;  
 	struct dle_q tx_dle_q;  
 	struct free_desc_q *tx_free_desc_qhead;  
 	struct sk_buff_head tx_dma_q, tx_backlog;  
@@ -1032,8 +1032,8 @@ typedef struct iadev_t {
 	struct atm_dev *next_board;	/* other iphase devices */  
 	struct pci_dev *pci;  
 	int mem;  
-	unsigned long base_diff;	/* virtual - real base address */  
-	unsigned int real_base, base;	/* real and virtual base address */  
+	unsigned int real_base;	/* real and virtual base address */  
+	void __iomem *base;
 	unsigned int pci_map_size;	/*pci map size of board */  
 	unsigned char irq;  
 	unsigned char bus;  

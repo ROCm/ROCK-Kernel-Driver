@@ -6,7 +6,7 @@
  *  Derived from drivers/mtd/nand/edb7312.c
  *
  *
- * $Id: ppchameleonevb.c,v 1.2 2004/05/05 22:09:54 gleixner Exp $
+ * $Id: ppchameleonevb.c,v 1.6 2004/11/05 16:07:16 kalev Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -64,21 +64,16 @@ static struct mtd_info *ppchameleonevb_mtd = NULL;
 /*
  * Module stuff
  */
-static int ppchameleon_fio_pbase 	= CFG_NAND0_PADDR;
-static int ppchameleonevb_fio_pbase = CFG_NAND1_PADDR;
+static unsigned long ppchameleon_fio_pbase 	= CFG_NAND0_PADDR;
+static unsigned long ppchameleonevb_fio_pbase = CFG_NAND1_PADDR;
 
 #ifdef MODULE
-MODULE_PARM(ppchameleon_fio_pbase, "i");
+module_param(ppchameleon_fio_pbase, ulong, 0);
+module_param(ppchameleonevb_fio_pbase, ulong, 0);
+#else
 __setup("ppchameleon_fio_pbase=",ppchameleon_fio_pbase);
-MODULE_PARM(ppchameleonevb_fio_pbase, "i");
 __setup("ppchameleonevb_fio_pbase=",ppchameleonevb_fio_pbase);
 #endif
-
-/* Internal buffers. Page buffer and oob buffer for one block */
-static u_char data_buf[2048 + 64];
-static u_char oob_buf[64 * 64];
-static u_char data_buf_evb[512 + 16];
-static u_char oob_buf_evb[16 * 32];
 
 #ifdef CONFIG_MTD_PARTITIONS
 /*
@@ -196,8 +191,8 @@ static int __init ppchameleonevb_init (void)
 	const char *part_type = 0;
 	int mtd_parts_nb = 0;
 	struct mtd_partition *mtd_parts = 0;
-	int ppchameleon_fio_base;
-	int ppchameleonevb_fio_base;
+	void __iomem *ppchameleon_fio_base;
+	void __iomem *ppchameleonevb_fio_base;
 
 
 	/*********************************
@@ -205,15 +200,14 @@ static int __init ppchameleonevb_init (void)
 	*********************************/
 	/* Allocate memory for MTD device structure and private data */
 	ppchameleon_mtd = kmalloc(sizeof(struct mtd_info) +
-			     sizeof(struct nand_chip),
-			     GFP_KERNEL);
+						      sizeof(struct nand_chip), GFP_KERNEL);
 	if (!ppchameleon_mtd) {
 		printk("Unable to allocate PPChameleon NAND MTD device structure.\n");
 		return -ENOMEM;
 	}
 
 	/* map physical address */
-	ppchameleon_fio_base = (unsigned long)ioremap(ppchameleon_fio_pbase, SZ_4M);
+	ppchameleon_fio_base = ioremap(ppchameleon_fio_pbase, SZ_4M);
 	if(!ppchameleon_fio_base) {
 		printk("ioremap PPChameleon NAND flash failed\n");
 		kfree(ppchameleon_mtd);
@@ -264,10 +258,6 @@ static int __init ppchameleonevb_init (void)
 	/* ECC mode */
 	this->eccmode = NAND_ECC_SOFT;
 
-	/* Set internal data buffer */
-	this->data_buf = data_buf;
-	this->oob_buf = oob_buf;
-
 	/* Scan to find existence of the device (it could not be mounted) */
 	if (nand_scan (ppchameleon_mtd, 1)) {
 		iounmap((void *)ppchameleon_fio_base);
@@ -309,15 +299,14 @@ nand_evb_init:
 	****************************/
 	/* Allocate memory for MTD device structure and private data */
 	ppchameleonevb_mtd = kmalloc(sizeof(struct mtd_info) +
-			     sizeof(struct nand_chip),
-			     GFP_KERNEL);
+							 sizeof(struct nand_chip), GFP_KERNEL);
 	if (!ppchameleonevb_mtd) {
 		printk("Unable to allocate PPChameleonEVB NAND MTD device structure.\n");
 		return -ENOMEM;
 	}
 
 	/* map physical address */
-	ppchameleonevb_fio_base = (unsigned long)ioremap(ppchameleonevb_fio_pbase, SZ_4M);
+	ppchameleonevb_fio_base = ioremap(ppchameleonevb_fio_pbase, SZ_4M);
 	if(!ppchameleonevb_fio_base) {
 		printk("ioremap PPChameleonEVB NAND flash failed\n");
 		kfree(ppchameleonevb_mtd);
@@ -349,7 +338,8 @@ nand_evb_init:
 	out_be32((volatile unsigned*)GPIO0_TSRH, in_be32((volatile unsigned*)GPIO0_TSRH) & 0xFFFFFFF0);
 	out_be32((volatile unsigned*)GPIO0_TSRL, in_be32((volatile unsigned*)GPIO0_TSRL) & 0x3FFFFFFF);
 	/* enable output driver */
-	out_be32((volatile unsigned*)GPIO0_TCR, in_be32((volatile unsigned*)GPIO0_TCR) | NAND_EVB_nCE_GPIO_PIN | NAND_EVB_CLE_GPIO_PIN | NAND_EVB_ALE_GPIO_PIN);
+	out_be32((volatile unsigned*)GPIO0_TCR, in_be32((volatile unsigned*)GPIO0_TCR) | NAND_EVB_nCE_GPIO_PIN | 
+		 NAND_EVB_CLE_GPIO_PIN | NAND_EVB_ALE_GPIO_PIN);
 #ifdef USE_READY_BUSY_PIN
 	/* three-state select */
 	out_be32((volatile unsigned*)GPIO0_TSRL, in_be32((volatile unsigned*)GPIO0_TSRL) & 0xFFFFFFFC);
@@ -358,7 +348,6 @@ nand_evb_init:
 	/* input select */
 	out_be32((volatile unsigned*)GPIO0_ISR1L, (in_be32((volatile unsigned*)GPIO0_ISR1L) & 0xFFFFFFFC) | 0x00000001);
 #endif
-
 
 	/* insert callbacks */
 	this->IO_ADDR_R = ppchameleonevb_fio_base;
@@ -371,10 +360,6 @@ nand_evb_init:
 
 	/* ECC mode */
 	this->eccmode = NAND_ECC_SOFT;
-
-	/* Set internal data buffer */
-	this->data_buf = data_buf_evb;
-	this->oob_buf = oob_buf_evb;
 
 	/* Scan to find existence of the device */
 	if (nand_scan (ppchameleonevb_mtd, 1)) {
@@ -412,15 +397,20 @@ module_init(ppchameleonevb_init);
  */
 static void __exit ppchameleonevb_cleanup (void)
 {
-	struct nand_chip *this = (struct nand_chip *) &ppchameleonevb_mtd[1];
+	struct nand_chip *this;
 
-	/* Unregister the device */
-	del_mtd_device (ppchameleonevb_mtd);
-
-	/* Free internal data buffer */
-	kfree (this->data_buf);
+	/* Release resources, unregister device(s) */
+	nand_release (ppchameleon_mtd);
+	nand_release (ppchameleonevb_mtd);
+	
+	/* Release iomaps */
+	this = (struct nand_chip *) &ppchameleon_mtd[1];
+	iounmap((void *) this->IO_ADDR_R;
+	this = (struct nand_chip *) &ppchameleonevb_mtd[1];
+	iounmap((void *) this->IO_ADDR_R;
 
 	/* Free the MTD device structure */
+	kfree (ppchameleon_mtd);
 	kfree (ppchameleonevb_mtd);
 }
 module_exit(ppchameleonevb_cleanup);

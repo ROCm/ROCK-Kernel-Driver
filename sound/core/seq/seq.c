@@ -51,8 +51,7 @@ MODULE_AUTHOR("Frank van de Pol <fvdpol@coil.demon.nl>, Jaroslav Kysela <perex@s
 MODULE_DESCRIPTION("Advanced Linux Sound Architecture sequencer.");
 MODULE_LICENSE("GPL");
 
-static int boot_devs;
-module_param_array(seq_client_load, int, boot_devs, 0444);
+module_param_array(seq_client_load, int, NULL, 0444);
 MODULE_PARM_DESC(seq_client_load, "The numbers of global (system) clients to load through kmod.");
 module_param(seq_default_timer_class, int, 0644);
 MODULE_PARM_DESC(seq_default_timer_class, "The default timer class.");

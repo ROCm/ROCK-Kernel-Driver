@@ -6,10 +6,6 @@
 #include <asm/machdep.h>		/* ppc_md */
 #include <asm/atomic.h>
 
-extern void disable_irq(unsigned int);
-extern void disable_irq_nosync(unsigned int);
-extern void enable_irq(unsigned int);
-
 /*
  * These constants are used for passing information about interrupt
  * signal polarity and level/edge sensing to the low-level PIC chip
@@ -85,6 +81,10 @@ irq_canonicalize(int irq)
 
 #elif defined(CONFIG_8xx)
 
+/* Now include the board configuration specific associations.
+*/
+#include <asm/mpc8xx.h>
+
 /* The MPC8xx cores have 16 possible interrupts.  There are eight
  * possible level sensitive interrupts assigned and generated internally
  * from such devices as CPM, PCMCIA, RTC, PIT, TimeBase and Decrementer.
@@ -93,10 +93,22 @@ irq_canonicalize(int irq)
  *
  * On some implementations, there is also the possibility of an 8259
  * through the PCI and PCI-ISA bridges.
+ *
+ * We are "flattening" the interrupt vectors of the cascaded CPM
+ * and 8259 interrupt controllers so that we can uniquely identify
+ * any interrupt source with a single integer.
  */
 #define NR_SIU_INTS	16
+#define NR_CPM_INTS	32
+#ifndef NR_8259_INTS
+#define NR_8259_INTS 0
+#endif
 
-#define NR_IRQS	(NR_SIU_INTS + NR_8259_INTS)
+#define SIU_IRQ_OFFSET		0
+#define CPM_IRQ_OFFSET		(SIU_IRQ_OFFSET + NR_SIU_INTS)
+#define I8259_IRQ_OFFSET	(CPM_IRQ_OFFSET + NR_CPM_INTS)
+
+#define NR_IRQS	(NR_SIU_INTS + NR_CPM_INTS + NR_8259_INTS)
 
 /* These values must be zero-based and map 1:1 with the SIU configuration.
  * They are used throughout the 8xx I/O subsystem to generate
@@ -120,10 +132,6 @@ irq_canonicalize(int irq)
 #define	SIU_LEVEL6	(13)
 #define	SIU_IRQ7	(14)
 #define	SIU_LEVEL7	(15)
-
-/* Now include the board configuration specific associations.
-*/
-#include <asm/mpc8xx.h>
 
 /* The internal interrupts we can configure as we see fit.
  * My personal preference is CPM at level 2, which puts it above the

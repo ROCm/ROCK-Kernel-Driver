@@ -27,8 +27,8 @@ static char *version =
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <linux/errno.h>
@@ -60,7 +60,7 @@ static char *version =
 #define for_each_socal(s) for (s = socals; s; s = s->next)
 struct socal *socals = NULL;
 
-static void socal_copy_from_xram(void *d, unsigned long xram, long size)
+static void socal_copy_from_xram(void *d, void __iomem *xram, long size)
 {
 	u32 *dp = (u32 *) d;
 	while (size) {
@@ -70,7 +70,7 @@ static void socal_copy_from_xram(void *d, unsigned long xram, long size)
 	}
 }
 
-static void socal_copy_to_xram(unsigned long xram, void *s, long size)
+static void socal_copy_to_xram(void __iomem *xram, void *s, long size)
 {
 	u32 *sp = (u32 *) s;
 	while (size) {
@@ -800,11 +800,11 @@ static inline void socal_init(struct sbus_dev *sdev, int no)
 	s->rsp[1].pool = s->rsp[0].pool + SOCAL_CQ_RSP0_SIZE;
 	s->rsp[2].pool = s->rsp[1].pool + SOCAL_CQ_RSP1_SIZE;
 	
-	s->req[0].hw_cq = (socal_hw_cq *)(s->xram + SOCAL_CQ_REQ_OFFSET);
-	s->req[1].hw_cq = (socal_hw_cq *)(s->xram + SOCAL_CQ_REQ_OFFSET + sizeof(socal_hw_cq));
-	s->rsp[0].hw_cq = (socal_hw_cq *)(s->xram + SOCAL_CQ_RSP_OFFSET);
-	s->rsp[1].hw_cq = (socal_hw_cq *)(s->xram + SOCAL_CQ_RSP_OFFSET + sizeof(socal_hw_cq));
-	s->rsp[2].hw_cq = (socal_hw_cq *)(s->xram + SOCAL_CQ_RSP_OFFSET + 2 * sizeof(socal_hw_cq));
+	s->req[0].hw_cq = (socal_hw_cq __iomem *)(s->xram + SOCAL_CQ_REQ_OFFSET);
+	s->req[1].hw_cq = (socal_hw_cq __iomem *)(s->xram + SOCAL_CQ_REQ_OFFSET + sizeof(socal_hw_cq));
+	s->rsp[0].hw_cq = (socal_hw_cq __iomem *)(s->xram + SOCAL_CQ_RSP_OFFSET);
+	s->rsp[1].hw_cq = (socal_hw_cq __iomem *)(s->xram + SOCAL_CQ_RSP_OFFSET + sizeof(socal_hw_cq));
+	s->rsp[2].hw_cq = (socal_hw_cq __iomem *)(s->xram + SOCAL_CQ_RSP_OFFSET + 2 * sizeof(socal_hw_cq));
 	
 	cq[1].address = cq[0].address + (SOCAL_CQ_REQ0_SIZE * sizeof(socal_req));
 	cq[4].address = cq[1].address + (SOCAL_CQ_REQ1_SIZE * sizeof(socal_req));

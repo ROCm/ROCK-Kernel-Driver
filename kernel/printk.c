@@ -30,6 +30,7 @@
 #include <linux/smp.h>
 #include <linux/security.h>
 #include <linux/bootmem.h>
+#include <linux/syscalls.h>
 
 #include <asm/uaccess.h>
 
@@ -108,6 +109,7 @@ struct console_cmdline
 #define MAX_CMDLINECONSOLES 8
 
 static struct console_cmdline console_cmdline[MAX_CMDLINECONSOLES];
+static int selected_console = -1;
 static int preferred_console = -1;
 
 /* Flag: console code may call schedule() */
@@ -140,7 +142,7 @@ static int __init console_setup(char *str)
 		strcpy(name, "ttyS1");
 #endif
 	for(s = name; *s; s++)
-		if (*s >= '0' && *s <= '9')
+		if ((*s >= '0' && *s <= '9') || *s == ',')
 			break;
 	idx = simple_strtoul(s, NULL, 10);
 	*s = 0;
@@ -173,12 +175,12 @@ int __init add_preferred_console(char *name, int idx, char *options)
 	for(i = 0; i < MAX_CMDLINECONSOLES && console_cmdline[i].name[0]; i++)
 		if (strcmp(console_cmdline[i].name, name) == 0 &&
 			  console_cmdline[i].index == idx) {
-				preferred_console = i;
+				selected_console = i;
 				return 0;
 		}
 	if (i == MAX_CMDLINECONSOLES)
 		return -E2BIG;
-	preferred_console = i;
+	selected_console = i;
 	c = &console_cmdline[i];
 	memcpy(c->name, name, sizeof(c->name));
 	c->name[sizeof(c->name) - 1] = 0;
@@ -192,6 +194,8 @@ static int __init log_buf_len_setup(char *str)
 	unsigned long size = memparse(str, &str);
 	unsigned long flags;
 
+	if (size)
+		size = roundup_pow_of_two(size);
 	if (size > log_buf_len) {
 		unsigned long start, dest_idx, offset;
 		char * new_log_buf;
@@ -370,20 +374,6 @@ int do_syslog(int type, char __user * buf, int len)
 out:
 	return error;
 }
-
-#ifdef	CONFIG_KDB
-/* kdb dmesg command needs access to the syslog buffer.  do_syslog() uses locks
- * so it cannot be used during debugging.  Just tell kdb where the start and
- * end of the physical and logical logs are.  This is equivalent to do_syslog(3).
- */
-void kdb_syslog_data(char *syslog_data[4])
-{
-	syslog_data[0] = log_buf;
-	syslog_data[1] = log_buf + __LOG_BUF_LEN;
-	syslog_data[2] = log_buf + log_end - (logged_chars < __LOG_BUF_LEN ? logged_chars : __LOG_BUF_LEN);
-	syslog_data[3] = log_buf + log_end;
-}
-#endif	/* CONFIG_KDB */
 
 asmlinkage long sys_syslog(int type, char __user * buf, int len)
 {
@@ -672,12 +662,10 @@ EXPORT_SYMBOL(release_console_sem);
  *
  * Must be called within acquire_console_sem().
  */
-void console_conditional_schedule(void)
+void __sched console_conditional_schedule(void)
 {
-	if (console_may_schedule && need_resched()) {
-		set_current_state(TASK_RUNNING);
-		schedule();
-	}
+	if (console_may_schedule)
+		cond_resched();
 }
 EXPORT_SYMBOL(console_conditional_schedule);
 
@@ -758,6 +746,9 @@ void register_console(struct console * console)
 {
 	int     i;
 	unsigned long flags;
+
+	if (preferred_console < 0)
+		preferred_console = selected_console;
 
 	/*
 	 *	See if we want to use this console driver. If we
@@ -849,7 +840,7 @@ int unregister_console(struct console * console)
 	 * would prevent fbcon from taking over.
 	 */
 	if (console_drivers == NULL)
-		preferred_console = -1;
+		preferred_console = selected_console;
 		
 
 	release_console_sem();
@@ -867,7 +858,7 @@ EXPORT_SYMBOL(unregister_console);
 void tty_write_message(struct tty_struct *tty, char *msg)
 {
 	if (tty && tty->driver->write)
-		tty->driver->write(tty, 0, msg, strlen(msg));
+		tty->driver->write(tty, msg, strlen(msg));
 	return;
 }
 

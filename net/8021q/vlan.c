@@ -35,6 +35,8 @@
 #include "vlan.h"
 #include "vlanproc.h"
 
+#define DRV_VERSION "1.8"
+
 /* Global VLAN variables */
 
 /* Our listing of VLAN group(s) */
@@ -42,8 +44,7 @@ struct hlist_head vlan_group_hash[VLAN_GRP_HASH_SIZE];
 #define vlan_grp_hashfn(IDX)	((((IDX) >> VLAN_GRP_HASH_SHIFT) ^ (IDX)) & VLAN_GRP_HASH_MASK)
 
 static char vlan_fullname[] = "802.1Q VLAN Support";
-static unsigned int vlan_version = 1;
-static unsigned int vlan_release = 8;
+static char vlan_version[] = DRV_VERSION;
 static char vlan_copyright[] = "Ben Greear <greearb@candelatech.com>";
 static char vlan_buggyright[] = "David S. Miller <davem@redhat.com>";
 
@@ -68,7 +69,7 @@ static struct packet_type vlan_packet_type = {
 	.func = vlan_skb_recv, /* VLAN receive method */
 };
 
-/* Bits of netdev state that are propogated from real device to virtual */
+/* Bits of netdev state that are propagated from real device to virtual */
 #define VLAN_LINK_STATE_MASK \
 	((1<<__LINK_STATE_PRESENT)|(1<<__LINK_STATE_NOCARRIER))
 
@@ -84,8 +85,8 @@ static int __init vlan_proto_init(void)
 {
 	int err;
 
-	printk(VLAN_INF "%s v%u.%u %s\n",
-	       vlan_fullname, vlan_version, vlan_release, vlan_copyright);
+	printk(VLAN_INF "%s v%s %s\n",
+	       vlan_fullname, vlan_version, vlan_copyright);
 	printk(VLAN_INF "All bugs added by %s\n",
 	       vlan_buggyright);
 
@@ -95,13 +96,18 @@ static int __init vlan_proto_init(void)
 		printk(KERN_ERR 
 		       "%s %s: can't create entry in proc filesystem!\n",
 		       __FUNCTION__, VLAN_NAME);
-		return 1;
+		return err;
 	}
 
 	dev_add_pack(&vlan_packet_type);
 
 	/* Register us to receive netdevice events */
-	register_netdevice_notifier(&vlan_notifier_block);
+	err = register_netdevice_notifier(&vlan_notifier_block);
+	if (err < 0) {
+		dev_remove_pack(&vlan_packet_type);
+		vlan_proc_cleanup();
+		return err;
+	}
 
 	vlan_ioctl_set(vlan_ioctl_handler);
 
@@ -448,10 +454,6 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 
 	new_dev->state = real_dev->state & VLAN_LINK_STATE_MASK;
 
-	/* ipv6 shared card related stuff */
-	new_dev->dev_id = real_dev->dev_id;
-	new_dev->generate_eui64 = real_dev->generate_eui64;
-
 	/* need 4 bytes for extra VLAN header info,
 	 * hope the underlying device can handle it.
 	 */
@@ -541,7 +543,7 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 
 out_free_unregister:
 	unregister_netdev(new_dev);
-	goto out_put_dev;
+	goto out_unlock;
 
 out_free_newdev:
 	free_netdev(new_dev);
@@ -572,7 +574,7 @@ static int vlan_device_event(struct notifier_block *unused, unsigned long event,
 
 	switch (event) {
 	case NETDEV_CHANGE:
-		/* Propogate real device state to vlan devices */
+		/* Propagate real device state to vlan devices */
 		flgs = dev->state & VLAN_LINK_STATE_MASK;
 		for (i = 0; i < VLAN_GROUP_ARRAY_LEN; i++) {
 			vlandev = grp->vlan_devices[i];
@@ -650,14 +652,8 @@ out:
 static int vlan_ioctl_handler(void __user *arg)
 {
 	int err = 0;
+	unsigned short vid = 0;
 	struct vlan_ioctl_args args;
-
-	/* everything here needs root permissions, except aguably the
-	 * hack ioctls for sending packets.  However, I know _I_ don't
-	 * want users running that on my network! --BLG
-	 */
-	if (!capable(CAP_NET_ADMIN))
-		return -EPERM;
 
 	if (copy_from_user(&args, arg, sizeof(struct vlan_ioctl_args)))
 		return -EFAULT;
@@ -672,24 +668,32 @@ static int vlan_ioctl_handler(void __user *arg)
 
 	switch (args.cmd) {
 	case SET_VLAN_INGRESS_PRIORITY_CMD:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
 		err = vlan_dev_set_ingress_priority(args.device1,
 						    args.u.skb_priority,
 						    args.vlan_qos);
 		break;
 
 	case SET_VLAN_EGRESS_PRIORITY_CMD:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
 		err = vlan_dev_set_egress_priority(args.device1,
 						   args.u.skb_priority,
 						   args.vlan_qos);
 		break;
 
 	case SET_VLAN_FLAG_CMD:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
 		err = vlan_dev_set_vlan_flag(args.device1,
 					     args.u.flag,
 					     args.vlan_qos);
 		break;
 
 	case SET_VLAN_NAME_TYPE_CMD:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
 		if ((args.u.name_type >= 0) &&
 		    (args.u.name_type < VLAN_NAME_TYPE_HIGHEST)) {
 			vlan_name_type = args.u.name_type;
@@ -699,17 +703,9 @@ static int vlan_ioctl_handler(void __user *arg)
 		}
 		break;
 
-		/* TODO:  Figure out how to pass info back...
-		   case GET_VLAN_INGRESS_PRIORITY_IOCTL:
-		   err = vlan_dev_get_ingress_priority(args);
-		   break;
-
-		   case GET_VLAN_EGRESS_PRIORITY_IOCTL:
-		   err = vlan_dev_get_egress_priority(args);
-		   break;
-		*/
-
 	case ADD_VLAN_CMD:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
 		/* we have been given the name of the Ethernet Device we want to
 		 * talk to:  args.dev1	 We also have the
 		 * VLAN ID:  args.u.VID
@@ -722,10 +718,49 @@ static int vlan_ioctl_handler(void __user *arg)
 		break;
 
 	case DEL_VLAN_CMD:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
 		/* Here, the args.dev1 is the actual VLAN we want
 		 * to get rid of.
 		 */
 		err = unregister_vlan_device(args.device1);
+		break;
+
+	case GET_VLAN_INGRESS_PRIORITY_CMD:
+		/* TODO:  Implement
+		   err = vlan_dev_get_ingress_priority(args);
+		   if (copy_to_user((void*)arg, &args,
+		        sizeof(struct vlan_ioctl_args))) {
+		        err = -EFAULT;
+		   }
+		*/
+		err = -EINVAL;
+		break;
+	case GET_VLAN_EGRESS_PRIORITY_CMD:
+		/* TODO:  Implement
+		   err = vlan_dev_get_egress_priority(args.device1, &(args.args);
+		   if (copy_to_user((void*)arg, &args,
+		        sizeof(struct vlan_ioctl_args))) {
+		        err = -EFAULT;
+		   }
+		*/
+		err = -EINVAL;
+		break;
+	case GET_VLAN_REALDEV_NAME_CMD:
+		err = vlan_dev_get_realdev_name(args.device1, args.u.device2);
+		if (copy_to_user(arg, &args,
+				 sizeof(struct vlan_ioctl_args))) {
+			err = -EFAULT;
+		}
+		break;
+
+	case GET_VLAN_VID_CMD:
+		err = vlan_dev_get_vid(args.device1, &vid);
+		args.u.VID = vid;
+		if (copy_to_user(arg, &args,
+				 sizeof(struct vlan_ioctl_args))) {
+                      err = -EFAULT;
+		}
 		break;
 
 	default:
@@ -739,3 +774,4 @@ static int vlan_ioctl_handler(void __user *arg)
 }
 
 MODULE_LICENSE("GPL");
+MODULE_VERSION(DRV_VERSION);

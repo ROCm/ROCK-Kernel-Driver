@@ -44,10 +44,10 @@ ENTRY(swsusp_arch_resume)
 	movq	mmu_cr4_features(%rip), %rax
 	movq	%rax, %rdx
 	andq	$~(1<<7), %rdx	# PGE
-	movq	%rdx, %cr4;  # turn off PGE     
-	movq	%cr3, %rcx;  # flush TLB        
-	movq	%rcx, %cr3;                     
-	movq	%rax, %cr4;  # turn PGE back on 
+	movq	%rdx, %cr4;  # turn off PGE
+	movq	%cr3, %rcx;  # flush TLB
+	movq	%rcx, %cr3;
+	movq	%rax, %cr4;  # turn PGE back on
 
 	movl	nr_copy_pages(%rip), %eax
 	xorl	%ecx, %ecx
@@ -70,8 +70,8 @@ copy_one_page:
 	movzbl	(%rsi,%rax), %eax
 	movb	%al, (%rsi,%rcx)
 
-	movq	%cr3, %rax;  # flush TLB 
-	movq	%rax, %cr3;              
+	movq	%cr3, %rax;  # flush TLB
+	movq	%rax, %cr3;
 
 	movq	%r11, %rax
 	incq	%rax
@@ -89,7 +89,7 @@ copy_one_page:
 done:
 	movl	$24, %eax
 	movl	%eax, %ds
-	
+
 	movq saved_context_esp(%rip), %rsp
 	movq saved_context_ebp(%rip), %rbp
 	movq saved_context_eax(%rip), %rax

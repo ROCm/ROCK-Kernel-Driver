@@ -59,13 +59,13 @@
 
 static int __init ibmasm_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 {
-	int result = -ENOMEM;
+	int err, result = -ENOMEM;
 	struct service_processor *sp;
 
-	if (pci_enable_device(pdev)) {
+	if ((err = pci_enable_device(pdev))) {
 		printk(KERN_ERR "%s: can't enable PCI device at %s\n",
 			DRIVER_NAME, pci_name(pdev));
-		return -ENODEV;
+		return err;
 	}
 
 	sp = kmalloc(sizeof(struct service_processor), GFP_KERNEL);
@@ -209,10 +209,9 @@ static int __init ibmasm_init(void)
 		return result;
 	}
 	result = pci_register_driver(&ibmasm_driver);
-	if (result <= 0) {
-		pci_unregister_driver(&ibmasm_driver);
+	if (result) {
 		ibmasmfs_unregister();
-		return -ENODEV;
+		return result;
 	}
 	ibmasm_register_panic_notifier();
 	info(DRIVER_DESC " version " DRIVER_VERSION " loaded");
@@ -225,3 +224,4 @@ module_exit(ibmasm_exit);
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
+

@@ -45,7 +45,11 @@ EXPORT_SYMBOL(last_cli_ip);
 
 #endif
 
-static struct time_interpolator itc_interpolator;
+static struct time_interpolator itc_interpolator = {
+	.shift = 16,
+	.mask = 0xffffffffffffffffLL,
+	.source = TIME_SOURCE_CPU
+};
 
 static irqreturn_t
 timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
@@ -67,14 +71,8 @@ timer_interrupt (int irq, void *dev_id, struct pt_regs *regs)
 	profile_tick(CPU_PROFILING, regs);
 
 	while (1) {
-#ifdef CONFIG_SMP
-		/*
-		 * For UP, this is done in do_timer().  Weird, but
-		 * fixing that would require updates to all
-		 * platforms.
-		 */
 		update_process_times(user_mode(regs));
-#endif
+
 		new_itm += local_cpu_data->itm_delta;
 
 		if (smp_processor_id() == TIME_KEEPER_ID) {
@@ -167,7 +165,7 @@ ia64_init_itm (void)
 	if (status != 0) {
 		printk(KERN_ERR "SAL_FREQ_BASE_PLATFORM failed: %s\n", ia64_sal_strerror(status));
 	} else {
-		status = ia64_pal_freq_ratios(&proc_ratio, 0, &itc_ratio);
+		status = ia64_pal_freq_ratios(&proc_ratio, NULL, &itc_ratio);
 		if (status != 0)
 			printk(KERN_ERR "PAL_FREQ_RATIOS failed with status=%ld\n", status);
 	}
@@ -192,17 +190,20 @@ ia64_init_itm (void)
 		itc_ratio.den = 1;	/* avoid division by zero */
 
 	itc_freq = (platform_base_freq*itc_ratio.num)/itc_ratio.den;
-	if (platform_base_drift != -1)
-		itc_drift = platform_base_drift*itc_ratio.num/itc_ratio.den;
-	else
-		itc_drift = -1;
 
 	local_cpu_data->itm_delta = (itc_freq + HZ/2) / HZ;
 	printk(KERN_DEBUG "CPU %d: base freq=%lu.%03luMHz, ITC ratio=%lu/%lu, "
-	       "ITC freq=%lu.%03luMHz+/-%ldppm\n", smp_processor_id(),
+	       "ITC freq=%lu.%03luMHz", smp_processor_id(),
 	       platform_base_freq / 1000000, (platform_base_freq / 1000) % 1000,
-	       itc_ratio.num, itc_ratio.den, itc_freq / 1000000, (itc_freq / 1000) % 1000,
-	       itc_drift);
+	       itc_ratio.num, itc_ratio.den, itc_freq / 1000000, (itc_freq / 1000) % 1000);
+
+	if (platform_base_drift != -1) {
+		itc_drift = platform_base_drift*itc_ratio.num/itc_ratio.den;
+		printk("+/-%ldppm\n", itc_drift);
+	} else {
+		itc_drift = -1;
+		printk("\n");
+	}
 
 	local_cpu_data->proc_freq = (platform_base_freq*proc_ratio.num)/proc_ratio.den;
 	local_cpu_data->itc_freq = itc_freq;
@@ -212,9 +213,7 @@ ia64_init_itm (void)
 
 	if (!(sal_platform_features & IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT)) {
 		itc_interpolator.frequency = local_cpu_data->itc_freq;
-		itc_interpolator.shift = 16;
 		itc_interpolator.drift = itc_drift;
-		itc_interpolator.source = TIME_SOURCE_CPU;
 #ifdef CONFIG_SMP
 		/* On IA64 in an SMP configuration ITCs are never accurately synchronized.
 		 * Jitter compensation requires a cmpxchg which may limit
@@ -228,7 +227,6 @@ ia64_init_itm (void)
 		 */
 		if (!nojitter) itc_interpolator.jitter = 1;
 #endif
-		itc_interpolator.addr = NULL;
 		register_time_interpolator(&itc_interpolator);
 	}
 

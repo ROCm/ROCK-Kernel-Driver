@@ -1098,7 +1098,7 @@ struct BusLogic_HostAdapter {
 	struct BusLogic_DriverOptions *DriverOptions;
 	struct FlashPoint_Info FlashPointInfo;
 	FlashPoint_CardHandle_T CardHandle;
-	struct BusLogic_HostAdapter *Next;
+	struct list_head host_list;
 	struct BusLogic_CCB *All_CCBs;
 	struct BusLogic_CCB *Free_CCBs;
 	struct BusLogic_CCB *FirstCompletedCCB;
@@ -1168,46 +1168,6 @@ struct SCSI_Inquiry {
 	unsigned char ProductIdentification[16];	/* Bytes 16-31 */
 	unsigned char ProductRevisionLevel[4];	/* Bytes 32-35 */
 };
-
-/*
-  BusLogic_AcquireHostAdapterLock acquires exclusive access to Host Adapter.
-*/
-
-static inline void BusLogic_AcquireHostAdapterLock(struct BusLogic_HostAdapter *HostAdapter)
-{
-	spin_lock_irq(HostAdapter->SCSI_Host->host_lock);
-}
-
-/*
-  BusLogic_ReleaseHostAdapterLock releases exclusive access to Host Adapter.
-*/
-
-static inline void BusLogic_ReleaseHostAdapterLock(struct BusLogic_HostAdapter *HostAdapter)
-{
-	spin_unlock_irq(HostAdapter->SCSI_Host->host_lock);
-}
-
-
-/*
-  BusLogic_AcquireHostAdapterLockIH acquires exclusive access to Host Adapter,
-  but is only called from the interrupt handler.
-*/
-
-static inline void BusLogic_AcquireHostAdapterLockIH(struct BusLogic_HostAdapter *HostAdapter, unsigned long *ProcessorFlags)
-{
-	spin_lock_irqsave(HostAdapter->SCSI_Host->host_lock, *ProcessorFlags);
-}
-
-
-/*
-  BusLogic_ReleaseHostAdapterLockIH releases exclusive access to Host Adapter,
-  but is only called from the interrupt handler.
-*/
-
-static inline void BusLogic_ReleaseHostAdapterLockIH(struct BusLogic_HostAdapter *HostAdapter, unsigned long *ProcessorFlags)
-{
-	spin_unlock_irqrestore(HostAdapter->SCSI_Host->host_lock, *ProcessorFlags);
-}
 
 
 /*
@@ -1386,8 +1346,6 @@ static inline void BusLogic_IncrementSizeBucket(BusLogic_CommandSizeBuckets_T Co
 */
 
 static const char *BusLogic_DriverInfo(struct Scsi_Host *);
-static int BusLogic_DetectHostAdapter(struct scsi_host_template *);
-static int BusLogic_ReleaseHostAdapter(struct Scsi_Host *);
 static int BusLogic_QueueCommand(struct scsi_cmnd *, void (*CompletionRoutine) (struct scsi_cmnd *));
 static int BusLogic_BIOSDiskParameters(struct scsi_device *, struct block_device *, sector_t, int *);
 static int BusLogic_ProcDirectoryInfo(struct Scsi_Host *, char *, char **, off_t, int, int);

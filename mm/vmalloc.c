@@ -199,21 +199,19 @@ struct vm_struct *__get_vm_area(unsigned long size, unsigned long flags,
 		align = 1ul << bit;
 	}
 	addr = ALIGN(start, align);
-	size = PAGE_ALIGN(size);
 
 	area = kmalloc(sizeof(*area), GFP_KERNEL);
 	if (unlikely(!area))
 		return NULL;
 
-	if (unlikely(!size)) {
-		kfree (area);
-		return NULL;
-	}
-
 	/*
 	 * We always allocate a guard page.
 	 */
 	size += PAGE_SIZE;
+	if (unlikely(!size)) {
+		kfree (area);
+		return NULL;
+	}
 
 	write_lock(&vmlist_lock);
 	for (p = &vmlist; (tmp = *p) != NULL ;p = &tmp->next) {
@@ -249,6 +247,8 @@ found:
 out:
 	write_unlock(&vmlist_lock);
 	kfree(area);
+	if (printk_ratelimit())
+		printk(KERN_WARNING "allocation failed: out of vmalloc space - use vmalloc=<size> to increase size.\n");
 	return NULL;
 }
 
@@ -292,11 +292,6 @@ found:
 	unmap_vm_area(tmp);
 	*p = tmp->next;
 	write_unlock(&vmlist_lock);
-
-	/*
-	 * Remove the guard page.
-	 */
-	tmp->size -= PAGE_SIZE;
 	return tmp;
 }
 

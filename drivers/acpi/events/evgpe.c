@@ -102,6 +102,8 @@ acpi_ev_set_gpe_type (
  * FUNCTION:    acpi_ev_update_gpe_enable_masks
  *
  * PARAMETERS:  gpe_event_info          - GPE to update
+ *              Type                    - What to do: ACPI_GPE_DISABLE or
+ *                                        ACPI_GPE_ENABLE
  *
  * RETURN:      Status
  *
@@ -166,6 +168,8 @@ acpi_ev_update_gpe_enable_masks (
  * FUNCTION:    acpi_ev_enable_gpe
  *
  * PARAMETERS:  gpe_event_info          - GPE to enable
+ *              write_to_hardware       - Enable now, or just mark data structs
+ *                                        (WAKE GPEs should be deferred)
  *
  * RETURN:      Status
  *
@@ -430,13 +434,8 @@ acpi_ev_gpe_detect (
 			}
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_INTERRUPTS,
-				"GPE pair: Status %8.8X%8.8X = %02X, Enable %8.8X%8.8X = %02X\n",
-				ACPI_FORMAT_UINT64 (
-					gpe_register_info->status_address.address),
-					status_reg,
-				ACPI_FORMAT_UINT64 (
-					gpe_register_info->enable_address.address),
-					enable_reg));
+				"Read GPE Register at GPE%X: Status=%02X, Enable=%02X\n",
+				gpe_register_info->base_gpe_number, status_reg, enable_reg));
 
 			/* First check if there is anything active at all in this register */
 
@@ -707,7 +706,7 @@ acpi_ev_gpe_dispatch (
 #ifdef ACPI_GPE_NOTIFY_CHECK
 
 /*******************************************************************************
- * NOT USED, PROTOTYPE ONLY AND WILL PROBABLY BE REMOVED
+ * TBD: NOT USED, PROTOTYPE ONLY AND WILL PROBABLY BE REMOVED
  *
  * FUNCTION:    acpi_ev_check_for_wake_only_gpe
  *

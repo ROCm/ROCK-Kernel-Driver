@@ -1,4 +1,6 @@
 /*
+ * $Id: saa7134-input.c,v 1.12 2004/11/07 13:17:15 kraxel Exp $
+ *
  * handle saa7134 IR remotes via linux kernel input layer.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -28,11 +30,11 @@
 #include "saa7134.h"
 
 static unsigned int disable_ir = 0;
-MODULE_PARM(disable_ir,"i");
+module_param(disable_ir, int, 0444);
 MODULE_PARM_DESC(disable_ir,"disable infrared remote support");
 
 static unsigned int ir_debug = 0;
-MODULE_PARM(ir_debug,"i");
+module_param(ir_debug, int, 0644);
 MODULE_PARM_DESC(ir_debug,"enable debug messages [IR]");
 
 #define dprintk(fmt, arg...)	if (ir_debug) \
@@ -61,7 +63,7 @@ static IR_KEYTAB_TYPE flyvideo_codes[IR_KEYTAB_SIZE] = {
 	[   20 ] = KEY_VOLUMEUP,
 	[   23 ] = KEY_VOLUMEDOWN,
 	[   18 ] = KEY_CHANNELUP,    // Channel +
-	[   19 ] = KEY_CHANNELDOWN,  // Channel - 
+	[   19 ] = KEY_CHANNELDOWN,  // Channel -
 	[    6 ] = KEY_AGAIN,        // Recal
 	[   16 ] = KEY_KPENTER,      // Enter
 
@@ -209,6 +211,53 @@ static IR_KEYTAB_TYPE avacssmart_codes[IR_KEYTAB_SIZE] = {
         [ 15 ] = KEY_F22,		// min
 	[ 26 ] = KEY_F23,		// freeze
 };
+
+/* Alex Hermann <gaaf@gmx.net> */
+static IR_KEYTAB_TYPE md2819_codes[IR_KEYTAB_SIZE] = {
+	[ 40 ] = KEY_KP1,
+	[ 24 ] = KEY_KP2,
+	[ 56 ] = KEY_KP3,
+	[ 36 ] = KEY_KP4,
+	[ 20 ] = KEY_KP5,
+	[ 52 ] = KEY_KP6,
+	[ 44 ] = KEY_KP7,
+	[ 28 ] = KEY_KP8,
+	[ 60 ] = KEY_KP9,
+	[ 34 ] = KEY_KP0,
+
+	[ 32 ] = KEY_TV,		// TV/FM
+	[ 16 ] = KEY_CD,		// CD
+	[ 48 ] = KEY_TEXT,		// TELETEXT
+	[  0 ] = KEY_POWER,		// POWER
+
+	[  8 ] = KEY_VIDEO,		// VIDEO
+	[  4 ] = KEY_AUDIO,		// AUDIO
+	[ 12 ] = KEY_ZOOM,		// FULL SCREEN
+
+	[ 18 ] = KEY_SUBTITLE,		// DISPLAY	- ???
+	[ 50 ] = KEY_REWIND,		// LOOP		- ???
+	[  2 ] = KEY_PRINT,		// PREVIEW	- ???
+
+	[ 42 ] = KEY_SEARCH,		// AUTOSCAN
+	[ 26 ] = KEY_SLEEP,		// FREEZE	- ???
+	[ 58 ] = KEY_SHUFFLE,		// SNAPSHOT	- ???
+	[ 10 ] = KEY_MUTE,		// MUTE
+
+	[ 38 ] = KEY_RECORD,		// RECORD
+	[ 22 ] = KEY_PAUSE,		// PAUSE
+	[ 54 ] = KEY_STOP,		// STOP
+	[  6 ] = KEY_PLAY,		// PLAY
+
+	[ 46 ] = KEY_RED,		// <RED>
+	[ 33 ] = KEY_GREEN,		// <GREEN>
+	[ 14 ] = KEY_YELLOW,		// <YELLOW>
+	[  1 ] = KEY_BLUE,		// <BLUE>
+
+	[ 30 ] = KEY_VOLUMEDOWN,	// VOLUME-
+	[ 62 ] = KEY_VOLUMEUP,		// VOLUME+
+	[ 17 ] = KEY_CHANNELDOWN,	// CHANNEL/PAGE-
+	[ 49 ] = KEY_CHANNELUP		// CHANNEL/PAGE+
+};
 /* ---------------------------------------------------------------------- */
 
 static int build_key(struct saa7134_dev *dev)
@@ -303,6 +352,16 @@ int saa7134_input_init1(struct saa7134_dev *dev)
 		mask_keyup   = 0x000020;
 		polling      = 50; // ms
 		break;
+	case SAA7134_BOARD_MD2819:
+	case SAA7134_BOARD_AVERMEDIA_307:
+		ir_codes     = md2819_codes;
+		mask_keycode = 0x0007C8;
+		mask_keydown = 0x000010;
+		polling      = 50; // ms
+		/* Set GPIO pin2 to high to enable the IR controller */
+		saa_setb(SAA7134_GPIO_GPMODE0, 0x4);
+		saa_setb(SAA7134_GPIO_GPSTATUS0, 0x4);
+		break;
 	}
 	if (NULL == ir_codes) {
 		printk("%s: Oops: IR config error [card=%d]\n",
@@ -320,7 +379,7 @@ int saa7134_input_init1(struct saa7134_dev *dev)
 	ir->mask_keydown = mask_keydown;
 	ir->mask_keyup   = mask_keyup;
         ir->polling      = polling;
-	
+
 	/* init input device */
 	snprintf(ir->name, sizeof(ir->name), "saa7134 IR (%s)",
 		 saa7134_boards[dev->board].name);
@@ -332,8 +391,6 @@ int saa7134_input_init1(struct saa7134_dev *dev)
 	ir->dev.phys = ir->phys;
 	ir->dev.id.bustype = BUS_PCI;
 	ir->dev.id.version = 1;
-	sprintf(ir->dev.cdev.class_id,"irkbd-saa7134-%s",
-		pci_name(dev->pci));
 	if (dev->pci->subsystem_vendor) {
 		ir->dev.id.vendor  = dev->pci->subsystem_vendor;
 		ir->dev.id.product = dev->pci->subsystem_device;
@@ -361,7 +418,7 @@ void saa7134_input_fini(struct saa7134_dev *dev)
 {
 	if (NULL == dev->remote)
 		return;
-	
+
 	input_unregister_device(&dev->remote->dev);
 	if (dev->remote->polling)
 		del_timer_sync(&dev->remote->timer);

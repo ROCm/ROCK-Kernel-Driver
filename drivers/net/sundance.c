@@ -162,9 +162,9 @@ static char *media[MAX_UNITS];
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>		/* Processor type for cache alignment. */
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/spinlock.h>
@@ -511,8 +511,7 @@ static int __set_mac_addr(struct net_device *dev);
 static struct net_device_stats *get_stats(struct net_device *dev);
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static int  netdev_close(struct net_device *dev);
-
-
+static struct ethtool_ops ethtool_ops;
 
 static int __devinit sundance_probe1 (struct pci_dev *pdev,
 				      const struct pci_device_id *ent)
@@ -567,7 +566,7 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	dev->base_addr = ioaddr;
 	dev->irq = irq;
 
-	np = dev->priv;
+	np = netdev_priv(dev);
 	np->pci_dev = pdev;
 	np->chip_id = chip_idx;
 	np->msg_enable = (1 << debug) - 1;
@@ -600,6 +599,7 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	dev->get_stats = &get_stats;
 	dev->set_multicast_list = &set_rx_mode;
 	dev->do_ioctl = &netdev_ioctl;
+	SET_ETHTOOL_OPS(dev, &ethtool_ops);
 	dev->tx_timeout = &tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
 	dev->change_mtu = &change_mtu;
@@ -787,7 +787,7 @@ static void mdio_sync(long mdio_addr)
 
 static int mdio_read(struct net_device *dev, int phy_id, int location)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long mdio_addr = dev->base_addr + MIICtrl;
 	int mii_cmd = (0xf6 << 10) | (phy_id << 5) | location;
 	int i, retval = 0;
@@ -817,7 +817,7 @@ static int mdio_read(struct net_device *dev, int phy_id, int location)
 
 static void mdio_write(struct net_device *dev, int phy_id, int location, int value)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long mdio_addr = dev->base_addr + MIICtrl;
 	int mii_cmd = (0x5002 << 16) | (phy_id << 23) | (location<<18) | value;
 	int i;
@@ -846,7 +846,7 @@ static void mdio_write(struct net_device *dev, int phy_id, int location, int val
 
 static int netdev_open(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int i;
 
@@ -879,7 +879,7 @@ static int netdev_open(struct net_device *dev)
 	if (dev->if_port == 0)
 		dev->if_port = np->default_port;
 
-	np->mcastlock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&np->mcastlock);
 
 	set_rx_mode(dev);
 	writew(0, ioaddr + IntrEnable);
@@ -916,7 +916,7 @@ static int netdev_open(struct net_device *dev)
 
 static void check_duplex(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int mii_lpa = mdio_read(dev, np->phys[0], MII_LPA);
 	int negotiated = mii_lpa & np->mii_if.advertising;
@@ -945,7 +945,7 @@ static void check_duplex(struct net_device *dev)
 static void netdev_timer(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int next_tick = 10*HZ;
 
@@ -962,7 +962,7 @@ static void netdev_timer(unsigned long data)
 
 static void tx_timeout(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	unsigned long flag;
 	
@@ -1015,7 +1015,7 @@ static void tx_timeout(struct net_device *dev)
 /* Initialize the Rx and Tx rings, along with various 'dev' bits. */
 static void init_ring(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	int i;
 
 	np->cur_rx = np->cur_tx = 0;
@@ -1058,7 +1058,7 @@ static void init_ring(struct net_device *dev)
 static void tx_poll (unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	unsigned head = np->cur_task % TX_RING_SIZE;
 	struct netdev_desc *txdesc = 
 		&np->tx_ring[(np->cur_tx - 1) % TX_RING_SIZE];
@@ -1085,7 +1085,7 @@ static void tx_poll (unsigned long data)
 static int
 start_tx (struct sk_buff *skb, struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	struct netdev_desc *txdesc;
 	unsigned entry;
 
@@ -1127,7 +1127,7 @@ start_tx (struct sk_buff *skb, struct net_device *dev)
 static int
 reset_tx (struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	struct sk_buff *skb;
 	int i;
@@ -1176,7 +1176,7 @@ static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs
 	int handled = 0;
 
 	ioaddr = dev->base_addr;
-	np = dev->priv;
+	np = netdev_priv(dev);
 
 	do {
 		int intr_status = readw(ioaddr + IntrStatus);
@@ -1301,7 +1301,7 @@ static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs
 static void rx_poll(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	int entry = np->cur_rx % RX_RING_SIZE;
 	int boguscnt = np->budget;
 	long ioaddr = dev->base_addr;
@@ -1398,7 +1398,7 @@ not_done:
 
 static void refill_rx (struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	int entry;
 	int cnt = 0;
 
@@ -1429,7 +1429,7 @@ static void refill_rx (struct net_device *dev)
 static void netdev_error(struct net_device *dev, int intr_status)
 {
 	long ioaddr = dev->base_addr;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	u16 mii_ctl, mii_advertise, mii_lpa;
 	int speed;
 
@@ -1483,7 +1483,7 @@ static void netdev_error(struct net_device *dev, int intr_status)
 
 static struct net_device_stats *get_stats(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int i;
 
@@ -1512,7 +1512,7 @@ static struct net_device_stats *get_stats(struct net_device *dev)
 static void set_rx_mode(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	u16 mc_filter[4];			/* Multicast hash filter */
 	u32 rx_mode;
 	int i;
@@ -1565,91 +1565,79 @@ static int __set_mac_addr(struct net_device *dev)
 	writew(addr16, dev->base_addr + StationAddr+4);
 	return 0;
 }
-	
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
+static int check_if_running(struct net_device *dev)
 {
-	struct netdev_private *np = dev->priv;
-	u32 ethcmd;
-
-	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
-		return -EFAULT;
-
-        switch (ethcmd) {
-		/* get constant driver settings/info */
-        	case ETHTOOL_GDRVINFO: {
-			struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-			strcpy(info.driver, DRV_NAME);
-			strcpy(info.version, DRV_VERSION);
-			strcpy(info.bus_info, pci_name(np->pci_dev));
-			memset(&info.fw_version, 0, sizeof(info.fw_version));
-			if (copy_to_user(useraddr, &info, sizeof(info)))
-				return -EFAULT;
-			return 0;
-		}
-
-		/* get media settings */
-		case ETHTOOL_GSET: {
-			struct ethtool_cmd ecmd = { ETHTOOL_GSET };
-			spin_lock_irq(&np->lock);
-			mii_ethtool_gset(&np->mii_if, &ecmd);
-			spin_unlock_irq(&np->lock);
-			if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
-				return -EFAULT;
-			return 0;
-		}
-		/* set media settings */
-		case ETHTOOL_SSET: {
-			int r;
-			struct ethtool_cmd ecmd;
-			if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
-				return -EFAULT;
-			spin_lock_irq(&np->lock);
-			r = mii_ethtool_sset(&np->mii_if, &ecmd);
-			spin_unlock_irq(&np->lock);
-			return r;
-		}
-
-		/* restart autonegotiation */
-		case ETHTOOL_NWAY_RST: {
-			return mii_nway_restart(&np->mii_if);
-		}
-
-		/* get link status */
-		case ETHTOOL_GLINK: {
-			struct ethtool_value edata = {ETHTOOL_GLINK};
-			edata.data = mii_link_ok(&np->mii_if);
-			if (copy_to_user(useraddr, &edata, sizeof(edata)))
-				return -EFAULT;
-			return 0;
-		}
-
-		/* get message-level */
-		case ETHTOOL_GMSGLVL: {
-			struct ethtool_value edata = {ETHTOOL_GMSGLVL};
-			edata.data = np->msg_enable;
-			if (copy_to_user(useraddr, &edata, sizeof(edata)))
-				return -EFAULT;
-			return 0;
-		}
-		/* set message-level */
-		case ETHTOOL_SMSGLVL: {
-			struct ethtool_value edata;
-			if (copy_from_user(&edata, useraddr, sizeof(edata)))
-				return -EFAULT;
-			np->msg_enable = edata.data;
-			return 0;
-		}
-
-		default:
-		return -EOPNOTSUPP;
-
-        }
+	if (!netif_running(dev))
+		return -EINVAL;
+	return 0;
 }
+
+static void get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	strcpy(info->driver, DRV_NAME);
+	strcpy(info->version, DRV_VERSION);
+	strcpy(info->bus_info, pci_name(np->pci_dev));
+}
+
+static int get_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	spin_lock_irq(&np->lock);
+	mii_ethtool_gset(&np->mii_if, ecmd);
+	spin_unlock_irq(&np->lock);
+	return 0;
+}
+
+static int set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	int res;
+	spin_lock_irq(&np->lock);
+	res = mii_ethtool_sset(&np->mii_if, ecmd);
+	spin_unlock_irq(&np->lock);
+	return res;
+}
+
+static int nway_reset(struct net_device *dev)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	return mii_nway_restart(&np->mii_if);
+}
+
+static u32 get_link(struct net_device *dev)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	return mii_link_ok(&np->mii_if);
+}
+
+static u32 get_msglevel(struct net_device *dev)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	return np->msg_enable;
+}
+
+static void set_msglevel(struct net_device *dev, u32 val)
+{
+	struct netdev_private *np = netdev_priv(dev);
+	np->msg_enable = val;
+}
+
+static struct ethtool_ops ethtool_ops = {
+	.begin = check_if_running,
+	.get_drvinfo = get_drvinfo,
+	.get_settings = get_settings,
+	.set_settings = set_settings,
+	.nway_reset = nway_reset,
+	.get_link = get_link,
+	.get_msglevel = get_msglevel,
+	.set_msglevel = set_msglevel,
+};
 
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	int rc;
 	int i;
 	long ioaddr = dev->base_addr;
@@ -1657,14 +1645,9 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	if (!netif_running(dev))
 		return -EINVAL;
 
-	if (cmd == SIOCETHTOOL)
-		rc = netdev_ethtool_ioctl(dev, rq->ifr_data);
-
-	else {
-		spin_lock_irq(&np->lock);
-		rc = generic_mii_ioctl(&np->mii_if, if_mii(rq), cmd, NULL);
-		spin_unlock_irq(&np->lock);
-	}
+	spin_lock_irq(&np->lock);
+	rc = generic_mii_ioctl(&np->mii_if, if_mii(rq), cmd, NULL);
+	spin_unlock_irq(&np->lock);
 	switch (cmd) {
 		case SIOCDEVPRIVATE:
 		for (i=0; i<TX_RING_SIZE; i++) {
@@ -1696,7 +1679,7 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 static int netdev_close(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct netdev_private *np = dev->priv;
+	struct netdev_private *np = netdev_priv(dev);
 	struct sk_buff *skb;
 	int i;
 
@@ -1775,7 +1758,7 @@ static void __devexit sundance_remove1 (struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 
 	if (dev) {
-		struct netdev_private *np = dev->priv;
+		struct netdev_private *np = netdev_priv(dev);
 
 		unregister_netdev(dev);
         	pci_free_consistent(pdev, RX_TOTAL_SIZE, np->rx_ring,

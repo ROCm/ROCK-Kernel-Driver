@@ -1,5 +1,5 @@
 /*
- * $Id: edb7312.c,v 1.11 2004/07/14 09:52:55 dwmw2 Exp $
+ * $Id: edb7312.c,v 1.13 2004/11/04 13:24:14 gleixner Exp $
  *
  * Handle mapping of the NOR flash on Cogent EDB7312 boards
  *
@@ -71,19 +71,18 @@ static const char *probes[] = { "RedBoot", "cmdlinepart", NULL };
 
 #endif
 
-static int mtd_parts_nb;
-static struct mtd_partition *mtd_parts;
+static int                   mtd_parts_nb = 0;
+static struct mtd_partition *mtd_parts    = 0;
 
 int __init init_edb7312nor(void)
 {
 	static const char *rom_probe_types[] = PROBETYPES;
 	const char **type;
-	const char *part_type = NULL;
+	const char *part_type = 0;
 
        	printk(KERN_NOTICE MSG_PREFIX "0x%08x at 0x%08x\n", 
 	       WINDOW_SIZE, WINDOW_ADDR);
-	edb7312nor_map.virt = (unsigned long)
-	  ioremap(WINDOW_ADDR, WINDOW_SIZE);
+	edb7312nor_map.virt = ioremap(WINDOW_ADDR, WINDOW_SIZE);
 
 	if (!edb7312nor_map.virt) {
 		printk(MSG_PREFIX "failed to ioremap\n");
@@ -92,7 +91,7 @@ int __init init_edb7312nor(void)
 	
 	simple_map_init(&edb7312nor_map);
 
-	mymtd = NULL;
+	mymtd = 0;
 	type = rom_probe_types;
 	for(; !mymtd && *type; type++) {
 		mymtd = do_map_probe(*type, &edb7312nor_map);

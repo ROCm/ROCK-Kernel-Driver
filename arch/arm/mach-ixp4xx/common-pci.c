@@ -33,7 +33,6 @@
 #include <asm/system.h>
 #include <asm/mach/pci.h>
 #include <asm/hardware.h>
-#include <asm/sizes.h>
 
 
 /*
@@ -239,9 +238,10 @@ static u32 byte_lane_enable_bits(u32 n, int size)
 	return 0xffffffff;
 }
 
-static int read_config(u8 bus_num, u16 devfn, int where, int size, u32 *value)
+static int ixp4xx_pci_read_config(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *value)
 {
 	u32 n, byte_enables, addr, data;
+	u8 bus_num = bus->number;
 
 	pr_debug("read_config from %d size %d dev %d:%d:%d\n", where, size,
 		bus_num, PCI_SLOT(devfn), PCI_FUNC(devfn));
@@ -261,9 +261,10 @@ static int read_config(u8 bus_num, u16 devfn, int where, int size, u32 *value)
 	return PCIBIOS_SUCCESSFUL;
 }
 
-static int write_config(u8 bus_num, u16 devfn, int where, int size, u32 value)
+static int ixp4xx_pci_write_config(struct pci_bus *bus,  unsigned int devfn, int where, int size, u32 value)
 {
 	u32 n, byte_enables, addr, data;
+	u8 bus_num = bus->number;
 
 	pr_debug("write_config_byte %#x to %d size %d dev %d:%d:%d\n", value, where,
 		size, bus_num, PCI_SLOT(devfn), PCI_FUNC(devfn));
@@ -281,30 +282,10 @@ static int write_config(u8 bus_num, u16 devfn, int where, int size, u32 value)
 	return PCIBIOS_SUCCESSFUL;
 }
 
-/*
- *	Generalized PCI config access functions.
- */
-static int ixp4xx_read_config(struct pci_bus *bus, unsigned int devfn,
-	int where, int size, u32 *value)
-{
-	if (bus->number && !PCI_SLOT(devfn))
-		return local_read_config(where, size, value);
-	return read_config(bus->number, devfn, where, size, value);
-}
-
-static int ixp4xx_write_config(struct pci_bus *bus, unsigned int devfn,
-	int where, int size, u32 value)
-{
-	if (bus->number && !PCI_SLOT(devfn))
-		return local_write_config(where, size, value);
-	return write_config(bus->number, devfn, where, size, value);
-}
-
 struct pci_ops ixp4xx_ops = {
-	.read =  ixp4xx_read_config,
-	.write = ixp4xx_write_config,
+	.read =  ixp4xx_pci_read_config,
+	.write = ixp4xx_pci_write_config,
 };
-
 
 /*
  * PCI abort handler

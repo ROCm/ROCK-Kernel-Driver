@@ -1,6 +1,7 @@
 /*
  * sleep.c - ACPI sleep support.
  *
+ * Copyright (c) 2004 David Shaohua Li <shaohua.li@intel.com>
  * Copyright (c) 2000-2003 Patrick Mochel
  * Copyright (c) 2003 Open Source Development Lab
  *
@@ -12,8 +13,8 @@
 #include <linux/irq.h>
 #include <linux/dmi.h>
 #include <linux/device.h>
-#include <asm/io.h>
 #include <linux/suspend.h>
+#include <asm/io.h>
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
 #include "sleep.h"
@@ -43,7 +44,7 @@ static int init_8259A_after_S1;
  *	wakeup code to the waking vector. 
  */
 
-static int acpi_pm_prepare(u32 pm_state)
+static int acpi_pm_prepare(suspend_state_t pm_state)
 {
 	u32 acpi_state = acpi_suspend_states[pm_state];
 
@@ -58,7 +59,7 @@ static int acpi_pm_prepare(u32 pm_state)
 			return -EFAULT;
 		acpi_set_firmware_waking_vector(
 			(acpi_physical_address) virt_to_phys(
-			(void *)acpi_wakeup_address));
+				(void *)acpi_wakeup_address));
 	}
 	ACPI_FLUSH_CPU_CACHE();
 	acpi_enable_wakeup_device_prep(acpi_state);
@@ -76,7 +77,7 @@ static int acpi_pm_prepare(u32 pm_state)
  *	It's unfortunate, but it works. Please fix if you're feeling frisky.
  */
 
-static int acpi_pm_enter(u32 pm_state)
+static int acpi_pm_enter(suspend_state_t pm_state)
 {
 	acpi_status status = AE_OK;
 	unsigned long flags = 0;
@@ -138,7 +139,7 @@ static int acpi_pm_enter(u32 pm_state)
  *	failed). 
  */
 
-static int acpi_pm_finish(u32 pm_state)
+static int acpi_pm_finish(suspend_state_t pm_state)
 {
 	u32 acpi_state = acpi_suspend_states[pm_state];
 
@@ -219,7 +220,7 @@ static int __init acpi_sleep_init(void)
 				sleep_states[i] = 1;
 				printk(" S4bios");
 				acpi_pm_ops.pm_disk_mode = PM_DISK_FIRMWARE;
-			} 
+			}
 			if (sleep_states[i])
 				acpi_pm_ops.pm_disk_mode = PM_DISK_PLATFORM;
 		}

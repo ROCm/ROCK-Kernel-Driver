@@ -32,7 +32,9 @@
 #include <asm/timex.h>
 #include <asm/proto.h>
 #include <asm/hpet.h>
+#include <asm/sections.h>
 #include <linux/cpufreq.h>
+#include <linux/hpet.h>
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/apic.h>
 #endif
@@ -51,9 +53,9 @@ spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 spinlock_t i8253_lock = SPIN_LOCK_UNLOCKED;
 
 static int nohpet __initdata = 0;
+static int notsc __initdata = 0;
 
 #undef HPET_HACK_ENABLE_DANGEROUS
-
 
 unsigned int cpu_khz;					/* TSC clocks / usec, not used here */
 unsigned long hpet_period;				/* fsecs / HPET clock */
@@ -179,19 +181,27 @@ int do_settimeofday(struct timespec *tv)
 
 EXPORT_SYMBOL(do_settimeofday);
 
-#if defined(CONFIG_SMP) && defined(CONFIG_FRAME_POINTER)
 unsigned long profile_pc(struct pt_regs *regs)
 {
 	unsigned long pc = instruction_pointer(regs);
 
-#if 0
-	if (in_lock_functions(pc))
-		return *(unsigned long *)regs->rbp;
-#endif
+	/* Assume the lock function has either no stack frame or only a single word.
+	   This checks if the address on the stack looks like a kernel text address.
+	   There is a small window for false hits, but in that case the tick
+	   is just accounted to the spinlock function.
+	   Better would be to write these functions in assembler again
+	   and check exactly. */
+	if (in_lock_functions(pc)) {
+		char *v = *(char **)regs->rsp;
+		if ((v >= _stext && v <= _etext) ||
+			(v >= _sinittext && v <= _einittext) ||
+			(v >= (char *)MODULES_VADDR  && v <= (char *)MODULES_END))
+			return (unsigned long)v;
+		return ((unsigned long *)regs->rsp)[1];
+	}
 	return pc;
 }
 EXPORT_SYMBOL(profile_pc);
-#endif
 
 /*
  * In order to set the CMOS clock precisely, set_rtc_mmss has to be called 500
@@ -321,7 +331,7 @@ static noinline void handle_lost_ticks(int lost, struct pt_regs *regs)
 	    print_symbol("rip %s)\n", regs->rip);
     }
 
-    if (lost_count == 100 && !warned) {
+    if (lost_count == 1000 && !warned) {
 	    printk(KERN_WARNING
 		   "warning: many lost ticks.\n"
 		   KERN_WARNING "Your time source seems to be instable or "
@@ -418,6 +428,9 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  */
 
 	do_timer(regs);
+#ifndef CONFIG_SMP
+	update_process_times(user_mode(regs));
+#endif
 
 /*
  * In the SMP case we use the local APIC timer interrupt to do the profiling,
@@ -714,31 +727,59 @@ static unsigned int __init pit_calibrate_tsc(void)
 	return (end - start) / 50;
 }
 
-static int hpet_init(void)
+#ifdef	CONFIG_HPET
+static __init int late_hpet_init(void)
 {
-	unsigned int cfg, id;
+	struct hpet_data	hd;
+	unsigned int 		ntimer;
 
 	if (!vxtime.hpet_address)
-		return -1;
-	set_fixmap_nocache(FIX_HPET_BASE, vxtime.hpet_address);
-	__set_fixmap(VSYSCALL_HPET, vxtime.hpet_address, PAGE_KERNEL_VSYSCALL_NOCACHE);
+          return -1;
 
-/*
- * Read the period, compute tick and quotient.
- */
+	memset(&hd, 0, sizeof (hd));
 
-	id = hpet_readl(HPET_ID);
+	ntimer = hpet_readl(HPET_ID);
+	ntimer = (ntimer & HPET_ID_NUMBER) >> HPET_ID_NUMBER_SHIFT;
+	ntimer++;
 
-	if (!(id & HPET_ID_VENDOR) || !(id & HPET_ID_NUMBER) ||
-	    !(id & HPET_ID_LEGSUP))
-		return -1;
+	/*
+	 * Register with driver.
+	 * Timer0 and Timer1 is used by platform.
+	 */
+	hd.hd_phys_address = vxtime.hpet_address;
+	hd.hd_address = (void *)fix_to_virt(FIX_HPET_BASE);
+	hd.hd_nirqs = ntimer;
+	hd.hd_flags = HPET_DATA_PLATFORM;
+	hpet_reserve_timer(&hd, 0);
+#ifdef	CONFIG_HPET_EMULATE_RTC
+	hpet_reserve_timer(&hd, 1);
+#endif
+	hd.hd_irq[0] = HPET_LEGACY_8254;
+	hd.hd_irq[1] = HPET_LEGACY_RTC;
+	if (ntimer > 2) {
+		struct hpet		*hpet;
+		struct hpet_timer	*timer;
+		int			i;
 
-	hpet_period = hpet_readl(HPET_PERIOD);
-	if (hpet_period < 100000 || hpet_period > 100000000)
-		return -1;
+		hpet = (struct hpet *) fix_to_virt(FIX_HPET_BASE);
 
-	hpet_tick = (1000000000L * (USEC_PER_SEC / HZ) + hpet_period / 2) /
-		hpet_period;
+		for (i = 2, timer = &hpet->hpet_timers[2]; i < ntimer;
+		     timer++, i++)
+			hd.hd_irq[i] = (timer->hpet_config &
+					Tn_INT_ROUTE_CNF_MASK) >>
+				Tn_INT_ROUTE_CNF_SHIFT;
+
+	}
+
+	hpet_alloc(&hd);
+	return 0;
+}
+fs_initcall(late_hpet_init);
+#endif
+
+static int hpet_timer_stop_set_go(unsigned long tick)
+{
+	unsigned int cfg;
 
 /*
  * Stop the timers and reset the main counter.
@@ -768,6 +809,40 @@ static int hpet_init(void)
 	hpet_writel(cfg, HPET_CFG);
 
 	return 0;
+}
+
+static int hpet_init(void)
+{
+	unsigned int id;
+
+	if (!vxtime.hpet_address)
+		return -1;
+	set_fixmap_nocache(FIX_HPET_BASE, vxtime.hpet_address);
+	__set_fixmap(VSYSCALL_HPET, vxtime.hpet_address, PAGE_KERNEL_VSYSCALL_NOCACHE);
+
+/*
+ * Read the period, compute tick and quotient.
+ */
+
+	id = hpet_readl(HPET_ID);
+
+	if (!(id & HPET_ID_VENDOR) || !(id & HPET_ID_NUMBER) ||
+	    !(id & HPET_ID_LEGSUP))
+		return -1;
+
+	hpet_period = hpet_readl(HPET_PERIOD);
+	if (hpet_period < 100000 || hpet_period > 100000000)
+		return -1;
+
+	hpet_tick = (1000000000L * (USEC_PER_SEC / HZ) + hpet_period / 2) /
+		hpet_period;
+
+	return hpet_timer_stop_set_go(hpet_tick);
+}
+
+static int hpet_reenable(void)
+{
+	return hpet_timer_stop_set_go(hpet_tick);
 }
 
 void __init pit_init(void)
@@ -804,9 +879,9 @@ void __init time_init(void)
                 outl(0x800038a0, 0xcf8);
                 outl(0xff000001, 0xcfc);
                 outl(0x800038a0, 0xcf8);
-                hpet_address = inl(0xcfc) & 0xfffffffe;
+                vxtime.hpet_address = inl(0xcfc) & 0xfffffffe;
 		printk(KERN_WARNING "time.c: WARNING: Enabled HPET "
-		       "at %#lx.\n", hpet_address);
+		       "at %#lx.\n", vxtime.hpet_address);
         }
 #endif
 	if (nohpet)
@@ -847,15 +922,34 @@ void __init time_init_smp(void)
 {
 	char *timetype;
 
-	if (vxtime.hpet_address) {
+	/*
+	 * AMD systems with more than one CPU don't have fully synchronized
+	 * TSCs. Always use HPET gettimeofday for these, although it is slower.
+	 * Intel SMP systems usually have synchronized TSCs, so use always
+	 * the TSC.
+	 *
+	 * Exceptions:
+	 * IBM Summit2 checked by oem_force_hpet_timer().
+ 	 * AMD dual core may also not need HPET. Check me.
+	 *
+	 * Can be turned off with "notsc".
+	 */
+	if (num_online_cpus() > 1 &&
+	    boot_cpu_data.x86_vendor == X86_VENDOR_AMD)
+		notsc = 1;
+	/* Some systems will want to disable TSC and use HPET. */
+	if (oem_force_hpet_timer())
+		notsc = 1;
+	if (vxtime.hpet_address && notsc) {
 		timetype = "HPET";
 		vxtime.last = hpet_readl(HPET_T0_CMP) - hpet_tick;
 		vxtime.mode = VXTIME_HPET;
 		do_gettimeoffset = do_gettimeoffset_hpet;
 	} else {
-		timetype = "PIT/TSC";
+		timetype = vxtime.hpet_address ? "HPET/TSC" : "PIT/TSC";
 		vxtime.mode = VXTIME_TSC;
 	}
+
 	printk(KERN_INFO "time.c: Using %s based timekeeping.\n", timetype);
 }
 
@@ -863,7 +957,7 @@ __setup("report_lost_ticks", time_setup);
 
 static long clock_cmos_diff;
 
-static int time_suspend(struct sys_device *dev, u32 state)
+static int timer_suspend(struct sys_device *dev, u32 state)
 {
 	/*
 	 * Estimate time zone so that set_time can update the clock
@@ -873,10 +967,15 @@ static int time_suspend(struct sys_device *dev, u32 state)
 	return 0;
 }
 
-static int time_resume(struct sys_device *dev)
+static int timer_resume(struct sys_device *dev)
 {
 	unsigned long flags;
-	unsigned long sec = get_cmos_time() + clock_cmos_diff;
+	unsigned long sec;
+
+	if (vxtime.hpet_address)
+		hpet_reenable();
+
+	sec = get_cmos_time() + clock_cmos_diff;
 	write_seqlock_irqsave(&xtime_lock,flags);
 	xtime.tv_sec = sec;
 	xtime.tv_nsec = 0;
@@ -884,24 +983,24 @@ static int time_resume(struct sys_device *dev)
 	return 0;
 }
 
-static struct sysdev_class pit_sysclass = {
-	.resume = time_resume,
-	.suspend = time_suspend,
-	set_kset_name("pit"),
+static struct sysdev_class timer_sysclass = {
+	.resume = timer_resume,
+	.suspend = timer_suspend,
+	set_kset_name("timer"),
 };
 
 
 /* XXX this driverfs stuff should probably go elsewhere later -john */
-static struct sys_device device_i8253 = {
+static struct sys_device device_timer = {
 	.id	= 0,
-	.cls	= &pit_sysclass,
+	.cls	= &timer_sysclass,
 };
 
 static int time_init_device(void)
 {
-	int error = sysdev_class_register(&pit_sysclass);
+	int error = sysdev_class_register(&timer_sysclass);
 	if (!error)
-		error = sysdev_register(&device_i8253);
+		error = sysdev_register(&device_timer);
 	return error;
 }
 
@@ -1142,3 +1241,14 @@ static int __init nohpet_setup(char *s)
 } 
 
 __setup("nohpet", nohpet_setup);
+
+
+static int __init notsc_setup(char *s)
+{
+	notsc = 1;
+	return 0;
+}
+
+__setup("notsc", notsc_setup);
+
+

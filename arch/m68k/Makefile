@@ -28,7 +28,7 @@ ifdef CONFIG_SUN3
 LDFLAGS_vmlinux = -N
 endif
 
-CHECKFLAGS += -D__mc68000__=1 -I$(shell $(CC) -print-file-name=include)
+CHECKFLAGS += -D__mc68000__
 
 # without -fno-strength-reduce the 53c7xx.c driver fails ;-(
 CFLAGS += -pipe -fno-strength-reduce -ffixed-a2
@@ -114,7 +114,7 @@ else
 endif
 
 prepare: include/asm-$(ARCH)/offsets.h
-MRPROPER_FILES += include/asm-$(ARCH)/offsets.h
+CLEAN_FILES += include/asm-$(ARCH)/offsets.h
 
 arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/config/MARKER

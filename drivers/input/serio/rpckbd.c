@@ -45,9 +45,6 @@ MODULE_AUTHOR("Vojtech Pavlik, Russell King");
 MODULE_DESCRIPTION("Acorn RiscPC PS/2 keyboard controller driver");
 MODULE_LICENSE("GPL");
 
-static struct serio *rpckbd_port;
-static struct platform_device *rpckbd_device;
-
 static int rpckbd_write(struct serio *port, unsigned char val)
 {
 	while (!(iomd_readb(IOMD_KCTRL) & (1 << 7)))
@@ -109,45 +106,50 @@ static void rpckbd_close(struct serio *port)
  * Allocate and initialize serio structure for subsequent registration
  * with serio core.
  */
-
-static struct serio * __init rpckbd_allocate_port(void)
+static int __devinit rpckbd_probe(struct device *dev)
 {
 	struct serio *serio;
 
 	serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
-	if (serio) {
-		memset(serio, 0, sizeof(struct serio));
-		serio->type		= SERIO_8042;
-		serio->write		= rpckbd_write;
-		serio->open		= rpckbd_open;
-		serio->close		= rpckbd_close;
-		serio->dev.parent	= &rpckbd_device->dev;
-		strlcpy(serio->name, "RiscPC PS/2 kbd port", sizeof(serio->name));
-		strlcpy(serio->phys, "rpckbd/serio0", sizeof(serio->phys));
-	}
+	if (!serio)
+		return -ENOMEM;
 
-	return serio;
+	memset(serio, 0, sizeof(struct serio));
+	serio->type		= SERIO_8042;
+	serio->write		= rpckbd_write;
+	serio->open		= rpckbd_open;
+	serio->close		= rpckbd_close;
+	serio->dev.parent	= dev;
+	strlcpy(serio->name, "RiscPC PS/2 kbd port", sizeof(serio->name));
+	strlcpy(serio->phys, "rpckbd/serio0", sizeof(serio->phys));
+
+	dev_set_drvdata(dev, serio);
+	serio_register_port(serio);
+	return 0;
 }
+
+static int __devexit rpckbd_remove(struct device *dev)
+{
+	struct serio *serio = dev_get_drvdata(dev);
+	serio_unregister_port(serio);
+	return 0;
+}
+
+static struct device_driver rpckbd_driver = {
+	.name		= "kart",
+	.bus		= &platform_bus_type,
+	.probe		= rpckbd_probe,
+	.remove		= __devexit_p(rpckbd_remove),
+};
 
 static int __init rpckbd_init(void)
 {
-	rpckbd_device = platform_device_register_simple("rpckbd", -1, NULL, 0);
-	if (IS_ERR(rpckbd_device))
-		return PTR_ERR(rpckbd_device);
-
-	if (!(rpckbd_port = rpckbd_allocate_port())) {
-		platform_device_unregister(rpckbd_device);
-		return -ENOMEM;
-	}
-
-	serio_register_port(rpckbd_port);
-	return 0;
+	return driver_register(&rpckbd_driver);
 }
 
 static void __exit rpckbd_exit(void)
 {
-	serio_unregister_port(rpckbd_port);
-	platform_device_unregister(rpckbd_device);
+	driver_unregister(&rpckbd_driver);
 }
 
 module_init(rpckbd_init);

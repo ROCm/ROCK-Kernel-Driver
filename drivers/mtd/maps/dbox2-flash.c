@@ -1,5 +1,5 @@
 /*
- * $Id: dbox2-flash.c,v 1.11 2004/07/12 21:59:43 dwmw2 Exp $
+ * $Id: dbox2-flash.c,v 1.13 2004/11/04 13:24:14 gleixner Exp $
  *
  * D-Box 2 flash driver
  */
@@ -75,7 +75,7 @@ struct map_info dbox2_flash_map = {
 int __init init_dbox2_flash(void)
 {
        	printk(KERN_NOTICE "D-Box 2 flash driver (size->0x%X mem->0x%X)\n", WINDOW_SIZE, WINDOW_ADDR);
-	dbox2_flash_map.virt = (unsigned long)ioremap(WINDOW_ADDR, WINDOW_SIZE);
+	dbox2_flash_map.virt = ioremap(WINDOW_ADDR, WINDOW_SIZE);
 
 	if (!dbox2_flash_map.virt) {
 		printk("Failed to ioremap\n");

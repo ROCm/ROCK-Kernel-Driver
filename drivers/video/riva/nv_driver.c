@@ -56,32 +56,33 @@ static inline unsigned char MISCin(struct riva_par *par)
 static Bool 
 riva_is_connected(struct riva_par *par, Bool second)
 {
-	volatile U032 *PRAMDAC = par->riva.PRAMDAC0;
+	volatile U032 __iomem *PRAMDAC = par->riva.PRAMDAC0;
 	U032 reg52C, reg608;
 	Bool present;
 
 	if(second) PRAMDAC += 0x800;
 
-	reg52C = PRAMDAC[0x052C/4];
-	reg608 = PRAMDAC[0x0608/4];
+	reg52C = NV_RD32(PRAMDAC, 0x052C);
+	reg608 = NV_RD32(PRAMDAC, 0x0608);
 
-	PRAMDAC[0x0608/4] = reg608 & ~0x00010000;
+	NV_WR32(PRAMDAC, 0x0608, reg608 & ~0x00010000);
 
-	PRAMDAC[0x052C/4] = reg52C & 0x0000FEEE;
+	NV_WR32(PRAMDAC, 0x052C, reg52C & 0x0000FEEE);
 	mdelay(1); 
-	PRAMDAC[0x052C/4] |= 1;
+	NV_WR32(PRAMDAC, 0x052C, NV_RD32(PRAMDAC, 0x052C) | 1);
 
-	par->riva.PRAMDAC0[0x0610/4] = 0x94050140;
-	par->riva.PRAMDAC0[0x0608/4] |= 0x00001000;
+	NV_WR32(par->riva.PRAMDAC0, 0x0610, 0x94050140);
+	NV_WR32(par->riva.PRAMDAC0, 0x0608, 0x00001000);
 
 	mdelay(1);
 
-	present = (PRAMDAC[0x0608/4] & (1 << 28)) ? TRUE : FALSE;
+	present = (NV_RD32(PRAMDAC, 0x0608) & (1 << 28)) ? TRUE : FALSE;
 
-	par->riva.PRAMDAC0[0x0608/4] &= 0x0000EFFF;
+	NV_WR32(par->riva.PRAMDAC0, 0x0608,
+		NV_RD32(par->riva.PRAMDAC0, 0x0608) & 0x0000EFFF);
 
-	PRAMDAC[0x052C/4] = reg52C;
-	PRAMDAC[0x0608/4] = reg608;
+	NV_WR32(PRAMDAC, 0x052C, reg52C);
+	NV_WR32(PRAMDAC, 0x0608, reg608);
 
 	return present;
 }
@@ -104,12 +105,33 @@ static void
 riva_is_second(struct riva_par *par)
 {
 	if (par->FlatPanel == 1) {
-		switch(par->Chipset) {
-		case NV_CHIP_GEFORCE4_440_GO:
-		case NV_CHIP_GEFORCE4_440_GO_M64:
-		case NV_CHIP_GEFORCE4_420_GO:
-		case NV_CHIP_GEFORCE4_420_GO_M32:
-		case NV_CHIP_QUADRO4_500_GOGL:
+		switch(par->Chipset & 0xffff) {
+		case 0x0174:
+		case 0x0175:
+		case 0x0176:
+		case 0x0177:
+		case 0x0179:
+		case 0x017C:
+		case 0x017D:
+		case 0x0186:
+		case 0x0187:
+		/* this might not be a good default for the chips below */
+		case 0x0286:
+		case 0x028C:
+		case 0x0316:
+		case 0x0317:
+		case 0x031A:
+		case 0x031B:
+		case 0x031C:
+		case 0x031D:
+		case 0x031E:
+		case 0x031F:
+		case 0x0324:
+		case 0x0325:
+		case 0x0328:
+		case 0x0329:
+		case 0x032C:
+		case 0x032D:
 			par->SecondCRTC = TRUE;
 			break;
 		default:
@@ -118,13 +140,14 @@ riva_is_second(struct riva_par *par)
 		}
 	} else {
 		if(riva_is_connected(par, 0)) {
-			if(par->riva.PRAMDAC0[0x0000052C/4] & 0x100)
+
+			if (NV_RD32(par->riva.PRAMDAC0, 0x0000052C) & 0x100)
 				par->SecondCRTC = TRUE;
 			else
 				par->SecondCRTC = FALSE;
 		} else 
 		if (riva_is_connected(par, 1)) {
-			if(par->riva.PRAMDAC0[0x0000252C/4] & 0x100)
+			if(NV_RD32(par->riva.PRAMDAC0, 0x0000252C) & 0x100)
 				par->SecondCRTC = TRUE;
 			else
 				par->SecondCRTC = FALSE;
@@ -144,13 +167,13 @@ unsigned long riva_get_memlen(struct riva_par *par)
 
 	switch (chip->Architecture) {
 	case NV_ARCH_03:
-		if (chip->PFB[0x00000000/4] & 0x00000020) {
-			if (((chip->PMC[0x00000000/4] & 0xF0) == 0x20)
-			    && ((chip->PMC[0x00000000/4] & 0x0F) >= 0x02)) {
+		if (NV_RD32(chip->PFB, 0x00000000) & 0x00000020) {
+			if (((NV_RD32(chip->PMC, 0x00000000) & 0xF0) == 0x20)
+			    && ((NV_RD32(chip->PMC, 0x00000000)&0x0F)>=0x02)) {
 				/*
 				 * SDRAM 128 ZX.
 				 */
-				switch (chip->PFB[0x00000000/4] & 0x03) {
+				switch (NV_RD32(chip->PFB,0x00000000) & 0x03) {
 				case 2:
 					memlen = 1024 * 4;
 					break;
@@ -168,7 +191,7 @@ unsigned long riva_get_memlen(struct riva_par *par)
 			/*
 			 * SGRAM 128.
 			 */
-			switch (chip->PFB[0x00000000/4] & 0x00000003) {
+			switch (NV_RD32(chip->PFB, 0x00000000) & 0x00000003) {
 			case 0:
 				memlen = 1024 * 8;
 				break;
@@ -182,11 +205,11 @@ unsigned long riva_get_memlen(struct riva_par *par)
 		}        
 		break;
 	case NV_ARCH_04:
-		if (chip->PFB[0x00000000/4] & 0x00000100) {
-			memlen = ((chip->PFB[0x00000000/4] >> 12) & 0x0F) * 
+		if (NV_RD32(chip->PFB, 0x00000000) & 0x00000100) {
+			memlen = ((NV_RD32(chip->PFB, 0x00000000)>>12)&0x0F) *
 				1024 * 2 + 1024 * 2;
 		} else {
-			switch (chip->PFB[0x00000000/4] & 0x00000003) {
+			switch (NV_RD32(chip->PFB, 0x00000000) & 0x00000003) {
 			case 0:
 				memlen = 1024 * 32;
 				break;
@@ -216,7 +239,8 @@ unsigned long riva_get_memlen(struct riva_par *par)
 			pci_read_config_dword(dev, 0x84, &amt);
 			memlen = (((amt >> 4) & 127) + 1) * 1024;
 		} else {
-			switch ((chip->PFB[0x0000020C/4] >> 20) & 0x000000FF){
+			switch ((NV_RD32(chip->PFB, 0x0000020C) >> 20) &
+				0x000000FF){
 			case 0x02:
 				memlen = 1024 * 2;
 				break;
@@ -255,9 +279,9 @@ unsigned long riva_get_maxdclk(struct riva_par *par)
 
 	switch (chip->Architecture) {
 	case NV_ARCH_03:
-		if (chip->PFB[0x00000000/4] & 0x00000020) {
-			if (((chip->PMC[0x00000000/4] & 0xF0) == 0x20)
-			    && ((chip->PMC[0x00000000/4] & 0x0F) >= 0x02)) {   
+		if (NV_RD32(chip->PFB, 0x00000000) & 0x00000020) {
+			if (((NV_RD32(chip->PMC, 0x00000000) & 0xF0) == 0x20)
+			    && ((NV_RD32(chip->PMC,0x00000000)&0x0F) >= 0x02)) {
 				/*
 				 * SDRAM 128 ZX.
 				 */
@@ -276,7 +300,7 @@ unsigned long riva_get_maxdclk(struct riva_par *par)
 	case NV_ARCH_10:
 	case NV_ARCH_20:
 	case NV_ARCH_30:
-		switch ((chip->PFB[0x00000000/4] >> 3) & 0x00000003) {
+		switch ((NV_RD32(chip->PFB, 0x00000000) >> 3) & 0x00000003) {
 		case 3:
 			dclk = 800000;
 			break;
@@ -293,28 +317,56 @@ void
 riva_common_setup(struct riva_par *par)
 {
 	par->riva.EnableIRQ = 0;
-	par->riva.PRAMDAC0 = (unsigned *)(par->ctrl_base + 0x00680000);
-	par->riva.PFB = (unsigned *)(par->ctrl_base + 0x00100000);
-	par->riva.PFIFO = (unsigned *)(par->ctrl_base + 0x00002000);
-	par->riva.PGRAPH = (unsigned *)(par->ctrl_base + 0x00400000);
-	par->riva.PEXTDEV = (unsigned *)(par->ctrl_base + 0x00101000);
-	par->riva.PTIMER = (unsigned *)(par->ctrl_base + 0x00009000);
-	par->riva.PMC = (unsigned *)(par->ctrl_base + 0x00000000);
-	par->riva.FIFO = (unsigned *)(par->ctrl_base + 0x00800000);
-	par->riva.PCIO0 = (U008 *)(par->ctrl_base + 0x00601000);
-	par->riva.PDIO0 = (U008 *)(par->ctrl_base + 0x00681000);
-	par->riva.PVIO = (U008 *)(par->ctrl_base + 0x000C0000);
+	par->riva.PRAMDAC0 =
+		(volatile U032 __iomem *)(par->ctrl_base + 0x00680000);
+	par->riva.PFB =
+		(volatile U032 __iomem *)(par->ctrl_base + 0x00100000);
+	par->riva.PFIFO =
+		(volatile U032 __iomem *)(par->ctrl_base + 0x00002000);
+	par->riva.PGRAPH =
+		(volatile U032 __iomem *)(par->ctrl_base + 0x00400000);
+	par->riva.PEXTDEV =
+		(volatile U032 __iomem *)(par->ctrl_base + 0x00101000);
+	par->riva.PTIMER =
+		(volatile U032 __iomem *)(par->ctrl_base + 0x00009000);
+	par->riva.PMC =
+		(volatile U032 __iomem *)(par->ctrl_base + 0x00000000);
+	par->riva.FIFO =
+		(volatile U032 __iomem *)(par->ctrl_base + 0x00800000);
+	par->riva.PCIO0 = par->ctrl_base + 0x00601000;
+	par->riva.PDIO0 = par->ctrl_base + 0x00681000;
+	par->riva.PVIO = par->ctrl_base + 0x000C0000;
 
 	par->riva.IO = (MISCin(par) & 0x01) ? 0x3D0 : 0x3B0;
 	
 	if (par->FlatPanel == -1) {
-		switch (par->Chipset) {
-		case NV_CHIP_GEFORCE4_440_GO:
-		case NV_CHIP_GEFORCE4_440_GO_M64:
-		case NV_CHIP_GEFORCE4_420_GO:
-		case NV_CHIP_GEFORCE4_420_GO_M32:
-		case NV_CHIP_QUADRO4_500_GOGL:
-		case NV_CHIP_GEFORCE2_GO:
+		switch (par->Chipset & 0xffff) {
+		case 0x0112:   /* known laptop chips */
+		case 0x0174:
+		case 0x0175:
+		case 0x0176:
+		case 0x0177:
+		case 0x0179:
+		case 0x017C:
+		case 0x017D:
+		case 0x0186:
+		case 0x0187:
+		case 0x0286:
+		case 0x028C:
+		case 0x0316:
+		case 0x0317:
+		case 0x031A:
+		case 0x031B:
+		case 0x031C:
+		case 0x031D:
+		case 0x031E:
+		case 0x031F:
+		case 0x0324:
+		case 0x0325:
+		case 0x0328:
+		case 0x0329:
+		case 0x032C:
+		case 0x032D:
 			printk(KERN_INFO PFX 
 				"On a laptop.  Assuming Digital Flat Panel\n");
 			par->FlatPanel = 1;
@@ -339,6 +391,11 @@ riva_common_setup(struct riva_par *par)
 	case 0x01F0:
 	case 0x0250:
 	case 0x0280:
+	case 0x0300:
+	case 0x0310:
+	case 0x0320:
+	case 0x0330:
+	case 0x0340:
 		riva_is_second(par);
 		break;
 	default:
@@ -362,5 +419,7 @@ riva_common_setup(struct riva_par *par)
 		par->FlatPanel = 0;
 	}
 	par->riva.flatPanel = (par->FlatPanel > 0) ? TRUE : FALSE;
+
+	RivaGetConfig(&par->riva, par->Chipset);
 }
 

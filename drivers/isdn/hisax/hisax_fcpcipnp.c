@@ -996,27 +996,17 @@ static struct pci_driver fcpci_driver = {
 
 static int __init hisax_fcpcipnp_init(void)
 {
-	int retval, pci_nr_found;
+	int retval;
 
 	printk(KERN_INFO "hisax_fcpcipnp: Fritz!Card PCI/PCIv2/PnP ISDN driver v0.0.1\n");
 
 	retval = pci_register_driver(&fcpci_driver);
-	if (retval < 0)
+	if (retval)
 		goto out;
-	pci_nr_found = retval;
-	retval = 0;
-
 #ifdef __ISAPNP__
 	retval = pnp_register_driver(&fcpnp_driver);
 	if (retval < 0)
 		goto out_unregister_pci;
-#endif
-
-#if !defined(CONFIG_HOTPLUG) || defined(MODULE)
-	if (pci_nr_found + retval == 0) {
-		retval = -ENODEV;
-		goto out_unregister_isapnp;
-	}
 #endif
 	return 0;
 

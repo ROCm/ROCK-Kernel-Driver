@@ -13,7 +13,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -31,7 +31,8 @@
 #include <linux/init.h>
 #include <linux/kmod.h>
 #include <net/sock.h>
-#include <net/pkt_sched.h>
+#include <net/sch_generic.h>
+#include <net/act_api.h>
 
 #if 1 /* control */
 #define DPRINTK(format,args...) printk(KERN_DEBUG format,##args)
@@ -87,7 +88,7 @@ int tcf_unregister_action(struct tc_action_ops *act)
 }
 
 /* lookup by name */
-struct tc_action_ops *tc_lookup_action_n(char *kind)
+static struct tc_action_ops *tc_lookup_action_n(char *kind)
 {
 
 	struct tc_action_ops *a = NULL;
@@ -110,7 +111,7 @@ struct tc_action_ops *tc_lookup_action_n(char *kind)
 }
 
 /* lookup by rtattr */
-struct tc_action_ops *tc_lookup_action(struct rtattr *kind)
+static struct tc_action_ops *tc_lookup_action(struct rtattr *kind)
 {
 
 	struct tc_action_ops *a = NULL;
@@ -133,8 +134,9 @@ struct tc_action_ops *tc_lookup_action(struct rtattr *kind)
 	return a;
 }
 
+#if 0
 /* lookup by id */
-struct tc_action_ops *tc_lookup_action_id(u32 type)
+static struct tc_action_ops *tc_lookup_action_id(u32 type)
 {
 	struct tc_action_ops *a = NULL;
 
@@ -154,8 +156,9 @@ struct tc_action_ops *tc_lookup_action_id(u32 type)
 
 	return a;
 }
+#endif
 
-int tcf_action_exec(struct sk_buff *skb,struct tc_action *act)
+int tcf_action_exec(struct sk_buff *skb,struct tc_action *act, struct tcf_result *res)
 {
 
 	struct tc_action *a;
@@ -164,7 +167,8 @@ int tcf_action_exec(struct sk_buff *skb,struct tc_action *act)
 	if (skb->tc_verd & TC_NCLS) {
 		skb->tc_verd = CLR_TC_NCLS(skb->tc_verd);
 		D2PRINTK("(%p)tcf_action_exec: cleared TC_NCLS in %s out %s\n",skb,skb->input_dev?skb->input_dev->name:"xxx",skb->dev->name);
-		return TC_ACT_OK;
+		ret = TC_ACT_OK;
+		goto exec_done;
 	}
 	while ((a = act) != NULL) {
 repeat:
@@ -186,6 +190,11 @@ repeat:
 	}
 
 exec_done:
+	if (skb->tc_classid > 0) {
+		res->classid = skb->tc_classid;
+		res->class = 0;
+		skb->tc_classid = 0;
+	}
 
 	return ret;
 }
@@ -409,14 +418,37 @@ bad_ret:
 
 int tcf_action_copy_stats (struct sk_buff *skb,struct tc_action *a)
 {
+	struct gnet_dump d;
+	struct tcf_act_hdr *h = a->priv;
+	
 #ifdef CONFIG_KMOD
 	/* place holder */
 #endif
 
-	if (NULL == a->ops || NULL == a->ops->get_stats)
-		return 1;
+	if (NULL == h)
+		goto errout;
 
-	return a->ops->get_stats(skb,a);
+	if (gnet_stats_start_copy(skb, TCA_ACT_STATS, h->stats_lock, &d) < 0)
+		goto errout;
+
+	if (NULL != a->ops && NULL != a->ops->get_stats)
+		if (a->ops->get_stats(skb, a) < 0)
+			goto errout;
+
+	if (gnet_stats_copy_basic(&d, &h->bstats) < 0 ||
+#ifdef CONFIG_NET_ESTIMATOR
+	    gnet_stats_copy_rate_est(&d, &h->rate_est) < 0 ||
+#endif
+	    gnet_stats_copy_queue(&d, &h->qstats) < 0)
+		goto errout;
+
+	if (gnet_stats_finish_copy(&d) < 0)
+		goto errout;
+
+	return 0;
+
+errout:
+	return -1;
 }
 
 
@@ -474,7 +506,7 @@ static int act_get_notify(u32 pid, struct nlmsghdr *n,
 	return err;
 }
 
-int tcf_action_get_1(struct rtattr *rta, struct tc_action *a, struct nlmsghdr *n, u32 pid)
+static int tcf_action_get_1(struct rtattr *rta, struct tc_action *a, struct nlmsghdr *n, u32 pid)
 {
 	struct tc_action_ops *a_o;
 	char act_name[4 + IFNAMSIZ + 1];
@@ -541,7 +573,7 @@ err_out:
 	return err;
 }
 
-void cleanup_a (struct tc_action *act) 
+static void cleanup_a (struct tc_action *act) 
 {
 	struct tc_action *a;
 
@@ -557,7 +589,7 @@ void cleanup_a (struct tc_action *act)
 	}
 }
 
-struct tc_action_ops *get_ao(struct rtattr *kind, struct tc_action *a)
+static struct tc_action_ops *get_ao(struct rtattr *kind, struct tc_action *a)
 {
 	char act_name[4 + IFNAMSIZ + 1];
 	struct tc_action_ops *a_o = NULL;
@@ -592,7 +624,7 @@ struct tc_action_ops *get_ao(struct rtattr *kind, struct tc_action *a)
 	return a_o;
 }
 
-struct tc_action *create_a(int i)
+static struct tc_action *create_a(int i)
 {
 	struct tc_action *act = NULL;
 
@@ -609,7 +641,7 @@ struct tc_action *create_a(int i)
 	return act;
 }
 
-int tca_action_flush(struct rtattr *rta, struct nlmsghdr *n, u32 pid)
+static int tca_action_flush(struct rtattr *rta, struct nlmsghdr *n, u32 pid)
 {
 	struct sk_buff *skb;
 	unsigned char *b;
@@ -679,7 +711,7 @@ err_out:
 	return err;
 }
 
-int tca_action_gd(struct rtattr *rta, struct nlmsghdr *n, u32 pid, int event )
+static int tca_action_gd(struct rtattr *rta, struct nlmsghdr *n, u32 pid, int event )
 {
 
 	int s = 0;
@@ -763,7 +795,7 @@ nlmsg_failure:
 }
 
 
-int tcf_add_notify(struct tc_action *a, u32 pid, u32 seq, int event, unsigned flags) 
+static int tcf_add_notify(struct tc_action *a, u32 pid, u32 seq, int event, unsigned flags) 
 {
 	struct tcamsg *t;
 	struct nlmsghdr  *nlh;
@@ -810,7 +842,7 @@ nlmsg_failure:
 }
 
 	
-int tcf_action_add(struct rtattr *rta, struct nlmsghdr *n, u32 pid, int ovr ) 
+static int tcf_action_add(struct rtattr *rta, struct nlmsghdr *n, u32 pid, int ovr ) 
 {
 	int ret = 0;
 	struct tc_action *act = NULL;
@@ -893,7 +925,7 @@ static int tc_ctl_action(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 	return ret;
 }
 
-char *
+static char *
 find_dump_kind(struct nlmsghdr *n)
 {
 	struct rtattr *tb1, *tb2[TCA_ACT_MAX+1];

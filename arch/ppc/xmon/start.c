@@ -12,6 +12,7 @@
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/sysrq.h>
+#include <linux/bitops.h>
 #include <asm/xmon.h>
 #include <asm/prom.h>
 #include <asm/bootx.h>
@@ -21,9 +22,6 @@
 #include <asm/processor.h>
 #include <asm/delay.h>
 #include <asm/btext.h>
-#ifdef CONFIG_SMP
-#include <asm/bitops.h>
-#endif
 
 static volatile unsigned char *sccc, *sccd;
 unsigned int TXRDY, RXRDY, DLAB;
@@ -104,7 +102,7 @@ static struct sysrq_key_op sysrq_xmon_op =
 {
 	.handler =	sysrq_handle_xmon,
 	.help_msg =	"Xmon",
-	.action_msg =	"Entering xmon\n",
+	.action_msg =	"Entering xmon",
 };
 #endif
 

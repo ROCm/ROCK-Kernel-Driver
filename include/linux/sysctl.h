@@ -134,11 +134,6 @@ enum
 	KERN_SPARC_SCONS_PWROFF=64, /* int: serial console power-off halt */
 	KERN_HZ_TIMER=65,	/* int: hz timer on or off */
 	KERN_UNKNOWN_NMI_PANIC=66, /* int: unknown nmi panic flag */
-	KERN_KDB=67,		/* int: kdb on/off */
-	KERN_DEFTIMESLICE=68,	/* int: nice   0 def timeslice */
-	KERN_MINTIMESLICE=69,	/* int: nice +19 min timeslice */
-	KERN_HZ=70,		/* unsigned long: internal kernel HZ */
-	KERN_UNSUPPORTED=71,	/* int: allow loading of unsupported modules */
 };
 
 
@@ -164,7 +159,7 @@ enum
 	VM_PAGEBUF=17,		/* struct: Control pagebuf parameters */
 	VM_HUGETLB_PAGES=18,	/* int: Number of available Huge Pages */
 	VM_SWAPPINESS=19,	/* Tendency to steal mapped memory */
-	VM_LOWMEM_RESERVE_RATIO=20,/* reservation ratio for lower memory zones */
+	VM_LOWER_ZONE_PROTECTION=20,/* Amount of protection of lower zones */
 	VM_MIN_FREE_KBYTES=21,	/* Minimum free kilobytes to maintain */
 	VM_MAX_MAP_COUNT=22,	/* int: Maximum number of mmaps/address-space */
 	VM_LAPTOP_MODE=23,	/* vm laptop mode */
@@ -172,7 +167,7 @@ enum
 	VM_HUGETLB_GROUP=25,	/* permitted hugetlb group */
 	VM_VFS_CACHE_PRESSURE=26, /* dcache/icache reclaim pressure */
 	VM_LEGACY_VA_LAYOUT=27, /* legacy/compatibility virtual address space layout */
- 	VM_HEAP_STACK_GAP=28,	/* int: page gap between heap and stack */
+	VM_SWAP_TOKEN_TIMEOUT=28, /* default time for token time out */
 };
 
 
@@ -347,6 +342,7 @@ enum
 	NET_TCP_BIC_LOW_WINDOW=104,
 	NET_TCP_DEFAULT_WIN_SCALE=105,
 	NET_TCP_MODERATE_RCVBUF=106,
+	NET_TCP_TSO_WIN_DIVISOR=107,
 };
 
 enum {
@@ -430,6 +426,7 @@ enum
  	NET_IPV4_NF_CONNTRACK_SCTP_TIMEOUT_SHUTDOWN_SENT=24,
  	NET_IPV4_NF_CONNTRACK_SCTP_TIMEOUT_SHUTDOWN_RECD=25,
  	NET_IPV4_NF_CONNTRACK_SCTP_TIMEOUT_SHUTDOWN_ACK_SENT=26,
+	NET_IPV4_NF_CONNTRACK_COUNT=27,
 };
  
 /* /proc/sys/net/ipv6 */

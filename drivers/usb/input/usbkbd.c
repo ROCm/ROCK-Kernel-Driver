@@ -82,8 +82,6 @@ struct usb_kbd {
 	dma_addr_t leds_dma;
 };
 
-static int usb_kbd_num;
-
 static void usb_kbd_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_kbd *kbd = urb->context;
@@ -198,7 +196,7 @@ static void usb_kbd_close(struct input_dev *dev)
 	struct usb_kbd *kbd = dev->private;
 
 	if (!--kbd->open)
-		usb_unlink_urb(kbd->irq);
+		usb_kill_urb(kbd->irq);
 }
 
 static int usb_kbd_alloc_mem(struct usb_device *dev, struct usb_kbd *kbd)
@@ -302,7 +300,6 @@ static int usb_kbd_probe(struct usb_interface *iface,
 	kbd->dev.id.product = dev->descriptor.idProduct;
 	kbd->dev.id.version = dev->descriptor.bcdDevice;
 	kbd->dev.dev = &iface->dev;
-	sprintf(kbd->dev.cdev.class_id,"usbkbd%d",usb_kbd_num++);
 
 	if (!(buf = kmalloc(63, GFP_KERNEL))) {
 		usb_free_urb(kbd->irq);
@@ -346,7 +343,7 @@ static void usb_kbd_disconnect(struct usb_interface *intf)
 	
 	usb_set_intfdata(intf, NULL);
 	if (kbd) {
-		usb_unlink_urb(kbd->irq);
+		usb_kill_urb(kbd->irq);
 		input_unregister_device(&kbd->dev);
 		usb_kbd_free_mem(interface_to_usbdev(intf), kbd);
 		kfree(kbd);

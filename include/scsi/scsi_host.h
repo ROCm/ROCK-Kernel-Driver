@@ -146,15 +146,6 @@ struct scsi_host_template {
 	enum scsi_eh_timer_return (* eh_timed_out)(struct scsi_cmnd *);
 
 	/*
-	 * Old EH handlers, no longer used. Make them warn the user of old
-	 * drivers by using a wrong type
-	 *
-	 * Status: MORE THAN OBSOLETE
-	 */
-	int (* abort)(int);
-	int (* reset)(int, int);
-
-	/*
 	 * Before the mid layer attempts to scan for a new device where none
 	 * currently exists, it will call this entry in your driver.  Should
 	 * your driver need to allocate any structs or perform any other init
@@ -511,6 +502,13 @@ struct Scsi_Host {
 	struct list_head sht_legacy_list;
 
 	/*
+	 * Points to the transport data (if any) which is allocated
+	 * separately
+	 */
+	void *shost_data;
+	struct class_device transport_classdev;
+
+	/*
 	 * We should ensure that this is aligned, both for better performance
 	 * and also because some compilers (m68k) don't automatically force
 	 * alignment to a long boundary.
@@ -522,9 +520,12 @@ struct Scsi_Host {
 	container_of(d, struct Scsi_Host, shost_gendev)
 #define		class_to_shost(d)	\
 	container_of(d, struct Scsi_Host, shost_classdev)
+#define		transport_class_to_shost(class_dev) \
+	container_of(class_dev, struct Scsi_Host, transport_classdev)
+
 
 extern struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *, int);
-extern int scsi_add_host(struct Scsi_Host *, struct device *);
+extern int __must_check scsi_add_host(struct Scsi_Host *, struct device *);
 extern void scsi_scan_host(struct Scsi_Host *);
 extern void scsi_remove_host(struct Scsi_Host *);
 extern struct Scsi_Host *scsi_host_get(struct Scsi_Host *);

@@ -614,7 +614,7 @@ static void as_antic_stop(struct as_data *ad)
 static void as_antic_timeout(unsigned long data)
 {
 	struct request_queue *q = (struct request_queue *)data;
-	struct as_data *ad = q->elevator.elevator_data;
+	struct as_data *ad = q->elevator->elevator_data;
 	unsigned long flags;
 
 	spin_lock_irqsave(q->queue_lock, flags);
@@ -945,7 +945,7 @@ static void update_write_batch(struct as_data *ad)
  */
 static void as_completed_request(request_queue_t *q, struct request *rq)
 {
-	struct as_data *ad = q->elevator.elevator_data;
+	struct as_data *ad = q->elevator->elevator_data;
 	struct as_rq *arq = RQ_DATA(rq);
 
 	WARN_ON(!list_empty(&rq->queuelist));
@@ -1030,7 +1030,7 @@ static void as_remove_queued_request(request_queue_t *q, struct request *rq)
 {
 	struct as_rq *arq = RQ_DATA(rq);
 	const int data_dir = arq->is_sync;
-	struct as_data *ad = q->elevator.elevator_data;
+	struct as_data *ad = q->elevator->elevator_data;
 
 	WARN_ON(arq->state != AS_RQ_QUEUED);
 
@@ -1361,7 +1361,7 @@ fifo_expired:
 
 static struct request *as_next_request(request_queue_t *q)
 {
-	struct as_data *ad = q->elevator.elevator_data;
+	struct as_data *ad = q->elevator->elevator_data;
 	struct request *rq = NULL;
 
 	/*
@@ -1469,7 +1469,7 @@ static void as_add_request(struct as_data *ad, struct as_rq *arq)
  */
 static void as_requeue_request(request_queue_t *q, struct request *rq)
 {
-	struct as_data *ad = q->elevator.elevator_data;
+	struct as_data *ad = q->elevator->elevator_data;
 	struct as_rq *arq = RQ_DATA(rq);
 
 	if (arq) {
@@ -1509,7 +1509,7 @@ static void as_account_queued_request(struct as_data *ad, struct request *rq)
 static void
 as_insert_request(request_queue_t *q, struct request *rq, int where)
 {
-	struct as_data *ad = q->elevator.elevator_data;
+	struct as_data *ad = q->elevator->elevator_data;
 	struct as_rq *arq = RQ_DATA(rq);
 
 	if (arq) {
@@ -1562,7 +1562,7 @@ as_insert_request(request_queue_t *q, struct request *rq, int where)
  */
 static int as_queue_empty(request_queue_t *q)
 {
-	struct as_data *ad = q->elevator.elevator_data;
+	struct as_data *ad = q->elevator->elevator_data;
 
 	if (!list_empty(&ad->fifo_list[REQ_ASYNC])
 		|| !list_empty(&ad->fifo_list[REQ_SYNC])
@@ -1601,7 +1601,7 @@ as_latter_request(request_queue_t *q, struct request *rq)
 static int
 as_merge(request_queue_t *q, struct request **req, struct bio *bio)
 {
-	struct as_data *ad = q->elevator.elevator_data;
+	struct as_data *ad = q->elevator->elevator_data;
 	sector_t rb_key = bio->bi_sector + bio_sectors(bio);
 	struct request *__rq;
 	int ret;
@@ -1656,7 +1656,7 @@ out_insert:
 
 static void as_merged_request(request_queue_t *q, struct request *req)
 {
-	struct as_data *ad = q->elevator.elevator_data;
+	struct as_data *ad = q->elevator->elevator_data;
 	struct as_rq *arq = RQ_DATA(req);
 
 	/*
@@ -1701,7 +1701,7 @@ static void
 as_merged_requests(request_queue_t *q, struct request *req,
 			 struct request *next)
 {
-	struct as_data *ad = q->elevator.elevator_data;
+	struct as_data *ad = q->elevator->elevator_data;
 	struct as_rq *arq = RQ_DATA(req);
 	struct as_rq *anext = RQ_DATA(next);
 
@@ -1788,7 +1788,7 @@ static void as_work_handler(void *data)
 
 static void as_put_request(request_queue_t *q, struct request *rq)
 {
-	struct as_data *ad = q->elevator.elevator_data;
+	struct as_data *ad = q->elevator->elevator_data;
 	struct as_rq *arq = RQ_DATA(rq);
 
 	if (!arq) {
@@ -1807,7 +1807,7 @@ static void as_put_request(request_queue_t *q, struct request *rq)
 
 static int as_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 {
-	struct as_data *ad = q->elevator.elevator_data;
+	struct as_data *ad = q->elevator->elevator_data;
 	struct as_rq *arq = mempool_alloc(ad->arq_pool, gfp_mask);
 
 	if (arq) {
@@ -1828,21 +1828,21 @@ static int as_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 
 static int as_may_queue(request_queue_t *q, int rw)
 {
-	int ret = 0;
-	struct as_data *ad = q->elevator.elevator_data;
+	int ret = ELV_MQUEUE_MAY;
+	struct as_data *ad = q->elevator->elevator_data;
 	struct io_context *ioc;
 	if (ad->antic_status == ANTIC_WAIT_REQ ||
 			ad->antic_status == ANTIC_WAIT_NEXT) {
 		ioc = as_get_io_context();
 		if (ad->io_context == ioc)
-			ret = 1;
+			ret = ELV_MQUEUE_MUST;
 		put_io_context(ioc);
 	}
 
 	return ret;
 }
 
-static void as_exit(request_queue_t *q, elevator_t *e)
+static void as_exit_queue(elevator_t *e)
 {
 	struct as_data *ad = e->elevator_data;
 
@@ -1862,7 +1862,7 @@ static void as_exit(request_queue_t *q, elevator_t *e)
  * initialize elevator private data (as_data), and alloc a arq for
  * each request on the free lists
  */
-static int as_init(request_queue_t *q, elevator_t *e)
+static int as_init_queue(request_queue_t *q, elevator_t *e)
 {
 	struct as_data *ad;
 	int i;
@@ -1962,10 +1962,10 @@ static ssize_t as_est_show(struct as_data *ad, char *page)
 	return pos;
 }
 
-#define SHOW_FUNCTION(__FUNC, __VAR)					\
+#define SHOW_FUNCTION(__FUNC, __VAR)				\
 static ssize_t __FUNC(struct as_data *ad, char *page)		\
-{									\
-	return as_var_show(__VAR, (page));			\
+{								\
+	return as_var_show(jiffies_to_msecs((__VAR)), (page));	\
 }
 SHOW_FUNCTION(as_readexpire_show, ad->fifo_expire[REQ_SYNC]);
 SHOW_FUNCTION(as_writeexpire_show, ad->fifo_expire[REQ_ASYNC]);
@@ -1982,6 +1982,7 @@ static ssize_t __FUNC(struct as_data *ad, const char *page, size_t count)	\
 		*(__PTR) = (MIN);					\
 	else if (*(__PTR) > (MAX))					\
 		*(__PTR) = (MAX);					\
+	*(__PTR) = msecs_to_jiffies(*(__PTR));				\
 	return ret;							\
 }
 STORE_FUNCTION(as_readexpire_store, &ad->fifo_expire[REQ_SYNC], 0, INT_MAX);
@@ -2070,39 +2071,64 @@ static struct kobj_type as_ktype = {
 	.default_attrs	= default_attrs,
 };
 
-static int __init as_slab_setup(void)
-{
-	arq_pool = kmem_cache_create("as_arq", sizeof(struct as_rq),
-				     0, 0, NULL, NULL);
+static struct elevator_type iosched_as = {
+	.ops = {
+		.elevator_merge_fn = 		as_merge,
+		.elevator_merged_fn =		as_merged_request,
+		.elevator_merge_req_fn =	as_merged_requests,
+		.elevator_next_req_fn =		as_next_request,
+		.elevator_add_req_fn =		as_insert_request,
+		.elevator_remove_req_fn =	as_remove_request,
+		.elevator_requeue_req_fn = 	as_requeue_request,
+		.elevator_queue_empty_fn =	as_queue_empty,
+		.elevator_completed_req_fn =	as_completed_request,
+		.elevator_former_req_fn =	as_former_request,
+		.elevator_latter_req_fn =	as_latter_request,
+		.elevator_set_req_fn =		as_set_request,
+		.elevator_put_req_fn =		as_put_request,
+		.elevator_may_queue_fn =	as_may_queue,
+		.elevator_init_fn =		as_init_queue,
+		.elevator_exit_fn =		as_exit_queue,
+	},
 
-	if (!arq_pool)
-		panic("as: can't init slab pool\n");
-
-	return 0;
-}
-
-subsys_initcall(as_slab_setup);
-
-elevator_t iosched_as = {
-	.elevator_merge_fn = 		as_merge,
-	.elevator_merged_fn =		as_merged_request,
-	.elevator_merge_req_fn =	as_merged_requests,
-	.elevator_next_req_fn =		as_next_request,
-	.elevator_add_req_fn =		as_insert_request,
-	.elevator_remove_req_fn =	as_remove_request,
-	.elevator_requeue_req_fn = 	as_requeue_request,
-	.elevator_queue_empty_fn =	as_queue_empty,
-	.elevator_completed_req_fn =	as_completed_request,
-	.elevator_former_req_fn =	as_former_request,
-	.elevator_latter_req_fn =	as_latter_request,
-	.elevator_set_req_fn =		as_set_request,
-	.elevator_put_req_fn =		as_put_request,
-	.elevator_may_queue_fn =	as_may_queue,
-	.elevator_init_fn =		as_init,
-	.elevator_exit_fn =		as_exit,
-
-	.elevator_ktype =		&as_ktype,
-	.elevator_name =		"anticipatory",
+	.elevator_ktype = &as_ktype,
+	.elevator_name = "anticipatory",
+	.elevator_owner = THIS_MODULE,
 };
 
-EXPORT_SYMBOL(iosched_as);
+static int __init as_init(void)
+{
+	int ret;
+
+	arq_pool = kmem_cache_create("as_arq", sizeof(struct as_rq),
+				     0, 0, NULL, NULL);
+	if (!arq_pool)
+		return -ENOMEM;
+
+	ret = elv_register(&iosched_as);
+	if (!ret) {
+		/*
+		 * don't allow AS to get unregistered, since we would have
+		 * to browse all tasks in the system and release their
+		 * as_io_context first
+		 */
+		__module_get(THIS_MODULE);
+		return 0;
+	}
+
+	kmem_cache_destroy(arq_pool);
+	return ret;
+}
+
+static void __exit as_exit(void)
+{
+	kmem_cache_destroy(arq_pool);
+	elv_unregister(&iosched_as);
+}
+
+module_init(as_init);
+module_exit(as_exit);
+
+MODULE_AUTHOR("Nick Piggin");
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("anticipatory IO scheduler");

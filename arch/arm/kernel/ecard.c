@@ -33,6 +33,7 @@
 #include <linux/types.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
+#include <linux/completion.h>
 #include <linux/reboot.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
@@ -53,18 +54,14 @@
 #define HAVE_EXPMASK
 #endif
 
-enum req {
-	req_readbytes,
-	req_reset
-};
-
 struct ecard_request {
-	enum req	req;
+	void		(*fn)(struct ecard_request *);
 	ecard_t		*ec;
 	unsigned int	address;
 	unsigned int	length;
 	unsigned int	use_loader;
 	void		*buffer;
+	struct completion *complete;
 };
 
 struct expcard_blacklist {
@@ -129,15 +126,14 @@ slot_to_ecard(unsigned int slot)
 #define POD_INT_ADDR(x)	((volatile unsigned char *)\
 			 ((BUS_ADDR((x)) - IO_BASE) + IO_START))
 
-static inline void ecard_task_reset(struct ecard_request *req)
+static void ecard_task_reset(struct ecard_request *req)
 {
 	struct expansion_card *ec = req->ec;
 	if (ec->loader)
 		ecard_loader_reset(POD_INT_ADDR(ec->podaddr), ec->loader);
 }
 
-static void
-ecard_task_readbytes(struct ecard_request *req)
+static void ecard_task_readbytes(struct ecard_request *req)
 {
 	unsigned char *buf = (unsigned char *)req->buffer;
 	volatile unsigned char *base_addr =
@@ -206,26 +202,9 @@ ecard_task_readbytes(struct ecard_request *req)
 
 }
 
-static void ecard_do_request(struct ecard_request *req)
-{
-	switch (req->req) {
-	case req_readbytes:
-		ecard_task_readbytes(req);
-		break;
-
-	case req_reset:
-		ecard_task_reset(req);
-		break;
-	}
-}
-
-#include <linux/completion.h>
-
-static pid_t ecard_pid;
-static wait_queue_head_t ecard_wait;
+static DECLARE_WAIT_QUEUE_HEAD(ecard_wait);
 static struct ecard_request *ecard_req;
-
-static DECLARE_COMPLETION(ecard_completion);
+static DECLARE_MUTEX(ecard_sem);
 
 /*
  * Set up the expansion card daemon's page tables.
@@ -282,8 +261,6 @@ static int ecard_init_mm(void)
 static int
 ecard_task(void * unused)
 {
-	struct task_struct *tsk = current;
-
 	daemonize("kecardd");
 
 	/*
@@ -298,17 +275,13 @@ ecard_task(void * unused)
 	while (1) {
 		struct ecard_request *req;
 
-		do {
-			req = xchg(&ecard_req, NULL);
+		wait_event_interruptible(ecard_wait, ecard_req != NULL);
 
-			if (req == NULL) {
-				sigemptyset(&tsk->pending.signal);
-				interruptible_sleep_on(&ecard_wait);
-			}
-		} while (req == NULL);
-
-		ecard_do_request(req);
-		complete(&ecard_completion);
+		req = xchg(&ecard_req, NULL);
+		if (req != NULL) {
+			req->fn(req);
+			complete(req->complete);
+		}
 	}
 }
 
@@ -318,25 +291,21 @@ ecard_task(void * unused)
  * FIXME: The test here is not sufficient to detect if the
  * kcardd is running.
  */
-static void
-ecard_call(struct ecard_request *req)
+static void ecard_call(struct ecard_request *req)
 {
-	/*
-	 * Make sure we have a context that is able to sleep.
-	 */
-	if (current == &init_task || in_interrupt())
-		BUG();
+	DECLARE_COMPLETION(completion);
 
-	if (ecard_pid <= 0)
-		ecard_pid = kernel_thread(ecard_task, NULL, CLONE_KERNEL);
+	req->complete = &completion;
 
+	down(&ecard_sem);
 	ecard_req = req;
 	wake_up(&ecard_wait);
 
 	/*
 	 * Now wait for kecardd to run.
 	 */
-	wait_for_completion(&ecard_completion);
+	wait_for_completion(&completion);
+	up(&ecard_sem);
 }
 
 /* ======================= Mid-level card control ===================== */
@@ -346,7 +315,7 @@ ecard_readbytes(void *addr, ecard_t *ec, int off, int len, int useld)
 {
 	struct ecard_request req;
 
-	req.req		= req_readbytes;
+	req.fn		= ecard_task_readbytes;
 	req.ec		= ec;
 	req.address	= off;
 	req.length	= len;
@@ -534,27 +503,33 @@ void ecard_disablefiq(unsigned int fiqnr)
 	}
 }
 
-static void
-ecard_dump_irq_state(ecard_t *ec)
+static void ecard_dump_irq_state(void)
 {
-	printk("  %d: %sclaimed, ",
-	       ec->slot_no,
-	       ec->claimed ? "" : "not ");
+	ecard_t *ec;
 
-	if (ec->ops && ec->ops->irqpending &&
-	    ec->ops != &ecard_default_ops)
-		printk("irq %spending\n",
-		       ec->ops->irqpending(ec) ? "" : "not ");
-	else
-		printk("irqaddr %p, mask = %02X, status = %02X\n",
-		       ec->irqaddr, ec->irqmask, *ec->irqaddr);
+	printk("Expansion card IRQ state:\n");
+
+	for (ec = cards; ec; ec = ec->next) {
+		if (ec->slot_no == 8)
+			continue;
+
+		printk("  %d: %sclaimed, ",
+		       ec->slot_no, ec->claimed ? "" : "not ");
+
+		if (ec->ops && ec->ops->irqpending &&
+		    ec->ops != &ecard_default_ops)
+			printk("irq %spending\n",
+			       ec->ops->irqpending(ec) ? "" : "not ");
+		else
+			printk("irqaddr %p, mask = %02X, status = %02X\n",
+			       ec->irqaddr, ec->irqmask, *ec->irqaddr);
+	}
 }
 
 static void ecard_check_lockup(struct irqdesc *desc)
 {
 	static unsigned long last;
 	static int lockup;
-	ecard_t *ec;
 
 	/*
 	 * If the timer interrupt has not run since the last million
@@ -572,11 +547,7 @@ static void ecard_check_lockup(struct irqdesc *desc)
 			       "disabling all expansion card interrupts\n");
 
 			desc->chip->mask(IRQ_EXPANSIONCARD);
-
-			printk("Expansion card IRQ state:\n");
-
-			for (ec = cards; ec; ec = ec->next)
-				ecard_dump_irq_state(ec);
+			ecard_dump_irq_state();
 		}
 	} else
 		lockup = 0;
@@ -588,6 +559,7 @@ static void ecard_check_lockup(struct irqdesc *desc)
 	if (!last || time_after(jiffies, last + 5*HZ)) {
 		last = jiffies;
 		printk(KERN_WARNING "Unrecognised interrupt from backplane\n");
+		ecard_dump_irq_state();
 	}
 }
 
@@ -1066,9 +1038,14 @@ nomem:
  */
 static int __init ecard_init(void)
 {
-	int slot, irqhw;
+	int slot, irqhw, ret;
 
-	init_waitqueue_head(&ecard_wait);
+	ret = kernel_thread(ecard_task, NULL, CLONE_KERNEL);
+	if (ret < 0) {
+		printk(KERN_ERR "Ecard: unable to create kernel thread: %d\n",
+		       ret);
+		return ret;
+	}
 
 	printk("Probing expansion cards\n");
 
@@ -1151,7 +1128,7 @@ static void ecard_drv_shutdown(struct device *dev)
 	if (drv->shutdown)
 		drv->shutdown(ec);
 	ecard_release(ec);
-	req.req = req_reset;
+	req.fn = ecard_task_reset;
 	req.ec = ec;
 	ecard_call(&req);
 }

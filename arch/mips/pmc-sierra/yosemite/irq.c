@@ -34,10 +34,11 @@
 #include <linux/types.h>
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
+#include <linux/irq.h>
 #include <linux/timex.h>
 #include <linux/slab.h>
 #include <linux/random.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/bootinfo.h>
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -111,28 +112,22 @@ asmlinkage void ll_ht_smp_irq_handler(int irq, struct pt_regs *regs)
 
 #ifdef CONFIG_KGDB
 extern void init_second_port(void);
-extern void breakpoint(void);
-extern void set_debug_traps(void);
 #endif
 
 /*
  * Initialize the next level interrupt handler
  */
-void __init init_IRQ(void)
+void __init arch_init_irq(void)
 {
 	clear_c0_status(ST0_IM);
 
 	set_except_vector(0, titan_handle_int);
-	init_generic_irq();
 	mips_cpu_irq_init(0);
 	rm7k_cpu_irq_init(8);
 
 #ifdef CONFIG_KGDB
 	/* At this point, initialize the second serial port */
 	init_second_port();
-	printk("Start kgdb ... \n");
-	set_debug_traps();
-	breakpoint();
 #endif
 
 #ifdef CONFIG_GDB_CONSOLE

@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2004 by Ralf Baechle
+ * Copyright (C) 2004 by Ralf Baechle (ralf@linux-mips.org)
  *
  * This doesn't really fly - but I don't have a GT64240 system for testing.
  */
@@ -12,7 +12,6 @@
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <asm/gt64240.h>
-#include <asm/pci_channel.h>
 
 /*
  * We assume these address ranges have been programmed into the GT-64240 by

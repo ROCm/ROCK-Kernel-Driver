@@ -32,9 +32,9 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/blkdev.h>
+#include <linux/bitops.h>
 
 #include <asm/setup.h>
-#include <asm/bitops.h>
 #include <asm/amigahw.h>
 #include <asm/pgtable.h>
 

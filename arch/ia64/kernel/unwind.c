@@ -59,16 +59,9 @@
 
 #ifdef UNW_DEBUG
   static unsigned int unw_debug_level = UNW_DEBUG;
-#  ifdef CONFIG_KDB
-#    include <linux/kdb.h>
-#    define UNW_DEBUG_ON(n)	(unw_debug_level >= n && !KDB_IS_RUNNING())
-#    define UNW_DPRINT(n, ...)	if (UNW_DEBUG_ON(n)) kdb_printf(__VA_ARGS__)
-#  else	/* !CONFIG_KDB */
-#    define UNW_DEBUG_ON(n)	unw_debug_level >= n
-     /* Do not code a printk level, not all debug lines end in newline */
-#    define UNW_DPRINT(n, ...)  if (UNW_DEBUG_ON(n)) printk(__VA_ARGS__)
-#  endif /* CONFIG_KDB */
-#  undef inline
+#  define UNW_DEBUG_ON(n)	unw_debug_level >= n
+   /* Do not code a printk level, not all debug lines end in newline */
+#  define UNW_DPRINT(n, ...)  if (UNW_DEBUG_ON(n)) printk(__VA_ARGS__)
 #  define inline
 #else /* !UNW_DEBUG */
 #  define UNW_DEBUG_ON(n)  0
@@ -453,7 +446,7 @@ EXPORT_SYMBOL(unw_access_br);
 int
 unw_access_fr (struct unw_frame_info *info, int regnum, struct ia64_fpreg *val, int write)
 {
-	struct ia64_fpreg *addr = 0;
+	struct ia64_fpreg *addr = NULL;
 	struct pt_regs *pt;
 
 	if ((unsigned) (regnum - 2) >= 126) {
@@ -849,7 +842,7 @@ desc_prologue (int body, unw_word rlen, unsigned char mask, unsigned char grsave
 		}
 		sr->gr_save_loc = grsave;
 		sr->any_spills = 0;
-		sr->imask = 0;
+		sr->imask = NULL;
 		sr->spill_offset = 0x10;	/* default to psp+16 */
 	}
 }
@@ -1212,7 +1205,7 @@ desc_spill_sprel_p (unsigned char qp, unw_word t, unsigned char abreg, unw_word 
 static inline unw_hash_index_t
 hash (unsigned long ip)
 {
-#	define hashmagic	0x9e3779b97f4a7c16	/* based on (sqrt(5)/2-1)*2^64 */
+#	define hashmagic	0x9e3779b97f4a7c16UL	/* based on (sqrt(5)/2-1)*2^64 */
 
 	return (ip >> 4)*hashmagic >> (64 - UNW_LOG_HASH_SIZE);
 #undef hashmagic
@@ -1237,7 +1230,7 @@ script_lookup (struct unw_frame_info *info)
 	unsigned long ip, pr;
 
 	if (UNW_DEBUG_ON(0))
-		return 0;	/* Always regenerate scripts in debug mode */
+		return NULL;	/* Always regenerate scripts in debug mode */
 
 	STAT(++unw.stat.cache.lookups);
 
@@ -1251,7 +1244,7 @@ script_lookup (struct unw_frame_info *info)
 
 	index = unw.hash[hash(ip)];
 	if (index >= UNW_CACHE_SIZE)
-		return 0;
+		return NULL;
 
 	script = unw.cache + index;
 	while (1) {
@@ -1262,7 +1255,7 @@ script_lookup (struct unw_frame_info *info)
 			return script;
 		}
 		if (script->coll_chain >= UNW_HASH_SIZE)
-			return 0;
+			return NULL;
 		script = unw.cache + script->coll_chain;
 		STAT(++unw.stat.cache.collision_chain_traversals);
 	}
@@ -1276,7 +1269,6 @@ script_new (unsigned long ip)
 {
 	struct unw_script *script, *prev, *tmp;
 	unw_hash_index_t index;
-	unsigned long flags;
 	unsigned short head;
 
 	STAT(++unw.stat.script.news);
@@ -1285,13 +1277,9 @@ script_new (unsigned long ip)
 	 * Can't (easily) use cmpxchg() here because of ABA problem
 	 * that is intrinsic in cmpxchg()...
 	 */
-	spin_lock_irqsave(&unw.lock, flags);
-	{
-		head = unw.lru_head;
-		script = unw.cache + head;
-		unw.lru_head = script->lru_chain;
-	}
-	spin_unlock(&unw.lock);
+	head = unw.lru_head;
+	script = unw.cache + head;
+	unw.lru_head = script->lru_chain;
 
 	/*
 	 * We'd deadlock here if we interrupted a thread that is holding a read lock on
@@ -1302,43 +1290,39 @@ script_new (unsigned long ip)
 	if (!write_trylock(&script->lock))
 		return NULL;
 
-	spin_lock(&unw.lock);
-	{
-		/* re-insert script at the tail of the LRU chain: */
-		unw.cache[unw.lru_tail].lru_chain = head;
-		unw.lru_tail = head;
+	/* re-insert script at the tail of the LRU chain: */
+	unw.cache[unw.lru_tail].lru_chain = head;
+	unw.lru_tail = head;
 
-		/* remove the old script from the hash table (if it's there): */
-		if (script->ip) {
-			index = hash(script->ip);
-			tmp = unw.cache + unw.hash[index];
-			prev = 0;
-			while (1) {
-				if (tmp == script) {
-					if (prev)
-						prev->coll_chain = tmp->coll_chain;
-					else
-						unw.hash[index] = tmp->coll_chain;
-					break;
-				} else
-					prev = tmp;
-				if (tmp->coll_chain >= UNW_CACHE_SIZE)
-				/* old script wasn't in the hash-table */
-					break;
-				tmp = unw.cache + tmp->coll_chain;
-			}
+	/* remove the old script from the hash table (if it's there): */
+	if (script->ip) {
+		index = hash(script->ip);
+		tmp = unw.cache + unw.hash[index];
+		prev = NULL;
+		while (1) {
+			if (tmp == script) {
+				if (prev)
+					prev->coll_chain = tmp->coll_chain;
+				else
+					unw.hash[index] = tmp->coll_chain;
+				break;
+			} else
+				prev = tmp;
+			if (tmp->coll_chain >= UNW_CACHE_SIZE)
+			/* old script wasn't in the hash-table */
+				break;
+			tmp = unw.cache + tmp->coll_chain;
 		}
-
-		/* enter new script in the hash table */
-		index = hash(ip);
-		script->coll_chain = unw.hash[index];
-		unw.hash[index] = script - unw.cache;
-
-		script->ip = ip;	/* set new IP while we're holding the locks */
-
-		STAT(if (script->coll_chain < UNW_CACHE_SIZE) ++unw.stat.script.collisions);
 	}
-	spin_unlock_irqrestore(&unw.lock, flags);
+
+	/* enter new script in the hash table */
+	index = hash(ip);
+	script->coll_chain = unw.hash[index];
+	unw.hash[index] = script - unw.cache;
+
+	script->ip = ip;	/* set new IP while we're holding the locks */
+
+	STAT(if (script->coll_chain < UNW_CACHE_SIZE) ++unw.stat.script.collisions);
 
 	script->flags = 0;
 	script->hint = 0;
@@ -1517,7 +1501,7 @@ compile_reg (struct unw_state_record *sr, int i, struct unw_script *script)
 static inline const struct unw_table_entry *
 lookup (struct unw_table *table, unsigned long rel_ip)
 {
-	const struct unw_table_entry *e = 0;
+	const struct unw_table_entry *e = NULL;
 	unsigned long lo, hi, mid;
 
 	/* do a binary search for right entry: */
@@ -1543,8 +1527,8 @@ lookup (struct unw_table *table, unsigned long rel_ip)
 static inline struct unw_script *
 build_script (struct unw_frame_info *info)
 {
-	const struct unw_table_entry *e = 0;
-	struct unw_script *script = 0;
+	const struct unw_table_entry *e = NULL;
+	struct unw_script *script = NULL;
 	struct unw_labeled_state *ls, *next;
 	unsigned long ip = info->ip;
 	struct unw_state_record sr;
@@ -1569,7 +1553,7 @@ build_script (struct unw_frame_info *info)
 	if (!script) {
 		UNW_DPRINT(0, "unwind.%s: failed to create unwind script\n",  __FUNCTION__);
 		STAT(unw.stat.script.build_time += ia64_get_itc() - start);
-		return 0;
+		return NULL;
 	}
 	unw.cache[info->prev_script].hint = script - unw.cache;
 
@@ -1837,19 +1821,22 @@ find_save_locs (struct unw_frame_info *info)
 {
 	int have_write_lock = 0;
 	struct unw_script *scr;
+	unsigned long flags = 0;
 
 	if ((info->ip & (local_cpu_data->unimpl_va_mask | 0xf)) || info->ip < TASK_SIZE) {
 		/* don't let obviously bad addresses pollute the cache */
 		/* FIXME: should really be level 0 but it occurs too often. KAO */
 		UNW_DPRINT(1, "unwind.%s: rejecting bad ip=0x%lx\n", __FUNCTION__, info->ip);
-		info->rp_loc = 0;
+		info->rp_loc = NULL;
 		return -1;
 	}
 
 	scr = script_lookup(info);
 	if (!scr) {
+		spin_lock_irqsave(&unw.lock, flags);
 		scr = build_script(info);
 		if (!scr) {
+			spin_unlock_irqrestore(&unw.lock, flags);
 			UNW_DPRINT(0,
 				   "unwind.%s: failed to locate/build unwind script for ip %lx\n",
 				   __FUNCTION__, info->ip);
@@ -1862,9 +1849,10 @@ find_save_locs (struct unw_frame_info *info)
 
 	run_script(scr, info);
 
-	if (have_write_lock)
+	if (have_write_lock) {
 		write_unlock(&scr->lock);
-	else
+		spin_unlock_irqrestore(&unw.lock, flags);
+	} else
 		read_unlock(&scr->lock);
 	return 0;
 }
@@ -2099,12 +2087,12 @@ unw_add_unwind_table (const char *name, unsigned long segment_base, unsigned lon
 	if (end - start <= 0) {
 		UNW_DPRINT(0, "unwind.%s: ignoring attempt to insert empty unwind table\n",
 			   __FUNCTION__);
-		return 0;
+		return NULL;
 	}
 
 	table = kmalloc(sizeof(*table), GFP_USER);
 	if (!table)
-		return 0;
+		return NULL;
 
 	init_unwind_table(table, name, segment_base, gp, table_start, table_end);
 
@@ -2306,7 +2294,7 @@ unw_init (void)
  *	EFAULT	BUF points outside your accessible address space.
  */
 asmlinkage long
-sys_getunwind (void *buf, size_t buf_size)
+sys_getunwind (void __user *buf, size_t buf_size)
 {
 	if (buf && buf_size >= unw.gate_table_size)
 		if (copy_to_user(buf, unw.gate_table, unw.gate_table_size) != 0)

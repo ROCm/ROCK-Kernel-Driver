@@ -9,6 +9,7 @@
  * 	
  */
 
+#include <linux/module.h>
 #include <linux/string.h>
 #include <net/inet_ecn.h>
 #include <net/ip.h>
@@ -18,6 +19,8 @@ int xfrm4_rcv(struct sk_buff *skb)
 {
 	return xfrm4_rcv_encap(skb, 0);
 }
+
+EXPORT_SYMBOL(xfrm4_rcv);
 
 static inline void ipip_ecn_decapsulate(struct sk_buff *skb)
 {
@@ -101,6 +104,8 @@ int xfrm4_rcv_encap(struct sk_buff *skb, __u16 encap_type)
 			if (skb_cloned(skb) &&
 			    pskb_expand_head(skb, 0, 0, GFP_ATOMIC))
 				goto drop;
+			if (x->props.flags & XFRM_STATE_DECAP_DSCP)
+				ipv4_copy_dscp(iph, skb->h.ipiph);
 			if (!(x->props.flags & XFRM_STATE_NOECN))
 				ipip_ecn_decapsulate(skb);
 			skb->mac.raw = memmove(skb->data - skb->mac_len,

@@ -33,10 +33,10 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/if_arp.h>
+#include <linux/bitops.h>
 #include <net/arp.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/byteorder.h>
 
 #include <net/irda/irda.h>
@@ -234,7 +234,7 @@ static void irlan_client_ctrl_disconnect_indication(void *instance, void *sap,
 	ASSERT(tsap == self->client.tsap_ctrl, return;);
 
        	/* Remove frames queued on the control channel */
-	while ((skb = skb_dequeue(&self->client.txq))) {
+	while ((skb = skb_dequeue(&self->client.txq)) != NULL) {
 		dev_kfree_skb(skb);
 	}
 	self->client.tx_busy = FALSE;

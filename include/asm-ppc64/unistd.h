@@ -202,19 +202,19 @@
 #define __NR_vfork		189
 #define __NR_ugetrlimit		190	/* SuS compliant getrlimit */
 #define __NR_readahead		191
-#define __NR_mmap2		192
-#define __NR_truncate64		193
-#define __NR_ftruncate64	194
-#define __NR_stat64		195
-#define __NR_lstat64		196
-#define __NR_fstat64		197
+/* #define __NR_mmap2		192	32bit only */
+/* #define __NR_truncate64	193	32bit only */
+/* #define __NR_ftruncate64	194	32bit only */
+/* #define __NR_stat64		195	32bit only */
+/* #define __NR_lstat64		196	32bit only */
+/* #define __NR_fstat64		197	32bit only */
 #define __NR_pciconfig_read	198
 #define __NR_pciconfig_write	199
 #define __NR_pciconfig_iobase	200
 #define __NR_multiplexer	201
 #define __NR_getdents64		202
 #define __NR_pivot_root		203
-#define __NR_fcntl64		204
+/* #define __NR_fcntl64		204	32bit only */
 #define __NR_madvise		205
 #define __NR_mincore		206
 #define __NR_gettid		207
@@ -236,7 +236,7 @@
 #define __NR_sched_getaffinity	223
 /* 224 currently unused */
 #define __NR_tuxcall		225
-#define __NR_sendfile64		226
+/* #define __NR_sendfile64	226	32bit only */
 #define __NR_io_setup		227
 #define __NR_io_destroy		228
 #define __NR_io_getevents	229
@@ -264,14 +264,14 @@
 #define __NR_utimes		251
 #define __NR_statfs64		252
 #define __NR_fstatfs64		253
-#define __NR_fadvise64_64	254
+/* #define __NR_fadvise64_64	254	32bit only */
 #define __NR_rtas		255
 /* Number 256 is reserved for sys_debug_setcontext */
 /* Number 257 is reserved for vserver */
 /* Number 258 is reserved for new sys_remap_file_pages */
-/* Number 259 is reserved for new sys_mbind */
-/* Number 260 is reserved for new sys_get_mempolicy */
-/* Number 261 is reserved for new sys_set_mempolicy */
+#define __NR_mbind		259
+#define __NR_get_mempolicy	260
+#define __NR_set_mempolicy	261
 #define __NR_mq_open		262
 #define __NR_mq_unlink		263
 #define __NR_mq_timedsend	264
@@ -279,8 +279,11 @@
 #define __NR_mq_notify		266
 #define __NR_mq_getsetattr	267
 #define __NR_kexec_load		268
+#define __NR_add_key		269
+#define __NR_request_key	270
+#define __NR_keyctl		271
 
-#define __NR_syscalls		269
+#define __NR_syscalls		272
 #ifdef __KERNEL__
 #define NR_syscalls	__NR_syscalls
 #endif

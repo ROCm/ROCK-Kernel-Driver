@@ -50,20 +50,20 @@ static int block_to_path(struct inode *inode, long block, int offsets[DEPTH])
 	return n;
 }
 
-static inline int block_to_cpu(struct sysv_sb_info *sbi, u32 nr)
+static inline int block_to_cpu(struct sysv_sb_info *sbi, sysv_zone_t nr)
 {
 	return sbi->s_block_base + fs32_to_cpu(sbi, nr);
 }
 
 typedef struct {
-	u32     *p;
-	u32     key;
+	sysv_zone_t     *p;
+	sysv_zone_t     key;
 	struct buffer_head *bh;
 } Indirect;
 
 static rwlock_t pointers_lock = RW_LOCK_UNLOCKED;
 
-static inline void add_chain(Indirect *p, struct buffer_head *bh, u32 *v)
+static inline void add_chain(Indirect *p, struct buffer_head *bh, sysv_zone_t *v)
 {
 	p->key = *(p->p = v);
 	p->bh = bh;
@@ -76,9 +76,9 @@ static inline int verify_chain(Indirect *from, Indirect *to)
 	return (from > to);
 }
 
-static inline u32 *block_end(struct buffer_head *bh)
+static inline sysv_zone_t *block_end(struct buffer_head *bh)
 {
-	return (u32*)((char*)bh->b_data + bh->b_size);
+	return (sysv_zone_t*)((char*)bh->b_data + bh->b_size);
 }
 
 /*
@@ -105,7 +105,7 @@ static Indirect *get_branch(struct inode *inode,
 			goto failure;
 		if (!verify_chain(chain, p))
 			goto changed;
-		add_chain(++p, bh, (u32*)bh->b_data + *++offsets);
+		add_chain(++p, bh, (sysv_zone_t*)bh->b_data + *++offsets);
 		if (!p->key)
 			goto no_block;
 	}
@@ -147,7 +147,7 @@ static int alloc_branch(struct inode *inode,
 		lock_buffer(bh);
 		memset(bh->b_data, 0, blocksize);
 		branch[n].bh = bh;
-		branch[n].p = (u32*) bh->b_data + offsets[n];
+		branch[n].p = (sysv_zone_t*) bh->b_data + offsets[n];
 		*branch[n].p = branch[n].key;
 		set_buffer_uptodate(bh);
 		unlock_buffer(bh);
@@ -265,7 +265,7 @@ changed:
 	goto reread;
 }
 
-static inline int all_zeroes(u32 *p, u32 *q)
+static inline int all_zeroes(sysv_zone_t *p, sysv_zone_t *q)
 {
 	while (p < q)
 		if (*p++)
@@ -277,7 +277,7 @@ static Indirect *find_shared(struct inode *inode,
 				int depth,
 				int offsets[],
 				Indirect chain[],
-				u32 *top)
+				sysv_zone_t *top)
 {
 	Indirect *partial, *p;
 	int k, err;
@@ -298,7 +298,7 @@ static Indirect *find_shared(struct inode *inode,
 		write_unlock(&pointers_lock);
 		goto no_top;
 	}
-	for (p=partial; p>chain && all_zeroes((u32*)p->bh->b_data,p->p); p--)
+	for (p=partial; p>chain && all_zeroes((sysv_zone_t*)p->bh->b_data,p->p); p--)
 		;
 	/*
 	 * OK, we've found the last block that must survive. The rest of our
@@ -322,10 +322,10 @@ no_top:
 	return partial;
 }
 
-static inline void free_data(struct inode *inode, u32 *p, u32 *q)
+static inline void free_data(struct inode *inode, sysv_zone_t *p, sysv_zone_t *q)
 {
 	for ( ; p < q ; p++) {
-		u32 nr = *p;
+		sysv_zone_t nr = *p;
 		if (nr) {
 			*p = 0;
 			sysv_free_block(inode->i_sb, nr);
@@ -334,7 +334,7 @@ static inline void free_data(struct inode *inode, u32 *p, u32 *q)
 	}
 }
 
-static void free_branches(struct inode *inode, u32 *p, u32 *q, int depth)
+static void free_branches(struct inode *inode, sysv_zone_t *p, sysv_zone_t *q, int depth)
 {
 	struct buffer_head * bh;
 	struct super_block *sb = inode->i_sb;
@@ -342,7 +342,7 @@ static void free_branches(struct inode *inode, u32 *p, u32 *q, int depth)
 	if (depth--) {
 		for ( ; p < q ; p++) {
 			int block;
-			u32 nr = *p;
+			sysv_zone_t nr = *p;
 			if (!nr)
 				continue;
 			*p = 0;
@@ -350,7 +350,7 @@ static void free_branches(struct inode *inode, u32 *p, u32 *q, int depth)
 			bh = sb_bread(sb, block);
 			if (!bh)
 				continue;
-			free_branches(inode, (u32*)bh->b_data,
+			free_branches(inode, (sysv_zone_t*)bh->b_data,
 					block_end(bh), depth);
 			bforget(bh);
 			sysv_free_block(sb, nr);
@@ -362,11 +362,11 @@ static void free_branches(struct inode *inode, u32 *p, u32 *q, int depth)
 
 void sysv_truncate (struct inode * inode)
 {
-	u32 *i_data = SYSV_I(inode)->i_data;
+	sysv_zone_t *i_data = SYSV_I(inode)->i_data;
 	int offsets[DEPTH];
 	Indirect chain[DEPTH];
 	Indirect *partial;
-	int nr = 0;
+	sysv_zone_t nr = 0;
 	int n;
 	long iblock;
 	unsigned blocksize;

@@ -45,17 +45,17 @@ MODULE_LICENSE("GPL");
 
 static int db9[] __initdata = { -1, 0 };
 static int db9_nargs __initdata = 0;
-module_param_array_named(dev, db9, int, db9_nargs, 0);
+module_param_array_named(dev, db9, int, &db9_nargs, 0);
 MODULE_PARM_DESC(dev, "Describes first attached device (<parport#>,<type>)");
 
 static int db9_2[] __initdata = { -1, 0 };
 static int db9_nargs_2 __initdata = 0;
-module_param_array_named(dev2, db9_2, int, db9_nargs_2, 0);
+module_param_array_named(dev2, db9_2, int, &db9_nargs_2, 0);
 MODULE_PARM_DESC(dev2, "Describes second attached device (<parport#>,<type>)");
 
 static int db9_3[] __initdata = { -1, 0 };
 static int db9_nargs_3 __initdata = 0;
-module_param_array_named(dev3, db9_3, int, db9_nargs_3, 0);
+module_param_array_named(dev3, db9_3, int, &db9_nargs_3, 0);
 MODULE_PARM_DESC(dev3, "Describes third attached device (<parport#>,<type>)");
 
 __obsolete_setup("db9=");
@@ -597,7 +597,6 @@ static struct db9 __init *db9_probe(int *config, int nargs)
 		db9->dev[i].id.vendor = 0x0002;
 		db9->dev[i].id.product = config[1];
 		db9->dev[i].id.version = 0x0100;
-		sprintf(db9->dev[i].cdev.class_id,"db9-%d",i);
 
 		db9->dev[i].evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 		for (j = 0; j < db9_buttons[db9->mode]; j++)

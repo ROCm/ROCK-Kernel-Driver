@@ -1,6 +1,6 @@
 /*
-    $Id: cx88-i2c.c,v 1.12 2004/09/16 07:05:48 kraxel Exp $
-    
+    $Id: cx88-i2c.c,v 1.18 2004/10/13 10:39:00 kraxel Exp $
+
     cx88-i2c.c  --  all the i2c code is here
 
     Copyright (C) 1996,97,98 Ralph  Metzler (rjkm@thp.uni-koeln.de)
@@ -21,7 +21,7 @@
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-    
+
 */
 
 #include <linux/module.h>
@@ -32,8 +32,12 @@
 #include "cx88.h"
 
 static unsigned int i2c_debug = 0;
-MODULE_PARM(i2c_debug,"i");
+module_param(i2c_debug, int, 0644);
 MODULE_PARM_DESC(i2c_debug,"enable debug messages [i2c]");
+
+static unsigned int i2c_scan = 0;
+module_param(i2c_scan, int, 0444);
+MODULE_PARM_DESC(i2c_scan,"scan i2c bus at insmod time");
 
 #define dprintk(level,fmt, arg...)	if (i2c_debug >= level) \
 	printk(KERN_DEBUG "%s: " fmt, core->name , ## arg)
@@ -68,7 +72,7 @@ static int cx8800_bit_getscl(void *data)
 {
 	struct cx88_core *core = data;
 	u32 state;
-	
+
 	state = cx_read(MO_I2C);
 	return state & 0x02 ? 1 : 0;
 }
@@ -88,7 +92,8 @@ static int attach_inform(struct i2c_client *client)
 {
 	struct cx88_core *core = i2c_get_adapdata(client->adapter);
 
-	dprintk(1, "i2c attach [client=%s]\n", i2c_clientname(client));
+	dprintk(1, "i2c attach [addr=0x%x,client=%s]\n",
+		client->addr, i2c_clientname(client));
 	if (!client->driver->command)
 		return 0;
 
@@ -96,9 +101,6 @@ static int attach_inform(struct i2c_client *client)
 		client->driver->command(client, TUNER_SET_TYPE, &core->tuner_type);
 	if (core->tda9887_conf)
 		client->driver->command(client, TDA9887_SET_CONFIG, &core->tda9887_conf);
-	if (core->dvb_adapter)
-		client->driver->command(client, FE_REGISTER, core->dvb_adapter);
-
 	return 0;
 }
 
@@ -106,17 +108,6 @@ static int detach_inform(struct i2c_client *client)
 {
 	struct cx88_core *core = i2c_get_adapdata(client->adapter);
 
-#if 0
-	/* FIXME: should switch to cx88_call_i2c_clients */
-	/* FIXME: drop FE_UNREGISTER altogether in favor of using
-	 *        i2c_driver->detach_client() ??? */
-	if (core->dvb_adapter && client->driver->command) {
-		dprintk(1, "i2c detach [client=%s] dvb_adapter %p\n",
-		        i2c_clientname(client), core->dvb_adapter);
-		return client->driver->command(client, FE_UNREGISTER, core->dvb_adapter);
-	}
-#endif
-	
 	dprintk(1, "i2c detach [client=%s]\n", i2c_clientname(client));
 	return 0;
 }
@@ -153,6 +144,28 @@ static struct i2c_client cx8800_i2c_client_template = {
         .id   = -1,
 };
 
+static char *i2c_devs[128] = {
+	[ 0x86 >> 1 ] = "tda9887/cx22702",
+	[ 0xa0 >> 1 ] = "eeprom",
+	[ 0xc0 >> 1 ] = "tuner (analog)",
+	[ 0xc2 >> 1 ] = "tuner (analog/dvb)",
+};
+
+static void do_i2c_scan(char *name, struct i2c_client *c)
+{
+	unsigned char buf;
+	int i,rc;
+
+	for (i = 0; i < 128; i++) {
+		c->addr = i;
+		rc = i2c_master_recv(c,&buf,0);
+		if (rc < 0)
+			continue;
+		printk("%s: i2c scan: found device @ 0x%x  [%s]\n",
+		       name, i << 1, i2c_devs[i] ? i2c_devs[i] : "???");
+	}
+}
+
 /* init + register i2c algo-bit adapter */
 int cx88_i2c_init(struct cx88_core *core, struct pci_dev *pci)
 {
@@ -163,7 +176,7 @@ int cx88_i2c_init(struct cx88_core *core, struct pci_dev *pci)
 	memcpy(&core->i2c_client, &cx8800_i2c_client_template,
 	       sizeof(core->i2c_client));
 
-	if (core->tuner_type != UNSET)
+	if (core->tuner_type != TUNER_ABSENT)
 		core->i2c_adap.class |= I2C_CLASS_TV_ANALOG;
 	if (cx88_boards[core->board].dvb)
 		core->i2c_adap.class |= I2C_CLASS_TV_DIGITAL;
@@ -179,10 +192,12 @@ int cx88_i2c_init(struct cx88_core *core, struct pci_dev *pci)
 	cx8800_bit_setsda(core,1);
 
 	core->i2c_rc = i2c_bit_add_bus(&core->i2c_adap);
-	if (0 != core->i2c_rc)
-		printk("%s: i2c register FAILED\n", core->name);
-	else
+	if (0 == core->i2c_rc) {
 		dprintk(1, "i2c register ok\n");
+		if (i2c_scan)
+			do_i2c_scan(core->name,&core->i2c_client);
+	} else
+		printk("%s: i2c register FAILED\n", core->name);
 	return core->i2c_rc;
 }
 

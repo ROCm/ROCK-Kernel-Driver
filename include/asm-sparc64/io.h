@@ -3,6 +3,7 @@
 #define __SPARC64_IO_H
 
 #include <linux/kernel.h>
+#include <linux/compiler.h>
 #include <linux/types.h>
 
 #include <asm/page.h>      /* IO address mapping routines need this */
@@ -99,28 +100,31 @@ static __inline__ void _outl(u32 l, unsigned long addr)
 #define inl_p(__addr)		inl(__addr)
 #define outl_p(__l, __addr)	outl(__l, __addr)
 
-extern void outsb(unsigned long addr, const void *src, unsigned long count);
-extern void outsw(unsigned long addr, const void *src, unsigned long count);
-extern void outsl(unsigned long addr, const void *src, unsigned long count);
-extern void insb(unsigned long addr, void *dst, unsigned long count);
-extern void insw(unsigned long addr, void *dst, unsigned long count);
-extern void insl(unsigned long addr, void *dst, unsigned long count);
+extern void outsb(void __iomem *addr, const void *src, unsigned long count);
+extern void outsw(void __iomem *addr, const void *src, unsigned long count);
+extern void outsl(void __iomem *addr, const void *src, unsigned long count);
+extern void insb(void __iomem *addr, void *dst, unsigned long count);
+extern void insw(void __iomem *addr, void *dst, unsigned long count);
+extern void insl(void __iomem *addr, void *dst, unsigned long count);
+#define ioread8_rep(a,d,c)	insb(a,d,c)
+#define ioread16_rep(a,d,c)	insw(a,d,c)
+#define ioread32_rep(a,d,c)	insl(a,d,c)
+#define iowrite8_rep(a,s,c)	outsb(a,s,c)
+#define iowrite16_rep(a,s,c)	outsw(a,s,c)
+#define iowrite32_rep(a,s,c)	outsl(a,s,c)
 
 /* Memory functions, same as I/O accesses on Ultra. */
-static __inline__ u8 _readb(unsigned long addr)
-{
-	u8 ret;
+static inline u8 _readb(const volatile void __iomem *addr)
+{	u8 ret;
 
 	__asm__ __volatile__("lduba\t[%1] %2, %0\t/* pci_readb */"
 			     : "=r" (ret)
 			     : "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E_L));
-
 	return ret;
 }
 
-static __inline__ u16 _readw(unsigned long addr)
-{
-	u16 ret;
+static inline u16 _readw(const volatile void __iomem *addr)
+{	u16 ret;
 
 	__asm__ __volatile__("lduha\t[%1] %2, %0\t/* pci_readw */"
 			     : "=r" (ret)
@@ -129,9 +133,8 @@ static __inline__ u16 _readw(unsigned long addr)
 	return ret;
 }
 
-static __inline__ u32 _readl(unsigned long addr)
-{
-	u32 ret;
+static inline u32 _readl(const volatile void __iomem *addr)
+{	u32 ret;
 
 	__asm__ __volatile__("lduwa\t[%1] %2, %0\t/* pci_readl */"
 			     : "=r" (ret)
@@ -140,9 +143,8 @@ static __inline__ u32 _readl(unsigned long addr)
 	return ret;
 }
 
-static __inline__ u64 _readq(unsigned long addr)
-{
-	u64 ret;
+static inline u64 _readq(const volatile void __iomem *addr)
+{	u64 ret;
 
 	__asm__ __volatile__("ldxa\t[%1] %2, %0\t/* pci_readq */"
 			     : "=r" (ret)
@@ -151,46 +153,46 @@ static __inline__ u64 _readq(unsigned long addr)
 	return ret;
 }
 
-static __inline__ void _writeb(u8 b, unsigned long addr)
+static inline void _writeb(u8 b, volatile void __iomem *addr)
 {
 	__asm__ __volatile__("stba\t%r0, [%1] %2\t/* pci_writeb */"
 			     : /* no outputs */
 			     : "Jr" (b), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E_L));
 }
 
-static __inline__ void _writew(u16 w, unsigned long addr)
+static inline void _writew(u16 w, volatile void __iomem *addr)
 {
 	__asm__ __volatile__("stha\t%r0, [%1] %2\t/* pci_writew */"
 			     : /* no outputs */
 			     : "Jr" (w), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E_L));
 }
 
-static __inline__ void _writel(u32 l, unsigned long addr)
+static inline void _writel(u32 l, volatile void __iomem *addr)
 {
 	__asm__ __volatile__("stwa\t%r0, [%1] %2\t/* pci_writel */"
 			     : /* no outputs */
 			     : "Jr" (l), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E_L));
 }
 
-static __inline__ void _writeq(u64 q, unsigned long addr)
+static inline void _writeq(u64 q, volatile void __iomem *addr)
 {
 	__asm__ __volatile__("stxa\t%r0, [%1] %2\t/* pci_writeq */"
 			     : /* no outputs */
 			     : "Jr" (q), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E_L));
 }
 
-#define readb(__addr)		(_readb((unsigned long)(__addr)))
-#define readw(__addr)		(_readw((unsigned long)(__addr)))
-#define readl(__addr)		(_readl((unsigned long)(__addr)))
-#define readq(__addr)		(_readq((unsigned long)(__addr)))
-#define readb_relaxed(a)	readb(a)
-#define readw_relaxed(a)	readw(a)
-#define readl_relaxed(a)	readl(a)
-#define readq_relaxed(a)	readq(a)
-#define writeb(__b, __addr)	(_writeb((u8)(__b), (unsigned long)(__addr)))
-#define writew(__w, __addr)	(_writew((u16)(__w), (unsigned long)(__addr)))
-#define writel(__l, __addr)	(_writel((u32)(__l), (unsigned long)(__addr)))
-#define writeq(__q, __addr)	(_writeq((u64)(__q), (unsigned long)(__addr)))
+#define readb(__addr)		_readb(__addr)
+#define readw(__addr)		_readw(__addr)
+#define readl(__addr)		_readl(__addr)
+#define readq(__addr)		_readq(__addr)
+#define readb_relaxed(__addr)	_readb(__addr)
+#define readw_relaxed(__addr)	_readw(__addr)
+#define readl_relaxed(__addr)	_readl(__addr)
+#define readq_relaxed(__addr)	_readq(__addr)
+#define writeb(__b, __addr)	_writeb(__b, __addr)
+#define writew(__w, __addr)	_writew(__w, __addr)
+#define writel(__l, __addr)	_writel(__l, __addr)
+#define writeq(__q, __addr)	_writeq(__q, __addr)
 
 /* Now versions without byte-swapping. */
 static __inline__ u8 _raw_readb(unsigned long addr)
@@ -282,7 +284,7 @@ static __inline__ void _raw_writeq(u64 q, unsigned long addr)
 /* Now, SBUS variants, only difference from PCI is that we do
  * not use little-endian ASIs.
  */
-static __inline__ u8 _sbus_readb(unsigned long addr)
+static inline u8 _sbus_readb(const volatile void __iomem *addr)
 {
 	u8 ret;
 
@@ -293,7 +295,7 @@ static __inline__ u8 _sbus_readb(unsigned long addr)
 	return ret;
 }
 
-static __inline__ u16 _sbus_readw(unsigned long addr)
+static inline u16 _sbus_readw(const volatile void __iomem *addr)
 {
 	u16 ret;
 
@@ -304,7 +306,7 @@ static __inline__ u16 _sbus_readw(unsigned long addr)
 	return ret;
 }
 
-static __inline__ u32 _sbus_readl(unsigned long addr)
+static inline u32 _sbus_readl(const volatile void __iomem *addr)
 {
 	u32 ret;
 
@@ -315,7 +317,7 @@ static __inline__ u32 _sbus_readl(unsigned long addr)
 	return ret;
 }
 
-static __inline__ u64 _sbus_readq(unsigned long addr)
+static inline u64 _sbus_readq(const volatile void __iomem *addr)
 {
 	u64 ret;
 
@@ -326,73 +328,68 @@ static __inline__ u64 _sbus_readq(unsigned long addr)
 	return ret;
 }
 
-static __inline__ void _sbus_writeb(u8 b, unsigned long addr)
+static inline void _sbus_writeb(u8 b, volatile void __iomem *addr)
 {
 	__asm__ __volatile__("stba\t%r0, [%1] %2\t/* sbus_writeb */"
 			     : /* no outputs */
 			     : "Jr" (b), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E));
 }
 
-static __inline__ void _sbus_writew(u16 w, unsigned long addr)
+static inline void _sbus_writew(u16 w, volatile void __iomem *addr)
 {
 	__asm__ __volatile__("stha\t%r0, [%1] %2\t/* sbus_writew */"
 			     : /* no outputs */
 			     : "Jr" (w), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E));
 }
 
-static __inline__ void _sbus_writel(u32 l, unsigned long addr)
+static inline void _sbus_writel(u32 l, volatile void __iomem *addr)
 {
 	__asm__ __volatile__("stwa\t%r0, [%1] %2\t/* sbus_writel */"
 			     : /* no outputs */
 			     : "Jr" (l), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E));
 }
 
-static __inline__ void _sbus_writeq(u64 l, unsigned long addr)
+static inline void _sbus_writeq(u64 l, volatile void __iomem *addr)
 {
 	__asm__ __volatile__("stxa\t%r0, [%1] %2\t/* sbus_writeq */"
 			     : /* no outputs */
 			     : "Jr" (l), "r" (addr), "i" (ASI_PHYS_BYPASS_EC_E));
 }
 
-#define sbus_readb(__addr)		(_sbus_readb((unsigned long)(__addr)))
-#define sbus_readw(__addr)		(_sbus_readw((unsigned long)(__addr)))
-#define sbus_readl(__addr)		(_sbus_readl((unsigned long)(__addr)))
-#define sbus_readq(__addr)		(_sbus_readq((unsigned long)(__addr)))
-#define sbus_writeb(__b, __addr)	(_sbus_writeb((__b), (unsigned long)(__addr)))
-#define sbus_writew(__w, __addr)	(_sbus_writew((__w), (unsigned long)(__addr)))
-#define sbus_writel(__l, __addr)	(_sbus_writel((__l), (unsigned long)(__addr)))
-#define sbus_writeq(__l, __addr)	(_sbus_writeq((__l), (unsigned long)(__addr)))
+#define sbus_readb(__addr)		_sbus_readb(__addr)
+#define sbus_readw(__addr)		_sbus_readw(__addr)
+#define sbus_readl(__addr)		_sbus_readl(__addr)
+#define sbus_readq(__addr)		_sbus_readq(__addr)
+#define sbus_writeb(__b, __addr)	_sbus_writeb(__b, __addr)
+#define sbus_writew(__w, __addr)	_sbus_writew(__w, __addr)
+#define sbus_writel(__l, __addr)	_sbus_writel(__l, __addr)
+#define sbus_writeq(__l, __addr)	_sbus_writeq(__l, __addr)
 
-static inline void *_sbus_memset_io(unsigned long dst, int c, __kernel_size_t n)
+static inline void _sbus_memset_io(volatile void __iomem *dst, int c, __kernel_size_t n)
 {
 	while(n--) {
 		sbus_writeb(c, dst);
 		dst++;
 	}
-	return (void *) dst;
 }
 
-#define sbus_memset_io(d,c,sz)	\
-	_sbus_memset_io((unsigned long)d,(int)c,(__kernel_size_t)sz)
+#define sbus_memset_io(d,c,sz)	_sbus_memset_io(d,c,sz)
 
-static inline void *
-_memset_io(void *dst, int c, __kernel_size_t n)
+static inline void
+_memset_io(volatile void __iomem *dst, int c, __kernel_size_t n)
 {
-	char *d = dst;
+	volatile void __iomem *d = dst;
 
 	while (n--) {
 		writeb(c, d);
 		d++;
 	}
-
-	return dst;
 }
 
-#define memset_io(d,c,sz)	\
-	_memset_io((void *)d,(int)c,(__kernel_size_t)sz)
+#define memset_io(d,c,sz)	_memset_io(d,c,sz)
 
-static inline void *
-_memcpy_fromio(void *dst, unsigned long src, __kernel_size_t n)
+static inline void
+_memcpy_fromio(void *dst, const volatile void __iomem *src, __kernel_size_t n)
 {
 	char *d = dst;
 
@@ -401,29 +398,24 @@ _memcpy_fromio(void *dst, unsigned long src, __kernel_size_t n)
 		*d++ = tmp;
 		src++;
 	}
-
-	return dst;
 }
 
-#define memcpy_fromio(d,s,sz)	\
-	_memcpy_fromio((void *)d,(unsigned long)s,(__kernel_size_t)sz)
+#define memcpy_fromio(d,s,sz)	_memcpy_fromio(d,s,sz)
 
-static inline void *
-_memcpy_toio(unsigned long dst, const void *src, __kernel_size_t n)
+static inline void 
+_memcpy_toio(volatile void __iomem *dst, const void *src, __kernel_size_t n)
 {
 	const char *s = src;
-	unsigned long d = dst;
+	volatile void __iomem *d = dst;
 
 	while (n--) {
 		char tmp = *s++;
 		writeb(tmp, d);
 		d++;
 	}
-	return (void *)dst;
 }
 
-#define memcpy_toio(d,s,sz)	\
-	_memcpy_toio((unsigned long)d,(const void *)s,(__kernel_size_t)sz)
+#define memcpy_toio(d,s,sz)	_memcpy_toio(d,s,sz)
 
 static inline int check_signature(unsigned long io_addr,
 				  const unsigned char *signature,
@@ -431,22 +423,48 @@ static inline int check_signature(unsigned long io_addr,
 {
 	int retval = 0;
 	do {
-		if (readb(io_addr++) != *signature++)
+		if (readb((void __iomem *)io_addr) != *signature++)
 			goto out;
+		io_addr++;
 	} while (--length);
 	retval = 1;
 out:
 	return retval;
 }
 
+#define mmiowb()
+
 #ifdef __KERNEL__
 
 /* On sparc64 we have the whole physical IO address space accessible
  * using physically addressed loads and stores, so this does nothing.
  */
-#define ioremap(__offset, __size)	((void *)(__offset))
+static inline void __iomem *ioremap(unsigned long offset, unsigned long size)
+{
+	return (void __iomem *)offset;
+}
+
 #define ioremap_nocache(X,Y)		ioremap((X),(Y))
-#define iounmap(__addr)			do { (void)(__addr); } while(0)
+
+static inline void iounmap(volatile void __iomem *addr)
+{
+}
+
+#define ioread8(X)			readb(X)
+#define ioread16(X)			readw(X)
+#define ioread32(X)			readl(X)
+#define iowrite8(val,X)			writeb(val,X)
+#define iowrite16(val,X)		writew(val,X)
+#define iowrite32(val,X)		writel(val,X)
+
+/* Create a virtual mapping cookie for an IO port range */
+extern void __iomem *ioport_map(unsigned long port, unsigned int nr);
+extern void ioport_unmap(void __iomem *);
+
+/* Create a virtual mapping cookie for a PCI BAR (memory or IO) */
+struct pci_dev;
+extern void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long max);
+extern void pci_iounmap(struct pci_dev *dev, void __iomem *);
 
 /* Similarly for SBUS. */
 #define sbus_ioremap(__res, __offset, __size, __name) \
@@ -455,11 +473,11 @@ out:
 	__ret += (unsigned long) (__offset); \
 	if (! request_region((__ret), (__size), (__name))) \
 		__ret = 0UL; \
-	__ret; \
+	(void __iomem *) __ret; \
 })
 
 #define sbus_iounmap(__addr, __size)	\
-	release_region((__addr), (__size))
+	release_region((unsigned long)(__addr), (__size))
 
 /* Nothing to do */
 

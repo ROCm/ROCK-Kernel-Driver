@@ -47,14 +47,13 @@
 static int dsp_map[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 0};
 static int adsp_map[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 1};
 static int nonblock_open;
-static int boot_devs;
 
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>, Abramo Bagnara <abramo@alsa-project.org>");
 MODULE_DESCRIPTION("PCM OSS emulation for ALSA.");
 MODULE_LICENSE("GPL");
-module_param_array(dsp_map, int, boot_devs, 0444);
+module_param_array(dsp_map, int, NULL, 0444);
 MODULE_PARM_DESC(dsp_map, "PCM device number assigned to 1st OSS device.");
-module_param_array(adsp_map, int, boot_devs, 0444);
+module_param_array(adsp_map, int, NULL, 0444);
 MODULE_PARM_DESC(adsp_map, "PCM device number assigned to 2nd OSS device.");
 module_param(nonblock_open, bool, 0644);
 MODULE_PARM_DESC(nonblock_open, "Don't block opening busy PCM devices.");
@@ -830,18 +829,18 @@ static ssize_t snd_pcm_oss_write1(snd_pcm_substream_t *substream, const char __u
 			xfer += tmp;
 			if ((substream->oss.setup != NULL && substream->oss.setup->partialfrag) ||
 			    runtime->oss.buffer_used == runtime->oss.period_bytes) {
-				tmp = snd_pcm_oss_write2(substream, runtime->oss.buffer, runtime->oss.buffer_used, 1);
+				tmp = snd_pcm_oss_write2(substream, runtime->oss.buffer + runtime->oss.period_ptr, 
+							 runtime->oss.buffer_used - runtime->oss.period_ptr, 1);
 				if (tmp <= 0)
 					return xfer > 0 ? (snd_pcm_sframes_t)xfer : tmp;
 				runtime->oss.bytes += tmp;
 				runtime->oss.period_ptr += tmp;
 				runtime->oss.period_ptr %= runtime->oss.period_bytes;
-				if ((substream->ffile->f_flags & O_NONBLOCK) != 0 &&
-				    tmp != runtime->oss.buffer_used) {
+				if (runtime->oss.period_ptr == 0 ||
+				    runtime->oss.period_ptr == runtime->oss.buffer_used)
 					runtime->oss.buffer_used = 0;
-					break;
-				}
-				runtime->oss.buffer_used = 0;
+				else if ((substream->ffile->f_flags & O_NONBLOCK) != 0)
+					return xfer > 0 ? xfer : -EAGAIN;
 			}
 		} else {
 			tmp = snd_pcm_oss_write2(substream, (char *)buf, runtime->oss.period_bytes, 0);

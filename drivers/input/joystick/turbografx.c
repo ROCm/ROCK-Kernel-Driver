@@ -44,17 +44,17 @@ MODULE_LICENSE("GPL");
 
 static int tgfx[] __initdata = { -1, 0, 0, 0, 0, 0, 0, 0 };
 static int tgfx_nargs __initdata = 0;
-module_param_array_named(map, tgfx, int, tgfx_nargs, 0);
+module_param_array_named(map, tgfx, int, &tgfx_nargs, 0);
 MODULE_PARM_DESC(map, "Describes first set of devices (<parport#>,<js1>,<js2>,..<js7>");
 
 static int tgfx_2[] __initdata = { -1, 0, 0, 0, 0, 0, 0, 0 };
 static int tgfx_nargs_2 __initdata = 0;
-module_param_array_named(map2, tgfx_2, int, tgfx_nargs_2, 0);
+module_param_array_named(map2, tgfx_2, int, &tgfx_nargs_2, 0);
 MODULE_PARM_DESC(map2, "Describes second set of devices");
 
 static int tgfx_3[] __initdata = { -1, 0, 0, 0, 0, 0, 0, 0 };
 static int tgfx_nargs_3 __initdata = 0;
-module_param_array_named(map3, tgfx_3, int, tgfx_nargs_3, 0);
+module_param_array_named(map3, tgfx_3, int, &tgfx_nargs_3, 0);
 MODULE_PARM_DESC(map3, "Describes third set of devices");
 
 __obsolete_setup("tgfx=");
@@ -205,7 +205,6 @@ static struct tgfx __init *tgfx_probe(int *config, int nargs)
 			tgfx->dev[i].id.vendor = 0x0003;
 			tgfx->dev[i].id.product = config[i+1];
 			tgfx->dev[i].id.version = 0x0100;
-			sprintf(tgfx->dev[i].cdev.class_id,"turbografx%d",i);
 
 			tgfx->dev[i].evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 			tgfx->dev[i].absbit[0] = BIT(ABS_X) | BIT(ABS_Y);

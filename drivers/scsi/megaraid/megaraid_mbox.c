@@ -10,7 +10,7 @@
  *	   2 of the License, or (at your option) any later version.
  *
  * FILE		: megaraid_mbox.c
- * Version	: v2.20.4 (September 27 2004)
+ * Version	: v2.20.4.1 (Nov 04 2004)
  *
  * Authors:
  * 	Atul Mukker		<Atul.Mukker@lsil.com>
@@ -292,6 +292,12 @@ static struct pci_device_id pci_id_table_g[] =  {
 		PCI_VENDOR_ID_AMI,
 		PCI_DEVICE_ID_AMI_MEGARAID3,
 		PCI_VENDOR_ID_DELL,
+		PCI_SUBSYS_ID_PERC3_SC,
+	},
+	{
+		PCI_VENDOR_ID_AMI,
+		PCI_DEVICE_ID_AMI_MEGARAID3,
+		PCI_VENDOR_ID_AMI,
 		PCI_SUBSYS_ID_PERC3_SC,
 	},
 	{
@@ -872,8 +878,7 @@ megaraid_init_mbox(adapter_t *adapter)
 		goto out_free_raid_dev;
 	}
 
-	raid_dev->baseaddr = (unsigned long)
-			ioremap_nocache(raid_dev->baseport, 128);
+	raid_dev->baseaddr = ioremap_nocache(raid_dev->baseport, 128);
 
 	if (!raid_dev->baseaddr) {
 
@@ -996,7 +1001,7 @@ out_alloc_cmds:
 out_free_irq:
 	free_irq(adapter->irq, adapter);
 out_iounmap:
-	iounmap((caddr_t)raid_dev->baseaddr);
+	iounmap(raid_dev->baseaddr);
 out_release_regions:
 	pci_release_regions(pdev);
 out_free_raid_dev:
@@ -1024,7 +1029,7 @@ megaraid_fini_mbox(adapter_t *adapter)
 
 	free_irq(adapter->irq, adapter);
 
-	iounmap((caddr_t)raid_dev->baseaddr);
+	iounmap(raid_dev->baseaddr);
 
 	pci_release_regions(adapter->pdev);
 
@@ -1554,12 +1559,12 @@ mbox_post_cmd(adapter_t *adapter, scb_t *scb)
 
 	if (scb->dma_direction == PCI_DMA_TODEVICE) {
 		if (!scb->scp->use_sg) {	// sg list not used
-			pci_dma_sync_single(adapter->pdev, ccb->buf_dma_h,
+			pci_dma_sync_single_for_device(adapter->pdev, ccb->buf_dma_h,
 					scb->scp->request_bufflen,
 					PCI_DMA_TODEVICE);
 		}
 		else {
-			pci_dma_sync_sg(adapter->pdev, scb->scp->request_buffer,
+			pci_dma_sync_sg_for_device(adapter->pdev, scb->scp->request_buffer,
 				scb->scp->use_sg, PCI_DMA_TODEVICE);
 		}
 	}
@@ -1618,6 +1623,7 @@ megaraid_queue_command(struct scsi_cmnd *scp, void (* done)(struct scsi_cmnd *))
 
 	if (!scb) {	// command already completed
 		done(scp);
+		return 0;
 	}
 
 	return if_busy;
@@ -2332,7 +2338,7 @@ megaraid_mbox_sync_scb(adapter_t *adapter, scb_t *scb)
 
 	case MRAID_DMA_WBUF:
 		if (scb->dma_direction == PCI_DMA_FROMDEVICE) {
-			pci_dma_sync_single(adapter->pdev,
+			pci_dma_sync_single_for_cpu(adapter->pdev,
 					ccb->buf_dma_h,
 					scb->scp->request_bufflen,
 					PCI_DMA_FROMDEVICE);
@@ -2345,7 +2351,7 @@ megaraid_mbox_sync_scb(adapter_t *adapter, scb_t *scb)
 
 	case MRAID_DMA_WSG:
 		if (scb->dma_direction == PCI_DMA_FROMDEVICE) {
-			pci_dma_sync_sg(adapter->pdev,
+			pci_dma_sync_sg_for_cpu(adapter->pdev,
 					scb->scp->request_buffer,
 					scb->scp->use_sg, PCI_DMA_FROMDEVICE);
 		}
@@ -3591,7 +3597,7 @@ megaraid_cmm_register(adapter_t *adapter)
 	adp.drvr_data		= (unsigned long)adapter;
 	adp.pdev		= adapter->pdev;
 	adp.issue_uioc		= megaraid_mbox_mm_handler;
-	adp.timeout		= 30;
+	adp.timeout		= 300;
 	adp.max_kioc		= MBOX_MAX_USER_CMDS;
 
 	if ((rval = mraid_mm_register_adp(&adp)) != 0) {

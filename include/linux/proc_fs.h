@@ -79,6 +79,7 @@ struct kcore_list {
 extern struct proc_dir_entry proc_root;
 extern struct proc_dir_entry *proc_root_fs;
 extern struct proc_dir_entry *proc_net;
+extern struct proc_dir_entry *proc_net_stat;
 extern struct proc_dir_entry *proc_bus;
 extern struct proc_dir_entry *proc_root_driver;
 extern struct proc_dir_entry *proc_root_kcore;
@@ -116,7 +117,6 @@ extern int proc_match(int, const char *,struct proc_dir_entry *);
 extern int proc_readdir(struct file *, void *, filldir_t);
 extern struct dentry *proc_lookup(struct inode *, struct dentry *, struct nameidata *);
 
-extern struct file_operations proc_file_operations;
 extern struct file_operations proc_kcore_operations;
 extern struct file_operations proc_kmsg_operations;
 extern struct file_operations ppc_htab_operations;
@@ -193,6 +193,7 @@ static inline void proc_net_remove(const char *name)
 
 #define proc_root_driver NULL
 #define proc_net NULL
+#define proc_bus NULL
 
 #define proc_net_fops_create(name, mode, fops)  ({ (void)(mode), NULL; })
 #define proc_net_create(name, mode, info)	({ (void)(mode), NULL; })
@@ -226,7 +227,7 @@ extern struct proc_dir_entry proc_root;
 
 #endif /* CONFIG_PROC_FS */
 
-#if !defined(CONFIG_PROC_FS)
+#if !defined(CONFIG_PROC_KCORE)
 static inline void kclist_add(struct kcore_list *new, void *addr, size_t size)
 {
 }

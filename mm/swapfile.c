@@ -14,10 +14,6 @@
 #include <linux/swap.h>
 #include <linux/vmalloc.h>
 #include <linux/pagemap.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#include <linux/kdbprivate.h>
-#endif	/* CONFIG_KDB */
 #include <linux/namei.h>
 #include <linux/shm.h>
 #include <linux/blkdev.h>
@@ -29,6 +25,7 @@
 #include <linux/rmap.h>
 #include <linux/security.h>
 #include <linux/backing-dev.h>
+#include <linux/syscalls.h>
 
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
@@ -294,10 +291,10 @@ static int exclusive_swap_page(struct page *page)
 		/* Is the only swap cache user the cache itself? */
 		if (p->swap_map[swp_offset(entry)] == 1) {
 			/* Recheck the page count with the swapcache lock held.. */
-			write_lock_irq(&swapper_space.tree_lock);
+			spin_lock_irq(&swapper_space.tree_lock);
 			if (page_count(page) == 2)
 				retval = 1;
-			write_unlock_irq(&swapper_space.tree_lock);
+			spin_unlock_irq(&swapper_space.tree_lock);
 		}
 		swap_info_put(p);
 	}
@@ -365,13 +362,13 @@ int remove_exclusive_swap_page(struct page *page)
 	retval = 0;
 	if (p->swap_map[swp_offset(entry)] == 1) {
 		/* Recheck the page count with the swapcache lock held.. */
-		write_lock_irq(&swapper_space.tree_lock);
+		spin_lock_irq(&swapper_space.tree_lock);
 		if ((page_count(page) == 2) && !PageWriteback(page)) {
 			__delete_from_swap_cache(page);
 			SetPageDirty(page);
 			retval = 1;
 		}
-		write_unlock_irq(&swapper_space.tree_lock);
+		spin_unlock_irq(&swapper_space.tree_lock);
 	}
 	swap_info_put(p);
 
@@ -395,12 +392,12 @@ void free_swap_and_cache(swp_entry_t entry)
 	p = swap_info_get(entry);
 	if (p) {
 		if (swap_entry_free(p, swp_offset(entry)) == 1) {
-			read_lock_irq(&swapper_space.tree_lock);
+			spin_lock_irq(&swapper_space.tree_lock);
 			page = radix_tree_lookup(&swapper_space.page_tree,
 				entry.val);
 			if (page && TestSetPageLocked(page))
 				page = NULL;
-			read_unlock_irq(&swapper_space.tree_lock);
+			spin_unlock_irq(&swapper_space.tree_lock);
 		}
 		swap_info_put(p);
 	}
@@ -651,11 +648,12 @@ static int try_to_unuse(unsigned int type)
 	 *
 	 * A simpler strategy would be to start at the last mm we
 	 * freed the previous entry from; but that would take less
-	 * advantage of mmlist ordering (now preserved by swap_out()),
-	 * which clusters forked address spaces together, most recent
-	 * child immediately after parent.  If we race with dup_mmap(),
-	 * we very much want to resolve parent before child, otherwise
-	 * we may miss some entries: using last mm would invert that.
+	 * advantage of mmlist ordering, which clusters forked mms
+	 * together, child after parent.  If we race with dup_mmap(), we
+	 * prefer to resolve parent before child, lest we miss entries
+	 * duplicated after we scanned child: using last mm would invert
+	 * that.  Though it's only a serious concern when an overflowed
+	 * swap count is reset from SWAP_MAP_MAX, preventing a rescan.
 	 */
 	start_mm = &init_mm;
 	atomic_inc(&init_mm.mm_users);
@@ -663,15 +661,7 @@ static int try_to_unuse(unsigned int type)
 	/*
 	 * Keep on scanning until all entries have gone.  Usually,
 	 * one pass through swap_map is enough, but not necessarily:
-	 * mmput() removes mm from mmlist before exit_mmap() and its
-	 * zap_page_range().  That's not too bad, those entries are
-	 * on their way out, and handled faster there than here.
-	 * do_munmap() behaves similarly, taking the range out of mm's
-	 * vma list before zap_page_range().  But unfortunately, when
-	 * unmapping a part of a vma, it takes the whole out first,
-	 * then reinserts what's left after (might even reschedule if
-	 * open() method called) - so swap entries may be invisible
-	 * to swapoff for a while, then reappear - but that is rare.
+	 * there are races when an instance of an entry might be missed.
 	 */
 	while ((i = find_next_to_unuse(si, i)) != 0) {
 		if (signal_pending(current)) {
@@ -723,7 +713,7 @@ static int try_to_unuse(unsigned int type)
 		wait_on_page_writeback(page);
 
 		/*
-		 * Remove all references to entry, without blocking.
+		 * Remove all references to entry.
 		 * Whenever we reach init_mm, there's no address space
 		 * to search, but use it as a reminder to search shmem.
 		 */
@@ -748,7 +738,10 @@ static int try_to_unuse(unsigned int type)
 			while (*swap_map > 1 && !retval &&
 					(p = p->next) != &start_mm->mmlist) {
 				mm = list_entry(p, struct mm_struct, mmlist);
-				atomic_inc(&mm->mm_users);
+				if (atomic_inc_return(&mm->mm_users) == 1) {
+					atomic_dec(&mm->mm_users);
+					continue;
+				}
 				spin_unlock(&mmlist_lock);
 				mmput(prev_mm);
 				prev_mm = mm;
@@ -859,6 +852,26 @@ static int try_to_unuse(unsigned int type)
 		swap_overflow = 0;
 	}
 	return retval;
+}
+
+/*
+ * After a successful try_to_unuse, if no swap is now in use, we know we
+ * can empty the mmlist.  swap_list_lock must be held on entry and exit.
+ * Note that mmlist_lock nests inside swap_list_lock, and an mm must be
+ * added to the mmlist just after page_duplicate - before would be racy.
+ */
+static void drain_mmlist(void)
+{
+	struct list_head *p, *next;
+	unsigned int i;
+
+	for (i = 0; i < nr_swapfiles; i++)
+		if (swap_info[i].inuse_pages)
+			return;
+	spin_lock(&mmlist_lock);
+	list_for_each_safe(p, next, &init_mm.mmlist)
+		list_del_init(p);
+	spin_unlock(&mmlist_lock);
 }
 
 /*
@@ -1175,6 +1188,7 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 	}
 	down(&swapon_sem);
 	swap_list_lock();
+	drain_mmlist();
 	swap_device_lock(p);
 	swap_file = p->swap_file;
 	p->swap_file = NULL;
@@ -1360,7 +1374,7 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 	p->highest_bit = 0;
 	p->cluster_nr = 0;
 	p->inuse_pages = 0;
-	p->sdev_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&p->sdev_lock);
 	p->next = -1;
 	if (swap_flags & SWAP_FLAG_PREFER) {
 		p->prio =
@@ -1613,24 +1627,6 @@ void si_swapinfo(struct sysinfo *val)
 	val->totalswap = total_swap_pages + nr_to_be_unused;
 	swap_list_unlock();
 }
-
-#ifdef	CONFIG_KDB
-/* Like si_swapinfo() but without the locks */
-void kdb_si_swapinfo(struct sysinfo *val)
-{
-	unsigned int i;
-	unsigned long nr_to_be_unused = 0;
-
-	for (i = 0; i < nr_swapfiles; i++) {
-		if (!(swap_info[i].flags & SWP_USED) ||
-		     (swap_info[i].flags & SWP_WRITEOK))
-			continue;
-		nr_to_be_unused += swap_info[i].inuse_pages;
-	}
-	val->freeswap = nr_swap_pages + nr_to_be_unused;
-	val->totalswap = total_swap_pages + nr_to_be_unused;
-}
-#endif	/* CONFIG_KDB */
 
 /*
  * Verify that a swap entry is valid and increment its swap map count.

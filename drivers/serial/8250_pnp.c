@@ -21,14 +21,10 @@
 #include <linux/pnp.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
-#include <linux/tty.h>
-#include <linux/serial.h>
-#include <linux/serialP.h>
 #include <linux/serial_core.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/byteorder.h>
-#include <asm/serial.h>
 
 #include "8250.h"
 
@@ -49,7 +45,7 @@ static const struct pnp_device_id pnp_dev_table[] = {
 	/* Actiontec ISA PNP 56K X2 Fax Modem */
 	{	"AEI1240",		0	},
 	/* Rockwell 56K ACF II Fax+Data+Voice Modem */
-	{	"AKY1021",		SPCI_FL_NO_SHIRQ	},
+	{	"AKY1021",		0 /*SPCI_FL_NO_SHIRQ*/	},
 	/* AZT3005 PnP SOUND DEVICE */
 	{	"AZT4001",		0	},
 	/* Best Data Products Inc. Smart One 336F PnP Modem */
@@ -293,6 +289,8 @@ static const struct pnp_device_id pnp_dev_table[] = {
 	{	"USR0006",		0	},
 	/* U.S. Robotics 33.6K Voice EXT PnP */
 	{	"USR0007",		0	},
+	/* U.S. Robotics Courier V.Everything INT PnP */
+	{	"USR0009",		0	},
 	/* U.S. Robotics 33.6K Voice INT PnP */
 	{	"USR2002",		0	},
 	/* U.S. Robotics 56K Voice INT PnP */
@@ -396,26 +394,29 @@ static int __devinit serial_pnp_guess_board(struct pnp_dev *dev, int *flags)
 static int __devinit
 serial_pnp_probe(struct pnp_dev * dev, const struct pnp_device_id *dev_id)
 {
-	struct serial_struct serial_req;
+	struct uart_port port;
 	int ret, line, flags = dev_id->driver_data;
+
 	if (flags & UNKNOWN_DEV) {
 		ret = serial_pnp_guess_board(dev, &flags);
 		if (ret < 0)
 			return ret;
 	}
-	memset(&serial_req, 0, sizeof(serial_req));
-	serial_req.irq = pnp_irq(dev,0);
-	serial_req.port = pnp_port_start(dev, 0);
-	if (HIGH_BITS_OFFSET)
-		serial_req.port = pnp_port_start(dev, 0) >> HIGH_BITS_OFFSET;
+
+	memset(&port, 0, sizeof(struct uart_port));
+	port.irq = pnp_irq(dev,0);
+	port.iobase = pnp_port_start(dev, 0);
+
 #ifdef SERIAL_DEBUG_PNP
 	printk("Setup PNP port: port %x, irq %d, type %d\n",
-	       serial_req.port, serial_req.irq, serial_req.io_type);
+	       port.iobase, port.irq, port.iotype);
 #endif
 
-	serial_req.flags = UPF_SKIP_TEST | UPF_AUTOPROBE;
-	serial_req.baud_base = 115200;
-	line = register_serial(&serial_req);
+	port.flags = UPF_SKIP_TEST | UPF_BOOT_AUTOCONF;
+	port.uartclk = 1843200;
+	port.dev = &dev->dev;
+
+	line = serial8250_register_port(&port);
 
 	if (line >= 0)
 		pnp_set_drvdata(dev, (void *)(line + 1));
@@ -427,7 +428,7 @@ static void __devexit serial_pnp_remove(struct pnp_dev * dev)
 {
 	int line = (int)pnp_get_drvdata(dev);
 	if (line)
-		unregister_serial(line - 1);
+		serial8250_unregister_port(line - 1);
 }
 
 static struct pnp_driver serial_pnp_driver = {

@@ -289,7 +289,7 @@ deadline_find_first_drq(struct deadline_data *dd, int data_dir)
 static inline void
 deadline_add_request(struct request_queue *q, struct request *rq)
 {
-	struct deadline_data *dd = q->elevator.elevator_data;
+	struct deadline_data *dd = q->elevator->elevator_data;
 	struct deadline_rq *drq = RQ_DATA(rq);
 
 	const int data_dir = rq_data_dir(drq->request);
@@ -317,7 +317,7 @@ static void deadline_remove_request(request_queue_t *q, struct request *rq)
 	struct deadline_rq *drq = RQ_DATA(rq);
 
 	if (drq) {
-		struct deadline_data *dd = q->elevator.elevator_data;
+		struct deadline_data *dd = q->elevator->elevator_data;
 
 		list_del_init(&drq->fifo);
 		deadline_remove_merge_hints(q, drq);
@@ -328,7 +328,7 @@ static void deadline_remove_request(request_queue_t *q, struct request *rq)
 static int
 deadline_merge(request_queue_t *q, struct request **req, struct bio *bio)
 {
-	struct deadline_data *dd = q->elevator.elevator_data;
+	struct deadline_data *dd = q->elevator->elevator_data;
 	struct request *__rq;
 	int ret;
 
@@ -383,7 +383,7 @@ out_insert:
 
 static void deadline_merged_request(request_queue_t *q, struct request *req)
 {
-	struct deadline_data *dd = q->elevator.elevator_data;
+	struct deadline_data *dd = q->elevator->elevator_data;
 	struct deadline_rq *drq = RQ_DATA(req);
 
 	/*
@@ -407,7 +407,7 @@ static void
 deadline_merged_requests(request_queue_t *q, struct request *req,
 			 struct request *next)
 {
-	struct deadline_data *dd = q->elevator.elevator_data;
+	struct deadline_data *dd = q->elevator->elevator_data;
 	struct deadline_rq *drq = RQ_DATA(req);
 	struct deadline_rq *dnext = RQ_DATA(next);
 
@@ -604,7 +604,7 @@ dispatch_request:
 
 static struct request *deadline_next_request(request_queue_t *q)
 {
-	struct deadline_data *dd = q->elevator.elevator_data;
+	struct deadline_data *dd = q->elevator->elevator_data;
 	struct request *rq;
 
 	/*
@@ -625,7 +625,7 @@ dispatch:
 static void
 deadline_insert_request(request_queue_t *q, struct request *rq, int where)
 {
-	struct deadline_data *dd = q->elevator.elevator_data;
+	struct deadline_data *dd = q->elevator->elevator_data;
 
 	/* barriers must flush the reorder queue */
 	if (unlikely(rq->flags & (REQ_SOFTBARRIER | REQ_HARDBARRIER)
@@ -653,7 +653,7 @@ deadline_insert_request(request_queue_t *q, struct request *rq, int where)
 
 static int deadline_queue_empty(request_queue_t *q)
 {
-	struct deadline_data *dd = q->elevator.elevator_data;
+	struct deadline_data *dd = q->elevator->elevator_data;
 
 	if (!list_empty(&dd->fifo_list[WRITE])
 	    || !list_empty(&dd->fifo_list[READ])
@@ -687,7 +687,7 @@ deadline_latter_request(request_queue_t *q, struct request *rq)
 	return NULL;
 }
 
-static void deadline_exit(request_queue_t *q, elevator_t *e)
+static void deadline_exit_queue(elevator_t *e)
 {
 	struct deadline_data *dd = e->elevator_data;
 
@@ -703,7 +703,7 @@ static void deadline_exit(request_queue_t *q, elevator_t *e)
  * initialize elevator private data (deadline_data), and alloc a drq for
  * each request on the free lists
  */
-static int deadline_init(request_queue_t *q, elevator_t *e)
+static int deadline_init_queue(request_queue_t *q, elevator_t *e)
 {
 	struct deadline_data *dd;
 	int i;
@@ -748,7 +748,7 @@ static int deadline_init(request_queue_t *q, elevator_t *e)
 
 static void deadline_put_request(request_queue_t *q, struct request *rq)
 {
-	struct deadline_data *dd = q->elevator.elevator_data;
+	struct deadline_data *dd = q->elevator->elevator_data;
 	struct deadline_rq *drq = RQ_DATA(rq);
 
 	if (drq) {
@@ -760,7 +760,7 @@ static void deadline_put_request(request_queue_t *q, struct request *rq)
 static int
 deadline_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 {
-	struct deadline_data *dd = q->elevator.elevator_data;
+	struct deadline_data *dd = q->elevator->elevator_data;
 	struct deadline_rq *drq;
 
 	drq = mempool_alloc(dd->drq_pool, gfp_mask);
@@ -805,33 +805,41 @@ deadline_var_store(unsigned int *var, const char *page, size_t count)
 	return count;
 }
 
-#define SHOW_FUNCTION(__FUNC, __VAR)					\
+#define SHOW_FUNCTION(__FUNC, __VAR, __CONV)				\
 static ssize_t __FUNC(struct deadline_data *dd, char *page)		\
 {									\
-	return deadline_var_show(__VAR, (page));			\
+	unsigned int __data = __VAR;					\
+	if (__CONV)							\
+		__data = jiffies_to_msecs(__data);			\
+	return deadline_var_show(__data, (page));			\
 }
-SHOW_FUNCTION(deadline_readexpire_show, dd->fifo_expire[READ]);
-SHOW_FUNCTION(deadline_writeexpire_show, dd->fifo_expire[WRITE]);
-SHOW_FUNCTION(deadline_writesstarved_show, dd->writes_starved);
-SHOW_FUNCTION(deadline_frontmerges_show, dd->front_merges);
-SHOW_FUNCTION(deadline_fifobatch_show, dd->fifo_batch);
+SHOW_FUNCTION(deadline_readexpire_show, dd->fifo_expire[READ], 1);
+SHOW_FUNCTION(deadline_writeexpire_show, dd->fifo_expire[WRITE], 1);
+SHOW_FUNCTION(deadline_writesstarved_show, dd->writes_starved, 0);
+SHOW_FUNCTION(deadline_frontmerges_show, dd->front_merges, 0);
+SHOW_FUNCTION(deadline_fifobatch_show, dd->fifo_batch, 0);
 #undef SHOW_FUNCTION
 
-#define STORE_FUNCTION(__FUNC, __PTR, MIN, MAX)				\
+#define STORE_FUNCTION(__FUNC, __PTR, MIN, MAX, __CONV)			\
 static ssize_t __FUNC(struct deadline_data *dd, const char *page, size_t count)	\
 {									\
-	int ret = deadline_var_store(__PTR, (page), count);		\
-	if (*(__PTR) < (MIN))						\
-		*(__PTR) = (MIN);					\
-	else if (*(__PTR) > (MAX))					\
-		*(__PTR) = (MAX);					\
+	unsigned int __data;						\
+	int ret = deadline_var_store(&__data, (page), count);		\
+	if (__data < (MIN))						\
+		__data = (MIN);						\
+	else if (__data > (MAX))					\
+		__data = (MAX);						\
+	if (__CONV)							\
+		*(__PTR) = msecs_to_jiffies(__data);			\
+	else								\
+		*(__PTR) = __data;					\
 	return ret;							\
 }
-STORE_FUNCTION(deadline_readexpire_store, &dd->fifo_expire[READ], 0, INT_MAX);
-STORE_FUNCTION(deadline_writeexpire_store, &dd->fifo_expire[WRITE], 0, INT_MAX);
-STORE_FUNCTION(deadline_writesstarved_store, &dd->writes_starved, INT_MIN, INT_MAX);
-STORE_FUNCTION(deadline_frontmerges_store, &dd->front_merges, 0, 1);
-STORE_FUNCTION(deadline_fifobatch_store, &dd->fifo_batch, 0, INT_MAX);
+STORE_FUNCTION(deadline_readexpire_store, &dd->fifo_expire[READ], 0, INT_MAX, 1);
+STORE_FUNCTION(deadline_writeexpire_store, &dd->fifo_expire[WRITE], 0, INT_MAX, 1);
+STORE_FUNCTION(deadline_writesstarved_store, &dd->writes_starved, INT_MIN, INT_MAX, 0);
+STORE_FUNCTION(deadline_frontmerges_store, &dd->front_merges, 0, 1, 0);
+STORE_FUNCTION(deadline_fifobatch_store, &dd->fifo_batch, 0, INT_MAX, 0);
 #undef STORE_FUNCTION
 
 static struct deadline_fs_entry deadline_readexpire_entry = {
@@ -906,36 +914,54 @@ struct kobj_type deadline_ktype = {
 	.default_attrs	= default_attrs,
 };
 
-static int __init deadline_slab_setup(void)
+static struct elevator_type iosched_deadline = {
+	.ops = {
+		.elevator_merge_fn = 		deadline_merge,
+		.elevator_merged_fn =		deadline_merged_request,
+		.elevator_merge_req_fn =	deadline_merged_requests,
+		.elevator_next_req_fn =		deadline_next_request,
+		.elevator_add_req_fn =		deadline_insert_request,
+		.elevator_remove_req_fn =	deadline_remove_request,
+		.elevator_queue_empty_fn =	deadline_queue_empty,
+		.elevator_former_req_fn =	deadline_former_request,
+		.elevator_latter_req_fn =	deadline_latter_request,
+		.elevator_set_req_fn =		deadline_set_request,
+		.elevator_put_req_fn = 		deadline_put_request,
+		.elevator_init_fn =		deadline_init_queue,
+		.elevator_exit_fn =		deadline_exit_queue,
+	},
+
+	.elevator_ktype = &deadline_ktype,
+	.elevator_name = "deadline",
+	.elevator_owner = THIS_MODULE,
+};
+
+static int __init deadline_init(void)
 {
+	int ret;
+
 	drq_pool = kmem_cache_create("deadline_drq", sizeof(struct deadline_rq),
 				     0, 0, NULL, NULL);
 
 	if (!drq_pool)
-		panic("deadline: can't init slab pool\n");
+		return -ENOMEM;
 
-	return 0;
+	ret = elv_register(&iosched_deadline);
+	if (ret)
+		kmem_cache_destroy(drq_pool);
+
+	return ret;
 }
 
-subsys_initcall(deadline_slab_setup);
+static void __exit deadline_exit(void)
+{
+	kmem_cache_destroy(drq_pool);
+	elv_unregister(&iosched_deadline);
+}
 
-elevator_t iosched_deadline = {
-	.elevator_merge_fn = 		deadline_merge,
-	.elevator_merged_fn =		deadline_merged_request,
-	.elevator_merge_req_fn =	deadline_merged_requests,
-	.elevator_next_req_fn =		deadline_next_request,
-	.elevator_add_req_fn =		deadline_insert_request,
-	.elevator_remove_req_fn =	deadline_remove_request,
-	.elevator_queue_empty_fn =	deadline_queue_empty,
-	.elevator_former_req_fn =	deadline_former_request,
-	.elevator_latter_req_fn =	deadline_latter_request,
-	.elevator_set_req_fn =		deadline_set_request,
-	.elevator_put_req_fn = 		deadline_put_request,
-	.elevator_init_fn =		deadline_init,
-	.elevator_exit_fn =		deadline_exit,
+module_init(deadline_init);
+module_exit(deadline_exit);
 
-	.elevator_ktype =		&deadline_ktype,
-	.elevator_name =		"deadline",
-};
-
-EXPORT_SYMBOL(iosched_deadline);
+MODULE_AUTHOR("Jens Axboe");
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("deadline IO scheduler");

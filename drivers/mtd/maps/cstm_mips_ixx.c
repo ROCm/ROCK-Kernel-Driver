@@ -1,5 +1,5 @@
 /*
- * $Id: cstm_mips_ixx.c,v 1.10 2004/07/12 21:59:43 dwmw2 Exp $
+ * $Id: cstm_mips_ixx.c,v 1.12 2004/11/04 13:24:14 gleixner Exp $
  *
  * Mapping of a custom board with both AMD CFI and JEDEC flash in partitions.
  * Config with both CFI and JEDEC device support.
@@ -170,7 +170,7 @@ int __init init_cstm_mips_ixx(void)
 
 
 		cstm_mips_ixx_map[i].phys = cstm_mips_ixx_board_desc[i].window_addr;
-		cstm_mips_ixx_map[i].virt = (unsigned long)ioremap(cstm_mips_ixx_board_desc[i].window_addr, cstm_mips_ixx_board_desc[i].window_size);
+		cstm_mips_ixx_map[i].virt = ioremap(cstm_mips_ixx_board_desc[i].window_addr, cstm_mips_ixx_board_desc[i].window_size);
 		if (!cstm_mips_ixx_map[i].virt) {
 			printk(KERN_WARNING "Failed to ioremap\n");
 			return -EIO;

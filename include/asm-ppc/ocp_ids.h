@@ -61,6 +61,7 @@
 #define OCP_FUNC_PERFMON	0x00D2	/* Performance Monitor */
 #define OCP_FUNC_RGMII		0x00D3
 #define OCP_FUNC_TAH		0x00D4
+#define OCP_FUNC_SEC2		0x00D5	/* Crypto/Security 2.0 */
 
 /* Network 0x0200 - 0x02FF */
 #define OCP_FUNC_EMAC		0x0200

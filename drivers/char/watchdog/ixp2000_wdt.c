@@ -25,9 +25,9 @@
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 
 #include <asm/hardware.h>
-#include <asm/bitops.h>
 #include <asm/uaccess.h>
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT

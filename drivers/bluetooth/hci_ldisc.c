@@ -143,7 +143,7 @@ restart:
 		int len;
 	
 		set_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
-		len = tty->driver->write(tty, 0, skb->data, skb->len);
+		len = tty->driver->write(tty, skb->data, skb->len);
 		hdev->stat.byte_tx += len;
 
 		skb_pull(skb, len);
@@ -188,9 +188,7 @@ static int hci_uart_flush(struct hci_dev *hdev)
 	}
 
 	/* Flush any pending characters in the driver and discipline. */
-	if (tty->ldisc.flush_buffer)
-		tty->ldisc.flush_buffer(tty);
-
+	tty_ldisc_flush(tty);
 	if (tty->driver->flush_buffer)
 		tty->driver->flush_buffer(tty);
 
@@ -280,7 +278,9 @@ static int hci_uart_tty_open(struct tty_struct *tty)
 
 	spin_lock_init(&hu->rx_lock);
 
-	/* Flush any pending characters in the driver and line discipline */
+	/* Flush any pending characters in the driver and line discipline. */
+	/* FIXME: why is this needed. Note don't use ldisc_ref here as the
+	   open path is before the ldisc is referencable */
 	if (tty->ldisc.flush_buffer)
 		tty->ldisc.flush_buffer(tty);
 
@@ -502,7 +502,7 @@ static ssize_t hci_uart_tty_read(struct tty_struct *tty, struct file *file, unsi
 {
 	return 0;
 }
-static ssize_t hci_uart_tty_write(struct tty_struct *tty, struct file *file, const unsigned char __user *data, size_t count)
+static ssize_t hci_uart_tty_write(struct tty_struct *tty, struct file *file, const unsigned char *data, size_t count)
 {
 	return 0;
 }

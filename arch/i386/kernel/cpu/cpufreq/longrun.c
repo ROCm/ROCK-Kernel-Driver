@@ -16,6 +16,8 @@
 #include <asm/processor.h>
 #include <asm/timex.h>
 
+#define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, "longrun", msg)
+
 static struct cpufreq_driver	longrun_driver;
 
 /**
@@ -38,12 +40,14 @@ static void __init longrun_get_policy(struct cpufreq_policy *policy)
 	u32 msr_lo, msr_hi;
 
 	rdmsr(MSR_TMTA_LONGRUN_FLAGS, msr_lo, msr_hi);
+	dprintk("longrun flags are %x - %x\n", msr_lo, msr_hi);
 	if (msr_lo & 0x01)
 		policy->policy = CPUFREQ_POLICY_PERFORMANCE;
 	else
 		policy->policy = CPUFREQ_POLICY_POWERSAVE;
 
 	rdmsr(MSR_TMTA_LONGRUN_CTRL, msr_lo, msr_hi);
+	dprintk("longrun ctrl is %x - %x\n", msr_lo, msr_hi);
 	msr_lo &= 0x0000007F;
 	msr_hi &= 0x0000007F;
 
@@ -146,6 +150,7 @@ static unsigned int longrun_get(unsigned int cpu)
 		return 0;
 
 	cpuid(0x80860007, &eax, &ebx, &ecx, &edx);
+	dprintk("cpuid eax is %u\n", eax);
 
 	return (eax * 1000);
 }
@@ -191,6 +196,8 @@ static unsigned int __init longrun_determine_freqs(unsigned int *low_freq,
 		rdmsr(MSR_TMTA_LRTI_VOLT_MHZ, msr_lo, msr_hi);
 		*high_freq = msr_lo * 1000; /* to kHz */
 
+		dprintk("longrun table interface told %u - %u kHz\n", *low_freq, *high_freq);
+
 		if (*low_freq > *high_freq)
 			*low_freq = *high_freq;
 		return 0;
@@ -199,6 +206,7 @@ static unsigned int __init longrun_determine_freqs(unsigned int *low_freq,
 	/* set the upper border to the value determined during TSC init */
 	*high_freq = (cpu_khz / 1000);
 	*high_freq = *high_freq * 1000;
+	dprintk("high frequency is %u kHz\n", *high_freq);
 
 	/* get current borders */
 	rdmsr(MSR_TMTA_LONGRUN_CTRL, msr_lo, msr_hi);
@@ -225,6 +233,7 @@ static unsigned int __init longrun_determine_freqs(unsigned int *low_freq,
 		/* restore values */
 		wrmsr(MSR_TMTA_LONGRUN_CTRL, save_lo, save_hi);
 	}
+	dprintk("percentage is %u %%, freq is %u MHz\n", ecx, eax);
 
 	/* performance_pctg = (current_freq - low_freq)/(high_freq - low_freq)
 	 * eqals
@@ -239,6 +248,8 @@ static unsigned int __init longrun_determine_freqs(unsigned int *low_freq,
 
 	edx = (eax - ebx) / (100 - ecx);
 	*low_freq = edx * 1000; /* back to kHz */
+
+	dprintk("low frequency is %u kHz\n", *low_freq);
 
 	if (*low_freq > *high_freq)
 		*low_freq = *high_freq;
@@ -308,7 +319,7 @@ static void __exit longrun_exit(void)
 
 
 MODULE_AUTHOR ("Dominik Brodowski <linux@brodo.de>");
-MODULE_DESCRIPTION ("LongRun driver for Transmeta Crusoe processors.");
+MODULE_DESCRIPTION ("LongRun driver for Transmeta Crusoe and Efficeon processors.");
 MODULE_LICENSE ("GPL");
 
 module_init(longrun_init);

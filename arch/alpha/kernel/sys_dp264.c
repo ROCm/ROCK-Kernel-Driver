@@ -19,12 +19,12 @@
 #include <linux/sched.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 
 #include <asm/ptrace.h>
 #include <asm/system.h>
 #include <asm/dma.h>
 #include <asm/irq.h>
-#include <asm/bitops.h>
 #include <asm/mmu_context.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
@@ -71,10 +71,10 @@ tsunami_update_irq_hw(unsigned long mask)
 	dim1 = &cchip->dim1.csr;
 	dim2 = &cchip->dim2.csr;
 	dim3 = &cchip->dim3.csr;
-	if (cpu_possible(0)) dim0 = &dummy;
-	if (cpu_possible(1)) dim1 = &dummy;
-	if (cpu_possible(2)) dim2 = &dummy;
-	if (cpu_possible(3)) dim3 = &dummy;
+	if (!cpu_possible(0)) dim0 = &dummy;
+	if (!cpu_possible(1)) dim1 = &dummy;
+	if (!cpu_possible(2)) dim2 = &dummy;
+	if (!cpu_possible(3)) dim3 = &dummy;
 
 	*dim0 = mask0;
 	*dim1 = mask1;
@@ -569,7 +569,6 @@ struct alpha_machine_vector dp264_mv __initmv = {
 	DO_EV6_MMU,
 	DO_DEFAULT_RTC,
 	DO_TSUNAMI_IO,
-	DO_TSUNAMI_BUS,
 	.machine_check		= tsunami_machine_check,
 	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,
@@ -594,7 +593,6 @@ struct alpha_machine_vector monet_mv __initmv = {
 	DO_EV6_MMU,
 	DO_DEFAULT_RTC,
 	DO_TSUNAMI_IO,
-	DO_TSUNAMI_BUS,
 	.machine_check		= tsunami_machine_check,
 	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,
@@ -618,7 +616,6 @@ struct alpha_machine_vector webbrick_mv __initmv = {
 	DO_EV6_MMU,
 	DO_DEFAULT_RTC,
 	DO_TSUNAMI_IO,
-	DO_TSUNAMI_BUS,
 	.machine_check		= tsunami_machine_check,
 	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,
@@ -642,7 +639,6 @@ struct alpha_machine_vector clipper_mv __initmv = {
 	DO_EV6_MMU,
 	DO_DEFAULT_RTC,
 	DO_TSUNAMI_IO,
-	DO_TSUNAMI_BUS,
 	.machine_check		= tsunami_machine_check,
 	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,
@@ -671,7 +667,6 @@ struct alpha_machine_vector shark_mv __initmv = {
 	DO_EV6_MMU,
 	DO_DEFAULT_RTC,
 	DO_TSUNAMI_IO,
-	DO_TSUNAMI_BUS,
 	.machine_check		= tsunami_machine_check,
 	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,

@@ -66,19 +66,12 @@
 
 #include <linux/config.h>
 
-/* These options are not tunable from 'make config' */
-#define	SCSI_NCR_PROC_INFO_SUPPORT
-
 /*
 **	If you want a driver as small as possible, donnot define the 
 **	following options.
 */
 #define SCSI_NCR_BOOT_COMMAND_LINE_SUPPORT
 #define SCSI_NCR_DEBUG_INFO_SUPPORT
-#ifdef	SCSI_NCR_PROC_INFO_SUPPORT
-#	define	SCSI_NCR_USER_COMMAND_SUPPORT
-#	define	SCSI_NCR_USER_INFO_SUPPORT
-#endif
 
 /*
 **	To disable integrity checking, do not define the 
@@ -422,42 +415,42 @@
  *  MEMORY mapped IO input / output
  */
 
-#define INB_OFF(o)		readb_raw((char *)np->reg + ncr_offb(o))
-#define OUTB_OFF(o, val)	writeb_raw((val), (char *)np->reg + ncr_offb(o))
+#define INB_OFF(o)		readb_raw((char __iomem *)np->reg + ncr_offb(o))
+#define OUTB_OFF(o, val)	writeb_raw((val), (char __iomem *)np->reg + ncr_offb(o))
 
 #if	defined(__BIG_ENDIAN) && !defined(SCSI_NCR_BIG_ENDIAN)
 
-#define INW_OFF(o)		readw_l2b((char *)np->reg + ncr_offw(o))
-#define INL_OFF(o)		readl_l2b((char *)np->reg + (o))
+#define INW_OFF(o)		readw_l2b((char __iomem *)np->reg + ncr_offw(o))
+#define INL_OFF(o)		readl_l2b((char __iomem *)np->reg + (o))
 
-#define OUTW_OFF(o, val)	writew_b2l((val), (char *)np->reg + ncr_offw(o))
-#define OUTL_OFF(o, val)	writel_b2l((val), (char *)np->reg + (o))
+#define OUTW_OFF(o, val)	writew_b2l((val), (char __iomem *)np->reg + ncr_offw(o))
+#define OUTL_OFF(o, val)	writel_b2l((val), (char __iomem *)np->reg + (o))
 
 #elif	defined(__LITTLE_ENDIAN) && defined(SCSI_NCR_BIG_ENDIAN)
 
-#define INW_OFF(o)		readw_b2l((char *)np->reg + ncr_offw(o))
-#define INL_OFF(o)		readl_b2l((char *)np->reg + (o))
+#define INW_OFF(o)		readw_b2l((char __iomem *)np->reg + ncr_offw(o))
+#define INL_OFF(o)		readl_b2l((char __iomem *)np->reg + (o))
 
-#define OUTW_OFF(o, val)	writew_l2b((val), (char *)np->reg + ncr_offw(o))
-#define OUTL_OFF(o, val)	writel_l2b((val), (char *)np->reg + (o))
+#define OUTW_OFF(o, val)	writew_l2b((val), (char __iomem *)np->reg + ncr_offw(o))
+#define OUTL_OFF(o, val)	writel_l2b((val), (char __iomem *)np->reg + (o))
 
 #else
 
 #ifdef CONFIG_SCSI_NCR53C8XX_NO_WORD_TRANSFERS
 /* Only 8 or 32 bit transfers allowed */
-#define INW_OFF(o)		(readb((char *)np->reg + ncr_offw(o)) << 8 | readb((char *)np->reg + ncr_offw(o) + 1))
+#define INW_OFF(o)		(readb((char __iomem *)np->reg + ncr_offw(o)) << 8 | readb((char __iomem *)np->reg + ncr_offw(o) + 1))
 #else
-#define INW_OFF(o)		readw_raw((char *)np->reg + ncr_offw(o))
+#define INW_OFF(o)		readw_raw((char __iomem *)np->reg + ncr_offw(o))
 #endif
-#define INL_OFF(o)		readl_raw((char *)np->reg + (o))
+#define INL_OFF(o)		readl_raw((char __iomem *)np->reg + (o))
 
 #ifdef CONFIG_SCSI_NCR53C8XX_NO_WORD_TRANSFERS
 /* Only 8 or 32 bit transfers allowed */
-#define OUTW_OFF(o, val)	do { writeb((char)((val) >> 8), (char *)np->reg + ncr_offw(o)); writeb((char)(val), (char *)np->reg + ncr_offw(o) + 1); } while (0)
+#define OUTW_OFF(o, val)	do { writeb((char)((val) >> 8), (char __iomem *)np->reg + ncr_offw(o)); writeb((char)(val), (char __iomem *)np->reg + ncr_offw(o) + 1); } while (0)
 #else
-#define OUTW_OFF(o, val)	writew_raw((val), (char *)np->reg + ncr_offw(o))
+#define OUTW_OFF(o, val)	writew_raw((val), (char __iomem *)np->reg + ncr_offw(o))
 #endif
-#define OUTL_OFF(o, val)	writel_raw((val), (char *)np->reg + (o))
+#define OUTL_OFF(o, val)	writel_raw((val), (char __iomem *)np->reg + (o))
 
 #endif
 

@@ -120,7 +120,7 @@
  * i_sem on quota files is special (it's below dqio_sem)
  */
 
-spinlock_t dq_list_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t dq_list_lock = SPIN_LOCK_UNLOCKED;
 spinlock_t dq_data_lock = SPIN_LOCK_UNLOCKED;
 
 static char *quotatypes[] = INITQFNAMES;
@@ -758,7 +758,7 @@ static inline void dquot_decr_inodes(struct dquot *dquot, unsigned long number)
 		dquot->dq_dqb.dqb_curinodes -= number;
 	else
 		dquot->dq_dqb.dqb_curinodes = 0;
-	if (dquot->dq_dqb.dqb_curinodes < dquot->dq_dqb.dqb_isoftlimit)
+	if (dquot->dq_dqb.dqb_curinodes <= dquot->dq_dqb.dqb_isoftlimit)
 		dquot->dq_dqb.dqb_itime = (time_t) 0;
 	clear_bit(DQ_INODES_B, &dquot->dq_flags);
 }
@@ -769,7 +769,7 @@ static inline void dquot_decr_space(struct dquot *dquot, qsize_t number)
 		dquot->dq_dqb.dqb_curspace -= number;
 	else
 		dquot->dq_dqb.dqb_curspace = 0;
-	if (toqb(dquot->dq_dqb.dqb_curspace) < dquot->dq_dqb.dqb_bsoftlimit)
+	if (toqb(dquot->dq_dqb.dqb_curspace) <= dquot->dq_dqb.dqb_bsoftlimit)
 		dquot->dq_dqb.dqb_btime = (time_t) 0;
 	clear_bit(DQ_BLKS_B, &dquot->dq_flags);
 }
@@ -811,22 +811,22 @@ static void print_warning(struct dquot *dquot, const char warntype)
 	tty_write_message(current->signal->tty, quotatypes[dquot->dq_type]);
 	switch (warntype) {
 		case IHARDWARN:
-			msg = " file limit reached.\n";
+			msg = " file limit reached.\r\n";
 			break;
 		case ISOFTLONGWARN:
-			msg = " file quota exceeded too long.\n";
+			msg = " file quota exceeded too long.\r\n";
 			break;
 		case ISOFTWARN:
-			msg = " file quota exceeded.\n";
+			msg = " file quota exceeded.\r\n";
 			break;
 		case BHARDWARN:
-			msg = " block limit reached.\n";
+			msg = " block limit reached.\r\n";
 			break;
 		case BSOFTLONGWARN:
-			msg = " block quota exceeded too long.\n";
+			msg = " block quota exceeded too long.\r\n";
 			break;
 		case BSOFTWARN:
-			msg = " block quota exceeded.\n";
+			msg = " block quota exceeded.\r\n";
 			break;
 	}
 	tty_write_message(current->signal->tty, msg);
@@ -1792,7 +1792,6 @@ module_init(dquot_init);
 EXPORT_SYMBOL(register_quota_format);
 EXPORT_SYMBOL(unregister_quota_format);
 EXPORT_SYMBOL(dqstats);
-EXPORT_SYMBOL(dq_list_lock);
 EXPORT_SYMBOL(dq_data_lock);
 EXPORT_SYMBOL(vfs_quota_on);
 EXPORT_SYMBOL(vfs_quota_on_mount);

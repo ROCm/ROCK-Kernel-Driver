@@ -19,8 +19,6 @@
 
 #include <net/dst.h>
 
-const char dst_underflow_bug_msg[] = KERN_DEBUG "BUG: dst underflow %d: %p at %p\n";
-
 /* Locking strategy:
  * 1) Garbage collection state of dead destination cache
  *    entries is protected by dst_lock.
@@ -108,9 +106,9 @@ static int dst_discard_in(struct sk_buff *skb)
 	return 0;
 }
 
-static int dst_discard_out(struct sk_buff **pskb)
+static int dst_discard_out(struct sk_buff *skb)
 {
-	kfree_skb(*pskb);
+	kfree_skb(skb);
 	return 0;
 }
 
@@ -275,7 +273,6 @@ void __init dst_init(void)
 	register_netdevice_notifier(&dst_dev_notifier);
 }
 
-EXPORT_SYMBOL(dst_underflow_bug_msg);
 EXPORT_SYMBOL(__dst_free);
 EXPORT_SYMBOL(dst_alloc);
 EXPORT_SYMBOL(dst_destroy);

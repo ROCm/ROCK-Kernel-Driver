@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-ixp4xx/coyote-setup.c
  *
- * ADI Engineering Coyote board-setup 
+ * Board setup for ADI Engineering and IXDGP425 boards
  *
  * Copyright (C) 2003-2004 MontaVista Software, Inc.
  *
@@ -30,7 +30,7 @@
 #endif
 
 /*
- * Only one serial port is connected on the Coyote.
+ * Only one serial port is connected on the Coyote & IXDPG425
  */
 static struct uart_port coyote_serial_port = {
 	.membase	= (char*)(IXP4XX_UART2_BASE_VIRT + REG_OFFSET),
@@ -47,6 +47,13 @@ static struct uart_port coyote_serial_port = {
 
 void __init coyote_map_io(void)
 {
+	if (machine_is_ixdpg425()) {
+		coyote_serial_port.membase =
+			(char*)(IXP4XX_UART1_BASE_VIRT + REG_OFFSET);
+		coyote_serial_port.mapbase = IXP4XX_UART1_BASE_PHYS;
+		coyote_serial_port.irq = IRQ_IXP4XX_UART1;
+	}
+
 	early_serial_setup(&coyote_serial_port);
 
 	ixp4xx_map_io();
@@ -79,17 +86,39 @@ static struct platform_device *coyote_devices[] __initdata = {
 
 static void __init coyote_init(void)
 {
+	*IXP4XX_EXP_CS0 |= IXP4XX_FLASH_WRITABLE;
+	*IXP4XX_EXP_CS1 = *IXP4XX_EXP_CS0;
+
 	platform_add_devices(&coyote_devices, ARRAY_SIZE(coyote_devices));
 }
 
-MACHINE_START(ADI_COYOTE, "ADI Engineering IXP4XX Coyote Development Platform")
+#ifdef CONFIG_ARCH_ADI_COYOTE
+MACHINE_START(ADI_COYOTE, "ADI Engineering Coyote")
         MAINTAINER("MontaVista Software, Inc.")
         BOOT_MEM(PHYS_OFFSET, IXP4XX_PERIPHERAL_BASE_PHYS,
                 IXP4XX_PERIPHERAL_BASE_VIRT)
         MAPIO(coyote_map_io)
         INITIRQ(ixp4xx_init_irq)
-	INITTIME(ixp4xx_init_time)
+	.timer		= &ixp4xx_timer,
         BOOT_PARAMS(0x0100)
 	INIT_MACHINE(coyote_init)
 MACHINE_END
+#endif
+
+/*
+ * IXDPG425 is identical to Coyote except for which serial port
+ * is connected.
+ */
+#ifdef CONFIG_MACH_IXDPG425
+MACHINE_START(IXDPG425, "Intel IXDPG425")
+        MAINTAINER("MontaVista Software, Inc.")
+        BOOT_MEM(PHYS_OFFSET, IXP4XX_PERIPHERAL_BASE_PHYS,
+                IXP4XX_PERIPHERAL_BASE_VIRT)
+        MAPIO(coyote_map_io)
+        INITIRQ(ixp4xx_init_irq)
+	.timer		= &ixp4xx_timer,
+        BOOT_PARAMS(0x0100)
+	INIT_MACHINE(coyote_init)
+MACHINE_END
+#endif
 

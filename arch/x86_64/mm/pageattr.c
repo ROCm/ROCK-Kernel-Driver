@@ -61,10 +61,7 @@ static void flush_kernel_map(void *address)
 			asm volatile("clflush (%0)" :: "r" (address + i)); 
 	} else
 		asm volatile("wbinvd":::"memory"); 
-	if (address)
-		__flush_tlb_one(address);
-	else
-		__flush_tlb_all();
+	__flush_tlb_one(address);
 }
 
 
@@ -127,36 +124,28 @@ __change_page_attr(unsigned long address, struct page *page, pgprot_t prot,
 	kpte_flags = pte_val(*kpte); 
 	if (pgprot_val(prot) != pgprot_val(ref_prot)) { 
 		if ((kpte_flags & _PAGE_PSE) == 0) { 
+			pte_t old = *kpte;
+			pte_t standard = mk_pte(page, ref_prot); 
+
 			set_pte(kpte, mk_pte(page, prot)); 
+			if (pte_same(old,standard))
+				get_page(kpte_page);
 		} else {
-			/*
-			 * split_large_page will take the reference for this change_page_attr
-			 * on the split page.
-			 */
 			struct page *split = split_large_page(address, prot, ref_prot); 
 			if (!split)
 				return -ENOMEM;
+			get_page(kpte_page);
 			set_pte(kpte,mk_pte(split, ref_prot));
-			kpte_page = split;
 		}	
-		get_page(kpte_page);
 	} else if ((kpte_flags & _PAGE_PSE) == 0) { 
 		set_pte(kpte, mk_pte(page, ref_prot));
 		__put_page(kpte_page);
-	} else
-		BUG();
+	}
 
-	/* on x86-64 the direct mapping set at boot is not using 4k pages */
-	BUG_ON(PageReserved(kpte_page));
-
-	switch (page_count(kpte_page)) {
-	case 1:
+	if (page_count(kpte_page) == 1) {
 		save_page(address, kpte_page); 		     
 		revert_page(address, ref_prot);
-		break;
-	case 0:
-		BUG(); /* memleak and failed 2M page regeneration */
-	}
+	} 
 	return 0;
 } 
 
@@ -205,18 +194,13 @@ void global_flush_tlb(void)
 	down_read(&init_mm.mmap_sem);
 	df = xchg(&df_list, NULL);
 	up_read(&init_mm.mmap_sem);
-	if (df) {
-		if (!df->next)
-			flush_map(df->address);
-		else
-			flush_map(0); /* flush everything */
-		for (; df; df = next_df) { 
-			next_df = df->next;
-			if (df->fpage) 
-				__free_page(df->fpage);
-			kfree(df);
-		}
-	}
+	flush_map((df && !df->next) ? df->address : 0);
+	for (; df; df = next_df) { 
+		next_df = df->next;
+		if (df->fpage) 
+			__free_page(df->fpage);
+		kfree(df);
+	} 
 } 
 
 EXPORT_SYMBOL(change_page_attr);

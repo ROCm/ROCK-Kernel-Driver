@@ -151,6 +151,13 @@ static struct resource pic_edgectrl_iores = {
 	"8259 edge control", 0x4d0, 0x4d1, IORESOURCE_BUSY
 };
 
+static struct irqaction i8259_irqaction = {
+	.handler = no_action,
+	.flags = SA_INTERRUPT,
+	.mask = CPU_MASK_NONE,
+	.name = "82c59 secondary cascade",
+};
+
 /*
  * i8259_init()
  * intack_addr - PCI interrupt acknowledge (real) address which will return
@@ -185,8 +192,7 @@ i8259_init(long intack_addr)
 	spin_unlock_irqrestore(&i8259_lock, flags);
 
 	/* reserve our resources */
-	request_irq( i8259_pic_irq_offset + 2, no_action, SA_INTERRUPT,
-				"82c59 secondary cascade", NULL );
+	setup_irq( i8259_pic_irq_offset + 2, &i8259_irqaction);
 	request_resource(&ioport_resource, &pic1_iores);
 	request_resource(&ioport_resource, &pic2_iores);
 	request_resource(&ioport_resource, &pic_edgectrl_iores);

@@ -73,7 +73,7 @@ static void mce_log(struct mce *mce)
 static void print_mce(struct mce *m)
 {
 	printk(KERN_EMERG "\n"
-	       KERN_EMERG 
+	       KERN_EMERG
 	       "CPU %d: Machine Check Exception: %16Lx Bank %d: %016Lx\n",
 	       m->cpu, m->mcgstatus, m->bank, m->status);
 	if (m->rip) {
@@ -361,8 +361,7 @@ static ssize_t mce_read(struct file *filp, char __user *ubuf, size_t usize, loff
 
 	memset(mcelog.entry, 0, next * sizeof(struct mce));
 	mcelog.next = 0;
-	smp_wmb(); 
-	
+
 	synchronize_kernel();	
 
 	/* Collect entries that were still getting written before the synchronize. */
@@ -473,7 +472,7 @@ static struct sys_device device_mce = {
 /* Why are there no generic functions for this? */
 #define ACCESSOR(name, var, start) \
 	static ssize_t show_ ## name(struct sys_device *s, char *buf) { 	   	   \
-		return sprintf(buf, "%lu\n", (unsigned long)var);		   \
+		return sprintf(buf, "%lx\n", (unsigned long)var);		   \
 	} 									   \
 	static ssize_t set_ ## name(struct sys_device *s,const char *buf,size_t siz) { \
 		char *end; 							   \

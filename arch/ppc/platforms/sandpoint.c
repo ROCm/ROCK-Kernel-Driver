@@ -60,11 +60,6 @@
  * of the amount of memory in the system.  Once a method of determining
  * what version of DINK initializes the system for us, if applicable, is
  * found, we can hopefully stop hardcoding 32MB of RAM.
- *
- * It is important to note that this code only supports the Sandpoint X3
- * (all flavors) platform, and it does not support the X2 anymore.  Code
- * that at one time worked on the X2 can be found at:
- * ftp://source.mvista.com/pub/linuxppc/obsolete/sandpoint/
  */
 
 #include <linux/config.h>
@@ -107,9 +102,13 @@
 
 #include "sandpoint.h"
 
+/* Set non-zero if an X2 Sandpoint detected. */
+static int sandpoint_is_x2;
+
 unsigned char __res[sizeof(bd_t)];
 
 static void sandpoint_halt(void);
+static void sandpoint_probe_type(void);
 
 /*
  * Define all of the IRQ senses and polarities.  Taken from the
@@ -129,7 +128,7 @@ static u_char sandpoint_openpic_initsenses[] __initdata = {
  * Motorola SPS Sandpoint interrupt routing.
  */
 static inline int
-sandpoint_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
+x3_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 {
 	static char pci_irq_table[][4] =
 	/*
@@ -143,6 +142,27 @@ sandpoint_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 		{ 19, 18, 21, 20 },	/* IDSEL 14 - PCI slot 2 */
 		{ 20, 19, 18, 21 },	/* IDSEL 15 - PCI slot 3 */
 		{ 21, 20, 19, 18 },	/* IDSEL 16 - PCI slot 4 */
+	};
+
+	const long min_idsel = 11, max_idsel = 16, irqs_per_slot = 4;
+	return PCI_IRQ_TABLE_LOOKUP;
+}
+
+static inline int
+x2_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
+{
+	static char pci_irq_table[][4] =
+	/*
+	 *	PCI IDSEL/INTPIN->INTLINE
+	 * 	   A   B   C   D
+	 */
+	{
+		{ 18,  0,  0,  0 },	/* IDSEL 11 - i8259 on Windbond */
+		{  0,  0,  0,  0 },	/* IDSEL 12 - unused */
+		{ 16, 17, 18, 19 },	/* IDSEL 13 - PCI slot 1 */
+		{ 17, 18, 19, 16 },	/* IDSEL 14 - PCI slot 2 */
+		{ 18, 19, 16, 17 },	/* IDSEL 15 - PCI slot 3 */
+		{ 19, 16, 17, 18 },	/* IDSEL 16 - PCI slot 4 */
 	};
 
 	const long min_idsel = 11, max_idsel = 16, irqs_per_slot = 4;
@@ -216,6 +236,18 @@ sandpoint_setup_winbond_83553(struct pci_controller *hose)
 	return;
 }
 
+/* On the sandpoint X2, we must avoid sending configuration cycles to
+ * device #12 (IDSEL addr = AD12).
+ */
+static int
+x2_exclude_device(u_char bus, u_char devfn)
+{
+	if ((bus == 0) && (PCI_SLOT(devfn) == SANDPOINT_HOST_BRIDGE_IDSEL))
+		return PCIBIOS_DEVICE_NOT_FOUND;
+	else
+		return PCIBIOS_SUCCESSFUL;
+}
+
 static void __init
 sandpoint_find_bridges(void)
 {
@@ -241,7 +273,11 @@ sandpoint_find_bridges(void)
 		ppc_md.pcibios_fixup = NULL;
 		ppc_md.pcibios_fixup_bus = NULL;
 		ppc_md.pci_swizzle = common_swizzle;
-		ppc_md.pci_map_irq = sandpoint_map_irq;
+		if (sandpoint_is_x2) {
+			ppc_md.pci_map_irq = x2_map_irq;
+			ppc_md.pci_exclude_device = x2_exclude_device;
+		} else
+			ppc_md.pci_map_irq = x3_map_irq;
 	}
 	else {
 		if (ppc_md.progress)
@@ -252,41 +288,14 @@ sandpoint_find_bridges(void)
 	return;
 }
 
-#if defined(CONFIG_SERIAL_8250) && \
-	(defined(CONFIG_KGDB) || defined(CONFIG_SERIAL_TEXT_DEBUG))
-static void __init
-sandpoint_early_serial_map(void)
-{
-	struct uart_port serial_req;
-
-	/* Setup serial port access */
-	memset(&serial_req, 0, sizeof(serial_req));
-	serial_req.uartclk = UART_CLK;
-	serial_req.irq = 4;
-	serial_req.flags = STD_COM_FLAGS;
-	serial_req.iotype = SERIAL_IO_MEM;
-	serial_req.membase = (u_char *)SANDPOINT_SERIAL_0;
-
-	gen550_init(0, &serial_req);
-
-	if (early_serial_setup(&serial_req) != 0)
-		printk(KERN_ERR "Early serial init of port 0 failed\n");
-
-	/* Assume early_serial_setup() doesn't modify serial_req */
-	serial_req.line = 1;
-	serial_req.irq = 3; /* XXXX */
-	serial_req.membase = (u_char *)SANDPOINT_SERIAL_1;
-
-	gen550_init(1, &serial_req);
-
-	if (early_serial_setup(&serial_req) != 0)
-		printk(KERN_ERR "Early serial init of port 1 failed\n");
-}
-#endif
-
 static void __init
 sandpoint_setup_arch(void)
 {
+	/* Probe for Sandpoint model */
+	sandpoint_probe_type();
+	if (sandpoint_is_x2)
+		epic_serial_mode = 0;
+
 	loops_per_jiffy = 100000000 / HZ;
 
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -351,13 +360,48 @@ sandpoint_setup_arch(void)
 }
 
 /*
+ * To probe the Sandpoint type, we need to check for a connection between GPIO
+ * pins 6 and 7 on the NS87308 SuperIO.
+ */
+static void __init sandpoint_probe_type(void)
+{
+	u8 x;
+	/* First, ensure that the GPIO pins are enabled. */
+	SANDPOINT_87308_SELECT_DEV(0x07); /* Select GPIO logical device */
+	SANDPOINT_87308_CFG_OUTB(0x60, 0x07); /* Base address 0x700 */
+	SANDPOINT_87308_CFG_OUTB(0x61, 0x00);
+	SANDPOINT_87308_CFG_OUTB(0x30, 0x01); /* Enable */
+
+	/* Now, set pin 7 to output and pin 6 to input. */
+	outb((inb(0x701) | 0x80) & 0xbf, 0x701);
+	/* Set push-pull output */
+	outb(inb(0x702) | 0x80, 0x702);
+	/* Set pull-up on input */
+	outb(inb(0x703) | 0x40, 0x703);
+	/* Set output high and check */
+	x = inb(0x700);
+	outb(x | 0x80, 0x700);
+	x = inb(0x700);
+	sandpoint_is_x2 = ! (x & 0x40);
+	if (ppc_md.progress && sandpoint_is_x2)
+		ppc_md.progress("High output says X2", 0);
+	/* Set output low and check */
+	outb(x & 0x7f, 0x700);
+	sandpoint_is_x2 |= inb(0x700) & 0x40;
+	if (ppc_md.progress && sandpoint_is_x2)
+		ppc_md.progress("Low output says X2", 0);
+	if (ppc_md.progress && ! sandpoint_is_x2)
+		ppc_md.progress("Sandpoint is X3", 0);
+}
+
+/*
  * Fix IDE interrupts.
  */
 static int __init
 sandpoint_fix_winbond_83553(void)
 {
-	/* Make all 8259 interrupt level sensitive */
-	outb(0xf8, 0x4d0);
+	/* Make some 8259 interrupt level sensitive */
+	outb(0xe0, 0x4d0);
 	outb(0xde, 0x4d1);
 
 	return 0;
@@ -430,7 +474,7 @@ sandpoint_init_IRQ(void)
 	OpenPIC_NumInitSenses = sizeof(sandpoint_openpic_initsenses);
 
 	mpc10x_set_openpic();
-	openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
+	openpic_hookup_cascade(sandpoint_is_x2 ? 17 : NUM_8259_INTERRUPTS, "82c59 cascade",
 			i8259_irq);
 
 	/*
@@ -531,7 +575,7 @@ static unsigned long	sandpoint_idedma_regbase;
 static void
 sandpoint_ide_probe(void)
 {
-	struct pci_dev *pdev = pci_find_device(PCI_VENDOR_ID_WINBOND,
+	struct pci_dev *pdev = pci_get_device(PCI_VENDOR_ID_WINBOND,
 			PCI_DEVICE_ID_WINBOND_82C105, NULL);
 
 	if (pdev) {
@@ -540,6 +584,7 @@ sandpoint_ide_probe(void)
 		sandpoint_ide_ctl_regbase[0]=pdev->resource[1].start;
 		sandpoint_ide_ctl_regbase[1]=pdev->resource[3].start;
 		sandpoint_idedma_regbase=pdev->resource[4].start;
+		pci_dev_put(pdev);
 	}
 
 	sandpoint_ide_ports_known = 1;
@@ -689,15 +734,11 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.nvram_read_val = todc_mc146818_read_val;
 	ppc_md.nvram_write_val = todc_mc146818_write_val;
 
-#if defined(CONFIG_SERIAL_8250) && \
-	(defined(CONFIG_KGDB) || defined(CONFIG_SERIAL_TEXT_DEBUG))
-	sandpoint_early_serial_map();
 #ifdef CONFIG_KGDB
 	ppc_md.kgdb_map_scc = gen550_kgdb_map_scc;
 #endif
 #ifdef CONFIG_SERIAL_TEXT_DEBUG
 	ppc_md.progress = gen550_progress;
-#endif
 #endif
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)

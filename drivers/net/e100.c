@@ -154,8 +154,8 @@
 
 
 #define DRV_NAME		"e100"
-#define DRV_EXT			"-NAPI"
-#define DRV_VERSION		"3.0.27-k2"DRV_EXT
+#define DRV_EXT		"-NAPI"
+#define DRV_VERSION		"3.2.3-k2"DRV_EXT
 #define DRV_DESCRIPTION		"Intel(R) PRO/100 Network Driver"
 #define DRV_COPYRIGHT		"Copyright(c) 1999-2004 Intel Corporation"
 #define PFX			DRV_NAME ": "
@@ -513,7 +513,7 @@ struct nic {
 
 	spinlock_t cb_lock			____cacheline_aligned;
 	spinlock_t cmd_lock;
-	struct csr *csr;
+	struct csr __iomem *csr;
 	enum scb_cmd_lo cuc_cmd;
 	unsigned int cbs_avail;
 	struct cb *cbs;
@@ -563,7 +563,6 @@ struct nic {
 	u16 leds;
 	u16 eeprom_wc;
 	u16 eeprom[256];
-	u32 pm_state[16];
 };
 
 static inline void e100_write_flush(struct nic *nic)
@@ -575,13 +574,21 @@ static inline void e100_write_flush(struct nic *nic)
 
 static inline void e100_enable_irq(struct nic *nic)
 {
+	unsigned long flags;
+
+	spin_lock_irqsave(&nic->cmd_lock, flags);
 	writeb(irq_mask_none, &nic->csr->scb.cmd_hi);
+	spin_unlock_irqrestore(&nic->cmd_lock, flags);
 	e100_write_flush(nic);
 }
 
 static inline void e100_disable_irq(struct nic *nic)
 {
+	unsigned long flags;
+
+	spin_lock_irqsave(&nic->cmd_lock, flags);
 	writeb(irq_mask_all, &nic->csr->scb.cmd_hi);
+	spin_unlock_irqrestore(&nic->cmd_lock, flags);
 	e100_write_flush(nic);
 }
 
@@ -595,16 +602,6 @@ static void e100_hw_reset(struct nic *nic)
 	/* Now fully reset device */
 	writel(software_reset, &nic->csr->port);
 	e100_write_flush(nic); udelay(20);
-
-	/* TCO workaround - 82559 and greater */
-	if(nic->mac >= mac_82559_D101M) {
-		/* Issue a redundant CU load base without setting
-		 * general pointer, and without waiting for scb to
-		 * clear.  This gets us into post-driver.  Finally,
-		 * wait 20 msec for reset to take effect. */
-		writeb(cuc_load_base, &nic->csr->scb.cmd_lo);
-		mdelay(20);
-	}
 
 	/* Mask off our interrupt line - it's unmasked after reset */
 	e100_disable_irq(nic);
@@ -783,8 +780,6 @@ static inline int e100_exec_cmd(struct nic *nic, u8 cmd, dma_addr_t dma_addr)
 
 	spin_lock_irqsave(&nic->cmd_lock, flags);
 
-	mb();
-
 	/* Previous command is accepted when SCB clears */
 	for(i = 0; i < E100_WAIT_SCB_TIMEOUT; i++) {
 		if(likely(!readb(&nic->csr->scb.cmd_lo)))
@@ -835,10 +830,8 @@ static inline int e100_exec_cb(struct nic *nic, struct sk_buff *skb,
 	/* Order is important otherwise we'll be in a race with h/w:
 	 * set S-bit in current first, then clear S-bit in previous. */
 	cb->command |= cpu_to_le16(cb_s);
-	mb();
+	wmb();
 	cb->prev->command &= cpu_to_le16(~cb_s);
-
-	mb();
 
 	while(nic->cb_to_send != nic->cb_to_use) {
 		if(unlikely(e100_exec_cmd(nic, nic->cuc_cmd,
@@ -1258,8 +1251,13 @@ static void e100_watchdog(unsigned long data)
 	mii_check_link(&nic->mii);
 
 	/* Software generated interrupt to recover from (rare) Rx
-	 * allocation failure */
-	writeb(irq_sw_gen, &nic->csr->scb.cmd_hi);
+	* allocation failure.
+	* Unfortunately have to use a spinlock to not re-enable interrupts
+	* accidentally, due to hardware that shares a register between the
+	* interrupt mask bit and the SW Interrupt generation bit */
+	spin_lock_irq(&nic->cmd_lock);
+	writeb(readb(&nic->csr->scb.cmd_hi) | irq_sw_gen,&nic->csr->scb.cmd_hi);
+	spin_unlock_irq(&nic->cmd_lock);
 	e100_write_flush(nic);
 
 	e100_update_stats(nic);
@@ -1309,6 +1307,7 @@ static int e100_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	switch(err) {
 	case -ENOSPC:
 		/* We queued the skb, but now we're out of space. */
+		DPRINTK(TX_ERR, DEBUG, "No space for CB\n");
 		netif_stop_queue(netdev);
 		break;
 	case -ENOMEM:
@@ -1429,14 +1428,12 @@ static inline void e100_start_receiver(struct nic *nic)
 #define RFD_BUF_LEN (sizeof(struct rfd) + VLAN_ETH_FRAME_LEN)
 static inline int e100_rx_alloc_skb(struct nic *nic, struct rx *rx)
 {
-	unsigned int rx_offset = 2; /* u32 align protocol headers */
-
-	if(!(rx->skb = dev_alloc_skb(RFD_BUF_LEN + rx_offset)))
+	if(!(rx->skb = dev_alloc_skb(RFD_BUF_LEN + NET_IP_ALIGN)))
 		return -ENOMEM;
 
 	/* Align, init, and map the RFD. */
 	rx->skb->dev = nic->netdev;
-	skb_reserve(rx->skb, rx_offset);
+	skb_reserve(rx->skb, NET_IP_ALIGN);
 	memcpy(rx->skb->data, &nic->blank_rfd, sizeof(struct rfd));
 	rx->dma_addr = pci_map_single(nic->pdev, rx->skb->data,
 		RFD_BUF_LEN, PCI_DMA_BIDIRECTIONAL);
@@ -1447,7 +1444,7 @@ static inline int e100_rx_alloc_skb(struct nic *nic, struct rx *rx)
 		struct rfd *prev_rfd = (struct rfd *)rx->prev->skb->data;
 		put_unaligned(cpu_to_le32(rx->dma_addr),
 			(u32 *)&prev_rfd->link);
-		mb();
+		wmb();
 		prev_rfd->command &= ~cpu_to_le16(cb_el);
 		pci_dma_sync_single_for_device(nic->pdev, rx->prev->dma_addr,
 			sizeof(struct rfd), PCI_DMA_TODEVICE);
@@ -1475,9 +1472,7 @@ static inline int e100_rx_indicate(struct nic *nic, struct rx *rx,
 
 	/* If data isn't ready, nothing to indicate */
 	if(unlikely(!(rfd_status & cb_complete)))
-       		return -EAGAIN;
-
-	rmb();
+		return -EAGAIN;
 
 	/* Get actual data size */
 	actual_size = le16_to_cpu(rfd->actual_size) & 0x3FFF;
@@ -1769,7 +1764,7 @@ static int e100_loopback_test(struct nic *nic, enum loopback loopback_mode)
 
 	if(memcmp(nic->rx_to_clean->skb->data + sizeof(struct rfd),
 	   skb->data, ETH_DATA_LEN))
-       		err = -EAGAIN;
+		err = -EAGAIN;
 
 err_loopback_none:
 	mdio_write(nic->netdev, nic->mii.phy_id, MII_BMCR, 0);
@@ -1962,12 +1957,17 @@ static int e100_set_ringparam(struct net_device *netdev,
 	struct param_range *rfds = &nic->params.rfds;
 	struct param_range *cbs = &nic->params.cbs;
 
+	if ((ring->rx_mini_pending) || (ring->rx_jumbo_pending)) 
+		return -EINVAL;
+
 	if(netif_running(netdev))
 		e100_down(nic);
 	rfds->count = max(ring->rx_pending, rfds->min);
 	rfds->count = min(rfds->count, rfds->max);
 	cbs->count = max(ring->tx_pending, cbs->min);
 	cbs->count = min(cbs->count, cbs->max);
+	DPRINTK(DRV, INFO, "Ring Param settings: rx: %d, tx %d\n",
+	        rfds->count, cbs->count);
 	if(netif_running(netdev))
 		e100_up(nic);
 
@@ -2179,6 +2179,7 @@ static int __devinit e100_probe(struct pci_dev *pdev,
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	netdev->poll_controller = e100_netpoll;
 #endif
+	strcpy(netdev->name, pci_name(pdev));
 
 	nic = netdev_priv(netdev);
 	nic->netdev = netdev;
@@ -2203,8 +2204,6 @@ static int __devinit e100_probe(struct pci_dev *pdev,
 		goto err_out_disable_pdev;
 	}
 
-	pci_set_master(pdev);
-
 	if((err = pci_set_dma_mask(pdev, 0xFFFFFFFFULL))) {
 		DPRINTK(PROBE, ERR, "No usable DMA configuration, aborting.\n");
 		goto err_out_free_res;
@@ -2225,8 +2224,17 @@ static int __devinit e100_probe(struct pci_dev *pdev,
 	else
 		nic->flags &= ~ich;
 
+	e100_get_defaults(nic);
+
 	spin_lock_init(&nic->cb_lock);
 	spin_lock_init(&nic->cmd_lock);
+
+	/* Reset the device before pci_set_master() in case device is in some
+	 * funky state and has an interrupt pending - hint: we don't have the
+	 * interrupt handler registered yet. */
+	e100_hw_reset(nic);
+
+	pci_set_master(pdev);
 
 	init_timer(&nic->watchdog);
 	nic->watchdog.function = e100_watchdog;
@@ -2240,8 +2248,6 @@ static int __devinit e100_probe(struct pci_dev *pdev,
 		goto err_out_iounmap;
 	}
 
-	e100_get_defaults(nic);
-	e100_hw_reset(nic);
 	e100_phy_init(nic);
 
 	if((err = e100_eeprom_load(nic)))
@@ -2262,6 +2268,7 @@ static int __devinit e100_probe(struct pci_dev *pdev,
 
 	pci_enable_wake(pdev, 0, nic->flags & (wol_magic | e100_asf(nic)));
 
+	strcpy(netdev->name, "eth%d");
 	if((err = register_netdev(netdev))) {
 		DPRINTK(PROBE, ERR, "Cannot register net device, aborting.\n");
 		goto err_out_free;
@@ -2316,7 +2323,7 @@ static int e100_suspend(struct pci_dev *pdev, u32 state)
 	e100_hw_reset(nic);
 	netif_device_detach(netdev);
 
-	pci_save_state(pdev, nic->pm_state);
+	pci_save_state(pdev);
 	pci_enable_wake(pdev, state, nic->flags & (wol_magic | e100_asf(nic)));
 	pci_disable_device(pdev);
 	pci_set_power_state(pdev, state);
@@ -2330,7 +2337,7 @@ static int e100_resume(struct pci_dev *pdev)
 	struct nic *nic = netdev_priv(netdev);
 
 	pci_set_power_state(pdev, 0);
-	pci_restore_state(pdev, nic->pm_state);
+	pci_restore_state(pdev);
 	e100_hw_init(nic);
 
 	netif_device_attach(netdev);
@@ -2358,7 +2365,7 @@ static int __init e100_init_module(void)
 		printk(KERN_INFO PFX "%s, %s\n", DRV_DESCRIPTION, DRV_VERSION);
 		printk(KERN_INFO PFX "%s\n", DRV_COPYRIGHT);
 	}
-        return pci_module_init(&e100_driver);
+	return pci_module_init(&e100_driver);
 }
 
 static void __exit e100_cleanup_module(void)

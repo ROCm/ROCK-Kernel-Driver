@@ -43,6 +43,7 @@
 #include <linux/acpi.h>
 #include <linux/efi.h>
 #include <linux/mmzone.h>
+#include <linux/nodemask.h>
 #include <asm/io.h>
 #include <asm/iosapic.h>
 #include <asm/machvec.h>
@@ -178,8 +179,8 @@ acpi_parse_lapic_addr_ovr (
 		return -EINVAL;
 
 	if (lapic->address) {
-		iounmap((void *) ipi_base_addr);
-		ipi_base_addr = (unsigned long) ioremap(lapic->address, 0);
+		iounmap(ipi_base_addr);
+		ipi_base_addr = ioremap(lapic->address, 0);
 	}
 	return 0;
 }
@@ -336,9 +337,9 @@ acpi_parse_madt (unsigned long phys_addr, unsigned long size)
 	/* Get base address of IPI Message Block */
 
 	if (acpi_madt->lapic_address)
-		ipi_base_addr = (unsigned long) ioremap(acpi_madt->lapic_address, 0);
+		ipi_base_addr = ioremap(acpi_madt->lapic_address, 0);
 
-	printk(KERN_INFO PREFIX "Local APIC address 0x%lx\n", ipi_base_addr);
+	printk(KERN_INFO PREFIX "Local APIC address %p\n", ipi_base_addr);
 
 	acpi_madt_oem_check(acpi_madt->header.oem_id,
 		acpi_madt->header.oem_table_id);
@@ -437,8 +438,9 @@ acpi_numa_arch_fixup (void)
 {
 	int i, j, node_from, node_to;
 
-	/* If there's no SRAT, fix the phys_id */
+	/* If there's no SRAT, fix the phys_id and mark node 0 online */
 	if (srat_num_cpus == 0) {
+		node_set_online(0);
 		node_cpuid[0].phys_id = hard_smp_processor_id();
 		return;
 	}
@@ -650,4 +652,71 @@ acpi_gsi_to_irq (u32 gsi, unsigned int *irq)
 	return 0;
 }
 
+#ifdef CONFIG_NUMA
+acpi_status __init
+acpi_map_iosapic (acpi_handle handle, u32 depth, void *context, void **ret)
+{
+	struct acpi_buffer buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	union acpi_object *obj;
+	struct acpi_table_iosapic *iosapic;
+	unsigned int gsi_base;
+	int node;
+
+	/* Only care about objects w/ a method that returns the MADT */
+	if (ACPI_FAILURE(acpi_evaluate_object(handle, "_MAT", NULL, &buffer)))
+		return AE_OK;
+
+	if (!buffer.length || !buffer.pointer)
+		return AE_OK;
+
+	obj = buffer.pointer;
+	if (obj->type != ACPI_TYPE_BUFFER ||
+	    obj->buffer.length < sizeof(*iosapic)) {
+		acpi_os_free(buffer.pointer);
+		return AE_OK;
+	}
+
+	iosapic = (struct acpi_table_iosapic *)obj->buffer.pointer;
+
+	if (iosapic->header.type != ACPI_MADT_IOSAPIC) {
+		acpi_os_free(buffer.pointer);
+		return AE_OK;
+	}
+
+	gsi_base = iosapic->global_irq_base;
+
+	acpi_os_free(buffer.pointer);
+	buffer.length = ACPI_ALLOCATE_BUFFER;
+	buffer.pointer = NULL;
+
+	/*
+	 * OK, it's an IOSAPIC MADT entry, look for a _PXM method to tell
+	 * us which node to associate this with.
+	 */
+	if (ACPI_FAILURE(acpi_evaluate_object(handle, "_PXM", NULL, &buffer)))
+		return AE_OK;
+
+	if (!buffer.length || !buffer.pointer)
+		return AE_OK;
+
+	obj = buffer.pointer;
+
+	if (obj->type != ACPI_TYPE_INTEGER ||
+	    obj->integer.value >= MAX_PXM_DOMAINS) {
+		acpi_os_free(buffer.pointer);
+		return AE_OK;
+	}
+
+	node = pxm_to_nid_map[obj->integer.value];
+	acpi_os_free(buffer.pointer);
+
+	if (node >= MAX_NUMNODES || !node_online(node) ||
+	    cpus_empty(node_to_cpumask(node)))
+		return AE_OK;
+
+	/* We know a gsi to node mapping! */
+	map_iosapic_to_node(gsi_base, node);
+	return AE_OK;
+}
+#endif /* CONFIG_NUMA */
 #endif /* CONFIG_ACPI_BOOT */

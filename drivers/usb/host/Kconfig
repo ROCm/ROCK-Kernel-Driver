@@ -1,3 +1,21 @@
+# Host-side USB depends on having a host controller
+# NOTE:  dummy_hcd is always an option, but it's ignored here ...
+# NOTE:  SL-811 option should be board-specific ...
+config USB_ARCH_HAS_HCD
+	boolean
+	default y if USB_ARCH_HAS_OHCI
+	default y if ARM				# SL-811
+	default PCI
+
+# many non-PCI hcds implement OHCI
+config USB_ARCH_HAS_OHCI
+	boolean
+	default y if SA1111
+	default y if ARCH_OMAP
+	default y if ARCH_LH7A404
+	default y if PXA27x
+	default PCI
+
 #
 # USB Host Controller Drivers
 #
@@ -6,7 +24,7 @@ comment "USB Host Controller Drivers"
 
 config USB_EHCI_HCD
 	tristate "EHCI HCD (USB 2.0) support"
-	depends on USB
+	depends on USB && PCI
 	---help---
 	  The Enhanced Host Controller Interface (EHCI) is standard for USB 2.0
 	  "high speed" (480 Mbit/sec, 60 Mbyte/sec) host controller hardware.
@@ -51,8 +69,8 @@ config USB_EHCI_ROOT_HUB_TT
 
 config USB_OHCI_HCD
 	tristate "OHCI HCD support"
-	depends on USB
-	select ISP1301_OMAP if MACH_OMAP_H2
+	depends on USB && USB_ARCH_HAS_OHCI
+	select ISP1301_OMAP if MACH_OMAP_H2 || MACH_OMAP_H3
 	---help---
 	  The Open Host Controller Interface (OHCI) is a standard for accessing
 	  USB 1.1 host controller hardware.  It does more in hardware than Intel's
@@ -68,7 +86,7 @@ config USB_OHCI_HCD
 
 config USB_UHCI_HCD
 	tristate "UHCI HCD (most Intel and VIA) support"
-	depends on USB
+	depends on USB && PCI
 	---help---
 	  The Universal Host Controller Interface is a standard by Intel for
 	  accessing the USB hardware in the PC (which is also called the USB
@@ -82,14 +100,16 @@ config USB_UHCI_HCD
 	  To compile this driver as a module, choose M here: the
 	  module will be called uhci-hcd.
 
-config USB_SL811HS
-	tristate "SL811HS support"
-	depends on ARM && USB
+config USB_SL811_HCD
+	tristate "SL811HS HCD support"
+	depends on USB
+	default N
 	help
-	  Say Y here if you have a SL811HS USB host controller in your system.
-
-	  If you do not know what this is, please say N.
+	  The SL811HS is a single-port USB controller that supports either
+	  host side or peripheral side roles.  Enable this option if your
+	  board has this chip, and you want to use it as a host controller. 
+	  If unsure, say N.
 
 	  To compile this driver as a module, choose M here: the
-	  module will be called hc_sl811.
+	  module will be called sl811-hcd.
 

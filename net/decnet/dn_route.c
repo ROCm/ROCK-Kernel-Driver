@@ -287,10 +287,9 @@ static int dn_insert_route(struct dn_route *rt, unsigned hash, struct dn_route *
 		if (compare_keys(&rth->fl, &rt->fl)) {
 			/* Put it first */
 			*rthp = rth->u.rt_next;
-			smp_wmb();
-			rth->u.rt_next = dn_rt_hash_table[hash].chain;
-			smp_wmb();
-			dn_rt_hash_table[hash].chain = rth;
+			rcu_assign_pointer(rth->u.rt_next,
+					   dn_rt_hash_table[hash].chain);
+			rcu_assign_pointer(dn_rt_hash_table[hash].chain, rth);
 
 			rth->u.dst.__use++;
 			dst_hold(&rth->u.dst);
@@ -304,10 +303,8 @@ static int dn_insert_route(struct dn_route *rt, unsigned hash, struct dn_route *
 		rthp = &rth->u.rt_next;
 	}
 
-	smp_wmb();
-	rt->u.rt_next = dn_rt_hash_table[hash].chain;
-	smp_wmb();
-	dn_rt_hash_table[hash].chain = rt;
+	rcu_assign_pointer(rt->u.rt_next, dn_rt_hash_table[hash].chain);
+	rcu_assign_pointer(dn_rt_hash_table[hash].chain, rt);
 	
 	dst_hold(&rt->u.dst);
 	rt->u.dst.__use++;
@@ -683,9 +680,8 @@ out:
 	return NET_RX_DROP;
 }
 
-static int dn_output(struct sk_buff **pskb)
+static int dn_output(struct sk_buff *skb)
 {
-	struct sk_buff *skb = *pskb;
 	struct dst_entry *dst = skb->dst;
 	struct dn_route *rt = (struct dn_route *)dst;
 	struct net_device *dev = dst->dev;
@@ -794,11 +790,6 @@ static int dn_rt_bug(struct sk_buff *skb)
 	kfree_skb(skb);
 
 	return NET_RX_BAD;
-}
-
-static int dn_rt_bug_out(struct sk_buff **pskb)
-{
-	return dn_rt_bug(*pskb);
 }
 
 static int dn_rt_set_next_hop(struct dn_route *rt, struct dn_fib_res *res)
@@ -996,7 +987,7 @@ source_ok:
 		 * here
 		 */
 		if (!try_hard) {
-			neigh = dn_neigh_lookup(&dn_neigh_table, &fl.fld_dst);
+			neigh = neigh_lookup_nodev(&dn_neigh_table, &fl.fld_dst);
 			if (neigh) {
 				if ((oldflp->oif && 
 				    (neigh->dev->ifindex != oldflp->oif)) ||
@@ -1392,7 +1383,7 @@ make_route:
 	rt->u.dst.neighbour = neigh;
 	rt->u.dst.dev = out_dev;
 	rt->u.dst.lastuse = jiffies;
-	rt->u.dst.output = dn_rt_bug_out;
+	rt->u.dst.output = dn_rt_bug;
 	switch(res.type) {
 		case RTN_UNICAST:
 			rt->u.dst.input = dn_forward;
@@ -1685,7 +1676,7 @@ static struct dn_route *dn_rt_cache_get_first(struct seq_file *seq)
 		rt = dn_rt_hash_table[s->bucket].chain;
 		if (rt)
 			break;
-		rcu_read_unlock();
+		rcu_read_unlock_bh();
 	}
 	return rt;
 }
@@ -1831,7 +1822,7 @@ void __init dn_route_init(void)
 
 	dn_rt_hash_mask--;
         for(i = 0; i <= dn_rt_hash_mask; i++) {
-                dn_rt_hash_table[i].lock = SPIN_LOCK_UNLOCKED;
+                spin_lock_init(&dn_rt_hash_table[i].lock);
                 dn_rt_hash_table[i].chain = NULL;
         }
 

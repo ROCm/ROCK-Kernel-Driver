@@ -321,7 +321,7 @@ struct alt_instr {
  * If you use variable sized constraints like "m" or "g" in the 
  * replacement maake sure to pad to the worst case length.
  */
-#define alternative_input(oldinstr, newinstr, feature, input)			\
+#define alternative_input(oldinstr, newinstr, feature, input...)		\
 	asm volatile ("661:\n\t" oldinstr "\n662:\n"				\
 		      ".section .altinstructions,\"a\"\n"			\
 		      "  .align 4\n"						\
@@ -333,7 +333,7 @@ struct alt_instr {
 		      ".previous\n"						\
 		      ".section .altinstr_replacement,\"ax\"\n"			\
 		      "663:\n\t" newinstr "\n664:\n"   /* replacement */ 	\
-		      ".previous" :: "i" (feature), input)  
+		      ".previous" :: "i" (feature), ##input)
 
 /*
  * Force strict CPU ordering.

@@ -102,7 +102,6 @@ struct rcu_data {
 	struct rcu_head *donelist;
 	struct rcu_head **donetail;
 	int cpu;
-	struct rcu_head barrier;
 };
 
 DECLARE_PER_CPU(struct rcu_data, rcu_data);
@@ -239,6 +238,24 @@ static inline int rcu_pending(int cpu)
 				(_________p1); \
 				})
 
+/**
+ * rcu_assign_pointer - assign (publicize) a pointer to a newly
+ * initialized structure that will be dereferenced by RCU read-side
+ * critical sections.  Returns the value assigned.
+ *
+ * Inserts memory barriers on architectures that require them
+ * (pretty much all of them other than x86), and also prevents
+ * the compiler from reordering the code that initializes the
+ * structure after the pointer assignment.  More importantly, this
+ * call documents which pointers will be dereferenced by RCU read-side
+ * code.
+ */
+
+#define rcu_assign_pointer(p, v)	({ \
+						smp_wmb(); \
+						(p) = (v); \
+					})
+
 extern void rcu_init(void);
 extern void rcu_check_callbacks(int cpu, int user);
 extern void rcu_restart_cpu(int cpu);
@@ -249,7 +266,6 @@ extern void FASTCALL(call_rcu(struct rcu_head *head,
 extern void FASTCALL(call_rcu_bh(struct rcu_head *head,
 				void (*func)(struct rcu_head *head)));
 extern void synchronize_kernel(void);
-extern void rcu_barrier(void);
 
 #endif /* __KERNEL__ */
 #endif /* __LINUX_RCUPDATE_H */

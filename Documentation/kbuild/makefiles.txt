@@ -6,7 +6,7 @@ This document describes the Linux kernel Makefiles.
 
 	=== 1 Overview
 	=== 2 Who does what
-	=== 3 The kbuild Makefiles
+	=== 3 The kbuild files
 	   --- 3.1 Goal definitions
 	   --- 3.2 Built-in object goals - obj-y
 	   --- 3.3 Loadable module goals - obj-m
@@ -101,11 +101,14 @@ These people need to know about all aspects of the kernel Makefiles.
 This document is aimed towards normal developers and arch developers.
 
 
-=== 3 The kbuild Makefiles
+=== 3 The kbuild files
 
 Most Makefiles within the kernel are kbuild Makefiles that use the
 kbuild infrastructure. This chapter introduce the syntax used in the
 kbuild makefiles.
+The preferred name for the kbuild files is 'Kbuild' but 'Makefile' will
+continue to be supported. All new developmen is expected to use the
+Kbuild filename.
 
 Section 3.1 "Goal definitions" is a quick intro, further chapters provide
 more details, with real examples.
@@ -707,15 +710,17 @@ When kbuild executes the following steps are followed (roughly):
 	probe supported options:
 
 		#arch/i386/Makefile
-		check_gcc = $(shell if $(CC) $(1) -S -o /dev/null -xc \
-		            /dev/null\ > /dev/null 2>&1; then echo "$(1)"; \
-		            else echo "$(2)"; fi)
-		cflags-$(CONFIG_MCYRIXIII) += $(call check_gcc,\
-		                                     -march=c3,-march=i486)
 
-		CFLAGS += $(cflags-y)
+		...
+		cflags-$(CONFIG_MPENTIUMII)     += $(call cc-option,\
+						-march=pentium2,-march=i686)
+		...
+		# Disable unit-at-a-time mode ...
+		CFLAGS += $(call cc-option,-fno-unit-at-a-time)
+		...
 
-	The above examples both utilise the trick that a config option expands
+
+	The first examples utilises the trick that a config option expands
 	to 'y' when selected.
 
     CFLAGS_KERNEL	$(CC) options specific for built-in
@@ -997,6 +1002,21 @@ When kbuild executes the following steps are followed (roughly):
 	option. When $(biarch) equals to y the expanded variables $(aflags-y)
 	and $(cflags-y) will be assigned the values -a32 and -m32.
 
+    cc-option-align
+	gcc version >= 3.0 shifted type of options used to speify
+	alignment of functions, loops etc. $(cc-option-align) whrn used
+	as prefix to the align options will select the right prefix:
+	gcc < 3.00
+		cc-option-align = -malign
+	gcc >= 3.00
+		cc-option-align = -falign
+	
+	Example:
+		CFLAGS += $(cc-option-align)-functions=4
+
+	In the above example the option -falign-functions=4 is used for
+	gcc >= 3.00. For gcc < 3.00 -malign-functions=4 is used.
+	
     cc-version
 	cc-version return a numerical version of the $(CC) compiler version.
 	The format is <major><minor> where both are two digits. So for example

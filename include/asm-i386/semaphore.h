@@ -87,15 +87,15 @@ static inline void init_MUTEX_LOCKED (struct semaphore *sem)
 	sema_init(sem, 0);
 }
 
-asmlinkage void __down_failed(void /* special register calling convention */);
-asmlinkage int  __down_failed_interruptible(void  /* params in registers */);
-asmlinkage int  __down_failed_trylock(void  /* params in registers */);
-asmlinkage void __up_wakeup(void /* special register calling convention */);
+fastcall void __down_failed(void /* special register calling convention */);
+fastcall int  __down_failed_interruptible(void  /* params in registers */);
+fastcall int  __down_failed_trylock(void  /* params in registers */);
+fastcall void __up_wakeup(void /* special register calling convention */);
 
-asmlinkage void __down(struct semaphore * sem);
-asmlinkage int  __down_interruptible(struct semaphore * sem);
-asmlinkage int  __down_trylock(struct semaphore * sem);
-asmlinkage void __up(struct semaphore * sem);
+fastcall void __down(struct semaphore * sem);
+fastcall int  __down_interruptible(struct semaphore * sem);
+fastcall int  __down_trylock(struct semaphore * sem);
+fastcall void __up(struct semaphore * sem);
 
 /*
  * This is ugly, but we want the default case to fall through.
@@ -111,12 +111,13 @@ static inline void down(struct semaphore * sem)
 		"js 2f\n"
 		"1:\n"
 		LOCK_SECTION_START("")
-		"2:\tcall __down_failed\n\t"
+		"2:\tlea %0,%%eax\n\t"
+		"call __down_failed\n\t"
 		"jmp 1b\n"
 		LOCK_SECTION_END
 		:"=m" (sem->count)
-		:"c" (sem)
-		:"memory");
+		:
+		:"memory","ax");
 }
 
 /*
@@ -135,11 +136,12 @@ static inline int down_interruptible(struct semaphore * sem)
 		"xorl %0,%0\n"
 		"1:\n"
 		LOCK_SECTION_START("")
-		"2:\tcall __down_failed_interruptible\n\t"
+		"2:\tlea %1,%%eax\n\t"
+		"call __down_failed_interruptible\n\t"
 		"jmp 1b\n"
 		LOCK_SECTION_END
 		:"=a" (result), "=m" (sem->count)
-		:"c" (sem)
+		:
 		:"memory");
 	return result;
 }
@@ -159,11 +161,12 @@ static inline int down_trylock(struct semaphore * sem)
 		"xorl %0,%0\n"
 		"1:\n"
 		LOCK_SECTION_START("")
-		"2:\tcall __down_failed_trylock\n\t"
+		"2:\tlea %1,%%eax\n\t"
+		"call __down_failed_trylock\n\t"
 		"jmp 1b\n"
 		LOCK_SECTION_END
 		:"=a" (result), "=m" (sem->count)
-		:"c" (sem)
+		:
 		:"memory");
 	return result;
 }
@@ -182,13 +185,14 @@ static inline void up(struct semaphore * sem)
 		"jle 2f\n"
 		"1:\n"
 		LOCK_SECTION_START("")
-		"2:\tcall __up_wakeup\n\t"
+		"2:\tlea %0,%%eax\n\t"
+		"call __up_wakeup\n\t"
 		"jmp 1b\n"
 		LOCK_SECTION_END
 		".subsection 0\n"
 		:"=m" (sem->count)
-		:"c" (sem)
-		:"memory");
+		:
+		:"memory","ax");
 }
 
 #endif

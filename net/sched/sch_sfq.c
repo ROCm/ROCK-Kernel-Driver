@@ -13,7 +13,7 @@
 #include <linux/module.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/jiffies.h>
@@ -227,7 +227,7 @@ static unsigned int sfq_drop(struct Qdisc *sch)
 		kfree_skb(skb);
 		sfq_dec(q, x);
 		sch->q.qlen--;
-		sch->stats.drops++;
+		sch->qstats.drops++;
 		return len;
 	}
 
@@ -243,7 +243,7 @@ static unsigned int sfq_drop(struct Qdisc *sch)
 		sfq_dec(q, d);
 		sch->q.qlen--;
 		q->ht[q->hash[d]] = SFQ_DEPTH;
-		sch->stats.drops++;
+		sch->qstats.drops++;
 		return len;
 	}
 
@@ -276,8 +276,8 @@ sfq_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 		}
 	}
 	if (++sch->q.qlen < q->limit-1) {
-		sch->stats.bytes += skb->len;
-		sch->stats.packets++;
+		sch->bstats.bytes += skb->len;
+		sch->bstats.packets++;
 		return 0;
 	}
 
@@ -310,10 +310,12 @@ sfq_requeue(struct sk_buff *skb, struct Qdisc* sch)
 			q->tail = x;
 		}
 	}
-	if (++sch->q.qlen < q->limit - 1)
+	if (++sch->q.qlen < q->limit - 1) {
+		sch->qstats.requeues++;
 		return 0;
+	}
 
-	sch->stats.drops++;
+	sch->qstats.drops++;
 	sfq_drop(sch);
 	return NET_XMIT_CN;
 }
@@ -372,7 +374,6 @@ static void sfq_perturbation(unsigned long arg)
 	struct sfq_sched_data *q = qdisc_priv(sch);
 
 	q->perturbation = net_random()&0x1F;
-	q->perturb_timer.expires = jiffies + q->perturb_period;
 
 	if (q->perturb_period) {
 		q->perturb_timer.expires = jiffies + q->perturb_period;

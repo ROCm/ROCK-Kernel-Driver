@@ -73,14 +73,11 @@ static const char* host_info(struct Scsi_Host *host)
 static int slave_alloc (struct scsi_device *sdev)
 {
 	/*
-	 * Set default bflags. These can be overridden for individual
-	 * models and vendors via the scsi devinfo mechanism.  The only
-	 * flag we need is to force 36-byte INQUIRYs; we don't use any
-	 * of the extra data and many devices choke if asked for more or
+	 * Set the INQUIRY transfer length to 36.  We don't use any of
+	 * the extra data and many devices choke if asked for more or
 	 * less than 36 bytes.
 	 */
-	sdev->sdev_bflags = BLIST_INQUIRY_36;
-
+	sdev->inquiry_len = 36;
 	return 0;
 }
 
@@ -97,6 +94,23 @@ static int slave_configure(struct scsi_device *sdev)
 	 * have the desired effect because, except at the beginning and
 	 * the end, scatter-gather buffers follow page boundaries. */
 	blk_queue_dma_alignment(sdev->request_queue, (512 - 1));
+
+	/* Set the SCSI level to at least 2.  We'll leave it at 3 if that's
+	 * what is originally reported.  We need this to avoid confusing
+	 * the SCSI layer with devices that report 0 or 1, but need 10-byte
+	 * commands (ala ATAPI devices behind certain bridges, or devices
+	 * which simply have broken INQUIRY data).
+	 *
+	 * NOTE: This means /dev/sg programs (ala cdrecord) will get the
+	 * actual information.  This seems to be the preference for
+	 * programs like that.
+	 *
+	 * NOTE: This also means that /proc/scsi/scsi and sysfs may report
+	 * the actual value or the modified one, depending on where the
+	 * data comes from.
+	 */
+	if (sdev->scsi_level < SCSI_2)
+		sdev->scsi_level = SCSI_2;
 
 	/* According to the technical support people at Genesys Logic,
 	 * devices using their chips have problems transferring more than
@@ -158,26 +172,24 @@ static int queuecommand(struct scsi_cmnd *srb,
 	US_DEBUGP("%s called\n", __FUNCTION__);
 	srb->host_scribble = (unsigned char *)us;
 
-	/* enqueue the command */
-	if (us->sm_state != US_STATE_IDLE || us->srb != NULL) {
-		printk(KERN_ERR USB_STORAGE "Error in %s: " 
-			"state = %d, us->srb = %p\n",
-			__FUNCTION__, us->sm_state, us->srb);
+	/* check for state-transition errors */
+	if (us->srb != NULL) {
+		printk(KERN_ERR USB_STORAGE "Error in %s: us->srb = %p\n",
+			__FUNCTION__, us->srb);
 		return SCSI_MLQUEUE_HOST_BUSY;
 	}
 
 	/* fail the command if we are disconnecting */
 	if (test_bit(US_FLIDX_DISCONNECTING, &us->flags)) {
-		US_DEBUGP("Command failed for disconnect\n");
+		US_DEBUGP("Fail command during disconnect\n");
 		srb->result = DID_NO_CONNECT << 16;
 		done(srb);
 		return 0;
 	}
 
+	/* enqueue the command and wake up the control thread */
 	srb->scsi_done = done;
 	us->srb = srb;
-
-	/* wake up the process task */
 	up(&(us->sema));
 
 	return 0;
@@ -187,7 +199,7 @@ static int queuecommand(struct scsi_cmnd *srb,
  * Error handling functions
  ***********************************************************************/
 
-/* Command abort */
+/* Command timeout and abort */
 /* This is always called with scsi_lock(srb->host) held */
 static int command_abort(struct scsi_cmnd *srb )
 {
@@ -202,22 +214,12 @@ static int command_abort(struct scsi_cmnd *srb )
 		return FAILED;
 	}
 
-	/* Normally the current state is RUNNING.  If the control thread
-	 * hasn't even started processing this command, the state will be
-	 * IDLE.  Anything else is a bug. */
-	if (us->sm_state != US_STATE_RUNNING
-				&& us->sm_state != US_STATE_IDLE) {
-		printk(KERN_ERR USB_STORAGE "Error in %s: "
-			"invalid state %d\n", __FUNCTION__, us->sm_state);
-		return FAILED;
-	}
-
-	/* Set state to ABORTING and set the ABORTING bit, but only if
+	/* Set the TIMED_OUT bit.  Also set the ABORTING bit, but only if
 	 * a device reset isn't already in progress (to avoid interfering
 	 * with the reset).  To prevent races with auto-reset, we must
 	 * stop any ongoing USB transfers while still holding the host
 	 * lock. */
-	us->sm_state = US_STATE_ABORTING;
+	set_bit(US_FLIDX_TIMED_OUT, &us->flags);
 	if (!test_bit(US_FLIDX_RESETTING, &us->flags)) {
 		set_bit(US_FLIDX_ABORTING, &us->flags);
 		usb_stor_stop_transport(us);
@@ -230,6 +232,7 @@ static int command_abort(struct scsi_cmnd *srb )
 	/* Reacquire the lock and allow USB transfers to resume */
 	scsi_lock(host);
 	clear_bit(US_FLIDX_ABORTING, &us->flags);
+	clear_bit(US_FLIDX_TIMED_OUT, &us->flags);
 	return SUCCESS;
 }
 
@@ -242,14 +245,7 @@ static int device_reset(struct scsi_cmnd *srb)
 	int result;
 
 	US_DEBUGP("%s called\n", __FUNCTION__);
-	if (us->sm_state != US_STATE_IDLE) {
-		printk(KERN_ERR USB_STORAGE "Error in %s: "
-			"invalid state %d\n", __FUNCTION__, us->sm_state);
-		return FAILED;
-	}
 
-	/* set the state and release the lock */
-	us->sm_state = US_STATE_RESETTING;
 	scsi_unlock(srb->device->host);
 
 	/* lock the device pointers and do the reset */
@@ -261,9 +257,8 @@ static int device_reset(struct scsi_cmnd *srb)
 		result = us->transport_reset(us);
 	up(&(us->dev_semaphore));
 
-	/* lock access to the state and clear it */
+	/* lock the host for the return */
 	scsi_lock(srb->device->host);
-	us->sm_state = US_STATE_IDLE;
 	return result;
 }
 
@@ -274,17 +269,10 @@ static int device_reset(struct scsi_cmnd *srb)
 static int bus_reset(struct scsi_cmnd *srb)
 {
 	struct us_data *us = (struct us_data *)srb->device->host->hostdata[0];
-	int result;
+	int result, rc;
 
 	US_DEBUGP("%s called\n", __FUNCTION__);
-	if (us->sm_state != US_STATE_IDLE) {
-		printk(KERN_ERR USB_STORAGE "Error in %s: "
-			"invalid state %d\n", __FUNCTION__, us->sm_state);
-		return FAILED;
-	}
 
-	/* set the state and release the lock */
-	us->sm_state = US_STATE_RESETTING;
 	scsi_unlock(srb->device->host);
 
 	/* The USB subsystem doesn't handle synchronisation between
@@ -299,14 +287,21 @@ static int bus_reset(struct scsi_cmnd *srb)
 		result = -EBUSY;
 		US_DEBUGP("Refusing to reset a multi-interface device\n");
 	} else {
-		result = usb_reset_device(us->pusb_dev);
-		US_DEBUGP("usb_reset_device returns %d\n", result);
+		rc = usb_lock_device_for_reset(us->pusb_dev, us->pusb_intf);
+		if (rc < 0) {
+			US_DEBUGP("unable to lock device for reset: %d\n", rc);
+			result = rc;
+		} else {
+			result = usb_reset_device(us->pusb_dev);
+			if (rc)
+				usb_unlock_device(us->pusb_dev);
+			US_DEBUGP("usb_reset_device returns %d\n", result);
+		}
 	}
 	up(&(us->dev_semaphore));
 
-	/* lock access to the state and clear it */
+	/* lock the host for the return */
 	scsi_lock(srb->device->host);
-	us->sm_state = US_STATE_IDLE;
 	return result < 0 ? FAILED : SUCCESS;
 }
 

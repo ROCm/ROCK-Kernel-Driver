@@ -6,7 +6,7 @@
  *  Derived from drivers/mtd/spia.c
  * 	 Copyright (C) 2000 Steven J. Hill (sjhill@realitydiluted.com)
  * 
- * $Id: autcpu12.c,v 1.20 2004/07/20 02:44:26 dwmw2 Exp $
+ * $Id: autcpu12.c,v 1.22 2004/11/04 12:53:10 gleixner Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -48,17 +48,7 @@ static int autcpu12_io_base = CS89712_VIRT_BASE;
 static int autcpu12_fio_pbase = AUTCPU12_PHYS_SMC;
 static int autcpu12_fio_ctrl = AUTCPU12_SMC_SELECT_OFFSET;
 static int autcpu12_pedr = AUTCPU12_SMC_PORT_OFFSET;
-static int autcpu12_fio_base;
-
-#ifdef MODULE
-MODULE_PARM(autcpu12_fio_pbase, "i");
-MODULE_PARM(autcpu12_fio_ctrl, "i");
-MODULE_PARM(autcpu12_pedr, "i");
-
-__setup("autcpu12_fio_pbase=",autcpu12_fio_pbase);
-__setup("autcpu12_fio_ctrl=",autcpu12_fio_ctrl);
-__setup("autcpu12_pedr=",autcpu12_pedr);
-#endif
+static void __iomem * autcpu12_fio_base;
 
 /*
  * Define partitions for flash devices
@@ -150,7 +140,7 @@ int __init autcpu12_init (void)
 	}
 
 	/* map physical adress */
-	autcpu12_fio_base=(unsigned long)ioremap(autcpu12_fio_pbase,SZ_1K);
+	autcpu12_fio_base = ioremap(autcpu12_fio_pbase,SZ_1K);
 	if(!autcpu12_fio_base){
 		printk("Ioremap autcpu12 SmartMedia Card failed\n");
 		err = -EIO;

@@ -44,8 +44,8 @@ static int sol_compat = 0;		/* Solaris compatibility mode	*/
  * If you wish the device to operate as under Solaris,
  * omitting above features, set this parameter to non-zero.
  */
-MODULE_PARM
-	(sol_compat, "1i");
+module_param
+	(sol_compat, int, 0);
 MODULE_PARM_DESC
 	(sol_compat, 
 	 "Disables documented functionality omitted from Solaris driver");
@@ -70,7 +70,7 @@ MODULE_SUPPORTED_DEVICE
  * FLIP		- Inverts display for upside-down mounted board
  * bits 0-4	- 7-segment display contents
  */
-volatile u8* d7s_regs = NULL;
+static void __iomem* d7s_regs;
 
 static inline void d7s_free(void)
 {

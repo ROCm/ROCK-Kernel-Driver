@@ -923,34 +923,34 @@ MODULE_PARM_DESC(type, "Defines the type of each interface, each"
 		 " interface separated by commas.  The types are 'kcs',"
 		 " 'smic', and 'bt'.  For example si_type=kcs,bt will set"
 		 " the first interface to kcs and the second to bt");
-module_param_array(addrs, long, num_addrs, 0);
+module_param_array(addrs, long, &num_addrs, 0);
 MODULE_PARM_DESC(addrs, "Sets the memory address of each interface, the"
 		 " addresses separated by commas.  Only use if an interface"
 		 " is in memory.  Otherwise, set it to zero or leave"
 		 " it blank.");
-module_param_array(ports, int, num_ports, 0);
+module_param_array(ports, int, &num_ports, 0);
 MODULE_PARM_DESC(ports, "Sets the port address of each interface, the"
 		 " addresses separated by commas.  Only use if an interface"
 		 " is a port.  Otherwise, set it to zero or leave"
 		 " it blank.");
-module_param_array(irqs, int, num_irqs, 0);
+module_param_array(irqs, int, &num_irqs, 0);
 MODULE_PARM_DESC(irqs, "Sets the interrupt of each interface, the"
 		 " addresses separated by commas.  Only use if an interface"
 		 " has an interrupt.  Otherwise, set it to zero or leave"
 		 " it blank.");
-module_param_array(regspacings, int, num_regspacings, 0);
+module_param_array(regspacings, int, &num_regspacings, 0);
 MODULE_PARM_DESC(regspacings, "The number of bytes between the start address"
 		 " and each successive register used by the interface.  For"
 		 " instance, if the start address is 0xca2 and the spacing"
 		 " is 2, then the second address is at 0xca4.  Defaults"
 		 " to 1.");
-module_param_array(regsizes, int, num_regsizes, 0);
+module_param_array(regsizes, int, &num_regsizes, 0);
 MODULE_PARM_DESC(regsizes, "The size of the specific IPMI register in bytes."
 		 " This should generally be 1, 2, 4, or 8 for an 8-bit,"
 		 " 16-bit, 32-bit, or 64-bit register.  Use this if you"
 		 " the 8-bit IPMI register has to be read from a larger"
 		 " register.");
-module_param_array(regshifts, int, num_regshifts, 0);
+module_param_array(regshifts, int, &num_regshifts, 0);
 MODULE_PARM_DESC(regshifts, "The amount to shift the data read from the."
 		 " IPMI register, in bits.  For instance, if the data"
 		 " is read from a 32-bit word and the IPMI data is in"
@@ -1370,7 +1370,7 @@ static int acpi_gpe_irq_setup(struct smi_info *info)
 	status = acpi_install_gpe_handler(NULL,
 					  info->irq,
 					  ACPI_GPE_LEVEL_TRIGGERED,
-					  ipmi_acpi_gpe,
+					  &ipmi_acpi_gpe,
 					  info);
 	if (status != AE_OK) {
 		printk(KERN_WARNING
@@ -1390,7 +1390,7 @@ static void acpi_gpe_irq_cleanup(struct smi_info *info)
 	if (!info->irq)
 		return;
 
-	acpi_remove_gpe_handler(NULL, info->irq, ipmi_acpi_gpe);
+	acpi_remove_gpe_handler(NULL, info->irq, &ipmi_acpi_gpe);
 }
 
 /*
@@ -1777,10 +1777,10 @@ static int find_pci_smic(int intf_num, struct smi_info **new_info)
 
 	pci_smic_checked = 1;
 
-	if ((pci_dev = pci_find_device(PCI_HP_VENDOR_ID, PCI_MMC_DEVICE_ID,
+	if ((pci_dev = pci_get_device(PCI_HP_VENDOR_ID, PCI_MMC_DEVICE_ID,
 				       NULL)))
 		;
-	else if ((pci_dev = pci_find_class(PCI_ERMC_CLASSCODE, NULL)) &&
+	else if ((pci_dev = pci_get_class(PCI_ERMC_CLASSCODE, NULL)) &&
 		 pci_dev->subsystem_vendor == PCI_HP_VENDOR_ID)
 		fe_rmc = 1;
 	else
@@ -1789,6 +1789,7 @@ static int find_pci_smic(int intf_num, struct smi_info **new_info)
 	error = pci_read_config_word(pci_dev, PCI_MMC_ADDR_CW, &base_addr);
 	if (error)
 	{
+		pci_dev_put(pci_dev);
 		printk(KERN_ERR
 		       "ipmi_si: pci_read_config_word() failed (%d).\n",
 		       error);
@@ -1798,6 +1799,7 @@ static int find_pci_smic(int intf_num, struct smi_info **new_info)
 	/* Bit 0: 1 specifies programmed I/O, 0 specifies memory mapped I/O */
 	if (!(base_addr & 0x0001))
 	{
+		pci_dev_put(pci_dev);
 		printk(KERN_ERR
 		       "ipmi_si: memory mapped I/O not supported for PCI"
 		       " smic.\n");
@@ -1809,11 +1811,14 @@ static int find_pci_smic(int intf_num, struct smi_info **new_info)
 		/* Data register starts at base address + 1 in eRMC */
 		++base_addr;
 
-	if (!is_new_interface(-1, IPMI_IO_ADDR_SPACE, base_addr))
-	    return -ENODEV;
+	if (!is_new_interface(-1, IPMI_IO_ADDR_SPACE, base_addr)) {
+		pci_dev_put(pci_dev);
+		return -ENODEV;
+	}
 
 	info = kmalloc(sizeof(*info), GFP_KERNEL);
 	if (!info) {
+		pci_dev_put(pci_dev);
 		printk(KERN_ERR "ipmi_si: Could not allocate SI data (5)\n");
 		return -ENOMEM;
 	}
@@ -1836,6 +1841,7 @@ static int find_pci_smic(int intf_num, struct smi_info **new_info)
 	printk("ipmi_si: Found PCI SMIC at I/O address 0x%lx\n",
 		(long unsigned int) base_addr);
 
+	pci_dev_put(pci_dev);
 	return 0;
 }
 #endif /* CONFIG_PCI */
@@ -2283,6 +2289,7 @@ void __exit cleanup_one_si(struct smi_info *to_clean)
 	   interface is in a clean state. */
 	while ((to_clean->curr_msg) || (to_clean->si_state != SI_NORMAL)) {
 		poll(to_clean);
+		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(1);
 	}
 

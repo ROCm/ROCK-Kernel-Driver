@@ -5,9 +5,9 @@
 extra-y := head.o init_task.o vmlinux.lds
 
 obj-y	:= process.o semaphore.o signal.o entry.o traps.o irq.o vm86.o \
-		ptrace.o i8259.o ioport.o ldt.o setup.o time.o sys_i386.o \
+		ptrace.o time.o ioport.o ldt.o setup.o i8259.o sys_i386.o \
 		pci-dma.o i386_ksyms.o i387.o dmi_scan.o bootflag.o \
-		doublefault.o
+		doublefault.o quirks.o
 
 obj-y				+= cpu/
 obj-y				+= timers/
@@ -69,6 +69,3 @@ $(obj)/built-in.o: ld_flags += -R $(obj)/vsyscall-syms.o
 SYSCFLAGS_vsyscall-syms.o = -r
 $(obj)/vsyscall-syms.o: $(src)/vsyscall.lds $(obj)/vsyscall-sysenter.o FORCE
 	$(call if_changed,syscall)
-
-CFLAGS_process.o += -DOOPS_TIMESTAMP='"$(OOPS_TIMESTAMP)"'
-CFLAGS_traps.o   += -DOOPS_TIMESTAMP='"$(OOPS_TIMESTAMP)"'

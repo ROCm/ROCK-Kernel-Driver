@@ -267,7 +267,7 @@ static struct atmdev_ops atm_ops =
 };
 static struct timer_list ns_timer;
 static char *mac[NS_MAX_CARDS];
-MODULE_PARM(mac, "1-" __MODULE_STRING(NS_MAX_CARDS) "s");
+module_param_array(mac, charp, NULL, 0);
 MODULE_LICENSE("GPL");
 
 
@@ -467,7 +467,7 @@ static int __devinit ns_init_card(int i, struct pci_dev *pcidev)
    u32 u32d[4];
    u32 ns_cfg_rctsize;
    int bcount;
-   unsigned long mbase;
+   unsigned long membase;
 
    error = 0;
 
@@ -495,8 +495,8 @@ static int __devinit ns_init_card(int i, struct pci_dev *pcidev)
    card->index = i;
    card->atmdev = NULL;
    card->pcidev = pcidev;
-   mbase = pci_resource_start(pcidev, 1);
-   card->membase = ioremap(mbase, NS_IOREMAP_SIZE);
+   membase = pci_resource_start(pcidev, 1);
+   card->membase = ioremap(membase, NS_IOREMAP_SIZE);
    if (card->membase == 0)
    {
       printk("nicstar%d: can't ioremap() membase.\n",i);

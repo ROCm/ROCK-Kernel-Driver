@@ -1,4 +1,4 @@
-/*
+/* -*- linux-c -*-
  * INET		802.1Q VLAN
  *		Ethernet-type device handling.
  *
@@ -211,7 +211,7 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 		 * This allows the VLAN to have a different MAC than the underlying
 		 * device, and still route correctly.
 		 */
-		if (memcmp(skb->mac.ethernet->h_dest, skb->dev->dev_addr, ETH_ALEN) == 0) {
+		if (memcmp(eth_hdr(skb)->h_dest, skb->dev->dev_addr, ETH_ALEN) == 0) {
 			/* It is for our (changed) MAC-address! */
 			skb->pkt_type = PACKET_HOST;
 		}
@@ -527,7 +527,7 @@ int vlan_dev_change_mtu(struct net_device *dev, int new_mtu)
 
 	dev->mtu = new_mtu;
 
-	return new_mtu;
+	return 0;
 }
 
 int vlan_dev_set_ingress_priority(char *dev_name, __u32 skb_prio, short vlan_prio)
@@ -621,6 +621,44 @@ int vlan_dev_set_vlan_flag(char *dev_name, __u32 flag, short flag_val)
 
 	return -EINVAL;
 }
+
+
+int vlan_dev_get_realdev_name(const char *dev_name, char* result)
+{
+	struct net_device *dev = dev_get_by_name(dev_name);
+	int rv = 0;
+	if (dev) {
+		if (dev->priv_flags & IFF_802_1Q_VLAN) {
+			strncpy(result, VLAN_DEV_INFO(dev)->real_dev->name, 23);
+			rv = 0;
+		} else {
+			rv = -EINVAL;
+		}
+		dev_put(dev);
+	} else {
+		rv = -ENODEV;
+	}
+	return rv;
+}
+
+int vlan_dev_get_vid(const char *dev_name, unsigned short* result)
+{
+	struct net_device *dev = dev_get_by_name(dev_name);
+	int rv = 0;
+	if (dev) {
+		if (dev->priv_flags & IFF_802_1Q_VLAN) {
+			*result = VLAN_DEV_INFO(dev)->vlan_id;
+			rv = 0;
+		} else {
+			rv = -EINVAL;
+		}
+		dev_put(dev);
+	} else {
+		rv = -ENODEV;
+	}
+	return rv;
+}
+
 
 int vlan_dev_set_mac_address(struct net_device *dev, void *addr_struct_p)
 {

@@ -1,11 +1,11 @@
 /*
- *  linux/drivers/s390/misc/z90crypt.h
+ *  linux/drivers/s390/crypto/z90crypt.h
  *
- *  z90crypt 1.3.1
+ *  z90crypt 1.3.2
  *
  *  Copyright (C)  2001, 2004 IBM Corporation
  *  Author(s): Robert Burroughs (burrough@us.ibm.com)
- *	       Eric Rossman (edrossma@us.ibm.com)
+ *             Eric Rossman (edrossma@us.ibm.com)
  *
  *  Hotplug & misc device support: Jochen Roehrig (roehrig@de.ibm.com)
  *
@@ -16,7 +16,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
@@ -24,16 +24,25 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#ifndef _LINUX_Z90CRYPT_H_
-#define _LINUX_Z90CRYPT_H_
+#ifndef _Z90CRYPT_H_
+#define _Z90CRYPT_H_
 
 #include <linux/ioctl.h>
 
-#define VERSION_Z90CRYPT_H "$Revision: 1.2 $"
+#define VERSION_Z90CRYPT_H "$Revision: 1.11 $"
 
 #define z90crypt_VERSION 1
 #define z90crypt_RELEASE 3	// 2 = PCIXCC, 3 = rewrite for coding standards
-#define z90crypt_VARIANT 1
+#define z90crypt_VARIANT 2	// 2 = added PCIXCC MCL3 and CEX2C support
+
+/**
+ * If we are not using the sparse checker, __user has no use.
+ */
+#ifdef __CHECKER__
+# define __user		__attribute__((noderef, address_space(1)))
+#else
+# define __user
+#endif
 
 /**
  * struct ica_rsa_modexpo
@@ -93,16 +102,16 @@ struct ica_rsa_modexpo_crt {
  *     This takes an ica_rsa_modexpo struct as its arg.
  *
  *     NOTE: please refer to the comments preceding this structure
- *	     for the implementation details for the contents of the
- *	     block
+ *           for the implementation details for the contents of the
+ *           block
  *
  *   ICARSACRT
  *     Perform an RSA operation using a Chinese-Remainder Theorem key
  *     This takes an ica_rsa_modexpo_crt struct as its arg.
  *
  *     NOTE: please refer to the comments preceding this structure
- *	     for the implementation details for the contents of the
- *	     block
+ *           for the implementation details for the contents of the
+ *           block
  *
  *   Z90STAT_TOTALCOUNT
  *     Return an integer count of all device types together.
@@ -113,8 +122,14 @@ struct ica_rsa_modexpo_crt {
  *   Z90STAT_PCICCCOUNT
  *     Return an integer count of all PCICCs.
  *
- *   Z90STAT_PCIXCCCOUNT
- *     Return an integer count of all PCIXCCs.
+ *   Z90STAT_PCIXCCMCL2COUNT
+ *     Return an integer count of all MCL2 PCIXCCs.
+ *
+ *   Z90STAT_PCIXCCMCL3COUNT
+ *     Return an integer count of all MCL3 PCIXCCs.
+ *
+ *   Z90STAT_CEX2CCOUNT
+ *     Return an integer count of all CEX2Cs.
  *
  *   Z90STAT_REQUESTQ_COUNT
  *     Return an integer count of the number of entries waiting to be
@@ -133,10 +148,12 @@ struct ica_rsa_modexpo_crt {
  *   Z90STAT_STATUS_MASK
  *     Return an 64 element array of unsigned chars for the status of
  *     all devices.
- *	 0x01: PCICA
- *	 0x02: PCICC
- *	 0x03: PCIXCC
- *	 0x0d: device is disabled via the proc filesystem
+ *       0x01: PCICA
+ *       0x02: PCICC
+ *       0x03: PCIXCC_MCL2
+ *       0x04: PCIXCC_MCL3
+ *       0x05: CEX2C
+ *       0x0d: device is disabled via the proc filesystem
  *
  *   Z90STAT_QDEPTH_MASK
  *     Return an 64 element array of unsigned chars for the queue
@@ -152,18 +169,23 @@ struct ica_rsa_modexpo_crt {
  *     This takes an ica_z90_status struct as its arg.
  *
  *     NOTE: this ioctl() is deprecated, and has been replaced with
- *	     single ioctl()s for each type of status being requested
+ *           single ioctl()s for each type of status being requested
+ *
+ *   Z90STAT_PCIXCCCOUNT (deprecated)
+ *     Return an integer count of all PCIXCCs (MCL2 + MCL3).
+ *     This is DEPRECATED now that MCL3 PCIXCCs are treated differently from
+ *     MCL2 PCIXCCs.
  *
  *   Z90QUIESCE (not recommended)
  *     Quiesce the driver.  This is intended to stop all new
- *     requests from being processed.  Its use is not recommended,
+ *     requests from being processed.  Its use is NOT recommended,
  *     except in circumstances where there is no other way to stop
  *     callers from accessing the driver.  Its original use was to
  *     allow the driver to be "drained" of work in preparation for
  *     a system shutdown.
  *
  *     NOTE: once issued, this ban on new work cannot be undone
- *	     except by unloading and reloading the driver.
+ *           except by unloading and reloading the driver.
  */
 
 /**
@@ -172,8 +194,9 @@ struct ica_rsa_modexpo_crt {
 #define ICARSAMODEXPO	_IOC(_IOC_READ|_IOC_WRITE, Z90_IOCTL_MAGIC, 0x05, 0)
 #define ICARSACRT	_IOC(_IOC_READ|_IOC_WRITE, Z90_IOCTL_MAGIC, 0x06, 0)
 
-/* DEPRECATED status call (bound for removal SOON) */
+/* DEPRECATED status calls (bound for removal at some point) */
 #define ICAZ90STATUS	_IOR(Z90_IOCTL_MAGIC, 0x10, struct ica_z90_status)
+#define Z90STAT_PCIXCCCOUNT	_IOR(Z90_IOCTL_MAGIC, 0x43, int)
 
 /* unrelated to ICA callers */
 #define Z90QUIESCE	_IO(Z90_IOCTL_MAGIC, 0x11)
@@ -182,7 +205,9 @@ struct ica_rsa_modexpo_crt {
 #define Z90STAT_TOTALCOUNT	_IOR(Z90_IOCTL_MAGIC, 0x40, int)
 #define Z90STAT_PCICACOUNT	_IOR(Z90_IOCTL_MAGIC, 0x41, int)
 #define Z90STAT_PCICCCOUNT	_IOR(Z90_IOCTL_MAGIC, 0x42, int)
-#define Z90STAT_PCIXCCCOUNT	_IOR(Z90_IOCTL_MAGIC, 0x43, int)
+#define Z90STAT_PCIXCCMCL2COUNT	_IOR(Z90_IOCTL_MAGIC, 0x4b, int)
+#define Z90STAT_PCIXCCMCL3COUNT	_IOR(Z90_IOCTL_MAGIC, 0x4c, int)
+#define Z90STAT_CEX2CCOUNT	_IOR(Z90_IOCTL_MAGIC, 0x4d, int)
 #define Z90STAT_REQUESTQ_COUNT	_IOR(Z90_IOCTL_MAGIC, 0x44, int)
 #define Z90STAT_PENDINGQ_COUNT	_IOR(Z90_IOCTL_MAGIC, 0x45, int)
 #define Z90STAT_TOTALOPEN_COUNT _IOR(Z90_IOCTL_MAGIC, 0x46, int)
@@ -199,8 +224,9 @@ struct ica_rsa_modexpo_crt {
 #define ERELEASED 131	// user released while ioctl pending
 #define EQUIESCE  132	// z90crypt quiescing (no more work allowed)
 #define ETIMEOUT  133	// request timed out
-#define EUNKNOWN  134	// some unrecognized error occured
-#define EGETBUFF  135	// Error getting buffer
+#define EUNKNOWN  134	// some unrecognized error occured (retry may succeed)
+#define EGETBUFF  135	// Error getting buffer or hardware lacks capability
+			// (retry in software)
 
 /**
  * DEPRECATED STRUCTURES
@@ -222,10 +248,11 @@ struct ica_z90_status {
 	int pendingqWaitCount;
 	int totalOpenCount;
 	int cryptoDomain;
-	// status: 0=not there. 1=PCICA. 2=PCICC. 3=PCIXCC
+	// status: 0=not there, 1=PCICA, 2=PCICC, 3=PCIXCC_MCL2, 4=PCIXCC_MCL3,
+	//         5=CEX2C
 	unsigned char status[MASK_LENGTH];
 	// qdepth: # work elements waiting for each device
 	unsigned char qdepth[MASK_LENGTH];
 };
 
-#endif /* _LINUX_Z90CRYPT_H_ */
+#endif /* _Z90CRYPT_H_ */

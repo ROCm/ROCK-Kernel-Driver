@@ -219,7 +219,7 @@ static int put_compat_statfs64(struct compat_statfs64 __user *ubuf, struct kstat
 	return 0;
 }
 
-asmlinkage long compat_statfs64(const char __user *path, compat_size_t sz, struct compat_statfs64 __user *buf)
+asmlinkage long compat_sys_statfs64(const char __user *path, compat_size_t sz, struct compat_statfs64 __user *buf)
 {
 	struct nameidata nd;
 	int error;
@@ -238,7 +238,7 @@ asmlinkage long compat_statfs64(const char __user *path, compat_size_t sz, struc
 	return error;
 }
 
-asmlinkage long compat_fstatfs64(unsigned int fd, compat_size_t sz, struct compat_statfs64 __user *buf)
+asmlinkage long compat_sys_fstatfs64(unsigned int fd, compat_size_t sz, struct compat_statfs64 __user *buf)
 {
 	struct file * file;
 	struct kstatfs tmp;
@@ -860,7 +860,7 @@ efault:
 	return -EFAULT;
 }
 
-asmlinkage long compat_old_readdir(unsigned int fd,
+asmlinkage long compat_sys_old_readdir(unsigned int fd,
 	struct compat_old_linux_dirent __user *dirent, unsigned int count)
 {
 	int error;
@@ -1382,99 +1382,101 @@ int compat_do_execve(char * filename,
 	compat_uptr_t __user *envp,
 	struct pt_regs * regs)
 {
-	struct linux_binprm bprm;
+	struct linux_binprm *bprm;
 	struct file *file;
 	int retval;
 	int i;
 
-	file = open_exec(filename);
+	retval = -ENOMEM;
+	bprm = kmalloc(sizeof(*bprm), GFP_KERNEL);
+	if (!bprm)
+		goto out_ret;
+	memset(bprm, 0, sizeof(*bprm));
 
+	file = open_exec(filename);
 	retval = PTR_ERR(file);
 	if (IS_ERR(file))
-		return retval;
+		goto out_kfree;
 
 	sched_exec();
 
-	bprm.p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
-	memset(bprm.page, 0, MAX_ARG_PAGES*sizeof(bprm.page[0]));
-
-	bprm.file = file;
-	bprm.filename = filename;
-	bprm.interp = filename;
-	bprm.sh_bang = 0;
-	bprm.loader = 0;
-	bprm.exec = 0;
-	bprm.interp_flags = 0;
-	bprm.interp_data = 0;
-	bprm.security = NULL;
-	bprm.mm = mm_alloc();
+	bprm->p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
+	bprm->file = file;
+	bprm->filename = filename;
+	bprm->interp = filename;
+	bprm->mm = mm_alloc();
 	retval = -ENOMEM;
-	if (!bprm.mm)
+	if (!bprm->mm)
 		goto out_file;
 
-	retval = init_new_context(current, bprm.mm);
+	retval = init_new_context(current, bprm->mm);
 	if (retval < 0)
 		goto out_mm;
 
-	bprm.argc = compat_count(argv, bprm.p / sizeof(compat_uptr_t));
-	if ((retval = bprm.argc) < 0)
+	bprm->argc = compat_count(argv, bprm->p / sizeof(compat_uptr_t));
+	if ((retval = bprm->argc) < 0)
 		goto out_mm;
 
-	bprm.envc = compat_count(envp, bprm.p / sizeof(compat_uptr_t));
-	if ((retval = bprm.envc) < 0)
+	bprm->envc = compat_count(envp, bprm->p / sizeof(compat_uptr_t));
+	if ((retval = bprm->envc) < 0)
 		goto out_mm;
 
-	retval = security_bprm_alloc(&bprm);
+	retval = security_bprm_alloc(bprm);
 	if (retval)
 		goto out;
 
-	retval = prepare_binprm(&bprm);
+	retval = prepare_binprm(bprm);
 	if (retval < 0)
 		goto out;
 
-	retval = copy_strings_kernel(1, &bprm.filename, &bprm);
+	retval = copy_strings_kernel(1, &bprm->filename, bprm);
 	if (retval < 0)
 		goto out;
 
-	bprm.exec = bprm.p;
-	retval = compat_copy_strings(bprm.envc, envp, &bprm);
+	bprm->exec = bprm->p;
+	retval = compat_copy_strings(bprm->envc, envp, bprm);
 	if (retval < 0)
 		goto out;
 
-	retval = compat_copy_strings(bprm.argc, argv, &bprm);
+	retval = compat_copy_strings(bprm->argc, argv, bprm);
 	if (retval < 0)
 		goto out;
 
-	retval = search_binary_handler(&bprm,regs);
+	retval = search_binary_handler(bprm, regs);
 	if (retval >= 0) {
-		free_arg_pages(&bprm);
+		free_arg_pages(bprm);
 
 		/* execve success */
-		security_bprm_free(&bprm);
+		security_bprm_free(bprm);
+		kfree(bprm);
 		return retval;
 	}
 
 out:
 	/* Something went wrong, return the inode and free the argument pages*/
 	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
-		struct page * page = bprm.page[i];
+		struct page * page = bprm->page[i];
 		if (page)
 			__free_page(page);
 	}
 
-	if (bprm.security)
-		security_bprm_free(&bprm);
+	if (bprm->security)
+		security_bprm_free(bprm);
 
 out_mm:
-	if (bprm.mm)
-		mmdrop(bprm.mm);
+	if (bprm->mm)
+		mmdrop(bprm->mm);
 
 out_file:
-	if (bprm.file) {
-		allow_write_access(bprm.file);
-		fput(bprm.file);
+	if (bprm->file) {
+		allow_write_access(bprm->file);
+		fput(bprm->file);
 	}
 
+out_kfree:
+	kfree(bprm);
+
+out_ret:
 	return retval;
 }
 

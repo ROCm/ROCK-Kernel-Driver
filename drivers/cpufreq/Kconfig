@@ -1,3 +1,32 @@
+config CPU_FREQ
+	bool "CPU Frequency scaling"
+	help
+	  CPU Frequency scaling allows you to change the clock speed of 
+	  CPUs on the fly. This is a nice method to save power, because 
+	  the lower the CPU clock speed, the less power the CPU consumes.
+
+	  Note that this driver doesn't automatically change the CPU
+	  clock speed, you need to either enable a dynamic cpufreq governor
+	  (see below) after boot, or use a userspace tool.
+
+	  For details, take a look at <file:Documentation/cpu-freq>.
+
+	  If in doubt, say N.
+
+config CPU_FREQ_DEBUG
+	bool "Enable CPUfreq debugging"
+	depends on CPU_FREQ
+	help
+	  Say Y here to enable CPUfreq subsystem (including drivers)
+	  debugging. You will need to activate it via the kernel
+	  command line by passing
+	     cpufreq.debug=<value>
+
+	  To get <value>, add 
+	       1 to activate CPUfreq core debugging,
+	       2 to activate CPUfreq drivers debugging, and
+	       4 to activate CPUfreq governor debugging
+
 config CPU_FREQ_PROC_INTF
 	tristate "/proc/cpufreq interface (deprecated)"
 	depends on CPU_FREQ && PROC_FS
@@ -33,7 +62,7 @@ config CPU_FREQ_DEFAULT_GOV_USERSPACE
 	help
 	  Use the CPUFreq governor 'userspace' as default. This allows
 	  you to set the CPU frequency manually or when an userspace 
-	  programm shall be able to set the CPU dynamically without having
+	  program shall be able to set the CPU dynamically without having
 	  to enable the userspace governor manually.
 
 endchoice
@@ -42,7 +71,7 @@ config CPU_FREQ_GOV_PERFORMANCE
        tristate "'performance' governor"
        depends on CPU_FREQ
        help
-	  This cpufreq governors set the frequency statically to the
+	  This cpufreq governor sets the frequency statically to the
 	  highest available CPU frequency.
 
 	  If in doubt, say Y.
@@ -51,7 +80,7 @@ config CPU_FREQ_GOV_POWERSAVE
        tristate "'powersave' governor"
        depends on CPU_FREQ
        help
-	  Theis cpufreq governors set the frequency statically to the
+	  This cpufreq governor sets the frequency statically to the
 	  lowest available CPU frequency.
 
 	  If in doubt, say Y.
@@ -61,13 +90,28 @@ config CPU_FREQ_GOV_USERSPACE
        depends on CPU_FREQ 
        help
 	  Enable this cpufreq governor when you either want to set the
-	  CPU frequency manually or when an userspace programm shall
-          be able to set the CPU dynamically, like on LART 
+	  CPU frequency manually or when an userspace program shall
+	  be able to set the CPU dynamically, like on LART 
 	  <http://www.lart.tudelft.nl/>
 
 	  For details, take a look at <file:Documentation/cpu-freq/>.
 
 	  If in doubt, say Y.
+
+config CPU_FREQ_24_API
+	bool "/proc/sys/cpu/ interface (2.4. / OLD)"
+	depends on CPU_FREQ_GOV_USERSPACE
+	depends on SYSCTL
+	help
+	  This enables the /proc/sys/cpu/ sysctl interface for controlling
+	  the CPUFreq,"userspace" governor. This is the same interface
+	  as known from the 2.4.-kernel patches for CPUFreq, and offers
+	  the same functionality as long as "userspace" is the
+	  selected governor for the specified CPU.
+	
+	  For details, take a look at <file:Documentation/cpu-freq/>.
+
+	  If in doubt, say N.
 
 config CPU_FREQ_GOV_ONDEMAND
 	tristate "'ondemand' cpufreq policy governor"
@@ -81,19 +125,5 @@ config CPU_FREQ_GOV_ONDEMAND
 	  transitions). 
 
 	  For details, take a look at linux/Documentation/cpu-freq.
-
-	  If in doubt, say N.
-
-config CPU_FREQ_24_API
-	bool "/proc/sys/cpu/ interface (2.4. / OLD)"
-	depends on CPU_FREQ && SYSCTL && CPU_FREQ_GOV_USERSPACE
-	help
-	  This enables the /proc/sys/cpu/ sysctl interface for controlling
-	  the CPUFreq,"userspace" governor. This is the same interface
-	  as known from the 2.4.-kernel patches for CPUFreq, and offers
-	  the same functionality as long as "userspace" is the
-	  selected governor for the specified CPU.
-	
-	  For details, take a look at <file:Documentation/cpu-freq/>.
 
 	  If in doubt, say N.

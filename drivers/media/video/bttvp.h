@@ -1,4 +1,6 @@
 /*
+    $Id: bttvp.h,v 1.12 2004/10/25 11:26:36 kraxel Exp $
+
     bttv - Bt848 frame grabber driver
 
     bttv's *private* header file  --  nobody other than bttv itself
@@ -127,8 +129,8 @@ struct bttv_buffer {
 struct bttv_buffer_set {
 	struct bttv_buffer     *top;       /* top field buffer    */
 	struct bttv_buffer     *bottom;    /* bottom field buffer */
-	unsigned int           irqflags;
-	unsigned int           topirq;
+	unsigned int           top_irq;
+	unsigned int           frame_irq;
 };
 
 struct bttv_overlay {
@@ -143,7 +145,7 @@ struct bttv_overlay {
 struct bttv_fh {
 	struct bttv              *btv;
 	int resources;
-#ifdef VIDIOC_G_PRIORITY 
+#ifdef VIDIOC_G_PRIORITY
 	enum v4l2_priority       prio;
 #endif
 	enum v4l2_buf_type       type;
@@ -189,7 +191,7 @@ void bttv_calc_geo(struct bttv *btv, struct bttv_geometry *geo,
 void bttv_apply_geo(struct bttv *btv, struct bttv_geometry *geo, int top);
 
 /* control dma register + risc main loop */
-void bttv_set_dma(struct bttv *btv, int override, int irqflags);
+void bttv_set_dma(struct bttv *btv, int override);
 int bttv_risc_init_main(struct bttv *btv);
 int bttv_risc_hook(struct bttv *btv, int slot, struct btcx_riscmem *risc,
 		   int irqflags);
@@ -277,10 +279,10 @@ struct bttv_input {
 };
 
 struct bttv_suspend_state {
-	u32  pci_cfg[64 / sizeof(u32)];
 	u32  gpio_enable;
 	u32  gpio_data;
 	int  disabled;
+	int  loop_irq;
 	struct bttv_buffer_set video;
 	struct bttv_buffer     *vbi;
 };
@@ -291,7 +293,7 @@ struct bttv {
 	/* pci device config */
 	unsigned short id;
 	unsigned char revision;
-	unsigned char *bt848_mmio;   /* pointer to mmio */
+	unsigned char __iomem *bt848_mmio;   /* pointer to mmio */
 
 	/* card configuration info */
 	unsigned int cardid;   /* pci subsystem id (bt878 based ones) */
@@ -332,10 +334,10 @@ struct bttv {
         struct semaphore lock;
 	int resources;
         struct semaphore reslock;
-#ifdef VIDIOC_G_PRIORITY 
+#ifdef VIDIOC_G_PRIORITY
 	struct v4l2_prio_state prio;
 #endif
-	
+
 	/* video state */
 	unsigned int input;
 	unsigned int audio;
@@ -381,6 +383,7 @@ struct bttv {
 	struct list_head        vcapture;   /* vbi capture queue   */
 	struct bttv_buffer_set  curr;       /* active buffers      */
 	struct bttv_buffer      *cvbi;      /* active vbi buffer   */
+	int                     loop_irq;
 	int                     new_input;
 
 	unsigned long cap_ctl;
@@ -404,7 +407,7 @@ struct bttv {
 
 #endif
 
-#define btwrite(dat,adr)    writel((dat), (char *) (btv->bt848_mmio+(adr)))
+#define btwrite(dat,adr)    writel((dat), btv->bt848_mmio+(adr))
 #define btread(adr)         readl(btv->bt848_mmio+(adr))
 
 #define btand(dat,adr)      btwrite((dat) & btread(adr), adr)

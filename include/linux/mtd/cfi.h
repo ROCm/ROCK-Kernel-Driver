@@ -1,7 +1,7 @@
 
 /* Common Flash Interface structures 
  * See http://support.intel.com/design/flash/technote/index.htm
- * $Id: cfi.h,v 1.45 2004/07/20 02:44:27 dwmw2 Exp $
+ * $Id: cfi.h,v 1.49 2004/11/15 20:56:32 nico Exp $
  */
 
 #ifndef __MTD_CFI_H__
@@ -145,6 +145,24 @@ struct cfi_pri_intelext {
 	uint16_t ProtRegAddr;
 	uint8_t  FactProtRegSize;
 	uint8_t  UserProtRegSize;
+	uint8_t  extra[0];
+} __attribute__((packed));
+
+struct cfi_intelext_blockinfo {
+	uint16_t NumIdentBlocks;
+	uint16_t BlockSize;
+	uint16_t MinBlockEraseCycles;
+	uint8_t  BitsPerCell;
+	uint8_t  BlockCap;
+} __attribute__((packed));
+
+struct cfi_intelext_regioninfo {
+	uint16_t NumIdentPartitions;
+	uint8_t  NumOpAllowed;
+	uint8_t  NumOpAllowedSimProgMode;
+	uint8_t  NumOpAllowedSimEraMode;
+	uint8_t  NumBlockTypes;
+	struct cfi_intelext_blockinfo BlockTypes[1];
 } __attribute__((packed));
 
 /* Vendor-Specific PRI for AMD/Fujitsu Extended Command Set (0x0002) */
@@ -177,16 +195,19 @@ struct cfi_bri_query {
 	uint32_t ConfField[1]; /* Not host ordered */
 } __attribute__((packed));
 
-#define P_ID_NONE 0
-#define P_ID_INTEL_EXT 1
-#define P_ID_AMD_STD 2
-#define P_ID_INTEL_STD 3
-#define P_ID_AMD_EXT 4
-#define P_ID_ST_ADV 32
-#define P_ID_MITSUBISHI_STD 256
-#define P_ID_MITSUBISHI_EXT 257
-#define P_ID_SST_PAGE 258
-#define P_ID_RESERVED 65535
+#define P_ID_NONE               0x0000
+#define P_ID_INTEL_EXT          0x0001
+#define P_ID_AMD_STD            0x0002
+#define P_ID_INTEL_STD          0x0003
+#define P_ID_AMD_EXT            0x0004
+#define P_ID_WINBOND            0x0006
+#define P_ID_ST_ADV             0x0020
+#define P_ID_MITSUBISHI_STD     0x0100
+#define P_ID_MITSUBISHI_EXT     0x0101
+#define P_ID_SST_PAGE           0x0102
+#define P_ID_INTEL_PERFORMANCE  0x0200
+#define P_ID_INTEL_DATA         0x0210
+#define P_ID_RESERVED           0xffff
 
 
 #define CFI_MODE_CFI	1
@@ -350,17 +371,26 @@ static inline void cfi_spin_unlock(spinlock_t *mutex)
 
 struct cfi_extquery *cfi_read_pri(struct map_info *map, uint16_t adr, uint16_t size,
 			     const char* name);
-
 struct cfi_fixup {
 	uint16_t mfr;
 	uint16_t id;
-	void (*fixup)(struct map_info *map, void* param);
+	void (*fixup)(struct mtd_info *mtd, void* param);
 	void* param;
 };
 
 #define CFI_MFR_ANY 0xffff
 #define CFI_ID_ANY  0xffff
 
-void cfi_fixup(struct map_info *map, struct cfi_fixup* fixups);
+#define CFI_MFR_AMD 0x0001
+#define CFI_MFR_ST  0x0020 	/* STMicroelectronics */
+
+void cfi_fixup(struct mtd_info *mtd, struct cfi_fixup* fixups);
+
+typedef int (*varsize_frob_t)(struct map_info *map, struct flchip *chip,
+			      unsigned long adr, int len, void *thunk);
+
+int cfi_varsize_frob(struct mtd_info *mtd, varsize_frob_t frob,
+	loff_t ofs, size_t len, void *thunk);
+
 
 #endif /* __MTD_CFI_H__ */

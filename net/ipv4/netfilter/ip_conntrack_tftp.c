@@ -28,7 +28,7 @@ MODULE_LICENSE("GPL");
 #define MAX_PORTS 8
 static int ports[MAX_PORTS];
 static int ports_c;
-module_param_array(ports, int, ports_c, 0400);
+module_param_array(ports, int, &ports_c, 0400);
 MODULE_PARM_DESC(ports, "port numbers of tftp servers");
 
 #if 0

@@ -40,10 +40,12 @@
 #include <asm/tlbflush.h>
 #include <asm/sections.h>
 
+unsigned int __VMALLOC_RESERVE = 128 << 20;
+
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 unsigned long highstart_pfn, highend_pfn;
 
-static int do_test_wp_bit(void);
+static int noinline do_test_wp_bit(void);
 
 /*
  * Creates a middle page table and puts a pointer to it in the
@@ -436,8 +438,8 @@ static int __init noexec_setup(char *str)
 
 __setup("noexec=", noexec_setup);
 
-#ifdef CONFIG_X86_PAE
 int nx_enabled = 0;
+#ifdef CONFIG_X86_PAE
 
 static void __init set_nx(void)
 {
@@ -671,7 +673,7 @@ void __init pgtable_cache_init(void)
  * This function cannot be __init, since exceptions don't work in that
  * section.  Put this after the callers, so that it cannot be inlined.
  */
-static int do_test_wp_bit(void)
+static int noinline do_test_wp_bit(void)
 {
 	char tmp_reg;
 	int flag;
@@ -702,6 +704,7 @@ void free_initmem(void)
 	for (; addr < (unsigned long)(&__init_end); addr += PAGE_SIZE) {
 		ClearPageReserved(virt_to_page(addr));
 		set_page_count(virt_to_page(addr), 1);
+		memset((void *)addr, 0xcc, PAGE_SIZE);
 		free_page(addr);
 		totalram_pages++;
 	}

@@ -162,9 +162,6 @@
 	;;							\
 	srlz.d;							\
 	mov	r13 = ar.k6;					\
-	;;							\
-	DATA_PA_TO_VA(r13,temp1);				\
-	;;							\
 	mov	temp2 = ar.bspstore;				\
 	;;							\
 	DATA_PA_TO_VA(temp2,temp1);				\

@@ -95,7 +95,7 @@ static inline int _raw_spin_trylock(spinlock_t *lock)
 /***********************************************************/
 
 typedef struct {
-	volatile int write_lock:1, read_counter:31;
+	volatile unsigned int write_lock:1, read_counter:31;
 } /*__attribute__((aligned(32)))*/ rwlock_t;
 
 #define RW_LOCK_UNLOCKED (rwlock_t) { 0, 0 }
@@ -124,7 +124,7 @@ static inline void _raw_write_lock(rwlock_t * lock)
 	"	br	1b\n"
 	".previous"
 	: "=m" (*lock), "=&r" (regx)
-	: "0" (*lock) : "memory");
+	: "m" (*lock) : "memory");
 }
 
 static inline void _raw_read_lock(rwlock_t * lock)
@@ -147,6 +147,29 @@ static inline void _raw_read_lock(rwlock_t * lock)
 	: "m" (*lock) : "memory");
 }
 #endif /* CONFIG_DEBUG_RWLOCK */
+
+static inline int _raw_write_trylock(rwlock_t * lock)
+{
+	long regx;
+	int success;
+
+	__asm__ __volatile__(
+	"1:	ldl_l	%1,%0\n"
+	"	lda	%2,0\n"
+	"	bne	%1,2f\n"
+	"	or	$31,1,%1\n"
+	"	stl_c	%1,%0\n"
+	"	beq	%1,6f\n"
+	"	lda	%2,1\n"
+	"2:	mb\n"
+	".subsection 2\n"
+	"6:	br	1b\n"
+	".previous"
+	: "=m" (*lock), "=&r" (regx), "=&r" (success)
+	: "m" (*lock) : "memory");
+
+	return success;
+}
 
 static inline void _raw_write_unlock(rwlock_t * lock)
 {

@@ -671,36 +671,16 @@ static int sis5513_config_drive_xfer_rate (ide_drive_t *drive)
 	drive->init_speed = 0;
 
 	if (id && (id->capability & 1) && drive->autodma) {
-		/* Consult the list of known "bad" drives */
-		if (__ide_dma_bad_drive(drive))
-			goto fast_ata_pio;
-		if (id->field_valid & 4) {
-			if (id->dma_ultra & hwif->ultra_mask) {
-				/* Force if Capable UltraDMA */
-				int dma = config_chipset_for_dma(drive);
-				if ((id->field_valid & 2) && !dma)
-					goto try_dma_modes;
-			}
-		} else if (id->field_valid & 2) {
-try_dma_modes:
-			if ((id->dma_mword & hwif->mwdma_mask) ||
-			    (id->dma_1word & hwif->swdma_mask)) {
-				/* Force if Capable regular DMA modes */
-				if (!config_chipset_for_dma(drive))
-					goto no_dma_set;
-			}
-		} else if (__ide_dma_good_drive(drive) &&
-			   (id->eide_dma_time < 150)) {
-			/* Consult the list of known "good" drives */
-			if (!config_chipset_for_dma(drive))
-				goto no_dma_set;
-		} else {
-			goto fast_ata_pio;
+
+		if (ide_use_dma(drive)) {
+			if (config_chipset_for_dma(drive))
+				return hwif->ide_dma_on(drive);
 		}
-		return hwif->ide_dma_on(drive);
+
+		goto fast_ata_pio;
+
 	} else if ((id->capability & 8) || (id->field_valid & 2)) {
 fast_ata_pio:
-no_dma_set:
 		sis5513_tune_drive(drive, 5);
 		return hwif->ide_dma_off_quietly(drive);
 	}
@@ -954,31 +934,25 @@ static void __init init_hwif_sis5513 (ide_hwif_t *hwif)
 	return;
 }
 
-#define DECLARE_SIS_DEV(name_str)					\
-	{								\
-		.name		= name_str,				\
-		.init_chipset	= init_chipset_sis5513,			\
-		.init_hwif	= init_hwif_sis5513,			\
-		.channels	= 2,					\
-		.autodma	= NOAUTODMA,				\
-		.enablebits	= {{0x4a,0x02,0x02}, {0x4a,0x04,0x04}},	\
-		.bootable	= ON_BOARD,				\
-	}
-
-static ide_pci_device_t sis5513_chipsets[] __devinitdata = {
-	/* 0 */ DECLARE_SIS_DEV("SIS5513"),
-	/* 1 */ DECLARE_SIS_DEV("SIS5518")
+static ide_pci_device_t sis5513_chipset __devinitdata = {
+	.name		= "SIS5513",
+	.init_chipset	= init_chipset_sis5513,
+	.init_hwif	= init_hwif_sis5513,
+	.channels	= 2,
+	.autodma	= NOAUTODMA,
+	.enablebits	= {{0x4a,0x02,0x02}, {0x4a,0x04,0x04}},
+	.bootable	= ON_BOARD,
 };
 
 static int __devinit sis5513_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_setup_pci_device(dev, &sis5513_chipsets[id->driver_data]);
+	ide_setup_pci_device(dev, &sis5513_chipset);
 	return 0;
 }
 
 static struct pci_device_id sis5513_pci_tbl[] = {
 	{ PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_5513, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{ PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_5518, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
+	{ PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_5518, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
 };
 MODULE_DEVICE_TABLE(pci, sis5513_pci_tbl);

@@ -90,6 +90,7 @@ extern char ignore_irq13;
 
 extern void identify_cpu(struct cpuinfo_x86 *);
 extern void print_cpu_info(struct cpuinfo_x86 *);
+extern unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c);
 extern void dodgy_tsc(void);
 
 /*
@@ -170,14 +171,9 @@ static inline void clear_in_cr4 (unsigned long mask)
 
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
- *
- * /proc/pid/unmap_base is only supported for 32bit processes without
- * 3GB personality for now.
  */
 #define IA32_PAGE_OFFSET ((current->personality & ADDR_LIMIT_3GB) ? 0xc0000000 : 0xFFFFe000)
-#define __TASK_UNMAPPED_BASE (PAGE_ALIGN(0xffffe000 / 3))
-#define TASK_UNMAPPED_32 ((current->personality & ADDR_LIMIT_3GB) ? \
-	PAGE_ALIGN(0xc0000000 / 3) : PAGE_ALIGN(current->map_base))
+#define TASK_UNMAPPED_32 PAGE_ALIGN(IA32_PAGE_OFFSET/3)
 #define TASK_UNMAPPED_64 PAGE_ALIGN(TASK_SIZE/3) 
 #define TASK_UNMAPPED_BASE	\
 	(test_thread_flag(TIF_IA32) ? TASK_UNMAPPED_32 : TASK_UNMAPPED_64)  
@@ -464,5 +460,7 @@ static inline void __mwait(unsigned long eax, unsigned long ecx)
 })
 
 #define cache_line_size() (boot_cpu_data.x86_cache_alignment)
+
+extern unsigned long boot_option_idle_override;
 
 #endif /* __ASM_X86_64_PROCESSOR_H */

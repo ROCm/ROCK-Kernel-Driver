@@ -70,8 +70,6 @@ static unsigned char sunkbd_keycode[128] = {
 #define SUNKBD_RELEASE		0x80
 #define SUNKBD_KEY		0x7f
 
-static int sunkbd_num;
-
 /*
  * Per-keyboard data.
  */
@@ -287,8 +285,6 @@ static void sunkbd_connect(struct serio *serio, struct serio_driver *drv)
 	sunkbd->dev.id.vendor = SERIO_SUNKBD;
 	sunkbd->dev.id.product = sunkbd->type;
 	sunkbd->dev.id.version = 0x0100;
-	sunkbd->dev.dev = get_device(&serio->dev);
-	sprintf(sunkbd->dev.cdev.class_id,"sunkbd%d", sunkbd_num++);
 
 	input_register_device(&sunkbd->dev);
 
@@ -303,7 +299,6 @@ static void sunkbd_disconnect(struct serio *serio)
 {
 	struct sunkbd *sunkbd = serio->private;
 	input_unregister_device(&sunkbd->dev);
-	put_device(&serio->dev);
 	serio_close(serio);
 	kfree(sunkbd);
 }

@@ -1,5 +1,5 @@
 /*
- * $Id: mbx860.c,v 1.6 2004/07/12 21:59:44 dwmw2 Exp $
+ * $Id: mbx860.c,v 1.8 2004/11/04 13:24:15 gleixner Exp $
  *
  * Handle mapping of the flash on MBX860 boards
  *
@@ -60,7 +60,7 @@ struct map_info mbx_map = {
 int __init init_mbx(void)
 {
 	printk(KERN_NOTICE "Motorola MBX flash device: 0x%x at 0x%x\n", WINDOW_SIZE*4, WINDOW_ADDR);
-	mbx_map.virt = (unsigned long)ioremap(WINDOW_ADDR, WINDOW_SIZE * 4);
+	mbx_map.virt = ioremap(WINDOW_ADDR, WINDOW_SIZE * 4);
 
 	if (!mbx_map.virt) {
 		printk("Failed to ioremap\n");

@@ -406,7 +406,6 @@ struct i810_card {
 	u16 pci_id_internal; /* used to access card_cap[] */
 #ifdef CONFIG_PM	
 	u16 pm_suspended;
-	u32 pm_save_state[64/sizeof(u32)];
 	int pm_saved_mixer_settings[SOUND_MIXER_NRDEVICES][NR_AC97];
 #endif
 	/* soundcore stuff */
@@ -430,8 +429,8 @@ struct i810_card {
 
 	unsigned long ac97base_mmio_phys;
 	unsigned long iobase_mmio_phys;
-	u_int8_t *ac97base_mmio;
-	u_int8_t *iobase_mmio;
+	u_int8_t __iomem *ac97base_mmio;
+	u_int8_t __iomem *iobase_mmio;
 
 	int           use_mmio;
 	
@@ -917,7 +916,7 @@ static int alloc_dmabuf(struct i810_state *state)
 	dmabuf->rawbuf = rawbuf;
 	dmabuf->buforder = order;
 	
-	/* now mark the pages as reserved; otherwise remap_page_range doesn't do what we want */
+	/* now mark the pages as reserved; otherwise remap_pfn_range doesn't do what we want */
 	pend = virt_to_page(rawbuf + (PAGE_SIZE << order) - 1);
 	for (page = virt_to_page(rawbuf); page <= pend; page++)
 		SetPageReserved(page);
@@ -1750,7 +1749,8 @@ static int i810_mmap(struct file *file, struct vm_area_struct *vma)
 	if (size > (PAGE_SIZE << dmabuf->buforder))
 		goto out;
 	ret = -EAGAIN;
-	if (remap_page_range(vma, vma->vm_start, virt_to_phys(dmabuf->rawbuf),
+	if (remap_pfn_range(vma, vma->vm_start,
+			     virt_to_phys(dmabuf->rawbuf) >> PAGE_SHIFT,
 			     size, vma->vm_page_prot))
 		goto out;
 	dmabuf->mapped = 1;
@@ -3385,7 +3385,7 @@ static int i810_pm_suspend(struct pci_dev *dev, u32 pm_state)
 			}
 		}
 	}
-	pci_save_state(dev,card->pm_save_state); /* XXX do we need this? */
+	pci_save_state(dev); /* XXX do we need this? */
 	pci_disable_device(dev); /* disable busmastering */
 	pci_set_power_state(dev,3); /* Zzz. */
 
@@ -3398,7 +3398,7 @@ static int i810_pm_resume(struct pci_dev *dev)
 	int num_ac97,i=0;
 	struct i810_card *card=pci_get_drvdata(dev);
 	pci_enable_device(dev);
-	pci_restore_state (dev,card->pm_save_state);
+	pci_restore_state (dev);
 
 	/* observation of a toshiba portege 3440ct suggests that the 
 	   hardware has to be more or less completely reinitialized from
@@ -3484,13 +3484,15 @@ static struct pci_driver i810_pci_driver = {
 
 static int __init i810_init_module (void)
 {
+	int retval;
+
 	printk(KERN_INFO "Intel 810 + AC97 Audio, version "
 	       DRIVER_VERSION ", " __TIME__ " " __DATE__ "\n");
 
-	if (!pci_register_driver(&i810_pci_driver)) {
-		pci_unregister_driver(&i810_pci_driver);
-                return -ENODEV;
-	}
+	retval = pci_register_driver(&i810_pci_driver);
+	if (retval)
+		return retval;
+
 	if(ftsodell != 0) {
 		printk("i810_audio: ftsodell is now a deprecated option.\n");
 	}

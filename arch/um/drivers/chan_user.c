@@ -27,14 +27,26 @@ int generic_console_write(int fd, const char *buf, int n, void *unused)
 	int err;
 
 	if(isatty(fd)){
-		tcgetattr(fd, &save);
+		CATCH_EINTR(err = tcgetattr(fd, &save));
+		if (err)
+			goto error;
 		new = save;
+		/* The terminal becomes a bit less raw, to handle \n also as
+		 * "Carriage Return", not only as "New Line". Otherwise, the new
+		 * line won't start at the first column.*/
 		new.c_oflag |= OPOST;
-		tcsetattr(fd, TCSAFLUSH, &new);
+		CATCH_EINTR(err = tcsetattr(fd, TCSAFLUSH, &new));
+		if (err)
+			goto error;
 	}
 	err = generic_write(fd, buf, n, NULL);
-	if(isatty(fd)) tcsetattr(fd, TCSAFLUSH, &save);
+	/* Restore raw mode, in any case; we *must* ignore any error apart
+	 * EINTR, except for debug.*/
+	if(isatty(fd))
+		CATCH_EINTR(tcsetattr(fd, TCSAFLUSH, &save));
 	return(err);
+error:
+	return(-errno);
 }
 
 static void winch_handler(int sig)
@@ -98,7 +110,7 @@ static int winch_thread(void *arg)
 	}
 }
 
-static int winch_tramp(int fd, struct tty_struct *tty, int *fd_out)
+static int winch_tramp(int fd, void *device_data, int *fd_out)
 {
 	struct winch_data data;
 	unsigned long stack;
@@ -132,7 +144,7 @@ static int winch_tramp(int fd, struct tty_struct *tty, int *fd_out)
 	return(pid);
 }
 
-void register_winch(int fd, struct tty_struct *tty)
+void register_winch(int fd, void *device_data)
 {
 	int pid, thread, thread_fd;
 	int count;
@@ -143,10 +155,10 @@ void register_winch(int fd, struct tty_struct *tty)
 
 	pid = tcgetpgrp(fd);
 	if(!CHOOSE_MODE_PROC(is_tracer_winch, is_skas_winch, pid, fd,
-			     tty) && (pid == -1)){
-		thread = winch_tramp(fd, tty, &thread_fd);
+			     device_data) && (pid == -1)){
+		thread = winch_tramp(fd, device_data, &thread_fd);
 		if(fd != -1){
-			register_winch_irq(thread_fd, fd, thread, tty);
+			register_winch_irq(thread_fd, fd, thread, device_data);
 
 			count = os_write_file(thread_fd, &c, sizeof(c));
 			if(count != sizeof(c))

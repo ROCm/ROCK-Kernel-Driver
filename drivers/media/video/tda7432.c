@@ -1,8 +1,8 @@
 /*
  * For the STS-Thompson TDA7432 audio processor chip
- * 
+ *
  * Handles audio functions: volume, balance, tone, loudness
- * This driver will not complain if used with any 
+ * This driver will not complain if used with any
  * other i2c device with the same address.
  *
  * Muting and tone control by Jonathan Isom <jisom@ematic.com>
@@ -106,7 +106,7 @@ static struct i2c_client client_template;
  * output (for front and rear).  Since most vidcap cards probably
  * don't have 4 channel output, this driver will set front & rear
  * together (no independent control).
- */ 
+ */
 
 		/* Subaddresses for TDA7432 */
 
@@ -132,13 +132,13 @@ static struct i2c_client client_template;
  * 0x03 - Mute  (Using Attenuators Plays better with modules)
  * Mono probably isn't used - I'm guessing only the stereo
  * input is connected on most cards, so we'll set it to stereo.
- * 
+ *
  * Bit 3 controls bass cut: 0/1 is non-symmetric/symmetric bass cut
  * Bit 4 controls bass range: 0/1 is extended/standard bass range
- * 
+ *
  * Highest 3 bits not used
  */
- 
+
 #define TDA7432_STEREO_IN	0
 #define TDA7432_MONO_IN		2	/* Probably won't be used */
 #define TDA7432_BASS_SYM	1 << 3
@@ -161,7 +161,7 @@ static struct i2c_client client_template;
 #define TDA7432_LD_ON		1 << 7
 
 
-/* Subaddress 0x02 - Tone control */ 
+/* Subaddress 0x02 - Tone control */
 
 /* Bits 0,1,2 control absolute treble gain from 0dB to 14dB
  * 0x0 is 14dB, 0x7 is 0dB
@@ -173,23 +173,23 @@ static struct i2c_client client_template;
  * Bits 4,5,6 control absolute bass gain from 0dB to 14dB
  * (This is only true for normal base range, set in 0x00)
  * 0x0 << 4 is 14dB, 0x7 is 0dB
- * 
+ *
  * Bit 7 controls bass attenuation/gain (sign)
  * 1 << 7 = gain (+)
- * 0 << 7 = attenuation (-) 
+ * 0 << 7 = attenuation (-)
  *
  * Example:
  * 1 1 0 1 0 1 0 1 is +4dB bass, -4dB treble
  */
 
-#define TDA7432_TREBLE_0DB		0xf 
+#define TDA7432_TREBLE_0DB		0xf
 #define TDA7432_TREBLE			7
 #define TDA7432_TREBLE_GAIN		1 << 3
 #define TDA7432_BASS_0DB		0xf
 #define TDA7432_BASS			7 << 4
 #define TDA7432_BASS_GAIN		1 << 7
 
- 
+
 /* Subaddress 0x03 - Left  Front attenuation */
 /* Subaddress 0x04 - Left  Rear  attenuation */
 /* Subaddress 0x05 - Right Front attenuation */
@@ -202,7 +202,7 @@ static struct i2c_client client_template;
  * 0x1f is -37.5dB
  *
  * Bit 5 mutes that channel when set (1 = mute, 0 = unmute)
- * We'll use the mute on the input, though (above) 
+ * We'll use the mute on the input, though (above)
  * Bits 6,7 unused
  */
 
@@ -223,8 +223,8 @@ static struct i2c_client client_template;
  *
  * Bits 5,6,7 unused
  */
- 
- 
+
+
 
 /* Begin code */
 
@@ -253,7 +253,7 @@ static int tda7432_read(struct i2c_client *client)
 		printk(KERN_WARNING "tda7432: I/O error, trying (read)\n");
 		return -1;
 	}
-	dprintk("tda7432: Read 0x%02x\n", buffer); 
+	dprintk("tda7432: Read 0x%02x\n", buffer);
 	return buffer;
 }
 #endif
@@ -263,8 +263,8 @@ static int tda7432_set(struct i2c_client *client)
 	struct tda7432 *t = i2c_get_clientdata(client);
 	unsigned char buf[16];
 	d2printk("tda7432: In tda7432_set\n");
-	
-	dprintk(KERN_INFO 
+
+	dprintk(KERN_INFO
 		"tda7432: 7432_set(0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x,0x%02x)\n",
 		t->input,t->volume,t->bass,t->treble,t->lf,t->lr,t->rf,t->rr,t->loud);
 	buf[0]  = TDA7432_IN;
@@ -292,10 +292,10 @@ static void do_tda7432_init(struct i2c_client *client)
 
 	t->input  = TDA7432_STEREO_IN |  /* Main (stereo) input   */
 		    TDA7432_BASS_SYM  |  /* Symmetric bass cut    */
-		    TDA7432_BASS_NORM;   /* Normal bass range     */ 
+		    TDA7432_BASS_NORM;   /* Normal bass range     */
 	t->volume =  0x3b ;				 /* -27dB Volume            */
 	if (loudness)			 /* Turn loudness on?     */
-		t->volume |= TDA7432_LD_ON;	
+		t->volume |= TDA7432_LD_ON;
 	t->muted    = VIDEO_AUDIO_MUTE;
 	t->treble   = TDA7432_TREBLE_0DB; /* 0dB Treble            */
 	t->bass		= TDA7432_BASS_0DB; 	 /* 0dB Bass              */
@@ -328,7 +328,7 @@ static int tda7432_attach(struct i2c_adapter *adap, int addr, int kind)
         client->adapter = adap;
         client->addr = addr;
 	i2c_set_clientdata(client, t);
-	
+
 	do_tda7432_init(client);
 	printk(KERN_INFO "tda7432: init\n");
 
@@ -354,7 +354,7 @@ static int tda7432_detach(struct i2c_client *client)
 
 	do_tda7432_init(client);
 	i2c_detach_client(client);
-	
+
 	kfree(t);
 	return 0;
 }
@@ -369,7 +369,7 @@ static int tda7432_command(struct i2c_client *client,
 	/* --- v4l ioctls --- */
 	/* take care: bttv does userspace copying, we'll get a
 	   kernel pointer here... */
-	
+
 	/* Query card - scale from TDA7432 settings to V4L settings */
 	case VIDIOCGAUDIO:
 	{
@@ -385,7 +385,7 @@ static int tda7432_command(struct i2c_client *client,
 		va->mode |= VIDEO_SOUND_STEREO;
 		/* Master volume control
 		 * V4L volume is min 0, max 65535
-		 * TDA7432 Volume: 
+		 * TDA7432 Volume:
 		 * Min (-79dB) is 0x6f
 		 * Max (+20dB) is 0x07 (630)
 		 * Max (0dB) is 0x20 (829)
@@ -396,7 +396,7 @@ static int tda7432_command(struct i2c_client *client,
 		} else {       /* max 0db   */
 			va->volume = ( 0x6f - (t->volume & 0x7F) ) * 829;
 		}
-		
+
 		/* Balance depends on L,R attenuation
 		 * V4L balance is 0 to 65535, middle is 32768
 		 * TDA7432 attenuation: min (0dB) is 0, max (-37.5dB) is 0x1f
@@ -404,15 +404,15 @@ static int tda7432_command(struct i2c_client *client,
 		 * attenuation exists for lf, lr, rf, rr
 		 * we use only lf and rf (front channels)
 		 */
-		
+
 		if ( (t->lf) < (t->rf) )
 			/* right is attenuated, balance shifted left */
 			va->balance = (32768 - 1057*(t->rf));
 		else
 			/* left is attenuated, balance shifted right */
 			va->balance = (32768 + 1057*(t->lf));
-		
-		/* Bass/treble 4 bits each */	
+
+		/* Bass/treble 4 bits each */
 		va->bass=t->bass;
 		if(va->bass >= 0x8)
 			va->bass = ~(va->bass - 0x8) & 0xf;
@@ -421,7 +421,7 @@ static int tda7432_command(struct i2c_client *client,
 		if(va->treble >= 0x8)
 			va->treble = ~(va->treble - 0x8) & 0xf;
 		va->treble = (va->treble << 12)+(va->treble << 8)+(va->treble << 4)+(va->treble);
-								
+
 		break; /* VIDIOCGAUDIO case */
 	}
 
@@ -437,13 +437,13 @@ static int tda7432_command(struct i2c_client *client,
 			} else {    /* max 0db   */
 				t->volume = 0x6f - ((va->volume)/829);
 			}
-		
+
 		if (loudness)		/* Turn on the loudness bit */
 			t->volume |= TDA7432_LD_ON;
-		
+
 			tda7432_write(client,TDA7432_VL, t->volume);
 		}
-		
+
 		if(va->flags & VIDEO_AUDIO_BASS)
 		{
 			t->bass = va->bass >> 12;
@@ -458,15 +458,15 @@ static int tda7432_command(struct i2c_client *client,
 		}
 		if(va->flags & (VIDEO_AUDIO_TREBLE| VIDEO_AUDIO_BASS))
 			tda7432_write(client,TDA7432_TN, 0x10 | (t->bass << 4) | t->treble );
-		
+
 		if(va->flags & VIDEO_AUDIO_BALANCE)	{
-		if (va->balance < 32768) 
+		if (va->balance < 32768)
 		{
 			/* shifted to left, attenuate right */
 			t->rr = (32768 - va->balance)/1057;
 			t->rf = t->rr;
 			t->lr = TDA7432_ATTEN_0DB;
-			t->lf = TDA7432_ATTEN_0DB;	
+			t->lf = TDA7432_ATTEN_0DB;
 		}
 		else if(va->balance > 32769)
 		{
@@ -474,22 +474,22 @@ static int tda7432_command(struct i2c_client *client,
 			t->lf = (va->balance - 32768)/1057;
 			t->lr = t->lf;
 			t->rr = TDA7432_ATTEN_0DB;
-			t->rf = TDA7432_ATTEN_0DB;		
+			t->rf = TDA7432_ATTEN_0DB;
 		}
-		else 
+		else
 		{
-			/* centered */		
+			/* centered */
 			t->rr = TDA7432_ATTEN_0DB;
 			t->rf = TDA7432_ATTEN_0DB;
 			t->lf = TDA7432_ATTEN_0DB;
 			t->lr = TDA7432_ATTEN_0DB;
 		}
 		}
-					
-	 	t->muted=(va->flags & VIDEO_AUDIO_MUTE);	
+
+	 	t->muted=(va->flags & VIDEO_AUDIO_MUTE);
 		if (t->muted)
 		{
-			/* Mute & update balance*/	
+			/* Mute & update balance*/
 			tda7432_write(client,TDA7432_LF, t->lf | TDA7432_MUTE);
 			tda7432_write(client,TDA7432_LR, t->lr | TDA7432_MUTE);
 			tda7432_write(client,TDA7432_RF, t->rf | TDA7432_MUTE);
@@ -500,7 +500,7 @@ static int tda7432_command(struct i2c_client *client,
 			tda7432_write(client,TDA7432_RF, t->rf);
 			tda7432_write(client,TDA7432_RR, t->rr);
 		}
-							
+
 		break;
 
 	} /* end of VIDEOCSAUDIO case */
@@ -529,7 +529,7 @@ static struct i2c_client client_template =
 {
 	I2C_DEVNAME("tda7432"),
         .id         = -1,
-	.driver     = &driver, 
+	.driver     = &driver,
 };
 
 static int __init tda7432_init(void)

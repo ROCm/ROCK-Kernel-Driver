@@ -350,22 +350,6 @@ available.  In this case, there are 0 chunks of 2^0*PAGE_SIZE available in
 ZONE_DMA, 4 chunks of 2^1*PAGE_SIZE in ZONE_DMA, 101 chunks of 2^4*PAGE_SIZE 
 available in ZONE_NORMAL, etc... 
 
-
-1.3 IDE devices in /proc/ide
-----------------------------
-
-The subdirectory /proc/ide contains information about all IDE devices of which
-the kernel  is  aware.  There is one subdirectory for each IDE controller, the
-file drivers  and a link for each IDE device, pointing to the device directory
-in the controller specific subtree.
-
-The file  drivers  contains general information about the drivers used for the
-IDE devices:
-
-  > cat /proc/ide/drivers 
-  ide-cdrom version 4.53 
-  ide-disk version 1.08 
-
 ..............................................................................
 
 meminfo:
@@ -394,9 +378,9 @@ Dirty:             968 kB
 Writeback:           0 kB
 Mapped:         280372 kB
 Slab:           684068 kB
-Committed_AS:  1576424 kB
+CommitLimit:   7669796 kB
+Committed_AS:   100056 kB
 PageTables:      24448 kB
-ReverseMaps:   1080904
 VmallocTotal:   112216 kB
 VmallocUsed:       428 kB
 VmallocChunk:   111088 kB
@@ -434,25 +418,53 @@ VmallocChunk:   111088 kB
    Writeback: Memory which is actively being written back to the disk
       Mapped: files which have been mmaped, such as libraries
               Slab: in-kernel data structures cache
-Committed_AS: An estimate of how much RAM you would need to make a
-              99.99% guarantee that there never is OOM (out of memory)
-              for this workload. Normally the kernel will overcommit
-              memory. That means, say you do a 1GB malloc, nothing
-              happens, really. Only when you start USING that malloc
-              memory you will get real memory on demand, and just as
-              much as you use. So you sort of take a mortgage and hope
-              the bank doesn't go bust. Other cases might include when
-              you mmap a file that's shared only when you write to it
-              and you get a private copy of that data. While it normally
-              is shared between processes. The Committed_AS is a
-              guesstimate of how much RAM/swap you would need
-              worst-case.
+ CommitLimit: Based on the overcommit ratio ('vm.overcommit_ratio'),
+              this is the total amount of  memory currently available to
+              be allocated on the system. This limit is only adhered to
+              if strict overcommit accounting is enabled (mode 2 in
+              'vm.overcommit_memory').
+              The CommitLimit is calculated with the following formula:
+              CommitLimit = ('vm.overcommit_ratio' * Physical RAM) + Swap
+              For example, on a system with 1G of physical RAM and 7G
+              of swap with a `vm.overcommit_ratio` of 30 it would
+              yield a CommitLimit of 7.3G.
+              For more details, see the memory overcommit documentation
+              in vm/overcommit-accounting.
+Committed_AS: The amount of memory presently allocated on the system.
+              The committed memory is a sum of all of the memory which
+              has been allocated by processes, even if it has not been
+              "used" by them as of yet. A process which malloc()'s 1G
+              of memory, but only touches 300M of it will only show up
+              as using 300M of memory even if it has the address space
+              allocated for the entire 1G. This 1G is memory which has
+              been "committed" to by the VM and can be used at any time
+              by the allocating application. With strict overcommit
+              enabled on the system (mode 2 in 'vm.overcommit_memory'),
+              allocations which would exceed the CommitLimit (detailed
+              above) will not be permitted. This is useful if one needs
+              to guarantee that processes will not fail due to lack of
+              memory once that memory has been successfully allocated.
   PageTables: amount of memory dedicated to the lowest level of page
               tables.
- ReverseMaps: number of reverse mappings performed
 VmallocTotal: total size of vmalloc memory area
  VmallocUsed: amount of vmalloc area which is used
 VmallocChunk: largest contigious block of vmalloc area which is free
+
+
+1.3 IDE devices in /proc/ide
+----------------------------
+
+The subdirectory /proc/ide contains information about all IDE devices of which
+the kernel  is  aware.  There is one subdirectory for each IDE controller, the
+file drivers  and a link for each IDE device, pointing to the device directory
+in the controller specific subtree.
+
+The file  drivers  contains general information about the drivers used for the
+IDE devices:
+
+  > cat /proc/ide/drivers
+  ide-cdrom version 4.53
+  ide-disk version 1.08
 
 More detailed  information  can  be  found  in  the  controller  specific
 subdirectories. These  are  named  ide0,  ide1  and  so  on.  Each  of  these
@@ -1268,6 +1280,14 @@ block_dump
 
 block_dump enables block I/O debugging when set to a nonzero value. More
 information on block I/O debugging is in Documentation/laptop-mode.txt.
+
+swap_token_timeout
+------------------
+
+This file contains valid hold time of swap out protection token. The Linux
+VM has token based thrashing control mechanism and uses the token to prevent
+unnecessary page faults in thrashing situation. The unit of the value is
+second. The value would be useful to tune thrashing behavior.
 
 2.5 /proc/sys/dev - Device specific parameters
 ----------------------------------------------

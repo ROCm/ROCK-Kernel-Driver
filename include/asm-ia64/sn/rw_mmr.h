@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2002-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (C) 2002-2004 Silicon Graphics, Inc.  All Rights Reserved.
  */
 #ifndef _ASM_IA64_SN_RW_MMR_H
 #define _ASM_IA64_SN_RW_MMR_H

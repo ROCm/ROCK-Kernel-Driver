@@ -11,7 +11,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Martin Schwidefsky <schwidefsky@de.ibm.com>
  *
- *    $Revision: 1.92 $	 $Date: 2004/09/03 08:06:11 $
+ *    $Revision: 1.96 $	 $Date: 2004/11/11 13:42:33 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -59,7 +59,7 @@
 /**
  * initialization string for output
  */
-#define VERSION_LCS_C  "$Revision: 1.92 $"
+#define VERSION_LCS_C  "$Revision: 1.96 $"
 
 static char version[] __initdata = "LCS driver ("VERSION_LCS_C "/" VERSION_LCS_H ")";
 static char debug_buffer[255];
@@ -191,6 +191,7 @@ lcs_alloc_card(void)
 		return NULL;
 	memset(card, 0, sizeof(struct lcs_card));
 	card->lan_type = LCS_FRAME_TYPE_AUTO;
+	card->pkt_seq = 0;
 	card->lancmd_timeout = LCS_LANCMD_TIMEOUT_DEFAULT;
 	/* Allocate io buffers for the read channel. */
 	rc = lcs_alloc_channel(&card->read);
@@ -549,6 +550,7 @@ lcs_stop_channel(struct lcs_channel *channel)
 		return 0;
 	LCS_DBF_TEXT(4,trace,"haltsch");
 	LCS_DBF_TEXT_(4,trace,"%s", channel->ccwdev->dev.bus_id);
+	channel->state = CH_STATE_INIT;
 	spin_lock_irqsave(get_ccwdev_lock(channel->ccwdev), flags);
 	rc = ccw_device_halt(channel->ccwdev, (addr_t) channel);
 	spin_unlock_irqrestore(get_ccwdev_lock(channel->ccwdev), flags);
@@ -1357,6 +1359,7 @@ lcs_irq(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 
 	LCS_DBF_TEXT_(5, trace, "Rint%s",cdev->dev.bus_id);
 	LCS_DBF_TEXT_(5, trace, "%4x%4x",irb->scsw.cstat, irb->scsw.dstat);
+	LCS_DBF_TEXT_(5, trace, "%4x%4x",irb->scsw.fctl, irb->scsw.actl);
 
 	/* How far in the ccw chain have we processed? */
 	if ((channel->state != CH_STATE_INIT) &&
@@ -1624,8 +1627,6 @@ lcs_detect(struct lcs_card *card)
 	/* start/reset card */
 	if (card->dev)
 		netif_stop_queue(card->dev);
-	card->write.state = CH_STATE_INIT;
-	card->read.state = CH_STATE_INIT;
 	rc = lcs_stop_channels(card);
 	if (rc == 0) {
 		rc = lcs_start_channels(card);
@@ -1874,6 +1875,7 @@ lcs_get_skb(struct lcs_card *card, char *skb_data, unsigned int skb_len)
 	skb->protocol =	card->lan_type_trans(skb, card->dev);
 	card->stats.rx_bytes += skb_len;
 	card->stats.rx_packets++;
+	*((__u32 *)skb->cb) = ++card->pkt_seq;
 	netif_rx(skb);
 }
 

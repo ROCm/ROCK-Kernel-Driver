@@ -1,10 +1,10 @@
 /*
  * Flash memory access on Alchemy Db1550 board
  * 
- * $Id: db1550-flash.c,v 1.3 2004/07/14 17:45:40 dwmw2 Exp $
+ * $Id: db1550-flash.c,v 1.7 2004/11/04 13:24:14 gleixner Exp $
  *
  * (C) 2004 Embedded Edge, LLC, based on db1550-flash.c:
- * (C) 2003 Pete Popov <pete_popov@yahoo.com>
+ * (C) 2003, 2004 Pete Popov <ppopov@embeddedalley.com>
  * 
  */
 
@@ -19,7 +19,6 @@
 #include <linux/mtd/partitions.h>
 
 #include <asm/io.h>
-#include <asm/au1000.h>
 
 #ifdef 	DEBUG_RW
 #define	DBG(x...)	printk(x)
@@ -132,7 +131,7 @@ int setup_flash_params(void)
 			window_addr = 0x1C000000;
 			window_size = 0x4000000; 
 #else /* USER ONLY */
-			window_addr = 0x1E000000;
+			window_addr = 0x18000000;
 			window_size = 0x4000000; 
 #endif
 	return 0;
@@ -160,10 +159,9 @@ int __init db1550_mtd_init(void)
 	 * Now let's probe for the actual flash.  Do it here since
 	 * specific machine settings might have been set above.
 	 */
-	printk(KERN_NOTICE "Pb1550 flash: probing %d-bit flash bus\n", 
+	printk(KERN_NOTICE "Db1550 flash: probing %d-bit flash bus\n", 
 			db1550_map.bankwidth*8);
-	db1550_map.virt = 
-		(unsigned long)ioremap(window_addr, window_size);
+	db1550_map.virt = ioremap(window_addr, window_size);
 	mymtd = do_map_probe("cfi_probe", &db1550_map);
 	if (!mymtd) return -ENXIO;
 	mymtd->owner = THIS_MODULE;
@@ -177,6 +175,7 @@ static void __exit db1550_mtd_cleanup(void)
 	if (mymtd) {
 		del_mtd_partitions(mymtd);
 		map_destroy(mymtd);
+		iounmap((void *) db1550_map.virt);
 	}
 }
 

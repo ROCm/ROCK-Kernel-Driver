@@ -23,6 +23,7 @@
 #include <linux/vt_kern.h>		/* For unblank_screen() */
 #include <linux/compiler.h>
 #include <linux/module.h>
+#include <linux/kprobes.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -32,6 +33,7 @@
 #include <asm/proto.h>
 #include <asm/kdebug.h>
 #include <asm-generic/sections.h>
+#include <asm/kdebug.h>
 
 void bust_spinlocks(int yes)
 {
@@ -248,7 +250,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 {
 	struct task_struct *tsk;
 	struct mm_struct *mm;
-	struct vm_area_struct * vma, * prev_vma;
+	struct vm_area_struct * vma;
 	unsigned long address;
 	const struct exception_table_entry *fixup;
 	int write;
@@ -268,6 +270,9 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 
 	/* get the address */
 	__asm__("movq %%cr2,%0":"=r" (address));
+	if (notify_die(DIE_PAGE_FAULT, "page fault", regs, error_code, 14,
+					SIGSEGV) == NOTIFY_STOP)
+		return;
 
 	if (likely(regs->eflags & X86_EFLAGS_IF))
 		local_irq_enable();
@@ -315,7 +320,27 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 		goto bad_area_nosemaphore;
 
  again:
-	down_read(&mm->mmap_sem);
+	/* When running in the kernel we expect faults to occur only to
+	 * addresses in user space.  All other faults represent errors in the
+	 * kernel and should generate an OOPS.  Unfortunatly, in the case of an
+	 * erroneous fault occuring in a code path which already holds mmap_sem
+	 * we will deadlock attempting to validate the fault against the
+	 * address space.  Luckily the kernel only validly references user
+	 * space from well defined areas of code, which are listed in the
+	 * exceptions table.
+	 *
+	 * As the vast majority of faults will be valid we will only perform
+	 * the source reference check when there is a possibilty of a deadlock.
+	 * Attempt to lock the address space, if we cannot we then validate the
+	 * source.  If this is invalid we can skip the address space check,
+	 * thus avoiding the deadlock.
+	 */
+	if (!down_read_trylock(&mm->mmap_sem)) {
+		if ((error_code & 4) == 0 &&
+		    !search_exception_tables(regs->rip))
+			goto bad_area_nosemaphore;
+		down_read(&mm->mmap_sem);
+	}
 
 	vma = find_vma(mm, address);
 	if (!vma)
@@ -329,13 +354,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 		if (address + 128 < regs->rsp)
 			goto bad_area;
 	}
-	/*
-	 * find_vma_prev is just a bit slower, because it cannot
-	 * use the mmap_cache, so we run it only in the growsdown
-	 * slow path and we leave find_vma in the fast path.
-	 */
-	find_vma_prev(current->mm, address, &prev_vma);
-	if (expand_stack(vma, address, prev_vma))
+	if (expand_stack(vma, address))
 		goto bad_area;
 /*
  * Ok, we have a good vm_area for this memory access, so

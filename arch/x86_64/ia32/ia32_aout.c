@@ -31,6 +31,7 @@
 #include <asm/pgalloc.h>
 #include <asm/cacheflush.h>
 #include <asm/user32.h>
+#include <asm/ia32.h>
 
 #undef WARN_OLD
 #undef CORE_DUMP /* probably broken */
@@ -107,18 +108,13 @@ static struct linux_binfmt aout_format = {
 	.min_coredump	= PAGE_SIZE
 };
 
-#define BAD_ADDR(x)	((unsigned long)(x) >= TASK_SIZE)
-
-static int set_brk(unsigned long start, unsigned long end)
+static void set_brk(unsigned long start, unsigned long end)
 {
 	start = PAGE_ALIGN(start);
 	end = PAGE_ALIGN(end);
-	if (end > start) {
-		unsigned long addr = do_brk(start, end - start);
-		if (BAD_ADDR(addr))
-			return addr;
-	}
-	return 0;
+	if (end <= start)
+		return;
+	do_brk(start, end - start);
 }
 
 #if CORE_DUMP
@@ -173,12 +169,12 @@ static int aout_core_dump(long signr, struct pt_regs * regs, struct file *file)
 /* If the size of the dump file exceeds the rlimit, then see what would happen
    if we wrote the stack, but not the data area.  */
 	if ((dump.u_dsize+dump.u_ssize+1) * PAGE_SIZE >
-	    current->rlim[RLIMIT_CORE].rlim_cur)
+	    current->signal->rlim[RLIMIT_CORE].rlim_cur)
 		dump.u_dsize = 0;
 
 /* Make sure we have enough room to write the stack and data areas. */
 	if ((dump.u_ssize+1) * PAGE_SIZE >
-	    current->rlim[RLIMIT_CORE].rlim_cur)
+	    current->signal->rlim[RLIMIT_CORE].rlim_cur)
 		dump.u_ssize = 0;
 
 /* make sure we actually have a data and stack area to dump */
@@ -286,7 +282,7 @@ static int load_aout_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	 * size limits imposed on them by creating programs with large
 	 * arrays in the data or bss.
 	 */
-	rlim = current->rlim[RLIMIT_DATA].rlim_cur;
+	rlim = current->signal->rlim[RLIMIT_DATA].rlim_cur;
 	if (rlim >= RLIM_INFINITY)
 		rlim = ~0;
 	if (ex.a_data + ex.a_bss > rlim)
@@ -399,11 +395,7 @@ static int load_aout_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 beyond_if:
 	set_binfmt(&aout_format);
 
-	retval = set_brk(current->mm->start_brk, current->mm->brk);
-	if (retval < 0) {
-		send_sig(SIGKILL, current, 0);
-		return retval;
-	}
+	set_brk(current->mm->start_brk, current->mm->brk);
 
 	retval = ia32_setup_arg_pages(bprm, EXSTACK_DEFAULT);
 	if (retval < 0) { 

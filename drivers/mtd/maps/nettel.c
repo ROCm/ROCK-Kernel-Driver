@@ -6,7 +6,7 @@
  *      (C) Copyright 2000-2001, Greg Ungerer (gerg@snapgear.com)
  *      (C) Copyright 2001-2002, SnapGear (www.snapgear.com)
  *
- *	$Id: nettel.c,v 1.5 2004/07/12 21:59:44 dwmw2 Exp $
+ *	$Id: nettel.c,v 1.8 2004/11/04 13:24:15 gleixner Exp $
  */
 
 /****************************************************************************/
@@ -232,7 +232,7 @@ int __init nettel_init(void)
 #endif
 	int rc = 0;
 
-	nettel_mmcrp = (void __iomem *) ioremap_nocache(0xfffef000, 4096);
+	nettel_mmcrp = (void *) ioremap_nocache(0xfffef000, 4096);
 	if (nettel_mmcrp == NULL) {
 		printk("SNAPGEAR: failed to disable MMCR cache??\n");
 		return(-EIO);
@@ -357,7 +357,8 @@ int __init nettel_init(void)
 	/* Probe for the the size of the first Intel flash */
 	nettel_intel_map.size = maxsize;
 	nettel_intel_map.phys = intel0addr;
-	nettel_intel_map.virt = ioremap_nocache(intel0addr, maxsize);
+	nettel_intel_map.virt = (unsigned long)
+		ioremap_nocache(intel0addr, maxsize);
 	if (!nettel_intel_map.virt) {
 		printk("SNAPGEAR: failed to ioremap() ROMCS1\n");
 		return(-EIO);
@@ -390,7 +391,8 @@ int __init nettel_init(void)
 	iounmap((void *) nettel_intel_map.virt);
 
 	nettel_intel_map.size = maxsize;
-	nettel_intel_map.virt = ioremap_nocache(intel0addr, maxsize);
+	nettel_intel_map.virt = (unsigned long)
+		ioremap_nocache(intel0addr, maxsize);
 	if (!nettel_intel_map.virt) {
 		printk("SNAPGEAR: failed to ioremap() ROMCS1/2\n");
 		return(-EIO);
@@ -469,8 +471,8 @@ void __exit nettel_cleanup(void)
 		map_destroy(amd_mtd);
 	}
 	if (nettel_amd_map.virt) {
-		iounmap((void *)nettel_amd_map.virt);
-		nettel_amd_map.virt = 0;
+		iounmap(nettel_amd_map.virt);
+		nettel_amd_map.virt = NULL;
 	}
 #ifdef CONFIG_MTD_CFI_INTELEXT
 	if (intel_mtd) {

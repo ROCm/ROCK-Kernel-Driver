@@ -20,11 +20,17 @@
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_ioctl.h>
 #include <scsi/scsi_request.h>
+#include <scsi/sg.h>
 
 #include "scsi_logging.h"
 
 #define NORMAL_RETRIES			5
 #define IOCTL_NORMAL_TIMEOUT			(10 * HZ)
+#define FORMAT_UNIT_TIMEOUT		(2 * 60 * 60 * HZ)
+#define START_STOP_TIMEOUT		(60 * HZ)
+#define MOVE_MEDIUM_TIMEOUT		(5 * 60 * HZ)
+#define READ_ELEMENT_STATUS_TIMEOUT	(5 * 60 * HZ)
+#define READ_DEFECT_DATA_TIMEOUT	(60 * HZ )  /* ZIP-250 on parallel port takes as long! */
 
 #define MAX_BUF PAGE_SIZE
 
@@ -451,3 +457,51 @@ int scsi_ioctl(struct scsi_device *sdev, int cmd, void __user *arg)
 	}
 	return -EINVAL;
 }
+
+/*
+ * the scsi_nonblock_ioctl() function is designed for ioctls which may
+ * be executed even if the device is in recovery.
+ */
+int scsi_nonblockable_ioctl(struct scsi_device *sdev, int cmd,
+			    void __user *arg, struct file *filp)
+{
+	int val, result;
+
+	/* The first set of iocts may be executed even if we're doing
+	 * error processing, as long as the device was opened
+	 * non-blocking */
+	if (filp && filp->f_flags & O_NONBLOCK) {
+		if (test_bit(SHOST_RECOVERY,
+			     &sdev->host->shost_state))
+			return -ENODEV;
+	} else if (!scsi_block_when_processing_errors(sdev))
+		return -ENODEV;
+
+	switch (cmd) {
+	case SG_SCSI_RESET:
+		result = get_user(val, (int __user *)arg);
+		if (result)
+			return result;
+		if (val == SG_SCSI_RESET_NOTHING)
+			return 0;
+		switch (val) {
+		case SG_SCSI_RESET_DEVICE:
+			val = SCSI_TRY_RESET_DEVICE;
+			break;
+		case SG_SCSI_RESET_BUS:
+			val = SCSI_TRY_RESET_BUS;
+			break;
+		case SG_SCSI_RESET_HOST:
+			val = SCSI_TRY_RESET_HOST;
+			break;
+		default:
+			return -EINVAL;
+		}
+		if (!capable(CAP_SYS_ADMIN) || !capable(CAP_SYS_RAWIO))
+			return -EACCES;
+		return (scsi_reset_provider(sdev, val) ==
+			SUCCESS) ? 0 : -EIO;
+	}
+	return -ENODEV;
+}
+EXPORT_SYMBOL(scsi_nonblockable_ioctl);

@@ -481,7 +481,6 @@ struct netdrv_private {
 	unsigned int mediasense:1;	/* Media sensing in progress. */
 	spinlock_t lock;
 	chip_t chipset;
-	u32 pci_state[16];	/* Data saved during suspend */
 };
 
 MODULE_AUTHOR ("Jeff Garzik <jgarzik@pobox.com>");
@@ -796,7 +795,7 @@ static int __devinit netdrv_init_one (struct pci_dev *pdev,
 	tp->pci_dev = pdev;
 	tp->board = ent->driver_data;
 	tp->mmio_addr = ioaddr;
-	tp->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&tp->lock);
 
 	pci_set_drvdata(pdev, dev);
 
@@ -1921,7 +1920,7 @@ static int netdrv_suspend (struct pci_dev *pdev, u32 state)
 
 	spin_unlock_irqrestore (&tp->lock, flags);
 
-	pci_save_state (pdev, tp->pci_state);
+	pci_save_state (pdev);
 	pci_set_power_state (pdev, 3);
 
 	return 0;
@@ -1936,7 +1935,7 @@ static int netdrv_resume (struct pci_dev *pdev)
 	if (!netif_running(dev))
 		return 0;
 	pci_set_power_state (pdev, 0);
-	pci_restore_state (pdev, tp->pci_state);
+	pci_restore_state (pdev);
 	netif_device_attach (dev);
 	netdrv_hw_start (dev);
 

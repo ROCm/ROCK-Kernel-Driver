@@ -5,18 +5,55 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/tty.h>
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/partitions.h>
 
 #include <asm/hardware.h>
 #include <asm/setup.h>
 #include <asm/irq.h>
 
 #include <asm/mach/arch.h>
+#include <asm/mach/flash.h>
 #include <asm/mach/map.h>
 #include <asm/mach/serial_sa1100.h>
 #include <asm/arch/shannon.h>
 
 #include "generic.h"
 
+static struct mtd_partition shannon_partitions[] = {
+	{
+		.name		= "BLOB boot loader",
+		.offset		= 0,
+		.size		= 0x20000
+	},
+	{
+		.name		= "kernel",
+		.offset		= MTDPART_OFS_APPEND,
+		.size		= 0xe0000
+	},
+	{ 
+		.name		= "initrd",
+		.offset		= MTDPART_OFS_APPEND,	
+		.size		= MTDPART_SIZ_FULL
+	}
+};
+
+static struct flash_platform_data shannon_flash_data = {
+	.map_name	= "cfi_probe",
+	.parts		= shannon_partitions,
+	.nr_parts	= ARRAY_SIZE(shannon_partitions),
+};
+
+static struct resource shannon_flash_resource = {
+	.start		= SA1100_CS0_PHYS,
+	.end		= SA1100_CS0_PHYS + SZ_4M - 1,
+	.flags		= IORESOURCE_MEM,
+};
+
+static void __init shannon_init(void)
+{
+	sa11x0_set_flash_data(&shannon_flash_data, shannon_flash_resource, 1);
+}
 
 static void __init shannon_map_io(void)
 {
@@ -41,5 +78,6 @@ MACHINE_START(SHANNON, "Shannon (AKA: Tuxscreen)")
 	BOOT_PARAMS(0xc0000100)
 	MAPIO(shannon_map_io)
 	INITIRQ(sa1100_init_irq)
-	INITTIME(sa1100_init_time)
+	.timer		= &sa1100_timer,
+	.init_machine	= shannon_init,
 MACHINE_END

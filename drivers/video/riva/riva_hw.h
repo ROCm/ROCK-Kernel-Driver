@@ -73,20 +73,17 @@ typedef unsigned int   U032;
 /*
  * HW access macros.
  */
-#if defined(__powerpc__)
 #include <asm/io.h>
-#define NV_WR08(p,i,d)	out_8(p+i, d)
-#define NV_RD08(p,i)	in_8(p+i)
-#else
-#define NV_WR08(p,i,d)  (((U008 *)(p))[i]=(d))
-#define NV_RD08(p,i)    (((U008 *)(p))[i])
-#endif
-#define NV_WR16(p,i,d)  (((U016 *)(p))[(i)/2]=(d))
-#define NV_RD16(p,i)    (((U016 *)(p))[(i)/2])
-#define NV_WR32(p,i,d)  (((U032 *)(p))[(i)/4]=(d))
-#define NV_RD32(p,i)    (((U032 *)(p))[(i)/4])
-#define VGA_WR08(p,i,d) NV_WR08(p,i,d)
-#define VGA_RD08(p,i)   NV_RD08(p,i)
+
+#define NV_WR08(p,i,d)  (__raw_writeb((d), (void __iomem *)(p) + (i)))
+#define NV_RD08(p,i)    (__raw_readb((void __iomem *)(p) + (i)))
+#define NV_WR16(p,i,d)  (__raw_writew((d), (void __iomem *)(p) + (i)))
+#define NV_RD16(p,i)    (__raw_readw((void __iomem *)(p) + (i)))
+#define NV_WR32(p,i,d)  (__raw_writel((d), (void __iomem *)(p) + (i)))
+#define NV_RD32(p,i)    (__raw_readl((void __iomem *)(p) + (i)))
+
+#define VGA_WR08(p,i,d) (writeb((d), (void __iomem *)(p) + (i)))
+#define VGA_RD08(p,i)   (readb((void __iomem *)(p) + (i)))
 
 /*
  * Define different architectures.
@@ -444,24 +441,24 @@ typedef struct _riva_hw_inst
     /*
      * Non-FIFO registers.
      */
-    volatile U032 *PCRTC0;
-    volatile U032 *PCRTC;
-    volatile U032 *PRAMDAC0;
-    volatile U032 *PFB;
-    volatile U032 *PFIFO;
-    volatile U032 *PGRAPH;
-    volatile U032 *PEXTDEV;
-    volatile U032 *PTIMER;
-    volatile U032 *PMC;
-    volatile U032 *PRAMIN;
-    volatile U032 *FIFO;
-    volatile U032 *CURSOR;
-    volatile U008 *PCIO0;
-    volatile U008 *PCIO;
-    volatile U008 *PVIO;
-    volatile U008 *PDIO0;
-    volatile U008 *PDIO;
-    volatile U032 *PRAMDAC;
+    volatile U032 __iomem *PCRTC0;
+    volatile U032 __iomem *PCRTC;
+    volatile U032 __iomem *PRAMDAC0;
+    volatile U032 __iomem *PFB;
+    volatile U032 __iomem *PFIFO;
+    volatile U032 __iomem *PGRAPH;
+    volatile U032 __iomem *PEXTDEV;
+    volatile U032 __iomem *PTIMER;
+    volatile U032 __iomem *PMC;
+    volatile U032 __iomem *PRAMIN;
+    volatile U032 __iomem *FIFO;
+    volatile U032 __iomem *CURSOR;
+    volatile U008 __iomem *PCIO0;
+    volatile U008 __iomem *PCIO;
+    volatile U008 __iomem *PVIO;
+    volatile U008 __iomem *PDIO0;
+    volatile U008 __iomem *PDIO;
+    volatile U032 __iomem *PRAMDAC;
     /*
      * Common chip functions.
      */
@@ -481,15 +478,15 @@ typedef struct _riva_hw_inst
     /*
      * FIFO registers.
      */
-    RivaRop                 *Rop;
-    RivaPattern             *Patt;
-    RivaClip                *Clip;
-    RivaPixmap              *Pixmap;
-    RivaScreenBlt           *Blt;
-    RivaBitmap              *Bitmap;
-    RivaLine                *Line;
-    RivaTexturedTriangle03  *Tri03;
-    RivaTexturedTriangle05  *Tri05;
+    RivaRop                 __iomem *Rop;
+    RivaPattern             __iomem *Patt;
+    RivaClip                __iomem *Clip;
+    RivaPixmap              __iomem *Pixmap;
+    RivaScreenBlt           __iomem *Blt;
+    RivaBitmap              __iomem *Bitmap;
+    RivaLine                __iomem *Line;
+    RivaTexturedTriangle03  __iomem *Tri03;
+    RivaTexturedTriangle05  __iomem *Tri05;
 } RIVA_HW_INST;
 /*
  * Extended mode state information.
@@ -541,8 +538,10 @@ int RivaGetConfig(RIVA_HW_INST *, unsigned int);
 
 #define RIVA_FIFO_FREE(hwinst,hwptr,cnt)                            \
 {                                                                   \
-    while ((hwinst).FifoFreeCount < (cnt))                          \
-        (hwinst).FifoFreeCount = (hwinst).hwptr->FifoFree >> 2;     \
+    while ((hwinst).FifoFreeCount < (cnt)) {                        \
+	mb();mb();						    \
+        (hwinst).FifoFreeCount = NV_RD32(&(hwinst).hwptr->FifoFree, 0) >> 2;     \
+    }								    \
     (hwinst).FifoFreeCount -= (cnt);                                \
 }
 #endif /* __RIVA_HW_H__ */

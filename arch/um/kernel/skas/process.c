@@ -30,7 +30,7 @@
 
 int is_skas_winch(int pid, int fd, void *data)
 {
-	if(pid != getpid())
+	if(pid != os_getpid())
 		return(0);
 
 	register_winch_irq(-1, fd, -1, data);
@@ -54,17 +54,6 @@ static void handle_segv(int pid)
 		panic("handle_segv - PTRACE_FAULTINFO failed, errno = %d\n",
 		      errno);
 
-	if (!(fault.is_write & 4)) {
-		/*
-		    kernel fault -- likely that was general
- 		    protection fault (trap_no = 13), not a
-		    page fault (trap_no = 14).  But we don't
-		    know for sure as PTRACE_FAULTINFO doesn't
-		    tell us :-/
-		*/
-		bad_segv(fault.addr, 0, fault.is_write);
-		return;
-	}
 	segv(fault.addr, 0, FAULT_WRITE(fault.is_write), 1, NULL);
 }
 
@@ -75,7 +64,7 @@ static void handle_trap(int pid, union uml_pt_regs *regs, int local_using_sysemu
 
 	syscall_nr = PT_SYSCALL_NR(regs->skas.regs);
 	UPT_SYSCALL_NR(regs) = syscall_nr;
-	if(syscall_nr < 1){
+	if(syscall_nr < 0){
 		relay_signal(SIGTRAP, regs);
 		return;
 	}
@@ -150,17 +139,16 @@ void start_userspace(int cpu)
 
 void userspace(union uml_pt_regs *regs)
 {
-	int err, status, op, pid = userspace_pid[0];
+	int err, status, op, pt_syscall_parm, pid = userspace_pid[0];
 	int local_using_sysemu; /*To prevent races if using_sysemu changes under us.*/
 
 	restore_registers(regs);
 		
 	local_using_sysemu = get_using_sysemu();
 
-	if (local_using_sysemu)
-		err = ptrace(PTRACE_SYSEMU, pid, 0, 0);
-	else
-		err = ptrace(PTRACE_SYSCALL, pid, 0, 0);
+	pt_syscall_parm = local_using_sysemu ? PTRACE_SYSEMU : PTRACE_SYSCALL;
+	err = ptrace(pt_syscall_parm, pid, 0, 0);
+
 	if(err)
 		panic("userspace - PTRACE_%s failed, errno = %d\n",
 		       local_using_sysemu ? "SYSEMU" : "SYSCALL", errno);
@@ -200,13 +188,10 @@ void userspace(union uml_pt_regs *regs)
 
 		/*Now we ended the syscall, so re-read local_using_sysemu.*/
 		local_using_sysemu = get_using_sysemu();
+		pt_syscall_parm = local_using_sysemu ? PTRACE_SYSEMU : PTRACE_SYSCALL;
 
-		if (local_using_sysemu)
-			op = singlestepping_skas() ? PTRACE_SINGLESTEP :
-				PTRACE_SYSEMU;
-		else
-			op = singlestepping_skas() ? PTRACE_SINGLESTEP :
-				PTRACE_SYSCALL;
+		op = singlestepping(NULL) ? PTRACE_SINGLESTEP :
+			pt_syscall_parm;
 
 		err = ptrace(op, pid, 0, 0);
 		if(err)
@@ -400,7 +385,7 @@ void switch_mm_skas(int mm_fd)
 void kill_off_processes_skas(void)
 {
 #warning need to loop over userspace_pids in kill_off_processes_skas
-	os_kill_process(userspace_pid[0], 1, 1);
+	os_kill_ptraced_process(userspace_pid[0], 1);
 }
 
 void init_registers(int pid)

@@ -12,7 +12,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -53,16 +53,16 @@ static rwlock_t gact_lock = RW_LOCK_UNLOCKED;
 
 #ifdef CONFIG_GACT_PROB
 typedef int (*g_rand)(struct tcf_gact *p);
-int
+static int
 gact_net_rand(struct tcf_gact *p) {
 	if (net_random()%p->pval)
 		return p->action;
 	return p->paction;
 }
 
-int
+static int
 gact_determ(struct tcf_gact *p) {
-	if (p->stats.packets%p->pval)
+	if (p->bstats.packets%p->pval)
 		return p->action;
 	return p->paction;
 }
@@ -71,7 +71,7 @@ gact_determ(struct tcf_gact *p) {
 g_rand gact_rand[MAX_RAND]= { NULL,gact_net_rand, gact_determ};
 
 #endif
-int
+static int
 tcf_gact_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,int ovr,int bind)
 {
 	struct rtattr *tb[TCA_GACT_MAX];
@@ -129,7 +129,7 @@ override:
 	return ret;
 }
 
-int
+static int
 tcf_gact_cleanup(struct tc_action *a, int bind)
 {
 	struct tcf_gact *p;
@@ -139,7 +139,7 @@ tcf_gact_cleanup(struct tc_action *a, int bind)
 	return 0;
 }
 
-int
+static int
 tcf_gact(struct sk_buff **pskb, struct tc_action *a)
 {
 	struct tcf_gact *p;
@@ -163,17 +163,17 @@ tcf_gact(struct sk_buff **pskb, struct tc_action *a)
 #else
 	action = p->action;
 #endif
-	p->stats.bytes += skb->len;
-	p->stats.packets++;
+	p->bstats.bytes += skb->len;
+	p->bstats.packets++;
 	if (TC_ACT_SHOT == action)
-		p->stats.drops++;
+		p->qstats.drops++;
 	p->tm.lastuse = jiffies;
 	spin_unlock(&p->lock);
 
 	return action;
 }
 
-int
+static int
 tcf_gact_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 {
 	unsigned char *b = skb->tail;
@@ -203,9 +203,9 @@ tcf_gact_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 		RTA_PUT(skb, TCA_GACT_PROB, sizeof (p_opt), &p_opt);
 	} 
 #endif
-	t.install = jiffies - p->tm.install;
-	t.lastuse = jiffies - p->tm.lastuse;
-	t.expires = p->tm.expires;
+	t.install = jiffies_to_clock_t(jiffies - p->tm.install);
+	t.lastuse = jiffies_to_clock_t(jiffies - p->tm.lastuse);
+	t.expires = jiffies_to_clock_t(p->tm.expires);
 	RTA_PUT(skb, TCA_GACT_TM, sizeof (t), &t);
 	return skb->len;
 
@@ -214,25 +214,13 @@ tcf_gact_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 	return -1;
 }
 
-int
-tcf_gact_stats(struct sk_buff *skb, struct tc_action *a)
-{
-	struct tcf_gact *p;
-	p = PRIV(a,gact);
-	if (NULL != p)
-		return qdisc_copy_stats(skb, &p->stats,p->stats_lock);
-
-	return 1;
-}
-
-struct tc_action_ops act_gact_ops = {
+static struct tc_action_ops act_gact_ops = {
 	.next		=	NULL,
 	.kind		=	"gact",
 	.type		=	TCA_ACT_GACT,
 	.capab		=	TCA_CAP_NONE,
 	.owner		=	THIS_MODULE,
 	.act		=	tcf_gact,
-	.get_stats	=	tcf_gact_stats,
 	.dump		=	tcf_gact_dump,
 	.cleanup	=	tcf_gact_cleanup,
 	.lookup		=	tcf_hash_search,

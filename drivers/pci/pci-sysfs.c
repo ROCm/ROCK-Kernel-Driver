@@ -5,6 +5,8 @@
  * (C) Copyright 2002-2004 IBM Corp.
  * (C) Copyright 2003 Matthew Wilcox
  * (C) Copyright 2003 Hewlett-Packard
+ * (C) Copyright 2004 Jon Smirl <jonsmirl@yahoo.com>
+ * (C) Copyright 2004 Silicon Graphics, Inc. Jesse Barnes <jbarnes@sgi.com>
  *
  * File attributes for PCI devices
  *
@@ -17,8 +19,11 @@
 #include <linux/kernel.h>
 #include <linux/pci.h>
 #include <linux/stat.h>
+#include <linux/topology.h>
 
 #include "pci.h"
+
+static int sysfs_initialized;	/* = 0 */
 
 /* show configuration fields */
 #define pci_config_attr(field, format_string)				\
@@ -37,6 +42,14 @@ pci_config_attr(subsystem_vendor, "0x%04x\n");
 pci_config_attr(subsystem_device, "0x%04x\n");
 pci_config_attr(class, "0x%06x\n");
 pci_config_attr(irq, "%u\n");
+
+static ssize_t local_cpus_show(struct device *dev, char *buf)
+{		
+	cpumask_t mask = pcibus_to_cpumask(to_pci_dev(dev)->bus->number);
+	int len = cpumask_scnprintf(buf, PAGE_SIZE-2, mask);
+	strcat(buf,"\n"); 
+	return 1+len;
+}
 
 /* show resources */
 static ssize_t
@@ -67,6 +80,7 @@ struct device_attribute pci_dev_attrs[] = {
 	__ATTR_RO(subsystem_device),
 	__ATTR_RO(class),
 	__ATTR_RO(irq),
+	__ATTR_RO(local_cpus),
 	__ATTR_NULL,
 };
 
@@ -164,6 +178,65 @@ pci_write_config(struct kobject *kobj, char *buf, loff_t off, size_t count)
 	return count;
 }
 
+/**
+ * pci_write_rom - used to enable access to the PCI ROM display
+ * @kobj: kernel object handle
+ * @buf: user input
+ * @off: file offset
+ * @count: number of byte in input
+ *
+ * writing anything except 0 enables it
+ */
+static ssize_t
+pci_write_rom(struct kobject *kobj, char *buf, loff_t off, size_t count)
+{
+	struct pci_dev *pdev = to_pci_dev(container_of(kobj, struct device, kobj));
+
+	if ((off ==  0) && (*buf == '0') && (count == 2))
+		pdev->rom_attr_enabled = 0;
+	else
+		pdev->rom_attr_enabled = 1;
+
+	return count;
+}
+
+/**
+ * pci_read_rom - read a PCI ROM
+ * @kobj: kernel object handle
+ * @buf: where to put the data we read from the ROM
+ * @off: file offset
+ * @count: number of bytes to read
+ *
+ * Put @count bytes starting at @off into @buf from the ROM in the PCI
+ * device corresponding to @kobj.
+ */
+static ssize_t
+pci_read_rom(struct kobject *kobj, char *buf, loff_t off, size_t count)
+{
+	struct pci_dev *pdev = to_pci_dev(container_of(kobj, struct device, kobj));
+	void __iomem *rom;
+	size_t size;
+
+	if (!pdev->rom_attr_enabled)
+		return -EINVAL;
+	
+	rom = pci_map_rom(pdev, &size);	/* size starts out as PCI window size */
+	if (!rom)
+		return 0;
+		
+	if (off >= size)
+		count = 0;
+	else {
+		if (off + count > size)
+			count = size - off;
+		
+		memcpy_fromio(buf, rom + off, count);
+	}
+	pci_unmap_rom(pdev, rom);
+		
+	return count;
+}
+
 static struct bin_attribute pci_config_attr = {
 	.attr =	{
 		.name = "config",
@@ -186,13 +259,68 @@ static struct bin_attribute pcie_config_attr = {
 	.write = pci_write_config,
 };
 
-void pci_create_sysfs_dev_files (struct pci_dev *pdev)
+int pci_create_sysfs_dev_files (struct pci_dev *pdev)
 {
+	if (!sysfs_initialized)
+		return -EACCES;
+
 	if (pdev->cfg_size < 4096)
 		sysfs_create_bin_file(&pdev->dev.kobj, &pci_config_attr);
 	else
 		sysfs_create_bin_file(&pdev->dev.kobj, &pcie_config_attr);
 
+	/* If the device has a ROM, try to expose it in sysfs. */
+	if (pci_resource_len(pdev, PCI_ROM_RESOURCE)) {
+		struct bin_attribute *rom_attr;
+		
+		rom_attr = kmalloc(sizeof(*rom_attr), GFP_ATOMIC);
+		if (rom_attr) {
+			pdev->rom_attr = rom_attr;
+			rom_attr->size = pci_resource_len(pdev, PCI_ROM_RESOURCE);
+			rom_attr->attr.name = "rom";
+			rom_attr->attr.mode = S_IRUSR;
+			rom_attr->attr.owner = THIS_MODULE;
+			rom_attr->read = pci_read_rom;
+			rom_attr->write = pci_write_rom;
+			sysfs_create_bin_file(&pdev->dev.kobj, rom_attr);
+		}
+	}
 	/* add platform-specific attributes */
 	pcibios_add_platform_entries(pdev);
+	
+	return 0;
 }
+
+/**
+ * pci_remove_sysfs_dev_files - cleanup PCI specific sysfs files
+ * @pdev: device whose entries we should free
+ *
+ * Cleanup when @pdev is removed from sysfs.
+ */
+void pci_remove_sysfs_dev_files(struct pci_dev *pdev)
+{
+	if (pdev->cfg_size < 4096)
+		sysfs_remove_bin_file(&pdev->dev.kobj, &pci_config_attr);
+	else
+		sysfs_remove_bin_file(&pdev->dev.kobj, &pcie_config_attr);
+
+	if (pci_resource_len(pdev, PCI_ROM_RESOURCE)) {
+		if (pdev->rom_attr) {
+			sysfs_remove_bin_file(&pdev->dev.kobj, pdev->rom_attr);
+			kfree(pdev->rom_attr);
+		}
+	}
+}
+
+static int __init pci_sysfs_init(void)
+{
+	struct pci_dev *pdev = NULL;
+	
+	sysfs_initialized = 1;
+	while ((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev)) != NULL)
+		pci_create_sysfs_dev_files(pdev);
+
+	return 0;
+}
+
+__initcall(pci_sysfs_init);

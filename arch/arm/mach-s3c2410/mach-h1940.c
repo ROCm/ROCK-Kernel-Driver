@@ -18,6 +18,8 @@
  *     17-Feb-2003 BJD  Copied to mach-ipaq.c
  *     21-Aug-2004 BJD  Added struct s3c2410_board
  *     04-Sep-2004 BJD  Changed uart init, renamed ipaq_ -> h1940_
+ *     18-Oct-2004 BJD  Updated new board structure name
+ *     04-Nov-2004 BJD  Change for new serial clock
 */
 
 #include <linux/kernel.h>
@@ -40,7 +42,10 @@
 //#include <asm/debug-ll.h>
 #include <asm/arch/regs-serial.h>
 
+#include <linux/serial_core.h>
+
 #include "s3c2410.h"
+#include "clock.h"
 #include "devs.h"
 #include "cpu.h"
 
@@ -56,7 +61,6 @@ static struct s3c2410_uartcfg h1940_uartcfgs[] = {
 	[0] = {
 		.hwport	     = 0,
 		.flags	     = 0,
-		.clock	     = &s3c2410_pclk,
 		.ucon	     = 0x3c5,
 		.ulcon	     = 0x03,
 		.ufcon	     = 0x51,
@@ -64,7 +68,6 @@ static struct s3c2410_uartcfg h1940_uartcfgs[] = {
 	[1] = {
 		.hwport	     = 1,
 		.flags	     = 0,
-		.clock	     = &s3c2410_pclk,
 		.ucon	     = 0x245,
 		.ulcon	     = 0x03,
 		.ufcon	     = 0x00,
@@ -73,7 +76,7 @@ static struct s3c2410_uartcfg h1940_uartcfgs[] = {
 	[2] = {
 		.hwport	     = 2,
 		.flags	     = 0,
-		.clock	     = &s3c2410_pclk,
+		.uart_flags  = UPF_CONS_FLOW,
 		.ucon	     = 0x3c5,
 		.ulcon	     = 0x43,
 		.ufcon	     = 0x51,
@@ -91,7 +94,7 @@ static struct platform_device *h1940_devices[] __initdata = {
 	&s3c_device_iis,
 };
 
-static struct s3c2410_board h1940_board __initdata = {
+static struct s3c24xx_board h1940_board __initdata = {
 	.devices       = h1940_devices,
 	.devices_count = ARRAY_SIZE(h1940_devices)
 };
@@ -100,7 +103,7 @@ void __init h1940_map_io(void)
 {
 	s3c24xx_init_io(h1940_iodesc, ARRAY_SIZE(h1940_iodesc));
 	s3c2410_init_uarts(h1940_uartcfgs, ARRAY_SIZE(h1940_uartcfgs));
-	s3c2410_set_board(&h1940_board);
+	s3c24xx_set_board(&h1940_board);
 }
 
 void __init h1940_init_irq(void)
@@ -109,16 +112,11 @@ void __init h1940_init_irq(void)
 
 }
 
-void __init h1940_init_time(void)
-{
-	s3c2410_init_time();
-}
-
 MACHINE_START(H1940, "IPAQ-H1940")
      MAINTAINER("Ben Dooks <ben@fluff.org>")
      BOOT_MEM(S3C2410_SDRAM_PA, S3C2410_PA_UART, S3C2410_VA_UART)
      BOOT_PARAMS(S3C2410_SDRAM_PA + 0x100)
      MAPIO(h1940_map_io)
      INITIRQ(h1940_init_irq)
-     INITTIME(h1940_init_time)
+     .timer		= &s3c2410_timer,
 MACHINE_END

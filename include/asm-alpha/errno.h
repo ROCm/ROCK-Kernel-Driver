@@ -110,5 +110,10 @@
 
 #define ENOMEDIUM	129	/* No medium found */
 #define EMEDIUMTYPE	130	/* Wrong medium type */
+#define	ECANCELED	131	/* Operation Cancelled */
+#define	ENOKEY		132	/* Required key not available */
+#define	EKEYEXPIRED	133	/* Key has expired */
+#define	EKEYREVOKED	134	/* Key has been revoked */
+#define	EKEYREJECTED	135	/* Key was rejected by service */
 
 #endif

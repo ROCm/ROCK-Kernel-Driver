@@ -110,7 +110,7 @@ reload_context (mm_context_t context)
 	unsigned long rid_incr = 0;
 	unsigned long rr0, rr1, rr2, rr3, rr4, old_rr4;
 
-	old_rr4 = ia64_get_rr(0x8000000000000000);
+	old_rr4 = ia64_get_rr(0x8000000000000000UL);
 	rid = context << 3;	/* make space for encoding the region number */
 	rid_incr = 1 << 8;
 
@@ -124,11 +124,11 @@ reload_context (mm_context_t context)
 	rr4 = (rr4 & (~(0xfcUL))) | (old_rr4 & 0xfc);
 #endif
 
-	ia64_set_rr(0x0000000000000000, rr0);
-	ia64_set_rr(0x2000000000000000, rr1);
-	ia64_set_rr(0x4000000000000000, rr2);
-	ia64_set_rr(0x6000000000000000, rr3);
-	ia64_set_rr(0x8000000000000000, rr4);
+	ia64_set_rr(0x0000000000000000UL, rr0);
+	ia64_set_rr(0x2000000000000000UL, rr1);
+	ia64_set_rr(0x4000000000000000UL, rr2);
+	ia64_set_rr(0x6000000000000000UL, rr3);
+	ia64_set_rr(0x8000000000000000UL, rr4);
 	ia64_srlz_i();			/* srlz.i implies srlz.d */
 }
 

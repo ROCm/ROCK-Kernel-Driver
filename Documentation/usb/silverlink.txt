@@ -1,5 +1,6 @@
 -------------------------------------------------------------------------
 Readme for Linux device driver for the Texas Instruments SilverLink cable
+and direct USB cable provided by some TI's handhelds.
 -------------------------------------------------------------------------
 
 Author: Romain Liévin & Julien Blache
@@ -9,7 +10,8 @@ INTRODUCTION:
 
 This is a driver for the TI-GRAPH LINK USB (aka SilverLink) cable, a cable 
 designed by TI for connecting their TI8x/9x calculators to a computer 
-(PC or Mac usually).
+(PC or Mac usually). It has been extended to support the USB port offered by
+some latest TI handhelds (TI84+ and TI89 Titanium).
 
 If you need more information, please visit the 'SilverLink drivers' homepage 
 at the above URL.
@@ -73,4 +75,4 @@ this driver but he better knows the Mac OS-X driver.
 CREDITS:
 
 The code is based on dabusb.c, printer.c and scanner.c !
-The driver has been developed independently of Texas Instruments.
+The driver has been developed independently of Texas Instruments Inc.

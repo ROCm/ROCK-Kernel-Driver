@@ -24,23 +24,45 @@
 #include <linux/xattr.h>
 #include <linux/hugetlb.h>
 
+int cap_netlink_send(struct sock *sk, struct sk_buff *skb)
+{
+	NETLINK_CB(skb).eff_cap = current->cap_effective;
+	return 0;
+}
+
+EXPORT_SYMBOL(cap_netlink_send);
+
+int cap_netlink_recv(struct sk_buff *skb)
+{
+	if (!cap_raised(NETLINK_CB(skb).eff_cap, CAP_NET_ADMIN))
+		return -EPERM;
+	return 0;
+}
+
+EXPORT_SYMBOL(cap_netlink_recv);
+
 int cap_capable (struct task_struct *tsk, int cap)
 {
 	/* Derived from include/linux/sched.h:capable. */
-	if (cap_raised (tsk->cap_effective, cap))
+	if (cap_raised(tsk->cap_effective, cap))
 		return 0;
-	else
+	return -EPERM;
+}
+
+int cap_settime(struct timespec *ts, struct timezone *tz)
+{
+	if (!capable(CAP_SYS_TIME))
 		return -EPERM;
+	return 0;
 }
 
 int cap_ptrace (struct task_struct *parent, struct task_struct *child)
 {
 	/* Derived from arch/i386/kernel/ptrace.c:sys_ptrace. */
 	if (!cap_issubset (child->cap_permitted, current->cap_permitted) &&
-	    !capable (CAP_SYS_PTRACE))
+	    !capable(CAP_SYS_PTRACE))
 		return -EPERM;
-	else
-		return 0;
+	return 0;
 }
 
 int cap_capget (struct task_struct *target, kernel_cap_t *effective,
@@ -314,10 +336,10 @@ int cap_vm_enough_memory(long pages)
 	/*
 	 * Sometimes we want to use more memory than we have
 	 */
-	if (sysctl_overcommit_memory == 1)
+	if (sysctl_overcommit_memory == OVERCOMMIT_ALWAYS)
 		return 0;
 
-	if (sysctl_overcommit_memory == 0) {
+	if (sysctl_overcommit_memory == OVERCOMMIT_GUESS) {
 		unsigned long n;
 
 		free = get_page_cache_size();
@@ -372,43 +394,8 @@ int cap_vm_enough_memory(long pages)
 	return -ENOMEM;
 }
 
-#ifdef CONFIG_SECURITY
-struct security_operations capability_security_ops = {
-	.ptrace =			cap_ptrace,
-	.capget =			cap_capget,
-	.capset_check =			cap_capset_check,
-	.capset_set =			cap_capset_set,
-	.capable =			cap_capable,
-	.netlink_send =			cap_netlink_send,
-	.netlink_recv =			cap_netlink_recv,
-
-	.bprm_apply_creds =		cap_bprm_apply_creds,
-	.bprm_set_security =		cap_bprm_set_security,
-	.bprm_secureexec =		cap_bprm_secureexec,
-
-	.inode_setxattr =		cap_inode_setxattr,
-	.inode_removexattr =		cap_inode_removexattr,
-
-	.task_post_setuid =		cap_task_post_setuid,
-	.task_reparent_to_init =	cap_task_reparent_to_init,
-
-	.syslog =                       cap_syslog,
-
-	.vm_enough_memory =             cap_vm_enough_memory,
-};
-
-EXPORT_SYMBOL(capability_security_ops);
-/* Note: If the capability security module is loaded, we do NOT register
- * the capability_security_ops but a second structure that has the
- * identical entries. The reason is that this way,
- * - we could stack on top of capability if it was stackable
- * - a loaded capability module will prevent others to register, which
- *   is the previous behaviour; if capabilities are used as default (not
- *   because the module has been loaded), we allow the replacement.
- */
-#endif
-
 EXPORT_SYMBOL(cap_capable);
+EXPORT_SYMBOL(cap_settime);
 EXPORT_SYMBOL(cap_ptrace);
 EXPORT_SYMBOL(cap_capget);
 EXPORT_SYMBOL(cap_capset_check);

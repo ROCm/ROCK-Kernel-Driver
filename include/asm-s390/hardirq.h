@@ -38,33 +38,11 @@ softirq_pending(unsigned int cpu)
 
 #define __ARCH_IRQ_STAT
 
-/*
- * We put the hardirq and softirq counter into the preemption
- * counter. The bitmask has the following meaning:
- *
- * - bits 0-7 are the preemption count (max preemption depth: 256)
- * - bits 8-15 are the softirq count (max # of softirqs: 256)
- * - bits 16-23 are the hardirq count (max # of hardirqs: 256)
- *
- * - ( bit 26 is the PREEMPT_ACTIVE flag. )
- *
- * PREEMPT_MASK: 0x000000ff
- * SOFTIRQ_MASK: 0x0000ff00
- * HARDIRQ_MASK: 0x00ff0000
- */
-
-#define PREEMPT_BITS	8
-#define SOFTIRQ_BITS	8
 #define HARDIRQ_BITS	8
 
-#define PREEMPT_SHIFT	0
-#define SOFTIRQ_SHIFT	(PREEMPT_SHIFT + PREEMPT_BITS)
-#define HARDIRQ_SHIFT	(SOFTIRQ_SHIFT + SOFTIRQ_BITS)
-
-extern void do_call_softirq(void);
 extern void account_ticks(struct pt_regs *);
 
-#define invoke_softirq() do_call_softirq()
+#define __ARCH_HAS_DO_SOFTIRQ
 
 #define irq_enter()							\
 do {									\
@@ -75,7 +53,7 @@ do {									\
 	preempt_count() -= IRQ_EXIT_OFFSET;				\
 	if (!in_interrupt() && local_softirq_pending())			\
 		/* Use the async. stack for softirq */			\
-		do_call_softirq();					\
+		do_softirq();						\
 	preempt_enable_no_resched();					\
 } while (0)
 

@@ -863,8 +863,6 @@ isdn_net_hangup(struct net_device *d)
 		isdn_all_eaz(lp->isdn_device, lp->isdn_channel);
 	}
 	isdn_net_unbind_channel(lp);
-	if (!lp->master) /* never send this event to an slave device */
-		netdev_event(d, NETDEV_REBOOT);
 }
 
 typedef struct {
@@ -1371,7 +1369,7 @@ isdn_net_type_trans(struct sk_buff *skb, struct net_device *dev)
 
 	skb->mac.raw = skb->data;
 	skb_pull(skb, ETH_HLEN);
-	eth = skb->mac.ethernet;
+	eth = eth_hdr(skb);
 
 	if (*eth->h_dest & 1) {
 		if (memcmp(eth->h_dest, dev->broadcast, ETH_ALEN) == 0)

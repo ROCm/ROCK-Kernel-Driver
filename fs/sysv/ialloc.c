@@ -137,7 +137,7 @@ struct inode * sysv_new_inode(const struct inode * dir, mode_t mode)
 	struct super_block *sb = dir->i_sb;
 	struct sysv_sb_info *sbi = SYSV_SB(sb);
 	struct inode *inode;
-	u16 ino;
+	sysv_ino_t ino;
 	unsigned count;
 
 	inode = new_inode(sb);

@@ -233,4 +233,6 @@ void hpte_init_iSeries(void)
 	ppc_md.hpte_updateboltedpp = iSeries_hpte_updateboltedpp;
 	ppc_md.hpte_insert	= iSeries_hpte_insert;
 	ppc_md.hpte_remove     	= iSeries_hpte_remove;
+
+	htab_finish_init();
 }

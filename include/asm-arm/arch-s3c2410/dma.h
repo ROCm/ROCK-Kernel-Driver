@@ -1,7 +1,7 @@
 /* linux/include/asm-arm/arch-bast/dma.h
  *
- * Copyright (C) 2003 Simtec Electronics
- *  Ben Dooks <ben@simtec.co.uk>
+ * Copyright (C) 2003,2004 Simtec Electronics
+ *	Ben Dooks <ben@simtec.co.uk>
  *
  * Samsung S3C2410X DMA support
  *
@@ -12,13 +12,14 @@
  * Changelog:
  *  ??-May-2003 BJD   Created file
  *  ??-Jun-2003 BJD   Added more dma functionality to go with arch
+ *  10-Nov-2004 BJD   Added sys_device support
 */
 
-
 #ifndef __ASM_ARCH_DMA_H
-#define __ASM_ARCH_DMA_H
+#define __ASM_ARCH_DMA_H __FILE__
 
 #include <linux/config.h>
+#include <linux/sysdev.h>
 #include "hardware.h"
 
 
@@ -198,9 +199,9 @@ struct s3c2410_dma_chan_s {
 	unsigned int           flags;        /* channel flags */
 
 	/* channel's hardware position and configuration */
-	unsigned long          regs;         /* channels registers */
+	void __iomem           *regs;        /* channels registers */
+	void __iomem           *addr_reg;    /* data address register */
 	unsigned int           irq;          /* channel irq */
-	unsigned long          addr_reg;     /* data address register */
 	unsigned long          dcon;         /* default value of DCON */
 
 	/* driver handles */
@@ -215,6 +216,9 @@ struct s3c2410_dma_chan_s {
 	s3c2410_dma_buf_t      *curr;        /* current dma buffer */
 	s3c2410_dma_buf_t      *next;        /* next buffer to load */
 	s3c2410_dma_buf_t      *end;         /* end of queue */
+
+	/* system device */
+	struct sys_device	dev;
 };
 
 /* the currently allocated channel information */
@@ -296,18 +300,46 @@ extern int s3c2410_dma_set_buffdone_fn(dmach_t, s3c2410_dma_cbfn_t rtn);
 #define S3C2410_DMA_DCDST       (0x1C)
 #define S3C2410_DMA_DMASKTRIG   (0x20)
 
+#define S3C2410_DISRCC_INC	(1<<0)
+#define S3C2410_DISRCC_APB	(1<<1)
+
 #define S3C2410_DMASKTRIG_STOP   (1<<2)
 #define S3C2410_DMASKTRIG_ON     (1<<1)
 #define S3C2410_DMASKTRIG_SWTRIG (1<<0)
 
-#define S3C2410_DCOM_DEMAND     (0<<31)
+#define S3C2410_DCON_DEMAND     (0<<31)
 #define S3C2410_DCON_HANDSHAKE  (1<<31)
 #define S3C2410_DCON_SYNC_PCLK  (0<<30)
 #define S3C2410_DCON_SYNC_HCLK  (1<<30)
 
 #define S3C2410_DCON_INTREQ     (1<<29)
 
+#define S3C2410_DCON_CH0_XDREQ0	(0<<24)
+#define S3C2410_DCON_CH0_UART0	(1<<24)
+#define S3C2410_DCON_CH0_SDI	(2<<24)
+#define S3C2410_DCON_CH0_TIMER	(3<<24)
+#define S3C2410_DCON_CH0_USBEP1	(4<<24)
+
+#define S3C2410_DCON_CH1_XDREQ1	(0<<24)
+#define S3C2410_DCON_CH1_UART1	(1<<24)
+#define S3C2410_DCON_CH1_I2SSDI	(2<<24)
+#define S3C2410_DCON_CH1_SPI	(3<<24)
+#define S3C2410_DCON_CH1_USBEP2	(4<<24)
+
+#define S3C2410_DCON_CH2_I2SSDO	(0<<24)
+#define S3C2410_DCON_CH2_I2SSDI	(1<<24)
+#define S3C2410_DCON_CH2_SDI	(2<<24)
+#define S3C2410_DCON_CH2_TIMER	(3<<24)
+#define S3C2410_DCON_CH2_USBEP3	(4<<24)
+
+#define S3C2410_DCON_CH3_UART2	(0<<24)
+#define S3C2410_DCON_CH3_SDI	(1<<24)
+#define S3C2410_DCON_CH3_SPI	(2<<24)
+#define S3C2410_DCON_CH3_TIMER	(3<<24)
+#define S3C2410_DCON_CH3_USBEP4	(4<<24)
+
 #define S3C2410_DCON_SRCSHIFT   (24)
+#define S3C2410_DCON_SRCMASK	(7<<24)
 
 #define S3C2410_DCON_BYTE       (0<<20)
 #define S3C2410_DCON_HALFWORD   (1<<20)
@@ -316,5 +348,21 @@ extern int s3c2410_dma_set_buffdone_fn(dmach_t, s3c2410_dma_cbfn_t rtn);
 #define S3C2410_DCON_AUTORELOAD (0<<22)
 #define S3C2410_DCON_NORELOAD   (1<<22)
 #define S3C2410_DCON_HWTRIG     (1<<23)
+
+#ifdef CONFIG_CPU_S3C2440
+#define S3C2440_DIDSTC_CHKINT	(1<<2)
+
+#define S3C2440_DCON_CH0_I2SSDO	(5<<24)
+#define S3C2440_DCON_CH0_PCMIN	(6<<24)
+
+#define S3C2440_DCON_CH1_PCMOUT	(5<<24)
+#define S3C2440_DCON_CH1_SDI	(6<<24)
+
+#define S3C2440_DCON_CH2_PCMIN	(5<<24)
+#define S3C2440_DCON_CH2_MICIN	(6<<24)
+
+#define S3C2440_DCON_CH3_MICIN	(5<<24)
+#define S3C2440_DCON_CH3_PCMOUT	(6<<24)
+#endif
 
 #endif /* __ASM_ARCH_DMA_H */

@@ -147,8 +147,7 @@
 	compiler is not permitted to reorder the I/O sequence. When the 
 	ordering can be compiler optimised, you can use <function>
 	__readb</function> and friends to indicate the relaxed ordering. Use 
-	this with care. The <function>rmb</function> provides a read memory 
-	barrier. The <function>wmb</function> provides a write memory barrier.
+	this with care.
       </para>
 
       <para>
@@ -159,19 +158,113 @@
 	asynchronously. A driver author must issue a read from the same
 	device to ensure that writes have occurred in the specific cases the
 	author cares. This kind of property cannot be hidden from driver
-	writers in the API.
+	writers in the API.  In some cases, the read used to flush the device
+	may be expected to fail (if the card is resetting, for example).  In
+	that case, the read should be done from config space, which is
+	guaranteed to soft-fail if the card doesn't respond.
+      </para>
+
+      <para>
+	The following is an example of flushing a write to a device when
+	the driver would like to ensure the write's effects are visible prior
+	to continuing execution.
+      </para>
+
+<programlisting>
+static inline void
+qla1280_disable_intrs(struct scsi_qla_host *ha)
+{
+	struct device_reg *reg;
+
+	reg = ha->iobase;
+	/* disable risc and host interrupts */
+	WRT_REG_WORD(&amp;reg->ictrl, 0);
+	/*
+	 * The following read will ensure that the above write
+	 * has been received by the device before we return from this
+	 * function.
+	 */
+	RD_REG_WORD(&amp;reg->ictrl);
+	ha->flags.ints_enabled = 0;
+}
+</programlisting>
+
+      <para>
+	In addition to write posting, on some large multiprocessing systems
+	(e.g. SGI Challenge, Origin and Altix machines) posted writes won't
+	be strongly ordered coming from different CPUs.  Thus it's important
+	to properly protect parts of your driver that do memory-mapped writes
+	with locks and use the <function>mmiowb</function> to make sure they
+	arrive in the order intended.  Issuing a regular <function>readX
+	</function> will also ensure write ordering, but should only be used
+	when the driver has to be sure that the write has actually arrived
+	at the device (not that it's simply ordered with respect to other
+	writes), since a full <function>readX</function> is a relatively
+	expensive operation.
+      </para>
+
+      <para>
+	Generally, one should use <function>mmiowb</function> prior to
+	releasing a spinlock that protects regions using <function>writeb
+	</function> or similar functions that aren't surrounded by <function>
+	readb</function> calls, which will ensure ordering and flushing.  The
+	following pseudocode illustrates what might occur if write ordering
+	isn't guaranteed via <function>mmiowb</function> or one of the
+	<function>readX</function> functions.
+      </para>
+
+<programlisting>
+CPU A:  spin_lock_irqsave(&amp;dev_lock, flags)
+CPU A:  ...
+CPU A:  writel(newval, ring_ptr);
+CPU A:  spin_unlock_irqrestore(&amp;dev_lock, flags)
+        ...
+CPU B:  spin_lock_irqsave(&amp;dev_lock, flags)
+CPU B:  writel(newval2, ring_ptr);
+CPU B:  ...
+CPU B:  spin_unlock_irqrestore(&amp;dev_lock, flags)
+</programlisting>
+
+      <para>
+	In the case above, newval2 could be written to ring_ptr before
+	newval.  Fixing it is easy though:
+      </para>
+
+<programlisting>
+CPU A:  spin_lock_irqsave(&amp;dev_lock, flags)
+CPU A:  ...
+CPU A:  writel(newval, ring_ptr);
+CPU A:  mmiowb(); /* ensure no other writes beat us to the device */
+CPU A:  spin_unlock_irqrestore(&amp;dev_lock, flags)
+        ...
+CPU B:  spin_lock_irqsave(&amp;dev_lock, flags)
+CPU B:  writel(newval2, ring_ptr);
+CPU B:  ...
+CPU B:  mmiowb();
+CPU B:  spin_unlock_irqrestore(&amp;dev_lock, flags)
+</programlisting>
+
+      <para>
+	See tg3.c for a real world example of how to use <function>mmiowb
+	</function>
       </para>
 
       <para>
 	PCI ordering rules also guarantee that PIO read responses arrive
-	after any outstanding DMA writes on that bus, since for some devices
+	after any outstanding DMA writes from that bus, since for some devices
 	the result of a <function>readb</function> call may signal to the
 	driver that a DMA transaction is complete.  In many cases, however,
 	the driver may want to indicate that the next
 	<function>readb</function> call has no relation to any previous DMA
 	writes performed by the device.  The driver can use
 	<function>readb_relaxed</function> for these cases, although only
-	some platforms will honor the relaxed semantics.
+	some platforms will honor the relaxed semantics.  Using the relaxed
+	read functions will provide significant performance benefits on
+	platforms that support it.  The qla2xxx driver provides examples
+	of how to use <function>readX_relaxed</function>.  In many cases,
+	a majority of the driver's <function>readX</function> calls can
+	safely be converted to <function>readX_relaxed</function> calls, since
+	only a few will indicate or depend on DMA completion.
       </para>
     </sect1>
 

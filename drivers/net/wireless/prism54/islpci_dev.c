@@ -52,15 +52,13 @@ static int islpci_alloc_memory(islpci_private *);
  * Of course, this is not the final/real MAC address. It doesn't
  * matter, as you are suppose to be able to change it anytime via
  * ndev->set_mac_address. Jean II */
-/* Set dummy address to 00:00:00:00:00:00 so tools have a chance
-   to find out that this is no real mac address - jg */
-const unsigned char	dummy_mac[6] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+const unsigned char	dummy_mac[6] = { 0x00, 0x30, 0xB4, 0x00, 0x00, 0x00 };
 
 static int
 isl_upload_firmware(islpci_private *priv)
 {
 	u32 reg, rc;
-	void *device_base = priv->device_base;
+	void __iomem *device_base = priv->device_base;
 
 	/* clear the RAMBoot and the Reset bit */
 	reg = readl(device_base + ISL38XX_CTRL_STAT_REG);
@@ -107,7 +105,7 @@ isl_upload_firmware(islpci_private *priv)
 			       "%s: firmware '%s' size is not multiple of 32bit, aborting!\n",
 			       "prism54", priv->firmware);
 			release_firmware(fw_entry);
-			return EILSEQ; /* Illegal byte sequence  */;
+			return -EILSEQ; /* Illegal byte sequence  */;
 		}
 
 		while (fw_len > 0) {
@@ -115,7 +113,7 @@ isl_upload_firmware(islpci_private *priv)
 			    (fw_len >
 			     ISL38XX_MEMORY_WINDOW_SIZE) ?
 			    ISL38XX_MEMORY_WINDOW_SIZE : fw_len;
-			u32 *dev_fw_ptr = device_base + ISL38XX_DIRECT_MEM_WIN;
+			u32 __iomem *dev_fw_ptr = device_base + ISL38XX_DIRECT_MEM_WIN;
 
 			/* set the cards base address for writting the data */
 			isl38xx_w32_flush(device_base, reg,
@@ -143,6 +141,10 @@ isl_upload_firmware(islpci_private *priv)
 		}
 
 		BUG_ON(fw_len != 0);
+
+		/* Firmware version is at offset 40 (also for "newmac") */
+		printk(KERN_DEBUG "%s: firmware version: %.8s\n",
+		       priv->ndev->name, fw_entry->data + 40);
 
 		release_firmware(fw_entry);
 	}
@@ -185,7 +187,7 @@ islpci_interrupt(int irq, void *config, struct pt_regs *regs)
 	u32 reg;
 	islpci_private *priv = config;
 	struct net_device *ndev = priv->ndev;
-	void *device = priv->device_base;
+	void __iomem *device = priv->device_base;
 	int powerstate = ISL38XX_PSM_POWERSAVE_STATE;
 
 	/* lock the interrupt handler */
@@ -377,8 +379,6 @@ islpci_open(struct net_device *ndev)
 	u32 rc;
 	islpci_private *priv = netdev_priv(ndev);
 
-	printk(KERN_DEBUG "%s: islpci_open()\n", ndev->name);
-
 	/* reset data structures, upload firmware and reset device */
 	rc = islpci_reset(priv,1);
 	if (rc) {
@@ -407,7 +407,7 @@ islpci_close(struct net_device *ndev)
 static int
 prism54_bring_down(islpci_private *priv)
 {
-	void *device_base = priv->device_base;
+	void __iomem *device_base = priv->device_base;
 	u32 reg;
 	/* we are going to shutdown the device */
 	islpci_set_state(priv, PRV_STATE_PREBOOT);
@@ -464,8 +464,7 @@ islpci_upload_fw(islpci_private *priv)
 		return rc;
 	}
 
-	printk(KERN_DEBUG
-	       "%s: firmware uploaded done, now triggering reset...\n",
+	printk(KERN_DEBUG "%s: firmware upload complete\n",
 	       priv->ndev->name);
 
 	islpci_set_state(priv, PRV_STATE_POSTBOOT);
@@ -491,6 +490,7 @@ islpci_reset_if(islpci_private *priv)
 		/* The software reset acknowledge needs about 220 msec here.
 		 * Be conservative and wait for up to one second. */
 	
+		set_current_state(TASK_UNINTERRUPTIBLE);
 		remaining = schedule_timeout(HZ);
 
 		if(remaining > 0) {
@@ -501,15 +501,16 @@ islpci_reset_if(islpci_private *priv)
 		/* If we're here it's because our IRQ hasn't yet gone through. 
 		 * Retry a bit more...
 		 */
-		 printk(KERN_ERR "%s: device soft reset timed out\n",
-		       priv->ndev->name);
-
+		printk(KERN_ERR "%s: no 'reset complete' IRQ seen - retrying\n",
+			priv->ndev->name);
 	}
 
 	finish_wait(&priv->reset_done, &wait);
 
-	if(result)
+	if (result) {
+		printk(KERN_ERR "%s: interface reset failure\n", priv->ndev->name);
 		return result;
+	}
 
 	islpci_set_state(priv, PRV_STATE_INIT);
 
@@ -521,11 +522,17 @@ islpci_reset_if(islpci_private *priv)
 	isl38xx_enable_common_interrupts(priv->device_base);
 
 	down_write(&priv->mib_sem);
-	mgt_commit(priv);
+	result = mgt_commit(priv);
+	if (result) {
+		printk(KERN_ERR "%s: interface reset failure\n", priv->ndev->name);
+		up_write(&priv->mib_sem);
+		return result;
+	}
 	up_write(&priv->mib_sem);
 
 	islpci_set_state(priv, PRV_STATE_READY);
 
+	printk(KERN_DEBUG "%s: interface reset complete\n", priv->ndev->name);
 	return 0;
 }
 
@@ -586,18 +593,18 @@ islpci_reset(islpci_private *priv, int reload_firmware)
 	/* now that the data structures are cleaned up, upload
 	 * firmware and reset interface */
 		rc = islpci_upload_fw(priv);
-		if (rc) 
+		if (rc) {
+			printk(KERN_ERR "%s: islpci_reset: failure\n",
+				priv->ndev->name);
 			return rc;
+		}
 	}
 
 	/* finally reset interface */
 	rc = islpci_reset_if(priv);
-	if (!rc) /* If successful */
-		return rc;
-	
-	printk(KERN_DEBUG  "prism54: Your card/socket may be faulty, or IRQ line too busy :(\n");
+	if (rc)
+		printk(KERN_ERR "prism54: Your card/socket may be faulty, or IRQ line too busy :(\n");
 	return rc;
-
 }
 
 struct net_device_stats *
@@ -606,7 +613,7 @@ islpci_statistics(struct net_device *ndev)
 	islpci_private *priv = netdev_priv(ndev);
 
 #if VERBOSE > SHOW_ERROR_MESSAGES
-	DEBUG(SHOW_FUNCTION_CALLS, "islpci_statistics \n");
+	DEBUG(SHOW_FUNCTION_CALLS, "islpci_statistics\n");
 #endif
 
 	return &priv->statistics;
@@ -831,6 +838,12 @@ islpci_setup(struct pci_dev *pdev)
 	priv->monitor_type = ARPHRD_IEEE80211;
 	priv->ndev->type = (priv->iw_mode == IW_MODE_MONITOR) ?
 		priv->monitor_type : ARPHRD_ETHER;
+
+#if WIRELESS_EXT > 16
+	/* Add pointers to enable iwspy support. */
+	priv->wireless_data.spy_data = &priv->spy_data;
+	ndev->wireless_data = &priv->wireless_data;
+#endif /* WIRELESS_EXT > 16 */
 
 	/* save the start and end address of the PCI memory area */
 	ndev->mem_start = (unsigned long) priv->device_base;

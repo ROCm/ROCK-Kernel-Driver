@@ -574,13 +574,13 @@ void __init pci_common_init(struct hw_pci *hw)
 
 		if (!use_firmware) {
 			/*
-		 	 * Size the bridge windows.
-		 	 */
+			 * Size the bridge windows.
+			 */
 			pci_bus_size_bridges(bus);
 
 			/*
-		 	 * Assign resources.
-		 	 */
+			 * Assign resources.
+			 */
 			pci_bus_assign_resources(bus);
 		}
 
@@ -681,7 +681,7 @@ int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
 	if (mmap_state == pci_mmap_io) {
 		return -EINVAL;
 	} else {
-		phys = root->mem_offset + (vma->vm_pgoff << PAGE_SHIFT);
+		phys = vma->vm_pgoff + (root->mem_offset >> PAGE_SHIFT);
 	}
 
 	/*
@@ -690,7 +690,7 @@ int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
 	vma->vm_flags |= VM_SHM | VM_LOCKED | VM_IO;
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
-	if (remap_page_range(vma, vma->vm_start, phys,
+	if (remap_pfn_range(vma, vma->vm_start, phys,
 			     vma->vm_end - vma->vm_start,
 			     vma->vm_page_prot))
 		return -EAGAIN;

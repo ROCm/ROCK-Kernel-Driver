@@ -30,11 +30,7 @@
 #include <linux/version.h>
 #include <linux/interrupt.h>
 #include <linux/firmware.h>
-#if defined(CONFIG_CRC32) || defined(CONFIG_CRC32_MODULE)
 #include <linux/crc32.h>
-#else
-#warning "CRC checking of firmware not available"
-#endif
 #include <linux/init.h>
 
 #include "dmxdev.h"
@@ -42,6 +38,7 @@
 #include "dvb_filter.h"
 #include "dvb_frontend.h"
 #include "dvb_net.h"
+#include "ttusbdecfe.h"
 
 static int debug;
 static int output_pva;
@@ -68,9 +65,6 @@ MODULE_PARM_DESC(output_pva, "Output PVA from dvr device (default:off)");
 #define ISO_FRAME_SIZE		0x03FF
 
 #define	MAX_PVA_LENGTH		6144
-
-#define LOF_HI			10600000
-#define LOF_LO			9750000
 
 enum ttusb_dec_model {
 	TTUSB_DEC2000T,
@@ -102,22 +96,19 @@ struct ttusb_dec {
 	struct dvb_demux		demux;
 	struct dmx_frontend		frontend;
 	struct dvb_net			dvb_net;
-	struct dvb_frontend_info	*frontend_info;
-	int (*frontend_ioctl) (struct dvb_frontend *, unsigned int, void *);
+	struct dvb_frontend*		fe;
 
 	u16			pid[DMX_PES_OTHER];
-	int			hi_band;
-	int			voltage;
 
 	/* USB bits */
-	struct usb_device		*udev;
-	u8				trans_count;
-	unsigned int			command_pipe;
-	unsigned int			result_pipe;
+	struct usb_device	*udev;
+	u8			trans_count;
+	unsigned int		command_pipe;
+	unsigned int		result_pipe;
 	unsigned int			in_pipe;
 	unsigned int			out_pipe;
 	enum ttusb_dec_interface	interface;
-	struct semaphore		usb_sem;
+	struct semaphore	usb_sem;
 
 	void			*iso_buffer;
 	dma_addr_t		iso_dma_handle;
@@ -166,32 +157,6 @@ struct filter_info {
 	struct list_head	filter_info_list;
 };
 
-static struct dvb_frontend_info dec2000t_frontend_info = {
-	.name			= "TechnoTrend/Hauppauge DEC2000-t Frontend",
-	.type			= FE_OFDM,
-	.frequency_min		= 51000000,
-	.frequency_max		= 858000000,
-	.frequency_stepsize	= 62500,
-	.caps =	FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
-		FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
-		FE_CAN_QAM_16 | FE_CAN_QAM_64 | FE_CAN_QAM_AUTO |
-		FE_CAN_TRANSMISSION_MODE_AUTO | FE_CAN_GUARD_INTERVAL_AUTO |
-		FE_CAN_HIERARCHY_AUTO,
-};
-
-static struct dvb_frontend_info dec3000s_frontend_info = {
-	.name			= "TechnoTrend/Hauppauge DEC3000-s Frontend",
-	.type			= FE_QPSK,
-	.frequency_min		= 950000,
-	.frequency_max		= 2150000,
-	.frequency_stepsize	= 125,
-	.caps =	FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
-		FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
-		FE_CAN_QAM_16 | FE_CAN_QAM_64 | FE_CAN_QAM_AUTO |
-		FE_CAN_TRANSMISSION_MODE_AUTO | FE_CAN_GUARD_INTERVAL_AUTO |
-		FE_CAN_HIERARCHY_AUTO,
-};
-
 static void ttusb_dec_set_model(struct ttusb_dec *dec,
 				enum ttusb_dec_model model);
 
@@ -216,7 +181,7 @@ static int ttusb_dec_send_command(struct ttusb_dec *dec, const u8 command,
 	u8 *b;
 
 	dprintk("%s\n", __FUNCTION__);
-
+	
 	b = kmalloc(COMMAND_PACKET_SIZE + 4, GFP_KERNEL);
 	if (!b)
 		return -ENOMEM;
@@ -355,9 +320,9 @@ static void ttusb_dec_set_pids(struct ttusb_dec *dec)
 
 	ttusb_dec_send_command(dec, 0x50, sizeof(b), b, NULL, NULL);
 
-	dvb_filter_pes2ts_init(&dec->a_pes2ts, dec->pid[DMX_PES_AUDIO],
+		dvb_filter_pes2ts_init(&dec->a_pes2ts, dec->pid[DMX_PES_AUDIO],
 			       ttusb_dec_audio_pes2ts_cb, dec);
-	dvb_filter_pes2ts_init(&dec->v_pes2ts, dec->pid[DMX_PES_VIDEO],
+		dvb_filter_pes2ts_init(&dec->v_pes2ts, dec->pid[DMX_PES_VIDEO],
 			       ttusb_dec_video_pes2ts_cb, dec);
 	dec->v_pes_length = 0;
 	dec->v_pes_postbytes = 0;
@@ -380,7 +345,7 @@ static void ttusb_dec_process_pva(struct ttusb_dec *dec, u8 *pva, int length)
 	case 0x01: {		/* VideoStream */
 		int prebytes = pva[5] & 0x03;
 		int postbytes = (pva[5] & 0x0c) >> 2;
-		u16 v_pes_payload_length;
+			u16 v_pes_payload_length;
 
 		if (output_pva) {
 			dec->video_filter->feed->cb.ts(pva, length, NULL, 0,
@@ -388,23 +353,23 @@ static void ttusb_dec_process_pva(struct ttusb_dec *dec, u8 *pva, int length)
 			return;
 		}
 
-		if (dec->v_pes_postbytes > 0 &&
-		    dec->v_pes_postbytes == prebytes) {
-			memcpy(&dec->v_pes[dec->v_pes_length],
+			if (dec->v_pes_postbytes > 0 &&
+			    dec->v_pes_postbytes == prebytes) {
+				memcpy(&dec->v_pes[dec->v_pes_length],
 			       &pva[12], prebytes);
 
-			dvb_filter_pes2ts(&dec->v_pes2ts, dec->v_pes,
+				dvb_filter_pes2ts(&dec->v_pes2ts, dec->v_pes,
 					  dec->v_pes_length + prebytes, 1);
-		}
+			}
 
 		if (pva[5] & 0x10) {
-			dec->v_pes[7] = 0x80;
-			dec->v_pes[8] = 0x05;
+				dec->v_pes[7] = 0x80;
+				dec->v_pes[8] = 0x05;
 
 			dec->v_pes[9] = 0x21 | ((pva[8] & 0xc0) >> 5);
 			dec->v_pes[10] = ((pva[8] & 0x3f) << 2) |
 					 ((pva[9] & 0xc0) >> 6);
-			dec->v_pes[11] = 0x01 |
+				dec->v_pes[11] = 0x01 |
 					 ((pva[9] & 0x3f) << 2) |
 					 ((pva[10] & 0x80) >> 6);
 			dec->v_pes[12] = ((pva[10] & 0x7f) << 1) |
@@ -414,33 +379,33 @@ static void ttusb_dec_process_pva(struct ttusb_dec *dec, u8 *pva, int length)
 			memcpy(&dec->v_pes[14], &pva[12 + prebytes],
 			       length - 12 - prebytes);
 			dec->v_pes_length = 14 + length - 12 - prebytes;
-		} else {
-			dec->v_pes[7] = 0x00;
-			dec->v_pes[8] = 0x00;
+			} else {
+				dec->v_pes[7] = 0x00;
+				dec->v_pes[8] = 0x00;
 
 			memcpy(&dec->v_pes[9], &pva[8], length - 8);
 			dec->v_pes_length = 9 + length - 8;
+			}
+
+			dec->v_pes_postbytes = postbytes;
+
+			if (dec->v_pes[9 + dec->v_pes[8]] == 0x00 &&
+			    dec->v_pes[10 + dec->v_pes[8]] == 0x00 &&
+			    dec->v_pes[11 + dec->v_pes[8]] == 0x01)
+				dec->v_pes[6] = 0x84;
+			else
+				dec->v_pes[6] = 0x80;
+
+			v_pes_payload_length = htons(dec->v_pes_length - 6 +
+						     postbytes);
+			memcpy(&dec->v_pes[4], &v_pes_payload_length, 2);
+
+			if (postbytes == 0)
+				dvb_filter_pes2ts(&dec->v_pes2ts, dec->v_pes,
+						  dec->v_pes_length, 1);
+
+			break;
 		}
-
-		dec->v_pes_postbytes = postbytes;
-
-		if (dec->v_pes[9 + dec->v_pes[8]] == 0x00 &&
-		    dec->v_pes[10 + dec->v_pes[8]] == 0x00 &&
-		    dec->v_pes[11 + dec->v_pes[8]] == 0x01)
-			dec->v_pes[6] = 0x84;
-		else
-			dec->v_pes[6] = 0x80;
-
-		v_pes_payload_length = htons(dec->v_pes_length - 6 +
-					     postbytes);
-		memcpy(&dec->v_pes[4], &v_pes_payload_length, 2);
-
-		if (postbytes == 0)
-			dvb_filter_pes2ts(&dec->v_pes2ts, dec->v_pes,
-					  dec->v_pes_length, 1);
-
-		break;
-	}
 
 	case 0x02:		/* MainAudioStream */
 		if (output_pva) {
@@ -522,7 +487,7 @@ static void ttusb_dec_process_packet(struct ttusb_dec *dec)
 	case TTUSB_DEC_PACKET_PVA:
 		if (dec->pva_stream_count)
 			ttusb_dec_process_pva(dec, dec->packet,
-					      dec->packet_payload_length);
+						 dec->packet_payload_length);
 		break;
 
 	case TTUSB_DEC_PACKET_SECTION:
@@ -548,7 +513,7 @@ static void swap_bytes(u8 *b, int length)
 	}
 }
 
-static void ttusb_dec_process_urb_frame(struct ttusb_dec *dec, u8 *b,
+static void ttusb_dec_process_urb_frame(struct ttusb_dec * dec, u8 * b,
 					int length)
 {
 	swap_bytes(b, length);
@@ -597,7 +562,7 @@ static void ttusb_dec_process_urb_frame(struct ttusb_dec *dec, u8 *b,
 						TTUSB_DEC_PACKET_EMPTY;
 					dec->packet_payload_length = 2;
 					dec->packet_state = 7;
-				} else {
+			} else {
 					printk("%s: unknown packet type: "
 					       "%02x%02x\n", __FUNCTION__,
 					       dec->packet[0], dec->packet[1]);
@@ -633,22 +598,22 @@ static void ttusb_dec_process_urb_frame(struct ttusb_dec *dec, u8 *b,
 			int remainder = dec->packet_payload_length -
 					dec->packet_length;
 
-			if (length >= remainder) {
+				if (length >= remainder) {
 				memcpy(dec->packet + dec->packet_length,
-				       b, remainder);
+					       b, remainder);
 				dec->packet_length += remainder;
-				b += remainder;
-				length -= remainder;
+					b += remainder;
+					length -= remainder;
 				dec->packet_state++;
-			} else {
+				} else {
 				memcpy(&dec->packet[dec->packet_length],
-				       b, length);
+					       b, length);
 				dec->packet_length += length;
-				length = 0;
-			}
+					length = 0;
+				}
 
-			break;
-		}
+				break;
+			}
 
 		case 7: {
 			int tail = 4;
@@ -711,6 +676,7 @@ static void ttusb_dec_process_urb(struct urb *urb, struct pt_regs *ptregs)
 
 		for (i = 0; i < FRAMES_PER_ISO_BUF; i++) {
 			struct usb_iso_packet_descriptor *d;
+
 			u8 *b;
 			int length;
 			struct urb_frame *frame;
@@ -1169,9 +1135,7 @@ static int ttusb_dec_boot_dsp(struct ttusb_dec *dec)
 	u16 firmware_csum = 0;
 	u16 firmware_csum_ns;
 	u32 firmware_size_nl;
-#if defined(CONFIG_CRC32) || defined(CONFIG_CRC32_MODULE)
 	u32 crc32_csum, crc32_check, tmp;
-#endif
 	const struct firmware *fw_entry = NULL;
 
 	dprintk("%s\n", __FUNCTION__);
@@ -1186,7 +1150,7 @@ static int ttusb_dec_boot_dsp(struct ttusb_dec *dec)
 	firmware_size = fw_entry->size;
 
 	if (firmware_size < 60) {
-		printk("%s: firmware size too small for DSP code (%u < 60).\n",
+		printk("%s: firmware size too small for DSP code (%zu < 60).\n",
 			__FUNCTION__, firmware_size);
 		return -1;
 	}
@@ -1194,7 +1158,6 @@ static int ttusb_dec_boot_dsp(struct ttusb_dec *dec)
 	/* a 32 bit checksum over the first 56 bytes of the DSP Code is stored
 	   at offset 56 of file, so use it to check if the firmware file is
 	   valid. */
-#if defined(CONFIG_CRC32) || defined(CONFIG_CRC32_MODULE)
 	crc32_csum = crc32(~0L, firmware, 56) ^ ~0L;
 	memcpy(&tmp, &firmware[56], 4);
 	crc32_check = htonl(tmp);
@@ -1204,7 +1167,6 @@ static int ttusb_dec_boot_dsp(struct ttusb_dec *dec)
 			__FUNCTION__, crc32_csum, crc32_check);
 		return -1;
 	}
-#endif
 	memcpy(idstring, &firmware[36], 20);
 	idstring[20] = '\0';
 	printk(KERN_INFO "ttusb_dec: found DSP code \"%s\".\n", idstring);
@@ -1282,7 +1244,7 @@ static int ttusb_dec_init_stb(struct ttusb_dec *dec)
 			result = ttusb_dec_boot_dsp(dec);
 			if (result)
 				return result;
-			else
+		else
 				return 1;
 		} else {
 			/* We can't trust the USB IDs that some firmwares
@@ -1293,6 +1255,7 @@ static int ttusb_dec_init_stb(struct ttusb_dec *dec)
 				ttusb_dec_set_model(dec, TTUSB_DEC3000S);
 				break;
 			case 0x00070009:
+			case 0x00070013:
 				ttusb_dec_set_model(dec, TTUSB_DEC2000T);
 				break;
 			case 0x00070011:
@@ -1310,7 +1273,7 @@ static int ttusb_dec_init_stb(struct ttusb_dec *dec)
 				dec->can_playback = 1;
 
 			return 0;
-		}
+	}
 	}
 	else
 		return result;
@@ -1403,6 +1366,7 @@ static void ttusb_dec_exit_dvb(struct ttusb_dec *dec)
 	dec->demux.dmx.remove_frontend(&dec->demux.dmx, &dec->frontend);
 	dvb_dmxdev_release(&dec->dmxdev);
 	dvb_dmx_release(&dec->demux);
+	if (dec->fe) dvb_unregister_frontend(dec->fe);
 	dvb_unregister_adapter(dec->adapter);
 }
 
@@ -1434,261 +1398,6 @@ static void ttusb_dec_exit_tasklet(struct ttusb_dec *dec)
 	}
 }
 
-static int ttusb_dec_2000t_frontend_ioctl(struct dvb_frontend *fe, unsigned int cmd,
-				  void *arg)
-{
-	struct ttusb_dec *dec = fe->data;
-
-	dprintk("%s\n", __FUNCTION__);
-
-	switch (cmd) {
-	case FE_GET_INFO:
-		dprintk("%s: FE_GET_INFO\n", __FUNCTION__);
-		memcpy(arg, dec->frontend_info,
-		       sizeof (struct dvb_frontend_info));
-		break;
-
-	case FE_READ_STATUS: {
-		fe_status_t *status = (fe_status_t *)arg;
-		dprintk("%s: FE_READ_STATUS\n", __FUNCTION__);
-		*status = FE_HAS_SIGNAL | FE_HAS_VITERBI |
-			  FE_HAS_SYNC | FE_HAS_CARRIER | FE_HAS_LOCK;
-		break;
-	}
-
-	case FE_READ_BER: {
-		u32 *ber = (u32 *)arg;
-		dprintk("%s: FE_READ_BER\n", __FUNCTION__);
-		*ber = 0;
-		return -ENOSYS;
-		break;
-	}
-
-	case FE_READ_SIGNAL_STRENGTH: {
-		dprintk("%s: FE_READ_SIGNAL_STRENGTH\n", __FUNCTION__);
-		*(s32 *)arg = 0xFF;
-		return -ENOSYS;
-		break;
-	}
-
-	case FE_READ_SNR:
-		dprintk("%s: FE_READ_SNR\n", __FUNCTION__);
-		*(s32 *)arg = 0;
-		return -ENOSYS;
-		break;
-
-	case FE_READ_UNCORRECTED_BLOCKS:
-		dprintk("%s: FE_READ_UNCORRECTED_BLOCKS\n", __FUNCTION__);
-		*(u32 *)arg = 0;
-		return -ENOSYS;
-		break;
-
-	case FE_SET_FRONTEND: {
-		struct dvb_frontend_parameters *p =
-			(struct dvb_frontend_parameters *)arg;
-		u8 b[] = { 0x00, 0x00, 0x00, 0x03,
-			   0x00, 0x00, 0x00, 0x00,
-			   0x00, 0x00, 0x00, 0x01,
-			   0x00, 0x00, 0x00, 0xff,
-			   0x00, 0x00, 0x00, 0xff };
-		u32 freq;
-
-		dprintk("%s: FE_SET_FRONTEND\n", __FUNCTION__);
-
-		dprintk("            frequency->%d\n", p->frequency);
-		dprintk("            symbol_rate->%d\n",
-			p->u.qam.symbol_rate);
-		dprintk("            inversion->%d\n", p->inversion);
-
-		freq = htonl(p->frequency / 1000);
-		memcpy(&b[4], &freq, sizeof (u32));
-		ttusb_dec_send_command(dec, 0x71, sizeof(b), b, NULL, NULL);
-
-		break;
-	}
-
-	case FE_GET_FRONTEND:
-		dprintk("%s: FE_GET_FRONTEND\n", __FUNCTION__);
-		break;
-
-	case FE_SLEEP:
-		dprintk("%s: FE_SLEEP\n", __FUNCTION__);
-		return -ENOSYS;
-		break;
-
-	case FE_INIT:
-		dprintk("%s: FE_INIT\n", __FUNCTION__);
-		break;
-
-	default:
-		dprintk("%s: unknown IOCTL (0x%X)\n", __FUNCTION__, cmd);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-static int ttusb_dec_3000s_frontend_ioctl(struct dvb_frontend *fe,
-					  unsigned int cmd, void *arg)
-{
-	struct ttusb_dec *dec = fe->data;
-
-	dprintk("%s\n", __FUNCTION__);
-
-	switch (cmd) {
-
-	case FE_GET_INFO:
-		dprintk("%s: FE_GET_INFO\n", __FUNCTION__);
-		memcpy(arg, dec->frontend_info,
-		       sizeof (struct dvb_frontend_info));
-		break;
-
-	case FE_READ_STATUS: {
-		fe_status_t *status = (fe_status_t *)arg;
-		dprintk("%s: FE_READ_STATUS\n", __FUNCTION__);
-		*status = FE_HAS_SIGNAL | FE_HAS_VITERBI |
-			  FE_HAS_SYNC | FE_HAS_CARRIER | FE_HAS_LOCK;
-		break;
-	}
-
-	case FE_READ_BER: {
-		u32 *ber = (u32 *)arg;
-		dprintk("%s: FE_READ_BER\n", __FUNCTION__);
-		*ber = 0;
-		return -ENOSYS;
-		break;
-	}
-
-	case FE_READ_SIGNAL_STRENGTH: {
-		dprintk("%s: FE_READ_SIGNAL_STRENGTH\n", __FUNCTION__);
-		*(s32 *)arg = 0xFF;
-		return -ENOSYS;
-		break;
-	}
-
-	case FE_READ_SNR:
-		dprintk("%s: FE_READ_SNR\n", __FUNCTION__);
-		*(s32 *)arg = 0;
-		return -ENOSYS;
-		break;
-
-	case FE_READ_UNCORRECTED_BLOCKS:
-		dprintk("%s: FE_READ_UNCORRECTED_BLOCKS\n", __FUNCTION__);
-		*(u32 *)arg = 0;
-		return -ENOSYS;
-		break;
-
-	case FE_SET_FRONTEND: {
-		struct dvb_frontend_parameters *p =
-			(struct dvb_frontend_parameters *)arg;
-		u8 b[] = { 0x00, 0x00, 0x00, 0x01,
-			   0x00, 0x00, 0x00, 0x00,
-			   0x00, 0x00, 0x00, 0x01,
-			   0x00, 0x00, 0x00, 0x00,
-			   0x00, 0x00, 0x00, 0x00,
-			   0x00, 0x00, 0x00, 0x00,
-			   0x00, 0x00, 0x00, 0x00,
-			   0x00, 0x00, 0x00, 0x00,
-			   0x00, 0x00, 0x00, 0x00,
-			   0x00, 0x00, 0x00, 0x00 };
-		u32 freq;
-		u32 sym_rate;
-		u32 band;
-		u32 lnb_voltage;
-
-		dprintk("%s: FE_SET_FRONTEND\n", __FUNCTION__);
-
-		dprintk("            frequency->%d\n", p->frequency);
-		dprintk("            symbol_rate->%d\n",
-			p->u.qam.symbol_rate);
-		dprintk("            inversion->%d\n", p->inversion);
-
-		freq = htonl(p->frequency +
-		       (dec->hi_band ? LOF_HI : LOF_LO));
-		memcpy(&b[4], &freq, sizeof(u32));
-		sym_rate = htonl(p->u.qam.symbol_rate);
-		memcpy(&b[12], &sym_rate, sizeof(u32));
-		band = htonl(dec->hi_band ? LOF_HI : LOF_LO);
-		memcpy(&b[24], &band, sizeof(u32));
-		lnb_voltage = htonl(dec->voltage);
-		memcpy(&b[28], &lnb_voltage, sizeof(u32));
-
-		ttusb_dec_send_command(dec, 0x71, sizeof(b), b, NULL, NULL);
-
-		break;
-	}
-
-	case FE_GET_FRONTEND:
-		dprintk("%s: FE_GET_FRONTEND\n", __FUNCTION__);
-		break;
-
-	case FE_SLEEP:
-		dprintk("%s: FE_SLEEP\n", __FUNCTION__);
-		return -ENOSYS;
-		break;
-
-	case FE_INIT:
-		dprintk("%s: FE_INIT\n", __FUNCTION__);
-		break;
-
-	case FE_DISEQC_SEND_MASTER_CMD: {
-		u8 b[] = { 0x00, 0xff, 0x00, 0x00,
-			   0x00, 0x00, 0x00, 0x00,
-			   0x00, 0x00 };
-		struct dvb_diseqc_master_cmd *cmd = arg;
-		memcpy(&b[4], cmd->msg, cmd->msg_len);
-		dprintk("%s: FE_DISEQC_SEND_MASTER_CMD\n", __FUNCTION__);
-		ttusb_dec_send_command(dec, 0x72,
-				       sizeof(b) - (6 - cmd->msg_len), b,
-				       NULL, NULL);
-		break;
-	}
-
-	case FE_DISEQC_SEND_BURST:
-		dprintk("%s: FE_DISEQC_SEND_BURST\n", __FUNCTION__);
-		break;
-
-	case FE_SET_TONE: {
-		fe_sec_tone_mode_t tone = (fe_sec_tone_mode_t)arg;
-		dprintk("%s: FE_SET_TONE\n", __FUNCTION__);
-		dec->hi_band = (SEC_TONE_ON == tone);
-		break;
-	}
-
-	case FE_SET_VOLTAGE:
-		dprintk("%s: FE_SET_VOLTAGE\n", __FUNCTION__);
-		switch ((fe_sec_voltage_t) arg) {
-		case SEC_VOLTAGE_13:
-			dec->voltage = 13;
-			break;
-		case SEC_VOLTAGE_18:
-			dec->voltage = 18;
-			break;
-		default:
-			return -EINVAL;
-			break;
-		}
-		break;
-
-	default:
-		dprintk("%s: unknown IOCTL (0x%X)\n", __FUNCTION__, cmd);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-static void ttusb_dec_init_frontend(struct ttusb_dec *dec)
-{
-	int ret;
-	ret = dvb_register_frontend(dec->frontend_ioctl, dec->adapter, dec, dec->frontend_info, THIS_MODULE);
-}
-
-static void ttusb_dec_exit_frontend(struct ttusb_dec *dec)
-{
-	dvb_unregister_frontend(dec->frontend_ioctl, dec->adapter);
-}
-
 static void ttusb_dec_init_filters(struct ttusb_dec *dec)
 {
 	INIT_LIST_HEAD(&dec->filter_info_list);
@@ -1706,6 +1415,18 @@ static void ttusb_dec_exit_filters(struct ttusb_dec *dec)
 		kfree(finfo);
 	}
 }
+
+int fe_send_command(struct dvb_frontend* fe, const u8 command,
+		    int param_length, const u8 params[],
+		    int *result_length, u8 cmd_result[])
+{
+	struct ttusb_dec* dec = (struct ttusb_dec*) fe->dvb->priv;
+	return ttusb_dec_send_command(dec, command, param_length, params, result_length, cmd_result);
+}
+
+struct ttusbdecfe_config fe_config = {
+	.send_command = fe_send_command
+};
 
 static int ttusb_dec_probe(struct usb_interface *intf,
 			   const struct usb_device_id *id)
@@ -1727,17 +1448,17 @@ static int ttusb_dec_probe(struct usb_interface *intf,
 	memset(dec, 0, sizeof(struct ttusb_dec));
 
 	switch (id->idProduct) {
-	case 0x1006:
+		case 0x1006:
 		ttusb_dec_set_model(dec, TTUSB_DEC3000S);
-		break;
+			break;
 
-	case 0x1008:
+		case 0x1008:
 		ttusb_dec_set_model(dec, TTUSB_DEC2000T);
 		break;
 
 	case 0x1009:
 		ttusb_dec_set_model(dec, TTUSB_DEC2540T);
-		break;
+			break;
 	}
 
 	dec->udev = udev;
@@ -1748,7 +1469,32 @@ static int ttusb_dec_probe(struct usb_interface *intf,
 		return 0;
 	}
 	ttusb_dec_init_dvb(dec);
-	ttusb_dec_init_frontend(dec);
+
+	dec->adapter->priv = dec;
+	switch (id->idProduct) {
+	case 0x1006:
+		dec->fe = ttusbdecfe_dvbs_attach(&fe_config);
+		break;
+
+	case 0x1008:
+	case 0x1009:
+		dec->fe = ttusbdecfe_dvbt_attach(&fe_config);
+		break;
+	}
+
+	if (dec->fe == NULL) {
+		printk("dvb-ttusb-dec: A frontend driver was not found for device %04x/%04x\n",
+		       dec->udev->descriptor.idVendor,
+		       dec->udev->descriptor.idProduct);
+	} else {
+		if (dvb_register_frontend(dec->adapter, dec->fe)) {
+			printk("budget-ci: Frontend registration failed!\n");
+			if (dec->fe->ops->release)
+				dec->fe->ops->release(dec->fe);
+			dec->fe = NULL;
+		}
+	}
+
 	ttusb_dec_init_v_pes(dec);
 	ttusb_dec_init_filters(dec);
 	ttusb_dec_init_tasklet(dec);
@@ -1769,11 +1515,10 @@ static void ttusb_dec_disconnect(struct usb_interface *intf)
 	dprintk("%s\n", __FUNCTION__);
 
 	if (dec->active) {
-		ttusb_dec_exit_tasklet(dec);
+	ttusb_dec_exit_tasklet(dec);
 		ttusb_dec_exit_filters(dec);
-		ttusb_dec_exit_usb(dec);
-		ttusb_dec_exit_frontend(dec);
-		ttusb_dec_exit_dvb(dec);
+	ttusb_dec_exit_usb(dec);
+	ttusb_dec_exit_dvb(dec);
 	}
 
 	kfree(dec);
@@ -1788,22 +1533,16 @@ static void ttusb_dec_set_model(struct ttusb_dec *dec,
 	case TTUSB_DEC2000T:
 		dec->model_name = "DEC2000-t";
 		dec->firmware_name = "dvb-ttusb-dec-2000t.fw";
-		dec->frontend_info = &dec2000t_frontend_info;
-		dec->frontend_ioctl = ttusb_dec_2000t_frontend_ioctl;
 		break;
 
 	case TTUSB_DEC2540T:
 		dec->model_name = "DEC2540-t";
 		dec->firmware_name = "dvb-ttusb-dec-2540t.fw";
-		dec->frontend_info = &dec2000t_frontend_info;
-		dec->frontend_ioctl = ttusb_dec_2000t_frontend_ioctl;
 		break;
 
 	case TTUSB_DEC3000S:
 		dec->model_name = "DEC3000-s";
 		dec->firmware_name = "dvb-ttusb-dec-3000s.fw";
-		dec->frontend_info = &dec3000s_frontend_info;
-		dec->frontend_ioctl = ttusb_dec_3000s_frontend_ioctl;
 		break;
 	}
 }
@@ -1818,9 +1557,9 @@ static struct usb_device_id ttusb_dec_table[] = {
 
 static struct usb_driver ttusb_dec_driver = {
 	.name		= "ttusb-dec",
-	.probe		= ttusb_dec_probe,
-	.disconnect	= ttusb_dec_disconnect,
-	.id_table	= ttusb_dec_table,
+      .probe		= ttusb_dec_probe,
+      .disconnect	= ttusb_dec_disconnect,
+      .id_table		= ttusb_dec_table,
 };
 
 static int __init ttusb_dec_init(void)

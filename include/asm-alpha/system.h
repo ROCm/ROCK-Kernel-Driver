@@ -55,9 +55,9 @@
  */
 struct el_common {
 	unsigned int	size;		/* size in bytes of logout area */
-	int		sbz1	: 30;	/* should be zero */
-	int		err2	:  1;	/* second error */
-	int		retry	:  1;	/* retry flag */
+	unsigned int	sbz1	: 30;	/* should be zero */
+	unsigned int	err2	:  1;	/* second error */
+	unsigned int	retry	:  1;	/* retry flag */
 	unsigned int	proc_offset;	/* processor-specific offset */
 	unsigned int	sys_offset;	/* system-specific offset */
 	unsigned int	code;		/* machine check code */

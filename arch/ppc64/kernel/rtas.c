@@ -42,13 +42,16 @@ char rtas_err_buf[RTAS_ERROR_LOG_MAX];
 
 spinlock_t rtas_data_buf_lock = SPIN_LOCK_UNLOCKED;
 char rtas_data_buf[RTAS_DATA_BUF_SIZE]__page_aligned;
+unsigned long rtas_rmo_buf;
 
 void
-call_rtas_display_status(char c)
+call_rtas_display_status(unsigned char c)
 {
 	struct rtas_args *args = &rtas.args;
 	unsigned long s;
 
+	if (!rtas.base)
+		return;
 	spin_lock_irqsave(&rtas.lock, s);
 
 	args->token = 10;
@@ -60,6 +63,31 @@ call_rtas_display_status(char c)
 	enter_rtas(__pa(args));
 
 	spin_unlock_irqrestore(&rtas.lock, s);
+}
+
+void
+call_rtas_display_status_delay(unsigned char c)
+{
+	static int pending_newline = 0;  /* did last write end with unprinted newline? */
+	static int width = 16;
+
+	if (c == '\n') {	
+		while (width-- > 0)
+			call_rtas_display_status(' ');
+		width = 16;
+		udelay(500000);
+		pending_newline = 1;
+	} else {
+		if (pending_newline) {
+			call_rtas_display_status('\r');
+			call_rtas_display_status('\n');
+		} 
+		pending_newline = 0;
+		if (width--) {
+			call_rtas_display_status(c);
+			udelay(10000);
+		}
+	}
 }
 
 int
@@ -74,6 +102,27 @@ rtas_token(const char *service)
 	return tokp ? *tokp : RTAS_UNKNOWN_SERVICE;
 }
 
+/*
+ * Return the firmware-specified size of the error log buffer
+ *  for all rtas calls that require an error buffer argument.
+ *  This includes 'check-exception' and 'rtas-last-error'.
+ */
+int rtas_get_error_log_max(void)
+{
+	static int rtas_error_log_max;
+	if (rtas_error_log_max)
+		return rtas_error_log_max;
+
+	rtas_error_log_max = rtas_token ("rtas-error-log-max");
+	if ((rtas_error_log_max == RTAS_UNKNOWN_SERVICE) ||
+	    (rtas_error_log_max > RTAS_ERROR_LOG_MAX)) {
+		printk (KERN_WARNING "RTAS: bad log buffer size %d\n", rtas_error_log_max);
+		rtas_error_log_max = RTAS_ERROR_LOG_MAX;
+	}
+	return rtas_error_log_max;
+}
+
+
 /** Return a copy of the detailed error text associated with the
  *  most recent failed call to rtas.  Because the error text
  *  might go stale if there are any other intervening rtas calls,
@@ -86,12 +135,7 @@ __fetch_rtas_last_error(void)
 	struct rtas_args err_args, save_args;
 	u32 bufsz;
 
-	bufsz = rtas_token ("rtas-error-log-max");
-	if ((bufsz == RTAS_UNKNOWN_SERVICE) ||
-	    (bufsz > RTAS_ERROR_LOG_MAX)) {
-		printk (KERN_WARNING "RTAS: bad log buffer size %d\n", bufsz);
-		bufsz = RTAS_ERROR_LOG_MAX;
-	}
+	bufsz = rtas_get_error_log_max();
 
 	err_args.token = rtas_token("rtas-last-error");
 	err_args.nargs = 2;
@@ -411,6 +455,9 @@ void rtas_os_term(char *str)
 {
 	int status;
 
+	if (RTAS_UNKNOWN_SERVICE == rtas_token("ibm,os-term"))
+		return;
+
 	snprintf(rtas_os_term_buf, 2048, "OS panic: %s", str);
 
 	do {
@@ -425,7 +472,6 @@ void rtas_os_term(char *str)
 	} while (status == RTAS_BUSY);
 }
 
-unsigned long rtas_rmo_buf = 0;
 
 asmlinkage int ppc_rtas(struct rtas_args __user *uargs)
 {
@@ -489,7 +535,6 @@ asmlinkage int ppc_rtas(struct rtas_args __user *uargs)
 	return 0;
 }
 
-#ifdef CONFIG_HOTPLUG_CPU
 /* This version can't take the spinlock, because it never returns */
 
 struct rtas_args rtas_stop_self_args = {
@@ -514,27 +559,53 @@ void rtas_stop_self(void)
 
 	panic("Alas, I survived.\n");
 }
-#endif /* CONFIG_HOTPLUG_CPU */
 
 /*
- * Return the firmware-specified size of the error log buffer
- *  for all rtas calls that require an error buffer argument.
- *  This includes 'check-exception' and 'rtas-last-error'.
+ * Call early during boot, before mem init or bootmem, to retreive the RTAS
+ * informations from the device-tree and allocate the RMO buffer for userland
+ * accesses.
  */
-int rtas_get_error_log_max(void)
+void __init rtas_initialize(void)
 {
-	static int rtas_error_log_max;
-	if (rtas_error_log_max)
-		return rtas_error_log_max;
+	/* Get RTAS dev node and fill up our "rtas" structure with infos
+	 * about it.
+	 */
+	rtas.dev = of_find_node_by_name(NULL, "rtas");
+	if (rtas.dev) {
+		u32 *basep, *entryp;
+		u32 *sizep;
 
-	rtas_error_log_max = rtas_token ("rtas-error-log-max");
-	if ((rtas_error_log_max == RTAS_UNKNOWN_SERVICE) ||
-	    (rtas_error_log_max > RTAS_ERROR_LOG_MAX)) {
-		printk (KERN_WARNING "RTAS: bad log buffer size %d\n", rtas_error_log_max);
-		rtas_error_log_max = RTAS_ERROR_LOG_MAX;
+		basep = (u32 *)get_property(rtas.dev, "linux,rtas-base", NULL);
+		sizep = (u32 *)get_property(rtas.dev, "rtas-size", NULL);
+		if (basep != NULL && sizep != NULL) {
+			rtas.base = *basep;
+			rtas.size = *sizep;
+			entryp = (u32 *)get_property(rtas.dev, "linux,rtas-entry", NULL);
+			if (entryp == NULL) /* Ugh */
+				rtas.entry = rtas.base;
+			else
+				rtas.entry = *entryp;
+		} else
+			rtas.dev = NULL;
 	}
-	return rtas_error_log_max;
+	/* If RTAS was found, allocate the RMO buffer for it and look for
+	 * the stop-self token if any
+	 */
+	if (rtas.dev) {
+		unsigned long rtas_region = RTAS_INSTANTIATE_MAX;
+		if (systemcfg->platform == PLATFORM_PSERIES_LPAR)
+			rtas_region = min(lmb.rmo_size, RTAS_INSTANTIATE_MAX);
+
+		rtas_rmo_buf = lmb_alloc_base(RTAS_RMOBUF_MAX, PAGE_SIZE,
+							rtas_region);
+
+#ifdef CONFIG_HOTPLUG_CPU
+		rtas_stop_self_args.token = rtas_token("stop-self");
+#endif /* CONFIG_HOTPLUG_CPU */
+	}
+
 }
+
 
 EXPORT_SYMBOL(rtas_firmware_flash_list);
 EXPORT_SYMBOL(rtas_token);

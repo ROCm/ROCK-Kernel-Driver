@@ -15,7 +15,6 @@ extern void boot(int a1, int a2, void *prom);
 phandle stdin;
 phandle stdout;
 phandle stderr;
-phandle chosen_handle;
 
 void printk(char *fmt, ...);
 
@@ -23,7 +22,7 @@ void
 start(int a1, int a2, void *promptr)
 {
     ofinit(promptr);
-    if (ofstdio(&stdin, &stdout, &stderr, &chosen_handle))
+    if (ofstdio(&stdin, &stdout, &stderr))
 	exit();
 
     boot(a1, a2, promptr);

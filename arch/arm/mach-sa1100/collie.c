@@ -22,6 +22,8 @@
 #include <linux/tty.h>
 #include <linux/delay.h>
 #include <linux/device.h>
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/partitions.h>
 #include <linux/timer.h>
 
 #include <asm/hardware.h>
@@ -31,6 +33,7 @@
 #include <asm/arch/collie.h>
 
 #include <asm/mach/arch.h>
+#include <asm/mach/flash.h>
 #include <asm/mach/map.h>
 #include <asm/mach/serial_sa1100.h>
 
@@ -89,6 +92,48 @@ static struct platform_device *devices[] __initdata = {
 	&locomo_device,
 };
 
+static struct mtd_partition collie_partitions[] = {
+	{
+		.name		= "bootloader",
+		.offset 	= 0,
+		.size		= 0x000C0000,
+		.mask_flags	= MTD_WRITEABLE
+	}, {
+		.name		= "kernel",
+		.offset 	= MTDPART_OFS_APPEND,
+		.size		= 0x00100000,
+	}, {
+		.name		= "rootfs",
+		.offset 	= MTDPART_OFS_APPEND,
+		.size		= 0x00e20000,
+	}
+};
+
+static void collie_set_vpp(int vpp)
+{
+	COLLIE_SCP_REG_GPCR |= COLLIE_SCP_VPEN;
+	if (vpp) {
+		COLLIE_SCP_REG_GPWR |= COLLIE_SCP_VPEN;
+	} else {
+		COLLIE_SCP_REG_GPWR &= ~COLLIE_SCP_VPEN;
+	}
+}
+
+static struct flash_platform_data collie_flash_data = {
+	.map_name	= "cfi_probe",
+	.set_vpp	= collie_set_vpp,
+	.parts		= collie_partitions,
+	.nr_parts	= ARRAY_SIZE(collie_partitions),
+};
+
+static struct resource collie_flash_resources[] = {
+	{
+		.start	= SA1100_CS0_PHYS,
+		.end	= SA1100_CS0_PHYS + SZ_32M - 1,
+		.flags	= IORESOURCE_MEM,
+	}
+};
+
 static void __init collie_init(void)
 {
 	int ret = 0;
@@ -121,6 +166,9 @@ static void __init collie_init(void)
 	if (ret) {
 		printk(KERN_WARNING "collie: Unable to register LoCoMo device\n");
 	}
+
+	sa11x0_set_flash_data(&collie_flash_data, collie_flash_resources,
+			      ARRAY_SIZE(collie_flash_resources));
 }
 
 static struct map_desc collie_io_desc[] __initdata = {
@@ -140,6 +188,6 @@ MACHINE_START(COLLIE, "Sharp-Collie")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	MAPIO(collie_map_io)
 	INITIRQ(sa1100_init_irq)
-	INIT_MACHINE(collie_init)
-	INITTIME(sa1100_init_time)
+	.timer		= &sa1100_timer,
+	.init_machine	= collie_init,
 MACHINE_END

@@ -85,12 +85,14 @@ acpi_ns_report_error (
 	if (lookup_status == AE_BAD_CHARACTER) {
 		/* There is a non-ascii character in the name */
 
-		acpi_os_printf ("[0x%4.4X] (NON-ASCII)\n", *(ACPI_CAST_PTR (u32, internal_name)));
+		acpi_os_printf ("[0x%4.4X] (NON-ASCII)\n",
+			*(ACPI_CAST_PTR (u32, internal_name)));
 	}
 	else {
 		/* Convert path to external format */
 
-		status = acpi_ns_externalize_name (ACPI_UINT32_MAX, internal_name, NULL, &name);
+		status = acpi_ns_externalize_name (ACPI_UINT32_MAX,
+				 internal_name, NULL, &name);
 
 		/* Print target name */
 
@@ -141,7 +143,8 @@ acpi_ns_report_method_error (
 
 
 	if (path) {
-		status = acpi_ns_get_node_by_path (path, prefix_node, ACPI_NS_NO_UPSEARCH, &node);
+		status = acpi_ns_get_node_by_path (path, prefix_node,
+				 ACPI_NS_NO_UPSEARCH, &node);
 		if (ACPI_FAILURE (status)) {
 			acpi_os_printf ("report_method_error: Could not get node\n");
 			return;
@@ -180,7 +183,7 @@ acpi_ns_print_node_pathname (
 		return;
 	}
 
-	/* Convert handle to a full pathname and print it (with supplied message) */
+	/* Convert handle to full pathname and print it (with supplied message) */
 
 	buffer.length = ACPI_ALLOCATE_LOCAL_BUFFER;
 
@@ -324,13 +327,11 @@ acpi_ns_get_internal_name_length (
 	info->fully_qualified = FALSE;
 
 	/*
-	 * For the internal name, the required length is 4 bytes
-	 * per segment, plus 1 each for root_prefix, multi_name_prefix_op,
-	 * segment count, trailing null (which is not really needed,
-	 * but no there's harm in putting it there)
+	 * For the internal name, the required length is 4 bytes per segment, plus
+	 * 1 each for root_prefix, multi_name_prefix_op, segment count, trailing null
+	 * (which is not really needed, but no there's harm in putting it there)
 	 *
-	 * strlen() + 1 covers the first name_seg, which has no
-	 * path separator
+	 * strlen() + 1 covers the first name_seg, which has no path separator
 	 */
 	if (acpi_ns_valid_root_prefix (next_external_char[0])) {
 		info->fully_qualified = TRUE;
@@ -347,10 +348,9 @@ acpi_ns_get_internal_name_length (
 	}
 
 	/*
-	 * Determine the number of ACPI name "segments" by counting
-	 * the number of path separators within the string.  Start
-	 * with one segment since the segment count is (# separators)
-	 * + 1, and zero separators is ok.
+	 * Determine the number of ACPI name "segments" by counting the number of
+	 * path separators within the string. Start with one segment since the
+	 * segment count is [(# separators) + 1], and zero separators is ok.
 	 */
 	if (*next_external_char) {
 		info->num_segments = 1;
@@ -625,7 +625,8 @@ acpi_ns_externalize_name (
 			/* <count> 4-byte names */
 
 			names_index = prefix_length + 2;
-			num_segments = (acpi_native_uint) (u8) internal_name[(acpi_native_uint) (prefix_length + 1)];
+			num_segments = (acpi_native_uint) (u8)
+					   internal_name[(acpi_native_uint) (prefix_length + 1)];
 			break;
 
 		case AML_DUAL_NAME_PREFIX:
@@ -672,7 +673,7 @@ acpi_ns_externalize_name (
 	}
 
 	/*
-	 * Build converted_name...
+	 * Build converted_name
 	 */
 	*converted_name = ACPI_MEM_CALLOCATE (required_length);
 	if (!(*converted_name)) {
@@ -756,7 +757,7 @@ acpi_ns_map_handle_to_node (
  *
  * PARAMETERS:  Node          - Node to be converted to a Handle
  *
- * RETURN:      An USER acpi_handle
+ * RETURN:      A user handle
  *
  * DESCRIPTION: Convert a real Node to a namespace handle
  *
@@ -960,7 +961,7 @@ cleanup:
  *              (which "should not happen").
  *
  ******************************************************************************/
-
+#ifdef ACPI_FUTURE_USAGE
 acpi_name
 acpi_ns_find_parent_name (
 	struct acpi_namespace_node      *child_node)
@@ -976,7 +977,8 @@ acpi_ns_find_parent_name (
 
 		parent_node = acpi_ns_get_parent_node (child_node);
 		if (parent_node) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Parent of %p [%4.4s] is %p [%4.4s]\n",
+			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
+				"Parent of %p [%4.4s] is %p [%4.4s]\n",
 				child_node, acpi_ut_get_node_name (child_node),
 				parent_node, acpi_ut_get_node_name (parent_node)));
 
@@ -985,12 +987,14 @@ acpi_ns_find_parent_name (
 			}
 		}
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "unable to find parent of %p (%4.4s)\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
+			"Unable to find parent of %p (%4.4s)\n",
 			child_node, acpi_ut_get_node_name (child_node)));
 	}
 
 	return_VALUE (ACPI_UNKNOWN_NAME);
 }
+#endif
 
 
 /*******************************************************************************
@@ -1018,11 +1022,9 @@ acpi_ns_get_parent_node (
 	}
 
 	/*
-	 * Walk to the end of this peer list.
-	 * The last entry is marked with a flag and the peer
-	 * pointer is really a pointer back to the parent.
-	 * This saves putting a parent back pointer in each and
-	 * every named object!
+	 * Walk to the end of this peer list. The last entry is marked with a flag
+	 * and the peer pointer is really a pointer back to the parent. This saves
+	 * putting a parent back pointer in each and every named object!
 	 */
 	while (!(node->flags & ANOBJ_END_OF_PEER_LIST)) {
 		node = node->peer;
@@ -1039,8 +1041,8 @@ acpi_ns_get_parent_node (
  *
  * PARAMETERS:  Node       - Current table entry
  *
- * RETURN:      Next valid Node in the linked node list.  NULL if no more valid
- *              nodess
+ * RETURN:      Next valid Node in the linked node list. NULL if no more valid
+ *              nodes.
  *
  * DESCRIPTION: Find the next valid node within a name table.
  *              Useful for implementing NULL-end-of-list loops.

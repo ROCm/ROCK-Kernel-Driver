@@ -536,8 +536,7 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		  default:
 			return -EINVAL;
 		}
-		if (tty->ldisc.flush_buffer)
-			tty->ldisc.flush_buffer(tty);
+		tty_ldisc_flush(tty);
 		return 0;
 
 	case KDGKBMODE:

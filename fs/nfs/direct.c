@@ -422,8 +422,6 @@ nfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	/*
 	 * No support for async yet
 	 */
-	up(&inode->i_sem);
-
 	if (!is_sync_kiocb(iocb))
 		return result;
 
@@ -446,8 +444,6 @@ nfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
 	default:
 		break;
 	}
-
-	down(&inode->i_sem);
 	return result;
 }
 
@@ -549,7 +545,7 @@ nfs_file_direct_write(struct kiocb *iocb, const char __user *buf, size_t count, 
 {
 	ssize_t retval = -EINVAL;
 	loff_t *ppos = &iocb->ki_pos;
-	unsigned long limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
+	unsigned long limit = current->signal->rlim[RLIMIT_FSIZE].rlim_cur;
 	struct file *file = iocb->ki_filp;
 	struct nfs_open_context *ctx =
 			(struct nfs_open_context *) file->private_data;

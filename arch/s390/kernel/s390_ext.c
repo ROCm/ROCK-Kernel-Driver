@@ -12,6 +12,7 @@
 #include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/kernel_stat.h>
+#include <linux/interrupt.h>
 
 #include <asm/lowcore.h>
 #include <asm/s390_ext.h>

@@ -1,7 +1,7 @@
-/* 
+/*
  * Sony Programmable I/O Control Device driver for VAIO
  *
- * Copyright (C) 2001-2003 Stelian Pop <stelian@popies.net>
+ * Copyright (C) 2001-2004 Stelian Pop <stelian@popies.net>
  *
  * Copyright (C) 2001-2002 Alcôve <www.alcove.com>
  *
@@ -14,30 +14,29 @@
  * Copyright (C) 2000 Andrew Tridgell <tridge@valinux.com>
  *
  * Earlier work by Werner Almesberger, Paul `Rusty' Russell and Paul Mackerras.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  */
 
-#ifndef _SONYPI_PRIV_H_ 
+#ifndef _SONYPI_PRIV_H_
 #define _SONYPI_PRIV_H_
 
 #ifdef __KERNEL__
 
-#define SONYPI_DRIVER_MAJORVERSION	 1
-#define SONYPI_DRIVER_MINORVERSION	23
+#define SONYPI_DRIVER_VERSION	 "1.25"
 
 #define SONYPI_DEVICE_MODEL_TYPE1	1
 #define SONYPI_DEVICE_MODEL_TYPE2	2
@@ -46,9 +45,9 @@
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/input.h>
-#include <linux/pm.h>
 #include <linux/acpi.h>
-#include "linux/sonypi.h"
+#include <linux/kfifo.h>
+#include <linux/sonypi.h>
 
 /* type1 models use those */
 #define SONYPI_IRQ_PORT			0x8034
@@ -223,6 +222,7 @@ static struct sonypi_event sonypi_fnkeyev[] = {
 	{ 0x1a, SONYPI_EVENT_FNKEY_F10 },
 	{ 0x1b, SONYPI_EVENT_FNKEY_F11 },
 	{ 0x1c, SONYPI_EVENT_FNKEY_F12 },
+	{ 0x1f, SONYPI_EVENT_FNKEY_RELEASED },
 	{ 0x21, SONYPI_EVENT_FNKEY_1 },
 	{ 0x22, SONYPI_EVENT_FNKEY_2 },
 	{ 0x31, SONYPI_EVENT_FNKEY_D },
@@ -340,30 +340,53 @@ struct sonypi_eventtypes {
 };
 
 #define SONYPI_BUF_SIZE	128
-struct sonypi_queue {
-	unsigned long head;
-	unsigned long tail;
-	unsigned long len;
-	spinlock_t s_lock;
-	wait_queue_head_t proc_list;
-	struct fasync_struct *fasync;
-	unsigned char buf[SONYPI_BUF_SIZE];
+
+/* The name of the devices for the input device drivers */
+#define SONYPI_JOG_INPUTNAME	"Sony Vaio Jogdial"
+#define SONYPI_KEY_INPUTNAME	"Sony Vaio Keys"
+
+/* Correspondance table between sonypi events and input layer events */
+struct {
+	int sonypiev;
+	int inputev;
+} sonypi_inputkeys[] = {
+	{ SONYPI_EVENT_CAPTURE_PRESSED,	 	KEY_CAMERA },
+	{ SONYPI_EVENT_FNKEY_ONLY, 		KEY_FN },
+	{ SONYPI_EVENT_FNKEY_ESC, 		KEY_FN_ESC },
+	{ SONYPI_EVENT_FNKEY_F1, 		KEY_FN_F1 },
+	{ SONYPI_EVENT_FNKEY_F2, 		KEY_FN_F2 },
+	{ SONYPI_EVENT_FNKEY_F3, 		KEY_FN_F3 },
+	{ SONYPI_EVENT_FNKEY_F4, 		KEY_FN_F4 },
+	{ SONYPI_EVENT_FNKEY_F5, 		KEY_FN_F5 },
+	{ SONYPI_EVENT_FNKEY_F6, 		KEY_FN_F6 },
+	{ SONYPI_EVENT_FNKEY_F7, 		KEY_FN_F7 },
+	{ SONYPI_EVENT_FNKEY_F8, 		KEY_FN_F8 },
+	{ SONYPI_EVENT_FNKEY_F9,		KEY_FN_F9 },
+	{ SONYPI_EVENT_FNKEY_F10,		KEY_FN_F10 },
+	{ SONYPI_EVENT_FNKEY_F11, 		KEY_FN_F11 },
+	{ SONYPI_EVENT_FNKEY_F12,		KEY_FN_F12 },
+	{ SONYPI_EVENT_FNKEY_1, 		KEY_FN_1 },
+	{ SONYPI_EVENT_FNKEY_2, 		KEY_FN_2 },
+	{ SONYPI_EVENT_FNKEY_D,			KEY_FN_D },
+	{ SONYPI_EVENT_FNKEY_E,			KEY_FN_E },
+	{ SONYPI_EVENT_FNKEY_F,			KEY_FN_F },
+	{ SONYPI_EVENT_FNKEY_S,			KEY_FN_S },
+	{ SONYPI_EVENT_FNKEY_B,			KEY_FN_B },
+	{ SONYPI_EVENT_BLUETOOTH_PRESSED, 	KEY_BLUE },
+	{ SONYPI_EVENT_BLUETOOTH_ON, 		KEY_BLUE },
+	{ SONYPI_EVENT_PKEY_P1, 		KEY_PROG1 },
+	{ SONYPI_EVENT_PKEY_P2, 		KEY_PROG2 },
+	{ SONYPI_EVENT_PKEY_P3, 		KEY_PROG3 },
+	{ SONYPI_EVENT_BACK_PRESSED, 		KEY_BACK },
+	{ SONYPI_EVENT_HELP_PRESSED, 		KEY_HELP },
+	{ SONYPI_EVENT_ZOOM_PRESSED, 		KEY_ZOOM },
+	{ SONYPI_EVENT_THUMBPHRASE_PRESSED, 	BTN_THUMB },
+	{ 0, 0 },
 };
-
-/* We enable input subsystem event forwarding if the input 
- * subsystem is compiled in, but only if sonypi is not into the
- * kernel and input as a module... */
-#if defined(CONFIG_INPUT) || defined(CONFIG_INPUT_MODULE)
-#if ! (defined(CONFIG_SONYPI) && defined(CONFIG_INPUT_MODULE))
-#define SONYPI_USE_INPUT
-#endif
-#endif
-
-/* The name of the Jog Dial for the input device drivers */
-#define SONYPI_INPUTNAME	"Sony VAIO Jog Dial"
 
 struct sonypi_device {
 	struct pci_dev *dev;
+	struct platform_device *pdev;
 	u16 irq;
 	u16 bits;
 	u16 ioport1;
@@ -373,15 +396,17 @@ struct sonypi_device {
 	int camera_power;
 	int bluetooth_power;
 	struct semaphore lock;
-	struct sonypi_queue queue;
+	struct kfifo *fifo;
+	spinlock_t fifo_lock;
+	wait_queue_head_t fifo_proc_list;
+	struct fasync_struct *fifo_async;
 	int open_count;
 	int model;
-#ifdef SONYPI_USE_INPUT
-	struct input_dev jog_dev;
-#endif
-#ifdef CONFIG_PM
-	struct pm_dev *pm;
-#endif
+	struct input_dev input_jog_dev;
+	struct input_dev input_key_dev;
+	struct work_struct input_work;
+	struct kfifo *input_fifo;
+	spinlock_t input_fifo_lock;
 };
 
 #define ITERATIONS_LONG		10000
@@ -399,37 +424,8 @@ struct sonypi_device {
 #define SONYPI_ACPI_ACTIVE (!acpi_disabled)
 #else
 #define SONYPI_ACPI_ACTIVE 0
-#endif /* CONFIG_ACPI */
+#endif				/* CONFIG_ACPI */
 
-static inline int sonypi_ec_write(u8 addr, u8 value) {
-#ifdef CONFIG_ACPI_EC
-	if (SONYPI_ACPI_ACTIVE)
-		return ec_write(addr, value);
-#endif
-	wait_on_command(1, inb_p(SONYPI_CST_IOPORT) & 3, ITERATIONS_LONG);
-	outb_p(0x81, SONYPI_CST_IOPORT);
-	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2, ITERATIONS_LONG);
-	outb_p(addr, SONYPI_DATA_IOPORT);
-	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2, ITERATIONS_LONG);
-	outb_p(value, SONYPI_DATA_IOPORT);
-	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2, ITERATIONS_LONG);
-	return 0;
-}
+#endif				/* __KERNEL__ */
 
-static inline int sonypi_ec_read(u8 addr, u8 *value) {
-#ifdef CONFIG_ACPI_EC
-	if (SONYPI_ACPI_ACTIVE)
-		return ec_read(addr, value);
-#endif
-	wait_on_command(1, inb_p(SONYPI_CST_IOPORT) & 3, ITERATIONS_LONG);
-	outb_p(0x80, SONYPI_CST_IOPORT);
-	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2, ITERATIONS_LONG);
-	outb_p(addr, SONYPI_DATA_IOPORT);
-	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2, ITERATIONS_LONG);
-	*value = inb_p(SONYPI_DATA_IOPORT);
-	return 0;
-}
-
-#endif /* __KERNEL__ */
-
-#endif /* _SONYPI_PRIV_H_ */
+#endif				/* _SONYPI_PRIV_H_ */

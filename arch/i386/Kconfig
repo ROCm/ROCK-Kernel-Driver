@@ -29,6 +29,10 @@ config GENERIC_ISA_DMA
 	bool
 	default y
 
+config GENERIC_IOMAP
+	bool
+	default y
+
 source "init/Kconfig"
 
 menu "Processor type and features"
@@ -175,6 +179,7 @@ config M386
 	  - "K6" for the AMD K6, K6-II and K6-III (aka K6-3D).
 	  - "Athlon" for the AMD K7 family (Athlon/Duron/Thunderbird).
 	  - "Crusoe" for the Transmeta Crusoe series.
+	  - "Efficeon" for the Transmeta Efficeon series.
 	  - "Winchip-C6" for original IDT Winchip.
 	  - "Winchip-2" for IDT Winchip 2.
 	  - "Winchip-2A" for IDT Winchips with 3dNow! capabilities.
@@ -195,7 +200,7 @@ config M586
 	bool "586/K5/5x86/6x86/6x86MX"
 	help
 	  Select this for an 586 or 686 series processor such as the AMD K5,
-	  the Intel 5x86 or 6x86, or the Intel 6x86MX.  This choice does not
+	  the Cyrix 5x86, 6x86 and 6x86MX.  This choice does not
 	  assume the RDTSC (Read Time Stamp Counter) instruction.
 
 config M586TSC
@@ -277,6 +282,11 @@ config MCRUSOE
 	  like a 586 with TSC, and sets some GCC optimization flags (like a
 	  Pentium Pro with no alignment requirements).
 
+config MEFFICEON
+	bool "Efficeon"
+	help
+	  Select this for a Transmeta Efficeon processor.
+
 config MWINCHIPC6
 	bool "Winchip-C6"
 	help
@@ -350,7 +360,7 @@ config X86_L1_CACHE_SHIFT
 	int
 	default "7" if MPENTIUM4 || X86_GENERIC
 	default "4" if X86_ELAN || M486 || M386
-	default "5" if MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCRUSOE || MCYRIXIII || MK6 || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || M586 || MVIAC3_2
+	default "5" if MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCRUSOE || MEFFICEON || MCYRIXIII || MK6 || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || M586 || MVIAC3_2
 	default "6" if MK7 || MK8 || MPENTIUMM
 
 config RWSEM_GENERIC_SPINLOCK
@@ -400,17 +410,17 @@ config X86_ALIGNMENT_16
 
 config X86_GOOD_APIC
 	bool
-	depends on MK7 || MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || MK8
+	depends on MK7 || MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || MK8 || MEFFICEON
 	default y
 
 config X86_INTEL_USERCOPY
 	bool
-	depends on MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M586MMX || X86_GENERIC || MK8 || MK7
+	depends on MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M586MMX || X86_GENERIC || MK8 || MK7 || MEFFICEON
 	default y
 
 config X86_USE_PPRO_CHECKSUM
 	bool
-	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M686 || MK8 || MVIAC3_2
+	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6 || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M686 || MK8 || MVIAC3_2 || MEFFICEON
 	default y
 
 config X86_USE_3DNOW
@@ -545,7 +555,7 @@ config X86_IO_APIC
 
 config X86_TSC
 	bool
-	depends on (MWINCHIP3D || MWINCHIP2 || MCRUSOE || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || MK8 || MVIAC3_2) && !X86_NUMAQ
+	depends on (MWINCHIP3D || MWINCHIP2 || MCRUSOE || MEFFICEON || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || MK8 || MVIAC3_2) && !X86_NUMAQ
 	default y
 
 config X86_MCE
@@ -580,7 +590,7 @@ config X86_MCE_NONFATAL
 
 config X86_MCE_P4THERMAL
 	bool "check for P4 thermal throttling interrupt."
-	depends on X86_MCE && (X86_UP_APIC || SMP)
+	depends on X86_MCE && (X86_UP_APIC || SMP) && !X86_VISWS
 	help
 	  Enabling this feature will cause a message to be printed when the P4
 	  enters thermal throttling.
@@ -718,10 +728,6 @@ config HIGHMEM
 config X86_PAE
 	bool
 	depends on HIGHMEM64G
-	default y
-
-config PROC_MM
-	bool "/proc/mm support"
 	default y
 
 # Common NUMA Features
@@ -879,7 +885,7 @@ source kernel/power/Kconfig
 source "drivers/acpi/Kconfig"
 
 menu "APM (Advanced Power Management) BIOS Support"
-depends on PM
+depends on PM && !X86_VISWS
 
 config APM
 	tristate "APM (Advanced Power Management) BIOS support"
@@ -1194,7 +1200,16 @@ source "crypto/Kconfig"
 
 source "lib/Kconfig"
 
-source "rpmify/Kconfig"
+#
+# Use the generic interrupt handling code in kernel/irq/:
+#
+config GENERIC_HARDIRQS
+	bool
+	default y
+
+config GENERIC_IRQ_PROBE
+	bool
+	default y
 
 config X86_SMP
 	bool
@@ -1220,85 +1235,3 @@ config PC
 	bool
 	depends on X86 && !EMBEDDED
 	default y
-
-config KDB
-	bool "Built-in Kernel Debugger support"
-	depends on DEBUG_KERNEL
-	select KALLSYMS
-	select KALLSYMS_ALL
-	help
-	  This option provides a built-in kernel debugger.  The built-in
-	  kernel debugger contains commands which allow memory to be examined,
-	  instructions to be disassembled and breakpoints to be set.  For details,
-	  see Documentation/kdb/kdb.mm and the manual pages kdb_bt, kdb_ss, etc.
-	  Kdb can also be used via the serial port.  Set up the system to
-	  have a serial console (see Documentation/serial-console.txt).
-	  The key sequence <escape>KDB on the serial port will cause the
-	  kernel debugger to be entered with input from the serial port and
-	  output to the serial console.  If unsure, say N.
-
-config KDB_MODULES
-	tristate "KDB modules"
-	depends on KDB
-	help
-	  KDB can be extended by adding your own modules, in directory
-	  kdb/modules.  This option selects the way that these modules should
-	  be compiled, as free standing modules (select M) or built into the
-	  kernel (select Y).  If unsure say M.
-
-config KDB_OFF
-	bool "KDB off by default"
-	depends on KDB
-	help
-	  Normally kdb is activated by default, as long as CONFIG_KDB is set.
-	  If you want to ship a kernel with kdb support but only have kdb
-	  turned on when the user requests it then select this option.  When
-	  compiled with CONFIG_KDB_OFF, kdb ignores all events unless you boot
-	  with kdb=on or you echo "1" > /proc/sys/kernel/kdb.  This option also
-	  works in reverse, if kdb is normally activated, you can boot with
-	  kdb=off or echo "0" > /proc/sys/kernel/kdb to deactivate kdb. If
-	  unsure, say N.
-
-config KDB_CONTINUE_CATASTROPHIC
-	int "KDB continues after catastrophic errors"
-	depends on KDB
-	default "0"
-	help
-	  This integer controls the behaviour of kdb when the kernel gets a
-  	  catastrophic error, i.e. for a panic, oops, NMI or other watchdog
-  	  tripping.  CONFIG_KDB_CONTINUE_CATASTROPHIC interacts with
-  	  /proc/sys/kernel/kdb and CONFIG_DUMP (if your kernel has the LKCD
-  	  patch).
-  	  When KDB is active (/proc/sys/kernel/kdb == 1) and a catastrophic
-  	  error occurs, nothing extra happens until you type 'go'.
-	  CONFIG_KDB_CONTINUE_CATASTROPHIC == 0 (default).  The first time
-    	  you type 'go', kdb warns you.  The second time you type 'go', KDB
-    	  tries to continue - no guarantees that the kernel is still usable.
-    	  CONFIG_KDB_CONTINUE_CATASTROPHIC == 1.  KDB tries to continue - no
-    	  guarantees that the kernel is still usable.
-    	  CONFIG_KDB_CONTINUE_CATASTROPHIC == 2.  If your kernel has the LKCD
-    	  patch and LKCD is configured to take a dump then KDB forces a dump.
-    	  Whether or not a dump is taken, KDB forces a reboot.
-  	  When KDB is not active (/proc/sys/kernel/kdb == 0) and a catastrophic
-  	  error occurs, the following steps are automatic, no human
-  	  intervention is required.
-    	  CONFIG_KDB_CONTINUE_CATASTROPHIC == 0 (default) or 1.  KDB attempts
-    	  to continue - no guarantees that the kernel is still usable.
-    	  CONFIG_KDB_CONTINUE_CATASTROPHIC == 2.  If your kernel has the LKCD
-    	  patch and LKCD is configured to take a dump then KDB automatically
-    	  forces a dump.  Whether or not a dump is taken, KDB forces a
-    	  reboot.
-  	  If you are not sure, say 0.  Read Documentation/kdb/dump.txt before
-  	  setting to 2.
-
-# KDB_USB does not work, the usb code needs to be
-# converted from 2.4.19 to 2.5.40 APIs.  Omit it until somebody
-# fixes CONFIG_KDB_USB.
-#config KDB_USB
-#	bool "Support for USB Keyboard in KDB"
-#	depends on KDB && USB
-#	help
-#	  If you want to use kdb from a USB keyboard then say Y here.  If you
-#	  say N then kdb can only be used from a PC (AT) keyboard or a serial
-#	  console.
-

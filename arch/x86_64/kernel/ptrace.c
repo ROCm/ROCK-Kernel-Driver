@@ -323,6 +323,8 @@ asmlinkage long sys_ptrace(long request, long pid, unsigned long addr, long data
 			ret = 0;
 			break;
 		case offsetof(struct user, u_debugreg[7]):
+			/* See arch/i386/kernel/ptrace.c for an explanation of
+			 * this awkward check.*/
 				  data &= ~DR_CONTROL_RESERVED;
 				  for(i=0; i<4; i++)
 					  if ((0x5454 >> ((data >> (16 + 4*i)) & 0xf)) & 1)
@@ -395,7 +397,7 @@ asmlinkage long sys_ptrace(long request, long pid, unsigned long addr, long data
 		long tmp;
 
 		ret = 0;
-		if (child->state == TASK_ZOMBIE)	/* already dead */
+		if (child->exit_state == EXIT_ZOMBIE)	/* already dead */
 			break;
 		clear_tsk_thread_flag(child, TIF_SINGLESTEP);
 		child->exit_code = SIGKILL;

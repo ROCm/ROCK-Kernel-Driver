@@ -58,8 +58,6 @@ static unsigned char xtkbd_keycode[256] = {
 
 static char *xtkbd_name = "XT Keyboard";
 
-static int xtkbd_num;
-
 struct xtkbd {
 	unsigned char keycode[256];
 	struct input_dev dev;
@@ -133,8 +131,6 @@ void xtkbd_connect(struct serio *serio, struct serio_driver *drv)
 	xtkbd->dev.id.vendor = 0x0001;
 	xtkbd->dev.id.product = 0x0001;
 	xtkbd->dev.id.version = 0x0100;
-	xtkbd->dev.dev = get_device(&serio->dev);
-	sprintf(xtkbd->dev.cdev.class_id,"xtkbd%d",xtkbd_num++);
 
 	input_register_device(&xtkbd->dev);
 
@@ -145,7 +141,6 @@ void xtkbd_disconnect(struct serio *serio)
 {
 	struct xtkbd *xtkbd = serio->private;
 	input_unregister_device(&xtkbd->dev);
-	put_device(&serio->dev);
 	serio_close(serio);
 	kfree(xtkbd);
 }

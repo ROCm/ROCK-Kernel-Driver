@@ -47,8 +47,6 @@ static char *sermouse_protocols[] = { "None", "Mouse Systems Mouse", "Sun Mouse"
 					"Logitech M+ Mouse", "Microsoft MZ Mouse", "Logitech MZ+ Mouse",
 					"Logitech MZ++ Mouse"};
 
-static int sermouse_num;
-
 struct sermouse {
 	struct input_dev dev;
 	signed char buf[8];
@@ -232,7 +230,6 @@ static void sermouse_disconnect(struct serio *serio)
 {
 	struct sermouse *sermouse = serio->private;
 	input_unregister_device(&sermouse->dev);
-	put_device(&serio->dev);
 	serio_close(serio);
 	kfree(sermouse);
 }
@@ -283,8 +280,6 @@ static void sermouse_connect(struct serio *serio, struct serio_driver *drv)
 	sermouse->dev.id.vendor = sermouse->type;
 	sermouse->dev.id.product = c;
 	sermouse->dev.id.version = 0x0100;
-	sermouse->dev.dev = get_device(&serio->dev);
-	sprintf(sermouse->dev.cdev.class_id,"sermouse%d", sermouse_num++);
 
 	if (serio_open(serio, drv)) {
 		kfree(sermouse);

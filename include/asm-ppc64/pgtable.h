@@ -45,10 +45,16 @@
                     PGD_INDEX_SIZE + PAGE_SHIFT) 
 
 /*
+ * Size of EA range mapped by our pagetables.
+ */
+#define PGTABLE_EA_BITS	41
+#define PGTABLE_EA_MASK	((1UL<<PGTABLE_EA_BITS)-1)
+
+/*
  * Define the address range of the vmalloc VM area.
  */
 #define VMALLOC_START (0xD000000000000000ul)
-#define VMALLOC_END   (VMALLOC_START + VALID_EA_BITS)
+#define VMALLOC_END   (VMALLOC_START + PGTABLE_EA_MASK)
 
 /*
  * Define the address range of the imalloc VM area.
@@ -58,19 +64,13 @@
 #define IMALLOC_VMADDR(x) ((unsigned long)(x))
 #define PHBS_IO_BASE  	  (0xE000000000000000ul)	/* Reserve 2 gigs for PHBs */
 #define IMALLOC_BASE      (0xE000000080000000ul)  
-#define IMALLOC_END       (IMALLOC_BASE + VALID_EA_BITS)
-
-/*
- * Define the address range mapped virt <-> physical
- */
-#define KRANGE_START KERNELBASE
-#define KRANGE_END   (KRANGE_START + VALID_EA_BITS)
+#define IMALLOC_END       (IMALLOC_BASE + PGTABLE_EA_MASK)
 
 /*
  * Define the user address range
  */
 #define USER_START (0UL)
-#define USER_END   (USER_START + VALID_EA_BITS)
+#define USER_END   (USER_START + PGTABLE_EA_MASK)
 
 
 /*
@@ -92,6 +92,7 @@
 #define _PAGE_BUSY	0x0800 /* software: PTE & hash are busy */ 
 #define _PAGE_SECONDARY 0x8000 /* software: HPTE is in secondary group */
 #define _PAGE_GROUP_IX  0x7000 /* software: HPTE index within group */
+#define _PAGE_HUGE	0x10000 /* 16MB page */
 /* Bits 0x7000 identify the index within an HPT Group */
 #define _PAGE_HPTEFLAGS (_PAGE_BUSY | _PAGE_HASHPTE | _PAGE_SECONDARY | _PAGE_GROUP_IX)
 /* PAGE_MASK gives the right answer below, but only by accident */
@@ -151,19 +152,19 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 #endif /* __ASSEMBLY__ */
 
 /* shift to put page number into pte */
-#define PTE_SHIFT (16)
+#define PTE_SHIFT (17)
 
 /* We allow 2^41 bytes of real memory, so we need 29 bits in the PMD
  * to give the PTE page number.  The bottom two bits are for flags. */
 #define PMD_TO_PTEPAGE_SHIFT (2)
 
 #ifdef CONFIG_HUGETLB_PAGE
-#define _PMD_HUGEPAGE	0x00000001U
-#define HUGEPTE_BATCH_SIZE (1<<(HPAGE_SHIFT-PMD_SHIFT))
 
 #ifndef __ASSEMBLY__
 int hash_huge_page(struct mm_struct *mm, unsigned long access,
 		   unsigned long ea, unsigned long vsid, int local);
+
+void hugetlb_mm_free_pgd(struct mm_struct *mm);
 #endif /* __ASSEMBLY__ */
 
 #define HAVE_ARCH_UNMAPPED_AREA
@@ -171,7 +172,7 @@ int hash_huge_page(struct mm_struct *mm, unsigned long access,
 #else
 
 #define hash_huge_page(mm,a,ea,vsid,local)	-1
-#define _PMD_HUGEPAGE	0
+#define hugetlb_mm_free_pgd(mm)			do {} while (0)
 
 #endif
 
@@ -207,10 +208,8 @@ int hash_huge_page(struct mm_struct *mm, unsigned long access,
 #define pmd_set(pmdp, ptep) 	\
 	(pmd_val(*(pmdp)) = (__ba_to_bpn(ptep) << PMD_TO_PTEPAGE_SHIFT))
 #define pmd_none(pmd)		(!pmd_val(pmd))
-#define	pmd_hugepage(pmd)	(!!(pmd_val(pmd) & _PMD_HUGEPAGE))
-#define	pmd_bad(pmd)		(((pmd_val(pmd)) == 0) || pmd_hugepage(pmd))
-#define	pmd_present(pmd)	((!pmd_hugepage(pmd)) \
-				 && (pmd_val(pmd) & ~_PMD_HUGEPAGE) != 0)
+#define	pmd_bad(pmd)		(pmd_val(pmd) == 0)
+#define	pmd_present(pmd)	(pmd_val(pmd) != 0)
 #define	pmd_clear(pmdp)		(pmd_val(*(pmdp)) = 0)
 #define pmd_page_kernel(pmd)	\
 	(__bpn_to_ba(pmd_val(pmd) >> PMD_TO_PTEPAGE_SHIFT))
@@ -263,6 +262,7 @@ static inline int pte_exec(pte_t pte)  { return pte_val(pte) & _PAGE_EXEC;}
 static inline int pte_dirty(pte_t pte) { return pte_val(pte) & _PAGE_DIRTY;}
 static inline int pte_young(pte_t pte) { return pte_val(pte) & _PAGE_ACCESSED;}
 static inline int pte_file(pte_t pte) { return pte_val(pte) & _PAGE_FILE;}
+static inline int pte_huge(pte_t pte) { return pte_val(pte) & _PAGE_HUGE;}
 
 static inline void pte_uncache(pte_t pte) { pte_val(pte) |= _PAGE_NO_CACHE; }
 static inline void pte_cache(pte_t pte)   { pte_val(pte) &= ~_PAGE_NO_CACHE; }
@@ -288,6 +288,8 @@ static inline pte_t pte_mkdirty(pte_t pte) {
 	pte_val(pte) |= _PAGE_DIRTY; return pte; }
 static inline pte_t pte_mkyoung(pte_t pte) {
 	pte_val(pte) |= _PAGE_ACCESSED; return pte; }
+static inline pte_t pte_mkhuge(pte_t pte) {
+	pte_val(pte) |= _PAGE_HUGE; return pte; }
 
 /* Atomic PTE updates */
 static inline unsigned long pte_update(pte_t *p, unsigned long clr)
@@ -458,6 +460,10 @@ extern pgd_t ioremap_dir[1024];
 
 extern void paging_init(void);
 
+struct mmu_gather;
+void hugetlb_free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *prev,
+			   unsigned long start, unsigned long end);
+
 /*
  * This gets called at the end of handling a page fault, when
  * the kernel has put a new PTE into the page table for the process.
@@ -486,11 +492,13 @@ extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
  */
 #define kern_addr_valid(addr)	(1)
 
-#define io_remap_page_range remap_page_range 
+#define io_remap_page_range(vma, vaddr, paddr, size, prot)		\
+		remap_pfn_range(vma, vaddr, (paddr) >> PAGE_SHIFT, size, prot)
 
 void pgtable_cache_init(void);
 
-extern void hpte_init_pSeries(void);
+extern void hpte_init_native(void);
+extern void hpte_init_lpar(void);
 extern void hpte_init_iSeries(void);
 
 /* imalloc region types */
@@ -505,14 +513,14 @@ extern struct vm_struct * im_get_area(unsigned long v_addr, unsigned long size,
 			int region_type);
 unsigned long im_free(void *addr);
 
-long pSeries_lpar_hpte_insert(unsigned long hpte_group,
-			      unsigned long va, unsigned long prpn,
-			      int secondary, unsigned long hpteflags,
-			      int bolted, int large);
+extern long pSeries_lpar_hpte_insert(unsigned long hpte_group,
+				     unsigned long va, unsigned long prpn,
+				     int secondary, unsigned long hpteflags,
+				     int bolted, int large);
 
-long pSeries_hpte_insert(unsigned long hpte_group, unsigned long va,
-			 unsigned long prpn, int secondary,
-			 unsigned long hpteflags, int bolted, int large);
+extern long native_hpte_insert(unsigned long hpte_group, unsigned long va,
+			       unsigned long prpn, int secondary,
+			       unsigned long hpteflags, int bolted, int large);
 
 /*
  * find_linux_pte returns the address of a linux pte for a given 

@@ -1,11 +1,11 @@
 /*
- * $Id: ebony.c,v 1.10 2004/07/12 21:59:44 dwmw2 Exp $
+ * $Id: ebony.c,v 1.13 2004/11/04 13:24:14 gleixner Exp $
  * 
  * Mapping for Ebony user flash
  *
- * Matt Porter <mporter@mvista.com>
+ * Matt Porter <mporter@kernel.crashing.org>
  *
- * Copyright 2002 MontaVista Software Inc.
+ * Copyright 2002-2004 MontaVista Software Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -21,9 +21,10 @@
 #include <linux/mtd/map.h>
 #include <linux/mtd/partitions.h>
 #include <linux/config.h>
+#include <linux/version.h>
 #include <asm/io.h>
 #include <asm/ibm44x.h>
-#include <platforms/ebony.h>
+#include <platforms/4xx/ebony.h>
 
 static struct mtd_info *flash;
 
@@ -63,7 +64,7 @@ static struct mtd_partition ebony_large_partitions[] = {
 int __init init_ebony(void)
 {
 	u8 fpga0_reg;
-	unsigned long fpga0_adr;
+	u8 __iomem *fpga0_adr;
 	unsigned long long small_flash_base, large_flash_base;
 
 	fpga0_adr = ioremap64(EBONY_FPGA_ADDR, 16);
@@ -92,8 +93,7 @@ int __init init_ebony(void)
 		large_flash_base = EBONY_LARGE_FLASH_HIGH;
 
 	ebony_small_map.phys = small_flash_base;
-	ebony_small_map.virt =
-		(unsigned long)ioremap64(small_flash_base,
+	ebony_small_map.virt = ioremap64(small_flash_base,
 					 ebony_small_map.size);
 
 	if (!ebony_small_map.virt) {
@@ -114,8 +114,7 @@ int __init init_ebony(void)
 	}
 
 	ebony_large_map.phys = large_flash_base;
-	ebony_large_map.virt =
-		(unsigned long)ioremap64(large_flash_base,
+	ebony_large_map.virt = ioremap64(large_flash_base,
 					 ebony_large_map.size);
 
 	if (!ebony_large_map.virt) {
@@ -146,13 +145,13 @@ static void __exit cleanup_ebony(void)
 	}
 
 	if (ebony_small_map.virt) {
-		iounmap((void *)ebony_small_map.virt);
-		ebony_small_map.virt = 0;
+		iounmap(ebony_small_map.virt);
+		ebony_small_map.virt = NULL;
 	}
 
 	if (ebony_large_map.virt) {
-		iounmap((void *)ebony_large_map.virt);
-		ebony_large_map.virt = 0;
+		iounmap(ebony_large_map.virt);
+		ebony_large_map.virt = NULL;
 	}
 }
 
@@ -160,5 +159,5 @@ module_init(init_ebony);
 module_exit(cleanup_ebony);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Matt Porter <mporter@mvista.com>");
+MODULE_AUTHOR("Matt Porter <mporter@kernel.crashing.org>");
 MODULE_DESCRIPTION("MTD map and partitions for IBM 440GP Ebony boards");

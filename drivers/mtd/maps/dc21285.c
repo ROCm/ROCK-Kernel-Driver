@@ -5,7 +5,7 @@
  *
  * This code is GPL
  * 
- * $Id: dc21285.c,v 1.20 2004/07/12 22:38:29 dwmw2 Exp $
+ * $Id: dc21285.c,v 1.22 2004/11/01 13:39:21 rmk Exp $
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -32,7 +32,8 @@ static struct mtd_info *dc21285_mtd;
  * is unpredictible. So we have a 25us penalty per
  * write access.
  */
-static void nw_en_write(void) {
+static void nw_en_write(void)
+{
 	extern spinlock_t gpio_lock;
 	unsigned long flags;
 
@@ -55,53 +56,60 @@ static void nw_en_write(void) {
 
 static map_word dc21285_read8(struct map_info *map, unsigned long ofs)
 {
-	return *(uint8_t*)(map->map_priv_1 + ofs);
+	map_word val;
+	val.x[0] = *(uint8_t*)(map->virt + ofs);
+	return val;
 }
 
 static map_word dc21285_read16(struct map_info *map, unsigned long ofs)
 {
-	return *(uint16_t*)(map->map_priv_1 + ofs);
+	map_word val;
+	val.x[0] = *(uint16_t*)(map->virt + ofs);
+	return val;
 }
 
 static map_word dc21285_read32(struct map_info *map, unsigned long ofs)
 {
-	return *(uint32_t*)(map->map_priv_1 + ofs);
+	map_word val;
+	val.x[0] = *(uint32_t*)(map->virt + ofs);
+	return val;
 }
 
 static void dc21285_copy_from(struct map_info *map, void *to, unsigned long from, ssize_t len)
 {
-	memcpy(to, (void*)(map->map_priv_1 + from), len);
+	memcpy(to, (void*)(map->virt + from), len);
 }
 
-static void dc21285_write(struct map_info *map, map_word d, unsigned long adr)
+static void dc21285_write8(struct map_info *map, const map_word d, unsigned long adr)
 {
 	if (machine_is_netwinder())
 		nw_en_write();
 	*CSR_ROMWRITEREG = adr & 3;
 	adr &= ~3;
-	*(uint8_t*)(map->map_priv_1 + adr) = d.x[0];
+	*(uint8_t*)(map->virt + adr) = d.x[0];
 }
 
-static void dc21285_write16(struct map_info *map, map_word d, unsigned long adr)
+static void dc21285_write16(struct map_info *map, const map_word d, unsigned long adr)
 {
 	if (machine_is_netwinder())
 		nw_en_write();
 	*CSR_ROMWRITEREG = adr & 3;
 	adr &= ~3;
-	*(uint16_t*)(map->map_priv_1 + adr) = d.x[0];
+	*(uint16_t*)(map->virt + adr) = d.x[0];
 }
 
-static void dc21285_write32(struct map_info *map, map_word d, unsigned long adr)
+static void dc21285_write32(struct map_info *map, const map_word d, unsigned long adr)
 {
 	if (machine_is_netwinder())
 		nw_en_write();
-	*(uint32_t*)(map->map_priv_1 + adr) = d.x[0];
+	*(uint32_t*)(map->virt + adr) = d.x[0];
 }
 
 static void dc21285_copy_to_32(struct map_info *map, unsigned long to, const void *from, ssize_t len)
 {
 	while (len > 0) {
-		uint32_t d = *((uint32_t*)from)++;
+		map_word d;
+		d.x[0] = *((uint32_t*)from)++;
 		dc21285_write32(map, d, to);
 		to += 4;
 		len -= 4;
@@ -111,7 +119,8 @@ static void dc21285_copy_to_32(struct map_info *map, unsigned long to, const voi
 static void dc21285_copy_to_16(struct map_info *map, unsigned long to, const void *from, ssize_t len)
 {
 	while (len > 0) {
-		uint16_t d = *((uint16_t*)from)++;
+		map_word d;
+		d.x[0] = *((uint16_t*)from)++;
 		dc21285_write16(map, d, to);
 		to += 2;
 		len -= 2;
@@ -120,7 +129,8 @@ static void dc21285_copy_to_16(struct map_info *map, unsigned long to, const voi
 
 static void dc21285_copy_to_8(struct map_info *map, unsigned long to, const void *from, ssize_t len)
 {
-	uint8_t d = *((uint8_t*)from)++;
+	map_word d;
+	d.x[0] = *((uint8_t*)from)++;
 	dc21285_write8(map, d, to);
 	to++;
 	len--;
@@ -135,8 +145,8 @@ static struct map_info dc21285_map = {
 
 
 /* Partition stuff */
-static struct mtd_partition *dc21285_parts;
 #ifdef CONFIG_MTD_PARTITIONS
+static struct mtd_partition *dc21285_parts;
 static const char *probes[] = { "RedBoot", "cmdlinepart", NULL };
 #endif
   
@@ -163,10 +173,10 @@ static int __init init_dc21285(void)
 			break;
 		case SA110_CNTL_ROMWIDTH_32: 
 			dc21285_map.bankwidth = 4; 
-			break;
 			dc21285_map.read = dc21285_read32;
 			dc21285_map.write = dc21285_write32;
 			dc21285_map.copy_to = dc21285_copy_to_32;
+			break;
 		default:
 			printk (KERN_ERR "DC21285 flash: undefined bankwidth\n");
 			return -ENXIO;
@@ -175,8 +185,8 @@ static int __init init_dc21285(void)
 		dc21285_map.bankwidth*8);
 
 	/* Let's map the flash area */
-	dc21285_map.map_priv_1 = (unsigned long)ioremap(DC21285_FLASH, 16*1024*1024);
-	if (!dc21285_map.map_priv_1) {
+	dc21285_map.virt = ioremap(DC21285_FLASH, 16*1024*1024);
+	if (!dc21285_map.virt) {
 		printk("Failed to ioremap\n");
 		return -EIO;
 	}
@@ -188,14 +198,14 @@ static int __init init_dc21285(void)
 	}
 
 	if (!dc21285_mtd) {
-		iounmap((void *)dc21285_map.map_priv_1);
+		iounmap(dc21285_map.virt);
 		return -ENXIO;
 	}	
 	
 	dc21285_mtd->owner = THIS_MODULE;
 
 #ifdef CONFIG_MTD_PARTITIONS
-	nrparts = parse_mtd_partitions(dc21285_mtd, probes, &dc21285_parts, (void *)0);
+	nrparts = parse_mtd_partitions(dc21285_mtd, probes, &dc21285_parts, 0);
 	if (nrparts > 0)
 		add_mtd_partitions(dc21285_mtd, dc21285_parts, nrparts);
 	else	
@@ -231,7 +241,7 @@ static void __exit cleanup_dc21285(void)
 		del_mtd_device(dc21285_mtd);
 
 	map_destroy(dc21285_mtd);
-	iounmap((void *)dc21285_map.map_priv_1);
+	iounmap(dc21285_map.virt);
 }
 
 module_init(init_dc21285);

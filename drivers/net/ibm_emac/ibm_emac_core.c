@@ -40,9 +40,9 @@
 #include <linux/dma-mapping.h>
 #include <linux/ethtool.h>
 #include <linux/mii.h>
+#include <linux/bitops.h>
 
 #include <asm/processor.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/irq.h>
@@ -620,7 +620,7 @@ emac_rx_csum(struct net_device *dev, unsigned short ctrl, struct sk_buff *skb)
 
 static int emac_rx_clean(struct net_device *dev)
 {
-	int i, b, bnum, buf[6];
+	int i, b, bnum = 0, buf[6];
 	int error, frame_length;
 	struct ocp_enet_private *fep = dev->priv;
 	unsigned short ctrl;
@@ -1021,7 +1021,6 @@ static int emac_start_xmit(struct sk_buff *skb, struct net_device *dev)
 static int emac_adjust_to_link(struct ocp_enet_private *fep)
 {
 	emac_t *emacp = fep->emacp;
-	struct ibm_ocp_rgmii *rgmii;
 	unsigned long mode_reg;
 	int full_duplex, speed;
 
@@ -1038,21 +1037,23 @@ static int emac_adjust_to_link(struct ocp_enet_private *fep)
 		speed = fep->phy_mii.speed;
 	}
 
-	if (fep->rgmii_dev)
-		rgmii = RGMII_PRIV(fep->rgmii_dev);
 
 	/* set speed (default is 10Mb) */
 	switch (speed) {
 	case SPEED_1000:
 		mode_reg |= EMAC_M1_JUMBO_ENABLE | EMAC_M1_RFS_16K;
-		if ((rgmii->mode[fep->rgmii_input] == RTBI)
-		    || (rgmii->mode[fep->rgmii_input] == TBI))
-			mode_reg |= EMAC_M1_MF_1000GPCS;
-		else
-			mode_reg |= EMAC_M1_MF_1000MBPS;
-		if (fep->rgmii_dev)
+		if (fep->rgmii_dev) {
+			struct ibm_ocp_rgmii *rgmii = RGMII_PRIV(fep->rgmii_dev);
+
+			if ((rgmii->mode[fep->rgmii_input] == RTBI)
+			    || (rgmii->mode[fep->rgmii_input] == TBI))
+				mode_reg |= EMAC_M1_MF_1000GPCS;
+			else
+				mode_reg |= EMAC_M1_MF_1000MBPS;
+
 			emac_rgmii_port_speed(fep->rgmii_dev, fep->rgmii_input,
 					      1000);
+		}
 		break;
 	case SPEED_100:
 		mode_reg |= EMAC_M1_MF_100MBPS | EMAC_M1_RFS_4K;

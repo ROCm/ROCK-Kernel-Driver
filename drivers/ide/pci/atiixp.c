@@ -47,102 +47,6 @@ static atiixp_ide_timing mdma_timing[] = {
 
 static int save_mdma_mode[4];
 
-#define DISPLAY_ATIIXP_TIMINGS
-
-#if defined(DISPLAY_ATIIXP_TIMINGS) && defined(CONFIG_PROC_FS)
-
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 atiixp_proc;
-static struct pci_dev *bmide_dev;
-
-/**
- *	atiixp_get_info		-	fill in /proc for ATIIXP IDE
- *	@buffer: buffer to fill
- *	@addr: address of user start in buffer
- *	@offset: offset into 'file'
- *	@count: buffer count
- *
- *	Output summary data on the tuning.
- */
-
-static int atiixp_get_info(char *buffer, char **addr, off_t offset, int count)
-{
-	char *p = buffer;
-	struct pci_dev *dev = bmide_dev;
-	unsigned long bibma = pci_resource_start(dev, 4);
-	u32 mdma_timing = 0;
-	u16 udma_mode = 0, pio_mode = 0;
-	u8 c0, c1, udma_control = 0;
-
-	p += sprintf(p, "\n                          ATI ");
-	p += sprintf(p, "ATIIXP Ultra100 IDE Chipset.\n");
-
-	pci_read_config_byte(dev, ATIIXP_IDE_UDMA_CONTROL, &udma_control);
-	pci_read_config_word(dev, ATIIXP_IDE_UDMA_MODE, &udma_mode);
-	pci_read_config_word(dev, ATIIXP_IDE_PIO_MODE, &pio_mode);
-	pci_read_config_dword(dev, ATIIXP_IDE_MDMA_TIMING, &mdma_timing);
-
-	/*
-	 * at that point bibma+0x2 et bibma+0xa are byte registers
-	 * to investigate:
-	 */
-	c0 = inb(bibma + 0x02);
-	c1 = inb(bibma + 0x0a);
-
-	p += sprintf(p, "--------------- Primary Channel "
-			"---------------- Secondary Channel "
-			"-------------\n");
-	p += sprintf(p, "                %sabled "
-			"                        %sabled\n",
-			(c0 & 0x80) ? "dis" : " en",
-			(c1 & 0x80) ? "dis" : " en");
-	p += sprintf(p, "--------------- drive0 --------- drive1 "
-			"-------- drive0 ---------- drive1 ------\n");
-	p += sprintf(p, "DMA enabled:    %s              %s "
-			"            %s               %s\n",
-			(c0 & 0x20) ? "yes" : "no ",
-			(c0 & 0x40) ? "yes" : "no ",
-			(c1 & 0x20) ? "yes" : "no ",
-			(c1 & 0x40) ? "yes" : "no " );
-	p += sprintf(p, "UDMA enabled:   %s              %s "
-			"            %s               %s\n",
-			(udma_control & 0x01) ? "yes" : "no ",
-			(udma_control & 0x02) ? "yes" : "no ",
-			(udma_control & 0x04) ? "yes" : "no ",
-			(udma_control & 0x08) ? "yes" : "no " );
-	p += sprintf(p, "UDMA mode:      %c                %c "
-			"              %c                 %c\n",
-			(udma_control & 0x01) ?
-			((udma_mode & 0x07) + 48) : 'X',
-			(udma_control & 0x02) ?
-			(((udma_mode >> 4) & 0x07) + 48) : 'X',
-			(udma_control & 0x04) ?
-			(((udma_mode >> 8) & 0x07) + 48) : 'X',
-			(udma_control & 0x08) ?
-			(((udma_mode >> 12) & 0x07) + 48) : 'X');
-	p += sprintf(p, "MDMA mode:      %c                %c "
-			"              %c                 %c\n",
-			(save_mdma_mode[0] && (c0 & 0x20)) ?
-			((save_mdma_mode[0] & 0xf) + 48) : 'X',
-			(save_mdma_mode[1] && (c0 & 0x40)) ?
-			((save_mdma_mode[1] & 0xf) + 48) : 'X',
-			(save_mdma_mode[2] && (c1 & 0x20)) ?
-			((save_mdma_mode[2] & 0xf) + 48) : 'X',
-			(save_mdma_mode[3] && (c1 & 0x40)) ?
-			((save_mdma_mode[3] & 0xf) + 48) : 'X');
-	p += sprintf(p, "PIO mode:       %c                %c "
-			"              %c                 %c\n",
-			(c0 & 0x20) ? 'X' : ((pio_mode & 0x07) + 48),
-			(c0 & 0x40) ? 'X' : (((pio_mode >> 4) & 0x07) + 48),
-			(c1 & 0x20) ? 'X' : (((pio_mode >> 8) & 0x07) + 48),
-			(c1 & 0x40) ? 'X' : (((pio_mode >> 12) & 0x07) + 48));
-
-	return p - buffer;	/* => must be less than 4k! */
-}
-#endif  /* defined(DISPLAY_ATIIXP_TIMINGS) && defined(CONFIG_PROC_FS) */
-
 /**
  *	atiixp_ratemask		-	compute rate mask for ATIIXP IDE
  *	@drive: IDE drive to compute for
@@ -357,63 +261,22 @@ static int atiixp_dma_check(ide_drive_t *drive)
 	drive->init_speed = 0;
 
 	if ((id->capability & 1) && drive->autodma) {
-		/* Consult the list of known "bad" drives */
-		if (__ide_dma_bad_drive(drive))
-			goto fast_ata_pio;
-		if (id->field_valid & 4) {
-			if (id->dma_ultra & hwif->ultra_mask) {
-				/* Force if Capable UltraDMA */
-				if ((id->field_valid & 2) &&
-				    (!atiixp_config_drive_for_dma(drive)))
-					goto try_dma_modes;
-			}
-		} else if (id->field_valid & 2) {
-try_dma_modes:
-			if ((id->dma_mword & hwif->mwdma_mask) ||
-			    (id->dma_1word & hwif->swdma_mask)) {
-				/* Force if Capable regular DMA modes */
-				if (!atiixp_config_drive_for_dma(drive))
-					goto no_dma_set;
-			}
-		} else if (__ide_dma_good_drive(drive) &&
-			   (id->eide_dma_time < 150)) {
-			/* Consult the list of known "good" drives */
-			if (!atiixp_config_drive_for_dma(drive))
-				goto no_dma_set;
-		} else {
-			goto fast_ata_pio;
+
+		if (ide_use_dma(drive)) {
+			if (atiixp_config_drive_for_dma(drive))
+				return hwif->ide_dma_on(drive);
 		}
-		return hwif->ide_dma_on(drive);
+
+		goto fast_ata_pio;
+
 	} else if ((id->capability & 8) || (id->field_valid & 2)) {
 fast_ata_pio:
-no_dma_set:
 		tspeed = ide_get_best_pio_mode(drive, 255, 5, NULL);
 		speed = atiixp_dma_2_pio(XFER_PIO_0 + tspeed) + XFER_PIO_0;
 		hwif->speedproc(drive, speed);
 		return hwif->ide_dma_off_quietly(drive);
 	}
 	/* IORDY not supported */
-	return 0;
-}
-
-/**
- *	init_chipset_atiixp	-	set up the ATIIXP chipset
- *	@dev: PCI device to set up
- *	@name: Name of the device
- *
- *	Initialize the PCI device as required. For the ATIIXP this turns
- *	out to be nice and simple
- */
-
-static unsigned int __devinit init_chipset_atiixp(struct pci_dev *dev, const char *name)
-{
-#if defined(DISPLAY_ATIIXP_TIMINGS) && defined(CONFIG_PROC_FS)
-	if (!atiixp_proc) {
-		atiixp_proc = 1;
-		bmide_dev = dev;
-		ide_pci_create_host_proc("atiixp", atiixp_get_info);
-	}
-#endif /* DISPLAY_ATIIXP_TIMINGS && CONFIG_PROC_FS */
 	return 0;
 }
 
@@ -459,7 +322,6 @@ static void __devinit init_hwif_atiixp(ide_hwif_t *hwif)
 static ide_pci_device_t atiixp_pci_info[] __devinitdata = {
 	{	/* 0 */
 		.name		= "ATIIXP",
-		.init_chipset	= init_chipset_atiixp,
 		.init_hwif	= init_hwif_atiixp,
 		.channels	= 2,
 		.autodma	= AUTODMA,
@@ -485,6 +347,7 @@ static int __devinit atiixp_init_one(struct pci_dev *dev, const struct pci_devic
 
 static struct pci_device_id atiixp_pci_tbl[] = {
 	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_IXP_IDE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{ PCI_VENDOR_ID_ATI, PCI_DEVICE_ID_ATI_IXP2_IDE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
 };
 MODULE_DEVICE_TABLE(pci, atiixp_pci_tbl);

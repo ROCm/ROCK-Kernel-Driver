@@ -54,6 +54,9 @@ unsigned long kernel_thread_flags = CLONE_VM | CLONE_UNTRACED;
 
 atomic_t hlt_counter = ATOMIC_INIT(0);
 
+unsigned long boot_option_idle_override = 0;
+EXPORT_SYMBOL(boot_option_idle_override);
+
 /*
  * Powermanagement idle function, if any..
  */
@@ -130,11 +133,20 @@ void cpu_idle (void)
 {
 	/* endless idle loop with no priority at all */
 	while (1) {
-		void (*idle)(void) = pm_idle;
-		if (!idle)
-			idle = default_idle;
-		while (!need_resched())
+		while (!need_resched()) {
+			void (*idle)(void);
+			/*
+			 * Mark this as an RCU critical section so that
+			 * synchronize_kernel() in the unload path waits
+			 * for our completion.
+			 */
+			rcu_read_lock();
+			idle = pm_idle;
+			if (!idle)
+				idle = default_idle;
 			idle();
+			rcu_read_unlock();
+		}
 		schedule();
 	}
 }
@@ -187,6 +199,7 @@ static int __init idle_setup (char *str)
 		pm_idle = poll_idle;
 	}
 
+	boot_option_idle_override = 1;
 	return 1;
 }
 
@@ -201,9 +214,8 @@ void __show_regs(struct pt_regs * regs)
 
 	printk("\n");
 	print_modules();
-	printk("Pid: %d, comm: %.20s %s (%s %s)\n", 
-	       current->pid, current->comm, print_tainted(), UTS_RELEASE,
-	       OOPS_TIMESTAMP);
+	printk("Pid: %d, comm: %.20s %s %s\n", 
+	       current->pid, current->comm, print_tainted(), UTS_RELEASE);
 	printk("RIP: %04lx:[<%016lx>] ", regs->cs & 0xffff, regs->rip);
 	printk_address(regs->rip); 
 	printk("\nRSP: %04lx:%016lx  EFLAGS: %08lx\n", regs->ss, regs->rsp, regs->eflags);
@@ -351,7 +363,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 	if (rsp == ~0UL) {
 		childregs->rsp = (unsigned long)childregs;
 	}
-	p->set_child_tid = p->clear_child_tid = NULL;
 
 	p->thread.rsp = (unsigned long) childregs;
 	p->thread.rsp0 = (unsigned long) (childregs+1);
@@ -391,7 +402,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long rsp,
 	}
 	err = 0;
 out:
-	if (err && p->thread.io_bitmap_ptr) { 
+	if (err && p->thread.io_bitmap_ptr) {
 		kfree(p->thread.io_bitmap_ptr);
 		p->thread.io_bitmap_max = 0;
 	}
@@ -506,7 +517,7 @@ struct task_struct *__switch_to(struct task_struct *prev_p, struct task_struct *
 			 * Copy the relevant range of the IO bitmap.
 			 * Normally this is 128 bytes or less:
  			 */
-			memcpy(tss->io_bitmap, next->io_bitmap_ptr, 
+			memcpy(tss->io_bitmap, next->io_bitmap_ptr,
 				max(prev->io_bitmap_max, next->io_bitmap_max));
 		else {
 			/*
@@ -534,8 +545,11 @@ long sys_execve(char __user *name, char __user * __user *argv,
 	if (IS_ERR(filename)) 
 		return error;
 	error = do_execve(filename, argv, envp, &regs); 
-	if (error == 0)
+	if (error == 0) {
+		task_lock(current);
 		current->ptrace &= ~PT_DTRACE;
+		task_unlock(current);
+	}
 	putname(filename);
 	return error;
 }

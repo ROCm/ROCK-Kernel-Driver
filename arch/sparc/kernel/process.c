@@ -45,7 +45,7 @@
 
 /* 
  * Power management idle function 
- * Set in pm platform drivers
+ * Set in pm platform drivers (apc.c and pmc.c)
  */
 void (*pm_idle)(void);
 
@@ -122,7 +122,7 @@ int cpu_idle(void)
 		}
 
 		while((!need_resched()) && pm_idle) {
-			(*pm_idle)();		/* XXX Huh? On sparc?! */
+			(*pm_idle)();
 		}
 
 		schedule();
@@ -480,8 +480,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 #endif
 	}
 
-	p->set_child_tid = p->clear_child_tid = NULL;
-
 	/*
 	 *  p->thread_info         new_stack   childregs
 	 *  !                      !           !             {if(PSR_PS) }
@@ -670,8 +668,11 @@ asmlinkage int sparc_execve(struct pt_regs *regs)
 			  (char __user * __user *)regs->u_regs[base + UREG_I2],
 			  regs);
 	putname(filename);
-	if (error == 0)
+	if (error == 0) {
+		task_lock(current);
 		current->ptrace &= ~PT_DTRACE;
+		task_unlock(current);
+	}
 out:
 	return error;
 }

@@ -15,10 +15,8 @@
 
 #define MAX_ADAPTER_NUM 	4
 #define MAX_SG_LIST_BUF 	16	/* Not used */
-#define MAX_CMD_PER_LUN 	32
-#define MAX_CMD_QUEUE		MAX_CMD_PER_LUN+MAX_CMD_PER_LUN/2+1	
 #define MAX_SCSI_ID		8
-#define MAX_SRB_CNT		MAX_CMD_QUEUE+1	/* Max number of started commands */
+#define MAX_SRB_CNT		50	/* Max number of started commands */
 
 #define SEL_TIMEOUT		153	/* 250 ms selection timeout (@ 40 MHz) */
 
@@ -44,17 +42,15 @@ struct dc390_dcb	*pSRBDCB;
 struct scsi_cmnd	*pcmd;
 struct scatterlist	*pSegmentList;
 
-/* 0x10: */
 struct scatterlist Segmentx;	/* make a one entry of S/G list table */
 
-/* 0x1c: */
 unsigned long	SGBusAddr;	/*;a segment starting address as seen by AM53C974A*/
 unsigned long	SGToBeXferLen;	/*; to be xfer length */
 unsigned long	TotalXferredLen;
 unsigned long	SavedTotXLen;
+unsigned long	Saved_Ptr;
 u32		SRBState;
 
-/* 0x30: */
 u8		SRBStatus;
 u8		SRBFlag;	/*; b0-AutoReqSense,b6-Read,b7-write */
 				/*; b4-settimeout,b5-Residual valid */
@@ -62,24 +58,18 @@ u8		AdaptStatus;
 u8		TargetStatus;
 
 u8		ScsiPhase;
-u8		TagNumber;
+s8		TagNumber;
 u8		SGIndex;
 u8		SGcount;
 
-/* 0x38: */
 u8		MsgCnt;
 u8		EndMessage;
-u8		RetryCnt;
 u8		SavedSGCount;			
 
-unsigned long	Saved_Ptr;
-
-/* 0x40: */
 u8		MsgInBuf[6];
 u8		MsgOutBuf[6];
 
 //u8		IORBFlag;	/*;81h-Reset, 2-retry */
-/* 0x4c: */
 };
 
 
@@ -93,20 +83,12 @@ struct dc390_dcb
 struct dc390_dcb	*pNextDCB;
 struct dc390_acb	*pDCBACB;
 
-/* 0x08: */
 /* Queued SRBs */
-struct dc390_srb	*pWaitingSRB;
-struct dc390_srb	*pWaitLast;
 struct dc390_srb	*pGoingSRB;
 struct dc390_srb	*pGoingLast;
 struct dc390_srb	*pActiveSRB;
-u8		WaitSRBCnt;	/* Not used */
 u8		GoingSRBCnt;
 
-u8		DevType;
-u8		MaxCommand;
-
-/* 0x20: */
 u32		TagMask;
 
 u8		TargetID;	/*; SCSI Target ID  (SCSI Only) */
@@ -117,18 +99,11 @@ u8		DCBFlag;
 u8		CtrlR1;
 u8		CtrlR3;
 u8		CtrlR4;
-u8		Inquiry7;
 
-/* 0x2c: */
 u8		SyncMode;	/*; 0:async mode */
 u8		NegoPeriod;	/*;for nego. */
 u8		SyncPeriod;	/*;for reg. */
 u8		SyncOffset;	/*;for reg. and nego.(low nibble) */
-
-/* 0x30:*/
-//u8		InqDataBuf[8];
-//u8		CapacityBuf[8];
-///* 0x40: */
 };
 
 
@@ -140,7 +115,6 @@ u8		SyncOffset;	/*;for reg. and nego.(low nibble) */
 struct dc390_acb
 {
 struct Scsi_Host *pScsiHost;
-struct dc390_acb	*pNextACB;
 u16		IOPortBase;
 u8		IRQLevel;
 u8		status;
@@ -182,8 +156,6 @@ u32		SelLost;
 u32		SelConn;
 u32		CmdInQ;
 u32		CmdOutOfSRB;
-	
-struct timer_list	Waiting_Timer;
 
 struct dc390_srb	TmpSRB;
 struct dc390_srb	SRB_array[MAX_SRB_CNT]; 	/* 50 SRBs */
@@ -310,11 +282,11 @@ struct dc390_srb	SRB_array[MAX_SRB_CNT]; 	/* 50 SRBs */
 #define MK_RES(drv,did,msg,tgt) ((int)(drv)<<24 | (int)(did)<<16 | (int)(msg)<<8 | (int)(tgt))
 #define MK_RES_LNX(drv,did,msg,tgt) ((int)(drv)<<24 | (int)(did)<<16 | (int)(msg)<<8 | (int)(tgt)<<1)
 
-#define SET_RES_TARGET(who,tgt) { who &= ~RES_TARGET; who |= (int)(tgt); }
-#define SET_RES_TARGET_LNX(who,tgt) { who &= ~RES_TARGET_LNX; who |= (int)(tgt) << 1; }
-#define SET_RES_MSG(who,msg) { who &= ~RES_ENDMSG; who |= (int)(msg) << 8; }
-#define SET_RES_DID(who,did) { who &= ~RES_DID; who |= (int)(did) << 16; }
-#define SET_RES_DRV(who,drv) { who &= ~RES_DRV; who |= (int)(drv) << 24; }
+#define SET_RES_TARGET(who, tgt) do { who &= ~RES_TARGET; who |= (int)(tgt); } while (0)
+#define SET_RES_TARGET_LNX(who, tgt) do { who &= ~RES_TARGET_LNX; who |= (int)(tgt) << 1; } while (0)
+#define SET_RES_MSG(who, msg) do { who &= ~RES_ENDMSG; who |= (int)(msg) << 8; } while (0)
+#define SET_RES_DID(who, did) do { who &= ~RES_DID; who |= (int)(did) << 16; } while (0)
+#define SET_RES_DRV(who, drv) do { who &= ~RES_DRV; who |= (int)(drv) << 24; } while (0)
 
 /*;---Sync_Mode */
 #define SYNC_DISABLE	0
@@ -346,64 +318,6 @@ struct dc390_srb	SRB_array[MAX_SRB_CNT]; 	/* 50 SRBs */
 typedef struct {
 	dma_addr_t		saved_dma_handle;
 } dc390_cmd_scp_t;
-
-/*
-**  Inquiry Data format
-*/
-
-typedef struct	_SCSIInqData { /* INQUIRY */
-
-	u8	 DevType;		/* Periph Qualifier & Periph Dev Type*/
-	u8	 RMB_TypeMod;		/* rem media bit & Dev Type Modifier */
-	u8	 Vers;			/* ISO, ECMA, & ANSI versions	     */
-	u8	 RDF;			/* AEN, TRMIOP, & response data format*/
-	u8	 AddLen;		/* length of additional data	     */
-	u8	 Res1;			/* reserved			     */
-	u8	 Res2;			/* reserved			     */
-	u8	 Flags; 		/* RelADr,Wbus32,Wbus16,Sync,etc.    */
-	u8	 VendorID[8];		/* Vendor Identification	     */
-	u8	 ProductID[16]; 	/* Product Identification	     */
-	u8	 ProductRev[4]; 	/* Product Revision		     */
-
-
-} SCSI_INQDATA, *PSCSI_INQDATA;
-
-
-/*  Inquiry byte 0 masks */
-
-
-#define SCSI_DEVTYPE	    0x1F      /* Peripheral Device Type 	    */
-#define SCSI_PERIPHQUAL     0xE0      /* Peripheral Qualifier		    */
-#define TYPE_NODEV	    SCSI_DEVTYPE    /* Unknown or no device type    */
-
-
-/*  Inquiry byte 1 mask */
-
-#define SCSI_REMOVABLE_MEDIA  0x80    /* Removable Media bit (1=removable)  */
-
-
-/*  Peripheral Device Type definitions */
-/*  see include/scsi/scsi.h for the rest */
-
-#ifndef TYPE_PRINTER
-# define TYPE_PRINTER		 0x02	   /* Printer device		   */
-#endif
-#ifndef TYPE_COMM
-# define TYPE_COMM		 0x09	   /* Communications device	   */
-#endif
-
-/*
-** Inquiry flag definitions (Inq data byte 7)
-*/
-
-#define SCSI_INQ_RELADR       0x80    /* device supports relative addressing*/
-#define SCSI_INQ_WBUS32       0x40    /* device supports 32 bit data xfers  */
-#define SCSI_INQ_WBUS16       0x20    /* device supports 16 bit data xfers  */
-#define SCSI_INQ_SYNC	      0x10    /* device supports synchronous xfer   */
-#define SCSI_INQ_LINKED       0x08    /* device supports linked commands    */
-#define SCSI_INQ_CMDQUEUE     0x02    /* device supports command queueing   */
-#define SCSI_INQ_SFTRE	      0x01    /* device supports soft resets */
-
 
 /*
 ;==========================================================

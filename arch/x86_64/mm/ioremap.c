@@ -111,7 +111,7 @@ static int remap_area_pages(unsigned long address, unsigned long phys_addr,
  * have to convert them into an offset in a page-aligned mapping, but the
  * caller shouldn't need to know that small detail.
  */
-void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flags)
+void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flags)
 {
 	void * addr;
 	struct vm_struct * area;
@@ -126,13 +126,13 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 	 * Don't remap the low PCI/ISA area, it's always mapped..
 	 */
 	if (phys_addr >= 0xA0000 && last_addr < 0x100000)
-		return phys_to_virt(phys_addr);
+		return (__force void __iomem *)phys_to_virt(phys_addr);
 
-#ifndef CONFIG_DISCONTIGMEM
 	/*
 	 * Don't allow anybody to remap normal RAM that we're using..
 	 */
 	if (phys_addr < virt_to_phys(high_memory)) {
+#ifndef CONFIG_DISCONTIGMEM
 		char *t_addr, *t_end;
  		struct page *page;
 
@@ -142,8 +142,8 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 		for(page = virt_to_page(t_addr); page <= virt_to_page(t_end); page++)
 			if(!PageReserved(page))
 				return NULL;
-	}
 #endif
+	}
 
 	/*
 	 * Mappings have to be page-aligned
@@ -155,7 +155,7 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 	/*
 	 * Ok, go for it..
 	 */
-	area = get_vm_area(size, VM_IOREMAP | (flags << 24));
+	area = get_vm_area(size, VM_IOREMAP);
 	if (!area)
 		return NULL;
 	area->phys_addr = phys_addr;
@@ -164,7 +164,7 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 		vunmap(addr);
 		return NULL;
 	}
-	return (void *) (offset + (char *)addr);
+	return (__force void __iomem *) (offset + (char *)addr);
 }
 
 /**
@@ -189,18 +189,18 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
  * Must be freed with iounmap.
  */
 
-void *ioremap_nocache (unsigned long phys_addr, unsigned long size)
+void __iomem *ioremap_nocache (unsigned long phys_addr, unsigned long size)
 {
-	void *p = __ioremap(phys_addr, size, _PAGE_PCD);
+	void __iomem *p = __ioremap(phys_addr, size, _PAGE_PCD);
 	if (!p) 
 		return p; 
 
-	if (phys_addr + size <= virt_to_phys(high_memory)) { 
+	if (phys_addr + size < virt_to_phys(high_memory)) { 
 		struct page *ppage = virt_to_page(__va(phys_addr));		
 		unsigned long npages = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
 
-		BUG_ON(phys_addr+size >= (unsigned long)high_memory);
-		BUG_ON(phys_addr + size <= phys_addr);
+		BUG_ON(phys_addr+size > (unsigned long)high_memory);
+		BUG_ON(phys_addr + size < phys_addr);
 
 		if (change_page_attr(ppage, npages, PAGE_KERNEL_NOCACHE) < 0) { 
 			iounmap(p); 
@@ -212,7 +212,7 @@ void *ioremap_nocache (unsigned long phys_addr, unsigned long size)
 	return p;					
 }
 
-void iounmap(void *addr)
+void iounmap(volatile void __iomem *addr)
 {
 	struct vm_struct *p;
 	if (addr <= high_memory) 
@@ -223,7 +223,7 @@ void iounmap(void *addr)
 		return;
 	} 
 
-	if ((p->flags >> 24) && p->phys_addr + p->size <= virt_to_phys(high_memory)) { 
+	if (p->flags && p->phys_addr < virt_to_phys(high_memory)) { 
 		change_page_attr(virt_to_page(__va(p->phys_addr)),
 				 p->size >> PAGE_SHIFT,
 				 PAGE_KERNEL); 				 

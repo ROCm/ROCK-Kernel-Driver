@@ -4,6 +4,35 @@
 
 menu "Security options"
 
+config KEYS
+	bool "Enable access key retention support"
+	help
+	  This option provides support for retaining authentication tokens and
+	  access keys in the kernel.
+
+	  It also includes provision of methods by which such keys might be
+	  associated with a process so that network filesystems, encryption
+	  support and the like can find them.
+
+	  Furthermore, a special type of key is available that acts as keyring:
+	  a searchable sequence of keys. Each process is equipped with access
+	  to five standard keyrings: UID-specific, GID-specific, session,
+	  process and thread.
+
+	  If you are unsure as to whether this is required, answer N.
+
+config KEYS_DEBUG_PROC_KEYS
+	bool "Enable the /proc/keys file by which all keys may be viewed"
+	depends on KEYS
+	help
+	  This option turns on support for the /proc/keys file through which
+	  all the keys on the system can be listed.
+
+	  This option is a slight security risk in that it makes it possible
+	  for anyone to see all the keys on the system. Normally the manager
+	  pretends keys that are inaccessible to a process don't exist as far
+	  as that process is concerned.
+
 config SECURITY
 	bool "Enable different security models"
 	help
@@ -42,6 +71,17 @@ config SECURITY_ROOTPLUG
 	  See <http://www.linuxjournal.com/article.php?sid=6279> for
 	  more information about this module.
 	  
+	  If you are unsure how to answer this question, answer N.
+
+config SECURITY_SECLVL
+	tristate "BSD Secure Levels"
+	depends on SECURITY
+	select CRYPTO_SHA1
+	help
+	  Implements BSD Secure Levels as an LSM.  See
+	  Documentation/seclvl.txt for instructions on how to use this
+	  module.
+
 	  If you are unsure how to answer this question, answer N.
 
 source security/selinux/Kconfig

@@ -58,7 +58,7 @@ irqreturn_t ibmasm_interrupt_handler(int irq, void * dev_id, struct pt_regs *reg
 {
 	u32	mfa;
 	struct service_processor *sp = (struct service_processor *)dev_id;
-	void *base_address = sp->base_address;
+	void __iomem *base_address = sp->base_address;
 
 	if (!sp_interrupt_pending(base_address))
 		return IRQ_NONE;

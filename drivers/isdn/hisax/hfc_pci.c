@@ -1619,8 +1619,7 @@ hfcpci_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			inithfcpci(cs);
 			reset_hfcpci(cs);
 			spin_unlock_irqrestore(&cs->lock, flags);
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout((80 * HZ) / 1000);	/* Timeout 80ms */
+			msleep(80);				/* Timeout 80ms */
 			/* now switch timer interrupt off */
 			spin_lock_irqsave(&cs->lock, flags);
 			cs->hw.hfcpci.int_m1 &= ~HFCPCI_INTS_TIMER;

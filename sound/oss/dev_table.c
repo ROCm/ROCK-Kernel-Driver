@@ -16,6 +16,8 @@
 #define _DEV_TABLE_C_
 #include "sound_config.h"
 
+static int sound_alloc_audiodev(void);
+
 int sound_install_audiodrv(int vers, char *name, struct audio_driver *driver,
 			int driver_size, int flags, unsigned int format_mask,
 			void *devc, int dma1, int dma2)
@@ -121,7 +123,7 @@ void sound_unload_audiodev(int dev)
 	}
 }
 
-int sound_alloc_audiodev(void)
+static int sound_alloc_audiodev(void)
 { 
 	int i = register_sound_dsp(&oss_sound_fops, -1);
 	if(i==-1)

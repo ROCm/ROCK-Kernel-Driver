@@ -22,9 +22,9 @@
 #include <linux/string.h>
 #include <linux/init.h>
 #include <linux/seq_file.h>
+#include <linux/bitops.h>
 
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 #include <asm/processor.h>
 #include <asm/io.h>
 #include <asm/prom.h>
@@ -580,7 +580,7 @@ static void ppc_rtas_process_sensor(struct seq_file *m,
 			}
 			break;
 		case THERMAL_SENSOR:
-			seq_printf(m, "Temp. (°C/°F):\t");
+			seq_printf(m, "Temp. (C/F):\t");
 			temperature = 1;
 			break;
 		case LID_STATUS:

@@ -99,8 +99,6 @@ struct twidjoy {
 	char phys[32];
 };
 
-static int twidjoy_num;
-
 /*
  * twidjoy_process_packet() decodes packets the driver receives from the
  * Twiddler. It updates the data accordingly.
@@ -179,7 +177,6 @@ static void twidjoy_disconnect(struct serio *serio)
 {
 	struct twidjoy *twidjoy = serio->private;
 	input_unregister_device(&twidjoy->dev);
-	put_device(&serio->dev);
 	serio_close(serio);
 	kfree(twidjoy);
 }
@@ -239,9 +236,6 @@ static void twidjoy_connect(struct serio *serio, struct serio_driver *drv)
 		kfree(twidjoy);
 		return;
 	}
-
-	twidjoy->dev.dev = get_device(&serio->dev);
-	sprintf(twidjoy->dev.cdev.class_id,"twidjoy%d", twidjoy_num++);
 
 	input_register_device(&twidjoy->dev);
 

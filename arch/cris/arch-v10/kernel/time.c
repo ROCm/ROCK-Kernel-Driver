@@ -1,4 +1,4 @@
-/* $Id: time.c,v 1.3 2004/06/01 05:38:42 starvik Exp $
+/* $Id: time.c,v 1.5 2004/09/29 06:12:46 starvik Exp $
  *
  *  linux/arch/cris/arch-v10/kernel/time.c
  *
@@ -200,6 +200,8 @@ static long last_rtc_update = 0;
 
 //static unsigned short myjiff; /* used by our debug routine print_timestamp */
 
+extern void cris_do_profile(struct pt_regs *regs);
+
 static inline irqreturn_t
 timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
@@ -228,6 +230,8 @@ timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	do_timer(regs);
 	
+        cris_do_profile(regs); /* Save profiling information */
+
 	/*
 	 * If we have an externally synchronized Linux clock, then update
 	 * CMOS clock accordingly every ~11 minutes. Set_rtc_mmss() has to be

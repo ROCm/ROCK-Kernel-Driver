@@ -50,41 +50,11 @@
 #define read_cpuid(reg)							\
 	({								\
 		unsigned int __val;					\
-		asm("mrc%? p15, 0, %0, c0, c0, " __stringify(reg)	\
-		    : "=r" (__val));					\
+		asm("mrc	p15, 0, %0, c0, c0, " __stringify(reg)	\
+		    : "=r" (__val)					\
+		    :							\
+		    : "cc");						\
 		__val;							\
-	})
-
-#define __cacheid_present(val)		(val != read_cpuid(CPUID_ID))
-#define __cacheid_vivt(val)		((val & (15 << 25)) != (14 << 25))
-#define __cacheid_vipt(val)		((val & (15 << 25)) == (14 << 25))
-#define __cacheid_vipt_nonaliasing(val)	((val & (15 << 25 | 1 << 23)) == (14 << 25))
-#define __cacheid_vipt_aliasing(val)	((val & (15 << 25 | 1 << 23)) == (14 << 25 | 1 << 23))
-
-#define cache_is_vivt()							\
-	({								\
-		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
-		(!__cacheid_present(__val)) || __cacheid_vivt(__val);	\
-	})
-		
-#define cache_is_vipt()							\
-	({								\
-		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
-		__cacheid_present(__val) && __cacheid_vipt(__val);	\
-	})
-
-#define cache_is_vipt_nonaliasing()					\
-	({								\
-		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
-		__cacheid_present(__val) &&				\
-		 __cacheid_vipt_nonaliasing(__val);			\
-	})
-
-#define cache_is_vipt_aliasing()					\
-	({								\
-		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
-		__cacheid_present(__val) &&				\
-		 __cacheid_vipt_aliasing(__val);			\
 	})
 
 /*
@@ -93,14 +63,16 @@
  * the compiler from one version to another so a bit of paranoia won't hurt.
  * This string is meant to be concatenated with the inline asm string and
  * will cause compilation to stop on mismatch.
+ * (for details, see gcc PR 15089)
  */
 #define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
 
 #ifndef __ASSEMBLY__
 
-#include <linux/kernel.h>
+#include <linux/linkage.h>
 
 struct thread_info;
+struct task_struct;
 
 /* information about the system we're running on */
 extern unsigned int system_rev;
@@ -203,8 +175,6 @@ do {									\
  * `prev' will never be the same as `next'.  schedule() itself
  * contains the memory barrier to tell GCC not to cache `current'.
  */
-struct thread_info;
-struct task_struct;
 extern struct task_struct *__switch_to(struct task_struct *, struct thread_info *, struct thread_info *);
 
 #define switch_to(prev,next,last)					\
@@ -281,7 +251,7 @@ do {									\
 /*
  * Enable FIQs
  */
-#define __stf()							\
+#define local_fiq_enable()					\
 	({							\
 		unsigned long temp;				\
 	__asm__ __volatile__(					\
@@ -296,7 +266,7 @@ do {									\
 /*
  * Disable FIQs
  */
-#define __clf()							\
+#define local_fiq_disable()					\
 	({							\
 		unsigned long temp;				\
 	__asm__ __volatile__(					\
@@ -330,6 +300,13 @@ do {									\
 	: "r" (x)						\
 	: "memory", "cc")
 
+#define irqs_disabled()			\
+({					\
+	unsigned long flags;		\
+	local_save_flags(flags);	\
+	flags & PSR_I_BIT;		\
+})
+
 #ifdef CONFIG_SMP
 #error SMP not supported
 
@@ -344,16 +321,6 @@ do {									\
 #define smp_rmb()		barrier()
 #define smp_wmb()		barrier()
 #define smp_read_barrier_depends()		do { } while(0)
-
-#define clf()			__clf()
-#define stf()			__stf()
-
-#define irqs_disabled()			\
-({					\
-	unsigned long flags;		\
-	local_save_flags(flags);	\
-	flags & PSR_I_BIT;		\
-})
 
 #if defined(CONFIG_CPU_SA1100) || defined(CONFIG_CPU_SA110)
 /*

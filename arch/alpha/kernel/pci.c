@@ -227,7 +227,7 @@ pdev_save_srm_config(struct pci_dev *dev)
 	tmp->next = srm_saved_configs;
 	tmp->dev = dev;
 
-	pci_save_state(dev, tmp->regs);
+	pci_save_state(dev);
 
 	srm_saved_configs = tmp;
 }
@@ -243,7 +243,7 @@ pci_restore_srm_config(void)
 
 	/* Restore SRM config. */
 	for (tmp = srm_saved_configs; tmp; tmp = tmp->next) {
-		pci_restore_state(tmp->dev, tmp->regs);
+		pci_restore_state(tmp->dev);
 	}
 }
 #endif
@@ -280,7 +280,6 @@ pcibios_fixup_bus(struct pci_bus *bus)
 	/* Propagate hose info into the subordinate devices.  */
 
 	struct pci_controller *hose = bus->sysdata;
-	struct list_head *ln;
 	struct pci_dev *dev = bus->self;
 
 	if (!dev) {
@@ -304,9 +303,7 @@ pcibios_fixup_bus(struct pci_bus *bus)
  		pcibios_fixup_device_resources(dev, bus);
 	} 
 
-	for (ln = bus->devices.next; ln != &bus->devices; ln = ln->next) {
-		struct pci_dev *dev = pci_dev_b(ln);
-
+	list_for_each_entry(dev, &bus->devices, bus_list) {
 		pdev_save_srm_config(dev);
 		if ((dev->class >> 8) != PCI_CLASS_BRIDGE_PCI)
 			pcibios_fixup_device_resources(dev, bus);
@@ -403,11 +400,10 @@ pcibios_set_master(struct pci_dev *dev)
 static void __init
 pcibios_claim_one_bus(struct pci_bus *b)
 {
-	struct list_head *ld;
+	struct pci_dev *dev;
 	struct pci_bus *child_bus;
 
-	for (ld = b->devices.next; ld != &b->devices; ld = ld->next) {
-		struct pci_dev *dev = pci_dev_b(ld);
+	list_for_each_entry(dev, &b->devices, bus_list) {
 		int i;
 
 		for (i = 0; i < PCI_NUM_RESOURCES; i++) {
@@ -426,12 +422,10 @@ pcibios_claim_one_bus(struct pci_bus *b)
 static void __init
 pcibios_claim_console_setup(void)
 {
-	struct list_head *lb;
+	struct pci_bus *b;
 
-	for(lb = pci_root_buses.next; lb != &pci_root_buses; lb = lb->next) {
-		struct pci_bus *b = pci_bus_b(lb);
+	list_for_each_entry(b, &pci_root_buses, node)
 		pcibios_claim_one_bus(b);
-	}
 }
 
 void __init
@@ -531,3 +525,37 @@ sys_pciconfig_iobase(long which, unsigned long bus, unsigned long dfn)
 
 	return -EOPNOTSUPP;
 }
+
+/* Create an __iomem token from a PCI BAR.  Copied from lib/iomap.c with
+   no changes, since we don't want the other things in that object file.  */
+
+void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long maxlen)
+{
+	unsigned long start = pci_resource_start(dev, bar);
+	unsigned long len = pci_resource_len(dev, bar);
+	unsigned long flags = pci_resource_flags(dev, bar);
+
+	if (!len || !start)
+		return NULL;
+	if (maxlen && len > maxlen)
+		len = maxlen;
+	if (flags & IORESOURCE_IO)
+		return ioport_map(start, len);
+	if (flags & IORESOURCE_MEM) {
+		/* Not checking IORESOURCE_CACHEABLE because alpha does
+		   not distinguish between ioremap and ioremap_nocache.  */
+		return ioremap(start, len);
+	}
+	return NULL;
+}
+
+/* Destroy that token.  Not copied from lib/iomap.c.  */
+
+void pci_iounmap(struct pci_dev *dev, void __iomem * addr)
+{
+	if (__is_mmio(addr))
+		iounmap(addr);
+}
+
+EXPORT_SYMBOL(pci_iomap);
+EXPORT_SYMBOL(pci_iounmap);

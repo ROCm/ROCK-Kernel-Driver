@@ -40,6 +40,8 @@ struct irqaction {
 	const char *name;
 	void *dev_id;
 	struct irqaction *next;
+	int irq;
+	struct proc_dir_entry *dir;
 };
 
 extern irqreturn_t no_action(int cpl, void *dev_id, struct pt_regs *regs);
@@ -47,6 +49,13 @@ extern int request_irq(unsigned int,
 		       irqreturn_t (*handler)(int, void *, struct pt_regs *),
 		       unsigned long, const char *, void *);
 extern void free_irq(unsigned int, void *);
+
+
+#ifdef CONFIG_GENERIC_HARDIRQS
+extern void disable_irq_nosync(unsigned int irq);
+extern void disable_irq(unsigned int irq);
+extern void enable_irq(unsigned int irq);
+#endif
 
 /*
  * Temporary defines for UP kernels, until all code gets fixed.
@@ -99,10 +108,6 @@ extern void softirq_init(void);
 #define __raise_softirq_irqoff(nr) do { local_softirq_pending() |= 1UL << (nr); } while (0)
 extern void FASTCALL(raise_softirq_irqoff(unsigned int nr));
 extern void FASTCALL(raise_softirq(unsigned int nr));
-
-#ifndef invoke_softirq
-#define invoke_softirq() do_softirq()
-#endif
 
 
 /* Tasklets --- multithreaded analogue of BHs.
@@ -243,8 +248,24 @@ extern void tasklet_init(struct tasklet_struct *t,
  * or zero if none occurred, or a negative irq number
  * if more than one irq occurred.
  */
+
+#if defined(CONFIG_GENERIC_HARDIRQS) && !defined(CONFIG_GENERIC_IRQ_PROBE) 
+static inline unsigned long probe_irq_on(void)
+{
+	return 0;
+}
+static inline int probe_irq_off(unsigned long val)
+{
+	return 0;
+}
+static inline unsigned int probe_irq_mask(unsigned long val)
+{
+	return 0;
+}
+#else
 extern unsigned long probe_irq_on(void);	/* returns 0 on failure */
 extern int probe_irq_off(unsigned long);	/* returns 0 or negative on failure */
 extern unsigned int probe_irq_mask(unsigned long);	/* returns mask of ISA interrupts */
+#endif
 
 #endif

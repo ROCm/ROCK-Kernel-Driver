@@ -15,24 +15,24 @@
 
 extern inline void scr_writew(u16 val, volatile u16 *addr)
 {
-	if (__is_ioaddr((unsigned long) addr))
-		__raw_writew(val, (unsigned long) addr);
+	if (__is_ioaddr(addr))
+		__raw_writew(val, (volatile u16 __iomem *) addr);
 	else
 		*addr = val;
 }
 
 extern inline u16 scr_readw(volatile const u16 *addr)
 {
-	if (__is_ioaddr((unsigned long) addr))
-		return __raw_readw((unsigned long) addr);
+	if (__is_ioaddr(addr))
+		return __raw_readw((volatile const u16 __iomem *) addr);
 	else
 		return *addr;
 }
 
 extern inline void scr_memsetw(u16 *s, u16 c, unsigned int count)
 {
-	if (__is_ioaddr((unsigned long) s))
-		memsetw_io(s, c, count);
+	if (__is_ioaddr(s))
+		memsetw_io((u16 __iomem *) s, c, count);
 	else
 		memsetw(s, c, count);
 }
@@ -43,9 +43,9 @@ extern void scr_memcpyw(u16 *d, const u16 *s, unsigned int count);
 /* ??? These are currently only used for downloading character sets.  As
    such, they don't need memory barriers.  Is this all they are intended
    to be used for?  */
-#define vga_readb	readb
-#define vga_writeb	writeb
+#define vga_readb(a)	readb((u8 __iomem *)(a))
+#define vga_writeb(v,a)	writeb(v, (u8 __iomem *)(a))
 
-#define VGA_MAP_MEM(x)	((unsigned long) ioremap((x), 0))
+#define VGA_MAP_MEM(x)	((unsigned long) ioremap(x, 0))
 
 #endif

@@ -24,6 +24,8 @@
 #include <linux/capi.h>
 #include <linux/kernelcapi.h>
 #include <linux/init.h>
+#include <linux/moduleparam.h>
+#include <linux/delay.h>
 #include <asm/uaccess.h>
 #include <linux/isdn/capicmd.h>
 #include <linux/isdn/capiutil.h>
@@ -40,7 +42,7 @@ static int showcapimsgs = 0;
 MODULE_DESCRIPTION("CAPI4Linux: kernel CAPI layer");
 MODULE_AUTHOR("Carsten Paeth");
 MODULE_LICENSE("GPL");
-MODULE_PARM(showcapimsgs, "i");
+module_param(showcapimsgs, uint, 0);
 
 /* ------------------------------------------------------------- */
 
@@ -828,8 +830,7 @@ static int old_capi_manufacturer(unsigned int cmd, void __user *data)
 
 		while (card->cardstate != CARD_RUNNING) {
 
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(HZ/10);	/* 0.1 sec */
+			msleep_interruptible(100);	/* 0.1 sec */
 
 			if (signal_pending(current)) {
 				capi_ctr_put(card);
@@ -853,8 +854,7 @@ static int old_capi_manufacturer(unsigned int cmd, void __user *data)
 
 		while (card->cardstate > CARD_DETECTED) {
 
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(HZ/10);	/* 0.1 sec */
+			msleep_interruptible(100);	/* 0.1 sec */
 
 			if (signal_pending(current))
 				return -EINTR;

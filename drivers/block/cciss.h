@@ -47,7 +47,7 @@ struct ctlr_info
 	unsigned long paddr;
 	unsigned long io_mem_addr;
 	unsigned long io_mem_length;
-	CfgTable_struct *cfgtable;
+	CfgTable_struct __iomem *cfgtable;
 	unsigned int intr;
 	int	interrupts_enabled;
 	int 	max_commands;

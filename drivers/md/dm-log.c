@@ -601,12 +601,9 @@ static region_t core_get_sync_count(struct dirty_log *log)
         return lc->sync_count;
 }
 
-#define EMIT(x...) sz += ((sz >= maxlen) ? \
-			0 : scnprintf(result + sz, maxlen - sz, x))
-
 #define	DMEMIT_SYNC \
 	if (lc->sync != DEFAULTSYNC) \
-		EMIT("%ssync ", lc->sync == NOSYNC ? "no" : "")
+		DMEMIT("%ssync ", lc->sync == NOSYNC ? "no" : "")
 
 static int core_status(struct dirty_log *log, status_type_t status,
 		       char *result, unsigned int maxlen)
@@ -619,7 +616,7 @@ static int core_status(struct dirty_log *log, status_type_t status,
 		break;
 
 	case STATUSTYPE_TABLE:
-		EMIT("%s %u " SECTOR_FORMAT " ", log->type->name,
+		DMEMIT("%s %u " SECTOR_FORMAT " ", log->type->name,
 		       lc->sync == DEFAULTSYNC ? 1 : 2, lc->region_size);
 		DMEMIT_SYNC;
 	}
@@ -633,14 +630,14 @@ static int disk_status(struct dirty_log *log, status_type_t status,
 	int sz = 0;
 	char buffer[16];
 	struct log_c *lc = log->context;
-	
+
 	switch(status) {
 	case STATUSTYPE_INFO:
 		break;
 
 	case STATUSTYPE_TABLE:
 		format_dev_t(buffer, lc->log_dev->bdev->bd_dev);
-		EMIT("%s %u %s " SECTOR_FORMAT " ", log->type->name,
+		DMEMIT("%s %u %s " SECTOR_FORMAT " ", log->type->name,
 		       lc->sync == DEFAULTSYNC ? 2 : 3, buffer,
 		       lc->region_size);
 		DMEMIT_SYNC;

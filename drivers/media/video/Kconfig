@@ -9,8 +9,13 @@ comment "Video Adapters"
 
 config VIDEO_BT848
 	tristate "BT848 Video For Linux"
-	depends on VIDEO_DEV && PCI && I2C && SOUND
+	depends on VIDEO_DEV && PCI && I2C
 	select I2C_ALGOBIT
+	select FW_LOADER
+	select VIDEO_BTCX
+	select VIDEO_BUF
+	select VIDEO_IR
+	select VIDEO_TUNER
 	---help---
 	  Support for BT848 based frame grabber/overlay boards. This includes
 	  the Miro, Hauppauge and STB boards. Please read the material in
@@ -214,8 +219,8 @@ config VIDEO_ZR36120
 	  module will be called zr36120.
 
 config VIDEO_MEYE
-	tristate "Sony Vaio Picturebook Motion Eye Video For Linux (EXPERIMENTAL)"
-	depends on VIDEO_DEV && SONYPI && !HIGHMEM64G
+	tristate "Sony Vaio Picturebook Motion Eye Video For Linux"
+	depends on VIDEO_DEV && PCI && SONYPI
 	---help---
 	  This is the video4linux driver for the Motion Eye camera found
 	  in the Vaio Picturebook laptops. Please read the material in
@@ -230,6 +235,9 @@ config VIDEO_MEYE
 config VIDEO_SAA7134
 	tristate "Philips SAA7134 support"
 	depends on VIDEO_DEV && PCI && I2C
+	select VIDEO_BUF
+	select VIDEO_IR
+	select VIDEO_TUNER
 	---help---
 	  This is a video4linux driver for Philips SAA7130/7134 based
 	  TV cards.
@@ -237,10 +245,18 @@ config VIDEO_SAA7134
 	  To compile this driver as a module, choose M here: the
 	  module will be called saa7134.
 
+config VIDEO_SAA7134_DVB
+	tristate "DVB Support for saa7134 based TV cards"
+	depends on VIDEO_SAA7134 && DVB_CORE && BROKEN
+	---help---
+	  This adds support for DVB cards based on the
+	  Philips saa7134 chip.
+
 config VIDEO_MXB
 	tristate "Siemens-Nixdorf 'Multimedia eXtension Board'"
 	depends on VIDEO_DEV && PCI
 	select VIDEO_SAA7146_VV
+	select VIDEO_TUNER
 	---help---
 	  This is a video4linux driver for the 'Multimedia eXtension Board'
 	  TV card by Siemens-Nixdorf.
@@ -287,7 +303,11 @@ config VIDEO_HEXIUM_GEMINI
 
 config VIDEO_CX88
 	tristate "Conexant 2388x (bt878 successor) support"
-	depends on VIDEO_DEV && PCI && I2C_ALGOBIT && EXPERIMENTAL
+	depends on VIDEO_DEV && PCI && EXPERIMENTAL
+	select I2C_ALGOBIT
+	select VIDEO_BTCX
+	select VIDEO_BUF
+	select VIDEO_TUNER
 	---help---
 	  This is a video4linux driver for Conexant 2388x based
 	  TV cards.
@@ -297,7 +317,8 @@ config VIDEO_CX88
 
 config VIDEO_CX88_DVB
 	tristate "DVB Support for cx2388x based TV cards"
-	depends on VIDEO_CX88 && DVB_CORE
+	depends on VIDEO_CX88 && DVB_CORE && BROKEN
+	select VIDEO_BUF_DVB
 	---help---
 	  This adds support for DVB cards based on the
 	  Connexant 2388x chip.
@@ -313,5 +334,18 @@ config VIDEO_OVCAMCHIP
 	  To compile this driver as a module, choose M here: the
 	  module will be called ovcamchip
 
-endmenu
+config VIDEO_M32R_AR
+	tristate "AR devices"
+	depends on M32R
+	---help---
+	  This is a video4linux driver for the Renesas AR (Artificial Retina)
+	  camera module.
 
+config VIDEO_M32R_AR_M64278
+	tristate "Use Colour AR module M64278(VGA)"
+	depends on VIDEO_M32R_AR
+	---help---
+	  Say Y here to use the Renesas M64278E-800 camera module,
+	  which supports VGA(640x480 pixcels) size of images.
+
+endmenu

@@ -32,7 +32,6 @@ SECTIONS
     *(.text)
     *(.fixup)
     *(.got1)
-    *(.kernel:cmdline)
   }
   . = ALIGN(4096);
   _etext = .;
@@ -62,18 +61,8 @@ SECTIONS
 
   . = ALIGN(4096);
   _vmlinux_start =  .;
-  .kernel:vmlinux : { *(.kernel:vmlinux) }
+  .kernel:vmlinux.strip : { *(.kernel:vmlinux.strip) }
   _vmlinux_end =  .;
-
-  . = ALIGN(4096);
-  _dotconfig_start =  .;
-  .kernel:.config : { *(.kernel:.config) }
-  _dotconfig_end =  .;
-
-  . = ALIGN(4096);
-  _sysmap_start =  .;
-  .kernel:System.map : { *(.kernel:System.map) }
-  _sysmap_end =  .;
 
   . = ALIGN(4096);
   _initrd_start =  .;

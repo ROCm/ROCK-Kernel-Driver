@@ -146,6 +146,7 @@ int usb_hcd_lh7a404_probe (const struct hc_driver *driver,
 
 	usb_bus_init (&hcd->self);
 	hcd->self.op = &usb_hcd_operations;
+	hcd->self.release = &usb_hcd_release;
 	hcd->self.hcpriv = (void *) hcd;
 	hcd->self.bus_name = "lh7a404";
 	hcd->product_desc = "LH7A404 OHCI";
@@ -165,9 +166,8 @@ int usb_hcd_lh7a404_probe (const struct hc_driver *driver,
 
  err2:
 	hcd_buffer_destroy (hcd);
-	if (hcd)
-		driver->hcd_free(hcd);
  err1:
+	kfree(hcd);
 	lh7a404_stop_hc(dev);
 	release_mem_region(dev->resource[0].start,
 				dev->resource[0].end
@@ -191,8 +191,6 @@ int usb_hcd_lh7a404_probe (const struct hc_driver *driver,
  */
 void usb_hcd_lh7a404_remove (struct usb_hcd *hcd, struct platform_device *dev)
 {
-	void *base;
-
 	pr_debug ("remove: %s, state %x", hcd->self.bus_name, hcd->state);
 
 	if (in_interrupt ())
@@ -211,9 +209,6 @@ void usb_hcd_lh7a404_remove (struct usb_hcd *hcd, struct platform_device *dev)
 
 	usb_deregister_bus (&hcd->self);
 
-	base = hcd->regs;
-	hcd->driver->hcd_free (hcd);
-
 	lh7a404_stop_hc(dev);
 	release_mem_region(dev->resource[0].start,
 			   dev->resource[0].end
@@ -229,38 +224,14 @@ ohci_lh7a404_start (struct usb_hcd *hcd)
 	int		ret;
 
 	ohci_dbg (ohci, "ohci_lh7a404_start, ohci:%p", ohci);
-			
-	ohci->hcca = dma_alloc_coherent (hcd->self.controller,
-			sizeof *ohci->hcca, &ohci->hcca_dma, 0);
-	if (!ohci->hcca)
-		return -ENOMEM;
+	if ((ret = ohci_init(ohci)) < 0)
+		return ret;
 
-	ohci_dbg (ohci, "ohci_lh7a404_start, ohci->hcca:%p",
-			ohci->hcca);
-
-	memset (ohci->hcca, 0, sizeof (struct ohci_hcca));
-
-	if ((ret = ohci_mem_init (ohci)) < 0) {
+	if ((ret = ohci_run (ohci)) < 0) {
+		err ("can't start %s", ohci->hcd.self.bus_name);
 		ohci_stop (hcd);
 		return ret;
 	}
-	ohci->regs = hcd->regs;
-
-	if (hc_reset (ohci) < 0) {
-		ohci_stop (hcd);
-		return -ENODEV;
-	}
-
-	if (hc_start (ohci) < 0) {
-		err ("can't start %s", ohci->hcd.self.bus_name);
-		ohci_stop (hcd);
-		return -EBUSY;
-	}
-	create_debug_files (ohci);
-
-#ifdef	DEBUG
-	ohci_dump (ohci, 1);
-#endif /*DEBUG*/
 	return 0;
 }
 
@@ -289,7 +260,6 @@ static const struct hc_driver ohci_lh7a404_hc_driver = {
 	 * memory lifecycle (except per-request)
 	 */
 	.hcd_alloc =		ohci_hcd_alloc,
-	.hcd_free =		ohci_hcd_free,
 
 	/*
 	 * managing i/o requests and associated device resources

@@ -90,11 +90,11 @@ struct sock *__raw_v6_lookup(struct sock *sk, unsigned short num,
 			struct ipv6_pinfo *np = inet6_sk(sk);
 
 			if (!ipv6_addr_any(&np->daddr) &&
-			    ipv6_addr_cmp(&np->daddr, rmt_addr))
+			    !ipv6_addr_equal(&np->daddr, rmt_addr))
 				continue;
 
 			if (!ipv6_addr_any(&np->rcv_saddr)) {
-				if (!ipv6_addr_cmp(&np->rcv_saddr, loc_addr))
+				if (ipv6_addr_equal(&np->rcv_saddr, loc_addr))
 					goto found;
 				if (is_multicast &&
 				    inet6_mc_check(sk, loc_addr, rmt_addr))
@@ -190,7 +190,7 @@ static int rawv6_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	addr_type = ipv6_addr_type(&addr->sin6_addr);
 
 	/* Raw sockets are IPv6 only */
-	if (addr_type & IPV6_ADDR_MAPPED)
+	if (addr_type == IPV6_ADDR_MAPPED)
 		return(-EADDRNOTAVAIL);
 
 	lock_sock(sk);
@@ -639,7 +639,7 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk,
 			return -EINVAL;
 
 		if (sin6->sin6_family && sin6->sin6_family != AF_INET6) 
-			return(-EINVAL);
+			return(-EAFNOSUPPORT);
 
 		/* port is the proto value [0..255] carried in nexthdr */
 		proto = ntohs(sin6->sin6_port);
@@ -668,7 +668,7 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk,
 		 * sk->sk_dst_cache.
 		 */
 		if (sk->sk_state == TCP_ESTABLISHED &&
-		    !ipv6_addr_cmp(daddr, &np->daddr))
+		    ipv6_addr_equal(daddr, &np->daddr))
 			daddr = &np->daddr;
 
 		if (addr_len >= sizeof(struct sockaddr_in6) &&
@@ -775,7 +775,7 @@ back_from_confirm:
 	}
 done:
 	ip6_dst_store(sk, dst,
-		      !ipv6_addr_cmp(&fl.fl6_dst, &np->daddr) ?
+		      ipv6_addr_equal(&fl.fl6_dst, &np->daddr) ?
 		      &np->daddr : NULL);
 	if (err > 0)
 		err = np->recverr ? net_xmit_errno(err) : 0;
@@ -975,6 +975,7 @@ static int rawv6_init_sk(struct sock *sk)
 
 struct proto rawv6_prot = {
 	.name =		"RAW",
+	.owner =	THIS_MODULE,
 	.close =	rawv6_close,
 	.connect =	ip6_datagram_connect,
 	.disconnect =	udp_disconnect,
@@ -989,6 +990,7 @@ struct proto rawv6_prot = {
 	.backlog_rcv =	rawv6_rcv_skb,
 	.hash =		raw_v6_hash,
 	.unhash =	raw_v6_unhash,
+	.slab_obj_size = sizeof(struct raw6_sock),
 };
 
 #ifdef CONFIG_PROC_FS

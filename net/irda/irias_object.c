@@ -159,11 +159,14 @@ int irias_delete_object(struct ias_object *obj)
 	ASSERT(obj != NULL, return -1;);
 	ASSERT(obj->magic == IAS_OBJECT_MAGIC, return -1;);
 
+	/* Remove from list */
 	node = hashbin_remove_this(irias_objects, (irda_queue_t *) obj);
 	if (!node)
-		return 0; /* Already removed */
+		IRDA_DEBUG( 0, "%s(), object already removed!\n",
+			    __FUNCTION__);
 
-	__irias_delete_object(node);
+	/* Destroy */
+	__irias_delete_object(obj);
 
 	return 0;
 }
@@ -176,7 +179,8 @@ EXPORT_SYMBOL(irias_delete_object);
  *    the object, remove the object as well.
  *
  */
-int irias_delete_attrib(struct ias_object *obj, struct ias_attrib *attrib)
+int irias_delete_attrib(struct ias_object *obj, struct ias_attrib *attrib,
+			int cleanobject)
 {
 	struct ias_attrib *node;
 
@@ -192,9 +196,13 @@ int irias_delete_attrib(struct ias_object *obj, struct ias_attrib *attrib)
 	/* Deallocate attribute */
 	__irias_delete_attrib(node);
 
-	/* Check if object has still some attributes */
+	/* Check if object has still some attributes, destroy it if none.
+	 * At first glance, this look dangerous, as the kernel reference
+	 * various IAS objects. However, we only use this function on
+	 * user attributes, not kernel attributes, so there is no risk
+	 * of deleting a kernel object this way. Jean II */
 	node = (struct ias_attrib *) hashbin_get_first(obj->attribs);
-	if (!node)
+	if (cleanobject && !node)
 		irias_delete_object(obj);
 
 	return 0;

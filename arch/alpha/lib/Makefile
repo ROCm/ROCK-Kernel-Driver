@@ -17,7 +17,6 @@ lib-y =	__divqu.o __remqu.o __divlu.o __remlu.o \
 	$(ev6-y)memset.o \
 	$(ev6-y)memcpy.o \
 	memmove.o \
-	io.o \
 	checksum.o \
 	csum_partial_copy.o \
 	$(ev67-y)strlen.o \

@@ -29,9 +29,9 @@ static int ebt_target_reply(struct sk_buff **pskb, unsigned int hooknr,
 	if (ap == NULL)
 		return EBT_DROP;
 
-	if (ap->ar_op != __constant_htons(ARPOP_REQUEST) ||
+	if (ap->ar_op != htons(ARPOP_REQUEST) ||
 	    ap->ar_hln != ETH_ALEN ||
-	    ap->ar_pro != __constant_htons(ETH_P_IP) ||
+	    ap->ar_pro != htons(ETH_P_IP) ||
 	    ap->ar_pln != 4)
 		return EBT_CONTINUE;
 
@@ -65,7 +65,7 @@ static int ebt_target_reply_check(const char *tablename, unsigned int hookmask,
 		return -EINVAL;
 	if (BASE_CHAIN && info->target == EBT_RETURN)
 		return -EINVAL;
-	if (e->ethproto != __constant_htons(ETH_P_ARP) ||
+	if (e->ethproto != htons(ETH_P_ARP) ||
 	    e->invflags & EBT_IPROTO)
 		return -EINVAL;
 	CLEAR_BASE_CHAIN_BIT;

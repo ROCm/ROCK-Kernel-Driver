@@ -60,14 +60,14 @@ static const unsigned long palette_4[16] = {
  * params_phys is a linker defined symbol - see
  * arch/arm/boot/compressed/Makefile
  */
-extern struct param_struct params_phys;
-#define params (&params_phys)
+extern __attribute__((pure)) struct param_struct *params(void);
+#define params (params())
 
 #ifndef STANDALONE_DEBUG 
 /*
  * This does not append a newline
  */
-static void puts(const char *s)
+static void putstr(const char *s)
 {
 	extern void ll_write_char(char *, char c, char white);
 	int x,y;

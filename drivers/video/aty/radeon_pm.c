@@ -465,7 +465,9 @@ static void radeon_pm_setup_for_suspend(struct radeonfb_info *rinfo)
 						
  	OUTPLL( pllPIXCLKS_CNTL, pixclks_cntl);
 
-
+	/* Switch off LVDS interface */
+	OUTREG(LVDS_GEN_CNTL, INREG(LVDS_GEN_CNTL) &
+	       ~(LVDS_BLON | LVDS_EN | LVDS_ON | LVDS_DIGON));
 
 	/* Enable System power management */
 	pll_pwrmgt_cntl = INPLL( pllPLL_PWRMGT_CNTL);
@@ -896,7 +898,7 @@ int radeonfb_pci_suspend(struct pci_dev *pdev, u32 state)
 
 	release_console_sem();
 
-	pdev->dev.power_state = state;
+	pdev->dev.power.power_state = state;
 
 	return 0;
 }
@@ -906,7 +908,7 @@ int radeonfb_pci_resume(struct pci_dev *pdev)
         struct fb_info *info = pci_get_drvdata(pdev);
         struct radeonfb_info *rinfo = info->par;
 
-	if (pdev->dev.power_state == 0)
+	if (pdev->dev.power.power_state == 0)
 		return 0;
 
 	acquire_console_sem();
@@ -933,7 +935,7 @@ int radeonfb_pci_resume(struct pci_dev *pdev)
 
 	release_console_sem();
 
-	pdev->dev.power_state = 0;
+	pdev->dev.power.power_state = 0;
 
 	printk(KERN_DEBUG "radeonfb: resumed !\n");
 

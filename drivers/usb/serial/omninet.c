@@ -67,7 +67,7 @@ static int  omninet_open		(struct usb_serial_port *port, struct file *filp);
 static void omninet_close		(struct usb_serial_port *port, struct file *filp);
 static void omninet_read_bulk_callback	(struct urb *urb, struct pt_regs *regs);
 static void omninet_write_bulk_callback	(struct urb *urb, struct pt_regs *regs);
-static int  omninet_write		(struct usb_serial_port *port, int from_user, const unsigned char *buf, int count);
+static int  omninet_write		(struct usb_serial_port *port, const unsigned char *buf, int count);
 static int  omninet_write_room		(struct usb_serial_port *port);
 static void omninet_shutdown		(struct usb_serial *serial);
 
@@ -183,8 +183,8 @@ static void omninet_close (struct usb_serial_port *port, struct file * filp)
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	wport = serial->port[1];
-	usb_unlink_urb(wport->write_urb);
-	usb_unlink_urb(port->read_urb);
+	usb_kill_urb(wport->write_urb);
+	usb_kill_urb(port->read_urb);
 
 	od = usb_get_serial_port_data(port);
 	if (od)
@@ -241,7 +241,7 @@ static void omninet_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	return;
 }
 
-static int omninet_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)
+static int omninet_write (struct usb_serial_port *port, const unsigned char *buf, int count)
 {
 	struct usb_serial 	*serial	= port->serial;
 	struct usb_serial_port 	*wport	= serial->port[1];
@@ -264,15 +264,7 @@ static int omninet_write (struct usb_serial_port *port, int from_user, const uns
 
 	count = (count > OMNINET_BULKOUTSIZE) ? OMNINET_BULKOUTSIZE : count;
 
-	if (from_user) {
-		if (copy_from_user(wport->write_urb->transfer_buffer + OMNINET_DATAOFFSET, buf, count) != 0) {
-			result = -EFAULT;
-			goto exit;
-		}
-	}
-	else {
-		memcpy (wport->write_urb->transfer_buffer + OMNINET_DATAOFFSET, buf, count);
-	}
+	memcpy (wport->write_urb->transfer_buffer + OMNINET_DATAOFFSET, buf, count);
 
 	usb_serial_debug_data(debug, &port->dev, __FUNCTION__, count, wport->write_urb->transfer_buffer);
 
@@ -291,7 +283,6 @@ static int omninet_write (struct usb_serial_port *port, int from_user, const uns
 	else
 		result = count;
 
-exit:	
 	return result;
 }
 

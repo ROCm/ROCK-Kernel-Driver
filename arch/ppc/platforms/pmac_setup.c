@@ -51,13 +51,13 @@
 #include <linux/irq.h>
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
+#include <linux/bitops.h>
 
 #include <asm/reg.h>
 #include <asm/sections.h>
 #include <asm/prom.h>
 #include <asm/system.h>
 #include <asm/pgtable.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/pci-bridge.h>
 #include <asm/ohare.h>
@@ -324,7 +324,6 @@ pmac_setup_arch(void)
 	else
 #endif
 		ROOT_DEV = DEFAULT_ROOT_DEVICE;
-	ROOT_DEV = Root_SDA3;
 
 #ifdef CONFIG_SMP
 	/* Check for Core99 */

@@ -59,17 +59,16 @@ static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card *
 static int reverb[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 static int mge[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 static unsigned int dmaio = 0x7a00;	/* DDMA i/o address */
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for S3 SonicVibes soundcard.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for S3 SonicVibes soundcard.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable S3 SonicVibes soundcard.");
-module_param_array(reverb, bool, boot_devs, 0444);
+module_param_array(reverb, bool, NULL, 0444);
 MODULE_PARM_DESC(reverb, "Enable reverb (SRAM is present) for S3 SonicVibes soundcard.");
-module_param_array(mge, bool, boot_devs, 0444);
+module_param_array(mge, bool, NULL, 0444);
 MODULE_PARM_DESC(mge, "MIC Gain Enable for S3 SonicVibes soundcard.");
 module_param(dmaio, uint, 0444);
 MODULE_PARM_DESC(dmaio, "DDMA i/o base address for S3 SonicVibes soundcard.");
@@ -1186,6 +1185,7 @@ static int snd_sonicvibes_free(sonicvibes_t *sonic)
 		kfree_nocheck(sonic->res_dmac);
 	}
 	pci_release_regions(sonic->pci);
+	pci_disable_device(sonic->pci);
 	kfree(sonic);
 	return 0;
 }
@@ -1217,12 +1217,15 @@ static int __devinit snd_sonicvibes_create(snd_card_t * card,
         if (pci_set_dma_mask(pci, 0x00ffffff) < 0 ||
 	    pci_set_consistent_dma_mask(pci, 0x00ffffff) < 0) {
                 snd_printk("architecture does not support 24bit PCI busmaster DMA\n");
+		pci_disable_device(pci);
                 return -ENXIO;
         }
 
 	sonic = kcalloc(1, sizeof(*sonic), GFP_KERNEL);
-	if (sonic == NULL)
+	if (sonic == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	spin_lock_init(&sonic->reg_lock);
 	sonic->card = card;
 	sonic->pci = pci;
@@ -1230,6 +1233,7 @@ static int __devinit snd_sonicvibes_create(snd_card_t * card,
 
 	if ((err = pci_request_regions(pci, "S3 SonicVibes")) < 0) {
 		kfree(sonic);
+		pci_disable_device(pci);
 		return err;
 	}
 

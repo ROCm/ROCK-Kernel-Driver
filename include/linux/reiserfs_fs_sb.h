@@ -209,7 +209,7 @@ struct reiserfs_journal {
   unsigned int j_trans_max ;           /* max number of blocks in a transaction.  */
   unsigned int j_max_batch ;           /* max number of blocks to batch into a trans */
   unsigned int j_max_commit_age ;      /* in seconds, how old can an async commit be */
-  unsigned int j_max_trans_age ;       /* in seconds, how old can a transaction be */ 
+  unsigned int j_max_trans_age ;       /* in seconds, how old can a transaction be */
   unsigned int j_default_max_commit_age ; /* the default for the max commit age */
 
   struct reiserfs_journal_cnode *j_cnode_free_list ;
@@ -467,6 +467,7 @@ enum reiserfs_mount_options {
     REISERFS_TEST2,
     REISERFS_TEST3,
     REISERFS_TEST4,
+    REISERFS_UNSUPPORTED_OPT,
 };
 
 #define reiserfs_r5_hash(s) (REISERFS_SB(s)->s_mount_opt & (1 << FORCE_R5_HASH))

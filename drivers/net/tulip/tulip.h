@@ -149,6 +149,9 @@ enum status_bits {
 	TxIntr = 0x01,
 };
 
+/* bit mask for CSR5 TX/RX process state */
+#define CSR5_TS	0x00700000
+#define CSR5_RS	0x000e0000
 
 enum tulip_mode_bits {
 	TxThreshold		= (1 << 22),
@@ -379,7 +382,7 @@ struct tulip_private {
 	int ttimer;
 	int susp_rx;
 	unsigned long nir;
-	unsigned long base_addr;
+	void __iomem *base_addr;
 	int csr12_shadow;
 	int pad0;		/* Used for 8-byte alignment */
 };
@@ -446,43 +449,34 @@ extern struct tulip_chip_table tulip_tbl[];
 void oom_timer(unsigned long data);
 extern u8 t21040_csr13[];
 
-#ifndef USE_IO_OPS
-#undef inb
-#undef inw
-#undef inl
-#undef outb
-#undef outw
-#undef outl
-#define inb(addr) readb((void*)(addr))
-#define inw(addr) readw((void*)(addr))
-#define inl(addr) readl((void*)(addr))
-#define outb(val,addr) writeb((val), (void*)(addr))
-#define outw(val,addr) writew((val), (void*)(addr))
-#define outl(val,addr) writel((val), (void*)(addr))
-#endif /* !USE_IO_OPS */
-
-
-
 static inline void tulip_start_rxtx(struct tulip_private *tp)
 {
-	long ioaddr = tp->base_addr;
-	outl(tp->csr6 | RxTx, ioaddr + CSR6);
+	void __iomem *ioaddr = tp->base_addr;
+	iowrite32(tp->csr6 | RxTx, ioaddr + CSR6);
 	barrier();
-	(void) inl(ioaddr + CSR6); /* mmio sync */
+	(void) ioread32(ioaddr + CSR6); /* mmio sync */
 }
 
-static inline int tulip_stop_rxtx(struct tulip_private *tp)
+static inline void tulip_stop_rxtx(struct tulip_private *tp)
 {
-	long ioaddr = tp->base_addr;
-	u32 csr6 = inl(ioaddr + CSR6);
-	unsigned int i = 13; /* min of 1250usec */
+	void __iomem *ioaddr = tp->base_addr;
+	u32 csr6 = ioread32(ioaddr + CSR6);
 
 	if (csr6 & RxTx) {
-		outl(csr6 & ~RxTx, ioaddr + CSR6);
+		unsigned i=1300/10;
+		iowrite32(csr6 & ~RxTx, ioaddr + CSR6);
 		barrier();
-		while (i-- && ((inl(ioaddr + CSR5) & (TxDied|RxDied)) != (TxDied|RxDied))) udelay(100); /* mmio sync */
+		/* wait until in-flight frame completes.
+		 * Max time @ 10BT: 1500*8b/10Mbps == 1200us (+ 100us margin)
+		 * Typically expect this loop to end in < 50 us on 100BT.
+		 */
+		while (--i && (ioread32(ioaddr + CSR5) & (CSR5_TS|CSR5_RS)))
+			udelay(10);
+
+		if (!i)
+			printk(KERN_DEBUG "%s: tulip_stop_rxtx() failed\n",
+					tp->pdev->slot_name);
 	}
-	return (!(i>0)); /* return 0 (success) or 1 (failure) */;
 }
 
 static inline void tulip_restart_rxtx(struct tulip_private *tp)

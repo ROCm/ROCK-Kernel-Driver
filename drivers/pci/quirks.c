@@ -30,7 +30,7 @@ static void __devinit quirk_passive_release(struct pci_dev *dev)
 
 	/* We have to make sure a particular bit is set in the PIIX3
 	   ISA bridge, so we have to go out and find it. */
-	while ((d = pci_find_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371SB_0, d))) {
+	while ((d = pci_get_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371SB_0, d))) {
 		pci_read_config_byte(d, 0x82, &dlc);
 		if (!(dlc & 1<<1)) {
 			printk(KERN_ERR "PCI: PIIX3: Enabling Passive Release on %s\n", pci_name(d));
@@ -116,21 +116,21 @@ static void __devinit quirk_vialatency(struct pci_dev *dev)
 	/* Ok we have a potential problem chipset here. Now see if we have
 	   a buggy southbridge */
 	   
-	p = pci_find_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C686, NULL);
+	p = pci_get_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_82C686, NULL);
 	if (p!=NULL) {
 		pci_read_config_byte(p, PCI_CLASS_REVISION, &rev);
 		/* 0x40 - 0x4f == 686B, 0x10 - 0x2f == 686A; thanks Dan Hollis */
 		/* Check for buggy part revisions */
-		if (rev < 0x40 || rev > 0x42) 
-			return;
+		if (rev < 0x40 || rev > 0x42)
+			goto exit;
 	} else {
-		p = pci_find_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_8231, NULL);
+		p = pci_get_device(PCI_VENDOR_ID_VIA, PCI_DEVICE_ID_VIA_8231, NULL);
 		if (p==NULL)	/* No problem parts */
-			return;
+			goto exit;
 		pci_read_config_byte(p, PCI_CLASS_REVISION, &rev);
 		/* Check for buggy part revisions */
 		if (rev < 0x10 || rev > 0x12) 
-			return;
+			goto exit;
 	}
 	
 	/*
@@ -153,6 +153,8 @@ static void __devinit quirk_vialatency(struct pci_dev *dev)
 	busarb |= (1<<4);
 	pci_write_config_byte(dev, 0x76, busarb);
 	printk(KERN_INFO "Applying VIA southbridge workaround.\n");
+exit:
+	pci_dev_put(p);
 }
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8363_0,	quirk_vialatency );
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8371_1,	quirk_vialatency );
@@ -477,7 +479,7 @@ static void __devinit quirk_via_acpi(struct pci_dev *d)
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_3,	quirk_via_acpi );
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_4,	quirk_via_acpi );
 
-static void __devinit quirk_via_irqpic(struct pci_dev *dev)
+static void quirk_via_irqpic(struct pci_dev *dev)
 {
 	u8 irq, new_irq = dev->irq & 0xf;
 
@@ -491,9 +493,10 @@ static void __devinit quirk_via_irqpic(struct pci_dev *dev)
 		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, new_irq);
 	}
 }
-DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_2,	quirk_via_irqpic );
-DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_5,	quirk_via_irqpic );
-DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_6,	quirk_via_irqpic );
+DECLARE_PCI_FIXUP_ENABLE(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_2,	quirk_via_irqpic );
+DECLARE_PCI_FIXUP_ENABLE(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_5,	quirk_via_irqpic );
+DECLARE_PCI_FIXUP_ENABLE(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_6,	quirk_via_irqpic );
+DECLARE_PCI_FIXUP_ENABLE(PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_8233_5,	quirk_via_irqpic );
 
 
 /*
@@ -769,6 +772,11 @@ static void __init asus_hides_smbus_hostbridge(struct pci_dev *dev)
 			case 0x1751: /* M2N notebook */
 				asus_hides_smbus = 1;
 			}
+		if (dev->device == PCI_DEVICE_ID_INTEL_82855PM_HB)
+			switch (dev->subsystem_device) {
+			case 0x186a: /* M6Ne notebook */
+				asus_hides_smbus = 1;
+			}
 	} else if (unlikely(dev->subsystem_vendor == PCI_VENDOR_ID_HP)) {
 		if (dev->device ==  PCI_DEVICE_ID_INTEL_82855PM_HB)
 			switch(dev->subsystem_device) {
@@ -814,121 +822,6 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801CA_12,	as
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801DB_12,	asus_hides_smbus_lpc );
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82801EB_0,	asus_hides_smbus_lpc );
 
-#ifdef CONFIG_X86_IO_APIC
-#include <asm/hw_irq.h>
-#ifdef CONFIG_IRQBALANCE
-extern int irqbalance_disable(char *str);
-#endif
-extern int no_irq_affinity;
-extern int noirqdebug_setup(char *str);
-
-
-static void __devinit quirk_intel_irqbalance(struct pci_dev *dev)
-{
-	u8 config, rev;
-	u32 word;
-	extern struct pci_raw_ops *raw_pci_ops;
-
-	pci_read_config_byte(dev, PCI_CLASS_REVISION, &rev);
-	if (rev > 0x9)
-		return;
-
-	printk(KERN_INFO "Intel E7520/7320/7525 detected.");
-
-	/* enable access to config space*/
-	pci_read_config_byte(dev, 0xf4, &config);
-	config |= 0x2;
-	pci_write_config_byte(dev, 0xf4, config);
-
-	/* read xTPR register */
-	raw_pci_ops->read(0, 0, 0x40, 0x4c, 2, &word);
-
-	if (!(word & (1 << 13))) {
-		printk(KERN_INFO "Disabling irq balancing and affinity\n");
-#ifdef __i386__
-#ifdef CONFIG_IRQBALANCE
-		irqbalance_disable("");
-		setup_ioapic_dest();
-#endif
-		noirqdebug_setup("");
-#endif
-#ifdef CONFIG_SMP
-		no_irq_affinity = 1;
-#endif
-	}
-
-	config &= ~0x2;
-	/* disable access to config space*/
-	pci_write_config_byte(dev, 0xf4, config);
-}
-DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_SMCH,	quirk_intel_irqbalance);
-DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_E7320_MCH,	quirk_intel_irqbalance);
-DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_E7525_MCH,	quirk_intel_irqbalance);
-#endif
-
-#define UHCI_USBLEGSUP		0xc0		/* legacy support */
-#define UHCI_USBCMD		0		/* command register */
-#define UHCI_USBINTR		4		/* interrupt register */
-#define UHCI_USBLEGSUP_DEFAULT	0x2000		/* only PIRQ enable set */
-#define UHCI_USBCMD_GRESET	0x0004		/* Global reset */
-
-#define OHCI_CONTROL		0x04
-#define OHCI_CMDSTATUS		0x08
-#define OHCI_INTRENABLE		0x10
-#define OHCI_OCR		(1 << 3)	/* ownership change request */
-#define OHCI_CTRL_IR		(1 << 8)	/* interrupt routing */
-#define OHCI_INTR_OC		(1 << 30)	/* ownership change */
-
-#if defined(__i386__) || defined(__x86_64__)
-static void __init quirk_usb_disable_smm_bios(struct pci_dev *pdev)
-{
-
-	if (pdev->class == ((PCI_CLASS_SERIAL_USB << 8) | 0x00)) { /* UHCI */
-		int i;
-		unsigned long base = 0;;
-
-		for (i = 0; i < PCI_ROM_RESOURCE; i++) 
-			if ((pci_resource_flags(pdev, i) & IORESOURCE_IO)) {
-				base = pci_resource_start(pdev, i);
-				break;
-			}
-
-		if (!base)
-			return;
-
-		outw(0, base + UHCI_USBINTR);
-		outw(UHCI_USBCMD_GRESET, base + UHCI_USBCMD);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-       		schedule_timeout((HZ*50+999) / 1000);
-		outw(0, base + UHCI_USBCMD);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout((HZ*10+999) / 1000);
-
-		pci_write_config_word(pdev, UHCI_USBLEGSUP, UHCI_USBLEGSUP_DEFAULT);
-	}
-
-	if (pdev->class == ((PCI_CLASS_SERIAL_USB << 8) | 0x10)) { /* OHCI */
-		char *base = ioremap_nocache(pci_resource_start(pdev, 0),
-							pci_resource_len(pdev, 0));
-		if (base == NULL) return;
-
-		if (readl(base + OHCI_CONTROL) & OHCI_CTRL_IR) {
-			int temp = 500;     /* arbitrary: five seconds */
-			writel(OHCI_INTR_OC, base + OHCI_INTRENABLE);
-			writel(OHCI_OCR, base + OHCI_CMDSTATUS);
-			while (temp && readl(base + OHCI_CONTROL) & OHCI_CTRL_IR) {
-				temp--;
-				set_current_state(TASK_UNINTERRUPTIBLE);
-				schedule_timeout( HZ / 100);
-			}
-		}
-		iounmap(base);
-	}
-}
-
-DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID,	PCI_ANY_ID,	quirk_usb_disable_smm_bios);
-#endif
-
 /*
  * SiS 96x south bridge: BIOS typically hides SMBus device...
  */
@@ -940,6 +833,234 @@ static void __init quirk_sis_96x_smbus(struct pci_dev *dev)
 	pci_write_config_byte(dev, 0x77, val & ~0x10);
 	pci_read_config_byte(dev, 0x77, &val);
 }
+
+
+#define UHCI_USBLEGSUP		0xc0		/* legacy support */
+#define UHCI_USBCMD		0		/* command register */
+#define UHCI_USBSTS		2		/* status register */
+#define UHCI_USBINTR		4		/* interrupt register */
+#define UHCI_USBLEGSUP_DEFAULT	0x2000		/* only PIRQ enable set */
+#define UHCI_USBCMD_RUN		(1 << 0)	/* RUN/STOP bit */
+#define UHCI_USBCMD_GRESET	(1 << 2)	/* Global reset */
+#define UHCI_USBCMD_CONFIGURE	(1 << 6)	/* config semaphore */
+#define UHCI_USBSTS_HALTED	(1 << 5)	/* HCHalted bit */
+
+#define OHCI_CONTROL		0x04
+#define OHCI_CMDSTATUS		0x08
+#define OHCI_INTRSTATUS		0x0c
+#define OHCI_INTRENABLE		0x10
+#define OHCI_INTRDISABLE	0x14
+#define OHCI_OCR		(1 << 3)	/* ownership change request */
+#define OHCI_CTRL_IR		(1 << 8)	/* interrupt routing */
+#define OHCI_INTR_OC		(1 << 30)	/* ownership change */
+
+#define EHCI_HCC_PARAMS		0x08		/* extended capabilities */
+#define EHCI_USBCMD		0		/* command register */
+#define EHCI_USBCMD_RUN		(1 << 0)	/* RUN/STOP bit */
+#define EHCI_USBSTS		4		/* status register */
+#define EHCI_USBSTS_HALTED	(1 << 12)	/* HCHalted bit */
+#define EHCI_USBINTR		8		/* interrupt register */
+#define EHCI_USBLEGSUP		0		/* legacy support register */
+#define EHCI_USBLEGSUP_BIOS	(1 << 16)	/* BIOS semaphore */
+#define EHCI_USBLEGSUP_OS	(1 << 24)	/* OS semaphore */
+#define EHCI_USBLEGCTLSTS	4		/* legacy control/status */
+#define EHCI_USBLEGCTLSTS_SOOE	(1 << 13)	/* SMI on ownership change */
+
+int usb_early_handoff __devinitdata = 0;
+static int __init usb_handoff_early(char *str)
+{
+	usb_early_handoff = 1;
+	return 0;
+}
+__setup("usb-handoff", usb_handoff_early);
+
+static void __devinit quirk_usb_handoff_uhci(struct pci_dev *pdev)
+{
+	unsigned long base = 0;
+	int wait_time, delta;
+	u16 val, sts;
+	int i;
+
+	for (i = 0; i < PCI_ROM_RESOURCE; i++)
+		if ((pci_resource_flags(pdev, i) & IORESOURCE_IO)) {
+			base = pci_resource_start(pdev, i);
+			break;
+		}
+
+	if (!base)
+		return;
+
+	/*
+	 * stop controller
+	 */
+	sts = inw(base + UHCI_USBSTS);
+	val = inw(base + UHCI_USBCMD);
+	val &= ~(u16)(UHCI_USBCMD_RUN | UHCI_USBCMD_CONFIGURE);
+	outw(val, base + UHCI_USBCMD);
+
+	/*
+	 * wait while it stops if it was running
+	 */
+	if ((sts & UHCI_USBSTS_HALTED) == 0)
+	{
+		wait_time = 1000;
+		delta = 100;
+
+		do {
+			outw(0x1f, base + UHCI_USBSTS);
+			udelay(delta);
+			wait_time -= delta;
+			val = inw(base + UHCI_USBSTS);
+			if (val & UHCI_USBSTS_HALTED)
+				break;
+		} while (wait_time > 0);
+	}
+
+	/*
+	 * disable interrupts & legacy support
+	 */
+	outw(0, base + UHCI_USBINTR);
+	outw(0x1f, base + UHCI_USBSTS);
+	pci_read_config_word(pdev, UHCI_USBLEGSUP, &val);
+	if (val & 0xbf) 
+		pci_write_config_word(pdev, UHCI_USBLEGSUP, UHCI_USBLEGSUP_DEFAULT);
+		
+}
+
+static void __devinit quirk_usb_handoff_ohci(struct pci_dev *pdev)
+{
+	void __iomem *base;
+	int wait_time;
+
+	base = ioremap_nocache(pci_resource_start(pdev, 0),
+				     pci_resource_len(pdev, 0));
+	if (base == NULL) return;
+
+	if (readl(base + OHCI_CONTROL) & OHCI_CTRL_IR) {
+		wait_time = 500; /* 0.5 seconds */
+		writel(OHCI_INTR_OC, base + OHCI_INTRENABLE);
+		writel(OHCI_OCR, base + OHCI_CMDSTATUS);
+		while (wait_time > 0 && 
+				readl(base + OHCI_CONTROL) & OHCI_CTRL_IR) {
+			wait_time -= 10;
+			msleep(10);
+		}
+	}
+
+	/*
+	 * disable interrupts
+	 */
+	writel(~(u32)0, base + OHCI_INTRDISABLE);
+	writel(~(u32)0, base + OHCI_INTRSTATUS);
+
+	iounmap(base);
+}
+
+static void __devinit quirk_usb_disable_ehci(struct pci_dev *pdev)
+{
+	int wait_time, delta;
+	void __iomem *base, *op_reg_base;
+	u32 hcc_params, val, temp;
+	u8 cap_length;
+
+	base = ioremap_nocache(pci_resource_start(pdev, 0),
+				pci_resource_len(pdev, 0));
+	if (base == NULL) return;
+
+	cap_length = readb(base);
+	op_reg_base = base + cap_length;
+	hcc_params = readl(base + EHCI_HCC_PARAMS);
+	hcc_params = (hcc_params >> 8) & 0xff;
+	if (hcc_params) {
+		pci_read_config_dword(pdev, 
+					hcc_params + EHCI_USBLEGSUP,
+					&val);
+		if (((val & 0xff) == 1) && (val & EHCI_USBLEGSUP_BIOS)) {
+			/*
+			 * Ok, BIOS is in smm mode, try to hand off...
+			 */
+			pci_read_config_dword(pdev,
+						hcc_params + EHCI_USBLEGCTLSTS,
+						&temp);
+			pci_write_config_dword(pdev,
+						hcc_params + EHCI_USBLEGCTLSTS,
+						temp | EHCI_USBLEGCTLSTS_SOOE);
+			val |= EHCI_USBLEGSUP_OS;
+			pci_write_config_dword(pdev, 
+						hcc_params + EHCI_USBLEGSUP, 
+						val);
+
+			wait_time = 500;
+			do {
+				msleep(10);
+				wait_time -= 10;
+				pci_read_config_dword(pdev,
+						hcc_params + EHCI_USBLEGSUP,
+						&val);
+			} while (wait_time && (val & EHCI_USBLEGSUP_BIOS));
+			if (!wait_time) {
+				/*
+				 * well, possibly buggy BIOS...
+				 */
+				printk(KERN_WARNING "EHCI early BIOS handoff "
+						"failed (BIOS bug ?)\n");
+				pci_write_config_dword(pdev,
+						hcc_params + EHCI_USBLEGSUP,
+						EHCI_USBLEGSUP_OS);
+				pci_write_config_dword(pdev,
+						hcc_params + EHCI_USBLEGCTLSTS,
+						0);
+			}
+		}
+	}
+
+	/*
+	 * halt EHCI & disable its interrupts in any case
+	 */
+	val = readl(op_reg_base + EHCI_USBSTS);
+	if ((val & EHCI_USBSTS_HALTED) == 0) {
+		val = readl(op_reg_base + EHCI_USBCMD);
+		val &= ~EHCI_USBCMD_RUN;
+		writel(val, op_reg_base + EHCI_USBCMD);
+
+		wait_time = 2000;
+		delta = 100;
+		do {
+			writel(0x3f, op_reg_base + EHCI_USBSTS);
+			udelay(delta);
+			wait_time -= delta;
+			val = readl(op_reg_base + EHCI_USBSTS);
+			if ((val == ~(u32)0) || (val & EHCI_USBSTS_HALTED)) {
+				break;
+			}
+		} while (wait_time > 0);
+	}
+	writel(0, op_reg_base + EHCI_USBINTR);
+	writel(0x3f, op_reg_base + EHCI_USBSTS);
+
+	iounmap(base);
+
+	return;
+}
+
+
+
+static void __devinit quirk_usb_early_handoff(struct pci_dev *pdev)
+{
+	if (!usb_early_handoff)
+		return;
+
+	if (pdev->class == ((PCI_CLASS_SERIAL_USB << 8) | 0x00)) { /* UHCI */
+		quirk_usb_handoff_uhci(pdev);
+	} else if (pdev->class == ((PCI_CLASS_SERIAL_USB << 8) | 0x10)) { /* OHCI */
+		quirk_usb_handoff_ohci(pdev);
+	} else if (pdev->class == ((PCI_CLASS_SERIAL_USB << 8) | 0x20)) { /* EHCI */
+		quirk_usb_disable_ehci(pdev);
+	}
+
+	return;
+}
+DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, quirk_usb_early_handoff);
 
 /*
  * ... This is further complicated by the fact that some SiS96x south
@@ -1020,7 +1141,7 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_EESSC,	quirk_a
 #endif
 
 #ifdef CONFIG_SCSI_SATA
-static void __init quirk_intel_ide_combined(struct pci_dev *pdev)
+static void __devinit quirk_intel_ide_combined(struct pci_dev *pdev)
 {
 	u8 prog, comb, tmp;
 	int ich = 0;
@@ -1093,21 +1214,23 @@ static void __init quirk_intel_ide_combined(struct pci_dev *pdev)
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,    PCI_ANY_ID,	  quirk_intel_ide_combined );
 #endif /* CONFIG_SCSI_SATA */
 
-int pciehp_msi_quirk;
 
-static void __devinit quirk_pciehp_msi(struct pci_dev *pdev)
+int pcie_mch_quirk;
+
+static void __devinit quirk_pcie_mch(struct pci_dev *pdev)
 {
-	pciehp_msi_quirk = 1;
+	pcie_mch_quirk = 1;
 }
-DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,    PCI_DEVICE_ID_INTEL_SMCH,	quirk_pciehp_msi );
-
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_E7520_MCH,	quirk_pcie_mch );
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_E7320_MCH,	quirk_pcie_mch );
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_E7525_MCH,	quirk_pcie_mch );
 
 static void pci_do_fixups(struct pci_dev *dev, struct pci_fixup *f, struct pci_fixup *end)
 {
 	while (f < end) {
 		if ((f->vendor == dev->vendor || f->vendor == (u16) PCI_ANY_ID) &&
  		    (f->device == dev->device || f->device == (u16) PCI_ANY_ID)) {
-			pr_debug(KERN_INFO "PCI: Calling quirk %p for %s\n", f->hook, pci_name(dev));
+			pr_debug("PCI: Calling quirk %p for %s\n", f->hook, pci_name(dev));
 			f->hook(dev);
 		}
 		f++;
@@ -1118,6 +1241,9 @@ extern struct pci_fixup __start_pci_fixups_header[];
 extern struct pci_fixup __end_pci_fixups_header[];
 extern struct pci_fixup __start_pci_fixups_final[];
 extern struct pci_fixup __end_pci_fixups_final[];
+extern struct pci_fixup __start_pci_fixups_enable[];
+extern struct pci_fixup __end_pci_fixups_enable[];
+
 
 void pci_fixup_device(enum pci_fixup_pass pass, struct pci_dev *dev)
 {
@@ -1133,6 +1259,12 @@ void pci_fixup_device(enum pci_fixup_pass pass, struct pci_dev *dev)
 		start = __start_pci_fixups_final;
 		end = __end_pci_fixups_final;
 		break;
+
+	case pci_fixup_enable:
+		start = __start_pci_fixups_enable;
+		end = __end_pci_fixups_enable;
+		break;
+
 	default:
 		/* stupid compiler warning, you would think with an enum... */
 		return;
@@ -1140,4 +1272,7 @@ void pci_fixup_device(enum pci_fixup_pass pass, struct pci_dev *dev)
 	pci_do_fixups(dev, start, end);
 }
 
-EXPORT_SYMBOL(pciehp_msi_quirk);
+EXPORT_SYMBOL(pcie_mch_quirk);
+#ifdef CONFIG_HOTPLUG
+EXPORT_SYMBOL(pci_fixup_device);
+#endif

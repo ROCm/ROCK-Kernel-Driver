@@ -22,6 +22,7 @@
 #include <linux/blockgroup_lock.h>
 #include <linux/percpu_counter.h>
 #endif
+#include <linux/rbtree.h>
 
 /*
  * third extended-fs super-block data in memory
@@ -53,11 +54,15 @@ struct ext3_sb_info {
 	u32 s_next_generation;
 	u32 s_hash_seed[4];
 	int s_def_hash_version;
-        u8 *s_debts;
 	struct percpu_counter s_freeblocks_counter;
 	struct percpu_counter s_freeinodes_counter;
 	struct percpu_counter s_dirs_counter;
 	struct blockgroup_lock s_blockgroup_lock;
+
+	/* root of the per fs reservation window tree */
+	spinlock_t s_rsv_window_lock;
+	struct rb_root s_rsv_window_root;
+	struct ext3_reserve_window_node s_rsv_window_head;
 
 	/* Journaling */
 	struct inode * s_journal_inode;

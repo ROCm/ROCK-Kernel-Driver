@@ -63,9 +63,9 @@ do {						\
 
 /* Default MSR for kernel mode. */
 #if defined (CONFIG_40x)
-#define MSR_KERNEL	(MSR_ME|MSR_RI|MSR_IR|MSR_DR|MSR_CE|MSR_DE)
+#define MSR_KERNEL	(MSR_ME|MSR_RI|MSR_IR|MSR_DR|MSR_CE)
 #elif defined(CONFIG_BOOKE)
-#define MSR_KERNEL	(MSR_ME|MSR_RI|MSR_CE|MSR_DE)
+#define MSR_KERNEL	(MSR_ME|MSR_RI|MSR_CE)
 #endif
 
 /* Special Purpose Registers (SPRNs)*/
@@ -123,9 +123,10 @@ do {						\
 #define SPRN_PID2	0x27A	/* Process ID Register 2 */
 #define SPRN_TLB0CFG	0x2B0	/* TLB 0 Config Register */
 #define SPRN_TLB1CFG	0x2B1	/* TLB 1 Config Register */
+#define SPRN_CCR1	0x378	/* Core Configuration Register 1 */
 #define SPRN_ZPR	0x3B0	/* Zone Protection Register (40x) */
 #define SPRN_MMUCR	0x3B2	/* MMU Control Register */
-#define SPRN_CCR0	0x3B3	/* Core Configuration Register */
+#define SPRN_CCR0	0x3B3	/* Core Configuration Register 0 */
 #define SPRN_SGR	0x3B9	/* Storage Guarded Register */
 #define SPRN_DCWR	0x3BA	/* Data Cache Write-thru Register */
 #define SPRN_SLER	0x3BB	/* Little-endian real mode */
@@ -178,6 +179,9 @@ do {						\
 #define SPRN_CSRR0	SPRN_SRR2 /* Critical Save and Restore Register 0 */
 #define SPRN_CSRR1	SPRN_SRR3 /* Critical Save and Restore Register 1 */
 #endif
+
+/* Bit definitions for CCR1. */
+#define	CCR1_TCS	0x00000080 /* Timer Clock Select */
 
 /* Bit definitions for the MCSR. */
 #ifdef CONFIG_440A

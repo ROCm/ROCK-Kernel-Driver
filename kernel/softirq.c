@@ -137,11 +137,17 @@ EXPORT_SYMBOL(do_softirq);
 
 void local_bh_enable(void)
 {
-	__local_bh_enable();
 	WARN_ON(irqs_disabled());
-	if (unlikely(!in_interrupt() &&
-		     local_softirq_pending()))
-		invoke_softirq();
+	/*
+	 * Keep preemption disabled until we are done with
+	 * softirq processing:
+ 	 */
+	preempt_count() -= SOFTIRQ_OFFSET - 1;
+
+	if (unlikely(!in_interrupt() && local_softirq_pending()))
+		do_softirq();
+
+	dec_preempt_count();
 	preempt_check_resched();
 }
 EXPORT_SYMBOL(local_bh_enable);
@@ -176,8 +182,6 @@ void fastcall raise_softirq(unsigned int nr)
 	raise_softirq_irqoff(nr);
 	local_irq_restore(flags);
 }
-
-EXPORT_SYMBOL(raise_softirq);
 
 void open_softirq(int nr, void (*action)(struct softirq_action*), void *data)
 {

@@ -19,6 +19,11 @@
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <linux/pagemap.h>
+#include <linux/buffer_head.h>
+
+#include "inode.h"
+#include "debug.h"
 #include "ntfs.h"
 
 /**
@@ -140,7 +145,7 @@ struct file_operations ntfs_file_ops = {
 
 struct inode_operations ntfs_file_inode_ops = {
 #ifdef NTFS_RW
-	.truncate	= ntfs_truncate,
+	.truncate	= ntfs_truncate_vfs,
 	.setattr	= ntfs_setattr,
 #endif /* NTFS_RW */
 };

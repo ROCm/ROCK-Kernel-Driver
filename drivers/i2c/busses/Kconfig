@@ -40,21 +40,36 @@ config I2C_ALI15X3
 	  will be called i2c-ali15x3.
 
 config I2C_AMD756
-	tristate "AMD 756/766"
-	depends on I2C && EXPERIMENTAL
+	tristate "AMD 756/766/768/8111 and nVidia nForce"
+	depends on I2C && PCI && EXPERIMENTAL
 	help
 	  If you say yes to this option, support will be included for the AMD
-	  756/766/768 mainboard I2C interfaces.
+	  756/766/768 mainboard I2C interfaces.  The driver also includes
+	  support for the first (SMBus 1.0) I2C interface of the AMD 8111 and
+	  the nVidia nForce I2C interface.
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-amd756.
 
+config I2C_AMD756_S4882
+	tristate "SMBus multiplexing on the Tyan S4882"
+	depends on I2C_AMD756 && EXPERIMENTAL
+	help
+	  Enabling this option will add specific SMBus support for the Tyan
+	  S4882 motherboard.  On this 4-CPU board, the SMBus is multiplexed
+	  over 8 different channels, where the various memory module EEPROMs
+	  and temperature sensors live.  Saying yes here will give you access
+	  to these in addition to the trunk.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-amd756-s4882.
+
 config I2C_AMD8111
 	tristate "AMD 8111"
-	depends on I2C && EXPERIMENTAL
+	depends on I2C && PCI && EXPERIMENTAL
 	help
-	  If you say yes to this option, support will be included for the AMD
-	  8111 mainboard I2C interfaces.
+	  If you say yes to this option, support will be included for the
+	  second (SMBus 2.0) AMD 8111 mainboard I2C interface.
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-amd8111.
@@ -203,6 +218,7 @@ config I2C_NFORCE2
 	help
 	  If you say yes to this option, support will be included for the Nvidia
 	  Nforce2 family of mainboard I2C interfaces.
+	  This driver also supports the nForce3 Pro 150 MCP.
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-nforce2.
@@ -289,6 +305,13 @@ config I2C_RPXLITE
 	depends on (RPXLITE || RPXCLASSIC) && I2C
 	select I2C_ALGO8XX
 
+config I2C_S3C2410
+	tristate "S3C2410 I2C Driver"
+	depends on I2C && ARCH_S3C2410
+	help
+	  Say Y here to include support for I2C controller in the
+	  Samsung S3C2410 based System-on-Chip devices.
+
 config I2C_SAVAGE4
 	tristate "S3 Savage 4"
 	depends on I2C && PCI && EXPERIMENTAL
@@ -330,7 +353,7 @@ config SCx200_I2C_SDA
 
 config SCx200_ACB
 	tristate "NatSemi SCx200 ACCESS.bus"
-	depends on I2C
+	depends on I2C && PCI
 	help
 	  Enable the use of the ACCESS.bus controllers of a SCx200 processor.
 
@@ -375,6 +398,19 @@ config I2C_SIS96X
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-sis96x.
+
+config I2C_STUB
+	tristate "I2C/SMBus Test Stub"
+	depends on I2C && EXPERIMENTAL && 'm'
+	default 'n'
+	help
+	  This module may be useful to developers of SMBus client drivers,
+	  especially for certain kinds of sensor chips.
+
+	  If you do build this module, be sure to read the notes and warnings
+	  in Documentation/i2c/i2c-stub.
+
+	  If you don't know what to do here, definitely say N.
 
 config I2C_VIA
 	tristate "VIA 82C586B"

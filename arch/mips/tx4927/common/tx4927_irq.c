@@ -37,7 +37,7 @@
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/irq.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/bootinfo.h>
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -48,8 +48,6 @@
 /*
  * DEBUG
  */
-#define TX4927_IRQ_CHECK_CP0
-#define TX4927_IRQ_CHECK_PIC
 
 #undef TX4927_IRQ_DEBUG
 
@@ -239,16 +237,6 @@ static unsigned int tx4927_irq_cp0_startup(unsigned int irq)
 {
 	TX4927_IRQ_DPRINTK(TX4927_IRQ_CP0_STARTUP, "irq=%d \n", irq);
 
-#ifdef TX4927_IRQ_CHECK_CP0
-	{
-		if (irq < TX4927_IRQ_CP0_BEG || irq > TX4927_IRQ_CP0_END) {
-			TX4927_IRQ_DPRINTK(TX4927_IRQ_EROR,
-					   "bad irq=%d \n", irq);
-			panic("\n");
-		}
-	}
-#endif
-
 	tx4927_irq_cp0_enable(irq);
 
 	return (0);
@@ -257,16 +245,6 @@ static unsigned int tx4927_irq_cp0_startup(unsigned int irq)
 static void tx4927_irq_cp0_shutdown(unsigned int irq)
 {
 	TX4927_IRQ_DPRINTK(TX4927_IRQ_CP0_SHUTDOWN, "irq=%d \n", irq);
-
-#ifdef TX4927_IRQ_CHECK_CP0
-	{
-		if (irq < TX4927_IRQ_CP0_BEG || irq > TX4927_IRQ_CP0_END) {
-			TX4927_IRQ_DPRINTK(TX4927_IRQ_EROR,
-					   "bad irq=%d \n", irq);
-			panic("\n");
-		}
-	}
-#endif
 
 	tx4927_irq_cp0_disable(irq);
 
@@ -278,16 +256,6 @@ static void tx4927_irq_cp0_enable(unsigned int irq)
 	unsigned long flags;
 
 	TX4927_IRQ_DPRINTK(TX4927_IRQ_CP0_ENABLE, "irq=%d \n", irq);
-
-#ifdef TX4927_IRQ_CHECK_CP0
-	{
-		if (irq < TX4927_IRQ_CP0_BEG || irq > TX4927_IRQ_CP0_END) {
-			TX4927_IRQ_DPRINTK(TX4927_IRQ_EROR,
-					   "bad irq=%d \n", irq);
-			panic("\n");
-		}
-	}
-#endif
 
 	spin_lock_irqsave(&tx4927_cp0_lock, flags);
 
@@ -304,16 +272,6 @@ static void tx4927_irq_cp0_disable(unsigned int irq)
 
 	TX4927_IRQ_DPRINTK(TX4927_IRQ_CP0_DISABLE, "irq=%d \n", irq);
 
-#ifdef TX4927_IRQ_CHECK_CP0
-	{
-		if (irq < TX4927_IRQ_CP0_BEG || irq > TX4927_IRQ_CP0_END) {
-			TX4927_IRQ_DPRINTK(TX4927_IRQ_EROR,
-					   "bad irq=%d \n", irq);
-			panic("\n");
-		}
-	}
-#endif
-
 	spin_lock_irqsave(&tx4927_cp0_lock, flags);
 
 	tx4927_irq_cp0_modify(CCP0_STATUS, tx4927_irq_cp0_mask(irq), 0);
@@ -327,16 +285,6 @@ static void tx4927_irq_cp0_mask_and_ack(unsigned int irq)
 {
 	TX4927_IRQ_DPRINTK(TX4927_IRQ_CP0_MASK, "irq=%d \n", irq);
 
-#ifdef TX4927_IRQ_CHECK_CP0
-	{
-		if (irq < TX4927_IRQ_CP0_BEG || irq > TX4927_IRQ_CP0_END) {
-			TX4927_IRQ_DPRINTK(TX4927_IRQ_EROR,
-					   "bad irq=%d \n", irq);
-			panic("\n");
-		}
-	}
-#endif
-
 	tx4927_irq_cp0_disable(irq);
 
 	return;
@@ -345,16 +293,6 @@ static void tx4927_irq_cp0_mask_and_ack(unsigned int irq)
 static void tx4927_irq_cp0_end(unsigned int irq)
 {
 	TX4927_IRQ_DPRINTK(TX4927_IRQ_CP0_ENDIRQ, "irq=%d \n", irq);
-
-#ifdef TX4927_IRQ_CHECK_CP0
-	{
-		if (irq < TX4927_IRQ_CP0_BEG || irq > TX4927_IRQ_CP0_END) {
-			TX4927_IRQ_DPRINTK(TX4927_IRQ_EROR,
-					   "bad irq=%d \n", irq);
-			panic("\n");
-		}
-	}
-#endif
 
 	if (!(irq_desc[irq].status & (IRQ_DISABLED | IRQ_INPROGRESS))) {
 		tx4927_irq_cp0_enable(irq);
@@ -516,16 +454,6 @@ static unsigned int tx4927_irq_pic_startup(unsigned int irq)
 {
 	TX4927_IRQ_DPRINTK(TX4927_IRQ_PIC_STARTUP, "irq=%d\n", irq);
 
-#ifdef TX4927_IRQ_CHECK_PIC
-	{
-		if (irq < TX4927_IRQ_PIC_BEG || irq > TX4927_IRQ_PIC_END) {
-			TX4927_IRQ_DPRINTK(TX4927_IRQ_EROR,
-					   "bad irq=%d \n", irq);
-			panic("\n");
-		}
-	}
-#endif
-
 	tx4927_irq_pic_enable(irq);
 
 	return (0);
@@ -534,16 +462,6 @@ static unsigned int tx4927_irq_pic_startup(unsigned int irq)
 static void tx4927_irq_pic_shutdown(unsigned int irq)
 {
 	TX4927_IRQ_DPRINTK(TX4927_IRQ_PIC_SHUTDOWN, "irq=%d\n", irq);
-
-#ifdef TX4927_IRQ_CHECK_PIC
-	{
-		if (irq < TX4927_IRQ_PIC_BEG || irq > TX4927_IRQ_PIC_END) {
-			TX4927_IRQ_DPRINTK(TX4927_IRQ_EROR,
-					   "bad irq=%d \n", irq);
-			panic("\n");
-		}
-	}
-#endif
 
 	tx4927_irq_pic_disable(irq);
 
@@ -555,16 +473,6 @@ static void tx4927_irq_pic_enable(unsigned int irq)
 	unsigned long flags;
 
 	TX4927_IRQ_DPRINTK(TX4927_IRQ_PIC_ENABLE, "irq=%d\n", irq);
-
-#ifdef TX4927_IRQ_CHECK_PIC
-	{
-		if (irq < TX4927_IRQ_PIC_BEG || irq > TX4927_IRQ_PIC_END) {
-			TX4927_IRQ_DPRINTK(TX4927_IRQ_EROR,
-					   "bad irq=%d \n", irq);
-			panic("\n");
-		}
-	}
-#endif
 
 	spin_lock_irqsave(&tx4927_pic_lock, flags);
 
@@ -582,16 +490,6 @@ static void tx4927_irq_pic_disable(unsigned int irq)
 
 	TX4927_IRQ_DPRINTK(TX4927_IRQ_PIC_DISABLE, "irq=%d\n", irq);
 
-#ifdef TX4927_IRQ_CHECK_PIC
-	{
-		if (irq < TX4927_IRQ_PIC_BEG || irq > TX4927_IRQ_PIC_END) {
-			TX4927_IRQ_DPRINTK(TX4927_IRQ_EROR,
-					   "bad irq=%d \n", irq);
-			panic("\n");
-		}
-	}
-#endif
-
 	spin_lock_irqsave(&tx4927_pic_lock, flags);
 
 	tx4927_irq_pic_modify(tx4927_irq_pic_addr(irq),
@@ -606,16 +504,6 @@ static void tx4927_irq_pic_mask_and_ack(unsigned int irq)
 {
 	TX4927_IRQ_DPRINTK(TX4927_IRQ_PIC_MASK, "irq=%d\n", irq);
 
-#ifdef TX4927_IRQ_CHECK_PIC
-	{
-		if (irq < TX4927_IRQ_PIC_BEG || irq > TX4927_IRQ_PIC_END) {
-			TX4927_IRQ_DPRINTK(TX4927_IRQ_EROR,
-					   "bad irq=%d \n", irq);
-			panic("\n");
-		}
-	}
-#endif
-
 	tx4927_irq_pic_disable(irq);
 
 	return;
@@ -624,16 +512,6 @@ static void tx4927_irq_pic_mask_and_ack(unsigned int irq)
 static void tx4927_irq_pic_end(unsigned int irq)
 {
 	TX4927_IRQ_DPRINTK(TX4927_IRQ_PIC_ENDIRQ, "irq=%d\n", irq);
-
-#ifdef TX4927_IRQ_CHECK_PIC
-	{
-		if (irq < TX4927_IRQ_PIC_BEG || irq > TX4927_IRQ_PIC_END) {
-			TX4927_IRQ_DPRINTK(TX4927_IRQ_EROR,
-					   "bad irq=%d \n", irq);
-			panic("\n");
-		}
-	}
-#endif
 
 	if (!(irq_desc[irq].status & (IRQ_DISABLED | IRQ_INPROGRESS))) {
 		tx4927_irq_pic_enable(irq);

@@ -95,17 +95,8 @@ struct mptscsih_driver_setup
 {
         u8      dv;
         u8      max_width;
-        u8      min_sync_fac;
+        u8      min_sync_factor;
         u8      saf_te;
 };
-
-
-#define MPTSCSIH_DRIVER_SETUP                   \
-{                                               \
-        MPTSCSIH_DOMAIN_VALIDATION,             \
-        MPTSCSIH_MAX_WIDTH,                     \
-        MPTSCSIH_MIN_SYNC,                      \
-        MPTSCSIH_SAF_TE,                        \
-}
 
 #endif

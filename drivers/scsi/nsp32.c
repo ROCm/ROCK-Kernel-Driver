@@ -43,10 +43,11 @@
 #include <asm/system.h>
 #include <asm/io.h>
 
-#include "scsi.h"
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_ioctl.h>
-#include <scsi/scsi.h>
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
 # include <linux/blk.h>
@@ -209,37 +210,38 @@ static int         nsp32_detect      (struct pci_dev *pdev);
 #else
 static int         nsp32_detect      (Scsi_Host_Template *);
 #endif
-static int         nsp32_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
+static int         nsp32_queuecommand(struct scsi_cmnd *,
+		void (*done)(struct scsi_cmnd *));
 static const char *nsp32_info        (struct Scsi_Host *);
 static int         nsp32_release     (struct Scsi_Host *);
 
 /* SCSI error handler */
-static int         nsp32_eh_abort     (Scsi_Cmnd *);
-static int         nsp32_eh_bus_reset (Scsi_Cmnd *);
-static int         nsp32_eh_host_reset(Scsi_Cmnd *);
+static int         nsp32_eh_abort     (struct scsi_cmnd *);
+static int         nsp32_eh_bus_reset (struct scsi_cmnd *);
+static int         nsp32_eh_host_reset(struct scsi_cmnd *);
 
 /* generate SCSI message */
-static void nsp32_build_identify(Scsi_Cmnd *);
-static void nsp32_build_nop     (Scsi_Cmnd *);
-static void nsp32_build_reject  (Scsi_Cmnd *);
-static void nsp32_build_sdtr    (Scsi_Cmnd *, unsigned char, unsigned char);
+static void nsp32_build_identify(struct scsi_cmnd *);
+static void nsp32_build_nop     (struct scsi_cmnd *);
+static void nsp32_build_reject  (struct scsi_cmnd *);
+static void nsp32_build_sdtr    (struct scsi_cmnd *, unsigned char, unsigned char);
 
 /* SCSI message handler */
-static int  nsp32_busfree_occur(Scsi_Cmnd *, unsigned short);
-static void nsp32_msgout_occur (Scsi_Cmnd *);
-static void nsp32_msgin_occur  (Scsi_Cmnd *, unsigned long, unsigned short);
+static int  nsp32_busfree_occur(struct scsi_cmnd *, unsigned short);
+static void nsp32_msgout_occur (struct scsi_cmnd *);
+static void nsp32_msgin_occur  (struct scsi_cmnd *, unsigned long, unsigned short);
 
-static int  nsp32_setup_sg_table    (Scsi_Cmnd *);
-static int  nsp32_selection_autopara(Scsi_Cmnd *);
-static int  nsp32_selection_autoscsi(Scsi_Cmnd *);
-static void nsp32_scsi_done         (Scsi_Cmnd *);
-static int  nsp32_arbitration       (Scsi_Cmnd *, unsigned int);
-static int  nsp32_reselection       (Scsi_Cmnd *, unsigned char);
-static void nsp32_adjust_busfree    (Scsi_Cmnd *, unsigned int);
-static void nsp32_restart_autoscsi  (Scsi_Cmnd *, unsigned short);
+static int  nsp32_setup_sg_table    (struct scsi_cmnd *);
+static int  nsp32_selection_autopara(struct scsi_cmnd *);
+static int  nsp32_selection_autoscsi(struct scsi_cmnd *);
+static void nsp32_scsi_done         (struct scsi_cmnd *);
+static int  nsp32_arbitration       (struct scsi_cmnd *, unsigned int);
+static int  nsp32_reselection       (struct scsi_cmnd *, unsigned char);
+static void nsp32_adjust_busfree    (struct scsi_cmnd *, unsigned int);
+static void nsp32_restart_autoscsi  (struct scsi_cmnd *, unsigned short);
 
 /* SCSI SDTR */
-static void nsp32_analyze_sdtr       (Scsi_Cmnd *);
+static void nsp32_analyze_sdtr       (struct scsi_cmnd *);
 static int  nsp32_search_period_entry(nsp32_hw_data *, nsp32_target *, unsigned char);
 static void nsp32_set_async          (nsp32_hw_data *, nsp32_target *);
 static void nsp32_set_max_sync       (nsp32_hw_data *, nsp32_target *, unsigned char *, unsigned char *);
@@ -279,7 +281,7 @@ static void nsp32_dmessage(const char *, int, int,    char *, ...);
 /*
  * max_sectors is currently limited up to 128.
  */
-static Scsi_Host_Template nsp32_template = {
+static struct scsi_host_template nsp32_template = {
 	.proc_name			= "nsp32",
 	.name				= "Workbit NinjaSCSI-32Bi/UDE",
 	.proc_info			= nsp32_proc_info,
@@ -388,7 +390,7 @@ static void nsp32_dmessage(const char *func, int line, int mask, char *fmt, ...)
 /*
  * IDENTIFY Message
  */
-static void nsp32_build_identify(Scsi_Cmnd *SCpnt)
+static void nsp32_build_identify(struct scsi_cmnd *SCpnt)
 {
 	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	int pos             = data->msgout_len;
@@ -407,7 +409,7 @@ static void nsp32_build_identify(Scsi_Cmnd *SCpnt)
 /*
  * SDTR Message Routine
  */
-static void nsp32_build_sdtr(Scsi_Cmnd    *SCpnt,
+static void nsp32_build_sdtr(struct scsi_cmnd    *SCpnt,
 			     unsigned char period,
 			     unsigned char offset)
 {
@@ -426,7 +428,7 @@ static void nsp32_build_sdtr(Scsi_Cmnd    *SCpnt,
 /*
  * No Operation Message
  */
-static void nsp32_build_nop(Scsi_Cmnd *SCpnt)
+static void nsp32_build_nop(struct scsi_cmnd *SCpnt)
 {
 	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	int            pos  = data->msgout_len;
@@ -444,7 +446,7 @@ static void nsp32_build_nop(Scsi_Cmnd *SCpnt)
 /*
  * Reject Message
  */
-static void nsp32_build_reject(Scsi_Cmnd *SCpnt)
+static void nsp32_build_reject(struct scsi_cmnd *SCpnt)
 {
 	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	int            pos  = data->msgout_len;
@@ -457,7 +459,7 @@ static void nsp32_build_reject(Scsi_Cmnd *SCpnt)
  * timer
  */
 #if 0
-static void nsp32_start_timer(Scsi_Cmnd *SCpnt, int time)
+static void nsp32_start_timer(struct scsi_cmnd *SCpnt, int time)
 {
 	unsigned int base = SCpnt->host->io_port;
 
@@ -475,7 +477,7 @@ static void nsp32_start_timer(Scsi_Cmnd *SCpnt, int time)
 /*
  * set SCSI command and other parameter to asic, and start selection phase
  */
-static int nsp32_selection_autopara(Scsi_Cmnd *SCpnt)
+static int nsp32_selection_autopara(struct scsi_cmnd *SCpnt)
 {
 	nsp32_hw_data  *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	unsigned int	base    = SCpnt->device->host->io_port;
@@ -606,7 +608,7 @@ static int nsp32_selection_autopara(Scsi_Cmnd *SCpnt)
 /*
  * Selection with AUTO SCSI (without AUTO PARAMETER)
  */
-static int nsp32_selection_autoscsi(Scsi_Cmnd *SCpnt)
+static int nsp32_selection_autoscsi(struct scsi_cmnd *SCpnt)
 {
 	nsp32_hw_data  *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	unsigned int	base    = SCpnt->device->host->io_port;
@@ -781,7 +783,7 @@ static int nsp32_selection_autoscsi(Scsi_Cmnd *SCpnt)
  *	 arbitration delay time is defined minimal 2.4us in SCSI
  *	 specification, thus udelay works as coarse grained wait timer.
  */
-static int nsp32_arbitration(Scsi_Cmnd *SCpnt, unsigned int base)
+static int nsp32_arbitration(struct scsi_cmnd *SCpnt, unsigned int base)
 {
 	unsigned char arbit;
 	int	      status = TRUE;
@@ -830,7 +832,7 @@ static int nsp32_arbitration(Scsi_Cmnd *SCpnt, unsigned int base)
  *	 reselection target id&lun must be already set.
  *	 SCSI-2 says IDENTIFY implies RESTORE_POINTER operation.
  */
-static int nsp32_reselection(Scsi_Cmnd *SCpnt, unsigned char newlun)
+static int nsp32_reselection(struct scsi_cmnd *SCpnt, unsigned char newlun)
 {
 	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	unsigned int   host_id = SCpnt->device->host->this_id;
@@ -884,7 +886,7 @@ static int nsp32_reselection(Scsi_Cmnd *SCpnt, unsigned char newlun)
  *
  * Note: NinjaSCSI-32Bi/UDE bus master can not transfer over 64KB at a time.
  */
-static int nsp32_setup_sg_table(Scsi_Cmnd *SCpnt)
+static int nsp32_setup_sg_table(struct scsi_cmnd *SCpnt)
 {
 	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	struct scatterlist   *sgl;
@@ -904,7 +906,7 @@ static int nsp32_setup_sg_table(Scsi_Cmnd *SCpnt)
 	if (SCpnt->use_sg) {
 		sgl = (struct scatterlist *)SCpnt->request_buffer;
 		num = pci_map_sg(data->Pci, sgl, SCpnt->use_sg,
-				 scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
+				 SCpnt->sc_data_direction);
 		for (i = 0; i < num; i++) {
 			/*
 			 * Build nsp32_sglist, substitute sg dma addresses.
@@ -932,7 +934,7 @@ static int nsp32_setup_sg_table(Scsi_Cmnd *SCpnt)
 	} else {
 		SCpnt->SCp.have_data_in	= pci_map_single(data->Pci,
 			SCpnt->request_buffer, SCpnt->request_bufflen,
-			scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
+			SCpnt->sc_data_direction);
 
 		sgt[0].addr = cpu_to_le32(SCpnt->SCp.have_data_in);
 		sgt[0].len  = cpu_to_le32(SCpnt->request_bufflen | SGTEND); /* set end mark */
@@ -950,7 +952,7 @@ static int nsp32_setup_sg_table(Scsi_Cmnd *SCpnt)
 	return TRUE;
 }
 
-static int nsp32_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
+static int nsp32_queuecommand(struct scsi_cmnd *SCpnt, void (*done)(struct scsi_cmnd *))
 {
 	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	nsp32_target *target;
@@ -968,8 +970,7 @@ static int nsp32_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 		data->CurrentSC = NULL;
 		SCpnt->result   = DID_NO_CONNECT << 16;
 		done(SCpnt);
-
-		return SCSI_MLQUEUE_HOST_BUSY;
+		return 0;
 	}
 
 	/* check target ID is not same as this initiator ID */
@@ -977,7 +978,7 @@ static int nsp32_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 		nsp32_dbg(NSP32_DEBUG_QUEUECOMMAND, "terget==host???");
 		SCpnt->result = DID_BAD_TARGET << 16;
 		done(SCpnt);
-		return SCSI_MLQUEUE_DEVICE_BUSY;
+		return 0;
 	}
 
 	/* check target LUN is allowable value */
@@ -985,7 +986,7 @@ static int nsp32_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 		nsp32_dbg(NSP32_DEBUG_QUEUECOMMAND, "no more lun");
 		SCpnt->result = DID_BAD_TARGET << 16;
 		done(SCpnt);
-		return SCSI_MLQUEUE_DEVICE_BUSY;
+		return 0;
 	}
 
 	show_command(SCpnt);
@@ -1017,7 +1018,7 @@ static int nsp32_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 		nsp32_msg(KERN_ERR, "SGT fail");
 		SCpnt->result = DID_ERROR << 16;
 		nsp32_scsi_done(SCpnt);
-		return SCSI_MLQUEUE_HOST_BUSY;
+		return 0;
 	}
 
 	/* Build IDENTIFY */
@@ -1087,7 +1088,6 @@ static int nsp32_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	if (ret != TRUE) {
 		nsp32_dbg(NSP32_DEBUG_QUEUECOMMAND, "selection fail");
 		nsp32_scsi_done(SCpnt);
-		return SCSI_MLQUEUE_DEVICE_BUSY;
 	}
 
 	return 0;
@@ -1205,7 +1205,7 @@ static irqreturn_t do_nsp32_isr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	nsp32_hw_data *data = dev_id;
 	unsigned int base = data->BaseAddress;
-	Scsi_Cmnd *SCpnt = data->CurrentSC;
+	struct scsi_cmnd *SCpnt = data->CurrentSC;
 	unsigned short auto_stat, irq_stat, trans_stat;
 	unsigned char busmon, busphase;
 	unsigned long flags;
@@ -1622,7 +1622,7 @@ static int nsp32_proc_info(
  * Reset parameters and call scsi_done for data->cur_lunt.
  * Be careful setting SCpnt->result = DID_* before calling this function.
  */
-static void nsp32_scsi_done(Scsi_Cmnd *SCpnt)
+static void nsp32_scsi_done(struct scsi_cmnd *SCpnt)
 {
 	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	unsigned int   base = SCpnt->device->host->io_port;
@@ -1637,13 +1637,12 @@ static void nsp32_scsi_done(Scsi_Cmnd *SCpnt)
 	if (SCpnt->use_sg) {
 		pci_unmap_sg(data->Pci,
 			     (struct scatterlist *)SCpnt->buffer,
-			     SCpnt->use_sg,
-			     scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
+			     SCpnt->use_sg, SCpnt->sc_data_direction);
 	} else {
 		pci_unmap_single(data->Pci,
 				 (u32)SCpnt->SCp.have_data_in,
 				 SCpnt->request_bufflen,
-				 scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
+				 SCpnt->sc_data_direction);
 	}
 
  skip:
@@ -1678,7 +1677,7 @@ static void nsp32_scsi_done(Scsi_Cmnd *SCpnt)
  *	MsgIn 04: Diconnect.
  * In other case, unexpected BUSFREE is detected.
  */
-static int nsp32_busfree_occur(Scsi_Cmnd *SCpnt, unsigned short execph)
+static int nsp32_busfree_occur(struct scsi_cmnd *SCpnt, unsigned short execph)
 {
 	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	unsigned int base   = SCpnt->device->host->io_port;
@@ -1836,7 +1835,7 @@ static int nsp32_busfree_occur(Scsi_Cmnd *SCpnt, unsigned short execph)
  * Note: This driver adjust the SG table using SCSI ACK
  *       counter instead of BMCNT counter!
  */
-static void nsp32_adjust_busfree(Scsi_Cmnd *SCpnt, unsigned int s_sacklen)
+static void nsp32_adjust_busfree(struct scsi_cmnd *SCpnt, unsigned int s_sacklen)
 {
 	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	int                   old_entry = data->cur_entry;
@@ -1909,7 +1908,7 @@ static void nsp32_adjust_busfree(Scsi_Cmnd *SCpnt, unsigned int s_sacklen)
  * message out phase. It, however, has more than 3 messages,
  * HBA creates the interrupt and we have to process by hand.
  */
-static void nsp32_msgout_occur(Scsi_Cmnd *SCpnt)
+static void nsp32_msgout_occur(struct scsi_cmnd *SCpnt)
 {
 	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	unsigned int base   = SCpnt->device->host->io_port;
@@ -1985,7 +1984,7 @@ static void nsp32_msgout_occur(Scsi_Cmnd *SCpnt)
  * Note: Restarting AutoSCSI needs set:
  *		SYNC_REG, ACK_WIDTH, SGT_ADR, TRANSFER_CONTROL
  */
-static void nsp32_restart_autoscsi(Scsi_Cmnd *SCpnt, unsigned short command)
+static void nsp32_restart_autoscsi(struct scsi_cmnd *SCpnt, unsigned short command)
 {
 	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	unsigned int   base = data->BaseAddress;
@@ -2051,7 +2050,7 @@ static void nsp32_restart_autoscsi(Scsi_Cmnd *SCpnt, unsigned short command)
 /*
  * cannot run automatically message in occur
  */
-static void nsp32_msgin_occur(Scsi_Cmnd     *SCpnt,
+static void nsp32_msgin_occur(struct scsi_cmnd     *SCpnt,
 			      unsigned long  irq_status,
 			      unsigned short execph)
 {
@@ -2348,7 +2347,7 @@ static void nsp32_msgin_occur(Scsi_Cmnd     *SCpnt,
 /*
  * 
  */
-static void nsp32_analyze_sdtr(Scsi_Cmnd *SCpnt)
+static void nsp32_analyze_sdtr(struct scsi_cmnd *SCpnt)
 {
 	nsp32_hw_data   *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	nsp32_target     *target     = data->cur_target;
@@ -2720,7 +2719,7 @@ static int nsp32_detect(Scsi_Host_Template *sht)
 	host->io_port   = data->BaseAddress;
 	host->unique_id = data->BaseAddress;
 	host->n_io_port	= data->NumAddress;
-	host->base      = data->MmioAddress;
+	host->base      = (unsigned long)data->MmioAddress;
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,5,63))
 	scsi_set_device(host, &PCIDEV->dev);
 #else
@@ -2938,8 +2937,8 @@ static int nsp32_release(struct Scsi_Host *host)
 		release_region(host->io_port, host->n_io_port);
 	}
 
-	if (data->MmioAddress != 0) {
-		iounmap((void *)(data->MmioAddress));
+	if (data->MmioAddress) {
+		iounmap(data->MmioAddress);
 	}
 
 	return 0;
@@ -2956,7 +2955,7 @@ static const char *nsp32_info(struct Scsi_Host *shpnt)
 /****************************************************************************
  * error handler
  */
-static int nsp32_eh_abort(Scsi_Cmnd *SCpnt)
+static int nsp32_eh_abort(struct scsi_cmnd *SCpnt)
 {
 	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	unsigned int   base = SCpnt->device->host->io_port;
@@ -2984,7 +2983,7 @@ static int nsp32_eh_abort(Scsi_Cmnd *SCpnt)
 	return SUCCESS;
 }
 
-static int nsp32_eh_bus_reset(Scsi_Cmnd *SCpnt)
+static int nsp32_eh_bus_reset(struct scsi_cmnd *SCpnt)
 {
 	nsp32_hw_data *data = (nsp32_hw_data *)SCpnt->device->host->hostdata;
 	unsigned int   base = SCpnt->device->host->io_port;
@@ -3041,7 +3040,7 @@ static void nsp32_do_bus_reset(nsp32_hw_data *data)
 	data->CurrentSC = NULL;
 }
 
-static int nsp32_eh_host_reset(Scsi_Cmnd *SCpnt)
+static int nsp32_eh_host_reset(struct scsi_cmnd *SCpnt)
 {
 	struct Scsi_Host *host = SCpnt->device->host;
 	unsigned int      base = SCpnt->device->host->io_port;
@@ -3439,11 +3438,10 @@ static int nsp32_prom_read_bit(nsp32_hw_data *data)
 static int nsp32_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct Scsi_Host *host = pci_get_drvdata(pdev);
-	nsp32_hw_data    *data = (nsp32_hw_data *)host->hostdata;
 
 	nsp32_msg(KERN_INFO, "pci-suspend: pdev=0x%p, state=%ld, slot=%s, host=0x%p", pdev, state, pci_name(pdev), host);
 
-	pci_save_state     (pdev, data->PciState);
+	pci_save_state     (pdev);
 	pci_disable_device (pdev);
 	pci_set_power_state(pdev, state);
 
@@ -3461,7 +3459,7 @@ static int nsp32_resume(struct pci_dev *pdev)
 
 	pci_set_power_state(pdev, 0);
 	pci_enable_wake    (pdev, 0, 0);
-	pci_restore_state  (pdev, data->PciState);
+	pci_restore_state  (pdev);
 
 	reg = nsp32_read2(data->BaseAddress, INDEX_REG);
 
@@ -3512,8 +3510,7 @@ static int __devinit nsp32_probe(struct pci_dev *pdev, const struct pci_device_i
 	data->IrqNumber   = pdev->irq;
 	data->BaseAddress = pci_resource_start(pdev, 0);
 	data->NumAddress  = pci_resource_len  (pdev, 0);
-	data->MmioAddress = 
-		(unsigned long)ioremap_nocache(pci_resource_start(pdev, 1),
+	data->MmioAddress = ioremap_nocache(pci_resource_start(pdev, 1),
 					       pci_resource_len  (pdev, 1));
 	data->MmioLength  = pci_resource_len  (pdev, 1);
 
@@ -3525,7 +3522,7 @@ static int __devinit nsp32_probe(struct pci_dev *pdev, const struct pci_device_i
 	ret = scsi_register_host(&nsp32_template);
 #endif
 
-	nsp32_msg(KERN_INFO, "irq: %i mmio: 0x%lx+0x%lx slot: %s model: %s",
+	nsp32_msg(KERN_INFO, "irq: %i mmio: %p+0x%lx slot: %s model: %s",
 		  pdev->irq,
 		  data->MmioAddress, data->MmioLength,
 		  pci_name(pdev),

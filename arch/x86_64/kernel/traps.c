@@ -43,8 +43,10 @@
 #include <asm/pgalloc.h>
 #include <asm/pda.h>
 #include <asm/proto.h>
+#include <asm/nmi.h>
 
 #include <linux/irq.h>
+
 
 extern struct gate_struct idt_table[256]; 
 
@@ -72,6 +74,17 @@ asmlinkage void spurious_interrupt_bug(void);
 asmlinkage void call_debug(void);
 
 struct notifier_block *die_chain;
+static spinlock_t die_notifier_lock = SPIN_LOCK_UNLOCKED;
+
+int register_die_notifier(struct notifier_block *nb)
+{
+	int err = 0;
+	unsigned long flags;
+	spin_lock_irqsave(&die_notifier_lock, flags);
+	err = notifier_chain_register(&die_chain, nb);
+	spin_unlock_irqrestore(&die_notifier_lock, flags);
+	return err;
+}
 
 static inline void conditional_sti(struct pt_regs *regs)
 {
@@ -111,9 +124,9 @@ unsigned long *in_exception_stack(int cpu, unsigned long stack)
 	int k;
 	for (k = 0; k < N_EXCEPTION_STACKS; k++) {
 		struct tss_struct *tss = &per_cpu(init_tss, cpu);
-		unsigned long end = tss->ist[k] + EXCEPTION_STKSZ; 
+		unsigned long end = tss->ist[k] + EXCEPTION_STKSZ;
 
-		if (stack >= tss->ist[k]  && stack <= end) 
+		if (stack >= tss->ist[k]  && stack <= end)
 			return (unsigned long *)end;
 	}
 	return NULL;
@@ -376,6 +389,22 @@ static inline void die_if_kernel(const char * str, struct pt_regs * regs, long e
 		die(str, regs, err);
 }
 
+void die_nmi(char *str, struct pt_regs *regs)
+{
+	oops_begin();
+	/*
+	 * We are in trouble anyway, lets at least try
+	 * to get a message out.
+	 */
+	printk(str, safe_smp_processor_id());
+	show_registers(regs);
+	if (panic_on_timeout || panic_on_oops)
+		panic("nmi watchdog");
+	printk("console shuts up ...\n");
+	oops_end();
+	do_exit(SIGSEGV);
+}
+
 static inline unsigned long get_cr2(void)
 {
 	unsigned long address;
@@ -437,7 +466,8 @@ static void do_trap(int trapnr, int signr, char *str,
 #define DO_ERROR(trapnr, signr, str, name) \
 asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 { \
-	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) == NOTIFY_BAD) \
+	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) \
+							== NOTIFY_STOP) \
 		return; \
 	do_trap(trapnr, signr, str, regs, error_code, NULL); \
 }
@@ -450,13 +480,13 @@ asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 	info.si_errno = 0; \
 	info.si_code = sicode; \
 	info.si_addr = (void __user *)siaddr; \
-	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) == NOTIFY_BAD) \
+	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) \
+							== NOTIFY_STOP) \
 		return; \
 	do_trap(trapnr, signr, str, regs, error_code, &info); \
 }
 
 DO_ERROR_INFO( 0, SIGFPE,  "divide error", divide_error, FPE_INTDIV, regs->rip)
-DO_ERROR( 3, SIGTRAP, "int3", int3);
 DO_ERROR( 4, SIGSEGV, "overflow", overflow)
 DO_ERROR( 5, SIGSEGV, "bounds", bounds)
 DO_ERROR_INFO( 6, SIGILL,  "invalid operand", invalid_op, ILL_ILLOPN, regs->rip)
@@ -471,7 +501,8 @@ DO_ERROR(18, SIGSEGV, "reserved", reserved)
 asmlinkage void *do_##name(struct pt_regs * regs, long error_code) \
 { \
 	struct pt_regs *pr = ((struct pt_regs *)(current->thread.rsp0))-1; \
-	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) == NOTIFY_BAD) \
+	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) \
+							== NOTIFY_STOP) \
 		return regs; \
 	if (regs->cs & 3) { \
 		memcpy(pr, regs, sizeof(struct pt_regs)); \
@@ -560,12 +591,17 @@ static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
 	printk("Do you have a strange power saving mode enabled?\n");
 }
 
-asmlinkage void default_do_nmi(struct pt_regs * regs)
+asmlinkage void default_do_nmi(struct pt_regs *regs)
 {
-	unsigned char reason = inb(0x61);
+	unsigned char reason = 0;
+
+	/* Only the BSP gets external NMIs from the system.  */
+	if (!smp_processor_id())
+		reason = get_nmi_reason();
 
 	if (!(reason & 0xc0)) {
-		if (notify_die(DIE_NMI_IPI, "nmi_ipi", regs, reason, 0, SIGINT) == NOTIFY_BAD)
+		if (notify_die(DIE_NMI_IPI, "nmi_ipi", regs, reason, 0, SIGINT)
+								== NOTIFY_STOP)
 			return;
 #ifdef CONFIG_X86_LOCAL_APIC
 		/*
@@ -580,8 +616,11 @@ asmlinkage void default_do_nmi(struct pt_regs * regs)
 		unknown_nmi_error(reason, regs);
 		return;
 	}
-	if (notify_die(DIE_NMI, "nmi", regs, reason, 0, SIGINT) == NOTIFY_BAD)
+	if (notify_die(DIE_NMI, "nmi", regs, reason, 0, SIGINT) == NOTIFY_STOP)
 		return; 
+
+	/* AK: following checks seem to be broken on modern chipsets. FIXME */
+
 	if (reason & 0x80)
 		mem_parity_error(reason, regs);
 	if (reason & 0x40)
@@ -595,6 +634,15 @@ asmlinkage void default_do_nmi(struct pt_regs * regs)
 	inb(0x71);		/* dummy */
 	outb(0x0f, 0x70);
 	inb(0x71);		/* dummy */
+}
+
+asmlinkage void do_int3(struct pt_regs * regs, long error_code)
+{
+	if (notify_die(DIE_INT3, "int3", regs, error_code, 3, SIGTRAP) == NOTIFY_STOP) {
+		return;
+	}
+	do_trap(3, SIGTRAP, "int3", regs, error_code, NULL);
+	return;
 }
 
 /* runs on IST stack. */
@@ -626,6 +674,10 @@ asmlinkage void *do_debug(struct pt_regs * regs, unsigned long error_code)
 
 	asm("movq %%db6,%0" : "=r" (condition));
 
+	if (notify_die(DIE_DEBUG, "debug", regs, condition, error_code,
+						SIGTRAP) == NOTIFY_STOP) {
+		return regs;
+	}
 	conditional_sti(regs);
 
 	/* Mask out spurious debug traps due to lazy DR7 setting */
@@ -676,7 +728,7 @@ clear_TF_reenable:
 clear_TF:
 	/* RED-PEN could cause spurious errors */
 	if (notify_die(DIE_DEBUG, "debug2", regs, condition, 1, SIGTRAP) 
-	    != NOTIFY_BAD)
+								!= NOTIFY_STOP)
 	regs->eflags &= ~TF_MASK;
 	return regs;	
 }
@@ -858,8 +910,8 @@ void __init trap_init(void)
 	set_intr_gate(0,&divide_error);
 	set_intr_gate_ist(1,&debug,DEBUG_STACK);
 	set_intr_gate_ist(2,&nmi,NMI_STACK);
-	set_system_gate(3,&int3);	/* int3-5 can be called from all */
-	set_system_gate(4,&overflow);
+	set_intr_gate(3,&int3);
+	set_system_gate(4,&overflow);	/* int4-5 can be called from all */
 	set_system_gate(5,&bounds);
 	set_intr_gate(6,&invalid_op);
 	set_intr_gate(7,&device_not_available);
@@ -873,7 +925,9 @@ void __init trap_init(void)
 	set_intr_gate(15,&spurious_interrupt_bug);
 	set_intr_gate(16,&coprocessor_error);
 	set_intr_gate(17,&alignment_check);
+#ifdef CONFIG_X86_MCE
 	set_intr_gate_ist(18,&machine_check, MCE_STACK); 
+#endif
 	set_intr_gate(19,&simd_coprocessor_error);
 
 #ifdef CONFIG_IA32_EMULATION
@@ -896,3 +950,11 @@ static int __init oops_dummy(char *s)
 	return -1; 
 } 
 __setup("oops=", oops_dummy); 
+
+static int __init kstack_setup(char *s)
+{
+	kstack_depth_to_print = simple_strtoul(s,NULL,0);
+	return 0;
+}
+__setup("kstack=", kstack_setup);
+

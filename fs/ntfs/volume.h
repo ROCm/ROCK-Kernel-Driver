@@ -24,6 +24,8 @@
 #ifndef _LINUX_NTFS_VOLUME_H
 #define _LINUX_NTFS_VOLUME_H
 
+#include <linux/rwsem.h>
+
 #include "types.h"
 #include "layout.h"
 
@@ -81,6 +83,8 @@ typedef struct {
 
 #ifdef NTFS_RW
 	/* Variables used by the cluster and mft allocators. */
+	s64 mft_data_pos;		/* Mft record number at which to
+					   allocate the next mft record. */
 	LCN mft_zone_start;		/* First cluster of the mft zone. */
 	LCN mft_zone_end;		/* First cluster beyond the mft zone. */
 	LCN mft_zone_pos;		/* Current position in the mft zone. */
@@ -95,9 +99,6 @@ typedef struct {
 	struct inode *mftbmp_ino;	/* Attribute inode for $MFT/$BITMAP. */
 	struct rw_semaphore mftbmp_lock; /* Lock for serializing accesses to the
 					    mft record bitmap ($MFT/$BITMAP). */
-	unsigned long nr_mft_records;	/* Number of mft records == number of
-					   bits in mft bitmap. */
-
 #ifdef NTFS_RW
 	struct inode *mftmirr_ino;	/* The VFS inode of $MFTMirr. */
 	int mftmirr_size;		/* Size of mft mirror in mft records. */

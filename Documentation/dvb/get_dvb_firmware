@@ -1,19 +1,19 @@
 #!/usr/bin/perl
 #     DVB firmware extractor
-#  
+#
 #     (c) 2004 Andrew de Quincey
-#  
+#
 #     This program is free software; you can redistribute it and/or modify
 #       it under the terms of the GNU General Public License as published by
 #       the Free Software Foundation; either version 2 of the License, or
 #       (at your option) any later version.
-#  
+#
 #     This program is distributed in the hope that it will be useful,
 #       but WITHOUT ANY WARRANTY; without even the implied warranty of
 #       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  
+#
 #     GNU General Public License for more details.
-#  
+#
 #     You should have received a copy of the GNU General Public License
 #       along with this program; if not, write to the Free Software
 #       Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -21,7 +21,7 @@
 use File::Temp qw/ tempdir /;
 use IO::Handle;
 
-@components = ( "alps_tdlb7", "sp887x", "tda10045", "tda10046", "av7110", "dec2000t", "dec2540t", "dec3000s", "vp7041", "dibusb" );
+@components = ( "sp8870", "sp887x", "tda10045", "tda10046", "av7110", "dec2000t", "dec2540t", "dec3000s", "vp7041", "dibusb" );
 
 # Check args
 syntax() if (scalar(@ARGV) != 1);
@@ -32,7 +32,7 @@ for($i=0; $i < scalar(@components); $i++) {
     if ($cid eq $components[$i]) {
 	$outfile = eval($cid);
 	die $@ if $@;
-	print STDERR "Firmware $outfile extracted successfully. Now copy it to /usr/lib/hotplug/firmware/.\n";
+	print STDERR "Firmware $outfile extracted successfully. Now copy it to either /lib/firmware or /usr/lib/hotplug/firmware/ (depending on your hotplug version).\n";
 	exit(0);
     }
 }
@@ -47,20 +47,20 @@ syntax();
 # ---------------------------------------------------------------
 # Firmware-specific extraction subroutines
 
-sub alps_tdlb7 {
+sub sp8870 {
     my $sourcefile = "tt_Premium_217g.zip";
     my $url = "http://www.technotrend.de/new/217g/$sourcefile";
     my $hash = "53970ec17a538945a6d8cb608a7b3899";
-    my $outfile = "dvb-fe-tdlb7.fw";
+    my $outfile = "dvb-fe-sp8870.fw";
     my $tmpdir = tempdir(DIR => "/tmp", CLEANUP => 1);
 
     checkstandard();
-    
+
     wgetfile($sourcefile, $url);
     unzip($sourcefile, $tmpdir);
     verify("$tmpdir/software/OEM/HE/App/boot/SC_MAIN.MC", $hash);
     copy("$tmpdir/software/OEM/HE/App/boot/SC_MAIN.MC", $outfile);
-    
+
     $outfile;
 }
 
@@ -71,16 +71,16 @@ sub sp887x {
     my $hash = "237938d53a7f834c05c42b894ca68ac3";
     my $outfile = "dvb-fe-sp887x.fw";
     my $tmpdir = tempdir(DIR => "/tmp", CLEANUP => 1);
-    
+
     checkstandard();
     checkunshield();
-    
+
     wgetfile($sourcefile, $url);
     unzip($sourcefile, $tmpdir);
     unshield("$tmpdir/$cabfile", $tmpdir);
     verify("$tmpdir/sc_main.mc", $hash);
     copy("$tmpdir/sc_main.mc", $outfile);
-    
+
     $outfile;
 }
 
@@ -91,14 +91,14 @@ sub tda10045 {
     my $outfile = "dvb-fe-tda10045.fw";
     my $tmpdir = tempdir(DIR => "/tmp", CLEANUP => 1);
 
-    checkstandard();    
-    
+    checkstandard();
+
     wgetfile($sourcefile, $url);
     unzip($sourcefile, $tmpdir);
     extract("$tmpdir/software/OEM/PCI/App/ttlcdacc.dll", 0x37ef9, 30555, "$tmpdir/fwtmp");
     verify("$tmpdir/fwtmp", $hash);
     copy("$tmpdir/fwtmp", $outfile);
-    
+
     $outfile;
 }
 
@@ -110,13 +110,13 @@ sub tda10046 {
     my $tmpdir = tempdir(DIR => "/tmp", CLEANUP => 1);
 
     checkstandard();
-    
+
     wgetfile($sourcefile, $url);
     unzip($sourcefile, $tmpdir);
     extract("$tmpdir/software/OEM/PCI/App/ttlcdacc.dll", 0x3f731, 24479, "$tmpdir/fwtmp");
     verify("$tmpdir/fwtmp", $hash);
     copy("$tmpdir/fwtmp", $outfile);
-    
+
     $outfile;
 }
 
@@ -127,11 +127,11 @@ sub av7110 {
     my $outfile = "dvb-ttpci-01.fw";
 
     checkstandard();
-    
+
     wgetfile($sourcefile, $url);
     verify($sourcefile, $hash);
     copy($sourcefile, $outfile);
-    
+
     $outfile;
 }
 
@@ -143,7 +143,7 @@ sub dec2000t {
     my $tmpdir = tempdir(DIR => "/tmp", CLEANUP => 1);
 
     checkstandard();
-    
+
     wgetfile($sourcefile, $url);
     unzip($sourcefile, $tmpdir);
     verify("$tmpdir/software/OEM/STB/App/Boot/STB_PC_T.bin", $hash);
@@ -160,7 +160,7 @@ sub dec2540t {
     my $tmpdir = tempdir(DIR => "/tmp", CLEANUP => 1);
 
     checkstandard();
-    
+
     wgetfile($sourcefile, $url);
     unzip($sourcefile, $tmpdir);
     verify("$tmpdir/software/OEM/STB/App/Boot/STB_PC_X.bin", $hash);
@@ -177,7 +177,7 @@ sub dec3000s {
     my $tmpdir = tempdir(DIR => "/tmp", CLEANUP => 1);
 
     checkstandard();
-    
+
     wgetfile($sourcefile, $url);
     unzip($sourcefile, $tmpdir);
     verify("$tmpdir/software/OEM/STB/App/Boot/STB_PC_S.bin", $hash);
@@ -192,9 +192,9 @@ sub vp7041 {
     my $hash = "e88c9372d1f66609a3e7b072c53fbcfe";
     my $outfile = "dvb-vp7041-2.422.fw";
     my $tmpdir = tempdir(DIR => "/tmp", CLEANUP => 1);
-    
+
     checkstandard();
-    
+
     wgetfile($sourcefile, $url);
     unzip($sourcefile, $tmpdir);
     extract("$tmpdir/VisionDTV/Drivers/Win2K&XP/UDTTload.sys", 12503, 3036, "$tmpdir/fwtmp1");
@@ -291,14 +291,14 @@ sub verify {
 
 sub copy {
     my ($from, $to) = @_;
-    
+
     system("cp -f \"$from\" \"$to\"") and die ("cp failed");
 }
 
 sub extract {
     my ($infile, $offset, $length, $outfile) = @_;
     my ($chunklength, $buf, $rcount);
-    
+
     open INFILE, "<$infile";
     open OUTFILE, ">$outfile";
     sysseek(INFILE, $offset, SEEK_SET);
@@ -306,7 +306,7 @@ sub extract {
 	# Calc chunk size
 	$chunklength = 2048;
 	$chunklength = $length if ($chunklength > $length);
-	
+
 	$rcount = sysread(INFILE, $buf, $chunklength);
 	die "Ran out of data\n" if ($rcount != $chunklength);
 	syswrite(OUTFILE, $buf);
@@ -319,7 +319,7 @@ sub extract {
 sub appendfile {
     my ($FH, $infile) = @_;
     my ($buf);
-    
+
     open INFILE, "<$infile";
     while(1) {
 	$rcount = sysread(INFILE, $buf, 2048);

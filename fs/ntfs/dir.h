@@ -24,6 +24,8 @@
 #define _LINUX_NTFS_DIR_H
 
 #include "layout.h"
+#include "inode.h"
+#include "types.h"
 
 /*
  * ntfs_name is used to return the file name to the caller of

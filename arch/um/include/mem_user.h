@@ -67,6 +67,7 @@ extern void map_memory(unsigned long virt, unsigned long phys,
 extern int protect_memory(unsigned long addr, unsigned long len, 
 			  int r, int w, int x, int must_succeed);
 extern unsigned long get_kmem_end(void);
+extern void check_tmpexec(void);
 
 #endif
 

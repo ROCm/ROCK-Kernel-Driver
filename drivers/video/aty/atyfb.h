@@ -3,6 +3,8 @@
  */
 
 #include <linux/config.h>
+#include <linux/spinlock.h>
+#include <linux/wait.h>
     /*
      *  Elements of the hardware specific atyfb_par structure
      */
@@ -10,15 +12,59 @@
 struct crtc {
 	u32 vxres;
 	u32 vyres;
+	u32 xoffset;
+	u32 yoffset;
+	u32 bpp;
 	u32 h_tot_disp;
 	u32 h_sync_strt_wid;
 	u32 v_tot_disp;
 	u32 v_sync_strt_wid;
+	u32 vline_crnt_vline;
 	u32 off_pitch;
 	u32 gen_cntl;
 	u32 dp_pix_width;	/* acceleration */
 	u32 dp_chain_mask;	/* acceleration */
+#ifdef CONFIG_FB_ATY_GENERIC_LCD
+	u32 horz_stretching;
+	u32 vert_stretching;
+	u32 ext_vert_stretch;
+	u32 shadow_h_tot_disp;
+	u32 shadow_h_sync_strt_wid;
+	u32 shadow_v_tot_disp;
+	u32 shadow_v_sync_strt_wid;
+	u32 lcd_gen_cntl;
+	u32 lcd_config_panel;
+	u32 lcd_index;
+#endif
 };
+
+struct aty_interrupt {
+	wait_queue_head_t wait;
+	unsigned int count;
+	int pan_display;
+};
+
+struct pll_info {
+	int pll_max;
+	int pll_min;
+	int sclk, mclk, mclk_pm, xclk;
+	int ref_div;
+	int ref_clk;
+};
+
+typedef struct {
+	u16 unknown1;
+	u16 PCLK_min_freq;
+	u16 PCLK_max_freq;
+	u16 unknown2;
+	u16 ref_freq;
+	u16 ref_divider;
+	u16 unknown3;
+	u16 MCLK_pwd;
+	u16 MCLK_max_freq;
+	u16 XCLK_max_freq;
+	u16 SCLK_freq;
+} __attribute__ ((packed)) PLL_BLOCK_MACH64;
 
 struct pll_514 {
 	u8 m;
@@ -36,15 +82,38 @@ struct pll_ct {
 	u8 pll_ref_div;
 	u8 pll_gen_cntl;
 	u8 mclk_fb_div;
+	u8 mclk_fb_mult; /* 2 ro 4 */
+/*	u8 sclk_fb_div;*/
 	u8 pll_vclk_cntl;
 	u8 vclk_post_div;
 	u8 vclk_fb_div;
 	u8 pll_ext_cntl;
-	u32 dsp_config;		/* Mach64 GTB DSP */
-	u32 dsp_on_off;		/* Mach64 GTB DSP */
+/*	u8 ext_vpll_cntl;
+	u8 spll_cntl2;*/
+	u32 dsp_config; /* Mach64 GTB DSP */
+	u32 dsp_on_off; /* Mach64 GTB DSP */
+	u32 dsp_loop_latency;
+	u32 fifo_size;
+	u32 xclkpagefaultdelay;
+	u32 xclkmaxrasdelay;
+	u8 xclk_ref_div;
+	u8 xclk_post_div;
 	u8 mclk_post_div_real;
+	u8 xclk_post_div_real;
 	u8 vclk_post_div_real;
+	u8 features;
+#ifdef CONFIG_FB_ATY_GENERIC_LCD
+	u32 xres; /* use for LCD stretching/scaling */
+#endif
 };
+
+/*
+	for pll_ct.features
+*/
+#define DONT_USE_SPLL 0x1
+#define DONT_USE_XDLL 0x2
+#define USE_CPUCLK    0x4
+#define POWERDOWN_PLL 0x8
 
 union aty_pll {
 	struct pll_ct ct;
@@ -56,42 +125,68 @@ union aty_pll {
      *  The hardware parameters for each card
      */
 
-struct aty_cursor {
-	u8 bits[8][64];
-	u8 mask[8][64];
-	u8 *ram;
-};
-
 struct atyfb_par {
-	struct aty_cmap_regs *aty_cmap_regs;
+	struct aty_cmap_regs __iomem *aty_cmap_regs;
+	struct { u8 red, green, blue; } palette[256];
 	const struct aty_dac_ops *dac_ops;
 	const struct aty_pll_ops *pll_ops;
-	struct aty_cursor *cursor;
-	unsigned long ati_regbase;
-	unsigned long clk_wr_offset;
+	void __iomem *ati_regbase;
+	unsigned long clk_wr_offset; /* meaning overloaded, clock id by CT */
 	struct crtc crtc;
 	union aty_pll pll;
+	struct pll_info pll_limits;
 	u32 features;
 	u32 ref_clk_per;
 	u32 pll_per;
 	u32 mclk_per;
+	u32 xclk_per;
 	u8 bus_type;
 	u8 ram_type;
 	u8 mem_refresh_rate;
-	u8 blitter_may_be_busy;
+	u16 pci_id;
 	u32 accel_flags;
+	int blitter_may_be_busy;
+	int asleep;
+	int lock_blank;
+	unsigned long res_start;
+	unsigned long res_size;
 #ifdef __sparc__
 	struct pci_mmap_map *mmap_map;
 	u8 mmaped;
-	int open;
 #endif
-#ifdef CONFIG_PMAC_PBOOK
-	struct fb_info *next;
-	unsigned char *save_framebuffer;
-	unsigned long save_pll[64];
+	int open;
+#ifdef CONFIG_FB_ATY_GENERIC_LCD
+	unsigned long bios_base_phys;
+	unsigned long bios_base;
+	unsigned long lcd_table;
+	u16 lcd_width;
+	u16 lcd_height;
+	u32 lcd_pixclock;
+	u16 lcd_refreshrate;
+	u16 lcd_htotal;
+	u16 lcd_hdisp;
+	u16 lcd_hsync_dly;
+	u16 lcd_hsync_len;
+	u16 lcd_vtotal;
+	u16 lcd_vdisp;
+	u16 lcd_vsync_len;
+	u16 lcd_right_margin;
+	u16 lcd_lower_margin;
+	u16 lcd_hblank_len;
+	u16 lcd_vblank_len;
+#endif
+	unsigned long aux_start; /* auxiliary aperture */
+	unsigned long aux_size;
+	struct aty_interrupt vblank;
+	unsigned long irq_flags;
+	unsigned int irq;
+	spinlock_t int_lock;
+#ifdef CONFIG_MTRR
+	int mtrr_aper;
+	int mtrr_reg;
 #endif
 };
-    
+
     /*
      *  ATI Mach64 features
      */
@@ -101,7 +196,7 @@ struct atyfb_par {
 #define M64F_RESET_3D		0x00000001
 #define M64F_MAGIC_FIFO		0x00000002
 #define M64F_GTB_DSP		0x00000004
-#define M64F_FIFO_24		0x00000008
+#define M64F_FIFO_32		0x00000008
 #define M64F_SDRAM_MAGIC_PLL	0x00000010
 #define M64F_MAGIC_POSTDIV	0x00000020
 #define M64F_INTEGRATED		0x00000040
@@ -116,9 +211,10 @@ struct atyfb_par {
 #define M64F_G3_PB_1_1		0x00008000
 #define M64F_G3_PB_1024x768	0x00010000
 #define M64F_EXTRA_BRIGHT	0x00020000
-#define M64F_LT_SLEEP		0x00040000
+#define M64F_LT_LCD_REGS	0x00040000
 #define M64F_XL_DLL		0x00080000
-
+#define M64F_MFB_FORCE_4	0x00100000
+#define M64F_HW_TRIPLE		0x00200000
 
     /*
      *  Register access
@@ -137,8 +233,7 @@ static inline u32 aty_ld_le32(int regindex, const struct atyfb_par *par)
 #endif
 }
 
-static inline void aty_st_le32(int regindex, u32 val,
-			       const struct atyfb_par *par)
+static inline void aty_st_le32(int regindex, u32 val, const struct atyfb_par *par)
 {
 	/* Hack for bloc 1, should be cleanly optimized by compiler */
 	if (regindex >= 0x400)
@@ -163,8 +258,7 @@ static inline u8 aty_ld_8(int regindex, const struct atyfb_par *par)
 #endif
 }
 
-static inline void aty_st_8(int regindex, u8 val,
-			    const struct atyfb_par *par)
+static inline void aty_st_8(int regindex, u8 val, const struct atyfb_par *par)
 {
 	/* Hack for bloc 1, should be cleanly optimized by compiler */
 	if (regindex >= 0x400)
@@ -177,17 +271,10 @@ static inline void aty_st_8(int regindex, u8 val,
 #endif
 }
 
-static inline u8 aty_ld_pll(int offset, const struct atyfb_par *par)
-{
-	u8 res;
-
-	/* write addr byte */
-	aty_st_8(CLOCK_CNTL + 1, (offset << 2), par);
-	/* read the register value */
-	res = aty_ld_8(CLOCK_CNTL + 2, par);
-	return res;
-}
-
+#if defined(CONFIG_PM) || defined(CONFIG_PMAC_BACKLIGHT) || defined (CONFIG_FB_ATY_GENERIC_LCD)
+extern void aty_st_lcd(int index, u32 val, const struct atyfb_par *par);
+extern u32 aty_ld_lcd(int index, const struct atyfb_par *par);
+#endif
 
     /*
      *  DAC operations
@@ -195,14 +282,14 @@ static inline u8 aty_ld_pll(int offset, const struct atyfb_par *par)
 
 struct aty_dac_ops {
 	int (*set_dac) (const struct fb_info * info,
-			const union aty_pll * pll, u32 bpp, u32 accel);
+		const union aty_pll * pll, u32 bpp, u32 accel);
 };
 
-extern const struct aty_dac_ops aty_dac_ibm514;	/* IBM RGB514 */
-extern const struct aty_dac_ops aty_dac_ati68860b;	/* ATI 68860-B */
-extern const struct aty_dac_ops aty_dac_att21c498;	/* AT&T 21C498 */
-extern const struct aty_dac_ops aty_dac_unsupported;	/* unsupported */
-extern const struct aty_dac_ops aty_dac_ct;	/* Integrated */
+extern const struct aty_dac_ops aty_dac_ibm514; /* IBM RGB514 */
+extern const struct aty_dac_ops aty_dac_ati68860b; /* ATI 68860-B */
+extern const struct aty_dac_ops aty_dac_att21c498; /* AT&T 21C498 */
+extern const struct aty_dac_ops aty_dac_unsupported; /* unsupported */
+extern const struct aty_dac_ops aty_dac_ct; /* Integrated */
 
 
     /*
@@ -210,37 +297,32 @@ extern const struct aty_dac_ops aty_dac_ct;	/* Integrated */
      */
 
 struct aty_pll_ops {
-	int (*var_to_pll) (const struct fb_info * info, u32 vclk_per,
-			   u8 bpp, union aty_pll * pll);
-	 u32(*pll_to_var) (const struct fb_info * info,
-			   const union aty_pll * pll);
-	void (*set_pll) (const struct fb_info * info,
-			 const union aty_pll * pll);
+	int (*var_to_pll) (const struct fb_info * info, u32 vclk_per, u32 bpp, union aty_pll * pll);
+	u32 (*pll_to_var) (const struct fb_info * info, const union aty_pll * pll);
+	void (*set_pll)   (const struct fb_info * info, const union aty_pll * pll);
+	void (*get_pll)   (const struct fb_info *info, union aty_pll * pll);
+	int (*init_pll)   (const struct fb_info * info, union aty_pll * pll);
 };
 
-extern const struct aty_pll_ops aty_pll_ati18818_1;	/* ATI 18818 */
-extern const struct aty_pll_ops aty_pll_stg1703;	/* STG 1703 */
-extern const struct aty_pll_ops aty_pll_ch8398;	/* Chrontel 8398 */
-extern const struct aty_pll_ops aty_pll_att20c408;	/* AT&T 20C408 */
-extern const struct aty_pll_ops aty_pll_ibm514;	/* IBM RGB514 */
-extern const struct aty_pll_ops aty_pll_unsupported;	/* unsupported */
-extern const struct aty_pll_ops aty_pll_ct;	/* Integrated */
+extern const struct aty_pll_ops aty_pll_ati18818_1; /* ATI 18818 */
+extern const struct aty_pll_ops aty_pll_stg1703; /* STG 1703 */
+extern const struct aty_pll_ops aty_pll_ch8398; /* Chrontel 8398 */
+extern const struct aty_pll_ops aty_pll_att20c408; /* AT&T 20C408 */
+extern const struct aty_pll_ops aty_pll_ibm514; /* IBM RGB514 */
+extern const struct aty_pll_ops aty_pll_unsupported; /* unsupported */
+extern const struct aty_pll_ops aty_pll_ct; /* Integrated */
 
 
-extern void aty_set_pll_ct(const struct fb_info *info,
-			   const union aty_pll *pll);
-extern void aty_calc_pll_ct(const struct fb_info *info,
-			    struct pll_ct *pll);
+extern void aty_set_pll_ct(const struct fb_info *info, const union aty_pll *pll);
+extern u8 aty_ld_pll_ct(int offset, const struct atyfb_par *par);
 
 
     /*
      *  Hardware cursor support
      */
 
-extern struct aty_cursor *aty_init_cursor(struct fb_info *info);
+extern int aty_init_cursor(struct fb_info *info);
 extern int atyfb_cursor(struct fb_info *info, struct fb_cursor *cursor);
-extern void aty_set_cursor_color(struct fb_info *info);
-extern void aty_set_cursor_shape(struct fb_info *info);
 
     /*
      *  Hardware acceleration
@@ -260,6 +342,5 @@ static inline void wait_for_idle(struct atyfb_par *par)
 }
 
 extern void aty_reset_engine(const struct atyfb_par *par);
-extern void aty_init_engine(struct atyfb_par *par,
-			    struct fb_info *info);
+extern void aty_init_engine(struct atyfb_par *par, struct fb_info *info);
 

@@ -25,8 +25,7 @@ match(const struct sk_buff *skb,
       const struct net_device *out,
       const void *matchinfo,
       int offset,
-      const void *hdr,
-      u_int16_t datalen,
+      unsigned int protoff,
       int *hotdrop)
 {
     const struct ip6t_mac_info *info = matchinfo;
@@ -35,7 +34,7 @@ match(const struct sk_buff *skb,
     return (skb->mac.raw >= skb->head
 	    && (skb->mac.raw + ETH_HLEN) <= skb->data
 	    /* If so, compare... */
-	    && ((memcmp(skb->mac.ethernet->h_source, info->srcaddr, ETH_ALEN)
+	    && ((memcmp(eth_hdr(skb)->h_source, info->srcaddr, ETH_ALEN)
 		== 0) ^ info->invert));
 }
 

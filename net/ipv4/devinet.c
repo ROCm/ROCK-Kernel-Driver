@@ -31,7 +31,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
@@ -158,8 +158,7 @@ struct in_device *inetdev_init(struct net_device *dev)
 
 	/* Account for reference dev->ip_ptr */
 	in_dev_hold(in_dev);
-	smp_wmb();
-	dev->ip_ptr = in_dev;
+	rcu_assign_pointer(dev->ip_ptr, in_dev);
 
 #ifdef CONFIG_SYSCTL
 	devinet_sysctl_register(in_dev, &in_dev->cnf);
@@ -996,13 +995,6 @@ static int inetdev_event(struct notifier_block *this, unsigned long event,
 				      NET_IPV4_NEIGH, "ipv4", NULL);
 		devinet_sysctl_register(in_dev, &in_dev->cnf);
 #endif
-		break;
-	case NETDEV_REBOOT:
-		if (dev->flags & IFF_DYNAMIC ) { 
-			for_primary_ifa(in_dev) {
-				notifier_call_chain(&inetaddr_chain, NETDEV_REBOOT, ifa); 
-			} endfor_ifa(in_dev); 
-		}
 		break;
 	}
 out:

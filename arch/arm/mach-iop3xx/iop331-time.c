@@ -27,13 +27,9 @@
 #include <asm/mach/irq.h>
 #include <asm/mach/time.h>
 
-#undef IOP331_TIME_SYNC
-
-static unsigned long iop331_latch;
-
 static inline unsigned long get_elapsed(void)
 {
-	return iop331_latch - *IOP331_TU_TCR0;
+	return LATCH - *IOP331_TU_TCR0;
 }
 
 static unsigned long iop331_gettimeoffset(void)
@@ -55,14 +51,14 @@ static unsigned long iop331_gettimeoffset(void)
 	asm volatile("mrc p6, 0, %0, c6, c1, 0" : "=r" (tisr2));
 
 	if(tisr1 & 1)
-		elapsed += iop331_latch;
+		elapsed += LATCH;
 	else if (tisr2 & 1)
-		elapsed = iop331_latch + get_elapsed();
+		elapsed = LATCH + get_elapsed();
 
 	/*
 	 * Now convert them to usec.
 	 */
-	usec = (unsigned long)(elapsed * (tick_nsec / 1000)) / iop331_latch;
+	usec = (unsigned long)(elapsed * (tick_nsec / 1000)) / LATCH;
 
 	return usec;
 }
@@ -71,36 +67,16 @@ static irqreturn_t
 iop331_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	u32 tisr;
-#ifdef IOP331_TIME_SYNC
-	u32 passed;
-#define TM_THRESH (iop331_latch*2)
-#endif
+
+	write_seqlock(&xtime_lock);
 
 	asm volatile("mrc p6, 0, %0, c6, c1, 0" : "=r" (tisr));
-
 	tisr |= 1;
-
 	asm volatile("mcr p6, 0, %0, c6, c1, 0" : : "r" (tisr));
 
-#ifdef IOP331_TIME_SYNC
-	passed = 0xffffffff - *IOP331_TU_TCR1;
+	timer_tick(regs);
 
-	do
-	{
-		do_timer(regs);
-		if(passed < TM_THRESH)
-			break;
-		if(passed > iop331_latch)
-			passed -= iop331_latch;
-		else
-			passed = 0;
-	} while(1);
-
-	asm volatile("mcr p6, 0, %0, c3, c1, 0" : : "r" (0xffffffff));
-#else
-	do_timer(regs);
-#endif
-
+	write_sequnlock(&xtime_lock);
 	return IRQ_HANDLED;
 }
 
@@ -110,32 +86,22 @@ static struct irqaction iop331_timer_irq = {
 	.flags		= SA_INTERRUPT
 };
 
-extern int setup_arm_irq(int, struct irqaction*);
-
-void __init iop331_init_time(void)
+static void __init iop331_timer_init(void)
 {
 	u32 timer_ctl;
 
-	iop331_latch = (CLOCK_TICK_RATE + HZ / 2) / HZ;
-	gettimeoffset = iop331_gettimeoffset;
 	setup_irq(IRQ_IOP331_TIMER0, &iop331_timer_irq);
 
 	timer_ctl = IOP331_TMR_EN | IOP331_TMR_PRIVILEGED | IOP331_TMR_RELOAD |
 			IOP331_TMR_RATIO_1_1;
 
-	asm volatile("mcr p6, 0, %0, c4, c1, 0" : : "r" (iop331_latch));
+	asm volatile("mcr p6, 0, %0, c4, c1, 0" : : "r" (LATCH));
 
 	asm volatile("mcr p6, 0, %0, c0, c1, 0"	: : "r" (timer_ctl));
 
-#ifdef IOP331_TIME_SYNC
-        /* Setup second timer */
-        /* setup counter */
-        timer_ctl = IOP331_TMR_EN | IOP331_TMR_PRIVILEGED |
-                        IOP331_TMR_RATIO_1_1;
-        asm volatile("mcr p6, 0, %0, c3, c1, 0" : : "r" (0xffffffff));
-        /* setup control */
-        asm volatile("mcr p6, 0, %0, c1, c1, 0" : : "r" (timer_ctl));
-#endif
 }
 
-
+struct sys_timer iop331_timer = {
+	.init		= iop331_timer_init,
+	.offset		= iop331_gettimeoffset,
+};

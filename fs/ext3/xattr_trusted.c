@@ -16,20 +16,21 @@
 #define XATTR_TRUSTED_PREFIX "trusted."
 
 static size_t
-ext3_xattr_trusted_list(char *list, struct inode *inode,
-			const char *name, int name_len)
+ext3_xattr_trusted_list(struct inode *inode, char *list, size_t list_size,
+			const char *name, size_t name_len)
 {
-	const int prefix_len = sizeof(XATTR_TRUSTED_PREFIX)-1;
+	const size_t prefix_len = sizeof(XATTR_TRUSTED_PREFIX)-1;
+	const size_t total_len = prefix_len + name_len + 1;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return 0;
 
-	if (list) {
+	if (list && total_len <= list_size) {
 		memcpy(list, XATTR_TRUSTED_PREFIX, prefix_len);
 		memcpy(list+prefix_len, name, name_len);
 		list[prefix_len + name_len] = '\0';
 	}
-	return prefix_len + name_len + 1;
+	return total_len;
 }
 
 static int
@@ -56,7 +57,7 @@ ext3_xattr_trusted_set(struct inode *inode, const char *name,
 			      value, size, flags);
 }
 
-struct ext3_xattr_handler ext3_xattr_trusted_handler = {
+struct xattr_handler ext3_xattr_trusted_handler = {
 	.prefix	= XATTR_TRUSTED_PREFIX,
 	.list	= ext3_xattr_trusted_list,
 	.get	= ext3_xattr_trusted_get,

@@ -22,7 +22,7 @@
    This is access code for flashes using ARM's flash partitioning 
    standards.
 
-   $Id: integrator-flash.c,v 1.16 2004/07/12 21:59:44 dwmw2 Exp $
+   $Id: integrator-flash.c,v 1.18 2004/11/01 13:26:15 rmk Exp $
 
 ======================================================================*/
 
@@ -75,7 +75,7 @@ static int armflash_probe(struct device *_dev)
 	unsigned int size = res->end - res->start + 1;
 	struct armflash_info *info;
 	int err;
-	void *base;
+	void __iomem *base;
 
 	info = kmalloc(sizeof(struct armflash_info), GFP_KERNEL);
 	if (!info) {
@@ -110,7 +110,7 @@ static int armflash_probe(struct device *_dev)
 	info->map.size		= size;
 	info->map.bankwidth	= plat->width;
 	info->map.phys		= res->start;
-	info->map.virt		= (unsigned long) base;
+	info->map.virt		= base;
 	info->map.name		= dev->dev.bus_id;
 	info->map.set_vpp	= armflash_set_vpp;
 
@@ -179,7 +179,7 @@ static int armflash_remove(struct device *_dev)
 		if (info->parts)
 			kfree(info->parts);
 
-		iounmap((void *)info->map.virt);
+		iounmap(info->map.virt);
 		release_resource(info->res);
 		kfree(info->res);
 

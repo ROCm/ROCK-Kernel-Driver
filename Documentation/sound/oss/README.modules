@@ -59,8 +59,9 @@ sound.o # The sound driver
 uart401.o # Used by sb, maybe other cards
 
  Whichever card you have, try feeding it the options that would be the
-default if you were making the driver wired, not as modules. You can look
-at the init_module() code for the card to see what args are expected.
+default if you were making the driver wired, not as modules. You can
+look at function referred to by module_init() for the card to see what
+args are expected.
 
  Note that at present there is no way to configure the io, irq and other
 parameters for the modular drivers as one does for the wired drivers.. One

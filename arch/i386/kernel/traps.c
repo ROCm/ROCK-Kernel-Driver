@@ -25,7 +25,7 @@
 #include <linux/highmem.h>
 #include <linux/kallsyms.h>
 #include <linux/ptrace.h>
-#include <linux/version.h>
+#include <linux/utsname.h>
 #include <linux/kprobes.h>
 
 #ifdef CONFIG_EISA
@@ -36,10 +36,6 @@
 #ifdef CONFIG_MCA
 #include <linux/mca.h>
 #endif
-
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 
 #include <asm/processor.h>
 #include <asm/system.h>
@@ -61,11 +57,6 @@
 #include "mach_traps.h"
 
 asmlinkage int system_call(void);
-#ifdef	CONFIG_KDB
-asmlinkage int kdb_call(void);
-#endif	/* CONFIG_KDB */
-asmlinkage void lcall7(void);
-asmlinkage void lcall27(void);
 
 struct desc_struct default_ldt[] = { { 0, 0 }, { 0, 0 }, { 0, 0 },
 		{ 0, 0 }, { 0, 0 } };
@@ -94,9 +85,6 @@ asmlinkage void segment_not_present(void);
 asmlinkage void stack_segment(void);
 asmlinkage void general_protection(void);
 asmlinkage void page_fault(void);
-#ifdef	CONFIG_KDB
-asmlinkage void page_fault_mca(void);
-#endif	/* CONFIG_KDB */
 asmlinkage void coprocessor_error(void);
 asmlinkage void simd_coprocessor_error(void);
 asmlinkage void alignment_check(void);
@@ -117,36 +105,27 @@ int register_die_notifier(struct notifier_block *nb)
 	return err;
 }
 
-static int valid_stack_ptr(struct task_struct *task, void *p)
+static inline int valid_stack_ptr(struct thread_info *tinfo, void *p)
 {
-	if (p <= (void *)task->thread_info)
-		return 0;
-	if (kstack_end(p))
-		return 0;
-	return 1;
+	return	p > (void *)tinfo &&
+		p < (void *)tinfo + THREAD_SIZE - 3;
 }
 
-#ifdef CONFIG_FRAME_POINTER
-static void print_context_stack(struct task_struct *task, unsigned long *stack,
-			 unsigned long ebp)
+static inline unsigned long print_context_stack(struct thread_info *tinfo,
+				unsigned long *stack, unsigned long ebp)
 {
 	unsigned long addr;
 
-	while (valid_stack_ptr(task, (void *)ebp)) {
+#ifdef	CONFIG_FRAME_POINTER
+	while (valid_stack_ptr(tinfo, (void *)ebp)) {
 		addr = *(unsigned long *)(ebp + 4);
 		printk(" [<%08lx>] ", addr);
 		print_symbol("%s", addr);
 		printk("\n");
 		ebp = *(unsigned long *)ebp;
 	}
-}
 #else
-static void print_context_stack(struct task_struct *task, unsigned long *stack,
-			 unsigned long ebp)
-{
-	unsigned long addr;
-
-	while (!kstack_end(stack)) {
+	while (valid_stack_ptr(tinfo, stack)) {
 		addr = *stack++;
 		if (__kernel_text_address(addr)) {
 			printk(" [<%08lx>]", addr);
@@ -154,8 +133,9 @@ static void print_context_stack(struct task_struct *task, unsigned long *stack,
 			printk("\n");
 		}
 	}
-}
 #endif
+	return ebp;
+}
 
 void show_trace(struct task_struct *task, unsigned long * stack)
 {
@@ -163,11 +143,6 @@ void show_trace(struct task_struct *task, unsigned long * stack)
 
 	if (!task)
 		task = current;
-
-	if (!valid_stack_ptr(task, stack)) {
-		printk("Stack pointer is garbage, not printing trace\n");
-		return;
-	}
 
 	if (task == current) {
 		/* Grab ebp right from our regs */
@@ -181,7 +156,7 @@ void show_trace(struct task_struct *task, unsigned long * stack)
 		struct thread_info *context;
 		context = (struct thread_info *)
 			((unsigned long)stack & (~(THREAD_SIZE - 1)));
-		print_context_stack(task, stack, ebp);
+		ebp = print_context_stack(context, stack, ebp);
 		stack = (unsigned long*)context->previous_esp;
 		if (!stack)
 			break;
@@ -241,9 +216,9 @@ void show_registers(struct pt_regs *regs)
 	}
 	print_modules();
 	printk("CPU:    %d\nEIP:    %04x:[<%08lx>]    %s VLI\nEFLAGS: %08lx"
-			"   (%s %s) \n",
+			"   (%s) \n",
 		smp_processor_id(), 0xffff & regs->xcs, regs->eip,
-		print_tainted(), regs->eflags, UTS_RELEASE, OOPS_TIMESTAMP);
+		print_tainted(), regs->eflags, system_utsname.release);
 	print_symbol("EIP is at %s\n", regs->eip);
 	printk("eax: %08lx   ebx: %08lx   ecx: %08lx   edx: %08lx\n",
 		regs->eax, regs->ebx, regs->ecx, regs->edx);
@@ -365,10 +340,6 @@ void die(const char * str, struct pt_regs * regs, long err)
 	bust_spinlocks(0);
 	die.lock_owner = -1;
 	spin_unlock_irq(&die.lock);
-#ifdef CONFIG_KDB
-	kdb_diemsg = str;
-	kdb(KDB_REASON_OOPS, err, regs);
-#endif /* CONFIG_KDB */
 	if (in_interrupt())
 		panic("Fatal exception in interrupt");
 
@@ -387,16 +358,7 @@ static inline void die_if_kernel(const char * str, struct pt_regs * regs, long e
 		die(str, regs, err);
 }
 
-static inline unsigned long get_cr2(void)
-{
-	unsigned long address;
-
-	/* get the address */
-	__asm__("movl %%cr2,%0":"=r" (address));
-	return address;
-}
-
-static inline void do_trap(int trapnr, int signr, char *str, int vm86,
+static void do_trap(int trapnr, int signr, char *str, int vm86,
 			   struct pt_regs * regs, long error_code, siginfo_t *info)
 {
 	if (regs->eflags & VM_MASK) {
@@ -433,16 +395,16 @@ static inline void do_trap(int trapnr, int signr, char *str, int vm86,
 }
 
 #define DO_ERROR(trapnr, signr, str, name) \
-asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
+fastcall void do_##name(struct pt_regs * regs, long error_code) \
 { \
 	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) \
-						== NOTIFY_OK) \
+						== NOTIFY_STOP) \
 		return; \
 	do_trap(trapnr, signr, str, 0, regs, error_code, NULL); \
 }
 
 #define DO_ERROR_INFO(trapnr, signr, str, name, sicode, siaddr) \
-asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
+fastcall void do_##name(struct pt_regs * regs, long error_code) \
 { \
 	siginfo_t info; \
 	info.si_signo = signr; \
@@ -450,22 +412,22 @@ asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 	info.si_code = sicode; \
 	info.si_addr = (void __user *)siaddr; \
 	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) \
-						== NOTIFY_BAD) \
+						== NOTIFY_STOP) \
 		return; \
 	do_trap(trapnr, signr, str, 0, regs, error_code, &info); \
 }
 
 #define DO_VM86_ERROR(trapnr, signr, str, name) \
-asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
+fastcall void do_##name(struct pt_regs * regs, long error_code) \
 { \
 	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) \
-						== NOTIFY_OK) \
+						== NOTIFY_STOP) \
 		return; \
 	do_trap(trapnr, signr, str, 1, regs, error_code, NULL); \
 }
 
 #define DO_VM86_ERROR_INFO(trapnr, signr, str, name, sicode, siaddr) \
-asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
+fastcall void do_##name(struct pt_regs * regs, long error_code) \
 { \
 	siginfo_t info; \
 	info.si_signo = signr; \
@@ -473,13 +435,13 @@ asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 	info.si_code = sicode; \
 	info.si_addr = (void __user *)siaddr; \
 	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) \
-						== NOTIFY_OK) \
+						== NOTIFY_STOP) \
 		return; \
 	do_trap(trapnr, signr, str, 1, regs, error_code, &info); \
 }
 
 DO_VM86_ERROR_INFO( 0, SIGFPE,  "divide error", divide_error, FPE_INTDIV, regs->eip)
-#if !defined(CONFIG_KPROBES) && !defined(CONFIG_KDB)
+#ifndef CONFIG_KPROBES
 DO_VM86_ERROR( 3, SIGTRAP, "int3", int3)
 #endif
 DO_VM86_ERROR( 4, SIGSEGV, "overflow", overflow)
@@ -491,8 +453,38 @@ DO_ERROR(11, SIGBUS,  "segment not present", segment_not_present)
 DO_ERROR(12, SIGBUS,  "stack segment", stack_segment)
 DO_ERROR_INFO(17, SIGBUS, "alignment check", alignment_check, BUS_ADRALN, 0)
 
-asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
+fastcall void do_general_protection(struct pt_regs * regs, long error_code)
 {
+	int cpu = get_cpu();
+	struct tss_struct *tss = &per_cpu(init_tss, cpu);
+	struct thread_struct *thread = &current->thread;
+
+	/*
+	 * Perform the lazy TSS's I/O bitmap copy. If the TSS has an
+	 * invalid offset set (the LAZY one) and the faulting thread has
+	 * a valid I/O bitmap pointer, we copy the I/O bitmap in the TSS
+	 * and we set the offset field correctly. Then we let the CPU to
+	 * restart the faulting instruction.
+	 */
+	if (tss->io_bitmap_base == INVALID_IO_BITMAP_OFFSET_LAZY &&
+	    thread->io_bitmap_ptr) {
+		memcpy(tss->io_bitmap, thread->io_bitmap_ptr,
+		       thread->io_bitmap_max);
+		/*
+		 * If the previously set map was extending to higher ports
+		 * than the current one, pad extra space with 0xff (no access).
+		 */
+		if (thread->io_bitmap_max < tss->io_bitmap_max)
+			memset((char *) tss->io_bitmap +
+				thread->io_bitmap_max, 0xff,
+				tss->io_bitmap_max - thread->io_bitmap_max);
+		tss->io_bitmap_max = thread->io_bitmap_max;
+		tss->io_bitmap_base = IO_BITMAP_OFFSET;
+		put_cpu();
+		return;
+	}
+	put_cpu();
+
 	if (regs->eflags & VM_MASK)
 		goto gp_in_vm86;
 
@@ -512,7 +504,7 @@ gp_in_vm86:
 gp_in_kernel:
 	if (!fixup_exception(regs)) {
 		if (notify_die(DIE_GPF, "general protection fault", regs,
-				error_code, 13, SIGSEGV) == NOTIFY_OK);
+				error_code, 13, SIGSEGV) == NOTIFY_STOP)
 			return;
 		die("general protection fault", regs, error_code);
 	}
@@ -553,23 +545,11 @@ static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
 		return;
 	}
 #endif
-#ifdef CONFIG_KDB
-	(void)kdb(KDB_REASON_NMI, reason, regs);
-#endif /* CONFIG_KDB */
 	printk("Uhhuh. NMI received for unknown reason %02x on CPU %d.\n",
 		reason, smp_processor_id());
 	printk("Dazed and confused, but trying to continue\n");
 	printk("Do you have a strange power saving mode enabled?\n");
 }
-
-#if defined(CONFIG_SMP) && defined(CONFIG_KDB)
-static void
-do_ack_apic_irq(void)
-{
-	ack_APIC_irq();
-}
-#endif /* defined(CONFIG_SMP) && defined(CONFIG_KDB) */
-
 
 static spinlock_t nmi_print_lock = SPIN_LOCK_UNLOCKED;
 
@@ -586,9 +566,6 @@ void die_nmi (struct pt_regs *regs, const char *msg)
 		smp_processor_id(), regs->eip);
 	show_registers(regs);
 	printk("console shuts up ...\n");
-#ifdef  CONFIG_KDB
-	kdb(KDB_REASON_NMI, 0, regs);
-#endif  /* CONFIG_KDB */
 	console_silent();
 	spin_unlock(&nmi_print_lock);
 	bust_spinlocks(0);
@@ -597,21 +574,15 @@ void die_nmi (struct pt_regs *regs, const char *msg)
 
 static void default_do_nmi(struct pt_regs * regs)
 {
-	unsigned char reason = get_nmi_reason();
- 
-#if defined(CONFIG_SMP) && defined(CONFIG_KDB)
-	/*
-	 * Call the kernel debugger to see if this NMI is due
-	 * to an KDB requested IPI.  If so, kdb will handle it.
-	 */
-	if (kdb_ipi(regs, do_ack_apic_irq)) {
-		return;
-	}
-#endif /* defined(CONFIG_SMP) && defined(CONFIG_KDB) */
+	unsigned char reason = 0;
 
+	/* Only the BSP gets external NMIs from the system.  */
+	if (!smp_processor_id())
+		reason = get_nmi_reason();
+ 
 	if (!(reason & 0xc0)) {
 		if (notify_die(DIE_NMI_IPI, "nmi_ipi", regs, reason, 0, SIGINT)
-							== NOTIFY_BAD)
+							== NOTIFY_STOP)
 			return;
 #ifdef CONFIG_X86_LOCAL_APIC
 		/*
@@ -626,7 +597,7 @@ static void default_do_nmi(struct pt_regs * regs)
 		unknown_nmi_error(reason, regs);
 		return;
 	}
-	if (notify_die(DIE_NMI, "nmi", regs, reason, 0, SIGINT) == NOTIFY_BAD)
+	if (notify_die(DIE_NMI, "nmi", regs, reason, 0, SIGINT) == NOTIFY_STOP)
 		return;
 	if (reason & 0x80)
 		mem_parity_error(reason, regs);
@@ -646,7 +617,7 @@ static int dummy_nmi_callback(struct pt_regs * regs, int cpu)
  
 static nmi_callback_t nmi_callback = dummy_nmi_callback;
  
-asmlinkage void do_nmi(struct pt_regs * regs, long error_code)
+fastcall void do_nmi(struct pt_regs * regs, long error_code)
 {
 	int cpu;
 
@@ -672,10 +643,10 @@ void unset_nmi_callback(void)
 }
 
 #ifdef CONFIG_KPROBES
-asmlinkage int do_int3(struct pt_regs *regs, long error_code)
+fastcall int do_int3(struct pt_regs *regs, long error_code)
 {
 	if (notify_die(DIE_INT3, "int3", regs, error_code, 3, SIGTRAP)
-			== NOTIFY_OK)
+			== NOTIFY_STOP)
 		return 1;
 	/* This is an interrupt gate, because kprobes wants interrupts
 	disabled.  Normal trap handlers don't. */
@@ -707,7 +678,7 @@ asmlinkage int do_int3(struct pt_regs *regs, long error_code)
  * find every occurrence of the TF bit that could be saved away even
  * by user code)
  */
-asmlinkage void do_debug(struct pt_regs * regs, long error_code)
+fastcall void do_debug(struct pt_regs * regs, long error_code)
 {
 	unsigned int condition;
 	struct task_struct *tsk = current;
@@ -715,13 +686,8 @@ asmlinkage void do_debug(struct pt_regs * regs, long error_code)
 
 	__asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
 
-#ifdef	CONFIG_KDB
-	if (kdb(KDB_REASON_DEBUG, error_code, regs))
-		return;
-#endif	/* CONFIG_KDB */
-
 	if (notify_die(DIE_DEBUG, "debug", regs, condition, error_code,
-					SIGTRAP) == NOTIFY_OK)
+					SIGTRAP) == NOTIFY_STOP)
 		return;
 	/* It's safe to allow irq's after DR6 has been saved */
 	if (regs->eflags & X86_EFLAGS_IF)
@@ -790,16 +756,6 @@ clear_TF:
 	return;
 }
 
-#ifdef	CONFIG_KDB
-asmlinkage void do_int3(struct pt_regs * regs, long error_code)
-{
-	if (kdb(KDB_REASON_BREAK, error_code, regs))
-		return;
-	do_trap(3, SIGTRAP, "int3", 1, regs, error_code, NULL);
-}
-#endif	/* CONFIG_KDB */
-
-
 /*
  * Note that we play around with the 'TS' bit in an attempt to get
  * the correct behaviour even in the presence of the asynchronous
@@ -861,7 +817,7 @@ void math_error(void __user *eip)
 	force_sig_info(SIGFPE, &info, task);
 }
 
-asmlinkage void do_coprocessor_error(struct pt_regs * regs, long error_code)
+fastcall void do_coprocessor_error(struct pt_regs * regs, long error_code)
 {
 	ignore_fpu_irq = 1;
 	math_error((void __user *)regs->eip);
@@ -915,7 +871,7 @@ void simd_math_error(void __user *eip)
 	force_sig_info(SIGFPE, &info, task);
 }
 
-asmlinkage void do_simd_coprocessor_error(struct pt_regs * regs,
+fastcall void do_simd_coprocessor_error(struct pt_regs * regs,
 					  long error_code)
 {
 	if (cpu_has_xmm) {
@@ -939,7 +895,7 @@ asmlinkage void do_simd_coprocessor_error(struct pt_regs * regs,
 	}
 }
 
-asmlinkage void do_spurious_interrupt_bug(struct pt_regs * regs,
+fastcall void do_spurious_interrupt_bug(struct pt_regs * regs,
 					  long error_code)
 {
 #if 0
@@ -1039,11 +995,6 @@ static void __init set_system_gate(unsigned int n, void *addr)
 	_set_gate(idt_table+n,15,3,addr,__KERNEL_CS);
 }
 
-static void __init set_call_gate(void *a, void *addr)
-{
-	_set_gate(a,12,3,addr,__KERNEL_CS);
-}
-
 static void __init set_task_gate(unsigned int n, unsigned int gdt_entry)
 {
 	_set_gate(idt_table+n,5,0,0,(gdt_entry<<3));
@@ -1076,17 +1027,7 @@ void __init trap_init(void)
 	set_trap_gate(11,&segment_not_present);
 	set_trap_gate(12,&stack_segment);
 	set_trap_gate(13,&general_protection);
-#ifdef	CONFIG_KDB
-	if (test_bit(X86_FEATURE_MCE, boot_cpu_data.x86_capability) &&
-	    test_bit(X86_FEATURE_MCA, boot_cpu_data.x86_capability)) {
-		set_intr_gate(14,&page_fault_mca);
-	}
-	else {
-		set_intr_gate(14,&page_fault);
-	}
-#else	/* !CONFIG_KDB */
 	set_intr_gate(14,&page_fault);
-#endif	/* CONFIG_KDB */
 	set_trap_gate(15,&spurious_interrupt_bug);
 	set_trap_gate(16,&coprocessor_error);
 	set_trap_gate(17,&alignment_check);
@@ -1096,21 +1037,6 @@ void __init trap_init(void)
 	set_trap_gate(19,&simd_coprocessor_error);
 
 	set_system_gate(SYSCALL_VECTOR,&system_call);
-#ifdef	CONFIG_KDB
-	kdb_enablehwfault();
-	/*
-	 * A trap gate, used by the kernel to enter the 
-	 * debugger, preserving all registers.
-	 */
-	set_trap_gate(KDBENTER_VECTOR, &kdb_call);
-#endif	/* CONFIG_KDB */
-
-	/*
-	 * default LDT is a single-entry callgate to lcall7 for iBCS
-	 * and a callgate to lcall27 for Solaris/x86 binaries
-	 */
-	set_call_gate(&default_ldt[0],lcall7);
-	set_call_gate(&default_ldt[4],lcall27);
 
 	/*
 	 * Should be a barrier for any external CPU state.

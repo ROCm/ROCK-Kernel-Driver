@@ -11,7 +11,6 @@
 
 #include <linux/types.h>
 #include <linux/string.h>
-#include <asm/setup.h>
 #include <asm/bootinfo.h>
 
 #include "nonstdio.h"

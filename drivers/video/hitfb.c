@@ -270,6 +270,9 @@ int __init hitfb_init(void)
 	unsigned short lcdclor, ldr3, ldvndr;
 	int size;
 
+	if (fb_get_options("hitfb", NULL))
+		return -ENODEV;
+
 	hitfb_fix.smem_start = CONFIG_HD64461_IOBASE + 0x02000000;
 	hitfb_fix.smem_len = (MACH_HP690) ? 1024 * 1024 : 512 * 1024;
 

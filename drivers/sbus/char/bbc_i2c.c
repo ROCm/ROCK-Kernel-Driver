@@ -57,8 +57,8 @@ struct bbc_i2c_bus {
 	struct bbc_i2c_bus		*next;
 	int				index;
 	spinlock_t			lock;
-	void				*i2c_bussel_reg;
-	void				*i2c_control_regs;
+	void				__iomem *i2c_bussel_reg;
+	void				__iomem *i2c_control_regs;
 	unsigned char			own, clock;
 
 	wait_queue_head_t		wq;
@@ -189,13 +189,13 @@ static int wait_for_pin(struct bbc_i2c_bus *bp, u8 *status)
 	while (limit-- > 0) {
 		u8 val;
 
-		current->state = TASK_INTERRUPTIBLE;
+		set_current_state(TASK_INTERRUPTIBLE);
 		*status = val = readb(bp->i2c_control_regs + 0);
 		if ((val & I2C_PCF_PIN) == 0) {
 			ret = 0;
 			break;
 		}
-		schedule_timeout(HZ/4);
+		msleep_interruptible(250);
 	}
 	remove_wait_queue(&bp->wq, &wait);
 	bp->waiting = 0;

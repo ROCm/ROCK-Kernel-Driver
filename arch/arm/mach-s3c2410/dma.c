@@ -1,7 +1,7 @@
 /* linux/arch/arm/mach-bast/dma.c
  *
  * (c) 2003,2004 Simtec Electronics
- * Ben Dooks <ben@simtec.co.uk>
+ *	Ben Dooks <ben@simtec.co.uk>
  *
  * S3C2410 DMA core
  *
@@ -12,6 +12,9 @@
  * published by the Free Software Foundation.
  *
  * Changelog:
+ *  18-Nov-2004 BJD  Removed error for loading onto stopped channel
+ *  10-Nov-2004 BJD  Ensure all external symbols exported for modules
+ *  10-Nov-2004 BJD  Use sys_device and sysdev_class for power management
  *  08-Aug-2004 BJD  Apply rmk's suggestions
  *  21-Jul-2004 BJD  Ported to linux 2.6
  *  12-Jul-2004 BJD  Finished re-write and change of API
@@ -38,6 +41,7 @@
 #include <linux/sched.h>
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
+#include <linux/sysdev.h>
 #include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/delay.h>
@@ -52,7 +56,7 @@
 #include <asm/arch/map.h>
 
 /* io map for dma */
-static void *dma_base;
+static void __iomem *dma_base;
 
 /* dma channel state information */
 s3c2410_dma_chan_t s3c2410_chans[S3C2410_DMA_CHANNELS];
@@ -490,16 +494,14 @@ int s3c2410_dma_enqueue(unsigned int channel, void *id,
 	} else if (chan->state == S3C2410_DMA_IDLE) {
 		if (chan->flags & S3C2410_DMAF_AUTOSTART) {
 			s3c2410_dma_ctrl(chan->number, S3C2410_DMAOP_START);
-		} else {
-			printk(KERN_DEBUG "dma%d: cannot load onto stopped channel'n", chan->number);
-			local_irq_restore(flags);
-			return -EINVAL;
 		}
 	}
 
 	local_irq_restore(flags);
 	return 0;
 }
+
+EXPORT_SYMBOL(s3c2410_dma_enqueue);
 
 static inline void
 s3c2410_dma_freebuf(s3c2410_dma_buf_t *buf)
@@ -648,6 +650,9 @@ s3c2410_dma_irq(int irq, void *devpw, struct pt_regs *regs)
 
 			break;
 
+		case S3C2410_DMALOAD_1LOADED_1RUNNING:
+			goto no_load;
+
 		default:
 			printk(KERN_ERR "dma%d: unknown load_state in irq, %d\n",
 			       chan->number, chan->load_state);
@@ -668,6 +673,7 @@ s3c2410_dma_irq(int irq, void *devpw, struct pt_regs *regs)
 		}
 	}
 
+ no_load:
 	return IRQ_HANDLED;
 }
 
@@ -736,6 +742,8 @@ int s3c2410_dma_request(unsigned int channel, s3c2410_dma_client_t *client,
 	return 0;
 }
 
+EXPORT_SYMBOL(s3c2410_dma_request);
+
 /* s3c2410_dma_free
  *
  * release the given channel back to the system, will stop and flush
@@ -779,6 +787,8 @@ int s3c2410_dma_free(dmach_t channel, s3c2410_dma_client_t *client)
 
 	return 0;
 }
+
+EXPORT_SYMBOL(s3c2410_dma_free);
 
 static int s3c2410_dma_dostop(s3c2410_dma_chan_t *chan)
 {
@@ -886,6 +896,7 @@ s3c2410_dma_ctrl(dmach_t channel, s3c2410_chan_op_t op)
 	return -ENOENT;      /* unknown, don't bother */
 }
 
+EXPORT_SYMBOL(s3c2410_dma_ctrl);
 
 /* DMA configuration for each channel
  *
@@ -941,6 +952,7 @@ int s3c2410_dma_config(dmach_t channel,
 	return 0;
 }
 
+EXPORT_SYMBOL(s3c2410_dma_config);
 
 int s3c2410_dma_setflags(dmach_t channel, unsigned int flags)
 {
@@ -954,6 +966,9 @@ int s3c2410_dma_setflags(dmach_t channel, unsigned int flags)
 
 	return 0;
 }
+
+EXPORT_SYMBOL(s3c2410_dma_setflags);
+
 
 /* do we need to protect the settings of the fields from
  * irq?
@@ -972,6 +987,8 @@ int s3c2410_dma_set_opfn(dmach_t channel, s3c2410_dma_opfn_t rtn)
 	return 0;
 }
 
+EXPORT_SYMBOL(s3c2410_dma_set_opfn);
+
 int s3c2410_dma_set_buffdone_fn(dmach_t channel, s3c2410_dma_cbfn_t rtn)
 {
 	s3c2410_dma_chan_t *chan = &s3c2410_chans[channel];
@@ -984,6 +1001,8 @@ int s3c2410_dma_set_buffdone_fn(dmach_t channel, s3c2410_dma_cbfn_t rtn)
 
 	return 0;
 }
+
+EXPORT_SYMBOL(s3c2410_dma_set_buffdone_fn);
 
 /* s3c2410_dma_devconfig
  *
@@ -1042,12 +1061,57 @@ int s3c2410_dma_devconfig(int channel,
 	return -EINVAL;
 }
 
+EXPORT_SYMBOL(s3c2410_dma_devconfig);
+
+/* system device class */
+
+#ifdef CONFIG_PM
+
+static int s3c2410_dma_suspend(struct sys_device *dev, u32 state)
+{
+	s3c2410_dma_chan_t *cp = container_of(dev, s3c2410_dma_chan_t, dev);
+
+	printk(KERN_DEBUG "suspending dma channel %d\n", cp->number);
+
+	if (dma_rdreg(cp, S3C2410_DMA_DMASKTRIG) & S3C2410_DMASKTRIG_ON) {
+		/* the dma channel is still working, which is probably
+		 * a bad thing to do over suspend/resume. We stop the
+		 * channel and assume that the client is either going to
+		 * retry after resume, or that it is broken.
+		 */
+
+		printk(KERN_INFO "dma: stopping channel %d due to suspend\n",
+		       cp->number);
+
+		s3c2410_dma_dostop(cp);
+	}
+
+	return 0;
+}
+
+static int s3c2410_dma_resume(struct sys_device *dev)
+{
+	return 0;
+}
+
+#else
+#define s3c2410_dma_suspend NULL
+#define s3c2410_dma_resume  NULL
+#endif /* CONFIG_PM */
+
+static struct sysdev_class dma_sysclass = {
+	set_kset_name("s3c24xx-dma"),
+	.suspend	= s3c2410_dma_suspend,
+	.resume		= s3c2410_dma_resume,
+};
+
 /* initialisation code */
 
 static int __init s3c2410_init_dma(void)
 {
-	int channel;
 	s3c2410_dma_chan_t *cp;
+	int channel;
+	int ret;
 
 	printk("S3C2410 DMA Driver, (c) 2003-2004 Simtec Electronics\n");
 
@@ -1055,6 +1119,12 @@ static int __init s3c2410_init_dma(void)
 	if (dma_base == NULL) {
 		printk(KERN_ERR "dma failed to remap register block\n");
 		return -ENOMEM;
+	}
+
+	ret = sysdev_class_register(&dma_sysclass);
+	if (ret != 0) {
+		printk(KERN_ERR "dma sysclass registration failed\n");
+		goto err;
 	}
 
 	for (channel = 0; channel < S3C2410_DMA_CHANNELS; channel++) {
@@ -1065,7 +1135,7 @@ static int __init s3c2410_init_dma(void)
 		/* dma channel irqs are in order.. */
 		cp->number = channel;
 		cp->irq    = channel + IRQ_DMA0;
-		cp->regs   = (unsigned long)dma_base + (channel*0x40);
+		cp->regs   = dma_base + (channel*0x40);
 
 		/* point current stats somewhere */
 		cp->stats  = &cp->stats_store;
@@ -1075,11 +1145,22 @@ static int __init s3c2410_init_dma(void)
 
 		cp->load_timeout = 1<<18;
 
-		printk("DMA channel %d at %08lx, irq %d\n",
+		/* register system device */
+
+		cp->dev.cls = &dma_sysclass;
+		cp->dev.id  = channel;
+		ret = sysdev_register(&cp->dev);
+
+		printk("DMA channel %d at %p, irq %d\n",
 		       cp->number, cp->regs, cp->irq);
 	}
 
 	return 0;
+
+ err:
+	iounmap(dma_base);
+	dma_base = NULL;
+	return ret;
 }
 
 __initcall(s3c2410_init_dma);

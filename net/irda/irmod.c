@@ -62,7 +62,7 @@ extern int  irlap_driver_rcv(struct sk_buff *, struct net_device *,
 #ifdef CONFIG_IRDA_DEBUG
 unsigned int irda_debug = IRDA_DEBUG_LEVEL;
 module_param_named(debug, irda_debug, uint, 0);
-MODULE_PARM_DESC(irda_debug, "IRDA debugging level");
+MODULE_PARM_DESC(debug, "IRDA debugging level");
 EXPORT_SYMBOL(irda_debug);
 #endif
 

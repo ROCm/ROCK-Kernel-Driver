@@ -1813,8 +1813,11 @@ sisfb_set_par(struct fb_info *info)
 		return err;
 	}
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,10)
 	sisfb_get_fix(&info->fix, info->currcon, info);
-
+#else
+	sisfb_get_fix(&info->fix, -1, info);
+#endif
 	return 0;
 }
 
@@ -3952,19 +3955,19 @@ int __init sisfb_setup(char *options)
 }
 #endif
 
-static char * __devinit sis_find_rom(struct pci_dev *pdev)
+static void __iomem * __devinit sis_find_rom(struct pci_dev *pdev)
 {
 	struct sis_video_info *ivideo = pci_get_drvdata(pdev);
 
 #if defined(__i386__) || defined(__x86_64__)
         u32  segstart;
-        unsigned char *rom_base, *rom;
+	void __iomem *rom_base, *rom;
         int  romptr;
 	unsigned short pciid;
 
         for(segstart=0x000c0000; segstart<0x000f0000; segstart+=0x00001000) {
 
-            rom_base = (unsigned char *)ioremap(segstart, 0x10000);
+            rom_base = ioremap(segstart, 0x10000);
 	    if(!rom_base) continue;
 
 	    if((readb(rom_base) != 0x55) || (readb(rom_base + 1) != 0xaa)) {
@@ -3998,7 +4001,7 @@ static char * __devinit sis_find_rom(struct pci_dev *pdev)
 	    iounmap(rom_base);
         }
 #else
-	unsigned char *rom_base, *rom, *myrombase = NULL;
+	void __iomem *rom_base, *rom, *myrombase = NULL;
         int  romptr;
 	unsigned short pciid;
 	u32 backup;
@@ -4037,7 +4040,7 @@ static char * __devinit sis_find_rom(struct pci_dev *pdev)
 
 #ifdef CONFIG_FB_SIS_300
 static int __devinit
-sisfb_chkbuswidth300(struct pci_dev *pdev, ULONG FBAddress)
+sisfb_chkbuswidth300(struct pci_dev *pdev, void __iomem *FBAddress)
 {
 	struct sis_video_info *ivideo = pci_get_drvdata(pdev);
 	int i, j;
@@ -4080,7 +4083,7 @@ static void __devinit
 sisfb_setramsize300(struct pci_dev *pdev)
 {
 	struct  sis_video_info *ivideo = pci_get_drvdata(pdev);
-  	ULONG 	FBAddr = (ULONG)ivideo->sishw_ext.pjVideoMemoryAddress, Addr;
+	void __iomem *FBAddr = ivideo->sishw_ext.pjVideoMemoryAddress, *Addr;
 	USHORT 	SR13, SR14=0, buswidth, Done, data, TotalCapacity, PhysicalAdrOtherPage=0;
 	int     PseudoRankCapacity, PseudoTotalCapacity, PseudoAdrPinCount;
    	int     RankCapacity, AdrPinCount, BankNumHigh, BankNumMid, MB2Bank;
@@ -4959,7 +4962,7 @@ int __devinit sisfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		ivideo->modeprechange = 0x03;
 #if defined(__i386__) || defined(__x86_64__)
 		{
-			unsigned char *tt = ioremap(0, 0x1000);
+			unsigned char __iomem *tt = ioremap(0, 0x1000);
 			if(tt) {
 			   	ivideo->modeprechange = tt[0x449];
 			   	iounmap(tt);
@@ -4993,7 +4996,8 @@ int __devinit sisfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 #endif
 
-	ivideo->bios_vbase = ivideo->bios_abase = NULL;
+	ivideo->bios_abase = NULL;
+	ivideo->bios_vbase = NULL;
 	if(ivideo->sisfb_userom) {
 	    ivideo->sishw_ext.pjVirtualRomBase = sis_find_rom(pdev);
 #if defined(__i386__) || defined(__x86_64__)
@@ -5147,8 +5151,8 @@ int __devinit sisfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		return -ENODEV;
 	}
 
-	ivideo->video_vbase = (unsigned long)ioremap(ivideo->video_base, ivideo->video_size);
-	ivideo->sishw_ext.pjVideoMemoryAddress = (unsigned char *)ivideo->video_vbase;
+	ivideo->video_vbase = ioremap(ivideo->video_base, ivideo->video_size);
+	ivideo->sishw_ext.pjVideoMemoryAddress = ivideo->video_vbase;
 	if(!ivideo->video_vbase) {
 	   	printk(KERN_ERR "sisfb: Fatal error: Unable to map frame buffer memory\n");
 	   	release_mem_region(ivideo->video_base, ivideo->video_size);
@@ -5160,10 +5164,10 @@ int __devinit sisfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	   	return -ENODEV;
 	}
 
-	ivideo->mmio_vbase = (unsigned long)ioremap(ivideo->mmio_base, ivideo->mmio_size);
+	ivideo->mmio_vbase = ioremap(ivideo->mmio_base, ivideo->mmio_size);
 	if(!ivideo->mmio_vbase) {
 	   	printk(KERN_ERR "sisfb: Fatal error: Unable to map MMIO region\n");
-	   	iounmap((void *)ivideo->video_vbase);
+	   	iounmap(ivideo->video_vbase);
 	   	release_mem_region(ivideo->video_base, ivideo->video_size);
 	   	release_mem_region(ivideo->mmio_base, ivideo->mmio_size);
 		if(ivideo->bios_abase) vfree(ivideo->bios_abase);
@@ -5173,10 +5177,10 @@ int __devinit sisfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	   	return -ENODEV;
 	}
 
-	printk(KERN_INFO "sisfb: Framebuffer at 0x%lx, mapped to 0x%lx, size %ldk\n",
+	printk(KERN_INFO "sisfb: Framebuffer at 0x%lx, mapped to 0x%p, size %ldk\n",
 	       	ivideo->video_base, ivideo->video_vbase, ivideo->video_size / 1024);
 
-	printk(KERN_INFO "sisfb: MMIO at 0x%lx, mapped to 0x%lx, size %ldk\n",
+	printk(KERN_INFO "sisfb: MMIO at 0x%lx, mapped to 0x%p, size %ldk\n",
 	       	ivideo->mmio_base, ivideo->mmio_vbase, ivideo->mmio_size / 1024);
 
 	if((ivideo->havenoheap = sisfb_heap_init(ivideo))) {
@@ -5450,8 +5454,8 @@ int __devinit sisfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		if(SiSSetMode(&ivideo->SiS_Pr, &ivideo->sishw_ext, ivideo->mode_no) == 0) {
 			printk(KERN_ERR "sisfb: Fatal error: Setting mode[0x%x] failed\n",
 									ivideo->mode_no);
-			iounmap((void *)ivideo->video_vbase);
-			iounmap((void *)ivideo->mmio_vbase);
+			iounmap(ivideo->video_vbase);
+			iounmap(ivideo->mmio_vbase);
 			release_mem_region(ivideo->video_base, ivideo->video_size);
 			release_mem_region(ivideo->mmio_base, ivideo->mmio_size);
 			if(ivideo->bios_abase) vfree(ivideo->bios_abase);
@@ -5549,7 +5553,7 @@ int __devinit sisfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 #endif
 		sis_fb_info->var = ivideo->default_var;
 		sis_fb_info->fix = ivideo->sisfb_fix;
-		sis_fb_info->screen_base = (char *)ivideo->video_vbase;
+		sis_fb_info->screen_base = ivideo->video_vbase;
 		sis_fb_info->fbops = &sisfb_ops;
 
 		sisfb_get_fix(&sis_fb_info->fix, -1, sis_fb_info);
@@ -5574,8 +5578,8 @@ int __devinit sisfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 		if(register_framebuffer(sis_fb_info) < 0) {
 			printk(KERN_ERR "sisfb: Fatal error: Failed to register framebuffer\n");
-			iounmap((void *)ivideo->video_vbase);
-			iounmap((void *)ivideo->mmio_vbase);
+			iounmap(ivideo->video_vbase);
+			iounmap(ivideo->mmio_vbase);
 			release_mem_region(ivideo->video_base, ivideo->video_size);
 			release_mem_region(ivideo->mmio_base, ivideo->mmio_size);
 			if(ivideo->bios_abase) vfree(ivideo->bios_abase);
@@ -5669,8 +5673,8 @@ static void __devexit sisfb_remove(struct pci_dev *pdev)
 #endif
 
 	/* Unmap */
-	iounmap((void *)ivideo->video_vbase);
-	iounmap((void *)ivideo->mmio_vbase);
+	iounmap(ivideo->video_vbase);
+	iounmap(ivideo->mmio_vbase);
 	if(ivideo->bios_vbase) iounmap(ivideo->bios_vbase);
 	if(ivideo->bios_abase)    vfree(ivideo->bios_abase);
 
@@ -5720,7 +5724,11 @@ int __init sisfb_init(void)
 {
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,8)
 #ifndef MODULE
-	sisfb_setup(fb_get_options("sisfb"));
+	char *option = NULL;
+
+	if (fb_get_options("sisfb", &option))
+		return -ENODEV;
+	sisfb_setup(option);
 #endif
 #endif
 	return(pci_module_init(&sisfb_driver));

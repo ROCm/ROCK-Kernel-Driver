@@ -268,7 +268,7 @@ salinfo_event_open(struct inode *inode, struct file *file)
 }
 
 static ssize_t
-salinfo_event_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
+salinfo_event_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct inode *inode = file->f_dentry->d_inode;
 	struct proc_dir_entry *entry = PDE(inode);
@@ -417,11 +417,16 @@ retry:
 
 	if (!data->saved_num)
 		call_on_cpu(cpu, salinfo_log_read_cpu, data);
-	data->state = data->log_size ? STATE_LOG_RECORD : STATE_NO_DATA;
+	if (!data->log_size) {
+	        data->state = STATE_NO_DATA;
+	        clear_bit(cpu, &data->cpu_event);
+	} else {
+	        data->state = STATE_LOG_RECORD;
+	}
 }
 
 static ssize_t
-salinfo_log_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
+salinfo_log_read(struct file *file, char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct inode *inode = file->f_dentry->d_inode;
 	struct proc_dir_entry *entry = PDE(inode);
@@ -478,7 +483,7 @@ salinfo_log_clear(struct salinfo_data *data, int cpu)
 }
 
 static ssize_t
-salinfo_log_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
+salinfo_log_write(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	struct inode *inode = file->f_dentry->d_inode;
 	struct proc_dir_entry *entry = PDE(inode);

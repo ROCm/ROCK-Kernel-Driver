@@ -44,7 +44,7 @@
 #include "dmxdev.h"
 #include "dvbdev.h"
 #include "bt878.h"
-#include "dst-bt878.h"
+#include "dst_priv.h"
 
 
 /**************************************/
@@ -412,6 +412,8 @@ static int __devinit bt878_probe(struct pci_dev *dev,
 
 	printk(KERN_INFO "bt878: Bt878 AUDIO function found (%d).\n",
 	       bt878_num);
+	if (pci_enable_device(dev))
+		return -EIO;
 
 	bt = &bt878[bt878_num];
 	bt->dev = dev;
@@ -421,11 +423,10 @@ static int __devinit bt878_probe(struct pci_dev *dev,
 	bt->id = dev->device;
 	bt->irq = dev->irq;
 	bt->bt878_adr = pci_resource_start(dev, 0);
-	if (pci_enable_device(dev))
-		return -EIO;
 	if (!request_mem_region(pci_resource_start(dev, 0),
 				pci_resource_len(dev, 0), "bt878")) {
-		return -EBUSY;
+		result = -EBUSY;
+		goto fail0;
 	}
 
 	pci_read_config_byte(dev, PCI_CLASS_REVISION, &bt->revision);
@@ -496,6 +497,8 @@ static int __devinit bt878_probe(struct pci_dev *dev,
       fail1:
 	release_mem_region(pci_resource_start(bt->dev, 0),
 			   pci_resource_len(bt->dev, 0));
+      fail0:
+	pci_disable_device(dev);
 	return result;
 }
 
@@ -508,11 +511,11 @@ static void __devexit bt878_remove(struct pci_dev *pci_dev)
 		printk("bt878(%d): unloading\n", bt->nr);
 
 	/* turn off all capturing, DMA and IRQs */
-	btand(~13, BT878_AGPIO_DMA_CTL);
+	btand(~0x13, BT878_AGPIO_DMA_CTL);
 
 	/* first disable interrupts before unmapping the memory! */
 	btwrite(0, BT878_AINT_MASK);
-	btwrite(~0x0UL, BT878_AINT_STAT);
+	btwrite(~0U, BT878_AINT_STAT);
 
 	/* disable PCI bus-mastering */
 	pci_read_config_byte(bt->dev, PCI_COMMAND, &command);
@@ -535,6 +538,7 @@ static void __devexit bt878_remove(struct pci_dev *pci_dev)
 	bt878_mem_free(bt);
 
 	pci_set_drvdata(pci_dev, NULL);
+	pci_disable_device(pci_dev);
 	return;
 }
 
@@ -555,22 +559,11 @@ static struct pci_driver bt878_pci_driver = {
 
 static int bt878_pci_driver_registered = 0;
 
-/* This will be used later by dvb-bt8xx to only use the audio
- * dma of certain cards */
-int bt878_find_audio_dma(void)
-{
-	// pci_register_driver(&bt878_pci_driver);
-	bt878_pci_driver_registered = 1;
-	return 0;
-}
-
-EXPORT_SYMBOL(bt878_find_audio_dma);
-
 /*******************************/
 /* Module management functions */
 /*******************************/
 
-int bt878_init_module(void)
+static int bt878_init_module(void)
 {
 	bt878_num = 0;
 	bt878_pci_driver_registered = 0;
@@ -582,13 +575,13 @@ int bt878_init_module(void)
 /*
         bt878_check_chipset();
 */
-	/* later we register inside of bt878_find_audio_dma
+	/* later we register inside of bt878_find_audio_dma()
 	 * because we may want to ignore certain cards */
 	bt878_pci_driver_registered = 1;
 	return pci_module_init(&bt878_pci_driver);
 }
 
-void bt878_cleanup_module(void)
+static void bt878_cleanup_module(void)
 {
 	if (bt878_pci_driver_registered) {
 		bt878_pci_driver_registered = 0;
@@ -597,8 +590,6 @@ void bt878_cleanup_module(void)
 	return;
 }
 
-EXPORT_SYMBOL(bt878_init_module);
-EXPORT_SYMBOL(bt878_cleanup_module);
 module_init(bt878_init_module);
 module_exit(bt878_cleanup_module);
 

@@ -63,9 +63,6 @@ static int pci_mmcfg_write(int seg, int bus, int devfn, int reg, int len, u32 va
 		break;
 	}
 
-	/* Dummy read to flush PCI write */
-	readl(addr);
-
 	return 0;
 }
 
@@ -80,6 +77,13 @@ static int __init pci_mmcfg_init(void)
 		return 0;
 	if (!pci_mmcfg_base_addr)
 		return 0;
+
+	/* Kludge for now. Don't use mmconfig on AMD systems because
+	   those have some busses where mmconfig doesn't work,
+	   and we don't parse ACPI MCFG well enough to handle that. 
+	   Remove when proper handling is added. */
+	if (boot_cpu_data.x86_vendor == X86_VENDOR_AMD)
+		return 0; 
 
 	/* RED-PEN i386 doesn't do _nocache right now */
 	pci_mmcfg_virt = ioremap_nocache(pci_mmcfg_base_addr, MMCONFIG_APER_SIZE);

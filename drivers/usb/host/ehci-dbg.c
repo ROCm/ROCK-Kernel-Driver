@@ -119,16 +119,16 @@ static void __attribute__((__unused__))
 dbg_qtd (const char *label, struct ehci_hcd *ehci, struct ehci_qtd *qtd)
 {
 	ehci_dbg (ehci, "%s td %p n%08x %08x t%08x p0=%08x\n", label, qtd,
-		cpu_to_le32p (&qtd->hw_next),
-		cpu_to_le32p (&qtd->hw_alt_next),
-		cpu_to_le32p (&qtd->hw_token),
-		cpu_to_le32p (&qtd->hw_buf [0]));
+		le32_to_cpup (&qtd->hw_next),
+		le32_to_cpup (&qtd->hw_alt_next),
+		le32_to_cpup (&qtd->hw_token),
+		le32_to_cpup (&qtd->hw_buf [0]));
 	if (qtd->hw_buf [1])
 		ehci_dbg (ehci, "  p1=%08x p2=%08x p3=%08x p4=%08x\n",
-			cpu_to_le32p (&qtd->hw_buf [1]),
-			cpu_to_le32p (&qtd->hw_buf [2]),
-			cpu_to_le32p (&qtd->hw_buf [3]),
-			cpu_to_le32p (&qtd->hw_buf [4]));
+			le32_to_cpup (&qtd->hw_buf [1]),
+			le32_to_cpup (&qtd->hw_buf [2]),
+			le32_to_cpup (&qtd->hw_buf [3]),
+			le32_to_cpup (&qtd->hw_buf [4]));
 }
 
 static void __attribute__((__unused__))
@@ -185,7 +185,7 @@ dbg_sitd (const char *label, struct ehci_hcd *ehci, struct ehci_sitd *sitd)
 }
 
 static int __attribute__((__unused__))
-dbg_status_buf (char *buf, unsigned len, char *label, u32 status)
+dbg_status_buf (char *buf, unsigned len, const char *label, u32 status)
 {
 	return scnprintf (buf, len,
 		"%s%sstatus %04x%s%s%s%s%s%s%s%s%s%s",
@@ -204,7 +204,7 @@ dbg_status_buf (char *buf, unsigned len, char *label, u32 status)
 }
 
 static int __attribute__((__unused__))
-dbg_intr_buf (char *buf, unsigned len, char *label, u32 enable)
+dbg_intr_buf (char *buf, unsigned len, const char *label, u32 enable)
 {
 	return scnprintf (buf, len,
 		"%s%sintrenable %02x%s%s%s%s%s%s",
@@ -221,7 +221,8 @@ dbg_intr_buf (char *buf, unsigned len, char *label, u32 enable)
 static const char *const fls_strings [] =
     { "1024", "512", "256", "??" };
 
-static int dbg_command_buf (char *buf, unsigned len, char *label, u32 command)
+static int
+dbg_command_buf (char *buf, unsigned len, const char *label, u32 command)
 {
 	return scnprintf (buf, len,
 		"%s%scommand %06x %s=%d ithresh=%d%s%s%s%s period=%s%s %s",
@@ -240,7 +241,7 @@ static int dbg_command_buf (char *buf, unsigned len, char *label, u32 command)
 }
 
 static int
-dbg_port_buf (char *buf, unsigned len, char *label, int port, u32 status)
+dbg_port_buf (char *buf, unsigned len, const char *label, int port, u32 status)
 {
 	char	*sig;
 
@@ -276,19 +277,19 @@ dbg_qh (char *label, struct ehci_hcd *ehci, struct ehci_qh *qh)
 {}
 
 static inline int __attribute__((__unused__))
-dbg_status_buf (char *buf, unsigned len, char *label, u32 status)
+dbg_status_buf (char *buf, unsigned len, const char *label, u32 status)
 { return 0; }
 
 static inline int __attribute__((__unused__))
-dbg_command_buf (char *buf, unsigned len, char *label, u32 command)
+dbg_command_buf (char *buf, unsigned len, const char *label, u32 command)
 { return 0; }
 
 static inline int __attribute__((__unused__))
-dbg_intr_buf (char *buf, unsigned len, char *label, u32 enable)
+dbg_intr_buf (char *buf, unsigned len, const char *label, u32 enable)
 { return 0; }
 
 static inline int __attribute__((__unused__))
-dbg_port_buf (char *buf, unsigned len, char *label, int port, u32 status)
+dbg_port_buf (char *buf, unsigned len, const char *label, int port, u32 status)
 { return 0; }
 
 #endif	/* DEBUG */
@@ -331,14 +332,14 @@ static inline void remove_debug_files (struct ehci_hcd *bus) { }
 		default: tmp = '?'; break; \
 		}; tmp; })
 
-static inline char token_mark (u32 token)
+static inline char token_mark (__le32 token)
 {
-	token = le32_to_cpu (token);
-	if (token & QTD_STS_ACTIVE)
+	__u32 v = le32_to_cpu (token);
+	if (v & QTD_STS_ACTIVE)
 		return '*';
-	if (token & QTD_STS_HALT)
+	if (v & QTD_STS_HALT)
 		return '-';
-	if (!IS_SHORT_READ (token))
+	if (!IS_SHORT_READ (v))
 		return ' ';
 	/* tries to advance through hw_alt_next */
 	return '/';
@@ -371,25 +372,25 @@ static void qh_lines (
 			mark = '.';	/* use hw_qtd_next */
 		/* else alt_next points to some other qtd */
 	}
-	scratch = cpu_to_le32p (&qh->hw_info1);
-	hw_curr = (mark == '*') ? cpu_to_le32p (&qh->hw_current) : 0;
+	scratch = le32_to_cpup (&qh->hw_info1);
+	hw_curr = (mark == '*') ? le32_to_cpup (&qh->hw_current) : 0;
 	temp = scnprintf (next, size,
 			"qh/%p dev%d %cs ep%d %08x %08x (%08x%c %s nak%d)",
 			qh, scratch & 0x007f,
 			speed_char (scratch),
 			(scratch >> 8) & 0x000f,
-			scratch, cpu_to_le32p (&qh->hw_info2),
-			cpu_to_le32p (&qh->hw_token), mark,
+			scratch, le32_to_cpup (&qh->hw_info2),
+			le32_to_cpup (&qh->hw_token), mark,
 			(__constant_cpu_to_le32 (QTD_TOGGLE) & qh->hw_token)
 				? "data1" : "data0",
-			(cpu_to_le32p (&qh->hw_alt_next) >> 1) & 0x0f);
+			(le32_to_cpup (&qh->hw_alt_next) >> 1) & 0x0f);
 	size -= temp;
 	next += temp;
 
 	/* hc may be modifying the list as we read it ... */
 	list_for_each (entry, &qh->qtd_list) {
 		td = list_entry (entry, struct ehci_qtd, qtd_list);
-		scratch = cpu_to_le32p (&td->hw_token);
+		scratch = le32_to_cpup (&td->hw_token);
 		mark = ' ';
 		if (hw_curr == td->qtd_dma)
 			mark = '*';
@@ -488,7 +489,8 @@ show_periodic (struct class_device *class_dev, char *buf)
 	union ehci_shadow	p, *seen;
 	unsigned		temp, size, seen_count;
 	char			*next;
-	unsigned		i, tag;
+	unsigned		i;
+	__le32			tag;
 
 	if (!(seen = kmalloc (DBG_SCHED_LIMIT * sizeof *seen, SLAB_ATOMIC)))
 		return 0;
@@ -541,7 +543,7 @@ show_periodic (struct class_device *class_dev, char *buf)
 				}
 				/* show more info the first time around */
 				if (temp == seen_count && p.ptr) {
-					u32	scratch = cpu_to_le32p (
+					u32	scratch = le32_to_cpup (
 							&p.qh->hw_info1);
 					struct ehci_qtd	*qtd;
 					char		*type = "";

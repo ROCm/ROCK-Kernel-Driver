@@ -590,9 +590,6 @@ xfs_fs_goingdown(
 	xfs_mount_t	*mp,
 	__uint32_t	inflags)
 {
-	if (!capable(CAP_SYS_ADMIN))
-		return -EPERM;
-
 	switch (inflags) {
 	case XFS_FSOP_GOING_FLAGS_DEFAULT: {
 		struct vfs *vfsp = XFS_MTOVFS(mp);
@@ -602,7 +599,7 @@ xfs_fs_goingdown(
 			xfs_force_shutdown(mp, XFS_FORCE_UMOUNT);
 			thaw_bdev(sb->s_bdev, sb);
 		}
-
+	
 		break;
 	}
 	case XFS_FSOP_GOING_FLAGS_LOGFLUSH:

@@ -346,17 +346,17 @@ struct cs_card {
 	u32 irq;
 	
 	/* mappings */
-	void *ba0;
+	void __iomem *ba0;
 	union
 	{
 		struct
 		{
-			u8 *data0;
-			u8 *data1;
-			u8 *pmem;
-			u8 *reg;
+			u8 __iomem *data0;
+			u8 __iomem *data1;
+			u8 __iomem *pmem;
+			u8 __iomem *reg;
 		} name;
-		u8 *idx[4];
+		u8 __iomem *idx[4];
 	} ba1;
 	
 	/* Function support */
@@ -1190,7 +1190,7 @@ static int alloc_dmabuf(struct cs_state *state)
 	dmabuf->buforder = order;
 	dmabuf->rawbuf = rawbuf;
 	// Now mark the pages as reserved; otherwise the 
-	// remap_page_range() in cs46xx_mmap doesn't work.
+	// remap_pfn_range() in cs46xx_mmap doesn't work.
 	// 1. get index to last page in mem_map array for rawbuf.
 	mapend = virt_to_page(dmabuf->rawbuf + 
 		(PAGE_SIZE << dmabuf->buforder) - 1);
@@ -1227,7 +1227,7 @@ static int alloc_dmabuf(struct cs_state *state)
 	dmabuf->buforder_tmpbuff = order;
 	
 	// Now mark the pages as reserved; otherwise the 
-	// remap_page_range() in cs46xx_mmap doesn't work.
+	// remap_pfn_range() in cs46xx_mmap doesn't work.
 	// 1. get index to last page in mem_map array for rawbuf.
 	mapend = virt_to_page(dmabuf->tmpbuff + 
 		(PAGE_SIZE << dmabuf->buforder_tmpbuff) - 1);
@@ -2452,7 +2452,8 @@ static int cs_mmap(struct file *file, struct vm_area_struct *vma)
 		ret = -EINVAL;
 		goto out;
 	}
-	if (remap_page_range(vma, vma->vm_start, virt_to_phys(dmabuf->rawbuf),
+	if (remap_pfn_range(vma, vma->vm_start,
+			     virt_to_phys(dmabuf->rawbuf) >> PAGE_SHIFT,
 			     size, vma->vm_page_prot))
 	{
 		ret = -EAGAIN;
@@ -4308,7 +4309,7 @@ static int __init cs_ac97_init(struct cs_card *card)
 static void cs461x_download_image(struct cs_card *card)
 {
     unsigned i, j, temp1, temp2, offset, count;
-    unsigned char *pBA1 = ioremap(card->ba1_addr, 0x40000);
+    unsigned char __iomem *pBA1 = ioremap(card->ba1_addr, 0x40000);
     for( i=0; i < CLEAR__COUNT; i++)
     {
         offset = ClrStat[i].BA1__DestByteOffset;

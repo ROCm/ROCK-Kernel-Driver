@@ -73,6 +73,7 @@ struct us_unusual_dev {
 #define US_FL_SCM_MULT_TARG   0x00000020 /* supports multiple targets	    */
 #define US_FL_FIX_INQUIRY     0x00000040 /* INQUIRY response needs faking   */
 #define US_FL_FIX_CAPACITY    0x00000080 /* READ CAPACITY response too big  */
+#define US_FL_IGNORE_RESIDUE  0x00000100 /* reported residue is wrong	    */
 
 /* Dynamic flag definitions: used in set_bit() etc. */
 #define US_FLIDX_URB_ACTIVE	18  /* 0x00040000  current_urb is in use  */
@@ -82,13 +83,8 @@ struct us_unusual_dev {
 #define ABORTING_OR_DISCONNECTING	((1UL << US_FLIDX_ABORTING) | \
 					 (1UL << US_FLIDX_DISCONNECTING))
 #define US_FLIDX_RESETTING	22  /* 0x00400000  device reset in progress */
+#define US_FLIDX_TIMED_OUT	23  /* 0x00800000  SCSI midlayer timed out  */
 
-
-/* processing state machine states */
-#define US_STATE_IDLE		1
-#define US_STATE_RUNNING	2
-#define US_STATE_RESETTING	3
-#define US_STATE_ABORTING	4
 
 #define USB_STOR_STRING_LEN 32
 
@@ -147,7 +143,6 @@ struct us_data {
 
 	/* thread information */
 	int			pid;		 /* control thread	 */
-	int			sm_state;	 /* what we are doing	 */
 
 	/* control and bulk communications data */
 	struct urb		*current_urb;	 /* USB requests	 */
@@ -161,6 +156,8 @@ struct us_data {
 	struct semaphore	sema;		 /* to sleep thread on   */
 	struct completion	notify;		 /* thread begin/end	 */
 	wait_queue_head_t	dev_reset_wait;  /* wait during reset    */
+	wait_queue_head_t	scsi_scan_wait;	 /* wait before scanning */
+	struct completion	scsi_scan_done;	 /* scan thread end	 */
 
 	/* subdriver information */
 	void			*extra;		 /* Any extra data          */

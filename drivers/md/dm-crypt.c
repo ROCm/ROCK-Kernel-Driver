@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2003 Christophe Saout <christophe@saout.de>
+ * Copyright (C) 2004 Clemens Fruhwirth <clemens@endorphin.org>
  *
  * This file is released under the GPL.
  */
@@ -15,6 +16,7 @@
 #include <linux/workqueue.h>
 #include <asm/atomic.h>
 #include <asm/scatterlist.h>
+#include <asm/page.h>
 
 #include "dm.h"
 
@@ -40,10 +42,20 @@ struct convert_context {
 	struct bio *bio_out;
 	unsigned int offset_in;
 	unsigned int offset_out;
-	int idx_in;
-	int idx_out;
+	unsigned int idx_in;
+	unsigned int idx_out;
 	sector_t sector;
 	int write;
+};
+
+struct crypt_config;
+
+struct crypt_iv_operations {
+	int (*ctr)(struct crypt_config *cc, struct dm_target *ti,
+	           const char *opts);
+	void (*dtr)(struct crypt_config *cc);
+	const char *(*status)(struct crypt_config *cc);
+	int (*generator)(struct crypt_config *cc, u8 *iv, sector_t sector);
 };
 
 /*
@@ -64,11 +76,14 @@ struct crypt_config {
 	/*
 	 * crypto related data
 	 */
-	struct crypto_tfm *tfm;
+	struct crypt_iv_operations *iv_gen_ops;
+	char *iv_mode;
+	void *iv_gen_private;
 	sector_t iv_offset;
-	int (*iv_generator)(struct crypt_config *cc, u8 *iv, sector_t sector);
-	int iv_size;
-	int key_size;
+	unsigned int iv_size;
+
+	struct crypto_tfm *tfm;
+	unsigned int key_size;
 	u8 key[0];
 };
 
@@ -93,17 +108,128 @@ static void mempool_free_page(void *page, void *data)
 
 
 /*
- * Different IV generation algorithms
+ * Different IV generation algorithms:
+ *
+ * plain: the initial vector is the 32-bit low-endian version of the sector
+ *        number, padded with zeros if neccessary.
+ *
+ * ess_iv: "encrypted sector|salt initial vector", the sector number is
+ *         encrypted with the bulk cipher using a salt as key. The salt
+ *         should be derived from the bulk cipher's key via hashing.
+ *
+ * plumb: unimplemented, see:
+ * http://article.gmane.org/gmane.linux.kernel.device-mapper.dm-crypt/454
  */
-static int crypt_iv_plain(struct crypt_config *cc, u8 *iv, sector_t sector)
+
+static int crypt_iv_plain_gen(struct crypt_config *cc, u8 *iv, sector_t sector)
 {
+	memset(iv, 0, cc->iv_size);
 	*(u32 *)iv = cpu_to_le32(sector & 0xffffffff);
-	if (cc->iv_size > sizeof(u32) / sizeof(u8))
-		memset(iv + (sizeof(u32) / sizeof(u8)), 0,
-		       cc->iv_size - (sizeof(u32) / sizeof(u8)));
 
 	return 0;
 }
+
+static int crypt_iv_essiv_ctr(struct crypt_config *cc, struct dm_target *ti,
+	                      const char *opts)
+{
+	struct crypto_tfm *essiv_tfm;
+	struct crypto_tfm *hash_tfm;
+	struct scatterlist sg;
+	unsigned int saltsize;
+	u8 *salt;
+
+	if (opts == NULL) {
+		ti->error = PFX "Digest algorithm missing for ESSIV mode";
+		return -EINVAL;
+	}
+
+	/* Hash the cipher key with the given hash algorithm */
+	hash_tfm = crypto_alloc_tfm(opts, 0);
+	if (hash_tfm == NULL) {
+		ti->error = PFX "Error initializing ESSIV hash";
+		return -EINVAL;
+	}
+
+	if (crypto_tfm_alg_type(hash_tfm) != CRYPTO_ALG_TYPE_DIGEST) {
+		ti->error = PFX "Expected digest algorithm for ESSIV hash";
+		crypto_free_tfm(hash_tfm);
+		return -EINVAL;
+	}
+
+	saltsize = crypto_tfm_alg_digestsize(hash_tfm);
+	salt = kmalloc(saltsize, GFP_KERNEL);
+	if (salt == NULL) {
+		ti->error = PFX "Error kmallocing salt storage in ESSIV";
+		crypto_free_tfm(hash_tfm);
+		return -ENOMEM;
+	}
+
+	sg.page = virt_to_page(cc->key);
+	sg.offset = offset_in_page(cc->key);
+	sg.length = cc->key_size;
+	crypto_digest_digest(hash_tfm, &sg, 1, salt);
+	crypto_free_tfm(hash_tfm);
+
+	/* Setup the essiv_tfm with the given salt */
+	essiv_tfm = crypto_alloc_tfm(crypto_tfm_alg_name(cc->tfm),
+	                             CRYPTO_TFM_MODE_ECB);
+	if (essiv_tfm == NULL) {
+		ti->error = PFX "Error allocating crypto tfm for ESSIV";
+		kfree(salt);
+		return -EINVAL;
+	}
+	if (crypto_tfm_alg_blocksize(essiv_tfm)
+	    != crypto_tfm_alg_ivsize(cc->tfm)) {
+		ti->error = PFX "Block size of ESSIV cipher does "
+			        "not match IV size of block cipher";
+		crypto_free_tfm(essiv_tfm);
+		kfree(salt);
+		return -EINVAL;
+	}
+	if (crypto_cipher_setkey(essiv_tfm, salt, saltsize) < 0) {
+		ti->error = PFX "Failed to set key for ESSIV cipher";
+		crypto_free_tfm(essiv_tfm);
+		kfree(salt);
+		return -EINVAL;
+	}
+	kfree(salt);
+
+	cc->iv_gen_private = (void *)essiv_tfm;
+	return 0;
+}
+
+static void crypt_iv_essiv_dtr(struct crypt_config *cc)
+{
+	crypto_free_tfm((struct crypto_tfm *)cc->iv_gen_private);
+	cc->iv_gen_private = NULL;
+}
+
+static int crypt_iv_essiv_gen(struct crypt_config *cc, u8 *iv, sector_t sector)
+{
+	struct scatterlist sg = { NULL, };
+
+	memset(iv, 0, cc->iv_size);
+	*(u64 *)iv = cpu_to_le64(sector);
+
+	sg.page = virt_to_page(iv);
+	sg.offset = offset_in_page(iv);
+	sg.length = cc->iv_size;
+	crypto_cipher_encrypt((struct crypto_tfm *)cc->iv_gen_private,
+	                      &sg, &sg, cc->iv_size);
+
+	return 0;
+}
+
+static struct crypt_iv_operations crypt_iv_plain_ops = {
+	.generator = crypt_iv_plain_gen
+};
+
+static struct crypt_iv_operations crypt_iv_essiv_ops = {
+	.ctr       = crypt_iv_essiv_ctr,
+	.dtr       = crypt_iv_essiv_dtr,
+	.generator = crypt_iv_essiv_gen
+};
+
 
 static inline int
 crypt_convert_scatterlist(struct crypt_config *cc, struct scatterlist *out,
@@ -113,8 +239,8 @@ crypt_convert_scatterlist(struct crypt_config *cc, struct scatterlist *out,
 	u8 iv[cc->iv_size];
 	int r;
 
-	if (cc->iv_generator) {
-		r = cc->iv_generator(cc, iv, sector);
+	if (cc->iv_gen_ops) {
+		r = cc->iv_gen_ops->generator(cc, iv, sector);
 		if (r < 0)
 			return r;
 
@@ -200,13 +326,13 @@ static int crypt_convert(struct crypt_config *cc,
  */
 static struct bio *
 crypt_alloc_buffer(struct crypt_config *cc, unsigned int size,
-                   struct bio *base_bio, int *bio_vec_idx)
+                   struct bio *base_bio, unsigned int *bio_vec_idx)
 {
 	struct bio *bio;
-	int nr_iovecs = dm_div_up(size, PAGE_SIZE);
+	unsigned int nr_iovecs = dm_div_up(size, PAGE_SIZE);
 	int gfp_mask = GFP_NOIO | __GFP_HIGHMEM;
-	int flags = current->flags;
-	int i;
+	unsigned long flags = current->flags;
+	unsigned int i;
 
 	/*
 	 * Tell VM to act less aggressively and fail earlier.
@@ -280,9 +406,8 @@ crypt_alloc_buffer(struct crypt_config *cc, unsigned int size,
 static void crypt_free_buffer_pages(struct crypt_config *cc,
                                     struct bio *bio, unsigned int bytes)
 {
-	unsigned int start, end;
+	unsigned int i, start, end;
 	struct bio_vec *bv;
-	int i;
 
 	/*
 	 * This is ugly, but Jens Axboe thinks that using bi_idx in the
@@ -366,11 +491,11 @@ static void kcryptd_queue_io(struct crypt_io *io)
 /*
  * Decode key from its hex representation
  */
-static int crypt_decode_key(u8 *key, char *hex, int size)
+static int crypt_decode_key(u8 *key, char *hex, unsigned int size)
 {
 	char buffer[3];
 	char *endp;
-	int i;
+	unsigned int i;
 
 	buffer[2] = '\0';
 
@@ -393,9 +518,9 @@ static int crypt_decode_key(u8 *key, char *hex, int size)
 /*
  * Encode key into its hex representation
  */
-static void crypt_encode_key(char *hex, u8 *key, int size)
+static void crypt_encode_key(char *hex, u8 *key, unsigned int size)
 {
-	int i;
+	unsigned int i;
 
 	for(i = 0; i < size; i++) {
 		sprintf(hex, "%02x", *key);
@@ -414,9 +539,11 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 	struct crypto_tfm *tfm;
 	char *tmp;
 	char *cipher;
-	char *mode;
-	int crypto_flags;
-	int key_size;
+	char *chainmode;
+	char *ivmode;
+	char *ivopts;
+	unsigned int crypto_flags;
+	unsigned int key_size;
 
 	if (argc != 5) {
 		ti->error = PFX "Not enough arguments";
@@ -425,7 +552,9 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 
 	tmp = argv[0];
 	cipher = strsep(&tmp, "-");
-	mode = strsep(&tmp, "-");
+	chainmode = strsep(&tmp, "-");
+	ivopts = strsep(&tmp, "-");
+	ivmode = strsep(&ivopts, ":");
 
 	if (tmp)
 		DMWARN(PFX "Unexpected additional cipher options");
@@ -439,19 +568,33 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 		return -ENOMEM;
 	}
 
-	if (!mode || strcmp(mode, "plain") == 0)
-		cc->iv_generator = crypt_iv_plain;
-	else if (strcmp(mode, "ecb") == 0)
-		cc->iv_generator = NULL;
-	else {
-		ti->error = PFX "Invalid chaining mode";
+	cc->key_size = key_size;
+	if ((!key_size && strcmp(argv[1], "-") != 0) ||
+	    (key_size && crypt_decode_key(cc->key, argv[1], key_size) < 0)) {
+		ti->error = PFX "Error decoding key";
 		goto bad1;
 	}
 
-	if (cc->iv_generator)
+	/* Compatiblity mode for old dm-crypt cipher strings */
+	if (!chainmode || (strcmp(chainmode, "plain") == 0 && !ivmode)) {
+		chainmode = "cbc";
+		ivmode = "plain";
+	}
+
+	/* Choose crypto_flags according to chainmode */
+	if (strcmp(chainmode, "cbc") == 0)
 		crypto_flags = CRYPTO_TFM_MODE_CBC;
-	else
+	else if (strcmp(chainmode, "ecb") == 0)
 		crypto_flags = CRYPTO_TFM_MODE_ECB;
+	else {
+		ti->error = PFX "Unknown chaining mode";
+		goto bad1;
+	}
+
+	if (crypto_flags != CRYPTO_TFM_MODE_ECB && !ivmode) {
+		ti->error = PFX "This chaining mode requires an IV mechanism";
+		goto bad1;
+	}
 
 	tfm = crypto_alloc_tfm(cipher, crypto_flags);
 	if (!tfm) {
@@ -463,15 +606,39 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 		goto bad2;
 	}
 
+	cc->tfm = tfm;
+
+	/*
+	 * Choose ivmode. Valid modes: "plain", "essiv:<esshash>".
+	 * See comments at iv code
+	 */
+
+	if (ivmode == NULL)
+		cc->iv_gen_ops = NULL;
+	else if (strcmp(ivmode, "plain") == 0)
+		cc->iv_gen_ops = &crypt_iv_plain_ops;
+	else if (strcmp(ivmode, "essiv") == 0)
+		cc->iv_gen_ops = &crypt_iv_essiv_ops;
+	else {
+		ti->error = PFX "Invalid IV mode";
+		goto bad2;
+	}
+
+	if (cc->iv_gen_ops && cc->iv_gen_ops->ctr &&
+	    cc->iv_gen_ops->ctr(cc, ti, ivopts) < 0)
+		goto bad2;
+
 	if (tfm->crt_cipher.cit_decrypt_iv && tfm->crt_cipher.cit_encrypt_iv)
-		/* at least a 32 bit sector number should fit in our buffer */
+		/* at least a 64 bit sector number should fit in our buffer */
 		cc->iv_size = max(crypto_tfm_alg_ivsize(tfm),
-		                  (unsigned int)(sizeof(u32) / sizeof(u8)));
+		                  (unsigned int)(sizeof(u64) / sizeof(u8)));
 	else {
 		cc->iv_size = 0;
-		if (cc->iv_generator) {
+		if (cc->iv_gen_ops) {
 			DMWARN(PFX "Selected cipher does not support IVs");
-			cc->iv_generator = NULL;
+			if (cc->iv_gen_ops->dtr)
+				cc->iv_gen_ops->dtr(cc);
+			cc->iv_gen_ops = NULL;
 		}
 	}
 
@@ -479,52 +646,59 @@ static int crypt_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 				     mempool_free_slab, _crypt_io_pool);
 	if (!cc->io_pool) {
 		ti->error = PFX "Cannot allocate crypt io mempool";
-		goto bad2;
+		goto bad3;
 	}
 
 	cc->page_pool = mempool_create(MIN_POOL_PAGES, mempool_alloc_page,
 				       mempool_free_page, NULL);
 	if (!cc->page_pool) {
 		ti->error = PFX "Cannot allocate page mempool";
-		goto bad3;
-	}
-
-	cc->tfm = tfm;
-	cc->key_size = key_size;
-	if ((key_size == 0 && strcmp(argv[1], "-") != 0)
-	    || crypt_decode_key(cc->key, argv[1], key_size) < 0) {
-		ti->error = PFX "Error decoding key";
 		goto bad4;
 	}
 
 	if (tfm->crt_cipher.cit_setkey(tfm, cc->key, key_size) < 0) {
 		ti->error = PFX "Error setting key";
-		goto bad4;
+		goto bad5;
 	}
 
 	if (sscanf(argv[2], SECTOR_FORMAT, &cc->iv_offset) != 1) {
 		ti->error = PFX "Invalid iv_offset sector";
-		goto bad4;
+		goto bad5;
 	}
 
 	if (sscanf(argv[4], SECTOR_FORMAT, &cc->start) != 1) {
 		ti->error = PFX "Invalid device sector";
-		goto bad4;
+		goto bad5;
 	}
 
 	if (dm_get_device(ti, argv[3], cc->start, ti->len,
 	                  dm_table_get_mode(ti->table), &cc->dev)) {
 		ti->error = PFX "Device lookup failed";
-		goto bad4;
+		goto bad5;
 	}
+
+	if (ivmode && cc->iv_gen_ops) {
+		if (ivopts)
+			*(ivopts - 1) = ':';
+		cc->iv_mode = kmalloc(strlen(ivmode) + 1, GFP_KERNEL);
+		if (!cc->iv_mode) {
+			ti->error = PFX "Error kmallocing iv_mode string";
+			goto bad5;
+		}
+		strcpy(cc->iv_mode, ivmode);
+	} else
+		cc->iv_mode = NULL;
 
 	ti->private = cc;
 	return 0;
 
-bad4:
+bad5:
 	mempool_destroy(cc->page_pool);
-bad3:
+bad4:
 	mempool_destroy(cc->io_pool);
+bad3:
+	if (cc->iv_gen_ops && cc->iv_gen_ops->dtr)
+		cc->iv_gen_ops->dtr(cc);
 bad2:
 	crypto_free_tfm(tfm);
 bad1:
@@ -539,6 +713,10 @@ static void crypt_dtr(struct dm_target *ti)
 	mempool_destroy(cc->page_pool);
 	mempool_destroy(cc->io_pool);
 
+	if (cc->iv_mode)
+		kfree(cc->iv_mode);
+	if (cc->iv_gen_ops && cc->iv_gen_ops->dtr)
+		cc->iv_gen_ops->dtr(cc);
 	crypto_free_tfm(cc->tfm);
 	dm_put_device(ti, cc->dev);
 	kfree(cc);
@@ -577,7 +755,8 @@ static int crypt_endio(struct bio *bio, unsigned int done, int error)
 
 static inline struct bio *
 crypt_clone(struct crypt_config *cc, struct crypt_io *io, struct bio *bio,
-            sector_t sector, int *bvec_idx, struct convert_context *ctx)
+            sector_t sector, unsigned int *bvec_idx,
+            struct convert_context *ctx)
 {
 	struct bio *clone;
 
@@ -630,7 +809,7 @@ static int crypt_map(struct dm_target *ti, struct bio *bio,
 	struct bio *clone;
 	unsigned int remaining = bio->bi_size;
 	sector_t sector = bio->bi_sector - ti->begin;
-	int bvec_idx = 0;
+	unsigned int bvec_idx = 0;
 
 	io->target = ti;
 	io->bio = bio;
@@ -692,8 +871,8 @@ static int crypt_status(struct dm_target *ti, status_type_t type,
 	struct crypt_config *cc = (struct crypt_config *) ti->private;
 	char buffer[32];
 	const char *cipher;
-	const char *mode = NULL;
-	int offset;
+	const char *chainmode = NULL;
+	unsigned int sz = 0;
 
 	switch (type) {
 	case STATUSTYPE_INFO:
@@ -705,34 +884,35 @@ static int crypt_status(struct dm_target *ti, status_type_t type,
 
 		switch(cc->tfm->crt_cipher.cit_mode) {
 		case CRYPTO_TFM_MODE_CBC:
-			mode = "plain";
+			chainmode = "cbc";
 			break;
 		case CRYPTO_TFM_MODE_ECB:
-			mode = "ecb";
+			chainmode = "ecb";
 			break;
 		default:
 			BUG();
 		}
 
-		snprintf(result, maxlen, "%s-%s ", cipher, mode);
-		offset = strlen(result);
+		if (cc->iv_mode)
+			DMEMIT("%s-%s-%s ", cipher, chainmode, cc->iv_mode);
+		else
+			DMEMIT("%s-%s ", cipher, chainmode);
 
 		if (cc->key_size > 0) {
-			if ((maxlen - offset) < ((cc->key_size << 1) + 1))
+			if ((maxlen - sz) < ((cc->key_size << 1) + 1))
 				return -ENOMEM;
 
-			crypt_encode_key(result + offset, cc->key, cc->key_size);
-			offset += cc->key_size << 1;
+			crypt_encode_key(result + sz, cc->key, cc->key_size);
+			sz += cc->key_size << 1;
 		} else {
-			if (offset >= maxlen)
+			if (sz >= maxlen)
 				return -ENOMEM;
-			result[offset++] = '-';
+			result[sz++] = '-';
 		}
 
 		format_dev_t(buffer, cc->dev->bdev->bd_dev);
-		snprintf(result + offset, maxlen - offset, " " SECTOR_FORMAT
-		         " %s " SECTOR_FORMAT, cc->iv_offset,
-		         buffer, cc->start);
+		DMEMIT(" " SECTOR_FORMAT " %s " SECTOR_FORMAT,
+		       cc->iv_offset, buffer, cc->start);
 		break;
 	}
 	return 0;
@@ -740,7 +920,7 @@ static int crypt_status(struct dm_target *ti, status_type_t type,
 
 static struct target_type crypt_target = {
 	.name   = "crypt",
-	.version= {1, 0, 0},
+	.version= {1, 1, 0},
 	.module = THIS_MODULE,
 	.ctr    = crypt_ctr,
 	.dtr    = crypt_dtr,

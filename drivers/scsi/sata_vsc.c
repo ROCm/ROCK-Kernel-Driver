@@ -26,7 +26,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME	"sata_vsc"
-#define DRV_VERSION	"0.01"
+#define DRV_VERSION	"1.0"
 
 /* Interrupt register offsets (from chip base address) */
 #define VSC_SATA_INT_STAT_OFFSET	0x00
@@ -211,11 +211,12 @@ static struct ata_port_operations vsc_sata_ops = {
 	.port_disable		= ata_port_disable,
 	.tf_load		= vsc_sata_tf_load,
 	.tf_read		= vsc_sata_tf_read,
-	.exec_command		= ata_exec_command_mmio,
-	.check_status		= ata_check_status_mmio,
+	.exec_command		= ata_exec_command,
+	.check_status		= ata_check_status,
+	.dev_select		= ata_std_dev_select,
 	.phy_reset		= sata_phy_reset,
-	.bmdma_setup            = ata_bmdma_setup_mmio,
-	.bmdma_start            = ata_bmdma_start_mmio,
+	.bmdma_setup            = ata_bmdma_setup,
+	.bmdma_start            = ata_bmdma_start,
 	.qc_prep		= ata_qc_prep,
 	.qc_issue		= ata_qc_issue_prot,
 	.eng_timeout		= ata_eng_timeout,
@@ -292,7 +293,7 @@ static int __devinit vsc_sata_init_one (struct pci_dev *pdev, const struct pci_d
 		goto err_out_regions;
 	}
 	memset(probe_ent, 0, sizeof(*probe_ent));
-	probe_ent->pdev = pdev;
+	probe_ent->dev = pci_dev_to_dev(pdev);
 	INIT_LIST_HEAD(&probe_ent->node);
 
 	mmio_base = ioremap(pci_resource_start(pdev, 0),
@@ -331,6 +332,14 @@ static int __devinit vsc_sata_init_one (struct pci_dev *pdev, const struct pci_d
 	vsc_sata_setup_port(&probe_ent->port[3], base + 4 * VSC_SATA_PORT_OFFSET);
 
 	pci_set_master(pdev);
+
+	/* 
+	 * Config offset 0x98 is "Extended Control and Status Register 0"
+	 * Default value is (1 << 28).  All bits except bit 28 are reserved in
+	 * DPA mode.  If bit 28 is set, LED 0 reflects all ports' activity.
+	 * If bit 28 is clear, each port has its own LED.
+	 */
+	pci_write_config_dword(pdev, 0x98, 0);
 
 	/* FIXME: check ata_device_add return value */
 	ata_device_add(probe_ent);
@@ -384,6 +393,7 @@ MODULE_AUTHOR("Jeremy Higdon");
 MODULE_DESCRIPTION("low-level driver for Vitesse VSC7174 SATA controller");
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, vsc_sata_pci_tbl);
+MODULE_VERSION(DRV_VERSION);
 
 module_init(vsc_sata_init);
 module_exit(vsc_sata_exit);

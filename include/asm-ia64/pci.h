@@ -105,6 +105,8 @@ struct pci_controller {
 #define PCI_CONTROLLER(busdev) ((struct pci_controller *) busdev->sysdata)
 #define pci_domain_nr(busdev)    (PCI_CONTROLLER(busdev)->segment)
 
+extern struct pci_ops pci_root_ops;
+
 static inline int pci_name_bus(char *name, struct pci_bus *bus)
 {
 	if (pci_domain_nr(bus) == 0) {
@@ -119,7 +121,12 @@ static inline void pcibios_add_platform_entries(struct pci_dev *dev)
 {
 }
 
-/* generic pci stuff */
-#include <asm-generic/pci.h>
+extern void pcibios_resource_to_bus(struct pci_dev *dev,
+		struct pci_bus_region *region, struct resource *res);
+
+extern void pcibios_bus_to_resource(struct pci_dev *dev,
+		struct resource *res, struct pci_bus_region *region);
+
+#define pcibios_scan_all_fns(a, b)	0
 
 #endif /* _ASM_IA64_PCI_H */

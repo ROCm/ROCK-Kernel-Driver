@@ -22,64 +22,46 @@
  *
  *-----------------------------------------------------------------------------
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- * Where this Software is combined with software released under the terms of 
- * the GNU Public License ("GPL") and the terms of the GPL would require the 
- * combined work to also be released under the terms of the GPL, the terms
- * and conditions of this License will apply in addition to those of the
- * GPL with the exception of any terms or conditions of this License that
- * conflict with, or are expressly prohibited by, the GPL.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHORS AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #ifndef SYM_DEFS_H
 #define SYM_DEFS_H
 
-#define SYM_VERSION "2.1.18j"
+#define SYM_VERSION "2.1.18m"
 #define SYM_DRIVER_NAME	"sym-" SYM_VERSION
-
-/*
- *  Vendor.
- */
-#define PCI_VENDOR_NCR		0x1000
 
 /*
  *  PCI device identifier of SYMBIOS chips.
  */
-#define PCI_ID_SYM53C810	1
-#define PCI_ID_SYM53C810AP	5
-#define PCI_ID_SYM53C815	4
-#define PCI_ID_SYM53C820	2
-#define PCI_ID_SYM53C825	3
-#define PCI_ID_SYM53C860	6
-#define PCI_ID_SYM53C875	0xf
-#define PCI_ID_SYM53C875_2	0x8f
-#define PCI_ID_SYM53C885	0xd
-#define PCI_ID_SYM53C895	0xc
-#define PCI_ID_SYM53C896	0xb
-#define PCI_ID_SYM53C895A	0x12
-#define PCI_ID_SYM53C875A	0x13
-#define PCI_ID_LSI53C1010_33	0x20
-#define PCI_ID_LSI53C1010_66	0x21
-#define PCI_ID_LSI53C1510D	0xa
+#define PCI_ID_SYM53C810	PCI_DEVICE_ID_NCR_53C810
+#define PCI_ID_SYM53C810AP	PCI_DEVICE_ID_LSI_53C810AP
+#define PCI_ID_SYM53C815	PCI_DEVICE_ID_NCR_53C815
+#define PCI_ID_SYM53C820	PCI_DEVICE_ID_NCR_53C820
+#define PCI_ID_SYM53C825	PCI_DEVICE_ID_NCR_53C825
+#define PCI_ID_SYM53C860	PCI_DEVICE_ID_NCR_53C860
+#define PCI_ID_SYM53C875	PCI_DEVICE_ID_NCR_53C875
+#define PCI_ID_SYM53C875_2	PCI_DEVICE_ID_NCR_53C875J
+#define PCI_ID_SYM53C885	PCI_DEVICE_ID_NCR_53C885
+#define PCI_ID_SYM53C895	PCI_DEVICE_ID_NCR_53C895
+#define PCI_ID_SYM53C896	PCI_DEVICE_ID_NCR_53C896
+#define PCI_ID_SYM53C895A	PCI_DEVICE_ID_LSI_53C895A
+#define PCI_ID_SYM53C875A	PCI_DEVICE_ID_LSI_53C875A
+#define PCI_ID_LSI53C1010_33	PCI_DEVICE_ID_LSI_53C1010_33
+#define PCI_ID_LSI53C1010_66	PCI_DEVICE_ID_LSI_53C1010_66
+#define PCI_ID_LSI53C1510D	PCI_DEVICE_ID_LSI_53C1510
 
 /*
  *	SYM53C8XX device features descriptor.
@@ -776,33 +758,32 @@ struct sym_tblsel {
  *	Messages
  */
 
-#define	M_COMPLETE	(0x00)
-#define	M_EXTENDED	(0x01)
-#define	M_SAVE_DP	(0x02)
-#define	M_RESTORE_DP	(0x03)
-#define	M_DISCONNECT	(0x04)
-#define	M_ID_ERROR	(0x05)
-#define	M_ABORT		(0x06)
-#define	M_REJECT	(0x07)
-#define	M_NOOP		(0x08)
-#define	M_PARITY	(0x09)
-#define	M_LCOMPLETE	(0x0a)
-#define	M_FCOMPLETE	(0x0b)
-#define	M_RESET		(0x0c)
+#define	M_COMPLETE	COMMAND_COMPLETE
+#define	M_EXTENDED	EXTENDED_MESSAGE
+#define	M_SAVE_DP	SAVE_POINTERS
+#define	M_RESTORE_DP	RESTORE_POINTERS
+#define	M_DISCONNECT	DISCONNECT
+#define	M_ID_ERROR	INITIATOR_ERROR
+#define	M_ABORT		ABORT
+#define	M_REJECT	MESSAGE_REJECT
+#define	M_NOOP		NOP
+#define	M_PARITY	MSG_PARITY_ERROR
+#define	M_LCOMPLETE	LINKED_CMD_COMPLETE
+#define	M_FCOMPLETE	LINKED_FLG_CMD_COMPLETE
+#define	M_RESET		BUS_DEVICE_RESET
 #define	M_ABORT_TAG	(0x0d)
 #define	M_CLEAR_QUEUE	(0x0e)
-#define	M_INIT_REC	(0x0f)
-#define	M_REL_REC	(0x10)
+#define	M_INIT_REC	INITIATE_RECOVERY
+#define	M_REL_REC	RELEASE_RECOVERY
 #define	M_TERMINATE	(0x11)
-#define	M_SIMPLE_TAG	(0x20)
-#define	M_HEAD_TAG	(0x21)
-#define	M_ORDERED_TAG	(0x22)
+#define	M_SIMPLE_TAG	SIMPLE_QUEUE_TAG
+#define	M_HEAD_TAG	HEAD_OF_QUEUE_TAG
+#define	M_ORDERED_TAG	ORDERED_QUEUE_TAG
 #define	M_IGN_RESIDUE	(0x23)
-#define	M_IDENTIFY   	(0x80)
 
-#define	M_X_MODIFY_DP	(0x00)
-#define	M_X_SYNC_REQ	(0x01)
-#define	M_X_WIDE_REQ	(0x03)
+#define	M_X_MODIFY_DP	EXTENDED_MODIFY_DATA_POINTER
+#define	M_X_SYNC_REQ	EXTENDED_SDTR
+#define	M_X_WIDE_REQ	EXTENDED_WDTR
 #define	M_X_PPR_REQ	(0x04)
 
 /*
@@ -817,15 +798,15 @@ struct sym_tblsel {
  *	Status
  */
 
-#define	S_GOOD		(0x00)
-#define	S_CHECK_COND	(0x02)
-#define	S_COND_MET	(0x04)
-#define	S_BUSY		(0x08)
-#define	S_INT		(0x10)
-#define	S_INT_COND_MET	(0x14)
-#define	S_CONFLICT	(0x18)
-#define	S_TERMINATED	(0x20)
-#define	S_QUEUE_FULL	(0x28)
+#define	S_GOOD		SAM_STAT_GOOD
+#define	S_CHECK_COND	SAM_STAT_CHECK_CONDITION
+#define	S_COND_MET	SAM_STAT_CONDITION_MET
+#define	S_BUSY		SAM_STAT_BUSY
+#define	S_INT		SAM_STAT_INTERMEDIATE
+#define	S_INT_COND_MET	SAM_STAT_INTERMEDIATE_CONDITION_MET
+#define	S_CONFLICT	SAM_STAT_RESERVATION_CONFLICT
+#define	S_TERMINATED	SAM_STAT_COMMAND_TERMINATED
+#define	S_QUEUE_FULL	SAM_STAT_TASK_SET_FULL
 #define	S_ILLEGAL	(0xff)
 
 #endif /* defined SYM_DEFS_H */

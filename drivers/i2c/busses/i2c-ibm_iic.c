@@ -81,7 +81,7 @@ MODULE_PARM_DESC(iic_fast_poll, "Force fast mode (400 kHz)");
 #if DBG_LEVEL > 2
 static void dump_iic_regs(const char* header, struct ibm_iic_private* dev)
 {
-	volatile struct iic_regs *iic = dev->vaddr;
+	volatile struct iic_regs __iomem *iic = dev->vaddr;
 	printk(KERN_DEBUG "ibm-iic%d: %s\n", dev->idx, header);
 	printk(KERN_DEBUG "  cntl     = 0x%02x, mdcntl = 0x%02x\n"
 	       KERN_DEBUG "  sts      = 0x%02x, extsts = 0x%02x\n"
@@ -132,7 +132,7 @@ static inline void iic_interrupt_mode(struct ibm_iic_private* dev, int enable)
  */
 static void iic_dev_init(struct ibm_iic_private* dev)
 {
-	volatile struct iic_regs *iic = dev->vaddr;
+	volatile struct iic_regs __iomem *iic = dev->vaddr;
 
 	DBG("%d: init\n", dev->idx);
 	
@@ -177,7 +177,7 @@ static void iic_dev_init(struct ibm_iic_private* dev)
  */
 static void iic_dev_reset(struct ibm_iic_private* dev)
 {
-	volatile struct iic_regs *iic = dev->vaddr;
+	volatile struct iic_regs __iomem *iic = dev->vaddr;
 	int i;
 	u8 dc;
 	
@@ -225,7 +225,7 @@ static void iic_dev_reset(struct ibm_iic_private* dev)
  */
 
 /* Wait for SCL and/or SDA to be high */
-static int iic_dc_wait(volatile struct iic_regs *iic, u8 mask)
+static int iic_dc_wait(volatile struct iic_regs __iomem *iic, u8 mask)
 {
 	unsigned long x = jiffies + HZ / 28 + 2;
 	while ((in_8(&iic->directcntl) & mask) != mask){
@@ -238,7 +238,7 @@ static int iic_dc_wait(volatile struct iic_regs *iic, u8 mask)
 
 static int iic_smbus_quick(struct ibm_iic_private* dev, const struct i2c_msg* p)
 {
-	volatile struct iic_regs* iic = dev->vaddr;
+	volatile struct iic_regs __iomem *iic = dev->vaddr;
 	const struct i2c_timings* t = &timings[dev->fast_mode ? 1 : 0];
 	u8 mask, v, sda;
 	int i, res;
@@ -324,7 +324,7 @@ err:
 static irqreturn_t iic_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct ibm_iic_private* dev = (struct ibm_iic_private*)dev_id;
-	volatile struct iic_regs* iic = dev->vaddr;
+	volatile struct iic_regs __iomem *iic = dev->vaddr;
 	
 	DBG2("%d: irq handler, STS = 0x%02x, EXTSTS = 0x%02x\n", 
 	     dev->idx, in_8(&iic->sts), in_8(&iic->extsts));
@@ -342,7 +342,7 @@ static irqreturn_t iic_handler(int irq, void *dev_id, struct pt_regs *regs)
  */
 static int iic_xfer_result(struct ibm_iic_private* dev)
 {
-	volatile struct iic_regs *iic = dev->vaddr;	
+	volatile struct iic_regs __iomem *iic = dev->vaddr;	
 	
 	if (unlikely(in_8(&iic->sts) & STS_ERR)){
 		DBG("%d: xfer error, EXTSTS = 0x%02x\n", dev->idx, 
@@ -375,7 +375,7 @@ static int iic_xfer_result(struct ibm_iic_private* dev)
  */
 static void iic_abort_xfer(struct ibm_iic_private* dev)
 {
-	volatile struct iic_regs *iic = dev->vaddr;
+	volatile struct iic_regs __iomem *iic = dev->vaddr;
 	unsigned long x;
 	
 	DBG("%d: iic_abort_xfer\n", dev->idx);
@@ -407,25 +407,17 @@ static void iic_abort_xfer(struct ibm_iic_private* dev)
  */
 static int iic_wait_for_tc(struct ibm_iic_private* dev){
 	
-	volatile struct iic_regs *iic = dev->vaddr;
+	volatile struct iic_regs __iomem *iic = dev->vaddr;
 	int ret = 0;
 	
 	if (dev->irq >= 0){
 		/* Interrupt mode */
-		wait_queue_t wait;
-    		init_waitqueue_entry(&wait, current);
-		
-		add_wait_queue(&dev->wq, &wait);
-		set_current_state(TASK_INTERRUPTIBLE);
-		if (in_8(&iic->sts) & STS_PT)
-			schedule_timeout(dev->adap.timeout * HZ);
-		set_current_state(TASK_RUNNING);
-		remove_wait_queue(&dev->wq, &wait);
-		
-		if (unlikely(signal_pending(current))){
+		ret = wait_event_interruptible_timeout(dev->wq, 
+			!(in_8(&iic->sts) & STS_PT), dev->adap.timeout * HZ);
+
+		if (unlikely(ret < 0))
 			DBG("%d: wait interrupted\n", dev->idx);
-			ret = -ERESTARTSYS;
-		} else if (unlikely(in_8(&iic->sts) & STS_PT)){
+		else if (unlikely(in_8(&iic->sts) & STS_PT)){
 			DBG("%d: wait timeout\n", dev->idx);
 			ret = -ETIMEDOUT;
 		}
@@ -466,7 +458,7 @@ static int iic_wait_for_tc(struct ibm_iic_private* dev){
 static int iic_xfer_bytes(struct ibm_iic_private* dev, struct i2c_msg* pm, 
 			  int combined_xfer)
 {
-	volatile struct iic_regs *iic = dev->vaddr;
+	volatile struct iic_regs __iomem *iic = dev->vaddr;
 	char* buf = pm->buf;
 	int i, j, loops, ret = 0;
 	int len = pm->len;
@@ -482,7 +474,7 @@ static int iic_xfer_bytes(struct ibm_iic_private* dev, struct i2c_msg* pm,
 		
 		if (!(cntl & CNTL_RW))
 			for (j = 0; j < count; ++j)
-				out_8((volatile u8*)&iic->mdbuf, *buf++);
+				out_8((void __iomem *)&iic->mdbuf, *buf++);
 		
 		if (i < loops - 1)
 			cmd |= CNTL_CHT;
@@ -513,7 +505,7 @@ static int iic_xfer_bytes(struct ibm_iic_private* dev, struct i2c_msg* pm,
 		
 		if (cntl & CNTL_RW)
 			for (j = 0; j < count; ++j)
-				*buf++ = in_8((volatile u8*)&iic->mdbuf);
+				*buf++ = in_8((void __iomem *)&iic->mdbuf);
 	}
 	
 	return ret > 0 ? 0 : ret;
@@ -524,7 +516,7 @@ static int iic_xfer_bytes(struct ibm_iic_private* dev, struct i2c_msg* pm,
  */
 static inline void iic_address(struct ibm_iic_private* dev, struct i2c_msg* msg)
 {
-	volatile struct iic_regs *iic = dev->vaddr;
+	volatile struct iic_regs __iomem *iic = dev->vaddr;
 	u16 addr = msg->addr;
 	
 	DBG2("%d: iic_address, 0x%03x (%d-bit)\n", dev->idx, 
@@ -560,7 +552,7 @@ static inline int iic_address_neq(const struct i2c_msg* p1,
 static int iic_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 {
     	struct ibm_iic_private* dev = (struct ibm_iic_private*)(i2c_get_adapdata(adap));
-	volatile struct iic_regs *iic = dev->vaddr;
+	volatile struct iic_regs __iomem *iic = dev->vaddr;
 	int i, ret = 0;
 	
 	DBG2("%d: iic_xfer, %d msg(s)\n", dev->idx, num);
@@ -763,9 +755,9 @@ fail:
 		free_irq(dev->irq, dev);
 	}	
 
-	iounmap((void*)dev->vaddr);
+	iounmap(dev->vaddr);
 fail2:	
-	ocp_set_drvdata(ocp, 0);
+	ocp_set_drvdata(ocp, NULL);
 	kfree(dev);	
 	return ret;
 }
@@ -791,7 +783,7 @@ static void __devexit iic_remove(struct ocp_device *ocp)
 		    iic_interrupt_mode(dev, 0);	
 		    free_irq(dev->irq, dev);
 		}
-		iounmap((void*)dev->vaddr);
+		iounmap(dev->vaddr);
 		kfree(dev);
 	}
 }

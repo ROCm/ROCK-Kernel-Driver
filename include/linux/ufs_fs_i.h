@@ -15,9 +15,9 @@
 
 struct ufs_inode_info {
 	union {
-		__u32	i_data[15];
+		__fs32	i_data[15];
 		__u8	i_symlink[4*15];
-		__u64	u2_i_data[15];
+		__fs64	u2_i_data[15];
 	} i_u1;
 	__u32	i_flags;
 	__u32	i_gen;

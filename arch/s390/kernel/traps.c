@@ -38,6 +38,7 @@
 #include <asm/cpcmd.h>
 #include <asm/s390_ext.h>
 #include <asm/lowcore.h>
+#include <asm/debug.h>
 
 /* Called from entry.S only */
 extern void handle_per_exception(struct pt_regs *regs);
@@ -277,8 +278,10 @@ spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
 void die(const char * str, struct pt_regs * regs, long err)
 {
 	static int die_counter;
-        console_verbose();
-        spin_lock_irq(&die_lock);
+
+	debug_stop_all();
+	console_verbose();
+	spin_lock_irq(&die_lock);
 	bust_spinlocks(1);
 	printk("%s: %04lx [#%d]\n", str, err & 0xffff, ++die_counter);
         show_regs(regs);
@@ -289,6 +292,20 @@ void die(const char * str, struct pt_regs * regs, long err)
 	if (panic_on_oops)
 		panic("Fatal exception: panic_on_oops");
         do_exit(SIGSEGV);
+}
+
+static void inline
+report_user_fault(long interruption_code, struct pt_regs *regs)
+{
+#if defined(CONFIG_SYSCTL)
+	if (!sysctl_userprocess_debug)
+		return;
+#endif
+#if defined(CONFIG_SYSCTL) || defined(CONFIG_PROCESS_DEBUG)
+	printk("User process fault: interruption code 0x%lX\n",
+	       interruption_code);
+	show_regs(regs);
+#endif
 }
 
 static void inline do_trap(long interruption_code, int signr, char *str,
@@ -305,23 +322,8 @@ static void inline do_trap(long interruption_code, int signr, char *str,
                 struct task_struct *tsk = current;
 
                 tsk->thread.trap_no = interruption_code & 0xffff;
-		if (info)
-			force_sig_info(signr, info, tsk);
-		else
-                	force_sig(signr, tsk);
-#ifndef CONFIG_SYSCTL
-#ifdef CONFIG_PROCESS_DEBUG
-                printk("User process fault: interruption code 0x%lX\n",
-                       interruption_code);
-                show_regs(regs);
-#endif
-#else
-		if (sysctl_userprocess_debug) {
-			printk("User process fault: interruption code 0x%lX\n",
-			       interruption_code);
-			show_regs(regs);
-		}
-#endif
+		force_sig_info(signr, info, tsk);
+		report_user_fault(interruption_code, regs);
         } else {
                 const struct exception_table_entry *fixup;
                 fixup = search_exception_tables(regs->psw.addr & PSW_ADDR_INSN);
@@ -343,10 +345,15 @@ void do_single_step(struct pt_regs *regs)
 		force_sig(SIGTRAP, current);
 }
 
-#define DO_ERROR(signr, str, name) \
-asmlinkage void name(struct pt_regs * regs, long interruption_code) \
-{ \
-	do_trap(interruption_code, signr, str, regs, NULL); \
+asmlinkage void
+default_trap_handler(struct pt_regs * regs, long interruption_code)
+{
+        if (regs->psw.mask & PSW_MASK_PSTATE) {
+		local_irq_enable();
+		do_exit(SIGSEGV);
+		report_user_fault(interruption_code, regs);
+	} else
+		die("Unknown program exception", regs, interruption_code);
 }
 
 #define DO_ERROR_INFO(signr, str, name, sicode, siaddr) \
@@ -359,8 +366,6 @@ asmlinkage void name(struct pt_regs * regs, long interruption_code) \
         info.si_addr = (void *)siaddr; \
         do_trap(interruption_code, signr, str, regs, &info); \
 }
-
-DO_ERROR(SIGSEGV, "Unknown program exception", default_trap_handler)
 
 DO_ERROR_INFO(SIGILL, "addressing exception", addressing_exception,
 	      ILL_ILLADR, get_check_address(regs))
@@ -420,6 +425,7 @@ do_fp_trap(struct pt_regs *regs, void *location,
 
 asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
 {
+	siginfo_t info;
         __u8 opcode[6];
 	__u16 *location;
 	int signal = 0;
@@ -463,12 +469,27 @@ asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
 	} else
 		signal = SIGILL;
 
+#ifdef CONFIG_MATHEMU
         if (signal == SIGFPE)
 		do_fp_trap(regs, location,
                            current->thread.fp_regs.fpc, interruption_code);
-        else if (signal)
+        else if (signal == SIGSEGV) {
+		info.si_signo = signal;
+		info.si_errno = 0;
+		info.si_code = SEGV_MAPERR;
+		info.si_addr = (void *) location;
 		do_trap(interruption_code, signal,
-			"illegal operation", regs, NULL);
+			"user address fault", regs, &info);
+	} else
+#endif
+        if (signal) {
+		info.si_signo = signal;
+		info.si_errno = 0;
+		info.si_code = ILL_ILLOPC;
+		info.si_addr = (void *) location;
+		do_trap(interruption_code, signal,
+			"illegal operation", regs, &info);
+	}
 }
 
 
@@ -630,6 +651,21 @@ asmlinkage void data_exception(struct pt_regs * regs, long interruption_code)
 	}
 }
 
+asmlinkage void space_switch_exception(struct pt_regs * regs, long int_code)
+{
+        siginfo_t info;
+
+	/* Set user psw back to home space mode. */
+	if (regs->psw.mask & PSW_MASK_PSTATE)
+		regs->psw.mask |= PSW_ASC_HOME;
+	/* Send SIGILL. */
+        info.si_signo = SIGILL;
+        info.si_errno = 0;
+        info.si_code = ILL_PRVOPC;
+        info.si_addr = get_check_address(regs);
+        do_trap(int_code, SIGILL, "space switch event", regs, &info);
+}
+
 asmlinkage void kernel_stack_overflow(struct pt_regs * regs)
 {
 	die("Kernel stack overflow", regs, 0);
@@ -673,7 +709,7 @@ void __init trap_init(void)
         pgm_check_table[0x3B] = &do_dat_exception;
 #endif /* CONFIG_ARCH_S390X */
         pgm_check_table[0x15] = &operand_exception;
-        pgm_check_table[0x1C] = &privileged_op;
+        pgm_check_table[0x1C] = &space_switch_exception;
         pgm_check_table[0x1D] = &hfp_sqrt_exception;
 	pgm_check_table[0x40] = &do_monitor_call;
 

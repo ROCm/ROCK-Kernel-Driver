@@ -7,7 +7,7 @@
 #include <asm/io.h>
 #include <asm/byteorder.h>
 
-void outsb(unsigned long addr, const void *src, unsigned long count)
+void outsb(void __iomem *addr, const void *src, unsigned long count)
 {
 	const u8 *p = src;
 
@@ -15,7 +15,7 @@ void outsb(unsigned long addr, const void *src, unsigned long count)
 		outb(*p++, addr);
 }
 
-void outsw(unsigned long addr, const void *src, unsigned long count)
+void outsw(void __iomem *addr, const void *src, unsigned long count)
 {
 	if(count) {
 		u16 *ps = (u16 *)src;
@@ -44,7 +44,7 @@ void outsw(unsigned long addr, const void *src, unsigned long count)
 	}
 }
 
-void outsl(unsigned long addr, const void *src, unsigned long count)
+void outsl(void __iomem *addr, const void *src, unsigned long count)
 {
 	if(count) {
 		if((((u64)src) & 0x3) == 0) {
@@ -119,7 +119,7 @@ void outsl(unsigned long addr, const void *src, unsigned long count)
 	}
 }
 
-void insb(unsigned long addr, void *dst, unsigned long count)
+void insb(void __iomem *addr, void *dst, unsigned long count)
 {
 	if(count) {
 		u32 *pi;
@@ -144,7 +144,7 @@ void insb(unsigned long addr, void *dst, unsigned long count)
 	}
 }
 
-void insw(unsigned long addr, void *dst, unsigned long count)
+void insw(void __iomem *addr, void *dst, unsigned long count)
 {
 	if(count) {
 		u16 *ps = dst;
@@ -169,7 +169,7 @@ void insw(unsigned long addr, void *dst, unsigned long count)
 	}
 }
 
-void insl(unsigned long addr, void *dst, unsigned long count)
+void insl(void __iomem *addr, void *dst, unsigned long count)
 {
 	if(count) {
 		if((((unsigned long)dst) & 0x3) == 0) {

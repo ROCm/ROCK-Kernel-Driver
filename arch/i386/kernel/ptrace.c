@@ -15,7 +15,6 @@
 #include <linux/user.h>
 #include <linux/security.h>
 #include <linux/audit.h>
-#include <linux/proc_mm.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -139,6 +138,28 @@ static unsigned long getreg(struct task_struct *child,
 	return retval;
 }
 
+static void set_singlestep(struct task_struct *child)
+{
+	long eflags;
+
+	set_tsk_thread_flag(child, TIF_SINGLESTEP);
+	eflags = get_stack_long(child, EFL_OFFSET);
+	put_stack_long(child, EFL_OFFSET, eflags | TRAP_FLAG);
+	child->ptrace |= PT_DTRACE;
+}
+
+static void clear_singlestep(struct task_struct *child)
+{
+	if (child->ptrace & PT_DTRACE) {
+		long eflags;
+
+		clear_tsk_thread_flag(child, TIF_SINGLESTEP);
+		eflags = get_stack_long(child, EFL_OFFSET);
+		put_stack_long(child, EFL_OFFSET, eflags & ~TRAP_FLAG);
+		child->ptrace &= ~PT_DTRACE;
+	}
+}
+
 /*
  * Called by kernel/ptrace.c when detaching..
  *
@@ -146,11 +167,7 @@ static unsigned long getreg(struct task_struct *child,
  */
 void ptrace_disable(struct task_struct *child)
 { 
-	long tmp;
-
-	clear_tsk_thread_flag(child, TIF_SINGLESTEP);
-	tmp = get_stack_long(child, EFL_OFFSET) & ~TRAP_FLAG;
-	put_stack_long(child, EFL_OFFSET, tmp);
+	clear_singlestep(child);
 }
 
 /*
@@ -345,6 +362,36 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			  if(addr < (long) &dummy->u_debugreg[4] &&
 			     ((unsigned long) data) >= TASK_SIZE-3) break;
 			  
+			  /* Sanity-check data. Take one half-byte at once with
+			   * check = (val >> (16 + 4*i)) & 0xf. It contains the
+			   * R/Wi and LENi bits; bits 0 and 1 are R/Wi, and bits
+			   * 2 and 3 are LENi. Given a list of invalid values,
+			   * we do mask |= 1 << invalid_value, so that
+			   * (mask >> check) & 1 is a correct test for invalid
+			   * values.
+			   *
+			   * R/Wi contains the type of the breakpoint /
+			   * watchpoint, LENi contains the length of the watched
+			   * data in the watchpoint case.
+			   *
+			   * The invalid values are:
+			   * - LENi == 0x10 (undefined), so mask |= 0x0f00.
+			   * - R/Wi == 0x10 (break on I/O reads or writes), so
+			   *   mask |= 0x4444.
+			   * - R/Wi == 0x00 && LENi != 0x00, so we have mask |=
+			   *   0x1110.
+			   *
+			   * Finally, mask = 0x0f00 | 0x4444 | 0x1110 == 0x5f54.
+			   *
+			   * See the Intel Manual "System Programming Guide",
+			   * 15.2.4
+			   *
+			   * Note that LENi == 0x10 is defined on x86_64 in long
+			   * mode (i.e. even for 32-bit userspace software, but
+			   * 64-bit kernel), so the x86_64 mask value is 0x5454.
+			   * See the AMD manual no. 24593 (AMD64 System
+			   * Programming)*/
+
 			  if(addr == (long) &dummy->u_debugreg[7]) {
 				  data &= ~DR_CONTROL_RESERVED;
 				  for(i=0; i<4; i++)
@@ -359,83 +406,50 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		  }
 		  break;
 
-	case PTRACE_SYSEMU: /* continue and stop at next syscall, which will not be executed */
-	case PTRACE_SYSCALL: /* continue and stop at next (return from) syscall */
-	case PTRACE_CONT: { /* restart after signal. */
-		long tmp;
-
+	case PTRACE_SYSCALL:	/* continue and stop at next (return from) syscall */
+	case PTRACE_CONT:	/* restart after signal. */
 		ret = -EIO;
 		if ((unsigned long) data > _NSIG)
 			break;
-		/* If we came here with PTRACE_SYSEMU and now continue with
-		 * PTRACE_SYSCALL, entry.S used to intercept the syscall return.
-		 * But it shouldn't!
-		 * So we don't clear TIF_SYSCALL_EMU, which is always unused in
-		 * this special case, to remember, we came from SYSEMU. That
-		 * flag will be cleared by do_syscall_trace().
-		 */
-		if (request == PTRACE_SYSEMU) {
-			set_tsk_thread_flag(child, TIF_SYSCALL_EMU);
-		} else if (request == PTRACE_CONT) {
-			clear_tsk_thread_flag(child, TIF_SYSCALL_EMU);
-		}
 		if (request == PTRACE_SYSCALL) {
 			set_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
-		} else {
+		}
+		else {
 			clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 		}
-		clear_tsk_thread_flag(child, TIF_SINGLESTEP);
 		child->exit_code = data;
-	/* make sure the single step bit is not set. */
-		tmp = get_stack_long(child, EFL_OFFSET) & ~TRAP_FLAG;
-		put_stack_long(child, EFL_OFFSET,tmp);
+		/* make sure the single step bit is not set. */
+		clear_singlestep(child);
 		wake_up_process(child);
 		ret = 0;
 		break;
-	}
 
 /*
  * make the child exit.  Best I can do is send it a sigkill. 
  * perhaps it should be put in the status that it wants to 
  * exit.
  */
-	case PTRACE_KILL: {
-		long tmp;
-
+	case PTRACE_KILL:
 		ret = 0;
-		if (child->state == TASK_ZOMBIE)	/* already dead */
+		if (child->exit_state == EXIT_ZOMBIE)	/* already dead */
 			break;
 		child->exit_code = SIGKILL;
-		clear_tsk_thread_flag(child, TIF_SINGLESTEP);
 		/* make sure the single step bit is not set. */
-		tmp = get_stack_long(child, EFL_OFFSET) & ~TRAP_FLAG;
-		put_stack_long(child, EFL_OFFSET, tmp);
+		clear_singlestep(child);
 		wake_up_process(child);
 		break;
-	}
 
-	case PTRACE_SINGLESTEP: {  /* set the trap flag. */
-		long tmp;
-
+	case PTRACE_SINGLESTEP:	/* set the trap flag. */
 		ret = -EIO;
 		if ((unsigned long) data > _NSIG)
 			break;
-		/*See do_syscall_trace to know why we don't clear
-		 * TIF_SYSCALL_EMU.*/
 		clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
-		if ((child->ptrace & PT_DTRACE) == 0) {
-			/* Spurious delayed TF traps may occur */
-			child->ptrace |= PT_DTRACE;
-		}
-		tmp = get_stack_long(child, EFL_OFFSET) | TRAP_FLAG;
-		put_stack_long(child, EFL_OFFSET, tmp);
-		set_tsk_thread_flag(child, TIF_SINGLESTEP);
+		set_singlestep(child);
 		child->exit_code = data;
 		/* give it a chance to run. */
 		wake_up_process(child);
 		ret = 0;
 		break;
-	}
 
 	case PTRACE_DETACH:
 		/* detach a process that was attached. */
@@ -528,56 +542,6 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 					(struct user_desc __user *) data);
 		break;
 
-#ifdef CONFIG_PROC_MM
-	case PTRACE_FAULTINFO: {
-		struct ptrace_faultinfo fault;
-
-		fault = ((struct ptrace_faultinfo)
-			{ .is_write	= child->thread.error_code,
-			  .addr		= child->thread.cr2 });
-		ret = copy_to_user((unsigned long *) data, &fault,
-				   sizeof(fault));
-		if(ret)
-			break;
-		break;
-	}
-
-	case PTRACE_SIGPENDING:
-		ret = copy_to_user((unsigned long *) data,
-				   &child->pending.signal,
-				   sizeof(child->pending.signal));
-		break;
-
-	case PTRACE_LDT: {
-		struct ptrace_ldt ldt;
-
-		if(copy_from_user(&ldt, (unsigned long *) data,
-				  sizeof(ldt))){
-			ret = -EIO;
-			break;
-		}
-		ret = modify_ldt(child->mm, ldt.func, ldt.ptr, ldt.bytecount);
-		break;
-	}
-
-	case PTRACE_SWITCH_MM: {
-		struct mm_struct *old = child->mm;
-		struct mm_struct *new = proc_mm_get_mm(data);
-
-		if(IS_ERR(new)){
-			ret = PTR_ERR(new);
-			break;
-		}
-
-		atomic_inc(&new->mm_users);
-		child->mm = new;
-		child->active_mm = new;
-		mmput(old);
-		ret = 0;
-		break;
-	}
-#endif
-
 	default:
 		ret = ptrace_request(child, request, addr, data);
 		break;
@@ -593,9 +557,8 @@ out:
  * - triggered by current->work.syscall_trace
  */
 __attribute__((regparm(3)))
-int do_syscall_trace(struct pt_regs *regs, int entryexit)
+void do_syscall_trace(struct pt_regs *regs, int entryexit)
 {
-	int is_sysemu, is_systrace, is_singlestep;
 	if (unlikely(current->audit_context)) {
 		if (!entryexit)
 			audit_syscall_entry(current, regs->orig_eax,
@@ -604,27 +567,16 @@ int do_syscall_trace(struct pt_regs *regs, int entryexit)
 		else
 			audit_syscall_exit(current, regs->eax);
 	}
-	is_sysemu = test_thread_flag(TIF_SYSCALL_EMU);
-	is_systrace = test_thread_flag(TIF_SYSCALL_TRACE);
-	is_singlestep = test_thread_flag(TIF_SINGLESTEP);
 
-	if (!is_systrace && !is_singlestep && !is_sysemu)
-		return 0;
-	/* We can detect the case of coming from PTRACE_SYSEMU and now running
-	 * with PTRACE_SYSCALL or PTRACE_SINGLESTEP, by TIF_SYSCALL_EMU being
-	 * set additionally.
-	 * If so let's reset the flag and return without action.
-	 */
-	if (is_sysemu && (is_systrace || is_singlestep)) {
-		clear_thread_flag(TIF_SYSCALL_EMU);
-		return 0;
-	}
+	if (!test_thread_flag(TIF_SYSCALL_TRACE) &&
+	    !test_thread_flag(TIF_SINGLESTEP))
+		return;
 	if (!(current->ptrace & PT_PTRACED))
-		return 0;
+		return;
 	/* the 0x80 provides a way for the tracing parent to distinguish
 	   between a syscall stop and SIGTRAP delivery */
 	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD) &&
-				 !is_singlestep ? 0x80 : 0));
+				 !test_thread_flag(TIF_SINGLESTEP) ? 0x80 : 0));
 
 	/*
 	 * this isn't the same as continuing with a signal, but it will do
@@ -635,6 +587,4 @@ int do_syscall_trace(struct pt_regs *regs, int entryexit)
 		send_sig(current->exit_code, current, 1);
 		current->exit_code = 0;
 	}
-	/* != 0 if nullifying the syscall, 0 if running it normally */
-	return is_sysemu;
 }

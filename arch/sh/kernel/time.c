@@ -1,6 +1,5 @@
-/* $Id: time.c,v 1.21 2004/04/21 00:09:15 lethal Exp $
- *
- *  linux/arch/sh/kernel/time.c
+/*
+ *  arch/sh/kernel/time.c
  *
  *  Copyright (C) 1999  Tetsuya Okada & Niibe Yutaka
  *  Copyright (C) 2000  Philipp Rumpf <prumpf@tux.org>
@@ -96,8 +95,8 @@ EXPORT_SYMBOL(jiffies_64);
 void (*rtc_get_time)(struct timespec *) = sh_rtc_gettimeofday;
 int (*rtc_set_time)(const time_t) = sh_rtc_settimeofday;
 #else
-void (*rtc_get_time)(struct timespec *) = 0;
-int (*rtc_set_time)(const time_t) = 0;
+void (*rtc_get_time)(struct timespec *);
+int (*rtc_set_time)(const time_t);
 #endif
 
 #if defined(CONFIG_CPU_SUBTYPE_SH7300)
@@ -113,12 +112,21 @@ static int ifc_values[]      = { 0, 1, 4, 2, 0, 0, 0, 0 };
 static int pfc_divisors[]    = { 1, 2, 3, 4, 6, 1, 1, 1 };
 static int pfc_values[]      = { 0, 1, 4, 2, 5, 0, 0, 0 };
 #elif defined(CONFIG_CPU_SH4)
+#if defined(CONFIG_CPU_SUBTYPE_SH73180)
+static int ifc_divisors[] = { 1, 2, 3, 4, 6, 8, 12, 16 };
+static int ifc_values[] = { 0, 1, 2, 3, 4, 5, 6, 7 };
+#define bfc_divisors ifc_divisors	/* Same */
+#define bfc_values ifc_values
+#define pfc_divisors ifc_divisors	/* Same */
+#define pfc_values ifc_values
+#else
 static int ifc_divisors[] = { 1, 2, 3, 4, 6, 8, 1, 1 };
 static int ifc_values[]   = { 0, 1, 2, 3, 0, 4, 0, 5 };
 #define bfc_divisors ifc_divisors	/* Same */
 #define bfc_values ifc_values
 static int pfc_divisors[] = { 2, 3, 4, 6, 8, 2, 2, 2 };
 static int pfc_values[]   = { 0, 0, 1, 2, 0, 3, 0, 4 };
+#endif
 #else
 #error "Unknown ifc/bfc/pfc/stc values for this processor"
 #endif
@@ -140,7 +148,7 @@ static unsigned long do_gettimeoffset(void)
 	static unsigned long jiffies_p = 0;
 
 	/*
-	 * cache volatile jiffies temporarily; we have IRQs turned off. 
+	 * cache volatile jiffies temporarily; we have IRQs turned off.
 	 */
 	unsigned long jiffies_t;
 
@@ -148,7 +156,7 @@ static unsigned long do_gettimeoffset(void)
 	/* timer count may underflow right here */
 	count = ctrl_inl(TMU0_TCNT);	/* read the latched count */
 
- 	jiffies_t = jiffies;
+	jiffies_t = jiffies;
 
 	/*
 	 * avoiding timer inconsistencies (they are rare, but they happen)...
@@ -162,7 +170,7 @@ static unsigned long do_gettimeoffset(void)
 
 			if(ctrl_inw(TMU0_TCR) & 0x100) { /* Check UNF bit */
 				/*
-				 * We cannot detect lost timer interrupts ... 
+				 * We cannot detect lost timer interrupts ...
 				 * well, that's why we call them lost, don't we? :)
 				 * [hmm, on the Pentium and Alpha we can ... sort of]
 				 */
@@ -192,7 +200,7 @@ void do_gettimeofday(struct timeval *tv)
 	do {
 		seq = read_seqbegin(&xtime_lock);
 		usec = do_gettimeoffset();
-		
+
 		lost = jiffies - wall_jiffies;
 		if (lost)
 			usec += lost * (1000000 / HZ);
@@ -258,6 +266,9 @@ static long last_rtc_update;
 static inline void do_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	do_timer(regs);
+#ifndef CONFIG_SMP
+	update_process_times(user_mode(regs));
+#endif
 	profile_tick(CPU_PROFILING, regs);
 
 #ifdef CONFIG_HEARTBEAT
@@ -363,8 +374,8 @@ static unsigned int __init get_timer_frequency(void)
 	return freq * factor;
 }
 
-void (*board_time_init)(void) = 0;
-void (*board_timer_setup)(struct irqaction *irq) = 0;
+void (*board_time_init)(void);
+void (*board_timer_setup)(struct irqaction *irq);
 
 static unsigned int sh_pclk_freq __initdata = CONFIG_SH_PCLK_FREQ;
 
@@ -408,9 +419,15 @@ void get_current_frequency_divisors(unsigned int *ifc, unsigned int *bfc, unsign
 	*pfc = pfc_divisors[tmp];
 #endif
 #elif defined(CONFIG_CPU_SH4)
+#if defined(CONFIG_CPU_SUBTYPE_SH73180)
+	*ifc = ifc_divisors[(frqcr>> 20) & 0x0007];
+	*bfc = bfc_divisors[(frqcr>> 12) & 0x0007];
+	*pfc = pfc_divisors[frqcr & 0x0007];
+#else
 	*ifc = ifc_divisors[(frqcr >> 6) & 0x0007];
 	*bfc = bfc_divisors[(frqcr >> 3) & 0x0007];
 	*pfc = pfc_divisors[frqcr & 0x0007];
+#endif
 #endif
 }
 
@@ -419,7 +436,7 @@ void get_current_frequency_divisors(unsigned int *ifc, unsigned int *bfc, unsign
  * the divisors and the physical values.
  */
 #define _FREQ_TABLE(x) \
-	unsigned int get_##x##_divisor(unsigned int value) 	\
+	unsigned int get_##x##_divisor(unsigned int value)	\
 		{ return x##_divisors[value]; }			\
 								\
 	unsigned int get_##x##_value(unsigned int divisor)	\
@@ -431,109 +448,120 @@ _FREQ_TABLE(pfc);
 
 #ifdef CONFIG_CPU_SUBTYPE_ST40STB1
 
-/* The ST40 divisors are totally different so we set the cpu data
-** clocks using a different algorithm
-**
-** I've just plugged this from the 2.4 code - Alex Bennee <kernel-hacker@bennee.com>
-*/
+/*
+ * The ST40 divisors are totally different so we set the cpu data
+ * clocks using a different algorithm
+ *
+ * I've just plugged this from the 2.4 code
+ *	- Alex Bennee <kernel-hacker@bennee.com>
+ */
 #define CCN_PVR_CHIP_SHIFT 24
 #define CCN_PVR_CHIP_MASK  0xff
 #define CCN_PVR_CHIP_ST40STB1 0x4
 
 
 struct frqcr_data {
-    unsigned short frqcr;
-    struct {
-	unsigned char multiplier;
-	unsigned char divisor;
-    } factor[3];
+	unsigned short frqcr;
+
+	struct {
+		unsigned char multiplier;
+		unsigned char divisor;
+	} factor[3];
 };
 
 static struct frqcr_data st40_frqcr_table[] = {
-    { 0x000, {{1,1}, {1,1}, {1,2}}},
-    { 0x002, {{1,1}, {1,1}, {1,4}}},
-    { 0x004, {{1,1}, {1,1}, {1,8}}},
-    { 0x008, {{1,1}, {1,2}, {1,2}}},
-    { 0x00A, {{1,1}, {1,2}, {1,4}}},
-    { 0x00C, {{1,1}, {1,2}, {1,8}}},
-    { 0x011, {{1,1}, {2,3}, {1,6}}},
-    { 0x013, {{1,1}, {2,3}, {1,3}}},
-    { 0x01A, {{1,1}, {1,2}, {1,4}}},
-    { 0x01C, {{1,1}, {1,2}, {1,8}}},
-    { 0x023, {{1,1}, {2,3}, {1,3}}},
-    { 0x02C, {{1,1}, {1,2}, {1,8}}},
-    { 0x048, {{1,2}, {1,2}, {1,4}}},
-    { 0x04A, {{1,2}, {1,2}, {1,6}}},
-    { 0x04C, {{1,2}, {1,2}, {1,8}}},
-    { 0x05A, {{1,2}, {1,3}, {1,6}}},
-    { 0x05C, {{1,2}, {1,3}, {1,6}}},
-    { 0x063, {{1,2}, {1,4}, {1,4}}},
-    { 0x06C, {{1,2}, {1,4}, {1,8}}},
-    { 0x091, {{1,3}, {1,3}, {1,6}}},
-    { 0x093, {{1,3}, {1,3}, {1,6}}},
-    { 0x0A3, {{1,3}, {1,6}, {1,6}}},
-    { 0x0DA, {{1,4}, {1,4}, {1,8}}},
-    { 0x0DC, {{1,4}, {1,4}, {1,8}}},
-    { 0x0EC, {{1,4}, {1,8}, {1,8}}},
-    { 0x123, {{1,4}, {1,4}, {1,8}}},
-    { 0x16C, {{1,4}, {1,8}, {1,8}}},
+	{ 0x000, {{1,1}, {1,1}, {1,2}}},
+	{ 0x002, {{1,1}, {1,1}, {1,4}}},
+	{ 0x004, {{1,1}, {1,1}, {1,8}}},
+	{ 0x008, {{1,1}, {1,2}, {1,2}}},
+	{ 0x00A, {{1,1}, {1,2}, {1,4}}},
+	{ 0x00C, {{1,1}, {1,2}, {1,8}}},
+	{ 0x011, {{1,1}, {2,3}, {1,6}}},
+	{ 0x013, {{1,1}, {2,3}, {1,3}}},
+	{ 0x01A, {{1,1}, {1,2}, {1,4}}},
+	{ 0x01C, {{1,1}, {1,2}, {1,8}}},
+	{ 0x023, {{1,1}, {2,3}, {1,3}}},
+	{ 0x02C, {{1,1}, {1,2}, {1,8}}},
+	{ 0x048, {{1,2}, {1,2}, {1,4}}},
+	{ 0x04A, {{1,2}, {1,2}, {1,6}}},
+	{ 0x04C, {{1,2}, {1,2}, {1,8}}},
+	{ 0x05A, {{1,2}, {1,3}, {1,6}}},
+	{ 0x05C, {{1,2}, {1,3}, {1,6}}},
+	{ 0x063, {{1,2}, {1,4}, {1,4}}},
+	{ 0x06C, {{1,2}, {1,4}, {1,8}}},
+	{ 0x091, {{1,3}, {1,3}, {1,6}}},
+	{ 0x093, {{1,3}, {1,3}, {1,6}}},
+	{ 0x0A3, {{1,3}, {1,6}, {1,6}}},
+	{ 0x0DA, {{1,4}, {1,4}, {1,8}}},
+	{ 0x0DC, {{1,4}, {1,4}, {1,8}}},
+	{ 0x0EC, {{1,4}, {1,8}, {1,8}}},
+	{ 0x123, {{1,4}, {1,4}, {1,8}}},
+	{ 0x16C, {{1,4}, {1,8}, {1,8}}},
 };
 
 struct memclk_data {
-    unsigned char multiplier;
-    unsigned char divisor;
+	unsigned char multiplier;
+	unsigned char divisor;
 };
+
 static struct memclk_data st40_memclk_table[8] = {
-    {1,1},	// 000
-    {1,2},	// 001
-    {1,3},	// 010
-    {2,3},	// 011
-    {1,4},	// 100
-    {1,6},	// 101
-    {1,8},	// 110
-    {1,8}	// 111
+	{1,1},	// 000
+	{1,2},	// 001
+	{1,3},	// 010
+	{2,3},	// 011
+	{1,4},	// 100
+	{1,6},	// 101
+	{1,8},	// 110
+	{1,8}	// 111
 };
 
 static void st40_specific_time_init(unsigned int module_clock, unsigned short frqcr)
 {
-    unsigned int cpu_clock, master_clock, bus_clock, memory_clock;
-    struct frqcr_data *d;
-    int a;
-    unsigned long memclkcr;
-    struct memclk_data *e;
+	unsigned int cpu_clock, master_clock, bus_clock, memory_clock;
+	struct frqcr_data *d;
+	int a;
+	unsigned long memclkcr;
+	struct memclk_data *e;
 
-    for (a=0; a<ARRAY_SIZE(st40_frqcr_table); a++) {
-	d = &st40_frqcr_table[a];
-	if (d->frqcr == (frqcr & 0x1ff))
-	    break;
-    }
-    if (a == ARRAY_SIZE(st40_frqcr_table)) {
-	d = st40_frqcr_table;
-	printk("ERROR: Unrecognised FRQCR value (0x%x), using default multipliers\n",frqcr);
-    }
+	for (a = 0; a < ARRAY_SIZE(st40_frqcr_table); a++) {
+		d = &st40_frqcr_table[a];
 
-    memclkcr = ctrl_inl(CLOCKGEN_MEMCLKCR);
-    e = &st40_memclk_table[memclkcr & MEMCLKCR_RATIO_MASK];
+		if (d->frqcr == (frqcr & 0x1ff))
+			break;
+	}
 
-    printk("Clock multipliers: CPU: %d/%d Bus: %d/%d Mem: %d/%d Periph: %d/%d\n",
-	    d->factor[0].multiplier, d->factor[0].divisor,
-	    d->factor[1].multiplier, d->factor[1].divisor,
-	    e->multiplier,           e->divisor,
-	    d->factor[2].multiplier, d->factor[2].divisor);
+	if (a == ARRAY_SIZE(st40_frqcr_table)) {
+		d = st40_frqcr_table;
 
-    master_clock = module_clock * d->factor[2].divisor    / d->factor[2].multiplier;
-    bus_clock    = master_clock * d->factor[1].multiplier / d->factor[1].divisor;
-    memory_clock = master_clock * e->multiplier           / e->divisor;
-    cpu_clock    = master_clock * d->factor[0].multiplier / d->factor[0].divisor;
+		printk("ERROR: Unrecognised FRQCR value (0x%x), "
+		       "using default multipliers\n", frqcr);
+	}
 
-    current_cpu_data.cpu_clock    = cpu_clock;
-    current_cpu_data.master_clock = master_clock;
-    current_cpu_data.bus_clock    = bus_clock;
-    current_cpu_data.memory_clock = memory_clock;
-    current_cpu_data.module_clock = module_clock;
+	memclkcr = ctrl_inl(CLOCKGEN_MEMCLKCR);
+	e = &st40_memclk_table[memclkcr & MEMCLKCR_RATIO_MASK];
 
+	printk(KERN_INFO "Clock multipliers: CPU: %d/%d Bus: %d/%d "
+	       "Mem: %d/%d Periph: %d/%d\n",
+	       d->factor[0].multiplier, d->factor[0].divisor,
+	       d->factor[1].multiplier, d->factor[1].divisor,
+	       e->multiplier,           e->divisor,
+	       d->factor[2].multiplier, d->factor[2].divisor);
+
+	master_clock = module_clock * d->factor[2].divisor
+				    / d->factor[2].multiplier;
+	bus_clock    = master_clock * d->factor[1].multiplier
+				    / d->factor[1].divisor;
+	memory_clock = master_clock * e->multiplier
+				    / e->divisor;
+	cpu_clock    = master_clock * d->factor[0].multiplier
+				    / d->factor[0].divisor;
+
+	current_cpu_data.cpu_clock    = cpu_clock;
+	current_cpu_data.master_clock = master_clock;
+	current_cpu_data.bus_clock    = bus_clock;
+	current_cpu_data.memory_clock = memory_clock;
+	current_cpu_data.module_clock = module_clock;
 }
-
 #endif
 
 void __init time_init(void)
@@ -549,7 +577,6 @@ void __init time_init(void)
 	if (board_time_init)
 		board_time_init();
 
-
 	/*
 	 * If we don't have an RTC (such as with the SH7300), don't attempt to
 	 * probe the timer frequency. Rely on an either hardcoded peripheral
@@ -564,15 +591,10 @@ void __init time_init(void)
 	{
 		unsigned int freq;
 
-		/* 
+		/*
 		 * If we've specified a peripheral clock frequency, and we have
 		 * an RTC, compare it against the autodetected value. Complain
 		 * if there's a mismatch.
-		 *
-		 * Note: We should allow for some high and low watermarks for
-		 * the frequency here (compensating for potential drift), as
-		 * otherwise we'll likely end up triggering this essentially
-		 * on every boot.
 		 */
 		timer_freq = get_timer_frequency();
 		freq = timer_freq * 4;
@@ -587,20 +609,22 @@ void __init time_init(void)
 #endif
 
 #ifdef CONFIG_CPU_SUBTYPE_ST40STB1
+	/* XXX: Update ST40 code to use board_time_init() */
 	pvr = ctrl_inl(CCN_PVR);
 	frqcr = ctrl_inw(FRQCR);
 	printk("time.c ST40 Probe: PVR %08lx, FRQCR %04hx\n", pvr, frqcr);
-	if (((pvr >>CCN_PVR_CHIP_SHIFT) & CCN_PVR_CHIP_MASK) == CCN_PVR_CHIP_ST40STB1)
-	    st40_specific_time_init(current_cpu_data.module_clock, frqcr);
+
+	if (((pvr >> CCN_PVR_CHIP_SHIFT) & CCN_PVR_CHIP_MASK) == CCN_PVR_CHIP_ST40STB1)
+		st40_specific_time_init(current_cpu_data.module_clock, frqcr);
 	else
 #endif
-	    get_current_frequency_divisors(&ifc, &bfc, &pfc);
+		get_current_frequency_divisors(&ifc, &bfc, &pfc);
 
-	if (rtc_get_time)
+	if (rtc_get_time) {
 		rtc_get_time(&xtime);
-	else {
-         	xtime.tv_sec = mktime(2000, 1, 1, 0, 0, 0);
-         	xtime.tv_nsec = 0;
+	} else {
+		xtime.tv_sec = mktime(2000, 1, 1, 0, 0, 0);
+		xtime.tv_nsec = 0;
 	}
 
         set_normalized_timespec(&wall_to_monotonic,
@@ -613,9 +637,9 @@ void __init time_init(void)
 	}
 
 	/*
-	** for ST40 chips the current_cpu_data should already be set
-	** so not having valid pfc/bfc/ifc shouldn't be a problem
-	*/
+	 * for ST40 chips the current_cpu_data should already be set
+	 * so not having valid pfc/bfc/ifc shouldn't be a problem
+	 */
 	if (!current_cpu_data.master_clock)
 		current_cpu_data.master_clock = current_cpu_data.module_clock * pfc;
 	if (!current_cpu_data.bus_clock)
@@ -637,11 +661,8 @@ void __init time_init(void)
 	printk("Module clock: %d.%02dMHz\n",
 	       (current_cpu_data.module_clock / 1000000),
 	       (current_cpu_data.module_clock % 1000000)/10000);
-#if defined(CONFIG_SH_HS7751RVOIP) || defined(CONFIG_SH_RTS7751R2D)
-	interval = ((current_cpu_data.module_clock/4 + HZ/2) / HZ) - 1;
-#else
+
 	interval = (current_cpu_data.module_clock/4 + HZ/2) / HZ;
-#endif
 
 	printk("Interval = %ld\n", interval);
 

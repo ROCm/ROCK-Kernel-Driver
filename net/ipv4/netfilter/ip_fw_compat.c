@@ -28,8 +28,6 @@ struct notifier_block;
 
 static struct firewall_ops *fwops;
 
-unsigned int ip_ct_log_invalid;
-
 #ifdef CONFIG_IP_VS
 /* From ip_vs_core.c */
 extern unsigned int
@@ -71,7 +69,7 @@ fw_in(unsigned int hooknum,
 	/* Assume worse case: any hook could change packet */
 	(*pskb)->nfcache |= NFC_UNKNOWN | NFC_ALTERED;
 	if ((*pskb)->ip_summed == CHECKSUM_HW)
-		if (skb_checksum_help(pskb, (out == NULL)))
+		if (skb_checksum_help(*pskb, (out == NULL)))
 			return NF_DROP;
 
 	switch (hooknum) {

@@ -74,7 +74,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/config.h>
 #include <linux/cpu.h>
 #include <linux/types.h>
@@ -520,35 +520,6 @@ struct net_device *dev_get_by_name(const char *name)
 	return dev;
 }
 
-/*
-   Return value is changed to int to prevent illegal usage in future.
-   It is still legal to use to check for device existence.
-
-   User should understand, that the result returned by this function
-   is meaningless, if it was not issued under rtnl semaphore.
- */
-
-/**
- *	dev_get	-	test if a device exists
- *	@name:	name to test for
- *
- *	Test if a name exists. Returns true if the name is found. In order
- *	to be sure the name is not allocated or removed during the test the
- *	caller must hold the rtnl semaphore.
- *
- *	This function exists only for back compatibility with older
- *	drivers.
- */
-int __dev_get(const char *name)
-{
-	struct net_device *dev;
-
-	read_lock(&dev_base_lock);
-	dev = __dev_get_by_name(name);
-	read_unlock(&dev_base_lock);
-	return dev != NULL;
-}
-
 /**
  *	__dev_get_by_index - find a device by its ifindex
  *	@ifindex: index of device
@@ -623,26 +594,17 @@ struct net_device *dev_getbyhwaddr(unsigned short type, char *ha)
 	return dev;
 }
 
-struct net_device *__dev_getfirstbyhwtype(unsigned short type)
-{
-	struct net_device *dev;
-
-	for (dev = dev_base; dev; dev = dev->next)
-		if (dev->type == type)
-			break;
-	return dev;
-}
-
-EXPORT_SYMBOL(__dev_getfirstbyhwtype);
-
 struct net_device *dev_getfirstbyhwtype(unsigned short type)
 {
 	struct net_device *dev;
 
 	rtnl_lock();
-	dev = __dev_getfirstbyhwtype(type);
-	if (dev)
-		dev_hold(dev);
+	for (dev = dev_base; dev; dev = dev->next) {
+		if (dev->type == type) {
+			dev_hold(dev);
+			break;
+		}
+	}
 	rtnl_unlock();
 	return dev;
 }
@@ -665,32 +627,14 @@ struct net_device * dev_get_by_flags(unsigned short if_flags, unsigned short mas
 	struct net_device *dev;
 
 	read_lock(&dev_base_lock);
-	dev = __dev_get_by_flags(if_flags, mask);
-	if (dev)
-		dev_hold(dev);
+	for (dev = dev_base; dev != NULL; dev = dev->next) {
+		if (((dev->flags ^ if_flags) & mask) == 0) {
+			dev_hold(dev);
+			break;
+		}
+	}
 	read_unlock(&dev_base_lock);
 	return dev;
-}
-
-/**
- *	__dev_get_by_flags - find any device with given flags
- *	@if_flags: IFF_* values
- *	@mask: bitmask of bits in if_flags to check
- *
- *	Search for any interface with the given flags. Returns NULL if a device
- *	is not found or a pointer to the device. The caller must hold either
- *	the RTNL semaphore or @dev_base_lock.
- */
-
-struct net_device *__dev_get_by_flags(unsigned short if_flags, unsigned short mask)
-{
-	struct net_device *dev;
-
-	for (dev = dev_base; dev != NULL; dev = dev->next) {
-		if (((dev->flags ^ if_flags) & mask) == 0)
-			return dev;
-	}
-	return NULL;
 }
 
 /**
@@ -813,78 +757,6 @@ int dev_change_name(struct net_device *dev, char *newname)
 	}
 
 	return err;
-}
-
-struct dev_tq { 
-	struct work_struct	work;
-	struct net_device	*dev;
-	int			event;
-};
-
-static char *NetEvtStr[16] = {
-	"0000",
-	"up",
-	"down",
-	"reboot",
-	"change",
-	"register",
-	"unregister",
-	"change mtu",
-	"change addr",
-	"going down",
-	"change name",
-	"000B",
-	"000C",
-	"000D",
-	"000E",
-	"000F"
-};
-
-static void netdev_event_callback(void *data)
-{ 
-	struct dev_tq *tq = (struct dev_tq *) data;
-
-	if (0 == rtnl_shlock_nowait()) {
-		notifier_call_chain(&netdev_chain, tq->event, tq->dev);
-		rtnl_shunlock();
-	} else {
-		if (tq->dev->reg_state == NETREG_UNREGISTERED) {
-			printk(KERN_WARNING "%s: task for event %s canceled for device unregister\n",
-				__FUNCTION__, NetEvtStr[0xf & tq->event]);
-		} else {
-			schedule_delayed_work(&tq->work, 1);
-			return; 
-		}
-	}
-	dev_put(tq->dev);
-	kfree(tq);
-} 
-
-/**
- *	netdev_event - send an event for a network device
- *	@dev:	pointer to net device
- *	@event:	event type
- *
- *	Send an event about a network device to clients in the stack.
- *	Can be called from interrupt context.
- *	Currently useful events:
- *	NETDEV_REBOOT - A dial-on-demand device hung up.
- */
-void netdev_event(struct net_device *dev, int event)
-{      
-	struct dev_tq *tq;
-	
-	if (dev->reg_state == NETREG_UNREGISTERED)
-		return;
-	tq = kmalloc(sizeof(*tq), GFP_ATOMIC);
-	if (!tq)
-		return;
-	memset(tq, 0, sizeof(*tq));
-	dev_hold(dev);
-	tq->dev = dev;
-	tq->event = event;
-	INIT_WORK(&tq->work, netdev_event_callback, tq);
-	schedule_work(&tq->work);
 }
 
 /**
@@ -1129,6 +1001,29 @@ int call_netdevice_notifiers(unsigned long val, void *v)
 	return notifier_call_chain(&netdev_chain, val, v);
 }
 
+/* When > 0 there are consumers of rx skb time stamps */
+static atomic_t netstamp_needed = ATOMIC_INIT(0);
+
+void net_enable_timestamp(void)
+{
+	atomic_inc(&netstamp_needed);
+}
+
+void net_disable_timestamp(void)
+{
+	atomic_dec(&netstamp_needed);
+}
+
+static inline void net_timestamp(struct timeval *stamp)
+{
+	if (atomic_read(&netstamp_needed))
+		do_gettimeofday(stamp);
+	else {
+		stamp->tv_sec = 0;
+		stamp->tv_usec = 0;
+	}
+}
+
 /*
  *	Support routine. Sends outgoing frames to any network
  *	taps currently in use.
@@ -1178,34 +1073,34 @@ void dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev)
  * Invalidate hardware checksum when packet is to be mangled, and
  * complete checksum manually on outgoing path.
  */
-int skb_checksum_help(struct sk_buff **pskb, int inward)
+int skb_checksum_help(struct sk_buff *skb, int inward)
 {
 	unsigned int csum;
-	int ret = 0, offset = (*pskb)->h.raw - (*pskb)->data;
+	int ret = 0, offset = skb->h.raw - skb->data;
 
 	if (inward) {
-		(*pskb)->ip_summed = CHECKSUM_NONE;
+		skb->ip_summed = CHECKSUM_NONE;
 		goto out;
 	}
 
-	if (skb_cloned(*pskb)) {
-		ret = pskb_expand_head(*pskb, 0, 0, GFP_ATOMIC);
+	if (skb_cloned(skb)) {
+		ret = pskb_expand_head(skb, 0, 0, GFP_ATOMIC);
 		if (ret)
 			goto out;
 	}
 
-	if (offset > (int)(*pskb)->len)
+	if (offset > (int)skb->len)
 		BUG();
-	csum = skb_checksum(*pskb, offset, (*pskb)->len-offset, 0);
+	csum = skb_checksum(skb, offset, skb->len-offset, 0);
 
-	offset = (*pskb)->tail - (*pskb)->h.raw;
+	offset = skb->tail - skb->h.raw;
 	if (offset <= 0)
 		BUG();
-	if ((*pskb)->csum + 2 > offset)
+	if (skb->csum + 2 > offset)
 		BUG();
 
-	*(u16*)((*pskb)->h.raw + (*pskb)->csum) = csum_fold(csum);
-	(*pskb)->ip_summed = CHECKSUM_NONE;
+	*(u16*)(skb->h.raw + skb->csum) = csum_fold(csum);
+	skb->ip_summed = CHECKSUM_NONE;
 out:	
 	return ret;
 }
@@ -1307,13 +1202,6 @@ int __skb_linearize(struct sk_buff *skb, int gfp_mask)
 	}						\
 }
 
-static inline void qdisc_run(struct net_device *dev)
-{
-	while (!netif_queue_stopped(dev) &&
-	       qdisc_restart(dev)<0)
-		/* NOTHING */;
-}
-
 /**
  *	dev_queue_xmit - transmit a buffer
  *	@skb: buffer to transmit
@@ -1354,9 +1242,8 @@ int dev_queue_xmit(struct sk_buff *skb)
 	    (!(dev->features & (NETIF_F_HW_CSUM | NETIF_F_NO_CSUM)) &&
 	     (!(dev->features & NETIF_F_IP_CSUM) ||
 	      skb->protocol != htons(ETH_P_IP))))
-	      	if (skb_checksum_help(&skb, 0))
+	      	if (skb_checksum_help(skb, 0))
 	      		goto out_kfree_skb;
-
 
 	/* Disable soft irqs for various locks below. Also 
 	 * stops preemption for RCU. 
@@ -1425,7 +1312,6 @@ int dev_queue_xmit(struct sk_buff *skb)
 			if (net_ratelimit())
 				printk(KERN_CRIT "Virtual device %s asks to "
 				       "queue packet!\n", dev->name);
-			goto out_enetdown;
 		} else {
 			/* Recursion is detected! It is possible,
 			 * unfortunately */
@@ -1434,10 +1320,13 @@ int dev_queue_xmit(struct sk_buff *skb)
 				       "%s, fix it urgently!\n", dev->name);
 		}
 	}
-out_enetdown:
+
 	rc = -ENETDOWN;
+	local_bh_enable();
+
 out_kfree_skb:
 	kfree_skb(skb);
+	return rc;
 out:
 	local_bh_enable();
 	return rc;
@@ -1461,66 +1350,6 @@ int mod_cong = 290;
 
 DEFINE_PER_CPU(struct netif_rx_stats, netdev_rx_stat) = { 0, };
 
-
-#ifdef CONFIG_NET_HW_FLOWCONTROL
-atomic_t netdev_dropping = ATOMIC_INIT(0);
-static unsigned long netdev_fc_mask = 1;
-unsigned long netdev_fc_xoff;
-spinlock_t netdev_fc_lock = SPIN_LOCK_UNLOCKED;
-
-static struct
-{
-	void (*stimul)(struct net_device *);
-	struct net_device *dev;
-} netdev_fc_slots[BITS_PER_LONG];
-
-int netdev_register_fc(struct net_device *dev,
-		       void (*stimul)(struct net_device *dev))
-{
-	int bit = 0;
-	unsigned long flags;
-
-	spin_lock_irqsave(&netdev_fc_lock, flags);
-	if (netdev_fc_mask != ~0UL) {
-		bit = ffz(netdev_fc_mask);
-		netdev_fc_slots[bit].stimul = stimul;
-		netdev_fc_slots[bit].dev = dev;
-		set_bit(bit, &netdev_fc_mask);
-		clear_bit(bit, &netdev_fc_xoff);
-	}
-	spin_unlock_irqrestore(&netdev_fc_lock, flags);
-	return bit;
-}
-
-void netdev_unregister_fc(int bit)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&netdev_fc_lock, flags);
-	if (bit > 0) {
-		netdev_fc_slots[bit].stimul = NULL;
-		netdev_fc_slots[bit].dev = NULL;
-		clear_bit(bit, &netdev_fc_mask);
-		clear_bit(bit, &netdev_fc_xoff);
-	}
-	spin_unlock_irqrestore(&netdev_fc_lock, flags);
-}
-
-static void netdev_wakeup(void)
-{
-	unsigned long xoff;
-
-	spin_lock(&netdev_fc_lock);
-	xoff = netdev_fc_xoff;
-	netdev_fc_xoff = 0;
-	while (xoff) {
-		int i = ffz(~xoff);
-		xoff &= ~(1 << i);
-		netdev_fc_slots[i].stimul(netdev_fc_slots[i].dev);
-	}
-	spin_unlock(&netdev_fc_lock);
-}
-#endif
 
 static void get_sample_stats(int cpu)
 {
@@ -1631,13 +1460,8 @@ enqueue:
 			return queue->cng_level;
 		}
 
-		if (queue->throttle) {
+		if (queue->throttle)
 			queue->throttle = 0;
-#ifdef CONFIG_NET_HW_FLOWCONTROL
-			if (atomic_dec_and_test(&netdev_dropping))
-				netdev_wakeup();
-#endif
-		}
 
 		netif_rx_schedule(&queue->backlog_dev);
 		goto enqueue;
@@ -1646,9 +1470,6 @@ enqueue:
 	if (!queue->throttle) {
 		queue->throttle = 1;
 		__get_cpu_var(netdev_rx_stat).throttled++;
-#ifdef CONFIG_NET_HW_FLOWCONTROL
-		atomic_inc(&netdev_dropping);
-#endif
 	}
 
 drop:
@@ -1658,6 +1479,21 @@ drop:
 	kfree_skb(skb);
 	return NET_RX_DROP;
 }
+
+int netif_rx_ni(struct sk_buff *skb)
+{
+	int err;
+
+	preempt_disable();
+	err = netif_rx(skb);
+	if (softirq_pending(smp_processor_id()))
+		do_softirq();
+	preempt_enable();
+
+	return err;
+}
+
+EXPORT_SYMBOL(netif_rx_ni);
 
 static __inline__ void skb_bond(struct sk_buff *skb)
 {
@@ -1905,16 +1741,6 @@ static int process_backlog(struct net_device *backlog_dev, int *budget)
 		if (work >= quota || jiffies - start_time > 1)
 			break;
 
-#ifdef CONFIG_NET_HW_FLOWCONTROL
-		if (queue->throttle &&
-		    queue->input_pkt_queue.qlen < no_cong_thresh ) {
-			queue->throttle = 0;
-			if (atomic_dec_and_test(&netdev_dropping)) {
-				netdev_wakeup();
-				break;
-			}
-		}
-#endif
 	}
 
 	backlog_dev->quota -= work;
@@ -1929,13 +1755,8 @@ job_done:
 	smp_mb__before_clear_bit();
 	netif_poll_enable(backlog_dev);
 
-	if (queue->throttle) {
+	if (queue->throttle)
 		queue->throttle = 0;
-#ifdef CONFIG_NET_HW_FLOWCONTROL
-		if (atomic_dec_and_test(&netdev_dropping))
-			netdev_wakeup();
-#endif
-	}
 	local_irq_enable();
 	return 0;
 }
@@ -2515,8 +2336,11 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
 			return dev_set_mtu(dev, ifr->ifr_mtu);
 
 		case SIOCGIFHWADDR:
-			memcpy(ifr->ifr_hwaddr.sa_data, dev->dev_addr,
-			       min(sizeof ifr->ifr_hwaddr.sa_data, (size_t) dev->addr_len));
+			if (!dev->addr_len)
+				memset(ifr->ifr_hwaddr.sa_data, 0, sizeof ifr->ifr_hwaddr.sa_data);
+			else
+				memcpy(ifr->ifr_hwaddr.sa_data, dev->dev_addr,
+				       min(sizeof ifr->ifr_hwaddr.sa_data, (size_t) dev->addr_len));
 			ifr->ifr_hwaddr.sa_family = dev->type;
 			return 0;
 
@@ -2817,7 +2641,7 @@ int dev_ioctl(unsigned int cmd, void __user *arg)
 				/* Follow me in net/core/wireless.c */
 				ret = wireless_process_ioctl(&ifr, cmd);
 				rtnl_unlock();
-				if (!ret && IW_IS_GET(cmd) &&
+				if (IW_IS_GET(cmd) &&
 				    copy_to_user(arg, &ifr,
 					    	 sizeof(struct ifreq)))
 					ret = -EFAULT;
@@ -2836,7 +2660,7 @@ int dev_ioctl(unsigned int cmd, void __user *arg)
  *	number.  The caller must hold the rtnl semaphore or the
  *	dev_base_lock to be sure it remains unique.
  */
-int dev_new_index(void)
+static int dev_new_index(void)
 {
 	static int ifindex;
 	for (;;) {
@@ -2943,9 +2767,11 @@ int register_netdevice(struct net_device *dev)
 		dev->features &= ~NETIF_F_SG;
 	}
 
-	if (dev->features & NETIF_F_TSO) {
-		printk("%s: TCP Segmentation Offload (TSO) disabled by default\n",
-			dev->name);
+	/* TSO requires that SG is present as well. */
+	if ((dev->features & NETIF_F_TSO) &&
+	    !(dev->features & NETIF_F_SG)) {
+		printk("%s: Dropping NETIF_F_TSO since no SG feature.\n",
+		       dev->name);
 		dev->features &= ~NETIF_F_TSO;
 	}
 
@@ -3374,103 +3200,23 @@ out:
 
 subsys_initcall(net_dev_init);
 
-static spinlock_t netdev_printk_lock = SPIN_LOCK_UNLOCKED;
-/**
- * __netdev_printk() - Log message with interface name, gated by message level
- * @sevlevel: severity level -- e.g., KERN_INFO
- * @netdev: net_device pointer
- * @msglevel: a standard message-level flag such as NETIF_MSG_PROBE.
- *	Unless msglevel is NETIF_MSG_ALL, log the message only if
- *	that flag is set in netdev->msg_enable.
- * @format: as with printk
- * @args: as with printk
- *
- * Does the work for the netdev_printk macro.
- * For a lot of network drivers, the probe function looks like
- *	...
- *	netdev = alloc_netdev(...);	// or alloc_etherdev(...)
- *	SET_NETDEV_DEV(netdev, dev);
- *	...
- *	register_netdev(netdev);
- *	...
- * netdev_printk and its wrappers (e.g., netdev_err) can be used as
- * soon as you have a valid net_device pointer -- e.g., from alloc_netdev,
- * alloc_etherdev, or init_etherdev.  (Before that, use dev_printk and
- * its wrappers to report device errors.)  It's common for an interface to
- * have a name like "eth%d" until the device is successfully configured,
- * and the call to register_netdev changes it to a "real" name like "eth0".
- *
- * If the interface's reg_state is NETREG_REGISTERED, we assume that it has
- * been successfully set up in sysfs, and we prepend only the interface name
- * to the message -- e.g., "eth0: NIC Link is Down".  The interface
- * name can be used to find eth0's driver, bus ID, etc. in sysfs.
- *
- * For any other value of reg_state, we prepend the driver name and bus ID
- * as well as the (possibly incomplete) interface name -- e.g.,
- * "eth%d (e100 0000:00:03.0): Failed to map PCI address..."
- *
- * Probe functions that alloc and register in one step (via init_etherdev),
- * or otherwise register the device before the probe completes successfully,
- * may need to take other steps to ensure that the failing device is clearly
- * identified.
- */
-int __netdev_printk(const char *sevlevel, const struct net_device *netdev,
-	int msglevel, const char *format, ...)
-{
-	if (!netdev || !format) {
-		return -EINVAL;
-	}
-	if (msglevel == NETIF_MSG_ALL || (netdev->msg_enable & msglevel)) {
-		static char msg[512];	/* protected by netdev_printk_lock */
-		unsigned long flags;
-		va_list args;
-		struct device *dev = netdev->class_dev.dev;
-		
-		spin_lock_irqsave(&netdev_printk_lock, flags);
-		va_start(args, format);
-		vsnprintf(msg, 512, format, args);
-		va_end(args);
-
-		if (!sevlevel) {
-			sevlevel = "";
-		}
-
-		if (netdev->reg_state == NETREG_REGISTERED || !dev) {
-			printk("%s%s: %s", sevlevel, netdev->name, msg);
-		} else {
-			printk("%s%s (%s %s): %s", sevlevel, netdev->name,
-				dev->driver->name, dev->bus_id, msg);
-		}
-		spin_unlock_irqrestore(&netdev_printk_lock, flags);
-	}
-	return 0;
-}
-
-EXPORT_SYMBOL(__netdev_printk);
-EXPORT_SYMBOL(__dev_get);
-EXPORT_SYMBOL(__dev_get_by_flags);
 EXPORT_SYMBOL(__dev_get_by_index);
 EXPORT_SYMBOL(__dev_get_by_name);
 EXPORT_SYMBOL(__dev_remove_pack);
 EXPORT_SYMBOL(__skb_linearize);
-EXPORT_SYMBOL(call_netdevice_notifiers);
 EXPORT_SYMBOL(dev_add_pack);
 EXPORT_SYMBOL(dev_alloc_name);
 EXPORT_SYMBOL(dev_close);
 EXPORT_SYMBOL(dev_get_by_flags);
 EXPORT_SYMBOL(dev_get_by_index);
 EXPORT_SYMBOL(dev_get_by_name);
-EXPORT_SYMBOL(dev_getbyhwaddr);
 EXPORT_SYMBOL(dev_ioctl);
-EXPORT_SYMBOL(dev_new_index);
 EXPORT_SYMBOL(dev_open);
 EXPORT_SYMBOL(dev_queue_xmit);
-EXPORT_SYMBOL(dev_queue_xmit_nit);
 EXPORT_SYMBOL(dev_remove_pack);
 EXPORT_SYMBOL(dev_set_allmulti);
 EXPORT_SYMBOL(dev_set_promiscuity);
 EXPORT_SYMBOL(dev_change_flags);
-EXPORT_SYMBOL(dev_change_name);
 EXPORT_SYMBOL(dev_set_mtu);
 EXPORT_SYMBOL(free_netdev);
 EXPORT_SYMBOL(netdev_boot_setup_check);
@@ -3481,11 +3227,12 @@ EXPORT_SYMBOL(netif_rx);
 EXPORT_SYMBOL(register_gifconf);
 EXPORT_SYMBOL(register_netdevice);
 EXPORT_SYMBOL(register_netdevice_notifier);
-EXPORT_SYMBOL(netdev_event);
 EXPORT_SYMBOL(skb_checksum_help);
 EXPORT_SYMBOL(synchronize_net);
 EXPORT_SYMBOL(unregister_netdevice);
 EXPORT_SYMBOL(unregister_netdevice_notifier);
+EXPORT_SYMBOL(net_enable_timestamp);
+EXPORT_SYMBOL(net_disable_timestamp);
 
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
 EXPORT_SYMBOL(br_handle_frame_hook);
@@ -3493,12 +3240,6 @@ EXPORT_SYMBOL(br_handle_frame_hook);
 
 #ifdef CONFIG_KMOD
 EXPORT_SYMBOL(dev_load);
-#endif
-#ifdef CONFIG_NET_HW_FLOWCONTROL
-EXPORT_SYMBOL(netdev_dropping);
-EXPORT_SYMBOL(netdev_fc_xoff);
-EXPORT_SYMBOL(netdev_register_fc);
-EXPORT_SYMBOL(netdev_unregister_fc);
 #endif
 
 #ifdef CONFIG_NET_CLS_ACT

@@ -8,7 +8,6 @@
 #define _ASM_DMA_MAPPING_H
 
 #include <linux/types.h>
-#include <linux/device.h>
 #include <linux/cache.h>
 /* need struct page definitions */
 #include <linux/mm.h>

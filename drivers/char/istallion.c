@@ -660,7 +660,7 @@ static unsigned long	stli_atol(char *str);
 int		stli_init(void);
 static int	stli_open(struct tty_struct *tty, struct file *filp);
 static void	stli_close(struct tty_struct *tty, struct file *filp);
-static int	stli_write(struct tty_struct *tty, int from_user, const unsigned char *buf, int count);
+static int	stli_write(struct tty_struct *tty, const unsigned char *buf, int count);
 static void	stli_putchar(struct tty_struct *tty, unsigned char ch);
 static void	stli_flushchars(struct tty_struct *tty);
 static int	stli_writeroom(struct tty_struct *tty);
@@ -691,7 +691,6 @@ static int	stli_rawopen(stlibrd_t *brdp, stliport_t *portp, unsigned long arg, i
 static int	stli_rawclose(stlibrd_t *brdp, stliport_t *portp, unsigned long arg, int wait);
 static int	stli_waitcarrier(stlibrd_t *brdp, stliport_t *portp, struct file *filp);
 static void	stli_dohangup(void *arg);
-static void	stli_delay(int len);
 static int	stli_setport(stliport_t *portp);
 static int	stli_cmdwait(stlibrd_t *brdp, stliport_t *portp, unsigned long cmd, void *arg, int size, int copyback);
 static void	stli_sendcmd(stlibrd_t *brdp, stliport_t *portp, unsigned long cmd, void *arg, int size, int copyback);
@@ -1180,7 +1179,7 @@ static void stli_close(struct tty_struct *tty, struct file *filp)
 
 	if (portp->openwaitcnt) {
 		if (portp->close_delay)
-			stli_delay(portp->close_delay);
+			msleep_interruptible(jiffies_to_msecs(portp->close_delay));
 		wake_up_interruptible(&portp->open_wait);
 	}
 
@@ -1478,25 +1477,6 @@ static int stli_setport(stliport_t *portp)
 /*****************************************************************************/
 
 /*
- *	Wait for a specified delay period, this is not a busy-loop. It will
- *	give up the processor while waiting. Unfortunately this has some
- *	rather intimate knowledge of the process management stuff.
- */
-
-static void stli_delay(int len)
-{
-#ifdef DEBUG
-	printk("stli_delay(len=%d)\n", len);
-#endif
-	if (len > 0) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(len);
-	}
-}
-
-/*****************************************************************************/
-
-/*
  *	Possibly need to wait for carrier (DCD signal) to come high. Say
  *	maybe because if we are clocal then we don't need to wait...
  */
@@ -1563,7 +1543,7 @@ static int stli_waitcarrier(stlibrd_t *brdp, stliport_t *portp, struct file *fil
  *	service bits for this port.
  */
 
-static int stli_write(struct tty_struct *tty, int from_user, const unsigned char *buf, int count)
+static int stli_write(struct tty_struct *tty, const unsigned char *buf, int count)
 {
 	volatile cdkasy_t	*ap;
 	volatile cdkhdr_t	*hdrp;
@@ -1575,8 +1555,8 @@ static int stli_write(struct tty_struct *tty, int from_user, const unsigned char
 	unsigned long		flags;
 
 #ifdef DEBUG
-	printk("stli_write(tty=%x,from_user=%d,buf=%x,count=%d)\n",
-		(int) tty, from_user, (int) buf, count);
+	printk("stli_write(tty=%x,buf=%x,count=%d)\n",
+		(int) tty, (int) buf, count);
 #endif
 
 	if ((tty == (struct tty_struct *) NULL) ||
@@ -1593,38 +1573,6 @@ static int stli_write(struct tty_struct *tty, int from_user, const unsigned char
 	if (brdp == (stlibrd_t *) NULL)
 		return(0);
 	chbuf = (unsigned char *) buf;
-
-/*
- *	If copying direct from user space we need to be able to handle page
- *	faults while we are copying. To do this copy as much as we can now
- *	into a kernel buffer. From there we copy it into shared memory. The
- *	big problem is that we do not want shared memory enabled when we are
- *	sleeping (other boards may be serviced while asleep). Something else
- *	to note here is the reading of the tail twice. Since the boards
- *	shared memory can be on an 8-bit bus then we need to be very careful
- *	reading 16 bit quantities - since both the board (slave) and host
- *	could be writing and reading at the same time.
- */
-	if (from_user) {
-		save_flags(flags);
-		cli();
-		EBRDENABLE(brdp);
-		ap = (volatile cdkasy_t *) EBRDGETMEMPTR(brdp, portp->addr);
-		head = (unsigned int) ap->txq.head;
-		tail = (unsigned int) ap->txq.tail;
-		if (tail != ((unsigned int) ap->txq.tail))
-			tail = (unsigned int) ap->txq.tail;
-		len = (head >= tail) ? (portp->txsize - (head - tail) - 1) :
-			(tail - head - 1);
-		count = MIN(len, count);
-		EBRDDISABLE(brdp);
-		restore_flags(flags);
-
-		down(&stli_tmpwritesem);
-		if (copy_from_user(stli_tmpwritebuf, chbuf, count)) 
-			return -EFAULT;
-		chbuf = &stli_tmpwritebuf[0];
-	}
 
 /*
  *	All data is now local, shove as much as possible into shared memory.
@@ -1676,8 +1624,6 @@ static int stli_write(struct tty_struct *tty, int from_user, const unsigned char
 	set_bit(ST_TXBUSY, &portp->state);
 	EBRDDISABLE(brdp);
 
-	if (from_user)
-		up(&stli_tmpwritesem);
 	restore_flags(flags);
 
 	return(count);
@@ -2504,7 +2450,7 @@ static void stli_waituntilsent(struct tty_struct *tty, int timeout)
 	while (test_bit(ST_TXBUSY, &portp->state)) {
 		if (signal_pending(current))
 			break;
-		stli_delay(2);
+		msleep_interruptible(20);
 		if (time_after_eq(jiffies, tend))
 			break;
 	}

@@ -201,7 +201,7 @@ static inline int is_prefetch(struct pt_regs *regs, unsigned long addr,
 	return 0;
 } 
 
-asmlinkage void do_invalid_op(struct pt_regs *, unsigned long);
+fastcall void do_invalid_op(struct pt_regs *, unsigned long);
 
 /*
  * This routine handles page faults.  It determines the address,
@@ -213,11 +213,11 @@ asmlinkage void do_invalid_op(struct pt_regs *, unsigned long);
  *	bit 1 == 0 means read, 1 means write
  *	bit 2 == 0 means kernel, 1 means user-mode
  */
-asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
+fastcall void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 {
 	struct task_struct *tsk;
 	struct mm_struct *mm;
-	struct vm_area_struct * vma, * prev_vma;
+	struct vm_area_struct * vma;
 	unsigned long address;
 	unsigned long page;
 	int write;
@@ -227,7 +227,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	__asm__("movl %%cr2,%0":"=r" (address));
 
 	if (notify_die(DIE_PAGE_FAULT, "page fault", regs, error_code, 14,
-					SIGSEGV) == NOTIFY_OK)
+					SIGSEGV) == NOTIFY_STOP)
 		return;
 	/* It's safe to allow irq's after cr2 has been saved */
 	if (regs->eflags & (X86_EFLAGS_IF|VM_MASK))
@@ -308,13 +308,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 		if (address + 32 < regs->esp)
 			goto bad_area;
 	}
-	/*
-	 * find_vma_prev is just a bit slower, because it cannot
-	 * use the mmap_cache, so we run it only in the growsdown
-	 * slow path and we leave find_vma in the fast path.
-	 */
-	find_vma_prev(current->mm, address, &prev_vma);
-	if (expand_stack(vma, address, prev_vma))
+	if (expand_stack(vma, address))
 		goto bad_area;
 /*
  * Ok, we have a good vm_area for this memory access, so

@@ -1,7 +1,6 @@
 #ifndef _ASM_DMA_MAPPING_H
 #define _ASM_DMA_MAPPING_H
 
-#include <linux/device.h>
 #include <asm/scatterlist.h>
 #include <asm/cache.h>
 
@@ -68,5 +67,13 @@ extern int dma_is_consistent(dma_addr_t dma_addr);
 
 extern void dma_cache_sync(void *vaddr, size_t size,
 	       enum dma_data_direction direction);
+
+#define ARCH_HAS_DMA_DECLARE_COHERENT_MEMORY
+
+extern int dma_declare_coherent_memory(struct device *dev, dma_addr_t bus_addr,
+	dma_addr_t device_addr, size_t size, int flags);
+extern void dma_release_declared_memory(struct device *dev);
+extern void * dma_mark_declared_memory_occupied(struct device *dev,
+	dma_addr_t device_addr, size_t size);
 
 #endif /* _ASM_DMA_MAPPING_H */

@@ -32,7 +32,6 @@
 #include <linux/sunrpc/svc.h>
 #include <linux/sunrpc/svcsock.h>
 #include <linux/lockd/lockd.h>
-#include <linux/lockd/sm_inter.h>
 #include <linux/nfs.h>
 
 #define NLMDBG_FACILITY		NLMDBG_SVC
@@ -40,7 +39,10 @@
 #define ALLOWED_SIGS		(sigmask(SIGKILL))
 
 extern struct svc_program	nlmsvc_program;
+
 struct nlmsvc_binding *		nlmsvc_ops;
+EXPORT_SYMBOL(nlmsvc_ops);
+
 static DECLARE_MUTEX(nlmsvc_sema);
 static unsigned int		nlmsvc_users;
 static pid_t			nlmsvc_pid;
@@ -114,22 +116,13 @@ lockd(struct svc_rqst *rqstp)
 
 	daemonize("lockd");
 
-#ifdef CONFIG_STATD
-	/* Set up statd */
-	nsm_init();
-#endif
-
 	/* Process request with signals blocked, but allow SIGKILL.  */
 	allow_signal(SIGKILL);
 
 	/* kick rpciod */
 	rpciod_up();
 
-#ifndef CONFIG_STATD
 	dprintk("NFS locking service started (ver " LOCKD_VERSION ").\n");
-#else
-	dprintk("NFS lockd/statd started (ver " LOCKD_VERSION ").\n");
-#endif
 
 	if (!nlm_timeout)
 		nlm_timeout = LOCKD_DFLT_TIMEO;
@@ -210,32 +203,6 @@ lockd(struct svc_rqst *rqstp)
 	module_put_and_exit(0);
 }
 
-static int
-lockd_rqst_needs_auth(struct svc_rqst *rqstp)
-{
-	u32 proc = rqstp->rq_proc;
-
-	if (proc == 0
-	 || proc == NLMPROC_GRANTED
-	 || proc == NLMPROC_TEST_RES
-	 || proc == NLMPROC_LOCK_RES
-	 || proc == NLMPROC_CANCEL_RES
-	 || proc == NLMPROC_UNLOCK_RES
-	 || proc == NLMPROC_GRANTED_MSG
-	 || proc == NLMPROC_NSM_NOTIFY)
-		return 0;
-	return 1;
-}
-
-#ifdef CONFIG_STATD
-static int
-statd_rqst_needs_auth(struct svc_rqst *rqstp)
-{
-	/* statd is unauthenticated */
-	return 0;
-}
-#endif
-
 /*
  * Bring up the lockd process if it's not already up.
  */
@@ -306,6 +273,7 @@ out:
 	up(&nlmsvc_sema);
 	return error;
 }
+EXPORT_SYMBOL(lockd_up);
 
 /*
  * Decrement the user count and bring down lockd if we're the last.
@@ -347,6 +315,7 @@ lockd_down(void)
 out:
 	up(&nlmsvc_sema);
 }
+EXPORT_SYMBOL(lockd_down);
 
 /*
  * Sysctl parameters (same as module parameters, different interface).
@@ -473,39 +442,6 @@ static void __exit exit_nlm(void)
 module_init(init_nlm);
 module_exit(exit_nlm);
 
-#ifdef CONFIG_STATD
-/*
- * Define NSM program and procedures
- */
-static struct svc_version	nsmsvc_version1 = {
-		.vs_vers	= 1,
-		.vs_nproc	= 7,
-		.vs_proc	= nsmsvc_procedures,
-		.vs_xdrsize	= SMSVC_XDRSIZE,
-};
-static struct svc_version *	nsmsvc_version[] = {
-	[1] = &nsmsvc_version1,
-};
-
-static struct svc_stat		nsmsvc_stats;
-
-#define SM_NRVERS	(sizeof(nsmsvc_version)/sizeof(nsmsvc_version[0]))
-static struct svc_program	nsmsvc_program = {
-	.pg_prog	= SM_PROGRAM,		/* program number */
-	.pg_nvers	= SM_NRVERS,		/* number of entries in nlmsvc_version */
-	.pg_vers	= nsmsvc_version,	/* version table */
-	.pg_name	= "statd",		/* service name */
-	.pg_class	= "nfsd",		/* share authentication with nfsd */
-	.pg_stats	= &nsmsvc_stats,	/* stats table */
-
-	.pg_need_auth	= statd_rqst_needs_auth,
-};
-
-#define nsmsvc_program_p &nsmsvc_program
-#else
-#define nsmsvc_program_p NULL
-#endif
-
 /*
  * Define NLM program and procedures
  */
@@ -541,13 +477,10 @@ static struct svc_stat		nlmsvc_stats;
 
 #define NLM_NRVERS	(sizeof(nlmsvc_version)/sizeof(nlmsvc_version[0]))
 struct svc_program	nlmsvc_program = {
-	.pg_next	= nsmsvc_program_p,
 	.pg_prog	= NLM_PROGRAM,		/* program number */
 	.pg_nvers	= NLM_NRVERS,		/* number of entries in nlmsvc_version */
 	.pg_vers	= nlmsvc_version,	/* version table */
 	.pg_name	= "lockd",		/* service name */
 	.pg_class	= "nfsd",		/* share authentication with nfsd */
 	.pg_stats	= &nlmsvc_stats,	/* stats table */
-
-	.pg_need_auth	= lockd_rqst_needs_auth,
 };

@@ -389,6 +389,7 @@
 #define PLATFORM_ISERIES_LPAR 0x0201
 #define PLATFORM_LPAR         0x0001
 #define PLATFORM_POWERMAC     0x0400
+#define PLATFORM_MAPLE        0x0500
 
 /* Compatibility with drivers coming from PPC32 world */
 #define _machine	(systemcfg->platform)
@@ -517,11 +518,8 @@ extern struct task_struct *last_task_used_altivec;
 
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
- *
- * /proc/pid/unmap_base is only supported for 32bit processes for now.
  */
-#define __TASK_UNMAPPED_BASE (PAGE_ALIGN(STACK_TOP_USER32 / 4))
-#define TASK_UNMAPPED_BASE_USER32 (PAGE_ALIGN(current->map_base))
+#define TASK_UNMAPPED_BASE_USER32 (PAGE_ALIGN(STACK_TOP_USER32 / 4))
 #define TASK_UNMAPPED_BASE_USER64 (PAGE_ALIGN(STACK_TOP_USER64 / 4))
 
 #define TASK_UNMAPPED_BASE ((test_thread_flag(TIF_32BIT)||(ppcdebugset(PPCDBG_BINFMT_32ADDR))) ? \

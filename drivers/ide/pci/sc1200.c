@@ -67,61 +67,12 @@ static unsigned short sc1200_get_pci_clock (void)
 	return pci_clock;
 }
 
-#define DISPLAY_SC1200_TIMINGS
-
-#if defined(DISPLAY_SC1200_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static int sc1200_get_info(char *, char **, off_t, int);
-extern int (*sc1200_display_info)(char *, char **, off_t, int); /* ide-proc.c */
-extern char *ide_media_verbose(ide_drive_t *);
-static u8 sc1200_proc = 0;
-
-static struct pci_dev *bmide_dev;
-
-static int sc1200_get_info (char *buffer, char **addr, off_t offset, int count)
-{
-	char *p = buffer;
-	unsigned long bibma = pci_resource_start(bmide_dev, 4);
-	int len;
-	u8  c0 = 0, c1 = 0;
-
-	/*
-	 * at that point bibma+0x2 et bibma+0xa are byte registers
-	 * to investigate:
-	 */
-
-	c0 = inb_p(bibma + 0x02);
-	c1 = inb_p(bibma + 0x0a);
-
-	p += sprintf(p, "\n                               National SCx200 Chipset.\n");
-	p += sprintf(p, "--------------- Primary Channel ---------------- Secondary Channel -------------\n");
-	p += sprintf(p, "                %sabled                         %sabled\n",
-			(c0&0x80) ? "dis" : " en",
-			(c1&0x80) ? "dis" : " en");
-	p += sprintf(p, "--------------- drive0 --------- drive1 -------- drive0 ---------- drive1 ------\n");
-	p += sprintf(p, "DMA enabled:    %s              %s             %s               %s\n",
-			(c0&0x20) ? "yes" : "no ", (c0&0x40) ? "yes" : "no ",
-			(c1&0x20) ? "yes" : "no ", (c1&0x40) ? "yes" : "no " );
-
-	p += sprintf(p, "UDMA\n");
-	p += sprintf(p, "DMA\n");
-	p += sprintf(p, "PIO\n");
-
-	len = (p - buffer) - offset;
-	*addr = buffer + offset;
-	
-	return len > count ? count : len;
-}
-#endif /* DISPLAY_SC1200_TIMINGS && CONFIG_PROC_FS */
-
 extern char *ide_xfer_verbose (byte xfer_rate);
 
 /*
  * Set a new transfer mode at the drive
  */
-int sc1200_set_xfer_mode (ide_drive_t *drive, byte mode)
+static int sc1200_set_xfer_mode (ide_drive_t *drive, byte mode)
 {
 	printk("%s: sc1200_set_xfer_mode(%s)\n", drive->name, ide_xfer_verbose(mode));
 	return ide_config_drive_speed(drive, mode);
@@ -312,7 +263,7 @@ static int sc1200_config_dma (ide_drive_t *drive)
  *
  *  returns 1 on error, 0 otherwise
  */
-int sc1200_ide_dma_end (ide_drive_t *drive)
+static int sc1200_ide_dma_end (ide_drive_t *drive)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	unsigned long dma_base = hwif->dma_base;
@@ -505,21 +456,6 @@ printk("%s: SC1200: resume\n", hwif->name);
 }
 
 /*
- * Initialize the sc1200 bridge for reliable IDE DMA operation.
- */
-static unsigned int __init init_chipset_sc1200 (struct pci_dev *dev, const char *name)
-{
-#if defined(DISPLAY_SC1200_TIMINGS) && defined(CONFIG_PROC_FS)
-	if (!bmide_dev) {
-		sc1200_proc = 1;
-		bmide_dev = dev;
-		ide_pci_create_host_proc("sc1200", sc1200_get_info);
-	}
-#endif /* DISPLAY_SC1200_TIMINGS && CONFIG_PROC_FS */
-	return 0;
-}
-
-/*
  * This gets invoked by the IDE driver once for each channel,
  * and performs channel-specific pre-initialization before drive probing.
  */
@@ -545,7 +481,6 @@ static void __init init_hwif_sc1200 (ide_hwif_t *hwif)
 
 static ide_pci_device_t sc1200_chipset __devinitdata = {
 	.name		= "SC1200",
-	.init_chipset	= init_chipset_sc1200,
 	.init_hwif	= init_hwif_sc1200,
 	.channels	= 2,
 	.autodma	= AUTODMA,

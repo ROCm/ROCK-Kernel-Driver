@@ -1,5 +1,5 @@
 /*
- * $Id: arctic-mtd.c,v 1.11 2004/07/12 21:59:43 dwmw2 Exp $
+ * $Id: arctic-mtd.c,v 1.13 2004/11/04 13:24:14 gleixner Exp $
  * 
  * drivers/mtd/maps/arctic-mtd.c MTD mappings and partition tables for 
  *                              IBM 405LP Arctic boards.
@@ -98,7 +98,7 @@ init_arctic_mtd(void)
 {
 	printk("%s: 0x%08x at 0x%08x\n", NAME, SIZE, PADDR);
 
-	arctic_mtd_map.virt = (unsigned long) ioremap(PADDR, SIZE);
+	arctic_mtd_map.virt = ioremap(PADDR, SIZE);
 
 	if (!arctic_mtd_map.virt) {
 		printk("%s: failed to ioremap 0x%x\n", NAME, PADDR);

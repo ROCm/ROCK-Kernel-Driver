@@ -16,8 +16,13 @@ obj-$(CONFIG_PNP)		+= pnp/
 # char/ comes before serial/ etc so that the VT console is the boot-time
 # default.
 obj-y				+= char/
-# serio/ needs to come before input and other dirs that register serio
-# driver modules because the serio bus needs to be initialized
+
+# i810fb and intelfb depend on char/agp/
+obj-$(CONFIG_FB_I810)           += video/i810/
+obj-$(CONFIG_FB_INTEL)          += video/intelfb/
+
+# we also need input/serio early so serio bus is initialized by the time
+# serial drivers start registering their serio ports
 obj-$(CONFIG_SERIO)		+= input/serio/
 obj-y				+= serial/
 obj-$(CONFIG_PARPORT)		+= parport/
@@ -32,7 +37,7 @@ obj-$(CONFIG_FUSION)		+= message/
 obj-$(CONFIG_IEEE1394)		+= ieee1394/
 obj-y				+= cdrom/
 obj-$(CONFIG_MTD)		+= mtd/
-obj-$(CONFIG_PCMCIA)		+= pcmcia/
+obj-$(CONFIG_PCCARD)		+= pcmcia/
 obj-$(CONFIG_DIO)		+= dio/
 obj-$(CONFIG_SBUS)		+= sbus/
 obj-$(CONFIG_ZORRO)		+= zorro/
@@ -53,6 +58,5 @@ obj-$(CONFIG_ISDN)		+= isdn/
 obj-$(CONFIG_MCA)		+= mca/
 obj-$(CONFIG_EISA)		+= eisa/
 obj-$(CONFIG_CPU_FREQ)		+= cpufreq/
-obj-$(CONFIG_INFINIBAND)	+= infiniband/
 obj-$(CONFIG_MMC)		+= mmc/
 obj-y				+= firmware/

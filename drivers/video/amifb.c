@@ -1239,8 +1239,6 @@ int __init amifb_setup(char *options)
 		if (!strcmp(this_opt, "inverse")) {
 			amifb_inverse = 1;
 			fb_invert_cmaps();
-		} else if (!strcmp(this_opt, "off")) {
-			amifb_video_off();
 		} else if (!strcmp(this_opt, "ilbm"))
 			amifb_ilbm = 1;
 		else if (!strncmp(this_opt, "monitorcap:", 11))
@@ -2258,23 +2256,16 @@ int __init amifb_init(void)
 	u_int defmode;
 
 #ifndef MODULE
-	amifb_setup(fb_get_options("amifb"));
+	char *option = NULL;
+
+	if (fb_get_options("amifb", &option)) {
+		amifb_video_off();
+		return -ENODEV;
+	}
+	amifb_setup(option);
 #endif
 	if (!MACH_IS_AMIGA || !AMIGAHW_PRESENT(AMI_VIDEO))
 		return -ENXIO;
-
-	/*
-	 * TODO: where should we put this? The DMI Resolver doesn't have a
-	 *	 frame buffer accessible by the CPU
-	 */
-
-#ifdef CONFIG_GSP_RESOLVER
-	if (amifb_resolver){
-		custom.dmacon = DMAF_MASTER | DMAF_RASTER | DMAF_COPPER |
-				DMAF_BLITTER | DMAF_SPRITE;
-		return 0;
-	}
-#endif
 
 	/*
 	 * We request all registers starting from bplpt[0]
@@ -2478,6 +2469,7 @@ static void amifb_deinit(void)
 static int amifb_blank(int blank, struct fb_info *info)
 {
 	do_blank = blank ? blank : -1;
+
 	return 0;
 }
 
@@ -2952,21 +2944,11 @@ static int ami_encode_var(struct fb_var_screeninfo *var,
 	var->bits_per_pixel = par->bpp;
 	var->grayscale = 0;
 
-	if (IS_AGA) {
-		var->red.offset = 0;
-		var->red.length = 8;
-		var->red.msb_right = 0;
-	} else {
-		if (clk_shift == TAG_SHRES) {
-			var->red.offset = 0;
-			var->red.length = 2;
-			var->red.msb_right = 0;
-		} else {
-			var->red.offset = 0;
-			var->red.length = 4;
-			var->red.msb_right = 0;
-		}
-	}
+	var->red.offset = 0;
+	var->red.msb_right = 0;
+	var->red.length = par->bpp;
+	if (par->bplcon0 & BPC0_HAM)
+	    var->red.length -= 2;
 	var->blue = var->green = var->red;
 	var->transp.offset = 0;
 	var->transp.length = 0;
@@ -3266,20 +3248,20 @@ static void ami_do_blank(void)
 		custom.dmacon = DMAF_RASTER | DMAF_SPRITE;
 		red = green = blue = 0;
 		if (!IS_OCS && do_blank > 1) {
-			switch (do_blank-1) {
-				case VESA_VSYNC_SUSPEND:
+			switch (do_blank) {
+				case FB_BLANK_VSYNC_SUSPEND:
 					custom.hsstrt = hsstrt2hw(par->hsstrt);
 					custom.hsstop = hsstop2hw(par->hsstop);
 					custom.vsstrt = vsstrt2hw(par->vtotal+4);
 					custom.vsstop = vsstop2hw(par->vtotal+4);
 					break;
-				case VESA_HSYNC_SUSPEND:
+				case FB_BLANK_HSYNC_SUSPEND:
 					custom.hsstrt = hsstrt2hw(par->htotal+16);
 					custom.hsstop = hsstop2hw(par->htotal+16);
 					custom.vsstrt = vsstrt2hw(par->vsstrt);
 					custom.vsstop = vsstrt2hw(par->vsstop);
 					break;
-				case VESA_POWERDOWN:
+				case FB_BLANK_POWERDOWN:
 					custom.hsstrt = hsstrt2hw(par->htotal+16);
 					custom.hsstop = hsstop2hw(par->htotal+16);
 					custom.vsstrt = vsstrt2hw(par->vtotal+4);

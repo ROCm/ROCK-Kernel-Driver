@@ -59,10 +59,8 @@
  * NE1619 has two possible addresses: 0x2c and 0x2d.
  */
 
-static unsigned short normal_i2c[] = { I2C_CLIENT_END };
-static unsigned short normal_i2c_range[] = { 0x2c, 0x2e, I2C_CLIENT_END };
+static unsigned short normal_i2c[] = { 0x2c, 0x2d, 0x2e, I2C_CLIENT_END };
 static unsigned int normal_isa[] = { I2C_CLIENT_ISA_END };
-static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 
 /*
  * Insmod parameters
@@ -153,7 +151,7 @@ struct adm1025_data {
  * Internal variables
  */
 
-static int adm1025_id = 0;
+static int adm1025_id;
 
 /*
  * Sysfs stuff
@@ -212,8 +210,8 @@ static ssize_t set_in##offset##_min(struct device *dev, const char *buf, \
 { \
 	struct i2c_client *client = to_i2c_client(dev); \
 	struct adm1025_data *data = i2c_get_clientdata(client); \
-	data->in_min[offset] = IN_TO_REG(simple_strtol(buf, NULL, 10), \
-			       in_scale[offset]); \
+	long val = simple_strtol(buf, NULL, 10); \
+	data->in_min[offset] = IN_TO_REG(val, in_scale[offset]); \
 	i2c_smbus_write_byte_data(client, ADM1025_REG_IN_MIN(offset), \
 				  data->in_min[offset]); \
 	return count; \
@@ -223,8 +221,8 @@ static ssize_t set_in##offset##_max(struct device *dev, const char *buf, \
 { \
 	struct i2c_client *client = to_i2c_client(dev); \
 	struct adm1025_data *data = i2c_get_clientdata(client); \
-	data->in_max[offset] = IN_TO_REG(simple_strtol(buf, NULL, 10), \
-			       in_scale[offset]); \
+	long val = simple_strtol(buf, NULL, 10); \
+	data->in_max[offset] = IN_TO_REG(val, in_scale[offset]); \
 	i2c_smbus_write_byte_data(client, ADM1025_REG_IN_MAX(offset), \
 				  data->in_max[offset]); \
 	return count; \
@@ -246,7 +244,8 @@ static ssize_t set_temp##offset##_min(struct device *dev, const char *buf, \
 { \
 	struct i2c_client *client = to_i2c_client(dev); \
 	struct adm1025_data *data = i2c_get_clientdata(client); \
-	data->temp_min[offset-1] = TEMP_TO_REG(simple_strtol(buf, NULL, 10)); \
+	long val = simple_strtol(buf, NULL, 10); \
+	data->temp_min[offset-1] = TEMP_TO_REG(val); \
 	i2c_smbus_write_byte_data(client, ADM1025_REG_TEMP_LOW(offset-1), \
 				  data->temp_min[offset-1]); \
 	return count; \
@@ -256,7 +255,8 @@ static ssize_t set_temp##offset##_max(struct device *dev, const char *buf, \
 { \
 	struct i2c_client *client = to_i2c_client(dev); \
 	struct adm1025_data *data = i2c_get_clientdata(client); \
-	data->temp_max[offset-1] = TEMP_TO_REG(simple_strtol(buf, NULL, 10)); \
+	long val = simple_strtol(buf, NULL, 10); \
+	data->temp_max[offset-1] = TEMP_TO_REG(val); \
 	i2c_smbus_write_byte_data(client, ADM1025_REG_TEMP_HIGH(offset-1), \
 				  data->temp_max[offset-1]); \
 	return count; \

@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.33 $)
+ * linux/drivers/s390/net/qeth_sys.c ($Revision: 1.40 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  * This file contains code related to sysfs.
@@ -20,7 +20,7 @@
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-const char *VERSION_QETH_SYS_C = "$Revision: 1.33 $";
+const char *VERSION_QETH_SYS_C = "$Revision: 1.40 $";
 
 /*****************************************************************************/
 /*                                                                           */
@@ -694,6 +694,44 @@ qeth_dev_canonical_macaddr_store(struct device *dev, const char *buf,
 static DEVICE_ATTR(canonical_macaddr, 0644, qeth_dev_canonical_macaddr_show,
 		   qeth_dev_canonical_macaddr_store);
 
+static ssize_t
+qeth_dev_layer2_show(struct device *dev, char *buf)
+{
+	struct qeth_card *card = dev->driver_data;
+
+	if (!card)
+		return -EINVAL;
+
+	return sprintf(buf, "%i\n", card->options.layer2 ? 1:0);
+}
+
+static ssize_t
+qeth_dev_layer2_store(struct device *dev, const char *buf, size_t count)
+{
+	struct qeth_card *card = dev->driver_data;
+	char *tmp;
+	int i;
+
+	if (!card)
+		return -EINVAL;
+
+	if ((card->state != CARD_STATE_DOWN) &&
+	    (card->state != CARD_STATE_RECOVER))
+		return -EPERM;
+
+	i = simple_strtoul(buf, &tmp, 16);
+	if ((i == 0) || (i == 1))
+		card->options.layer2 = i;
+	else {
+		PRINT_WARN("layer2: write 0 or 1 to this file!\n");
+		return -EINVAL;
+	}
+	return count;
+}
+
+static DEVICE_ATTR(layer2, 0644, qeth_dev_layer2_show,
+		   qeth_dev_layer2_store);
+
 static struct device_attribute * qeth_device_attrs[] = {
 	&dev_attr_state,
 	&dev_attr_chpid,
@@ -714,6 +752,7 @@ static struct device_attribute * qeth_device_attrs[] = {
 	&dev_attr_recover,
 	&dev_attr_broadcast_mode,
 	&dev_attr_canonical_macaddr,
+	&dev_attr_layer2,
 	NULL,
 };
 
@@ -729,6 +768,15 @@ struct device_attribute dev_attr_##_id = {				     \
 	.store	= _store,						     \
 };
 
+int
+qeth_check_layer2(struct qeth_card *card)
+{
+	if (card->options.layer2)
+		return -EPERM;
+	return 0;
+}
+
+
 static ssize_t
 qeth_dev_ipato_enable_show(struct device *dev, char *buf)
 {
@@ -737,6 +785,8 @@ qeth_dev_ipato_enable_show(struct device *dev, char *buf)
 	if (!card)
 		return -EINVAL;
 
+	if (qeth_check_layer2(card))
+		return -EPERM;
 	return sprintf(buf, "%i\n", card->ipato.enabled? 1:0);
 }
 
@@ -751,6 +801,9 @@ qeth_dev_ipato_enable_store(struct device *dev, const char *buf, size_t count)
 
 	if ((card->state != CARD_STATE_DOWN) &&
 	    (card->state != CARD_STATE_RECOVER))
+		return -EPERM;
+
+	if (qeth_check_layer2(card))
 		return -EPERM;
 
 	tmp = strsep((char **) &buf, "\n");
@@ -780,6 +833,9 @@ qeth_dev_ipato_invert4_show(struct device *dev, char *buf)
 	if (!card)
 		return -EINVAL;
 
+	if (qeth_check_layer2(card))
+		return -EPERM;
+
 	return sprintf(buf, "%i\n", card->ipato.invert4? 1:0);
 }
 
@@ -791,6 +847,9 @@ qeth_dev_ipato_invert4_store(struct device *dev, const char *buf, size_t count)
 
 	if (!card)
 		return -EINVAL;
+
+	if (qeth_check_layer2(card))
+		return -EPERM;
 
 	tmp = strsep((char **) &buf, "\n");
 	if (!strcmp(tmp, "toggle")){
@@ -817,18 +876,31 @@ qeth_dev_ipato_add_show(char *buf, struct qeth_card *card,
 {
 	struct qeth_ipato_entry *ipatoe;
 	unsigned long flags;
-	char addr_str[49];
+	char addr_str[40];
+	int entry_len; /* length of 1 entry string, differs between v4 and v6 */
 	int i = 0;
 
+	if (qeth_check_layer2(card))
+		return -EPERM;
+
+	entry_len = (proto == QETH_PROT_IPV4)? 12 : 40;
+	/* add strlen for "/<mask>\n" */
+	entry_len += (proto == QETH_PROT_IPV4)? 5 : 6;
 	spin_lock_irqsave(&card->ip_lock, flags);
 	list_for_each_entry(ipatoe, &card->ipato.entries, entry){
 		if (ipatoe->proto != proto)
 			continue;
+		/* String must not be longer than PAGE_SIZE. So we check if
+		 * string length gets near PAGE_SIZE. Then we can savely display
+		 * the next IPv6 address (worst case, compared to IPv4) */
+		if ((PAGE_SIZE - i) <= entry_len)
+			break;
 		qeth_ipaddr_to_string(proto, ipatoe->addr, addr_str);
-		i += sprintf(buf + i, "%s/%i\n", addr_str, ipatoe->mask_bits);
+		i += snprintf(buf + i, PAGE_SIZE - i,
+			      "%s/%i\n", addr_str, ipatoe->mask_bits);
 	}
 	spin_unlock_irqrestore(&card->ip_lock, flags);
-	i += sprintf(buf + i, "\n");
+	i += snprintf(buf + i, PAGE_SIZE - i, "\n");
 
 	return i;
 }
@@ -880,6 +952,8 @@ qeth_dev_ipato_add_store(const char *buf, size_t count,
 	int mask_bits;
 	int rc;
 
+	if (qeth_check_layer2(card))
+		return -EPERM;
 	if ((rc = qeth_parse_ipatoe(buf, proto, addr, &mask_bits)))
 		return rc;
 
@@ -923,6 +997,8 @@ qeth_dev_ipato_del_store(const char *buf, size_t count,
 	int mask_bits;
 	int rc;
 
+	if (qeth_check_layer2(card))
+		return -EPERM;
 	if ((rc = qeth_parse_ipatoe(buf, proto, addr, &mask_bits)))
 		return rc;
 
@@ -954,6 +1030,9 @@ qeth_dev_ipato_invert6_show(struct device *dev, char *buf)
 	if (!card)
 		return -EINVAL;
 
+	if (qeth_check_layer2(card))
+		return -EPERM;
+
 	return sprintf(buf, "%i\n", card->ipato.invert6? 1:0);
 }
 
@@ -965,6 +1044,9 @@ qeth_dev_ipato_invert6_store(struct device *dev, const char *buf, size_t count)
 
 	if (!card)
 		return -EINVAL;
+
+	if (qeth_check_layer2(card))
+		return -EPERM;
 
 	tmp = strsep((char **) &buf, "\n");
 	if (!strcmp(tmp, "toggle")){
@@ -1050,21 +1132,32 @@ qeth_dev_vipa_add_show(char *buf, struct qeth_card *card,
 			enum qeth_prot_versions proto)
 {
 	struct qeth_ipaddr *ipaddr;
-	char addr_str[49];
+	char addr_str[40];
+	int entry_len; /* length of 1 entry string, differs between v4 and v6 */
 	unsigned long flags;
 	int i = 0;
 
+	if (qeth_check_layer2(card))
+		return -EPERM;
+
+	entry_len = (proto == QETH_PROT_IPV4)? 12 : 40;
+	entry_len += 2; /* \n + terminator */
 	spin_lock_irqsave(&card->ip_lock, flags);
 	list_for_each_entry(ipaddr, &card->ip_list, entry){
 		if (ipaddr->proto != proto)
 			continue;
 		if (ipaddr->type != QETH_IP_TYPE_VIPA)
 			continue;
+		/* String must not be longer than PAGE_SIZE. So we check if
+		 * string length gets near PAGE_SIZE. Then we can savely display
+		 * the next IPv6 address (worst case, compared to IPv4) */
+		if ((PAGE_SIZE - i) <= entry_len)
+			break;
 		qeth_ipaddr_to_string(proto, (const u8 *)&ipaddr->u, addr_str);
-		i += sprintf(buf + i, "%s\n", addr_str);
+		i += snprintf(buf + i, PAGE_SIZE - i, "%s\n", addr_str);
 	}
 	spin_unlock_irqrestore(&card->ip_lock, flags);
-	i += sprintf(buf + i, "\n");
+	i += snprintf(buf + i, PAGE_SIZE - i, "\n");
 
 	return i;
 }
@@ -1098,6 +1191,8 @@ qeth_dev_vipa_add_store(const char *buf, size_t count,
 	u8 addr[16] = {0, };
 	int rc;
 
+	if (qeth_check_layer2(card))
+		return -EPERM;
 	if ((rc = qeth_parse_vipae(buf, proto, addr)))
 		return rc;
 
@@ -1129,6 +1224,8 @@ qeth_dev_vipa_del_store(const char *buf, size_t count,
 	u8 addr[16];
 	int rc;
 
+	if (qeth_check_layer2(card))
+		return -EPERM;
 	if ((rc = qeth_parse_vipae(buf, proto, addr)))
 		return rc;
 
@@ -1186,6 +1283,9 @@ qeth_dev_vipa_del6_store(struct device *dev, const char *buf, size_t count)
 	if (!card)
 		return -EINVAL;
 
+	if (qeth_check_layer2(card))
+		return -EPERM;
+
 	return qeth_dev_vipa_del_store(buf, count, card, QETH_PROT_IPV6);
 }
 
@@ -1213,21 +1313,32 @@ qeth_dev_rxip_add_show(char *buf, struct qeth_card *card,
 		       enum qeth_prot_versions proto)
 {
 	struct qeth_ipaddr *ipaddr;
-	char addr_str[49];
+	char addr_str[40];
+	int entry_len; /* length of 1 entry string, differs between v4 and v6 */
 	unsigned long flags;
 	int i = 0;
 
+	if (qeth_check_layer2(card))
+		return -EPERM;
+
+	entry_len = (proto == QETH_PROT_IPV4)? 12 : 40;
+	entry_len += 2; /* \n + terminator */
 	spin_lock_irqsave(&card->ip_lock, flags);
 	list_for_each_entry(ipaddr, &card->ip_list, entry){
 		if (ipaddr->proto != proto)
 			continue;
 		if (ipaddr->type != QETH_IP_TYPE_RXIP)
 			continue;
+		/* String must not be longer than PAGE_SIZE. So we check if
+		 * string length gets near PAGE_SIZE. Then we can savely display
+		 * the next IPv6 address (worst case, compared to IPv4) */
+		if ((PAGE_SIZE - i) <= entry_len)
+			break;
 		qeth_ipaddr_to_string(proto, (const u8 *)&ipaddr->u, addr_str);
-		i += sprintf(buf + i, "%s\n", addr_str);
+		i += snprintf(buf + i, PAGE_SIZE - i, "%s\n", addr_str);
 	}
 	spin_unlock_irqrestore(&card->ip_lock, flags);
-	i += sprintf(buf + i, "\n");
+	i += snprintf(buf + i, PAGE_SIZE - i, "\n");
 
 	return i;
 }
@@ -1261,6 +1372,8 @@ qeth_dev_rxip_add_store(const char *buf, size_t count,
 	u8 addr[16] = {0, };
 	int rc;
 
+	if (qeth_check_layer2(card))
+		return -EPERM;
 	if ((rc = qeth_parse_rxipe(buf, proto, addr)))
 		return rc;
 
@@ -1292,6 +1405,8 @@ qeth_dev_rxip_del_store(const char *buf, size_t count,
 	u8 addr[16];
 	int rc;
 
+	if (qeth_check_layer2(card))
+		return -EPERM;
 	if ((rc = qeth_parse_rxipe(buf, proto, addr)))
 		return rc;
 

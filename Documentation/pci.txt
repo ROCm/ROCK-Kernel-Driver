@@ -141,26 +141,24 @@ for PCI devices manually using the following constructs:
 Searching by vendor and device ID:
 
 	struct pci_dev *dev = NULL;
-	while (dev = pci_find_device(VENDOR_ID, DEVICE_ID, dev))
+	while (dev = pci_get_device(VENDOR_ID, DEVICE_ID, dev))
 		configure_device(dev);
 
 Searching by class ID (iterate in a similar way):
 
-	pci_find_class(CLASS_ID, dev)
+	pci_get_class(CLASS_ID, dev)
 
 Searching by both vendor/device and subsystem vendor/device ID:
 
-	pci_find_subsys(VENDOR_ID, DEVICE_ID, SUBSYS_VENDOR_ID, SUBSYS_DEVICE_ID, dev).
+	pci_get_subsys(VENDOR_ID, DEVICE_ID, SUBSYS_VENDOR_ID, SUBSYS_DEVICE_ID, dev).
 
    You can use the constant PCI_ANY_ID as a wildcard replacement for
 VENDOR_ID or DEVICE_ID.  This allows searching for any device from a
 specific vendor, for example.
 
-Note that these functions are not hotplug-safe.  Their hotplug-safe
-replacements are pci_get_device(), pci_get_class() and pci_get_subsys().
-They increment the reference count on the pci_dev that they return.
-You must eventually (possibly at module unload) decrement the reference
-count on these devices by calling pci_dev_put().
+   These functions are hotplug-safe. They increment the reference count on
+the pci_dev that they return. You must eventually (possibly at module unload)
+decrement the reference count on these devices by calling pci_dev_put().
 
 
 3. Enabling and disabling devices
@@ -275,11 +273,12 @@ pci_present()			of PCI subsystem when trying to talk to it.
 				devices just return NULL.
 pcibios_(read|write)_*		Superseded by their pci_(read|write)_*
 				counterparts.
-pcibios_find_*			Superseded by their pci_find_* counterparts.
-pci_for_each_dev()		Superseded by pci_find_device()
+pcibios_find_*			Superseded by their pci_get_* counterparts.
+pci_for_each_dev()		Superseded by pci_get_device()
 pci_for_each_dev_reverse()	Superseded by pci_find_device_reverse()
 pci_for_each_bus()		Superseded by pci_find_next_bus()
 pci_find_device()		Superseded by pci_get_device()
 pci_find_subsys()		Superseded by pci_get_subsys()
-pcibios_find_class()		Superseded by pci_find_class()
+pcibios_find_class()		Superseded by pci_get_class()
+pci_find_class()		Superseded by pci_get_class()
 pci_(read|write)_*_nodev()	Superseded by pci_bus_(read|write)_*()

@@ -1393,7 +1393,7 @@ static int prog_dmabuf(struct cm_state *s, unsigned rec)
 		if (!db->rawbuf || !db->dmaaddr)
 			return -ENOMEM;
 		db->buforder = order;
-		/* now mark the pages as reserved; otherwise remap_page_range doesn't do what we want */
+		/* now mark the pages as reserved; otherwise remap_pfn_range doesn't do what we want */
 		pend = virt_to_page(db->rawbuf + (PAGE_SIZE << db->buforder) - 1);
 		for (pstart = virt_to_page(db->rawbuf); pstart <= pend; pstart++)
 			SetPageReserved(pstart);
@@ -2301,7 +2301,9 @@ static int cm_mmap(struct file *file, struct vm_area_struct *vma)
 	if (size > (PAGE_SIZE << db->buforder))
 		goto out;
 	ret = -EINVAL;
-	if (remap_page_range(vma, vma->vm_start, virt_to_phys(db->rawbuf), size, vma->vm_page_prot))
+	if (remap_pfn_range(vma, vma->vm_start,
+				virt_to_phys(db->rawbuf) >> PAGE_SHIFT,
+				size, vma->vm_page_prot))
 		goto out;
 	db->mapped = 1;
 	ret = 0;

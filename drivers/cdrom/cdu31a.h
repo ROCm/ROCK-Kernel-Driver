@@ -72,10 +72,10 @@
                                            from drive (in 1/100th's
                                            of seconds). */
  
-#define SONY_JIFFIES_TIMEOUT    1000	/* Maximum number of times the
+#define SONY_JIFFIES_TIMEOUT    (10*HZ)	/* Maximum number of times the
                                            drive will wait/try for an
                                            operation */
-#define SONY_RESET_TIMEOUT      100	/* Maximum number of times the
+#define SONY_RESET_TIMEOUT      HZ	/* Maximum number of times the
                                            drive will wait/try a reset
                                            operation */
 #define SONY_READY_RETRIES      20000   /* How many times to retry a

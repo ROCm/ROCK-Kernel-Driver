@@ -236,9 +236,9 @@ long rio_irqmask = -1;
 MODULE_AUTHOR("Rogier Wolff <R.E.Wolff@bitwizard.nl>, Patrick van de Lageweg <patrick@bitwizard.nl>");
 MODULE_DESCRIPTION("RIO driver");
 MODULE_LICENSE("GPL");
-MODULE_PARM(rio_poll, "i");
-MODULE_PARM(rio_debug, "i");
-MODULE_PARM(rio_irqmask, "i");
+module_param(rio_poll, int, 0);
+module_param(rio_debug, int, 0644);
+module_param(rio_irqmask, long, 0);
 
 static struct real_driver rio_real_driver = {
   rio_disable_tx_interrupts,
@@ -330,8 +330,7 @@ int RIODelay (struct Port *PortP, int njiffies)
   func_enter ();
 
   rio_dprintk (RIO_DEBUG_DELAY, "delaying %d jiffies\n", njiffies);  
-  current->state = TASK_INTERRUPTIBLE;
-  schedule_timeout(njiffies);
+  msleep_interruptible(jiffies_to_msecs(njiffies));
   func_exit();
 
   if (signal_pending(current))
@@ -347,8 +346,7 @@ int RIODelay_ni (struct Port *PortP, int njiffies)
   func_enter ();
 
   rio_dprintk (RIO_DEBUG_DELAY, "delaying %d jiffies (ni)\n", njiffies);  
-  current->state = TASK_UNINTERRUPTIBLE;
-  schedule_timeout(njiffies);
+  msleep(jiffies_to_msecs(njiffies));
   func_exit();
   return !RIO_FAIL;
 }
@@ -1138,8 +1136,8 @@ static int __init rio_init(void)
       hp->Ivec = pdev->irq;
       if (((1 << hp->Ivec) & rio_irqmask) == 0)
               hp->Ivec = 0;
-      hp->CardP	= (struct DpRam *)
       hp->Caddr = ioremap(p->RIOHosts[p->RIONumHosts].PaddrP, RIO_WINDOW_LEN);
+      hp->CardP	= (struct DpRam *) hp->Caddr;
       hp->Type  = RIO_PCI;
       hp->Copy  = rio_pcicopy; 
       hp->Mode  = RIO_PCI_BOOT_FROM_RAM;
@@ -1196,8 +1194,8 @@ static int __init rio_init(void)
       if (((1 << hp->Ivec) & rio_irqmask) == 0) 
       	hp->Ivec = 0;
       hp->Ivec |= 0x8000; /* Mark as non-sharable */
-      hp->CardP	= (struct DpRam *)
       hp->Caddr = ioremap(p->RIOHosts[p->RIONumHosts].PaddrP, RIO_WINDOW_LEN);
+      hp->CardP	= (struct DpRam *) hp->Caddr;
       hp->Type  = RIO_PCI;
       hp->Copy  = rio_pcicopy;
       hp->Mode  = RIO_PCI_BOOT_FROM_RAM;
@@ -1242,8 +1240,8 @@ static int __init rio_init(void)
     hp->PaddrP = rio_probe_addrs[i];
     /* There was something about the IRQs of these cards. 'Forget what.--REW */
     hp->Ivec = 0;
-    hp->CardP = (struct DpRam *)
     hp->Caddr = ioremap(p->RIOHosts[p->RIONumHosts].PaddrP, RIO_WINDOW_LEN);
+    hp->CardP = (struct DpRam *) hp->Caddr;
     hp->Type = RIO_AT;
     hp->Copy = rio_pcicopy; /* AT card PCI???? - PVDL
                              * -- YES! this is now a normal copy. Only the 

@@ -11,6 +11,7 @@
 #define _ASM_IO_H
 
 #include <linux/config.h>
+#include <linux/compiler.h>
 #include <linux/types.h>
 
 #include <asm/addrspace.h>
@@ -169,9 +170,9 @@ extern unsigned long isa_slot_offset;
 #define page_to_phys(page)	((dma_addr_t)page_to_pfn(page) << PAGE_SHIFT)
 
 extern void * __ioremap(phys_t offset, phys_t size, unsigned long flags);
-extern void __iounmap(void *addr);
+extern void __iounmap(volatile void __iomem *addr);
 
-static inline void * __ioremap_mode(unsigned long offset, unsigned long size,
+static inline void * __ioremap_mode(phys_t offset, unsigned long size,
 	unsigned long flags)
 {
 	if (cpu_has_64bit_addresses) {
@@ -236,7 +237,7 @@ static inline void * __ioremap_mode(unsigned long offset, unsigned long size,
 #define ioremap_uncached_accelerated(offset, size)			\
 	__ioremap_mode((offset), (size), _CACHE_UNCACHED_ACCELERATED)
 
-static inline void iounmap(void *addr)
+static inline void iounmap(volatile void __iomem *addr)
 {
 	if (cpu_has_64bits)
 		return;
@@ -244,9 +245,12 @@ static inline void iounmap(void *addr)
 	__iounmap(addr);
 }
 
-#define __raw_readb(addr)	(*(volatile unsigned char *)(addr))
-#define __raw_readw(addr)	(*(volatile unsigned short *)(addr))
-#define __raw_readl(addr)	(*(volatile unsigned int *)(addr))
+#define __raw_readb(addr)						\
+	(*(volatile unsigned char *) __swizzle_addr_b((unsigned long)(addr)))
+#define __raw_readw(addr)						\
+	(*(volatile unsigned short *) __swizzle_addr_w((unsigned long)(addr)))
+#define __raw_readl(addr)						\
+	(*(volatile unsigned int *) __swizzle_addr_l((unsigned long)(addr)))
 #ifdef CONFIG_MIPS32
 #define ____raw_readq(addr)						\
 ({									\
@@ -259,7 +263,7 @@ static inline void iounmap(void *addr)
 		"	sll	%L0, %L0, 0			\n"	\
 		"	.set	mips0				\n"	\
 		: "=r" (__res)						\
-		: "r" (addr));						\
+		: "r" (__swizzle_addr_q((unsigned long)(addr))));	\
 	__res;								\
 })
 #define __raw_readq(addr)						\
@@ -274,7 +278,8 @@ static inline void iounmap(void *addr)
 })
 #endif
 #ifdef CONFIG_MIPS64
-#define ____raw_readq(addr)	(*(volatile unsigned long *)(addr))
+#define ____raw_readq(addr)						\
+	(*(volatile unsigned long *)__swizzle_addr_q((unsigned long)(addr)))
 #define __raw_readq(addr)	____raw_readq(addr)
 #endif
 
@@ -287,12 +292,24 @@ static inline void iounmap(void *addr)
 #define readl_relaxed(addr)	readl(addr)
 #define readq_relaxed(addr)	readq(addr)
 
-#define __raw_writeb(b,addr)	((*(volatile unsigned char *)(addr)) = (b))
-#define __raw_writew(w,addr)	((*(volatile unsigned short *)(addr)) = (w))
-#define __raw_writel(l,addr)	((*(volatile unsigned int *)(addr)) = (l))
+#define __raw_writeb(b,addr)						\
+do {									\
+	((*(volatile unsigned char *)__swizzle_addr_b((unsigned long)(addr))) = (b));	\
+} while (0)
+
+#define __raw_writew(w,addr)						\
+do {									\
+	((*(volatile unsigned short *)__swizzle_addr_w((unsigned long)(addr))) = (w));	\
+} while (0)
+
+#define __raw_writel(l,addr)						\
+do {									\
+	((*(volatile unsigned int *)__swizzle_addr_l((unsigned long)(addr))) = (l));	\
+} while (0)
+
 #ifdef CONFIG_MIPS32
-#define ____raw_writeq(val,addr)						\
-({									\
+#define ____raw_writeq(val,addr)					\
+do {									\
 	u64 __tmp;							\
 									\
 	__asm__ __volatile__ (						\
@@ -304,19 +321,25 @@ static inline void iounmap(void *addr)
 		"	sd	%L0, (%2)			\n"	\
 		"	.set	mips0				\n"	\
 		: "=r" (__tmp)						\
-		: "0" ((unsigned long long)val), "r" (addr));		\
-})
+		: "0" ((unsigned long long)val),			\
+		  "r" (__swizzle_addr_q((unsigned long)(addr))));	\
+} while (0)
+
 #define __raw_writeq(val,addr)						\
-({									\
+do {									\
 	unsigned long __flags;						\
 									\
 	local_irq_save(__flags);					\
 	____raw_writeq(val, addr);					\
 	local_irq_restore(__flags);					\
-})
+} while (0)
 #endif
 #ifdef CONFIG_MIPS64
-#define ____raw_writeq(q,addr)	((*(volatile unsigned long *)(addr)) = (q))
+#define ____raw_writeq(q,addr)						\
+do {									\
+	*(volatile unsigned long *)__swizzle_addr_q((unsigned long)(addr)) = (q);	\
+} while (0)
+
 #define __raw_writeq(q,addr)	____raw_writeq(q, addr)
 #endif
 
@@ -324,6 +347,9 @@ static inline void iounmap(void *addr)
 #define writew(w,addr)		__raw_writew(__ioswab16(w),(addr))
 #define writel(l,addr)		__raw_writel(__ioswab32(l),(addr))
 #define writeq(q,addr)		__raw_writeq(__ioswab64(q),(addr))
+
+/* Depends on MIPS II instruction set */
+#define mmiowb() asm volatile ("sync" ::: "memory")
 
 #define memset_io(a,b,c)	memset((void *)(a),(b),(c))
 #define memcpy_fromio(a,b,c)	memcpy((a),(void *)(b),(c))
@@ -383,20 +409,6 @@ static inline int check_signature(unsigned long io_addr,
 out:
 	return retval;
 }
-
-/*
- *     isa_check_signature             -       find BIOS signatures
- *     @io_addr: mmio address to check
- *     @signature:  signature block
- *     @length: length of signature
- *
- *     Perform a signature comparison with the ISA mmio address io_addr.
- *     Returns 1 on a match.
- *
- *     This function is deprecated. New drivers should use ioremap and
- *     check_signature.
- */
-#define isa_check_signature(io, s, l)	check_signature(i,s,l)
 
 static inline void __outb(unsigned char val, unsigned long port)
 {

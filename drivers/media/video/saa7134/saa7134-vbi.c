@@ -1,4 +1,6 @@
 /*
+ * $Id: saa7134-vbi.c,v 1.5 2004/11/07 13:17:15 kraxel Exp $
+ *
  * device driver for philips saa7134 based TV cards
  * video4linux video interface
  *
@@ -31,11 +33,11 @@
 /* ------------------------------------------------------------------ */
 
 static unsigned int vbi_debug  = 0;
-MODULE_PARM(vbi_debug,"i");
+module_param(vbi_debug, int, 0644);
 MODULE_PARM_DESC(vbi_debug,"enable debug messages [vbi]");
 
 static unsigned int vbibufs = 4;
-MODULE_PARM(vbibufs,"i");
+module_param(vbibufs, int, 0444);
 MODULE_PARM_DESC(vbibufs,"number of vbi buffers, range 2-32");
 
 #define dprintk(fmt, arg...)	if (vbi_debug) \
@@ -51,7 +53,7 @@ static void task_init(struct saa7134_dev *dev, struct saa7134_buf *buf,
 		      int task)
 {
 	struct saa7134_tvnorm *norm = dev->tvnorm;
-	
+
 	/* setup video scaler */
 	saa_writeb(SAA7134_VBI_H_START1(task), norm->h_start     &  0xff);
 	saa_writeb(SAA7134_VBI_H_START2(task), norm->h_start     >> 8);
@@ -113,12 +115,13 @@ static int buffer_activate(struct saa7134_dev *dev,
 	return 0;
 }
 
-static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
+static int buffer_prepare(struct videobuf_queue *q,
+			  struct videobuf_buffer *vb,
 			  enum v4l2_field field)
 {
-	struct saa7134_fh *fh   = file->private_data;
+	struct saa7134_fh *fh   = q->priv_data;
 	struct saa7134_dev *dev = fh->dev;
-	struct saa7134_buf *buf = (struct saa7134_buf *)vb;
+	struct saa7134_buf *buf = container_of(vb,struct saa7134_buf,vb);
 	struct saa7134_tvnorm *norm = dev->tvnorm;
 	unsigned int lines, llength, size;
 	int err;
@@ -167,12 +170,12 @@ static int buffer_prepare(struct file *file, struct videobuf_buffer *vb,
 }
 
 static int
-buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
+buffer_setup(struct videobuf_queue *q, unsigned int *count, unsigned int *size)
 {
-	struct saa7134_fh *fh   = file->private_data;
+	struct saa7134_fh *fh   = q->priv_data;
 	struct saa7134_dev *dev = fh->dev;
 	int llength,lines;
-	
+
 	lines   = dev->tvnorm->vbi_v_stop - dev->tvnorm->vbi_v_start +1;
 #if 1
 	llength = VBI_LINE_LENGTH;
@@ -188,21 +191,21 @@ buffer_setup(struct file *file, unsigned int *count, unsigned int *size)
 	return 0;
 }
 
-static void buffer_queue(struct file *file, struct videobuf_buffer *vb)
+static void buffer_queue(struct videobuf_queue *q, struct videobuf_buffer *vb)
 {
-	struct saa7134_fh *fh = file->private_data;
+	struct saa7134_fh *fh = q->priv_data;
 	struct saa7134_dev *dev = fh->dev;
-	struct saa7134_buf *buf = (struct saa7134_buf *)vb;
-	
+	struct saa7134_buf *buf = container_of(vb,struct saa7134_buf,vb);
+
 	saa7134_buffer_queue(dev,&dev->vbi_q,buf);
 }
 
-static void buffer_release(struct file *file, struct videobuf_buffer *vb)
+static void buffer_release(struct videobuf_queue *q, struct videobuf_buffer *vb)
 {
-	struct saa7134_fh *fh   = file->private_data;
+	struct saa7134_fh *fh   = q->priv_data;
 	struct saa7134_dev *dev = fh->dev;
-	struct saa7134_buf *buf = (struct saa7134_buf *)vb;
-	
+	struct saa7134_buf *buf = container_of(vb,struct saa7134_buf,vb);
+
 	saa7134_dma_free(dev,buf);
 }
 

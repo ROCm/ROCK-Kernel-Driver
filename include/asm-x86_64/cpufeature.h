@@ -45,6 +45,7 @@
 /* Don't duplicate feature flags which are redundant with Intel! */
 #define X86_FEATURE_SYSCALL	(1*32+11) /* SYSCALL/SYSRET */
 #define X86_FEATURE_MMXEXT	(1*32+22) /* AMD MMX extensions */
+#define X86_FEATURE_FXSR_OPT	(1*32+25) /* FXSR optimizations */
 #define X86_FEATURE_LM		(1*32+29) /* Long Mode (x86-64) */
 #define X86_FEATURE_3DNOWEXT	(1*32+30) /* AMD 3DNow! extensions */
 #define X86_FEATURE_3DNOW	(1*32+31) /* 3DNow! */
@@ -73,7 +74,8 @@
 #define X86_FEATURE_XTPR	(4*32+14) /* Send Task Priority Messages */
 
 /* More extended AMD flags: CPUID level 0x80000001, ecx, word 5 */
-#define X86_FEATURE_HTVALID	(5*32+ 0) /* HyperThreading valid, otherwise CMP */
+#define X86_FEATURE_LAHF_LM	(5*32+ 0) /* LAHF/SAHF in long mode */
+#define X86_FEATURE_HTVALID	(5*32+ 1) /* HyperThreading valid, otherwise CMP */
 
 #define cpu_has(c, bit)                test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)      test_bit(bit, boot_cpu_data.x86_capability)

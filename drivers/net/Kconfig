@@ -200,7 +200,7 @@ source "drivers/net/arm/Kconfig"
 
 config MACE
 	tristate "MACE (Power Mac ethernet) support"
-	depends on NET_ETHERNET && PPC_PMAC
+	depends on NET_ETHERNET && PPC_PMAC && PPC32
 	select CRC32
 	help
 	  Power Macintoshes and clones with Ethernet built-in on the
@@ -223,7 +223,7 @@ config MACE_AAUI_PORT
 
 config BMAC
 	tristate "BMAC (G3 ethernet) support"
-	depends on NET_ETHERNET && PPC_PMAC
+	depends on NET_ETHERNET && PPC_PMAC && PPC32
 	select CRC32
 	help
 	  Say Y for support of BMAC Ethernet interfaces. These are used on G3
@@ -288,7 +288,7 @@ config ZORRO8390
 
 config APNE
 	tristate "PCMCIA NE2000 support"
-	depends on NETDEVICES && AMIGA_PCMCIA
+	depends on NET_ETHERNET && AMIGA_PCMCIA
 	select CRC32
 	help
 	  If you have a PCMCIA NE2000 compatible adapter, say Y.  Otherwise,
@@ -299,7 +299,7 @@ config APNE
 
 config APOLLO_ELPLUS
 	tristate "Apollo 3c505 support"
-	depends on NETDEVICES && APOLLO
+	depends on NET_ETHERNET && APOLLO
 	help
 	  Say Y or M here if your Apollo has a 3Com 3c505 ISA Ethernet card.
 	  If you don't have one made for Apollos, you can use one from a PC,
@@ -308,7 +308,7 @@ config APOLLO_ELPLUS
 
 config MAC8390
 	bool "Macintosh NS 8390 based ethernet cards"
-	depends on NETDEVICES && MAC
+	depends on NET_ETHERNET && MAC
 	select CRC32
 	help
 	  If you want to include a driver to support Nubus or LC-PDS
@@ -318,7 +318,7 @@ config MAC8390
 
 config MAC89x0
 	tristate "Macintosh CS89x0 based ethernet cards"
-	depends on NETDEVICES && MAC && BROKEN
+	depends on NET_ETHERNET && MAC && BROKEN
 	---help---
 	  Support for CS89x0 chipset based Ethernet cards.  If you have a
 	  Nubus or LC-PDS network (Ethernet) card of this type, say Y and
@@ -331,7 +331,7 @@ config MAC89x0
 
 config MACSONIC
 	tristate "Macintosh SONIC based ethernet (onboard, NuBus, LC, CS)"
-	depends on NETDEVICES && MAC
+	depends on NET_ETHERNET && MAC
 	---help---
 	  Support for NatSemi SONIC based Ethernet devices.  This includes
 	  the onboard Ethernet in many Quadras as well as some LC-PDS,
@@ -345,7 +345,7 @@ config MACSONIC
 
 config MACMACE
 	bool "Macintosh (AV) onboard MACE ethernet (EXPERIMENTAL)"
-	depends on NETDEVICES && MAC && EXPERIMENTAL
+	depends on NET_ETHERNET && MAC && EXPERIMENTAL
 	select CRC32
 	help
 	  Support for the onboard AMD 79C940 MACE Ethernet controller used in
@@ -355,7 +355,7 @@ config MACMACE
 
 config MVME147_NET
 	tristate "MVME147 (Lance) Ethernet support"
-	depends on NETDEVICES && MVME147
+	depends on NET_ETHERNET && MVME147
 	select CRC32
 	help
 	  Support for the on-board Ethernet interface on the Motorola MVME147
@@ -365,7 +365,7 @@ config MVME147_NET
 
 config MVME16x_NET
 	tristate "MVME16x Ethernet support"
-	depends on NETDEVICES && MVME16x
+	depends on NET_ETHERNET && MVME16x
 	help
 	  This is the driver for the Ethernet interface on the Motorola
 	  MVME162, 166, 167, 172 and 177 boards.  Say Y here to include the
@@ -374,7 +374,7 @@ config MVME16x_NET
 
 config BVME6000_NET
 	tristate "BVME6000 Ethernet support"
-	depends on NETDEVICES && BVME6000
+	depends on NET_ETHERNET && BVME6000
 	help
 	  This is the driver for the Ethernet interface on BVME4000 and
 	  BVME6000 VME boards.  Say Y here to include the driver for this chip
@@ -383,7 +383,7 @@ config BVME6000_NET
 
 config ATARILANCE
 	tristate "Atari Lance support"
-	depends on NETDEVICES && ATARI
+	depends on NET_ETHERNET && ATARI
 	help
 	  Say Y to include support for several Atari Ethernet adapters based
 	  on the AMD Lance chipset: RieblCard (with or without battery), or
@@ -391,7 +391,7 @@ config ATARILANCE
 
 config ATARI_BIONET
 	tristate "BioNet-100 support"
-	depends on NETDEVICES && ATARI && ATARI_ACSI!=n && BROKEN
+	depends on NET_ETHERNET && ATARI && ATARI_ACSI && BROKEN
 	help
 	  Say Y to include support for BioData's BioNet-100 Ethernet adapter
 	  for the ACSI port. The driver works (has to work...) with a polled
@@ -399,7 +399,7 @@ config ATARI_BIONET
 
 config ATARI_PAMSNET
 	tristate "PAMsNet support"
-	depends on NETDEVICES && ATARI && ATARI_ACSI!=n && BROKEN
+	depends on NET_ETHERNET && ATARI && ATARI_ACSI && BROKEN
 	help
 	  Say Y to include support for the PAMsNet Ethernet adapter for the
 	  ACSI port ("ACSI node"). The driver works (has to work...) with a
@@ -407,7 +407,7 @@ config ATARI_PAMSNET
 
 config SUN3LANCE
 	tristate "Sun3/Sun3x on-board LANCE support"
-	depends on NETDEVICES && (SUN3 || SUN3X)
+	depends on NET_ETHERNET && (SUN3 || SUN3X)
 	help
 	  Most Sun3 and Sun3x motherboards (including the 3/50, 3/60 and 3/80)
 	  featured an AMD Lance 10Mbit Ethernet controller on board; say Y
@@ -420,7 +420,7 @@ config SUN3LANCE
 
 config SUN3_82586
 	tristate "Sun3 on-board Intel 82586 support"
-	depends on NETDEVICES && SUN3
+	depends on NET_ETHERNET && SUN3
 	help
 	  This driver enables support for the on-board Intel 82586 based
 	  Ethernet adapter found on Sun 3/1xx and 3/2xx motherboards.  Note
@@ -429,7 +429,7 @@ config SUN3_82586
 
 config HPLANCE
 	bool "HP on-board LANCE support"
-	depends on NETDEVICES && HP300
+	depends on NET_ETHERNET && DIO
 	select CRC32
 	help
 	  If you want to use the builtin "LANCE" Ethernet controller on an
@@ -817,7 +817,7 @@ config SMC91X
 	tristate "SMC 91C9x/91C1xxx support"
 	select CRC32
 	select MII
-	depends on NET_ETHERNET && (ARM || REDWOOD_5 || REDWOOD_6)
+	depends on NET_ETHERNET && (ARM || REDWOOD_5 || REDWOOD_6 || M32R)
 	help
 	  This is a driver for SMC's 91x series of Ethernet chipsets,
 	  including the SMC91C94 and the SMC91C111. Say Y if you want it
@@ -1075,7 +1075,7 @@ config ETH16I
 
 config NE2000
 	tristate "NE2000/NE1000 support"
-	depends on NET_ISA || (Q40 && m)
+	depends on NET_ISA || (Q40 && m) || M32R
 	select CRC32
 	---help---
 	  If you have a network (Ethernet) card of this type, say Y and read
@@ -1413,65 +1413,16 @@ config E100
 	depends on NET_PCI && PCI
 	select MII
 	---help---
-	  This driver supports Intel(R) PRO/100 family of adapters, which 
-	  includes:
-
-	  Controller  Adapter Name                       Board IDs
-	  ----------  ------------                       ---------
-
-	  82558       PRO/100+ PCI Adapter               668081-xxx, 
-	  689661-xxx
-	  82558       PRO/100+ Management Adapter        691334-xxx, 
-	  701738-xxx,
-	  721383-xxx
-	  82558       PRO/100+ Dual Port Server Adapter  714303-xxx, 
-	  711269-xxx, 
-	  A28276-xxx
-	  82558       PRO/100+ PCI Server Adapter        710550-xxx
-	  82550       PRO/100 S Server Adapter           752438-xxx
-	  82559                                          A56831-xxx, 
-	  A10563-xxx,
-	  A12171-xxx, 
-	  A12321-xxx, 
-	  A12320-xxx, 
-	  A12170-xxx
-	  748568-xxx
-	  748565-xxx
-	  82550       PRO/100 S Desktop Adapter          751767-xxx
-	  82559                                          748592-xxx, 
-	  A12167-xxx, 
-	  A12318-xxx, 
-	  A12317-xxx, 
-	  A12165-xxx,
-	  748569-xxx 
-	  82559       PRO/100+ Server Adapter            729757-xxx
-	  82559       PRO/100 S Management Adapter       748566-xxx, 
-	  748564-xxx
-	  82550       PRO/100 S Dual Port Server Adapter A56831-xxx
-	  82551       PRO/100 M Desktop Adapter          A80897-xxx
-	  PRO/100 S Advanced Management Adapter 
-	  747842-xxx, 
-	  745171-xxx
-	  CNR         PRO/100 VE Desktop Adapter         A10386-xxx, 
-	  A10725-xxx, 
-	  A23801-xxx, 
-	  A19716-xxx
-	  PRO/100 VM Desktop Adapter         A14323-xxx, 
-	  A19725-xxx, 
-	  A23801-xxx, 
-	  A22220-xxx, 
-	  A23796-xxx
-
-
+	  This driver supports Intel(R) PRO/100 family of adapters.
 	  To verify that your adapter is supported, find the board ID number 
 	  on the adapter. Look for a label that has a barcode and a number 
-	  in the format 123456-001 (six digits hyphen three digits). Match 
-	  this to the list of numbers above.
+	  in the format 123456-001 (six digits hyphen three digits). 
 
-	  For more information on how to identify your adapter, go to the 
-	  Adapter & Driver ID Guide at:
+	  Use the above information and the Adapter & Driver ID Guide at:
 
 	  http://support.intel.com/support/network/adapter/pro100/21397.htm
+
+          to identify the adapter.
 
 	  For the latest Intel PRO/100 network driver for Linux, see:
 
@@ -1486,7 +1437,7 @@ config E100
 
 config E100_NAPI
 	bool "Use Rx Polling (NAPI)"
-	depends on E100 && !PPC_PSERIES
+	depends on E100
 	help
 	  NAPI is a new driver API designed to reduce CPU and interrupt load
 	  when the driver is receiving lots of packets from the card. It is
@@ -1742,18 +1693,6 @@ config VIA_RHINE_MMIO
 
 	  If unsure, say Y.
 
-config VIA_VELOCITY
-	tristate "VIA Velocity support"
-	depends on NET_PCI && PCI
-	select CRC32
-	select CRC_CCITT
-	select MII
-	help
-	  If you have a VIA "Velocity" based network card say Y here.
-
-	  To compile this driver as a module, choose M here. The module
-	  will be called via-velocity.
-
 config LAN_SAA9730
 	bool "Philips SAA9730 Ethernet support (EXPERIMENTAL)"
 	depends on NET_PCI && EXPERIMENTAL && MIPS
@@ -1933,29 +1872,8 @@ config E1000
 	depends on PCI
 	---help---
 	  This driver supports Intel(R) PRO/1000 gigabit ethernet family of
-	  adapters, which includes:
-
-	  Controller  Adapter Name                         Board IDs
-	  ----------  ------------                         ---------
-	  82542       PRO/1000 Gigabit Server Adapter      700262-xxx,
-	  717037-xxx
-	  82543       PRO/1000 F Server Adapter            738640-xxx,
-	  A38888-xxx
-	  82543       PRO/1000 T Server Adapter            A19845-xxx,
-	  A33948-xxx
-	  82544       PRO/1000 XT Server Adapter           A51580-xxx
-	  82544       PRO/1000 XF Server Adapter           A50484-xxx
-	  82544       PRO/1000 T Desktop Adapter           A62947-xxx
-	  82540       PRO/1000 MT Desktop Adapter          A78408-xxx
-	  82541       PRO/1000 MT Desktop Adapter          C91016-xxx
-	  82545       PRO/1000 MT Server Adapter           A92165-xxx
-	  82546       PRO/1000 MT Dual Port Server Adapter A92111-xxx
-	  82545       PRO/1000 MF Server Adapter           A91622-xxx
-	  82545       PRO/1000 MF Server Adapter(LX)       A91624-xxx
-	  82546       PRO/1000 MF Dual Port Server Adapter A91620-xxx 
-
-	  For more information on how to identify your adapter, go to the
-	  Adapter & Driver ID Guide at:
+	  adapters.  For more information on how to identify your adapter, go 
+	  to the Adapter & Driver ID Guide at:
 
 	  <http://support.intel.com/support/network/adapter/pro100/21397.htm>
 
@@ -2061,7 +1979,6 @@ config R8169_NAPI
 
 	  If in doubt, say N.
 
-
 config SK98LIN
 	tristate "Marvell Yukon Chipset / SysKonnect SK-98xx Support"
 	depends on PCI
@@ -2083,57 +2000,29 @@ config SK98LIN
 	    - DGE-530T Gigabit Ethernet Adapter
 	    - EG1032 v2 Instant Gigabit Network Adapter
 	    - EG1064 v2 Instant Gigabit Network Adapter
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Abit)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Albatron)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Asus)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Chaintech)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (ECS)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Epox)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Foxconn)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Gigabyte)
-	    - Marvell 88E8001 Gigabit Ethernet Controller (Iwill)
-	    - Marvell 88E8035 Fast Ethernet Controller (LGE)
-	    - Marvell 88E8035 Fast Ethernet Controller (Toshiba)
-	    - Marvell 88E8036 Fast Ethernet Controller (LGE)
-	    - Marvell 88E8036 Fast Ethernet Controller (Toshiba)
-	    - Marvell 88E8050 Gigabit Ethernet Controller (Intel)
-	    - Marvell 88E8052 Gigabit Ethernet Controller (ASRock)
-	    - Marvell 88E8052 Gigabit Ethernet Controller (Asus)
-	    - Marvell 88E8052 Gigabit Ethernet Controller (Gigabyte)
-	    - Marvell 88E8052 Gigabit Ethernet Controller (MSI)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (ASRock)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Albatron)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Aopen)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Asus)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Chaintech)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Clevo)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (DFI)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Epox)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Gigabyte)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (LGE)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (MSI)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (SOYO)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Toshiba)
-	    - Marvell 88E8053 Gigabit Ethernet Controller (Trigem)
-	    - Marvell RDK-8001 
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Abit)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Albatron)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Asus)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (ECS)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Epox)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Foxconn)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Gigabyte)
+	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Iwill)
+	    - Marvell 88E8050 Gigabit LOM Ethernet Adapter (Intel)
 	    - Marvell RDK-8001 Adapter
 	    - Marvell RDK-8002 Adapter
-	    - Marvell RDK-8003 
 	    - Marvell RDK-8003 Adapter
 	    - Marvell RDK-8004 Adapter
 	    - Marvell RDK-8006 Adapter
 	    - Marvell RDK-8007 Adapter
 	    - Marvell RDK-8008 Adapter
 	    - Marvell RDK-8009 Adapter
-	    - Marvell RDK-8010 
+	    - Marvell RDK-8010 Adapter
 	    - Marvell RDK-8011 Adapter
 	    - Marvell RDK-8012 Adapter
-	    - Marvell RDK-8035 
-	    - Marvell RDK-8036 
-	    - Marvell RDK-8052 
-	    - Marvell RDK-8053 
-	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Controller (32 bit)
-	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Controller (64 bit)
+	    - Marvell RDK-8052 Adapter
+	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Adapter (32 bit)
+	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Adapter (64 bit)
 	    - N-Way PCI-Bus Giga-Card 1000/100/10Mbps(L)
 	    - SK-9521 10/100/1000Base-T Adapter
 	    - SK-9521 V2.0 10/100/1000Base-T Adapter
@@ -2166,16 +2055,20 @@ config SK98LIN
 	  
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read Documentation/modules.txt. This is recommended.
-	  The module will be called sk98lin. This is recommended.
+	  say M here and read Documentation/kbuild/modules.txt. The module will
+	  be called sk98lin. This is recommended.
 
-config SK98LIN_NAPI
-	bool "Use Rx polling (NAPI)"
-	depends on SK98LIN
+config VIA_VELOCITY
+	tristate "VIA Velocity support"
+	depends on NET_PCI && PCI
+	select CRC32
+	select CRC_CCITT
+	select MII
 	help
-	  NAPI is a new driver API designed to reduce CPU and interrupt load
-	  when the driver is receiving lots of packets from the card.
+	  If you have a VIA "Velocity" based network card say Y here.
 
+	  To compile this driver as a module, choose M here. The module
+	  will be called via-velocity.
 
 config TIGON3
 	tristate "Broadcom Tigon3 support"
@@ -2225,17 +2118,6 @@ config MV643XX_ETH_2
 	  This enables support for Port 2 of the Marvell MV643XX Gigabit
 	  Ethernet.
 
-config NET_BROADCOM
-	tristate "Broadcom bcm5700 support"
-	depends on PCI
-	help
-	  This driver supports Broadcom based gigabit Ethernet cards.
-
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  This is
-	  recommended.  The module will be called bcm5700.
-
 endmenu
 
 #
@@ -2250,14 +2132,8 @@ config IXGB
 	depends on PCI
 	---help---
 	  This driver supports Intel(R) PRO/10GbE family of
-	  adapters, which includes:
-
-	  Controller  Adapter Name                           Board IDs
-	  ----------  ------------                           ---------
-	  82597EX     Intel(R) PRO/10GbE LR Server Adapter   A82505-xxx
-
-	  For more information on how to identify your adapter, go to the
-	  Adapter & Driver ID Guide at:
+	  adapters.  For more information on how to identify your adapter, go
+	  to the Adapter & Driver ID Guide at:
 
 	  <http://support.intel.com/support/network/adapter/pro100/21397.htm>
 
@@ -2565,12 +2441,6 @@ config PPP_BSDCOMP
 	  module; it is called bsd_comp and will show up in the directory
 	  modules once you have said "make modules". If unsure, say N.
 
-config PPP_MPPE
-       tristate "PPP MPPE compression (encryption)"
-       depends on PPP
-       ---help---
-         Support for the MPPE Encryption protocol.
-
 config PPPOE
 	tristate "PPP over Ethernet (EXPERIMENTAL)"
 	depends on EXPERIMENTAL && PPP
@@ -2672,13 +2542,6 @@ config NET_FC
 	  adaptor below. You also should have said Y to "SCSI support" and
 	  "SCSI generic support".
 
-config NET_LPFC
-        tristate "Emulex LightPulse IP over FC Support"
-        depends on MODULES && NET_FC && SCSI_LPFC && m && (PPC_PSERIES || PPC_ISERIES || IA64 || X86)
-	help
-          The lpfndd driver provides IP over FC Support for the Emulex
-          LightPulse Family of Fibre Channel PCI host adapters.
-
 config IPHASE5526
 	tristate "Interphase 5526 Tachyon chipset based adapter support"
 	depends on NET_FC && SCSI && PCI && BROKEN
@@ -2715,16 +2578,4 @@ config NETCONSOLE
 	---help---
 	If you want to log kernel messages over the network, enable this.
 	See Documentation/networking/netconsole.txt for details.
-
-config XPNET
-	tristate "SGI DMA network driver"
-	depends on NETDEVICES && IA64_SGI_SN_XPC
-	default m if NETDEVICES && IA64_SGI_SN_XPC
-	help
-	  An SGI machine can be divided into multiple Single System
-	  Images which act independently of each other and have
-	  hardware based memory protection from the others.  Enabling
-	  this feature will produce a network adapter that can be
-	  used to communicate directly between SSIs.
-
 

@@ -34,6 +34,7 @@
 #include <linux/vermagic.h>
 #include <linux/notifier.h>
 #include <linux/stop_machine.h>
+#include <linux/device.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 #include <asm/cacheflush.h>
@@ -50,20 +51,6 @@
 
 /* If this is set, the section belongs in the init part of the module */
 #define INIT_OFFSET_MASK (1UL << (BITS_PER_LONG-1))
-
-/* Allow unsupported modules switch. */ 
-#ifdef UNSUPPORTED_MODULES
-int unsupported = UNSUPPORTED_MODULES;
-#else
-int unsupported = 2;  /* don't warn when loading unsupported modules. */
-#endif
-
-static int __init unsupported_setup(char *str)
-{
-	get_option(&str, &unsupported);
-	return 1;
-}
-__setup("unsupported=", unsupported_setup);
 
 /* Protects module list */
 static spinlock_t modlist_lock = SPIN_LOCK_UNLOCKED;
@@ -382,22 +369,6 @@ static inline void percpu_modcopy(void *pcpudst, const void *src,
 }
 #endif /* CONFIG_SMP */
 
-static int add_attribute(struct module *mod, struct kernel_param *kp)
-{
-	struct module_attribute *a;
-	int retval;
-
-	a = &mod->mkobj->attr[mod->mkobj->num_attributes];
-	a->attr.name = (char *)kp->name;
-	a->attr.owner = mod;
-	a->attr.mode = kp->perm;
-	a->param = kp;
-	retval = sysfs_create_file(&mod->mkobj->kobj, &a->attr);
-	if (!retval)
-		mod->mkobj->num_attributes++;
-	return retval;
-}
-
 #ifdef CONFIG_MODULE_UNLOAD
 /* Init the unload section of the module. */
 static void module_unload_init(struct module *mod)
@@ -605,6 +576,8 @@ sys_delete_module(const char __user *name_user, unsigned int flags)
 
 	/* Stop the machine so refcounts can't move and disable module. */
 	ret = try_stop_module(mod, flags, &forced);
+	if (ret != 0)
+		goto out;
 
 	/* Never wait if forced. */
 	if (!forced && module_refcount(mod) != 0)
@@ -678,22 +651,16 @@ void symbol_put_addr(void *addr)
 }
 EXPORT_SYMBOL_GPL(symbol_put_addr);
 
-static int refcnt_get_fn(char *buffer, struct kernel_param *kp)
+static ssize_t show_refcnt(struct module *mod, char *buffer)
 {
-	struct module *mod = container_of(kp, struct module, refcnt_param);
-
-	/* sysfs holds one reference. */
-	return sprintf(buffer, "%u", module_refcount(mod)-1);
+	/* sysfs holds a reference */
+	return sprintf(buffer, "%u\n", module_refcount(mod)-1);
 }
 
-static inline int sysfs_unload_setup(struct module *mod)
-{
-	mod->refcnt_param.name = "refcnt";
-	mod->refcnt_param.perm = 0444;
-	mod->refcnt_param.get = refcnt_get_fn;
-
-	return add_attribute(mod, &mod->refcnt_param);
-}
+static struct module_attribute refcnt = {
+	.attr = { .name = "refcnt", .mode = 0444, .owner = THIS_MODULE },
+	.show = show_refcnt,
+};
 
 #else /* !CONFIG_MODULE_UNLOAD */
 static void print_unload_info(struct seq_file *m, struct module *mod)
@@ -721,10 +688,6 @@ sys_delete_module(const char __user *name_user, unsigned int flags)
 	return -ENOSYS;
 }
 
-static inline int sysfs_unload_setup(struct module *mod)
-{
-	return 0;
-}
 #endif /* CONFIG_MODULE_UNLOAD */
 
 #ifdef CONFIG_OBSOLETE_MODPARM
@@ -1063,101 +1026,57 @@ static inline void remove_sect_attrs(struct module *mod)
 #endif /* CONFIG_KALLSYMS */
 
 
-
-
-#define to_module_attr(n) container_of(n, struct module_attribute, attr);
-
-static ssize_t module_attr_show(struct kobject *kobj,
-				struct attribute *attr,
-				char *buf)
+#ifdef CONFIG_MODULE_UNLOAD
+static inline int module_add_refcnt_attr(struct module *mod)
 {
-	int count;
-	struct module_attribute *attribute = to_module_attr(attr);
-
-	if (!attribute->param->get)
-		return -EPERM;
-
-	count = attribute->param->get(buf, attribute->param);
-	if (count > 0) {
-		strcat(buf, "\n");
-		++count;
-	}
-	return count;
+	return sysfs_create_file(&mod->mkobj->kobj, &refcnt.attr);
 }
-
-/* sysfs always hands a nul-terminated string in buf.  We rely on that. */
-static ssize_t module_attr_store(struct kobject *kobj,
-				 struct attribute *attr,
-				 const char *buf, size_t len)
+static void module_remove_refcnt_attr(struct module *mod)
 {
-	int err;
-	struct module_attribute *attribute = to_module_attr(attr);
-
-	if (!attribute->param->set)
-		return -EPERM;
-
-	err = attribute->param->set(buf, attribute->param);
-	if (!err)
-		return len;
-	return err;
+	return sysfs_remove_file(&mod->mkobj->kobj, &refcnt.attr);
 }
-
-static struct sysfs_ops module_sysfs_ops = {
-	.show = module_attr_show,
-	.store = module_attr_store,
-};
-
-static void module_kobj_release(struct kobject *kobj)
+#else
+static inline int module_add_refcnt_attr(struct module *mod)
 {
-	kfree(container_of(kobj, struct module_kobject, kobj));
+	return 0;
 }
+static void module_remove_refcnt_attr(struct module *mod)
+{
+}
+#endif
 
-static struct kobj_type module_ktype = {
-	.sysfs_ops =	&module_sysfs_ops,
-	.release =	&module_kobj_release,
-};
-static decl_subsys(module, &module_ktype, NULL);
 
 static int mod_sysfs_setup(struct module *mod,
 			   struct kernel_param *kparam,
 			   unsigned int num_params)
 {
-	unsigned int i;
 	int err;
 
-	/* We overallocate: not every param is in sysfs, and maybe no refcnt */
-	mod->mkobj = kmalloc(sizeof(*mod->mkobj)
-			     + sizeof(mod->mkobj->attr[0]) * (num_params+1),
-			     GFP_KERNEL);
+	mod->mkobj = kmalloc(sizeof(struct module_kobject), GFP_KERNEL);
 	if (!mod->mkobj)
 		return -ENOMEM;
 
 	memset(&mod->mkobj->kobj, 0, sizeof(mod->mkobj->kobj));
-	err = kobject_set_name(&mod->mkobj->kobj, mod->name);
+	err = kobject_set_name(&mod->mkobj->kobj, "%s", mod->name);
 	if (err)
 		goto out;
 	kobj_set_kset_s(mod->mkobj, module_subsys);
+	mod->mkobj->mod = mod;
 	err = kobject_register(&mod->mkobj->kobj);
 	if (err)
 		goto out;
 
-	mod->mkobj->num_attributes = 0;
-
-	for (i = 0; i < num_params; i++) {
-		if (kparam[i].perm) {
-			err = add_attribute(mod, &kparam[i]);
-			if (err)
-				goto out_unreg;
-		}
-	}
-	err = sysfs_unload_setup(mod);
+	err = module_add_refcnt_attr(mod);
 	if (err)
 		goto out_unreg;
+
+	err = module_param_sysfs_setup(mod, kparam, num_params);
+	if (err)
+		goto out_unreg;
+
 	return 0;
 
 out_unreg:
-	for (i = 0; i < mod->mkobj->num_attributes; i++)
-		sysfs_remove_file(&mod->mkobj->kobj,&mod->mkobj->attr[i].attr);
 	/* Calls module_kobj_release */
 	kobject_unregister(&mod->mkobj->kobj);
 	return err;
@@ -1168,9 +1087,9 @@ out:
 
 static void mod_kobject_remove(struct module *mod)
 {
-	unsigned int i;
-	for (i = 0; i < mod->mkobj->num_attributes; i++)
-		sysfs_remove_file(&mod->mkobj->kobj,&mod->mkobj->attr[i].attr);
+	module_remove_refcnt_attr(mod);
+	module_param_sysfs_remove(mod);
+
 	/* Calls module_kobj_release */
 	kobject_unregister(&mod->mkobj->kobj);
 }
@@ -1499,7 +1418,7 @@ static struct module *load_module(void __user *umod,
 {
 	Elf_Ehdr *hdr;
 	Elf_Shdr *sechdrs;
-	char *secstrings, *args, *modmagic, *strtab = NULL, *supported;
+	char *secstrings, *args, *modmagic, *strtab = NULL;
 	unsigned int i, symindex = 0, strindex = 0, setupindex, exindex,
 		exportindex, modindex, obsparmindex, infoindex, gplindex,
 		crcindex, gplcrcindex, versindex, pcpuindex;
@@ -1616,29 +1535,6 @@ static struct module *load_module(void __user *umod,
 		       mod->name, modmagic, vermagic);
 		err = -ENOEXEC;
 		goto free_hdr;
-	}
-
-	supported = get_modinfo(sechdrs, infoindex, "supported");
-	if (supported) {
-		if (!strcmp(supported, "external"))
-			tainted |= TAINT_EXTERNAL_SUPPORT;
-		else if (strcmp(supported, "yes"))
-			supported = NULL;
-	}
-	if (!supported) {
-		if (unsupported == 0) {
-			printk(KERN_WARNING "%s: unsupported module, refusing "
-			       "to load. To override, echo "
-			       "1 > /proc/sys/kernel/unsupported\n",
-			       mod->name);
-			err = -ENOEXEC;
-			goto free_hdr;
-		}
-		tainted |= TAINT_NO_SUPPORT;
-		if (unsupported == 1) {
-			printk(KERN_WARNING "%s: unsupported module, tainting "
-			       "kernel.\n", mod->name);
-		}
 	}
 
 	/* Now copy in args */
@@ -1940,6 +1836,16 @@ static inline int within(unsigned long addr, void *start, unsigned long size)
 }
 
 #ifdef CONFIG_KALLSYMS
+/*
+ * This ignores the intensely annoying "mapping symbols" found
+ * in ARM ELF files: $a, $t and $d.
+ */
+static inline int is_arm_mapping_symbol(const char *str)
+{
+	return str[0] == '$' && strchr("atd", str[1]) 
+	       && (str[2] == '\0' || str[2] == '.');
+}
+
 static const char *get_ksymbol(struct module *mod,
 			       unsigned long addr,
 			       unsigned long *size,
@@ -1964,11 +1870,13 @@ static const char *get_ksymbol(struct module *mod,
 		 * and inserted at a whim. */
 		if (mod->symtab[i].st_value <= addr
 		    && mod->symtab[i].st_value > mod->symtab[best].st_value
-		    && *(mod->strtab + mod->symtab[i].st_name) != '\0' )
+		    && *(mod->strtab + mod->symtab[i].st_name) != '\0'
+		    && !is_arm_mapping_symbol(mod->strtab + mod->symtab[i].st_name))
 			best = i;
 		if (mod->symtab[i].st_value > addr
 		    && mod->symtab[i].st_value < nextval
-		    && *(mod->strtab + mod->symtab[i].st_name) != '\0')
+		    && *(mod->strtab + mod->symtab[i].st_name) != '\0'
+		    && !is_arm_mapping_symbol(mod->strtab + mod->symtab[i].st_name))
 			nextval = mod->symtab[i].st_value;
 	}
 
@@ -2177,18 +2085,28 @@ void print_modules(void)
 	printk("\n");
 }
 
+void module_add_driver(struct module *mod, struct device_driver *drv)
+{
+	if (!mod || !drv)
+		return;
+	if (!mod->mkobj)
+		return;
+
+	/* Don't check return code; this call is idempotent */
+	sysfs_create_link(&drv->kobj, &mod->mkobj->kobj, "module");
+}
+EXPORT_SYMBOL(module_add_driver);
+
+void module_remove_driver(struct device_driver *drv)
+{
+	if (!drv)
+		return;
+	sysfs_remove_link(&drv->kobj, "module");
+}
+EXPORT_SYMBOL(module_remove_driver);
+
 #ifdef CONFIG_MODVERSIONS
 /* Generate the signature for struct module here, too, for modversions. */
 void struct_module(struct module *mod) { return; }
 EXPORT_SYMBOL(struct_module);
 #endif
-
-#ifdef	CONFIG_KDB
-struct list_head *kdb_modules = &modules;	/* kdb needs the list of modules */
-#endif	/* CONFIG_KDB */
-
-static int __init modules_init(void)
-{
-	return subsystem_register(&module_subsys);
-}
-__initcall(modules_init);

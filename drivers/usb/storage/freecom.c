@@ -59,14 +59,14 @@ struct freecom_cb_wrap {
 struct freecom_xfer_wrap {
 	u8    Type;		/* Command type. */
 	u8    Timeout;		/* Timeout in seconds. */
-	u32   Count;		/* Number of bytes to transfer. */
+	__le32   Count;		/* Number of bytes to transfer. */
 	u8    Pad[58];
 } __attribute__ ((packed));
 
 struct freecom_ide_out {
 	u8    Type;		/* Type + IDE register. */
 	u8    Pad;
-	u16   Value;		/* Value to write. */
+	__le16   Value;		/* Value to write. */
 	u8    Pad2[60];
 };
 
@@ -78,7 +78,7 @@ struct freecom_ide_in {
 struct freecom_status {
 	u8    Status;
 	u8    Reason;
-	u16   Count;
+	__le16   Count;
 	u8    Pad[60];
 };
 
@@ -290,7 +290,7 @@ int freecom_transport(struct scsi_cmnd *srb, struct us_data *us)
 		case REQUEST_SENSE:		/* 16 or 18 bytes? spec says 18, lots of devices only have 16 */
 		case MODE_SENSE:
 		case MODE_SENSE_10:
-			length = fst->Count;
+			length = le16_to_cpu(fst->Count);
 			break;
 		default:
  			length = srb->request_bufflen;

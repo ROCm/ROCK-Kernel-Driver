@@ -26,9 +26,6 @@
 #include <linux/nmi.h>
 #include <linux/sysdev.h>
 #include <linux/sysctl.h>
-#ifdef CONFIG_KDB
-#include <linux/kdb.h>
-#endif /* CONFIG_KDB */
 
 #include <asm/smp.h>
 #include <asm/mtrr.h>

@@ -10,6 +10,7 @@
 #include <linux/types.h>
 #include <linux/fs.h>
 #include <linux/linkage.h>
+#include <linux/pagemap.h>
 #include <linux/wait.h>
 #include <asm/atomic.h>
 
@@ -76,7 +77,7 @@ static inline void clear_buffer_##name(struct buffer_head *bh)		\
 {									\
 	clear_bit(BH_##bit, &(bh)->b_state);				\
 }									\
-static inline int buffer_##name(struct buffer_head *bh)			\
+static inline int buffer_##name(const struct buffer_head *bh)		\
 {									\
 	return test_bit(BH_##bit, &(bh)->b_state);			\
 }
@@ -136,6 +137,8 @@ void init_buffer(struct buffer_head *, bh_end_io_t *, void *);
 void set_bh_page(struct buffer_head *bh,
 		struct page *page, unsigned long offset);
 int try_to_free_buffers(struct page *);
+struct buffer_head *alloc_page_buffers(struct page *page, unsigned long size,
+		int retry);
 void create_empty_buffers(struct page *, unsigned long,
 			unsigned long b_state);
 void end_buffer_read_sync(struct buffer_head *bh, int uptodate);
@@ -155,7 +158,6 @@ void invalidate_bdev(struct block_device *, int);
 int sync_blockdev(struct block_device *bdev);
 void __wait_on_buffer(struct buffer_head *);
 wait_queue_head_t *bh_waitq_head(struct buffer_head *bh);
-void wake_up_buffer(struct buffer_head *bh);
 int fsync_bdev(struct block_device *);
 struct super_block *freeze_bdev(struct block_device *);
 void thaw_bdev(struct block_device *, struct super_block *);
@@ -205,6 +207,14 @@ int nobh_truncate_page(struct address_space *, loff_t);
 /*
  * inline definitions
  */
+
+static inline void attach_page_buffers(struct page *page,
+		struct buffer_head *head)
+{
+	page_cache_get(page);
+	SetPagePrivate(page);
+	page->private = (unsigned long)head;
+}
 
 static inline void get_bh(struct buffer_head *bh)
 {

@@ -22,9 +22,9 @@
 
 #define IO_SPACE_LIMIT 0xffffffff
 
-#define __io(a)			((a))
-#define __mem_pci(a)		((unsigned long)(a))
-#define __mem_isa(a)		((unsigned long)(a))
+#define __io(a)			((void __iomem *)(a))
+#define __mem_pci(a)		(a)
+#define __mem_isa(a)		(a)
 
 /*
  * We don't support ins[lb]/outs[lb].  Make them fault.

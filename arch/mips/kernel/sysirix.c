@@ -128,16 +128,21 @@ asmlinkage int irix_prctl(struct pt_regs *regs)
 		if (value > RLIM_INFINITY)
 			value = RLIM_INFINITY;
 		if (capable(CAP_SYS_ADMIN)) {
-			current->rlim[RLIMIT_STACK].rlim_max =
-				current->rlim[RLIMIT_STACK].rlim_cur = value;
+			task_lock(current->group_leader);
+			current->signal->rlim[RLIMIT_STACK].rlim_max =
+				current->signal->rlim[RLIMIT_STACK].rlim_cur = value;
+			task_unlock(current->group_leader);
 			error = value;
 			break;
 		}
-		if (value > current->rlim[RLIMIT_STACK].rlim_max) {
+		task_lock(current->group_leader);
+		if (value > current->signal->rlim[RLIMIT_STACK].rlim_max) {
 			error = -EINVAL;
+			task_unlock(current->group_leader);
 			break;
 		}
-		current->rlim[RLIMIT_STACK].rlim_cur = value;
+		current->signal->rlim[RLIMIT_STACK].rlim_cur = value;
+		task_unlock(current->group_leader);
 		error = value;
 		break;
 	}
@@ -145,7 +150,7 @@ asmlinkage int irix_prctl(struct pt_regs *regs)
 	case PR_GETSTACKSIZE:
 		printk("irix_prctl[%s:%d]: Wants PR_GETSTACKSIZE\n",
 		       current->comm, current->pid);
-		error = current->rlim[RLIMIT_STACK].rlim_cur;
+		error = current->signal->rlim[RLIMIT_STACK].rlim_cur;
 		break;
 
 	case PR_MAXPPROCS:
@@ -282,9 +287,9 @@ asmlinkage int irix_syssgi(struct pt_regs *regs)
 		int pid = (int) regs->regs[base + 5];
 		char *buf = (char *) regs->regs[base + 6];
 		struct task_struct *p;
-		char comm[16];
+		char tcomm[sizeof(current->comm)];
 
-		retval = verify_area(VERIFY_WRITE, buf, 16);
+		retval = verify_area(VERIFY_WRITE, buf, sizeof(tcomm));
 		if (retval)
 			break;
 		read_lock(&tasklist_lock);
@@ -294,11 +299,11 @@ asmlinkage int irix_syssgi(struct pt_regs *regs)
 			retval = -ESRCH;
 			break;
 		}
-		memcpy(comm, p->comm, 16);
+		get_task_comm(tcomm, p);
 		read_unlock(&tasklist_lock);
 
 		/* XXX Need to check sizes. */
-		copy_to_user(buf, p->comm, 16);
+		copy_to_user(buf, tcomm, sizeof(tcomm));
 		retval = 0;
 		break;
 	}
@@ -558,7 +563,7 @@ asmlinkage int irix_brk(unsigned long brk)
 	/*
 	 * Check against rlimit and stack..
 	 */
-	rlim = current->rlim[RLIMIT_DATA].rlim_cur;
+	rlim = current->signal->rlim[RLIMIT_DATA].rlim_cur;
 	if (rlim >= RLIM_INFINITY)
 		rlim = ~0;
 	if (brk - mm->end_code > rlim) {
@@ -614,8 +619,14 @@ asmlinkage int irix_getgid(struct pt_regs *regs)
 
 asmlinkage int irix_stime(int value)
 {
-	if (!capable(CAP_SYS_TIME))
-		return -EPERM;
+	int err;
+	struct timespec tv;
+
+	tv.tv_sec = value;
+	tv.tv_nsec = 0;
+	err = security_settime(&tv, NULL);
+	if (err)
+		return err;
 
 	write_seqlock_irq(&xtime_lock);
 	xtime.tv_sec = value;
@@ -913,8 +924,8 @@ asmlinkage int irix_getdomainname(char *name, int len)
 		return error;
 
 	down_read(&uts_sem);
-	if(len > (__NEW_UTS_LEN - 1))
-		len = __NEW_UTS_LEN - 1;
+	if (len > __NEW_UTS_LEN)
+		len = __NEW_UTS_LEN;
 	error = 0;
 	if (copy_to_user(name, system_utsname.domainname, len))
 		error = -EFAULT;
@@ -2132,7 +2143,7 @@ asmlinkage int irix_ulimit(int cmd, int arg)
 		retval = -EINVAL;
 		goto out;
 #endif
-		retval = current->rlim[RLIMIT_NOFILE].rlim_cur;
+		retval = current->signal->rlim[RLIMIT_NOFILE].rlim_cur;
 		goto out;
 
 	case 5:

@@ -124,7 +124,7 @@ This function will read the PHY registers.
 */
 static int amd8111e_read_phy(struct amd8111e_priv* lp, int phy_id, int reg, u32* val)
 {
-	void * mmio = lp->mmio;
+	void __iomem *mmio = lp->mmio;
 	unsigned int reg_val;
 	unsigned int repeat= REPEAT_CNT;
 
@@ -155,7 +155,7 @@ This function will write into PHY registers.
 static int amd8111e_write_phy(struct amd8111e_priv* lp,int phy_id, int reg, u32 val)
 {
 	unsigned int repeat = REPEAT_CNT
-	void * mmio = lp->mmio;
+	void __iomem *mmio = lp->mmio;
 	unsigned int reg_val;
 
 	reg_val = readl(mmio + PHY_ACCESS);
@@ -211,7 +211,7 @@ static void amd8111e_set_ext_phy(struct net_device *dev)
 	u32 bmcr,advert,tmp;
 	
 	/* Determine mii register values to set the speed */
-	advert = amd8111e_mdio_read(dev, PHY_ID, MII_ADVERTISE);
+	advert = amd8111e_mdio_read(dev, lp->ext_phy_addr, MII_ADVERTISE);
 	tmp = advert & ~(ADVERTISE_ALL | ADVERTISE_100BASE4);
 	switch (lp->ext_phy_option){
 
@@ -235,11 +235,11 @@ static void amd8111e_set_ext_phy(struct net_device *dev)
 	}
 
 	if(advert != tmp)
-		amd8111e_mdio_write(dev, PHY_ID, MII_ADVERTISE, tmp);
+		amd8111e_mdio_write(dev, lp->ext_phy_addr, MII_ADVERTISE, tmp);
 	/* Restart auto negotiation */
-	bmcr = amd8111e_mdio_read(dev, PHY_ID, MII_BMCR);
+	bmcr = amd8111e_mdio_read(dev, lp->ext_phy_addr, MII_BMCR);
 	bmcr |= (BMCR_ANENABLE | BMCR_ANRESTART);
-	amd8111e_mdio_write(dev, PHY_ID, MII_BMCR, bmcr);
+	amd8111e_mdio_write(dev, lp->ext_phy_addr, MII_BMCR, bmcr);
 
 }
 
@@ -350,6 +350,7 @@ static int amd8111e_init_ring(struct net_device *dev)
 
 		lp->rx_ring[i].buff_phy_addr = cpu_to_le32(lp->rx_dma_addr[i]);
 		lp->rx_ring[i].buff_count = cpu_to_le16(lp->rx_buff_len-2);
+		wmb();
 		lp->rx_ring[i].rx_flags = cpu_to_le16(OWN_BIT);
 	}
 
@@ -384,7 +385,7 @@ static int amd8111e_set_coalesce(struct net_device * dev, enum coal_mode cmod)
 	unsigned int event_count;
 
 	struct amd8111e_priv *lp = netdev_priv(dev);
-	void* mmio = lp->mmio;
+	void __iomem *mmio = lp->mmio;
 	struct amd8111e_coalesce_conf * coal_conf = &lp->coal_conf;
 
 
@@ -442,7 +443,7 @@ This function initializes the device registers  and starts the device.
 static int amd8111e_restart(struct net_device *dev)
 {
 	struct amd8111e_priv *lp = netdev_priv(dev);
-	void * mmio = lp->mmio;
+	void __iomem *mmio = lp->mmio;
 	int i,reg_val;
 
 	/* stop the chip */
@@ -522,14 +523,14 @@ static void amd8111e_init_hw_default( struct amd8111e_priv* lp)
 {
 	unsigned int reg_val;
 	unsigned int logic_filter[2] ={0,};
-	void * mmio = lp->mmio;
+	void __iomem *mmio = lp->mmio;
 
 
         /* stop the chip */
 	writel(RUN, mmio + CMD0);
 
 	/* AUTOPOLL0 Register *//*TBD default value is 8100 in FPS */
-	writew( 0x8101, mmio + AUTOPOLL0);
+	writew( 0x8100 | lp->ext_phy_addr, mmio + AUTOPOLL0);
 
 	/* Clear RCV_RING_BASE_ADDR */
 	writel(0, mmio + RCV_RING_BASE_ADDR0);
@@ -723,9 +724,9 @@ static int amd8111e_tx(struct net_device *dev)
 /* This function handles the driver receive operation in polling mode */
 static int amd8111e_rx_poll(struct net_device *dev, int * budget)
 {
-	struct amd8111e_priv *lp = dev->priv;
+	struct amd8111e_priv *lp = netdev_priv(dev);
 	int rx_index = lp->rx_idx & RX_RING_DR_MOD_MASK;
-	void * mmio = lp->mmio;
+	void __iomem *mmio = lp->mmio;
 	struct sk_buff *skb,*new_skb;
 	int min_pkt_len, status;
 	unsigned int intr0;
@@ -740,11 +741,11 @@ static int amd8111e_rx_poll(struct net_device *dev, int * budget)
 	do{   
 		/* process receive packets until we use the quota*/
 		/* If we own the next entry, it's a new packet. Send it up. */
-		while(!(lp->rx_ring[rx_index].rx_flags & OWN_BIT)){
-	       
-			/* check if err summary bit is set */ 
-			if(le16_to_cpu(lp->rx_ring[rx_index].rx_flags) 
-								& ERR_BIT){
+		while(1) {
+			status = le16_to_cpu(lp->rx_ring[rx_index].rx_flags);
+			if (status & OWN_BIT)
+				break;
+
 			/* 
 			 * There is a tricky error noted by John Murphy,
 			 * <murf@perftech.com> to Russ Nelson: Even with
@@ -753,89 +754,88 @@ static int amd8111e_rx_poll(struct net_device *dev, int * budget)
 			 * the last correctly noting the error.
 			 */
 
-			/* reseting flags */
-			lp->rx_ring[rx_index].rx_flags &=RESET_RX_FLAGS;
-			goto err_next_pkt;
-
+			if(status & ERR_BIT) {
+				/* reseting flags */
+				lp->rx_ring[rx_index].rx_flags &= RESET_RX_FLAGS;
+				goto err_next_pkt;
 			}
 			/* check for STP and ENP */
-		status = le16_to_cpu(lp->rx_ring[rx_index].rx_flags);
-		if(!((status & STP_BIT) && (status & ENP_BIT))){
-			/* reseting flags */
-			lp->rx_ring[rx_index].rx_flags &=RESET_RX_FLAGS;
-			goto err_next_pkt;
-		}
-		pkt_len = le16_to_cpu(lp->rx_ring[rx_index].msg_count) - 4;
+			if(!((status & STP_BIT) && (status & ENP_BIT))){
+				/* reseting flags */
+				lp->rx_ring[rx_index].rx_flags &= RESET_RX_FLAGS;
+				goto err_next_pkt;
+			}
+			pkt_len = le16_to_cpu(lp->rx_ring[rx_index].msg_count) - 4;
 
 #if AMD8111E_VLAN_TAG_USED		
-		vtag = le16_to_cpu(lp->rx_ring[rx_index].rx_flags) & TT_MASK;
-		/*MAC will strip vlan tag*/ 
-		if(lp->vlgrp != NULL && vtag !=0)
-			min_pkt_len =MIN_PKT_LEN - 4;
-		else
+			vtag = status & TT_MASK;
+			/*MAC will strip vlan tag*/ 
+			if(lp->vlgrp != NULL && vtag !=0)
+				min_pkt_len =MIN_PKT_LEN - 4;
+			else
 #endif
-			min_pkt_len =MIN_PKT_LEN;
+				min_pkt_len =MIN_PKT_LEN;
 
-		if (pkt_len < min_pkt_len) {
-			lp->rx_ring[rx_index].rx_flags &= RESET_RX_FLAGS;
-			lp->drv_rx_errors++;
-			goto err_next_pkt;
-		}
-		if(--rx_pkt_limit < 0)
-			goto rx_not_empty;
-		if(!(new_skb = dev_alloc_skb(lp->rx_buff_len))){
-			/* if allocation fail, 
-				ignore that pkt and go to next one */
-			lp->rx_ring[rx_index].rx_flags &= RESET_RX_FLAGS;
-			lp->drv_rx_errors++;
-			goto err_next_pkt;
-		}
+			if (pkt_len < min_pkt_len) {
+				lp->rx_ring[rx_index].rx_flags &= RESET_RX_FLAGS;
+				lp->drv_rx_errors++;
+				goto err_next_pkt;
+			}
+			if(--rx_pkt_limit < 0)
+				goto rx_not_empty;
+			if(!(new_skb = dev_alloc_skb(lp->rx_buff_len))){
+				/* if allocation fail, 
+				   ignore that pkt and go to next one */
+				lp->rx_ring[rx_index].rx_flags &= RESET_RX_FLAGS;
+				lp->drv_rx_errors++;
+				goto err_next_pkt;
+			}
 		
-		skb_reserve(new_skb, 2);
-		skb = lp->rx_skbuff[rx_index];
-		pci_unmap_single(lp->pci_dev,lp->rx_dma_addr[rx_index],
-			lp->rx_buff_len-2, PCI_DMA_FROMDEVICE);
-		skb_put(skb, pkt_len);
-		skb->dev = dev;
-		lp->rx_skbuff[rx_index] = new_skb;
-		new_skb->dev = dev;
-		lp->rx_dma_addr[rx_index] = pci_map_single(lp->pci_dev,
-			new_skb->data, lp->rx_buff_len-2,PCI_DMA_FROMDEVICE);
+			skb_reserve(new_skb, 2);
+			skb = lp->rx_skbuff[rx_index];
+			pci_unmap_single(lp->pci_dev,lp->rx_dma_addr[rx_index],
+					 lp->rx_buff_len-2, PCI_DMA_FROMDEVICE);
+			skb_put(skb, pkt_len);
+			skb->dev = dev;
+			lp->rx_skbuff[rx_index] = new_skb;
+			new_skb->dev = dev;
+			lp->rx_dma_addr[rx_index] = pci_map_single(lp->pci_dev,
+								   new_skb->data,
+								   lp->rx_buff_len-2,
+								   PCI_DMA_FROMDEVICE);
 	
-		skb->protocol = eth_type_trans(skb, dev);
+			skb->protocol = eth_type_trans(skb, dev);
 
 #if AMD8111E_VLAN_TAG_USED		
-		
-		vtag = lp->rx_ring[rx_index].rx_flags & TT_MASK;
-		if(lp->vlgrp != NULL && (vtag == TT_VLAN_TAGGED)){
-			amd8111e_vlan_rx(lp, skb,
-				    lp->rx_ring[rx_index].tag_ctrl_info);
-		} else
+			if(lp->vlgrp != NULL && (vtag == TT_VLAN_TAGGED)){
+				amd8111e_vlan_rx(lp, skb,
+					 le16_to_cpu(lp->rx_ring[rx_index].tag_ctrl_info));
+			} else
 #endif
-			
-			netif_receive_skb(skb);
-		/*COAL update rx coalescing parameters*/
-		lp->coal_conf.rx_packets++;
-		lp->coal_conf.rx_bytes += pkt_len;	
-		num_rx_pkt++;
-		dev->last_rx = jiffies;
+				netif_receive_skb(skb);
+			/*COAL update rx coalescing parameters*/
+			lp->coal_conf.rx_packets++;
+			lp->coal_conf.rx_bytes += pkt_len;	
+			num_rx_pkt++;
+			dev->last_rx = jiffies;
 	
-err_next_pkt:	
-		lp->rx_ring[rx_index].buff_phy_addr
-			 = cpu_to_le32(lp->rx_dma_addr[rx_index]);
-		lp->rx_ring[rx_index].buff_count = 
+		err_next_pkt:	
+			lp->rx_ring[rx_index].buff_phy_addr
+				= cpu_to_le32(lp->rx_dma_addr[rx_index]);
+			lp->rx_ring[rx_index].buff_count = 
 				cpu_to_le16(lp->rx_buff_len-2);
-		lp->rx_ring[rx_index].rx_flags |= cpu_to_le16(OWN_BIT);
-		rx_index = (++lp->rx_idx) & RX_RING_DR_MOD_MASK;
-	}
-	/* Check the interrupt status register for more packets in the 
-	mean time. Process them since we have not used up our quota.*/
+			wmb();
+			lp->rx_ring[rx_index].rx_flags |= cpu_to_le16(OWN_BIT);
+			rx_index = (++lp->rx_idx) & RX_RING_DR_MOD_MASK;
+		}
+		/* Check the interrupt status register for more packets in the 
+		   mean time. Process them since we have not used up our quota.*/
 
-	intr0 = readl(mmio + INT0);
-	/*Ack receive packets */
-	writel(intr0 & RINT0,mmio + INT0);
+		intr0 = readl(mmio + INT0);
+		/*Ack receive packets */
+		writel(intr0 & RINT0,mmio + INT0);
 
-	}while(intr0 & RINT0);
+	} while(intr0 & RINT0);
 
 	/* Receive descriptor is empty now */
 	dev->quota -= num_rx_pkt;
@@ -873,11 +873,12 @@ static int amd8111e_rx(struct net_device *dev)
 	
 	/* If we own the next entry, it's a new packet. Send it up. */
 	while(++num_rx_pkt <= max_rx_pkt){
-		if(lp->rx_ring[rx_index].rx_flags & OWN_BIT)
+		status = le16_to_cpu(lp->rx_ring[rx_index].rx_flags);
+		if(status & OWN_BIT)
 			return 0;
 	       
 		/* check if err summary bit is set */ 
-		if(le16_to_cpu(lp->rx_ring[rx_index].rx_flags) & ERR_BIT){
+		if(status & ERR_BIT){
 			/* 
 			 * There is a tricky error noted by John Murphy,
 			 * <murf@perftech.com> to Russ Nelson: Even with full-sized
@@ -888,7 +889,6 @@ static int amd8111e_rx(struct net_device *dev)
 			goto err_next_pkt;
 		}
 		/* check for STP and ENP */
-		status = le16_to_cpu(lp->rx_ring[rx_index].rx_flags);
 		if(!((status & STP_BIT) && (status & ENP_BIT))){
 			/* reseting flags */
 			lp->rx_ring[rx_index].rx_flags &= RESET_RX_FLAGS;
@@ -897,7 +897,7 @@ static int amd8111e_rx(struct net_device *dev)
 		pkt_len = le16_to_cpu(lp->rx_ring[rx_index].msg_count) - 4;
 
 #if AMD8111E_VLAN_TAG_USED		
-		vtag = le16_to_cpu(lp->rx_ring[rx_index].rx_flags) & TT_MASK;
+		vtag = status & TT_MASK;
 		/*MAC will strip vlan tag*/ 
 		if(lp->vlgrp != NULL && vtag !=0)
 			min_pkt_len =MIN_PKT_LEN - 4;
@@ -931,12 +931,10 @@ static int amd8111e_rx(struct net_device *dev)
 	
 		skb->protocol = eth_type_trans(skb, dev);
 
-#if AMD8111E_VLAN_TAG_USED		
-		
-		vtag = lp->rx_ring[rx_index].rx_flags & TT_MASK;
+#if AMD8111E_VLAN_TAG_USED				
 		if(lp->vlgrp != NULL && (vtag == TT_VLAN_TAGGED)){
 			amd8111e_vlan_rx(lp, skb,
-				    lp->rx_ring[rx_index].tag_ctrl_info);
+				 le16_to_cpu(lp->rx_ring[rx_index].tag_ctrl_info));
 		} else
 #endif
 			
@@ -952,6 +950,7 @@ err_next_pkt:
 			 = cpu_to_le32(lp->rx_dma_addr[rx_index]);
 		lp->rx_ring[rx_index].buff_count = 
 				cpu_to_le16(lp->rx_buff_len-2);
+		wmb();
 		lp->rx_ring[rx_index].rx_flags |= cpu_to_le16(OWN_BIT);
 		rx_index = (++lp->rx_idx) & RX_RING_DR_MOD_MASK;
 	}
@@ -1004,7 +1003,7 @@ static int amd8111e_link_change(struct net_device* dev)
 /*
 This function reads the mib counters. 	 
 */
-static int amd8111e_read_mib(void* mmio, u8 MIB_COUNTER)
+static int amd8111e_read_mib(void __iomem *mmio, u8 MIB_COUNTER)
 {
 	unsigned int  status;
 	unsigned  int data;
@@ -1027,7 +1026,7 @@ This function reads the mib registers and returns the hardware statistics. It  u
 static struct net_device_stats *amd8111e_get_stats(struct net_device * dev)
 {
 	struct amd8111e_priv *lp = netdev_priv(dev);
-	void * mmio = lp->mmio;
+	void __iomem *mmio = lp->mmio;
 	unsigned long flags;
 	/* struct net_device_stats *prev_stats = &lp->prev_stats; */
 	struct net_device_stats* new_stats = &lp->stats;
@@ -1260,7 +1259,7 @@ static irqreturn_t amd8111e_interrupt(int irq, void *dev_id, struct pt_regs *reg
 
 	struct net_device * dev = (struct net_device *) dev_id;
 	struct amd8111e_priv *lp = netdev_priv(dev);
-	void * mmio = lp->mmio;
+	void __iomem *mmio = lp->mmio;
 	unsigned int intr0;
 	unsigned int handled = 1;
 
@@ -1432,7 +1431,7 @@ static int amd8111e_start_xmit(struct sk_buff *skb, struct net_device * dev)
 #if AMD8111E_VLAN_TAG_USED
 	if((lp->vlgrp != NULL) && vlan_tx_tag_present(skb)){
 		lp->tx_ring[tx_index].tag_ctrl_cmd |= 
-				cpu_to_le32(TCC_VLAN_INSERT);	
+				cpu_to_le16(TCC_VLAN_INSERT);	
 		lp->tx_ring[tx_index].tag_ctrl_info = 
 				cpu_to_le16(vlan_tx_tag_get(skb));
 
@@ -1444,6 +1443,7 @@ static int amd8111e_start_xmit(struct sk_buff *skb, struct net_device * dev)
 	    (u32) cpu_to_le32(lp->tx_dma_addr[tx_index]);
 
 	/*  Set FCS and LTINT bits */
+	wmb();
 	lp->tx_ring[tx_index].tx_flags |=
 	    cpu_to_le16(OWN_BIT | STP_BIT | ENP_BIT|ADD_FCS_BIT|LTINT_BIT);
 
@@ -1464,32 +1464,25 @@ static int amd8111e_start_xmit(struct sk_buff *skb, struct net_device * dev)
 /*
 This function returns all the memory mapped registers of the device.
 */
-static char* amd8111e_read_regs(struct amd8111e_priv* lp)
-{    	
-	void * mmio = lp->mmio;
-        u32 * reg_buff;
-
-     	reg_buff = kmalloc( AMD8111E_REG_DUMP_LEN,GFP_KERNEL);
-	if(NULL == reg_buff)
-		return NULL;
-
+static void amd8111e_read_regs(struct amd8111e_priv *lp, u32 *buf)
+{
+	void __iomem *mmio = lp->mmio;
 	/* Read only necessary registers */
-	reg_buff[0] = readl(mmio + XMT_RING_BASE_ADDR0);
-	reg_buff[1] = readl(mmio + XMT_RING_LEN0);
-	reg_buff[2] = readl(mmio + RCV_RING_BASE_ADDR0);
-	reg_buff[3] = readl(mmio + RCV_RING_LEN0);
-	reg_buff[4] = readl(mmio + CMD0);
-	reg_buff[5] = readl(mmio + CMD2);
-	reg_buff[6] = readl(mmio + CMD3);
-	reg_buff[7] = readl(mmio + CMD7);
-	reg_buff[8] = readl(mmio + INT0);
-	reg_buff[9] = readl(mmio + INTEN0);
-	reg_buff[10] = readl(mmio + LADRF);
-	reg_buff[11] = readl(mmio + LADRF+4);
-	reg_buff[12] = readl(mmio + STAT0);
-
-	return (char *)reg_buff;
+	buf[0] = readl(mmio + XMT_RING_BASE_ADDR0);
+	buf[1] = readl(mmio + XMT_RING_LEN0);
+	buf[2] = readl(mmio + RCV_RING_BASE_ADDR0);
+	buf[3] = readl(mmio + RCV_RING_LEN0);
+	buf[4] = readl(mmio + CMD0);
+	buf[5] = readl(mmio + CMD2);
+	buf[6] = readl(mmio + CMD3);
+	buf[7] = readl(mmio + CMD7);
+	buf[8] = readl(mmio + INT0);
+	buf[9] = readl(mmio + INTEN0);
+	buf[10] = readl(mmio + LADRF);
+	buf[11] = readl(mmio + LADRF+4);
+	buf[12] = readl(mmio + STAT0);
 }
+
 /*
 amd8111e crc generator implementation is different from the kernel
 ether_crc() function.
@@ -1567,131 +1560,101 @@ static void amd8111e_set_multicast_list(struct net_device *dev)
 
 }
 
+static void amd8111e_get_drvinfo(struct net_device* dev, struct ethtool_drvinfo *info)
+{
+	struct amd8111e_priv *lp = netdev_priv(dev);
+	struct pci_dev *pci_dev = lp->pci_dev;
+	strcpy (info->driver, MODULE_NAME);
+	strcpy (info->version, MODULE_VERS);
+	sprintf(info->fw_version,"%u",chip_version);
+	strcpy (info->bus_info, pci_name(pci_dev));
+}
+
+static int amd8111e_get_regs_len(struct net_device *dev)
+{
+	return AMD8111E_REG_DUMP_LEN;
+}
+
+static void amd8111e_get_regs(struct net_device *dev, struct ethtool_regs *regs, void *buf)
+{
+	struct amd8111e_priv *lp = netdev_priv(dev);
+	regs->version = 0;
+	amd8111e_read_regs(lp, buf);
+}
+
+static int amd8111e_get_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct amd8111e_priv *lp = netdev_priv(dev);
+	spin_lock_irq(&lp->lock);
+	mii_ethtool_gset(&lp->mii_if, ecmd);
+	spin_unlock_irq(&lp->lock);
+	return 0;
+}
+
+static int amd8111e_set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct amd8111e_priv *lp = netdev_priv(dev);
+	int res;
+	spin_lock_irq(&lp->lock);
+	res = mii_ethtool_sset(&lp->mii_if, ecmd);
+	spin_unlock_irq(&lp->lock);
+	return res;
+}
+
+static int amd8111e_nway_reset(struct net_device *dev)
+{
+	struct amd8111e_priv *lp = netdev_priv(dev);
+	return mii_nway_restart(&lp->mii_if);
+}
+
+static u32 amd8111e_get_link(struct net_device *dev)
+{
+	struct amd8111e_priv *lp = netdev_priv(dev);
+	return mii_link_ok(&lp->mii_if);
+}
+
+static void amd8111e_get_wol(struct net_device *dev, struct ethtool_wolinfo *wol_info)
+{
+	struct amd8111e_priv *lp = netdev_priv(dev);
+	wol_info->supported = WAKE_MAGIC|WAKE_PHY;
+	if (lp->options & OPTION_WOL_ENABLE)
+		wol_info->wolopts = WAKE_MAGIC;
+}
+
+static int amd8111e_set_wol(struct net_device *dev, struct ethtool_wolinfo *wol_info)
+{
+	struct amd8111e_priv *lp = netdev_priv(dev);
+	if (wol_info->wolopts & ~(WAKE_MAGIC|WAKE_PHY))
+		return -EINVAL;
+	spin_lock_irq(&lp->lock);
+	if (wol_info->wolopts & WAKE_MAGIC)
+		lp->options |= 
+			(OPTION_WOL_ENABLE | OPTION_WAKE_MAGIC_ENABLE);
+	else if(wol_info->wolopts & WAKE_PHY)
+		lp->options |= 
+			(OPTION_WOL_ENABLE | OPTION_WAKE_PHY_ENABLE);
+	else
+		lp->options &= ~OPTION_WOL_ENABLE; 
+	spin_unlock_irq(&lp->lock);
+	return 0;
+}
+
+static struct ethtool_ops ops = {
+	.get_drvinfo = amd8111e_get_drvinfo,
+	.get_regs_len = amd8111e_get_regs_len,
+	.get_regs = amd8111e_get_regs,
+	.get_settings = amd8111e_get_settings,
+	.set_settings = amd8111e_set_settings,
+	.nway_reset = amd8111e_nway_reset,
+	.get_link = amd8111e_get_link,
+	.get_wol = amd8111e_get_wol,
+	.set_wol = amd8111e_set_wol,
+};
+
 /*
 This function handles all the  ethtool ioctls. It gives driver info, gets/sets driver speed, gets memory mapped register values, forces auto negotiation, sets/gets WOL options for ethtool application. 
 */
 	
-static int amd8111e_ethtool_ioctl(struct net_device* dev, void __user *useraddr)
-{
-	struct amd8111e_priv *lp = netdev_priv(dev);
-	struct pci_dev *pci_dev = lp->pci_dev;
-	u32 ethcmd;
-	
-	if( useraddr == NULL) 
-		return -EINVAL;
-	if(copy_from_user (&ethcmd, useraddr, sizeof (ethcmd)))
-		return -EFAULT;
-	
-	switch(ethcmd){
-	
-	case ETHTOOL_GDRVINFO:{
-		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-		strcpy (info.driver, MODULE_NAME);
-		strcpy (info.version, MODULE_VERS);
-		memset(&info.fw_version, 0, sizeof(info.fw_version));
-		sprintf(info.fw_version,"%u",chip_version);
-		strcpy (info.bus_info, pci_name(pci_dev));
-		info.eedump_len = 0;
-		info.regdump_len = AMD8111E_REG_DUMP_LEN;
-		if (copy_to_user (useraddr, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
-	}
-	/* get settings */
-	case ETHTOOL_GSET: {
-		struct ethtool_cmd ecmd = { ETHTOOL_GSET };
-		spin_lock_irq(&lp->lock);
-		mii_ethtool_gset(&lp->mii_if, &ecmd);
-		spin_unlock_irq(&lp->lock);
-		if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
-			return -EFAULT;
-		return 0;
-	}
-	/* set settings */
-	case ETHTOOL_SSET: {
-		int r;
-		struct ethtool_cmd ecmd;
-		if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
-			return -EFAULT;
-
-		spin_lock_irq(&lp->lock);
-		r = mii_ethtool_sset(&lp->mii_if, &ecmd);
-		spin_unlock_irq(&lp->lock);
-		return r;
-	}
-	case ETHTOOL_GREGS: {
-		struct ethtool_regs regs;
-		u8 *regbuf;
-		int ret;
-
-		if (copy_from_user(&regs, useraddr, sizeof(regs)))
-			return -EFAULT;
-		if (regs.len > AMD8111E_REG_DUMP_LEN)
-			regs.len = AMD8111E_REG_DUMP_LEN;
-		regs.version = 0;
-		if (copy_to_user(useraddr, &regs, sizeof(regs)))
-			return -EFAULT;
-
-		regbuf = amd8111e_read_regs(lp);
-		if (!regbuf)
-			return -ENOMEM;
-
-		useraddr += offsetof(struct ethtool_regs, data);
-		ret = 0;
-		if (copy_to_user(useraddr, regbuf, regs.len))
-			ret = -EFAULT;
-		kfree(regbuf);
-		return ret;
-	}
-	/* restart autonegotiation */
-	case ETHTOOL_NWAY_RST: {
-		return mii_nway_restart(&lp->mii_if);
-	}
-	/* get link status */
-	case ETHTOOL_GLINK: {
-		struct ethtool_value val = {ETHTOOL_GLINK};
-		val.data = mii_link_ok(&lp->mii_if);
-		if (copy_to_user(useraddr, &val, sizeof(val)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_GWOL: {
-		struct ethtool_wolinfo wol_info = { ETHTOOL_GWOL };
-
-		wol_info.supported = WAKE_MAGIC|WAKE_PHY;
-		wol_info.wolopts = 0;
-		if (lp->options & OPTION_WOL_ENABLE)
-			wol_info.wolopts = WAKE_MAGIC;
-		memset(&wol_info.sopass, 0, sizeof(wol_info.sopass));
-		if (copy_to_user(useraddr, &wol_info, sizeof(wol_info)))
-			return -EFAULT;
-		return 0;
-	}
-	case ETHTOOL_SWOL: {
-		struct ethtool_wolinfo wol_info;
-
-		if (copy_from_user(&wol_info, useraddr, sizeof(wol_info)))
-			return -EFAULT;
-		if (wol_info.wolopts & ~(WAKE_MAGIC |WAKE_PHY))
-			return -EINVAL;
-		spin_lock_irq(&lp->lock);
-		if(wol_info.wolopts & WAKE_MAGIC)
-			lp->options |= 
-				(OPTION_WOL_ENABLE | OPTION_WAKE_MAGIC_ENABLE);
-		else if(wol_info.wolopts & WAKE_PHY)
-			lp->options |= 
-				(OPTION_WOL_ENABLE | OPTION_WAKE_PHY_ENABLE);
-		else
-			lp->options &= ~OPTION_WOL_ENABLE; 
-		spin_unlock_irq(&lp->lock);
-		return 0;
-	}
-	
-	default:
-		break;
-	}
-		return -EOPNOTSUPP;
-}
 static int amd8111e_ioctl(struct net_device * dev , struct ifreq *ifr, int cmd)
 {
 	struct mii_ioctl_data *data = if_mii(ifr);
@@ -1703,10 +1666,8 @@ static int amd8111e_ioctl(struct net_device * dev , struct ifreq *ifr, int cmd)
 		return -EPERM;
 
 	switch(cmd) {
-	case SIOCETHTOOL:
-		return amd8111e_ethtool_ioctl(dev, ifr->ifr_data);
 	case SIOCGMIIPHY:
-		data->phy_id = PHY_ID;
+		data->phy_id = lp->ext_phy_addr;
 
 	/* fallthru */
 	case SIOCGMIIREG: 
@@ -1736,7 +1697,7 @@ static int amd8111e_ioctl(struct net_device * dev , struct ifreq *ifr, int cmd)
 }
 static int amd8111e_set_mac_address(struct net_device *dev, void *p)
 {
-	struct amd8111e_priv *lp = dev->priv;
+	struct amd8111e_priv *lp = netdev_priv(dev);
 	int i;
 	struct sockaddr *addr = p;
 
@@ -1874,7 +1835,7 @@ static int amd8111e_suspend(struct pci_dev *pci_dev, u32 state)
 		pci_enable_wake(pci_dev, 4, 0); /* 4 == D3 cold */
 	}
 	
-	pci_save_state(pci_dev, lp->pm_state);
+	pci_save_state(pci_dev);
 	pci_set_power_state(pci_dev, 3);
 
 	return 0;
@@ -1888,7 +1849,7 @@ static int amd8111e_resume(struct pci_dev *pci_dev)
 		return 0;
 
 	pci_set_power_state(pci_dev, 0);
-	pci_restore_state(pci_dev, lp->pm_state);
+	pci_restore_state(pci_dev);
 
 	pci_enable_wake(pci_dev, 3, 0);
 	pci_enable_wake(pci_dev, 4, 0); /* D3 cold */
@@ -1912,7 +1873,7 @@ static void __devexit amd8111e_remove_one(struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 	if (dev) {
 		unregister_netdev(dev);
-		iounmap((void *) ((struct amd8111e_priv *)(dev->priv))->mmio);
+		iounmap(((struct amd8111e_priv *)netdev_priv(dev))->mmio);
 		free_netdev(dev);
 		pci_release_regions(pdev);
 		pci_disable_device(pdev);
@@ -1923,7 +1884,7 @@ static void amd8111e_config_ipg(struct net_device* dev)
 {
 	struct amd8111e_priv *lp = netdev_priv(dev);
 	struct ipg_info* ipg_data = &lp->ipg_data;
-	void * mmio = lp->mmio;
+	void __iomem *mmio = lp->mmio;
 	unsigned int prev_col_cnt = ipg_data->col_cnt;
 	unsigned int total_col_cnt;
 	unsigned int tmp_ipg;
@@ -1977,6 +1938,26 @@ static void amd8111e_config_ipg(struct net_device* dev)
 	 mod_timer(&lp->ipg_data.ipg_timer, jiffies + IPG_CONVERGE_JIFFIES);
 	return;
 
+}
+
+static void __devinit amd8111e_probe_ext_phy(struct net_device* dev)
+{
+	struct amd8111e_priv *lp = netdev_priv(dev);
+	int i;
+
+	for (i = 0x1e; i >= 0; i--) {
+		u32 id1, id2;
+
+		if (amd8111e_read_phy(lp, i, MII_PHYSID1, &id1))
+			continue;
+		if (amd8111e_read_phy(lp, i, MII_PHYSID2, &id2))
+			continue;
+		lp->ext_phy_id = (id1 << 16) | id2;
+		lp->ext_phy_addr = i;
+		return;
+	}
+	lp->ext_phy_id = 0;
+	lp->ext_phy_addr = 1;
 }
 
 static int __devinit amd8111e_probe_one(struct pci_dev *pdev,
@@ -2049,12 +2030,6 @@ static int __devinit amd8111e_probe_one(struct pci_dev *pdev,
 	lp->amd8111e_net_dev = dev;
 	lp->pm_cap = pm_cap;
 
-	/* setting mii default values */
-	lp->mii_if.dev = dev;
-	lp->mii_if.mdio_read = amd8111e_mdio_read;
-	lp->mii_if.mdio_write = amd8111e_mdio_write;
-	lp->mii_if.phy_id = PHY_ID;
-
 	spin_lock_init(&lp->lock);
 
 	lp->mmio = ioremap(reg_addr, reg_len);
@@ -2085,6 +2060,7 @@ static int __devinit amd8111e_probe_one(struct pci_dev *pdev,
 	dev->set_mac_address = amd8111e_set_mac_address;
 	dev->do_ioctl = amd8111e_ioctl;
 	dev->change_mtu = amd8111e_change_mtu;
+	SET_ETHTOOL_OPS(dev, &ops);
 	dev->irq =pdev->irq;
 	dev->tx_timeout = amd8111e_tx_timeout; 
 	dev->watchdog_timeo = AMD8111E_TX_TIMEOUT; 
@@ -2101,7 +2077,15 @@ static int __devinit amd8111e_probe_one(struct pci_dev *pdev,
 	dev->vlan_rx_register =amd8111e_vlan_rx_register;
 	dev->vlan_rx_kill_vid = amd8111e_vlan_rx_kill_vid;
 #endif	
-	
+	/* Probe the external PHY */
+	amd8111e_probe_ext_phy(dev);
+
+	/* setting mii default values */
+	lp->mii_if.dev = dev;
+	lp->mii_if.mdio_read = amd8111e_mdio_read;
+	lp->mii_if.mdio_write = amd8111e_mdio_write;
+	lp->mii_if.phy_id = lp->ext_phy_addr;
+
 	/* Set receive buffer length and set jumbo option*/
 	amd8111e_set_rx_buff_len(dev);
 
@@ -2134,9 +2118,15 @@ static int __devinit amd8111e_probe_one(struct pci_dev *pdev,
     	for (i = 0; i < 6; i++)
 		printk("%2.2x%c",dev->dev_addr[i],i == 5 ? ' ' : ':');
     	printk( "\n");	
+	if (lp->ext_phy_id)
+		printk(KERN_INFO "%s: Found MII PHY ID 0x%08x at address 0x%02x\n",
+		       dev->name, lp->ext_phy_id, lp->ext_phy_addr);
+	else
+		printk(KERN_INFO "%s: Couldn't detect MII PHY, assuming address 0x01\n",
+		       dev->name);
     	return 0;
 err_iounmap:
-	iounmap((void *) lp->mmio);
+	iounmap(lp->mmio);
 
 err_free_dev:
 	free_netdev(dev);

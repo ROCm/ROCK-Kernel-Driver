@@ -325,10 +325,8 @@ static void disk_sysfs_symlinks(struct gendisk *disk)
 /* Not exported, helper to add_disk(). */
 void register_disk(struct gendisk *disk)
 {
-	struct parsed_partitions *state;
 	struct block_device *bdev;
 	char *s;
-	int j;
 	int err;
 
 	strlcpy(disk->kobj.name,disk->disk_name,KOBJ_NAME_LEN);
@@ -358,24 +356,9 @@ void register_disk(struct gendisk *disk)
 	if (!bdev)
 		return;
 
+	bdev->bd_invalidated = 1;
 	if (blkdev_get(bdev, FMODE_READ, 0) < 0)
 		return;
-	state = check_partition(disk, bdev);
-	if (state) {
-		for (j = 1; j < state->limit; j++) {
-			sector_t size = state->parts[j].size;
-			sector_t from = state->parts[j].from;
-			if (!size)
-				continue;
-			add_partition(disk, j, from, size);
-#ifdef CONFIG_BLK_DEV_MD
-			if (!state->parts[j].flags)
-				continue;
-			md_autodetect_dev(bdev->bd_dev+j);
-#endif
-		}
-		kfree(state);
-	}
 	blkdev_put(bdev);
 }
 
@@ -395,7 +378,7 @@ int rescan_partitions(struct gendisk *disk, struct block_device *bdev)
 	if (disk->fops->revalidate_disk)
 		disk->fops->revalidate_disk(disk);
 	if (!get_capacity(disk) || !(state = check_partition(disk, bdev)))
-		return -EIO;
+		return 0;
 	for (p = 1; p < state->limit; p++) {
 		sector_t size = state->parts[p].size;
 		sector_t from = state->parts[p].from;

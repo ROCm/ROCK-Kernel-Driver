@@ -34,7 +34,7 @@ struct sndrv_hwdep_dsp_image32 {
 	u32 driver_data;
 } /* don't set packed attribute here */;
 
-static int _snd_ioctl32_hwdep_dsp_image(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
+static inline int _snd_ioctl32_hwdep_dsp_image(unsigned int fd, unsigned int cmd, unsigned long arg, struct file *file, unsigned int native_ctl)
 {
 	struct sndrv_hwdep_dsp_image data;
 	struct sndrv_hwdep_dsp_image32 data32;

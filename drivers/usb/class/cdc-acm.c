@@ -142,7 +142,7 @@ static void acm_ctrl_irq(struct urb *urb, struct pt_regs *regs)
 
 		case ACM_IRQ_LINE_STATE:
 
-			newctrl = le16_to_cpu(get_unaligned((__u16 *) data));
+			newctrl = le16_to_cpu(get_unaligned((__le16 *) data));
 
 			if (acm->tty && !acm->clocal && (acm->ctrlin & ~newctrl & ACM_CTRL_DCD)) {
 				dbg("calling hangup");
@@ -248,16 +248,11 @@ out:
 static void acm_softint(void *private)
 {
 	struct acm *acm = private;
-	struct tty_struct *tty = acm->tty;
 	dbg("Entering acm_softint.\n");
 	
 	if (!ACM_READY(acm))
 		return;
-
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
-
-	wake_up_interruptible(&tty->write_wait);
+	tty_wakeup(acm->tty);
 }
 
 /*
@@ -306,9 +301,9 @@ done:
 	return 0;
 
 full_bailout:
-	usb_unlink_urb(acm->readurb);
+	usb_kill_urb(acm->readurb);
 bail_out_and_unlink:
-	usb_unlink_urb(acm->ctrlurb);
+	usb_kill_urb(acm->ctrlurb);
 bail_out:
 	up(&open_sem);
 	return -EIO;
@@ -325,9 +320,9 @@ static void acm_tty_close(struct tty_struct *tty, struct file *filp)
 	if (!--acm->used) {
 		if (acm->dev) {
 			acm_set_control(acm, acm->ctrlout = 0);
-			usb_unlink_urb(acm->ctrlurb);
-			usb_unlink_urb(acm->writeurb);
-			usb_unlink_urb(acm->readurb);
+			usb_kill_urb(acm->ctrlurb);
+			usb_kill_urb(acm->writeurb);
+			usb_kill_urb(acm->readurb);
 		} else {
 			tty_unregister_device(acm_tty_driver, acm->minor);
 			acm_table[acm->minor] = NULL;
@@ -340,11 +335,11 @@ static void acm_tty_close(struct tty_struct *tty, struct file *filp)
 	up(&open_sem);
 }
 
-static int acm_tty_write(struct tty_struct *tty, int from_user, const unsigned char *buf, int count)
+static int acm_tty_write(struct tty_struct *tty, const unsigned char *buf, int count)
 {
 	struct acm *acm = tty->driver_data;
 	int stat;
-	dbg("Entering acm_tty_write to write %d bytes from %s space,\n", count, from_user ? "user" : "kernel");
+	dbg("Entering acm_tty_write to write %d bytes,\n", count);
 
 	if (!ACM_READY(acm))
 		return -EINVAL;
@@ -355,19 +350,15 @@ static int acm_tty_write(struct tty_struct *tty, int from_user, const unsigned c
 
 	count = (count > acm->writesize) ? acm->writesize : count;
 
-	dbg("Get %d bytes from %s space...", count, from_user ? "user" : "kernel");
-	if (from_user) {
-		if (copy_from_user(acm->write_buffer, (void __user *)buf, count))
-			return -EFAULT;
-	} else
-		memcpy(acm->write_buffer, buf, count);
+	dbg("Get %d bytes...", count);
+	memcpy(acm->write_buffer, buf, count);
 	dbg("  Successfully copied.\n");
 
 	acm->writeurb->transfer_buffer_length = count;
 	acm->writeurb->dev = acm->dev;
 
 	acm->ready_for_write = 0;
-	stat = usb_submit_urb(acm->writeurb, from_user ? GFP_KERNEL : GFP_ATOMIC);
+	stat = usb_submit_urb(acm->writeurb, GFP_ATOMIC);
 	if (stat < 0) {
 		dbg("usb_submit_urb(write bulk) failed");
 		acm->ready_for_write = 1;
@@ -547,6 +538,17 @@ static int acm_probe (struct usb_interface *intf,
 		return -EINVAL;
 	}
 
+	if (!buflen) {
+		if (intf->cur_altsetting->endpoint->extralen && intf->cur_altsetting->endpoint->extra) {
+			dev_dbg(&intf->dev,"Seeking extra descriptors on endpoint");
+			buflen = intf->cur_altsetting->endpoint->extralen;
+			buffer = intf->cur_altsetting->endpoint->extra;
+		} else {
+			err("Zero length descriptor references");
+			return -EINVAL;
+		}
+	}
+
 	while (buflen > 0) {
 		if (buffer [1] != USB_DT_CS_INTERFACE) {
 			err("skipping garbage");
@@ -563,6 +565,8 @@ static int acm_probe (struct usb_interface *intf,
 				break;
 			case CDC_COUNTRY_TYPE: /* maybe somehow export */
 				break; /* for now we ignore it */
+			case CDC_HEADER_TYPE: /* maybe check version */ 
+				break; /* for now we ignore it */ 
 			case CDC_AC_MANAGEMENT_TYPE:
 				ac_management_function = buffer[3];
 				break;
@@ -574,7 +578,7 @@ static int acm_probe (struct usb_interface *intf,
 				break;
 				
 			default:
-				err("Ignoring extra header");
+				err("Ignoring extra header, type %d, length %d", buffer[2], buffer[0]);
 				break;
 			}
 next_desc:
@@ -642,7 +646,7 @@ next_desc:
 	dbg("interfaces are valid");
 	for (minor = 0; minor < ACM_TTY_MINORS && acm_table[minor]; minor++);
 
-	if (acm_table[minor]) {
+	if (minor == ACM_TTY_MINORS) {
 		err("no more free acm devices");
 		return -ENODEV;
 	}
@@ -767,9 +771,9 @@ static void acm_disconnect(struct usb_interface *intf)
 	acm->dev = NULL;
 	usb_set_intfdata (intf, NULL);
 
-	usb_unlink_urb(acm->ctrlurb);
-	usb_unlink_urb(acm->readurb);
-	usb_unlink_urb(acm->writeurb);
+	usb_kill_urb(acm->ctrlurb);
+	usb_kill_urb(acm->readurb);
+	usb_kill_urb(acm->writeurb);
 
 	flush_scheduled_work(); /* wait for acm_softint */
 

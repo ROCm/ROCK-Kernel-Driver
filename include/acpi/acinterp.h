@@ -83,21 +83,25 @@ acpi_status
 acpi_ex_convert_to_integer (
 	union acpi_operand_object       *obj_desc,
 	union acpi_operand_object       **result_desc,
-	struct acpi_walk_state          *walk_state);
+	u32                             flags);
 
 acpi_status
 acpi_ex_convert_to_buffer (
 	union acpi_operand_object       *obj_desc,
-	union acpi_operand_object       **result_desc,
-	struct acpi_walk_state          *walk_state);
+	union acpi_operand_object       **result_desc);
 
 acpi_status
 acpi_ex_convert_to_string (
 	union acpi_operand_object       *obj_desc,
 	union acpi_operand_object       **result_desc,
-	u32                             base,
-	u32                             max_length,
-	struct acpi_walk_state          *walk_state);
+	u32                             type);
+
+/* Types for ->String conversion */
+
+#define ACPI_EXPLICIT_BYTE_COPY         0x00000000
+#define ACPI_EXPLICIT_CONVERT_HEX       0x00000001
+#define ACPI_IMPLICIT_CONVERT_HEX       0x00000002
+#define ACPI_EXPLICIT_CONVERT_DECIMAL   0x00000003
 
 acpi_status
 acpi_ex_convert_to_target_type (
@@ -109,7 +113,7 @@ acpi_ex_convert_to_target_type (
 u32
 acpi_ex_convert_to_ascii (
 	acpi_integer                    integer,
-	u32                             base,
+	u16                             base,
 	u8                              *string,
 	u8                              max_length);
 
@@ -243,11 +247,19 @@ acpi_ex_do_concatenate (
 	union acpi_operand_object       **actual_return_desc,
 	struct acpi_walk_state          *walk_state);
 
-u8
+acpi_status
+acpi_ex_do_logical_numeric_op (
+	u16                             opcode,
+	acpi_integer                    integer0,
+	acpi_integer                    integer1,
+	u8                              *logical_result);
+
+acpi_status
 acpi_ex_do_logical_op (
 	u16                             opcode,
-	union acpi_operand_object       *obj_desc,
-	union acpi_operand_object       *obj_desc2);
+	union acpi_operand_object       *operand0,
+	union acpi_operand_object       *operand1,
+	u8                              *logical_result);
 
 acpi_integer
 acpi_ex_do_math_op (
@@ -374,7 +386,7 @@ acpi_ex_system_do_notify_op (
 
 acpi_status
 acpi_ex_system_do_suspend(
-	u32                             time);
+	acpi_integer                    time);
 
 acpi_status
 acpi_ex_system_do_stall (
@@ -411,6 +423,10 @@ acpi_ex_system_wait_semaphore (
 /*
  * exmonadic - ACPI AML (p-code) execution, monadic operators
  */
+
+acpi_status
+acpi_ex_opcode_0A_0T_1R (
+	struct acpi_walk_state          *walk_state);
 
 acpi_status
 acpi_ex_opcode_1A_0T_0R (
@@ -470,12 +486,13 @@ acpi_ex_resolve_object_to_value (
 
 
 /*
- * exdump - Scanner debug output routines
+ * exdump - Interpreter debug output routines
  */
 
 void
 acpi_ex_dump_operand (
-	union acpi_operand_object       *entry_desc);
+	union acpi_operand_object       *obj_desc,
+	u32                             depth);
 
 void
 acpi_ex_dump_operands (
@@ -487,6 +504,7 @@ acpi_ex_dump_operands (
 	char                            *module_name,
 	u32                             line_number);
 
+#ifdef ACPI_FUTURE_USAGE
 void
 acpi_ex_dump_object_descriptor (
 	union acpi_operand_object       *object,
@@ -516,7 +534,7 @@ void
 acpi_ex_out_address (
 	char                            *title,
 	acpi_physical_address           value);
-
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 /*
  * exnames - interpreter/scanner name load/execute

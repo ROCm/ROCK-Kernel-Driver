@@ -178,6 +178,12 @@ acpi_ut_strncpy (
 	acpi_size                       count);
 
 int
+acpi_ut_memcmp (
+	const char                      *buffer1,
+	const char                      *buffer2,
+	acpi_size                       count);
+
+int
 acpi_ut_strncmp (
 	const char                      *string1,
 	const char                      *string2,
@@ -577,6 +583,10 @@ union acpi_operand_object *
 acpi_ut_create_buffer_object (
 	acpi_size                       buffer_size);
 
+union acpi_operand_object *
+acpi_ut_create_string_object (
+	acpi_size                       string_size);
+
 
 /*
  * ut_ref_cnt - Object reference count management
@@ -656,12 +666,14 @@ acpi_ut_create_update_state_and_push (
 	u16                             action,
 	union acpi_generic_state        **state_list);
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_ut_create_pkg_state_and_push (
 	void                            *internal_object,
 	void                            *external_object,
 	u16                             index,
 	union acpi_generic_state        **state_list);
+#endif
 
 union acpi_generic_state *
 acpi_ut_create_control_state (
@@ -690,14 +702,14 @@ acpi_ut_print_string (
 
 acpi_status
 acpi_ut_divide (
-	acpi_integer                    *in_dividend,
-	acpi_integer                    *in_divisor,
+	acpi_integer                    in_dividend,
+	acpi_integer                    in_divisor,
 	acpi_integer                    *out_quotient,
 	acpi_integer                    *out_remainder);
 
 acpi_status
 acpi_ut_short_divide (
-	acpi_integer                    *in_dividend,
+	acpi_integer                    in_dividend,
 	u32                             divisor,
 	acpi_integer                    *out_quotient,
 	u32                             *out_remainder);
@@ -716,9 +728,15 @@ acpi_ut_strtoul64 (
 	u32                             base,
 	acpi_integer                    *ret_integer);
 
+/* Values for Base above (16=Hex, 10=Decimal) */
+
+#define ACPI_ANY_BASE        0
+
+#ifdef ACPI_FUTURE_USAGE
 char *
 acpi_ut_strupr (
 	char                            *src_string);
+#endif
 
 u8 *
 acpi_ut_get_resource_end_tag (
@@ -837,9 +855,11 @@ acpi_ut_remove_allocation (
 	char                            *module,
 	u32                             line);
 
+#ifdef ACPI_FUTURE_USAGE
 void
 acpi_ut_dump_allocation_info (
 	void);
+#endif
 
 void
 acpi_ut_dump_allocations (

@@ -10,8 +10,6 @@
 
 #include "linux/config.h"
 
-#include "asm/current.h"
-
 #define pt_regs pt_regs_subarch
 #define show_regs show_regs_subarch
 

@@ -17,8 +17,8 @@
 static int
 fill_read(struct dentry *dentry, char *buffer, loff_t off, size_t count)
 {
-	struct bin_attribute * attr = dentry->d_fsdata;
-	struct kobject * kobj = dentry->d_parent->d_fsdata;
+	struct bin_attribute * attr = to_bin_attr(dentry);
+	struct kobject * kobj = to_kobj(dentry->d_parent);
 
 	return attr->read(kobj, buffer, off, count);
 }
@@ -60,8 +60,8 @@ read(struct file * file, char __user * userbuf, size_t count, loff_t * off)
 static int
 flush_write(struct dentry *dentry, char *buffer, loff_t offset, size_t count)
 {
-	struct bin_attribute *attr = dentry->d_fsdata;
-	struct kobject *kobj = dentry->d_parent->d_fsdata;
+	struct bin_attribute *attr = to_bin_attr(dentry);
+	struct kobject *kobj = to_kobj(dentry->d_parent);
 
 	return attr->write(kobj, buffer, offset, count);
 }
@@ -95,7 +95,7 @@ static ssize_t write(struct file * file, const char __user * userbuf,
 static int open(struct inode * inode, struct file * file)
 {
 	struct kobject *kobj = sysfs_get_kobject(file->f_dentry->d_parent);
-	struct bin_attribute * attr = file->f_dentry->d_fsdata;
+	struct bin_attribute * attr = to_bin_attr(file->f_dentry);
 	int error = -EINVAL;
 
 	if (!kobj || !attr)
@@ -130,8 +130,8 @@ static int open(struct inode * inode, struct file * file)
 
 static int release(struct inode * inode, struct file * file)
 {
-	struct kobject * kobj = file->f_dentry->d_parent->d_fsdata;
-	struct bin_attribute * attr = file->f_dentry->d_fsdata;
+	struct kobject * kobj = to_kobj(file->f_dentry->d_parent);
+	struct bin_attribute * attr = to_bin_attr(file->f_dentry);
 	u8 * buffer = file->private_data;
 
 	if (kobj) 
@@ -141,7 +141,7 @@ static int release(struct inode * inode, struct file * file)
 	return 0;
 }
 
-static struct file_operations bin_fops = {
+struct file_operations bin_fops = {
 	.read		= read,
 	.write		= write,
 	.llseek		= generic_file_llseek,
@@ -158,31 +158,9 @@ static struct file_operations bin_fops = {
 
 int sysfs_create_bin_file(struct kobject * kobj, struct bin_attribute * attr)
 {
-	struct dentry * dentry;
-	struct dentry * parent;
-	int error = 0;
+	BUG_ON(!kobj || !kobj->dentry || !attr);
 
-	if (!kobj || !attr)
-		return -EINVAL;
-
-	parent = kobj->dentry;
-
-	down(&parent->d_inode->i_sem);
-	dentry = sysfs_get_dentry(parent,attr->attr.name);
-	if (!IS_ERR(dentry)) {
-		dentry->d_fsdata = (void *)attr;
-		error = sysfs_create(dentry,
-				     (attr->attr.mode & S_IALLUGO) | S_IFREG,
-				     NULL);
-		if (!error) {
-			dentry->d_inode->i_size = attr->size;
-			dentry->d_inode->i_fop = &bin_fops;
-		}
-		dput(dentry);
-	} else
-		error = PTR_ERR(dentry);
-	up(&parent->d_inode->i_sem);
-	return error;
+	return sysfs_add_file(kobj->dentry, &attr->attr, SYSFS_KOBJ_BIN_ATTR);
 }
 
 
@@ -199,5 +177,5 @@ int sysfs_remove_bin_file(struct kobject * kobj, struct bin_attribute * attr)
 	return 0;
 }
 
-EXPORT_SYMBOL(sysfs_create_bin_file);
-EXPORT_SYMBOL(sysfs_remove_bin_file);
+EXPORT_SYMBOL_GPL(sysfs_create_bin_file);
+EXPORT_SYMBOL_GPL(sysfs_remove_bin_file);

@@ -16,10 +16,6 @@
 #include <linux/module.h>       /* for EXPORT_SYMBOL */
 #include <linux/hardirq.h>
 
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
-
 #include <asm/fpswa.h>
 #include <asm/ia32.h>
 #include <asm/intrinsics.h>
@@ -99,9 +95,6 @@ die (const char *str, struct pt_regs *regs, long err)
 	bust_spinlocks(0);
 	die.lock_owner = -1;
 	spin_unlock_irq(&die.lock);
-#ifdef	CONFIG_KDB
-	(void)kdb(KDB_REASON_OOPS, err, regs);
-#endif	/* CONFIG_KDB */
   	do_exit(SIGSEGV);
 }
 
@@ -119,7 +112,7 @@ ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 	int sig, code;
 
 	/* SIGILL, SIGFPE, SIGSEGV, and SIGBUS want these field initialized: */
-	siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
+	siginfo.si_addr = (void __user *) (regs->cr_iip + ia64_psr(regs)->ri);
 	siginfo.si_imm = break_num;
 	siginfo.si_flags = 0;		/* clear __ISR_VALID */
 	siginfo.si_isr = 0;
@@ -185,14 +178,6 @@ ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 		if (break_num < 0x80000) {
 			sig = SIGILL; code = __ILL_BREAK;
 		} else {
-#ifdef	CONFIG_KDB
-			if (break_num == KDB_BREAK_ENTER &&
-			    kdb(KDB_REASON_ENTER, break_num, regs))
-				return;		/* kdb handled it */
-			if (break_num == KDB_BREAK_BREAK &&
-			    kdb(KDB_REASON_BREAK, break_num, regs))
-				return;		/* kdb handled it */
-#endif	/* CONFIG_KDB */
 			sig = SIGTRAP; code = TRAP_BRKPT;
 		}
 	}
@@ -297,7 +282,7 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 	fault_ip = regs->cr_iip;
 	if (!fp_fault && (ia64_psr(regs)->ri == 0))
 		fault_ip -= 16;
-	if (copy_from_user(bundle, (void *) fault_ip, sizeof(bundle)))
+	if (copy_from_user(bundle, (void __user *) fault_ip, sizeof(bundle)))
 		return -1;
 
 	if (jiffies - last_time > 5*HZ)
@@ -327,7 +312,7 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 			siginfo.si_signo = SIGFPE;
 			siginfo.si_errno = 0;
 			siginfo.si_code = __SI_FAULT;	/* default code */
-			siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
+			siginfo.si_addr = (void __user *) (regs->cr_iip + ia64_psr(regs)->ri);
 			if (isr & 0x11) {
 				siginfo.si_code = FPE_FLTINV;
 			} else if (isr & 0x22) {
@@ -351,7 +336,7 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 			siginfo.si_signo = SIGFPE;
 			siginfo.si_errno = 0;
 			siginfo.si_code = __SI_FAULT;	/* default code */
-			siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
+			siginfo.si_addr = (void __user *) (regs->cr_iip + ia64_psr(regs)->ri);
 			if (isr & 0x880) {
 				siginfo.si_code = FPE_FLTOVF;
 			} else if (isr & 0x1100) {
@@ -398,7 +383,7 @@ ia64_illegal_op_fault (unsigned long ec, unsigned long arg1, unsigned long arg2,
 	memset(&si, 0, sizeof(si));
 	si.si_signo = SIGILL;
 	si.si_code = ILL_ILLOPC;
-	si.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
+	si.si_addr = (void __user *) (regs->cr_iip + ia64_psr(regs)->ri);
 	force_sig_info(SIGILL, &si, current);
 	rv.fkt = 0;
 	return rv;
@@ -460,18 +445,18 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 
 	      case 26: /* NaT Consumption */
 		if (user_mode(regs)) {
-			void *addr;
+			void __user *addr;
 
 			if (((isr >> 4) & 0xf) == 2) {
 				/* NaT page consumption */
 				sig = SIGSEGV;
 				code = SEGV_ACCERR;
-				addr = (void *) ifa;
+				addr = (void __user *) ifa;
 			} else {
 				/* register NaT consumption */
 				sig = SIGILL;
 				code = ILL_ILLOPN;
-				addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
+				addr = (void __user *) (regs->cr_iip + ia64_psr(regs)->ri);
 			}
 			siginfo.si_signo = sig;
 			siginfo.si_code = code;
@@ -492,7 +477,7 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 			siginfo.si_signo = SIGILL;
 			siginfo.si_code = ILL_ILLOPN;
 			siginfo.si_errno = 0;
-			siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
+			siginfo.si_addr = (void __user *) (regs->cr_iip + ia64_psr(regs)->ri);
 			siginfo.si_imm = vector;
 			siginfo.si_flags = __ISR_VALID;
 			siginfo.si_isr = isr;
@@ -537,13 +522,9 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		      case 35: siginfo.si_code = TRAP_BRANCH; ifa = 0; break;
 		      case 36: siginfo.si_code = TRAP_TRACE; ifa = 0; break;
 		}
-#ifdef	CONFIG_KDB
-		if (!user_mode(regs) && kdb(KDB_REASON_DEBUG, vector, regs))
-			return;	/* kdb handled this */
-#endif	/* CONFIG_KDB */
 		siginfo.si_signo = SIGTRAP;
 		siginfo.si_errno = 0;
-		siginfo.si_addr  = (void *) ifa;
+		siginfo.si_addr  = (void __user *) ifa;
 		siginfo.si_imm   = 0;
 		siginfo.si_flags = __ISR_VALID;
 		siginfo.si_isr   = isr;
@@ -557,7 +538,7 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 			siginfo.si_signo = SIGFPE;
 			siginfo.si_errno = 0;
 			siginfo.si_code = FPE_FLTINV;
-			siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
+			siginfo.si_addr = (void __user *) (regs->cr_iip + ia64_psr(regs)->ri);
 			siginfo.si_flags = __ISR_VALID;
 			siginfo.si_isr = isr;
 			siginfo.si_imm = 0;
@@ -584,7 +565,8 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 				siginfo.si_flags = 0;
 				siginfo.si_isr = 0;
 				siginfo.si_imm = 0;
-				siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
+				siginfo.si_addr = (void __user *)
+					(regs->cr_iip + ia64_psr(regs)->ri);
 				force_sig_info(SIGILL, &siginfo, current);
 				return;
 			}

@@ -17,7 +17,7 @@
 #include <asm/auxio.h>
 
 /* This cannot be static, as it is referenced in entry.S */
-unsigned long auxio_register = 0UL;
+void __iomem *auxio_register = 0UL;
 
 enum auxio_type {
 	AUXIO_TYPE_NODEV,
@@ -30,7 +30,7 @@ static spinlock_t auxio_lock = SPIN_LOCK_UNLOCKED;
 
 static void __auxio_sbus_set(u8 bits_on, u8 bits_off)
 {
-	if(auxio_register) {
+	if (auxio_register) {
 		unsigned char regval;
 		unsigned long flags;
 		unsigned char newval;
@@ -49,7 +49,7 @@ static void __auxio_sbus_set(u8 bits_on, u8 bits_off)
 
 static void __auxio_ebus_set(u8 bits_on, u8 bits_off)
 {
-	if(auxio_register) {
+	if (auxio_register) {
 		unsigned char regval;
 		unsigned long flags;
 		unsigned char newval;
@@ -126,7 +126,8 @@ found_sdev:
 	if (sdev) {
 		auxio_devtype  = AUXIO_TYPE_SBUS;
 		auxio_register = sbus_ioremap(&sdev->resource[0], 0,
-		  		sdev->reg_addrs[0].reg_size, "auxiliaryIO");
+					      sdev->reg_addrs[0].reg_size,
+					      "auxiliaryIO");
 	}
 #ifdef CONFIG_PCI
 	else {
@@ -142,7 +143,7 @@ found_sdev:
 	ebus_done:
 		if (edev) {
 			auxio_devtype  = AUXIO_TYPE_EBUS;
-			auxio_register = (unsigned long)
+			auxio_register =
 				ioremap(edev->resource[0].start, sizeof(u32));
 		}
 	}

@@ -217,8 +217,11 @@ int __init tx3912fb_init(void)
 {
 	u_long tx3912fb_paddr = 0;
 	int size = (info->var.bits_per_pixel == 8) ? 256 : 16;
+	char *option = NULL;
 
-	tx3912fb_setup(fb_get_options("tx3912fb"));
+	if (fb_get_options("tx3912fb", &option))
+		return -ENODEV;
+	tx3912fb_setup(option);
 
 	/* Disable the video logic */
 	outl(inl(TX3912_VIDEO_CTRL1) &

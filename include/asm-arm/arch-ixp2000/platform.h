@@ -16,10 +16,10 @@
 #ifndef __ASSEMBLY__
 
 /*
- * The IXP2400 B0 silicon contains an errata that causes writes to 
- * on-chip I/O register to not complete fully. What this means is
+ * The IXP2400 B0 silicon contains an erratum (#66) that causes writes
+ * to on-chip I/O register to not complete fully. What this means is
  * that if you have a write to on-chip I/O followed by a back-to-back
- * read or write, the first write will happend twice. OR...if it's
+ * read or write, the first write will happen twice. OR...if it's
  * not a back-to-back trasaction, the read or write will generate 
  * incorrect data.
  *
@@ -117,6 +117,7 @@ static inline unsigned int ixp2000_is_pcimaster(void)
 void ixp2000_map_io(void);
 void ixp2000_init_irq(void);
 void ixp2000_init_time(unsigned long);
+unsigned long ixp2000_gettimeoffset(void);
 
 struct pci_sys_data;
 

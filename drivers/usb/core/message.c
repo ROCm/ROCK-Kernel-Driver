@@ -17,6 +17,8 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/timer.h>
+#include <linux/ctype.h>
+#include <linux/device.h>
 #include <asm/byteorder.h>
 
 #include "hcd.h"	/* for usbcore internals */
@@ -32,10 +34,6 @@ static void timeout_kill(unsigned long data)
 {
 	struct urb	*urb = (struct urb *) data;
 
-	dev_warn(&urb->dev->dev, "%s timeout on ep%d%s\n",
-		usb_pipecontrol(urb->pipe) ? "control" : "bulk",
-		usb_pipeendpoint(urb->pipe),
-		usb_pipein(urb->pipe) ? "in" : "out");
 	usb_unlink_urb(urb);
 }
 
@@ -66,8 +64,14 @@ static int usb_start_wait_urb(struct urb *urb, int timeout, int* actual_length)
 		wait_for_completion(&done);
 		status = urb->status;
 		/* note:  HCDs return ETIMEDOUT for other reasons too */
-		if (status == -ECONNRESET)
+		if (status == -ECONNRESET) {
+			dev_warn(&urb->dev->dev,
+				"%s timed out on ep%d%s\n",
+				current->comm,
+				usb_pipeendpoint(urb->pipe),
+				usb_pipein(urb->pipe) ? "in" : "out");
 			status = -ETIMEDOUT;
+		}
 		if (timeout > 0)
 			del_timer_sync(&timer);
 	}
@@ -239,14 +243,16 @@ static void sg_complete (struct urb *urb, struct pt_regs *regs)
 		// BUG ();
 	}
 
-	if (urb->status && urb->status != -ECONNRESET) {
+	if (io->status == 0 && urb->status && urb->status != -ECONNRESET) {
 		int		i, found, status;
 
 		io->status = urb->status;
 
 		/* the previous urbs, and this one, completed already.
 		 * unlink pending urbs so they won't rx/tx bad data.
+		 * careful: unlink can sometimes be synchronous...
 		 */
+		spin_unlock (&io->lock);
 		for (i = 0, found = 0; i < io->entries; i++) {
 			if (!io->urbs [i] || !io->urbs [i]->dev)
 				continue;
@@ -259,6 +265,7 @@ static void sg_complete (struct urb *urb, struct pt_regs *regs)
 			} else if (urb == io->urbs [i])
 				found = 1;
 		}
+		spin_lock (&io->lock);
 	}
 	urb->dev = NULL;
 
@@ -520,6 +527,7 @@ void usb_sg_cancel (struct usb_sg_request *io)
 		int	i;
 
 		io->status = -ECONNRESET;
+		spin_unlock (&io->lock);
 		for (i = 0; i < io->entries; i++) {
 			int	retval;
 
@@ -530,6 +538,7 @@ void usb_sg_cancel (struct usb_sg_request *io)
 				dev_warn (&io->dev->dev, "%s, unlink --> %d\n",
 					__FUNCTION__, retval);
 		}
+		spin_lock (&io->lock);
 	}
 	spin_unlock_irqrestore (&io->lock, flags);
 }
@@ -547,8 +556,7 @@ void usb_sg_cancel (struct usb_sg_request *io)
  *
  * Gets a USB descriptor.  Convenience functions exist to simplify
  * getting some types of descriptors.  Use
- * usb_get_device_descriptor() for USB_DT_DEVICE (not exported),
- * and usb_get_string() or usb_string() for USB_DT_STRING.
+ * usb_get_string() or usb_string() for USB_DT_STRING.
  * Device (USB_DT_DEVICE) and configuration descriptors (USB_DT_CONFIG)
  * are part of the device structure.
  * In addition to a number of USB-standard descriptors, some
@@ -623,6 +631,20 @@ int usb_get_string(struct usb_device *dev, unsigned short langid,
 	return result;
 }
 
+static void usb_try_string_workarounds(unsigned char *buf, int *length)
+{
+	int newlength, oldlength = *length;
+
+	for (newlength = 2; newlength + 1 < oldlength; newlength += 2)
+		if (!isprint(buf[newlength]) || buf[newlength + 1])
+			break;
+
+	if (newlength > 2) {
+		buf[0] = newlength;
+		*length = newlength;
+	}
+}
+
 static int usb_string_sub(struct usb_device *dev, unsigned int langid,
 		unsigned int index, unsigned char *buf)
 {
@@ -634,19 +656,26 @@ static int usb_string_sub(struct usb_device *dev, unsigned int langid,
 
 	/* If that failed try to read the descriptor length, then
 	 * ask for just that many bytes */
-	if (rc < 0) {
+	if (rc < 2) {
 		rc = usb_get_string(dev, langid, index, buf, 2);
 		if (rc == 2)
 			rc = usb_get_string(dev, langid, index, buf, buf[0]);
 	}
 
-	if (rc >= 0) {
+	if (rc >= 2) {
+		if (!buf[0] && !buf[1])
+			usb_try_string_workarounds(buf, &rc);
+
 		/* There might be extra junk at the end of the descriptor */
 		if (buf[0] < rc)
 			rc = buf[0];
-		if (rc < 2)
-			rc = -EINVAL;
+
+		rc = rc - (rc & 1); /* force a multiple of two */
 	}
+
+	if (rc < 2)
+		rc = (rc < 0 ? rc : -EINVAL);
+
 	return rc;
 }
 
@@ -680,6 +709,8 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 	int err;
 	unsigned int u, idx;
 
+	if (dev->state == USB_STATE_SUSPENDED)
+		return -EHOSTUNREACH;
 	if (size <= 0 || !buf || !index)
 		return -EINVAL;
 	buf[0] = 0;
@@ -724,13 +755,16 @@ int usb_string(struct usb_device *dev, int index, char *buf, size_t size)
 	buf[idx] = 0;
 	err = idx;
 
+	if (tbuf[1] != USB_DT_STRING)
+		dev_dbg(&dev->dev, "wrong descriptor type %02x for string %d (\"%s\")\n", tbuf[1], index, buf);
+
  errout:
 	kfree(tbuf);
 	return err;
 }
 
-/**
- * usb_get_device_descriptor - (re)reads the device descriptor
+/*
+ * usb_get_device_descriptor - (re)reads the device descriptor (usbcore)
  * @dev: the device whose device descriptor is being updated
  * @size: how much of the descriptor to read
  * Context: !in_interrupt ()
@@ -797,9 +831,19 @@ int usb_get_device_descriptor(struct usb_device *dev, unsigned int size)
  */
 int usb_get_status(struct usb_device *dev, int type, int target, void *data)
 {
-	return usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-		USB_REQ_GET_STATUS, USB_DIR_IN | type, 0, target, data, 2,
-		HZ * USB_CTRL_GET_TIMEOUT);
+	int ret;
+	u16 *status = kmalloc(sizeof(*status), GFP_KERNEL);
+
+	if (!status)
+		return -ENOMEM;
+
+	ret = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
+		USB_REQ_GET_STATUS, USB_DIR_IN | type, 0, target, status,
+		sizeof(*status), HZ * USB_CTRL_GET_TIMEOUT);
+
+	*(u16 *)data = *status;
+	kfree(status);
+	return ret;
 }
 
 /**
@@ -1132,6 +1176,8 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate)
  * use usb_set_interface() on the interfaces it claims.  Resetting the whole
  * configuration would affect other drivers' interfaces.
  *
+ * The caller must own the device lock.
+ *
  * Returns zero on success, else a negative error code.
  */
 int usb_reset_configuration(struct usb_device *dev)
@@ -1142,9 +1188,9 @@ int usb_reset_configuration(struct usb_device *dev)
 	if (dev->state == USB_STATE_SUSPENDED)
 		return -EHOSTUNREACH;
 
-	/* caller must own dev->serialize (config won't change)
-	 * and the usb bus readlock (so driver bindings are stable);
-	 * so calls during probe() are fine
+	/* caller must have locked the device and must own
+	 * the usb bus readlock (so driver bindings are stable);
+	 * calls during probe() are fine
 	 */
 
 	for (i = 1; i < 16; ++i) {
@@ -1199,7 +1245,7 @@ static void release_interface(struct device *dev)
  * usb_set_configuration - Makes a particular device setting be current
  * @dev: the device whose configuration is being updated
  * @configuration: the configuration being chosen.
- * Context: !in_interrupt(), caller holds dev->serialize
+ * Context: !in_interrupt(), caller owns the device lock
  *
  * This is used to enable non-default device modes.  Not all devices
  * use this kind of configurability; many devices only have one
@@ -1220,8 +1266,8 @@ static void release_interface(struct device *dev)
  * usb_set_interface().
  *
  * This call is synchronous. The calling context must be able to sleep,
- * and must not hold the driver model lock for USB; usb device driver
- * probe() methods may not use this routine.
+ * must own the device lock, and must not hold the driver model's USB
+ * bus rwsem; usb device driver probe() methods cannot use this routine.
  *
  * Returns zero on success, or else the status code returned by the
  * underlying call that failed.  On succesful completion, each interface
@@ -1235,8 +1281,6 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 	struct usb_host_config *cp = NULL;
 	struct usb_interface **new_interfaces = NULL;
 	int n, nintf;
-
-	/* dev->serialize guards all config changes */
 
 	for (i = 0; i < dev->descriptor.bNumConfigurations; i++) {
 		if (dev->config[i].desc.bConfigurationValue == configuration) {

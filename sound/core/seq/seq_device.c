@@ -41,6 +41,7 @@
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/seq_device.h>
+#include <sound/seq_kernel.h>
 #include <sound/initval.h>
 #include <linux/kmod.h>
 #include <linux/slab.h>

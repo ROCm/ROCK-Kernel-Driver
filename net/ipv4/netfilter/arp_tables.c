@@ -395,7 +395,7 @@ static inline struct arpt_table *arpt_find_table_lock(const char *name, int *err
 	return find_inlist_lock(&arpt_tables, name, "arptable_", error, mutex);
 }
 
-struct arpt_target *arpt_find_target_lock(const char *name, int *error, struct semaphore *mutex)
+static struct arpt_target *arpt_find_target_lock(const char *name, int *error, struct semaphore *mutex)
 {
 	return find_inlist_lock(&arpt_target, name, "arpt_", error, mutex);
 }
@@ -1199,7 +1199,7 @@ int arpt_register_table(struct arpt_table *table)
 	/* save number of initial entries */
 	table->private->initial_entries = table->private->number;
 
-	table->lock = RW_LOCK_UNLOCKED;
+	rwlock_init(&table->lock);
 	list_prepend(&arpt_tables, table);
 
  unlock:
@@ -1325,7 +1325,6 @@ static void __exit fini(void)
 EXPORT_SYMBOL(arpt_register_table);
 EXPORT_SYMBOL(arpt_unregister_table);
 EXPORT_SYMBOL(arpt_do_table);
-EXPORT_SYMBOL(arpt_find_target_lock);
 EXPORT_SYMBOL(arpt_register_target);
 EXPORT_SYMBOL(arpt_unregister_target);
 

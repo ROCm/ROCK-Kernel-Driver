@@ -139,10 +139,7 @@ sclp_vt220_process_queue(struct sclp_vt220_request *request)
 	wake_up(&sclp_vt220_waitq);
 	/* Check if the tty needs a wake up call */
 	if (sclp_vt220_tty != NULL) {
-		if ((sclp_vt220_tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-		    (sclp_vt220_tty->ldisc.write_wakeup != NULL))
-			(sclp_vt220_tty->ldisc.write_wakeup)(sclp_vt220_tty);
-		wake_up_interruptible(&sclp_vt220_tty->write_wait);
+		tty_wakeup(sclp_vt220_tty);
 	}
 }
 
@@ -476,33 +473,9 @@ __sclp_vt220_write(const unsigned char *buf, int count, int do_schedule,
  * number of characters actually accepted for writing.
  */
 static int
-sclp_vt220_write(struct tty_struct *tty, int from_user,
-		 const unsigned char *buf, int count)
+sclp_vt220_write(struct tty_struct *tty, const unsigned char *buf, int count)
 {
-	int length;
-	int ret;
-
-	if (!from_user)
-		return __sclp_vt220_write(buf, count, 1, 0);
-	/* Use intermediate buffer to prevent calling copy_from_user() while
-	 * holding a lock. */
-	ret = 0;
-	while (count > 0) {
-		length = count < SCLP_VT220_BUF_SIZE ?
-			 count : SCLP_VT220_BUF_SIZE;
-		length -= copy_from_user(tty->driver_data,
-				(const unsigned char __user *)buf, length);
-		if (length == 0) {
-			if (!ret)
-				return -EFAULT;
-			break;
-		}
-		length = __sclp_vt220_write(tty->driver_data, length, 1, 0);
-		buf += length;
-		count -= length;
-		ret += length;
-	}
-	return ret;
+	return __sclp_vt220_write(buf, count, 1, 0);
 }
 
 #define SCLP_VT220_SESSION_ENDED	0x01

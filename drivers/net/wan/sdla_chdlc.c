@@ -3628,11 +3628,7 @@ static void tty_poll_work (void* data)
 	if ((tty=card->tty)==NULL)
 		return;
 	
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup){
-		(tty->ldisc.write_wakeup)(tty);
-	}
-	wake_up_interruptible(&tty->write_wait);
+	tty_wakeup(tty);
 #if defined(SERIAL_HAVE_POLL_WAIT)
 	wake_up_interruptible(&tty->poll_wait);
 #endif	
@@ -3743,8 +3739,7 @@ static int wanpipe_tty_open(struct tty_struct *tty, struct file * filp)
 	return 0;
 }
 
-static int wanpipe_tty_write(struct tty_struct * tty, int from_user,
-		    const unsigned char *buf, int count)
+static int wanpipe_tty_write(struct tty_struct * tty, const unsigned char *buf, int count)
 {
 	unsigned long smp_flags=0;
 	sdla_t *card=NULL;
@@ -3788,58 +3783,16 @@ static int wanpipe_tty_write(struct tty_struct * tty, int from_user,
 		return -EINVAL; 
 	}
 	
-	if (from_user) {
-		
-		unsigned char *tmp_buf;
-		
-		if ((tmp_buf=card->tty_buf)==NULL){
-			dbg_printk(KERN_INFO "No TTY BUF in Write\n");
-			
-			clear_bit(SEND_CRIT,(void*)&card->wandev.critical);
-			
-			if(card->hw.type != SDLA_S514)
-				s508_unlock(card,&smp_flags);
-			
-			return -ENOMEM;
-		}
-		
-		if (copy_from_user(tmp_buf,buf,count)){
-			dbg_printk(KERN_INFO "%s: Failed to copy from user!\n",
-					card->devname);
-			
-			clear_bit(SEND_CRIT,(void*)&card->wandev.critical);
-			
-			if(card->hw.type != SDLA_S514)
-				s508_unlock(card,&smp_flags);
-			
-			return -EINVAL;
-		}
+ 	if (chdlc_send(card,(void*)buf,count)){
+		dbg_printk(KERN_INFO "%s: Failed to send, retry later: kernel!\n",
+				card->devname);
+		clear_bit(SEND_CRIT,(void*)&card->wandev.critical);
 
-		if (chdlc_send(card,(void*)tmp_buf,count)){
-			dbg_printk(KERN_INFO "%s: Failed to send, retry later: user!\n",
-					card->devname);
-			
-			clear_bit(SEND_CRIT,(void*)&card->wandev.critical);
-			
-			wanpipe_tty_trigger_tx_irq(card);
-			
-			if(card->hw.type != SDLA_S514)
-				s508_unlock(card,&smp_flags);
-			return 0;
-		}
-
-	}else{
-	 	if (chdlc_send(card,(void*)buf,count)){
-			dbg_printk(KERN_INFO "%s: Failed to send, retry later: kernel!\n",
-					card->devname);
-			clear_bit(SEND_CRIT,(void*)&card->wandev.critical);
-	
-			wanpipe_tty_trigger_tx_irq(card);
-			
-			if(card->hw.type != SDLA_S514)
-				s508_unlock(card,&smp_flags);
-			return 0;
-		}
+		wanpipe_tty_trigger_tx_irq(card);
+		
+		if(card->hw.type != SDLA_S514)
+			s508_unlock(card,&smp_flags);
+		return 0;
 	}
 	dbg_printk(KERN_INFO "%s: Packet sent OK: %i\n",card->devname,count);
 	clear_bit(SEND_CRIT,(void*)&card->wandev.critical);
@@ -3857,6 +3810,7 @@ static void wanpipe_tty_receive(sdla_t *card, unsigned addr, unsigned int len)
 	char fp=0;
 	struct tty_struct *tty;
 	int i;
+	struct tty_ldisc *ld;
 	
 	if (!card->tty_open){
 		dbg_printk(KERN_INFO "%s: TTY not open during receive\n",
@@ -3944,8 +3898,11 @@ static void wanpipe_tty_receive(sdla_t *card, unsigned addr, unsigned int len)
 			len -= offset;
 		}
 		sdla_peek(&card->hw, addr, card->tty_rx+offset, len);
-		if (tty->ldisc.receive_buf){
-			tty->ldisc.receive_buf(tty,card->tty_rx,&fp,olen);
+		ld = tty_ldisc_ref(tty);
+		if (ld) {
+			if (ld->receive_buf)
+				ld->receive_buf(tty,card->tty_rx,&fp,olen);
+			tty_ldisc_deref(ld);
 		}else{
 			if (net_ratelimit()){
 				printk(KERN_INFO 
@@ -4252,14 +4209,10 @@ static void wanpipe_tty_flush_buffer(struct tty_struct *tty)
 	if (!tty)
 		return;
 	
-	wake_up_interruptible(&tty->write_wait);
 #if defined(SERIAL_HAVE_POLL_WAIT)
 	wake_up_interruptible(&tty->poll_wait);
 #endif
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
-
+	tty_wakeup(tty);
 	return;
 }
 

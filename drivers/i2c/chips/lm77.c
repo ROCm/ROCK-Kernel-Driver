@@ -34,10 +34,8 @@
 
 
 /* Addresses to scan */
-static unsigned short normal_i2c[] = { I2C_CLIENT_END };
-static unsigned short normal_i2c_range[] = { 0x48, 0x4b, I2C_CLIENT_END };
+static unsigned short normal_i2c[] = { 0x48, 0x49, 0x4a, 0x4b, I2C_CLIENT_END };
 static unsigned int normal_isa[] = { I2C_CLIENT_ISA_END };
-static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 
 /* Insmod parameters */
 SENSORS_INSMOD_1(lm77);
@@ -83,7 +81,7 @@ static struct i2c_driver lm77_driver = {
 	.detach_client	= lm77_detach_client,
 };
 
-static int lm77_id = 0;
+static int lm77_id;
 
 /* straight from the datasheet */
 #define LM77_TEMP_MIN (-55000)

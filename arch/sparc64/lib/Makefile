@@ -16,3 +16,5 @@ lib-y := PeeCeeI.o copy_page.o clear_page.o strlen.o strncmp.o \
 
 lib-$(CONFIG_DEBUG_SPINLOCK) += debuglocks.o
 lib-$(CONFIG_HAVE_DEC_LOCK) += dec_and_lock.o
+
+obj-y += iomap.o

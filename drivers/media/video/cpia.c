@@ -37,6 +37,7 @@
 #include <linux/proc_fs.h>
 #include <linux/ctype.h>
 #include <linux/pagemap.h>
+#include <linux/delay.h>
 #include <asm/io.h>
 #include <asm/semaphore.h>
 
@@ -215,20 +216,6 @@ static void set_flicker(struct cam_params *params, volatile u32 *command_flags,
  * Memory management
  *
  **********************************************************************/
-
-/* Here we want the physical address of the memory.
- * This is used when initializing the contents of the area.
- */
-static inline unsigned long kvirt_to_pa(unsigned long adr)
-{
-	unsigned long kva, ret;
-
-	kva = (unsigned long) page_address(vmalloc_to_page((void *)adr));
-	kva |= adr & (PAGE_SIZE-1); /* restore the offset */
-	ret = __pa(kva);
-	return ret;
-}
-
 static void *rvmalloc(unsigned long size)
 {
 	void *mem;
@@ -2886,9 +2873,7 @@ static int fetch_frame(void *data)
 				cond_resched();
 
 				/* sleep for 10 ms, hopefully ;) */
-				current->state = TASK_INTERRUPTIBLE;
-
-				schedule_timeout(10*HZ/1000);
+				msleep_interruptible(10);
 				if (signal_pending(current))
 					return -EINTR;
 
@@ -2951,8 +2936,7 @@ static int fetch_frame(void *data)
 		        		   CPIA_GRAB_SINGLE, 0, 0, 0);
 				/* FIXME: Trial & error - need up to 70ms for
 				   the grab mode change to complete ? */
-				current->state = TASK_INTERRUPTIBLE;
-				schedule_timeout(70*HZ / 1000);
+				msleep_interruptible(70);
 				if (signal_pending(current))
 					return -EINTR;
 			}
@@ -3003,8 +2987,7 @@ static int goto_high_power(struct cam_data *cam)
 {
 	if (do_command(cam, CPIA_COMMAND_GotoHiPower, 0, 0, 0, 0))
 		return -EIO;
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(40*HZ/1000);	/* windows driver does it too */
+	msleep_interruptible(40);	/* windows driver does it too */
 	if(signal_pending(current))
 		return -EINTR;
 	if (do_command(cam, CPIA_COMMAND_GetCameraStatus, 0, 0, 0, 0))
@@ -3074,10 +3057,8 @@ static int set_camera_state(struct cam_data *cam)
 	
 	/* Wait 6 frames for the sensor to get all settings and
 	   AEC/ACB to settle */
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout((6*(cam->params.sensorFps.baserate ? 33 : 40) *
-	                    (1 << cam->params.sensorFps.divisor) + 10) *
-			 HZ / 1000);
+	msleep_interruptible(6*(cam->params.sensorFps.baserate ? 33 : 40) *
+			       (1 << cam->params.sensorFps.divisor) + 10);
 
 	if(signal_pending(current))
 		return -EINTR;
@@ -3800,8 +3781,8 @@ static int cpia_mmap(struct file *file, struct vm_area_struct *vma)
 
 	pos = (unsigned long)(cam->frame_buf);
 	while (size > 0) {
-		page = kvirt_to_pa(pos);
-		if (remap_page_range(vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
+		page = vmalloc_to_pfn((void *)pos);
+		if (remap_pfn_range(vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
 			up(&cam->busy_lock);
 			return -EAGAIN;
 		}
@@ -4066,22 +4047,13 @@ static int __init cpia_init(void)
 	proc_cpia_create();
 #endif
 
-#ifdef CONFIG_KMOD
-#ifdef CONFIG_VIDEO_CPIA_PP_MODULE
-	request_module("cpia_pp");
-#endif
-
-#ifdef CONFIG_VIDEO_CPIA_USB_MODULE
-	request_module("cpia_usb");
-#endif
-#endif	/* CONFIG_KMOD */
-
 #ifdef CONFIG_VIDEO_CPIA_PP
 	cpia_pp_init();
 #endif
 #ifdef CONFIG_VIDEO_CPIA_USB
 	cpia_usb_init();
 #endif
+
 	return 0;
 }
 

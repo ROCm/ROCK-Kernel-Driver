@@ -52,7 +52,7 @@ FILEONLY *internalfunctions;
 FILEONLY *externalfunctions;
 FILEONLY *symbolsonly;
 
-typedef void FILELINE(char * file, char * line);
+typedef void FILELINE(char * file, signed char * line);
 FILELINE * singlefunctions;
 FILELINE * entity_system;
 
@@ -79,6 +79,7 @@ void exec_kernel_doc(char **svec)
 {
 	pid_t pid;
 	int ret;
+	char real_filename[PATH_MAX + 1];
 	/* Make sure output generated so far are flushed */
 	fflush(stdout);
 	switch(pid=fork()) {
@@ -86,8 +87,13 @@ void exec_kernel_doc(char **svec)
 			perror("fork");
 			exit(1);
 		case  0:
-			execvp(KERNELDOCPATH KERNELDOC, svec);
-			perror("exec " KERNELDOCPATH KERNELDOC);
+			memset(real_filename, 0, sizeof(real_filename));
+			strncat(real_filename, getenv("SRCTREE"), PATH_MAX);
+			strncat(real_filename, KERNELDOCPATH KERNELDOC,
+					PATH_MAX - strlen(real_filename));
+			execvp(real_filename, svec);
+			fprintf(stderr, "exec ");
+			perror(real_filename);
 			exit(1);
 		default:
 			waitpid(pid, &ret ,0);
@@ -142,9 +148,9 @@ struct symfile * filename_exist(char * filename)
  * Files are separated by tabs.
  */
 void adddep(char * file)		   { printf("\t%s", file); }
-void adddep2(char * file, char * line)     { line = line; adddep(file); }
+void adddep2(char * file, signed char * line)     { line = line; adddep(file); }
 void noaction(char * line)		   { line = line; }
-void noaction2(char * file, char * line)   { file = file; line = line; }
+void noaction2(char * file, signed char * line)   { file = file; line = line; }
 
 /* Echo the line without further action */
 void printline(char * line)               { printf("%s", line); }
@@ -160,16 +166,21 @@ void find_export_symbols(char * filename)
 	struct symfile *sym;
 	char line[MAXLINESZ];
 	if (filename_exist(filename) == NULL) {
+		char real_filename[PATH_MAX + 1];
+		memset(real_filename, 0, sizeof(real_filename));
+		strncat(real_filename, getenv("SRCTREE"), PATH_MAX);
+		strncat(real_filename, filename,
+				PATH_MAX - strlen(real_filename));
 		sym = add_new_file(filename);
-		fp = fopen(filename, "r");
+		fp = fopen(real_filename, "r");
 		if (fp == NULL)
 		{
 			fprintf(stderr, "docproc: ");
-			perror(filename);
+			perror(real_filename);
 		}
 		while(fgets(line, MAXLINESZ, fp)) {
-			char *p;
-			char *e;
+			signed char *p;
+			signed char *e;
 			if (((p = strstr(line, "EXPORT_SYMBOL_GPL")) != 0) ||
                             ((p = strstr(line, "EXPORT_SYMBOL")) != 0)) {
 				/* Skip EXPORT_SYMBOL{_GPL} */
@@ -242,7 +253,7 @@ void extfunc(char * filename) { docfunctions(filename, FUNCTION);   }
  * Call kernel-doc with the following parameters:
  * kernel-doc -docbook -function function1 [-function function2]
  */
-void singfunc(char * filename, char * line)
+void singfunc(char * filename, signed char * line)
 {
 	char *vec[200]; /* Enough for specific functions */
         int i, idx = 0;
@@ -279,7 +290,7 @@ void singfunc(char * filename, char * line)
 void parse_file(FILE *infile)
 {
 	char line[MAXLINESZ];
-	char * s;
+	signed char * s;
 	while(fgets(line, MAXLINESZ, infile)) {
 		if (line[0] == '!') {
 			s = line + 2;

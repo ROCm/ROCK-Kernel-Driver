@@ -29,17 +29,12 @@
 #include <linux/cache.h>
 #include <linux/delay.h>
 #include <linux/efi.h>
+#include <linux/bitops.h>
 
 #include <asm/atomic.h>
-#include <asm/bitops.h>
 #include <asm/current.h>
 #include <asm/delay.h>
 #include <asm/machvec.h>
-
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
-
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/page.h>
@@ -71,9 +66,6 @@ static volatile struct call_data_struct *call_data;
 
 #define IPI_CALL_FUNC		0
 #define IPI_CPU_STOP		1
-#ifdef	CONFIG_KDB
-#define IPI_KDB_INTERRUPT	2
-#endif	/* CONFIG_KDB */
 
 /* This needs to be cacheline aligned because it is written to by *other* CPUs.  */
 static DEFINE_PER_CPU(u64, ipi_operation) ____cacheline_aligned;
@@ -164,13 +156,6 @@ handle_IPI (int irq, void *dev_id, struct pt_regs *regs)
 				stop_this_cpu();
 				break;
 
-#ifdef CONFIG_KDB
-			      case IPI_KDB_INTERRUPT:
-				if (!kdb_ipi(regs, NULL))
-					printk(KERN_ERR "kdb_ipi() rejected IPI_KDB_INTERRUPT\n");
-				break;
-#endif
-
 			      default:
 				printk(KERN_CRIT "Unknown IPI on CPU %d: %lu\n", this_cpu, which);
 				break;
@@ -240,7 +225,7 @@ smp_send_reschedule (int cpu)
 void
 smp_flush_tlb_all (void)
 {
-	on_each_cpu((void (*)(void *))local_flush_tlb_all, 0, 1, 1);
+	on_each_cpu((void (*)(void *))local_flush_tlb_all, NULL, 1, 1);
 }
 EXPORT_SYMBOL(smp_flush_tlb_all);
 
@@ -305,11 +290,11 @@ smp_call_function_single (int cpuid, void (*func) (void *info), void *info, int 
 
 	/* Wait for response */
 	while (atomic_read(&data.started) != cpus)
-		barrier();
+		cpu_relax();
 
 	if (wait)
 		while (atomic_read(&data.finished) != cpus)
-			barrier();
+			cpu_relax();
 	call_data = NULL;
 
 	spin_unlock_bh(&call_lock);
@@ -364,11 +349,11 @@ smp_call_function (void (*func) (void *info), void *info, int nonatomic, int wai
 
 	/* Wait for response */
 	while (atomic_read(&data.started) != cpus)
-		barrier();
+		cpu_relax();
 
 	if (wait)
 		while (atomic_read(&data.finished) != cpus)
-			barrier();
+			cpu_relax();
 	call_data = NULL;
 
 	spin_unlock(&call_lock);
@@ -390,12 +375,3 @@ setup_profiling_timer (unsigned int multiplier)
 {
 	return -EINVAL;
 }
-
-#if defined(CONFIG_KDB)
-void
-smp_kdb_stop(void)
-{
-	if (!KDB_FLAG(NOIPI))
-		send_IPI_allbutself(IPI_KDB_INTERRUPT);
-}
-#endif	/* CONFIG_KDB */

@@ -33,9 +33,9 @@
 
 #define SUN4M_IOBASE_VADDR	0xfd000000 /* Base for mapping pages */
 #define IOBASE_VADDR		0xfe000000
-#define IOBASE_END		0xfe300000
+#define IOBASE_END		0xfe600000
 
-#define VMALLOC_START		0xfe300000
+#define VMALLOC_START		0xfe600000
 
 /* XXX Alter this when I get around to fixing sun4c - Anton */
 #define VMALLOC_END		0xffc00000

@@ -76,17 +76,6 @@ config HOTPLUG_PCI_IBM
 
 	  When in doubt, say N.
 
-config HOTPLUG_PCI_AMD
-	tristate "AMD Standard Hot Plug Controller (SHPC) driver"
-	depends on HOTPLUG_PCI && X86
-	help
-	  Say Y here if you have a motherboard with an AMD Standard HotPlug Controller.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called amdshpc.
-
-	  When in doubt, say N.
-
 config HOTPLUG_PCI_ACPI
 	tristate "ACPI PCI Hotplug driver"
 	depends on ACPI_BUS && HOTPLUG_PCI

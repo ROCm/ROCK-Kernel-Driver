@@ -71,7 +71,7 @@ typedef struct card_t {
 	int n_ports;		/* 1, 2 or 4 ports */
 	u8 irq;
 
-	u8 *plx;		/* PLX PCI9060 virtual base address */
+	u8 __iomem *plx;	/* PLX PCI9060 virtual base address */
 	struct pci_dev *pdev;	/* for pdev->slot_name */
 	int rx_in;
 	struct sk_buff *rx_skbs[RX_QUEUE_LENGTH];
@@ -224,8 +224,6 @@ static inline void wanxl_rx_intr(card_t *card)
 #endif
 				stats->rx_packets++;
 				stats->rx_bytes += skb->len;
-				skb->mac.raw = skb->data;
-				skb->dev = dev;
 				dev->last_rx = jiffies;
 				skb->protocol = hdlc_type_trans(skb, dev);
 				netif_rx(skb);
@@ -399,7 +397,7 @@ static int wanxl_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 static int wanxl_open(struct net_device *dev)
 {
 	port_t *port = dev_to_port(dev);
-	u8 *dbr = port->card->plx + PLX_DOORBELL_TO_CARD;
+	u8 __iomem *dbr = port->card->plx + PLX_DOORBELL_TO_CARD;
 	unsigned long timeout;
 	int i;
 
@@ -562,7 +560,7 @@ static int __devinit wanxl_pci_init_one(struct pci_dev *pdev,
 	unsigned long timeout;
 	u32 plx_phy;		/* PLX PCI base address */
 	u32 mem_phy;		/* memory PCI base addr */
-	u8 *mem;		/* memory virtual base addr */
+	u8 __iomem *mem;	/* memory virtual base addr */
 	int i, ports, alloc_size;
 
 #ifndef MODULE

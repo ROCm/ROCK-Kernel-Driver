@@ -21,14 +21,6 @@
 
 #include <linux/config.h>
 
-#define ERASEQ_MAGIC	0xFA67
-typedef struct eraseq_t {
-    u_short		eraseq_magic;
-    client_handle_t	handle;
-    int			count;
-    eraseq_entry_t	*entry;
-} eraseq_t;
-
 #define CLIENT_MAGIC 	0x51E6
 typedef struct client_t {
     u_short		client_magic;
@@ -42,9 +34,6 @@ typedef struct client_t {
 			 event_callback_args_t *);
     event_callback_args_t event_callback_args;
     struct client_t 	*next;
-    u_int		mtd_count;
-    wait_queue_head_t	mtd_req;
-    erase_busy_t	erase_busy;
 } client_t;
 
 /* Flags in client state */
@@ -157,27 +146,7 @@ void write_cis_mem(struct pcmcia_socket *s, int attr,
 void release_cis_mem(struct pcmcia_socket *s);
 void destroy_cis_cache(struct pcmcia_socket *s);
 int verify_cis_cache(struct pcmcia_socket *s);
-void preload_cis_cache(struct pcmcia_socket *s);
-int get_first_tuple(client_handle_t handle, tuple_t *tuple);
-int get_next_tuple(client_handle_t handle, tuple_t *tuple);
-int get_tuple_data(client_handle_t handle, tuple_t *tuple);
-int parse_tuple(client_handle_t handle, tuple_t *tuple, cisparse_t *parse);
-int validate_cis(client_handle_t handle, cisinfo_t *info);
-int replace_cis(client_handle_t handle, cisdump_t *cis);
-int read_tuple(client_handle_t handle, cisdata_t code, void *parse);
-
-/* In bulkmem.c */
-int get_first_region(client_handle_t handle, region_info_t *rgn);
-int get_next_region(client_handle_t handle, region_info_t *rgn);
-int register_mtd(client_handle_t handle, mtd_reg_t *reg);
-int register_erase_queue(client_handle_t *handle, eraseq_hdr_t *header);
-int deregister_erase_queue(eraseq_handle_t eraseq);
-int check_erase_queue(eraseq_handle_t eraseq);
-int open_memory(client_handle_t *handle, open_mem_t *open);
-int close_memory(memory_handle_t handle);
-int read_memory(memory_handle_t handle, mem_op_t *req, caddr_t buf);
-int write_memory(memory_handle_t handle, mem_op_t *req, caddr_t buf);
-int copy_memory(memory_handle_t handle, copy_op_t *req);
+int pccard_read_tuple(struct pcmcia_socket *s, unsigned int function, cisdata_t code, void *parse);
 
 /* In rsrc_mgr */
 void pcmcia_validate_mem(struct pcmcia_socket *s);
@@ -198,6 +167,11 @@ extern struct class_interface pccard_sysfs_interface;
 /* In cs.c */
 extern struct rw_semaphore pcmcia_socket_list_rwsem;
 extern struct list_head pcmcia_socket_list;
+int pcmcia_get_window(struct pcmcia_socket *s, window_handle_t *handle, int idx, win_req_t *req);
+int pccard_get_configuration_info(struct pcmcia_socket *s, unsigned int function, config_info_t *config);
+int pccard_reset_card(struct pcmcia_socket *skt);
+int pccard_get_status(struct pcmcia_socket *s, unsigned int function, cs_status_t *status);
+int pccard_access_configuration_register(struct pcmcia_socket *s, unsigned int function, conf_reg_t *reg);
 
 #define cs_socket_name(skt)	((skt)->dev.class_id)
 

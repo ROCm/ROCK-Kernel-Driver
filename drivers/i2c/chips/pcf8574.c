@@ -42,10 +42,10 @@
 #include <linux/i2c-sensor.h>
 
 /* Addresses to scan */
-static unsigned short normal_i2c[] = { I2C_CLIENT_END };
-static unsigned short normal_i2c_range[] = { 0x20, 0x27, 0x38, 0x3f, I2C_CLIENT_END };
+static unsigned short normal_i2c[] = { 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
+					0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f,
+					I2C_CLIENT_END };
 static unsigned int normal_isa[] = { I2C_CLIENT_ISA_END };
-static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 
 /* Insmod parameters */
 SENSORS_INSMOD_2(pcf8574, pcf8574a);
@@ -77,7 +77,7 @@ static struct i2c_driver pcf8574_driver = {
 	.detach_client	= pcf8574_detach_client,
 };
 
-static int pcf8574_id = 0;
+static int pcf8574_id;
 
 /* following are the sysfs callback functions */
 static ssize_t show_read(struct device *dev, char *buf)

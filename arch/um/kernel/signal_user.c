@@ -57,6 +57,10 @@ int change_sig(int signal, int on)
 	return(!sigismember(&old, signal));
 }
 
+/* Both here and in set/get_signal we don't touch SIGPROF, because we must not
+ * disable profiling; it's safe because the profiling code does not interact
+ * with the kernel code at all.*/
+
 static void change_signals(int type)
 {
 	sigset_t mask;
@@ -65,7 +69,6 @@ static void change_signals(int type)
 	sigaddset(&mask, SIGVTALRM);
 	sigaddset(&mask, SIGALRM);
 	sigaddset(&mask, SIGIO);
-	sigaddset(&mask, SIGPROF);
 	if(sigprocmask(type, &mask, NULL) < 0)
 		panic("Failed to change signal mask - errno = %d", errno);
 }
@@ -80,23 +83,22 @@ void unblock_signals(void)
 	change_signals(SIG_UNBLOCK);
 }
 
+/* These are the asynchronous signals.  SIGVTALRM and SIGARLM are handled
+ * together under SIGVTALRM_BIT.  SIGPROF is excluded because we want to
+ * be able to profile all of UML, not just the non-critical sections.  If
+ * profiling is not thread-safe, then that is not my problem.  We can disable
+ * profiling when SMP is enabled in that case.
+ */
 #define SIGIO_BIT 0
 #define SIGVTALRM_BIT 1
-#define SIGPROF_BIT 2
 
-/*
- * Inverts the signal mask:
- * @mask: a sigset_t* point to the mask of blocked signals.
- * Returns a mask (of different type) of *unblocked* signals.
- */
-static inline int enable_mask(const sigset_t *mask)
+static int enable_mask(sigset_t *mask)
 {
 	int sigs;
 
 	sigs = sigismember(mask, SIGIO) ? 0 : 1 << SIGIO_BIT;
 	sigs |= sigismember(mask, SIGVTALRM) ? 0 : 1 << SIGVTALRM_BIT;
 	sigs |= sigismember(mask, SIGALRM) ? 0 : 1 << SIGVTALRM_BIT;
-	sigs |= sigismember(mask, SIGPROF) ? 0 : 1 << SIGPROF_BIT;
 	return(sigs);
 }
 
@@ -109,22 +111,18 @@ int get_signals(void)
 	return(enable_mask(&mask));
 }
 
-/* Returns the old mask of the old active signals (not sigset_t, but
- * suitable for set_signals.*/
 int set_signals(int enable)
 {
 	sigset_t mask;
 	int ret;
 
 	sigemptyset(&mask);
-	if(enable & (1 << SIGIO_BIT))
+	if(enable & (1 << SIGIO_BIT)) 
 		sigaddset(&mask, SIGIO);
 	if(enable & (1 << SIGVTALRM_BIT)){
 		sigaddset(&mask, SIGVTALRM);
 		sigaddset(&mask, SIGALRM);
 	}
-	if(enable & (1 << SIGPROF_BIT))
-		sigaddset(&mask, SIGPROF);
 
 	/* This is safe - sigprocmask is guaranteed to copy locally the
 	 * value of new_set, do his work and then, at the end, write to

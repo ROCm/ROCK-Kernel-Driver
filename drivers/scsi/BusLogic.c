@@ -47,14 +47,19 @@
 #include <asm/io.h>
 #include <asm/system.h>
 
-#include "scsi.h"
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
+#include <scsi/scsi_tcq.h>
 #include "BusLogic.h"
 #include "FlashPoint.c"
 
 #ifndef FAILURE
 #define FAILURE (-1)
 #endif
+
+static struct scsi_host_template Bus_Logic_template;
 
 /*
   BusLogic_DriverOptionsCount is a count of the number of BusLogic Driver
@@ -81,7 +86,7 @@ static struct BusLogic_DriverOptions BusLogic_DriverOptions[BusLogic_MaxHostAdap
 MODULE_LICENSE("GPL");
 #ifdef MODULE
 static char *BusLogic;
-MODULE_PARM(BusLogic, "s");
+module_param(BusLogic, charp, 0);
 #endif
 
 
@@ -100,15 +105,7 @@ static struct BusLogic_ProbeOptions BusLogic_ProbeOptions;
 
 static struct BusLogic_GlobalOptions BusLogic_GlobalOptions;
 
-
-/*
-  BusLogic_FirstRegisteredHostAdapter and BusLogic_LastRegisteredHostAdapter
-  are pointers to the first and last registered BusLogic Host Adapters.
-*/
-
-static struct BusLogic_HostAdapter *BusLogic_FirstRegisteredHostAdapter;
-static struct BusLogic_HostAdapter *BusLogic_LastRegisteredHostAdapter;
-
+static LIST_HEAD(BusLogic_host_list);
 
 /*
   BusLogic_ProbeInfoCount is the number of entries in BusLogic_ProbeInfoList.
@@ -157,47 +154,6 @@ static const char *BusLogic_DriverInfo(struct Scsi_Host *Host)
 	struct BusLogic_HostAdapter *HostAdapter = (struct BusLogic_HostAdapter *) Host->hostdata;
 	return HostAdapter->FullModelName;
 }
-
-
-/*
-  BusLogic_RegisterHostAdapter adds Host Adapter to the list of registered
-  BusLogic Host Adapters.
-*/
-
-static void __init BusLogic_RegisterHostAdapter(struct BusLogic_HostAdapter *HostAdapter)
-{
-	HostAdapter->Next = NULL;
-	if (BusLogic_FirstRegisteredHostAdapter == NULL) {
-		BusLogic_FirstRegisteredHostAdapter = HostAdapter;
-		BusLogic_LastRegisteredHostAdapter = HostAdapter;
-	} else {
-		BusLogic_LastRegisteredHostAdapter->Next = HostAdapter;
-		BusLogic_LastRegisteredHostAdapter = HostAdapter;
-	}
-}
-
-
-/*
-  BusLogic_UnregisterHostAdapter removes Host Adapter from the list of
-  registered BusLogic Host Adapters.
-*/
-
-static void BusLogic_UnregisterHostAdapter(struct BusLogic_HostAdapter *HostAdapter)
-{
-	if (HostAdapter == BusLogic_FirstRegisteredHostAdapter) {
-		BusLogic_FirstRegisteredHostAdapter = BusLogic_FirstRegisteredHostAdapter->Next;
-		if (HostAdapter == BusLogic_LastRegisteredHostAdapter)
-			BusLogic_LastRegisteredHostAdapter = NULL;
-	} else {
-		struct BusLogic_HostAdapter *PreviousHostAdapter = BusLogic_FirstRegisteredHostAdapter;
-		while (PreviousHostAdapter != NULL && PreviousHostAdapter->Next != HostAdapter)
-			PreviousHostAdapter = PreviousHostAdapter->Next;
-		if (PreviousHostAdapter != NULL)
-			PreviousHostAdapter->Next = HostAdapter->Next;
-	}
-	HostAdapter->Next = NULL;
-}
-
 
 /*
   BusLogic_InitializeCCBs initializes a group of Command Control Blocks (CCBs)
@@ -347,12 +303,19 @@ static struct BusLogic_CCB *BusLogic_AllocateCCB(struct BusLogic_HostAdapter
 static void BusLogic_DeallocateCCB(struct BusLogic_CCB *CCB)
 {
 	struct BusLogic_HostAdapter *HostAdapter = CCB->HostAdapter;
-	if (CCB->Command->use_sg != 0) {
-		pci_unmap_sg(HostAdapter->PCI_Device, (struct scatterlist *) CCB->Command->request_buffer, CCB->Command->use_sg, scsi_to_pci_dma_dir(CCB->Command->sc_data_direction));
-	} else if (CCB->Command->request_bufflen != 0) {
-		pci_unmap_single(HostAdapter->PCI_Device, CCB->DataPointer, CCB->DataLength, scsi_to_pci_dma_dir(CCB->Command->sc_data_direction));
+	struct scsi_cmnd *cmd = CCB->Command;
+
+	if (cmd->use_sg != 0) {
+		pci_unmap_sg(HostAdapter->PCI_Device,
+				(struct scatterlist *)cmd->request_buffer,
+				cmd->use_sg, cmd->sc_data_direction);
+	} else if (cmd->request_bufflen != 0) {
+		pci_unmap_single(HostAdapter->PCI_Device, CCB->DataPointer,
+				CCB->DataLength, cmd->sc_data_direction);
 	}
-	pci_unmap_single(HostAdapter->PCI_Device, CCB->SenseDataPointer, CCB->SenseDataLength, PCI_DMA_FROMDEVICE);
+	pci_unmap_single(HostAdapter->PCI_Device, CCB->SenseDataPointer,
+			CCB->SenseDataLength, PCI_DMA_FROMDEVICE);
+
 	CCB->Command = NULL;
 	CCB->Status = BusLogic_CCB_Free;
 	CCB->Next = HostAdapter->Free_CCBs;
@@ -2208,17 +2171,23 @@ static int BusLogic_SlaveConfigure(struct scsi_device *Device)
   registered.
 */
 
-static int __init BusLogic_DetectHostAdapter(struct scsi_host_template *HostTemplate)
+static int __init BusLogic_init(void)
 {
 	int BusLogicHostAdapterCount = 0, DriverOptionsIndex = 0, ProbeIndex;
 	struct BusLogic_HostAdapter *PrototypeHostAdapter;
+
+#ifdef MODULE
+	if (BusLogic)
+		BusLogic_Setup(BusLogic);
+#endif
+
 	if (BusLogic_ProbeOptions.NoProbe)
-		return 0;
+		return -ENODEV;
 	BusLogic_ProbeInfoList = (struct BusLogic_ProbeInfo *)
 	    kmalloc(BusLogic_MaxHostAdapters * sizeof(struct BusLogic_ProbeInfo), GFP_ATOMIC);
 	if (BusLogic_ProbeInfoList == NULL) {
 		BusLogic_Error("BusLogic: Unable to allocate Probe Info List\n", NULL);
-		return 0;
+		return -ENOMEM;
 	}
 	memset(BusLogic_ProbeInfoList, 0, BusLogic_MaxHostAdapters * sizeof(struct BusLogic_ProbeInfo));
 	PrototypeHostAdapter = (struct BusLogic_HostAdapter *)
@@ -2226,7 +2195,7 @@ static int __init BusLogic_DetectHostAdapter(struct scsi_host_template *HostTemp
 	if (PrototypeHostAdapter == NULL) {
 		kfree(BusLogic_ProbeInfoList);
 		BusLogic_Error("BusLogic: Unable to allocate Prototype " "Host Adapter\n", NULL);
-		return 0;
+		return -ENOMEM;
 	}
 	memset(PrototypeHostAdapter, 0, sizeof(struct BusLogic_HostAdapter));
 #ifdef MODULE
@@ -2289,7 +2258,7 @@ static int __init BusLogic_DetectHostAdapter(struct scsi_host_template *HostTemp
 		   Register the SCSI Host structure.
 		 */
 
-		Host = scsi_host_alloc(HostTemplate, sizeof(struct BusLogic_HostAdapter));
+		Host = scsi_host_alloc(&Bus_Logic_template, sizeof(struct BusLogic_HostAdapter));
 		if (Host == NULL) {
 			release_region(HostAdapter->IO_Address, HostAdapter->AddressCount);
 			continue;
@@ -2302,7 +2271,8 @@ static int __init BusLogic_DetectHostAdapter(struct scsi_host_template *HostTemp
 		   Add Host Adapter to the end of the list of registered BusLogic
 		   Host Adapters.
 		 */
-		BusLogic_RegisterHostAdapter(HostAdapter);
+		list_add_tail(&HostAdapter->host_list, &BusLogic_host_list);
+
 		/*
 		   Read the Host Adapter Configuration, Configure the Host Adapter,
 		   Acquire the System Resources necessary to use the Host Adapter, then
@@ -2322,7 +2292,7 @@ static int __init BusLogic_DetectHostAdapter(struct scsi_host_template *HostTemp
 				printk(KERN_WARNING "BusLogic: Release and re-register of " "port 0x%04lx failed \n", (unsigned long) HostAdapter->IO_Address);
 				BusLogic_DestroyCCBs(HostAdapter);
 				BusLogic_ReleaseResources(HostAdapter);
-				BusLogic_UnregisterHostAdapter(HostAdapter);
+				list_del(&HostAdapter->host_list);
 				scsi_host_put(Host);
 			} else {
 				BusLogic_InitializeHostStructure(HostAdapter, Host);
@@ -2341,14 +2311,14 @@ static int __init BusLogic_DetectHostAdapter(struct scsi_host_template *HostTemp
 			 */
 			BusLogic_DestroyCCBs(HostAdapter);
 			BusLogic_ReleaseResources(HostAdapter);
-			BusLogic_UnregisterHostAdapter(HostAdapter);
+			list_del(&HostAdapter->host_list);
 			scsi_host_put(Host);
 		}
 	}
 	kfree(PrototypeHostAdapter);
 	kfree(BusLogic_ProbeInfoList);
 	BusLogic_ProbeInfoList = NULL;
-	return BusLogicHostAdapterCount;
+	return 0;
 }
 
 
@@ -2358,9 +2328,12 @@ static int __init BusLogic_DetectHostAdapter(struct scsi_host_template *HostTemp
   unregisters the BusLogic Host Adapter.
 */
 
-static int __exit BusLogic_ReleaseHostAdapter(struct Scsi_Host *Host)
+static int __exit BusLogic_ReleaseHostAdapter(struct BusLogic_HostAdapter *HostAdapter)
 {
-	struct BusLogic_HostAdapter *HostAdapter = (struct BusLogic_HostAdapter *) Host->hostdata;
+	struct Scsi_Host *Host = HostAdapter->SCSI_Host;
+
+	scsi_remove_host(Host);
+
 	/*
 	   FlashPoint Host Adapters must first be released by the FlashPoint
 	   SCCB Manager.
@@ -2380,7 +2353,9 @@ static int __exit BusLogic_ReleaseHostAdapter(struct Scsi_Host *Host)
 	/*
 	   Remove Host Adapter from the list of registered BusLogic Host Adapters.
 	 */
-	BusLogic_UnregisterHostAdapter(HostAdapter);
+	list_del(&HostAdapter->host_list);
+
+	scsi_host_put(Host);
 	return 0;
 }
 
@@ -2656,7 +2631,7 @@ static irqreturn_t BusLogic_InterruptHandler(int IRQ_Channel, void *DeviceIdenti
 	/*
 	   Acquire exclusive access to Host Adapter.
 	 */
-	BusLogic_AcquireHostAdapterLockIH(HostAdapter, &ProcessorFlags);
+	spin_lock_irqsave(HostAdapter->SCSI_Host->host_lock, ProcessorFlags);
 	/*
 	   Handle Interrupts appropriately for each Host Adapter type.
 	 */
@@ -2724,7 +2699,7 @@ static irqreturn_t BusLogic_InterruptHandler(int IRQ_Channel, void *DeviceIdenti
 	/*
 	   Release exclusive access to Host Adapter.
 	 */
-	BusLogic_ReleaseHostAdapterLockIH(HostAdapter, &ProcessorFlags);
+	spin_unlock_irqrestore(HostAdapter->SCSI_Host->host_lock, ProcessorFlags);
 	return IRQ_HANDLED;
 }
 
@@ -2765,7 +2740,7 @@ static boolean BusLogic_WriteOutgoingMailbox(struct BusLogic_HostAdapter
 
 /* Error Handling (EH) support */
 
-static int BusLogic_host_reset(Scsi_Cmnd * SCpnt)
+static int BusLogic_host_reset(struct scsi_cmnd * SCpnt)
 {
 	struct BusLogic_HostAdapter *HostAdapter = (struct BusLogic_HostAdapter *) SCpnt->device->host->hostdata;
 
@@ -2812,9 +2787,9 @@ static int BusLogic_QueueCommand(struct scsi_cmnd *Command, void (*CompletionRou
 	 */
 	CCB = BusLogic_AllocateCCB(HostAdapter);
 	if (CCB == NULL) {
-		BusLogic_ReleaseHostAdapterLock(HostAdapter);
+		spin_unlock_irq(HostAdapter->SCSI_Host->host_lock);
 		BusLogic_Delay(1);
-		BusLogic_AcquireHostAdapterLock(HostAdapter);
+		spin_lock_irq(HostAdapter->SCSI_Host->host_lock);
 		CCB = BusLogic_AllocateCCB(HostAdapter);
 		if (CCB == NULL) {
 			Command->result = DID_ERROR << 16;
@@ -2828,12 +2803,15 @@ static int BusLogic_QueueCommand(struct scsi_cmnd *Command, void (*CompletionRou
 	if (SegmentCount == 0 && BufferLength != 0) {
 		CCB->Opcode = BusLogic_InitiatorCCB;
 		CCB->DataLength = BufferLength;
-		CCB->DataPointer = pci_map_single(HostAdapter->PCI_Device, BufferPointer, BufferLength, scsi_to_pci_dma_dir(Command->sc_data_direction));
+		CCB->DataPointer = pci_map_single(HostAdapter->PCI_Device,
+				BufferPointer, BufferLength,
+				Command->sc_data_direction);
 	} else if (SegmentCount != 0) {
 		struct scatterlist *ScatterList = (struct scatterlist *) BufferPointer;
 		int Segment, Count;
 
-		Count = pci_map_sg(HostAdapter->PCI_Device, ScatterList, SegmentCount, scsi_to_pci_dma_dir(Command->sc_data_direction));
+		Count = pci_map_sg(HostAdapter->PCI_Device, ScatterList, SegmentCount,
+				Command->sc_data_direction);
 		CCB->Opcode = BusLogic_InitiatorCCB_ScatterGather;
 		CCB->DataLength = Count * sizeof(struct BusLogic_ScatterGatherSegment);
 		if (BusLogic_MultiMasterHostAdapterP(HostAdapter))
@@ -2938,10 +2916,10 @@ static int BusLogic_QueueCommand(struct scsi_cmnd *Command, void (*CompletionRou
 		   error as a Host Adapter Hard Reset should be initiated soon.
 		 */
 		if (!BusLogic_WriteOutgoingMailbox(HostAdapter, BusLogic_MailboxStartCommand, CCB)) {
-			BusLogic_ReleaseHostAdapterLock(HostAdapter);
+			spin_unlock_irq(HostAdapter->SCSI_Host->host_lock);
 			BusLogic_Warning("Unable to write Outgoing Mailbox - " "Pausing for 1 second\n", HostAdapter);
 			BusLogic_Delay(1);
-			BusLogic_AcquireHostAdapterLock(HostAdapter);
+			spin_lock_irq(HostAdapter->SCSI_Host->host_lock);
 			if (!BusLogic_WriteOutgoingMailbox(HostAdapter, BusLogic_MailboxStartCommand, CCB)) {
 				BusLogic_Warning("Still unable to write Outgoing Mailbox - " "Host Adapter Dead?\n", HostAdapter);
 				BusLogic_DeallocateCCB(CCB);
@@ -3079,9 +3057,9 @@ static int BusLogic_ResetHostAdapter(struct BusLogic_HostAdapter *HostAdapter, b
 	 */
 
 	if (HardReset) {
-		BusLogic_ReleaseHostAdapterLock(HostAdapter);
+		spin_unlock_irq(HostAdapter->SCSI_Host->host_lock);
 		BusLogic_Delay(HostAdapter->BusSettleTime);
-		BusLogic_AcquireHostAdapterLock(HostAdapter);
+		spin_lock_irq(HostAdapter->SCSI_Host->host_lock);
 	}
 
 	for (TargetID = 0; TargetID < HostAdapter->MaxTargetDevices; TargetID++) {
@@ -3181,17 +3159,11 @@ static int BusLogic_BIOSDiskParameters(struct scsi_device *sdev, struct block_de
 
 static int BusLogic_ProcDirectoryInfo(struct Scsi_Host *shost, char *ProcBuffer, char **StartPointer, off_t Offset, int BytesAvailable, int WriteFlag)
 {
-	struct BusLogic_HostAdapter *HostAdapter;
+	struct BusLogic_HostAdapter *HostAdapter = (struct BusLogic_HostAdapter *) shost->hostdata;
 	struct BusLogic_TargetStatistics *TargetStatistics;
 	int TargetID, Length;
 	char *Buffer;
-	for (HostAdapter = BusLogic_FirstRegisteredHostAdapter; HostAdapter != NULL; HostAdapter = HostAdapter->Next)
-		if (HostAdapter->HostNumber == shost->host_no)
-			break;
-	if (HostAdapter == NULL) {
-		BusLogic_Error("Cannot find Host Adapter for SCSI Host %d\n", NULL, shost->host_no);
-		return 0;
-	}
+
 	TargetStatistics = HostAdapter->TargetStatistics;
 	if (WriteFlag) {
 		HostAdapter->ExternalHostAdapterResets = 0;
@@ -3547,7 +3519,7 @@ static int __init BusLogic_ParseDriverOptions(char *OptionsString)
   Get it all started
 */
 
-static struct scsi_host_template driver_template = {
+static struct scsi_host_template Bus_Logic_template = {
 	.module = THIS_MODULE,
 	.proc_name = "BusLogic",
 	.proc_info = BusLogic_ProcDirectoryInfo,
@@ -3585,36 +3557,15 @@ static int __init BusLogic_Setup(char *str)
 }
 
 /*
- * Initialization function
- */
-
-static int __init BusLogic_init(void)
-{
-
-#ifdef MODULE
-	if (BusLogic)
-		BusLogic_Setup(BusLogic);
-#endif
-
-	return BusLogic_DetectHostAdapter(&driver_template) ? 0 : -ENODEV;
-}
-
-/*
  * Exit function.  Deletes all hosts associated with this driver.
  */
 
 static void __exit BusLogic_exit(void)
 {
-	struct BusLogic_HostAdapter *HostAdapter;
-	for (HostAdapter = BusLogic_FirstRegisteredHostAdapter; HostAdapter != NULL; HostAdapter = HostAdapter->Next) {
-		struct Scsi_Host *host = HostAdapter->SCSI_Host;
-		scsi_remove_host(host);
+	struct BusLogic_HostAdapter *ha, *next;
 
-	}
-	for (HostAdapter = BusLogic_FirstRegisteredHostAdapter; HostAdapter != NULL; HostAdapter = HostAdapter->Next) {
-		struct Scsi_Host *host = HostAdapter->SCSI_Host;
-		BusLogic_ReleaseHostAdapter(host);
-	}
+	list_for_each_entry_safe(ha, next, &BusLogic_host_list, host_list)
+		BusLogic_ReleaseHostAdapter(ha);
 }
 
 __setup("BusLogic=", BusLogic_Setup);

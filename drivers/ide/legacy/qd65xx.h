@@ -46,7 +46,7 @@
 
 /* Drive specific timing taken from DOS driver v3.7 */
 
-struct qd65xx_timing_s {
+static struct qd65xx_timing_s {
 	s8	offset;   /* ofset from the beginning of Model Number" */
 	char	model[4];    /* 4 chars from Model number, no conversion */
 	s16	active;   /* active time */

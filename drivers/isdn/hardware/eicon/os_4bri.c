@@ -143,7 +143,7 @@ static void diva_4bri_set_addresses(diva_os_xdi_adapter_t *a)
 int diva_4bri_init_card(diva_os_xdi_adapter_t * a)
 {
 	int bar, i;
-	byte *p;
+	byte __iomem *p;
 	PADAPTER_LIST_ENTRY quadro_list;
 	diva_os_xdi_adapter_t *diva_current;
 	diva_os_xdi_adapter_t *adapter_list[4];
@@ -424,7 +424,7 @@ int diva_4bri_init_card(diva_os_xdi_adapter_t * a)
 	   reset contains the base address for the PLX 9054 register set
 	 */
 	p = DIVA_OS_MEM_ATTACH_RESET(&a->xdi_adapter);
-	p[PLX9054_INTCSR] = 0x00;	/* disable PCI interrupts */
+	WRITE_BYTE(&p[PLX9054_INTCSR], 0x00);	/* disable PCI interrupts */
 	DIVA_OS_MEM_DETACH_RESET(&a->xdi_adapter, p);
 
 	/*
@@ -788,15 +788,15 @@ diva_4bri_cmd_card_proc(struct _diva_os_xdi_adapter *a,
 							   a->xdi_mbox.
 							   data_length);
 					if (a->xdi_mbox.data) {
-						byte *p = DIVA_OS_MEM_ATTACH_ADDRESS(&a->xdi_adapter);
-						byte *src = p;
+						byte __iomem *p = DIVA_OS_MEM_ATTACH_ADDRESS(&a->xdi_adapter);
+						byte __iomem *src = p;
 						byte *dst = a->xdi_mbox.data;
 						dword len = a->xdi_mbox.data_length;
 
 						src += cmd->command_data.read_sdram.offset;
 
 						while (len--) {
-							*dst++ = *src++;
+							*dst++ = READ_BYTE(src++);
 						}
 						DIVA_OS_MEM_DETACH_ADDRESS(&a->xdi_adapter, p);
 						a->xdi_mbox.status = DIVA_XDI_MBOX_BUSY;
@@ -910,8 +910,8 @@ diva_4bri_write_sdram_block(PISDN_ADAPTER IoAdapter,
 			    dword address,
 			    const byte * data, dword length, dword limit)
 {
-	byte *p = DIVA_OS_MEM_ATTACH_ADDRESS(IoAdapter);
-	byte *mem = p;
+	byte __iomem *p = DIVA_OS_MEM_ATTACH_ADDRESS(IoAdapter);
+	byte __iomem *mem = p;
 
 	if (((address + length) >= limit) || !mem) {
 		DIVA_OS_MEM_DETACH_ADDRESS(IoAdapter, p);
@@ -922,7 +922,7 @@ diva_4bri_write_sdram_block(PISDN_ADAPTER IoAdapter,
 	mem += address;
 
 	while (length--) {
-		*mem++ = *data++;
+		WRITE_BYTE(mem++, *data++);
 	}
 
 	DIVA_OS_MEM_DETACH_ADDRESS(IoAdapter, p);
@@ -933,10 +933,10 @@ static int
 diva_4bri_start_adapter(PISDN_ADAPTER IoAdapter,
 			dword start_address, dword features)
 {
-	volatile word *signature;
+	volatile word __iomem *signature;
 	int started = 0;
 	int i;
-	byte *p;
+	byte __iomem *p;
 
 	/*
 	   start adapter
@@ -947,7 +947,7 @@ diva_4bri_start_adapter(PISDN_ADAPTER IoAdapter,
 	/*
 	   wait for signature in shared memory (max. 3 seconds)
 	 */
-	signature = (volatile word *) (&p[0x1E]);
+	signature = (volatile word __iomem *) (&p[0x1E]);
 
 	for (i = 0; i < 300; ++i) {
 		diva_os_wait(10);
@@ -1011,7 +1011,7 @@ static int check_qBri_interrupt(PISDN_ADAPTER IoAdapter)
 #ifdef	SUPPORT_INTERRUPT_TEST_ON_4BRI
 	int i;
 	ADAPTER *a = &IoAdapter->a;
-	byte *p;
+	byte __iomem *p;
 
 	IoAdapter->IrqCount = 0;
 
@@ -1019,7 +1019,7 @@ static int check_qBri_interrupt(PISDN_ADAPTER IoAdapter)
 		return (-1);
 
 	p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
-	p[PLX9054_INTCSR] = PLX9054_INT_ENABLE;
+	WRITE_BYTE(&p[PLX9054_INTCSR], PLX9054_INT_ENABLE);
 	DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
 	/*
 	   interrupt test
@@ -1031,14 +1031,14 @@ static int check_qBri_interrupt(PISDN_ADAPTER IoAdapter)
 
 	return ((IoAdapter->IrqCount > 0) ? 0 : -1);
 #else
-	dword volatile *qBriIrq;
-	byte *p;
+	dword volatile __iomem *qBriIrq;
+	byte __iomem *p;
 	/*
 	   Reset on-board interrupt register
 	 */
 	IoAdapter->IrqCount = 0;
 	p = DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
-	qBriIrq = (dword volatile *) (&p[_4bri_is_rev_2_card
+	qBriIrq = (dword volatile __iomem *) (&p[_4bri_is_rev_2_card
 				       (IoAdapter->
 					cardType) ? (MQ2_BREG_IRQ_TEST)
 				       : (MQ_BREG_IRQ_TEST)]);
@@ -1047,7 +1047,7 @@ static int check_qBri_interrupt(PISDN_ADAPTER IoAdapter)
 	DIVA_OS_MEM_DETACH_CTLREG(IoAdapter, p);
 
 	p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
-	p[PLX9054_INTCSR] = PLX9054_INT_ENABLE;
+	WRITE_BYTE(&p[PLX9054_INTCSR], PLX9054_INT_ENABLE);
 	DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
 
 	diva_os_wait(100);

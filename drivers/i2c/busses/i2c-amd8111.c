@@ -67,7 +67,7 @@ struct amd_smbus {
  * ACPI 2.0 chapter 13 access of registers of the EC
  */
 
-unsigned int amd_ec_wait_write(struct amd_smbus *smbus)
+static unsigned int amd_ec_wait_write(struct amd_smbus *smbus)
 {
 	int timeout = 500;
 
@@ -82,7 +82,7 @@ unsigned int amd_ec_wait_write(struct amd_smbus *smbus)
 	return 0;
 }
 
-unsigned int amd_ec_wait_read(struct amd_smbus *smbus)
+static unsigned int amd_ec_wait_read(struct amd_smbus *smbus)
 {
 	int timeout = 500;
 
@@ -97,7 +97,7 @@ unsigned int amd_ec_wait_read(struct amd_smbus *smbus)
 	return 0;
 }
 
-unsigned int amd_ec_read(struct amd_smbus *smbus, unsigned char address, unsigned char *data)
+static unsigned int amd_ec_read(struct amd_smbus *smbus, unsigned char address, unsigned char *data)
 {
 	if (amd_ec_wait_write(smbus))
 		return -1;
@@ -114,7 +114,7 @@ unsigned int amd_ec_read(struct amd_smbus *smbus, unsigned char address, unsigne
 	return 0;
 }
 
-unsigned int amd_ec_write(struct amd_smbus *smbus, unsigned char address, unsigned char data)
+static unsigned int amd_ec_write(struct amd_smbus *smbus, unsigned char address, unsigned char data)
 {
 	if (amd_ec_wait_write(smbus))
 		return -1;
@@ -174,7 +174,7 @@ unsigned int amd_ec_write(struct amd_smbus *smbus, unsigned char address, unsign
 #define AMD_SMB_PRTCL_PEC		0x80
 
 
-s32 amd8111_access(struct i2c_adapter * adap, u16 addr, unsigned short flags,
+static s32 amd8111_access(struct i2c_adapter * adap, u16 addr, unsigned short flags,
 		char read_write, u8 command, int size, union i2c_smbus_data * data)
 {
 	struct amd_smbus *smbus = adap->algo_data;
@@ -315,7 +315,7 @@ s32 amd8111_access(struct i2c_adapter * adap, u16 addr, unsigned short flags,
 }
 
 
-u32 amd8111_func(struct i2c_adapter *adapter)
+static u32 amd8111_func(struct i2c_adapter *adapter)
 {
 	return	I2C_FUNC_SMBUS_QUICK | I2C_FUNC_SMBUS_BYTE | I2C_FUNC_SMBUS_BYTE_DATA |
 		I2C_FUNC_SMBUS_WORD_DATA | I2C_FUNC_SMBUS_BLOCK_DATA |
@@ -335,6 +335,8 @@ static struct pci_device_id amd8111_ids[] = {
 	{ 0x1022, 0x746a, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ 0, }
 };
+
+MODULE_DEVICE_TABLE (pci, amd8111_ids);
 
 static int __devinit amd8111_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
@@ -400,7 +402,7 @@ static struct pci_driver amd8111_driver = {
 
 static int __init i2c_amd8111_init(void)
 {
-	return pci_module_init(&amd8111_driver);
+	return pci_register_driver(&amd8111_driver);
 }
 
 

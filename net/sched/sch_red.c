@@ -18,7 +18,7 @@
 #include <linux/module.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -40,6 +40,7 @@
 #include <net/sock.h>
 #include <net/pkt_sched.h>
 #include <net/inet_ecn.h>
+#include <net/dsfield.h>
 
 
 /*	Random Early Detection (RED) algorithm.
@@ -167,7 +168,7 @@ static int red_ecn_mark(struct sk_buff *skb)
 		IP_ECN_set_ce(skb->nh.iph);
 		return 1;
 	case __constant_htons(ETH_P_IPV6):
-		if (INET_ECN_is_not_ect(ip6_get_dsfield(skb->nh.ipv6h)))
+		if (INET_ECN_is_not_ect(ipv6_get_dsfield(skb->nh.ipv6h)))
 			return 0;
 		IP6_ECN_set_ce(skb->nh.ipv6h);
 		return 1;
@@ -227,13 +228,13 @@ red_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 				q->qave >>= 1;
 		}
 	} else {
-		q->qave += sch->stats.backlog - (q->qave >> q->Wlog);
+		q->qave += sch->qstats.backlog - (q->qave >> q->Wlog);
 		/* NOTE:
 		   q->qave is fixed point number with point at Wlog.
 		   The formulae above is equvalent to floating point
 		   version:
 
-		   qave = qave*(1-W) + sch->stats.backlog*W;
+		   qave = qave*(1-W) + sch->qstats.backlog*W;
 		                                           --ANK (980924)
 		 */
 	}
@@ -241,22 +242,22 @@ red_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 	if (q->qave < q->qth_min) {
 		q->qcount = -1;
 enqueue:
-		if (sch->stats.backlog + skb->len <= q->limit) {
+		if (sch->qstats.backlog + skb->len <= q->limit) {
 			__skb_queue_tail(&sch->q, skb);
-			sch->stats.backlog += skb->len;
-			sch->stats.bytes += skb->len;
-			sch->stats.packets++;
+			sch->qstats.backlog += skb->len;
+			sch->bstats.bytes += skb->len;
+			sch->bstats.packets++;
 			return NET_XMIT_SUCCESS;
 		} else {
 			q->st.pdrop++;
 		}
 		kfree_skb(skb);
-		sch->stats.drops++;
+		sch->qstats.drops++;
 		return NET_XMIT_DROP;
 	}
 	if (q->qave >= q->qth_max) {
 		q->qcount = -1;
-		sch->stats.overlimits++;
+		sch->qstats.overlimits++;
 mark:
 		if  (!(q->flags&TC_RED_ECN) || !red_ecn_mark(skb)) {
 			q->st.early++;
@@ -287,7 +288,7 @@ mark:
 			goto enqueue;
 		q->qcount = 0;
 		q->qR = net_random()&q->Rmask;
-		sch->stats.overlimits++;
+		sch->qstats.overlimits++;
 		goto mark;
 	}
 	q->qR = net_random()&q->Rmask;
@@ -295,7 +296,7 @@ mark:
 
 drop:
 	kfree_skb(skb);
-	sch->stats.drops++;
+	sch->qstats.drops++;
 	return NET_XMIT_CN;
 }
 
@@ -307,7 +308,8 @@ red_requeue(struct sk_buff *skb, struct Qdisc* sch)
 	PSCHED_SET_PASTPERFECT(q->qidlestart);
 
 	__skb_queue_head(&sch->q, skb);
-	sch->stats.backlog += skb->len;
+	sch->qstats.backlog += skb->len;
+	sch->qstats.requeues++;
 	return 0;
 }
 
@@ -319,7 +321,7 @@ red_dequeue(struct Qdisc* sch)
 
 	skb = __skb_dequeue(&sch->q);
 	if (skb) {
-		sch->stats.backlog -= skb->len;
+		sch->qstats.backlog -= skb->len;
 		return skb;
 	}
 	PSCHED_GET_TIME(q->qidlestart);
@@ -334,8 +336,8 @@ static unsigned int red_drop(struct Qdisc* sch)
 	skb = __skb_dequeue_tail(&sch->q);
 	if (skb) {
 		unsigned int len = skb->len;
-		sch->stats.backlog -= len;
-		sch->stats.drops++;
+		sch->qstats.backlog -= len;
+		sch->qstats.drops++;
 		q->st.other++;
 		kfree_skb(skb);
 		return len;
@@ -349,7 +351,7 @@ static void red_reset(struct Qdisc* sch)
 	struct red_sched_data *q = qdisc_priv(sch);
 
 	__skb_queue_purge(&sch->q);
-	sch->stats.backlog = 0;
+	sch->qstats.backlog = 0;
 	PSCHED_SET_PASTPERFECT(q->qidlestart);
 	q->qave = 0;
 	q->qcount = -1;
@@ -394,16 +396,6 @@ static int red_init(struct Qdisc* sch, struct rtattr *opt)
 	return red_change(sch, opt);
 }
 
-
-int red_copy_xstats(struct sk_buff *skb, struct tc_red_xstats *st)
-{
-        RTA_PUT(skb, TCA_XSTATS, sizeof(*st), st);
-        return 0;
-
-rtattr_failure:
-        return 1;
-}
-
 static int red_dump(struct Qdisc *sch, struct sk_buff *skb)
 {
 	struct red_sched_data *q = qdisc_priv(sch);
@@ -423,14 +415,18 @@ static int red_dump(struct Qdisc *sch, struct sk_buff *skb)
 	RTA_PUT(skb, TCA_RED_PARMS, sizeof(opt), &opt);
 	rta->rta_len = skb->tail - b;
 
-	if (red_copy_xstats(skb, &q->st))
-		goto rtattr_failure;
-
 	return skb->len;
 
 rtattr_failure:
 	skb_trim(skb, b - skb->data);
 	return -1;
+}
+
+static int red_dump_stats(struct Qdisc *sch, struct gnet_dump *d)
+{
+	struct red_sched_data *q = qdisc_priv(sch);
+
+	return gnet_stats_copy_app(d, &q->st, sizeof(q->st));
 }
 
 static struct Qdisc_ops red_qdisc_ops = {
@@ -446,6 +442,7 @@ static struct Qdisc_ops red_qdisc_ops = {
 	.reset		=	red_reset,
 	.change		=	red_change,
 	.dump		=	red_dump,
+	.dump_stats	=	red_dump_stats,
 	.owner		=	THIS_MODULE,
 };
 

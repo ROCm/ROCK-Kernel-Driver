@@ -126,6 +126,9 @@ int __init maxinefb_init(void)
 	unsigned long fb_start;
 	int i;
 
+	if (fb_get_options("maxinefb", NULL))
+		return -ENODEV;
+
 	/* Validate we're on the proper machine type */
 	if (mips_machtype != MACH_DS5000_XX) {
 		return -EINVAL;

@@ -299,7 +299,7 @@ static int ubd_setup_common(char *str, int *index_out)
 	}
 	if(n >= MAX_DEV){
 		printk(KERN_ERR "ubd_setup : index %d out of range "
-		       "(%d devices)\n", n, MAX_DEV);
+		       "(%d devices, from 0 to %d)\n", n, MAX_DEV, MAX_DEV - 1);
 		return(1);
 	}
 
@@ -396,14 +396,13 @@ int thread_fd = -1;
  */
 int intr_count = 0;
 
-static void ubd_finish(struct request *req, int error)
+/* call ubd_finish if you need to serialize */
+static void __ubd_finish(struct request *req, int error)
 {
 	int nsect;
 
 	if(error){
- 		spin_lock(&ubd_io_lock);
 		end_request(req, 0);
- 		spin_unlock(&ubd_io_lock);
 		return;
 	}
 	nsect = req->current_nr_sectors;
@@ -412,11 +411,17 @@ static void ubd_finish(struct request *req, int error)
 	req->errors = 0;
 	req->nr_sectors -= nsect;
 	req->current_nr_sectors = 0;
-	spin_lock(&ubd_io_lock);
 	end_request(req, 1);
+}
+
+static inline void ubd_finish(struct request *req, int error)
+{
+ 	spin_lock(&ubd_io_lock);
+	__ubd_finish(req, error);
 	spin_unlock(&ubd_io_lock);
 }
 
+/* Called without ubd_io_lock held */
 static void ubd_handler(void)
 {
 	struct io_thread_req req;
@@ -465,7 +470,7 @@ static int io_pid = -1;
 void kill_io_thread(void)
 {
 	if(io_pid != -1) 
-		os_kill_process(io_pid, 1, 0);
+		os_kill_process(io_pid, 1);
 }
 
 __uml_exitcall(kill_io_thread);
@@ -768,18 +773,20 @@ int ubd_driver_init(void){
 	unsigned long stack;
 	int err;
 
+	/* Set by CONFIG_BLK_DEV_UBD_SYNC or ubd=sync.*/
 	if(global_openflags.s){
-		printk(KERN_INFO "ubd : Synchronous mode\n");
-		return(0);
+		printk(KERN_INFO "ubd: Synchronous mode\n");
+		/* Letting ubd=sync be like using ubd#s= instead of ubd#= is
+		 * enough. So use anyway the io thread. */
 	}
 	stack = alloc_stack(0, 0);
 	io_pid = start_io_thread(stack + PAGE_SIZE - sizeof(void *), 
 				 &thread_fd);
 	if(io_pid < 0){
-		io_pid = -1;
 		printk(KERN_ERR 
 		       "ubd : Failed to start I/O thread (errno = %d) - "
 		       "falling back to synchronous I/O\n", -io_pid);
+		io_pid = -1;
 		return(0);
 	}
 	err = um_request_irq(UBD_IRQ, thread_fd, IRQ_READ, ubd_intr, 
@@ -965,6 +972,7 @@ static int prepare_mmap_request(struct ubd *dev, int fd, __u64 offset,
 	return(0);
 }
 
+/* Called with ubd_io_lock held */
 static int prepare_request(struct request *req, struct io_thread_req *io_req)
 {
 	struct gendisk *disk = req->rq_disk;
@@ -977,9 +985,7 @@ static int prepare_request(struct request *req, struct io_thread_req *io_req)
 	if((rq_data_dir(req) == WRITE) && !dev->openflags.w){
 		printk("Write attempted on readonly ubd device %s\n", 
 		       disk->disk_name);
- 		spin_lock(&ubd_io_lock);
 		end_request(req, 0);
- 		spin_unlock(&ubd_io_lock);
 		return(1);
 	}
 
@@ -1029,6 +1035,7 @@ static int prepare_request(struct request *req, struct io_thread_req *io_req)
 	return(0);
 }
 
+/* Called with ubd_io_lock held */
 static void do_ubd_request(request_queue_t *q)
 {
 	struct io_thread_req io_req;
@@ -1040,7 +1047,7 @@ static void do_ubd_request(request_queue_t *q)
 			err = prepare_request(req, &io_req);
 			if(!err){
 				do_io(&io_req);
-				ubd_finish(req, io_req.error);
+				__ubd_finish(req, io_req.error);
 			}
 		}
 	}

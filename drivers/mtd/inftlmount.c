@@ -8,7 +8,7 @@
  * Author: Fabrice Bellard (fabrice.bellard@netgem.com) 
  * Copyright (C) 2000 Netgem S.A.
  *
- * $Id: inftlmount.c,v 1.14 2004/08/09 13:57:42 dwmw2 Exp $
+ * $Id: inftlmount.c,v 1.15 2004/11/05 21:55:55 kalev Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -41,7 +41,7 @@
 #include <linux/mtd/inftl.h>
 #include <linux/mtd/compatmac.h>
 
-char inftlmountrev[]="$Revision: 1.14 $";
+char inftlmountrev[]="$Revision: 1.15 $";
 
 /*
  * find_boot_record: Find the INFTL Media Header and its Spare copy which
@@ -222,6 +222,8 @@ static int find_boot_record(struct INFTLrecord *inftl)
 			if (ip->Reserved0 != ip->firstUnit) {
 				struct erase_info *instr = &inftl->instr;
 
+				instr->mtd = inftl->mbd.mtd;
+
 				/*
 				 * 	Most likely this is using the
 				 * 	undocumented qiuck mount feature.
@@ -386,6 +388,8 @@ int INFTL_formatblock(struct INFTLrecord *inftl, int block)
 	struct inftl_unittail uci;
 	struct erase_info *instr = &inftl->instr;
 	int physblock;
+
+	instr->mtd = inftl->mbd.mtd;
 
 	DEBUG(MTD_DEBUG_LEVEL3, "INFTL: INFTL_formatblock(inftl=%p,"
 		"block=%d)\n", inftl, block);

@@ -204,11 +204,10 @@ static int get_ctlr_slot_config(struct controller *ctrl)
 	int num_ctlr_slots;		/* Not needed; PCI Express has 1 slot per port*/
 	int first_device_num;		/* Not needed */
 	int physical_slot_num;
-	int updown;			/* Not needed */
+	u8 ctrlcap;			
 	int rc;
-	int flags;			/* Not needed */
 
-	rc = pcie_get_ctlr_slot_config(ctrl, &num_ctlr_slots, &first_device_num, &physical_slot_num, &updown, &flags);
+	rc = pcie_get_ctlr_slot_config(ctrl, &num_ctlr_slots, &first_device_num, &physical_slot_num, &ctrlcap);
 	if (rc) {
 		err("%s: get_ctlr_slot_config fail for b:d (%x:%x)\n", __FUNCTION__, ctrl->bus, ctrl->device);
 		return (-1);
@@ -217,10 +216,10 @@ static int get_ctlr_slot_config(struct controller *ctrl)
 	ctrl->num_slots = num_ctlr_slots;	/* PCI Express has 1 slot per port */
 	ctrl->slot_device_offset = first_device_num;
 	ctrl->first_slot = physical_slot_num;
-	ctrl->slot_num_inc = updown; 	/* Not needed */		/* either -1 or 1 */
+	ctrl->ctrlcap = ctrlcap; 	
 
-	dbg("%s: bus(0x%x) num_slot(0x%x) 1st_dev(0x%x) psn(0x%x) updown(%d) for b:d (%x:%x)\n",
-		__FUNCTION__, ctrl->slot_bus, num_ctlr_slots, first_device_num, physical_slot_num, updown, 
+	dbg("%s: bus(0x%x) num_slot(0x%x) 1st_dev(0x%x) psn(0x%x) ctrlcap(%x) for b:d (%x:%x)\n",
+		__FUNCTION__, ctrl->slot_bus, num_ctlr_slots, first_device_num, physical_slot_num, ctrlcap, 
 		ctrl->bus, ctrl->device);
 
 	return (0);
@@ -237,7 +236,9 @@ static int set_attention_status(struct hotplug_slot *hotplug_slot, u8 status)
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
 	hotplug_slot->info->attention_status = status;
-	slot->hpc_ops->set_attention_status(slot, status);
+	
+	if (ATTN_LED(slot->ctrl->ctrlcap)) 
+		slot->hpc_ops->set_attention_status(slot, status);
 
 	return 0;
 }
@@ -451,7 +452,8 @@ static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	t_slot->hpc_ops->get_adapter_status(t_slot, &value); /* Check if slot is occupied */
 	dbg("%s: adpater value %x\n", __FUNCTION__, value);
-	if (!value) {
+	
+	if ((POWER_CTRL(ctrl->ctrlcap)) && !value) {
 		rc = t_slot->hpc_ops->power_off_slot(t_slot); /* Power off slot if not occupied*/
 		if (rc) {
 			/* Done with exclusive hardware access */
@@ -602,8 +604,8 @@ static int __init pcied_init(void)
 
 	retval = pciehprm_init(PCI);
 	if (!retval) {
-		retval = pci_module_init(&pcie_driver);
-		dbg("pci_module_init = %d\n", retval);
+		retval = pci_register_driver(&pcie_driver);
+		dbg("pci_register_driver = %d\n", retval);
 		info(DRIVER_DESC " version: " DRIVER_VERSION "\n");
 	}
 

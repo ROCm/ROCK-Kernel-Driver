@@ -126,10 +126,14 @@ static int parport_pc_find_nonpci_ports (int autoirq, int autodma)
 			if (ebus_ecpp_p(edev)) {
 				unsigned long base = edev->resource[0].start;
 				unsigned long config = edev->resource[1].start;
+				unsigned long d_base = edev->resource[2].start;
+				unsigned long d_len;
 
 				spin_lock_init(&sparc_ebus_dmas[count].info.lock);
+				d_len = (edev->resource[2].end -
+					 d_base) + 1;
 				sparc_ebus_dmas[count].info.regs =
-					edev->resource[2].start;
+					ioremap(d_base, d_len);
 				if (!sparc_ebus_dmas[count].info.regs)
 					continue;
 				sparc_ebus_dmas[count].info.flags = 0;

@@ -222,6 +222,7 @@ static int usblp_cache_device_id_string(struct usblp *usblp);
 
 /* forward reference to make our lives easier */
 static struct usb_driver usblp_driver;
+static DECLARE_MUTEX(usblp_sem);	/* locks the existence of usblp's */
 
 /*
  * Functions for usblp control messages.
@@ -343,7 +344,7 @@ static int usblp_open(struct inode *inode, struct file *file)
 	if (minor < 0)
 		return -ENODEV;
 
-	lock_kernel();
+	down (&usblp_sem);
 
 	retval = -ENODEV;
 	intf = usb_find_interface(&usblp_driver, minor);
@@ -389,7 +390,7 @@ static int usblp_open(struct inode *inode, struct file *file)
 		}
 	}
 out:
-	unlock_kernel();
+	up (&usblp_sem);
 	return retval;
 }
 
@@ -397,10 +398,6 @@ static void usblp_cleanup (struct usblp *usblp)
 {
 	info("usblp%d: removed", usblp->minor);
 
-	usb_buffer_free (usblp->dev, USBLP_BUF_SIZE,
-			usblp->writebuf, usblp->writeurb->transfer_dma);
-	usb_buffer_free (usblp->dev, USBLP_BUF_SIZE,
-			usblp->readbuf, usblp->readurb->transfer_dma);
 	kfree (usblp->device_id_string);
 	kfree (usblp->statusbuf);
 	usb_free_urb(usblp->writeurb);
@@ -410,22 +407,22 @@ static void usblp_cleanup (struct usblp *usblp)
 
 static void usblp_unlink_urbs(struct usblp *usblp)
 {
-	usb_unlink_urb(usblp->writeurb);
+	usb_kill_urb(usblp->writeurb);
 	if (usblp->bidir)
-		usb_unlink_urb(usblp->readurb);
+		usb_kill_urb(usblp->readurb);
 }
 
 static int usblp_release(struct inode *inode, struct file *file)
 {
 	struct usblp *usblp = file->private_data;
 
-	down (&usblp->sem);
+	down (&usblp_sem);
 	usblp->used = 0;
 	if (usblp->present) {
 		usblp_unlink_urbs(usblp);
-		up(&usblp->sem);
 	} else 		/* finish cleanup from disconnect */
 		usblp_cleanup (usblp);
+	up (&usblp_sem);
 	return 0;
 }
 
@@ -1129,7 +1126,7 @@ static int usblp_cache_device_id_string(struct usblp *usblp)
 	/* First two bytes are length in big-endian.
 	 * They count themselves, and we copy them into
 	 * the user's buffer. */
-	length = be16_to_cpu(*((u16 *)usblp->device_id_string));
+	length = be16_to_cpu(*((__be16 *)usblp->device_id_string));
 	if (length < 2)
 		length = 2;
 	else if (length >= USBLP_DEVICE_ID_SIZE)
@@ -1153,18 +1150,21 @@ static void usblp_disconnect(struct usb_interface *intf)
 		BUG ();
 	}
 
+	down (&usblp_sem);
 	down (&usblp->sem);
-	lock_kernel();
 	usblp->present = 0;
 	usb_set_intfdata (intf, NULL);
 
 	usblp_unlink_urbs(usblp);
+	usb_buffer_free (usblp->dev, USBLP_BUF_SIZE,
+			usblp->writebuf, usblp->writeurb->transfer_dma);
+	usb_buffer_free (usblp->dev, USBLP_BUF_SIZE,
+			usblp->readbuf, usblp->readurb->transfer_dma);
+	up (&usblp->sem);
 
 	if (!usblp->used)
 		usblp_cleanup (usblp);
-	else 	/* cleanup later, on release */
-		up (&usblp->sem);
-	unlock_kernel();
+	up (&usblp_sem);
 }
 
 static struct usb_device_id usblp_ids [] = {

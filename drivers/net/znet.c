@@ -98,9 +98,9 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/if_arp.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 
@@ -421,7 +421,7 @@ static int __init znet_probe (void)
 
 	znet->rx_dma = netinfo->dma1;
 	znet->tx_dma = netinfo->dma2;
-	znet->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&znet->lock);
 	znet->sia_base = 0xe6;	/* Magic address for the 82501 SIA */
 	znet->sia_size = 2;
 	/* maz: Despite the '593 being advertised above as using a

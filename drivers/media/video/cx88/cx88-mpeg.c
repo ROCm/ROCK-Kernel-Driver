@@ -1,9 +1,9 @@
 /*
- * $Id: cx88-mpeg.c,v 1.9 2004/09/15 15:35:40 kraxel Exp $
+ * $Id: cx88-mpeg.c,v 1.14 2004/10/25 11:26:36 kraxel Exp $
  *
  *  Support for the mpeg transport stream transfers
  *  PCI function #2 of the cx2388x.
- *  
+ *
  *    (c) 2004 Jelle Foks <jelle@foks.8m.com>
  *    (c) 2004 Chris Pascoe <c.pascoe@itee.uq.edu.au>
  *    (c) 2004 Gerd Knorr <kraxel@bytesex.org>
@@ -40,7 +40,7 @@ MODULE_AUTHOR("Gerd Knorr <kraxel@bytesex.org> [SuSE Labs]");
 MODULE_LICENSE("GPL");
 
 static unsigned int debug = 0;
-MODULE_PARM(debug,"i");
+module_param(debug,int,0644);
 MODULE_PARM_DESC(debug,"enable debug messages [mpeg]");
 
 #define dprintk(level,fmt, arg...)	if (debug >= level) \
@@ -48,14 +48,14 @@ MODULE_PARM_DESC(debug,"enable debug messages [mpeg]");
 
 /* ------------------------------------------------------------------ */
 
-int cx8802_start_dma(struct cx8802_dev    *dev,
-		     struct cx88_dmaqueue *q,
-		     struct cx88_buffer   *buf)
+static int cx8802_start_dma(struct cx8802_dev    *dev,
+			    struct cx88_dmaqueue *q,
+			    struct cx88_buffer   *buf)
 {
 	struct cx88_core *core = dev->core;
 
 	dprintk(1, "cx8802_start_mpegport_dma %d\n", buf->vb.width);
-	
+
 	/* setup fifo + format */
 	cx88_sram_channel_setup(core, &cx88_sram_channels[SRAM_CH28],
 				dev->ts_packet_size, buf->risc.dma);
@@ -74,15 +74,15 @@ int cx8802_start_dma(struct cx8802_dev    *dev,
 
 	if (cx88_boards[core->board].blackbird) {
 		cx_write(MO_PINMUX_IO, 0x88); /* enable MPEG parallel IO */
-		
+
 		// cx_write(TS_F2_CMD_STAT_MM, 0x2900106); /* F2_CMD_STAT_MM defaults + master + memory space */
-		cx_write(TS_GEN_CNTRL, 0x46); /* punctured clock TS & posedge driven & software reset */	
+		cx_write(TS_GEN_CNTRL, 0x46); /* punctured clock TS & posedge driven & software reset */
 		udelay(100);
-		
+
 		cx_write(TS_HW_SOP_CNTRL, 0x408); /* mpeg start byte */
 		//cx_write(TS_HW_SOP_CNTRL, 0x2F0BC0); /* mpeg start byte ts: 0x2F0BC0 ? */
 		cx_write(TS_VALERR_CNTRL, 0x2000);
-		
+
 		cx_write(TS_GEN_CNTRL, 0x06); /* punctured clock TS & posedge driven */
 		udelay(100);
 	}
@@ -91,35 +91,35 @@ int cx8802_start_dma(struct cx8802_dev    *dev,
 	/* reset counter */
 	cx_write(MO_TS_GPCNTRL, GP_COUNT_CONTROL_RESET);
 	q->count = 1;
-	
+
 	/* enable irqs */
 	cx_set(MO_PCI_INTMSK, 0x00fc04);
 	cx_write(MO_TS_INTMSK,  0x1f0011);
-	
+
 	/* start dma */
 	cx_write(MO_DEV_CNTRL2, (1<<5)); /* FIXME: s/write/set/ ??? */
 	cx_write(MO_TS_DMACNTRL, 0x11);
 	return 0;
 }
 
-void cx8802_shutdown(struct cx8802_dev *dev)
+static int cx8802_stop_dma(struct cx8802_dev *dev)
 {
 	struct cx88_core *core = dev->core;
 
-	/* disable and clear irqs */
-	cx_write(MO_TS_INTMSK, 0x0);
-	cx_write(MO_TS_INTSTAT, 0x1f1111);
-
 	/* stop dma */
 	cx_clear(MO_TS_DMACNTRL, 0x11);
-	cx_write(MO_DEV_CNTRL2, 0); /* FIXME: affects other pci functions ??? */
+
+	/* disable irqs */
+	cx_clear(MO_PCI_INTMSK, 0x000004);
+	cx_clear(MO_TS_INTMSK, 0x1f0011);
 
 	/* Reset the controller */
 	cx_write(TS_GEN_CNTRL, 0xcd);
+	return 0;
 }
 
-int cx8802_restart_queue(struct cx8802_dev    *dev,
-			 struct cx88_dmaqueue *q)
+static int cx8802_restart_queue(struct cx8802_dev    *dev,
+				struct cx88_dmaqueue *q)
 {
 	struct cx88_buffer *buf;
 	struct list_head *item;
@@ -159,7 +159,7 @@ int cx8802_buf_prepare(struct cx8802_dev *dev, struct cx88_buffer *buf)
 		if (0 != (rc = videobuf_iolock(dev->pci,&buf->vb,NULL)))
 			goto fail;
 		cx88_risc_databuffer(dev->pci, &buf->risc,
-				     buf->vb.dma.sglist, 
+				     buf->vb.dma.sglist,
 				     buf->vb.width, buf->vb.height);
 	}
 	buf->vb.state = STATE_PREPARED;
@@ -226,7 +226,7 @@ void cx8802_cancel_buffers(struct cx8802_dev *dev)
 	struct cx88_dmaqueue *q = &dev->mpegq;
 
 	del_timer_sync(&q->timeout);
-	cx8802_shutdown(dev);
+	cx8802_stop_dma(dev);
 	do_cancel_buffers(dev,"cancel",0);
 }
 
@@ -238,8 +238,7 @@ static void cx8802_timeout(unsigned long data)
 
 	if (debug)
 		cx88_sram_channel_dump(dev->core, &cx88_sram_channels[SRAM_CH28]);
-	cx8802_shutdown(dev);
-	dev->timeout_count++;
+	cx8802_stop_dma(dev);
 	do_cancel_buffers(dev,"timeout",1);
 }
 
@@ -252,7 +251,7 @@ static void cx8802_mpeg_irq(struct cx8802_dev *dev)
 	mask   = cx_read(MO_TS_INTMSK);
 	if (0 == (status & mask))
 		return;
-	
+
 	cx_write(MO_TS_INTSTAT, status);
 	if (debug || (status & mask & ~0xff))
 		cx88_print_irqbits(core->name, "irq mpeg ",
@@ -276,7 +275,6 @@ static void cx8802_mpeg_irq(struct cx8802_dev *dev)
 	/* risc2 y */
 	if (status & 0x10) {
 		spin_lock(&dev->slock);
-		dev->stopper_count++;
 		cx8802_restart_queue(dev,&dev->mpegq);
 		spin_unlock(&dev->slock);
 	}
@@ -284,8 +282,7 @@ static void cx8802_mpeg_irq(struct cx8802_dev *dev)
         /* other general errors */
         if (status & 0x1f0100) {
                 spin_lock(&dev->slock);
-		dev->error_count++;
-		cx8802_shutdown(dev);
+		cx8802_stop_dma(dev);
                 cx8802_restart_queue(dev,&dev->mpegq);
                 spin_unlock(&dev->slock);
         }
@@ -316,7 +313,7 @@ static irqreturn_t cx8802_irq(int irq, void *dev_id, struct pt_regs *regs)
 		       core->name);
 		cx_write(MO_PCI_INTMSK,0);
 	}
-	
+
  out:
 	return IRQ_RETVAL(handled);
 }
@@ -383,16 +380,74 @@ int cx8802_init_common(struct cx8802_dev *dev)
 
 void cx8802_fini_common(struct cx8802_dev *dev)
 {
-	cx8802_shutdown(dev);
+	cx8802_stop_dma(dev);
 	pci_disable_device(dev->pci);
 
-	/* unregister stuff */	
+	/* unregister stuff */
 	free_irq(dev->pci->irq, dev);
 	pci_set_drvdata(dev->pci, NULL);
 
 	/* free memory */
 	btcx_riscmem_free(dev->pci,&dev->mpegq.stopper);
 }
+
+/* ----------------------------------------------------------- */
+
+int cx8802_suspend_common(struct pci_dev *pci_dev, u32 state)
+{
+        struct cx8802_dev *dev = pci_get_drvdata(pci_dev);
+	struct cx88_core *core = dev->core;
+
+	/* stop mpeg dma */
+	spin_lock(&dev->slock);
+	if (!list_empty(&dev->mpegq.active)) {
+		printk("%s: suspend mpeg\n", core->name);
+		cx8802_stop_dma(dev);
+		del_timer(&dev->mpegq.timeout);
+	}
+	spin_unlock(&dev->slock);
+
+#if 1
+	/* FIXME -- shutdown device */
+	cx88_shutdown(dev->core);
+#endif
+
+	pci_save_state(pci_dev);
+	if (0 != pci_set_power_state(pci_dev, state)) {
+		pci_disable_device(pci_dev);
+		dev->state.disabled = 1;
+	}
+	return 0;
+}
+
+int cx8802_resume_common(struct pci_dev *pci_dev)
+{
+        struct cx8802_dev *dev = pci_get_drvdata(pci_dev);
+	struct cx88_core *core = dev->core;
+
+	if (dev->state.disabled) {
+		pci_enable_device(pci_dev);
+		dev->state.disabled = 0;
+	}
+	pci_set_power_state(pci_dev, 0);
+	pci_restore_state(pci_dev);
+
+#if 1
+	/* FIXME: re-initialize hardware */
+	cx88_reset(dev->core);
+#endif
+
+	/* restart video+vbi capture */
+	spin_lock(&dev->slock);
+	if (!list_empty(&dev->mpegq.active)) {
+		printk("%s: resume mpeg\n", core->name);
+		cx8802_restart_queue(dev,&dev->mpegq);
+	}
+	spin_unlock(&dev->slock);
+
+	return 0;
+}
+
 /* ----------------------------------------------------------- */
 
 EXPORT_SYMBOL(cx8802_buf_prepare);
@@ -401,6 +456,9 @@ EXPORT_SYMBOL(cx8802_cancel_buffers);
 
 EXPORT_SYMBOL(cx8802_init_common);
 EXPORT_SYMBOL(cx8802_fini_common);
+
+EXPORT_SYMBOL(cx8802_suspend_common);
+EXPORT_SYMBOL(cx8802_resume_common);
 
 /* ----------------------------------------------------------- */
 /*

@@ -17,6 +17,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+#ifndef LINUX_SERIAL_CORE_H
+#define LINUX_SERIAL_CORE_H
 
 /*
  * The type definitions.  These are from Ted Ts'o's serial.h
@@ -89,6 +91,15 @@
 /* MPC52xx type numbers */
 #define PORT_MPC52xx	59
 
+/* IBM icom */
+#define PORT_ICOM	60
+
+/* Samsung S3C2440 SoC */
+#define PORT_S3C2440	61
+
+/* Motorola i.MX SoC */
+#define PORT_IMX	62
+
 #ifdef __KERNEL__
 
 #include <linux/config.h>
@@ -96,6 +107,7 @@
 #include <linux/circ_buf.h>
 #include <linux/spinlock.h>
 #include <linux/sched.h>
+#include <linux/tty.h>
 
 struct uart_port;
 struct uart_info;
@@ -165,7 +177,7 @@ struct uart_icount {
 struct uart_port {
 	spinlock_t		lock;			/* port lock */
 	unsigned int		iobase;			/* in/out[bwl] */
-	char			*membase;		/* read/write[bwl] */
+	unsigned char __iomem	*membase;		/* read/write[bwl] */
 	unsigned int		irq;			/* irq number */
 	unsigned int		uartclk;		/* base uart clock */
 	unsigned char		fifosize;		/* tx fifo size */
@@ -176,6 +188,7 @@ struct uart_port {
 #define UPIO_PORT		(0)
 #define UPIO_HUB6		(1)
 #define UPIO_MEM		(2)
+#define UPIO_MEM32		(3)
 
 	unsigned int		read_status_mask;	/* driver specific */
 	unsigned int		ignore_status_mask;	/* driver specific */
@@ -231,11 +244,11 @@ struct uart_port {
  * within.
  */
 struct uart_state {
-	unsigned int		close_delay;
-	unsigned int		closing_wait;
+	unsigned int		close_delay;		/* msec */
+	unsigned int		closing_wait;		/* msec */
 
 #define USF_CLOSING_WAIT_INF	(0)
-#define USF_CLOSING_WAIT_NONE	(65535)
+#define USF_CLOSING_WAIT_NONE	(~0U)
 
 	int			count;
 	int			pm_state;
@@ -245,7 +258,7 @@ struct uart_state {
 	struct semaphore	sem;
 };
 
-#define UART_XMIT_SIZE 1024
+#define UART_XMIT_SIZE	PAGE_SIZE
 /*
  * This is the state information which is only valid when the port
  * is open; it may be freed by the core driver once the device has
@@ -266,9 +279,6 @@ struct uart_info {
 #define UIF_CTS_FLOW		(1 << 26)
 #define UIF_NORMAL_ACTIVE	(1 << 29)
 #define UIF_INITIALIZED		(1 << 31)
-
-	unsigned char		*tmpbuf;
-	struct semaphore	tmpbuf_sem;
 
 	int			blocked_open;
 
@@ -457,3 +467,5 @@ uart_handle_cts_change(struct uart_port *port, unsigned int status)
 					 !((cflag) & CLOCAL))
 
 #endif
+
+#endif /* LINUX_SERIAL_CORE_H */

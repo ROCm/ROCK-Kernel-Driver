@@ -78,11 +78,13 @@ static struct pci_driver matrox_w1_pci_driver = {
 
 struct matrox_device
 {
-	unsigned long base_addr;
-	unsigned long port_index, port_data;
+	void __iomem *base_addr;
+	void __iomem *port_index;
+	void __iomem *port_data;
 	u8 data_mask;
 
-	unsigned long phys_addr, virt_addr;
+	unsigned long phys_addr;
+	void __iomem *virt_addr;
 	unsigned long found;
 
 	struct w1_bus_master *bus_master;
@@ -181,8 +183,7 @@ static int __devinit matrox_w1_probe(struct pci_dev *pdev, const struct pci_devi
 
 	dev->phys_addr = pci_resource_start(pdev, 1);
 
-	dev->virt_addr =
-		(unsigned long) ioremap_nocache(dev->phys_addr, 16384);
+	dev->virt_addr = ioremap_nocache(dev->phys_addr, 16384);
 	if (!dev->virt_addr) {
 		dev_err(&pdev->dev, "%s: failed to ioremap(0x%lx, %d).\n",
 			__func__, dev->phys_addr, 16384);
@@ -227,7 +228,7 @@ static void __devexit matrox_w1_remove(struct pci_dev *pdev)
 
 	if (dev->found) {
 		w1_remove_master_device(dev->bus_master);
-		iounmap((void *) dev->virt_addr);
+		iounmap(dev->virt_addr);
 	}
 	kfree(dev);
 }

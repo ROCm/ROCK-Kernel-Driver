@@ -45,27 +45,29 @@ struct alpha_machine_vector
 	void (*mv_pci_tbi)(struct pci_controller *hose,
 			   dma_addr_t start, dma_addr_t end);
 
-	u8 (*mv_inb)(unsigned long);
-	u16 (*mv_inw)(unsigned long);
-	u32 (*mv_inl)(unsigned long);
+	unsigned int (*mv_ioread8)(void __iomem *);
+	unsigned int (*mv_ioread16)(void __iomem *);
+	unsigned int (*mv_ioread32)(void __iomem *);
 
-	void (*mv_outb)(u8, unsigned long);
-	void (*mv_outw)(u16, unsigned long);
-	void (*mv_outl)(u32, unsigned long);
-	
-	u8 (*mv_readb)(unsigned long);
-	u16 (*mv_readw)(unsigned long);
-	u32 (*mv_readl)(unsigned long);
-	u64 (*mv_readq)(unsigned long);
+	void (*mv_iowrite8)(u8, void __iomem *);
+	void (*mv_iowrite16)(u16, void __iomem *);
+	void (*mv_iowrite32)(u32, void __iomem *);
 
-	void (*mv_writeb)(u8, unsigned long);
-	void (*mv_writew)(u16, unsigned long);
-	void (*mv_writel)(u32, unsigned long);
-	void (*mv_writeq)(u64, unsigned long);
+	u8 (*mv_readb)(const volatile void __iomem *);
+	u16 (*mv_readw)(const volatile void __iomem *);
+	u32 (*mv_readl)(const volatile void __iomem *);
+	u64 (*mv_readq)(const volatile void __iomem *);
 
-	unsigned long (*mv_ioremap)(unsigned long, unsigned long);
-	void (*mv_iounmap)(unsigned long);
+	void (*mv_writeb)(u8, volatile void __iomem *);
+	void (*mv_writew)(u16, volatile void __iomem *);
+	void (*mv_writel)(u32, volatile void __iomem *);
+	void (*mv_writeq)(u64, volatile void __iomem *);
+
+	void __iomem *(*mv_ioportmap)(unsigned long);
+	void __iomem *(*mv_ioremap)(unsigned long, unsigned long);
+	void (*mv_iounmap)(volatile void __iomem *);
 	int (*mv_is_ioaddr)(unsigned long);
+	int (*mv_is_mmio)(const volatile void __iomem *);
 
 	void (*mv_switch_mm)(struct mm_struct *, struct mm_struct *,
 			     struct task_struct *);

@@ -53,19 +53,19 @@
 
 #define NR_IOSAPICS			256
 
-static inline unsigned int iosapic_read(char *iosapic, unsigned int reg)
+static inline unsigned int iosapic_read(char __iomem *iosapic, unsigned int reg)
 {
 	writel(reg, iosapic + IOSAPIC_REG_SELECT);
 	return readl(iosapic + IOSAPIC_WINDOW);
 }
 
-static inline void iosapic_write(char *iosapic, unsigned int reg, u32 val)
+static inline void iosapic_write(char __iomem *iosapic, unsigned int reg, u32 val)
 {
 	writel(reg, iosapic + IOSAPIC_REG_SELECT);
 	writel(val, iosapic + IOSAPIC_WINDOW);
 }
 
-static inline void iosapic_eoi(char *iosapic, u32 vector)
+static inline void iosapic_eoi(char __iomem *iosapic, u32 vector)
 {
 	writel(vector, iosapic + IOSAPIC_EOI);
 }
@@ -87,9 +87,12 @@ extern int __init iosapic_register_platform_intr (u32 int_type,
 					   u16 eid, u16 id,
 					   unsigned long polarity,
 					   unsigned long trigger);
-extern unsigned int iosapic_version (char *addr);
+extern unsigned int iosapic_version (char __iomem *addr);
 
 extern void iosapic_pci_fixup (int);
+#ifdef CONFIG_NUMA
+extern void __init map_iosapic_to_node (unsigned int, int);
+#endif
 #else
 #define iosapic_system_init(pcat_compat)			do { } while (0)
 #define iosapic_init(address,gsi_base)				do { } while (0)

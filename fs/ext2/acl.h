@@ -7,6 +7,7 @@
 #include <linux/xattr_acl.h>
 
 #define EXT2_ACL_VERSION	0x0001
+#define EXT2_ACL_MAX_ENTRIES	32
 
 typedef struct {
 	__le16		e_tag;
@@ -61,9 +62,6 @@ static inline int ext2_acl_count(size_t size)
 extern int ext2_permission (struct inode *, int, struct nameidata *);
 extern int ext2_acl_chmod (struct inode *);
 extern int ext2_init_acl (struct inode *, struct inode *);
-
-extern int init_ext2_acl(void);
-extern void exit_ext2_acl(void);
 
 #else
 #include <linux/sched.h>

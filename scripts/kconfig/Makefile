@@ -2,8 +2,7 @@
 # Kernel configuration targets
 # These targets are used from top-level makefile
 
-.PHONY: oldconfig xconfig gconfig menuconfig config silentoldconfig \
-	cloneconfig
+.PHONY: oldconfig xconfig gconfig menuconfig config silentoldconfig
 
 xconfig: $(obj)/qconf
 	$< arch/$(ARCH)/Kconfig
@@ -24,16 +23,6 @@ oldconfig: $(obj)/conf
 silentoldconfig: $(obj)/conf
 	$< -s arch/$(ARCH)/Kconfig
 
-check_CONFIG_IKCONFIG_PROC:
-	$(Q)if ! [ -f /proc/config.gz ]; then				\
-	    echo "Running kernel compiled without CONFIG_IKCONFIG_PROC"; \
-	    false;							\
-	fi
-
-_cloneconfig: check_CONFIG_IKCONFIG_PROC
-	$(Q)gzip -cd /proc/config.gz > $(objtree)/.config
-cloneconfig: _cloneconfig oldconfig
-
 .PHONY: randconfig allyesconfig allnoconfig allmodconfig defconfig
 
 randconfig: $(obj)/conf
@@ -48,20 +37,20 @@ allnoconfig: $(obj)/conf
 allmodconfig: $(obj)/conf
 	$< -m arch/$(ARCH)/Kconfig
 
-_defconfig: check_CONFIG_IKCONFIG_PROC
-	$(Q)eval "$$(gzip -cd /proc/config.gz)";			\
-	config=$(srctree)/arch/$(ARCH)/defconfig.$$CONFIG_CFGNAME;	\
-	if ! [ -e $$config ]; then					\
-	    echo "Config file $$config not found";			\
-	    false;							\
-	fi;								\
-	cp $$config $(objtree)/.config
-defconfig: _defconfig oldconfig
+defconfig: $(obj)/conf
+ifeq ($(KBUILD_DEFCONFIG),)
+	$< -d arch/$(ARCH)/Kconfig
+else
+	@echo *** Default configuration is based on '$(KBUILD_DEFCONFIG)'
+	$(Q)$< -D arch/$(ARCH)/configs/$(KBUILD_DEFCONFIG) arch/$(ARCH)/Kconfig
+endif
+
+%_defconfig: $(obj)/conf
+	$(Q)$< -D arch/$(ARCH)/configs/$@ arch/$(ARCH)/Kconfig
 
 # Help text used by make help
 help:
 	@echo  '  oldconfig	  - Update current config utilising a line-oriented program'
-	@echo  '  cloneconfig     - Update current config to the contents of /proc/config.gz'
 	@echo  '  menuconfig	  - Update current config utilising a menu based program'
 	@echo  '  xconfig	  - Update current config utilising a QT based front-end'
 	@echo  '  gconfig	  - Update current config utilising a GTK based front-end'
@@ -81,11 +70,9 @@ help:
 #         Based on GTK which needs to be installed to compile it
 # object files used by all kconfig flavours
 
-libkconfig-objs := zconf.tab.o
-
 hostprogs-y	:= conf mconf qconf gconf
-conf-objs	:= conf.o  libkconfig.so
-mconf-objs	:= mconf.o libkconfig.so
+conf-objs	:= conf.o  zconf.tab.o
+mconf-objs	:= mconf.o zconf.tab.o
 
 ifeq ($(MAKECMDGOALS),xconfig)
 	qconf-target := 1
@@ -97,14 +84,14 @@ endif
 
 ifeq ($(qconf-target),1)
 qconf-cxxobjs	:= qconf.o
-qconf-objs	:= kconfig_load.o
+qconf-objs	:= kconfig_load.o zconf.tab.o
 endif
 
 ifeq ($(gconf-target),1)
-gconf-objs	:= gconf.o kconfig_load.o
+gconf-objs	:= gconf.o kconfig_load.o zconf.tab.o
 endif
 
-clean-files	:= libkconfig.so lkc_defs.h qconf.moc .tmp_qtcheck \
+clean-files	:= lkc_defs.h qconf.moc .tmp_qtcheck \
 		   .tmp_gtkcheck zconf.tab.c zconf.tab.h lex.zconf.c
 
 # generated files seem to need this to find local include files
@@ -112,10 +99,11 @@ HOSTCFLAGS_lex.zconf.o	:= -I$(src)
 HOSTCFLAGS_zconf.tab.o	:= -I$(src)
 
 HOSTLOADLIBES_qconf	= -L$(QTLIBPATH) -Wl,-rpath,$(QTLIBPATH) -l$(QTLIB) -ldl
-HOSTCXXFLAGS_qconf.o	= -I$(QTDIR)/include 
+HOSTCXXFLAGS_qconf.o	= -I$(QTDIR)/include -D LKC_DIRECT_LINK
 
 HOSTLOADLIBES_gconf	= `pkg-config gtk+-2.0 gmodule-2.0 libglade-2.0 --libs`
-HOSTCFLAGS_gconf.o	= `pkg-config gtk+-2.0 gmodule-2.0 libglade-2.0 --cflags`
+HOSTCFLAGS_gconf.o	= `pkg-config gtk+-2.0 gmodule-2.0 libglade-2.0 --cflags` \
+                          -D LKC_DIRECT_LINK
 
 $(obj)/conf.o $(obj)/mconf.o $(obj)/qconf.o $(obj)/gconf.o: $(obj)/zconf.tab.h
 

@@ -71,6 +71,7 @@
 #include <linux/time.h>
 #include <linux/smp_lock.h>
 #include <linux/security.h>
+#include <linux/syscalls.h>
 #include <asm/uaccess.h>
 #include "util.h"
 
@@ -523,7 +524,7 @@ static int semctl_nolock(int semid, int semnum, int cmd, int version, union semu
 		struct semid64_ds tbuf;
 		int id;
 
-		if(semid >= sem_ids.size)
+		if(semid >= sem_ids.entries->size)
 			return -EINVAL;
 
 		memset(&tbuf,0,sizeof(tbuf));

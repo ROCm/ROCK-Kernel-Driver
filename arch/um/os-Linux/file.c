@@ -187,7 +187,7 @@ int os_sigio_async(int master, int slave)
 
 	if((fcntl(master, F_SETFL, flags | O_NONBLOCK | O_ASYNC) < 0) ||
 	   (fcntl(master, F_SETOWN, os_getpid()) < 0)){
-		printk("fcntl F_SETFL or F_SETOWN failed, errno = %d\n", 
+		printk("fcntl F_SETFL or F_SETOWN failed, errno = %d\n",
 		       errno);
 		return(-errno);
 	}
@@ -308,7 +308,8 @@ int os_seek_file(int fd, __u64 offset)
 	__u64 actual;
 
 	actual = lseek64(fd, offset, SEEK_SET);
-	if(actual != offset) return(-errno);
+	if(actual != offset)
+		return(-errno);
 	return(0);
 }
 

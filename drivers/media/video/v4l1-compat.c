@@ -44,7 +44,7 @@
 #endif
 
 static unsigned int debug  = 0;
-MODULE_PARM(debug,"i");
+module_param(debug, int, 0644);
 MODULE_PARM_DESC(debug,"enable debug messages");
 MODULE_AUTHOR("Bill Dirks");
 MODULE_DESCRIPTION("v4l(1) compatibility layer for v4l2 drivers.");
@@ -116,7 +116,7 @@ set_v4l_control(struct inode            *inode,
 		if (value && qctrl2.type == V4L2_CTRL_TYPE_BOOLEAN)
 			value = 65535;
 		ctrl2.id = qctrl2.id;
-		ctrl2.value = 
+		ctrl2.value =
 			(value * (qctrl2.maximum - qctrl2.minimum)
 			 + 32767)
 			/ 65535;
@@ -256,7 +256,7 @@ static int check_size(struct inode         *inode,
 
 	memset(&desc2,0,sizeof(desc2));
 	memset(&fmt2,0,sizeof(fmt2));
-	
+
 	desc2.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	if (0 != drv(inode,file,VIDIOC_ENUM_FMT, &desc2))
 		goto done;
@@ -326,7 +326,7 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 			err = 0;
 		}
 
-		memcpy(cap->name, cap2->card, 
+		memcpy(cap->name, cap2->card,
 		       min(sizeof(cap->name), sizeof(cap2->card)));
 		cap->name[sizeof(cap->name) - 1] = 0;
 		if (cap2->capabilities & V4L2_CAP_VIDEO_CAPTURE)
@@ -383,7 +383,7 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 		if (0 != fbuf2.fmt.bytesperline)
 			buffer->bytesperline = fbuf2.fmt.bytesperline;
 		else {
-			buffer->bytesperline = 
+			buffer->bytesperline =
 				(buffer->width * buffer->depth + 7) & 7;
 			buffer->bytesperline >>= 3;
 		}
@@ -633,7 +633,7 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 		err = drv(inode, file, VIDIOC_G_FMT, fmt2);
 		if (err < 0)
 			dprintk("VIDIOCSPICT / VIDIOC_G_FMT: %d\n",err);
-		if (fmt2->fmt.pix.pixelformat != 
+		if (fmt2->fmt.pix.pixelformat !=
 		    palette_to_pixelformat(pict->palette)) {
 			fmt2->fmt.pix.pixelformat = palette_to_pixelformat(
 				pict->palette);
@@ -807,7 +807,7 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 
 		memset(&aud2,0,sizeof(aud2));
 		memset(&tun2,0,sizeof(tun2));
-		
+
 		aud2.index = aud->audio;
 		err = drv(inode, file, VIDIOC_S_AUDIO, &aud2);
 		if (err < 0) {
@@ -815,7 +815,7 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 			break;
 		}
 
-		set_v4l_control(inode, file, V4L2_CID_AUDIO_VOLUME, 
+		set_v4l_control(inode, file, V4L2_CID_AUDIO_VOLUME,
 				aud->volume, drv);
 		set_v4l_control(inode, file, V4L2_CID_AUDIO_BASS,
 				aud->bass, drv);
@@ -863,16 +863,16 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 		fmt2 = kmalloc(sizeof(*fmt2),GFP_KERNEL);
 		memset(&buf2,0,sizeof(buf2));
 		memset(fmt2,0,sizeof(*fmt2));
-		
+
 		fmt2->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 		err = drv(inode, file, VIDIOC_G_FMT, fmt2);
 		if (err < 0) {
 			dprintk("VIDIOCMCAPTURE / VIDIOC_G_FMT: %d\n",err);
 			break;
 		}
-		if (mm->width   != fmt2->fmt.pix.width  || 
+		if (mm->width   != fmt2->fmt.pix.width  ||
 		    mm->height  != fmt2->fmt.pix.height ||
-		    palette_to_pixelformat(mm->format) != 
+		    palette_to_pixelformat(mm->format) !=
 		    fmt2->fmt.pix.pixelformat)
 		{/* New capture format...  */
 			fmt2->fmt.pix.width = mm->width;
@@ -955,11 +955,11 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 	case VIDIOCGVBIFMT: /* query VBI data capture format */
 	{
 		struct vbi_format      *fmt = arg;
-		
+
 		fmt2 = kmalloc(sizeof(*fmt2),GFP_KERNEL);
 		memset(fmt2, 0, sizeof(*fmt2));
 		fmt2->type = V4L2_BUF_TYPE_VBI_CAPTURE;
-		
+
 		err = drv(inode, file, VIDIOC_G_FMT, fmt2);
 		if (err < 0) {
 			dprintk("VIDIOCGVBIFMT / VIDIOC_G_FMT: %d\n", err);
@@ -979,7 +979,7 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 	case VIDIOCSVBIFMT:
 	{
 		struct vbi_format      *fmt = arg;
-		
+
 		fmt2 = kmalloc(sizeof(*fmt2),GFP_KERNEL);
 		memset(fmt2, 0, sizeof(*fmt2));
 
@@ -987,10 +987,10 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 		fmt2->fmt.vbi.samples_per_line = fmt->samples_per_line;
 		fmt2->fmt.vbi.sampling_rate    = fmt->sampling_rate;
 		fmt2->fmt.vbi.sample_format    = V4L2_PIX_FMT_GREY;
-		fmt2->fmt.vbi.start[0]         = fmt->start[0]; 
-		fmt2->fmt.vbi.count[0]         = fmt->count[0]; 
-		fmt2->fmt.vbi.start[1]         = fmt->start[1]; 
-		fmt2->fmt.vbi.count[1]         = fmt->count[1]; 
+		fmt2->fmt.vbi.start[0]         = fmt->start[0];
+		fmt2->fmt.vbi.count[0]         = fmt->count[0];
+		fmt2->fmt.vbi.start[1]         = fmt->start[1];
+		fmt2->fmt.vbi.count[1]         = fmt->count[1];
 		fmt2->fmt.vbi.flags            = fmt->flags;
 		err = drv(inode, file, VIDIOC_TRY_FMT, fmt2);
 		if (err < 0) {
@@ -1014,7 +1014,7 @@ v4l_compat_translate_ioctl(struct inode         *inode,
 			dprintk("VIDIOCSVBIFMT / VIDIOC_S_FMT: %d\n", err);
 		break;
 	}
-	
+
 	default:
 		err = -ENOIOCTLCMD;
 		break;

@@ -4,6 +4,8 @@
  * Copyright (C) 2001 MontaVista Software Inc.
  * Author: Jun Sun, jsun@mvista.com or jsun@junsun.net
  *
+ * Copyright (C) 2004 by Ralf Baechle (ralf@linux-mips.org)
+ *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
  * Free Software Foundation;  either version 2 of the  License, or (at your
@@ -15,7 +17,6 @@
 #include <linux/pci.h>
 
 #include <asm/bootinfo.h>
-#include <asm/pci_channel.h>
 #include <asm/debug.h>
 
 #include <asm/ddb5xxx/ddb5xxx.h>
@@ -173,6 +174,12 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 	}
 
 	return irq;
+}
+
+/* Do platform specific device initialization at pci_enable_device() time */
+int pcibios_plat_dev_init(struct pci_dev *dev)
+{
+	return 0;
 }
 
 void ddb_pci_reset_bus(void)

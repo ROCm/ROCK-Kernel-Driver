@@ -411,7 +411,6 @@ static int hidp_session(void *arg)
 static inline void hidp_setup_input(struct hidp_session *session, struct hidp_connadd_req *req)
 {
 	struct input_dev *input = session->input;
-	bdaddr_t bdaddr;
 	int i;
 
 	input->private = session;
@@ -420,9 +419,6 @@ static inline void hidp_setup_input(struct hidp_session *session, struct hidp_co
 	input->id.vendor  = req->vendor;
 	input->id.product = req->product;
 	input->id.version = req->version;
-
-	baswap(&bdaddr, &session->bdaddr);
-	snprintf(input->cdev.class_id, BUS_ID_SIZE, "hidp_%s", batostr(&bdaddr));
 
 	if (req->subclass & 0x40) {
 		set_bit(EV_KEY, input->evbit);

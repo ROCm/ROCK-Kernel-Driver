@@ -19,6 +19,8 @@
 #include <linux/device.h>
 #include <linux/delay.h>
 #include <linux/tty.h>
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/partitions.h>
 #include <linux/errno.h>
 
 #include <asm/hardware.h>
@@ -27,6 +29,7 @@
 #include <asm/arch/irqs.h>
 
 #include <asm/mach/arch.h>
+#include <asm/mach/flash.h>
 #include <asm/mach/map.h>
 #include <asm/hardware/sa1111.h>
 #include <asm/mach/serial_sa1100.h>
@@ -79,6 +82,45 @@ static int __init badge4_sa1111_init(void)
 	return platform_add_devices(devices, ARRAY_SIZE(devices));
 }
 
+
+/*
+ * 1 x Intel 28F320C3 Advanced+ Boot Block Flash (32 Mi bit)
+ *   Eight 4 KiW Parameter Bottom Blocks (64 KiB)
+ *   Sixty-three 32 KiW Main Blocks (4032 Ki b)
+ *
+ * <or>
+ *
+ * 1 x Intel 28F640C3 Advanced+ Boot Block Flash (64 Mi bit)
+ *   Eight 4 KiW Parameter Bottom Blocks (64 KiB)
+ *   One-hundred-twenty-seven 32 KiW Main Blocks (8128 Ki b)
+ */
+static struct mtd_partition badge4_partitions[] = {
+        {
+                .name           = "BLOB boot loader",
+                .offset         = 0,
+                .size           = 0x0000A000
+        }, {
+                .name           = "params",
+                .offset         = MTDPART_OFS_APPEND,
+                .size           = 0x00006000
+        }, {
+                .name           = "root",
+                .offset         = MTDPART_OFS_APPEND,
+                .size           = MTDPART_SIZ_FULL
+        }
+};
+
+static struct flash_platform_data badge4_flash_data = {
+	.map_name	= "cfi_probe",
+	.parts		= badge4_partitions,
+	.nr_parts	= ARRAY_SIZE(badge4_partitions),
+};
+
+static struct resource badge4_flash_resource = {
+	.start		= SA1100_CS0_PHYS,
+	.end		= SA1100_CS0_PHYS + SZ_64M - 1,
+	.flags		= IORESOURCE_MEM,
+};
 
 static int five_v_on __initdata = 0;
 
@@ -170,6 +212,9 @@ static int __init badge4_init(void)
 	/* maybe turn on 5v0 from the start */
 	badge4_set_5V(BADGE4_5V_INITIALLY, five_v_on);
 
+	sa11x0_set_flash_data(badge4_flash_data, badge4_flash_resources,
+			      ARRAY_SIZE(badge4_flash_resources);
+
 	return 0;
 }
 
@@ -245,5 +290,5 @@ MACHINE_START(BADGE4, "Hewlett-Packard Laboratories BadgePAD 4")
 	BOOT_PARAMS(0xc0000100)
 	MAPIO(badge4_map_io)
 	INITIRQ(sa1100_init_irq)
-	INITTIME(sa1100_init_time)
+	.timer		= &sa1100_timer,
 MACHINE_END

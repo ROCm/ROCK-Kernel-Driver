@@ -23,10 +23,10 @@
 
 #define NTLMSSP_SIGNATURE "NTLMSSP"
 /* Message Types */
-#define NtLmNegotiate     1
-#define NtLmChallenge     2
-#define NtLmAuthenticate  3
-#define UnknownMessage    8
+#define NtLmNegotiate     cpu_to_le32(1)
+#define NtLmChallenge     cpu_to_le32(2)
+#define NtLmAuthenticate  cpu_to_le32(3)
+#define UnknownMessage    cpu_to_le32(8)
 
 /* Negotiate Flags */
 #define NTLMSSP_NEGOTIATE_UNICODE       0x01	// Text strings are in unicode
@@ -60,15 +60,15 @@
 /* appearance */
 
 typedef struct _SECURITY_BUFFER {
-	__u16 Length;
-	__u16 MaximumLength;
-	__u32 Buffer;		/* offset to buffer */
+	__le16 Length;
+	__le16 MaximumLength;
+	__le32 Buffer;		/* offset to buffer */
 } SECURITY_BUFFER;
 
 typedef struct _NEGOTIATE_MESSAGE {
 	__u8 Signature[sizeof (NTLMSSP_SIGNATURE)];
-	__u32 MessageType;     /* 1 */
-	__u32 NegotiateFlags;
+	__le32 MessageType;     /* 1 */
+	__le32 NegotiateFlags;
 	SECURITY_BUFFER DomainName;	/* RFC 1001 style and ASCII */
 	SECURITY_BUFFER WorkstationName;	/* RFC 1001 and ASCII */
 	char DomainString[0];
@@ -77,9 +77,9 @@ typedef struct _NEGOTIATE_MESSAGE {
 
 typedef struct _CHALLENGE_MESSAGE {
 	__u8 Signature[sizeof (NTLMSSP_SIGNATURE)];
-	__u32 MessageType;   /* 2 */
+	__le32 MessageType;   /* 2 */
 	SECURITY_BUFFER TargetName;
-	__u32 NegotiateFlags;
+	__le32 NegotiateFlags;
 	__u8 Challenge[CIFS_CRYPTO_KEY_SIZE];
 	__u8 Reserved[8];
 	SECURITY_BUFFER TargetInfoArray;
@@ -87,14 +87,14 @@ typedef struct _CHALLENGE_MESSAGE {
 
 typedef struct _AUTHENTICATE_MESSAGE {
 	__u8 Signature[sizeof (NTLMSSP_SIGNATURE)];
-	__u32 MessageType;  /* 3 */
+	__le32 MessageType;  /* 3 */
 	SECURITY_BUFFER LmChallengeResponse;
 	SECURITY_BUFFER NtChallengeResponse;
 	SECURITY_BUFFER DomainName;
 	SECURITY_BUFFER UserName;
 	SECURITY_BUFFER WorkstationName;
 	SECURITY_BUFFER SessionKey;
-	__u32 NegotiateFlags;
+	__le32 NegotiateFlags;
 	char UserString[0];
 } AUTHENTICATE_MESSAGE, *PAUTHENTICATE_MESSAGE;
 

@@ -2,10 +2,42 @@
 #define LINUX_HARDIRQ_H
 
 #include <linux/config.h>
-#ifdef CONFIG_PREEPT
 #include <linux/smp_lock.h>
-#endif
 #include <asm/hardirq.h>
+
+/*
+ * We put the hardirq and softirq counter into the preemption
+ * counter. The bitmask has the following meaning:
+ *
+ * - bits 0-7 are the preemption count (max preemption depth: 256)
+ * - bits 8-15 are the softirq count (max # of softirqs: 256)
+ *
+ * The hardirq count can be overridden per architecture, the default is:
+ *
+ * - bits 16-27 are the hardirq count (max # of hardirqs: 4096)
+ * - ( bit 28 is the PREEMPT_ACTIVE flag. )
+ *
+ * PREEMPT_MASK: 0x000000ff
+ * SOFTIRQ_MASK: 0x0000ff00
+ * HARDIRQ_MASK: 0x0fff0000
+ */
+#define PREEMPT_BITS	8
+#define SOFTIRQ_BITS	8
+
+#ifndef HARDIRQ_BITS
+#define HARDIRQ_BITS	12
+/*
+ * The hardirq mask has to be large enough to have space for potentially
+ * all IRQ sources in the system nesting on a single CPU.
+ */
+#if (1 << HARDIRQ_BITS) < NR_IRQS
+# error HARDIRQ_BITS is too low!
+#endif
+#endif
+
+#define PREEMPT_SHIFT	0
+#define SOFTIRQ_SHIFT	(PREEMPT_SHIFT + PREEMPT_BITS)
+#define HARDIRQ_SHIFT	(SOFTIRQ_SHIFT + SOFTIRQ_BITS)
 
 #define __IRQ_MASK(x)	((1UL << (x))-1)
 
@@ -29,9 +61,6 @@
 #define in_softirq()		(softirq_count())
 #define in_interrupt()		(irq_count())
 
-#define hardirq_trylock()	(!in_interrupt())
-#define hardirq_endlock()	do { } while (0)
-
 #ifdef CONFIG_PREEMPT
 # define in_atomic()	((preempt_count() & ~PREEMPT_ACTIVE) != kernel_locked())
 # define preemptible()	(preempt_count() == 0 && !irqs_disabled())
@@ -46,6 +75,14 @@
 extern void synchronize_irq(unsigned int irq);
 #else
 # define synchronize_irq(irq)	barrier()
+#endif
+
+#ifdef CONFIG_GENERIC_HARDIRQS
+#define nmi_enter()		(preempt_count() += HARDIRQ_OFFSET)
+#define nmi_exit()		(preempt_count() -= HARDIRQ_OFFSET)
+
+#define irq_enter()		(preempt_count() += HARDIRQ_OFFSET)
+extern void irq_exit(void);
 #endif
 
 #endif /* LINUX_HARDIRQ_H */

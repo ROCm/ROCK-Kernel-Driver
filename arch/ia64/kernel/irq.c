@@ -43,13 +43,13 @@
 #include <linux/seq_file.h>
 #include <linux/kallsyms.h>
 #include <linux/notifier.h>
+#include <linux/bitops.h>
 
 #include <asm/atomic.h>
 #include <asm/cpu.h>
 #include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
@@ -215,11 +215,6 @@ int show_interrupts(struct seq_file *p, void *v)
 skip:
 		spin_unlock_irqrestore(&idesc->lock, flags);
 	} else if (i == NR_IRQS) {
-		seq_puts(p, "NMI: ");
-		for (j = 0; j < NR_CPUS; j++)
-			if (cpu_online(j))
-				seq_printf(p, "%10u ", nmi_count(j));
-		seq_putc(p, '\n');
 #ifdef CONFIG_X86_LOCAL_APIC
 		seq_puts(p, "LOC: ");
 		for (j = 0; j < NR_CPUS; j++)
@@ -307,7 +302,7 @@ static void report_bad_irq(int irq, irq_desc_t *desc, irqreturn_t action_ret)
 	}
 }
 
-static int noirqdebug = 1;
+static int noirqdebug;
 
 static int __init noirqdebug_setup(char *str)
 {
@@ -317,15 +312,6 @@ static int __init noirqdebug_setup(char *str)
 }
 
 __setup("noirqdebug", noirqdebug_setup);
-
-static int __init irqdebug_setup(char *str)
-{
-	noirqdebug = 0;
-	printk("IRQ lockup detection enabled\n");
-	return 1;
-}
-
-__setup("irqdebug", irqdebug_setup);
 
 /*
  * If 99,900 of the previous 100,000 interrupts have not been handled then
@@ -975,7 +961,7 @@ static int irq_affinity_read_proc (char *page, char **start, off_t off,
 	return len;
 }
 
-static int irq_affinity_write_proc (struct file *file, const char *buffer,
+static int irq_affinity_write_proc (struct file *file, const char __user *buffer,
 				    unsigned long count, void *data)
 {
 	unsigned int irq = (unsigned long) data;
@@ -1189,7 +1175,7 @@ void init_irq_proc (void)
 	int i;
 
 	/* create /proc/irq */
-	root_irq_dir = proc_mkdir("irq", 0);
+	root_irq_dir = proc_mkdir("irq", NULL);
 
 	/* create /proc/irq/prof_cpu_mask */
 	create_prof_cpu_mask(root_irq_dir);

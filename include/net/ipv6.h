@@ -90,20 +90,6 @@
 #define IPV6_ADDR_SCOPE_GLOBAL		0x0e
 
 /*
- * 	Addr scopes
- */
-#ifdef __KERNEL__
-#define IPV6_ADDR_MC_SCOPE(a)   \
-        ((a)->s6_addr[1] & 0x0f)        /* XXX nonstandard */
-#define __IPV6_ADDR_SCOPE_INVALID	-1
-#endif
-#define IPV6_ADDR_SCOPE_NODELOCAL       0x01
-#define IPV6_ADDR_SCOPE_LINKLOCAL       0x02
-#define IPV6_ADDR_SCOPE_SITELOCAL       0x05
-#define IPV6_ADDR_SCOPE_ORGLOCAL        0x08
-#define IPV6_ADDR_SCOPE_GLOBAL          0x0e
-
-/*
  *	fragmentation header
  */
 
@@ -263,28 +249,12 @@ typedef int		(*inet_getfrag_t) (const void *data,
 					   char *,
 					   unsigned int, unsigned int);
 
-/*
- *	Address manipulation functions
- */
-extern int		__ipv6_addr_type(const struct in6_addr *addr);
-static inline		int ipv6_addr_type(const struct in6_addr *addr)
-{
-	return __ipv6_addr_type(addr) & 0xffff;
-}
+
+extern int		ipv6_addr_type(const struct in6_addr *addr);
 
 static inline int ipv6_addr_scope(const struct in6_addr *addr)
 {
-	return __ipv6_addr_type(addr) & IPV6_ADDR_SCOPE_MASK;
-}
-
-static inline int __ipv6_addr_src_scope(int type)
-{
-	return type == IPV6_ADDR_ANY ? __IPV6_ADDR_SCOPE_INVALID : type>>16;
-}
-
-static inline int ipv6_addr_src_scope(const struct in6_addr *addr)
-{
-	return __ipv6_addr_src_scope(__ipv6_addr_type(addr));
+	return ipv6_addr_type(addr) & IPV6_ADDR_SCOPE_MASK;
 }
 
 static inline int ipv6_addr_cmp(const struct in6_addr *a1, const struct in6_addr *a2)
@@ -325,6 +295,15 @@ static inline void ipv6_addr_set(struct in6_addr *addr,
 	addr->s6_addr32[3] = w4;
 }
 #endif
+
+static inline int ipv6_addr_equal(const struct in6_addr *a1,
+				  const struct in6_addr *a2)
+{
+	return (a1->s6_addr32[0] == a2->s6_addr32[0] &&
+		a1->s6_addr32[1] == a2->s6_addr32[1] &&
+		a1->s6_addr32[2] == a2->s6_addr32[2] &&
+		a1->s6_addr32[3] == a2->s6_addr32[3]);
+}
 
 static inline int ipv6_addr_any(const struct in6_addr *a)
 {
@@ -385,7 +364,7 @@ extern int			ip6_dst_lookup(struct sock *sk,
  *	skb processing functions
  */
 
-extern int			ip6_output(struct sk_buff **pskb);
+extern int			ip6_output(struct sk_buff *skb);
 extern int			ip6_forward(struct sk_buff *skb);
 extern int			ip6_input(struct sk_buff *skb);
 extern int			ip6_mc_input(struct sk_buff *skb);

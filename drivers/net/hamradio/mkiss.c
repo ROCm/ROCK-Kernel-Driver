@@ -30,7 +30,7 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/uaccess.h>
 #include <linux/string.h>
 #include <linux/mm.h>
@@ -379,7 +379,7 @@ static void ax_encaps(struct ax_disp *ax, unsigned char *icp, int len)
 	}
 	
 	ax->tty->flags |= (1 << TTY_DO_WRITE_WAKEUP);
-	actual = ax->tty->driver->write(ax->tty, 0, ax->xbuff, count);
+	actual = ax->tty->driver->write(ax->tty, ax->xbuff, count);
 	ax->tx_packets++;
 	ax->tx_bytes+=actual;
 	ax->dev->trans_start = jiffies;
@@ -411,7 +411,7 @@ static void ax25_write_wakeup(struct tty_struct *tty)
 		return;
 	}
 
-	actual = tty->driver->write(tty, 0, ax->xhead, ax->xleft);
+	actual = tty->driver->write(tty, ax->xhead, ax->xleft);
 	ax->xleft -= actual;
 	ax->xhead += actual;
 }
@@ -518,7 +518,7 @@ static int ax_open(struct net_device *dev)
 
 	ax->flags   &= (1 << AXF_INUSE);      /* Clear ESCAPE & ERROR flags */
 
-	ax->buflock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&ax->buflock);
 
 	netif_start_queue(dev);
 	return 0;
@@ -602,8 +602,6 @@ static int ax25_open(struct tty_struct *tty)
 
 	if (tty->driver->flush_buffer)
 		tty->driver->flush_buffer(tty);
-	if (tty->ldisc.flush_buffer)
-		tty->ldisc.flush_buffer(tty);
 
 	/* Restore default settings */
 	ax->dev->type = ARPHRD_AX25;

@@ -45,11 +45,11 @@
 #include <linux/skbuff.h>
 #include <linux/if_arp.h>
 #include <linux/if_frad.h>
+#include <linux/bitops.h>
 
 #include <net/sock.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/uaccess.h>

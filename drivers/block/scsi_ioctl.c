@@ -107,12 +107,13 @@ static int sg_emulated_host(request_queue_t *q, int __user *p)
 
 #define CMD_READ_SAFE	0x01
 #define CMD_WRITE_SAFE	0x02
+#define CMD_WARNED	0x04
 #define safe_for_read(cmd)	[cmd] = CMD_READ_SAFE
 #define safe_for_write(cmd)	[cmd] = CMD_WRITE_SAFE
 
 static int verify_command(struct file *file, unsigned char *cmd)
 {
-	static const unsigned char cmd_type[256] = {
+	static unsigned char cmd_type[256] = {
 
 		/* Basic read-only commands */
 		safe_for_read(TEST_UNIT_READY),
@@ -126,10 +127,10 @@ static int verify_command(struct file *file, unsigned char *cmd)
 		safe_for_read(INQUIRY),
 		safe_for_read(MODE_SENSE),
 		safe_for_read(MODE_SENSE_10),
+		safe_for_read(LOG_SENSE),
 		safe_for_read(START_STOP),
 		safe_for_read(GPCMD_VERIFY_10),
 		safe_for_read(VERIFY_16),
-		safe_for_read(READ_BUFFER),
 
 		/* Audio CD commands */
 		safe_for_read(GPCMD_PLAY_CD),
@@ -139,6 +140,7 @@ static int verify_command(struct file *file, unsigned char *cmd)
 		safe_for_read(GPCMD_PAUSE_RESUME),
 
 		/* CD/DVD data reading */
+		safe_for_read(GPCMD_READ_BUFFER_CAPACITY),
 		safe_for_read(GPCMD_READ_CD),
 		safe_for_read(GPCMD_READ_CD_MSF),
 		safe_for_read(GPCMD_READ_DISC_INFO),
@@ -168,6 +170,7 @@ static int verify_command(struct file *file, unsigned char *cmd)
 		safe_for_write(ERASE),
 		safe_for_write(GPCMD_MODE_SELECT_10),
 		safe_for_write(MODE_SELECT),
+		safe_for_write(LOG_SELECT),
 		safe_for_write(GPCMD_BLANK),
 		safe_for_write(GPCMD_CLOSE_TRACK),
 		safe_for_write(GPCMD_FLUSH_CACHE),
@@ -194,6 +197,11 @@ static int verify_command(struct file *file, unsigned char *cmd)
 	if (type & CMD_WRITE_SAFE) {
 		if (file->f_mode & FMODE_WRITE)
 			return 0;
+	}
+
+	if (!(type & CMD_WARNED)) {
+		cmd_type[cmd[0]] = CMD_WARNED;
+		printk(KERN_WARNING "scsi: unknown opcode 0x%02x\n", cmd[0]);
 	}
 
 	/* And root can do any command.. */
@@ -293,11 +301,11 @@ static int sg_io(struct file *file, request_queue_t *q,
 	blk_execute_rq(q, bd_disk, rq);
 
 	/* write to all output members */
-	hdr->status = rq->errors;	
-	hdr->masked_status = (hdr->status >> 1) & 0x1f;
-	hdr->msg_status = 0;
-	hdr->host_status = 0;
-	hdr->driver_status = 0;
+	hdr->status = 0xff & rq->errors;
+	hdr->masked_status = status_byte(rq->errors);
+	hdr->msg_status = msg_byte(rq->errors);
+	hdr->host_status = host_byte(rq->errors);
+	hdr->driver_status = driver_byte(rq->errors);
 	hdr->info = 0;
 	if (hdr->masked_status || hdr->host_status || hdr->driver_status)
 		hdr->info |= SG_INFO_CHECK;
@@ -320,6 +328,11 @@ static int sg_io(struct file *file, request_queue_t *q,
 	return 0;
 }
 
+#define FORMAT_UNIT_TIMEOUT		(2 * 60 * 60 * HZ)
+#define START_STOP_TIMEOUT		(60 * HZ)
+#define MOVE_MEDIUM_TIMEOUT		(5 * 60 * HZ)
+#define READ_ELEMENT_STATUS_TIMEOUT	(5 * 60 * HZ)
+#define READ_DEFECT_DATA_TIMEOUT	(60 * HZ )
 #define OMAX_SB_LEN 16          /* For backward compatibility */
 
 static int sg_scsi_ioctl(struct file *file, request_queue_t *q,
@@ -533,6 +546,7 @@ int scsi_cmd_ioctl(struct file *file, struct gendisk *bd_disk, unsigned int cmd,
 		 * old junk scsi send command ioctl
 		 */
 		case SCSI_IOCTL_SEND_COMMAND:
+			printk(KERN_WARNING "program %s is using a deprecated SCSI ioctl, please convert it to SG_IO\n", current->comm);
 			err = -EINVAL;
 			if (!arg)
 				break;

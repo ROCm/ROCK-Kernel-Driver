@@ -53,7 +53,7 @@ struct linux_ebus {
 
 struct ebus_dma_info {
 	spinlock_t	lock;
-	unsigned long	regs;
+	void __iomem	*regs;
 
 	unsigned int	flags;
 #define EBUS_DMA_FLAG_USE_EBDMA_HANDLER		0x00000001

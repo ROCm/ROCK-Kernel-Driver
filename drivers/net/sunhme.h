@@ -397,7 +397,7 @@ struct quattro;
 
 /* Happy happy, joy joy! */
 struct happy_meal {
-	unsigned long	gregs;			/* Happy meal global registers       */
+	void __iomem	*gregs;			/* Happy meal global registers       */
 	struct hmeal_init_block  *happy_block;	/* RX and TX descriptors (CPU addr)  */
 
 #if defined(CONFIG_SBUS) && defined(CONFIG_PCI)
@@ -423,14 +423,14 @@ struct happy_meal {
 	struct net_device_stats	  net_stats;      /* Statistical counters              */
 
 #if defined(CONFIG_SBUS) && defined(CONFIG_PCI)
-	u32 (*read32)(unsigned long);
-	void (*write32)(unsigned long, u32);
+	u32 (*read32)(void __iomem *);
+	void (*write32)(void __iomem *, u32);
 #endif
 
-	unsigned long	etxregs;        /* External transmitter regs         */
-	unsigned long	erxregs;        /* External receiver regs            */
-	unsigned long	bigmacregs;     /* BIGMAC core regs		     */
-	unsigned long	tcvregs;        /* MIF transceiver regs              */
+	void __iomem	*etxregs;        /* External transmitter regs        */
+	void __iomem	*erxregs;        /* External receiver regs           */
+	void __iomem	*bigmacregs;     /* BIGMAC core regs		     */
+	void __iomem	*tcvregs;        /* MIF transceiver regs             */
 
 	dma_addr_t                hblock_dvma;    /* DVMA visible address happy block  */
 	unsigned int              happy_flags;    /* Driver state flags                */

@@ -53,8 +53,8 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/pgtable.h>
@@ -1260,7 +1260,7 @@ struct net_device * __init i82596_probe(int unit)
 	lp->scb.command = 0;
 	lp->scb.cmd = I596_NULL;
 	lp->scb.rfd = I596_NULL;
-	lp->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&lp->lock);
 
 	err = register_netdev(dev);
 	if (err)

@@ -83,15 +83,6 @@ struct viocharlpevent {
 	u8 data[VIOCHAR_MAX_DATA];
 };
 
-/*
- * This is a place where we handle the distribution of memory
- * for copy_from_user() calls.  The buffer_available array is to
- * help us determine which buffer to use.
- */
-#define VIOCHAR_NUM_CFU_BUFFERS	7
-static struct viocharlpevent viocons_cfu_buffer[VIOCHAR_NUM_CFU_BUFFERS];
-static atomic_t viocons_cfu_buffer_available[VIOCHAR_NUM_CFU_BUFFERS];
-
 #define VIOCHAR_WINDOW		10
 #define VIOCHAR_HIGHWATERMARK	3
 
@@ -204,50 +195,6 @@ static inline int viotty_paranoia_check(struct port_info *pi,
 		return 1;
 	}
 	return 0;
-}
-
-/*
- * This function should ONLY be called once from viocons_init2
- */
-static void viocons_init_cfu_buffer(void)
-{
-	int i;
-
-	for (i = 1; i < VIOCHAR_NUM_CFU_BUFFERS; i++)
-		atomic_set(&viocons_cfu_buffer_available[i], 1);
-}
-
-static struct viocharlpevent *viocons_get_cfu_buffer(void)
-{
-	int i;
-
-	/*
-	 * Grab the first available buffer.  It doesn't matter if we
-	 * are interrupted during this array traversal as long as we
-	 * get an available space.
-	 */
-	for (i = 0; i < VIOCHAR_NUM_CFU_BUFFERS; i++)
-		if (atomic_dec_if_positive(&viocons_cfu_buffer_available[i])
-				== 0 )
-			return &viocons_cfu_buffer[i];
-	hvlog("\n\rviocons: viocons_get_cfu_buffer : no free buffers found");
-	return NULL;
-}
-
-static void viocons_free_cfu_buffer(struct viocharlpevent *buffer)
-{
-	int i;
-
-	i = buffer - &viocons_cfu_buffer[0];
-	if (i >= (sizeof(viocons_cfu_buffer) / sizeof(viocons_cfu_buffer[0]))) {
-		hvlog("\n\rviocons: viocons_free_cfu_buffer : buffer pointer not found in list.");
-		return;
-	}
-	if (atomic_read(&viocons_cfu_buffer_available[i]) != 0) {
-		hvlog("\n\rviocons: WARNING : returning unallocated cfu buffer.");
-		return;
-	}
-	atomic_set(&viocons_cfu_buffer_available[i], 1);
 }
 
 /*
@@ -422,10 +369,7 @@ static void send_buffers(struct port_info *pi)
 			pi->overflowMessage = 0;
 
 		if (pi->tty) {
-			if ((pi->tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-			    (pi->tty->ldisc.write_wakeup))
-				(pi->tty->ldisc.write_wakeup)(pi->tty);
-			wake_up_interruptible(&pi->tty->write_wait);
+			tty_wakeup(pi->tty);
 		}
 	}
 
@@ -441,15 +385,14 @@ static void send_buffers(struct port_info *pi)
  * NOTE: Don't use printk in here because it gets nastily recursive.  hvlog
  * can be used to log to the hypervisor buffer
  */
-static int internal_write(struct port_info *pi, const char *buf,
-			  size_t len, struct viocharlpevent *viochar)
+static int internal_write(struct port_info *pi, const char *buf, size_t len)
 {
 	HvLpEvent_Rc hvrc;
 	size_t bleft;
 	size_t curlen;
 	const char *curbuf;
 	unsigned long flags;
-	int copy_needed = (viochar == NULL);
+	struct viocharlpevent *viochar;
 
 	/*
 	 * Write to the hvlog of inbound data are now done prior to
@@ -465,25 +408,13 @@ static int internal_write(struct port_info *pi, const char *buf,
 
 	spin_lock_irqsave(&consolelock, flags);
 
-	/*
-	 * If the internal_write() was passed a pointer to a
-	 * viocharlpevent then we don't need to allocate a new one
-	 * (this is the case where we are internal_writing user space
-	 * data).  If we aren't writing user space data then we need
-	 * to get an event from viopath.
-	 */
-	if (copy_needed) {
-		/* This one is fetched from the viopath data structure */
-		viochar = (struct viocharlpevent *)
-			vio_get_event_buffer(viomajorsubtype_chario);
-		/* Make sure we got a buffer */
-		if (viochar == NULL) {
-			spin_unlock_irqrestore(&consolelock, flags);
-			hvlog("\n\rviocons: Can't get viochar buffer in internal_write().");
-			return -EAGAIN;
-		}
-		initDataEvent(viochar, pi->lp);
+	viochar = vio_get_event_buffer(viomajorsubtype_chario);
+	if (viochar == NULL) {
+		spin_unlock_irqrestore(&consolelock, flags);
+		hvlog("\n\rviocons: Can't get vio buffer in internal_write().");
+		return -EAGAIN;
 	}
+	initDataEvent(viochar, pi->lp);
 
 	curbuf = buf;
 	bleft = len;
@@ -496,25 +427,16 @@ static int internal_write(struct port_info *pi, const char *buf,
 			curlen = bleft;
 
 		viochar->event.xCorrelationToken = pi->seq++;
-
-		if (copy_needed) {
-			memcpy(viochar->data, curbuf, curlen);
-			viochar->len = curlen;
-		}
-
+		memcpy(viochar->data, curbuf, curlen);
+		viochar->len = curlen;
 		viochar->event.xSizeMinus1 =
 		    offsetof(struct viocharlpevent, data) + curlen;
 
 		hvrc = HvCallEvent_signalLpEvent(&viochar->event);
 		if (hvrc) {
-			spin_unlock_irqrestore(&consolelock, flags);
-			if (copy_needed)
-				vio_free_event_buffer(viomajorsubtype_chario, viochar);
-
 			hvlog("viocons: error sending event! %d\n", (int)hvrc);
-			return len - bleft;
+			goto out;
 		}
-
 		curbuf += curlen;
 		bleft -= curlen;
 	}
@@ -522,14 +444,9 @@ static int internal_write(struct port_info *pi, const char *buf,
 	/* If we didn't send it all, buffer as much of it as we can. */
 	if (bleft > 0)
 		bleft -= buffer_add(pi, curbuf, bleft);
-	/*
-	 * Since we grabbed it from the viopath data structure, return
-	 * it to the data structure.
-	 */
-	if (copy_needed)
-		vio_free_event_buffer(viomajorsubtype_chario, viochar);
+out:
+	vio_free_event_buffer(viomajorsubtype_chario, viochar);
 	spin_unlock_irqrestore(&consolelock, flags);
-
 	return len - bleft;
 }
 
@@ -606,18 +523,8 @@ static void viocons_write(struct console *co, const char *s, unsigned count)
 
 	hvlogOutput(s, count);
 
-	if (!viopath_isactive(pi->lp)) {
-		/*
-		 * This is a VERY noisy trace message in the case where the
-		 * path manager is not active or in the case where this
-		 * function is called prior to viocons initialization.  It is
-		 * being commented out for the sake of a clear trace buffer.
-		 */
-#if 0
-		 hvlog("\n\rviocons_write: path not active to lp %d", pi->lp);
-#endif
+	if (!viopath_isactive(pi->lp))
 		return;
-	}
 
 	/* 
 	 * Any newline character found will cause a
@@ -630,17 +537,16 @@ static void viocons_write(struct console *co, const char *s, unsigned count)
 			 * Newline found. Print everything up to and 
 			 * including the newline
 			 */
-			internal_write(pi, &s[begin], index - begin + 1,
-					NULL);
+			internal_write(pi, &s[begin], index - begin + 1);
 			begin = index + 1;
 			/* Emit a carriage return as well */
-			internal_write(pi, &cr, 1, NULL);
+			internal_write(pi, &cr, 1);
 		}
 	}
 
 	/* If any characters left to write, write them now */
 	if ((index - begin) > 0)
-		internal_write(pi, &s[begin], index - begin, NULL);
+		internal_write(pi, &s[begin], index - begin);
 }
 
 /*
@@ -724,11 +630,9 @@ static void viotty_close(struct tty_struct *tty, struct file *filp)
 /*
  * TTY Write method
  */
-static int viotty_write(struct tty_struct *tty, int from_user,
-			const unsigned char *buf, int count)
+static int viotty_write(struct tty_struct *tty, const unsigned char *buf,
+		int count)
 {
-	int ret;
-	int total = 0;
 	struct port_info *pi;
 
 	pi = get_port_data(tty);
@@ -749,53 +653,10 @@ static int viotty_write(struct tty_struct *tty, int from_user,
 	 * viotty_write call and, since the viopath isn't active to this
 	 * partition, return count.
 	 */
-	if (!viopath_isactive(pi->lp)) {
-		/* Noisy trace.  Commented unless needed. */
-#if 0
-		 hvlog("\n\rviotty_write: viopath NOT active for lp %d.",pi->lp);
-#endif
+	if (!viopath_isactive(pi->lp))
 		return count;
-	}
 
-	/*
-	 * If the viotty_write is invoked from user space we want to do the
-	 * copy_from_user() into an event buffer from the cfu buffer before
-	 * internal_write() is called because internal_write may need to buffer
-	 * data which will need to grab a spin_lock and we shouldn't
-	 * copy_from_user() while holding a spin_lock.  Should internal_write()
-	 * not need to buffer data then it'll just use the event we created here
-	 * rather than checking one out from vio_get_event_buffer().
-	 */
-	if (from_user) {
-		struct viocharlpevent *viochar;
-		int curlen;
-		const char *curbuf = buf;
-
-		viochar = viocons_get_cfu_buffer();
-		if (viochar == NULL)
-			return -EAGAIN;
-		initDataEvent(viochar, pi->lp);
-		while (count > 0) {
-			if (count > VIOCHAR_MAX_DATA)
-				curlen = VIOCHAR_MAX_DATA;
-			else
-				curlen = count;
-			viochar->len = curlen;
-			ret = copy_from_user(viochar->data, curbuf, curlen);
-			if (ret)
-				break;
-			ret = internal_write(pi, viochar->data,
-					viochar->len, viochar);
-			total += ret;
-			if (ret != curlen)
-				break;
-			count -= curlen;
-			curbuf += curlen;
-		}
-		viocons_free_cfu_buffer(viochar);
-	} else
-		total = internal_write(pi, buf, count, NULL);
-	return total;
+	return internal_write(pi, buf, count);
 }
 
 /*
@@ -814,7 +675,7 @@ static void viotty_put_char(struct tty_struct *tty, unsigned char ch)
 		hvlogOutput(&ch, 1);
 
 	if (viopath_isactive(pi->lp))
-		internal_write(pi, &ch, 1, NULL);
+		internal_write(pi, &ch, 1);
 }
 
 /*
@@ -923,7 +784,7 @@ static void vioHandleOpenEvent(struct HvLpEvent *event)
 			atomic_set(aptr, 1);
 		} else
 			printk(VIOCONS_KERN_WARN
-			       "wierd...got open ack without atomic\n");
+			       "weird...got open ack without atomic\n");
 		return;
 	}
 
@@ -1309,8 +1170,6 @@ static int __init viocons_init2(void)
 		put_tty_driver(viotty_driver);
 		viotty_driver = NULL;
 	}
-
-	viocons_init_cfu_buffer();
 
 	unregister_console(&viocons_early);
 	register_console(&viocons);

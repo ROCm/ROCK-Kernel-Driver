@@ -56,7 +56,7 @@
 #include <net/xfrm.h>
 #include <net/checksum.h>
 
-static int ip6_fragment(struct sk_buff **pskb, int (*output)(struct sk_buff**));
+static int ip6_fragment(struct sk_buff *skb, int (*output)(struct sk_buff *));
 
 static __inline__ void ipv6_select_ident(struct sk_buff *skb, struct frag_hdr *fhdr)
 {
@@ -108,9 +108,8 @@ static int ip6_dev_loopback_xmit(struct sk_buff *newskb)
 }
 
 
-static int ip6_output2(struct sk_buff **pskb)
+static int ip6_output2(struct sk_buff *skb)
 {
-	struct sk_buff *skb = *pskb;
 	struct dst_entry *dst = skb->dst;
 	struct net_device *dev = dst->dev;
 
@@ -146,16 +145,12 @@ static int ip6_output2(struct sk_buff **pskb)
 	return NF_HOOK(PF_INET6, NF_IP6_POST_ROUTING, skb,NULL, skb->dev,ip6_output_finish);
 }
 
-int ip6_output(struct sk_buff **pskb)
+int ip6_output(struct sk_buff *skb)
 {
-	struct sk_buff *skb = *pskb;
-
-	if ((skb->len > dst_pmtu(skb->dst)
-	     || (skb->dst->flags & DST_FRAGHDR)
-	     || skb_shinfo(skb)->frag_list))
-		return ip6_fragment(pskb, ip6_output2);
+	if (skb->len > dst_pmtu(skb->dst))
+		return ip6_fragment(skb, ip6_output2);
 	else
-		return ip6_output2(pskb);
+		return ip6_output2(skb);
 }
 
 #ifdef CONFIG_NETFILTER
@@ -272,6 +267,8 @@ int ip6_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl,
 		return NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, dst->dev, ip6_maybe_reroute);
 	}
 
+	if (net_ratelimit())
+		printk(KERN_DEBUG "IPv6: sending pkt_too_big to self\n");
 	skb->dev = dst->dev;
 	icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, mtu, skb->dev);
 	IP6_INC_STATS(IPSTATS_MIB_FRAGFAILS);
@@ -477,6 +474,7 @@ static void ip6_copy_metadata(struct sk_buff *to, struct sk_buff *from)
 	/* Connection association is same as pre-frag packet */
 	to->nfct = from->nfct;
 	nf_conntrack_get(to->nfct);
+	to->nfctinfo = from->nfctinfo;
 #ifdef CONFIG_BRIDGE_NETFILTER
 	nf_bridge_put(to->nf_bridge);
 	to->nf_bridge = from->nf_bridge;
@@ -517,10 +515,10 @@ int ip6_find_1stfragopt(struct sk_buff *skb, u8 **nexthdr)
 	return offset;
 }
 
-static int ip6_fragment(struct sk_buff **pskb, int (*output)(struct sk_buff**))
+static int ip6_fragment(struct sk_buff *skb, int (*output)(struct sk_buff *))
 {
 	struct net_device *dev;
-	struct sk_buff *frag, *skb = *pskb;
+	struct sk_buff *frag;
 	struct rt6_info *rt = (struct rt6_info*)skb->dst;
 	struct ipv6hdr *tmp_hdr;
 	struct frag_hdr *fh;
@@ -609,7 +607,7 @@ static int ip6_fragment(struct sk_buff **pskb, int (*output)(struct sk_buff**))
 				ip6_copy_metadata(frag, skb);
 			}
 			
-			err = output(&skb);
+			err = output(skb);
 			if (err || !frag)
 				break;
 
@@ -725,7 +723,7 @@ slow_path:
 
 		IP6_INC_STATS(IPSTATS_MIB_FRAGCREATES);
 
-		err = output(&frag);
+		err = output(frag);
 		if (err)
 			goto fail;
 	}
@@ -770,9 +768,9 @@ int ip6_dst_lookup(struct sock *sk, struct dst_entry **dst, struct flowi *fl)
 				 */
 	
 			if (((rt->rt6i_dst.plen != 128 ||
-			      ipv6_addr_cmp(&fl->fl6_dst, &rt->rt6i_dst.addr))
+			      !ipv6_addr_equal(&fl->fl6_dst, &rt->rt6i_dst.addr))
 			     && (np->daddr_cache == NULL ||
-				 ipv6_addr_cmp(&fl->fl6_dst, np->daddr_cache)))
+				 !ipv6_addr_equal(&fl->fl6_dst, np->daddr_cache)))
 			    || (fl->oif && fl->oif != (*dst)->dev->ifindex)) {
 				*dst = NULL;
 			} else
@@ -867,6 +865,7 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 	hh_len = LL_RESERVED_SPACE(rt->u.dst.dev);
 
 	fragheaderlen = sizeof(struct ipv6hdr) + (opt ? opt->opt_nflen : 0);
+	maxfraglen = ((mtu - fragheaderlen) & ~7) + fragheaderlen - sizeof(struct frag_hdr);
 
 	if (mtu <= sizeof(struct ipv6hdr) + IPV6_MAXPLEN) {
 		if (inet->cork.length + length > sizeof(struct ipv6hdr) + IPV6_MAXPLEN - fragheaderlen) {
@@ -890,11 +889,6 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 	 *        are too large.
 	 * --yoshfuji 
 	 */
-
-	if (fragheaderlen + inet->cork.length + length <= mtu)
-		maxfraglen = mtu;
-	else
-		maxfraglen = ((mtu - fragheaderlen) & ~7) + fragheaderlen - sizeof(struct frag_hdr);
 
 	inet->cork.length += length;
 

@@ -226,6 +226,10 @@ int show_cpuinfo(struct seq_file *m, void *v)
 		maj = ((pvr >> 8) & 0xFF) - 1;
 		min = pvr & 0xFF;
 		break;
+	case 0x8020:	/* e500 */
+		maj = PVR_MAJ(pvr);
+		min = PVR_MIN(pvr);
+		break;
 	default:
 		maj = (pvr >> 8) & 0xFF;
 		min = pvr & 0xFF;
@@ -418,7 +422,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	 * are used for initrd_start and initrd_size,
 	 * otherwise they contain 0xdeadbeef.
 	 */
-	cmd_line[0] = 0;
 	if (r3 >= 0x4000 && r3 < 0x800000 && r4 == 0) {
 		strlcpy(cmd_line, (char *)r3 + KERNELBASE,
 			sizeof(cmd_line));
@@ -477,8 +480,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 #ifdef CONFIG_SERIAL_CORE_CONSOLE
 extern char *of_stdout_device;
-int do_not_try_pc_legacy_8250_console;
-EXPORT_SYMBOL(do_not_try_pc_legacy_8250_console);
 
 static int __init set_preferred_console(void)
 {
@@ -524,15 +525,9 @@ static int __init set_preferred_console(void)
 			}
 		}
 	} else if (strcmp(name, "ch-a") == 0)
-	{
-		do_not_try_pc_legacy_8250_console = 1;
 		offset = 0;
-	}
 	else if (strcmp(name, "ch-b") == 0)
-	{
-		do_not_try_pc_legacy_8250_console = 1;
 		offset = 1;
-	}
 	else
 		return -ENODEV;
 	return add_preferred_console("ttyS", offset, NULL);

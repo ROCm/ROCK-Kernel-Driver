@@ -2,7 +2,6 @@
 #define _LINUX__INIT_TASK_H
 
 #include <linux/file.h>
-#include <asm/resource.h>
 
 #define INIT_FILES \
 { 							\
@@ -43,7 +42,6 @@
 	.mmlist		= LIST_HEAD_INIT(name.mmlist),		\
 	.cpu_vm_mask	= CPU_MASK_ALL,				\
 	.default_kioctx = INIT_KIOCTX(name.default_kioctx, name),	\
-	.rlimit_rss	= RLIM_INFINITY,			\
 }
 
 #define INIT_SIGNALS(sig) {	\
@@ -52,6 +50,7 @@
 		.list = LIST_HEAD_INIT(sig.shared_pending.list),	\
 		.signal =  {{0}}}, \
 	.posix_timers	 = LIST_HEAD_INIT(sig.posix_timers),		\
+	.rlim		= INIT_RLIMITS,					\
 }
 
 #define INIT_SIGHAND(sighand) {	\
@@ -98,7 +97,6 @@ extern struct group_info init_groups;
 	.cap_inheritable = CAP_INIT_INH_SET,				\
 	.cap_permitted	= CAP_FULL_SET,					\
 	.keep_capabilities = 0,						\
-	.rlim		= INIT_RLIMITS,					\
 	.user		= INIT_USER,					\
 	.comm		= "swapper",					\
 	.thread		= INIT_THREAD,					\
@@ -114,9 +112,8 @@ extern struct group_info init_groups;
 	.proc_lock	= SPIN_LOCK_UNLOCKED,				\
 	.switch_lock	= SPIN_LOCK_UNLOCKED,				\
 	.journal_info	= NULL,						\
- 	.map_base	= __TASK_UNMAPPED_BASE,				\
-	.private_pages	= LIST_HEAD_INIT(tsk.private_pages),		\
-	.private_pages_count = 0,					\
 }
+
+
 
 #endif

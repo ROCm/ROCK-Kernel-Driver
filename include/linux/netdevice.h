@@ -309,7 +309,9 @@ struct net_device
 
 	/* List of functions to handle Wireless Extensions (instead of ioctl).
 	 * See <net/iw_handler.h> for details. Jean II */
-	struct iw_handler_def *	wireless_handlers;
+	const struct iw_handler_def *	wireless_handlers;
+	/* Instance data managed by the core of Wireless Extensions. */
+	struct iw_public_data *	wireless_data;
 
 	struct ethtool_ops *ethtool_ops;
 
@@ -467,7 +469,6 @@ struct net_device
 						     unsigned char *haddr);
 	int			(*neigh_setup)(struct net_device *dev, struct neigh_parms *);
 	int			(*accept_fastpath)(struct net_device *, struct dst_entry*);
-	int                     (*generate_eui64)(u8 *eui, struct net_device *dev);
 #ifdef CONFIG_NETPOLL
 	int			netpoll_rx;
 #endif
@@ -483,15 +484,8 @@ struct net_device
 	struct divert_blk	*divert;
 #endif /* CONFIG_NET_DIVERT */
 
-	/* NETIF_MSG_* flags to control the types of events we log */
-	int msg_enable;
-
 	/* class/net/name entry */
 	struct class_device	class_dev;
-
-	/* use dev_id in conjunction with shared network cards*/
-	unsigned short           dev_id; 
-
 	/* how much padding had been added by alloc_netdev() */
 	int padded;
 };
@@ -532,20 +526,13 @@ extern int			netdev_boot_setup_add(char *name, struct ifmap *map);
 extern int 			netdev_boot_setup_check(struct net_device *dev);
 extern unsigned long		netdev_boot_base(const char *prefix, int unit);
 extern struct net_device    *dev_getbyhwaddr(unsigned short type, char *hwaddr);
-extern struct net_device *__dev_getfirstbyhwtype(unsigned short type);
 extern struct net_device *dev_getfirstbyhwtype(unsigned short type);
 extern void		dev_add_pack(struct packet_type *pt);
 extern void		dev_remove_pack(struct packet_type *pt);
 extern void		__dev_remove_pack(struct packet_type *pt);
-extern int		__dev_get(const char *name);
-static inline int __deprecated dev_get(const char *name)
-{
-	return __dev_get(name);
-}
+
 extern struct net_device	*dev_get_by_flags(unsigned short flags,
 						  unsigned short mask);
-extern struct net_device	*__dev_get_by_flags(unsigned short flags,
-						    unsigned short mask);
 extern struct net_device	*dev_get_by_name(const char *name);
 extern struct net_device	*__dev_get_by_name(const char *name);
 extern int		dev_alloc_name(struct net_device *dev, const char *name);
@@ -559,7 +546,6 @@ extern void		synchronize_net(void);
 extern int 		register_netdevice_notifier(struct notifier_block *nb);
 extern int		unregister_netdevice_notifier(struct notifier_block *nb);
 extern int		call_netdevice_notifiers(unsigned long val, void *v);
-extern int		dev_new_index(void);
 extern struct net_device	*dev_get_by_index(int ifindex);
 extern struct net_device	*__dev_get_by_index(int ifindex);
 extern int		dev_restart(struct net_device *dev);
@@ -683,6 +669,7 @@ static inline void dev_kfree_skb_any(struct sk_buff *skb)
 
 #define HAVE_NETIF_RX 1
 extern int		netif_rx(struct sk_buff *skb);
+extern int		netif_rx_ni(struct sk_buff *skb);
 #define HAVE_NETIF_RECEIVE_SKB 1
 extern int		netif_receive_skb(struct sk_buff *skb);
 extern int		dev_ioctl(unsigned int cmd, void __user *);
@@ -696,17 +683,6 @@ extern void		dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev);
 extern void		dev_init(void);
 
 extern int		netdev_nit;
-
-/* Post buffer to the network code from _non interrupt_ context.
- * see net/core/dev.c for netif_rx description.
- */
-static inline int netif_rx_ni(struct sk_buff *skb)
-{
-       int err = netif_rx(skb);
-       if (softirq_pending(smp_processor_id()))
-               do_softirq();
-       return err;
-}
 
 /* Called by rtnetlink.c:rtnl_unlock() */
 extern void netdev_run_todo(void);
@@ -791,7 +767,6 @@ enum {
 	NETIF_MSG_PKTDATA	= 0x1000,
 	NETIF_MSG_HW		= 0x2000,
 	NETIF_MSG_WOL		= 0x4000,
-	NETIF_MSG_ALL		= -1,		/* always log message */
 };
 
 #define netif_msg_drv(p)	((p)->msg_enable & NETIF_MSG_DRV)
@@ -927,10 +902,7 @@ static inline void netif_tx_disable(struct net_device *dev)
 /* These functions live elsewhere (drivers/net/net_init.c, but related) */
 
 extern void		ether_setup(struct net_device *dev);
-extern void		fddi_setup(struct net_device *dev);
-extern void		tr_setup(struct net_device *dev);
-extern void		fc_setup(struct net_device *dev);
-extern void		fc_freedev(struct net_device *dev);
+
 /* Support for loadable net-drivers */
 extern struct net_device *alloc_netdev(int sizeof_priv, const char *name,
 				       void (*setup)(struct net_device *));
@@ -944,57 +916,22 @@ extern void		dev_mc_discard(struct net_device *dev);
 extern void		dev_set_promiscuity(struct net_device *dev, int inc);
 extern void		dev_set_allmulti(struct net_device *dev, int inc);
 extern void		netdev_state_change(struct net_device *dev);
-extern void		netdev_event(struct net_device *dev, int event);
 /* Load a device via the kmod */
 extern void		dev_load(const char *name);
 extern void		dev_mcast_init(void);
-extern int		netdev_register_fc(struct net_device *dev, void (*stimul)(struct net_device *dev));
-extern void		netdev_unregister_fc(int bit);
 extern int		netdev_max_backlog;
 extern int		weight_p;
 extern unsigned long	netdev_fc_xoff;
 extern atomic_t netdev_dropping;
 extern int		netdev_set_master(struct net_device *dev, struct net_device *master);
-extern int skb_checksum_help(struct sk_buff **pskb, int inward);
+extern int skb_checksum_help(struct sk_buff *skb, int inward);
+/* rx skb timestamps */
+extern void		net_enable_timestamp(void);
+extern void		net_disable_timestamp(void);
 
 #ifdef CONFIG_SYSCTL
 extern char *net_sysctl_strdup(const char *s);
 #endif
-
-/* debugging and troubleshooting/diagnostic helpers. */
-/**
- * netdev_printk() - Log message with interface name, gated by message level
- * @sevlevel: severity level -- e.g., KERN_INFO
- * @netdev: net_device pointer
- * @msglevel: a standard message-level flag with the NETIF_MSG_ prefix removed.
- *	Unless msglevel is ALL, log the message only if that flag is set in
- *	netdev->msg_enable.
- * @format: as with printk
- * @args: as with printk
- */
-extern int __netdev_printk(const char *sevlevel,
-	const struct net_device *netdev, int msglevel, const char *format, ...);
-#define netdev_printk(sevlevel, netdev, msglevel, format, arg...)	\
-	__netdev_printk(sevlevel , netdev , NETIF_MSG_##msglevel ,	\
-	format , ## arg)
-
-#ifdef DEBUG
-#define netdev_dbg(netdev, msglevel, format, arg...)		\
-	netdev_printk(KERN_DEBUG , netdev , msglevel , format , ## arg)
-#else
-#define netdev_dbg(netdev, msglevel, format, arg...) do {} while (0)
-#endif
-
-#define netdev_err(netdev, msglevel, format, arg...)		\
-	netdev_printk(KERN_ERR , netdev , msglevel , format , ## arg)
-#define netdev_info(netdev, msglevel, format, arg...)		\
-	netdev_printk(KERN_INFO , netdev , msglevel , format , ## arg)
-#define netdev_warn(netdev, msglevel, format, arg...)		\
-	netdev_printk(KERN_WARNING , netdev , msglevel , format , ## arg)
-
-/* report fatal error unconditionally; msglevel ignored for now */
-#define netdev_fatal(netdev, msglevel, format, arg...)		\
-	netdev_printk(KERN_ERR , netdev , ALL , format , ## arg)
 
 #endif /* __KERNEL__ */
 

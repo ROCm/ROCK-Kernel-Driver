@@ -123,7 +123,6 @@ struct konicawc {
 #endif
 };
 
-static int konicawc_num;
 
 #define konicawc_set_misc(uvd, req, value, index)		konicawc_ctrl_msg(uvd, USB_DIR_OUT, req, value, index, NULL, 0)
 #define konicawc_get_misc(uvd, req, value, index, buf, sz)	konicawc_ctrl_msg(uvd, USB_DIR_IN, req, value, index, buf, sz)
@@ -363,8 +362,8 @@ static void konicawc_isoc_irq(struct urb *urb, struct pt_regs *regs)
 		else if (!urb->status && !cam->last_data_urb->status)
 			len = konicawc_compress_iso(uvd, cam->last_data_urb, urb);
 
-		resubmit_urb(uvd, urb);
 		resubmit_urb(uvd, cam->last_data_urb);
+		resubmit_urb(uvd, urb);
 		cam->last_data_urb = NULL;
 		uvd->stats.urb_length = len;
 		uvd->stats.data_count += len;
@@ -475,13 +474,8 @@ static void konicawc_stop_data(struct uvd *uvd)
 
 	/* Unschedule all of the iso td's */
 	for (i=0; i < USBVIDEO_NUMSBUF; i++) {
-		j = usb_unlink_urb(uvd->sbuf[i].urb);
-		if (j < 0)
-			err("usb_unlink_urb() error %d.", j);
-
-		j = usb_unlink_urb(cam->sts_urb[i]);
-		if (j < 0)
-			err("usb_unlink_urb() error %d.", j);
+		usb_kill_urb(uvd->sbuf[i].urb);
+		usb_kill_urb(cam->sts_urb[i]);
 	}
 
 	if (!uvd->remove_pending) {
@@ -855,7 +849,6 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 		cam->input.id.vendor = dev->descriptor.idVendor;
 		cam->input.id.product = dev->descriptor.idProduct;
 		cam->input.id.version = dev->descriptor.bcdDevice;
-		sprintf(cam->input.cdev.class_id,"konicawc%d", konicawc_num++);
 		input_register_device(&cam->input);
 		
 		usb_make_path(dev, cam->input_physname, 56);

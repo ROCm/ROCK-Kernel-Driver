@@ -20,8 +20,8 @@
 #include <linux/tty.h>
 #include <linux/binfmts.h>
 #include <linux/security.h>
+#include <linux/syscalls.h>
 #include <linux/ptrace.h>
-#include <linux/suspend.h>
 #include <asm/param.h>
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
@@ -265,18 +265,18 @@ next_signal(struct sigpending *pending, sigset_t *mask)
 	return sig;
 }
 
-static struct sigqueue *__sigqueue_alloc(void)
+static struct sigqueue *__sigqueue_alloc(struct task_struct *t, int flags)
 {
 	struct sigqueue *q = NULL;
 
-	if (atomic_read(&current->user->sigpending) <
-			current->rlim[RLIMIT_SIGPENDING].rlim_cur)
-		q = kmem_cache_alloc(sigqueue_cachep, GFP_ATOMIC);
+	if (atomic_read(&t->user->sigpending) <
+			t->signal->rlim[RLIMIT_SIGPENDING].rlim_cur)
+		q = kmem_cache_alloc(sigqueue_cachep, flags);
 	if (q) {
 		INIT_LIST_HEAD(&q->list);
 		q->flags = 0;
 		q->lock = NULL;
-		q->user = get_uid(current->user);
+		q->user = get_uid(t->user);
 		atomic_inc(&q->user->sigpending);
 	}
 	return(q);
@@ -764,14 +764,8 @@ static int send_signal(int sig, struct siginfo *info, struct task_struct *t,
 	   make sure at least one signal gets delivered and don't
 	   pass on the info struct.  */
 
-	if (atomic_read(&t->user->sigpending) <
-			t->rlim[RLIMIT_SIGPENDING].rlim_cur)
-		q = kmem_cache_alloc(sigqueue_cachep, GFP_ATOMIC);
-
+	q = __sigqueue_alloc(t, GFP_ATOMIC);
 	if (q) {
-		q->flags = 0;
-		q->user = get_uid(t->user);
-		atomic_inc(&q->user->sigpending);
 		list_add_tail(&q->list, &signals->list);
 		switch ((unsigned long) info) {
 		case 0:
@@ -914,7 +908,7 @@ __group_complete_signal(int sig, struct task_struct *p)
 	 * Don't bother zombies and stopped tasks (but
 	 * SIGKILL will punch through stopped state)
 	 */
-	mask = TASK_DEAD | TASK_ZOMBIE | TASK_TRACED;
+	mask = EXIT_DEAD | EXIT_ZOMBIE | TASK_TRACED;
 	if (sig != SIGKILL)
 		mask |= TASK_STOPPED;
 
@@ -1070,7 +1064,7 @@ void zap_other_threads(struct task_struct *p)
 		/*
 		 * Don't bother with already dead threads
 		 */
-		if (t->state & (TASK_ZOMBIE|TASK_DEAD))
+		if (t->exit_state & (EXIT_ZOMBIE|EXIT_DEAD))
 			continue;
 
 		/*
@@ -1115,7 +1109,7 @@ int group_send_sig_info(int sig, struct siginfo *info, struct task_struct *p)
 
 int __kill_pg_info(int sig, struct siginfo *info, pid_t pgrp)
 {
-	struct task_struct *p;
+	struct task_struct *p = NULL;
 	int retval, success;
 
 	if (pgrp <= 0)
@@ -1140,36 +1134,6 @@ kill_pg_info(int sig, struct siginfo *info, pid_t pgrp)
 	retval = __kill_pg_info(sig, info, pgrp);
 	read_unlock(&tasklist_lock);
 
-	return retval;
-}
-
-/*
- * kill_sl_info() sends a signal to the session leader: this is used
- * to send SIGHUP to the controlling process of a terminal when
- * the connection is lost.
- */
-
-
-int
-kill_sl_info(int sig, struct siginfo *info, pid_t sid)
-{
-	int err, retval = -EINVAL;
-	struct task_struct *p;
-
-	if (sid <= 0)
-		goto out;
-
-	retval = -ESRCH;
-	read_lock(&tasklist_lock);
-	do_each_task_pid(sid, PIDTYPE_SID, p) {
-		if (!p->signal->leader)
-			continue;
-		err = group_send_sig_info(sig, info, p);
-		if (retval)
-			retval = err;
-	} while_each_task_pid(sid, PIDTYPE_SID, p);
-	read_unlock(&tasklist_lock);
-out:
 	return retval;
 }
 
@@ -1309,12 +1273,6 @@ kill_pg(pid_t pgrp, int sig, int priv)
 }
 
 int
-kill_sl(pid_t sess, int sig, int priv)
-{
-	return kill_sl_info(sig, (void *)(long)(priv != 0), sess);
-}
-
-int
 kill_proc(pid_t pid, int sig, int priv)
 {
 	return kill_proc_info(sig, (void *)(long)(priv != 0), pid);
@@ -1334,7 +1292,7 @@ struct sigqueue *sigqueue_alloc(void)
 {
 	struct sigqueue *q;
 
-	if ((q = __sigqueue_alloc()))
+	if ((q = __sigqueue_alloc(current, GFP_KERNEL)))
 		q->flags |= SIGQUEUE_PREALLOC;
 	return(q);
 }
@@ -1484,7 +1442,8 @@ void do_notify_parent(struct task_struct *tsk, int sig)
 	unsigned long flags;
 	struct sighand_struct *psig;
 
-	BUG_ON(sig == -1);
+	if (sig == -1)
+		BUG();
 
  	/* do_notify_parent_cldstop should have been called instead.  */
  	BUG_ON(tsk->state & (TASK_STOPPED|TASK_TRACED));
@@ -1944,22 +1903,16 @@ relock:
 		 * Anything else is fatal, maybe with a core dump.
 		 */
 		current->flags |= PF_SIGNALED;
-		if (sig_kernel_coredump(signr) &&
-		    do_coredump((long)signr, signr, regs)) {
+		if (sig_kernel_coredump(signr)) {
 			/*
-			 * That killed all other threads in the group and
-			 * synchronized with their demise, so there can't
-			 * be any more left to kill now.  The group_exit
-			 * flags are set by do_coredump.  Note that
-			 * thread_group_empty won't always be true yet,
-			 * because those threads were blocked in __exit_mm
-			 * and we just let them go to finish dying.
+			 * If it was able to dump core, this kills all
+			 * other threads in the group and synchronizes with
+			 * their demise.  If we lost the race with another
+			 * thread getting here, it set group_exit_code
+			 * first and our do_group_exit call below will use
+			 * that value and ignore the one we pass it.
 			 */
-			const int code = signr | 0x80;
-			BUG_ON(!current->signal->group_exit);
-			BUG_ON(current->signal->group_exit_code != code);
-			do_exit(code);
-			/* NOTREACHED */
+			do_coredump((long)signr, signr, regs);
 		}
 
 		/*
@@ -1978,21 +1931,11 @@ EXPORT_SYMBOL(recalc_sigpending);
 EXPORT_SYMBOL_GPL(dequeue_signal);
 EXPORT_SYMBOL(flush_signals);
 EXPORT_SYMBOL(force_sig);
-EXPORT_SYMBOL(force_sig_info);
 EXPORT_SYMBOL(kill_pg);
-EXPORT_SYMBOL(kill_pg_info);
 EXPORT_SYMBOL(kill_proc);
-EXPORT_SYMBOL(kill_proc_info);
-EXPORT_SYMBOL(kill_sl);
-EXPORT_SYMBOL(kill_sl_info);
 EXPORT_SYMBOL(ptrace_notify);
 EXPORT_SYMBOL(send_sig);
 EXPORT_SYMBOL(send_sig_info);
-EXPORT_SYMBOL(send_group_sig_info);
-EXPORT_SYMBOL(sigqueue_alloc);
-EXPORT_SYMBOL(sigqueue_free);
-EXPORT_SYMBOL(send_sigqueue);
-EXPORT_SYMBOL(send_group_sigqueue);
 EXPORT_SYMBOL(sigprocmask);
 EXPORT_SYMBOL(block_all_signals);
 EXPORT_SYMBOL(unblock_all_signals);
@@ -2259,8 +2202,6 @@ sys_rt_sigtimedwait(const sigset_t __user *uthese,
 		if (timeout)
 			ret = -EINTR;
 	}
-	if (current->flags & PF_FREEZE)
-		refrigerator(1);
 
 	return ret;
 }
@@ -2680,52 +2621,3 @@ void __init signals_init(void)
 				  __alignof__(struct sigqueue),
 				  SLAB_PANIC, NULL, NULL);
 }
-
-#ifdef CONFIG_KDB
-#include <linux/kdb.h>
-/*
- * kdb_send_sig_info
- *
- *	Allows kdb to send signals without exposing signal internals.
- *
- * Inputs:
- *	t	task
- *	siginfo	signal information
- *	seqno	current kdb sequence number (avoid including kdbprivate.h)
- * Outputs:
- *	None.
- * Returns:
- *	None.
- * Locking:
- *	Checks if the required locks are available before calling the main
- *	signal code, to avoid kdb deadlocks.
- * Remarks:
- */
-void
-kdb_send_sig_info(struct task_struct *t, struct siginfo *info, int seqno)
-{
-	static struct task_struct *kdb_prev_t;
-	static int kdb_prev_seqno;
-	int sig, new_t;
-	if (!spin_trylock(&t->sighand->siglock)) {
-		kdb_printf("Can't do kill command now.\n"
-			"The sigmask lock is held somewhere else in kernel, try again later\n");
-		return;
-	}
-	spin_unlock(&t->sighand->siglock);
-	new_t = kdb_prev_t != t || kdb_prev_seqno != seqno;
-	kdb_prev_t = t;
-	kdb_prev_seqno = seqno;
-	if (t->state != TASK_RUNNING && new_t) {
-		kdb_printf("Process is not RUNNING, sending a signal from kdb risks deadlock\n"
-			   "on the run queue locks.  The signal has _not_ been sent.\n"
-			   "Reissue the kill command if you want to risk the deadlock.\n");
-		return;
-	}
-	sig = info->si_signo;
-	if (send_sig_info(sig, info, t))
-		kdb_printf("Fail to deliver Signal %d to process %d.\n", sig, t->pid);
-	else
-		kdb_printf("Signal %d is sent to process %d.\n", sig, t->pid);
-}
-#endif	/* CONFIG_KDB */

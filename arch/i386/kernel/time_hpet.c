@@ -60,13 +60,46 @@ void __init wait_hpet_tick(void)
 }
 #endif
 
+static int hpet_timer_stop_set_go(unsigned long tick)
+{
+	unsigned int cfg;
+
+	/*
+	 * Stop the timers and reset the main counter.
+	 */
+	cfg = hpet_readl(HPET_CFG);
+	cfg &= ~HPET_CFG_ENABLE;
+	hpet_writel(cfg, HPET_CFG);
+	hpet_writel(0, HPET_COUNTER);
+	hpet_writel(0, HPET_COUNTER + 4);
+
+	/*
+	 * Set up timer 0, as periodic with first interrupt to happen at
+	 * hpet_tick, and period also hpet_tick.
+	 */
+	cfg = hpet_readl(HPET_T0_CFG);
+	cfg |= HPET_TN_ENABLE | HPET_TN_PERIODIC |
+	       HPET_TN_SETVAL | HPET_TN_32BIT;
+	hpet_writel(cfg, HPET_T0_CFG);
+	hpet_writel(tick, HPET_T0_CMP);
+
+	/*
+ 	 * Go!
+ 	 */
+	cfg = hpet_readl(HPET_CFG);
+	cfg |= HPET_CFG_ENABLE | HPET_CFG_LEGACY;
+	hpet_writel(cfg, HPET_CFG);
+
+	return 0;
+}
+
 /*
  * Check whether HPET was found by ACPI boot parse. If yes setup HPET
  * counter 0 for kernel base timer.
  */
 int __init hpet_enable(void)
 {
-	unsigned int cfg, id;
+	unsigned int id;
 	unsigned long tick_fsec_low, tick_fsec_high; /* tick in femto sec */
 	unsigned long hpet_tick_rem;
 
@@ -108,31 +141,8 @@ int __init hpet_enable(void)
 	if (hpet_tick_rem > (hpet_period >> 1))
 		hpet_tick++; /* rounding the result */
 
-	/*
-	 * Stop the timers and reset the main counter.
-	 */
-	cfg = hpet_readl(HPET_CFG);
-	cfg &= ~HPET_CFG_ENABLE;
-	hpet_writel(cfg, HPET_CFG);
-	hpet_writel(0, HPET_COUNTER);
-	hpet_writel(0, HPET_COUNTER + 4);
-
-	/*
-	 * Set up timer 0, as periodic with first interrupt to happen at
-	 * hpet_tick, and period also hpet_tick.
-	 */
-	cfg = hpet_readl(HPET_T0_CFG);
-	cfg |= HPET_TN_ENABLE | HPET_TN_PERIODIC |
-	       HPET_TN_SETVAL | HPET_TN_32BIT;
-	hpet_writel(cfg, HPET_T0_CFG);
-	hpet_writel(hpet_tick, HPET_T0_CMP);
-
-	/*
- 	 * Go!
- 	 */
-	cfg = hpet_readl(HPET_CFG);
-	cfg |= HPET_CFG_ENABLE | HPET_CFG_LEGACY;
-	hpet_writel(cfg, HPET_CFG);
+	if (hpet_timer_stop_set_go(hpet_tick))
+		return -1;
 
 	use_hpet = 1;
 
@@ -151,6 +161,7 @@ int __init hpet_enable(void)
 		 * Register with driver.
 		 * Timer0 and Timer1 is used by platform.
 		 */
+		hd.hd_phys_address = hpet_address;
 		hd.hd_address = hpet_virt_address;
 		hd.hd_nirqs = ntimer;
 		hd.hd_flags = HPET_DATA_PLATFORM;
@@ -183,6 +194,11 @@ int __init hpet_enable(void)
 	wait_timer_tick = wait_hpet_tick;
 #endif
 	return 0;
+}
+
+int hpet_reenable(void)
+{
+	return hpet_timer_stop_set_go(hpet_tick);
 }
 
 int is_hpet_enabled(void)

@@ -83,8 +83,8 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/types.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/irq.h>
@@ -1218,7 +1218,7 @@ static int __devinit i82596_probe(struct net_device *dev,
 	lp->scb.command = 0;
 	lp->scb.cmd = I596_NULL;
 	lp->scb.rfd = I596_NULL;
-	lp->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&lp->lock);
 	lp->dma_addr = dma_addr;
 	lp->dev = gen_dev;
 

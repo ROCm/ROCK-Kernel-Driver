@@ -1,12 +1,6 @@
 
 menu "Character Devices"
 
-config STDERR_CONSOLE
-	bool "stderr console"
-	default y
-	help
-	console driver which dumps all printk messages to stderr.
-
 config STDIO_CONSOLE
 	bool
 	default y
@@ -77,6 +71,10 @@ config XTERM_CHAN
         If you disable this option, then CONFIG_PT_PROXY will be disabled as
         well, since UML's gdb currently requires an xterm.
         It is safe to say 'Y' here.
+
+config NOCONFIG_CHAN
+	bool
+	default !(XTERM_CHAN && TTY_CHAN && PTY_CHAN && PORT_CHAN && FD_CHAN && NULL_CHAN)
 
 config CON_ZERO_CHAN
 	string "Default main console channel initialization"
@@ -163,11 +161,6 @@ config LEGACY_PTY_COUNT
 
 	  When not in use, each legacy PTY occupies 12 bytes on 32-bit
 	  architectures and 24 bytes on 64-bit architectures.
-
-#config UNIX98_PTY_COUNT
-#	int "Maximum number of Unix98 PTYs in use (0-2048)"
-#	depends on UNIX98_PTYS
-#	default "256"
 
 config WATCHDOG
 	bool "Watchdog Timer Support"

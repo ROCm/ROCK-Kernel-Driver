@@ -30,6 +30,7 @@
 #include <asm/hardware.h>
 #include <asm/memory.h>
 #include <asm/system.h>
+#include <asm/mach/time.h>
 
 extern void sa1100_cpu_suspend(void);
 extern void sa1100_cpu_resume(void);
@@ -44,9 +45,6 @@ extern void sa1100_cpu_resume(void);
  */
 enum {	SLEEP_SAVE_SP = 0,
 
-	SLEEP_SAVE_OSCR, SLEEP_SAVE_OIER,
-	SLEEP_SAVE_OSMR0, SLEEP_SAVE_OSMR1, SLEEP_SAVE_OSMR2, SLEEP_SAVE_OSMR3,
-
 	SLEEP_SAVE_GPDR, SLEEP_SAVE_GAFR,
 	SLEEP_SAVE_PPDR, SLEEP_SAVE_PPSR, SLEEP_SAVE_PPAR, SLEEP_SAVE_PSDR,
 
@@ -56,26 +54,21 @@ enum {	SLEEP_SAVE_SP = 0,
 };
 
 
-static int sa11x0_pm_enter(u32 state)
+static int sa11x0_pm_enter(suspend_state_t state)
 {
-	unsigned long sleep_save[SLEEP_SAVE_SIZE];
-	unsigned long delta, gpio;
+	unsigned long gpio, sleep_save[SLEEP_SAVE_SIZE];
+	struct timespec delta, rtc;
 
 	if (state != PM_SUSPEND_MEM)
 		return -EINVAL;
 
 	/* preserve current time */
-	delta = xtime.tv_sec - RCNR;
+	rtc.tv_sec = RCNR;
+	rtc.tv_nsec = 0;
+	save_time_delta(&delta, &rtc);
 	gpio = GPLR;
 
 	/* save vital registers */
-	SAVE(OSCR);
-	SAVE(OSMR0);
-	SAVE(OSMR1);
-	SAVE(OSMR2);
-	SAVE(OSMR3);
-	SAVE(OIER);
-
 	SAVE(GPDR);
 	SAVE(GAFR);
 
@@ -127,15 +120,9 @@ static int sa11x0_pm_enter(u32 state)
 	 */
 	PSSR = PSSR_PH;
 
-	RESTORE(OSMR0);
-	RESTORE(OSMR1);
-	RESTORE(OSMR2);
-	RESTORE(OSMR3);
-	RESTORE(OSCR);
-	RESTORE(OIER);
-
 	/* restore current time */
-	xtime.tv_sec = RCNR + delta;
+	rtc.tv_sec = RCNR;
+	restore_time_delta(&delta, &rtc);
 
 	return 0;
 }
@@ -148,7 +135,7 @@ unsigned long sleep_phys_sp(void *sp)
 /*
  * Called after processes are frozen, but before we shut down devices.
  */
-static int sa11x0_pm_prepare(u32 state)
+static int sa11x0_pm_prepare(suspend_state_t state)
 {
 	return 0;
 }
@@ -156,7 +143,7 @@ static int sa11x0_pm_prepare(u32 state)
 /*
  * Called after devices are re-setup, but before processes are thawed.
  */
-static int sa11x0_pm_finish(u32 state)
+static int sa11x0_pm_finish(suspend_state_t state)
 {
 	return 0;
 }

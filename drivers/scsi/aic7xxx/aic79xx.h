@@ -549,7 +549,7 @@ struct ahd_dma64_seg {
 
 struct map_node {
 	bus_dmamap_t		 dmamap;
-	bus_addr_t		 physaddr;
+	dma_addr_t		 physaddr;
 	uint8_t			*vaddr;
 	SLIST_ENTRY(map_node)	 links;
 };
@@ -626,8 +626,8 @@ struct scb {
 	struct map_node	 	 *sense_map;
 	void			 *sg_list;
 	uint8_t			 *sense_data;
-	bus_addr_t		  sg_list_busaddr;
-	bus_addr_t		  sense_busaddr;
+	dma_addr_t		  sg_list_busaddr;
+	dma_addr_t		  sense_busaddr;
 	u_int			  sg_count;/* How full ahd_dma_seg is */
 #define	AHD_MAX_LQ_CRC_ERRORS 5
 	u_int			  crc_retry_count;
@@ -1198,7 +1198,7 @@ struct ahd_softc {
 	bus_dma_tag_t		  parent_dmat;
 	bus_dma_tag_t		  shared_data_dmat;
 	bus_dmamap_t		  shared_data_dmamap;
-	bus_addr_t		  shared_data_busaddr;
+	dma_addr_t		  shared_data_busaddr;
 
 	/* Information saved through suspend/resume cycles */
 	struct ahd_suspend_state  suspend_state;

@@ -233,6 +233,7 @@ acpi_extract_package (
 
 	return_ACPI_STATUS(AE_OK);
 }
+EXPORT_SYMBOL(acpi_extract_package);
 
 
 acpi_status
@@ -268,6 +269,7 @@ acpi_evaluate_integer (
 
 	return_ACPI_STATUS(AE_OK);
 }
+EXPORT_SYMBOL(acpi_evaluate_integer);
 
 
 #if 0
@@ -373,7 +375,7 @@ acpi_evaluate_reference (
 	}
 
 	if (package->package.count > ACPI_MAX_HANDLES) {
-		return AE_NO_MEMORY;
+		return_ACPI_STATUS(AE_NO_MEMORY);
 	}
 	list->count = package->package.count;
 
@@ -409,5 +411,5 @@ end:
 
 	return_ACPI_STATUS(status);
 }
-
+EXPORT_SYMBOL(acpi_evaluate_reference);
 

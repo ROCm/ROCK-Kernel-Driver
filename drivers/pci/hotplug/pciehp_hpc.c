@@ -182,7 +182,7 @@ static int pcie_cap_base = 0;		/* Base of the PCI Express capability item struct
 #define MRL_SENS_PRSN	0x00000004
 #define ATTN_LED_PRSN	0x00000008
 #define PWR_LED_PRSN	0x00000010
-#define HP_SUPR_RM	0x00000020
+#define HP_SUPR_RM_SUP	0x00000020
 #define HP_CAP		0x00000040
 #define SLOT_PWR_VALUE	0x000003F8
 #define SLOT_PWR_LIMIT	0x00000C00
@@ -237,8 +237,8 @@ struct php_ctlr_state_s {
 static spinlock_t hpc_event_lock;
 
 DEFINE_DBG_BUFFER		/* Debug string buffer for entire HPC defined here */
-static struct php_ctlr_state_s *php_ctlr_list_head;	/* HPC state linked list */
-static int ctlr_seq_num;	/* Controller sequence # */
+static struct php_ctlr_state_s *php_ctlr_list_head = 0;	/* HPC state linked list */
+static int ctlr_seq_num = 0;	/* Controller sequence # */
 static spinlock_t list_lock;
 
 static irqreturn_t pcie_isr(int IRQ, void *dev_id, struct pt_regs *regs);
@@ -691,8 +691,7 @@ int pcie_get_ctlr_slot_config(struct controller *ctrl,
 	int *num_ctlr_slots,	/* number of slots in this HPC; only 1 in PCIE  */	
 	int *first_device_num,	/* PCI dev num of the first slot in this PCIE	*/
 	int *physical_slot_num,	/* phy slot num of the first slot in this PCIE	*/
-	int *updown,		/* physical_slot_num increament: 1 or -1	*/
-	int *flags)
+	u8 *ctrlcap)
 {
 	struct php_ctlr_state_s *php_ctlr = ctrl->hpc_ctlr_handle;
 	u32 slot_cap;
@@ -716,8 +715,9 @@ int pcie_get_ctlr_slot_config(struct controller *ctrl,
 	}
 	
 	*physical_slot_num = slot_cap >> 19;
-
-	*updown = -1;
+	dbg("%s: PSN %d \n", __FUNCTION__, *physical_slot_num);
+	
+	*ctrlcap = slot_cap & 0x0000007f;
 
 	DBG_LEAVE_ROUTINE 
 	return 0;
@@ -741,6 +741,8 @@ static void hpc_release_ctlr(struct controller *ctrl)
 		if (php_ctlr->irq) {
 			free_irq(php_ctlr->irq, ctrl);
 			php_ctlr->irq = 0;
+			if (!pcie_mch_quirk) 
+				pci_disable_msi(php_ctlr->pci_dev);
 		}
 	}
 	if (php_ctlr->pci_dev) 
@@ -1259,7 +1261,7 @@ int pcie_init(struct controller * ctrl,
 	static int first = 1;
 	u16 temp_word;
 	u16 cap_reg;
-	u16 intr_enable;
+	u16 intr_enable = 0;
 	u32 slot_cap;
 	int cap_base, saved_cap_base;
 	u16 slot_status, slot_ctrl;
@@ -1345,6 +1347,9 @@ int pcie_init(struct controller * ctrl,
 	info("HPC vendor_id %x device_id %x ss_vid %x ss_did %x\n", pdev->vendor, pdev->device, 
 		pdev->subsystem_vendor, pdev->subsystem_device);
 
+	if (pci_enable_device(pdev))
+		goto abort_free_ctlr;
+	
 	init_MUTEX(&ctrl->crit_sect);
 	/* setup wait queue */
 	init_waitqueue_head(&ctrl->queue);
@@ -1402,8 +1407,8 @@ int pcie_init(struct controller * ctrl,
 		start_int_poll_timer( php_ctlr, 10 );   /* start with 10 second delay */
 	} else {
 		/* Installs the interrupt handler */
-		dbg("%s: pciehp_msi_quirk = %x\n", __FUNCTION__, pciehp_msi_quirk);
-		if (!pciehp_msi_quirk) {
+		dbg("%s: pcie_mch_quirk = %x\n", __FUNCTION__, pcie_mch_quirk);
+		if (!pcie_mch_quirk) {
 			rc = pci_enable_msi(pdev);
 			if (rc) {
 				info("Can't get msi for the hotplug controller\n");
@@ -1412,6 +1417,7 @@ int pcie_init(struct controller * ctrl,
 			} else 
 				php_ctlr->irq = pdev->irq;
 		}
+
 		rc = request_irq(php_ctlr->irq, pcie_isr, SA_SHIRQ, MY_NAME, (void *) ctrl);
 		dbg("%s: request_irq %d for hpc%d (returns %d)\n", __FUNCTION__, php_ctlr->irq, ctlr_seq_num, rc);
 		if (rc) {
@@ -1426,9 +1432,18 @@ int pcie_init(struct controller * ctrl,
 		goto abort_free_ctlr;
 	}
 	dbg("%s: SLOT_CTRL %x value read %x\n", __FUNCTION__, SLOT_CTRL, temp_word);
+	dbg("%s: slot_cap %x\n", __FUNCTION__, slot_cap);
 
-	intr_enable = ATTN_BUTTN_ENABLE | PWR_FAULT_DETECT_ENABLE | MRL_DETECT_ENABLE |
-					PRSN_DETECT_ENABLE;
+	intr_enable = intr_enable | PRSN_DETECT_ENABLE;
+
+	if (ATTN_BUTTN(slot_cap))
+		intr_enable = intr_enable | ATTN_BUTTN_ENABLE;
+	
+	if (POWER_CTRL(slot_cap))
+		intr_enable = intr_enable | PWR_FAULT_DETECT_ENABLE;
+	
+	if (MRL_SENS(slot_cap))
+		intr_enable = intr_enable | MRL_DETECT_ENABLE;
 
 	temp_word = (temp_word & ~intr_enable) | intr_enable; 
 

@@ -31,18 +31,17 @@
 
 struct pci_dev *rpaphp_find_pci_dev(struct device_node *dn)
 {
-	struct pci_dev *retval_dev = NULL, *dev = NULL;
+	struct pci_dev *dev = NULL;
 	char bus_id[BUS_ID_SIZE];
 
-	sprintf(bus_id, "%04x:%02x:%02x.%d",dn->phb->global_number,
+	sprintf(bus_id, "%04x:%02x:%02x.%d", dn->phb->global_number,
 		dn->busno, PCI_SLOT(dn->devfn), PCI_FUNC(dn->devfn));
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
+	for_each_pci_dev(dev) {
 		if (!strcmp(pci_name(dev), bus_id)) {
-			retval_dev = dev;
 			break;
 		}
 	}
-	return retval_dev;
+	return dev;
 }
 
 EXPORT_SYMBOL_GPL(rpaphp_find_pci_dev);
@@ -117,33 +116,40 @@ static int rpaphp_get_sensor_state(struct slot *slot, int *state)
 int rpaphp_get_pci_adapter_status(struct slot *slot, int is_init, u8 * value)
 {
 	int state, rc;
-	*value = NOT_VALID;
+ 	struct device_node *child_dn;
+ 	struct pci_dev *child_dev = NULL;
 
+	*value = NOT_VALID;
 	rc = rpaphp_get_sensor_state(slot, &state);
 	if (rc)
 		goto exit;
-	if (state == PRESENT) {
+
+ 	if ((state == EMPTY) || (slot->type == PHB)) {
+ 		dbg("slot is empty\n");
+ 		*value = EMPTY;
+ 	}
+ 	else if (state == PRESENT) {
 		if (!is_init)
 			/* at run-time slot->state can be changed by */
 			/* config/unconfig adapter */
 			*value = slot->state;
 		else {
-			if (!slot->dn->child)
+ 			child_dn = slot->dn->child;
+ 			if (child_dn)
+ 				child_dev = rpaphp_find_pci_dev(child_dn);
+
+ 			if (child_dev)
+ 				*value = CONFIGURED;
+ 			else if (!child_dn)
 				dbg("%s: %s is not valid OFDT node\n",
 				    __FUNCTION__, slot->dn->full_name);
-			else if (rpaphp_find_pci_dev(slot->dn->child))
-				*value = CONFIGURED;
 			else {
 				err("%s: can't find pdev of adapter in slot[%s]\n", 
 					__FUNCTION__, slot->dn->full_name);
 				*value = NOT_CONFIGURED;
 			}
 		}
-	} else if (state == EMPTY) {
-		dbg("slot is empty\n");
-		*value = state;
 	}
-
 exit:
 	return rc;
 }
@@ -186,7 +192,7 @@ static struct pci_dev *
 rpaphp_pci_config_slot(struct device_node *dn, struct pci_bus *bus)
 {
 	struct device_node *eads_first_child = dn->child;
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 	int num;
 	
 	dbg("Enter %s: dn=%s bus=%s\n", __FUNCTION__, dn->full_name, bus->name);
@@ -362,7 +368,7 @@ static void rpaphp_eeh_remove_bus_device(struct pci_dev *dev)
 int rpaphp_unconfig_pci_adapter(struct slot *slot)
 {
 	int retval = 0;
-	struct list_head *ln;
+	struct list_head *ln, *tmp;
 
 	dbg("Entry %s: slot[%s]\n", __FUNCTION__, slot->name);
 	if (list_empty(&slot->dev.pci_funcs)) {
@@ -373,7 +379,7 @@ int rpaphp_unconfig_pci_adapter(struct slot *slot)
 		goto exit;
 	}
 	/* remove the devices from the pci core */
-	list_for_each (ln, &slot->dev.pci_funcs) {
+	list_for_each_safe (ln, tmp, &slot->dev.pci_funcs) {
 		struct rpaphp_pci_func *func;
 	
 		func = list_entry(ln, struct rpaphp_pci_func, sibling);
@@ -408,15 +414,52 @@ static int setup_pci_hotplug_slot_info(struct slot *slot)
 	return 0;
 }
 
+static int set_phb_slot_name(struct slot *slot)
+{
+	struct device_node *dn;
+	struct pci_controller *phb;
+	struct pci_bus *bus;
+
+	dn = slot->dn;
+	if (!dn) {
+		return 1;
+	}
+	phb = dn->phb;
+	if (!phb) {
+		return 1;
+	}
+	bus = phb->bus;
+	if (!bus) {
+		return 1;
+	}
+
+	sprintf(slot->name, "%04x:%02x:%02x.%x", pci_domain_nr(bus),
+			bus->number, 0, 0);
+	return 0;
+}
+
 static int setup_pci_slot(struct slot *slot)
 {
-	slot->bridge = rpaphp_find_bridge_pdev(slot);
-	if (!slot->bridge) {	/* slot being added doesn't have pci_dev yet */
-		err("%s: no pci_dev for bridge dn %s\n", __FUNCTION__, slot->name);
-		goto exit_rc;
+	int rc;
+
+	if (slot->type == PHB) {
+		rc = set_phb_slot_name(slot);
+		if (rc) {
+			err("%s: failed to set phb slot name\n", __FUNCTION__);
+			goto exit_rc;
+		}
+	} else {
+		slot->bridge = rpaphp_find_bridge_pdev(slot);
+		if (!slot->bridge) {
+			/* slot being added doesn't have pci_dev yet */
+			err("%s: no pci_dev for bridge dn %s\n",
+					__FUNCTION__, slot->name);
+			goto exit_rc;
+		}
+		dbg("%s set slot->name to %s\n",  __FUNCTION__,
+				pci_name(slot->bridge));
+		strcpy(slot->name, pci_name(slot->bridge));
 	}
-	dbg("%s set slot->name to %s\n",  __FUNCTION__, pci_name(slot->bridge));
-	strcpy(slot->name, pci_name(slot->bridge));
 
 	/* find slot's pci_dev if it's not empty */
 	if (slot->hotplug_slot->info->adapter_status == EMPTY) {
@@ -470,10 +513,10 @@ int register_pci_slot(struct slot *slot)
 	int rc = 1;
 
 	slot->dev_type = PCI_DEV;
-	if (slot->type == EMBEDDED)
-		slot->removable = EMBEDDED;
+	if ((slot->type == EMBEDDED) || (slot->type == PHB))
+		slot->removable = 0;
 	else
-		slot->removable = HOTPLUG;
+		slot->removable = 1;
 	INIT_LIST_HEAD(&slot->dev.pci_funcs);
 	if (setup_pci_hotplug_slot_info(slot))
 		goto exit_rc;

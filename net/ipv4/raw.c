@@ -130,6 +130,9 @@ static __inline__ int icmp_filter(struct sock *sk, struct sk_buff *skb)
 {
 	int type;
 
+	if (!pskb_may_pull(skb, sizeof(struct icmphdr)))
+		return 1;
+
 	type = skb->h.icmph->type;
 	if (type < 32) {
 		__u32 data = raw4_sk(sk)->filter.data;
@@ -249,7 +252,6 @@ int raw_rcv(struct sock *sk, struct sk_buff *skb)
 		kfree_skb(skb);
 		return NET_RX_DROP;
 	}
-	nf_reset(skb);
 
 	skb_push(skb, skb->data - skb->nh.raw);
 
@@ -308,7 +310,7 @@ static int raw_send_hdrinc(struct sock *sk, void *from, int length,
 	}
 
 	err = NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
-	              ip_dst_output);
+		      dst_output);
 	if (err > 0)
 		err = inet->recverr ? net_xmit_errno(err) : 0;
 	if (err)
@@ -408,7 +410,7 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 				printk(KERN_INFO "%s forgot to set AF_INET in "
 						 "raw sendmsg. Fix it!\n",
 						 current->comm);
-			err = -EINVAL;
+			err = -EAFNOSUPPORT;
 			if (usin->sin_family)
 				goto out;
 		}
@@ -707,6 +709,7 @@ static int raw_ioctl(struct sock *sk, int cmd, unsigned long arg)
 
 struct proto raw_prot = {
 	.name =		"RAW",
+	.owner =	THIS_MODULE,
 	.close =	raw_close,
 	.connect =	ip4_datagram_connect,
 	.disconnect =	udp_disconnect,
@@ -720,6 +723,7 @@ struct proto raw_prot = {
 	.backlog_rcv =	raw_rcv_skb,
 	.hash =		raw_v4_hash,
 	.unhash =	raw_v4_unhash,
+	.slab_obj_size = sizeof(struct raw_sock),
 };
 
 #ifdef CONFIG_PROC_FS

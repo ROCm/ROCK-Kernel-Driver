@@ -44,9 +44,9 @@
 #undef DEBUG_FEATURE
 
 #ifdef DEBUG_FEATURE
-#define DBG(fmt,...) printk(KERN_DEBUG fmt)
+#define DBG(fmt...) printk(KERN_DEBUG fmt)
 #else
-#define DBG(fmt,...)
+#define DBG(fmt...)
 #endif
 
 /*
@@ -340,6 +340,10 @@ static struct feature_table_entry g5_features[]  __pmacdata = {
 
 static struct pmac_mb_def pmac_mb_defs[] __pmacdata = {
 	{	"PowerMac7,2",			"PowerMac G5",
+		PMAC_TYPE_POWERMAC_G5,		g5_features,
+		0,
+	},
+	{	"PowerMac7,3",			"PowerMac G5",
 		PMAC_TYPE_POWERMAC_G5,		g5_features,
 		0,
 	},

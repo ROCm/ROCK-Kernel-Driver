@@ -23,39 +23,39 @@
 
 /* efs superblock on disk */
 struct efs_super {
-	int32_t		fs_size;        /* size of filesystem, in sectors */
-	int32_t		fs_firstcg;     /* bb offset to first cg */
-	int32_t		fs_cgfsize;     /* size of cylinder group in bb's */
-	short		fs_cgisize;     /* bb's of inodes per cylinder group */
-	short		fs_sectors;     /* sectors per track */
-	short		fs_heads;       /* heads per cylinder */
-	short		fs_ncg;         /* # of cylinder groups in filesystem */
-	short		fs_dirty;       /* fs needs to be fsck'd */
-	int32_t		fs_time;        /* last super-block update */
-	int32_t		fs_magic;       /* magic number */
+	__be32		fs_size;        /* size of filesystem, in sectors */
+	__be32		fs_firstcg;     /* bb offset to first cg */
+	__be32		fs_cgfsize;     /* size of cylinder group in bb's */
+	__be16		fs_cgisize;     /* bb's of inodes per cylinder group */
+	__be16		fs_sectors;     /* sectors per track */
+	__be16		fs_heads;       /* heads per cylinder */
+	__be16		fs_ncg;         /* # of cylinder groups in filesystem */
+	__be16		fs_dirty;       /* fs needs to be fsck'd */
+	__be32		fs_time;        /* last super-block update */
+	__be32		fs_magic;       /* magic number */
 	char		fs_fname[6];    /* file system name */
 	char		fs_fpack[6];    /* file system pack name */
-	int32_t		fs_bmsize;      /* size of bitmap in bytes */
-	int32_t		fs_tfree;       /* total free data blocks */
-	int32_t		fs_tinode;      /* total free inodes */
-	int32_t		fs_bmblock;     /* bitmap location. */
-	int32_t		fs_replsb;      /* Location of replicated superblock. */
-	int32_t		fs_lastialloc;  /* last allocated inode */
+	__be32		fs_bmsize;      /* size of bitmap in bytes */
+	__be32		fs_tfree;       /* total free data blocks */
+	__be32		fs_tinode;      /* total free inodes */
+	__be32		fs_bmblock;     /* bitmap location. */
+	__be32		fs_replsb;      /* Location of replicated superblock. */
+	__be32		fs_lastialloc;  /* last allocated inode */
 	char		fs_spare[20];   /* space for expansion - MUST BE ZERO */
-	int32_t		fs_checksum;    /* checksum of volume portion of fs */
+	__be32		fs_checksum;    /* checksum of volume portion of fs */
 };
 
 /* efs superblock information in memory */
 struct efs_sb_info {
-	int32_t	fs_magic;	/* superblock magic number */
-	int32_t	fs_start;	/* first block of filesystem */
-	int32_t	first_block;	/* first data block in filesystem */
-	int32_t	total_blocks;	/* total number of blocks in filesystem */
-	int32_t	group_size;	/* # of blocks a group consists of */ 
-	int32_t	data_free;	/* # of free data blocks */
-	int32_t	inode_free;	/* # of free inodes */
-	short	inode_blocks;	/* # of blocks used for inodes in every grp */
-	short	total_groups;	/* # of groups */
+	__u32	fs_magic;	/* superblock magic number */
+	__u32	fs_start;	/* first block of filesystem */
+	__u32	first_block;	/* first data block in filesystem */
+	__u32	total_blocks;	/* total number of blocks in filesystem */
+	__u32	group_size;	/* # of blocks a group consists of */ 
+	__u32	data_free;	/* # of free data blocks */
+	__u32	inode_free;	/* # of free inodes */
+	__u16	inode_blocks;	/* # of blocks used for inodes in every grp */
+	__u16	total_groups;	/* # of groups */
 };
 
 #endif /* __EFS_FS_SB_H__ */

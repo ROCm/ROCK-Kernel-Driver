@@ -104,12 +104,15 @@ config DEBUG_S3C2410_PORT
 	  before it is used.
 
 config DEBUG_S3C2410_UART
-	depends on DEBUG_LL && ARCH_S3C2410
+	depends on ARCH_S3C2410
 	int "S3C2410 UART to use for low-level debug"
 	default "0"
 	help
 	  Choice for UART for kernel low-level using S3C2410 UARTS,
 	  should be between zero and two. The port must have been
 	  initalised by the boot-loader before use.
+
+	  The uncompressor code port configuration is now handled
+	  by CONFIG_S3C2410_LOWLEVEL_UART_PORT.
 
 endmenu

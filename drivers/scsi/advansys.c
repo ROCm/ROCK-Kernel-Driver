@@ -796,6 +796,7 @@
 
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_device.h>
+#include <scsi/scsi_tcq.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_host.h>
 #include "advansys.h"
@@ -4566,7 +4567,7 @@ advansys_detect(struct scsi_host_template *tpnt)
             boardp->id = asc_board_count - 1;
 
             /* Initialize spinlock. */
-            boardp->lock = SPIN_LOCK_UNLOCKED;
+            spin_lock_init(&boardp->lock);
 
             /*
              * Handle both narrow and wide boards.

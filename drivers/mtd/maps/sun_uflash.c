@@ -1,4 +1,4 @@
-/* $Id: sun_uflash.c,v 1.9 2004/07/12 21:59:45 dwmw2 Exp $
+/* $Id: sun_uflash.c,v 1.11 2004/11/04 13:24:15 gleixner Exp $
  *
  * sun_uflash - Driver implementation for user-programmable flash
  * present on many Sun Microsystems SME boardsets.
@@ -96,8 +96,7 @@ int uflash_devinit(struct linux_ebus_device* edev)
 		pdev->map.name = pdev->name;
 	}
 	pdev->map.phys = edev->resource[0].start;
-	pdev->map.virt = 
-		(unsigned long)ioremap_nocache(edev->resource[0].start, pdev->map.size);
+	pdev->map.virt = ioremap_nocache(edev->resource[0].start, pdev->map.size);
 	if(0 == pdev->map.virt) {
 		printk("%s: failed to map device\n", __FUNCTION__);
 		kfree(pdev->name);

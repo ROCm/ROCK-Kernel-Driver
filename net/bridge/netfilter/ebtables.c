@@ -109,11 +109,17 @@ static inline int ebt_do_match (struct ebt_entry_match *m,
 
 static inline int ebt_dev_check(char *entry, const struct net_device *device)
 {
+	int i = 0;
+	char *devname = device->name;
+
 	if (*entry == '\0')
 		return 0;
 	if (!device)
 		return 1;
-	return !!strcmp(entry, device->name);
+	/* 1 is the wildcard token */
+	while (entry[i] != '\0' && entry[i] != 1 && entry[i] == devname[i])
+		i++;
+	return (devname[i] != entry[i] && entry[i] != 1);
 }
 
 #define FWINV2(bool,invflg) ((bool) ^ !!(e->invflags & invflg))
@@ -190,7 +196,7 @@ unsigned int ebt_do_table (unsigned int hook, struct sk_buff **pskb,
 	base = private->entries;
 	i = 0;
 	while (i < nentries) {
-		if (ebt_basic_match(point, (**pskb).mac.ethernet, in, out))
+		if (ebt_basic_match(point, eth_hdr(*pskb), in, out))
 			goto letscontinue;
 
 		if (EBT_MATCH_ITERATE(point, ebt_do_match, *pskb, in, out) != 0)
@@ -1162,7 +1168,7 @@ int ebt_register_table(struct ebt_table *table)
 	}
 
 	table->private = newinfo;
-	table->lock = RW_LOCK_UNLOCKED;
+	rwlock_init(&table->lock);
 	ret = down_interruptible(&ebt_mutex);
 	if (ret != 0)
 		goto free_chainstack;

@@ -305,8 +305,15 @@ swiotlb_alloc_coherent (struct device *hwdev, size_t size, dma_addr_t *dma_handl
 	flags |= GFP_DMA;
 
 	ret = (void *)__get_free_pages(flags, get_order(size));
-	if (!ret)
-		return NULL;
+	if (!ret) {
+		 /* DMA_FROM_DEVICE is to avoid the memcpy in map_single */
+		dma_addr_t handle;
+		handle = swiotlb_map_single(NULL, NULL, size, DMA_FROM_DEVICE);
+		if (dma_mapping_error(handle))
+			return NULL;
+
+		ret = phys_to_virt(handle);
+	}
 
 	memset(ret, 0, size);
 	dev_addr = virt_to_phys(ret);
@@ -319,7 +326,12 @@ swiotlb_alloc_coherent (struct device *hwdev, size_t size, dma_addr_t *dma_handl
 void
 swiotlb_free_coherent (struct device *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle)
 {
-	free_pages((unsigned long) vaddr, get_order(size));
+	if (!(vaddr >= (void *)io_tlb_start
+                    && vaddr < (void *)io_tlb_end))
+		free_pages((unsigned long) vaddr, get_order(size));
+	else
+		/* DMA_TO_DEVICE to avoid memcpy in unmap_single */
+		swiotlb_unmap_single (hwdev, dma_handle, size, DMA_TO_DEVICE);
 }
 
 static void swiotlb_full(struct device *dev, size_t size, int dir, int do_panic)

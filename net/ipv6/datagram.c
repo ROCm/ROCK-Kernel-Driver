@@ -190,7 +190,7 @@ ipv4_connected:
 	}
 
 	ip6_dst_store(sk, dst,
-		      !ipv6_addr_cmp(&fl.fl6_dst, &np->daddr) ?
+		      ipv6_addr_equal(&fl.fl6_dst, &np->daddr) ?
 		      &np->daddr : NULL);
 
 	sk->sk_state = TCP_ESTABLISHED;

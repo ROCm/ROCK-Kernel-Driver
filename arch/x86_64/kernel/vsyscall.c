@@ -40,6 +40,7 @@
 #include <linux/kernel.h>
 #include <linux/timer.h>
 #include <linux/seqlock.h>
+#include <linux/jiffies.h>
 
 #include <asm/vsyscall.h>
 #include <asm/pgtable.h>
@@ -88,7 +89,7 @@ static force_inline void do_vgettimeofday(struct timeval * tv)
 				 __vxtime.tsc_quot) >> 32;
 			/* See comment in x86_64 do_gettimeofday. */ 
 		} else {
-			usec += ((readl(fix_to_virt(VSYSCALL_HPET) + 0xf0) -
+			usec += ((readl((void *)fix_to_virt(VSYSCALL_HPET) + 0xf0) -
 				  __vxtime.last) * __vxtime.quot) >> 32;
 		}
 	} while (read_seqretry(&__xtime_lock, sequence));
@@ -165,14 +166,12 @@ static void __init map_vsyscall(void)
 
 static int __init vsyscall_init(void)
 {
-	if ((unsigned long) &vgettimeofday != VSYSCALL_ADDR(__NR_vgettimeofday))
-		panic("vgettimeofday link addr broken");
-	if ((unsigned long) &vtime != VSYSCALL_ADDR(__NR_vtime))
-		panic("vtime link addr broken");
-	if (VSYSCALL_ADDR(0) != __fix_to_virt(VSYSCALL_FIRST_PAGE))
-		panic("fixmap first vsyscall %lx should be %lx", __fix_to_virt(VSYSCALL_FIRST_PAGE),
-		      VSYSCALL_ADDR(0));
+        BUG_ON(((unsigned long) &vgettimeofday != 
+		      VSYSCALL_ADDR(__NR_vgettimeofday)));
+	BUG_ON((unsigned long) &vtime != VSYSCALL_ADDR(__NR_vtime));
+	BUG_ON((VSYSCALL_ADDR(0) != __fix_to_virt(VSYSCALL_FIRST_PAGE)));
 	map_vsyscall();
+	sysctl_vsyscall = 1; 
 
 	return 0;
 }

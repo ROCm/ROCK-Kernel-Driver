@@ -30,7 +30,7 @@
 #include <linux/bitmap.h>
 #include <linux/slab.h>
 #include <linux/rbtree.h>
-#include <asm/semaphore.h>
+#include <linux/spinlock.h>
 
 struct vm_area_struct;
 
@@ -134,13 +134,13 @@ struct sp_node {
 
 struct shared_policy {
 	struct rb_root root;
-	struct semaphore sem;
+	spinlock_t lock;
 };
 
 static inline void mpol_shared_policy_init(struct shared_policy *info)
 {
 	info->root = RB_ROOT;
-	init_MUTEX(&info->sem);
+	spin_lock_init(&info->lock);
 }
 
 int mpol_set_shared_policy(struct shared_policy *info,

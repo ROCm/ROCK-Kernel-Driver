@@ -65,7 +65,7 @@
 #include <linux/module.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -356,10 +356,13 @@ static void *rt_cpu_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	int cpu;
 
-	for (cpu = *pos; cpu < NR_CPUS; ++cpu) {
+	if (*pos == 0)
+		return SEQ_START_TOKEN;
+
+	for (cpu = *pos-1; cpu < NR_CPUS; ++cpu) {
 		if (!cpu_possible(cpu))
 			continue;
-		*pos = cpu;
+		*pos = cpu+1;
 		return per_cpu_ptr(rt_cache_stat, cpu);
 	}
 	return NULL;
@@ -369,10 +372,10 @@ static void *rt_cpu_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	int cpu;
 
-	for (cpu = *pos + 1; cpu < NR_CPUS; ++cpu) {
+	for (cpu = *pos; cpu < NR_CPUS; ++cpu) {
 		if (!cpu_possible(cpu))
 			continue;
-		*pos = cpu;
+		*pos = cpu+1;
 		return per_cpu_ptr(rt_cache_stat, cpu);
 	}
 	return NULL;
@@ -387,6 +390,11 @@ static void rt_cpu_seq_stop(struct seq_file *seq, void *v)
 static int rt_cpu_seq_show(struct seq_file *seq, void *v)
 {
 	struct rt_cache_stat *st = v;
+
+	if (v == SEQ_START_TOKEN) {
+		seq_printf(seq, "entries  in_hit in_slow_tot in_no_route in_brd in_martian_dst in_martian_src  out_hit out_slow_tot out_slow_mc  gc_total gc_ignored gc_goal_miss gc_dst_overflow in_hlist_search out_hlist_search\n");
+		return 0;
+	}
 	
 	seq_printf(seq,"%08x  %08x %08x %08x %08x %08x %08x %08x "
 		   " %08x %08x %08x %08x %08x %08x %08x %08x %08x \n",
@@ -793,14 +801,13 @@ restart:
 			 * must be visible to another weakly ordered CPU before
 			 * the insertion at the start of the hash chain.
 			 */
-			smp_wmb();
-			rth->u.rt_next = rt_hash_table[hash].chain;
+			rcu_assign_pointer(rth->u.rt_next,
+					   rt_hash_table[hash].chain);
 			/*
 			 * Since lookup is lockfree, the update writes
 			 * must be ordered for consistency on SMP.
 			 */
-			smp_wmb();
-			rt_hash_table[hash].chain = rth;
+			rcu_assign_pointer(rt_hash_table[hash].chain, rth);
 
 			rth->u.dst.__use++;
 			dst_hold(&rth->u.dst);
@@ -1359,10 +1366,8 @@ static void ipv4_link_failure(struct sk_buff *skb)
 		dst_set_expires(&rt->u.dst, 0);
 }
 
-static int ip_rt_bug(struct sk_buff **pskb)
+static int ip_rt_bug(struct sk_buff *skb)
 {
-	struct sk_buff *skb = *pskb;
-
 	printk(KERN_DEBUG "ip_rt_bug: %u.%u.%u.%u -> %u.%u.%u.%u, %s\n",
 		NIPQUAD(skb->nh.iph->saddr), NIPQUAD(skb->nh.iph->daddr),
 		skb->dev ? skb->dev->name : "?");
@@ -2206,22 +2211,27 @@ int __ip_route_output_key(struct rtable **rp, const struct flowi *flp)
 	return ip_route_output_slow(rp, flp);
 }
 
-int ip_route_output_key(struct rtable **rp, struct flowi *flp)
-{
-	int err;
-
-	if ((err = __ip_route_output_key(rp, flp)) != 0)
-		return err;
-	return flp->proto ? xfrm_lookup((struct dst_entry**)rp, flp, NULL, 0) : 0;
-}
-
 int ip_route_output_flow(struct rtable **rp, struct flowi *flp, struct sock *sk, int flags)
 {
 	int err;
 
 	if ((err = __ip_route_output_key(rp, flp)) != 0)
 		return err;
-	return flp->proto ? xfrm_lookup((struct dst_entry**)rp, flp, sk, flags) : 0;
+
+	if (flp->proto) {
+		if (!flp->fl4_src)
+			flp->fl4_src = (*rp)->rt_src;
+		if (!flp->fl4_dst)
+			flp->fl4_dst = (*rp)->rt_dst;
+		return xfrm_lookup((struct dst_entry **)rp, flp, sk, flags);
+	}
+
+	return 0;
+}
+
+int ip_route_output_key(struct rtable **rp, struct flowi *flp)
+{
+	return ip_route_output_flow(rp, flp, NULL, 0);
 }
 
 static int rt_fill_info(struct sk_buff *skb, u32 pid, u32 seq, int event,
@@ -2745,7 +2755,7 @@ int __init ip_rt_init(void)
 
 	rt_hash_mask--;
 	for (i = 0; i <= rt_hash_mask; i++) {
-		rt_hash_table[i].lock = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&rt_hash_table[i].lock);
 		rt_hash_table[i].chain = NULL;
 	}
 
@@ -2778,12 +2788,16 @@ int __init ip_rt_init(void)
 	add_timer(&rt_secret_timer);
 
 #ifdef CONFIG_PROC_FS
+	{
+	struct proc_dir_entry *rtstat_pde = NULL; /* keep gcc happy */
 	if (!proc_net_fops_create("rt_cache", S_IRUGO, &rt_cache_seq_fops) ||
-	    !proc_net_fops_create("rt_cache_stat", S_IRUGO, &rt_cpu_seq_fops)) {
+	    !(rtstat_pde = create_proc_entry("rt_cache", S_IRUGO, 
+			    		     proc_net_stat))) {
 		free_percpu(rt_cache_stat);
 		return -ENOMEM;
 	}
-
+	rtstat_pde->proc_fops = &rt_cpu_seq_fops;
+	}
 #ifdef CONFIG_NET_CLS_ROUTE
 	create_proc_read_entry("rt_acct", 0, proc_net, ip_rt_acct_read, NULL);
 #endif

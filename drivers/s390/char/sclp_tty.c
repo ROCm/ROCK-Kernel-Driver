@@ -277,10 +277,7 @@ sclp_ttybuf_callback(struct sclp_buffer *buffer, int rc)
 	wake_up(&sclp_tty_waitq);
 	/* check if the tty needs a wake up call */
 	if (sclp_tty != NULL) {
-		if ((sclp_tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-		    sclp_tty->ldisc.write_wakeup)
-			(sclp_tty->ldisc.write_wakeup)(sclp_tty);
-		wake_up_interruptible(&sclp_tty->write_wait);
+		tty_wakeup(sclp_tty);
 	}
 }
 
@@ -398,36 +395,14 @@ sclp_tty_write_string(const unsigned char *str, int count)
  * routine will return the number of characters actually accepted for writing.
  */
 static int
-sclp_tty_write(struct tty_struct *tty, int from_user,
-	       const unsigned char *buf, int count)
+sclp_tty_write(struct tty_struct *tty, const unsigned char *buf, int count)
 {
-	int length, ret;
-
 	if (sclp_tty_chars_count > 0) {
 		sclp_tty_write_string(sclp_tty_chars, sclp_tty_chars_count);
 		sclp_tty_chars_count = 0;
 	}
-	if (!from_user) {
-		sclp_tty_write_string(buf, count);
-		return count;
-	}
-	ret = 0;
-	while (count > 0) {
-		length = count < SCLP_TTY_BUF_SIZE ?
-			count : SCLP_TTY_BUF_SIZE;
-		length -= copy_from_user(sclp_tty_chars,
-				(const unsigned char __user *)buf, length);
-		if (length == 0) {
-			if (!ret)
-				ret = -EFAULT;
-			break;
-		}
-		sclp_tty_write_string(sclp_tty_chars, length);
-		buf += length;
-		count -= length;
-		ret += length;
-	}
-	return ret;
+	sclp_tty_write_string(buf, count);
+	return count;
 }
 
 /*
@@ -626,7 +601,7 @@ sclp_get_input(unsigned char *start, unsigned char *end)
 
 	/* if set in ioctl write operators input to console  */
 	if (sclp_ioctls.echo)
-		sclp_tty_write(sclp_tty, 0, start, count);
+		sclp_tty_write(sclp_tty, start, count);
 
 	/* transfer input to high level driver */
 	sclp_tty_input(start, count);

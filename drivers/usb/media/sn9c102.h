@@ -1,5 +1,5 @@
 /***************************************************************************
- * V4L2 driver for SN9C10[12] PC Camera Controllers                        *
+ * V4L2 driver for SN9C10x PC Camera Controllers                           *
  *                                                                         *
  * Copyright (C) 2004 by Luca Risolia <luca.risolia@studio.unibo.it>       *
  *                                                                         *
@@ -27,6 +27,7 @@
 #include <linux/device.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
+#include <linux/time.h>
 #include <linux/wait.h>
 #include <linux/types.h>
 #include <linux/param.h>
@@ -45,19 +46,26 @@
 #define SN9C102_URBS              2
 #define SN9C102_ISO_PACKETS       7
 #define SN9C102_ALTERNATE_SETTING 8
-#define SN9C102_CTRL_TIMEOUT      10*HZ
+#define SN9C102_URB_TIMEOUT       msecs_to_jiffies(3)
+#define SN9C102_CTRL_TIMEOUT      msecs_to_jiffies(100)
 
 /*****************************************************************************/
 
-#define SN9C102_MODULE_NAME  "V4L2 driver for SN9C10[12] PC Camera Controllers"
+#define SN9C102_MODULE_NAME     "V4L2 driver for SN9C10x PC Camera Controllers"
 #define SN9C102_MODULE_AUTHOR   "(C) 2004 Luca Risolia"
 #define SN9C102_AUTHOR_EMAIL    "<luca.risolia@studio.unibo.it>"
 #define SN9C102_MODULE_LICENSE  "GPL"
-#define SN9C102_MODULE_VERSION  "1:1.08"
-#define SN9C102_MODULE_VERSION_CODE  KERNEL_VERSION(1, 0, 8)
+#define SN9C102_MODULE_VERSION  "1:1.19"
+#define SN9C102_MODULE_VERSION_CODE  KERNEL_VERSION(1, 0, 19)
 
-SN9C102_ID_TABLE;
-SN9C102_SENSOR_TABLE;
+enum sn9c102_bridge {
+	BRIDGE_SN9C101 = 0x01,
+	BRIDGE_SN9C102 = 0x02,
+	BRIDGE_SN9C103 = 0x04,
+};
+
+SN9C102_ID_TABLE
+SN9C102_SENSOR_TABLE
 
 enum sn9c102_frame_state {
 	F_UNUSED,
@@ -94,7 +102,7 @@ enum sn9c102_stream_state {
 };
 
 struct sn9c102_sysfs_attr {
-	u8 reg, val, i2c_reg, i2c_val;
+	u8 reg, i2c_reg;
 };
 
 static DECLARE_MUTEX(sn9c102_sysfs_lock);
@@ -105,6 +113,7 @@ struct sn9c102_device {
 
 	struct video_device* v4ldev;
 
+	enum sn9c102_bridge bridge;
 	struct sn9c102_sensor* sensor;
 
 	struct usb_device* usbdev;
@@ -114,10 +123,12 @@ struct sn9c102_device {
 
 	struct sn9c102_frame_t *frame_current, frame[SN9C102_MAX_FRAMES];
 	struct list_head inqueue, outqueue;
-	u32 frame_count, nbuffers;
+	u32 frame_count, nbuffers, nreadbuffers;
 
 	enum sn9c102_io_method io;
 	enum sn9c102_stream_state stream;
+
+	struct v4l2_jpegcompression compression;
 
 	struct sn9c102_sysfs_attr sysfs;
 	u16 reg[32];

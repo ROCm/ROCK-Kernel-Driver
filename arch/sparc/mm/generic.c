@@ -41,7 +41,7 @@ static inline void forget_pte(pte_t page)
 #endif
 }
 
-/* Remap IO memory, the same way as remap_page_range(), but use
+/* Remap IO memory, the same way as remap_pfn_range(), but use
  * the obio memory space.
  *
  * They use a pgprot that sets PAGE_IO and does not check the

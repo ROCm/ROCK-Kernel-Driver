@@ -14,12 +14,12 @@
 #include <linux/sched.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 
 #include <asm/ptrace.h>
 #include <asm/system.h>
 #include <asm/dma.h>
 #include <asm/irq.h>
-#include <asm/bitops.h>
 #include <asm/mmu_context.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
@@ -201,7 +201,6 @@ struct alpha_machine_vector rx164_mv __initmv = {
 	DO_EV5_MMU,
 	DO_DEFAULT_RTC,
 	DO_POLARIS_IO,
-	DO_POLARIS_BUS,
 	.machine_check		= polaris_machine_check,
 	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= DEFAULT_IO_BASE,

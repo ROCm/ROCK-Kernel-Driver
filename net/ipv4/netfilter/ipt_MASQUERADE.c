@@ -81,8 +81,8 @@ masquerade_target(struct sk_buff **pskb,
 	enum ip_conntrack_info ctinfo;
 	const struct ip_nat_multi_range *mr;
 	struct ip_nat_multi_range newrange;
-	u_int32_t newsrc;
 	struct rtable *rt;
+	u_int32_t newsrc;
 
 	IP_NF_ASSERT(hooknum == NF_IP_POST_ROUTING);
 
@@ -96,35 +96,12 @@ masquerade_target(struct sk_buff **pskb,
 	                    || ctinfo == IP_CT_RELATED + IP_CT_IS_REPLY));
 
 	mr = targinfo;
-
-	{
-		struct flowi fl = { .nl_u = { .ip4_u =
-					      { .daddr = (*pskb)->nh.iph->daddr,
-						.tos = (RT_TOS((*pskb)->nh.iph->tos) |
-							RTO_CONN),
-#ifdef CONFIG_IP_ROUTE_FWMARK
-						.fwmark = (*pskb)->nfmark
-#endif
-					      } } };
-		if (ip_route_output_key(&rt, &fl) != 0) {
-			/* Funky routing can do this. */
-			if (net_ratelimit())
-				printk("MASQUERADE:"
-				       " No route: Rusty's brain broke!\n");
-			return NF_DROP;
-		}
-		if (rt->u.dst.dev != out) {
-			if (net_ratelimit())
-				printk("MASQUERADE:"
-				       " Route sent us somewhere else.\n");
-			ip_rt_put(rt);
-			return NF_DROP;
-		}
+	rt = (struct rtable *)(*pskb)->dst;
+	newsrc = inet_select_addr(out, rt->rt_gateway, RT_SCOPE_UNIVERSE);
+	if (!newsrc) {
+		printk("MASQUERADE: %s ate my IP address\n", out->name);
+		return NF_DROP;
 	}
-
-	newsrc = rt->rt_src;
-	DEBUGP("newsrc = %u.%u.%u.%u\n", NIPQUAD(newsrc));
-	ip_rt_put(rt);
 
 	WRITE_LOCK(&masq_lock);
 	ct->nat.masq_index = out->ifindex;
@@ -141,34 +118,56 @@ masquerade_target(struct sk_buff **pskb,
 }
 
 static inline int
-device_cmp(const struct ip_conntrack *i, void *_ina)
+device_cmp(const struct ip_conntrack *i, void *ifindex)
 {
-	int ret = 0;
-	struct in_ifaddr *ina = _ina;
+	int ret;
 
 	READ_LOCK(&masq_lock);
-	/* If it's masquerading out this interface with a different address,
-	   or we don't know the new address of this interface. */
-	if (i->nat.masq_index == ina->ifa_dev->dev->ifindex
-	    && i->tuplehash[IP_CT_DIR_REPLY].tuple.dst.ip != ina->ifa_address)
-		ret = 1;
+	ret = (i->nat.masq_index == (int)(long)ifindex);
 	READ_UNLOCK(&masq_lock);
 
 	return ret;
+}
+
+static int masq_device_event(struct notifier_block *this,
+			     unsigned long event,
+			     void *ptr)
+{
+	struct net_device *dev = ptr;
+
+	if (event == NETDEV_DOWN) {
+		/* Device was downed.  Search entire table for
+		   conntracks which were associated with that device,
+		   and forget them. */
+		IP_NF_ASSERT(dev->ifindex != 0);
+
+		ip_ct_selective_cleanup(device_cmp, (void *)(long)dev->ifindex);
+	}
+
+	return NOTIFY_DONE;
 }
 
 static int masq_inet_event(struct notifier_block *this,
 			   unsigned long event,
 			   void *ptr)
 {
-	/* For some configurations, interfaces often come back with
-	 * the same address.  If not, clean up old conntrack
-	 * entries. */
-	if (event == NETDEV_UP)
-		ip_ct_selective_cleanup(device_cmp, ptr);
+	struct net_device *dev = ((struct in_ifaddr *)ptr)->ifa_dev->dev;
+
+	if (event == NETDEV_DOWN) {
+		/* IP address was deleted.  Search entire table for
+		   conntracks which were associated with that device,
+		   and forget them. */
+		IP_NF_ASSERT(dev->ifindex != 0);
+
+		ip_ct_selective_cleanup(device_cmp, (void *)(long)dev->ifindex);
+	}
 
 	return NOTIFY_DONE;
 }
+
+static struct notifier_block masq_dev_notifier = {
+	.notifier_call	= masq_device_event,
+};
 
 static struct notifier_block masq_inet_notifier = {
 	.notifier_call	= masq_inet_event,
@@ -187,9 +186,12 @@ static int __init init(void)
 
 	ret = ipt_register_target(&masquerade);
 
-	if (ret == 0)
+	if (ret == 0) {
+		/* Register for device down reports */
+		register_netdevice_notifier(&masq_dev_notifier);
 		/* Register IP address change reports */
 		register_inetaddr_notifier(&masq_inet_notifier);
+	}
 
 	return ret;
 }
@@ -197,6 +199,7 @@ static int __init init(void)
 static void __exit fini(void)
 {
 	ipt_unregister_target(&masquerade);
+	unregister_netdevice_notifier(&masq_dev_notifier);
 	unregister_inetaddr_notifier(&masq_inet_notifier);	
 }
 

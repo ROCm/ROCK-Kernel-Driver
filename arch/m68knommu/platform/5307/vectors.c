@@ -14,6 +14,7 @@
 #include <linux/param.h>
 #include <linux/init.h>
 #include <linux/unistd.h>
+#include <linux/delay.h>
 #include <asm/irq.h>
 #include <asm/dma.h>
 #include <asm/traps.h>
@@ -22,7 +23,6 @@
 #include <asm/mcftimer.h>
 #include <asm/mcfsim.h>
 #include <asm/mcfdma.h>
-#include <asm/delay.h>
 #include <asm/mcfwdebug.h>
 
 /***************************************************************************/

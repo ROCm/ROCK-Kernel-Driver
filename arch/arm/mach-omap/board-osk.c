@@ -38,16 +38,17 @@
 #include <asm/arch/clocks.h>
 #include <asm/arch/gpio.h>
 #include <asm/arch/fpga.h>
+#include <asm/arch/usb.h>
+#include <asm/arch/serial.h>
 
 #include "common.h"
 
-extern void __init omap_init_time(void);
-
 static struct map_desc osk5912_io_desc[] __initdata = {
-{ OMAP_OSK_ETHR_BASE, OMAP_OSK_ETHR_START, OMAP_OSK_ETHR_SIZE,MT_DEVICE },
 { OMAP_OSK_NOR_FLASH_BASE, OMAP_OSK_NOR_FLASH_START, OMAP_OSK_NOR_FLASH_SIZE,
 	MT_DEVICE },
 };
+
+static int __initdata osk_serial_ports[OMAP_MAX_NR_PORTS] = {1, 0, 0};
 
 static struct resource osk5912_smc91x_resources[] = {
 	[0] = {
@@ -78,16 +79,29 @@ void osk_init_irq(void)
 	omap_init_irq();
 }
 
+static struct omap_usb_config osk_usb_config __initdata = {
+	/* has usb host and device, but no Mini-AB port */
+	.register_host	= 1,
+	.hmc_mode	= 16,
+	.pins[0]	= 2,
+};
+
+static struct omap_board_config_kernel osk_config[] = {
+	{ OMAP_TAG_USB,           &osk_usb_config },
+};
+
 static void __init osk_init(void)
 {
         platform_add_devices(osk5912_devices, ARRAY_SIZE(osk5912_devices));
+	omap_board_config = osk_config;
+	omap_board_config_size = ARRAY_SIZE(osk_config);
 }
 
 static void __init osk_map_io(void)
 {
 	omap_map_io();
 	iotable_init(osk5912_io_desc, ARRAY_SIZE(osk5912_io_desc));
-
+	omap_serial_init(osk_serial_ports);
 }
 
 MACHINE_START(OMAP_OSK, "TI-OSK")
@@ -97,5 +111,5 @@ MACHINE_START(OMAP_OSK, "TI-OSK")
 	MAPIO(osk_map_io)
 	INITIRQ(osk_init_irq)
 	INIT_MACHINE(osk_init)
-	INITTIME(omap_init_time)
+	.timer		= &omap_timer,
 MACHINE_END

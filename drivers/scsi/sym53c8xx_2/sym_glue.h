@@ -22,32 +22,19 @@
  *
  *-----------------------------------------------------------------------------
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- * Where this Software is combined with software released under the terms of 
- * the GNU Public License ("GPL") and the terms of the GPL would require the 
- * combined work to also be released under the terms of the GPL, the terms
- * and conditions of this License will apply in addition to those of the
- * GPL with the exception of any terms or conditions of this License that
- * conflict with, or are expressly prohibited by, the GPL.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHORS AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #ifndef SYM_GLUE_H
@@ -89,7 +76,6 @@
 
 #define SYM_OPT_HANDLE_DIR_UNKNOWN
 #define SYM_OPT_HANDLE_DEVICE_QUEUEING
-#define SYM_OPT_NVRAM_PRE_READ
 #define SYM_OPT_LIMIT_COMMAND_REORDERING
 #define	SYM_OPT_ANNOUNCE_TRANSFER_RATE
 
@@ -107,10 +93,9 @@
 #define	printf(args...)		printk(args)
 
 /*
- *  Insert a delay in micro-seconds and milli-seconds.
+ *  Insert a delay in micro-seconds
  */
 #define sym_udelay(us)	udelay(us)
-#define sym_mdelay(ms)	mdelay(ms)
 
 /*
  *  A 'read barrier' flushes any data that have been prefetched 
@@ -288,32 +273,32 @@ typedef struct scsi_cmnd *cam_scsiio_p;/* SCSI I/O */
  *  MEMORY mapped IO input / output
  */
 
-#define INB_OFF(o)        readb((char *)np->s.mmio_va + sym_offb(o))
-#define OUTB_OFF(o, val)  writeb((val), (char *)np->s.mmio_va + sym_offb(o))
+#define INB_OFF(o)        readb(np->s.mmio_va + sym_offb(o))
+#define OUTB_OFF(o, val)  writeb((val), np->s.mmio_va + sym_offb(o))
 
 #if	defined(__BIG_ENDIAN) && !defined(SYM_CONF_CHIP_BIG_ENDIAN)
 
-#define INW_OFF(o)        readw_l2b((char *)np->s.mmio_va + sym_offw(o))
-#define INL_OFF(o)        readl_l2b((char *)np->s.mmio_va + (o))
+#define INW_OFF(o)        readw_l2b(np->s.mmio_va + sym_offw(o))
+#define INL_OFF(o)        readl_l2b(np->s.mmio_va + (o))
 
-#define OUTW_OFF(o, val)  writew_b2l((val), (char *)np->s.mmio_va + sym_offw(o))
-#define OUTL_OFF(o, val)  writel_b2l((val), (char *)np->s.mmio_va + (o))
+#define OUTW_OFF(o, val)  writew_b2l((val), np->s.mmio_va + sym_offw(o))
+#define OUTL_OFF(o, val)  writel_b2l((val), np->s.mmio_va + (o))
 
 #elif	defined(__LITTLE_ENDIAN) && defined(SYM_CONF_CHIP_BIG_ENDIAN)
 
-#define INW_OFF(o)        readw_b2l((char *)np->s.mmio_va + sym_offw(o))
-#define INL_OFF(o)        readl_b2l((char *)np->s.mmio_va + (o))
+#define INW_OFF(o)        readw_b2l(np->s.mmio_va + sym_offw(o))
+#define INL_OFF(o)        readl_b2l(np->s.mmio_va + (o))
 
-#define OUTW_OFF(o, val)  writew_l2b((val), (char *)np->s.mmio_va + sym_offw(o))
-#define OUTL_OFF(o, val)  writel_l2b((val), (char *)np->s.mmio_va + (o))
+#define OUTW_OFF(o, val)  writew_l2b((val), np->s.mmio_va + sym_offw(o))
+#define OUTL_OFF(o, val)  writel_l2b((val), np->s.mmio_va + (o))
 
 #else
 
-#define INW_OFF(o)        readw_raw((char *)np->s.mmio_va + sym_offw(o))
-#define INL_OFF(o)        readl_raw((char *)np->s.mmio_va + (o))
+#define INW_OFF(o)        readw_raw(np->s.mmio_va + sym_offw(o))
+#define INL_OFF(o)        readl_raw(np->s.mmio_va + (o))
 
-#define OUTW_OFF(o, val)  writew_raw((val), (char *)np->s.mmio_va + sym_offw(o))
-#define OUTL_OFF(o, val)  writel_raw((val), (char *)np->s.mmio_va + (o))
+#define OUTW_OFF(o, val)  writew_raw((val), np->s.mmio_va + sym_offw(o))
+#define OUTL_OFF(o, val)  writel_raw((val), np->s.mmio_va + (o))
 
 #endif
 
@@ -390,14 +375,11 @@ struct sym_shcb {
 
 	struct Scsi_Host *host;
 
-	void *		mmio_va;	/* MMIO kernel virtual address	*/
-	void *		ram_va;		/* RAM  kernel virtual address	*/
+	void __iomem *	mmio_va;	/* MMIO kernel virtual address	*/
+	void __iomem *	ram_va;		/* RAM  kernel virtual address	*/
 	u_long		io_port;	/* IO port address cookie	*/
 	u_short		io_ws;		/* IO window size		*/
 	int		irq;		/* IRQ number			*/
-
-	SYM_QUEHEAD	wait_cmdq;	/* Awaiting SCSI commands	*/
-	SYM_QUEHEAD	busy_cmdq;	/* Enqueued SCSI commands	*/
 
 	struct timer_list timer;	/* Timer handler link header	*/
 	u_long		lasttime;
@@ -423,7 +405,7 @@ struct sym_slot {
 	int	irq;
 /* port and address fields to fit INB, OUTB macros */
 	u_long	io_port;
-	void *	mmio_va;
+	void __iomem *	mmio_va;
 	char	inst_name[16];
 };
 

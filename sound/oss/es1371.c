@@ -637,7 +637,7 @@ static void set_dac2_rate(struct es1371_state *s, unsigned rate)
 
 /* --------------------------------------------------------------------- */
 
-static void __init src_init(struct es1371_state *s)
+static void __devinit src_init(struct es1371_state *s)
 {
         unsigned int i;
 
@@ -910,7 +910,7 @@ static int prog_dmabuf(struct es1371_state *s, struct dmabuf *db, unsigned rate,
 		if (!db->rawbuf)
 			return -ENOMEM;
 		db->buforder = order;
-		/* now mark the pages as reserved; otherwise remap_page_range doesn't do what we want */
+		/* now mark the pages as reserved; otherwise remap_pfn_range doesn't do what we want */
 		pend = virt_to_page(db->rawbuf + (PAGE_SIZE << db->buforder) - 1);
 		for (page = virt_to_page(db->rawbuf); page <= pend; page++)
 			SetPageReserved(page);
@@ -1555,7 +1555,9 @@ static int es1371_mmap(struct file *file, struct vm_area_struct *vma)
 		ret = -EINVAL;
 		goto out;
 	}
-	if (remap_page_range(vma, vma->vm_start, virt_to_phys(db->rawbuf), size, vma->vm_page_prot)) {
+	if (remap_pfn_range(vma, vma->vm_start,
+				virt_to_phys(db->rawbuf) >> PAGE_SHIFT,
+				size, vma->vm_page_prot)) {
 		ret = -EAGAIN;
 		goto out;
 	}
@@ -2128,7 +2130,9 @@ static int es1371_mmap_dac(struct file *file, struct vm_area_struct *vma)
 	if (size > (PAGE_SIZE << s->dma_dac1.buforder))
 		goto out;
 	ret = -EAGAIN;
-	if (remap_page_range(vma, vma->vm_start, virt_to_phys(s->dma_dac1.rawbuf), size, vma->vm_page_prot))
+	if (remap_pfn_range(vma, vma->vm_start,
+			virt_to_phys(s->dma_dac1.rawbuf) >> PAGE_SHIFT,
+			size, vma->vm_page_prot))
 		goto out;
 	s->dma_dac1.mapped = 1;
 	ret = 0;
@@ -2754,7 +2758,7 @@ MODULE_LICENSE("GPL");
 static struct initvol {
 	int mixch;
 	int vol;
-} initvol[] __initdata = {
+} initvol[] __devinitdata = {
 	{ SOUND_MIXER_WRITE_LINE, 0x4040 },
 	{ SOUND_MIXER_WRITE_CD, 0x4040 },
 	{ MIXER_WRITE(SOUND_MIXER_VIDEO), 0x4040 },

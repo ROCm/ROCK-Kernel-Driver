@@ -48,17 +48,16 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int precise_ptr[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = 0 }; /* Enable precise pointer */
 static int line_outs_monitor[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = 0}; /* Send all inputs/playback to line outs */
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for RME Hammerfall DSP interface.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for RME Hammerfall DSP interface.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable/disable specific Hammerfall DSP soundcards.");
-module_param_array(precise_ptr, bool, boot_devs, 0444);
+module_param_array(precise_ptr, bool, NULL, 0444);
 MODULE_PARM_DESC(precise_ptr, "Enable precise pointer (doesn't work reliably).");
-module_param_array(line_outs_monitor, bool, boot_devs, 0444);
+module_param_array(line_outs_monitor, bool, NULL, 0444);
 MODULE_PARM_DESC(line_outs_monitor, "Send all input and playback streams to line outs by default.");
 MODULE_AUTHOR("Paul Davis <paul@linuxaudiosystems.com>, Marcus Andersson, Thomas Charbonnel <thomas@undata.org>");
 MODULE_DESCRIPTION("RME Hammerfall DSP");
@@ -802,7 +801,7 @@ static int hdsp_write_gain(hdsp_t *hdsp, unsigned int addr, unsigned short data)
 	
 	if (hdsp->io_type == H9652 || hdsp->io_type == H9632) {
 
-		/* from martin björnsen:
+		/* from martin bjÃ¶rnsen:
 		   
 		   "You can only write dwords to the
 		   mixer memory which contain two
@@ -935,9 +934,7 @@ static snd_pcm_uframes_t hdsp_hw_pointer(hdsp_t *hdsp)
 	}
 
 	position &= HDSP_BufferPositionMask;
-	position /= 4;
-	position -= 32;
-	position &= (HDSP_CHANNEL_BUFFER_SAMPLES-1);
+	position &= (hdsp->period_bytes/2) - 1;
 	return position;
 }
 
@@ -5063,6 +5060,7 @@ static int snd_hdsp_free(hdsp_t *hdsp)
 	if (hdsp->port)
 		pci_release_regions(hdsp->pci);
 		
+	pci_disable_device(hdsp->pci);
 	return 0;
 }
 

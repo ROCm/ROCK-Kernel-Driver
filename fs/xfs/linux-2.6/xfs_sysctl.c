@@ -129,6 +129,11 @@ STATIC ctl_table xfs_table[] = {
 	&sysctl_intvec, NULL,
 	&xfs_params.xfs_buf_age.min, &xfs_params.xfs_buf_age.max},
 
+	{XFS_INHERIT_NOSYM, "inherit_nosymlinks", &xfs_params.inherit_nosym.val,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
+	&sysctl_intvec, NULL,
+	&xfs_params.inherit_nosym.min, &xfs_params.inherit_nosym.max},
+
 	/* please keep this the last entry */
 #ifdef CONFIG_PROC_FS
 	{XFS_STATS_CLEAR, "stats_clear", &xfs_params.stats_clear.val,

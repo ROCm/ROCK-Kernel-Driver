@@ -391,7 +391,7 @@ void matroxfb_vgaHWrestore(WPMINFO2) {
 	CRITEND
 }
 
-static void get_pins(unsigned char* pins, struct matrox_bios* bd) {
+static void get_pins(unsigned char __iomem* pins, struct matrox_bios* bd) {
 	unsigned int b0 = readb(pins);
 	
 	if (b0 == 0x2E && readb(pins+1) == 0x41) {
@@ -427,7 +427,7 @@ static void get_pins(unsigned char* pins, struct matrox_bios* bd) {
 	}
 }
 
-static void get_bios_version(unsigned char* vbios, struct matrox_bios* bd) {
+static void get_bios_version(unsigned char __iomem * vbios, struct matrox_bios* bd) {
 	unsigned int pcir_offset;
 	
 	pcir_offset = readb(vbios + 24) | (readb(vbios + 25) << 8);
@@ -452,7 +452,7 @@ static void get_bios_version(unsigned char* vbios, struct matrox_bios* bd) {
 	}
 }
 
-static void get_bios_output(unsigned char* vbios, struct matrox_bios* bd) {
+static void get_bios_output(unsigned char __iomem* vbios, struct matrox_bios* bd) {
 	unsigned char b;
 	
 	b = readb(vbios + 0x7FF1);
@@ -462,7 +462,7 @@ static void get_bios_output(unsigned char* vbios, struct matrox_bios* bd) {
 	bd->output.state = b;
 }
 
-static void get_bios_tvout(unsigned char* vbios, struct matrox_bios* bd) {
+static void get_bios_tvout(unsigned char __iomem* vbios, struct matrox_bios* bd) {
 	unsigned int i;
 	
 	/* Check for 'IBM .*(V....TVO' string - it means TVO BIOS */
@@ -489,7 +489,7 @@ static void get_bios_tvout(unsigned char* vbios, struct matrox_bios* bd) {
 	}
 }
 
-static void parse_bios(unsigned char* vbios, struct matrox_bios* bd) {
+static void parse_bios(unsigned char __iomem* vbios, struct matrox_bios* bd) {
 	unsigned int pins_offset;
 	
 	if (readb(vbios) != 0x55 || readb(vbios + 1) != 0xAA) {
@@ -738,7 +738,7 @@ void matroxfb_read_pins(WPMINFO2) {
 	pci_write_config_dword(pdev, PCI_OPTION_REG, opt);
 #ifdef CONFIG_X86
 	if (!ACCESS_FBINFO(bios).bios_valid) {
-		unsigned char* b;
+		unsigned char __iomem* b;
 
 		b = ioremap(0x000C0000, 65536);
 		if (!b) {

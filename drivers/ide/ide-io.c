@@ -47,6 +47,7 @@
 #include <linux/seq_file.h>
 #include <linux/device.h>
 #include <linux/kmod.h>
+#include <linux/scatterlist.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -384,6 +385,8 @@ void ide_end_drive_cmd (ide_drive_t *drive, u8 stat, u8 err)
 				args->hobRegister[IDE_DATA_OFFSET]	= (data >> 8) & 0xFF;
 			}
 			args->tfRegister[IDE_ERROR_OFFSET]   = err;
+			/* be sure we're looking at the low order bits */
+			hwif->OUTB(drive->ctl & ~0x80, IDE_CONTROL_REG);
 			args->tfRegister[IDE_NSECTOR_OFFSET] = hwif->INB(IDE_NSECTOR_REG);
 			args->tfRegister[IDE_SECTOR_OFFSET]  = hwif->INB(IDE_SECTOR_REG);
 			args->tfRegister[IDE_LCYL_OFFSET]    = hwif->INB(IDE_LCYL_REG);
@@ -540,8 +543,6 @@ media_out:
 	return ide_stopped;
 }
 
-EXPORT_SYMBOL(ide_error);
-
 /**
  *	ide_abort	-	abort pending IDE operatins
  *	@drive: drive the error occurred on
@@ -582,8 +583,6 @@ ide_startstop_t ide_abort(ide_drive_t *drive, const char *msg)
 	return ide_stopped;
 }
 
-EXPORT_SYMBOL(ide_abort);
-
 /**
  *	ide_cmd		-	issue a simple drive command
  *	@drive: drive the command is for
@@ -595,7 +594,8 @@ EXPORT_SYMBOL(ide_abort);
  *	The drive must be selected beforehand.
  */
 
-void ide_cmd (ide_drive_t *drive, u8 cmd, u8 nsect, ide_handler_t *handler)
+static void ide_cmd (ide_drive_t *drive, u8 cmd, u8 nsect,
+		ide_handler_t *handler)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	if (IDE_CONTROL_REG)
@@ -604,8 +604,6 @@ void ide_cmd (ide_drive_t *drive, u8 cmd, u8 nsect, ide_handler_t *handler)
 	hwif->OUTB(nsect,IDE_NSECTOR_REG);
 	ide_execute_command(drive, cmd, handler, WAIT_CMD, NULL);
 }
-
-EXPORT_SYMBOL(ide_cmd);
 
 /**
  *	drive_cmd_intr		- 	drive command completion interrupt
@@ -617,7 +615,7 @@ EXPORT_SYMBOL(ide_cmd);
  *	the request
  */
  
-ide_startstop_t drive_cmd_intr (ide_drive_t *drive)
+static ide_startstop_t drive_cmd_intr (ide_drive_t *drive)
 {
 	struct request *rq = HWGROUP(drive)->rq;
 	ide_hwif_t *hwif = HWIF(drive);
@@ -642,8 +640,6 @@ ide_startstop_t drive_cmd_intr (ide_drive_t *drive)
 	return ide_stopped;
 }
 
-EXPORT_SYMBOL(drive_cmd_intr);
-
 /**
  *	do_special		-	issue some special commands
  *	@drive: drive the command is for
@@ -653,7 +649,7 @@ EXPORT_SYMBOL(drive_cmd_intr);
  *	back.
  */
 
-ide_startstop_t do_special (ide_drive_t *drive)
+static ide_startstop_t do_special (ide_drive_t *drive)
 {
 	special_t *s = &drive->special;
 
@@ -670,7 +666,33 @@ ide_startstop_t do_special (ide_drive_t *drive)
 		return DRIVER(drive)->special(drive);
 }
 
-EXPORT_SYMBOL(do_special);
+void ide_map_sg(ide_drive_t *drive, struct request *rq)
+{
+	ide_hwif_t *hwif = drive->hwif;
+	struct scatterlist *sg = hwif->sg_table;
+
+	if (hwif->sg_mapped)	/* needed by ide-scsi */
+		return;
+
+	if ((rq->flags & REQ_DRIVE_TASKFILE) == 0) {
+		hwif->sg_nents = blk_rq_map_sg(drive->queue, rq, sg);
+	} else {
+		sg_init_one(sg, rq->buffer, rq->nr_sectors * SECTOR_SIZE);
+		hwif->sg_nents = 1;
+	}
+}
+
+EXPORT_SYMBOL_GPL(ide_map_sg);
+
+void ide_init_sg_cmd(ide_drive_t *drive, struct request *rq)
+{
+	ide_hwif_t *hwif = drive->hwif;
+
+	hwif->nsect = hwif->nleft = rq->nr_sectors;
+	hwif->cursg = hwif->cursg_ofs = 0;
+}
+
+EXPORT_SYMBOL_GPL(ide_init_sg_cmd);
 
 /**
  *	execute_drive_command	-	issue special drive command
@@ -684,7 +706,8 @@ EXPORT_SYMBOL(do_special);
  *	all commands to finish. Don't do this as that is due to change
  */
 
-ide_startstop_t execute_drive_cmd (ide_drive_t *drive, struct request *rq)
+static ide_startstop_t execute_drive_cmd (ide_drive_t *drive,
+		struct request *rq)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	if (rq->flags & REQ_DRIVE_TASKFILE) {
@@ -694,6 +717,17 @@ ide_startstop_t execute_drive_cmd (ide_drive_t *drive, struct request *rq)
 			goto done;
 
 		hwif->data_phase = args->data_phase;
+
+		switch (hwif->data_phase) {
+		case TASKFILE_MULTI_OUT:
+		case TASKFILE_OUT:
+		case TASKFILE_MULTI_IN:
+		case TASKFILE_IN:
+			ide_init_sg_cmd(drive, rq);
+			ide_map_sg(drive, rq);
+		default:
+			break;
+		}
 
 		if (args->tf_out_flags.all != 0) 
 			return flagged_taskfile(drive, args);
@@ -763,8 +797,6 @@ done:
  	return ide_stopped;
 }
 
-EXPORT_SYMBOL(execute_drive_cmd);
-
 /**
  *	start_request	-	start of I/O and command issuing for IDE
  *
@@ -776,7 +808,7 @@ EXPORT_SYMBOL(execute_drive_cmd);
  *	FIXME: this function needs a rename
  */
  
-ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
+static ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 {
 	ide_startstop_t startstop;
 	sector_t block;
@@ -867,8 +899,6 @@ kill_rq:
 	return ide_stopped;
 }
 
-EXPORT_SYMBOL(start_request);
-
 /**
  *	ide_stall_queue		-	pause an IDE device
  *	@drive: drive to stall
@@ -883,52 +913,6 @@ void ide_stall_queue (ide_drive_t *drive, unsigned long timeout)
 	if (timeout > WAIT_WORSTCASE)
 		timeout = WAIT_WORSTCASE;
 	drive->sleep = timeout + jiffies;
-}
-
-void ide_unpin_hwgroup(ide_drive_t *drive)
-{
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
-
-	if (in_interrupt())
-		return;
-
-	if (hwgroup) {
-		spin_lock_irq(&ide_lock);
-		HWGROUP(drive)->busy = 0;
-		drive->blocked = 0;
-		do_ide_request(drive->queue);
-		spin_unlock_irq(&ide_lock);
-	}
-}
-
-void ide_pin_hwgroup(ide_drive_t *drive)
-{
-	ide_hwgroup_t *hwgroup = HWGROUP(drive);
-
-	if (in_interrupt())
-		return;
-
-	/*
-	 * should only happen very early, so not a problem
-	 */
-	if (!hwgroup)
-		return;
-
-	spin_lock_irq(&ide_lock);
-	do {
-		if (!hwgroup->busy && !drive->blocked && !drive->doing_barrier)
-			break;
-		spin_unlock_irq(&ide_lock);
-		schedule_timeout(HZ/100);
-		spin_lock_irq(&ide_lock);
-	} while (hwgroup->busy || drive->blocked || drive->doing_barrier);
-
-	/*
-	 * we've now secured exclusive access to this hwgroup
-	 */
-	hwgroup->busy = 1;
-	drive->blocked = 1;
-	spin_unlock_irq(&ide_lock);
 }
 
 EXPORT_SYMBOL(ide_stall_queue);
@@ -1037,10 +1021,7 @@ repeat:
  * the driver.  This makes the driver much more friendlier to shared IRQs
  * than previous designs, while remaining 100% (?) SMP safe and capable.
  */
-/* --BenH: made non-static as ide-pmac.c uses it to kick the hwgroup back
- *         into life on wakeup from machine sleep.
- */ 
-void ide_do_request (ide_hwgroup_t *hwgroup, int masked_irq)
+static void ide_do_request (ide_hwgroup_t *hwgroup, int masked_irq)
 {
 	ide_drive_t	*drive;
 	ide_hwif_t	*hwif;
@@ -1172,8 +1153,6 @@ void ide_do_request (ide_hwgroup_t *hwgroup, int masked_irq)
 	}
 }
 
-EXPORT_SYMBOL(ide_do_request);
-
 /*
  * Passes the stuff to ide_do_request
  */
@@ -1226,12 +1205,15 @@ static ide_startstop_t ide_dma_timeout_retry(ide_drive_t *drive, int error)
 	HWGROUP(drive)->rq = NULL;
 
 	rq->errors = 0;
+
+	if (!rq->bio)
+		goto out;
+
 	rq->sector = rq->bio->bi_sector;
 	rq->current_nr_sectors = bio_iovec(rq->bio)->bv_len >> 9;
 	rq->hard_cur_sectors = rq->current_nr_sectors;
-	if (rq->bio)
-		rq->buffer = NULL;
-
+	rq->buffer = NULL;
+out:
 	return ret;
 }
 
@@ -1334,8 +1316,6 @@ void ide_timer_expiry (unsigned long data)
 	ide_do_request(hwgroup, IDE_NO_IRQ);
 	spin_unlock_irqrestore(&ide_lock, flags);
 }
-
-EXPORT_SYMBOL(ide_timer_expiry);
 
 /**
  *	unexpected_intr		-	handle an unexpected IDE interrupt
@@ -1534,8 +1514,6 @@ irqreturn_t ide_intr (int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 
-EXPORT_SYMBOL(ide_intr);
-
 /**
  *	ide_init_drive_cmd	-	initialize a drive command request
  *	@rq: request object
@@ -1594,18 +1572,6 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 	int where = ELEVATOR_INSERT_BACK, err;
 	int must_wait = (action == ide_wait || action == ide_head_wait);
 
-#ifdef CONFIG_BLK_DEV_PDC4030
-	/*
-	 *	FIXME: there should be a drive or hwif->special
-	 *	handler that points here by default, not hacks
-	 *	in the ide-io.c code
-	 *
-	 *	FIXME2: That code breaks power management if used with
-	 *	this chipset, that really doesn't belong here !
-	 */
-	if (HWIF(drive)->chipset == ide_pdc4030 && rq->buffer != NULL)
-		return -ENOSYS;  /* special drive cmds not supported */
-#endif
 	rq->errors = 0;
 	rq->rq_status = RQ_ACTIVE;
 

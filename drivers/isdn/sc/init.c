@@ -7,6 +7,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
+#include <linux/delay.h>
 #include "includes.h"
 #include "hardware.h"
 #include "card.h"
@@ -167,8 +168,7 @@ static int __init sc_init(void)
 		if(do_reset) {
 			pr_debug("Doing a SAFE probe reset\n");
 			outb(0xFF, io[b] + RESET_OFFSET);
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(milliseconds(10000));
+			msleep_interruptible(10000);
 		}
 		pr_debug("RAM Base for board %d is 0x%x, %s probe\n", b, ram[b],
 			ram[b] == 0 ? "will" : "won't");
@@ -500,8 +500,7 @@ int identify_board(unsigned long rambase, unsigned int iobase)
 	 * Try to identify a PRI card
 	 */
 	outb(PRI_BASEPG_VAL, pgport);
-	set_current_state(TASK_INTERRUPTIBLE);
-	schedule_timeout(HZ);
+	msleep_interruptible(1000);
 	sig = readl(rambase + SIG_OFFSET);
 	pr_debug("Looking for a signature, got 0x%x\n", sig);
 	if(sig == SIGNATURE)
@@ -511,8 +510,7 @@ int identify_board(unsigned long rambase, unsigned int iobase)
 	 * Try to identify a PRI card
 	 */
 	outb(BRI_BASEPG_VAL, pgport);
-	set_current_state(TASK_INTERRUPTIBLE);
-	schedule_timeout(HZ);
+	msleep_interruptible(1000);
 	sig = readl(rambase + SIG_OFFSET);
 	pr_debug("Looking for a signature, got 0x%x\n", sig);
 	if(sig == SIGNATURE)

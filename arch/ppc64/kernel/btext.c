@@ -10,7 +10,7 @@
 #include <linux/version.h>
 
 #include <asm/sections.h>
-#include <asm/bootx.h>
+#include <asm/prom.h>
 #include <asm/btext.h>
 #include <asm/prom.h>
 #include <asm/page.h>
@@ -36,6 +36,11 @@ static int g_loc_Y;
 static int g_max_loc_X;
 static int g_max_loc_Y;
 
+static int dispDeviceRowBytes;
+static int dispDeviceDepth;
+static int dispDeviceRect[4];
+static unsigned char *dispDeviceBase, *logicalDisplayBase;
+
 unsigned long disp_BAT[2] __initdata = {0, 0};
 
 #define cmapsz	(16*256)
@@ -45,30 +50,6 @@ static unsigned char vga_font[cmapsz];
 int boot_text_mapped;
 int force_printk_to_btext = 0;
 
-boot_infos_t disp_bi;
-
-/* This function will enable the early boot text when doing OF booting. This
- * way, xmon output should work too
- */
-void __init btext_setup_display(int width, int height, int depth, int pitch,
-		    unsigned long address)
-{
-	unsigned long offset = reloc_offset();
-	boot_infos_t* bi = PTRRELOC(&disp_bi);
-
-	RELOC(g_loc_X) = 0;
-	RELOC(g_loc_Y) = 0;
-	RELOC(g_max_loc_X) = width / 8;
-	RELOC(g_max_loc_Y) = height / 16;
-	bi->logicalDisplayBase = (unsigned char *)address;
-	bi->dispDeviceBase = (unsigned char *)address;
-	bi->dispDeviceRowBytes = pitch;
-	bi->dispDeviceDepth = depth;
-	bi->dispDeviceRect[0] = bi->dispDeviceRect[1] = 0;
-	bi->dispDeviceRect[2] = width;
-	bi->dispDeviceRect[3] = height;
-	RELOC(boot_text_mapped) = 1;
-}
 
 /* Here's a small text engine to use during early boot
  * or for debugging purposes
@@ -84,34 +65,84 @@ void __init btext_setup_display(int width, int height, int depth, int pitch,
 void map_boot_text(void)
 {
 	unsigned long base, offset, size;
-	boot_infos_t *bi = &disp_bi;
 	unsigned char *vbase;
 
 	/* By default, we are no longer mapped */
 	boot_text_mapped = 0;
-	if (bi->dispDeviceBase == 0)
+	if (dispDeviceBase == 0)
 		return;
-	base = ((unsigned long) bi->dispDeviceBase) & 0xFFFFF000UL;
-	offset = ((unsigned long) bi->dispDeviceBase) - base;
-	size = bi->dispDeviceRowBytes * bi->dispDeviceRect[3] + offset
-		+ bi->dispDeviceRect[0];
+	base = ((unsigned long) dispDeviceBase) & 0xFFFFF000UL;
+	offset = ((unsigned long) dispDeviceBase) - base;
+	size = dispDeviceRowBytes * dispDeviceRect[3] + offset
+		+ dispDeviceRect[0];
 	vbase = __ioremap(base, size, _PAGE_NO_CACHE);
 	if (vbase == 0)
 		return;
-	bi->logicalDisplayBase = vbase + offset;
+	logicalDisplayBase = vbase + offset;
 	boot_text_mapped = 1;
 }
 
+int btext_initialize(struct device_node *np)
+{
+	unsigned int width, height, depth, pitch;
+	unsigned long address = 0;
+	u32 *prop;
+
+	prop = (u32 *)get_property(np, "width", NULL);
+	if (prop == NULL)
+		return -EINVAL;
+	width = *prop;
+	prop = (u32 *)get_property(np, "height", NULL);
+	if (prop == NULL)
+		return -EINVAL;
+	height = *prop;
+	prop = (u32 *)get_property(np, "depth", NULL);
+	if (prop == NULL)
+		return -EINVAL;
+	depth = *prop;
+	pitch = width * ((depth + 7) / 8);
+	prop = (u32 *)get_property(np, "linebytes", NULL);
+	if (prop)
+		pitch = *prop;
+	if (pitch == 1)
+		pitch = 0x1000;
+	prop = (u32 *)get_property(np, "address", NULL);
+	if (prop)
+		address = *prop;
+
+	/* FIXME: Add support for PCI reg properties */
+
+	if (address == 0)
+		return -EINVAL;
+
+	g_loc_X = 0;
+	g_loc_Y = 0;
+	g_max_loc_X = width / 8;
+	g_max_loc_Y = height / 16;
+	logicalDisplayBase = (unsigned char *)address;
+	dispDeviceBase = (unsigned char *)address;
+	dispDeviceRowBytes = pitch;
+	dispDeviceDepth = depth;
+	dispDeviceRect[0] = dispDeviceRect[1] = 0;
+	dispDeviceRect[2] = width;
+	dispDeviceRect[3] = height;
+
+	map_boot_text();
+
+	return 0;
+}
+
+
 /* Calc the base address of a given point (x,y) */
-static unsigned char * calc_base(boot_infos_t *bi, int x, int y)
+static unsigned char * calc_base(int x, int y)
 {
 	unsigned char *base;
 
-	base = bi->logicalDisplayBase;
+	base = logicalDisplayBase;
 	if (base == 0)
-		base = bi->dispDeviceBase;
-	base += (x + bi->dispDeviceRect[0]) * (bi->dispDeviceDepth >> 3);
-	base += (y + bi->dispDeviceRect[1]) * bi->dispDeviceRowBytes;
+		base = dispDeviceBase;
+	base += (x + dispDeviceRect[0]) * (dispDeviceDepth >> 3);
+	base += (y + dispDeviceRect[1]) * dispDeviceRowBytes;
 	return base;
 }
 
@@ -119,24 +150,22 @@ static unsigned char * calc_base(boot_infos_t *bi, int x, int y)
 void btext_update_display(unsigned long phys, int width, int height,
 			  int depth, int pitch)
 {
-	boot_infos_t *bi = &disp_bi;
-
-	if (bi->dispDeviceBase == 0)
+	if (dispDeviceBase == 0)
 		return;
 
 	/* check it's the same frame buffer (within 256MB) */
-	if ((phys ^ (unsigned long)bi->dispDeviceBase) & 0xf0000000)
+	if ((phys ^ (unsigned long)dispDeviceBase) & 0xf0000000)
 		return;
 
-	bi->dispDeviceBase = (__u8 *) phys;
-	bi->dispDeviceRect[0] = 0;
-	bi->dispDeviceRect[1] = 0;
-	bi->dispDeviceRect[2] = width;
-	bi->dispDeviceRect[3] = height;
-	bi->dispDeviceDepth = depth;
-	bi->dispDeviceRowBytes = pitch;
+	dispDeviceBase = (__u8 *) phys;
+	dispDeviceRect[0] = 0;
+	dispDeviceRect[1] = 0;
+	dispDeviceRect[2] = width;
+	dispDeviceRect[3] = height;
+	dispDeviceDepth = depth;
+	dispDeviceRowBytes = pitch;
 	if (boot_text_mapped) {
-		iounmap(bi->logicalDisplayBase);
+		iounmap(logicalDisplayBase);
 		boot_text_mapped = 0;
 	}
 	map_boot_text();
@@ -148,108 +177,101 @@ void btext_update_display(unsigned long phys, int width, int height,
 
 void btext_clearscreen(void)
 {
-	unsigned long offset = reloc_offset();
-	boot_infos_t* bi	= PTRRELOC(&disp_bi);
-	unsigned long *base	= (unsigned long *)calc_base(bi, 0, 0);
-	unsigned long width 	= ((bi->dispDeviceRect[2] - bi->dispDeviceRect[0]) *
-					(bi->dispDeviceDepth >> 3)) >> 3;
+	unsigned long *base	= (unsigned long *)calc_base(0, 0);
+	unsigned long width 	= ((dispDeviceRect[2] - dispDeviceRect[0]) *
+					(dispDeviceDepth >> 3)) >> 3;
 	int i,j;
 
-	for (i=0; i<(bi->dispDeviceRect[3] - bi->dispDeviceRect[1]); i++)
+	for (i=0; i<(dispDeviceRect[3] - dispDeviceRect[1]); i++)
 	{
 		unsigned long *ptr = base;
 		for(j=width; j; --j)
 			*(ptr++) = 0;
-		base += (bi->dispDeviceRowBytes >> 3);
+		base += (dispDeviceRowBytes >> 3);
 	}
 }
 
 #ifndef NO_SCROLL
 static void scrollscreen(void)
 {
-	unsigned long offset   	= reloc_offset();
-	boot_infos_t* bi       	= PTRRELOC(&disp_bi);
-	unsigned long *src     	= (unsigned long *)calc_base(bi,0,16);
-	unsigned long *dst     	= (unsigned long *)calc_base(bi,0,0);
-	unsigned long width    	= ((bi->dispDeviceRect[2] - bi->dispDeviceRect[0]) *
-				   (bi->dispDeviceDepth >> 3)) >> 3;
+	unsigned long *src     	= (unsigned long *)calc_base(0,16);
+	unsigned long *dst     	= (unsigned long *)calc_base(0,0);
+	unsigned long width    	= ((dispDeviceRect[2] - dispDeviceRect[0]) *
+				   (dispDeviceDepth >> 3)) >> 3;
 	int i,j;
 
-	for (i=0; i<(bi->dispDeviceRect[3] - bi->dispDeviceRect[1] - 16); i++)
+	for (i=0; i<(dispDeviceRect[3] - dispDeviceRect[1] - 16); i++)
 	{
 		unsigned long *src_ptr = src;
 		unsigned long *dst_ptr = dst;
 		for(j=width; j; --j)
 			*(dst_ptr++) = *(src_ptr++);
-		src += (bi->dispDeviceRowBytes >> 3);
-		dst += (bi->dispDeviceRowBytes >> 3);
+		src += (dispDeviceRowBytes >> 3);
+		dst += (dispDeviceRowBytes >> 3);
 	}
 	for (i=0; i<16; i++)
 	{
 		unsigned long *dst_ptr = dst;
 		for(j=width; j; --j)
 			*(dst_ptr++) = 0;
-		dst += (bi->dispDeviceRowBytes >> 3);
+		dst += (dispDeviceRowBytes >> 3);
 	}
 }
 #endif /* ndef NO_SCROLL */
 
 void btext_drawchar(char c)
 {
-	unsigned long offset = reloc_offset();
 	int cline = 0;
 #ifdef NO_SCROLL
 	int x;
 #endif
-	if (!RELOC(boot_text_mapped))
+	if (!boot_text_mapped)
 		return;
 
 	switch (c) {
 	case '\b':
-		if (RELOC(g_loc_X) > 0)
-			--RELOC(g_loc_X);
+		if (g_loc_X > 0)
+			--g_loc_X;
 		break;
 	case '\t':
-		RELOC(g_loc_X) = (RELOC(g_loc_X) & -8) + 8;
+		g_loc_X = (g_loc_X & -8) + 8;
 		break;
 	case '\r':
-		RELOC(g_loc_X) = 0;
+		g_loc_X = 0;
 		break;
 	case '\n':
-		RELOC(g_loc_X) = 0;
-		RELOC(g_loc_Y)++;
+		g_loc_X = 0;
+		g_loc_Y++;
 		cline = 1;
 		break;
 	default:
-		draw_byte(c, RELOC(g_loc_X)++, RELOC(g_loc_Y));
+		draw_byte(c, g_loc_X++, g_loc_Y);
 	}
-	if (RELOC(g_loc_X) >= RELOC(g_max_loc_X)) {
-		RELOC(g_loc_X) = 0;
-		RELOC(g_loc_Y)++;
+	if (g_loc_X >= g_max_loc_X) {
+		g_loc_X = 0;
+		g_loc_Y++;
 		cline = 1;
 	}
 #ifndef NO_SCROLL
-	while (RELOC(g_loc_Y) >= RELOC(g_max_loc_Y)) {
+	while (g_loc_Y >= g_max_loc_Y) {
 		scrollscreen();
-		RELOC(g_loc_Y)--;
+		g_loc_Y--;
 	}
 #else
 	/* wrap around from bottom to top of screen so we don't
 	   waste time scrolling each line.  -- paulus. */
-	if (RELOC(g_loc_Y) >= RELOC(g_max_loc_Y))
-		RELOC(g_loc_Y) = 0;
+	if (g_loc_Y >= g_max_loc_Y)
+		g_loc_Y = 0;
 	if (cline) {
-		for (x = 0; x < RELOC(g_max_loc_X); ++x)
-			draw_byte(' ', x, RELOC(g_loc_Y));
+		for (x = 0; x < g_max_loc_X; ++x)
+			draw_byte(' ', x, g_loc_Y);
 	}
 #endif
 }
 
 void btext_drawstring(const char *c)
 {
-	unsigned long offset = reloc_offset();
-
-	if (!RELOC(boot_text_mapped))
+	if (!boot_text_mapped)
 		return;
 	while (*c)
 		btext_drawchar(*c++);
@@ -257,10 +279,9 @@ void btext_drawstring(const char *c)
 
 void btext_drawhex(unsigned long v)
 {
-	unsigned long offset = reloc_offset();
-	char *hex_table = RELOC("0123456789abcdef");
+	char *hex_table = "0123456789abcdef";
 
-	if (!RELOC(boot_text_mapped))
+	if (!boot_text_mapped)
 		return;
 	btext_drawchar(hex_table[(v >> 60) & 0x0000000FUL]);
 	btext_drawchar(hex_table[(v >> 56) & 0x0000000FUL]);
@@ -283,14 +304,11 @@ void btext_drawhex(unsigned long v)
 
 static void draw_byte(unsigned char c, long locX, long locY)
 {
-	unsigned long offset	= reloc_offset();
-	boot_infos_t* bi       	= PTRRELOC(&disp_bi);
-	unsigned char *base	= calc_base(bi, locX << 3, locY << 4);
-	unsigned char *font	= PTRRELOC(&vga_font[((unsigned int)c) * 16]);
-	int rb			= bi->dispDeviceRowBytes;
+	unsigned char *base	= calc_base(locX << 3, locY << 4);
+	unsigned char *font	= &vga_font[((unsigned int)c) * 16];
+	int rb			= dispDeviceRowBytes;
 
-#if 0
-	switch(bi->dispDeviceDepth) {
+	switch(dispDeviceDepth) {
 	case 24:
 	case 32:
 		draw_byte_32(font, (unsigned int *)base, rb);
@@ -303,17 +321,6 @@ static void draw_byte(unsigned char c, long locX, long locY)
 		draw_byte_8(font, (unsigned int *)base, rb);
 		break;
 	}
-#else
-	if(bi->dispDeviceDepth == 24 ||
-	   bi->dispDeviceDepth == 32) {
-		draw_byte_32(font, (unsigned int *)base, rb);
-	} else if(bi->dispDeviceDepth == 15 ||
-	   bi->dispDeviceDepth == 16) {
-		draw_byte_16(font, (unsigned int *)base, rb);
-	} else if(bi->dispDeviceDepth == 8) {
-		draw_byte_8(font, (unsigned int *)base, rb);
-	} 
-#endif
 }
 
 static unsigned int expand_bits_8[16] = {
@@ -369,8 +376,7 @@ static void draw_byte_16(unsigned char *font, unsigned int *base, int rb)
 	int l, bits;
 	int fg = 0xFFFFFFFFUL;
 	int bg = 0x00000000UL;
-	unsigned long offset = reloc_offset();
-	unsigned int *eb = PTRRELOC((int *)expand_bits_16);
+	unsigned int *eb = (int *)expand_bits_16;
 
 	for (l = 0; l < 16; ++l)
 	{
@@ -388,8 +394,7 @@ static void draw_byte_8(unsigned char *font, unsigned int *base, int rb)
 	int l, bits;
 	int fg = 0x0F0F0F0FUL;
 	int bg = 0x00000000UL;
-	unsigned long offset = reloc_offset();
-	unsigned int *eb = PTRRELOC((int *)expand_bits_8);
+	unsigned int *eb = (int *)expand_bits_8;
 
 	for (l = 0; l < 16; ++l)
 	{

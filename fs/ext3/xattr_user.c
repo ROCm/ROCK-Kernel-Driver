@@ -16,20 +16,21 @@
 #define XATTR_USER_PREFIX "user."
 
 static size_t
-ext3_xattr_user_list(char *list, struct inode *inode,
-		     const char *name, int name_len)
+ext3_xattr_user_list(struct inode *inode, char *list, size_t list_size,
+		     const char *name, size_t name_len)
 {
-	const int prefix_len = sizeof(XATTR_USER_PREFIX)-1;
+	const size_t prefix_len = sizeof(XATTR_USER_PREFIX)-1;
+	const size_t total_len = prefix_len + name_len + 1;
 
 	if (!test_opt(inode->i_sb, XATTR_USER))
 		return 0;
 
-	if (list) {
+	if (list && total_len <= list_size) {
 		memcpy(list, XATTR_USER_PREFIX, prefix_len);
 		memcpy(list+prefix_len, name, name_len);
 		list[prefix_len + name_len] = '\0';
 	}
-	return prefix_len + name_len + 1;
+	return total_len;
 }
 
 static int
@@ -70,7 +71,7 @@ ext3_xattr_user_set(struct inode *inode, const char *name,
 			      value, size, flags);
 }
 
-struct ext3_xattr_handler ext3_xattr_user_handler = {
+struct xattr_handler ext3_xattr_user_handler = {
 	.prefix	= XATTR_USER_PREFIX,
 	.list	= ext3_xattr_user_list,
 	.get	= ext3_xattr_user_get,

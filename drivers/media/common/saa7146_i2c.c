@@ -1,7 +1,7 @@
 #include <linux/version.h>
 #include <media/saa7146_vv.h>
 
-u32 saa7146_i2c_func(struct i2c_adapter *adapter)
+static u32 saa7146_i2c_func(struct i2c_adapter *adapter)
 {
 //fm	DEB_I2C(("'%s'.\n", adapter->name));
 
@@ -190,7 +190,7 @@ static int saa7146_i2c_writeout(struct saa7146_dev *dev, u32* dword, int short_d
 		saa7146_write(dev, I2C_TRANSFER, *dword);
 
 		dev->i2c_op = 1;
-		IER_ENABLE(dev, MASK_16|MASK_17);
+		SAA7146_IER_ENABLE(dev, MASK_16|MASK_17);
 		saa7146_write(dev, MC2, (MASK_00 | MASK_16));
 
 		wait_event_interruptible(dev->i2c_wq, dev->i2c_op == 0);
@@ -296,7 +296,7 @@ int saa7146_i2c_transfer(struct saa7146_dev *dev, const struct i2c_msg msgs[], i
 
 	if ( count > 3 || 0 != (SAA7146_I2C_SHORT_DELAY & dev->ext->flags) )
 		short_delay = 1;
-
+  
 	do {
 		/* reset the i2c-device if necessary */
 		err = saa7146_i2c_reset(dev);
@@ -375,7 +375,7 @@ out:
 static int saa7146_i2c_xfer(struct i2c_adapter* adapter, struct i2c_msg msg[], int num)
 {
 	struct saa7146_dev* dev = i2c_get_adapdata(adapter);
-
+	
 	/* use helper function to transfer data */
 	return saa7146_i2c_transfer(dev, msg, num, adapter->retries);
 }
@@ -405,7 +405,7 @@ int saa7146_i2c_adapter_prepare(struct saa7146_dev *dev, struct i2c_adapter *i2c
 
 	if( NULL != i2c_adapter ) {
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
- 		i2c_adapter->data = dev;
+		i2c_adapter->data = dev;
 #else
 		BUG_ON(!i2c_adapter->class);
 		i2c_set_adapdata(i2c_adapter,dev);

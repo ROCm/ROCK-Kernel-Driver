@@ -411,7 +411,7 @@ struct buf_window {
 };
 
 /* Calculate offset of a buffer object within the shared memory window */
-#define BUF_OFFSET(X)   ((unsigned int)&(((struct buf_window *)BFM_BASE)->X))
+#define BUF_OFFSET(X)   (BFM_BASE + offsetof(struct buf_window, X))
 
 #pragma pack()
 
@@ -443,8 +443,8 @@ struct fst_port_info {
 /*      Per card information
  */
 struct fst_card_info {
-	char *mem;		/* Card memory mapped to kernel space */
-	char *ctlmem;		/* Control memory for PCI cards */
+	char __iomem *mem;	/* Card memory mapped to kernel space */
+	char __iomem *ctlmem;	/* Control memory for PCI cards */
 	unsigned int phys_mem;	/* Physical memory window address */
 	unsigned int phys_ctlmem;	/* Physical control memory address */
 	unsigned int irq;	/* Interrupt request line number */
@@ -781,7 +781,7 @@ fst_disable_intr(struct fst_card_info *card)
 	}
 }
 
-/*      Process the result of trying to pass a recieved frame up the stack
+/*      Process the result of trying to pass a received frame up the stack
  */
 static void
 fst_process_rx_status(int rx_status, char *name)
@@ -857,6 +857,18 @@ fst_tx_dma_complete(struct fst_card_info *card, struct fst_port_info *port,
 	dev->trans_start = jiffies;
 }
 
+/*
+ * Mark it for our own raw sockets interface
+ */
+static unsigned short farsync_type_trans(struct sk_buff *skb,
+					 struct net_device *dev)
+{
+	skb->dev = dev;
+	skb->mac.raw = skb->data;
+	skb->pkt_type = PACKET_HOST;
+	return htons(ETH_P_CUST);
+}
+
 /*      Rx dma complete interrupt
  */
 static void
@@ -881,17 +893,10 @@ fst_rx_dma_complete(struct fst_card_info *card, struct fst_port_info *port,
 
 	/* Push upstream */
 	dbg(DBG_RX, "Pushing the frame up the stack\n");
-	skb->mac.raw = skb->data;
-	skb->dev = dev;
-	if (port->mode == FST_RAW) {
-		/*
-		 * Mark it for our own raw sockets interface
-		 */
-		skb->protocol = htons(ETH_P_CUST);
-		skb->pkt_type = PACKET_HOST;
-	} else {
-		skb->protocol = hdlc_type_trans(skb, skb->dev);
-	}
+	if (port->mode == FST_RAW)
+		skb->protocol = farsync_type_trans(skb, dev);
+	else
+		skb->protocol = hdlc_type_trans(skb, dev);
 	rx_status = netif_rx(skb);
 	fst_process_rx_status(rx_status, port_to_dev(port)->name);
 	if (rx_status == NET_RX_DROP)
@@ -1316,17 +1321,10 @@ fst_intr_rx(struct fst_card_info *card, struct fst_port_info *port)
 
 		/* Push upstream */
 		dbg(DBG_RX, "Pushing frame up the stack\n");
-		skb->mac.raw = skb->data;
-		skb->dev = dev;
-		if (port->mode == FST_RAW) {
-			/*
-			 * Mark it for our own raw sockets interface
-			 */
-			skb->protocol = htons(ETH_P_CUST);
-			skb->pkt_type = PACKET_HOST;
-		} else {
-			skb->protocol = hdlc_type_trans(skb, skb->dev);
-		}
+		if (port->mode == FST_RAW)
+			skb->protocol = farsync_type_trans(skb, dev);
+		else
+			skb->protocol = hdlc_type_trans(skb, dev);
 		rx_status = netif_rx(skb);
 		fst_process_rx_status(rx_status, port_to_dev(port)->name);
 		if (rx_status == NET_RX_DROP) {

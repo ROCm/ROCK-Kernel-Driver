@@ -45,7 +45,6 @@
 #include <linux/nfsd/nfsfh.h>
 #include <linux/quotaops.h>
 #include <linux/dnotify.h>
-#include <linux/xattr_acl.h>
 #ifdef CONFIG_NFSD_V4
 #include <linux/posix_acl.h>
 #include <linux/posix_acl_xattr.h>
@@ -255,18 +254,11 @@ nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap,
 
 	/* Get inode */
 	err = fh_verify(rqstp, fhp, ftype, accmode);
-	if (err)
+	if (err || !iap->ia_valid)
 		goto out;
 
 	dentry = fhp->fh_dentry;
 	inode = dentry->d_inode;
-
-	/* Ignore any mode updates on symlinks */
-	if (S_ISLNK(inode->i_mode))
-		iap->ia_valid &= ~ATTR_MODE;
-
-	if (!iap->ia_valid)
-		goto out;
 
 	/* NFSv2 does not differentiate between "set-[ac]time-to-now"
 	 * which only requires access, and "set-[ac]time-to-X" which
@@ -456,39 +448,37 @@ _get_posix_acl(struct dentry *dentry, char *key)
 	int buflen, error = 0;
 	struct posix_acl *pacl = NULL;
 
-	down(&inode->i_sem);
+	error = -EOPNOTSUPP;
+	if (inode->i_op == NULL)
+		goto out_err;
+	if (inode->i_op->getxattr == NULL)
+		goto out_err;
+
+	error = security_inode_getxattr(dentry, key);
+	if (error)
+		goto out_err;
 
 	buflen = inode->i_op->getxattr(dentry, key, NULL, 0);
 	if (buflen <= 0) {
 		error = buflen < 0 ? buflen : -ENODATA;
-		goto out_sem;
+		goto out_err;
 	}
 
 	buf = kmalloc(buflen, GFP_KERNEL);
 	if (buf == NULL) {
 		error = -ENOMEM;
-		goto out_sem;
+		goto out_err;
 	}
 
-	error = -EOPNOTSUPP;
-	if (inode->i_op && inode->i_op->getxattr) {
-		error = security_inode_getxattr(dentry, key);
-		if (error)
-			goto out_sem;
-		error = inode->i_op->getxattr(dentry, key, buf, buflen);
-	}
+	error = inode->i_op->getxattr(dentry, key, buf, buflen);
 	if (error < 0)
-		goto out_sem;
-
-	error = 0;
-	up(&inode->i_sem);
+		goto out_err;
 
 	pacl = posix_acl_from_xattr(buf, buflen);
  out:
 	kfree(buf);
 	return pacl;
- out_sem:
-	up(&inode->i_sem);
+ out_err:
 	pacl = ERR_PTR(error);
 	goto out;
 }
@@ -1820,109 +1810,3 @@ nfsd_racache_init(int cache_size)
 	nfsdstats.ra_size = cache_size;
 	return 0;
 }
-
-#ifdef CONFIG_NFSD_ACL
-struct posix_acl *
-nfsd_get_posix_acl(struct svc_fh *fhp, int type)
-{
-	struct inode *inode = fhp->fh_dentry->d_inode;
-	char *name;
-	void *value = NULL;
-	ssize_t size;
-	struct posix_acl *acl;
-
-	if (!IS_POSIXACL(inode) || !inode->i_op || !inode->i_op->getxattr)
-		return ERR_PTR(-EOPNOTSUPP);
-	switch(type) {
-		case ACL_TYPE_ACCESS:
-			name = XATTR_NAME_ACL_ACCESS;
-			break;
-		case ACL_TYPE_DEFAULT:
-			name = XATTR_NAME_ACL_DEFAULT;
-			break;
-		default:
-			return ERR_PTR(-EOPNOTSUPP);
-	}
-
-	size = inode->i_op->getxattr(fhp->fh_dentry, name, NULL, 0);
-
-	if (size < 0) {
-		acl = ERR_PTR(size);
-		goto getout;
-	} else if (size > 0) {
-		value = kmalloc(size, GFP_KERNEL);
-		if (!value) {
-			acl = ERR_PTR(-ENOMEM);
-			goto getout;
-		}
-		size = inode->i_op->getxattr(fhp->fh_dentry, name, value, size);
-		if (size < 0) {
-			acl = ERR_PTR(size);
-			goto getout;
-		}
-	}
-	acl = posix_acl_from_xattr(value, size);
-
-getout:
-	kfree(value);
-	return acl;
-}
-#endif  /* CONFIG_NFSD_ACL */
-
-#ifdef CONFIG_NFSD_ACL
-int
-nfsd_set_posix_acl(struct svc_fh *fhp, int type, struct posix_acl *acl)
-{
-	struct inode *inode = fhp->fh_dentry->d_inode;
-	char *name;
-	void *value = NULL;
-	size_t size;
-	int error;
-
-	if (!IS_POSIXACL(inode) || !inode->i_op ||
-	    !inode->i_op->setxattr || !inode->i_op->removexattr)
-		return -EOPNOTSUPP;
-	switch(type) {
-		case ACL_TYPE_ACCESS:
-			name = XATTR_NAME_ACL_ACCESS;
-			break;
-		case ACL_TYPE_DEFAULT:
-			name = XATTR_NAME_ACL_DEFAULT;
-			break;
-		default:
-			return -EOPNOTSUPP;
-	}
-
-	if (acl && acl->a_count) {
-		size = xattr_acl_size(acl->a_count);
-		value = kmalloc(size, GFP_KERNEL);
-		if (!value)
-			return -ENOMEM;
-		size = posix_acl_to_xattr(acl, value, size);
-		if (size < 0) {
-			error = size;
-			goto getout;
-		}
-	} else
-		size = 0;
-
-	if (!fhp->fh_locked)
-		fh_lock(fhp);  /* unlocking is done automatically */
-	if (size)
-		error = inode->i_op->setxattr(fhp->fh_dentry, name,
-					      value, size, 0);
-	else {
-		if (!S_ISDIR(inode->i_mode) && type == ACL_TYPE_DEFAULT)
-			error = 0;
-		else {
-			error = inode->i_op->removexattr(fhp->fh_dentry, name);
-			if (error == -ENODATA)
-				error = 0;
-		}
-	}
-
-getout:
-	kfree(value);
-	return error;
-}
-#endif  /* CONFIG_NFSD_ACL */

@@ -32,7 +32,7 @@ static char *version =
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/init.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <linux/errno.h>
@@ -671,10 +671,10 @@ static inline void soc_init(struct sbus_dev *sdev, int no)
 	cq[0].address = s->req_dvma;
 	s->req[1].pool = s->req[0].pool + SOC_CQ_REQ0_SIZE;
 	
-	s->req[0].hw_cq = (soc_hw_cq *)(s->xram + SOC_CQ_REQ_OFFSET);
-	s->req[1].hw_cq = (soc_hw_cq *)(s->xram + SOC_CQ_REQ_OFFSET + sizeof(soc_hw_cq));
-	s->rsp[0].hw_cq = (soc_hw_cq *)(s->xram + SOC_CQ_RSP_OFFSET);
-	s->rsp[1].hw_cq = (soc_hw_cq *)(s->xram + SOC_CQ_RSP_OFFSET + sizeof(soc_hw_cq));
+	s->req[0].hw_cq = (soc_hw_cq __iomem *)(s->xram + SOC_CQ_REQ_OFFSET);
+	s->req[1].hw_cq = (soc_hw_cq __iomem *)(s->xram + SOC_CQ_REQ_OFFSET + sizeof(soc_hw_cq));
+	s->rsp[0].hw_cq = (soc_hw_cq __iomem *)(s->xram + SOC_CQ_RSP_OFFSET);
+	s->rsp[1].hw_cq = (soc_hw_cq __iomem *)(s->xram + SOC_CQ_RSP_OFFSET + sizeof(soc_hw_cq));
 	
 	cq[1].address = cq[0].address + (SOC_CQ_REQ0_SIZE * sizeof(soc_req));
 	cq[4].address = 1;

@@ -387,6 +387,7 @@ static int matroxfb_dh_set_par(struct fb_info* info) {
 		up_read(&ACCESS_FBINFO(altout).lock);
 		matroxfb_dh_cfbX_init(m2info);
 	}
+	m2info->initialized = 1;
 	return 0;
 #undef m2info
 }
@@ -603,7 +604,8 @@ static int matroxfb_dh_regit(CPMINFO struct matroxfb_dh_fb_info* m2info) {
 
 	m2info->fbcon.fbops = &matroxfb_dh_ops;
 	m2info->fbcon.flags = FBINFO_FLAG_DEFAULT;
-	m2info->fbcon.currcon = -1;
+	m2info->fbcon.flags |= FBINFO_HWACCEL_XPAN |
+			       FBINFO_HWACCEL_YPAN;
 	m2info->fbcon.pseudo_palette = m2info->cmap;
 	fb_alloc_cmap(&m2info->fbcon.cmap, 256, 1);
 
@@ -632,9 +634,8 @@ static int matroxfb_dh_regit(CPMINFO struct matroxfb_dh_fb_info* m2info) {
 	if (register_framebuffer(&m2info->fbcon)) {
 		return -ENXIO;
 	}
-	if (m2info->fbcon.currcon < 0) {
+	if (!m2info->initialized)
 		fb_set_var(&m2info->fbcon, &matroxfb_dh_defined);
-	}
 	down_write(&ACCESS_FBINFO(crtc2.lock));
 	oldcrtc2 = ACCESS_FBINFO(crtc2.info);
 	ACCESS_FBINFO(crtc2.info) = m2info;
@@ -721,6 +722,9 @@ static struct matroxfb_driver crtc2 = {
 		.remove =	matroxfb_crtc2_remove };
 
 static int matroxfb_crtc2_init(void) {
+	if (fb_get_options("matrox_crtc2fb", NULL))
+		return -ENODEV;
+
 	matroxfb_register_driver(&crtc2);
 	return 0;
 }

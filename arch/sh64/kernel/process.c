@@ -765,9 +765,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	childregs->regs[9] = 0; /* Set return value for child */
 	childregs->sr |= SR_FD; /* Invalidate FPU flag */
 
-	/* From sh */
-	p->set_child_tid = p->clear_child_tid = NULL;
-
 	p->thread.sp = (unsigned long) childregs;
 	p->thread.pc = (unsigned long) ret_from_fork;
 
@@ -862,8 +859,11 @@ asmlinkage int sys_execve(char *ufilename, char **uargv,
 			  (char __user * __user *)uargv,
 			  (char __user * __user *)uenvp,
 			  pregs);
-	if (error == 0)
+	if (error == 0) {
+		task_lock(current);
 		current->ptrace &= ~PT_DTRACE;
+		task_unlock(current);
+	}
 	putname(filename);
 out:
 	unlock_kernel();

@@ -148,12 +148,12 @@ static u8 read_prom_byte(struct he_dev *he_dev, int addr);
 /* globals */
 
 struct he_dev *he_devs = NULL;
-static short disable64 = -1;
+static int disable64 = 0;
 static short nvpibits = -1;
 static short nvcibits = -1;
 static short rx_skb_reserve = 16;
-static short irq_coalesce = 1;
-static short sdh = 0;
+static int irq_coalesce = 1;
+static int sdh = 0;
 
 static struct atmdev_ops he_ops =
 {
@@ -1007,7 +1007,7 @@ he_start(struct atm_dev *dev)
 {
 	struct he_dev *he_dev;
 	struct pci_dev *pci_dev;
-	unsigned long mbase;
+	unsigned long membase;
 
 	u16 command;
 	u32 gen_cntl_0, host_cntl, lb_swap;
@@ -1020,8 +1020,8 @@ he_start(struct atm_dev *dev)
 	he_dev = HE_DEV(dev);
 	pci_dev = he_dev->pci_dev;
 
-	mbase = pci_dev->resource[0].start;
-	HPRINTK("membase = 0x%p  irq = %d.\n", he_dev->membase, pci_dev->irq);
+	membase = pci_resource_start(pci_dev, 0);
+	HPRINTK("membase = 0x%lx  irq = %d.\n", membase, pci_dev->irq);
 
 	/*
 	 * pci bus controller initialization 
@@ -1081,7 +1081,7 @@ he_start(struct atm_dev *dev)
 			hprintk("can't set latency timer to %d\n", timer);
 	}
 
-	if (!(he_dev->membase = ioremap(mbase, HE_REGMAP_SIZE))) {
+	if (!(he_dev->membase = ioremap(membase, HE_REGMAP_SIZE))) {
 		hprintk("can't set up page mapping\n");
 		return -EINVAL;
 	}
@@ -1701,7 +1701,7 @@ he_stop(struct he_dev *he_dev)
 	}
 	
 	if (he_dev->membase)
-		iounmap((void *) he_dev->membase);
+		iounmap(he_dev->membase);
 }
 
 static struct he_tpd *
@@ -1963,7 +1963,7 @@ he_service_tbrq(struct he_dev *he_dev, int group)
 	struct he_tpd *tpd;
 	int slot, updated = 0;
 #ifdef USE_TPD_POOL
-	struct list_head *p;
+	struct he_tpd *__tpd;
 #endif
 
 	/* 2.1.6 transmit buffer return queue */
@@ -1978,8 +1978,7 @@ he_service_tbrq(struct he_dev *he_dev, int group)
 			TBRQ_MULTIPLE(he_dev->tbrq_head) ? " MULTIPLE" : "");
 #ifdef USE_TPD_POOL
 		tpd = NULL;
-		list_for_each(p, &he_dev->outstanding_tpds) {
-			struct he_tpd *__tpd = list_entry(p, struct he_tpd, entry);
+		list_for_each_entry(__tpd, &he_dev->outstanding_tpds, entry) {
 			if (TPD_ADDR(__tpd->status) == TBRQ_TPD(he_dev->tbrq_head)) {
 				tpd = __tpd;
 				list_del(&__tpd->entry);
@@ -2596,9 +2595,8 @@ he_close(struct atm_vcc *vcc)
 
 		while (((tx_inuse = atomic_read(&vcc->sk->sk_wmem_alloc)) > 0) &&
 		       (retry < MAX_RETRY)) {
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			(void) schedule_timeout(sleep);
-			if (sleep < HZ)
+			msleep(sleep);
+			if (sleep < 250)
 				sleep = sleep * 2;
 
 			++retry;
@@ -3034,17 +3032,17 @@ read_prom_byte(struct he_dev *he_dev, int addr)
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("chas williams <chas@cmf.nrl.navy.mil>");
 MODULE_DESCRIPTION("ForeRunnerHE ATM Adapter driver");
-MODULE_PARM(disable64, "h");
+module_param(disable64, bool, 0);
 MODULE_PARM_DESC(disable64, "disable 64-bit pci bus transfers");
-MODULE_PARM(nvpibits, "i");
+module_param(nvpibits, short, 0);
 MODULE_PARM_DESC(nvpibits, "numbers of bits for vpi (default 0)");
-MODULE_PARM(nvcibits, "i");
+module_param(nvcibits, short, 0);
 MODULE_PARM_DESC(nvcibits, "numbers of bits for vci (default 12)");
-MODULE_PARM(rx_skb_reserve, "i");
+module_param(rx_skb_reserve, short, 0);
 MODULE_PARM_DESC(rx_skb_reserve, "padding for receive skb (default 16)");
-MODULE_PARM(irq_coalesce, "i");
+module_param(irq_coalesce, bool, 0);
 MODULE_PARM_DESC(irq_coalesce, "use interrupt coalescing (default 1)");
-MODULE_PARM(sdh, "i");
+module_param(sdh, bool, 0);
 MODULE_PARM_DESC(sdh, "use SDH framing (default 0)");
 
 static struct pci_device_id he_pci_tbl[] = {
@@ -3052,6 +3050,8 @@ static struct pci_device_id he_pci_tbl[] = {
 	  0, 0, 0 },
 	{ 0, }
 };
+
+MODULE_DEVICE_TABLE(pci, he_pci_tbl);
 
 static struct pci_driver he_driver = {
 	.name =		"he",

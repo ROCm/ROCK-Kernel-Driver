@@ -43,8 +43,6 @@ const static char *pdc_quirk_drives[] = {
 		set_2regs(0x13,(c));			\
 	} while(0)
 
-#define DISPLAY_PDC202XX_TIMINGS
-
 static void init_setup_pdcnew(struct pci_dev *, ide_pci_device_t *);
 static void init_setup_pdc20270(struct pci_dev *, ide_pci_device_t *);
 static void init_setup_pdc20276(struct pci_dev *dev, ide_pci_device_t *d);

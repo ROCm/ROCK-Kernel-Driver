@@ -23,9 +23,6 @@
 #include <linux/interrupt.h>
 #include <linux/bitops.h>
 #include <linux/pci.h>
-#include <linux/interrupt.h>
-#include <linux/mm.h>
-#include <linux/init.h>
 #include <linux/ioport.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
@@ -54,12 +51,14 @@
  *************************************************************************/
 static void ixdp2x01_irq_mask(unsigned int irq)
 {
-	*IXDP2X01_INT_MASK_SET_REG = IXP2000_BOARD_IRQ_MASK(irq);
+	ixp2000_reg_write(IXDP2X01_INT_MASK_SET_REG,
+				IXP2000_BOARD_IRQ_MASK(irq));
 }
 
 static void ixdp2x01_irq_unmask(unsigned int irq)
 {
-	*IXDP2X01_INT_MASK_CLR_REG = IXP2000_BOARD_IRQ_MASK(irq);
+	ixp2000_reg_write(IXDP2X01_INT_MASK_CLR_REG,
+				IXP2000_BOARD_IRQ_MASK(irq));
 }
 
 static u32 valid_irq_mask;
@@ -114,8 +113,8 @@ void __init ixdp2x01_init_irq(void)
 		valid_irq_mask = IXDP2801_VALID_IRQ_MASK;
 
 	/* Mask all interrupts from CPLD, disable simulation */
-	*IXDP2X01_INT_MASK_SET_REG = 0xffffffff;
-	*IXDP2X01_INT_SIM_REG = 0;
+	ixp2000_reg_write(IXDP2X01_INT_MASK_SET_REG, 0xffffffff);
+	ixp2000_reg_write(IXDP2X01_INT_SIM_REG, 0);
 
 	for (irq = NR_IXP2000_IRQS; irq < NR_IXDP2X01_IRQS; irq++) {
 		if (irq & valid_irq_mask) {
@@ -193,13 +192,18 @@ static int __init ixdp2x01_clock_setup(char *str)
 
 __setup("ixdp2x01_clock=", ixdp2x01_clock_setup);
 
-static void __init ixdp2x01_init_time(void)
+static void __init ixdp2x01_timer_init(void)
 {
 	if (!ixdp2x01_clock)
 		ixdp2x01_clock = 50000000;
 
 	ixp2000_init_time(ixdp2x01_clock);
 }
+
+static struct sys_timer ixdp2x01_timer = {
+	.init		= ixdp2x01_timer_init,
+	.offset		= ixp2000_gettimeoffset,
+};
 
 /*************************************************************************
  * IXDP2x01 PCI
@@ -312,8 +316,8 @@ static struct flash_platform_data ixdp2x01_flash_platform_data = {
 
 static unsigned long ixdp2x01_flash_bank_setup(unsigned long ofs)
 {
-	*IXDP2X01_CPLD_FLASH_REG = 
-		((ofs >> IXDP2X01_FLASH_WINDOW_BITS) | IXDP2X01_CPLD_FLASH_INTERN);
+	ixp2000_reg_write(IXDP2X01_CPLD_FLASH_REG,
+		((ofs >> IXDP2X01_FLASH_WINDOW_BITS) | IXDP2X01_CPLD_FLASH_INTERN));
 	return (ofs & IXDP2X01_FLASH_WINDOW_MASK);
 }
 
@@ -338,14 +342,29 @@ static struct platform_device ixdp2x01_flash = {
 	.resource	= &ixdp2x01_flash_resource,
 };
 
+static struct ixp2000_i2c_pins ixdp2x01_i2c_gpio_pins = {
+	.sda_pin	= IXDP2X01_GPIO_SDA,
+	.scl_pin	= IXDP2X01_GPIO_SCL,
+};
+
+static struct platform_device ixdp2x01_i2c_controller = {
+	.name		= "IXP2000-I2C",
+	.id		= 0,
+	.dev		= {
+		.platform_data = &ixdp2x01_i2c_gpio_pins,
+	},
+	.num_resources	= 0
+};
+
 static struct platform_device *ixdp2x01_devices[] __initdata = {
-	&ixdp2x01_flash
+	&ixdp2x01_flash,
+	&ixdp2x01_i2c_controller
 };
 
 static void __init ixdp2x01_init_machine(void)
 {
-	*IXDP2X01_CPLD_FLASH_REG = 
-		(IXDP2X01_CPLD_FLASH_BANK_MASK | IXDP2X01_CPLD_FLASH_INTERN);
+	ixp2000_reg_write(IXDP2X01_CPLD_FLASH_REG,
+		(IXDP2X01_CPLD_FLASH_BANK_MASK | IXDP2X01_CPLD_FLASH_INTERN));
 	
 	ixdp2x01_flash_data.nr_banks =
 		((*IXDP2X01_CPLD_FLASH_REG & IXDP2X01_CPLD_FLASH_BANK_MASK) + 1);
@@ -361,7 +380,7 @@ MACHINE_START(IXDP2401, "Intel IXDP2401 Development Platform")
 	BOOT_PARAMS(0x00000100)
 	MAPIO(ixdp2x01_map_io)
 	INITIRQ(ixdp2x01_init_irq)
-	INITTIME(ixdp2x01_init_time)
+	.timer		= &ixdp2x01_timer,
 	INIT_MACHINE(ixdp2x01_init_machine)
 MACHINE_END
 #endif
@@ -373,7 +392,7 @@ MACHINE_START(IXDP2801, "Intel IXDP2801 Development Platform")
 	BOOT_PARAMS(0x00000100)
 	MAPIO(ixdp2x01_map_io)
 	INITIRQ(ixdp2x01_init_irq)
-	INITTIME(ixdp2x01_init_time)
+	.timer		= &ixdp2x01_timer,
 	INIT_MACHINE(ixdp2x01_init_machine)
 MACHINE_END
 #endif

@@ -1,5 +1,5 @@
 /*
- * $Id: wr_sbc82xx_flash.c,v 1.5 2004/07/15 14:52:02 dwmw2 Exp $
+ * $Id: wr_sbc82xx_flash.c,v 1.7 2004/11/04 13:24:15 gleixner Exp $
  *
  * Map for flash chips on Wind River PowerQUICC II SBC82xx board.
  *
@@ -116,7 +116,7 @@ int __init init_sbc82xx_flash(void)
 		}
 		printk(" at %08lx)\n",  sbc82xx_flash_map[i].phys);
 
-		sbc82xx_flash_map[i].virt = (unsigned long)ioremap(sbc82xx_flash_map[i].phys, sbc82xx_flash_map[i].size);
+		sbc82xx_flash_map[i].virt = ioremap(sbc82xx_flash_map[i].phys, sbc82xx_flash_map[i].size);
 
 		if (!sbc82xx_flash_map[i].virt) {
 			printk("Failed to ioremap\n");

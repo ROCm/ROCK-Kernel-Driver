@@ -48,7 +48,7 @@ extern void (*mtrr_hook) (void);
 extern void zap_low_mappings(void);
 void smp_stop_cpu(void);
 extern cpumask_t cpu_sibling_map[NR_CPUS];
-extern char phys_proc_id[NR_CPUS];
+extern u8 phys_proc_id[NR_CPUS];
 
 #define SMP_TRAMPOLINE_BASE 0x6000
 
@@ -74,14 +74,29 @@ extern __inline int hard_smp_processor_id(void)
 	return GET_APIC_ID(*(unsigned int *)(APIC_BASE+APIC_ID));
 }
 
+#define safe_smp_processor_id() (disable_apic ? 0 : x86_apicid_to_cpu(hard_smp_processor_id()))
+
+#endif /* !ASSEMBLY */
+
+#define NO_PROC_ID		0xFF		/* No processor magic marker */
+
+#endif
+
+#ifndef ASSEMBLY
 /*
  * Some lowlevel functions might want to know about
  * the real APIC ID <-> CPU # mapping.
- * AK: why is this volatile?
  */
-extern volatile char x86_cpu_to_apicid[NR_CPUS];
+extern u8 x86_cpu_to_apicid[NR_CPUS];	/* physical ID */
+extern u8 x86_cpu_to_log_apicid[NR_CPUS];
+extern u8 bios_cpu_apicid[];
 
-static inline char x86_apicid_to_cpu(char apicid)
+static inline unsigned int cpu_mask_to_apicid(cpumask_t cpumask)
+{
+	return cpus_addr(cpumask)[0];
+}
+
+static inline int x86_apicid_to_cpu(u8 apicid)
 {
 	int i;
 
@@ -89,12 +104,13 @@ static inline char x86_apicid_to_cpu(char apicid)
 		if (x86_cpu_to_apicid[i] == apicid)
 			return i;
 
+	/* No entries in x86_cpu_to_apicid?  Either no MPS|ACPI,
+	 * or called too early.  Either way, we must be CPU 0. */
+      	if (x86_cpu_to_apicid[0] == BAD_APICID)
+		return 0;
+
 	return -1;
 }
-
-#define safe_smp_processor_id() (disable_apic ? 0 : x86_apicid_to_cpu(hard_smp_processor_id()))
-
-extern u8 bios_cpu_apicid[];
 
 static inline int cpu_present_to_apicid(int mps_cpu)
 {
@@ -105,23 +121,6 @@ static inline int cpu_present_to_apicid(int mps_cpu)
 }
 
 #endif /* !ASSEMBLY */
-
-#define NO_PROC_ID		0xFF		/* No processor magic marker */
-
-#endif
-#define INT_DELIVERY_MODE 1     /* logical delivery */
-
-#ifndef ASSEMBLY
-#ifdef CONFIG_SMP
-#define TARGET_CPUS cpu_online_map
-#else
-#define TARGET_CPUS cpumask_of_cpu(0)
-#endif
-static inline unsigned int cpu_mask_to_apicid(cpumask_t cpumask)
-{
-	return cpus_addr(cpumask)[0];
-}
-#endif
 
 #ifndef CONFIG_SMP
 #define stack_smp_processor_id() 0

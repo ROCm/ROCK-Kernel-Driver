@@ -31,6 +31,7 @@
  *	- GeneSys GL620USB-A
  *	- NetChip 1080 (interoperates with NetChip Win32 drivers)
  *	- Prolific PL-2301/2302 (replaces "plusb" driver)
+ *	- KC Technology KC2190
  *
  *   + Smart USB devices can support such links directly, using Internet
  *     standard protocols instead of proprietary host-to-device links.
@@ -106,6 +107,7 @@
  * 22-aug-2003	AX8817X support (Dave Hollis).
  * 14-jun-2004  Trivial patch for AX8817X based Buffalo LUA-U2-KTX in Japan
  *		(Neil Bortnak)
+ * 03-nov-2004	Trivial patch for KC2190 (KC-190) chip. (Jonathan McDowell)
  *
  *-------------------------------------------------------------------------*/
 
@@ -134,7 +136,7 @@
 #include <linux/mm.h>
 #include <linux/dma-mapping.h>
 
-#define DRIVER_VERSION		"25-Aug-2003"
+#define DRIVER_VERSION		"03-Nov-2004"
 
 
 /*-------------------------------------------------------------------------*/
@@ -525,7 +527,7 @@ static void ax8817x_interrupt_complete(struct urb *urb, struct pt_regs *regs)
 				devdbg(dev, "ax8817x - Link Status is: %d", link);
 			}
 		}
-		usb_submit_urb(data->int_urb, GFP_KERNEL);
+		usb_submit_urb(data->int_urb, GFP_ATOMIC);
 	}
 }
 
@@ -567,7 +569,7 @@ static void ax8817x_write_cmd_async(struct usbnet *dev, u8 cmd, u16 value, u16 i
 
 static void ax8817x_set_multicast(struct net_device *net)
 {
-	struct usbnet *dev = (struct usbnet *) net->priv;
+	struct usbnet *dev = netdev_priv(net);
 	struct ax8817x_data *data = (struct ax8817x_data *)&dev->data;
 	u8 rx_ctl = 0x8c;
 
@@ -610,7 +612,7 @@ static void ax8817x_set_multicast(struct net_device *net)
 
 static int ax8817x_mdio_read(struct net_device *netdev, int phy_id, int loc)
 {
-	struct usbnet *dev = netdev->priv;
+	struct usbnet *dev = netdev_priv(netdev);
 	u16 res;
 	u8 buf[1];
 
@@ -623,7 +625,7 @@ static int ax8817x_mdio_read(struct net_device *netdev, int phy_id, int loc)
 
 static void ax8817x_mdio_write(struct net_device *netdev, int phy_id, int loc, int val)
 {
-	struct usbnet *dev = netdev->priv;
+	struct usbnet *dev = netdev_priv(netdev);
 	u16 res = val;
 	u8 buf[1];
 
@@ -634,7 +636,7 @@ static void ax8817x_mdio_write(struct net_device *netdev, int phy_id, int loc, i
 
 static void ax8817x_get_wol(struct net_device *net, struct ethtool_wolinfo *wolinfo)
 {
-	struct usbnet *dev = (struct usbnet *)net->priv;
+	struct usbnet *dev = netdev_priv(net);
 	u8 opt;
 
 	if (ax8817x_read_cmd(dev, AX_CMD_READ_MONITOR_MODE, 0, 0, 1, &opt) < 0) {
@@ -654,7 +656,7 @@ static void ax8817x_get_wol(struct net_device *net, struct ethtool_wolinfo *woli
 
 static int ax8817x_set_wol(struct net_device *net, struct ethtool_wolinfo *wolinfo)
 {
-	struct usbnet *dev = (struct usbnet *)net->priv;
+	struct usbnet *dev = netdev_priv(net);
 	u8 opt = 0;
 	u8 buf[1];
 
@@ -675,7 +677,7 @@ static int ax8817x_set_wol(struct net_device *net, struct ethtool_wolinfo *wolin
 static int ax8817x_get_eeprom(struct net_device *net,
 			      struct ethtool_eeprom *eeprom, u8 *data)
 {
-	struct usbnet *dev = (struct usbnet *)net->priv;
+	struct usbnet *dev = netdev_priv(net);
 	u16 *ebuf = (u16 *)data;
 	int i;
 
@@ -704,14 +706,14 @@ static void ax8817x_get_drvinfo (struct net_device *net,
 
 static int ax8817x_get_settings(struct net_device *net, struct ethtool_cmd *cmd)
 {
-	struct usbnet *dev = (struct usbnet *)net->priv;
+	struct usbnet *dev = netdev_priv(net);
 
 	return mii_ethtool_gset(&dev->mii,cmd);
 }
 
 static int ax8817x_set_settings(struct net_device *net, struct ethtool_cmd *cmd)
 {
-	struct usbnet *dev = (struct usbnet *)net->priv;
+	struct usbnet *dev = netdev_priv(net);
 
 	return mii_ethtool_sset(&dev->mii,cmd);
 }
@@ -825,7 +827,7 @@ static void ax8817x_unbind(struct usbnet *dev, struct usb_interface *intf)
 {
 	struct ax8817x_data *data = (struct ax8817x_data *)dev->data;
 
-	usb_unlink_urb(data->int_urb);
+	usb_kill_urb(data->int_urb);
 	usb_free_urb(data->int_urb);
 	kfree(data->int_buf);
 }
@@ -937,8 +939,8 @@ struct ether_desc {
 
 	u8	iMACAddress;
 	u32	bmEthernetStatistics;
-	u16	wMaxSegmentSize;
-	u16	wNumberMCFilters;
+	__le16	wMaxSegmentSize;
+	__le16	wNumberMCFilters;
 	u8	bNumberPowerFilters;
 } __attribute__ ((packed));
 
@@ -1074,7 +1076,7 @@ static int generic_cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 					info->u->bLength);
 				goto bad_desc;
 			}
-			dev->net->mtu = cpu_to_le16p (
+			dev->net->mtu = le16_to_cpup (
 						&info->ether->wMaxSegmentSize)
 					- ETH_HLEN;
 			/* because of Zaurus, we may be ignoring the host
@@ -1437,7 +1439,7 @@ static int genelink_free (struct usbnet *dev)
 // handling needs to be generic)
 
 	// cancel irq urb first
-	usb_unlink_urb (priv->irq_urb);
+	usb_kill_urb (priv->irq_urb);
 
 	// free irq urb
 	usb_free_urb (priv->irq_urb);
@@ -2159,6 +2161,13 @@ static const struct driver_info	prolific_info = {
 
 #endif /* CONFIG_USB_PL2301 */
 
+
+#ifdef CONFIG_USB_KC2190
+#define HAVE_HARDWARE
+static const struct driver_info kc2190_info = {
+	.description =  "KC Technology KC-190",
+};
+#endif /* CONFIG_USB_KC2190 */
 
 
 #ifdef	CONFIG_USB_ARMLINUX
@@ -2276,7 +2285,7 @@ static const struct driver_info	zaurus_pxa_info = {
 
 static int usbnet_change_mtu (struct net_device *net, int new_mtu)
 {
-	struct usbnet	*dev = (struct usbnet *) net->priv;
+	struct usbnet	*dev = netdev_priv(net);
 
 	if (new_mtu <= MIN_PACKET || new_mtu > MAX_PACKET)
 		return -EINVAL;
@@ -2302,7 +2311,8 @@ static int usbnet_change_mtu (struct net_device *net, int new_mtu)
 
 static struct net_device_stats *usbnet_get_stats (struct net_device *net)
 {
-	return &((struct usbnet *) net->priv)->stats;
+	struct usbnet	*dev = netdev_priv(net);
+	return &dev->stats;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -2569,7 +2579,7 @@ static int unlink_urbs (struct usbnet *dev, struct sk_buff_head *q)
 
 static int usbnet_stop (struct net_device *net)
 {
-	struct usbnet		*dev = (struct usbnet *) net->priv;
+	struct usbnet		*dev = netdev_priv(net);
 	int			temp;
 	DECLARE_WAIT_QUEUE_HEAD (unlink_wakeup); 
 	DECLARE_WAITQUEUE (wait, current);
@@ -2616,7 +2626,7 @@ static int usbnet_stop (struct net_device *net)
 
 static int usbnet_open (struct net_device *net)
 {
-	struct usbnet		*dev = (struct usbnet *) net->priv;
+	struct usbnet		*dev = netdev_priv(net);
 	int			retval = 0;
 	struct driver_info	*info = dev->driver_info;
 
@@ -2666,7 +2676,7 @@ done:
 
 static void usbnet_get_drvinfo (struct net_device *net, struct ethtool_drvinfo *info)
 {
-	struct usbnet *dev = net->priv;
+	struct usbnet *dev = netdev_priv(net);
 
 	strncpy (info->driver, driver_name, sizeof info->driver);
 	strncpy (info->version, DRIVER_VERSION, sizeof info->version);
@@ -2677,7 +2687,7 @@ static void usbnet_get_drvinfo (struct net_device *net, struct ethtool_drvinfo *
 
 static u32 usbnet_get_link (struct net_device *net)
 {
-	struct usbnet *dev = net->priv;
+	struct usbnet *dev = netdev_priv(net);
 
 	/* If a check_connect is defined, return it's results */
 	if (dev->driver_info->check_connect)
@@ -2689,14 +2699,14 @@ static u32 usbnet_get_link (struct net_device *net)
 
 static u32 usbnet_get_msglevel (struct net_device *net)
 {
-	struct usbnet *dev = net->priv;
+	struct usbnet *dev = netdev_priv(net);
 
 	return dev->msg_level;
 }
 
 static void usbnet_set_msglevel (struct net_device *net, u32 level)
 {
-	struct usbnet *dev = net->priv;
+	struct usbnet *dev = netdev_priv(net);
 
 	dev->msg_level = level;
 }
@@ -2705,7 +2715,7 @@ static int usbnet_ioctl (struct net_device *net, struct ifreq *rq, int cmd)
 {
 #ifdef NEED_MII
 	{
-	struct usbnet *dev = (struct usbnet *)net->priv;
+	struct usbnet *dev = netdev_priv(net);
 
 	if (dev->mii.mdio_read != NULL && dev->mii.mdio_write != NULL)
 		return generic_mii_ioctl(&dev->mii, if_mii(rq), cmd, NULL);
@@ -2817,7 +2827,7 @@ static void tx_complete (struct urb *urb, struct pt_regs *regs)
 
 static void usbnet_tx_timeout (struct net_device *net)
 {
-	struct usbnet		*dev = (struct usbnet *) net->priv;
+	struct usbnet		*dev = netdev_priv(net);
 
 	unlink_urbs (dev, &dev->txq);
 	tasklet_schedule (&dev->bh);
@@ -2829,7 +2839,7 @@ static void usbnet_tx_timeout (struct net_device *net)
 
 static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 {
-	struct usbnet		*dev = (struct usbnet *) net->priv;
+	struct usbnet		*dev = netdev_priv(net);
 	int			length;
 	int			retval = NET_XMIT_SUCCESS;
 	struct urb		*urb = NULL;
@@ -3014,6 +3024,7 @@ static void usbnet_disconnect (struct usb_interface *intf)
 {
 	struct usbnet		*dev;
 	struct usb_device	*xdev;
+	struct net_device	*net;
 
 	dev = usb_get_intfdata(intf);
 	usb_set_intfdata(intf, NULL);
@@ -3026,7 +3037,8 @@ static void usbnet_disconnect (struct usb_interface *intf)
 		xdev->bus->bus_name, xdev->devpath,
 		dev->driver_info->description);
 	
-	unregister_netdev (dev->net);
+	net = dev->net;
+	unregister_netdev (net);
 
 	/* we don't hold rtnl here ... */
 	flush_scheduled_work ();
@@ -3034,8 +3046,7 @@ static void usbnet_disconnect (struct usb_interface *intf)
 	if (dev->driver_info->unbind)
 		dev->driver_info->unbind (dev, intf);
 
-	free_netdev(dev->net);
-	kfree (dev);
+	free_netdev(net);
 	usb_put_dev (xdev);
 }
 
@@ -3069,12 +3080,13 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	status = -ENOMEM;
 
 	// set up our own records
-	if (!(dev = kmalloc (sizeof *dev, GFP_KERNEL))) {
+	net = alloc_etherdev(sizeof(*dev));
+	if (!net) {
 		dbg ("can't kmalloc dev");
 		goto out;
 	}
-	memset (dev, 0, sizeof *dev);
 
+	dev = netdev_priv(net);
 	dev->udev = xdev;
 	dev->driver_info = info;
 	dev->msg_level = msg_level;
@@ -3088,14 +3100,8 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	dev->delay.data = (unsigned long) dev;
 	init_timer (&dev->delay);
 
-	// set up network interface records
-	net = alloc_etherdev(0);
-	if (!net)
-		goto out1;
-
 	SET_MODULE_OWNER (net);
 	dev->net = net;
-	net->priv = dev;
 	strcpy (net->name, "usb%d");
 	memcpy (net->dev_addr, node_id, sizeof node_id);
 
@@ -3144,8 +3150,8 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 
 	dev->maxpacket = usb_maxpacket (dev->udev, dev->out, 1);
 	
-	SET_NETDEV_DEV(dev->net, &udev->dev);
-	status = register_netdev (dev->net);
+	SET_NETDEV_DEV(net, &udev->dev);
+	status = register_netdev (net);
 	if (status)
 		goto out3;
 	devinfo (dev, "register usbnet at usb-%s-%s, %s",
@@ -3156,16 +3162,15 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	usb_set_intfdata (udev, dev);
 
 	// start as if the link is up
-	netif_device_attach (dev->net);
+	netif_device_attach (net);
 
 	return 0;
 
 out3:
 	if (info->unbind)
 		info->unbind (dev, udev);
-	free_netdev(net);
 out1:
-	kfree(dev);
+	free_netdev(net);
 out:
 	usb_put_dev(xdev);
 	return status;
@@ -3252,6 +3257,14 @@ static const struct usb_device_id	products [] = {
 	// Sitecom LN-029 "USB 2.0 10/100 Ethernet adapter"
 	USB_DEVICE (0x6189, 0x182d),
 	.driver_info =  (unsigned long) &ax8817x_info,
+}, {
+	// corega FEther USB2-TX
+	USB_DEVICE (0x07aa, 0x0017),
+	.driver_info =  (unsigned long) &ax8817x_info,
+}, {
+	// Surecom EP-1427X-2
+	USB_DEVICE (0x1189, 0x0893),
+	.driver_info = (unsigned long) &ax8817x_info,
 },
 #endif
 
@@ -3292,6 +3305,13 @@ static const struct usb_device_id	products [] = {
 },
 #endif
 
+#ifdef CONFIG_USB_KC2190
+{
+	USB_DEVICE (0x050f, 0x0190),	// KC-190
+	.driver_info =	(unsigned long) &kc2190_info,
+},
+#endif
+
 #ifdef	CONFIG_USB_RNDIS
 {
 	/* RNDIS is MSFT's un-official variant of CDC ACM */
@@ -3308,11 +3328,18 @@ static const struct usb_device_id	products [] = {
  *
  * PXA25x or PXA210 ...  these use a "usb-eth" driver much like
  * the sa1100 one, but hardware uses different endpoint numbers.
+ *
+ * Or the Linux "Ethernet" gadget on hardware that can't talk
+ * CDC Ethernet (e.g., no altsettings), in either of two modes:
+ *  - acting just like the old "usb-eth" firmware, though
+ *    the implementation is different 
+ *  - supporting RNDIS as the first/default configuration for
+ *    MS-Windows interop; Linux needs to use the other config
  */
 {
 	// 1183 = 0x049F, both used as hex values?
 	// Compaq "Itsy" vendor/product id
-	USB_DEVICE (0x049F, 0x505A),
+	USB_DEVICE (0x049F, 0x505A),	// usb-eth, or compatible
 	.driver_info =	(unsigned long) &linuxdev_info,
 }, {
 	USB_DEVICE (0x0E7E, 0x1001),	// G.Mate "Yopy"
@@ -3320,6 +3347,10 @@ static const struct usb_device_id	products [] = {
 }, {
 	USB_DEVICE (0x8086, 0x07d3),	// "blob" bootloader
 	.driver_info =	(unsigned long) &blob_info,
+}, {
+	// Linux Ethernet/RNDIS gadget on pxa210/25x/26x
+	USB_DEVICE_VER (0x0525, 0xa4a2, 0x0203, 0x0203),
+	.driver_info =	(unsigned long) &linuxdev_info,
 }, 
 #endif
 

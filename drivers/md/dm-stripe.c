@@ -191,20 +191,17 @@ static int stripe_status(struct dm_target *ti,
 	unsigned int i;
 	char buffer[32];
 
-#define EMIT(x...) sz += ((sz >= maxlen) ? \
-			  0 : scnprintf(result + sz, maxlen - sz, x))
-
 	switch (type) {
 	case STATUSTYPE_INFO:
 		result[0] = '\0';
 		break;
 
 	case STATUSTYPE_TABLE:
-		EMIT("%d " SECTOR_FORMAT, sc->stripes, sc->chunk_mask + 1);
+		DMEMIT("%d " SECTOR_FORMAT, sc->stripes, sc->chunk_mask + 1);
 		for (i = 0; i < sc->stripes; i++) {
 			format_dev_t(buffer, sc->stripe[i].dev->bdev->bd_dev);
-			EMIT(" %s " SECTOR_FORMAT, buffer,
-			     sc->stripe[i].physical_start);
+			DMEMIT(" %s " SECTOR_FORMAT, buffer,
+			       sc->stripe[i].physical_start);
 		}
 		break;
 	}

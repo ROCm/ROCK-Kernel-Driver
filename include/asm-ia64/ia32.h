@@ -6,7 +6,7 @@
 #include <asm/ptrace.h>
 #include <asm/signal.h>
 
-#define IA32_NR_syscalls		283	/* length of syscall table */
+#define IA32_NR_syscalls		285	/* length of syscall table */
 #define IA32_PAGE_SHIFT			12	/* 4KB pages */
 
 #ifndef __ASSEMBLY__
@@ -14,7 +14,7 @@
 # ifdef CONFIG_IA32_SUPPORT
 
 extern void ia32_cpu_init (void);
-extern void ia32_boot_gdt_init (void);
+extern void ia32_mem_init (void);
 extern void ia32_gdt_init (void);
 extern int ia32_exception (struct pt_regs *regs, unsigned long isr);
 extern int ia32_intercept (struct pt_regs *regs, unsigned long isr);

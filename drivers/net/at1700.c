@@ -56,9 +56,9 @@
 #include <linux/string.h>
 #include <linux/init.h>
 #include <linux/crc32.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 

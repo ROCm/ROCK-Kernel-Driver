@@ -1,4 +1,4 @@
-/* linux/include/asm/hardware/s3c2410/
+/* linux/include/asm/hardware/s3c2410/regs-gpio.h
  *
  * Copyright (c) 2003,2004 Simtec Electronics <linux@simtec.co.uk>
  *		           http://www.simtec.co.uk/products/SWLINUX/
@@ -14,7 +14,11 @@
  *    23-06-2003     BJD     Updated GSTATUS registers
  *    12-03-2004     BJD     Updated include protection
  *    20-07-2004     BJD     Added GPIO pin numbers, added Port A definitions
- */
+ *    04-10-2004     BJD     Fixed number of bugs, added EXT IRQ filter defs
+ *    17-10-2004     BJD     Added GSTATUS1 register definitions
+ *    18-11-2004     BJD     Fixed definitions of GPE3, GPE4, GPE5 and GPE6
+ *    18-11-2004     BJD     Added S3C2440 AC97 controls
+*/
 
 
 #ifndef __ASM_ARCH_REGS_GPIO_H
@@ -422,12 +426,14 @@
 #define S3C2410_GPE3_INP       (0x00 << 6)
 #define S3C2410_GPE3_OUTP      (0x01 << 6)
 #define S3C2410_GPE3_I2SSDI    (0x02 << 6)
+#define S3C2410_GPE3_nSS0      (0x03 << 6)
 #define S3C2410_GPE3_MASK      (0x03 << 6)
 
 #define S3C2410_GPE4           S3C2410_GPIONO(S3C2410_GPIO_BANKE, 4)
 #define S3C2410_GPE4_INP       (0x00 << 8)
 #define S3C2410_GPE4_OUTP      (0x01 << 8)
 #define S3C2410_GPE4_I2SSDO    (0x02 << 8)
+#define S3C2410_GPE4_I2SSDI    (0x03 << 8)
 #define S3C2410_GPE4_MASK      (0x03 << 8)
 
 #define S3C2410_GPE5           S3C2410_GPIONO(S3C2410_GPIO_BANKE, 5)
@@ -438,12 +444,12 @@
 #define S3C2410_GPE6           S3C2410_GPIONO(S3C2410_GPIO_BANKE, 6)
 #define S3C2410_GPE6_INP       (0x00 << 12)
 #define S3C2410_GPE6_OUTP      (0x01 << 12)
-#define S3C2410_GPE6_SDCLK     (0x02 << 12)
+#define S3C2410_GPE6_SDCMD     (0x02 << 12)
 
 #define S3C2410_GPE7           S3C2410_GPIONO(S3C2410_GPIO_BANKE, 7)
 #define S3C2410_GPE7_INP       (0x00 << 14)
 #define S3C2410_GPE7_OUTP      (0x01 << 14)
-#define S3C2410_GPE7_SDCMD     (0x02 << 14)
+#define S3C2410_GPE7_SDDAT0    (0x02 << 14)
 
 #define S3C2410_GPE8           S3C2410_GPIONO(S3C2410_GPIO_BANKE, 8)
 #define S3C2410_GPE8_INP       (0x00 << 16)
@@ -486,6 +492,12 @@
 #define S3C2410_GPE15_OUTP     (0x01 << 30)
 #define S3C2410_GPE15_IICSDA   (0x02 << 30)
 #define S3C2410_GPE15_MASK     (0x03 << 30)
+
+#define S3C2440_GPE0_ACSYNC    (0x03 << 0)
+#define S3C2440_GPE1_ACBITCLK  (0x03 << 2)
+#define S3C2440_GPE2_ACRESET   (0x03 << 4)
+#define S3C2440_GPE3_ACIN      (0x03 << 6)
+#define S3C2440_GPE4_ACOUT     (0x03 << 8)
 
 #define S3C2410_GPE_PUPDIS(x)  (1<<(x))
 
@@ -614,34 +626,34 @@
 #define S3C2410_GPG10_OUTP    (0x01 << 20)
 #define S3C2410_GPG10_EINT18  (0x02 << 20)
 
-#define S3C2410_GPG10         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 10)
+#define S3C2410_GPG11         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 11)
 #define S3C2410_GPG11_INP     (0x00 << 22)
 #define S3C2410_GPG11_OUTP    (0x01 << 22)
 #define S3C2410_GPG11_EINT19  (0x02 << 22)
 #define S3C2410_GPG11_TCLK1   (0x03 << 22)
 
-#define S3C2410_GPG10         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 10)
+#define S3C2410_GPG12         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 12)
 #define S3C2410_GPG12_INP     (0x00 << 24)
 #define S3C2410_GPG12_OUTP    (0x01 << 24)
-#define S3C2410_GPG12_EINT18  (0x02 << 24)
+#define S3C2410_GPG12_EINT20  (0x02 << 24)
 #define S3C2410_GPG12_XMON    (0x03 << 24)
 
-#define S3C2410_GPG10         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 10)
+#define S3C2410_GPG13         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 13)
 #define S3C2410_GPG13_INP     (0x00 << 26)
 #define S3C2410_GPG13_OUTP    (0x01 << 26)
-#define S3C2410_GPG13_EINT18  (0x02 << 26)
+#define S3C2410_GPG13_EINT21  (0x02 << 26)
 #define S3C2410_GPG13_nXPON   (0x03 << 26)
 
-#define S3C2410_GPG10         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 10)
+#define S3C2410_GPG14         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 14)
 #define S3C2410_GPG14_INP     (0x00 << 28)
 #define S3C2410_GPG14_OUTP    (0x01 << 28)
-#define S3C2410_GPG14_EINT18  (0x02 << 28)
+#define S3C2410_GPG14_EINT22  (0x02 << 28)
 #define S3C2410_GPG14_YMON    (0x03 << 28)
 
-#define S3C2410_GPG10         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 10)
+#define S3C2410_GPG15         S3C2410_GPIONO(S3C2410_GPIO_BANKG, 15)
 #define S3C2410_GPG15_INP     (0x00 << 30)
 #define S3C2410_GPG15_OUTP    (0x01 << 30)
-#define S3C2410_GPG15_EINT18  (0x02 << 30)
+#define S3C2410_GPG15_EINT23  (0x02 << 30)
 #define S3C2410_GPG15_nYPON   (0x03 << 30)
 
 
@@ -751,6 +763,11 @@
 
 #define S3C2410_MISCCR_nRSTCON	    (1<<16)
 
+#define S3C2410_MISCCR_nEN_SCLK0    (1<<17)
+#define S3C2410_MISCCR_nEN_SCLK1    (1<<18)
+#define S3C2410_MISCCR_nEN_SCLKE    (1<<19)
+#define S3C2410_MISCCR_SDSLEEP	    (7<<17)
+
 /* external interrupt control... */
 /* S3C2410_EXTINT0 -> irq sense control for EINT0..EINT7
  * S3C2410_EXTINT1 -> irq sense control for EINT8..EINT15
@@ -778,6 +795,11 @@
 #define S3C2410_EINFLT2	   S3C2410_GPIOREG(0x9C)
 #define S3C2410_EINFLT3	   S3C2410_GPIOREG(0xA0)
 
+/* values for interrupt filtering */
+#define S3C2410_EINTFLT_PCLK		(0x00)
+#define S3C2410_EINTFLT_EXTCLK		(1<<7)
+#define S3C2410_EINTFLT_WIDTHMSK(x)	((x) & 0x3f)
+
 /* removed EINTxxxx defs from here, not meant for this */
 
 /* GSTATUS have miscellaneous information in them
@@ -795,8 +817,12 @@
 #define S3C2410_GSTATUS0_RnB	   (1<<1)
 #define S3C2410_GSTATUS0_nBATTFLT  (1<<0)
 
+#define S3C2410_GSTATUS1_IDMASK	   (0xffff0000)
+#define S3C2410_GSTATUS1_2410	   (0x32410000)
+#define S3C2410_GSTATUS1_2440	   (0x32440000)
+
 #define S3C2410_GSTATUS2_WTRESET   (1<<2)
-#define S3C2410_GSTATUs2_OFFRESET  (1<<1)
+#define S3C2410_GSTATUS2_OFFRESET  (1<<1)
 #define S3C2410_GSTATUS2_PONRESET  (1<<0)
 
 #endif	/* __ASM_ARCH_REGS_GPIO_H */

@@ -68,8 +68,8 @@ static int int_timeout = 0;
 #include <linux/skbuff.h>
 #include <linux/init.h>
 #include <linux/config.h>
+#include <linux/bitops.h>
 #include <asm/processor.h>		/* Processor type for cache alignment. */
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/cache.h>
 

@@ -21,6 +21,7 @@
 #include <linux/delay.h>
 #include <linux/smp_lock.h>
 #include <linux/syscalls.h>
+#include <linux/bitops.h>
 
 #include <asm/page.h>
 #include <asm/semaphore.h>
@@ -28,7 +29,6 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/atomic.h>
-#include <asm/bitops.h>
 #include <asm/checksum.h>
 #include <asm/pgtable.h>
 #include <asm/prom.h>
@@ -119,7 +119,6 @@ EXPORT_SYMBOL(start_thread);
 EXPORT_SYMBOL(kernel_thread);
 
 EXPORT_SYMBOL(flush_instruction_cache);
-EXPORT_SYMBOL(_get_PVR);
 EXPORT_SYMBOL(giveup_fpu);
 #ifdef CONFIG_ALTIVEC
 EXPORT_SYMBOL(giveup_altivec);
@@ -137,7 +136,7 @@ EXPORT_SYMBOL(local_irq_restore);
 
 EXPORT_SYMBOL(ppc_md);
 
-#ifdef CONFIG_PPC_PSERIES
+#ifdef CONFIG_PPC_MULTIPLATFORM
 EXPORT_SYMBOL(find_devices);
 EXPORT_SYMBOL(find_type_devices);
 EXPORT_SYMBOL(find_compatible_devices);

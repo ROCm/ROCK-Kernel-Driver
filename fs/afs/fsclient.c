@@ -307,7 +307,7 @@ int afs_rxfs_fetch_file_status(struct afs_server *server,
 	struct kvec piov[1];
 	size_t sent;
 	int ret;
-	u32 *bp;
+	__be32 *bp;
 
 	DECLARE_WAITQUEUE(myself, current);
 
@@ -432,7 +432,7 @@ int afs_rxfs_fetch_file_data(struct afs_server *server,
 	struct kvec piov[1];
 	size_t sent;
 	int ret;
-	u32 *bp;
+	__be32 *bp;
 
 	DECLARE_WAITQUEUE(myself, current);
 
@@ -583,7 +583,7 @@ int afs_rxfs_give_up_callback(struct afs_server *server,
 	struct kvec piov[1];
 	size_t sent;
 	int ret;
-	u32 *bp;
+	__be32 *bp;
 
 	DECLARE_WAITQUEUE(myself, current);
 

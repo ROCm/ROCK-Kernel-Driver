@@ -61,18 +61,7 @@ extern unsigned long ldt_eoi_space;
 #endif
 
 #ifdef CONFIG_KGDB
-#include <asm/gdb-stub.h>
-extern void breakpoint(void);
 static int kgdb_irq;
-
-/* kgdb is on when configured.  Pass "nokgdb" kernel arg to turn it off */
-static int kgdb_flag = 1;
-static int __init nokgdb(char *str)
-{
-	kgdb_flag = 0;
-	return 1;
-}
-__setup("nokgdb", nokgdb);
 
 /* Default to UART1 */
 int kgdb_port = 1;
@@ -307,10 +296,10 @@ int sb1250_steal_irq(int irq)
 }
 
 /*
- *  init_IRQ is called early in the boot sequence from init/main.c.  It
- *  is responsible for setting up the interrupt mapper and installing the
- *  handler that will be responsible for dispatching interrupts to the
- *  "right" place.
+ *  arch_init_irq is called early in the boot sequence from init/main.c via
+ *  init_IRQ.  It is responsible for setting up the interrupt mapper and
+ *  installing the handler that will be responsible for dispatching interrupts
+ *  to the "right" place.
  */
 /*
  * For now, map all interrupts to IP[2].  We could save
@@ -332,7 +321,7 @@ int sb1250_steal_irq(int irq)
 #define IMR_IP5_VAL	K_INT_MAP_I3
 #define IMR_IP6_VAL	K_INT_MAP_I4
 
-void __init init_IRQ(void)
+void __init arch_init_irq(void)
 {
 
 	unsigned int i;
@@ -405,10 +394,6 @@ void __init init_IRQ(void)
 			     IOADDR(A_IMR_REGISTER(0, R_IMR_INTERRUPT_MAP_BASE) +
 				    (kgdb_irq<<3)));
 		sb1250_unmask_irq(0, kgdb_irq);
-
-		prom_printf("Waiting for GDB on UART port %d\n", kgdb_port);
-		set_debug_traps();
-		breakpoint();
 	}
 #endif
 }

@@ -12,6 +12,7 @@
  *            Wolfgang Taphorn
  *            Stefan Bader <stefan.bader@de.ibm.com> 
  *            Heiko Carstens <heiko.carstens@de.ibm.com> 
+ *            Andreas Herrmann <aherrman@de.ibm.com>
  * 
  * This program is free software; you can redistribute it and/or modify 
  * it under the terms of the GNU General Public License as published by 
@@ -30,8 +31,8 @@
 
 #ifndef ZFCP_EXT_H
 #define ZFCP_EXT_H
-/* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_EXT_REVISION "$Revision: 1.57 $"
+
+#define ZFCP_EXT_REVISION "$Revision: 1.62 $"
 
 #include "zfcp_def.h"
 
@@ -169,6 +170,12 @@ extern int  zfcp_erp_wait(struct zfcp_adapter *);
 extern int  zfcp_erp_async_handler(struct zfcp_erp_action *, unsigned long);
 
 extern int  zfcp_test_link(struct zfcp_port *);
+
+extern void zfcp_erp_port_access_denied(struct zfcp_port *);
+extern void zfcp_erp_unit_access_denied(struct zfcp_unit *);
+extern void zfcp_erp_adapter_access_changed(struct zfcp_adapter *);
+extern void zfcp_erp_port_access_changed(struct zfcp_port *);
+extern void zfcp_erp_unit_access_changed(struct zfcp_unit *);
 
 /******************************** AUX ****************************************/
 extern void zfcp_cmd_dbf_event_fsf(const char *, struct zfcp_fsf_req *,

@@ -124,10 +124,10 @@ static int gx_fix;
 #include <linux/skbuff.h>
 #include <linux/ethtool.h>
 #include <linux/crc32.h>
+#include <linux/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>		/* Processor type for cache alignment. */
 #include <asm/unaligned.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 
 /* These identify the driver base version and may not be removed. */
@@ -136,20 +136,6 @@ KERN_INFO DRV_NAME ".c:v1.05  1/09/2001  Written by Donald Becker <becker@scyld.
 KERN_INFO "  http://www.scyld.com/network/yellowfin.html\n"
 KERN_INFO "  (unofficial 2.4.x port, " DRV_VERSION ", " DRV_RELDATE ")\n";
 
-#ifndef USE_IO_OPS
-#undef inb
-#undef inw
-#undef inl
-#undef outb
-#undef outw
-#undef outl
-#define inb readb
-#define inw readw
-#define inl readl
-#define outb writeb
-#define outw writew
-#define outl writel
-#endif /* !USE_IO_OPS */
 MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
 MODULE_DESCRIPTION("Packet Engines Yellowfin G-NIC Gigabit Ethernet driver");
 MODULE_LICENSE("GPL");
@@ -389,11 +375,12 @@ struct yellowfin_private {
 	u16 advertising;					/* NWay media advertisement */
 	unsigned char phys[MII_CNT];		/* MII device addresses, only first one used */
 	spinlock_t lock;
+	void __iomem *base;
 };
 
-static int read_eeprom(long ioaddr, int location);
-static int mdio_read(long ioaddr, int phy_id, int location);
-static void mdio_write(long ioaddr, int phy_id, int location, int value);
+static int read_eeprom(void __iomem *ioaddr, int location);
+static int mdio_read(void __iomem *ioaddr, int phy_id, int location);
+static void mdio_write(void __iomem *ioaddr, int phy_id, int location, int value);
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static int yellowfin_open(struct net_device *dev);
 static void yellowfin_timer(unsigned long data);
@@ -406,6 +393,7 @@ static void yellowfin_error(struct net_device *dev, int intr_status);
 static int yellowfin_close(struct net_device *dev);
 static struct net_device_stats *yellowfin_get_stats(struct net_device *dev);
 static void set_rx_mode(struct net_device *dev);
+static struct ethtool_ops ethtool_ops;
 
 
 static int __devinit yellowfin_init_one(struct pci_dev *pdev,
@@ -416,11 +404,16 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 	int irq;
 	int chip_idx = ent->driver_data;
 	static int find_cnt;
-	long ioaddr, real_ioaddr;
+	void __iomem *ioaddr;
 	int i, option = find_cnt < MAX_UNITS ? options[find_cnt] : 0;
 	int drv_flags = pci_id_tbl[chip_idx].drv_flags;
         void *ring_space;
         dma_addr_t ring_dma;
+#ifdef USE_IO_OPS
+	int bar = 0;
+#else
+	int bar = 1;
+#endif
 	
 /* when built into the kernel, we only print version if device is found */
 #ifndef MODULE
@@ -440,26 +433,22 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
-	np = dev->priv;
+	np = netdev_priv(dev);
 
 	if (pci_request_regions(pdev, DRV_NAME))
 		goto err_out_free_netdev;
 
 	pci_set_master (pdev);
 
-#ifdef USE_IO_OPS
-	real_ioaddr = ioaddr = pci_resource_start (pdev, 0);
-#else
-	real_ioaddr = ioaddr = pci_resource_start (pdev, 1);
-	ioaddr = (long) ioremap(ioaddr, YELLOWFIN_SIZE);
+	ioaddr = pci_iomap(pdev, bar, YELLOWFIN_SIZE);
 	if (!ioaddr)
 		goto err_out_free_res;
-#endif
+
 	irq = pdev->irq;
 
 	if (drv_flags & DontUseEeprom)
 		for (i = 0; i < 6; i++)
-			dev->dev_addr[i] = inb(ioaddr + StnAddr + i);
+			dev->dev_addr[i] = ioread8(ioaddr + StnAddr + i);
 	else {
 		int ee_offset = (read_eeprom(ioaddr, 6) == 0xff ? 0x100 : 0);
 		for (i = 0; i < 6; i++)
@@ -467,9 +456,9 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 	}
 
 	/* Reset the chip. */
-	outl(0x80000000, ioaddr + DMACtrl);
+	iowrite32(0x80000000, ioaddr + DMACtrl);
 
-	dev->base_addr = ioaddr;
+	dev->base_addr = (unsigned long)ioaddr;
 	dev->irq = irq;
 
 	pci_set_drvdata(pdev, dev);
@@ -478,6 +467,7 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 	np->pci_dev = pdev;
 	np->chip_id = chip_idx;
 	np->drv_flags = drv_flags;
+	np->base = ioaddr;
 
 	ring_space = pci_alloc_consistent(pdev, TX_TOTAL_SIZE, &ring_dma);
 	if (!ring_space)
@@ -521,6 +511,7 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 	dev->get_stats = &yellowfin_get_stats;
 	dev->set_multicast_list = &set_rx_mode;
 	dev->do_ioctl = &netdev_ioctl;
+	SET_ETHTOOL_OPS(dev, &ethtool_ops);
 	dev->tx_timeout = yellowfin_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
 
@@ -531,8 +522,9 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 	if (i)
 		goto err_out_unmap_status;
 
-	printk(KERN_INFO "%s: %s type %8x at 0x%lx, ",
-		   dev->name, pci_id_tbl[chip_idx].name, inl(ioaddr + ChipRev), ioaddr);
+	printk(KERN_INFO "%s: %s type %8x at %p, ",
+		   dev->name, pci_id_tbl[chip_idx].name,
+		   ioread32(ioaddr + ChipRev), ioaddr);
 	for (i = 0; i < 5; i++)
 			printk("%2.2x:", dev->dev_addr[i]);
 	printk("%2.2x, IRQ %d.\n", dev->dev_addr[i], irq);
@@ -565,53 +557,51 @@ err_out_unmap_tx:
         pci_free_consistent(pdev, TX_TOTAL_SIZE, np->tx_ring, np->tx_ring_dma);
 err_out_cleardev:
 	pci_set_drvdata(pdev, NULL);
-#ifndef USE_IO_OPS
-	iounmap((void *)ioaddr);
+	pci_iounmap(pdev, ioaddr);
 err_out_free_res:
-#endif
 	pci_release_regions(pdev);
 err_out_free_netdev:
 	free_netdev (dev);
 	return -ENODEV;
 }
 
-static int __devinit read_eeprom(long ioaddr, int location)
+static int __devinit read_eeprom(void __iomem *ioaddr, int location)
 {
 	int bogus_cnt = 10000;		/* Typical 33Mhz: 1050 ticks */
 
-	outb(location, ioaddr + EEAddr);
-	outb(0x30 | ((location >> 8) & 7), ioaddr + EECtrl);
-	while ((inb(ioaddr + EEStatus) & 0x80)  &&  --bogus_cnt > 0)
+	iowrite8(location, ioaddr + EEAddr);
+	iowrite8(0x30 | ((location >> 8) & 7), ioaddr + EECtrl);
+	while ((ioread8(ioaddr + EEStatus) & 0x80)  &&  --bogus_cnt > 0)
 		;
-	return inb(ioaddr + EERead);
+	return ioread8(ioaddr + EERead);
 }
 
 /* MII Managemen Data I/O accesses.
    These routines assume the MDIO controller is idle, and do not exit until
    the command is finished. */
 
-static int mdio_read(long ioaddr, int phy_id, int location)
+static int mdio_read(void __iomem *ioaddr, int phy_id, int location)
 {
 	int i;
 
-	outw((phy_id<<8) + location, ioaddr + MII_Addr);
-	outw(1, ioaddr + MII_Cmd);
+	iowrite16((phy_id<<8) + location, ioaddr + MII_Addr);
+	iowrite16(1, ioaddr + MII_Cmd);
 	for (i = 10000; i >= 0; i--)
-		if ((inw(ioaddr + MII_Status) & 1) == 0)
+		if ((ioread16(ioaddr + MII_Status) & 1) == 0)
 			break;
-	return inw(ioaddr + MII_Rd_Data);
+	return ioread16(ioaddr + MII_Rd_Data);
 }
 
-static void mdio_write(long ioaddr, int phy_id, int location, int value)
+static void mdio_write(void __iomem *ioaddr, int phy_id, int location, int value)
 {
 	int i;
 
-	outw((phy_id<<8) + location, ioaddr + MII_Addr);
-	outw(value, ioaddr + MII_Wr_Data);
+	iowrite16((phy_id<<8) + location, ioaddr + MII_Addr);
+	iowrite16(value, ioaddr + MII_Wr_Data);
 
 	/* Wait for the command to finish. */
 	for (i = 10000; i >= 0; i--)
-		if ((inw(ioaddr + MII_Status) & 1) == 0)
+		if ((ioread16(ioaddr + MII_Status) & 1) == 0)
 			break;
 	return;
 }
@@ -619,12 +609,12 @@ static void mdio_write(long ioaddr, int phy_id, int location, int value)
 
 static int yellowfin_open(struct net_device *dev)
 {
-	struct yellowfin_private *yp = dev->priv;
-	long ioaddr = dev->base_addr;
+	struct yellowfin_private *yp = netdev_priv(dev);
+	void __iomem *ioaddr = yp->base;
 	int i;
 
 	/* Reset the chip. */
-	outl(0x80000000, ioaddr + DMACtrl);
+	iowrite32(0x80000000, ioaddr + DMACtrl);
 
 	i = request_irq(dev->irq, &yellowfin_interrupt, SA_SHIRQ, dev->name, dev);
 	if (i) return i;
@@ -635,30 +625,30 @@ static int yellowfin_open(struct net_device *dev)
 
 	yellowfin_init_ring(dev);
 
-	outl(yp->rx_ring_dma, ioaddr + RxPtr);
-	outl(yp->tx_ring_dma, ioaddr + TxPtr);
+	iowrite32(yp->rx_ring_dma, ioaddr + RxPtr);
+	iowrite32(yp->tx_ring_dma, ioaddr + TxPtr);
 
 	for (i = 0; i < 6; i++)
-		outb(dev->dev_addr[i], ioaddr + StnAddr + i);
+		iowrite8(dev->dev_addr[i], ioaddr + StnAddr + i);
 
 	/* Set up various condition 'select' registers.
 	   There are no options here. */
-	outl(0x00800080, ioaddr + TxIntrSel); 	/* Interrupt on Tx abort */
-	outl(0x00800080, ioaddr + TxBranchSel);	/* Branch on Tx abort */
-	outl(0x00400040, ioaddr + TxWaitSel); 	/* Wait on Tx status */
-	outl(0x00400040, ioaddr + RxIntrSel);	/* Interrupt on Rx done */
-	outl(0x00400040, ioaddr + RxBranchSel);	/* Branch on Rx error */
-	outl(0x00400040, ioaddr + RxWaitSel);	/* Wait on Rx done */
+	iowrite32(0x00800080, ioaddr + TxIntrSel); 	/* Interrupt on Tx abort */
+	iowrite32(0x00800080, ioaddr + TxBranchSel);	/* Branch on Tx abort */
+	iowrite32(0x00400040, ioaddr + TxWaitSel); 	/* Wait on Tx status */
+	iowrite32(0x00400040, ioaddr + RxIntrSel);	/* Interrupt on Rx done */
+	iowrite32(0x00400040, ioaddr + RxBranchSel);	/* Branch on Rx error */
+	iowrite32(0x00400040, ioaddr + RxWaitSel);	/* Wait on Rx done */
 
 	/* Initialize other registers: with so many this eventually this will
 	   converted to an offset/value list. */
-	outl(dma_ctrl, ioaddr + DMACtrl);
-	outw(fifo_cfg, ioaddr + FIFOcfg);
+	iowrite32(dma_ctrl, ioaddr + DMACtrl);
+	iowrite16(fifo_cfg, ioaddr + FIFOcfg);
 	/* Enable automatic generation of flow control frames, period 0xffff. */
-	outl(0x0030FFFF, ioaddr + FlowCtrl);
+	iowrite32(0x0030FFFF, ioaddr + FlowCtrl);
 
 	yp->tx_threshold = 32;
-	outl(yp->tx_threshold, ioaddr + TxThreshold);
+	iowrite32(yp->tx_threshold, ioaddr + TxThreshold);
 
 	if (dev->if_port == 0)
 		dev->if_port = yp->default_port;
@@ -669,19 +659,19 @@ static int yellowfin_open(struct net_device *dev)
 	if (yp->drv_flags & IsGigabit) {
 		/* We are always in full-duplex mode with gigabit! */
 		yp->full_duplex = 1;
-		outw(0x01CF, ioaddr + Cnfg);
+		iowrite16(0x01CF, ioaddr + Cnfg);
 	} else {
-		outw(0x0018, ioaddr + FrameGap0); /* 0060/4060 for non-MII 10baseT */
-		outw(0x1018, ioaddr + FrameGap1);
-		outw(0x101C | (yp->full_duplex ? 2 : 0), ioaddr + Cnfg);
+		iowrite16(0x0018, ioaddr + FrameGap0); /* 0060/4060 for non-MII 10baseT */
+		iowrite16(0x1018, ioaddr + FrameGap1);
+		iowrite16(0x101C | (yp->full_duplex ? 2 : 0), ioaddr + Cnfg);
 	}
 	set_rx_mode(dev);
 
 	/* Enable interrupts by setting the interrupt mask. */
-	outw(0x81ff, ioaddr + IntrEnb);			/* See enum intr_status_bits */
-	outw(0x0000, ioaddr + EventStatus);		/* Clear non-interrupting events */
-	outl(0x80008000, ioaddr + RxCtrl);		/* Start Rx and Tx channels. */
-	outl(0x80008000, ioaddr + TxCtrl);
+	iowrite16(0x81ff, ioaddr + IntrEnb);			/* See enum intr_status_bits */
+	iowrite16(0x0000, ioaddr + EventStatus);		/* Clear non-interrupting events */
+	iowrite32(0x80008000, ioaddr + RxCtrl);		/* Start Rx and Tx channels. */
+	iowrite32(0x80008000, ioaddr + TxCtrl);
 
 	if (yellowfin_debug > 2) {
 		printk(KERN_DEBUG "%s: Done yellowfin_open().\n",
@@ -701,13 +691,13 @@ static int yellowfin_open(struct net_device *dev)
 static void yellowfin_timer(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	struct yellowfin_private *yp = dev->priv;
-	long ioaddr = dev->base_addr;
+	struct yellowfin_private *yp = netdev_priv(dev);
+	void __iomem *ioaddr = yp->base;
 	int next_tick = 60*HZ;
 
 	if (yellowfin_debug > 3) {
 		printk(KERN_DEBUG "%s: Yellowfin timer tick, status %8.8x.\n",
-			   dev->name, inw(ioaddr + IntrStatus));
+			   dev->name, ioread16(ioaddr + IntrStatus));
 	}
 
 	if (yp->mii_cnt) {
@@ -721,7 +711,7 @@ static void yellowfin_timer(unsigned long data)
 
 		yp->full_duplex = mii_duplex(yp->duplex_lock, negotiated);
 			
-		outw(0x101C | (yp->full_duplex ? 2 : 0), ioaddr + Cnfg);
+		iowrite16(0x101C | (yp->full_duplex ? 2 : 0), ioaddr + Cnfg);
 
 		if (bmsr & BMSR_LSTATUS)
 			next_tick = 60*HZ;
@@ -735,13 +725,13 @@ static void yellowfin_timer(unsigned long data)
 
 static void yellowfin_tx_timeout(struct net_device *dev)
 {
-	struct yellowfin_private *yp = dev->priv;
-	long ioaddr = dev->base_addr;
+	struct yellowfin_private *yp = netdev_priv(dev);
+	void __iomem *ioaddr = yp->base;
 
 	printk(KERN_WARNING "%s: Yellowfin transmit timed out at %d/%d Tx "
 		   "status %4.4x, Rx status %4.4x, resetting...\n",
 		   dev->name, yp->cur_tx, yp->dirty_tx,
-		   inl(ioaddr + TxStatus), inl(ioaddr + RxStatus));
+		   ioread32(ioaddr + TxStatus), ioread32(ioaddr + RxStatus));
 
 	/* Note: these should be KERN_DEBUG. */
 	if (yellowfin_debug) {
@@ -761,7 +751,7 @@ static void yellowfin_tx_timeout(struct net_device *dev)
 	dev->if_port = 0;
 
 	/* Wake the potentially-idle transmit channel. */
-	outl(0x10001000, dev->base_addr + TxCtrl);
+	iowrite32(0x10001000, yp->base + TxCtrl);
 	if (yp->cur_tx - yp->dirty_tx < TX_QUEUE_SIZE)
 		netif_wake_queue (dev);		/* Typical path */
 
@@ -772,7 +762,7 @@ static void yellowfin_tx_timeout(struct net_device *dev)
 /* Initialize the Rx and Tx rings, along with various 'dev' bits. */
 static void yellowfin_init_ring(struct net_device *dev)
 {
-	struct yellowfin_private *yp = dev->priv;
+	struct yellowfin_private *yp = netdev_priv(dev);
 	int i;
 
 	yp->tx_full = 0;
@@ -855,7 +845,7 @@ static void yellowfin_init_ring(struct net_device *dev)
 
 static int yellowfin_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct yellowfin_private *yp = dev->priv;
+	struct yellowfin_private *yp = netdev_priv(dev);
 	unsigned entry;
 	int len = skb->len;
 
@@ -920,7 +910,7 @@ static int yellowfin_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	/* Non-x86 Todo: explicitly flush cache lines here. */
 
 	/* Wake the potentially-idle transmit channel. */
-	outl(0x10001000, dev->base_addr + TxCtrl);
+	iowrite32(0x10001000, yp->base + TxCtrl);
 
 	if (yp->cur_tx - yp->dirty_tx < TX_QUEUE_SIZE)
 		netif_start_queue (dev);		/* Typical path */
@@ -941,7 +931,7 @@ static irqreturn_t yellowfin_interrupt(int irq, void *dev_instance, struct pt_re
 {
 	struct net_device *dev = dev_instance;
 	struct yellowfin_private *yp;
-	long ioaddr;
+	void __iomem *ioaddr;
 	int boguscnt = max_interrupt_work;
 	unsigned int handled = 0;
 
@@ -952,13 +942,13 @@ static irqreturn_t yellowfin_interrupt(int irq, void *dev_instance, struct pt_re
 	}
 #endif
 
-	ioaddr = dev->base_addr;
-	yp = dev->priv;
+	yp = netdev_priv(dev);
+	ioaddr = yp->base;
 	
 	spin_lock (&yp->lock);
 
 	do {
-		u16 intr_status = inw(ioaddr + IntrClear);
+		u16 intr_status = ioread16(ioaddr + IntrClear);
 
 		if (yellowfin_debug > 4)
 			printk(KERN_DEBUG "%s: Yellowfin interrupt, status %4.4x.\n",
@@ -970,7 +960,7 @@ static irqreturn_t yellowfin_interrupt(int irq, void *dev_instance, struct pt_re
 
 		if (intr_status & (IntrRxDone | IntrEarlyRx)) {
 			yellowfin_rx(dev);
-			outl(0x10001000, ioaddr + RxCtrl);		/* Wake Rx engine. */
+			iowrite32(0x10001000, ioaddr + RxCtrl);		/* Wake Rx engine. */
 		}
 
 #ifdef NO_TXSTATS
@@ -1085,7 +1075,7 @@ static irqreturn_t yellowfin_interrupt(int irq, void *dev_instance, struct pt_re
 
 	if (yellowfin_debug > 3)
 		printk(KERN_DEBUG "%s: exiting interrupt, status=%#4.4x.\n",
-			   dev->name, inw(ioaddr + IntrStatus));
+			   dev->name, ioread16(ioaddr + IntrStatus));
 
 	spin_unlock (&yp->lock);
 	return IRQ_RETVAL(handled);
@@ -1095,7 +1085,7 @@ static irqreturn_t yellowfin_interrupt(int irq, void *dev_instance, struct pt_re
    for clarity and better register allocation. */
 static int yellowfin_rx(struct net_device *dev)
 {
-	struct yellowfin_private *yp = dev->priv;
+	struct yellowfin_private *yp = netdev_priv(dev);
 	int entry = yp->cur_rx % RX_RING_SIZE;
 	int boguscnt = yp->dirty_rx + RX_RING_SIZE - yp->cur_rx;
 
@@ -1239,7 +1229,7 @@ static int yellowfin_rx(struct net_device *dev)
 
 static void yellowfin_error(struct net_device *dev, int intr_status)
 {
-	struct yellowfin_private *yp = dev->priv;
+	struct yellowfin_private *yp = netdev_priv(dev);
 
 	printk(KERN_ERR "%s: Something Wicked happened! %4.4x.\n",
 		   dev->name, intr_status);
@@ -1252,8 +1242,8 @@ static void yellowfin_error(struct net_device *dev, int intr_status)
 
 static int yellowfin_close(struct net_device *dev)
 {
-	long ioaddr = dev->base_addr;
-	struct yellowfin_private *yp = dev->priv;
+	struct yellowfin_private *yp = netdev_priv(dev);
+	void __iomem *ioaddr = yp->base;
 	int i;
 
 	netif_stop_queue (dev);
@@ -1261,18 +1251,19 @@ static int yellowfin_close(struct net_device *dev)
 	if (yellowfin_debug > 1) {
 		printk(KERN_DEBUG "%s: Shutting down ethercard, status was Tx %4.4x "
 			   "Rx %4.4x Int %2.2x.\n",
-			   dev->name, inw(ioaddr + TxStatus),
-			   inw(ioaddr + RxStatus), inw(ioaddr + IntrStatus));
+			   dev->name, ioread16(ioaddr + TxStatus),
+			   ioread16(ioaddr + RxStatus),
+			   ioread16(ioaddr + IntrStatus));
 		printk(KERN_DEBUG "%s: Queue pointers were Tx %d / %d,  Rx %d / %d.\n",
 			   dev->name, yp->cur_tx, yp->dirty_tx, yp->cur_rx, yp->dirty_rx);
 	}
 
 	/* Disable interrupts by clearing the interrupt mask. */
-	outw(0x0000, ioaddr + IntrEnb);
+	iowrite16(0x0000, ioaddr + IntrEnb);
 
 	/* Stop the chip's Tx and Rx processes. */
-	outl(0x80000000, ioaddr + RxCtrl);
-	outl(0x80000000, ioaddr + TxCtrl);
+	iowrite32(0x80000000, ioaddr + RxCtrl);
+	iowrite32(0x80000000, ioaddr + TxCtrl);
 
 	del_timer(&yp->timer);
 
@@ -1282,7 +1273,7 @@ static int yellowfin_close(struct net_device *dev)
 				(unsigned long long)yp->tx_ring_dma);
 		for (i = 0; i < TX_RING_SIZE*2; i++)
 			printk(" %c #%d desc. %8.8x %8.8x %8.8x %8.8x.\n",
-				   inl(ioaddr + TxPtr) == (long)&yp->tx_ring[i] ? '>' : ' ',
+				   ioread32(ioaddr + TxPtr) == (long)&yp->tx_ring[i] ? '>' : ' ',
 				   i, yp->tx_ring[i].dbdma_cmd, yp->tx_ring[i].addr,
 				   yp->tx_ring[i].branch_addr, yp->tx_ring[i].result_status);
 		printk(KERN_DEBUG "  Tx status %p:\n", yp->tx_status);
@@ -1295,7 +1286,7 @@ static int yellowfin_close(struct net_device *dev)
 				(unsigned long long)yp->rx_ring_dma);
 		for (i = 0; i < RX_RING_SIZE; i++) {
 			printk(KERN_DEBUG " %c #%d desc. %8.8x %8.8x %8.8x\n",
-				   inl(ioaddr + RxPtr) == (long)&yp->rx_ring[i] ? '>' : ' ',
+				   ioread32(ioaddr + RxPtr) == (long)&yp->rx_ring[i] ? '>' : ' ',
 				   i, yp->rx_ring[i].dbdma_cmd, yp->rx_ring[i].addr,
 				   yp->rx_ring[i].result_status);
 			if (yellowfin_debug > 6) {
@@ -1340,7 +1331,7 @@ static int yellowfin_close(struct net_device *dev)
 
 static struct net_device_stats *yellowfin_get_stats(struct net_device *dev)
 {
-	struct yellowfin_private *yp = dev->priv;
+	struct yellowfin_private *yp = netdev_priv(dev);
 	return &yp->stats;
 }
 
@@ -1348,19 +1339,19 @@ static struct net_device_stats *yellowfin_get_stats(struct net_device *dev)
 
 static void set_rx_mode(struct net_device *dev)
 {
-	struct yellowfin_private *yp = dev->priv;
-	long ioaddr = dev->base_addr;
-	u16 cfg_value = inw(ioaddr + Cnfg);
+	struct yellowfin_private *yp = netdev_priv(dev);
+	void __iomem *ioaddr = yp->base;
+	u16 cfg_value = ioread16(ioaddr + Cnfg);
 
 	/* Stop the Rx process to change any value. */
-	outw(cfg_value & ~0x1000, ioaddr + Cnfg);
+	iowrite16(cfg_value & ~0x1000, ioaddr + Cnfg);
 	if (dev->flags & IFF_PROMISC) {			/* Set promiscuous. */
 		/* Unconditionally log net taps. */
 		printk(KERN_NOTICE "%s: Promiscuous mode enabled.\n", dev->name);
-		outw(0x000F, ioaddr + AddrMode);
+		iowrite16(0x000F, ioaddr + AddrMode);
 	} else if ((dev->mc_count > 64)  ||  (dev->flags & IFF_ALLMULTI)) {
 		/* Too many to filter well, or accept all multicasts. */
-		outw(0x000B, ioaddr + AddrMode);
+		iowrite16(0x000B, ioaddr + AddrMode);
 	} else if (dev->mc_count > 0) { /* Must use the multicast hash table. */
 		struct dev_mc_list *mclist;
 		u16 hash_table[4];
@@ -1385,48 +1376,34 @@ static void set_rx_mode(struct net_device *dev)
 		}
 		/* Copy the hash table to the chip. */
 		for (i = 0; i < 4; i++)
-			outw(hash_table[i], ioaddr + HashTbl + i*2);
-		outw(0x0003, ioaddr + AddrMode);
+			iowrite16(hash_table[i], ioaddr + HashTbl + i*2);
+		iowrite16(0x0003, ioaddr + AddrMode);
 	} else {					/* Normal, unicast/broadcast-only mode. */
-		outw(0x0001, ioaddr + AddrMode);
+		iowrite16(0x0001, ioaddr + AddrMode);
 	}
 	/* Restart the Rx process. */
-	outw(cfg_value | 0x1000, ioaddr + Cnfg);
+	iowrite16(cfg_value | 0x1000, ioaddr + Cnfg);
 }
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
+static void yellowfin_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
-	struct yellowfin_private *np = dev->priv;
-	u32 ethcmd;
-		
-	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
-		return -EFAULT;
-
-        switch (ethcmd) {
-        case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-		strcpy(info.driver, DRV_NAME);
-		strcpy(info.version, DRV_VERSION);
-		strcpy(info.bus_info, pci_name(np->pci_dev));
-		if (copy_to_user(useraddr, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
-	}
-
-        }
-	
-	return -EOPNOTSUPP;
+	struct yellowfin_private *np = netdev_priv(dev);
+	strcpy(info->driver, DRV_NAME);
+	strcpy(info->version, DRV_VERSION);
+	strcpy(info->bus_info, pci_name(np->pci_dev));
 }
+
+static struct ethtool_ops ethtool_ops = {
+	.get_drvinfo = yellowfin_get_drvinfo
+};
 
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct yellowfin_private *np = dev->priv;
-	long ioaddr = dev->base_addr;
+	struct yellowfin_private *np = netdev_priv(dev);
+	void __iomem *ioaddr = np->base;
 	struct mii_ioctl_data *data = if_mii(rq);
 
 	switch(cmd) {
-	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(dev, rq->ifr_data);
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
 		data->phy_id = np->phys[0] & 0x1f;
 		/* Fall Through */
@@ -1466,7 +1443,7 @@ static void __devexit yellowfin_remove_one (struct pci_dev *pdev)
 
 	if (!dev)
 		BUG();
-	np = dev->priv;
+	np = netdev_priv(dev);
 
         pci_free_consistent(pdev, STATUS_TOTAL_SIZE, np->tx_status, 
 		np->tx_status_dma);
@@ -1474,11 +1451,9 @@ static void __devexit yellowfin_remove_one (struct pci_dev *pdev)
 	pci_free_consistent(pdev, TX_TOTAL_SIZE, np->tx_ring, np->tx_ring_dma);
 	unregister_netdev (dev);
 
-	pci_release_regions (pdev);
+	pci_iounmap(pdev, np->base);
 
-#ifndef USE_IO_OPS
-	iounmap ((void *) dev->base_addr);
-#endif
+	pci_release_regions (pdev);
 
 	free_netdev (dev);
 	pci_set_drvdata(pdev, NULL);

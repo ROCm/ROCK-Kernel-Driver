@@ -6,6 +6,7 @@
  * for more details.
  */
 
+#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -85,6 +86,9 @@ static irqreturn_t sun3_int5(int irq, void *dev_id, struct pt_regs *fp)
 	intersil_clear();
 #endif
         do_timer(fp);
+#ifndef CONFIG_SMP
+	update_process_times(user_mode(fp));
+#endif
         if(!(kstat_cpu(0).irqs[SYS_IRQS + irq] % 20))
                 sun3_leds(led_pattern[(kstat_cpu(0).irqs[SYS_IRQS+irq]%160)
                 /20]);

@@ -40,13 +40,14 @@
 #include <linux/errno.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
+#include <linux/ethtool.h>
 #include <linux/skbuff.h>
 #include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/ecard.h>
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -56,14 +57,19 @@
 #define NET_DEBUG  0
 #define DEBUG_INIT 2
 
+#define DRV_NAME	"etherh"
+#define DRV_VERSION	"1.11"
+
 static unsigned int net_debug = NET_DEBUG;
 
 struct etherh_priv {
-	void		*ioc_fast;
-	void		*memc;
+	void __iomem	*ioc_fast;
+	void __iomem	*memc;
+	void __iomem	*dma_base;
 	unsigned int	id;
-	void		*ctrl_port;
+	void __iomem	*ctrl_port;
 	unsigned char	ctrl;
+	u32		supported;
 };
 
 struct etherh_data {
@@ -72,11 +78,7 @@ struct etherh_data {
 	unsigned long	ctrlport_offset;
 	int		ctrl_ioc;
 	const char	name[16];
-	/*
-	 * netdev flags and port
-	 */
-	unsigned short	flags;
-	unsigned char	if_port;
+	u32		supported;
 	unsigned char	tx_start_page;
 	unsigned char	stop_page;
 };
@@ -86,7 +88,7 @@ MODULE_DESCRIPTION("EtherH/EtherM driver");
 MODULE_LICENSE("GPL");
 
 static char version[] __initdata =
-	"EtherH/EtherM Driver (c) 2002 Russell King v1.09\n";
+	"EtherH/EtherM Driver (c) 2002-2004 Russell King " DRV_VERSION "\n";
 
 #define ETHERH500_DATAPORT	0x800	/* MEMC */
 #define ETHERH500_NS8390	0x000	/* MEMC */
@@ -166,7 +168,8 @@ static void
 etherh_setif(struct net_device *dev)
 {
 	struct ei_device *ei_local = netdev_priv(dev);
-	unsigned long addr, flags;
+	unsigned long flags;
+	void __iomem *addr;
 
 	local_irq_save(flags);
 
@@ -174,7 +177,7 @@ etherh_setif(struct net_device *dev)
 	switch (etherh_priv(dev)->id) {
 	case PROD_I3_ETHERLAN600:
 	case PROD_I3_ETHERLAN600A:
-		addr = dev->base_addr + EN0_RCNTHI;
+		addr = (void *)dev->base_addr + EN0_RCNTHI;
 
 		switch (dev->if_port) {
 		case IF_PORT_10BASE2:
@@ -209,17 +212,19 @@ static int
 etherh_getifstat(struct net_device *dev)
 {
 	struct ei_device *ei_local = netdev_priv(dev);
+	void __iomem *addr;
 	int stat = 0;
 
 	switch (etherh_priv(dev)->id) {
 	case PROD_I3_ETHERLAN600:
 	case PROD_I3_ETHERLAN600A:
+		addr = (void *)dev->base_addr + EN0_RCNTHI;
 		switch (dev->if_port) {
 		case IF_PORT_10BASE2:
 			stat = 1;
 			break;
 		case IF_PORT_10BASET:
-			stat = readb(dev->base_addr+EN0_RCNTHI) & 4;
+			stat = readb(addr) & 4;
 			break;
 		}
 		break;
@@ -276,8 +281,9 @@ static void
 etherh_reset(struct net_device *dev)
 {
 	struct ei_device *ei_local = netdev_priv(dev);
+	void __iomem *addr = (void *)dev->base_addr;
 
-	writeb(E8390_NODMA+E8390_PAGE0+E8390_STOP, dev->base_addr);
+	writeb(E8390_NODMA+E8390_PAGE0+E8390_STOP, addr);
 
 	/*
 	 * See if we need to change the interface type.
@@ -303,8 +309,8 @@ static void
 etherh_block_output (struct net_device *dev, int count, const unsigned char *buf, int start_page)
 {
 	struct ei_device *ei_local = netdev_priv(dev);
-	unsigned int addr, dma_addr;
 	unsigned long dma_start;
+	void __iomem *dma_base, *addr;
 
 	if (ei_local->dmaing) {
 		printk(KERN_ERR "%s: DMAing conflict in etherh_block_input: "
@@ -321,8 +327,8 @@ etherh_block_output (struct net_device *dev, int count, const unsigned char *buf
 
 	ei_local->dmaing = 1;
 
-	addr = dev->base_addr;
-	dma_addr = dev->mem_start;
+	addr = (void *)dev->base_addr;
+	dma_base = etherh_priv(dev)->dma_base;
 
 	count = (count + 1) & ~1;
 	writeb (E8390_NODMA | E8390_PAGE0 | E8390_START, addr + E8390_CMD);
@@ -343,9 +349,9 @@ etherh_block_output (struct net_device *dev, int count, const unsigned char *buf
 	writeb (E8390_RWRITE | E8390_START, addr + E8390_CMD);
 
 	if (ei_local->word16)
-		writesw (dma_addr, buf, count >> 1);
+		writesw (dma_base, buf, count >> 1);
 	else
-		writesb (dma_addr, buf, count);
+		writesb (dma_base, buf, count);
 
 	dma_start = jiffies;
 
@@ -369,8 +375,8 @@ static void
 etherh_block_input (struct net_device *dev, int count, struct sk_buff *skb, int ring_offset)
 {
 	struct ei_device *ei_local = netdev_priv(dev);
-	unsigned int addr, dma_addr;
 	unsigned char *buf;
+	void __iomem *dma_base, *addr;
 
 	if (ei_local->dmaing) {
 		printk(KERN_ERR "%s: DMAing conflict in etherh_block_input: "
@@ -381,8 +387,8 @@ etherh_block_input (struct net_device *dev, int count, struct sk_buff *skb, int 
 
 	ei_local->dmaing = 1;
 
-	addr = dev->base_addr;
-	dma_addr = dev->mem_start;
+	addr = (void *)dev->base_addr;
+	dma_base = etherh_priv(dev)->dma_base;
 
 	buf = skb->data;
 	writeb (E8390_NODMA | E8390_PAGE0 | E8390_START, addr + E8390_CMD);
@@ -393,11 +399,11 @@ etherh_block_input (struct net_device *dev, int count, struct sk_buff *skb, int 
 	writeb (E8390_RREAD | E8390_START, addr + E8390_CMD);
 
 	if (ei_local->word16) {
-		readsw (dma_addr, buf, count >> 1);
+		readsw (dma_base, buf, count >> 1);
 		if (count & 1)
-			buf[count - 1] = readb (dma_addr);
+			buf[count - 1] = readb (dma_base);
 	} else
-		readsb (dma_addr, buf, count);
+		readsb (dma_base, buf, count);
 
 	writeb (ENISR_RDC, addr + EN0_ISR);
 	ei_local->dmaing = 0;
@@ -410,7 +416,7 @@ static void
 etherh_get_header (struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring_page)
 {
 	struct ei_device *ei_local = netdev_priv(dev);
-	unsigned int addr, dma_addr;
+	void __iomem *dma_base, *addr;
 
 	if (ei_local->dmaing) {
 		printk(KERN_ERR "%s: DMAing conflict in etherh_get_header: "
@@ -421,8 +427,8 @@ etherh_get_header (struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring_p
 
 	ei_local->dmaing = 1;
 
-	addr = dev->base_addr;
-	dma_addr = dev->mem_start;
+	addr = (void *)dev->base_addr;
+	dma_base = etherh_priv(dev)->dma_base;
 
 	writeb (E8390_NODMA | E8390_PAGE0 | E8390_START, addr + E8390_CMD);
 	writeb (sizeof (*hdr), addr + EN0_RCNTLO);
@@ -432,9 +438,9 @@ etherh_get_header (struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring_p
 	writeb (E8390_RREAD | E8390_START, addr + E8390_CMD);
 
 	if (ei_local->word16)
-		readsw (dma_addr, hdr, sizeof (*hdr) >> 1);
+		readsw (dma_base, hdr, sizeof (*hdr) >> 1);
 	else
-		readsb (dma_addr, hdr, sizeof (*hdr));
+		readsb (dma_base, hdr, sizeof (*hdr));
 
 	writeb (ENISR_RDC, addr + EN0_ISR);
 	ei_local->dmaing = 0;
@@ -522,16 +528,30 @@ static int __init etherh_addr(char *addr, struct expansion_card *ec)
 	struct in_chunk_dir cd;
 	char *s;
 	
-	if (ecard_readchunk(&cd, ec, 0xf5, 0) && (s = strchr(cd.d.string, '('))) {
+	if (!ecard_readchunk(&cd, ec, 0xf5, 0)) {
+		printk(KERN_ERR "%s: unable to read podule description string\n",
+		       ec->dev.bus_id);
+		goto no_addr;
+	}
+
+	s = strchr(cd.d.string, '(');
+	if (s) {
 		int i;
+
 		for (i = 0; i < 6; i++) {
 			addr[i] = simple_strtoul(s + 1, &s, 0x10);
 			if (*s != (i == 5? ')' : ':'))
 				break;
 		}
+
 		if (i == 6)
 			return 0;
 	}
+
+	printk(KERN_ERR "%s: unable to parse MAC address: %s\n",
+	       ec->dev.bus_id, cd.d.string);
+
+ no_addr:
 	return -ENODEV;
 }
 
@@ -555,6 +575,62 @@ static int __init etherm_addr(char *addr)
 	addr[5] = serial >> 8;
 	return 0;
 }
+
+static void etherh_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+{
+	strlcpy(info->driver, DRV_NAME, sizeof(info->driver));
+	strlcpy(info->version, DRV_VERSION, sizeof(info->version));
+	strlcpy(info->bus_info, dev->class_dev.dev->bus_id,
+		sizeof(info->bus_info));
+}
+
+static int etherh_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	cmd->supported	= etherh_priv(dev)->supported;
+	cmd->speed	= SPEED_10;
+	cmd->duplex	= DUPLEX_HALF;
+	cmd->port	= dev->if_port == IF_PORT_10BASET ? PORT_TP : PORT_BNC;
+	cmd->autoneg	= dev->flags & IFF_AUTOMEDIA ? AUTONEG_ENABLE : AUTONEG_DISABLE;
+	return 0;
+}
+
+static int etherh_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+{
+	switch (cmd->autoneg) {
+	case AUTONEG_ENABLE:
+		dev->flags |= IFF_AUTOMEDIA;
+		break;
+
+	case AUTONEG_DISABLE:
+		switch (cmd->port) {
+		case PORT_TP:
+			dev->if_port = IF_PORT_10BASET;
+			break;
+
+		case PORT_BNC:
+			dev->if_port = IF_PORT_10BASE2;
+			break;
+
+		default:
+			return -EINVAL;
+		}
+		dev->flags &= ~IFF_AUTOMEDIA;
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	etherh_setif(dev);
+
+	return 0;
+}
+
+static struct ethtool_ops etherh_ethtool_ops = {
+	.get_settings	= etherh_get_settings,
+	.set_settings	= etherh_set_settings,
+	.get_drvinfo	= etherh_get_drvinfo,
+};
 
 static u32 etherh_regoffsets[16];
 static u32 etherm_regoffsets[16];
@@ -587,10 +663,21 @@ etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
 	dev->stop		= etherh_close;
 	dev->set_config		= etherh_set_config;
 	dev->irq		= ec->irq;
-	dev->if_port		= data->if_port;
-	dev->flags		|= data->flags;
+	dev->ethtool_ops	= &etherh_ethtool_ops;
+
+	if (data->supported & SUPPORTED_Autoneg)
+		dev->flags |= IFF_AUTOMEDIA;
+	if (data->supported & SUPPORTED_TP) {
+		dev->flags |= IFF_PORTSEL;
+		dev->if_port = IF_PORT_10BASET;
+	} else if (data->supported & SUPPORTED_BNC) {
+		dev->flags |= IFF_PORTSEL;
+		dev->if_port = IF_PORT_10BASE2;
+	} else
+		dev->if_port = IF_PORT_UNKNOWN;
 
 	eh = etherh_priv(dev);
+	eh->supported		= data->supported;
 	eh->ctrl		= 0;
 	eh->id			= ec->cid.product;
 	eh->memc		= ioremap(ecard_resource_start(ec, ECARD_RES_MEMC), PAGE_SIZE);
@@ -610,7 +697,7 @@ etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
 	}
 
 	dev->base_addr = (unsigned long)eh->memc + data->ns8390_offset;
-	dev->mem_start = (unsigned long)eh->memc + data->dataport_offset;
+	eh->dma_base = eh->memc + data->dataport_offset;
 	eh->ctrl_port += data->ctrlport_offset;
 
 	/*
@@ -701,7 +788,7 @@ static struct etherh_data etherm_data = {
 	.dataport_offset	= ETHERM_NS8390 + ETHERM_DATAPORT,
 	.ctrlport_offset	= ETHERM_NS8390 + ETHERM_CTRLPORT,
 	.name			= "ANT EtherM",
-	.if_port		= IF_PORT_UNKNOWN,
+	.supported		= SUPPORTED_10baseT_Half,
 	.tx_start_page		= ETHERM_TX_START_PAGE,
 	.stop_page		= ETHERM_STOP_PAGE,
 };
@@ -712,7 +799,7 @@ static struct etherh_data etherlan500_data = {
 	.ctrlport_offset	= ETHERH500_CTRLPORT,
 	.ctrl_ioc		= 1,
 	.name			= "i3 EtherH 500",
-	.if_port		= IF_PORT_UNKNOWN,
+	.supported		= SUPPORTED_10baseT_Half,
 	.tx_start_page		= ETHERH_TX_START_PAGE,
 	.stop_page		= ETHERH_STOP_PAGE,
 };
@@ -722,8 +809,7 @@ static struct etherh_data etherlan600_data = {
 	.dataport_offset	= ETHERH600_NS8390 + ETHERH600_DATAPORT,
 	.ctrlport_offset	= ETHERH600_NS8390 + ETHERH600_CTRLPORT,
 	.name			= "i3 EtherH 600",
-	.flags			= IFF_PORTSEL | IFF_AUTOMEDIA,
-	.if_port		= IF_PORT_10BASET,
+	.supported		= SUPPORTED_10baseT_Half | SUPPORTED_TP | SUPPORTED_BNC | SUPPORTED_Autoneg,
 	.tx_start_page		= ETHERH_TX_START_PAGE,
 	.stop_page		= ETHERH_STOP_PAGE,
 };
@@ -733,8 +819,7 @@ static struct etherh_data etherlan600a_data = {
 	.dataport_offset	= ETHERH600_NS8390 + ETHERH600_DATAPORT,
 	.ctrlport_offset	= ETHERH600_NS8390 + ETHERH600_CTRLPORT,
 	.name			= "i3 EtherH 600A",
-	.flags			= IFF_PORTSEL | IFF_AUTOMEDIA,
-	.if_port		= IF_PORT_10BASET,
+	.supported		= SUPPORTED_10baseT_Half | SUPPORTED_TP | SUPPORTED_BNC | SUPPORTED_Autoneg,
 	.tx_start_page		= ETHERH_TX_START_PAGE,
 	.stop_page		= ETHERH_STOP_PAGE,
 };
@@ -752,7 +837,7 @@ static struct ecard_driver etherh_driver = {
 	.remove		= __devexit_p(etherh_remove),
 	.id_table	= etherh_ids,
 	.drv = {
-		.name	= "etherh",
+		.name	= DRV_NAME,
 	},
 };
 

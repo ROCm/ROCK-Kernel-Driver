@@ -33,6 +33,9 @@
 #include <asm/irq.h>
 #include <asm/sizes.h>
 
+#include <asm/arch/pxa-regs.h>
+#include <asm/arch/mmc.h>
+
 #include "pxamci.h"
 
 #ifdef CONFIG_MMC_DEBUG
@@ -40,6 +43,10 @@
 #else
 #define DBG(x...)	do { } while (0)
 #endif
+
+#define DRIVER_NAME	"pxa2xx-mci"
+
+#define NR_SG	1
 
 struct pxamci_host {
 	struct mmc_host		*mmc;
@@ -52,6 +59,7 @@ struct pxamci_host {
 	unsigned int		cmdat;
 	unsigned int		imask;
 	unsigned int		power_mode;
+	struct pxamci_platform_data *pdata;
 
 	struct mmc_request	*mrq;
 	struct mmc_command	*cmd;
@@ -59,16 +67,10 @@ struct pxamci_host {
 
 	dma_addr_t		sg_dma;
 	struct pxa_dma_desc	*sg_cpu;
+	unsigned int		dma_len;
 
-	dma_addr_t		dma_buf;
-	unsigned int		dma_size;
 	unsigned int		dma_dir;
 };
-
-/*
- * The base MMC clock rate
- */
-#define CLOCKRATE	20000000
 
 static inline unsigned int ns_to_clocks(unsigned int ns)
 {
@@ -118,10 +120,9 @@ static void pxamci_disable_irq(struct pxamci_host *host, unsigned int mask)
 static void pxamci_setup_data(struct pxamci_host *host, struct mmc_data *data)
 {
 	unsigned int nob = data->blocks;
-	unsigned int timeout, size;
-	dma_addr_t dma;
+	unsigned int timeout;
 	u32 dcmd;
-	int i;
+	int i, len;
 
 	host->data = data;
 
@@ -148,35 +149,22 @@ static void pxamci_setup_data(struct pxamci_host *host, struct mmc_data *data)
 
 	dcmd |= DCMD_BURST32 | DCMD_WIDTH1;
 
-	host->dma_size = data->blocks << data->blksz_bits;
-	host->dma_buf = dma_map_single(mmc_dev(host->mmc), data->req->buffer,
-				       host->dma_size, host->dma_dir);
+	host->dma_len = dma_map_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
+				   host->dma_dir);
 
-	for (i = 0, size = host->dma_size, dma = host->dma_buf; size; i++) {
-		u32 len = size;
-
-		if (len > DCMD_LENGTH)
-			len = 0x1000;
-
+	for (i = 0; i < host->dma_len; i++) {
 		if (data->flags & MMC_DATA_READ) {
 			host->sg_cpu[i].dsadr = host->res->start + MMC_RXFIFO;
-			host->sg_cpu[i].dtadr = dma;
+			host->sg_cpu[i].dtadr = sg_dma_address(&data->sg[i]);
 		} else {
-			host->sg_cpu[i].dsadr = dma;
+			host->sg_cpu[i].dsadr = sg_dma_address(&data->sg[i]);
 			host->sg_cpu[i].dtadr = host->res->start + MMC_TXFIFO;
 		}
-		host->sg_cpu[i].dcmd = dcmd | len;
-
-		dma += len;
-		size -= len;
-
-		if (size) {
-			host->sg_cpu[i].ddadr = host->sg_dma + (i + 1) *
-						 sizeof(struct pxa_dma_desc);
-		} else {
-			host->sg_cpu[i].ddadr = DDADR_STOP;
-		}
+		host->sg_cpu[i].dcmd = dcmd | sg_dma_len(&data->sg[i]);
+		host->sg_cpu[i].ddadr = host->sg_dma + (i + 1) *
+					sizeof(struct pxa_dma_desc);
 	}
+	host->sg_cpu[host->dma_len - 1].ddadr = DDADR_STOP;
 	wmb();
 
 	DDADR(host->dma) = host->sg_dma;
@@ -251,7 +239,24 @@ static int pxamci_cmd_done(struct pxamci_host *host, unsigned int stat)
 	if (stat & STAT_TIME_OUT_RESPONSE) {
 		cmd->error = MMC_ERR_TIMEOUT;
 	} else if (stat & STAT_RES_CRC_ERR && cmd->flags & MMC_RSP_CRC) {
+#ifdef CONFIG_PXA27x
+		/*
+		 * workaround for erratum #42:
+		 * Intel PXA27x Family Processor Specification Update Rev 001
+		 */
+		if (cmd->opcode == MMC_ALL_SEND_CID ||
+		    cmd->opcode == MMC_SEND_CSD ||
+		    cmd->opcode == MMC_SEND_CID) {
+			/* a bogus CRC error can appear if the msb of
+			   the 15 byte response is a one */
+			if ((cmd->resp[0] & 0x80000000) == 0)
+				cmd->error = MMC_ERR_BADCRC;
+		} else {
+			DBG("ignoring CRC from command %d - *risky*\n",cmd->opcode);
+		}
+#else
 		cmd->error = MMC_ERR_BADCRC;
+#endif
 	}
 
 	pxamci_disable_irq(host, END_CMD_RES);
@@ -272,8 +277,8 @@ static int pxamci_data_done(struct pxamci_host *host, unsigned int stat)
 		return 0;
 
 	DCSR(host->dma) = 0;
-	dma_unmap_single(mmc_dev(host->mmc), host->dma_buf, host->dma_size,
-			 host->dma_dir);
+	dma_unmap_sg(mmc_dev(host->mmc), data->sg, host->dma_len,
+		     host->dma_dir);
 
 	if (stat & STAT_READ_TIME_OUT)
 		data->error = MMC_ERR_TIMEOUT;
@@ -384,9 +389,8 @@ static void pxamci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	if (host->power_mode != ios->power_mode) {
 		host->power_mode = ios->power_mode;
 
-		/*
-		 * power control?  none on the lubbock.
-		 */
+		if (host->pdata && host->pdata->setpower)
+			host->pdata->setpower(mmc->dev, ios->vdd);
 
 		if (ios->power_mode == MMC_POWER_ON)
 			host->cmdat |= CMDAT_INIT;
@@ -407,6 +411,12 @@ static void pxamci_dma_irq(int dma, void *devid, struct pt_regs *regs)
 	DCSR(dma) = DCSR_STARTINTR|DCSR_ENDINTR|DCSR_BUSERR;
 }
 
+static irqreturn_t pxamci_detect_irq(int irq, void *devid, struct pt_regs *regs)
+{
+	mmc_detect_change(devid);
+	return IRQ_HANDLED;
+}
+
 static int pxamci_probe(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
@@ -420,7 +430,7 @@ static int pxamci_probe(struct device *dev)
 	if (!r || irq == NO_IRQ)
 		return -ENXIO;
 
-	r = request_mem_region(r->start, SZ_4K, "PXAMCI");
+	r = request_mem_region(r->start, SZ_4K, DRIVER_NAME);
 	if (!r)
 		return -EBUSY;
 
@@ -431,13 +441,27 @@ static int pxamci_probe(struct device *dev)
 	}
 
 	mmc->ops = &pxamci_ops;
-	mmc->f_min = 312500;
-	mmc->f_max = 20000000;
-	mmc->ocr_avail = MMC_VDD_32_33;
+	mmc->f_min = CLOCKRATE_MIN;
+	mmc->f_max = CLOCKRATE_MAX;
+
+	/*
+	 * We can do SG-DMA, but we don't because we never know how much
+	 * data we successfully wrote to the card.
+	 */
+	mmc->max_phys_segs = NR_SG;
+
+	/*
+	 * Our hardware DMA can handle a maximum of one page per SG entry.
+	 */
+	mmc->max_seg_size = PAGE_SIZE;
 
 	host = mmc_priv(mmc);
 	host->mmc = mmc;
 	host->dma = -1;
+	host->pdata = pdev->dev.platform_data;
+	mmc->ocr_avail = host->pdata ?
+			 host->pdata->ocr_mask :
+			 MMC_VDD_32_33|MMC_VDD_33_34;
 
 	host->sg_cpu = dma_alloc_coherent(dev, PAGE_SIZE, &host->sg_dma, GFP_KERNEL);
 	if (!host->sg_cpu) {
@@ -448,8 +472,7 @@ static int pxamci_probe(struct device *dev)
 	spin_lock_init(&host->lock);
 	host->res = r;
 	host->irq = irq;
-	host->imask = TXFIFO_WR_REQ|RXFIFO_RD_REQ|CLK_IS_OFF|STOP_CMD|
-		      END_CMD_RES|PRG_DONE|DATA_TRAN_DONE;
+	host->imask = MMC_I_MASK_ALL;
 
 	host->base = ioremap(r->start, SZ_4K);
 	if (!host->base) {
@@ -464,22 +487,25 @@ static int pxamci_probe(struct device *dev)
 	pxamci_stop_clock(host);
 	writel(0, host->base + MMC_SPI);
 	writel(64, host->base + MMC_RESTO);
+	writel(host->imask, host->base + MMC_I_MASK);
 
-	pxa_gpio_mode(GPIO6_MMCCLK_MD);
-	pxa_gpio_mode(GPIO8_MMCCS0_MD);
-	pxa_set_cken(CKEN12_MMC, 1);
-
-	host->dma = pxa_request_dma("PXAMCI", DMA_PRIO_LOW, pxamci_dma_irq, host);
+	host->dma = pxa_request_dma(DRIVER_NAME, DMA_PRIO_LOW,
+				    pxamci_dma_irq, host);
 	if (host->dma < 0) {
 		ret = -EBUSY;
 		goto out;
 	}
 
-	ret = request_irq(host->irq, pxamci_irq, 0, "PXAMCI", host);
+	ret = request_irq(host->irq, pxamci_irq, 0, DRIVER_NAME, host);
 	if (ret)
 		goto out;
 
 	dev_set_drvdata(dev, mmc);
+
+	if (host->pdata && host->pdata->init)
+		host->pdata->init(dev, pxamci_detect_irq, mmc);
+
+	pxa_set_cken(CKEN12_MMC, 1);
 
 	mmc_add_host(mmc);
 
@@ -509,12 +535,20 @@ static int pxamci_remove(struct device *dev)
 	if (mmc) {
 		struct pxamci_host *host = mmc_priv(mmc);
 
+		if (host->pdata && host->pdata->exit)
+			host->pdata->exit(dev, mmc);
+
 		mmc_remove_host(mmc);
 
 		pxamci_stop_clock(host);
 		writel(TXFIFO_WR_REQ|RXFIFO_RD_REQ|CLK_IS_OFF|STOP_CMD|
 		       END_CMD_RES|PRG_DONE|DATA_TRAN_DONE,
 		       host->base + MMC_I_MASK);
+
+		pxa_set_cken(CKEN12_MMC, 0);
+
+		DRCMRRXMMC = 0;
+		DRCMRTXMMC = 0;
 
 		free_irq(host->irq, host);
 		pxa_free_dma(host->dma);
@@ -558,7 +592,7 @@ static int pxamci_resume(struct device *dev, u32 level)
 #endif
 
 static struct device_driver pxamci_driver = {
-	.name		= "pxa2xx-mci",
+	.name		= DRIVER_NAME,
 	.bus		= &platform_bus_type,
 	.probe		= pxamci_probe,
 	.remove		= pxamci_remove,

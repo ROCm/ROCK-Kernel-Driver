@@ -50,8 +50,7 @@
 
 extern int i2o_parm_issue(struct i2o_device *, int, void *, int, void *, int);
 
-static spinlock_t i2o_config_lock = SPIN_LOCK_UNLOCKED;
-struct wait_queue *i2o_wait_queue;
+static spinlock_t i2o_config_lock;
 
 #define MODINC(x,y) ((x) = ((x) + 1) % (y))
 
@@ -74,102 +73,12 @@ struct i2o_cfg_info {
 static struct i2o_cfg_info *open_files = NULL;
 static ulong i2o_cfg_info_id = 0;
 
-#if 0
-/*
- *	This is the callback for any message we have posted. The message itself
- *	will be returned to the message pool when we return from the IRQ
- *
- *	This runs in irq context so be short and sweet.
- */
-static void i2o_cfg_reply(struct i2o_handler *h, struct i2o_controller *c,
-			  struct i2o_message *m)
-{
-	u32 *msg = (u32 *) m;
-
-	if (msg[0] & MSG_FAIL) {
-		u32 *preserved_msg = (u32 *) (c->msg_virt + msg[7]);
-
-		printk(KERN_ERR "i2o_config: IOP failed to process the msg.\n");
-
-		/* Release the preserved msg frame by resubmitting it as a NOP */
-
-		preserved_msg[0] = THREE_WORD_MSG_SIZE | SGL_OFFSET_0;
-		preserved_msg[1] = I2O_CMD_UTIL_NOP << 24 | HOST_TID << 12 | 0;
-		preserved_msg[2] = 0;
-		i2o_post_message(c, msg[7]);
-	}
-
-	if (msg[4] >> 24)	// ReqStatus != SUCCESS
-		i2o_report_status(KERN_INFO, "i2o_config", msg);
-
-	if (m->function == I2O_CMD_UTIL_EVT_REGISTER) {
-		struct i2o_cfg_info *inf;
-
-		for (inf = open_files; inf; inf = inf->next)
-			if (inf->q_id == i2o_cntxt_list_get(c, msg[3]))
-				break;
-
-		//
-		// If this is the case, it means that we're getting
-		// events for a file descriptor that's been close()'d
-		// w/o the user unregistering for events first.
-		// The code currently assumes that the user will
-		// take care of unregistering for events before closing
-		// a file.
-		//
-		// TODO:
-		// Should we track event registartion and deregister
-		// for events when a file is close()'d so this doesn't
-		// happen? That would get rid of the search through
-		// the linked list since file->private_data could point
-		// directly to the i2o_config_info data structure...but
-		// it would mean having all sorts of tables to track
-		// what each file is registered for...I think the
-		// current method is simpler. - DS
-		//
-		if (!inf)
-			return;
-
-		inf->event_q[inf->q_in].id.iop = c->unit;
-		inf->event_q[inf->q_in].id.tid = m->target_tid;
-		inf->event_q[inf->q_in].id.evt_mask = msg[4];
-
-		//
-		// Data size = msg size - reply header
-		//
-		inf->event_q[inf->q_in].data_size = (m->size - 5) * 4;
-		if (inf->event_q[inf->q_in].data_size)
-			memcpy(inf->event_q[inf->q_in].evt_data,
-			       (unsigned char *)(msg + 5),
-			       inf->event_q[inf->q_in].data_size);
-
-		spin_lock(&i2o_config_lock);
-		MODINC(inf->q_in, I2O_EVT_Q_LEN);
-		if (inf->q_len == I2O_EVT_Q_LEN) {
-			MODINC(inf->q_out, I2O_EVT_Q_LEN);
-			inf->q_lost++;
-		} else {
-			// Keep I2OEVTGET on another CPU from touching this
-			inf->q_len++;
-		}
-		spin_unlock(&i2o_config_lock);
-
-//              printk(KERN_INFO "File %p w/id %d has %d events\n",
-//                      inf->fp, inf->q_id, inf->q_len);
-
-		kill_fasync(&inf->fasync, SIGIO, POLL_IN);
-	}
-
-	return;
-}
-#endif
-
 /*
  *	Each of these describes an i2o message handler. They are
  *	multiplexed by the i2o_core code
  */
 
-struct i2o_driver i2o_config_driver = {
+static struct i2o_driver i2o_config_driver = {
 	.name = "Config-OSM"
 };
 
@@ -178,18 +87,17 @@ static int i2o_cfg_getiops(unsigned long arg)
 	struct i2o_controller *c;
 	u8 __user *user_iop_table = (void __user *)arg;
 	u8 tmp[MAX_I2O_CONTROLLERS];
+	int ret = 0;
 
 	memset(tmp, 0, MAX_I2O_CONTROLLERS);
-
-	if (!access_ok(VERIFY_WRITE, user_iop_table, MAX_I2O_CONTROLLERS))
-		return -EFAULT;
 
 	list_for_each_entry(c, &i2o_controllers, list)
 	    tmp[c->unit] = 1;
 
-	__copy_to_user(user_iop_table, tmp, MAX_I2O_CONTROLLERS);
+	if (copy_to_user(user_iop_table, tmp, MAX_I2O_CONTROLLERS))
+		ret = -EFAULT;
 
-	return 0;
+	return ret;
 };
 
 static int i2o_cfg_gethrt(unsigned long arg)
@@ -338,7 +246,7 @@ static int i2o_cfg_swdl(unsigned long arg)
 	struct i2o_sw_xfer __user *pxfer = (struct i2o_sw_xfer __user *)arg;
 	unsigned char maxfrag = 0, curfrag = 1;
 	struct i2o_dma buffer;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	unsigned int status = 0, swlen = 0, fragsize = 8192;
 	struct i2o_controller *c;
@@ -388,7 +296,7 @@ static int i2o_cfg_swdl(unsigned long arg)
 	writel(0xD0000000 | fragsize, &msg->body[3]);
 	writel(buffer.phys, &msg->body[4]);
 
-//      printk("i2o_config: swdl frag %d/%d (size %d)\n", curfrag, maxfrag, fragsize);
+//      printk(KERN_INFO "i2o_config: swdl frag %d/%d (size %d)\n", curfrag, maxfrag, fragsize);
 	status = i2o_msg_post_wait_mem(c, m, 60, &buffer);
 
 	if (status != -ETIMEDOUT)
@@ -412,28 +320,29 @@ static int i2o_cfg_swul(unsigned long arg)
 	struct i2o_sw_xfer __user *pxfer = (struct i2o_sw_xfer __user *)arg;
 	unsigned char maxfrag = 0, curfrag = 1;
 	struct i2o_dma buffer;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	unsigned int status = 0, swlen = 0, fragsize = 8192;
 	struct i2o_controller *c;
+	int ret = 0;
 
 	if (copy_from_user(&kxfer, pxfer, sizeof(struct i2o_sw_xfer)))
-		return -EFAULT;
+		goto return_fault;
 
 	if (get_user(swlen, kxfer.swlen) < 0)
-		return -EFAULT;
+		goto return_fault;
 
 	if (get_user(maxfrag, kxfer.maxfrag) < 0)
-		return -EFAULT;
+		goto return_fault;
 
 	if (get_user(curfrag, kxfer.curfrag) < 0)
-		return -EFAULT;
+		goto return_fault;
 
 	if (curfrag == maxfrag)
 		fragsize = swlen - (maxfrag - 1) * 8192;
 
-	if (!kxfer.buf || !access_ok(VERIFY_WRITE, kxfer.buf, fragsize))
-		return -EFAULT;
+	if (!kxfer.buf)
+		goto return_fault;
 
 	c = i2o_find_iop(kxfer.iop);
 	if (!c)
@@ -461,7 +370,7 @@ static int i2o_cfg_swul(unsigned long arg)
 	writel(0xD0000000 | fragsize, &msg->body[3]);
 	writel(buffer.phys, &msg->body[4]);
 
-//      printk("i2o_config: swul frag %d/%d (size %d)\n", curfrag, maxfrag, fragsize);
+//      printk(KERN_INFO "i2o_config: swul frag %d/%d (size %d)\n", curfrag, maxfrag, fragsize);
 	status = i2o_msg_post_wait_mem(c, m, 60, &buffer);
 
 	if (status != I2O_POST_WAIT_OK) {
@@ -474,10 +383,16 @@ static int i2o_cfg_swul(unsigned long arg)
 		return status;
 	}
 
-	__copy_to_user(kxfer.buf, buffer.virt, fragsize);
+	if (copy_to_user(kxfer.buf, buffer.virt, fragsize))
+		ret = -EFAULT;
+
 	i2o_dma_free(&c->pdev->dev, &buffer);
 
-	return 0;
+return_ret:
+	return ret;
+return_fault:
+	ret = -EFAULT;
+	goto return_ret;
 };
 
 static int i2o_cfg_swdel(unsigned long arg)
@@ -485,7 +400,7 @@ static int i2o_cfg_swdel(unsigned long arg)
 	struct i2o_controller *c;
 	struct i2o_sw_xfer kxfer;
 	struct i2o_sw_xfer __user *pxfer = (struct i2o_sw_xfer __user *)arg;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	unsigned int swlen;
 	int token;
@@ -530,7 +445,7 @@ static int i2o_cfg_validate(unsigned long arg)
 {
 	int token;
 	int iop = (int)arg;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	struct i2o_controller *c;
 
@@ -561,7 +476,7 @@ static int i2o_cfg_validate(unsigned long arg)
 
 static int i2o_cfg_evt_reg(unsigned long arg, struct file *fp)
 {
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	struct i2o_evt_id __user *pdesc = (struct i2o_evt_id __user *)arg;
 	struct i2o_evt_id kdesc;
@@ -624,15 +539,15 @@ static int i2o_cfg_evt_get(unsigned long arg, struct file *fp)
 	return 0;
 }
 
-#if BITS_PER_LONG == 64
+#ifdef CONFIG_COMPAT
 static int i2o_cfg_passthru32(unsigned fd, unsigned cmnd, unsigned long arg,
 			      struct file *file)
 {
 	struct i2o_cmd_passthru32 __user *cmd;
 	struct i2o_controller *c;
-	u32 *user_msg;
+	u32 __user *user_msg;
 	u32 *reply = NULL;
-	u32 *user_reply = NULL;
+	u32 __user *user_reply = NULL;
 	u32 size = 0;
 	u32 reply_size = 0;
 	u32 rcode = 0;
@@ -752,7 +667,7 @@ static int i2o_cfg_passthru32(unsigned fd, unsigned cmnd, unsigned long arg,
 			    flag_count & 0x04000000 /*I2O_SGL_FLAGS_DIR */ ) {
 				// TODO 64bit fix
 				if (copy_from_user
-				    (p->virt, (void *)(u64) sg[i].addr_bus,
+				    (p->virt, (void __user *)(unsigned long)sg[i].addr_bus,
 				     sg_size)) {
 					printk(KERN_DEBUG
 					       "%s: Could not copy SG buf %d FROM user\n",
@@ -862,7 +777,7 @@ static int i2o_cfg_passthru(unsigned long arg)
 	u32 i = 0;
 	void *p = NULL;
 	i2o_status_block *sb;
-	struct i2o_message *msg;
+	struct i2o_message __iomem *msg;
 	u32 m;
 	unsigned int iop;
 
@@ -1105,7 +1020,7 @@ static int i2o_cfg_ioctl(struct inode *inode, struct file *fp, unsigned int cmd,
 		ret = i2o_cfg_evt_get(arg, fp);
 		break;
 
-#if BITS_PER_LONG != 64
+#ifndef CONFIG_COMPAT
 	case I2OPASSTHRU:
 		ret = i2o_cfg_passthru(arg);
 		break;
@@ -1213,6 +1128,8 @@ static int __init i2o_config_init(void)
 	printk(KERN_INFO "I2O configuration manager v 0.04.\n");
 	printk(KERN_INFO "  (C) Copyright 1999 Red Hat Software\n");
 
+	spin_lock_init(&i2o_config_lock);
+
 	if (misc_register(&i2o_miscdev) < 0) {
 		printk(KERN_ERR "i2o_config: can't register device.\n");
 		return -EBUSY;
@@ -1225,7 +1142,7 @@ static int __init i2o_config_init(void)
 		misc_deregister(&i2o_miscdev);
 		return -EBUSY;
 	}
-#if BITS_PER_LONG ==64
+#ifdef CONFIG_COMPAT
 	register_ioctl32_conversion(I2OPASSTHRU32, i2o_cfg_passthru32);
 	register_ioctl32_conversion(I2OGETIOPS, (void *)sys_ioctl);
 #endif
@@ -1234,7 +1151,7 @@ static int __init i2o_config_init(void)
 
 static void i2o_config_exit(void)
 {
-#if BITS_PER_LONG ==64
+#ifdef CONFIG_COMPAT
 	unregister_ioctl32_conversion(I2OPASSTHRU32);
 	unregister_ioctl32_conversion(I2OGETIOPS);
 #endif

@@ -357,8 +357,7 @@ static int sbp2util_down_timeout(atomic_t *done, int timeout)
 	int i;
 
 	for (i = timeout; (i > 0 && atomic_read(done) == 0); i-= HZ/10) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		if (schedule_timeout(HZ/10))	/* 100ms */
+		if (msleep_interruptible(100))	/* 100ms */
 			return(1);
 	}
 	return ((i > 0) ? 0:1);
@@ -1088,7 +1087,7 @@ static int sbp2_query_logins(struct scsi_id_instance_data *scsi_id)
 	scsi_id->query_logins_orb->query_response_hi = ORB_SET_NODE_ID(hi->host->node_id);
 	SBP2_DEBUG("sbp2_query_logins: query_response_hi/lo initialized");
 
-	scsi_id->query_logins_orb->lun_misc = ORB_SET_FUNCTION(QUERY_LOGINS_REQUEST);
+	scsi_id->query_logins_orb->lun_misc = ORB_SET_FUNCTION(SBP2_QUERY_LOGINS_REQUEST);
 	scsi_id->query_logins_orb->lun_misc |= ORB_SET_NOTIFY(1);
 	if (scsi_id->sbp2_device_type_and_lun != SBP2_DEVICE_TYPE_LUN_UNINITIALIZED) {
 		scsi_id->query_logins_orb->lun_misc |= ORB_SET_LUN(scsi_id->sbp2_device_type_and_lun);
@@ -1199,7 +1198,7 @@ static int sbp2_login_device(struct scsi_id_instance_data *scsi_id)
 	scsi_id->login_orb->login_response_hi = ORB_SET_NODE_ID(hi->host->node_id);
 	SBP2_DEBUG("sbp2_login_device: login_response_hi/lo initialized");
 
-	scsi_id->login_orb->lun_misc = ORB_SET_FUNCTION(LOGIN_REQUEST);
+	scsi_id->login_orb->lun_misc = ORB_SET_FUNCTION(SBP2_LOGIN_REQUEST);
 	scsi_id->login_orb->lun_misc |= ORB_SET_RECONNECT(0);	/* One second reconnect time */
 	scsi_id->login_orb->lun_misc |= ORB_SET_EXCLUSIVE(exclusive_login);	/* Exclusive access to device */
 	scsi_id->login_orb->lun_misc |= ORB_SET_NOTIFY(1);	/* Notify us of login complete */
@@ -1325,7 +1324,7 @@ static int sbp2_logout_device(struct scsi_id_instance_data *scsi_id)
 	scsi_id->logout_orb->reserved3 = 0x0;
 	scsi_id->logout_orb->reserved4 = 0x0;
 
-	scsi_id->logout_orb->login_ID_misc = ORB_SET_FUNCTION(LOGOUT_REQUEST);
+	scsi_id->logout_orb->login_ID_misc = ORB_SET_FUNCTION(SBP2_LOGOUT_REQUEST);
 	scsi_id->logout_orb->login_ID_misc |= ORB_SET_LOGIN_ID(scsi_id->login_response->length_login_ID);
 
 	/* Notify us when complete */
@@ -1390,7 +1389,7 @@ static int sbp2_reconnect_device(struct scsi_id_instance_data *scsi_id)
 	scsi_id->reconnect_orb->reserved3 = 0x0;
 	scsi_id->reconnect_orb->reserved4 = 0x0;
 
-	scsi_id->reconnect_orb->login_ID_misc = ORB_SET_FUNCTION(RECONNECT_REQUEST);
+	scsi_id->reconnect_orb->login_ID_misc = ORB_SET_FUNCTION(SBP2_RECONNECT_REQUEST);
 	scsi_id->reconnect_orb->login_ID_misc |=
 		ORB_SET_LOGIN_ID(scsi_id->login_response->length_login_ID);
 

@@ -5,7 +5,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/compat.h>
 #include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/utsname.h>
@@ -19,10 +18,14 @@
 #include <linux/fs.h>
 #include <linux/workqueue.h>
 #include <linux/device.h>
+#include <linux/key.h>
 #include <linux/times.h>
 #include <linux/security.h>
 #include <linux/dcookies.h>
 #include <linux/suspend.h>
+
+#include <linux/compat.h>
+#include <linux/syscalls.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -212,75 +215,6 @@ int unregister_reboot_notifier(struct notifier_block * nb)
 }
 
 EXPORT_SYMBOL(unregister_reboot_notifier);
-
-asmlinkage long sys_ni_syscall(void)
-{
-	return -ENOSYS;
-}
-
-cond_syscall(sys_nfsservctl)
-cond_syscall(sys_quotactl)
-cond_syscall(sys_acct)
-cond_syscall(sys_lookup_dcookie)
-cond_syscall(sys_swapon)
-cond_syscall(sys_swapoff)
-cond_syscall(sys_init_module)
-cond_syscall(sys_delete_module)
-cond_syscall(sys_socketpair)
-cond_syscall(sys_bind)
-cond_syscall(sys_listen)
-cond_syscall(sys_accept)
-cond_syscall(sys_connect)
-cond_syscall(sys_getsockname)
-cond_syscall(sys_getpeername)
-cond_syscall(sys_sendto)
-cond_syscall(sys_send)
-cond_syscall(sys_recvfrom)
-cond_syscall(sys_recv)
-cond_syscall(sys_socket)
-cond_syscall(sys_setsockopt)
-cond_syscall(sys_getsockopt)
-cond_syscall(sys_shutdown)
-cond_syscall(sys_sendmsg)
-cond_syscall(sys_recvmsg)
-cond_syscall(sys_socketcall)
-cond_syscall(sys_futex)
-cond_syscall(compat_sys_futex)
-cond_syscall(sys_epoll_create)
-cond_syscall(sys_epoll_ctl)
-cond_syscall(sys_epoll_wait)
-cond_syscall(sys_semget)
-cond_syscall(sys_semop)
-cond_syscall(sys_semtimedop)
-cond_syscall(sys_semctl)
-cond_syscall(sys_msgget)
-cond_syscall(sys_msgsnd)
-cond_syscall(sys_msgrcv)
-cond_syscall(sys_msgctl)
-cond_syscall(sys_shmget)
-cond_syscall(sys_shmdt)
-cond_syscall(sys_shmctl)
-cond_syscall(sys_mq_open)
-cond_syscall(sys_mq_unlink)
-cond_syscall(sys_mq_timedsend)
-cond_syscall(sys_mq_timedreceive)
-cond_syscall(sys_mq_notify)
-cond_syscall(sys_mq_getsetattr)
-cond_syscall(compat_sys_mq_open)
-cond_syscall(compat_sys_mq_timedsend)
-cond_syscall(compat_sys_mq_timedreceive)
-cond_syscall(compat_sys_mq_notify)
-cond_syscall(compat_sys_mq_getsetattr)
-cond_syscall(sys_mbind)
-cond_syscall(sys_get_mempolicy)
-cond_syscall(sys_set_mempolicy)
-cond_syscall(compat_get_mempolicy)
-
-/* arch-specific weak syscall entries */
-cond_syscall(sys_pciconfig_read)
-cond_syscall(sys_pciconfig_write)
-cond_syscall(sys_pciconfig_iobase)
-
 static int set_one_prio(struct task_struct *p, int niceval, int error)
 {
 	int no_nice;
@@ -339,19 +273,18 @@ asmlinkage long sys_setpriority(int which, int who, int niceval)
 			} while_each_task_pid(who, PIDTYPE_PGID, p);
 			break;
 		case PRIO_USER:
+			user = current->user;
 			if (!who)
-				user = current->user;
+				who = current->uid;
 			else
-				user = find_user(who);
-
-			if (!user)
-				goto out_unlock;
+				if ((who != current->uid) && !(user = find_user(who)))
+					goto out_unlock;	/* No processes for this user */
 
 			do_each_thread(g, p)
 				if (p->uid == who)
 					error = set_one_prio(p, niceval, error);
 			while_each_thread(g, p);
-			if (who)
+			if (who != current->uid)
 				free_uid(user);		/* For find_user() */
 			break;
 	}
@@ -398,13 +331,12 @@ asmlinkage long sys_getpriority(int which, int who)
 			} while_each_task_pid(who, PIDTYPE_PGID, p);
 			break;
 		case PRIO_USER:
+			user = current->user;
 			if (!who)
-				user = current->user;
+				who = current->uid;
 			else
-				user = find_user(who);
-
-			if (!user)
-				goto out_unlock;
+				if ((who != current->uid) && !(user = find_user(who)))
+					goto out_unlock;	/* No processes for this user */
 
 			do_each_thread(g, p)
 				if (p->uid == who) {
@@ -413,7 +345,7 @@ asmlinkage long sys_getpriority(int which, int who)
 						retval = niceval;
 				}
 			while_each_thread(g, p);
-			if (who)
+			if (who != current->uid)
 				free_uid(user);		/* for find_user() */
 			break;
 	}
@@ -598,6 +530,7 @@ asmlinkage long sys_setregid(gid_t rgid, gid_t egid)
 	current->fsgid = new_egid;
 	current->egid = new_egid;
 	current->gid = new_rgid;
+	key_fsgid_changed(current);
 	return 0;
 }
 
@@ -635,6 +568,8 @@ asmlinkage long sys_setgid(gid_t gid)
 	}
 	else
 		return -EPERM;
+
+	key_fsgid_changed(current);
 	return 0;
 }
   
@@ -647,7 +582,7 @@ static int set_user(uid_t new_ruid, int dumpclear)
 		return -EAGAIN;
 
 	if (atomic_read(&new_user->processes) >=
-				current->rlim[RLIMIT_NPROC].rlim_cur &&
+				current->signal->rlim[RLIMIT_NPROC].rlim_cur &&
 			new_user != &root_user) {
 		free_uid(new_user);
 		return -EAGAIN;
@@ -723,6 +658,8 @@ asmlinkage long sys_setreuid(uid_t ruid, uid_t euid)
 		current->suid = current->euid;
 	current->fsuid = current->euid;
 
+	key_fsuid_changed(current);
+
 	return security_task_post_setuid(old_ruid, old_euid, old_suid, LSM_SETID_RE);
 }
 
@@ -767,6 +704,8 @@ asmlinkage long sys_setuid(uid_t uid)
 	}
 	current->fsuid = current->euid = uid;
 	current->suid = new_suid;
+
+	key_fsuid_changed(current);
 
 	return security_task_post_setuid(old_ruid, old_euid, old_suid, LSM_SETID_ID);
 }
@@ -813,6 +752,8 @@ asmlinkage long sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
 	current->fsuid = current->euid;
 	if (suid != (uid_t) -1)
 		current->suid = suid;
+
+	key_fsuid_changed(current);
 
 	return security_task_post_setuid(old_ruid, old_euid, old_suid, LSM_SETID_RES);
 }
@@ -863,6 +804,8 @@ asmlinkage long sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid)
 		current->gid = rgid;
 	if (sgid != (gid_t) -1)
 		current->sgid = sgid;
+
+	key_fsgid_changed(current);
 	return 0;
 }
 
@@ -904,6 +847,8 @@ asmlinkage long sys_setfsuid(uid_t uid)
 		current->fsuid = uid;
 	}
 
+	key_fsuid_changed(current);
+
 	security_task_post_setuid(old_fsuid, (uid_t)-1, (uid_t)-1, LSM_SETID_FS);
 
 	return old_fsuid;
@@ -930,6 +875,7 @@ asmlinkage long sys_setfsgid(gid_t gid)
 			wmb();
 		}
 		current->fsgid = gid;
+		key_fsgid_changed(current);
 	}
 	return old_fsgid;
 }
@@ -1494,9 +1440,13 @@ asmlinkage long sys_getrlimit(unsigned int resource, struct rlimit __user *rlim)
 {
 	if (resource >= RLIM_NLIMITS)
 		return -EINVAL;
-	else
-		return copy_to_user(rlim, current->rlim + resource, sizeof(*rlim))
-			? -EFAULT : 0;
+	else {
+		struct rlimit value;
+		task_lock(current->group_leader);
+		value = current->signal->rlim[resource];
+		task_unlock(current->group_leader);
+		return copy_to_user(rlim, &value, sizeof(*rlim)) ? -EFAULT : 0;
+	}
 }
 
 #ifdef __ARCH_WANT_SYS_OLD_GETRLIMIT
@@ -1511,7 +1461,9 @@ asmlinkage long sys_old_getrlimit(unsigned int resource, struct rlimit __user *r
 	if (resource >= RLIM_NLIMITS)
 		return -EINVAL;
 
-	memcpy(&x, current->rlim + resource, sizeof(*rlim));
+	task_lock(current->group_leader);
+	x = current->signal->rlim[resource];
+	task_unlock(current->group_leader);
 	if(x.rlim_cur > 0x7FFFFFFF)
 		x.rlim_cur = 0x7FFFFFFF;
 	if(x.rlim_max > 0x7FFFFFFF)
@@ -1532,29 +1484,20 @@ asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit __user *rlim)
 		return -EFAULT;
        if (new_rlim.rlim_cur > new_rlim.rlim_max)
                return -EINVAL;
-	old_rlim = current->rlim + resource;
-	if (((new_rlim.rlim_cur > old_rlim->rlim_max) ||
-	     (new_rlim.rlim_max > old_rlim->rlim_max)) &&
+	old_rlim = current->signal->rlim + resource;
+	if ((new_rlim.rlim_max > old_rlim->rlim_max) &&
 	    !capable(CAP_SYS_RESOURCE))
 		return -EPERM;
-	if (resource == RLIMIT_NOFILE) {
-		if (new_rlim.rlim_cur > NR_OPEN || new_rlim.rlim_max > NR_OPEN)
+	if (resource == RLIMIT_NOFILE && new_rlim.rlim_max > NR_OPEN)
 			return -EPERM;
-	}
 
 	retval = security_task_setrlimit(resource, &new_rlim);
 	if (retval)
 		return retval;
 
-	/* The rlimit is specified in bytes, convert to pages for mm. */
-	if (resource == RLIMIT_RSS && current->mm) {
-		unsigned long pages = RLIM_INFINITY;
-		if (new_rlim.rlim_cur != RLIM_INFINITY)
-			pages = new_rlim.rlim_cur >> PAGE_SHIFT;
-		current->mm->rlimit_rss = pages;
-	}
-
+	task_lock(current->group_leader);
 	*old_rlim = new_rlim;
+	task_unlock(current->group_leader);
 	return 0;
 }
 
@@ -1665,7 +1608,7 @@ asmlinkage long sys_umask(int mask)
 asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
 			  unsigned long arg4, unsigned long arg5)
 {
-	int error;
+	long error;
 	int sig;
 
 	error = security_task_prctl(option, arg2, arg3, arg4, arg5);
@@ -1740,7 +1683,7 @@ asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
 			unsigned char ncomm[sizeof(me->comm)];
 
 			ncomm[sizeof(me->comm)-1] = 0;
-			if (strncpy_from_user(ncomm, (char *)arg2,
+			if (strncpy_from_user(ncomm, (char __user *)arg2,
 						sizeof(me->comm)-1) < 0)
 				return -EFAULT;
 			set_task_comm(me, ncomm);

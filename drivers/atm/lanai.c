@@ -191,7 +191,7 @@
 #define LANAI_EEPROM_SIZE	(128)
 
 typedef int vci_t;
-typedef void __iomem * bus_addr_t;
+typedef void __iomem *bus_addr_t;
 
 /* DMA buffer in host memory for TX, RX, or service list. */
 struct lanai_buffer {
@@ -468,7 +468,7 @@ enum lanai_register {
 	DMA_Addr_Reg		= 0x5C	/* DMA address */
 };
 
-static inline void __iomem * reg_addr(const struct lanai_dev *lanai,
+static inline bus_addr_t reg_addr(const struct lanai_dev *lanai,
 	enum lanai_register reg)
 {
 	return lanai->base + reg;
@@ -813,7 +813,7 @@ static void lanai_shutdown_tx_vci(struct lanai_dev *lanai,
 			DPRINTK("read, write = %d, %d\n", read, write);
 			break;
 		}
-		schedule_timeout(HZ / 25);
+		msleep(40);
 	}
 	/* 15.2.2 - clear out all tx registers */
 	cardvcc_write(lvcc, 0, vcc_txreadptr);
@@ -1481,7 +1481,7 @@ static inline struct lanai_vcc *new_lanai_vcc(void)
 	struct lanai_vcc *lvcc;
 	lvcc = (struct lanai_vcc *) kmalloc(sizeof(*lvcc), GFP_KERNEL);
 	if (likely(lvcc != NULL)) {
-		lvcc->vbase = 0;
+		lvcc->vbase = NULL;
 		lvcc->rx.atmvcc = lvcc->tx.atmvcc = NULL;
 		lvcc->nref = 0;
 		memset(&lvcc->stats, 0, sizeof lvcc->stats);
@@ -1565,7 +1565,7 @@ static inline void host_vcc_unbind(struct lanai_dev *lanai,
 	if (lvcc->vbase == 0)
 		return;	/* This vcc was never bound */
 	DPRINTK("Unbinding vci %d\n", lvcc->vci);
-	lvcc->vbase = 0;
+	lvcc->vbase = NULL;
 	lanai->vccs[lvcc->vci] = NULL;
 #ifdef USE_POWERDOWN
 	if (--lanai->nbound == 0) {
@@ -2279,7 +2279,7 @@ static int __init lanai_dev_open(struct atm_dev *atmdev)
 	lanai->conf1 = reg_read(lanai, Config1_Reg) | CONFIG1_POWERDOWN;
 	conf1_write(lanai);
 #endif
-	iounmap((void *) lanai->base);
+	iounmap(lanai->base);
     error_pci:
 	pci_disable_device(lanai->pci);
     error:
@@ -2309,7 +2309,7 @@ static void lanai_dev_close(struct atm_dev *atmdev)
 	pci_disable_device(lanai->pci);
 	vcc_table_deallocate(lanai);
 	service_buffer_deallocate(lanai);
-	iounmap((void *) lanai->base);
+	iounmap(lanai->base);
 	kfree(lanai);
 }
 

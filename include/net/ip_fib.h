@@ -23,8 +23,7 @@
 /* WARNING: The ordering of these elements must match ordering
  *          of RTA_* rtnetlink attribute numbers.
  */
-struct kern_rta
-{
+struct kern_rta {
 	void		*rta_dst;
 	void		*rta_src;
 	int		*rta_iif;
@@ -40,9 +39,12 @@ struct kern_rta
 	struct rta_session *rta_sess;
 };
 
-struct fib_nh
-{
-	struct net_device		*nh_dev;
+struct fib_info;
+
+struct fib_nh {
+	struct net_device	*nh_dev;
+	struct hlist_node	nh_hash;
+	struct fib_info		*nh_parent;
 	unsigned		nh_flags;
 	unsigned char		nh_scope;
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
@@ -60,10 +62,9 @@ struct fib_nh
  * This structure contains data shared by many of routes.
  */
 
-struct fib_info
-{
-	struct fib_info		*fib_next;
-	struct fib_info		*fib_prev;
+struct fib_info {
+	struct hlist_node	fib_hash;
+	struct hlist_node	fib_lhash;
 	int			fib_treeref;
 	atomic_t		fib_clntref;
 	int			fib_dead;
@@ -89,8 +90,7 @@ struct fib_info
 struct fib_rule;
 #endif
 
-struct fib_result
-{
+struct fib_result {
 	unsigned char	prefixlen;
 	unsigned char	nh_sel;
 	unsigned char	type;
@@ -119,8 +119,7 @@ struct fib_result
 #define FIB_RES_DEV(res)		(FIB_RES_NH(res).nh_dev)
 #define FIB_RES_OIF(res)		(FIB_RES_NH(res).nh_oif)
 
-struct fib_table
-{
+struct fib_table {
 	unsigned char	tb_id;
 	unsigned	tb_stamp;
 	int		(*tb_lookup)(struct fib_table *tb, const struct flowi *flp, struct fib_result *res);
@@ -211,22 +210,11 @@ extern int fib_validate_source(u32 src, u32 dst, u8 tos, int oif,
 extern void fib_select_multipath(const struct flowi *flp, struct fib_result *res);
 
 /* Exported by fib_semantics.c */
-extern int 		ip_fib_check_default(u32 gw, struct net_device *dev);
-extern void		fib_release_info(struct fib_info *);
-extern int		fib_semantic_match(int type, struct fib_info *,
-					   const struct flowi *, struct fib_result*);
-extern struct fib_info	*fib_create_info(const struct rtmsg *r, struct kern_rta *rta,
-					 const struct nlmsghdr *, int *err);
-extern int fib_nh_match(struct rtmsg *r, struct nlmsghdr *, struct kern_rta *rta, struct fib_info *fi);
-extern int fib_dump_info(struct sk_buff *skb, u32 pid, u32 seq, int event,
-			 u8 tb_id, u8 type, u8 scope, void *dst, int dst_len, u8 tos,
-			 struct fib_info *fi);
+extern int ip_fib_check_default(u32 gw, struct net_device *dev);
 extern int fib_sync_down(u32 local, struct net_device *dev, int force);
 extern int fib_sync_up(struct net_device *dev);
 extern int fib_convert_rtentry(int cmd, struct nlmsghdr *nl, struct rtmsg *rtm,
 			       struct kern_rta *rta, struct rtentry *r);
-extern void fib_node_seq_show(struct seq_file *seq, int type, int dead,
-			      struct fib_info *fi, u32 prefix, u32 mask);
 extern u32  __fib_res_prefsrc(struct fib_result *res);
 
 /* Exported by fib_hash.c */

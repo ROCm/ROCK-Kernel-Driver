@@ -11,6 +11,10 @@ config MMU
 config UID16
 	bool
 
+config GENERIC_HARDIRQS
+	bool
+	default y
+
 config RWSEM_GENERIC_SPINLOCK
 	bool
 
@@ -70,6 +74,7 @@ config POWER4
 	bool "POWER4 and 970 (G5)"
 
 config 8xx
+	depends on BROKEN
 	bool "8xx"
 
 config E500
@@ -183,18 +188,6 @@ config MATH_EMULATION
 	  or any machine with a 6xx, 7xx or 7xxx series processor, say N
 	  here.  Saying Y here will not hurt performance (on any machine) but
 	  will increase the size of the kernel.
-
-config CPU_FREQ
-	bool "CPU Frequency scaling"
-	help
-	  Clock scaling allows you to change the clock speed of CPUs on the
-	  fly. This is a nice method to save battery power on notebooks,
-	  because the lower the clock speed, the less power the CPU consumes.
-
-	  For more information, take a look at <file:Documentation/cpu-freq> or
-	  at <http://www.brodo.de/cpufreq/>
-
-	  If in doubt, say N.
 
 source "drivers/cpufreq/Kconfig"
 
@@ -752,16 +745,6 @@ config PC_KEYBOARD
 	bool "PC PS/2 style Keyboard"
 	depends on 4xx || CPM2
 
-config SERIAL_CONSOLE
-	bool
-	depends on 8xx
-	default y
-
-config SERIAL_CONSOLE_BAUD
-	int
-	depends on EV64260
-	default "115200"
-
 config PPCBUG_NVRAM
 	bool "Enable reading PPCBUG NVRAM during boot" if PPLUS || LOPEC
 	default y if PPC_PREP
@@ -1231,6 +1214,3 @@ source "arch/ppc/Kconfig.debug"
 source "security/Kconfig"
 
 source "crypto/Kconfig"
-
-source "rpmify/Kconfig"
-

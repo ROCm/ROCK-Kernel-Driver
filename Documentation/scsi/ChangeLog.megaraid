@@ -1,3 +1,28 @@
+Release Date	: Thu Nov  4 18:24:56 EST 2004 - Sreenivas Bagalkote <sreenib@lsil.com>
+
+Current Version	: 2.20.4.1 (scsi module), 2.20.2.2 (cmm module)
+Older Version	: 2.20.4.0 (scsi module), 2.20.2.1 (cmm module)
+
+i.	Handle IOCTL cmd timeouts more properly.
+
+ii.	pci_dma_sync_{sg,single}_for_cpu was introduced into megaraid_mbox
+	incorrectly (instead of _for_device). Changed to appropriate
+	pci_dma_sync_{sg,single}_for_device.
+
+Release Date	: Wed Oct 06 11:15:29 EDT 2004 - Sreenivas Bagalkote <sreenib@lsil.com>
+Current Version	: 2.20.4.0 (scsi module), 2.20.2.1 (cmm module)
+Older Version	: 2.20.4.0 (scsi module), 2.20.2.0 (cmm module)
+
+i.	Remove CONFIG_COMPAT around register_ioctl32_conversion
+
+Release Date	: Mon Sep 27 22:15:07 EDT 2004 - Atul Mukker <atulm@lsil.com>
+Current Version	: 2.20.4.0 (scsi module), 2.20.2.0 (cmm module)
+Older Version	: 2.20.3.1 (scsi module), 2.20.2.0 (cmm module)
+
+i.	Fix data corruption. Because of a typo in the driver, the IO packets
+	were wrongly shared by the ioctl path. This causes a whole IO command
+	to be replaced by an incoming ioctl command.
+
 Release Date	: Tue Aug 24 09:43:35 EDT 2004 - Atul Mukker <atulm@lsil.com>
 Current Version	: 2.20.3.1 (scsi module), 2.20.2.0 (cmm module)
 Older Version	: 2.20.3.0 (scsi module), 2.20.2.0 (cmm module)

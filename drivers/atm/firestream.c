@@ -306,11 +306,11 @@ static int fs_debug = 0;
 
 #ifdef MODULE
 #ifdef DEBUG 
-MODULE_PARM(fs_debug, "i");
+module_param(fs_debug, int, 0644);
 #endif
-MODULE_PARM(loopback, "i");
-MODULE_PARM(num, "i");
-MODULE_PARM(fs_keystream, "i");
+module_param(loopback, int, 0);
+module_param(num, int, 0);
+module_param(fs_keystream, int, 0);
 /* XXX Add rx_buf_sizes, and rx_pool_sizes As per request Amar. -- REW */
 #endif
 
@@ -1704,8 +1704,7 @@ static int __devinit fs_init (struct fs_dev *dev)
 		}
 
 		/* Try again after 10ms. */
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout ((HZ+99)/100);
+		msleep(10);
 	}
 
 	if (!to) {
@@ -2013,66 +2012,6 @@ void __devexit firestream_remove_one (struct pci_dev *pdev)
 	func_exit ();
 }
 
-
-#if 0
-int __init fs_detect(void)
-{
-	struct pci_dev  *pci_dev;
-	int devs = 0;
-
-	func_enter ();
-	pci_dev = NULL;
-	while ((pci_dev = pci_find_device(PCI_VENDOR_ID_FUJITSU_ME,
-					  PCI_DEVICE_ID_FUJITSU_FS50, 
-					  pci_dev))) {
-		if (fs_register_and_init (pci_dev, &fs_pci_tbl[0]))
-			break;
-		devs++;
-	}
-
-	while ((pci_dev = pci_find_device(PCI_VENDOR_ID_FUJITSU_ME,
-					  PCI_DEVICE_ID_FUJITSU_FS155, 
-					  pci_dev))) {
-		if (fs_register_and_init (pci_dev, FS_IS155)) 
-			break;
-		devs++;
-	}
-	func_exit ();
-	return devs;
-}
-#else
-
-#if 0
-int __init init_PCI (void)
-{ /* Begin init_PCI */
-	
-	int pci_count;
-	printk ("init_PCI\n");
-	/*
-	  memset (&firestream_driver, 0, sizeof (firestream_driver));
-	  firestream_driver.name = "firestream";
-	  firestream_driver.id_table = firestream_pci_tbl;
-	  firestream_driver.probe = fs_register_and_init;
-	*/
-	pci_count = pci_register_driver (&firestream_driver);
-	
-	if (pci_count <= 0) {
-		pci_unregister_driver (&firestream_driver);
-		pci_count = 0;
-	}
-
-	return(pci_count);
-
-} /* End init_PCI */
-#endif
-#endif
-
-/*
-#ifdef MODULE
-#define firestream_init init_module
-#endif 
-*/
-
 static struct pci_device_id firestream_pci_tbl[] = {
 	{ PCI_VENDOR_ID_FUJITSU_ME, PCI_DEVICE_ID_FUJITSU_FS50, 
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, FS_IS50},
@@ -2109,5 +2048,6 @@ module_init(firestream_init_module);
 module_exit(firestream_cleanup_module);
 
 MODULE_LICENSE("GPL");
+
 
 

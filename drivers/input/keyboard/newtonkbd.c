@@ -59,8 +59,6 @@ static unsigned char nkbd_keycode[128] = {
 
 static char *nkbd_name = "Newton Keyboard";
 
-static int nkbd_num;
-
 struct nkbd {
 	unsigned char keycode[128];
 	struct input_dev dev;
@@ -128,8 +126,6 @@ void nkbd_connect(struct serio *serio, struct serio_driver *drv)
 	nkbd->dev.id.vendor = SERIO_NEWTON;
 	nkbd->dev.id.product = 0x0001;
 	nkbd->dev.id.version = 0x0100;
-	nkbd->dev.dev = get_device(&serio->dev);
-	sprintf(nkbd->dev.cdev.class_id,"nkbd%d",nkbd_num++);
 
 	input_register_device(&nkbd->dev);
 
@@ -140,7 +136,6 @@ void nkbd_disconnect(struct serio *serio)
 {
 	struct nkbd *nkbd = serio->private;
 	input_unregister_device(&nkbd->dev);
-	put_device(&serio->dev);
 	serio_close(serio);
 	kfree(nkbd);
 }

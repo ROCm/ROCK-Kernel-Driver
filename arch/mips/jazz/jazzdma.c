@@ -304,6 +304,8 @@ unsigned long vdma_phys2log(unsigned long paddr)
 	return (i << 12) + (paddr & (VDMA_PAGESIZE - 1));
 }
 
+EXPORT_SYMBOL(vdma_phys2log);
+
 /*
  * Translate a logical DMA address to a physical address
  */
@@ -394,6 +396,8 @@ void vdma_enable(int channel)
 			  R4030_CHNL_ENABLE);
 }
 
+EXPORT_SYMBOL(vdma_enable);
+
 /*
  * Disable a DMA channel
  */
@@ -428,6 +432,8 @@ void vdma_disable(int channel)
 	 */
 	*((volatile unsigned int *) JAZZ_DUMMY_DEVICE);
 }
+
+EXPORT_SYMBOL(vdma_disable);
 
 /*
  * Set DMA mode. This function accepts the mode values used
@@ -496,6 +502,8 @@ void vdma_set_mode(int channel, int mode)
 	}
 }
 
+EXPORT_SYMBOL(vdma_set_mode);
+
 /*
  * Set Transfer Address
  */
@@ -508,6 +516,8 @@ void vdma_set_addr(int channel, long addr)
 	r4030_write_reg32(JAZZ_R4030_CHNL_ADDR + (channel << 5), addr);
 }
 
+EXPORT_SYMBOL(vdma_set_addr);
+
 /*
  * Set Transfer Count
  */
@@ -519,6 +529,8 @@ void vdma_set_count(int channel, int count)
 
 	r4030_write_reg32(JAZZ_R4030_CHNL_COUNT + (channel << 5), count);
 }
+
+EXPORT_SYMBOL(vdma_set_count);
 
 /*
  * Get Residual

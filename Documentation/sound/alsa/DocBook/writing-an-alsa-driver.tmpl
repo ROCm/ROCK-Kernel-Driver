@@ -4340,7 +4340,39 @@ struct _snd_pcm_runtime {
       </para>
 
       <para>
-        If this function returns successfully with 0, then create a
+        When the accessing to the hardware requires special method
+        instead of the standard I/O access, you can create opl3 instance
+        separately with <function>snd_opl3_new()</function>.
+
+        <informalexample>
+          <programlisting>
+<![CDATA[
+  opl3_t *opl3;
+  snd_opl3_new(card, OPL3_HW_OPL3_XXX, &opl3);
+]]>
+          </programlisting>
+        </informalexample>
+      </para>
+
+      <para>
+	Then set <structfield>command</structfield>,
+	<structfield>private_data</structfield> and
+	<structfield>private_free</structfield> for the private
+	access function, the private data and the destructor.
+	The l_port and r_port are not necessarily set.  Only the
+	command must be set properly.  You can retrieve the data
+	from opl3-&gt;private_data field.
+      </para>
+
+      <para>
+	After creating the opl3 instance via <function>snd_opl3_new()</function>,
+	call <function>snd_opl3_init()</function> to initialize the chip to the
+	proper state.  Note that <function>snd_opl3_create()</function> always
+	calls it internally.
+      </para>
+
+      <para>
+        If the opl3 instance is created successfully, then create a
         hwdep device for this opl3. 
 
         <informalexample>

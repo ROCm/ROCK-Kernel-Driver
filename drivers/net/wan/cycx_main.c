@@ -223,13 +223,12 @@ static int cycx_wan_setup(struct wan_device *wandev, wandev_conf_t *conf)
 	/* Configure hardware, load firmware, etc. */
 	memset(&card->hw, 0, sizeof(card->hw));
 	card->hw.irq	 = irq;
-	card->hw.dpmbase = (void *)conf->maddr;
 	card->hw.dpmsize = CYCX_WINDOWSIZE;
 	card->hw.fwid	 = CFID_X25_2X;
-	card->lock	 = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&card->lock);
 	init_waitqueue_head(&card->wait_stats);
 
-	rc = cycx_setup(&card->hw, conf->data, conf->data_size);
+	rc = cycx_setup(&card->hw, conf->data, conf->data_size, conf->maddr);
 	if (rc)
 		goto out_irq;
 

@@ -1,5 +1,5 @@
 # drivers/mtd/nand/Kconfig
-# $Id: Kconfig,v 1.17 2004/08/10 14:24:07 dwmw2 Exp $
+# $Id: Kconfig,v 1.22 2004/10/05 22:11:46 gleixner Exp $
 
 menu "NAND Flash Device Drivers"
 	depends on MTD!=n
@@ -35,6 +35,12 @@ config MTD_NAND_EDB7312
 	help
 	  This enables the driver for the Cirrus Logic EBD7312 evaluation 
 	  board to access the onboard NAND Flash.
+
+config MTD_NAND_H1900
+	tristate "iPAQ H1900 flash"
+	depends on ARM && MTD_NAND && ARCH_PXA && MTD_PARTITIONS
+	help
+	  This enables the driver for the iPAQ h1900 flash.
 
 config MTD_NAND_SPIA
 	tristate "NAND Flash device on SPIA board"
@@ -74,15 +80,54 @@ config MTD_NAND_AU1550
 	  This enables the driver for the NAND flash controller on the
 	  AMD/Alchemy 1550 SOC.
 
+config MTD_NAND_RTC_FROM4
+	tristate "Renesas Flash ROM 4-slot interface board (FROM_BOARD4)"
+	depends on MTD_NAND && SH_SOLUTION_ENGINE
+	select REED_SOLOMON
+	select REED_SOLOMON_DEC8
+	help
+	  This enables the driver for the Renesas Technology AG-AND 
+	  flash interface board (FROM_BOARD4)
+
 config MTD_NAND_PPCHAMELEONEVB
 	tristate "NAND Flash device on PPChameleonEVB board"
 	depends on PPCHAMELEONEVB && MTD_NAND
 	help
-	  This enables the NAND flash driver on the PPChameleon EVB Board.	
+	  This enables the NAND flash driver on the PPChameleon EVB Board.
+
+config MTD_NAND_S3C2410
+	tristate "NAND Flash support for S3C2410 SoC"
+	depends on ARCH_S3C2410 && MTD_NAND
+	help
+	  This enables the NAND flash controller on the S3C2410.
+
+	  No board specfic support is done by this driver, each board
+	  must advertise a platform_device for the driver to attach. 
+
+config MTD_NAND_S3C2410_DEBUG
+	bool "S3C2410 NAND driver debug"
+	depends on MTD_NAND_S3C2410
+	help
+	  Enable debugging of the S3C2410 NAND driver
+
+config MTD_NAND_S3C2410_HWECC
+	bool "S3C2410 NAND Hardware ECC"
+	depends on MTD_NAND_S3C2410
+	help
+	  Enable the use of the S3C2410's internal ECC generator when
+	  using NAND. Early versions of the chip have had problems with
+	  incorrect ECC generation, and if using these, the default of
+	  software ECC is preferable.
+
+	  If you lay down a device with the hardware ECC, then you will
+	  currently not be able to switch to software, as there is no
+	  implementation for ECC method used by the S3C2410
 
 config MTD_NAND_DISKONCHIP
 	tristate "DiskOnChip 2000, Millennium and Millennium Plus (NAND reimplementation) (EXPERIMENTAL)"
 	depends on MTD_NAND && EXPERIMENTAL
+	select REED_SOLOMON
+	select REED_SOLOMON_DEC16
 	help
 	  This is a reimplementation of M-Systems DiskOnChip 2000,
 	  Millennium and Millennium Plus as a standard NAND device driver,

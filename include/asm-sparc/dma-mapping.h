@@ -2,7 +2,6 @@
 #define _ASM_SPARC_DMA_MAPPING_H
 
 #include <linux/config.h>
-#include <linux/device.h>
 
 #ifdef CONFIG_PCI
 #include <asm-generic/dma-mapping.h>

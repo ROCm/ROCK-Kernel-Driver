@@ -21,103 +21,6 @@
 
 #include <asm/io.h>
 
-#define DISPLAY_SLC90E66_TIMINGS
-
-#if defined(DISPLAY_SLC90E66_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 slc90e66_proc = 0;
-static struct pci_dev *bmide_dev;
-
-static int slc90e66_get_info (char *buffer, char **addr, off_t offset, int count)
-{
-	char *p = buffer;
-	int len;
-	unsigned long bibma = pci_resource_start(bmide_dev, 4);
-	u16 reg40 = 0, psitre = 0, reg42 = 0, ssitre = 0;
-	u8  c0 = 0, c1 = 0;
-	u8  reg44 = 0, reg47 = 0, reg48 = 0, reg4a = 0, reg4b = 0;
-
-	pci_read_config_word(bmide_dev, 0x40, &reg40);
-	pci_read_config_word(bmide_dev, 0x42, &reg42);
-	pci_read_config_byte(bmide_dev, 0x44, &reg44);
-	pci_read_config_byte(bmide_dev, 0x47, &reg47);
-	pci_read_config_byte(bmide_dev, 0x48, &reg48);
-	pci_read_config_byte(bmide_dev, 0x4a, &reg4a);
-	pci_read_config_byte(bmide_dev, 0x4b, &reg4b);
-
-	psitre = (reg40 & 0x4000) ? 1 : 0;
-	ssitre = (reg42 & 0x4000) ? 1 : 0;
-
-        /*
-         * at that point bibma+0x2 et bibma+0xa are byte registers
-         * to investigate:
-         */
-	c0 = inb_p(bibma + 0x02);
-	c1 = inb_p(bibma + 0x0a);
-
-	p += sprintf(p, "                                SLC90E66 Chipset.\n");
-	p += sprintf(p, "--------------- Primary Channel "
-			"---------------- Secondary Channel "
-			"-------------\n");
-	p += sprintf(p, "                %sabled "
-			"                        %sabled\n",
-			(c0&0x80) ? "dis" : " en",
-			(c1&0x80) ? "dis" : " en");
-	p += sprintf(p, "--------------- drive0 --------- drive1 "
-			"-------- drive0 ---------- drive1 ------\n");
-	p += sprintf(p, "DMA enabled:    %s              %s "
-			"            %s               %s\n",
-			(c0&0x20) ? "yes" : "no ",
-			(c0&0x40) ? "yes" : "no ",
-			(c1&0x20) ? "yes" : "no ",
-			(c1&0x40) ? "yes" : "no " );
-	p += sprintf(p, "UDMA enabled:   %s              %s "
-			"            %s               %s\n",
-			(reg48&0x01) ? "yes" : "no ",
-			(reg48&0x02) ? "yes" : "no ",
-			(reg48&0x04) ? "yes" : "no ",
-			(reg48&0x08) ? "yes" : "no " );
-	p += sprintf(p, "UDMA enabled:   %s                %s "
-			"              %s                 %s\n",
-			((reg4a&0x04)==0x04) ? "4" :
-			((reg4a&0x03)==0x03) ? "3" :
-			(reg4a&0x02) ? "2" :
-			(reg4a&0x01) ? "1" :
-			(reg4a&0x00) ? "0" : "X",
-			((reg4a&0x40)==0x40) ? "4" :
-			((reg4a&0x30)==0x30) ? "3" :
-			(reg4a&0x20) ? "2" :
-			(reg4a&0x10) ? "1" :
-			(reg4a&0x00) ? "0" : "X",
-			((reg4b&0x04)==0x04) ? "4" :
-			((reg4b&0x03)==0x03) ? "3" :
-			(reg4b&0x02) ? "2" :
-			(reg4b&0x01) ? "1" :
-			(reg4b&0x00) ? "0" : "X",
-			((reg4b&0x40)==0x40) ? "4" :
-			((reg4b&0x30)==0x30) ? "3" :
-			(reg4b&0x20) ? "2" :
-			(reg4b&0x10) ? "1" :
-			(reg4b&0x00) ? "0" : "X");
-
-	p += sprintf(p, "UDMA\n");
-	p += sprintf(p, "DMA\n");
-	p += sprintf(p, "PIO\n");
-
-/*
- *	FIXME.... Add configuration junk data....blah blah......
- */
-
-	/* p - buffer must be less than 4k! */
-	len = (p - buffer) - offset;
-	*addr = buffer + offset;
-	
-	return len > count ? count : len;
-}
-#endif  /* defined(DISPLAY_SLC90E66_TIMINGS) && defined(CONFIG_PROC_FS) */
-
 static u8 slc90e66_ratemask (ide_drive_t *drive)
 {
 	u8 mode	= 2;
@@ -236,6 +139,7 @@ static int slc90e66_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	if (speed >= XFER_UDMA_0) {
 		if (!(reg48 & u_flag))
 			pci_write_config_word(dev, 0x48, reg48|u_flag);
+		/* FIXME: (reg4a & a_speed) ? */
 		if ((reg4a & u_speed) != u_speed) {
 			pci_write_config_word(dev, 0x4a, reg4a & ~a_speed);
 			pci_read_config_word(dev, 0x4a, &reg4a);
@@ -274,37 +178,16 @@ static int slc90e66_config_drive_xfer_rate (ide_drive_t *drive)
 	drive->init_speed = 0;
 
 	if (id && (id->capability & 1) && drive->autodma) {
-		/* Consult the list of known "bad" drives */
-		if (__ide_dma_bad_drive(drive))
-			goto fast_ata_pio;
 
-		if (id->field_valid & 4) {
-			if (id->dma_ultra & hwif->ultra_mask) {
-				/* Force if Capable UltraDMA */
-				int dma = slc90e66_config_drive_for_dma(drive);
-				if ((id->field_valid & 2) && !dma)
-					goto try_dma_modes;
-			}
-		} else if (id->field_valid & 2) {
-try_dma_modes:
-			if ((id->dma_mword & hwif->mwdma_mask) ||
-			    (id->dma_1word & hwif->swdma_mask)) {
-				/* Force if Capable regular DMA modes */
-				if (!slc90e66_config_drive_for_dma(drive))
-					goto no_dma_set;
-			}
-		} else if (__ide_dma_good_drive(drive) &&
-			   (id->eide_dma_time < 150)) {
-			/* Consult the list of known "good" drives */
-			if (!slc90e66_config_drive_for_dma(drive))
-				goto no_dma_set;
-		} else {
-			goto fast_ata_pio;
+		if (ide_use_dma(drive)) {
+			if (slc90e66_config_drive_for_dma(drive))
+				return hwif->ide_dma_on(drive);
 		}
-		return hwif->ide_dma_on(drive);
+
+		goto fast_ata_pio;
+
 	} else if ((id->capability & 8) || (id->field_valid & 2)) {
 fast_ata_pio:
-no_dma_set:
 		hwif->tuneproc(drive, 5);
 		return hwif->ide_dma_off_quietly(drive);
 	}
@@ -312,18 +195,6 @@ no_dma_set:
 	return 0;
 }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
-
-static unsigned int __init init_chipset_slc90e66 (struct pci_dev *dev, const char *name)
-{
-#if defined(DISPLAY_SLC90E66_TIMINGS) && defined(CONFIG_PROC_FS)
-	if (!slc90e66_proc) {
-		slc90e66_proc = 1;
-		bmide_dev = dev;
-		ide_pci_create_host_proc("slc90e66", slc90e66_get_info);
-	}
-#endif /* DISPLAY_SLC90E66_TIMINGS && CONFIG_PROC_FS */
-	return 0;
-}
 
 static void __init init_hwif_slc90e66 (ide_hwif_t *hwif)
 {
@@ -366,7 +237,6 @@ static void __init init_hwif_slc90e66 (ide_hwif_t *hwif)
 
 static ide_pci_device_t slc90e66_chipset __devinitdata = {
 	.name		= "SLC90E66",
-	.init_chipset	= init_chipset_slc90e66,
 	.init_hwif	= init_hwif_slc90e66,
 	.channels	= 2,
 	.autodma	= AUTODMA,

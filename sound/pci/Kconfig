@@ -112,6 +112,16 @@ config SND_BT87X
 	  To compile this driver as a module, choose M here: the module
 	  will be called snd-bt87x.
 
+config SND_BT87X_OVERCLOCK
+	bool "Bt87x Audio overclocking"
+	depends on SND_BT87X
+	help
+	  Say Y here if 448000 Hz isn't enough for you and you want to
+	  record from the analog input with up to 1792000 Hz.
+
+	  Higher sample rates won't hurt your hardware, but audio
+	  quality may suffer.
+
 config SND_CS46XX
 	tristate "Cirrus Logic (Sound Fusion) CS4280/CS461x/CS462x/CS463x"
 	depends on SND
@@ -469,36 +479,5 @@ config SND_VX222
 	  To compile this driver as a module, choose M here: the module
 	  will be called snd-vx222.
 
-config SND_EMU10K1X
-	tristate "Emu10k1X (Dell OEM Version)"
-	depends on SND
-	select SND_AC97_CODEC
-	help
-	  Say Y here to include support for the Dell OEM version of the
-	  Sound Blaster Live!.
-
-	  To compile this driver as a module, choose M here: the module
-	  will be called snd-emu10k1x.
-
-config SND_AUDIGYLS
-	tristate "SB Audigy LS"
-	depends on SND
-	select SND_AC97_CODEC
-	help
-	  Say Y here to include support for the Sound Blaster Audigy LS.
-
-	  To compile this driver as a module, choose M here: the module
-	  will be called snd-audigyls.
-
-config SND_VIA82XX_MODEM
-	tristate "VIA 82C686A/B, 8233 based Modems"
-	depends on SND
-	select SND_AC97_CODEC
-	help
-	  Say Y here to include support for the integrated MC97 modem on
-	  motherboards with VIA chipsets.
-
-	  To compile this driver as a module, choose M here: the module
-	  will be called snd-via82xx-modem.
-
 endmenu
+

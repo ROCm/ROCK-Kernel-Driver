@@ -44,7 +44,7 @@ static int ehci_get_frame (struct usb_hcd *hcd);
  * @tag: hardware tag for type of this record
  */
 static union ehci_shadow *
-periodic_next_shadow (union ehci_shadow *periodic, int tag)
+periodic_next_shadow (union ehci_shadow *periodic, __le32 tag)
 {
 	switch (tag) {
 	case Q_TYPE_QH:
@@ -64,7 +64,7 @@ periodic_next_shadow (union ehci_shadow *periodic, int tag)
 static int periodic_unlink (struct ehci_hcd *ehci, unsigned frame, void *ptr)
 {
 	union ehci_shadow	*prev_p = &ehci->pshadow [frame];
-	u32			*hw_p = &ehci->periodic [frame];
+	__le32			*hw_p = &ehci->periodic [frame];
 	union ehci_shadow	here = *prev_p;
 	union ehci_shadow	*next_p;
 
@@ -98,7 +98,7 @@ static int periodic_unlink (struct ehci_hcd *ehci, unsigned frame, void *ptr)
 static unsigned short
 periodic_usecs (struct ehci_hcd *ehci, unsigned frame, unsigned uframe)
 {
-	u32			*hw_p = &ehci->periodic [frame];
+	__le32			*hw_p = &ehci->periodic [frame];
 	union ehci_shadow	*q = &ehci->pshadow [frame];
 	unsigned		usecs = 0;
 
@@ -196,7 +196,7 @@ static int tt_no_collision (
 	 */
 	for (; frame < ehci->periodic_size; frame += period) {
 		union ehci_shadow	here;
-		u32			type;
+		__le32			type;
 
 		here = ehci->pshadow [frame];
 		type = Q_NEXT_TYPE (ehci->periodic [frame]);
@@ -325,7 +325,7 @@ static void intr_deschedule (
 		status = disable_periodic (ehci);
 	else {
 		status = 0;
-		vdbg ("periodic schedule still enabled");
+		ehci_vdbg (ehci, "periodic schedule still enabled\n");
 	}
 
 	/*
@@ -342,7 +342,7 @@ static void intr_deschedule (
 			 * the race is very short.  then if qh also isn't
 			 * rescheduled soon, it won't matter.  otherwise...
 			 */
-			vdbg ("intr_deschedule...");
+			ehci_vdbg (ehci, "intr_deschedule...\n");
 		}
 	} else
 		qh->hw_next = EHCI_LIST_END;
@@ -353,8 +353,8 @@ static void intr_deschedule (
 	hcd_to_bus (&ehci->hcd)->bandwidth_allocated -= 
 		(qh->usecs + qh->c_usecs) / qh->period;
 
-	dbg ("descheduled qh %p, period = %d frame = %d count = %d, urbs = %d",
-		qh, qh->period, frame,
+	ehci_dbg (ehci, "descheduled qh%d/%p frame=%d count=%d, urbs=%d\n",
+		qh->period, qh, frame,
 		atomic_read (&qh->kref.refcount), ehci->periodic_sched);
 }
 
@@ -403,7 +403,7 @@ static int check_intr_schedule (
 	unsigned		frame,
 	unsigned		uframe,
 	const struct ehci_qh	*qh,
-	u32			*c_maskp
+	__le32			*c_maskp
 )
 {
     	int		retval = -ENOSPC;
@@ -412,7 +412,7 @@ static int check_intr_schedule (
 		goto done;
 	if (!qh->c_usecs) {
 		retval = 0;
-		*c_maskp = cpu_to_le32 (0);
+		*c_maskp = 0;
 		goto done;
 	}
 
@@ -447,9 +447,10 @@ static int qh_schedule (struct ehci_hcd *ehci, struct ehci_qh *qh)
 {
 	int 		status;
 	unsigned	uframe;
-	u32		c_mask;
+	__le32		c_mask;
 	unsigned	frame;		/* 0..(qh->period - 1), or NO_FRAME */
 
+	qh_refresh(ehci, qh);
 	qh->hw_next = EHCI_LIST_END;
 	frame = qh->start;
 
@@ -486,13 +487,14 @@ static int qh_schedule (struct ehci_hcd *ehci, struct ehci_qh *qh)
 		qh->hw_info2 &= ~__constant_cpu_to_le32(0xffff);
 		qh->hw_info2 |= cpu_to_le32 (1 << uframe) | c_mask;
 	} else
-		dbg ("reused previous qh %p schedule", qh);
+		ehci_dbg (ehci, "reused qh %p schedule\n", qh);
 
 	/* stuff into the periodic schedule */
 	qh->qh_state = QH_STATE_LINKED;
-	dbg ("scheduled qh %p usecs %d/%d period %d.0 starting %d.%d (gap %d)",
-		qh, qh->usecs, qh->c_usecs,
-		qh->period, frame, uframe, qh->gap_uf);
+	ehci_dbg(ehci,
+		"scheduled qh%d/%p usecs %d/%d starting %d.%d (gap %d)\n",
+		qh->period, qh, qh->usecs, qh->c_usecs,
+		frame, uframe, qh->gap_uf);
 	do {
 		if (unlikely (ehci->pshadow [frame].ptr != 0)) {
 
@@ -907,6 +909,7 @@ itd_urb_transaction (
 
 		if (unlikely (0 == itd)) {
 			iso_sched_free (stream, sched);
+			spin_unlock_irqrestore (&ehci->lock, flags);
 			return -ENOMEM;
 		}
 		memset (itd, 0, sizeof *itd);
@@ -1008,8 +1011,7 @@ sitd_slot_ok (
 		uframe += period_uframes;
 	} while (uframe < mod);
 
-	stream->splits = stream->raw_mask << (uframe & 7);
-	cpu_to_le32s (&stream->splits);
+	stream->splits = cpu_to_le32(stream->raw_mask << (uframe & 7));
 	return 1;
 }
 
@@ -1812,7 +1814,7 @@ scan_periodic (struct ehci_hcd *ehci, struct pt_regs *regs)
 
 	for (;;) {
 		union ehci_shadow	q, *q_p;
-		u32			type, *hw_p;
+		__le32			type, *hw_p;
 		unsigned		uframes;
 
 		/* don't scan past the live uframe */
@@ -1836,7 +1838,9 @@ restart:
 		while (q.ptr != 0) {
 			unsigned		uf;
 			union ehci_shadow	temp;
+			int			live;
 
+			live = HCD_IS_RUNNING (ehci->hcd.state);
 			switch (type) {
 			case Q_TYPE_QH:
 				/* handle any completions */
@@ -1861,7 +1865,7 @@ restart:
 			case Q_TYPE_ITD:
 				/* skip itds for later in the frame */
 				rmb ();
-				for (uf = uframes; uf < 8; uf++) {
+				for (uf = live ? uframes : 8; uf < 8; uf++) {
 					if (0 == (q.itd->hw_transaction [uf]
 							& ITD_ACTIVE))
 						continue;
@@ -1885,7 +1889,8 @@ restart:
 				q = *q_p;
 				break;
 			case Q_TYPE_SITD:
-				if (q.sitd->hw_results & SITD_ACTIVE) {
+				if ((q.sitd->hw_results & SITD_ACTIVE)
+						&& live) {
 					q_p = &q.sitd->sitd_next;
 					hw_p = &q.sitd->hw_next;
 					type = Q_NEXT_TYPE (q.sitd->hw_next);

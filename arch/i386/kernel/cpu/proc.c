@@ -88,7 +88,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	if (c->x86_cache_size >= 0)
 		seq_printf(m, "cache size\t: %d KB\n", c->x86_cache_size);
 #ifdef CONFIG_X86_HT
-	if (cpu_has_ht) {
+	if (smp_num_siblings > 1) {
 		extern int phys_proc_id[NR_CPUS];
 		seq_printf(m, "physical id\t: %d\n", phys_proc_id[n]);
 		seq_printf(m, "siblings\t: %d\n", smp_num_siblings);

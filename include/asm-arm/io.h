@@ -16,6 +16,7 @@
  *  04-Apr-1999	PJB	Added check_signature.
  *  12-Dec-1999	RMK	More cleanups
  *  18-Jun-2000 RMK	Removed virt_to_* and friends definitions
+ *  05-Oct-2004 BJD     Moved memory string functions to use void __iomem
  */
 #ifndef __ASM_ARM_IO_H
 #define __ASM_ARM_IO_H
@@ -38,21 +39,21 @@
  * Generic IO read/write.  These perform native-endian accesses.  Note
  * that some architectures will want to re-define __raw_{read,write}w.
  */
-extern void __raw_writesb(unsigned int addr, const void *data, int bytelen);
-extern void __raw_writesw(unsigned int addr, const void *data, int wordlen);
-extern void __raw_writesl(unsigned int addr, const void *data, int longlen);
+extern void __raw_writesb(void __iomem *addr, const void *data, int bytelen);
+extern void __raw_writesw(void __iomem *addr, const void *data, int wordlen);
+extern void __raw_writesl(void __iomem *addr, const void *data, int longlen);
 
-extern void __raw_readsb(unsigned int addr, void *data, int bytelen);
-extern void __raw_readsw(unsigned int addr, void *data, int wordlen);
-extern void __raw_readsl(unsigned int addr, void *data, int longlen);
+extern void __raw_readsb(void __iomem *addr, void *data, int bytelen);
+extern void __raw_readsw(void __iomem *addr, void *data, int wordlen);
+extern void __raw_readsl(void __iomem *addr, void *data, int longlen);
 
-#define __raw_writeb(v,a)	(*(volatile unsigned char  *)(a) = (v))
-#define __raw_writew(v,a)	(*(volatile unsigned short *)(a) = (v))
-#define __raw_writel(v,a)	(*(volatile unsigned int   *)(a) = (v))
+#define __raw_writeb(v,a)	(*(volatile unsigned char __force  *)(a) = (v))
+#define __raw_writew(v,a)	(*(volatile unsigned short __force *)(a) = (v))
+#define __raw_writel(v,a)	(*(volatile unsigned int __force   *)(a) = (v))
 
-#define __raw_readb(a)		(*(volatile unsigned char  *)(a))
-#define __raw_readw(a)		(*(volatile unsigned short *)(a))
-#define __raw_readl(a)		(*(volatile unsigned int   *)(a))
+#define __raw_readb(a)		(*(volatile unsigned char __force  *)(a))
+#define __raw_readw(a)		(*(volatile unsigned short __force *)(a))
+#define __raw_readl(a)		(*(volatile unsigned int __force   *)(a))
 
 /*
  * Bad read/write accesses...
@@ -131,9 +132,11 @@ extern void __readwrite_bug(const char *fn);
 /*
  * String version of IO memory access ops:
  */
-extern void _memcpy_fromio(void *, unsigned long, size_t);
-extern void _memcpy_toio(unsigned long, const void *, size_t);
-extern void _memset_io(unsigned long, int, size_t);
+extern void _memcpy_fromio(void *, void __iomem *, size_t);
+extern void _memcpy_toio(void __iomem *, const void *, size_t);
+extern void _memset_io(void __iomem *, int, size_t);
+
+#define mmiowb()
 
 /*
  *  Memory access primitives
@@ -153,17 +156,17 @@ extern void _memset_io(unsigned long, int, size_t);
 #define readw_relaxed(addr) readw(addr)
 #define readl_relaxed(addr) readl(addr)
 
-#define readsb(p,d,l)		__raw_readsb((unsigned int)__mem_pci(p),d,l)
-#define readsw(p,d,l)		__raw_readsw((unsigned int)__mem_pci(p),d,l)
-#define readsl(p,d,l)		__raw_readsl((unsigned int)__mem_pci(p),d,l)
+#define readsb(p,d,l)		__raw_readsb(__mem_pci(p),d,l)
+#define readsw(p,d,l)		__raw_readsw(__mem_pci(p),d,l)
+#define readsl(p,d,l)		__raw_readsl(__mem_pci(p),d,l)
 
 #define writeb(v,c)		__raw_writeb(v,__mem_pci(c))
 #define writew(v,c)		__raw_writew(cpu_to_le16(v),__mem_pci(c))
 #define writel(v,c)		__raw_writel(cpu_to_le32(v),__mem_pci(c))
 
-#define writesb(p,d,l)		__raw_writesb((unsigned int)__mem_pci(p),d,l)
-#define writesw(p,d,l)		__raw_writesw((unsigned int)__mem_pci(p),d,l)
-#define writesl(p,d,l)		__raw_writesl((unsigned int)__mem_pci(p),d,l)
+#define writesb(p,d,l)		__raw_writesb(__mem_pci(p),d,l)
+#define writesw(p,d,l)		__raw_writesw(__mem_pci(p),d,l)
+#define writesl(p,d,l)		__raw_writesl(__mem_pci(p),d,l)
 
 #define memset_io(c,v,l)	_memset_io(__mem_pci(c),(v),(l))
 #define memcpy_fromio(a,c,l)	_memcpy_fromio((a),__mem_pci(c),(l))
@@ -173,7 +176,7 @@ extern void _memset_io(unsigned long, int, size_t);
 				eth_copy_and_sum((s),__mem_pci(c),(l),(b))
 
 static inline int
-check_signature(unsigned long io_addr, const unsigned char *signature,
+check_signature(void __iomem *io_addr, const unsigned char *signature,
 		int length)
 {
 	int retval = 0;
@@ -223,23 +226,6 @@ out:
 #define isa_eth_io_copy_and_sum(a,b,c,d) \
 				eth_copy_and_sum((a),__mem_isa(b),(c),(d))
 
-static inline int
-isa_check_signature(unsigned long io_addr, const unsigned char *signature,
-		    int length)
-{
-	int retval = 0;
-	do {
-		if (isa_readb(io_addr) != *signature)
-			goto out;
-		io_addr++;
-		signature++;
-		length--;
-	} while (length);
-	retval = 1;
-out:
-	return retval;
-}
-
 #else	/* __mem_isa */
 
 #define isa_readb(addr)			(__readwrite_bug("isa_readb"),0)
@@ -255,8 +241,6 @@ out:
 #define isa_eth_io_copy_and_sum(a,b,c,d) \
 				__readwrite_bug("isa_eth_io_copy_and_sum")
 
-#define isa_check_signature(io,sig,len)	(0)
-
 #endif	/* __mem_isa */
 
 /*
@@ -265,8 +249,8 @@ out:
  * ioremap takes a PCI memory address, as specified in
  * Documentation/IO-mapping.txt.
  */
-extern void * __ioremap(unsigned long, size_t, unsigned long, unsigned long);
-extern void __iounmap(void *addr);
+extern void __iomem * __ioremap(unsigned long, size_t, unsigned long, unsigned long);
+extern void __iounmap(void __iomem *addr);
 
 #ifndef __arch_ioremap
 #define ioremap(cookie,size)		__ioremap(cookie,size,0,1)

@@ -14,14 +14,15 @@
 #include <linux/types.h>
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
+#include <linux/irq.h>
 #include <linux/timex.h>
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/smp_lock.h>
 #include <linux/kernel_stat.h>
 #include <linux/delay.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/bootinfo.h>
 #include <asm/io.h>
 #include <asm/mipsregs.h>
@@ -151,9 +152,6 @@ void ip27_do_irq_mask0(struct pt_regs *regs)
 	if (!pend0)
 		return;
 
-	/* Prevent any of the picked intrs from recursing */
-	LOCAL_HUB_S(pi_int_mask0, mask0 & ~pend0);
-
 	swlevel = ms1bit(pend0);
 #ifdef CONFIG_SMP
 	if (pend0 & (1UL << CPU_RESCHED_A_IRQ)) {
@@ -176,11 +174,6 @@ void ip27_do_irq_mask0(struct pt_regs *regs)
 		do_IRQ(irq, regs);
 	}
 
-	/* clear bit in pend0 */
-	pend0 ^= 1UL << swlevel;
-
-	/* Now allow the set of serviced intrs again */
-	LOCAL_HUB_S(pi_int_mask0, mask0);
 	LOCAL_HUB_L(PI_INT_PEND0);
 }
 
@@ -200,19 +193,12 @@ void ip27_do_irq_mask1(struct pt_regs *regs)
 	if (!pend1)
 		return;
 
-	/* Prevent any of the picked intrs from recursing */
-	LOCAL_HUB_S(pi_int_mask1, mask1 & ~pend1);
-
 	swlevel = ms1bit(pend1);
 	/* "map" swlevel to irq */
 	irq = si->level_to_irq[swlevel];
 	LOCAL_HUB_CLR_INTR(swlevel);
 	do_IRQ(irq, regs);
-	/* clear bit in pend1 */
-	pend1 ^= 1UL << swlevel;
 
-	/* Now allow the set of serviced intrs again */
-	LOCAL_HUB_S(pi_int_mask1, mask1);
 	LOCAL_HUB_L(PI_INT_PEND1);
 }
 
@@ -232,9 +218,6 @@ static int intr_connect_level(int cpu, int bit)
 	struct slice_data *si = cpu_data[cpu].data;
 
 	__set_bit(bit, si->irq_enable_mask);
-
-	/* Make sure it's not already pending when we connect it. */
-	REMOTE_HUB_CLR_INTR(nasid, bit);
 
 	if (!cputoslice(cpu)) {
 		REMOTE_HUB_S(nasid, PI_INT_MASK0_A, si->irq_enable_mask[0]);
@@ -272,6 +255,7 @@ static unsigned int startup_bridge_irq(unsigned int irq)
 	bridgereg_t device;
 	bridge_t *bridge;
 	int pin, swlevel;
+	cpuid_t cpu;
 
 	pin = SLOT_FROM_PCI_IRQ(irq);
 	bc = IRQ_TO_BRIDGE(irq);
@@ -282,13 +266,10 @@ static unsigned int startup_bridge_irq(unsigned int irq)
 	 * "map" irq to a swlevel greater than 6 since the first 6 bits
 	 * of INT_PEND0 are taken
 	 */
-	swlevel = alloc_level(bc->irq_cpu, irq);
-	intr_connect_level(bc->irq_cpu, swlevel);
-
+	swlevel = find_level(&cpu, irq);
 	bridge->b_int_addr[pin].addr = (0x20000 | swlevel | (bc->nasid << 8));
 	bridge->b_int_enable |= (1 << pin);
-	/* more stuff in int_enable reg */
-	bridge->b_int_enable |= 0x7ffffe00;
+	bridge->b_int_enable |= 0x7ffffe00;	/* more stuff in int_enable */
 
 	/*
 	 * Enable sending of an interrupt clear packt to the hub on a high to
@@ -308,7 +289,7 @@ static unsigned int startup_bridge_irq(unsigned int irq)
 	device |= (pin << (pin*3));
 	bridge->b_int_device = device;
 
-        bridge->b_widget.w_tflush;                      /* Flush */
+        bridge->b_wid_tflush;
 
         return 0;       /* Never anything pending.  */
 }
@@ -336,26 +317,37 @@ static void shutdown_bridge_irq(unsigned int irq)
 	si->level_to_irq[swlevel] = -1;
 
 	bridge->b_int_enable &= ~(1 << pin);
-	bridge->b_widget.w_tflush;                      /* Flush */
+	bridge->b_wid_tflush;
 }
 
 static inline void enable_bridge_irq(unsigned int irq)
 {
-	/* All the braindamage happens magically for us in ip27_do_irq */
+	cpuid_t cpu;
+	int swlevel;
+
+	swlevel = find_level(&cpu, irq);	/* Criminal offence */
+	intr_connect_level(cpu, swlevel);
 }
 
-static void disable_bridge_irq(unsigned int irq)
+static inline void disable_bridge_irq(unsigned int irq)
 {
-	/* All the braindamage happens magically for us in ip27_do_irq */
+	cpuid_t cpu;
+	int swlevel;
+
+	swlevel = find_level(&cpu, irq);	/* Criminal offence */
+	intr_disconnect_level(cpu, swlevel);
 }
 
 static void mask_and_ack_bridge_irq(unsigned int irq)
 {
-	/* All the braindamage happens magically for us in ip27_do_irq */
+	disable_bridge_irq(irq);
 }
 
 static void end_bridge_irq(unsigned int irq)
 {
+	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)) &&
+	    irq_desc[irq].action)
+		enable_bridge_irq(irq);
 }
 
 static struct hw_interrupt_type bridge_irq_type = {
@@ -370,15 +362,15 @@ static struct hw_interrupt_type bridge_irq_type = {
 
 static unsigned long irq_map[NR_IRQS / BITS_PER_LONG];
 
-unsigned int allocate_irqno(void)
+static int allocate_irqno(void)
 {
 	int irq;
 
 again:
-	irq = find_first_zero_bit(irq_map, LEVELS_PER_SLICE);
+	irq = find_first_zero_bit(irq_map, NR_IRQS);
 
 	if (irq >= NR_IRQS)
-		return -1;
+		return -ENOSPC;
 
 	if (test_and_set_bit(irq, irq_map))
 		goto again;
@@ -391,21 +383,49 @@ void free_irqno(unsigned int irq)
 	clear_bit(irq, irq_map);
 }
 
-void __init init_IRQ(void)
+void __devinit register_bridge_irq(unsigned int irq)
 {
-	int i;
+	irq_desc[irq].status	= IRQ_DISABLED;
+	irq_desc[irq].action	= 0;
+	irq_desc[irq].depth	= 1;
+	irq_desc[irq].handler	= &bridge_irq_type;
+}
 
-	set_except_vector(0, ip27_irq);
+int __devinit request_bridge_irq(struct bridge_controller *bc)
+{
+	int irq = allocate_irqno();
+	int swlevel, cpu;
+	nasid_t nasid;
+
+	if (irq < 0)
+		return irq;
 
 	/*
-	 * Right now the bridge irq is our kitchen sink interrupt type
+	 * "map" irq to a swlevel greater than 6 since the first 6 bits
+	 * of INT_PEND0 are taken
 	 */
-	for (i = 0; i <= NR_IRQS; i++) {
-		irq_desc[i].status	= IRQ_DISABLED;
-		irq_desc[i].action	= 0;
-		irq_desc[i].depth	= 1;
-		irq_desc[i].handler	= &bridge_irq_type;
+	cpu = bc->irq_cpu;
+	swlevel = alloc_level(cpu, irq);
+	if (unlikely(swlevel < 0)) {
+		free_irqno(irq);
+
+		return -EAGAIN;
 	}
+
+	/* Make sure it's not already pending when we connect it. */
+	nasid = COMPACT_TO_NASID_NODEID(cpu_to_node(cpu));
+	REMOTE_HUB_CLR_INTR(nasid, swlevel);
+
+	intr_connect_level(cpu, swlevel);
+
+	register_bridge_irq(irq);
+
+	return irq;
+}
+
+void __init arch_init_irq(void)
+{
+	set_except_vector(0, ip27_irq);
 }
 
 void install_ipi(void)

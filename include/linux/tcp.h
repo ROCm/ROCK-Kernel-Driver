@@ -186,6 +186,8 @@ struct tcp_info
 
 	__u32	tcpi_rcv_rtt;
 	__u32	tcpi_rcv_space;
+
+	__u32	tcpi_total_retrans;
 };
 
 #ifdef __KERNEL__
@@ -204,6 +206,13 @@ struct tcp_sack_block {
 typedef struct tcp_pcount {
 	__u32	val;
 } tcp_pcount_t;
+
+enum tcp_congestion_algo {
+	TCP_RENO=0,
+	TCP_VEGAS,
+	TCP_WESTWOOD,
+	TCP_BIC,
+};
 
 struct tcp_opt {
 	int	tcp_header_len;	/* Bytes of tcp header to send		*/
@@ -265,7 +274,7 @@ struct tcp_opt {
 	__u8	frto_counter;	/* Number of new acks after RTO */
 	__u32	frto_highmark;	/* snd_nxt when RTO occurred */
 
-	__u8	unused_pad;
+	__u8	adv_cong;	/* Using Vegas, Westwood, or BIC */
 	__u8	defer_accept;	/* User waits for some data after accept() */
 	/* one byte hole, try to pack */
 
@@ -357,6 +366,8 @@ struct tcp_opt {
 	__u8	urg_mode;	/* In urgent mode		*/
 	__u32	snd_up;		/* Urgent pointer		*/
 
+	__u32	total_retrans;	/* Total retransmits for entire connection */
+
 	/* The syn_wait_lock is necessary only to avoid proc interface having
 	 * to grab the main lock sock while browsing the listening hash
 	 * (otherwise it's deadlock prone).
@@ -412,7 +423,6 @@ struct tcp_opt {
 		__u32	beg_snd_nxt;	/* right edge during last RTT */
 		__u32	beg_snd_una;	/* left edge  during last RTT */
 		__u32	beg_snd_cwnd;	/* saves the size of the cwnd */
-		__u8	do_vegas;	/* do vegas for this connection */
 		__u8	doing_vegas_now;/* if true, do vegas for this RTT */
 		__u16	cntRTT;		/* # of RTTs measured within last RTT */
 		__u32	minRTT;		/* min of RTTs measured within last RTT (in usec) */

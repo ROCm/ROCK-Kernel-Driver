@@ -653,6 +653,7 @@ static void yenta_close(struct pci_dev *dev)
 	yenta_free_resources(sock);
 
 	pci_release_regions(dev);
+	pci_disable_device(dev);
 	pci_set_drvdata(dev, NULL);
 }
 
@@ -688,7 +689,7 @@ enum {
  * Different cardbus controllers have slightly different
  * initialization sequences etc details. List them here..
  */
-struct cardbus_type cardbus_type[] = {
+static struct cardbus_type cardbus_type[] = {
 	[CARDBUS_TYPE_TI]	= {
 		.override	= ti_override,
 		.save_state	= ti_save_state,
@@ -827,8 +828,7 @@ static int yenta_probe_cb_irq(struct yenta_socket *socket)
 	cb_writel(socket, CB_SOCKET_MASK, CB_CSTSMASK);
 	cb_writel(socket, CB_SOCKET_FORCE, CB_FCARDSTS);
 	
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ/10);
+	msleep(100);
 
 	/* disable interrupts */
 	cb_writel(socket, CB_SOCKET_MASK, 0);
@@ -1023,10 +1023,16 @@ static int yenta_dev_suspend (struct pci_dev *dev, u32 state)
 			socket->type->save_state(socket);
 
 		/* FIXME: pci_save_state needs to have a better interface */
-		pci_save_state(dev, socket->saved_state);
-		pci_read_config_dword(dev, 16*4, &socket->saved_state[16]);
-		pci_read_config_dword(dev, 17*4, &socket->saved_state[17]);
-		pci_set_power_state(dev, 3);
+		pci_save_state(dev);
+		pci_read_config_dword(dev, 16*4, &socket->saved_state[0]);
+		pci_read_config_dword(dev, 17*4, &socket->saved_state[1]);
+
+		/*
+		 * Some laptops (IBM T22) do not like us putting the Cardbus
+		 * bridge into D3.  At a guess, some other laptop will
+		 * probably require this, so leave it commented out for now.
+		 */
+		/* pci_set_power_state(dev, 3); */
 	}
 
 	return ret;
@@ -1040,9 +1046,9 @@ static int yenta_dev_resume (struct pci_dev *dev)
 	if (socket) {
 		pci_set_power_state(dev, 0);
 		/* FIXME: pci_restore_state needs to have a better interface */
-		pci_restore_state(dev, socket->saved_state);
-		pci_write_config_dword(dev, 16*4, socket->saved_state[16]);
-		pci_write_config_dword(dev, 17*4, socket->saved_state[17]);
+		pci_restore_state(dev);
+		pci_write_config_dword(dev, 16*4, socket->saved_state[0]);
+		pci_write_config_dword(dev, 17*4, socket->saved_state[1]);
 
 		if (socket->type && socket->type->restore_state)
 			socket->type->restore_state(socket);
@@ -1091,6 +1097,7 @@ static struct pci_device_id yenta_table [] = {
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_4410, TI12XX),
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_4450, TI12XX),
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_4451, TI12XX),
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_4520, TI12XX),
 
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1250, TI1250),
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1410, TI1250),

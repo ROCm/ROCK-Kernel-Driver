@@ -40,6 +40,7 @@
 #include <linux/spinlock.h>
 #include <linux/hardirq.h>
 
+#include <asm/compiler.h>
 #include <asm/mipsregs.h>
 #include <asm/ptrace.h>
 #include <asm/time.h>
@@ -99,6 +100,9 @@ void mips_timer_interrupt(struct pt_regs *regs)
 
 		kstat_this_cpu.irqs[irq]++;
 		do_timer(regs);
+#ifndef CONFIG_SMP
+		update_process_times(user_mode(regs));
+#endif
 		r4k_cur += r4k_offset;
 		ack_r4ktimer(r4k_cur);
 
@@ -137,6 +141,9 @@ void counter0_irq(int irq, void *dev_id, struct pt_regs *regs)
 
 	while (time_elapsed > 0) {
 		do_timer(regs);
+#ifndef CONFIG_SMP
+		update_process_times(user_mode(regs));
+#endif
 		time_elapsed -= MATCH20_INC;
 		last_match20 += MATCH20_INC;
 		jiffie_drift++;
@@ -153,6 +160,9 @@ void counter0_irq(int irq, void *dev_id, struct pt_regs *regs)
 	if (jiffie_drift >= 999) {
 		jiffie_drift -= 999;
 		do_timer(regs); /* increment jiffies by one */
+#ifndef CONFIG_SMP
+		update_process_times(user_mode(regs));
+#endif
 	}
 }
 
@@ -342,9 +352,9 @@ static unsigned long do_fast_cp0_gettimeoffset(void)
 
 	__asm__("multu\t%1,%2\n\t"
 		"mfhi\t%0"
-		:"=r" (res)
-		:"r" (count),
-		 "r" (quotient));
+		: "=r" (res)
+		: "r" (count), "r" (quotient)
+		: "hi", "lo", GCC_REG_ACCUM);
 
 	/*
  	 * Due to possible jiffies inconsistencies, we need to check 

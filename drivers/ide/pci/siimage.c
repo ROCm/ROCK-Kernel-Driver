@@ -420,37 +420,16 @@ static int siimage_config_drive_for_dma (ide_drive_t *drive)
 	struct hd_driveid *id	= drive->id;
 
 	if ((id->capability & 1) != 0 && drive->autodma) {
-		/* Consult the list of known "bad" drives */
-		if (__ide_dma_bad_drive(drive))
-			goto fast_ata_pio;
 
-		if ((id->field_valid & 4) && siimage_ratemask(drive)) {
-			if (id->dma_ultra & hwif->ultra_mask) {
-				/* Force if Capable UltraDMA */
-				int dma = config_chipset_for_dma(drive);
-				if ((id->field_valid & 2) && !dma)
-					goto try_dma_modes;
-			}
-		} else if (id->field_valid & 2) {
-try_dma_modes:
-			if ((id->dma_mword & hwif->mwdma_mask) ||
-			    (id->dma_1word & hwif->swdma_mask)) {
-				/* Force if Capable regular DMA modes */
-				if (!config_chipset_for_dma(drive))
-					goto no_dma_set;
-			}
-		} else if (__ide_dma_good_drive(drive) &&
-			   (id->eide_dma_time < 150)) {
-			/* Consult the list of known "good" drives */
-			if (!config_chipset_for_dma(drive))
-				goto no_dma_set;
-		} else {
-			goto fast_ata_pio;
+		if (ide_use_dma(drive)) {
+			if (config_chipset_for_dma(drive))
+				return hwif->ide_dma_on(drive);
 		}
-		return hwif->ide_dma_on(drive);
+
+		goto fast_ata_pio;
+
 	} else if ((id->capability & 8) || (id->field_valid & 2)) {
 fast_ata_pio:
-no_dma_set:
 		config_chipset_for_pio(drive, 1);
 		return hwif->ide_dma_off_quietly(drive);
 	}
@@ -552,12 +531,6 @@ static int siimage_mmio_ide_dma_test_irq (ide_drive_t *drive)
 		return 0;	//return 1;
 
 	return 0;
-}
-
-static int siimage_mmio_ide_dma_verbose (ide_drive_t *drive)
-{
-	int temp = __ide_dma_verbose(drive);
-	return temp;
 }
 
 /**
@@ -898,12 +871,11 @@ static void __devinit init_mmio_iops_siimage(ide_hwif_t *hwif)
 	 *	the MMIO layout isnt the same as the the standard port
 	 *	based I/O
 	 */
-	 
-	memset(&hw, 0, sizeof(hw_regs_t));
-	hw.priv				= addr;
 
-	base				= (unsigned long)addr;
-	if(ch)
+	memset(&hw, 0, sizeof(hw_regs_t));
+
+	base = (unsigned long)addr;
+	if (ch)
 		base += 0xC0;
 	else
 		base += 0x80;
@@ -928,27 +900,22 @@ static void __devinit init_mmio_iops_siimage(ide_hwif_t *hwif)
 
 	hw.io_ports[IDE_IRQ_OFFSET]	= 0;
 
-        if (pdev_is_sata(dev)) {
-        	base = (unsigned long) addr;
-        	if(ch)
-        		base += 0x80;
-		hw.sata_scr[SATA_STATUS_OFFSET]	= base + 0x104;
-		hw.sata_scr[SATA_ERROR_OFFSET]	= base + 0x108;
-		hw.sata_scr[SATA_CONTROL_OFFSET]= base + 0x100;
-		hw.sata_misc[SATA_MISC_OFFSET]	= base + 0x140;
-		hw.sata_misc[SATA_PHY_OFFSET]	= base + 0x144;
-		hw.sata_misc[SATA_IEN_OFFSET]	= base + 0x148;
+	if (pdev_is_sata(dev)) {
+		base = (unsigned long)addr;
+		if (ch)
+			base += 0x80;
+		hwif->sata_scr[SATA_STATUS_OFFSET]	= base + 0x104;
+		hwif->sata_scr[SATA_ERROR_OFFSET]	= base + 0x108;
+		hwif->sata_scr[SATA_CONTROL_OFFSET]	= base + 0x100;
+		hwif->sata_misc[SATA_MISC_OFFSET]	= base + 0x140;
+		hwif->sata_misc[SATA_PHY_OFFSET]	= base + 0x144;
+		hwif->sata_misc[SATA_IEN_OFFSET]	= base + 0x148;
 	}
 
 	hw.irq				= hwif->pci_dev->irq;
 
 	memcpy(&hwif->hw, &hw, sizeof(hw));
 	memcpy(hwif->io_ports, hwif->hw.io_ports, sizeof(hwif->hw.io_ports));
-
-	if (is_sata(hwif)) {
-		memcpy(hwif->sata_scr, hwif->hw.sata_scr, sizeof(hwif->hw.sata_scr));
-		memcpy(hwif->sata_misc, hwif->hw.sata_misc, sizeof(hwif->hw.sata_misc));
-	}
 
 	hwif->irq			= hw.irq;
 
@@ -988,6 +955,22 @@ static int is_dev_seagate_sata(ide_drive_t *drive)
 }
 
 /**
+ *	siimage_fixup		-	post probe fixups
+ *	@hwif: interface to fix up
+ *
+ *	Called after drive probe we use this to decide whether the
+ *	Seagate fixup must be applied. This used to be in init_iops but
+ *	that can occur before we know what drives are present.
+ */
+
+static void __devinit siimage_fixup(ide_hwif_t *hwif)
+{
+	/* Try and raise the rqsize */
+	if (!is_sata(hwif) || !is_dev_seagate_sata(&hwif->drives[0]))
+		hwif->rqsize = 128;
+}
+
+/**
  *	init_iops_siimage	-	set up iops
  *	@hwif: interface to set up
  *
@@ -1007,9 +990,8 @@ static void __devinit init_iops_siimage(ide_hwif_t *hwif)
 	
 	hwif->hwif_data = NULL;
 
-	hwif->rqsize = 128;
-	if (is_sata(hwif) && is_dev_seagate_sata(&hwif->drives[0]))
-		hwif->rqsize = 15;
+	/* Pessimal until we finish probing */
+	hwif->rqsize = 15;
 
 	if (pci_get_drvdata(dev) == NULL)
 		return;
@@ -1077,7 +1059,6 @@ static void __devinit init_hwif_siimage(ide_hwif_t *hwif)
 
 	if (hwif->mmio) {
 		hwif->ide_dma_test_irq = &siimage_mmio_ide_dma_test_irq;
-		hwif->ide_dma_verbose = &siimage_mmio_ide_dma_verbose;
 	} else {
 		hwif->ide_dma_test_irq = & siimage_io_ide_dma_test_irq;
 	}
@@ -1098,6 +1079,7 @@ static void __devinit init_hwif_siimage(ide_hwif_t *hwif)
 		.init_chipset	= init_chipset_siimage,	\
 		.init_iops	= init_iops_siimage,	\
 		.init_hwif	= init_hwif_siimage,	\
+		.fixup		= siimage_fixup,	\
 		.channels	= 2,			\
 		.autodma	= AUTODMA,		\
 		.bootable	= ON_BOARD,		\

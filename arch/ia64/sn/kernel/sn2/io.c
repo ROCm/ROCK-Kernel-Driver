@@ -9,7 +9,7 @@
  * we wrap the inlines from asm/ia64/sn/sn2/io.h here.
  */
 
-#include <asm/sn/sn2/io.h>
+#include <asm/sn/io.h>
 
 #ifdef CONFIG_IA64_GENERIC
 
@@ -28,88 +28,74 @@
 #undef __sn_readl_relaxed
 #undef __sn_readq_relaxed
 
-unsigned int
-__sn_inb (unsigned long port)
+unsigned int __sn_inb(unsigned long port)
 {
 	return ___sn_inb(port);
 }
 
-unsigned int
-__sn_inw (unsigned long port)
+unsigned int __sn_inw(unsigned long port)
 {
 	return ___sn_inw(port);
 }
 
-unsigned int
-__sn_inl (unsigned long port)
+unsigned int __sn_inl(unsigned long port)
 {
 	return ___sn_inl(port);
 }
 
-void
-__sn_outb (unsigned char val, unsigned long port)
+void __sn_outb(unsigned char val, unsigned long port)
 {
 	___sn_outb(val, port);
 }
 
-void
-__sn_outw (unsigned short val, unsigned long port)
+void __sn_outw(unsigned short val, unsigned long port)
 {
 	___sn_outw(val, port);
 }
 
-void
-__sn_outl (unsigned int val, unsigned long port)
+void __sn_outl(unsigned int val, unsigned long port)
 {
 	___sn_outl(val, port);
 }
 
-unsigned char
-__sn_readb (void *addr)
+unsigned char __sn_readb(void __iomem *addr)
 {
-	return ___sn_readb (addr);
+	return ___sn_readb(addr);
 }
 
-unsigned short
-__sn_readw (void *addr)
+unsigned short __sn_readw(void __iomem *addr)
 {
-	return ___sn_readw (addr);
+	return ___sn_readw(addr);
 }
 
-unsigned int
-__sn_readl (void *addr)
+unsigned int __sn_readl(void __iomem *addr)
 {
-	return ___sn_readl (addr);
+	return ___sn_readl(addr);
 }
 
-unsigned long
-__sn_readq (void *addr)
+unsigned long __sn_readq(void __iomem *addr)
 {
-	return ___sn_readq (addr);
+	return ___sn_readq(addr);
 }
 
-unsigned char
-__sn_readb_relaxed (void *addr)
+unsigned char __sn_readb_relaxed(void __iomem *addr)
 {
-	return ___sn_readb_relaxed (addr);
+	return ___sn_readb_relaxed(addr);
 }
 
-unsigned short
-__sn_readw_relaxed (void *addr)
+unsigned short __sn_readw_relaxed(void __iomem *addr)
 {
-	return ___sn_readw_relaxed (addr);
+	return ___sn_readw_relaxed(addr);
 }
 
-unsigned int
-__sn_readl_relaxed (void *addr)
+unsigned int __sn_readl_relaxed(void __iomem *addr)
 {
-	return ___sn_readl_relaxed (addr);
+	return ___sn_readl_relaxed(addr);
 }
 
-unsigned long
-__sn_readq_relaxed (void *addr)
+unsigned long __sn_readq_relaxed(void __iomem *addr)
 {
-	return ___sn_readq_relaxed (addr);
+	return ___sn_readq_relaxed(addr);
 }
 
 #endif

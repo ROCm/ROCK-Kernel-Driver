@@ -40,12 +40,11 @@
 #define ADM1021_ALARM_RTEMP_NA		0x04
 
 /* Addresses to scan */
-static unsigned short normal_i2c[] = { I2C_CLIENT_END };
-static unsigned short normal_i2c_range[] = { 0x18, 0x1a, 0x29, 0x2b,
-	0x4c, 0x4e, I2C_CLIENT_END
-};
+static unsigned short normal_i2c[] = { 0x18, 0x19, 0x1a,
+					0x29, 0x2a, 0x2b,
+					0x4c, 0x4d, 0x4e, 
+					I2C_CLIENT_END };
 static unsigned int normal_isa[] = { I2C_CLIENT_ISA_END };
-static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 
 /* Insmod parameters */
 SENSORS_INSMOD_8(adm1021, adm1023, max1617, max1617a, thmc10, lm84, gl523sm, mc1066);
@@ -148,7 +147,7 @@ static struct i2c_driver adm1021_driver = {
 	.detach_client	= adm1021_detach_client,
 };
 
-static int adm1021_id = 0;
+static int adm1021_id;
 
 #define show(value)	\
 static ssize_t show_##value(struct device *dev, char *buf)		\

@@ -42,7 +42,13 @@ extern void (*copy_page)(void *to, void *from);
 extern void clear_page_slow(void *to);
 extern void copy_page_slow(void *to, void *from);
 
-#if defined(CONFIG_CPU_SH2) || defined(CONFIG_CPU_SH3) || !defined(CONFIG_MMU)
+#if defined(CONFIG_SH7705_CACHE_32KB) && defined(CONFIG_MMU)
+struct page;
+extern void clear_user_page(void *to, unsigned long address, struct page *pg);
+extern void copy_user_page(void *to, void *from, unsigned long address, struct page *pg);
+extern void __clear_user_page(void *to, void *orig_to);
+extern void __copy_user_page(void *to, void *from, void *orig_to);
+#elif defined(CONFIG_CPU_SH2) || defined(CONFIG_CPU_SH3) || !defined(CONFIG_MMU)
 #define clear_user_page(page, vaddr, pg)	clear_page(page)
 #define copy_user_page(to, from, vaddr, pg)	copy_page(to, from)
 #elif defined(CONFIG_CPU_SH4)

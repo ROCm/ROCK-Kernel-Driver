@@ -376,7 +376,7 @@ void __init mem_init(void)
 	 * Turn on overcommit on tiny machines
 	 */
 	if (PAGE_SIZE >= 16384 && num_physpages <= 128) {
-		sysctl_overcommit_memory = 1;
+		sysctl_overcommit_memory = OVERCOMMIT_ALWAYS;
 		printk("Turning on overcommit\n");
 	}
 }

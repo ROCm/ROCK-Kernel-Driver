@@ -22,6 +22,7 @@ unsigned int
 csum_partial_copy_from_user(const char __user *src, char *dst, 
 			    int len, unsigned int isum, int *errp)
 { 
+	might_sleep();
 	*errp = 0;
 	if (likely(access_ok(VERIFY_READ,src, len))) { 
 		/* Why 6, not 7? To handle odd addresses aligned we
@@ -69,6 +70,7 @@ unsigned int
 csum_partial_copy_to_user(const char *src, char __user *dst, 
 			  int len, unsigned int isum, int *errp)
 { 
+	might_sleep();
 	if (unlikely(!access_ok(VERIFY_WRITE, dst, len))) {
 		*errp = -EFAULT;
 		return 0; 

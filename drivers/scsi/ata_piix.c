@@ -32,7 +32,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME	"ata_piix"
-#define DRV_VERSION	"1.02"
+#define DRV_VERSION	"1.03"
 
 enum {
 	PIIX_IOCFG		= 0x54, /* IDE I/O configuration register */
@@ -125,15 +125,16 @@ static struct ata_port_operations piix_pata_ops = {
 	.set_piomode		= piix_set_piomode,
 	.set_dmamode		= piix_set_dmamode,
 
-	.tf_load		= ata_tf_load_pio,
-	.tf_read		= ata_tf_read_pio,
-	.check_status		= ata_check_status_pio,
-	.exec_command		= ata_exec_command_pio,
+	.tf_load		= ata_tf_load,
+	.tf_read		= ata_tf_read,
+	.check_status		= ata_check_status,
+	.exec_command		= ata_exec_command,
+	.dev_select		= ata_std_dev_select,
 
 	.phy_reset		= piix_pata_phy_reset,
 
-	.bmdma_setup		= ata_bmdma_setup_pio,
-	.bmdma_start		= ata_bmdma_start_pio,
+	.bmdma_setup		= ata_bmdma_setup,
+	.bmdma_start		= ata_bmdma_start,
 	.qc_prep		= ata_qc_prep,
 	.qc_issue		= ata_qc_issue_prot,
 
@@ -149,15 +150,16 @@ static struct ata_port_operations piix_pata_ops = {
 static struct ata_port_operations piix_sata_ops = {
 	.port_disable		= ata_port_disable,
 
-	.tf_load		= ata_tf_load_pio,
-	.tf_read		= ata_tf_read_pio,
-	.check_status		= ata_check_status_pio,
-	.exec_command		= ata_exec_command_pio,
+	.tf_load		= ata_tf_load,
+	.tf_read		= ata_tf_read,
+	.check_status		= ata_check_status,
+	.exec_command		= ata_exec_command,
+	.dev_select		= ata_std_dev_select,
 
 	.phy_reset		= piix_sata_phy_reset,
 
-	.bmdma_setup		= ata_bmdma_setup_pio,
-	.bmdma_start		= ata_bmdma_start_pio,
+	.bmdma_setup		= ata_bmdma_setup,
+	.bmdma_start		= ata_bmdma_start,
 	.qc_prep		= ata_qc_prep,
 	.qc_issue		= ata_qc_issue_prot,
 
@@ -182,7 +184,7 @@ static struct ata_port_info piix_port_info[] = {
 #else
 		.mwdma_mask	= 0x00, /* mwdma broken */
 #endif
-		.udma_mask	= ATA_UDMA_MASK_40C, /* FIXME: cbl det */
+		.udma_mask	= 0x3f, /* udma0-5 */
 		.port_ops	= &piix_pata_ops,
 	},
 
@@ -207,7 +209,7 @@ static struct ata_port_info piix_port_info[] = {
 #else
 		.mwdma_mask	= 0x00, /* mwdma broken */
 #endif
-		.udma_mask	= ATA_UDMA_MASK_40C, /* FIXME: cbl det */
+		.udma_mask	= ATA_UDMA_MASK_40C,
 		.port_ops	= &piix_pata_ops,
 	},
 
@@ -245,12 +247,13 @@ MODULE_AUTHOR("Andre Hedrick, Alan Cox, Andrzej Krzysztofowicz, Jeff Garzik");
 MODULE_DESCRIPTION("SCSI low-level driver for Intel PIIX/ICH ATA controllers");
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, piix_pci_tbl);
+MODULE_VERSION(DRV_VERSION);
 
 /**
  *	piix_pata_cbl_detect - Probe host controller cable detect info
  *	@ap: Port for which cable detect info is desired
  *
- *	Read 80c cable indicator from SATA PCI device's PCI config
+ *	Read 80c cable indicator from ATA PCI device's PCI config
  *	register.  This register is normally set by firmware (BIOS).
  *
  *	LOCKING:
@@ -258,7 +261,7 @@ MODULE_DEVICE_TABLE(pci, piix_pci_tbl);
  */
 static void piix_pata_cbl_detect(struct ata_port *ap)
 {
-	struct pci_dev *pdev = ap->host_set->pdev;
+	struct pci_dev *pdev = to_pci_dev(ap->host_set->dev);
 	u8 tmp, mask;
 
 	/* no 80c support in host controller? */
@@ -266,7 +269,7 @@ static void piix_pata_cbl_detect(struct ata_port *ap)
 		goto cbl40;
 
 	/* check BIOS cable detect results */
-	mask = ap->port_no == 0 ? PIIX_80C_PRI : PIIX_80C_SEC;
+	mask = ap->hard_port_no == 0 ? PIIX_80C_PRI : PIIX_80C_SEC;
 	pci_read_config_byte(pdev, PIIX_IOCFG, &tmp);
 	if ((tmp & mask) == 0)
 		goto cbl40;
@@ -291,8 +294,9 @@ cbl40:
 
 static void piix_pata_phy_reset(struct ata_port *ap)
 {
-	if (!pci_test_config_bits(ap->host_set->pdev,
-				  &piix_enable_bits[ap->port_no])) {
+	struct pci_dev *pdev = to_pci_dev(ap->host_set->dev);
+
+	if (!pci_test_config_bits(pdev, &piix_enable_bits[ap->hard_port_no])) {
 		ata_port_disable(ap);
 		printk(KERN_INFO "ata%u: port disabled. ignoring.\n", ap->id);
 		return;
@@ -320,13 +324,13 @@ static void piix_pata_phy_reset(struct ata_port *ap)
  */
 static int piix_sata_probe (struct ata_port *ap)
 {
-	struct pci_dev *pdev = ap->host_set->pdev;
+	struct pci_dev *pdev = to_pci_dev(ap->host_set->dev);
 	int combined = (ap->flags & ATA_FLAG_SLAVE_POSS);
 	int orig_mask, mask, i;
 	u8 pcs;
 
-	mask = (PIIX_PORT_PRESENT << ap->port_no) |
-	       (PIIX_PORT_ENABLED << ap->port_no);
+	mask = (PIIX_PORT_PRESENT << ap->hard_port_no) |
+	       (PIIX_PORT_ENABLED << ap->hard_port_no);
 
 	pci_read_config_byte(pdev, ICH5_PCS, &pcs);
 	orig_mask = (int) pcs & 0xff;
@@ -343,7 +347,7 @@ static int piix_sata_probe (struct ata_port *ap)
 		mask = (PIIX_PORT_PRESENT << i) | (PIIX_PORT_ENABLED << i);
 
 		if ((orig_mask & mask) == mask)
-			if (combined || (i == ap->port_no))
+			if (combined || (i == ap->hard_port_no))
 				return 1;
 	}
 
@@ -390,9 +394,9 @@ static void piix_sata_phy_reset(struct ata_port *ap)
 static void piix_set_piomode (struct ata_port *ap, struct ata_device *adev)
 {
 	unsigned int pio	= adev->pio_mode - XFER_PIO_0;
-	struct pci_dev *dev	= ap->host_set->pdev;
+	struct pci_dev *dev	= to_pci_dev(ap->host_set->dev);
 	unsigned int is_slave	= (adev->devno != 0);
-	unsigned int master_port= ap->port_no ? 0x42 : 0x40;
+	unsigned int master_port= ap->hard_port_no ? 0x42 : 0x40;
 	unsigned int slave_port	= 0x44;
 	u16 master_data;
 	u8 slave_data;
@@ -410,10 +414,10 @@ static void piix_set_piomode (struct ata_port *ap, struct ata_device *adev)
 		/* enable PPE, IE and TIME */
 		master_data |= 0x0070;
 		pci_read_config_byte(dev, slave_port, &slave_data);
-		slave_data &= (ap->port_no ? 0x0f : 0xf0);
+		slave_data &= (ap->hard_port_no ? 0x0f : 0xf0);
 		slave_data |=
 			(timings[pio][0] << 2) |
-			(timings[pio][1] << (ap->port_no ? 4 : 0));
+			(timings[pio][1] << (ap->hard_port_no ? 4 : 0));
 	} else {
 		master_data &= 0xccf8;
 		/* enable PPE, IE and TIME */
@@ -442,10 +446,10 @@ static void piix_set_piomode (struct ata_port *ap, struct ata_device *adev)
 static void piix_set_dmamode (struct ata_port *ap, struct ata_device *adev)
 {
 	unsigned int udma	= adev->dma_mode; /* FIXME: MWDMA too */
-	struct pci_dev *dev	= ap->host_set->pdev;
-	u8 maslave		= ap->port_no ? 0x42 : 0x40;
+	struct pci_dev *dev	= to_pci_dev(ap->host_set->dev);
+	u8 maslave		= ap->hard_port_no ? 0x42 : 0x40;
 	u8 speed		= udma;
-	unsigned int drive_dn	= (ap->port_no ? 2 : 0) + adev->devno;
+	unsigned int drive_dn	= (ap->hard_port_no ? 2 : 0) + adev->devno;
 	int a_speed		= 3 << (drive_dn * 4);
 	int u_flag		= 1 << drive_dn;
 	int v_flag		= 0x01 << drive_dn;

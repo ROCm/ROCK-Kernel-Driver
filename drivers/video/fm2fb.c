@@ -2,7 +2,7 @@
  *  linux/drivers/video/fm2fb.c -- BSC FrameMaster II/Rainbow II frame buffer
  *				   device
  *
- *	Copyright (C) 1998 Steffen A. Mork (mork@ls7.cs.uni-dortmund.de)
+ *	Copyright (C) 1998 Steffen A. Mork (linux-dev@morknet.de)
  *	Copyright (C) 1999 Geert Uytterhoeven
  *
  *  Written for 2.0.x by Steffen A. Mork
@@ -292,14 +292,7 @@ static int __devinit fm2fb_probe(struct zorro_dev *z,
 	return 0;
 }
 
-int __init fm2fb_setup(char *options);
-
-int __init fm2fb_init(void)
-{
-	fm2fb_setup(fb_get_options("fb2fb"));
-	return zorro_register_driver(&fm2fb_driver);
-}
-
+int __init fm2fb_setup(char *options)
 {
 	char *this_opt;
 
@@ -313,6 +306,16 @@ int __init fm2fb_init(void)
 			fm2fb_mode = FM2FB_MODE_NTSC;
 	}
 	return 0;
+}
+
+int __init fm2fb_init(void)
+{
+	char *option = NULL;
+
+	if (fb_get_options("fm2fb", &option))
+		return -ENODEV;
+	fm2fb_setup(option);
+	return zorro_register_driver(&fm2fb_driver);
 }
 
 module_init(fm2fb_init);

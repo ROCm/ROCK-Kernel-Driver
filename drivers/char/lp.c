@@ -609,12 +609,9 @@ static int lp_ioctl(struct inode *inode, struct file *file,
 				return -EFAULT;
 			break;
 		case LPGETSTATUS:
-			if (down_interruptible (&lp_table[minor].port_mutex))
-				return -EINTR;
 			lp_claim_parport_or_block (&lp_table[minor]);
 			status = r_str(minor);
 			lp_release_parport (&lp_table[minor]);
-			up (&lp_table[minor].port_mutex);
 
 			if (copy_to_user(argp, &status, sizeof(int)))
 				return -EFAULT;
@@ -752,8 +749,8 @@ static int parport_nr[LP_NO] = { [0 ... LP_NO-1] = LP_PARPORT_UNSPEC };
 static char *parport[LP_NO] = { NULL,  };
 static int reset = 0;
 
-MODULE_PARM(parport, "1-" __MODULE_STRING(LP_NO) "s");
-MODULE_PARM(reset, "i");
+module_param_array(parport, charp, NULL, 0);
+module_param(reset, bool, 0);
 
 #ifndef MODULE
 static int __init lp_setup (char *str)

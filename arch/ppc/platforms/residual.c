@@ -935,8 +935,8 @@ unsigned int __init residual_isapic_addr(void)
 		goto unknown;
 
 #define p pkt->L4_Pack.L4_Data.L4_PPCPack
-	/* Must be 32-bit memory address */
-	if (!((p.PPCData[0] == 2) && (p.PPCData[1] == 32)))
+	/* Must be 32-bit system address */
+	if (!((p.PPCData[0] == 3) && (p.PPCData[1] == 32)))
 		goto unknown;
 
 	/* It doesn't seem to work where length != 1 (what can I say? :-/ ) */

@@ -92,23 +92,77 @@ typedef struct	mem_ctlr {
 	char	res3[0x80];
 } memctl8xx_t;
 
+/*-----------------------------------------------------------------------
+ * BR - Memory Controler: Base Register					16-9
+ */
+#define BR_BA_MSK	0xffff8000	/* Base Address Mask			*/
+#define BR_AT_MSK	0x00007000	/* Address Type Mask			*/
+#define BR_PS_MSK	0x00000c00	/* Port Size Mask			*/
+#define BR_PS_32	0x00000000	/* 32 bit port size			*/
+#define BR_PS_16	0x00000800	/* 16 bit port size			*/
+#define BR_PS_8		0x00000400	/*  8 bit port size			*/
+#define BR_PARE		0x00000200	/* Parity Enable			*/
+#define BR_WP		0x00000100	/* Write Protect			*/
+#define BR_MS_MSK	0x000000c0	/* Machine Select Mask			*/
+#define BR_MS_GPCM	0x00000000	/* G.P.C.M. Machine Select		*/
+#define BR_MS_UPMA	0x00000080	/* U.P.M.A Machine Select		*/
+#define BR_MS_UPMB	0x000000c0	/* U.P.M.B Machine Select		*/
+#define BR_V		0x00000001	/* Bank Valid				*/
+
+/*-----------------------------------------------------------------------
+ * OR - Memory Controler: Option Register				16-11
+ */
+#define OR_AM_MSK	0xffff8000	/* Address Mask Mask			*/
+#define OR_ATM_MSK	0x00007000	/* Address Type Mask Mask		*/
+#define OR_CSNT_SAM	0x00000800	/* Chip Select Negation Time/ Start	*/
+					/* Address Multiplex			*/
+#define OR_ACS_MSK	0x00000600	/* Address to Chip Select Setup mask	*/
+#define OR_ACS_DIV1	0x00000000	/* CS is output at the same time	*/
+#define OR_ACS_DIV4	0x00000400	/* CS is output 1/4 a clock later	*/
+#define OR_ACS_DIV2	0x00000600	/* CS is output 1/2 a clock later	*/
+#define OR_G5LA		0x00000400	/* Output #GPL5 on #GPL_A5		*/
+#define OR_G5LS		0x00000200	/* Drive #GPL high on falling edge of...*/
+#define OR_BI		0x00000100	/* Burst inhibit			*/
+#define OR_SCY_MSK	0x000000f0	/* Cycle Lenght in Clocks		*/
+#define OR_SCY_0_CLK	0x00000000	/* 0 clock cycles wait states		*/
+#define OR_SCY_1_CLK	0x00000010	/* 1 clock cycles wait states		*/
+#define OR_SCY_2_CLK	0x00000020	/* 2 clock cycles wait states		*/
+#define OR_SCY_3_CLK	0x00000030	/* 3 clock cycles wait states		*/
+#define OR_SCY_4_CLK	0x00000040	/* 4 clock cycles wait states		*/
+#define OR_SCY_5_CLK	0x00000050	/* 5 clock cycles wait states		*/
+#define OR_SCY_6_CLK	0x00000060	/* 6 clock cycles wait states		*/
+#define OR_SCY_7_CLK	0x00000070	/* 7 clock cycles wait states		*/
+#define OR_SCY_8_CLK	0x00000080	/* 8 clock cycles wait states		*/
+#define OR_SCY_9_CLK	0x00000090	/* 9 clock cycles wait states		*/
+#define OR_SCY_10_CLK	0x000000a0	/* 10 clock cycles wait states		*/
+#define OR_SCY_11_CLK	0x000000b0	/* 11 clock cycles wait states		*/
+#define OR_SCY_12_CLK	0x000000c0	/* 12 clock cycles wait states		*/
+#define OR_SCY_13_CLK	0x000000d0	/* 13 clock cycles wait states		*/
+#define OR_SCY_14_CLK	0x000000e0	/* 14 clock cycles wait states		*/
+#define OR_SCY_15_CLK	0x000000f0	/* 15 clock cycles wait states		*/
+#define OR_SETA		0x00000008	/* External Transfer Acknowledge	*/
+#define OR_TRLX		0x00000004	/* Timing Relaxed			*/
+#define OR_EHTR		0x00000002	/* Extended Hold Time on Read		*/
+
 /* System Integration Timers.
 */
 typedef struct	sys_int_timers {
 	ushort	sit_tbscr;
+	char	res0[0x02];
 	uint	sit_tbreff0;
 	uint	sit_tbreff1;
 	char	res1[0x14];
 	ushort	sit_rtcsc;
+	char	res2[0x02];
 	uint	sit_rtc;
 	uint	sit_rtsec;
 	uint	sit_rtcal;
-	char	res2[0x10];
+	char	res3[0x10];
 	ushort	sit_piscr;
-	char	res3[2];
+	char	res4[2];
 	uint	sit_pitc;
 	uint	sit_pitr;
-	char	res4[0x34];
+	char	res5[0x34];
 } sit8xx_t;
 
 #define TBSCR_TBIRQ_MASK	((ushort)0xff00)
@@ -174,20 +228,38 @@ typedef struct cark {
 */
 #define KAPWR_KEY	((unsigned int)0x55ccaa33)
 
-/* LCD interface.  MPC821 and MPC823 Only.
+/* Video interface.  MPC823 Only.
+*/
+typedef struct vid823 {
+	ushort	vid_vccr;
+	ushort	res1;
+	u_char	vid_vsr;
+	u_char	res2;
+	u_char	vid_vcmr;
+	u_char	res3;
+	uint	vid_vbcb;
+	uint	res4;
+	uint	vid_vfcr0;
+	uint	vid_vfaa0;
+	uint	vid_vfba0;
+	uint	vid_vfcr1;
+	uint	vid_vfaa1;
+	uint	vid_vfba1;
+	u_char	res5[0x18];
+} vid823_t;
+
+/* LCD interface.  823 Only.
 */
 typedef struct lcd {
-	ushort	lcd_lcolr[16];
-	char	res[0x20];
 	uint	lcd_lccr;
 	uint	lcd_lchcr;
 	uint	lcd_lcvcr;
-	char	res2[4];
+	char	res1[4];
 	uint	lcd_lcfaa;
 	uint	lcd_lcfba;
 	char	lcd_lcsr;
-	char	res3[0x7];
-} lcd8xx_t;
+	char	res2[0x7];
+} lcd823_t;
 
 /* I2C
 */
@@ -254,7 +326,8 @@ typedef struct io_port {
 	ushort	iop_pdpar;
 	char	res3[2];
 	ushort	iop_pddat;
-	char	res4[8];
+	uint	utmode;
+	char	res4[4];
 } iop8xx_t;
 
 /* Communication Processor Module Timers
@@ -290,7 +363,7 @@ typedef struct cpm_timers {
 typedef struct scc {		/* Serial communication channels */
 	uint	scc_gsmrl;
 	uint	scc_gsmrh;
-	ushort	scc_pmsr;
+	ushort	scc_psmr;
 	char	res1[2];
 	ushort	scc_todr;
 	ushort	scc_dsr;
@@ -315,41 +388,44 @@ typedef struct smc {		/* Serial management channels */
 /* MPC860T Fast Ethernet Controller.  It isn't part of the CPM, but
  * it fits within the address space.
  */
+
 typedef struct fec {
-	uint	fec_addr_low;		/* LS 32 bits of station address */
-	ushort	fec_addr_high;		/* MS 16 bits of address */
-	ushort	res1;
-	uint	fec_hash_table_high;
-	uint	fec_hash_table_low;
-	uint	fec_r_des_start;
-	uint	fec_x_des_start;
-	uint	fec_r_buff_size;
-	uint	res2[9];
-	uint	fec_ecntrl;
-	uint	fec_ievent;
-	uint	fec_imask;
-	uint	fec_ivec;
-	uint	fec_r_des_active;
-	uint	fec_x_des_active;
-	uint	res3[10];
-	uint	fec_mii_data;
-	uint	fec_mii_speed;
-	uint	res4[17];
-	uint	fec_r_bound;
-	uint	fec_r_fstart;
-	uint	res5[6];
-	uint	fec_x_fstart;
-	uint	res6[17];
-	uint	fec_fun_code;
-	uint	res7[3];
-	uint	fec_r_cntrl;
-	uint	fec_r_hash;
-	uint	res8[14];
-	uint	fec_x_cntrl;
-	uint	res9[0x1e];
+	uint	fec_addr_low;		/* lower 32 bits of station address	*/
+	ushort	fec_addr_high;		/* upper 16 bits of station address	*/
+	ushort	res1;			/* reserved				*/
+	uint	fec_hash_table_high;	/* upper 32-bits of hash table		*/
+	uint	fec_hash_table_low;	/* lower 32-bits of hash table		*/
+	uint	fec_r_des_start;	/* beginning of Rx descriptor ring	*/
+	uint	fec_x_des_start;	/* beginning of Tx descriptor ring	*/
+	uint	fec_r_buff_size;	/* Rx buffer size			*/
+	uint	res2[9];		/* reserved				*/
+	uint	fec_ecntrl;		/* ethernet control register		*/
+	uint	fec_ievent;		/* interrupt event register		*/
+	uint	fec_imask;		/* interrupt mask register		*/
+	uint	fec_ivec;		/* interrupt level and vector status	*/
+	uint	fec_r_des_active;	/* Rx ring updated flag			*/
+	uint	fec_x_des_active;	/* Tx ring updated flag			*/
+	uint	res3[10];		/* reserved				*/
+	uint	fec_mii_data;		/* MII data register			*/
+	uint	fec_mii_speed;		/* MII speed control register		*/
+	uint	res4[17];		/* reserved				*/
+	uint	fec_r_bound;		/* end of RAM (read-only)		*/
+	uint	fec_r_fstart;		/* Rx FIFO start address		*/
+	uint	res5[6];		/* reserved				*/
+	uint	fec_x_fstart;		/* Tx FIFO start address		*/
+	uint	res6[17];		/* reserved				*/
+	uint	fec_fun_code;		/* fec SDMA function code		*/
+	uint	res7[3];		/* reserved				*/
+	uint	fec_r_cntrl;		/* Rx control register			*/
+	uint	fec_r_hash;		/* Rx hash register			*/
+	uint	res8[14];		/* reserved				*/
+	uint	fec_x_cntrl;		/* Tx control register			*/
+	uint	res9[0x1e];		/* reserved				*/
 } fec_t;
 
-/* We need this as the fec and fb cmap use the same address space */
+/* The FEC and LCD color map share the same address space....
+ * I guess we will never see an 823T :-).
+ */
 union fec_lcd {
 	fec_t	fl_un_fec;
 	u_char	fl_un_cmap[0x200];
@@ -359,18 +435,20 @@ typedef struct comm_proc {
 	/* General control and status registers.
 	*/
 	ushort	cp_cpcr;
-	char	res1[2];
+	u_char	res1[2];
 	ushort	cp_rccr;
-	char	res2[6];
+	u_char	res2;
+	u_char	cp_rmds;
+	u_char	res3[4];
 	ushort	cp_cpmcr1;
 	ushort	cp_cpmcr2;
 	ushort	cp_cpmcr3;
 	ushort	cp_cpmcr4;
-	char	res3[2];
+	u_char	res4[2];
 	ushort	cp_rter;
-	char	res4[2];
+	u_char	res5[2];
 	ushort	cp_rtmr;
-	char	res5[0x14];
+	u_char	res6[0x14];
 
 	/* Baud rate generators.
 	*/
@@ -390,56 +468,75 @@ typedef struct comm_proc {
 	/* Serial Peripheral Interface.
 	*/
 	ushort	cp_spmode;
-	char	res6[4];
+	u_char	res7[4];
 	u_char	cp_spie;
-	char	res7[3];
+	u_char	res8[3];
 	u_char	cp_spim;
-	char	res8[2];
+	u_char	res9[2];
 	u_char	cp_spcom;
-	char	res9[2];
+	u_char	res10[2];
 
 	/* Parallel Interface Port.
 	*/
-	char	res10[2];
+	u_char	res11[2];
 	ushort	cp_pipc;
-	char	res11[2];
+	u_char	res12[2];
 	ushort	cp_ptpr;
 	uint	cp_pbdir;
 	uint	cp_pbpar;
-	char	res12[2];
+	u_char	res13[2];
 	ushort	cp_pbodr;
 	uint	cp_pbdat;
-	char	res13[0x18];
+
+	/* Port E - MPC87x/88x only.
+	 */
+	uint	cp_pedir;
+	uint	cp_pepar;
+	uint	cp_peso;
+	uint	cp_peodr;
+	uint	cp_pedat;
+
+	/* Communications Processor Timing Register -
+	   Contains RMII Timing for the FECs on MPC87x/88x only.
+	*/
+	uint	cp_cptr;
 
 	/* Serial Interface and Time Slot Assignment.
 	*/
 	uint	cp_simode;
 	u_char	cp_sigmr;
-	char	res14;
+	u_char	res15;
 	u_char	cp_sistr;
 	u_char	cp_sicmr;
-	char	res15[4];
+	u_char	res16[4];
 	uint	cp_sicr;
 	uint	cp_sirp;
-	char	res16[0x10c];
+	u_char	res17[0xc];
+
+	/* 256 bytes of MPC823 video controller RAM array.
+	*/
+	u_char	cp_vcram[0x100];
 	u_char	cp_siram[0x200];
 
 	/* The fast ethernet controller is not really part of the CPM,
 	 * but it resides in the address space.
-	 *
-	 * The colormap for the LCD controller is also located here
+	 * The LCD color map is also here.
 	 */
-	union	fec_lcd fl_un;
-#define cp_fec	fl_un.fl_un_fec
-#define lcd_cmap fl_un.fl_un_cmap
-	char	res18[0x1000];
+	union	fec_lcd	fl_un;
+#define cp_fec		fl_un.fl_un_fec
+#define lcd_cmap	fl_un.fl_un_cmap
+	char	res18[0xE00];
+
+	/* The DUET family has a second FEC here */
+	fec_t	cp_fec2;
+#define cp_fec1	cp_fec	/* consistency macro */
 
 	/* Dual Ported RAM follows.
 	 * There are many different formats for this memory area
 	 * depending upon the devices used and options chosen.
+	 * Some processors don't have all of it populated.
 	 */
-	u_char	cp_dpmem[0x1000];	/* BD / Data / ucode */
-	u_char	res19[0xc00];
+	u_char	cp_dpmem[0x1C00];	/* BD / Data / ucode */
 	u_char	cp_dparam[0x400];	/* Parameter RAM */
 } cpm8xx_t;
 
@@ -453,7 +550,8 @@ typedef struct immap {
 	car8xx_t	im_clkrst;	/* Clocks and reset */
 	sitk8xx_t	im_sitk;	/* Sys int timer keys */
 	cark8xx_t	im_clkrstk;	/* Clocks and reset keys */
-	lcd8xx_t	im_lcd;		/* LCD (821 and 823 only) */
+	vid823_t	im_vid;		/* Video (823 only) */
+	lcd823_t	im_lcd;		/* LCD (823 only) */
 	i2c8xx_t	im_i2c;		/* I2C control/status */
 	sdma8xx_t	im_sdma;	/* SDMA control/status */
 	cpic8xx_t	im_cpic;	/* CPM Interrupt Controller */

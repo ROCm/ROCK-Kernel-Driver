@@ -61,26 +61,28 @@ static int force_ac97[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* disable
 static int buffer_top[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* not specified */
 static int use_cache[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* disabled */
 static int vaio_hack[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0}; /* disabled */
-static int boot_devs;
+static int reset_workaround[SNDRV_CARDS];
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable this soundcard.");
-module_param_array(playback_bufsize, int, boot_devs, 0444);
+module_param_array(playback_bufsize, int, NULL, 0444);
 MODULE_PARM_DESC(playback_bufsize, "DAC frame size in kB for " CARD_NAME " soundcard.");
-module_param_array(capture_bufsize, int, boot_devs, 0444);
+module_param_array(capture_bufsize, int, NULL, 0444);
 MODULE_PARM_DESC(capture_bufsize, "ADC frame size in kB for " CARD_NAME " soundcard.");
-module_param_array(force_ac97, bool, boot_devs, 0444);
+module_param_array(force_ac97, bool, NULL, 0444);
 MODULE_PARM_DESC(force_ac97, "Force to use AC97 codec for " CARD_NAME " soundcard.");
-module_param_array(buffer_top, int, boot_devs, 0444);
+module_param_array(buffer_top, int, NULL, 0444);
 MODULE_PARM_DESC(buffer_top, "Set the top address of audio buffer for " CARD_NAME " soundcard.");
-module_param_array(use_cache, bool, boot_devs, 0444);
+module_param_array(use_cache, bool, NULL, 0444);
 MODULE_PARM_DESC(use_cache, "Enable the cache for coefficient table access.");
-module_param_array(vaio_hack, bool, boot_devs, 0444);
+module_param_array(vaio_hack, bool, NULL, 0444);
 MODULE_PARM_DESC(vaio_hack, "Enable workaround for Sony VAIO notebooks.");
+module_param_array(reset_workaround, bool, NULL, 0444);
+MODULE_PARM_DESC(reset_workaround, "Enable AC97 RESET workaround for some laptops.");
 
 /*
  * hw definitions
@@ -222,7 +224,7 @@ struct snd_nm256 {
 
 	unsigned int coeffs_current: 1;	/* coeff. table is loaded? */
 	unsigned int use_cache: 1;	/* use one big coef. table */
-	unsigned int latitude_workaround: 1; /* Dell Latitude LS workaround needed */
+	unsigned int reset_workaround: 1; /* Workaround for some laptops to avoid freeze */
 
 	int mixer_base;			/* register offset of ac97 mixer */
 	int mixer_status_offset;	/* offset of mixer status reg. */
@@ -1162,16 +1164,14 @@ snd_nm256_ac97_reset(ac97_t *ac97)
 {
 	nm256_t *chip = ac97->private_data;
 
-	spin_lock(&chip->reg_lock);
 	/* Reset the mixer.  'Tis magic!  */
 	snd_nm256_writeb(chip, 0x6c0, 1);
-	if (chip->latitude_workaround) {
+	if (! chip->reset_workaround) {
 		/* Dell latitude LS will lock up by this */
 		snd_nm256_writeb(chip, 0x6cc, 0x87);
 	}
 	snd_nm256_writeb(chip, 0x6cc, 0x80);
 	snd_nm256_writeb(chip, 0x6cc, 0x0);
-	spin_unlock(&chip->reg_lock);
 }
 
 /* create an ac97 mixer interface */
@@ -1274,6 +1274,7 @@ static int nm256_suspend(snd_card_t *card, unsigned int state)
 	snd_pcm_suspend_all(chip->pcm);
 	snd_ac97_suspend(chip->ac97);
 	chip->coeffs_current = 0;
+	pci_disable_device(chip->pci);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
@@ -1319,6 +1320,7 @@ static int snd_nm256_free(nm256_t *chip)
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void*)chip);
 
+	pci_disable_device(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -1343,13 +1345,17 @@ snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 		.dev_free =	snd_nm256_dev_free,
 	};
 	u32 addr;
-	u16 subsystem_vendor, subsystem_device;
 
 	*chip_ret = NULL;
 
+	if ((err = pci_enable_device(pci)) < 0)
+		return err;
+
 	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
-	if (chip == NULL)
+	if (chip == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 
 	chip->card = card;
 	chip->pci = pci;
@@ -1480,19 +1486,6 @@ snd_nm256_create(snd_card_t *card, struct pci_dev *pci,
 
 	chip->coeffs_current = 0;
 
-	/* check workarounds */
-	chip->latitude_workaround = 1;
-	pci_read_config_word(pci, PCI_SUBSYSTEM_VENDOR_ID, &subsystem_vendor);
-	pci_read_config_word(pci, PCI_SUBSYSTEM_ID, &subsystem_device);
-	if (subsystem_vendor == 0x104d && subsystem_device == 0x8041) {
-		/* this workaround will cause lock-up after suspend/resume on Sony PCG-F305 */
-		chip->latitude_workaround = 0;
-	}
-	if (subsystem_vendor == 0x1028 && subsystem_device == 0x0080) {
-		/* this workaround will cause lock-up after suspend/resume on a Dell laptop */
-		chip->latitude_workaround = 0;
-	}
-
 	snd_nm256_init_chip(chip);
 
 	if ((err = snd_nm256_pcm(chip, 0)) < 0)
@@ -1525,11 +1518,15 @@ struct nm256_quirk {
 	int type;
 };
 
-#define NM_BLACKLISTED	1
+enum { NM_BLACKLISTED, NM_RESET_WORKAROUND };
 
 static struct nm256_quirk nm256_quirks[] __devinitdata = {
 	/* HP omnibook 4150 has cs4232 codec internally */
 	{ .vendor = 0x103c, .device = 0x0007, .type = NM_BLACKLISTED },
+	/* Sony PCG-F305 */
+	{ .vendor = 0x104d, .device = 0x8041, .type = NM_RESET_WORKAROUND },
+	/* Dell Latitude LS */
+	{ .vendor = 0x1028, .device = 0x0080, .type = NM_RESET_WORKAROUND },
 	{ } /* terminator */
 };
 
@@ -1545,9 +1542,6 @@ static int __devinit snd_nm256_probe(struct pci_dev *pci,
 	struct nm256_quirk *q;
 	u16 subsystem_vendor, subsystem_device;
 
-	if ((err = pci_enable_device(pci)) < 0)
-		return err;
-
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
 	if (!enable[dev]) {
@@ -1560,9 +1554,13 @@ static int __devinit snd_nm256_probe(struct pci_dev *pci,
 
 	for (q = nm256_quirks; q->vendor; q++) {
 		if (q->vendor == subsystem_vendor && q->device == subsystem_device) {
-			if (q->type == NM_BLACKLISTED) {
+			switch (q->type) {
+			case NM_BLACKLISTED:
 				printk(KERN_INFO "nm256: The device is blacklisted.  Loading stopped\n");
 				return -ENODEV;
+			case NM_RESET_WORKAROUND:
+				reset_workaround[dev] = 1;
+				break;
 			}
 		}
 	}
@@ -1609,6 +1607,11 @@ static int __devinit snd_nm256_probe(struct pci_dev *pci,
 				    &chip)) < 0) {
 		snd_card_free(card);
 		return err;
+	}
+
+	if (reset_workaround[dev]) {
+		snd_printdd(KERN_INFO "nm256: reset_workaround activated\n");
+		chip->reset_workaround = 1;
 	}
 
 	sprintf(card->shortname, "NeoMagic %s", card->driver);

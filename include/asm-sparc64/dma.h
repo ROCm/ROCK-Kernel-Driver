@@ -62,7 +62,7 @@ enum dvma_rev {
 struct sbus_dma {
 	struct sbus_dma *next;
 	struct sbus_dev *sdev;
-	unsigned long regs;
+	void __iomem *regs;
 
 	/* Status, misc info */
 	int node;                /* Prom node for this DMA device */

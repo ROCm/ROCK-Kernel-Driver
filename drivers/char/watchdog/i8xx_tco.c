@@ -415,12 +415,15 @@ static unsigned char __init i8xx_tco_getdevice (void)
 			}
 		}
 		/* Set the TCO_EN bit in SMI_EN register */
+		if (!request_region (SMI_EN + 1, 1, "i8xx TCO")) {
+			printk (KERN_ERR PFX "I/O address 0x%04x already in use\n",
+				SMI_EN + 1);
+			return 0;
+		}
 		val1 = inb (SMI_EN + 1);
 		val1 &= 0xdf;
 		outb (val1, SMI_EN + 1);
-		/* Clear out the (probably old) status */
-		outb (0, TCO1_STS);
-		outb (3, TCO2_STS);
+		release_region (SMI_EN + 1, 1);
 		return 1;
 	}
 	return 0;
@@ -442,6 +445,10 @@ static int __init watchdog_init (void)
 		ret = -EIO;
 		goto out;
 	}
+
+	/* Clear out the (probably old) status */
+	outb (0, TCO1_STS);
+	outb (3, TCO2_STS);
 
 	/* Check that the heartbeat value is within it's range ; if not reset to the default */
 	if (tco_timer_set_heartbeat (heartbeat)) {
@@ -465,7 +472,7 @@ static int __init watchdog_init (void)
 		goto unreg_notifier;
 	}
 
-	tco_timer_keepalive ();
+	tco_timer_stop ();
 
 	printk (KERN_INFO PFX "initialized (0x%04x). heartbeat=%d sec (nowayout=%d)\n",
 		TCOBASE, heartbeat, nowayout);

@@ -175,7 +175,8 @@ struct irlmp_cb {
 	discovery_t discovery_cmd; /* Discovery command to use by IrLAP */
 	discovery_t discovery_rsp; /* Discovery response to use by IrLAP */
 
-	int free_lsap_sel;
+	/* Last lsap picked automatically by irlmp_find_free_slsap() */
+	int	last_lsap_sel;
 
 	struct timer_list discovery_timer;
 

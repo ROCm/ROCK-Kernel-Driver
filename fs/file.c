@@ -12,8 +12,7 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/file.h>
-
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 
 
 /*
@@ -55,6 +54,8 @@ void free_fd_array(struct file **array, int num)
  */
 
 int expand_fd_array(struct files_struct *files, int nr)
+	__releases(files->file_lock)
+	__acquires(files->file_lock)
 {
 	struct file **new_fds;
 	int error, nfds;
@@ -158,6 +159,8 @@ void free_fdset(fd_set *array, int num)
  * held for write.
  */
 int expand_fdset(struct files_struct *files, int nr)
+	__releases(file->file_lock)
+	__acquires(file->file_lock)
 {
 	fd_set *new_openset = NULL, *new_execset = NULL;
 	int error, nfds = 0;

@@ -32,12 +32,12 @@
 #include <linux/libata.h>
 
 #define DRV_NAME	"sata_uli"
-#define DRV_VERSION	"0.10"
+#define DRV_VERSION	"0.2"
 
 enum {
 	uli_5289		= 0,
 	uli_5287		= 1,
-	
+
 	/* PCI configuration registers */
 	ULI_SCR_BASE		= 0x90, /* sata0 phy SCR registers */
 	ULI_SATA1_OFS		= 0x10, /* offset from sata0->sata1 phy regs */
@@ -65,11 +65,12 @@ static struct pci_driver uli_pci_driver = {
 static Scsi_Host_Template uli_sht = {
 	.module			= THIS_MODULE,
 	.name			= DRV_NAME,
+	.ioctl			= ata_scsi_ioctl,
 	.queuecommand		= ata_scsi_queuecmd,
 	.eh_strategy_handler	= ata_scsi_error,
 	.can_queue		= ATA_DEF_QUEUE,
 	.this_id		= ATA_SHT_THIS_ID,
-	.sg_tablesize		= ATA_MAX_PRD,
+	.sg_tablesize		= LIBATA_MAX_PRD,
 	.max_sectors		= ATA_MAX_SECTORS,
 	.cmd_per_lun		= ATA_SHT_CMD_PER_LUN,
 	.emulated		= ATA_SHT_EMULATED,
@@ -82,22 +83,39 @@ static Scsi_Host_Template uli_sht = {
 
 static struct ata_port_operations uli_ops = {
 	.port_disable		= ata_port_disable,
-	.tf_load		= ata_tf_load_pio,
-	.tf_read		= ata_tf_read_pio,
-	.check_status		= ata_check_status_pio,
-	.exec_command		= ata_exec_command_pio,
+
+	.tf_load		= ata_tf_load,
+	.tf_read		= ata_tf_read,
+	.check_status		= ata_check_status,
+	.exec_command		= ata_exec_command,
+	.dev_select		= ata_std_dev_select,
+
 	.phy_reset		= sata_phy_reset,
-	.bmdma_setup            = ata_bmdma_setup_pio,
-	.bmdma_start            = ata_bmdma_start_pio,
+
+	.bmdma_setup            = ata_bmdma_setup,
+	.bmdma_start            = ata_bmdma_start,
 	.qc_prep		= ata_qc_prep,
 	.qc_issue		= ata_qc_issue_prot,
+
 	.eng_timeout		= ata_eng_timeout,
+
 	.irq_handler		= ata_interrupt,
 	.irq_clear		= ata_bmdma_irq_clear,
+
 	.scr_read		= uli_scr_read,
 	.scr_write		= uli_scr_write,
+
 	.port_start		= ata_port_start,
 	.port_stop		= ata_port_stop,
+};
+
+static struct ata_port_info uli_port_info = {
+	.sht            = &uli_sht,
+	.host_flags     = ATA_FLAG_SATA | ATA_FLAG_SATA_RESET |
+			  ATA_FLAG_NO_LEGACY,
+	.pio_mask       = 0x03,		//support pio mode 4 (FIXME)
+	.udma_mask      = 0x7f,		//support udma mode 6
+	.port_ops       = &uli_ops,
 };
 
 
@@ -105,6 +123,7 @@ MODULE_AUTHOR("Peer Chen");
 MODULE_DESCRIPTION("low-level driver for ULi Electronics SATA controller");
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, uli_pci_tbl);
+MODULE_VERSION(DRV_VERSION);
 
 static unsigned int get_scr_cfg_addr(unsigned int port_no, unsigned int sc_reg)
 {
@@ -131,18 +150,20 @@ static unsigned int get_scr_cfg_addr(unsigned int port_no, unsigned int sc_reg)
 
 static u32 uli_scr_cfg_read (struct ata_port *ap, unsigned int sc_reg)
 {
+	struct pci_dev *pdev = to_pci_dev(ap->host_set->dev);
 	unsigned int cfg_addr = get_scr_cfg_addr(ap->port_no, sc_reg);
 	u32 val;
 
-	pci_read_config_dword(ap->host_set->pdev, cfg_addr, &val);
+	pci_read_config_dword(pdev, cfg_addr, &val);
 	return val;
 }
 
 static void uli_scr_cfg_write (struct ata_port *ap, unsigned int scr, u32 val)
 {
+	struct pci_dev *pdev = to_pci_dev(ap->host_set->dev);
 	unsigned int cfg_addr = get_scr_cfg_addr(ap->port_no, scr);
 
-	pci_write_config_dword(ap->host_set->pdev, cfg_addr, val);
+	pci_write_config_dword(pdev, cfg_addr, val);
 }
 
 static u32 uli_scr_read (struct ata_port *ap, unsigned int sc_reg)
@@ -175,7 +196,8 @@ static void pci_enable_intx(struct pci_dev *pdev)
 
 static int uli_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 {
-	struct ata_probe_ent *probe_ent = NULL;
+	struct ata_probe_ent *probe_ent;
+	struct ata_port_info *ppi;
 	int rc;
 	unsigned int board_idx = (unsigned int) ent->driver_data;
 
@@ -194,63 +216,42 @@ static int uli_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (rc)
 		goto err_out_regions;
 
-	probe_ent = kmalloc(sizeof(*probe_ent), GFP_KERNEL);
+	ppi = &uli_port_info;
+	probe_ent = ata_pci_init_native_mode(pdev, &ppi);
 	if (!probe_ent) {
 		rc = -ENOMEM;
 		goto err_out_regions;
 	}
 
-	memset(probe_ent, 0, sizeof(*probe_ent));
-	probe_ent->pdev = pdev;
-	INIT_LIST_HEAD(&probe_ent->node);
-
-	probe_ent->sht = &uli_sht;
-	probe_ent->host_flags = ATA_FLAG_SATA | ATA_FLAG_SATA_RESET |
-				ATA_FLAG_NO_LEGACY;
-
-	probe_ent->pio_mask = 0x03;	//support pio mode 4
-	probe_ent->udma_mask = 0x7f;	//support udma mode 6
-	probe_ent->port_ops = &uli_ops;
-	probe_ent->irq = pdev->irq;
-	probe_ent->irq_flags = SA_SHIRQ;
-
-
-	probe_ent->port[0].cmd_addr = pci_resource_start(pdev, 0);
-	ata_std_ports(&probe_ent->port[0]);
-	probe_ent->port[0].ctl_addr =
-		pci_resource_start(pdev, 1) | ATA_PCI_CTL_OFS;
-	probe_ent->port[0].bmdma_addr = pci_resource_start(pdev, 4);
-
-	probe_ent->port[1].cmd_addr = pci_resource_start(pdev, 2);
-	ata_std_ports(&probe_ent->port[1]);
-	probe_ent->port[1].ctl_addr =
-		pci_resource_start(pdev, 3) | ATA_PCI_CTL_OFS;
-	probe_ent->port[1].bmdma_addr = pci_resource_start(pdev, 4) + 8;
-
 	switch (board_idx) {
 	case uli_5287:
-       	probe_ent->n_ports = 4;
-       	
-       	probe_ent->port[2].cmd_addr = pci_resource_start(pdev, 0) + 8;
-		ata_std_ports(&probe_ent->port[2]);
+       		probe_ent->n_ports = 4;
+
+       		probe_ent->port[2].cmd_addr = pci_resource_start(pdev, 0) + 8;
+		probe_ent->port[2].altstatus_addr =
 		probe_ent->port[2].ctl_addr =
 			(pci_resource_start(pdev, 1) | ATA_PCI_CTL_OFS) + 4;
 		probe_ent->port[2].bmdma_addr = pci_resource_start(pdev, 4) + 16;
 
 		probe_ent->port[3].cmd_addr = pci_resource_start(pdev, 2) + 8;
-		ata_std_ports(&probe_ent->port[3]);
+		probe_ent->port[3].altstatus_addr =
 		probe_ent->port[3].ctl_addr =
 			(pci_resource_start(pdev, 3) | ATA_PCI_CTL_OFS) + 4;
 		probe_ent->port[3].bmdma_addr = pci_resource_start(pdev, 4) + 24;
 
+		ata_std_ports(&probe_ent->port[2]);
+		ata_std_ports(&probe_ent->port[3]);
 		break;
+
 	case uli_5289:
-       	probe_ent->n_ports = 2;
+		/* do nothing; ata_pci_init_native_mode did it all */
 		break;
+
 	default:
 		BUG();
 		break;
 	}
+
 	pci_set_master(pdev);
 	pci_enable_intx(pdev);
 

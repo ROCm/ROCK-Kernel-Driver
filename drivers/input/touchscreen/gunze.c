@@ -49,7 +49,6 @@ MODULE_LICENSE("GPL");
 #define	GUNZE_MAX_LENGTH	10
 
 static char *gunze_name = "Gunze AHL-51S TouchScreen";
-static int gunze_num;
 
 /*
  * Per-touchscreen data.
@@ -104,7 +103,6 @@ static void gunze_disconnect(struct serio *serio)
 {
 	struct gunze* gunze = serio->private;
 	input_unregister_device(&gunze->dev);
-	put_device(&serio->dev);
 	serio_close(serio);
 	kfree(gunze);
 }
@@ -151,8 +149,6 @@ static void gunze_connect(struct serio *serio, struct serio_driver *drv)
 		return;
 	}
 
-	gunze->dev.dev = get_device(&serio->dev);
-	sprintf(gunze->dev.cdev.class_id,"gunze%d",gunze_num++);
 	input_register_device(&gunze->dev);
 
 	printk(KERN_INFO "input: %s on %s\n", gunze_name, serio->phys);

@@ -970,15 +970,13 @@ acpi_ev_create_gpe_block (
 	/* Dump info about this GPE block */
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INIT,
-		"GPE %02X to %02X [%4.4s] %u regs at %8.8X%8.8X on int 0x%X\n",
+		"GPE %02X to %02X [%4.4s] %u regs on int 0x%X\n",
 		(u32) gpe_block->block_base_number,
 		(u32) (gpe_block->block_base_number +
 				((gpe_block->register_count * ACPI_GPE_REGISTER_WIDTH) -1)),
 		gpe_device->name.ascii,
 		gpe_block->register_count,
-		ACPI_FORMAT_UINT64 (gpe_block->block_address.address),
 		interrupt_level));
-
 
 	/* Enable all valid GPEs found above */
 

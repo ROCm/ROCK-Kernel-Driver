@@ -14,7 +14,6 @@
 #include "linux/bootmem.h"
 #include "linux/spinlock.h"
 #include "linux/utsname.h"
-#include "linux/console.h"
 #include "linux/sysrq.h"
 #include "linux/seq_file.h"
 #include "linux/delay.h"
@@ -28,7 +27,6 @@
 #include "user_util.h"
 #include "kern_util.h"
 #include "kern.h"
-#include "mprot.h"
 #include "mem_user.h"
 #include "mem.h"
 #include "umid.h"
@@ -302,7 +300,6 @@ static void __init uml_postsetup(void)
 /* Set during early boot */
 unsigned long brk_start;
 unsigned long end_iomem;
-EXPORT_SYMBOL(end_iomem);
 
 #define MIN_VMALLOC (32 * 1024 * 1024)
 
@@ -324,12 +321,17 @@ int linux_main(int argc, char **argv)
 	uml_start = CHOOSE_MODE_PROC(set_task_sizes_tt, set_task_sizes_skas, 0,
 				     &host_task_size, &task_size);
 
+	/* Need to check this early because mmapping happens before the
+	 * kernel is running.
+	 */
+	check_tmpexec();
+
 	brk_start = (unsigned long) sbrk(0);
 	CHOOSE_MODE_PROC(before_mem_tt, before_mem_skas, brk_start);
 	/* Increase physical memory size for exec-shield users
 	so they actually get what they asked for. This should
 	add zero for non-exec shield users */
-	
+
 	diff = UML_ROUND_UP(brk_start) - UML_ROUND_UP(&_end);
 	if(diff > 1024 * 1024){
 		printf("Adding %ld bytes to physical memory to account for "
@@ -403,9 +405,9 @@ extern int uml_exitcode;
 static int panic_exit(struct notifier_block *self, unsigned long unused1,
 		      void *unused2)
 {
-#ifdef CONFIG_MAGIC_SYSRQ
-	handle_sysrq('p', &current->thread.regs, NULL);
-#endif
+	bust_spinlocks(1);
+	show_regs(&(current->thread.regs));
+	bust_spinlocks(0);
 	uml_exitcode = 1;
 	machine_halt();
 	return(0);
@@ -424,9 +426,6 @@ void __init setup_arch(char **cmdline_p)
  	strcpy(command_line, saved_command_line);
  	*cmdline_p = command_line;
 	setup_hostinfo();
-#if defined(CONFIG_DUMMY_CONSOLE)
-	conswitchp = &dummy_con;
-#endif  
 }
 
 void __init check_bugs(void)

@@ -298,8 +298,6 @@ struct lkkbd {
 	int ctrlclick_volume;
 };
 
-int lkkbd_num;
-
 /*
  * Calculate volume parameter byte for a given volume.
  */
@@ -687,8 +685,6 @@ lkkbd_connect (struct serio *serio, struct serio_driver *drv)
 	lk->dev.id.vendor = SERIO_LKKBD;
 	lk->dev.id.product = 0;
 	lk->dev.id.version = 0x0100;
-	lk->dev.dev = get_device(&serio->dev);
-	sprintf(lk->dev.cdev.class_id,"lkkbd%d",lkkbd_num++);
 
 	input_register_device (&lk->dev);
 
@@ -705,7 +701,6 @@ lkkbd_disconnect (struct serio *serio)
 	struct lkkbd *lk = serio->private;
 
 	input_unregister_device (&lk->dev);
-	put_device(&serio->dev);
 	serio_close (serio);
 	kfree (lk);
 }

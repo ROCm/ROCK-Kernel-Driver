@@ -30,13 +30,17 @@ extern void flush_icache_user_range(struct vm_area_struct *vma,
 #define flush_icache_page(vma, page)	do { } while (0)
 
 #define copy_to_user_page(vma, page, vaddr, dst, src, len) \
-do { memcpy(dst, src, len); \
-     flush_icache_user_range(vma, page, vaddr, len); \
-} while (0)
+	do {							\
+		flush_cache_page(vma, vaddr);			\
+		memcpy(dst, src, len);				\
+		flush_icache_user_range(vma, page, vaddr, len);	\
+	} while (0)
 
 #define copy_from_user_page(vma, page, vaddr, dst, src, len) \
-	memcpy(dst, src, len)
-
+	do {							\
+		flush_cache_page(vma, vaddr);			\
+		memcpy(dst, src, len);				\
+	} while (0)
 
 #endif /* __ASSEMBLY__ */
 

@@ -1,4 +1,5 @@
 #include <media/saa7146_vv.h>
+#include <linux/version.h>
 
 #define BOARD_CAN_DO_VBI(dev)   (dev->revision != 0 && dev->vv_data->vbi_minor != -1) 
 
@@ -9,13 +10,13 @@ int saa7146_res_get(struct saa7146_fh *fh, unsigned int bit)
 {
 	struct saa7146_dev *dev = fh->dev;
 	struct saa7146_vv *vv = dev->vv_data;
-	
+
 	if (fh->resources & bit) {
 		DEB_D(("already allocated! want: 0x%02x, cur:0x%02x\n",bit,vv->resources));
 		/* have it already allocated */
 		return 1;
 	}
-	
+
 	/* is it free? */
 	down(&dev->lock);
 	if (vv->resources & bit) {
@@ -30,17 +31,6 @@ int saa7146_res_get(struct saa7146_fh *fh, unsigned int bit)
 	DEB_D(("res: get 0x%02x, cur:0x%02x\n",bit,vv->resources));
 	up(&dev->lock);
 	return 1;
-}
-
-int saa7146_res_check(struct saa7146_fh *fh, unsigned int bit)
-{
-	return (fh->resources & bit);
-}
-
-int saa7146_res_locked(struct saa7146_dev *dev, unsigned int bit)
-{
-	struct saa7146_vv *vv = dev->vv_data;
-	return (vv->resources & bit);
 }
 
 void saa7146_res_free(struct saa7146_fh *fh, unsigned int bits)
@@ -275,7 +265,7 @@ static int fops_open(struct inode *inode, struct file *file)
 		DEB_S(("initializing video...\n"));
 		result = saa7146_video_uops.open(dev,file);
 	}
-	
+
 	if (0 != result) {
 		goto out;
 	}
@@ -349,7 +339,7 @@ static int fops_mmap(struct file *file, struct vm_area_struct * vma)
 		BUG();
 		return 0;
 	}
-	return videobuf_mmap_mapper(vma,q);
+	return videobuf_mmap_mapper(q,vma);
 }
 
 static unsigned int fops_poll(struct file *file, struct poll_table_struct *wait)
@@ -460,7 +450,7 @@ int saa7146_vv_init(struct saa7146_dev* dev, struct saa7146_ext_vv *ext_vv)
 	memset(vv, 0x0, sizeof(*vv));
 
 	DEB_EE(("dev:%p\n",dev));
-
+	
 	/* set default values for video parts of the saa7146 */
 	saa7146_write(dev, BCS_CTRL, 0x80400040);
 
@@ -513,7 +503,7 @@ int saa7146_register_device(struct video_device **vid, struct saa7146_dev* dev,
 	struct video_device *vfd;
 
 	DEB_EE(("dev:%p, name:'%s', type:%d\n",dev,name,type));
-
+ 
 	// released by vfd->release
  	vfd = video_device_alloc();
 	if (vfd == NULL)

@@ -101,7 +101,7 @@ static int afs_rxvl_probe(struct afs_server *server, int alloc_flags)
 	struct kvec piov[1];
 	size_t sent;
 	int ret;
-	u32 param[1];
+	__be32 param[1];
 
 	DECLARE_WAITQUEUE(myself, current);
 
@@ -193,7 +193,7 @@ int afs_rxvl_get_entry_by_name(struct afs_server *server,
 	unsigned tmp;
 	size_t sent;
 	int ret, loop;
-	u32 *bp, param[2], zero;
+	__be32 *bp, param[2], zero;
 
 	_enter(",%*.*s,%u,", volnamesz, volnamesz, volname, volnamesz);
 
@@ -328,7 +328,7 @@ int afs_rxvl_get_entry_by_id(struct afs_server *server,
 	unsigned tmp;
 	size_t sent;
 	int ret, loop;
-	u32 *bp, param[3];
+	__be32 *bp, param[3];
 
 	_enter(",%x,%d,", volid, voltype);
 
@@ -464,7 +464,7 @@ int afs_rxvl_get_entry_by_id_async(struct afs_async_op *op,
 	struct kvec piov[1];
 	size_t sent;
 	int ret;
-	u32 param[3];
+	__be32 param[3];
 
 	_enter(",%x,%d,", volid, voltype);
 
@@ -547,7 +547,8 @@ int afs_rxvl_get_entry_by_id_async(struct afs_async_op *op,
 int afs_rxvl_get_entry_by_id_async2(struct afs_async_op *op,
 				    struct afs_cache_vlocation *entry)
 {
-	unsigned *bp, tmp;
+	__be32 *bp;
+	__u32 tmp;
 	int loop, ret;
 
 	_enter("{op=%p cst=%u}", op, op->call->app_call_state);

@@ -4,7 +4,7 @@
  * PPC440GX system library
  *
  * Eugene Surovegin <eugene.surovegin@zultys.com> or <ebs@ebshome.net>
- * Copyright (c) 2003 Zultys Technologies
+ * Copyright (c) 2003, 2004 Zultys Technologies
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -14,6 +14,7 @@
  */
 #include <linux/config.h>
 #include <linux/kernel.h>
+#include <linux/interrupt.h>
 #include <asm/ibm44x.h>
 #include <asm/mmu.h>
 #include <asm/processor.h>
@@ -97,10 +98,51 @@ bypass:
 		p->uart1 = p->plb / __fix_zero(uart1 & 0xff, 256);
 }
 
-/* Enable L2 cache (call with IRQs disabled) */
+/* Issue L2C diagnostic command */
+static inline u32 l2c_diag(u32 addr)
+{
+	mtdcr(DCRN_L2C0_ADDR, addr);
+	mtdcr(DCRN_L2C0_CMD, L2C_CMD_DIAG);
+	while (!(mfdcr(DCRN_L2C0_SR) & L2C_SR_CC)) ;
+	return mfdcr(DCRN_L2C0_DATA);
+}
+
+static irqreturn_t l2c_error_handler(int irq, void* dev, struct pt_regs* regs)
+{
+	u32 sr = mfdcr(DCRN_L2C0_SR);
+	if (sr & L2C_SR_CPE){
+		/* Read cache trapped address */
+		u32 addr = l2c_diag(0x42000000);
+		printk(KERN_EMERG "L2C: Cache Parity Error, addr[16:26] = 0x%08x\n", addr);
+	}
+	if (sr & L2C_SR_TPE){
+		/* Read tag trapped address */
+		u32 addr = l2c_diag(0x82000000) >> 16;
+		printk(KERN_EMERG "L2C: Tag Parity Error, addr[16:26] = 0x%08x\n", addr);
+	}
+
+	/* Clear parity errors */
+	if (sr & (L2C_SR_CPE | L2C_SR_TPE)){
+		mtdcr(DCRN_L2C0_ADDR, 0);
+		mtdcr(DCRN_L2C0_CMD, L2C_CMD_CCP | L2C_CMD_CTE);
+	} else
+		printk(KERN_EMERG "L2C: LRU error\n");
+
+	return IRQ_HANDLED;
+}
+
+/* Enable L2 cache */
 void __init ibm440gx_l2c_enable(void){
 	u32 r;
+	unsigned long flags;
 
+	/* Install error handler */
+	if (request_irq(87, l2c_error_handler, SA_INTERRUPT, "L2C", 0) < 0){
+		printk(KERN_ERR "Cannot install L2C error handler, cache is not enabled\n");
+		return;
+	}
+
+	local_irq_save(flags);
 	asm volatile ("sync" ::: "memory");
 
 	/* Disable SRAM */
@@ -137,20 +179,22 @@ void __init ibm440gx_l2c_enable(void){
 
 	/* Enable ICU/DCU ports */
 	r = mfdcr(DCRN_L2C0_CFG);
-	r &= ~(L2C_CFG_DCW_MASK | L2C_CFG_CPIM | L2C_CFG_TPIM | L2C_CFG_LIM
-		| L2C_CFG_PMUX_MASK | L2C_CFG_PMIM | L2C_CFG_TPEI | L2C_CFG_CPEI
-		| L2C_CFG_NAM | L2C_CFG_NBRM);
+	r &= ~(L2C_CFG_DCW_MASK | L2C_CFG_PMUX_MASK | L2C_CFG_PMIM | L2C_CFG_TPEI
+		| L2C_CFG_CPEI | L2C_CFG_NAM | L2C_CFG_NBRM);
 	r |= L2C_CFG_ICU | L2C_CFG_DCU | L2C_CFG_TPC | L2C_CFG_CPC | L2C_CFG_FRAN
-		| L2C_CFG_SMCM;
+		| L2C_CFG_CPIM | L2C_CFG_TPIM | L2C_CFG_LIM | L2C_CFG_SMCM;
 	mtdcr(DCRN_L2C0_CFG, r);
 
 	asm volatile ("sync; isync" ::: "memory");
+	local_irq_restore(flags);
 }
 
-/* Disable L2 cache (call with IRQs disabled) */
+/* Disable L2 cache */
 void __init ibm440gx_l2c_disable(void){
 	u32 r;
+	unsigned long flags;
 
+	local_irq_save(flags);
 	asm volatile ("sync" ::: "memory");
 
 	/* Disable L2C mode */
@@ -169,6 +213,20 @@ void __init ibm440gx_l2c_disable(void){
 	      SRAM_SBCR_BAS3 | SRAM_SBCR_BS_64KB | SRAM_SBCR_BU_RW);
 
 	asm volatile ("sync; isync" ::: "memory");
+	local_irq_restore(flags);
+}
+
+void __init ibm440gx_l2c_setup(struct ibm44x_clocks* p)
+{
+	/* Disable L2C on rev.A, rev.B and 800MHz version of rev.C,
+	   enable it on all other revisions
+	 */
+	u32 pvr = mfspr(PVR);
+	if (pvr == PVR_440GX_RA || pvr == PVR_440GX_RB ||
+	    (pvr == PVR_440GX_RC && p->cpu > 667000000))
+		ibm440gx_l2c_disable();
+	else
+		ibm440gx_l2c_enable();
 }
 
 int __init ibm440gx_get_eth_grp(void)

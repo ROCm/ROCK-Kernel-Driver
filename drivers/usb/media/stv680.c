@@ -118,20 +118,6 @@ module_param(video_nr, int, 0);
  *
  * And the STV0680 driver - Kevin
  ********************************************************************/
-
-/* Here we want the physical address of the memory.
- * This is used when initializing the contents of the area.
- */
-static inline unsigned long kvirt_to_pa (unsigned long adr)
-{
-	unsigned long kva, ret;
-
-	kva = (unsigned long) page_address(vmalloc_to_page((void *)adr));
-	kva |= adr & (PAGE_SIZE-1); /* restore the offset */
-	ret = __pa(kva);
-	return ret;
-}
-
 static void *rvmalloc (unsigned long size)
 {
 	void *mem;
@@ -512,12 +498,6 @@ exit:
 /****************************************************************************
  *  sysfs
  ***************************************************************************/
-static inline struct usb_stv *cd_to_stv(struct class_device *cd)
-{
-	struct video_device *vdev = to_video_device(cd);
-	return video_get_drvdata(vdev);
-}
-
 #define stv680_file(name, variable, field)				\
 static ssize_t show_##name(struct class_device *class_dev, char *buf)	\
 {									\
@@ -725,7 +705,7 @@ static int stv680_stop_stream (struct usb_stv *stv680)
 
 	for (i = 0; i < STV680_NUMSBUF; i++)
 		if (stv680->urb[i]) {
-			usb_unlink_urb (stv680->urb[i]);
+			usb_kill_urb (stv680->urb[i]);
 			usb_free_urb (stv680->urb[i]);
 			stv680->urb[i] = NULL;
 			kfree (stv680->sbuf[i].data);
@@ -1291,8 +1271,8 @@ static int stv680_mmap (struct file *file, struct vm_area_struct *vma)
 	}
 	pos = (unsigned long) stv680->fbuf;
 	while (size > 0) {
-		page = kvirt_to_pa (pos);
-		if (remap_page_range (vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
+		page = vmalloc_to_pfn((void *)pos);
+		if (remap_pfn_range(vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
 			up (&stv680->lock);
 			return -EAGAIN;
 		}
@@ -1457,7 +1437,7 @@ static inline void usb_stv680_remove_disconnected (struct usb_stv *stv680)
 
 	for (i = 0; i < STV680_NUMSBUF; i++)
 		if (stv680->urb[i]) {
-			usb_unlink_urb (stv680->urb[i]);
+			usb_kill_urb (stv680->urb[i]);
 			usb_free_urb (stv680->urb[i]);
 			stv680->urb[i] = NULL;
 			kfree (stv680->sbuf[i].data);

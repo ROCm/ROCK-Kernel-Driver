@@ -75,7 +75,11 @@ static float64 float64_mnf(float64 rFm)
 	union float64_components u;
 
 	u.f64 = rFm;
+#ifdef __ARMEB__
+	u.i[0] ^= 0x80000000;
+#else
 	u.i[1] ^= 0x80000000;
+#endif
 
 	return u.f64;
 }
@@ -85,7 +89,11 @@ static float64 float64_abs(float64 rFm)
 	union float64_components u;
 
 	u.f64 = rFm;
+#ifdef __ARMEB__
+	u.i[0] &= 0x7fffffff;
+#else
 	u.i[1] &= 0x7fffffff;
+#endif
 
 	return u.f64;
 }

@@ -67,6 +67,18 @@ config CRYPTO_SHA512
 	  This code also includes SHA-384, a 384 bit hash with 192 bits
 	  of security against collision attacks.
 
+config CRYPTO_WP512
+	tristate "Whirlpool digest algorithms"
+	depends on CRYPTO
+	help
+	  Whirlpool hash algorithm 512, 384 and 256-bit hashes
+
+	  Whirlpool-512 is part of the NESSIE cryptographic primitives.
+	  Whirlpool will be part of the ISO/IEC 10118-3:2003(E) standard
+
+	  See also:
+	  http://planeta.terra.com.br/informatica/paulobarreto/WhirlpoolPage.html
+
 config CRYPTO_DES
 	tristate "DES and Triple DES EDE cipher algorithms"
 	depends on CRYPTO
@@ -113,7 +125,8 @@ config CRYPTO_SERPENT
 	  Serpent cipher algorithm, by Anderson, Biham & Knudsen.
 
 	  Keys are allowed to be from 0 to 256 bits in length, in steps
-	  of 8 bits.
+	  of 8 bits.  Also includes the 'Tnepres' algorithm, a reversed
+	  variant of Serpent for compatibility with old kerneli code.
 
 	  See also:
 	  http://www.cl.cam.ac.uk/~rja14/serpent.html
@@ -209,6 +222,21 @@ config CRYPTO_KHAZAD
 
 	  See also:
 	  http://planeta.terra.com.br/informatica/paulobarreto/KhazadPage.html
+
+config CRYPTO_ANUBIS
+	tristate "Anubis cipher algorithm"
+	depends on CRYPTO
+	help
+	  Anubis cipher algorithm.
+
+	  Anubis is a variable key length cipher which can use keys from 
+	  128 bits to 320 bits in length.  It was evaluated as a entrant
+	  in the NESSIE competition.
+	  
+	  See also:
+	  https://www.cosic.esat.kuleuven.ac.be/nessie/reports/
+	  http://planeta.terra.com.br/informatica/paulobarreto/AnubisPage.html
+
 
 config CRYPTO_DEFLATE
 	tristate "Deflate compression algorithm"

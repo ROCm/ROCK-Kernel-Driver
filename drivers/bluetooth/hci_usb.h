@@ -28,9 +28,6 @@
 #define HCI_DEV_SUBCLASS	0x01	/* RF subclass */
 #define HCI_DEV_PROTOCOL	0x01	/* Bluetooth programming protocol */
 
-#define HCI_CTRL_REQ		0x20
-#define HCI_DIGI_REQ		0x40
-
 #define HCI_IGNORE		0x01
 #define HCI_RESET		0x02
 #define HCI_DIGIANSWER		0x04
@@ -58,8 +55,6 @@ struct _urb {
 	void              *priv;
 	struct urb        urb;
 };
-
-struct _urb *_urb_alloc(int isoc, int gfp);
 
 static inline void _urb_free(struct _urb *_urb)
 {
@@ -98,8 +93,6 @@ static inline void _urb_unlink(struct _urb *_urb)
 		spin_unlock_irqrestore(&q->lock, flags);
 	}
 }
-
-struct _urb *_urb_dequeue(struct _urb_queue *q);
 
 struct hci_usb {
 	struct hci_dev		*hdev;

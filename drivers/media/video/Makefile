@@ -46,4 +46,9 @@ obj-$(CONFIG_TUNER_3036) += tuner-3036.o
 
 obj-$(CONFIG_VIDEO_TUNER) += tuner.o tda9887.o
 obj-$(CONFIG_VIDEO_BUF)   += video-buf.o
+obj-$(CONFIG_VIDEO_BUF_DVB) += video-buf-dvb.o
 obj-$(CONFIG_VIDEO_BTCX)  += btcx-risc.o
+
+obj-$(CONFIG_VIDEO_M32R_AR_M64278) += arv.o
+
+EXTRA_CFLAGS += -I$(srctree)/drivers/media/dvb/dvb-core

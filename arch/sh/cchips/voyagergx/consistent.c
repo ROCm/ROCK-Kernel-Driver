@@ -49,13 +49,13 @@ void *voyagergx_consistent_alloc(struct device *dev, size_t size,
 	if (!dev || dev->bus != &sh_bus_types[SH_BUS_VIRT] ||
 		   (dev->bus == &sh_bus_types[SH_BUS_VIRT] &&
 		    shdev->dev_id != SH_DEV_ID_USB_OHCI))
-		return consistent_alloc(flag, size, handle);
+		return NULL;
 
 	start = OHCI_SRAM_START + OHCI_HCCA_SIZE;
 
 	entry = kmalloc(sizeof(struct voya_alloc_entry), GFP_ATOMIC);
 	if (!entry)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 
 	entry->len = (size + 15) & ~15;
 
@@ -91,11 +91,11 @@ out:
 	kfree(entry);
 	spin_unlock_irqrestore(&voya_list_lock, flags);
 
-	return NULL;
+	return ERR_PTR(-EINVAL);
 }
 
-void voyagergx_consistent_free(struct device *dev, size_t size,
-			       void *vaddr, dma_addr_t handle)
+int voyagergx_consistent_free(struct device *dev, size_t size,
+			      void *vaddr, dma_addr_t handle)
 {
 	struct voya_alloc_entry *entry;
 	struct sh_dev *shdev = to_sh_dev(dev);
@@ -103,10 +103,8 @@ void voyagergx_consistent_free(struct device *dev, size_t size,
 
 	if (!dev || dev->bus != &sh_bus_types[SH_BUS_VIRT] ||
 		   (dev->bus == &sh_bus_types[SH_BUS_VIRT] &&
-		    shdev->dev_id != SH_DEV_ID_USB_OHCI)) {
-		consistent_free(vaddr, size);
-		return;
-	}
+		    shdev->dev_id != SH_DEV_ID_USB_OHCI))
+		return -EINVAL;
 
 	spin_lock_irqsave(&voya_list_lock, flags);
 	list_for_each_entry(entry, &voya_alloc_list, list) {
@@ -119,6 +117,8 @@ void voyagergx_consistent_free(struct device *dev, size_t size,
 		break;
 	}
 	spin_unlock_irqrestore(&voya_list_lock, flags);
+
+	return 0;
 }
 
 EXPORT_SYMBOL(voyagergx_consistent_alloc);

@@ -41,6 +41,7 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
+#include <linux/module.h>
 
 #include <acpi/acpi.h>
 #include <acpi/acnamesp.h>
@@ -49,6 +50,52 @@
 
 #define _COMPONENT          ACPI_EVENTS
 	 ACPI_MODULE_NAME    ("evxface")
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    acpi_install_exception_handler
+ *
+ * PARAMETERS:  Handler         - Pointer to the handler function for the
+ *                                event
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Saves the pointer to the handler function
+ *
+ ******************************************************************************/
+#ifdef ACPI_FUTURE_USAGE
+acpi_status
+acpi_install_exception_handler (
+	acpi_exception_handler          handler)
+{
+	acpi_status                     status;
+
+
+	ACPI_FUNCTION_TRACE ("acpi_install_exception_handler");
+
+
+	status = acpi_ut_acquire_mutex (ACPI_MTX_EVENTS);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
+
+	/* Don't allow two handlers. */
+
+	if (acpi_gbl_exception_handler) {
+		status = AE_ALREADY_EXISTS;
+		goto cleanup;
+	}
+
+	/* Install the handler */
+
+	acpi_gbl_exception_handler = handler;
+
+cleanup:
+	(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
+	return_ACPI_STATUS (status);
+}
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 
 /*******************************************************************************
@@ -121,6 +168,7 @@ cleanup:
 	(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_install_fixed_event_handler);
 
 
 /*******************************************************************************
@@ -178,6 +226,7 @@ acpi_remove_fixed_event_handler (
 	(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_remove_fixed_event_handler);
 
 
 /*******************************************************************************
@@ -347,6 +396,7 @@ unlock_and_exit:
 	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_install_notify_handler);
 
 
 /*******************************************************************************
@@ -359,6 +409,7 @@ unlock_and_exit:
  *                                  ACPI_DEVICE_NOTIFY: driver_handler (80-ff)
  *                                  ACPI_ALL_NOTIFY:  both system and device
  *              Handler         - Address of the handler
+ *
  * RETURN:      Status
  *
  * DESCRIPTION: Remove a handler for notifies on an ACPI device
@@ -401,9 +452,8 @@ acpi_remove_notify_handler (
 		goto unlock_and_exit;
 	}
 
-	/*
-	 * Root Object
-	 */
+	/* Root Object */
+
 	if (device == ACPI_ROOT_OBJECT) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Removing notify handler for ROOT object.\n"));
 
@@ -437,9 +487,8 @@ acpi_remove_notify_handler (
 		}
 	}
 
-	/*
-	 * All Other Objects
-	 */
+	/* All Other Objects */
+
 	else {
 		/* Notifies allowed on this object? */
 
@@ -506,6 +555,7 @@ unlock_and_exit:
 	(void) acpi_ut_release_mutex (ACPI_MTX_NAMESPACE);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_remove_notify_handler);
 
 
 /*******************************************************************************
@@ -603,6 +653,7 @@ unlock_and_exit:
 	(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_install_gpe_handler);
 
 
 /*******************************************************************************
@@ -705,6 +756,7 @@ unlock_and_exit:
 	(void) acpi_ut_release_mutex (ACPI_MTX_EVENTS);
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_remove_gpe_handler);
 
 
 /*******************************************************************************
@@ -747,6 +799,7 @@ acpi_acquire_global_lock (
 
 	return (status);
 }
+EXPORT_SYMBOL(acpi_acquire_global_lock);
 
 
 /*******************************************************************************
@@ -775,5 +828,5 @@ acpi_release_global_lock (
 	status = acpi_ev_release_global_lock ();
 	return (status);
 }
-
+EXPORT_SYMBOL(acpi_release_global_lock);
 

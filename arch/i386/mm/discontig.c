@@ -28,6 +28,7 @@
 #include <linux/mmzone.h>
 #include <linux/highmem.h>
 #include <linux/initrd.h>
+#include <linux/nodemask.h>
 #include <asm/e820.h>
 #include <asm/setup.h>
 #include <asm/mmzone.h>
@@ -266,19 +267,6 @@ unsigned long __init setup_memory(void)
 	system_start_pfn = min_low_pfn = PFN_UP(init_pg_tables_end);
 
 	find_max_pfn();
-
-	/* Added 2004-03-02, <garloff@suse.de>, copied from i386/setup.c
-	 * but leave out automatic vmalloc size increase ... */
-	if (vm_reserve != -1) {
-		if (vm_reserve < __VMALLOC_RESERVE_MIN)
-			vm_reserve = __VMALLOC_RESERVE_MIN;
-		if (vm_reserve > __VMALLOC_RESERVE_MAX)
-			vm_reserve = __VMALLOC_RESERVE_MAX;
-		vmalloc_reserve = vm_reserve;
-	}
-	printk(KERN_NOTICE "%ldMB vmalloc/ioremap area available.\n",
-		vmalloc_reserve>>20);
-
 	system_max_low_pfn = max_low_pfn = find_max_low_pfn() - reserve_pages;
 	printk("reserve_pages = %ld find_max_low_pfn() ~ %ld\n",
 			reserve_pages, max_low_pfn + reserve_pages);
@@ -480,7 +468,7 @@ void __init set_max_mapnr_init(void)
 	if (high0->spanned_pages > 0)
 	      	highmem_start_page = high0->zone_mem_map;
 	else
-		highmem_start_page = pfn_to_page(max_low_pfn+1); 
+		highmem_start_page = pfn_to_page(max_low_pfn - 1) + 1;
 	num_physpages = highend_pfn;
 #else
 	num_physpages = max_low_pfn;

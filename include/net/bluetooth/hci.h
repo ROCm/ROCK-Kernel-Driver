@@ -68,7 +68,9 @@ enum {
 	HCI_ENCRYPT,
 	HCI_INQUIRY,
 
-	HCI_RAW
+	HCI_RAW,
+
+	HCI_SECMGR
 };
 
 /* HCI ioctl defines */
@@ -91,7 +93,8 @@ enum {
 #define HCISETLINKMODE	_IOW('H', 226, int)
 #define HCISETACLMTU	_IOW('H', 227, int)
 #define HCISETSCOMTU	_IOW('H', 228, int)
-#define HCISETRAWVND	_IOW('H', 229, int)
+
+#define HCISETSECMGR	_IOW('H', 230, int)
 
 #define HCIINQUIRY	_IOR('H', 240, int)
 
@@ -105,7 +108,7 @@ enum {
 #define HCI_ACLDATA_PKT		0x02
 #define HCI_SCODATA_PKT		0x03
 #define HCI_EVENT_PKT		0x04
-#define HCI_UNKNOWN_PKT		0xff
+#define HCI_VENDOR_PKT		0xff
 
 /* HCI Packet types */
 #define HCI_DM1		0x0008
@@ -167,6 +170,8 @@ enum {
 #define HCI_LM_AUTH	0x0002
 #define HCI_LM_ENCRYPT	0x0004
 #define HCI_LM_TRUSTED	0x0008
+#define HCI_LM_RELIABLE	0x0010
+#define HCI_LM_SECURE	0x0020
 
 /* -----  HCI Commands ---- */
 /* OGF & OCF values */
@@ -324,18 +329,26 @@ struct hci_cp_inquiry {
 #define OCF_INQUIRY_CANCEL	0x0002
 
 #define OCF_LINK_KEY_REPLY	0x000B
-#define OCF_LINK_KEY_NEG_REPLY	0x000C
 struct hci_cp_link_key_reply {
 	bdaddr_t bdaddr;
 	__u8     link_key[16];
 } __attribute__ ((packed));
 
+#define OCF_LINK_KEY_NEG_REPLY	0x000C
+struct hci_cp_link_key_neg_reply {
+	bdaddr_t bdaddr;
+} __attribute__ ((packed));
+
 #define OCF_PIN_CODE_REPLY	0x000D
-#define OCF_PIN_CODE_NEG_REPLY	0x000E
 struct hci_cp_pin_code_reply {
 	bdaddr_t bdaddr;
 	__u8     pin_len;
 	__u8     pin_code[16];
+} __attribute__ ((packed));
+
+#define OCF_PIN_CODE_NEG_REPLY	0x000E
+struct hci_cp_pin_code_neg_reply {
+	bdaddr_t bdaddr;
 } __attribute__ ((packed));
 
 #define OCF_CHANGE_CONN_PTYPE	0x000F
@@ -353,6 +366,11 @@ struct hci_cp_auth_requested {
 struct hci_cp_set_conn_encrypt {
 	__u16    handle;
 	__u8     encrypt;
+} __attribute__ ((packed));
+
+#define OCF_CHANGE_CONN_LINK_KEY 0x0015
+struct hci_cp_change_conn_link_key {
+	__u16    handle;
 } __attribute__ ((packed));
 
 #define OCF_READ_REMOTE_FEATURES 0x001B
@@ -471,6 +489,12 @@ struct hci_ev_encrypt_change {
 	__u8     encrypt;
 } __attribute__ ((packed));
 
+#define HCI_EV_CHANGE_CONN_LINK_KEY_COMPLETE	0x09
+struct hci_ev_change_conn_link_key_complete {
+	__u8     status;
+	__u16    handle;
+} __attribute__ ((packed));
+
 #define HCI_EV_QOS_SETUP_COMPLETE	0x0D
 struct hci_qos {
 	__u8     service_type;
@@ -509,6 +533,14 @@ struct hci_ev_role_change {
 	__u8     status;
 	bdaddr_t bdaddr;
 	__u8     role;
+} __attribute__ ((packed));
+
+#define HCI_EV_MODE_CHANGE	0x14
+struct hci_ev_mode_change {
+	__u8     status;
+	__u16    handle;
+	__u8     mode;
+	__u16    interval;
 } __attribute__ ((packed));
 
 #define HCI_EV_PIN_CODE_REQ	0x16

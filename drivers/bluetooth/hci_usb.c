@@ -40,6 +40,7 @@
 #include <linux/unistd.h>
 #include <linux/types.h>
 #include <linux/interrupt.h>
+#include <linux/moduleparam.h>
 
 #include <linux/slab.h>
 #include <linux/errno.h>
@@ -63,6 +64,10 @@
 #ifndef CONFIG_BT_HCIUSB_ZERO_PACKET
 #undef  URB_ZERO_PACKET
 #define URB_ZERO_PACKET 0
+#endif
+
+#ifdef CONFIG_BT_HCIUSB_SCO
+static int isoc = 2;
 #endif
 
 #define VERSION "2.7"
@@ -96,13 +101,18 @@ static struct usb_device_id blacklist_ids[] = {
 	{ USB_DEVICE(0x0a5c, 0x2033), .driver_info = HCI_IGNORE },
 
 	/* Broadcom BCM2035 */
+	{ USB_DEVICE(0x0a5c, 0x2009), .driver_info = HCI_RESET | HCI_BROKEN_ISOC },
 	{ USB_DEVICE(0x0a5c, 0x200a), .driver_info = HCI_RESET | HCI_BROKEN_ISOC },
+
+	/* Microsoft Wireless Transceiver for Bluetooth 2.0 */
+	{ USB_DEVICE(0x045e, 0x009c), .driver_info = HCI_RESET | HCI_BROKEN_ISOC },
 
 	/* ISSC Bluetooth Adapter v3.1 */
 	{ USB_DEVICE(0x1131, 0x1001), .driver_info = HCI_RESET },
 
-	/* Digianswer device */
+	/* Digianswer devices */
 	{ USB_DEVICE(0x08fd, 0x0001), .driver_info = HCI_DIGIANSWER },
+	{ USB_DEVICE(0x08fd, 0x0002), .driver_info = HCI_IGNORE },
 
 	/* RTX Telecom based adapter with buggy SCO support */
 	{ USB_DEVICE(0x0400, 0x0807), .driver_info = HCI_BROKEN_ISOC },
@@ -110,7 +120,7 @@ static struct usb_device_id blacklist_ids[] = {
 	{ }	/* Terminating entry */
 };
 
-struct _urb *_urb_alloc(int isoc, int gfp)
+static struct _urb *_urb_alloc(int isoc, int gfp)
 {
 	struct _urb *_urb = kmalloc(sizeof(struct _urb) +
 				sizeof(struct usb_iso_packet_descriptor) * isoc, gfp);
@@ -121,7 +131,7 @@ struct _urb *_urb_alloc(int isoc, int gfp)
 	return _urb;
 }
 
-struct _urb *_urb_dequeue(struct _urb_queue *q)
+static struct _urb *_urb_dequeue(struct _urb_queue *q)
 {
 	struct _urb *_urb = NULL;
 	unsigned long flags;
@@ -790,7 +800,12 @@ static void hci_usb_destruct(struct hci_dev *hdev)
 	kfree(husb);
 }
 
-int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
+static void hci_usb_notify(struct hci_dev *hdev, unsigned int evt)
+{
+	BT_DBG("%s evt %d", hdev->name, evt);
+}
+
+static int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_device *udev = interface_to_usbdev(intf);
 	struct usb_host_endpoint *bulk_out_ep = NULL;
@@ -856,9 +871,9 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	husb->intr_in_ep  = intr_in_ep;
 
 	if (id->driver_info & HCI_DIGIANSWER)
-		husb->ctrl_req = HCI_DIGI_REQ;
+		husb->ctrl_req = USB_TYPE_VENDOR;
 	else
-		husb->ctrl_req = HCI_CTRL_REQ;
+		husb->ctrl_req = USB_TYPE_CLASS;
 
 	/* Find isochronous endpoints that we can use */
 	size = 0; 
@@ -867,7 +882,7 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	isoc_ifnum = 1;
 
 #ifdef CONFIG_BT_HCIUSB_SCO
-	if (!(id->driver_info & HCI_BROKEN_ISOC))
+	if (isoc && !(id->driver_info & HCI_BROKEN_ISOC))
 		isoc_iface = usb_ifnum_to_if(udev, isoc_ifnum);
 
 	if (isoc_iface) {
@@ -883,7 +898,7 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 				switch (ep->desc.bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) {
 				case USB_ENDPOINT_XFER_ISOC:
 					if (ep->desc.wMaxPacketSize < size ||
-							uif->desc.bAlternateSetting > 2)
+							uif->desc.bAlternateSetting != isoc)
 						break;
 					size = ep->desc.wMaxPacketSize;
 
@@ -906,7 +921,9 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 				BT_ERR("Can't claim isoc interface");
 			else if (usb_set_interface(udev, isoc_ifnum, isoc_alts)) {
 				BT_ERR("Can't set isoc interface settings");
+				husb->isoc_iface = isoc_iface;
 				usb_driver_release_interface(&hci_usb_driver, isoc_iface);
+				husb->isoc_iface = NULL;
 			} else {
 				husb->isoc_iface  = isoc_iface;
 				husb->isoc_in_ep  = isoc_in_ep;
@@ -916,7 +933,7 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	}
 #endif
 
-	husb->completion_lock = RW_LOCK_UNLOCKED;
+	rwlock_init(&husb->completion_lock);
 
 	for (i = 0; i < 4; i++) {
 		skb_queue_head_init(&husb->transmit_q[i]);
@@ -942,6 +959,7 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	hdev->flush    = hci_usb_flush;
 	hdev->send     = hci_usb_send_frame;
 	hdev->destruct = hci_usb_destruct;
+	hdev->notify   = hci_usb_notify;
 
 	hdev->owner = THIS_MODULE;
 
@@ -1017,6 +1035,11 @@ static void __exit hci_usb_exit(void)
 
 module_init(hci_usb_init);
 module_exit(hci_usb_exit);
+
+#ifdef CONFIG_BT_HCIUSB_SCO
+module_param(isoc, int, 0644);
+MODULE_PARM_DESC(isoc, "Set isochronous transfers for SCO over HCI support");
+#endif
 
 MODULE_AUTHOR("Maxim Krasnyansky <maxk@qualcomm.com>, Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("Bluetooth HCI USB driver ver " VERSION);

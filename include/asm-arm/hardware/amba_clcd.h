@@ -22,7 +22,7 @@
 #define CLCD_UBAS 		0x00000010
 #define CLCD_LBAS 		0x00000014
 
-#ifndef CONFIG_ARCH_VERSATILE_PB
+#ifndef CONFIG_ARCH_VERSATILE
 #define CLCD_IENB 		0x00000018
 #define CLCD_CNTL 		0x0000001c
 #else
@@ -141,7 +141,7 @@ struct clcd_fb {
 	struct clcd_panel	*panel;
 	struct clcd_board	*board;
 	void			*board_data;
-	void			*regs;
+	void __iomem		*regs;
 	u32			clcd_cntl;
 	u32			cmap[16];
 };

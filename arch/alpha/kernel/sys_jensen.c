@@ -249,8 +249,6 @@ jensen_machine_check (u64 vector, u64 la, struct pt_regs *regs)
 	printk(KERN_CRIT "Machine check\n");
 }
 
-#define jensen_pci_tbi	((void*)0)
-
 
 /*
  * The System Vector
@@ -260,7 +258,6 @@ struct alpha_machine_vector jensen_mv __initmv = {
 	.vector_name		= "Jensen",
 	DO_EV4_MMU,
 	IO_LITE(JENSEN,jensen),
-	BUS(jensen),
 	.machine_check		= jensen_machine_check,
 	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.rtc_port		= 0x170,

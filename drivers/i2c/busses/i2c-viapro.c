@@ -454,6 +454,8 @@ static struct pci_device_id vt596_ids[] = {
 	{ 0, }
 };
 
+MODULE_DEVICE_TABLE (pci, vt596_ids);
+
 static struct pci_driver vt596_driver = {
 	.name		= "vt596_smbus",
 	.id_table	= vt596_ids,
@@ -463,7 +465,7 @@ static struct pci_driver vt596_driver = {
 
 static int __init i2c_vt596_init(void)
 {
-	return pci_module_init(&vt596_driver);
+	return pci_register_driver(&vt596_driver);
 }
 
 

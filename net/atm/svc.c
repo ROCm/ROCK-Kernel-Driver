@@ -194,10 +194,6 @@ static int svc_connect(struct socket *sock,struct sockaddr *sockaddr,
 		}
 		break;
 	case SS_UNCONNECTED:
-		if (test_bit(ATM_VF_SESSION, &vcc->flags)) {
-			error = -EINVAL;
-			goto out;
-		}
 		addr = (struct sockaddr_atmsvc *) sockaddr;
 		if (addr->sas_family != AF_ATMSVC) {
 			error = -EAFNOSUPPORT;
@@ -458,24 +454,48 @@ int svc_change_qos(struct atm_vcc *vcc,struct atm_qos *qos)
 }
 
 
-static int svc_setsockopt(struct socket *sock,int level,int optname,
-    char __user *optval,int optlen)
+static int svc_setsockopt(struct socket *sock, int level, int optname,
+			  char __user *optval, int optlen)
 {
 	struct sock *sk = sock->sk;
-	struct atm_vcc *vcc;
-	int error = 0;
+	struct atm_vcc *vcc = ATM_SD(sock);
+	int value, error = 0;
 
-	if (!__SO_LEVEL_MATCH(optname, level) || optname != SO_ATMSAP ||
-	    optlen != sizeof(struct atm_sap)) {
-		error = vcc_setsockopt(sock, level, optname, optval, optlen);
-		goto out;
+	lock_sock(sk);
+	switch (optname) {
+		case SO_ATMSAP:
+			if (level != SOL_ATM || optlen != sizeof(struct atm_sap)) {
+				error = -EINVAL;
+				goto out;
+			}
+			if (copy_from_user(&vcc->sap, optval, optlen)) {
+				error = -EFAULT;
+				goto out;
+			}
+			set_bit(ATM_VF_HASSAP, &vcc->flags);
+			break;
+ 		case SO_MULTIPOINT:
+			if (level != SOL_ATM || optlen != sizeof(int)) {
+				error = -EINVAL;
+				goto out;
+			}
+ 			if (get_user(value, (int __user *) optval)) {
+ 				error = -EFAULT;
+				goto out;
+			}
+			if (value == 1) {
+				set_bit(ATM_VF_SESSION, &vcc->flags);
+			} else if (value == 0) {
+				clear_bit(ATM_VF_SESSION, &vcc->flags);
+			} else {
+				error = -EINVAL;
+			}
+  			break;
+		default:
+			error = vcc_setsockopt(sock, level, optname,
+					       optval, optlen);
 	}
-	vcc = ATM_SD(sock);
-	if (copy_from_user(&vcc->sap, optval, optlen)) {
-		error = -EFAULT;
-		goto out;
-	}
-	set_bit(ATM_VF_HASSAP, &vcc->flags);
+
 out:
 	release_sock(sk);
 	return error;
@@ -511,6 +531,90 @@ out:
 }
 
 
+static int svc_addparty(struct socket *sock, struct sockaddr *sockaddr,
+			int sockaddr_len, int flags)
+{
+	DEFINE_WAIT(wait);
+	struct atm_vcc *vcc = ATM_SD(sock);
+	int error;
+
+	lock_sock(vcc->sk);
+	set_bit(ATM_VF_WAITING, &vcc->flags);
+	prepare_to_wait(vcc->sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
+	sigd_enq(vcc, as_addparty, NULL, NULL,
+	         (struct sockaddr_atmsvc *) sockaddr);
+	if (flags & O_NONBLOCK) {
+		finish_wait(vcc->sk->sk_sleep, &wait);
+		error = -EINPROGRESS;
+		goto out;
+	}
+	DPRINTK("svc_addparty added wait queue\n");
+	while (test_bit(ATM_VF_WAITING, &vcc->flags) && sigd) {
+		schedule();
+		prepare_to_wait(vcc->sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
+	}
+	finish_wait(vcc->sk->sk_sleep, &wait);
+	error = xchg(&vcc->sk->sk_err_soft, 0);
+out:
+	release_sock(vcc->sk);
+	return error;
+}
+
+
+static int svc_dropparty(struct socket *sock, int ep_ref)
+{
+	DEFINE_WAIT(wait);
+	struct atm_vcc *vcc = ATM_SD(sock);
+	int error;
+
+	lock_sock(vcc->sk);
+	set_bit(ATM_VF_WAITING, &vcc->flags);
+	prepare_to_wait(vcc->sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
+	sigd_enq2(vcc, as_dropparty, NULL, NULL, NULL, NULL, ep_ref);
+	while (test_bit(ATM_VF_WAITING, &vcc->flags) && sigd) {
+		schedule();
+		prepare_to_wait(vcc->sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
+	}
+	finish_wait(vcc->sk->sk_sleep, &wait);
+	if (!sigd) {
+		error = -EUNATCH;
+		goto out;
+	}
+	error = xchg(&vcc->sk->sk_err_soft, 0);
+out:
+	release_sock(vcc->sk);
+	return error;
+}
+
+
+static int svc_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
+{
+ 	int error, ep_ref;
+ 	struct sockaddr_atmsvc sa;
+	struct atm_vcc *vcc = ATM_SD(sock);
+  
+	switch (cmd) {
+ 		case ATM_ADDPARTY:
+ 			if (!test_bit(ATM_VF_SESSION, &vcc->flags))
+ 				return -EINVAL;
+ 			if (copy_from_user(&sa, (void __user *) arg, sizeof(sa)))
+				return -EFAULT;
+ 			error = svc_addparty(sock, (struct sockaddr *) &sa, sizeof(sa), 0);
+ 			break;
+ 		case ATM_DROPPARTY:
+ 			if (!test_bit(ATM_VF_SESSION, &vcc->flags))
+ 				return -EINVAL;
+ 			if (copy_from_user(&ep_ref, (void __user *) arg, sizeof(int)))
+				return -EFAULT;
+ 			error = svc_dropparty(sock, ep_ref);
+ 			break;
+  		default:
+			error = vcc_ioctl(sock, cmd, arg);
+	}
+
+	return error;
+}
+
 static struct proto_ops svc_proto_ops = {
 	.family =	PF_ATMSVC,
 	.owner =	THIS_MODULE,
@@ -522,7 +626,7 @@ static struct proto_ops svc_proto_ops = {
 	.accept =	svc_accept,
 	.getname =	svc_getname,
 	.poll =		vcc_poll,
-	.ioctl =	vcc_ioctl,
+	.ioctl =	svc_ioctl,
 	.listen =	svc_listen,
 	.shutdown =	svc_shutdown,
 	.setsockopt =	svc_setsockopt,

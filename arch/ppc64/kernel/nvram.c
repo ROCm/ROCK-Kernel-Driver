@@ -43,9 +43,9 @@ static struct nvram_partition * nvram_part;
 static long nvram_error_log_index = -1;
 static long nvram_error_log_size = 0;
 
-volatile int no_more_logging = 1; /* Until we initialize everything,
-				   * make sure we don't try logging
-				   * anything */
+int no_logging = 1; 	/* Until we initialize everything,
+			 * make sure we don't try logging
+			 * anything */
 
 extern volatile int error_log_cnt;
 
@@ -77,7 +77,7 @@ static loff_t dev_nvram_llseek(struct file *file, loff_t offset, int origin)
 }
 
 
-static ssize_t dev_nvram_read(struct file *file, char *buf,
+static ssize_t dev_nvram_read(struct file *file, char __user *buf,
 			  size_t count, loff_t *ppos)
 {
 	ssize_t len;
@@ -117,7 +117,7 @@ static ssize_t dev_nvram_read(struct file *file, char *buf,
 
 }
 
-static ssize_t dev_nvram_write(struct file *file, const char *buf,
+static ssize_t dev_nvram_write(struct file *file, const char __user *buf,
 			   size_t count, loff_t *ppos)
 {
 	ssize_t len;
@@ -340,7 +340,7 @@ static int nvram_create_os_partition(void)
 	struct list_head * p;
 	struct nvram_partition * part;
 	struct nvram_partition * new_part = NULL;
-	struct nvram_partition * free_part;
+	struct nvram_partition * free_part = NULL;
 	int seq_init[2] = { 0, 0 };
 	loff_t tmp_index;
 	long size = 0;
@@ -603,6 +603,7 @@ void __exit nvram_cleanup(void)
 }
 
 
+#ifdef CONFIG_PPC_PSERIES
 
 /* nvram_write_error_log
  *
@@ -639,7 +640,7 @@ int nvram_write_error_log(char * buff, int length, unsigned int err_type)
 	loff_t tmp_index;
 	struct err_log_info info;
 	
-	if (no_more_logging) {
+	if (no_logging) {
 		return -EPERM;
 	}
 
@@ -710,7 +711,7 @@ int nvram_read_error_log(char * buff, int length, unsigned int * err_type)
 /* This doesn't actually zero anything, but it sets the event_logged
  * word to tell that this event is safely in syslog.
  */
-int nvram_clear_error_log()
+int nvram_clear_error_log(void)
 {
 	loff_t tmp_index;
 	int clear_word = ERR_FLAG_ALREADY_LOGGED;
@@ -727,6 +728,7 @@ int nvram_clear_error_log()
 	return 0;
 }
 
+#endif /* CONFIG_PPC_PSERIES */
 
 module_init(nvram_init);
 module_exit(nvram_cleanup);

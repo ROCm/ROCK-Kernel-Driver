@@ -42,6 +42,8 @@
  * POSSIBILITY OF SUCH DAMAGES.
  */
 
+#include <linux/module.h>
+
 #include <acpi/acpi.h>
 
 #define _COMPONENT          ACPI_HARDWARE
@@ -52,11 +54,11 @@
  *
  * FUNCTION:    acpi_get_timer_resolution
  *
- * PARAMETERS:  none
+ * PARAMETERS:  Resolution          - Where the resolution is returned
  *
- * RETURN:      Number of bits of resolution in the PM Timer (24 or 32).
+ * RETURN:      Status and timer resolution
  *
- * DESCRIPTION: Obtains resolution of the ACPI PM Timer.
+ * DESCRIPTION: Obtains resolution of the ACPI PM Timer (24 or 32 bits).
  *
  ******************************************************************************/
 
@@ -86,11 +88,11 @@ acpi_get_timer_resolution (
  *
  * FUNCTION:    acpi_get_timer
  *
- * PARAMETERS:  none
+ * PARAMETERS:  Ticks               - Where the timer value is returned
  *
- * RETURN:      Current value of the ACPI PM Timer (in ticks).
+ * RETURN:      Status and current ticks
  *
- * DESCRIPTION: Obtains current value of ACPI PM Timer.
+ * DESCRIPTION: Obtains current value of ACPI PM Timer (in ticks).
  *
  ******************************************************************************/
 
@@ -112,17 +114,18 @@ acpi_get_timer (
 
 	return_ACPI_STATUS (status);
 }
+EXPORT_SYMBOL(acpi_get_timer);
 
 
 /******************************************************************************
  *
  * FUNCTION:    acpi_get_timer_duration
  *
- * PARAMETERS:  start_ticks
- *              end_ticks
- *              time_elapsed
+ * PARAMETERS:  start_ticks         - Starting timestamp
+ *              end_ticks           - End timestamp
+ *              time_elapsed        - Where the elapsed time is returned
  *
- * RETURN:      time_elapsed
+ * RETURN:      Status and time_elapsed
  *
  * DESCRIPTION: Computes the time elapsed (in microseconds) between two
  *              PM Timer time stamps, taking into account the possibility of
@@ -136,7 +139,7 @@ acpi_get_timer (
  *              Note that this function accommodates only a single timer
  *              rollover.  Thus for 24-bit timers, this function should only
  *              be used for calculating durations less than ~4.6 seconds
- *              (~20 minutes for 32-bit timers) -- calculations below
+ *              (~20 minutes for 32-bit timers) -- calculations below:
  *
  *              2**24 Ticks / 3,600,000 Ticks/Sec = 4.66 sec
  *              2**32 Ticks / 3,600,000 Ticks/Sec = 1193 sec or 19.88 minutes
@@ -149,10 +152,9 @@ acpi_get_timer_duration (
 	u32                             end_ticks,
 	u32                             *time_elapsed)
 {
-	u32                             delta_ticks = 0;
-	union uint64_overlay            normalized_ticks;
 	acpi_status                     status;
-	acpi_integer                    out_quotient;
+	u32                             delta_ticks;
+	acpi_integer                    quotient;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_get_timer_duration");
@@ -164,8 +166,7 @@ acpi_get_timer_duration (
 
 	/*
 	 * Compute Tick Delta:
-	 * -------------------
-	 * Handle (max one) timer rollovers on 24- versus 32-bit timers.
+	 * Handle (max one) timer rollovers on 24-bit versus 32-bit timers.
 	 */
 	if (start_ticks < end_ticks) {
 		delta_ticks = end_ticks - start_ticks;
@@ -182,26 +183,21 @@ acpi_get_timer_duration (
 			delta_ticks = (0xFFFFFFFF - start_ticks) + end_ticks;
 		}
 	}
-	else {
+	else /* start_ticks == end_ticks */ {
 		*time_elapsed = 0;
 		return_ACPI_STATUS (AE_OK);
 	}
 
 	/*
-	 * Compute Duration:
-	 * -----------------
-	 *
-	 * Requires a 64-bit divide:
+	 * Compute Duration (Requires a 64-bit multiply and divide):
 	 *
 	 * time_elapsed = (delta_ticks * 1000000) / PM_TIMER_FREQUENCY;
 	 */
-	normalized_ticks.full = ((u64) delta_ticks) * 1000000;
+	status = acpi_ut_short_divide (((u64) delta_ticks) * 1000000,
+			 PM_TIMER_FREQUENCY, &quotient, NULL);
 
-	status = acpi_ut_short_divide (&normalized_ticks.full, PM_TIMER_FREQUENCY,
-			   &out_quotient, NULL);
-
-	*time_elapsed = (u32) out_quotient;
+	*time_elapsed = (u32) quotient;
 	return_ACPI_STATUS (status);
 }
-
+EXPORT_SYMBOL(acpi_get_timer_duration);
 

@@ -34,6 +34,7 @@
 #include <linux/pagemap.h>
 #include <linux/highmem.h>
 #include <linux/spinlock.h>
+#include <linux/key.h>
 #include <linux/personality.h>
 #include <linux/binfmts.h>
 #include <linux/swap.h>
@@ -377,7 +378,7 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 	bprm->p = PAGE_SIZE * i - offset;
 
 	/* Limit stack size to 1GB */
-	stack_base = current->rlim[RLIMIT_STACK].rlim_max;
+	stack_base = current->signal->rlim[RLIMIT_STACK].rlim_max;
 	if (stack_base > (1 << 30))
 		stack_base = 1 << 30;
 	stack_base = PAGE_ALIGN(STACK_TOP - stack_base);
@@ -533,12 +534,6 @@ static int exec_mmap(struct mm_struct *mm)
 	struct task_struct *tsk;
 	struct mm_struct * old_mm, *active_mm;
 
-	/* Add it to the list of mm's */
-	spin_lock(&mmlist_lock);
-	list_add(&mm->mmlist, &init_mm.mmlist);
-	mmlist_nr++;
-	spin_unlock(&mmlist_lock);
-
 	/* Notify parent that we're no longer interested in the old VM */
 	tsk = current;
 	old_mm = current->mm;
@@ -568,7 +563,7 @@ static int exec_mmap(struct mm_struct *mm)
  */
 static inline int de_thread(struct task_struct *tsk)
 {
-	struct signal_struct *newsig, *oldsig = tsk->signal;
+	struct signal_struct *sig = tsk->signal;
 	struct sighand_struct *newsighand, *oldsighand = tsk->sighand;
 	spinlock_t *lock = &oldsighand->siglock;
 	int count;
@@ -577,42 +572,15 @@ static inline int de_thread(struct task_struct *tsk)
 	 * If we don't share sighandlers, then we aren't sharing anything
 	 * and we can just re-use it all.
 	 */
-	if (atomic_read(&oldsighand->count) <= 1)
+	if (atomic_read(&oldsighand->count) <= 1) {
+		BUG_ON(atomic_read(&sig->count) != 1);
+		exit_itimers(sig);
 		return 0;
+	}
 
 	newsighand = kmem_cache_alloc(sighand_cachep, GFP_KERNEL);
 	if (!newsighand)
 		return -ENOMEM;
-
-	spin_lock_init(&newsighand->siglock);
-	atomic_set(&newsighand->count, 1);
-	memcpy(newsighand->action, oldsighand->action, sizeof(newsighand->action));
-
-	/*
-	 * See if we need to allocate a new signal structure
-	 */
-	newsig = NULL;
-	if (atomic_read(&oldsig->count) > 1) {
-		newsig = kmem_cache_alloc(signal_cachep, GFP_KERNEL);
-		if (!newsig) {
-			kmem_cache_free(sighand_cachep, newsighand);
-			return -ENOMEM;
-		}
-		atomic_set(&newsig->count, 1);
-		newsig->group_exit = 0;
-		newsig->group_exit_code = 0;
-		newsig->group_exit_task = NULL;
-		newsig->group_stop_count = 0;
-		newsig->curr_target = NULL;
-		init_sigpending(&newsig->shared_pending);
-		INIT_LIST_HEAD(&newsig->posix_timers);
-
-		newsig->tty = oldsig->tty;
-		newsig->pgrp = oldsig->pgrp;
-		newsig->session = oldsig->session;
-		newsig->leader = oldsig->leader;
-		newsig->tty_old_pgrp = oldsig->tty_old_pgrp;
-	}
 
 	if (thread_group_empty(current))
 		goto no_thread_group;
@@ -623,7 +591,7 @@ static inline int de_thread(struct task_struct *tsk)
 	 */
 	read_lock(&tasklist_lock);
 	spin_lock_irq(lock);
-	if (oldsig->group_exit) {
+	if (sig->group_exit) {
 		/*
 		 * Another group action in progress, just
 		 * return so that the signal is processed.
@@ -631,11 +599,9 @@ static inline int de_thread(struct task_struct *tsk)
 		spin_unlock_irq(lock);
 		read_unlock(&tasklist_lock);
 		kmem_cache_free(sighand_cachep, newsighand);
-		if (newsig)
-			kmem_cache_free(signal_cachep, newsig);
 		return -EAGAIN;
 	}
-	oldsig->group_exit = 1;
+	sig->group_exit = 1;
 	zap_other_threads(current);
 	read_unlock(&tasklist_lock);
 
@@ -645,14 +611,16 @@ static inline int de_thread(struct task_struct *tsk)
 	count = 2;
 	if (current->pid == current->tgid)
 		count = 1;
-	while (atomic_read(&oldsig->count) > count) {
-		oldsig->group_exit_task = current;
-		oldsig->notify_count = count;
+	while (atomic_read(&sig->count) > count) {
+		sig->group_exit_task = current;
+		sig->notify_count = count;
 		__set_current_state(TASK_UNINTERRUPTIBLE);
 		spin_unlock_irq(lock);
 		schedule();
 		spin_lock_irq(lock);
 	}
+	sig->group_exit_task = NULL;
+	sig->notify_count = 0;
 	spin_unlock_irq(lock);
 
 	/*
@@ -663,14 +631,14 @@ static inline int de_thread(struct task_struct *tsk)
 	if (current->pid != current->tgid) {
 		struct task_struct *leader = current->group_leader, *parent;
 		struct dentry *proc_dentry1, *proc_dentry2;
-		unsigned long state, ptrace;
+		unsigned long exit_state, ptrace;
 
 		/*
 		 * Wait for the thread group leader to be a zombie.
 		 * It should already be zombie at this point, most
 		 * of the time.
 		 */
-		while (leader->state != TASK_ZOMBIE)
+		while (leader->exit_state != EXIT_ZOMBIE)
 			yield();
 
 		spin_lock(&leader->proc_lock);
@@ -714,7 +682,7 @@ static inline int de_thread(struct task_struct *tsk)
 		list_del(&current->tasks);
 		list_add_tail(&current->tasks, &init_task.tasks);
 		current->exit_signal = SIGCHLD;
-		state = leader->state;
+		exit_state = leader->exit_state;
 
 		write_unlock_irq(&tasklist_lock);
 		spin_unlock(&leader->proc_lock);
@@ -722,36 +690,51 @@ static inline int de_thread(struct task_struct *tsk)
 		proc_pid_flush(proc_dentry1);
 		proc_pid_flush(proc_dentry2);
 
-		if (state != TASK_ZOMBIE)
+		if (exit_state != EXIT_ZOMBIE)
 			BUG();
 		release_task(leader);
         }
 
+	/*
+	 * Now there are really no other threads at all,
+	 * so it's safe to stop telling them to kill themselves.
+	 */
+	sig->group_exit = 0;
+
 no_thread_group:
+	BUG_ON(atomic_read(&sig->count) != 1);
+	exit_itimers(sig);
 
-	write_lock_irq(&tasklist_lock);
-	spin_lock(&oldsighand->siglock);
-	spin_lock(&newsighand->siglock);
+	if (atomic_read(&oldsighand->count) == 1) {
+		/*
+		 * Now that we nuked the rest of the thread group,
+		 * it turns out we are not sharing sighand any more either.
+		 * So we can just keep it.
+		 */
+		kmem_cache_free(sighand_cachep, newsighand);
+	} else {
+		/*
+		 * Move our state over to newsighand and switch it in.
+		 */
+		spin_lock_init(&newsighand->siglock);
+		atomic_set(&newsighand->count, 1);
+		memcpy(newsighand->action, oldsighand->action,
+		       sizeof(newsighand->action));
 
-	if (current == oldsig->curr_target)
-		oldsig->curr_target = next_thread(current);
-	if (newsig)
-		current->signal = newsig;
-	current->sighand = newsighand;
-	init_sigpending(&current->pending);
-	recalc_sigpending();
+		write_lock_irq(&tasklist_lock);
+		spin_lock(&oldsighand->siglock);
+		spin_lock(&newsighand->siglock);
 
-	spin_unlock(&newsighand->siglock);
-	spin_unlock(&oldsighand->siglock);
-	write_unlock_irq(&tasklist_lock);
+		current->sighand = newsighand;
+		recalc_sigpending();
 
-	if (newsig && atomic_dec_and_test(&oldsig->count)) {
-		exit_itimers(oldsig);
-		kmem_cache_free(signal_cachep, oldsig);
+		spin_unlock(&newsighand->siglock);
+		spin_unlock(&oldsighand->siglock);
+		write_unlock_irq(&tasklist_lock);
+
+		if (atomic_dec_and_test(&oldsighand->count))
+			kmem_cache_free(sighand_cachep, oldsighand);
 	}
-
-	if (atomic_dec_and_test(&oldsighand->count))
-		kmem_cache_free(sighand_cachep, oldsighand);
 
 	if (!thread_group_empty(current))
 		BUG();
@@ -864,8 +847,10 @@ int flush_old_exec(struct linux_binprm * bprm)
 
 	if (bprm->e_uid != current->euid || bprm->e_gid != current->egid || 
 	    permission(bprm->file->f_dentry->d_inode,MAY_READ, NULL) ||
-	    (bprm->interp_flags & BINPRM_FLAGS_ENFORCE_NONDUMP))
+	    (bprm->interp_flags & BINPRM_FLAGS_ENFORCE_NONDUMP)) {
+		suid_keys(current);
 		current->mm->dumpable = 0;
+	}
 
 	/* An exec changes our domain. We are no longer part of the thread
 	   group */
@@ -899,7 +884,7 @@ int prepare_binprm(struct linux_binprm *bprm)
 	mode = inode->i_mode;
 	/*
 	 * Check execute perms again - if the caller has CAP_DAC_OVERRIDE,
-	 * vfs_permission lets a non-executable through
+	 * generic_permission lets a non-executable through
 	 */
 	if (!(mode & 0111))	/* with at least _one_ execute bit set */
 		return -EACCES;
@@ -959,6 +944,11 @@ static inline int unsafe_exec(struct task_struct *p)
 void compute_creds(struct linux_binprm *bprm)
 {
 	int unsafe;
+
+	if (bprm->e_uid != current->uid)
+		suid_keys(current);
+	exec_keys(current);
+
 	task_lock(current);
 	unsafe = unsafe_exec(current);
 	security_bprm_apply_creds(bprm, unsafe);
@@ -998,7 +988,7 @@ EXPORT_SYMBOL(remove_arg_zero);
  */
 int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 {
-	int try,retval=0;
+	int try,retval;
 	struct linux_binfmt *fmt;
 #ifdef __alpha__
 	/* handle /sbin/loader.. */
@@ -1042,6 +1032,7 @@ int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 	/* kernel module loader fixup */
 	/* so we don't try to load run modprobe in kernel space. */
 	set_fs(USER_DS);
+	retval = -ENOENT;
 	for (try=0; try<2; try++) {
 		read_lock(&binfmt_lock);
 		for (fmt = formats ; fmt ; fmt = fmt->next) {
@@ -1098,107 +1089,104 @@ int do_execve(char * filename,
 	char __user *__user *envp,
 	struct pt_regs * regs)
 {
-	struct linux_binprm bprm;
+	struct linux_binprm *bprm;
 	struct file *file;
 	int retval;
 	int i;
 
-	file = open_exec(filename);
+	retval = -ENOMEM;
+	bprm = kmalloc(sizeof(*bprm), GFP_KERNEL);
+	if (!bprm)
+		goto out_ret;
+	memset(bprm, 0, sizeof(*bprm));
 
+	file = open_exec(filename);
 	retval = PTR_ERR(file);
 	if (IS_ERR(file))
-		return retval;
+		goto out_kfree;
 
 	sched_exec();
 
-	bprm.p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
-	memset(bprm.page, 0, MAX_ARG_PAGES*sizeof(bprm.page[0]));
+	bprm->p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
 
-	bprm.file = file;
-	bprm.filename = filename;
-	bprm.interp = filename;
-	bprm.interp_flags = 0;
-	bprm.interp_data = 0;
-	bprm.sh_bang = 0;
-	bprm.loader = 0;
-	bprm.exec = 0;
-	bprm.security = NULL;
-	bprm.mm = mm_alloc();
+	bprm->file = file;
+	bprm->filename = filename;
+	bprm->interp = filename;
+	bprm->mm = mm_alloc();
 	retval = -ENOMEM;
-	if (!bprm.mm)
+	if (!bprm->mm)
 		goto out_file;
 
-	retval = init_new_context(current, bprm.mm);
+	retval = init_new_context(current, bprm->mm);
 	if (retval < 0)
 		goto out_mm;
-	if (likely(current->mm)) {
-		bprm.mm->rlimit_rss = current->mm->rlimit_rss;
-	} else {
-		bprm.mm->rlimit_rss = init_mm.rlimit_rss;
-	}
 
-	bprm.argc = count(argv, bprm.p / sizeof(void *));
-	if ((retval = bprm.argc) < 0)
+	bprm->argc = count(argv, bprm->p / sizeof(void *));
+	if ((retval = bprm->argc) < 0)
 		goto out_mm;
 
-	bprm.envc = count(envp, bprm.p / sizeof(void *));
-	if ((retval = bprm.envc) < 0)
+	bprm->envc = count(envp, bprm->p / sizeof(void *));
+	if ((retval = bprm->envc) < 0)
 		goto out_mm;
 
-	retval = security_bprm_alloc(&bprm);
+	retval = security_bprm_alloc(bprm);
 	if (retval)
 		goto out;
 
-	retval = prepare_binprm(&bprm);
+	retval = prepare_binprm(bprm);
 	if (retval < 0)
 		goto out;
 
-	retval = copy_strings_kernel(1, &bprm.filename, &bprm);
+	retval = copy_strings_kernel(1, &bprm->filename, bprm);
 	if (retval < 0)
 		goto out;
 
-	bprm.exec = bprm.p;
-	retval = copy_strings(bprm.envc, envp, &bprm);
+	bprm->exec = bprm->p;
+	retval = copy_strings(bprm->envc, envp, bprm);
 	if (retval < 0)
 		goto out;
 
-	retval = copy_strings(bprm.argc, argv, &bprm);
+	retval = copy_strings(bprm->argc, argv, bprm);
 	if (retval < 0)
 		goto out;
 
-	retval = search_binary_handler(&bprm,regs);
+	retval = search_binary_handler(bprm,regs);
 	if (retval >= 0) {
-		free_arg_pages(&bprm);
+		free_arg_pages(bprm);
 
 		/* execve success */
-		security_bprm_free(&bprm);
+		security_bprm_free(bprm);
+		kfree(bprm);
 		return retval;
 	}
 
 out:
 	/* Something went wrong, return the inode and free the argument pages*/
 	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
-		struct page * page = bprm.page[i];
+		struct page * page = bprm->page[i];
 		if (page)
 			__free_page(page);
 	}
 
-	if (bprm.security)
-		security_bprm_free(&bprm);
+	if (bprm->security)
+		security_bprm_free(bprm);
 
 out_mm:
-	if (bprm.mm)
-		mmdrop(bprm.mm);
+	if (bprm->mm)
+		mmdrop(bprm->mm);
 
 out_file:
-	if (bprm.file) {
-		allow_write_access(bprm.file);
-		fput(bprm.file);
+	if (bprm->file) {
+		allow_write_access(bprm->file);
+		fput(bprm->file);
 	}
+
+out_kfree:
+	kfree(bprm);
+
+out_ret:
 	return retval;
 }
-
-EXPORT_SYMBOL(do_execve);
 
 int set_binfmt(struct linux_binfmt *new)
 {
@@ -1400,7 +1388,7 @@ int do_coredump(long signr, int exit_code, struct pt_regs * regs)
 	current->signal->group_exit_code = exit_code;
 	coredump_wait(mm);
 
-	if (current->rlim[RLIMIT_CORE].rlim_cur < binfmt->min_coredump)
+	if (current->signal->rlim[RLIMIT_CORE].rlim_cur < binfmt->min_coredump)
 		goto fail_unlock;
 
 	/*
@@ -1430,7 +1418,8 @@ int do_coredump(long signr, int exit_code, struct pt_regs * regs)
 
 	retval = binfmt->core_dump(signr, regs, file);
 
-	current->signal->group_exit_code |= 0x80;
+	if (retval)
+		current->signal->group_exit_code |= 0x80;
 close_fail:
 	filp_close(file, NULL);
 fail_unlock:

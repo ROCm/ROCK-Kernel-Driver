@@ -633,7 +633,7 @@ static Scsi_Host_Template driver_template = {
 #include "scsi_module.c"
 
 #ifdef MODULE
-MODULE_PARM(pas16_addr, "h");
-MODULE_PARM(pas16_irq, "i");
+module_param(pas16_addr, ushort, 0);
+module_param(pas16_irq, int, 0);
 #endif
 MODULE_LICENSE("GPL");

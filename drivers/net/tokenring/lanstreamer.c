@@ -120,12 +120,12 @@
 #include <linux/pci.h>
 #include <linux/spinlock.h>
 #include <linux/version.h>
+#include <linux/bitops.h>
 
 #include <net/checksum.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 
 #include "lanstreamer.h"
 
@@ -1606,7 +1606,7 @@ static void streamer_arb_cmd(struct net_device *dev)
 				i += 2;
 			}
 
-			memcpy_fromio(skb_put(mac_frame, buffer_len),
+			memcpy(skb_put(mac_frame, buffer_len),
 				      frame_data, buffer_len);
 		} while (next_ptr && (buff_off = next_ptr));
 

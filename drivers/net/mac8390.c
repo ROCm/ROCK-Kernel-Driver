@@ -32,19 +32,15 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/hwtest.h>
 #include <asm/macints.h>
 
 #include "8390.h"
-
-#if (LINUX_VERSION_CODE < 0x02030e)
-#define net_device device
-#endif
 
 #define WD_START_PG			0x00	/* First page of TX buffer */
 #define CABLETRON_RX_START_PG		0x00    /* First page of RX buffer */

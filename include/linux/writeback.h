@@ -68,7 +68,7 @@ struct writeback_control {
  */	
 void writeback_inodes(struct writeback_control *wbc);
 void wake_up_inode(struct inode *inode);
-void __wait_on_inode(struct inode * inode);
+int inode_wait(void *);
 void sync_inodes_sb(struct super_block *, int wait);
 void sync_inodes(int wait);
 
@@ -76,8 +76,8 @@ void sync_inodes(int wait);
 static inline void wait_on_inode(struct inode *inode)
 {
 	might_sleep();
-	if (inode->i_state & I_LOCK)
-		__wait_on_inode(inode);
+	wait_on_bit(&inode->i_state, __I_LOCK, inode_wait,
+							TASK_UNINTERRUPTIBLE);
 }
 
 /*
@@ -106,6 +106,8 @@ int pdflush_operation(void (*fn)(unsigned long), unsigned long arg0);
 int do_writepages(struct address_space *mapping, struct writeback_control *wbc);
 int sync_page_range(struct inode *inode, struct address_space *mapping,
 			loff_t pos, size_t count);
+int sync_page_range_nolock(struct inode *inode, struct address_space
+		*mapping, loff_t pos, size_t count);
 
 /* pdflush.c */
 extern int nr_pdflush_threads;	/* Global so it can be exported to sysctl

@@ -73,8 +73,8 @@ void sysdev_remove_file(struct sys_device * s, struct sysdev_attribute * a)
 	sysfs_remove_file(&s->kobj, &a->attr);
 }
 
-EXPORT_SYMBOL(sysdev_create_file);
-EXPORT_SYMBOL(sysdev_remove_file);
+EXPORT_SYMBOL_GPL(sysdev_create_file);
+EXPORT_SYMBOL_GPL(sysdev_remove_file);
 
 /*
  * declare system_subsys
@@ -98,8 +98,8 @@ void sysdev_class_unregister(struct sysdev_class * cls)
 	kset_unregister(&cls->kset);
 }
 
-EXPORT_SYMBOL(sysdev_class_register);
-EXPORT_SYMBOL(sysdev_class_unregister);
+EXPORT_SYMBOL_GPL(sysdev_class_register);
+EXPORT_SYMBOL_GPL(sysdev_class_unregister);
 
 
 static LIST_HEAD(global_drivers);
@@ -157,8 +157,8 @@ void sysdev_driver_unregister(struct sysdev_class * cls,
 	up_write(&system_subsys.rwsem);
 }
 
-EXPORT_SYMBOL(sysdev_driver_register);
-EXPORT_SYMBOL(sysdev_driver_unregister);
+EXPORT_SYMBOL_GPL(sysdev_driver_register);
+EXPORT_SYMBOL_GPL(sysdev_driver_unregister);
 
 
 
@@ -392,5 +392,5 @@ int __init system_bus_init(void)
 	return subsystem_register(&system_subsys);
 }
 
-EXPORT_SYMBOL(sysdev_register);
-EXPORT_SYMBOL(sysdev_unregister);
+EXPORT_SYMBOL_GPL(sysdev_register);
+EXPORT_SYMBOL_GPL(sysdev_unregister);

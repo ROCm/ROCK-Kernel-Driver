@@ -52,16 +52,7 @@ static struct cpufreq_frequency_table speedstep_freqs[] = {
 };
 
 
-/* DEBUG
- *   Define it if you want verbose debug output, e.g. for bug reporting
- */
-//#define SPEEDSTEP_DEBUG
-
-#ifdef SPEEDSTEP_DEBUG
-#define dprintk(msg...) printk(msg)
-#else
-#define dprintk(msg...) do { } while(0)
-#endif
+#define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, "speedstep-ich", msg)
 
 
 /**
@@ -83,13 +74,13 @@ static void speedstep_set_state (unsigned int state)
 	/* get PMBASE */
 	pci_read_config_dword(speedstep_chipset_dev, 0x40, &pmbase);
 	if (!(pmbase & 0x01)) {
-		printk(KERN_ERR "cpufreq: could not find speedstep register\n");
+		printk(KERN_ERR "speedstep-ich: could not find speedstep register\n");
 		return;
 	}
 
 	pmbase &= 0xFFFFFFFE;
 	if (!pmbase) {
-		printk(KERN_ERR "cpufreq: could not find speedstep register\n");
+		printk(KERN_ERR "speedstep-ich: could not find speedstep register\n");
 		return;
 	}
 
@@ -99,13 +90,13 @@ static void speedstep_set_state (unsigned int state)
 	/* read state */
 	value = inb(pmbase + 0x50);
 
-	dprintk(KERN_DEBUG "cpufreq: read at pmbase 0x%x + 0x50 returned 0x%x\n", pmbase, value);
+	dprintk("read at pmbase 0x%x + 0x50 returned 0x%x\n", pmbase, value);
 
 	/* write new state */
 	value &= 0xFE;
 	value |= state;
 
-	dprintk(KERN_DEBUG "cpufreq: writing 0x%x to pmbase 0x%x + 0x50\n", value, pmbase);
+	dprintk("writing 0x%x to pmbase 0x%x + 0x50\n", value, pmbase);
 
 	/* Disable bus master arbitration */
 	pm2_blk = inb(pmbase + 0x20);
@@ -125,10 +116,10 @@ static void speedstep_set_state (unsigned int state)
 	/* Enable IRQs */
 	local_irq_restore(flags);
 
-	dprintk(KERN_DEBUG "cpufreq: read at pmbase 0x%x + 0x50 returned 0x%x\n", pmbase, value);
+	dprintk("read at pmbase 0x%x + 0x50 returned 0x%x\n", pmbase, value);
 
 	if (state == (value & 0x1)) {
-		dprintk (KERN_INFO "cpufreq: change to %u MHz succeeded\n", (speedstep_get_processor_frequency(speedstep_processor) / 1000));
+		dprintk("change to %u MHz succeeded\n", (speedstep_get_processor_frequency(speedstep_processor) / 1000));
 	} else {
 		printk (KERN_ERR "cpufreq: change failed - I/O error\n");
 	}
@@ -153,7 +144,7 @@ static int speedstep_activate (void)
 	pci_read_config_word(speedstep_chipset_dev, 0x00A0, &value);
 	if (!(value & 0x08)) {
 		value |= 0x08;
-		dprintk(KERN_DEBUG "cpufreq: activating SpeedStep (TM) registers\n");
+		dprintk("activating SpeedStep (TM) registers\n");
 		pci_write_config_word(speedstep_chipset_dev, 0x00A0, value);
 	}
 
@@ -171,7 +162,7 @@ static int speedstep_activate (void)
  */
 static unsigned int speedstep_detect_chipset (void)
 {
-	speedstep_chipset_dev = pci_find_subsys(PCI_VENDOR_ID_INTEL,
+	speedstep_chipset_dev = pci_get_subsys(PCI_VENDOR_ID_INTEL,
 			      PCI_DEVICE_ID_INTEL_82801DB_12,
 			      PCI_ANY_ID,
 			      PCI_ANY_ID,
@@ -179,7 +170,7 @@ static unsigned int speedstep_detect_chipset (void)
 	if (speedstep_chipset_dev)
 		return 4; /* 4-M */
 
-	speedstep_chipset_dev = pci_find_subsys(PCI_VENDOR_ID_INTEL,
+	speedstep_chipset_dev = pci_get_subsys(PCI_VENDOR_ID_INTEL,
 			      PCI_DEVICE_ID_INTEL_82801CA_12,
 			      PCI_ANY_ID,
 			      PCI_ANY_ID,
@@ -188,7 +179,7 @@ static unsigned int speedstep_detect_chipset (void)
 		return 3; /* 3-M */
 
 
-	speedstep_chipset_dev = pci_find_subsys(PCI_VENDOR_ID_INTEL,
+	speedstep_chipset_dev = pci_get_subsys(PCI_VENDOR_ID_INTEL,
 			      PCI_DEVICE_ID_INTEL_82801BA_10,
 			      PCI_ANY_ID,
 			      PCI_ANY_ID,
@@ -201,7 +192,7 @@ static unsigned int speedstep_detect_chipset (void)
 		static struct pci_dev *hostbridge;
 		u8 rev = 0;
 
-		hostbridge  = pci_find_subsys(PCI_VENDOR_ID_INTEL,
+		hostbridge  = pci_get_subsys(PCI_VENDOR_ID_INTEL,
 			      PCI_DEVICE_ID_INTEL_82815_MC,
 			      PCI_ANY_ID,
 			      PCI_ANY_ID,
@@ -212,33 +203,35 @@ static unsigned int speedstep_detect_chipset (void)
 
 		pci_read_config_byte(hostbridge, PCI_REVISION_ID, &rev);
 		if (rev < 5) {
-			dprintk(KERN_INFO "cpufreq: hostbridge does not support speedstep\n");
+			dprintk("hostbridge does not support speedstep\n");
 			speedstep_chipset_dev = NULL;
+			pci_dev_put(hostbridge);
 			return 0;
 		}
 
+		pci_dev_put(hostbridge);
 		return 2; /* 2-M */
 	}
 
 	return 0;
 }
 
-static unsigned int speedstep_get(unsigned int cpu)
+static unsigned int _speedstep_get(cpumask_t cpus)
 {
 	unsigned int speed;
-	cpumask_t cpus_allowed,affected_cpu_map;
+	cpumask_t cpus_allowed;
 
-	/* only run on CPU to be set, or on its sibling */
 	cpus_allowed = current->cpus_allowed;
-#ifdef CONFIG_SMP
-	affected_cpu_map = cpu_sibling_map[cpu];
-#else
-	affected_cpu_map = cpumask_of_cpu(cpu);
-#endif
-	set_cpus_allowed(current, affected_cpu_map);
-	speed=speedstep_get_processor_frequency(speedstep_processor);
+	set_cpus_allowed(current, cpus);
+	speed = speedstep_get_processor_frequency(speedstep_processor);
 	set_cpus_allowed(current, cpus_allowed);
+	dprintk("detected %u kHz as current frequency\n", speed);
 	return speed;
+}
+
+static unsigned int speedstep_get(unsigned int cpu)
+{
+	return _speedstep_get(cpumask_of_cpu(cpu));
 }
 
 /**
@@ -255,15 +248,17 @@ static int speedstep_target (struct cpufreq_policy *policy,
 {
 	unsigned int newstate = 0;
 	struct cpufreq_freqs freqs;
-	cpumask_t cpus_allowed, affected_cpu_map;
+	cpumask_t cpus_allowed;
 	int i;
 
 	if (cpufreq_frequency_table_target(policy, &speedstep_freqs[0], target_freq, relation, &newstate))
 		return -EINVAL;
 
-	freqs.old = speedstep_get(policy->cpu);
+	freqs.old = _speedstep_get(policy->cpus);
 	freqs.new = speedstep_freqs[newstate].frequency;
 	freqs.cpu = policy->cpu;
+
+	dprintk("transiting from %u to %u kHz\n", freqs.old, freqs.new);
 
 	/* no transition necessary */
 	if (freqs.old == freqs.new)
@@ -271,27 +266,20 @@ static int speedstep_target (struct cpufreq_policy *policy,
 
 	cpus_allowed = current->cpus_allowed;
 
-	/* only run on CPU to be set, or on its sibling */
-#ifdef CONFIG_SMP
-	affected_cpu_map = cpu_sibling_map[policy->cpu];
-#else
-	affected_cpu_map = cpumask_of_cpu(policy->cpu);
-#endif
-
-	for_each_cpu_mask(i, affected_cpu_map) {
+	for_each_cpu_mask(i, policy->cpus) {
 		freqs.cpu = i;
 		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 	}
 
 	/* switch to physical CPU where state is to be changed */
-	set_cpus_allowed(current, affected_cpu_map);
+	set_cpus_allowed(current, policy->cpus);
 
 	speedstep_set_state(newstate);
 
 	/* allow to be run on all CPUs */
 	set_cpus_allowed(current, cpus_allowed);
 
-	for_each_cpu_mask(i, affected_cpu_map) {
+	for_each_cpu_mask(i, policy->cpus) {
 		freqs.cpu = i;
 		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 	}
@@ -317,21 +305,15 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 {
 	int result = 0;
 	unsigned int speed;
-	cpumask_t cpus_allowed,affected_cpu_map;
-
-
-	/* capability check */
-	if (policy->cpu != 0) /* FIXME: better support for SMT in cpufreq core. Up until then, it's better to register only one CPU */
-		return -ENODEV;
+	cpumask_t cpus_allowed;
 
 	/* only run on CPU to be set, or on its sibling */
-	cpus_allowed = current->cpus_allowed;
 #ifdef CONFIG_SMP
-	affected_cpu_map = cpu_sibling_map[policy->cpu];
-#else
-	affected_cpu_map = cpumask_of_cpu(policy->cpu);
+	policy->cpus = cpu_sibling_map[policy->cpu];
 #endif
-	set_cpus_allowed(current, affected_cpu_map);
+
+	cpus_allowed = current->cpus_allowed;
+	set_cpus_allowed(current, policy->cpus);
 
 	/* detect low and high frequency */
 	result = speedstep_get_freqs(speedstep_processor,
@@ -343,11 +325,11 @@ static int speedstep_cpu_init(struct cpufreq_policy *policy)
 		return result;
 
 	/* get current speed setting */
-	speed = speedstep_get(policy->cpu);
+	speed = _speedstep_get(policy->cpus);
 	if (!speed)
 		return -EIO;
 
-	dprintk(KERN_INFO "cpufreq: currently at %s speed setting - %i MHz\n",
+	dprintk("currently at %s speed setting - %i MHz\n",
 		(speed == speedstep_freqs[SPEEDSTEP_LOW].frequency) ? "low" : "high",
 		(speed / 1000));
 
@@ -401,18 +383,22 @@ static int __init speedstep_init(void)
 {
 	/* detect processor */
 	speedstep_processor = speedstep_detect_processor();
-	if (!speedstep_processor)
+	if (!speedstep_processor) {
+		dprintk("Intel(R) SpeedStep(TM) capable processor not found\n");
 		return -ENODEV;
+	}
 
 	/* detect chipset */
 	if (!speedstep_detect_chipset()) {
-		printk(KERN_INFO "cpufreq: Intel(R) SpeedStep(TM) for this chipset not (yet) available.\n");
+		dprintk("Intel(R) SpeedStep(TM) for this chipset not (yet) available.\n");
 		return -ENODEV;
 	}
 
 	/* activate speedstep support */
-	if (speedstep_activate())
+	if (speedstep_activate()) {
+		pci_dev_put(speedstep_chipset_dev);
 		return -EINVAL;
+	}
 
 	return cpufreq_register_driver(&speedstep_driver);
 }
@@ -425,6 +411,7 @@ static int __init speedstep_init(void)
  */
 static void __exit speedstep_exit(void)
 {
+	pci_dev_put(speedstep_chipset_dev);
 	cpufreq_unregister_driver(&speedstep_driver);
 }
 

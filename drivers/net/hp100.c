@@ -114,8 +114,8 @@
 #include <linux/config.h>	/* for CONFIG_PCI */
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/io.h>
 
 #include "hp100.h"
@@ -161,7 +161,7 @@ struct hp100_private {
 	u_char bus;
 	struct pci_dev *pci_dev;
 	short mem_mapped;	/* memory mapped access */
-	void *mem_ptr_virt;	/* virtual memory mapped area, maybe NULL */
+	void __iomem *mem_ptr_virt;	/* virtual memory mapped area, maybe NULL */
 	unsigned long mem_ptr_phys;	/* physical memory mapped area */
 	short lan_type;		/* 10Mb/s, 100Mb/s or -1 (error) */
 	int hub_status;		/* was login to hub successful? */
@@ -435,7 +435,7 @@ static int __init hp100_probe1(struct net_device *dev, int ioaddr,
 	u_short local_mode, lsw;
 	short mem_mapped;
 	unsigned long mem_ptr_phys;
-	void **mem_ptr_virt;
+	void __iomem *mem_ptr_virt;
 	struct hp100_private *lp;
 
 #ifdef HP100_DEBUG_B

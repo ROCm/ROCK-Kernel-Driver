@@ -17,11 +17,16 @@
 #include "kern_util.h"
 #include "mem_user.h"
 #include "signal_user.h"
+#include "time_user.h"
+#include "irq_user.h"
 #include "user.h"
 #include "init.h"
 #include "mode.h"
 #include "choose-mode.h"
 #include "uml-config.h"
+#include "irq_user.h"
+#include "time_user.h"
+#include "os.h"
 
 /* Set in set_stklim, which is called from main and __wrap_malloc.
  * __wrap_malloc only calls it if main hasn't started.
@@ -151,15 +156,15 @@ int main(int argc, char **argv, char **envp)
 
 		printf("\n");
 
-		/* Let any pending signals fire, then disable them.  This 
-		 * ensures that they won't be delivered after the exec, when 
+		/* Let any pending signals fire, then disable them.  This
+		 * ensures that they won't be delivered after the exec, when
 		 * they are definitely not expected.
 		 */
 		unblock_signals();
 		disable_timer();
 		err = deactivate_all_fds();
 		if(err)
-			printf("deactivate_all_fds failed, errno = %d\n", 
+			printf("deactivate_all_fds failed, errno = %d\n",
 			       -err);
 
 		execvp(new_argv[0], new_argv);
@@ -171,7 +176,7 @@ int main(int argc, char **argv, char **envp)
 }
 
 #define CAN_KMALLOC() \
-	(kmalloc_ok && CHOOSE_MODE((getpid() != tracing_pid), 1))
+	(kmalloc_ok && CHOOSE_MODE((os_getpid() != tracing_pid), 1))
 
 extern void *__real_malloc(int);
 
@@ -220,14 +225,19 @@ void __wrap_free(void *ptr)
 	 * If kmalloc is not yet possible, then the kernel memory regions
 	 * may not be set up yet, and the variables not initialized.  So,
 	 * free is called.
+	 *
+	 * CAN_KMALLOC is checked because it would be bad to free a buffer
+	 * with kmalloc/vmalloc after they have been turned off during
+	 * shutdown.
 	 */
-	if(CAN_KMALLOC()){
-		if((addr >= uml_physmem) && (addr <= high_physmem))
+
+	if((addr >= uml_physmem) && (addr < high_physmem)){
+		if(CAN_KMALLOC())
 			kfree(ptr);
-		else if((addr >= start_vm) && (addr <= end_vm))
+	}
+	else if((addr >= start_vm) && (addr < end_vm)){
+		if(CAN_KMALLOC())
 			vfree(ptr);
-		else
-			__real_free(ptr);
 	}
 	else __real_free(ptr);
 }

@@ -281,7 +281,7 @@ typedef struct {
 } socal_port; 
 
 typedef struct {
-	socal_hw_cq		*hw_cq;	/* Related XRAM cq */
+	socal_hw_cq		__iomem *hw_cq;	/* Related XRAM cq */
 	socal_req		*pool;
 	u8			in;
 	u8			out;
@@ -295,9 +295,9 @@ struct socal {
 	socal_cq		req[4]; /* Request CQs */
 	socal_cq		rsp[4]; /* Response CQs */
 	int			socal_no;
-	unsigned long		regs;
-	unsigned long		xram;
-	unsigned long		eeprom;
+	void __iomem		*regs;
+	void __iomem		*xram;
+	void __iomem		*eeprom;
 	fc_wwn			wwn;
 	u32			imask;	/* Our copy of regs->imask */
 	u32			cfg;	/* Our copy of regs->cfg */

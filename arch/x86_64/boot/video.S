@@ -66,6 +66,7 @@
 #define VIDEO_80x30 0x0f05
 #define VIDEO_80x34 0x0f06
 #define VIDEO_80x60 0x0f07
+#define VIDEO_GFX_HACK 0x0f08
 #define VIDEO_LAST_SPECIAL 0x0f09
 
 /* Video modes given by resolution */
@@ -96,7 +97,6 @@
 #define PARAM_VESAPM_OFF	0x30
 #define PARAM_LFB_PAGES		0x32
 #define PARAM_VESA_ATTRIB	0x34
-
 
 /* Define DO_STORE according to CONFIG_VIDEO_RETAIN */
 #ifdef CONFIG_VIDEO_RETAIN
@@ -133,6 +133,7 @@ vid1:
 #ifdef CONFIG_VIDEO_RETAIN
 	call	restore_screen			# Restore screen contents
 #endif /* CONFIG_VIDEO_RETAIN */
+	call	store_edid
 #endif /* CONFIG_VIDEO_SELECT */
 	call	mode_params			# Store mode parameters
 	popw	%ds				# Restore original DS
@@ -231,6 +232,41 @@ mopar_gr:
 	xorl	%eax, %eax
 	movw	18(%di), %ax
 	movl	%eax, %fs:(PARAM_LFB_SIZE)
+
+# switching the DAC to 8-bit is for <= 8 bpp only
+	movw	%fs:(PARAM_LFB_DEPTH), %ax
+	cmpw	$8, %ax
+	jg	dac_done
+
+# get DAC switching capability
+	xorl	%eax, %eax
+	movb	10(%di), %al
+	testb	$1, %al
+	jz	dac_set
+
+# attempt to switch DAC to 8-bit
+	movw	$0x4f08, %ax
+	movw	$0x0800, %bx
+	int	$0x10
+	cmpw	$0x004f, %ax
+	jne     dac_set
+	movb    %bh, dac_size		# store actual DAC size
+
+dac_set:
+# set color size to DAC size
+	movb	dac_size, %al
+	movb	%al, %fs:(PARAM_LFB_COLORS+0)
+	movb	%al, %fs:(PARAM_LFB_COLORS+2)
+	movb	%al, %fs:(PARAM_LFB_COLORS+4)
+	movb	%al, %fs:(PARAM_LFB_COLORS+6)
+
+# set color offsets to 0
+	movb	$0, %fs:(PARAM_LFB_COLORS+1)
+	movb	$0, %fs:(PARAM_LFB_COLORS+3)
+	movb	$0, %fs:(PARAM_LFB_COLORS+5)
+	movb	$0, %fs:(PARAM_LFB_COLORS+7)
+
+dac_done:
 # get protected mode interface informations
 	movw	$0x4f0a, %ax
 	xorw	%bx, %bx
@@ -440,7 +476,7 @@ setalias:
 
 # Setting of user mode (AX=mode ID) => CF=success
 mode_set:
-       	movw    %ax, %fs:(0x01fa)
+	movw	%ax, %fs:(0x01fa)		# Store mode for use in acpi_wakeup.S
 	movw	%ax, %bx
 	cmpb	$0xff, %ah
 	jz	setalias
@@ -744,7 +780,15 @@ set_80x60:
 	movw	$0x503c, force_size
 	jmp	setvde
 
+# Special hack for ThinkPad graphics
 set_gfx:
+#ifdef CONFIG_VIDEO_GFX_HACK
+	movw	$VIDEO_GFX_BIOS_AX, %ax
+	movw	$VIDEO_GFX_BIOS_BX, %bx
+	int	$0x10
+	movw	$VIDEO_GFX_DUMMY_RESOLUTION, force_size
+	stc
+#endif
 	ret
 
 #ifdef CONFIG_VIDEO_RETAIN
@@ -969,6 +1013,10 @@ vga_modes:
 	.word	0x5022				# 80x34
 	.word	VIDEO_80x60
 	.word	0x503c				# 80x60
+#ifdef CONFIG_VIDEO_GFX_HACK
+	.word	VIDEO_GFX_HACK
+	.word	VIDEO_GFX_DUMMY_RESOLUTION
+#endif
 
 vga_modes_end:
 # Detect VESA modes.
@@ -1875,6 +1923,39 @@ skip10:	movb	%ah, %al
 	popw	%ax
 	ret
 
+store_edid:
+	pushw	%es				# just save all registers
+	pushw	%ax
+	pushw	%bx
+	pushw   %cx
+	pushw	%dx
+	pushw   %di
+
+	pushw	%fs
+	popw    %es
+
+	movl	$0x13131313, %eax		# memset block with 0x13
+	movw    $32, %cx
+	movw	$0x140, %di
+	cld
+	rep
+	stosl
+
+	movw	$0x4f15, %ax                    # do VBE/DDC
+	movw	$0x01, %bx
+	movw	$0x00, %cx
+	movw    $0x01, %dx
+	movw	$0x140, %di
+	int	$0x10
+
+	popw	%di				# restore all registers
+	popw	%dx
+	popw	%cx
+	popw	%bx
+	popw	%ax
+	popw	%es
+	ret
+
 # VIDEO_SELECT-only variables
 mt_end:		.word	0	# End of video mode table if built
 edit_buf:	.space	6	# Line editor buffer
@@ -1883,6 +1964,7 @@ scanning:	.byte	0	# Performing mode scan
 do_restore:	.byte	0	# Screen contents altered during mode change
 svga_prefix:	.byte	VIDEO_FIRST_BIOS>>8	# Default prefix for BIOS modes
 graphic_mode:	.byte	0	# Graphic mode with a linear frame buffer
+dac_size:	.byte	6	# DAC bit depth
 
 # Status messages
 keymsg:		.ascii	"Press <RETURN> to see video modes available, "

@@ -8,6 +8,7 @@
  *  Copyright (C) 1998-2000 Andre Hedrick (andre@linux-ide.org)
  *  May be copied or modified under the terms of the GNU General Public License
  *  Copyright (C) 2002 Alan Cox <alan@redhat.com>
+ *  ALi (now ULi M5228) support by Clear Zhang <Clear.Zhang@ali.com.tw>
  *
  *  (U)DMA capable version of ali 1533/1543(C), 1535(D)
  *
@@ -558,18 +559,19 @@ no_dma_set:
 }
 
 /**
- *	ali15x3_dma_write	-	do a DMA IDE write
- *	@drive:	drive to issue write for
+ *	ali15x3_dma_setup	-	begin a DMA phase
+ *	@drive:	target device
  *
- *	Returns 1 if the DMA write cannot be performed, zero on 
- *	success.
+ *	Returns 1 if the DMA cannot be performed, zero on success.
  */
- 
-static int ali15x3_dma_write (ide_drive_t *drive)
+
+static int ali15x3_dma_setup(ide_drive_t *drive)
 {
-	if ((m5229_revision < 0xC2) && (drive->media != ide_disk))
-		return 1;	/* try PIO instead of DMA */
-	return __ide_dma_write(drive);
+	if (m5229_revision < 0xC2 && drive->media != ide_disk) {
+		if (rq_data_dir(drive->hwif->hwgroup->rq))
+			return 1;	/* try PIO instead of DMA */
+	}
+	return ide_dma_setup(drive);
 }
 
 /**
@@ -773,7 +775,7 @@ static void __init init_hwif_common_ali15x3 (ide_hwif_t *hwif)
                  * M1543C or newer for DMAing
                  */
                 hwif->ide_dma_check = &ali15x3_config_drive_for_dma;
-                hwif->ide_dma_write = &ali15x3_dma_write;
+		hwif->dma_setup = &ali15x3_dma_setup;
 		if (!noautodma)
 			hwif->autodma = 1;
 		if (!(hwif->udma_four))
@@ -798,8 +800,9 @@ static void __init init_hwif_ali15x3 (ide_hwif_t *hwif)
 	s8 irq_routing_table[] = { -1,  9, 3, 10, 4,  5, 7,  6,
 				      1, 11, 0, 12, 0, 14, 0, 15 };
 	int irq = -1;
-	
-	hwif->irq = hwif->channel ? 15 : 14;
+
+	if (hwif->pci_dev->device == PCI_DEVICE_ID_AL_M5229)
+		hwif->irq = hwif->channel ? 15 : 14;
 
 	if (isa_dev) {
 		/*
@@ -888,6 +891,7 @@ static int __devinit alim15x3_init_one(struct pci_dev *dev, const struct pci_dev
 
 static struct pci_device_id alim15x3_pci_tbl[] = {
 	{ PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M5229, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M5228, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ 0, },
 };
 MODULE_DEVICE_TABLE(pci, alim15x3_pci_tbl);

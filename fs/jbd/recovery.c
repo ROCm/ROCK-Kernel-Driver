@@ -191,10 +191,10 @@ static int count_tags(struct buffer_head *bh, int size)
 
 		nr++;
 		tagp += sizeof(journal_block_tag_t);
-		if (!(tag->t_flags & htonl(JFS_FLAG_SAME_UUID)))
+		if (!(tag->t_flags & cpu_to_be32(JFS_FLAG_SAME_UUID)))
 			tagp += 16;
 
-		if (tag->t_flags & htonl(JFS_FLAG_LAST_TAG))
+		if (tag->t_flags & cpu_to_be32(JFS_FLAG_LAST_TAG))
 			break;
 	}
 
@@ -239,8 +239,8 @@ int journal_recover(journal_t *journal)
 
 	if (!sb->s_start) {
 		jbd_debug(1, "No recovery required, last transaction %d\n",
-			  ntohl(sb->s_sequence));
-		journal->j_transaction_sequence = ntohl(sb->s_sequence) + 1;
+			  be32_to_cpu(sb->s_sequence));
+		journal->j_transaction_sequence = be32_to_cpu(sb->s_sequence) + 1;
 		return 0;
 	}
 
@@ -295,7 +295,7 @@ int journal_skip_recovery(journal_t *journal)
 		++journal->j_transaction_sequence;
 	} else {
 #ifdef CONFIG_JBD_DEBUG
-		int dropped = info.end_transaction - ntohl(sb->s_sequence);
+		int dropped = info.end_transaction - be32_to_cpu(sb->s_sequence);
 #endif
 		jbd_debug(0, 
 			  "JBD: ignoring %d transaction%s from the journal.\n",
@@ -331,8 +331,8 @@ static int do_one_pass(journal_t *journal,
 	 */
 
 	sb = journal->j_superblock;
-	next_commit_ID = ntohl(sb->s_sequence);
-	next_log_block = ntohl(sb->s_start);
+	next_commit_ID = be32_to_cpu(sb->s_sequence);
+	next_log_block = be32_to_cpu(sb->s_start);
 
 	first_commit_ID = next_commit_ID;
 	if (pass == PASS_SCAN)
@@ -385,13 +385,13 @@ static int do_one_pass(journal_t *journal,
 
 		tmp = (journal_header_t *)bh->b_data;
 
-		if (tmp->h_magic != htonl(JFS_MAGIC_NUMBER)) {
+		if (tmp->h_magic != cpu_to_be32(JFS_MAGIC_NUMBER)) {
 			brelse(bh);
 			break;
 		}
 
-		blocktype = ntohl(tmp->h_blocktype);
-		sequence = ntohl(tmp->h_sequence);
+		blocktype = be32_to_cpu(tmp->h_blocktype);
+		sequence = be32_to_cpu(tmp->h_sequence);
 		jbd_debug(3, "Found magic %d, sequence %d\n", 
 			  blocktype, sequence);
 
@@ -427,7 +427,7 @@ static int do_one_pass(journal_t *journal,
 				unsigned long io_block;
 
 				tag = (journal_block_tag_t *) tagp;
-				flags = ntohl(tag->t_flags);
+				flags = be32_to_cpu(tag->t_flags);
 
 				io_block = next_log_block++;
 				wrap(journal, next_log_block);
@@ -444,7 +444,7 @@ static int do_one_pass(journal_t *journal,
 					unsigned long blocknr;
 
 					J_ASSERT(obh != NULL);
-					blocknr = ntohl(tag->t_blocknr);
+					blocknr = be32_to_cpu(tag->t_blocknr);
 
 					/* If the block has been
 					 * revoked, then we're all done
@@ -476,8 +476,8 @@ static int do_one_pass(journal_t *journal,
 					memcpy(nbh->b_data, obh->b_data,
 							journal->j_blocksize);
 					if (flags & JFS_FLAG_ESCAPE) {
-						*((unsigned int *)bh->b_data) =
-							htonl(JFS_MAGIC_NUMBER);
+						*((__be32 *)bh->b_data) =
+						cpu_to_be32(JFS_MAGIC_NUMBER);
 					}
 
 					BUFFER_TRACE(nbh, "marking dirty");
@@ -572,13 +572,13 @@ static int scan_revoke_records(journal_t *journal, struct buffer_head *bh,
 
 	header = (journal_revoke_header_t *) bh->b_data;
 	offset = sizeof(journal_revoke_header_t);
-	max = ntohl(header->r_count);
+	max = be32_to_cpu(header->r_count);
 
 	while (offset < max) {
 		unsigned long blocknr;
 		int err;
 
-		blocknr = ntohl(* ((unsigned int *) (bh->b_data+offset)));
+		blocknr = be32_to_cpu(* ((__be32 *) (bh->b_data+offset)));
 		offset += 4;
 		err = journal_set_revoke(journal, blocknr, sequence);
 		if (err)

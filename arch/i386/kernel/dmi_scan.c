@@ -4,7 +4,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/slab.h>
-#include <asm/acpi.h>
+#include <linux/acpi.h>
 #include <asm/io.h>
 #include <linux/pm.h>
 #include <asm/system.h>
@@ -214,20 +214,6 @@ static __init __attribute__((unused)) int force_acpi_ht(struct dmi_blacklist *d)
 	}
 	return 0;
 } 
-
-/*
- * early nForce2 reference BIOS shipped with a
- * bogus ACPI IRQ0 -> pin2 interrupt override -- ignore it
- */
-static __init int ignore_timer_override(struct dmi_blacklist *d)
-{
-	extern int acpi_skip_timer_override;
-	printk(KERN_NOTICE "%s detected: BIOS IRQ0 pin2 override"
-		" will be ignored\n", d->ident); 	
-
-	acpi_skip_timer_override = 1;
-	return 0;
-}
 #endif
 
 #ifdef	CONFIG_ACPI_PCI
@@ -353,48 +339,6 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_PRODUCT_NAME, "eserver xSeries 440"),
 			NO_MATCH, NO_MATCH }},
 
-	/*
-	 * Systems with nForce2 BIOS timer override bug
-	 * nVidia claims all nForce have timer on pin0,
-	 * and applying this workaround is a NOP on fixed BIOS,
-	 * so prospects are good for replacing these entries
-	 * with something to key of chipset PCI-ID.
-	 */
-	{ ignore_timer_override, "Abit NF7-S v2", {
-			MATCH(DMI_BOARD_VENDOR, "http://www.abit.com.tw/"),
-			MATCH(DMI_BOARD_NAME, "NF7-S/NF7,NF7-V (nVidia-nForce2)"),
-			MATCH(DMI_BIOS_VERSION, "6.00 PG"),
-			MATCH(DMI_BIOS_DATE, "03/24/2004") }},
-
-	{ ignore_timer_override, "Asus A7N8X v2", {
-			MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC."),
-			MATCH(DMI_BOARD_NAME, "A7N8X2.0"),
-			MATCH(DMI_BIOS_VERSION, "ASUS A7N8X2.0 Deluxe ACPI BIOS Rev 1007"),
-			MATCH(DMI_BIOS_DATE, "10/06/2003") }},
-
-	{ ignore_timer_override, "Asus A7N8X-X", {
-			MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC."),
-			MATCH(DMI_BOARD_NAME, "A7N8X-X"),
-			MATCH(DMI_BIOS_VERSION, "ASUS A7N8X-X ACPI BIOS Rev 1009"),
-			MATCH(DMI_BIOS_DATE, "2/3/2004") }},
-
-	{ ignore_timer_override, "MSI K7N2-Delta", {
-			MATCH(DMI_BOARD_VENDOR, "MICRO-STAR INTERNATIONAL CO., LTD"),
-			MATCH(DMI_BOARD_NAME, "MS-6570"),
-			MATCH(DMI_BIOS_VERSION, "6.00 PG"),
-			MATCH(DMI_BIOS_DATE, "03/29/2004") }},
-
-	{ ignore_timer_override, "Shuttle SN41G2", {
-			MATCH(DMI_BOARD_VENDOR, "Shuttle Inc"),
-			MATCH(DMI_BOARD_NAME, "FN41"),
-			MATCH(DMI_BIOS_VERSION, "6.00 PG"),
-			MATCH(DMI_BIOS_DATE, "01/14/2004") }},
-
-	{ ignore_timer_override, "Shuttle AN35N", {
-			MATCH(DMI_BOARD_VENDOR, "Shuttle Inc"),
-			MATCH(DMI_BOARD_NAME, "AN35"),
-			MATCH(DMI_BIOS_VERSION, "6.00 PG"),
-			MATCH(DMI_BIOS_DATE, "12/05/2003") }},
 #endif	// CONFIG_ACPI_BOOT
 
 #ifdef	CONFIG_ACPI_PCI
@@ -428,41 +372,6 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 
 	{ NULL, }
 };
-	
-	
-/*
- *	Walk the blacklist table running matching functions until someone 
- *	returns 1 or we hit the end.
- */
- 
-
-static __init void dmi_check_blacklist(void)
-{
-#ifdef	CONFIG_ACPI_BOOT
-#define	ACPI_BLACKLIST_CUTOFF_YEAR	2001
-
-	if (dmi_ident[DMI_BIOS_DATE]) { 
-		char *s = strrchr(dmi_ident[DMI_BIOS_DATE], '/'); 
-		if (s) { 
-			int year, disable = 0;
-			s++; 
-			year = simple_strtoul(s,NULL,0); 
-			if (year >= 1000) 
-				disable = year < ACPI_BLACKLIST_CUTOFF_YEAR; 
-			else if (year < 1 || (year > 90 && year <= 99))
-				disable = 1; 
-			if (disable && !acpi_force) { 
-				printk(KERN_NOTICE "ACPI disabled because your bios is from %s and too old\n", s);
-				printk(KERN_NOTICE "You can enable it with acpi=force\n");
-				disable_acpi();
-			} 
-		}
-	}
-#endif
- 	dmi_check_system(dmi_blacklist);
-}
-
-	
 
 /*
  *	Process a DMI table entry. Right now all we care about are the BIOS
@@ -520,7 +429,7 @@ void __init dmi_scan_machine(void)
 {
 	int err = dmi_iterate(dmi_decode);
 	if(err == 0)
-		dmi_check_blacklist();
+ 		dmi_check_system(dmi_blacklist);
 	else
 		printk(KERN_INFO "DMI not present.\n");
 }

@@ -103,15 +103,6 @@ extern void inherit_locked_prom_mappings(int save_p);
 void __init smp_callin(void)
 {
 	int cpuid = hard_smp_processor_id();
-	extern int bigkernel;
-	extern unsigned long kern_locked_tte_data;
-
-	if (bigkernel) {
-		prom_dtlb_load(sparc64_highest_locked_tlbent()-1, 
-			kern_locked_tte_data + 0x400000, KERNBASE + 0x400000);
-		prom_itlb_load(sparc64_highest_locked_tlbent()-1, 
-			kern_locked_tte_data + 0x400000, KERNBASE + 0x400000);
-	}
 
 	inherit_locked_prom_mappings(0);
 

@@ -81,7 +81,6 @@ static int debug;
 static int  empeg_open			(struct usb_serial_port *port, struct file *filp);
 static void empeg_close			(struct usb_serial_port *port, struct file *filp);
 static int  empeg_write			(struct usb_serial_port *port,
-					int from_user,
 					const unsigned char *buf,
 					int count);
 static int  empeg_write_room		(struct usb_serial_port *port);
@@ -185,13 +184,13 @@ static void empeg_close (struct usb_serial_port *port, struct file * filp)
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	/* shutdown our bulk read */
-	usb_unlink_urb (port->read_urb);
+	usb_kill_urb(port->read_urb);
 	/* Uncomment the following line if you want to see some statistics in your syslog */
 	/* dev_info (&port->dev, "Bytes In = %d  Bytes Out = %d\n", bytes_in, bytes_out); */
 }
 
 
-static int empeg_write (struct usb_serial_port *port, int from_user, const unsigned char *buf, int count)
+static int empeg_write (struct usb_serial_port *port, const unsigned char *buf, int count)
 {
 	struct usb_serial *serial = port->serial;
 	struct urb *urb;
@@ -235,14 +234,7 @@ static int empeg_write (struct usb_serial_port *port, int from_user, const unsig
 
 		transfer_size = min (count, URB_TRANSFER_BUFFER_SIZE);
 
-		if (from_user) {
-			if (copy_from_user (urb->transfer_buffer, current_position, transfer_size)) {
-				bytes_sent = -EFAULT;
-				break;
-			}
-		} else {
-			memcpy (urb->transfer_buffer, current_position, transfer_size);
-		}
+		memcpy (urb->transfer_buffer, current_position, transfer_size);
 
 		usb_serial_debug_data(debug, &port->dev, __FUNCTION__, transfer_size, urb->transfer_buffer);
 
@@ -406,7 +398,7 @@ static void empeg_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 static void empeg_throttle (struct usb_serial_port *port)
 {
 	dbg("%s - port %d", __FUNCTION__, port->number);
-	usb_unlink_urb (port->read_urb);
+	usb_kill_urb(port->read_urb);
 }
 
 
@@ -516,11 +508,7 @@ static void empeg_set_termios (struct usb_serial_port *port, struct termios *old
 	 */
 	port->tty->low_latency = 1;
 
-	/* Notify the tty driver that the termios have changed. */
-	port->tty->ldisc.set_termios(port->tty, NULL);
-
 	return;
-
 }
 
 
@@ -583,10 +571,10 @@ static void __exit empeg_exit (void)
 
 	for (i = 0; i < NUM_URBS; ++i) {
 		if (write_urb_pool[i]) {
-			/* FIXME - uncomment the following usb_unlink_urb call when
+			/* FIXME - uncomment the following usb_kill_urb call when
 			 * the host controllers get fixed to set urb->dev = NULL after
 			 * the urb is finished.  Otherwise this call oopses. */
-			/* usb_unlink_urb(write_urb_pool[i]); */
+			/* usb_kill_urb(write_urb_pool[i]); */
 			if (write_urb_pool[i]->transfer_buffer)
 				kfree(write_urb_pool[i]->transfer_buffer);
 			usb_free_urb (write_urb_pool[i]);

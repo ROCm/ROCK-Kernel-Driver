@@ -12,6 +12,7 @@
 #include <linux/stddef.h>
 #include <linux/types.h>
 #include <linux/compiler.h>
+#include <linux/bitops.h>
 #include <asm/byteorder.h>
 #include <asm/bug.h>
 
@@ -65,9 +66,10 @@ void __might_sleep(char *file, int line);
 	})
 
 extern struct notifier_block *panic_notifier_list;
+extern long (*panic_blink)(long time);
 NORET_TYPE void panic(const char * fmt, ...)
 	__attribute__ ((NORET_AND format (printf, 1, 2)));
-asmlinkage NORET_TYPE void do_exit(long error_code)
+fastcall NORET_TYPE void do_exit(long error_code)
 	ATTRIB_NORET;
 NORET_TYPE void complete_and_exit(struct completion *, long)
 	ATTRIB_NORET;
@@ -88,8 +90,6 @@ extern int vscnprintf(char *buf, size_t size, const char *fmt, va_list args);
 extern int sscanf(const char *, const char *, ...)
 	__attribute__ ((format (scanf,2,3)));
 extern int vsscanf(const char *, const char *, va_list);
-
-extern void qsort(void *, size_t, size_t, int (*)(const void *,const void *));
 
 extern int get_option(char **str, int *pint);
 extern char *get_options(const char *str, int nints, int *ints);
@@ -113,6 +113,10 @@ static inline int __attribute_pure__ long_log2(unsigned long x)
 	return r;
 }
 
+static inline unsigned long __attribute_const__ roundup_pow_of_two(unsigned long x)
+{
+	return (1UL << fls(x - 1));
+}
 
 extern int printk_ratelimit(void);
 extern int __printk_ratelimit(int ratelimit_jiffies, int ratelimit_burst);
@@ -132,8 +136,8 @@ extern void bust_spinlocks(int yes);
 extern int oops_in_progress;		/* If set, an oops, panic(), BUG() or die() is in progress */
 extern int panic_on_oops;
 extern int tainted;
-extern int unsupported;
 extern const char *print_tainted(void);
+extern void add_taint(unsigned);
 
 /* Values used for system_state */
 extern enum system_states {
@@ -144,13 +148,12 @@ extern enum system_states {
 	SYSTEM_RESTART,
 } system_state;
 
-#define TAINT_MACHINE_CHECK		(1<<10)
 #define TAINT_PROPRIETARY_MODULE	(1<<0)
 #define TAINT_FORCED_MODULE		(1<<1)
 #define TAINT_UNSAFE_SMP		(1<<2)
 #define TAINT_FORCED_RMMOD		(1<<3)
-#define TAINT_NO_SUPPORT		(1<<4)
-#define TAINT_EXTERNAL_SUPPORT		(1<<5)
+#define TAINT_MACHINE_CHECK		(1<<4)
+#define TAINT_BAD_PAGE			(1<<5)
 
 extern void dump_stack(void);
 

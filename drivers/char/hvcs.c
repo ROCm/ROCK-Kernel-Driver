@@ -119,13 +119,27 @@
  * Rearranged hvcs_close().  Cleaned up some printks and did some housekeeping
  * on the changelog.  Removed local CLC_LENGTH and used HVCS_CLC_LENGTH from
  * arch/ppc64/hvcserver.h.
+ *
+ * 1.3.2 -> 1.3.3 Replaced yield() in hvcs_close() with tty_wait_until_sent() to
+ * prevent possible lockup with realtime scheduling as similarily pointed out by
+ * akpm in hvc_console.  Changed resulted in the removal of hvcs_final_close()
+ * to reorder cleanup operations and prevent discarding of pending data during
+ * an hvcs_close().  Removed spinlock protection of hvcs_struct data members in
+ * hvcs_write_room() and hvcs_chars_in_buffer() because they aren't needed.
  */
-#define HVCS_DRIVER_VERSION "1.3.2"
+
+#define HVCS_DRIVER_VERSION "1.3.3"
 
 MODULE_AUTHOR("Ryan S. Arnold <rsa@us.ibm.com>");
 MODULE_DESCRIPTION("IBM hvcs (Hypervisor Virtual Console Server) Driver");
 MODULE_LICENSE("GPL");
 MODULE_VERSION(HVCS_DRIVER_VERSION);
+
+/*
+ * Wait this long per iteration while trying to push buffered data to the
+ * hypervisor before allowing the tty to complete a close operation.
+ */
+#define HVCS_CLOSE_WAIT (HZ/100) /* 1/10 of a second */
 
 /*
  * Since the Linux TTY code does not currently (2-04-2004) support dynamic
@@ -301,7 +315,7 @@ static void hvcs_throttle(struct tty_struct *tty);
 static irqreturn_t hvcs_handle_interrupt(int irq, void *dev_instance,
 		struct pt_regs *regs);
 
-static int hvcs_write(struct tty_struct *tty, int from_user,
+static int hvcs_write(struct tty_struct *tty,
 		const unsigned char *buf, int count);
 static int hvcs_write_room(struct tty_struct *tty);
 static int hvcs_chars_in_buffer(struct tty_struct *tty);
@@ -317,7 +331,6 @@ static void hvcs_partner_free(struct hvcs_struct *hvcsd);
 
 static int hvcs_enable_device(struct hvcs_struct *hvcsd,
 		uint32_t unit_address, unsigned int irq, struct vio_dev *dev);
-static void hvcs_final_close(struct hvcs_struct *hvcsd);
 
 static void destroy_hvcs_struct(struct kobject *kobj);
 static int hvcs_open(struct tty_struct *tty, struct file *filp);
@@ -412,10 +425,7 @@ static void hvcs_try_write(struct hvcs_struct *hvcsd)
 			 * a non-existent tty.
 			 */
 			if (tty) {
-				if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP))
-						&& tty->ldisc.write_wakeup)
-					(tty->ldisc.write_wakeup) (tty);
-				wake_up_interruptible(&tty->write_wait);
+				tty_wakeup(tty);
 			}
 		}
 	}
@@ -427,7 +437,7 @@ static int hvcs_io(struct hvcs_struct *hvcsd)
 	struct tty_struct *tty;
 	char buf[HVCS_BUFF_LEN] __ALIGNED__;
 	unsigned long flags;
-	int got;
+	int got = 0;
 	int i;
 
 	spin_lock_irqsave(&hvcsd->lock, flags);
@@ -517,7 +527,7 @@ static int khvcsd(void *unused)
 
 static struct vio_device_id hvcs_driver_table[] __devinitdata= {
 	{"serial-server", "hvterm2"},
-	{ 0, }
+	{ NULL, }
 };
 MODULE_DEVICE_TABLE(vio, hvcs_driver_table);
 
@@ -572,28 +582,6 @@ static void destroy_hvcs_struct(struct kobject *kobj)
 	hvcs_remove_device_attrs(vdev);
 
 	kfree(hvcsd);
-}
-
-/*
- * This function must be called with hvcsd->lock held.  Do not free the irq in
- * this function since it is called with the spinlock held.
- */
-static void hvcs_final_close(struct hvcs_struct *hvcsd)
-{
-	vio_disable_interrupts(hvcsd->vdev);
-
-	hvcsd->todo_mask = 0;
-
-	/* These two may be redundant if the operation was a close. */
-	if (hvcsd->tty) {
-		hvcsd->tty->driver_data = NULL;
-		hvcsd->tty = NULL;
-	}
-
-	hvcsd->open_count = 0;
-
-	memset(&hvcsd->buffer[0], 0x00, HVCS_BUFF_LEN);
-	hvcsd->chars_in_buffer = 0;
 }
 
 static struct kobj_type hvcs_kobj_type = {
@@ -691,8 +679,6 @@ static int __devinit hvcs_probe(
 	 */
 	return 0;
 }
-
-
 
 static int __devexit hvcs_remove(struct vio_dev *dev)
 {
@@ -945,7 +931,7 @@ static int hvcs_enable_device(struct hvcs_struct *hvcsd, uint32_t unit_address,
  */
 struct hvcs_struct *hvcs_get_by_index(int index)
 {
-	struct hvcs_struct *hvcsd;
+	struct hvcs_struct *hvcsd = NULL;
 	unsigned long flags;
 
 	spin_lock(&hvcs_structs_lock);
@@ -1099,12 +1085,7 @@ static void hvcs_close(struct tty_struct *tty, struct file *filp)
 	kobjp = &hvcsd->kobj;
 	if (--hvcsd->open_count == 0) {
 
-		/*
-		 * This line is important because it tells hvcs_open that this
-		 * device needs to be re-configured the next time hvcs_open is
-		 * called.
-		 */
-		hvcsd->tty->driver_data = NULL;
+		vio_disable_interrupts(hvcsd->vdev);
 
 		/*
 		 * NULL this early so that the kernel_thread doesn't try to
@@ -1113,26 +1094,18 @@ static void hvcs_close(struct tty_struct *tty, struct file *filp)
 		 */
 		hvcsd->tty = NULL;
 
-		/*
-		 * Block the close until all the buffered data has been
-		 * delivered.
-		 */
-		while(hvcsd->chars_in_buffer) {
-			spin_unlock_irqrestore(&hvcsd->lock, flags);
-
-			/*
-			 * Give the kernel thread the hvcs_struct so that it can
-			 * try to deliver the remaining data but block the close
-			 * operation by spinning in this function so that other
-			 * tty operations have to wait.
-			 */
-			yield();
-			spin_lock_irqsave(&hvcsd->lock, flags);
-		}
-
-		hvcs_final_close(hvcsd);
 		irq = hvcsd->vdev->irq;
 		spin_unlock_irqrestore(&hvcsd->lock, flags);
+
+		tty_wait_until_sent(tty, HVCS_CLOSE_WAIT);
+
+		/*
+		 * This line is important because it tells hvcs_open that this
+		 * device needs to be re-configured the next time hvcs_open is
+		 * called.
+		 */
+		tty->driver_data = NULL;
+
 		free_irq(irq, hvcsd);
 		kobject_put(kobjp);
 		return;
@@ -1162,12 +1135,25 @@ static void hvcs_hangup(struct tty_struct * tty)
 	 * Don't kobject put inside the spinlock because the destruction
 	 * callback may use the spinlock and it may get called before the
 	 * spinlock has been released.  Get a pointer to the kobject and
-	 * kobject_put on that instead.
+	 * kobject_put on that after releasing the spinlock.
 	 */
 	kobjp = &hvcsd->kobj;
 
-	/* Calling this will drop any buffered data on the floor. */
-	hvcs_final_close(hvcsd);
+	vio_disable_interrupts(hvcsd->vdev);
+
+	hvcsd->todo_mask = 0;
+
+	/* I don't think the tty needs the hvcs_struct pointer after a hangup */
+	hvcsd->tty->driver_data = NULL;
+	hvcsd->tty = NULL;
+
+	hvcsd->open_count = 0;
+
+	/* This will drop any buffered data on the floor which is OK in a hangup
+	 * scenario. */
+	memset(&hvcsd->buffer[0], 0x00, HVCS_BUFF_LEN);
+	hvcsd->chars_in_buffer = 0;
+
 	irq = hvcsd->vdev->irq;
 
 	spin_unlock_irqrestore(&hvcsd->lock, flags);
@@ -1197,12 +1183,12 @@ static void hvcs_hangup(struct tty_struct * tty)
  * tty_hangup will allow hvcs_write time to complete execution before it
  * terminates our device.
  */
-static int hvcs_write(struct tty_struct *tty, int from_user,
+static int hvcs_write(struct tty_struct *tty,
 		const unsigned char *buf, int count)
 {
 	struct hvcs_struct *hvcsd = tty->driver_data;
 	unsigned int unit_address;
-	unsigned char *charbuf;
+	const unsigned char *charbuf;
 	unsigned long flags;
 	int total_sent = 0;
 	int tosend = 0;
@@ -1222,21 +1208,7 @@ static int hvcs_write(struct tty_struct *tty, int from_user,
 		count = HVCS_MAX_FROM_USER;
 	}
 
-	if (!from_user)
-		charbuf = (unsigned char *)buf;
-	else {
-		charbuf = kmalloc(count, GFP_KERNEL);
-		if (!charbuf) {
-			printk(KERN_WARNING "HVCS: write -ENOMEM.\n");
-			return -ENOMEM;
-		}
-
-		if (copy_from_user(charbuf, buf, count)) {
-			kfree(charbuf);
-			printk(KERN_WARNING "HVCS: write -EFAULT.\n");
-			return -EFAULT;
-		}
-	}
+	charbuf = buf;
 
 	spin_lock_irqsave(&hvcsd->lock, flags);
 
@@ -1248,8 +1220,6 @@ static int hvcs_write(struct tty_struct *tty, int from_user,
 	 */
 	if (hvcsd->open_count <= 0) {
 		spin_unlock_irqrestore(&hvcsd->lock, flags);
-		if (from_user)
-			kfree(charbuf);
 		return -ENODEV;
 	}
 
@@ -1306,8 +1276,6 @@ static int hvcs_write(struct tty_struct *tty, int from_user,
 	}
 
 	spin_unlock_irqrestore(&hvcsd->lock, flags);
-	if (from_user)
-		kfree(charbuf);
 
 	if (result == -1)
 		return -EIO;
@@ -1323,28 +1291,18 @@ static int hvcs_write(struct tty_struct *tty, int from_user,
 static int hvcs_write_room(struct tty_struct *tty)
 {
 	struct hvcs_struct *hvcsd = tty->driver_data;
-	unsigned long flags;
-	int retval;
 
 	if (!hvcsd || hvcsd->open_count <= 0)
 		return 0;
 
-	spin_lock_irqsave(&hvcsd->lock, flags);
-	retval = HVCS_BUFF_LEN - hvcsd->chars_in_buffer;
-	spin_unlock_irqrestore(&hvcsd->lock, flags);
-	return retval;
+	return HVCS_BUFF_LEN - hvcsd->chars_in_buffer;
 }
 
 static int hvcs_chars_in_buffer(struct tty_struct *tty)
 {
 	struct hvcs_struct *hvcsd = tty->driver_data;
-	unsigned long flags;
-	int retval;
 
-	spin_lock_irqsave(&hvcsd->lock, flags);
-	retval = hvcsd->chars_in_buffer;
-	spin_unlock_irqrestore(&hvcsd->lock, flags);
-	return retval;
+	return hvcsd->chars_in_buffer;
 }
 
 static struct tty_operations hvcs_ops = {
@@ -1433,7 +1391,7 @@ static int __init hvcs_module_init(void)
 			" as a tty driver failed.\n");
 		hvcs_free_index_list();
 		put_tty_driver(hvcs_tty_driver);
-		return rc;
+		return -EIO;
 	}
 
 	hvcs_pi_buff = kmalloc(PAGE_SIZE, GFP_KERNEL);

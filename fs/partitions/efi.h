@@ -66,20 +66,20 @@
               0xa2, 0x3c, 0x23, 0x8f, 0x2a, 0x3d, 0xf9, 0x28)
 
 typedef struct _gpt_header {
-	u64 signature;
-	u32 revision;
-	u32 header_size;
-	u32 header_crc32;
-	u32 reserved1;
-	u64 my_lba;
-	u64 alternate_lba;
-	u64 first_usable_lba;
-	u64 last_usable_lba;
+	__le64 signature;
+	__le32 revision;
+	__le32 header_size;
+	__le32 header_crc32;
+	__le32 reserved1;
+	__le64 my_lba;
+	__le64 alternate_lba;
+	__le64 first_usable_lba;
+	__le64 last_usable_lba;
 	efi_guid_t disk_guid;
-	u64 partition_entry_lba;
-	u32 num_partition_entries;
-	u32 sizeof_partition_entry;
-	u32 partition_entry_array_crc32;
+	__le64 partition_entry_lba;
+	__le32 num_partition_entries;
+	__le32 sizeof_partition_entry;
+	__le32 partition_entry_array_crc32;
 	u8 reserved2[GPT_BLOCK_SIZE - 92];
 } __attribute__ ((packed)) gpt_header;
 
@@ -92,18 +92,18 @@ typedef struct _gpt_entry_attributes {
 typedef struct _gpt_entry {
 	efi_guid_t partition_type_guid;
 	efi_guid_t unique_partition_guid;
-	u64 starting_lba;
-	u64 ending_lba;
+	__le64 starting_lba;
+	__le64 ending_lba;
 	gpt_entry_attributes attributes;
 	efi_char16_t partition_name[72 / sizeof (efi_char16_t)];
 } __attribute__ ((packed)) gpt_entry;
 
 typedef struct _legacy_mbr {
 	u8 boot_code[440];
-	u32 unique_mbr_signature;
-	u16 unknown;
+	__le32 unique_mbr_signature;
+	__le16 unknown;
 	struct partition partition_record[4];
-	u16 signature;
+	__le16 signature;
 } __attribute__ ((packed)) legacy_mbr;
 
 /* Functions */

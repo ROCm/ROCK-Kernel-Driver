@@ -176,10 +176,12 @@ acpi_os_unmap_memory (
 	void __iomem                  *logical_address,
 	acpi_size                       size);
 
+#ifdef ACPI_FUTURE_USAGE
 acpi_status
 acpi_os_get_physical_address (
 	void                            *logical_address,
 	acpi_physical_address           *physical_address);
+#endif
 
 
 /*
@@ -217,9 +219,12 @@ acpi_os_wait_events_complete(
 	void * context);
 
 void
+acpi_os_wait_events_complete (
+	void                            *context);
+
+void
 acpi_os_sleep (
-	u32                             seconds,
-	u32                             milliseconds);
+	acpi_integer                    milliseconds);
 
 void
 acpi_os_stall (
@@ -299,12 +304,14 @@ acpi_os_readable (
 	void                            *pointer,
 	acpi_size                       length);
 
+#ifdef ACPI_FUTURE_USAGE
 u8
 acpi_os_writable (
 	void                            *pointer,
 	acpi_size                       length);
+#endif
 
-u32
+u64
 acpi_os_get_timer (
 	void);
 
@@ -336,9 +343,11 @@ acpi_os_redirect_output (
  * Debug input
  */
 
+#ifdef ACPI_FUTURE_USAGE
 u32
 acpi_os_get_line (
 	char                            *buffer);
+#endif
 
 
 /*

@@ -308,7 +308,6 @@ static struct net_protocol ah4_protocol = {
 	.handler	=	xfrm4_rcv,
 	.err_handler	=	ah4_err,
 	.no_policy	=	1,
-	.xfrm_prot	=	1,
 };
 
 static int __init ah4_init(void)

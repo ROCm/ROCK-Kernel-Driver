@@ -59,6 +59,7 @@
 #include <linux/smp_lock.h>
 #include <linux/pci.h>
 #include <linux/init.h>
+#include <linux/delay.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -222,9 +223,9 @@ static int verbose;
 MODULE_AUTHOR("William Chen");
 MODULE_DESCRIPTION("MOXA Smartio Family Multiport Board Device Driver");
 MODULE_LICENSE("GPL");
-MODULE_PARM(ioaddr, "1-4i");
-MODULE_PARM(ttymajor, "i");
-MODULE_PARM(verbose, "i");
+module_param_array(ioaddr, int, NULL, 0);
+module_param(ttymajor, int, 0);
+module_param(verbose, bool, 0644);
 
 struct mxser_hwconf {
 	int board_type;
@@ -331,7 +332,7 @@ static int mxser_get_ISA_conf(int, struct mxser_hwconf *);
 static void mxser_do_softint(void *);
 static int mxser_open(struct tty_struct *, struct file *);
 static void mxser_close(struct tty_struct *, struct file *);
-static int mxser_write(struct tty_struct *, int, const unsigned char *, int);
+static int mxser_write(struct tty_struct *, const unsigned char *, int);
 static int mxser_write_room(struct tty_struct *);
 static void mxser_flush_buffer(struct tty_struct *);
 static int mxser_chars_in_buffer(struct tty_struct *);
@@ -674,9 +675,7 @@ static void mxser_do_softint(void *private_)
 	tty = info->tty;
 	if (tty) {
 		if (test_and_clear_bit(MXSER_EVENT_TXLOW, &info->event)) {
-			if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-			    tty->ldisc.write_wakeup)
-				(tty->ldisc.write_wakeup) (tty);
+			tty_wakeup(tty);
 			wake_up_interruptible(&tty->write_wait);
 		}
 		if (test_and_clear_bit(MXSER_EVENT_HANGUP, &info->event)) {
@@ -813,15 +812,14 @@ static void mxser_close(struct tty_struct *tty, struct file *filp)
 	mxser_shutdown(info);
 	if (tty->driver->flush_buffer)
 		tty->driver->flush_buffer(tty);
-	if (tty->ldisc.flush_buffer)
-		tty->ldisc.flush_buffer(tty);
+	tty_ldisc_flush(tty);
+
 	tty->closing = 0;
 	info->event = 0;
 	info->tty = NULL;
 	if (info->blocked_open) {
 		if (info->close_delay) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(info->close_delay);
+			msleep_interruptible(jiffies_to_msecs(info->close_delay));
 		}
 		wake_up_interruptible(&info->open_wait);
 	}
@@ -831,7 +829,7 @@ static void mxser_close(struct tty_struct *tty, struct file *filp)
 
 }
 
-static int mxser_write(struct tty_struct *tty, int from_user,
+static int mxser_write(struct tty_struct *tty,
 		       const unsigned char *buf, int count)
 {
 	int c, total = 0;
@@ -842,53 +840,23 @@ static int mxser_write(struct tty_struct *tty, int from_user,
 		return (0);
 
 	save_flags(flags);
-	if (from_user) {
-		down(&mxvar_tmp_buf_sem);
-		while (1) {
-			c = min_t(int, count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-					   SERIAL_XMIT_SIZE - info->xmit_head));
-			if (c <= 0)
-				break;
-
-			c -= copy_from_user(mxvar_tmp_buf, buf, c);
-			if (!c) {
-				if (!total)
-					total = -EFAULT;
-				break;
-			}
-
-			cli();
-			c = min_t(int, c, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-				       SERIAL_XMIT_SIZE - info->xmit_head));
-			memcpy(info->xmit_buf + info->xmit_head, mxvar_tmp_buf, c);
-			info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE - 1);
-			info->xmit_cnt += c;
+	while (1) {
+		cli();
+		c = min_t(int, count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
+				   SERIAL_XMIT_SIZE - info->xmit_head));
+		if (c <= 0) {
 			restore_flags(flags);
-
-			buf += c;
-			count -= c;
-			total += c;
+			break;
 		}
-		up(&mxvar_tmp_buf_sem);
-	} else {
-		while (1) {
-			cli();
-			c = min_t(int, count, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-					   SERIAL_XMIT_SIZE - info->xmit_head));
-			if (c <= 0) {
-				restore_flags(flags);
-				break;
-			}
 
-			memcpy(info->xmit_buf + info->xmit_head, buf, c);
-			info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE - 1);
-			info->xmit_cnt += c;
-			restore_flags(flags);
+		memcpy(info->xmit_buf + info->xmit_head, buf, c);
+		info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE - 1);
+		info->xmit_cnt += c;
+		restore_flags(flags);
 
-			buf += c;
-			count -= c;
-			total += c;
-		}
+		buf += c;
+		count -= c;
+		total += c;
 	}
 
 	cli();
@@ -972,9 +940,7 @@ static void mxser_flush_buffer(struct tty_struct *tty)
 	info->xmit_cnt = info->xmit_head = info->xmit_tail = 0;
 	restore_flags(flags);
 	wake_up_interruptible(&tty->write_wait);
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup) (tty);
+	tty_wakeup(tty);
 }
 
 static int mxser_ioctl(struct tty_struct *tty, struct file *file,

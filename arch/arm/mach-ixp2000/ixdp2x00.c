@@ -23,9 +23,6 @@
 #include <linux/device.h>
 #include <linux/bitops.h>
 #include <linux/pci.h>
-#include <linux/interrupt.h>
-#include <linux/mm.h>
-#include <linux/init.h>
 #include <linux/ioport.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
@@ -197,7 +194,7 @@ void __init ixdp2x00_map_io(void)
  * Linux is a common design in telecom systems. The problem is that instead 
  * of all the devices being controlled by a single host, different
  * devices are controlles by different NPUs on the same bus, leading to
- * multiple hosts on the bus.i The exact bus layout looks like:
+ * multiple hosts on the bus. The exact bus layout looks like:
  *
  *                   Bus 0
  *    Master NPU <-------------------+-------------------> Slave NPU
@@ -213,9 +210,9 @@ void __init ixdp2x00_map_io(void)
  *             ... Dev    PMC       Media     Eth0   Eth1 ...
  *
  * The master controlls all but Eth1, which is controlled by the
- * slave. What this measn is that the both the master and the slave
+ * slave. What this means is that the both the master and the slave
  * have to scan the bus, but only one of them can enumerate the bus.
- * In addition, after the bus is scaned, each kernel must remove
+ * In addition, after the bus is scanned, each kernel must remove
  * the device(s) it does not control from the PCI dev list otherwise
  * a driver on each NPU will try to manage it and we will have horrible
  * conflicts. Oh..and the slave NPU needs to see the master NPU

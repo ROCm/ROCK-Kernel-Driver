@@ -58,15 +58,14 @@ static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for Intel i8x0 modemcard.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for Intel i8x0 modemcard.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable Intel i8x0 modemcard.");
-module_param_array(ac97_clock, int, boot_devs, 0444);
+module_param_array(ac97_clock, int, NULL, 0444);
 MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (0 = auto-detect).");
 
 /*
@@ -1075,6 +1074,7 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
 	pci_release_regions(chip->pci);
+	pci_disable_device(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -1092,6 +1092,7 @@ static int intel8x0m_suspend(snd_card_t *card, unsigned int state)
 		snd_pcm_suspend_all(chip->pcm[i]);
 	if (chip->ac97)
 		snd_ac97_suspend(chip->ac97);
+	pci_disable_device(chip->pci);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
@@ -1173,8 +1174,10 @@ static int __devinit snd_intel8x0m_create(snd_card_t * card,
 		return err;
 
 	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
-	if (chip == NULL)
+	if (chip == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	spin_lock_init(&chip->reg_lock);
 	spin_lock_init(&chip->ac97_lock);
 	chip->device_type = device_type;
@@ -1184,6 +1187,7 @@ static int __devinit snd_intel8x0m_create(snd_card_t * card,
 
 	if ((err = pci_request_regions(pci, card->shortname)) < 0) {
 		kfree(chip);
+		pci_disable_device(pci);
 		return err;
 	}
 

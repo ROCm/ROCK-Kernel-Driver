@@ -117,7 +117,7 @@ MACHINE_START(IXDP425, "Intel IXDP425 Development Platform")
 		IXP4XX_PERIPHERAL_BASE_VIRT)
 	MAPIO(ixdp425_map_io)
 	INITIRQ(ixp4xx_init_irq)
-	INITTIME(ixp4xx_init_time)
+	.timer		= &ixp4xx_timer,
 	BOOT_PARAMS(0x0100)
 	INIT_MACHINE(ixdp425_init)
 MACHINE_END
@@ -128,7 +128,7 @@ MACHINE_START(IXCDP1100, "Intel IXCDP1100 Development Platform")
 		IXP4XX_PERIPHERAL_BASE_VIRT)
 	MAPIO(ixdp425_map_io)
 	INITIRQ(ixp4xx_init_irq)
-	INITTIME(ixp4xx_init_time)
+	.timer		= &ixp4xx_timer,
 	BOOT_PARAMS(0x0100)
 	INIT_MACHINE(ixdp425_init)
 MACHINE_END
@@ -146,7 +146,7 @@ MACHINE_START(AVILA, "Gateworks Avila Network Platform")
 		IXP4XX_PERIPHERAL_BASE_VIRT)
 	MAPIO(ixdp425_map_io)
 	INITIRQ(ixp4xx_init_irq)
-	INITTIME(ixp4xx_init_time)
+	.timer		= &ixp4xx_timer,
 	BOOT_PARAMS(0x0100)
 	INIT_MACHINE(ixdp425_init)
 MACHINE_END

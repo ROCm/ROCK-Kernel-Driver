@@ -38,13 +38,13 @@ void bt_dump(char *pref, __u8 *buf, int count)
 {
 	char *ptr;
 	char line[100];
-	int i;
+	unsigned int i;
 
 	printk(KERN_INFO "%s: dump, len %d\n", pref, count);
 
 	ptr = line;
 	*ptr = 0;
-	for (i = 0; i<count; i++) {
+	for (i = 0; i < count; i++) {
 		ptr += sprintf(ptr, " %2.2X", buf[i]);
 
 		if (i && !((i + 1) % 20)) {
@@ -63,7 +63,7 @@ void baswap(bdaddr_t *dst, bdaddr_t *src)
 {
 	unsigned char *d = (unsigned char *) dst;
 	unsigned char *s = (unsigned char *) src;
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < 6; i++)
 		d[i] = s[5 - i];

@@ -677,7 +677,8 @@ shortname:
 	de->attr = is_dir ? ATTR_DIR : ATTR_ARCH;
 	de->lcase = lcase;
 	de->adate = de->cdate = de->date = 0;
-	de->ctime_ms = de->ctime = de->time = 0;
+	de->ctime = de->time = 0;
+	de->ctime_ms = 0;
 	de->start = 0;
 	de->starthi = 0;
 	de->size = 0;
@@ -1046,8 +1047,8 @@ static int vfat_rename(struct inode *old_dir, struct dentry *old_dentry,
 
 	if (is_dir) {
 		int start = MSDOS_I(new_dir)->i_logstart;
-		dotdot_de->start = CT_LE_W(start);
-		dotdot_de->starthi = CT_LE_W(start>>16);
+		dotdot_de->start = cpu_to_le16(start);
+		dotdot_de->starthi = cpu_to_le16(start>>16);
 		mark_buffer_dirty(dotdot_bh);
 		old_dir->i_nlink--;
 		if (new_inode) {

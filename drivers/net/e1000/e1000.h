@@ -54,7 +54,7 @@
 #include <linux/string.h>
 #include <linux/pagemap.h>
 #include <linux/dma-mapping.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <linux/capability.h>
@@ -64,7 +64,6 @@
 #include <linux/udp.h>
 #include <net/pkt_sched.h>
 #include <linux/list.h>
-#include <linux/rtnetlink.h>
 #include <linux/reboot.h>
 #ifdef NETIF_F_TSO
 #include <net/checksum.h>
@@ -73,7 +72,6 @@
 #include <linux/mii.h>
 #include <linux/ethtool.h>
 #include <linux/if_vlan.h>
-#include <linux/moduleparam.h>
 
 #define BAR_0		0
 #define BAR_1		1
@@ -254,7 +252,6 @@ struct e1000_adapter {
 	struct e1000_desc_ring test_rx_ring;
 
 
-	uint32_t pci_state[16];
 	int msg_enable;
 };
 #endif /* _E1000_H_ */

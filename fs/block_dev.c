@@ -137,13 +137,26 @@ static int
 blkdev_get_blocks(struct inode *inode, sector_t iblock,
 		unsigned long max_blocks, struct buffer_head *bh, int create)
 {
-	if ((iblock + max_blocks) > max_block(I_BDEV(inode)))
-		return -EIO;
+	sector_t end_block = max_block(I_BDEV(inode));
+
+	if ((iblock + max_blocks) > end_block) {
+		max_blocks = end_block - iblock;
+		if ((long)max_blocks <= 0) {
+			if (create)
+				return -EIO;	/* write fully beyond EOF */
+			/*
+			 * It is a read which is fully beyond EOF.  We return
+			 * a !buffer_mapped buffer
+			 */
+			max_blocks = 0;
+		}
+	}
 
 	bh->b_bdev = I_BDEV(inode);
 	bh->b_blocknr = iblock;
 	bh->b_size = max_blocks << inode->i_blkbits;
-	set_buffer_mapped(bh);
+	if (max_blocks)
+		set_buffer_mapped(bh);
 	return 0;
 }
 
@@ -666,7 +679,7 @@ int blkdev_get(struct block_device *bdev, mode_t mode, unsigned flags)
 
 EXPORT_SYMBOL(blkdev_get);
 
-int blkdev_open(struct inode * inode, struct file * filp)
+static int blkdev_open(struct inode * inode, struct file * filp)
 {
 	struct block_device *bdev;
 	int res;
@@ -694,8 +707,6 @@ int blkdev_open(struct inode * inode, struct file * filp)
 	blkdev_put(bdev);
 	return res;
 }
-
-EXPORT_SYMBOL(blkdev_open);
 
 int blkdev_put(struct block_device *bdev)
 {
@@ -797,8 +808,6 @@ struct file_operations def_blk_fops = {
 	.writev		= generic_file_write_nolock,
 	.sendfile	= generic_file_sendfile,
 };
-
-EXPORT_SYMBOL(def_blk_fops);
 
 int ioctl_by_bdev(struct block_device *bdev, unsigned cmd, unsigned long arg)
 {

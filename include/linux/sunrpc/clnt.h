@@ -22,7 +22,6 @@
  * This defines an RPC port mapping
  */
 struct rpc_portmap {
-	struct rpc_portmap	*pm_parent;
 	__u32			pm_prog;
 	__u32			pm_vers;
 	__u32			pm_prot;
@@ -117,8 +116,6 @@ struct rpc_clnt *rpc_clone_client(struct rpc_clnt *);
 int		rpc_shutdown_client(struct rpc_clnt *);
 int		rpc_destroy_client(struct rpc_clnt *);
 void		rpc_release_client(struct rpc_clnt *);
-void		rpc_change_program(struct rpc_clnt *, struct rpc_program *,
-				   int);
 void		rpc_getport(struct rpc_task *, struct rpc_clnt *);
 int		rpc_register(u32, u32, int, unsigned short, int *);
 

@@ -28,12 +28,15 @@
 #define HPET_ID_LEGSUP	0x00008000
 #define HPET_ID_NUMBER	0x00001f00
 #define HPET_ID_REV	0x000000ff
+#define	HPET_ID_NUMBER_SHIFT	8
 
 #define HPET_ID_VENDOR_SHIFT	16
 #define HPET_ID_VENDOR_8086	0x8086
 
 #define HPET_CFG_ENABLE	0x001
 #define HPET_CFG_LEGACY	0x002
+#define	HPET_LEGACY_8254	2
+#define	HPET_LEGACY_RTC		8
 
 #define HPET_TN_ENABLE		0x004
 #define HPET_TN_PERIODIC	0x008
@@ -43,6 +46,7 @@
 
 extern int is_hpet_enabled(void);
 extern int hpet_rtc_timer_init(void);
+extern int oem_force_hpet_timer(void);
 
 #ifdef CONFIG_HPET_EMULATE_RTC
 extern int hpet_mask_rtc_irq_bit(unsigned long bit_mask);

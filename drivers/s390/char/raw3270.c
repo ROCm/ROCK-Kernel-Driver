@@ -65,7 +65,7 @@ static int raw3270_registered;
 
 /* Module parameters */
 static int tubxcorrect = 0;
-MODULE_PARM(tubxcorrect, "i");
+module_param(tubxcorrect, bool, 0);
 
 /*
  * Wait queue for device init/delete, view delete.
@@ -347,8 +347,11 @@ raw3270_irq (struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 
 	if (IS_ERR(irb))
 		rc = RAW3270_IO_RETRY;
-	else if (irb->scsw.dstat ==  (DEV_STAT_CHN_END | DEV_STAT_DEV_END |
-				      DEV_STAT_UNIT_EXCEP)) {
+	else if (irb->scsw.fctl & SCSW_FCTL_HALT_FUNC) {
+		rq->rc = -EIO;
+		rc = RAW3270_IO_DONE;
+	} else if (irb->scsw.dstat ==  (DEV_STAT_CHN_END | DEV_STAT_DEV_END |
+					DEV_STAT_UNIT_EXCEP)) {
 		/* Handle CE-DE-UE and subsequent UDE */
 		set_bit(RAW3270_FLAGS_BUSY, &rp->flags);
 		rc = RAW3270_IO_BUSY;
@@ -552,6 +555,8 @@ raw3270_start_init(struct raw3270 *rp, struct raw3270_view *view,
 	rc = wait_event_interruptible(wq, raw3270_request_final(rq));
 	if (rc == -ERESTARTSYS) {	/* Interrupted by a signal. */
 		raw3270_halt_io(view->dev, rq);
+		/* No wait for the halt to complete. */
+		wait_event(wq, raw3270_request_final(rq));
 		return -ERESTARTSYS;
 	}
 	return rq->rc;
@@ -809,9 +814,15 @@ raw3270_setup_console(struct ccw_device *cdev)
 	if (rc)
 		return ERR_PTR(rc);
 	set_bit(RAW3270_FLAGS_CONSOLE, &rp->flags);
-	raw3270_reset_device(rp);
-	raw3270_size_device(rp);
-	raw3270_reset_device(rp);
+	rc = raw3270_reset_device(rp);
+	if (rc)
+		return ERR_PTR(rc);
+	rc = raw3270_size_device(rp);
+	if (rc)
+		return ERR_PTR(rc);
+	rc = raw3270_reset_device(rp);
+	if (rc)
+		return ERR_PTR(rc);
 	set_bit(RAW3270_FLAGS_READY, &rp->flags);
 	return rp;
 }
@@ -1030,7 +1041,7 @@ raw3270_del_view(struct raw3270_view *view)
 	}
 	spin_unlock_irqrestore(get_ccwdev_lock(rp->cdev), flags);
 	/* Wait for reference counter to drop to zero. */
-	atomic_sub(2, &view->ref_count);
+	atomic_dec(&view->ref_count);
 	wait_event(raw3270_wait_queue, atomic_read(&view->ref_count) == 0);
 	if (view->fn->free)
 		view->fn->free(view);
@@ -1165,13 +1176,20 @@ raw3270_set_online (struct ccw_device *cdev)
 {
 	struct raw3270 *rp;
 	struct raw3270_notifier *np;
+	int rc;
 
 	rp = raw3270_create_device(cdev);
 	if (IS_ERR(rp))
 		return PTR_ERR(rp);
-	raw3270_reset_device(rp);
-	raw3270_size_device(rp);
-	raw3270_reset_device(rp);
+	rc = raw3270_reset_device(rp);
+	if (rc)
+		return rc;
+	rc = raw3270_size_device(rp);
+	if (rc)
+		return rc;
+	rc = raw3270_reset_device(rp);
+	if (rc)
+		return rc;
 	raw3270_create_attributes(rp);
 	set_bit(RAW3270_FLAGS_READY, &rp->flags);
 	down(&raw3270_sem);

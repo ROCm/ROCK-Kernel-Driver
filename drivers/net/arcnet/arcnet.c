@@ -401,7 +401,8 @@ static int arcnet_open(struct net_device *dev)
 	lp->rfc1201.sequence = 1;
 
 	/* bring up the hardware driver */
-	lp->hw.open(dev);
+	if (lp->hw.open)
+		lp->hw.open(dev);
 
 	if (dev->dev_addr[0] == 0)
 		BUGMSG(D_NORMAL, "WARNING!  Station address 00 is reserved "

@@ -339,9 +339,9 @@ static unsigned long load_elf_interp(struct elfhdr * interp_elf_ex,
 	if (retval != size) {
 		if (retval < 0)
 			error = retval;	
- 		goto out_close;
+		goto out_close;
 	}
- 
+
 	eppnt = elf_phdata;
 	for (i=0; i<interp_elf_ex->e_phnum; i++, eppnt++) {
 	  if (eppnt->p_type == PT_LOAD) {
@@ -491,25 +491,33 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	unsigned long elf_entry, interp_load_addr = 0;
 	unsigned long start_code, end_code, start_data, end_data;
 	unsigned long reloc_func_desc = 0;
-	struct elfhdr elf_ex;
-	struct elfhdr interp_elf_ex;
-  	struct exec interp_ex;
 	char passed_fileno[6];
 	struct files_struct *files;
 	int have_pt_gnu_stack, executable_stack = EXSTACK_DEFAULT;
 	unsigned long def_flags = 0;
+	struct {
+		struct elfhdr elf_ex;
+		struct elfhdr interp_elf_ex;
+  		struct exec interp_ex;
+	} *loc;
+
+	loc = kmalloc(sizeof(*loc), GFP_KERNEL);
+	if (!loc) {
+		retval = -ENOMEM;
+		goto out_ret;
+	}
 	
 	/* Get the exec-header */
-	elf_ex = *((struct elfhdr *) bprm->buf);
+	loc->elf_ex = *((struct elfhdr *) bprm->buf);
 
 	retval = -ENOEXEC;
 	/* First of all, some simple consistency checks */
-	if (memcmp(elf_ex.e_ident, ELFMAG, SELFMAG) != 0)
+	if (memcmp(loc->elf_ex.e_ident, ELFMAG, SELFMAG) != 0)
 		goto out;
 
-	if (elf_ex.e_type != ET_EXEC && elf_ex.e_type != ET_DYN)
+	if (loc->elf_ex.e_type != ET_EXEC && loc->elf_ex.e_type != ET_DYN)
 		goto out;
-	if (!elf_check_arch(&elf_ex))
+	if (!elf_check_arch(&loc->elf_ex))
 		goto out;
 	if (!bprm->file->f_op||!bprm->file->f_op->mmap)
 		goto out;
@@ -517,22 +525,22 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	/* Now read in all of the header information */
 
 	retval = -ENOMEM;
-	if (elf_ex.e_phentsize != sizeof(struct elf_phdr))
+	if (loc->elf_ex.e_phentsize != sizeof(struct elf_phdr))
 		goto out;
-	if (elf_ex.e_phnum > 65536U / sizeof(struct elf_phdr))
+	if (loc->elf_ex.e_phnum > 65536U / sizeof(struct elf_phdr))
 		goto out;
-	size = elf_ex.e_phnum * sizeof(struct elf_phdr);
+	size = loc->elf_ex.e_phnum * sizeof(struct elf_phdr);
 	elf_phdata = (struct elf_phdr *) kmalloc(size, GFP_KERNEL);
 	if (!elf_phdata)
 		goto out;
 
-	retval = kernel_read(bprm->file, elf_ex.e_phoff, (char *) elf_phdata, size);
+	retval = kernel_read(bprm->file, loc->elf_ex.e_phoff, (char *) elf_phdata, size);
 	if (retval != size) {
 		if (retval >= 0)
 			retval = -EIO;
- 		goto out_free_ph;
+		goto out_free_ph;
 	}
- 
+
 	files = current->files;		/* Refcounted so ok */
 	retval = unshare_files();
 	if (retval < 0)
@@ -560,7 +568,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	start_data = 0;
 	end_data = 0;
 
-	for (i = 0; i < elf_ex.e_phnum; i++) {
+	for (i = 0; i < loc->elf_ex.e_phnum; i++) {
 		if (elf_ppnt->p_type == PT_INTERP) {
 			/* This is the program interpreter used for
 			 * shared libraries - for now assume that this
@@ -582,13 +590,13 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 			if (retval != elf_ppnt->p_filesz) {
 				if (retval >= 0)
 					retval = -EIO;
- 				goto out_free_interp;
+				goto out_free_interp;
 			}
 			/* make sure path is NULL terminated */
 			retval = -EINVAL;
 			if (elf_interpreter[elf_ppnt->p_filesz - 1] != '\0')
 				goto out_free_interp;
- 
+
 			/* If the program interpreter is one of these two,
 			 * then assume an iBCS2 image. Otherwise assume
 			 * a native linux image.
@@ -616,7 +624,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 			 * switch really is going to happen - do this in
 			 * flush_thread().	- akpm
 			 */
-			SET_PERSONALITY(elf_ex, ibcs2_interpreter);
+			SET_PERSONALITY(loc->elf_ex, ibcs2_interpreter);
 
 			interpreter = open_exec(elf_interpreter);
 			retval = PTR_ERR(interpreter);
@@ -626,19 +634,19 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 			if (retval != BINPRM_BUF_SIZE) {
 				if (retval >= 0)
 					retval = -EIO;
- 				goto out_free_dentry;
+				goto out_free_dentry;
 			}
- 
+
 			/* Get the exec headers */
-			interp_ex = *((struct exec *) bprm->buf);
-			interp_elf_ex = *((struct elfhdr *) bprm->buf);
+			loc->interp_ex = *((struct exec *) bprm->buf);
+			loc->interp_elf_ex = *((struct elfhdr *) bprm->buf);
 			break;
 		}
 		elf_ppnt++;
 	}
 
 	elf_ppnt = elf_phdata;
-	for (i = 0; i < elf_ex.e_phnum; i++, elf_ppnt++)
+	for (i = 0; i < loc->elf_ex.e_phnum; i++, elf_ppnt++)
 		if (elf_ppnt->p_type == PT_GNU_STACK) {
 			if (elf_ppnt->p_flags & PF_X)
 				executable_stack = EXSTACK_ENABLE_X;
@@ -646,19 +654,19 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 				executable_stack = EXSTACK_DISABLE_X;
 			break;
 		}
-	have_pt_gnu_stack = (i < elf_ex.e_phnum);
+	have_pt_gnu_stack = (i < loc->elf_ex.e_phnum);
 
 	/* Some simple consistency checks for the interpreter */
 	if (elf_interpreter) {
 		interpreter_type = INTERPRETER_ELF | INTERPRETER_AOUT;
 
 		/* Now figure out which format our binary is */
-		if ((N_MAGIC(interp_ex) != OMAGIC) &&
-		    (N_MAGIC(interp_ex) != ZMAGIC) &&
-		    (N_MAGIC(interp_ex) != QMAGIC))
+		if ((N_MAGIC(loc->interp_ex) != OMAGIC) &&
+		    (N_MAGIC(loc->interp_ex) != ZMAGIC) &&
+		    (N_MAGIC(loc->interp_ex) != QMAGIC))
 			interpreter_type = INTERPRETER_ELF;
 
-		if (memcmp(interp_elf_ex.e_ident, ELFMAG, SELFMAG) != 0)
+		if (memcmp(loc->interp_elf_ex.e_ident, ELFMAG, SELFMAG) != 0)
 			interpreter_type &= ~INTERPRETER_ELF;
 
 		retval = -ELIBBAD;
@@ -674,11 +682,11 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		}
 		/* Verify the interpreter has a valid arch */
 		if ((interpreter_type == INTERPRETER_ELF) &&
-		    !elf_check_arch(&interp_elf_ex))
+		    !elf_check_arch(&loc->interp_elf_ex))
 			goto out_free_dentry;
 	} else {
 		/* Executables without an interpreter also need a personality  */
-		SET_PERSONALITY(elf_ex, ibcs2_interpreter);
+		SET_PERSONALITY(loc->elf_ex, ibcs2_interpreter);
 	}
 
 	/* OK, we are done with that, now set up the arg stuff,
@@ -718,8 +726,8 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 
 	/* Do this immediately, since STACK_TOP as used in setup_arg_pages
 	   may depend on the personality.  */
-	SET_PERSONALITY(elf_ex, ibcs2_interpreter);
-	if (elf_read_implies_exec(elf_ex, have_pt_gnu_stack))
+	SET_PERSONALITY(loc->elf_ex, ibcs2_interpreter);
+	if (elf_read_implies_exec(loc->elf_ex, have_pt_gnu_stack))
 		current->personality |= READ_IMPLIES_EXEC;
 
 	arch_pick_mmap_layout(current->mm);
@@ -741,7 +749,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	   the image should be loaded at fixed address, not at a variable
 	   address. */
 
-	for(i = 0, elf_ppnt = elf_phdata; i < elf_ex.e_phnum; i++, elf_ppnt++) {
+	for(i = 0, elf_ppnt = elf_phdata; i < loc->elf_ex.e_phnum; i++, elf_ppnt++) {
 		int elf_prot = 0, elf_flags;
 		unsigned long k, vaddr;
 
@@ -776,9 +784,9 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		elf_flags = MAP_PRIVATE|MAP_DENYWRITE|MAP_EXECUTABLE;
 
 		vaddr = elf_ppnt->p_vaddr;
-		if (elf_ex.e_type == ET_EXEC || load_addr_set) {
+		if (loc->elf_ex.e_type == ET_EXEC || load_addr_set) {
 			elf_flags |= MAP_FIXED;
-		} else if (elf_ex.e_type == ET_DYN) {
+		} else if (loc->elf_ex.e_type == ET_DYN) {
 			/* Try and get dynamic programs out of the way of the default mmap
 			   base, as well as whatever program they might try to exec.  This
 			   is because the brk will follow the loader, and is not movable.  */
@@ -790,11 +798,11 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 			send_sig(SIGKILL, current, 0);
 			goto out_free_dentry;
 		}
- 
+
 		if (!load_addr_set) {
 			load_addr_set = 1;
 			load_addr = (elf_ppnt->p_vaddr - elf_ppnt->p_offset);
-			if (elf_ex.e_type == ET_DYN) {
+			if (loc->elf_ex.e_type == ET_DYN) {
 				load_bias += error -
 				             ELF_PAGESTART(load_bias + vaddr);
 				load_addr += load_bias;
@@ -831,7 +839,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 			elf_brk = k;
 	}
 
-	elf_ex.e_entry += load_bias;
+	loc->elf_ex.e_entry += load_bias;
 	elf_bss += load_bias;
 	elf_brk += load_bias;
 	start_code += load_bias;
@@ -853,10 +861,10 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 
 	if (elf_interpreter) {
 		if (interpreter_type == INTERPRETER_AOUT)
-			elf_entry = load_aout_interp(&interp_ex,
+			elf_entry = load_aout_interp(&loc->interp_ex,
 						     interpreter);
 		else
-			elf_entry = load_elf_interp(&interp_elf_ex,
+			elf_entry = load_elf_interp(&loc->interp_elf_ex,
 						    interpreter,
 						    &interp_load_addr);
 		if (BAD_ADDR(elf_entry)) {
@@ -871,7 +879,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 		fput(interpreter);
 		kfree(elf_interpreter);
 	} else {
-		elf_entry = elf_ex.e_entry;
+		elf_entry = loc->elf_ex.e_entry;
 	}
 
 	kfree(elf_phdata);
@@ -883,7 +891,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 
 	compute_creds(bprm);
 	current->flags &= ~PF_FORKNOEXEC;
-	create_elf_tables(bprm, &elf_ex, (interpreter_type == INTERPRETER_AOUT),
+	create_elf_tables(bprm, &loc->elf_ex, (interpreter_type == INTERPRETER_AOUT),
 			load_addr, interp_load_addr);
 	/* N.B. passed_fileno might not be initialized? */
 	if (interpreter_type == INTERPRETER_AOUT)
@@ -928,6 +936,8 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	}
 	retval = 0;
 out:
+	kfree(loc);
+out_ret:
 	return retval;
 
 	/* error cleanup */
@@ -1064,22 +1074,14 @@ static int dump_seek(struct file *file, off_t off)
  */
 static int maydump(struct vm_area_struct *vma)
 {
-	/*
-	 * If we may not read the contents, don't allow us to dump
-	 * them either. "dump_write()" can't handle it anyway.
-	 */
-	if (!(vma->vm_flags & VM_READ))
+	/* Do not dump I/O mapped devices, shared memory, or special mappings */
+	if (vma->vm_flags & (VM_IO | VM_SHARED | VM_RESERVED))
 		return 0;
 
-	/* Do not dump I/O mapped devices! -DaveM */
-	if (vma->vm_flags & VM_IO)
+	/* If it hasn't been written to, don't write it out */
+	if (!vma->anon_vma)
 		return 0;
-#if 1
-	if (vma->vm_flags & (VM_WRITE|VM_GROWSUP|VM_GROWSDOWN))
-		return 1;
-	if (vma->vm_flags & (VM_READ|VM_EXEC|VM_EXECUTABLE|VM_SHARED))
-		return 0;
-#endif
+
 	return 1;
 }
 
@@ -1324,7 +1326,7 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 	struct vm_area_struct *vma;
 	struct elfhdr *elf = NULL;
 	off_t offset = 0, dataoff;
-	unsigned long limit = current->rlim[RLIMIT_CORE].rlim_cur;
+	unsigned long limit = current->signal->rlim[RLIMIT_CORE].rlim_cur;
 	int numnote;
 	struct memelfnote *notes = NULL;
 	struct elf_prstatus *prstatus = NULL;	/* NT_PRSTATUS */

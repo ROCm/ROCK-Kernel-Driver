@@ -45,8 +45,8 @@
 #include <linux/random.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/mipsregs.h>
 #include <asm/system.h>
@@ -343,7 +343,8 @@ static struct irqaction pcierr_action = {
 int jmr3927_ether1_irq = 0;
 
 void jmr3927_irq_init(u32 irq_base);
-void jmr3927_irq_setup(void)
+
+void __init arch_init_irq(void)
 {
 	/* look for io board's presence */
 	int have_isac = jmr3927_have_isac();
@@ -421,24 +422,6 @@ void jmr3927_irq_setup(void)
 	set_c0_status(ST0_IM);	/* IE bit is still 0. */
 }
 
-void (*irq_setup)(void);
-
-void __init init_IRQ(void)
-{
-
-#ifdef CONFIG_KGDB
-        extern void breakpoint(void);
-        extern void set_debug_traps(void);
-
-        puts("Wait for gdb client connection ...\n");
-        set_debug_traps();
-        breakpoint();
-#endif
-
-        /* invoke board-specific irq setup */
-        irq_setup();
-}
-
 static hw_irq_controller jmr3927_irq_controller = {
 	"jmr3927_irq",
 	jmr3927_irq_startup,
@@ -453,7 +436,6 @@ void jmr3927_irq_init(u32 irq_base)
 {
 	u32 i;
 
-	init_generic_irq();
 	for (i= irq_base; i< irq_base + JMR3927_NR_IRQ_IRC + JMR3927_NR_IRQ_IOC; i++) {
 		irq_desc[i].status = IRQ_DISABLED;
 		irq_desc[i].action = NULL;

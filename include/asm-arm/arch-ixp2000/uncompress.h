@@ -37,7 +37,7 @@ static __inline__ void putc(char c)
 	*UARTDR = c;
 }
 
-static void puts(const char *s)
+static void putstr(const char *s)
 {
 	while (*s)
 	{

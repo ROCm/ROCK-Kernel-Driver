@@ -26,7 +26,6 @@
 #include <linux/mc146818rtc.h>
 #include <linux/kernel_stat.h>
 #include <linux/sysdev.h>
-#include <linux/dmi.h>
 
 #include <asm/atomic.h>
 #include <asm/smp.h>
@@ -46,9 +45,25 @@
 int apic_verbosity;
 
 
-extern int enable_local_apic;
-
 static void apic_pm_activate(void);
+
+/*
+ * 'what should we do if we get a hw irq event on an illegal vector'.
+ * each architecture has to answer this themselves.
+ */
+void ack_bad_irq(unsigned int irq)
+{
+	printk("unexpected IRQ trap at vector %02x\n", irq);
+	/*
+	 * Currently unexpected vectors happen only on SMP and APIC.
+	 * We _must_ ack these because every local APIC has only N
+	 * irq slots per priority level, and a 'hanging, unacked' IRQ
+	 * holds up an irq slot - in excessive cases (when multiple
+	 * unexpected vectors occur) that might lock up the APIC
+	 * completely.
+	 */
+	ack_APIC_irq();
+}
 
 void __init apic_intr_init(void)
 {
@@ -94,7 +109,7 @@ int get_physical_broadcast(void)
 	unsigned int lvr, version;
 	lvr = apic_read(APIC_LVR);
 	version = GET_APIC_VERSION(lvr);
-	if (version >= 0x14)
+	if (!APIC_INTEGRATED(version) || version >= 0x14)
 		return 0xff;
 	else
 		return 0xf;
@@ -210,9 +225,6 @@ void disable_local_APIC(void)
 {
 	unsigned long value;
 
-	if (enable_local_apic < 0) 
-		return;
-
 	clear_local_APIC();
 
 	/*
@@ -288,6 +300,10 @@ int __init verify_local_APIC(void)
 
 void __init sync_Arb_IDs(void)
 {
+	/* Unsupported on P4 - see Intel Dev. Manual Vol. 3, Ch. 8.6.1 */
+	unsigned int ver = GET_APIC_VERSION(apic_read(APIC_LVR));
+	if (ver >= 0x14)	/* P4 or higher */
+		return;
 	/*
 	 * Wait for idle.
 	 */
@@ -497,12 +513,25 @@ void __init setup_local_APIC (void)
 	apic_pm_activate();
 }
 
+/*
+ * If Linux enabled the LAPIC against the BIOS default
+ * disable it down before re-entering the BIOS on shutdown.
+ * Otherwise the BIOS may get confused and not power-off.
+ */
+void
+lapic_shutdown()
+{
+	if (!cpu_has_apic || !enabled_via_apicbase)
+		return;
+
+	local_irq_disable();
+	disable_local_APIC();
+	local_irq_enable();
+}
+
 #ifdef CONFIG_PM
 
 static struct {
-	/* 'active' is true if the local APIC was enabled by us and
-	   not the BIOS; this signifies that we are also responsible
-	   for disabling it before entering apm/acpi suspend */
 	int active;
 	/* r/w apic fields */
 	unsigned int apic_id;
@@ -590,6 +619,10 @@ static int lapic_resume(struct sys_device *dev)
 	return 0;
 }
 
+/*
+ * This device has no shutdown method - fully functioning local APICs
+ * are needed on every CPU up until machine_halt/restart/poweroff.
+ */
 
 static struct sysdev_class lapic_sysclass = {
 	set_kset_name("lapic"),
@@ -636,14 +669,9 @@ static void apic_pm_activate(void) { }
 /*
  * Knob to control our willingness to enable the local APIC.
  */
-/* For SuSE don't enable APIC by default on UP kernels */ 
-#ifndef CONFIG_SMP
-int enable_local_apic = -1; /* -1=force-disable, +1=force-enable */
-#else
-int enable_local_apic = 0;
-#endif
+int enable_local_apic __initdata = 0; /* -1=force-disable, +1=force-enable */
 
-int __init lapic_disable(char *str)
+static int __init lapic_disable(char *str)
 {
 	enable_local_apic = -1;
 	clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
@@ -651,7 +679,7 @@ int __init lapic_disable(char *str)
 }
 __setup("nolapic", lapic_disable);
 
-int __init lapic_enable(char *str)
+static int __init lapic_enable(char *str)
 {
 	enable_local_apic = 1;
 	return 0;
@@ -673,25 +701,12 @@ static int __init apic_set_verbosity(char *str)
 
 __setup("apic=", apic_set_verbosity);
 
-int __init apic_enable(char *str)
-{
-	printk("apic_enable\n");
-	
-#ifdef CONFIG_X86_IO_APIC
-	extern int skip_ioapic_setup;
-	skip_ioapic_setup = 0;
-#endif
-	enable_local_apic = 1;
-	return 0;
-}
-__setup("apic", apic_enable); 
-
 static int __init detect_init_APIC (void)
 {
 	u32 h, l, features;
 	extern void get_cpu_vendor(struct cpuinfo_x86*);
 
-	/* Disabled by DMI scan or kernel option? */
+	/* Disabled by kernel option? */
 	if (enable_local_apic < 0)
 		return -1;
 
@@ -705,8 +720,7 @@ static int __init detect_init_APIC (void)
 			break;
 		goto no_apic;
 	case X86_VENDOR_INTEL:
-		if (boot_cpu_data.x86 == 6 ||
-		    (boot_cpu_data.x86 == 15 && (cpu_has_apic || enable_local_apic > 0)) ||
+		if (boot_cpu_data.x86 == 6 || boot_cpu_data.x86 == 15 ||
 		    (boot_cpu_data.x86 == 5 && cpu_has_apic))
 			break;
 		goto no_apic;
@@ -716,14 +730,23 @@ static int __init detect_init_APIC (void)
 
 	if (!cpu_has_apic) {
 		/*
+		 * Over-ride BIOS and try to enable the local
+		 * APIC only if "lapic" specified.
+		 */
+		if (enable_local_apic <= 0) {
+			printk("Local APIC disabled by BIOS -- "
+			       "you can enable it with \"lapic\"\n");
+			return -1;
+		}
+		/*
 		 * Some BIOSes disable the local APIC in the
 		 * APIC_BASE MSR. This can only be done in
-		 * software for Intel P6 and AMD K7 (Model > 1).
+		 * software for Intel P6 or later and AMD K7
+		 * (Model > 1) or later.
 		 */
 		rdmsr(MSR_IA32_APICBASE, l, h);
 		if (!(l & MSR_IA32_APICBASE_ENABLE)) {
-			apic_printk(APIC_VERBOSE, "Local APIC disabled "
-					"by BIOS -- reenabling.\n");
+			printk("Local APIC disabled by BIOS -- reenabling.\n");
 			l &= ~MSR_IA32_APICBASE_BASE;
 			l |= MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
 			wrmsr(MSR_IA32_APICBASE, l, h);
@@ -750,7 +773,7 @@ static int __init detect_init_APIC (void)
 	if (nmi_watchdog != NMI_NONE)
 		nmi_watchdog = NMI_LOCAL_APIC;
 
-	apic_printk(APIC_VERBOSE, "Found and enabled local APIC!\n");
+	printk("Found and enabled local APIC!\n");
 
 	apic_pm_activate();
 
@@ -777,8 +800,8 @@ void __init init_apic_mappings(void)
 		apic_phys = mp_lapic_addr;
 
 	set_fixmap_nocache(FIX_APIC_BASE, apic_phys);
-	apic_printk(APIC_DEBUG, "mapped APIC to %08lx (%08lx)\n", APIC_BASE,
-			apic_phys);
+	printk(KERN_DEBUG "mapped APIC to %08lx (%08lx)\n", APIC_BASE,
+	       apic_phys);
 
 	/*
 	 * Fetch the APIC ID of the BSP in case we have a
@@ -796,21 +819,23 @@ void __init init_apic_mappings(void)
 			if (smp_found_config) {
 				ioapic_phys = mp_ioapics[i].mpc_apicaddr;
 				if (!ioapic_phys) {
-					printk(KERN_ERR "WARNING: bogus zero IO-APIC address found in MPTABLE, disabling IO/APIC support!\n");
-
+					printk(KERN_ERR
+					       "WARNING: bogus zero IO-APIC "
+					       "address found in MPTABLE, "
+					       "disabling IO/APIC support!\n");
 					smp_found_config = 0;
 					skip_ioapic_setup = 1;
 					goto fake_ioapic_page;
 				}
 			} else {
 fake_ioapic_page:
-				ioapic_phys = (unsigned long) alloc_bootmem_pages(PAGE_SIZE);
+				ioapic_phys = (unsigned long)
+					      alloc_bootmem_pages(PAGE_SIZE);
 				ioapic_phys = __pa(ioapic_phys);
 			}
 			set_fixmap_nocache(idx, ioapic_phys);
-			apic_printk(APIC_DEBUG, "mapped IOAPIC to "
-					"%08lx (%08lx)\n",
-					__fix_to_virt(idx), ioapic_phys);
+			printk(KERN_DEBUG "mapped IOAPIC to %08lx (%08lx)\n",
+			       __fix_to_virt(idx), ioapic_phys);
 			idx++;
 		}
 	}
@@ -1141,7 +1166,7 @@ inline void smp_local_timer_interrupt(struct pt_regs * regs)
  *   interrupt as well. Thus we cannot inline the local irq ... ]
  */
 
-void smp_apic_timer_interrupt(struct pt_regs regs)
+fastcall void smp_apic_timer_interrupt(struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
 
@@ -1161,14 +1186,14 @@ void smp_apic_timer_interrupt(struct pt_regs regs)
 	 * interrupt lock, which is the WrongThing (tm) to do.
 	 */
 	irq_enter();
-	smp_local_timer_interrupt(&regs);
+	smp_local_timer_interrupt(regs);
 	irq_exit();
 }
 
 /*
  * This interrupt should _never_ happen with our APIC/SMP architecture
  */
-asmlinkage void smp_spurious_interrupt(void)
+fastcall void smp_spurious_interrupt(struct pt_regs *regs)
 {
 	unsigned long v;
 
@@ -1192,7 +1217,7 @@ asmlinkage void smp_spurious_interrupt(void)
  * This interrupt should never happen with our APIC/SMP architecture
  */
 
-asmlinkage void smp_error_interrupt(void)
+fastcall void smp_error_interrupt(struct pt_regs *regs)
 {
 	unsigned long v, v1;
 
@@ -1219,31 +1244,12 @@ asmlinkage void smp_error_interrupt(void)
 	irq_exit();
 }
 
-static int __init need_local_apic(struct dmi_system_id *d)
-{ 
-#ifdef CONFIG_X86_LOCAL_APIC
-	extern int enable_local_apic;
-	enable_local_apic = 0;
-	printk(KERN_WARNING "%s machine detected. Enablig LAPIC\n",
-		       d->ident);
-#endif
-	return 0;
-} 
-
-static struct dmi_system_id __initdata apic_dmi_table[] = {
-	{ need_local_apic, "Intel C440GX+", {
-	  DMI_MATCH(DMI_BOARD_VENDOR,"Intel"),
-	  DMI_MATCH(DMI_BOARD_NAME,"C440GX+") } }
-};
-
 /*
  * This initializes the IO-APIC and APIC hardware if this is
  * a UP kernel.
  */
 int __init APIC_init_uniprocessor (void)
 {
-	dmi_check_system(apic_dmi_table);
-
 	if (enable_local_apic < 0)
 		clear_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
 
@@ -1254,6 +1260,8 @@ int __init APIC_init_uniprocessor (void)
 	 * Complain if the BIOS pretends there is one.
 	 */
 	if (!cpu_has_apic && APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid])) {
+		printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
+			boot_cpu_physical_apicid);
 		return -1;
 	}
 

@@ -16,7 +16,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/compiler.h>
 #include <linux/cpu.h>
 #include <linux/errno.h>
@@ -171,9 +170,7 @@ void show_regs(struct pt_regs *regs)
 {
 	struct task_struct *tsk = current;
 
-        printk("CPU:    %d    %s (%s %s)\n",
-	       tsk->thread_info->cpu, print_tainted(),
-	       UTS_RELEASE, OOPS_TIMESTAMP);
+        printk("CPU:    %d    %s\n", tsk->thread_info->cpu, print_tainted());
         printk("Process %s (pid: %d, task: %p, ksp: %p)\n",
 	       current->comm, current->pid, (void *) tsk,
 	       (void *) tsk->thread.ksp);
@@ -241,7 +238,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
         frame = ((struct fake_frame *)
 		 (THREAD_SIZE + (unsigned long) p->thread_info)) - 1;
         p->thread.ksp = (unsigned long) frame;
-	p->set_child_tid = p->clear_child_tid = NULL;
 	/* Store access registers to kernel stack of new process. */
         frame->childregs = *regs;
 	frame->childregs.gprs[2] = 0;	/* child returns 0 on fork. */
@@ -343,7 +339,9 @@ asmlinkage long sys_execve(struct pt_regs regs)
         error = do_execve(filename, (char __user * __user *) regs.gprs[3],
 			  (char __user * __user *) regs.gprs[4], &regs);
 	if (error == 0) {
+		task_lock(current);
 		current->ptrace &= ~PT_DTRACE;
+		task_unlock(current);
 		current->thread.fp_regs.fpc = 0;
 		if (MACHINE_HAS_IEEE)
 			asm volatile("sfpc %0,%0" : : "d" (0));

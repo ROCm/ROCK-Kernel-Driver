@@ -34,13 +34,14 @@
 #include <linux/serialP.h>
 #include <linux/console.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
+#include <linux/delay.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/system.h>
 #include <asm/segment.h>
 #include <asm/semaphore.h>
-#include <asm/bitops.h>
 #include <asm/delay.h>
 #include <asm/coldfire.h>
 #include <asm/mcfsim.h>
@@ -424,11 +425,7 @@ static void mcfrs_offintr(void *private)
 	tty = info->tty;
 	if (!tty)
 		return;
-
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
-	wake_up_interruptible(&tty->write_wait);
+	tty_wakeup(tty);
 }
 
 
@@ -739,7 +736,7 @@ static void mcfrs_flush_chars(struct tty_struct *tty)
 	local_irq_restore(flags);
 }
 
-static int mcfrs_write(struct tty_struct * tty, int from_user,
+static int mcfrs_write(struct tty_struct * tty,
 		    const unsigned char *buf, int count)
 {
 	volatile unsigned char	*uartp;
@@ -748,8 +745,8 @@ static int mcfrs_write(struct tty_struct * tty, int from_user,
 	int			c, total = 0;
 
 #if 0
-	printk("%s(%d): mcfrs_write(tty=%x,from_user=%d,buf=%x,count=%d)\n",
-		__FILE__, __LINE__, (int)tty, from_user, (int)buf, count);
+	printk("%s(%d): mcfrs_write(tty=%x,buf=%x,count=%d)\n",
+		__FILE__, __LINE__, (int)tty, (int)buf, count);
 #endif
 
 	if (serial_paranoia_check(info, tty->name, "mcfrs_write"))
@@ -768,19 +765,7 @@ static int mcfrs_write(struct tty_struct * tty, int from_user,
 		if (c <= 0)
 			break;
 
-		if (from_user) {
-			down(&mcfrs_tmp_buf_sem);
-			if (copy_from_user(mcfrs_tmp_buf, buf, c))
-				return -EFAULT;
-
-			local_irq_disable();
-			c = min(c, (int) min(((int)SERIAL_XMIT_SIZE) - info->xmit_cnt - 1,
-				       ((int)SERIAL_XMIT_SIZE) - info->xmit_head));
-			local_irq_restore(flags);
-			memcpy(info->xmit_buf + info->xmit_head, mcfrs_tmp_buf, c);
-			up(&mcfrs_tmp_buf_sem);
-		} else
-			memcpy(info->xmit_buf + info->xmit_head, buf, c);
+		memcpy(info->xmit_buf + info->xmit_head, buf, c);
 
 		local_irq_disable();
 		info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
@@ -835,10 +820,7 @@ static void mcfrs_flush_buffer(struct tty_struct *tty)
 	info->xmit_cnt = info->xmit_head = info->xmit_tail = 0;
 	local_irq_restore(flags);
 
-	wake_up_interruptible(&tty->write_wait);
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
+	tty_wakeup(tty);
 }
 
 /*
@@ -997,7 +979,7 @@ static void send_break(	struct mcf_serial * info, int duration)
 
 	if (!info->addr)
 		return;
-	current->state = TASK_INTERRUPTIBLE;
+	set_current_state(TASK_INTERRUPTIBLE);
 	uartp = info->addr;
 
 	local_irq_save(flags);
@@ -1232,11 +1214,12 @@ static void mcfrs_close(struct tty_struct *tty, struct file * filp)
 	shutdown(info);
 	if (tty->driver->flush_buffer)
 		tty->driver->flush_buffer(tty);
-	if (tty->ldisc.flush_buffer)
-		tty->ldisc.flush_buffer(tty);
+	tty_ldisc_flush(tty);
+	
 	tty->closing = 0;
 	info->event = 0;
 	info->tty = 0;
+#if 0	
 	if (tty->ldisc.num != ldiscs[N_TTY].num) {
 		if (tty->ldisc.close)
 			(tty->ldisc.close)(tty);
@@ -1245,10 +1228,10 @@ static void mcfrs_close(struct tty_struct *tty, struct file * filp)
 		if (tty->ldisc.open)
 			(tty->ldisc.open)(tty);
 	}
+#endif	
 	if (info->blocked_open) {
 		if (info->close_delay) {
-			current->state = TASK_INTERRUPTIBLE;
-			schedule_timeout(info->close_delay);
+			msleep_interruptible(jiffies_to_msecs(info->close_delay));
 		}
 		wake_up_interruptible(&info->open_wait);
 	}
@@ -1313,8 +1296,7 @@ mcfrs_wait_until_sent(struct tty_struct *tty, int timeout)
 			fifo_cnt++;
 		if (fifo_cnt == 0)
 			break;
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(char_time);
+		msleep_interruptible(jiffies_to_msecs(char_time));
 		if (signal_pending(current))
 			break;
 		if (timeout && time_after(jiffies, orig_jiffies + timeout))

@@ -65,6 +65,7 @@
 #include <linux/tty_driver.h>
 #include <linux/slab.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 
 #ifndef MODULE
 #include <linux/ctype.h> /* We only need it for parsing the "digi="-line */
@@ -73,7 +74,6 @@
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 #include <asm/semaphore.h>
 
 #define VERSION 	"1.6.3"
@@ -112,13 +112,13 @@ static int numports[]     = {0, 0, 0, 0};
 MODULE_AUTHOR("Bernhard Kaindl");
 MODULE_DESCRIPTION("Digiboard PC/X{i,e,eve} driver");
 MODULE_LICENSE("GPL");
-MODULE_PARM(verbose,     "i");
-MODULE_PARM(debug,       "i");
-MODULE_PARM(io,          "1-4i");
-MODULE_PARM(membase,     "1-4i");
-MODULE_PARM(memsize,     "1-4i");
-MODULE_PARM(altpin,      "1-4i");
-MODULE_PARM(numports,    "1-4i");
+module_param(verbose,     bool, 0644);
+module_param(debug,       bool, 0644);
+module_param_array(io,          int, NULL, 0);
+module_param_array(membase,     int, NULL, 0);
+module_param_array(memsize,     int, NULL, 0);
+module_param_array(altpin,      int, NULL, 0);
+module_param_array(numports,    int, NULL, 0);
 
 #endif /* MODULE */
 
@@ -148,7 +148,7 @@ static void pcxx_error(int, char *);
 static void pcxe_close(struct tty_struct *, struct file *);
 static int pcxe_ioctl(struct tty_struct *, struct file *, unsigned int, unsigned long);
 static void pcxe_set_termios(struct tty_struct *, struct termios *);
-static int pcxe_write(struct tty_struct *, int, const unsigned char *, int);
+static int pcxe_write(struct tty_struct *, const unsigned char *, int);
 static int pcxe_write_room(struct tty_struct *);
 static int pcxe_chars_in_buffer(struct tty_struct *);
 static void pcxe_flush_buffer(struct tty_struct *);
@@ -531,32 +531,14 @@ static void pcxe_close(struct tty_struct * tty, struct file * filp)
 	
 		if(tty->driver->flush_buffer)
 			tty->driver->flush_buffer(tty);
-		if(tty->ldisc.flush_buffer)
-			tty->ldisc.flush_buffer(tty);
+		tty_ldisc_flush(tty);
 		shutdown(info);
 		tty->closing = 0;
 		info->event = 0;
 		info->tty = NULL;
-#ifndef MODULE
-/* ldiscs[] is not available in a MODULE
-** worth noting that while I'm not sure what this hunk of code is supposed
-** to do, it is not present in the serial.c driver.  Hmmm.  If you know,
-** please send me a note.  brian@ilinx.com
-** Don't know either what this is supposed to do christoph@lameter.com.
-*/
-		if(tty->ldisc.num != ldiscs[N_TTY].num) {
-			if(tty->ldisc.close)
-				(tty->ldisc.close)(tty);
-			tty->ldisc = ldiscs[N_TTY];
-			tty->termios->c_line = N_TTY;
-			if(tty->ldisc.open)
-				(tty->ldisc.open)(tty);
-		}
-#endif
 		if(info->blocked_open) {
 			if(info->close_delay) {
-				current->state = TASK_INTERRUPTIBLE;
-				schedule_timeout(info->close_delay);
+				msleep_interruptible(jiffies_to_msecs(info->close_delay));
 			}
 			wake_up_interruptible(&info->open_wait);
 		}
@@ -588,7 +570,7 @@ void pcxe_hangup(struct tty_struct *tty)
 
 
 
-static int pcxe_write(struct tty_struct * tty, int from_user, const unsigned char *buf, int count)
+static int pcxe_write(struct tty_struct * tty, const unsigned char *buf, int count)
 {
 	struct channel *ch;
 	volatile struct board_chan *bc;
@@ -602,33 +584,6 @@ static int pcxe_write(struct tty_struct * tty, int from_user, const unsigned cha
 
 	bc = ch->brdchan;
 	size = ch->txbufsize;
-
-	if (from_user) {
-
-		down(&ch->tmp_buf_sem);
-		save_flags(flags);
-		cli();
-		globalwinon(ch);
-		head = bc->tin & (size - 1);
-		/* It seems to be necessary to make sure that the value is stable here somehow
-		   This is a rather odd pice of code here. */
-		do
-		{
-			tail = bc->tout;
-		} while (tail != bc->tout);
-		
-		tail &= (size - 1);
-		stlen = (head >= tail) ? (size - (head - tail) - 1) : (tail - head - 1);
-		count = min(stlen, count);
-		memoff(ch);
-		restore_flags(flags);
-
-		if (count)
-			if (copy_from_user(ch->tmp_buf, buf, count))
-				count = 0;
-
-		buf = ch->tmp_buf;
-	}
 
 	/*
 	 * All data is now local
@@ -676,16 +631,13 @@ static int pcxe_write(struct tty_struct * tty, int from_user, const unsigned cha
 	memoff(ch);
 	restore_flags(flags);
 	
-	if(from_user)
-		up(&ch->tmp_buf_sem);
-
 	return(total);
 }
 
 
 static void pcxe_put_char(struct tty_struct *tty, unsigned char c)
 {
-	pcxe_write(tty, 0, &c, 1);
+	pcxe_write(tty, &c, 1);
 	return;
 }
 
@@ -793,9 +745,7 @@ static void pcxe_flush_buffer(struct tty_struct *tty)
 	memoff(ch);
 	restore_flags(flags);
 
-	wake_up_interruptible(&tty->write_wait);
-	if((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
+	tty_wakeup(tty);
 }
 
 static void pcxe_flush_chars(struct tty_struct *tty)
@@ -1667,10 +1617,7 @@ static void doevent(int crd)
 			if (event & LOWTX_IND) {
 				if (ch->statusflags & LOWWAIT) {
 					ch->statusflags &= ~LOWWAIT;
-					if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-						tty->ldisc.write_wakeup)
-						(tty->ldisc.write_wakeup)(tty);
-					wake_up_interruptible(&tty->write_wait);
+					tty_wakeup(tty);
 				}
 			}
 
@@ -1678,10 +1625,7 @@ static void doevent(int crd)
 				ch->statusflags &= ~TXBUSY;
 				if (ch->statusflags & EMPTYWAIT) {
 					ch->statusflags &= ~EMPTYWAIT;
-					if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-						tty->ldisc.write_wakeup)
-						(tty->ldisc.write_wakeup)(tty);
-					wake_up_interruptible(&tty->write_wait);
+					tty_wakeup(tty);
 				}
 			}
 		}
@@ -2159,8 +2103,7 @@ static int pcxe_ioctl(struct tty_struct *tty, struct file * file,
 				tty_wait_until_sent(tty, 0);
 			}
 			else {
-				if(tty->ldisc.flush_buffer)
-					tty->ldisc.flush_buffer(tty);
+				tty_ldisc_flush(tty);
 			}
 
 			/* Fall Thru */

@@ -1,7 +1,0 @@
-../../../../../common/hw/mellanox-hca/mlxsys/mpga/internal_functions.c
-../../../../../common/hw/mellanox-hca/mlxsys/mpga/mpga.c
-../../../../../common/hw/mellanox-hca/mlxsys/mpga/nMPGA.c
-../../../../../common/hw/mellanox-hca/mlxsys/mpga/nMPGA_packet_append.c
-../../../../../common/hw/mellanox-hca/mlxsys/mpga/os_dep/linux/mpgaklsyms.c
-../../../../../common/hw/mellanox-hca/mlxsys/mpga/packet_append.c
-../../../../../common/hw/mellanox-hca/mlxsys/mpga/packet_utilities.c

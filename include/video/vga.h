@@ -203,7 +203,7 @@
 #define VGA_SAVE_CMAP  16 /* save/restore color map/DAC   */
 
 struct vgastate {
-	caddr_t vgabase;	/* mmio base, if supported 		   */
+	void __iomem *vgabase;	/* mmio base, if supported 		   */
 	unsigned long membase;	/* VGA window base, 0 for default - 0xA000 */
 	__u32 memsize;		/* VGA window size, 0 for default 64K	   */
 	__u32 flags;		/* what state[s] to save (see VGA_SAVE_*)  */
@@ -238,23 +238,23 @@ static inline void vga_io_w_fast (unsigned short port, unsigned char reg,
 	outw(VGA_OUT16VAL (val, reg), port);
 }
 
-static inline unsigned char vga_mm_r (caddr_t regbase, unsigned short port)
+static inline unsigned char vga_mm_r (void __iomem *regbase, unsigned short port)
 {
 	return readb (regbase + port);
 }
 
-static inline void vga_mm_w (caddr_t regbase, unsigned short port, unsigned char val)
+static inline void vga_mm_w (void __iomem *regbase, unsigned short port, unsigned char val)
 {
 	writeb (val, regbase + port);
 }
 
-static inline void vga_mm_w_fast (caddr_t regbase, unsigned short port,
+static inline void vga_mm_w_fast (void __iomem *regbase, unsigned short port,
 				  unsigned char reg, unsigned char val)
 {
 	writew (VGA_OUT16VAL (val, reg), regbase + port);
 }
 
-static inline unsigned char vga_r (caddr_t regbase, unsigned short port)
+static inline unsigned char vga_r (void __iomem *regbase, unsigned short port)
 {
 	if (regbase)
 		return vga_mm_r (regbase, port);
@@ -262,7 +262,7 @@ static inline unsigned char vga_r (caddr_t regbase, unsigned short port)
 		return vga_io_r (port);
 }
 
-static inline void vga_w (caddr_t regbase, unsigned short port, unsigned char val)
+static inline void vga_w (void __iomem *regbase, unsigned short port, unsigned char val)
 {
 	if (regbase)
 		vga_mm_w (regbase, port, val);
@@ -271,7 +271,7 @@ static inline void vga_w (caddr_t regbase, unsigned short port, unsigned char va
 }
 
 
-static inline void vga_w_fast (caddr_t regbase, unsigned short port,
+static inline void vga_w_fast (void __iomem *regbase, unsigned short port,
 			       unsigned char reg, unsigned char val)
 {
 	if (regbase)
@@ -285,13 +285,13 @@ static inline void vga_w_fast (caddr_t regbase, unsigned short port,
  * VGA CRTC register read/write
  */
  
-static inline unsigned char vga_rcrt (caddr_t regbase, unsigned char reg)
+static inline unsigned char vga_rcrt (void __iomem *regbase, unsigned char reg)
 {
         vga_w (regbase, VGA_CRT_IC, reg);
         return vga_r (regbase, VGA_CRT_DC);
 }
 
-static inline void vga_wcrt (caddr_t regbase, unsigned char reg, unsigned char val)
+static inline void vga_wcrt (void __iomem *regbase, unsigned char reg, unsigned char val)
 {
 #ifdef VGA_OUTW_WRITE
 	vga_w_fast (regbase, VGA_CRT_IC, reg, val);
@@ -317,13 +317,13 @@ static inline void vga_io_wcrt (unsigned char reg, unsigned char val)
 #endif /* VGA_OUTW_WRITE */
 }
 
-static inline unsigned char vga_mm_rcrt (caddr_t regbase, unsigned char reg)
+static inline unsigned char vga_mm_rcrt (void __iomem *regbase, unsigned char reg)
 {
         vga_mm_w (regbase, VGA_CRT_IC, reg);
         return vga_mm_r (regbase, VGA_CRT_DC);
 }
 
-static inline void vga_mm_wcrt (caddr_t regbase, unsigned char reg, unsigned char val)
+static inline void vga_mm_wcrt (void __iomem *regbase, unsigned char reg, unsigned char val)
 {
 #ifdef VGA_OUTW_WRITE
 	vga_mm_w_fast (regbase, VGA_CRT_IC, reg, val);
@@ -338,13 +338,13 @@ static inline void vga_mm_wcrt (caddr_t regbase, unsigned char reg, unsigned cha
  * VGA sequencer register read/write
  */
  
-static inline unsigned char vga_rseq (caddr_t regbase, unsigned char reg)
+static inline unsigned char vga_rseq (void __iomem *regbase, unsigned char reg)
 {
         vga_w (regbase, VGA_SEQ_I, reg);
         return vga_r (regbase, VGA_SEQ_D);
 }
 
-static inline void vga_wseq (caddr_t regbase, unsigned char reg, unsigned char val)
+static inline void vga_wseq (void __iomem *regbase, unsigned char reg, unsigned char val)
 {
 #ifdef VGA_OUTW_WRITE
 	vga_w_fast (regbase, VGA_SEQ_I, reg, val);
@@ -370,13 +370,13 @@ static inline void vga_io_wseq (unsigned char reg, unsigned char val)
 #endif /* VGA_OUTW_WRITE */
 }
 
-static inline unsigned char vga_mm_rseq (caddr_t regbase, unsigned char reg)
+static inline unsigned char vga_mm_rseq (void __iomem *regbase, unsigned char reg)
 {
         vga_mm_w (regbase, VGA_SEQ_I, reg);
         return vga_mm_r (regbase, VGA_SEQ_D);
 }
 
-static inline void vga_mm_wseq (caddr_t regbase, unsigned char reg, unsigned char val)
+static inline void vga_mm_wseq (void __iomem *regbase, unsigned char reg, unsigned char val)
 {
 #ifdef VGA_OUTW_WRITE
 	vga_mm_w_fast (regbase, VGA_SEQ_I, reg, val);
@@ -390,13 +390,13 @@ static inline void vga_mm_wseq (caddr_t regbase, unsigned char reg, unsigned cha
  * VGA graphics controller register read/write
  */
  
-static inline unsigned char vga_rgfx (caddr_t regbase, unsigned char reg)
+static inline unsigned char vga_rgfx (void __iomem *regbase, unsigned char reg)
 {
         vga_w (regbase, VGA_GFX_I, reg);
         return vga_r (regbase, VGA_GFX_D);
 }
 
-static inline void vga_wgfx (caddr_t regbase, unsigned char reg, unsigned char val)
+static inline void vga_wgfx (void __iomem *regbase, unsigned char reg, unsigned char val)
 {
 #ifdef VGA_OUTW_WRITE
 	vga_w_fast (regbase, VGA_GFX_I, reg, val);
@@ -422,13 +422,13 @@ static inline void vga_io_wgfx (unsigned char reg, unsigned char val)
 #endif /* VGA_OUTW_WRITE */
 }
 
-static inline unsigned char vga_mm_rgfx (caddr_t regbase, unsigned char reg)
+static inline unsigned char vga_mm_rgfx (void __iomem *regbase, unsigned char reg)
 {
         vga_mm_w (regbase, VGA_GFX_I, reg);
         return vga_mm_r (regbase, VGA_GFX_D);
 }
 
-static inline void vga_mm_wgfx (caddr_t regbase, unsigned char reg, unsigned char val)
+static inline void vga_mm_wgfx (void __iomem *regbase, unsigned char reg, unsigned char val)
 {
 #ifdef VGA_OUTW_WRITE
 	vga_mm_w_fast (regbase, VGA_GFX_I, reg, val);
@@ -443,13 +443,13 @@ static inline void vga_mm_wgfx (caddr_t regbase, unsigned char reg, unsigned cha
  * VGA attribute controller register read/write
  */
  
-static inline unsigned char vga_rattr (caddr_t regbase, unsigned char reg)
+static inline unsigned char vga_rattr (void __iomem *regbase, unsigned char reg)
 {
         vga_w (regbase, VGA_ATT_IW, reg);
         return vga_r (regbase, VGA_ATT_R);
 }
 
-static inline void vga_wattr (caddr_t regbase, unsigned char reg, unsigned char val)
+static inline void vga_wattr (void __iomem *regbase, unsigned char reg, unsigned char val)
 {
         vga_w (regbase, VGA_ATT_IW, reg);
         vga_w (regbase, VGA_ATT_W, val);
@@ -467,13 +467,13 @@ static inline void vga_io_wattr (unsigned char reg, unsigned char val)
         vga_io_w (VGA_ATT_W, val);
 }
 
-static inline unsigned char vga_mm_rattr (caddr_t regbase, unsigned char reg)
+static inline unsigned char vga_mm_rattr (void __iomem *regbase, unsigned char reg)
 {
         vga_mm_w (regbase, VGA_ATT_IW, reg);
         return vga_mm_r (regbase, VGA_ATT_R);
 }
 
-static inline void vga_mm_wattr (caddr_t regbase, unsigned char reg, unsigned char val)
+static inline void vga_mm_wattr (void __iomem *regbase, unsigned char reg, unsigned char val)
 {
         vga_mm_w (regbase, VGA_ATT_IW, reg);
         vga_mm_w (regbase, VGA_ATT_W, val);

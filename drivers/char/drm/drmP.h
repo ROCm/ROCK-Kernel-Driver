@@ -458,13 +458,6 @@ typedef struct drm_device_dma {
 		_DRM_DMA_USE_SG  = 0x02
 	} flags;
 
-	/** \name DMA support */
-	/*@{*/
-	drm_buf_t	  *this_buffer;	/**< Buffer being sent */
-	drm_buf_t	  *next_buffer; /**< Selected buffer to send */
-	drm_queue_t	  *next_queue;	/**< Queue from which buffer selected*/
-	wait_queue_head_t waiting;	/**< Processes waiting on free bufs */
-	/*@}*/
 } drm_device_dma_t;
 
 /** 

@@ -88,16 +88,15 @@ static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card *
 #ifdef SUPPORT_JOYSTICK
 static int joystick_port[SNDRV_CARDS];
 #endif
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for ALS4000 soundcard.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for ALS4000 soundcard.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable ALS4000 soundcard.");
 #ifdef SUPPORT_JOYSTICK
-module_param_array(joystick_port, int, boot_devs, 0444);
+module_param_array(joystick_port, int, NULL, 0444);
 MODULE_PARM_DESC(joystick_port, "Joystick port address for ALS4000 soundcard. (0 = disabled)");
 #endif
 
@@ -583,6 +582,7 @@ static void snd_card_als4000_free( snd_card_t *card )
 	}
 #endif
 	pci_release_regions(acard->pci);
+	pci_disable_device(acard->pci);
 }
 
 static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
@@ -613,11 +613,14 @@ static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
 	if (pci_set_dma_mask(pci, 0x00ffffff) < 0 ||
 	    pci_set_consistent_dma_mask(pci, 0x00ffffff) < 0) {
 		snd_printk("architecture does not support 24bit PCI busmaster DMA\n");
+		pci_disable_device(pci);
 		return -ENXIO;
 	}
 
-	if ((err = pci_request_regions(pci, "ALS4000")) < 0)
+	if ((err = pci_request_regions(pci, "ALS4000")) < 0) {
+		pci_disable_device(pci);
 		return err;
+	}
 	gcr = pci_resource_start(pci, 0);
 
 	pci_read_config_word(pci, PCI_COMMAND, &word);
@@ -628,6 +631,7 @@ static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
 			    sizeof( snd_card_als4000_t ) );
 	if (card == NULL) {
 		pci_release_regions(pci);
+		pci_disable_device(pci);
 		return -ENOMEM;
 	}
 

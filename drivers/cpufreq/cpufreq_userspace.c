@@ -68,12 +68,14 @@
  */
 static unsigned int	cpu_max_freq[NR_CPUS];
 static unsigned int	cpu_min_freq[NR_CPUS];
-static unsigned int	cpu_cur_freq[NR_CPUS];
+static unsigned int	cpu_cur_freq[NR_CPUS]; /* current CPU freq */
+static unsigned int	cpu_set_freq[NR_CPUS]; /* CPU freq desired by userspace */
 static unsigned int	cpu_is_managed[NR_CPUS];
 static struct cpufreq_policy current_policy[NR_CPUS];
 
 static DECLARE_MUTEX	(userspace_sem); 
 
+#define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_GOVERNOR, "userspace", msg)
 
 /* keep track of frequency transitions */
 static int 
@@ -82,13 +84,7 @@ userspace_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 {
         struct cpufreq_freqs *freq = data;
 
-	/* Don't update cur_freq if CPU is managed and we're
-	 * waking up: else we won't remember what frequency 
-	 * we need to set the CPU to.
-	 */
-	if (cpu_is_managed[freq->cpu] && (val == CPUFREQ_RESUMECHANGE))
-		return 0;
-
+	dprintk("saving cpu_cur_freq of cpu %u to be %u kHz\n", freq->cpu, freq->new);
 	cpu_cur_freq[freq->cpu] = freq->new;
 
         return 0;
@@ -100,19 +96,23 @@ static struct notifier_block userspace_cpufreq_notifier_block = {
 
 
 /** 
- * cpufreq_set - set the CPU frequency
+ * _cpufreq_set - set the CPU frequency
  * @freq: target frequency in kHz
  * @cpu: CPU for which the frequency is to be set
  *
  * Sets the CPU frequency to freq.
  */
-int cpufreq_set(unsigned int freq, unsigned int cpu)
+static int _cpufreq_set(unsigned int freq, unsigned int cpu)
 {
 	int ret = -EINVAL;
+
+	dprintk("_cpufreq_set for cpu %u, freq %u kHz\n", cpu, freq);
 
 	down(&userspace_sem);
 	if (!cpu_is_managed[cpu])
 		goto err;
+
+	cpu_set_freq[cpu] = freq;
 
 	if (freq < cpu_min_freq[cpu])
 		freq = cpu_min_freq[cpu];
@@ -133,6 +133,18 @@ int cpufreq_set(unsigned int freq, unsigned int cpu)
 	up(&userspace_sem);
 	return ret;
 }
+
+
+#ifdef CONFIG_CPU_FREQ_24_API
+
+#warning The /proc/sys/cpu/ and sysctl interface to cpufreq will be removed from the 2.6. kernel series soon after 2005-01-01
+
+static unsigned int warning_print = 0;
+
+int __deprecated cpufreq_set(unsigned int freq, unsigned int cpu)
+{
+	return _cpufreq_set(freq, cpu);
+}
 EXPORT_SYMBOL_GPL(cpufreq_set);
 
 
@@ -143,20 +155,13 @@ EXPORT_SYMBOL_GPL(cpufreq_set);
  * Sets the CPU frequency to the maximum frequency supported by
  * this CPU.
  */
-int cpufreq_setmax(unsigned int cpu)
+int __deprecated cpufreq_setmax(unsigned int cpu)
 {
 	if (!cpu_is_managed[cpu] || !cpu_online(cpu))
 		return -EINVAL;
-	return cpufreq_set(cpu_max_freq[cpu], cpu);
+	return _cpufreq_set(cpu_max_freq[cpu], cpu);
 }
 EXPORT_SYMBOL_GPL(cpufreq_setmax);
-
-
-#ifdef CONFIG_CPU_FREQ_24_API
-
-#warning The /proc/sys/cpu/ and sysctl interface to cpufreq will be removed from the 2.6. kernel series soon after 2005-01-01
-
-static unsigned int warning_print = 0;
 
 /*********************** cpufreq_sysctl interface ********************/
 static int
@@ -190,7 +195,7 @@ cpufreq_procctl(ctl_table *ctl, int write, struct file *filp,
 		buf[sizeof(buf) - 1] = '\0';
 
 		freq = simple_strtoul(buf, &p, 0);
-		cpufreq_set(freq, cpu);
+		_cpufreq_set(freq, cpu);
 	} else {
 		len = sprintf(buf, "%d\n", cpufreq_get(cpu));
 		if (len > left)
@@ -243,7 +248,7 @@ cpufreq_sysctl(ctl_table *table, int __user *name, int nlen,
 		if (get_user(freq, (unsigned int __user *)newval))
 			return -EFAULT;
 
-		cpufreq_set(freq, cpu);
+		_cpufreq_set(freq, cpu);
 	}
 	return 1;
 }
@@ -464,7 +469,7 @@ static ctl_table ctl_cpu[2] = {
 	}
 };
 
-struct ctl_table_header *cpufreq_sysctl_table;
+static struct ctl_table_header *cpufreq_sysctl_table;
 
 static inline void cpufreq_sysctl_init(void)
 {
@@ -498,13 +503,14 @@ store_speed (struct cpufreq_policy *policy, const char *buf, size_t count)
 	if (ret != 1)
 		return -EINVAL;
 
-	cpufreq_set(freq, policy->cpu);
+	_cpufreq_set(freq, policy->cpu);
 
 	return count;
 }
 
-static struct freq_attr freq_attr_scaling_setspeed = {
-	.attr = { .name = "scaling_setspeed", .mode = 0644 },
+static struct freq_attr freq_attr_scaling_setspeed = 
+{
+	.attr = { .name = "scaling_setspeed", .mode = 0644, .owner = THIS_MODULE },
 	.show = show_speed,
 	.store = store_speed,
 };
@@ -515,7 +521,7 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 	unsigned int cpu = policy->cpu;
 	switch (event) {
 	case CPUFREQ_GOV_START:
-		if ((!cpu_online(cpu)) || (!try_module_get(THIS_MODULE)))
+		if (!cpu_online(cpu))
 			return -EINVAL;
 		BUG_ON(!policy->cur);
 		down(&userspace_sem);
@@ -523,8 +529,10 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 		cpu_min_freq[cpu] = policy->min;
 		cpu_max_freq[cpu] = policy->max;
 		cpu_cur_freq[cpu] = policy->cur;
+		cpu_set_freq[cpu] = policy->cur;
 		sysfs_create_file (&policy->kobj, &freq_attr_scaling_setspeed.attr);
 		memcpy (&current_policy[cpu], policy, sizeof(struct cpufreq_policy));
+		dprintk("managing cpu %u started (%u - %u kHz, currently %u kHz)\n", cpu, cpu_min_freq[cpu], cpu_max_freq[cpu], cpu_cur_freq[cpu]);
 		up(&userspace_sem);
 		break;
 	case CPUFREQ_GOV_STOP:
@@ -532,23 +540,26 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 		cpu_is_managed[cpu] = 0;
 		cpu_min_freq[cpu] = 0;
 		cpu_max_freq[cpu] = 0;
+		cpu_set_freq[cpu] = 0;
 		sysfs_remove_file (&policy->kobj, &freq_attr_scaling_setspeed.attr);
+		dprintk("managing cpu %u stopped\n", cpu);
 		up(&userspace_sem);
-		module_put(THIS_MODULE);
 		break;
 	case CPUFREQ_GOV_LIMITS:
 		down(&userspace_sem);
 		cpu_min_freq[cpu] = policy->min;
 		cpu_max_freq[cpu] = policy->max;
-		if (policy->max < cpu_cur_freq[cpu])
+		dprintk("limit event for cpu %u: %u - %u kHz, currently %u kHz, last set to %u kHz\n", cpu, cpu_min_freq[cpu], cpu_max_freq[cpu], cpu_cur_freq[cpu], cpu_set_freq[cpu]);
+		if (policy->max < cpu_set_freq[cpu]) {
 			__cpufreq_driver_target(&current_policy[cpu], policy->max, 
 			      CPUFREQ_RELATION_H);
-		else if (policy->min > cpu_cur_freq[cpu])
+		} else if (policy->min > cpu_set_freq[cpu]) {
 			__cpufreq_driver_target(&current_policy[cpu], policy->min, 
 			      CPUFREQ_RELATION_L);
-		else
-			__cpufreq_driver_target(&current_policy[cpu], cpu_cur_freq[cpu],
+		} else {
+			__cpufreq_driver_target(&current_policy[cpu], cpu_set_freq[cpu],
 			      CPUFREQ_RELATION_L);
+		}
 		memcpy (&current_policy[cpu], policy, sizeof(struct cpufreq_policy));
 		up(&userspace_sem);
 		break;

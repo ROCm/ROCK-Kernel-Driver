@@ -1,9 +1,9 @@
 /*
  * Flash memory access on Alchemy Db1xxx boards
  * 
- * $Id: db1x00-flash.c,v 1.3 2004/07/14 17:45:40 dwmw2 Exp $
+ * $Id: db1x00-flash.c,v 1.6 2004/11/04 13:24:14 gleixner Exp $
  *
- * (C) 2003 Pete Popov <ppopov@pacbell.net>
+ * (C) 2003 Pete Popov <ppopov@embeddedalley.com>
  * 
  */
 
@@ -18,8 +18,6 @@
 #include <linux/mtd/partitions.h>
 
 #include <asm/io.h>
-#include <asm/au1000.h>
-#include <asm/db1x00.h>
 
 #ifdef 	DEBUG_RW
 #define	DBG(x...)	printk(x)
@@ -27,11 +25,20 @@
 #define	DBG(x...)	
 #endif
 
+/* MTD CONFIG OPTIONS */
+#if defined(CONFIG_MTD_DB1X00_BOOT) && defined(CONFIG_MTD_DB1X00_USER)
+#define DB1X00_BOTH_BANKS
+#elif defined(CONFIG_MTD_DB1X00_BOOT) && !defined(CONFIG_MTD_DB1X00_USER)
+#define DB1X00_BOOT_ONLY
+#elif !defined(CONFIG_MTD_DB1X00_BOOT) && defined(CONFIG_MTD_DB1X00_USER)
+#define DB1X00_USER_ONLY
+#endif
+
 static unsigned long window_addr;
 static unsigned long window_size;
 static unsigned long flash_size;
 
-static BCSR * const bcsr = (BCSR *)0xAE000000;
+static unsigned short *bcsr = (unsigned short *)0xAE000000;
 static unsigned char flash_bankwidth = 4;
 
 /* 
@@ -113,7 +120,7 @@ static struct mtd_info *db1xxx_mtd;
  */
 int setup_flash_params(void)
 {
-	switch ((bcsr->status >> 14) & 0x3) {
+	switch ((bcsr[2] >> 14) & 0x3) {
 		case 0: /* 64Mbit devices */
 			flash_size = 0x800000; /* 8MB per part */
 #if defined(DB1X00_BOTH_BANKS)
@@ -192,7 +199,7 @@ int __init db1x00_mtd_init(void)
 	 */
 	printk(KERN_NOTICE "Db1xxx flash: probing %d-bit flash bus\n", 
 			db1xxx_mtd_map.bankwidth*8);
-	db1xxx_mtd_map.virt = (unsigned long)ioremap(window_addr, window_size);
+	db1xxx_mtd_map.virt = ioremap(window_addr, window_size);
 	db1xxx_mtd = do_map_probe("cfi_probe", &db1xxx_mtd_map);
 	if (!db1xxx_mtd) return -ENXIO;
 	db1xxx_mtd->owner = THIS_MODULE;

@@ -335,7 +335,7 @@ struct scsi_cmnd;
 /* Software state for the driver. */
 struct qlogicpti {
 	/* These are the hot elements in the cache, so they come first. */
-	unsigned long             qregs;                /* Adapter registers          */
+	void __iomem             *qregs;                /* Adapter registers          */
 	struct pti_queue_entry   *res_cpu;              /* Ptr to RESPONSE bufs (CPU) */
 	struct pti_queue_entry   *req_cpu;              /* Ptr to REQUEST bufs (CPU)  */
 
@@ -370,7 +370,7 @@ struct qlogicpti {
 	struct	host_param        host_param;
 	struct	dev_param         dev_param[MAX_TARGETS];
 
-	unsigned long             sreg;
+	void __iomem              *sreg;
 #define SREG_TPOWER               0x80   /* State of termpwr           */
 #define SREG_FUSE                 0x40   /* State of on board fuse     */
 #define SREG_PDISAB               0x20   /* Disable state for power on */

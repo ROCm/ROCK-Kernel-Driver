@@ -124,15 +124,6 @@ static inline int ip_select_ttl(struct inet_opt *inet, struct dst_entry *dst)
 	return ttl;
 }
 
-#ifdef CONFIG_NETFILTER
-/* out-of-line copy is only required with netfilter */
-int ip_dst_output(struct sk_buff *skb)
-{
-	return NF_HOOK_COND(PF_INET, NF_IP_POST_ROUTING, skb, NULL,
-	                    skb->dst->dev, dst_output, skb->dst->xfrm != NULL);
-}
-#endif
-
 /* 
  *		Add an ip header to a skbuff and send it out.
  *
@@ -175,7 +166,7 @@ int ip_build_and_send_pkt(struct sk_buff *skb, struct sock *sk,
 
 	/* Send it out. */
 	return NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
-		       ip_dst_output);
+		       dst_output);
 }
 
 static inline int ip_finish_output2(struct sk_buff *skb)
@@ -233,9 +224,8 @@ int ip_finish_output(struct sk_buff *skb)
 		       ip_finish_output2);
 }
 
-int ip_mc_output(struct sk_buff **pskb)
+int ip_mc_output(struct sk_buff *skb)
 {
-	struct sk_buff *skb = *pskb;
 	struct sock *sk = skb->sk;
 	struct rtable *rt = (struct rtable*)skb->dst;
 	struct net_device *dev = rt->u.dst.dev;
@@ -266,7 +256,7 @@ int ip_mc_output(struct sk_buff **pskb)
 		    && ((rt->rt_flags&RTCF_LOCAL) || !(IPCB(skb)->flags&IPSKB_FORWARDED))
 #endif
 		) {
-			struct sk_buff *newskb = skb_copy(skb, GFP_ATOMIC);
+			struct sk_buff *newskb = skb_clone(skb, GFP_ATOMIC);
 			if (newskb)
 				NF_HOOK(PF_INET, NF_IP_POST_ROUTING, newskb, NULL,
 					newskb->dev, 
@@ -282,38 +272,26 @@ int ip_mc_output(struct sk_buff **pskb)
 	}
 
 	if (rt->rt_flags&RTCF_BROADCAST) {
-		struct sk_buff *newskb = skb_copy(skb, GFP_ATOMIC);
+		struct sk_buff *newskb = skb_clone(skb, GFP_ATOMIC);
 		if (newskb)
 			NF_HOOK(PF_INET, NF_IP_POST_ROUTING, newskb, NULL,
 				newskb->dev, ip_dev_loopback_xmit);
 	}
 
-	if (skb->len > dst_pmtu(&rt->u.dst) || skb_shinfo(skb)->frag_list)
+	if (skb->len > dst_pmtu(&rt->u.dst))
 		return ip_fragment(skb, ip_finish_output);
 	else
 		return ip_finish_output(skb);
 }
 
-static inline int ip_output2(struct sk_buff *skb)
+int ip_output(struct sk_buff *skb)
 {
 	IP_INC_STATS(IPSTATS_MIB_OUTREQUESTS);
 
-	if ((skb->len > dst_pmtu(skb->dst) || skb_shinfo(skb)->frag_list) &&
-	    !skb_shinfo(skb)->tso_size)
+	if (skb->len > dst_pmtu(skb->dst) && !skb_shinfo(skb)->tso_size)
 		return ip_fragment(skb, ip_finish_output);
 	else
 		return ip_finish_output(skb);
-}
-
-int ip_output(struct sk_buff **pskb)
-{
-	struct sk_buff *skb = *pskb;
-	int transformed = IPCB(skb)->flags & IPSKB_XFRM_TRANSFORMED;
-
-	if (transformed)
-		nf_reset(skb);
-	return NF_HOOK_COND(PF_INET, NF_IP_LOCAL_OUT, skb, NULL,
-	                    skb->dst->dev, ip_output2, transformed);
 }
 
 int ip_queue_xmit(struct sk_buff *skb, int ipfragok)
@@ -323,7 +301,6 @@ int ip_queue_xmit(struct sk_buff *skb, int ipfragok)
 	struct ip_options *opt = inet->opt;
 	struct rtable *rt;
 	struct iphdr *iph;
-	u32 mtu;
 
 	/* Skip all of this if the packet is already routed,
 	 * f.e. by something like SCTP.
@@ -384,21 +361,9 @@ packet_routed:
 	skb->nh.iph   = iph;
 	/* Transport layer set skb->h.foo itself. */
 
-	if(opt && opt->optlen) {
+	if (opt && opt->optlen) {
 		iph->ihl += opt->optlen >> 2;
 		ip_options_build(skb, opt, inet->daddr, rt, 0);
-	}
-
-	mtu = dst_pmtu(&rt->u.dst);
-	if (skb->len > mtu && (sk->sk_route_caps & NETIF_F_TSO)) {
-		unsigned int hlen;
-
-		/* Hack zone: all this must be done by TCP. */
-		hlen = ((skb->h.raw - skb->data) + (skb->h.th->doff << 2));
-		skb_shinfo(skb)->tso_size = mtu - hlen;
-		skb_shinfo(skb)->tso_segs =
-			(skb->len - hlen + skb_shinfo(skb)->tso_size - 1)/
-				skb_shinfo(skb)->tso_size - 1;
 	}
 
 	ip_select_ident_more(iph, &rt->u.dst, sk, skb_shinfo(skb)->tso_segs);
@@ -409,7 +374,7 @@ packet_routed:
 	skb->priority = sk->sk_priority;
 
 	return NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
-		       ip_dst_output);
+		       dst_output);
 
 no_route:
 	IP_INC_STATS(IPSTATS_MIB_OUTNOROUTES);
@@ -440,6 +405,7 @@ static void ip_copy_metadata(struct sk_buff *to, struct sk_buff *from)
 	nf_conntrack_put(to->nfct);
 	to->nfct = from->nfct;
 	nf_conntrack_get(to->nfct);
+	to->nfctinfo = from->nfctinfo;
 #ifdef CONFIG_BRIDGE_NETFILTER
 	nf_bridge_put(to->nf_bridge);
 	to->nf_bridge = from->nf_bridge;
@@ -1221,7 +1187,7 @@ int ip_push_pending_frames(struct sock *sk)
 
 	/* Netfilter gets whole the not fragmented skb. */
 	err = NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, 
-		      skb->dst->dev, ip_dst_output);
+		      skb->dst->dev, dst_output);
 	if (err) {
 		if (err > 0)
 			err = inet->recverr ? net_xmit_errno(err) : 0;

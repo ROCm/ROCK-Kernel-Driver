@@ -133,7 +133,7 @@ struct video_channel
 #define VIDEO_VC_AUDIO		2	/* Channel has audio */
 	__u16  type;
 #define VIDEO_TYPE_TV		1
-#define VIDEO_TYPE_CAMERA	2	
+#define VIDEO_TYPE_CAMERA	2
 	__u16 norm;			/* Norm set by channel */
 };
 
@@ -172,7 +172,7 @@ struct video_picture
 #define VIDEO_PALETTE_HI240	2	/* High 240 cube (BT848) */
 #define VIDEO_PALETTE_RGB565	3	/* 565 16 bit RGB */
 #define VIDEO_PALETTE_RGB24	4	/* 24bit RGB */
-#define VIDEO_PALETTE_RGB32	5	/* 32bit RGB */	
+#define VIDEO_PALETTE_RGB32	5	/* 32bit RGB */
 #define VIDEO_PALETTE_RGB555	6	/* 555 15bit RGB */
 #define VIDEO_PALETTE_YUV422	7	/* YUV422 capture */
 #define VIDEO_PALETTE_YUYV	8
@@ -198,7 +198,7 @@ struct video_audio
 #define VIDEO_AUDIO_MUTABLE	2
 #define VIDEO_AUDIO_VOLUME	4
 #define VIDEO_AUDIO_BASS	8
-#define VIDEO_AUDIO_TREBLE	16	
+#define VIDEO_AUDIO_TREBLE	16
 #define VIDEO_AUDIO_BALANCE	32
 	char    name[16];
 #define VIDEO_SOUND_MONO	1
@@ -272,11 +272,11 @@ struct video_mbuf
 	int	frames;		/* Frames */
 	int	offsets[VIDEO_MAX_FRAME];
 };
-	
+
 
 #define 	VIDEO_NO_UNIT	(-1)
 
-	
+
 struct video_unit
 {
 	int 	video;		/* Video minor */
@@ -373,7 +373,7 @@ struct video_code
 	/* p1: = VIDEO_MODE_PAL, VIDEO_MODE_NTSC, etc ... */
 #define VID_PLAY_GENLOCK		1
 	/* p1: 0 = OFF, 1 = ON */
-	/* p2: GENLOCK FINE DELAY value */ 
+	/* p2: GENLOCK FINE DELAY value */
 #define VID_PLAY_NORMAL			2
 #define VID_PLAY_PAUSE			3
 #define VID_PLAY_SINGLE_FRAME		4
@@ -421,7 +421,7 @@ struct video_code
 #define VID_HARDWARE_CPIA	24
 #define VID_HARDWARE_ZR36120	25	/* Zoran ZR36120/ZR36125 */
 #define VID_HARDWARE_ZR36067	26	/* Zoran ZR36067/36060 */
-#define VID_HARDWARE_OV511	27	
+#define VID_HARDWARE_OV511	27
 #define VID_HARDWARE_ZR356700	28	/* Zoran 36700 series */
 #define VID_HARDWARE_W9966	29
 #define VID_HARDWARE_SE401	30	/* SE401 USB webcams */
@@ -433,6 +433,7 @@ struct video_code
 #define VID_HARDWARE_W9968CF	36
 #define VID_HARDWARE_SAA7114H   37
 #define VID_HARDWARE_SN9C102	38
+#define VID_HARDWARE_ARV	39
 #endif /* __LINUX_VIDEODEV_H */
 
 /*

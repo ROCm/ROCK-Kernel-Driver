@@ -139,7 +139,7 @@ int class_register(struct class * cls)
 
 	INIT_LIST_HEAD(&cls->children);
 	INIT_LIST_HEAD(&cls->interfaces);
-	error = kobject_set_name(&cls->subsys.kset.kobj, cls->name);
+	error = kobject_set_name(&cls->subsys.kset.kobj, "%s", cls->name);
 	if (error)
 		return error;
 
@@ -283,8 +283,40 @@ static int class_hotplug(struct kset *kset, struct kobject *kobj, char **envp,
 {
 	struct class_device *class_dev = to_class_dev(kobj);
 	int retval = 0;
+	int i = 0;
+	int length = 0;
 
 	pr_debug("%s - name = %s\n", __FUNCTION__, class_dev->class_id);
+
+	if (class_dev->dev) {
+		/* add physical device, backing this device  */
+		struct device *dev = class_dev->dev;
+		char *path = kobject_get_path(&dev->kobj, GFP_KERNEL);
+
+		add_hotplug_env_var(envp, num_envp, &i, buffer, buffer_size,
+				    &length, "PHYSDEVPATH=%s", path);
+		kfree(path);
+
+		/* add bus name of physical device */
+		if (dev->bus)
+			add_hotplug_env_var(envp, num_envp, &i,
+					    buffer, buffer_size, &length,
+					    "PHYSDEVBUS=%s", dev->bus->name);
+
+		/* add driver name of physical device */
+		if (dev->driver)
+			add_hotplug_env_var(envp, num_envp, &i,
+					    buffer, buffer_size, &length,
+					    "PHYSDEVDRIVER=%s", dev->driver->name);
+
+		/* terminate, set to next free slot, shrink available space */
+		envp[i] = NULL;
+		envp = &envp[i];
+		num_envp -= i;
+		buffer = &buffer[length];
+		buffer_size -= length;
+	}
+
 	if (class_dev->class->hotplug) {
 		/* have the bus specific function add its stuff */
 		retval = class_dev->class->hotplug (class_dev, envp, num_envp,
@@ -368,7 +400,7 @@ int class_device_add(struct class_device *class_dev)
 		 class_dev->class_id);
 
 	/* first, register with generic layer. */
-	kobject_set_name(&class_dev->kobj, class_dev->class_id);
+	kobject_set_name(&class_dev->kobj, "%s", class_dev->class_id);
 	if (parent)
 		class_dev->kobj.parent = &parent->subsys.kset.kobj;
 
@@ -528,22 +560,22 @@ int __init classes_init(void)
 	return 0;
 }
 
-EXPORT_SYMBOL(class_create_file);
-EXPORT_SYMBOL(class_remove_file);
-EXPORT_SYMBOL(class_register);
-EXPORT_SYMBOL(class_unregister);
-EXPORT_SYMBOL(class_get);
-EXPORT_SYMBOL(class_put);
+EXPORT_SYMBOL_GPL(class_create_file);
+EXPORT_SYMBOL_GPL(class_remove_file);
+EXPORT_SYMBOL_GPL(class_register);
+EXPORT_SYMBOL_GPL(class_unregister);
+EXPORT_SYMBOL_GPL(class_get);
+EXPORT_SYMBOL_GPL(class_put);
 
-EXPORT_SYMBOL(class_device_register);
-EXPORT_SYMBOL(class_device_unregister);
-EXPORT_SYMBOL(class_device_initialize);
-EXPORT_SYMBOL(class_device_add);
-EXPORT_SYMBOL(class_device_del);
-EXPORT_SYMBOL(class_device_get);
-EXPORT_SYMBOL(class_device_put);
-EXPORT_SYMBOL(class_device_create_file);
-EXPORT_SYMBOL(class_device_remove_file);
+EXPORT_SYMBOL_GPL(class_device_register);
+EXPORT_SYMBOL_GPL(class_device_unregister);
+EXPORT_SYMBOL_GPL(class_device_initialize);
+EXPORT_SYMBOL_GPL(class_device_add);
+EXPORT_SYMBOL_GPL(class_device_del);
+EXPORT_SYMBOL_GPL(class_device_get);
+EXPORT_SYMBOL_GPL(class_device_put);
+EXPORT_SYMBOL_GPL(class_device_create_file);
+EXPORT_SYMBOL_GPL(class_device_remove_file);
 
-EXPORT_SYMBOL(class_interface_register);
-EXPORT_SYMBOL(class_interface_unregister);
+EXPORT_SYMBOL_GPL(class_interface_register);
+EXPORT_SYMBOL_GPL(class_interface_unregister);

@@ -15,7 +15,8 @@
 #include <linux/pm.h>
 #include <linux/init.h>
 #include <linux/sched.h>
-#include <linux/interrupt.h>
+#include <linux/device.h>
+#include <linux/serial_8250.h>
 
 #include <asm/elf.h>
 #include <asm/io.h>
@@ -66,11 +67,11 @@ __tagtable(ATAG_ACORN, parse_tag_acorn);
 
 static struct map_desc rpc_io_desc[] __initdata = {
  { SCREEN_BASE,	SCREEN_START,	2*1048576, MT_DEVICE }, /* VRAM		*/
- { IO_BASE,	IO_START,	IO_SIZE	 , MT_DEVICE }, /* IO space		*/
+ { IO_BASE,	IO_START,	IO_SIZE	 , MT_DEVICE }, /* IO space	*/
  { EASI_BASE,	EASI_START,	EASI_SIZE, MT_DEVICE }  /* EASI space	*/
 };
 
-void __init rpc_map_io(void)
+static void __init rpc_map_io(void)
 {
 	iotable_init(rpc_io_desc, ARRAY_SIZE(rpc_io_desc));
 
@@ -85,30 +86,86 @@ void __init rpc_map_io(void)
 	elf_hwcap &= ~HWCAP_HALF;
 }
 
-static irqreturn_t
-rpc_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
-{
-	timer_tick(regs);
-
-	return IRQ_HANDLED;
-}
-
-static struct irqaction rpc_timer_irq = {
-	.name		= "RiscPC Timer Tick",
-	.flags		= SA_INTERRUPT,
-	.handler	= rpc_timer_interrupt
+static struct resource acornfb_resources[] = {
+	{	/* VIDC */
+		.start		= 0x03400000,
+		.end		= 0x035fffff,
+		.flags		= IORESOURCE_MEM,
+	}, {
+		.start		= IRQ_VSYNCPULSE,
+		.end		= IRQ_VSYNCPULSE,
+		.flags		= IORESOURCE_IRQ,
+	},
 };
 
-/*
- * Set up timer interrupt.
- */
-void __init rpc_init_time(void)
-{
-	extern void ioctime_init(void);
-	ioctime_init();
+static struct platform_device acornfb_device = {
+	.name			= "acornfb",
+	.id			= -1,
+	.dev			= {
+		.coherent_dma_mask = 0xffffffff,
+	},
+	.num_resources		= ARRAY_SIZE(acornfb_resources),
+	.resource		= acornfb_resources,
+};
 
-	setup_irq(IRQ_TIMER, &rpc_timer_irq);
+static struct resource iomd_resources[] = {
+	{
+		.start		= 0x03200000,
+		.end		= 0x0320ffff,
+		.flags		= IORESOURCE_MEM,
+	},
+};
+
+static struct platform_device iomd_device = {
+	.name			= "iomd",
+	.id			= -1,
+	.num_resources		= ARRAY_SIZE(iomd_resources),
+	.resource		= iomd_resources,
+};
+
+static struct platform_device kbd_device = {
+	.name			= "kart",
+	.id			= -1,
+	.dev			= {
+		.parent 	= &iomd_device.dev,
+	},
+};
+
+static struct plat_serial8250_port serial_platform_data[] = {
+	{
+		.mapbase	= 0x03010fe0,
+		.irq		= 10,
+		.uartclk	= 1843200,
+		.regshift	= 2,
+		.iotype		= UPIO_MEM,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_IOREMAP | UPF_SKIP_TEST,
+	},
+	{ },
+};
+
+static struct platform_device serial_device = {
+	.name			= "serial8250",
+	.id			= 0,
+	.dev			= {
+		.platform_data	= serial_platform_data,
+	},
+};
+
+static struct platform_device *devs[] __initdata = {
+	&iomd_device,
+	&kbd_device,
+	&serial_device,
+	&acornfb_device,
+};
+
+static int __init rpc_init(void)
+{
+	return platform_add_devices(devs, ARRAY_SIZE(devs));
 }
+
+arch_initcall(rpc_init);
+
+extern struct sys_timer ioc_timer;
 
 MACHINE_START(RISCPC, "Acorn-RiscPC")
 	MAINTAINER("Russell King")
@@ -118,5 +175,5 @@ MACHINE_START(RISCPC, "Acorn-RiscPC")
 	DISABLE_PARPORT(1)
 	MAPIO(rpc_map_io)
 	INITIRQ(rpc_init_irq)
-	INITTIME(rpc_init_time)
+	.timer		= &ioc_timer,
 MACHINE_END

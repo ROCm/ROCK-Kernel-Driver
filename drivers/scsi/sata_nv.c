@@ -44,14 +44,12 @@
 #include <linux/libata.h>
 
 #define DRV_NAME			"sata_nv"
-#define DRV_VERSION			"0.03"
+#define DRV_VERSION			"0.5"
 
 #define NV_PORTS			2
 #define NV_PIO_MASK			0x1f
 #define NV_MWDMA_MASK			0x07
 #define NV_UDMA_MASK			0x7f
-#define NV_PORT0_BMDMA_REG_OFFSET	0x00
-#define NV_PORT1_BMDMA_REG_OFFSET	0x08
 #define NV_PORT0_SCR_REG_OFFSET		0x00
 #define NV_PORT1_SCR_REG_OFFSET		0x40
 
@@ -187,7 +185,7 @@ static Scsi_Host_Template nv_sht = {
 	.eh_strategy_handler	= ata_scsi_error,
 	.can_queue		= ATA_DEF_QUEUE,
 	.this_id		= ATA_SHT_THIS_ID,
-	.sg_tablesize		= ATA_MAX_PRD,
+	.sg_tablesize		= LIBATA_MAX_PRD,
 	.max_sectors		= ATA_MAX_SECTORS,
 	.cmd_per_lun		= ATA_SHT_CMD_PER_LUN,
 	.emulated		= ATA_SHT_EMULATED,
@@ -200,13 +198,14 @@ static Scsi_Host_Template nv_sht = {
 
 static struct ata_port_operations nv_ops = {
 	.port_disable		= ata_port_disable,
-	.tf_load		= ata_tf_load_pio,
-	.tf_read		= ata_tf_read_pio,
-	.exec_command		= ata_exec_command_pio,
-	.check_status		= ata_check_status_pio,
+	.tf_load		= ata_tf_load,
+	.tf_read		= ata_tf_read,
+	.exec_command		= ata_exec_command,
+	.check_status		= ata_check_status,
+	.dev_select		= ata_std_dev_select,
 	.phy_reset		= sata_phy_reset,
-	.bmdma_setup		= ata_bmdma_setup_pio,
-	.bmdma_start		= ata_bmdma_start_pio,
+	.bmdma_setup		= ata_bmdma_setup,
+	.bmdma_start		= ata_bmdma_start,
 	.qc_prep		= ata_qc_prep,
 	.qc_issue		= ata_qc_issue_prot,
 	.eng_timeout		= ata_eng_timeout,
@@ -219,10 +218,23 @@ static struct ata_port_operations nv_ops = {
 	.host_stop		= nv_host_stop,
 };
 
+static struct ata_port_info nv_port_info = {
+	.sht		= &nv_sht,
+	.host_flags	= ATA_FLAG_SATA |
+			  ATA_FLAG_SATA_RESET |
+			  ATA_FLAG_SRST |
+			  ATA_FLAG_NO_LEGACY,
+	.pio_mask	= NV_PIO_MASK,
+	.mwdma_mask	= NV_MWDMA_MASK,
+	.udma_mask	= NV_UDMA_MASK,
+	.port_ops	= &nv_ops,
+};
+
 MODULE_AUTHOR("NVIDIA");
 MODULE_DESCRIPTION("low-level driver for NVIDIA nForce SATA controller");
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, nv_pci_tbl);
+MODULE_VERSION(DRV_VERSION);
 
 irqreturn_t nv_interrupt (int irq, void *dev_instance, struct pt_regs *regs)
 {
@@ -299,7 +311,8 @@ static int nv_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	static int printed_version = 0;
 	struct nv_host *host;
-	struct ata_probe_ent *probe_ent = NULL;
+	struct ata_port_info *ppi;
+	struct ata_probe_ent *probe_ent;
 	int rc;
 
 	if (!printed_version++)
@@ -307,11 +320,11 @@ static int nv_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	rc = pci_enable_device(pdev);
 	if (rc)
-		return rc;
+		goto err_out;
 
 	rc = pci_request_regions(pdev, DRV_NAME);
 	if (rc)
-		goto err_out;
+		goto err_out_disable;
 
 	rc = pci_set_dma_mask(pdev, ATA_DMA_MASK);
 	if (rc)
@@ -320,53 +333,18 @@ static int nv_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (rc)
 		goto err_out_regions;
 
-	probe_ent = kmalloc(sizeof(*probe_ent), GFP_KERNEL);
-	if (!probe_ent) {
-		rc = -ENOMEM;
+	rc = -ENOMEM;
+
+	ppi = &nv_port_info;
+	probe_ent = ata_pci_init_native_mode(pdev, &ppi);
+	if (!probe_ent)
 		goto err_out_regions;
-	}
 
 	host = kmalloc(sizeof(struct nv_host), GFP_KERNEL);
-	if (!host) {
-		rc = -ENOMEM;
+	if (!host)
 		goto err_out_free_ent;
-	}
 
 	host->host_desc = &nv_device_tbl[ent->driver_data];
-
-	memset(probe_ent, 0, sizeof(*probe_ent));
-	INIT_LIST_HEAD(&probe_ent->node);
-
-	probe_ent->pdev = pdev;
-	probe_ent->sht = &nv_sht;
-	probe_ent->host_flags = ATA_FLAG_SATA |
-				ATA_FLAG_SATA_RESET |
-				ATA_FLAG_SRST |
-				ATA_FLAG_NO_LEGACY;
-
-	probe_ent->port_ops = &nv_ops;
-	probe_ent->n_ports = NV_PORTS;
-	probe_ent->irq = pdev->irq;
-	probe_ent->irq_flags = SA_SHIRQ;
-	probe_ent->pio_mask = NV_PIO_MASK;
-	probe_ent->mwdma_mask = NV_MWDMA_MASK;
-	probe_ent->udma_mask = NV_UDMA_MASK;
-
-	probe_ent->port[0].cmd_addr = pci_resource_start(pdev, 0);
-	ata_std_ports(&probe_ent->port[0]);
-	probe_ent->port[0].altstatus_addr =
-	probe_ent->port[0].ctl_addr =
-		pci_resource_start(pdev, 1) | ATA_PCI_CTL_OFS;
-	probe_ent->port[0].bmdma_addr =
-		pci_resource_start(pdev, 4) | NV_PORT0_BMDMA_REG_OFFSET;
-
-	probe_ent->port[1].cmd_addr = pci_resource_start(pdev, 2);
-	ata_std_ports(&probe_ent->port[1]);
-	probe_ent->port[1].altstatus_addr =
-	probe_ent->port[1].ctl_addr =
-		pci_resource_start(pdev, 3) | ATA_PCI_CTL_OFS;
-	probe_ent->port[1].bmdma_addr =
-		pci_resource_start(pdev, 4) | NV_PORT1_BMDMA_REG_OFFSET;
 
 	probe_ent->private_data = host;
 
@@ -375,8 +353,10 @@ static int nv_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 		probe_ent->mmio_base = ioremap(pci_resource_start(pdev, 5),
 				pci_resource_len(pdev, 5));
-		if (probe_ent->mmio_base == NULL)
-			goto err_out_iounmap;
+		if (probe_ent->mmio_base == NULL) {
+			rc = -EIO;
+			goto err_out_free_host;
+		}
 
 		base = (unsigned long)probe_ent->mmio_base;
 
@@ -394,13 +374,13 @@ static int nv_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	pci_set_master(pdev);
 
-	// Enable hotplug event interrupts.
-	if (host->host_desc->enable_hotplug)
-		host->host_desc->enable_hotplug(probe_ent);
-
 	rc = ata_device_add(probe_ent);
 	if (rc != NV_PORTS)
 		goto err_out_iounmap;
+
+	// Enable hotplug event interrupts.
+	if (host->host_desc->enable_hotplug)
+		host->host_desc->enable_hotplug(probe_ent);
 
 	kfree(probe_ent);
 
@@ -409,15 +389,15 @@ static int nv_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 err_out_iounmap:
 	if (host->host_desc->host_flags & NV_HOST_FLAGS_SCR_MMIO)
 		iounmap(probe_ent->mmio_base);
-
+err_out_free_host:
+	kfree(host);
 err_out_free_ent:
 	kfree(probe_ent);
-
 err_out_regions:
 	pci_release_regions(pdev);
-
-err_out:
+err_out_disable:
 	pci_disable_device(pdev);
+err_out:
 	return rc;
 }
 
@@ -475,12 +455,13 @@ static void nv_check_hotplug(struct ata_host_set *host_set)
 
 static void nv_enable_hotplug_ck804(struct ata_probe_ent *probe_ent)
 {
+	struct pci_dev *pdev = to_pci_dev(probe_ent->dev);
 	u8 intr_mask;
 	u8 regval;
 
-	pci_read_config_byte(probe_ent->pdev, NV_MCP_SATA_CFG_20, &regval);
+	pci_read_config_byte(pdev, NV_MCP_SATA_CFG_20, &regval);
 	regval |= NV_MCP_SATA_CFG_20_SATA_SPACE_EN;
-	pci_write_config_byte(probe_ent->pdev, NV_MCP_SATA_CFG_20, regval);
+	pci_write_config_byte(pdev, NV_MCP_SATA_CFG_20, regval);
 
 	writeb(NV_INT_STATUS_HOTPLUG, probe_ent->mmio_base + NV_INT_STATUS_CK804);
 
@@ -492,6 +473,7 @@ static void nv_enable_hotplug_ck804(struct ata_probe_ent *probe_ent)
 
 static void nv_disable_hotplug_ck804(struct ata_host_set *host_set)
 {
+	struct pci_dev *pdev = to_pci_dev(host_set->dev);
 	u8 intr_mask;
 	u8 regval;
 
@@ -501,9 +483,9 @@ static void nv_disable_hotplug_ck804(struct ata_host_set *host_set)
 
 	writeb(intr_mask, host_set->mmio_base + NV_INT_ENABLE_CK804);
 
-	pci_read_config_byte(host_set->pdev, NV_MCP_SATA_CFG_20, &regval);
+	pci_read_config_byte(pdev, NV_MCP_SATA_CFG_20, &regval);
 	regval &= ~NV_MCP_SATA_CFG_20_SATA_SPACE_EN;
-	pci_write_config_byte(host_set->pdev, NV_MCP_SATA_CFG_20, regval);
+	pci_write_config_byte(pdev, NV_MCP_SATA_CFG_20, regval);
 }
 
 static void nv_check_hotplug_ck804(struct ata_host_set *host_set)

@@ -90,7 +90,7 @@ module_param(use_dma, uint, S_IRUGO);
 static void nuke(struct goku_ep *, int status);
 
 static inline void
-command(struct goku_udc_regs *regs, int command, unsigned epnum)
+command(struct goku_udc_regs __iomem *regs, int command, unsigned epnum)
 {
 	writel(COMMAND_EP(epnum) | command, &regs->Command);
 	udelay(300);
@@ -161,8 +161,8 @@ goku_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
 
 	/* ep1 and ep2 can do double buffering and/or dma */
 	if (ep->num < 3) {
-		struct goku_udc_regs	*regs = ep->dev->regs;
-		u32			tmp;
+		struct goku_udc_regs __iomem	*regs = ep->dev->regs;
+		u32				tmp;
 
 		/* double buffer except (for now) with pio in */
 		tmp = ((ep->dma || !ep->is_in)
@@ -191,7 +191,7 @@ goku_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
 	return 0;
 }
 
-static void ep_reset(struct goku_udc_regs *regs, struct goku_ep *ep)
+static void ep_reset(struct goku_udc_regs __iomem *regs, struct goku_ep *ep)
 {
 	struct goku_udc		*dev = ep->dev;
 
@@ -209,16 +209,16 @@ static void ep_reset(struct goku_udc_regs *regs, struct goku_ep *ep)
 		writel(dev->int_enable, &regs->int_enable);
 		readl(&regs->int_enable);
 		if (ep->num < 3) {
-			struct goku_udc_regs	*regs = ep->dev->regs;
-			u32			tmp;
+			struct goku_udc_regs __iomem	*r = ep->dev->regs;
+			u32				tmp;
 
-			tmp = readl(&regs->EPxSingle);
+			tmp = readl(&r->EPxSingle);
 			tmp &= ~(0x11 << ep->num);
-			writel(tmp, &regs->EPxSingle);
+			writel(tmp, &r->EPxSingle);
 
-			tmp = readl(&regs->EPxBCS);
+			tmp = readl(&r->EPxBCS);
 			tmp &= ~(0x11 << ep->num);
-			writel(tmp, &regs->EPxBCS);
+			writel(tmp, &r->EPxBCS);
 		}
 		/* reset dma in case we're still using it */
 		if (ep->dma) {
@@ -237,7 +237,7 @@ static void ep_reset(struct goku_udc_regs *regs, struct goku_ep *ep)
 	}
 
 	ep->ep.maxpacket = MAX_FIFO_SIZE;
-	ep->desc = 0;
+	ep->desc = NULL;
 	ep->stopped = 1;
 	ep->irqs = 0;
 	ep->dma = 0;
@@ -274,10 +274,10 @@ goku_alloc_request(struct usb_ep *_ep, int gfp_flags)
 	struct goku_request	*req;
 
 	if (!_ep)
-		return 0;
+		return NULL;
 	req = kmalloc(sizeof *req, gfp_flags);
 	if (!req)
-		return 0;
+		return NULL;
 
 	memset(req, 0, sizeof *req);
 	req->req.dma = DMA_ADDR_INVALID;
@@ -334,7 +334,7 @@ goku_alloc_buffer(struct usb_ep *_ep, unsigned bytes,
 
 	ep = container_of(_ep, struct goku_ep, ep);
 	if (!_ep)
-		return 0;
+		return NULL;
 	*dma = DMA_ADDR_INVALID;
 
 #if	defined(USE_KMALLOC)
@@ -413,7 +413,7 @@ done(struct goku_ep *ep, struct goku_request *req, int status)
 /*-------------------------------------------------------------------------*/
 
 static inline int
-write_packet(u32 *fifo, u8 *buf, struct goku_request *req, unsigned max)
+write_packet(u32 __iomem *fifo, u8 *buf, struct goku_request *req, unsigned max)
 {
 	unsigned	length, count;
 
@@ -488,10 +488,10 @@ static int write_fifo(struct goku_ep *ep, struct goku_request *req)
 
 static int read_fifo(struct goku_ep *ep, struct goku_request *req)
 {
-	struct goku_udc_regs	*regs;
-	u32			size, set;
-	u8			*buf;
-	unsigned		bufferspace, is_short, dbuff;
+	struct goku_udc_regs __iomem	*regs;
+	u32				size, set;
+	u8				*buf;
+	unsigned			bufferspace, is_short, dbuff;
 
 	regs = ep->dev->regs;
 top:
@@ -581,7 +581,8 @@ top:
 }
 
 static inline void
-pio_irq_enable(struct goku_udc *dev, struct goku_udc_regs *regs, int epnum)
+pio_irq_enable(struct goku_udc *dev,
+		struct goku_udc_regs __iomem *regs, int epnum)
 {
 	dev->int_enable |= INT_EPxDATASET (epnum);
 	writel(dev->int_enable, &regs->int_enable);
@@ -589,7 +590,8 @@ pio_irq_enable(struct goku_udc *dev, struct goku_udc_regs *regs, int epnum)
 }
 
 static inline void
-pio_irq_disable(struct goku_udc *dev, struct goku_udc_regs *regs, int epnum)
+pio_irq_disable(struct goku_udc *dev,
+		struct goku_udc_regs __iomem *regs, int epnum)
 {
 	dev->int_enable &= ~INT_EPxDATASET (epnum);
 	writel(dev->int_enable, &regs->int_enable);
@@ -613,10 +615,10 @@ pio_advance(struct goku_ep *ep)
 // return:  0 = q running, 1 = q stopped, negative = errno
 static int start_dma(struct goku_ep *ep, struct goku_request *req)
 {
-	struct goku_udc_regs	*regs = ep->dev->regs;
-	u32			master;
-	u32			start = req->req.dma;
-	u32			end = start + req->req.length - 1;
+	struct goku_udc_regs __iomem	*regs = ep->dev->regs;
+	u32				master;
+	u32				start = req->req.dma;
+	u32				end = start + req->req.length - 1;
 
 	master = readl(&regs->dma_master) & MST_RW_BITS;
 
@@ -668,9 +670,9 @@ static int start_dma(struct goku_ep *ep, struct goku_request *req)
 
 static void dma_advance(struct goku_udc *dev, struct goku_ep *ep)
 {
-	struct goku_request	*req;
-	struct goku_udc_regs	*regs = ep->dev->regs;
-	u32			master;
+	struct goku_request		*req;
+	struct goku_udc_regs __iomem	*regs = ep->dev->regs;
+	u32				master;
 
 	master = readl(&regs->dma_master);
 
@@ -716,9 +718,9 @@ stop:
 
 static void abort_dma(struct goku_ep *ep, int status)
 {
-	struct goku_udc_regs	*regs = ep->dev->regs;
-	struct goku_request	*req;
-	u32			curr, master;
+	struct goku_udc_regs __iomem	*regs = ep->dev->regs;
+	struct goku_request		*req;
+	u32				curr, master;
 
 	/* NAK future host requests, hoping the implicit delay lets the
 	 * dma engine finish reading (or writing) its latest packet and
@@ -848,7 +850,7 @@ goku_queue(struct usb_ep *_ep, struct usb_request *_req, int gfp_flags)
 		if (unlikely(status != 0)) {
 			if (status > 0)
 				status = 0;
-			req = 0;
+			req = NULL;
 		}
 
 	} /* else pio or dma irq handler advances the queue. */
@@ -927,7 +929,7 @@ static int goku_dequeue(struct usb_ep *_ep, struct usb_request *_req)
 	} else if (!list_empty(&req->queue))
 		done(ep, req, -ECONNRESET);
 	else
-		req = 0;
+		req = NULL;
 	spin_unlock_irqrestore(&dev->lock, flags);
 
 	return req ? 0 : -EOPNOTSUPP;
@@ -984,7 +986,8 @@ static int goku_set_halt(struct usb_ep *_ep, int value)
 		retval = -EAGAIN;
 	else if (ep->is_in && value
 			/* data in (either) packet buffer? */
-			&& (ep->dev->regs->DataSet & DATASET_AB(ep->num)))
+			&& (readl(&ep->dev->regs->DataSet)
+					& DATASET_AB(ep->num)))
 		retval = -EAGAIN;
 	else if (!value)
 		goku_clear_halt(ep);
@@ -1000,9 +1003,9 @@ static int goku_set_halt(struct usb_ep *_ep, int value)
 
 static int goku_fifo_status(struct usb_ep *_ep)
 {
-	struct goku_ep		*ep;
-	struct goku_udc_regs	*regs;
-	u32			size;
+	struct goku_ep			*ep;
+	struct goku_udc_regs __iomem	*regs;
+	u32				size;
 
 	if (!_ep)
 		return -ENODEV;
@@ -1022,9 +1025,9 @@ static int goku_fifo_status(struct usb_ep *_ep)
 
 static void goku_fifo_flush(struct usb_ep *_ep)
 {
-	struct goku_ep		*ep;
-	struct goku_udc_regs	*regs;
-	u32			size;
+	struct goku_ep			*ep;
+	struct goku_udc_regs __iomem	*regs;
+	u32				size;
 
 	if (!_ep)
 		return;
@@ -1092,13 +1095,7 @@ static inline char *dmastr(void)
 		return "(dma IN)";
 }
 
-/* if we're trying to save space, don't bother with this proc file */
-
-#if defined(CONFIG_PROC_FS) && !defined(CONFIG_EMBEDDED)
-#  define	UDC_PROC_FILE
-#endif
-
-#ifdef UDC_PROC_FILE
+#ifdef CONFIG_USB_GADGET_DEBUG_FILES
 
 static const char proc_node_name [] = "driver/udc";
 
@@ -1147,14 +1144,14 @@ static int
 udc_proc_read(char *buffer, char **start, off_t off, int count,
 		int *eof, void *_dev)
 {
-	char			*buf = buffer;
-	struct goku_udc		*dev = _dev;
-	struct goku_udc_regs	*regs = dev->regs;
-	char			*next = buf;
-	unsigned		size = count;
-	unsigned long		flags;
-	int			i, t, is_usb_connected;
-	u32			tmp;
+	char				*buf = buffer;
+	struct goku_udc			*dev = _dev;
+	struct goku_udc_regs __iomem	*regs = dev->regs;
+	char				*next = buf;
+	unsigned			size = count;
+	unsigned long			flags;
+	int				i, t, is_usb_connected;
+	u32				tmp;
 
 	if (off != 0)
 		return 0;
@@ -1312,7 +1309,7 @@ done:
 	return count - size;
 }
 
-#endif	/* UDC_PROC_FILE */
+#endif	/* CONFIG_USB_GADGET_DEBUG_FILES */
 
 /*-------------------------------------------------------------------------*/
 
@@ -1342,17 +1339,17 @@ static void udc_reinit (struct goku_udc *dev)
 		ep->dev = dev;
 		INIT_LIST_HEAD (&ep->queue);
 
-		ep_reset(0, ep);
+		ep_reset(NULL, ep);
 	}
 
-	dev->ep[0].reg_mode = 0;
+	dev->ep[0].reg_mode = NULL;
 	dev->ep[0].ep.maxpacket = MAX_EP0_SIZE;
 	list_del_init (&dev->ep[0].ep.ep_list);
 }
 
 static void udc_reset(struct goku_udc *dev)
 {
-	struct goku_udc_regs	*regs = dev->regs;
+	struct goku_udc_regs __iomem	*regs = dev->regs;
 
 	writel(0, &regs->power_detect);
 	writel(0, &regs->int_enable);
@@ -1369,8 +1366,8 @@ static void udc_reset(struct goku_udc *dev)
 
 static void ep0_start(struct goku_udc *dev)
 {
-	struct goku_udc_regs	*regs = dev->regs;
-	unsigned		i;
+	struct goku_udc_regs __iomem	*regs = dev->regs;
+	unsigned			i;
 
 	VDBG(dev, "%s\n", __FUNCTION__);
 
@@ -1447,15 +1444,15 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 		return -EBUSY;
 
 	/* hook up the driver */
-	driver->driver.bus = 0;
+	driver->driver.bus = NULL;
 	dev->driver = driver;
 	dev->gadget.dev.driver = &driver->driver;
 	retval = driver->bind(&dev->gadget);
 	if (retval) {
 		DBG(dev, "bind to driver %s --> error %d\n",
 				driver->driver.name, retval);
-		dev->driver = 0;
-		dev->gadget.dev.driver = 0;
+		dev->driver = NULL;
+		dev->gadget.dev.driver = NULL;
 		return retval;
 	}
 
@@ -1477,7 +1474,7 @@ stop_activity(struct goku_udc *dev, struct usb_gadget_driver *driver)
 	DBG (dev, "%s\n", __FUNCTION__);
 
 	if (dev->gadget.speed == USB_SPEED_UNKNOWN)
-		driver = 0;
+		driver = NULL;
 
 	/* disconnect gadget driver after quiesceing hw and the driver */
 	udc_reset (dev);
@@ -1504,7 +1501,7 @@ int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
 		return -EINVAL;
 
 	spin_lock_irqsave(&dev->lock, flags);
-	dev->driver = 0;
+	dev->driver = NULL;
 	stop_activity(dev, driver);
 	spin_unlock_irqrestore(&dev->lock, flags);
 
@@ -1520,9 +1517,9 @@ EXPORT_SYMBOL(usb_gadget_unregister_driver);
 
 static void ep0_setup(struct goku_udc *dev)
 {
-	struct goku_udc_regs	*regs = dev->regs;
-	struct usb_ctrlrequest	ctrl;
-	int			tmp;
+	struct goku_udc_regs __iomem	*regs = dev->regs;
+	struct usb_ctrlrequest		ctrl;
+	int				tmp;
 
 	/* read SETUP packet and enter DATA stage */
 	ctrl.bRequestType = readl(&regs->bRequestType);
@@ -1629,11 +1626,11 @@ stall:
 
 static irqreturn_t goku_irq(int irq, void *_dev, struct pt_regs *r)
 {
-	struct goku_udc		*dev = _dev;
-	struct goku_udc_regs	*regs = dev->regs;
-	struct goku_ep		*ep;
-	u32			stat, handled = 0;
-	unsigned		i, rescans = 5;
+	struct goku_udc			*dev = _dev;
+	struct goku_udc_regs __iomem	*regs = dev->regs;
+	struct goku_ep			*ep;
+	u32				stat, handled = 0;
+	unsigned			i, rescans = 5;
 
 	spin_lock(&dev->lock);
 
@@ -1651,7 +1648,7 @@ rescan:
 			stat = 0;
 			handled = 1;
 			// FIXME have a neater way to prevent re-enumeration
-			dev->driver = 0;
+			dev->driver = NULL;
 			goto done;
 		}
 		if (stat & INT_PWRDETECT) {
@@ -1815,7 +1812,7 @@ static void goku_remove(struct pci_dev *pdev)
 		usb_gadget_unregister_driver(dev->driver);
 	}
 
-#ifdef	UDC_PROC_FILE
+#ifdef CONFIG_USB_GADGET_DEBUG_FILES
 	remove_proc_entry(proc_node_name, NULL);
 #endif
 	if (dev->regs)
@@ -1831,9 +1828,9 @@ static void goku_remove(struct pci_dev *pdev)
 		pci_disable_device(pdev);
 	device_unregister(&dev->gadget.dev);
 
-	pci_set_drvdata(pdev, 0);
-	dev->regs = 0;
-	the_controller = 0;
+	pci_set_drvdata(pdev, NULL);
+	dev->regs = NULL;
+	the_controller = NULL;
 
 	INFO(dev, "unbind\n");
 }
@@ -1844,9 +1841,9 @@ static void goku_remove(struct pci_dev *pdev)
 
 static int goku_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
-	struct goku_udc		*dev = 0;
+	struct goku_udc		*dev = NULL;
 	unsigned long		resource, len;
-	void			*base = 0;
+	void __iomem		*base = NULL;
 	int			retval;
 	char			buf [8], *bufp;
 
@@ -1906,7 +1903,7 @@ static int goku_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		retval = -EFAULT;
 		goto done;
 	}
-	dev->regs = (struct goku_udc_regs *) base;
+	dev->regs = (struct goku_udc_regs __iomem *) base;
 
 	pci_set_drvdata(pdev, dev);
 	INFO(dev, "%s\n", driver_desc);
@@ -1933,7 +1930,7 @@ static int goku_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		pci_set_master(pdev);
 
 
-#ifdef	UDC_PROC_FILE
+#ifdef CONFIG_USB_GADGET_DEBUG_FILES
 	create_proc_read_entry(proc_node_name, 0, NULL, udc_proc_read, dev);
 #endif
 
@@ -1976,7 +1973,7 @@ static struct pci_driver goku_pci_driver = {
 
 static int __init init (void)
 {
-	return pci_module_init (&goku_pci_driver);
+	return pci_register_driver (&goku_pci_driver);
 }
 module_init (init);
 

@@ -2,8 +2,8 @@
  *
  * Name:	skdrv1st.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.3 $
- * Date:	$Date: 2004/06/16 08:10:24 $
+ * Version:	$Revision: 1.4 $
+ * Date:	$Date: 2003/11/12 14:28:14 $
  * Purpose:	First header file for driver and all other modules
  *
  ******************************************************************************/
@@ -58,12 +58,6 @@ typedef struct s_AC	SK_AC;
 
 #define SK_ADDR_EQUAL(a1,a2)		(!memcmp(a1,a2,6))
 
-#if !defined(__OPTIMIZE__)  ||  !defined(__KERNEL__)
-#warning  You must compile this file with the correct options!
-#warning  See the last lines of the source file.
-#error You must compile this driver with "-O".
-#endif
-
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
@@ -72,8 +66,8 @@ typedef struct s_AC	SK_AC;
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
+#include <linux/bitops.h>
 #include <asm/byteorder.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -96,10 +90,6 @@ typedef struct s_AC	SK_AC;
 #include	"h/lm80.h"
 #include	"h/xmac_ii.h"
 
-#ifndef SK_BMU_RX_WM_PEX
-#define SK_BMU_RX_WM_PEX 0x80
-#endif
-
 #ifdef __LITTLE_ENDIAN
 #define SK_LITTLE_ENDIAN
 #else
@@ -119,7 +109,7 @@ typedef struct s_AC	SK_AC;
 #define SK_MAX_MACS		2
 #define SK_MAX_NETS		2
 
-#define SK_IOC			char*
+#define SK_IOC			char __iomem *
 
 typedef struct s_DrvRlmtMbuf SK_MBUF;
 

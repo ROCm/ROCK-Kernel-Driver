@@ -55,9 +55,9 @@ struct controller *cpqhp_ctrl_list;	/* = NULL */
 struct pci_func *cpqhp_slot_list[256];
 
 /* local variables */
-static void *smbios_table;
-static void *smbios_start;
-static void *cpqhp_rom_start;
+static void __iomem *smbios_table;
+static void __iomem *smbios_start;
+static void __iomem *cpqhp_rom_start;
 static int power_mode;
 static int debug;
 
@@ -123,10 +123,10 @@ static inline int is_slot66mhz(struct slot *slot)
  * Returns pointer to the head of the SMBIOS tables (or NULL)
  *
  */
-static void * detect_SMBIOS_pointer(void *begin, void *end)
+static void __iomem * detect_SMBIOS_pointer(void __iomem *begin, void __iomem *end)
 {
-	void *fp;
-	void *endp;
+	void __iomem *fp;
+	void __iomem *endp;
 	u8 temp1, temp2, temp3, temp4;
 	int status = 0;
 
@@ -232,13 +232,14 @@ static int pci_print_IRQ_route (void)
  *
  * returns a pointer to an SMBIOS structure or NULL if none found
  */
-static void *get_subsequent_smbios_entry(void *smbios_start,
-			void *smbios_table, void *curr)
+static void __iomem *get_subsequent_smbios_entry(void __iomem *smbios_start,
+						void __iomem *smbios_table,
+						void __iomem *curr)
 {
 	u8 bail = 0;
 	u8 previous_byte = 1;
-	void *p_temp;
-	void *p_max;
+	void __iomem *p_temp;
+	void __iomem *p_max;
 
 	if (!smbios_table || !curr)
 		return(NULL);
@@ -282,8 +283,10 @@ static void *get_subsequent_smbios_entry(void *smbios_start,
  *
  * returns a pointer to an SMBIOS structure or %NULL if none found
  */
-static void *get_SMBIOS_entry(void *smbios_start, void *smbios_table, u8 type,
-			void * previous)
+static void __iomem *get_SMBIOS_entry(void __iomem *smbios_start,
+					void __iomem *smbios_table,
+					u8 type,
+					void __iomem *previous)
 {
 	if (!smbios_table)
 		return NULL;
@@ -319,8 +322,9 @@ static void release_slot(struct hotplug_slot *hotplug_slot)
 	kfree(slot);
 }
 
-static int ctrl_slot_setup(struct controller * ctrl, void *smbios_start,
-			void *smbios_table)
+static int ctrl_slot_setup(struct controller *ctrl,
+			void __iomem *smbios_start,
+			void __iomem *smbios_table)
 {
 	struct slot *new_slot;
 	u8 number_of_slots;
@@ -328,7 +332,7 @@ static int ctrl_slot_setup(struct controller * ctrl, void *smbios_start,
 	u8 slot_number;
 	u8 ctrl_slot;
 	u32 tempdword;
-	void *slot_entry= NULL;
+	void __iomem *slot_entry= NULL;
 	int result = -ENOMEM;
 
 	dbg("%s\n", __FUNCTION__);
@@ -1483,8 +1487,8 @@ static int __init cpqhpc_init(void)
 	cpqhp_debug = debug;
 
 	info (DRIVER_DESC " version: " DRIVER_VERSION "\n");
-	result = pci_module_init(&cpqhpc_driver);
-	dbg("pci_module_init = %d\n", result);
+	result = pci_register_driver(&cpqhpc_driver);
+	dbg("pci_register_driver = %d\n", result);
 	return result;
 }
 

@@ -24,8 +24,7 @@ match(const struct sk_buff *skb,
       const struct net_device *out,
       const void *matchinfo,
       int offset,
-      const void *hdr,
-      u_int16_t datalen,
+      unsigned int protoff,
       int *hotdrop)
 {
 
@@ -41,10 +40,10 @@ match(const struct sk_buff *skb,
     
     memset(eui64, 0, sizeof(eui64));
 
-    if (skb->mac.ethernet->h_proto == ntohs(ETH_P_IPV6)) {
+    if (eth_hdr(skb)->h_proto == ntohs(ETH_P_IPV6)) {
       if (skb->nh.ipv6h->version == 0x6) { 
-         memcpy(eui64, skb->mac.ethernet->h_source, 3);
-         memcpy(eui64 + 5, skb->mac.ethernet->h_source + 3, 3);
+         memcpy(eui64, eth_hdr(skb)->h_source, 3);
+         memcpy(eui64 + 5, eth_hdr(skb)->h_source + 3, 3);
 	 eui64[3]=0xff;
 	 eui64[4]=0xfe;
 	 eui64[0] |= 0x02;
@@ -70,7 +69,7 @@ ip6t_eui64_checkentry(const char *tablename,
 {
 	if (hook_mask
 	    & ~((1 << NF_IP6_PRE_ROUTING) | (1 << NF_IP6_LOCAL_IN) |
-		(1 << NF_IP6_PRE_ROUTING) )) {
+		(1 << NF_IP6_FORWARD))) {
 		printk("ip6t_eui64: only valid for PRE_ROUTING, LOCAL_IN or FORWARD.\n");
 		return 0;
 	}

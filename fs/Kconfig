@@ -160,8 +160,6 @@ config FS_MBCACHE
 	default y if EXT2_FS=y || EXT3_FS=y
 	default m if EXT2_FS=m || EXT3_FS=m
 
-source "fs/Kconfig.reiser4"
-
 config REISERFS_FS
 	tristate "Reiserfs support"
 	help
@@ -440,11 +438,16 @@ config QUOTACTL
 	depends on XFS_QUOTA || QUOTA
 	default y
 
-config SUBFS_FS
-	tristate "subfs file system support"
-	---help---
-	  If you don't know whether you need it, then you don't need it:
-	  answer N.
+config DNOTIFY
+	bool "Dnotify support" if EMBEDDED
+	default y
+	help
+	  Dnotify is a directory-based per-fd file change notification system
+	  that uses signals to communicate events to user-space.  There exist
+	  superior alternatives, but some applications may still rely on
+	  dnotify.
+
+	  Because of this, if unsure, say Y.
 
 config AUTOFS_FS
 	tristate "Kernel automounter support"
@@ -816,8 +819,8 @@ config PROC_FS
 	  programs depend on this, so everyone should say Y here.
 
 config PROC_KCORE
-	bool
-	default y if !ARM
+	bool "/proc/kcore support" if !ARM
+	depends on PROC_FS && MMU
 
 config SYSFS
 	bool "sysfs file system support" if EMBEDDED
@@ -926,6 +929,27 @@ config TMPFS
 	  lost.
 
 	  See <file:Documentation/filesystems/tmpfs.txt> for details.
+
+config TMPFS_XATTR
+	bool "tmpfs Extended Attributes"
+	depends on TMPFS
+	help
+	  Extended attributes are name:value pairs associated with inodes by
+	  the kernel or by users (see the attr(5) manual page, or visit
+	  <http://acl.bestbits.at/> for details).
+
+	  If unsure, say N.
+
+config TMPFS_SECURITY
+	bool "tmpfs Security Labels"
+	depends on TMPFS_XATTR
+	help
+	  Security labels support alternative access control models
+	  implemented by security modules like SELinux.  This option
+	  enables an extended attribute handler for file security
+	  labels in the tmpfs filesystem.
+	  If you are not using a security module that requires using
+	  extended attributes for file security labels, say N.
 
 config HUGETLBFS
 	bool "HugeTLB file system support"
@@ -1389,7 +1413,6 @@ config NFS_FS
 	depends on INET
 	select LOCKD
 	select SUNRPC
-	select NFS_ACL_SUPPORT if NFS_ACL
 	help
 	  If you are connected to some other (usually local) Unix computer
 	  (using SLIP, PLIP, PPP or Ethernet) and want to mount files residing
@@ -1431,17 +1454,6 @@ config NFS_V3
 	  3 of the NFS protocol.
 
 	  If unsure, say Y.
-
-config NFS_ACL
-	bool "NFS_ACL protocol extension"
-	depends on NFS_V3
-	select QSORT
-	help
-	  Implement the NFS_ACL protocol extension for manipulating POSIX
-	  Access Control Lists.  The server must also implement the NFS_ACL
-	  protocol extension; see the CONFIG_NFSD_ACL option.
-
-	  If unsure, say N.
 
 config NFS_V4
 	bool "Provide NFSv4 client support (EXPERIMENTAL)"
@@ -1485,7 +1497,6 @@ config NFSD
 	depends on INET
 	select LOCKD
 	select SUNRPC
-	select NFS_ACL_SUPPORT if NFSD_ACL
 	help
 	  If you want your Linux box to act as an NFS *server*, so that other
 	  computers on your local network which support NFS can access certain
@@ -1515,19 +1526,6 @@ config NFSD_V3
 	help
 	  If you would like to include the NFSv3 server as well as the NFSv2
 	  server, say Y here.  If unsure, say Y.
-
-config NFSD_ACL
-	bool "NFS_ACL protocol extension"
-	depends on NFSD_V3
-	select QSORT
-	help
-	  Implement the NFS_ACL protocol extension for manipulating POSIX
-	  Access Control Lists on exported file systems.  The clients must
-	  also implement the NFS_ACL protocol extension; see the
-	  CONFIG_NFS_ACL option.  If unsure, say N.
-
-config NFS_ACL_SUPPORT
-	tristate
 
 config NFSD_V4
 	bool "Provide NFSv4 server support (EXPERIMENTAL)"
@@ -1564,10 +1562,6 @@ config ROOT_NFS
 
 config LOCKD
 	tristate
-	select STATD
-
-config STATD
-	bool
 
 config LOCKD_V4
 	bool
@@ -1724,12 +1718,22 @@ config CIFS_XATTR
 
 config CIFS_POSIX
         bool "CIFS POSIX Extensions (EXPERIMENTAL)"
-        depends on CIFS
+        depends on CIFS_XATTR
         help
           Enabling this option will cause the cifs client to attempt to
 	  negotiate a newer dialect with servers, such as Samba 3.0.5
 	  or later, that optionally can handle more POSIX like (rather
-	  than Windows like) file behavior.  If unsure, say N.
+	  than Windows like) file behavior.  It also enables
+	  support for POSIX ACLs (getfacl and setfacl) to servers
+	  (such as Samba 3.10 and later) which can negotiate
+	  CIFS POSIX ACL support.  If unsure, say N.
+
+config CIFS_EXPERIMENTAL
+	  bool "CIFS Experimental Features (EXPERIMENTAL)"
+	  depends on CIFS
+	  help
+	    Enables cifs features under testing. These features
+	    are highly experimental.  If unsure, say N.
 
 config NCP_FS
 	tristate "NCP file system support (to mount NetWare volumes)"

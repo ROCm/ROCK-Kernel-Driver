@@ -207,16 +207,8 @@ ax25_cb *ax25_find_cb(ax25_address *src_addr, ax25_address *dest_addr,
 			continue;
 		if (s->ax25_dev == NULL)
 			continue;
-		if (ax25cmp(&s->source_addr, src_addr) == 0 && ax25cmp(&s->dest_addr, dest_addr) == 0 && s->ax25_dev->dev == dev) {
-			if (digi != NULL && digi->ndigi != 0) {
-				if (s->digipeat == NULL)
-					continue;
-				if (ax25digicmp(s->digipeat, digi) != 0)
-					continue;
-			} else {
-				if (s->digipeat != NULL && s->digipeat->ndigi != 0)
-					continue;
-			}
+		if (ax25cmp(&s->source_addr, src_addr) == 0 &&
+		    ax25cmp(&s->dest_addr, dest_addr) == 0) {
 			ax25_cb_hold(s);
 			spin_unlock_bh(&ax25_list_lock);
 
@@ -1338,7 +1330,6 @@ static int ax25_accept(struct socket *sock, struct socket *newsock, int flags)
 	remove_wait_queue(sk->sk_sleep, &wait);
 
 	newsk		 = skb->sk;
-	newsk->sk_pair	 = NULL;
 	newsk->sk_socket = newsock;
 	newsk->sk_sleep	 = &newsock->wait;
 

@@ -31,7 +31,7 @@
  * ===========================================================================
  */
 #include <linux/kernel.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/ptrace.h>
 #include <asm/vfp.h>
 
@@ -201,7 +201,7 @@ u32 vfp_single_normaliseround(int sd, struct vfp_single *vs, u32 fpscr, u32 exce
 		vfp_put_float(sd, d);
 	}
 
-	return exceptions;
+	return exceptions & ~VFP_NAN_FLAG;
 }
 
 /*
@@ -246,7 +246,7 @@ vfp_propagate_nan(struct vfp_single *vsd, struct vfp_single *vsn,
 	/*
 	 * If one was a signalling NAN, raise invalid operation.
 	 */
-	return tn == VFP_SNAN || tm == VFP_SNAN ? FPSCR_IOC : 0x100;
+	return tn == VFP_SNAN || tm == VFP_SNAN ? FPSCR_IOC : VFP_NAN_FLAG;
 }
 
 

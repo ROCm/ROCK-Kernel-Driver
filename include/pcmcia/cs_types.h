@@ -56,9 +56,6 @@ typedef struct window_t *window_handle_t;
 struct region_t;
 typedef struct region_t *memory_handle_t;
 
-struct eraseq_t;
-typedef struct eraseq_t *eraseq_handle_t;
-
 #ifndef DEV_NAME_LEN
 #define DEV_NAME_LEN 32
 #endif

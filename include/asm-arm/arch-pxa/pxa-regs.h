@@ -15,17 +15,6 @@
 
 #include <linux/config.h>
 
-// FIXME hack so that SA-1111.h will work [cb]
-
-#ifndef __ASSEMBLY__
-typedef unsigned short  Word16 ;
-typedef unsigned int    Word32 ;
-typedef Word32          Word ;
-typedef Word            Quad [4] ;
-typedef void            *Address ;
-typedef void            (*ExcpHndlr) (void) ;
-#endif
-
 /*
  * PXA Chip selects
  */
@@ -180,12 +169,16 @@ typedef void            (*ExcpHndlr) (void) ;
 #define DRCMRTXPCDR	DRCMR12
 #define DRCMRRXSSDR	DRCMR13
 #define DRCMRTXSSDR	DRCMR14
+#define DRCMRRXSS2DR   DRCMR15
+#define DRCMRTXSS2DR   DRCMR16
 #define DRCMRRXICDR	DRCMR17
 #define DRCMRTXICDR	DRCMR18
 #define DRCMRRXSTRBR	DRCMR19
 #define DRCMRTXSTTHR	DRCMR20
 #define DRCMRRXMMC	DRCMR21
 #define DRCMRTXMMC	DRCMR22
+#define DRCMRRXSS3DR   DRCMR66
+#define DRCMRTXSS3DR   DRCMR67
 #define DRCMRUDC(x)	DRCMR((x) + 24)
 
 #define DRCMR_MAPVLD	(1 << 7)	/* Map Valid (read / write) */
@@ -465,6 +458,43 @@ typedef void            (*ExcpHndlr) (void) ;
 #define SADIV		__REG(0x40400060)  /* Audio Clock Divider Register. */
 #define SADR		__REG(0x40400080)  /* Serial Audio Data Register (TX and RX FIFO access Register). */
 #endif
+
+#define SACR0_RFTH(x)	(x << 12)		/* Rx FIFO Interrupt or DMA Trigger Threshold */
+#define SACR0_TFTH(x)	(x << 8)		/* Tx FIFO Interrupt or DMA Trigger Threshold */
+#define SACR0_STRF		(1 << 5)		/* FIFO Select for EFWR Special Function */
+#define SACR0_EFWR		(1 << 4)		/* Enable EFWR Function  */
+#define SACR0_RST		(1 << 3)		/* FIFO, i2s Register Reset */
+#define SACR0_BCKD		(1 << 2) 		/* Bit Clock Direction */
+#define SACR0_ENB		(1 << 0)		/* Enable I2S Link */
+
+#define SACR1_ENLBF		(1 << 5)		/* Enable Loopback */
+#define SACR1_DRPL		(1 << 4) 		/* Disable Replaying Function */
+#define SACR1_DREC		(1 << 3)		/* Disable Recording Function */
+#define SACR1_AMSL		(1 << 1)		/* Specify Alternate Mode */
+
+#define SASR0_I2SOFF	(1 << 7)		/* Controller Status */
+#define SASR0_ROR		(1 << 6)		/* Rx FIFO Overrun */
+#define SASR0_TUR		(1 << 5)		/* Tx FIFO Underrun */
+#define SASR0_RFS		(1 << 4)		/* Rx FIFO Service Request */
+#define SASR0_TFS		(1 << 3)		/* Tx FIFO Service Request */
+#define SASR0_BSY		(1 << 2)		/* I2S Busy */
+#define SASR0_RNE		(1 << 1)		/* Rx FIFO Not Empty */
+#define SASR0_TNF		(1 << 0) 		/* Tx FIFO Not Empty */
+
+#define SADIV_3_058M	0x0c			/* Serial Clock Divider 3.058MHz */
+#define SADIV_2_836M	0x0d			/* 2.836 MHz */
+#define SADIV_1_405M	0x1a			/* 1.405 MHz */
+#define SADIV_1_026M	0x24			/* 1.026 MHz */
+#define SADIV_702K		0x34			/* 702 kHz */
+#define SADIV_513K		0x48			/* 513 kHz */
+
+#define SAICR_ROR		(1 << 6)		/* Clear Rx FIFO Overrun Interrupt */
+#define SAICR_TUR		(1 << 5)		/* Clear Tx FIFO Underrun Interrupt */
+
+#define SAIMR_ROR		(1 << 6)		/* Enable Rx FIFO Overrun Condition Interrupt */
+#define SAIMR_TUR		(1 << 5)		/* Enable Tx FIFO Underrun Condition Interrupt */
+#define SAIMR_RFS		(1 << 4)		/* Enable Rx FIFO Service Interrupt */
+#define SAIMR_TFS		(1 << 3)		/* Enable Tx FIFO Service Interrupt */
 
 
 /*
@@ -962,7 +992,7 @@ typedef void            (*ExcpHndlr) (void) ;
 #define ICCR0_LBM	(1 << 1)	/* Loopback mode */
 #define ICCR0_ITR	(1 << 0)	/* IrDA transmission */
 
-#ifdef CONFIG_CPU_BULVERDE
+#ifdef CONFIG_PXA27x
 #define ICCR2_RXP       (1 << 3)	/* Receive Pin Polarity select */
 #define ICCR2_TXP       (1 << 2)	/* Transmit Pin Polarity select */
 #define ICCR2_TRIG	(3 << 0)	/* Receive FIFO Trigger threshold */
@@ -971,7 +1001,7 @@ typedef void            (*ExcpHndlr) (void) ;
 #define ICCR2_TRIG_32   (2 << 0)	/*	>= 32 bytes */
 #endif
 
-#ifdef CONFIG_CPU_BULVERDE
+#ifdef CONFIG_PXA27x
 #define ICSR0_EOC	(1 << 6)	/* DMA End of Descriptor Chain */
 #endif
 #define ICSR0_FRE	(1 << 5)	/* Framing error */
@@ -1185,6 +1215,7 @@ typedef void            (*ExcpHndlr) (void) ;
 #define GPIO30_SDATA_OUT	30	/* AC97/I2S Sdata_out */
 #define GPIO31_SYNC		31	/* AC97/I2S sync */
 #define GPIO32_SDATA_IN1	32	/* AC97 Sdata_in1 */
+#define GPIO32_MMCCLK		32	/* MMC Clock (PXA270) */
 #define GPIO33_nCS_5		33	/* chip select 5 */
 #define GPIO34_FFRXD		34	/* FFUART receive */
 #define GPIO34_MMCCS0		34	/* MMC Chip Select 0 */
@@ -1200,6 +1231,7 @@ typedef void            (*ExcpHndlr) (void) ;
 #define GPIO43_BTTXD		43	/* BTUART transmit data */
 #define GPIO44_BTCTS		44	/* BTUART clear to send */
 #define GPIO45_BTRTS		45	/* BTUART request to send */
+#define GPIO45_AC97_SYSCLK	45	/* AC97 System Clock */
 #define GPIO46_ICPRXD		46	/* ICP receive data */
 #define GPIO46_STRXD		46	/* STD_UART receive data */
 #define GPIO47_ICPTXD		47	/* ICP transmit data */
@@ -1213,6 +1245,7 @@ typedef void            (*ExcpHndlr) (void) ;
 #define GPIO53_MMCCLK		53	/* MMC Clock */
 #define GPIO54_MMCCLK		54	/* MMC Clock */
 #define GPIO54_pSKTSEL		54	/* Socket Select for Card Space */
+#define GPIO54_nPCE_2		54	/* Card Enable for Card Space (PXA27x) */
 #define GPIO55_nPREG		55	/* Card Address bit 26 */
 #define GPIO56_nPWAIT		56	/* Wait signal for Card Space */
 #define GPIO57_nIOIS16		57	/* Bus Width select for I/O Card Space */
@@ -1247,6 +1280,19 @@ typedef void            (*ExcpHndlr) (void) ;
 #define GPIO78_nCS_2		78	/* chip select 2 */
 #define GPIO79_nCS_3		79	/* chip select 3 */
 #define GPIO80_nCS_4		80	/* chip select 4 */
+#define GPIO81_NSCLK		81	/* NSSP clock */
+#define GPIO82_NSFRM		82	/* NSSP Frame */
+#define GPIO83_NSTXD		83	/* NSSP transmit */
+#define GPIO84_NSRXD		84	/* NSSP receive */
+#define GPIO85_nPCE_1		85	/* Card Enable for Card Space (PXA27x) */
+#define GPIO92_MMCDAT0		92	/* MMC DAT0 (PXA27x) */
+#define GPIO109_MMCDAT1		109	/* MMC DAT1 (PXA27x) */
+#define GPIO110_MMCDAT2		110	/* MMC DAT2 (PXA27x) */
+#define GPIO110_MMCCS0		110	/* MMC Chip Select 0 (PXA27x) */
+#define GPIO111_MMCDAT3		111	/* MMC DAT3 (PXA27x) */
+#define GPIO111_MMCCS1		111	/* MMC Chip Select 1 (PXA27x) */
+#define GPIO112_MMCCMD		112	/* MMC CMD (PXA27x) */
+#define GPIO113_AC97_RESET_N	113	/* AC97 NRESET on (PXA27x) */
 
 /* GPIO alternate function mode & direction */
 
@@ -1261,6 +1307,8 @@ typedef void            (*ExcpHndlr) (void) ;
 #define GPIO_MD_MASK_NR		0x07f
 #define GPIO_MD_MASK_DIR	0x080
 #define GPIO_MD_MASK_FN		0x300
+#define GPIO_DFLT_LOW		0x400
+#define GPIO_DFLT_HIGH		0x800
 
 #define GPIO1_RTS_MD		( 1 | GPIO_ALT_FN_1_IN)
 #define GPIO6_MMCCLK_MD		( 6 | GPIO_ALT_FN_1_OUT)
@@ -1292,6 +1340,7 @@ typedef void            (*ExcpHndlr) (void) ;
 #define GPIO31_SYNC_AC97_MD	(31 | GPIO_ALT_FN_2_OUT)
 #define GPIO31_SYNC_I2S_MD	(31 | GPIO_ALT_FN_1_OUT)
 #define GPIO32_SDATA_IN1_AC97_MD	(32 | GPIO_ALT_FN_1_IN)
+#define GPIO32_MMCCLK_MD		( 32 | GPIO_ALT_FN_2_OUT)
 #define GPIO33_nCS_5_MD		(33 | GPIO_ALT_FN_2_OUT)
 #define GPIO34_FFRXD_MD		(34 | GPIO_ALT_FN_1_IN)
 #define GPIO34_MMCCS0_MD	(34 | GPIO_ALT_FN_2_OUT)
@@ -1307,6 +1356,7 @@ typedef void            (*ExcpHndlr) (void) ;
 #define GPIO43_BTTXD_MD		(43 | GPIO_ALT_FN_2_OUT)
 #define GPIO44_BTCTS_MD		(44 | GPIO_ALT_FN_1_IN)
 #define GPIO45_BTRTS_MD		(45 | GPIO_ALT_FN_2_OUT)
+#define GPIO45_SYSCLK_AC97_MD		(45 | GPIO_ALT_FN_1_OUT)
 #define GPIO46_ICPRXD_MD	(46 | GPIO_ALT_FN_1_IN)
 #define GPIO46_STRXD_MD		(46 | GPIO_ALT_FN_2_IN)
 #define GPIO47_ICPTXD_MD	(47 | GPIO_ALT_FN_2_OUT)
@@ -1319,6 +1369,7 @@ typedef void            (*ExcpHndlr) (void) ;
 #define GPIO53_nPCE_2_MD	(53 | GPIO_ALT_FN_2_OUT)
 #define GPIO53_MMCCLK_MD	(53 | GPIO_ALT_FN_1_OUT)
 #define GPIO54_MMCCLK_MD	(54 | GPIO_ALT_FN_1_OUT)
+#define GPIO54_nPCE_2_MD	(54 | GPIO_ALT_FN_2_OUT)
 #define GPIO54_pSKTSEL_MD	(54 | GPIO_ALT_FN_2_OUT)
 #define GPIO55_nPREG_MD		(55 | GPIO_ALT_FN_2_OUT)
 #define GPIO56_nPWAIT_MD	(56 | GPIO_ALT_FN_1_IN)
@@ -1353,8 +1404,27 @@ typedef void            (*ExcpHndlr) (void) ;
 #define GPIO77_LCD_ACBIAS_MD	(77 | GPIO_ALT_FN_2_OUT)
 #define GPIO78_nCS_2_MD		(78 | GPIO_ALT_FN_2_OUT)
 #define GPIO79_nCS_3_MD		(79 | GPIO_ALT_FN_2_OUT)
+#define GPIO79_pSKTSEL_MD	(79 | GPIO_ALT_FN_1_OUT)
 #define GPIO80_nCS_4_MD		(80 | GPIO_ALT_FN_2_OUT)
-
+#define GPIO81_NSSP_CLK_OUT 	(81 | GPIO_ALT_FN_1_OUT)
+#define GPIO81_NSSP_CLK_IN  	(81 | GPIO_ALT_FN_1_IN)
+#define GPIO82_NSSP_FRM_OUT 	(82 | GPIO_ALT_FN_1_OUT)
+#define GPIO82_NSSP_FRM_IN  	(82 | GPIO_ALT_FN_1_IN)
+#define GPIO83_NSSP_TX      	(83 | GPIO_ALT_FN_1_OUT)
+#define GPIO83_NSSP_RX      	(83 | GPIO_ALT_FN_2_IN)
+#define GPIO84_NSSP_TX      	(84 | GPIO_ALT_FN_1_OUT)
+#define GPIO84_NSSP_RX      	(84 | GPIO_ALT_FN_2_IN)
+#define GPIO85_nPCE_1_MD	(85 | GPIO_ALT_FN_1_OUT)
+#define GPIO92_MMCDAT0_MD	(92 | GPIO_ALT_FN_1_OUT)
+#define GPIO109_MMCDAT1_MD	(109 | GPIO_ALT_FN_1_OUT)
+#define GPIO110_MMCDAT2_MD	(110 | GPIO_ALT_FN_1_OUT)
+#define GPIO110_MMCCS0_MD	(110 | GPIO_ALT_FN_1_OUT)
+#define GPIO111_MMCDAT3_MD	(111 | GPIO_ALT_FN_1_OUT)
+#define GPIO110_MMCCS1_MD	(111 | GPIO_ALT_FN_1_OUT)
+#define GPIO112_MMCCMD_MD	(112 | GPIO_ALT_FN_1_OUT)
+#define GPIO113_AC97_RESET_N_MD	(113 | GPIO_ALT_FN_2_OUT)
+#define GPIO117_I2CSCL_MD	(117 | GPIO_ALT_FN_1_OUT)
+#define GPIO118_I2CSDA_MD	(118 | GPIO_ALT_FN_1_IN)
 
 /*
  * Power Manager
@@ -1424,7 +1494,7 @@ typedef void            (*ExcpHndlr) (void) ;
 #define PVCR_CommandDelay (0xf80)
 #define PCFR_PI2C_EN	(0x1 << 6)
 
-#define PSSR_OTGPH	(1 << 7)	/* OTG Peripheral control Hold */
+#define PSSR_OTGPH	(1 << 6)	/* OTG Peripheral control Hold */
 #define PSSR_RDH	(1 << 5)	/* Read Disable Hold */
 #define PSSR_PH		(1 << 4)	/* Peripheral Control Hold */
 #define PSSR_VFS	(1 << 2)	/* VDD Fault Status */
@@ -1448,17 +1518,33 @@ typedef void            (*ExcpHndlr) (void) ;
 #define RCSR_WDR	(1 << 1)	/* Watchdog Reset */
 #define RCSR_HWR	(1 << 0)	/* Hardware Reset */
 
+#define PWER_GPIO(Nb)	(1 << Nb)	/* GPIO [0..15] wake-up enable     */
+#define PWER_GPIO0	PWER_GPIO (0)	/* GPIO  [0] wake-up enable        */
+#define PWER_GPIO1	PWER_GPIO (1)	/* GPIO  [1] wake-up enable        */
+#define PWER_GPIO2	PWER_GPIO (2)	/* GPIO  [2] wake-up enable        */
+#define PWER_GPIO3	PWER_GPIO (3)	/* GPIO  [3] wake-up enable        */
+#define PWER_GPIO4	PWER_GPIO (4)	/* GPIO  [4] wake-up enable        */
+#define PWER_GPIO5	PWER_GPIO (5)	/* GPIO  [5] wake-up enable        */
+#define PWER_GPIO6	PWER_GPIO (6)	/* GPIO  [6] wake-up enable        */
+#define PWER_GPIO7	PWER_GPIO (7)	/* GPIO  [7] wake-up enable        */
+#define PWER_GPIO8	PWER_GPIO (8)	/* GPIO  [8] wake-up enable        */
+#define PWER_GPIO9	PWER_GPIO (9)	/* GPIO  [9] wake-up enable        */
+#define PWER_GPIO10	PWER_GPIO (10)	/* GPIO [10] wake-up enable        */
+#define PWER_GPIO11	PWER_GPIO (11)	/* GPIO [11] wake-up enable        */
+#define PWER_GPIO12	PWER_GPIO (12)	/* GPIO [12] wake-up enable        */
+#define PWER_GPIO13	PWER_GPIO (13)	/* GPIO [13] wake-up enable        */
+#define PWER_GPIO14	PWER_GPIO (14)	/* GPIO [14] wake-up enable        */
+#define PWER_GPIO15	PWER_GPIO (15)	/* GPIO [15] wake-up enable        */
+#define PWER_RTC	0x80000000	/* RTC alarm wake-up enable        */
+
 
 /*
  * SSP Serial Port Registers
+ * PXA250, PXA255, PXA26x and PXA27x SSP controllers are all slightly different.
+ * PXA255, PXA26x and PXA27x have extra ports, registers and bits.
  */
 
-#define SSCR0		__REG(0x41000000)  /* SSP Control Register 0 */
-#define SSCR1		__REG(0x41000004)  /* SSP Control Register 1 */
-#define SSSR		__REG(0x41000008)  /* SSP Status Register */
-#define SSITR		__REG(0x4100000C)  /* SSP Interrupt Test Register */
-#define SSDR		__REG(0x41000010)  /* (Write / Read) SSP Data Write Register/SSP Data Read Register */
-
+ /* Common PXA2xx bits first */
 #define SSCR0_DSS	(0x0000000f)	/* Data Size Select (mask) */
 #define SSCR0_DataSize(x)  ((x) - 1)	/* Data Size Select [4..16] */
 #define SSCR0_FRF	(0x00000030)	/* FRame Format (mask) */
@@ -1488,6 +1574,103 @@ typedef void            (*ExcpHndlr) (void) ;
 #define SSSR_RFS	(1 << 6)	/* Receive FIFO Service Request */
 #define SSSR_ROR	(1 << 7)	/* Receive FIFO Overrun */
 
+#define SSCR0_TIM		(1 << 23)	/* Transmit FIFO Under Run Interrupt Mask */
+#define SSCR0_RIM		(1 << 22)	/* Receive FIFO Over Run interrupt Mask */
+#define SSCR0_NCS		(1 << 21)	/* Network Clock Select */
+#define SSCR0_EDSS		(1 << 20)	/* Extended Data Size Select */
+
+/* extra bits in PXA255, PXA26x and PXA27x SSP ports */
+#define SSCR1_TTELP		(1 << 31)	/* TXD Tristate Enable Last Phase */
+#define SSCR1_TTE		(1 << 30)	/* TXD Tristate Enable */
+#define SSCR1_EBCEI		(1 << 29)	/* Enable Bit Count Error interrupt */
+#define SSCR1_SCFR		(1 << 28)	/* Slave Clock free Running */
+#define SSCR1_ECRA		(1 << 27)	/* Enable Clock Request A */
+#define SSCR1_ECRB		(1 << 26)	/* Enable Clock request B */
+#define SSCR1_SCLKDIR	(1 << 25)	/* Serial Bit Rate Clock Direction */
+#define SSCR1_SFRMDIR	(1 << 24)	/* Frame Direction */
+#define SSCR1_RWOT		(1 << 23)	/* Receive Without Transmit */
+#define SSCR1_TRAIL		(1 << 22)	/* Trailing Byte */
+#define SSCR1_TSRE		(1 << 21)	/* Transmit Service Request Enable */
+#define SSCR1_RSRE		(1 << 20)	/* Receive Service Request Enable */
+#define SSCR1_TINTE		(1 << 19)	/* Receiver Time-out Interrupt enable */
+#define SSCR1_PINTE		(1 << 18)	/* Peripheral Trailing Byte Interupt Enable */
+#define SSCR1_STRF		(1 << 15)	/* Select FIFO or EFWR */
+#define SSCR1_EFWR		(1 << 14)	/* Enable FIFO Write/Read */
+
+#define SSSR_BCE		(1 << 23)	/* Bit Count Error */
+#define SSSR_CSS		(1 << 22)	/* Clock Synchronisation Status */
+#define SSSR_TUR		(1 << 21)	/* Transmit FIFO Under Run */
+#define SSSR_EOC		(1 << 20)	/* End Of Chain */
+#define SSSR_TINT		(1 << 19)	/* Receiver Time-out Interrupt */
+#define SSSR_PINT		(1 << 18)	/* Peripheral Trailing Byte Interrupt */
+
+#define SSPSP_DMYSTOP(x)	(x << 23)	/* Dummy Stop */
+#define SSPSP_SFRMWDTH(x)	(x << 16)	/* Serial Frame Width */
+#define SSPSP_SFRMDLY(x)	(x << 9)	/* Serial Frame Delay */
+#define SSPSP_DMYSTRT(x)	(x << 7)	/* Dummy Start */
+#define SSPSP_STRTDLY(x)	(x << 4)	/* Start Delay */
+#define SSPSP_ETDS			(1 << 3)	/* End of Transfer data State */
+#define SSPSP_SFRMP			(1 << 2)	/* Serial Frame Polarity */
+#define SSPSP_SCMODE(x)		(x << 0)	/* Serial Bit Rate Clock Mode */
+
+
+#define SSCR0_P1	__REG(0x41000000)  /* SSP Port 1 Control Register 0 */
+#define SSCR1_P1	__REG(0x41000004)  /* SSP Port 1 Control Register 1 */
+#define SSSR_P1		__REG(0x41000008)  /* SSP Port 1 Status Register */
+#define SSITR_P1	__REG(0x4100000C)  /* SSP Port 1 Interrupt Test Register */
+#define SSDR_P1		__REG(0x41000010)  /* (Write / Read) SSP Port 1 Data Write Register/SSP Data Read Register */
+
+/* Support existing PXA25x drivers */
+#define SSCR0		SSCR0_P1  /* SSP Control Register 0 */
+#define SSCR1		SSCR1_P1  /* SSP Control Register 1 */
+#define SSSR		SSSR_P1	  /* SSP Status Register */
+#define SSITR		SSITR_P1  /* SSP Interrupt Test Register */
+#define SSDR		SSDR_P1	  /* (Write / Read) SSP Data Write Register/SSP Data Read Register */
+
+/* PXA27x ports */
+#if defined (CONFIG_PXA27x)
+#define SSTO_P1		__REG(0x41000028)  /* SSP Port 1 Time Out Register */
+#define SSPSP_P1	__REG(0x4100002C)  /* SSP Port 1 Programmable Serial Protocol */
+#define SSCR0_P2	__REG(0x41700000)  /* SSP Port 2 Control Register 0 */
+#define SSCR1_P2	__REG(0x41700004)  /* SSP Port 2 Control Register 1 */
+#define SSSR_P2		__REG(0x41700008)  /* SSP Port 2 Status Register */
+#define SSITR_P2	__REG(0x4170000C)  /* SSP Port 2 Interrupt Test Register */
+#define SSDR_P2		__REG(0x41700010)  /* (Write / Read) SSP Port 2 Data Write Register/SSP Data Read Register */
+#define SSTO_P2		__REG(0x41700028)  /* SSP Port 2 Time Out Register */
+#define SSPSP_P2	__REG(0x4170002C)  /* SSP Port 2 Programmable Serial Protocol */
+#define SSCR0_P3	__REG(0x41900000)  /* SSP Port 3 Control Register 0 */
+#define SSCR1_P3	__REG(0x41900004)  /* SSP Port 3 Control Register 1 */
+#define SSSR_P3		__REG(0x41900008)  /* SSP Port 3 Status Register */
+#define SSITR_P3	__REG(0x4190000C)  /* SSP Port 3 Interrupt Test Register */
+#define SSDR_P3		__REG(0x41900010)  /* (Write / Read) SSP Port 3 Data Write Register/SSP Data Read Register */
+#define SSTO_P3		__REG(0x41900028)  /* SSP Port 3 Time Out Register */
+#define SSPSP_P3	__REG(0x4190002C)  /* SSP Port 3 Programmable Serial Protocol */
+#else /* PXA255 (only port 2) and PXA26x ports*/
+#define SSTO_P1		__REG(0x41000028)  /* SSP Port 1 Time Out Register */
+#define SSPSP_P1	__REG(0x4100002C)  /* SSP Port 1 Programmable Serial Protocol */
+#define SSCR0_P2	__REG(0x41400000)  /* SSP Port 2 Control Register 0 */
+#define SSCR1_P2	__REG(0x41400004)  /* SSP Port 2 Control Register 1 */
+#define SSSR_P2		__REG(0x41400008)  /* SSP Port 2 Status Register */
+#define SSITR_P2	__REG(0x4140000C)  /* SSP Port 2 Interrupt Test Register */
+#define SSDR_P2		__REG(0x41400010)  /* (Write / Read) SSP Port 2 Data Write Register/SSP Data Read Register */
+#define SSTO_P2		__REG(0x41400028)  /* SSP Port 2 Time Out Register */
+#define SSPSP_P2	__REG(0x4140002C)  /* SSP Port 2 Programmable Serial Protocol */
+#define SSCR0_P3	__REG(0x41500000)  /* SSP Port 3 Control Register 0 */
+#define SSCR1_P3	__REG(0x41500004)  /* SSP Port 3 Control Register 1 */
+#define SSSR_P3		__REG(0x41500008)  /* SSP Port 3 Status Register */
+#define SSITR_P3	__REG(0x4150000C)  /* SSP Port 3 Interrupt Test Register */
+#define SSDR_P3		__REG(0x41500010)  /* (Write / Read) SSP Port 3 Data Write Register/SSP Data Read Register */
+#define SSTO_P3		__REG(0x41500028)  /* SSP Port 3 Time Out Register */
+#define SSPSP_P3	__REG(0x4150002C)  /* SSP Port 3 Programmable Serial Protocol */
+#endif
+
+#define SSCR0_P(x) (*(((x) == 1) ? &SSCR0_P1 : ((x) == 2) ? &SSCR0_P2 : ((x) == 3) ? &SSCR0_P3 : NULL))
+#define SSCR1_P(x) (*(((x) == 1) ? &SSCR1_P1 : ((x) == 2) ? &SSCR1_P2 : ((x) == 3) ? &SSCR1_P3 : NULL))
+#define SSSR_P(x) (*(((x) == 1) ? &SSSR_P1 : ((x) == 2) ? &SSSR_P2 : ((x) == 3) ? &SSSR_P3 : NULL))
+#define SSITR_P(x) (*(((x) == 1) ? &SSITR_P1 : ((x) == 2) ? &SSITR_P2 : ((x) == 3) ? &SSITR_P3 : NULL))
+#define SSDR_P(x) (*(((x) == 1) ? &SSDR_P1 : ((x) == 2) ? &SSDR_P2 : ((x) == 3) ? &SSDR_P3 : NULL))
+#define SSTO_P(x) (*(((x) == 1) ? &SSTO_P1 : ((x) == 2) ? &SSTO_P2 : ((x) == 3) ? &SSTO_P3 : NULL))
+#define SSPSP_P(x) (*(((x) == 1) ? &SSPSP_P1 : ((x) == 2) ? &SSPSP_P2 : ((x) == 3) ? &SSPSP_P3 : NULL))
 
 /*
  * MultiMediaCard (MMC) controller
@@ -1540,8 +1723,10 @@ typedef void            (*ExcpHndlr) (void) ;
 #define CKEN13_FICP	(1 << 13)	/* FICP Unit Clock Enable */
 #define CKEN12_MMC	(1 << 12)	/* MMC Unit Clock Enable */
 #define CKEN11_USB	(1 << 11)	/* USB Unit Clock Enable */
+#define CKEN10_ASSP	(1 << 10)	/* ASSP (SSP3) Clock Enable */
 #define CKEN10_USBHOST	(1 << 10)	/* USB Host Unit Clock Enable */
 #define CKEN9_OSTIMER	(1 << 9)	/* OS Timer Unit Clock Enable */
+#define CKEN9_NSSP	(1 << 9)	/* NSSP (SSP2) Clock Enable */
 #define CKEN8_I2S	(1 << 8)	/* I2S Unit Clock Enable */
 #define CKEN7_BTUART	(1 << 7)	/* BTUART Unit Clock Enable */
 #define CKEN6_FFUART	(1 << 6)	/* FFUART Unit Clock Enable */

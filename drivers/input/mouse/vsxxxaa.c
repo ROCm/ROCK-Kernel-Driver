@@ -106,7 +106,7 @@ MODULE_LICENSE ("GPL");
 #define VSXXXAA_PACKET_POR	0xa0
 #define MATCH_PACKET_TYPE(data, type)	(((data) & VSXXXAA_PACKET_MASK) == type)
 
-static int vsxxxaa_num;
+
 
 struct vsxxxaa {
 	struct input_dev dev;
@@ -479,7 +479,6 @@ vsxxxaa_disconnect (struct serio *serio)
 	struct vsxxxaa *mouse = serio->private;
 
 	input_unregister_device (&mouse->dev);
-	put_device(&serio->dev);
 	serio_close (serio);
 	kfree (mouse);
 }
@@ -537,9 +536,6 @@ vsxxxaa_connect (struct serio *serio, struct serio_driver *drv)
 	 * mode will be requested after the device ID'ed successfully.
 	 */
 	mouse->serio->write (mouse->serio, 'T'); /* Test */
-
-	mouse->dev.dev = get_device(&serio->dev);
-	sprintf(mouse->dev.cdev.class_id,"decmouse%d", vsxxxaa_num++);
 
 	input_register_device (&mouse->dev);
 

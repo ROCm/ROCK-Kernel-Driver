@@ -1,7 +1,7 @@
 #
 # USB Input driver configuration
 #
-comment "USB Human Interface Devices (HID)"
+comment "USB Input Devices"
 	depends on USB
 
 config USB_HID
@@ -12,7 +12,8 @@ config USB_HID
 	  mice, joysticks, graphic tablets, or any other HID based devices
 	  to your computer via USB. You also need to select HID Input layer
 	  support (below) if you want to use keyboards, mice, joysticks and
-	  the like.
+	  the like ... as well as Uninterruptible Power Supply (UPS) and
+	  monitor control devices.
 
 	  You can't use this driver and the HIDBP (Boot Protocol) keyboard
 	  and mouse drivers at the same time. More information is available:
@@ -24,7 +25,7 @@ config USB_HID
 	  module will be called usbhid.
 
 comment "Input core support is needed for USB HID input layer or HIDBP support"
-	depends on USB && INPUT=n
+	depends on USB_HID && INPUT=n
 
 config USB_HIDINPUT
 	bool "HID input layer support"
@@ -32,8 +33,7 @@ config USB_HIDINPUT
 	depends on INPUT && USB_HID
 	help
 	  Say Y here if you want to use a USB keyboard, mouse or joystick,
-	  or any other HID input device. You also need "Input core support", 
-	  (CONFIG_INPUT), which you select under "Input device support", above.
+	  or any other HID input device.
 
 	  If unsure, say Y.
 
@@ -87,7 +87,6 @@ config USB_HIDDEV
 
 	  This module supports these devices separately using a separate
 	  event interface on /dev/usb/hiddevX (char 180:96 to 180:111).
-	  This driver requires CONFIG_USB_HID.
 
 	  If unsure, say Y.
 
@@ -200,6 +199,9 @@ config USB_EGALAX
 
 	  The driver has been tested on a Xenarc 700TSV monitor
 	  with eGalax touchscreen.
+
+	  Have a look at http://linux.chapter7.ch/touchkit/ for
+	  a usage description and the required user-space stuff.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called touchkitusb.

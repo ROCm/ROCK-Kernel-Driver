@@ -663,3 +663,50 @@ sys_call_table:
 	.long sys_lremovexattr
 	.long sys_fremovexattr
 	.long sys_futex		/* 235 */
+	.long sys_sendfile64
+	.long sys_mincore
+	.long sys_madvise
+	.long sys_fcntl64
+	.long sys_readahead	/* 240 */
+	.long sys_io_setup
+	.long sys_io_destroy
+	.long sys_io_getevents
+	.long sys_io_submit
+	.long sys_io_cancel	/* 245 */
+	.long sys_fadvise64
+	.long sys_exit_group
+	.long sys_lookup_dcookie
+	.long sys_epoll_create
+	.long sys_epoll_ctl	/* 250 */
+	.long sys_epoll_wait
+	.long sys_remap_file_pages
+	.long sys_set_tid_address
+	.long sys_timer_create
+	.long sys_timer_settime	/* 255 */
+	.long sys_timer_gettime
+	.long sys_timer_getoverrun
+	.long sys_timer_delete
+	.long sys_clock_settime
+	.long sys_clock_gettime	/* 260 */
+	.long sys_clock_getres
+	.long sys_clock_nanosleep
+	.long sys_statfs64
+	.long sys_fstatfs64
+	.long sys_tgkill	/* 265 */
+	.long sys_utimes
+	.long sys_fadvise64_64
+	.long sys_mbind	
+	.long sys_get_mempolicy
+	.long sys_set_mempolicy	/* 270 */
+	.long sys_mq_open
+	.long sys_mq_unlink
+	.long sys_mq_timedsend
+	.long sys_mq_timedreceive
+	.long sys_mq_notify	/* 275 */
+	.long sys_mq_getsetattr
+	.long sys_waitid
+	.long sys_ni_syscall	/* for sys_vserver */
+	.long sys_add_key
+	.long sys_request_key	/* 280 */
+	.long sys_keyctl
+

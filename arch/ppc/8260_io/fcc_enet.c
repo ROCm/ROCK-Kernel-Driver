@@ -34,12 +34,12 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/spinlock.h>
+#include <linux/bitops.h>
 
 #include <asm/immap_cpm2.h>
 #include <asm/pgtable.h>
 #include <asm/mpc8260.h>
 #include <asm/irq.h>
-#include <asm/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/cpm2.h>
 
@@ -1986,9 +1986,9 @@ fcc_restart(struct net_device *dev, int duplex)
 	fccp = fcp->fccp;
 
 	if (duplex)
-		fccp->fcc_fpsmr |= FCC_PSMR_FDE;
+		fccp->fcc_fpsmr |= FCC_PSMR_FDE | FCC_PSMR_LPB;
 	else
-		fccp->fcc_fpsmr &= ~FCC_PSMR_FDE;
+		fccp->fcc_fpsmr &= ~(FCC_PSMR_FDE | FCC_PSMR_LPB);
 
 	/* Enable transmit/receive */
 	fccp->fcc_gfmr |= FCC_GFMR_ENR | FCC_GFMR_ENT;

@@ -25,8 +25,8 @@
 	 * }
 	 */
 
-	.globl	atomic_dec_and_lock
-atomic_dec_and_lock:	/* %o0 = counter, %o1 = lock */
+	.globl	_atomic_dec_and_lock
+_atomic_dec_and_lock:	/* %o0 = counter, %o1 = lock */
 loop1:	lduw	[%o0], %g5
 	subcc	%g5, 1, %g7
 	be,pn	%icc, start_to_zero

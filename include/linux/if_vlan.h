@@ -18,7 +18,6 @@
 /* externally defined structs */
 struct vlan_group;
 struct net_device;
-struct sk_buff;
 struct packet_type;
 struct vlan_collection;
 struct vlan_dev_info;
@@ -47,6 +46,13 @@ struct vlan_ethhdr {
    unsigned short       h_vlan_TCI;                /* Encapsulates priority and VLAN ID */
    unsigned short	h_vlan_encapsulated_proto; /* packet type ID field (or len) */
 };
+
+#include <linux/skbuff.h>
+
+static inline struct vlan_ethhdr *vlan_eth_hdr(const struct sk_buff *skb)
+{
+	return (struct vlan_ethhdr *)skb->mac.raw;
+}
 
 struct vlan_hdr {
    unsigned short       h_vlan_TCI;                /* Encapsulates priority and VLAN ID */
@@ -180,7 +186,7 @@ static inline int __vlan_hwaccel_rx(struct sk_buff *skb,
 		 * This allows the VLAN to have a different MAC than the underlying
 		 * device, and still route correctly.
 		 */
-		if (!memcmp(skb->mac.ethernet->h_dest, skb->dev->dev_addr, ETH_ALEN))
+		if (!memcmp(eth_hdr(skb)->h_dest, skb->dev->dev_addr, ETH_ALEN))
 			skb->pkt_type = PACKET_HOST;
 		break;
 	};
@@ -360,7 +366,9 @@ enum vlan_ioctl_cmds {
 	GET_VLAN_INGRESS_PRIORITY_CMD,
 	GET_VLAN_EGRESS_PRIORITY_CMD,
 	SET_VLAN_NAME_TYPE_CMD,
-	SET_VLAN_FLAG_CMD
+	SET_VLAN_FLAG_CMD,
+	GET_VLAN_REALDEV_NAME_CMD, /* If this works, you know it's a VLAN device, btw */
+	GET_VLAN_VID_CMD /* Get the VID of this VLAN (specified by name) */
 };
 
 enum vlan_name_types {

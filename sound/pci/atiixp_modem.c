@@ -43,15 +43,14 @@ static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 48000};
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for ATI IXP controller.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for ATI IXP controller.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable audio part of ATI IXP controller.");
-module_param_array(ac97_clock, int, boot_devs, 0444);
+module_param_array(ac97_clock, int, NULL, 0444);
 MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (default 48000Hz).");
 
 
@@ -1143,6 +1142,7 @@ static int snd_atiixp_resume(snd_card_t *card, unsigned int state)
 
 	pci_enable_device(chip->pci);
 	pci_set_power_state(chip->pci, 0);
+	pci_set_master(chip->pci);
 
 	snd_atiixp_aclink_reset(chip);
 	snd_atiixp_chip_start(chip);
@@ -1196,6 +1196,7 @@ static int snd_atiixp_free(atiixp_t *chip)
 	if (chip->remap_addr)
 		iounmap(chip->remap_addr);
 	pci_release_regions(chip->pci);
+	pci_disable_device(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -1223,8 +1224,10 @@ static int __devinit snd_atiixp_create(snd_card_t *card,
 		return err;
 
 	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
-	if (chip == NULL)
+	if (chip == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 
 	spin_lock_init(&chip->reg_lock);
 	spin_lock_init(&chip->ac97_lock);
@@ -1234,6 +1237,7 @@ static int __devinit snd_atiixp_create(snd_card_t *card,
 	chip->irq = -1;
 	if ((err = pci_request_regions(pci, "ATI IXP MC97")) < 0) {
 		kfree(chip);
+		pci_disable_device(pci);
 		return err;
 	}
 	chip->addr = pci_resource_start(pci, 0);

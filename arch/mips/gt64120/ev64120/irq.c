@@ -39,7 +39,7 @@
 #include <linux/timex.h>
 #include <linux/slab.h>
 #include <linux/random.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/bootinfo.h>
 #include <asm/io.h>
 #include <asm/mipsregs.h>
@@ -128,7 +128,7 @@ void gt64120_irq_setup(void)
 	set_c0_status(IE_IRQ2);
 }
 
-void __init init_IRQ(void)
+void __init arch_init_irq(void)
 {
 	int i;
 

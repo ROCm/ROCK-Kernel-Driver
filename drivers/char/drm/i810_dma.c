@@ -138,8 +138,8 @@ int i810_mmap_buffers(struct file *filp, struct vm_area_struct *vma)
    	buf_priv->currently_mapped = I810_BUF_MAPPED;
 	unlock_kernel();
 
-	if (remap_page_range(DRM_RPR_ARG(vma) vma->vm_start,
-			     VM_OFFSET(vma),
+	if (remap_pfn_range(DRM_RPR_ARG(vma) vma->vm_start,
+			     VM_OFFSET(vma) >> PAGE_SHIFT,
 			     vma->vm_end - vma->vm_start,
 			     vma->vm_page_prot)) return -EAGAIN;
 	return 0;
@@ -1412,5 +1412,11 @@ void i810_driver_register_fns(drm_device_t *dev)
 	dev->fn_tbl.release = i810_driver_release;
 	dev->fn_tbl.dma_quiescent = i810_driver_dma_quiescent;
 	dev->fn_tbl.reclaim_buffers = i810_reclaim_buffers;
+
+	dev->counters += 4;
+	dev->types[6] = _DRM_STAT_IRQ;
+	dev->types[7] = _DRM_STAT_PRIMARY;
+	dev->types[8] = _DRM_STAT_SECONDARY;
+	dev->types[9] = _DRM_STAT_DMA;
 }
 

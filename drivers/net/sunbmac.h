@@ -303,10 +303,10 @@ enum bigmac_timer_state {
 };
 
 struct bigmac {
-	unsigned long	gregs;	/* QEC Global Registers               */
-	unsigned long	creg;	/* QEC BigMAC Channel Registers       */
-	unsigned long	bregs;	/* BigMAC Registers                   */
-	unsigned long	tregs;	/* BigMAC Transceiver                 */
+	void __iomem	*gregs;	/* QEC Global Registers               */
+	void __iomem	*creg;	/* QEC BigMAC Channel Registers       */
+	void __iomem	*bregs;	/* BigMAC Registers                   */
+	void __iomem	*tregs;	/* BigMAC Transceiver                 */
 	struct bmac_init_block	*bmac_block;	/* RX and TX descriptors */
 	__u32			 bblock_dvma;	/* RX and TX descriptors */
 

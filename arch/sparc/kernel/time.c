@@ -53,7 +53,7 @@ EXPORT_SYMBOL(jiffies_64);
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 enum sparc_clock_type sp_clock_typ;
 spinlock_t mostek_lock = SPIN_LOCK_UNLOCKED;
-unsigned long mstk48t02_regs = 0UL;
+void __iomem *mstk48t02_regs = NULL;
 static struct mostek48t08 *mstk48t08_regs = NULL;
 static int set_rtc_mmss(unsigned long);
 static int sbus_do_settimeofday(struct timespec *tv);
@@ -134,6 +134,10 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	clear_clock_irq();
 
 	do_timer(regs);
+#ifndef CONFIG_SMP
+	update_process_times(user_mode(regs));
+#endif
+
 
 	/* Determine when to update the Mostek clock. */
 	if ((time_status & STA_UNSYNC) == 0 &&
@@ -346,7 +350,7 @@ static __inline__ void clock_probe(void)
 		mstk48t08_regs = (struct mostek48t08 *) sbus_ioremap(&r, 0,
 		    sizeof(struct mostek48t08), "mk48t08");
 
-		mstk48t02_regs = (unsigned long)&mstk48t08_regs->regs;
+		mstk48t02_regs = &mstk48t08_regs->regs;
 	} else {
 		prom_printf("CLOCK: Unknown model name '%s'\n",model);
 		prom_halt();

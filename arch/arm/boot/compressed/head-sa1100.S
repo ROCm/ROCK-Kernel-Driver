@@ -16,47 +16,13 @@
 __SA1100_start:
 
 		@ Preserve r8/r7 i.e. kernel entry values
-
-#if defined(CONFIG_SA1100_GRAPHICSCLIENT) && !defined(CONFIG_ANGELBOOT)
-		mov	r7, #MACH_TYPE_GRAPHICSCLIENT
-		mov	r8, #0
-#endif
-#if defined(CONFIG_SA1100_GRAPHICSMASTER) && !defined(CONFIG_ANGELBOOT)
-		mov	r7, #MACH_TYPE_GRAPHICSMASTER
-		mov	r8, #0
-#endif
-#if defined(CONFIG_SA1100_ADSBITSY) && !defined(CONFIG_ANGELBOOT)
-		mov	r7, #MACH_TYPE_ADSBITSY
-		mov	r8, #0
-#endif
-
 #ifdef CONFIG_SA1100_COLLIE
 		mov	r7, #MACH_TYPE_COLLIE
 #endif
-#ifdef CONFIG_SA1100_PFS168
-		@ REVISIT_PFS168: Temporary until firmware updated to use assigned machine number
-		mov	r7, #MACH_TYPE_PFS168
-#endif
 #ifdef CONFIG_SA1100_SIMPAD
 		@ UNTIL we've something like an open bootldr
-		mov	r7, #MACH_TYPE_SIMPAD @should be 87
+		mov	r7, #MACH_TYPE_SIMPAD	@should be 87
 #endif
-
-#ifdef CONFIG_SA1100_VICTOR
-		teq	r7, #MACH_TYPE_VICTOR
-		bne	10f
-
-		@ Copy cmdline to 0xc0000000
-		mov	r1, #0xc0000000
-		cmp	r0, #0
-		moveq	r2, #0
-1:		ldrneb	r2, [r0], #1
-		cmpne	r2, #0
-		strb	r2, [r1], #1
-		bne	1b
-10:
-#endif
-
 		mrc	p15, 0, r0, c1, c0, 0	@ read control reg
 		ands	r0, r0, #0x0d
 		beq	99f

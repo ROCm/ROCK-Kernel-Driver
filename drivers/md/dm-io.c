@@ -267,7 +267,7 @@ static int resize_pool(unsigned int new_ios)
 		/* create new pool */
 		_io_pool = mempool_create(new_ios, alloc_io, free_io, NULL);
 		if (!_io_pool)
-			r = -ENOMEM;
+			return -ENOMEM;
 
 		r = bio_set_init(&_bios, "dm-io", 512, 1);
 		if (r) {

@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000-2004 Silicon Graphics, Inc. All rights reserved.
  */
 #ifndef _ASM_IA64_SN_NODEPDA_H
 #define _ASM_IA64_SN_NODEPDA_H
@@ -14,9 +14,7 @@
 #include <asm/sn/intr.h>
 #include <asm/sn/router.h>
 #include <asm/sn/pda.h>
-#include <asm/sn/module.h>
 #include <asm/sn/bte.h>
-#include <asm/sn/sn2/arch.h>
 
 /*
  * NUMA Node-Specific Data structures are defined in this file.
@@ -32,32 +30,14 @@
  * This structure provides a convenient way of keeping together 
  * all per-node data structures. 
  */
-
-
+struct phys_cpuid {
+	short			nasid;
+	char			subnode;
+	char			slice;
+};
 
 struct nodepda_s {
-	vertex_hdl_t 	xbow_vhdl;
-	nasid_t		xbow_peer;	/* NASID of our peer hub on xbow */
-	struct semaphore xbow_sema;	/* Sema for xbow synchronization */
-	slotid_t	slotdesc;
-	geoid_t		geoid;
-	module_t	*module;	/* Pointer to containing module */
-	xwidgetnum_t 	basew_id;
-	vertex_hdl_t 	basew_xc;
-	int		hubticks;
-	int		num_routers;	/* XXX not setup! Total routers in the system */
-
-	
-	char		*hwg_node_name;	/* hwgraph node name */
-	vertex_hdl_t	node_vertex;	/* Hwgraph vertex for this node */
-
 	void 		*pdinfo;	/* Platform-dependent per-node info */
-
-
-	nodepda_router_info_t	*npda_rip_first;
-	nodepda_router_info_t	**npda_rip_last;
-
-
 	spinlock_t		bist_lock;
 
 	/*
@@ -72,20 +52,13 @@ struct nodepda_s {
 	 */
 	struct nodepda_s	*pernode_pdaindr[MAX_COMPACT_NODES]; 
 
+	/*
+	 * Array of physical cpu identifiers. Indexed by cpuid.
+	 */
+	struct phys_cpuid	phys_cpuid[NR_CPUS];
 };
 
 typedef struct nodepda_s nodepda_t;
-
-struct irqpda_s {
-	int num_irq_used;
-	char irq_flags[NR_IRQS];
-	struct pci_dev *device_dev[NR_IRQS];
-	char share_count[NR_IRQS];
-	struct pci_dev *curr;
-};
-
-typedef struct irqpda_s irqpda_t;
-
 
 /*
  * Access Functions for node PDA.
@@ -104,32 +77,10 @@ typedef struct irqpda_s irqpda_t;
 #define	nodepda		pda->p_nodepda		/* Ptr to this node's PDA */
 #define	NODEPDA(cnode)		(nodepda->pernode_pdaindr[cnode])
 
-
-/*
- * Macros to access data structures inside nodepda 
- */
-#define NODE_MODULEID(cnode)    geo_module((NODEPDA(cnode)->geoid))
-#define NODE_SLOTID(cnode)	(NODEPDA(cnode)->slotdesc)
-
-
-/*
- * Quickly convert a compact node ID into a hwgraph vertex
- */
-#define cnodeid_to_vertex(cnodeid) (NODEPDA(cnodeid)->node_vertex)
-
-
 /*
  * Check if given a compact node id the corresponding node has all the
  * cpus disabled. 
  */
 #define is_headless_node(cnode)		(nr_cpus_node(cnode) == 0)
-
-/*
- * Check if given a node vertex handle the corresponding node has all the
- * cpus disabled. 
- */
-#define is_headless_node_vertex(_nodevhdl) \
-			is_headless_node(nodevertex_to_cnodeid(_nodevhdl))
-
 
 #endif /* _ASM_IA64_SN_NODEPDA_H */

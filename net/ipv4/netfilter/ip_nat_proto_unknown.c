@@ -39,7 +39,7 @@ static int unknown_unique_tuple(struct ip_conntrack_tuple *tuple,
 
 static int
 unknown_manip_pkt(struct sk_buff **pskb,
-		  unsigned int hdroff,
+		  unsigned int iphdroff,
 		  const struct ip_conntrack_manip *manip,
 		  enum ip_nat_manip_type maniptype)
 {
@@ -60,8 +60,8 @@ unknown_print_range(char *buffer, const struct ip_nat_range *range)
 	return 0;
 }
 
-struct ip_nat_protocol unknown_nat_protocol = {
-	{ NULL, NULL }, "unknown", 0,
+struct ip_nat_protocol ip_nat_unknown_protocol = {
+	"unknown", 0,
 	unknown_manip_pkt,
 	unknown_in_range,
 	unknown_unique_tuple,

@@ -216,9 +216,9 @@ struct goku_ep {
 	struct list_head			queue;
 	const struct usb_endpoint_descriptor	*desc;
 
-	u32					*reg_fifo;
-	u32					*reg_mode;
-	u32					*reg_status;
+	u32 __iomem				*reg_fifo;
+	u32 __iomem				*reg_mode;
+	u32 __iomem				*reg_status;
 };
 
 struct goku_request {
@@ -253,7 +253,7 @@ struct goku_udc {
 
 	/* pci state used to access those endpoints */
 	struct pci_dev			*pdev;
-	struct goku_udc_regs		*regs;
+	struct goku_udc_regs __iomem	*regs;
 	u32				int_enable;
 
 	/* statistics... */

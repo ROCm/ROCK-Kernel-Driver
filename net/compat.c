@@ -22,6 +22,7 @@
 #include <linux/filter.h>
 #include <linux/compat.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
+#include <linux/security.h>
 
 #include <net/scm.h>
 #include <net/sock.h>
@@ -266,6 +267,9 @@ void scm_detach_fds_compat(struct msghdr *kmsg, struct scm_cookie *scm)
 
 	for (i = 0, cmfptr = (int __user *) CMSG_COMPAT_DATA(cm); i < fdmax; i++, cmfptr++) {
 		int new_fd;
+		err = security_file_receive(fp[i]);
+		if (err)
+			break;
 		err = get_unused_fd();
 		if (err < 0)
 			break;
@@ -458,7 +462,7 @@ asmlinkage long compat_sys_setsockopt(int fd, int level, int optname,
 				char __user *optval, int optlen)
 {
 	/* SO_SET_REPLACE seems to be the same in all levels */
-	if (/*level == SOL_IP && */optname == IPT_SO_SET_REPLACE)
+	if (optname == IPT_SO_SET_REPLACE)
 		return do_netfilter_replace(fd, level, optname,
 					    optval, optlen);
 	if (level == SOL_SOCKET && optname == SO_ATTACH_FILTER)
@@ -503,8 +507,7 @@ static int do_get_sock_timeout(int fd, int level, int optname,
 asmlinkage long compat_sys_getsockopt(int fd, int level, int optname,
 				char __user *optval, int __user *optlen)
 {
-	if (level == SOL_SOCKET &&
-	    (optname == SO_RCVTIMEO || optname == SO_SNDTIMEO))
+	if (optname == SO_RCVTIMEO || optname == SO_SNDTIMEO)
 		return do_get_sock_timeout(fd, level, optname, optval, optlen);
 	return sys_getsockopt(fd, level, optname, optval, optlen);
 }

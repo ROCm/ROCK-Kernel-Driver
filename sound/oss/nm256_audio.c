@@ -1011,7 +1011,7 @@ nm256_peek_for_sig (struct nm256_info *card)
     u32 port1offset 
 	= card->port[0].physaddr + card->port[0].end_offset - 0x0400;
     /* The signature is located 1K below the end of video RAM.  */
-    char *temp = ioremap_nocache (port1offset, 16);
+    char __iomem *temp = ioremap_nocache (port1offset, 16);
     /* Default buffer end is 5120 bytes below the top of RAM.  */
     u32 default_value = card->port[0].end_offset - 0x1400;
     u32 sig;

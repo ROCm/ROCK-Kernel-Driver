@@ -49,6 +49,11 @@
 
 #include "soc_common.h"
 
+/* FIXME: platform dependent resource declaration has to move out of this file */
+#ifdef CONFIG_ARCH_PXA
+#include <asm/arch/pxa-regs.h>
+#endif
+
 #ifdef DEBUG
 
 static int pc_debug;

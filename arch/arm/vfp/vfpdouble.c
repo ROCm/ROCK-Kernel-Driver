@@ -31,7 +31,7 @@
  * ===========================================================================
  */
 #include <linux/kernel.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/ptrace.h>
 #include <asm/vfp.h>
 
@@ -195,7 +195,7 @@ u32 vfp_double_normaliseround(int dd, struct vfp_double *vd, u32 fpscr, u32 exce
 			 dd, d, exceptions);
 		vfp_put_double(dd, d);
 	}
-	return exceptions;
+	return exceptions & ~VFP_NAN_FLAG;
 }
 
 /*
@@ -240,7 +240,7 @@ vfp_propagate_nan(struct vfp_double *vdd, struct vfp_double *vdn,
 	/*
 	 * If one was a signalling NAN, raise invalid operation.
 	 */
-	return tn == VFP_SNAN || tm == VFP_SNAN ? FPSCR_IOC : 0x100;
+	return tn == VFP_SNAN || tm == VFP_SNAN ? FPSCR_IOC : VFP_NAN_FLAG;
 }
 
 /*
@@ -427,12 +427,12 @@ static u32 vfp_double_fcmpe(int dd, int unused, int dm, u32 fpscr)
 
 static u32 vfp_double_fcmpz(int dd, int unused, int dm, u32 fpscr)
 {
-	return vfp_compare(dd, 0, -1, fpscr);
+	return vfp_compare(dd, 0, VFP_REG_ZERO, fpscr);
 }
 
 static u32 vfp_double_fcmpez(int dd, int unused, int dm, u32 fpscr)
 {
-	return vfp_compare(dd, 1, -1, fpscr);
+	return vfp_compare(dd, 1, VFP_REG_ZERO, fpscr);
 }
 
 static u32 vfp_double_fcvts(int sd, int unused, int dm, u32 fpscr)

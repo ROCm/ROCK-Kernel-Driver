@@ -290,14 +290,20 @@
 #define __NR_mq_getsetattr	(__NR_mq_open+5)
 #define __NR_sys_kexec_load	283
 #define __NR_waitid		284
+/* #define __NR_sys_setaltroot	285 */
+#define __NR_add_key		286
+#define __NR_request_key	287
+#define __NR_keyctl		288
 
-#define NR_syscalls 285
+#define NR_syscalls 289
 
-/* user-visible error numbers are in the range -1 - -124: see <asm-i386/errno.h> */
-
+/*
+ * user-visible error numbers are in the range -1 - -128: see
+ * <asm-i386/errno.h>
+ */
 #define __syscall_return(type, res) \
 do { \
-	if ((unsigned long)(res) >= (unsigned long)(-125)) { \
+	if ((unsigned long)(res) >= (unsigned long)(-(128 + 1))) { \
 		errno = -(res); \
 		res = -1; \
 	} \

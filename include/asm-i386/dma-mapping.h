@@ -1,7 +1,6 @@
 #ifndef _ASM_I386_DMA_MAPPING_H
 #define _ASM_I386_DMA_MAPPING_H
 
-#include <linux/device.h>
 #include <linux/mm.h>
 
 #include <asm/cache.h>

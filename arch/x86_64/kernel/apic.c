@@ -32,8 +32,9 @@
 #include <asm/mtrr.h>
 #include <asm/mpspec.h>
 #include <asm/pgalloc.h>
+#include <asm/mach_apic.h>
 
-int apic_verbosity; 
+int apic_verbosity;
 
 int disable_apic_timer __initdata;
 
@@ -300,8 +301,7 @@ void __init setup_local_APIC (void)
 	 * Double-check whether this APIC is really registered.
 	 * This is meaningless in clustered apic mode, so we skip it.
 	 */
-	if (!clustered_apic_mode &&
-		!physid_isset(GET_APIC_ID(apic_read(APIC_ID)), phys_cpu_present_map))
+	if (!apic_id_registered())
 		BUG();
 
 	/*
@@ -309,23 +309,7 @@ void __init setup_local_APIC (void)
 	 * an APIC.  See e.g. "AP-388 82489DX User's Manual" (Intel
 	 * document number 292116).  So here it goes...
 	 */
-
-	if (!clustered_apic_mode) {
-		/*
-		 * In clustered apic mode, the firmware does this for us 
-		 * Put the APIC into flat delivery mode.
-		 * Must be "all ones" explicitly for 82489DX.
-		 */
-		apic_write_around(APIC_DFR, 0xffffffff);
-
-		/*
-		 * Set up the logical destination ID.
-		 */
-		value = apic_read(APIC_LDR);
-		value &= ~APIC_LDR_MASK;
-		value |= (1<<(smp_processor_id()+24));
-		apic_write_around(APIC_LDR, value);
-	}
+	init_apic_ldr();
 
 	/*
 	 * Set Task Priority to 'accept all'. We never change this
@@ -422,9 +406,9 @@ void __init setup_local_APIC (void)
 		if (maxlvt > 3)
 			apic_write(APIC_ESR, 0);
 		value = apic_read(APIC_ESR);
-		if (value != oldvalue) 
-			apic_printk(APIC_VERBOSE, 
-			"ESR value after enabling vector: %08x, after %08x\n", 
+		if (value != oldvalue)
+			apic_printk(APIC_VERBOSE,
+			"ESR value after enabling vector: %08x, after %08x\n",
 			oldvalue, value);
 	} else {
 		if (esr_disable)	
@@ -922,6 +906,54 @@ void smp_apic_timer_interrupt(struct pt_regs *regs)
 }
 
 /*
+ * oem_force_hpet_timer -- force HPET mode for some boxes.
+ *
+ * Thus far, the major user of this is IBM's Summit2 series:
+ *
+ * Clustered boxes may have unsynced TSC problems if they are
+ * multi-chassis. Use available data to take a good guess.
+ * If in doubt, go HPET.
+ */
+__init int oem_force_hpet_timer(void)
+{
+	int i, clusters, zeros;
+	unsigned id;
+	DECLARE_BITMAP(clustermap, NUM_APIC_CLUSTERS);
+
+	bitmap_empty(clustermap, NUM_APIC_CLUSTERS);
+
+	for (i = 0; i < NR_CPUS; i++) {
+		id = bios_cpu_apicid[i];
+		if (id != BAD_APICID)
+			__set_bit(APIC_CLUSTERID(id), clustermap);
+	}
+
+	/* Problem:  Partially populated chassis may not have CPUs in some of
+	 * the APIC clusters they have been allocated.  Only present CPUs have
+	 * bios_cpu_apicid entries, thus causing zeroes in the bitmap.  Since
+	 * clusters are allocated sequentially, count zeros only if they are
+	 * bounded by ones.
+	 */
+	clusters = 0;
+	zeros = 0;
+	for (i = 0; i < NUM_APIC_CLUSTERS; i++) {
+		if (test_bit(i, clustermap)) {
+			clusters += 1 + zeros;
+			zeros = 0;
+		} else
+			++zeros;
+	}
+
+	/*
+	 * If clusters > 2, then should be multi-chassis.  Return 1 for HPET.
+	 * Else return 0 to use TSC.
+	 * May have to revisit this when multi-core + hyperthreaded CPUs come
+	 * out, but AFAIK this will work even for them.
+	 */
+	return (clusters > 2);
+}
+
+/*
  * This interrupt should _never_ happen with our APIC/SMP architecture
  */
 asmlinkage void smp_spurious_interrupt(void)
@@ -986,7 +1018,6 @@ asmlinkage void smp_error_interrupt(void)
 }
 
 int disable_apic; 
-int enable_local_apic = 1;
 
 /*
  * This initializes the IO-APIC and APIC hardware if this is
@@ -1026,14 +1057,12 @@ int __init APIC_init_uniprocessor (void)
 
 static __init int setup_disableapic(char *str) 
 { 
-	enable_local_apic = -1;
 	disable_apic = 1;
 	return 0;
 } 
 
 static __init int setup_nolapic(char *str) 
 { 
-	enable_local_apic = -1;
 	disable_apic = 1;
 	return 0;
 } 

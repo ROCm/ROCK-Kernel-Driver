@@ -15,8 +15,8 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/zorro.h>
+#include <linux/bitops.h>
 #include <asm/setup.h>
-#include <asm/bitops.h>
 #include <asm/amigahw.h>
 
 #include "zorro.h"

@@ -22,6 +22,7 @@
 #include <asm/io.h>
 #include <asm/sbus.h>
 #include <asm/ebus.h>
+#include <asm/upa.h>
 
 static spinlock_t flash_lock = SPIN_LOCK_UNLOCKED;
 static struct {
@@ -65,7 +66,7 @@ flash_mmap(struct file *file, struct vm_area_struct *vma)
 
 	if ((vma->vm_pgoff << PAGE_SHIFT) > size)
 		return -ENXIO;
-	addr += (vma->vm_pgoff << PAGE_SHIFT);
+	addr = vma->vm_pgoff + (addr >> PAGE_SHIFT);
 
 	if (vma->vm_end - (vma->vm_start + (vma->vm_pgoff << PAGE_SHIFT)) > size)
 		size = vma->vm_end - (vma->vm_start + (vma->vm_pgoff << PAGE_SHIFT));
@@ -74,7 +75,7 @@ flash_mmap(struct file *file, struct vm_area_struct *vma)
 	pgprot_val(vma->vm_page_prot) |= _PAGE_E;
 	vma->vm_flags |= (VM_SHM | VM_LOCKED);
 
-	if (remap_page_range(vma, vma->vm_start, addr, size, vma->vm_page_prot))
+	if (remap_pfn_range(vma, vma->vm_start, addr, size, vma->vm_page_prot))
 		return -EAGAIN;
 		
 	return 0;
@@ -115,7 +116,7 @@ flash_read(struct file * file, char __user * buf,
 		count = flash.read_size - p;
 
 	for (i = 0; i < count; i++) {
-		u8 data = readb(flash.read_base + p + i);
+		u8 data = upa_readb(flash.read_base + p + i);
 		if (put_user(data, buf))
 			return -EFAULT;
 		buf++;

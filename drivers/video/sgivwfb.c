@@ -719,8 +719,8 @@ static int sgivwfb_mmap(struct fb_info *info, struct file *file,
 	pgprot_val(vma->vm_page_prot) =
 	    pgprot_val(vma->vm_page_prot) | _PAGE_PCD;
 	vma->vm_flags |= VM_IO;
-	if (remap_page_range
-	    (vma, vma->vm_start, offset, size, vma->vm_page_prot))
+	if (remap_pfn_range(vma, vma->vm_start, offset >> PAGE_SHIFT,
+						size, vma->vm_page_prot))
 		return -EAGAIN;
 	vma->vm_file = file;
 	printk(KERN_DEBUG "sgivwfb: mmap framebuffer P(%lx)->V(%lx)\n",
@@ -870,7 +870,11 @@ int __init sgivwfb_init(void)
 	int ret;
 
 #ifndef MODULE
-	sgivwfb_setup(fb_get_options("sgivwfb"));
+	char *option = NULL;
+
+	if (fb_get_options("sgivwfb", &option))
+		return -ENODEV;
+	sgivwfb_setup(option);
 #endif
 	ret = driver_register(&sgivwfb_driver);
 	if (!ret) {

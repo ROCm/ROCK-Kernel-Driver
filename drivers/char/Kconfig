@@ -59,11 +59,8 @@ config VT_CONSOLE
 
 config HW_CONSOLE
 	bool
-	depends on VT && !S390
+	depends on VT && !S390 && !USERMODE
 	default y
-
-config ECC
-	tristate "ECC memory monitoring"
 
 config SERIAL_NONSTANDARD
 	bool "Non-standard serial port support"
@@ -381,24 +378,6 @@ config AU1000_SERIAL_CONSOLE
 	  If you have an Alchemy AU1000 processor (MIPS based) and you want
 	  to use a console on a serial port, say Y.  Otherwise, say N.
 
-config FETCHOP
-	tristate "SGI Altix small TLB memory mapping support"
-	depends on IA64_GENERIC || IA64_SGI_SN2
-	default y
-	help
-	  Support small TLB entry memory mapping for special uncached
-	  operations that can operate without interference from
-	  kernel speculation.
-
-config SGI_IOC4_SERIAL
-	tristate "SGI Altix ioc4 serial support"
-	depends on SERIAL_NONSTANDARD && (IA64_GENERIC || IA64_SGI_SN2)
-	help
-	  If you have an SGI Altix and you would like to use the ioc4
-	  serial ports, say M.  Otherwise, say N.
-
-	  This driver will be built as a module called ioc4_serial.
-
 config QTRONIX_KEYBOARD
 	bool "Enable Qtronix 990P Keyboard Support"
 	depends on IT8712
@@ -499,6 +478,7 @@ config LEGACY_PTYS
 config LEGACY_PTY_COUNT
 	int "Maximum number of legacy PTY in use"
 	depends on LEGACY_PTYS
+	range 1 256
 	default "256"
 	---help---
 	  The maximum number of legacy PTYs that can be used at any one time.
@@ -801,6 +781,23 @@ config EFI_RTC
 	bool "EFI Real Time Clock Services"
 	depends on IA64
 
+config DS1302
+	tristate "DS1302 RTC support"
+	depends on M32R && (PLAT_M32700UT || PLAT_OPSPUT)
+	help
+	  If you say Y here and create a character special file /dev/rtc with
+	  major number 121 and minor number 0 using mknod ("man mknod"), you
+	  will get access to the real time clock (or hardware clock) built
+	  into your computer.
+
+config S3C2410_RTC
+	bool "S3C2410 RTC Driver"
+	depends on ARCH_S3C2410
+	help
+	  RTC (Realtime Clock) driver for the clock inbuilt into the
+	  Samsung S3C2410. This can provide periodic interrupt rates
+	  from 1Hz to 64Hz for user programs, and wakeup from Alarm.
+
 config COBALT_LCD
 	bool "Support for Cobalt LCD"
 	depends on MIPS_COBALT
@@ -847,7 +844,7 @@ config APPLICOM
 
 config SONYPI
 	tristate "Sony Vaio Programmable I/O Control Device support (EXPERIMENTAL)"
-	depends on EXPERIMENTAL && X86 && PCI && !64BIT
+	depends on EXPERIMENTAL && X86 && PCI && INPUT && !64BIT
 	---help---
 	  This driver enables access to the Sony Programmable I/O Control
 	  Device which can be found in many (all ?) Sony Vaio laptops.
@@ -1003,21 +1000,12 @@ config HANGCHECK_TIMER
 	  or merely print a warning.
 
 config MMTIMER
-	tristate "Memory mapped RTC"
+	tristate "MMTIMER Memory mapped RTC for SGI Altix"
 	depends on IA64_GENERIC || IA64_SGI_SN2
 	default y
 	help
-	  The mmtimer device memory gives userspace access to the
-	  Altix realtime clock.
-
-config VTUNE
-	tristate "Intel VTune sampling driver"
-	depends on X86 || X86_64 || IA64
-	default n
-	help
-	  Intel VTune sampling driver.
+	  The mmtimer device allows direct userspace access to the
+	  Altix system timer.
 
 endmenu
-
-source "drivers/char/lirc/Kconfig"
 

@@ -29,10 +29,11 @@ unsigned char *scsi_bios_ptable(struct block_device *dev)
 	unsigned char *res = kmalloc(66, GFP_KERNEL);
 	if (res) {
 		struct block_device *bdev = dev->bd_contains;
-		struct buffer_head *bh = __bread(bdev, 0, block_size(bdev));
-		if (bh) {
-			memcpy(res, bh->b_data + 0x1be, 66);
-			brelse(bh);
+		Sector sect;
+		void *data = read_dev_sector(bdev, 0, &sect);
+		if (data) {
+			memcpy(res, data + 0x1be, 66);
+			put_dev_sector(sect);
 		} else {
 			kfree(res);
 			res = NULL;

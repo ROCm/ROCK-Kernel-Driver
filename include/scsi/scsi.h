@@ -41,7 +41,6 @@ extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
 #define FORMAT_UNIT           0x04
 #define READ_BLOCK_LIMITS     0x05
 #define REASSIGN_BLOCKS       0x07
-#define INITIALIZE_ELEMENT_STATUS 0x07
 #define READ_6                0x08
 #define WRITE_6               0x0a
 #define SEEK_6                0x0b
@@ -66,7 +65,6 @@ extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
 #define READ_10               0x28
 #define WRITE_10              0x2a
 #define SEEK_10               0x2b
-#define POSITION_TO_ELEMENT   0x2b
 #define WRITE_VERIFY          0x2e
 #define VERIFY                0x2f
 #define SEARCH_HIGH           0x30
@@ -99,7 +97,6 @@ extern const char *const scsi_device_types[MAX_SCSI_DEVICE_CODE];
 #define PERSISTENT_RESERVE_OUT 0x5f
 #define REPORT_LUNS           0xa0
 #define MOVE_MEDIUM           0xa5
-#define EXCHANGE_MEDIUM       0xa6
 #define READ_12               0xa8
 #define WRITE_12              0xaa
 #define WRITE_VERIFY_12       0xae
@@ -249,24 +246,35 @@ struct scsi_lun {
 #define     EXTENDED_SDTR                   0x01
 #define     EXTENDED_EXTENDED_IDENTIFY      0x02    /* SCSI-I only */
 #define     EXTENDED_WDTR                   0x03
+#define     EXTENDED_PPR                    0x04
+#define     EXTENDED_MODIFY_BIDI_DATA_PTR   0x05
 #define SAVE_POINTERS       0x02
 #define RESTORE_POINTERS    0x03
 #define DISCONNECT          0x04
 #define INITIATOR_ERROR     0x05
-#define ABORT               0x06
+#define ABORT_TASK_SET      0x06
 #define MESSAGE_REJECT      0x07
 #define NOP                 0x08
 #define MSG_PARITY_ERROR    0x09
 #define LINKED_CMD_COMPLETE 0x0a
 #define LINKED_FLG_CMD_COMPLETE 0x0b
-#define BUS_DEVICE_RESET    0x0c
-
+#define TARGET_RESET        0x0c
+#define ABORT_TASK          0x0d
+#define CLEAR_TASK_SET      0x0e
 #define INITIATE_RECOVERY   0x0f            /* SCSI-II only */
 #define RELEASE_RECOVERY    0x10            /* SCSI-II only */
-
+#define CLEAR_ACA           0x16
+#define LOGICAL_UNIT_RESET  0x17
 #define SIMPLE_QUEUE_TAG    0x20
 #define HEAD_OF_QUEUE_TAG   0x21
 #define ORDERED_QUEUE_TAG   0x22
+#define IGNORE_WIDE_RESIDUE 0x23
+#define ACA                 0x24
+#define QAS_REQUEST         0x55
+
+/* Old SCSI2 names, don't use in new code */
+#define BUS_DEVICE_RESET    TARGET_RESET
+#define ABORT               ABORT_TASK_SET
 
 /*
  * Host byte codes
@@ -350,14 +358,6 @@ struct scsi_lun {
 #define sense_error(sense)  ((sense) & 0xf)
 #define sense_valid(sense)  ((sense) & 0x80);
 
-/*
- * default timeouts
- */
-#define FORMAT_UNIT_TIMEOUT		(12 * 60 * 60 * HZ)
-#define START_STOP_TIMEOUT		(60 * HZ)
-#define MOVE_MEDIUM_TIMEOUT		(5 * 60 * HZ)
-#define READ_ELEMENT_STATUS_TIMEOUT	(5 * 60 * HZ)
-#define READ_DEFECT_DATA_TIMEOUT	(60 * HZ )
 
 #define IDENTIFY_BASE       0x80
 #define IDENTIFY(can_disconnect, lun)   (IDENTIFY_BASE |\

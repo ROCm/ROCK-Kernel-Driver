@@ -288,7 +288,7 @@ static int random_write_wakeup_thresh = 128;
 
 static int trickle_thresh = DEFAULT_POOL_SIZE * 7;
 
-DEFINE_PER_CPU(int, trickle_count) = 0;
+static DEFINE_PER_CPU(int, trickle_count) = 0;
 
 /*
  * A pool of size .poolwords is stirred with a primitive polynomial
@@ -572,8 +572,8 @@ static void free_entropy_store(struct entropy_store *r)
  * it's cheap to do so and helps slightly in the expected case where
  * the entropy is concentrated in the low-order bits.
  */
-static void add_entropy_words(struct entropy_store *r, const __u32 *in,
-			      int nwords)
+static void __add_entropy_words(struct entropy_store *r, const __u32 *in,
+				int nwords, __u32 out[16])
 {
 	static __u32 const twist_table[8] = {
 		         0, 0x3b6e20c8, 0x76dc4190, 0x4db26158,
@@ -626,8 +626,22 @@ static void add_entropy_words(struct entropy_store *r, const __u32 *in,
 	r->input_rotate = input_rotate;
 	r->add_ptr = add_ptr;
 
+	if (out) {
+		for (i = 0; i < 16; i++) {
+			out[i] = r->pool[add_ptr];
+			add_ptr = (add_ptr - 1) & wordmask;
+		}
+	}
+
 	spin_unlock_irqrestore(&r->lock, flags);
 }
+
+static inline void add_entropy_words(struct entropy_store *r, const __u32 *in,
+				     int nwords)
+{
+	__add_entropy_words(r, in, nwords, NULL);
+}
+
 
 /*
  * Credit (or debit) the entropy store with n bits of entropy
@@ -698,7 +712,7 @@ static int __init batch_entropy_init(int size, struct entropy_store *r)
  * hashing calculations during an interrupt in add_timer_randomness().
  * Instead, the entropy is only added to the pool by keventd.
  */
-void batch_entropy_store(u32 a, u32 b, int num)
+static void batch_entropy_store(u32 a, u32 b, int num)
 {
 	int new;
 	unsigned long flags;
@@ -728,8 +742,6 @@ void batch_entropy_store(u32 a, u32 b, int num)
 
 	spin_unlock_irqrestore(&batch_lock, flags);
 }
-
-EXPORT_SYMBOL(batch_entropy_store);
 
 /*
  * Flush out the accumulated entropy operations, adding entropy to the passed
@@ -807,22 +819,21 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 	long		delta, delta2, delta3;
 	int		entropy = 0;
 
+	preempt_disable();
 	/* if over the trickle threshold, use only 1 in 4096 samples */
 	if ( random_state->entropy_count > trickle_thresh &&
 	     (__get_cpu_var(trickle_count)++ & 0xfff))
-		return;
+		goto out;
 
 	/*
 	 * Use get_cycles() if implemented, otherwise fall back to
 	 * jiffies.
 	 */
 	time = get_cycles();
-	if (time != 0) {
-		if (sizeof(time) > 4)
-			num ^= (u32)(time >> 32);
-	} else {
+	if (time)
+		num ^= (u32)((time >> 31) >> 1);
+	else
 		time = jiffies;
-	}
 
 	/*
 	 * Calculate number of bits of randomness we probably added.
@@ -861,6 +872,8 @@ static void add_timer_randomness(struct timer_rand_state *state, unsigned num)
 		entropy = int_ln_12bits(delta);
 	}
 	batch_entropy_store(num, time, entropy);
+out:
+	preempt_enable();
 }
 
 void add_keyboard_randomness(unsigned char scancode)
@@ -872,8 +885,6 @@ void add_keyboard_randomness(unsigned char scancode)
 		add_timer_randomness(&keyboard_timer_state, scancode);
 	}
 }
-
-EXPORT_SYMBOL(add_keyboard_randomness);
 
 void add_mouse_randomness(__u32 mouse_data)
 {
@@ -889,8 +900,6 @@ void add_interrupt_randomness(int irq)
 
 	add_timer_randomness(irq_timer_state[irq], 0x100+irq);
 }
-
-EXPORT_SYMBOL(add_interrupt_randomness);
 
 void add_disk_randomness(struct gendisk *disk)
 {
@@ -1347,7 +1356,7 @@ static ssize_t extract_entropy(struct entropy_store *r, void * buf,
 			       size_t nbytes, int flags)
 {
 	ssize_t ret, i;
-	__u32 tmp[TMP_BUF_SIZE];
+	__u32 tmp[TMP_BUF_SIZE], data[16];
 	__u32 x;
 	unsigned long cpuflags;
 
@@ -1427,7 +1436,15 @@ static ssize_t extract_entropy(struct entropy_store *r, void * buf,
 			HASH_TRANSFORM(tmp, r->pool+i);
 			add_entropy_words(r, &tmp[x%HASH_BUFFER_SIZE], 1);
 		}
-		
+
+		/*
+		 * To avoid duplicates, we atomically extract a
+		 * portion of the pool while mixing, and hash one
+		 * final time.
+		 */
+		__add_entropy_words(r, &tmp[x%HASH_BUFFER_SIZE], 1, data);
+		HASH_TRANSFORM(tmp, data);
+
 		/*
 		 * In case the hash function has some recognizable
 		 * output pattern, we fold it in half.
@@ -2051,6 +2068,7 @@ static void sysctl_init_random(struct entropy_store *random_state)
  *
  ********************************************************************/
 
+#ifdef CONFIG_INET
 /*
  * TCP initial sequence number picking.  This uses the random number
  * generator to pick an initial secret value.  This value is hashed
@@ -2184,7 +2202,7 @@ static __u32 twothirdsMD4Transform (__u32 const buf[4], __u32 const in[12])
 #undef K3
 
 /* This should not be decreased so low that ISNs wrap too fast. */
-#define REKEY_INTERVAL	300
+#define REKEY_INTERVAL	(300*HZ)
 /*
  * Bit layout of the tcp sequence numbers (before adding current time):
  * bit 24-31: increased after every key exchange
@@ -2210,47 +2228,54 @@ static __u32 twothirdsMD4Transform (__u32 const buf[4], __u32 const in[12])
 #define HASH_MASK	( (1<<HASH_BITS)-1 )
 
 static struct keydata {
-	time_t rekey_time;
 	__u32	count;		// already shifted to the final position
 	__u32	secret[12];
 } ____cacheline_aligned ip_keydata[2];
 
-static spinlock_t ip_lock = SPIN_LOCK_UNLOCKED;
 static unsigned int ip_cnt;
 
-static void rekey_seq_generator(void *private_)
-{
-	struct keydata *keyptr;
-	struct timeval 	tv;
-
-	do_gettimeofday(&tv);
-
-	spin_lock_bh(&ip_lock);
-	keyptr = &ip_keydata[ip_cnt&1];
-
-	keyptr = &ip_keydata[1^(ip_cnt&1)];
-	keyptr->rekey_time = tv.tv_sec;
-	get_random_bytes(keyptr->secret, sizeof(keyptr->secret));
-	keyptr->count = (ip_cnt&COUNT_MASK)<<HASH_BITS;
-	mb();
-	ip_cnt++;
-
-	spin_unlock_bh(&ip_lock);
-}
+static void rekey_seq_generator(void *private_);
 
 static DECLARE_WORK(rekey_work, rekey_seq_generator, NULL);
 
-static inline struct keydata *check_and_rekey(time_t time)
+/*
+ * Lock avoidance:
+ * The ISN generation runs lockless - it's just a hash over random data.
+ * State changes happen every 5 minutes when the random key is replaced.
+ * Synchronization is performed by having two copies of the hash function
+ * state and rekey_seq_generator always updates the inactive copy.
+ * The copy is then activated by updating ip_cnt.
+ * The implementation breaks down if someone blocks the thread
+ * that processes SYN requests for more than 5 minutes. Should never
+ * happen, and even if that happens only a not perfectly compliant
+ * ISN is generated, nothing fatal.
+ */
+static void rekey_seq_generator(void *private_)
+{
+	struct keydata *keyptr = &ip_keydata[1^(ip_cnt&1)];
+
+	get_random_bytes(keyptr->secret, sizeof(keyptr->secret));
+	keyptr->count = (ip_cnt&COUNT_MASK)<<HASH_BITS;
+	smp_wmb();
+	ip_cnt++;
+	schedule_delayed_work(&rekey_work, REKEY_INTERVAL);
+}
+
+static inline struct keydata *get_keyptr(void)
 {
 	struct keydata *keyptr = &ip_keydata[ip_cnt&1];
 
-	rmb();
-	if (!keyptr->rekey_time || (time - keyptr->rekey_time) > REKEY_INTERVAL) {
-		schedule_work(&rekey_work);
-	}
+	smp_rmb();
 
 	return keyptr;
 }
+
+static __init int seqgen_init(void)
+{
+	rekey_seq_generator(NULL);
+	return 0;
+}
+late_initcall(seqgen_init);
 
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 __u32 secure_tcpv6_sequence_number(__u32 *saddr, __u32 *daddr,
@@ -2259,14 +2284,12 @@ __u32 secure_tcpv6_sequence_number(__u32 *saddr, __u32 *daddr,
 	struct timeval 	tv;
 	__u32		seq;
 	__u32		hash[12];
-	struct keydata *keyptr;
+	struct keydata *keyptr = get_keyptr();
 
 	/* The procedure is the same as for IPv4, but addresses are longer.
 	 * Thus we must use twothirdsMD4Transform.
 	 */
 
-	do_gettimeofday(&tv);	/* We need the usecs below... */
-	keyptr = check_and_rekey(tv.tv_sec);
 
 	memcpy(hash, saddr, 16);
 	hash[4]=(sport << 16) + dport;
@@ -2274,6 +2297,8 @@ __u32 secure_tcpv6_sequence_number(__u32 *saddr, __u32 *daddr,
 
 	seq = twothirdsMD4Transform(daddr, hash) & HASH_MASK;
 	seq += keyptr->count;
+
+	do_gettimeofday(&tv);
 	seq += tv.tv_usec + tv.tv_sec*1000000;
 
 	return seq;
@@ -2287,13 +2312,7 @@ __u32 secure_tcp_sequence_number(__u32 saddr, __u32 daddr,
 	struct timeval 	tv;
 	__u32		seq;
 	__u32	hash[4];
-	struct keydata *keyptr;
-
-	/*
-	 * Pick a random secret every REKEY_INTERVAL seconds.
-	 */
-	do_gettimeofday(&tv);	/* We need the usecs below... */
-	keyptr = check_and_rekey(tv.tv_sec);
+	struct keydata *keyptr = get_keyptr();
 
 	/*
 	 *  Pick a unique starting offset for each TCP connection endpoints
@@ -2316,6 +2335,7 @@ __u32 secure_tcp_sequence_number(__u32 saddr, __u32 daddr,
 	 *	That's funny, Linux has one built in!  Use it!
 	 *	(Networks are faster now - should this be increased?)
 	 */
+	do_gettimeofday(&tv);
 	seq += tv.tv_usec + tv.tv_sec*1000000;
 #if 0
 	printk("init_seq(%lx, %lx, %d, %d) = %d\n",
@@ -2334,7 +2354,7 @@ __u32 secure_ip_id(__u32 daddr)
 	struct keydata *keyptr;
 	__u32 hash[4];
 
-	keyptr = check_and_rekey(get_seconds());
+	keyptr = get_keyptr();
 
 	/*
 	 *  Pick a unique starting offset for each IP destination.
@@ -2448,3 +2468,4 @@ __u32 check_tcp_syn_cookie(__u32 cookie, __u32 saddr, __u32 daddr, __u16 sport,
 	return (cookie - tmp[17]) & COOKIEMASK;	/* Leaving the data behind */
 }
 #endif
+#endif /* CONFIG_INET */

@@ -15,21 +15,9 @@
 #include <linux/vmalloc.h>	/* for vmalloc() */
 #include <linux/mm.h>		/* for vmalloc_to_page() */
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-#ifndef __CRAP_H
-static inline int try_module_get(struct module *mod)
-{
-	if (!MOD_CAN_QUERY(mod))
-		return 0;
-	__MOD_INC_USE_COUNT(mod);
-	return 1;
-}
-
-#define module_put(mod) __MOD_DEC_USE_COUNT(mod)
-#define iminor(xx) minor(xx->i_rdev)
-#define strlcpy strncpy
-#define i2c_get_adapdata(adapter) (struct saa7146_dev*)adapter->data;
-#endif
+/* ugly, but necessary to build the dvb stuff under 2.4. */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
+	#include "dvb_functions.h"
 #endif
 
 #define SAA7146_VERSION_CODE KERNEL_VERSION(0,5,0)
@@ -63,10 +51,12 @@ extern unsigned int saa7146_debug;
 #define DEB_INT(x)  if (0!=(DEBUG_VARIABLE&0x20)) { DEBUG_PROLOG; printk x; } /* interrupt debug messages */
 #define DEB_CAP(x)  if (0!=(DEBUG_VARIABLE&0x40)) { DEBUG_PROLOG; printk x; } /* capture debug messages */
 
-#define IER_DISABLE(x,y) \
+#define SAA7146_IER_DISABLE(x,y) \
 	saa7146_write(x, IER, saa7146_read(x, IER) & ~(y));
-#define IER_ENABLE(x,y) \
+#define SAA7146_IER_ENABLE(x,y) \
 	saa7146_write(x, IER, saa7146_read(x, IER) | (y));
+#define SAA7146_ISR_CLEAR(x,y) \
+	saa7146_write(x, ISR, (y));
 
 struct saa7146_dev;
 struct saa7146_extension;
@@ -103,7 +93,7 @@ struct saa7146_extension
 #define SAA7146_USE_I2C_IRQ	0x1
 #define SAA7146_I2C_SHORT_DELAY	0x2
 	int	flags;
-		
+	
 	/* pairs of subvendor and subdevice ids for
 	   supported devices, last entry 0xffff, 0xfff */
 	struct module *module;
@@ -135,7 +125,7 @@ struct saa7146_dev
        	spinlock_t                 	slock;
         struct semaphore           	lock;
 
-	unsigned char			*mem;		/* pointer to mapped IO memory */
+	unsigned char			__iomem *mem;	/* pointer to mapped IO memory */
 	int				revision;	/* chip revision; needed for bug-workarounds*/
 
 	/* pci-device & irq stuff*/
@@ -167,7 +157,7 @@ struct saa7146_dev
 
 /* from saa7146_i2c.c */
 int saa7146_i2c_adapter_prepare(struct saa7146_dev *dev, struct i2c_adapter *i2c_adapter, u32 bitrate);
-int saa7146_i2c_transfer(struct saa7146_dev *saa, const struct i2c_msg msgs[], int num, int retries);
+int saa7146_i2c_transfer(struct saa7146_dev *saa, const struct i2c_msg msgs[], int num,  int retries);
 
 /* from saa7146_core.c */
 extern struct list_head saa7146_devices;
@@ -180,7 +170,7 @@ void saa7146_pgtable_free(struct pci_dev *pci, struct saa7146_pgtable *pt);
 int saa7146_pgtable_build_single(struct pci_dev *pci, struct saa7146_pgtable *pt, struct scatterlist *list, int length );
 char *saa7146_vmalloc_build_pgtable(struct pci_dev *pci, long length, struct saa7146_pgtable *pt);
 void saa7146_setgpio(struct saa7146_dev *dev, int port, u32 data);
-int saa7146_wait_for_debi_done(struct saa7146_dev *dev);
+int saa7146_wait_for_debi_done(struct saa7146_dev *dev, int nobusyloop);
 
 /* some memory sizes */
 #define SAA7146_I2C_MEM		( 1*PAGE_SIZE)

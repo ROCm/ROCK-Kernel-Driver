@@ -111,11 +111,10 @@ struct tsdev {
 	int exist;
 	int open;
 	int minor;
-	char name[16];
-	struct input_handle handle;
+	char name[8];
 	wait_queue_head_t wait;
 	struct list_head list;
-
+	struct input_handle handle;
 	int x, y, pressure;
 	struct ts_calibration cal;
 };
@@ -179,7 +178,7 @@ static int tsdev_open(struct inode *inode, struct file *file)
 static void tsdev_free(struct tsdev *tsdev)
 {
 	devfs_remove("input/ts%d", tsdev->minor);
-	input_class_remove_handle(&tsdev->handle);
+	class_simple_device_remove(MKDEV(INPUT_MAJOR, TSDEV_MINOR_BASE + tsdev->minor));
 	tsdev_table[tsdev->minor] = NULL;
 	kfree(tsdev);
 }
@@ -251,12 +250,12 @@ static int tsdev_ioctl(struct inode *inode, struct file *file,
 
 	switch (cmd) {
 	case TS_GET_CAL:
-		if (copy_to_user ((void *)arg, &tsdev->cal,
+		if (copy_to_user ((void __user *)arg, &tsdev->cal,
 				  sizeof (struct ts_calibration)))
 			retval = -EFAULT;
 		break;
 	case TS_SET_CAL:
-		if (copy_from_user (&tsdev->cal, (void *)arg,
+		if (copy_from_user (&tsdev->cal, (void __user *)arg,
 				    sizeof (struct ts_calibration)))
 			retval = -EFAULT;
 		break;
@@ -399,7 +398,6 @@ static struct input_handle *tsdev_connect(struct input_handler *handler,
 	tsdev->handle.name = tsdev->name;
 	tsdev->handle.handler = handler;
 	tsdev->handle.private = tsdev;
-	tsdev->handle.minor_base = TSDEV_MINOR_BASE;
 
 	/* Precompute the rough calibration matrix */
 	delta = dev->absmax [ABS_X] - dev->absmin [ABS_X] + 1;
@@ -420,8 +418,9 @@ static struct input_handle *tsdev_connect(struct input_handler *handler,
 			S_IFCHR|S_IRUGO|S_IWUSR, "input/ts%d", minor);
 	devfs_mk_cdev(MKDEV(INPUT_MAJOR, TSDEV_MINOR_BASE + minor + TSDEV_MINORS/2),
 			S_IFCHR|S_IRUGO|S_IWUSR, "input/tsraw%d", minor);
-
-	input_class_add_handle(&tsdev->handle);
+	class_simple_device_add(input_class, 
+				MKDEV(INPUT_MAJOR, TSDEV_MINOR_BASE + minor),
+				dev->dev, "ts%d", minor);
 
 	return &tsdev->handle;
 }

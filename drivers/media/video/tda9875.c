@@ -1,19 +1,19 @@
 /*
  * For the TDA9875 chip
- * (The TDA9875 is used on the Diamond DTV2000 french version 
+ * (The TDA9875 is used on the Diamond DTV2000 french version
  * Other cards probably use these chips as well.)
- * This driver will not complain if used with any 
+ * This driver will not complain if used with any
  * other i2c device with the same address.
  *
  * Copyright (c) 2000 Guillaume Delvit based on Gerd Knorr source and
- * Eric Sandeen 
+ * Eric Sandeen
  * This code is placed under the terms of the GNU General Public License
  * Based on tda9855.c by Steve VanDeBogart (vandebo@uclink.berkeley.edu)
  * Which was based on tda8425.c by Greg Alexander (c) 1998
  *
  * OPTIONS:
  * debug   - set to 1 if you'd like to see debug messages
- * 
+ *
  *  Revision: 0.1 - original version
  */
 
@@ -64,7 +64,7 @@ static struct i2c_client client_template;
  * http://www.semiconductors.philips.com
  * TDA9875: I2C-bus controlled DSP audio processor, FM demodulator
  *
- */ 
+ */
 
 		/* subaddresses for TDA9875 */
 #define TDA9875_MUT         0x12  /*General mute  (value --> 0b11001100*/
@@ -133,7 +133,7 @@ static int tda9875_read(struct i2c_client *client)
 		printk(KERN_WARNING "tda9875: I/O error, trying (read)\n");
 		return -1;
 	}
-	dprintk("Read 0x%02x\n", buffer); 
+	dprintk("Read 0x%02x\n", buffer);
 	return buffer;
 }
 #endif
@@ -178,7 +178,7 @@ static void tda9875_set(struct i2c_client *client)
 static void do_tda9875_init(struct i2c_client *client)
 {
 	struct tda9875 *t = i2c_get_clientdata(client);
-	dprintk("In tda9875_init\n"); 
+	dprintk("In tda9875_init\n");
 	tda9875_write(client, TDA9875_CFG, 0xd0 ); /*reg de config 0 (reset)*/
     	tda9875_write(client, TDA9875_MSR, 0x03 );    /* Monitor 0b00000XXX*/
 	tda9875_write(client, TDA9875_C1MSB, 0x00 );  /*Car1(FM) MSB XMHz*/
@@ -192,7 +192,7 @@ static void do_tda9875_init(struct i2c_client *client)
 	tda9875_write(client, TDA9875_FMAT, 0x00 );   /*FM Matrix reg 0x00*/
 	tda9875_write(client, TDA9875_SC1, 0x00 );    /* SCART 1 (SC1)*/
 	tda9875_write(client, TDA9875_SC2, 0x01 );    /* SCART 2 (sc2)*/
-        
+
 	tda9875_write(client, TDA9875_CH1V, 0x10 );  /* Channel volume 1 mute*/
 	tda9875_write(client, TDA9875_CH2V, 0x10 );  /* Channel volume 2 mute */
 	tda9875_write(client, TDA9875_DACOS, 0x02 ); /* sig DAC i/o(in:nicam)*/
@@ -204,14 +204,14 @@ static void do_tda9875_init(struct i2c_client *client)
 	tda9875_write(client, TDA9875_MVR, 0x03 );   /* Vol Main right 10dB*/
 	tda9875_write(client, TDA9875_MBA, 0x00 );   /* Main Bass Main 0dB*/
 	tda9875_write(client, TDA9875_MTR, 0x00 );   /* Main Treble Main 0dB*/
-	tda9875_write(client, TDA9875_ACS, 0x44 );   /* Aux chan select (dac)*/	
+	tda9875_write(client, TDA9875_ACS, 0x44 );   /* Aux chan select (dac)*/
 	tda9875_write(client, TDA9875_AVL, 0x00 );   /* Vol Aux left 0dB*/
 	tda9875_write(client, TDA9875_AVR, 0x00 );   /* Vol Aux right 0dB*/
 	tda9875_write(client, TDA9875_ABA, 0x00 );   /* Aux Bass Main 0dB*/
 	tda9875_write(client, TDA9875_ATR, 0x00 );   /* Aux Aigus Main 0dB*/
-	
+
 	tda9875_write(client, TDA9875_MUT, 0xcc );   /* General mute  */
-        
+
 	t->mode=AUDIO_UNMUTE;
 	t->lvol=t->rvol =0;  	/* 0dB */
 	t->bass=0; 		        /* 0dB */
@@ -262,7 +262,7 @@ static int tda9875_attach(struct i2c_adapter *adap, int addr, int kind)
 		kfree(t);
 		return 1;
 	}
-	
+
 	do_tda9875_init(client);
 	printk(KERN_INFO "tda9875: init\n");
 
@@ -288,7 +288,7 @@ static int tda9875_detach(struct i2c_client *client)
 
 	do_tda9875_init(client);
 	i2c_detach_client(client);
-	
+
 	kfree(t);
 	return 0;
 }
@@ -298,9 +298,9 @@ static int tda9875_command(struct i2c_client *client,
 {
 	struct tda9875 *t = i2c_get_clientdata(client);
 
-	dprintk("In tda9875_command...\n"); 
+	dprintk("In tda9875_command...\n");
 
-	switch (cmd) {	
+	switch (cmd) {
         /* --- v4l ioctls --- */
 	/* take care: bttv does userspace copying, we'll get a
 	   kernel pointer here... */
@@ -335,7 +335,7 @@ static int tda9875_command(struct i2c_client *client,
 		struct video_audio *va = arg;
 		int left,right;
 
-		dprintk("VIDEOCSAUDIO...\n"); 
+		dprintk("VIDEOCSAUDIO...\n");
 		left = (min(65536 - va->balance,32768) *
 			va->volume) / 32768;
 		right = (min(va->balance,(__u16)32768) *
@@ -357,7 +357,7 @@ static int tda9875_command(struct i2c_client *client,
 		 t->bass = 15;
 		if (t->bass < -12)
 		 t->bass = -12 & 0xff;
-		
+
 		t->treble = ((va->treble/2700)-12) & 0xff;
 		if (t->treble > 12)
 		 t->treble = 12;
@@ -367,7 +367,7 @@ static int tda9875_command(struct i2c_client *client,
 
 
 //printk("tda9875 bal:%04x vol:%04x bass:%04x treble:%04x\n",va->balance,va->volume,va->bass,va->treble);
-		
+
 
                 tda9875_set(client);
 

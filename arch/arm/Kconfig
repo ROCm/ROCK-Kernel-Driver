@@ -63,6 +63,10 @@ config GENERIC_BUST_SPINLOCK
 config GENERIC_ISA_DMA
 	bool
 
+config GENERIC_IOMAP
+	bool
+	default y
+
 source "init/Kconfig"
 
 menu "System Type"
@@ -79,6 +83,8 @@ config ARCH_CLPS711X
 
 config ARCH_CO285
 	bool "Co-EBSA285"
+	select FOOTBRIDGE
+	select FOOTBRIDGE_ADDIN
 
 config ARCH_EBSA110
 	bool "EBSA-110"
@@ -97,6 +103,7 @@ config ARCH_CAMELOT
 
 config ARCH_FOOTBRIDGE
 	bool "FootBridge"
+	select FOOTBRIDGE
 
 config ARCH_INTEGRATOR
 	bool "Integrator"
@@ -155,13 +162,18 @@ config ARCH_LH7A40X
 config ARCH_OMAP
 	bool "TI OMAP"
 
-config ARCH_VERSATILE_PB
-	bool "Versatile PB"
+config ARCH_VERSATILE
+	bool "Versatile"
 	help
-	  This enables support for ARM Ltd Versatile PB board.
+	  This enables support for ARM Ltd Versatile board.
 
 config ARCH_IMX
 	bool "IMX"
+
+config ARCH_H720X
+	bool "Hynix-HMS720x-based"
+	help
+	  This enables support for systems based on the Hynix HMS720x
 
 endchoice
 
@@ -191,6 +203,10 @@ source "arch/arm/mach-lh7a40x/Kconfig"
 
 source "arch/arm/mach-imx/Kconfig"
 
+source "arch/arm/mach-h720x/Kconfig"
+
+source "arch/arm/mach-versatile/Kconfig"
+
 # Definitions to make life easier
 config ARCH_ACORN
 	bool
@@ -200,28 +216,6 @@ config ARCH_ACORN
 config TIMER_ACORN
 	bool
 	depends on ARCH_ACORN || ARCH_CLPS7500
-	default y
-
-#####################################################################
-# Footbridge support
-config FOOTBRIDGE
-	bool
-	depends on ARCH_CO285 || ARCH_FOOTBRIDGE
-	default y
-
-config FOOTBRIDGE_HOST
-	bool
-	depends on ARCH_CATS || ARCH_EBSA285_HOST || ARCH_NETWINDER || ARCH_PERSONAL_SERVER
-	default y
-
-config FOOTBRIDGE_ADDIN
-	bool
-	depends on ARCH_CO285 || ARCH_EBSA285_ADDIN
-	default y
-
-config ARCH_EBSA285
-	bool
-	depends on ARCH_EBSA285_HOST || ARCH_EBSA285_ADDIN
 	default y
 
 #####################################################################
@@ -295,9 +289,14 @@ config ICST525
 	depends on ARCH_INTEGRATOR
 	default y
 
+config ICST307
+	bool
+	depends on ARCH_VERSATILE
+	default y
+
 config ARM_AMBA
 	bool
-	depends on ARCH_INTEGRATOR || ARCH_VERSATILE_PB
+	depends on ARCH_INTEGRATOR || ARCH_VERSATILE
 	default y
 
 config ISA
@@ -318,58 +317,98 @@ config ISA_DMA
 
 config FIQ
 	bool
-	depends on ARCH_ACORN || ARCH_L7200 || ARCH_LH7A400
+	depends on ARCH_ACORN || ARCH_L7200
 	default y
 
 # Compressed boot loader in ROM.  Yes, we really want to ask about
 # TEXT and BSS so we preserve their values in the config files.
-config ZBOOT_ROM
-	bool "Compressed boot loader in ROM/flash"
-	help
-	  Say Y here if you intend to execute your compressed kernel image (zImage)
-	  directly from ROM or flash.  If unsure, say N.
-
 config ZBOOT_ROM_TEXT
 	hex "Compressed ROM boot loader base address"
 	default "0"
 	help
-	  The base address for zImage.  Unless you have special requirements, you
-	  should not change this value.
+	  The physical address at which the ROM-able zImage is to be
+	  placed in the target.  Platforms which normally make use of
+	  ROM-able zImage formats normally set this to a suitable
+	  value in their defconfig file.
+
+	  If ZBOOT_ROM is not enabled, this has no effect.
 
 config ZBOOT_ROM_BSS
 	hex "Compressed ROM boot loader BSS address"
 	default "0"
 	help
-	  The base address of 64KiB of read/write memory, which must be available
-	  while the decompressor is running.  Unless you have special requirements,
-	  you should not change this value.
+	  The base address of 64KiB of read/write memory in the target
+	  for the ROM-able zImage, which must be available while the
+	  decompressor is running.  Platforms which normally make use of
+	  ROM-able zImage formats normally set this to a suitable
+	  value in their defconfig file.
 
-config CPU_FREQ
-	bool "Support CPU clock change (EXPERIMENTAL)"
-	depends on (ARCH_SA1100 || ARCH_INTEGRATOR) && EXPERIMENTAL
+	  If ZBOOT_ROM is not enabled, this has no effect.
+
+config ZBOOT_ROM
+	bool "Compressed boot loader in ROM/flash"
+	depends on ZBOOT_ROM_TEXT != ZBOOT_ROM_BSS
 	help
-	  CPU clock scaling allows you to change the clock speed of the
-	  running CPU on the fly. This is a nice method to save battery power,
-	  because the lower the clock speed, the less power the CPU
-	  consumes. Note that this driver doesn't automatically change the CPU
-	  clock speed, you need some userland tools (which still have to be
-	  written) to implement the policy. If you don't understand what this
-	  is all about, it's safe to say 'N'.
+	  Say Y here if you intend to execute your compressed kernel image
+	  (zImage) directly from ROM or flash.  If unsure, say N.
 
+config XIP_KERNEL
+	bool "Kernel Execute-In-Place from ROM"
+	depends on !ZBOOT_ROM
+	help
+	  Execute-In-Place allows the kernel to run from non-volatile storage
+	  directly addressable by the CPU, such as NOR flash. This saves RAM
+	  space since the text section of the kernel is not loaded from flash
+	  to RAM.  Read-write sections, such as the data section and stack,
+	  are still copied to RAM.  The XIP kernel is not compressed since
+	  it has to run directly from flash, so it will take more space to
+	  store it.  The flash address used to link the kernel object files,
+	  and for storing it, is configuration dependent. Therefore, if you
+	  say Y here, you must know the proper physical address where to
+	  store the kernel image depending on your own flash memory usage.
 
-# CPUfreq on SA11x0 is special -- it _needs_ the userspace governor
+	  Also note that the make target becomes "make xipImage" rather than
+	  "make zImage" or "make Image".  The final kernel binary to put in
+	  ROM memory will be arch/arm/boot/xipImage.
+
+	  If unsure, say N.
+
+config XIP_PHYS_ADDR
+	hex "XIP Kernel Physical Location"
+	depends on XIP_KERNEL
+	default "0x00080000"
+	help
+	  This is the physical address in your flash memory the kernel will
+	  be linked for and stored to.  This address is dependent on your
+	  own flash usage.
+
+	  Please note that, if you're using MTD, you must use a flash chip
+	  that is NOT handled by MTD or the flash will be turned into non
+	  data mode for status and query purposes which will instantaneously
+	  crash the kernel.
+
+	  MTD can however be used with a XIP kernel on the same flash chip
+	  but only if the flash memory supports multiple partitions in
+	  hardware, like with the Intel K3 flash parts, and only if the
+	  kernel is not stored within the firrst hardware partition of the
+	  chip.
+
+	  In any case, make sure that MTD support is configured out for
+	  the first attempt.
+
+if (ARCH_SA1100 || ARCH_INTEGRATOR)
+
+source "drivers/cpufreq/Kconfig"
 
 config CPU_FREQ_SA1100
 	bool
-	depends on CPU_FREQ && SA1100_LART
+	depends on CPU_FREQ && (SA1100_LART || SA1100_PLEB)
 	default y
-	select CPU_FREQ_24_API if SYSCTL
 
 config CPU_FREQ_SA1110
 	bool
 	depends on CPU_FREQ && (SA1100_ASSABET || SA1100_CERF || SA1100_PT_SYSTEM3)
 	default y
-	select CPU_FREQ_24_API if SYSCTL
 
 config CPU_FREQ_INTEGRATOR
 	tristate "CPUfreq driver for ARM Integrator CPUs"
@@ -381,10 +420,6 @@ config CPU_FREQ_INTEGRATOR
 	  For details, take a look at <file:Documentation/cpu-freq>.
 
 	  If in doubt, say Y.
-
-if (CPU_FREQ_INTEGRATOR) || (CPU_FREQ_SA1110) || (CPU_FREQ_SA1100)
-
-source "drivers/cpufreq/Kconfig"
 
 endif
 
@@ -561,7 +596,7 @@ config CMDLINE
 
 config LEDS
 	bool "Timer and CPU usage LEDs"
-	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T || ARCH_OMAP || ARCH_VERSATILE_PB || ARCH_IMX
+	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T || ARCH_OMAP || ARCH_VERSATILE || ARCH_IMX
 	help
 	  If you say Y here, the LEDs on your machine will be used
 	  to provide useful information about your current system status.
@@ -574,8 +609,8 @@ config LEDS
 	  system, but the driver will do nothing.
 
 config LEDS_TIMER
-	bool "Timer LED" if LEDS && (ARCH_NETWINDER || ARCH_EBSA285 || ARCH_SHARK || MACH_MAINSTONE || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_P720T || ARCH_VERSATILE_PB || ARCH_IMX)
-	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T || ARCH_OMAP || ARCH_VERSATILE_PB || ARCH_IMX
+	bool "Timer LED" if LEDS && (ARCH_NETWINDER || ARCH_EBSA285 || ARCH_SHARK || MACH_MAINSTONE || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_P720T || ARCH_VERSATILE || ARCH_IMX)
+	depends on ARCH_NETWINDER || ARCH_EBSA110 || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_CDB89712 || ARCH_P720T || ARCH_OMAP || ARCH_VERSATILE || ARCH_IMX
 	default y if ARCH_EBSA110
 	help
 	  If you say Y here, one of the system LEDs (the green one on the
@@ -590,7 +625,7 @@ config LEDS_TIMER
 
 config LEDS_CPU
 	bool "CPU usage LED"
-	depends on LEDS && (ARCH_NETWINDER || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_P720T || ARCH_VERSATILE_PB || ARCH_IMX)
+	depends on LEDS && (ARCH_NETWINDER || ARCH_EBSA285 || ARCH_SHARK || ARCH_CO285 || ARCH_SA1100 || ARCH_LUBBOCK || MACH_MAINSTONE || ARCH_PXA_IDP || ARCH_INTEGRATOR || ARCH_P720T || ARCH_VERSATILE || ARCH_IMX)
 	help
 	  If you say Y here, the red LED will be used to give a good real
 	  time indication of CPU usage, by lighting whenever the idle task
@@ -679,5 +714,3 @@ source "security/Kconfig"
 source "crypto/Kconfig"
 
 source "lib/Kconfig"
-
-source "rpmify/Kconfig"

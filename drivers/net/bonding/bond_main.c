@@ -469,6 +469,13 @@
  *	  * Add support for VLAN hardware acceleration capable slaves.
  *	  * Add capability to tag self generated packets in ALB/TLB modes.
  *	  Set version to 2.6.0.
+ * 2004/10/29 - Mitch Williams <mitch.a.williams at intel dot com>
+ *      - Fixed bug when unloading module while using 802.3ad.  If
+ *        spinlock debugging is turned on, this causes a stack dump.
+ *        Solution is to move call to dev_remove_pack outside of the
+ *        spinlock.
+ *        Set version to 2.6.1.
+ *
  */
 
 //#define BONDING_DEBUG 1
@@ -491,8 +498,8 @@
 #include <linux/socket.h>
 #include <linux/ctype.h>
 #include <linux/inet.h>
+#include <linux/bitops.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/uaccess.h>
@@ -4700,6 +4707,7 @@ static void __exit bonding_exit(void)
 module_init(bonding_init);
 module_exit(bonding_exit);
 MODULE_LICENSE("GPL");
+MODULE_VERSION(DRV_VERSION);
 MODULE_DESCRIPTION(DRV_DESCRIPTION ", v" DRV_VERSION);
 MODULE_AUTHOR("Thomas Davis, tadavis@lbl.gov and many others");
 MODULE_SUPPORTED_DEVICE("most ethernet devices");

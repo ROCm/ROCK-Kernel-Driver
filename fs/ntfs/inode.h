@@ -24,10 +24,18 @@
 #ifndef _LINUX_NTFS_INODE_H
 #define _LINUX_NTFS_INODE_H
 
+#include <linux/mm.h>
+#include <linux/fs.h>
 #include <linux/seq_file.h>
+#include <linux/list.h>
+#include <asm/atomic.h>
+#include <asm/semaphore.h>
 
 #include "layout.h"
 #include "volume.h"
+#include "types.h"
+#include "runlist.h"
+#include "debug.h"
 
 typedef struct _ntfs_inode ntfs_inode;
 
@@ -53,7 +61,7 @@ struct _ntfs_inode {
 	 * name_len = 0 for files and name = I30 (global constant) and
 	 * name_len = 4 for directories.
 	 */
-	ATTR_TYPES type;	/* Attribute type of this fake inode. */
+	ATTR_TYPE type;	/* Attribute type of this fake inode. */
 	ntfschar *name;		/* Attribute name of this fake inode. */
 	u32 name_len;		/* Attribute name length of this fake inode. */
 	runlist runlist;	/* If state has the NI_NonResident bit set,
@@ -96,7 +104,7 @@ struct _ntfs_inode {
 			u32 block_size;		/* Size of an index block. */
 			u32 vcn_size;		/* Size of a vcn in this
 						   index. */
-			COLLATION_RULES collation_rule; /* The collation rule
+			COLLATION_RULE collation_rule; /* The collation rule
 						   for the index. */
 			u8 block_size_bits; 	/* Log2 of the above. */
 			u8 vcn_size_bits;	/* Log2 of the above. */
@@ -157,6 +165,7 @@ typedef enum {
 	NI_Sparse,		/* 1: Unnamed data attr is sparse (f).
 				   1: Create sparse files by default (d).
 				   1: Attribute is sparse (a). */
+	NI_TruncateFailed,	/* 1: Last ntfs_truncate() call failed. */
 } ntfs_inode_state_bits;
 
 /*
@@ -208,6 +217,7 @@ NINO_FNS(IndexAllocPresent)
 NINO_FNS(Compressed)
 NINO_FNS(Encrypted)
 NINO_FNS(Sparse)
+NINO_FNS(TruncateFailed)
 
 /*
  * The full structure containing a ntfs_inode and a vfs struct inode. Used for
@@ -252,7 +262,7 @@ typedef struct {
 	unsigned long mft_no;
 	ntfschar *name;
 	u32 name_len;
-	ATTR_TYPES type;
+	ATTR_TYPE type;
 } ntfs_attr;
 
 typedef int (*test_t)(struct inode *, void *);
@@ -260,7 +270,7 @@ typedef int (*test_t)(struct inode *, void *);
 extern int ntfs_test_inode(struct inode *vi, ntfs_attr *na);
 
 extern struct inode *ntfs_iget(struct super_block *sb, unsigned long mft_no);
-extern struct inode *ntfs_attr_iget(struct inode *base_vi, ATTR_TYPES type,
+extern struct inode *ntfs_attr_iget(struct inode *base_vi, ATTR_TYPE type,
 		ntfschar *name, u32 name_len);
 extern struct inode *ntfs_index_iget(struct inode *base_vi, ntfschar *name,
 		u32 name_len);
@@ -268,6 +278,17 @@ extern struct inode *ntfs_index_iget(struct inode *base_vi, ntfschar *name,
 extern struct inode *ntfs_alloc_big_inode(struct super_block *sb);
 extern void ntfs_destroy_big_inode(struct inode *inode);
 extern void ntfs_clear_big_inode(struct inode *vi);
+
+extern void __ntfs_init_inode(struct super_block *sb, ntfs_inode *ni);
+
+static inline void ntfs_init_big_inode(struct inode *vi)
+{
+	ntfs_inode *ni = NTFS_I(vi);
+
+	ntfs_debug("Entering.");
+	__ntfs_init_inode(vi->i_sb, ni);
+	ni->mft_no = vi->i_ino;
+}
 
 extern ntfs_inode *ntfs_new_extent_inode(struct super_block *sb,
 		unsigned long mft_no);
@@ -281,12 +302,12 @@ extern int ntfs_show_options(struct seq_file *sf, struct vfsmount *mnt);
 
 #ifdef NTFS_RW
 
-extern void ntfs_truncate(struct inode *vi);
+extern int ntfs_truncate(struct inode *vi);
+extern void ntfs_truncate_vfs(struct inode *vi);
 
 extern int ntfs_setattr(struct dentry *dentry, struct iattr *attr);
 
 extern int ntfs_write_inode(struct inode *vi, int sync);
-extern void ntfs_write_inode_vfs(struct inode *vi, int sync);
 
 static inline void ntfs_commit_inode(struct inode *vi)
 {

@@ -24,11 +24,6 @@
 #include <asm/tlbflush.h>
 #include <mach_apic.h>
 
-#include <linux/config.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
-
 /*
  *	Some notes on x86 processor bugs affecting SMP operation:
  *
@@ -147,15 +142,6 @@ void __send_IPI_shortcut(unsigned int shortcut, int vector)
 	 */
 	cfg = __prepare_ICR(shortcut, vector);
 
-#ifdef	CONFIG_KDB
-	if (vector == KDB_VECTOR) {
-		/*
-		 * Setup KDB IPI to be delivered as an NMI
-		 */
-		cfg = (cfg&~APIC_VECTOR_MASK)|APIC_DM_NMI;
-	}
-#endif	/* CONFIG_KDB */
-
 	/*
 	 * Send the IPI. The write to APIC_ICR fires this off.
 	 */
@@ -233,15 +219,6 @@ inline void send_IPI_mask_sequence(cpumask_t mask, int vector)
 			 * program the ICR 
 			 */
 			cfg = __prepare_ICR(0, vector);
-
-#ifdef	CONFIG_KDB
-			if (vector == KDB_VECTOR) {
-				/*
-				 * Setup KDB IPI to be delivered as an NMI
-				 */
-				cfg = (cfg&~APIC_VECTOR_MASK)|APIC_DM_NMI;
-			}
-#endif	/* CONFIG_KDB */
 			
 			/*
 			 * Send the IPI. The write to APIC_ICR fires this off.
@@ -331,7 +308,7 @@ static inline void leave_mm (unsigned long cpu)
  * 2) Leave the mm if we are in the lazy tlb mode.
  */
 
-asmlinkage void smp_invalidate_interrupt (void)
+fastcall void smp_invalidate_interrupt(struct pt_regs *regs)
 {
 	unsigned long cpu;
 
@@ -490,15 +467,6 @@ void flush_tlb_all(void)
 	on_each_cpu(do_flush_tlb_all, NULL, 1, 1);
 }
 
-#ifdef	CONFIG_KDB
-void
-smp_kdb_stop(void)
-{
-	if (!KDB_FLAG(NOIPI))
-		send_IPI_allbutself(KDB_VECTOR);
-}
-#endif	/* CONFIG_KDB */
-
 /*
  * this function sends a 'reschedule' IPI to another CPU.
  * it goes straight through and wastes no time serializing
@@ -570,11 +538,11 @@ int smp_call_function (void (*func) (void *info), void *info, int nonatomic,
 
 	/* Wait for response */
 	while (atomic_read(&data.started) != cpus)
-		barrier();
+		cpu_relax();
 
 	if (wait)
 		while (atomic_read(&data.finished) != cpus)
-			barrier();
+			cpu_relax();
 	spin_unlock(&call_lock);
 
 	return 0;
@@ -611,12 +579,12 @@ void smp_send_stop(void)
  * all the work is done automatically when
  * we return from the interrupt.
  */
-asmlinkage void smp_reschedule_interrupt(void)
+fastcall void smp_reschedule_interrupt(struct pt_regs *regs)
 {
 	ack_APIC_irq();
 }
 
-asmlinkage void smp_call_function_interrupt(void)
+fastcall void smp_call_function_interrupt(struct pt_regs *regs)
 {
 	void (*func) (void *info) = call_data->func;
 	void *info = call_data->info;

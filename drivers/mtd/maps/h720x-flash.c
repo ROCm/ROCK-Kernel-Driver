@@ -2,7 +2,7 @@
  * Flash memory access on Hynix GMS30C7201/HMS30C7202 based 
  * evaluation boards
  * 
- * $Id: h720x-flash.c,v 1.9 2004/07/14 17:45:40 dwmw2 Exp $
+ * $Id: h720x-flash.c,v 1.11 2004/11/04 13:24:14 gleixner Exp $
  *
  * (C) 2002 Jungjun Kim <jungjun.kim@hynix.com>
  *     2003 Thomas Gleixner <tglx@linutronix.de>	
@@ -73,7 +73,7 @@ int __init h720x_mtd_init(void)
 
 	char	*part_type = NULL;
 	
-	h720x_map.virt = (unsigned long)ioremap(FLASH_PHYS, FLASH_SIZE);
+	h720x_map.virt = ioremap(FLASH_PHYS, FLASH_SIZE);
 
 	if (!h720x_map.virt) {
 		printk(KERN_ERR "H720x-MTD: ioremap failed\n");

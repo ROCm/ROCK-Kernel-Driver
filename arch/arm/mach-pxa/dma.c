@@ -23,6 +23,7 @@
 #include <asm/hardware.h>
 #include <asm/dma.h>
 
+#include <asm/arch/pxa-regs.h>
 
 static struct dma_channel {
 	char *name;

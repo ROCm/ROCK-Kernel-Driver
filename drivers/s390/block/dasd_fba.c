@@ -4,7 +4,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.34 $
+ * $Revision: 1.37 $
  */
 
 #include <linux/config.h>
@@ -311,6 +311,14 @@ dasd_fba_build_cp(struct dasd_device * device, struct request *req)
 	recid = first_rec;
 	rq_for_each_bio(bio, req) bio_for_each_segment(bv, bio, i) {
 		dst = page_address(bv->bv_page) + bv->bv_offset;
+		if (dasd_page_cache) {
+			char *copy = kmem_cache_alloc(dasd_page_cache,
+						      SLAB_DMA | __GFP_NOWARN);
+			if (copy && rq_data_dir(req) == WRITE)
+				memcpy(copy + bv->bv_offset, dst, bv->bv_len);
+			if (copy)
+				dst = copy + bv->bv_offset;
+		}
 		for (off = 0; off < bv->bv_len; off += blksize) {
 			/* Locate record for stupid devices. */
 			if (private->rdc_data.mode.bits.data_chain == 0) {
@@ -345,6 +353,54 @@ dasd_fba_build_cp(struct dasd_device * device, struct request *req)
 	cqr->expires = 5 * 60 * HZ;	/* 5 minutes */
 	cqr->status = DASD_CQR_FILLED;
 	return cqr;
+}
+
+static int
+dasd_fba_free_cp(struct dasd_ccw_req *cqr, struct request *req)
+{
+	struct dasd_fba_private *private;
+	struct ccw1 *ccw;
+	struct bio *bio;
+	struct bio_vec *bv;
+	char *dst, *cda;
+	unsigned int blksize, off;
+	int i, status;
+
+	if (!dasd_page_cache)
+		goto out;
+	private = (struct dasd_fba_private *) cqr->device->private;
+	blksize = cqr->device->bp_block;
+	ccw = cqr->cpaddr;
+	/* Skip over define extent & locate record. */
+	ccw++;
+	if (private->rdc_data.mode.bits.data_chain != 0)
+		ccw++;
+	rq_for_each_bio(bio, req) bio_for_each_segment(bv, bio, i) {
+		dst = page_address(bv->bv_page) + bv->bv_offset;
+		for (off = 0; off < bv->bv_len; off += blksize) {
+			/* Skip locate record. */
+			if (private->rdc_data.mode.bits.data_chain == 0)
+				ccw++;
+			if (dst) {
+				if (ccw->flags & CCW_FLAG_IDA)
+					cda = *((char **)((addr_t) ccw->cda));
+				else
+					cda = (char *)((addr_t) ccw->cda);
+				if (dst != cda) {
+					if (rq_data_dir(req) == READ)
+						memcpy(dst, cda, bv->bv_len);
+					kmem_cache_free(dasd_page_cache,
+					    (void *)((addr_t)cda & PAGE_MASK));
+				}
+				dst = NULL;
+			}
+			ccw++;
+		}
+	}
+out:
+	status = cqr->status == DASD_CQR_DONE;
+	dasd_sfree_request(cqr, cqr->device);
+	return status;
 }
 
 static int
@@ -410,6 +466,7 @@ static struct dasd_discipline dasd_fba_discipline = {
 	.erp_action = dasd_fba_erp_action,
 	.erp_postaction = dasd_fba_erp_postaction,
 	.build_cp = dasd_fba_build_cp,
+	.free_cp = dasd_fba_free_cp,
 	.dump_sense = dasd_fba_dump_sense,
 	.fill_info = dasd_fba_fill_info,
 };

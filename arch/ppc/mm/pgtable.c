@@ -22,6 +22,7 @@
 
 #include <linux/config.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
@@ -152,19 +153,19 @@ void pte_free(struct page *ptepage)
 }
 
 #ifndef CONFIG_44x
-void *
+void __iomem *
 ioremap(phys_addr_t addr, unsigned long size)
 {
 	return __ioremap(addr, size, _PAGE_NO_CACHE);
 }
 #else /* CONFIG_44x */
-void *
+void __iomem *
 ioremap64(unsigned long long addr, unsigned long size)
 {
 	return __ioremap(addr, size, _PAGE_NO_CACHE);
 }
 
-void *
+void __iomem *
 ioremap(phys_addr_t addr, unsigned long size)
 {
 	phys_addr_t addr64 = fixup_bigphys_addr(addr, size);
@@ -173,7 +174,7 @@ ioremap(phys_addr_t addr, unsigned long size)
 }
 #endif /* CONFIG_44x */
 
-void *
+void __iomem *
 __ioremap(phys_addr_t addr, unsigned long size, unsigned long flags)
 {
 	unsigned long v, i;
@@ -256,10 +257,10 @@ __ioremap(phys_addr_t addr, unsigned long size, unsigned long flags)
 	}
 
 out:
-	return (void *) (v + ((unsigned long)addr & ~PAGE_MASK));
+	return (void __iomem *) (v + ((unsigned long)addr & ~PAGE_MASK));
 }
 
-void iounmap(void *addr)
+void iounmap(volatile void __iomem *addr)
 {
 	/*
 	 * If mapped by BATs then there is nothing to do.
@@ -270,6 +271,18 @@ void iounmap(void *addr)
 	if (addr > high_memory && (unsigned long) addr < ioremap_bot)
 		vunmap((void *) (PAGE_MASK & (unsigned long)addr));
 }
+
+void __iomem *ioport_map(unsigned long port, unsigned int len)
+{
+	return (void __iomem *) (port + _IO_BASE);
+}
+
+void ioport_unmap(void __iomem *addr)
+{
+	/* Nothing to do */
+}
+EXPORT_SYMBOL(ioport_map);
+EXPORT_SYMBOL(ioport_unmap);
 
 int
 map_page(unsigned long va, phys_addr_t pa, int flags)

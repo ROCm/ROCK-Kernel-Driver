@@ -1,5 +1,8 @@
+
+menu "IO Schedulers"
+
 config IOSCHED_NOOP
-	bool "No-op I/O scheduler" if EMBEDDED
+	bool
 	default y
 	---help---
 	  The no-op I/O scheduler is a minimal scheduler that does basic merging
@@ -9,7 +12,7 @@ config IOSCHED_NOOP
 	  the kernel.
 
 config IOSCHED_AS
-	bool "Anticipatory I/O scheduler" if EMBEDDED
+	tristate "Anticipatory I/O scheduler"
 	default y
 	---help---
 	  The anticipatory I/O scheduler is the default disk scheduler. It is
@@ -18,7 +21,7 @@ config IOSCHED_AS
 	  slower in some cases especially some database loads.
 
 config IOSCHED_DEADLINE
-	bool "Deadline I/O scheduler" if EMBEDDED
+	tristate "Deadline I/O scheduler"
 	default y
 	---help---
 	  The deadline I/O scheduler is simple and compact, and is often as
@@ -28,9 +31,11 @@ config IOSCHED_DEADLINE
 	  anticipatory I/O scheduler and so is a good choice.
 
 config IOSCHED_CFQ
-	bool "CFQ I/O scheduler" if EMBEDDED
+	tristate "CFQ I/O scheduler"
 	default y
 	---help---
 	  The CFQ I/O scheduler tries to distribute bandwidth equally
 	  among all processes in the system. It should provide a fair
 	  working environment, suitable for desktop systems.
+
+endmenu

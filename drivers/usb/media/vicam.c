@@ -351,16 +351,6 @@ static unsigned char setup5[] = {
 	0x46, 0x05, 0x6C, 0x05, 0x00, 0x00
 };
 
-static unsigned long kvirt_to_pa(unsigned long adr)
-{
-	unsigned long kva, ret;
-
-	kva = (unsigned long) page_address(vmalloc_to_page((void *)adr));
-	kva |= adr & (PAGE_SIZE-1); /* restore the offset */
-	ret = __pa(kva);
-	return ret;
-}
-
 /* rvmalloc / rvfree copied from usbvideo.c
  *
  * Not sure why these are not yet non-statics which I can reference through
@@ -1055,8 +1045,8 @@ vicam_mmap(struct file *file, struct vm_area_struct *vma)
 
 	pos = (unsigned long)cam->framebuf;
 	while (size > 0) {
-		page = kvirt_to_pa(pos);
-		if (remap_page_range(vma, start, page, PAGE_SIZE, PAGE_SHARED))
+		page = vmalloc_to_pfn((void *)pos);
+		if (remap_pfn_range(vma, start, page, PAGE_SIZE, PAGE_SHARED))
 			return -EAGAIN;
 
 		start += PAGE_SIZE;

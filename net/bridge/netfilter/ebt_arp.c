@@ -108,8 +108,8 @@ static int ebt_arp_check(const char *tablename, unsigned int hookmask,
 
 	if (datalen != EBT_ALIGN(sizeof(struct ebt_arp_info)))
 		return -EINVAL;
-	if ((e->ethproto != __constant_htons(ETH_P_ARP) &&
-	   e->ethproto != __constant_htons(ETH_P_RARP)) ||
+	if ((e->ethproto != htons(ETH_P_ARP) &&
+	   e->ethproto != htons(ETH_P_RARP)) ||
 	   e->invflags & EBT_IPROTO)
 		return -EINVAL;
 	if (info->bitmask & ~EBT_ARP_MASK || info->invflags & ~EBT_ARP_MASK)

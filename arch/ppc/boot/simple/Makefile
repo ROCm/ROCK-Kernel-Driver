@@ -41,7 +41,7 @@ end-y := elf
 # if present on 'classic' PPC.
 cacheflag-y	:= -DCLEAR_CACHES=""
 # This file will flush / disable the L2, and L3 if present.
-clear_L2_L3	:= $(boot)/simple/clear.S
+clear_L2_L3	:= $(srctree)/$(boot)/simple/clear.S
 
 #
 # See arch/ppc/kconfig and arch/ppc/platforms/Kconfig
@@ -64,6 +64,7 @@ zimageinitrd-$(CONFIG_EBONY)		:= zImage.initrd-TREE
 zimageinitrd-$(CONFIG_OCOTEA)		:= zImage.initrd-TREE
          end-$(CONFIG_OCOTEA)		:= ocotea
   entrypoint-$(CONFIG_OCOTEA)		:= 0x01000000
+     extra.o-$(CONFIG_OCOTEA)		:= pibs.o
 
      extra.o-$(CONFIG_EV64260)		:= direct.o misc-ev64260.o
          end-$(CONFIG_EV64260)		:= ev64260

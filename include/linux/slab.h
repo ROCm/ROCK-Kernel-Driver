@@ -13,6 +13,7 @@ typedef struct kmem_cache_s kmem_cache_t;
 
 #include	<linux/config.h>	/* kmalloc_sizes.h needs CONFIG_ options */
 #include	<linux/gfp.h>
+#include	<linux/init.h>
 #include	<linux/types.h>
 #include	<asm/page.h>		/* kmalloc_sizes.h needs PAGE_SIZE */
 #include	<asm/cache.h>		/* kmalloc_sizes.h needs L1_CACHE_BYTES */
@@ -53,16 +54,22 @@ typedef struct kmem_cache_s kmem_cache_t;
 #define	SLAB_CTOR_VERIFY	0x004UL		/* tell constructor it's a verify call */
 
 /* prototypes */
-extern void kmem_cache_init(void);
+extern void __init kmem_cache_init(void);
 
-extern kmem_cache_t *kmem_find_general_cachep(size_t, int gfpflags);
 extern kmem_cache_t *kmem_cache_create(const char *, size_t, size_t, unsigned long,
 				       void (*)(void *, kmem_cache_t *, unsigned long),
 				       void (*)(void *, kmem_cache_t *, unsigned long));
 extern int kmem_cache_destroy(kmem_cache_t *);
 extern int kmem_cache_shrink(kmem_cache_t *);
 extern void *kmem_cache_alloc(kmem_cache_t *, int);
+#ifdef CONFIG_NUMA
 extern void *kmem_cache_alloc_node(kmem_cache_t *, int);
+#else
+static inline void *kmem_cache_alloc_node(kmem_cache_t *cachep, int node)
+{
+	return kmem_cache_alloc(cachep, GFP_KERNEL);
+}
+#endif
 extern void kmem_cache_free(kmem_cache_t *, void *);
 extern unsigned int kmem_cache_size(kmem_cache_t *);
 

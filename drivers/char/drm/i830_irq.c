@@ -92,7 +92,7 @@ int i830_wait_irq(drm_device_t *dev, int irq_nr)
 	add_wait_queue(&dev_priv->irq_queue, &entry);
 
 	for (;;) {
-		current->state = TASK_INTERRUPTIBLE;
+		__set_current_state(TASK_INTERRUPTIBLE);
 	   	if (atomic_read(&dev_priv->irq_received) >= irq_nr) 
 		   break;
 		if((signed)(end - jiffies) <= 0) {
@@ -112,7 +112,7 @@ int i830_wait_irq(drm_device_t *dev, int irq_nr)
 		}
 	}
 
-	current->state = TASK_RUNNING;
+	__set_current_state(TASK_RUNNING);
 	remove_wait_queue(&dev_priv->irq_queue, &entry);
 	return ret;
 }

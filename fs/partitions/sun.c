@@ -12,9 +12,10 @@
 
 int sun_partition(struct parsed_partitions *state, struct block_device *bdev)
 {
-	int i, csum;
+	int i;
+	__be16 csum;
 	int slot = 1;
-	unsigned short *ush;
+	__be16 *ush;
 	Sector sect;
 	struct sun_disklabel {
 		unsigned char info[128];   /* Informative text string */
@@ -26,22 +27,22 @@ int sun_partition(struct parsed_partitions *state, struct block_device *bdev)
 			unsigned char flags;
 		} infos[8];
 		unsigned char spare[246];  /* Boot information etc. */
-		unsigned short rspeed;     /* Disk rotational speed */
-		unsigned short pcylcount;  /* Physical cylinder count */
-		unsigned short sparecyl;   /* extra sects per cylinder */
+		__be16 rspeed;     /* Disk rotational speed */
+		__be16 pcylcount;  /* Physical cylinder count */
+		__be16 sparecyl;   /* extra sects per cylinder */
 		unsigned char spare2[4];   /* More magic... */
-		unsigned short ilfact;     /* Interleave factor */
-		unsigned short ncyl;       /* Data cylinder count */
-		unsigned short nacyl;      /* Alt. cylinder count */
-		unsigned short ntrks;      /* Tracks per cylinder */
-		unsigned short nsect;      /* Sectors per track */
+		__be16 ilfact;     /* Interleave factor */
+		__be16 ncyl;       /* Data cylinder count */
+		__be16 nacyl;      /* Alt. cylinder count */
+		__be16 ntrks;      /* Tracks per cylinder */
+		__be16 nsect;      /* Sectors per track */
 		unsigned char spare3[4];   /* Even more magic... */
 		struct sun_partition {
-			__u32 start_cylinder;
-			__u32 num_sectors;
+			__be32 start_cylinder;
+			__be32 num_sectors;
 		} partitions[8];
-		unsigned short magic;      /* Magic number */
-		unsigned short csum;       /* Label xor'd checksum */
+		__be16 magic;      /* Magic number */
+		__be16 csum;       /* Label xor'd checksum */
 	} * label;		
 	struct sun_partition *p;
 	unsigned long spc;
@@ -59,8 +60,8 @@ int sun_partition(struct parsed_partitions *state, struct block_device *bdev)
 		return 0;
 	}
 	/* Look at the checksum */
-	ush = ((unsigned short *) (label+1)) - 1;
-	for (csum = 0; ush >= ((unsigned short *) label);)
+	ush = ((__be16 *) (label+1)) - 1;
+	for (csum = 0; ush >= ((__be16 *) label);)
 		csum ^= *ush--;
 	if (csum) {
 		printk("Dev %s Sun disklabel: Csum bad, label corrupted\n",

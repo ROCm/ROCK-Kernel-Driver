@@ -232,7 +232,6 @@ chrp_setup_arch(void)
 	else
 #endif
 		ROOT_DEV = Root_SDA2; /* sda2 (sda1 is for the kernel) */
-	ROOT_DEV = Root_SDA3; /* sda3 (sda1 is for the kernel) */
 
 	/* Lookup PCI host bridges */
 	chrp_find_bridges();
@@ -372,11 +371,19 @@ static void __init chrp_find_openpic(void)
 	}
 }
 
+#if defined(CONFIG_VT) && defined(CONFIG_INPUT_ADBHID) && defined(XMON)
+static struct irqaction xmon_irqaction = {
+	.handler = xmon_irq,
+	.mask = CPU_MASK_NONE,
+	.name = "XMON break",
+};
+#endif
+
 void __init chrp_init_IRQ(void)
 {
 	struct device_node *np;
 	int i;
-	unsigned long chrp_int_ack;
+	unsigned long chrp_int_ack = 0;
 	unsigned char init_senses[NR_IRQS - NUM_8259_INTERRUPTS];
 #if defined(CONFIG_VT) && defined(CONFIG_INPUT_ADBHID) && defined(XMON)
 	struct device_node *kbd;
@@ -417,7 +424,7 @@ void __init chrp_init_IRQ(void)
 		    && strcmp(kbd->parent->type, "adb") == 0)
 			break;
 	if (kbd)
-		request_irq(HYDRA_INT_ADB_NMI, xmon_irq, 0, "XMON break", 0);
+		setup_irq(HYDRA_INT_ADB_NMI, &xmon_irqaction);
 #endif
 }
 

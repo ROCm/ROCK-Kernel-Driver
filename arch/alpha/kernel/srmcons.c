@@ -91,15 +91,15 @@ srmcons_receive_chars(unsigned long data)
 
 /* called with callback_lock held */
 static int
-srmcons_do_write(struct tty_struct *tty, const unsigned char *buf, int count)
+srmcons_do_write(struct tty_struct *tty, const char *buf, int count)
 {
-	unsigned char *str_cr = "\r";
+	static char str_cr[1] = "\r";
 	long c, remaining = count;
 	srmcons_result result;
-	unsigned char *cur;
+	char *cur;
 	int need_cr;
 
-	for (cur = (unsigned char *)buf; remaining > 0; ) {
+	for (cur = (char *)buf; remaining > 0; ) {
 		need_cr = 0;
 		/* 
 		 * Break it up into reasonable size chunks to allow a chance
@@ -132,42 +132,13 @@ srmcons_do_write(struct tty_struct *tty, const unsigned char *buf, int count)
 }
 
 static int
-srmcons_write(struct tty_struct *tty, int from_user,
+srmcons_write(struct tty_struct *tty,
 	      const unsigned char *buf, int count)
 {
 	unsigned long flags;
 
-	if (from_user) {
-		unsigned char tmp[512];
-		int ret = 0;
-		size_t c;
-
-		while ((c = count) > 0) {
-			if (c > sizeof(tmp))
-				c = sizeof(tmp);
-			
-			c -= copy_from_user(tmp, buf, c);
-
-			if (!c) { 
-				printk("%s: EFAULT (count %d)\n",
-				       __FUNCTION__, count);
-				return -EFAULT;
-			}
-
-			spin_lock_irqsave(&srmcons_callback_lock, flags);
-			srmcons_do_write(tty, tmp, c);
-			spin_unlock_irqrestore(&srmcons_callback_lock, flags);
-
-			buf += c;
-			count -= c;
-			ret += c;
-		}
-
-		return ret;
-	}
-
 	spin_lock_irqsave(&srmcons_callback_lock, flags);
-	srmcons_do_write(tty, buf, count);
+	srmcons_do_write(tty, (const char *) buf, count);
 	spin_unlock_irqrestore(&srmcons_callback_lock, flags);
 
 	return count;

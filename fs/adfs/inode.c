@@ -373,10 +373,11 @@ out:
  * The adfs-specific inode data has already been updated by
  * adfs_notify_change()
  */
-void adfs_write_inode(struct inode *inode, int unused)
+int adfs_write_inode(struct inode *inode, int unused)
 {
 	struct super_block *sb = inode->i_sb;
 	struct object_info obj;
+	int ret;
 
 	lock_kernel();
 	obj.file_id	= inode->i_ino;
@@ -387,7 +388,8 @@ void adfs_write_inode(struct inode *inode, int unused)
 	obj.attr	= ADFS_I(inode)->attr;
 	obj.size	= inode->i_size;
 
-	adfs_dir_update(sb, &obj);
+	ret = adfs_dir_update(sb, &obj);
 	unlock_kernel();
+	return ret;
 }
 MODULE_LICENSE("GPL");

@@ -42,51 +42,25 @@ struct i2c_force_data {
 /* A structure containing the detect information.
    normal_i2c: filled in by the module writer. Terminated by I2C_CLIENT_ISA_END.
      A list of I2C addresses which should normally be examined.
-   normal_i2c_range: filled in by the module writer. Terminated by 
-     I2C_CLIENT_ISA_END
-     A list of pairs of I2C addresses, each pair being an inclusive range of
-     addresses which should normally be examined.
    normal_isa: filled in by the module writer. Terminated by SENSORS_ISA_END.
      A list of ISA addresses which should normally be examined.
-   normal_isa_range: filled in by the module writer. Terminated by 
-     SENSORS_ISA_END
-     A list of triples. The first two elements are ISA addresses, being an
-     range of addresses which should normally be examined. The third is the
-     modulo parameter: only addresses which are 0 module this value relative
-     to the first address of the range are actually considered.
    probe: insmod parameter. Initialize this list with I2C_CLIENT_ISA_END values.
      A list of pairs. The first value is a bus number (ANY_I2C_ISA_BUS for
      the ISA bus, -1 for any I2C bus), the second is the address. These
      addresses are also probed, as if they were in the 'normal' list.
-   probe_range: insmod parameter. Initialize this list with I2C_CLIENT_ISA_END 
-     values.
-     A list of triples. The first value is a bus number (ANY_I2C_ISA_BUS for
-     the ISA bus, -1 for any I2C bus), the second and third are addresses. 
-     These form an inclusive range of addresses that are also probed, as
-     if they were in the 'normal' list.
    ignore: insmod parameter. Initialize this list with I2C_CLIENT_ISA_END values.
      A list of pairs. The first value is a bus number (ANY_I2C_ISA_BUS for
      the ISA bus, -1 for any I2C bus), the second is the I2C address. These
      addresses are never probed. This parameter overrules 'normal' and 
      'probe', but not the 'force' lists.
-   ignore_range: insmod parameter. Initialize this list with I2C_CLIENT_ISA_END 
-      values.
-     A list of triples. The first value is a bus number (ANY_I2C_ISA_BUS for
-     the ISA bus, -1 for any I2C bus), the second and third are addresses. 
-     These form an inclusive range of I2C addresses that are never probed.
-     This parameter overrules 'normal' and 'probe', but not the 'force' lists.
    force_data: insmod parameters. A list, ending with an element of which
      the force field is NULL.
 */
 struct i2c_address_data {
 	unsigned short *normal_i2c;
-	unsigned short *normal_i2c_range;
 	unsigned int *normal_isa;
-	unsigned int *normal_isa_range;
 	unsigned short *probe;
-	unsigned short *probe_range;
 	unsigned short *ignore;
-	unsigned short *ignore_range;
 	struct i2c_force_data *forces;
 };
 
@@ -100,23 +74,13 @@ struct i2c_address_data {
 #define SENSORS_INSMOD \
   I2C_CLIENT_MODULE_PARM(probe, \
                       "List of adapter,address pairs to scan additionally"); \
-  I2C_CLIENT_MODULE_PARM(probe_range, \
-                      "List of adapter,start-addr,end-addr triples to scan " \
-                      "additionally"); \
   I2C_CLIENT_MODULE_PARM(ignore, \
                       "List of adapter,address pairs not to scan"); \
-  I2C_CLIENT_MODULE_PARM(ignore_range, \
-                      "List of adapter,start-addr,end-addr triples not to " \
-                      "scan"); \
 	static struct i2c_address_data addr_data = {			\
 			.normal_i2c =		normal_i2c,		\
-			.normal_i2c_range =	normal_i2c_range,	\
 			.normal_isa =		normal_isa,		\
-			.normal_isa_range =	normal_isa_range,	\
 			.probe =		probe,			\
-			.probe_range =		probe_range,		\
 			.ignore =		ignore,			\
-			.ignore_range =		ignore_range,		\
 			.forces =		forces,			\
 		}
 

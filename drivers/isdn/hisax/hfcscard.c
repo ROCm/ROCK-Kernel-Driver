@@ -125,8 +125,7 @@ hfcs_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			init2bds0(cs);
 			spin_unlock_irqrestore(&cs->lock, flags);
 			delay = (80*HZ)/1000 +1;
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout((80*HZ)/1000);
+			msleep(80);
 			spin_lock_irqsave(&cs->lock, flags);
 			cs->hw.hfcD.ctmt |= HFCD_TIM800;
 			cs->BC_Write_Reg(cs, HFCD_DATA, HFCD_CTMT, cs->hw.hfcD.ctmt); 

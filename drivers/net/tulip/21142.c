@@ -14,9 +14,9 @@
 
 */
 
-#include "tulip.h"
 #include <linux/pci.h>
 #include <linux/delay.h>
+#include "tulip.h"
 
 
 static u16 t21142_csr13[] = { 0x0001, 0x0009, 0x0009, 0x0000, 0x0001, };
@@ -30,8 +30,8 @@ void t21142_timer(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
 	struct tulip_private *tp = netdev_priv(dev);
-	long ioaddr = dev->base_addr;
-	int csr12 = inl(ioaddr + CSR12);
+	void __iomem *ioaddr = tp->base_addr;
+	int csr12 = ioread32(ioaddr + CSR12);
 	int next_tick = 60*HZ;
 	int new_csr6 = 0;
 
@@ -69,18 +69,18 @@ void t21142_timer(unsigned long data)
 		if (!(csr12 & 4)) {		/* 10mbps link beat good. */
 			new_csr6 = 0x82420000;
 			dev->if_port = 0;
-			outl(0, ioaddr + CSR13);
-			outl(0x0003FFFF, ioaddr + CSR14);
-			outw(t21142_csr15[dev->if_port], ioaddr + CSR15);
-			outl(t21142_csr13[dev->if_port], ioaddr + CSR13);
+			iowrite32(0, ioaddr + CSR13);
+			iowrite32(0x0003FFFF, ioaddr + CSR14);
+			iowrite16(t21142_csr15[dev->if_port], ioaddr + CSR15);
+			iowrite32(t21142_csr13[dev->if_port], ioaddr + CSR13);
 		} else {
 			/* Select 100mbps port to check for link beat. */
 			new_csr6 = 0x83860000;
 			dev->if_port = 3;
-			outl(0, ioaddr + CSR13);
-			outl(0x0003FF7F, ioaddr + CSR14);
-			outw(8, ioaddr + CSR15);
-			outl(1, ioaddr + CSR13);
+			iowrite32(0, ioaddr + CSR13);
+			iowrite32(0x0003FF7F, ioaddr + CSR14);
+			iowrite16(8, ioaddr + CSR15);
+			iowrite32(1, ioaddr + CSR13);
 		}
 		if (tulip_debug > 1)
 			printk(KERN_INFO"%s: Testing new 21143 media %s.\n",
@@ -88,7 +88,7 @@ void t21142_timer(unsigned long data)
 		if (new_csr6 != (tp->csr6 & ~0x00D5)) {
 			tp->csr6 &= 0x00D5;
 			tp->csr6 |= new_csr6;
-			outl(0x0301, ioaddr + CSR12);
+			iowrite32(0x0301, ioaddr + CSR12);
 			tulip_restart_rxtx(tp);
 		}
 		next_tick = 3*HZ;
@@ -104,7 +104,7 @@ void t21142_timer(unsigned long data)
 void t21142_start_nway(struct net_device *dev)
 {
 	struct tulip_private *tp = netdev_priv(dev);
-	long ioaddr = dev->base_addr;
+	void __iomem *ioaddr = tp->base_addr;
 	int csr14 = ((tp->sym_advertise & 0x0780) << 9)  |
 		((tp->sym_advertise & 0x0020) << 1) | 0xffbf;
 
@@ -114,17 +114,17 @@ void t21142_start_nway(struct net_device *dev)
 	if (tulip_debug > 1)
 		printk(KERN_DEBUG "%s: Restarting 21143 autonegotiation, csr14=%8.8x.\n",
 			   dev->name, csr14);
-	outl(0x0001, ioaddr + CSR13);
+	iowrite32(0x0001, ioaddr + CSR13);
 	udelay(100);
-	outl(csr14, ioaddr + CSR14);
+	iowrite32(csr14, ioaddr + CSR14);
 	tp->csr6 = 0x82420000 | (tp->sym_advertise & 0x0040 ? FullDuplex : 0);
-	outl(tp->csr6, ioaddr + CSR6);
+	iowrite32(tp->csr6, ioaddr + CSR6);
 	if (tp->mtable  &&  tp->mtable->csr15dir) {
-		outl(tp->mtable->csr15dir, ioaddr + CSR15);
-		outl(tp->mtable->csr15val, ioaddr + CSR15);
+		iowrite32(tp->mtable->csr15dir, ioaddr + CSR15);
+		iowrite32(tp->mtable->csr15val, ioaddr + CSR15);
 	} else
-		outw(0x0008, ioaddr + CSR15);
-	outl(0x1301, ioaddr + CSR12); 		/* Trigger NWAY. */
+		iowrite16(0x0008, ioaddr + CSR15);
+	iowrite32(0x1301, ioaddr + CSR12); 		/* Trigger NWAY. */
 }
 
 
@@ -132,12 +132,12 @@ void t21142_start_nway(struct net_device *dev)
 void t21142_lnk_change(struct net_device *dev, int csr5)
 {
 	struct tulip_private *tp = netdev_priv(dev);
-	long ioaddr = dev->base_addr;
-	int csr12 = inl(ioaddr + CSR12);
+	void __iomem *ioaddr = tp->base_addr;
+	int csr12 = ioread32(ioaddr + CSR12);
 
 	if (tulip_debug > 1)
 		printk(KERN_INFO"%s: 21143 link status interrupt %8.8x, CSR5 %x, "
-			   "%8.8x.\n", dev->name, csr12, csr5, inl(ioaddr + CSR14));
+			   "%8.8x.\n", dev->name, csr12, csr5, ioread32(ioaddr + CSR14));
 
 	/* If NWay finished and we have a negotiated partner capability. */
 	if (tp->nway  &&  !tp->nwayset  &&  (csr12 & 0x7000) == 0x5000) {
@@ -183,19 +183,19 @@ void t21142_lnk_change(struct net_device *dev, int csr5)
 			tp->csr6 = (dev->if_port & 1 ? 0x838E0000 : 0x82420000) | (tp->csr6 & 0x20ff);
 			if (tp->full_duplex)
 				tp->csr6 |= 0x0200;
-			outl(1, ioaddr + CSR13);
+			iowrite32(1, ioaddr + CSR13);
 		}
 #if 0							/* Restart shouldn't be needed. */
-		outl(tp->csr6 | RxOn, ioaddr + CSR6);
+		iowrite32(tp->csr6 | RxOn, ioaddr + CSR6);
 		if (tulip_debug > 2)
 			printk(KERN_DEBUG "%s:  Restarting Tx and Rx, CSR5 is %8.8x.\n",
-				   dev->name, inl(ioaddr + CSR5));
+				   dev->name, ioread32(ioaddr + CSR5));
 #endif
 		tulip_start_rxtx(tp);
 		if (tulip_debug > 2)
 			printk(KERN_DEBUG "%s:  Setting CSR6 %8.8x/%x CSR12 %8.8x.\n",
-				   dev->name, tp->csr6, inl(ioaddr + CSR6),
-				   inl(ioaddr + CSR12));
+				   dev->name, tp->csr6, ioread32(ioaddr + CSR6),
+				   ioread32(ioaddr + CSR12));
 	} else if ((tp->nwayset  &&  (csr5 & 0x08000000)
 				&& (dev->if_port == 3  ||  dev->if_port == 5)
 				&& (csr12 & 2) == 2) ||
@@ -216,7 +216,7 @@ void t21142_lnk_change(struct net_device *dev, int csr5)
 			tp->timer.expires = RUN_AT(3*HZ);
 			add_timer(&tp->timer);
 		} else if (dev->if_port == 5)
-			outl(inl(ioaddr + CSR14) & ~0x080, ioaddr + CSR14);
+			iowrite32(ioread32(ioaddr + CSR14) & ~0x080, ioaddr + CSR14);
 	} else if (dev->if_port == 0  ||  dev->if_port == 4) {
 		if ((csr12 & 4) == 0)
 			printk(KERN_INFO"%s: 21143 10baseT link beat good.\n",
@@ -236,8 +236,8 @@ void t21142_lnk_change(struct net_device *dev, int csr5)
 				   dev->name);
 		dev->if_port = 3;
 		tp->csr6 = 0x838E0000 | (tp->csr6 & 0x20ff);
-		outl(0x0003FF7F, ioaddr + CSR14);
-		outl(0x0301, ioaddr + CSR12);
+		iowrite32(0x0003FF7F, ioaddr + CSR14);
+		iowrite32(0x0301, ioaddr + CSR12);
 		tulip_restart_rxtx(tp);
 	}
 }

@@ -38,9 +38,9 @@
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
@@ -148,13 +148,13 @@ static inline u16 desc_offset(port_t *port, u16 desc, int transmit)
 
 
 
-static inline pkt_desc* desc_address(port_t *port, u16 desc, int transmit)
+static inline pkt_desc __iomem *desc_address(port_t *port, u16 desc, int transmit)
 {
 #ifdef PAGE0_ALWAYS_MAPPED
-	return (pkt_desc*)(win0base(port_to_card(port))
+	return (pkt_desc __iomem *)(win0base(port_to_card(port))
 			   + desc_offset(port, desc, transmit));
 #else
-	return (pkt_desc*)(winbase(port_to_card(port))
+	return (pkt_desc __iomem *)(winbase(port_to_card(port))
 			   + desc_offset(port, desc, transmit));
 #endif
 }
@@ -188,7 +188,7 @@ static void sca_init_sync_port(port_t *port)
 			: card->rx_ring_buffers;
 
 		for (i = 0; i < buffs; i++) {
-			pkt_desc* desc = desc_address(port, i, transmit);
+			pkt_desc __iomem *desc = desc_address(port, i, transmit);
 			u16 chain_off = desc_offset(port, i + 1, transmit);
 			u32 buff_off = buffer_offset(port, i, transmit);
 
@@ -269,7 +269,7 @@ static inline void sca_msci_intr(port_t *port)
 
 
 
-static inline void sca_rx(card_t *card, port_t *port, pkt_desc *desc, u16 rxin)
+static inline void sca_rx(card_t *card, port_t *port, pkt_desc __iomem *desc, u16 rxin)
 {
 	struct net_device *dev = port_to_dev(port);
 	struct net_device_stats *stats = hdlc_stats(dev);
@@ -315,8 +315,6 @@ static inline void sca_rx(card_t *card, port_t *port, pkt_desc *desc, u16 rxin)
 #endif
 	stats->rx_packets++;
 	stats->rx_bytes += skb->len;
-	skb->mac.raw = skb->data;
-	skb->dev = dev;
 	skb->dev->last_rx = jiffies;
 	skb->protocol = hdlc_type_trans(skb, dev);
 	netif_rx(skb);
@@ -341,7 +339,7 @@ static inline void sca_rx_intr(port_t *port)
 
 	while (1) {
 		u32 desc_off = desc_offset(port, port->rxin, 0);
-		pkt_desc *desc;
+		pkt_desc __iomem *desc;
 		u32 cda = sca_ina(dmac + CDAL, card);
 
 		if ((cda >= desc_off) && (cda < desc_off + sizeof(pkt_desc)))
@@ -392,7 +390,7 @@ static inline void sca_tx_intr(port_t *port)
 		DSR_TX(phy_node(port)), card);
 
 	while (1) {
-		pkt_desc *desc;
+		pkt_desc __iomem *desc;
 
 		u32 desc_off = desc_offset(port, port->txlast, 1);
 		u32 cda = sca_ina(dmac + CDAL, card);
@@ -730,7 +728,7 @@ static int sca_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	port_t *port = dev_to_port(dev);
 	card_t *card = port_to_card(port);
-	pkt_desc *desc;
+	pkt_desc __iomem *desc;
 	u32 buff, len;
 #ifndef ALL_PAGES_ALWAYS_MAPPED
 	u8 page;
@@ -799,7 +797,7 @@ static int sca_xmit(struct sk_buff *skb, struct net_device *dev)
 
 
 #ifdef NEED_DETECT_RAM
-static u32 __devinit sca_detect_ram(card_t *card, u8 *rambase, u32 ramsize)
+static u32 __devinit sca_detect_ram(card_t *card, u8 __iomem *rambase, u32 ramsize)
 {
 	/* Round RAM size to 32 bits, fill from end to start */
 	u32 i = ramsize &= ~3;

@@ -384,11 +384,11 @@ static int gbefb_blank(int blank, struct fb_info *info)
 {
 	/* 0 unblank, 1 blank, 2 no vsync, 3 no hsync, 4 off */
 	switch (blank) {
-	case 0:		/* unblank */
+	case FB_BLANK_UNBLANK:		/* unblank */
 		gbe_turn_on();
 		break;
 
-	case 1:		/* blank */
+	case FB_BLANK_NORMAL:		/* blank */
 		gbe_turn_off();
 		break;
 
@@ -1018,8 +1018,8 @@ static int gbefb_mmap(struct fb_info *info, struct file *file,
 		else
 			phys_size = TILE_SIZE - offset;
 
-		if (remap_page_range
-		    (vma, addr, phys_addr, phys_size, vma->vm_page_prot))
+		if (remap_pfn_range(vma, addr, phys_addr >> PAGE_SHIFT,
+						phys_size, vma->vm_page_prot))
 			return -EAGAIN;
 
 		offset = 0;
@@ -1084,7 +1084,11 @@ int __init gbefb_init(void)
 	int i, ret = 0;
 
 #ifndef MODULE
-	gbefb_setup(fb_get_options("gbefb"));
+	char *options = NULL;
+
+	if (fb_get_options("gbefb", &options))
+		return -ENODEV;
+	gbefb_setup(options);
 #endif
 
 	if (!request_mem_region(GBE_BASE, sizeof(struct sgi_gbe), "GBE")) {
@@ -1136,7 +1140,6 @@ int __init gbefb_init(void)
 	for (i = 0; i < (gbe_mem_size >> TILE_SHIFT); i++)
 		gbe_tiles.cpu[i] = (gbe_mem_phys >> TILE_SHIFT) + i;
 
-	fb_info.currcon = -1;
 	fb_info.fbops = &gbefb_ops;
 	fb_info.pseudo_palette = pseudo_palette;
 	fb_info.flags = FBINFO_DEFAULT;

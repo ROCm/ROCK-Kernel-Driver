@@ -80,7 +80,7 @@ extern struct task_struct *_switch_to(struct task_struct *, struct task_struct *
 #define mtctl(gr, cr) \
 	__asm__ __volatile__("mtctl %0,%1" \
 		: /* no outputs */ \
-		: "r" (gr), "i" (cr))
+		: "r" (gr), "i" (cr) : "memory")
 
 /* these are here to de-mystefy the calling code, and to provide hooks */
 /* which I needed for debugging EIEM problems -PB */
@@ -102,7 +102,7 @@ static inline void set_eiem(unsigned long val)
 #define mtsp(gr, cr) \
 	__asm__ __volatile__("mtsp %0,%1" \
 		: /* no outputs */ \
-		: "r" (gr), "i" (cr))
+		: "r" (gr), "i" (cr) : "memory")
 
 
 /*
@@ -154,7 +154,7 @@ static inline void set_eiem(unsigned long val)
    for the semaphore.  */
 #define __PA_LDCW_ALIGNMENT 16
 #define __ldcw_align(a) ({ \
-  unsigned long __ret = (unsigned long) a;                     		\
+  unsigned long __ret = (unsigned long) &(a)->lock[0];        		\
   __ret = (__ret + __PA_LDCW_ALIGNMENT - 1) & ~(__PA_LDCW_ALIGNMENT - 1); \
   (volatile unsigned int *) __ret;                                      \
 })
@@ -183,5 +183,23 @@ typedef struct {
 #endif
 
 #define KERNEL_START (0x10100000 - 0x1000)
+
+/* This is for the serialisation of PxTLB broadcasts.  At least on the
+ * N class systems, only one PxTLB inter processor broadcast can be
+ * active at any one time on the Merced bus.  This tlb purge
+ * synchronisation is fairly lightweight and harmless so we activate
+ * it on all SMP systems not just the N class. */
+#ifdef CONFIG_SMP
+extern spinlock_t pa_tlb_lock;
+
+#define purge_tlb_start(x) spin_lock(&pa_tlb_lock)
+#define purge_tlb_end(x) spin_unlock(&pa_tlb_lock)
+
+#else
+
+#define purge_tlb_start(x) do { } while(0)
+#define purge_tlb_end(x) do { } while (0)
+
+#endif
 
 #endif

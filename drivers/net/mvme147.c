@@ -18,7 +18,6 @@
 /* Used for the temporal inet entries and routing */
 #include <linux/socket.h>
 #include <linux/route.h>
-#include <linux/dio.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
@@ -40,7 +39,6 @@
 /* Our private data structure */
 struct m147lance_private {
 	struct lance_private lance;
-	void *base;
 	unsigned long ram;
 };
 
@@ -51,9 +49,9 @@ struct m147lance_private {
  */
 static int m147lance_open(struct net_device *dev);
 static int m147lance_close(struct net_device *dev);
-static void m147lance_writerap(struct m147lance_private *lp, unsigned short value);
-static void m147lance_writerdp(struct m147lance_private *lp, unsigned short value);
-static unsigned short m147lance_readrdp(struct m147lance_private *lp);
+static void m147lance_writerap(struct lance_private *lp, unsigned short value);
+static void m147lance_writerdp(struct lance_private *lp, unsigned short value);
+static unsigned short m147lance_readrdp(struct lance_private *lp);
 
 typedef void (*writerap_t)(void *, unsigned short);
 typedef void (*writerdp_t)(void *, unsigned short);
@@ -122,7 +120,7 @@ struct net_device * __init mvme147lance_probe(int unit)
 	}
 
 	lp->lance.name = (char*)name;                   /* discards const, shut up gcc */
-	lp->lance.ll = (struct lance_regs *)(dev->base_addr);
+	lp->lance.base = dev->base_addr;
 	lp->lance.init_block = (struct lance_init_block *)(lp->ram); /* CPU addr */
 	lp->lance.lance_init_block = (struct lance_init_block *)(lp->ram);                 /* LANCE addr of same RAM */
 	lp->lance.busmaster_regval = LE_C3_BSWP;        /* we're bigendian */
@@ -145,19 +143,19 @@ struct net_device * __init mvme147lance_probe(int unit)
 	return dev;
 }
 
-static void m147lance_writerap(struct m147lance_private *lp, unsigned short value)
+static void m147lance_writerap(struct lance_private *lp, unsigned short value)
 {
-	lp->lance.ll->rap = value;
+	out_be16(lp->base + LANCE_RAP, value);
 }
 
-static void m147lance_writerdp(struct m147lance_private *lp, unsigned short value)
+static void m147lance_writerdp(struct lance_private *lp, unsigned short value)
 {
-	lp->lance.ll->rdp = value;
+	out_be16(lp->base + LANCE_RDP, value);
 }
 
-static unsigned short m147lance_readrdp(struct m147lance_private *lp)
+static unsigned short m147lance_readrdp(struct lance_private *lp)
 {
-	return lp->lance.ll->rdp;
+	return in_be16(lp->base + LANCE_RDP);
 }
 
 static int m147lance_open(struct net_device *dev)

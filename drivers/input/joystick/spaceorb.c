@@ -66,8 +66,6 @@ struct spaceorb {
 	char phys[32];
 };
 
-static int spaceorb_num;
-
 static unsigned char spaceorb_xor[] = "SpaceWare";
 
 static unsigned char *spaceorb_errors[] = { "EEPROM storing 0 failed", "Receive queue overflow", "Transmit queue timeout",
@@ -155,9 +153,7 @@ static irqreturn_t spaceorb_interrupt(struct serio *serio,
 static void spaceorb_disconnect(struct serio *serio)
 {
 	struct spaceorb* spaceorb = serio->private;
-
 	input_unregister_device(&spaceorb->dev);
-	put_device(&serio->dev);
 	serio_close(serio);
 	kfree(spaceorb);
 }
@@ -204,8 +200,6 @@ static void spaceorb_connect(struct serio *serio, struct serio_driver *drv)
 	spaceorb->dev.id.vendor = SERIO_SPACEORB;
 	spaceorb->dev.id.product = 0x0001;
 	spaceorb->dev.id.version = 0x0100;
-	spaceorb->dev.dev = get_device(&serio->dev);
-	sprintf(spaceorb->dev.cdev.class_id,"spaceorb%d", spaceorb_num++);
 
 	serio->private = spaceorb;
 

@@ -40,7 +40,7 @@
 
 /* Make parport_wait_peripheral wake up.
  * It will be useful to call this from an interrupt handler. */
-void parport_ieee1284_wakeup (struct parport *port)
+static void parport_ieee1284_wakeup (struct parport *port)
 {
 	up (&port->physport->ieee1284.irq);
 }
@@ -813,9 +813,7 @@ long parport_set_timeout (struct pardevice *dev, long inactivity)
 EXPORT_SYMBOL(parport_negotiate);
 EXPORT_SYMBOL(parport_write);
 EXPORT_SYMBOL(parport_read);
-EXPORT_SYMBOL(parport_ieee1284_wakeup);
 EXPORT_SYMBOL(parport_wait_peripheral);
-EXPORT_SYMBOL(parport_poll_peripheral);
 EXPORT_SYMBOL(parport_wait_event);
 EXPORT_SYMBOL(parport_set_timeout);
 EXPORT_SYMBOL(parport_ieee1284_interrupt);

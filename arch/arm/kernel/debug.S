@@ -538,6 +538,9 @@
 #elif defined(CONFIG_ARCH_S3C2410)
 #include <asm/arch/map.h>
 #include <asm/arch/regs-serial.h>
+#include <asm/arch/regs-gpio.h>
+#define S3C2410_UART1_OFF (0x4000)
+#define SHIFT_2440TXF (14-9)
 
 		.macro addruart, rx
 		mrc	p15, 0, \rx, c1, c0
@@ -559,7 +562,17 @@
 		beq	1001f				@
 		@ FIFO enabled...
 1003:
+		mrc	p15, 0, \rd, c1, c0
+		tst	\rd, #1
+		addeq	\rd, \rx, #(S3C2410_PA_GPIO - S3C2410_PA_UART)
+		addne	\rd, \rx, #(S3C2410_VA_GPIO - S3C2410_VA_UART)
+		bic	\rd, \rd, #0xff000
+		ldr	\rd, [ \rd, # S3C2410_GSTATUS1 - S3C2410_GPIOREG(0) ]
+		and	\rd, \rd, #0x00ff0000
+		teq	\rd, #0x00440000		@ is it 2440?
+
 		ldr	\rd, [ \rx, # S3C2410_UFSTAT ]
+		moveq	\rd, \rd, lsr #SHIFT_2440TXF
 		tst	\rd, #S3C2410_UFSTAT_TXFULL
 		bne	1003b
 		b	1002f
@@ -580,8 +593,19 @@
 		beq	1001f				@
 		@ FIFO enabled...
 1003:
+		mrc	p15, 0, \rd, c1, c0
+		tst	\rd, #1
+		addeq	\rd, \rx, #(S3C2410_PA_GPIO - S3C2410_PA_UART)
+		addne	\rd, \rx, #(S3C2410_VA_GPIO - S3C2410_VA_UART)
+		bic	\rd, \rd, #0xff000
+		ldr	\rd, [ \rd, # S3C2410_GSTATUS1 - S3C2410_GPIOREG(0) ]
+		and	\rd, \rd, #0x00ff0000
+		teq	\rd, #0x00440000		@ is it 2440?
+
 		ldr	\rd, [ \rx, # S3C2410_UFSTAT ]
-		ands	\rd, \rd, #15<<S3C2410_UFSTAT_TXSHIFT
+		andne	\rd, \rd, #S3C2410_UFSTAT_TXMASK
+		andeq	\rd, \rd, #S3C2440_UFSTAT_TXMASK
+		teq	\rd, #0
 		bne	1003b
 		b	1002f
 
@@ -623,7 +647,7 @@
 		.endm
 
 
-#elif defined(CONFIG_ARCH_VERSATILE_PB)
+#elif defined(CONFIG_ARCH_VERSATILE)
 
 #include <asm/hardware/amba_serial.h>
 
@@ -674,6 +698,36 @@
 1002:		ldr	\rd, [\rx, #0x98]	@ SR2
 		tst	\rd, #1 << 3		@ TXDC
 		beq	1002b			@ wait until transmit done
+		.endm
+
+#elif defined(CONFIG_ARCH_H720X)
+
+		.equ    io_virt, IO_BASE
+		.equ    io_phys, IO_START
+
+		.macro  addruart,rx
+		mrc     p15, 0, \rx, c1, c0
+		tst     \rx, #1  	       @ MMU enabled?
+		moveq   \rx, #io_phys	       @ physical base address
+		movne   \rx, #io_virt	       @ virtual address
+		add     \rx, \rx, #0x00020000   @ UART1
+		.endm
+
+		.macro  senduart,rd,rx
+		str     \rd, [\rx, #0x0]        @ UARTDR
+
+		.endm
+
+		.macro  waituart,rd,rx
+1001:		ldr     \rd, [\rx, #0x18]       @ UARTFLG
+		tst     \rd, #1 << 5	       @ UARTFLGUTXFF - 1 when full
+		bne     1001b
+		.endm
+
+		.macro  busyuart,rd,rx
+1001:		ldr     \rd, [\rx, #0x18]       @ UARTFLG
+		tst     \rd, #1 << 3	       @ UARTFLGUBUSY - 1 when busy
+		bne     1001b
 		.endm
 #else
 #error Unknown architecture

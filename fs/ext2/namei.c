@@ -2,7 +2,8 @@
  * linux/fs/ext2/namei.c
  *
  * Rewrite to pagecache. Almost all code had been changed, so blame me
- * if the things go wrong. Please, send bug reports to viro@math.psu.edu
+ * if the things go wrong. Please, send bug reports to
+ * viro@parcelfarce.linux.theplanet.co.uk
  *
  * Stuff here is basically a glue between the VFS and generic UNIXish
  * filesystem that keeps everything in pagecache. All knowledge of the
@@ -395,19 +396,23 @@ struct inode_operations ext2_dir_inode_operations = {
 	.rmdir		= ext2_rmdir,
 	.mknod		= ext2_mknod,
 	.rename		= ext2_rename,
-	.setxattr	= ext2_setxattr,
-	.getxattr	= ext2_getxattr,
+#ifdef CONFIG_EXT2_FS_XATTR
+	.setxattr	= generic_setxattr,
+	.getxattr	= generic_getxattr,
 	.listxattr	= ext2_listxattr,
-	.removexattr	= ext2_removexattr,
+	.removexattr	= generic_removexattr,
+#endif
 	.setattr	= ext2_setattr,
 	.permission	= ext2_permission,
 };
 
 struct inode_operations ext2_special_inode_operations = {
-	.setxattr	= ext2_setxattr,
-	.getxattr	= ext2_getxattr,
+#ifdef CONFIG_EXT2_FS_XATTR
+	.setxattr	= generic_setxattr,
+	.getxattr	= generic_getxattr,
 	.listxattr	= ext2_listxattr,
-	.removexattr	= ext2_removexattr,
+	.removexattr	= generic_removexattr,
+#endif
 	.setattr	= ext2_setattr,
 	.permission	= ext2_permission,
 };

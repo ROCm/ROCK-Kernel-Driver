@@ -176,6 +176,18 @@ initial_code:
 init_rsp:
 	.quad  init_thread_union+THREAD_SIZE-8
 
+ENTRY(early_idt_handler)
+	xorl %eax,%eax
+	movq 8(%rsp),%rsi	# get rip
+	movq (%rsp),%rdx
+	movq %cr2,%rcx
+	leaq early_idt_msg(%rip),%rdi
+	call early_printk
+1:	hlt
+	jmp 1b
+
+early_idt_msg:
+	.asciz "PANIC: early exception rip %lx error %lx cr2 %lx\n"
 
 .code32
 ENTRY(no_long_mode)

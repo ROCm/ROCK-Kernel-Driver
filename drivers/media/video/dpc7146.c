@@ -106,6 +106,10 @@ static int dpc_probe(struct saa7146_dev* dev)
 	   video port pins should be enabled here ?! */
 	saa7146_write(dev, MC1, (MASK_08 | MASK_24 | MASK_10 | MASK_26));
 
+	dpc->i2c_adapter = (struct i2c_adapter) {
+		.class = I2C_CLASS_TV_ANALOG,
+		.name = "dpc7146",
+	};
 	saa7146_i2c_adapter_prepare(dev, &dpc->i2c_adapter, SAA7146_I2C_BUS_BIT_RATE_480);
 	if(i2c_add_adapter(&dpc->i2c_adapter) < 0) {
 		DEB_S(("cannot register i2c-device. skipping.\n"));
@@ -123,6 +127,7 @@ static int dpc_probe(struct saa7146_dev* dev)
 	/* check if all devices are present */
 	if( 0 == dpc->saa7111a ) {
 		DEB_D(("dpc_v4l2.o: dpc_attach failed for this device.\n"));	
+		i2c_del_adapter(&dpc->i2c_adapter);
 		kfree(dpc);
 		return -ENODEV;
 	}

@@ -36,9 +36,6 @@
  *		the boot cpu is 0.
  *			smp_processor_id() returns the cpuid of the current cpu.
  *
- *	   CPUNUM - On IA64, a cpunum and cpuid are the same. This is NOT true
- *		on other architectures like IA32.
- *
  * 	   CPU_PHYSICAL_ID (also known as HARD_PROCESSOR_ID)
  *		This is the same as 31:24 of the processor LID register
  *			hard_smp_processor_id()- cpu_physical_id of current processor
@@ -46,15 +43,15 @@
  *			cpu_logical_id(phy_id) - convert a <physical_cpuid> to a <cpuid> 
  *				* not real efficient - don't use in perf critical code
  *
- *         LID - processor defined register (see PRM V2).
+ *         SLICE - a number in the range of 0 - 3 (typically) that represents the
+ *		cpu number on a brick.
  *
- *           On SN2
- *		31:28 - id   Contains 0-3 to identify the cpu on the node
- *		27:16 - eid  Contains the NASID
+ *	   SUBNODE - (almost obsolete) the number of the FSB that a cpu is
+ *		connected to. This is also the same as the PI number. Usually 0 or 1.
  *
+ *	NOTE!!!: the value of the bits in the cpu physical id (SAPICid or LID) of a cpu has no 
+ *	significance. The SAPIC id (LID) is a 16-bit cookie that has meaning only to the PROM.
  *
- *
- * The following assumes the following mappings for LID register values:
  *
  * The macros convert between cpu physical ids & slice/nasid/cnodeid.
  * These terms are described below:
@@ -84,18 +81,11 @@
  */
 
 #ifndef CONFIG_SMP
+#define cpu_logical_id(cpu)			0
 #define cpu_physical_id(cpuid)			((ia64_getreg(_IA64_REG_CR_LID) >> 16) & 0xffff)
 #endif
 
-/*
- * macros for some of these exist in sn/addrs.h & sn/arch.h, etc. However, 
- * trying #include these files here causes circular dependencies.
- */
-#define cpu_physical_id_to_nasid(cpi)		((cpi) &0xfff)
-#define cpu_physical_id_to_slice(cpi)		((cpi>>12) & 3)
-#define cpu_physical_id_to_coherence_id(cpi)	(cpu_physical_id_to_nasid(cpi) >> 9)
-#define get_nasid()				((ia64_getreg(_IA64_REG_CR_LID) >> 16) & 0xfff)
-#define get_slice()				((ia64_getreg(_IA64_REG_CR_LID) >> 28) & 0xf)
+
 #define get_node_number(addr)			(((unsigned long)(addr)>>38) & 0x7ff)
 
 /*
@@ -103,43 +93,35 @@
  * 
  * NOTE: on non-MP systems, only cpuid 0 exists
  */
-#define id_eid_to_cpu_physical_id(id,eid)	 	(((id)<<8) | (eid))
 
-#define nasid_slice_to_cpuid(nasid,slice)		(cpu_logical_id(nasid_slice_to_cpu_physical_id((nasid),(slice))))
-
-#define nasid_slice_to_cpu_physical_id(nasid, slice)	(((slice)<<12) | (nasid))
-
-/*
- * The following table/struct  is used for managing PTC coherency domains.
- */
-typedef struct {
-	u8	domain;
-	u8	reserved;
-	u16	sapicid;
-} sn_sapicid_info_t;
-
-extern sn_sapicid_info_t	sn_sapicid_info[];	/* indexed by cpuid */
 extern short physical_node_map[];			/* indexed by nasid to get cnode */
 
+/*
+ * Macros for retrieving info about current cpu
+ */
+#define get_nasid()			(nodepda->phys_cpuid[smp_processor_id()].nasid)
+#define get_subnode()			(nodepda->phys_cpuid[smp_processor_id()].subnode)
+#define get_slice()			(nodepda->phys_cpuid[smp_processor_id()].slice)
+#define get_cnode()			(nodepda->phys_cpuid[smp_processor_id()].cnode)
+#define get_sapicid()			((ia64_getreg(_IA64_REG_CR_LID) >> 16) & 0xffff)
 
 /*
- * cpuid_to_slice  - convert a cpuid to the slice that it resides on
- *  There are 4 cpus per node. This function returns 0 .. 3)
+ * Macros for retrieving info about an arbitrary cpu
+ *	cpuid - logical cpu id
  */
-#define cpuid_to_slice(cpuid)		(cpu_physical_id_to_slice(cpu_physical_id(cpuid)))
-
-
-/*
- * cpuid_to_nasid  - convert a cpuid to the NASID that it resides on
- */
-#define cpuid_to_nasid(cpuid)		(cpu_physical_id_to_nasid(cpu_physical_id(cpuid)))
-
-
-/*
- * cpuid_to_cnodeid  - convert a cpuid to the cnode that it resides on
- */
+#define cpuid_to_nasid(cpuid)		(nodepda->phys_cpuid[cpuid].nasid)
+#define cpuid_to_subnode(cpuid)		(nodepda->phys_cpuid[cpuid].subnode)
+#define cpuid_to_slice(cpuid)		(nodepda->phys_cpuid[cpuid].slice)
 #define cpuid_to_cnodeid(cpuid)		(physical_node_map[cpuid_to_nasid(cpuid)])
 
+
+/*
+ * Dont use the following in performance critical code. They require scans
+ * of potentially large tables.
+ */
+extern int nasid_slice_to_cpuid(int, int);
+#define nasid_slice_to_cpu_physical_id(nasid, slice)			\
+	cpu_physical_id(nasid_slice_to_cpuid(nasid, slice))
 
 /*
  * cnodeid_to_nasid - convert a cnodeid to a NASID
@@ -149,35 +131,15 @@ extern short physical_node_map[];			/* indexed by nasid to get cnode */
  */
 #define cnodeid_to_nasid(cnodeid)	pda->cnodeid_to_nasid_table[cnodeid]
  
-
 /*
  * nasid_to_cnodeid - convert a NASID to a cnodeid
  */
 #define nasid_to_cnodeid(nasid)		(physical_node_map[nasid])
 
-
 /*
- * cnode_slice_to_cpuid - convert a codeid & slice to a cpuid
+ * partition_coherence_id - cget the coherence ID of the current partition
  */
-
-#define cnode_slice_to_cpuid(cnodeid,slice) (nasid_slice_to_cpuid(cnodeid_to_nasid(cnodeid),(slice)))
- 
-
-/*
- * cpuid_to_subnode - convert a cpuid to the subnode it resides on.
- *   slice 0 & 1 are on subnode 0
- *   slice 2 & 3 are on subnode 1.
- */
-#define cpuid_to_subnode(cpuid)		((cpuid_to_slice(cpuid)<2) ? 0 : 1)
- 
-
-#define smp_physical_node_id()			(cpuid_to_nasid(smp_processor_id()))
-
-/*
- * cpuid_to_coherence_id - convert a cpuid to the coherence domain id it
- * resides on
- */
-#define cpuid_to_coherence_id(cpuid)	cpu_physical_id_to_coherence_id(cpu_physical_id(cpuid))
+#define partition_coherence_id()	(get_nasid() >> 9)
 
 #endif /* _ASM_IA64_SN_SN_CPUID_H */
 

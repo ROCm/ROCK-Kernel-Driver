@@ -22,6 +22,11 @@
 
 #define IA64_MCA_RENDEZ_TIMEOUT		(20 * 1000)	/* value in milliseconds - 20 seconds */
 
+typedef struct ia64_fptr {
+	unsigned long fp;
+	unsigned long gp;
+} ia64_fptr_t;
+
 typedef union cmcv_reg_u {
 	u64	cmcv_regval;
 	struct	{
@@ -114,6 +119,8 @@ extern void ia64_mca_ucmc_handler(void);
 extern void ia64_monarch_init_handler(void);
 extern void ia64_slave_init_handler(void);
 extern void ia64_mca_cmc_vector_setup(void);
+extern int  ia64_reg_MCA_extension(void*);
+extern void ia64_unreg_MCA_extension(void);
 
 #endif /* !__ASSEMBLY__ */
 #endif /* _ASM_IA64_MCA_H */

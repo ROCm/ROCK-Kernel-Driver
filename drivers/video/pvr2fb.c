@@ -939,6 +939,7 @@ static int __devinit pvr2fb_pci_probe(struct pci_dev *pdev,
 
 	pvr2_fix.mmio_start	= pci_resource_start(pdev, 1);
 	pvr2_fix.mmio_len	= pci_resource_len(pdev, 1);
+	fbinfo->device = &pdev->dev;
 
 	return pvr2fb_common_init();
 }
@@ -1058,7 +1059,11 @@ int __init pvr2fb_init(void)
 	int size;
 
 #ifndef MODULE
-	pvr2fb_setup(fb_get_options("pvr2fb"));
+	char *option = NULL;
+
+	if (fb_get_options("pvr2fb", &option))
+		return -ENODEV;
+	pvr2fb_setup(option);
 #endif
 	size = sizeof(struct fb_info) + sizeof(struct pvr2fb_par) + 16 * sizeof(u32);
 

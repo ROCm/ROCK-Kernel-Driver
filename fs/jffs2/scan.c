@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: scan.c,v 1.110 2004/06/17 17:15:31 gleixner Exp $
+ * $Id: scan.c,v 1.112 2004/09/12 09:56:13 gleixner Exp $
  *
  */
 #include <linux/kernel.h>
@@ -103,6 +103,10 @@ int jffs2_scan_medium(struct jffs2_sb_info *c)
 			buf_size = c->sector_size;
 		else
 			buf_size = PAGE_SIZE;
+
+		/* Respect kmalloc limitations */
+		if (buf_size > 128*1024)
+			buf_size = 128*1024;
 
 		D1(printk(KERN_DEBUG "Allocating readbuf of %d bytes\n", buf_size));
 		flashbuf = kmalloc(buf_size, GFP_KERNEL);
@@ -237,7 +241,7 @@ int jffs2_scan_medium(struct jffs2_sb_info *c)
 	}
 #endif
 	if (c->nr_erasing_blocks) {
-		if ( !c->used_size && ((empty_blocks+bad_blocks)!= c->nr_blocks || bad_blocks == c->nr_blocks) ) {
+		if ( !c->used_size && ((c->nr_free_blocks+empty_blocks+bad_blocks)!= c->nr_blocks || bad_blocks == c->nr_blocks) ) { 
 			printk(KERN_NOTICE "Cowardly refusing to erase blocks on filesystem with no valid JFFS2 nodes\n");
 			printk(KERN_NOTICE "empty_blocks %d, bad_blocks %d, c->nr_blocks %d\n",empty_blocks,bad_blocks,c->nr_blocks);
 			ret = -EIO;

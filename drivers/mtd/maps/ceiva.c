@@ -11,7 +11,7 @@
  *
  * (C) 2000 Nicolas Pitre <nico@cam.org>
  *
- * $Id: ceiva.c,v 1.10 2004/07/12 21:59:43 dwmw2 Exp $
+ * $Id: ceiva.c,v 1.11 2004/09/16 23:27:12 gleixner Exp $
  */
 
 #include <linux/config.h>
@@ -103,7 +103,7 @@ struct clps_info {
 	unsigned long base;
 	unsigned long size;
 	int width;
-	void __iomem *vbase;
+	void *vbase;
 	struct map_info *map;
 	struct mtd_info *mtd;
 	struct resource *res;
@@ -150,7 +150,7 @@ static int __init clps_setup_mtd(struct clps_info *clps, int nr, struct mtd_info
 			break;
 		}
 
-		clps[i].map->virt = clps[i].vbase;
+		clps[i].map->virt = (void __iomem *)clps[i].vbase;
 		clps[i].map->bankwidth = clps[i].width;
 		clps[i].map->size = clps[i].size;
 

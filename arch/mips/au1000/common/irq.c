@@ -41,8 +41,8 @@
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/delay.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/bootinfo.h>
 #include <asm/io.h>
 #include <asm/mipsregs.h>
@@ -66,10 +66,6 @@
 #define EXT_INTC1_REQ1 5 /* IP 5 */
 #define MIPS_TIMER_IP  7 /* IP 7 */
 
-#ifdef CONFIG_KGDB
-extern void breakpoint(void);
-#endif
-
 extern asmlinkage void au1000_IRQ(void);
 extern void set_debug_traps(void);
 extern irq_cpustat_t irq_stat [NR_CPUS];
@@ -84,7 +80,6 @@ static inline void mask_and_ack_either_edge_irq(unsigned int irq_nr);
 inline void local_enable_irq(unsigned int irq_nr);
 inline void local_disable_irq(unsigned int irq_nr);
 
-extern void __init init_generic_irq(void);
 void	(*board_init_irq)(void);
 
 #ifdef CONFIG_PM
@@ -420,7 +415,7 @@ static void setup_local_irq(unsigned int irq_nr, int type, int int_req)
 }
 
 
-void __init init_IRQ(void)
+void __init arch_init_irq(void)
 {
 	int i;
 	unsigned long cp0_status;
@@ -433,8 +428,6 @@ void __init init_IRQ(void)
 	cp0_status = read_c0_status();
 	memset(irq_desc, 0, sizeof(irq_desc));
 	set_except_vector(0, au1000_IRQ);
-
-	init_generic_irq();
 
 	/* Initialize interrupt controllers to a safe state.
 	*/
@@ -482,13 +475,6 @@ void __init init_IRQ(void)
 	*/
 	if (board_init_irq)
 		(*board_init_irq)();
-
-#ifdef CONFIG_KGDB
-	/* If local serial I/O used for debug port, enter kgdb at once */
-	puts("Waiting for kgdb to connect...");
-	set_debug_traps();
-	breakpoint();
-#endif
 }
 
 

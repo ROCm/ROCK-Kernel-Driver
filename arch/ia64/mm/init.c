@@ -19,9 +19,9 @@
 #include <linux/slab.h>
 #include <linux/swap.h>
 #include <linux/proc_fs.h>
+#include <linux/bitops.h>
 
 #include <asm/a.out.h>
-#include <asm/bitops.h>
 #include <asm/dma.h>
 #include <asm/ia32.h>
 #include <asm/io.h>
@@ -67,9 +67,9 @@ check_pgt_cache (void)
 	if (pgtable_cache_size > (u64) high) {
 		do {
 			if (pgd_quicklist)
-				free_page((unsigned long)pgd_alloc_one_fast(0));
+				free_page((unsigned long)pgd_alloc_one_fast(NULL));
 			if (pmd_quicklist)
-				free_page((unsigned long)pmd_alloc_one_fast(0, 0));
+				free_page((unsigned long)pmd_alloc_one_fast(NULL, 0));
 		} while (pgtable_cache_size > (u64) low);
 	}
 	preempt_enable();
@@ -98,7 +98,7 @@ update_mmu_cache (struct vm_area_struct *vma, unsigned long vaddr, pte_t pte)
 inline void
 ia64_set_rbs_bot (void)
 {
-	unsigned long stack_size = current->rlim[RLIMIT_STACK].rlim_max & -16;
+	unsigned long stack_size = current->signal->rlim[RLIMIT_STACK].rlim_max & -16;
 
 	if (stack_size > MAX_USER_STACK_SIZE)
 		stack_size = MAX_USER_STACK_SIZE;
@@ -472,9 +472,9 @@ ia64_pfn_valid (unsigned long pfn)
 	char byte;
 	struct page *pg = pfn_to_page(pfn);
 
-	return     (__get_user(byte, (char *) pg) == 0)
+	return     (__get_user(byte, (char __user *) pg) == 0)
 		&& ((((u64)pg & PAGE_MASK) == (((u64)(pg + 1) - 1) & PAGE_MASK))
-			|| (__get_user(byte, (char *) (pg + 1) - 1) == 0));
+			|| (__get_user(byte, (char __user *) (pg + 1) - 1) == 0));
 }
 EXPORT_SYMBOL(ia64_pfn_valid);
 
@@ -599,6 +599,6 @@ mem_init (void)
 	setup_gate();
 
 #ifdef CONFIG_IA32_SUPPORT
-	ia32_boot_gdt_init();
+	ia32_mem_init();
 #endif
 }

@@ -58,7 +58,7 @@
 
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
+module_param(pc_debug, int, 0644);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 static char *version =
 "aha152x_cs.c 1.54 2000/06/12 21:27:25 (David Hinds)";
@@ -90,6 +90,8 @@ MODULE_PARM(parity, "i");
 MODULE_PARM(synchronous, "i");
 MODULE_PARM(reset_delay, "i");
 MODULE_PARM(ext_trans, "i");
+
+MODULE_LICENSE("Dual MPL/GPL");
 
 /*====================================================================*/
 

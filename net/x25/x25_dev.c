@@ -92,7 +92,9 @@ static int x25_receive_data(struct sk_buff *skb, struct x25_neigh *nb)
 /*
 	x25_transmit_clear_request(nb, lci, 0x0D);
 */
-	printk(KERN_DEBUG "x25_receive_data(): unknown frame type %2x\n",frametype);
+
+	if (frametype != X25_CLEAR_CONFIRMATION)
+		printk(KERN_DEBUG "x25_receive_data(): unknown frame type %2x\n",frametype);
 
 	return 0;
 }

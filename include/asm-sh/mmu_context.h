@@ -6,6 +6,7 @@
  */
 #ifndef __ASM_SH_MMU_CONTEXT_H
 #define __ASM_SH_MMU_CONTEXT_H
+#ifdef __KERNEL__
 
 #include <asm/cpu/mmu_context.h>
 #include <asm/tlbflush.h>
@@ -201,4 +202,5 @@ static inline void disable_mmu(void)
 #define disable_mmu()	do { BUG(); } while (0)
 #endif
 
+#endif /* __KERNEL__ */
 #endif /* __ASM_SH_MMU_CONTEXT_H */

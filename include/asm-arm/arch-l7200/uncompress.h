@@ -23,7 +23,7 @@ static __inline__ void putc(char c)
 	__raw_writeb(c, IO_UART + 0x00);
 }
 
-static void puts(const char *s)
+static void putstr(const char *s)
 {
 	while (*s) {
 		if (*s == 10) {			/* If a LF, add CR */

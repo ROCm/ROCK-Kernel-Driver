@@ -18,10 +18,10 @@
 #include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
 #include <asm/irq.h>
-#include <asm/bitops.h>
 
 #include <linux/spinlock.h>
 #include <linux/cache.h>

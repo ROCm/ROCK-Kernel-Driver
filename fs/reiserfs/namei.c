@@ -341,7 +341,7 @@ static struct dentry * reiserfs_lookup (struct inode * dir, struct dentry * dent
             REISERFS_SB(dir->i_sb)->priv_root &&
             REISERFS_SB(dir->i_sb)->priv_root->d_inode &&
 	    de.de_objectid == le32_to_cpu (INODE_PKEY(REISERFS_SB(dir->i_sb)->priv_root->d_inode)->k_objectid)) {
-          reiserfs_write_unlock (dir->i_sb);
+	  reiserfs_write_unlock (dir->i_sb);
 	  return ERR_PTR (-EACCES);
 	}
 
@@ -1166,7 +1166,7 @@ static int entry_points_to_object (const char * name, int len, struct reiserfs_d
 
 
 /* sets key of objectid the entry has to point to */
-static void set_ino_in_dir_entry (struct reiserfs_dir_entry * de, struct key * key)
+static void set_ino_in_dir_entry (struct reiserfs_dir_entry * de, struct reiserfs_key * key)
 {
     /* JDM These operations are endian safe - both are le */
     de->de_deh[de->de_entry_num].deh_dir_id = key->k_dir_id;

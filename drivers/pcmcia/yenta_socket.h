@@ -107,7 +107,7 @@ struct cardbus_type {
 struct yenta_socket {
 	struct pci_dev *dev;
 	int cb_irq, io_irq;
-	void *base;
+	void __iomem *base;
 	struct timer_list poll_timer;
 
 	struct pcmcia_socket socket;
@@ -120,7 +120,7 @@ struct yenta_socket {
 	unsigned int private[8];
 
 	/* PCI saved state */
-	u32 saved_state[18];
+	u32 saved_state[2];
 };
 
 

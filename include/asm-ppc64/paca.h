@@ -99,11 +99,17 @@ struct paca_struct {
 	u64 exdsi[8];		/* used for linear mapping hash table misses */
 
 	/*
-	 * iSeries structues which the hypervisor knows about - Not
-	 * sure if these particularly need to be cacheline aligned.
+	 * iSeries structure which the hypervisor knows about -
+	 * this structure should not cross a page boundary.
+	 * The vpa_init/register_vpa call is now known to fail if the
+	 * lppaca structure crosses a page boundary.
 	 * The lppaca is also used on POWER5 pSeries boxes.
+	 * The lppaca is 640 bytes long, and cannot readily change
+	 * since the hypervisor knows its layout, so a 1kB
+	 * alignment will suffice to ensure that it doesn't
+	 * cross a page boundary.
 	 */
-	struct ItLpPaca lppaca __attribute__((aligned(0x80)));
+	struct ItLpPaca lppaca __attribute__((__aligned__(0x400)));
 #ifdef CONFIG_PPC_ISERIES
 	struct ItLpRegSave reg_save;
 #endif

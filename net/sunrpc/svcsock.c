@@ -1035,7 +1035,7 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 	} else {
 		printk(KERN_NOTICE "%s: recvfrom returned errno %d\n",
 					svsk->sk_server->sv_name, -len);
-		goto err_delete;
+		svc_sock_received(svsk);
 	}
 
 	return len;

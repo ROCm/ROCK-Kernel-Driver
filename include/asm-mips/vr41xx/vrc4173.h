@@ -48,6 +48,8 @@
 /*
  * PCI I/O accesses
  */
+#ifdef CONFIG_VRC4173
+
 extern unsigned long vrc4173_io_offset;
 
 #define set_vrc4173_io_offset(offset)	do { vrc4173_io_offset = (offset); } while (0)
@@ -74,6 +76,34 @@ extern unsigned long vrc4173_io_offset;
 #define vrc4173_insw(port,addr,count)	insw(vrc4173_io_offset+(port),(addr),(count))
 #define vrc4173_insl(port,addr,count)	insl(vrc4173_io_offset+(port),(addr),(count))
 
+#else
+
+#define set_vrc4173_io_offset(offset)	do {} while (0)
+
+#define vrc4173_outb(val,port)		do {} while (0)
+#define vrc4173_outw(val,port)		do {} while (0)
+#define vrc4173_outl(val,port)		do {} while (0)
+#define vrc4173_outb_p(val,port)	do {} while (0)
+#define vrc4173_outw_p(val,port)	do {} while (0)
+#define vrc4173_outl_p(val,port)	do {} while (0)
+
+#define vrc4173_inb(port)		0
+#define vrc4173_inw(port)		0
+#define vrc4173_inl(port)		0
+#define vrc4173_inb_p(port)		0
+#define vrc4173_inw_p(port)		0
+#define vrc4173_inl_p(port)		0
+
+#define vrc4173_outsb(port,addr,count)	do {} while (0)
+#define vrc4173_outsw(port,addr,count)	do {} while (0)
+#define vrc4173_outsl(port,addr,count)	do {} while (0)
+
+#define vrc4173_insb(port,addr,count)	do {} while (0)
+#define vrc4173_insw(port,addr,count)	do {} while (0)
+#define vrc4173_insl(port,addr,count)	do {} while (0)
+
+#endif
+
 /*
  * Clock Mask Unit
  */
@@ -92,8 +122,76 @@ typedef enum vrc4173_clock {
 	VRC4173_48MHz_CLOCK,
 } vrc4173_clock_t;
 
+#ifdef CONFIG_VRC4173
+
 extern void vrc4173_supply_clock(vrc4173_clock_t clock);
 extern void vrc4173_mask_clock(vrc4173_clock_t clock);
+
+#else
+
+static inline void vrc4173_supply_clock(vrc4173_clock_t clock) {}
+static inline void vrc4173_mask_clock(vrc4173_clock_t clock) {}
+
+#endif
+
+/*
+ * Interupt Control Unit
+ */
+
+#define VRC4173_PIUINT_COMMAND		0x0040
+#define VRC4173_PIUINT_DATA		0x0020
+#define VRC4173_PIUINT_PAGE1		0x0010
+#define VRC4173_PIUINT_PAGE0		0x0008
+#define VRC4173_PIUINT_DATALOST		0x0004
+#define VRC4173_PIUINT_STATUSCHANGE	0x0001
+
+#ifdef CONFIG_VRC4173
+
+extern void vrc4173_enable_piuint(uint16_t mask);
+extern void vrc4173_disable_piuint(uint16_t mask);
+
+#else
+
+static inline void vrc4173_enable_piuint(uint16_t mask) {}
+static inline void vrc4173_disable_piuint(uint16_t mask) {}
+
+#endif
+
+#define VRC4173_AIUINT_INPUT_DMAEND	0x0800
+#define VRC4173_AIUINT_INPUT_DMAHALT	0x0400
+#define VRC4173_AIUINT_INPUT_DATALOST	0x0200
+#define VRC4173_AIUINT_INPUT_DATA	0x0100
+#define VRC4173_AIUINT_OUTPUT_DMAEND	0x0008
+#define VRC4173_AIUINT_OUTPUT_DMAHALT	0x0004
+#define VRC4173_AIUINT_OUTPUT_NODATA	0x0002
+
+#ifdef CONFIG_VRC4173
+
+extern void vrc4173_enable_aiuint(uint16_t mask);
+extern void vrc4173_disable_aiuint(uint16_t mask);
+
+#else
+
+static inline void vrc4173_enable_aiuint(uint16_t mask) {}
+static inline void vrc4173_disable_aiuint(uint16_t mask) {}
+
+#endif
+
+#define VRC4173_KIUINT_DATALOST		0x0004
+#define VRC4173_KIUINT_DATAREADY	0x0002
+#define VRC4173_KIUINT_SCAN		0x0001
+
+#ifdef CONFIG_VRC4173
+
+extern void vrc4173_enable_kiuint(uint16_t mask);
+extern void vrc4173_disable_kiuint(uint16_t mask);
+
+#else
+
+static inline void vrc4173_enable_kiuint(uint16_t mask) {}
+static inline void vrc4173_disable_kiuint(uint16_t mask) {}
+
+#endif
 
 /*
  * General-Purpose I/O Unit
@@ -109,6 +207,14 @@ typedef enum vrc4173_function {
 	GPIO_16_20PINS,
 } vrc4173_function_t;
 
+#ifdef CONFIG_VRC4173
+
 extern void vrc4173_select_function(vrc4173_function_t function);
+
+#else
+
+static inline void vrc4173_select_function(vrc4173_function_t function) {}
+
+#endif
 
 #endif /* __NEC_VRC4173_H */

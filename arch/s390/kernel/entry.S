@@ -144,34 +144,11 @@ __switch_to_noper:
 	l	%r15,__THREAD_ksp(%r3)	# load kernel stack from next->tss.ksp
 	lm	%r6,%r15,__SF_GPRS(%r15)# load __switch_to registers of next task
 	st	%r3,__LC_CURRENT	# __LC_CURRENT = current task struct
+	lctl	%c4,%c4,__TASK_pid(%r3) # load pid to control reg. 4
 	l	%r3,__THREAD_info(%r3)  # load thread_info from task struct
 	st	%r3,__LC_THREAD_INFO
 	ahi	%r3,STACK_SIZE
 	st	%r3,__LC_KERNEL_STACK	# __LC_KERNEL_STACK = new kernel stack
-	br	%r14
-
-/*
- * do_softirq calling function. We want to run the softirq functions on the
- * asynchronous interrupt stack.
- */
-	.global do_call_softirq
-do_call_softirq:
-	stnsm	__SF_EMPTY(%r15),0xfc
-	stm	%r12,%r15,__SF_GPRS(%r15)
-	lr	%r12,%r15
-        basr    %r13,0
-do_call_base:
-	l	%r0,__LC_ASYNC_STACK
-	slr     %r0,%r15
-	sra	%r0,STACK_SHIFT
-	be	0f-do_call_base(%r13)
-	l	%r15,__LC_ASYNC_STACK
-0:	sl	%r15,.Lc_overhead-do_call_base(%r13)
-        st	%r12,__SF_BACKCHAIN(%r15)	# store backchain
-	l	%r1,.Ldo_softirq-do_call_base(%r13)
-	basr	%r14,%r1
-	lm	%r12,%r15,__SF_GPRS(%r12)
-	ssm	__SF_EMPTY(%r15)
 	br	%r14
 
 __critical_start:
@@ -252,6 +229,8 @@ sysc_sigpending:
 	basr	%r14,%r1               # call do_signal
 	tm	__TI_flags+3(%r9),_TIF_RESTART_SVC
 	bo	BASED(sysc_restart)
+	tm	__TI_flags+3(%r9),_TIF_SINGLE_STEP
+	bo	BASED(sysc_singlestep)
 	b	BASED(sysc_leave)      # out of here, do NOT recheck
 
 #
@@ -733,7 +712,6 @@ cleanup_sysc_leave_lpsw:
 .Ldo_IRQ:      .long  do_IRQ
 .Ldo_extint:   .long  do_extint
 .Ldo_signal:   .long  do_signal
-.Ldo_softirq:  .long  do_softirq
 .Lhandle_per:  .long  do_single_step
 .Ljump_table:  .long  pgm_check_table
 .Lschedule:    .long  schedule

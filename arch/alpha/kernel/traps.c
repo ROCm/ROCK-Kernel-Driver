@@ -111,7 +111,7 @@ dik_show_code(unsigned int *pc)
 	printk("Code:");
 	for (i = -6; i < 2; i++) {
 		unsigned int insn;
-		if (__get_user(insn, pc+i))
+		if (__get_user(insn, (unsigned int __user *)pc + i))
 			break;
 		printk("%c%08x%c", i ? ' ' : '<', insn, i ? ' ' : '>');
 	}

@@ -69,10 +69,8 @@ static void long_delay(int delay)
 	init_waitqueue_head(&delay_wait);
 
 	add_wait_queue(&delay_wait, &wait);
-	set_current_state(TASK_INTERRUPTIBLE);
-	schedule_timeout(delay);
+	msleep_interruptible(jiffies_to_msecs(delay));
 	remove_wait_queue(&delay_wait, &wait);
-	set_current_state(TASK_RUNNING);
 	
 	up(&delay_sem);
 }

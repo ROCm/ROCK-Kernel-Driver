@@ -3678,7 +3678,7 @@ static int process_udp_mgmt_pkt(sdla_t* card)
                                 break;
                         }
 
-			(void *)ptr_trc_el = card->u.f.curr_trc_el;
+			ptr_trc_el = (void *)card->u.f.curr_trc_el;
 
                         buffer_length = 0;
 			fr_udp_pkt->data[0x00] = 0x00;
@@ -3729,7 +3729,7 @@ static int process_udp_mgmt_pkt(sdla_t* card)
                                
 				ptr_trc_el ++;
 				if((void *)ptr_trc_el > card->u.f.trc_el_last)
-					(void*)ptr_trc_el = card->u.f.trc_el_base;
+					ptr_trc_el = (void*)card->u.f.trc_el_base;
 
 				buffer_length += sizeof(fpipemon_trc_hdr_t);
                                	if(fpipemon_trc->fpipemon_trc_hdr.data_passed) {

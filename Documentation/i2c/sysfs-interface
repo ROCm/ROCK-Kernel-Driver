@@ -135,17 +135,43 @@ fan[1-3]_div	Fan divisor.
 		Note that this is actually an internal clock divisor, which
 		affects the measurable speed range, not the read value.
 
-fan[1-3]_pwm	Pulse width modulation fan control.
+*******
+* PWM *
+*******
+
+pwm[1-3]	Pulse width modulation fan control.
 		Integer value in the range 0 to 255
 		Read/Write
 		255 is max or 100%.
 
-fan[1-3]_pwm_enable
+pwm[1-3]_enable
 		Switch PWM on and off.
 		Not always present even if fan*_pwm is.
 		0 to turn off
-		1 to turn on
+		1 to turn on in manual mode
+		2 to turn on in automatic mode
 		Read/Write
+
+pwm[1-*]_auto_channels_temp
+		Select which temperature channels affect this PWM output in
+		auto mode. Bitfield, 1 is temp1, 2 is temp2, 4 is temp3 etc...
+		Which values are possible depend on the chip used.
+
+pwm[1-*]_auto_point[1-*]_pwm
+pwm[1-*]_auto_point[1-*]_temp
+pwm[1-*]_auto_point[1-*]_temp_hyst
+		Define the PWM vs temperature curve. Number of trip points is
+		chip-dependent. Use this for chips which associate trip points
+		to PWM output channels.
+
+OR
+
+temp[1-*]_auto_point[1-*]_pwm
+temp[1-*]_auto_point[1-*]_temp
+temp[1-*]_auto_point[1-*]_temp_hyst
+		Define the PWM vs temperature curve. Number of trip points is
+		chip-dependent. Use this for chips which associate trip points
+		to temperature channels.
 
 
 ****************

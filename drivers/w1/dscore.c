@@ -35,26 +35,26 @@ MODULE_DEVICE_TABLE(usb, ds_id_table);
 int ds_probe(struct usb_interface *, const struct usb_device_id *);
 void ds_disconnect(struct usb_interface *);
 
-inline int ds_touch_bit(struct ds_device *, u8, u8 *);
-inline int ds_read_byte(struct ds_device *, u8 *);
-inline int ds_read_bit(struct ds_device *, u8 *);
-inline int ds_write_byte(struct ds_device *, u8);
-inline int ds_write_bit(struct ds_device *, u8);
-inline int ds_start_pulse(struct ds_device *, int);
-inline int ds_set_speed(struct ds_device *, int);
-inline int ds_reset(struct ds_device *, struct ds_status *);
-inline int ds_detect(struct ds_device *, struct ds_status *);
-inline int ds_stop_pulse(struct ds_device *, int);
-inline int ds_send_data(struct ds_device *, unsigned char *, int);
-inline int ds_recv_data(struct ds_device *, unsigned char *, int);
-inline int ds_recv_status(struct ds_device *, struct ds_status *);
-inline struct ds_device * ds_get_device(void);
-inline void ds_put_device(struct ds_device *);
+int ds_touch_bit(struct ds_device *, u8, u8 *);
+int ds_read_byte(struct ds_device *, u8 *);
+int ds_read_bit(struct ds_device *, u8 *);
+int ds_write_byte(struct ds_device *, u8);
+int ds_write_bit(struct ds_device *, u8);
+int ds_start_pulse(struct ds_device *, int);
+int ds_set_speed(struct ds_device *, int);
+int ds_reset(struct ds_device *, struct ds_status *);
+int ds_detect(struct ds_device *, struct ds_status *);
+int ds_stop_pulse(struct ds_device *, int);
+int ds_send_data(struct ds_device *, unsigned char *, int);
+int ds_recv_data(struct ds_device *, unsigned char *, int);
+int ds_recv_status(struct ds_device *, struct ds_status *);
+struct ds_device * ds_get_device(void);
+void ds_put_device(struct ds_device *);
 
 static inline void ds_dump_status(unsigned char *, unsigned char *, int);
-static inline int ds_send_control(struct ds_device *, u16, u16);
-static inline int ds_send_control_mode(struct ds_device *, u16, u16);
-static inline int ds_send_control_cmd(struct ds_device *, u16, u16);
+static int ds_send_control(struct ds_device *, u16, u16);
+static int ds_send_control_mode(struct ds_device *, u16, u16);
+static int ds_send_control_cmd(struct ds_device *, u16, u16);
 
 
 static struct usb_driver ds_driver = {
@@ -503,7 +503,7 @@ int ds_read_byte(struct ds_device *dev, u8 *byte)
 	return 0;
 }
 
-inline int ds_read_block(struct ds_device *dev, u8 *buf, int len)
+int ds_read_block(struct ds_device *dev, u8 *buf, int len)
 {
 	struct ds_status st;
 	int err;
@@ -529,7 +529,7 @@ inline int ds_read_block(struct ds_device *dev, u8 *buf, int len)
 	return err;
 }
 
-inline int ds_write_block(struct ds_device *dev, u8 *buf, int len)
+int ds_write_block(struct ds_device *dev, u8 *buf, int len)
 {
 	int err;
 	struct ds_status st;
@@ -727,11 +727,16 @@ void ds_disconnect(struct usb_interface *intf)
 {
 	struct ds_device *dev;
 	
-	dev = usb_get_intfdata (intf);
-	usb_set_intfdata (intf, NULL);
+	dev = usb_get_intfdata(intf);
+	usb_set_intfdata(intf, NULL);
 
-	while(atomic_read(&dev->refcnt))
-		schedule_timeout(HZ);
+	while (atomic_read(&dev->refcnt)) {
+		printk(KERN_INFO "Waiting for DS to become free: refcnt=%d.\n",
+				atomic_read(&dev->refcnt));
+
+		if (msleep_interruptible(1000))
+			flush_signals(current);
+	}
 
 	usb_put_dev(dev->udev);
 	kfree(dev);

@@ -4,7 +4,7 @@
  * Target: Texas Instruments graphing calculators (http://lpg.ticalc.org).
  *
  * Copyright (C) 2001-2004:
- *   Romain Lievin <roms@lpg.ticalc.org>
+ *   Romain Lievin <roms@tilp.info>
  *   Julien BLACHE <jb@technologeek.org>
  * under the terms of the GNU General Public License.
  *
@@ -14,7 +14,7 @@
  * and the website at:  http://lpg.ticalc.org/prj_usb/
  * for more info.
  *
- * History :
+ * History:
  *   1.0x, Romain & Julien: initial submit.
  *   1.03, Greg Kroah: modifications.
  *   1.04, Julien: clean-up & fixes; Romain: 2.4 backport.
@@ -22,6 +22,7 @@
  *   1.06, Romain: synched with 2.5, version/firmware changed (confusing).
  *   1.07, Romain: fixed bad use of usb_clear_halt (invalid argument);
  *          timeout argument checked in ioctl + clean-up.
+ *   1.08, Romain: added support of USB port embedded on some TI's handhelds.
  */
 
 #include <linux/module.h>
@@ -41,7 +42,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "1.07"
+#define DRIVER_VERSION "1.08"
 #define DRIVER_AUTHOR  "Romain Lievin <roms@tilp.info> & Julien Blache <jb@jblache.org>"
 #define DRIVER_DESC    "TI-GRAPH LINK USB (aka SilverLink) driver"
 #define DRIVER_LICENSE "GPL"
@@ -115,7 +116,7 @@ tiglusb_open (struct inode *inode, struct file *filp)
 			return -EBUSY;
 		}
 
-		schedule_timeout (HZ / 2);
+		msleep_interruptible(500);
 
 		if (signal_pending (current)) {
 			return -EAGAIN;
@@ -177,11 +178,11 @@ tiglusb_read (struct file *filp, char __user *buf, size_t count, loff_t * f_pos)
 	if (!s->dev)
 		return -EIO;
 
-	buffer = kmalloc(BULK_RCV_MAX, GFP_KERNEL);
+	buffer = kmalloc (s->max_ps, GFP_KERNEL);
 	if (!buffer)
 		return -ENOMEM;
 
-	bytes_to_read = (count >= BULK_RCV_MAX) ? BULK_RCV_MAX : count;
+	bytes_to_read = (count >= s->max_ps) ? s->max_ps : count;
 
 	pipe = usb_rcvbulkpipe (s->dev, 1);
 	result = usb_bulk_msg (s->dev, pipe, buffer, bytes_to_read,
@@ -234,11 +235,11 @@ tiglusb_write (struct file *filp, const char __user *buf, size_t count, loff_t *
 	if (!s->dev)
 		return -EIO;
 
-	buffer = kmalloc(BULK_SND_MAX, GFP_KERNEL);
+	buffer = kmalloc (s->max_ps, GFP_KERNEL);
 	if (!buffer)
 		return -ENOMEM;
 
-	bytes_to_write = (count >= BULK_SND_MAX) ? BULK_SND_MAX : count;
+	bytes_to_write = (count >= s->max_ps) ? s->max_ps : count;
 	if (copy_from_user (buffer, buf, bytes_to_write)) {
 		ret = -EFAULT;
 		goto out;
@@ -308,6 +309,15 @@ tiglusb_ioctl (struct inode *inode, struct file *filp,
 		if (clear_pipes (s->dev))
 			ret = -EIO;
 		break;
+	case IOCTL_TIUSB_GET_MAXPS:
+                if (copy_to_user((int __user *) arg, &s->max_ps, sizeof(int)))
+                        return -EFAULT;
+                break;
+        case IOCTL_TIUSB_GET_DEVID:
+                if (copy_to_user((int __user *) arg, &s->dev->descriptor.idProduct,
+                                 sizeof(int)))
+                        return -EFAULT;
+                break;
 	default:
 		ret = -ENOTTY;
 		break;
@@ -340,6 +350,9 @@ tiglusb_probe (struct usb_interface *intf,
 	int minor = -1;
 	int i, err = 0;
 	ptiglusb_t s;
+	struct usb_host_config *conf;
+        struct usb_host_interface *ifdata = NULL;
+        int max_ps;
 
 	dbg ("probing vendor id 0x%x, device id 0x%x",
 	     dev->descriptor.idVendor, dev->descriptor.idProduct);
@@ -354,19 +367,31 @@ tiglusb_probe (struct usb_interface *intf,
 		goto out;
 	}
 
-	if ((dev->descriptor.idProduct != 0xe001)
-	    && (dev->descriptor.idVendor != 0x451)) {
+	if (dev->descriptor.idVendor != 0x451) {
 		err = -ENODEV;
 		goto out;
 	}
 
-	// NOTE:  it's already in this config, this shouldn't be needed.
-	// is this working around some hardware bug?
-	if (usb_reset_configuration (dev) < 0) {
-		err ("tiglusb_probe: reset_configuration failed");
-		err = -ENODEV;
-		goto out;
-	}
+	if ((dev->descriptor.idProduct != 0xe001) &&
+            (dev->descriptor.idProduct != 0xe004) &&
+            (dev->descriptor.idProduct != 0xe008)) {
+                err = -ENODEV;
+                goto out;
+        }
+
+	/*
+         * TI introduced some new handhelds with embedded USB port.
+         * Port advertises same config as SilverLink cable but with a 
+	 * different maximum packet size (64 rather than 32).
+         */
+
+        conf = dev->actconfig;
+        ifdata = conf->interface[0]->cur_altsetting;
+        max_ps = ifdata->endpoint[0].desc.wMaxPacketSize;
+
+        info("max packet size of %d/%d bytes\n",
+             ifdata->endpoint[0].desc.wMaxPacketSize,
+             ifdata->endpoint[1].desc.wMaxPacketSize);
 
 	/*
 	 * Find a tiglusb struct
@@ -389,6 +414,7 @@ tiglusb_probe (struct usb_interface *intf,
 	down (&s->mutex);
 	s->remove_pending = 0;
 	s->dev = dev;
+	s->max_ps = max_ps;
 	up (&s->mutex);
 	dbg ("bound to interface");
 

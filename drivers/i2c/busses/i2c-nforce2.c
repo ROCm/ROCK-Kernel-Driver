@@ -1,6 +1,7 @@
 /*
     SMBus driver for nVidia nForce2 MCP
 
+    Added nForce3 Pro 150  Thomas Leibold <thomas@plx.com>,
 	Ported to 2.5 Patrick Dreker <patrick@dreker.de>,
     Copyright (c) 2003  Hans-Frieder Vogt <hfvogt@arcor.de>,
     Based on
@@ -23,8 +24,10 @@
 */
 
 /*
-    SUPPORTED DEVICES	PCI ID
-    nForce2 MCP		0064
+    SUPPORTED DEVICES		PCI ID
+    nForce2 MCP			0064
+    nForce2 Ultra 400 MCP	0084
+    nForce3 Pro150 MCP		00D4
 
     This driver supports the 2 SMBuses that are included in the MCP2 of the
     nForce2 chipset.
@@ -47,11 +50,6 @@
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR ("Hans-Frieder Vogt <hfvogt@arcor.de>");
 MODULE_DESCRIPTION("nForce2 SMBus driver");
-
-
-#ifndef PCI_DEVICE_ID_NVIDIA_NFORCE2_SMBUS
-#define PCI_DEVICE_ID_NVIDIA_NFORCE2_SMBUS   0x0064
-#endif
 
 
 struct nforce2_smbus {
@@ -294,8 +292,15 @@ static u32 nforce2_func(struct i2c_adapter *adapter)
 static struct pci_device_id nforce2_ids[] = {
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_NFORCE2_SMBUS,
 	       	PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_NFORCE2S_SMBUS,
+	       	PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_NFORCE3_SMBUS,
+	       	PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ 0 }
 };
+
+
+MODULE_DEVICE_TABLE (pci, nforce2_ids);
 
 
 static int __devinit nforce2_probe_smb (struct pci_dev *dev, int reg,
@@ -391,7 +396,7 @@ static struct pci_driver nforce2_driver = {
 
 static int __init nforce2_init(void)
 {
-	return pci_module_init(&nforce2_driver);
+	return pci_register_driver(&nforce2_driver);
 }
 
 static void __exit nforce2_exit(void)

@@ -324,7 +324,7 @@ static int chkSuper(struct super_block *sb)
 	 */
 	/* validate fs signature */
 	if (strncmp(j_sb->s_magic, JFS_MAGIC, 4) ||
-	    j_sb->s_version > cpu_to_le32(JFS_VERSION)) {
+	    le32_to_cpu(j_sb->s_version) > JFS_VERSION) {
 		rc = -EINVAL;
 		goto out;
 	}

@@ -116,8 +116,14 @@ acpi_system_read_debug (
 				(acpi_dbg_layer & acpi_debug_layers[i].value) ?
 				'*' : ' ');
 		}
-		p += sprintf(p, "debug_layer = 0x%08X (* = enabled)\n",
-				acpi_dbg_layer);
+		p += sprintf(p, "%-25s\t0x%08X [%c]\n", "ACPI_ALL_DRIVERS",
+			ACPI_ALL_DRIVERS,
+			(acpi_dbg_layer & ACPI_ALL_DRIVERS) == ACPI_ALL_DRIVERS?
+			'*' : (acpi_dbg_layer & ACPI_ALL_DRIVERS) == 0 ?
+			' ' : '-');
+		p += sprintf(p,
+			"--\ndebug_layer = 0x%08X (* = enabled, - = partial)\n",
+			acpi_dbg_layer);
 		break;
 	case 1:
 		for (i = 0; i < NUM_OF(acpi_debug_levels); i++) {
@@ -127,7 +133,7 @@ acpi_system_read_debug (
 				(acpi_dbg_level & acpi_debug_levels[i].value) ?
 				'*' : ' ');
 		}
-		p += sprintf(p, "debug_level = 0x%08X (* = enabled)\n",
+		p += sprintf(p, "--\ndebug_level = 0x%08X (* = enabled)\n",
 				acpi_dbg_level);
 		break;
 	default:

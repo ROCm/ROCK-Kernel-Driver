@@ -53,16 +53,16 @@ adfs_partition(struct parsed_partitions *state, char *name, char *data,
 #ifdef CONFIG_ACORN_PARTITION_RISCIX
 
 struct riscix_part {
-	__u32	start;
-	__u32	length;
-	__u32	one;
+	__le32	start;
+	__le32	length;
+	__le32	one;
 	char	name[16];
 };
 
 struct riscix_record {
-	__u32	magic;
+	__le32	magic;
 #define RISCIX_MAGIC	cpu_to_le32(0x4a657320)
-	__u32	date;
+	__le32	date;
 	struct riscix_part part[8];
 };
 
@@ -111,9 +111,9 @@ riscix_partition(struct parsed_partitions *state, struct block_device *bdev,
 #define LINUX_SWAP_MAGIC   0xdeafab1e
 
 struct linux_part {
-	__u32 magic;
-	__u32 start_sect;
-	__u32 nr_sects;
+	__le32 magic;
+	__le32 start_sect;
+	__le32 nr_sects;
 };
 
 static int
@@ -306,8 +306,8 @@ adfspart_check_ADFS(struct parsed_partitions *state, struct block_device *bdev)
 #ifdef CONFIG_ACORN_PARTITION_ICS
 
 struct ics_part {
-	__u32 start;
-	__s32 size;
+	__le32 start;
+	__le32 size;
 };
 
 static int adfspart_check_ICSLinux(struct block_device *bdev, unsigned long block)
@@ -336,7 +336,7 @@ static inline int valid_ics_sector(const unsigned char *data)
 	for (i = 0, sum = 0x50617274; i < 508; i++)
 		sum += data[i];
 
-	sum -= le32_to_cpu(*(__u32 *)(&data[508]));
+	sum -= le32_to_cpu(*(__le32 *)(&data[508]));
 
 	return sum == 0;
 }
@@ -412,11 +412,11 @@ adfspart_check_ICS(struct parsed_partitions *state, struct block_device *bdev)
 
 #ifdef CONFIG_ACORN_PARTITION_POWERTEC
 struct ptec_part {
-	__u32 unused1;
-	__u32 unused2;
-	__u32 start;
-	__u32 size;
-	__u32 unused5;
+	__le32 unused1;
+	__le32 unused2;
+	__le32 start;
+	__le32 size;
+	__le32 unused5;
 	char type[8];
 };
 
@@ -486,10 +486,10 @@ adfspart_check_POWERTEC(struct parsed_partitions *state, struct block_device *bd
 struct eesox_part {
 	char	magic[6];
 	char	name[10];
-	u32	start;
-	u32	unused6;
-	u32	unused7;
-	u32	unused8;
+	__le32	start;
+	__le32	unused6;
+	__le32	unused7;
+	__le32	unused8;
 };
 
 /*

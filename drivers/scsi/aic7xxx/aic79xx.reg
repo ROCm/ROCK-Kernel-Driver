@@ -1199,7 +1199,7 @@ register TARGPCISTAT {
 
 /*
  * LQ Packet In
- * The last LQ Packet recieved
+ * The last LQ Packet received
  */
 register LQIN {
 	address			0x020

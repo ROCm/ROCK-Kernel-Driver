@@ -92,6 +92,8 @@
 #include <linux/cyclomx.h>	/* Cyclom 2X common user API definitions */
 #include <linux/cycx_x25.h>	/* X.25 firmware API definitions */
 
+#include <net/x25device.h>
+
 /* Defines & Macros */
 #define CYCX_X25_MAX_CMD_RETRY 5
 #define CYCX_X25_CHAN_MTU 2048	/* unfragmented logical channel MTU */
@@ -231,7 +233,7 @@ int cycx_x25_wan_init(struct cycx_device *card, wandev_conf_t *conf)
 	/* Initialize protocol-specific fields */
 	card->mbox  = card->hw.dpmbase + X25_MBOX_OFFS;
 	card->u.x.connection_keys = 0;
-	card->u.x.lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&card->u.x.lock);
 
 	/* Configure adapter. Here we set reasonable defaults, then parse
 	 * device configuration structure and set configuration options.
@@ -1195,7 +1197,7 @@ static int x25_place_call(struct cycx_device *card,
 	     remotelen = strlen(chan->addr);
 	u8 key;
 
-	if (card->u.x.connection_keys == ~0UL) {
+	if (card->u.x.connection_keys == ~0U) {
 		printk(KERN_INFO "%s: too many simultaneous connection "
 				 "requests!\n", card->devname);
 		return -EAGAIN;
@@ -1486,11 +1488,7 @@ static void cycx_x25_chan_send_event(struct net_device *dev, u8 event)
 	ptr  = skb_put(skb, 1);
 	*ptr = event;
 
-	skb->dev = dev;
-	skb->protocol = htons(ETH_P_X25);
-	skb->mac.raw = skb->data;
-	skb->pkt_type = PACKET_HOST;
-
+	skb->protocol = x25_type_trans(skb, dev);
 	netif_rx(skb);
 	dev->last_rx = jiffies;		/* timestamp */
 }

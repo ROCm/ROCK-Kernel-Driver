@@ -54,6 +54,7 @@
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
+#include <linux/bitops.h>
 #ifdef CONFIG_NET_RADIO
 #include <linux/wireless.h>
 #if WIRELESS_EXT > 12
@@ -70,7 +71,6 @@
 #include <pcmcia/mem_op.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 
@@ -219,7 +219,6 @@ static void netwave_reset(struct net_device *dev);
 /* Misc device stuff */
 static int netwave_open(struct net_device *dev);  /* Open the device */
 static int netwave_close(struct net_device *dev); /* Close the device */
-static int netwave_config(struct net_device *dev, struct ifmap *map);
 
 /* Packet transmission and Packet reception */
 static int netwave_start_xmit( struct sk_buff *skb, struct net_device *dev);
@@ -482,7 +481,6 @@ static dev_link_t *netwave_attach(void)
     /* Netwave specific entries in the device structure */
     SET_MODULE_OWNER(dev);
     dev->hard_start_xmit = &netwave_start_xmit;
-    dev->set_config = &netwave_config;
     dev->get_stats  = &netwave_get_stats;
     dev->set_multicast_list = &set_multicast_list;
     /* wireless extensions */
@@ -1286,16 +1284,6 @@ static void netwave_reset(struct net_device *dev) {
     /* Set the IENA bit in COR */
     wait_WOC(iobase);
     outb(corConfIENA + corConfLVLREQ, iobase + NETWAVE_REG_COR);
-}
-
-/*
- * Function netwave_config (dev, map)
- *
- *    Configure device, this work is done by netwave_pcmcia_config when a
- *    card is inserted
- */
-static int netwave_config(struct net_device *dev, struct ifmap *map) {
-    return 0; 
 }
 
 /*

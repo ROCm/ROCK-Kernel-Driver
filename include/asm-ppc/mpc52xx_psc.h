@@ -19,8 +19,8 @@
  * kind, whether express or implied.
  */
 
-#ifndef __MPC52xx_PSC_H__
-#define __MPC52xx_PSC_H__
+#ifndef __ASM_MPC52xx_PSC_H__
+#define __ASM_MPC52xx_PSC_H__
 
 #include <asm/types.h>
 
@@ -95,97 +95,97 @@
 
 /* Structure of the hardware registers */
 struct mpc52xx_psc {
-	volatile u8		mode;		/* PSC + 0x00 */
-	volatile u8		reserved0[3];
-	union {					/* PSC + 0x04 */
-		volatile u16	status;
-		volatile u16	clock_select;
+	u8		mode;		/* PSC + 0x00 */
+	u8		reserved0[3];
+	union {				/* PSC + 0x04 */
+		u16	status;
+		u16	clock_select;
 	} sr_csr;
 #define mpc52xx_psc_status	sr_csr.status
-#define mpc52xx_psc_clock_select	sr_csr.clock_select
-	volatile u16		reserved1;
-	volatile u8		command;	/* PSC + 0x08 */
-volatile u8		reserved2[3];
-	union {					/* PSC + 0x0c */
-		volatile u8	buffer_8;
-		volatile u16	buffer_16;
-		volatile u32	buffer_32;
+#define mpc52xx_psc_clock_select sr_csr.clock_select
+	u16		reserved1;
+	u8		command;	/* PSC + 0x08 */
+	u8		reserved2[3];
+	union {				/* PSC + 0x0c */
+		u8	buffer_8;
+		u16	buffer_16;
+		u32	buffer_32;
 	} buffer;
 #define mpc52xx_psc_buffer_8	buffer.buffer_8
 #define mpc52xx_psc_buffer_16	buffer.buffer_16
 #define mpc52xx_psc_buffer_32	buffer.buffer_32
-	union {					/* PSC + 0x10 */
-		volatile u8	ipcr;
-		volatile u8	acr;
+	union {				/* PSC + 0x10 */
+		u8	ipcr;
+		u8	acr;
 	} ipcr_acr;
 #define mpc52xx_psc_ipcr	ipcr_acr.ipcr
 #define mpc52xx_psc_acr		ipcr_acr.acr
-	volatile u8		reserved3[3];
-	union {					/* PSC + 0x14 */
-		volatile u16	isr;
-		volatile u16	imr;
+	u8		reserved3[3];
+	union {				/* PSC + 0x14 */
+		u16	isr;
+		u16	imr;
 	} isr_imr;
 #define mpc52xx_psc_isr		isr_imr.isr
 #define mpc52xx_psc_imr		isr_imr.imr
-	volatile u16		reserved4;
-	volatile u8		ctur;		/* PSC + 0x18 */
-	volatile u8		reserved5[3];
-	volatile u8		ctlr;		/* PSC + 0x1c */
-	volatile u8		reserved6[3];
-	volatile u16		ccr;		/* PSC + 0x20 */
-	volatile u8		reserved7[14];
-	volatile u8		ivr;		/* PSC + 0x30 */
-	volatile u8		reserved8[3];
-	volatile u8		ip;		/* PSC + 0x34 */
-	volatile u8		reserved9[3];
-	volatile u8		op1;		/* PSC + 0x38 */
-	volatile u8		reserved10[3];
-	volatile u8		op0;		/* PSC + 0x3c */
-	volatile u8		reserved11[3];
-	volatile u32		sicr;		/* PSC + 0x40 */
-	volatile u8		ircr1;		/* PSC + 0x44 */
-	volatile u8		reserved13[3];
-	volatile u8		ircr2;		/* PSC + 0x44 */
-	volatile u8		reserved14[3];
-	volatile u8		irsdr;		/* PSC + 0x4c */
-	volatile u8		reserved15[3];
-	volatile u8		irmdr;		/* PSC + 0x50 */
-	volatile u8		reserved16[3];
-	volatile u8		irfdr;		/* PSC + 0x54 */
-	volatile u8		reserved17[3];
-	volatile u16		rfnum;		/* PSC + 0x58 */
-	volatile u16		reserved18;
-	volatile u16		tfnum;		/* PSC + 0x5c */
-	volatile u16		reserved19;
-	volatile u32		rfdata;		/* PSC + 0x60 */
-	volatile u16		rfstat;		/* PSC + 0x64 */
-	volatile u16		reserved20;
-	volatile u8		rfcntl;		/* PSC + 0x68 */
-	volatile u8		reserved21[5];
-	volatile u16		rfalarm;	/* PSC + 0x6e */
-	volatile u16		reserved22;
-	volatile u16		rfrptr;		/* PSC + 0x72 */
-	volatile u16		reserved23;
-	volatile u16		rfwptr;		/* PSC + 0x76 */
-	volatile u16		reserved24;
-	volatile u16		rflrfptr;	/* PSC + 0x7a */
-	volatile u16		reserved25;
-	volatile u16		rflwfptr;	/* PSC + 0x7e */
-	volatile u32		tfdata;		/* PSC + 0x80 */
-	volatile u16		tfstat;		/* PSC + 0x84 */
-	volatile u16		reserved26;
-	volatile u8		tfcntl;		/* PSC + 0x88 */
-	volatile u8		reserved27[5];
-	volatile u16		tfalarm;	/* PSC + 0x8e */
-	volatile u16		reserved28;
-	volatile u16		tfrptr;		/* PSC + 0x92 */
-	volatile u16		reserved29;
-	volatile u16		tfwptr;		/* PSC + 0x96 */
-	volatile u16		reserved30;
-	volatile u16		tflrfptr;	/* PSC + 0x9a */
-	volatile u16		reserved31;
-	volatile u16		tflwfptr;	/* PSC + 0x9e */
+	u16		reserved4;
+	u8		ctur;		/* PSC + 0x18 */
+	u8		reserved5[3];
+	u8		ctlr;		/* PSC + 0x1c */
+	u8		reserved6[3];
+	u16		ccr;		/* PSC + 0x20 */
+	u8		reserved7[14];
+	u8		ivr;		/* PSC + 0x30 */
+	u8		reserved8[3];
+	u8		ip;		/* PSC + 0x34 */
+	u8		reserved9[3];
+	u8		op1;		/* PSC + 0x38 */
+	u8		reserved10[3];
+	u8		op0;		/* PSC + 0x3c */
+	u8		reserved11[3];
+	u32		sicr;		/* PSC + 0x40 */
+	u8		ircr1;		/* PSC + 0x44 */
+	u8		reserved13[3];
+	u8		ircr2;		/* PSC + 0x44 */
+	u8		reserved14[3];
+	u8		irsdr;		/* PSC + 0x4c */
+	u8		reserved15[3];
+	u8		irmdr;		/* PSC + 0x50 */
+	u8		reserved16[3];
+	u8		irfdr;		/* PSC + 0x54 */
+	u8		reserved17[3];
+	u16		rfnum;		/* PSC + 0x58 */
+	u16		reserved18;
+	u16		tfnum;		/* PSC + 0x5c */
+	u16		reserved19;
+	u32		rfdata;		/* PSC + 0x60 */
+	u16		rfstat;		/* PSC + 0x64 */
+	u16		reserved20;
+	u8		rfcntl;		/* PSC + 0x68 */
+	u8		reserved21[5];
+	u16		rfalarm;	/* PSC + 0x6e */
+	u16		reserved22;
+	u16		rfrptr;		/* PSC + 0x72 */
+	u16		reserved23;
+	u16		rfwptr;		/* PSC + 0x76 */
+	u16		reserved24;
+	u16		rflrfptr;	/* PSC + 0x7a */
+	u16		reserved25;
+	u16		rflwfptr;	/* PSC + 0x7e */
+	u32		tfdata;		/* PSC + 0x80 */
+	u16		tfstat;		/* PSC + 0x84 */
+	u16		reserved26;
+	u8		tfcntl;		/* PSC + 0x88 */
+	u8		reserved27[5];
+	u16		tfalarm;	/* PSC + 0x8e */
+	u16		reserved28;
+	u16		tfrptr;		/* PSC + 0x92 */
+	u16		reserved29;
+	u16		tfwptr;		/* PSC + 0x96 */
+	u16		reserved30;
+	u16		tflrfptr;	/* PSC + 0x9a */
+	u16		reserved31;
+	u16		tflwfptr;	/* PSC + 0x9e */
 };
 
 
-#endif  /* __MPC52xx_PSC_H__ */
+#endif  /* __ASM_MPC52xx_PSC_H__ */

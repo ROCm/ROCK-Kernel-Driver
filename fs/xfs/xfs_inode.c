@@ -881,6 +881,10 @@ xfs_dic2xflags(
 			flags |= XFS_XFLAG_NODUMP;
 		if (di_flags & XFS_DIFLAG_RTINHERIT)
 			flags |= XFS_XFLAG_RTINHERIT;
+		if (di_flags & XFS_DIFLAG_PROJINHERIT)
+			flags |= XFS_XFLAG_PROJINHERIT;
+		if (di_flags & XFS_DIFLAG_NOSYMLINKS)
+			flags |= XFS_XFLAG_NOSYMLINKS;
 	}
 	return flags;
 }
@@ -1257,6 +1261,9 @@ xfs_ialloc(
 			if ((pip->i_d.di_flags & XFS_DIFLAG_SYNC) &&
 			    xfs_inherit_sync)
 				ip->i_d.di_flags |= XFS_DIFLAG_SYNC;
+			if ((pip->i_d.di_flags & XFS_DIFLAG_NOSYMLINKS) &&
+			    xfs_inherit_nosymlinks)
+				ip->i_d.di_flags |= XFS_DIFLAG_NOSYMLINKS;
 		}
 		/* FALLTHROUGH */
 	case S_IFLNK:

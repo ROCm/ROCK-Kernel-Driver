@@ -20,17 +20,17 @@ const char conf_defname[] = "arch/$ARCH/defconfig";
 
 const char *conf_confnames[] = {
 	".config",
-	conf_defname,
 	"/lib/modules/$UNAME_RELEASE/.config",
 	"/etc/kernel-config",
 	"/boot/config-$UNAME_RELEASE",
+	conf_defname,
 	NULL,
 };
 
-static char *conf_expand_value(const char *in)
+static char *conf_expand_value(const signed char *in)
 {
 	struct symbol *sym;
-	const char *src;
+	const signed char *src;
 	static char res_value[SYMBOL_MAXLENGTH];
 	char *dst, name[SYMBOL_MAXLENGTH];
 
@@ -295,7 +295,7 @@ int conf_write(const char *name)
 	} else
 		basename = conf_def_filename;
 
-	sprintf(newname, "%s.tmpconfig.%d", dirname, getpid());
+	sprintf(newname, "%s.tmpconfig.%d", dirname, (int)getpid());
 	out = fopen(newname, "w");
 	if (!out)
 		return 1;
@@ -308,8 +308,8 @@ int conf_write(const char *name)
 	sym = sym_lookup("KERNELRELEASE", 0);
 	sym_calc_value(sym);
 	time(&now);
-	env = getenv("NOTIMESTAMP");
-	if (env)
+	env = getenv("KCONFIG_NOTIMESTAMP");
+	if (env && *env)
 		use_timestamp = 0;
 
 	fprintf(out, "#\n"

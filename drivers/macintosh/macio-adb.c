@@ -57,7 +57,7 @@ struct adb_regs {
 /* Bits in autopoll register */
 #define APE	1		/* autopoll enable */
 
-static volatile struct adb_regs *adb;
+static volatile struct adb_regs __iomem *adb;
 static struct adb_request *current_req, *last_req;
 static spinlock_t macio_lock = SPIN_LOCK_UNLOCKED;
 
@@ -105,8 +105,7 @@ int macio_init(void)
 	printk("\n"); }
 #endif
 	
-	adb = (volatile struct adb_regs *)
-		ioremap(adbs->addrs->address, sizeof(struct adb_regs));
+	adb = ioremap(adbs->addrs->address, sizeof(struct adb_regs));
 
 	out_8(&adb->ctrl.r, 0);
 	out_8(&adb->intr.r, 0);
@@ -202,7 +201,7 @@ static irqreturn_t macio_adb_interrupt(int irq, void *arg,
 				       struct pt_regs *regs)
 {
 	int i, n, err;
-	struct adb_request *req;
+	struct adb_request *req = NULL;
 	unsigned char ibuf[16];
 	int ibuf_len = 0;
 	int complete = 0;

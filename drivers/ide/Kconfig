@@ -273,15 +273,6 @@ config IDE_TASK_IOCTL
 
 	  If you are unsure, say N here.
 
-config IDE_TASKFILE_IO
-	bool 'IDE Taskfile IO (EXPERIMENTAL)'
-	depends on EXPERIMENTAL
-	default n
-	---help---
-	  Use new taskfile IO code.
-
-	  It is safe to say Y to this question, in most cases.
-
 comment "IDE chipset support/bugfixes"
 
 config IDE_GENERIC
@@ -456,11 +447,6 @@ config IDEDMA_ONLYDISK
 	  Transfers.
 
 	  Generally say N here.
-
-config BLK_DEV_ADMA
-	bool
-	depends on PCI && BLK_DEV_IDEPCI
-	default BLK_DEV_IDEDMA_PCI
 
 config BLK_DEV_AEC62XX
 	tristate "AEC62XX chipset support"
@@ -786,17 +772,6 @@ config BLK_DEV_IDE_PMAC_BLINK
 	  This option enables the use of the sleep LED as a hard drive
 	  activity LED.
 
-config BLK_DEV_IDEDMA_PMAC_AUTO
-	bool "Use DMA by default"
-	depends on BLK_DEV_IDEDMA_PMAC
-	help
-	  This option allows the driver for the built-in IDE controller on
-	  Power Macintoshes and PowerBooks to use DMA automatically, without
-	  it having to be explicitly enabled.  This option is provided because
-	  of concerns about a couple of cases where using DMA on buggy PC
-	  hardware may have caused damage.  Saying Y should be safe on all
-	  Apple machines.
-
 config IDE_ARM
 	def_bool ARM && (ARCH_A5K || ARCH_CLPS7500 || ARCH_RPC || ARCH_SHARK)
 
@@ -834,6 +809,13 @@ config BLK_DEV_IDE_RAPIDE
 	help
 	  Say Y here if you want to support the Yellowstone RapIDE controller
 	  manufactured for use with Acorn computers.
+
+config BLK_DEV_IDE_BAST
+	tristate "Simtec BAST / Thorcom VR1000 IDE support"
+	depends on ARM && (ARCH_BAST || MACH_VR100)
+	help
+	  Say Y here if you want to support the onboard IDE channels on the
+	  Simtec BAST or the Thorcom VR1000
 
 config BLK_DEV_GAYLE
 	bool "Amiga Gayle IDE interface support"
@@ -1005,19 +987,6 @@ config BLK_DEV_HT6560B
 	  See the <file:Documentation/ide.txt> and
 	  <file:drivers/ide/legacy/ht6560b.c> files for more info.
 
-config BLK_DEV_PDC4030
-	tristate "PROMISE DC4030 support (EXPERIMENTAL)"
-	depends on BLK_DEV_IDEDISK && EXPERIMENTAL
-	help
-	  This driver provides support for the secondary IDE interface and
-	  cache of the original Promise IDE chipsets, e.g. DC4030 and DC5030.
-	  It is nothing to do with the later range of Promise UDMA chipsets -
-	  see the PDC_202XX support for these. CD-ROM and TAPE devices are not
-	  supported (and probably never will be since I don't think the cards
-	  support them). This driver is enabled at runtime using the "ide0=dc4030"
-	  or "ide1=dc4030" kernel boot parameter. See the
-	  <file:drivers/ide/legacy/pdc4030.c> file for more info.
-
 config BLK_DEV_QD65XX
 	tristate "QDI QD65xx support"
 	help
@@ -1057,7 +1026,7 @@ config IDEDMA_IVB
 	  It is normally safe to answer Y; however, the default is N.
 
 config IDEDMA_AUTO
-	def_bool IDEDMA_PCI_AUTO || BLK_DEV_IDEDMA_PMAC_AUTO || IDEDMA_ICS_AUTO
+	def_bool IDEDMA_PCI_AUTO || IDEDMA_ICS_AUTO
 
 endif
 

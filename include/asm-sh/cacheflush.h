@@ -14,10 +14,16 @@ extern void __flush_invalidate_region(void *start, int size);
 #define flush_cache_vunmap(start, end)		flush_cache_all()
 
 #define copy_to_user_page(vma, page, vaddr, dst, src, len) \
-do { memcpy(dst, src, len); \
-     flush_icache_user_range(vma, page, vaddr, len); \
-} while (0)
+	do {							\
+		flush_cache_page(vma, vaddr);			\
+		memcpy(dst, src, len);				\
+		flush_icache_user_range(vma, page, vaddr, len);	\
+	} while (0)
+
 #define copy_from_user_page(vma, page, vaddr, dst, src, len) \
-	memcpy(dst, src, len)
+	do {							\
+		flush_cache_page(vma, vaddr);			\
+		memcpy(dst, src, len);				\
+	} while (0)
 
 #endif /* __ASM_SH_CACHEFLUSH_H */

@@ -22,7 +22,7 @@ int reiserfs_resize (struct super_block * s, unsigned long block_count_new)
         int err = 0;
 	struct reiserfs_super_block * sb;
         struct reiserfs_bitmap_info *bitmap;
-	struct reiserfs_bitmap_info *old_bitmap = SB_AP_BITMAP(s);;
+	struct reiserfs_bitmap_info *old_bitmap = SB_AP_BITMAP(s);
 	struct buffer_head * bh;
 	struct reiserfs_transaction_handle th;
 	unsigned int bmap_nr_new, bmap_nr;

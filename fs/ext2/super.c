@@ -122,6 +122,9 @@ static void ext2_put_super (struct super_block * sb)
 			brelse (sbi->s_group_desc[i]);
 	kfree(sbi->s_group_desc);
 	kfree(sbi->s_debts);
+	percpu_counter_destroy(&sbi->s_freeblocks_counter);
+	percpu_counter_destroy(&sbi->s_freeinodes_counter);
+	percpu_counter_destroy(&sbi->s_dirs_counter);
 	brelse (sbi->s_sbh);
 	sb->s_fs_info = NULL;
 	kfree(sbi);
@@ -181,10 +184,9 @@ static void destroy_inodecache(void)
 		printk(KERN_INFO "ext2_inode_cache: not all structures were freed\n");
 }
 
-#ifdef CONFIG_EXT2_FS_POSIX_ACL
-
 static void ext2_clear_inode(struct inode *inode)
 {
+#ifdef CONFIG_EXT2_FS_POSIX_ACL
 	struct ext2_inode_info *ei = EXT2_I(inode);
 
 	if (ei->i_acl && ei->i_acl != EXT2_ACL_NOT_CACHED) {
@@ -195,18 +197,17 @@ static void ext2_clear_inode(struct inode *inode)
 		posix_acl_release(ei->i_default_acl);
 		ei->i_default_acl = EXT2_ACL_NOT_CACHED;
 	}
+#endif
+	if (!is_bad_inode(inode))
+		ext2_discard_prealloc(inode);
 }
 
-#else
-# define ext2_clear_inode NULL
-#endif
 
 static struct super_operations ext2_sops = {
 	.alloc_inode	= ext2_alloc_inode,
 	.destroy_inode	= ext2_destroy_inode,
 	.read_inode	= ext2_read_inode,
 	.write_inode	= ext2_write_inode,
-	.put_inode	= ext2_put_inode,
 	.delete_inode	= ext2_delete_inode,
 	.put_super	= ext2_put_super,
 	.write_super	= ext2_write_super,
@@ -595,12 +596,9 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	sbi->s_es = es;
 	sb->s_magic = le16_to_cpu(es->s_magic);
 	sb->s_flags |= MS_ONE_SECOND;
-	if (sb->s_magic != EXT2_SUPER_MAGIC) {
-		if (!silent)
-			printk ("VFS: Can't find ext2 filesystem on dev %s.\n",
-				sb->s_id);
-		goto failed_mount;
-	}
+
+	if (sb->s_magic != EXT2_SUPER_MAGIC)
+		goto cantfind_ext2;
 
 	/* Set defaults before we parse the mount options */
 	def_mount_opts = le32_to_cpu(es->s_default_mount_opts);
@@ -655,7 +653,9 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 		       sb->s_id, le32_to_cpu(features));
 		goto failed_mount;
 	}
+
 	blocksize = BLOCK_SIZE << le32_to_cpu(sbi->s_es->s_log_block_size);
+
 	/* If the blocksize doesn't match, re-read the thing.. */
 	if (sb->s_blocksize != blocksize) {
 		brelse(bh);
@@ -697,35 +697,36 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 			goto failed_mount;
 		}
 	}
+
 	sbi->s_frag_size = EXT2_MIN_FRAG_SIZE <<
 				   le32_to_cpu(es->s_log_frag_size);
-	if (sbi->s_frag_size)
-		sbi->s_frags_per_block = sb->s_blocksize /
-						  sbi->s_frag_size;
-	else
-		sb->s_magic = 0;
+	if (sbi->s_frag_size == 0)
+		goto cantfind_ext2;
+	sbi->s_frags_per_block = sb->s_blocksize / sbi->s_frag_size;
+
 	sbi->s_blocks_per_group = le32_to_cpu(es->s_blocks_per_group);
 	sbi->s_frags_per_group = le32_to_cpu(es->s_frags_per_group);
 	sbi->s_inodes_per_group = le32_to_cpu(es->s_inodes_per_group);
-	sbi->s_inodes_per_block = sb->s_blocksize /
-					   EXT2_INODE_SIZE(sb);
+
+	if (EXT2_INODE_SIZE(sb) == 0)
+		goto cantfind_ext2;
+	sbi->s_inodes_per_block = sb->s_blocksize / EXT2_INODE_SIZE(sb);
+	if (sbi->s_inodes_per_block == 0)
+		goto cantfind_ext2;
 	sbi->s_itb_per_group = sbi->s_inodes_per_group /
-				        sbi->s_inodes_per_block;
+					sbi->s_inodes_per_block;
 	sbi->s_desc_per_block = sb->s_blocksize /
-					 sizeof (struct ext2_group_desc);
+					sizeof (struct ext2_group_desc);
 	sbi->s_sbh = bh;
 	sbi->s_mount_state = le16_to_cpu(es->s_state);
 	sbi->s_addr_per_block_bits =
 		log2 (EXT2_ADDR_PER_BLOCK(sb));
 	sbi->s_desc_per_block_bits =
 		log2 (EXT2_DESC_PER_BLOCK(sb));
-	if (sb->s_magic != EXT2_SUPER_MAGIC) {
-		if (!silent)
-			printk ("VFS: Can't find an ext2 filesystem on dev "
-				"%s.\n",
-				sb->s_id);
-		goto failed_mount;
-	}
+
+	if (sb->s_magic != EXT2_SUPER_MAGIC)
+		goto cantfind_ext2;
+
 	if (sb->s_blocksize != bh->b_size) {
 		if (!silent)
 			printk ("VFS: Unsupported blocksize on dev "
@@ -755,6 +756,8 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 		goto failed_mount;
 	}
 
+	if (EXT2_BLOCKS_PER_GROUP(sb) == 0)
+		goto cantfind_ext2;
 	sbi->s_groups_count = (le32_to_cpu(es->s_blocks_count) -
 				        le32_to_cpu(es->s_first_data_block) +
 				       EXT2_BLOCKS_PER_GROUP(sb) - 1) /
@@ -800,6 +803,7 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	 */
 	sb->s_op = &ext2_sops;
 	sb->s_export_op = &ext2_export_ops;
+	sb->s_xattr = ext2_xattr_handlers;
 	root = iget(sb, EXT2_ROOT_INO);
 	sb->s_root = d_alloc_root(root);
 	if (!sb->s_root) {
@@ -824,13 +828,19 @@ static int ext2_fill_super(struct super_block *sb, void *data, int silent)
 	percpu_counter_mod(&sbi->s_dirs_counter,
 				ext2_count_dirs(sb));
 	return 0;
+
+cantfind_ext2:
+	if (!silent)
+		printk("VFS: Can't find an ext2 filesystem on dev %s.\n",
+		       sb->s_id);
+	goto failed_mount;
+
 failed_mount2:
 	for (i = 0; i < db_count; i++)
 		brelse(sbi->s_group_desc[i]);
 failed_mount_group_desc:
 	kfree(sbi->s_group_desc);
-	if (sbi->s_debts)
-		kfree(sbi->s_debts);
+	kfree(sbi->s_debts);
 failed_mount:
 	brelse(bh);
 failed_sbi:

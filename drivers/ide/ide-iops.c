@@ -23,12 +23,12 @@
 #include <linux/delay.h>
 #include <linux/hdreg.h>
 #include <linux/ide.h>
+#include <linux/bitops.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
-#include <asm/bitops.h>
 
 /*
  *	Conventional PIO operations for ATA devices
@@ -221,23 +221,17 @@ void SELECT_INTERRUPT (ide_drive_t *drive)
 		HWIF(drive)->OUTB(drive->ctl|2, IDE_CONTROL_REG);
 }
 
-EXPORT_SYMBOL(SELECT_INTERRUPT);
-
 void SELECT_MASK (ide_drive_t *drive, int mask)
 {
 	if (HWIF(drive)->maskproc)
 		HWIF(drive)->maskproc(drive, mask);
 }
 
-EXPORT_SYMBOL(SELECT_MASK);
-
 void QUIRK_LIST (ide_drive_t *drive)
 {
 	if (HWIF(drive)->quirkproc)
 		drive->quirk_list = HWIF(drive)->quirkproc(drive);
 }
-
-EXPORT_SYMBOL(QUIRK_LIST);
 
 /*
  * Some localbus EIDE interfaces require a special access sequence
@@ -252,8 +246,6 @@ void ata_vlb_sync (ide_drive_t *drive, unsigned long port)
 	(void) HWIF(drive)->INB(port);
 	(void) HWIF(drive)->INB(port);
 }
-
-EXPORT_SYMBOL(ata_vlb_sync);
 
 /*
  * This is used for most PIO data transfers *from* the IDE interface
@@ -277,8 +269,6 @@ void ata_input_data (ide_drive_t *drive, void *buffer, u32 wcount)
 	}
 }
 
-EXPORT_SYMBOL(ata_input_data);
-
 /*
  * This is used for most PIO data transfers *to* the IDE interface
  */
@@ -300,8 +290,6 @@ void ata_output_data (ide_drive_t *drive, void *buffer, u32 wcount)
 		hwif->OUTSW(IDE_DATA_REG, buffer, wcount<<1);
 	}
 }
-
-EXPORT_SYMBOL(ata_output_data);
 
 /*
  * The following routines are mainly used by the ATAPI drivers.
@@ -685,8 +673,6 @@ int ide_ata66_check (ide_drive_t *drive, ide_task_t *args)
 	return 0;
 }
 
-EXPORT_SYMBOL(ide_ata66_check);
-
 /*
  * Backside of HDIO_DRIVE_CMD call of SETFEATURES_XFER.
  * 1 : Safe to update drive->id DMA registers.
@@ -705,9 +691,8 @@ int set_transfer (ide_drive_t *drive, ide_task_t *args)
 	return 0;
 }
 
-EXPORT_SYMBOL(set_transfer);
-
-u8 ide_auto_reduce_xfer (ide_drive_t *drive)
+#ifdef CONFIG_BLK_DEV_IDEDMA
+static u8 ide_auto_reduce_xfer (ide_drive_t *drive)
 {
 	if (!drive->crc_count)
 		return drive->current_speed;
@@ -731,8 +716,7 @@ u8 ide_auto_reduce_xfer (ide_drive_t *drive)
 		default:		return XFER_PIO_4;
 	}
 }
-
-EXPORT_SYMBOL(ide_auto_reduce_xfer);
+#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 /*
  * Update the 
@@ -806,8 +790,6 @@ int ide_driveid_update (ide_drive_t *drive)
 	return 1;
 #endif
 }
-
-EXPORT_SYMBOL(ide_driveid_update);
 
 /*
  * Similar to ide_wait_stat(), except it never calls ide_error internally.
@@ -948,7 +930,7 @@ EXPORT_SYMBOL(ide_config_drive_speed);
  *
  * See also ide_execute_command
  */
-void __ide_set_handler (ide_drive_t *drive, ide_handler_t *handler,
+static void __ide_set_handler (ide_drive_t *drive, ide_handler_t *handler,
 		      unsigned int timeout, ide_expiry_t *expiry)
 {
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
@@ -963,8 +945,6 @@ void __ide_set_handler (ide_drive_t *drive, ide_handler_t *handler,
 	hwgroup->timer.expires	= jiffies + timeout;
 	add_timer(&hwgroup->timer);
 }
-
-EXPORT_SYMBOL(__ide_set_handler);
 
 void ide_set_handler (ide_drive_t *drive, ide_handler_t *handler,
 		      unsigned int timeout, ide_expiry_t *expiry)

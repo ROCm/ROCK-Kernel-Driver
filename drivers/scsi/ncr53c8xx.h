@@ -44,8 +44,6 @@
 
 #include <scsi/scsi_host.h>
 
-typedef	u_long		vm_offset_t;
-
 #include "sym53c8xx_defs.h"
 
 /*
@@ -72,11 +70,11 @@ struct ncr_slot {
 	u_long	base_2;
 	u_long	base_c;
 	u_long	base_2_c;
-	u_long	base_v;
-	u_long	base_2_v;
+	void __iomem *base_v;
+	void __iomem *base_2_v;
 	int	irq;
 /* port and reg fields to use INB, OUTB macros */
-	volatile struct ncr_reg	*reg;
+	volatile struct ncr_reg	__iomem *reg;
 };
 
 /*==========================================================
@@ -97,5 +95,7 @@ struct ncr_device {
 extern struct Scsi_Host *ncr_attach(struct scsi_host_template *tpnt, int unit, struct ncr_device *device);
 extern int ncr53c8xx_release(struct Scsi_Host *host);
 irqreturn_t ncr53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs);
+extern int ncr53c8xx_init(void);
+extern void ncr53c8xx_exit(void);
 
 #endif /* NCR53C8XX_H */

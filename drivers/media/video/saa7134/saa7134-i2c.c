@@ -1,4 +1,6 @@
 /*
+ * $Id: saa7134-i2c.c,v 1.7 2004/11/07 13:17:15 kraxel Exp $
+ *
  * device driver for philips saa7134 based TV cards
  * i2c interface support
  *
@@ -32,11 +34,11 @@
 /* ----------------------------------------------------------- */
 
 static unsigned int i2c_debug = 0;
-MODULE_PARM(i2c_debug,"i");
+module_param(i2c_debug, int, 0644);
 MODULE_PARM_DESC(i2c_debug,"enable debug messages [i2c]");
 
 static unsigned int i2c_scan = 0;
-MODULE_PARM(i2c_scan,"i");
+module_param(i2c_scan, int, 0444);
 MODULE_PARM_DESC(i2c_scan,"scan i2c bus at insmod time");
 
 #define d1printk if (1 == i2c_debug) printk
@@ -86,7 +88,7 @@ enum i2c_attr {
 static inline enum i2c_status i2c_get_status(struct saa7134_dev *dev)
 {
 	enum i2c_status status;
-	
+
 	status = saa_readb(SAA7134_I2C_ATTR_STATUS) & 0x0f;
 	d2printk(KERN_DEBUG "%s: i2c stat <= %s\n",dev->name,
 		 str_i2c_status[status]);
@@ -182,7 +184,7 @@ static int i2c_reset(struct saa7134_dev *dev)
 
 	if (!i2c_is_idle(status))
 		return FALSE;
-	
+
 	i2c_set_attr(dev,NOP);
 	return TRUE;
 }
@@ -208,7 +210,7 @@ static inline int i2c_send_byte(struct saa7134_dev *dev,
 	saa_writel(SAA7134_I2C_ATTR_STATUS >> 2, dword);
 #endif
 	d2printk(KERN_DEBUG "%s: i2c data => 0x%x\n",dev->name,data);
-	
+
 	if (!i2c_is_busy_wait(dev))
 		return -EIO;
 	status = i2c_get_status(dev);
@@ -221,7 +223,7 @@ static inline int i2c_recv_byte(struct saa7134_dev *dev)
 {
 	enum i2c_status status;
 	unsigned char data;
-	
+
 	i2c_set_attr(dev,CONTINUE);
 	if (!i2c_is_busy_wait(dev))
 		return -EIO;
@@ -300,7 +302,7 @@ static int saa7134_i2c_xfer(struct i2c_adapter *i2c_adap,
 
 /* ----------------------------------------------------------- */
 
-static int algo_control(struct i2c_adapter *adapter, 
+static int algo_control(struct i2c_adapter *adapter,
 			unsigned int cmd, unsigned long arg)
 {
 	return 0;
@@ -393,21 +395,26 @@ saa7134_i2c_eeprom(struct saa7134_dev *dev, unsigned char *eedata, int len)
 	return 0;
 }
 
-static int
-saa7134_i2c_scan(struct saa7134_dev *dev)
+static char *i2c_devs[128] = {
+	[ 0x20      ] = "mpeg encoder (saa6752hs)",
+	[ 0xa0 >> 1 ] = "eeprom",
+	[ 0xc0 >> 1 ] = "tuner (analog)",
+	[ 0x86 >> 1 ] = "tda9887",
+};
+
+static void do_i2c_scan(char *name, struct i2c_client *c)
 {
 	unsigned char buf;
 	int i,rc;
 
-	for (i = 0; i < 256; i+= 2) {
-		dev->i2c_client.addr = i >> 1;
-		rc = i2c_master_recv(&dev->i2c_client,&buf,0);
+	for (i = 0; i < 128; i++) {
+		c->addr = i;
+		rc = i2c_master_recv(c,&buf,0);
 		if (rc < 0)
 			continue;
-		printk("%s: i2c scan: found device @ %x%s\n",
-		       dev->name, i, (i == 0xa0) ? " [eeprom]" : "");
+		printk("%s: i2c scan: found device @ 0x%x  [%s]\n",
+		       name, i << 1, i2c_devs[i] ? i2c_devs[i] : "???");
 	}
-	return 0;
 }
 
 void saa7134_i2c_call_clients(struct saa7134_dev *dev,
@@ -424,13 +431,13 @@ int saa7134_i2c_register(struct saa7134_dev *dev)
 	strcpy(dev->i2c_adap.name,dev->name);
 	dev->i2c_adap.algo_data = dev;
 	i2c_add_adapter(&dev->i2c_adap);
-	
+
 	dev->i2c_client = saa7134_client_template;
 	dev->i2c_client.adapter = &dev->i2c_adap;
-	
+
 	saa7134_i2c_eeprom(dev,dev->eedata,sizeof(dev->eedata));
 	if (i2c_scan)
-		saa7134_i2c_scan(dev);
+		do_i2c_scan(dev->name,&dev->i2c_client);
 	return 0;
 }
 

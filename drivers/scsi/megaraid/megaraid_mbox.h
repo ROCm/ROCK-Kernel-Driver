@@ -21,8 +21,8 @@
 #include "megaraid_ioctl.h"
 
 
-#define MEGARAID_VERSION	"2.20.4.0"
-#define MEGARAID_EXT_VERSION	"(Release Date: Mon Sep 27 22:15:07 EDT 2004)"
+#define MEGARAID_VERSION	"2.20.4.1"
+#define MEGARAID_EXT_VERSION	"(Release Date: Thu Nov  4 17:44:59 EST 2004)"
 
 
 /*
@@ -231,7 +231,7 @@ typedef struct {
 	dma_addr_t			mbox_dma;
 	spinlock_t			mailbox_lock;
 	unsigned long			baseport;
-	unsigned long			baseaddr;
+	void __iomem *			baseaddr;
 	struct mraid_pci_blk		mbox_pool[MBOX_MAX_SCSI_CMDS];
 	struct dma_pool			*mbox_pool_handle;
 	struct mraid_pci_blk		epthru_pool[MBOX_MAX_SCSI_CMDS];

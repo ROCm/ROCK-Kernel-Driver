@@ -24,10 +24,10 @@
 #define _LINUX_NTFS_MFT_H
 
 #include <linux/fs.h>
+#include <linux/highmem.h>
+#include <linux/pagemap.h>
 
 #include "inode.h"
-
-extern int format_mft_record(ntfs_inode *ni, MFT_RECORD *m);
 
 extern MFT_RECORD *map_mft_record(ntfs_inode *ni);
 extern void unmap_mft_record(ntfs_inode *ni);
@@ -76,6 +76,9 @@ static inline void mark_mft_record_dirty(ntfs_inode *ni)
 		__mark_mft_record_dirty(ni);
 }
 
+extern int ntfs_sync_mft_mirror(ntfs_volume *vol, const unsigned long mft_no,
+		MFT_RECORD *m, int sync);
+
 extern int write_mft_record_nolock(ntfs_inode *ni, MFT_RECORD *m, int sync);
 
 /**
@@ -110,6 +113,14 @@ static inline int write_mft_record(ntfs_inode *ni, MFT_RECORD *m, int sync)
 	unlock_page(page);
 	return err;
 }
+
+extern BOOL ntfs_may_write_mft_record(ntfs_volume *vol,
+		const unsigned long mft_no, const MFT_RECORD *m,
+		ntfs_inode **locked_ni);
+
+extern ntfs_inode *ntfs_mft_record_alloc(ntfs_volume *vol, const int mode,
+		ntfs_inode *base_ni, MFT_RECORD **mrec);
+extern int ntfs_extent_mft_record_free(ntfs_inode *ni, MFT_RECORD *m);
 
 #endif /* NTFS_RW */
 

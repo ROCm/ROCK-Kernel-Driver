@@ -13,131 +13,13 @@
 #define _ASM_SYSTEM_H
 
 #include <linux/config.h>
-#include <asm/sgidefs.h>
-
-#include <linux/kernel.h>
+#include <linux/types.h>
 
 #include <asm/addrspace.h>
+#include <asm/cpu-features.h>
 #include <asm/ptrace.h>
-#include <asm/hazards.h>
-
-__asm__ (
-	".macro\tlocal_irq_enable\n\t"
-	".set\tpush\n\t"
-	".set\treorder\n\t"
-	".set\tnoat\n\t"
-	"mfc0\t$1,$12\n\t"
-	"ori\t$1,0x1f\n\t"
-	"xori\t$1,0x1e\n\t"
-	"mtc0\t$1,$12\n\t"
-	"irq_enable_hazard\n\t"
-	".set\tpop\n\t"
-	".endm");
-
-static inline void local_irq_enable(void)
-{
-	__asm__ __volatile__(
-		"local_irq_enable"
-		: /* no outputs */
-		: /* no inputs */
-		: "memory");
-}
-
-/*
- * For cli() we have to insert nops to make sure that the new value
- * has actually arrived in the status register before the end of this
- * macro.
- * R4000/R4400 need three nops, the R4600 two nops and the R10000 needs
- * no nops at all.
- */
-__asm__ (
-	".macro\tlocal_irq_disable\n\t"
-	".set\tpush\n\t"
-	".set\tnoat\n\t"
-	"mfc0\t$1,$12\n\t"
-	"ori\t$1,1\n\t"
-	"xori\t$1,1\n\t"
-	".set\tnoreorder\n\t"
-	"mtc0\t$1,$12\n\t"
-	"irq_disable_hazard\n\t"
-	".set\tpop\n\t"
-	".endm");
-
-static inline void local_irq_disable(void)
-{
-	__asm__ __volatile__(
-		"local_irq_disable"
-		: /* no outputs */
-		: /* no inputs */
-		: "memory");
-}
-
-__asm__ (
-	".macro\tlocal_save_flags flags\n\t"
-	".set\tpush\n\t"
-	".set\treorder\n\t"
-	"mfc0\t\\flags, $12\n\t"
-	".set\tpop\n\t"
-	".endm");
-
-#define local_save_flags(x)						\
-__asm__ __volatile__(							\
-	"local_save_flags %0"						\
-	: "=r" (x))
-
-__asm__ (
-	".macro\tlocal_irq_save result\n\t"
-	".set\tpush\n\t"
-	".set\treorder\n\t"
-	".set\tnoat\n\t"
-	"mfc0\t\\result, $12\n\t"
-	"ori\t$1, \\result, 1\n\t"
-	"xori\t$1, 1\n\t"
-	".set\tnoreorder\n\t"
-	"mtc0\t$1, $12\n\t"
-	"irq_disable_hazard\n\t"
-	".set\tpop\n\t"
-	".endm");
-
-#define local_irq_save(x)						\
-__asm__ __volatile__(							\
-	"local_irq_save\t%0"						\
-	: "=r" (x)							\
-	: /* no inputs */						\
-	: "memory")
-
-__asm__ (
-	".macro\tlocal_irq_restore flags\n\t"
-	".set\tnoreorder\n\t"
-	".set\tnoat\n\t"
-	"mfc0\t$1, $12\n\t"
-	"andi\t\\flags, 1\n\t"
-	"ori\t$1, 1\n\t"
-	"xori\t$1, 1\n\t"
-	"or\t\\flags, $1\n\t"
-	"mtc0\t\\flags, $12\n\t"
-	"irq_disable_hazard\n\t"
-	".set\tat\n\t"
-	".set\treorder\n\t"
-	".endm");
-
-#define local_irq_restore(flags)					\
-do {									\
-	unsigned long __tmp1;						\
-									\
-	__asm__ __volatile__(						\
-		"local_irq_restore\t%0"					\
-		: "=r" (__tmp1)						\
-		: "0" (flags)						\
-		: "memory");						\
-} while(0)
-
-#define irqs_disabled()							\
-({									\
-	unsigned long flags;						\
-	local_save_flags(flags);					\
-	!(flags & 1);							\
-})
+#include <asm/war.h>
+#include <asm/interrupt.h>
 
 /*
  * read_barrier_depends - Flush all pending reads that subsequents reads
@@ -277,37 +159,51 @@ do { \
 	(last) = resume(prev, next, next->thread_info); \
 } while(0)
 
+#define ROT_IN_PIECES							\
+	"	.set	noreorder	\n"				\
+	"	.set	reorder		\n"
+
 static inline unsigned long __xchg_u32(volatile int * m, unsigned int val)
 {
 	__u32 retval;
 
-#ifdef CONFIG_CPU_HAS_LLSC
-	unsigned long dummy;
+	if (cpu_has_llsc && R10000_LLSC_WAR) {
+		unsigned long dummy;
 
-	__asm__ __volatile__(
-		".set\tpush\t\t\t\t# xchg_u32\n\t"
-		".set\tnoreorder\n\t"
-		".set\tnomacro\n\t"
-		"ll\t%0, %3\n"
-		"1:\tmove\t%2, %z4\n\t"
-		"sc\t%2, %1\n\t"
-		"beqzl\t%2, 1b\n\t"
-		" ll\t%0, %3\n\t"
+		__asm__ __volatile__(
+		"1:	ll	%0, %3			# xchg_u32	\n"
+		"	move	%2, %z4					\n"
+		"	sc	%2, %1					\n"
+		"	beqzl	%2, 1b					\n"
+		ROT_IN_PIECES
 #ifdef CONFIG_SMP
-		"sync\n\t"
+		"	sync						\n"
 #endif
-		".set\tpop"
 		: "=&r" (retval), "=m" (*m), "=&r" (dummy)
 		: "R" (*m), "Jr" (val)
 		: "memory");
-#else
-	unsigned long flags;
+	} else if (cpu_has_llsc) {
+		unsigned long dummy;
 
-	local_irq_save(flags);
-	retval = *m;
-	*m = val;
-	local_irq_restore(flags);	/* implies memory barrier  */
+		__asm__ __volatile__(
+		"1:	ll	%0, %3			# xchg_u32	\n"
+		"	move	%2, %z4					\n"
+		"	sc	%2, %1					\n"
+		"	beqz	%2, 1b					\n"
+#ifdef CONFIG_SMP
+		"	sync						\n"
 #endif
+		: "=&r" (retval), "=m" (*m), "=&r" (dummy)
+		: "R" (*m), "Jr" (val)
+		: "memory");
+	} else {
+		unsigned long flags;
+
+		local_irq_save(flags);
+		retval = *m;
+		*m = val;
+		local_irq_restore(flags);	/* implies memory barrier  */
+	}
 
 	return retval;
 }
@@ -317,33 +213,43 @@ static inline __u64 __xchg_u64(volatile __u64 * m, __u64 val)
 {
 	__u64 retval;
 
-#ifdef CONFIG_CPU_HAS_LLDSCD
-	unsigned long dummy;
+	if (cpu_has_llsc && R10000_LLSC_WAR) {
+		unsigned long dummy;
 
-	__asm__ __volatile__(
-		".set\tpush\t\t\t\t# xchg_u64\n\t"
-		".set\tnoreorder\n\t"
-		".set\tnomacro\n\t"
-		"lld\t%0, %3\n"
-		"1:\tmove\t%2, %z4\n\t"
-		"scd\t%2, %1\n\t"
-		"beqzl\t%2, 1b\n\t"
-		" lld\t%0, %3\n\t"
+		__asm__ __volatile__(
+		"1:	lld	%0, %3			# xchg_u64	\n"
+		"	move	%2, %z4					\n"
+		"	scd	%2, %1					\n"
+		"	beqzl	%2, 1b					\n"
+		ROT_IN_PIECES
 #ifdef CONFIG_SMP
-		"sync\n\t"
+		"	sync						\n"
 #endif
-		".set\tpop"
 		: "=&r" (retval), "=m" (*m), "=&r" (dummy)
 		: "R" (*m), "Jr" (val)
 		: "memory");
-#else
-	unsigned long flags;
+	} else if (cpu_has_llsc) {
+		unsigned long dummy;
 
-	local_irq_save(flags);
-	retval = *m;
-	*m = val;
-	local_irq_restore(flags);	/* implies memory barrier  */
+		__asm__ __volatile__(
+		"1:	lld	%0, %3			# xchg_u64	\n"
+		"	move	%2, %z4					\n"
+		"	scd	%2, %1					\n"
+		"	beqz	%2, 1b					\n"
+#ifdef CONFIG_SMP
+		"	sync						\n"
 #endif
+		: "=&r" (retval), "=m" (*m), "=&r" (dummy)
+		: "R" (*m), "Jr" (val)
+		: "memory");
+	} else {
+		unsigned long flags;
+
+		local_irq_save(flags);
+		retval = *m;
+		*m = val;
+		local_irq_restore(flags);	/* implies memory barrier  */
+	}
 
 	return retval;
 }
@@ -378,31 +284,48 @@ static inline unsigned long __cmpxchg_u32(volatile int * m, unsigned long old,
 {
 	__u32 retval;
 
-#ifdef CONFIG_CPU_HAS_LLSC
-	__asm__ __volatile__(
-	"	.set	noat					\n"
-	"1:	ll	%0, %2			# __cmpxchg_u32	\n"
-	"	bne	%0, %z3, 2f				\n"
-	"	move	$1, %z4					\n"
-	"	sc	$1, %1					\n"
-	"	beqz	$1, 1b					\n"
+	if (cpu_has_llsc && R10000_LLSC_WAR) {
+		__asm__ __volatile__(
+		"	.set	noat					\n"
+		"1:	ll	%0, %2			# __cmpxchg_u32	\n"
+		"	bne	%0, %z3, 2f				\n"
+		"	move	$1, %z4					\n"
+		"	sc	$1, %1					\n"
+		"	beqzl	$1, 1b					\n"
+		ROT_IN_PIECES
 #ifdef CONFIG_SMP
-	"	sync						\n"
+		"	sync						\n"
 #endif
-	"2:							\n"
-	"	.set	at					\n"
-	: "=&r" (retval), "=m" (*m)
-	: "R" (*m), "Jr" (old), "Jr" (new)
-	: "memory");
-#else
-	unsigned long flags;
+		"2:							\n"
+		"	.set	at					\n"
+		: "=&r" (retval), "=m" (*m)
+		: "R" (*m), "Jr" (old), "Jr" (new)
+		: "memory");
+	} else if (cpu_has_llsc) {
+		__asm__ __volatile__(
+		"	.set	noat					\n"
+		"1:	ll	%0, %2			# __cmpxchg_u32	\n"
+		"	bne	%0, %z3, 2f				\n"
+		"	move	$1, %z4					\n"
+		"	sc	$1, %1					\n"
+		"	beqz	$1, 1b					\n"
+#ifdef CONFIG_SMP
+		"	sync						\n"
+#endif
+		"2:							\n"
+		"	.set	at					\n"
+		: "=&r" (retval), "=m" (*m)
+		: "R" (*m), "Jr" (old), "Jr" (new)
+		: "memory");
+	} else {
+		unsigned long flags;
 
-	local_irq_save(flags);
-	retval = *m;
-	if (retval == old)
-		*m = new;
-	local_irq_restore(flags);	/* implies memory barrier  */
-#endif
+		local_irq_save(flags);
+		retval = *m;
+		if (retval == old)
+			*m = new;
+		local_irq_restore(flags);	/* implies memory barrier  */
+	}
 
 	return retval;
 }
@@ -413,31 +336,48 @@ static inline unsigned long __cmpxchg_u64(volatile int * m, unsigned long old,
 {
 	__u64 retval;
 
-#ifdef CONFIG_CPU_HAS_LLDSCD
-	__asm__ __volatile__(
-	"	.set	noat					\n"
-	"1:	lld	%0, %2			# __cmpxchg_u64	\n"
-	"	bne	%0, %z3, 2f				\n"
-	"	move	$1, %z4					\n"
-	"	scd	$1, %1					\n"
-	"	beqz	$1, 1b					\n"
+	if (cpu_has_llsc) {
+		__asm__ __volatile__(
+		"	.set	noat					\n"
+		"1:	lld	%0, %2			# __cmpxchg_u64	\n"
+		"	bne	%0, %z3, 2f				\n"
+		"	move	$1, %z4					\n"
+		"	scd	$1, %1					\n"
+		"	beqzl	$1, 1b					\n"
+		ROT_IN_PIECES
 #ifdef CONFIG_SMP
-	"	sync						\n"
+		"	sync						\n"
 #endif
-	"2:							\n"
-	"	.set	at					\n"
-	: "=&r" (retval), "=m" (*m)
-	: "R" (*m), "Jr" (old), "Jr" (new)
-	: "memory");
-#else
-	unsigned long flags;
+		"2:							\n"
+		"	.set	at					\n"
+		: "=&r" (retval), "=m" (*m)
+		: "R" (*m), "Jr" (old), "Jr" (new)
+		: "memory");
+	} else if (cpu_has_llsc) {
+		__asm__ __volatile__(
+		"	.set	noat					\n"
+		"1:	lld	%0, %2			# __cmpxchg_u64	\n"
+		"	bne	%0, %z3, 2f				\n"
+		"	move	$1, %z4					\n"
+		"	scd	$1, %1					\n"
+		"	beqz	$1, 1b					\n"
+#ifdef CONFIG_SMP
+		"	sync						\n"
+#endif
+		"2:							\n"
+		"	.set	at					\n"
+		: "=&r" (retval), "=m" (*m)
+		: "R" (*m), "Jr" (old), "Jr" (new)
+		: "memory");
+	} else {
+		unsigned long flags;
 
-	local_irq_save(flags);
-	retval = *m;
-	if (retval == old)
-		*m = new;
-	local_irq_restore(flags);	/* implies memory barrier  */
-#endif
+		local_irq_save(flags);
+		retval = *m;
+		if (retval == old)
+			*m = new;
+		local_irq_restore(flags);	/* implies memory barrier  */
+	}
 
 	return retval;
 }
@@ -479,13 +419,7 @@ extern void __die_if_kernel(const char *, struct pt_regs *, const char *file,
 #define die_if_kernel(msg, regs)					\
 	__die_if_kernel(msg, regs, __FILE__ ":", __FUNCTION__, __LINE__)
 
-extern int serial_console;
 extern int stop_a_enabled;
-
-static __inline__ int con_is_present(void)
-{
-	return serial_console ? 0 : 1;
-}
 
 /*
  * Taken from include/asm-ia64/system.h; prevents deadlock on SMP

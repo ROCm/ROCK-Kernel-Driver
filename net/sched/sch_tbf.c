@@ -16,7 +16,7 @@
 #include <linux/module.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/jiffies.h>
@@ -141,7 +141,7 @@ static int tbf_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 	int ret;
 
 	if (skb->len > q->max_size) {
-		sch->stats.drops++;
+		sch->qstats.drops++;
 #ifdef CONFIG_NET_CLS_POLICE
 		if (sch->reshape_fail == NULL || sch->reshape_fail(skb, sch))
 #endif
@@ -151,13 +151,13 @@ static int tbf_enqueue(struct sk_buff *skb, struct Qdisc* sch)
 	}
 
 	if ((ret = q->qdisc->enqueue(skb, q->qdisc)) != 0) {
-		sch->stats.drops++;
+		sch->qstats.drops++;
 		return ret;
 	}
 
 	sch->q.qlen++;
-	sch->stats.bytes += skb->len;
-	sch->stats.packets++;
+	sch->bstats.bytes += skb->len;
+	sch->bstats.packets++;
 	return 0;
 }
 
@@ -166,8 +166,10 @@ static int tbf_requeue(struct sk_buff *skb, struct Qdisc* sch)
 	struct tbf_sched_data *q = qdisc_priv(sch);
 	int ret;
 
-	if ((ret = q->qdisc->ops->requeue(skb, q->qdisc)) == 0)
+	if ((ret = q->qdisc->ops->requeue(skb, q->qdisc)) == 0) {
 		sch->q.qlen++;
+		sch->qstats.requeues++;
+	}
 
 	return ret;
 }
@@ -179,7 +181,7 @@ static unsigned int tbf_drop(struct Qdisc* sch)
 
 	if ((len = q->qdisc->ops->drop(q->qdisc)) != 0) {
 		sch->q.qlen--;
-		sch->stats.drops++;
+		sch->qstats.drops++;
 	}
 	return len;
 }
@@ -250,11 +252,11 @@ static struct sk_buff *tbf_dequeue(struct Qdisc* sch)
 		if (q->qdisc->ops->requeue(skb, q->qdisc) != NET_XMIT_SUCCESS) {
 			/* When requeue fails skb is dropped */
 			sch->q.qlen--;
-			sch->stats.drops++;
+			sch->qstats.drops++;
 		}
 
 		sch->flags |= TCQ_F_THROTTLED;
-		sch->stats.overlimits++;
+		sch->qstats.overlimits++;
 	}
 	return NULL;
 }

@@ -42,7 +42,7 @@ nlm4svc_retrieve_args(struct svc_rqst *rqstp, struct nlm_args *argp,
 
 	/* Obtain host handle */
 	if (!(host = nlmsvc_lookup_host(rqstp))
-	 || (argp->monitor && nsm_monitor(host) < 0))
+	 || (argp->monitor && !host->h_monitored && nsm_monitor(host) < 0))
 		goto no_locks;
 	*hostp = host;
 
@@ -546,10 +546,10 @@ struct nlm_void			{ int dummy; };
    .pc_ressize	= sizeof(struct nlm_##rest),		\
    .pc_xdrressize = respsize,				\
  }
-#define	Ck	(1+8)	/* cookie */
-#define	No	(1+1024/4)	/* netobj */
-#define	St	1	/* status */
-#define	Rg	4	/* range (offset + length) */
+#define	Ck	(1+XDR_QUADLEN(NLM_MAXCOOKIELEN))	/* cookie */
+#define	No	(1+1024/4)				/* netobj */
+#define	St	1					/* status */
+#define	Rg	4					/* range (offset + length) */
 struct svc_procedure		nlmsvc_procedures4[] = {
   PROC(null,		void,		void,		void,	void, 1),
   PROC(test,		testargs,	testres,	args,	res, Ck+St+2+No+Rg),

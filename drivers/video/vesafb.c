@@ -49,12 +49,14 @@ static struct fb_fix_screeninfo vesafb_fix __initdata = {
 
 static int             inverse   = 0;
 static int             mtrr      = 1;
-static int	       vram __initdata = 0; /* Set amount of memory to be used */
+static int	       vram_remap __initdata = 0; /* Set amount of memory to be used */
+static int	       vram_total __initdata = 0; /* Set total amount of memory */
 static int             pmi_setpal = 0;	/* pmi for palette changes ??? */
 static int             ypan       = 0;  /* 0..nothing, 1..ypan, 2..ywrap */
 static unsigned short  *pmi_base  = NULL;
 static void            (*pmi_start)(void);
 static void            (*pmi_pal)(void);
+static int             depth;
 
 /* --------------------------------------------------------------------- */
 
@@ -88,11 +90,11 @@ static int vesafb_pan_display(struct fb_var_screeninfo *var,
 }
 
 static void vesa_setpalette(int regno, unsigned red, unsigned green,
-			    unsigned blue, struct fb_var_screeninfo *var)
+			    unsigned blue)
 {
 #ifdef __i386__
 	struct { u_char blue, green, red, pad; } entry;
-	int shift = 16 - var->green.length;
+	int shift = 16 - depth;
 
 	if (pmi_setpal) {
 		entry.red   = red   >> shift;
@@ -134,7 +136,7 @@ static int vesafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 	switch (info->var.bits_per_pixel) {
 	case 8:
-		vesa_setpalette(regno,red,green,blue, &info->var);
+		vesa_setpalette(regno,red,green,blue);
 		break;
 	case 16:
 		if (info->var.red.offset == 10) {
@@ -173,10 +175,7 @@ static int vesafb_setcolreg(unsigned regno, unsigned red, unsigned green,
     return 0;
 }
 
-#ifndef CONFIG_BOOTSPLASH
-static
-#endif
-struct fb_ops vesafb_ops = {
+static struct fb_ops vesafb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_setcolreg	= vesafb_setcolreg,
 	.fb_pan_display	= vesafb_pan_display,
@@ -212,8 +211,10 @@ int __init vesafb_setup(char *options)
 			mtrr=1;
 		else if (! strcmp(this_opt, "nomtrr"))
 			mtrr=0;
-		else if (! strncmp(this_opt, "vram:", 5))
-			vram = simple_strtoul(this_opt+5, NULL, 0);
+		else if (! strncmp(this_opt, "vtotal:", 7))
+			vram_total = simple_strtoul(this_opt+7, NULL, 0);
+		else if (! strncmp(this_opt, "vremap:", 7))
+			vram_remap = simple_strtoul(this_opt+7, NULL, 0);
 	}
 	return 0;
 }
@@ -243,26 +244,26 @@ static int __init vesafb_probe(struct device *device)
 	/*   size_vmode -- that is the amount of memory needed for the
 	 *                 used video mode, i.e. the minimum amount of
 	 *                 memory we need. */
-	size_vmode = (vesafb_defined.xres * vesafb_defined.yres *
-		vesafb_defined.bits_per_pixel) >> 3;
+	size_vmode = vesafb_defined.yres * vesafb_fix.line_length;
 
 	/*   size_total -- all video memory we have. Used for mtrr
-	 *                 entries and bounds checking. */
+	 *                 entries, ressource allocation and bounds
+	 *                 checking. */
 	size_total = screen_info.lfb_size * 65536;
+	if (vram_total)
+		size_total = vram_total * 1024 * 1024;
 	if (size_total < size_vmode)
 		size_total = size_vmode;
-	if (vram)
-		size_total = vram * 1024 * 1024;
 
 	/*   size_remap -- the amount of video memory we are going to
 	 *                 use for vesafb.  With modern cards it is no
 	 *                 option to simply use size_total as that
 	 *                 wastes plenty of kernel address space. */
-#ifdef CONFIG_BOOTSPLASH
-	size_remap  = size_vmode * 4;	// some more for the images
-#else
 	size_remap  = size_vmode * 2;
-#endif
+	if (vram_remap)
+		size_remap = vram_remap * 1024 * 1024;
+	if (size_remap < size_vmode)
+		size_remap = size_vmode;
 	if (size_remap > size_total)
 		size_remap = size_total;
 	vesafb_fix.smem_len = size_remap;
@@ -358,6 +359,15 @@ static int __init vesafb_probe(struct device *device)
 	vesafb_defined.blue.length   = screen_info.blue_size;
 	vesafb_defined.transp.offset = screen_info.rsvd_pos;
 	vesafb_defined.transp.length = screen_info.rsvd_size;
+
+	if (vesafb_defined.bits_per_pixel <= 8) {
+		depth = vesafb_defined.green.length;
+		vesafb_defined.red.length =
+		vesafb_defined.green.length =
+		vesafb_defined.blue.length =
+		vesafb_defined.bits_per_pixel;
+	}
+
 	printk(KERN_INFO "vesafb: %s: "
 	       "size=%d:%d:%d:%d, shift=%d:%d:%d:%d\n",
 	       (vesafb_defined.bits_per_pixel > 8) ?
@@ -427,8 +437,11 @@ static struct platform_device vesafb_device = {
 int __init vesafb_init(void)
 {
 	int ret;
+	char *option = NULL;
 
-	vesafb_setup(fb_get_options("vesafb"));
+	/* ignore error return of fb_get_options */
+	fb_get_options("vesafb", &option);
+	vesafb_setup(option);
 	ret = driver_register(&vesafb_driver);
 
 	if (!ret) {

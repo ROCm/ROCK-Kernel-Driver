@@ -1,5 +1,6 @@
 /* 
  * Copyright (C) 2000, 2001, 2002 Jeff Dike (jdike@karaya.com)
+ * Copyright 2003 PathScale, Inc.
  * Licensed under the GPL
  */
 
@@ -18,6 +19,8 @@
 #include "linux/capability.h"
 #include "linux/vmalloc.h"
 #include "linux/spinlock.h"
+#include "linux/proc_fs.h"
+#include "linux/ptrace.h"
 #include "asm/unistd.h"
 #include "asm/mman.h"
 #include "asm/segment.h"
@@ -138,7 +141,7 @@ void *_switch_to(void *prev, void *next, void *last)
 void interrupt_end(void)
 {
 	if(need_resched()) schedule();
-	if(test_tsk_thread_flag(current, TIF_SIGPENDING)) do_signal(0);
+	if(test_tsk_thread_flag(current, TIF_SIGPENDING)) do_signal();
 }
 
 void release_thread(struct task_struct *task)
@@ -206,7 +209,6 @@ void default_idle(void)
 		 * although we are an idle CPU, we do not want to
 		 * get into the scheduler unnecessarily.
 		 */
-		irq_stat[smp_processor_id()].idle_timestamp = jiffies;
 		if(need_resched())
 			schedule();
 		
@@ -224,7 +226,7 @@ int page_size(void)
 	return(PAGE_SIZE);
 }
 
-int page_mask(void)
+unsigned long page_mask(void)
 {
 	return(PAGE_MASK);
 }
@@ -397,6 +399,74 @@ int um_in_interrupt(void)
 int cpu(void)
 {
 	return(current_thread->cpu);
+}
+
+static atomic_t using_sysemu = ATOMIC_INIT(0);
+int sysemu_supported;
+
+void set_using_sysemu(int value)
+{
+	atomic_set(&using_sysemu, sysemu_supported && value);
+}
+
+int get_using_sysemu(void)
+{
+	return atomic_read(&using_sysemu);
+}
+
+static int proc_read_sysemu(char *buf, char **start, off_t offset, int size,int *eof, void *data)
+{
+	if (snprintf(buf, size, "%d\n", get_using_sysemu()) < size) /*No overflow*/
+		*eof = 1;
+
+	return strlen(buf);
+}
+
+static int proc_write_sysemu(struct file *file,const char *buf, unsigned long count,void *data)
+{
+	char tmp[2];
+
+	if (copy_from_user(tmp, buf, 1))
+		return -EFAULT;
+
+	if (tmp[0] == '0' || tmp[0] == '1')
+		set_using_sysemu(tmp[0] - '0');
+	return count; /*We use the first char, but pretend to write everything*/
+}
+
+int __init make_proc_sysemu(void)
+{
+	struct proc_dir_entry *ent;
+	if (!sysemu_supported)
+		return 0;
+
+	ent = create_proc_entry("sysemu", 0600, &proc_root);
+
+	if (ent == NULL)
+	{
+		printk("Failed to register /proc/sysemu\n");
+		return(0);
+	}
+
+	ent->read_proc  = proc_read_sysemu;
+	ent->write_proc = proc_write_sysemu;
+
+	return 0;
+}
+
+late_initcall(make_proc_sysemu);
+
+int singlestepping(void * t)
+{
+	struct task_struct *task = t ? t : current;
+
+	if ( ! (task->ptrace & PT_DTRACE) )
+		return(0);
+
+	if (task->thread.singlestep_syscall)
+		return(0);
+
+	return 1;
 }
 
 /*

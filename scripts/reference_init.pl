@@ -93,6 +93,9 @@ foreach $object (sort(keys(%object))) {
 		     $from !~ /\.stab$/ &&
 		     $from !~ /\.rodata$/ &&
 		     $from !~ /\.text\.lock$/ &&
+		     $from !~ /\.pci_fixup_header$/ &&
+		     $from !~ /\.pci_fixup_final$/ &&
+		     $from !~ /\__param$/ &&
 		     $from !~ /\.debug_/)) {
 			printf("Error: %s %s refers to %s\n", $object, $from, $line);
 		}

@@ -45,9 +45,7 @@
 
 /* Addresses to scan */
 static unsigned short normal_i2c[] = { 0x2c, 0x2d, I2C_CLIENT_END };
-static unsigned short normal_i2c_range[] = { I2C_CLIENT_END };
 static unsigned int normal_isa[] = { I2C_CLIENT_ISA_END };
-static unsigned int normal_isa_range[] = { I2C_CLIENT_ISA_END };
 
 /* Insmod parameters */
 SENSORS_INSMOD_2(gl518sm_r00, gl518sm_r80);
@@ -164,7 +162,7 @@ static struct i2c_driver gl518_driver = {
  * Internal variables
  */
 
-static int gl518_id = 0;
+static int gl518_id;
 
 /*
  * Sysfs stuff
@@ -217,7 +215,8 @@ static ssize_t set_##suffix(struct device *dev, const char *buf,	\
 {									\
 	struct i2c_client *client = to_i2c_client(dev);			\
 	struct gl518_data *data = i2c_get_clientdata(client);		\
-	data->value = type##_TO_REG(simple_strtol(buf, NULL, 10));	\
+	long val = simple_strtol(buf, NULL, 10);			\
+	data->value = type##_TO_REG(val);				\
 	gl518_write_value(client, reg, data->value);			\
 	return count;							\
 }
@@ -229,7 +228,8 @@ static ssize_t set_##suffix(struct device *dev, const char *buf,	\
 	struct i2c_client *client = to_i2c_client(dev);			\
 	struct gl518_data *data = i2c_get_clientdata(client);		\
 	int regvalue = gl518_read_value(client, reg);			\
-	data->value = type##_TO_REG(simple_strtoul(buf, NULL, 10));	\
+	unsigned long val = simple_strtoul(buf, NULL, 10);		\
+	data->value = type##_TO_REG(val);				\
 	regvalue = (regvalue & ~mask) | (data->value << shift);		\
 	gl518_write_value(client, reg, regvalue);			\
 	return count;							\

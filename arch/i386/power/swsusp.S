@@ -31,7 +31,7 @@ ENTRY(swsusp_arch_resume)
 	movl $swsusp_pg_dir-__PAGE_OFFSET,%ecx
 	movl %ecx,%cr3
 
-	movl	pagedir_nosave,%ebx
+	movl	pagedir_nosave, %ebx
 	xorl	%eax, %eax
 	xorl	%edx, %edx
 	.p2align 4,,7

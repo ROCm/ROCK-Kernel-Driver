@@ -35,7 +35,7 @@ char *mixer = HOSTAUDIO_DEV_MIXER;
 "    The default is \"" HOSTAUDIO_DEV_DSP "\".\n\n"
 
 #define MIXER_HELP \
-"    This is used to specify the host mixer device to the hostaudio driver.\n" \
+"    This is used to specify the host mixer device to the hostaudio driver.\n"\
 "    The default is \"" HOSTAUDIO_DEV_MIXER "\".\n\n"
 
 #ifndef MODULE
@@ -72,7 +72,7 @@ static ssize_t hostaudio_read(struct file *file, char *buffer, size_t count,
 {
         struct hostaudio_state *state = file->private_data;
 	void *kbuf;
-	int ret;
+	int err;
 
 #ifdef DEBUG
         printk("hostaudio: read called, count = %d\n", count);
@@ -82,16 +82,16 @@ static ssize_t hostaudio_read(struct file *file, char *buffer, size_t count,
 	if(kbuf == NULL)
 		return(-ENOMEM);
 
-	ret = os_read_file(state->fd, kbuf, count);
-	if(ret < 0)
+	err = os_read_file(state->fd, kbuf, count);
+	if(err < 0)
 		goto out;
 
-	if(copy_to_user(buffer, kbuf, ret))
-		ret = -EFAULT;
+	if(copy_to_user(buffer, kbuf, err))
+		err = -EFAULT;
 
  out:
 	kfree(kbuf);
-	return(ret);
+	return(err);
 }
 
 static ssize_t hostaudio_write(struct file *file, const char *buffer, 
@@ -99,7 +99,7 @@ static ssize_t hostaudio_write(struct file *file, const char *buffer,
 {
         struct hostaudio_state *state = file->private_data;
 	void *kbuf;
-	int ret;
+	int err;
 
 #ifdef DEBUG
         printk("hostaudio: write called, count = %d\n", count);
@@ -109,17 +109,18 @@ static ssize_t hostaudio_write(struct file *file, const char *buffer,
 	if(kbuf == NULL)
 		return(-ENOMEM);
 
-	ret = -EFAULT;
+	err = -EFAULT;
 	if(copy_from_user(kbuf, buffer, count))
 		goto out;
 
-	ret = os_write_file(state->fd, kbuf, count);
-	if(ret < 0)
+	err = os_write_file(state->fd, kbuf, count);
+	if(err < 0)
 		goto out;
+	*ppos += err;
 
  out:
 	kfree(kbuf);
-	return(ret);
+	return(err);
 }
 
 static unsigned int hostaudio_poll(struct file *file, 
@@ -139,7 +140,7 @@ static int hostaudio_ioctl(struct inode *inode, struct file *file,
 {
         struct hostaudio_state *state = file->private_data;
 	unsigned long data = 0;
-	int ret;
+	int err;
 
 #ifdef DEBUG
         printk("hostaudio: ioctl called, cmd = %u\n", cmd);
@@ -158,7 +159,7 @@ static int hostaudio_ioctl(struct inode *inode, struct file *file,
 		break;
 	}
 
-	ret = os_ioctl_generic(state->fd, cmd, (unsigned long) &data);
+	err = os_ioctl_generic(state->fd, cmd, (unsigned long) &data);
 
 	switch(cmd){
 	case SNDCTL_DSP_SPEED:
@@ -174,7 +175,7 @@ static int hostaudio_ioctl(struct inode *inode, struct file *file,
 		break;
 	}
 
-	return(ret);
+	return(err);
 }
 
 static int hostaudio_open(struct inode *inode, struct file *file)
@@ -188,22 +189,19 @@ static int hostaudio_open(struct inode *inode, struct file *file)
 #endif
 
         state = kmalloc(sizeof(struct hostaudio_state), GFP_KERNEL);
-        if(state == NULL) return(-ENOMEM);
+        if(state == NULL)
+		return(-ENOMEM);
 
         if(file->f_mode & FMODE_READ) r = 1;
         if(file->f_mode & FMODE_WRITE) w = 1;
 
 	ret = os_open_file(dsp, of_set_rw(OPENFLAGS(), r, w), 0);
-
         if(ret < 0){
-		printk("hostaudio_open failed to open '%s', err = %d\n",
-		       dsp, -ret);
 		kfree(state);
 		return(ret);
         }
 
 	state->fd = ret;
-
         file->private_data = state;
         return(0);
 }
@@ -216,11 +214,7 @@ static int hostaudio_release(struct inode *inode, struct file *file)
         printk("hostaudio: release called\n");
 #endif
 
-	if(state->fd >= 0){
 		os_close_file(state->fd);
-		state->fd = -1;
-	}
-
         kfree(state);
 
 	return(0);
@@ -265,8 +259,6 @@ static int hostmixer_open_mixdev(struct inode *inode, struct file *file)
 		return(ret);
         }
 
-	state->fd = ret;
-
         file->private_data = state;
         return(0);
 }
@@ -279,10 +271,7 @@ static int hostmixer_release(struct inode *inode, struct file *file)
         printk("hostmixer: release called\n");
 #endif
 
-	if(state->fd >= 0){
 		os_close_file(state->fd);
-		state->fd = -1;
-	}
         kfree(state);
 
 	return(0);

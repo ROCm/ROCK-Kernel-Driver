@@ -1,6 +1,9 @@
 #ifndef _LINUX_HDREG_H
 #define _LINUX_HDREG_H
 
+#ifdef __KERNEL__
+#include <linux/ata.h>
+
 /*
  * This file contains some defines for the AT-hd-controller.
  * Various sources.
@@ -55,7 +58,7 @@
 #define IO			0x02
 #define REL			0x04
 #define TAG_MASK		0xf8
-
+#endif /* __KERNEL__ */
 
 /*
  * Command Header sizes for IOCTL commands
@@ -328,27 +331,6 @@ typedef struct hd_drive_hob_hdr {
 /* WIN_SETFEATURES sub-commands */
 #define SETFEATURES_EN_8BIT	0x01	/* Enable 8-Bit Transfers */
 #define SETFEATURES_EN_WCACHE	0x02	/* Enable write cache */
-#define SETFEATURES_XFER	0x03	/* Set transfer mode */
-#	define XFER_UDMA_7	0x47	/* 0100|0111 */
-#	define XFER_UDMA_6	0x46	/* 0100|0110 */
-#	define XFER_UDMA_5	0x45	/* 0100|0101 */
-#	define XFER_UDMA_4	0x44	/* 0100|0100 */
-#	define XFER_UDMA_3	0x43	/* 0100|0011 */
-#	define XFER_UDMA_2	0x42	/* 0100|0010 */
-#	define XFER_UDMA_1	0x41	/* 0100|0001 */
-#	define XFER_UDMA_0	0x40	/* 0100|0000 */
-#	define XFER_MW_DMA_2	0x22	/* 0010|0010 */
-#	define XFER_MW_DMA_1	0x21	/* 0010|0001 */
-#	define XFER_MW_DMA_0	0x20	/* 0010|0000 */
-#	define XFER_SW_DMA_2	0x12	/* 0001|0010 */
-#	define XFER_SW_DMA_1	0x11	/* 0001|0001 */
-#	define XFER_SW_DMA_0	0x10	/* 0001|0000 */
-#	define XFER_PIO_4	0x0C	/* 0000|1100 */
-#	define XFER_PIO_3	0x0B	/* 0000|1011 */
-#	define XFER_PIO_2	0x0A	/* 0000|1010 */
-#	define XFER_PIO_1	0x09	/* 0000|1001 */
-#	define XFER_PIO_0	0x08	/* 0000|1000 */
-#	define XFER_PIO_SLOW	0x00	/* 0000|0000 */
 #define SETFEATURES_DIS_DEFECT	0x04	/* Disable Defect Management */
 #define SETFEATURES_EN_APM	0x05	/* Enable advanced power management */
 #define SETFEATURES_EN_SAME_R	0x22	/* for a region ATA-1 */

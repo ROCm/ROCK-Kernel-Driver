@@ -329,9 +329,6 @@ struct xircom_private {
 	int saved_if_port;
 	struct pci_dev *pdev;
 	spinlock_t lock;
-#ifdef CONFIG_PM
-	u32 pci_state[16];
-#endif
 };
 
 static int mdio_read(struct net_device *dev, int phy_id, int location);
@@ -350,6 +347,7 @@ static struct net_device_stats *xircom_get_stats(struct net_device *dev);
 static int xircom_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static void set_rx_mode(struct net_device *dev);
 static void check_duplex(struct net_device *dev);
+static struct ethtool_ops ops;
 
 
 /* The Xircom cards are picky about when certain bits in CSR6 can be
@@ -450,7 +448,7 @@ static void __devinit read_mac_address(struct net_device *dev)
  */
 static void find_mii_transceivers(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	int phy, phy_idx;
 
 	if (media_cap[tp->default_port] & MediaIsMII) {
@@ -505,7 +503,7 @@ static void find_mii_transceivers(struct net_device *dev)
  */
 static void transceiver_voodoo(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
 	/* Reset the chip, holding bit 0 set at least 50 PCI cycles. */
@@ -584,9 +582,9 @@ static int __devinit xircom_init_one(struct pci_dev *pdev, const struct pci_devi
 	/* Clear the missed-packet counter. */
 	(volatile int)inl(ioaddr + CSR8);
 
-	tp = dev->priv;
+	tp = netdev_priv(dev);
 
-	tp->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&tp->lock);
 	tp->pdev = pdev;
 	tp->chip_id = chip_idx;
 	/* BugFixes: The 21143-TD hangs with PCI Write-and-Invalidate cycles. */
@@ -626,6 +624,7 @@ static int __devinit xircom_init_one(struct pci_dev *pdev, const struct pci_devi
 #endif
 	dev->tx_timeout = xircom_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
+	SET_ETHTOOL_OPS(dev, &ops);
 
 	transceiver_voodoo(dev);
 
@@ -749,7 +748,7 @@ static void mdio_write(struct net_device *dev, int phy_id, int location, int val
 static void
 xircom_up(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int i;
 
@@ -804,7 +803,7 @@ xircom_up(struct net_device *dev)
 static int
 xircom_open(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 
 	if (request_irq(dev->irq, &xircom_interrupt, SA_SHIRQ, dev->name, dev))
 		return -EAGAIN;
@@ -818,7 +817,7 @@ xircom_open(struct net_device *dev)
 
 static void xircom_tx_timeout(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
 	if (media_cap[dev->if_port] & MediaIsMII) {
@@ -870,7 +869,7 @@ static void xircom_tx_timeout(struct net_device *dev)
 /* Initialize the Rx and Tx rings, along with various 'dev' bits. */
 static void xircom_init_ring(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	int i;
 
 	tp->tx_full = 0;
@@ -919,7 +918,7 @@ static void xircom_init_ring(struct net_device *dev)
 static int
 xircom_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	int entry;
 	u32 flag;
 
@@ -971,7 +970,7 @@ xircom_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 static void xircom_media_change(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	u16 reg0, reg1, reg4, reg5;
 	u32 csr6 = inl(ioaddr + CSR6), newcsr6;
@@ -1032,7 +1031,7 @@ static void xircom_media_change(struct net_device *dev)
 
 static void check_duplex(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	u16 reg0;
 
 	mdio_write(dev, tp->phys[0], MII_BMCR, BMCR_RESET);
@@ -1065,7 +1064,7 @@ static void check_duplex(struct net_device *dev)
 static irqreturn_t xircom_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_instance;
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 	int csr5, work_budget = max_interrupt_work;
 	int handled = 0;
@@ -1203,7 +1202,7 @@ static irqreturn_t xircom_interrupt(int irq, void *dev_instance, struct pt_regs 
 static int
 xircom_rx(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	int entry = tp->cur_rx % RX_RING_SIZE;
 	int rx_work_limit = tp->dirty_rx + RX_RING_SIZE - tp->cur_rx;
 	int work_done = 0;
@@ -1303,7 +1302,7 @@ static void
 xircom_down(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 
 	/* Disable interrupts by clearing the interrupt mask. */
 	outl(0, ioaddr + CSR7);
@@ -1321,7 +1320,7 @@ static int
 xircom_close(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	int i;
 
 	if (xircom_debug > 1)
@@ -1359,7 +1358,7 @@ xircom_close(struct net_device *dev)
 
 static struct net_device_stats *xircom_get_stats(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	long ioaddr = dev->base_addr;
 
 	if (netif_device_present(dev))
@@ -1368,18 +1367,10 @@ static struct net_device_stats *xircom_get_stats(struct net_device *dev)
 	return &tp->stats;
 }
 
-
-static int xircom_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
+static int xircom_get_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
 {
-	struct ethtool_cmd ecmd;
-	struct xircom_private *tp = dev->priv;
-
-	if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
-		return -EFAULT;
-
-	switch (ecmd.cmd) {
-	case ETHTOOL_GSET:
-		ecmd.supported =
+	struct xircom_private *tp = netdev_priv(dev);
+	ecmd->supported =
 			SUPPORTED_10baseT_Half |
 			SUPPORTED_10baseT_Full |
 			SUPPORTED_100baseT_Half |
@@ -1387,98 +1378,90 @@ static int xircom_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
 			SUPPORTED_Autoneg |
 			SUPPORTED_MII;
 
-		ecmd.advertising = ADVERTISED_MII;
-		if (tp->advertising[0] & ADVERTISE_10HALF)
-			ecmd.advertising |= ADVERTISED_10baseT_Half;
-		if (tp->advertising[0] & ADVERTISE_10FULL)
-			ecmd.advertising |= ADVERTISED_10baseT_Full;
-		if (tp->advertising[0] & ADVERTISE_100HALF)
-			ecmd.advertising |= ADVERTISED_100baseT_Half;
-		if (tp->advertising[0] & ADVERTISE_100FULL)
-			ecmd.advertising |= ADVERTISED_100baseT_Full;
-		if (tp->autoneg) {
-			ecmd.advertising |= ADVERTISED_Autoneg;
-			ecmd.autoneg = AUTONEG_ENABLE;
-		} else
-			ecmd.autoneg = AUTONEG_DISABLE;
+	ecmd->advertising = ADVERTISED_MII;
+	if (tp->advertising[0] & ADVERTISE_10HALF)
+		ecmd->advertising |= ADVERTISED_10baseT_Half;
+	if (tp->advertising[0] & ADVERTISE_10FULL)
+		ecmd->advertising |= ADVERTISED_10baseT_Full;
+	if (tp->advertising[0] & ADVERTISE_100HALF)
+		ecmd->advertising |= ADVERTISED_100baseT_Half;
+	if (tp->advertising[0] & ADVERTISE_100FULL)
+		ecmd->advertising |= ADVERTISED_100baseT_Full;
+	if (tp->autoneg) {
+		ecmd->advertising |= ADVERTISED_Autoneg;
+		ecmd->autoneg = AUTONEG_ENABLE;
+	} else
+		ecmd->autoneg = AUTONEG_DISABLE;
 
-		ecmd.port = PORT_MII;
-		ecmd.transceiver = XCVR_INTERNAL;
-		ecmd.phy_address = tp->phys[0];
-		ecmd.speed = tp->speed100 ? SPEED_100 : SPEED_10;
-		ecmd.duplex = tp->full_duplex ? DUPLEX_FULL : DUPLEX_HALF;
-		ecmd.maxtxpkt = TX_RING_SIZE / 2;
-		ecmd.maxrxpkt = 0;
-
-		if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
-			return -EFAULT;
-		return 0;
-
-	case ETHTOOL_SSET: {
-		u16 autoneg, speed100, full_duplex;
-
-		autoneg = (ecmd.autoneg == AUTONEG_ENABLE);
-		speed100 = (ecmd.speed == SPEED_100);
-		full_duplex = (ecmd.duplex == DUPLEX_FULL);
-
-		tp->autoneg = autoneg;
-		if (speed100 != tp->speed100 ||
-		    full_duplex != tp->full_duplex) {
-			tp->speed100 = speed100;
-			tp->full_duplex = full_duplex;
-			/* change advertising bits */
-			tp->advertising[0] &= ~(ADVERTISE_10HALF |
-					     ADVERTISE_10FULL |
-					     ADVERTISE_100HALF |
-					     ADVERTISE_100FULL |
-					     ADVERTISE_100BASE4);
-			if (speed100) {
-				if (full_duplex)
-					tp->advertising[0] |= ADVERTISE_100FULL;
-				else
-					tp->advertising[0] |= ADVERTISE_100HALF;
-			} else {
-				if (full_duplex)
-					tp->advertising[0] |= ADVERTISE_10FULL;
-				else
-					tp->advertising[0] |= ADVERTISE_10HALF;
-			}
-		}
-		check_duplex(dev);
-		return 0;
-	}
-
-	case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info;
-		memset(&info, 0, sizeof(info));
-		info.cmd = ecmd.cmd;
-		strcpy(info.driver, DRV_NAME);
-		strcpy(info.version, DRV_VERSION);
-		*info.fw_version = 0;
-		strcpy(info.bus_info, pci_name(tp->pdev));
-		if (copy_to_user(useraddr, &info, sizeof(info)))
-		       return -EFAULT;
-		return 0;
-	}
-
-	default:
-		return -EOPNOTSUPP;
-	}
+	ecmd->port = PORT_MII;
+	ecmd->transceiver = XCVR_INTERNAL;
+	ecmd->phy_address = tp->phys[0];
+	ecmd->speed = tp->speed100 ? SPEED_100 : SPEED_10;
+	ecmd->duplex = tp->full_duplex ? DUPLEX_FULL : DUPLEX_HALF;
+	ecmd->maxtxpkt = TX_RING_SIZE / 2;
+	ecmd->maxrxpkt = 0;
+	return 0;
 }
 
+static int xircom_set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct xircom_private *tp = netdev_priv(dev);
+	u16 autoneg, speed100, full_duplex;
+
+	autoneg = (ecmd->autoneg == AUTONEG_ENABLE);
+	speed100 = (ecmd->speed == SPEED_100);
+	full_duplex = (ecmd->duplex == DUPLEX_FULL);
+
+	tp->autoneg = autoneg;
+	if (speed100 != tp->speed100 ||
+	    full_duplex != tp->full_duplex) {
+		tp->speed100 = speed100;
+		tp->full_duplex = full_duplex;
+		/* change advertising bits */
+		tp->advertising[0] &= ~(ADVERTISE_10HALF |
+				     ADVERTISE_10FULL |
+				     ADVERTISE_100HALF |
+				     ADVERTISE_100FULL |
+				     ADVERTISE_100BASE4);
+		if (speed100) {
+			if (full_duplex)
+				tp->advertising[0] |= ADVERTISE_100FULL;
+			else
+				tp->advertising[0] |= ADVERTISE_100HALF;
+		} else {
+			if (full_duplex)
+				tp->advertising[0] |= ADVERTISE_10FULL;
+			else
+				tp->advertising[0] |= ADVERTISE_10HALF;
+		}
+	}
+	check_duplex(dev);
+	return 0;
+}
+
+static void xircom_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+{
+	struct xircom_private *tp = netdev_priv(dev);
+	strcpy(info->driver, DRV_NAME);
+	strcpy(info->version, DRV_VERSION);
+	strcpy(info->bus_info, pci_name(tp->pdev));
+}
+
+static struct ethtool_ops ops = {
+	.get_settings = xircom_get_settings,
+	.set_settings = xircom_set_settings,
+	.get_drvinfo = xircom_get_drvinfo,
+};
 
 /* Provide ioctl() calls to examine the MII xcvr state. */
 static int xircom_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	u16 *data = (u16 *)&rq->ifr_ifru;
 	int phy = tp->phys[0] & 0x1f;
 	unsigned long flags;
 
 	switch(cmd) {
-	case SIOCETHTOOL:
-		return xircom_ethtool_ioctl(dev, rq->ifr_data);
-
 	/* Legacy mii-diag interface */
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
 		if (tp->mii_cnt)
@@ -1531,7 +1514,7 @@ static int xircom_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
    when re-entered but still correct. */
 static void set_rx_mode(struct net_device *dev)
 {
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	struct dev_mc_list *mclist;
 	long ioaddr = dev->base_addr;
 	int csr6 = inl(ioaddr + CSR6);
@@ -1672,12 +1655,12 @@ MODULE_DEVICE_TABLE(pci, xircom_pci_table);
 static int xircom_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	printk(KERN_INFO "xircom_suspend(%s)\n", dev->name);
 	if (tp->open)
 		xircom_down(dev);
 
-	pci_save_state(pdev, tp->pci_state);
+	pci_save_state(pdev);
 	pci_disable_device(pdev);
 	pci_set_power_state(pdev, 3);
 
@@ -1688,12 +1671,12 @@ static int xircom_suspend(struct pci_dev *pdev, u32 state)
 static int xircom_resume(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct xircom_private *tp = dev->priv;
+	struct xircom_private *tp = netdev_priv(dev);
 	printk(KERN_INFO "xircom_resume(%s)\n", dev->name);
 
 	pci_set_power_state(pdev,0);
 	pci_enable_device(pdev);
-	pci_restore_state(pdev, tp->pci_state);
+	pci_restore_state(pdev);
 
 	/* Bring the chip out of sleep mode.
 	   Caution: Snooze mode does not work with some boards! */

@@ -13,13 +13,11 @@
 
 
 #include <linux/config.h>
-#include <asm/sn/sgi.h>
 #include <asm/sal.h>
 #include <asm/sn/sn_cpuid.h>
 #include <asm/sn/arch.h>
+#include <asm/sn/geo.h>
 #include <asm/sn/nodepda.h>
-#include <asm/sn/klconfig.h>
-        
 
 // SGI Specific Calls
 #define  SN_SAL_POD_MODE                           0x02000001
@@ -34,7 +32,9 @@
 #define  SN_SAL_NO_FAULT_ZONE_VIRTUAL		   0x02000010
 #define  SN_SAL_NO_FAULT_ZONE_PHYSICAL		   0x02000011
 #define  SN_SAL_PRINT_ERROR			   0x02000012
+#define  SN_SAL_GET_SAPIC_INFO                     0x02009999	//ZZZZ fix
 #define  SN_SAL_SET_ERROR_HANDLING_FEATURES	   0x0200001a	// reentrant
+#define  SN_SAL_GET_FIT_COMPT			   0x0200001b	// reentrant
 #define  SN_SAL_CONSOLE_PUTC                       0x02000021
 #define  SN_SAL_CONSOLE_GETC                       0x02000022
 #define  SN_SAL_CONSOLE_PUTS                       0x02000023
@@ -62,6 +62,19 @@
 
 #define  SN_SAL_SYSCTL_IOBRICK_PCI_OP		   0x02000042	// reentrant
 #define	 SN_SAL_IROUTER_OP			   0x02000043
+#define  SN_SAL_IOIF_INTERRUPT			   0x0200004a
+#define  SN_SAL_HWPERF_OP			   0x02000050   // lock
+#define  SN_SAL_IOIF_ERROR_INTERRUPT		   0x02000051
+
+#define  SN_SAL_IOIF_SLOT_ENABLE		   0x02000053
+#define  SN_SAL_IOIF_SLOT_DISABLE		   0x02000054
+#define  SN_SAL_IOIF_GET_HUBDEV_INFO		   0x02000055
+#define  SN_SAL_IOIF_GET_PCIBUS_INFO		   0x02000056
+#define  SN_SAL_IOIF_GET_PCIDEV_INFO		   0x02000057
+#define  SN_SAL_IOIF_GET_WIDGET_DMAFLUSH_LIST	   0x02000058
+
+#define SN_SAL_HUB_ERROR_INTERRUPT		   0x02000060
+
 
 /*
  * Service-specific constants
@@ -76,16 +89,9 @@
 #define SAL_CONSOLE_INTR_XMIT	1	/* output interrupt */
 #define SAL_CONSOLE_INTR_RECV	2	/* input interrupt */
 
-#ifdef CONFIG_HOTPLUG_PCI_SGI
-/* power up / power down / reset a PCI slot or bus */
-#define SAL_SYSCTL_PCI_POWER_UP         0
-#define SAL_SYSCTL_PCI_POWER_DOWN       1
-#define SAL_SYSCTL_PCI_RESET            2
-
-/* what type of I/O brick? */
-#define SAL_SYSCTL_IO_XTALK	0       /* connected via a compute node */
-
-#endif	/* CONFIG_HOTPLUG_PCI_SGI */
+/* interrupt handling */
+#define SAL_INTR_ALLOC		1
+#define SAL_INTR_FREE		2
 
 /*
  * IRouter (i.e. generalized system controller) operations
@@ -107,25 +113,13 @@
 
 
 /*
- * SN_SAL_GET_PARTITION_ADDR return constants
+ * SAL Error Codes
  */
 #define SALRET_MORE_PASSES	1
 #define SALRET_OK		0
-#define SALRET_INVALID_ARG	-2
-#define SALRET_ERROR		-3
-
-/*
- * SN_SAL_SET_ERROR_HANDLING_FEATURES bit settings
- */
-enum 
-{
-	/* if "rz always" is set, have the mca slaves call os_init_slave */
-	SN_SAL_EHF_MCA_SLV_TO_OS_INIT_SLV=0,
-	/* do not rz on tlb checks, even if "rz always" is set */
-	SN_SAL_EHF_NO_RZ_TLBC,
-	/* do not rz on PIO reads to I/O space, even if "rz always" is set */
-	SN_SAL_EHF_NO_RZ_IO_READ,
-};
+#define SALRET_NOT_IMPLEMENTED	(-1)
+#define SALRET_INVALID_ARG	(-2)
+#define SALRET_ERROR		(-3)
 
 
 /**
@@ -162,10 +156,8 @@ sn_sal_rev_minor(void)
  * Specify the minimum PROM revsion required for this kernel.
  * Note that they're stored in hex format...
  */
-#define SN_SAL_MIN_MAJOR	0x3  /* SN2 kernels need at least PROM 3.40 */
-#define SN_SAL_MIN_MINOR	0x40
-
-u64 ia64_sn_probe_io_slot(long paddr, long size, void *data_ptr);
+#define SN_SAL_MIN_MAJOR	0x4  /* SN2 kernels need at least PROM 4.0 */
+#define SN_SAL_MIN_MINOR	0x0
 
 /*
  * Returns the master console nasid, if the call fails, return an illegal
@@ -644,12 +636,12 @@ sn_change_memprotect(u64 paddr, u64 len, u64 perms, u64 *nasid_array)
 	unsigned long irq_flags;
 
 	cnodeid = nasid_to_cnodeid(get_node_number(paddr));
-	spin_lock(&NODEPDA(cnodeid)->bist_lock);
+	// spin_lock(&NODEPDA(cnodeid)->bist_lock);
 	local_irq_save(irq_flags);
 	SAL_CALL_NOLOCK(ret_stuff, SN_SAL_MEMPROTECT, paddr, len, nasid_array,
 		 perms, 0, 0, 0);
 	local_irq_restore(irq_flags);
-	spin_unlock(&NODEPDA(cnodeid)->bist_lock);
+	// spin_unlock(&NODEPDA(cnodeid)->bist_lock);
 	return ret_stuff.status;
 }
 #define SN_MEMPROT_ACCESS_CLASS_0		0x14a080
@@ -693,7 +685,7 @@ ia64_sn_fru_capture(void)
  */
 static inline u64
 ia64_sn_sysctl_iobrick_pci_op(nasid_t n, u64 connection_type, 
-			      u64 bus, slotid_t slot, 
+			      u64 bus, char slot, 
 			      u64 action)
 {
 	struct ia64_sal_retval rv = {0, 0, 0, 0};
@@ -703,26 +695,6 @@ ia64_sn_sysctl_iobrick_pci_op(nasid_t n, u64 connection_type,
 	if (rv.status)
 	    	return rv.v0;
 	return 0;
-}
-
-/*
- * Tell the prom how the OS wants to handle specific error features.
- * It takes an array of 7 u64.
- */
-static inline u64
-ia64_sn_set_error_handling_features(const u64 *feature_bits)
-{
-	struct ia64_sal_retval rv = {0, 0, 0, 0};
-
-	SAL_CALL_REENTRANT(rv, SN_SAL_SET_ERROR_HANDLING_FEATURES,
-			feature_bits[0],
-			feature_bits[1],
-			feature_bits[2],
-			feature_bits[3],
-			feature_bits[4],
-			feature_bits[5],
-			feature_bits[6]);
-	return rv.status;
 }
 
 
@@ -829,6 +801,34 @@ ia64_sn_irtr_intr_disable(nasid_t nasid, int subch, u64 intr)
 	return (int) rv.v0;
 }
 
+/**
+ * ia64_sn_get_fit_compt - read a FIT entry from the PROM header
+ * @nasid: NASID of node to read
+ * @index: FIT entry index to be retrieved (0..n)
+ * @fitentry: 16 byte buffer where FIT entry will be stored.
+ * @banbuf: optional buffer for retrieving banner
+ * @banlen: length of banner buffer
+ *
+ * Access to the physical PROM chips needs to be serialized since reads and
+ * writes can't occur at the same time, so we need to call into the SAL when
+ * we want to look at the FIT entries on the chips.
+ *
+ * Returns:
+ *	%SALRET_OK if ok
+ *	%SALRET_INVALID_ARG if index too big
+ *	%SALRET_NOT_IMPLEMENTED if running on older PROM
+ *	??? if nasid invalid OR banner buffer not large enough
+ */
+static inline int
+ia64_sn_get_fit_compt(u64 nasid, u64 index, void *fitentry, void *banbuf,
+		      u64 banlen)
+{
+	struct ia64_sal_retval rv;
+	SAL_CALL_NOLOCK(rv, SN_SAL_GET_FIT_COMPT, nasid, index, fitentry,
+			banbuf, banlen, 0, 0);
+	return (int) rv.status;
+}
+
 /*
  * Initialize the SAL components of the system controller
  * communication driver; specifically pass in a sizable buffer that
@@ -842,6 +842,54 @@ ia64_sn_irtr_init(nasid_t nasid, void *buf, int len)
 	struct ia64_sal_retval rv;
 	SAL_CALL_REENTRANT(rv, SN_SAL_IROUTER_OP, SAL_IROUTER_INIT,
 			   (u64) nasid, (u64) buf, (u64) len, 0, 0, 0);
+	return (int) rv.status;
+}
+
+/*
+ * Returns the nasid, subnode & slice corresponding to a SAPIC ID
+ */
+static inline u64
+ia64_sn_get_sapic_info(int sapicid, int *nasid, int *subnode, int *slice)
+{
+	struct ia64_sal_retval ret_stuff;
+
+	ret_stuff.status = 0;
+	ret_stuff.v0 = 0;
+	ret_stuff.v1 = 0;
+	ret_stuff.v2 = 0;
+	SAL_CALL_NOLOCK(ret_stuff, SN_SAL_GET_SAPIC_INFO, sapicid, 0, 0, 0, 0, 0, 0);
+
+/***** BEGIN HACK - temp til new proms available ********/
+	if (ret_stuff.status == SALRET_NOT_IMPLEMENTED) {
+		if (nasid) *nasid = sapicid & 0xfff;
+		if (subnode) *subnode = (sapicid >> 13) & 1;
+		if (slice) *slice = (sapicid >> 12) & 3;
+		return 0;
+	}
+/***** END HACK *******/
+
+	if (ret_stuff.status < 0)
+		return ret_stuff.status;
+
+	if (nasid) *nasid = (int) ret_stuff.v0;
+	if (subnode) *subnode = (int) ret_stuff.v1;
+	if (slice) *slice = (int) ret_stuff.v2;
+	return 0;
+}
+/*
+ * This is the access point to the Altix PROM hardware performance
+ * and status monitoring interface. For info on using this, see
+ * include/asm-ia64/sn/sn2/sn_hwperf.h
+ */
+static inline int
+ia64_sn_hwperf_op(nasid_t nasid, u64 opcode, u64 a0, u64 a1, u64 a2,
+                  u64 a3, u64 a4, int *v0)
+{
+	struct ia64_sal_retval rv;
+	SAL_CALL_NOLOCK(rv, SN_SAL_HWPERF_OP, (u64)nasid,
+		opcode, a0, a1, a2, a3, a4);
+	if (v0)
+		*v0 = (int) rv.v0;
 	return (int) rv.status;
 }
 

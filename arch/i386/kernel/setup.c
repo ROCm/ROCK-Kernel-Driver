@@ -51,10 +51,6 @@
 #include "setup_arch_pre.h"
 #include <bios_ebda.h>
 
-#ifdef CONFIG_X86_LOCAL_APIC
-extern int enable_local_apic;
-#endif
-
 /* This value is set up by the early boot code to point to the value
    immediately after the boot time page tables.  It contains a *physical*
    address, and must not be in the .bss segment! */
@@ -100,11 +96,6 @@ unsigned int mca_pentium_flag;
 
 /* For PCI or other memory-mapped resources */
 unsigned long pci_mem_start = 0x10000000;
-
-/* reserved mapping space for vmalloc and ioremap */
-unsigned long vmalloc_reserve = __VMALLOC_RESERVE_DEFAULT;
-EXPORT_SYMBOL(vmalloc_reserve);
-static unsigned long vm_reserve __initdata = -1;
 
 /* user-defined highmem size */
 static unsigned int highmem_pages = -1;
@@ -777,7 +768,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		}
 
 		/* Limit ACPI just to boot-time to enable HT */
-		else if (!memcmp(from, "acpi=ht", 7) || !memcmp(from,"acpi=oldboot",12)) {
+		else if (!memcmp(from, "acpi=ht", 7)) {
 			if (!acpi_force)
 				disable_acpi();
 			acpi_ht = 1;
@@ -811,20 +802,8 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 
 #ifdef CONFIG_X86_LOCAL_APIC
 		/* disable IO-APIC */
-		else if (c == ' ' && !memcmp(from, "noapic", 6))
+		else if (!memcmp(from, "noapic", 6))
 			disable_ioapic_setup();
-		else if (c == ' ' && !memcmp(from, "apic", 4)) {
-		     extern int apic_enable(char *);
-		     apic_enable(from); 
-		}
-		else if (c == ' ' && !memcmp(from, "lapic", 5)) { 
-		     extern int lapic_enable(char *str);
-		     lapic_enable(from);
-		} 
-		else if (c == ' ' && !memcmp(from, "nolapic", 7)) { 
-		     extern int lapic_enable(char *str);
-		     lapic_disable(from);
-		}
 #endif /* CONFIG_X86_LOCAL_APIC */
 #endif /* CONFIG_ACPI_BOOT */
 
@@ -835,15 +814,14 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		 */
 		if (c == ' ' && !memcmp(from, "highmem=", 8))
 			highmem_pages = memparse(from+8, &from) >> PAGE_SHIFT;
-
+	
 		/*
-		 * vm_reserve=size forces to reserve 'size' bytes for vmalloc and
-		 * ioremap areas minimum is 32 MB maximum is 800 MB
-		 * the default without vm_reserve depends on the total amount of
-		 * memory the minimum default is 128 MB
+		 * vmalloc=size forces the vmalloc area to be exactly 'size'
+		 * bytes. This can be used to increase (or decrease) the
+		 * vmalloc area - the default is 128m.
 		 */
-		if (c == ' ' && !memcmp(from, "vm_reserve=", 11))
-			vm_reserve = memparse(from+11, &from);
+		if (c == ' ' && !memcmp(from, "vmalloc=", 8))
+			__VMALLOC_RESERVE = memparse(from+8, &from);
 
 		c = *(from++);
 		if (!c)
@@ -1049,28 +1027,7 @@ static unsigned long __init setup_memory(void)
 	start_pfn = PFN_UP(init_pg_tables_end);
 
 	find_max_pfn();
-	
-	/* 
-	 * calculate the default size of vmalloc/ioremap area
-	 * overwrite with the value of the vm_reserve= option
-	 * if set
-	 */
 
-	if (max_pfn >= PFN_UP(KERNEL_MAXMEM - __VMALLOC_RESERVE_DEFAULT))
-		vmalloc_reserve = __VMALLOC_RESERVE_DEFAULT;
-	else
-		vmalloc_reserve = KERNEL_MAXMEM - PFN_PHYS(max_pfn);
-	if (vm_reserve != -1) {
-		if (vm_reserve < __VMALLOC_RESERVE_MIN)
-			vm_reserve = __VMALLOC_RESERVE_MIN;
-		if (vm_reserve > __VMALLOC_RESERVE_MAX)
-			vm_reserve = __VMALLOC_RESERVE_MAX;
-		vmalloc_reserve = vm_reserve;
-	}
-	
-        printk(KERN_NOTICE "%ldMB vmalloc/ioremap area available.\n",
-                        vmalloc_reserve>>20);
-                        	
 	max_low_pfn = find_max_low_pfn();
 
 #ifdef CONFIG_HIGHMEM
@@ -1130,7 +1087,6 @@ static unsigned long __init setup_memory(void)
 	acpi_reserve_bootmem();
 #endif
 #ifdef CONFIG_X86_FIND_SMP_CONFIG
-	if (enable_local_apic >= 0) 
 	/*
 	 * Find and reserve possible boot-time SMP configuration:
 	 */
@@ -1451,7 +1407,7 @@ void __init setup_arch(char **cmdline_p)
 	acpi_boot_init();
 
 #ifdef CONFIG_X86_LOCAL_APIC
-	if (smp_found_config && enable_local_apic >= 0)
+	if (smp_found_config)
 		get_smp_config();
 #endif
 

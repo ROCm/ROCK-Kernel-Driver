@@ -10,6 +10,7 @@
 #include <linux/config.h>
 #include <asm/system.h>
 #include <asm/machvec.h>
+#include <asm/compiler.h>
 
 /*
  * Force a context reload. This is needed when we change the page

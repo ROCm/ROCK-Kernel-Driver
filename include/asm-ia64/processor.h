@@ -20,6 +20,9 @@
 #include <asm/ptrace.h>
 #include <asm/ustack.h>
 
+/* Our arch specific arch_init_sched_domain is in arch/ia64/kernel/domain.c */
+#define ARCH_HAS_SCHED_DOMAIN
+
 #define IA64_NUM_DBG_REGS	8
 /*
  * Limits for PMC and PMD are set to less than maximum architected values
@@ -28,8 +31,8 @@
 #define IA64_NUM_PMC_REGS	32
 #define IA64_NUM_PMD_REGS	32
 
-#define DEFAULT_MAP_BASE	0x2000000000000000
-#define DEFAULT_TASK_SIZE	0xa000000000000000
+#define DEFAULT_MAP_BASE	__IA64_UL_CONST(0x2000000000000000)
+#define DEFAULT_TASK_SIZE	__IA64_UL_CONST(0xa000000000000000)
 
 /*
  * TASK_SIZE really is a mis-named.  It really is the maximum user
@@ -200,7 +203,7 @@ typedef struct {
 #define GET_UNALIGN_CTL(task,addr)								\
 ({												\
 	put_user(((task)->thread.flags & IA64_THREAD_UAC_MASK) >> IA64_THREAD_UAC_SHIFT,	\
-		 (int *) (addr));								\
+		 (int __user *) (addr));							\
 })
 
 #define SET_FPEMU_CTL(task,value)								\
@@ -212,7 +215,7 @@ typedef struct {
 #define GET_FPEMU_CTL(task,addr)								\
 ({												\
 	put_user(((task)->thread.flags & IA64_THREAD_FPEMU_MASK) >> IA64_THREAD_FPEMU_SHIFT,	\
-		 (int *) (addr));								\
+		 (int __user *) (addr));							\
 })
 
 #ifdef CONFIG_IA32_SUPPORT
@@ -262,7 +265,7 @@ struct thread_struct {
 				.fdr =		0,			\
 				.old_k1 =	0,			\
 				.old_iob =	0,			\
-				.ppl =		0,
+				.ppl =		NULL,
 #else
 # define INIT_THREAD_IA32
 #endif /* CONFIG_IA32_SUPPORT */
@@ -333,26 +336,6 @@ struct task_struct;
 
 /* Prepare to copy thread state - unlazy all lazy status */
 #define prepare_to_copy(tsk)	do { } while (0)
-
-#ifdef CONFIG_NUMA
-#define SD_NODE_INIT (struct sched_domain) {		\
-	.span			= CPU_MASK_NONE,	\
-	.parent			= NULL,			\
-	.groups			= NULL,			\
-	.min_interval		= 80,			\
-	.max_interval		= 320,			\
-	.busy_factor		= 320,			\
-	.imbalance_pct		= 125,			\
-	.cache_hot_time		= (10*1000000),		\
-	.cache_nice_tries	= 1,			\
-	.per_cpu_gain		= 100,			\
-	.flags			= SD_BALANCE_EXEC	\
-				| SD_WAKE_BALANCE,	\
-	.last_balance		= jiffies,		\
-	.balance_interval	= 10,			\
-	.nr_balance_failed	= 0,			\
-}
-#endif
 
 /*
  * This is the mechanism for creating a new kernel thread.
@@ -707,6 +690,8 @@ prefetchw (const void *x)
 }
 
 #define spin_lock_prefetch(x)	prefetchw(x)
+
+extern unsigned long boot_option_idle_override;
 
 #endif /* !__ASSEMBLY__ */
 

@@ -1,3 +1,11 @@
+NOTE:  This driver is obsolete.  Digi provides a 2.6 driver (dgdm) at
+http://www.digi.com for PCI cards.  They no longer maintain this driver,
+and have no 2.6 driver for ISA cards.
+
+This driver requires a number of user-space tools.  They can be aquired from
+http://www.digi.com, but only works with 2.4 kernels.
+
+
 The Digi Intl. epca driver. 
 ----------------------------
 The Digi Intl. epca driver for Linux supports the following boards:
@@ -64,9 +72,6 @@ drivers/char/README.epca for more details.  Note,
 this driver REQUIRES that digiDload be executed prior to it being used. 
 Failure to do this will result in an ENODEV error.
 
-The latest version of the tool package is available at:
-ftp://ftp.dgii.com/drivers/linux/released/async/
-
 Documentation:
 --------------
 Complete documentation for this product may be found in the tool package. 
@@ -74,14 +79,8 @@ Complete documentation for this product may be found in the tool package.
 Sources of information and support:
 -----------------------------------
 Digi Intl. support site for this product:
--> digilnux@dgii.com 
 
-Related information and information concerning other drivers supporting 
-Digi Intl. products:
-
--> FTP: ftp://dgii.com
--> Webpage: http://www.dgii.com
--> Webpage: http://lameter.com/digi
+->  http://www.digi.com
 
 Acknowledgments:
 ----------------
@@ -90,3 +89,10 @@ supporting the original public domain DigiBoard driver Copyright (C)
 1994,1995 Troy De Jongh.  Many thanks to Christoph Lameter 
 (christoph@lameter.com) and Mike McLagan (mike.mclagan@linux.org) who authored 
 and contributed to the original document. 
+
+Changelog:
+----------
+10-29-04:	Update status of driver, remove dead links in document
+		James Nelson <james4765@gmail.com>
+
+2000 (?)	Original Document

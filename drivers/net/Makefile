@@ -7,7 +7,6 @@ ifeq ($(CONFIG_ISDN_PPP),y)
 endif
 
 obj-$(CONFIG_E1000) += e1000/
-obj-$(CONFIG_NET_BROADCOM) += bcm/
 obj-$(CONFIG_IBM_EMAC) += ibm_emac/
 obj-$(CONFIG_IXGB) += ixgb/
 obj-$(CONFIG_BONDING) += bonding/
@@ -106,8 +105,6 @@ obj-$(CONFIG_PPP_ASYNC) += ppp_async.o
 obj-$(CONFIG_PPP_SYNC_TTY) += ppp_synctty.o
 obj-$(CONFIG_PPP_DEFLATE) += ppp_deflate.o
 obj-$(CONFIG_PPP_BSDCOMP) += bsd_comp.o
-obj-$(CONFIG_PPP_MPPE) += ppp_mppe.o
-ppp_mppe-objs := ppp_mppe_compress.o sha1.o arcfour.o
 obj-$(CONFIG_PPPOE) += pppox.o pppoe.o
 
 obj-$(CONFIG_SLIP) += slip.o
@@ -188,7 +185,6 @@ obj-$(CONFIG_FEC_8XX) += fec_8xx/
 
 obj-$(CONFIG_ARM) += arm/
 obj-$(CONFIG_NET_FC) += fc/
-obj-$(CONFIG_NET_LPFC)	+= lpfc/
 obj-$(CONFIG_DEV_APPLETALK) += appletalk/
 obj-$(CONFIG_TR) += tokenring/
 obj-$(CONFIG_WAN) += wan/
@@ -198,6 +194,6 @@ obj-$(CONFIG_NET_WIRELESS) += wireless/
 obj-$(CONFIG_NET_TULIP) += tulip/
 obj-$(CONFIG_HAMRADIO) += hamradio/
 obj-$(CONFIG_IRDA) += irda/
+obj-$(CONFIG_ETRAX_ETHERNET) += cris/
 
 obj-$(CONFIG_NETCONSOLE) += netconsole.o
-obj-$(CONFIG_XPNET) += xpnet.o

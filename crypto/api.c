@@ -155,8 +155,12 @@ out:
 
 void crypto_free_tfm(struct crypto_tfm *tfm)
 {
+	struct crypto_alg *alg = tfm->__crt_alg;
+	int size = sizeof(*tfm) + alg->cra_ctxsize;
+
 	crypto_exit_ops(tfm);
-	crypto_alg_put(tfm->__crt_alg);
+	crypto_alg_put(alg);
+	memset(tfm, 0, size);
 	kfree(tfm);
 }
 

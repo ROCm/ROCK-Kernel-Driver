@@ -31,56 +31,6 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#define DISPLAY_CS5530_TIMINGS
-
-#if defined(DISPLAY_CS5530_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 cs5530_proc = 0;
-
-static struct pci_dev *bmide_dev;
-
-static int cs5530_get_info (char *buffer, char **addr, off_t offset, int count)
-{
-	char *p = buffer;
-	unsigned long bibma = pci_resource_start(bmide_dev, 4);
-	u8  c0 = 0, c1 = 0;
-
-	/*
-	 * at that point bibma+0x2 et bibma+0xa are byte registers
-	 * to investigate:
-	 */
-
-	c0 = inb_p((u16)bibma + 0x02);
-	c1 = inb_p((u16)bibma + 0x0a);
-
-	p += sprintf(p, "\n                                "
-			"Cyrix 5530 Chipset.\n");
-	p += sprintf(p, "--------------- Primary Channel "
-			"---------------- Secondary Channel "
-			"-------------\n");
-	p += sprintf(p, "                %sabled "
-			"                        %sabled\n",
-			(c0&0x80) ? "dis" : " en",
-			(c1&0x80) ? "dis" : " en");
-	p += sprintf(p, "--------------- drive0 --------- drive1 "
-			"-------- drive0 ---------- drive1 ------\n");
-	p += sprintf(p, "DMA enabled:    %s              %s "
-			"            %s               %s\n",
-			(c0&0x20) ? "yes" : "no ",
-			(c0&0x40) ? "yes" : "no ",
-			(c1&0x20) ? "yes" : "no ",
-			(c1&0x40) ? "yes" : "no " );
-
-	p += sprintf(p, "UDMA\n");
-	p += sprintf(p, "DMA\n");
-	p += sprintf(p, "PIO\n");
-
-	return p-buffer;
-}
-#endif /* DISPLAY_CS5530_TIMINGS && CONFIG_PROC_FS */
-
 /**
  *	cs5530_xfer_set_mode	-	set a new transfer mode at the drive
  *	@drive: drive to tune
@@ -272,14 +222,6 @@ static unsigned int __init init_chipset_cs5530 (struct pci_dev *dev, const char 
 	struct pci_dev *master_0 = NULL, *cs5530_0 = NULL;
 	unsigned long flags;
 
-#if defined(DISPLAY_CS5530_TIMINGS) && defined(CONFIG_PROC_FS)
-	if (!cs5530_proc) {
-		cs5530_proc = 1;
-		bmide_dev = dev;
-		ide_pci_create_host_proc("cs5530", cs5530_get_info);
-	}
-#endif /* DISPLAY_CS5530_TIMINGS && CONFIG_PROC_FS */
-
 	dev = NULL;
 	while ((dev = pci_find_device(PCI_VENDOR_ID_CYRIX, PCI_ANY_ID, dev)) != NULL) {
 		switch (dev->device) {
@@ -411,7 +353,6 @@ static ide_pci_device_t cs5530_chipset __devinitdata = {
 	.channels	= 2,
 	.autodma	= AUTODMA,
 	.bootable	= ON_BOARD,
-	.flags		= IDEPCI_FLAG_FORCE_MASTER,
 };
 
 static int __devinit cs5530_init_one(struct pci_dev *dev, const struct pci_device_id *id)

@@ -217,6 +217,7 @@
 #include <linux/compiler.h>
 #include <linux/completion.h>
 #include <linux/dcache.h>
+#include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/fcntl.h>
 #include <linux/file.h>
@@ -234,6 +235,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/string.h>
+#include <linux/suspend.h>
 #include <linux/uts.h>
 #include <linux/version.h>
 #include <linux/wait.h>
@@ -248,7 +250,7 @@
 
 #define DRIVER_DESC		"File-backed Storage Gadget"
 #define DRIVER_NAME		"g_file_storage"
-#define DRIVER_VERSION		"28 July 2004"
+#define DRIVER_VERSION		"20 October 2004"
 
 static const char longname[] = DRIVER_DESC;
 static const char shortname[] = DRIVER_NAME;
@@ -367,10 +369,10 @@ static struct {
 	};
 
 
-module_param_array(file, charp, mod_data.num_filenames, S_IRUGO);
+module_param_array(file, charp, &mod_data.num_filenames, S_IRUGO);
 MODULE_PARM_DESC(file, "names of backing files or devices");
 
-module_param_array(ro, bool, mod_data.num_ros, S_IRUGO);
+module_param_array(ro, bool, &mod_data.num_ros, S_IRUGO);
 MODULE_PARM_DESC(ro, "true to force read-only");
 
 module_param_named(luns, mod_data.nluns, uint, S_IRUGO);
@@ -428,9 +430,9 @@ MODULE_PARM_DESC(stall, "false to prevent bulk stalls");
 
 /* Command Block Wrapper */
 struct bulk_cb_wrap {
-	u32	Signature;		// Contains 'USBC'
+	__le32	Signature;		// Contains 'USBC'
 	u32	Tag;			// Unique per command id
-	u32	DataTransferLength;	// Size of the data
+	__le32	DataTransferLength;	// Size of the data
 	u8	Flags;			// Direction in bit 7
 	u8	Lun;			// LUN (normally 0)
 	u8	Length;			// Of the CDB, <= MAX_COMMAND_SIZE
@@ -443,9 +445,9 @@ struct bulk_cb_wrap {
 
 /* Command Status Wrapper */
 struct bulk_cs_wrap {
-	u32	Signature;		// Should = 'USBS'
+	__le32	Signature;		// Should = 'USBS'
 	u32	Tag;			// Same as original command
-	u32	Residue;		// Amount not transferred
+	__le32	Residue;		// Amount not transferred
 	u8	Status;			// See below
 };
 
@@ -866,6 +868,14 @@ config_desc = {
 	.bMaxPower =		1,	// self-powered
 };
 
+static struct usb_otg_descriptor
+otg_desc = {
+	.bLength =		sizeof(otg_desc),
+	.bDescriptorType =	USB_DT_OTG,
+
+	.bmAttributes =		USB_OTG_SRP,
+};
+
 /* There is only one interface. */
 
 static struct usb_interface_descriptor
@@ -914,12 +924,14 @@ fs_intr_in_desc = {
 };
 
 static const struct usb_descriptor_header *fs_function[] = {
+	(struct usb_descriptor_header *) &otg_desc,
 	(struct usb_descriptor_header *) &intf_desc,
 	(struct usb_descriptor_header *) &fs_bulk_in_desc,
 	(struct usb_descriptor_header *) &fs_bulk_out_desc,
 	(struct usb_descriptor_header *) &fs_intr_in_desc,
 	NULL,
 };
+#define FS_FUNCTION_PRE_EP_ENTRIES	2
 
 
 #ifdef	CONFIG_USB_GADGET_DUALSPEED
@@ -976,12 +988,14 @@ hs_intr_in_desc = {
 };
 
 static const struct usb_descriptor_header *hs_function[] = {
+	(struct usb_descriptor_header *) &otg_desc,
 	(struct usb_descriptor_header *) &intf_desc,
 	(struct usb_descriptor_header *) &hs_bulk_in_desc,
 	(struct usb_descriptor_header *) &hs_bulk_out_desc,
 	(struct usb_descriptor_header *) &hs_intr_in_desc,
 	NULL,
 };
+#define HS_FUNCTION_PRE_EP_ENTRIES	2
 
 /* Maxpacket and other transfer characteristics vary by speed. */
 #define ep_desc(g,fs,hs)	(((g)->speed==USB_SPEED_HIGH) ? (hs) : (fs))
@@ -996,7 +1010,7 @@ static const struct usb_descriptor_header *hs_function[] = {
 
 /* The CBI specification limits the serial string to 12 uppercase hexadecimal
  * characters. */
-static char				manufacturer[40];
+static char				manufacturer[50];
 static char				serial[13];
 
 /* Static strings, in UTF-8 (for simplicity we use only ASCII characters) */
@@ -1018,9 +1032,12 @@ static struct usb_gadget_strings	stringtab = {
  * and with code managing interfaces and their altsettings.  They must
  * also handle different speeds and other-speed requests.
  */
-static int populate_config_buf(enum usb_device_speed speed,
+static int populate_config_buf(struct usb_gadget *gadget,
 		u8 *buf, u8 type, unsigned index)
 {
+#ifdef CONFIG_USB_GADGET_DUALSPEED
+	enum usb_device_speed			speed = gadget->speed;
+#endif
 	int					len;
 	const struct usb_descriptor_header	**function;
 
@@ -1035,6 +1052,10 @@ static int populate_config_buf(enum usb_device_speed speed,
 	else
 #endif
 		function = fs_function;
+
+	/* for now, don't advertise srp-only devices */
+	if (!gadget->is_otg)
+		function++;
 
 	len = usb_gadget_config_buf(&config_desc, buf, EP0_BUFSIZE, function);
 	((struct usb_config_descriptor *) buf)->bDescriptorType = type;
@@ -1366,7 +1387,7 @@ static int standard_setup_req(struct fsg_dev *fsg,
 #ifdef CONFIG_USB_GADGET_DUALSPEED
 		get_config:
 #endif
-			value = populate_config_buf(fsg->gadget->speed,
+			value = populate_config_buf(fsg->gadget,
 					req->buf,
 					ctrl->wValue >> 8,
 					ctrl->wValue & 0xff);
@@ -1523,6 +1544,8 @@ static int sleep_thread(struct fsg_dev *fsg)
 	rc = wait_event_interruptible(fsg->thread_wqh,
 			fsg->thread_wakeup_needed);
 	fsg->thread_wakeup_needed = 0;
+	if (current->flags & PF_FREEZE)
+		refrigerator(PF_FREEZE);
 	return (rc ? -EINTR : 0);
 }
 
@@ -2280,8 +2303,7 @@ static int halt_bulk_in_endpoint(struct fsg_dev *fsg)
 		}
 
 		/* Wait for a short time and then try again */
-		set_current_state(TASK_INTERRUPTIBLE);
-		if (schedule_timeout(HZ / 10) != 0)
+		if (msleep_interruptible(100) != 0)
 			return -EINTR;
 		rc = usb_ep_set_halt(fsg->bulk_in);
 	}
@@ -3557,7 +3579,7 @@ static ssize_t show_file(struct device *dev, char *buf)
 }
 
 
-ssize_t store_ro(struct device *dev, const char *buf, size_t count)
+static ssize_t store_ro(struct device *dev, const char *buf, size_t count)
 {
 	ssize_t		rc = count;
 	struct lun	*curlun = dev_to_lun(dev);
@@ -3581,7 +3603,7 @@ ssize_t store_ro(struct device *dev, const char *buf, size_t count)
 	return rc;
 }
 
-ssize_t store_file(struct device *dev, const char *buf, size_t count)
+static ssize_t store_file(struct device *dev, const char *buf, size_t count)
 {
 	struct lun	*curlun = dev_to_lun(dev);
 	struct fsg_dev	*fsg = (struct fsg_dev *) dev_get_drvdata(dev);
@@ -3697,28 +3719,32 @@ static int __init check_parameters(struct fsg_dev *fsg)
 
 	if (mod_data.release == 0xffff) {	// Parameter wasn't set
 		if (gadget_is_net2280(fsg->gadget))
-			mod_data.release = __constant_cpu_to_le16(0x0301);
+			mod_data.release = 0x0301;
 		else if (gadget_is_dummy(fsg->gadget))
-			mod_data.release = __constant_cpu_to_le16(0x0302);
+			mod_data.release = 0x0302;
 		else if (gadget_is_pxa(fsg->gadget))
-			mod_data.release = __constant_cpu_to_le16(0x0303);
+			mod_data.release = 0x0303;
 		else if (gadget_is_sh(fsg->gadget))
-			mod_data.release = __constant_cpu_to_le16(0x0304);
+			mod_data.release = 0x0304;
 
 		/* The sa1100 controller is not supported */
 
 		else if (gadget_is_goku(fsg->gadget))
-			mod_data.release = __constant_cpu_to_le16(0x0306);
+			mod_data.release = 0x0306;
 		else if (gadget_is_mq11xx(fsg->gadget))
-			mod_data.release = __constant_cpu_to_le16(0x0307);
+			mod_data.release = 0x0307;
 		else if (gadget_is_omap(fsg->gadget))
-			mod_data.release = __constant_cpu_to_le16(0x0308);
-		else if (gadget_is_lh7a40x(gadget))
-			mod_data.release = __constant_cpu_to_le16 (0x0309);
+			mod_data.release = 0x0308;
+		else if (gadget_is_lh7a40x(fsg->gadget))
+			mod_data.release = 0x0309;
+		else if (gadget_is_n9604(fsg->gadget))
+			mod_data.release = 0x0310;
+		else if (gadget_is_pxa27x(fsg->gadget))
+			mod_data.release = 0x0311;
 		else {
 			WARN(fsg, "controller '%s' not recognized\n",
 				fsg->gadget->name);
-			mod_data.release = __constant_cpu_to_le16(0x0399);
+			mod_data.release = 0x0399;
 		}
 	}
 
@@ -3882,10 +3908,10 @@ static int __init fsg_bind(struct usb_gadget *gadget)
 	intf_desc.bNumEndpoints = i;
 	intf_desc.bInterfaceSubClass = mod_data.protocol_type;
 	intf_desc.bInterfaceProtocol = mod_data.transport_type;
-	fs_function[i+1] = NULL;
+	fs_function[i + FS_FUNCTION_PRE_EP_ENTRIES] = NULL;
 
 #ifdef CONFIG_USB_GADGET_DUALSPEED
-	hs_function[i+1] = NULL;
+	hs_function[i + HS_FUNCTION_PRE_EP_ENTRIES] = NULL;
 
 	/* Assume ep0 uses the same maxpacket value for both speeds */
 	dev_qualifier.bMaxPacketSize0 = fsg->ep0->maxpacket;
@@ -3895,6 +3921,11 @@ static int __init fsg_bind(struct usb_gadget *gadget)
 	hs_bulk_out_desc.bEndpointAddress = fs_bulk_out_desc.bEndpointAddress;
 	hs_intr_in_desc.bEndpointAddress = fs_intr_in_desc.bEndpointAddress;
 #endif
+
+	if (gadget->is_otg) {
+		otg_desc.bmAttributes |= USB_OTG_HNP,
+		config_desc.bmAttributes |= USB_CONFIG_ATT_WAKEUP;
+	}
 
 	rc = -ENOMEM;
 

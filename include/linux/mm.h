@@ -41,6 +41,8 @@ extern int sysctl_legacy_va_layout;
 #define MM_VM_SIZE(mm)	TASK_SIZE
 #endif
 
+#define nth_page(page,n) pfn_to_page(page_to_pfn((page)) + (n))
+
 /*
  * Linux kernel virtual memory manager primitives.
  * The idea being to have a "virtual" mm in the same way
@@ -139,7 +141,6 @@ struct vm_area_struct {
 #define VM_DONTEXPAND	0x00040000	/* Cannot expand with mremap() */
 #define VM_RESERVED	0x00080000	/* Don't unmap it from swap_out */
 #define VM_ACCOUNT	0x00100000	/* Is a VM accounted object */
-#define VM_NONCACHED	0x00200000	/* Noncached access */
 #define VM_HUGETLB	0x00400000	/* Huge TLB Page VM */
 #define VM_NONLINEAR	0x00800000	/* Is non-linear (remap_file_pages) */
 
@@ -541,7 +542,7 @@ static inline int can_do_mlock(void)
 {
 	if (capable(CAP_IPC_LOCK))
 		return 1;
-	if (current->rlim[RLIMIT_MEMLOCK].rlim_cur != 0)
+	if (current->signal->rlim[RLIMIT_MEMLOCK].rlim_cur != 0)
 		return 1;
 	return 0;
 }
@@ -624,9 +625,6 @@ struct shrinker;
 extern struct shrinker *set_shrinker(int, shrinker_t);
 extern void remove_shrinker(struct shrinker *shrinker);
 
-extern long do_mprotect(struct mm_struct *mm, unsigned long start,
-			size_t len, unsigned long prot);
-
 /*
  * On a two-level page table, this ends up being trivial. Thus the
  * inlining and the symmetry break with pte_alloc_map() that does all
@@ -686,15 +684,9 @@ extern void exit_mmap(struct mm_struct *);
 
 extern unsigned long get_unmapped_area(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
 
-extern unsigned long __do_mmap_pgoff(struct mm_struct *mm, struct file *file,
-				   unsigned long addr, unsigned long len,
-				   unsigned long prot, unsigned long flag,
-				   unsigned long pgoff);
-static inline unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
+extern unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
 	unsigned long len, unsigned long prot,
-	unsigned long flag, unsigned long pgoff) {
-	return __do_mmap_pgoff(current->mm, file, addr, len, prot, flag, pgoff);
-}
+	unsigned long flag, unsigned long pgoff);
 
 static inline unsigned long do_mmap(struct file *file, unsigned long addr,
 	unsigned long len, unsigned long prot,
@@ -716,8 +708,6 @@ extern unsigned long do_brk(unsigned long, unsigned long);
 /* filemap.c */
 extern unsigned long page_unuse(struct page *);
 extern void truncate_inode_pages(struct address_space *, loff_t);
-extern void truncate_inode_pages_range(struct address_space *,
-				       loff_t lstart, loff_t lend);
 
 /* generic vm_area_ops exported for stackable file systems */
 struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int *);
@@ -742,10 +732,7 @@ void handle_ra_miss(struct address_space *mapping,
 unsigned long max_sane_readahead(unsigned long nr);
 
 /* Do stack extension */
-#define EXPAND_STACK_HAS_3_ARGS
-extern int heap_stack_gap;
-extern int expand_stack(struct vm_area_struct * vma, unsigned long address,
-			struct vm_area_struct * prev_vma);
+extern int expand_stack(struct vm_area_struct * vma, unsigned long address);
 
 /* Look up the first VMA which satisfies  addr < vm_end,  NULL if none. */
 extern struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr);
@@ -771,10 +758,18 @@ static inline unsigned long vma_pages(struct vm_area_struct *vma)
 extern struct vm_area_struct *find_extend_vma(struct mm_struct *mm, unsigned long addr);
 
 extern struct page * vmalloc_to_page(void *addr);
+extern unsigned long vmalloc_to_pfn(void *addr);
 extern struct page * follow_page(struct mm_struct *mm, unsigned long address,
 		int write);
-extern int remap_page_range(struct vm_area_struct *vma, unsigned long from,
-		unsigned long to, unsigned long size, pgprot_t prot);
+int remap_pfn_range(struct vm_area_struct *, unsigned long,
+		unsigned long, unsigned long, pgprot_t);
+
+static inline __deprecated /* since 25 Sept 2004 -- wli */
+int remap_page_range(struct vm_area_struct *vma, unsigned long uvaddr,
+			unsigned long paddr, unsigned long size, pgprot_t prot)
+{
+	return remap_pfn_range(vma, uvaddr, paddr >> PAGE_SHIFT, size, prot);
+}
 
 #ifdef CONFIG_PROC_FS
 void __vm_stat_account(struct mm_struct *, unsigned long, struct file *, long);

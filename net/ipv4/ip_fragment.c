@@ -373,7 +373,7 @@ static struct ipq *ip_frag_create(unsigned hash, struct iphdr *iph)
 	init_timer(&qp->timer);
 	qp->timer.data = (unsigned long) qp;	/* pointer to queue	*/
 	qp->timer.function = ip_expire;		/* expire function	*/
-	qp->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&qp->lock);
 	atomic_set(&qp->refcnt, 1);
 
 	return ip_frag_intern(hash, qp);

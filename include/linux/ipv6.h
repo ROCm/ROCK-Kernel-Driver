@@ -182,8 +182,7 @@ enum {
    as offsets from skb->nh.
  */
 
-struct inet6_skb_parm
-{
+struct inet6_skb_parm {
 	int			iif;
 	__u16			ra;
 	__u16			hop;
@@ -194,6 +193,14 @@ struct inet6_skb_parm
 
 #define IP6CB(skb)	((struct inet6_skb_parm*)((skb)->cb))
 
+/**
+ * struct ipv6_pinfo - ipv6 private area
+ *
+ * In the struct sock hierarchy (tcp6_sock, upd6_sock, etc)
+ * this _must_ be the last member, so that inet6_sk_generic
+ * is able to calculate its offset from the base struct sock
+ * by using the struct proto->slab_obj_size member. -acme
+ */
 struct ipv6_pinfo {
 	struct in6_addr 	saddr;
 	struct in6_addr 	rcv_saddr;

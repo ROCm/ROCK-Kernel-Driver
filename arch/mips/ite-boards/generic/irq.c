@@ -47,8 +47,8 @@
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/serial_reg.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/bootinfo.h>
 #include <asm/io.h>
 #include <asm/mipsregs.h>
@@ -63,10 +63,6 @@
 #define DPRINTK(fmt, args...) printk("%s: " fmt, __FUNCTION__ , ## args)
 #else
 #define DPRINTK(fmt, args...)
-#endif
-
-#ifdef CONFIG_KGDB
-extern void breakpoint(void);
 #endif
 
 /* revisit */
@@ -251,15 +247,13 @@ void enable_cpu_timer(void)
         local_irq_restore(flags);
 }
 
-void __init init_IRQ(void)
+void __init arch_init_irq(void)
 {
 	int i;
         unsigned long flags;
 
         memset(irq_desc, 0, sizeof(irq_desc));
         set_except_vector(0, it8172_IRQ);
-
-	init_generic_irq();
 
 	/* mask all interrupts */
 	it8172_hw0_icregs->lb_mask  = 0xffff;
@@ -297,13 +291,6 @@ void __init init_IRQ(void)
 	}
 	irq_desc[MIPS_CPU_TIMER_IRQ].handler = &cp0_irq_type;
 	set_c0_status(ALLINTS_NOTIMER);
-
-#ifdef CONFIG_KGDB
-	/* If local serial I/O used for debug port, enter kgdb at once */
-	puts("Waiting for kgdb to connect...");
-	set_debug_traps();
-	breakpoint();
-#endif
 }
 
 void mips_spurious_interrupt(struct pt_regs *regs)

@@ -63,14 +63,17 @@ static void quirk_awe32_resources(struct pnp_dev *dev)
 static void quirk_cmi8330_resources(struct pnp_dev *dev)
 {
 	struct pnp_option *res = dev->dependent;
+	unsigned long tmp;
 
 	for ( ; res ; res = res->next ) {
 
 		struct pnp_irq *irq;
 		struct pnp_dma *dma;
 
-		for( irq = res->irq; irq; irq = irq->next )	// Valid irqs are 5, 7, 10
-			irq->map = 0x04A0;						// 0000 0100 1010 0000
+		for( irq = res->irq; irq; irq = irq->next ) {	// Valid irqs are 5, 7, 10
+			tmp = 0x04A0;
+			bitmap_copy(irq->map, &tmp, 16);	// 0000 0100 1010 0000
+		}
 
 		for( dma = res->dma; dma; dma = dma->next ) // Valid 8bit dma channels are 1,3
 			if( ( dma->flags & IORESOURCE_DMA_TYPE_MASK ) == IORESOURCE_DMA_8BIT )

@@ -3,11 +3,12 @@
  * The general structure of this is vaguely based on how
  * the Amiga port handles Zorro boards.
  * Copyright (C) Peter Maydell 05/1998 <pmaydell@chiark.greenend.org.uk>
+ * Converted to driver model Jochen Friedrich <jochen@scram.de>
  *
  * The board IDs are from the NetBSD kernel, which for once provided
  * helpful comments...
  *
- * This goes with arch/m68k/hp300/dio.c
+ * This goes with drivers/dio/dio.c
  */
 
 #ifndef _LINUX_DIO_H
@@ -27,34 +28,80 @@
  * so currently we just don't handle DIO-II boards.  It wouldn't be hard to 
  * do with ioremap() though.
  */
+
+#include <linux/device.h>
+
 #ifdef __KERNEL__
+
+#include <asm/hp300hw.h>
+
+typedef __u16 dio_id;
+
+    /*
+     *  DIO devices
+     */
+
+struct dio_dev {
+	struct dio_bus *bus;
+	dio_id id;
+	int scode;
+	struct dio_driver *driver;	/* which driver has allocated this device */
+	struct device dev;		/* Generic device interface */
+	u8 ipl;
+	char name[64];
+	struct resource resource;
+};
+
+#define to_dio_dev(n) container_of(n, struct dio_dev, dev)
+
+    /*
+     *  DIO bus
+     */
+
+struct dio_bus {
+	struct list_head devices;           /* list of devices on this bus */
+	unsigned int num_resources;         /* number of resources */
+	struct resource resources[2];       /* address space routed to this bus */
+	struct device dev;
+	char name[10];
+};
+
+extern struct dio_bus dio_bus;      /* Single DIO bus */
+extern struct bus_type dio_bus_type;
+
+    /*
+     *  DIO device IDs
+     */
+
+struct dio_device_id {
+	dio_id id;                    /* Device ID or DIO_WILDCARD */
+	unsigned long driver_data;    /* Data private to the driver */
+};
+
+    /*
+     *  DIO device drivers
+     */
+
+struct dio_driver {
+	struct list_head node;
+	char *name;
+	const struct dio_device_id *id_table;     /* NULL if wants all devices */
+	int (*probe)(struct dio_dev *z, const struct dio_device_id *id);
+/* New device inserted */
+	void (*remove)(struct dio_dev *z);        /* Device removed (NULL if not a hot-plug capable driver) */
+	struct device_driver driver;
+};
+
+#define to_dio_driver(drv)    container_of(drv, struct dio_driver, driver)
+
 /* DIO/DIO-II boards all have the following 8bit registers.
  * These are offsets from the base of the device.
  */
-#define DIO_IDOFF     0x01                        /* primary device ID */
-#define DIO_IPLOFF    0x03                        /* interrupt priority level */
-#define DIO_SECIDOFF  0x15                        /* secondary device ID */
-#define DIOII_SIZEOFF 0x101                       /* device size, DIO-II only */
-
-/* The internal HPIB device is special; this is its physaddr; its select code is 7. 
- * The reason why we have to treat it specially is because apparently it's broken:
- * the device ID isn't consistent/reliable. *sigh*
- */
-#define DIO_IHPIBADDR 0x47800
-#define DIO_IHPIBSCODE 7
-
-/* If we don't have the internal HPIB defined, then treat select code 7 like
- * any other. If we *do* have internal HPIB, then we just have to assume that
- * select code 7 is the internal HPIB regardless of the ID register :-<
- */
-#define CONFIG_IHPIB /* hack hack : not yet a proper config option */
-#ifdef CONFIG_IHPIB
-#define DIO_ISIHPIB(scode) ((scode) == DIO_IHPIBSCODE)
-#else
-#define DIO_ISIHPIB(scode) 0
-#endif
-
-#define DIO_VIRADDRBASE 0xf0000000                /* vir addr where IOspace is mapped */
+#define DIO_IDOFF     0x01             /* primary device ID */
+#define DIO_IPLOFF    0x03             /* interrupt priority level */
+#define DIO_SECIDOFF  0x15             /* secondary device ID */
+#define DIOII_SIZEOFF 0x101            /* device size, DIO-II only */
+#define DIO_VIRADDRBASE 0xf0000000UL   /* vir addr where IOspace is mapped */
 
 #define DIO_BASE                0x600000        /* start of DIO space */
 #define DIO_END                 0x1000000       /* end of DIO space */
@@ -67,9 +114,10 @@
 /* Highest valid select code. If we add DIO-II support this should become
  * 256 for everything except HP320, which only has DIO.
  */
-#define DIO_SCMAX 32                             
+#define DIO_SCMAX (hp300_model == HP_320 ? 32 : 256)
 #define DIOII_SCBASE 132 /* lowest DIO-II select code */
 #define DIO_SCINHOLE(scode) (((scode) >= 32) && ((scode) < DIOII_SCBASE))
+#define DIO_ISDIOII(scode) ((scode) >= 132 && (scode) < 256)
 
 /* macros to read device IDs, given base address */
 #define DIO_ID(baseaddr) in_8((baseaddr) + DIO_IDOFF)
@@ -91,9 +139,10 @@
  * In practice this is only important for framebuffers,
  * and everybody else just sets ID fields equal to the DIO_ID_FOO value.
  */
-#define DIO_ENCODE_ID(pr,sec) ((((int)sec & 0xff) << 8) & ((int)pr & 0xff))
+#define DIO_ENCODE_ID(pr,sec) ((((int)sec & 0xff) << 8) | ((int)pr & 0xff))
 /* macro to determine whether a given primary ID requires a secondary ID byte */
 #define DIO_NEEDSSECID(id) ((id) == DIO_ID_FBUFFER)
+#define DIO_WILDCARD 0xff
 
 /* Now a whole slew of macros giving device IDs and descriptive strings: */
 #define DIO_ID_DCA0     0x02 /* 98644A serial */
@@ -112,18 +161,16 @@
 #define DIO_DESC_LAN "98643A LANCE ethernet"
 #define DIO_ID_FHPIB    0x08 /* 98625A/98625B fast HP-IB */
 #define DIO_DESC_FHPIB "98625A/98625B fast HPIB"
-#define DIO_ID_NHPIB    0x80 /* 98624A HP-IB (normal ie slow) */
+#define DIO_ID_NHPIB    0x01 /* 98624A HP-IB (normal ie slow) */
 #define DIO_DESC_NHPIB "98624A HPIB"
-#define DIO_ID_IHPIB    0x00 /* internal HPIB (not its real ID, it hasn't got one! */
-#define DIO_DESC_IHPIB "internal HPIB"
-#define DIO_ID_SCSI0    0x07 /* 98625A SCSI */
-#define DIO_DESC_SCSI0 "98625A SCSI0"
+#define DIO_ID_SCSI0    0x07 /* 98265A SCSI */
+#define DIO_DESC_SCSI0 "98265A SCSI0"
 #define DIO_ID_SCSI1    0x27 /* ditto */
-#define DIO_DESC_SCSI1 "98625A SCSI1"
+#define DIO_DESC_SCSI1 "98265A SCSI1"
 #define DIO_ID_SCSI2    0x47 /* ditto */
-#define DIO_DESC_SCSI2 "98625A SCSI2"
+#define DIO_DESC_SCSI2 "98265A SCSI2"
 #define DIO_ID_SCSI3    0x67 /* ditto */
-#define DIO_DESC_SCSI3 "98625A SCSI3"
+#define DIO_DESC_SCSI3 "98265A SCSI3"
 #define DIO_ID_FBUFFER  0x39 /* framebuffer: flavour is distinguished by secondary ID */
 #define DIO_DESC_FBUFFER "bitmapped display"
 /* the NetBSD kernel source is a bit unsure as to what these next IDs actually do :-> */
@@ -193,12 +240,73 @@
  */
 
 extern int dio_find(int deviceid);
-extern void *dio_scodetoviraddr(int scode);
-extern int dio_scodetoipl(int scode);
-extern const char *dio_scodetoname(int scode);
-extern void dio_config_board(int scode);
-extern void dio_unconfig_board(int scode);
+extern unsigned long dio_scodetophysaddr(int scode);
+extern void dio_create_sysfs_dev_files(struct dio_dev *);
 
+/* New-style probing */
+extern int dio_register_driver(struct dio_driver *);
+extern void dio_unregister_driver(struct dio_driver *);
+extern const struct dio_device_id *dio_match_device(const struct dio_device_id *ids, const struct dio_dev *z);
+static inline struct dio_driver *dio_dev_driver(const struct dio_dev *d)
+{
+    return d->driver;
+}
+
+#define dio_resource_start(d) ((d)->resource.start)
+#define dio_resource_end(d)   ((d)->resource.end)
+#define dio_resource_len(d)   ((d)->resource.end-(d)->resource.start+1)
+#define dio_resource_flags(d) ((d)->resource.flags)
+
+#define dio_request_device(d, name) \
+    request_mem_region(dio_resource_start(d), dio_resource_len(d), name)
+#define dio_release_device(d) \
+    release_mem_region(dio_resource_start(d), dio_resource_len(d))
+
+/* Similar to the helpers above, these manipulate per-dio_dev
+ * driver-specific data.  They are really just a wrapper around
+ * the generic device structure functions of these calls.
+ */
+static inline void *dio_get_drvdata (struct dio_dev *d)
+{
+	return dev_get_drvdata(&d->dev);
+}
+
+static inline void dio_set_drvdata (struct dio_dev *d, void *data)
+{
+	dev_set_drvdata(&d->dev, data);
+}
+
+/*
+ * A helper function which helps ensure correct dio_driver
+ * setup and cleanup for commonly-encountered hotplug/modular cases
+ *
+ * This MUST stay in a header, as it checks for -DMODULE
+ */
+static inline int dio_module_init(struct dio_driver *drv)
+{
+	int rc = dio_register_driver(drv);
+
+	if (rc > 0)
+		return 0;
+
+	/* iff CONFIG_HOTPLUG and built into kernel, we should
+	 * leave the driver around for future hotplug events.
+	 * For the module case, a hotplug daemon of some sort
+	 * should load a module in response to an insert event. */
+#if defined(CONFIG_HOTPLUG) && !defined(MODULE)
+	if (rc == 0)
+		return 0;
+#else
+	if (rc == 0)
+		rc = -ENODEV;
+#endif
+
+	/* if we get here, we need to clean up DIO driver instance
+	 * and return some sort of error */
+	dio_unregister_driver(drv);
+
+	return rc;
+}
 
 #endif /* __KERNEL__ */
 #endif /* ndef _LINUX_DIO_H */

@@ -2,11 +2,9 @@
 #define _PSMOUSE_H
 
 #define PSMOUSE_CMD_SETSCALE11	0x00e6
-#define PSMOUSE_CMD_SETSCALE21	0x00e7
 #define PSMOUSE_CMD_SETRES	0x10e8
 #define PSMOUSE_CMD_GETINFO	0x03e9
 #define PSMOUSE_CMD_SETSTREAM	0x00ea
-#define PSMOUSE_CMD_SETPOLL	0x00f0
 #define PSMOUSE_CMD_POLL	0x03eb
 #define PSMOUSE_CMD_GETID	0x02f2
 #define PSMOUSE_CMD_SETRATE	0x10f3
@@ -55,7 +53,7 @@ struct psmouse {
 	unsigned long out_of_sync;
 	enum psmouse_state state;
 	unsigned char nak;
-	unsigned char error;
+	char error;
 	char devname[64];
 	char phys[32];
 	unsigned long flags;
@@ -78,7 +76,6 @@ struct psmouse {
 #define PSMOUSE_IMPS		5
 #define PSMOUSE_IMEX		6
 #define PSMOUSE_SYNAPTICS 	7
-#define PSMOUSE_ALPS		8
 
 int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command);
 int psmouse_sliced_command(struct psmouse *psmouse, unsigned char command);

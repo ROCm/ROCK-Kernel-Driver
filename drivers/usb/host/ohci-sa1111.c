@@ -194,6 +194,7 @@ int usb_hcd_sa1111_probe (const struct hc_driver *driver,
 
 	usb_bus_init (&hcd->self);
 	hcd->self.op = &usb_hcd_operations;
+	hcd->self.release = &usb_hcd_release;
 	hcd->self.hcpriv = (void *) hcd;
 	hcd->self.bus_name = "sa1111";
 	hcd->product_desc = "SA-1111 OHCI";
@@ -213,9 +214,8 @@ int usb_hcd_sa1111_probe (const struct hc_driver *driver,
 
  err2:
 	hcd_buffer_destroy (hcd);
-	if (hcd)
-		driver->hcd_free(hcd);
  err1:
+	kfree(hcd);
 	sa1111_stop_hc(dev);
 	release_mem_region(dev->res.start, dev->res.end - dev->res.start + 1);
 	return retval;
@@ -237,8 +237,6 @@ int usb_hcd_sa1111_probe (const struct hc_driver *driver,
  */
 void usb_hcd_sa1111_remove (struct usb_hcd *hcd, struct sa1111_dev *dev)
 {
-	void *base;
-
 	info ("remove: %s, state %x", hcd->self.bus_name, hcd->state);
 
 	if (in_interrupt ())
@@ -257,9 +255,6 @@ void usb_hcd_sa1111_remove (struct usb_hcd *hcd, struct sa1111_dev *dev)
 
 	usb_deregister_bus (&hcd->self);
 
-	base = hcd->regs;
-	hcd->driver->hcd_free (hcd);
-
 	sa1111_stop_hc(dev);
 	release_mem_region(dev->res.start, dev->res.end - dev->res.start + 1);
 }
@@ -272,33 +267,14 @@ ohci_sa1111_start (struct usb_hcd *hcd)
 	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
 	int		ret;
 
-	ohci->hcca = dma_alloc_coherent (hcd->self.controller,
-			sizeof *ohci->hcca, &ohci->hcca_dma, 0);
-	if (!ohci->hcca)
-		return -ENOMEM;
-        
-	memset (ohci->hcca, 0, sizeof (struct ohci_hcca));
-	if ((ret = ohci_mem_init (ohci)) < 0) {
+	if ((ret = ohci_init(ohci)) < 0)
+		return ret;
+
+	if ((ret = ohci_run (ohci)) < 0) {
+		err ("can't start %s", ohci->hcd.self.bus_name);
 		ohci_stop (hcd);
 		return ret;
 	}
-	ohci->regs = hcd->regs;
-
-	if (hc_reset (ohci) < 0) {
-		ohci_stop (hcd);
-		return -ENODEV;
-	}
-
-	if (hc_start (ohci) < 0) {
-		err ("can't start %s", ohci->hcd.self.bus_name);
-		ohci_stop (hcd);
-		return -EBUSY;
-	}
-	create_debug_files (ohci);
-
-#ifdef	DEBUG
-	ohci_dump (ohci, 1);
-#endif
 	return 0;
 }
 
@@ -327,7 +303,6 @@ static const struct hc_driver ohci_sa1111_hc_driver = {
 	 * memory lifecycle (except per-request)
 	 */
 	.hcd_alloc =		ohci_hcd_alloc,
-	.hcd_free =		ohci_hcd_free,
 
 	/*
 	 * managing i/o requests and associated device resources

@@ -48,9 +48,9 @@
 #include <linux/workqueue.h>
 #include <linux/interrupt.h>
 #include <linux/device.h>
+#include <linux/bitops.h>
 #include <asm/irq.h>
 #include <asm/io.h>
-#include <asm/bitops.h>
 #include <asm/system.h>
 
 #include <pcmcia/version.h>
@@ -134,7 +134,7 @@ module_param(i365_base, int, 0444);
 module_param(ignore, int, 0444);
 module_param(extra_sockets, int, 0444);
 module_param(irq_mask, int, 0444);
-module_param_array(irq_list, int, irq_list_count, 0444);
+module_param_array(irq_list, int, &irq_list_count, 0444);
 module_param(cs_irq, int, 0444);
 module_param(async_clock, int, 0444);
 module_param(cable_mode, int, 0444);
@@ -513,8 +513,7 @@ static u_int __init test_irq(u_short sock, int irq)
     if (request_irq(irq, i365_count_irq, 0, "scan", i365_count_irq) != 0)
 	return 1;
     irq_hits = 0; irq_sock = sock;
-    __set_current_state(TASK_UNINTERRUPTIBLE);
-    schedule_timeout(HZ/100);
+    msleep(10);
     if (irq_hits) {
 	free_irq(irq, i365_count_irq);
 	debug(2, "    spurious hit!\n");

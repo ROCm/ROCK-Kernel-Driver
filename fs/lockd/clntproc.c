@@ -7,6 +7,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/fs.h>
@@ -278,6 +279,7 @@ done:
 	nlm_release_host(host);
 	return status;
 }
+EXPORT_SYMBOL(nlmclnt_proc);
 
 /*
  * Allocate an NLM RPC call struct
@@ -541,7 +543,7 @@ nlmclnt_lock(struct nlm_rqst *req, struct file_lock *fl)
 	struct nlm_res	*resp = &req->a_res;
 	int		status;
 
-	if (nsm_monitor(host) < 0) {
+	if (!host->h_monitored && nsm_monitor(host) < 0) {
 		printk(KERN_NOTICE "lockd: failed to monitor %s\n",
 					host->h_name);
 		status = -ENOLCK;

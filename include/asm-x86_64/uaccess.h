@@ -102,7 +102,7 @@ extern void __get_user_8(void);
 
 /* Careful: we have to cast the result to the type of the pointer for sign reasons */
 #define get_user(x,ptr)							\
-({	long __val_gu;							\
+({	unsigned long __val_gu;						\
 	int __ret_gu; 							\
 	__chk_user_ptr(ptr);						\
 	switch(sizeof (*(ptr))) {					\

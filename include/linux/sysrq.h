@@ -31,49 +31,9 @@ struct sysrq_key_op {
 
 void handle_sysrq(int, struct pt_regs *, struct tty_struct *);
 void __handle_sysrq(int, struct pt_regs *, struct tty_struct *);
-
-/*
- * Sysrq registration manipulation functions
- */
-
-void __sysrq_lock_table (void);
-void __sysrq_unlock_table (void);
-struct sysrq_key_op *__sysrq_get_key_op (int key);
-void __sysrq_put_key_op (int key, struct sysrq_key_op *op_p);
-
-extern __inline__ int
-__sysrq_swap_key_ops_nolock(int key, struct sysrq_key_op *insert_op_p,
-				struct sysrq_key_op *remove_op_p)
-{
-	int retval;
-	if (__sysrq_get_key_op(key) == remove_op_p) {
-		__sysrq_put_key_op(key, insert_op_p);
-		retval = 0;
-	} else {
-                retval = -1;
-	}
-	return retval;
-}
-
-extern __inline__ int
-__sysrq_swap_key_ops(int key, struct sysrq_key_op *insert_op_p,
-				struct sysrq_key_op *remove_op_p) {
-	int retval;
-	__sysrq_lock_table();
-	retval = __sysrq_swap_key_ops_nolock(key, insert_op_p, remove_op_p);
-	__sysrq_unlock_table();
-	return retval;
-}
-	
-static inline int register_sysrq_key(int key, struct sysrq_key_op *op_p)
-{
-	return __sysrq_swap_key_ops(key, op_p, NULL);
-}
-
-static inline int unregister_sysrq_key(int key, struct sysrq_key_op *op_p)
-{
-	return __sysrq_swap_key_ops(key, NULL, op_p);
-}
+int register_sysrq_key(int, struct sysrq_key_op *);
+int unregister_sysrq_key(int, struct sysrq_key_op *);
+struct sysrq_key_op *__sysrq_get_key_op(int key);
 
 #else
 

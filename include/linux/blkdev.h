@@ -19,8 +19,8 @@
 
 struct request_queue;
 typedef struct request_queue request_queue_t;
-struct elevator_s;
-typedef struct elevator_s elevator_t;
+struct elevator_queue;
+typedef struct elevator_queue elevator_t;
 struct request_pm_state;
 
 #define BLKDEV_MIN_RQ	4
@@ -52,6 +52,20 @@ struct as_io_context {
 	sector_t seek_mean;
 };
 
+struct cfq_queue;
+struct cfq_io_context {
+	void (*dtor)(struct cfq_io_context *);
+	void (*exit)(struct cfq_io_context *);
+
+	struct io_context *ioc;
+
+	/*
+	 * circular list of cfq_io_contexts belonging to a process io context
+	 */
+	struct list_head list;
+	struct cfq_queue *cfqq;
+};
+
 /*
  * This is the per-process I/O subsystem state.  It is refcounted and
  * kmalloc'ed. Currently all fields are modified in process io context
@@ -67,7 +81,10 @@ struct io_context {
 	unsigned long last_waited; /* Time last woken after wait for request */
 	int nr_batch_requests;     /* Number of requests left in the batch */
 
+	spinlock_t lock;
+
 	struct as_io_context *aic;
+	struct cfq_io_context *cic;
 };
 
 void put_io_context(struct io_context *ioc);
@@ -80,6 +97,7 @@ struct request_list {
 	int count[2];
 	mempool_t *rq_pool;
 	wait_queue_head_t wait[2];
+	wait_queue_head_t drain;
 };
 
 #define BLK_MAX_CDB	16
@@ -107,13 +125,7 @@ struct request {
 	/* no. of sectors left to complete in the current segment */
 	unsigned int hard_cur_sectors;
 
-	/* no. of segments left to submit in the current bio */
-	unsigned short nr_cbio_segments;
-	/* no. of sectors left to submit in the current bio */
-	unsigned long nr_cbio_sectors;
-
-	struct bio *cbio;		/* next bio to submit */
-	struct bio *bio;		/* next unfinished bio to complete */
+	struct bio *bio;
 	struct bio *biotail;
 
 	void *elevator_private;
@@ -279,7 +291,7 @@ struct request_queue
 	 */
 	struct list_head	queue_head;
 	struct request		*last_merge;
-	elevator_t		elevator;
+	elevator_t		*elevator;
 
 	/*
 	 * the queue request freelist, one for reads and one for writes
@@ -342,8 +354,10 @@ struct request_queue
 	unsigned long		nr_requests;	/* Max # of requests */
 	unsigned int		nr_congestion_on;
 	unsigned int		nr_congestion_off;
+	unsigned int		nr_batching;
 
 	unsigned short		max_sectors;
+	unsigned short		max_hw_sectors;
 	unsigned short		max_phys_segments;
 	unsigned short		max_hw_segments;
 	unsigned short		hardsect_size;
@@ -363,6 +377,8 @@ struct request_queue
 	 */
 	unsigned int		sg_timeout;
 	unsigned int		sg_reserved_size;
+
+	struct list_head	drain_list;
 };
 
 #define RQ_INACTIVE		(-1)
@@ -380,6 +396,7 @@ struct request_queue
 #define QUEUE_FLAG_REENTER	6	/* Re-entrancy avoidance */
 #define QUEUE_FLAG_PLUGGED	7	/* queue is plugged */
 #define QUEUE_FLAG_ORDERED	8	/* supports ordered writes */
+#define QUEUE_FLAG_DRAIN	9	/* draining queue for sched switch */
 
 #define blk_queue_plugged(q)	test_bit(QUEUE_FLAG_PLUGGED, &(q)->queue_flags)
 #define blk_queue_tagged(q)	test_bit(QUEUE_FLAG_QUEUED, &(q)->queue_flags)
@@ -444,32 +461,6 @@ static inline void blk_clear_queue_full(struct request_queue *q, int rw)
  */
 #define blk_queue_headactive(q, head_active)
 
-/* current index into bio being processed for submission */
-#define blk_rq_idx(rq)	((rq)->cbio->bi_vcnt - (rq)->nr_cbio_segments)
-
-/* current bio vector being processed */
-#define blk_rq_vec(rq)	(bio_iovec_idx((rq)->cbio, blk_rq_idx(rq)))
-
-/* current offset with respect to start of the segment being submitted */
-#define blk_rq_offset(rq) \
-	(((rq)->hard_cur_sectors - (rq)->current_nr_sectors) << 9)
-
-/*
- * temporarily mapping a (possible) highmem bio (typically for PIO transfer)
- */
-
-/* Assumes rq->cbio != NULL */
-static inline char * rq_map_buffer(struct request *rq, unsigned long *flags)
-{
-	return (__bio_kmap_irq(rq->cbio, blk_rq_idx(rq), flags)
-		+ blk_rq_offset(rq));
-}
-
-static inline void rq_unmap_buffer(char *buffer, unsigned long *flags)
-{
-	__bio_kunmap_irq(buffer, flags);
-}
-
 /*
  * q->prep_rq_fn return values
  */
@@ -531,6 +522,7 @@ extern int blk_hw_contig_segment(request_queue_t *q, struct bio *, struct bio *)
 extern int scsi_cmd_ioctl(struct file *, struct gendisk *, unsigned int, void __user *);
 extern void blk_start_queue(request_queue_t *q);
 extern void blk_stop_queue(request_queue_t *q);
+extern void blk_sync_queue(struct request_queue *q);
 extern void __blk_stop_queue(request_queue_t *q);
 extern void blk_run_queue(request_queue_t *);
 extern void blk_queue_activity_fn(request_queue_t *, activity_fn *, void *);
@@ -568,7 +560,6 @@ static inline void blk_run_address_space(struct address_space *mapping)
 extern int end_that_request_first(struct request *, int, int);
 extern int end_that_request_chunk(struct request *, int, int);
 extern void end_that_request_last(struct request *);
-extern int process_that_request_first(struct request *, unsigned int);
 extern void end_request(struct request *req, int uptodate);
 
 /*
@@ -616,6 +607,8 @@ extern void blk_dump_rq_flags(struct request *, char *);
 extern void generic_unplug_device(request_queue_t *);
 extern void __generic_unplug_device(request_queue_t *);
 extern long nr_blockdev_pages(void);
+extern void blk_wait_queue_drained(request_queue_t *, int);
+extern void blk_finish_queue_drain(request_queue_t *);
 
 int blk_get_queue(request_queue_t *);
 request_queue_t *blk_alloc_queue(int);
@@ -637,7 +630,6 @@ extern void blk_queue_invalidate_tags(request_queue_t *);
 extern long blk_congestion_wait(int rw, long timeout);
 
 extern void blk_rq_bio_prep(request_queue_t *, struct request *, struct bio *);
-extern void blk_rq_prep_restart(struct request *);
 extern int blkdev_issue_flush(struct block_device *, sector_t *);
 
 #define MAX_PHYS_SEGMENTS 128

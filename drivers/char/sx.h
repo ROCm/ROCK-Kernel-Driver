@@ -32,8 +32,8 @@ struct sx_port {
 
 struct sx_board {
   int magic;
-  unsigned long base;
-  unsigned long base2;
+  void __iomem *base;
+  void __iomem *base2;
   unsigned long hw_base;
   int eisa_base;
   int port_base; /* Number of the first port */

@@ -149,7 +149,7 @@ struct rtas_error_log {
 	unsigned long target:4;			/* Target of failed operation */
 	unsigned long type:8;			/* General event or error*/
 	unsigned long extended_log_length:32;	/* length in bytes */
-	unsigned char buffer[1];		/* allocated by klimit bump */
+	unsigned char buffer[1];
 };
 
 struct flash_block {
@@ -180,7 +180,7 @@ extern struct rtas_t rtas;
 extern void enter_rtas(unsigned long);
 extern int rtas_token(const char *service);
 extern int rtas_call(int token, int, int, int *, ...);
-extern void call_rtas_display_status(char);
+extern void call_rtas_display_status(unsigned char);
 extern void rtas_restart(char *cmd);
 extern void rtas_power_off(void);
 extern void rtas_halt(void);
@@ -189,6 +189,7 @@ extern int rtas_get_sensor(int sensor, int index, int *state);
 extern int rtas_get_power_level(int powerdomain, int *level);
 extern int rtas_set_power_level(int powerdomain, int level, int *setlevel);
 extern int rtas_set_indicator(int indicator, int index, int new_value);
+extern void rtas_initialize(void);
 
 /* Given an RTAS status code of 9900..9905 compute the hinted delay */
 unsigned int rtas_extended_busy_delay_time(int status);

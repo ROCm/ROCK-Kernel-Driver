@@ -7,8 +7,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <limits.h>
-#include <sys/mman.h> 
 #include <setjmp.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/ptrace.h>
 #include <sys/utsname.h>
@@ -89,10 +89,10 @@ int wait_for_stop(int pid, int sig, int cont_type, void *relay)
 				       errno);
 			}
 			else if(WIFEXITED(status)) 
-				printk("process %d exited with status %d\n", 
+				printk("process %d exited with status %d\n",
 				       pid, WEXITSTATUS(status));
 			else if(WIFSIGNALED(status))
-				printk("process %d exited with signal %d\n", 
+				printk("process %d exited with signal %d\n",
 				       pid, WTERMSIG(status));
 			else if((WSTOPSIG(status) == SIGVTALRM) ||
 				(WSTOPSIG(status) == SIGALRM) ||
@@ -109,7 +109,7 @@ int wait_for_stop(int pid, int sig, int cont_type, void *relay)
 				ptrace(cont_type, pid, 0, WSTOPSIG(status));
 				continue;
 			}
-			else printk("process %d stopped with signal %d\n", 
+			else printk("process %d stopped with signal %d\n",
 				    pid, WSTOPSIG(status));
 			panic("wait_for_stop failed to wait for %d to stop "
 			      "with %d\n", pid, sig);
@@ -118,35 +118,26 @@ int wait_for_stop(int pid, int sig, int cont_type, void *relay)
 	}
 }
 
-int __raw(int fd, int complain, int now)
+int raw(int fd)
 {
 	struct termios tt;
 	int err;
-	int when;
 
 	CATCH_EINTR(err = tcgetattr(fd, &tt));
-
 	if (err < 0) {
-		if (complain)
 			printk("tcgetattr failed, errno = %d\n", errno);
 		return(-errno);
 	}
 
 	cfmakeraw(&tt);
 
-	if (now)
-		when = TCSANOW;
-	else
-		when = TCSADRAIN;
-
-	CATCH_EINTR(err = tcsetattr(fd, when, &tt));
-
+ 	CATCH_EINTR(err = tcsetattr(fd, TCSADRAIN, &tt));
 	if (err < 0) {
-		if (complain)
 			printk("tcsetattr failed, errno = %d\n", errno);
 		return(-errno);
 	}
-	/*XXX: tcsetattr could have applied only some changes
+
+	/* XXX tcsetattr could have applied only some changes
 	 * (and cfmakeraw() is a set of changes) */
 	return(0);
 }
@@ -157,18 +148,6 @@ void setup_machinename(char *machine_out)
 
 	uname(&host);
 	strcpy(machine_out, host.machine);
-	/*
-	 * Pretend to be a i586 machine.
-	 *
-	 * This is a temporary workaround for several problems
-	 * triggered by the fact that the current 2.6 uml kernel
-	 * lacks a few system calls required for TLS/NPTL support,
-	 * whereas glibc expects these syscalls being present
-	 * unconditionally when the kernel version is 2.6.x.
-	 *
-	 */
-	if (0 == strcmp(machine_out,"i686"))
-		strcpy(machine_out,"i586");
 }
 
 char host_info[(_UTSNAME_LENGTH + 1) * 4 + _UTSNAME_NODENAME_LENGTH + 1];

@@ -98,8 +98,7 @@ int hfs_remount(struct super_block *sb, int *flags, char *data)
 	if ((*flags & MS_RDONLY) == (sb->s_flags & MS_RDONLY))
 		return 0;
 	if (!(*flags & MS_RDONLY)) {
-		if (!(HFS_SB(sb)->mdb->drAtrb & cpu_to_be16(HFS_SB_ATTRIB_UNMNT))
-		    || (HFS_SB(sb)->mdb->drAtrb & cpu_to_be16(HFS_SB_ATTRIB_INCNSTNT))) {
+		if (!(HFS_SB(sb)->mdb->drAtrb & cpu_to_be16(HFS_SB_ATTRIB_UNMNT))) {
 			printk("HFS-fs warning: Filesystem was not cleanly unmounted, "
 			       "running fsck.hfs is recommended.  leaving read-only.\n");
 			sb->s_flags |= MS_RDONLY;
@@ -152,8 +151,7 @@ static int parse_options(char *options, struct hfs_sb_info *hsb)
 	hsb->s_gid = current->gid;
 	hsb->s_file_umask = 0644;
 	hsb->s_dir_umask = 0755;
-	hsb->s_type = 0x3f3f3f3f;	/* == '????' */
-	hsb->s_creator = 0x3f3f3f3f;	/* == '????' */
+	hsb->s_type = hsb->s_creator = cpu_to_be32(0x3f3f3f3f);	/* == '????' */
 	hsb->s_quiet = 0;
 	hsb->part = -1;
 	hsb->session = -1;
@@ -216,11 +214,11 @@ static int parse_options(char *options, struct hfs_sb_info *hsb)
 		} else if (!strcmp(this_char, "type") && value) {
 			if (strlen(value) != 4)
 				return 0;
-			hsb->s_type = *(u32 *)value;
+			memcpy(&hsb->s_type, value, 4);
 		} else if (!strcmp(this_char, "creator") && value) {
 			if (strlen(value) != 4)
 				return 0;
-			hsb->s_creator = *(u32 *)value;
+			memcpy(&hsb->s_creator, value, 4);
 	/* Boolean-valued options */
 		} else if (!strcmp(this_char, "quiet")) {
 			if (value)

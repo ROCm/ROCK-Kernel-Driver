@@ -74,10 +74,6 @@ struct inode_operations nfs_dir_inode_operations = {
 	.permission	= nfs_permission,
 	.getattr	= nfs_getattr,
 	.setattr	= nfs_setattr,
-	.listxattr	= nfs_listxattr,
-	.getxattr	= nfs_getxattr,
-	.setxattr	= nfs_setxattr,
-	.removexattr	= nfs_removexattr,
 };
 
 #ifdef CONFIG_NFS_V4
@@ -1442,7 +1438,7 @@ static int nfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		goto go_ahead;
 	if (S_ISDIR(new_inode->i_mode))
 		goto out;
-	else if (atomic_read(&new_dentry->d_count) > 2) {
+	else if (atomic_read(&new_dentry->d_count) > 1) {
 		int err;
 		/* copy the target dentry's name */
 		dentry = d_alloc(new_dentry->d_parent,
@@ -1457,8 +1453,10 @@ static int nfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 			new_inode = NULL;
 			/* instantiate the replacement target */
 			d_instantiate(new_dentry, NULL);
-		} else if (atomic_read(&new_dentry->d_count) > 1) {
+		}
+
 		/* dentry still busy? */
+		if (atomic_read(&new_dentry->d_count) > 1) {
 #ifdef NFS_PARANOIA
 			printk("nfs_rename: target %s/%s busy, d_count=%d\n",
 			       new_dentry->d_parent->d_name.name,
@@ -1556,7 +1554,6 @@ out:
 
 int nfs_permission(struct inode *inode, int mask, struct nameidata *nd)
 {
-	struct nfs_server *server = NFS_SERVER(inode);
 	struct rpc_cred *cred;
 	int mode = inode->i_mode;
 	int res;
@@ -1593,7 +1590,7 @@ int nfs_permission(struct inode *inode, int mask, struct nameidata *nd)
 
 	lock_kernel();
 
-	if ((server->flags & NFS_MOUNT_NOACL) || !NFS_PROTO(inode)->access)
+	if (!NFS_PROTO(inode)->access)
 		goto out_notsup;
 
 	cred = rpcauth_lookupcred(NFS_CLIENT(inode)->cl_auth, 0);
@@ -1603,7 +1600,7 @@ int nfs_permission(struct inode *inode, int mask, struct nameidata *nd)
 	return res;
 out_notsup:
 	nfs_revalidate_inode(NFS_SERVER(inode), inode);
-	res = vfs_permission(inode, mask);
+	res = generic_permission(inode, mask, NULL);
 	unlock_kernel();
 	return res;
 }

@@ -75,7 +75,7 @@
  *  from the %ISL38XX_PCI_POSTING_FLUSH offset.
  */
 static inline void
-isl38xx_w32_flush(void *base, u32 val, unsigned long offset)
+isl38xx_w32_flush(void __iomem *base, u32 val, unsigned long offset)
 {
 	writel(val, base + offset);
 	(void) readl(base + ISL38XX_PCI_POSTING_FLUSH);
@@ -95,6 +95,10 @@ isl38xx_w32_flush(void *base, u32 val, unsigned long offset)
 #define ISL38XX_INT_SOURCES                     0x001E
 
 /* Control/Status register bits */
+/* Looks like there are other meaningful bits
+    0x20004400 seen in normal operation,
+    0x200044db at 'timeout waiting for mgmt response'
+*/
 #define ISL38XX_CTRL_STAT_SLEEPMODE             0x00000200
 #define	ISL38XX_CTRL_STAT_CLKRUN		0x00800000
 #define ISL38XX_CTRL_STAT_RESET                 0x10000000
@@ -157,13 +161,13 @@ typedef struct isl38xx_cb isl38xx_control_block;
 /* determine number of entries currently in queue */
 int isl38xx_in_queue(isl38xx_control_block *cb, int queue);
 
-void isl38xx_disable_interrupts(void *);
-void isl38xx_enable_common_interrupts(void *);
+void isl38xx_disable_interrupts(void __iomem *);
+void isl38xx_enable_common_interrupts(void __iomem *);
 
 void isl38xx_handle_sleep_request(isl38xx_control_block *, int *,
-				  void *);
-void isl38xx_handle_wakeup(isl38xx_control_block *, int *, void *);
-void isl38xx_trigger_device(int, void *);
-void isl38xx_interface_reset(void *, dma_addr_t);
+				  void __iomem *);
+void isl38xx_handle_wakeup(isl38xx_control_block *, int *, void __iomem *);
+void isl38xx_trigger_device(int, void __iomem *);
+void isl38xx_interface_reset(void __iomem *, dma_addr_t);
 
 #endif				/* _ISL_38XX_H */

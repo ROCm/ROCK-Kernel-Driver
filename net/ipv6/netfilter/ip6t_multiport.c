@@ -53,28 +53,32 @@ match(const struct sk_buff *skb,
       const struct net_device *out,
       const void *matchinfo,
       int offset,
-      const void *hdr,
-      u_int16_t datalen,
+      unsigned int protoff,
       int *hotdrop)
 {
-	const struct udphdr *udp = hdr;
+	u16 _ports[2], *pptr;
 	const struct ip6t_multiport *multiinfo = matchinfo;
 
-	/* Must be big enough to read ports. */
-	if (offset == 0 && datalen < sizeof(struct udphdr)) {
+	/* Must not be a fragment. */
+	if (offset)
+		return 0;
+
+	/* Must be big enough to read ports (both UDP and TCP have
+	   them at the start). */
+	pptr = skb_header_pointer(skb, protoff, sizeof(_ports), &_ports[0]);
+	if (pptr == NULL) {
 		/* We've been asked to examine this packet, and we
-		   can't.  Hence, no choice but to drop. */
-			duprintf("ip6t_multiport:"
-				 " Dropping evil offset=0 tinygram.\n");
-			*hotdrop = 1;
-			return 0;
+		 * can't.  Hence, no choice but to drop.
+		 */
+		duprintf("ip6t_multiport:"
+			 " Dropping evil offset=0 tinygram.\n");
+		*hotdrop = 1;
+		return 0;
 	}
 
-	/* Must not be a fragment. */
-	return !offset
-		&& ports_match(multiinfo->ports,
-			       multiinfo->flags, multiinfo->count,
-			       ntohs(udp->source), ntohs(udp->dest));
+	return ports_match(multiinfo->ports,
+			   multiinfo->flags, multiinfo->count,
+			   ntohs(pptr[0]), ntohs(pptr[1]));
 }
 
 /* Called when user tries to insert an entry of this type. */
@@ -87,9 +91,12 @@ checkentry(const char *tablename,
 {
 	const struct ip6t_multiport *multiinfo = matchinfo;
 
+	if (matchsize != IP6T_ALIGN(sizeof(struct ip6t_multiport)))
+		return 0;
+
 	/* Must specify proto == TCP/UDP, no unknown flags or bad count */
 	return (ip->proto == IPPROTO_TCP || ip->proto == IPPROTO_UDP)
-		&& !(ip->flags & IP6T_INV_PROTO)
+		&& !(ip->invflags & IP6T_INV_PROTO)
 		&& matchsize == IP6T_ALIGN(sizeof(struct ip6t_multiport))
 		&& (multiinfo->flags == IP6T_MULTIPORT_SOURCE
 		    || multiinfo->flags == IP6T_MULTIPORT_DESTINATION

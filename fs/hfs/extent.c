@@ -279,13 +279,13 @@ int hfs_free_fork(struct super_block *sb, struct hfs_cat_file *file, int type)
 	int res, i;
 
 	if (type == HFS_FK_DATA) {
-		total_blocks = file->PyLen;
+		total_blocks = be32_to_cpu(file->PyLen);
 		extent = file->ExtRec;
 	} else {
-		total_blocks = file->RPyLen;
+		total_blocks = be32_to_cpu(file->RPyLen);
 		extent = file->RExtRec;
 	}
-	total_blocks = be32_to_cpu(total_blocks) / HFS_SB(sb)->alloc_blksz;
+	total_blocks /= HFS_SB(sb)->alloc_blksz;
 	if (!total_blocks)
 		return 0;
 
@@ -328,8 +328,8 @@ int hfs_get_block(struct inode *inode, sector_t block,
 	/* Convert inode block to disk allocation block */
 	ablock = (u32)block / HFS_SB(sb)->fs_div;
 
-	if (block >= inode->i_blocks) {
-		if (block > inode->i_blocks || !create)
+	if (block >= HFS_I(inode)->fs_blocks) {
+		if (block > HFS_I(inode)->fs_blocks || !create)
 			return -EIO;
 		if (ablock >= HFS_I(inode)->alloc_blocks) {
 			res = hfs_extend_file(inode);
@@ -363,7 +363,8 @@ done:
 	if (create) {
 		set_buffer_new(bh_result);
 		HFS_I(inode)->phys_size += sb->s_blocksize;
-		inode->i_blocks++;
+		HFS_I(inode)->fs_blocks++;
+		inode_add_bytes(inode, sb->s_blocksize);
 		mark_inode_dirty(inode);
 	}
 	return 0;
@@ -521,6 +522,7 @@ void hfs_file_truncate(struct inode *inode)
 	HFS_I(inode)->alloc_blocks = blk_cnt;
 out:
 	HFS_I(inode)->phys_size = inode->i_size;
+	HFS_I(inode)->fs_blocks = (inode->i_size + sb->s_blocksize - 1) >> sb->s_blocksize_bits;
+	inode_set_bytes(inode, HFS_I(inode)->fs_blocks << sb->s_blocksize_bits);
 	mark_inode_dirty(inode);
-	inode->i_blocks = (inode->i_size + sb->s_blocksize - 1) >> sb->s_blocksize_bits;
 }

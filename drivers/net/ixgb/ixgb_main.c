@@ -30,7 +30,7 @@
 
 char ixgb_driver_name[] = "ixgb";
 char ixgb_driver_string[] = "Intel(R) PRO/10GbE Network Driver";
-char ixgb_driver_version[] = "1.0.66";
+char ixgb_driver_version[] = "1.0.66-k2";
 char ixgb_copyright[] = "Copyright (c) 2001-2004 Intel Corporation.";
 
 /* ixgb_pci_tbl - PCI Device ID Table
@@ -97,7 +97,6 @@ static boolean_t ixgb_clean_rx_irq(struct ixgb_adapter *adapter,
 static boolean_t ixgb_clean_rx_irq(struct ixgb_adapter *adapter);
 #endif
 static void ixgb_alloc_rx_buffers(struct ixgb_adapter *adapter);
-static int ixgb_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd);
 static void ixgb_tx_timeout(struct net_device *dev);
 static void ixgb_tx_timeout_task(struct net_device *dev);
 static void ixgb_vlan_rx_register(struct net_device *netdev,
@@ -124,7 +123,7 @@ struct notifier_block ixgb_notifier_reboot = {
 /* Exported from other modules */
 
 extern void ixgb_check_options(struct ixgb_adapter *adapter);
-extern int ixgb_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr);
+extern struct ethtool_ops ixgb_ethtool_ops;
 
 static struct pci_driver ixgb_driver = {
 	.name = ixgb_driver_name,
@@ -372,9 +371,9 @@ ixgb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	netdev->set_multicast_list = &ixgb_set_multi;
 	netdev->set_mac_address = &ixgb_set_mac;
 	netdev->change_mtu = &ixgb_change_mtu;
-	netdev->do_ioctl = &ixgb_ioctl;
 	netdev->tx_timeout = &ixgb_tx_timeout;
 	netdev->watchdog_timeo = HZ;
+	SET_ETHTOOL_OPS(netdev, &ixgb_ethtool_ops);
 #ifdef CONFIG_IXGB_NAPI
 	netdev->poll = &ixgb_clean;
 	netdev->weight = 64;
@@ -1614,8 +1613,13 @@ static irqreturn_t ixgb_intr(int irq, void *data, struct pt_regs *regs)
 		__netif_rx_schedule(netdev);
 	}
 #else
-	for (i = 0; i < IXGB_MAX_INTR; i++)
-		if (!ixgb_clean_rx_irq(adapter) & !ixgb_clean_tx_irq(adapter))
+	/* yes, that is actually a & and it is meant to make sure that
+	 * every pass through this for loop checks both receive and
+	 * transmit queues for completed descriptors, intended to
+	 * avoid starvation issues and assist tx/rx fairness. */
+	for(i = 0; i < IXGB_MAX_INTR; i++)
+		if(!ixgb_clean_rx_irq(adapter) &
+		   !ixgb_clean_tx_irq(adapter))
 			break;
 	/* if RAIDC:EN == 1 and ICR:RXDMT0 == 1, we need to
 	 * set IMS:RXDMT0 to 1 to restart the RBD timer (POLL)
@@ -1677,7 +1681,7 @@ static boolean_t ixgb_clean_tx_irq(struct ixgb_adapter *adapter)
 	eop = tx_ring->buffer_info[i].next_to_watch;
 	eop_desc = IXGB_TX_DESC(*tx_ring, eop);
 
-	while (eop_desc->status & cpu_to_le32(IXGB_TX_DESC_STATUS_DD)) {
+	while (eop_desc->status & IXGB_TX_DESC_STATUS_DD) {
 
 		for (cleaned = FALSE; !cleaned;) {
 			tx_desc = IXGB_TX_DESC(*tx_ring, i);
@@ -1970,25 +1974,6 @@ static void ixgb_alloc_rx_buffers(struct ixgb_adapter *adapter)
 }
 
 /**
- * ixgb_ioctl - perform a command - e.g: ethtool:get_driver_info.
- * @param netdev network interface device structure
- * @param ifr data to be used/filled in by the ioctl command
- * @param cmd ioctl command to execute
- **/
-
-static int ixgb_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
-{
-	switch (cmd) {
-	case SIOCETHTOOL:
-		return ixgb_ethtool_ioctl(netdev, ifr);
-	default:
-		return -EOPNOTSUPP;
-	}
-
-	return 0;
-}
-
-/**
  * ixgb_vlan_rx_register - enables or disables vlan tagging/stripping.
  * 
  * @param netdev network interface device structure
@@ -2117,7 +2102,7 @@ static int ixgb_suspend(struct pci_dev *pdev, uint32_t state)
 	if (netif_running(netdev))
 		ixgb_down(adapter, TRUE);
 
-	pci_save_state(pdev, adapter->pci_state);
+	pci_save_state(pdev);
 
 	state = (state > 0) ? 3 : 0;
 	pci_set_power_state(pdev, state);

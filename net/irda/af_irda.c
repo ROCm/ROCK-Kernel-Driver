@@ -2005,7 +2005,7 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 		}
 
 		/* Remove the attribute (and maybe the object) */
-		irias_delete_attrib(ias_obj, ias_attr);
+		irias_delete_attrib(ias_obj, ias_attr, 1);
 		kfree(ias_opt);
 		break;
 	case IRLMP_MAX_SDU_SIZE:

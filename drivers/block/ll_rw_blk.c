@@ -100,7 +100,7 @@ static void blk_queue_congestion_threshold(struct request_queue *q)
 		nr = q->nr_requests;
 	q->nr_congestion_on = nr;
 
-	nr = q->nr_requests - (q->nr_requests / 8) - 1;
+	nr = q->nr_requests - (q->nr_requests / 8) - (q->nr_requests / 16) - 1;
 	if (nr < 1)
 		nr = 1;
 	q->nr_congestion_off = nr;
@@ -243,6 +243,7 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	blk_queue_hardsect_size(q, 512);
 	blk_queue_dma_alignment(q, 511);
 	blk_queue_congestion_threshold(q);
+	q->nr_batching = BLK_BATCH_REQ;
 
 	q->unplug_thresh = 4;		/* hmm */
 	q->unplug_delay = (3 * HZ) / 1000;	/* 3 milliseconds */
@@ -260,6 +261,8 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	blk_queue_bounce_limit(q, BLK_BOUNCE_HIGH);
 
 	blk_queue_activity_fn(q, NULL, NULL);
+
+	INIT_LIST_HEAD(&q->drain_list);
 }
 
 EXPORT_SYMBOL(blk_queue_make_request);
@@ -352,7 +355,7 @@ void blk_queue_max_sectors(request_queue_t *q, unsigned short max_sectors)
 		printk("%s: set to minimum %d\n", __FUNCTION__, max_sectors);
 	}
 
-	q->max_sectors = max_sectors;
+	q->max_sectors = q->max_hw_sectors = max_sectors;
 }
 
 EXPORT_SYMBOL(blk_queue_max_sectors);
@@ -454,7 +457,8 @@ EXPORT_SYMBOL(blk_queue_hardsect_size);
 void blk_queue_stack_limits(request_queue_t *t, request_queue_t *b)
 {
 	/* zero is "infinity" */
-	t->max_sectors = min_not_zero(t->max_sectors,b->max_sectors);
+	t->max_sectors = t->max_hw_sectors =
+		min_not_zero(t->max_sectors,b->max_sectors);
 
 	t->max_phys_segments = min(t->max_phys_segments,b->max_phys_segments);
 	t->max_hw_segments = min(t->max_hw_segments,b->max_hw_segments);
@@ -1353,8 +1357,28 @@ void blk_stop_queue(request_queue_t *q)
 	blk_remove_plug(q);
 	set_bit(QUEUE_FLAG_STOPPED, &q->queue_flags);
 }
-
 EXPORT_SYMBOL(blk_stop_queue);
+
+/**
+ * blk_sync_queue - cancel any pending callbacks on a queue
+ * @q: the queue
+ *
+ * Description:
+ *     The block layer may perform asynchronous callback activity
+ *     on a queue, such as calling the unplug function after a timeout.
+ *     A block device may call blk_sync_queue to ensure that any
+ *     such activity is cancelled, thus allowing it to release resources
+ *     the the callbacks might use. The caller must already have made sure
+ *     that its ->make_request_fn will not re-add plugging prior to calling
+ *     this function.
+ *
+ */
+void blk_sync_queue(struct request_queue *q)
+{
+	del_timer_sync(&q->unplug_timer);
+	kblockd_flush();
+}
+EXPORT_SYMBOL(blk_sync_queue);
 
 /**
  * blk_run_queue - run a single device queue
@@ -1369,7 +1393,6 @@ void blk_run_queue(struct request_queue *q)
 	q->request_fn(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
-
 EXPORT_SYMBOL(blk_run_queue);
 
 /**
@@ -1394,10 +1417,10 @@ void blk_cleanup_queue(request_queue_t * q)
 	if (!atomic_dec_and_test(&q->refcnt))
 		return;
 
-	elevator_exit(q);
+	if (q->elevator)
+		elevator_exit(q->elevator);
 
-	del_timer_sync(&q->unplug_timer);
-	kblockd_flush();
+	blk_sync_queue(q);
 
 	if (rl->rq_pool)
 		mempool_destroy(rl->rq_pool);
@@ -1417,6 +1440,7 @@ static int blk_init_free_list(request_queue_t *q)
 	rl->count[READ] = rl->count[WRITE] = 0;
 	init_waitqueue_head(&rl->wait[READ]);
 	init_waitqueue_head(&rl->wait[WRITE]);
+	init_waitqueue_head(&rl->drain);
 
 	rl->rq_pool = mempool_create(BLKDEV_MIN_RQ, mempool_alloc_slab, mempool_free_slab, request_cachep);
 
@@ -1427,45 +1451,6 @@ static int blk_init_free_list(request_queue_t *q)
 }
 
 static int __make_request(request_queue_t *, struct bio *);
-
-static elevator_t *chosen_elevator =
-#if defined(CONFIG_IOSCHED_AS)
-	&iosched_as;
-#elif defined(CONFIG_IOSCHED_DEADLINE)
-	&iosched_deadline;
-#elif defined(CONFIG_IOSCHED_CFQ)
-	&iosched_cfq;
-#elif defined(CONFIG_IOSCHED_NOOP)
-	&elevator_noop;
-#else
-	NULL;
-#error "You must have at least 1 I/O scheduler selected"
-#endif
-
-#if defined(CONFIG_IOSCHED_AS) || defined(CONFIG_IOSCHED_DEADLINE) || defined (CONFIG_IOSCHED_NOOP)
-static int __init elevator_setup(char *str)
-{
-#ifdef CONFIG_IOSCHED_DEADLINE
-	if (!strcmp(str, "deadline"))
-		chosen_elevator = &iosched_deadline;
-#endif
-#ifdef CONFIG_IOSCHED_AS
-	if (!strcmp(str, "as"))
-		chosen_elevator = &iosched_as;
-#endif
-#ifdef CONFIG_IOSCHED_CFQ
-	if (!strcmp(str, "cfq"))
-		chosen_elevator = &iosched_cfq;
-#endif
-#ifdef CONFIG_IOSCHED_NOOP
-	if (!strcmp(str, "noop"))
-		chosen_elevator = &elevator_noop;
-#endif
-	return 1;
-}
-
-__setup("elevator=", elevator_setup);
-#endif /* CONFIG_IOSCHED_AS || CONFIG_IOSCHED_DEADLINE || CONFIG_IOSCHED_NOOP */
 
 request_queue_t *blk_alloc_queue(int gfp_mask)
 {
@@ -1519,20 +1504,13 @@ EXPORT_SYMBOL(blk_alloc_queue);
  **/
 request_queue_t *blk_init_queue(request_fn_proc *rfn, spinlock_t *lock)
 {
-	request_queue_t *q;
-	static int printed;
+	request_queue_t *q = blk_alloc_queue(GFP_KERNEL);
 
-	q = blk_alloc_queue(GFP_KERNEL);
 	if (!q)
 		return NULL;
 
 	if (blk_init_free_list(q))
 		goto out_init;
-
-	if (!printed) {
-		printed = 1;
-		printk("Using %s io scheduler\n", chosen_elevator->elevator_name);
-	}
 
 	q->request_fn		= rfn;
 	q->back_merge_fn       	= ll_back_merge_fn;
@@ -1554,8 +1532,10 @@ request_queue_t *blk_init_queue(request_fn_proc *rfn, spinlock_t *lock)
 	/*
 	 * all done
 	 */
-	if (!elevator_init(q, chosen_elevator))
+	if (!elevator_init(q, NULL)) {
+		blk_queue_congestion_threshold(q);
 		return q;
+	}
 
 	blk_cleanup_queue(q);
 out_init:
@@ -1583,12 +1563,19 @@ static inline void blk_free_request(request_queue_t *q, struct request *rq)
 	mempool_free(rq, q->rq.rq_pool);
 }
 
-static inline struct request *blk_alloc_request(request_queue_t *q,int gfp_mask)
+static inline struct request *blk_alloc_request(request_queue_t *q, int rw,
+						int gfp_mask)
 {
 	struct request *rq = mempool_alloc(q->rq.rq_pool, gfp_mask);
 
 	if (!rq)
 		return NULL;
+
+	/*
+	 * first three bits are identical in rq->flags and bio->bi_rw,
+	 * see bio.h and blkdev.h
+	 */
+	rq->flags = rw;
 
 	if (!elv_set_request(q, rq, gfp_mask))
 		return rq;
@@ -1601,7 +1588,7 @@ static inline struct request *blk_alloc_request(request_queue_t *q,int gfp_mask)
  * ioc_batching returns true if the ioc is a valid batching request and
  * should be given priority access to a request.
  */
-static inline int ioc_batching(struct io_context *ioc)
+static inline int ioc_batching(request_queue_t *q, struct io_context *ioc)
 {
 	if (!ioc)
 		return 0;
@@ -1611,7 +1598,7 @@ static inline int ioc_batching(struct io_context *ioc)
 	 * even if the batch times out, otherwise we could theoretically
 	 * lose wakeups.
 	 */
-	return ioc->nr_batch_requests == BLK_BATCH_REQ ||
+	return ioc->nr_batch_requests == q->nr_batching ||
 		(ioc->nr_batch_requests > 0
 		&& time_before(jiffies, ioc->last_waited + BLK_BATCH_TIME));
 }
@@ -1622,12 +1609,12 @@ static inline int ioc_batching(struct io_context *ioc)
  * is the behaviour we want though - once it gets a wakeup it should be given
  * a nice run.
  */
-void ioc_set_batching(struct io_context *ioc)
+void ioc_set_batching(request_queue_t *q, struct io_context *ioc)
 {
-	if (!ioc || ioc_batching(ioc))
+	if (!ioc || ioc_batching(q, ioc))
 		return;
 
-	ioc->nr_batch_requests = BLK_BATCH_REQ;
+	ioc->nr_batch_requests = q->nr_batching;
 	ioc->last_waited = jiffies;
 }
 
@@ -1643,11 +1630,14 @@ static void freed_request(request_queue_t *q, int rw)
 	if (rl->count[rw] < queue_congestion_off_threshold(q))
 		clear_queue_congested(q, rw);
 	if (rl->count[rw]+1 <= q->nr_requests) {
+		smp_mb();
 		if (waitqueue_active(&rl->wait[rw]))
 			wake_up(&rl->wait[rw]);
-		if (!waitqueue_active(&rl->wait[rw]))
-			blk_clear_queue_full(q, rw);
+		blk_clear_queue_full(q, rw);
 	}
+	if (unlikely(waitqueue_active(&rl->drain)) &&
+	    !rl->count[READ] && !rl->count[WRITE])
+		wake_up(&rl->drain);
 }
 
 #define blkdev_free_rq(list) list_entry((list)->next, struct request, queuelist)
@@ -1660,6 +1650,9 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 	struct request_list *rl = &q->rq;
 	struct io_context *ioc = get_io_context(gfp_mask);
 
+	if (unlikely(test_bit(QUEUE_FLAG_DRAIN, &q->queue_flags)))
+		goto out;
+
 	spin_lock_irq(q->queue_lock);
 	if (rl->count[rw]+1 >= q->nr_requests) {
 		/*
@@ -1669,13 +1662,22 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 		 * will be blocked.
 		 */
 		if (!blk_queue_full(q, rw)) {
-			ioc_set_batching(ioc);
+			ioc_set_batching(q, ioc);
 			blk_set_queue_full(q, rw);
 		}
 	}
 
-	if (blk_queue_full(q, rw)
-			&& !ioc_batching(ioc) && !elv_may_queue(q, rw)) {
+	switch (elv_may_queue(q, rw)) {
+		case ELV_MQUEUE_NO:
+			spin_unlock_irq(q->queue_lock);
+			goto out;
+		case ELV_MQUEUE_MAY:
+			break;
+		case ELV_MQUEUE_MUST:
+			goto get_rq;
+	}
+
+	if (blk_queue_full(q, rw) && !ioc_batching(q, ioc)) {
 		/*
 		 * The queue is full and the allocating process is not a
 		 * "batcher", and not exempted by the IO scheduler
@@ -1684,12 +1686,13 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 		goto out;
 	}
 
+get_rq:
 	rl->count[rw]++;
 	if (rl->count[rw] >= queue_congestion_on_threshold(q))
 		set_queue_congested(q, rw);
 	spin_unlock_irq(q->queue_lock);
 
-	rq = blk_alloc_request(q, gfp_mask);
+	rq = blk_alloc_request(q, rw, gfp_mask);
 	if (!rq) {
 		/*
 		 * Allocation failed presumably due to memory. Undo anything
@@ -1704,16 +1707,10 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 		goto out;
 	}
 
-	if (ioc_batching(ioc))
+	if (ioc_batching(q, ioc))
 		ioc->nr_batch_requests--;
 	
 	INIT_LIST_HEAD(&rq->queuelist);
-
-	/*
-	 * first three bits are identical in rq->flags and bio->bi_rw,
-	 * see bio.h and blkdev.h
-	 */
-	rq->flags = rw;
 
 	rq->errors = 0;
 	rq->rq_status = RQ_ACTIVE;
@@ -1763,7 +1760,7 @@ static struct request *get_request_wait(request_queue_t *q, int rw)
 			 * See ioc_batching, ioc_set_batching
 			 */
 			ioc = get_io_context(GFP_NOIO);
-			ioc_set_batching(ioc);
+			ioc_set_batching(q, ioc);
 			put_io_context(ioc);
 		}
 		finish_wait(&rl->wait[rw], &wait);
@@ -2081,13 +2078,13 @@ void drive_stat_acct(struct request *rq, int nr_sectors, int new_io)
 		return;
 
 	if (rw == READ) {
-		disk_stat_add(rq->rq_disk, read_sectors, nr_sectors);
+		__disk_stat_add(rq->rq_disk, read_sectors, nr_sectors);
 		if (!new_io)
-			disk_stat_inc(rq->rq_disk, read_merges);
+			__disk_stat_inc(rq->rq_disk, read_merges);
 	} else if (rw == WRITE) {
-		disk_stat_add(rq->rq_disk, write_sectors, nr_sectors);
+		__disk_stat_add(rq->rq_disk, write_sectors, nr_sectors);
 		if (!new_io)
-			disk_stat_inc(rq->rq_disk, write_merges);
+			__disk_stat_inc(rq->rq_disk, write_merges);
 	}
 	if (new_io) {
 		disk_round_stats(rq->rq_disk);
@@ -2133,12 +2130,12 @@ void disk_round_stats(struct gendisk *disk)
 {
 	unsigned long now = jiffies;
 
-	disk_stat_add(disk, time_in_queue, 
+	__disk_stat_add(disk, time_in_queue,
 			disk->in_flight * (now - disk->stamp));
 	disk->stamp = now;
 
 	if (disk->in_flight)
-		disk_stat_add(disk, io_ticks, (now - disk->stamp_idle));
+		__disk_stat_add(disk, io_ticks, (now - disk->stamp_idle));
 	disk->stamp_idle = now;
 }
 
@@ -2383,9 +2380,7 @@ again:
 				break;
 
 			bio->bi_next = req->bio;
-			req->cbio = req->bio = bio;
-			req->nr_cbio_segments = bio_segments(bio);
-			req->nr_cbio_sectors = bio_sectors(bio);
+			req->bio = bio;
 
 			/*
 			 * may not be valid. if the low level driver said
@@ -2457,11 +2452,9 @@ get_rq:
 	req->current_nr_sectors = req->hard_cur_sectors = cur_nr_sectors;
 	req->nr_phys_segments = bio_phys_segments(q, bio);
 	req->nr_hw_segments = bio_hw_segments(q, bio);
-	req->nr_cbio_segments = bio_segments(bio);
-	req->nr_cbio_sectors = bio_sectors(bio);
 	req->buffer = bio_data(bio);	/* see ->buffer comment above */
 	req->waiting = NULL;
-	req->cbio = req->bio = req->biotail = bio;
+	req->bio = req->biotail = bio;
 	req->rq_disk = bio->bi_bdev->bd_disk;
 	req->start_time = jiffies;
 
@@ -2505,6 +2498,106 @@ static inline void blk_partition_remap(struct bio *bio)
 	}
 }
 
+void blk_finish_queue_drain(request_queue_t *q)
+{
+	struct request_list *rl = &q->rq;
+	struct request *rq;
+
+	spin_lock_irq(q->queue_lock);
+	clear_bit(QUEUE_FLAG_DRAIN, &q->queue_flags);
+
+	while (!list_empty(&q->drain_list)) {
+		rq = list_entry_rq(q->drain_list.next);
+
+		list_del_init(&rq->queuelist);
+		__elv_add_request(q, rq, ELEVATOR_INSERT_BACK, 1);
+	}
+
+	spin_unlock_irq(q->queue_lock);
+
+	wake_up(&rl->wait[0]);
+	wake_up(&rl->wait[1]);
+	wake_up(&rl->drain);
+}
+
+static int wait_drain(request_queue_t *q, struct request_list *rl, int dispatch)
+{
+	int wait = rl->count[READ] + rl->count[WRITE];
+
+	if (dispatch)
+		wait += !list_empty(&q->queue_head);
+
+	return wait;
+}
+
+/*
+ * We rely on the fact that only requests allocated through blk_alloc_request()
+ * have io scheduler private data structures associated with them. Any other
+ * type of request (allocated on stack or through kmalloc()) should not go
+ * to the io scheduler core, but be attached to the queue head instead.
+ */
+void blk_wait_queue_drained(request_queue_t *q, int wait_dispatch)
+{
+	struct request_list *rl = &q->rq;
+	DEFINE_WAIT(wait);
+
+	spin_lock_irq(q->queue_lock);
+	set_bit(QUEUE_FLAG_DRAIN, &q->queue_flags);
+
+	while (wait_drain(q, rl, wait_dispatch)) {
+		prepare_to_wait(&rl->drain, &wait, TASK_UNINTERRUPTIBLE);
+
+		if (wait_drain(q, rl, wait_dispatch)) {
+			__generic_unplug_device(q);
+			spin_unlock_irq(q->queue_lock);
+			io_schedule();
+			spin_lock_irq(q->queue_lock);
+		}
+
+		finish_wait(&rl->drain, &wait);
+	}
+
+	spin_unlock_irq(q->queue_lock);
+}
+
+/*
+ * block waiting for the io scheduler being started again.
+ */
+static inline void block_wait_queue_running(request_queue_t *q)
+{
+	DEFINE_WAIT(wait);
+
+	while (test_bit(QUEUE_FLAG_DRAIN, &q->queue_flags)) {
+		struct request_list *rl = &q->rq;
+
+		prepare_to_wait_exclusive(&rl->drain, &wait,
+				TASK_UNINTERRUPTIBLE);
+
+		/*
+		 * re-check the condition. avoids using prepare_to_wait()
+		 * in the fast path (queue is running)
+		 */
+		if (test_bit(QUEUE_FLAG_DRAIN, &q->queue_flags))
+			io_schedule();
+
+		finish_wait(&rl->drain, &wait);
+	}
+}
+
+static void handle_bad_sector(struct bio *bio)
+{
+	char b[BDEVNAME_SIZE];
+
+	printk(KERN_INFO "attempt to access beyond end of device\n");
+	printk(KERN_INFO "%s: rw=%ld, want=%Lu, limit=%Lu\n",
+			bdevname(bio->bi_bdev, b),
+			bio->bi_rw,
+			(unsigned long long)bio->bi_sector + bio_sectors(bio),
+			(long long)(bio->bi_bdev->bd_inode->i_size >> 9));
+
+	set_bit(BIO_EOF, &bio->bi_flags);
+}
+
 /**
  * generic_make_request: hand a buffer to its device driver for I/O
  * @bio:  The bio describing the location in memory and on the device.
@@ -2541,21 +2634,13 @@ void generic_make_request(struct bio *bio)
 	if (maxsector) {
 		sector_t sector = bio->bi_sector;
 
-		if (maxsector < nr_sectors ||
-		    maxsector - nr_sectors < sector) {
-			char b[BDEVNAME_SIZE];
-			/* This may well happen - the kernel calls
-			 * bread() without checking the size of the
-			 * device, e.g., when mounting a device. */
-			printk(KERN_INFO
-			       "attempt to access beyond end of device\n");
-			printk(KERN_INFO "%s: rw=%ld, want=%Lu, limit=%Lu\n",
-			       bdevname(bio->bi_bdev, b),
-			       bio->bi_rw,
-			       (unsigned long long) sector + nr_sectors,
-			       (long long) maxsector);
-
-			set_bit(BIO_EOF, &bio->bi_flags);
+		if (maxsector < nr_sectors || maxsector - nr_sectors < sector) {
+			/*
+			 * This may well happen - the kernel calls bread()
+			 * without checking the size of the device, e.g., when
+			 * mounting a device.
+			 */
+			handle_bad_sector(bio);
 			goto end_io;
 		}
 	}
@@ -2583,16 +2668,18 @@ end_io:
 			break;
 		}
 
-		if (unlikely(bio_sectors(bio) > q->max_sectors)) {
+		if (unlikely(bio_sectors(bio) > q->max_hw_sectors)) {
 			printk("bio too big device %s (%u > %u)\n", 
 				bdevname(bio->bi_bdev, b),
 				bio_sectors(bio),
-				q->max_sectors);
+				q->max_hw_sectors);
 			goto end_io;
 		}
 
 		if (test_bit(QUEUE_FLAG_DEAD, &q->queue_flags))
 			goto end_io;
+
+		block_wait_queue_running(q);
 
 		/*
 		 * If this device has partitions, remap block n
@@ -2642,103 +2729,40 @@ void submit_bio(int rw, struct bio *bio)
 
 EXPORT_SYMBOL(submit_bio);
 
-/**
- * blk_rq_next_segment
- * @rq:		the request being processed
- *
- * Description:
- *	Points to the next segment in the request if the current segment
- *	is complete. Leaves things unchanged if this segment is not over
- *	or if no more segments are left in this request.
- *
- *	Meant to be used for bio traversal during I/O submission
- *	Does not affect any I/O completions or update completion state
- *	in the request, and does not modify any bio fields.
- *
- *	Decrementing rq->nr_sectors, rq->current_nr_sectors and
- *	rq->nr_cbio_sectors as data is transferred is the caller's
- *	responsibility and should be done before calling this routine.
- **/
-void blk_rq_next_segment(struct request *rq)
-{
-	if (rq->current_nr_sectors > 0)
-		return;
-
-	if (rq->nr_cbio_sectors > 0) {
-		--rq->nr_cbio_segments;
-		rq->current_nr_sectors = blk_rq_vec(rq)->bv_len >> 9;
-	} else {
-		if ((rq->cbio = rq->cbio->bi_next)) {
-			rq->nr_cbio_segments = bio_segments(rq->cbio);
-			rq->nr_cbio_sectors = bio_sectors(rq->cbio);
- 			rq->current_nr_sectors = bio_cur_sectors(rq->cbio);
-		}
- 	}
-
-	/* remember the size of this segment before we start I/O */
-	rq->hard_cur_sectors = rq->current_nr_sectors;
-}
-
-/**
- * process_that_request_first	-	process partial request submission
- * @req:	the request being processed
- * @nr_sectors:	number of sectors I/O has been submitted on
- *
- * Description:
- *	May be used for processing bio's while submitting I/O without
- *	signalling completion. Fails if more data is requested than is
- *	available in the request in which case it doesn't advance any
- *	pointers.
- *
- *	Assumes a request is correctly set up. No sanity checks.
- *
- * Return:
- *	0 - no more data left to submit (not processed)
- *	1 - data available to submit for this request (processed)
- **/
-int process_that_request_first(struct request *req, unsigned int nr_sectors)
-{
-	unsigned int nsect;
-
-	if (req->nr_sectors < nr_sectors)
-		return 0;
-
-	req->nr_sectors -= nr_sectors;
-	req->sector += nr_sectors;
-	while (nr_sectors) {
-		nsect = min_t(unsigned, req->current_nr_sectors, nr_sectors);
-		req->current_nr_sectors -= nsect;
-		nr_sectors -= nsect;
-		if (req->cbio) {
-			req->nr_cbio_sectors -= nsect;
-			blk_rq_next_segment(req);
-		}
-	}
-	return 1;
-}
-
-EXPORT_SYMBOL(process_that_request_first);
-
 void blk_recalc_rq_segments(struct request *rq)
 {
 	struct bio *bio, *prevbio = NULL;
 	int nr_phys_segs, nr_hw_segs;
+	unsigned int phys_size, hw_size;
+	request_queue_t *q = rq->q;
 
 	if (!rq->bio)
 		return;
 
-	nr_phys_segs = nr_hw_segs = 0;
+	phys_size = hw_size = nr_phys_segs = nr_hw_segs = 0;
 	rq_for_each_bio(bio, rq) {
 		/* Force bio hw/phys segs to be recalculated. */
 		bio->bi_flags &= ~(1 << BIO_SEG_VALID);
 
-		nr_phys_segs += bio_phys_segments(rq->q, bio);
-		nr_hw_segs += bio_hw_segments(rq->q, bio);
+		nr_phys_segs += bio_phys_segments(q, bio);
+		nr_hw_segs += bio_hw_segments(q, bio);
 		if (prevbio) {
-			if (blk_phys_contig_segment(rq->q, prevbio, bio))
+			int pseg = phys_size + prevbio->bi_size + bio->bi_size;
+			int hseg = hw_size + prevbio->bi_size + bio->bi_size;
+
+			if (blk_phys_contig_segment(q, prevbio, bio) &&
+			    pseg <= q->max_segment_size) {
 				nr_phys_segs--;
-			if (blk_hw_contig_segment(rq->q, prevbio, bio))
+				phys_size += prevbio->bi_size + bio->bi_size;
+			} else
+				phys_size = 0;
+
+			if (blk_hw_contig_segment(q, prevbio, bio) &&
+			    hseg <= q->max_segment_size) {
 				nr_hw_segs--;
+				hw_size += prevbio->bi_size + bio->bi_size;
+			} else
+				hw_size = 0;
 		}
 		prevbio = bio;
 	}
@@ -2754,8 +2778,7 @@ void blk_recalc_rq_sectors(struct request *rq, int nsect)
 		rq->hard_nr_sectors -= nsect;
 
 		/*
-		 * Move the I/O submission pointers ahead if required,
-		 * i.e. for drivers not aware of rq->cbio.
+		 * Move the I/O submission pointers ahead if required.
 		 */
 		if ((rq->nr_sectors >= rq->hard_nr_sectors) &&
 		    (rq->sector <= rq->hard_sector)) {
@@ -2763,11 +2786,7 @@ void blk_recalc_rq_sectors(struct request *rq, int nsect)
 			rq->nr_sectors = rq->hard_nr_sectors;
 			rq->hard_cur_sectors = bio_cur_sectors(rq->bio);
 			rq->current_nr_sectors = rq->hard_cur_sectors;
-			rq->nr_cbio_segments = bio_segments(rq->bio);
-			rq->nr_cbio_sectors = bio_sectors(rq->bio);
 			rq->buffer = bio_data(rq->bio);
-
-			rq->cbio = rq->bio;
 		}
 
 		/*
@@ -2939,12 +2958,12 @@ void end_that_request_last(struct request *req)
 		unsigned long duration = jiffies - req->start_time;
 		switch (rq_data_dir(req)) {
 		    case WRITE:
-			disk_stat_inc(disk, writes);
-			disk_stat_add(disk, write_ticks, duration);
+			__disk_stat_inc(disk, writes);
+			__disk_stat_add(disk, write_ticks, duration);
 			break;
 		    case READ:
-			disk_stat_inc(disk, reads);
-			disk_stat_add(disk, read_ticks, duration);
+			__disk_stat_inc(disk, reads);
+			__disk_stat_add(disk, read_ticks, duration);
 			break;
 		}
 		disk_round_stats(disk);
@@ -2979,32 +2998,12 @@ void blk_rq_bio_prep(request_queue_t *q, struct request *rq, struct bio *bio)
 	rq->current_nr_sectors = bio_cur_sectors(bio);
 	rq->hard_cur_sectors = rq->current_nr_sectors;
 	rq->hard_nr_sectors = rq->nr_sectors = bio_sectors(bio);
-	rq->nr_cbio_segments = bio_segments(bio);
-	rq->nr_cbio_sectors = bio_sectors(bio);
 	rq->buffer = bio_data(bio);
 
-	rq->cbio = rq->bio = rq->biotail = bio;
+	rq->bio = rq->biotail = bio;
 }
 
 EXPORT_SYMBOL(blk_rq_bio_prep);
-
-void blk_rq_prep_restart(struct request *rq)
-{
-	struct bio *bio;
-
-	bio = rq->cbio = rq->bio;
-	if (bio) {
-		rq->nr_cbio_segments = bio_segments(bio);
-		rq->nr_cbio_sectors = bio_sectors(bio);
-		rq->hard_cur_sectors = bio_cur_sectors(bio);
-		rq->buffer = bio_data(bio);
-	}
-	rq->sector = rq->hard_sector;
-	rq->nr_sectors = rq->hard_nr_sectors;
-	rq->current_nr_sectors = rq->hard_cur_sectors;
-}
-
-EXPORT_SYMBOL(blk_rq_prep_restart);
 
 int kblockd_schedule_work(struct work_struct *work)
 {
@@ -3017,6 +3016,7 @@ void kblockd_flush(void)
 {
 	flush_workqueue(kblockd_workqueue);
 }
+EXPORT_SYMBOL(kblockd_flush);
 
 int __init blk_dev_init(void)
 {
@@ -3035,6 +3035,7 @@ int __init blk_dev_init(void)
 
 	blk_max_low_pfn = max_low_pfn;
 	blk_max_pfn = max_pfn;
+
 	return 0;
 }
 
@@ -3051,9 +3052,13 @@ void put_io_context(struct io_context *ioc)
 	if (atomic_dec_and_test(&ioc->refcount)) {
 		if (ioc->aic && ioc->aic->dtor)
 			ioc->aic->dtor(ioc->aic);
+		if (ioc->cic && ioc->cic->dtor)
+			ioc->cic->dtor(ioc->cic);
+
 		kmem_cache_free(iocontext_cachep, ioc);
 	}
 }
+EXPORT_SYMBOL(put_io_context);
 
 /* Called by the exitting task */
 void exit_io_context(void)
@@ -3063,14 +3068,15 @@ void exit_io_context(void)
 
 	local_irq_save(flags);
 	ioc = current->io_context;
-	if (ioc) {
-		if (ioc->aic && ioc->aic->exit)
-			ioc->aic->exit(ioc->aic);
-		put_io_context(ioc);
-		current->io_context = NULL;
-	} else
-		WARN_ON(1);
+	current->io_context = NULL;
 	local_irq_restore(flags);
+
+	if (ioc->aic && ioc->aic->exit)
+		ioc->aic->exit(ioc->aic);
+	if (ioc->cic && ioc->cic->exit)
+		ioc->cic->exit(ioc->cic);
+
+	put_io_context(ioc);
 }
 
 /*
@@ -3089,22 +3095,42 @@ struct io_context *get_io_context(int gfp_flags)
 
 	local_irq_save(flags);
 	ret = tsk->io_context;
-	if (ret == NULL) {
-		ret = kmem_cache_alloc(iocontext_cachep, GFP_ATOMIC);
-		if (ret) {
-			atomic_set(&ret->refcount, 1);
-			ret->pid = tsk->pid;
-			ret->last_waited = jiffies; /* doesn't matter... */
-			ret->nr_batch_requests = 0; /* because this is 0 */
-			ret->aic = NULL;
-			tsk->io_context = ret;
-		}
-	}
 	if (ret)
-		atomic_inc(&ret->refcount);
+		goto out;
+
 	local_irq_restore(flags);
+
+	ret = kmem_cache_alloc(iocontext_cachep, gfp_flags);
+	if (ret) {
+		atomic_set(&ret->refcount, 1);
+		ret->pid = tsk->pid;
+		ret->last_waited = jiffies; /* doesn't matter... */
+		ret->nr_batch_requests = 0; /* because this is 0 */
+		ret->aic = NULL;
+		ret->cic = NULL;
+		spin_lock_init(&ret->lock);
+
+		local_irq_save(flags);
+
+		/*
+		 * very unlikely, someone raced with us in setting up the task
+		 * io context. free new context and just grab a reference.
+		 */
+		if (!tsk->io_context)
+			tsk->io_context = ret;
+		else {
+			kmem_cache_free(iocontext_cachep, ret);
+			ret = tsk->io_context;
+		}
+
+out:
+		atomic_inc(&ret->refcount);
+		local_irq_restore(flags);
+	}
+
 	return ret;
 }
+EXPORT_SYMBOL(get_io_context);
 
 void copy_io_context(struct io_context **pdst, struct io_context **psrc)
 {
@@ -3118,6 +3144,7 @@ void copy_io_context(struct io_context **pdst, struct io_context **psrc)
 		*pdst = src;
 	}
 }
+EXPORT_SYMBOL(copy_io_context);
 
 void swap_io_context(struct io_context **ioc1, struct io_context **ioc2)
 {
@@ -3126,7 +3153,7 @@ void swap_io_context(struct io_context **ioc1, struct io_context **ioc2)
 	*ioc1 = *ioc2;
 	*ioc2 = temp;
 }
-
+EXPORT_SYMBOL(swap_io_context);
 
 /*
  * sysfs parts below
@@ -3206,12 +3233,60 @@ queue_ra_store(struct request_queue *q, const char *page, size_t count)
 	unsigned long ra_kb;
 	ssize_t ret = queue_var_store(&ra_kb, page, count);
 
+	spin_lock_irq(q->queue_lock);
 	if (ra_kb > (q->max_sectors >> 1))
 		ra_kb = (q->max_sectors >> 1);
 
 	q->backing_dev_info.ra_pages = ra_kb >> (PAGE_CACHE_SHIFT - 10);
+	spin_unlock_irq(q->queue_lock);
+
 	return ret;
 }
+
+static ssize_t queue_max_sectors_show(struct request_queue *q, char *page)
+{
+	int max_sectors_kb = q->max_sectors >> 1;
+
+	return queue_var_show(max_sectors_kb, (page));
+}
+
+static ssize_t
+queue_max_sectors_store(struct request_queue *q, const char *page, size_t count)
+{
+	unsigned long max_sectors_kb,
+			max_hw_sectors_kb = q->max_hw_sectors >> 1,
+			page_kb = 1 << (PAGE_CACHE_SHIFT - 10);
+	ssize_t ret = queue_var_store(&max_sectors_kb, page, count);
+	int ra_kb;
+
+	if (max_sectors_kb > max_hw_sectors_kb || max_sectors_kb < page_kb)
+		return -EINVAL;
+	/*
+	 * Take the queue lock to update the readahead and max_sectors
+	 * values synchronously:
+	 */
+	spin_lock_irq(q->queue_lock);
+	/*
+	 * Trim readahead window as well, if necessary:
+	 */
+	ra_kb = q->backing_dev_info.ra_pages << (PAGE_CACHE_SHIFT - 10);
+	if (ra_kb > max_sectors_kb)
+		q->backing_dev_info.ra_pages =
+				max_sectors_kb >> (PAGE_CACHE_SHIFT - 10);
+
+	q->max_sectors = max_sectors_kb << 1;
+	spin_unlock_irq(q->queue_lock);
+
+	return ret;
+}
+
+static ssize_t queue_max_hw_sectors_show(struct request_queue *q, char *page)
+{
+	int max_hw_sectors_kb = q->max_hw_sectors >> 1;
+
+	return queue_var_show(max_hw_sectors_kb, (page));
+}
+
 
 static struct queue_sysfs_entry queue_requests_entry = {
 	.attr = {.name = "nr_requests", .mode = S_IRUGO | S_IWUSR },
@@ -3225,9 +3300,29 @@ static struct queue_sysfs_entry queue_ra_entry = {
 	.store = queue_ra_store,
 };
 
+static struct queue_sysfs_entry queue_max_sectors_entry = {
+	.attr = {.name = "max_sectors_kb", .mode = S_IRUGO | S_IWUSR },
+	.show = queue_max_sectors_show,
+	.store = queue_max_sectors_store,
+};
+
+static struct queue_sysfs_entry queue_max_hw_sectors_entry = {
+	.attr = {.name = "max_hw_sectors_kb", .mode = S_IRUGO },
+	.show = queue_max_hw_sectors_show,
+};
+
+static struct queue_sysfs_entry queue_iosched_entry = {
+	.attr = {.name = "scheduler", .mode = S_IRUGO | S_IWUSR },
+	.show = elv_iosched_show,
+	.store = elv_iosched_store,
+};
+
 static struct attribute *default_attrs[] = {
 	&queue_requests_entry.attr,
 	&queue_ra_entry.attr,
+	&queue_max_hw_sectors_entry.attr,
+	&queue_max_sectors_entry.attr,
+	&queue_iosched_entry.attr,
 	NULL,
 };
 

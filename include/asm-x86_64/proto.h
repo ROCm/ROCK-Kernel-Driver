@@ -12,6 +12,8 @@ extern void get_cpu_vendor(struct cpuinfo_x86*);
 extern void start_kernel(void);
 extern void pda_init(int); 
 
+extern void early_idt_handler(void);
+
 extern void mcheck_init(struct cpuinfo_x86 *c);
 extern void init_memory_mapping(void);
 
@@ -70,6 +72,7 @@ extern void __show_regs(struct pt_regs * regs);
 extern void show_regs(struct pt_regs * regs);
 
 extern int map_syscall32(struct mm_struct *mm, unsigned long address);
+extern int __map_syscall32(struct mm_struct *mm, unsigned long address);
 extern char *syscall32_page;
 extern void syscall32_cpu_init(void);
 

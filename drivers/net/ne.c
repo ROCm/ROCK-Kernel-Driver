@@ -29,6 +29,7 @@
     last in cleanup_modue()
     Richard Guenther    : Added support for ISAPnP cards
     Paul Gortmaker	: Discontinued PCI support - use ne2k-pci.c instead.
+    Hayato Fujiwara	: Add m32r support.
 
 */
 
@@ -127,6 +128,14 @@ bad_clone_list[] __initdata = {
 #define NE1SM_STOP_PG 	0x40	/* Last page +1 of RX ring */
 #define NESM_START_PG	0x40	/* First page of TX buffer */
 #define NESM_STOP_PG	0x80	/* Last page +1 of RX ring */
+
+#ifdef CONFIG_PLAT_MAPPI
+#  define DCR_VAL 0x4b
+#elif CONFIG_PLAT_OAKS32R
+#  define DCR_VAL 0x48
+#else
+#  define DCR_VAL 0x49
+#endif
 
 static int ne_probe1(struct net_device *dev, int ioaddr);
 static int ne_probe_isapnp(struct net_device *dev);
@@ -387,7 +396,7 @@ static int __init ne_probe1(struct net_device *dev, int ioaddr)
 		for (i = 0; i < 16; i++)
 			SA_prom[i] = SA_prom[i+i];
 		/* We must set the 8390 for word mode. */
-		outb_p(0x49, ioaddr + EN0_DCFG);
+		outb_p(DCR_VAL, ioaddr + EN0_DCFG);
 		start_page = NESM_START_PG;
 		stop_page = NESM_STOP_PG;
 	} else {
@@ -395,7 +404,12 @@ static int __init ne_probe1(struct net_device *dev, int ioaddr)
 		stop_page = NE1SM_STOP_PG;
 	}
 
+#if  defined(CONFIG_PLAT_MAPPI) || defined(CONFIG_PLAT_OAKS32R)
+	neX000 = ((SA_prom[14] == 0x57  &&  SA_prom[15] == 0x57)
+		|| (SA_prom[14] == 0x42 && SA_prom[15] == 0x42));
+#else
 	neX000 = (SA_prom[14] == 0x57  &&  SA_prom[15] == 0x57);
+#endif
 	ctron =  (SA_prom[0] == 0x00 && SA_prom[1] == 0x00 && SA_prom[2] == 0x1d);
 	copam =  (SA_prom[14] == 0x49 && SA_prom[15] == 0x00);
 
@@ -476,10 +490,20 @@ static int __init ne_probe1(struct net_device *dev, int ioaddr)
 
 	dev->base_addr = ioaddr;
 
+#ifdef CONFIG_PLAT_MAPPI
+	outb_p(E8390_NODMA + E8390_PAGE1 + E8390_STOP,
+		ioaddr + E8390_CMD); /* 0x61 */
+	for (i = 0 ; i < ETHER_ADDR_LEN ; i++) {
+		dev->dev_addr[i] = SA_prom[i]
+			= inb_p(ioaddr + EN1_PHYS_SHIFT(i));
+		printk(" %2.2x", SA_prom[i]);
+	}
+#else
 	for(i = 0; i < ETHER_ADDR_LEN; i++) {
 		printk(" %2.2x", SA_prom[i]);
 		dev->dev_addr[i] = SA_prom[i];
 	}
+#endif
 
 	printk("\n%s: %s found at %#x, using IRQ %d.\n",
 		dev->name, name, ioaddr, dev->irq);
@@ -487,7 +511,11 @@ static int __init ne_probe1(struct net_device *dev, int ioaddr)
 	ei_status.name = name;
 	ei_status.tx_start_page = start_page;
 	ei_status.stop_page = stop_page;
+#ifdef CONFIG_PLAT_OAKS32R
+	ei_status.word16 = 0;
+#else
 	ei_status.word16 = (wordlength == 2);
+#endif
 
 	ei_status.rx_start_page = start_page + TX_PAGES;
 #ifdef PACKETBUF_MEMSIZE

@@ -131,7 +131,7 @@ VM_MASK		= 0x00020000
 	movl $(__USER_DS), %edx; \
 	movl %edx, %ds; \
 	movl %edx, %es; \
-	pushl $11;	\
+	movl $11,%eax;	\
 	call do_exit;	\
 .previous;		\
 .section __ex_table,"a";\
@@ -140,58 +140,12 @@ VM_MASK		= 0x00020000
 .previous
 
 
-
-ENTRY(lcall7)
-	pushfl			# We get a different stack layout with call
-				# gates, which has to be cleaned up later..
-	pushl %eax
-	SAVE_ALL
-	movl %esp, %ebp
-	pushl %ebp
-	pushl $0x7
-do_lcall:
-	movl EIP(%ebp), %eax	# due to call gates, this is eflags, not eip..
-	movl CS(%ebp), %edx	# this is eip..
-	movl EFLAGS(%ebp), %ecx	# and this is cs..
-	movl %eax,EFLAGS(%ebp)	#
-	movl %edx,EIP(%ebp)	# Now we move them to their "normal" places
-	movl %ecx,CS(%ebp)	#
-	GET_THREAD_INFO_WITH_ESP(%ebp)	# GET_THREAD_INFO
-	movl TI_exec_domain(%ebp), %edx	# Get the execution domain
-	call *EXEC_DOMAIN_handler(%edx)	# Call the handler for the domain
-	addl $4, %esp
-	popl %eax
-	jmp resume_userspace
-
-ENTRY(lcall27)
-	pushfl			# We get a different stack layout with call
-				# gates, which has to be cleaned up later..
-	pushl %eax
-	SAVE_ALL
-	movl %esp, %ebp
-	pushl %ebp
-	pushl $0x27
-	jmp do_lcall
-
-
 ENTRY(ret_from_fork)
 	pushl %eax
 	call schedule_tail
 	GET_THREAD_INFO(%ebp)
 	popl %eax
 	jmp syscall_exit
-
-#if defined(CONFIG_KDB)
-ENTRY(kdb_call)
-	pushl %eax              # save orig EAX
-	SAVE_ALL
-	pushl %esp              # struct pt_regs
-	pushl $0                # error_code
-	pushl $7                # KDB_REASON_ENTRY
-	call  kdb
-	addl  $12,%esp          # remove args
-	RESTORE_ALL
-#endif
 
 /*
  * Return to user mode is not as complex as all this looks,
@@ -233,8 +187,8 @@ need_resched:
 	movl $PREEMPT_ACTIVE,TI_preempt_count(%ebp)
 	sti
 	call schedule
-	movl $0,TI_preempt_count(%ebp)
 	cli
+	movl $0,TI_preempt_count(%ebp)
 	jmp need_resched
 #endif
 
@@ -268,7 +222,7 @@ sysenter_past_esp:
 	SAVE_ALL
 	GET_THREAD_INFO(%ebp)
 
-	testb $(_TIF_SYSCALL_EMU|_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_flags(%ebp)
+	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_flags(%ebp)
 	jnz syscall_trace_entry
 	cmpl $(nr_syscalls), %eax
 	jae syscall_badsys
@@ -281,6 +235,7 @@ sysenter_past_esp:
 /* if something modifies registers it must also disable sysexit */
 	movl EIP(%esp), %edx
 	movl OLDESP(%esp), %ecx
+	xorl %ebp,%ebp
 	sti
 	sysexit
 
@@ -290,8 +245,8 @@ ENTRY(system_call)
 	pushl %eax			# save orig_eax
 	SAVE_ALL
 	GET_THREAD_INFO(%ebp)
-					# system call tracing in operation / emulation
-	testb $(_TIF_SYSCALL_EMU|_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_flags(%ebp)
+					# system call tracing in operation
+	testb $(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT),TI_flags(%ebp)
 	jnz syscall_trace_entry
 	cmpl $(nr_syscalls), %eax
 	jae syscall_badsys
@@ -337,8 +292,8 @@ work_notifysig:				# deal with pending signals and
 
 	ALIGN
 work_notifysig_v86:
-	pushl %ecx
-	call save_v86_state
+	pushl %ecx			# save ti_flags for do_notify_resume
+	call save_v86_state		# %eax contains pt_regs pointer
 	popl %ecx
 	movl %eax, %esp
 	xorl %edx, %edx
@@ -352,9 +307,6 @@ syscall_trace_entry:
 	movl %esp, %eax
 	xorl %edx,%edx
 	call do_syscall_trace
-	cmpl $0, %eax
-	jne syscall_exit		# ret != 0 -> running under PTRACE_SYSEMU,
-					# so must skip actual syscall
 	movl ORIG_EAX(%esp), %eax
 	cmpl $(nr_syscalls), %eax
 	jnae syscall_call
@@ -408,6 +360,7 @@ vector=vector+1
 	ALIGN
 common_interrupt:
 	SAVE_ALL
+	movl %esp,%eax
 	call do_IRQ
 	jmp ret_from_intr
 
@@ -415,7 +368,8 @@ common_interrupt:
 ENTRY(name)				\
 	pushl $nr-256;			\
 	SAVE_ALL			\
-	call smp_/**/name;	\
+	movl %esp,%eax;			\
+	call smp_/**/name;		\
 	jmp ret_from_intr;
 
 /* The include is where all of the SMP etc. interrupts come from */
@@ -438,18 +392,15 @@ error_code:
 	pushl %ebx
 	cld
 	movl %es, %ecx
-	movl ORIG_EAX(%esp), %esi	# get the error code
 	movl ES(%esp), %edi		# get the function address
+	movl ORIG_EAX(%esp), %edx	# get the error code
 	movl %eax, ORIG_EAX(%esp)
 	movl %ecx, ES(%esp)
-	movl %esp, %edx
-	pushl %esi			# push the error code
-	pushl %edx			# push the pt_regs pointer
-	movl $(__USER_DS), %edx
-	movl %edx, %ds
-	movl %edx, %es
+	movl $(__USER_DS), %ecx
+	movl %ecx, %ds
+	movl %ecx, %es
+	movl %esp,%eax			# pt_regs pointer
 	call *%edi
-	addl $8, %esp
 	jmp ret_from_exception
 
 ENTRY(coprocessor_error)
@@ -506,11 +457,9 @@ ENTRY(debug)
 debug_stack_correct:
 	pushl $-1			# mark this as an int
 	SAVE_ALL
-	movl %esp,%edx
-  	pushl $0
-	pushl %edx
+	xorl %edx,%edx			# error code 0
+	movl %esp,%eax			# pt_regs pointer
 	call do_debug
-	addl $8,%esp
 	testl %eax,%eax
 	jnz restore_all
 	jmp ret_from_exception
@@ -540,11 +489,9 @@ ENTRY(nmi)
 nmi_stack_correct:
 	pushl %eax
 	SAVE_ALL
-	movl %esp, %edx
-	pushl $0
-	pushl %edx
+	xorl %edx,%edx		# zero error code
+	movl %esp,%eax		# pt_regs pointer
 	call do_nmi
-	addl $8, %esp
 	RESTORE_ALL
 
 nmi_stack_fixup:
@@ -564,11 +511,9 @@ nmi_debug_stack_fixup:
 ENTRY(int3)
 	pushl $-1			# mark this as an int
 	SAVE_ALL
-	movl %esp,%edx
-	pushl $0
-	pushl %edx
+	xorl %edx,%edx		# zero error code
+	movl %esp,%eax		# pt_regs pointer
 	call do_int3
-	addl $8,%esp
 	testl %eax,%eax
 	jnz restore_all
 	jmp ret_from_exception
@@ -612,22 +557,6 @@ ENTRY(general_protection)
 ENTRY(alignment_check)
 	pushl $do_alignment_check
 	jmp error_code
-
-#if defined(CONFIG_KDB)
-ENTRY(page_fault_mca)
-	pushl %ecx
-	pushl %edx
-	pushl %eax
-	movl  $473,%ecx
-	rdmsr
-	andl  $0xfffffffe,%eax		/* Disable last branch recording */
-	wrmsr
-	popl  %eax
-	popl  %edx
-	popl  %ecx
-	pushl $do_page_fault
-	jmp error_code
-#endif
 
 ENTRY(page_fault)
 	pushl $do_page_fault
@@ -932,5 +861,9 @@ ENTRY(sys_call_table)
 	.long sys_mq_getsetattr
 	.long sys_ni_syscall		/* reserved for kexec */
 	.long sys_waitid
+	.long sys_ni_syscall		/* 285 */ /* available */
+	.long sys_add_key
+	.long sys_request_key
+	.long sys_keyctl
 
 syscall_table_size=(.-sys_call_table)

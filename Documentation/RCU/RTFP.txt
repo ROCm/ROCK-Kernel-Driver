@@ -202,8 +202,31 @@ Utilizing Execution History and Thread Monitoring"
 ,institution="US Patent and Trademark Office"
 ,address="Washington, DC"
 ,year="1995"
-,number="US Patent 5,442,758"
+,number="US Patent 5,442,758 (contributed under GPL)"
 ,month="August"
+}
+
+@techreport{Slingwine97
+,author="John D. Slingwine and Paul E. McKenney"
+,title="Method for maintaining data coherency using thread
+activity summaries in a multicomputer system"
+,institution="US Patent and Trademark Office"
+,address="Washington, DC"
+,year="1997"
+,number="US Patent 5,608,893 (contributed under GPL)"
+,month="March"
+}
+
+@techreport{Slingwine98
+,author="John D. Slingwine and Paul E. McKenney"
+,title="Apparatus and method for achieving reduced overhead
+mutual exclusion and maintaining coherency in a multiprocessor
+system utilizing execution history and thread monitoring"
+,institution="US Patent and Trademark Office"
+,address="Washington, DC"
+,year="1998"
+,number="US Patent 5,727,209 (contributed under GPL)"
+,month="March"
 }
 
 @Conference{McKenney98
@@ -227,6 +250,18 @@ Operating System Design and Implementation}"
 ,Year="1999"
 ,pages="87-100"
 ,Address="New Orleans, LA"
+}
+
+@techreport{Slingwine01
+,author="John D. Slingwine and Paul E. McKenney"
+,title="Apparatus and method for achieving reduced overhead
+mutual exclusion and maintaining coherency in a multiprocessor
+system utilizing execution history and thread monitoring"
+,institution="US Patent and Trademark Office"
+,address="Washington, DC"
+,year="2001"
+,number="US Patent 5,219,690 (contributed under GPL)"
+,month="April"
 }
 
 @Conference{McKenney01a

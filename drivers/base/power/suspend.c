@@ -63,11 +63,6 @@ int suspend_device(struct device * dev, u32 state)
  *	If we hit a failure with any of the devices, call device_resume()
  *	above to bring the suspended devices back to life.
  *
- *	Note this function leaves dpm_sem held to
- *	a) block other devices from registering.
- *	b) prevent other PM operations from happening after we've begun.
- *	c) make sure we're exclusive when we disable interrupts.
- *
  */
 
 int device_suspend(u32 state)
@@ -75,32 +70,43 @@ int device_suspend(u32 state)
 	int error = 0;
 
 	down(&dpm_sem);
-	while(!list_empty(&dpm_active)) {
+	down(&dpm_list_sem);
+	while (!list_empty(&dpm_active) && error == 0) {
 		struct list_head * entry = dpm_active.prev;
 		struct device * dev = to_device(entry);
+
+		get_device(dev);
+		up(&dpm_list_sem);
+
 		error = suspend_device(dev, state);
 
-		if (!error) {
-			list_del(&dev->power.entry);
-			list_add(&dev->power.entry, &dpm_off);
-		} else if (error == -EAGAIN) {
-			list_del(&dev->power.entry);
-			list_add(&dev->power.entry, &dpm_off_irq);
-		} else {
+		down(&dpm_list_sem);
+
+		/* Check if the device got removed */
+		if (!list_empty(&dev->power.entry)) {
+			/* Move it to the dpm_off or dpm_off_irq list */
+			if (!error) {
+				list_del(&dev->power.entry);
+				list_add(&dev->power.entry, &dpm_off);
+			} else if (error == -EAGAIN) {
+				list_del(&dev->power.entry);
+				list_add(&dev->power.entry, &dpm_off_irq);
+				error = 0;
+			}
+		}
+		if (error)
 			printk(KERN_ERR "Could not suspend device %s: "
 				"error %d\n", kobject_name(&dev->kobj), error);
-			goto Error;
-		}
+		put_device(dev);
 	}
- Done:
+	up(&dpm_list_sem);
+	if (error)
+		dpm_resume();
 	up(&dpm_sem);
 	return error;
- Error:
-	dpm_resume();
-	goto Done;
 }
 
-EXPORT_SYMBOL(device_suspend);
+EXPORT_SYMBOL_GPL(device_suspend);
 
 
 /**
@@ -132,5 +138,5 @@ int device_power_down(u32 state)
 	goto Done;
 }
 
-EXPORT_SYMBOL(device_power_down);
+EXPORT_SYMBOL_GPL(device_power_down);
 

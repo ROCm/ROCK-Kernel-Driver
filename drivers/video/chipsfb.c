@@ -416,7 +416,7 @@ chipsfb_pci_init(struct pci_dev *dp, const struct pci_device_id *ent)
 		release_mem_region(addr, size);
 		return -ENOMEM;
 	}
-
+	p->device = &dp->dev;
 	init_chips(p, addr);
 
 #ifdef CONFIG_PMAC_PBOOK
@@ -462,6 +462,9 @@ static struct pci_driver chipsfb_driver = {
 
 int __init chips_init(void)
 {
+	if (fb_get_options("chipsfb", NULL))
+		return -ENODEV;
+
 	return pci_module_init(&chipsfb_driver);
 }
 

@@ -35,8 +35,8 @@ CR31 (TR 7)			Temporary register, used in various places
 SR0				temporary space register
 SR4-SR7 			set to 0
 SR1				temporary space register
-SR2				unused
-SR3				used for userspace accesses (current process)*
+SR2				kernel should not clobber this
+SR3				used for userspace accesses (current process)
 
 	Space Registers (user mode)
 
@@ -78,13 +78,8 @@ Shadow Registers		used by interruption handler code
 TOC enable bit			1
 
 =========================================================================
-Info from John Marvin:
-
-From: "John Marvin" <jsm@udlkern.fc.hp.com>
-To: randolf@tausq.org
-Subject: Re: parisc asm questions
-
-[...]
+Register usage notes, originally from John Marvin, with some additional
+notes from Randolph Chung.
 
 For the general registers:
 
@@ -111,9 +106,10 @@ that you should be aware of:
 	don't care about the values that were passed in anymore.
 
     r28,r29: are ret0 and ret1. They are what you pass return values
-	in. r28 is the primary return. I'm not sure I remember
-	under what circumstances stuff is returned in r29 (millicode
-	perhaps).
+	in. r28 is the primary return. When returning small structures
+	r29 may also be used to pass data back to the caller.
+
+    r30: stack pointer
 
     r31: the ble instruction puts the return pointer in here.
 
@@ -122,7 +118,4 @@ r3-r18,r27,r30 need to be saved and restored. r3-r18 are just
     general purpose registers. r27 is the data pointer, and is
     used to make references to global variables easier. r30 is
     the stack pointer.
-
-John
-
 

@@ -1,8 +1,8 @@
 /*
  * arch/v850/kernel/ptrace.c -- `ptrace' system call
  *
- *  Copyright (C) 2002,03  NEC Electronics Corporation
- *  Copyright (C) 2002,03  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2002,03,04  NEC Electronics Corporation
+ *  Copyright (C) 2002,03,04  Miles Bader <miles@gnu.org>
  *
  * Derived from arch/mips/kernel/ptrace.c:
  *
@@ -147,8 +147,8 @@ int sys_ptrace(long request, long pid, long addr, long data)
 		rval = ptrace_attach(child);
 		goto out_tsk;
 	}
-	ret = ptrace_check_attach(child, request == PTRACE_KILL);
-	if (ret < 0)
+	rval = ptrace_check_attach(child, request == PTRACE_KILL);
+	if (rval < 0)
 		goto out_tsk;
 
 	switch (request) {
@@ -232,7 +232,7 @@ int sys_ptrace(long request, long pid, long addr, long data)
 	 */
 	case PTRACE_KILL:
 		rval = 0;
-		if (child->state == TASK_ZOMBIE)	/* already dead */
+		if (child->exit_state == EXIT_ZOMBIE)	/* already dead */
 			break;
 		child->exit_code = SIGKILL;
 		wake_up_process(child);

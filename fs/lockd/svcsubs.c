@@ -303,16 +303,7 @@ nlmsvc_invalidate_all(void)
 	while ((host = nlm_find_client()) != NULL) {
 		nlmsvc_free_host_resources(host);
 		host->h_expires = 0;
-		/* Do not unmonitor the host */
-		if (host->h_nsmhandle)
-			host->h_nsmhandle->sm_sticky = 1;
-		if (atomic_read(&host->h_count) != 1) {
-			/* Whatever is holding references to this host,
-			 * it seems likely we're going to leak memory
-			 * or worse */
-			printk(KERN_WARNING "lockd: host still in use "
-				"after nlmsvc_free_host_resources!");
-		}
+		host->h_killed = 1;
 		nlm_release_host(host);
 	}
 }

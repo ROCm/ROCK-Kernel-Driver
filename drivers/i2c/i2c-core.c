@@ -177,11 +177,24 @@ out_unlock:
 int i2c_del_adapter(struct i2c_adapter *adap)
 {
 	struct list_head  *item, *_n;
+	struct i2c_adapter *adap_from_list;
 	struct i2c_driver *driver;
 	struct i2c_client *client;
 	int res = 0;
 
 	down(&core_lists);
+
+	/* First make sure that this adapter was ever added */
+	list_for_each_entry(adap_from_list, &adapters, list) {
+		if (adap_from_list == adap)
+			break;
+	}
+	if (adap_from_list != adap) {
+		pr_debug("I2C: Attempting to delete an unregistered "
+			 "adapter\n");
+		res = -EINVAL;
+		goto out_unlock;
+	}
 
 	list_for_each(item,&drivers) {
 		driver = list_entry(item, struct i2c_driver, list);
@@ -517,9 +530,29 @@ static int i2c_device_match(struct device *dev, struct device_driver *drv)
 	return 1;
 }
 
+static int i2c_bus_suspend(struct device * dev, u32 state)
+{
+	int rc = 0;
+
+	if (dev->driver && dev->driver->suspend)
+		rc = dev->driver->suspend(dev,state,0);
+	return rc;
+}
+
+static int i2c_bus_resume(struct device * dev)
+{
+	int rc = 0;
+	
+	if (dev->driver && dev->driver->resume)
+		rc = dev->driver->resume(dev,0);
+	return rc;
+}
+
 struct bus_type i2c_bus_type = {
 	.name =		"i2c",
 	.match =	i2c_device_match,
+	.suspend =      i2c_bus_suspend,
+	.resume =       i2c_bus_resume,
 };
 
 static int __init i2c_init(void)
@@ -727,7 +760,7 @@ int i2c_probe(struct i2c_adapter *adapter,
 			if (addr == address_data->normal_i2c[i]) {
 				found = 1;
 				dev_dbg(&adapter->dev, "found normal i2c entry for adapter %d, "
-					"addr %02x", adap_id,addr);
+					"addr %02x\n", adap_id, addr);
 			}
 		}
 
@@ -988,35 +1021,8 @@ s32 i2c_smbus_write_word_data(struct i2c_client *client, u8 command, u16 value)
 	                      I2C_SMBUS_WORD_DATA,&data);
 }
 
-s32 i2c_smbus_process_call(struct i2c_client *client, u8 command, u16 value)
-{
-	union i2c_smbus_data data;
-	data.word = value;
-	if (i2c_smbus_xfer(client->adapter,client->addr,client->flags,
-	                   I2C_SMBUS_WRITE,command,
-	                   I2C_SMBUS_PROC_CALL, &data))
-		return -1;
-	else
-		return 0x0FFFF & data.word;
-}
-
-/* Returns the number of read bytes */
-s32 i2c_smbus_read_block_data(struct i2c_client *client, u8 command, u8 *values)
-{
-	union i2c_smbus_data data;
-	int i;
-	if (i2c_smbus_xfer(client->adapter,client->addr,client->flags,
-	                   I2C_SMBUS_READ,command,
-	                   I2C_SMBUS_BLOCK_DATA,&data))
-		return -1;
-	else {
-		for (i = 1; i <= data.block[0]; i++)
-			values[i-1] = data.block[i];
-		return data.block[0];
-	}
-}
-
-s32 i2c_smbus_write_block_data(struct i2c_client *client, u8 command, u8 length, u8 *values)
+s32 i2c_smbus_write_block_data(struct i2c_client *client, u8 command,
+			       u8 length, u8 *values)
 {
 	union i2c_smbus_data data;
 	int i;
@@ -1026,27 +1032,8 @@ s32 i2c_smbus_write_block_data(struct i2c_client *client, u8 command, u8 length,
 		data.block[i] = values[i-1];
 	data.block[0] = length;
 	return i2c_smbus_xfer(client->adapter,client->addr,client->flags,
-	                      I2C_SMBUS_WRITE,command,
-	                      I2C_SMBUS_BLOCK_DATA,&data);
-}
-
-/* Returns the number of read bytes */
-s32 i2c_smbus_block_process_call(struct i2c_client *client, u8 command, u8 length, u8 *values)
-{
-	union i2c_smbus_data data;
-	int i;
-	if (length > I2C_SMBUS_BLOCK_MAX - 1)
-		return -1;
-	data.block[0] = length;
-	for (i = 1; i <= length; i++)
-		data.block[i] = values[i-1];
-	if(i2c_smbus_xfer(client->adapter,client->addr,client->flags,
-	                  I2C_SMBUS_WRITE, command,
-	                  I2C_SMBUS_BLOCK_PROC_CALL, &data))
-		return -1;
-	for (i = 1; i <= data.block[0]; i++)
-		values[i-1] = data.block[i];
-	return data.block[0];
+			      I2C_SMBUS_WRITE,command,
+			      I2C_SMBUS_BLOCK_DATA,&data);
 }
 
 /* Returns the number of read bytes */
@@ -1063,20 +1050,6 @@ s32 i2c_smbus_read_i2c_block_data(struct i2c_client *client, u8 command, u8 *val
 			values[i-1] = data.block[i];
 		return data.block[0];
 	}
-}
-
-s32 i2c_smbus_write_i2c_block_data(struct i2c_client *client, u8 command, u8 length, u8 *values)
-{
-	union i2c_smbus_data data;
-	int i;
-	if (length > I2C_SMBUS_I2C_BLOCK_MAX)
-		length = I2C_SMBUS_I2C_BLOCK_MAX;
-	for (i = 1; i <= length; i++)
-		data.block[i] = values[i-1];
-	data.block[0] = length;
-	return i2c_smbus_xfer(client->adapter,client->addr,client->flags,
-	                      I2C_SMBUS_WRITE,command,
-	                      I2C_SMBUS_I2C_BLOCK_DATA,&data);
 }
 
 /* Simulate a SMBus command using the i2c protocol 
@@ -1302,11 +1275,8 @@ EXPORT_SYMBOL(i2c_smbus_read_byte_data);
 EXPORT_SYMBOL(i2c_smbus_write_byte_data);
 EXPORT_SYMBOL(i2c_smbus_read_word_data);
 EXPORT_SYMBOL(i2c_smbus_write_word_data);
-EXPORT_SYMBOL(i2c_smbus_process_call);
-EXPORT_SYMBOL(i2c_smbus_read_block_data);
 EXPORT_SYMBOL(i2c_smbus_write_block_data);
 EXPORT_SYMBOL(i2c_smbus_read_i2c_block_data);
-EXPORT_SYMBOL(i2c_smbus_write_i2c_block_data);
 
 EXPORT_SYMBOL(i2c_get_functionality);
 EXPORT_SYMBOL(i2c_check_functionality);

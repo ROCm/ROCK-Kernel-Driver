@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/css.c
  *  driver for channel subsystem
- *   $Revision: 1.80 $
+ *   $Revision: 1.84 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -188,6 +188,12 @@ css_evaluate_subchannel(int irq, int slow)
 			put_device(&sch->dev);
 		return 0; /* Already processed. */
 	}
+	/*
+	 * We've got a machine check, so running I/O won't get an interrupt.
+	 * Kill any pending timers.
+	 */
+	if (sch)
+		device_kill_pending_timer(sch);
 	if (!disc && !slow) {
 		if (sch)
 			put_device(&sch->dev);
@@ -278,7 +284,7 @@ css_rescan_devices(void)
 {
 	int irq, ret;
 
-	for (irq = 0; irq <= __MAX_SUBCHANNELS; irq++) {
+	for (irq = 0; irq < __MAX_SUBCHANNELS; irq++) {
 		ret = css_evaluate_subchannel(irq, 1);
 		/* No more memory. It doesn't make sense to continue. No
 		 * panic because this can happen in midflight and just
@@ -521,6 +527,7 @@ css_enqueue_subchannel_slow(unsigned long schid)
 	new_slow_sch = kmalloc(sizeof(struct slow_subchannel), GFP_ATOMIC);
 	if (!new_slow_sch)
 		return -ENOMEM;
+	memset(new_slow_sch, sizeof(struct slow_subchannel), 0);
 	new_slow_sch->schid = schid;
 	spin_lock_irqsave(&slow_subchannel_lock, flags);
 	list_add_tail(&new_slow_sch->slow_list, &slow_subchannels_head);

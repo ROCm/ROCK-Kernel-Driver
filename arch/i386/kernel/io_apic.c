@@ -27,9 +27,6 @@
 #include <linux/delay.h>
 #include <linux/sched.h>
 #include <linux/config.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 #include <linux/smp_lock.h>
 #include <linux/mc146818rtc.h>
 #include <linux/compiler.h>
@@ -44,6 +41,9 @@
 #include <mach_apic.h>
 
 #include "io_ports.h"
+
+int (*ioapic_renumber_irq)(int ioapic, int irq);
+atomic_t irq_mis_count;
 
 static spinlock_t ioapic_lock = SPIN_LOCK_UNLOCKED;
 
@@ -257,8 +257,6 @@ static void set_ioapic_affinity_irq(unsigned int irq, cpumask_t cpumask)
 #  define TDprintk(x...) 
 #  define Dprintk(x...) 
 # endif
-
-extern cpumask_t irq_affinity[NR_IRQS];
 
 cpumask_t __cacheline_aligned pending_irq_balance_cpumask[NR_IRQS];
 
@@ -573,8 +571,6 @@ static int balanced_irq(void *unused)
 	}
 
 	for ( ; ; ) {
-		if (irqbalance_disabled)
-			return 0;
 		set_current_state(TASK_INTERRUPTIBLE);
 		time_remaining = schedule_timeout(time_remaining);
 		if (time_after(jiffies,
@@ -651,8 +647,6 @@ __setup("noirqbalance", irqbalance_disable);
 
 static inline void move_irq(int irq)
 {
-	if (irqbalance_disabled)
-		return; 
 	/* note - we hold the desc->lock */
 	if (unlikely(!cpus_empty(pending_irq_balance_cpumask[irq]))) {
 		set_ioapic_affinity_irq(irq, pending_irq_balance_cpumask[irq]);
@@ -660,7 +654,7 @@ static inline void move_irq(int irq)
 	}
 }
 
-__initcall(balanced_irq_init);
+late_initcall(balanced_irq_init);
 
 #else /* !CONFIG_IRQBALANCE */
 static inline void move_irq(int irq) { }
@@ -692,11 +686,7 @@ void fastcall send_IPI_self(int vector)
 #define MAX_PIRQS 8
 int pirq_entries [MAX_PIRQS];
 int pirqs_enabled;
-#ifdef CONFIG_SMP
-int skip_ioapic_setup = 0;
-#else
-int skip_ioapic_setup = 1;
-#endif
+int skip_ioapic_setup;
 
 static int __init ioapic_setup(char *str)
 {
@@ -739,7 +729,7 @@ __setup("pirq=", ioapic_pirq_setup);
 /*
  * Find the IRQ entry number of a certain pin.
  */
-static int __init find_irq_entry(int apic, int pin, int type)
+static int find_irq_entry(int apic, int pin, int type)
 {
 	int i;
 
@@ -756,7 +746,7 @@ static int __init find_irq_entry(int apic, int pin, int type)
 /*
  * Find the pin to which IRQ[irq] (ISA) is connected
  */
-static int __init find_isa_irq_pin(int irq, int type)
+static int find_isa_irq_pin(int irq, int type)
 {
 	int i;
 
@@ -849,7 +839,7 @@ void __init setup_ioapic_dest(void)
 /*
  * EISA Edge/Level control register, ELCR
  */
-static int __init EISA_ELCR(unsigned int irq)
+static int EISA_ELCR(unsigned int irq)
 {
 	if (irq < 16) {
 		unsigned int port = 0x4d0 + (irq >> 3);
@@ -966,7 +956,7 @@ static int __init MPBIOS_polarity(int idx)
 	return polarity;
 }
 
-static int __init MPBIOS_trigger(int idx)
+static int MPBIOS_trigger(int idx)
 {
 	int bus = mp_irqs[idx].mpc_srcbus;
 	int trigger;
@@ -1080,8 +1070,13 @@ static int pin_2_irq(int idx, int apic, int pin)
 			while (i < apic)
 				irq += nr_ioapic_registers[i++];
 			irq += pin;
-			if ((!apic) && (irq < 16)) 
-				irq += 16;
+
+			/*
+			 * For MPS mode, so far only needed by ES7000 platform
+			 */
+			if (ioapic_renumber_irq)
+				irq = ioapic_renumber_irq(apic, irq);
+
 			break;
 		}
 		default:
@@ -1142,10 +1137,6 @@ next:
 	current_vector += 8;
 	if (current_vector == SYSCALL_VECTOR)
 		goto next;
-#ifdef	CONFIG_KDB
-	if (current_vector == KDBENTER_VECTOR)
-		goto next;
-#endif	/* CONFIG_KDB */
 
 	if (current_vector >= FIRST_SYSTEM_VECTOR) {
 		offset++;
@@ -1894,9 +1885,7 @@ static void end_level_ioapic_irq (unsigned int irq)
 	ack_APIC_irq();
 
 	if (!(v & (1 << (i & 0x1f)))) {
-#ifdef APIC_MISMATCH_DEBUG
 		atomic_inc(&irq_mis_count);
-#endif
 		spin_lock(&ioapic_lock);
 		__mask_and_edge_IO_APIC_irq(irq);
 		__unmask_and_level_IO_APIC_irq(irq);
@@ -2535,15 +2524,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 		mp_ioapics[ioapic].mpc_apicid, pin, entry.vector, irq,
 		edge_level, active_high_low);
 
- 	if (use_pci_vector() && !platform_legacy_irq(irq))
-		irq = IO_APIC_VECTOR(irq);
-	if (edge_level) {
-		irq_desc[irq].handler = &ioapic_level_type;
-	} else {
-		irq_desc[irq].handler = &ioapic_edge_type;
-	}
-
-	set_intr_gate(entry.vector, interrupt[irq]);
+	ioapic_register_intr(irq, entry.vector, edge_level);
 
 	if (!ioapic && (irq < 16))
 		disable_8259A_irq(irq);

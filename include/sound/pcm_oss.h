@@ -39,10 +39,10 @@ struct _snd_pcm_oss_setup {
 };
 
 typedef struct _snd_pcm_oss_runtime {
-	int params: 1,				/* format/parameter change */
-            prepare: 1,				/* need to prepare the operation */
-            trigger: 1,				/* trigger flag */
-            sync_trigger: 1;			/* sync trigger flag */
+	unsigned params: 1,			/* format/parameter change */
+		 prepare: 1,			/* need to prepare the operation */
+		 trigger: 1,			/* trigger flag */
+		 sync_trigger: 1;		/* sync trigger flag */
 	int rate;				/* requested rate */
 	int format;				/* requested OSS format */
 	unsigned int channels;			/* requested channels */
@@ -68,7 +68,7 @@ typedef struct _snd_pcm_oss_file {
 } snd_pcm_oss_file_t;
 
 typedef struct _snd_pcm_oss_substream {
-	int oss: 1;				/* oss mode */
+	unsigned oss: 1;			/* oss mode */
 	snd_pcm_oss_setup_t *setup;		/* active setup */
 	snd_pcm_oss_file_t *file;
 } snd_pcm_oss_substream_t;

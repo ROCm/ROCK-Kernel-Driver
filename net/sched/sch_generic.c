@@ -13,7 +13,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/types.h>
@@ -280,6 +280,7 @@ struct Qdisc noop_qdisc = {
 	.dequeue	=	noop_dequeue,
 	.flags		=	TCQ_F_BUILTIN,
 	.ops		=	&noop_qdisc_ops,	
+	.list		=	LIST_HEAD_INIT(noop_qdisc.list),
 };
 
 struct Qdisc_ops noqueue_qdisc_ops = {
@@ -298,6 +299,7 @@ struct Qdisc noqueue_qdisc = {
 	.dequeue	=	noop_dequeue,
 	.flags		=	TCQ_F_BUILTIN,
 	.ops		=	&noqueue_qdisc_ops,
+	.list		=	LIST_HEAD_INIT(noqueue_qdisc.list),
 };
 
 
@@ -318,11 +320,11 @@ pfifo_fast_enqueue(struct sk_buff *skb, struct Qdisc* qdisc)
 	if (list->qlen < qdisc->dev->tx_queue_len) {
 		__skb_queue_tail(list, skb);
 		qdisc->q.qlen++;
-		qdisc->stats.bytes += skb->len;
-		qdisc->stats.packets++;
+		qdisc->bstats.bytes += skb->len;
+		qdisc->bstats.packets++;
 		return 0;
 	}
-	qdisc->stats.drops++;
+	qdisc->qstats.drops++;
 	kfree_skb(skb);
 	return NET_XMIT_DROP;
 }
@@ -353,6 +355,7 @@ pfifo_fast_requeue(struct sk_buff *skb, struct Qdisc* qdisc)
 
 	__skb_queue_head(list, skb);
 	qdisc->q.qlen++;
+	qdisc->qstats.requeues++;
 	return 0;
 }
 
@@ -435,9 +438,6 @@ struct Qdisc * qdisc_create_dflt(struct net_device *dev, struct Qdisc_ops *ops)
 	dev_hold(dev);
 	sch->stats_lock = &dev->queue_lock;
 	atomic_set(&sch->refcnt, 1);
-	/* enqueue is accessed locklessly - make sure it's visible
-	 * before we set a netdevice's qdisc pointer to sch */
-	smp_wmb();
 	if (!ops->init || ops->init(sch, NULL) == 0)
 		return sch;
 
@@ -465,7 +465,7 @@ static void __qdisc_destroy(struct rcu_head *head)
 	struct Qdisc_ops  *ops = qdisc->ops;
 
 #ifdef CONFIG_NET_ESTIMATOR
-	qdisc_kill_estimator(&qdisc->stats);
+	gen_kill_estimator(&qdisc->bstats, &qdisc->rate_est);
 #endif
 	write_lock(&qdisc_tree_lock);
 	if (ops->reset)
@@ -476,17 +476,39 @@ static void __qdisc_destroy(struct rcu_head *head)
 	module_put(ops->owner);
 
 	dev_put(qdisc->dev);
-	if (!(qdisc->flags&TCQ_F_BUILTIN))
-		kfree((char *) qdisc - qdisc->padded);
+	kfree((char *) qdisc - qdisc->padded);
 }
 
 /* Under dev->queue_lock and BH! */
 
 void qdisc_destroy(struct Qdisc *qdisc)
 {
-	if (!atomic_dec_and_test(&qdisc->refcnt))
+	struct list_head cql = LIST_HEAD_INIT(cql);
+	struct Qdisc *cq, *q, *n;
+
+	if (qdisc->flags & TCQ_F_BUILTIN ||
+		!atomic_dec_and_test(&qdisc->refcnt))
 		return;
-	list_del(&qdisc->list);
+
+	if (!list_empty(&qdisc->list)) {
+		if (qdisc->ops->cl_ops == NULL)
+			list_del(&qdisc->list);
+		else
+			list_move(&qdisc->list, &cql);
+	}
+
+	/* unlink inner qdiscs from dev->qdisc_list immediately */
+	list_for_each_entry(cq, &cql, list)
+		list_for_each_entry_safe(q, n, &qdisc->dev->qdisc_list, list)
+			if (TC_H_MAJ(q->parent) == TC_H_MAJ(cq->handle)) {
+				if (q->ops->cl_ops == NULL)
+					list_del_init(&q->list);
+				else
+					list_move_tail(&q->list, &cql);
+			}
+	list_for_each_entry_safe(cq, n, &cql, list)
+		list_del_init(&cq->list);
+
 	call_rcu(&qdisc->q_rcu, __qdisc_destroy);
 }
 
@@ -518,7 +540,8 @@ void dev_activate(struct net_device *dev)
 	}
 
 	spin_lock_bh(&dev->queue_lock);
-	if ((dev->qdisc = dev->qdisc_sleeping) != &noqueue_qdisc) {
+	rcu_assign_pointer(dev->qdisc, dev->qdisc_sleeping);
+	if (dev->qdisc != &noqueue_qdisc) {
 		dev->trans_start = jiffies;
 		dev_watchdog_up(dev);
 	}

@@ -129,10 +129,9 @@ union acpi_parse_object*
 acpi_ps_alloc_op (
 	u16                             opcode)
 {
-	union acpi_parse_object         *op = NULL;
-	u32                             size;
-	u8                              flags;
+	union acpi_parse_object         *op;
 	const struct acpi_opcode_info   *op_info;
+	u8                              flags = ACPI_PARSEOP_GENERIC;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -140,32 +139,28 @@ acpi_ps_alloc_op (
 
 	op_info = acpi_ps_get_opcode_info (opcode);
 
-	/* Allocate the minimum required size object */
+	/* Determine type of parse_op required */
 
 	if (op_info->flags & AML_DEFER) {
-		size = sizeof (struct acpi_parse_obj_named);
 		flags = ACPI_PARSEOP_DEFERRED;
 	}
 	else if (op_info->flags & AML_NAMED) {
-		size = sizeof (struct acpi_parse_obj_named);
 		flags = ACPI_PARSEOP_NAMED;
 	}
 	else if (opcode == AML_INT_BYTELIST_OP) {
-		size = sizeof (struct acpi_parse_obj_named);
 		flags = ACPI_PARSEOP_BYTELIST;
 	}
-	else {
-		size = sizeof (struct acpi_parse_obj_common);
-		flags = ACPI_PARSEOP_GENERIC;
-	}
 
-	if (size == sizeof (struct acpi_parse_obj_common)) {
-		/*
-		 * The generic op is by far the most common (16 to 1)
-		 */
+	/* Allocate the minimum required size object */
+
+	if (flags == ACPI_PARSEOP_GENERIC) {
+		/* The generic op (default) is by far the most common (16 to 1) */
+
 		op = acpi_ut_acquire_from_cache (ACPI_MEM_LIST_PSNODE);
 	}
 	else {
+		/* Extended parseop */
+
 		op = acpi_ut_acquire_from_cache (ACPI_MEM_LIST_PSNODE_EXT);
 	}
 
@@ -272,6 +267,7 @@ acpi_ps_is_prefix_char (
 /*
  * Get op's name (4-byte name segment) or 0 if unnamed
  */
+#ifdef ACPI_FUTURE_USAGE
 u32
 acpi_ps_get_name (
 	union acpi_parse_object         *op)
@@ -288,6 +284,7 @@ acpi_ps_get_name (
 
 	return (op->named.name);
 }
+#endif  /*  ACPI_FUTURE_USAGE  */
 
 
 /*

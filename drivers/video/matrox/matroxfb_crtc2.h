@@ -9,6 +9,7 @@
 struct matroxfb_dh_fb_info {
 	struct fb_info		fbcon;
 	int			fbcon_registered;
+	int                     initialized;
 
 	struct matrox_fb_info*	primary_dev;
 
@@ -27,7 +28,7 @@ struct matroxfb_dh_fb_info {
 		unsigned int	len;
 			      } mmio;
 
-	int			interlaced:1;
+	unsigned int		interlaced:1;
 
 	u_int32_t cmap[17];
 };

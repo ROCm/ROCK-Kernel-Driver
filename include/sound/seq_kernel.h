@@ -129,8 +129,8 @@ typedef struct _snd_seq_queue queue_t;
 
 typedef struct {
 	void *private_data;
-	int allow_input: 1,
-	    allow_output: 1;
+	unsigned allow_input: 1,
+		 allow_output: 1;
 	/*...*/
 } snd_seq_client_callback_t;
 
@@ -184,7 +184,7 @@ int snd_seq_event_port_detach(int client, int port);
 void snd_seq_autoload_lock(void);
 void snd_seq_autoload_unlock(void);
 #else
-#define snd_seq_autload_lock()
+#define snd_seq_autoload_lock()
 #define snd_seq_autoload_unlock()
 #endif
 

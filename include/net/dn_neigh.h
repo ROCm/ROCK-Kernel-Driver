@@ -18,7 +18,6 @@ struct dn_neigh {
 
 extern void dn_neigh_init(void);
 extern void dn_neigh_cleanup(void);
-extern struct neighbour *dn_neigh_lookup(struct neigh_table *tbl, const void *ptr);
 extern int dn_neigh_router_hello(struct sk_buff *skb);
 extern int dn_neigh_endnode_hello(struct sk_buff *skb);
 extern void dn_neigh_pointopoint_hello(struct sk_buff *skb);

@@ -343,7 +343,7 @@ static int igmpv3_sendpack(struct sk_buff *skb)
 	pig->csum = ip_compute_csum((void *)skb->h.igmph, igmplen);
 
 	return NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, skb->dev,
-	               ip_dst_output);
+		       dst_output);
 }
 
 static int grec_size(struct ip_mc_list *pmc, int type, int gdel, int sdel)
@@ -674,7 +674,7 @@ static int igmp_send_report(struct in_device *in_dev, struct ip_mc_list *pmc,
 	ih->csum=ip_compute_csum((void *)ih, sizeof(struct igmphdr));
 
 	return NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
-	               ip_dst_output);
+		       dst_output);
 }
 
 static void igmp_gq_timer_expire(unsigned long data)
@@ -1252,8 +1252,8 @@ void ip_mc_init_dev(struct in_device *in_dev)
 	in_dev->mr_qrv = IGMP_Unsolicited_Report_Count;
 #endif
 
-	in_dev->mc_list_lock = RW_LOCK_UNLOCKED;
-	in_dev->mc_tomb_lock = SPIN_LOCK_UNLOCKED;
+	rwlock_init(&in_dev->mc_list_lock);
+	spin_lock_init(&in_dev->mc_tomb_lock);
 }
 
 /* Device going up */
@@ -1774,13 +1774,13 @@ int ip_mc_source(int add, int omode, struct sock *sk, struct
 
 	psl = pmc->sflist;
 	if (!add) {
-		if (!psl || !psl->sl_count)
+		if (!psl)
 			goto done;
-		rv = 1;
+		rv = !0;
 		for (i=0; i<psl->sl_count; i++) {
 			rv = memcmp(&psl->sl_addr[i], &mreqs->imr_sourceaddr,
 				sizeof(__u32));
-			if (rv >= 0)	/* array is sorted */
+			if (rv == 0)
 				break;
 		}
 		if (rv)		/* source not found */
@@ -1827,7 +1827,7 @@ int ip_mc_source(int add, int omode, struct sock *sk, struct
 	for (i=0; i<psl->sl_count; i++) {
 		rv = memcmp(&psl->sl_addr[i], &mreqs->imr_sourceaddr,
 			sizeof(__u32));
-		if (rv >= 0)
+		if (rv == 0)
 			break;
 	}
 	if (rv == 0)		/* address already there is an error */

@@ -18,6 +18,7 @@
 #include <linux/types.h>
 #include <asm/pci.h>
 #include <linux/irq.h>
+#include <linux/interrupt.h>	/* irqreturn_t */
 
 #include "pci-st40.h"
 
@@ -28,24 +29,22 @@
 #define ST40PCI_REG_ADDRESS      (ST40PCI_BASE_ADDRESS+0x07000000)
 
 #define ST40PCI_REG(x) (ST40PCI_REG_ADDRESS+(ST40PCI_##x))
+#define ST40PCI_REG_INDEXED(reg, index) 				\
+	(ST40PCI_REG(reg##0) +					\
+	  ((ST40PCI_REG(reg##1) - ST40PCI_REG(reg##0))*index))
 
 #define ST40PCI_WRITE(reg,val) writel((val),ST40PCI_REG(reg))
 #define ST40PCI_WRITE_SHORT(reg,val) writew((val),ST40PCI_REG(reg))
 #define ST40PCI_WRITE_BYTE(reg,val) writeb((val),ST40PCI_REG(reg))
+#define ST40PCI_WRITE_INDEXED(reg, index, val)				\
+	 writel((val), ST40PCI_REG_INDEXED(reg, index));
 
 #define ST40PCI_READ(reg) readl(ST40PCI_REG(reg))
 #define ST40PCI_READ_SHORT(reg) readw(ST40PCI_REG(reg))
 #define ST40PCI_READ_BYTE(reg) readb(ST40PCI_REG(reg))
 
-#define ST40PCI_SERR_IRQ        64
-#define ST40PCI_SERR_INT_GROUP  0
-#define ST40PCI_SERR_INT_POS    0
-#define ST40PCI_SERR_INT_PRI    15
-
-#define ST40PCI_ERR_IRQ        65
-#define ST40PCI_ERR_INT_GROUP   1
-#define ST40PCI_ERR_INT_POS     1
-#define ST40PCI_ERR_INT_PRI     14
+#define ST40PCI_SERR_IRQ	64
+#define ST40PCI_ERR_IRQ        	65
 
 
 /* Macros to extract PLL params */
@@ -69,47 +68,143 @@
 #define PLL_25MHZ 0x793c8512
 #define PLL_33MHZ PLL_SET(18,88,3,295)
 
+static void pci_set_rbar_region(unsigned int region,     unsigned long localAddr,
+			 unsigned long pciOffset, unsigned long regionSize);
+
+/*
+ * The pcibios_map_platform_irq function is defined in the appropriate
+ * board specific code and referenced here
+ */
+extern int __init pcibios_map_platform_irq(struct pci_dev *dev, u8 slot, u8 pin);
 
 static __init void SetPCIPLL(void)
 {
-	/* Stop the PLL */
-	writel(0, PLLPCICR);
+	{
+		/* Lets play with the PLL values */
+		unsigned long pll1cr1;
+		unsigned long mdiv, ndiv, pdiv;
+		unsigned long muxcr;
+		unsigned int muxcr_ratios[4] = { 8, 16, 21, 1 };
+		unsigned int freq;
 
-	/* Always run at 33Mhz. The PCI clock is totally async 
-	 * to the rest of the system
-	 */
-	writel(PLL_33MHZ | PLLPCICR_POWERON, PLLPCICR);
-
-	printk("ST40PCI: Waiting for PCI PLL to lock\n");
-	while ((readl(PLLPCICR) & PLLPCICR_LOCK) == 0);
-	writel(readl(PLLPCICR) | PLLPCICR_OUT_EN, PLLPCICR);
+#define CLKGENA            0xbb040000
+#define CLKGENA_PLL2_MUXCR CLKGENA + 0x48
+		pll1cr1 = ctrl_inl(PLLPCICR);
+		printk("PLL1CR1 %08lx\n", pll1cr1);
+		mdiv = PLL_MDIV(pll1cr1);
+		ndiv = PLL_NDIV(pll1cr1);
+		pdiv = PLL_PDIV(pll1cr1);
+		printk("mdiv %02lx ndiv %02lx pdiv %02lx\n", mdiv, ndiv, pdiv);
+		freq = ((2*27*ndiv)/mdiv) / (1 << pdiv);
+		printk("PLL freq %dMHz\n", freq);
+		muxcr = ctrl_inl(CLKGENA_PLL2_MUXCR);
+		printk("PCI freq %dMhz\n", freq / muxcr_ratios[muxcr & 3]);
+	}
 }
 
 
+struct pci_err {
+  unsigned mask;
+  const char *error_string;
+};
+
+static struct pci_err int_error[]={
+  { INT_MNLTDIM,"MNLTDIM: Master non-lock transfer"},
+  { INT_TTADI,  "TTADI: Illegal byte enable in I/O transfer"},
+  { INT_TMTO,   "TMTO: Target memory read/write timeout"},
+  { INT_MDEI,   "MDEI: Master function disable error"},
+  { INT_APEDI,  "APEDI: Address parity error"},
+  { INT_SDI,    "SDI: SERR detected"},
+  { INT_DPEITW, "DPEITW: Data parity error target write"},
+  { INT_PEDITR, "PEDITR: PERR detected"},
+  { INT_TADIM,  "TADIM: Target abort detected"},
+  { INT_MADIM,  "MADIM: Master abort detected"},
+  { INT_MWPDI,  "MWPDI: PERR from target at data write"},
+  { INT_MRDPEI, "MRDPEI: Master read data parity error"}
+};
+#define NUM_PCI_INT_ERRS (sizeof(int_error)/sizeof(struct pci_err))
+
+static struct pci_err aint_error[]={
+  { AINT_MBI,   "MBI: Master broken"},
+  { AINT_TBTOI, "TBTOI: Target bus timeout"},
+  { AINT_MBTOI, "MBTOI: Master bus timeout"},
+  { AINT_TAI,   "TAI: Target abort"},
+  { AINT_MAI,   "MAI: Master abort"},
+  { AINT_RDPEI, "RDPEI: Read data parity"},
+  { AINT_WDPE,  "WDPE: Write data parity"}
+};
+
+#define NUM_PCI_AINT_ERRS (sizeof(aint_error)/sizeof(struct pci_err))
+
+static void print_pci_errors(unsigned reg,struct pci_err *error,int num_errors)
+{
+  int i;
+
+  for(i=0;i<num_errors;i++) {
+    if(reg & error[i].mask) {
+      printk("%s\n",error[i].error_string);
+    }
+  }
+
+}
+
+
+static char * pci_commands[16]={
+	"Int Ack",
+	"Special Cycle",
+	"I/O Read",
+	"I/O Write",
+	"Reserved",
+	"Reserved",
+	"Memory Read",
+	"Memory Write",
+	"Reserved",
+	"Reserved",
+	"Configuration Read",
+	"Configuration Write",
+	"Memory Read Multiple",
+	"Dual Address Cycle",
+	"Memory Read Line",
+	"Memory Write-and-Invalidate"
+};
+
 static irqreturn_t st40_pci_irq(int irq, void *dev_instance, struct pt_regs *regs)
 {
-
 	unsigned pci_int, pci_air, pci_cir, pci_aint;
+	static int count=0;
 
-	pci_int = ST40PCI_READ(INT);
-	pci_cir = ST40PCI_READ(CIR);
-	pci_air = ST40PCI_READ(AIR);
 
-	if (pci_int) {
-		printk("PCI INTERRUPT!\n");
-		printk("PCI INT -> 0x%x\n", pci_int & 0xffff);
-		printk("PCI AIR -> 0x%x\n", pci_air);
-		printk("PCI CIR -> 0x%x\n", pci_cir);
-		ST40PCI_WRITE(INT, ~0);
+	pci_int = ST40PCI_READ(INT);pci_aint = ST40PCI_READ(AINT);
+	pci_cir = ST40PCI_READ(CIR);pci_air = ST40PCI_READ(AIR);
+
+	/* Reset state to stop multiple interrupts */
+        ST40PCI_WRITE(INT, ~0); ST40PCI_WRITE(AINT, ~0);
+
+
+	if(++count>1) return IRQ_HANDLED;
+
+	printk("** PCI ERROR **\n");
+
+        if(pci_int) {
+		printk("** INT register status\n");
+		print_pci_errors(pci_int,int_error,NUM_PCI_INT_ERRS);
 	}
 
-	pci_aint = ST40PCI_READ(AINT);
-	if (pci_aint) {
-		printk("PCI ARB INTERRUPT!\n");
-		printk("PCI AINT -> 0x%x\n", pci_aint);
-		printk("PCI AIR -> 0x%x\n", pci_air);
-		printk("PCI CIR -> 0x%x\n", pci_cir);
-		ST40PCI_WRITE(AINT, ~0);
+        if(pci_aint) {
+		printk("** AINT register status\n");
+		print_pci_errors(pci_aint,aint_error,NUM_PCI_AINT_ERRS);
+	}
+
+	printk("** Address and command info\n");
+
+	printk("** Command  %s : Address 0x%x\n",
+	       pci_commands[pci_cir&0xf],pci_air);
+
+	if(pci_cir&CIR_PIOTEM) {
+		printk("CIR_PIOTEM:PIO transfer error for master\n");
+	}
+        if(pci_cir&CIR_RWTET) {
+		printk("CIR_RWTET:Read/Write transfer error for target\n");
 	}
 
 	return IRQ_HANDLED;
@@ -119,7 +214,7 @@ static irqreturn_t st40_pci_irq(int irq, void *dev_instance, struct pt_regs *reg
 /* Rounds a number UP to the nearest power of two. Used for
  * sizing the PCI window.
  */
-static u32 __init r2p2(u32 num)
+static u32 r2p2(u32 num)
 {
 	int i = 31;
 	u32 tmp = num;
@@ -179,12 +274,16 @@ int __init st40pci_init(unsigned memStart, unsigned memSize)
 	/* Loop while core resets */
 	while (ST40PCI_READ(CR) & CR_SOFT_RESET);
 
+	/* Switch off interrupts */
+	ST40PCI_WRITE(INTM, 0);
+	ST40PCI_WRITE(AINT, 0);
+
 	/* Now, lets reset all the cards on the bus with extreme prejudice */
 	ST40PCI_WRITE(CR, CR_LOCK_MASK | CR_RSTCTL);
 	udelay(250);
 
 	/* Set bus active, take it out of reset */
-	ST40PCI_WRITE(CR, CR_LOCK_MASK | CR_CFINT | CR_PFCS | CR_PFE);
+	ST40PCI_WRITE(CR, CR_LOCK_MASK | CR_BMAM | CR_CFINT | CR_PFCS | CR_PFE);
 
 	/* The PCI spec says that no access must be made to the bus until 1 second
 	 * after reset. This seem ludicrously long, but some delay is needed here
@@ -219,37 +318,20 @@ int __init st40pci_init(unsigned memStart, unsigned memSize)
 	/* Set up the 64K window */
 	ST40PCI_WRITE(IOBMR, 0x0);
 
-	/* Now we set up the mbars so the PCI bus can see the memory of the machine */
+	/* Now we set up the mbars so the PCI bus can see the local memory */
+	/* Expose a 256M window starting at PCI address 0... */
+	ST40PCI_WRITE(CSR_MBAR0, 0);
+	ST40PCI_WRITE(LSR0, 0x0fff0001);
 
-	if (memSize < (64 * 1024)) {
-		printk("Ridiculous memory size of 0x%x?\n",memSize);
-		return 0;
-	}
-
-	lsr0 =
-	    (memSize >
-	     (512 * 1024 * 1024)) ? 0x1fff0001 : ((r2p2(memSize) -
-						   0x10000) | 0x1);
-
-	ST40PCI_WRITE(LSR0, lsr0);
-
-	ST40PCI_WRITE(CSR_MBAR0, memStart);
-	ST40PCI_WRITE(LAR0, memStart);
+	/* ... and set up the initial incomming window to expose all of RAM */
+	pci_set_rbar_region(7, memStart, memStart, memSize);
 
 	/* Maximise timeout values */
 	ST40PCI_WRITE_BYTE(CSR_TRDY, 0xff);
 	ST40PCI_WRITE_BYTE(CSR_RETRY, 0xff);
 	ST40PCI_WRITE_BYTE(CSR_MIT, 0xff);
 
-
-	/* Install the pci interrupt handlers */
-	make_intc2_irq(ST40PCI_SERR_IRQ, INTC2_BASE0,
-		       ST40PCI_SERR_INT_GROUP, ST40PCI_SERR_INT_POS,
-		       ST40PCI_SERR_INT_PRI);
-
-	make_intc2_irq(ST40PCI_ERR_IRQ, INTC2_BASE0, ST40PCI_ERR_INT_GROUP,
-		       ST40PCI_ERR_INT_POS, ST40PCI_ERR_INT_PRI);
-
+	ST40PCI_WRITE_BYTE(PERF,PERF_MASTER_WRITE_POSTING);
 
 	return 1;
 }
@@ -332,7 +414,7 @@ static int st40pci_write(struct pci_bus *bus, unsigned int devfn, int where, int
 	return PCIBIOS_SUCCESSFUL;
 }
 
-static struct pci_ops pci_config_ops = {
+struct pci_ops st40pci_config_ops = {
 	.read = 	st40pci_read,
 	.write = 	st40pci_write,
 };
@@ -348,35 +430,11 @@ static u8 __init no_swizzle(struct pci_dev *dev, u8 * pin)
 }
 
 
-/* This needs to be shunted out of here into the board specific bit */
-#define HARP_PCI_IRQ    1
-#define HARP_BRIDGE_IRQ 2
-#define OVERDRIVE_SLOT0_IRQ 0
-
-static int __init map_harp_irq(struct pci_dev *dev, u8 slot, u8 pin)
-{
-	switch (slot) {
-#ifdef CONFIG_SH_STB1_HARP
-	case 2:		/*This is the PCI slot on the */
-		return HARP_PCI_IRQ;
-	case 1:		/* this is the bridge */
-		return HARP_BRIDGE_IRQ;
-#elif defined(CONFIG_SH_STB1_OVERDRIVE)
-	case 1:
-	case 2:
-	case 3:
-		return slot - 1;
-#else
-#error Unknown board
-#endif
-	default:
-		return -1;
-	}
-}
-
-void __init pcibios_init(void)
+static int __init pcibios_init(void)
 {
 	extern unsigned long memory_start, memory_end;
+
+	printk(KERN_ALERT "pci-st40.c: pcibios_init\n");
 
 	if (sh_mv.mv_init_pci != NULL) {
 		sh_mv.mv_init_pci();
@@ -392,7 +450,7 @@ void __init pcibios_init(void)
 	if (request_irq(ST40PCI_ERR_IRQ, st40_pci_irq, 
                         SA_INTERRUPT, "st40pci", NULL)) {
 		printk(KERN_ERR "st40pci: Cannot hook interrupt\n");
-		return;
+		return -EIO;
 	}
 
 	/* Enable the PCI interrupts on the device */
@@ -406,12 +464,46 @@ void __init pcibios_init(void)
 #endif
 
 	/* ok, do the scan man */
-	pci_root_bus = pci_scan_bus(0, &pci_config_ops, NULL);
+	pci_root_bus = pci_scan_bus(0, &st40pci_config_ops, NULL);
 	pci_assign_unassigned_resources();
-	pci_fixup_irqs(no_swizzle, map_harp_irq);
+	pci_fixup_irqs(no_swizzle, pcibios_map_platform_irq);
 
+	return 0;
 }
+
+subsys_initcall(pcibios_init);
 
 void __init pcibios_fixup_bus(struct pci_bus *bus)
 {
 }
+
+/*
+ * Publish a region of local address space over the PCI bus
+ * to other devices.
+ */
+static void pci_set_rbar_region(unsigned int region,     unsigned long localAddr,
+			 unsigned long pciOffset, unsigned long regionSize)
+{
+	unsigned long mask;
+
+	if (region > 7)
+		return;
+
+	if (regionSize > (512 * 1024 * 1024))
+		return;
+
+	mask = r2p2(regionSize) - 0x10000;
+
+	/* Diable the region (in case currently in use, should never happen) */
+	ST40PCI_WRITE_INDEXED(RSR, region, 0);
+
+	/* Start of local address space to publish */
+	ST40PCI_WRITE_INDEXED(RLAR, region, PHYSADDR(localAddr) );
+
+	/* Start of region in PCI address space as an offset from MBAR0 */
+	ST40PCI_WRITE_INDEXED(RBAR, region, pciOffset);
+
+	/* Size of region */
+	ST40PCI_WRITE_INDEXED(RSR, region, mask | 1);
+}
+

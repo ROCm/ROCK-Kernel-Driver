@@ -41,7 +41,7 @@
 #include <linux/timex.h>
 #include <linux/slab.h>
 #include <linux/random.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/bootinfo.h>
 #include <asm/io.h>
 #include <asm/irq_cpu.h>
@@ -61,7 +61,7 @@ static struct irqaction cascade_mv64340 = {
 	no_action, SA_INTERRUPT, CPU_MASK_NONE, "cascade via MV64340", NULL, NULL
 };
 
-void __init init_IRQ(void)
+void __init arch_init_irq(void)
 {
 	/*
 	 * Clear all of the interrupts while we change the able around a bit.
@@ -71,7 +71,6 @@ void __init init_IRQ(void)
 
 	/* Sets the first-level interrupt dispatcher. */
 	set_except_vector(0, ocelot_handle_int);
-	init_generic_irq();
 	mips_cpu_irq_init(0);
 
 	/* set up the cascading interrupts */
@@ -82,10 +81,4 @@ void __init init_IRQ(void)
 	mv64340_irq_init(16);
 	uart_irq_init();
 	cpci_irq_init();
-
-#ifdef CONFIG_KGDB
-	printk("start kgdb ...\n");
-	set_debug_traps();
-	breakpoint();	/* you may move this line to whereever you want :-) */
-#endif
 }

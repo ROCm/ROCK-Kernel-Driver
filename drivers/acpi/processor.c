@@ -101,8 +101,6 @@ static struct acpi_driver acpi_processor_driver = {
 			},
 };
 
-static int c2 = -1;
-static int c3 = -1;
 
 struct acpi_processor_errata {
 	u8			smp;
@@ -144,8 +142,6 @@ static struct file_operations acpi_processor_limit_fops = {
 
 static struct acpi_processor	*processors[NR_CPUS];
 static struct acpi_processor_errata errata;
-module_param_named(c2, c2, bool, 0);
-module_param_named(c3, c3, bool, 0);
 static void (*pm_idle_save)(void);
 
 
@@ -219,11 +215,13 @@ acpi_processor_errata_piix4 (
 		 * each IDE controller's DMA status to make sure we catch all
 		 * DMA activity.
 		 */
-		dev = pci_find_subsys(PCI_VENDOR_ID_INTEL,
+		dev = pci_get_subsys(PCI_VENDOR_ID_INTEL,
 		           PCI_DEVICE_ID_INTEL_82371AB, 
                            PCI_ANY_ID, PCI_ANY_ID, NULL);
-		if (dev)
+		if (dev) {
 			errata.piix4.bmisx = pci_resource_start(dev, 4);
+			pci_dev_put(dev);
+		}
 
 		/* 
 		 * Type-F DMA
@@ -234,7 +232,7 @@ acpi_processor_errata_piix4 (
 		 * disable C3 support if this is enabled, as some legacy 
 		 * devices won't operate well if fast DMA is disabled.
 		 */
-		dev = pci_find_subsys(PCI_VENDOR_ID_INTEL, 
+		dev = pci_get_subsys(PCI_VENDOR_ID_INTEL, 
 			PCI_DEVICE_ID_INTEL_82371AB_0, 
 			PCI_ANY_ID, PCI_ANY_ID, NULL);
 		if (dev) {
@@ -242,6 +240,7 @@ acpi_processor_errata_piix4 (
 			pci_read_config_byte(dev, 0x77, &value2);
 			if ((value1 & 0x80) || (value2 & 0x80))
 				errata.piix4.fdma = 1;
+			pci_dev_put(dev);
 		}
 
 		break;
@@ -273,10 +272,12 @@ acpi_processor_errata (
 	/*
 	 * PIIX4
 	 */
-	dev = pci_find_subsys(PCI_VENDOR_ID_INTEL, 
+	dev = pci_get_subsys(PCI_VENDOR_ID_INTEL, 
 		PCI_DEVICE_ID_INTEL_82371AB_3, PCI_ANY_ID, PCI_ANY_ID, NULL);
-	if (dev)
+	if (dev) {
 		result = acpi_processor_errata_piix4(dev);
+		pci_dev_put(dev);
+	}
 
 	return_VALUE(result);
 }
@@ -338,8 +339,8 @@ acpi_processor_idle (void)
 {
 	struct acpi_processor	*pr = NULL;
 	struct acpi_processor_cx *cx = NULL;
-	int			next_state = 0;
-	int			sleep_ticks = 0;
+	unsigned int			next_state = 0;
+	unsigned int		sleep_ticks = 0;
 	u32			t1, t2 = 0;
 
 	pr = processors[smp_processor_id()];
@@ -351,6 +352,15 @@ acpi_processor_idle (void)
 	 * for C2/C3 transitions.
 	 */
 	local_irq_disable();
+
+	/*
+	 * Check whether we truly need to go idle, or should
+	 * reschedule:
+	 */
+	if (unlikely(need_resched())) {
+		local_irq_enable();
+		return;
+	}
 
 	cx = &(pr->power.states[pr->power.state]);
 
@@ -411,8 +421,15 @@ acpi_processor_idle (void)
 	switch (pr->power.state) {
 
 	case ACPI_STATE_C1:
-		/* Invoke C1. */
-		safe_halt();
+		/*
+		 * Invoke C1.
+		 * Use the appropriate idle routine, the one that would
+		 * be used without acpi C-states.
+		 */
+		if (pm_idle_save)
+			pm_idle_save();
+		else
+			safe_halt();
 		/*
                  * TBD: Can't get time duration while in C1, as resumes
 		 *      go to an ISR rather than here.  Need to instrument
@@ -468,8 +485,9 @@ acpi_processor_idle (void)
 	 * Track the number of longs (time asleep is greater than threshold)
 	 * and promote when the count threshold is reached.  Note that bus
 	 * mastering activity may prevent promotions.
+	 * Do not promote above max_cstate.
 	 */
-	if (cx->promotion.state) {
+	if (cx->promotion.state && (cx->promotion.state <= max_cstate)) {
 		if (sleep_ticks > cx->promotion.threshold.ticks) {
 			cx->promotion.count++;
  			cx->demotion.count = 0;
@@ -506,6 +524,13 @@ acpi_processor_idle (void)
 	}
 
 end:
+	/*
+	 * Demote if current state exceeds max_cstate
+	 */
+	if (pr->power.state > max_cstate) {
+		next_state = max_cstate;
+	}
+
 	/*
 	 * New Cx State?
 	 * -------------
@@ -657,11 +682,6 @@ acpi_processor_get_power_info (
 		else if (errata.smp)
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 				"C2 not supported in SMP mode\n"));
-
-
-		else if (!c2) 
-			printk(KERN_INFO "C2 disabled\n");
-
 		/*
 		 * Otherwise we've met all of our C2 requirements.
 		 * Normalize the C2 latency to expidite policy.
@@ -717,9 +737,6 @@ acpi_processor_get_power_info (
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 				"C3 not supported on PIIX4 with Type-F DMA\n"));
 		}
-		else if (!c3)
-			printk(KERN_INFO "C3 disabled\n");
-
 		/*
 		 * Otherwise we've met all of our C3 requirements.  
 		 * Normalize the C2 latency to expidite policy.  Enable
@@ -776,7 +793,10 @@ static DECLARE_MUTEX(performance_sem);
  * policy is adjusted accordingly.
  */
 
-static int acpi_processor_ppc_is_init = 0;
+#define PPC_REGISTERED   1
+#define PPC_IN_USE       2
+
+static int acpi_processor_ppc_status = 0;
 
 static int acpi_processor_ppc_notifier(struct notifier_block *nb, 
 	unsigned long event,
@@ -834,6 +854,10 @@ acpi_processor_get_platform_limit (
 	 * (e.g. 0 = states 0..n; 1 = states 1..n; etc.
 	 */
 	status = acpi_evaluate_integer(pr->handle, "_PPC", NULL, &ppc);
+
+	if (status != AE_NOT_FOUND)
+		acpi_processor_ppc_status |= PPC_IN_USE;
+
 	if(ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Error evaluating _PPC\n"));
 		return_VALUE(-ENODEV);
@@ -858,17 +882,17 @@ static int acpi_processor_ppc_has_changed(
 
 static void acpi_processor_ppc_init(void) {
 	if (!cpufreq_register_notifier(&acpi_ppc_notifier_block, CPUFREQ_POLICY_NOTIFIER))
-		acpi_processor_ppc_is_init = 1;
+		acpi_processor_ppc_status |= PPC_REGISTERED;
 	else
 		printk(KERN_DEBUG "Warning: Processor Platform Limit not supported.\n");
 }
 
 
 static void acpi_processor_ppc_exit(void) {
-	if (acpi_processor_ppc_is_init)
+	if (acpi_processor_ppc_status & PPC_REGISTERED)
 		cpufreq_unregister_notifier(&acpi_ppc_notifier_block, CPUFREQ_POLICY_NOTIFIER);
 
-	acpi_processor_ppc_is_init = 0;
+	acpi_processor_ppc_status &= ~PPC_REGISTERED;
 }
 
 /*
@@ -980,7 +1004,7 @@ acpi_processor_get_performance_states (
 	struct acpi_buffer	format = {sizeof("NNNNNN"), "NNNNNN"};
 	struct acpi_buffer	state = {0, NULL};
 	union acpi_object 	*pss = NULL;
-	int			i = 0;
+	unsigned int		i;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_get_performance_states");
 
@@ -1088,6 +1112,73 @@ acpi_processor_get_performance_info (
 }
 
 
+int acpi_processor_notify_smm(struct module *calling_module) {
+	acpi_status		status;
+	static int		is_done = 0;
+
+	ACPI_FUNCTION_TRACE("acpi_processor_notify_smm");
+
+	if (!(acpi_processor_ppc_status & PPC_REGISTERED))
+		return_VALUE(-EBUSY);
+
+	if (!try_module_get(calling_module))
+		return_VALUE(-EINVAL);
+
+	/* is_done is set to negative if an error occured,
+	 * and to postitive if _no_ error occured, but SMM
+	 * was already notified. This avoids double notification
+	 * which might lead to unexpected results...
+	 */
+	if (is_done > 0) {
+		module_put(calling_module);
+		return_VALUE(0);
+	}
+	else if (is_done < 0) {
+		module_put(calling_module);
+		return_VALUE(is_done);
+	}
+
+	is_done = -EIO;
+
+	/* Can't write pstate_cnt to smi_cmd if either value is zero */
+	if ((!acpi_fadt.smi_cmd) ||
+	    (!acpi_fadt.pstate_cnt)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO,
+			"No SMI port or pstate_cnt\n"));
+		module_put(calling_module);
+		return_VALUE(0);
+	}
+
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Writing pstate_cnt [0x%x] to smi_cmd [0x%x]\n", acpi_fadt.pstate_cnt, acpi_fadt.smi_cmd));
+
+	/* FADT v1 doesn't support pstate_cnt, many BIOS vendors use
+	 * it anyway, so we need to support it... */
+	if (acpi_fadt_is_v1) {
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Using v1.0 FADT reserved value for pstate_cnt\n"));
+	}
+
+	status = acpi_os_write_port (acpi_fadt.smi_cmd,
+				     (u32) acpi_fadt.pstate_cnt, 8);
+	if (ACPI_FAILURE (status)) {
+		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
+				  "Failed to write pstate_cnt [0x%x] to "
+				  "smi_cmd [0x%x]\n", acpi_fadt.pstate_cnt, acpi_fadt.smi_cmd));
+		module_put(calling_module);
+		return_VALUE(status);
+	}
+
+	/* Success. If there's no _PPC, we need to fear nothing, so
+	 * we can allow the cpufreq driver to be rmmod'ed. */
+	is_done = 1;
+
+	if (!(acpi_processor_ppc_status & PPC_IN_USE))
+		module_put(calling_module);
+
+	return_VALUE(0);
+}
+EXPORT_SYMBOL(acpi_processor_notify_smm);
+
+
 #ifdef CONFIG_X86_ACPI_CPUFREQ_PROC_INTF
 /* /proc/acpi/processor/../performance interface (DEPRECATED) */
 
@@ -1102,7 +1193,7 @@ static struct file_operations acpi_processor_perf_fops = {
 static int acpi_processor_perf_seq_show(struct seq_file *seq, void *offset)
 {
 	struct acpi_processor	*pr = (struct acpi_processor *)seq->private;
-	int			i = 0;
+	unsigned int		i;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_perf_seq_show");
 
@@ -1128,7 +1219,7 @@ static int acpi_processor_perf_seq_show(struct seq_file *seq, void *offset)
 			(u32) pr->performance->states[i].transition_latency);
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_processor_perf_open_fs(struct inode *inode, struct file *file)
@@ -1244,7 +1335,7 @@ acpi_processor_register_performance (
 
 	ACPI_FUNCTION_TRACE("acpi_processor_register_performance");
 
-	if (!acpi_processor_ppc_is_init)
+	if (!(acpi_processor_ppc_status & PPC_REGISTERED))
 		return_VALUE(-EINVAL);
 
 	down(&performance_sem);
@@ -1284,9 +1375,6 @@ acpi_processor_unregister_performance (
 	struct acpi_processor *pr;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_unregister_performance");
-
-	if (!acpi_processor_ppc_is_init)
-		return_VOID;
 
 	down(&performance_sem);
 
@@ -1853,7 +1941,7 @@ static int acpi_processor_info_seq_show(struct seq_file *seq, void *offset)
 			pr->flags.limit ? "yes" : "no");
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_processor_info_open_fs(struct inode *inode, struct file *file)
@@ -1865,7 +1953,7 @@ static int acpi_processor_info_open_fs(struct inode *inode, struct file *file)
 static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 {
 	struct acpi_processor	*pr = (struct acpi_processor *)seq->private;
-	int			i = 0;
+	unsigned int		i;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_power_seq_show");
 
@@ -1874,9 +1962,11 @@ static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 
 	seq_printf(seq, "active state:            C%d\n"
 			"default state:           C%d\n"
+			"max_cstate:              C%d\n"
 			"bus master activity:     %08x\n",
 			pr->power.state,
 			pr->power.default_state,
+			max_cstate,
 			pr->power.bm_activity);
 
 	seq_puts(seq, "states:\n");
@@ -1908,7 +1998,7 @@ static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 	}
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_processor_power_open_fs(struct inode *inode, struct file *file)
@@ -1952,7 +2042,7 @@ static int acpi_processor_throttling_seq_show(struct seq_file *seq, void *offset
 			(pr->throttling.states[i].performance?pr->throttling.states[i].performance/10:0));
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_processor_throttling_open_fs(struct inode *inode, struct file *file)
@@ -2013,7 +2103,7 @@ static int acpi_processor_limit_seq_show(struct seq_file *seq, void *offset)
 			pr->limit.thermal.px, pr->limit.thermal.tx);
 
 end:
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_processor_limit_open_fs(struct inode *inode, struct file *file)
@@ -2388,22 +2478,28 @@ acpi_processor_add (
 
 	/*
 	 * Install the idle handler if processor power management is supported.
-	 * Note that the default idle handler (default_idle) will be used on 
+	 * Note that we use previously set idle handler will be used on 
 	 * platforms that only support C1.
 	 */
-	if ((pr->id == 0) && (pr->flags.power)) {
-		pm_idle_save = pm_idle;
-		pm_idle = acpi_processor_idle;
+	if ((pr->flags.power) && (!boot_option_idle_override)) {
+		printk(KERN_INFO PREFIX "%s [%s] (supports",
+			acpi_device_name(device), acpi_device_bid(device));
+		for (i = 1; i < ACPI_C_STATE_COUNT; i++)
+			if (pr->power.states[i].valid)
+				printk(" C%d", i);
+		printk(")\n");
+		if (pr->id == 0) {
+			pm_idle_save = pm_idle;
+			pm_idle = acpi_processor_idle;
+		}
 	}
 	
-	printk(KERN_INFO PREFIX "%s [%s] (supports",
-		acpi_device_name(device), acpi_device_bid(device));
-	for (i=1; i<ACPI_C_STATE_COUNT; i++)
-		if (pr->power.states[i].valid)
-			printk(" C%d", i);
-	if (pr->flags.throttling)
-		printk(", %d throttling states", pr->throttling.state_count);
-	printk(")\n");
+	if (pr->flags.throttling) {
+		printk(KERN_INFO PREFIX "%s [%s] (supports",
+			acpi_device_name(device), acpi_device_bid(device));
+		printk(" %d throttling states", pr->throttling.state_count);
+		printk(")\n");
+	}
 
 end:
 	if (result) {
@@ -2433,6 +2529,11 @@ acpi_processor_remove (
 	/* Unregister the idle handler when processor #0 is removed. */
 	if (pr->id == 0) {
 		pm_idle = pm_idle_save;
+		/*
+		 * We are about to unload the current idle thread pm callback
+		 * (pm_idle), Wait for all processors to update cached/local
+		 * copies of pm_idle before proceeding.
+		 */
 		synchronize_kernel();
 	}
 
@@ -2452,17 +2553,22 @@ acpi_processor_remove (
 	return_VALUE(0);
 }
 
-/* IBM ThinkPad R40e crashes mysteriously when going into C2 or C3. 
-   For now disable this. Probably a bug somewhere else. */
+/*
+ * IBM ThinkPad R40e crashes mysteriously when going into C2 or C3. 
+ * For now disable this. Probably a bug somewhere else.
+ *
+ * To skip this limit, boot/load with a large max_cstate limit.
+ */
 static int no_c2c3(struct dmi_system_id *id)
 {
-	printk(KERN_INFO 
-	       "%s detected - C2,C3 disabled. Overwrite with \"processor.c2=1 processor.c3=1\n\"",
-	       id->ident);
-	if (c2 == -1) 
-		c2 = 0;
-	if (c3 == -1) 
-		c3 = 0; 
+	if (max_cstate > ACPI_C_STATES_MAX)
+		return 0;
+
+	printk(KERN_NOTICE PREFIX "%s detected - C2,C3 disabled."
+		" Override with \"processor.max_cstate=9\"\n", id->ident);
+
+	max_cstate = 1;
+
 	return 0;
 }
 
@@ -2507,6 +2613,9 @@ acpi_processor_init (void)
 
 	dmi_check_system(processor_dmi_table); 
 
+	if (max_cstate < ACPI_C_STATES_MAX)
+		printk(KERN_NOTICE "ACPI: processor limited to max C-state %d\n", max_cstate);
+
 	return_VALUE(0);
 }
 
@@ -2530,5 +2639,6 @@ acpi_processor_exit (void)
 
 module_init(acpi_processor_init);
 module_exit(acpi_processor_exit);
+module_param_named(max_cstate, max_cstate, uint, 0);
 
 EXPORT_SYMBOL(acpi_processor_set_thermal_limit);

@@ -228,7 +228,7 @@ static struct icmp_control icmp_pointers[NR_ICMP_TYPES+1];
  *
  *	On SMP we have one ICMP socket per-cpu.
  */
-DEFINE_PER_CPU(struct socket *, __icmp_socket) = NULL;
+static DEFINE_PER_CPU(struct socket *, __icmp_socket) = NULL;
 #define icmp_socket	__get_cpu_var(__icmp_socket)
 
 static __inline__ int icmp_xmit_lock(void)
@@ -338,6 +338,8 @@ int icmp_glue_bits(void *from, char *to, int offset, int len, int odd,
 				      to, len, 0);
 
 	skb->csum = csum_block_add(skb->csum, csum, odd);
+	if (icmp_pointers[icmp_param->data.icmph.type].error)
+		nf_ct_attach(skb, icmp_param->skb);
 	return 0;
 }
 

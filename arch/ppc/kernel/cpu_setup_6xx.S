@@ -172,9 +172,9 @@ END_FTR_SECTION_IFCLR(CPU_FTR_NO_DPM)
 setup_750cx:
 	mfspr	r10, SPRN_HID1
 	rlwinm	r10,r10,4,28,31
-	cmpi	cr0,r10,7
-	cmpi	cr1,r10,9
-	cmpi	cr2,r10,11
+	cmpwi	cr0,r10,7
+	cmpwi	cr1,r10,9
+	cmpwi	cr2,r10,11
 	cror	4*cr0+eq,4*cr0+eq,4*cr1+eq
 	cror	4*cr0+eq,4*cr0+eq,4*cr2+eq
 	bnelr
@@ -287,12 +287,12 @@ _GLOBAL(__save_cpu_setup)
 	/* Now deal with CPU type dependent registers */
 	mfspr	r3,PVR
 	srwi	r3,r3,16
-	cmpli	cr0,r3,0x8000	/* 7450 */
-	cmpli	cr1,r3,0x000c	/* 7400 */
-	cmpli	cr2,r3,0x800c	/* 7410 */
-	cmpli	cr3,r3,0x8001	/* 7455 */
-	cmpli	cr4,r3,0x8002	/* 7457 */
-	cmpli	cr5,r3,0x7000	/* 750FX */
+	cmplwi	cr0,r3,0x8000	/* 7450 */
+	cmplwi	cr1,r3,0x000c	/* 7400 */
+	cmplwi	cr2,r3,0x800c	/* 7410 */
+	cmplwi	cr3,r3,0x8001	/* 7455 */
+	cmplwi	cr4,r3,0x8002	/* 7457 */
+	cmplwi	cr5,r3,0x7000	/* 750FX */
 	/* cr1 is 7400 || 7410 */
 	cror	4*cr1+eq,4*cr1+eq,4*cr2+eq
 	/* cr0 is 74xx */
@@ -323,7 +323,7 @@ _GLOBAL(__save_cpu_setup)
 	/* If rev 2.x, backup HID2 */
 	mfspr	r3,PVR
 	andi.	r3,r3,0xff00
-	cmpi	cr0,r3,0x0200
+	cmpwi	cr0,r3,0x0200
 	bne	1f
 	mfspr	r4,SPRN_HID2
 	stw	r4,CS_HID2(r5)
@@ -354,12 +354,12 @@ _GLOBAL(__restore_cpu_setup)
 	/* Now deal with CPU type dependent registers */
 	mfspr	r3,PVR
 	srwi	r3,r3,16
-	cmpli	cr0,r3,0x8000	/* 7450 */
-	cmpli	cr1,r3,0x000c	/* 7400 */
-	cmpli	cr2,r3,0x800c	/* 7410 */
-	cmpli	cr3,r3,0x8001	/* 7455 */
-	cmpli	cr4,r3,0x8002	/* 7457 */
-	cmpli	cr5,r3,0x7000	/* 750FX */
+	cmplwi	cr0,r3,0x8000	/* 7450 */
+	cmplwi	cr1,r3,0x000c	/* 7400 */
+	cmplwi	cr2,r3,0x800c	/* 7410 */
+	cmplwi	cr3,r3,0x8001	/* 7455 */
+	cmplwi	cr4,r3,0x8002	/* 7457 */
+	cmplwi	cr5,r3,0x7000	/* 750FX */
 	/* cr1 is 7400 || 7410 */
 	cror	4*cr1+eq,4*cr1+eq,4*cr2+eq
 	/* cr0 is 74xx */
@@ -412,7 +412,7 @@ _GLOBAL(__restore_cpu_setup)
 	/* If rev 2.x, restore HID2 with low voltage bit cleared */
 	mfspr	r3,PVR
 	andi.	r3,r3,0xff00
-	cmpi	cr0,r3,0x0200
+	cmpwi	cr0,r3,0x0200
 	bne	4f
 	lwz	r4,CS_HID2(r5)
 	rlwinm	r4,r4,0,19,17
@@ -426,7 +426,7 @@ _GLOBAL(__restore_cpu_setup)
 	mftbl	r5
 3:	mftbl	r6
 	sub	r6,r6,r5
-	cmpli	cr0,r6,10000
+	cmplwi	cr0,r6,10000
 	ble	3b
 	/* Setup final PLL */
 	mtspr	SPRN_HID1,r4

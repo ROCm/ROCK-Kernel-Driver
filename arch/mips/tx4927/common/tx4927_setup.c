@@ -38,7 +38,7 @@
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/irq.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/bootinfo.h>
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -89,15 +89,6 @@ void __init tx4927_time_init(void)
 	{
 		extern void toshiba_rbtx4927_time_init(void);
 		toshiba_rbtx4927_time_init();
-	}
-#endif
-
-#ifdef CONFIG_KGDB
-	{
-		printk("Calling breakpoint() -- start remote kgdb\n");
-		set_debug_traps();
-		breakpoint();
-		printk("Calling breakpoint() -- done\n");
 	}
 #endif
 

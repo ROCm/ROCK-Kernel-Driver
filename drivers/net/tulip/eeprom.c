@@ -14,6 +14,7 @@
 
 */
 
+#include <linux/pci.h>
 #include "tulip.h"
 #include <linux/init.h>
 #include <asm/unaligned.h>
@@ -312,7 +313,7 @@ subsequent_board:
 /* Delay between EEPROM clock transitions.
    Even at 33Mhz current PCI implementations don't overrun the EEPROM clock.
    We add a bus turn-around to insure that this remains true. */
-#define eeprom_delay()	inl(ee_addr)
+#define eeprom_delay()	ioread32(ee_addr)
 
 /* The EEPROM commands include the alway-set leading bit. */
 #define EE_READ_CMD		(6)
@@ -323,34 +324,34 @@ int __devinit tulip_read_eeprom(struct net_device *dev, int location, int addr_l
 	int i;
 	unsigned retval = 0;
 	struct tulip_private *tp = dev->priv;
-	long ee_addr = tp->base_addr + CSR9;
+	void __iomem *ee_addr = tp->base_addr + CSR9;
 	int read_cmd = location | (EE_READ_CMD << addr_len);
 
-	outl(EE_ENB & ~EE_CS, ee_addr);
-	outl(EE_ENB, ee_addr);
+	iowrite32(EE_ENB & ~EE_CS, ee_addr);
+	iowrite32(EE_ENB, ee_addr);
 
 	/* Shift the read command bits out. */
 	for (i = 4 + addr_len; i >= 0; i--) {
 		short dataval = (read_cmd & (1 << i)) ? EE_DATA_WRITE : 0;
-		outl(EE_ENB | dataval, ee_addr);
+		iowrite32(EE_ENB | dataval, ee_addr);
 		eeprom_delay();
-		outl(EE_ENB | dataval | EE_SHIFT_CLK, ee_addr);
+		iowrite32(EE_ENB | dataval | EE_SHIFT_CLK, ee_addr);
 		eeprom_delay();
-		retval = (retval << 1) | ((inl(ee_addr) & EE_DATA_READ) ? 1 : 0);
+		retval = (retval << 1) | ((ioread32(ee_addr) & EE_DATA_READ) ? 1 : 0);
 	}
-	outl(EE_ENB, ee_addr);
+	iowrite32(EE_ENB, ee_addr);
 	eeprom_delay();
 
 	for (i = 16; i > 0; i--) {
-		outl(EE_ENB | EE_SHIFT_CLK, ee_addr);
+		iowrite32(EE_ENB | EE_SHIFT_CLK, ee_addr);
 		eeprom_delay();
-		retval = (retval << 1) | ((inl(ee_addr) & EE_DATA_READ) ? 1 : 0);
-		outl(EE_ENB, ee_addr);
+		retval = (retval << 1) | ((ioread32(ee_addr) & EE_DATA_READ) ? 1 : 0);
+		iowrite32(EE_ENB, ee_addr);
 		eeprom_delay();
 	}
 
 	/* Terminate the EEPROM access. */
-	outl(EE_ENB & ~EE_CS, ee_addr);
+	iowrite32(EE_ENB & ~EE_CS, ee_addr);
 	return (tp->flags & HAS_SWAPPED_SEEPROM) ? swab16(retval) : retval;
 }
 

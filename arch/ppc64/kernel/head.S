@@ -26,6 +26,7 @@
 #define SECONDARY_PROCESSORS
 
 #include <linux/config.h>
+#include <linux/threads.h>
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <asm/mmu.h>
@@ -83,13 +84,14 @@
 	.text
 	.globl  _stext
 _stext:
-#ifdef CONFIG_PPC_PSERIES
-_STATIC(__start)
+#ifdef CONFIG_PPC_MULTIPLATFORM
+_GLOBAL(__start)
 	/* NOP this out unconditionally */
 BEGIN_FTR_SECTION
-	b .__start_initialization_pSeries
+	b .__start_initialization_multiplatform
 END_FTR_SECTION(0, 1)
-#endif
+#endif /* CONFIG_PPC_MULTIPLATFORM */
+
 	/* Catch branch to 0 in real mode */
 	trap
 #ifdef CONFIG_PPC_ISERIES
@@ -117,7 +119,8 @@ embedded_sysmap_start:
 	.globl	embedded_sysmap_end
 embedded_sysmap_end:
 	.llong	0
-#else
+
+#else /* CONFIG_PPC_ISERIES */
 
 	/* Secondary processors spin on this value until it goes to 1. */
 	.globl  __secondary_hold_spinloop
@@ -548,15 +551,15 @@ __end_systemcfg:
 	.llong	0		/* Reserved */
 	.llong	0		/* Reserved */
 	.llong	0		/* Reserved */
-	.llong	0xc00000000	/* KERNELBASE ESID */
-	.llong	0x6a99b4b14	/* KERNELBASE VSID */
+	.llong	(KERNELBASE>>SID_SHIFT)
+	.llong	0x408f92c94	/* KERNELBASE VSID */
 	/* We have to list the bolted VMALLOC segment here, too, so that it
 	 * will be restored on shared processor switch */
-	.llong	0xd00000000	/* VMALLOCBASE ESID */
-	.llong	0x08d12e6ab	/* VMALLOCBASE VSID */
+	.llong	(VMALLOCBASE>>SID_SHIFT)
+	.llong	0xf09b89af5	/* VMALLOCBASE VSID */
 	.llong	8192		/* # pages to map (32 MB) */
 	.llong	0		/* Offset from start of loadarea to start of map */
-	.llong	0x0006a99b4b140000	/* VPN of first page to map */
+	.llong	0x408f92c940000	/* VPN of first page to map */
 
 	. = 0x6100
 
@@ -1064,18 +1067,9 @@ _GLOBAL(do_stab_bolted)
 	rldimi	r10,r11,7,52	/* r10 = first ste of the group */
 
 	/* Calculate VSID */
-	/* (((ea >> 28) & 0x1fff) << 15) | (ea >> 60) */
-	rldic	r11,r11,15,36
-	ori	r11,r11,0xc
-
-	/* VSID_RANDOMIZER */
-	li	r9,9
-	sldi	r9,r9,32
-	oris	r9,r9,58231
-	ori	r9,r9,39831
-
-	mulld	r9,r11,r9
-	rldic	r9,r9,12,16	/* r9 = vsid << 12 */
+	/* This is a kernel address, so protovsid = ESID */
+	ASM_VSID_SCRAMBLE(r11, r9)
+	rldic	r9,r11,12,16	/* r9 = vsid << 12 */
 
 	/* Search the primary group for a free entry */
 1:	ld	r11,0(r10)	/* Test valid bit of the current ste	*/
@@ -1199,23 +1193,39 @@ unrecov_slb:
 
 /*
  * On pSeries, secondary processors spin in the following code.
- * At entry, r3 = this processor's number (in Linux terms, not hardware).
+ * At entry, r3 = this processor's number (physical cpu id)
  */
 _GLOBAL(pseries_secondary_smp_init)
+	mr	r24,r3
+	
 	/* turn on 64-bit mode */
 	bl	.enable_64b_mode
 	isync
 
-	/* Set up a paca value for this processor. */
-	LOADADDR(r24, paca) 		/* Get base vaddr of paca array	 */
-	mulli	r13,r3,PACA_SIZE	/* Calculate vaddr of right paca */
-	add	r13,r13,r24		/* for this processor.		 */
+	/* Copy some CPU settings from CPU 0 */
+	bl	.__restore_cpu_setup
 
-	mtspr	SPRG3,r13		/* Save vaddr of paca in SPRG3	 */
-	mr	r24,r3			/* __secondary_start needs cpu#	 */
+	/* Set up a paca value for this processor. Since we have the
+	 * physical cpu id in r3, we need to search the pacas to find
+	 * which logical id maps to our physical one.
+	 */
+	LOADADDR(r13, paca) 		/* Get base vaddr of paca array	 */
+	li	r5,0			/* logical cpu id                */
+1:	lhz	r6,PACAHWCPUID(r13)	/* Load HW procid from paca      */
+	cmpw	r6,r24			/* Compare to our id             */
+	beq	2f
+	addi	r13,r13,PACA_SIZE	/* Loop to next PACA on miss     */
+	addi	r5,r5,1
+	cmpwi	r5,NR_CPUS
+	blt	1b
 
-1:
-	HMT_LOW
+99:	HMT_LOW				/* Couldn't find our CPU id      */
+	b	99b
+
+2:	mtspr	SPRG3,r13		/* Save vaddr of paca in SPRG3	 */
+	/* From now on, r24 is expected to be logica cpuid */
+	mr	r24,r5
+3:	HMT_LOW
 	lbz	r23,PACAPROCSTART(r13)	/* Test if this processor should */
 					/* start.			 */
 	sync
@@ -1230,14 +1240,12 @@ _GLOBAL(pseries_secondary_smp_init)
 	bne	.__secondary_start
 #endif
 #endif
-	b 	1b			/* Loop until told to go	 */
+	b 	3b			/* Loop until told to go	 */
 #ifdef CONFIG_PPC_ISERIES
-_GLOBAL(__start_initialization_iSeries)
+_STATIC(__start_initialization_iSeries)
 	/* Clear out the BSS */
 	LOADADDR(r11,__bss_stop)
-
 	LOADADDR(r8,__bss_start)
-
 	sub	r11,r11,r8		/* bss size			*/
 	addi	r11,r11,7		/* round up to an even double word */
 	rldicl. r11,r11,61,3		/* shift right by 3		*/
@@ -1274,32 +1282,73 @@ _GLOBAL(__start_initialization_iSeries)
 	ld	r6,PACA(r4)		/* Get the base paca pointer	*/
 	ld	r4,PACASTABVIRT(r6)
 
-	bl	.iSeries_fixup_klimit
+	bl	.iSeries_early_setup
 
 	/* relocation is on at this point */
 
 	b	.start_here_common
-#endif
+#endif /* CONFIG_PPC_ISERIES */
 
-#ifdef CONFIG_PPC_PSERIES
+#ifdef CONFIG_PPC_MULTIPLATFORM
 
-_STATIC(mmu_off)
+_STATIC(__mmu_off)
 	mfmsr	r3
 	andi.	r0,r3,MSR_IR|MSR_DR
 	beqlr
 	andc	r3,r3,r0
-	mtspr	SRR0,r4
-	mtspr	SRR1,r3
+	mtspr	SPRN_SRR0,r4
+	mtspr	SPRN_SRR1,r3
 	sync
 	rfid
 	b	.	/* prevent speculative execution */
-_GLOBAL(__start_initialization_pSeries)
-	mr	r31,r3			/* save parameters */
+
+
+/*
+ * Here is our main kernel entry point. We support currently 2 kind of entries
+ * depending on the value of r5.
+ *
+ *   r5 != NULL -> OF entry, we go to prom_init, "legacy" parameter content
+ *                 in r3...r7
+ *   
+ *   r5 == NULL -> kexec style entry. r3 is a physical pointer to the
+ *                 DT block, r4 is a physical pointer to the kernel itself
+ *
+ */
+_GLOBAL(__start_initialization_multiplatform)
+	/*
+	 * Are we booted from a PROM Of-type client-interface ?
+	 */
+	cmpldi	cr0,r5,0
+	bne	.__boot_from_prom		/* yes -> prom */
+
+	/* Save parameters */
+	mr	r31,r3
+	mr	r30,r4
+
+	/* Make sure we are running in 64 bits mode */
+	bl	.enable_64b_mode
+
+	/* Setup some critical 970 SPRs before switching MMU off */
+	bl	.__970_cpu_preinit
+
+	/* cpu # */
+	li	r24,0
+
+	/* Switch off MMU if not already */
+	LOADADDR(r4, .__after_prom_start - KERNELBASE)
+	add	r4,r4,r30
+	bl	.__mmu_off
+	b	.__after_prom_start
+
+_STATIC(__boot_from_prom)
+	/* Save parameters */
+	mr	r31,r3
 	mr	r30,r4
 	mr	r29,r5
 	mr	r28,r6
 	mr	r27,r7
 
+	/* Make sure we are running in 64 bits mode */
 	bl	.enable_64b_mode
 
 	/* put a relocation offset into r3 */
@@ -1312,7 +1361,7 @@ _GLOBAL(__start_initialization_pSeries)
 	/* Relocate the TOC from a virt addr to a real addr */
 	sub	r2,r2,r3
 
-	/* Save parameters */
+	/* Restore parameters */
 	mr	r3,r31
 	mr	r4,r30
 	mr	r5,r29
@@ -1321,17 +1370,8 @@ _GLOBAL(__start_initialization_pSeries)
 
 	/* Do all of the interaction with OF client interface */
 	bl	.prom_init
-	mr	r23,r3			/* Save phys address we are running at */
-
-	/* Setup some critical 970 SPRs before switching MMU off */
-	bl	.__970_cpu_preinit
-
-	li	r24,0			/* cpu # */
-
-	/* Switch off MMU if not already */
-	LOADADDR(r4, .__after_prom_start - KERNELBASE)
-	add	r4,r4,r23
-	bl	.mmu_off	
+	/* We never return */
+	trap
 
 /*
  * At this point, r3 contains the physical address we are running at,
@@ -1357,7 +1397,7 @@ _STATIC(__after_prom_start)
 
 	li	r3,0			/* target addr */
 
-	// XXX FIXME: Use phys returned by OF (r23)
+	// XXX FIXME: Use phys returned by OF (r30)
 	sub	r4,r27,r26 		/* source addr			 */
 					/* current address of _start	 */
 					/*   i.e. where we are running	 */
@@ -1382,8 +1422,9 @@ _STATIC(__after_prom_start)
 	ld	r5,0(r5)		/* get the value of klimit */
 	sub	r5,r5,r27
 	bl	.copy_and_flush		/* copy the rest */
-	b	.start_here_pSeries
-#endif
+	b	.start_here_multiplatform
+
+#endif /* CONFIG_PPC_MULTIPLATFORM */
 
 /*
  * Copy routine used to copy the kernel to start at physical address 0
@@ -1803,14 +1844,32 @@ _GLOBAL(enable_64b_mode)
 	isync
 	blr
 
-#ifdef CONFIG_PPC_PSERIES
+#ifdef CONFIG_PPC_MULTIPLATFORM
 /*
  * This is where the main kernel code starts.
  */
-_STATIC(start_here_pSeries)
+_STATIC(start_here_multiplatform)
 	/* get a new offset, now that the kernel has moved. */
 	bl	.reloc_offset
 	mr	r26,r3
+
+	/* Clear out the BSS. It may have been done in prom_init,
+	 * already but that's irrelevant since prom_init will soon
+	 * be detached from the kernel completely. Besides, we need
+	 * to clear it now for kexec-style entry.
+	 */
+	LOADADDR(r11,__bss_stop)
+	LOADADDR(r8,__bss_start)
+	sub	r11,r11,r8		/* bss size			*/
+	addi	r11,r11,7		/* round up to an even double word */
+	rldicl. r11,r11,61,3		/* shift right by 3		*/
+	beq	4f
+	addi	r8,r8,-8
+	li	r0,0
+	mtctr	r11			/* zero this many doublewords	*/
+3:	stdu	r0,8(r8)
+	bdnz	3b
+4:
 
 	mfmsr	r6
 	ori	r6,r6,MSR_RI
@@ -1844,19 +1903,6 @@ _STATIC(start_here_pSeries)
 91:
 #endif
 
-#ifdef CONFIG_SMP
-	/* All secondary cpus are now spinning on a common
-	 * spinloop, release them all now so they can start
-	 * to spin on their individual paca spinloops.
-	 * For non SMP kernels, the secondary cpus never
-	 * get out of the common spinloop.
-	 */
-	li	r3,1
-	LOADADDR(r5,__secondary_hold_spinloop)
-	tophys(r4,r5)
-	std	r3,0(r4)
-#endif
-
 	/* The following gets the stack and TOC set up with the regs */
 	/* pointing to the real addr of the kernel stack.  This is   */
 	/* all done to support the C function call below which sets  */
@@ -1871,7 +1917,7 @@ _STATIC(start_here_pSeries)
 	li	r0,0
 	stdu	r0,-STACK_FRAME_OVERHEAD(r1)
 
-		/* set up the TOC (physical address) */
+	/* set up the TOC (physical address) */
 	LOADADDR(r2,__toc_start)
 	addi	r2,r2,0x4000
 	addi	r2,r2,0x4000
@@ -1884,8 +1930,17 @@ _STATIC(start_here_pSeries)
 	mr	r5,r26
 	bl	.identify_cpu
 
-	/* Get the pointer to the segment table which is used by		*/
-	/* stab_initialize						 */
+	/* Save some low level config HIDs of CPU0 to be copied to
+	 * other CPUs later on, or used for suspend/resume
+	 */
+	bl	.__save_cpu_setup
+	sync
+
+	/* Setup a valid physical PACA pointer in SPRG3 for early_setup
+	 * note that boot_cpuid can always be 0 nowadays since there is
+	 * nowhere it can be initialized differently before we reach this
+	 * code
+	 */
 	LOADADDR(r27, boot_cpuid)
 	sub	r27,r27,r26
 	lwz	r27,0(r27)
@@ -1894,12 +1949,18 @@ _STATIC(start_here_pSeries)
 	mulli	r13,r27,PACA_SIZE	/* Calculate vaddr of right paca */
 	add	r13,r13,r24		/* for this processor.		 */
 	sub	r13,r13,r26		/* convert to physical addr	 */
-
 	mtspr	SPRG3,r13		/* PPPBBB: Temp... -Peter */
+	
+	/* Do very early kernel initializations, including initial hash table,
+	 * stab and slb setup before we turn on relocation.	*/
+
+	/* Restore parameters passed from prom_init/kexec */
+	mr	r3,r31
+ 	bl	.early_setup
+
+	/* set the ASR */
 	ld	r3,PACASTABREAL(r13)
 	ori	r4,r3,1			/* turn on valid bit		 */
-	
-	/* set the ASR */
 	li	r3,SYSTEMCFG_PHYS_ADDR	/* r3 = ptr to systemcfg */
 	lwz	r3,PLATFORM(r3)		/* r3 = platform flags */
 	cmpldi 	r3,PLATFORM_PSERIES_LPAR
@@ -1918,13 +1979,7 @@ _STATIC(start_here_pSeries)
 98:					/* !(rpa hypervisor) || !(star) */
 	mtasr	r4			/* set the stab location	*/
 99:
-	mfspr	r6,SPRG3
-	ld	r3,PACASTABREAL(r6)	/* restore r3 for stab_initialize */
-
-	/* Initialize an initial memory mapping and turn on relocation.	*/
-	bl	.stab_initialize
-	bl	.htab_initialize
-
+	/* Set SDR1 (hash table pointer) */
 	li	r3,SYSTEMCFG_PHYS_ADDR	/* r3 = ptr to systemcfg */
 	lwz	r3,PLATFORM(r3)		/* r3 = platform flags */
 	/* Test if bit 0 is set (LPAR bit) */
@@ -1941,7 +1996,7 @@ _STATIC(start_here_pSeries)
 	mtspr	SRR1,r4
 	rfid
 	b	.	/* prevent speculative execution */
-#endif /* CONFIG_PPC_PSERIES */
+#endif /* CONFIG_PPC_MULTIPLATFORM */
 	
 	/* This is where all platforms converge execution */
 _STATIC(start_here_common)
@@ -1988,13 +2043,6 @@ _STATIC(start_here_common)
 	/* Load the TOC */
 	ld	r2,PACATOC(r13)
 	std	r1,PACAKSAVE(r13)
-
-	/* Restore the parms passed in from the bootloader. */
-	mr	r3,r31
-	mr	r4,r30
-	mr	r5,r29
-	mr	r6,r28
-	mr	r7,r27
 
 	bl	.setup_system
 
@@ -2084,6 +2132,22 @@ _GLOBAL(hmt_start_secondary)
 	mtspr	CTRLT, r4
 	blr
 #endif
+
+#if defined(CONFIG_SMP) && !defined(CONFIG_PPC_ISERIES)
+_GLOBAL(smp_release_cpus)
+	/* All secondary cpus are spinning on a common
+	 * spinloop, release them all now so they can start
+	 * to spin on their individual paca spinloops.
+	 * For non SMP kernels, the secondary cpus never
+	 * get out of the common spinloop.
+	 */
+	li	r3,1
+	LOADADDR(r5,__secondary_hold_spinloop)
+	std	r3,0(r5)
+	sync
+	blr
+#endif /* CONFIG_SMP && !CONFIG_PPC_ISERIES */
+
 
 /*
  * We put a few things here that have to be page-aligned.

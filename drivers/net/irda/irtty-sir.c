@@ -234,7 +234,7 @@ static int irtty_do_write(struct sir_dev *dev, const unsigned char *ptr, size_t 
 	}
 	else
 		writelen = len;
-	return tty->driver->write(tty, 0, ptr, writelen);
+	return tty->driver->write(tty, ptr, writelen);
 }
 
 /* ------------------------------------------------------- */
@@ -509,13 +509,6 @@ static int irtty_open(struct tty_struct *tty)
 	if (tty->driver->flush_buffer)
 		tty->driver->flush_buffer(tty);
 	
-/* from old irtty - but what is it good for?
- * we _are_ the ldisc and we _don't_ implement flush_buffer!
- *
- *	if (tty->ldisc.flush_buffer)
- *		tty->ldisc.flush_buffer(tty);
- */
-
 	/* apply mtt override */
 	sir_tty_drv.qos_mtt_bits = qos_mtt_bits;
 

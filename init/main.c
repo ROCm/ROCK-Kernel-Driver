@@ -45,6 +45,7 @@
 #include <linux/unistd.h>
 #include <linux/rmap.h>
 #include <linux/mempolicy.h>
+#include <linux/key.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -63,10 +64,6 @@
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/smp.h>
 #endif
-
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 
 /*
  * Versions of gcc older than that listed below may actually compile
@@ -159,24 +156,6 @@ __setup("maxcpus=", maxcpus);
 static char * argv_init[MAX_INIT_ARGS+2] = { "init", NULL, };
 char * envp_init[MAX_INIT_ENVS+2] = { "HOME=/", "TERM=linux", NULL, };
 static const char *panic_later, *panic_param;
-
-#ifdef	CONFIG_KDB
-static int __init kdb_setup(char *str)
-{
-	if (strcmp(str, "on") == 0) {
-		kdb_on = 1;
-	} else if (strcmp(str, "off") == 0) {
-		kdb_on = 0;
-	} else if (strcmp(str, "early") == 0) {
-		kdb_on = 1;
-		kdb_flags |= KDB_FLAG_EARLYKDB;
-	} else
-		printk("kdb flag %s not recognised\n", str);
-	return 0;
-}
-
-__setup("kdb=", kdb_setup);
-#endif	/* CONFIG_KDB */
 
 static int __init obsolete_checksetup(char *line)
 {
@@ -308,8 +287,17 @@ __setup("quiet", quiet_kernel);
 static int __init unknown_bootoption(char *param, char *val)
 {
 	/* Change NUL term back to "=", to make "param" the whole string. */
-	if (val)
-		val[-1] = '=';
+	if (val) {
+		/* param=val or param="val"? */
+		if (val == param+strlen(param)+1)
+			val[-1] = '=';
+		else if (val == param+strlen(param)+2) {
+			val[-2] = '=';
+			memmove(val-1, val, strlen(val)+1);
+			val--;
+		} else
+			BUG();
+	}
 
 	/* Handle obsolete-style parameters */
 	if (obsolete_checksetup(param))
@@ -453,6 +441,7 @@ static void __init smp_init(void)
  */
 
 static void noinline rest_init(void)
+	__releases(kernel_lock)
 {
 	kernel_thread(init, NULL, CLONE_FS | CLONE_SIGHAND);
 	numa_default_policy();
@@ -567,14 +556,6 @@ asmlinkage void __init start_kernel(void)
 	pgtable_cache_init();
 	prio_tree_init();
 	anon_vma_init();
-
-#ifdef	CONFIG_KDB
-	kdb_init();
-	if (KDB_FLAG(EARLYKDB)) {
-		KDB_ENTER();
-	}
-#endif	/* CONFIG_KDB */
-
 #ifdef CONFIG_X86
 	if (efi_enabled)
 		efi_enter_virtual_mode();
@@ -583,7 +564,7 @@ asmlinkage void __init start_kernel(void)
 	proc_caches_init();
 	buffer_init();
 	unnamed_dev_init();
-	security_scaffolding_startup();
+	security_init();
 	vfs_caches_init(num_physpages);
 	radix_tree_init();
 	signals_init();
@@ -623,7 +604,7 @@ static void __init do_initcalls(void)
 
 		if (initcall_debug) {
 			printk(KERN_DEBUG "Calling initcall 0x%p", *call);
-			print_symbol(": %s()", (unsigned long) *call);
+			print_fn_descriptor_symbol(": %s()", (unsigned long) *call);
 			printk("\n");
 		}
 
@@ -660,7 +641,7 @@ static void __init do_basic_setup(void)
 	/* drivers will send hotplug events */
 	init_workqueues();
 	usermodehelper_init();
-
+	key_init();
 	driver_init();
 
 #ifdef CONFIG_SYSCTL

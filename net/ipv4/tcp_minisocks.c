@@ -687,7 +687,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 	/* allocate the newsk from the same slab of the master sock,
 	 * if not, at sk_free time we'll try to free it from the wrong
 	 * slabcache (i.e. is it TCPv4 or v6?) -acme */
-	struct sock *newsk = sk_alloc(PF_INET, GFP_ATOMIC, 0, sk->sk_slab);
+	struct sock *newsk = sk_alloc(PF_INET, GFP_ATOMIC, 0, sk->sk_prot->slab);
 
 	if(newsk != NULL) {
 		struct tcp_opt *newtp;
@@ -706,7 +706,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 		sock_lock_init(newsk);
 		bh_lock_sock(newsk);
 
-		newsk->sk_dst_lock = RW_LOCK_UNLOCKED;
+		rwlock_init(&newsk->sk_dst_lock);
 		atomic_set(&newsk->sk_rmem_alloc, 0);
 		skb_queue_head_init(&newsk->sk_receive_queue);
 		atomic_set(&newsk->sk_wmem_alloc, 0);
@@ -719,7 +719,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 		newsk->sk_userlocks = sk->sk_userlocks & ~SOCK_BINDPORT_LOCK;
 		newsk->sk_backlog.head = newsk->sk_backlog.tail = NULL;
 		newsk->sk_send_head = NULL;
-		newsk->sk_callback_lock = RW_LOCK_UNLOCKED;
+		rwlock_init(&newsk->sk_callback_lock);
 		skb_queue_head_init(&newsk->sk_error_queue);
 		newsk->sk_write_space = sk_stream_write_space;
 
@@ -841,7 +841,8 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 		if (newtp->ecn_flags&TCP_ECN_OK)
 			newsk->sk_no_largesend = 1;
 
-		tcp_vegas_init(newtp);
+		tcp_ca_init(newtp);
+
 		TCP_INC_STATS_BH(TCP_MIB_PASSIVEOPENS);
 	}
 	return newsk;
@@ -1074,7 +1075,3 @@ EXPORT_SYMBOL(tcp_child_process);
 EXPORT_SYMBOL(tcp_create_openreq_child);
 EXPORT_SYMBOL(tcp_timewait_state_process);
 EXPORT_SYMBOL(tcp_tw_deschedule);
-
-#ifdef CONFIG_SYSCTL
-EXPORT_SYMBOL(sysctl_tcp_tw_recycle);
-#endif

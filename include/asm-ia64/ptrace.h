@@ -2,7 +2,7 @@
 #define _ASM_IA64_PTRACE_H
 
 /*
- * Copyright (C) 1998-2003 Hewlett-Packard Co
+ * Copyright (C) 1998-2004 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *	Stephane Eranian <eranian@hpl.hp.com>
  * Copyright (C) 2003 Intel Co
@@ -110,7 +110,11 @@ struct pt_regs {
 
 	unsigned long cr_ipsr;		/* interrupted task's psr */
 	unsigned long cr_iip;		/* interrupted task's instruction pointer */
-	unsigned long cr_ifs;		/* interrupted task's function state */
+	/*
+	 * interrupted task's function state; if bit 63 is cleared, it
+	 * contains syscall's ar.pfs.pfm:
+	 */
+	unsigned long cr_ifs;
 
 	unsigned long ar_unat;		/* interrupted task's NaT register (preserved) */
 	unsigned long ar_pfs;		/* prev function state  */

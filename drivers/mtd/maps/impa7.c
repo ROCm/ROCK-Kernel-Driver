@@ -1,5 +1,5 @@
 /*
- * $Id: impa7.c,v 1.11 2004/07/14 09:52:55 dwmw2 Exp $
+ * $Id: impa7.c,v 1.13 2004/11/04 13:24:14 gleixner Exp $
  *
  * Handle mapping of the NOR flash on implementa A7 boards
  *
@@ -77,7 +77,7 @@ int __init init_impa7(void)
 {
 	static const char *rom_probe_types[] = PROBETYPES;
 	const char **type;
-	const char *part_type = NULL;
+	const char *part_type = 0;
 	int i;
 	static struct { u_long addr; u_long size; } pt[NUM_FLASHBANKS] = {
 	  { WINDOW_ADDR0, WINDOW_SIZE0 },
@@ -91,15 +91,14 @@ int __init init_impa7(void)
 		       pt[i].size, pt[i].addr);
 
 		impa7_map[i].phys = pt[i].addr;
-		impa7_map[i].virt = (unsigned long)
-		  ioremap(pt[i].addr, pt[i].size);
+		impa7_map[i].virt = ioremap(pt[i].addr, pt[i].size);
 		if (!impa7_map[i].virt) {
 			printk(MSG_PREFIX "failed to ioremap\n");
 			return -EIO;
 		}
 		simple_map_init(&impa7_map[i]);
 
-		impa7_mtd[i] = NULL;
+		impa7_mtd[i] = 0;
 		type = rom_probe_types;
 		for(; !impa7_mtd[i] && *type; type++) {
 			impa7_mtd[i] = do_map_probe(*type, &impa7_map[i]);

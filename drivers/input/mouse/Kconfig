@@ -125,6 +125,6 @@ config MOUSE_VSXXXAA
 	  puck) or a VSXXX-GA (rectangular) mouse. Theses mice are
 	  typically used on DECstations or VAXstations, but can also
 	  be used on any box capable of RS232 (with some adaptor
-	  described in the source file). This driver should, in theory,
-	  also work with the digitizer DEC produced, but it isn't tested
-	  with that (I don't have the hardware yet).
+	  described in the source file). This driver also works with the
+	  digitizer (VSXXX-AB) DEC produced.
+

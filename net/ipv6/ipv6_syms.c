@@ -7,7 +7,7 @@
 #include <net/ip6_route.h>
 #include <net/xfrm.h>
 
-EXPORT_SYMBOL(__ipv6_addr_type);
+EXPORT_SYMBOL(ipv6_addr_type);
 EXPORT_SYMBOL(icmpv6_send);
 EXPORT_SYMBOL(icmpv6_statistics);
 EXPORT_SYMBOL(icmpv6_err_convert);
@@ -35,14 +35,9 @@ EXPORT_SYMBOL(ipv6_chk_addr);
 EXPORT_SYMBOL(in6addr_any);
 EXPORT_SYMBOL(in6addr_loopback);
 EXPORT_SYMBOL(in6_dev_finish_destroy);
-EXPORT_SYMBOL(ip6_find_1stfragopt);
 #ifdef CONFIG_XFRM
 EXPORT_SYMBOL(xfrm6_rcv);
 #endif
 EXPORT_SYMBOL(rt6_lookup);
 EXPORT_SYMBOL(fl6_sock_lookup);
-EXPORT_SYMBOL(ip6_append_data);
-EXPORT_SYMBOL(ip6_flush_pending_frames);
-EXPORT_SYMBOL(ip6_push_pending_frames);
 EXPORT_SYMBOL(ipv6_push_nfrag_opts);
-EXPORT_SYMBOL(ip6_dst_lookup);

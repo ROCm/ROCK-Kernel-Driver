@@ -54,6 +54,7 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
 	smp_wmb();
 	ptep->pte_low = pte.pte_low;
 }
+#define __HAVE_ARCH_SET_PTE_ATOMIC
 #define set_pte_atomic(pteptr,pteval) \
 		set_64bit((unsigned long long *)(pteptr),pte_val(pteval))
 #define set_pmd(pmdptr,pmdval) \
@@ -87,13 +88,6 @@ static inline pte_t ptep_get_and_clear(pte_t *ptep)
 
 	return res;
 }
-
-#define __HAVE_ARCH_PTEP_ESTABLISH
-#define ptep_establish(__vma, __address, __ptep, __entry)		\
-do {				  					\
-	set_pte_atomic(__ptep, __entry);				\
-	flush_tlb_page(__vma, __address);				\
-} while (0)
 
 static inline int pte_same(pte_t a, pte_t b)
 {

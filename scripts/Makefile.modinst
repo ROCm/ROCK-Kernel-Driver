@@ -20,9 +20,6 @@ quiet_cmd_modules_install = INSTALL $@
       cmd_modules_install = mkdir -p $(2); cp $@ $(2)
 
 # Modules built outside the kernel source tree go into extra by default
-ifneq ($(MOD_DIR),)
-INSTALL_MOD_DIR ?= $(MOD_DIR)
-endif
 INSTALL_MOD_DIR ?= extra
 
 modinst_dir = $(MODLIB)/$(if $(filter ../% /%,$@),$(INSTALL_MOD_DIR)/,kernel/$(@D))

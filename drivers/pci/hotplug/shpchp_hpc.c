@@ -792,6 +792,7 @@ static void hpc_release_ctlr(struct controller *ctrl)
 		if (php_ctlr->irq) {
 			free_irq(php_ctlr->irq, ctrl);
 			php_ctlr->irq = 0;
+			pci_disable_msi(php_ctlr->pci_dev);
 		}
 	}
 	if (php_ctlr->pci_dev) {
@@ -1158,7 +1159,7 @@ static irqreturn_t shpc_isr(int IRQ, void *dev_id, struct pt_regs *regs)
 					hp_slot, php_ctlr->callback_instance_id);
 			
 			/* Clear all slot events */
-			temp_dword = 0xe01fffff;
+			temp_dword = 0xe01f3fff;
 			dbg("%s: Clearing slot events, temp_dword = %x\n",
 				__FUNCTION__, temp_dword); 
 			writel(temp_dword, php_ctlr->creg + SLOT1 + (4*hp_slot));
@@ -1486,14 +1487,16 @@ int shpc_init(struct controller * ctrl,
 
 	info("HPC vendor_id %x device_id %x ss_vid %x ss_did %x\n", pdev->vendor, pdev->device, pdev->subsystem_vendor, 
 		pdev->subsystem_device);
+	
+	if (pci_enable_device(pdev))
+		goto abort_free_ctlr;
 
 	if (!request_mem_region(pci_resource_start(pdev, 0) + shpc_base_offset, pci_resource_len(pdev, 0), MY_NAME)) {
 		err("%s: cannot reserve MMIO region\n", __FUNCTION__);
 		goto abort_free_ctlr;
 	}
 
-	php_ctlr->creg = (struct ctrl_reg *)
-		ioremap(pci_resource_start(pdev, 0) + shpc_base_offset, pci_resource_len(pdev, 0));
+	php_ctlr->creg = ioremap(pci_resource_start(pdev, 0) + shpc_base_offset, pci_resource_len(pdev, 0));
 	if (!php_ctlr->creg) {
 		err("%s: cannot remap MMIO region %lx @ %lx\n", __FUNCTION__, pci_resource_len(pdev, 0), 
 			pci_resource_start(pdev, 0) + shpc_base_offset);
@@ -1539,7 +1542,7 @@ int shpc_init(struct controller * ctrl,
 		slot_reg = readl(php_ctlr->creg + SLOT1 + 4*hp_slot );
 		dbg("%s: Default Logical Slot Register %d value %x\n", __FUNCTION__,
 			hp_slot, slot_reg);
-		tempdword = 0xffffffff;  
+		tempdword = 0xffff3fff;  
 		writel(tempdword, php_ctlr->creg + SLOT1 + (4*hp_slot));
 	}
 	
@@ -1592,7 +1595,7 @@ int shpc_init(struct controller * ctrl,
 		slot_reg = readl(php_ctlr->creg + SLOT1 + 4*hp_slot );
 		dbg("%s: Default Logical Slot Register %d value %x\n", __FUNCTION__,
 			hp_slot, slot_reg);
-		tempdword = 0xe01fffff;  
+		tempdword = 0xe01f3fff;  
 		writel(tempdword, php_ctlr->creg + SLOT1 + (4*hp_slot));
 	}
 	if (!shpchp_poll_mode) {

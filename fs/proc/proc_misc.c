@@ -153,12 +153,14 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
 {
 	struct sysinfo i;
-	int len, committed;
+	int len;
 	struct page_state ps;
 	unsigned long inactive;
 	unsigned long active;
 	unsigned long free;
 	unsigned long vmtot;
+	unsigned long committed;
+	unsigned long allowed;
 	struct vmalloc_info vmi;
 
 	get_page_state(&ps);
@@ -171,6 +173,8 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 	si_meminfo(&i);
 	si_swapinfo(&i);
 	committed = atomic_read(&vm_committed_space);
+	allowed = ((totalram_pages - hugetlb_total_pages())
+		* sysctl_overcommit_ratio / 100) + total_swap_pages;
 
 	vmtot = (VMALLOC_END-VMALLOC_START)>>10;
 	vmi = get_vmalloc_info();
@@ -198,7 +202,8 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		"Writeback:    %8lu kB\n"
 		"Mapped:       %8lu kB\n"
 		"Slab:         %8lu kB\n"
-		"Committed_AS: %8u kB\n"
+		"CommitLimit:  %8lu kB\n"
+		"Committed_AS: %8lu kB\n"
 		"PageTables:   %8lu kB\n"
 		"VmallocTotal: %8lu kB\n"
 		"VmallocUsed:  %8lu kB\n"
@@ -220,6 +225,7 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(ps.nr_writeback),
 		K(ps.nr_mapped),
 		K(ps.nr_slab),
+		K(allowed),
 		K(committed),
 		K(ps.nr_page_table_pages),
 		vmtot,
@@ -232,96 +238,6 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 	return proc_calc_metrics(page, start, off, count, eof, len);
 #undef K
 }
-
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#include <linux/kdbprivate.h>
-/* Like meminfo_read_proc() but without the locks and using kdb_printf() */
-void
-kdb_meminfo_read_proc(void)
-{
-	struct sysinfo i;
-	int committed;
-	struct page_state ps;
-	unsigned long inactive;
-	unsigned long active;
-	unsigned long free;
-	unsigned long vmtot;
-	struct vmalloc_info vmi;
-
-	get_page_state(&ps);
-	get_zone_counts(&active, &inactive, &free);
-
-/*
- * display in kilobytes.
- */
-#define K(x) ((x) << (PAGE_SHIFT - 10))
-	si_meminfo(&i);
-	kdb_si_swapinfo(&i);
-	committed = atomic_read(&vm_committed_space);
-
-	vmtot = (VMALLOC_END-VMALLOC_START)>>10;
-	vmi = get_vmalloc_info();
-	vmi.used >>= 10;
-	vmi.largest_chunk >>= 10;
-	kdb_printf(
-		"MemTotal:     %8lu kB\n"
-		"MemFree:      %8lu kB\n"
-		"Buffers:      %8lu kB\n",
-		K(i.totalram),
-		K(i.freeram),
-		K(i.bufferram));
-	kdb_printf(
-		"Cached:       %8lu kB\n"
-		"SwapCached:   %8lu kB\n"
-		"Active:       %8lu kB\n",
-		K(get_page_cache_size()-total_swapcache_pages-i.bufferram),
-		K(total_swapcache_pages),
-		K(active));
-	kdb_printf(
-		"Inactive:     %8lu kB\n"
-		"HighTotal:    %8lu kB\n"
-		"HighFree:     %8lu kB\n",
-		K(inactive),
-		K(i.totalhigh),
-		K(i.freehigh));
-	kdb_printf(
-		"LowTotal:     %8lu kB\n"
-		"LowFree:      %8lu kB\n"
-		"SwapTotal:    %8lu kB\n",
-		K(i.totalram-i.totalhigh),
-		K(i.freeram-i.freehigh),
-		K(i.totalswap));
-	kdb_printf(
-		"SwapFree:     %8lu kB\n"
-		"Dirty:        %8lu kB\n"
-		"Writeback:    %8lu kB\n",
-		K(i.freeswap),
-		K(ps.nr_dirty),
-		K(ps.nr_writeback));
-	kdb_printf(
-		"Mapped:       %8lu kB\n"
-		"Slab:         %8lu kB\n"
-		"Committed_AS: %8u kB\n",
-		K(ps.nr_mapped),
-		K(ps.nr_slab),
-		K(committed));
-	kdb_printf(
-		"PageTables:   %8lu kB\n"
-		"VmallocTotal: %8lu kB\n"
-		"VmallocUsed:  %8lu kB\n",
-		K(ps.nr_page_table_pages),
-		vmtot,
-		vmi.used);
-	kdb_printf(
-		"VmallocChunk: %8lu kB\n",
-		vmi.largest_chunk
-		);
-#ifdef	CONFIG_HUGETLB_PAGE
-	kdb_hugetlb_report_meminfo();
-#endif	/* CONFIG_HUGETLB_PAGE */
-}
-#endif	/* CONFIG_KDB */
 
 extern struct seq_operations fragmentation_op;
 static int fragmentation_open(struct inode *inode, struct file *file)

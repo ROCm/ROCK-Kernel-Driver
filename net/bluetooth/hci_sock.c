@@ -111,7 +111,8 @@ void hci_send_to_sock(struct hci_dev *hdev, struct sk_buff *skb)
 		/* Apply filter */
 		flt = &hci_pi(sk)->filter;
 
-		if (!test_bit((skb->pkt_type & HCI_FLT_TYPE_BITS), &flt->type_mask))
+		if (!test_bit((skb->pkt_type == HCI_VENDOR_PKT) ?
+				0 : (skb->pkt_type & HCI_FLT_TYPE_BITS), &flt->type_mask))
 			continue;
 
 		if (skb->pkt_type == HCI_EVENT_PKT) {
@@ -182,6 +183,17 @@ static inline int hci_sock_bound_ioctl(struct sock *sk, unsigned int cmd, unsign
 			set_bit(HCI_RAW, &hdev->flags);
 		else
 			clear_bit(HCI_RAW, &hdev->flags);
+
+		return 0;
+
+	case HCISETSECMGR:
+		if (!capable(CAP_NET_ADMIN))
+			return -EACCES;
+
+		if (arg)
+			set_bit(HCI_SECMGR, &hdev->flags);
+		else
+			clear_bit(HCI_SECMGR, &hdev->flags);
 
 		return 0;
 

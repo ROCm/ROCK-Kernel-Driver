@@ -66,6 +66,13 @@
 #define S3C2410_LCON_PMASK	  (0x7 << 3)
 
 #define S3C2410_LCON_STOPB	  (1<<2)
+#define S3C2410_LCON_IRM          (1<<6)
+
+#define S3C2440_UCON_CLKMASK	  (3<<10)
+#define S3C2440_UCON_PCLK	  (0<<10)
+#define S3C2440_UCON_UCLK	  (1<<10)
+#define S3C2440_UCON_PCLK2	  (2<<10)
+#define S3C2440_UCON_FCLK	  (3<<10)
 
 #define S3C2410_UCON_UCLK	  (1<<10)
 #define S3C2410_UCON_SBREAK	  (1<<4)
@@ -76,19 +83,35 @@
 #define S3C2410_UCON_RXIRQMODE	  (1<<0)
 #define S3C2410_UCON_RXFIFO_TOI	  (1<<7)
 
-#define S3C2410_UCON_DEFAULT	  (S3C2410_UCON_TXILEVEL | S3C2410_UCON_RXILEVEL \
-				   | S3C2410_UCON_TXIRQMODE | S3C2410_UCON_RXIRQMODE \
-				   | S3C2410_UCON_RXFIFO_TOI)
+#define S3C2410_UCON_DEFAULT	  (S3C2410_UCON_TXILEVEL  | \
+				   S3C2410_UCON_RXILEVEL  | \
+				   S3C2410_UCON_TXIRQMODE | \
+				   S3C2410_UCON_RXIRQMODE | \
+				   S3C2410_UCON_RXFIFO_TOI)
 
 #define S3C2410_UFCON_FIFOMODE	  (1<<0)
 #define S3C2410_UFCON_TXTRIG0	  (0<<6)
 #define S3C2410_UFCON_RXTRIG8	  (1<<4)
 #define S3C2410_UFCON_RXTRIG12	  (2<<4)
 
-#define S3C2410_UFCON_RESETBOTH	  (3<<1)
+/* S3C2440 FIFO trigger levels */
+#define S3C2440_UFCON_RXTRIG1	  (0<<4)
+#define S3C2440_UFCON_RXTRIG8	  (1<<4)
+#define S3C2440_UFCON_RXTRIG16	  (2<<4)
+#define S3C2440_UFCON_RXTRIG32	  (3<<4)
 
-#define S3C2410_UFCON_DEFAULT	  (S3C2410_UFCON_FIFOMODE | S3C2410_UFCON_TXTRIG0 \
-				  | S3C2410_UFCON_RXTRIG8 )
+#define S3C2440_UFCON_TXTRIG0	  (0<<6)
+#define S3C2440_UFCON_TXTRIG16	  (1<<6)
+#define S3C2440_UFCON_TXTRIG32	  (2<<6)
+#define S3C2440_UFCON_TXTRIG48	  (3<<6)
+
+#define S3C2410_UFCON_RESETBOTH	  (3<<1)
+#define S3C2410_UFCON_RESETTX	  (1<<2)
+#define S3C2410_UFCON_RESETRX	  (1<<1)
+
+#define S3C2410_UFCON_DEFAULT	  (S3C2410_UFCON_FIFOMODE | \
+				   S3C2410_UFCON_TXTRIG0  | \
+				   S3C2410_UFCON_RXTRIG8 )
 
 #define S3C2410_UFSTAT_TXFULL	  (1<<9)
 #define S3C2410_UFSTAT_RXFULL	  (1<<8)
@@ -97,37 +120,49 @@
 #define S3C2410_UFSTAT_RXMASK	  (15<<0)
 #define S3C2410_UFSTAT_RXSHIFT	  (0)
 
+#define S3C2440_UFSTAT_TXFULL	  (1<<14)
+#define S3C2440_UFSTAT_RXFULL	  (1<<6)
+#define S3C2440_UFSTAT_TXSHIFT	  (8)
+#define S3C2440_UFSTAT_RXSHIFT	  (0)
+#define S3C2440_UFSTAT_TXMASK	  (63<<8)
+#define S3C2440_UFSTAT_RXMASK	  (63)
+
+#define S3C2410_UTRSTAT_TXE	  (1<<2)
 #define S3C2410_UTRSTAT_TXFE	  (1<<1)
 #define S3C2410_UTRSTAT_RXDR	  (1<<0)
 
 #define S3C2410_UERSTAT_OVERRUN	  (1<<0)
 #define S3C2410_UERSTAT_FRAME	  (1<<2)
-#define S3C2410_UERSTAT_ANY	  (S3C2410_UERSTAT_OVERRUN | S3C2410_UERSTAT_FRAME)
-
-/* fifo size information */
-
-#ifndef __ASSEMBLY__
-static inline int S3C2410_UFCON_RXC(int fcon)
-{
-	if (fcon & S3C2410_UFSTAT_RXFULL)
-		return 16;
-
-	return ((fcon) & S3C2410_UFSTAT_RXMASK) >> S3C2410_UFSTAT_RXSHIFT;
-}
-
-static inline int S3C2410_UFCON_TXC(int fcon)
-{
-	if (fcon & S3C2410_UFSTAT_TXFULL)
-		return 16;
-
-	return ((fcon) & S3C2410_UFSTAT_TXMASK) >> S3C2410_UFSTAT_TXSHIFT;
-}
-#endif /* __ASSEMBLY__ */
+#define S3C2410_UERSTAT_BREAK	  (1<<3)
+#define S3C2410_UERSTAT_ANY	  (S3C2410_UERSTAT_OVERRUN | \
+				   S3C2410_UERSTAT_FRAME | \
+				   S3C2410_UERSTAT_BREAK)
 
 #define S3C2410_UMSTAT_CTS	  (1<<0)
 #define S3C2410_UMSTAT_DeltaCTS	  (1<<2)
 
 #ifndef __ASSEMBLY__
+
+/* struct s3c24xx_uart_clksrc
+ *
+ * this structure defines a named clock source that can be used for the
+ * uart, so that the best clock can be selected for the requested baud
+ * rate.
+ *
+ * min_baud and max_baud define the range of baud-rates this clock is
+ * acceptable for, if they are both zero, it is assumed any baud rate that
+ * can be generated from this clock will be used.
+ *
+ * divisor gives the divisor from the clock to the one seen by the uart
+*/
+
+struct s3c24xx_uart_clksrc {
+	const char	*name;
+	unsigned int	 divisor;
+	unsigned int	 min_baud;
+	unsigned int	 max_baud;
+};
+
 /* configuration structure for per-machine configurations for the
  * serial port
  *
@@ -139,15 +174,23 @@ struct s3c2410_uartcfg {
 	unsigned char	   hwport;	 /* hardware port number */
 	unsigned char	   unused;
 	unsigned short	   flags;
-
-	unsigned long	  *clock;	 /* pointer to clock rate */
+	unsigned long	   uart_flags;	 /* default uart flags */
 
 	unsigned long	   ucon;	 /* value of ucon for port */
 	unsigned long	   ulcon;	 /* value of ulcon for port */
 	unsigned long	   ufcon;	 /* value of ufcon for port */
+
+	struct s3c24xx_uart_clksrc *clocks;
+	unsigned int		    clocks_size;
 };
 
-extern struct s3c2410_uartcfg *s3c2410_uartcfgs;
+/* s3c24xx_uart_devs
+ *
+ * this is exported from the core as we cannot use driver_register(),
+ * or platform_add_device() before the console_initcall()
+*/
+
+extern struct platform_device *s3c24xx_uart_devs[3];
 
 #endif /* __ASSEMBLY__ */
 

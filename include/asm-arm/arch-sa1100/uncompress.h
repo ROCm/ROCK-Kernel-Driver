@@ -17,7 +17,7 @@
 
 #define UART(x)		(*(volatile unsigned long *)(serial_port + (x)))
 
-static void puts( const char *s )
+static void putstr( const char *s )
 {
 	unsigned long serial_port;
 

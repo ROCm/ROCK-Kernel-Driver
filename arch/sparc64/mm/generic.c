@@ -15,15 +15,7 @@
 #include <asm/page.h>
 #include <asm/tlbflush.h>
 
-static inline void forget_pte(pte_t page)
-{
-	if (!pte_none(page)) {
-		printk("forget_pte: old mapping existed!\n");
-		BUG();
-	}
-}
-
-/* Remap IO memory, the same way as remap_page_range(), but use
+/* Remap IO memory, the same way as remap_pfn_range(), but use
  * the obio memory space.
  *
  * They use a pgprot that sets PAGE_IO and does not check the
@@ -43,7 +35,6 @@ static inline void io_remap_pte_range(pte_t * pte, unsigned long address, unsign
 	if (end > PMD_SIZE)
 		end = PMD_SIZE;
 	do {
-		pte_t oldpage;
 		pte_t entry;
 		unsigned long curend = address + PAGE_SIZE;
 		
@@ -75,10 +66,8 @@ static inline void io_remap_pte_range(pte_t * pte, unsigned long address, unsign
 		if (offset & 0x1UL)
 			pte_val(entry) &= ~(_PAGE_E);
 		do {
-			oldpage = *pte;
-			pte_clear(pte);
+			BUG_ON(!pte_none(*pte));
 			set_pte(pte, entry);
-			forget_pte(oldpage);
 			address += PAGE_SIZE;
 			pte++;
 		} while (address < curend);
@@ -132,8 +121,8 @@ int io_remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned
 		from = (from + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	}
+	flush_tlb_range(vma, beg, end);
 	spin_unlock(&mm->page_table_lock);
 
-	flush_tlb_range(vma, beg, end);
 	return error;
 }

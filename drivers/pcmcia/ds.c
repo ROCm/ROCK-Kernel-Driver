@@ -50,6 +50,7 @@
 #include <linux/poll.h>
 #include <linux/pci.h>
 #include <linux/list.h>
+#include <linux/delay.h>
 #include <linux/workqueue.h>
 
 #include <asm/atomic.h>
@@ -74,12 +75,12 @@ MODULE_DESCRIPTION("PCMCIA Driver Services");
 MODULE_LICENSE("Dual MPL/GPL");
 
 #ifdef DEBUG
-static int pc_debug;
+int ds_pc_debug;
 
-module_param(pc_debug, int, 0644);
+module_param_named(pc_debug, ds_pc_debug, int, 0644);
 
 #define ds_dbg(lvl, fmt, arg...) do {				\
-	if (pc_debug > (lvl))					\
+	if (ds_pc_debug > (lvl))					\
 		printk(KERN_DEBUG "ds: " fmt , ## arg);		\
 } while (0)
 #else
@@ -133,8 +134,6 @@ static dev_info_t dev_info = "Driver Services";
 
 static int major_dev = -1;
 
-static struct proc_dir_entry *proc_pccard;
-
 /*====================================================================*/
 
 /* code which was in cs.c before */
@@ -166,9 +165,6 @@ static int pcmcia_bind_device(bind_req_t *req)
 	client->Socket = s;
 	client->Function = req->Function;
 	client->state = CLIENT_UNBOUND;
-	client->erase_busy.next = &client->erase_busy;
-	client->erase_busy.prev = &client->erase_busy;
-	init_waitqueue_head(&client->mtd_req);
 	client->next = s->clients;
 	s->clients = client;
 	ds_dbg(1, "%s: bind_device(): client 0x%p, dev %s\n",
@@ -629,6 +625,8 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 
 /*====================================================================*/
 
+extern struct pci_bus *pcmcia_lookup_bus(struct pcmcia_socket *s);
+
 static int get_device_info(struct pcmcia_bus_socket *s, bind_info_t *bind_info, int first)
 {
     socket_bind_t *b;
@@ -642,7 +640,7 @@ static int get_device_info(struct pcmcia_bus_socket *s, bind_info_t *bind_info, 
     {
 	struct pci_bus *bus;
 
-	bus = pcmcia_lookup_bus(s->handle);
+	bus = pcmcia_lookup_bus(s->parent);
 	if (bus) {
 	    	struct list_head *list;
 		struct pci_dev *dev = NULL;
@@ -884,6 +882,10 @@ static u_int ds_poll(struct file *file, poll_table *wait)
 
 /*====================================================================*/
 
+extern int pcmcia_adjust_resource_info(adjust_t *adj);
+extern int pccard_get_next_region(struct pcmcia_socket *s, region_info_t *rgn);
+extern int pccard_get_first_region(struct pcmcia_socket *s, region_info_t *rgn);
+
 static int ds_ioctl(struct inode * inode, struct file * file,
 		    u_int cmd, u_long arg)
 {
@@ -932,39 +934,47 @@ static int ds_ioctl(struct inode * inode, struct file * file,
     
     switch (cmd) {
     case DS_ADJUST_RESOURCE_INFO:
-	ret = pcmcia_adjust_resource_info(s->handle, &buf.adjust);
+	ret = pcmcia_adjust_resource_info(&buf.adjust);
 	break;
     case DS_GET_CARD_SERVICES_INFO:
 	ret = pcmcia_get_card_services_info(&buf.servinfo);
 	break;
     case DS_GET_CONFIGURATION_INFO:
-	ret = pcmcia_get_configuration_info(s->handle, &buf.config);
+	if (buf.config.Function && 
+	   (buf.config.Function >= s->parent->functions))
+	    ret = CS_BAD_ARGS;
+	else
+	    ret = pccard_get_configuration_info(s->parent, buf.config.Function, &buf.config);
 	break;
     case DS_GET_FIRST_TUPLE:
 	pcmcia_validate_mem(s->parent);
-	ret = pcmcia_get_first_tuple(s->handle, &buf.tuple);
+	ret = pccard_get_first_tuple(s->parent, BIND_FN_ALL, &buf.tuple);
 	break;
     case DS_GET_NEXT_TUPLE:
-	ret = pcmcia_get_next_tuple(s->handle, &buf.tuple);
+	ret = pccard_get_next_tuple(s->parent, BIND_FN_ALL, &buf.tuple);
 	break;
     case DS_GET_TUPLE_DATA:
 	buf.tuple.TupleData = buf.tuple_parse.data;
 	buf.tuple.TupleDataMax = sizeof(buf.tuple_parse.data);
-	ret = pcmcia_get_tuple_data(s->handle, &buf.tuple);
+	ret = pccard_get_tuple_data(s->parent, &buf.tuple);
 	break;
     case DS_PARSE_TUPLE:
 	buf.tuple.TupleData = buf.tuple_parse.data;
-	ret = pcmcia_parse_tuple(s->handle, &buf.tuple, &buf.tuple_parse.parse);
+	ret = pccard_parse_tuple(&buf.tuple, &buf.tuple_parse.parse);
 	break;
     case DS_RESET_CARD:
-	ret = pcmcia_reset_card(s->handle, NULL);
+	ret = pccard_reset_card(s->parent);
 	break;
     case DS_GET_STATUS:
-	ret = pcmcia_get_status(s->handle, &buf.status);
+	if (buf.status.Function && 
+	   (buf.status.Function >= s->parent->functions))
+	    ret = CS_BAD_ARGS;
+	else
+	ret = pccard_get_status(s->parent, buf.status.Function, &buf.status);
 	break;
     case DS_VALIDATE_CIS:
 	pcmcia_validate_mem(s->parent);
-	ret = pcmcia_validate_cis(s->handle, &buf.cisinfo);
+	ret = pccard_validate_cis(s->parent, BIND_FN_ALL, &buf.cisinfo);
 	break;
     case DS_SUSPEND_CARD:
 	ret = pcmcia_suspend_card(s->parent);
@@ -981,27 +991,30 @@ static int ds_ioctl(struct inode * inode, struct file * file,
     case DS_ACCESS_CONFIGURATION_REGISTER:
 	if ((buf.conf_reg.Action == CS_WRITE) && !capable(CAP_SYS_ADMIN))
 	    return -EPERM;
-	ret = pcmcia_access_configuration_register(s->handle, &buf.conf_reg);
+	if (buf.conf_reg.Function && 
+	   (buf.conf_reg.Function >= s->parent->functions))
+	    ret = CS_BAD_ARGS;
+	else
+	    ret = pccard_access_configuration_register(s->parent, buf.conf_reg.Function, &buf.conf_reg);
 	break;
     case DS_GET_FIRST_REGION:
-        ret = pcmcia_get_first_region(s->handle, &buf.region);
+        ret = pccard_get_first_region(s->parent, &buf.region);
 	break;
     case DS_GET_NEXT_REGION:
-	ret = pcmcia_get_next_region(s->handle, &buf.region);
+	ret = pccard_get_next_region(s->parent, &buf.region);
 	break;
     case DS_GET_FIRST_WINDOW:
-	buf.win_info.handle = (window_handle_t)s->handle;
-	ret = pcmcia_get_first_window(&buf.win_info.handle, &buf.win_info.window);
+	ret = pcmcia_get_window(s->parent, &buf.win_info.handle, 0, &buf.win_info.window);
 	break;
     case DS_GET_NEXT_WINDOW:
-	ret = pcmcia_get_next_window(&buf.win_info.handle, &buf.win_info.window);
+	ret = pcmcia_get_window(s->parent, &buf.win_info.handle, buf.win_info.handle->index + 1, &buf.win_info.window);
 	break;
     case DS_GET_MEM_PAGE:
 	ret = pcmcia_get_mem_page(buf.win_info.handle,
 			   &buf.win_info.map);
 	break;
     case DS_REPLACE_CIS:
-	ret = pcmcia_replace_cis(s->handle, &buf.cisdump);
+	ret = pcmcia_replace_cis(s->parent, &buf.cisdump);
 	break;
     case DS_BIND_REQUEST:
 	if (!capable(CAP_SYS_ADMIN)) return -EPERM;
@@ -1045,7 +1058,11 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	}
     }
 
-    if (cmd & IOC_OUT) __copy_to_user(uarg, (char *)&buf, size);
+    if (cmd & IOC_OUT) {
+        if (__copy_to_user(uarg, (char *)&buf, size))
+            err = -EFAULT;
+    }
+
 
     return err;
 } /* ds_ioctl */
@@ -1080,8 +1097,7 @@ static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 	 * Ugly. But we want to wait for the socket threads to have started up.
 	 * We really should let the drivers themselves drive some of this..
 	 */
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(HZ/4);
+	msleep(250);
 
 	init_waitqueue_head(&s->queue);
 	init_waitqueue_head(&s->request);
@@ -1244,3 +1260,5 @@ static struct pcmcia_driver * get_pcmcia_driver (dev_info_t *dev_info)
 		return cmp.drv;
 	return NULL;
 }
+
+MODULE_ALIAS("ds");

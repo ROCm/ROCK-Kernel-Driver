@@ -8,10 +8,10 @@
 
 DOCBOOKS := wanbook.sgml z8530book.sgml mcabook.sgml videobook.sgml \
 	    kernel-hacking.sgml kernel-locking.sgml via-audio.sgml \
-	    mousedrivers.sgml deviceiobook.sgml procfs-guide.sgml \
-	    tulip-user.sgml writing_usb_driver.sgml scsidrivers.sgml \
-	    sis900.sgml kernel-api.sgml journal-api.sgml lsm.sgml usb.sgml \
-	    gadget.sgml libata.sgml
+	    deviceiobook.sgml procfs-guide.sgml tulip-user.sgml \
+	    writing_usb_driver.sgml scsidrivers.sgml sis900.sgml \
+	    kernel-api.sgml journal-api.sgml lsm.sgml usb.sgml \
+	    gadget.sgml libata.sgml mtdnand.sgml librs.sgml
 
 ###
 # The build process is as follows (targets):
@@ -58,14 +58,14 @@ MAKEMAN   = $(PERL) $(srctree)/scripts/makeman
 # The following rules are used to generate the .sgml documentation
 # required to generate the final targets. (ps, pdf, html).
 quiet_cmd_docproc = DOCPROC $@
-      cmd_docproc = $(DOCPROC) doc $< >$@
+      cmd_docproc = SRCTREE=$(srctree)/ $(DOCPROC) doc $< >$@
 define rule_docproc
 	set -e;								\
         $(if $($(quiet)cmd_$(1)),echo '  $($(quiet)cmd_$(1))';) 	\
         $(cmd_$(1)); 							\
         ( 								\
           echo 'cmd_$@ := $(cmd_$(1))'; 				\
-          echo $@: `$(DOCPROC) depend $<`; 				\
+          echo $@: `SRCTREE=$(srctree) $(DOCPROC) depend $<`; 		\
         ) > $(dir $@).$(notdir $@).cmd
 endef
 
@@ -129,6 +129,9 @@ quiet_cmd_db2html = DB2HTML $@
 # Rule to generate man files - output is placed in the man subdirectory
 
 %.9:	%.sgml
+ifneq ($(KBUILD_SRC),)
+	$(Q)mkdir -p $(objtree)/Documentation/DocBook/man
+endif
 	$(SPLITMAN) $< $(objtree)/Documentation/DocBook/man "$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)"
 	$(MAKEMAN) convert $(objtree)/Documentation/DocBook/man $<
 

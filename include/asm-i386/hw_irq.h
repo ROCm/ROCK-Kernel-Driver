@@ -32,21 +32,19 @@ extern u8 irq_vector[NR_IRQ_VECTORS];
 extern void (*interrupt[NR_IRQS])(void);
 
 #ifdef CONFIG_SMP
-asmlinkage void reschedule_interrupt(void);
-asmlinkage void invalidate_interrupt(void);
-asmlinkage void call_function_interrupt(void);
+fastcall void reschedule_interrupt(void);
+fastcall void invalidate_interrupt(void);
+fastcall void call_function_interrupt(void);
 #endif
 
 #ifdef CONFIG_X86_LOCAL_APIC
-asmlinkage void apic_timer_interrupt(void);
-asmlinkage void error_interrupt(void);
-asmlinkage void spurious_interrupt(void);
-asmlinkage void thermal_interrupt(struct pt_regs);
+fastcall void apic_timer_interrupt(void);
+fastcall void error_interrupt(void);
+fastcall void spurious_interrupt(void);
+fastcall void thermal_interrupt(struct pt_regs *);
 #define platform_legacy_irq(irq)	((irq) < 16)
 #endif
 
-void mask_irq(unsigned int irq);
-void unmask_irq(unsigned int irq);
 void disable_8259A_irq(unsigned int irq);
 void enable_8259A_irq(unsigned int irq);
 int i8259A_irq_pending(unsigned int irq);

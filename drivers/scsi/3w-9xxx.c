@@ -1746,6 +1746,7 @@ static int twa_scsi_queue(struct scsi_cmnd *SCpnt, void (*done)(struct scsi_cmnd
 		twa_free_request_id(tw_dev, request_id);
 		SCpnt->result = (DID_ERROR << 16);
 		done(SCpnt);
+		retval = 0;
 	}
 
 	return retval;

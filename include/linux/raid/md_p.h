@@ -197,7 +197,7 @@ struct mdp_superblock_1 {
 
 	__u32	chunksize;	/* in 512byte sectors */
 	__u32	raid_disks;
-	__u8	pad1[128-92];	/* set to 0 when written */
+	__u8	pad1[128-96];	/* set to 0 when written */
 
 	/* constant this-device information - 64 bytes */
 	__u64	data_offset;	/* sector start of data, often 0 */
@@ -215,7 +215,7 @@ struct mdp_superblock_1 {
 	__u64	resync_offset;	/* data before this offset (from data_offset) known to be in sync */
 	__u32	sb_csum;	/* checksum upto devs[max_dev] */
 	__u32	max_dev;	/* size of devs[] array to consider */
-	__u8	pad3[64-40];	/* set to 0 when writing */
+	__u8	pad3[64-32];	/* set to 0 when writing */
 
 	/* device state information. Indexed by dev_number.
 	 * 2 bytes per device

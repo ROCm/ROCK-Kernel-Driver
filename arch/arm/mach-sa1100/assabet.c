@@ -9,16 +9,17 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
-#include <linux/tty.h>
 #include <linux/module.h>
-#include <linux/mm.h>
 #include <linux/errno.h>
+#include <linux/ioport.h>
 #include <linux/serial_core.h>
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/partitions.h>
 #include <linux/delay.h>
+#include <linux/mm.h>
 
 #include <asm/hardware.h>
 #include <asm/mach-types.h>
@@ -29,6 +30,8 @@
 #include <asm/tlbflush.h>
 
 #include <asm/mach/arch.h>
+#include <asm/mach/flash.h>
+#include <asm/mach/irda.h>
 #include <asm/mach/map.h>
 #include <asm/mach/serial_sa1100.h>
 #include <asm/arch/assabet.h>
@@ -92,6 +95,109 @@ static void assabet_lcd_power(int on)
 		ASSABET_BCR_clear(ASSABET_BCR_LCD_ON);
 }
 
+
+/*
+ * Assabet flash support code.
+ */
+
+#ifdef ASSABET_REV_4
+/*
+ * Phase 4 Assabet has two 28F160B3 flash parts in bank 0:
+ */
+static struct mtd_partition assabet_partitions[] = {
+	{
+		.name		= "bootloader",
+		.size		= 0x00020000,
+		.offset		= 0,
+		.mask_flags	= MTD_WRITEABLE,
+	}, {
+		.name		= "bootloader params",
+		.size		= 0x00020000,
+		.offset		= MTDPART_OFS_APPEND,
+		.mask_flags	= MTD_WRITEABLE,
+	}, {
+		.name		= "jffs",
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= MTDPART_OFS_APPEND,
+	}
+};
+#else
+/*
+ * Phase 5 Assabet has two 28F128J3A flash parts in bank 0:
+ */
+static struct mtd_partition assabet_partitions[] = {
+	{
+		.name		= "bootloader",
+		.size		= 0x00040000,
+		.offset		= 0,
+		.mask_flags	= MTD_WRITEABLE,
+	}, {
+		.name		= "bootloader params",
+		.size		= 0x00040000,
+		.offset		= MTDPART_OFS_APPEND,
+		.mask_flags	= MTD_WRITEABLE,
+	}, {
+		.name		= "jffs",
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= MTDPART_OFS_APPEND,
+	}
+};
+#endif
+
+static struct flash_platform_data assabet_flash_data = {
+	.map_name	= "cfi_probe",
+	.parts		= assabet_partitions,
+	.nr_parts	= ARRAY_SIZE(assabet_partitions),
+};
+
+static struct resource assabet_flash_resources[] = {
+	{
+		.start	= SA1100_CS0_PHYS,
+		.end	= SA1100_CS0_PHYS + SZ_32M - 1,
+		.flags	= IORESOURCE_MEM,
+	}, {
+		.start	= SA1100_CS1_PHYS,
+		.end	= SA1100_CS1_PHYS + SZ_32M - 1,
+		.flags	= IORESOURCE_MEM,
+	}
+};
+
+
+/*
+ * Assabet IrDA support code.
+ */
+
+static int assabet_irda_set_power(struct device *dev, unsigned int state)
+{
+	static unsigned int bcr_state[4] = {
+		ASSABET_BCR_IRDA_MD0,
+		ASSABET_BCR_IRDA_MD1|ASSABET_BCR_IRDA_MD0,
+		ASSABET_BCR_IRDA_MD1,
+		0
+	};
+
+	if (state < 4) {
+		state = bcr_state[state];
+		ASSABET_BCR_clear(state ^ (ASSABET_BCR_IRDA_MD1|
+					   ASSABET_BCR_IRDA_MD0));
+		ASSABET_BCR_set(state);
+	}
+	return 0;
+}
+
+static void assabet_irda_set_speed(struct device *dev, unsigned int speed)
+{
+	if (speed < 4000000)
+		ASSABET_BCR_clear(ASSABET_BCR_IRDA_FSEL);
+	else
+		ASSABET_BCR_set(ASSABET_BCR_IRDA_FSEL);
+}
+
+static struct irda_platform_data assabet_irda_data = {
+	.set_power	= assabet_irda_set_power,
+	.set_speed	= assabet_irda_set_speed,
+};
+
 static void __init assabet_init(void)
 {
 	/*
@@ -136,6 +242,10 @@ static void __init assabet_init(void)
 			"hasn't been configured in the kernel\n" );
 #endif
 	}
+
+	sa11x0_set_flash_data(&assabet_flash_data, assabet_flash_resources,
+			      ARRAY_SIZE(assabet_flash_resources));
+	sa11x0_set_irda_data(&assabet_irda_data);
 }
 
 /*
@@ -324,6 +434,6 @@ MACHINE_START(ASSABET, "Intel-Assabet")
 	FIXUP(fixup_assabet)
 	MAPIO(assabet_map_io)
 	INITIRQ(sa1100_init_irq)
-	INITTIME(sa1100_init_time)
-	INIT_MACHINE(assabet_init)
+	.timer		= &sa1100_timer,
+	.init_machine	= assabet_init,
 MACHINE_END

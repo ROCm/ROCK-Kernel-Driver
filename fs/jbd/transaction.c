@@ -50,9 +50,7 @@ get_transaction(journal_t *journal, transaction_t *transaction)
 	transaction->t_state = T_RUNNING;
 	transaction->t_tid = journal->j_transaction_sequence++;
 	transaction->t_expires = jiffies + journal->j_commit_interval;
-	INIT_LIST_HEAD(&transaction->t_jcb);
 	spin_lock_init(&transaction->t_handle_lock);
-	spin_lock_init(&transaction->t_jcb_lock);
 
 	/* Set up the commit timer for the new transaction. */
 	journal->j_commit_timer->expires = transaction->t_expires;
@@ -243,7 +241,6 @@ static handle_t *new_handle(int nblocks)
 	memset(handle, 0, sizeof(*handle));
 	handle->h_buffer_credits = nblocks;
 	handle->h_ref = 1;
-	INIT_LIST_HEAD(&handle->h_jcb);
 
 	return handle;
 }
@@ -633,21 +630,22 @@ repeat:
 		 * disk then we cannot do copy-out here. */
 
 		if (jh->b_jlist == BJ_Shadow) {
+			DEFINE_WAIT_BIT(wait, &bh->b_state, BH_Unshadow);
 			wait_queue_head_t *wqh;
-			DEFINE_WAIT(wait);
+
+			wqh = bit_waitqueue(&bh->b_state, BH_Unshadow);
 
 			JBUFFER_TRACE(jh, "on shadow: sleep");
 			jbd_unlock_bh_state(bh);
 			/* commit wakes up all shadow buffers after IO */
-			wqh = bh_waitq_head(bh);
 			for ( ; ; ) {
-				prepare_to_wait(wqh, &wait,
+				prepare_to_wait(wqh, &wait.wait,
 						TASK_UNINTERRUPTIBLE);
 				if (jh->b_jlist != BJ_Shadow)
 					break;
 				schedule();
 			}
-			finish_wait(wqh, &wait);
+			finish_wait(wqh, &wait.wait);
 			goto repeat;
 		}
 
@@ -1276,36 +1274,6 @@ not_jbd:
 }
 
 /**
- * void journal_callback_set() -  Register a callback function for this handle.
- * @handle: handle to attach the callback to.
- * @func: function to callback.
- * @jcb:  structure with additional information required by func() , and
- *        some space for jbd internal information.
- * 
- * The function will be
- * called when the transaction that this handle is part of has been
- * committed to disk with the original callback data struct and the
- * error status of the journal as parameters.  There is no guarantee of
- * ordering between handles within a single transaction, nor between
- * callbacks registered on the same handle.
- *
- * The caller is responsible for allocating the journal_callback struct.
- * This is to allow the caller to add as much extra data to the callback
- * as needed, but reduce the overhead of multiple allocations.  The caller
- * allocated struct must start with a struct journal_callback at offset 0,
- * and has the caller-specific data afterwards.
- */
-void journal_callback_set(handle_t *handle,
-			void (*func)(struct journal_callback *jcb, int error),
-			struct journal_callback *jcb)
-{
-	spin_lock(&handle->h_transaction->t_jcb_lock);
-	list_add_tail(&jcb->jcb_list, &handle->h_jcb);
-	spin_unlock(&handle->h_transaction->t_jcb_lock);
-	jcb->jcb_func = func;
-}
-
-/**
  * int journal_stop() - complete a transaction
  * @handle: tranaction to complete.
  * 
@@ -1370,11 +1338,6 @@ int journal_stop(handle_t *handle)
 		if (journal->j_barrier_count)
 			wake_up(&journal->j_wait_transaction_locked);
 	}
-
-	/* Move callbacks from the handle to the transaction. */
-	spin_lock(&transaction->t_jcb_lock);
-	list_splice(&handle->h_jcb, &transaction->t_jcb);
-	spin_unlock(&transaction->t_jcb_lock);
 
 	/*
 	 * If the handle is marked SYNC, we need to set another commit

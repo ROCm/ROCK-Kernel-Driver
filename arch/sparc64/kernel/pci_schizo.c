@@ -1171,7 +1171,7 @@ static void __init tomatillo_register_error_handlers(struct pci_controller_info 
 		prom_halt();
 	}
 	bucket = __bucket(irq);
-	tmp = readl(bucket->imap);
+	tmp = upa_readl(bucket->imap);
 	upa_writel(tmp, (pbm->pbm_regs +
 			 schizo_imap_offset(SCHIZO_UE_INO) + 4));
 
@@ -1309,7 +1309,7 @@ static void __init schizo_register_error_handlers(struct pci_controller_info *p)
 		prom_halt();
 	}
 	bucket = __bucket(irq);
-	tmp = readl(bucket->imap);
+	tmp = upa_readl(bucket->imap);
 	upa_writel(tmp, (pbm->pbm_regs + schizo_imap_offset(SCHIZO_UE_INO) + 4));
 
 	pbm = pbm_for_ino(p, SCHIZO_CE_INO);
@@ -1372,10 +1372,10 @@ static void __init schizo_register_error_handlers(struct pci_controller_info *p)
 		    SCHIZO_PCICTRL_RTRY_ERR |
 		    SCHIZO_PCICTRL_SBH_ERR |
 		    SCHIZO_PCICTRL_SERR |
-		    SCHIZO_PCICTRL_SBH_INT |
 		    SCHIZO_PCICTRL_EEN);
 
-	err_no_mask = SCHIZO_PCICTRL_DTO_ERR;
+	err_no_mask = (SCHIZO_PCICTRL_DTO_ERR |
+		       SCHIZO_PCICTRL_SBH_INT);
 
 	/* Enable PCI Error interrupts and clear error
 	 * bits for each PBM.

@@ -389,7 +389,7 @@ static void add_host_bridge(acpi_handle *handle, int seg, int bus)
 
 	bridge->pci_bus = pci_find_bus(seg, bus);
 
-	bridge->res_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&bridge->res_lock);
 
 	/* to be overridden when we decode _CRS	*/
 	bridge->sub = bridge->bus;
@@ -457,7 +457,7 @@ static void add_p2p_bridge(acpi_handle *handle, int seg, int bus, int dev, int f
 		return;
 	}
 
-	bridge->res_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&bridge->res_lock);
 
 	bridge->bus = bridge->pci_bus->number;
 	bridge->sub = bridge->pci_bus->subordinate;

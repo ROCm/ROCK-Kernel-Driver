@@ -27,12 +27,12 @@ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 #define ELF_CORE_COPY_REGS(__elf_regs, __pt_regs)	\
 do {	unsigned int *dest = &(__elf_regs[0]);		\
 	struct pt_regs *src = (__pt_regs);		\
-	unsigned int *sp;				\
+	unsigned int __user *sp;			\
 	int i;						\
 	for(i = 0; i < 16; i++)				\
 		dest[i] = (unsigned int) src->u_regs[i];\
 	/* Don't try this at home kids... */		\
-	sp = (unsigned int *) (src->u_regs[14] &	\
+	sp = (unsigned int __user *) (src->u_regs[14] &	\
 		0x00000000fffffffc);			\
 	for(i = 0; i < 16; i++)				\
 		__get_user(dest[i+16], &sp[i]);		\
@@ -79,7 +79,7 @@ typedef struct {
 
 #define elf_check_arch(x)	(((x)->e_machine == EM_SPARC) || ((x)->e_machine == EM_SPARC32PLUS))
 
-#define ELF_ET_DYN_BASE         0x08000000
+#define ELF_ET_DYN_BASE         0x70000000
 
 
 #include <asm/processor.h>

@@ -9,7 +9,7 @@
 #include <linux/ctype.h>
 #include <linux/errno.h>
 #include <linux/bitmap.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/uaccess.h>
 
 /*

@@ -265,9 +265,8 @@ static unsigned int load_irix_interp(struct elfhdr * interp_elf_ex,
 	    return 0xffffffff;
 	}
 
-	elf_phdata =  (struct elf_phdr *)
-		kmalloc(sizeof(struct elf_phdr) * interp_elf_ex->e_phnum,
-			GFP_KERNEL);
+	elf_phdata = kmalloc(sizeof(struct elf_phdr) * interp_elf_ex->e_phnum,
+			     GFP_KERNEL);
 
 	if(!elf_phdata) {
           printk("Cannot kmalloc phdata for IRIX interp.\n");
@@ -436,9 +435,8 @@ static inline int look_for_irix_interpreter(char **name,
 		if (*name != NULL)
 			goto out;
 
-		*name = (char *) kmalloc((epp->p_filesz +
-					  strlen(IRIX_INTERP_PREFIX)),
-					 GFP_KERNEL);
+		*name = kmalloc((epp->p_filesz + strlen(IRIX_INTERP_PREFIX)),
+				GFP_KERNEL);
 		if (!*name)
 			return -ENOMEM;
 
@@ -611,7 +609,7 @@ static int load_irix_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	size = elf_ex.e_phentsize * elf_ex.e_phnum;
 	if (size > 65536)
 		goto out;
-	elf_phdata = (struct elf_phdr *) kmalloc(size, GFP_KERNEL);
+	elf_phdata = kmalloc(size, GFP_KERNEL);
 	if (elf_phdata == NULL) {
 		retval = -ENOMEM;
 		goto out;
@@ -814,8 +812,7 @@ static int load_irix_library(struct file *file)
 	if(sizeof(struct elf_phdr) * elf_ex.e_phnum > PAGE_SIZE)
 		return -ENOEXEC;
 
-	elf_phdata =  (struct elf_phdr *)
-		kmalloc(sizeof(struct elf_phdr) * elf_ex.e_phnum, GFP_KERNEL);
+	elf_phdata = kmalloc(sizeof(struct elf_phdr) * elf_ex.e_phnum, GFP_KERNEL);
 	if (elf_phdata == NULL)
 		return -ENOMEM;
 
@@ -1055,7 +1052,7 @@ static int irix_core_dump(long signr, struct pt_regs * regs, struct file *file)
 	struct vm_area_struct *vma;
 	struct elfhdr elf;
 	off_t offset = 0, dataoff;
-	int limit = current->rlim[RLIMIT_CORE].rlim_cur;
+	int limit = current->signal->rlim[RLIMIT_CORE].rlim_cur;
 	int numnote = 4;
 	struct memelfnote notes[4];
 	struct elf_prstatus prstatus;	/* NT_PRSTATUS */
@@ -1131,14 +1128,28 @@ static int irix_core_dump(long signr, struct pt_regs * regs, struct file *file)
 	psinfo.pr_ppid = prstatus.pr_ppid = current->parent->pid;
 	psinfo.pr_pgrp = prstatus.pr_pgrp = process_group(current);
 	psinfo.pr_sid = prstatus.pr_sid = current->signal->session;
-	prstatus.pr_utime.tv_sec = CT_TO_SECS(current->utime);
-	prstatus.pr_utime.tv_usec = CT_TO_USECS(current->utime);
-	prstatus.pr_stime.tv_sec = CT_TO_SECS(current->stime);
-	prstatus.pr_stime.tv_usec = CT_TO_USECS(current->stime);
-	prstatus.pr_cutime.tv_sec = CT_TO_SECS(current->cutime);
-	prstatus.pr_cutime.tv_usec = CT_TO_USECS(current->cutime);
-	prstatus.pr_cstime.tv_sec = CT_TO_SECS(current->cstime);
-	prstatus.pr_cstime.tv_usec = CT_TO_USECS(current->cstime);
+	if (current->pid == current->tgid) {
+		/*
+		 * This is the record for the group leader.  Add in the
+		 * cumulative times of previous dead threads.  This total
+		 * won't include the time of each live thread whose state
+		 * is included in the core dump.  The final total reported
+		 * to our parent process when it calls wait4 will include
+		 * those sums as well as the little bit more time it takes
+		 * this and each other thread to finish dying after the
+		 * core dump synchronization phase.
+		 */
+		jiffies_to_timeval(current->utime + current->signal->utime,
+		                   &prstatus.pr_utime);
+		jiffies_to_timeval(current->stime + current->signal->stime,
+		                   &prstatus.pr_stime);
+	} else {
+		jiffies_to_timeval(current->utime, &prstatus.pr_utime);
+		jiffies_to_timeval(current->stime, &prstatus.pr_stime);
+	}
+	jiffies_to_timeval(current->signal->cutime, &prstatus.pr_cutime);
+	jiffies_to_timeval(current->signal->cstime, &prstatus.pr_cstime);
+
 	if (sizeof(elf_gregset_t) != sizeof(struct pt_regs)) {
 		printk("sizeof(elf_gregset_t) (%d) != sizeof(struct pt_regs) "
 		       "(%d)\n", sizeof(elf_gregset_t), sizeof(struct pt_regs));

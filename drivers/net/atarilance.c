@@ -56,12 +56,12 @@ static char version[] = "atarilance.c: v1.3 04/04/96 "
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/bitops.h>
 
 #include <asm/setup.h>
 #include <asm/irq.h>
 #include <asm/atarihw.h>
 #include <asm/atariints.h>
-#include <asm/bitops.h>
 #include <asm/io.h>
 
 /* Debug level:
@@ -606,7 +606,7 @@ static unsigned long __init lance_probe1( struct net_device *dev,
 		printk( "      Use \"ifconfig hw ether ...\" to set the address.\n" );
 	}
 
-	lp->devlock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&lp->devlock);
 
 	MEM->init.mode = 0x0000;		/* Disable Rx and Tx. */
 	for( i = 0; i < 6; i++ )

@@ -130,10 +130,8 @@ static int errno;
  */
 #define ENVCTRL_CPCI_IGNORED_NODE		0x70
 
-struct pcf8584_reg {
-	 unsigned char data;
-	 unsigned char csr;
-};
+#define PCF8584_DATA	0x00
+#define PCF8584_CSR	0x01
 
 /* Each child device can be monitored by up to PCF8584_MAX_CHANNELS.
  * Property of a port or channel as defined by the firmware.
@@ -175,7 +173,7 @@ struct i2c_child_t {
 	char mon_type[PCF8584_MAX_CHANNELS];
 };
 
-volatile static struct pcf8584_reg *i2c = NULL;
+static void __iomem *i2c;
 static struct i2c_child_t i2c_childlist[ENVCTRL_MAX_CPU*2];
 static unsigned char chnls_mask[] = { 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80 };
 static unsigned int warning_temperature = 0;
@@ -184,22 +182,6 @@ static char read_cpu;
 
 /* Forward declarations. */
 static struct i2c_child_t *envctrl_get_i2c_child(unsigned char);
-
-/* Function description: Read a byte from an i2c controller register.
- * Return: A byte from the passed in address.
- */
-static inline unsigned char envctrl_readb(volatile unsigned char *p)
-{
-	return readb(p);
-}
-
-/* Function description: Write a byte to an i2c controller register.
- * Return: Nothing.
- */
-static inline void envctrl_writeb(unsigned char val, volatile unsigned char *p)
-{
-	writeb(val, p);
-}
 
 /* Function Description: Test the PIN bit (Pending Interrupt Not) 
  * 			 to test when serial transmission is completed .
@@ -210,7 +192,7 @@ static void envtrl_i2c_test_pin(void)
 	int limit = 1000000;
 
 	while (--limit > 0) {
-		if (!(envctrl_readb(&i2c->csr) & STATUS_PIN)) 
+		if (!(readb(i2c + PCF8584_CSR) & STATUS_PIN)) 
 			break;
 		udelay(1);
 	} 
@@ -228,7 +210,7 @@ static void envctrl_i2c_test_bb(void)
 
 	while (--limit > 0) {
 		/* Busy bit 0 means busy. */
-		if (envctrl_readb(&i2c->csr) & STATUS_BB)
+		if (readb(i2c + PCF8584_CSR) & STATUS_BB)
 			break;
 		udelay(1);
 	} 
@@ -245,20 +227,20 @@ static int envctrl_i2c_read_addr(unsigned char addr)
 	envctrl_i2c_test_bb();
 
 	/* Load address. */
-	envctrl_writeb(addr + 1, &i2c->data);
+	writeb(addr + 1, i2c + PCF8584_DATA);
 
 	envctrl_i2c_test_bb();
 
-	envctrl_writeb(OBD_SEND_START, &i2c->csr);
+	writeb(OBD_SEND_START, i2c + PCF8584_CSR);
 
 	/* Wait for PIN. */
 	envtrl_i2c_test_pin();
 
 	/* CSR 0 means acknowledged. */
-	if (!(envctrl_readb(&i2c->csr) & STATUS_LRB)) {
-		return envctrl_readb(&i2c->data);
+	if (!(readb(i2c + PCF8584_CSR) & STATUS_LRB)) {
+		return readb(i2c + PCF8584_DATA);
 	} else {
-		envctrl_writeb(OBD_SEND_STOP, &i2c->csr);
+		writeb(OBD_SEND_STOP, i2c + PCF8584_CSR);
 		return 0;
 	}
 }
@@ -269,10 +251,10 @@ static int envctrl_i2c_read_addr(unsigned char addr)
 static void envctrl_i2c_write_addr(unsigned char addr)
 {
 	envctrl_i2c_test_bb();
-	envctrl_writeb(addr, &i2c->data);
+	writeb(addr, i2c + PCF8584_DATA);
 
 	/* Generate Start condition. */
-	envctrl_writeb(OBD_SEND_START, &i2c->csr);
+	writeb(OBD_SEND_START, i2c + PCF8584_CSR);
 }
 
 /* Function Description: Read 1 byte of data from addr 
@@ -282,8 +264,8 @@ static void envctrl_i2c_write_addr(unsigned char addr)
 static unsigned char envctrl_i2c_read_data(void)
 {
 	envtrl_i2c_test_pin();
-	envctrl_writeb(CONTROL_ES0, &i2c->csr);  /* Send neg ack. */
-	return envctrl_readb(&i2c->data);
+	writeb(CONTROL_ES0, i2c + PCF8584_CSR);  /* Send neg ack. */
+	return readb(i2c + PCF8584_DATA);
 }
 
 /* Function Description: Instruct the device which port to read data from.  
@@ -292,7 +274,7 @@ static unsigned char envctrl_i2c_read_data(void)
 static void envctrl_i2c_write_data(unsigned char port)
 {
 	envtrl_i2c_test_pin();
-	envctrl_writeb(port, &i2c->data);
+	writeb(port, i2c + PCF8584_DATA);
 }
 
 /* Function Description: Generate Stop condition after last byte is sent.
@@ -301,7 +283,7 @@ static void envctrl_i2c_write_data(unsigned char port)
 static void envctrl_i2c_stop(void)
 {
 	envtrl_i2c_test_pin();
-	envctrl_writeb(OBD_SEND_STOP, &i2c->csr);
+	writeb(OBD_SEND_STOP, i2c + PCF8584_CSR);
 }
 
 /* Function Description: Read adc device.
@@ -323,7 +305,7 @@ static unsigned char envctrl_i2c_read_8591(unsigned char addr, unsigned char por
 	envctrl_i2c_read_data();
 	envctrl_i2c_stop();
 
-	return envctrl_readb(&i2c->data);
+	return readb(i2c + PCF8584_DATA);
 }
 
 /* Function Description: Read gpio device.
@@ -1084,8 +1066,7 @@ static int __init envctrl_init(void)
 	for_each_ebus(ebus) {
 		for_each_ebusdev(edev, ebus) {
 			if (!strcmp(edev->prom_name, "i2c")) {
-				i2c = ioremap(	edev->resource[0].start, 
-								sizeof(struct pcf8584_reg));
+				i2c = ioremap(edev->resource[0].start, 0x2);
 				for_each_edevchild(edev, edev_child) {
 					if (!strcmp("gpio", edev_child->prom_name)) {
 						i2c_childlist[i].i2ctype = I2C_GPIO;
@@ -1108,15 +1089,15 @@ done:
 	}
 
 	/* Set device address. */
-	envctrl_writeb(CONTROL_PIN, &i2c->csr);
-	envctrl_writeb(PCF8584_ADDRESS, &i2c->data);
+	writeb(CONTROL_PIN, i2c + PCF8584_CSR);
+	writeb(PCF8584_ADDRESS, i2c + PCF8584_DATA);
 
 	/* Set system clock and SCL frequencies. */ 
-	envctrl_writeb(CONTROL_PIN | CONTROL_ES1, &i2c->csr);
-	envctrl_writeb(CLK_4_43 | BUS_CLK_90, &i2c->data);
+	writeb(CONTROL_PIN | CONTROL_ES1, i2c + PCF8584_CSR);
+	writeb(CLK_4_43 | BUS_CLK_90, i2c + PCF8584_DATA);
 
 	/* Enable serial interface. */
-	envctrl_writeb(CONTROL_PIN | CONTROL_ES0 | CONTROL_ACK, &i2c->csr);
+	writeb(CONTROL_PIN | CONTROL_ES0 | CONTROL_ACK, i2c + PCF8584_CSR);
 	udelay(200);
 
 	/* Register the device as a minor miscellaneous device. */

@@ -102,6 +102,7 @@
 #define ATI_REMOTE_VENDOR_ID 	0x0bc7
 #define ATI_REMOTE_PRODUCT_ID 	0x004
 #define LOLA_REMOTE_PRODUCT_ID 	0x002
+#define MEDION_REMOTE_PRODUCT_ID 0x006
 
 #define DRIVER_VERSION 	        "2.2.1"
 #define DRIVER_AUTHOR           "Torrey Hoffman <thoffman@arnor.net>"
@@ -126,6 +127,7 @@ MODULE_PARM_DESC(debug, "Enable extra debug messages and information");
 static struct usb_device_id ati_remote_table[] = {
 	{ USB_DEVICE(ATI_REMOTE_VENDOR_ID, ATI_REMOTE_PRODUCT_ID) },
 	{ USB_DEVICE(ATI_REMOTE_VENDOR_ID, LOLA_REMOTE_PRODUCT_ID) },
+	{ USB_DEVICE(ATI_REMOTE_VENDOR_ID, MEDION_REMOTE_PRODUCT_ID) },
 	{}	/* Terminating entry */
 };
 
@@ -185,8 +187,6 @@ struct ati_remote {
 	wait_queue_head_t wait;
 	int send_flags;
 };
-
-static int ati_remote_num;
 
 /* "Kinds" of messages sent from the hardware to the driver. */
 #define KIND_END        0
@@ -420,13 +420,14 @@ static int ati_remote_sendpacket(struct ati_remote *ati_remote, u16 cmd, unsigne
 
 	while (timeout && (ati_remote->out_urb->status == -EINPROGRESS) 
 	       && !(ati_remote->send_flags & SEND_FLAG_COMPLETE)) {
+		set_current_state(TASK_INTERRUPTIBLE);
 		timeout = schedule_timeout(timeout);
 		rmb();
 	}
 
 	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&ati_remote->wait, &wait);
-	usb_unlink_urb(ati_remote->out_urb);
+	usb_kill_urb(ati_remote->out_urb);
 	
 	return retval;
 }
@@ -626,10 +627,10 @@ static void ati_remote_delete(struct ati_remote *ati_remote)
 	if (!ati_remote) return;
 
 	if (ati_remote->irq_urb)
-		usb_unlink_urb(ati_remote->irq_urb);
+		usb_kill_urb(ati_remote->irq_urb);
 
 	if (ati_remote->out_urb)
-		usb_unlink_urb(ati_remote->out_urb);
+		usb_kill_urb(ati_remote->out_urb);
 
 	input_unregister_device(&ati_remote->idev);
 
@@ -674,7 +675,6 @@ static void ati_remote_input_init(struct ati_remote *ati_remote)
 	idev->id.vendor = ati_remote->udev->descriptor.idVendor;
 	idev->id.product = ati_remote->udev->descriptor.idProduct;
 	idev->id.version = ati_remote->udev->descriptor.bcdDevice;
-	sprintf(idev->cdev.class_id,"ati-remote-%d",ati_remote_num++);
 }
 
 static int ati_remote_initialize(struct ati_remote *ati_remote)
@@ -732,7 +732,8 @@ static int ati_remote_probe(struct usb_interface *interface, const struct usb_de
 	/* See if the offered device matches what we can accept */
 	if ((udev->descriptor.idVendor != ATI_REMOTE_VENDOR_ID) ||
 		( (udev->descriptor.idProduct != ATI_REMOTE_PRODUCT_ID) &&
-		  (udev->descriptor.idProduct != LOLA_REMOTE_PRODUCT_ID) ))
+		  (udev->descriptor.idProduct != LOLA_REMOTE_PRODUCT_ID) &&
+		  (udev->descriptor.idProduct != MEDION_REMOTE_PRODUCT_ID) ))
 		return -ENODEV;
 
 	/* Allocate and clear an ati_remote struct */

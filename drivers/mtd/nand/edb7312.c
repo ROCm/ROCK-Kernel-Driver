@@ -6,7 +6,7 @@
  *  Derived from drivers/mtd/nand/autcpu12.c
  *       Copyright (c) 2001 Thomas Gleixner (gleixner@autronix.de)
  *
- * $Id: edb7312.c,v 1.8 2004/07/12 15:03:26 dwmw2 Exp $
+ * $Id: edb7312.c,v 1.11 2004/11/04 12:53:10 gleixner Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -53,19 +53,9 @@ static struct mtd_info *ep7312_mtd = NULL;
  * Module stuff
  */
 
-static int ep7312_fio_pbase = EP7312_FIO_PBASE;
-static int ep7312_pxdr = EP7312_PXDR;
-static int ep7312_pxddr = EP7312_PXDDR;
-
-#ifdef MODULE
-MODULE_PARM(ep7312_fio_pbase, "i");
-MODULE_PARM(ep7312_pxdr, "i");
-MODULE_PARM(ep7312_pxddr, "i");
-
-__setup("ep7312_fio_pbase=",ep7312_fio_pbase);
-__setup("ep7312_pxdr=",ep7312_pxdr);
-__setup("ep7312_pxddr=",ep7312_pxddr);
-#endif
+static unsigned long ep7312_fio_pbase = EP7312_FIO_PBASE;
+static void __iomem * ep7312_pxdr = (void __iomem *) EP7312_PXDR;
+static void __iomem * ep7312_pxddr = (void __iomem *) EP7312_PXDDR;
 
 #ifdef CONFIG_MTD_PARTITIONS
 /*
@@ -131,7 +121,7 @@ static int __init ep7312_init (void)
 	const char *part_type = 0;
 	int mtd_parts_nb = 0;
 	struct mtd_partition *mtd_parts = 0;
-	int ep7312_fio_base;
+	void __iomem * ep7312_fio_base;
 	
 	/* Allocate memory for MTD device structure and private data */
 	ep7312_mtd = kmalloc(sizeof(struct mtd_info) + 
@@ -143,7 +133,7 @@ static int __init ep7312_init (void)
 	}
 	
 	/* map physical adress */
-	ep7312_fio_base = (unsigned long)ioremap(ep7312_fio_pbase, SZ_1K);
+	ep7312_fio_base = ioremap(ep7312_fio_pbase, SZ_1K);
 	if(!ep7312_fio_base) {
 		printk("ioremap EDB7312 NAND flash failed\n");
 		kfree(ep7312_mtd);
@@ -181,16 +171,7 @@ static int __init ep7312_init (void)
 		return -ENXIO;
 	}
 	
-	/* Allocate memory for internal data buffer */
-	this->data_buf = kmalloc (sizeof(u_char) * (ep7312_mtd->oobblock + ep7312_mtd->oobsize), GFP_KERNEL);
-	if (!this->data_buf) {
-		printk("Unable to allocate NAND data buffer for EDB7312.\n");
-		iounmap((void *)ep7312_fio_base);
-		kfree (ep7312_mtd);
-		return -ENOMEM;
-	}
-	
-#ifdef CONFIG_PARTITIONS
+#ifdef CONFIG_MTD_PARTITIONS
 	ep7312_mtd->name = "edb7312-nand";
 	mtd_parts_nb = parse_mtd_partitions(ep7312_mtd, part_probes,
 					    &mtd_parts, 0);
@@ -221,8 +202,8 @@ static void __exit ep7312_cleanup (void)
 {
 	struct nand_chip *this = (struct nand_chip *) &ep7312_mtd[1];
 	
-	/* Unregister the device */
-	del_mtd_device (ep7312_mtd);
+	/* Release resources, unregister device */
+	nand_release (ap7312_mtd);
 	
 	/* Free internal data buffer */
 	kfree (this->data_buf);

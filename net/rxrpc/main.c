@@ -32,7 +32,7 @@ MODULE_DESCRIPTION("Rx RPC implementation");
 MODULE_AUTHOR("Red Hat, Inc.");
 MODULE_LICENSE("GPL");
 
-uint32_t rxrpc_epoch;
+__be32 rxrpc_epoch;
 
 /*****************************************************************************/
 /*

@@ -4,9 +4,11 @@
  * Author: Nicolas Pitre
  */
 
+struct sys_timer;
+
+extern struct sys_timer sa1100_timer;
 extern void __init sa1100_map_io(void);
 extern void __init sa1100_init_irq(void);
-extern void __init sa1100_init_time(void);
 
 #define SET_BANK(__nr,__start,__size) \
 	mi->bank[__nr].start = (__start), \
@@ -25,3 +27,12 @@ extern unsigned int sa11x0_freq_to_ppcr(unsigned int khz);
 extern int sa11x0_verify_speed(struct cpufreq_policy *policy);
 extern unsigned int sa11x0_getspeed(unsigned int cpu);
 extern unsigned int sa11x0_ppcr_to_freq(unsigned int idx);
+
+struct flash_platform_data;
+struct resource;
+
+extern void sa11x0_set_flash_data(struct flash_platform_data *flash,
+				  struct resource *res, int nr);
+
+struct irda_platform_data;
+void sa11x0_set_irda_data(struct irda_platform_data *irda);

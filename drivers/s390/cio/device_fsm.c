@@ -93,6 +93,18 @@ ccw_device_set_timeout(struct ccw_device *cdev, int expires)
 	add_timer(&cdev->private->timer);
 }
 
+/* Kill any pending timers after machine check. */
+void
+device_kill_pending_timer(struct subchannel *sch)
+{
+	struct ccw_device *cdev;
+
+	if (!sch->dev.driver_data)
+		return;
+	cdev = sch->dev.driver_data;
+	ccw_device_set_timeout(cdev, 0);
+}
+
 /*
  * Cancel running i/o. This is called repeatedly since halt/clear are
  * asynchronous operations. We do one try with cio_cancel, two tries
@@ -142,7 +154,7 @@ ccw_device_cancel_halt_clear(struct ccw_device *cdev)
 	panic("Can't stop i/o on subchannel.\n");
 }
 
-static void
+static int
 ccw_device_handle_oper(struct ccw_device *cdev)
 {
 	struct subchannel *sch;
@@ -162,9 +174,10 @@ ccw_device_handle_oper(struct ccw_device *cdev)
 		PREPARE_WORK(&cdev->private->kick_work,
 			     ccw_device_do_unreg_rereg, (void *)cdev);
 		queue_work(ccw_device_work, &cdev->private->kick_work);
-		return;
+		return 0;
 	}
 	cdev->private->flags.donotify = 1;
+	return 1;
 }
 
 /*
@@ -194,7 +207,7 @@ static void
 ccw_device_recog_done(struct ccw_device *cdev, int state)
 {
 	struct subchannel *sch;
-	int notify, old_lpm;
+	int notify, old_lpm, same_dev;
 
 	sch = to_subchannel(cdev->dev.parent);
 
@@ -224,6 +237,7 @@ ccw_device_recog_done(struct ccw_device *cdev, int state)
 		/* Boxed devices don't need extra treatment. */
 	}
 	notify = 0;
+	same_dev = 0; /* Keep the compiler quiet... */
 	switch (state) {
 	case DEV_STATE_NOT_OPER:
 		CIO_DEBUG(KERN_WARNING, 2,
@@ -232,7 +246,7 @@ ccw_device_recog_done(struct ccw_device *cdev, int state)
 		break;
 	case DEV_STATE_OFFLINE:
 		if (cdev->private->state == DEV_STATE_DISCONNECTED_SENSE_ID) {
-			ccw_device_handle_oper(cdev);
+			same_dev = ccw_device_handle_oper(cdev);
 			notify = 1;
 		}
 		/* fill out sense information */
@@ -243,10 +257,12 @@ ccw_device_recog_done(struct ccw_device *cdev, int state)
 			.dev_model = cdev->private->senseid.dev_model,
 		};
 		if (notify) {
-			/* Get device online again. */
 			cdev->private->state = DEV_STATE_OFFLINE;
-			ccw_device_online(cdev);
-			wake_up(&cdev->private->wait_q);
+			if (same_dev) {
+				/* Get device online again. */
+				ccw_device_online(cdev);
+				wake_up(&cdev->private->wait_q);
+			}
 			return;
 		}
 		/* Issue device info message. */
@@ -452,7 +468,8 @@ ccw_device_nopath_notify(void *data)
 					     (void *)cdev);
 				queue_work(ccw_device_work,
 					   &cdev->private->kick_work);
-			}
+			} else
+				put_device(&sch->dev);
 		}
 	} else {
 		cio_disable_subchannel(sch);
@@ -995,6 +1012,7 @@ device_trigger_reprobe(struct subchannel *sch)
 	if ((sch->lpm & (sch->lpm - 1)) != 0)
 		sch->schib.pmcw.mp = 1;
 	sch->schib.pmcw.intparm = (__u32)(unsigned long)sch;
+	/* We should also udate ssd info, but this has to wait. */
 	ccw_device_start_id(cdev, 0);
 	spin_unlock_irqrestore(&sch->lock, flags);
 }
@@ -1189,8 +1207,8 @@ io_subchannel_irq (struct device *pdev)
 
 	CIO_TRACE_EVENT (3, "IRQ");
 	CIO_TRACE_EVENT (3, pdev->bus_id);
-
-	dev_fsm_event(cdev, DEV_EVENT_INTERRUPT);
+	if (cdev)
+		dev_fsm_event(cdev, DEV_EVENT_INTERRUPT);
 }
 
 EXPORT_SYMBOL_GPL(ccw_device_set_timeout);

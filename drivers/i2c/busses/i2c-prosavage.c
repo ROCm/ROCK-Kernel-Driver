@@ -68,7 +68,7 @@
 #define MAX_BUSSES	2
 
 struct s_i2c_bus {
-	void	*mmvga;
+	void __iomem *mmvga;
 	int	i2c_reg;
 	int	adap_ok;
 	struct i2c_adapter		adap;
@@ -76,7 +76,7 @@ struct s_i2c_bus {
 };
 
 struct s_i2c_chip {
-	void	*mmio;
+	void __iomem *mmio;
 	struct s_i2c_bus	i2c_bus[MAX_BUSSES];
 };
 
@@ -181,7 +181,7 @@ static int bit_s3via_getsda(void *bus)
 /*
  * adapter initialisation
  */
-static int i2c_register_bus(struct pci_dev *dev, struct s_i2c_bus *p, u8 *mmvga, u32 i2c_reg)
+static int i2c_register_bus(struct pci_dev *dev, struct s_i2c_bus *p, void __iomem *mmvga, u32 i2c_reg)
 {
 	int ret;
 	p->adap.owner	  = THIS_MODULE;
@@ -228,7 +228,7 @@ static void prosavage_remove(struct pci_dev *dev)
 
 		ret = i2c_bit_del_bus(&chip->i2c_bus[i].adap);
 	        if (ret) {
-			dev_err(&dev->dev, ": %s not removed\n",
+			dev_err(&dev->dev, "%s not removed\n",
 				chip->i2c_bus[i].adap.name);
 		}
 	}
@@ -298,7 +298,7 @@ static int __devinit prosavage_probe(struct pci_dev *dev, const struct pci_devic
 	}
 	return 0;
 err_adap:
-	dev_err(&dev->dev, ": %s failed\n", bus->adap.name);
+	dev_err(&dev->dev, "%s failed\n", bus->adap.name);
 	prosavage_remove(dev);
 	return ret;
 }
@@ -313,6 +313,8 @@ static struct pci_device_id prosavage_pci_tbl[] = {
 	{ 0, },
 };
 
+MODULE_DEVICE_TABLE (pci, prosavage_pci_tbl);
+
 static struct pci_driver prosavage_driver = {
 	.name		=	"prosavage_smbus",
 	.id_table	=	prosavage_pci_tbl,
@@ -322,7 +324,7 @@ static struct pci_driver prosavage_driver = {
 
 static int __init i2c_prosavage_init(void)
 {
-	return pci_module_init(&prosavage_driver);
+	return pci_register_driver(&prosavage_driver);
 }
 
 static void __exit i2c_prosavage_exit(void)

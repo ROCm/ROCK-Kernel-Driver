@@ -69,10 +69,12 @@ const struct smb_to_posix_error mapping_table_ERRDOS[] = {
 	{ERRinvparm, -EINVAL},
 	{ERRdiskfull, -ENOSPC},
 	{ERRinvname, -ENOENT},
+	{ERRinvlevel,-EOPNOTSUPP},
 	{ERRdirnotempty, -ENOTEMPTY},
 	{ERRnotlocked, -ENOLCK},
 	{ERRalreadyexists, -EEXIST},
 	{ERRmoredata, -EOVERFLOW},
+	{ERReasnotsupported,-EOPNOTSUPP},
 	{ErrQuota, -EDQUOT},
 	{ErrNotALink, -ENOLINK},
 	{ERRnetlogonNotStarted,-ENOPROTOOPT},
@@ -187,8 +189,8 @@ cifs_inet_pton(int address_family, char *cp,void *dst)
 	if (value > addr_class_max[end - bytes])
 		return 0;
 
-	address.s_addr = *((int *) bytes) | htonl(value);
-	*((int *)dst) = address.s_addr;
+	address.s_addr = *((__be32 *) bytes) | htonl(value);
+	*((__be32 *)dst) = address.s_addr;
 	return 1; /* success */
 }
 
@@ -287,7 +289,7 @@ static const struct {
 	ERRDOS, 87, NT_STATUS_BAD_WORKING_SET_LIMIT}, {
 	ERRDOS, 87, NT_STATUS_INCOMPATIBLE_FILE_MAP}, {
 	ERRDOS, 87, NT_STATUS_SECTION_PROTECTION}, {
-	ERRDOS, 282, NT_STATUS_EAS_NOT_SUPPORTED}, {
+	ERRDOS, ERReasnotsupported, NT_STATUS_EAS_NOT_SUPPORTED}, {
 	ERRDOS, 255, NT_STATUS_EA_TOO_LARGE}, {
 	ERRHRD, ERRgeneral, NT_STATUS_NONEXISTENT_EA_ENTRY}, {
 	ERRHRD, ERRgeneral, NT_STATUS_NO_EAS_ON_FILE}, {
@@ -810,16 +812,13 @@ map_smb_to_linux_error(struct smb_hdr *smb)
 
 	if (smb->Flags2 & SMBFLG2_ERR_STATUS) {
 		/* translate the newer STATUS codes to old style errors and then to POSIX errors */
-		smb->Status.CifsError = le32_to_cpu(smb->Status.CifsError);
+		__u32 err = le32_to_cpu(smb->Status.CifsError);
 		if(cifsFYI)
-			cifs_print_status(smb->Status.CifsError);
-		ntstatus_to_dos(smb->Status.CifsError, &smberrclass,
-				&smberrcode);
+			cifs_print_status(err);
+		ntstatus_to_dos(err, &smberrclass, &smberrcode);
 	} else {
 		smberrclass = smb->Status.DosError.ErrorClass;
-		smb->Status.DosError.Error =
-		    le16_to_cpu(smb->Status.DosError.Error);
-		smberrcode = smb->Status.DosError.Error;
+		smberrcode = le16_to_cpu(smb->Status.DosError.Error);
 	}
 
 	/* old style errors */

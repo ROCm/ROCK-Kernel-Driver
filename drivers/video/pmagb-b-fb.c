@@ -163,6 +163,9 @@ int __init pmagbbfb_init(void)
 	int sid;
 	int found = 0;
 
+	if (fb_get_options("pmagbbfb", NULL))
+		return -ENODEV;
+
 	if (TURBOCHANNEL) {
 		while ((sid = search_tc_card("PMAGB-BA")) >= 0) {
 			found = 1;

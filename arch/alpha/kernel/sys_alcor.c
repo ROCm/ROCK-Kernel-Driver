@@ -16,12 +16,12 @@
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/reboot.h>
+#include <linux/bitops.h>
 
 #include <asm/ptrace.h>
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/dma.h>
-#include <asm/bitops.h>
 #include <asm/mmu_context.h>
 #include <asm/irq.h>
 #include <asm/pgtable.h>
@@ -274,7 +274,6 @@ struct alpha_machine_vector alcor_mv __initmv = {
 	DO_EV5_MMU,
 	DO_DEFAULT_RTC,
 	DO_CIA_IO,
-	DO_CIA_BUS,
 	.machine_check		= cia_machine_check,
 	.max_isa_dma_address	= ALPHA_ALCOR_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= EISA_DEFAULT_IO_BASE,
@@ -292,7 +291,7 @@ struct alpha_machine_vector alcor_mv __initmv = {
 	.pci_swizzle		= common_swizzle,
 
 	.sys = { .cia = {
-	    .gru_int_req_bits	= ALCOR_GRU_INT_REQ_BITS
+		.gru_int_req_bits = ALCOR_GRU_INT_REQ_BITS
 	}}
 };
 ALIAS_MV(alcor)
@@ -302,7 +301,6 @@ struct alpha_machine_vector xlt_mv __initmv = {
 	DO_EV5_MMU,
 	DO_DEFAULT_RTC,
 	DO_CIA_IO,
-	DO_CIA_BUS,
 	.machine_check		= cia_machine_check,
 	.max_isa_dma_address	= ALPHA_MAX_ISA_DMA_ADDRESS,
 	.min_io_address		= EISA_DEFAULT_IO_BASE,
@@ -320,7 +318,7 @@ struct alpha_machine_vector xlt_mv __initmv = {
 	.pci_swizzle		= common_swizzle,
 
 	.sys = { .cia = {
-	    .gru_int_req_bits	= XLT_GRU_INT_REQ_BITS
+		.gru_int_req_bits = XLT_GRU_INT_REQ_BITS
 	}}
 };
 

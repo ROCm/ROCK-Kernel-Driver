@@ -116,12 +116,12 @@ static int acpi_button_info_seq_show(struct seq_file *seq, void *offset)
 	ACPI_FUNCTION_TRACE("acpi_button_info_seq_show");
 
 	if (!button || !button->device)
-		return 0;
+		return_VALUE(0);
 
 	seq_printf(seq, "type:                    %s\n", 
 		acpi_device_name(button->device));
 
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_button_info_open_fs(struct inode *inode, struct file *file)
@@ -138,7 +138,7 @@ static int acpi_button_state_seq_show(struct seq_file *seq, void *offset)
 	ACPI_FUNCTION_TRACE("acpi_button_state_seq_show");
 
 	if (!button || !button->device)
-		return 0;
+		return_VALUE(0);
 
 	status = acpi_evaluate_integer(button->handle,"_LID",NULL,&state);
 	if (ACPI_FAILURE(status)) {
@@ -148,7 +148,7 @@ static int acpi_button_state_seq_show(struct seq_file *seq, void *offset)
 		seq_printf(seq, "state:      %s\n", (state ? "open" : "closed")); 
 	}
 
-	return 0;
+	return_VALUE(0);
 }
 
 static int acpi_button_state_open_fs(struct inode *inode, struct file *file)

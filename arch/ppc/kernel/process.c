@@ -18,7 +18,6 @@
  */
 
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -311,9 +310,9 @@ void show_regs(struct pt_regs * regs)
 {
 	int i, trap;
 
-	printk("NIP: %08lX LR: %08lX SP: %08lX REGS: %p TRAP: %04lx "
-	       "%s (%s %s)\n", regs->nip, regs->link, regs->gpr[1], regs,
-	       regs->trap, print_tainted(), UTS_RELEASE, OOPS_TIMESTAMP);
+	printk("NIP: %08lX LR: %08lX SP: %08lX REGS: %p TRAP: %04lx    %s\n",
+	       regs->nip, regs->link, regs->gpr[1], regs, regs->trap,
+	       print_tainted());
 	printk("MSR: %08lx EE: %01x PR: %01x FP: %01x ME: %01x IR/DR: %01x%01x\n",
 	       regs->msr, regs->msr&MSR_EE ? 1 : 0, regs->msr&MSR_PR ? 1 : 0,
 	       regs->msr & MSR_FP ? 1 : 0,regs->msr&MSR_ME ? 1 : 0,
@@ -322,7 +321,7 @@ void show_regs(struct pt_regs * regs)
 	trap = TRAP(regs);
 	if (trap == 0x300 || trap == 0x600)
 		printk("DAR: %08lX, DSISR: %08lX\n", regs->dar, regs->dsisr);
-	printk("TASK = %p[%d] '%s' THREAD: %p",
+	printk("TASK = %p[%d] '%s' THREAD: %p\n",
 	       current, current->pid, current->comm, current->thread_info);
 	printk("Last syscall: %ld ", current->thread.last_syscall);
 
@@ -371,6 +370,10 @@ void exit_thread(void)
 		last_task_used_math = NULL;
 	if (last_task_used_altivec == current)
 		last_task_used_altivec = NULL;
+#ifdef CONFIG_SPE
+	if (last_task_used_spe == current)
+		last_task_used_spe = NULL;
+#endif
 }
 
 void flush_thread(void)
@@ -379,6 +382,10 @@ void flush_thread(void)
 		last_task_used_math = NULL;
 	if (last_task_used_altivec == current)
 		last_task_used_altivec = NULL;
+#ifdef CONFIG_SPE
+	if (last_task_used_spe == current)
+		last_task_used_spe = NULL;
+#endif
 }
 
 void
@@ -422,8 +429,6 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	extern void ret_from_fork(void);
 	unsigned long sp = (unsigned long)p->thread_info + THREAD_SIZE;
 	unsigned long childframe;
-
-	p->set_child_tid = p->clear_child_tid = NULL;
 
 	CHECK_FULL_REGS(regs);
 	/* Copy registers */
@@ -483,6 +488,10 @@ void start_thread(struct pt_regs *regs, unsigned long nip, unsigned long sp)
 		last_task_used_math = NULL;
 	if (last_task_used_altivec == current)
 		last_task_used_altivec = NULL;
+#ifdef CONFIG_SPE
+	if (last_task_used_spe == current)
+		last_task_used_spe = NULL;
+#endif
 	memset(current->thread.fpr, 0, sizeof(current->thread.fpr));
 	current->thread.fpscr = 0;
 #ifdef CONFIG_ALTIVEC
@@ -599,8 +608,11 @@ int sys_execve(unsigned long a0, unsigned long a1, unsigned long a2,
 	preempt_enable();
 	error = do_execve(filename, (char __user *__user *) a1,
 			  (char __user *__user *) a2, regs);
-	if (error == 0)
+	if (error == 0) {
+		task_lock(current);
 		current->ptrace &= ~PT_DTRACE;
+		task_unlock(current);
+	}
 	putname(filename);
 out:
 	return error;

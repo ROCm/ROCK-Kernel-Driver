@@ -6,7 +6,7 @@ EXTRA_AFLAGS	:= -traditional
 
 obj-y	:=  bitmap.o traps.o time.o process.o \
             setup.o sys_s390.o ptrace.o signal.o cpcmd.o ebcdic.o \
-            semaphore.o s390_ext.o debug.o profile.o
+            semaphore.o s390_ext.o debug.o profile.o irq.o
 
 extra-$(CONFIG_ARCH_S390_31)	+= head.o 
 extra-$(CONFIG_ARCH_S390X)	+= head64.o 
@@ -29,5 +29,3 @@ obj-$(CONFIG_VIRT_TIMER)	+= vtime.o
 # This is just to get the dependencies...
 #
 binfmt_elf32.o:	$(TOPDIR)/fs/binfmt_elf.c
-
-CFLAGS_process.o += -DOOPS_TIMESTAMP='"$(OOPS_TIMESTAMP)"'

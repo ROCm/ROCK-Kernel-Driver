@@ -1,8 +1,8 @@
 VERSION = 2
 PATCHLEVEL = 6
-SUBLEVEL = 8
-EXTRAVERSION = -$(shell echo $(CONFIG_RELEASE)-$(CONFIG_CFGNAME))
-NAME=
+SUBLEVEL = 10
+EXTRAVERSION = -rc3-bk10
+NAME=Woozy Numbat
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
@@ -156,8 +156,8 @@ localversion-files := $(wildcard $(objtree)/localversion* $(srctree)/localversio
 endif
 
 LOCALVERSION = $(subst $(space),, \
-	       $(shell cat /dev/null $(localversion-files)) \
-	       $(subst ",,$(CONFIG_LOCALVERSION)))
+	       $(shell cat /dev/null $(localversion-files:%~=)) \
+	       $(patsubst "%",%,$(CONFIG_LOCALVERSION)))
 
 KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)$(LOCALVERSION)
 
@@ -295,6 +295,11 @@ check_gcc = $(warning check_gcc is deprecated - use cc-option) \
 cc-option-yn = $(shell if $(CC) $(CFLAGS) $(1) -S -o /dev/null -xc /dev/null \
                 > /dev/null 2>&1; then echo "y"; else echo "n"; fi;)
 
+# cc-option-align
+# Prefix align with either -falign or -malign
+cc-option-align = $(subst -functions=0,,\
+	$(call cc-option,-falign-functions=0,-malign-functions=0))
+
 # cc-version
 # Usage gcc-ver := $(call cc-version $(CC))
 cc-version = $(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-version.sh \
@@ -326,7 +331,7 @@ DEPMOD		= /sbin/depmod
 KALLSYMS	= scripts/kallsyms
 PERL		= perl
 CHECK		= sparse
-CHECKFLAGS     :=
+CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__
 MODFLAGS	= -DMODULE
 CFLAGS_MODULE   = $(MODFLAGS)
 AFLAGS_MODULE   = $(MODFLAGS)
@@ -346,11 +351,6 @@ CPPFLAGS        := -D__KERNEL__ $(LINUXINCLUDE)
 CFLAGS 		:= -Wall -Wstrict-prototypes -Wno-trigraphs \
 	  	   -fno-strict-aliasing -fno-common
 AFLAGS		:= -D__ASSEMBLY__
-
-# Warn about unsupported modules in kernels built inside Autobuild
-ifneq ($(wildcard /.buildenv),)
-CFLAGS		+= -DUNSUPPORTED_MODULES=1
-endif
 
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION LOCALVERSION KERNELRELEASE \
 	ARCH CONFIG_SHELL HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
@@ -383,6 +383,18 @@ RCS_TAR_IGNORE := --exclude SCCS --exclude BitKeeper --exclude .svn --exclude CV
 .PHONY: scripts_basic
 scripts_basic:
 	$(Q)$(MAKE) $(build)=scripts/basic
+
+.PHONY: outputmakefile
+# outputmakefile generate a Makefile to be placed in output directory, if
+# using a seperate output directory. This allows convinient use
+# of make in output directory
+outputmakefile:
+	$(Q)if /usr/bin/env test ! $(srctree) -ef $(objtree); then \
+	$(CONFIG_SHELL) $(srctree)/scripts/mkmakefile              \
+	    $(srctree) $(objtree) $(VERSION) $(PATCHLEVEL)         \
+	    > $(objtree)/Makefile;                                 \
+	    echo '  GEN    $(objtree)/Makefile';                   \
+	fi
 
 # To make sure we do not include .config for any of the *config targets
 # catch them early, and hand them over to scripts/kconfig/Makefile
@@ -428,9 +440,15 @@ ifeq ($(config-targets),1)
 # *config targets only - make sure prerequisites are updated, and descend
 # in scripts/kconfig to make the *config target
 
-config: scripts_basic FORCE
+# Read arch specific Makefile to set KBUILD_DEFCONFIG as needed.
+# KBUILD_DEFCONFIG may point out an alternative default configuration
+# used for 'make defconfig'
+include $(srctree)/arch/$(ARCH)/Makefile
+export KBUILD_DEFCONFIG
+
+config: scripts_basic outputmakefile FORCE
 	$(Q)$(MAKE) $(build)=scripts/kconfig $@
-%config: scripts_basic FORCE
+%config: scripts_basic outputmakefile FORCE
 	$(Q)$(MAKE) $(build)=scripts/kconfig $@
 
 else
@@ -491,7 +509,16 @@ else
 CFLAGS		+= -O2
 endif
 
-ifndef CONFIG_FRAME_POINTER
+#Add align options if CONFIG_CC_* is not equal to 0
+add-align = $(if $(filter-out 0,$($(1))),$(cc-option-align)$(2)=$($(1)))
+CFLAGS		+= $(call add-align,CONFIG_CC_ALIGN_FUNCTIONS,-functions)
+CFLAGS		+= $(call add-align,CONFIG_CC_ALIGN_LABELS,-labels)
+CFLAGS		+= $(call add-align,CONFIG_CC_ALIGN_LOOPS,-loops)
+CFLAGS		+= $(call add-align,CONFIG_CC_ALIGN_JUMPS,-jumps)
+
+ifdef CONFIG_FRAME_POINTER
+CFLAGS		+= -fno-omit-frame-pointer
+else
 CFLAGS		+= -fomit-frame-pointer
 endif
 
@@ -499,10 +526,10 @@ ifdef CONFIG_DEBUG_INFO
 CFLAGS		+= -g
 endif
 
+include $(srctree)/arch/$(ARCH)/Makefile
+
 # warn about C99 declaration after statement
 CFLAGS += $(call cc-option,-Wdeclaration-after-statement,)
-
-include $(srctree)/arch/$(ARCH)/Makefile
 
 # Default kernel image to build when no specific target is given.
 # KBUILD_IMAGE may be overruled on the commandline or
@@ -530,7 +557,6 @@ export MODLIB
 
 ifeq ($(KBUILD_EXTMOD),)
 core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/
-core-$(CONFIG_KDB) += kdb/
 
 vmlinux-dirs	:= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
 		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
@@ -717,22 +743,12 @@ $(vmlinux-dirs): prepare-all scripts
 
 .PHONY: prepare-all prepare prepare0 prepare1 prepare2
 
-# prepare 2 generate Makefile to be placed in output directory, if
-# using a seperate output directory. This allows convinient use
-# of make in output directory
-prepare2:
-	$(Q)if /usr/bin/env test ! $(srctree) -ef $(objtree); then \
-	$(CONFIG_SHELL) $(srctree)/scripts/mkmakefile              \
-	    $(srctree) $(objtree) $(VERSION) $(PATCHLEVEL)         \
-	    > $(objtree)/Makefile;                                 \
-	fi
-
-# prepare1 is used to check if we are building in a separate output directory,
+# prepare2 is used to check if we are building in a separate output directory,
 # and if so do:
 # 1) Check that make has not been executed in the kernel src $(srctree)
 # 2) Create the include2 directory, used for the second asm symlink
 
-prepare1: prepare2
+prepare2:
 ifneq ($(KBUILD_SRC),)
 	@echo '  Using $(srctree) as source for kernel'
 	$(Q)if [ -h $(srctree)/include/asm -o -f $(srctree)/.config ]; then \
@@ -743,6 +759,9 @@ ifneq ($(KBUILD_SRC),)
 	$(Q)if [ ! -d include2 ]; then mkdir -p include2; fi;
 	$(Q)ln -fsn $(srctree)/include/asm-$(ARCH) include2/asm
 endif
+
+# prepare1 creates a makefile if using a separate output directory
+prepare1: prepare2 outputmakefile
 
 prepare0: prepare1 include/linux/version.h include/asm include/config/MARKER
 ifneq ($(KBUILD_MODULES),)
@@ -811,7 +830,7 @@ define filechk_version.h
 	)
 endef
 
-include/linux/version.h: $(srctree)/Makefile .config FORCE
+include/linux/version.h: $(srctree)/Makefile FORCE
 	$(call filechk,version.h)
 
 # ---------------------------------------------------------------------------
@@ -1072,25 +1091,14 @@ KBUILD_MODULES := 1
 crmodverdir:
 	$(Q)mkdir -p $(MODVERDIR)
 
-.PHONY: $(objtree)/Module.symvers
-$(objtree)/Module.symvers:
-	@test -e $(objtree)/Module.symvers || ( \
-	echo; \
-	echo "WARNING: Symbol version dump $(objtree)/Module.symvers is " \
-	     "missing, modules will have CONFIG_MODVERSIONS disabled."; \
-	echo )
-
 module-dirs := $(addprefix _module_,$(KBUILD_EXTMOD))
 .PHONY: $(module-dirs) modules
-$(module-dirs): crmodverdir $(objtree)/Module.symvers
+$(module-dirs): crmodverdir
 	$(Q)$(MAKE) $(build)=$(patsubst _module_%,%,$@)
 
 modules: $(module-dirs)
 	@echo '  Building modules, stage 2.';
 	$(Q)$(MAKE) -rR -f $(srctree)/scripts/Makefile.modpost
-
-.PHONY: modules_add
-modules_add: modules_install
 
 .PHONY: modules_install
 modules_install:

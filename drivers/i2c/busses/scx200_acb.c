@@ -45,8 +45,7 @@ MODULE_LICENSE("GPL");
 
 #define MAX_DEVICES 4
 static int base[MAX_DEVICES] = { 0x820, 0x840 };
-static int num_base;
-module_param_array(base, int, num_base, 0);
+module_param_array(base, int, NULL, 0);
 MODULE_PARM_DESC(base, "Base addresses for the ACCESS.bus controllers");
 
 #ifdef DEBUG
@@ -403,9 +402,9 @@ static struct i2c_algorithm scx200_acb_algorithm = {
 	.functionality	= scx200_acb_func,
 };
 
-struct scx200_acb_iface *scx200_acb_list;
+static struct scx200_acb_iface *scx200_acb_list;
 
-int scx200_acb_probe(struct scx200_acb_iface *iface)
+static int scx200_acb_probe(struct scx200_acb_iface *iface)
 {
 	u8 val;
 
@@ -503,6 +502,12 @@ static int  __init scx200_acb_create(int base, int index)
 	return rc;
 }
 
+static struct pci_device_id scx200[] = {
+	{ PCI_DEVICE(PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_SCx200_BRIDGE) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_NS, PCI_DEVICE_ID_NS_SC1100_BRIDGE) },
+	{ },
+};
+
 static int __init scx200_acb_init(void)
 {
 	int i;
@@ -511,12 +516,7 @@ static int __init scx200_acb_init(void)
 	pr_debug(NAME ": NatSemi SCx200 ACCESS.bus Driver\n");
 
 	/* Verify that this really is a SCx200 processor */
-	if (pci_find_device(PCI_VENDOR_ID_NS,
-			    PCI_DEVICE_ID_NS_SCx200_BRIDGE,
-			    NULL) == NULL
-	    && pci_find_device(PCI_VENDOR_ID_NS,
-			       PCI_DEVICE_ID_NS_SC1100_BRIDGE,
-			       NULL) == NULL)
+	if (pci_dev_present(scx200) == 0)
 		return -ENODEV;
 
 	rc = -ENXIO;

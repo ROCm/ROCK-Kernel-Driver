@@ -142,9 +142,16 @@ static irqreturn_t sbc82xx_i8259_demux(int irq, void *dev_id, struct pt_regs *re
 			return IRQ_HANDLED;
 		}
 	}
-	ppc_irq_dispatch_handler(regs, NR_SIU_INTS + irq);
+	__do_IRQ(NR_SIU_INTS + irq, regs);
 	return IRQ_HANDLED;
 }
+
+static struct irqaction sbc82xx_i8259_irqaction = {
+	.handler = sbc82xx_i8259_demux,
+	.flags = SA_INTERRUPT,
+	.mask = CPU_MASK_NONE,
+	.name = "i8259 demux",
+};
 
 void __init sbc82xx_init_IRQ(void)
 {
@@ -186,8 +193,7 @@ void __init sbc82xx_init_IRQ(void)
 	sbc82xx_i8259_map[1] = sbc82xx_i8259_mask; /* Set interrupt mask */
 
 	/* Request cascade IRQ */
-	if (request_irq(SIU_INT_IRQ6, sbc82xx_i8259_demux, SA_INTERRUPT,
-			"i8259 demux", 0)) {
+	if (setup_irq(SIU_INT_IRQ6, &sbc82xx_i8259_irqaction)) {
 		printk("Installation of i8259 IRQ demultiplexer failed.\n");
 	}
 }

@@ -138,7 +138,7 @@ typedef struct osd_cap_s {
 } osd_cap_t;
 
 
-#define OSD_SEND_CMD            _IOW('o', 160, osd_cmd_t)
+#define OSD_SEND_CMD       _IOW('o', 160, osd_cmd_t)
 #define OSD_GET_CAPABILITY      _IOR('o', 161, osd_cap_t)
 
 #endif

@@ -80,7 +80,7 @@ static struct {
 int jfs_tlocks_low;		/* Indicates low number of available tlocks */
 
 #ifdef CONFIG_JFS_STATISTICS
-struct {
+static struct {
 	uint txBegin;
 	uint txBegin_barrier;
 	uint txBegin_lockslow;
@@ -152,7 +152,7 @@ static inline void TXN_SLEEP_DROP_LOCK(wait_queue_head_t * event)
 /*
  *      statistics
  */
-struct {
+static struct {
 	tid_t maxtid;		/* 4: biggest tid ever used */
 	lid_t maxlid;		/* 4: biggest lid ever used */
 	int ntid;		/* 4: # of transactions performed */

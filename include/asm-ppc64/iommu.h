@@ -104,16 +104,26 @@ extern struct iommu_table vio_tce_table;      /* Tce table for virtual bus */
 
 struct scatterlist;
 
-#ifdef CONFIG_PPC_PSERIES
+#ifdef CONFIG_PPC_MULTIPLATFORM
+
 /* Walks all buses and creates iommu tables */
 extern void iommu_setup_pSeries(void);
-extern void iommu_setup_pmac(void);
+extern void iommu_setup_u3(void);
+
+/* Frees table for an individual device node */
+extern void iommu_free_table(struct device_node *dn);
+
+#endif /* CONFIG_PPC_MULTIPLATFORM */
+
+#ifdef CONFIG_PPC_PSERIES
 
 /* Creates table for an individual device node */
-extern void iommu_devnode_init(struct device_node *dn);
+extern void iommu_devnode_init_pSeries(struct device_node *dn);
+
 #endif /* CONFIG_PPC_PSERIES */
 
 #ifdef CONFIG_PPC_ISERIES
+
 /* Walks all buses and creates iommu tables */
 extern void iommu_setup_iSeries(void);
 
@@ -122,9 +132,9 @@ extern void __init iommu_vio_init(void);
 
 struct iSeries_Device_Node;
 /* Creates table for an individual device node */
-extern void iommu_devnode_init(struct iSeries_Device_Node *dn);
-#endif /* CONFIG_PPC_ISERIES */
+extern void iommu_devnode_init_iSeries(struct iSeries_Device_Node *dn);
 
+#endif /* CONFIG_PPC_ISERIES */
 
 /* Initializes an iommu_table based in values set in the passed-in
  * structure
@@ -151,6 +161,8 @@ extern void tce_init_iSeries(void);
 
 extern void pci_iommu_init(void);
 extern void pci_dma_init_direct(void);
+
+extern void alloc_u3_dart_table(void);
 
 extern int ppc64_iommu_off;
 

@@ -52,7 +52,7 @@
 
 static int  ircomm_tty_open(struct tty_struct *tty, struct file *filp);
 static void ircomm_tty_close(struct tty_struct * tty, struct file *filp);
-static int  ircomm_tty_write(struct tty_struct * tty, int from_user,
+static int  ircomm_tty_write(struct tty_struct * tty,
 			     const unsigned char *buf, int count);
 static int  ircomm_tty_write_room(struct tty_struct *tty);
 static void ircomm_tty_throttle(struct tty_struct *tty);
@@ -662,14 +662,14 @@ static void ircomm_tty_do_softint(void *private_)
 }
 
 /*
- * Function ircomm_tty_write (tty, from_user, buf, count)
+ * Function ircomm_tty_write (tty, buf, count)
  *
  *    This routine is called by the kernel to write a series of characters
  *    to the tty device. The characters may come from user space or kernel
  *    space. This routine will return the number of characters actually
  *    accepted for writing. This routine is mandatory.
  */
-static int ircomm_tty_write(struct tty_struct *tty, int from_user,
+static int ircomm_tty_write(struct tty_struct *tty,
 			    const unsigned char *ubuf, int count)
 {
 	struct ircomm_tty_cb *self = (struct ircomm_tty_cb *) tty->driver_data;
@@ -713,21 +713,8 @@ static int ircomm_tty_write(struct tty_struct *tty, int from_user,
 	if (count < 1)
 		return 0;
 
-	/* Additional copy to avoid copy_from_user() under spinlock.
-	 * We tradeoff this extra copy to allow to pack more the
-	 * IrCOMM frames. This is advantageous because the IrDA link
-	 * is the bottleneck. */
-	if (from_user) {
-		kbuf = kmalloc(count, GFP_KERNEL);
-		if (kbuf == NULL)
-			return -ENOMEM;
-		if (copy_from_user(kbuf, ubuf, count)) {
-			kfree(kbuf);
-			return -EFAULT;
-		}
-	} else
-		/* The buffer is already in kernel space */
-		kbuf = (unsigned char *) ubuf;
+	/* The buffer is already in kernel space */
+	kbuf = (unsigned char *) ubuf;
 
 	/* Protect our manipulation of self->tx_skb and related */
 	spin_lock_irqsave(&self->spinlock, flags);
@@ -781,8 +768,6 @@ static int ircomm_tty_write(struct tty_struct *tty, int from_user,
 					    self->max_header_size);
 			if (!skb) {
 				spin_unlock_irqrestore(&self->spinlock, flags);
-	                        if (from_user)
-		                        kfree(kbuf);
 				return -ENOBUFS;
 			}
 			skb_reserve(skb, self->max_header_size);
@@ -800,9 +785,6 @@ static int ircomm_tty_write(struct tty_struct *tty, int from_user,
 	}
 
 	spin_unlock_irqrestore(&self->spinlock, flags);
-
-	if (from_user)
-		kfree(kbuf);
 
 	/*     
 	 * Schedule a new thread which will transmit the frame as soon

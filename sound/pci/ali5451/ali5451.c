@@ -50,17 +50,16 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;
 static int pcm_channels[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 32};
 static int spdif[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for ALI M5451 PCI Audio.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for ALI M5451 PCI Audio.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable ALI 5451 PCI Audio.");
-module_param_array(pcm_channels, int, boot_devs, 0444);
+module_param_array(pcm_channels, int, NULL, 0444);
 MODULE_PARM_DESC(pcm_channels, "PCM Channels");
-module_param_array(spdif, bool, boot_devs, 0444);
+module_param_array(spdif, bool, NULL, 0444);
 MODULE_PARM_DESC(spdif, "Support SPDIF I/O");
 
 /*
@@ -1933,6 +1932,7 @@ static int ali_suspend(snd_card_t *card, unsigned int state)
 	outl(0xffffffff, ALI_REG(chip, ALI_STOP));
 
 	spin_unlock_irq(&chip->reg_lock);
+	pci_disable_device(chip->pci);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
@@ -1987,6 +1987,7 @@ static int snd_ali_free(ali_t * codec)
 	}
 	if (codec->port)
 		pci_release_regions(codec->pci);
+	pci_disable_device(codec->pci);
 #ifdef CONFIG_PM
 	if (codec->image)
 		kfree(codec->image);
@@ -2094,11 +2095,14 @@ static int __devinit snd_ali_create(snd_card_t * card,
 	if (pci_set_dma_mask(pci, 0x7fffffff) < 0 ||
 	    pci_set_consistent_dma_mask(pci, 0x7fffffff) < 0) {
 		snd_printk("architecture does not support 31bit PCI busmaster DMA\n");
+		pci_disable_device(pci);
 		return -ENXIO;
 	}
 
-	if ((codec = kcalloc(1, sizeof(*codec), GFP_KERNEL)) == NULL)
+	if ((codec = kcalloc(1, sizeof(*codec), GFP_KERNEL)) == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 
 	spin_lock_init(&codec->reg_lock);
 	spin_lock_init(&codec->voice_alloc);

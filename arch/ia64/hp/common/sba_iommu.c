@@ -33,13 +33,14 @@
 #include <linux/seq_file.h>
 #include <linux/acpi.h>
 #include <linux/efi.h>
+#include <linux/nodemask.h>
+#include <linux/bitops.h>         /* hweight64() */
 
 #include <asm/delay.h>		/* ia64_get_itc() */
 #include <asm/io.h>
 #include <asm/page.h>		/* PAGE_OFFSET */
 #include <asm/dma.h>
 #include <asm/system.h>		/* wmb() */
-#include <asm/bitops.h>		/* hweight64() */
 
 #include <asm/acpi-ext.h>
 
@@ -191,7 +192,7 @@ static unsigned long iovp_shift;
 static unsigned long iovp_mask;
 
 struct ioc {
-	void		*ioc_hpa;	/* I/O MMU base address */
+	void __iomem	*ioc_hpa;	/* I/O MMU base address */
 	char		*res_map;	/* resource map, bit == pdir entry */
 	u64		*pdir_base;	/* physical base address */
 	unsigned long	ibase;		/* pdir IOV Space base */
@@ -203,6 +204,9 @@ struct ioc {
 					/* clearing pdir to prevent races with allocations. */
 	unsigned int	res_bitshift;	/* from the RIGHT! */
 	unsigned int	res_size;	/* size of resource map in bytes */
+#ifdef CONFIG_NUMA
+	unsigned int	node;		/* node where this IOC lives */
+#endif
 #if DELAYED_RESOURCE_CNT > 0
 	spinlock_t	saved_lock;	/* may want to try to get this on a separate cacheline */
 					/* than res_lock for bigger systems. */
@@ -475,7 +479,7 @@ sba_search_bitmap(struct ioc *ioc, unsigned long bits_wanted)
 	 * purges IOTLB entries in power-of-two sizes, so we also
 	 * allocate IOVA space in power-of-two sizes.
 	 */
-	bits_wanted = 1UL << get_iovp_order(bits_wanted << PAGE_SHIFT);
+	bits_wanted = 1UL << get_iovp_order(bits_wanted << iovp_shift);
 
 	if (likely(bits_wanted == 1)) {
 		unsigned int bitshiftcnt;
@@ -684,7 +688,7 @@ sba_free_range(struct ioc *ioc, dma_addr_t iova, size_t size)
 	unsigned long m;
 
 	/* Round up to power-of-two size: see AR2305 note above */
-	bits_not_wanted = 1UL << get_iovp_order(bits_not_wanted << PAGE_SHIFT);
+	bits_not_wanted = 1UL << get_iovp_order(bits_not_wanted << iovp_shift);
 	for (; bits_not_wanted > 0 ; res_ptr++) {
 		
 		if (unlikely(bits_not_wanted > BITS_PER_LONG)) {
@@ -1057,7 +1061,24 @@ sba_alloc_coherent (struct device *dev, size_t size, dma_addr_t *dma_handle, int
 	struct ioc *ioc;
 	void *addr;
 
+	ioc = GET_IOC(dev);
+	ASSERT(ioc);
+
+#ifdef CONFIG_NUMA
+	{
+		struct page *page;
+		page = alloc_pages_node(ioc->node == MAX_NUMNODES ?
+		                        numa_node_id() : ioc->node, flags,
+		                        get_order(size));
+
+		if (unlikely(!page))
+			return NULL;
+
+		addr = page_address(page);
+	}
+#else
 	addr = (void *) __get_free_pages(flags, get_order(size));
+#endif
 	if (unlikely(!addr))
 		return NULL;
 
@@ -1081,8 +1102,6 @@ sba_alloc_coherent (struct device *dev, size_t size, dma_addr_t *dma_handle, int
 	 * If device can't bypass or bypass is disabled, pass the 32bit fake
 	 * device to map single to get an iova mapping.
 	 */
-	ioc = GET_IOC(dev);
-	ASSERT(ioc);
 	*dma_handle = sba_map_single(&ioc->sac_only_dev->dev, addr, size, 0);
 
 	return addr;
@@ -1135,7 +1154,7 @@ sba_fill_pdir(
 {
 	struct scatterlist *dma_sg = startsg;	/* pointer to current DMA */
 	int n_mappings = 0;
-	u64 *pdirp = 0;
+	u64 *pdirp = NULL;
 	unsigned long dma_offset = 0;
 
 	dma_sg--;
@@ -1799,6 +1818,10 @@ ioc_show(struct seq_file *s, void *v)
 
 	seq_printf(s, "Hewlett Packard %s IOC rev %d.%d\n",
 		ioc->name, ((ioc->rev >> 4) & 0xF), (ioc->rev & 0xF));
+#ifdef CONFIG_NUMA
+	if (ioc->node != MAX_NUMNODES)
+		seq_printf(s, "NUMA node       : %d\n", ioc->node);
+#endif
 	seq_printf(s, "IOVA size       : %ld MB\n", ((ioc->pdir_size >> 3) * iovp_size)/(1024*1024));
 	seq_printf(s, "IOVA page size  : %ld kb\n", iovp_size/1024);
 
@@ -1853,7 +1876,7 @@ ioc_proc_init(void)
 {
 	struct proc_dir_entry *dir, *entry;
 
-	dir = proc_mkdir("bus/mckinley", 0);
+	dir = proc_mkdir("bus/mckinley", NULL);
 	if (!dir)
 		return;
 
@@ -1899,6 +1922,58 @@ sba_connect_bus(struct pci_bus *bus)
 	printk(KERN_WARNING "No IOC for PCI Bus %04x:%02x in ACPI\n", pci_domain_nr(bus), bus->number);
 }
 
+#ifdef CONFIG_NUMA
+static void __init
+sba_map_ioc_to_node(struct ioc *ioc, acpi_handle handle)
+{
+	struct acpi_buffer buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	union acpi_object *obj;
+	acpi_handle phandle;
+	unsigned int node;
+
+	ioc->node = MAX_NUMNODES;
+
+	/*
+	 * Check for a _PXM on this node first.  We don't typically see
+	 * one here, so we'll end up getting it from the parent.
+	 */
+	if (ACPI_FAILURE(acpi_evaluate_object(handle, "_PXM", NULL, &buffer))) {
+		if (ACPI_FAILURE(acpi_get_parent(handle, &phandle)))
+			return;
+
+		/* Reset the acpi buffer */
+		buffer.length = ACPI_ALLOCATE_BUFFER;
+		buffer.pointer = NULL;
+
+		if (ACPI_FAILURE(acpi_evaluate_object(phandle, "_PXM", NULL,
+		                                      &buffer)))
+			return;
+	}
+
+	if (!buffer.length || !buffer.pointer)
+		return;
+
+	obj = buffer.pointer;
+
+	if (obj->type != ACPI_TYPE_INTEGER ||
+	    obj->integer.value >= MAX_PXM_DOMAINS) {
+		acpi_os_free(buffer.pointer);
+		return;
+	}
+
+	node = pxm_to_nid_map[obj->integer.value];
+	acpi_os_free(buffer.pointer);
+
+	if (node >= MAX_NUMNODES || !node_online(node))
+		return;
+
+	ioc->node = node;
+	return;
+}
+#else
+#define sba_map_ioc_to_node(ioc, handle)
+#endif
+
 static int __init
 acpi_sba_ioc_add(struct acpi_device *device)
 {
@@ -1941,6 +2016,8 @@ acpi_sba_ioc_add(struct acpi_device *device)
 	if (!ioc)
 		return 1;
 
+	/* setup NUMA node association */
+	sba_map_ioc_to_node(ioc, device->handle);
 	return 0;
 }
 

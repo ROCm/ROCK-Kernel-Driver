@@ -25,6 +25,7 @@ struct thread_struct {
 	unsigned long cr2;
 	int err;
 	unsigned long trap_no;
+	int singlestep_syscall;
 	void *fault_addr;
 	void *fault_catcher;
 	struct task_struct *prev_sched;
@@ -37,7 +38,6 @@ struct thread_struct {
 			int extern_pid;
 			int tracing;
 			int switch_pipe[2];
-			int singlestep_syscall;
 			int vm_seq;
 		} tt;
 #endif
@@ -112,8 +112,7 @@ extern unsigned long task_size;
 /* This decides where the kernel will search for a free chunk of vm
  * space during mmap's.
  */
-#define __TASK_UNMAPPED_BASE	(0x40000000)
-#define TASK_UNMAPPED_BASE	(current->map_base)
+#define TASK_UNMAPPED_BASE	(0x40000000)
 
 extern void start_thread(struct pt_regs *regs, unsigned long entry, 
 			 unsigned long stack);

@@ -38,7 +38,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME	"sata_sil"
-#define DRV_VERSION	"0.54"
+#define DRV_VERSION	"0.8"
 
 enum {
 	sil_3112		= 0,
@@ -87,6 +87,7 @@ struct sil_drivelist {
 	{ "ST380023AS",		SIL_QUIRK_MOD15WRITE },
 	{ "ST3120023AS",	SIL_QUIRK_MOD15WRITE },
 	{ "ST3160023AS",	SIL_QUIRK_MOD15WRITE },
+	{ "ST3120026AS",	SIL_QUIRK_MOD15WRITE },
 	{ "ST340014ASL",	SIL_QUIRK_MOD15WRITE },
 	{ "ST360014ASL",	SIL_QUIRK_MOD15WRITE },
 	{ "ST380011ASL",	SIL_QUIRK_MOD15WRITE },
@@ -125,14 +126,15 @@ static Scsi_Host_Template sil_sht = {
 static struct ata_port_operations sil_ops = {
 	.port_disable		= ata_port_disable,
 	.dev_config		= sil_dev_config,
-	.tf_load		= ata_tf_load_mmio,
-	.tf_read		= ata_tf_read_mmio,
-	.check_status		= ata_check_status_mmio,
-	.exec_command		= ata_exec_command_mmio,
+	.tf_load		= ata_tf_load,
+	.tf_read		= ata_tf_read,
+	.check_status		= ata_check_status,
+	.exec_command		= ata_exec_command,
+	.dev_select		= ata_std_dev_select,
 	.phy_reset		= sata_phy_reset,
 	.post_set_mode		= sil_post_set_mode,
-	.bmdma_setup            = ata_bmdma_setup_mmio,
-	.bmdma_start            = ata_bmdma_start_mmio,
+	.bmdma_setup            = ata_bmdma_setup,
+	.bmdma_start            = ata_bmdma_start,
 	.qc_prep		= ata_qc_prep,
 	.qc_issue		= ata_qc_issue_prot,
 	.eng_timeout		= ata_eng_timeout,
@@ -188,6 +190,7 @@ MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("low-level driver for Silicon Image SATA controller");
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, sil_pci_tbl);
+MODULE_VERSION(DRV_VERSION);
 
 static void sil_post_set_mode (struct ata_port *ap)
 {
@@ -286,7 +289,7 @@ static void sil_dev_config(struct ata_port *ap, struct ata_device *dev)
 	const char *s;
 	unsigned int len;
 
-	ata_dev_id_string(dev, model_num, ATA_ID_PROD_OFS,
+	ata_dev_id_string(dev->id, model_num, ATA_ID_PROD_OFS,
 			  sizeof(model_num));
 	s = &model_num[0];
 	len = strnlen(s, sizeof(model_num));
@@ -361,7 +364,7 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	memset(probe_ent, 0, sizeof(*probe_ent));
 	INIT_LIST_HEAD(&probe_ent->node);
-	probe_ent->pdev = pdev;
+	probe_ent->dev = pci_dev_to_dev(pdev);
 	probe_ent->port_ops = sil_port_info[ent->driver_data].port_ops;
 	probe_ent->sht = sil_port_info[ent->driver_data].sht;
 	probe_ent->n_ports = (ent->driver_data == sil_3114) ? 4 : 2;

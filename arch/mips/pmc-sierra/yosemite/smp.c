@@ -1,178 +1,152 @@
+#include <linux/linkage.h>
+#include <linux/sched.h>
+
+#include <asm/pmon.h>
+#include <asm/titan_dep.h>
+
+#define LAUNCHSTACK_SIZE 256
+
+static spinlock_t launch_lock __initdata;
+
+static unsigned long secondary_sp __initdata;
+static unsigned long secondary_gp __initdata;
+
+static unsigned char launchstack[LAUNCHSTACK_SIZE] __initdata
+	__attribute__((aligned(2 * sizeof(long))));
+
+static void __init prom_smp_bootstrap(void)
+{
+	local_irq_disable();
+
+	while (spin_is_locked(&launch_lock));
+
+	__asm__ __volatile__(
+	"	move	$sp, %0		\n"
+	"	move	$gp, %1		\n"
+	"	j	smp_bootstrap	\n"
+	:
+	: "r" (secondary_sp), "r" (secondary_gp));
+}
+
 /*
- * Copyright 2003 PMC-Sierra
- * Author: Manish Lachwani (lachwani@pmc-sierra.com)
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * PMON is a fragile beast.  It'll blow up once the mappings it's littering
+ * right into the middle of KSEG3 are blown away so we have to grab the slave
+ * core early and keep it in a waiting loop.
  */
+void __init prom_grab_secondary(void)
+{
+	spin_lock(&launch_lock);
 
-#include <linux/init.h>
-#include <linux/delay.h>
-#include <linux/smp.h>
-#include <linux/kernel_stat.h>
+	debug_vectors->cpustart(1, &prom_smp_bootstrap,
+	                        launchstack + LAUNCHSTACK_SIZE, 0);
+}
 
-#include <asm/mmu_context.h>
-#include <asm/trace.h>
+/*
+ * Detect available CPUs, populate phys_cpu_present_map before smp_init
+ *
+ * We don't want to start the secondary CPU yet nor do we have a nice probing
+ * feature in PMON so we just assume presence of the secondary core.
+ */
+void prom_prepare_cpus(unsigned int max_cpus)
+{
+	cpus_clear(phys_cpu_present_map);
 
-extern void asmlinkage smp_bootstrap(void);
+	/*
+	 * The boot CPU
+	 */
+	cpu_set(0, phys_cpu_present_map);
+	__cpu_number_map[0]	= 0;
+	__cpu_logical_map[0]	= 0;
+
+	/*
+	 * The secondary core
+	 */
+	cpu_set(1, phys_cpu_present_map);
+	__cpu_number_map[1]	= 1;
+	__cpu_logical_map[1]	= 1;
+}
+
+/*
+ * Firmware CPU startup hook
+ * Complicated by PMON's weird interface which tries to minimic the UNIX fork.
+ * It launches the next * available CPU and copies some information on the
+ * stack so the first thing we do is throw away that stuff and load useful
+ * values into the registers ...
+ */
+void prom_boot_secondary(int cpu, struct task_struct *idle)
+{
+	unsigned long gp = (unsigned long) idle->thread_info;
+	unsigned long sp = gp + THREAD_SIZE - 32;
+
+	secondary_sp = sp;
+	secondary_gp = gp;
+
+	spin_unlock(&launch_lock);
+}
+
+/* Hook for after all CPUs are online */
+void prom_cpus_done(void)
+{
+}
+
+/*
+ *  After we've done initial boot, this function is called to allow the
+ *  board code to clean up state, if needed
+ */
+void prom_init_secondary(void)
+{
+	set_c0_status(ST0_CO | ST0_IE | ST0_IM);
+}
+
+void prom_smp_finish(void)
+{
+}
+
+asmlinkage void titan_mailbox_irq(struct pt_regs *regs)
+{
+	int cpu = smp_processor_id();
+	unsigned long status;
+
+	if (cpu == 0) {
+		status = OCD_READ(RM9000x2_OCD_INTP0STATUS3);
+		OCD_WRITE(RM9000x2_OCD_INTP0CLEAR3, status);
+	}
+
+	if (cpu == 1) {
+		status = OCD_READ(RM9000x2_OCD_INTP1STATUS3);
+		OCD_WRITE(RM9000x2_OCD_INTP1CLEAR3, status);
+	}
+
+	if (status & 0x2)
+		smp_call_function_interrupt();
+}
 
 /*
  * Send inter-processor interrupt
  */
 void core_send_ipi(int cpu, unsigned int action)
 {
-        /*
-         * Generate and INTMSG so that it can be sent over to the destination CPU
-         * The INTMSG will put the STATUS bits based on the action desired
-         */
-        switch(action) {
-                case SMP_RESCHEDULE_YOURSELF:
-                        /* Do nothing */
-                        break;
-                case SMP_CALL_FUNCTION:
-                        if (cpu == 1)
-                                *(volatile uint32_t *)(0xbb000a00) = 0x00610002;
-                        else
-                                *(volatile uint32_t *)(0xbb000a00) = 0x00610001;
-                        break;
+	/*
+	 * Generate an INTMSG so that it can be sent over to the
+	 * destination CPU. The INTMSG will put the STATUS bits
+	 * based on the action desired. An alternative strategy
+	 * is to write to the Interrupt Set register, read the
+	 * Interrupt Status register and clear the Interrupt
+	 * Clear register. The latter is preffered.
+	 */
+	switch (action) {
+	case SMP_RESCHEDULE_YOURSELF:
+		if (cpu == 1)
+			OCD_WRITE(RM9000x2_OCD_INTP1SET3, 4);
+		else
+			OCD_WRITE(RM9000x2_OCD_INTP0SET3, 4);
+		break;
 
-                default:
-                        panic("core_send_ipi \n");
-        }
-}
-
-/*
- * Mailbox interrupt to handle IPI
- */
-void jaguar_mailbox_irq(struct pt_regs *regs)
-{
-        int cpu = smp_processor_id();
-
-        /* SMP_CALL_FUNCTION */
-        smp_call_function_interrupt();
-}
-
-extern atomic_t cpus_booted;
-
-void __init start_secondary(void)
-{
-        unsigned int cpu = smp_processor_id();
-        extern atomic_t smp_commenced;
-
-        if (current->processor != 1) {
-                printk("Impossible CPU %d \n", cpu);
-                current->processor = 1;
-                current->cpus_runnable = 1 << 1;
-                cpu = current->processor;
-        }
-
-        if (current->mm)
-                current->mm = NULL;
-
-        prom_init_secondary();
-        per_cpu_trap_init();
-
-        /*
-         * XXX parity protection should be folded in here when it's converted
-         * to an option instead of something based on .cputype
-         */
-        pgd_current[cpu] = init_mm.pgd;
-        cpu_data[cpu].udelay_val = loops_per_jiffy;
-        prom_smp_finish();
-        CPUMASK_SETB(cpu_online_map, cpu);
-        atomic_inc(&cpus_booted);
-        __flush_cache_all();
-
-        printk("Slave cpu booted successfully  \n");
-        *(volatile uint32_t *)(0xbb000a68) = 0x00000000;
-        *(volatile uint32_t *)(0xbb000a68) = 0x80000000;
-
-        while (*(volatile uint32_t *)(0xbb000a68) != 0x00000000);
-
-        return cpu_idle();
-}
-
-void __init smp_boot_cpus(void)
-{
-        int i;
-        int cur_cpu = 0;
-
-        smp_num_cpus = prom_setup_smp();
-        printk("Detected %d available CPUs \n", smp_num_cpus);
-
-        init_new_context(current, &init_mm);
-        current->processor = 0;
-        cpu_data[0].udelay_val = loops_per_jiffy;
-        cpu_data[0].asid_cache = ASID_FIRST_VERSION;
-        CPUMASK_CLRALL(cpu_online_map);
-        CPUMASK_SETB(cpu_online_map, 0);
-        atomic_set(&cpus_booted, 1);  /* Master CPU is already booted... */
-        init_idle();
-
-        __cpu_number_map[0] = 0;
-        __cpu_logical_map[0] = 0;
-
-        /*
-         * This loop attempts to compensate for "holes" in the CPU
-         * numbering.  It's overkill, but general.
-         */
-        for (i = 1; i < smp_num_cpus; ) {
-                struct task_struct *p;
-                struct pt_regs regs;
-                int retval;
-                printk("Starting CPU %d... \n", i);
-
-                /* Spawn a new process normally.  Grab a pointer to
-                   its task struct so we can mess with it */
-                do_fork(CLONE_VM|CLONE_PID, 0, &regs, 0);
-
-                p = init_task.prev_task;
-                if (!p)
-                        panic("failed fork for CPU %d", i);
-
-                /* This is current for the second processor */
-                p->processor = i;
-                p->cpus_runnable = 1 << i; /* we schedule the first task manually */
-                p->thread.reg31 = (unsigned long) start_secondary;
-
-                del_from_runqueue(p);
-                unhash_process(p);
-                init_tasks[i] = p;
-
-                __flush_cache_all();
-
-                do {
-                        /* Iterate until we find a CPU that comes up */
-                        cur_cpu++;
-                        retval = prom_boot_secondary(cur_cpu,
-                                            (unsigned long)p + KERNEL_STACK_SIZE - 32,
-                                            (unsigned long)p);
-
-                } while (!retval && (cur_cpu < NR_CPUS));
-                if (retval) {
-                        __cpu_number_map[cur_cpu] = i;
-                        __cpu_logical_map[i] = cur_cpu;
-                        i++;
-                } else {
-                        panic("CPU discovery disaster");
-                }
-        }
-
-        /* Local semaphore to both the CPUs */
-
-        *(volatile uint32_t *)(0xbb000a68) = 0x80000000;
-        while (*(volatile uint32_t *)(0xbb000a68) != 0x00000000);
-
-        smp_threads_ready = 1;
+	case SMP_CALL_FUNCTION:
+		if (cpu == 1)
+			OCD_WRITE(RM9000x2_OCD_INTP1SET3, 2);
+		else
+			OCD_WRITE(RM9000x2_OCD_INTP0SET3, 2);
+		break;
+	}
 }

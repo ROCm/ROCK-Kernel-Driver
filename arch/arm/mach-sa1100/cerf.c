@@ -15,6 +15,8 @@
 #include <linux/kernel.h>
 #include <linux/tty.h>
 #include <linux/device.h>
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/partitions.h>
 
 #include <asm/irq.h>
 #include <asm/hardware.h>
@@ -22,6 +24,7 @@
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
+#include <asm/mach/flash.h>
 #include <asm/mach/map.h>
 #include <asm/mach/serial_sa1100.h>
 
@@ -45,6 +48,48 @@ static struct platform_device cerfuart2_device = {
 
 static struct platform_device *cerf_devices[] __initdata = {
 	&cerfuart2_device,
+};
+
+#ifdef CONFIG_SA1100_CERF_FLASH_32MB
+#  define CERF_FLASH_SIZE	0x02000000
+#elif defined CONFIG_SA1100_CERF_FLASH_16MB
+#  define CERF_FLASH_SIZE	0x01000000
+#elif defined CONFIG_SA1100_CERF_FLASH_8MB
+#  define CERF_FLASH_SIZE	0x00800000
+#else
+#  error "Undefined flash size for CERF"
+#endif
+
+static struct mtd_partition cerf_partitions[] = {
+	{
+		.name		= "Bootloader",
+		.size		= 0x00020000,
+		.offset		= 0x00000000,
+	}, {
+		.name		= "Params",
+		.size		= 0x00040000,
+		.offset		= 0x00020000,
+	}, {
+		.name		= "Kernel",
+		.size		= 0x00100000,
+		.offset		= 0x00060000,
+	}, {
+		.name		= "Filesystem",
+		.size		= CERF_FLASH_SIZE-0x00160000,
+		.offset		= 0x00160000,
+	}
+};
+
+static struct flash_platform_data cerf_flash_data = {
+	.map_name	= "cfi_probe",
+	.parts		= cerf_partitions,
+	.nr_parts	= ARRAY_SIZE(cerf_partitions),
+};
+
+static struct resource cerf_flash_resource = {
+	.start		= SA1100_CS0_PHYS,
+	.end		= SA1100_CS0_PHYS + SZ_32M - 1,
+	.flags		= IORESOURCE_MEM,
 };
 
 static void __init cerf_init_irq(void)
@@ -71,26 +116,17 @@ static void __init cerf_map_io(void)
 	GPDR |= CERF_GPIO_CF_RESET;
 }
 
-static int __init cerf_init(void)
+static void __init cerf_init(void)
 {
-	int ret;
-
-	if (!machine_is_cerf())
-		return -ENODEV;
-
-	ret = platform_add_devices(cerf_devices, ARRAY_SIZE(cerf_devices));
-	if (ret < 0)
-		return ret;
-
-	return 0;
+	platform_add_devices(cerf_devices, ARRAY_SIZE(cerf_devices));
+	sa11x0_set_flash_data(&cerf_flash_data, &cerf_flash_resource, 1);
 }
-
-arch_initcall(cerf_init);
 
 MACHINE_START(CERF, "Intrinsyc CerfBoard/CerfCube")
 	MAINTAINER("support@intrinsyc.com")
 	BOOT_MEM(0xc0000000, 0x80000000, 0xf8000000)
 	MAPIO(cerf_map_io)
 	INITIRQ(cerf_init_irq)
-	INITTIME(sa1100_init_time)
+	.timer		= &sa1100_timer,
+	.init_machine	= cerf_init,
 MACHINE_END

@@ -191,7 +191,7 @@ MODULE_DEVICE_TABLE (pci, rng_pci_tbl);
 #define INTEL_RNG_ADDR_LEN			3
 
 /* token to our ioremap'd RNG register area */
-static void *rng_mem;
+static void __iomem *rng_mem;
 
 static inline u8 intel_hwstatus (void)
 {
@@ -581,7 +581,7 @@ static int __init rng_init (void)
 	DPRINTK ("ENTER\n");
 
 	/* Probe for Intel, AMD RNGs */
-	while ((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev)) != NULL) {
+	for_each_pci_dev(pdev) {
 		ent = pci_match_device (rng_pci_tbl, pdev);
 		if (ent) {
 			rng_ops = &rng_vendor_ops[ent->driver_data];

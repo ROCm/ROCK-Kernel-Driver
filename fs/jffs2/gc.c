@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: gc.c,v 1.136 2004/05/27 19:06:09 gleixner Exp $
+ * $Id: gc.c,v 1.140 2004/11/13 10:59:22 dedekind Exp $
  *
  */
 
@@ -359,10 +359,14 @@ int jffs2_garbage_collect_pass(struct jffs2_sb_info *c)
 	spin_unlock(&c->inocache_lock);
 
 	f = jffs2_gc_fetch_inode(c, inum, nlink);
-	if (IS_ERR(f))
-		return PTR_ERR(f);
-	if (!f)
-		return 0;
+	if (IS_ERR(f)) {
+		ret = PTR_ERR(f);
+		goto release_sem;
+	}
+	if (!f) {
+		ret = 0;
+		goto release_sem;
+	}
 
 	ret = jffs2_garbage_collect_live(c, jeb, raw, f);
 
@@ -624,6 +628,7 @@ static int jffs2_garbage_collect_pristine(struct jffs2_sb_info *c,
 			jffs2_free_raw_node_ref(nraw);
 		}
 
+		jffs2_free_raw_node_ref(nraw);
 		if (!ret)
 			ret = -EIO;
 		goto out_node;
@@ -633,10 +638,12 @@ static int jffs2_garbage_collect_pristine(struct jffs2_sb_info *c,
 
 	/* Link into per-inode list. This is safe because of the ic
 	   state being INO_STATE_GC. Note that if we're doing this
-	   for an inode which is in-code, the 'nraw' pointer is then
+	   for an inode which is in-core, the 'nraw' pointer is then
 	   going to be fetched from ic->nodes by our caller. */
+	spin_lock(&c->erase_completion_lock);
         nraw->next_in_ino = ic->nodes;
         ic->nodes = nraw;
+	spin_unlock(&c->erase_completion_lock);
 
 	jffs2_mark_node_obsolete(c, raw);
 	D1(printk(KERN_DEBUG "WHEEE! GC REF_PRISTINE node at 0x%08x succeeded\n", ref_offset(raw)));

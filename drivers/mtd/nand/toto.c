@@ -15,7 +15,7 @@
  *   This is a device driver for the NAND flash device found on the
  *   TI fido board. It supports 32MiB and 64MiB cards
  *
- * $Id: toto.c,v 1.2 2003/10/21 10:04:58 dwmw2 Exp $
+ * $Id: toto.c,v 1.4 2004/10/05 13:50:20 gleixner Exp $
  */
 
 #include <linux/slab.h>
@@ -37,7 +37,7 @@
  */
 static struct mtd_info *toto_mtd = NULL;
 
-static int toto_io_base = OMAP_FLASH_1_BASE;
+static unsigned long toto_io_base = OMAP_FLASH_1_BASE;
 
 #define CONFIG_NAND_WORKAROUND 1
 
@@ -155,14 +155,6 @@ int __init toto_init (void)
 		goto out_mtd;
 	}
 
-	/* Allocate memory for internal data buffer */
-	this->data_buf = kmalloc (sizeof(u_char) * (toto_mtd->oobblock + toto_mtd->oobsize), GFP_KERNEL);
-	if (!this->data_buf) {
-		printk (KERN_WARNING "Unable to allocate NAND data buffer for toto.\n");
-		err = -ENOMEM;
-		goto out_mtd;
-	}
-
 	/* Register the partitions */
 	switch(toto_mtd->size){
 		case SZ_64M: add_mtd_partitions(toto_mtd, partition_info64M, NUM_PARTITIONS64M); break; 
@@ -194,16 +186,8 @@ module_init(toto_init);
  */
 static void __exit toto_cleanup (void)
 {
-	struct nand_chip *this = (struct nand_chip *) &toto_mtd[1];
-
-	/* Unregister partitions */
-	del_mtd_partitions(toto_mtd);
-	
-	/* Unregister the device */
-	del_mtd_device (toto_mtd);
-
-	/* Free internal data buffers */
-	kfree (this->data_buf);
+	/* Release resources, unregister device */
+	nand_release (toto_mtd);
 
 	/* Free the MTD device structure */
 	kfree (toto_mtd);

@@ -32,6 +32,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/delay.h>
 
 #undef SERIAL_PARANOIA_CHECK
 #define SERIAL_DO_RESTART
@@ -83,14 +84,13 @@ static char *serial_version = "4.30";
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/init.h>
-#include <linux/delay.h>
+#include <linux/bitops.h>
 
 #include <asm/setup.h>
 
 #include <asm/system.h>
 
 #include <asm/irq.h>
-#include <asm/bitops.h>
 
 #include <asm/amigahw.h>
 #include <asm/amigaints.h>
@@ -553,9 +553,7 @@ static void do_softint(unsigned long private_)
 		return;
 
 	if (test_and_clear_bit(RS_EVENT_WRITE_WAKEUP, &info->event)) {
-		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-		    tty->ldisc.write_wakeup)
-			(tty->ldisc.write_wakeup)(tty);
+		tty_wakeup(tty);
 		wake_up_interruptible(&tty->write_wait);
 	}
 }
@@ -647,7 +645,7 @@ static int startup(struct async_struct * info)
 	/*
 	 * and set the speed of the serial port
 	 */
-	change_speed(info, 0);
+	change_speed(info, NULL);
 
 	info->flags |= ASYNC_INITIALIZED;
 	local_irq_restore(flags);
@@ -693,7 +691,7 @@ static void shutdown(struct async_struct * info)
 
 	if (info->xmit.buf) {
 		free_page((unsigned long) info->xmit.buf);
-		info->xmit.buf = 0;
+		info->xmit.buf = NULL;
 	}
 
 	info->IER = 0;
@@ -909,8 +907,7 @@ static void rs_flush_chars(struct tty_struct *tty)
 	local_irq_restore(flags);
 }
 
-static int rs_write(struct tty_struct * tty, int from_user,
-		    const unsigned char *buf, int count)
+static int rs_write(struct tty_struct * tty, const unsigned char *buf, int count)
 {
 	int	c, ret = 0;
 	struct async_struct *info = (struct async_struct *)tty->driver_data;
@@ -923,57 +920,25 @@ static int rs_write(struct tty_struct * tty, int from_user,
 		return 0;
 
 	local_save_flags(flags);
-	if (from_user) {
-		down(&tmp_buf_sem);
-		while (1) {
-			int c1;
-			c = CIRC_SPACE_TO_END(info->xmit.head,
-					      info->xmit.tail,
-					      SERIAL_XMIT_SIZE);
-			if (count < c)
-				c = count;
-
-			c -= copy_from_user(tmp_buf, buf, c);
-			if (!c) {
-				if (!ret)
-					ret = -EFAULT;
-				break;
-			}
-			local_irq_disable();
-			c1 = CIRC_SPACE_TO_END(info->xmit.head,
-					       info->xmit.tail,
-					       SERIAL_XMIT_SIZE);
-			if (c1 < c)
-				c = c1;
-			memcpy(info->xmit.buf + info->xmit.head, tmp_buf, c);
-			info->xmit.head = ((info->xmit.head + c) &
-					   (SERIAL_XMIT_SIZE-1));
-			local_irq_restore(flags);
-			buf += c;
-			count -= c;
-			ret += c;
+	local_irq_disable();
+	while (1) {
+		c = CIRC_SPACE_TO_END(info->xmit.head,
+				      info->xmit.tail,
+				      SERIAL_XMIT_SIZE);
+		if (count < c)
+			c = count;
+		if (c <= 0) {
+			break;
 		}
-		up(&tmp_buf_sem);
-	} else {
-		local_irq_disable();
-		while (1) {
-			c = CIRC_SPACE_TO_END(info->xmit.head,
-					      info->xmit.tail,
-					      SERIAL_XMIT_SIZE);
-			if (count < c)
-				c = count;
-			if (c <= 0) {
-				break;
-			}
-			memcpy(info->xmit.buf + info->xmit.head, buf, c);
-			info->xmit.head = ((info->xmit.head + c) &
-					   (SERIAL_XMIT_SIZE-1));
-			buf += c;
-			count -= c;
-			ret += c;
-		}
-		local_irq_restore(flags);
+		memcpy(info->xmit.buf + info->xmit.head, buf, c);
+		info->xmit.head = ((info->xmit.head + c) &
+				   (SERIAL_XMIT_SIZE-1));
+		buf += c;
+		count -= c;
+		ret += c;
 	}
+	local_irq_restore(flags);
+
 	if (info->xmit.head != info->xmit.tail
 	    && !tty->stopped
 	    && !tty->hw_stopped
@@ -1019,9 +984,7 @@ static void rs_flush_buffer(struct tty_struct *tty)
 	info->xmit.head = info->xmit.tail = 0;
 	local_irq_restore(flags);
 	wake_up_interruptible(&tty->write_wait);
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
+	tty_wakeup(tty);
 }
 
 /*
@@ -1209,7 +1172,7 @@ check_and_exit:
 				info->tty->alt_speed = 230400;
 			if ((state->flags & ASYNC_SPD_MASK) == ASYNC_SPD_WARP)
 				info->tty->alt_speed = 460800;
-			change_speed(info, 0);
+			change_speed(info, NULL);
 		}
 	} else
 		retval = startup(info);
@@ -1560,15 +1523,14 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	shutdown(info);
 	if (tty->driver->flush_buffer)
 		tty->driver->flush_buffer(tty);
-	if (tty->ldisc.flush_buffer)
-		tty->ldisc.flush_buffer(tty);
+		
+	tty_ldisc_flush(tty);
 	tty->closing = 0;
 	info->event = 0;
-	info->tty = 0;
+	info->tty = NULL;
 	if (info->blocked_open) {
 		if (info->close_delay) {
-			current->state = TASK_INTERRUPTIBLE;
-			schedule_timeout(info->close_delay);
+			msleep_interruptible(jiffies_to_msecs(info->close_delay));
 		}
 		wake_up_interruptible(&info->open_wait);
 	}
@@ -1626,8 +1588,7 @@ static void rs_wait_until_sent(struct tty_struct *tty, int timeout)
 #ifdef SERIAL_DEBUG_RS_WAIT_UNTIL_SENT
 		printk("serdatr = %d (jiff=%lu)...", lsr, jiffies);
 #endif
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(char_time);
+		msleep_interruptible(jiffies_to_msecs(char_time));
 		if (signal_pending(current))
 			break;
 		if (timeout && time_after(jiffies, orig_jiffies + timeout))
@@ -1657,7 +1618,7 @@ static void rs_hangup(struct tty_struct *tty)
 	info->event = 0;
 	state->count = 0;
 	info->flags &= ~ASYNC_NORMAL_ACTIVE;
-	info->tty = 0;
+	info->tty = NULL;
 	wake_up_interruptible(&info->open_wait);
 }
 
@@ -1913,7 +1874,7 @@ static inline int line_info(char *buf, struct serial_state *state)
 		info->magic = SERIAL_MAGIC;
 		info->flags = state->flags;
 		info->quot = 0;
-		info->tty = 0;
+		info->tty = NULL;
 	}
 	local_irq_save(flags);
 	status = ciab.pra;

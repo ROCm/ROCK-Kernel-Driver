@@ -467,7 +467,7 @@ int tcp_listen_start(struct sock *sk)
 	sk->sk_max_ack_backlog = 0;
 	sk->sk_ack_backlog = 0;
 	tp->accept_queue = tp->accept_queue_tail = NULL;
-	tp->syn_wait_lock = RW_LOCK_UNLOCKED;
+	rwlock_init(&tp->syn_wait_lock);
 	tcp_delack_init(tp);
 
 	lopt = kmalloc(sizeof(struct tcp_listen_opt), GFP_KERNEL);
@@ -691,6 +691,7 @@ new_segment:
 		skb->ip_summed = CHECKSUM_HW;
 		tp->write_seq += copy;
 		TCP_SKB_CB(skb)->end_seq += copy;
+		skb_shinfo(skb)->tso_segs = 0;
 
 		if (!copied)
 			TCP_SKB_CB(skb)->flags &= ~TCPCB_FLAG_PSH;
@@ -937,6 +938,7 @@ new_segment:
 
 			tp->write_seq += copy;
 			TCP_SKB_CB(skb)->end_seq += copy;
+			skb_shinfo(skb)->tso_segs = 0;
 
 			from += copy;
 			copied += copy;
@@ -1591,14 +1593,6 @@ void tcp_destroy_sock(struct sock *sk)
 	/* If it has not 0 inet_sk(sk)->num, it must be bound */
 	BUG_TRAP(!inet_sk(sk)->num || tcp_sk(sk)->bind_hash);
 
-#ifdef TCP_DEBUG
-	if (sk->sk_zapped) {
-		printk(KERN_DEBUG "TCP: double destroy sk=%p\n", sk);
-		sock_hold(sk);
-	}
-	sk->sk_zapped = 1;
-#endif
-
 	sk->sk_prot->destroy(sk);
 
 	sk_stream_kill_queues(sk);
@@ -2101,6 +2095,65 @@ int tcp_setsockopt(struct sock *sk, int level, int optname, char __user *optval,
 	return err;
 }
 
+/* Return information about state of tcp endpoint in API format. */
+void tcp_get_info(struct sock *sk, struct tcp_info *info)
+{
+	struct tcp_opt *tp = tcp_sk(sk);
+	u32 now = tcp_time_stamp;
+
+	memset(info, 0, sizeof(*info));
+
+	info->tcpi_state = sk->sk_state;
+	info->tcpi_ca_state = tp->ca_state;
+	info->tcpi_retransmits = tp->retransmits;
+	info->tcpi_probes = tp->probes_out;
+	info->tcpi_backoff = tp->backoff;
+
+	if (tp->tstamp_ok)
+		info->tcpi_options |= TCPI_OPT_TIMESTAMPS;
+	if (tp->sack_ok)
+		info->tcpi_options |= TCPI_OPT_SACK;
+	if (tp->wscale_ok) {
+		info->tcpi_options |= TCPI_OPT_WSCALE;
+		info->tcpi_snd_wscale = tp->snd_wscale;
+		info->tcpi_rcv_wscale = tp->rcv_wscale;
+	} 
+
+	if (tp->ecn_flags&TCP_ECN_OK)
+		info->tcpi_options |= TCPI_OPT_ECN;
+
+	info->tcpi_rto = jiffies_to_usecs(tp->rto);
+	info->tcpi_ato = jiffies_to_usecs(tp->ack.ato);
+	info->tcpi_snd_mss = tp->mss_cache_std;
+	info->tcpi_rcv_mss = tp->ack.rcv_mss;
+
+	info->tcpi_unacked = tcp_get_pcount(&tp->packets_out);
+	info->tcpi_sacked = tcp_get_pcount(&tp->sacked_out);
+	info->tcpi_lost = tcp_get_pcount(&tp->lost_out);
+	info->tcpi_retrans = tcp_get_pcount(&tp->retrans_out);
+	info->tcpi_fackets = tcp_get_pcount(&tp->fackets_out);
+
+	info->tcpi_last_data_sent = jiffies_to_msecs(now - tp->lsndtime);
+	info->tcpi_last_data_recv = jiffies_to_msecs(now - tp->ack.lrcvtime);
+	info->tcpi_last_ack_recv = jiffies_to_msecs(now - tp->rcv_tstamp);
+
+	info->tcpi_pmtu = tp->pmtu_cookie;
+	info->tcpi_rcv_ssthresh = tp->rcv_ssthresh;
+	info->tcpi_rtt = jiffies_to_usecs(tp->srtt)>>3;
+	info->tcpi_rttvar = jiffies_to_usecs(tp->mdev)>>2;
+	info->tcpi_snd_ssthresh = tp->snd_ssthresh;
+	info->tcpi_snd_cwnd = tp->snd_cwnd;
+	info->tcpi_advmss = tp->advmss;
+	info->tcpi_reordering = tp->reordering;
+
+	info->tcpi_rcv_rtt = jiffies_to_usecs(tp->rcv_rtt_est.rtt)>>3;
+	info->tcpi_rcv_space = tp->rcvq_space.space;
+
+	info->tcpi_total_retrans = tp->total_retrans;
+}
+
+EXPORT_SYMBOL_GPL(tcp_get_info);
+
 int tcp_getsockopt(struct sock *sk, int level, int optname, char __user *optval,
 		   int __user *optlen)
 {
@@ -2256,7 +2309,7 @@ void __init tcp_init(void)
 	if (!tcp_ehash)
 		panic("Failed to allocate TCP established hash table\n");
 	for (i = 0; i < (tcp_ehash_size << 1); i++) {
-		tcp_ehash[i].lock = RW_LOCK_UNLOCKED;
+		rwlock_init(&tcp_ehash[i].lock);
 		INIT_HLIST_HEAD(&tcp_ehash[i].chain);
 	}
 
@@ -2272,7 +2325,7 @@ void __init tcp_init(void)
 	if (!tcp_bhash)
 		panic("Failed to allocate TCP bind hash table\n");
 	for (i = 0; i < tcp_bhash_size; i++) {
-		tcp_bhash[i].lock = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&tcp_bhash[i].lock);
 		INIT_HLIST_HEAD(&tcp_bhash[i].chain);
 	}
 
@@ -2307,13 +2360,10 @@ void __init tcp_init(void)
 	printk(KERN_INFO "TCP: Hash tables configured "
 	       "(established %d bind %d)\n",
 	       tcp_ehash_size << 1, tcp_bhash_size);
-
-	tcpdiag_init();
 }
 
 EXPORT_SYMBOL(tcp_accept);
 EXPORT_SYMBOL(tcp_close);
-EXPORT_SYMBOL(tcp_close_state);
 EXPORT_SYMBOL(tcp_destroy_sock);
 EXPORT_SYMBOL(tcp_disconnect);
 EXPORT_SYMBOL(tcp_getsockopt);

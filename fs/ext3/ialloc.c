@@ -22,8 +22,8 @@
 #include <linux/quotaops.h>
 #include <linux/buffer_head.h>
 #include <linux/random.h>
+#include <linux/bitops.h>
 
-#include <asm/bitops.h>
 #include <asm/byteorder.h>
 
 #include "xattr.h"
@@ -64,8 +64,8 @@ read_inode_bitmap(struct super_block * sb, unsigned long block_group)
 	if (!bh)
 		ext3_error(sb, "read_inode_bitmap",
 			    "Cannot read inode bitmap - "
-			    "block_group = %lu, inode_bitmap = %lu",
-			    block_group, (unsigned long) desc->bg_inode_bitmap);
+			    "block_group = %lu, inode_bitmap = %u",
+			    block_group, le32_to_cpu(desc->bg_inode_bitmap));
 error_out:
 	return bh;
 }
@@ -319,8 +319,6 @@ static int find_group_orlov(struct super_block *sb, struct inode *parent)
 		group = (parent_group + i) % ngroups;
 		desc = ext3_get_group_desc (sb, group, &bh);
 		if (!desc || !desc->bg_free_inodes_count)
-			continue;
-		if (sbi->s_debts[group] >= max_debt)
 			continue;
 		if (le16_to_cpu(desc->bg_used_dirs_count) >= max_dirs)
 			continue;
@@ -582,10 +580,11 @@ got:
 	ei->i_file_acl = 0;
 	ei->i_dir_acl = 0;
 	ei->i_dtime = 0;
-#ifdef EXT3_PREALLOCATE
-	ei->i_prealloc_block = 0;
-	ei->i_prealloc_count = 0;
-#endif
+	ei->i_rsv_window.rsv_start = EXT3_RESERVE_WINDOW_NOT_ALLOCATED;
+	ei->i_rsv_window.rsv_end = EXT3_RESERVE_WINDOW_NOT_ALLOCATED;
+	atomic_set(&ei->i_rsv_window.rsv_goal_size, EXT3_DEFAULT_RESERVE_BLOCKS);
+	atomic_set(&ei->i_rsv_window.rsv_alloc_hit, 0);
+	seqlock_init(&ei->i_rsv_window.rsv_seqlock);
 	ei->i_block_group = group;
 
 	ext3_set_inode_flags(inode);

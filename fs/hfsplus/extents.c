@@ -19,8 +19,8 @@
 /* Compare two extents keys, returns 0 on same, pos/neg for difference */
 int hfsplus_ext_cmp_key(hfsplus_btree_key *k1, hfsplus_btree_key *k2)
 {
-	u32 k1id, k2id;
-	u32 k1s, k2s;
+	__be32 k1id, k2id;
+	__be32 k1s, k2s;
 
 	k1id = k1->ext.cnid;
 	k2id = k2->ext.cnid;
@@ -183,8 +183,8 @@ int hfsplus_get_block(struct inode *inode, sector_t iblock,
 	shift = HFSPLUS_SB(sb).alloc_blksz_shift - sb->s_blocksize_bits;
 	ablock = iblock >> HFSPLUS_SB(sb).fs_shift;
 
-	if (iblock >= inode->i_blocks) {
-		if (iblock > inode->i_blocks || !create)
+	if (iblock >= HFSPLUS_I(inode).fs_blocks) {
+		if (iblock > HFSPLUS_I(inode).fs_blocks || !create)
 			return -EIO;
 		if (ablock >= HFSPLUS_I(inode).alloc_blocks) {
 			res = hfsplus_file_extend(inode);
@@ -217,7 +217,8 @@ done:
 	if (create) {
 		set_buffer_new(bh_result);
 		HFSPLUS_I(inode).phys_size += sb->s_blocksize;
-		inode->i_blocks++;
+		HFSPLUS_I(inode).fs_blocks++;
+		inode_add_bytes(inode, sb->s_blocksize);
 		mark_inode_dirty(inode);
 	}
 	return 0;
@@ -497,6 +498,7 @@ void hfsplus_file_truncate(struct inode *inode)
 	HFSPLUS_I(inode).alloc_blocks = blk_cnt;
 out:
 	HFSPLUS_I(inode).phys_size = inode->i_size;
+	HFSPLUS_I(inode).fs_blocks = (inode->i_size + sb->s_blocksize - 1) >> sb->s_blocksize_bits;
+	inode_set_bytes(inode, HFSPLUS_I(inode).fs_blocks << sb->s_blocksize_bits);
 	mark_inode_dirty(inode);
-	inode->i_blocks = (inode->i_size + sb->s_blocksize - 1) >> sb->s_blocksize_bits;
 }

@@ -21,7 +21,6 @@
  */
 #include <linux/config.h>	/* CONFIG_PROC_FS */
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/bio.h>
@@ -138,7 +137,7 @@ static struct gendisk *ida_gendisk[MAX_CTLR][NWD];
 
 int cpqarray_init_step2(void);
 static int cpqarray_pci_init(ctlr_info_t *c, struct pci_dev *pdev);
-static void *remap_pci_mem(ulong base, ulong size);
+static void __iomem *remap_pci_mem(ulong base, ulong size);
 static int cpqarray_eisa_detect(void);
 static int pollcomplete(int ctlr);
 static void getgeometry(int ctlr);
@@ -551,10 +550,10 @@ static int __init cpqarray_init_one( struct pci_dev *pdev,
 }
 
 static struct pci_driver cpqarray_pci_driver = {
-	name:   "cpqarray",
-	probe:  cpqarray_init_one,
-	remove:  __devexit_p(cpqarray_remove_one_pci),
-	id_table:  cpqarray_pci_device_id,
+	.name = "cpqarray",
+	.probe = cpqarray_init_one,
+	.remove = __devexit_p(cpqarray_remove_one_pci),
+	.id_table = cpqarray_pci_device_id,
 };
 
 /*
@@ -569,9 +568,9 @@ int __init cpqarray_init_step2(void)
 
 	/* detect controllers */
 	printk(DRIVER_NAME "\n");
-/* TODO: If it's an eisa only system, will rc return negative? */
+
 	rc = pci_register_driver(&cpqarray_pci_driver);
-	if (rc < 0)
+	if (rc)
 		return rc;
 	cpqarray_eisa_detect();
 	
@@ -722,17 +721,16 @@ DBGINFO(
 /*
  * Map (physical) PCI mem into (virtual) kernel space
  */
-static void *remap_pci_mem(ulong base, ulong size)
+static void __iomem *remap_pci_mem(ulong base, ulong size)
 {
         ulong page_base        = ((ulong) base) & PAGE_MASK;
         ulong page_offs        = ((ulong) base) - page_base;
-        void *page_remapped    = ioremap(page_base, page_offs+size);
+        void __iomem *page_remapped    = ioremap(page_base, page_offs+size);
 
         return (page_remapped ? (page_remapped + page_offs) : NULL);
 }
 
 #ifndef MODULE
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,13)
 /*
  * Config string is a comma separated set of i/o addresses of EISA cards.
  */
@@ -749,18 +747,6 @@ static int cpqarray_setup(char *str)
 
 __setup("smart2=", cpqarray_setup);
 
-#else
-
-/*
- * Copy the contents of the ints[] array passed to us by init.
- */
-void cpqarray_setup(char *str, int *ints)
-{
-	int i;
-	for(i=0; i<ints[0] && i<8; i++)
-		eisa[i] = ints[i+1];
-}
-#endif
 #endif
 
 /*

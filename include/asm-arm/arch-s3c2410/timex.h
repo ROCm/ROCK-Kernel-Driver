@@ -1,6 +1,6 @@
 /* linux/include/asm-arm/arch-s3c2410/timex.h
  *
- * (c) 2003 Simtec Electronics
+ * (c) 2003,2004 Simtec Electronics
  *  Ben Dooks <ben@simtec.co.uk>
  *
  * S3C2410 - time parameters
@@ -12,6 +12,7 @@
  * Changelog:
  *  02-Sep-2003 BJD  Created file
  *  05-Jan-2004 BJD  Updated for Linux 2.6.0
+ *  22-Nov-2004 BJD  Fixed CLOCK_TICK_RATE
 */
 
 #ifndef __ASM_ARCH_TIMEX_H
@@ -26,8 +27,8 @@ extern int s3c2410_clock_tick_rate;
 #define CLOCK_TICK_RATE (s3c2410_clock_tick_rate)
 #endif
 
-/* currently, the BAST uses 24MHz as a base clock rate */
-#define CLOCK_TICK_RATE 24000000
+/* currently, the BAST uses 12MHz as a base clock rate */
+#define CLOCK_TICK_RATE 12000000
 
 
 #endif /* __ASM_ARCH_TIMEX_H */

@@ -85,7 +85,7 @@ static struct mem_block *alloc_block( struct mem_block *heap, int size,
 	struct mem_block *p;
 	int mask = (1 << align2)-1;
 
-	for (p = heap->next ; p != heap ; p = p->next) {
+	list_for_each(p, heap) {
 		int start = (p->start + mask) & ~mask;
 		if (p->filp == 0 && start + size <= p->start + p->size)
 			return split_block( p, start, size, filp );
@@ -98,7 +98,7 @@ static struct mem_block *find_block( struct mem_block *heap, int start )
 {
 	struct mem_block *p;
 
-	for (p = heap->next ; p != heap ; p = p->next) 
+	list_for_each(p, heap)
 		if (p->start == start)
 			return p;
 
@@ -166,7 +166,7 @@ void radeon_mem_release( DRMFILE filp, struct mem_block *heap )
 	if (!heap || !heap->next)
 		return;
 
-	for (p = heap->next ; p != heap ; p = p->next) {
+	list_for_each(p, heap) {
 		if (p->filp == filp) 
 			p->filp = NULL;
 	}
@@ -174,7 +174,7 @@ void radeon_mem_release( DRMFILE filp, struct mem_block *heap )
 	/* Assumes a single contiguous range.  Needs a special filp in
 	 * 'heap' to stop it being subsumed.
 	 */
-	for (p = heap->next ; p != heap ; p = p->next) {
+	list_for_each(p, heap) {
 		while (p->filp == 0 && p->next->filp == 0) {
 			struct mem_block *q = p->next;
 			p->size += q->size;

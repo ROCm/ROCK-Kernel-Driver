@@ -3,7 +3,7 @@ possible to access all devices on an adapter from userspace, through
 the /dev interface. You need to load module i2c-dev for this.
 
 Each registered i2c adapter gets a number, counting from 0. You can
-examine /proc/bus/i2c to see what number corresponds to which adapter.
+examine /sys/class/i2c-dev/ to see what number corresponds to which adapter.
 I2C device files are character device files with major device number 89
 and a minor device number corresponding to the number assigned as 
 explained above. They should be called "i2c-%d" (i2c-0, i2c-1, ..., 
@@ -19,7 +19,7 @@ Yes, I know, you should never include kernel header files, but until glibc
 knows about i2c, there is not much choice.
 
 Now, you have to decide which adapter you want to access. You should
-inspect /proc/bus/i2c to decide this. Adapter numbers are assigned
+inspect /sys/class/i2c-dev/ to decide this. Adapter numbers are assigned
 somewhat dynamically, so you can not even assume /dev/i2c-0 is the
 first adapter.
 

@@ -373,8 +373,9 @@
 #define __NR_mq_timedreceive		435
 #define __NR_mq_notify			436
 #define __NR_mq_getsetattr		437
+#define __NR_waitid			438
 
-#define NR_SYSCALLS			438
+#define NR_SYSCALLS			439
 
 #if defined(__GNUC__)
 
@@ -617,7 +618,7 @@ static inline long read(int fd, char * buf, size_t nr)
 	return sys_read(fd, buf, nr);
 }
 
-extern long execve(char *, char **, char **);
+extern int execve(char *, char **, char **);
 
 static inline long setsid(void)
 {

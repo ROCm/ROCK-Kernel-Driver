@@ -38,7 +38,7 @@
 
 #define curptr      g6
 
-#define NR_SYSCALLS 283      /* Each OS is different... */
+#define NR_SYSCALLS 284      /* Each OS is different... */
 
 /* These are just handy. */
 #define _SV	save	%sp, -STACKFRAME_SZ, %sp
@@ -1508,7 +1508,7 @@ syscall_is_too_hard:
 	.globl	ret_sys_call
 ret_sys_call:
 	ld	[%curptr + TI_FLAGS], %l6
-	cmp	%o0, -ENOIOCTLCMD
+	cmp	%o0, -ERESTART_RESTARTBLOCK
 	ld	[%sp + STACKFRAME_SZ + PT_PSR], %g3
 	set	PSR_C, %g2
 	bgeu	1f
@@ -1587,7 +1587,7 @@ solaris_syscall:
 
 	st	%o0, [%sp + STACKFRAME_SZ + PT_I0]
 	set	PSR_C, %g2
-	cmp	%o0, -ENOIOCTLCMD
+	cmp	%o0, -ERESTART_RESTARTBLOCK
 	bgeu	1f
 	 ld	[%sp + STACKFRAME_SZ + PT_PSR], %g3
 
@@ -1678,7 +1678,7 @@ bsd_is_too_hard:
 
 	st	%o0, [%sp + STACKFRAME_SZ + PT_I0]
 	set	PSR_C, %g2
-	cmp	%o0, -ENOIOCTLCMD
+	cmp	%o0, -ERESTART_RESTARTBLOCK
 	bgeu	1f
 	 ld	[%sp + STACKFRAME_SZ + PT_PSR], %g3
 

@@ -38,11 +38,12 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/spinlock.h>
+#include <linux/dma-mapping.h>
+#include <linux/bitops.h>
 
 #include <asm/8xx_immap.h>
 #include <asm/pgtable.h>
 #include <asm/mpc8xx.h>
-#include <asm/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/commproc.h>
 
@@ -581,10 +582,10 @@ static void set_multicast_list(struct net_device *dev)
 	
 		/* Log any net taps. */
 		printk("%s: Promiscuous mode enabled.\n", dev->name);
-		cep->sccp->scc_pmsr |= SCC_PMSR_PRO;
+		cep->sccp->scc_psmr |= SCC_PSMR_PRO;
 	} else {
 
-		cep->sccp->scc_pmsr &= ~SCC_PMSR_PRO;
+		cep->sccp->scc_psmr &= ~SCC_PSMR_PRO;
 
 		if (dev->flags & IFF_ALLMULTI) {
 			/* Catch all multicast addresses, so set the
@@ -835,7 +836,8 @@ static int __init scc_enet_init(void)
 
 		/* Allocate a page.
 		*/
-		ba = (unsigned char *)consistent_alloc(GFP_KERNEL, PAGE_SIZE, &mem_addr);
+		ba = (unsigned char *)dma_alloc_coherent(NULL, PAGE_SIZE,
+				&mem_addr, GFP_KERNEL);
 		/* BUG: no check for failure */
 
 		/* Initialize the BD for every fragment in the page.
@@ -889,7 +891,7 @@ static int __init scc_enet_init(void)
 	/* Set processing mode.  Use Ethernet CRC, catch broadcast, and
 	 * start frame search 22 bit times after RENA.
 	 */
-	sccp->scc_pmsr = (SCC_PMSR_ENCRC | SCC_PMSR_NIB22);
+	sccp->scc_psmr = (SCC_PSMR_ENCRC | SCC_PSMR_NIB22);
 
 	/* It is now OK to enable the Ethernet transmitter.
 	 * Unfortunately, there are board implementation differences here.

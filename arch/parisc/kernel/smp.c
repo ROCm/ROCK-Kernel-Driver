@@ -33,10 +33,10 @@
 #include <linux/kernel_stat.h>
 #include <linux/mm.h>
 #include <linux/delay.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
 #include <asm/atomic.h>
-#include <asm/bitops.h>
 #include <asm/current.h>
 #include <asm/delay.h>
 #include <asm/pgalloc.h>	/* for flush_tlb_all() proto/macro */
@@ -333,6 +333,7 @@ smp_call_function (void (*func) (void *info), void *info, int retry, int wait)
 	struct smp_call_struct data;
 	unsigned long timeout;
 	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
+	int retries = 0;
 
 	if (num_online_cpus() < 2)
 		return 0;
@@ -365,21 +366,22 @@ smp_call_function (void (*func) (void *info), void *info, int retry, int wait)
 	/*  Send a message to all other CPUs and wait for them to respond  */
 	send_IPI_allbutself(IPI_CALL_FUNC);
 
+ retry:
 	/*  Wait for response  */
 	timeout = jiffies + HZ;
 	while ( (atomic_read (&data.unstarted_count) > 0) &&
 		time_before (jiffies, timeout) )
 		barrier ();
 
+	if (atomic_read (&data.unstarted_count) > 0) {
+		printk(KERN_CRIT "SMP CALL FUNCTION TIMED OUT! (cpu=%d), try %d\n",
+		      smp_processor_id(), ++retries);
+		goto retry;
+	}
 	/* We either got one or timed out. Release the lock */
 
 	mb();
 	smp_call_function_data = NULL;
-	if (atomic_read (&data.unstarted_count) > 0) {
-		printk(KERN_CRIT "SMP CALL FUNCTION TIMED OUT! (cpu=%d)\n",
-		      smp_processor_id());
-		return -ETIMEDOUT;
-	}
 
 	while (wait && atomic_read (&data.unfinished_count) > 0)
 			barrier ();

@@ -83,6 +83,26 @@ static int create_tmp_file(unsigned long len)
 	return(fd);
 }
 
+void check_tmpexec(void)
+{
+	void *addr;
+	int err, fd = create_tmp_file(UM_KERN_PAGE_SIZE);
+
+	addr = mmap(NULL, UM_KERN_PAGE_SIZE,
+		    PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE, fd, 0);
+	printf("Checking PROT_EXEC mmap in /tmp...");
+	fflush(stdout);
+	if(addr == MAP_FAILED){
+		err = errno;
+		perror("failed");
+		if(err == EPERM)
+			printf("/tmp must be not mounted noexec\n");
+		exit(1);
+	}
+	printf("OK\n");
+	munmap(addr, UM_KERN_PAGE_SIZE);
+}
+
 static int have_devanon = 0;
 
 void check_devanon(void)
@@ -111,7 +131,7 @@ static int create_anon_file(unsigned long len)
 		exit(1);
 	}
 
-	addr = mmap(NULL, len, PROT_READ | PROT_WRITE , MAP_PRIVATE, fd, 0);
+	addr = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
 	if(addr == MAP_FAILED){
 		os_print_error((int) addr, "mapping physmem file");
 		exit(1);
@@ -207,6 +227,39 @@ int protect_memory(unsigned long addr, unsigned long len, int r, int w, int x,
 	}
 	return(0);
 }
+
+#if 0
+/* Debugging facility for dumping stuff out to the host, avoiding the timing
+ * problems that come with printf and breakpoints.
+ * Enable in case of emergency.
+ */
+
+int logging = 1;
+int logging_fd = -1;
+
+int logging_line = 0;
+char logging_buf[512];
+
+void log(char *fmt, ...)
+{
+        va_list ap;
+        struct timeval tv;
+        struct openflags flags;
+
+        if(logging == 0) return;
+        if(logging_fd < 0){
+                flags = of_create(of_trunc(of_rdwr(OPENFLAGS())));
+                logging_fd = os_open_file("log", flags, 0644);
+        }
+        gettimeofday(&tv, NULL);
+        sprintf(logging_buf, "%d\t %u.%u  ", logging_line++, tv.tv_sec,
+                tv.tv_usec);
+        va_start(ap, fmt);
+        vsprintf(&logging_buf[strlen(logging_buf)], fmt, ap);
+        va_end(ap);
+        write(logging_fd, logging_buf, strlen(logging_buf));
+}
+#endif
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

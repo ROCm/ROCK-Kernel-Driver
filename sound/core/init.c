@@ -785,12 +785,15 @@ int snd_card_set_dev_pm_callback(snd_card_t *card, int type,
 int snd_card_pci_suspend(struct pci_dev *dev, u32 state)
 {
 	snd_card_t *card = pci_get_drvdata(dev);
+	int err;
 	if (! card || ! card->pm_suspend)
 		return 0;
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
 		return 0;
 	/* FIXME: correct state value? */
-	return card->pm_suspend(card, 0);
+	err = card->pm_suspend(card, 0);
+	pci_save_state(dev);
+	return err;
 }
 
 int snd_card_pci_resume(struct pci_dev *dev)
@@ -801,7 +804,7 @@ int snd_card_pci_resume(struct pci_dev *dev)
 	if (card->power_state == SNDRV_CTL_POWER_D0)
 		return 0;
 	/* restore the PCI config space */
-	pci_restore_state(dev, dev->saved_config_space);
+	pci_restore_state(dev);
 	/* FIXME: correct state value? */
 	return card->pm_resume(card, 0);
 }

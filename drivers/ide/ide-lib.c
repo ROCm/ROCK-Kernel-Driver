@@ -15,12 +15,12 @@
 #include <linux/delay.h>
 #include <linux/hdreg.h>
 #include <linux/ide.h>
+#include <linux/bitops.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
-#include <asm/bitops.h>
 
 /*
  *	IDE library routines. These are plug in code that most 
@@ -421,8 +421,6 @@ void ide_toggle_bounce(ide_drive_t *drive, int on)
 		blk_queue_bounce_limit(drive->queue, addr);
 }
 
-EXPORT_SYMBOL(ide_toggle_bounce);
-
 /**
  *	ide_set_xfer_rate	-	set transfer rate
  *	@drive: drive to set
@@ -436,17 +434,13 @@ EXPORT_SYMBOL(ide_toggle_bounce);
  
 int ide_set_xfer_rate(ide_drive_t *drive, u8 rate)
 {
-	int ret;
 #ifndef CONFIG_BLK_DEV_IDEDMA
 	rate = min(rate, (u8) XFER_PIO_4);
 #endif
-	ide_pin_hwgroup(drive);
-	if (HWIF(drive)->speedproc)
-		ret = HWIF(drive)->speedproc(drive, rate);
+	if(HWIF(drive)->speedproc)
+		return HWIF(drive)->speedproc(drive, rate);
 	else
-		ret = -1;
-	ide_unpin_hwgroup(drive);
-	return ret;
+		return -1;
 }
 
 EXPORT_SYMBOL_GPL(ide_set_xfer_rate);

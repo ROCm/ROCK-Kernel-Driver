@@ -40,17 +40,16 @@ static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int mic[SNDRV_CARDS]; /* microphone */
 static int ibl[SNDRV_CARDS]; /* microphone */
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for Digigram " CARD_NAME " soundcard.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for Digigram " CARD_NAME " soundcard.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable Digigram " CARD_NAME " soundcard.");
-module_param_array(mic, bool, boot_devs, 0444);
+module_param_array(mic, bool, NULL, 0444);
 MODULE_PARM_DESC(mic, "Enable Microphone.");
-module_param_array(ibl, int, boot_devs, 0444);
+module_param_array(ibl, int, NULL, 0444);
 MODULE_PARM_DESC(ibl, "Capture IBL size.");
 
 /*
@@ -117,6 +116,7 @@ static int snd_vx222_free(vx_core_t *chip)
 		free_irq(chip->irq, (void*)chip);
 	if (vx->port[0])
 		pci_release_regions(vx->pci);
+	pci_disable_device(vx->pci);
 	kfree(chip);
 	return 0;
 }
@@ -148,8 +148,10 @@ static int __devinit snd_vx222_create(snd_card_t *card, struct pci_dev *pci,
 	vx_ops = hw->type == VX_TYPE_BOARD ? &vx222_old_ops : &vx222_ops;
 	chip = snd_vx_create(card, hw, vx_ops,
 			     sizeof(struct snd_vx222) - sizeof(vx_core_t));
-	if (! chip)
+	if (! chip) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	vx = (struct snd_vx222 *)chip;
 	vx->pci = pci;
 

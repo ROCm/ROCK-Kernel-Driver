@@ -18,6 +18,7 @@
 #include <linux/security.h>
 #include <linux/mempolicy.h>
 #include <linux/personality.h>
+#include <linux/syscalls.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -92,34 +93,35 @@ change_protection(struct vm_area_struct *vma, unsigned long start,
 {
 	pgd_t *dir;
 	unsigned long beg = start;
-	struct mm_struct * mm = vma->vm_mm;
 
-	dir = pgd_offset(mm, start);
+	dir = pgd_offset(current->mm, start);
 	flush_cache_range(vma, beg, end);
 	if (start >= end)
 		BUG();
-	spin_lock(&mm->page_table_lock);
+	spin_lock(&current->mm->page_table_lock);
 	do {
 		change_pmd_range(dir, start, end - start, newprot);
 		start = (start + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	} while (start && (start < end));
 	flush_tlb_range(vma, beg, end);
-	spin_unlock(&mm->page_table_lock);
+	spin_unlock(&current->mm->page_table_lock);
 	return;
 }
 
 static int
 mprotect_fixup(struct vm_area_struct *vma, struct vm_area_struct **pprev,
-	unsigned long start, unsigned long end, unsigned int newflags)
+	unsigned long start, unsigned long end, unsigned long newflags)
 {
 	struct mm_struct * mm = vma->vm_mm;
+	unsigned long oldflags = vma->vm_flags;
+	long nrpages = (end - start) >> PAGE_SHIFT;
 	unsigned long charged = 0;
 	pgprot_t newprot;
 	pgoff_t pgoff;
 	int error;
 
-	if (newflags == vma->vm_flags) {
+	if (newflags == oldflags) {
 		*pprev = vma;
 		return 0;
 	}
@@ -133,8 +135,8 @@ mprotect_fixup(struct vm_area_struct *vma, struct vm_area_struct **pprev,
 	 * a MAP_NORESERVE private mapping to writable will now reserve.
 	 */
 	if (newflags & VM_WRITE) {
-		if (!(vma->vm_flags & (VM_ACCOUNT|VM_WRITE|VM_SHARED|VM_HUGETLB))) {
-			charged = (end - start) >> PAGE_SHIFT;
+		if (!(oldflags & (VM_ACCOUNT|VM_WRITE|VM_SHARED|VM_HUGETLB))) {
+			charged = nrpages;
 			if (security_vm_enough_memory(charged))
 				return -ENOMEM;
 			newflags |= VM_ACCOUNT;
@@ -176,11 +178,11 @@ success:
 	 * vm_flags and vm_page_prot are protected by the mmap_sem
 	 * held in write mode.
 	 */
-	vm_stat_unaccount(vma);
 	vma->vm_flags = newflags;
 	vma->vm_page_prot = newprot;
 	change_protection(vma, start, end, newprot);
-	vm_stat_account(vma);
+	__vm_stat_account(mm, oldflags, vma->vm_file, -nrpages);
+	__vm_stat_account(mm, newflags, vma->vm_file, nrpages);
 	return 0;
 
 fail:
@@ -188,9 +190,8 @@ fail:
 	return error;
 }
 
-long
-do_mprotect(struct mm_struct *mm, unsigned long start, size_t len,
-	     unsigned long prot)
+asmlinkage long
+sys_mprotect(unsigned long start, size_t len, unsigned long prot)
 {
 	unsigned long vm_flags, nstart, end, tmp;
 	struct vm_area_struct *vma, *prev;
@@ -219,9 +220,9 @@ do_mprotect(struct mm_struct *mm, unsigned long start, size_t len,
 
 	vm_flags = calc_vm_prot_bits(prot);
 
-	down_write(&mm->mmap_sem);
+	down_write(&current->mm->mmap_sem);
 
-	vma = find_vma_prev(mm, start, &prev);
+	vma = find_vma_prev(current->mm, start, &prev);
 	error = -ENOMEM;
 	if (!vma)
 		goto out;
@@ -247,7 +248,7 @@ do_mprotect(struct mm_struct *mm, unsigned long start, size_t len,
 		prev = vma;
 
 	for (nstart = start ; ; ) {
-		unsigned int newflags;
+		unsigned long newflags;
 
 		/* Here we know that  vma->vm_start <= nstart < vma->vm_end. */
 
@@ -287,11 +288,6 @@ do_mprotect(struct mm_struct *mm, unsigned long start, size_t len,
 		}
 	}
 out:
-	up_write(&mm->mmap_sem);
+	up_write(&current->mm->mmap_sem);
 	return error;
-}
-
-asmlinkage long sys_mprotect(unsigned long start, size_t len, unsigned long prot)
-{
-        return(do_mprotect(current->mm, start, len, prot));
 }

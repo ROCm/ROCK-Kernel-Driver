@@ -7,23 +7,20 @@
 #define __PPC_BTEXT_H
 #ifdef __KERNEL__
 
-#include <asm/bootx.h>
-
 extern void btext_clearscreen(void);
 extern void btext_flushscreen(void);
 
-extern boot_infos_t disp_bi;
 extern int boot_text_mapped;
 
-void btext_setup_display(int width, int height, int depth, int pitch,
-			 unsigned long address);
-void map_boot_text(void);
-void btext_update_display(unsigned long phys, int width, int height,
-			  int depth, int pitch);
+extern int btext_initialize(struct device_node *np);
 
-void btext_drawchar(char c);
-void btext_drawstring(const char *str);
-void btext_drawhex(unsigned long v);
+extern void map_boot_text(void);
+extern void btext_update_display(unsigned long phys, int width, int height,
+				 int depth, int pitch);
+
+extern void btext_drawchar(char c);
+extern void btext_drawstring(const char *str);
+extern void btext_drawhex(unsigned long v);
 
 #endif /* __KERNEL__ */
 #endif /* __PPC_BTEXT_H */

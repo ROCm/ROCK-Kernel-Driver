@@ -92,15 +92,14 @@ static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int fullduplex[SNDRV_CARDS]; // = {[0 ... (SNDRV_CARDS - 1)] = 1};
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for RME Digi32 soundcard.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for RME Digi32 soundcard.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable RME Digi32 soundcard.");
-module_param_array(fullduplex, bool, boot_devs, 0444);
+module_param_array(fullduplex, bool, NULL, 0444);
 MODULE_PARM_DESC(fullduplex, "Support full-duplex mode.");
 MODULE_AUTHOR("Martin Langer <martin-langer@gmx.de>, Pilo Chambert <pilo.c@wanadoo.fr>");
 MODULE_DESCRIPTION("RME Digi32, Digi32/8, Digi32 PRO");
@@ -1351,6 +1350,7 @@ static void snd_rme32_free(void *private_data)
 		pci_release_regions(rme32->pci);
 		rme32->port = 0;
 	}
+	pci_disable_device(rme32->pci);
 }
 
 static void snd_rme32_free_spdif_pcm(snd_pcm_t * pcm)
@@ -1970,16 +1970,14 @@ snd_rme32_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 	snd_card_t *card;
 	int err;
 
-	for (; dev < SNDRV_CARDS; dev++) {
-		if (!enable[dev]) {
-			dev++;
-			return -ENOENT;
-		}
-		break;
-	}
 	if (dev >= SNDRV_CARDS) {
 		return -ENODEV;
 	}
+	if (!enable[dev]) {
+		dev++;
+		return -ENOENT;
+	}
+
 	if ((card = snd_card_new(index[dev], id[dev], THIS_MODULE,
 				 sizeof(rme32_t))) == NULL)
 		return -ENOMEM;

@@ -649,7 +649,6 @@ typedef enum {
 #define TCC_MASK		0x0003
 
 /* driver ioctl parameters */
-#define PHY_ID 			0x01	/* currently it is fixed */
 #define AMD8111E_REG_DUMP_LEN	 13*sizeof(u32) 
 
 /* crc generator constants */
@@ -766,7 +765,7 @@ struct amd8111e_priv{
 	dma_addr_t tx_dma_addr[NUM_TX_BUFFERS];
 	dma_addr_t rx_dma_addr[NUM_RX_BUFFERS];
 	/* Reg memory mapped address */
-	void *  mmio;
+	void __iomem *mmio;
 	
 	spinlock_t lock;	/* Guard lock */
 	unsigned long rx_idx, tx_idx;	/* The next free ring entry */
@@ -777,10 +776,11 @@ struct amd8111e_priv{
 	int options;		/* Options enabled/disabled for the device */
 
 	unsigned long ext_phy_option;
+	int ext_phy_addr;
+	u32 ext_phy_id;
 	
 	struct amd8111e_link_config link_config;
 	int pm_cap;
-	u32 pm_state[12];
 
 	struct net_device *next;
 	int mii;

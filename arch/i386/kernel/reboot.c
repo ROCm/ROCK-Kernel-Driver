@@ -3,10 +3,6 @@
  */
 
 #include <linux/mm.h>
-#include <linux/config.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/init.h>
@@ -141,7 +137,7 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
 	{ }
 };
 
-static int reboot_init(void)
+static int __init reboot_init(void)
 {
 	dmi_check_system(reboot_dmi_table);
 	return 0;
@@ -334,22 +330,11 @@ void machine_restart(char * __unused)
 	 * Stop all CPUs and turn off local APICs and the IO-APIC, so
 	 * other OSs see a clean IRQ state.
 	 */
-#ifdef	CONFIG_KDB
-	/*
-	 * If this restart is occuring while kdb is running (e.g. reboot
-	 * command), the other CPU's are already stopped.  Don't try to
-	 * stop them yet again.
-	 */
-	if (!KDB_IS_RUNNING())
-#endif	/* CONFIG_KDB */
 	smp_send_stop();
-#elif defined(CONFIG_X86_LOCAL_APIC)
-	if (cpu_has_apic) {
-		local_irq_disable();
-		disable_local_APIC();
-		local_irq_enable();
-	}
-#endif
+#endif /* CONFIG_SMP */
+
+	lapic_shutdown();
+
 #ifdef CONFIG_X86_IO_APIC
 	disable_IO_APIC();
 #endif
@@ -385,6 +370,8 @@ EXPORT_SYMBOL(machine_halt);
 
 void machine_power_off(void)
 {
+	lapic_shutdown();
+
 	if (efi_enabled)
 		efi.reset_system(EFI_RESET_SHUTDOWN, EFI_SUCCESS, 0, NULL);
 	if (pm_power_off)

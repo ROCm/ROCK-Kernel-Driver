@@ -53,8 +53,6 @@ static inline void end_edge_ioapic_irq (unsigned int irq) { }
 #define end_edge_ioapic 	end_edge_ioapic_irq
 #endif
 
-#define APIC_MISMATCH_DEBUG
-
 #define IO_APIC_BASE(idx) \
 		((volatile int *)(__fix_to_virt(FIX_IO_APIC_BASE_0 + idx) \
 		+ (mp_ioapics[idx].mpc_apicaddr & ~PAGE_MASK)))
@@ -195,7 +193,7 @@ extern int skip_ioapic_setup;
  * If we use the IO-APIC for IRQ routing, disable automatic
  * assignment of PCI IRQ's.
  */
-#define io_apic_assign_pci_irqs (mp_irq_entries && !skip_ioapic_setup)
+#define io_apic_assign_pci_irqs (mp_irq_entries && !skip_ioapic_setup && io_apic_irqs)
 
 #ifdef CONFIG_ACPI_BOOT
 extern int io_apic_get_unique_id (int ioapic, int apic_id);
@@ -203,6 +201,8 @@ extern int io_apic_get_version (int ioapic);
 extern int io_apic_get_redir_entries (int ioapic);
 extern int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int active_high_low);
 #endif /*CONFIG_ACPI_BOOT*/
+
+extern int (*ioapic_renumber_irq)(int ioapic, int irq);
 
 #else  /* !CONFIG_X86_IO_APIC */
 #define io_apic_assign_pci_irqs 0

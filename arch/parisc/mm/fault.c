@@ -36,6 +36,9 @@
 
 #define BITSSET		0x1c0	/* for identifying LDCW */
 
+
+DEFINE_PER_CPU(struct exception_data, exception_data);
+
 /*
  * parisc_acctyp(unsigned int inst) --
  *    Given a PA-RISC memory access instruction, determine if the
@@ -196,7 +199,7 @@ good_area:
 
 check_expansion:
 	vma = prev_vma;
-	if (vma && (expand_stack(vma, address, NULL) == 0))
+	if (vma && (expand_stack(vma, address) == 0))
 		goto good_area;
 
 /*
@@ -230,17 +233,17 @@ bad_area:
 no_context:
 
 	if (!user_mode(regs)) {
-
 		fix = search_exception_tables(regs->iaoq[0]);
 
 		if (fix) {
+			struct exception_data *d;
 
-			if (fix->skip & 1) 
-				regs->gr[8] = -EFAULT;
-			if (fix->skip & 2)
-				regs->gr[9] = 0;
+			d = &__get_cpu_var(exception_data);
+			d->fault_ip = regs->iaoq[0];
+			d->fault_space = regs->isr;
+			d->fault_addr = regs->ior;
 
-			regs->iaoq[0] += ((fix->skip) & ~3);
+			regs->iaoq[0] = ((fix->fixup) & ~3);
 
 			/*
 			 * NOTE: In some cases the faulting instruction

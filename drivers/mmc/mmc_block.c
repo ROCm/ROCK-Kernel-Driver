@@ -42,7 +42,7 @@
  */
 #define MMC_SHIFT	3
 
-static int mmc_major;
+static int major;
 
 /*
  * There is one mmc_blk_data per slot.
@@ -200,6 +200,9 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 		}
 		brq.mrq.stop = brq.data.blocks > 1 ? &brq.stop : NULL;
 
+		brq.data.sg = mq->sg;
+		brq.data.sg_len = blk_rq_map_sg(req->q, req, brq.data.sg);
+
 		mmc_wait_for_req(card->host, &brq.mrq);
 		if (brq.cmd.error) {
 			printk(KERN_ERR "%s: error %d sending read/write command\n",
@@ -323,7 +326,7 @@ static struct mmc_blk_data *mmc_blk_alloc(struct mmc_card *card)
 		md->queue.issue_fn = mmc_blk_issue_rq;
 		md->queue.data = md;
 
-		md->disk->major	= mmc_major;
+		md->disk->major	= major;
 		md->disk->first_minor = devidx << MMC_SHIFT;
 		md->disk->fops = &mmc_bdops;
 		md->disk->private_data = md;
@@ -428,7 +431,7 @@ static int mmc_blk_suspend(struct mmc_card *card, u32 state)
 	struct mmc_blk_data *md = mmc_get_drvdata(card);
 
 	if (md) {
-		blk_stop_queue(md->queue.queue);
+		mmc_queue_suspend(&md->queue);
 	}
 	return 0;
 }
@@ -439,7 +442,7 @@ static int mmc_blk_resume(struct mmc_card *card)
 
 	if (md) {
 		mmc_blk_set_blksize(md, card);
-		blk_start_queue(md->queue.queue);
+		mmc_queue_resume(&md->queue);
 	}
 	return 0;
 }
@@ -462,14 +465,14 @@ static int __init mmc_blk_init(void)
 {
 	int res = -ENOMEM;
 
-	res = register_blkdev(mmc_major, "mmc");
+	res = register_blkdev(major, "mmc");
 	if (res < 0) {
 		printk(KERN_WARNING "Unable to get major %d for MMC media: %d\n",
-		       mmc_major, res);
+		       major, res);
 		goto out;
 	}
-	if (mmc_major == 0)
-		mmc_major = res;
+	if (major == 0)
+		major = res;
 
 	devfs_mk_dir("mmc");
 	return mmc_register_driver(&mmc_driver);
@@ -482,7 +485,7 @@ static void __exit mmc_blk_exit(void)
 {
 	mmc_unregister_driver(&mmc_driver);
 	devfs_remove("mmc");
-	unregister_blkdev(mmc_major, "mmc");
+	unregister_blkdev(major, "mmc");
 }
 
 module_init(mmc_blk_init);
@@ -490,3 +493,6 @@ module_exit(mmc_blk_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Multimedia Card (MMC) block device driver");
+
+module_param(major, int, 0444);
+MODULE_PARM_DESC(major, "specify the major device number for MMC block driver");

@@ -178,16 +178,22 @@ static void detected_v7(struct sysv_sb_info *sbi)
 static int detect_xenix(struct sysv_sb_info *sbi, struct buffer_head *bh)
 {
 	struct xenix_super_block *sbd = (struct xenix_super_block *)bh->b_data;
-	if (sbd->s_magic == cpu_to_le32(0x2b5544))
+	if (*(__le32 *)&sbd->s_magic == cpu_to_le32(0x2b5544))
 		sbi->s_bytesex = BYTESEX_LE;
-	else if (sbd->s_magic == cpu_to_be32(0x2b5544))
+	else if (*(__be32 *)&sbd->s_magic == cpu_to_be32(0x2b5544))
 		sbi->s_bytesex = BYTESEX_BE;
 	else
 		return 0;
-	if (sbd->s_type > 2 || sbd->s_type < 1)
+	switch (fs32_to_cpu(sbi, sbd->s_type)) {
+	case 1:
+		sbi->s_type = FSTYPE_XENIX;
+		return 1;
+	case 2:
+		sbi->s_type = FSTYPE_XENIX;
+		return 2;
+	default:
 		return 0;
-	sbi->s_type = FSTYPE_XENIX;
-	return sbd->s_type;
+	}
 }
 
 static int detect_sysv(struct sysv_sb_info *sbi, struct buffer_head *bh)
@@ -195,14 +201,17 @@ static int detect_sysv(struct sysv_sb_info *sbi, struct buffer_head *bh)
 	struct super_block *sb = sbi->s_sb;
 	/* All relevant fields are at the same offsets in R2 and R4 */
 	struct sysv4_super_block * sbd;
+	u32 type;
 
 	sbd = (struct sysv4_super_block *) (bh->b_data + BLOCK_SIZE/2);
-	if (sbd->s_magic == cpu_to_le32(0xfd187e20))
+	if (*(__le32 *)&sbd->s_magic == cpu_to_le32(0xfd187e20))
 		sbi->s_bytesex = BYTESEX_LE;
-	else if (sbd->s_magic == cpu_to_be32(0xfd187e20))
+	else if (*(__be32 *)&sbd->s_magic == cpu_to_be32(0xfd187e20))
 		sbi->s_bytesex = BYTESEX_BE;
 	else
 		return 0;
+
+	type = fs32_to_cpu(sbi, sbd->s_type);
  
  	if (fs16_to_cpu(sbi, sbd->s_nfree) == 0xffff) {
  		sbi->s_type = FSTYPE_AFS;
@@ -212,18 +221,17 @@ static int detect_sysv(struct sysv_sb_info *sbi, struct buffer_head *bh)
  				"forcing read-only mode.\n", 
  				sb->s_id);
  		}
- 		return sbd->s_type;
+ 		return type;
  	}
  
 	if (fs32_to_cpu(sbi, sbd->s_time) < JAN_1_1980) {
 		/* this is likely to happen on SystemV2 FS */
-		if (sbd->s_type > 3 || sbd->s_type < 1)
+		if (type > 3 || type < 1)
 			return 0;
 		sbi->s_type = FSTYPE_SYSV2;
-		return sbd->s_type;
+		return type;
 	}
-	if ((sbd->s_type > 3 || sbd->s_type < 1) &&
-	    (sbd->s_type > 0x30 || sbd->s_type < 0x10))
+	if ((type > 3 || type < 1) && (type > 0x30 || type < 0x10))
 		return 0;
 
 	/* On Interactive Unix (ISC) Version 4.0/3.x s_type field = 0x10,
@@ -231,14 +239,14 @@ static int detect_sysv(struct sysv_sb_info *sbi, struct buffer_head *bh)
 	   filename limit is gone. Due to lack of information about this
            feature read-only mode seems to be a reasonable approach... -KGB */
 
-	if (sbd->s_type >= 0x10) {
+	if (type >= 0x10) {
 		printk("SysV FS: can't handle long file names on %s, "
 		       "forcing read-only mode.\n", sb->s_id);
 		sbi->s_forced_ro = 1;
 	}
 
 	sbi->s_type = FSTYPE_SYSV4;
-	return sbd->s_type >= 0x10 ? (sbd->s_type >> 4) : sbd->s_type;
+	return type >= 0x10 ? type >> 4 : type;
 }
 
 static int detect_coherent(struct sysv_sb_info *sbi, struct buffer_head *bh)

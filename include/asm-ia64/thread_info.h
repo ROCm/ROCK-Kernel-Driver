@@ -9,14 +9,6 @@
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 
-#define TI_TASK			0x00
-#define TI_EXEC_DOMAIN		0x08
-#define TI_FLAGS		0x10
-#define TI_CPU			0x14
-#define TI_ADDR_LIMIT		0x18
-#define TI_PRE_COUNT		0x20
-#define TI_RESTART_BLOCK	0x28
-
 #define PREEMPT_ACTIVE_BIT 30
 #define PREEMPT_ACTIVE	(1 << PREEMPT_ACTIVE_BIT)
 

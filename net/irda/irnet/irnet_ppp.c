@@ -1111,3 +1111,4 @@ module_exit(irnet_cleanup);
 MODULE_AUTHOR("Jean Tourrilhes <jt@hpl.hp.com>");
 MODULE_DESCRIPTION("IrNET : Synchronous PPP over IrDA"); 
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_CHARDEV(10, 187);

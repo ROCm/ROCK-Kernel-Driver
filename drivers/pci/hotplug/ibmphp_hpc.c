@@ -108,8 +108,8 @@ static struct semaphore sem_exit;	// make sure polling thread goes away
 //----------------------------------------------------------------------------
 // local function prototypes
 //----------------------------------------------------------------------------
-static u8 i2c_ctrl_read (struct controller *, void *, u8);
-static u8 i2c_ctrl_write (struct controller *, void *, u8, u8);
+static u8 i2c_ctrl_read (struct controller *, void __iomem *, u8);
+static u8 i2c_ctrl_write (struct controller *, void __iomem *, u8, u8);
 static u8 hpc_writecmdtoindex (u8, u8);
 static u8 hpc_readcmdtoindex (u8, u8);
 static void get_hpc_access (void);
@@ -118,7 +118,7 @@ static void poll_hpc (void);
 static int process_changeinstatus (struct slot *, struct slot *);
 static int process_changeinlatch (u8, u8, struct controller *);
 static int hpc_poll_thread (void *);
-static int hpc_wait_ctlr_notworking (int, struct controller *, void *, u8 *);
+static int hpc_wait_ctlr_notworking (int, struct controller *, void __iomem *, u8 *);
 //----------------------------------------------------------------------------
 
 
@@ -147,11 +147,11 @@ void __init ibmphp_hpc_initvars (void)
 * Action:  read from HPC over I2C
 *
 *---------------------------------------------------------------------*/
-static u8 i2c_ctrl_read (struct controller *ctlr_ptr, void *WPGBbar, u8 index)
+static u8 i2c_ctrl_read (struct controller *ctlr_ptr, void __iomem *WPGBbar, u8 index)
 {
 	u8 status;
 	int i;
-	void *wpg_addr;		// base addr + offset
+	void __iomem *wpg_addr;	// base addr + offset
 	unsigned long wpg_data;	// data to/from WPG LOHI format
 	unsigned long ultemp;
 	unsigned long data;	// actual data HILO format
@@ -255,10 +255,10 @@ static u8 i2c_ctrl_read (struct controller *ctlr_ptr, void *WPGBbar, u8 index)
 *
 * Return   0 or error codes
 *---------------------------------------------------------------------*/
-static u8 i2c_ctrl_write (struct controller *ctlr_ptr, void *WPGBbar, u8 index, u8 cmd)
+static u8 i2c_ctrl_write (struct controller *ctlr_ptr, void __iomem *WPGBbar, u8 index, u8 cmd)
 {
 	u8 rc;
-	void *wpg_addr;		// base addr + offset
+	void __iomem *wpg_addr;	// base addr + offset
 	unsigned long wpg_data;	// data to/from WPG LOHI format 
 	unsigned long ultemp;
 	unsigned long data;	// actual data HILO format
@@ -399,7 +399,7 @@ static u8 pci_ctrl_write (struct controller *ctrl, u8 offset, u8 data)
 	return rc;
 }
 
-static u8 ctrl_read (struct controller *ctlr, void *base, u8 offset)
+static u8 ctrl_read (struct controller *ctlr, void __iomem *base, u8 offset)
 {
 	u8 rc;
 	switch (ctlr->ctlr_type) {
@@ -419,7 +419,7 @@ static u8 ctrl_read (struct controller *ctlr, void *base, u8 offset)
 	return rc;
 }
 
-static u8 ctrl_write (struct controller *ctlr, void *base, u8 offset, u8 data)
+static u8 ctrl_write (struct controller *ctlr, void __iomem *base, u8 offset, u8 data)
 {
 	u8 rc = 0;
 	switch (ctlr->ctlr_type) {
@@ -536,7 +536,7 @@ static u8 hpc_readcmdtoindex (u8 cmd, u8 index)
 *---------------------------------------------------------------------*/
 int ibmphp_hpc_readslot (struct slot * pslot, u8 cmd, u8 * pstatus)
 {
-	void *wpg_bbar = NULL;
+	void __iomem *wpg_bbar = NULL;
 	struct controller *ctlr_ptr;
 	struct list_head *pslotlist;
 	u8 index, status;
@@ -660,7 +660,7 @@ int ibmphp_hpc_readslot (struct slot * pslot, u8 cmd, u8 * pstatus)
 	
 	// remove physical to logical address mapping
 	if ((ctlr_ptr->ctlr_type == 2) || (ctlr_ptr->ctlr_type == 4))
-		iounmap (wpg_bbar);	
+		iounmap (wpg_bbar);
 	
 	free_hpc_access ();
 
@@ -675,7 +675,7 @@ int ibmphp_hpc_readslot (struct slot * pslot, u8 cmd, u8 * pstatus)
 *---------------------------------------------------------------------*/
 int ibmphp_hpc_writeslot (struct slot * pslot, u8 cmd)
 {
-	void *wpg_bbar = NULL;
+	void __iomem *wpg_bbar = NULL;
 	struct controller *ctlr_ptr;
 	u8 index, status;
 	int busindex;
@@ -764,7 +764,7 @@ int ibmphp_hpc_writeslot (struct slot * pslot, u8 cmd)
 
 	// remove physical to logical address mapping
 	if ((ctlr_ptr->ctlr_type == 2) || (ctlr_ptr->ctlr_type == 4))
-		iounmap (wpg_bbar);	
+		iounmap (wpg_bbar);
 	free_hpc_access ();
 
 	debug_polling ("%s - Exit rc[%d]\n", __FUNCTION__, rc);
@@ -1130,7 +1130,7 @@ void __exit ibmphp_hpc_stop_poll_thread (void)
 * Return   0, HPC_ERROR
 * Value:
 *---------------------------------------------------------------------*/
-static int hpc_wait_ctlr_notworking (int timeout, struct controller *ctlr_ptr, void *wpg_bbar,
+static int hpc_wait_ctlr_notworking (int timeout, struct controller *ctlr_ptr, void __iomem *wpg_bbar,
 				    u8 * pstatus)
 {
 	int rc = 0;

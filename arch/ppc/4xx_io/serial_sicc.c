@@ -51,12 +51,12 @@
 #include <linux/serial.h>
 #include <linux/console.h>
 #include <linux/sysrq.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 #include <asm/serial.h>
 
 
@@ -933,7 +933,7 @@ static void siccuart_flush_chars(struct tty_struct *tty)
     restore_flags(flags);
 }
 
-static int siccuart_write(struct tty_struct *tty, int from_user,
+static int siccuart_write(struct tty_struct *tty,
               const u_char * buf, int count)
 {
     struct SICC_info *info = tty->driver_data;
@@ -944,58 +944,23 @@ static int siccuart_write(struct tty_struct *tty, int from_user,
         return 0;
 
     save_flags(flags);
-    if (from_user) {
-        down(&tmp_buf_sem);
-        while (1) {
-            int c1;
-            c = CIRC_SPACE_TO_END(info->xmit.head,
-                          info->xmit.tail,
-                          SICC_XMIT_SIZE);
-            if (count < c)
-                c = count;
-            if (c <= 0)
-                break;
-
-            c -= copy_from_user(tmp_buf, buf, c);
-            if (!c) {
-                if (!ret)
-                    ret = -EFAULT;
-                break;
-            }
-            cli();
-            c1 = CIRC_SPACE_TO_END(info->xmit.head,
-                           info->xmit.tail,
-                           SICC_XMIT_SIZE);
-            if (c1 < c)
-                c = c1;
-            memcpy(info->xmit.buf + info->xmit.head, tmp_buf, c);
-            info->xmit.head = (info->xmit.head + c) &
-                      (SICC_XMIT_SIZE - 1);
-            restore_flags(flags);
-            buf += c;
-            count -= c;
-            ret += c;
-        }
-        up(&tmp_buf_sem);
-    } else {
-        cli();
-        while (1) {
-            c = CIRC_SPACE_TO_END(info->xmit.head,
-                          info->xmit.tail,
-                          SICC_XMIT_SIZE);
-            if (count < c)
-                c = count;
-            if (c <= 0)
-                break;
-            memcpy(info->xmit.buf + info->xmit.head, buf, c);
-            info->xmit.head = (info->xmit.head + c) &
-                      (SICC_XMIT_SIZE - 1);
-            buf += c;
-            count -= c;
-            ret += c;
-        }
-        restore_flags(flags);
+    cli();
+    while (1) {
+        c = CIRC_SPACE_TO_END(info->xmit.head,
+                      info->xmit.tail,
+                      SICC_XMIT_SIZE);
+        if (count < c)
+            c = count;
+        if (c <= 0)
+            break;
+        memcpy(info->xmit.buf + info->xmit.head, buf, c);
+        info->xmit.head = (info->xmit.head + c) &
+                  (SICC_XMIT_SIZE - 1);
+        buf += c;
+        count -= c;
+        ret += c;
     }
+    restore_flags(flags);
     if (info->xmit.head != info->xmit.tail
         && !tty->stopped
         && !tty->hw_stopped)

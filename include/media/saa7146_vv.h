@@ -127,11 +127,11 @@ struct saa7146_vv
 	struct saa7146_format		*ov_fmt;
 	struct saa7146_overlay		*ov_data;
 	struct saa7146_fh		*ov_suspend;
-	
+
 	/* video capture */
 	struct saa7146_dmaqueue		video_q;
 	enum v4l2_field			last_field;
-	
+
 	/* common: fixme? shouldn't this be in saa7146_fh?
 	   (this leads to a more complicated question: shall the driver
 	   store the different settings (for example S_INPUT) for every open
@@ -219,8 +219,6 @@ extern struct saa7146_use_ops saa7146_vbi_uops;
 
 /* resource management functions */
 int saa7146_res_get(struct saa7146_fh *fh, unsigned int bit);
-int saa7146_res_check(struct saa7146_fh *fh, unsigned int bit);
-int saa7146_res_locked(struct saa7146_dev *dev, unsigned int bit);
 void saa7146_res_free(struct saa7146_fh *fh, unsigned int bits);
 
 #define RESOURCE_DMA1_HPS	0x1
@@ -238,11 +236,7 @@ void saa7146_res_free(struct saa7146_fh *fh, unsigned int bits);
 #define SAA7146_HPS_SYNC_PORT_B		0x01
 
 /* some memory sizes */
-#if PAGE_SIZE <= 8192
 #define SAA7146_CLIPPING_MEM	(14*PAGE_SIZE)
-#else
-#define SAA7146_CLIPPING_MEM	(14*8192)
-#endif
 
 /* some defines for the various clipping-modes */
 #define SAA7146_CLIPPING_RECT		0x4

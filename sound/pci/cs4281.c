@@ -46,15 +46,14 @@ static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable switches */
 static int dual_codec[SNDRV_CARDS];	/* dual codec */
-static int boot_devs;
 
-module_param_array(index, int, boot_devs, 0444);
+module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for CS4281 soundcard.");
-module_param_array(id, charp, boot_devs, 0444);
+module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for CS4281 soundcard.");
-module_param_array(enable, bool, boot_devs, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable CS4281 soundcard.");
-module_param_array(dual_codec, bool, boot_devs, 0444);
+module_param_array(dual_codec, bool, NULL, 0444);
 MODULE_PARM_DESC(dual_codec, "Secondary Codec ID (0 = disabled).");
 
 /*
@@ -1363,6 +1362,7 @@ static int snd_cs4281_free(cs4281_t *chip)
 	if (chip->ba1)
 		iounmap(chip->ba1);
 	pci_release_regions(chip->pci);
+	pci_disable_device(chip->pci);
 
 	kfree(chip);
 	return 0;
@@ -1396,8 +1396,10 @@ static int __devinit snd_cs4281_create(snd_card_t * card,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
-	if (chip == NULL)
+	if (chip == NULL) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	spin_lock_init(&chip->reg_lock);
 	chip->card = card;
 	chip->pci = pci;
@@ -1411,6 +1413,7 @@ static int __devinit snd_cs4281_create(snd_card_t * card,
 
 	if ((err = pci_request_regions(pci, "CS4281")) < 0) {
 		kfree(chip);
+		pci_disable_device(pci);
 		return err;
 	}
 	chip->ba0_addr = pci_resource_start(pci, 0);
@@ -1914,6 +1917,31 @@ static irqreturn_t snd_cs4281_interrupt(int irq, void *dev_id, struct pt_regs *r
 }
 
 
+/*
+ * OPL3 command
+ */
+static void snd_cs4281_opl3_command(opl3_t * opl3, unsigned short cmd, unsigned char val)
+{
+	unsigned long flags;
+	cs4281_t *chip = opl3->private_data;
+	void __iomem *port;
+
+	if (cmd & OPL3_RIGHT)
+		port = chip->ba0 + BA0_B1AP; /* right port */
+	else
+		port = chip->ba0 + BA0_B0AP; /* left port */
+
+	spin_lock_irqsave(&opl3->reg_lock, flags);
+
+	writel((unsigned int)cmd, port);
+	udelay(10);
+
+	writel((unsigned int)val, port + 4);
+	udelay(30);
+
+	spin_unlock_irqrestore(&opl3->reg_lock, flags);
+}
+
 static int __devinit snd_cs4281_probe(struct pci_dev *pci,
 				      const struct pci_device_id *pci_id)
 {
@@ -1951,13 +1979,13 @@ static int __devinit snd_cs4281_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-	if ((err = snd_opl3_create(card,
-				   (unsigned long)(chip->ba0 + BA0_B0AP),
-				   (unsigned long)(chip->ba0 + BA0_B1AP),
-				   OPL3_HW_OPL3_CS4281, 1, &opl3)) < 0) {
+	if ((err = snd_opl3_new(card, OPL3_HW_OPL3_CS4281, &opl3)) < 0) {
 		snd_card_free(card);
 		return err;
 	}
+	opl3->private_data = chip;
+	opl3->command = snd_cs4281_opl3_command;
+	snd_opl3_init(opl3);
 	if ((err = snd_opl3_hwdep_new(opl3, 0, 1, NULL)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -2050,6 +2078,7 @@ static int cs4281_suspend(snd_card_t *card, unsigned int state)
 	ulCLK &= ~CLKCR1_CKRA;
 	snd_cs4281_pokeBA0(chip, BA0_CLKCR1, ulCLK);
 
+	pci_disable_device(chip->pci);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
 	return 0;
 }
@@ -2061,6 +2090,7 @@ static int cs4281_resume(snd_card_t *card, unsigned int state)
 	u32 ulCLK;
 
 	pci_enable_device(chip->pci);
+	pci_set_master(chip->pci);
 
 	ulCLK = snd_cs4281_peekBA0(chip, BA0_CLKCR1);
 	ulCLK |= CLKCR1_CKRA;

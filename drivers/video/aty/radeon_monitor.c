@@ -7,10 +7,25 @@
 #endif /* CONFIG_PPC_OF */
 
 static struct fb_var_screeninfo radeonfb_default_var = {
-        640, 480, 640, 480, 0, 0, 8, 0,
-        {0, 6, 0}, {0, 6, 0}, {0, 6, 0}, {0, 0, 0},
-        0, 0, -1, -1, 0, 39721, 40, 24, 32, 11, 96, 2,
-        0, FB_VMODE_NONINTERLACED
+	.xres		= 640,
+	.yres		= 480,
+	.xres_virtual	= 640,
+	.yres_virtual	= 480,
+	.bits_per_pixel = 8,
+	.red		= { .length = 8 },
+	.green		= { .length = 8 },
+	.blue		= { .length = 8 },
+	.activate	= FB_ACTIVATE_NOW,
+	.height		= -1,
+	.width		= -1,
+	.pixclock	= 39721,
+	.left_margin	= 40,
+	.right_margin	= 24,
+	.upper_margin	= 32,
+	.lower_margin	= 11,
+	.hsync_len	= 96,
+	.vsync_len	= 2,
+	.vmode		= FB_VMODE_NONINTERLACED
 };
 
 static char *radeon_get_mon_name(int type)
@@ -55,7 +70,7 @@ static int __devinit radeon_parse_montype_prop(struct device_node *dp, u8 **out_
 	u8 *pedid = NULL;
 	u8 *pmt = NULL;
 	u8 *tmp;
-        int i, mt;  
+        int i, mt = MT_NONE;  
 	
 	RTRACE("analyzing OF properties...\n");
 	pmt = (u8 *)get_property(dp, "display-type", NULL);
@@ -69,10 +84,13 @@ static int __devinit radeon_parse_montype_prop(struct device_node *dp, u8 **out_
 		mt = MT_DFP;
 	else if (!strcmp(pmt, "CRT"))
 		mt = MT_CRT;
-	else if (strcmp(pmt, "NONE")) {
-		printk(KERN_WARNING "radeonfb: Unknown OF display-type: %s\n", pmt);
+	else {
+		if (strcmp(pmt, "NONE") != 0)
+			printk(KERN_WARNING "radeonfb: Unknown OF display-type: %s\n",
+			       pmt);
 		return MT_NONE;
 	}
+
 	for (i = 0; propnames[i] != NULL; ++i) {
 		pedid = (u8 *)get_property(dp, propnames[i], NULL);
 		if (pedid != NULL)
@@ -630,35 +648,25 @@ void __devinit radeon_probe_screens(struct radeonfb_info *rinfo,
  */
 static void radeon_fixup_panel_info(struct radeonfb_info *rinfo)
 {
+ #ifdef CONFIG_PPC_OF
 	/*
-	 * A few iBook laptop panels seem to need a fixed PLL setting
-	 *
-	 * We should probably do this differently based on the panel
-	 * type/model or eventually some other device-tree informations,
-	 * but these tweaks below work enough for now. --BenH
+	 * LCD Flat panels should use fixed dividers, we enfore that on
+	 * PowerMac only for now...
 	 */
-#ifdef CONFIG_PPC_OF
-	/* iBook2's */
-	if (machine_is_compatible("PowerBook4,3")) {
+	if (!rinfo->panel_info.use_bios_dividers && rinfo->mon1_type == MT_LCD
+	    && rinfo->is_mobility) {
+		int ppll_div_sel = INREG8(CLOCK_CNTL_INDEX + 1) & 0x3;
+		u32 ppll_divn = INPLL(PPLL_DIV_0 + ppll_div_sel);
 		rinfo->panel_info.ref_divider = rinfo->pll.ref_div;
-		rinfo->panel_info.post_divider = 0x6;
-		rinfo->panel_info.fbk_divider = 0xad;
+		rinfo->panel_info.fbk_divider = ppll_divn & 0x7ff;
+		rinfo->panel_info.post_divider = (ppll_divn >> 16) & 0x7;
 		rinfo->panel_info.use_bios_dividers = 1;
-	}
-	/* Aluminium PowerBook 17" */
-	if (machine_is_compatible("PowerBook5,3")) {
-		rinfo->panel_info.ref_divider = rinfo->pll.ref_div;
-		rinfo->panel_info.post_divider = 0x4;
-		rinfo->panel_info.fbk_divider = 0x80;
-		rinfo->panel_info.use_bios_dividers = 1;
-	}
-	/* iBook G4 */
-        if (machine_is_compatible("PowerBook6,3") |
-            machine_is_compatible("PowerBook6,5")) {
-		rinfo->panel_info.ref_divider = rinfo->pll.ref_div;
-		rinfo->panel_info.post_divider = 0x6;
-		rinfo->panel_info.fbk_divider = 0xad;
-		rinfo->panel_info.use_bios_dividers = 1;
+
+		printk(KERN_DEBUG "radeonfb: Using Firmware dividers 0x%08x "
+		       "from PPLL %d\n",
+		       rinfo->panel_info.fbk_divider |
+		       (rinfo->panel_info.post_divider << 16),
+		       ppll_div_sel);
 	}
 #endif /* CONFIG_PPC_OF */
 }

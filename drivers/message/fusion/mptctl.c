@@ -1161,7 +1161,7 @@ mptctl_getiocinfo (unsigned long arg, unsigned int data_size)
 	int			numDevices = 0;
 	unsigned int		max_id;
 	int			ii;
-	unsigned int		port;
+	int			port;
 	int			cim_rev;
 	u8			revision;
 
@@ -1204,7 +1204,9 @@ mptctl_getiocinfo (unsigned long arg, unsigned int data_size)
 		return -ENODEV;
 	}
 
-	/* Verify the data transfer size is correct.  */
+	/* Verify the data transfer size is correct.
+	 * Ignore the port setting.
+	 */
 	if (karg->hdr.maxDataSize != data_size) {
 		printk(KERN_ERR "%s@%d::mptctl_getiocinfo - "
 			"Structure size mismatch. Command not completed.\n",
@@ -1216,13 +1218,11 @@ mptctl_getiocinfo (unsigned long arg, unsigned int data_size)
 	/* Fill in the data and return the structure to the calling
 	 * program
 	 */
-	if ((int)ioc->chip_type <= (int) FC929)
+	if (ioc->bus_type == FC)
 		karg->adapterType = MPT_IOCTL_INTERFACE_FC;
 	else
 		karg->adapterType = MPT_IOCTL_INTERFACE_SCSI;
 
-	if (karg->hdr.port > 1)
-		return -EINVAL;
 	port = karg->hdr.port;
 
 	karg->port = port;
@@ -1518,7 +1518,7 @@ mptctl_readtest (unsigned long arg)
 #ifdef MFCNT
 	karg.chip_type = ioc->mfcnt;
 #else
-	karg.chip_type = ioc->chip_type;
+	karg.chip_type = ioc->pcidev->device;
 #endif
 	strncpy (karg.name, ioc->name, MPT_MAX_NAME);
 	karg.name[MPT_MAX_NAME-1]='\0';
@@ -2470,7 +2470,7 @@ mptctl_hp_hostinfo(unsigned long arg, unsigned int data_size)
 
 	karg.base_io_addr = pci_resource_start(pdev, 0);
 
-	if ((int)ioc->chip_type <= (int) FC929)
+	if (ioc->bus_type == FC)
 		karg.bus_phys_width = HP_BUS_WIDTH_UNK;
 	else
 		karg.bus_phys_width = HP_BUS_WIDTH_16;
@@ -2559,7 +2559,7 @@ mptctl_hp_targetinfo(unsigned long arg)
 
 	/*  There is nothing to do for FCP parts.
 	 */
-	if ((int) ioc->chip_type <= (int) FC929)
+	if (ioc->bus_type == FC)
 		return 0;
 
 	if ((ioc->spi_data.sdp0length == 0) || (ioc->sh == NULL))

@@ -23,7 +23,7 @@
 #define __SLOW_DOWN_IO	do { } while (0)
 #define SLOW_DOWN_IO	do { } while (0)
 
-#define __IA64_UNCACHED_OFFSET	0xc000000000000000	/* region 6 */
+#define __IA64_UNCACHED_OFFSET	0xc000000000000000UL	/* region 6 */
 
 /*
  * The legacy I/O space defined by the ia64 architecture supports only 65536 ports, but
@@ -32,7 +32,8 @@
  */
 #define IO_SPACE_LIMIT		0xffffffffffffffffUL
 
-#define MAX_IO_SPACES			16
+#define MAX_IO_SPACES_BITS		4
+#define MAX_IO_SPACES			(1UL << MAX_IO_SPACES_BITS)
 #define IO_SPACE_BITS			24
 #define IO_SPACE_SIZE			(1UL << IO_SPACE_BITS)
 
@@ -52,10 +53,24 @@ extern unsigned int num_io_spaces;
 
 # ifdef __KERNEL__
 
+/*
+ * All MMIO iomem cookies are in region 6; anything less is a PIO cookie:
+ *	0xCxxxxxxxxxxxxxxx	MMIO cookie (return from ioremap)
+ *	0x000000001SPPPPPP	PIO cookie (S=space number, P..P=port)
+ *
+ * ioread/writeX() uses the leading 1 in PIO cookies (PIO_OFFSET) to catch
+ * code that uses bare port numbers without the prerequisite pci_iomap().
+ */
+#define PIO_OFFSET		(1UL << (MAX_IO_SPACES_BITS + IO_SPACE_BITS))
+#define PIO_MASK		(PIO_OFFSET - 1)
+#define PIO_RESERVED		__IA64_UNCACHED_OFFSET
+#define HAVE_ARCH_PIO_SIZE
+
 #include <asm/intrinsics.h>
 #include <asm/machvec.h>
 #include <asm/page.h>
 #include <asm/system.h>
+#include <asm-generic/iomap.h>
 
 /*
  * Change virtual addresses to physical addresses and vv.
@@ -90,6 +105,20 @@ extern int valid_phys_addr_range (unsigned long addr, size_t *count); /* efi.c *
  * not IA-64 specific.
  */
 #define __ia64_mf_a()	ia64_mfa()
+
+/**
+ * ___ia64_mmiowb - I/O write barrier
+ *
+ * Ensure ordering of I/O space writes.  This will make sure that writes
+ * following the barrier will arrive after all previous writes.  For most
+ * ia64 platforms, this is a simple 'mf.a' instruction.
+ *
+ * See Documentation/DocBook/deviceiobook.tmpl for more information.
+ */
+static inline void ___ia64_mmiowb(void)
+{
+	ia64_mfa();
+}
 
 static inline const unsigned long
 __ia64_get_io_port_base (void)
@@ -133,6 +162,7 @@ __ia64_mk_io_addr (unsigned long port)
 #define __ia64_writew	___ia64_writew
 #define __ia64_writel	___ia64_writel
 #define __ia64_writeq	___ia64_writeq
+#define __ia64_mmiowb	___ia64_mmiowb
 
 /*
  * For the in/out routines, we need to do "mf.a" _after_ doing the I/O access to ensure
@@ -248,7 +278,7 @@ __outsw (unsigned long port, const void *src, unsigned long count)
 }
 
 static inline void
-__outsl (unsigned long port, void *src, unsigned long count)
+__outsl (unsigned long port, const void *src, unsigned long count)
 {
 	const unsigned int *sp = src;
 
@@ -267,6 +297,7 @@ __outsl (unsigned long port, void *src, unsigned long count)
 #define __outb		platform_outb
 #define __outw		platform_outw
 #define __outl		platform_outl
+#define __mmiowb	platform_mmiowb
 
 #define inb(p)		__inb(p)
 #define inw(p)		__inw(p)
@@ -280,6 +311,7 @@ __outsl (unsigned long port, void *src, unsigned long count)
 #define outsb(p,s,c)	__outsb(p,s,c)
 #define outsw(p,s,c)	__outsw(p,s,c)
 #define outsl(p,s,c)	__outsl(p,s,c)
+#define mmiowb()	__mmiowb()
 
 /*
  * The address passed to these functions are ioremap()ped already.
@@ -290,51 +322,51 @@ __outsl (unsigned long port, void *src, unsigned long count)
  * hopefully it'll stay that way).
  */
 static inline unsigned char
-___ia64_readb (void *addr)
+___ia64_readb (const volatile void __iomem *addr)
 {
-	return *(volatile unsigned char *)addr;
+	return *(volatile unsigned char __force *)addr;
 }
 
 static inline unsigned short
-___ia64_readw (void *addr)
+___ia64_readw (const volatile void __iomem *addr)
 {
-	return *(volatile unsigned short *)addr;
+	return *(volatile unsigned short __force *)addr;
 }
 
 static inline unsigned int
-___ia64_readl (void *addr)
+___ia64_readl (const volatile void __iomem *addr)
 {
-	return *(volatile unsigned int *) addr;
+	return *(volatile unsigned int __force *) addr;
 }
 
 static inline unsigned long
-___ia64_readq (void *addr)
+___ia64_readq (const volatile void __iomem *addr)
 {
-	return *(volatile unsigned long *) addr;
+	return *(volatile unsigned long __force *) addr;
 }
 
 static inline void
-__writeb (unsigned char val, void *addr)
+__writeb (unsigned char val, volatile void __iomem *addr)
 {
-	*(volatile unsigned char *) addr = val;
+	*(volatile unsigned char __force *) addr = val;
 }
 
 static inline void
-__writew (unsigned short val, void *addr)
+__writew (unsigned short val, volatile void __iomem *addr)
 {
-	*(volatile unsigned short *) addr = val;
+	*(volatile unsigned short __force *) addr = val;
 }
 
 static inline void
-__writel (unsigned int val, void *addr)
+__writel (unsigned int val, volatile void __iomem *addr)
 {
-	*(volatile unsigned int *) addr = val;
+	*(volatile unsigned int __force *) addr = val;
 }
 
 static inline void
-__writeq (unsigned long val, void *addr)
+__writeq (unsigned long val, volatile void __iomem *addr)
 {
-	*(volatile unsigned long *) addr = val;
+	*(volatile unsigned long __force *) addr = val;
 }
 
 #define __readb		platform_readb
@@ -346,14 +378,14 @@ __writeq (unsigned long val, void *addr)
 #define __readl_relaxed	platform_readl_relaxed
 #define __readq_relaxed	platform_readq_relaxed
 
-#define readb(a)	__readb((void *)(a))
-#define readw(a)	__readw((void *)(a))
-#define readl(a)	__readl((void *)(a))
-#define readq(a)	__readq((void *)(a))
-#define readb_relaxed(a)	__readb_relaxed((void *)(a))
-#define readw_relaxed(a)	__readw_relaxed((void *)(a))
-#define readl_relaxed(a)	__readl_relaxed((void *)(a))
-#define readq_relaxed(a)	__readq_relaxed((void *)(a))
+#define readb(a)	__readb((a))
+#define readw(a)	__readw((a))
+#define readl(a)	__readl((a))
+#define readq(a)	__readq((a))
+#define readb_relaxed(a)	__readb_relaxed((a))
+#define readw_relaxed(a)	__readw_relaxed((a))
+#define readl_relaxed(a)	__readl_relaxed((a))
+#define readq_relaxed(a)	__readq_relaxed((a))
 #define __raw_readb	readb
 #define __raw_readw	readw
 #define __raw_readl	readl
@@ -362,10 +394,10 @@ __writeq (unsigned long val, void *addr)
 #define __raw_readw_relaxed	readw_relaxed
 #define __raw_readl_relaxed	readl_relaxed
 #define __raw_readq_relaxed	readq_relaxed
-#define writeb(v,a)	__writeb((v), (void *) (a))
-#define writew(v,a)	__writew((v), (void *) (a))
-#define writel(v,a)	__writel((v), (void *) (a))
-#define writeq(v,a)	__writeq((v), (void *) (a))
+#define writeb(v,a)	__writeb((v), (a))
+#define writew(v,a)	__writew((v), (a))
+#define writel(v,a)	__writel((v), (a))
+#define writeq(v,a)	__writeq((v), (a))
 #define __raw_writeb	writeb
 #define __raw_writew	writew
 #define __raw_writel	writel
@@ -397,14 +429,14 @@ __writeq (unsigned long val, void *addr)
  *
  * On ia-64, we access the physical I/O memory space through the uncached kernel region.
  */
-static inline void *
+static inline void __iomem *
 ioremap (unsigned long offset, unsigned long size)
 {
-	return (void *) (__IA64_UNCACHED_OFFSET | (offset));
+	return (void __iomem *) (__IA64_UNCACHED_OFFSET | (offset));
 }
 
 static inline void
-iounmap (void *addr)
+iounmap (volatile void __iomem *addr)
 {
 }
 
@@ -415,17 +447,14 @@ iounmap (void *addr)
 /*
  * String version of IO memory access ops:
  */
-extern void __ia64_memcpy_fromio (void *, unsigned long, long);
-extern void __ia64_memcpy_toio (unsigned long, void *, long);
-extern void __ia64_memset_c_io (unsigned long, unsigned long, long);
+extern void __ia64_memcpy_fromio (void *, volatile void __iomem *, long);
+extern void __ia64_memcpy_toio (volatile void __iomem *, void *, long);
+extern void __ia64_memset_c_io (volatile void __iomem *, unsigned long, long);
 
-#define memcpy_fromio(to,from,len) \
-  __ia64_memcpy_fromio((to),(unsigned long)(from),(len))
-#define memcpy_toio(to,from,len) \
-  __ia64_memcpy_toio((unsigned long)(to),(from),(len))
-#define memset_io(addr,c,len) \
-  __ia64_memset_c_io((unsigned long)(addr),0x0101010101010101UL*(u8)(c),(len))
-
+#define memcpy_fromio(to,from,len)	__ia64_memcpy_fromio((to), (from),(len))
+#define memcpy_toio(to,from,len)	__ia64_memcpy_toio((to),(from),(len))
+#define memset_io(addr,c,len)		__ia64_memset_c_io((addr), 0x0101010101010101UL*(u8)(c), \
+							   (len))
 
 #define dma_cache_inv(_start,_size)             do { } while (0)
 #define dma_cache_wback(_start,_size)           do { } while (0)

@@ -55,6 +55,7 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
+#include <linux/bitops.h>
 #ifdef CONFIG_SERIAL_CONSOLE
 #include <linux/console.h>
 #endif
@@ -63,7 +64,6 @@
 #include <asm/pgtable.h>
 #include <asm/irq.h>
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/uaccess.h>
 #include <asm/wbflush.h>
 #include <asm/bootinfo.h>
@@ -679,10 +679,7 @@ static void do_softint(void *private_)
 		return;
 
 	if (test_and_clear_bit(RS_EVENT_WRITE_WAKEUP, &info->event)) {
-		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-		    tty->ldisc.write_wakeup)
-			(tty->ldisc.write_wakeup)(tty);
-		wake_up_interruptible(&tty->write_wait);
+		tty_wakeup(tty);
 	}
 }
 
@@ -930,7 +927,7 @@ static void rs_flush_chars(struct tty_struct *tty)
 	restore_flags(flags);
 }
 
-static int rs_write(struct tty_struct * tty, int from_user,
+static int rs_write(struct tty_struct * tty,
 		    const unsigned char *buf, int count)
 {
 	int	c, total = 0;
@@ -951,15 +948,7 @@ static int rs_write(struct tty_struct * tty, int from_user,
 		if (c <= 0)
 			break;
 
-		if (from_user) {
-			down(&tmp_buf_sem);
-			copy_from_user(tmp_buf, buf, c);
-			c = min_t(int, c, min(SERIAL_XMIT_SIZE - info->xmit_cnt - 1,
-					      SERIAL_XMIT_SIZE - info->xmit_head));
-			memcpy(info->xmit_buf + info->xmit_head, tmp_buf, c);
-			up(&tmp_buf_sem);
-		} else
-			memcpy(info->xmit_buf + info->xmit_head, buf, c);
+		memcpy(info->xmit_buf + info->xmit_head, buf, c);
 		info->xmit_head = (info->xmit_head + c) & (SERIAL_XMIT_SIZE-1);
 		info->xmit_cnt += c;
 		restore_flags(flags);
@@ -1006,10 +995,7 @@ static void rs_flush_buffer(struct tty_struct *tty)
 	cli();
 	info->xmit_cnt = info->xmit_head = info->xmit_tail = 0;
 	sti();
-	wake_up_interruptible(&tty->write_wait);
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
+	tty_wakeup(tty);
 }
 
 /*
@@ -1403,8 +1389,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	shutdown(info);
 	if (tty->driver->flush_buffer)
 		tty->driver->flush_buffer(tty);
-	if (tty->ldisc.flush_buffer)
-		tty->ldisc.flush_buffer(tty);
+	tty_ldisc_flush(tty);
 	tty->closing = 0;
 	info->event = 0;
 	info->tty = 0;

@@ -2,7 +2,6 @@
 #define _ACI_H_
 
 extern int aci_port;
-extern int aci_idcode[2];	/* manufacturer and product ID */
 extern int aci_version;		/* ACI firmware version	*/
 extern int aci_rw_cmd(int write1, int write2, int write3);
 

@@ -65,20 +65,6 @@ static struct usb_driver se401_driver;
  * Memory management
  *
  **********************************************************************/
-
-/* Here we want the physical address of the memory.
- * This is used when initializing the contents of the area.
- */
-static inline unsigned long kvirt_to_pa(unsigned long adr)
-{
-	unsigned long kva, ret;
-
-	kva = (unsigned long) page_address(vmalloc_to_page((void *)adr));
-	kva |= adr & (PAGE_SIZE-1); /* restore the offset */
-	ret = __pa(kva);
-	return ret;
-}
-
 static void *rvmalloc(unsigned long size)
 {
 	void *mem;
@@ -514,7 +500,7 @@ static int se401_stop_stream(struct usb_se401 *se401)
 	se401_sndctrl(1, se401, SE401_REQ_CAMERA_POWER, 0, NULL, 0);
 
 	for (i=0; i<SE401_NUMSBUF; i++) if (se401->urb[i]) {
-		usb_unlink_urb(se401->urb[i]);
+		usb_kill_urb(se401->urb[i]);
 		usb_free_urb(se401->urb[i]);
 		se401->urb[i]=NULL;
 		kfree(se401->sbuf[i].data);
@@ -883,7 +869,7 @@ static void usb_se401_remove_disconnected (struct usb_se401 *se401)
         se401->dev = NULL;
 
 	for (i=0; i<SE401_NUMSBUF; i++) if (se401->urb[i]) {
-		usb_unlink_urb(se401->urb[i]);
+		usb_kill_urb(se401->urb[i]);
 		usb_free_urb(se401->urb[i]);
 		se401->urb[i] = NULL;
 		kfree(se401->sbuf[i].data);
@@ -892,7 +878,7 @@ static void usb_se401_remove_disconnected (struct usb_se401 *se401)
 		kfree(se401->scratch[i].data);
 	}
 	if (se401->inturb) {
-		usb_unlink_urb(se401->inturb);
+		usb_kill_urb(se401->inturb);
 		usb_free_urb(se401->inturb);
 	}
         info("%s disconnected", se401->camera_name);
@@ -1182,8 +1168,8 @@ static int se401_mmap(struct file *file, struct vm_area_struct *vma)
 	}
 	pos = (unsigned long)se401->fbuf;
 	while (size > 0) {
-		page = kvirt_to_pa(pos);
-		if (remap_page_range(vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
+		page = vmalloc_to_pfn((void *)pos);
+		if (remap_pfn_range(vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
 			up(&se401->lock);
 			return -EAGAIN;
 		}

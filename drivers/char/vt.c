@@ -101,11 +101,11 @@
 #include <linux/bootmem.h>
 #include <linux/pm.h>
 #include <linux/font.h>
+#include <linux/bitops.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 
 #include "console_macros.h"
 
@@ -768,6 +768,8 @@ inline int resize_screen(int currcons, int width, int height)
  * [this is to be used together with some user program
  * like resize that changes the hardware videomode]
  */
+#define VC_RESIZE_MAXCOL (32767)
+#define VC_RESIZE_MAXROW (32767)
 int vc_resize(int currcons, unsigned int cols, unsigned int lines)
 {
 	unsigned long old_origin, new_origin, new_scr_end, rlth, rrem, err = 0;
@@ -779,6 +781,9 @@ int vc_resize(int currcons, unsigned int cols, unsigned int lines)
 
 	if (!vc_cons_allocated(currcons))
 		return -ENXIO;
+
+	if (cols > VC_RESIZE_MAXCOL || lines > VC_RESIZE_MAXROW)
+		return -EINVAL;
 
 	new_cols = (cols ? cols : video_num_columns);
 	new_rows = (lines ? lines : video_num_lines);
@@ -1889,8 +1894,7 @@ char con_buf[CON_BUF_SIZE];
 DECLARE_MUTEX(con_buf_sem);
 
 /* acquires console_sem */
-static int do_con_write(struct tty_struct *tty, int from_user,
-			const unsigned char *buf, int count)
+static int do_con_write(struct tty_struct *tty, const unsigned char *buf, int count)
 {
 #ifdef VT_BUF_VRAM_ONLY
 #define FLUSH do { } while(0);
@@ -1937,22 +1941,6 @@ static int do_con_write(struct tty_struct *tty, int from_user,
 
 	orig_buf = buf;
 	orig_count = count;
-
-	if (from_user) {
-
-		down(&con_buf_sem);
-
-again:
-		if (count > CON_BUF_SIZE)
-			count = CON_BUF_SIZE;
-		console_conditional_schedule();
-		if (copy_from_user(con_buf, buf, count)) {
-			n = 0; /* ?? are error codes legal here ?? */
-			goto out;
-		}
-
-		buf = con_buf;
-	}
 
 	/* At this point 'buf' is guaranteed to be a kernel buffer
 	 * and therefore no access to userspace (and therefore sleeping)
@@ -2094,22 +2082,6 @@ again:
 	release_console_sem();
 
 out:
-	if (from_user) {
-		/* If the user requested something larger than
-		 * the CON_BUF_SIZE, and the tty is not stopped,
-		 * keep going.
-		 */
-		if ((orig_count > CON_BUF_SIZE) && !tty->stopped) {
-			orig_count -= CON_BUF_SIZE;
-			orig_buf += CON_BUF_SIZE;
-			count = orig_count;
-			buf = orig_buf;
-			goto again;
-		}
-
-		up(&con_buf_sem);
-	}
-
 	return n;
 #undef FLUSH
 }
@@ -2185,8 +2157,6 @@ void vt_console_print(struct console *co, const char *b, unsigned count)
 	/* console busy or not yet initialized */
 	if (!printable || test_and_set_bit(0, &printing))
 		return;
-
-	pm_access(pm_con);
 
 	if (kmsg_redirect && vc_cons_allocated(kmsg_redirect - 1))
 		currcons = kmsg_redirect - 1;
@@ -2382,13 +2352,11 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
  * /dev/ttyN handling
  */
 
-static int con_write(struct tty_struct *tty, int from_user,
-		     const unsigned char *buf, int count)
+static int con_write(struct tty_struct *tty, const unsigned char *buf, int count)
 {
 	int	retval;
 
-	pm_access(pm_con);
-	retval = do_con_write(tty, from_user, buf, count);
+	retval = do_con_write(tty, buf, count);
 	con_flush_chars(tty);
 
 	return retval;
@@ -2398,8 +2366,7 @@ static void con_put_char(struct tty_struct *tty, unsigned char ch)
 {
 	if (in_interrupt())
 		return;	/* n_r3964 calls put_char() from interrupt context */
-	pm_access(pm_con);
-	do_con_write(tty, 0, &ch, 1);
+	do_con_write(tty, &ch, 1);
 }
 
 static int con_write_room(struct tty_struct *tty)
@@ -2467,8 +2434,6 @@ static void con_flush_chars(struct tty_struct *tty)
 	if (in_interrupt())	/* from flush_to_ldisc */
 		return;
 
-	pm_access(pm_con);
-	
 	/* if we race with con_close(), vt may be null */
 	acquire_console_sem();
 	vt = tty->driver_data;
@@ -3077,6 +3042,10 @@ int con_font_get(int currcons, struct console_font_op *op)
 	if (rc)
 		goto out;
 
+	op->height = font.height;
+	op->width = font.width;
+	op->charcount = font.charcount;
+
 	if (op->data && copy_to_user(op->data, font.data, c))
 		rc = -EFAULT;
 
@@ -3277,31 +3246,6 @@ static int pm_con_request(struct pm_dev *dev, pm_request_t rqst, void *data)
 	return 0;
 }
 
-#ifdef CONFIG_BOOTSPLASH
-void con_remap_def_color(int currcons, int new_color)
-{
-       unsigned short *sbuf = screenbuf;
-       unsigned c, len = screenbuf_size >> 1;
-       int old_color;
-
-       if (sbuf) {
-	       old_color = def_color << 8;
-	       new_color <<= 8;
-	       while(len--) {
-		       c = *sbuf;
-		       if (((c ^ old_color) & 0xf000) == 0)
-			       *sbuf ^= (old_color ^ new_color) & 0xf000;
-		       if (((c ^ old_color) & 0x0f00) == 0)
-			       *sbuf ^= (old_color ^ new_color) & 0x0f00;
-		       sbuf++;
-	       }
-	       new_color >>= 8;
-       }
-       def_color = color = new_color;
-       update_attr(currcons);
-}
-#endif
-
 /*
  *	Visible symbols for modules
  */
@@ -3310,7 +3254,6 @@ EXPORT_SYMBOL(color_table);
 EXPORT_SYMBOL(default_red);
 EXPORT_SYMBOL(default_grn);
 EXPORT_SYMBOL(default_blu);
-EXPORT_SYMBOL(vc_cons_allocated);
 EXPORT_SYMBOL(update_region);
 EXPORT_SYMBOL(redraw_screen);
 EXPORT_SYMBOL(vc_resize);

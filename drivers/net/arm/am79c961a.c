@@ -28,9 +28,9 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/crc32.h>
+#include <linux/bitops.h>
 
 #include <asm/system.h>
-#include <asm/bitops.h>
 #include <asm/irq.h>
 #include <asm/io.h>
 #include <asm/dma.h>
@@ -630,6 +630,16 @@ am79c961_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_RETVAL(handled);
 }
 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+static void am79c961_poll_controller(struct net_device *dev)
+{
+	unsigned long flags;
+	local_irq_save(flags);
+	am79c961_interrupt(dev->irq, dev, NULL);
+	local_irq_restore(flags);
+}
+#endif
+
 /*
  * Initialise the chip.  Note that we always expect
  * to be entered with interrupts enabled.
@@ -721,6 +731,9 @@ static int __init am79c961_init(void)
 	dev->get_stats		= am79c961_getstats;
 	dev->set_multicast_list	= am79c961_setmulticastlist;
 	dev->tx_timeout		= am79c961_timeout;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller	= am79c961_poll_controller;
+#endif
 
 	ret = register_netdev(dev);
 	if (ret == 0)

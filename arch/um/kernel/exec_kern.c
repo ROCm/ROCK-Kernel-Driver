@@ -34,34 +34,36 @@ void start_thread(struct pt_regs *regs, unsigned long eip, unsigned long esp)
 
 extern void log_exec(char **argv, void *tty);
 
-static int execve1(char *file, char **argv, char **env)
+static long execve1(char *file, char **argv, char **env)
 {
-        int error;
+        long error;
 
 #ifdef CONFIG_TTY_LOG
 	log_exec(argv, current->tty);
 #endif
         error = do_execve(file, argv, env, &current->thread.regs);
         if (error == 0){
+		task_lock(current);
                 current->ptrace &= ~PT_DTRACE;
+		task_unlock(current);
                 set_cmdline(current_cmd());
         }
         return(error);
 }
 
-int um_execve(char *file, char **argv, char **env)
+long um_execve(char *file, char **argv, char **env)
 {
-	int err;
+	long err;
 
 	err = execve1(file, argv, env);
-	if(!err) 
+	if(!err)
 		do_longjmp(current->thread.exec_buf, 1);
 	return(err);
 }
 
-int sys_execve(char *file, char **argv, char **env)
+long sys_execve(char *file, char **argv, char **env)
 {
-	int error;
+	long error;
 	char *filename;
 
 	lock_kernel();

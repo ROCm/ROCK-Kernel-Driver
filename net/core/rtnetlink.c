@@ -182,7 +182,7 @@ static int rtnetlink_fill_ifinfo(struct sk_buff *skb, struct net_device *dev,
 	}
 
 	if (1) {
-		struct ifmap map = {
+		struct rtnl_link_ifmap map = {
 			.mem_start   = dev->mem_start,
 			.mem_end     = dev->mem_end,
 			.base_addr   = dev->base_addr,
@@ -218,9 +218,7 @@ static int rtnetlink_fill_ifinfo(struct sk_buff *skb, struct net_device *dev,
 		RTA_PUT(skb, IFLA_MASTER, sizeof(master), &master);
 	}
 
-	/* Don't call get_stats when the device is in low power state */
-	if (dev->get_stats &&
-	    (!dev->class_dev.dev || !dev->class_dev.dev->power_state)) { 
+	if (dev->get_stats) {
 		unsigned long *stats = (unsigned long*)dev->get_stats(dev);
 		if (stats) {
 			struct rtattr  *a;
@@ -279,6 +277,9 @@ static int do_setlink(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 		dev_change_flags(dev, ifm->ifi_flags);
 
 	if (ida[IFLA_MAP - 1]) {
+		struct rtnl_link_ifmap *u_map;
+		struct ifmap k_map;
+
 		if (!dev->set_config) {
 			err = -EOPNOTSUPP;
 			goto out;
@@ -289,11 +290,19 @@ static int do_setlink(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 			goto out;
 		}
 		
-		if (ida[IFLA_MAP - 1]->rta_len != RTA_LENGTH(sizeof(struct ifmap)))
+		if (ida[IFLA_MAP - 1]->rta_len != RTA_LENGTH(sizeof(*u_map)))
 			goto out;
-		
-		err = dev->set_config(dev, (struct ifmap *)
-				RTA_DATA(ida[IFLA_MAP - 1]));
+
+		u_map = RTA_DATA(ida[IFLA_MAP - 1]);
+
+		k_map.mem_start = (unsigned long) u_map->mem_start;
+		k_map.mem_end = (unsigned long) u_map->mem_end;
+		k_map.base_addr = (unsigned short) u_map->base_addr;
+		k_map.irq = (unsigned char) u_map->irq;
+		k_map.dma = (unsigned char) u_map->dma;
+		k_map.port = (unsigned char) u_map->port;
+
+		err = dev->set_config(dev, &k_map);
 
 		if (err)
 			goto out;
@@ -403,7 +412,9 @@ static int rtnetlink_dump_all(struct sk_buff *skb, struct netlink_callback *cb)
 void rtmsg_ifinfo(int type, struct net_device *dev, unsigned change)
 {
 	struct sk_buff *skb;
-	int size = NLMSG_GOODSIZE;
+	int size = NLMSG_SPACE(sizeof(struct ifinfomsg) +
+			       sizeof(struct rtnl_link_ifmap) +
+			       sizeof(struct rtnl_link_stats) + 128);
 
 	skb = alloc_skb(size, GFP_KERNEL);
 	if (!skb)

@@ -494,20 +494,15 @@ give_sigsegv:
  */	
 
 static long
-handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
-	      struct pt_regs *regs, int in_syscall)
+handle_signal(unsigned long sig, siginfo_t *info, struct k_sigaction *ka,
+		sigset_t *oldset, struct pt_regs *regs, int in_syscall)
 {
-	struct k_sigaction *ka = &current->sighand->action[sig-1];
-
 	DBG(1,"handle_signal: sig=%ld, ka=%p, info=%p, oldset=%p, regs=%p\n",
 	       sig, ka, info, oldset, regs);
 	
 	/* Set up the stack frame */
 	if (!setup_rt_frame(sig, ka, info, oldset, regs, in_syscall))
 		return 0;
-
-	if (ka->sa.sa_flags & SA_ONESHOT)
-		ka->sa.sa_handler = SIG_DFL;
 
 	if (!(ka->sa.sa_flags & SA_NODEFER)) {
 		spin_lock_irq(&current->sighand->siglock);
@@ -535,7 +530,7 @@ asmlinkage int
 do_signal(sigset_t *oldset, struct pt_regs *regs, int in_syscall)
 {
 	siginfo_t info;
-	struct k_sigaction *ka;
+	struct k_sigaction ka;
 	int signr;
 
 	DBG(1,"\ndo_signal: oldset=0x%p, regs=0x%p, sr7 %#lx, in_syscall=%d\n",
@@ -553,10 +548,15 @@ do_signal(sigset_t *oldset, struct pt_regs *regs, int in_syscall)
 		oldset->sig[0], oldset->sig[1]);
 
 
-	signr = get_signal_to_deliver(&info, regs, NULL);
-	DBG(3,"do_signal: signr = %d, regs->gr[28] = %ld\n", signr, regs->gr[28]); 
+	/* May need to force signal if handle_signal failed to deliver */
+	while (1) {
+	  
+		signr = get_signal_to_deliver(&info, &ka, regs, NULL);
+		DBG(3,"do_signal: signr = %d, regs->gr[28] = %ld\n", signr, regs->gr[28]); 
 	
-	if (signr > 0) {
+		if (signr <= 0)
+		  break;
+		
 		/* Restart a system call if necessary. */
 		if (in_syscall) {
 			/* Check the return code */
@@ -569,8 +569,7 @@ do_signal(sigset_t *oldset, struct pt_regs *regs, int in_syscall)
 				break;
 
 			case -ERESTARTSYS:
-				ka = &current->sighand->action[signr-1];
-				if (!(ka->sa.sa_flags & SA_RESTART)) {
+				if (!(ka.sa.sa_flags & SA_RESTART)) {
 					DBG(1,"ERESTARTSYS: putting -EINTR\n");
 					regs->gr[28] = -EINTR;
 					break;
@@ -578,8 +577,7 @@ do_signal(sigset_t *oldset, struct pt_regs *regs, int in_syscall)
 			/* fallthrough */
 			case -ERESTARTNOINTR:
 				/* A syscall is just a branch, so all
-                                   we have to do is fiddle the return
-                                   pointer. */
+				   we have to do is fiddle the return pointer. */
 				regs->gr[31] -= 8; /* delayed branching */
 				/* Preserve original r28. */
 				regs->gr[28] = regs->orig_r28;
@@ -589,12 +587,13 @@ do_signal(sigset_t *oldset, struct pt_regs *regs, int in_syscall)
 		/* Whee!  Actually deliver the signal.  If the
 		   delivery failed, we need to continue to iterate in
 		   this loop so we can deliver the SIGSEGV... */
-		if (handle_signal(signr, &info, oldset, regs, in_syscall)) {
+		if (handle_signal(signr, &info, &ka, oldset, regs, in_syscall)) {
 			DBG(1,KERN_DEBUG "do_signal: Exit (success), regs->gr[28] = %ld\n",
 				regs->gr[28]);
 			return 1;
 		}
 	}
+	/* end of while(1) looping forever if we can't force a signal */
 
 	/* Did we come from a system call? */
 	if (in_syscall) {

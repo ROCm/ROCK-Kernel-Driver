@@ -9,18 +9,6 @@
 
 #include "sysfs.h"
 
-static struct inode_operations sysfs_symlink_inode_operations = {
-	.readlink = generic_readlink,
-	.follow_link = sysfs_follow_link,
-	.put_link = sysfs_put_link,
-};
-
-static int init_symlink(struct inode * inode)
-{
-	inode->i_op = &sysfs_symlink_inode_operations;
-	return 0;
-}
-
 static int object_depth(struct kobject * kobj)
 {
 	struct kobject * p = kobj;
@@ -55,6 +43,36 @@ static void fill_object_path(struct kobject * kobj, char * buffer, int length)
 	}
 }
 
+static int sysfs_add_link(struct dentry * parent, char * name, struct kobject * target)
+{
+	struct sysfs_dirent * parent_sd = parent->d_fsdata;
+	struct sysfs_symlink * sl;
+	int error = 0;
+
+	error = -ENOMEM;
+	sl = kmalloc(sizeof(*sl), GFP_KERNEL);
+	if (!sl)
+		goto exit1;
+
+	sl->link_name = kmalloc(strlen(name) + 1, GFP_KERNEL);
+	if (!sl->link_name)
+		goto exit2;
+
+	strcpy(sl->link_name, name);
+	sl->target_kobj = kobject_get(target);
+
+	error = sysfs_make_dirent(parent_sd, NULL, sl, S_IFLNK|S_IRWXUGO,
+				SYSFS_KOBJ_LINK);
+	if (!error)
+		return 0;
+
+	kfree(sl->link_name);
+exit2:
+	kfree(sl);
+exit1:
+	return error;
+}
+
 /**
  *	sysfs_create_link - create symlink between two objects.
  *	@kobj:	object whose directory we're creating the link in.
@@ -64,21 +82,12 @@ static void fill_object_path(struct kobject * kobj, char * buffer, int length)
 int sysfs_create_link(struct kobject * kobj, struct kobject * target, char * name)
 {
 	struct dentry * dentry = kobj->dentry;
-	struct dentry * d;
 	int error = 0;
 
+	BUG_ON(!kobj || !kobj->dentry || !name);
+
 	down(&dentry->d_inode->i_sem);
-	d = sysfs_get_dentry(dentry,name);
-	if (!IS_ERR(d)) {
-		error = sysfs_create(d, S_IFLNK|S_IRWXUGO, init_symlink);
-		if (!error)
-			/* 
-			 * associate the link dentry with the target kobject 
-			 */
-			d->d_fsdata = kobject_get(target);
-		dput(d);
-	} else 
-		error = PTR_ERR(d);
+	error = sysfs_add_link(dentry, name, target);
 	up(&dentry->d_inode->i_sem);
 	return error;
 }
@@ -142,7 +151,7 @@ static int sysfs_getlink(struct dentry *dentry, char * path)
 
 }
 
-int sysfs_follow_link(struct dentry *dentry, struct nameidata *nd)
+static int sysfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
 	int error = -ENOMEM;
 	unsigned long page = get_zeroed_page(GFP_KERNEL);
@@ -152,13 +161,20 @@ int sysfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 	return 0;
 }
 
-void sysfs_put_link(struct dentry *dentry, struct nameidata *nd)
+static void sysfs_put_link(struct dentry *dentry, struct nameidata *nd)
 {
 	char *page = nd_get_link(nd);
 	if (!IS_ERR(page))
 		free_page((unsigned long)page);
 }
 
-EXPORT_SYMBOL(sysfs_create_link);
-EXPORT_SYMBOL(sysfs_remove_link);
+struct inode_operations sysfs_symlink_inode_operations = {
+	.readlink = generic_readlink,
+	.follow_link = sysfs_follow_link,
+	.put_link = sysfs_put_link,
+};
+
+
+EXPORT_SYMBOL_GPL(sysfs_create_link);
+EXPORT_SYMBOL_GPL(sysfs_remove_link);
 

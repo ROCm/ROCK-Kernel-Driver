@@ -156,7 +156,8 @@ extern int os_lock_file(int fd, int excl);
 extern unsigned long os_process_pc(int pid);
 extern int os_process_parent(int pid);
 extern void os_stop_process(int pid);
-extern void os_kill_process(int pid, int reap_child, int trace_cont);
+extern void os_kill_process(int pid, int reap_child);
+extern void os_kill_ptraced_process(int pid, int reap_child);
 extern void os_usr1_process(int pid);
 extern int os_getpid(void);
 

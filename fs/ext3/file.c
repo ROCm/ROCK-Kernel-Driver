@@ -33,8 +33,10 @@
  */
 static int ext3_release_file (struct inode * inode, struct file * filp)
 {
-	if (filp->f_mode & FMODE_WRITE)
-		ext3_discard_prealloc (inode);
+	/* if we are the last writer on the inode, drop the block reservation */
+	if ((filp->f_mode & FMODE_WRITE) &&
+			(atomic_read(&inode->i_writecount) == 1))
+		ext3_discard_reservation(inode);
 	if (is_dx(inode) && filp->private_data)
 		ext3_htree_free_dir_info(filp->private_data);
 
@@ -132,10 +134,12 @@ struct file_operations ext3_file_operations = {
 struct inode_operations ext3_file_inode_operations = {
 	.truncate	= ext3_truncate,
 	.setattr	= ext3_setattr,
-	.setxattr	= ext3_setxattr,
-	.getxattr	= ext3_getxattr,
+#ifdef CONFIG_EXT3_FS_XATTR
+	.setxattr	= generic_setxattr,
+	.getxattr	= generic_getxattr,
 	.listxattr	= ext3_listxattr,
-	.removexattr	= ext3_removexattr,
+	.removexattr	= generic_removexattr,
+#endif
 	.permission	= ext3_permission,
 };
 

@@ -472,7 +472,7 @@ static inline int __rxrpc_call_gen_normal_ACK(struct rxrpc_call *call,
 {
 	struct rxrpc_message *msg;
 	struct kvec diov[3];
-	unsigned aux[4];
+	__be32 aux[4];
 	int delta, ret;
 
 	/* ACKs default to DELAY */
@@ -840,7 +840,7 @@ static int __rxrpc_call_abort(struct rxrpc_call *call, int errno)
 	struct rxrpc_message *msg;
 	struct kvec diov[1];
 	int ret;
-	u32 _error;
+	__be32 _error;
 
 	_enter("%p{%08x},%p{%d},%d",
 	       conn, ntohl(conn->conn_id), call, ntohl(call->call_id), errno);
@@ -986,7 +986,7 @@ static void rxrpc_call_receive_packet(struct rxrpc_call *call)
 
 			/* deal with abort packets */
 		case RXRPC_PACKET_TYPE_ABORT: {
-			uint32_t _dbuf, *dp;
+			__be32 _dbuf, *dp;
 
 			dp = skb_header_pointer(msg->pkt, msg->offset,
 						sizeof(_dbuf), &_dbuf);
@@ -1048,7 +1048,7 @@ static void rxrpc_call_receive_data_packet(struct rxrpc_call *call,
 	struct rxrpc_message *pmsg;
 	struct list_head *_p;
 	int ret, lo, hi, rmtimo;
-	u32 opid;
+	__be32 opid;
 
 	_enter("%p{%u},%p{%u}", call, ntohl(call->call_id), msg, msg->seq);
 
@@ -1270,7 +1270,7 @@ static void rxrpc_call_receive_ack_packet(struct rxrpc_call *call,
 					  struct rxrpc_message *msg)
 {
 	struct rxrpc_ackpacket _ack, *ap;
-	rxrpc_serial_t serial;
+	rxrpc_serial_net_t serial;
 	rxrpc_seq_t seq;
 	int ret;
 

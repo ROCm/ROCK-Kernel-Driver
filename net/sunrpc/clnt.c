@@ -139,7 +139,6 @@ rpc_create_client(struct rpc_xprt *xprt, char *servname,
 	clnt->cl_maxproc  = version->nrprocs;
 	clnt->cl_protname = program->name;
 	clnt->cl_pmap	  = &clnt->cl_pmap_default;
-	clnt->cl_pmap->pm_parent = clnt->cl_pmap;
 	clnt->cl_port     = xprt->addr.sin_port;
 	clnt->cl_prog     = program->number;
 	clnt->cl_vers     = version->number;
@@ -208,9 +207,6 @@ rpc_clone_client(struct rpc_clnt *clnt)
 	rpc_init_rtt(&new->cl_rtt_default, clnt->cl_xprt->timeout.to_initval);
 	if (new->cl_auth)
 		atomic_inc(&new->cl_auth->au_count);
-	new->cl_pmap		= &new->cl_pmap_default;
-	new->cl_pmap->pm_parent = &clnt->cl_pmap->pm_parent;
-	rpc_init_wait_queue(&new->cl_pmap_default.pm_bindwait, "bindwait");
 	return new;
 out_no_clnt:
 	printk(KERN_INFO "RPC: out of memory in %s\n", __FUNCTION__);
@@ -297,25 +293,6 @@ rpc_release_client(struct rpc_clnt *clnt)
 	wake_up(&destroy_wait);
 	if (clnt->cl_oneshot || clnt->cl_dead)
 		rpc_destroy_client(clnt);
-}
-
-/*
- * Change the program of a (usually cloned) client
- */
-void
-rpc_change_program(struct rpc_clnt *clnt, struct rpc_program *program,
-		   int vers)
-{
-	struct rpc_version *version;
-
-	BUG_ON(vers >= program->nrvers || !program->version[vers]);
-	version = program->version[vers];
-	clnt->cl_procinfo = version->procs;
-	clnt->cl_maxproc  = version->nrprocs;
-	clnt->cl_protname = program->name;
-	clnt->cl_prog     = program->number;
-	clnt->cl_vers     = version->number;
-	clnt->cl_stats    = program->stats;
 }
 
 /*
@@ -1058,29 +1035,23 @@ call_verify(struct rpc_task *task)
 	case RPC_SUCCESS:
 		return p;
 	case RPC_PROG_UNAVAIL:
-		if (task->tk_client->cl_prog != 100227) {
-			/* Missing NFSACL support is reported by the caller. */
-			printk(KERN_WARNING "RPC: call_verify: program %u is unsupported by server %s\n",
+		printk(KERN_WARNING "RPC: call_verify: program %u is unsupported by server %s\n",
 				(unsigned int)task->tk_client->cl_prog,
 				task->tk_client->cl_server);
-		}
-		rpc_exit(task, -ENOSYS);
-		return NULL;
+		goto out_eio;
 	case RPC_PROG_MISMATCH:
 		printk(KERN_WARNING "RPC: call_verify: program %u, version %u unsupported by server %s\n",
 				(unsigned int)task->tk_client->cl_prog,
 				(unsigned int)task->tk_client->cl_vers,
 				task->tk_client->cl_server);
-		rpc_exit(task, -ENOSYS);
-		return NULL;
+		goto out_eio;
 	case RPC_PROC_UNAVAIL:
 		printk(KERN_WARNING "RPC: call_verify: proc %p unsupported by program %u, version %u on server %s\n",
 				task->tk_msg.rpc_proc,
 				task->tk_client->cl_prog,
 				task->tk_client->cl_vers,
 				task->tk_client->cl_server);
-		rpc_exit(task, -ENOSYS);
-		return NULL;
+		goto out_eio;
 	case RPC_GARBAGE_ARGS:
 		break;			/* retry */
 	default:

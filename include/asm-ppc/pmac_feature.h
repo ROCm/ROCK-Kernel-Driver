@@ -9,7 +9,7 @@
  *                    Ben. Herrenschmidt.
  *
  *
- * Note: I removed media-bay details from the feature stuff, I beleive it's
+ * Note: I removed media-bay details from the feature stuff, I believe it's
  *       not worth it, the media-bay driver can directly use the mac-io
  *       ASIC registers.
  *
@@ -315,7 +315,7 @@ struct macio_chip
 	int			type;
 	const char		*name;
 	int			rev;
-	volatile u32		*base;
+	volatile u32		__iomem *base;
 	unsigned long		flags;
 
 	/* For use by macio_asic PCI driver */
@@ -333,7 +333,7 @@ extern struct macio_chip macio_chips[MAX_MACIO_CHIPS];
 extern struct macio_chip* macio_find(struct device_node* child, int type);
 
 #define MACIO_FCR32(macio, r)	((macio)->base + ((r) >> 2))
-#define MACIO_FCR8(macio, r)	(((volatile u8*)((macio)->base)) + (r))
+#define MACIO_FCR8(macio, r)	(((volatile u8 __iomem *)((macio)->base)) + (r))
 
 #define MACIO_IN32(r)		(in_le32(MACIO_FCR32(macio,r)))
 #define MACIO_OUT32(r,v)	(out_le32(MACIO_FCR32(macio,r), (v)))

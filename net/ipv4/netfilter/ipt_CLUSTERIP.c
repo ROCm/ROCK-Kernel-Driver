@@ -10,6 +10,7 @@
  *
  */
 #include <linux/module.h>
+#include <linux/config.h>
 #include <linux/proc_fs.h>
 #include <linux/jhash.h>
 #include <linux/skbuff.h>
@@ -18,6 +19,8 @@
 #include <linux/udp.h>
 #include <linux/icmp.h>
 #include <linux/if_arp.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 
 #include <net/checksum.h>
 
@@ -27,7 +30,7 @@
 #include <linux/netfilter_ipv4/ipt_CLUSTERIP.h>
 #include <linux/netfilter_ipv4/ip_conntrack.h>
 
-#define CLUSTERIP_VERSION "0.5"
+#define CLUSTERIP_VERSION "0.6"
 
 #define DEBUG_CLUSTERIP
 
@@ -68,13 +71,6 @@ DECLARE_RWLOCK(clusterip_lock);
 #ifdef CONFIG_PROC_FS
 static struct file_operations clusterip_proc_fops;
 static struct proc_dir_entry *clusterip_procdir;
-static int clusterip_proc_open(struct inode *inode, struct file *file);
-static int clusterip_proc_release(struct inode *inode, struct file *file);
-static int clusterip_proc_read(char *buffer, char **start, off_t offset, 
-				int length, int *eof, void *data);
-static int clusterip_proc_write(struct file *file, const char *input, 
-				unsigned long size, void *data);
-
 #endif
 
 static inline void
@@ -154,16 +150,13 @@ clusterip_config_init(struct ipt_clusterip_tgt_info *i, u_int32_t ip,
 #ifdef CONFIG_PROC_FS
 	/* create proc dir entry */
 	sprintf(buffer, "%u.%u.%u.%u", NIPQUAD(ip));
-	c->pde = create_proc_entry(buffer, 0,  clusterip_procdir);
+	c->pde = create_proc_entry(buffer, S_IWUSR|S_IRUSR, clusterip_procdir);
 	if (!c->pde) {
 		kfree(c);
 		return NULL;
 	}
-	c->pde->owner = THIS_MODULE;
-	c->pde->data = c;
-	c->pde->read_proc = clusterip_proc_read;
-	c->pde->write_proc = clusterip_proc_write;
 	c->pde->proc_fops = &clusterip_proc_fops;
+	c->pde->data = c;
 #endif
 
 	WRITE_LOCK(&clusterip_lock);
@@ -578,56 +571,107 @@ static struct nf_hook_ops cip_arp_ops = {
 
 #ifdef CONFIG_PROC_FS
 
-static int clusterip_proc_open(struct inode *inode, struct file *file)
+static void *clusterip_seq_start(struct seq_file *s, loff_t *pos)
 {
-	struct proc_dir_entry *pde = PDE(inode);
+	struct proc_dir_entry *pde = s->private;
 	struct clusterip_config *c = pde->data;
+	unsigned int *nodeidx;
 
-	clusterip_config_get(c);
+	READ_LOCK(&clusterip_lock);
+	if (*pos >= c->num_local_nodes)
+		return NULL;
+
+	nodeidx = kmalloc(sizeof(unsigned int), GFP_KERNEL);
+	if (!nodeidx)
+		return ERR_PTR(-ENOMEM);
+
+	*nodeidx = *pos;
+	return nodeidx;
+}
+
+static void *clusterip_seq_next(struct seq_file *s, void *v, loff_t *pos)
+{
+	struct proc_dir_entry *pde = s->private;
+	struct clusterip_config *c = pde->data;
+	unsigned int *nodeidx = (unsigned int *)v;
+
+	*pos = ++(*nodeidx);
+	if (*pos >= c->num_local_nodes) {
+		kfree(v);
+		return NULL;
+	}
+	return nodeidx;
+}
+
+static void clusterip_seq_stop(struct seq_file *s, void *v)
+{
+	kfree(v);
+
+	READ_UNLOCK(&clusterip_lock);
+}
+
+static int clusterip_seq_show(struct seq_file *s, void *v)
+{
+	struct proc_dir_entry *pde = s->private;
+	struct clusterip_config *c = pde->data;
+	unsigned int *nodeidx = (unsigned int *)v;
+
+	if (*nodeidx != 0) 
+		seq_putc(s, ',');
+	seq_printf(s, "%u", c->local_nodes[*nodeidx]);
+
+	if (*nodeidx == c->num_local_nodes-1)
+		seq_putc(s, '\n');
 
 	return 0;
+}
+
+static struct seq_operations clusterip_seq_ops = {
+	.start	= clusterip_seq_start,
+	.next	= clusterip_seq_next,
+	.stop	= clusterip_seq_stop,
+	.show	= clusterip_seq_show,
+};
+
+static int clusterip_proc_open(struct inode *inode, struct file *file)
+{
+	int ret = seq_open(file, &clusterip_seq_ops);
+
+	if (!ret) {
+		struct seq_file *sf = file->private_data;
+		struct proc_dir_entry *pde = PDE(inode);
+		struct clusterip_config *c = pde->data;
+
+		sf->private = pde;
+
+		clusterip_config_get(c);
+	}
+
+	return ret;
 }
 
 static int clusterip_proc_release(struct inode *inode, struct file *file)
 {
 	struct proc_dir_entry *pde = PDE(inode);
 	struct clusterip_config *c = pde->data;
+	int ret;
 
-	clusterip_config_put(c);
+	ret = seq_release(inode, file);
 
-	return 0;
+	if (!ret)
+		clusterip_config_put(c);
+
+	return ret;
 }
 
-static int 
-clusterip_proc_read(char *buffer, char **start, off_t offset, int length, 
-		    int *eof, void *data)
+static ssize_t clusterip_proc_write(struct file *file, const char __user *input,
+				size_t size, loff_t *ofs)
 {
-	struct clusterip_config *c = data;
-	int i, len = 0;
-
-	READ_LOCK(&clusterip_lock);
-	for (i = 0; i < c->num_local_nodes; i++) {
-		len += sprintf(buffer+len, "%u,", c->local_nodes[i]);
-	}
-	READ_UNLOCK(&clusterip_lock);
-
-	if (len >= 1)
-		*(buffer+len-1) = '\n';
-	
-	if (length >= len)
-		*eof = 1;
-
-	return len;
-}
-
-static int 
-clusterip_proc_write(struct file *file, const char *input, 
-		     unsigned long size, void *data)
-{
-	#define PROC_WRITELEN	10
+#define PROC_WRITELEN	10
 	char buffer[PROC_WRITELEN+1];
-	struct clusterip_config *c = data;
-	unsigned long  nodenum;
+	struct proc_dir_entry *pde = PDE(file->f_dentry->d_inode);
+	struct clusterip_config *c = pde->data;
+	unsigned long nodenum;
 
 	if (copy_from_user(buffer, input, PROC_WRITELEN))
 		return -EFAULT;
@@ -637,7 +681,7 @@ clusterip_proc_write(struct file *file, const char *input,
 		if (clusterip_add_node(c, nodenum))
 			return -ENOMEM;
 	} else if (*buffer == '-') {
-		nodenum = simple_strtoul(buffer+1, NULL, 10);
+		nodenum = simple_strtoul(buffer+1, NULL,10);
 		if (clusterip_del_node(c, nodenum))
 			return -ENOENT;
 	} else
@@ -645,6 +689,16 @@ clusterip_proc_write(struct file *file, const char *input,
 
 	return size;
 }
+
+static struct file_operations clusterip_proc_fops = {
+	.owner	 = THIS_MODULE,
+	.open	 = clusterip_proc_open,
+	.read	 = seq_read,
+	.write	 = clusterip_proc_write,
+	.llseek	 = seq_lseek,
+	.release = clusterip_proc_release,
+};
+
 #endif /* CONFIG_PROC_FS */
 
 static int init_or_cleanup(int fini)
@@ -665,10 +719,6 @@ static int init_or_cleanup(int fini)
 	}
 
 #ifdef CONFIG_PROC_FS
-	memcpy(&clusterip_proc_fops, &proc_file_operations, sizeof(clusterip_proc_fops));
-	clusterip_proc_fops.owner = THIS_MODULE;
-	clusterip_proc_fops.open = clusterip_proc_open;
-	clusterip_proc_fops.release = clusterip_proc_release;
 	clusterip_procdir = proc_mkdir("ipt_CLUSTERIP", proc_net);
 	if (!clusterip_procdir) {
 		printk(KERN_ERR "CLUSTERIP: Unable to proc dir entry\n");

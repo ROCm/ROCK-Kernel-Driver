@@ -86,6 +86,9 @@ static inline void sh64_out64(unsigned long long b, unsigned long addr)
 #define readb(addr)		sh64_in8(addr)
 #define readw(addr)		sh64_in16(addr)
 #define readl(addr)		sh64_in32(addr)
+#define readb_relaxed(addr)		sh64_in8(addr)
+#define readw_relaxed(addr)		sh64_in16(addr)
+#define readl_relaxed(addr)		sh64_in32(addr)
 
 #define writeb(b, addr)		sh64_out8(b, addr)
 #define writew(b, addr)		sh64_out16(b, addr)
@@ -105,6 +108,8 @@ unsigned long inl(unsigned long port);
 void outb(unsigned long value, unsigned long port);
 void outw(unsigned long value, unsigned long port);
 void outl(unsigned long value, unsigned long port);
+
+#define mmiowb()
 
 #ifdef __KERNEL__
 

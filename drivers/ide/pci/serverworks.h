@@ -13,15 +13,13 @@
 
 /* Seagate Barracuda ATA IV Family drives in UDMA mode 5
  * can overrun their FIFOs when used with the CSB5 */
-const char *svwks_bad_ata100[] = {
+static const char *svwks_bad_ata100[] = {
 	"ST320011A",
 	"ST340016A",
 	"ST360021A",
 	"ST380021A",
 	NULL
 };
-
-#define DISPLAY_SVWKS_TIMINGS	1
 
 static void init_setup_svwks(struct pci_dev *, ide_pci_device_t *);
 static void init_setup_csb6(struct pci_dev *, ide_pci_device_t *);

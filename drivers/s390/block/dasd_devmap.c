@@ -11,7 +11,7 @@
  * functions may not be called from interrupt context. In particular
  * dasd_get_device is a no-no from interrupt context.
  *
- * $Revision: 1.30 $
+ * $Revision: 1.34 $
  */
 
 #include <linux/config.h>
@@ -25,6 +25,9 @@
 #define PRINTK_HEADER "dasd_devmap:"
 
 #include "dasd_int.h"
+
+kmem_cache_t *dasd_page_cache;
+EXPORT_SYMBOL(dasd_page_cache);
 
 /*
  * dasd_devmap_t is used to store the features and the relation
@@ -204,94 +207,144 @@ dasd_feature_list(char *str, char **endp)
 }
 
 /*
- * Read comma separated list of dasd ranges.
+ * Try to match the first element on the comma separated parse string
+ * with one of the known keywords. If a keyword is found, take the approprate
+ * action and return a pointer to the residual string. If the first element
+ * could not be matched to any keyword then return an error code.
  */
-static inline int
-dasd_ranges_list(char *str)
-{
+static char *
+dasd_parse_keyword( char *parsestring ) {
+
+	char *nextcomma, *residual_str;
+	int length;
+
+	nextcomma = strchr(parsestring,',');
+	if (nextcomma) {
+		length = nextcomma - parsestring;
+		residual_str = nextcomma + 1;
+	} else {
+		length = strlen(parsestring);
+		residual_str = parsestring + length;
+        }
+	if (strncmp ("autodetect", parsestring, length) == 0) {
+		dasd_autodetect = 1;
+		MESSAGE (KERN_INFO, "%s",
+			 "turning to autodetection mode");
+                return residual_str;
+        }
+        if (strncmp ("probeonly", parsestring, length) == 0) {
+		dasd_probeonly = 1;
+		MESSAGE(KERN_INFO, "%s",
+			"turning to probeonly mode");
+                return residual_str;
+        }
+        if (strncmp ("fixedbuffers", parsestring, length) == 0) {
+		if (dasd_page_cache)
+			return residual_str;
+		dasd_page_cache =
+			kmem_cache_create("dasd_page_cache", PAGE_SIZE, 0,
+					  SLAB_CACHE_DMA, NULL, NULL );
+		if (!dasd_page_cache)
+			MESSAGE(KERN_WARNING, "%s", "Failed to create slab, "
+				"fixed buffer mode disabled.");
+		else
+			MESSAGE (KERN_INFO, "%s",
+				 "turning on fixed buffer mode");
+                return residual_str;
+        }
+	return ERR_PTR(-EINVAL);
+}
+
+/*
+ * Try to interprete the first element on the comma separated parse string
+ * as a device number or a range of devices. If the interpretation is
+ * successfull, create the matching dasd_devmap entries and return a pointer
+ * to the residual string.
+ * If interpretation fails or in case of an error, return an error code.
+ */
+static char *
+dasd_parse_range( char *parsestring ) {
+
 	struct dasd_devmap *devmap;
 	int from, from_id0, from_id1;
 	int to, to_id0, to_id1;
 	int features, rc;
-	char bus_id[BUS_ID_SIZE+1], *orig_str;
+	char bus_id[BUS_ID_SIZE+1], *str;
 
-	orig_str = str;
-	while (1) {
-		rc = dasd_busid(&str, &from_id0, &from_id1, &from);
-		if (rc == 0) {
-			to = from;
-			to_id0 = from_id0;
-			to_id1 = from_id1;
-			if (*str == '-') {
-				str++;
-				rc = dasd_busid(&str, &to_id0, &to_id1, &to);
-			}
+	str = parsestring;
+	rc = dasd_busid(&str, &from_id0, &from_id1, &from);
+	if (rc == 0) {
+		to = from;
+		to_id0 = from_id0;
+		to_id1 = from_id1;
+		if (*str == '-') {
+			str++;
+			rc = dasd_busid(&str, &to_id0, &to_id1, &to);
 		}
-		if (rc == 0 &&
-		    (from_id0 != to_id0 || from_id1 != to_id1 || from > to))
-			rc = -EINVAL;
-		if (rc) {
-			MESSAGE(KERN_ERR, "Invalid device range %s", orig_str);
-			return rc;
-		}
-		features = dasd_feature_list(str, &str);
-		if (features < 0)
-			return -EINVAL;
-		while (from <= to) {
-			sprintf(bus_id, "%01x.%01x.%04x",
-				from_id0, from_id1, from++);
-			devmap = dasd_add_busid(bus_id, features);
-			if (IS_ERR(devmap))
-				return PTR_ERR(devmap);
-		}
-		if (*str != ',')
-			break;
-		str++;
 	}
-	if (*str != '\0') {
-		MESSAGE(KERN_WARNING,
-			"junk at end of dasd parameter string: %s\n", str);
-		return -EINVAL;
+	if (rc == 0 &&
+	    (from_id0 != to_id0 || from_id1 != to_id1 || from > to))
+		rc = -EINVAL;
+	if (rc) {
+		MESSAGE(KERN_ERR, "Invalid device range %s", parsestring);
+		return ERR_PTR(rc);
 	}
-	return 0;
+	features = dasd_feature_list(str, &str);
+	if (features < 0)
+		return ERR_PTR(-EINVAL);
+	while (from <= to) {
+		sprintf(bus_id, "%01x.%01x.%04x",
+			from_id0, from_id1, from++);
+		devmap = dasd_add_busid(bus_id, features);
+		if (IS_ERR(devmap))
+			return (char *)devmap;
+	}
+	if (*str == ',')
+		return str + 1;
+	if (*str == '\0')
+		return str;
+	MESSAGE(KERN_WARNING,
+		"junk at end of dasd parameter string: %s\n", str);
+	return ERR_PTR(-EINVAL);
+}
+
+static inline char *
+dasd_parse_next_element( char *parsestring ) {
+	char * residual_str;
+	residual_str = dasd_parse_keyword(parsestring);
+	if (!IS_ERR(residual_str))
+		return residual_str;
+	residual_str = dasd_parse_range(parsestring);
+	return residual_str;
 }
 
 /*
- * Parse a single dasd= parameter.
- */
-static int
-dasd_parameter(char *str)
-{
-	if (strcmp ("autodetect", str) == 0) {
-		dasd_autodetect = 1;
-		MESSAGE (KERN_INFO, "%s",
-			 "turning to autodetection mode");
-		return 0;
-	}
-	if (strcmp ("probeonly", str) == 0) {
-		dasd_probeonly = 1;
-		MESSAGE(KERN_INFO, "%s",
-			"turning to probeonly mode");
-		return 0;
-	}
-	/* turn off autodetect mode and scan for dasd ranges */
-	dasd_autodetect = 0;
-	return dasd_ranges_list(str);
-}
-
-/*
- * Parse parameters stored in dasd[] and dasd_disciplines[].
+ * Parse parameters stored in dasd[]
+ * The 'dasd=...' parameter allows to specify a comma separated list of
+ * keywords and device ranges. When the dasd driver is build into the kernel,
+ * the complete list will be stored as one element of the dasd[] array.
+ * When the dasd driver is build as a module, then the list is broken into
+ * it's elements and each dasd[] entry contains one element.
  */
 int
 dasd_parse(void)
 {
 	int rc, i;
+	char *parsestring;
 
 	rc = 0;
 	for (i = 0; i < 256; i++) {
 		if (dasd[i] == NULL)
 			break;
-		rc = dasd_parameter(dasd[i]);
+		parsestring = dasd[i];
+		/* loop over the comma separated list in the parsestring */
+		while (*parsestring) {
+			parsestring = dasd_parse_next_element(parsestring);
+			if(IS_ERR(parsestring)) {
+				rc = PTR_ERR(parsestring);
+				break;
+			}
+		}
 		if (rc) {
 			DBF_EVENT(DBF_ALERT, "%s", "invalid range found");
 			break;

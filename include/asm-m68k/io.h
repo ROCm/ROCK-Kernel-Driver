@@ -306,6 +306,25 @@ static inline void isa_delay(void)
 #endif
 #endif /* CONFIG_PCI */
 
+#if !defined(CONFIG_ISA) && !defined(CONFIG_PCI) && defined(CONFIG_HP300)
+/*
+ * We need to define dummy functions otherwise drivers/serial/8250.c doesn't link
+ */
+#define inb(port)        0xff
+#define inb_p(port)      0xff
+#define outb(val,port)   do { } while (0)
+#define outb_p(val,port) do { } while (0)
+
+/*
+ * These should be valid on any ioremap()ed region
+ */
+#define readb(addr)      in_8(addr)
+#define writeb(val,addr) out_8((addr),(val))
+#define readl(addr)      in_le32(addr)
+#define writel(val,addr) out_le32((addr),(val))
+#endif
+
+#define mmiowb()
 
 static inline void *ioremap(unsigned long physaddr, unsigned long size)
 {

@@ -19,7 +19,7 @@
  * acquiring the spinlock first.
  */
 int
-atomic_dec_and_lock (atomic_t *refcount, spinlock_t *lock)
+_atomic_dec_and_lock (atomic_t *refcount, spinlock_t *lock)
 {
 	int old, new;
 
@@ -39,4 +39,4 @@ atomic_dec_and_lock (atomic_t *refcount, spinlock_t *lock)
 	return 0;
 }
 
-EXPORT_SYMBOL(atomic_dec_and_lock);
+EXPORT_SYMBOL(_atomic_dec_and_lock);

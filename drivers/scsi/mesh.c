@@ -60,22 +60,22 @@ MODULE_AUTHOR("Paul Mackerras (paulus@samba.org)");
 MODULE_DESCRIPTION("PowerMac MESH SCSI driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(sync_rate, "i");
-MODULE_PARM_DESC(sync_rate, "Synchronous rate (0..10, 0=async)");
-MODULE_PARM(sync_targets, "i");
-MODULE_PARM_DESC(sync_targets, "Bitmask of targets allowed to set synchronous");
-MODULE_PARM(resel_targets, "i");
-MODULE_PARM_DESC(resel_targets, "Bitmask of targets allowed to set disconnect");
-MODULE_PARM(debug_targets, "i");
-MODULE_PARM_DESC(debug_targets, "Bitmask of debugged targets");
-MODULE_PARM(init_reset_delay, "i");
-MODULE_PARM_DESC(init_reset_delay, "Initial bus reset delay (0=no reset)");
-
 static int sync_rate = CONFIG_SCSI_MESH_SYNC_RATE;
 static int sync_targets = 0xff;
 static int resel_targets = 0xff;
 static int debug_targets = 0;	/* print debug for these targets */
 static int init_reset_delay = CONFIG_SCSI_MESH_RESET_DELAY_MS;
+
+module_param(sync_rate, int, 0);
+MODULE_PARM_DESC(sync_rate, "Synchronous rate (0..10, 0=async)");
+module_param(sync_targets, int, 0);
+MODULE_PARM_DESC(sync_targets, "Bitmask of targets allowed to set synchronous");
+module_param(resel_targets, int, 0);
+MODULE_PARM_DESC(resel_targets, "Bitmask of targets allowed to set disconnect");
+module_param(debug_targets, int, 0644);
+MODULE_PARM_DESC(debug_targets, "Bitmask of debugged targets");
+module_param(init_reset_delay, int, 0);
+MODULE_PARM_DESC(init_reset_delay, "Initial bus reset delay (0=no reset)");
 
 static int mesh_sync_period = 100;
 static int mesh_sync_offset = 0;
@@ -144,9 +144,9 @@ struct mesh_target {
 };
 
 struct mesh_state {
-	volatile struct	mesh_regs *mesh;
+	volatile struct	mesh_regs __iomem *mesh;
 	int	meshintr;
-	volatile struct	dbdma_regs *dma;
+	volatile struct	dbdma_regs __iomem *dma;
 	int	dmaintr;
 	struct	Scsi_Host *host;
 	struct	mesh_state *next;
@@ -304,8 +304,8 @@ static inline void dumpslog(struct mesh_state *ms)
 static void
 mesh_dump_regs(struct mesh_state *ms)
 {
-	volatile struct mesh_regs *mr = ms->mesh;
-	volatile struct dbdma_regs *md = ms->dma;
+	volatile struct mesh_regs __iomem *mr = ms->mesh;
+	volatile struct dbdma_regs __iomem *md = ms->dma;
 	int t;
 	struct mesh_target *tp;
 
@@ -338,7 +338,7 @@ mesh_dump_regs(struct mesh_state *ms)
 /*
  * Flush write buffers on the bus path to the mesh
  */
-static inline void mesh_flush_io(volatile struct mesh_regs *mr)
+static inline void mesh_flush_io(volatile struct mesh_regs __iomem *mr)
 {
 	(void)in_8(&mr->mesh_id);
 }
@@ -359,8 +359,8 @@ static void mesh_completed(struct mesh_state *ms, struct scsi_cmnd *cmd)
  */
 static void mesh_init(struct mesh_state *ms)
 {
-	volatile struct mesh_regs *mr = ms->mesh;
-	volatile struct dbdma_regs *md = ms->dma;
+	volatile struct mesh_regs __iomem *mr = ms->mesh;
+	volatile struct dbdma_regs __iomem *md = ms->dma;
 
 	mesh_flush_io(mr);
 	udelay(100);
@@ -388,8 +388,7 @@ static void mesh_init(struct mesh_state *ms)
 		mesh_flush_io(mr);
 
 		/* Wait for bus to come back */
-		current->state = TASK_UNINTERRUPTIBLE;
-		schedule_timeout((init_reset_delay * HZ) / 1000);
+		msleep(init_reset_delay);
 	}
 	
 	/* Reconfigure controller */
@@ -407,7 +406,7 @@ static void mesh_init(struct mesh_state *ms)
 
 static void mesh_start_cmd(struct mesh_state *ms, struct scsi_cmnd *cmd)
 {
-	volatile struct mesh_regs *mr = ms->mesh;
+	volatile struct mesh_regs __iomem *mr = ms->mesh;
 	int t, id;
 
 	id = cmd->device->id;
@@ -468,7 +467,7 @@ static void mesh_start_cmd(struct mesh_state *ms, struct scsi_cmnd *cmd)
 				dlog(ms, "intr b4 arb, intr/exc/err/fc=%.8x",
 				     MKWORD(mr->interrupt, mr->exception,
 					    mr->error, mr->fifo_count));
-				mesh_interrupt(0, (void *)ms, 0);
+				mesh_interrupt(0, (void *)ms, NULL);
 				if (ms->phase != arbitrating)
 					return;
 			}
@@ -506,7 +505,7 @@ static void mesh_start_cmd(struct mesh_state *ms, struct scsi_cmnd *cmd)
 		dlog(ms, "intr after disresel, intr/exc/err/fc=%.8x",
 		     MKWORD(mr->interrupt, mr->exception,
 			    mr->error, mr->fifo_count));
-		mesh_interrupt(0, (void *)ms, 0);
+		mesh_interrupt(0, (void *)ms, NULL);
 		if (ms->phase != arbitrating)
 			return;
 		dlog(ms, "after intr after disresel, intr/exc/err/fc=%.8x",
@@ -596,8 +595,8 @@ static void mesh_done(struct mesh_state *ms, int start_next)
 	struct mesh_target *tp = &ms->tgts[ms->conn_tgt];
 
 	cmd = ms->current_req;
-	ms->current_req = 0;
-	tp->current_req = 0;
+	ms->current_req = NULL;
+	tp->current_req = NULL;
 	if (cmd) {
 		cmd->result = (ms->stat << 16) + cmd->SCp.Status;
 		if (ms->stat == DID_OK)
@@ -639,7 +638,7 @@ static inline void add_sdtr_msg(struct mesh_state *ms)
 static void set_sdtr(struct mesh_state *ms, int period, int offset)
 {
 	struct mesh_target *tp = &ms->tgts[ms->conn_tgt];
-	volatile struct mesh_regs *mr = ms->mesh;
+	volatile struct mesh_regs __iomem *mr = ms->mesh;
 	int v, tr;
 
 	tp->sdtr_state = sdtr_done;
@@ -680,8 +679,8 @@ static void set_sdtr(struct mesh_state *ms, int period, int offset)
 static void start_phase(struct mesh_state *ms)
 {
 	int i, seq, nb;
-	volatile struct mesh_regs *mr = ms->mesh;
-	volatile struct dbdma_regs *md = ms->dma;
+	volatile struct mesh_regs __iomem *mr = ms->mesh;
+	volatile struct dbdma_regs __iomem *md = ms->dma;
 	struct scsi_cmnd *cmd = ms->current_req;
 	struct mesh_target *tp = &ms->tgts[ms->conn_tgt];
 
@@ -824,7 +823,7 @@ static void start_phase(struct mesh_state *ms)
 
 static inline void get_msgin(struct mesh_state *ms)
 {
-	volatile struct mesh_regs *mr = ms->mesh;
+	volatile struct mesh_regs __iomem *mr = ms->mesh;
 	int i, n;
 
 	n = mr->fifo_count;
@@ -856,7 +855,7 @@ static inline int msgin_length(struct mesh_state *ms)
 
 static void reselected(struct mesh_state *ms)
 {
-	volatile struct mesh_regs *mr = ms->mesh;
+	volatile struct mesh_regs __iomem *mr = ms->mesh;
 	struct scsi_cmnd *cmd;
 	struct mesh_target *tp;
 	int b, t, prev;
@@ -989,7 +988,7 @@ static void handle_reset(struct mesh_state *ms)
 	int tgt;
 	struct mesh_target *tp;
 	struct scsi_cmnd *cmd;
-	volatile struct mesh_regs *mr = ms->mesh;
+	volatile struct mesh_regs __iomem *mr = ms->mesh;
 
 	for (tgt = 0; tgt < 8; ++tgt) {
 		tp = &ms->tgts[tgt];
@@ -1031,7 +1030,7 @@ static irqreturn_t do_mesh_interrupt(int irq, void *dev_id, struct pt_regs *ptre
 static void handle_error(struct mesh_state *ms)
 {
 	int err, exc, count;
-	volatile struct mesh_regs *mr = ms->mesh;
+	volatile struct mesh_regs __iomem *mr = ms->mesh;
 
 	err = in_8(&mr->error);
 	exc = in_8(&mr->exception);
@@ -1125,7 +1124,7 @@ static void handle_error(struct mesh_state *ms)
 static void handle_exception(struct mesh_state *ms)
 {
 	int exc;
-	volatile struct mesh_regs *mr = ms->mesh;
+	volatile struct mesh_regs __iomem *mr = ms->mesh;
 
 	exc = in_8(&mr->exception);
 	out_8(&mr->interrupt, INT_EXCEPTION | INT_CMDDONE);
@@ -1232,8 +1231,8 @@ static void handle_msgin(struct mesh_state *ms)
 			} else if (code != cmd->device->lun + IDENTIFY_BASE) {
 				printk(KERN_WARNING "mesh: lun mismatch "
 				       "(%d != %d) on reselection from "
-				       "target %d\n", i, cmd->device->lun,
-				       ms->conn_tgt);
+				       "target %d\n", code - IDENTIFY_BASE,
+				       cmd->device->lun, ms->conn_tgt);
 			}
 			break;
 		}
@@ -1325,8 +1324,8 @@ static void set_dma_cmds(struct mesh_state *ms, struct scsi_cmnd *cmd)
 
 static void halt_dma(struct mesh_state *ms)
 {
-	volatile struct dbdma_regs *md = ms->dma;
-	volatile struct mesh_regs *mr = ms->mesh;
+	volatile struct dbdma_regs __iomem *md = ms->dma;
+	volatile struct mesh_regs __iomem *mr = ms->mesh;
 	struct scsi_cmnd *cmd = ms->current_req;
 	int t, nb;
 
@@ -1374,7 +1373,7 @@ static void halt_dma(struct mesh_state *ms)
 
 static void phase_mismatch(struct mesh_state *ms)
 {
-	volatile struct mesh_regs *mr = ms->mesh;
+	volatile struct mesh_regs __iomem *mr = ms->mesh;
 	int phase;
 
 	dlog(ms, "phasemm ch/cl/seq/fc=%.8x",
@@ -1453,7 +1452,7 @@ static void phase_mismatch(struct mesh_state *ms)
 
 static void cmd_complete(struct mesh_state *ms)
 {
-	volatile struct mesh_regs *mr = ms->mesh;
+	volatile struct mesh_regs __iomem *mr = ms->mesh;
 	struct scsi_cmnd *cmd = ms->current_req;
 	struct mesh_target *tp = &ms->tgts[ms->conn_tgt];
 	int seq, n, t;
@@ -1619,7 +1618,7 @@ static void cmd_complete(struct mesh_state *ms)
 			mesh_done(ms, 1);
 			return;
 		case disconnecting:
-			ms->current_req = 0;
+			ms->current_req = NULL;
 			ms->phase = idle;
 			mesh_start(ms);
 			return;
@@ -1666,7 +1665,7 @@ static int mesh_queue(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 static void mesh_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 {
 	struct mesh_state *ms = (struct mesh_state *) dev_id;
-	volatile struct mesh_regs *mr = ms->mesh;
+	volatile struct mesh_regs __iomem *mr = ms->mesh;
 	int intr;
 
 #if 0
@@ -1714,8 +1713,8 @@ static int mesh_abort(struct scsi_cmnd *cmd)
 static int mesh_host_reset(struct scsi_cmnd *cmd)
 {
 	struct mesh_state *ms = (struct mesh_state *) cmd->device->host->hostdata;
-	volatile struct mesh_regs *mr = ms->mesh;
-	volatile struct dbdma_regs *md = ms->dma;
+	volatile struct mesh_regs __iomem *mr = ms->mesh;
+	volatile struct dbdma_regs __iomem *md = ms->dma;
 
 	printk(KERN_DEBUG "mesh_host_reset\n");
 
@@ -1749,12 +1748,10 @@ static void set_mesh_power(struct mesh_state *ms, int state)
 		return;
 	if (state) {
 		pmac_call_feature(PMAC_FTR_MESH_ENABLE, macio_get_of_node(ms->mdev), 0, 1);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ/5);
+		msleep(200);
 	} else {
 		pmac_call_feature(PMAC_FTR_MESH_ENABLE, macio_get_of_node(ms->mdev), 0, 0);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ/100);
+		msleep(10);
 	}
 }			
 
@@ -1765,15 +1762,14 @@ static int mesh_suspend(struct macio_dev *mdev, u32 state)
 	struct mesh_state *ms = (struct mesh_state *)macio_get_drvdata(mdev);
 	unsigned long flags;
 
-	if (state == mdev->ofdev.dev.power_state || state < 2)
+	if (state == mdev->ofdev.dev.power.power_state || state < 2)
 		return 0;
 
 	scsi_block_requests(ms->host);
 	spin_lock_irqsave(ms->host->host_lock, flags);
 	while(ms->phase != idle) {
 		spin_unlock_irqrestore(ms->host->host_lock, flags);
-		current->state = TASK_UNINTERRUPTIBLE;
-		schedule_timeout(HZ/100);
+		msleep(10);
 		spin_lock_irqsave(ms->host->host_lock, flags);
 	}
 	ms->phase = sleeping;
@@ -1781,7 +1777,7 @@ static int mesh_suspend(struct macio_dev *mdev, u32 state)
 	disable_irq(ms->meshintr);
 	set_mesh_power(ms, 0);
 
-	mdev->ofdev.dev.power_state = state;
+	mdev->ofdev.dev.power.power_state = state;
 
 	return 0;
 }
@@ -1791,7 +1787,7 @@ static int mesh_resume(struct macio_dev *mdev)
 	struct mesh_state *ms = (struct mesh_state *)macio_get_drvdata(mdev);
 	unsigned long flags;
 
-	if (mdev->ofdev.dev.power_state == 0)
+	if (mdev->ofdev.dev.power.power_state == 0)
 		return 0;
 
 	set_mesh_power(ms, 1);
@@ -1802,7 +1798,7 @@ static int mesh_resume(struct macio_dev *mdev)
 	enable_irq(ms->meshintr);
 	scsi_unblock_requests(ms->host);
 
-	mdev->ofdev.dev.power_state = 0;
+	mdev->ofdev.dev.power.power_state = 0;
 
 	return 0;
 }
@@ -1817,7 +1813,7 @@ static int mesh_resume(struct macio_dev *mdev)
 static int mesh_shutdown(struct macio_dev *mdev)
 {
 	struct mesh_state *ms = (struct mesh_state *)macio_get_drvdata(mdev);
-	volatile struct mesh_regs *mr;
+	volatile struct mesh_regs __iomem *mr;
 	unsigned long flags;
 
        	printk(KERN_INFO "resetting MESH scsi bus(es)\n");
@@ -1896,17 +1892,15 @@ static int mesh_probe(struct macio_dev *mdev, const struct of_match *match)
 	ms->mdev = mdev;
 	ms->pdev = pdev;
 	
-	ms->mesh = (volatile struct mesh_regs *)
-		ioremap(macio_resource_start(mdev, 0), 0x1000);
+	ms->mesh = ioremap(macio_resource_start(mdev, 0), 0x1000);
 	if (ms->mesh == NULL) {
 		printk(KERN_ERR "mesh: can't map registers\n");
 		goto out_free;
 	}		
-	ms->dma = (volatile struct dbdma_regs *)
-	       	ioremap(macio_resource_start(mdev, 1), 0x1000);
+	ms->dma = ioremap(macio_resource_start(mdev, 1), 0x1000);
 	if (ms->dma == NULL) {
 		printk(KERN_ERR "mesh: can't map registers\n");
-		iounmap((void *)ms->mesh);
+		iounmap(ms->mesh);
 		goto out_free;
 	}
 
@@ -1938,7 +1932,7 @@ static int mesh_probe(struct macio_dev *mdev, const struct of_match *match)
        	for (tgt = 0; tgt < 8; ++tgt) {
 	       	ms->tgts[tgt].sdtr_state = do_sdtr;
 	       	ms->tgts[tgt].sync_params = ASYNC_PARAMS;
-	       	ms->tgts[tgt].current_req = 0;
+	       	ms->tgts[tgt].current_req = NULL;
        	}
 
 	if ((cfp = (int *) get_property(mesh, "clock-frequency", NULL)))
@@ -1972,8 +1966,8 @@ static int mesh_probe(struct macio_dev *mdev, const struct of_match *match)
 	return 0;
 
 out_unmap:
-	iounmap((void *)ms->dma);
-	iounmap((void *)ms->mesh);
+	iounmap(ms->dma);
+	iounmap(ms->mesh);
 out_free:
 	scsi_host_put(mesh_host);
 out_release:
@@ -1998,8 +1992,8 @@ static int mesh_remove(struct macio_dev *mdev)
 	set_mesh_power(ms, 0);
 
 	/* Unmap registers & dma controller */
-	iounmap((void *) ms->mesh);
-       	iounmap((void *) ms->dma);
+	iounmap(ms->mesh);
+       	iounmap(ms->dma);
 
 	/* Free DMA commands memory */
 	pci_free_consistent(macio_get_pci_dev(mdev), ms->dma_cmd_size,

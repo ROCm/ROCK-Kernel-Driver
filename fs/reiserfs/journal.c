@@ -2450,7 +2450,7 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
     /*we have the file system was created by old version of mkreiserfs 
       so this field contains zero value */
     journal->j_trans_max      = JOURNAL_TRANS_MAX_DEFAULT ;
-    journal->j_max_batch      = JOURNAL_MAX_BATCH_DEFAULT ; 
+    journal->j_max_batch      = JOURNAL_MAX_BATCH_DEFAULT ;
     journal->j_max_commit_age = JOURNAL_MAX_COMMIT_AGE ;
     
     /* for blocksize >= 4096 - max transaction size is 1024. For block size < 4096
@@ -2494,15 +2494,15 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
   journal->j_len_alloc = 0 ;
   atomic_set(&(journal->j_wcount), 0) ;
   atomic_set(&(journal->j_async_throttle), 0) ;
-  journal->j_bcount = 0 ;	 
-  journal->j_trans_start_time = 0 ;	 
-  journal->j_last = NULL ;	 
-  journal->j_first = NULL ;    
+  journal->j_bcount = 0 ;
+  journal->j_trans_start_time = 0 ;
+  journal->j_last = NULL ;
+  journal->j_first = NULL ;
   init_waitqueue_head(&(journal->j_join_wait)) ;
   sema_init(&journal->j_lock, 1);
   sema_init(&journal->j_flush_sem, 1);
 
-  journal->j_trans_id = 10 ; 
+  journal->j_trans_id = 10 ;
   journal->j_mount_id = 10 ;
   journal->j_state = 0 ;
   atomic_set(&(journal->j_jlock), 0) ;
@@ -3014,7 +3014,7 @@ static int remove_from_transaction(struct super_block *p_s_sb, b_blocknr_t block
     cn->next->prev = cn->prev ;
   }
   if (cn == journal->j_first) {
-    journal->j_first = cn->next ; 
+    journal->j_first = cn->next ;
   }
   if (cn == journal->j_last) {
     journal->j_last = cn->prev ;
@@ -3618,7 +3618,7 @@ static int do_journal_end(struct reiserfs_transaction_handle *th, struct super_b
   jl->j_timestamp = journal->j_trans_start_time ;
   jl->j_commit_bh = c_bh ;
   jl->j_start = journal->j_start ;
-  jl->j_len = journal->j_len ; 
+  jl->j_len = journal->j_len ;
   atomic_set(&jl->j_nonzerolen, journal->j_len) ;
   atomic_set(&jl->j_commit_left, journal->j_len + 2);
   jl->j_realblock = NULL ;

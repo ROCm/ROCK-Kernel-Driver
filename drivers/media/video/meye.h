@@ -1,27 +1,27 @@
-/* 
+/*
  * Motion Eye video4linux driver for Sony Vaio PictureBook
  *
- * Copyright (C) 2001-2003 Stelian Pop <stelian@popies.net>
+ * Copyright (C) 2001-2004 Stelian Pop <stelian@popies.net>
  *
  * Copyright (C) 2001-2002 Alcôve <www.alcove.com>
  *
  * Copyright (C) 2000 Andrew Tridgell <tridge@valinux.com>
  *
  * Earlier work by Werner Almesberger, Paul `Rusty' Russell and Paul Mackerras.
- * 
+ *
  * Some parts borrowed from various video4linux drivers, especially
  * bttv-driver.c and zoran.c, see original files for credits.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -30,12 +30,16 @@
 #ifndef _MEYE_PRIV_H_
 #define _MEYE_PRIV_H_
 
-#define MEYE_DRIVER_MAJORVERSION	1
-#define MEYE_DRIVER_MINORVERSION	10
+#define MEYE_DRIVER_MAJORVERSION	 1
+#define MEYE_DRIVER_MINORVERSION	13
+
+#define MEYE_DRIVER_VERSION __stringify(MEYE_DRIVER_MAJORVERSION) "." \
+			    __stringify(MEYE_DRIVER_MINORVERSION)
 
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/pci.h>
+#include <linux/kfifo.h>
 
 /****************************************************************************/
 /* Motion JPEG chip registers                                               */
@@ -43,7 +47,7 @@
 
 /* Motion JPEG chip PCI configuration registers */
 #define MCHIP_PCI_POWER_CSR		0x54
-#define MCHIP_PCI_MCORE_STATUS		0x60	/* see HIC_STATUS   */
+#define MCHIP_PCI_MCORE_STATUS		0x60		/* see HIC_STATUS   */
 #define MCHIP_PCI_HOSTUSEREQ_SET	0x64
 #define MCHIP_PCI_HOSTUSEREQ_CLR	0x68
 #define MCHIP_PCI_LOWPOWER_SET		0x6c
@@ -73,7 +77,7 @@
 #define MCHIP_MM_INTA_PCI_ERR		0x00000040	/* PCI error */
 #define MCHIP_MM_INTA_PCI_ERR_MASK	0x00004000
 
-#define MCHIP_MM_PT_ADDR		0x08		/* page table address */
+#define MCHIP_MM_PT_ADDR		0x08		/* page table address*/
 							/* n*4kB */
 #define MCHIP_NB_PAGES			1024		/* pages for display */
 #define MCHIP_NB_PAGES_MJPEG		256		/* pages for mjpeg */
@@ -275,47 +279,38 @@
 struct meye_grab_buffer {
 	int state;			/* state of buffer */
 	unsigned long size;		/* size of jpg frame */
+	struct timeval timestamp;	/* timestamp */
+	unsigned long sequence;		/* sequence number */
 };
 
-/* queues containing the buffer indices */
+/* size of kfifos containings buffer indices */
 #define MEYE_QUEUE_SIZE	MEYE_MAX_BUFNBRS
-struct meye_queue {
-	unsigned int head;		/* queue head */
-	unsigned int tail;		/* queue tail */
-	unsigned int len;		/* queue length */
-	spinlock_t s_lock;		/* spinlock protecting the queue */
-	wait_queue_head_t proc_list;	/* wait queue */
-	int buf[MEYE_QUEUE_SIZE];	/* queue contents */
-};
 
 /* Motion Eye device structure */
 struct meye {
-
-	/* mchip related */
 	struct pci_dev *mchip_dev;	/* pci device */
 	u8 mchip_irq;			/* irq */
 	u8 mchip_mode;			/* actual mchip mode: HIC_MODE... */
 	u8 mchip_fnum;			/* current mchip frame number */
-
-	unsigned char *mchip_mmregs;	/* mchip: memory mapped registers */
+	unsigned char __iomem *mchip_mmregs;/* mchip: memory mapped registers */
 	u8 *mchip_ptable[MCHIP_NB_PAGES];/* mchip: ptable */
-	dma_addr_t *mchip_ptable_toc;	/* mchip: ptable toc */
+	void *mchip_ptable_toc;		/* mchip: ptable toc */
 	dma_addr_t mchip_dmahandle;	/* mchip: dma handle to ptable toc */
-
 	unsigned char *grab_fbuffer;	/* capture framebuffer */
+	unsigned char *grab_temp;	/* temporary buffer */
 					/* list of buffers */
 	struct meye_grab_buffer grab_buffer[MEYE_MAX_BUFNBRS];
-
-	/* other */
+	int vma_use_count[MEYE_MAX_BUFNBRS]; /* mmap count */
 	struct semaphore lock;		/* semaphore for open/mmap... */
-
-	struct meye_queue grabq;	/* queue for buffers to be grabbed */
-
+	struct kfifo *grabq;		/* queue for buffers to be grabbed */
+	spinlock_t grabq_lock;		/* lock protecting the queue */
+	struct kfifo *doneq;		/* queue for grabbed buffers */
+	spinlock_t doneq_lock;		/* lock protecting the queue */
+	wait_queue_head_t proc_list;	/* wait queue */
 	struct video_device *video_dev;	/* video device parameters */
 	struct video_picture picture;	/* video picture parameters */
 	struct meye_params params;	/* additional parameters */
 #ifdef CONFIG_PM
-	u32 pm_state[16];		/* PCI configuration space */
 	u8 pm_mchip_mode;		/* old mchip mode */
 #endif
 };

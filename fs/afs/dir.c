@@ -65,9 +65,9 @@ union afs_dirent {
 	struct {
 		uint8_t		valid;
 		uint8_t		unused[1];
-		uint16_t	hash_next;
-		uint32_t	vnode;
-		uint32_t	unique;
+		__be16		hash_next;
+		__be32		vnode;
+		__be32		unique;
 		uint8_t		name[16];
 		uint8_t		overflow[4];	/* if any char of the name (inc
 						 * NUL) reaches here, consume
@@ -78,8 +78,8 @@ union afs_dirent {
 
 /* AFS directory page header (one at the beginning of every 2048-byte chunk) */
 struct afs_dir_pagehdr {
-	uint16_t	npages;
-	uint16_t	magic;
+	__be16		npages;
+	__be16		magic;
 #define AFS_DIR_MAGIC htons(1234)
 	uint8_t		nentries;
 	uint8_t		bitmap[8];
@@ -308,7 +308,7 @@ static int afs_dir_iterate_block(unsigned *fpos,
 			      blkoff + offset * sizeof(union afs_dirent),
 			      ntohl(dire->u.vnode),
 			      filldir == afs_dir_lookup_filldir ?
-			      dire->u.unique : DT_UNKNOWN);
+			      ntohl(dire->u.unique) : DT_UNKNOWN);
 		if (ret < 0) {
 			_leave(" = 0 [full]");
 			return 0;
@@ -416,7 +416,7 @@ static int afs_dir_lookup_filldir(void *_cookie, const char *name, int nlen,
 	struct afs_dir_lookup_cookie *cookie = _cookie;
 
 	_enter("{%s,%Zu},%s,%u,,%lu,%u",
-	       cookie->name, cookie->nlen, name, nlen, ino, ntohl(dtype));
+	       cookie->name, cookie->nlen, name, nlen, ino, dtype);
 
 	if (cookie->nlen != nlen || memcmp(cookie->name, name, nlen) != 0) {
 		_leave(" = 0 [no]");
@@ -424,7 +424,7 @@ static int afs_dir_lookup_filldir(void *_cookie, const char *name, int nlen,
 	}
 
 	cookie->fid.vnode = ino;
-	cookie->fid.unique = ntohl(dtype);
+	cookie->fid.unique = dtype;
 	cookie->found = 1;
 
 	_leave(" = -1 [found]");

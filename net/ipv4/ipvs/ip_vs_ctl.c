@@ -75,6 +75,7 @@ static int sysctl_ip_vs_amemthresh = 1024;
 static int sysctl_ip_vs_am_droprate = 10;
 int sysctl_ip_vs_cache_bypass = 0;
 int sysctl_ip_vs_expire_nodest_conn = 0;
+int sysctl_ip_vs_expire_quiescent_template = 0;
 int sysctl_ip_vs_sync_threshold[2] = { 3, 50 };
 int sysctl_ip_vs_nat_icmp_send = 0;
 
@@ -746,8 +747,8 @@ ip_vs_new_dest(struct ip_vs_service *svc, struct ip_vs_dest_user *udest,
 	atomic_set(&dest->refcnt, 0);
 
 	INIT_LIST_HEAD(&dest->d_list);
-	dest->dst_lock = SPIN_LOCK_UNLOCKED;
-	dest->stats.lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&dest->dst_lock);
+	spin_lock_init(&dest->stats.lock);
 	__ip_vs_update_dest(svc, dest, udest);
 	ip_vs_new_estimator(&dest->stats);
 
@@ -1062,8 +1063,8 @@ ip_vs_add_service(struct ip_vs_service_user *u, struct ip_vs_service **svc_p)
 	svc->netmask = u->netmask;
 
 	INIT_LIST_HEAD(&svc->destinations);
-	svc->sched_lock = RW_LOCK_UNLOCKED;
-	svc->stats.lock = SPIN_LOCK_UNLOCKED;
+	rwlock_init(&svc->sched_lock);
+	spin_lock_init(&svc->stats.lock);
 
 	/* Bind the scheduler */
 	ret = ip_vs_bind_scheduler(svc, sched);
@@ -1447,9 +1448,9 @@ static struct ctl_table vs_vars[] = {
 	{
 		.ctl_name	= NET_IPV4_VS_TO_ES,
 		.procname	= "timeout_established",
-	  	.data	= &vs_timeout_table_dos.timeout[IP_VS_S_ESTABLISHED],
+		.data	= &vs_timeout_table_dos.timeout[IP_VS_S_ESTABLISHED],
 		.maxlen		= sizeof(int),
-		.mode		= 0644, 
+		.mode		= 0644,
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
@@ -1457,7 +1458,7 @@ static struct ctl_table vs_vars[] = {
 		.procname	= "timeout_synsent",
 		.data	= &vs_timeout_table_dos.timeout[IP_VS_S_SYN_SENT],
 		.maxlen		= sizeof(int),
-		.mode		= 0644, 
+		.mode		= 0644,
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
@@ -1465,7 +1466,7 @@ static struct ctl_table vs_vars[] = {
 		.procname	= "timeout_synrecv",
 		.data	= &vs_timeout_table_dos.timeout[IP_VS_S_SYN_RECV],
 		.maxlen		= sizeof(int),
-		.mode		= 0644, 
+		.mode		= 0644,
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
@@ -1473,7 +1474,7 @@ static struct ctl_table vs_vars[] = {
 		.procname	= "timeout_finwait",
 		.data	= &vs_timeout_table_dos.timeout[IP_VS_S_FIN_WAIT],
 		.maxlen		= sizeof(int),
-		.mode		= 0644, 
+		.mode		= 0644,
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
@@ -1489,7 +1490,7 @@ static struct ctl_table vs_vars[] = {
 		.procname	= "timeout_close",
 		.data	= &vs_timeout_table_dos.timeout[IP_VS_S_CLOSE],
 		.maxlen		= sizeof(int),
-		.mode		= 0644, 
+		.mode		= 0644,
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
@@ -1497,7 +1498,7 @@ static struct ctl_table vs_vars[] = {
 		.procname	= "timeout_closewait",
 		.data	= &vs_timeout_table_dos.timeout[IP_VS_S_CLOSE_WAIT],
 		.maxlen		= sizeof(int),
-		.mode		= 0644, 
+		.mode		= 0644,
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
@@ -1505,7 +1506,7 @@ static struct ctl_table vs_vars[] = {
 		.procname	= "timeout_lastack",
 		.data	= &vs_timeout_table_dos.timeout[IP_VS_S_LAST_ACK],
 		.maxlen		= sizeof(int),
-		.mode		= 0644, 
+		.mode		= 0644,
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
@@ -1513,7 +1514,7 @@ static struct ctl_table vs_vars[] = {
 		.procname	= "timeout_listen",
 		.data	= &vs_timeout_table_dos.timeout[IP_VS_S_LISTEN],
 		.maxlen		= sizeof(int),
-		.mode		= 0644, 
+		.mode		= 0644,
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
@@ -1521,7 +1522,7 @@ static struct ctl_table vs_vars[] = {
 		.procname	= "timeout_synack",
 		.data	= &vs_timeout_table_dos.timeout[IP_VS_S_SYNACK],
 		.maxlen		= sizeof(int),
-		.mode		= 0644, 
+		.mode		= 0644,
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
@@ -1529,7 +1530,7 @@ static struct ctl_table vs_vars[] = {
 		.procname	= "timeout_udp",
 		.data	= &vs_timeout_table_dos.timeout[IP_VS_S_UDP],
 		.maxlen		= sizeof(int),
-		.mode		= 0644, 
+		.mode		= 0644,
 		.proc_handler	= &proc_dointvec_jiffies,
 	},
 	{
@@ -1553,6 +1554,14 @@ static struct ctl_table vs_vars[] = {
 		.ctl_name	= NET_IPV4_VS_EXPIRE_NODEST_CONN,
 		.procname	= "expire_nodest_conn",
 		.data		= &sysctl_ip_vs_expire_nodest_conn,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= NET_IPV4_VS_EXPIRE_QUIESCENT_TEMPLATE,
+		.procname	= "expire_quiescent_template",
+		.data		= &sysctl_ip_vs_expire_quiescent_template,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
@@ -2357,7 +2366,7 @@ int ip_vs_control_init(void)
 	}
 
 	memset(&ip_vs_stats, 0, sizeof(ip_vs_stats));
-	ip_vs_stats.lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&ip_vs_stats.lock);
 	ip_vs_new_estimator(&ip_vs_stats);
 
 	/* Hook the defense timer */
