@@ -150,13 +150,14 @@ static int futex_wait(struct list_head *head,
 	set_current_state(TASK_INTERRUPTIBLE);
 	queue_me(head, &q, page, offset);
 
-	/* Page is pinned, can't fail */
-	if (get_user(curval, uaddr) != 0)
-		BUG();
+	/* Page is pinned, but may no longer be in this address space. */
+	if (get_user(curval, uaddr) != 0) {
+		ret = -EFAULT;
+		goto out;
+	}
 
 	if (curval != val) {
 		ret = -EWOULDBLOCK;
-		set_current_state(TASK_RUNNING);
 		goto out;
 	}
 	time = schedule_timeout(time);
@@ -169,6 +170,7 @@ static int futex_wait(struct list_head *head,
 		goto out;
 	}
  out:
+	set_current_state(TASK_RUNNING);
 	/* Were we woken up anyway? */
 	if (!unqueue_me(&q))
 		return 0;
