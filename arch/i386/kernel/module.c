@@ -114,6 +114,7 @@ int module_finalize(const Elf_Ehdr *hdr,
 		    const Elf_Shdr *sechdrs,
 		    struct module *me)
 {
+#ifndef __arch_um__
 	const Elf_Shdr *s;
 	char *secstrings = (void *)hdr + sechdrs[hdr->e_shstrndx].sh_offset;
 
@@ -124,7 +125,8 @@ int module_finalize(const Elf_Ehdr *hdr,
 			continue;
 		seg = (void *)s->sh_addr; 
 		apply_alternatives(seg, seg + s->sh_size); 
-	} 	
+	}
+#endif
 	return 0;
 }
 
