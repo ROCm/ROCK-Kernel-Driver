@@ -1060,7 +1060,11 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	}
     }
 
-    if (cmd & IOC_OUT) __copy_to_user(uarg, (char *)&buf, size);
+    if (cmd & IOC_OUT) {
+        if (__copy_to_user(uarg, (char *)&buf, size))
+            err = -EFAULT;
+    }
+
 
     return err;
 } /* ds_ioctl */
