@@ -286,23 +286,20 @@ static void __init init_c3(struct cpuinfo_x86 *c)
 		c->x86_capability[5] = cpuid_edx(0xC0000001);
 	}
 
-	switch (c->x86_model) {
-		case 6 ... 8:		/* Cyrix III family */
-			rdmsr (MSR_VIA_FCR, lo, hi);
-			lo |= (1<<1 | 1<<7);	/* Report CX8 & enable PGE */
-			wrmsr (MSR_VIA_FCR, lo, hi);
-
-			set_bit(X86_FEATURE_CX8, c->x86_capability);
-			set_bit(X86_FEATURE_3DNOW, c->x86_capability);
-
-			/* fall through */
-
-		case 9:	/* Nehemiah */
-		default:
-			get_model_name(c);
-			display_cacheinfo(c);
-			break;
+	/* Cyrix III family needs CX8 & PGE explicity enabled. */
+	if (c->x86_model >=6 && c->x86_model <= 9) {
+		rdmsr (MSR_VIA_FCR, lo, hi);
+		lo |= (1<<1 | 1<<7);
+		wrmsr (MSR_VIA_FCR, lo, hi);
+		set_bit(X86_FEATURE_CX8, c->x86_capability);
 	}
+
+	/* Before Nehemiah, the C3's had 3dNOW! */
+	if (c->x86_model >=6 && c->x86_model <9)
+		set_bit(X86_FEATURE_3DNOW, c->x86_capability);
+
+	get_model_name(c);
+	display_cacheinfo(c);
 }
 
 static void __init init_centaur(struct cpuinfo_x86 *c)
