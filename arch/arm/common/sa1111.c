@@ -25,6 +25,7 @@
 #include <linux/device.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
+#include <linux/dma-mapping.h>
 
 #include <asm/hardware.h>
 #include <asm/mach-types.h>
@@ -547,15 +548,6 @@ sa1111_init_one_child(struct sa1111 *sachip, struct resource *parent,
 	snprintf(dev->dev.bus_id, sizeof(dev->dev.bus_id),
 		 "%4.4lx", info->offset);
 
-	/*
-	 * If the parent device has a DMA mask associated with it,
-	 * propagate it down to the children.
-	 */
-	if (sachip->dev->dma_mask) {
-		dev->dma_mask = *sachip->dev->dma_mask;
-		dev->dev.dma_mask = &dev->dma_mask;
-	}
-
 	dev->devid	 = info->devid;
 	dev->dev.parent  = sachip->dev;
 	dev->dev.bus     = &sa1111_bus_type;
@@ -573,15 +565,37 @@ sa1111_init_one_child(struct sa1111 *sachip, struct resource *parent,
 	if (ret) {
 		printk("SA1111: failed to allocate resource for %s\n",
 			dev->res.name);
+		kfree(dev);
 		goto out;
 	}
+
 
 	ret = device_register(&dev->dev);
 	if (ret) {
 		release_resource(&dev->res);
- out:
 		kfree(dev);
+		goto out;
 	}
+
+	/*
+	 * If the parent device has a DMA mask associated with it,
+	 * propagate it down to the children.
+	 */
+	if (sachip->dev->dma_mask) {
+		dev->dma_mask = *sachip->dev->dma_mask;
+		dev->dev.dma_mask = &dev->dma_mask;
+
+		if (dev->dma_mask != 0xffffffffUL) {
+			ret = dmabounce_register_dev(&dev->dev, 1024, 4096);
+			if (ret) {
+				printk("SA1111: Failed to register %s with dmabounce", dev->dev.bus_id);
+				kfree(dev);
+				device_unregister(dev);
+			}
+		}
+	}
+
+out:
 	return ret;
 }
 
@@ -742,61 +756,31 @@ static void __sa1111_remove(struct sa1111 *sachip)
  *
  * This routine only identifies whether or not a given DMA address
  * is susceptible to the bug.
+ *
+ * This should only get called for sa1111_device types due to the
+ * way we configure our device dma_masks.
  */
-int sa1111_check_dma_bug(dma_addr_t addr)
+int dma_needs_bounce(struct device *dev, dma_addr_t addr, size_t size)
 {
-	struct sa1111 *sachip = g_sa1111;
 	unsigned int physaddr = SA1111_DMA_ADDR((unsigned int)addr);
-	unsigned int smcr;
+	u32 dma_mask = *dev->dma_mask;
 
-	/* Section 4.6 of the "Intel StrongARM SA-1111 Development Module
+	/*
+	 * Section 4.6 of the "Intel StrongARM SA-1111 Development Module
 	 * User's Guide" mentions that jumpers R51 and R52 control the
 	 * target of SA-1111 DMA (either SDRAM bank 0 on Assabet, or
 	 * SDRAM bank 1 on Neponset). The default configuration selects
 	 * Assabet, so any address in bank 1 is necessarily invalid.
 	 */
-	if ((machine_is_assabet() || machine_is_pfs168()) && addr >= 0xc8000000)
-	  	return -1;
+	if ((machine_is_assabet() || machine_is_pfs168()) &&
+		(addr >= 0xc8000000 || (addr + size) >= 0xc8000000))
+	  	return 1;
 
-	/* The bug only applies to buffers located more than one megabyte
-	 * above the start of the target bank:
+	/*
+	 * Check to see if either the start or end are illegal.
 	 */
-	if (physaddr<(1<<20))
-		return 0;
-
-	smcr = sa1111_readl(sachip->base + SA1111_SMCR);
-	switch (FExtr(smcr, SMCR_DRAC)) {
-	case 01: /* 10 row + bank address bits, A<20> must not be set */
-	  	if (physaddr & (1<<20))
-		  	return -1;
-		break;
-	case 02: /* 11 row + bank address bits, A<23> must not be set */
-	  	if (physaddr & (1<<23))
-		  	return -1;
-		break;
-	case 03: /* 12 row + bank address bits, A<24> must not be set */
-	  	if (physaddr & (1<<24))
-		  	return -1;
-		break;
-	case 04: /* 13 row + bank address bits, A<25> must not be set */
-	  	if (physaddr & (1<<25))
-		  	return -1;
-		break;
-	case 05: /* 14 row + bank address bits, A<20> must not be set */
-	  	if (physaddr & (1<<20))
-		  	return -1;
-		break;
-	case 06: /* 15 row + bank address bits, A<20> must not be set */
-	  	if (physaddr & (1<<20))
-		  	return -1;
-		break;
-	default:
-	  	printk(KERN_ERR "%s(): invalid SMCR DRAC value 0%lo\n",
-		       __FUNCTION__, FExtr(smcr, SMCR_DRAC));
-		return -1;
-	}
-
-	return 0;
+	return ((addr & ~(*dev->dma_mask))) ||
+		((addr + size - 1) & ~(*dev->dma_mask));
 }
 
 struct sa1111_save_data {
@@ -1293,7 +1277,6 @@ module_exit(sa1111_exit);
 MODULE_DESCRIPTION("Intel Corporation SA1111 core driver");
 MODULE_LICENSE("GPL");
 
-EXPORT_SYMBOL(sa1111_check_dma_bug);
 EXPORT_SYMBOL(sa1111_select_audio_mode);
 EXPORT_SYMBOL(sa1111_set_audio_rate);
 EXPORT_SYMBOL(sa1111_get_audio_rate);
