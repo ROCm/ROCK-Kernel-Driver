@@ -91,12 +91,15 @@ static __inline__ long cnt_trailing_zeros(unsigned long mask)
 void
 lmb_analyze(void)
 {
-	unsigned long i, physbase = 0;
+	unsigned long i;
 	unsigned long mem_size = 0;
 	unsigned long io_size = 0;
 	unsigned long size_mask = 0;
 	unsigned long offset = reloc_offset();
 	struct lmb *_lmb = PTRRELOC(&lmb);
+#ifdef CONFIG_MSCHUNKS
+	unsigned long physbase = 0;
+#endif
 
 	for (i=0; i < _lmb->memory.cnt ;i++) {
 		unsigned long lmb_type = _lmb->memory.region[i].type;
@@ -318,7 +321,6 @@ lmb_end_of_DRAM(void)
 	unsigned long idx;
 
 	for(idx=_mem->cnt-1; idx >= 0 ;idx--) {
-		unsigned long lastbase, lastsize;
 		if ( _mem->region[idx].type != LMB_MEMORY_AREA )
 			continue;
 #ifdef CONFIG_MSCHUNKS
