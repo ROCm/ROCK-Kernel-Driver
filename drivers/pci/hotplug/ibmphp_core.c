@@ -418,8 +418,7 @@ static int get_max_bus_speed (struct hotplug_slot *hotplug_slot, enum pci_bus_sp
 				rc = -ENODEV;
 			}
 		}
-	} else
-		rc = -ENODEV;
+	}
 
 	ibmphp_unlock_operations ();
 	debug ("%s - Exit rc[%d] value[%x]\n", __FUNCTION__, rc, *value);
@@ -465,8 +464,7 @@ static int get_cur_bus_speed (struct hotplug_slot *hotplug_slot, enum pci_bus_sp
 				}
 			}
 		}
-	} else
-		rc = -ENODEV;
+	}
 
 	ibmphp_unlock_operations ();
 	debug ("%s - Exit rc[%d] value[%x]\n", __FUNCTION__, rc, *value);
