@@ -854,14 +854,9 @@ int ipv6_dev_mc_inc(struct net_device *dev, struct in6_addr *addr)
 /*
  *	device multicast group del
  */
-int ipv6_dev_mc_dec(struct net_device *dev, struct in6_addr *addr)
+static int __ipv6_dev_mc_dec(struct net_device *dev, struct inet6_dev *idev, struct in6_addr *addr)
 {
-	struct inet6_dev *idev;
 	struct ifmcaddr6 *ma, **map;
-
-	idev = in6_dev_get(dev);
-	if (idev == NULL)
-		return -ENODEV;
 
 	write_lock_bh(&idev->lock);
 	for (map = &idev->mc_list; (ma=*map) != NULL; map = &ma->next) {
@@ -873,18 +868,30 @@ int ipv6_dev_mc_dec(struct net_device *dev, struct in6_addr *addr)
 				igmp6_group_dropped(ma);
 
 				ma_put(ma);
-				in6_dev_put(idev);
 				return 0;
 			}
 			write_unlock_bh(&idev->lock);
-			in6_dev_put(idev);
 			return 0;
 		}
 	}
 	write_unlock_bh(&idev->lock);
-	in6_dev_put(idev);
 
 	return -ENOENT;
+}
+
+int ipv6_dev_mc_dec(struct net_device *dev, struct in6_addr *addr)
+{
+	struct inet6_dev *idev = in6_dev_get(dev);
+	int err;
+
+	if (!idev)
+		return -ENODEV;
+
+	err = __ipv6_dev_mc_dec(dev, idev, addr);
+
+	in6_dev_put(idev);
+
+	return err;
 }
 
 /*
@@ -2024,7 +2031,12 @@ void ipv6_mc_destroy_dev(struct inet6_dev *idev)
 
 	/* Delete all-nodes address. */
 	ipv6_addr_all_nodes(&maddr);
-	ipv6_dev_mc_dec(idev->dev, &maddr);
+
+	/* We cannot call ipv6_dev_mc_dec() directly, our caller in
+	 * addrconf.c has NULL'd out dev->ip6_ptr so in6_dev_get() will
+	 * fail.
+	 */
+	__ipv6_dev_mc_dec(idev->dev, idev, &maddr);
 
 	write_lock_bh(&idev->lock);
 	while ((i = idev->mc_list) != NULL) {

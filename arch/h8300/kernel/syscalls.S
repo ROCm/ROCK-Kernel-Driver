@@ -275,14 +275,18 @@ SYMBOL_NAME_LABEL(sys_call_table)
  	.long SYMBOL_NAME(sys_ni_syscall)	/* sys_remap_file_pages */
  	.long SYMBOL_NAME(sys_set_tid_address)
  	.long SYMBOL_NAME(sys_timer_create)
- 	.long SYMBOL_NAME(sys_timer_settime)		/* 260 */
+ 	.long SYMBOL_NAME(sys_timer_settime)	/* 260 */
  	.long SYMBOL_NAME(sys_timer_gettime)
  	.long SYMBOL_NAME(sys_timer_getoverrun)
  	.long SYMBOL_NAME(sys_timer_delete)
  	.long SYMBOL_NAME(sys_clock_settime)
- 	.long SYMBOL_NAME(sys_clock_gettime)		/* 265 */
+ 	.long SYMBOL_NAME(sys_clock_gettime)	/* 265 */
  	.long SYMBOL_NAME(sys_clock_getres)
  	.long SYMBOL_NAME(sys_clock_nanosleep)
+	.long SYMBOL_NAME(sys_statfs64)
+	.long SYMBOL_NAME(sys_fstatfs64)	
+	.long SYMBOL_NAME(sys_tgkill)		/* 270 */
+	.long SYMBOL_NAME(sys_utimes)
 
 	.rept NR_syscalls-(.-SYMBOL_NAME(sys_call_table))/4
 		.long SYMBOL_NAME(sys_ni_syscall)

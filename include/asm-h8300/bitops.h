@@ -39,16 +39,18 @@ static __inline__ unsigned long ffz(unsigned long word)
 
 static __inline__ void set_bit(int nr, volatile unsigned long* addr)
 {
-	unsigned char *a = (unsigned char *) addr;
-	a += ((nr >> 3) & ~3) + (3 - ((nr >> 3) & 3));
+	volatile unsigned char *b_addr;
+	b_addr = &(((volatile unsigned char *) addr)
+	          [((nr >> 3) & ~3) + 3 - ((nr >> 3) & 3)]);
 	__asm__("mov.l %1,er0\n\t"
-		"mov.l %0,er1\n\t"
-		"bset r0l,@er1"
-		:"=m"(a):"g"(nr & 7):"er0","er1","memory");
+		"bset r0l,%0"
+		:"+m"(*b_addr)
+		:"g"(nr & 7),"m"(*b_addr)
+		:"er0");
 }
-/* Bigendian is complexed... */
 
-#define __set_bit(nr, addr) set_bit(nr, addr)
+/* Bigendian is complexed... */
+#define __set_bit(nr, addr) set_bit((nr), (addr))
 
 /*
  * clear_bit() doesn't provide any barrier for the compiler.
@@ -58,260 +60,157 @@ static __inline__ void set_bit(int nr, volatile unsigned long* addr)
 
 static __inline__ void clear_bit(int nr, volatile unsigned long* addr)
 {
-	unsigned char *a = (unsigned char *) addr;
-	a += ((nr >> 3) & ~3) + (3 - ((nr >> 3) & 3));
+	volatile unsigned char *b_addr;
+	b_addr = &(((volatile unsigned char *) addr)
+	          [((nr >> 3) & ~3) + 3 - ((nr >> 3) & 3)]);
 	__asm__("mov.l %1,er0\n\t"
-		"mov.l %0,er1\n\t"
-		"bclr r0l,@er1"
-		:"=m"(a):"g"(nr & 7):"er0","er1","memory");
+		"bclr r0l,%0"
+		:"+m"(*b_addr)
+		:"g"(nr & 7),"m"(*b_addr)
+		:"er0");
 }
 
-#define __clear_bit(nr, addr) clear_bit(nr, addr)
+#define __clear_bit(nr, addr) clear_bit((nr), (addr))
 
 static __inline__ void change_bit(int nr, volatile unsigned long* addr)
 {
-	unsigned char *a = (unsigned char *) addr;
-	a += ((nr >> 3) & ~3) + (3 - ((nr >> 3) & 3));
+	volatile unsigned char *b_addr;
+	b_addr = &(((volatile unsigned char *) addr)
+	          [((nr >> 3) & ~3) + 3 - ((nr >> 3) & 3)]);
 	__asm__("mov.l %1,er0\n\t"
-		"mov.l %0,er1\n\t"
-		"bnot r0l,@er1"
-		:"=m"(a):"g"(nr & 7):"er0","er1","memory");
+		"bnot r0l,%0"
+		:"+m"(*b_addr)
+		:"g"(nr & 7),"m"(*b_addr)
+		:"er0");
 }
 
-#define __change_bit(nr, addr) change_bit(nr, addr)
+#define __change_bit(nr, addr) change_bit((nr), (addr))
 
-#if defined(__H8300H__)
+static __inline__ int test_bit(int nr, const unsigned long* addr)
+{
+	return ((1UL << (nr & 7)) & 
+               (((const volatile unsigned char *) addr)
+               [((nr >> 3) & ~3) + 3 - ((nr >> 3) & 3)])) != 0;
+}
+
+#define __test_bit(nr, addr) test_bit(nr, addr)
+
 static __inline__ int test_and_set_bit(int nr, volatile unsigned long* addr)
 {
-	int retval;
-	unsigned char *a;
-	a = (unsigned char *) addr;
+	register int retval __asm__("er0");
+	volatile unsigned char *a;
+	a = (volatile unsigned char *)addr;
 
 	a += ((nr >> 3) & ~3) + (3 - ((nr >> 3) & 3));
-	__asm__("mov.l %2,er0\n\t"
-		"stc ccr,r0h\n\t"
+	__asm__("mov.l %2,er3\n\t"
+		"sub.l %0,%0\n\t"
+		"stc ccr,r3h\n\t"
 		"orc #0x80,ccr\n\t"
-		"mov.b %1,r1l\n\t"
-		"btst r0l,r1l\n\t"
-		"bset r0l,r1l\n\t"
-		"stc ccr,r0l\n\t"
-		"mov.b r1l,%1\n\t"
-		"ldc r0h,ccr\n\t"
-		"sub.l %0,%0\n\t"
-		"bild #2,r0l\n\t"
-		"rotxl.l %0"
-		: "=r"(retval),"=m"(*a) :"g"(nr & 7):"er0","er1","memory");
+		"btst r3l,%1\n\t"
+		"bset r3l,%1\n\t"
+		"beq 1f\n\t"
+		"inc.l #1,%0\n\t"
+		"1:"
+		"ldc r3h,ccr"
+		: "=r"(retval),"+m"(*a) :"g"(nr & 7):"er3","memory");
 	return retval;
 }
-#endif
-#if defined(__H8300S__)
-static __inline__ int test_and_set_bit(int nr, volatile unsigned long* addr)
-{
-	int retval;
-	unsigned char *a;
-	a = (unsigned char *) addr;
-
-	a += ((nr >> 3) & ~3) + (3 - ((nr >> 3) & 3));
-	__asm__("mov.l %2,er0\n\t"
-		"stc exr,r0h\n\t"
-		"orc #0x07,exr\n\t"
-		"mov.b %1,r1l\n\t"
-		"btst r0l,r1l\n\t"
-		"bset r0l,r1l\n\t"
-		"stc ccr,r0l\n\t"
-		"mov.b r1l,%1\n\t"
-		"ldc r0h,exr\n\t"
-		"sub.l %0,%0\n\t"
-		"bild #2,r0l\n\t"
-		"rotxl.l %0"
-		: "=r"(retval),"=m"(*a) :"g"(nr & 7):"er0","er1","memory");
-	return retval;
-}
-#endif
 
 static __inline__ int __test_and_set_bit(int nr, volatile unsigned long* addr)
 {
-	int retval;
-	unsigned char *a = (unsigned char *) addr;
+	register int retval __asm__("er0");
+	volatile unsigned char *a;
+	a = (volatile unsigned char *)addr;
 
 	a += ((nr >> 3) & ~3) + (3 - ((nr >> 3) & 3));
-	__asm__("mov.l %2,er0\n\t"
-		"mov.b %1,r0h\n\t"
-		"btst r0l,r0h\n\t"
-		"bset r0l,r0h\n\t"
-		"stc ccr,r0l\n\t"
-		"mov.b r0h,%1\n\t"
+	__asm__("mov.l %2,er3\n\t"
 		"sub.l %0,%0\n\t"
-		"bild #2,r0l\n\t"
-		"rotxl.l %0"
-		: "=r"(retval),"=m"(*a) :"g"(nr & 7):"er0","memory");
+		"btst r3l,%1\n\t"
+		"bset r3l,%1\n\t"
+		"beq 1f\n\t"
+		"inc.l #1,%0\n\t"
+		"1:"
+		: "=r"(retval),"+m"(*a) :"g"(nr & 7):"er3","memory");
 	return retval;
 }
 
-#if defined(__H8300H__)
 static __inline__ int test_and_clear_bit(int nr, volatile unsigned long* addr)
 {
-	int retval;
-	unsigned char *a = (unsigned char *) addr;
+	register int retval __asm__("er0");
+	volatile unsigned char *a;
+	a = (volatile unsigned char *)addr;
 
 	a += ((nr >> 3) & ~3) + (3 - ((nr >> 3) & 3));
-	__asm__("mov.l %2,er0\n\t"
-		"stc ccr,r0h\n\t"
+	__asm__("mov.l %2,er3\n\t"
+		"sub.l %0,%0\n\t"
+		"stc ccr,r3h\n\t"
 		"orc #0x80,ccr\n\t"
-		"mov.b %1,r1l\n\t"
-		"btst r0l,r1l\n\t"
-		"bclr r0l,r1l\n\t"
-		"stc ccr,r0l\n\t"
-		"mov.b r1l,%1\n\t"
-		"ldc r0h,ccr\n\t"
-		"sub.l %0,%0\n\t"
-		"bild #2,r0l\n\t"
-		"rotxl.l %0"
-		: "=r"(retval),"=m"(*a) :"g"(nr & 7):"er0","er1","memory");
+		"btst r3l,%1\n\t"
+		"bclr r3l,%1\n\t"
+		"beq 1f\n\t"
+		"inc.l #1,%0\n\t"
+		"1:"
+		"ldc r3h,ccr"
+		: "=r"(retval),"=m"(*a) :"g"(nr & 7):"er3","memory");
 	return retval;
 }
-#endif
-#if defined(__H8300S__)
-static __inline__ int test_and_clear_bit(int nr, volatile unsigned long* addr)
-{
-	int retval;
-	unsigned char *a = (unsigned char *) addr;
-
-	a += ((nr >> 3) & ~3) + (3 - ((nr >> 3) & 3));
-	__asm__("mov.l %2,er0\n\t"
-		"stc exr,r0h\n\t"
-		"orc #0x07,exr\n\t"
-		"mov.b %1,r1l\n\t"
-		"btst r0l,r1l\n\t"
-		"bclr r0l,r1l\n\t"
-		"stc ccr,r0l\n\t"
-		"mov.b r1l,%1\n\t"
-		"ldc r0h,exr\n\t"
-		"sub.l %0,%0\n\t"
-		"bild #2,r0l\n\t"
-		"rotxl.l %0"
-		: "=r"(retval),"=m"(*a) :"g"(nr & 7):"er0","er1","memory");
-	return retval;
-}
-#endif
 
 static __inline__ int __test_and_clear_bit(int nr, volatile unsigned long* addr)
 {
-	int retval;
-	unsigned char *a = (unsigned char *) addr;
+	register int retval __asm__("er0");
+	volatile unsigned char *a;
+	a = (volatile unsigned char *)addr;
 
 	a += ((nr >> 3) & ~3) + (3 - ((nr >> 3) & 3));
-	__asm__("mov.l %2,er0\n\t"
-		"mov.b %1,r0h\n\t"
-		"btst r0l,r0h\n\t"
-		"bclr r0l,r0h\n\t"
-		"stc ccr,r0l\n\t"
-		"mov.b r0h,%1\n\t"
+	__asm__("mov.l %2,er3\n\t"
 		"sub.l %0,%0\n\t"
-		"bild #2,r0l\n\t"
-		"rotxl.l %0"
-		: "=r"(retval),"=m"(*a) :"g"(nr & 7):"er0","memory");
+		"btst r3l,%1\n\t"
+		"bclr r3l,%1\n\t"
+		"beq 1f\n\t"
+		"inc.l #1,%0\n\t"
+		"1:"
+		: "=r"(retval),"+m"(*a) :"g"(nr & 7):"er3","memory");
 	return retval;
 }
 
-#if defined(__H8300H__)
 static __inline__ int test_and_change_bit(int nr, volatile unsigned long* addr)
 {
-	int retval;
-	unsigned char *a = (unsigned char *) addr;
+	register int retval __asm__("er0");
+	volatile unsigned char *a;
+	a = (volatile unsigned char *)addr;
 
 	a += ((nr >> 3) & ~3) + (3 - ((nr >> 3) & 3));
-	__asm__("mov.l %2,er0\n\t"
-		"stc ccr,r0h\n\t"
+	__asm__("mov.l %2,er3\n\t"
+		"sub.l %0,%0\n\t"
+		"stc ccr,r3h\n\t"
 		"orc #0x80,ccr\n\t"
-		"mov.b %1,r1l\n\t"
-		"btst r0l,r1l\n\t"
-		"bnot r0l,r1l\n\t"
-		"stc ccr,r0l\n\t"
-		"mov.b r1l,%1\n\t"
-		"ldc r0h,ccr\n\t"
-		"sub.l %0,%0\n\t"
-		"bild #2,r0l\n\t"
-		"rotxl.l %0"
-		: "=r"(retval),"=m"(*a) :"g"(nr & 7):"er0","er1","memory");
+		"btst r3l,%1\n\t"
+		"bnot r3l,%1\n\t"
+		"beq 1f\n\t"
+		"inc.l #1,%0\n\t"
+		"1:"
+		"ldc r3h,ccr"
+		: "=r"(retval),"+m"(*a) :"g"(nr & 7):"er3","memory");
 	return retval;
 }
-#endif
-#if defined(__H8300S__)
-static __inline__ int test_and_change_bit(int nr, volatile unsigned long* addr)
-{
-	int retval;
-	unsigned char *a = (unsigned char *) addr;
-
-	a += ((nr >> 3) & ~3) + (3 - ((nr >> 3) & 3));
-	__asm__("mov.l %2,er0\n\t"
-		"stc exr,r0h\n\t"
-		"orc #0x07,exr\n\t"
-		"mov.b %1,r1l\n\t"
-		"btst r0l,r1l\n\t"
-		"bnot r0l,r1l\n\t"
-		"stc ccr,r0l\n\t"
-		"mov.b r1l,%1\n\t"
-		"ldc r0h,exr\n\t"
-		"sub.l %0,%0\n\t"
-		"bild #2,r0l\n\t"
-		"rotxl.l %0"
-		: "=r"(retval),"=m"(*a) :"g"(nr & 7):"er0","er1","memory");
-	return retval;
-}
-#endif
 
 static __inline__ int __test_and_change_bit(int nr, volatile unsigned long* addr)
 {
-	int retval;
-	unsigned char *a = (unsigned char *) addr;
+	register int retval __asm__("er0");
+	volatile unsigned char *a;
+	a = (volatile unsigned char *)addr;
 
 	a += ((nr >> 3) & ~3) + (3 - ((nr >> 3) & 3));
-	__asm__("mov.l %2,er0\n\t"
-		"mov.b %1,r0h\n\t"
-		"btst r0l,r0h\n\t"
-		"bnot r0l,r0h\n\t"
-		"stc ccr,r0l\n\t"
-		"mov.b r0h,%1\n\t"
+	__asm__("mov.l %2,er3\n\t"
 		"sub.l %0,%0\n\t"
-		"bild #2,r0l\n\t"
-		"rotxl.l %0"
-		: "=r"(retval),"=m"(*a) :"g"(nr & 7):"er0","memory");
-	return retval;
-}
-
-/*
- * This routine doesn't need to be atomic.
- */
-static __inline__ int __constant_test_bit(int nr, const volatile unsigned long* addr)
-{
-	return ((1UL << (nr & 31)) & (((const volatile unsigned int *) addr)[nr >> 5])) != 0;
-}
-
-static __inline__ int __test_bit(int nr, const unsigned long* addr)
-{
-	int retval;
-	unsigned char *a = (unsigned char *) addr;
-
-	a += ((nr >> 3) & ~3) + (3 - ((nr >> 3) & 3));
-	__asm__("mov.l %1,er0\n\t"
-		"btst r0l,@%2\n\t"
+		"btst r3l,%1\n\t"
+		"bnot r3l,%1\n\t"
 		"beq 1f\n\t"
-		"sub.l %0,%0\n\t"
-		"inc.l #1,%0\n"
-		"bra 2f\n"
-		"1:\n\t"
-		"sub.l %0,%0\n"
-		"2:"
-		: "=r"(retval) :"g"(nr & 7),"r"(a):"er0");
+		"inc.l #1,%0\n\t"
+		"1:"
+		: "=r"(retval),"+m"(*a) :"g"(nr & 7):"er3","memory");
 	return retval;
 }
-
-#define test_bit(nr,addr) \
-(__builtin_constant_p(nr) ? \
- __constant_test_bit((nr),(addr)) : \
- __test_bit((nr),(addr)))
-
 
 #define find_first_zero_bit(addr, size) \
         find_next_zero_bit((addr), (size), 0)

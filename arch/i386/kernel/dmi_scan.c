@@ -162,24 +162,6 @@ enum
 
 static char *dmi_ident[DMI_STRING_MAX];
 
-#ifdef CONFIG_ACPI_BOOT
-
-/* print some information suitable for a blacklist entry. */
-static void dmi_dump_system(void)
-{ 
-	printk("DMI: BIOS: %.40s, %.40s, %.40s\n",
-	       dmi_ident[DMI_BIOS_VENDOR], dmi_ident[DMI_BIOS_VERSION],
-	       dmi_ident[DMI_BIOS_DATE]);
-	printk("DMI: System: %.40s, %.40s, %.40s\n",
-	       dmi_ident[DMI_SYS_VENDOR], dmi_ident[DMI_PRODUCT_NAME],
-	       dmi_ident[DMI_PRODUCT_VERSION]); 
-	printk("DMI: Board: %.40s, %.40s, %.40s\n",
-	       dmi_ident[DMI_BOARD_VENDOR], dmi_ident[DMI_BOARD_NAME],
-	       dmi_ident[DMI_BOARD_VERSION]); 
-} 
-
-#endif
-
 /*
  *	Save a DMI string
  */

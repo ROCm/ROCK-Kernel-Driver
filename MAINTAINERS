@@ -363,6 +363,13 @@ L:	linux-scsi@vger.kernel.org
 W:	http://www.dandelion.com/Linux/
 S:	Maintained
 
+COMMON INTERNET FILE SYSTEM (CIFS)
+P:	Steve French
+M:	sfrench@samba.org
+L:	samba-technical@lists.samba.org
+W:	http://us1.samba.org/samba/Linux_CIFS_client.html
+S:	Supported	
+
 CIRRUS LOGIC GENERIC FBDEV DRIVER
 P:	Jeff Garzik
 M:	jgarzik@pobox.com
@@ -2160,6 +2167,12 @@ P:	Miles Bader
 M:	uclinux-v850@lsi.nec.co.jp
 W:	http://www.ic.nec.co.jp/micro/uclinux/eng/
 W:	http://www.ee.nec.de/uclinux/
+S:	Supported
+
+UCLINUX FOR RENESAS H8/300
+P:	Yoshinori Sato
+M:	ysato@users.sourceforge.jp
+W:	http://uclinux-h8.sourceforge.jp/
 S:	Supported
 
 USB DIAMOND RIO500 DRIVER

@@ -6,7 +6,7 @@ menu "Character devices"
 
 config VT
 	bool "Virtual terminal" if EMBEDDED
-	requires INPUT=y
+	select INPUT
 	default y
 	---help---
 	  If you say Y here, you will get support for terminal devices with

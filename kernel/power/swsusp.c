@@ -65,8 +65,6 @@
 
 #include "power.h"
 
-extern long sys_sync(void);
-
 unsigned char software_suspend_enabled = 1;
 
 #define __ADDRESS(x)  ((unsigned long) phys_to_virt(x))
@@ -89,8 +87,6 @@ static char resume_file[256];			/* For resume= kernel option */
 static dev_t resume_device;
 /* Local variables that should not be affected by save */
 unsigned int nr_copy_pages __nosavedata = 0;
-
-static int pm_suspend_state;
 
 /* Suspend pagedir is allocated before final copy, therefore it
    must be freed after resume 
@@ -439,81 +435,6 @@ static suspend_pagedir_t *create_suspend_pagedir(int nr_copy_pages)
 	return pagedir;
 }
 
-static int prepare_suspend_processes(void)
-{
-	sys_sync();	/* Syncing needs pdflushd, so do it before stopping processes */
-	if (freeze_processes()) {
-		printk( KERN_ERR "Suspend failed: Not all processes stopped!\n" );
-		thaw_processes();
-		return 1;
-	}
-	return 0;
-}
-
-/*
- * Try to free as much memory as possible, but do not OOM-kill anyone
- *
- * Notice: all userland should be stopped at this point, or livelock is possible.
- */
-static void free_some_memory(void)
-{
-	printk("Freeing memory: ");
-	while (shrink_all_memory(10000))
-		printk(".");
-	printk("|\n");
-}
-
-/* Make disk drivers accept operations, again */
-static void drivers_unsuspend(void)
-{
-	device_resume(RESUME_RESTORE_STATE);
-	device_resume(RESUME_ENABLE);
-}
-
-/* Called from process context */
-static int drivers_suspend(void)
-{
-	if (device_suspend(4, SUSPEND_NOTIFY))
-		return -EIO;
-	if (device_suspend(4, SUSPEND_SAVE_STATE)) {
-		device_resume(RESUME_RESTORE_STATE);
-		return -EIO;
-	}
-	if (!pm_suspend_state) {
-		if(pm_send_all(PM_SUSPEND,(void *)3)) {
-			printk(KERN_WARNING "Problem while sending suspend event\n");
-			return -EIO;
-		}
-		pm_suspend_state=1;
-	} else
-		printk(KERN_WARNING "PM suspend state already raised\n");
-	device_suspend(4, SUSPEND_DISABLE);
-	  
-	return 0;
-}
-
-#define RESUME_PHASE1 1 /* Called from interrupts disabled */
-#define RESUME_PHASE2 2 /* Called with interrupts enabled */
-#define RESUME_ALL_PHASES (RESUME_PHASE1 | RESUME_PHASE2)
-static void drivers_resume(int flags)
-{
-	if (flags & RESUME_PHASE1) {
-		device_resume(RESUME_RESTORE_STATE);
-		device_resume(RESUME_ENABLE);
-	}
-  	if (flags & RESUME_PHASE2) {
-		if (pm_suspend_state) {
-			if(pm_send_all(PM_RESUME,(void *)0))
-				printk(KERN_WARNING "Problem while sending resume event\n");
-			pm_suspend_state=0;
-		} else
-			printk(KERN_WARNING "PM suspend state wasn't raised\n");
-
-#ifdef SUSPEND_CONSOLE
-		update_screen(fg_console);	/* Hmm, is this the problem? */
-#endif
-	}
-}
 
 static int suspend_prepare_image(void)
 {
@@ -567,12 +488,14 @@ static int suspend_prepare_image(void)
 	return 0;
 }
 
-static void suspend_save_image(void)
+static int suspend_save_image(void)
 {
-	drivers_unsuspend();
+	int error;
+
+	device_resume();
 
 	lock_swapdevices();
-	write_suspend_image();
+	error = write_suspend_image();
 	lock_swapdevices();	/* This will unlock ignored swap devices since writing is finished */
 
 	/* It is important _NOT_ to umount filesystems at this point. We want
@@ -580,29 +503,7 @@ static void suspend_save_image(void)
 	 * filesystem clean: it is not. (And it does not matter, if we resume
 	 * correctly, we'll mark system clean, anyway.)
 	 */
-}
-
-static void suspend_power_down(void)
-{
-	extern int C_A_D;
-	C_A_D = 0;
-	printk(KERN_EMERG "%s%s Trying to power down.\n", name_suspend, TEST_SWSUSP ? "Disable TEST_SWSUSP. NOT ": "");
-#ifdef CONFIG_VT
-	PRINTK(KERN_EMERG "shift_state: %04x\n", shift_state);
-	mdelay(1000);
-	if (TEST_SWSUSP ^ (!!(shift_state & (1 << KG_CTRL))))
-		machine_restart(NULL);
-	else
-#endif
-	{
-		device_shutdown();
-		machine_power_off();
-	}
-
-	printk(KERN_EMERG "%sProbably not capable for powerdown. System halted.\n", name_suspend);
-	machine_halt();
-	while (1);
-	/* NOTREACHED */
+	return error;
 }
 
 /*
@@ -614,32 +515,21 @@ void do_magic_resume_1(void)
 	barrier();
 	mb();
 	spin_lock_irq(&suspend_pagedir_lock);	/* Done to disable interrupts */ 
-
 	PRINTK( "Waiting for DMAs to settle down...\n");
-	mdelay(1000);	/* We do not want some readahead with DMA to corrupt our memory, right?
-			   Do it with disabled interrupts for best effect. That way, if some
-			   driver scheduled DMA, we have good chance for DMA to finish ;-). */
+	/* We do not want some readahead with DMA to corrupt our memory, right?
+	   Do it with disabled interrupts for best effect. That way, if some
+	   driver scheduled DMA, we have good chance for DMA to finish ;-). */
+	mdelay(1000);
 }
 
 void do_magic_resume_2(void)
 {
 	BUG_ON (nr_copy_pages_check != nr_copy_pages);
 	BUG_ON (pagedir_order_check != pagedir_order);
-
-	__flush_tlb_global();		/* Even mappings of "global" things (vmalloc) need to be fixed */
-
-	PRINTK( "Freeing prev allocated pagedir\n" );
-	free_suspend_pagedir((unsigned long) pagedir_save);
+	
+	/* Even mappings of "global" things (vmalloc) need to be fixed */
+	__flush_tlb_global();
 	spin_unlock_irq(&suspend_pagedir_lock);
-	drivers_resume(RESUME_ALL_PHASES);
-
-	PRINTK( "Fixing swap signatures... " );
-	mark_swapfiles(((swp_entry_t) {0}), MARK_SWAP_RESUME);
-	PRINTK( "ok\n" );
-
-#ifdef SUSPEND_CONSOLE
-	update_screen(fg_console);	/* Hmm, is this the problem? */
-#endif
 }
 
 /* do_magic() is implemented in arch/?/kernel/suspend_asm.S, and basically does:
@@ -664,106 +554,28 @@ void do_magic_suspend_1(void)
 {
 	mb();
 	barrier();
-	BUG_ON(in_atomic());
 	spin_lock_irq(&suspend_pagedir_lock);
 }
 
-void do_magic_suspend_2(void)
+int do_magic_suspend_2(void)
 {
 	int is_problem;
 	read_swapfiles();
 	is_problem = suspend_prepare_image();
 	spin_unlock_irq(&suspend_pagedir_lock);
-	if (!is_problem) {
-		kernel_fpu_end();	/* save_processor_state() does kernel_fpu_begin, and we need to revert it in order to pass in_atomic() checks */
-		BUG_ON(in_atomic());
-		suspend_save_image();
-		suspend_power_down();	/* FIXME: if suspend_power_down is commented out, console is lost after few suspends ?! */
-	}
-
+	if (!is_problem)
+		return suspend_save_image();
 	printk(KERN_EMERG "%sSuspend failed, trying to recover...\n", name_suspend);
-	MDELAY(1000); /* So user can wait and report us messages if armageddon comes :-) */
-
 	barrier();
 	mb();
-	spin_lock_irq(&suspend_pagedir_lock);	/* Done to disable interrupts */ 
 	mdelay(1000);
-
-	free_pages((unsigned long) pagedir_nosave, pagedir_order);
-	spin_unlock_irq(&suspend_pagedir_lock);
-	mark_swapfiles(((swp_entry_t) {0}), MARK_SWAP_RESUME);
-}
-
-static int do_software_suspend(void)
-{
-	arch_prepare_suspend();
-	if (pm_prepare_console())
-		printk( "%sCan't allocate a console... proceeding\n", name_suspend);
-	if (!prepare_suspend_processes()) {
-
-		/* At this point, all user processes and "dangerous"
-                   kernel threads are stopped. Free some memory, as we
-                   need half of memory free. */
-
-		free_some_memory();
-		
-		/* No need to invalidate any vfsmnt list -- 
-		 * they will be valid after resume, anyway.
-		 */
-		blk_run_queues();
-
-		/* Save state of all device drivers, and stop them. */		   
-		if (drivers_suspend()==0)
-			/* If stopping device drivers worked, we proceed basically into
-			 * suspend_save_image.
-			 *
-			 * do_magic(0) returns after system is resumed.
-			 *
-			 * do_magic() copies all "used" memory to "free" memory, then
-			 * unsuspends all device drivers, and writes memory to disk
-			 * using normal kernel mechanism.
-			 */
-			do_magic(0);
-		thaw_processes();
-	}
-	software_suspend_enabled = 1;
-	MDELAY(1000);
-	pm_restore_console();
-	return 0;
-}
-
-
-/**
- *	software_suspend - initiate suspend-to-swap transition.
- *
- *	This is main interface to the outside world. It needs to be
- *	called from process context.
- */
-
-int software_suspend(void)
-{
-	if(!software_suspend_enabled)
-		return -EINVAL;
-
-	if (num_online_cpus() > 1) {
-		printk(KERN_WARNING "swsusp does not support SMP.\n");	
-		return -EPERM;
-	}
-
-#if defined (CONFIG_HIGHMEM) || defined (COFNIG_DISCONTIGMEM)
-	printk("swsusp is not supported with high- or discontig-mem.\n");
-	return -EPERM;
-#endif
-
-	software_suspend_enabled = 0;
-	might_sleep();
-	return do_software_suspend();
+	return -EFAULT;
 }
 
 /* More restore stuff */
 
 /* FIXME: Why not memcpy(to, from, 1<<pagedir_order*PAGE_SIZE)? */
-static void copy_pagedir(suspend_pagedir_t *to, suspend_pagedir_t *from)
+static void __init copy_pagedir(suspend_pagedir_t *to, suspend_pagedir_t *from)
 {
 	int i;
 	char *topointer=(char *)to, *frompointer=(char *)from;
@@ -780,8 +592,8 @@ static void copy_pagedir(suspend_pagedir_t *to, suspend_pagedir_t *from)
 /*
  * Returns true if given address/order collides with any orig_address 
  */
-static int does_collide_order(suspend_pagedir_t *pagedir, unsigned long addr,
-		int order)
+static int __init does_collide_order(suspend_pagedir_t *pagedir, 
+				     unsigned long addr, int order)
 {
 	int i;
 	unsigned long addre = addr + (PAGE_SIZE<<order);
@@ -798,7 +610,7 @@ static int does_collide_order(suspend_pagedir_t *pagedir, unsigned long addr,
  * We check here that pagedir & pages it points to won't collide with pages
  * where we're going to restore from the loaded pages later
  */
-static int check_pagedir(void)
+static int __init check_pagedir(void)
 {
 	int i;
 
@@ -816,7 +628,7 @@ static int check_pagedir(void)
 	return 0;
 }
 
-static int relocate_pagedir(void)
+static int __init relocate_pagedir(void)
 {
 	/*
 	 * We have to avoid recursion (not to overflow kernel stack),
@@ -866,13 +678,13 @@ static int relocate_pagedir(void)
  * I really don't think that it's foolproof but more than nothing..
  */
 
-static int sanity_check_failed(char *reason)
+static int __init sanity_check_failed(char *reason)
 {
 	printk(KERN_ERR "%s%s\n",name_resume,reason);
 	return -EPERM;
 }
 
-static int sanity_check(struct suspend_header *sh)
+static int __init sanity_check(struct suspend_header *sh)
 {
 	if(sh->version_code != LINUX_VERSION_CODE)
 		return sanity_check_failed("Incorrect kernel version");
@@ -889,7 +701,8 @@ static int sanity_check(struct suspend_header *sh)
 	return 0;
 }
 
-static int bdev_read_page(struct block_device *bdev, long pos, void *buf)
+static int __init bdev_read_page(struct block_device *bdev, 
+				 long pos, void *buf)
 {
 	struct buffer_head *bh;
 	BUG_ON (pos%PAGE_SIZE);
@@ -905,7 +718,8 @@ static int bdev_read_page(struct block_device *bdev, long pos, void *buf)
 
 extern dev_t __init name_to_dev_t(const char *line);
 
-static int __read_suspend_image(struct block_device *bdev, union diskpage *cur)
+static int __init read_suspend_image(struct block_device *bdev, 
+				     union diskpage *cur)
 {
 	swp_entry_t next;
 	int i, nr_pgdir_pages;
@@ -982,89 +796,106 @@ static int __read_suspend_image(struct block_device *bdev, union diskpage *cur)
 	return 0;
 }
 
-static int read_suspend_image(const char * specialfile)
+/**
+ *	swsusp_save - Snapshot memory
+ */
+
+int swsusp_save(void) 
+{
+#if defined (CONFIG_HIGHMEM) || defined (COFNIG_DISCONTIGMEM)
+	printk("swsusp is not supported with high- or discontig-mem.\n");
+	return -EPERM;
+#endif
+	return 0;
+}
+
+
+/**
+ *	swsusp_write - Write saved memory image to swap.
+ *
+ *	do_magic(0) returns after system is resumed.
+ *
+ *	do_magic() copies all "used" memory to "free" memory, then
+ *	unsuspends all device drivers, and writes memory to disk
+ *	using normal kernel mechanism.
+ */
+
+int swsusp_write(void)
+{
+	arch_prepare_suspend();
+	return do_magic(0);
+}
+
+
+/**
+ *	swsusp_read - Read saved image from swap.
+ */
+
+int __init swsusp_read(void)
 {
 	union diskpage *cur;
-	unsigned long scratch_page = 0;
 	int error;
 	char b[BDEVNAME_SIZE];
 
-	resume_device = name_to_dev_t(specialfile);
-	scratch_page = get_zeroed_page(GFP_ATOMIC);
-	cur = (void *) scratch_page;
+	if (!strlen(resume_file))
+		return -ENOENT;
+
+	resume_device = name_to_dev_t(resume_file);
+	printk("swsusp: Resume From Partition: %s, Device: %s\n", 
+	       resume_file, __bdevname(resume_device, b));
+
+	cur = (union diskpage *)get_zeroed_page(GFP_ATOMIC);
 	if (cur) {
 		struct block_device *bdev;
-		printk("Resuming from device %s\n",
-				__bdevname(resume_device, b));
 		bdev = open_by_devnum(resume_device, FMODE_READ, BDEV_RAW);
-		if (IS_ERR(bdev)) {
-			error = PTR_ERR(bdev);
-		} else {
+		if (!IS_ERR(bdev)) {
 			set_blocksize(bdev, PAGE_SIZE);
-			error = __read_suspend_image(bdev, cur);
+			error = read_suspend_image(bdev, cur);
 			blkdev_put(bdev, BDEV_RAW);
-		}
-	} else error = -ENOMEM;
+		} else
+			error = PTR_ERR(bdev);
+		free_page((unsigned long)cur);
+	} else
+		error = -ENOMEM;
 
-	if (scratch_page)
-		free_page(scratch_page);
-	switch (error) {
-		case 0:
-			PRINTK("Reading resume file was successful\n");
-			break;
-		case -EINVAL:
-			break;
-		case -EIO:
-			printk( "%sI/O error\n", name_resume);
-			break;
-		case -ENOENT:
-			printk( "%s%s: No such file or directory\n", name_resume, specialfile);
-			break;
-		case -ENOMEM:
-			printk( "%sNot enough memory\n", name_resume);
-			break;
-		default:
-			printk( "%sError %d resuming\n", name_resume, error );
-	}
+	if (!error)
+		PRINTK("Reading resume file was successful\n");
+	else
+		printk( "%sError %d resuming\n", name_resume, error );
 	MDELAY(1000);
 	return error;
 }
 
+
 /**
- *	software_resume - Check and load saved image from swap.
- *
- *	Defined as a late_initcall, so it gets called after all devices
- *	have been probed and initialized, but before we've mounted anything.
+ *	swsusp_restore - Replace running kernel with saved image.
  */
 
-static int software_resume(void)
+int __init swsusp_restore(void)
 {
-	if (!strlen(resume_file))
-		return 0;
-
-	if (pm_prepare_console())
-		printk("swsusp: Can't allocate a console... proceeding\n");
-
-	printk("swsusp: %s\n", name_resume );
-
-	MDELAY(1000);
-
-	printk("swsusp: resuming from %s\n", resume_file);
-	if (read_suspend_image(resume_file))
-		goto read_failure;
-	do_magic(1);
-	printk("swsusp: Resume failed. Continuing.\n");
-
-read_failure:
-	pm_restore_console();
-	return -EFAULT;
+	return do_magic(1);
 }
 
-late_initcall(software_resume);
+
+/**
+ *	swsusp_free - Free memory allocated to hold snapshot.
+ */
+
+int swsusp_free(void)
+{
+	PRINTK( "Freeing prev allocated pagedir\n" );
+	free_suspend_pagedir((unsigned long) pagedir_save);
+
+	PRINTK( "Fixing swap signatures... " );
+	mark_swapfiles(((swp_entry_t) {0}), MARK_SWAP_RESUME);
+	PRINTK( "ok\n" );
+	return 0;
+}
 
 static int __init resume_setup(char *str)
 {
-	strncpy( resume_file, str, 255 );
+	if (strlen(str))
+		strncpy(resume_file, str, 255);
 	return 1;
 }
 
@@ -1077,5 +908,3 @@ static int __init noresume_setup(char *str)
 __setup("noresume", noresume_setup);
 __setup("resume=", resume_setup);
 
-EXPORT_SYMBOL(software_suspend);
-EXPORT_SYMBOL(software_suspend_enabled);

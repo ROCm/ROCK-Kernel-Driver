@@ -9,6 +9,7 @@
 
 #include <linux/config.h>
 
+#include <asm/intrinsics.h>
 #include <asm/types.h>
 
 /*
@@ -143,7 +144,7 @@ get_order (unsigned long size)
 	double d = size - 1;
 	long order;
 
-	__asm__ ("getf.exp %0=%1" : "=r"(order) : "f"(d));
+	order = ia64_getf_exp(d);
 	order = order - PAGE_SHIFT - 0xffff + 1;
 	if (order < 0)
 		order = 0;

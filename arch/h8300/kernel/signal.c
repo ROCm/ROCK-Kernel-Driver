@@ -157,6 +157,7 @@ struct sigframe
 #if defined(CONFIG_CPU_H8S)
 	short dummy_exr;
 #endif
+	long dummy_pc;
 	char *pretcode;
 	unsigned char retcode[8];
 	unsigned long extramask[_NSIG_WORDS-1];
@@ -170,6 +171,7 @@ struct rt_sigframe
 #if defined(CONFIG_CPU_H8S)
 	short dummy_exr;
 #endif
+	long dummy_pc;
 	char *pretcode;
 	unsigned char retcode[8];
 	struct siginfo info;
@@ -241,7 +243,7 @@ badframe:
 
 asmlinkage int do_sigreturn(unsigned long __unused,...)
 {
-	struct pt_regs *regs = (struct pt_regs *) &__unused;
+	struct pt_regs *regs = (struct pt_regs *) (&__unused - 1);
 	unsigned long usp = rdusp();
 	struct sigframe *frame = (struct sigframe *)(usp - 4);
 	sigset_t set;
@@ -416,7 +418,6 @@ static void setup_rt_frame (int sig, struct k_sigaction *ka, siginfo_t *info,
 	/* Set up to return from userspace.  */
 	err |= __put_user(frame->retcode, &frame->pretcode);
 
-	/* moveq #,d0; notb d0; movea.l #,a5; trap #0 */
 	/* sub.l er0,er0; mov.b #__NR_rt_sigreturn,r0l; trapa #0 */
 	err != __put_user(0x1a80f800 + (__NR_rt_sigreturn & 0xff),
 			(long *)(frame->retcode + 0));

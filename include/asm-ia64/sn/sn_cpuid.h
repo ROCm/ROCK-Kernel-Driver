@@ -89,7 +89,7 @@
 
 #ifndef CONFIG_SMP
 #define cpu_logical_id(cpu)				0
-#define cpu_physical_id(cpuid)			((ia64_get_lid() >> 16) & 0xffff)
+#define cpu_physical_id(cpuid)			((ia64_getreg(_IA64_REG_CR_LID) >> 16) & 0xffff)
 #endif
 
 /*
@@ -98,8 +98,8 @@
  */
 #define cpu_physical_id_to_nasid(cpi)		((cpi) &0xfff)
 #define cpu_physical_id_to_slice(cpi)		((cpi>>12) & 3)
-#define get_nasid()				((ia64_get_lid() >> 16) & 0xfff)
-#define get_slice()				((ia64_get_lid() >> 28) & 0xf)
+#define get_nasid()				((ia64_getreg(_IA64_REG_CR_LID) >> 16) & 0xfff)
+#define get_slice()				((ia64_getreg(_IA64_REG_CR_LID) >> 28) & 0xf)
 #define get_node_number(addr)			(((unsigned long)(addr)>>38) & 0x7ff)
 
 /*

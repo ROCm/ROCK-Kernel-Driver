@@ -347,6 +347,7 @@ GLOBAL_EXTERN unsigned int multiuser_mount;	/* if enabled allows new sessions
 				have the uid/password or Kerberos credential 
 				or equivalent for current user */
 GLOBAL_EXTERN unsigned int oplockEnabled;
+GLOBAL_EXTERN unsigned int quotaEnabled;
 GLOBAL_EXTERN unsigned int lookupCacheEnabled;
 GLOBAL_EXTERN unsigned int extended_security;	/* if on, session setup sent 
 				with more secure ntlmssp2 challenge/resp */

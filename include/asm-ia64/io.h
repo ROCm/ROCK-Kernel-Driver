@@ -52,6 +52,7 @@ extern unsigned int num_io_spaces;
 
 # ifdef __KERNEL__
 
+#include <asm/intrinsics.h>
 #include <asm/machvec.h>
 #include <asm/page.h>
 #include <asm/system.h>
@@ -85,7 +86,7 @@ phys_to_virt (unsigned long address)
  * Memory fence w/accept.  This should never be used in code that is
  * not IA-64 specific.
  */
-#define __ia64_mf_a()	__asm__ __volatile__ ("mf.a" ::: "memory")
+#define __ia64_mf_a()	ia64_mfa()
 
 static inline const unsigned long
 __ia64_get_io_port_base (void)

@@ -25,19 +25,6 @@
 
 #include "hpsim_ssc.h"
 
-/*
- * Simulator system call.
- */
-asm (".text\n"
-     ".align 32\n"
-     ".global ia64_ssc\n"
-     ".proc ia64_ssc\n"
-     "ia64_ssc:\n"
-     "mov r15=r36\n"
-     "break 0x80001\n"
-     "br.ret.sptk.many rp\n"
-     ".endp\n");
-
 void
 ia64_ssc_connect_irq (long intr, long irq)
 {

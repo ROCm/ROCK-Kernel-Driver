@@ -237,9 +237,12 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 		c->x86_cache_size = l2 ? l2 : (l1i+l1d);
 	}
 
-	/* SEP CPUID bug: Pentium Pro reports SEP but doesn't have it */
-	if ( c->x86 == 6 && c->x86_model < 3 && c->x86_mask < 3 )
-		clear_bit(X86_FEATURE_SEP, c->x86_capability);
+	/* SEP CPUID bug: Pentium Pro reports SEP but doesn't have it until model 3 mask 3 */
+	if ( c->x86 == 6) {
+		unsigned model_mask = (c->x86_model << 8) + c->x86_mask;
+		if (model_mask < 0x0303)
+			clear_bit(X86_FEATURE_SEP, c->x86_capability);
+	}
 	
 	/* Names for the Pentium II/Celeron processors 
 	   detectable only by also checking the cache size.

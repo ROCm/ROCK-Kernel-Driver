@@ -388,7 +388,7 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
 	return allocated;
 }
 
-#ifdef CONFIG_SOFTWARE_SUSPEND
+#ifdef CONFIG_PM
 int is_head_of_free_region(struct page *page)
 {
         struct zone *zone = page_zone(page);
@@ -435,7 +435,7 @@ void drain_local_pages(void)
 	}
 	local_irq_restore(flags);	
 }
-#endif /* CONFIG_SOFTWARE_SUSPEND */
+#endif /* CONFIG_PM */
 
 /*
  * Free a 0-order page

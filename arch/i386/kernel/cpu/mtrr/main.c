@@ -574,7 +574,7 @@ static int mtrr_save(struct sys_device * sysdev, u32 state)
 	int i;
 	int size = num_var_ranges * sizeof(struct mtrr_value);
 
-	mtrr_state = kmalloc(size,GFP_KERNEL);
+	mtrr_state = kmalloc(size,GFP_ATOMIC);
 	if (mtrr_state)
 		memset(mtrr_state,0,size);
 	else
@@ -607,8 +607,8 @@ static int mtrr_restore(struct sys_device * sysdev)
 
 
 static struct sysdev_driver mtrr_sysdev_driver = {
-	.save		= mtrr_save,
-	.restore	= mtrr_restore,
+	.suspend	= mtrr_save,
+	.resume		= mtrr_restore,
 };
 
 
