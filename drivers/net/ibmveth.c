@@ -60,6 +60,9 @@
 
 #include "ibmveth.h"
 
+#warning remove NO_TCE usage from ibmveth.c
+#define NO_TCE PCI_DMA_ERROR_CODE
+
 #define DEBUG 1
 
 #define ibmveth_printk(fmt, args...) \

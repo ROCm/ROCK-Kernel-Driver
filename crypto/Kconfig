@@ -161,6 +161,15 @@ config CRYPTO_DEFLATE
 	  
 	  You will most probably want this if using IPSec.
 
+config CRYPTO_MICHAEL_MIC
+	tristate "Michael MIC keyed digest algorithm"
+	depends on CRYPTO
+	help
+	  Michael MIC is used for message integrity protection in TKIP
+	  (IEEE 802.11i). This algorithm is required for TKIP, but it
+	  should not be used for other purposes because of the weakness
+	  of the algorithm.
+
 config CRYPTO_TEST
 	tristate "Testing module"
 	depends on CRYPTO

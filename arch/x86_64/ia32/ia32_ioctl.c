@@ -27,7 +27,7 @@ static int tiocgdev(unsigned fd, unsigned cmd,  unsigned int *ptr)
 	struct file *file = fget(fd);
 	struct tty_struct *real_tty;
 
-	if (!fd)
+	if (!file)
 		return -EBADF;
 	if (file->f_op->ioctl != tty_ioctl)
 		return -EINVAL; 

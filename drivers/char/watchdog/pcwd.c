@@ -71,7 +71,7 @@
  */
 static int pcwd_ioports[] = { 0x270, 0x350, 0x370, 0x000 };
 
-#define WD_VER                  "1.12 (12/14/2001)"
+#define WD_VER                  "1.14 (03/12/2004)"
 
 /*
  * It should be noted that PCWD_REVISION_B was removed because A and B
@@ -227,6 +227,45 @@ void pcwd_showprevstate(void)
 	}
 }
 
+static int pcwd_start(void)
+{
+	int stat_reg;
+
+	/*  Enable the port  */
+	if (revision == PCWD_REVISION_C) {
+		spin_lock(&io_lock);
+		outb_p(0x00, current_readport + 3);
+		stat_reg = inb_p(current_readport + 2);
+		spin_unlock(&io_lock);
+		if (stat_reg & 0x10)
+		{
+			printk(KERN_INFO "pcwd: Could not start watchdog.\n");
+			return -EIO;
+		}
+	}
+	return 0;
+}
+
+static int pcwd_stop(void)
+{
+	int stat_reg;
+
+	/*  Disable the board  */
+	if (revision == PCWD_REVISION_C) {
+		spin_lock(&io_lock);
+		outb_p(0xA5, current_readport + 3);
+		outb_p(0xA5, current_readport + 3);
+		stat_reg = inb_p(current_readport + 2);
+		spin_unlock(&io_lock);
+		if ((stat_reg & 0x10) == 0)
+		{
+			printk(KERN_INFO "pcwd: Could not stop watchdog.\n");
+			return -EIO;
+		}
+	}
+	return 0;
+}
+
 static void pcwd_send_heartbeat(void)
 {
 	int wdrst_stat;
@@ -242,13 +281,41 @@ static void pcwd_send_heartbeat(void)
 		outb_p(wdrst_stat, current_readport);
 }
 
+static int pcwd_get_temperature(int *temperature)
+{
+	/* check that port 0 gives temperature info and no command results */
+	if (mode_debug)
+		return -1;
+
+	*temperature = 0;
+	if (!supports_temp)
+		return -ENODEV;
+
+	/*
+	 * Convert celsius to fahrenheit, since this was
+	 * the decided 'standard' for this return value.
+	 */
+	spin_lock(&io_lock);
+	*temperature = ((inb(current_readport)) * 9 / 5) + 32;
+	spin_unlock(&io_lock);
+
+	return 0;
+}
+
+/*
+ *	/dev/watchdog handling
+ */
+
 static int pcwd_ioctl(struct inode *inode, struct file *file,
 		      unsigned int cmd, unsigned long arg)
 {
 	int cdat, rv;
+	int temperature;
 	static struct watchdog_info ident=
 	{
-		.options =		WDIOF_OVERHEAT|WDIOF_CARDRESET,
+		.options =		WDIOF_OVERHEAT |
+					WDIOF_CARDRESET |
+					WDIOF_MAGICCLOSE,
 		.firmware_version =	1,
 		.identity =		"PCWD",
 	};
@@ -332,17 +399,10 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 
 	case WDIOC_GETTEMP:
 
-		rv = 0;
-		if ((supports_temp) && (mode_debug == 0))
-		{
-			spin_lock(&io_lock);
-			rv = inb(current_readport);
-			spin_unlock(&io_lock);
-			if(put_user(rv, (int*) arg))
-				return -EFAULT;
-		} else if(put_user(rv, (int*) arg))
-				return -EFAULT;
-		return 0;
+		if (pcwd_get_temperature(&temperature))
+			return -EFAULT;
+
+		return put_user(temperature, (int *) arg);
 
 	case WDIOC_SETOPTIONS:
 		if (revision == PCWD_REVISION_C)
@@ -352,32 +412,12 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 
 			if (rv & WDIOS_DISABLECARD)
 			{
-				spin_lock(&io_lock);
-				outb_p(0xA5, current_readport + 3);
-				outb_p(0xA5, current_readport + 3);
-				cdat = inb_p(current_readport + 2);
-				spin_unlock(&io_lock);
-				if ((cdat & 0x10) == 0)
-				{
-					printk(KERN_INFO "pcwd: Could not disable card.\n");
-					return -EIO;
-				}
-
-				return 0;
+				return pcwd_stop();
 			}
 
 			if (rv & WDIOS_ENABLECARD)
 			{
-				spin_lock(&io_lock);
-				outb_p(0x00, current_readport + 3);
-				cdat = inb_p(current_readport + 2);
-				spin_unlock(&io_lock);
-				if (cdat & 0x10)
-				{
-					printk(KERN_INFO "pcwd: Could not enable card.\n");
-					return -EIO;
-				}
-				return 0;
+				return pcwd_start();
 			}
 
 			if (rv & WDIOS_TEMPPANIC)
@@ -423,72 +463,66 @@ static ssize_t pcwd_write(struct file *file, const char *buf, size_t len,
 	return len;
 }
 
-static int pcwd_open(struct inode *ino, struct file *filep)
+static int pcwd_open(struct inode *inode, struct file *file)
 {
-	switch (iminor(ino)) {
-	case WATCHDOG_MINOR:
-		if (!atomic_dec_and_test(&open_allowed) ) {
-			atomic_inc( &open_allowed );
-			return -EBUSY;
-		}
-		__module_get(THIS_MODULE);
-		/*  Enable the port  */
-		if (revision == PCWD_REVISION_C) {
-			spin_lock(&io_lock);
-			outb_p(0x00, current_readport + 3);
-			spin_unlock(&io_lock);
-		}
-		return(0);
-
-	case TEMP_MINOR:
-		return(0);
-	default:
-		return (-ENODEV);
+	if (!atomic_dec_and_test(&open_allowed) ) {
+		atomic_inc( &open_allowed );
+		return -EBUSY;
 	}
+
+	if (nowayout)
+		__module_get(THIS_MODULE);
+
+	/* Activate */
+	pcwd_start();
+	return(0);
 }
 
-static ssize_t pcwd_read(struct file *file, char *buf, size_t count,
+static int pcwd_close(struct inode *inode, struct file *file)
+{
+	if (expect_close == 42) {
+		pcwd_stop();
+		atomic_inc( &open_allowed );
+        } else {
+                printk(KERN_CRIT "pcwd: Unexpected close, not stopping watchdog!\n");
+                pcwd_send_heartbeat();
+	}
+	expect_close = 0;
+	return 0;
+}
+
+/*
+ *	/dev/temperature handling
+ */
+
+static ssize_t pcwd_temp_read(struct file *file, char *buf, size_t count,
 			 loff_t *ppos)
 {
-	unsigned short c;
-	unsigned char cp;
+	int temperature;
 
 	/*  Can't seek (pread) on this device  */
 	if (ppos != &file->f_pos)
 		return -ESPIPE;
-	switch(iminor(file->f_dentry->d_inode))
-	{
-		case TEMP_MINOR:
-			/*
-			 * Convert metric to Fahrenheit, since this was
-			 * the decided 'standard' for this return value.
-			 */
 
-			c = inb(current_readport);
-			cp = (c * 9 / 5) + 32;
-			if(copy_to_user(buf, &cp, 1))
-				return -EFAULT;
-			return 1;
-		default:
-			return -EINVAL;
-	}
+	if (pcwd_get_temperature(&temperature))
+		return -EFAULT;
+
+	if (copy_to_user(buf, &temperature, 1))
+		return -EFAULT;
+
+	return 1;
 }
 
-static int pcwd_close(struct inode *ino, struct file *filep)
+static int pcwd_temp_open(struct inode *inode, struct file *file)
 {
-	if (iminor(ino)==WATCHDOG_MINOR) {
-		if (expect_close == 42) {
-			/*  Disable the board  */
-			if (revision == PCWD_REVISION_C) {
-				spin_lock(&io_lock);
-				outb_p(0xA5, current_readport + 3);
-				outb_p(0xA5, current_readport + 3);
-				spin_unlock(&io_lock);
-			}
-			atomic_inc( &open_allowed );
-		}
-	}
-	expect_close = 0;
+	if (!supports_temp)
+		return -ENODEV;
+
+	return 0;
+}
+
+static int pcwd_temp_close(struct inode *inode, struct file *file)
+{
 	return 0;
 }
 
@@ -569,7 +603,7 @@ static void debug_off(void)
 
 static struct file_operations pcwd_fops = {
 	.owner		= THIS_MODULE,
-	.read		= pcwd_read,
+	.llseek		= no_llseek,
 	.write		= pcwd_write,
 	.ioctl		= pcwd_ioctl,
 	.open		= pcwd_open,
@@ -582,10 +616,18 @@ static struct miscdevice pcwd_miscdev = {
 	.fops =		&pcwd_fops,
 };
 
+static struct file_operations pcwd_temp_fops = {
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= pcwd_temp_read,
+	.open		= pcwd_temp_open,
+	.release	= pcwd_temp_close,
+};
+
 static struct miscdevice temp_miscdev = {
 	.minor =	TEMP_MINOR,
 	.name =		"temperature",
-	.fops =		&pcwd_fops,
+	.fops =		&pcwd_temp_fops,
 };
 
 static void __init pcwd_validate_timeout(void)

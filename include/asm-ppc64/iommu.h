@@ -33,8 +33,6 @@
  */
 #define IOMAP_MAX_ORDER 10
 
-#define NO_TCE ((dma_addr_t)-1)
-
 /*
  * Tces come in two formats, one for the virtual bus and a different
  * format for PCI
@@ -151,5 +149,7 @@ extern void tce_init_iSeries(void);
 
 extern void pci_iommu_init(void);
 extern void pci_dma_init_direct(void);
+
+extern int ppc64_iommu_off;
 
 #endif

@@ -105,6 +105,9 @@ EXPORT_SYMBOL(viopath_ourLp);
  */
 static vio_event_handler_t *vio_handler[VIO_MAX_SUBTYPES];
 
+#define VIOPATH_KERN_WARN	KERN_WARNING "viopath: "
+#define VIOPATH_KERN_INFO	KERN_INFO "viopath: "
+
 static unsigned char e2a(unsigned char x)
 {
 	switch (x) {
@@ -209,7 +212,7 @@ static int proc_viopath_show(struct seq_file *m, void *v)
 			((u64)handle) << 32, PAGE_SIZE, 0, 0);
 
 	if (hvrc != HvLpEvent_Rc_Good)
-		printk("viopath hv error on op %d\n", (int)hvrc);
+		printk(VIOPATH_KERN_WARN "hv error on op %d\n", (int)hvrc);
 
 	down(&Semaphore);
 
@@ -318,7 +321,7 @@ static void sendMonMsg(HvLpIndex remoteLp)
 	if (hvrc == HvLpEvent_Rc_Good)
 		viopathStatus[remoteLp].isActive = 1;
 	else {
-		printk(KERN_WARNING_VIO "could not connect to partition %d\n",
+		printk(VIOPATH_KERN_WARN "could not connect to partition %d\n",
 				remoteLp);
 		viopathStatus[remoteLp].isActive = 0;
 	}
@@ -355,11 +358,11 @@ static void handleMonitorEvent(struct HvLpEvent *event)
 	remoteLp = event->xTargetLp;
 	if ((event->xSourceInstanceId != viopathStatus[remoteLp].mSourceInst) ||
 	    (event->xTargetInstanceId != viopathStatus[remoteLp].mTargetInst)) {
-		printk(KERN_WARNING_VIO "ignoring ack....mismatched instances\n");
+		printk(VIOPATH_KERN_WARN "ignoring ack....mismatched instances\n");
 		return;
 	}
 
-	printk(KERN_WARNING_VIO "partition %d ended\n", remoteLp);
+	printk(VIOPATH_KERN_WARN "partition %d ended\n", remoteLp);
 
 	viopathStatus[remoteLp].isActive = 0;
 
@@ -403,7 +406,7 @@ static void handleConfig(struct HvLpEvent *event)
 	if (!event)
 		return;
 	if (event->xFlags.xFunction == HvLpEvent_Function_Int) {
-		printk(KERN_WARNING_VIO
+		printk(VIOPATH_KERN_WARN
 		       "unexpected config request from partition %d",
 		       event->xSourceLp);
 
@@ -461,7 +464,7 @@ static void vio_handleEvent(struct HvLpEvent *event, struct pt_regs *regs)
 		if (viopathStatus[remoteLp].isActive
 		    && (event->xSourceInstanceId !=
 			viopathStatus[remoteLp].mTargetInst)) {
-			printk(KERN_WARNING_VIO
+			printk(VIOPATH_KERN_WARN
 			       "message from invalid partition. "
 			       "int msg rcvd, source inst (%d) doesnt match (%d)\n",
 			       viopathStatus[remoteLp].mTargetInst,
@@ -472,7 +475,7 @@ static void vio_handleEvent(struct HvLpEvent *event, struct pt_regs *regs)
 		if (viopathStatus[remoteLp].isActive
 		    && (event->xTargetInstanceId !=
 			viopathStatus[remoteLp].mSourceInst)) {
-			printk(KERN_WARNING_VIO
+			printk(VIOPATH_KERN_WARN
 			       "message from invalid partition. "
 			       "int msg rcvd, target inst (%d) doesnt match (%d)\n",
 			       viopathStatus[remoteLp].mSourceInst,
@@ -483,7 +486,7 @@ static void vio_handleEvent(struct HvLpEvent *event, struct pt_regs *regs)
 		remoteLp = event->xTargetLp;
 		if (event->xSourceInstanceId !=
 		    viopathStatus[remoteLp].mSourceInst) {
-			printk(KERN_WARNING_VIO
+			printk(VIOPATH_KERN_WARN
 			       "message from invalid partition. "
 			       "ack msg rcvd, source inst (%d) doesnt match (%d)\n",
 			       viopathStatus[remoteLp].mSourceInst,
@@ -493,7 +496,7 @@ static void vio_handleEvent(struct HvLpEvent *event, struct pt_regs *regs)
 
 		if (event->xTargetInstanceId !=
 		    viopathStatus[remoteLp].mTargetInst) {
-			printk(KERN_WARNING_VIO
+			printk(VIOPATH_KERN_WARN
 			       "message from invalid partition. "
 			       "viopath: ack msg rcvd, target inst (%d) doesnt match (%d)\n",
 			       viopathStatus[remoteLp].mTargetInst,
@@ -503,7 +506,7 @@ static void vio_handleEvent(struct HvLpEvent *event, struct pt_regs *regs)
 	}
 
 	if (vio_handler[subtype] == NULL) {
-		printk(KERN_WARNING_VIO
+		printk(VIOPATH_KERN_WARN
 		       "unexpected virtual io event subtype %d from partition %d\n",
 		       event->xSubtype, remoteLp);
 		/* No handler.  Ack if necessary */
@@ -608,10 +611,10 @@ int viopath_open(HvLpIndex remoteLp, int subtype, int numReq)
 		HvLpEvent_registerHandler(HvLpEvent_Type_VirtualIo,
 					  &vio_handleEvent);
 		sendMonMsg(remoteLp);
-		printk(KERN_INFO_VIO
-		       "Opening connection to partition %d, setting sinst %d, tinst %d\n",
-		       remoteLp, viopathStatus[remoteLp].mSourceInst,
-		       viopathStatus[remoteLp].mTargetInst);
+		printk(VIOPATH_KERN_INFO "opening connection to partition %d, "
+				"setting sinst %d, tinst %d\n",
+				remoteLp, viopathStatus[remoteLp].mSourceInst,
+				viopathStatus[remoteLp].mTargetInst);
 	}
 
 	spin_unlock_irqrestore(&statuslock, flags);
@@ -662,7 +665,7 @@ int viopath_close(HvLpIndex remoteLp, int subtype, int numReq)
 		numOpen += viopathStatus[remoteLp].users[i];
 
 	if ((viopathStatus[remoteLp].isOpen) && (numOpen == 0)) {
-		printk(KERN_INFO_VIO "Closing connection to partition %d",
+		printk(VIOPATH_KERN_INFO "closing connection to partition %d",
 				remoteLp);
 
 		HvCallEvent_closeLpEventPath(remoteLp,
@@ -696,23 +699,21 @@ void vio_free_event_buffer(int subtype, void *buffer)
 {
 	subtype = subtype >> VIOMAJOR_SUBTYPE_SHIFT;
 	if ((subtype < 0) || (subtype >= VIO_MAX_SUBTYPES)) {
-		printk(KERN_WARNING_VIO
-		       "unexpected subtype %d freeing event buffer\n",
-		       subtype);
+		printk(VIOPATH_KERN_WARN
+		       "unexpected subtype %d freeing event buffer\n", subtype);
 		return;
 	}
 
 	if (atomic_read(&event_buffer_available[subtype]) != 0) {
-		printk(KERN_WARNING_VIO
+		printk(VIOPATH_KERN_WARN
 		       "freeing unallocated event buffer, subtype %d\n",
 		       subtype);
 		return;
 	}
 
 	if (buffer != &event_buffer[subtype * 256]) {
-		printk(KERN_WARNING_VIO
-		       "freeing invalid event buffer, subtype %d\n",
-		       subtype);
+		printk(VIOPATH_KERN_WARN
+		       "freeing invalid event buffer, subtype %d\n", subtype);
 	}
 
 	atomic_set(&event_buffer_available[subtype], 1);

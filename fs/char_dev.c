@@ -265,7 +265,7 @@ int chrdev_open(struct inode * inode, struct file * filp)
 		spin_unlock(&cdev_lock);
 		kobj = kobj_lookup(cdev_map, inode->i_rdev, &idx);
 		if (!kobj)
-			return -ENODEV;
+			return -ENXIO;
 		new = container_of(kobj, struct cdev, kobj);
 		spin_lock(&cdev_lock);
 		p = inode->i_cdev;
@@ -275,9 +275,9 @@ int chrdev_open(struct inode * inode, struct file * filp)
 			list_add(&inode->i_devices, &p->list);
 			new = NULL;
 		} else if (!cdev_get(p))
-			ret = -ENODEV;
+			ret = -ENXIO;
 	} else if (!cdev_get(p))
-		ret = -ENODEV;
+		ret = -ENXIO;
 	spin_unlock(&cdev_lock);
 	cdev_put(new);
 	if (ret)
@@ -285,7 +285,7 @@ int chrdev_open(struct inode * inode, struct file * filp)
 	filp->f_op = fops_get(p->ops);
 	if (!filp->f_op) {
 		cdev_put(p);
-		return -ENODEV;
+		return -ENXIO;
 	}
 	if (filp->f_op->open) {
 		lock_kernel();

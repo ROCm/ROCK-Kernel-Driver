@@ -169,6 +169,12 @@ static inline int pci_dac_dma_supported(struct pci_dev *hwdev,u64 mask)
 	return 0;
 }
 
+#define PCI_DMA_ERROR_CODE      (~(dma_addr_t)0x0)
+static inline int pci_dma_error(dma_addr_t dma_addr)
+{
+	return (dma_addr == PCI_DMA_ERROR_CODE);
+}
+
 extern int pci_domain_nr(struct pci_bus *bus);
 
 /* Set the name of the bus as it appears in /proc/bus/pci */

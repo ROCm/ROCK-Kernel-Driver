@@ -130,7 +130,7 @@ rtas_token(const char *service)
 void
 log_rtas_error(struct rtas_args	*rtas_args)
 {
-	struct rtas_args err_args;
+	struct rtas_args err_args, temp_args;
 
 	err_args.token = rtas_token("rtas-last-error");
 	err_args.nargs = 2;
@@ -141,6 +141,7 @@ log_rtas_error(struct rtas_args	*rtas_args)
 	err_args.args[1] = RTAS_ERROR_LOG_MAX;
 	err_args.args[2] = 0;
 
+	temp_args = *rtas_args;
 	get_paca()->xRtas = err_args;
 
 	PPCDBG(PPCDBG_RTAS, "\tentering rtas with 0x%lx\n",
@@ -148,8 +149,9 @@ log_rtas_error(struct rtas_args	*rtas_args)
 	enter_rtas((void *)__pa((unsigned long)&get_paca()->xRtas));
 	PPCDBG(PPCDBG_RTAS, "\treturned from rtas ...\n");
 
+
 	err_args = get_paca()->xRtas;
-	get_paca()->xRtas = *rtas_args;
+	get_paca()->xRtas = temp_args;
 
 	if (err_args.rets[0] == 0)
 		log_error(rtas_err_buf, ERR_TYPE_RTAS_LOG, 0);
