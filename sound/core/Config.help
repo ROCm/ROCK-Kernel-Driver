@@ -1,0 +1,40 @@
+CONFIG_SND_SEQUENCER
+  Say 'Y' or 'M' to enable MIDI sequencer and router support. This feature
+  allows routing and enqueing MIDI events. Events can be processed at given
+  time.
+
+CONFIG_SND_SEQ_DUMMY
+  Say 'Y' or 'M' to enable dummy sequencer client. This client is a simple
+  midi-through client. All normal input events are redirected to output port
+  immediately.
+
+CONFIG_SND_OSSEMUL
+  Say 'Y' to enable OSS (Open Sound System) API emulation code.
+
+CONFIG_SND_MIXER_OSS
+  Say 'Y' or 'M' to enable mixer OSS API emulation (/dev/mixer*).
+
+CONFIG_SND_PCM_OSS
+  Say 'Y' or 'M' to enable digital audio (PCM) OSS API emulation (/dev/dsp*).
+
+CONFIG_SND_SEQUENCER_OSS
+  Say 'Y' or 'M' to enable OSS sequencer emulation (both /dev/sequencer and
+  /dev/music interfaces).
+
+CONFIG_SND_RTCTIMER
+  Say 'Y' or 'M' to enable RTC timer support for ALSA. ALSA code uses RTC
+  timer as precise timing source and maps the RTC timer to the ALSA's timer
+  interface. ALSA sequencer code can also use this timing source.
+
+CONFIG_SND_VERBOSE_PRINTK
+  Say 'Y' to enable verbose log messages. These messages will help to
+  identify source file and position containing printed messages.
+
+CONFIG_SND_DEBUG
+  Say 'Y' to enable ALSA debug code.
+
+CONFIG_SND_DEBUG_MEMORY
+  Say 'Y' to enable debugging of memory allocation.
+
+CONFIG_SND_DEBUG_DETECTION
+  Say 'Y' to enable debugging of hardware detection.

@@ -134,7 +134,7 @@ static const struct isapnp_card_id *snd_azt2320_isapnp_id[SNDRV_CARDS] __devinit
 static struct isapnp_card_id snd_azt2320_pnpids[] __devinitdata = {
 	/* PRO16V */
 	ISAPNP_AZT2320('A','Z','T',0x1008,0x1008,0x2001),
-	/* --- */
+	/* Aztech Sound Galaxy 16 */
 	ISAPNP_AZT2320('A','Z','T',0x2320,0x0001,0x0002),
 	/* Packard Bell Sound III 336 AM/SP */
 	ISAPNP_AZT2320('A','Z','T',0x3000,0x1003,0x2001),

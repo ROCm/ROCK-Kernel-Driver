@@ -233,8 +233,7 @@ static int snd_virmidi_output_open(snd_rawmidi_substream_t * substream)
 	}
 	vmidi->seq_mode = rdev->seq_mode;
 	vmidi->client = rdev->client;
-	vmidi->port = rdev->port;	
-	snd_midi_event_init(vmidi->parser);
+	vmidi->port = rdev->port;
 	snd_virmidi_init_event(vmidi, &vmidi->event);
 	vmidi->rdev = rdev;
 	runtime->private_data = vmidi;

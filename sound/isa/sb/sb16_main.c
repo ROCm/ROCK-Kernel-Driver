@@ -209,11 +209,11 @@ static void snd_sb16_csp_capture_close(sb_t *chip)
 #else
 #define snd_sb16_csp_playback_prepare(chip, runtime)	/*nop*/
 #define snd_sb16_csp_capture_prepare(chip, runtime)	/*nop*/
-#define snd_sb16_csp_update(chip)		/*nop*/
+#define snd_sb16_csp_update(chip)			/*nop*/
 #define snd_sb16_csp_playback_open(chip, runtime)	/*nop*/
-#define snd_sb16_csp_playback_close(chip)	/*nop*/
+#define snd_sb16_csp_playback_close(chip)		/*nop*/
 #define snd_sb16_csp_capture_open(chip, runtime)	/*nop*/
-#define snd_sb16_csp_capture_close(chip)       	/*nop*/
+#define snd_sb16_csp_capture_close(chip)      	 	/*nop*/
 #endif
 
 

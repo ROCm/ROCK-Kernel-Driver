@@ -54,6 +54,7 @@
 #include <asm/io.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/ioport.h>
 #include <sound/core.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>

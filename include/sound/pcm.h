@@ -25,6 +25,7 @@
 
 #include <sound/asound.h>
 #include <linux/poll.h>
+#include <linux/bitops.h>
 
 typedef sndrv_pcm_uframes_t snd_pcm_uframes_t;
 typedef sndrv_pcm_sframes_t snd_pcm_sframes_t;
