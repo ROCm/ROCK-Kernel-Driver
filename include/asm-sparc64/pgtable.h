@@ -234,20 +234,22 @@ static inline pte_t pte_modify(pte_t orig_pte, pgprot_t new_prot)
 	(pmd_val(*(pmdp)) = (__pa((unsigned long) (ptep)) >> 11UL))
 #define pgd_set(pgdp, pmdp)	\
 	(pgd_val(*(pgdp)) = (__pa((unsigned long) (pmdp)) >> 11UL))
-#define __pmd_page(pmd)			((unsigned long) __va((pmd_val(pmd)<<11UL)))
+#define __pmd_page(pmd)		\
+	((unsigned long) __va((((unsigned long)pmd_val(pmd))<<11UL)))
 #define pmd_page(pmd) 			virt_to_page((void *)__pmd_page(pmd))
-#define pgd_page(pgd)			((unsigned long) __va((pgd_val(pgd)<<11UL)))
+#define pgd_page(pgd)		\
+	((unsigned long) __va((((unsigned long)pgd_val(pgd))<<11UL)))
 #define pte_none(pte) 			(!pte_val(pte))
 #define pte_present(pte)		(pte_val(pte) & _PAGE_PRESENT)
 #define pte_clear(pte)			(pte_val(*(pte)) = 0UL)
 #define pmd_none(pmd)			(!pmd_val(pmd))
 #define pmd_bad(pmd)			(0)
-#define pmd_present(pmd)		(pmd_val(pmd) != 0UL)
-#define pmd_clear(pmdp)			(pmd_val(*(pmdp)) = 0UL)
+#define pmd_present(pmd)		(pmd_val(pmd) != 0U)
+#define pmd_clear(pmdp)			(pmd_val(*(pmdp)) = 0U)
 #define pgd_none(pgd)			(!pgd_val(pgd))
 #define pgd_bad(pgd)			(0)
-#define pgd_present(pgd)		(pgd_val(pgd) != 0UL)
-#define pgd_clear(pgdp)			(pgd_val(*(pgdp)) = 0UL)
+#define pgd_present(pgd)		(pgd_val(pgd) != 0U)
+#define pgd_clear(pgdp)			(pgd_val(*(pgdp)) = 0U)
 
 /* The following only work if pte_present() is true.
  * Undefined behaviour if not..

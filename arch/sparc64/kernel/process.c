@@ -435,7 +435,7 @@ void flush_thread(void)
 					page = pmd_alloc_one(NULL, 0);
 				pgd_set(pgd0, page);
 			}
-			pgd_cache = pgd_val(*pgd0) << 11UL;
+			pgd_cache = ((unsigned long) pgd_val(*pgd0)) << 11UL;
 		}
 		__asm__ __volatile__("stxa %0, [%1] %2\n\t"
 				     "membar #Sync"
