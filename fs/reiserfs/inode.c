@@ -1325,15 +1325,17 @@ int reiserfs_dentry_to_fh(struct dentry *dentry, __u32 *data, int *lenp, int nee
     if (maxlen < 5 || ! need_parent)
         return 3 ;
 
+    read_lock(&dparent_lock);
     inode = dentry->d_parent->d_inode ;
     data[3] = inode->i_ino ;
     data[4] = le32_to_cpu(INODE_PKEY (inode)->k_dir_id) ;
     *lenp = 5 ;
-    if (maxlen < 6)
-	    return 5 ;
-    data[5] = inode->i_generation ;
-    *lenp = 6 ;
-    return 6 ;
+    if (maxlen >= 6) {
+	    data[5] = inode->i_generation ;
+	    *lenp = 6 ;
+    }
+    read_unlock(&dparent_lock);
+    return *lenp ;
 }
 
 

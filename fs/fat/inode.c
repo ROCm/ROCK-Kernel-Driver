@@ -516,7 +516,9 @@ int fat_dentry_to_fh(struct dentry *de, __u32 *fh, int *lenp, int needparent)
 	fh[1] = inode->i_generation;
 	fh[2] = MSDOS_I(inode)->i_location;
 	fh[3] = MSDOS_I(inode)->i_logstart;
+	read_lock(&dparent_lock);
 	fh[4] = MSDOS_I(de->d_parent->d_inode)->i_logstart;
+	read_unlock(&dparent_lock);
 	return 3;
 }
 
