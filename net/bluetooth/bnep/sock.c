@@ -67,8 +67,6 @@ static int bnep_sock_release(struct socket *sock)
 
 	sock_orphan(sk);
 	sock_put(sk);
-
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -179,13 +177,10 @@ static int bnep_sock_create(struct socket *sock, int protocol)
 		return -ENOMEM;
 	sock->ops = &bnep_sock_ops;
 
-	MOD_INC_USE_COUNT;
-
-	sock->state = SS_UNCONNECTED;
+	sock->state  = SS_UNCONNECTED;
 
 	sk->destruct = NULL;
 	sk->protocol = protocol;
-
 	return 0;
 }
 

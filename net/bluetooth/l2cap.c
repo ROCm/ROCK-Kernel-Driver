@@ -145,8 +145,6 @@ static struct l2cap_conn *l2cap_conn_add(struct hci_conn *hcon, u8 status)
 	conn->chan_list.lock = RW_LOCK_UNLOCKED;
 
 	BT_DBG("hcon %p conn %p", hcon, conn);
-
-	MOD_INC_USE_COUNT;
 	return conn;
 }
 
@@ -173,8 +171,6 @@ static int l2cap_conn_del(struct hci_conn *hcon, int err)
 
 	hcon->l2cap_data = NULL;
 	kfree(conn);
-
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -242,8 +238,6 @@ static void l2cap_sock_destruct(struct sock *sk)
 
 	if (sk->protinfo)
 		kfree(sk->protinfo);
-	
-	MOD_DEC_USE_COUNT;
 }
 
 static void l2cap_sock_cleanup_listen(struct sock *parent)
@@ -356,6 +350,8 @@ static struct sock *l2cap_sock_alloc(struct socket *sock, int proto, int prio)
 	if (!sk)
 		return NULL;
 
+	sk_set_owner(sk, THIS_MODULE);
+
 	sk->destruct = l2cap_sock_destruct;
 	sk->sndtimeo = L2CAP_CONN_TIMEOUT;
 
@@ -365,8 +361,6 @@ static struct sock *l2cap_sock_alloc(struct socket *sock, int proto, int prio)
 	l2cap_sock_init_timer(sk);
 
 	bt_sock_link(&l2cap_sk_list, sk);
-
-	MOD_INC_USE_COUNT;
 	return sk;
 }
 
@@ -2133,7 +2127,6 @@ int __init l2cap_init(void)
 		return err;
 	}
 
-
 	l2cap_proc_init();
 	
 	BT_INFO("L2CAP ver %s", VERSION);
@@ -2153,6 +2146,15 @@ void __exit l2cap_cleanup(void)
 	if (hci_unregister_proto(&l2cap_hci_proto))
 		BT_ERR("L2CAP protocol unregistration failed");
 }
+
+void l2cap_load(void)
+{
+	/* Dummy function to trigger automatic L2CAP module loading by 
+	   other modules that use L2CAP sockets but don not use any other
+	   symbols from it. */
+	return;
+}
+EXPORT_SYMBOL(l2cap_load);
 
 module_init(l2cap_init);
 module_exit(l2cap_cleanup);

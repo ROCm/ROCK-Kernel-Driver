@@ -52,7 +52,7 @@
 #include <net/bluetooth/l2cap.h>
 #include <net/bluetooth/rfcomm.h>
 
-#define VERSION "0.3"
+#define VERSION "1.0"
 
 #ifndef CONFIG_BT_RFCOMM_DEBUG
 #undef  BT_DBG
@@ -481,9 +481,12 @@ struct rfcomm_session *rfcomm_session_add(struct socket *sock, int state)
 	list_add(&s->list, &session_list);
 
 	/* Do not increment module usage count for listeting sessions.
-	 * Otherwise we won't be able to unload the module. */
+	 * Otherwise we won't be able to unload the module.
+	 * Non listening session are added either by a socket or a TTYs
+	 * which means that we already hold refcount to this module.
+	 */
 	if (state != BT_LISTEN)
-		MOD_INC_USE_COUNT;
+		__module_get(THIS_MODULE);
 	return s;
 }
 
@@ -502,7 +505,7 @@ void rfcomm_session_del(struct rfcomm_session *s)
 	kfree(s);
 
 	if (state != BT_LISTEN)
-		MOD_DEC_USE_COUNT;
+		module_put(THIS_MODULE);
 }
 
 struct rfcomm_session *rfcomm_session_get(bdaddr_t *src, bdaddr_t *dst)
@@ -1868,6 +1871,8 @@ static void __exit rfcomm_proc_cleanup(void)
 /* ---- Initialization ---- */
 int  __init rfcomm_init(void)
 {
+	l2cap_load();
+
 	kernel_thread(rfcomm_run, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
 
 	BT_INFO("RFCOMM ver %s", VERSION);

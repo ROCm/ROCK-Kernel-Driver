@@ -235,4 +235,6 @@ struct l2cap_pinfo {
 #define CONF_INPUT_DONE  0x02
 #define CONF_OUTPUT_DONE 0x04
 
+void l2cap_load(void);
+
 #endif /* __L2CAP_H */
