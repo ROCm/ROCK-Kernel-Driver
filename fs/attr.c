@@ -81,7 +81,6 @@ int inode_setattr(struct inode * inode, struct iattr * attr)
 		}
 	}
 
-	lock_kernel();
 	if (ia_valid & ATTR_UID)
 		inode->i_uid = attr->ia_uid;
 	if (ia_valid & ATTR_GID)
@@ -93,12 +92,13 @@ int inode_setattr(struct inode * inode, struct iattr * attr)
 	if (ia_valid & ATTR_CTIME)
 		inode->i_ctime = attr->ia_ctime;
 	if (ia_valid & ATTR_MODE) {
-		inode->i_mode = attr->ia_mode;
+		umode_t mode = attr->ia_mode;
+
 		if (!in_group_p(inode->i_gid) && !capable(CAP_FSETID))
-			inode->i_mode &= ~S_ISGID;
+			mode &= ~S_ISGID;
+		inode->i_mode = mode;
 	}
 	mark_inode_dirty(inode);
-	unlock_kernel();
 out:
 	return error;
 }
