@@ -203,6 +203,10 @@ struct vm_struct *get_vm_area(unsigned long size, unsigned long flags)
 	 * We always allocate a guard page.
 	 */
 	size += PAGE_SIZE;
+	if (unlikely(!size)) {
+		kfree (area);
+		return NULL;
+	}
 
 	write_lock(&vmlist_lock);
 	for (p = &vmlist; (tmp = *p) ;p = &tmp->next) {
