@@ -1,7 +1,7 @@
 /**
  * inode.c - NTFS kernel inode handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2001,2002 Anton Altaparmakov.
+ * Copyright (c) 2001-2003 Anton Altaparmakov
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -996,16 +996,6 @@ skip_large_dir_stuff:
 			if (NInoCompressed(ni)) {
 				ni->_ICF(compressed_size) = sle64_to_cpu(
 					ctx->attr->_ANR(compressed_size));
-				if (vi->i_size != ni->initialized_size)
-					ntfs_warning(vi->i_sb, "BUG: Found "
-						"compressed file with "
-						"data_size not equal to "
-						"initialized_size. This will "
-						"probably cause problems when "
-						"trying to access the file. "
-						"Please notify linux-ntfs-dev@"
-						"lists.sf.net that you saw "
-						"this message. Thanks!");
 			}
 		} else { /* Resident attribute. */
 			/*
