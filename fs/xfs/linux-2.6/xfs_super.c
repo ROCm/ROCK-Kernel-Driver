@@ -491,8 +491,14 @@ xfssyncd(
 			break;
 
 		spin_lock(&vfsp->vfs_sync_lock);
-		if (!timeleft) {
-			timeleft = (xfs_syncd_centisecs * HZ) / 100;
+		/*
+		 * We can get woken by laptop mode, to do a sync -
+		 * that's the (only!) case where the list would be
+		 * empty with time remaining.
+		 */
+		if (!timeleft || list_empty(&vfsp->vfs_sync_list)) {
+			if (!timeleft)
+				timeleft = (xfs_syncd_centisecs * HZ) / 100;
 			INIT_LIST_HEAD(&vfsp->vfs_sync_work.w_list);
 			list_add_tail(&vfsp->vfs_sync_work.w_list,
 					&vfsp->vfs_sync_list);
@@ -595,9 +601,10 @@ linvfs_sync_super(
 
 	if (unlikely(laptop_mode)) {
 		int	prev_sync_seq = vfsp->vfs_sync_seq;
+
 		/*
 		 * The disk must be active because we're syncing.
-		 * We schedule syncd now (now that the disk is
+		 * We schedule xfssyncd now (now that the disk is
 		 * active) instead of later (when it might not be).
 		 */
 		wake_up_process(vfsp->vfs_sync_task);
