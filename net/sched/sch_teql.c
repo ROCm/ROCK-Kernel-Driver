@@ -456,7 +456,6 @@ static __init void teql_master_setup(struct net_device *dev)
 }
 
 static LIST_HEAD(master_dev_list);
-static spinlock_t master_dev_lock = SPIN_LOCK_UNLOCKED;
 static int max_equalizers = 1;
 MODULE_PARM(max_equalizers, "i");
 MODULE_PARM_DESC(max_equalizers, "Max number of link equalizers");
@@ -475,13 +474,13 @@ int __init teql_init(void)
 		if (!dev)
 			return -ENOMEM;
 
-		if ((err = register_netdev(dev)))
+		if ((err = register_netdev(dev))) {
+			free_netdev(dev);
 			goto out;
+		}
 
 		master = dev->priv;
-		spin_lock(&master_dev_lock);
 		list_add_tail(&master->master_list, &master_dev_list);
-		spin_unlock(&master_dev_lock);
 	}
  out:
 	return err;
@@ -491,7 +490,6 @@ static void __exit teql_exit(void)
 {
 	struct teql_master *master, *nxt;
 
-	spin_lock(&master_dev_lock);
 	list_for_each_entry_safe(master, nxt, &master_dev_list, master_list) {
 
 		list_del(&master->master_list);
@@ -500,7 +498,6 @@ static void __exit teql_exit(void)
 		unregister_netdev(master->dev);
 		free_netdev(master->dev);
 	}
-	spin_unlock(&master_dev_lock);
 }
 
 module_init(teql_init);

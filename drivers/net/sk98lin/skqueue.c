@@ -1,9 +1,9 @@
 /******************************************************************************
  *
  * Name:	skqueue.c
- * Project:	Gigabit Ethernet Adapters, Schedule-Modul
- * Version:	$Revision: 1.19 $
- * Date:	$Date: 2003/05/13 18:00:07 $
+ * Project:	Gigabit Ethernet Adapters, Event Scheduler Module
+ * Version:	$Revision: 1.20 $
+ * Date:	$Date: 2003/09/16 13:44:00 $
  * Purpose:	Management of an event queue.
  *
  ******************************************************************************/
@@ -27,6 +27,10 @@
  * History:
  *
  *	$Log: skqueue.c,v $
+ *	Revision 1.20  2003/09/16 13:44:00  rschmidt
+ *	Added (C) Marvell to SysKonnectFileId
+ *	Editorial changes
+ *	
  *	Revision 1.19  2003/05/13 18:00:07  mkarl
  *	Removed calls to RLMT, TWSI, and PNMI for SLIM driver (SK_SLIM).
  *	Editorial changes.
@@ -85,18 +89,16 @@
  *	
  *	Revision 1.1  1998/07/30 15:14:01  gklug
  *	Initial version. Adapted from SMT
- *	
- *	
  *
  ******************************************************************************/
 
 
 /*
-	Event queue and dispatcher
-*/
+ *	Event queue and dispatcher
+ */
 #if (defined(DEBUG) || ((!defined(LINT)) && (!defined(SK_SLIM))))
 static const char SysKonnectFileId[] =
-	"$Header: /usr56/projects/ge/schedule/skqueue.c,v 1.19 2003/05/13 18:00:07 mkarl Exp $" ;
+	"@(#) $Id: skqueue.c,v 1.20 2003/09/16 13:44:00 rschmidt Exp $ (C) Marvell.";
 #endif
 
 #include "h/skdrv1st.h"		/* Driver Specific Definitions */
@@ -124,11 +126,11 @@ intro()
 void	SkEventInit(
 SK_AC	*pAC,	/* Adapter context */
 SK_IOC	Ioc,	/* IO context */
-int	Level)	/* Init level */
+int		Level)	/* Init level */
 {
 	switch (Level) {
 	case SK_INIT_DATA:
-		pAC->Event.EvPut = pAC->Event.EvGet = pAC->Event.EvQueue ;
+		pAC->Event.EvPut = pAC->Event.EvGet = pAC->Event.EvQueue;
 		break;
 	default:
 		break;
@@ -144,14 +146,15 @@ SK_U32		Class,	/* Event Class */
 SK_U32		Event,	/* Event to be queued */
 SK_EVPARA	Para)	/* Event parameter */
 {
-	pAC->Event.EvPut->Class = Class ;
-	pAC->Event.EvPut->Event = Event ;
-	pAC->Event.EvPut->Para = Para ;
+	pAC->Event.EvPut->Class = Class;
+	pAC->Event.EvPut->Event = Event;
+	pAC->Event.EvPut->Para = Para;
+	
 	if (++pAC->Event.EvPut == &pAC->Event.EvQueue[SK_MAX_EVENT])
-		pAC->Event.EvPut = pAC->Event.EvQueue ;
+		pAC->Event.EvPut = pAC->Event.EvQueue;
 
 	if (pAC->Event.EvPut == pAC->Event.EvGet) {
-		SK_ERR_LOG(pAC, SK_ERRCL_NORES, SKERR_Q_E001, SKERR_Q_E001MSG) ;
+		SK_ERR_LOG(pAC, SK_ERRCL_NORES, SKERR_Q_E001, SKERR_Q_E001MSG);
 	}
 }
 
@@ -168,77 +171,79 @@ int	SkEventDispatcher(
 SK_AC	*pAC,	/* Adapters Context */
 SK_IOC	Ioc)	/* Io context */
 {
-	SK_EVENTELEM	*pEv ;	/* pointer into queue */
-	SK_U32			Class ;
-	int			Rtv ;
+	SK_EVENTELEM	*pEv;	/* pointer into queue */
+	SK_U32			Class;
+	int			Rtv;
 
-	pEv = pAC->Event.EvGet ;
-	PRINTF("dispatch get %x put %x\n",pEv,pAC->Event.ev_put) ;
+	pEv = pAC->Event.EvGet;
+	
+	PRINTF("dispatch get %x put %x\n", pEv, pAC->Event.ev_put);
+	
 	while (pEv != pAC->Event.EvPut) {
-		PRINTF("dispatch Class %d Event %d\n",pEv->Class,pEv->Event) ;
-		switch(Class = pEv->Class) {
+		PRINTF("dispatch Class %d Event %d\n", pEv->Class, pEv->Event);
+
+		switch (Class = pEv->Class) {
 #ifndef SK_USE_LAC_EV
 #ifndef SK_SLIM
-		case SKGE_RLMT :	/* RLMT Event */
-			Rtv = SkRlmtEvent(pAC,Ioc,pEv->Event,pEv->Para);
-			break ;
-		case SKGE_I2C :		/* I2C Event */
-			Rtv = SkI2cEvent(pAC,Ioc,pEv->Event,pEv->Para);
-			break ;
-		case SKGE_PNMI :
-			Rtv = SkPnmiEvent(pAC,Ioc,pEv->Event,pEv->Para);
-			break ;
+		case SKGE_RLMT:		/* RLMT Event */
+			Rtv = SkRlmtEvent(pAC, Ioc, pEv->Event, pEv->Para);
+			break;
+		case SKGE_I2C:		/* I2C Event */
+			Rtv = SkI2cEvent(pAC, Ioc, pEv->Event, pEv->Para);
+			break;
+		case SKGE_PNMI:		/* PNMI Event */
+			Rtv = SkPnmiEvent(pAC, Ioc, pEv->Event, pEv->Para);
+			break;
 #endif	/* not SK_SLIM */
 #endif	/* not SK_USE_LAC_EV */
-		case SKGE_DRV :		/* Driver Event */
-			Rtv = SkDrvEvent(pAC,Ioc,pEv->Event,pEv->Para);
-			break ;
-#ifndef SK_USE_SW_TIMER        
-		case SKGE_HWAC :
-			Rtv = SkGeSirqEvent(pAC,Ioc,pEv->Event,pEv->Para);
-			break ;
+		case SKGE_DRV:		/* Driver Event */
+			Rtv = SkDrvEvent(pAC, Ioc, pEv->Event, pEv->Para);
+			break;
+#ifndef SK_USE_SW_TIMER
+		case SKGE_HWAC:
+			Rtv = SkGeSirqEvent(pAC, Ioc, pEv->Event, pEv->Para);
+			break;
 #else /* !SK_USE_SW_TIMER */
-        case SKGE_SWT : 
-			Rtv = SkSwtEvent(pAC,Ioc,pEv->Event,pEv->Para);
-			break ;
+        case SKGE_SWT :
+			Rtv = SkSwtEvent(pAC, Ioc, pEv->Event, pEv->Para);
+			break;
 #endif /* !SK_USE_SW_TIMER */
-#ifdef SK_USE_LAC_EV        
+#ifdef SK_USE_LAC_EV
 		case SKGE_LACP :
-			Rtv = SkLacpEvent(pAC,Ioc,pEv->Event,pEv->Para);
-			break ;
+			Rtv = SkLacpEvent(pAC, Ioc, pEv->Event, pEv->Para);
+			break;
 		case SKGE_RSF :
-			Rtv = SkRsfEvent(pAC,Ioc,pEv->Event,pEv->Para);
-			break ;
+			Rtv = SkRsfEvent(pAC, Ioc, pEv->Event, pEv->Para);
+			break;
 		case SKGE_MARKER :
-			Rtv = SkMarkerEvent(pAC,Ioc,pEv->Event,pEv->Para);
-			break ;
+			Rtv = SkMarkerEvent(pAC, Ioc, pEv->Event, pEv->Para);
+			break;
 		case SKGE_FD :
-			Rtv = SkFdEvent(pAC,Ioc,pEv->Event,pEv->Para);
-			break ;
+			Rtv = SkFdEvent(pAC, Ioc, pEv->Event, pEv->Para);
+			break;
 #endif /* SK_USE_LAC_EV */
 #ifdef	SK_USE_CSUM
 		case SKGE_CSUM :
-			Rtv = SkCsEvent(pAC,Ioc,pEv->Event,pEv->Para);
-			break ;
+			Rtv = SkCsEvent(pAC, Ioc, pEv->Event, pEv->Para);
+			break;
 #endif	/* SK_USE_CSUM */
 		default :
-			SK_ERR_LOG(pAC, SK_ERRCL_SW, SKERR_Q_E002,
-				SKERR_Q_E002MSG) ;
+			SK_ERR_LOG(pAC, SK_ERRCL_SW, SKERR_Q_E002, SKERR_Q_E002MSG);
 			Rtv = 0;
 		}
 
 		if (Rtv != 0) {
-			return(Rtv) ;
+			return(Rtv);
 		}
 
 		if (++pEv == &pAC->Event.EvQueue[SK_MAX_EVENT])
-			pEv = pAC->Event.EvQueue ;
+			pEv = pAC->Event.EvQueue;
 
 		/* Renew get: it is used in queue_events to detect overruns */
 		pAC->Event.EvGet = pEv;
 	}
 
-	return(0) ;
+	return(0);
 }
 
 /* End of file */

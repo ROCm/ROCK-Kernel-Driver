@@ -741,7 +741,7 @@ filldir32 (void *__buf, const char *name, int namlen, loff_t offset, ino_t ino,
 	    || copy_to_user(dirent->d_name, name, namlen)
 	    || put_user(0, dirent->d_name + namlen))
 		return -EFAULT;
-	((char *) dirent) += reclen;
+	dirent = (struct compat_dirent *) ((char *) dirent + reclen);
 	buf->current_dir = dirent;
 	buf->count -= reclen;
 	return 0;

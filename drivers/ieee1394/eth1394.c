@@ -89,7 +89,7 @@
 #define TRACE() printk(KERN_ERR "%s:%s[%d] ---- TRACE\n", driver_name, __FUNCTION__, __LINE__)
 
 static char version[] __devinitdata =
-	"$Rev: 1079 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1096 $ Ben Collins <bcollins@debian.org>";
 
 struct fragment_info {
 	struct list_head list;
@@ -167,6 +167,26 @@ static void ether1394_iso(struct hpsb_iso *iso);
 
 static int ether1394_do_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd);
 static int ether1394_ethtool_ioctl(struct net_device *dev, void *useraddr);
+
+static int ether1394_write(struct hpsb_host *host, int srcid, int destid,
+			   quadlet_t *data, u64 addr, size_t len, u16 flags);
+static void ether1394_add_host (struct hpsb_host *host);
+static void ether1394_remove_host (struct hpsb_host *host);
+static void ether1394_host_reset (struct hpsb_host *host);
+
+/* Function for incoming 1394 packets */
+static struct hpsb_address_ops addr_ops = {
+	.write =	ether1394_write,
+};
+
+/* Ieee1394 highlevel driver functions */
+static struct hpsb_highlevel eth1394_highlevel = {
+	.name =		driver_name,
+	.add_host =	ether1394_add_host,
+	.remove_host =	ether1394_remove_host,
+	.host_reset =	ether1394_host_reset,
+};
+
 
 static void eth1394_iso_shutdown(struct eth1394_priv *priv)
 {
@@ -419,6 +439,10 @@ static void ether1394_add_host (struct hpsb_host *host)
 	struct net_device *dev = NULL;
 	struct eth1394_priv *priv;
 	static int version_printed = 0;
+
+	hpsb_register_addrspace(&eth1394_highlevel, host, &addr_ops,
+				ETHER1394_REGION_ADDR,
+				ETHER1394_REGION_ADDR_END);
 
 	if (version_printed++ == 0)
 		ETH1394_PRINT_G (KERN_INFO, "%s\n", version);
@@ -1599,7 +1623,7 @@ static int ether1394_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		case ETHTOOL_GDRVINFO: {
 			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 			strcpy (info.driver, driver_name);
-			strcpy (info.version, "$Rev: 1079 $");
+			strcpy (info.version, "$Rev: 1096 $");
 			/* FIXME XXX provide sane businfo */
 			strcpy (info.bus_info, "ieee1394");
 			if (copy_to_user (useraddr, &info, sizeof (info)))
@@ -1619,18 +1643,6 @@ static int ether1394_ethtool_ioctl(struct net_device *dev, void *useraddr)
 	return 0;
 }
 
-/* Function for incoming 1394 packets */
-static struct hpsb_address_ops addr_ops = {
-	.write =	ether1394_write,
-};
-
-/* Ieee1394 highlevel driver functions */
-static struct hpsb_highlevel eth1394_highlevel = {
-	.name =		driver_name,
-	.add_host =	ether1394_add_host,
-	.remove_host =	ether1394_remove_host,
-	.host_reset =	ether1394_host_reset,
-};
 
 static int __init ether1394_init_module (void)
 {
@@ -1639,9 +1651,6 @@ static int __init ether1394_init_module (void)
 
 	/* Register ourselves as a highlevel driver */
 	hpsb_register_highlevel(&eth1394_highlevel);
-
-	hpsb_register_addrspace(&eth1394_highlevel, &addr_ops, ETHER1394_REGION_ADDR,
-				 ETHER1394_REGION_ADDR_END);
 
 	return 0;
 }

@@ -1427,6 +1427,7 @@ static int aac_send_srb_fib(struct scsi_cmnd* scsicmd)
 		flag = SRB_DataIn;
 		break;
 	case DMA_NONE:
+	default:	/* shuts up some versions of gcc */
 		flag = SRB_NoDataXfer;
 		break;
 	}

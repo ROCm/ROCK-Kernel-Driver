@@ -43,15 +43,16 @@ extern void ia64_tlb_init (void);
 unsigned long MAX_DMA_ADDRESS = PAGE_OFFSET + 0x100000000UL;
 
 #ifdef CONFIG_VIRTUAL_MEM_MAP
-  unsigned long vmalloc_end = VMALLOC_END_INIT;
-  struct page *vmem_map;
-
-  EXPORT_SYMBOL(vmem_map);
+unsigned long vmalloc_end = VMALLOC_END_INIT;
+EXPORT_SYMBOL(vmalloc_end);
+struct page *vmem_map;
+EXPORT_SYMBOL(vmem_map);
 #endif
 
 static int pgt_cache_water[2] = { 25, 50 };
 
 struct page *zero_page_memmap_ptr;		/* map entry for zero page */
+EXPORT_SYMBOL(zero_page_memmap_ptr);
 
 void
 check_pgt_cache (void)
@@ -457,6 +458,7 @@ ia64_pfn_valid (unsigned long pfn)
 
 	return __get_user(byte, (char *) pfn_to_page(pfn)) == 0;
 }
+EXPORT_SYMBOL(ia64_pfn_valid);
 
 int
 find_largest_hole (u64 start, u64 end, void *arg)

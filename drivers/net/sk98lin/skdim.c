@@ -2,8 +2,8 @@
  *
  * Name:	skdim.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.2 $
- * Date:	$Date: 2003/08/21 12:35:05 $
+ * Version:	$Revision: 1.5 $
+ * Date:	$Date: 2003/11/28 12:55:40 $
  * Purpose:	All functions to maintain interrupt moderation
  *
  ******************************************************************************/
@@ -11,6 +11,7 @@
 /******************************************************************************
  *
  *	(C)Copyright 1998-2002 SysKonnect GmbH.
+ *	(C)Copyright 2002-2003 Marvell.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -26,6 +27,15 @@
  * History:
  *	
  *	$Log: skdim.c,v $
+ *	Revision 1.5  2003/11/28 12:55:40  rroesler
+ *	Fix: support for new process timing interface added
+ *	
+ *	Revision 1.4  2003/10/10 10:58:56  mlindner
+ *	Fix: CPU detection under the kernel 2.6
+ *	
+ *	Revision 1.3  2003/10/07 08:17:08  mlindner
+ *	Fix: Copyright changes
+ *	
  *	Revision 1.2  2003/08/21 12:35:05  mlindner
  *	Fix: Corrected CPU detection and compile errors on single CPU machines
  *	
@@ -62,7 +72,7 @@
 
 #ifndef	lint
 static const char SysKonnectFileId[] =
-	"@(#) $Id: skdim.c,v 1.2 2003/08/21 12:35:05 mlindner Exp $ (C) SysKonnect.";
+	"@(#) $Id: skdim.c,v 1.5 2003/11/28 12:55:40 rroesler Exp $ (C) SysKonnect.";
 #endif
 
 #define __SKADDR_C
@@ -327,7 +337,9 @@ GetCurrentSystemLoad(SK_AC *pAC) {
 	**
 	**      struct kernel_stat kstat
 	**
-	** is not marked as an exported symbol
+	** is not marked as an exported symbol in the file
+	**
+	**      kernel/ksyms.c 
 	**
 	** As a consequence, using this driver as KLM is not possible
 	** and any access of the structure kernel_stat via the 

@@ -2,8 +2,8 @@
  *
  * Name:	skcsum.h
  * Project:	GEnesis - SysKonnect SK-NET Gigabit Ethernet (SK-98xx)
- * Version:	$Revision: 1.9 $
- * Date:	$Date: 2001/02/06 11:21:39 $
+ * Version:	$Revision: 1.10 $
+ * Date:	$Date: 2003/08/20 13:59:57 $
  * Purpose:	Store/verify Internet checksum in send/receive packets.
  *
  ******************************************************************************/
@@ -26,6 +26,10 @@
  * History:
  *
  *	$Log: skcsum.h,v $
+ *	Revision 1.10  2003/08/20 13:59:57  mschmid
+ *	Changed notation of #ifndef SkCsCalculateChecksum to
+ *	#ifndef SK_CS_CALCULATE_CHECKSUM
+ *	
  *	Revision 1.9  2001/02/06 11:21:39  rassmann
  *	Editorial changes.
  *	
@@ -226,11 +230,11 @@ typedef struct s_CsPacketInfo {
 
 /* function prototypes ********************************************************/
 
-#ifndef SkCsCalculateChecksum
+#ifndef SK_CS_CALCULATE_CHECKSUM
 extern unsigned SkCsCalculateChecksum(
 	void		*pData,
 	unsigned	Length);
-#endif
+#endif /* SK_CS_CALCULATE_CHECKSUM */
 
 extern int SkCsEvent(
 	SK_AC		*pAc,

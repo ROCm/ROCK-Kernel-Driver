@@ -77,7 +77,7 @@
 #include "sbp2.h"
 
 static char version[] __devinitdata =
-	"$Rev: 1082 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1096 $ Ben Collins <bcollins@debian.org>";
 
 /*
  * Module load parameter definitions
@@ -711,6 +711,18 @@ static struct sbp2scsi_host_info *sbp2_add_host(struct hpsb_host *host)
 		SBP2_ERR("failed to register scsi host");
 		return NULL;
 	}
+
+	/* Register our sbp2 status address space... */
+	hpsb_register_addrspace(&sbp2_highlevel, host, &sbp2_ops,
+				SBP2_STATUS_FIFO_ADDRESS,
+				SBP2_STATUS_FIFO_ADDRESS +
+				SBP2_STATUS_FIFO_ENTRY_TO_OFFSET(SBP2SCSI_MAX_SCSI_IDS+1));
+
+	/* Handle data movement if physical dma is not enabled/supported
+	 * on host controller */
+#ifdef CONFIG_IEEE1394_SBP2_PHYS_DMA
+	hpsb_register_addrspace(&sbp2_highlevel, host, &sbp2_physdma_ops, 0x0ULL, 0xfffffffcULL);
+#endif
 
 	hi = hpsb_create_hostinfo(&sbp2_highlevel, host, sizeof(*hi));
 	if (!hi) {
@@ -2880,17 +2892,6 @@ static int sbp2_module_init(void)
 
 	/* Register our high level driver with 1394 stack */
 	hpsb_register_highlevel(&sbp2_highlevel);
-
-	/* Register our sbp2 status address space... */
-	hpsb_register_addrspace(&sbp2_highlevel, &sbp2_ops, SBP2_STATUS_FIFO_ADDRESS,
-				SBP2_STATUS_FIFO_ADDRESS + 
-				SBP2_STATUS_FIFO_ENTRY_TO_OFFSET(SBP2SCSI_MAX_SCSI_IDS+1));
-
-	/* Handle data movement if physical dma is not enabled/supported
-	 * on host controller */
-#ifdef CONFIG_IEEE1394_SBP2_PHYS_DMA
-	hpsb_register_addrspace(&sbp2_highlevel, &sbp2_physdma_ops, 0x0ULL, 0xfffffffcULL);
-#endif
 
 	hpsb_register_protocol(&sbp2_driver);
 
