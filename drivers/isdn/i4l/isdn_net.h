@@ -11,7 +11,10 @@
  *
  */
 
-			      /* Definitions for hupflags:                */
+#include <linux/kernel.h>
+#include <linux/netdevice.h>
+#include <linux/isdn.h>
+  			      /* Definitions for hupflags:                */
 #define ISDN_CHARGEHUP   4      /* We want to use the charge mechanism      */
 #define ISDN_INHUP       8      /* Even if incoming, close after huptimeout */
 #define ISDN_MANCHARGE  16      /* Charge Interval manually set             */
