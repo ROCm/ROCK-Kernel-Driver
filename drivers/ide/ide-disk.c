@@ -702,6 +702,37 @@ static u8 idedisk_dump_status (ide_drive_t *drive, const char *msg, u8 stat)
 	}
 #endif	/* FANCY_STATUS_DUMPS */
 	printk("\n");
+	{
+		struct request *rq;
+		unsigned char opcode = 0;
+		int found = 0;
+
+		spin_lock(&ide_lock);
+		rq = HWGROUP(drive)->rq;
+		spin_unlock(&ide_lock);
+		if (!rq)
+			goto out;
+		if (rq->flags & (REQ_DRIVE_CMD | REQ_DRIVE_TASK)) {
+			char *args = rq->buffer;
+			if (args) {
+				opcode = args[0];
+				found = 1;
+			}
+		} else if (rq->flags & REQ_DRIVE_TASKFILE) {
+			ide_task_t *args = rq->special;
+			if (args) {
+				task_struct_t *tf = (task_struct_t *) args->tfRegister;
+				opcode = tf->command;
+				found = 1;
+			}
+		}
+		printk("ide: failed opcode was: ");
+		if (!found)
+			printk("unknown\n");
+		else
+			printk("0x%02x\n", opcode);
+	}
+out:
 	local_irq_restore(flags);
 	return err;
 }
