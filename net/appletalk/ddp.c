@@ -249,6 +249,7 @@ static struct atalk_iface *atif_add_device(struct net_device *dev,
 	if (!iface)
 		goto out;
 
+	memset(iface, 0, sizeof(*iface));
 	dev_hold(dev);
 	iface->dev = dev;
 	dev->atalk_ptr = iface;
@@ -580,6 +581,7 @@ static int atrtr_create(struct rtentry *r, struct net_device *devhint)
 		retval = -ENOBUFS;
 		if (!rt)
 			goto out;
+		memset(rt, 0, sizeof(*rt));
 
 		rt->next = atalk_routes;
 		atalk_routes = rt;
