@@ -143,15 +143,14 @@ ccw_device_sense_pgid_irq(struct ccw_device *cdev, enum dev_event dev_event)
 	int ret;
 
 	irb = (struct irb *) __LC_IRB;
-	/*
-	 * Unsolicited interrupts may pertain to an earlier status pending or
-	 * busy condition on the subchannel. Retry sense pgid.
-	 */
+	/* Retry sense pgid for cc=1. */
 	if (irb->scsw.stctl ==
 	    (SCSW_STCTL_STATUS_PEND | SCSW_STCTL_ALERT_STATUS)) {
-		ret = __ccw_device_sense_pgid_start(cdev);
-		if (ret && ret != -EBUSY)
-			ccw_device_sense_pgid_done(cdev, ret);
+		if (irb->scsw.cc == 1) {
+			ret = __ccw_device_sense_pgid_start(cdev);
+			if (ret && ret != -EBUSY)
+				ccw_device_sense_pgid_done(cdev, ret);
+		}
 		return;
 	}
 	if (ccw_device_accumulate_and_sense(cdev, irb) != 0)
@@ -310,13 +309,11 @@ ccw_device_verify_irq(struct ccw_device *cdev, enum dev_event dev_event)
 	struct irb *irb;
 
 	irb = (struct irb *) __LC_IRB;
-	/*
-	 * Unsolicited interrupts may pertain to an earlier status pending or
-	 * busy condition on the subchannel. Restart path verification.
-	 */
+	/* Retry set pgid for cc=1. */
 	if (irb->scsw.stctl ==
 	    (SCSW_STCTL_STATUS_PEND | SCSW_STCTL_ALERT_STATUS)) {
-		__ccw_device_verify_start(cdev);
+		if (irb->scsw.cc == 1)
+			__ccw_device_verify_start(cdev);
 		return;
 	}
 	if (ccw_device_accumulate_and_sense(cdev, irb) != 0)
@@ -397,10 +394,13 @@ ccw_device_disband_irq(struct ccw_device *cdev, enum dev_event dev_event)
 	int ret;
 
 	irb = (struct irb *) __LC_IRB;
-	/* Ignore unsolicited interrupts. */
+	/* Retry set pgid for cc=1. */
 	if (irb->scsw.stctl ==
-	    		(SCSW_STCTL_STATUS_PEND | SCSW_STCTL_ALERT_STATUS))
+	    (SCSW_STCTL_STATUS_PEND | SCSW_STCTL_ALERT_STATUS)) {
+		if (irb->scsw.cc == 1)
+			__ccw_device_disband_start(cdev);
 		return;
+	}
 	if (ccw_device_accumulate_and_sense(cdev, irb) != 0)
 		return;
 	sch = to_subchannel(cdev->dev.parent);

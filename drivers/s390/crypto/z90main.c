@@ -50,7 +50,7 @@
 #  error "This kernel is too recent: not supported by this file"
 #endif
 
-#define VERSION_Z90MAIN_C "$Revision: 1.31.2.2 $"
+#define VERSION_Z90MAIN_C "$Revision: 1.31.2.3 $"
 
 static char z90cmain_version[] __initdata =
 	"z90main.o (" VERSION_Z90MAIN_C "/"
@@ -613,10 +613,15 @@ z90crypt_init_module(void)
 
 	PDEBUG("PID %d\n", PID());
 
+	if ((domain < -1) || (domain > 15)) {
+		PRINTKW("Invalid param: domain = %d.  Not loading.\n", domain);
+		return -EINVAL;
+	}
+
 #ifndef Z90CRYPT_USE_HOTPLUG
 	/* Register as misc device with given minor (or get a dynamic one). */
 	result = misc_register(&z90crypt_misc_device);
-	if (result <0) {
+	if (result < 0) {
 		PRINTKW(KERN_ERR "misc_register (minor %d) failed with %d\n",
 			z90crypt_misc_device.minor, result);
 		return result;

@@ -216,8 +216,9 @@ ccw_device_accumulate_irb(struct ccw_device *cdev, struct irb *irb)
 	/*
 	 * Don't accumulate unsolicited interrupts.
 	 */
-	if (irb->scsw.stctl ==
-	    (SCSW_STCTL_STATUS_PEND | SCSW_STCTL_ALERT_STATUS))
+	if ((irb->scsw.stctl ==
+	     (SCSW_STCTL_STATUS_PEND | SCSW_STCTL_ALERT_STATUS)) &&
+	    (!irb->scsw.cc))
 		return;
 
 	cdev_irb = &cdev->private->irb;

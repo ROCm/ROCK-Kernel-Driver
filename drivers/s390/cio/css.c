@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/css.c
  *  driver for channel subsystem
- *   $Revision: 1.72.2.3 $
+ *   $Revision: 1.72.2.4 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -198,6 +198,20 @@ css_evaluate_subchannel(int irq, int slow)
 	case CIO_GONE:
 		if (!sch) {
 			/* Never used this subchannel. Ignore. */
+			ret = 0;
+			break;
+		}
+		if (disc && (event == CIO_NO_PATH)) {
+			/*
+			 * Uargh, hack again. Because we don't get a machine
+			 * check on configure on, our path bookkeeping can
+			 * be out of date here (it's fine while we only do
+			 * logical varying or get chsc machine checks). We
+			 * need to force reprobing or we might miss devices
+			 * coming operational again. It won't do harm in real
+			 * no path situations.
+			 */
+			device_trigger_reprobe(sch);
 			ret = 0;
 			break;
 		}
