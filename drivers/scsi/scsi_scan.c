@@ -1,11 +1,28 @@
 /*
- *  scsi_scan.c Copyright (C) 2000 Eric Youngdale
+ * scsi_scan.c
  *
- *  Bus scan logic.
+ * Copyright (C) 2000 Eric Youngdale,
+ * Copyright (C) 2002 Patrick Mansfield
  *
- *  This used to live in scsi.c, but that file was just a laundry basket
- *  full of misc stuff.  This got separated out in order to make things
- *  clearer.
+ * The general scanning/probing algorithm is as follows, exceptions are
+ * made to it depending on device specific flags, compilation options, and
+ * global variable (boot or module load time) settings.
+ *
+ * A specific LUN is scanned via an INQUIRY command; if the LUN has a
+ * device attached, a Scsi_Device is allocated and setup for it.
+ *
+ * For every id of every channel on the given host:
+ *
+ * 	Scan LUN 0; if the target responds to LUN 0 (even if there is no
+ * 	device or storage attached to LUN 0):
+ *
+ * 		If LUN 0 has a device attached, allocate and setup a
+ * 		Scsi_Device for it.
+ *
+ * 		If target is SCSI-3 or up, issue a REPORT LUN, and scan
+ * 		all of the LUNs returned by the REPORT LUN; else,
+ * 		sequentially scan LUNs up until some maximum is reached,
+ * 		or a LUN is seen that cannot have a device attached to it.
  */
 
 #include <linux/config.h>
@@ -22,172 +39,180 @@
 #endif
 
 /*
- * Flags for irregular SCSI devices that need special treatment
+ * Flags for SCSI devices that need special treatment
  */
-#define BLIST_NOLUN		0x001	/* Don't scan for LUNs */
-#define BLIST_FORCELUN		0x002	/* Known to have LUNs, force sanning */
-#define BLIST_BORKEN		0x004	/* Flag for broken handshaking */
-#define BLIST_KEY		0x008	/* Needs to be unlocked by special command */
-#define BLIST_SINGLELUN		0x010	/* LUNs should better not be used in parallel */
+#define BLIST_NOLUN     	0x001	/* Only scan LUN 0 */
+#define BLIST_FORCELUN  	0x002	/* Known to have LUNs, force scanning */
+#define BLIST_BORKEN    	0x004	/* Flag for broken handshaking */
+#define BLIST_KEY       	0x008	/* unlock by special command */
+#define BLIST_SINGLELUN 	0x010	/* Do not use LUNs in parallel */
 #define BLIST_NOTQ		0x020	/* Buggy Tagged Command Queuing */
-#define BLIST_SPARSELUN		0x040	/* Non consecutive LUN numbering */
+#define BLIST_SPARSELUN 	0x040	/* Non consecutive LUN numbering */
 #define BLIST_MAX5LUN		0x080	/* Avoid LUNS >= 5 */
-#define BLIST_ISDISK		0x100	/* Treat as (removable) disk */
-#define BLIST_ISROM		0x200	/* Treat as (removable) CD-ROM */
-#define BLIST_LARGELUN		0x400	/* LUNs larger than 7 despite reporting as SCSI 2 */
-#define BLIST_INQUIRY_36	0x800	/* override additional length field */
-#define BLIST_INQUIRY_58	0x1000	/* ... for broken inquiry responses */
-
-/*
- * scan_scsis_single() return values.
- */
-#define SCSI_SCAN_NO_RESPONSE      0
-#define SCSI_SCAN_DEVICE_PRESENT   1
-#define SCSI_SCAN_DEVICE_ADDED     2
-
-static void print_inquiry(unsigned char *data);
-static int scan_scsis_single(unsigned int channel, unsigned int dev,
-		unsigned int lun, int scsi_level, Scsi_Device ** SDpnt2,
-		struct Scsi_Host *shpnt, char *scsi_result);
-static void scan_scsis_target(unsigned int channel, unsigned int dev,
-		Scsi_Device ** SDpnt2, struct Scsi_Host *shpnt,
-		char *scsi_result);
-static int find_lun0_scsi_level(unsigned int channel, unsigned int dev,
-				struct Scsi_Host *shpnt);
-static void scsi_load_identifier(Scsi_Device *SDpnt, Scsi_Request * SRpnt);
+#define BLIST_ISROM     	0x100	/* Treat as (removable) CD-ROM */
+#define BLIST_LARGELUN		0x200	/* LUNs past 7 on a SCSI-2 device */
+#define BLIST_INQUIRY_36	0x400	/* override additional length field */
+#define BLIST_INQUIRY_58	0x800	/* ... for broken inquiry responses */
 
 struct dev_info {
 	const char *vendor;
 	const char *model;
-	const char *revision;	/* Latest revision known to be bad.  Not used yet */
+	const char *revision;	/* revision known to be bad, unused */
 	unsigned flags;
 };
 
 /*
- * This is what was previously known as the blacklist.  The concept
- * has been expanded so that we can specify other types of things we
- * need to be aware of.
+ * device_list: devices that require settings that differ from the
+ * default, includes black-listed (broken) devices.
  */
-static struct dev_info device_list[] =
-{
-/* The following devices are known not to tolerate a lun != 0 scan for
- * one reason or another.  Some will respond to all luns, others will
- * lock up.
- */
-	{"Aashima", "IMAGERY 2400SP", "1.03", BLIST_NOLUN},	/* Locks up if polled for lun != 0 */
-	{"CHINON", "CD-ROM CDS-431", "H42", BLIST_NOLUN},	/* Locks up if polled for lun != 0 */
-	{"CHINON", "CD-ROM CDS-535", "Q14", BLIST_NOLUN},	/* Locks up if polled for lun != 0 */
-	{"DENON", "DRD-25X", "V", BLIST_NOLUN},			/* Locks up if probed for lun != 0 */
-	{"HITACHI", "DK312C", "CM81", BLIST_NOLUN},		/* Responds to all lun - dtg */
-	{"HITACHI", "DK314C", "CR21", BLIST_NOLUN},		/* responds to all lun */
-	{"IMS", "CDD521/10", "2.06", BLIST_NOLUN},		/* Locks-up when LUN>0 polled. */
-	{"MAXTOR", "XT-3280", "PR02", BLIST_NOLUN},		/* Locks-up when LUN>0 polled. */
-	{"MAXTOR", "XT-4380S", "B3C", BLIST_NOLUN},		/* Locks-up when LUN>0 polled. */
-	{"MAXTOR", "MXT-1240S", "I1.2", BLIST_NOLUN},		/* Locks up when LUN>0 polled */
-	{"MAXTOR", "XT-4170S", "B5A", BLIST_NOLUN},		/* Locks-up sometimes when LUN>0 polled. */
-	{"MAXTOR", "XT-8760S", "B7B", BLIST_NOLUN},		/* guess what? */
-	{"MEDIAVIS", "RENO CD-ROMX2A", "2.03", BLIST_NOLUN},	/* Responds to all lun */
-	{"NEC", "CD-ROM DRIVE:841", "1.0", BLIST_NOLUN},	/* Locks-up when LUN>0 polled. */
-	{"PHILIPS", "PCA80SC", "V4-2", BLIST_NOLUN},		/* Responds to all lun */
-	{"RODIME", "RO3000S", "2.33", BLIST_NOLUN},		/* Locks up if polled for lun != 0 */
-	{"SANYO", "CRD-250S", "1.20", BLIST_NOLUN},		/* causes failed REQUEST SENSE on lun 1
-								 * for aha152x controller, which causes
-								 * SCSI code to reset bus.*/
-	{"SEAGATE", "ST157N", "\004|j", BLIST_NOLUN},		/* causes failed REQUEST SENSE on lun 1
-								 * for aha152x controller, which causes
-								 * SCSI code to reset bus.*/
-	{"SEAGATE", "ST296", "921", BLIST_NOLUN},		/* Responds to all lun */
-	{"SEAGATE", "ST1581", "6538", BLIST_NOLUN},		/* Responds to all lun */
+static struct dev_info device_list[] = {
+	/*
+	 * The following devices are known not to tolerate a lun != 0 scan
+	 * for one reason or another. Some will respond to all luns,
+	 * others will lock up.
+	 */
+	{"Aashima", "IMAGERY 2400SP", "1.03", BLIST_NOLUN},	/* locks up */
+	{"CHINON", "CD-ROM CDS-431", "H42", BLIST_NOLUN},	/* locks up */
+	{"CHINON", "CD-ROM CDS-535", "Q14", BLIST_NOLUN},	/* locks up */
+	{"DENON", "DRD-25X", "V", BLIST_NOLUN},			/* locks up */
+	{"HITACHI", "DK312C", "CM81", BLIST_NOLUN},	/* responds to all lun */
+	{"HITACHI", "DK314C", "CR21", BLIST_NOLUN},	/* responds to all lun */
+	{"IMS", "CDD521/10", "2.06", BLIST_NOLUN},	/* locks up */
+	{"MAXTOR", "XT-3280", "PR02", BLIST_NOLUN},	/* locks up */
+	{"MAXTOR", "XT-4380S", "B3C", BLIST_NOLUN},	/* locks up */
+	{"MAXTOR", "MXT-1240S", "I1.2", BLIST_NOLUN},	/* locks up */
+	{"MAXTOR", "XT-4170S", "B5A", BLIST_NOLUN},	/* locks up */
+	{"MAXTOR", "XT-8760S", "B7B", BLIST_NOLUN},	/* locks up */
+	{"MEDIAVIS", "RENO CD-ROMX2A", "2.03", BLIST_NOLUN},	/* responds to all lun */
+	{"NEC", "CD-ROM DRIVE:841", "1.0", BLIST_NOLUN},/* locks up */
+	{"PHILIPS", "PCA80SC", "V4-2", BLIST_NOLUN},	/* responds to all lun */
+	{"RODIME", "RO3000S", "2.33", BLIST_NOLUN},	/* locks up */
+	/*
+	 * The following causes a failed REQUEST SENSE on lun 1 for
+	 * aha152x controller, which causes SCSI code to reset bus.
+	 */
+	{"SANYO", "CRD-250S", "1.20", BLIST_NOLUN},
+	/*
+	 * The following causes a failed REQUEST SENSE on lun 1 for
+	 * aha152x controller, which causes SCSI code to reset bus.
+	 */
+	{"SEAGATE", "ST157N", "\004|j", BLIST_NOLUN},
+	{"SEAGATE", "ST296", "921", BLIST_NOLUN},	/* responds to all lun */
+	{"SEAGATE", "ST1581", "6538", BLIST_NOLUN},	/* responds to all lun */
 	{"SONY", "CD-ROM CDU-541", "4.3d", BLIST_NOLUN},
 	{"SONY", "CD-ROM CDU-55S", "1.0i", BLIST_NOLUN},
 	{"SONY", "CD-ROM CDU-561", "1.7x", BLIST_NOLUN},
-	{"SONY", "CD-ROM CDU-8012", "*", BLIST_NOLUN},
-	{"TANDBERG", "TDC 3600", "U07", BLIST_NOLUN},		/* Locks up if polled for lun != 0 */
-	{"TEAC", "CD-R55S", "1.0H", BLIST_NOLUN},		/* Locks up if polled for lun != 0 */
-	{"TEAC", "CD-ROM", "1.06", BLIST_NOLUN},		/* causes failed REQUEST SENSE on lun 1
-								 * for seagate controller, which causes
-								 * SCSI code to reset bus.*/
-	{"TEAC", "MT-2ST/45S2-27", "RV M", BLIST_NOLUN},	/* Responds to all lun */
-	{"TEXEL", "CD-ROM", "1.06", BLIST_NOLUN},		/* causes failed REQUEST SENSE on lun 1
-								 * for seagate controller, which causes
-								 * SCSI code to reset bus.*/
-	{"QUANTUM", "LPS525S", "3110", BLIST_NOLUN},		/* Locks sometimes if polled for lun != 0 */
-	{"QUANTUM", "PD1225S", "3110", BLIST_NOLUN},		/* Locks sometimes if polled for lun != 0 */
-	{"QUANTUM", "FIREBALL ST4.3S", "0F0C", BLIST_NOLUN},	/* Locks up when polled for lun != 0 */
-	{"MEDIAVIS", "CDR-H93MV", "1.31", BLIST_NOLUN},		/* Locks up if polled for lun != 0 */
-	{"SANKYO", "CP525", "6.64", BLIST_NOLUN},		/* causes failed REQ SENSE, extra reset */
-	{"HP", "C1750A", "3226", BLIST_NOLUN},			/* scanjet iic */
-	{"HP", "C1790A", "", BLIST_NOLUN},			/* scanjet iip */
-	{"HP", "C2500A", "", BLIST_NOLUN},			/* scanjet iicx */
-	{"YAMAHA", "CDR100", "1.00", BLIST_NOLUN},		/* Locks up if polled for lun != 0 */
-	{"YAMAHA", "CDR102", "1.00", BLIST_NOLUN},		/* Locks up if polled for lun != 0 extra reset */
-	{"YAMAHA", "CRW8424S", "1.0", BLIST_NOLUN},		/* Locks up if polled for lun != 0 */
-	{"YAMAHA", "CRW6416S", "1.0c", BLIST_NOLUN},		/* Locks up if polled for lun != 0 */
-	{"MITSUMI", "CD-R CR-2201CS", "6119", BLIST_NOLUN},	/* Locks up if polled for lun != 0 */
-	{"RELISYS", "Scorpio", "*", BLIST_NOLUN},		/* responds to all LUN */
-	{"MICROTEK", "ScanMaker II", "5.61", BLIST_NOLUN},	/* responds to all LUN */
-
-/*
- * Other types of devices that have special flags.
- */
-	{"SONY", "CD-ROM CDU-8001", "*", BLIST_BORKEN},
-	{"TEXEL", "CD-ROM", "1.06", BLIST_BORKEN},
-	{"IOMEGA", "Io20S         *F", "*", BLIST_KEY},
-	{"INSITE", "Floptical   F*8I", "*", BLIST_KEY},
-	{"INSITE", "I325VM", "*", BLIST_KEY},
-	{"LASOUND","CDX7405","3.10", BLIST_MAX5LUN | BLIST_SINGLELUN},
-	{"MICROP", "4110", "*", BLIST_NOTQ},			/* Buggy Tagged Queuing */
-	{"NRC", "MBR-7", "*", BLIST_FORCELUN | BLIST_SINGLELUN},
-	{"NRC", "MBR-7.4", "*", BLIST_FORCELUN | BLIST_SINGLELUN},
-	{"REGAL", "CDC-4X", "*", BLIST_MAX5LUN | BLIST_SINGLELUN},
-	{"NAKAMICH", "MJ-4.8S", "*", BLIST_FORCELUN | BLIST_SINGLELUN},
-	{"NAKAMICH", "MJ-5.16S", "*", BLIST_FORCELUN | BLIST_SINGLELUN},
-	{"PIONEER", "CD-ROM DRM-600", "*", BLIST_FORCELUN | BLIST_SINGLELUN},
-	{"PIONEER", "CD-ROM DRM-602X", "*", BLIST_FORCELUN | BLIST_SINGLELUN},
-	{"PIONEER", "CD-ROM DRM-604X", "*", BLIST_FORCELUN | BLIST_SINGLELUN},
-	{"EMULEX", "MD21/S2     ESDI", "*", BLIST_SINGLELUN},
-	{"CANON", "IPUBJD", "*", BLIST_SPARSELUN},
-	{"nCipher", "Fastness Crypto", "*", BLIST_FORCELUN},
-	{"DEC","HSG80","*", BLIST_FORCELUN},
-	{"COMPAQ","LOGICAL VOLUME","*", BLIST_FORCELUN},
-	{"COMPAQ","CR3500","*", BLIST_FORCELUN},
-	{"NEC", "PD-1 ODX654P", "*", BLIST_FORCELUN | BLIST_SINGLELUN},
-	{"MATSHITA", "PD-1", "*", BLIST_FORCELUN | BLIST_SINGLELUN},
-	{"iomega", "jaz 1GB", "J.86", BLIST_NOTQ | BLIST_NOLUN},
- 	{"TOSHIBA","CDROM","*", BLIST_ISROM},
- 	{"TOSHIBA","CD-ROM","*", BLIST_ISROM},
-	{"MegaRAID", "LD", "*", BLIST_FORCELUN},
-	{"DGC",  "RAID",      "*", BLIST_SPARSELUN}, // Dell PV 650F (tgt @ LUN 0)
-	{"DGC",  "DISK",      "*", BLIST_SPARSELUN}, // Dell PV 650F (no tgt @ LUN 0) 
-	{"DELL", "PV660F",   "*", BLIST_SPARSELUN},
-	{"DELL", "PV660F   PSEUDO",   "*", BLIST_SPARSELUN},
-	{"DELL", "PSEUDO DEVICE .",   "*", BLIST_SPARSELUN}, // Dell PV 530F
-	{"DELL", "PV530F",    "*", BLIST_SPARSELUN}, // Dell PV 530F
-	{"EMC", "SYMMETRIX", "*", BLIST_SPARSELUN | BLIST_LARGELUN | BLIST_FORCELUN},
-	{"HP", "A6189A", "*", BLIST_SPARSELUN |  BLIST_LARGELUN}, // HP VA7400, by Alar Aun
-	{"CMD", "CRA-7280", "*", BLIST_SPARSELUN},   // CMD RAID Controller
-	{"CNSI", "G7324", "*", BLIST_SPARSELUN},     // Chaparral G7324 RAID
-	{"CNSi", "G8324", "*", BLIST_SPARSELUN},     // Chaparral G8324 RAID
-	{"Zzyzx", "RocketStor 500S", "*", BLIST_SPARSELUN},
-	{"Zzyzx", "RocketStor 2000", "*", BLIST_SPARSELUN},
-	{"SONY", "TSL",       "*", BLIST_FORCELUN},  // DDS3 & DDS4 autoloaders
-	{"DELL", "PERCRAID", "*", BLIST_FORCELUN},
-	{"HP", "NetRAID-4M", "*", BLIST_FORCELUN},
-	{"ADAPTEC", "AACRAID", "*", BLIST_FORCELUN},
-	{"ADAPTEC", "Adaptec 5400S", "*", BLIST_FORCELUN},
-	{"COMPAQ", "MSA1000", "*", BLIST_FORCELUN},
-	{"HP", "C1557A", "*", BLIST_FORCELUN},
-	{"IBM", "AuSaV1S2", "*", BLIST_FORCELUN},
+	{"SONY", "CD-ROM CDU-8012", NULL, BLIST_NOLUN},
+	{"TANDBERG", "TDC 3600", "U07", BLIST_NOLUN},	/* locks up */
+	{"TEAC", "CD-R55S", "1.0H", BLIST_NOLUN},	/* locks up */
+	/*
+	 * The following causes a failed REQUEST SENSE on lun 1 for
+	 * seagate controller, which causes SCSI code to reset bus.
+	 */
+	{"TEAC", "CD-ROM", "1.06", BLIST_NOLUN},
+	{"TEAC", "MT-2ST/45S2-27", "RV M", BLIST_NOLUN},	/* responds to all lun */
+	/*
+	 * The following causes a failed REQUEST SENSE on lun 1 for
+	 * seagate controller, which causes SCSI code to reset bus.
+	 */
+	{"TEXEL", "CD-ROM", "1.06", BLIST_NOLUN},
+	{"QUANTUM", "LPS525S", "3110", BLIST_NOLUN},	/* locks up */
+	{"QUANTUM", "PD1225S", "3110", BLIST_NOLUN},	/* locks up */
+	{"QUANTUM", "FIREBALL ST4.3S", "0F0C", BLIST_NOLUN},	/* locks up */
+	{"MEDIAVIS", "CDR-H93MV", "1.31", BLIST_NOLUN},	/* locks up */
+	{"SANKYO", "CP525", "6.64", BLIST_NOLUN},	/* causes failed REQ SENSE, extra reset */
+	{"HP", "C1750A", "3226", BLIST_NOLUN},		/* scanjet iic */
+	{"HP", "C1790A", "", BLIST_NOLUN},		/* scanjet iip */
+	{"HP", "C2500A", "", BLIST_NOLUN},		/* scanjet iicx */
+	{"YAMAHA", "CDR100", "1.00", BLIST_NOLUN},	/* locks up */
+	{"YAMAHA", "CDR102", "1.00", BLIST_NOLUN},	/* locks up */
+	{"YAMAHA", "CRW8424S", "1.0", BLIST_NOLUN},	/* locks up */
+	{"YAMAHA", "CRW6416S", "1.0c", BLIST_NOLUN},	/* locks up */
+	{"MITSUMI", "CD-R CR-2201CS", "6119", BLIST_NOLUN},	/* locks up */
+	{"RELISYS", "Scorpio", NULL, BLIST_NOLUN},	/* responds to all lun */
+	{"MICROTEK", "ScanMaker II", "5.61", BLIST_NOLUN},	/* responds to all lun */
 
 	/*
-	 * Must be at end of list...
+	 * Other types of devices that have special flags.
 	 */
-	{NULL, NULL, NULL}
+	{"SONY", "CD-ROM CDU-8001", NULL, BLIST_BORKEN},
+	{"TEXEL", "CD-ROM", "1.06", BLIST_BORKEN},
+	{"IOMEGA", "Io20S         *F", NULL, BLIST_KEY},
+	{"INSITE", "Floptical   F*8I", NULL, BLIST_KEY},
+	{"INSITE", "I325VM", NULL, BLIST_KEY},
+	{"LASOUND", "CDX7405", "3.10", BLIST_MAX5LUN | BLIST_SINGLELUN},
+	{"MICROP", "4110", NULL, BLIST_NOTQ},
+	{"NRC", "MBR-7", NULL, BLIST_FORCELUN | BLIST_SINGLELUN},
+	{"NRC", "MBR-7.4", NULL, BLIST_FORCELUN | BLIST_SINGLELUN},
+	{"REGAL", "CDC-4X", NULL, BLIST_MAX5LUN | BLIST_SINGLELUN},
+	{"NAKAMICH", "MJ-4.8S", NULL, BLIST_FORCELUN | BLIST_SINGLELUN},
+	{"NAKAMICH", "MJ-5.16S", NULL, BLIST_FORCELUN | BLIST_SINGLELUN},
+	{"PIONEER", "CD-ROM DRM-600", NULL, BLIST_FORCELUN | BLIST_SINGLELUN},
+	{"PIONEER", "CD-ROM DRM-602X", NULL, BLIST_FORCELUN | BLIST_SINGLELUN},
+	{"PIONEER", "CD-ROM DRM-604X", NULL, BLIST_FORCELUN | BLIST_SINGLELUN},
+	{"EMULEX", "MD21/S2     ESDI", NULL, BLIST_SINGLELUN},
+	{"CANON", "IPUBJD", NULL, BLIST_SPARSELUN},
+	{"nCipher", "Fastness Crypto", NULL, BLIST_FORCELUN},
+	{"DEC", "HSG80", NULL, BLIST_FORCELUN},
+	{"COMPAQ", "LOGICAL VOLUME", NULL, BLIST_FORCELUN},
+	{"COMPAQ", "CR3500", NULL, BLIST_FORCELUN},
+	{"NEC", "PD-1 ODX654P", NULL, BLIST_FORCELUN | BLIST_SINGLELUN},
+	{"MATSHITA", "PD-1", NULL, BLIST_FORCELUN | BLIST_SINGLELUN},
+	{"iomega", "jaz 1GB", "J.86", BLIST_NOTQ | BLIST_NOLUN},
+	{"TOSHIBA", "CDROM", NULL, BLIST_ISROM},
+	{"TOSHIBA", "CD-ROM", NULL, BLIST_ISROM},
+	{"MegaRAID", "LD", NULL, BLIST_FORCELUN},
+	{"DGC", "RAID", NULL, BLIST_SPARSELUN},	/* Dell PV 650F, storage on LUN 0 */
+	{"DGC", "DISK", NULL, BLIST_SPARSELUN},	/* Dell PV 650F, no storage on LUN 0 */
+	{"DELL", "PV660F", NULL, BLIST_SPARSELUN},
+	{"DELL", "PV660F   PSEUDO", NULL, BLIST_SPARSELUN},
+	{"DELL", "PSEUDO DEVICE .", NULL, BLIST_SPARSELUN},	/* Dell PV 530F */
+	{"DELL", "PV530F", NULL, BLIST_SPARSELUN},
+	{"EMC", "SYMMETRIX", NULL, BLIST_SPARSELUN | BLIST_LARGELUN | BLIST_FORCELUN},
+	{"HP", "A6189A", NULL, BLIST_SPARSELUN | BLIST_LARGELUN},	/* HP VA7400 */
+	{"CMD", "CRA-7280", NULL, BLIST_SPARSELUN},	/* CMD RAID Controller */
+	{"CNSI", "G7324", NULL, BLIST_SPARSELUN},	/* Chaparral G7324 RAID */
+	{"CNSi", "G8324", NULL, BLIST_SPARSELUN},	/* Chaparral G8324 RAID */
+	{"Zzyzx", "RocketStor 500S", NULL, BLIST_SPARSELUN},
+	{"Zzyzx", "RocketStor 2000", NULL, BLIST_SPARSELUN},
+	{"SONY", "TSL", NULL, BLIST_FORCELUN},		/* DDS3 & DDS4 autoloaders */
+	{"DELL", "PERCRAID", NULL, BLIST_FORCELUN},
+	{"HP", "NetRAID-4M", NULL, BLIST_FORCELUN},
+	{"ADAPTEC", "AACRAID", NULL, BLIST_FORCELUN},
+	{"ADAPTEC", "Adaptec 5400S", NULL, BLIST_FORCELUN},
+	{"COMPAQ", "MSA1000", NULL, BLIST_FORCELUN},
+	{"HP", "C1557A", NULL, BLIST_FORCELUN},
+	{"IBM", "AuSaV1S2", NULL, BLIST_FORCELUN},
 };
 
-static char * scsi_null_device_strs = "nullnullnullnull";
+#define ALLOC_FAILURE_MSG	KERN_ERR "%s: Allocation failure during" \
+	" SCSI scanning, some SCSI devices might not be configured\n"
 
-#define MAX_SCSI_LUNS 0xFFFFFFFF
+/*
+ * Prefix values for the SCSI id's (stored in driverfs name field)
+ */
+#define SCSI_UID_SER_NUM 'S'
+#define SCSI_UID_UNKNOWN 'Z'
+
+/*
+ * Return values of some of the scanning functions.
+ *
+ * SCSI_SCAN_NO_RESPONSE: no valid response received from the target, this
+ * includes allocation or general failures preventing IO from being sent.
+ *
+ * SCSI_SCAN_TARGET_PRESENT: target responded, but no device is available
+ * on the given LUN.
+ *
+ * SCSI_SCAN_LUN_PRESENT: target responded, and a device is available on a
+ * given LUN.
+ */
+#define SCSI_SCAN_NO_RESPONSE		0
+#define SCSI_SCAN_TARGET_PRESENT	1
+#define SCSI_SCAN_LUN_PRESENT		2
+
+static char *scsi_null_device_strs = "nullnullnullnull";
+
+#define MAX_SCSI_LUNS	512
 
 #ifdef CONFIG_SCSI_MULTI_LUN
 static unsigned int max_scsi_luns = MAX_SCSI_LUNS;
@@ -195,27 +220,10 @@ static unsigned int max_scsi_luns = MAX_SCSI_LUNS;
 static unsigned int max_scsi_luns = 1;
 #endif
 
-#ifdef CONFIG_SCSI_REPORT_LUNS
-/* 
- * max_scsi_report_luns: the maximum number of LUNS that will be
- * returned from the REPORT LUNS command. 8 times this value must
- * be allocated. In theory this could be up to an 8 byte value, but
- * in practice, the maximum number of LUNs suppored by any device
- * is about 16k.
- */
-static unsigned int max_scsi_report_luns = 128;
-#endif
-
 #ifdef MODULE
-
 MODULE_PARM(max_scsi_luns, "i");
-MODULE_PARM_DESC(max_scsi_luns, "last scsi LUN (should be between 1 and 2^32-1)");
-
-#ifdef CONFIG_SCSI_REPORT_LUNS
-MODULE_PARM(max_scsi_report_luns, "i");
-MODULE_PARM_DESC(max_scsi_report_luns, "REPORT LUNS maximum number of LUNS received (should be between 1 and 16384)");
-#endif
-
+MODULE_PARM_DESC(max_scsi_luns,
+		 "last scsi LUN (should be between 1 and 2^32-1)");
 #else
 
 static int __init scsi_luns_setup(char *str)
@@ -226,7 +234,7 @@ static int __init scsi_luns_setup(char *str)
 		max_scsi_luns = tmp;
 		return 1;
 	} else {
-		printk("scsi_luns_setup : usage max_scsi_luns=n "
+		printk(KERN_WARNING "scsi_luns_setup: usage max_scsi_luns=n "
 		       "(n should be between 1 and 2^32-1)\n");
 		return 0;
 	}
@@ -234,8 +242,25 @@ static int __init scsi_luns_setup(char *str)
 
 __setup("max_scsi_luns=", scsi_luns_setup);
 
+#endif
+
 #ifdef CONFIG_SCSI_REPORT_LUNS
-static int __init max_scsi_report_luns_setup(char *str)
+/*
+ * max_scsi_report_luns: the maximum number of LUNS that will be
+ * returned from the REPORT LUNS command. 8 times this value must
+ * be allocated. In theory this could be up to an 8 byte value, but
+ * in practice, the maximum number of LUNs suppored by any device
+ * is about 16k.
+ */
+static unsigned int max_scsi_report_luns = 128;
+
+#ifdef MODULE
+MODULE_PARM(max_scsi_report_luns, "i");
+MODULE_PARM_DESC(max_scsi_report_luns,
+		 "REPORT LUNS maximum number of LUNS received (should be"
+		 " between 1 and 16384)");
+#else
+static int __init scsi_report_luns_setup(char *str)
 {
 	unsigned int tmp;
 
@@ -243,541 +268,1097 @@ static int __init max_scsi_report_luns_setup(char *str)
 		max_scsi_report_luns = tmp;
 		return 1;
 	} else {
-		printk("scsi_report_luns_setup : usage max_scsi_report_luns=n "
-		       "(n should be between 1 and 16384)\n");
+		printk(KERN_WARNING "scsi_report_luns_setup: usage"
+		       " max_scsi_report_luns=n (n should be between 1"
+		       " and 16384)\n");
 		return 0;
 	}
 }
 
-__setup("max_scsi_report_luns=", max_scsi_report_luns_setup);
-#endif /* CONFIG_SCSI_REPORT_LUNS */
-
+__setup("max_scsi_report_luns=", scsi_report_luns_setup);
+#endif
 #endif
 
-#ifdef CONFIG_SCSI_REPORT_LUNS
-/*
- * Function:    scsilun_to_int
+/**
+ * scsi_unlock_floptical - unlock device via a special MODE SENSE command
+ * @sreq:	used to send the command
+ * @result:	area to store the result of the MODE SENSE
  *
- * Purpose:     Convert ScsiLun (8 byte LUN) to an int.
- *
- * Arguments:   scsilun_pnt - pointer to a ScsiLun to be converted
- *
- * Lock status: None
- *
- * Returns:     cpu ordered integer containing the truncated LUN value
- *
- * Notes:       The ScsiLun is assumed to be four levels, with each level
- * 		effectively containing a SCSI byte-ordered (big endidan)
- * 		short; the addressing bits of each level are ignored (the
- * 		highest two bits). For a description of the LUN format, post
- * 		SCSI-3 see the SCSI Architecture Model, for SCSI-3 see the
- * 		SCSI Controller Commands.
- *
- * 		Given a ScsiLun of: 0a 04 0b 03 00 00 00 00, this function
- * 		returns the integer: 0x0b030a04
- */
-static int scsilun_to_int(ScsiLun *scsilun_pnt) 
+ * Description:
+ *     Send a vendor specific MODE SENSE (not a MODE SELECT) command using
+ *     @sreq to unlock a device, storing the (unused) results into result.
+ *     Called for BLIST_KEY devices.
+ **/
+static void scsi_unlock_floptical(Scsi_Request *sreq, unsigned char *result)
 {
-	int i;
-	unsigned int lun;
+	Scsi_Device *sdscan = sreq->sr_device;
+	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
 
-	lun = 0;
-	for (i = 0; i < sizeof(lun); i += 2)
-		lun = lun | (((scsilun_pnt->scsi_lun[i] << 8) |
-			scsilun_pnt->scsi_lun[i + 1]) << (i * 8));
-	return lun;
+	printk(KERN_NOTICE "scsi: unlocking floptical drive\n");
+	scsi_cmd[0] = MODE_SENSE;
+	if (sdscan->scsi_level <= SCSI_2)
+		scsi_cmd[1] = (sdscan->lun << 5) & 0xe0;
+	else
+		scsi_cmd[1] = 0;
+	scsi_cmd[2] = 0x2e;
+	scsi_cmd[3] = 0;
+	scsi_cmd[4] = 0x2a;	/* size */
+	scsi_cmd[5] = 0;
+	sreq->sr_cmd_len = 0;
+	sreq->sr_data_direction = SCSI_DATA_READ;
+	scsi_wait_req(sreq, (void *) scsi_cmd, (void *) result, 0x2a /* size */,
+		      SCSI_TIMEOUT, 3);
 }
-#endif
 
-/* Driverfs file content handlers */
-static ssize_t scsi_device_type_read(struct device *driverfs_dev, char *page, 
+/**
+ * scsi_device_type_read - copy out the SCSI type
+ * @driverfs_dev:	driverfs device to check
+ * @page:		copy data into this area
+ * @count:		number of bytes to copy
+ * @off:		start at this offset in page
+ *
+ * Description:
+ *     Called via driverfs when the "type" (in scsi_device_type_file)
+ *     field is read. Copy the appropriate SCSI type string into @page,
+ *     followed by a newline and a '\0'. Go through gyrations so we don't
+ *     write more than @count, and we don't write past @off.
+ *
+ * Notes:
+ *     This is for the top-most scsi entry in driverfs, the upper-level
+ *     drivers have their own type file. XXX This is not part of scanning,
+ *     other than we reference the attr struct in this file, move to
+ *     scsi.c or scsi_lib.c.
+ *
+ * Return:
+ *     number of bytes written into page.
+ **/
+static ssize_t scsi_device_type_read(struct device *driverfs_dev, char *page,
 	size_t count, loff_t off)
 {
-	struct scsi_device *SDpnt = to_scsi_device(driverfs_dev);
+	struct scsi_device *sdev = to_scsi_device(driverfs_dev);
+	const char *type;
+	size_t size, len;
 
-	if ((SDpnt->type <= MAX_SCSI_DEVICE_CODE) && 
-		(scsi_device_types[(int)SDpnt->type] != NULL))
-		return off ? 0 : 
-			sprintf(page, "%s\n", 
-				scsi_device_types[(int)SDpnt->type]);
+	if ((sdev->type > MAX_SCSI_DEVICE_CODE) ||
+	    (scsi_device_types[(int)sdev->type] == NULL))
+		type = "Unknown";
 	else
-		return off ? 0 : sprintf(page, "UNKNOWN\n");
-
-	return 0;
+		type = scsi_device_types[(int)sdev->type];
+	size = strlen(type);
+	/*
+	 * Check if off is past size + 1 for newline + 1 for a '\0'.
+	 */
+	if (off >= (size + 2))
+		return 0;
+	if (size > off) {
+		len = min((size_t) (size - off), count);
+		memcpy(page + off, type + off, len);
+	} else
+		len = 0;
+	if (((len + off) == size) && (len < count))
+		/*
+		 * We are at the end of the string and have space, add a
+		 * new line.
+		 */
+		*(page + off + len++) = '\n';
+	if (((len + off) == (size + 1)) && (len < count))
+		/*
+		 * We are past the newline and have space, add a
+		 * terminating '\0'.
+		 */
+		*(page + off + len++) = '\0';
+	return len;
 }
-static DEVICE_ATTR(type,"type",S_IRUGO,scsi_device_type_read,NULL);
 
-/* end content handlers */
+/*
+ * Create dev_attr_type. This is different from the dev_attr_type in scsi
+ * upper level drivers.
+ */
+static DEVICE_ATTR(type, "type", S_IRUGO, scsi_device_type_read, NULL);
 
-static void print_inquiry(unsigned char *data)
+/**
+ * print_inquiry - printk the inquiry information
+ * @inq_result:	printk this SCSI INQUIRY
+ *
+ * Description:
+ *     printk the vendor, model, and other information found in the
+ *     INQUIRY data in @inq_result.
+ *
+ * Notes:
+ *     Remove this, and replace with a hotplug event that logs any
+ *     relevant information.
+ **/
+static void print_inquiry(unsigned char *inq_result)
 {
 	int i;
 
-	printk("  Vendor: ");
-	for (i = 8; i < 16; i++) {
-		if (data[i] >= 0x20 && i < data[4] + 5)
-			printk("%c", data[i]);
+	printk(KERN_NOTICE "  Vendor: ");
+	for (i = 8; i < 16; i++)
+		if (inq_result[i] >= 0x20 && i < inq_result[4] + 5)
+			printk("%c", inq_result[i]);
 		else
 			printk(" ");
-	}
 
 	printk("  Model: ");
-	for (i = 16; i < 32; i++) {
-		if (data[i] >= 0x20 && i < data[4] + 5)
-			printk("%c", data[i]);
+	for (i = 16; i < 32; i++)
+		if (inq_result[i] >= 0x20 && i < inq_result[4] + 5)
+			printk("%c", inq_result[i]);
 		else
 			printk(" ");
-	}
 
 	printk("  Rev: ");
-	for (i = 32; i < 36; i++) {
-		if (data[i] >= 0x20 && i < data[4] + 5)
-			printk("%c", data[i]);
+	for (i = 32; i < 36; i++)
+		if (inq_result[i] >= 0x20 && i < inq_result[4] + 5)
+			printk("%c", inq_result[i]);
 		else
 			printk(" ");
-	}
 
 	printk("\n");
 
-	i = data[0] & 0x1f;
+	i = inq_result[0] & 0x1f;
 
-	printk("  Type:   %s ",
-	       i < MAX_SCSI_DEVICE_CODE ? scsi_device_types[i] : "Unknown          ");
-	printk("                 ANSI SCSI revision: %02x", data[2] & 0x07);
-	if ((data[2] & 0x07) == 1 && (data[3] & 0x0f) == 1)
+	printk(KERN_NOTICE "  Type:   %s ",
+	       i <
+	       MAX_SCSI_DEVICE_CODE ? scsi_device_types[i] :
+	       "Unknown          ");
+	printk("                 ANSI SCSI revision: %02x",
+	       inq_result[2] & 0x07);
+	if ((inq_result[2] & 0x07) == 1 && (inq_result[3] & 0x0f) == 1)
 		printk(" CCS\n");
 	else
 		printk("\n");
 }
 
-static int get_device_flags(unsigned char *vendor_pnt, unsigned char *model_pnt)
+/**
+ * get_device_flags - get device specific flags from the device_list
+ * @vendor:	vendor name
+ * @model:	model name
+ *
+ * Description:
+ *     Search device_list for an entry matching @vendor and @model, if
+ *     found, return the matching flags value, else return 0.
+ *     Partial matches count as success - good for @model, but maybe not
+ *     @vendor.
+ **/
+static int get_device_flags(unsigned char *vendor, unsigned char *model)
 {
-	int i = 0;
-	for (i = 0; 1; i++) {
-		if (device_list[i].vendor == NULL)
-			return 0;
-		while (*vendor_pnt && *vendor_pnt == ' ')
-			vendor_pnt++;
-		if (memcmp(device_list[i].vendor, vendor_pnt,
-			   strlen(device_list[i].vendor)))
+	int i;
+	size_t max;
+
+	for (i = 0; i < ARRAY_SIZE(device_list); i++) {
+		/*
+		 * XXX why skip leading spaces? If an odd INQUIRY value,
+		 * that should have been part of the device_list[] entry,
+		 * such as "  FOO" rather than "FOO". Since this code is
+		 * already here, and we don't know what device it is
+		 * trying to work with, leave it as-is.
+		 */
+		max = 8;	/* max length of vendor */
+		while ((max > 0) && *vendor == ' ') {
+			max--;
+			vendor++;
+		}
+		/*
+		 * XXX removing the following strlen() would be good,
+		 * using it means that for a an entry not in the list, we
+		 * scan every byte of every vendor listed in
+		 * device_list[], and never match a single one (and still
+		 * have to compare at least the first byte of each
+		 * vendor).
+		 */
+		if (memcmp(device_list[i].vendor, vendor,
+			    min(max, strlen(device_list[i].vendor))))
 			continue;
-		while (*model_pnt && *model_pnt == ' ')
-			model_pnt++;
-		if (memcmp(device_list[i].model, model_pnt,
-			   strlen(device_list[i].model)))
+		/*
+		 * Skip spaces again.
+		 */
+		max = 16;	/* max length of model */
+		while ((max > 0) && *model == ' ') {
+			max--;
+			model++;
+		}
+		if (memcmp(device_list[i].model, model,
+			   min(max, strlen(device_list[i].model))))
 			continue;
 		return device_list[i].flags;
 	}
 	return 0;
 }
 
-/*
- *  Detecting SCSI devices :
- *  We scan all present host adapter's busses,  from ID 0 to ID (max_id).
- *  We use the INQUIRY command, determine device type, and pass the ID /
- *  lun address of all sequential devices to the tape driver, all random
- *  devices to the disk driver.
- */
-void scan_scsis(struct Scsi_Host *shpnt,
-		       uint hardcoded,
-		       uint hchannel,
-		       uint hid,
-		       uint hlun)
+/**
+ * scsi_alloc_sdev - allocate and setup a Scsi_Device
+ *
+ * Description:
+ *     Allocate, initialize for io, and return a pointer to a Scsi_Device.
+ *     Stores the @shost, @channel, @id, and @lun in the Scsi_Device, and
+ *     adds Scsi_Device to the appropriate list.
+ *
+ * Return value:
+ *     Scsi_Device pointer, or NULL on failure.
+ **/
+static Scsi_Device *scsi_alloc_sdev(struct Scsi_Host *shost, uint channel,
+				    uint id, uint lun)
 {
-	uint channel;
-	unsigned int dev;
-	unsigned int lun;
-	unsigned char *scsi_result;
-	unsigned char scsi_result0[256];
-	Scsi_Device *SDpnt;
-	Scsi_Device *SDtail;
+	Scsi_Device *sdev;
 
-	scsi_result = NULL;
-
-	SDpnt = (Scsi_Device *) kmalloc(sizeof(Scsi_Device),
-					GFP_ATOMIC);
-	if (SDpnt) {
-		memset(SDpnt, 0, sizeof(Scsi_Device));
-		SDpnt->vendor = scsi_null_device_strs;
-		SDpnt->model = scsi_null_device_strs;
-		SDpnt->rev = scsi_null_device_strs;
+	sdev = (Scsi_Device *) kmalloc(sizeof(Scsi_Device), GFP_ATOMIC);
+	if (sdev == NULL)
+		printk(ALLOC_FAILURE_MSG, __FUNCTION__);
+	else {
+		memset(sdev, 0, sizeof(Scsi_Device));
+		sdev->vendor = scsi_null_device_strs;
+		sdev->model = scsi_null_device_strs;
+		sdev->rev = scsi_null_device_strs;
+		sdev->host = shost;
+		sdev->id = id;
+		sdev->lun = lun;
+		sdev->channel = channel;
+		sdev->online = TRUE;
 		/*
-		 * Register the queue for the device.  All I/O requests will
-		 * come in through here.  We also need to register a pointer to
-		 * ourselves, since the queue handler won't know what device
-		 * the queue actually represents.   We could look it up, but it
-		 * is pointless work.
+		 * Some low level driver could use device->type
 		 */
-		scsi_initialize_queue(SDpnt, shpnt);
-		SDpnt->request_queue.queuedata = (void *) SDpnt;
-		/* Make sure we have something that is valid for DMA purposes */
-		scsi_result = ((!shpnt->unchecked_isa_dma)
-			       ? &scsi_result0[0] : kmalloc(512, GFP_DMA));
+		sdev->type = -1;
+		/*
+		 * Assume that the device will have handshaking problems,
+		 * and then fix this field later if it turns out it
+		 * doesn't
+		 */
+		sdev->borken = 1;
+		scsi_initialize_queue(sdev, shost);
+		sdev->request_queue.queuedata = (void *) sdev;
+
+		scsi_initialize_merge_fn(sdev);
+		init_waitqueue_head(&sdev->scpnt_wait);
+
+		/*
+		 * Add it to the end of the shost->host_queue list.
+		 */
+		if (shost->host_queue != NULL) {
+			sdev->prev = shost->host_queue;
+			while (sdev->prev->next != NULL)
+				sdev->prev = sdev->prev->next;
+			sdev->prev->next = sdev;
+		} else
+			shost->host_queue = sdev;
+
+	}
+	return (sdev);
+}
+
+/**
+ * scsi_free_sdev - cleanup and free a Scsi_Device
+ * @sdev:	cleanup and free this Scsi_Device
+ *
+ * Description:
+ *     Undo the actions in scsi_alloc_sdev, including removing @sdev from
+ *     the list, and freeing @sdev.
+ **/
+static void scsi_free_sdev(Scsi_Device *sdev)
+{
+	if (sdev->prev != NULL)
+		sdev->prev->next = sdev->next;
+	else
+		sdev->host->host_queue = sdev->next;
+	if (sdev->next != NULL)
+		sdev->next->prev = sdev->prev;
+
+	blk_cleanup_queue(&sdev->request_queue);
+	if (sdev->inquiry != NULL)
+		kfree(sdev->inquiry);
+	kfree(sdev);
+}
+
+/**
+ * scsi_check_id_size - check if size fits in the driverfs name
+ * @sdev:	Scsi_Device to use for error message
+ * @size:	the length of the id we want to store
+ *
+ * Description:
+ *     Use a function for this since the same code is used in various
+ *     places, and we only create one string and call to printk.
+ *
+ * Return:
+ *     0 - fits
+ *     1 - size too large
+ **/
+static int scsi_check_id_size(Scsi_Device *sdev, int size)
+{
+	if (size > DEVICE_NAME_SIZE) {
+		printk(KERN_WARNING "scsi scan: host %d channel %d id %d lun %d"
+		       " identifier too long, length %d, max %d. Device might"
+		       " be improperly identified.\n", sdev->host->host_no,
+		       sdev->channel, sdev->id, sdev->lun, size,
+		       DEVICE_NAME_SIZE);
+		return 1;
+	} else
+		return 0;
+}
+
+/**
+ * scsi_get_evpd_page - get a list of supported vpd pages
+ * @sdev:	Scsi_Device to send an INQUIRY VPD
+ * @sreq:	Scsi_Request associated with @sdev
+ *
+ * Description:
+ *     Get SCSI INQUIRY Vital Product Data page 0 - a list of supported
+ *     VPD pages.
+ *
+ * Return:
+ *     A pointer to data containing the results on success, else NULL.
+ **/
+unsigned char *scsi_get_evpd_page(Scsi_Device *sdev, Scsi_Request *sreq)
+{
+	unsigned char *evpd_page;
+	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
+	int lun = sdev->lun;
+	int scsi_level = sdev->scsi_level;
+	int max_lgth = 255;
+
+retry:
+	evpd_page = kmalloc(max_lgth, GFP_ATOMIC |
+			      (sdev->host->unchecked_isa_dma) ?
+			      GFP_DMA : 0);
+	if (!evpd_page) {
+		printk(KERN_WARNING "scsi scan: Allocation failure identifying"
+		       " host %d channel %d id %d lun %d, device might be"
+		       " improperly identified.\n", sdev->host->host_no,
+		       sdev->channel, sdev->id, sdev->lun);
+		return NULL;
 	}
 
-	if (scsi_result == NULL) {
-		printk("Unable to obtain scsi_result buffer\n");
+	memset(scsi_cmd, 0, MAX_COMMAND_SIZE);
+	scsi_cmd[0] = INQUIRY;
+	if ((lun > 0) && (scsi_level <= SCSI_2))
+		scsi_cmd[1] = ((lun << 5) & 0xe0) | 0x01;
+	else
+		scsi_cmd[1] = 0x01;	/* SCSI_3 and higher, don't touch */
+	scsi_cmd[4] = max_lgth;
+	sreq->sr_cmd_len = 0;
+	sreq->sr_sense_buffer[0] = 0;
+	sreq->sr_sense_buffer[2] = 0;
+	sreq->sr_data_direction = SCSI_DATA_READ;
+	scsi_wait_req(sreq, (void *) scsi_cmd, (void *) evpd_page,
+			max_lgth, SCSI_TIMEOUT+4*HZ, 3);
+
+	if (sreq->sr_result) {
+		kfree(evpd_page);
+		return NULL;
+	}
+
+	/*
+	 * check to see if response was truncated
+	 */
+	if (evpd_page[3] > max_lgth) {
+		max_lgth = evpd_page[3] + 4;
+		kfree(evpd_page);
+		goto retry;
+	}
+
+	/*
+	 * Some ill behaved devices return the standard inquiry here
+	 * rather than the evpd data, snoop the data to verify.
+	 */
+	if (evpd_page[3] > 16) {
+		/*
+		 * If the vendor id appears in the evpd page assume the
+		 * page is invalid.
+		 */
+		if (!strncmp(&evpd_page[8], sdev->vendor, 8)) {
+			kfree(evpd_page);
+			return NULL;
+		}
+	}
+	return evpd_page;
+}
+
+
+/*
+ * INQUIRY VPD page 0x83 identifier descriptor related values. Reference the
+ * SCSI Primary Commands specification for details.
+ *
+ * XXX The following defines should be in scsi.h
+ */
+
+/*
+ * id type values of id descriptors. These are assumed to fit in 4 bits,
+ * else the code using hex_str[id_type] needs modification.
+ */
+#define SCSI_ID_VENDOR_SPECIFIC	0
+#define SCSI_ID_T10_VENDOR	1
+#define SCSI_ID_EUI_64		2
+#define SCSI_ID_NAA		3
+
+/*
+ * Supported NAA values. These fit in 4 bits, so the don't care value
+ * cannot conflict with real values.
+ *
+ */
+#define	SCSI_ID_NAA_DONT_CARE		0xff
+#define	SCSI_ID_NAA_IEEE_REG		5
+#define	SCSI_ID_NAA_IEEE_REG_EXTENDED	6
+
+/*
+ * Supported Code Set values.
+ */
+#define	SCSI_ID_BINARY	1
+#define	SCSI_ID_ASCII	2
+
+/*
+ * Use a priority based list of id, naa, and binary/ascii for the
+ * identifier descriptor in VPD page 0x83.
+ *
+ * Brute force search for a match starting with the first value in
+ * id_search_list. This is not a performance issue, since there
+ * is normally one or some small number of descriptors.
+ */
+struct scsi_id_search_values {
+	int	id_type;
+	int	naa_type;
+	int	code_set;
+};
+
+static const struct scsi_id_search_values id_search_list[] = {
+	{ SCSI_ID_NAA,	SCSI_ID_NAA_IEEE_REG_EXTENDED,	SCSI_ID_BINARY },
+	{ SCSI_ID_NAA,	SCSI_ID_NAA_IEEE_REG_EXTENDED,	SCSI_ID_ASCII },
+	{ SCSI_ID_NAA,	SCSI_ID_NAA_IEEE_REG,	SCSI_ID_BINARY },
+	{ SCSI_ID_NAA,	SCSI_ID_NAA_IEEE_REG,	SCSI_ID_ASCII },
+	/*
+	 * Devices already exist using NAA values that are now marked
+	 * reserved. These should not conflict with other values, or it is
+	 * a bug in the device. As long as we find the IEEE extended one
+	 * first, we really don't care what other ones are used. Using
+	 * don't care here means that a device that returns multiple
+	 * non-IEEE descriptors in a random order will get different
+	 * names.
+	 */
+	{ SCSI_ID_NAA,	SCSI_ID_NAA_DONT_CARE,	SCSI_ID_BINARY },
+	{ SCSI_ID_NAA,	SCSI_ID_NAA_DONT_CARE,	SCSI_ID_ASCII },
+	{ SCSI_ID_EUI_64,	SCSI_ID_NAA_DONT_CARE,	SCSI_ID_BINARY },
+	{ SCSI_ID_EUI_64,	SCSI_ID_NAA_DONT_CARE,	SCSI_ID_ASCII },
+	{ SCSI_ID_T10_VENDOR,	SCSI_ID_NAA_DONT_CARE,	SCSI_ID_BINARY },
+	{ SCSI_ID_T10_VENDOR,	SCSI_ID_NAA_DONT_CARE,	SCSI_ID_ASCII },
+	{ SCSI_ID_VENDOR_SPECIFIC,	SCSI_ID_NAA_DONT_CARE,	SCSI_ID_BINARY },
+	{ SCSI_ID_VENDOR_SPECIFIC,	SCSI_ID_NAA_DONT_CARE,	SCSI_ID_ASCII },
+};
+
+/**
+ * scsi_check_fill_deviceid - check the id and if OK fill it
+ * @sdev:	device to use for error messages
+ * @id_page:	id descriptor for INQUIRY VPD DEVICE ID, page 0x83
+ * @name:	store the id in name
+ * @id_search:	store if the id_page matches these values
+ *
+ * Description:
+ *     Check if @id_page matches the @id_search, if so store an id (uid)
+ *     into name.
+ *
+ * Return:
+ *     0: Success
+ *     1: No match
+ *     2: Failure due to size constraints
+ **/
+static int scsi_check_fill_deviceid(Scsi_Device *sdev, char *id_page,
+	char *name, const struct scsi_id_search_values *id_search)
+{
+	static const char hex_str[]="0123456789abcdef";
+	int i, j;
+
+	/*
+	 * ASSOCIATION must be with the device (value 0)
+	 */
+	if ((id_page[1] & 0x30) != 0)
+		return 1;
+
+	if ((id_page[1] & 0x0f) != id_search->id_type)
+		return 1;
+	/*
+	 * Possibly check NAA sub-type.
+	 */
+	if ((id_search->naa_type != SCSI_ID_NAA_DONT_CARE) &&
+	    (id_search->naa_type != (id_page[4] & 0xf0) >> 4)) {
+		return 1;
+	}
+
+	/*
+	 * Check for matching code set - ASCII or BINARY.
+	 */
+	if ((id_page[0] & 0x0f) != id_search->code_set)
+		return 1;
+
+	name[0]  = hex_str[id_search->id_type];
+	if ((id_page[0] & 0x0f) == SCSI_ID_ASCII) {
+		/*
+		 * ASCII descriptor.
+		 */
+		if (id_search->id_type == SCSI_ID_VENDOR_SPECIFIC) {
+			/*
+			 * Prepend the vendor and model before the id,
+			 * since the id might not be unique across all
+			 * vendors and models. The same code is used
+			 * below, with a differnt size.
+			 *
+			 * Need 1 byte for the idtype, 1 for trailing
+			 * '\0', 8 for vendor, 16 for model total 26, plus
+			 * the name descriptor length.
+			 */
+			if (scsi_check_id_size(sdev, 26 + id_page[3]))
+				return 2;
+			else {
+				strncat(name, sdev->vendor, 8);
+				strncat(name, sdev->model, 16);
+			}
+		} else if (scsi_check_id_size (sdev, (2 + id_page[3])))
+			/*
+			 * Need 1 byte for the idtype, 1 byte for
+			 * the trailing '\0', plus the descriptor length.
+			 */
+			return 2;
+		memcpy(&name[strlen(name)], &id_page[4], id_page[3]);
+		return 0;
+	} else if ((id_page[0] & 0x0f) == SCSI_ID_BINARY) {
+		if (id_search->id_type == SCSI_ID_VENDOR_SPECIFIC) {
+			/*
+			 * Prepend the vendor and model before the id.
+			 */
+			if (scsi_check_id_size(sdev, 26 + (id_page[3] * 2)))
+				return 2;
+			else {
+				strncat(name, sdev->vendor, 8);
+				strncat(name, sdev->model, 16);
+			}
+		} else if (scsi_check_id_size(sdev, 2 + (id_page[3] * 2)))
+			/*
+			 * Need 1 byte for the idtype, 1 for trailing
+			 * '\0', 8 for vendor, 16 for model total 26, plus
+			 * the name descriptor length.
+			 */
+			return 2;
+		/*
+		 * Binary descriptor, convert to ASCII, using two bytes of
+		 * ASCII for each byte in the id_page. Store starting at
+		 * the end of name.
+		 */
+		for(i = 4, j = strlen(name); i < 4 + id_page[3]; i++) {
+			name[j++] = hex_str[(id_page[i] & 0xf0) >> 4];
+			name[j++] = hex_str[id_page[i] & 0x0f];
+		}
+		return 0;
+	}
+	/*
+	 * Code set must have already matched.
+	 */
+	printk(KERN_ERR "scsi scan: scsi_check_fill_deviceid unexpected state.\n");
+	return 1;
+}
+
+/**
+ * scsi_get_deviceid - get a device id using INQUIRY VPD page 0x83
+ * @sdev:	get the identifer of this device
+ * @sreq:	Scsi_Requeset associated with @sdev
+ *
+ * Description:
+ *     Try to get an id (serial number) for device @sdev using a SCSI
+ *     Vital Product Data page 0x83 (device id).
+ *
+ * Return:
+ *     0: Failure
+ *     1: Success
+ **/
+int scsi_get_deviceid(Scsi_Device *sdev, Scsi_Request *sreq)
+{
+	unsigned char *id_page;
+	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
+	int id_idx, scnt, ret;
+	int lun = sdev->lun;
+	int scsi_level = sdev->scsi_level;
+	int max_lgth = 255;
+
+retry:
+	id_page = kmalloc(max_lgth, GFP_ATOMIC |
+			      (sdev->host->unchecked_isa_dma) ?
+			      GFP_DMA : 0);
+	if (!id_page) {
+		printk(KERN_WARNING "scsi scan: Allocation failure identifying"
+		       " host %d channel %d id %d lun %d, device might be"
+		       " improperly identified.\n", sdev->host->host_no,
+		       sdev->channel, sdev->id, sdev->lun);
+		return 0;
+	}
+
+	memset(scsi_cmd, 0, MAX_COMMAND_SIZE);
+	scsi_cmd[0] = INQUIRY;
+	if ((lun > 0) && (scsi_level <= SCSI_2))
+		scsi_cmd[1] = ((lun << 5) & 0xe0) | 0x01;
+	else
+		scsi_cmd[1] = 0x01;	/* SCSI_3 and higher, don't touch */
+	scsi_cmd[2] = 0x83;
+	scsi_cmd[4] = max_lgth;
+	sreq->sr_cmd_len = 0;
+	sreq->sr_sense_buffer[0] = 0;
+	sreq->sr_sense_buffer[2] = 0;
+	sreq->sr_data_direction = SCSI_DATA_READ;
+	scsi_wait_req(sreq, (void *) scsi_cmd, (void *) id_page,
+			max_lgth, SCSI_TIMEOUT+4*HZ, 3);
+	if (sreq->sr_result) {
+		ret = 0;
 		goto leave;
 	}
-	/*
-	 * We must chain ourself in the host_queue, so commands can time out 
-	 */
-	SDpnt->queue_depth = 1;
-	SDpnt->host = shpnt;
-	SDpnt->online = TRUE;
-
-	scsi_initialize_merge_fn(SDpnt);
-
-        /*
-         * Initialize the object that we will use to wait for command blocks.
-         */
-	init_waitqueue_head(&SDpnt->scpnt_wait);
 
 	/*
-	 * Next, hook the device to the host in question.
+	 * check to see if response was truncated
 	 */
-	SDpnt->prev = NULL;
-	SDpnt->next = NULL;
-	if (shpnt->host_queue != NULL) {
-		SDtail = shpnt->host_queue;
-		while (SDtail->next != NULL)
-			SDtail = SDtail->next;
-
-		SDtail->next = SDpnt;
-		SDpnt->prev = SDtail;
-	} else {
-		shpnt->host_queue = SDpnt;
+	if (id_page[3] > max_lgth) {
+		max_lgth = id_page[3] + 4;
+		kfree(id_page);
+		goto retry;
 	}
 
 	/*
-	 * We need to increment the counter for this one device so we can track
-	 * when things are quiet.
+	 * Search for a match in the proiritized id_search_list.
 	 */
-	if (hardcoded == 1) {
-		Scsi_Device *oldSDpnt = SDpnt;
-		struct Scsi_Device_Template *sdtpnt;
-		unsigned int lun0_sl;
-
-		channel = hchannel;
-		if (channel > shpnt->max_channel)
-			goto leave;
-		dev = hid;
-		if (dev >= shpnt->max_id)
-			goto leave;
-		lun = hlun;
-		if (lun >= shpnt->max_lun)
-			goto leave;
-		if ((0 == lun) || (lun > 7))
-			lun0_sl = SCSI_3; /* actually don't care for 0 == lun */
-		else
-			lun0_sl = find_lun0_scsi_level(channel, dev, shpnt);
-		scan_scsis_single(channel, dev, lun, lun0_sl, &SDpnt, shpnt,
-				  scsi_result);
-		if (SDpnt != oldSDpnt) {
-
-			/* it could happen the blockdevice hasn't yet been inited */
-			/* queue_depth() moved from scsi_proc_info() so that
-			   it is called before scsi_build_commandblocks() */
-			if (shpnt->select_queue_depths != NULL)
-				(shpnt->select_queue_depths)(shpnt,
-							     shpnt->host_queue);
-
-			for (sdtpnt = scsi_devicelist; sdtpnt; sdtpnt = sdtpnt->next)
-				if (sdtpnt->init && sdtpnt->dev_noticed)
-					(*sdtpnt->init) ();
-
-			for (sdtpnt = scsi_devicelist; sdtpnt; sdtpnt = sdtpnt->next) {
-				if (sdtpnt->attach) {
-					(*sdtpnt->attach) (oldSDpnt);
-					if (oldSDpnt->attached) {
-						scsi_build_commandblocks(oldSDpnt);
-						if (0 == oldSDpnt->has_cmdblocks) {
-							printk("scan_scsis: DANGER, no command blocks\n");
-							/* What to do now ?? */
-						}
-					}
-				}
+	for (id_idx = 0; id_idx < ARRAY_SIZE(id_search_list); id_idx++) {
+		/*
+		 * Examine each descriptor returned. There is normally only
+		 * one or a small number of descriptors.
+		 */
+		for(scnt = 4; scnt <= id_page[3] + 3;
+			scnt += id_page[scnt + 3] + 4) {
+			if ((scsi_check_fill_deviceid(sdev, &id_page[scnt],
+			     sdev->sdev_driverfs_dev.name,
+			     &id_search_list[id_idx])) == 0) {
+				SCSI_LOG_SCAN_BUS(4, printk(KERN_INFO
+				  "scsi scan: host %d channel %d id %d lun %d"
+				  " used id desc %d/%d/%d\n",
+				  sdev->host->host_no, sdev->channel,
+				  sdev->id, sdev->lun,
+				  id_search_list[id_idx].id_type,
+				  id_search_list[id_idx].naa_type,
+				  id_search_list[id_idx].code_set));
+				ret = 1;
+				goto leave;
+			} else {
+				SCSI_LOG_SCAN_BUS(4, printk(KERN_INFO
+				  "scsi scan: host %d channel %d id %d lun %d"
+				  " no match/error id desc %d/%d/%d\n",
+				  sdev->host->host_no, sdev->channel,
+				  sdev->id, sdev->lun,
+				  id_search_list[id_idx].id_type,
+				  id_search_list[id_idx].naa_type,
+				  id_search_list[id_idx].code_set));
 			}
-			for (sdtpnt = scsi_devicelist; sdtpnt; sdtpnt = sdtpnt->next) {
-				if (sdtpnt->finish && sdtpnt->nr_dev) {
-					(*sdtpnt->finish) ();
-				}
-			}
-		}
-	} else {
-		/* Actual LUN. PC ordering is 0->n IBM/spec ordering is n->0 */
-		int order_dev;
-
-		for (channel = 0; channel <= shpnt->max_channel; channel++) {
-			for (dev = 0; dev < shpnt->max_id; ++dev) {
-				if (shpnt->reverse_ordering)
-					/* Shift to scanning 15,14,13... or 7,6,5,4, */
-					order_dev = shpnt->max_id - dev - 1;
-				else
-					order_dev = dev;
-
-				if (shpnt->this_id != order_dev) {
-					scan_scsis_target(channel, order_dev,
-						&SDpnt, shpnt, scsi_result);
-				}
-			}
-		}
-	}			/* if/else hardcoded */
-
-      leave:
-
-	{			/* Unchain SRpnt from host_queue */
-		Scsi_Device *prev, *next;
-		Scsi_Device *dqptr;
-
-		for (dqptr = shpnt->host_queue; dqptr != SDpnt; dqptr = dqptr->next)
-			continue;
-		if (dqptr) {
-			prev = dqptr->prev;
-			next = dqptr->next;
-			if (prev)
-				prev->next = next;
-			else
-				shpnt->host_queue = next;
-			if (next)
-				next->prev = prev;
+			/*
+			 * scsi_check_fill_deviceid can fill the first
+			 * byte of name with a non-zero value, reset it.
+			 */
+			sdev->sdev_driverfs_dev.name[0] = '\0';
 		}
 	}
+	ret = 0;
 
-	/* Last device block does not exist.  Free memory. */
-	if (SDpnt != NULL) {
-		blk_cleanup_queue(&SDpnt->request_queue);
-		if (SDpnt->inquiry)
-			kfree(SDpnt->inquiry);
-		kfree((char *) SDpnt);
+  leave:
+	kfree(id_page);
+	return ret;
+}
+
+/**
+ * scsi_get_serialnumber - get a serial number using INQUIRY page 0x80
+ * @sdev:	get the serial number of this device
+ * @sreq:	Scsi_Requeset associated with @sdev
+ *
+ * Description:
+ *     Send a SCSI INQUIRY page 0x80 to @sdev to get a serial number.
+ *
+ * Return:
+ *     0: Failure
+ *     1: Success
+ **/
+int scsi_get_serialnumber(Scsi_Device *sdev, Scsi_Request *sreq)
+{
+	unsigned char *serialnumber_page;
+	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
+	int lun = sdev->lun;
+	int scsi_level = sdev->scsi_level;
+	int max_lgth = 255;
+
+ retry:
+	serialnumber_page = kmalloc(max_lgth, GFP_ATOMIC |
+			      (sdev->host->unchecked_isa_dma) ?
+			      GFP_DMA : 0);
+	if (!serialnumber_page) {
+		printk(KERN_WARNING "scsi scan: Allocation failure identifying"
+		       " host %d channel %d id %d lun %d, device might be"
+		       " improperly identified.\n", sdev->host->host_no,
+		       sdev->channel, sdev->id, sdev->lun);
+		return 0;
 	}
 
-	/* If we allocated a buffer so we could do DMA, free it now */
-	if (scsi_result != &scsi_result0[0] && scsi_result != NULL) {
-		kfree(scsi_result);
-	} {
-		Scsi_Device *sdev;
-		Scsi_Cmnd *scmd;
+	memset(scsi_cmd, 0, MAX_COMMAND_SIZE);
+	scsi_cmd[0] = INQUIRY;
+	if ((lun > 0) && (scsi_level <= SCSI_2))
+		scsi_cmd[1] = ((lun << 5) & 0xe0) | 0x01;
+	else
+		scsi_cmd[1] = 0x01;	/* SCSI_3 and higher, don't touch */
+	scsi_cmd[2] = 0x80;
+	scsi_cmd[4] = max_lgth;
+	sreq->sr_cmd_len = 0;
+	sreq->sr_sense_buffer[0] = 0;
+	sreq->sr_sense_buffer[2] = 0;
+	sreq->sr_data_direction = SCSI_DATA_READ;
+	scsi_wait_req(sreq, (void *) scsi_cmd, (void *) serialnumber_page,
+			max_lgth, SCSI_TIMEOUT+4*HZ, 3);
 
-		SCSI_LOG_SCAN_BUS(4, printk("Host status for host %p:\n", shpnt));
-		for (sdev = shpnt->host_queue; sdev; sdev = sdev->next) {
-			SCSI_LOG_SCAN_BUS(4, printk("Device %d %p: ", sdev->id, sdev));
-			for (scmd = sdev->device_queue; scmd; scmd = scmd->next) {
-				SCSI_LOG_SCAN_BUS(4, printk("%p ", scmd));
-			}
-			SCSI_LOG_SCAN_BUS(4, printk("\n"));
-		}
+	if (sreq->sr_result)
+		goto leave;
+	/*
+	 * check to see if response was truncated
+	 */
+	if (serialnumber_page[3] > max_lgth) {
+		max_lgth = serialnumber_page[3] + 4;
+		kfree(serialnumber_page);
+		goto retry;
+	}
+
+	/*
+	 * Need 1 byte for SCSI_UID_SER_NUM, 1 for trailing '\0', 8 for
+	 * vendor, 16 for model = 26, plus serial number size.
+	 */
+	if (scsi_check_id_size (sdev, (26 + serialnumber_page[3])))
+		goto leave;
+	sdev->sdev_driverfs_dev.name[0] = SCSI_UID_SER_NUM;
+	strncat(sdev->sdev_driverfs_dev.name, sdev->vendor, 8);
+	strncat(sdev->sdev_driverfs_dev.name, sdev->model, 16);
+	strncat(sdev->sdev_driverfs_dev.name, &serialnumber_page[4],
+		serialnumber_page[3]);
+	kfree(serialnumber_page);
+	return 1;
+ leave:
+	memset(sdev->sdev_driverfs_dev.name, 0, DEVICE_NAME_SIZE);
+	kfree(serialnumber_page);
+	return 0;
+}
+
+/**
+ * scsi_get_default_name - get a default name
+ * @sdev:	get a default name for this device
+ *
+ * Description:
+ *     Set the name of @sdev to the concatenation of the vendor, model,
+ *     and revision found in @sdev.
+ *
+ * Return:
+ *     1: Success
+ **/
+int scsi_get_default_name(Scsi_Device *sdev)
+{
+	if (scsi_check_id_size(sdev, 29))
+		return 0;
+	else {
+		sdev->sdev_driverfs_dev.name[0] = SCSI_UID_UNKNOWN;
+		strncpy(&sdev->sdev_driverfs_dev.name[1], sdev->vendor, 8);
+		strncat(sdev->sdev_driverfs_dev.name, sdev->model, 16);
+		strncat(sdev->sdev_driverfs_dev.name, sdev->rev, 4);
+		return 1;
 	}
 }
 
-/*
- * Function:    scan_scsis_single
+/**
+ * scsi_load_identifier:
+ * @sdev:	get an identifier (name) of this device
+ * @sreq:	Scsi_Requeset associated with @sdev
  *
- * Purpose:     Determine if a SCSI device (a single LUN) exists, and
- * 		configure it into the system.
+ * Description:
+ *     Determine what INQUIRY pages are supported by @sdev, and try the
+ *     different pages until we get an identifier, or no other pages are
+ *     left. Start with page 0x83 (device id) and then try page 0x80
+ *     (serial number). If neither of these pages gets an id, use the
+ *     default naming convention.
  *
- * Arguments:   channel    - the host's channel
- * 		dev        - target dev (target id)
- * 		lun        - LUN
- * 		scsi_level - SCSI 1, 2 or 3
- * 		SDpnt2     - pointer to pointer of a preallocated Scsi_Device
- * 		shpnt      - host device to use
- * 		scsi_result - preallocated buffer for the SCSI command result
+ *     The first character of sdev_driverfs_dev.name is SCSI_UID_SER_NUM
+ *     (S) if we used page 0x80, SCSI_UID_UNKNOWN (Z) if we used the
+ *     default name, otherwise it starts with the page 0x83 id type
+ *     (see the SCSI Primary Commands specification for details).
  *
- * Lock status: None
- *
- * Returns:     SCSI_SCAN_NO_RESPONSE - no valid response received from the
- * 		device, this includes allocation failures preventing IO from
- * 		being sent, or any general failures.
- *
- *		SCSI_SCAN_DEVICE_PRESENT - device responded, SDpnt2 has all
- *		values needed to send IO set, plus scsi_level is set, but no
- *		new Scsi_Device was added/allocated.
- *
- *   		SCSI_SCAN_DEVICE_ADDED - device responded, and added to list;
- *   		SDpnt2 filled, and pointed to new allocated Scsi_Device.
- *
- * Notes:       This could be cleaned up more by moving SDpnt2 and Scsi_Device
- * 		allocation into scan_scsis_target.
- */
-static int scan_scsis_single(unsigned int channel, unsigned int dev,
-		unsigned int lun, int scsi_level, Scsi_Device ** SDpnt2,
-		struct Scsi_Host *shpnt, char *scsi_result)
+ * Notes:
+ *     If a device returns the same serial number for different LUNs or
+ *     even for different LUNs on different devices, special handling must
+ *     be added to get an id, or a new black list flag must to added and
+ *     used in device_list[] (so we use the default name, or add a way to
+ *     prefix the id/name with SCSI_UID_UNKNOWN - and change the define to
+ *     something meaningful like SCSI_UID_NOT_UNIQUE). Complete user level
+ *     scanning would be nice for such devices, so we do not need device
+ *     specific code in the kernel.
+ **/
+static void scsi_load_identifier(Scsi_Device *sdev, Scsi_Request *sreq)
 {
-	char devname[64];
-	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
-	struct Scsi_Device_Template *sdtpnt;
-	Scsi_Device *SDtail, *SDpnt = *SDpnt2;
-	Scsi_Request * SRpnt;
-	int bflags, type = -1;
-	int possible_inq_resp_len;
-	extern devfs_handle_t scsi_devfs_handle;
+	unsigned char *evpd_page = NULL;
+	int cnt;
 
-	SDpnt->host = shpnt;
-	SDpnt->id = dev;
-	SDpnt->lun = lun;
-	SDpnt->channel = channel;
-	SDpnt->online = TRUE;
+	memset(sdev->sdev_driverfs_dev.name, 0, DEVICE_NAME_SIZE);
+	evpd_page = scsi_get_evpd_page(sdev, sreq);
+	if (evpd_page == NULL) {
+		/*
+		 * try to obtain serial number anyway
+		 */
+		(void)scsi_get_serialnumber(sdev, sreq);
+	} else {
+		/*
+		 * XXX search high to low, since the pages are lowest to
+		 * highest - page 0x83 will be after page 0x80.
+		 */
+		for(cnt = 4; cnt <= evpd_page[3] + 3; cnt++)
+			if (evpd_page[cnt] == 0x83)
+				if (scsi_get_deviceid(sdev, sreq))
+					goto leave;
 
-	scsi_build_commandblocks(SDpnt);
- 
-	/* Some low level driver could use device->type (DB) */
-	SDpnt->type = -1;
+		for(cnt = 4; cnt <= evpd_page[3] + 3; cnt++)
+			if (evpd_page[cnt] == 0x80)
+				if (scsi_get_serialnumber(sdev, sreq))
+					goto leave;
 
-	/*
-	 * Assume that the device will have handshaking problems, and then fix
-	 * this field later if it turns out it doesn't
-	 */
-	SDpnt->borken = 1;
-	SDpnt->was_reset = 0;
-	SDpnt->expecting_cc_ua = 0;
-	SDpnt->starved = 0;
+		if (sdev->sdev_driverfs_dev.name[0] == 0)
+			scsi_get_default_name(sdev);
 
-	if (NULL == (SRpnt = scsi_allocate_request(SDpnt))) {
-		printk("scan_scsis_single: no memory\n");
-		scsi_release_commandblocks(SDpnt);
-		return SCSI_SCAN_NO_RESPONSE;
 	}
+leave:
+	if (evpd_page) kfree(evpd_page);
+	SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO "scsi scan: host %d channel %d"
+	    " id %d lun %d name/id: '%s'\n", sdev->host->host_no,
+	    sdev->channel, sdev->id, sdev->lun, sdev->sdev_driverfs_dev.name));
+	return;
+}
 
+/**
+ * scsi_find_scsi_level - return the scsi_level of a matching target
+ *
+ * Description:
+ *     Return the scsi_level of any Scsi_Device matching @channel, @id,
+ *     and @shost.
+ * Notes:
+ *     Needs to issue an INQUIRY to LUN 0 if no Scsi_Device matches, and
+ *     if the INQUIRY can't be sent return a failure.
+ **/
+static int scsi_find_scsi_level(unsigned int channel, unsigned int id,
+				struct Scsi_Host *shost)
+{
+	int res = SCSI_2;
+	Scsi_Device *sdev;
+
+	for (sdev = shost->host_queue; sdev; sdev = sdev->next)
+		if ((id == sdev->id) && (channel == sdev->channel))
+			return (int) sdev->scsi_level;
 	/*
-	 * We used to do a TEST_UNIT_READY before the INQUIRY but that was 
-	 * not really necessary.  Spec recommends using INQUIRY to scan for
-	 * devices (and TEST_UNIT_READY to poll for media change). - Paul G.
+	 * FIXME No matching target id is configured, this needs to get
+	 * the INQUIRY for LUN 0, and use it to determine the scsi_level.
 	 */
+	return res;
+}
 
-	SCSI_LOG_SCAN_BUS(3,
-		printk("scsi scan: INQUIRY to host %d channel %d id %d lun %d\n",
-		       shpnt->host_no, channel, dev, lun)
-	);
+/**
+ * scsi_probe_lun - probe a single LUN using a SCSI INQUIRY
+ * @sreq:	used to send the INQUIRY
+ * @inq_result:	area to store the INQUIRY result
+ * @bflags:	store any bflags found here
+ *
+ * Description:
+ *     Probe the lun associated with @sreq using a standard SCSI INQUIRY;
+ *
+ *     If the INQUIRY is successful, sreq->sr_result is zero and: the
+ *     INQUIRY data is in @inq_result; the scsi_level and INQUIRY length
+ *     are copied to the Scsi_Device at @sreq->sr_device (sdev);
+ *     any device_list flags value is stored in *@bflags.
+ **/
+static void scsi_probe_lun(Scsi_Request *sreq, char *inq_result,
+			   int *bflags)
+{
+	Scsi_Device *sdev = sreq->sr_device;	/* a bit ugly */
+	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
+	int possible_inq_resp_len;
 
-	/*
-	 * Build an INQUIRY command block.
-	 */
+	SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO "scsi scan: INQUIRY to host %d"
+			" channel %d id %d lun %d\n", sdev->host->host_no,
+			sdev->channel, sdev->id, sdev->lun));
+
 	memset(scsi_cmd, 0, 6);
 	scsi_cmd[0] = INQUIRY;
-	if ((lun > 0) && (scsi_level <= SCSI_2))
-		scsi_cmd[1] = (lun << 5) & 0xe0;
+	if ((sdev->lun > 0) && (sdev->scsi_level <= SCSI_2))
+		scsi_cmd[1] = (sdev->lun << 5) & 0xe0;
 	scsi_cmd[4] = 36;	/* issue conservative alloc_length */
-	SRpnt->sr_cmd_len = 0;
-	SRpnt->sr_data_direction = SCSI_DATA_READ;
+	sreq->sr_cmd_len = 0;
+	sreq->sr_data_direction = SCSI_DATA_READ;
 
-	memset(scsi_result, 0, 36);
-	scsi_wait_req (SRpnt, (void *) scsi_cmd,
-	          (void *) scsi_result,
-	          36, SCSI_TIMEOUT+4*HZ, 3);
+	memset(inq_result, 0, 36);
+	scsi_wait_req(sreq, (void *) scsi_cmd, (void *) inq_result, 36,
+		      SCSI_TIMEOUT + 4 * HZ, 3);
 
-	SCSI_LOG_SCAN_BUS(3, printk("scsi: INQUIRY %s with code 0x%x\n",
-		SRpnt->sr_result ? "failed" : "successful", SRpnt->sr_result));
+	SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO "scsi scan: 1st INQUIRY %s with"
+			" code 0x%x\n", sreq->sr_result ?
+			"failed" : "successful", sreq->sr_result));
 
-	/*
-	 * Now that we don't do TEST_UNIT_READY anymore, we must be prepared
-	 * for media change conditions here, so cannot require zero result.
-	 */
-	if (SRpnt->sr_result) {
-		if ((driver_byte(SRpnt->sr_result) & DRIVER_SENSE) != 0 &&
-		    (SRpnt->sr_sense_buffer[2] & 0xf) == UNIT_ATTENTION &&
-		    SRpnt->sr_sense_buffer[12] == 0x28 &&
-		    SRpnt->sr_sense_buffer[13] == 0) {
+	if (sreq->sr_result) {
+		if ((driver_byte(sreq->sr_result) & DRIVER_SENSE) != 0 &&
+		    (sreq->sr_sense_buffer[2] & 0xf) == UNIT_ATTENTION &&
+		    sreq->sr_sense_buffer[12] == 0x28 &&
+		    sreq->sr_sense_buffer[13] == 0) {
 			/* not-ready to ready transition - good */
-	 		/* dpg: bogus? INQUIRY never returns UNIT_ATTENTION */
-		} else {
-			/* assume no peripheral if any other sort of error */
-			scsi_release_request(SRpnt);
-			return 0;
-		}
+			/* dpg: bogus? INQUIRY never returns UNIT_ATTENTION */
+		} else
+			/*
+			 * assume no peripheral if any other sort of error
+			 */
+			return;
 	}
 
 	/*
-	 * Get any flags for this device.  
+	 * Get any flags for this device.
+	 *
+	 * XXX add a bflags to Scsi_Device, and replace the corresponding
+	 * bit fields in Scsi_Device, so bflags need not be passed as an
+	 * argument.
 	 */
-	bflags = get_device_flags (&scsi_result[8], &scsi_result[16]);
+	BUG_ON(bflags == NULL);
+	*bflags = get_device_flags(&inq_result[8], &inq_result[16]);
 
-	possible_inq_resp_len = (unsigned char)scsi_result[4] + 5;
-	if (BLIST_INQUIRY_36 & bflags)
+	possible_inq_resp_len = (unsigned char) inq_result[4] + 5;
+	if (BLIST_INQUIRY_36 & *bflags)
 		possible_inq_resp_len = 36;
-	else if (BLIST_INQUIRY_58 & bflags)
+	else if (BLIST_INQUIRY_58 & *bflags)
 		possible_inq_resp_len = 58;
 	else if (possible_inq_resp_len > 255)
 		possible_inq_resp_len = 36;	/* sanity */
 
-	if (possible_inq_resp_len > 36) { /* do additional INQUIRY */
+	if (possible_inq_resp_len > 36) {	/* do additional INQUIRY */
 		memset(scsi_cmd, 0, 6);
 		scsi_cmd[0] = INQUIRY;
-		if ((lun > 0) && (scsi_level <= SCSI_2))
-			scsi_cmd[1] = (lun << 5) & 0xe0;
-		scsi_cmd[4] = (unsigned char)possible_inq_resp_len;
-		SRpnt->sr_cmd_len = 0;
-		SRpnt->sr_data_direction = SCSI_DATA_READ;
+		if ((sdev->lun > 0) && (sdev->scsi_level <= SCSI_2))
+			scsi_cmd[1] = (sdev->lun << 5) & 0xe0;
+		scsi_cmd[4] = (unsigned char) possible_inq_resp_len;
+		sreq->sr_cmd_len = 0;
+		sreq->sr_data_direction = SCSI_DATA_READ;
+		/*
+		 * re-zero inq_result just to be safe.
+		 */
+		memset(inq_result, 0, possible_inq_resp_len);
+		scsi_wait_req(sreq, (void *) scsi_cmd,
+			      (void *) inq_result,
+			      possible_inq_resp_len, SCSI_TIMEOUT + 4 * HZ, 3);
+		SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO "scsi scan: 2nd INQUIRY"
+				" %s with code 0x%x\n", sreq->sr_result ?
+				"failed" : "successful", sreq->sr_result));
+		if (sreq->sr_result)
+			return;
 
-		scsi_wait_req (SRpnt, (void *) scsi_cmd,
-			  (void *) scsi_result,
-			  scsi_cmd[4], SCSI_TIMEOUT+4*HZ, 3);
-		/* assume successful */
+		/*
+		 * The INQUIRY can change, this means the length can change.
+		 */
+		possible_inq_resp_len = (unsigned char) inq_result[4] + 5;
+		if (BLIST_INQUIRY_58 & *bflags)
+			possible_inq_resp_len = 58;
+		else if (possible_inq_resp_len > 255)
+			possible_inq_resp_len = 36;	/* sanity */
 	}
-	SDpnt->inquiry_len = possible_inq_resp_len;
-	SDpnt->inquiry = kmalloc(possible_inq_resp_len, GFP_ATOMIC);
-	if (NULL == SDpnt->inquiry) {
-		scsi_release_commandblocks(SDpnt);
-		scsi_release_request(SRpnt);
+
+	sdev->inquiry_len = possible_inq_resp_len;
+
+	/*
+	 * XXX Abort if the response length is less than 36? If less than
+	 * 32, the lookup of the device flags (above) could be invalid,
+	 * and it would be possible to take an incorrect action - we do
+	 * not want to hang because of a short INQUIRY. On the flip side,
+	 * if the device is spun down or becoming ready (and so it gives a
+	 * short INQUIRY), an abort here prevents any further use of the
+	 * device, including spin up.
+	 *
+	 * Related to the above issue:
+	 *
+	 * XXX Devices (disk or all?) should be sent a TEST UNIT READY,
+	 * and if not ready, sent a START_STOP to start (maybe spin up) and
+	 * then send the INQUIRY again, since the INQUIRY can change after
+	 * a device is initialized.
+	 *
+	 * Ideally, start a device if explicitly asked to do so.  This
+	 * assumes that a device is spun up on power on, spun down on
+	 * request, and then spun up on request.
+	 */
+
+	/*
+	 * The scanning code needs to know the scsi_level, even if no
+	 * device is attached at LUN 0 (SCSI_SCAN_TARGET_PRESENT) so
+	 * non-zero LUNs can be scanned.
+	 */
+	sdev->scsi_level = inq_result[2] & 0x07;
+	if (sdev->scsi_level >= 2 ||
+	    (sdev->scsi_level == 1 && (inq_result[3] & 0x0f) == 1))
+		sdev->scsi_level++;
+
+	return;
+}
+
+/**
+ * scsi_add_lun - allocate and fully initialze a Scsi_Device
+ * @sdevscan:	holds information to be stored in the new Scsi_Device
+ * @sdevnew:	store the address of the newly allocated Scsi_Device
+ * @sreq:	scsi request used when getting an identifier
+ * @inq_result:	holds the result of a previous INQUIRY to the LUN
+ * @bflags:	flags value from device_list
+ *
+ * Description:
+ *     Allocate and initialize a Scsi_Device matching sdevscan. Optionally
+ *     set fields based on values in *@bflags. If @sdevnew is not
+ *     NULL, store the address of the new Scsi_Device in *@sdevnew (needed
+ *     when scanning a particular LUN).
+ *
+ * Return:
+ *     SCSI_SCAN_NO_RESPONSE: could not allocate or setup a Scsi_Device
+ *     SCSI_SCAN_LUN_PRESENT: a new Scsi_Device was allocated and initialized
+ **/
+static int scsi_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
+			Scsi_Request *sreq, char *inq_result, int *bflags)
+{
+	Scsi_Device *sdev;
+	struct Scsi_Device_Template *sdt;
+	char devname[64];
+	extern devfs_handle_t scsi_devfs_handle;
+
+	sdev = scsi_alloc_sdev(sdevscan->host, sdevscan->channel,
+				     sdevscan->id, sdevscan->lun);
+	if (sdev == NULL)
+		return SCSI_SCAN_NO_RESPONSE;
+
+	sdev->scsi_level = sdevscan->scsi_level;
+	/*
+	 * XXX do not save the inquiry, since it can change underneath us,
+	 * save just vendor/model/rev.
+	 *
+	 * Rather than save it and have an ioctl that retrieves the saved
+	 * value, have an ioctl that executes the same INQUIRY code used
+	 * in scsi_probe_lun, let user level programs doing INQUIRY
+	 * scanning run at their own risk, or supply a user level program
+	 * that can correctly scan.
+	 */
+	sdev->inquiry_len = sdevscan->inquiry_len;
+	sdev->inquiry = kmalloc(sdev->inquiry_len, GFP_ATOMIC);
+	if (sdev->inquiry == NULL) {
+		scsi_free_sdev(sdev);
 		return SCSI_SCAN_NO_RESPONSE;
 	}
-	memcpy(SDpnt->inquiry, scsi_result, possible_inq_resp_len);
-	SDpnt->vendor = (char *)(SDpnt->inquiry + 8);
-	SDpnt->model = (char *)(SDpnt->inquiry + 16);
-	SDpnt->rev = (char *)(SDpnt->inquiry + 32);
 
-	SDpnt->scsi_level = scsi_result[2] & 0x07;
-	if (SDpnt->scsi_level >= 2 ||
-	    (SDpnt->scsi_level == 1 &&
-	     (scsi_result[3] & 0x0f) == 1))
-		SDpnt->scsi_level++;
+	memcpy(sdev->inquiry, inq_result, sdev->inquiry_len);
+	sdev->vendor = (char *) (sdev->inquiry + 8);
+	sdev->model = (char *) (sdev->inquiry + 16);
+	sdev->rev = (char *) (sdev->inquiry + 32);
 
-	/*
-	 * Check the peripheral qualifier field - this tells us whether LUNS
-	 * are supported here or not.
-	 */
-	if ((scsi_result[0] >> 5) == 3) {
+	if (*bflags & BLIST_ISROM) {
 		/*
-		 * Peripheral qualifier 3 (011b): The device server is not
-		 * capable of supporting a physical device on this logical
-		 * unit.
+		 * It would be better to modify sdev->type, and set
+		 * sdev->removable, but then the print_inquiry() output
+		 * would not show TYPE_ROM; if print_inquiry() is removed
+		 * the issue goes away.
 		 */
-		scsi_release_commandblocks(SDpnt);
-  		scsi_release_request(SRpnt);
-		return SCSI_SCAN_DEVICE_PRESENT;
-	}
-	 /*   The Toshiba ROM was "gender-changed" here as an inline hack.
-	      This is now much more generic.
-	      This is a mess: What we really want is to leave the scsi_result
-	      alone, and just change the SDpnt structure. And the SDpnt is what
-	      we want print_inquiry to print.  -- REW
-	 */
-	if (bflags & BLIST_ISDISK) {
-		scsi_result[0] = TYPE_DISK;                                                
-		scsi_result[1] |= 0x80;     /* removable */
+		inq_result[0] = TYPE_ROM;
+		inq_result[1] |= 0x80;	/* removable */
 	}
 
-	if (bflags & BLIST_ISROM) {
-		scsi_result[0] = TYPE_ROM;
-		scsi_result[1] |= 0x80;     /* removable */
-	}
-    
-
-	SDpnt->removable = (0x80 & scsi_result[1]) >> 7;
-	/* Use the peripheral qualifier field to determine online/offline */
-	if (((scsi_result[0] >> 5) & 7) == 1) 	SDpnt->online = FALSE;
-	else SDpnt->online = TRUE;
-	SDpnt->lockable = SDpnt->removable;
-	SDpnt->changed = 0;
-	SDpnt->access_count = 0;
-	SDpnt->busy = 0;
-	SDpnt->has_cmdblocks = 0;
-	/*
-	 * Currently, all sequential devices are assumed to be tapes, all random
-	 * devices disk, with the appropriate read only flags set for ROM / WORM
-	 * treated as RO.
-	 */
-	switch (type = (scsi_result[0] & 0x1f)) {
+	switch (sdev->type = (inq_result[0] & 0x1f)) {
 	case TYPE_TAPE:
 	case TYPE_DISK:
 	case TYPE_PRINTER:
@@ -787,201 +1368,357 @@ static int scan_scsis_single(unsigned int channel, unsigned int dev,
 	case TYPE_MEDIUM_CHANGER:
 	case TYPE_ENCLOSURE:
 	case TYPE_COMM:
-		SDpnt->writeable = 1;
+		sdev->writeable = 1;
 		break;
 	case TYPE_WORM:
 	case TYPE_ROM:
-		SDpnt->writeable = 0;
+		sdev->writeable = 0;
 		break;
 	default:
-		printk("scsi: unknown type %d\n", type);
+		printk(KERN_INFO "scsi: unknown device type %d\n", sdev->type);
 	}
 
-	SDpnt->device_blocked = FALSE;
-	SDpnt->device_busy = 0;
-	SDpnt->single_lun = 0;
-	SDpnt->soft_reset =
-	    (scsi_result[7] & 1) && ((scsi_result[3] & 7) == 2);
-	SDpnt->random = (type == TYPE_TAPE) ? 0 : 1;
-	SDpnt->type = (type & 0x1f);
+	sdev->random = (sdev->type == TYPE_TAPE) ? 0 : 1;
 
-	print_inquiry(scsi_result);
-
-	/* interrogate scsi target to provide device identifier */
-	scsi_load_identifier(SDpnt, SRpnt);
-
-	/* create driverfs files */
-	sprintf(SDpnt->sdev_driverfs_dev.bus_id,"%d:%d:%d:%d",
-		SDpnt->host->host_no, SDpnt->channel, SDpnt->id, SDpnt->lun);
-	
-	SDpnt->sdev_driverfs_dev.parent = &SDpnt->host->host_driverfs_dev;
-	SDpnt->sdev_driverfs_dev.bus = &scsi_driverfs_bus_type;
-
-	device_register(&SDpnt->sdev_driverfs_dev); 
-
-	/* Create driverfs file entries */
-	device_create_file(&SDpnt->sdev_driverfs_dev, 
-			   &dev_attr_type);
-
-        sprintf (devname, "host%d/bus%d/target%d/lun%d",
-                 SDpnt->host->host_no, SDpnt->channel, SDpnt->id, SDpnt->lun);
-        if (SDpnt->de) printk ("DEBUG: dir: \"%s\" already exists\n", devname);
-        else SDpnt->de = devfs_mk_dir (scsi_devfs_handle, devname, NULL);
-
-	for (sdtpnt = scsi_devicelist; sdtpnt;
-	     sdtpnt = sdtpnt->next)
-		if (sdtpnt->detect)
-			SDpnt->attached +=
-			    (*sdtpnt->detect) (SDpnt);
+	print_inquiry(inq_result);
 
 	/*
-	 * Accommodate drivers that want to sleep when they should be in a polling
-	 * loop.
+	 * For a peripheral qualifier (PQ) value of 1 (001b), the SCSI
+	 * spec says: The device server is capable of supporting the
+	 * specified peripheral device type on this logical unit. However,
+	 * the physical device is not currently connected to this logical
+	 * unit.
+	 *
+	 * The above is vague, as it implies that we could treat 001 and
+	 * 011 the same. Stay compatible with previous code, and create a
+	 * Scsi_Device for a PQ of 1
+	 *
+	 * XXX Save the PQ field let the upper layers figure out if they
+	 * want to attach or not to this device, do not set online FALSE;
+	 * otherwise, offline devices still get an sd allocated, and they
+	 * use up an sd slot.
 	 */
-	SDpnt->disconnect = 0;
-
-
-	/*
-	 * Set the tagged_queue flag for SCSI-II devices that purport to support
-	 * tagged queuing in the INQUIRY data.
-	 */
-	SDpnt->tagged_queue = 0;
-	if ((SDpnt->scsi_level >= SCSI_2) &&
-	    (scsi_result[7] & 2) &&
-	    !(bflags & BLIST_NOTQ)) {
-		SDpnt->tagged_supported = 1;
-		SDpnt->current_tag = 0;
-	}
-	/*
-	 * Some revisions of the Texel CD ROM drives have handshaking problems when
-	 * used with the Seagate controllers.  Before we know what type of device
-	 * we're talking to, we assume it's borken and then change it here if it
-	 * turns out that it isn't a TEXEL drive.
-	 */
-	if ((bflags & BLIST_BORKEN) == 0)
-		SDpnt->borken = 0;
-
-	/*
-	 * If we want to only allow I/O to one of the luns attached to this device
-	 * at a time, then we set this flag.
-	 */
-	if (bflags & BLIST_SINGLELUN)
-		SDpnt->single_lun = 1;
-
-	/*
-	 * These devices need this "key" to unlock the devices so we can use it
-	 */
-	if ((bflags & BLIST_KEY) != 0) {
-		printk("Unlocked floptical drive.\n");
-		SDpnt->lockable = 0;
-		scsi_cmd[0] = MODE_SENSE;
-		if (shpnt->max_lun <= 8)
-			scsi_cmd[1] = (lun << 5) & 0xe0;
-		else	scsi_cmd[1] = 0;	/* any other idea? */
-		scsi_cmd[2] = 0x2e;
-		scsi_cmd[3] = 0;
-		scsi_cmd[4] = 0x2a;
-		scsi_cmd[5] = 0;
-		SRpnt->sr_cmd_len = 0;
-		SRpnt->sr_data_direction = SCSI_DATA_READ;
-		scsi_wait_req (SRpnt, (void *) scsi_cmd,
-	        	(void *) scsi_result, 0x2a,
-	        	SCSI_TIMEOUT, 3);
-		/*
-		 * scsi_result no longer holds inquiry data.
-		 */
+	if (((inq_result[0] >> 5) & 7) == 1) {
+		SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO "scsi scan: peripheral"
+				" qualifier of 1, device offlined\n"));
+		sdev->online = FALSE;
 	}
 
-	scsi_release_request(SRpnt);
-	SRpnt = NULL;
-
-	scsi_release_commandblocks(SDpnt);
-
-	/*
-	 * This device was already hooked up to the host in question,
-	 * so at this point we just let go of it and it should be fine.  We do need to
-	 * allocate a new one and attach it to the host so that we can further scan the bus.
-	 */
-	SDpnt = (Scsi_Device *) kmalloc(sizeof(Scsi_Device), GFP_ATOMIC);
-	if (!SDpnt) {
-		printk("scsi: scan_scsis_single: Cannot malloc\n");
-		return SCSI_SCAN_NO_RESPONSE;
-	}
-        memset(SDpnt, 0, sizeof(Scsi_Device));
-	SDpnt->vendor = scsi_null_device_strs;
-	SDpnt->model = scsi_null_device_strs;
-	SDpnt->rev = scsi_null_device_strs;
-
-	*SDpnt2 = SDpnt;
-	SDpnt->queue_depth = 1;
-	SDpnt->host = shpnt;
-	SDpnt->online = TRUE;
-	SDpnt->scsi_level = scsi_level;
+	sdev->removable = (0x80 & inq_result[1]) >> 7;
+	sdev->lockable = sdev->removable;
+	sdev->soft_reset = (inq_result[7] & 1) && ((inq_result[3] & 7) == 2);
 
 	/*
-	 * Register the queue for the device.  All I/O requests will come
-	 * in through here.  We also need to register a pointer to
-	 * ourselves, since the queue handler won't know what device
-	 * the queue actually represents.   We could look it up, but it
-	 * is pointless work.
+	 * XXX maybe move the identifier and driverfs/devfs setup to a new
+	 * function, and call them after this function is called.
+	 *
+	 * scsi_load_identifier is the only reason sreq is needed in this
+	 * function.
 	 */
-	scsi_initialize_queue(SDpnt, shpnt);
-	SDpnt->host = shpnt;
-	scsi_initialize_merge_fn(SDpnt);
+	scsi_load_identifier(sdev, sreq);
 
 	/*
-	 * Mark this device as online, or otherwise we won't be able to do much with it.
+	 * create driverfs files
 	 */
-	SDpnt->online = TRUE;
-
-        /*
-         * Initialize the object that we will use to wait for command blocks.
-         */
-	init_waitqueue_head(&SDpnt->scpnt_wait);
+	sprintf(sdev->sdev_driverfs_dev.bus_id,"%d:%d:%d:%d",
+		sdev->host->host_no, sdev->channel, sdev->id, sdev->lun);
+	sdev->sdev_driverfs_dev.parent = &sdev->host->host_driverfs_dev;
+	sdev->sdev_driverfs_dev.bus = &scsi_driverfs_bus_type;
+	device_register(&sdev->sdev_driverfs_dev);
 
 	/*
-	 * Since we just found one device, there had damn well better be one in the list
-	 * already.
+	 * Create driverfs file entries
 	 */
-	if (shpnt->host_queue == NULL)
-		panic("scan_scsis_single: Host queue == NULL\n");
+	device_create_file(&sdev->sdev_driverfs_dev, &dev_attr_type);
 
-	SDtail = shpnt->host_queue;
-	while (SDtail->next) {
-		SDtail = SDtail->next;
-	}
+	sprintf(devname, "host%d/bus%d/target%d/lun%d",
+		sdev->host->host_no, sdev->channel, sdev->id, sdev->lun);
+	if (sdev->de)
+		printk(KERN_WARNING "scsi devfs dir: \"%s\" already exists\n",
+		       devname);
+	else
+		sdev->de = devfs_mk_dir(scsi_devfs_handle, devname, NULL);
+	/*
+	 * End driverfs/devfs code.
+	 */
 
-	/* Add this device to the linked list at the end */
-	SDtail->next = SDpnt;
-	SDpnt->prev = SDtail;
-	SDpnt->next = NULL;
+	if ((sdev->scsi_level >= SCSI_2) && (inq_result[7] & 2) &&
+	    !(*bflags & BLIST_NOTQ))
+		sdev->tagged_supported = 1;
+	/*
+	 * Some devices (Texel CD ROM drives) have handshaking problems
+	 * when used with the Seagate controllers. borken is initialized
+	 * to 1, and then set it to 0 here.
+	 */
+	if ((*bflags & BLIST_BORKEN) == 0)
+		sdev->borken = 0;
 
-	return SCSI_SCAN_DEVICE_ADDED;
+	/*
+	 * If we need to allow I/O to only one of the luns attached to
+	 * this target id at a time, then we set this flag.
+	 */
+	if (*bflags & BLIST_SINGLELUN)
+		sdev->single_lun = 1;
+
+	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
+		if (sdt->detect)
+			sdev->attached += (*sdt->detect) (sdev);
+
+	if (sdevnew != NULL)
+		*sdevnew = sdev;
+
+	return SCSI_SCAN_LUN_PRESENT;
 }
 
-/*
- * Function:    scsi_report_lun_scan
+/**
+ * scsi_probe_and_add_lun - probe a LUN, if a LUN is found add it
+ * @sdevscan:	probe the LUN corresponding to this Scsi_Device
+ * @sdevnew:	store the value of any new Scsi_Device allocated
+ * @bflagsp:	store bflags here if not NULL
  *
- * Purpose:     Use a SCSI REPORT LUN to determine what LUNs to scan.
+ * Description:
+ *     Call scsi_probe_lun, if a LUN with an attached device is found,
+ *     allocate and set it up by calling scsi_add_lun.
  *
- * Arguments:   SDlun0_pnt - pointer to a Scsi_Device for LUN 0
- * 		channel    - the host's channel
- * 		dev        - target dev (target id)
- * 		SDpnt2     - pointer to pointer of a preallocated Scsi_Device
- * 		shpnt      - host device to use
- * 		scsi_result - preallocated buffer for the SCSI command result
+ * Return:
+ *     SCSI_SCAN_NO_RESPONSE: could not allocate or setup a Scsi_Device
+ *     SCSI_SCAN_TARGET_PRESENT: target responded, but no device is
+ *         attached at the LUN
+ *     SCSI_SCAN_LUN_PRESENT: a new Scsi_Device was allocated and initialized
+ **/
+static int scsi_probe_and_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
+				  int *bflagsp)
+{
+	Scsi_Device *sdev = NULL;
+	Scsi_Request *sreq = NULL;
+	unsigned char *scsi_result = NULL;
+	int bflags;
+	int res;
+
+	/*
+	 * Any command blocks allocated are fixed to use sdevscan->lun,
+	 * so they must be allocated and released if sdevscan->lun
+	 * changes.
+	 *
+	 * XXX optimize and don't call build/release commandblocks, instead
+	 * modify the LUN value of the existing command block - this means
+	 * the build/release calls would be moved to the alloc/free of
+	 * sdevscan, and the modifying function would be called here.
+	 *
+	 * XXX maybe change scsi_release_commandblocks to not reset
+	 * queue_depth to 0.
+	 */
+	sdevscan->queue_depth = 1;
+	scsi_build_commandblocks(sdevscan);
+	if (sdevscan->has_cmdblocks == 0)
+		goto alloc_failed;
+
+	sreq = scsi_allocate_request(sdevscan);
+	if (sreq == NULL)
+		goto alloc_failed;
+	/*
+	 * The sreq is for use only with sdevscan.
+	 */
+
+	scsi_result = kmalloc(256, GFP_ATOMIC |
+			      (sdevscan->host->unchecked_isa_dma) ?
+			      GFP_DMA : 0);
+	if (scsi_result == NULL)
+		goto alloc_failed;
+
+	scsi_probe_lun(sreq, scsi_result, &bflags);
+	if (sreq->sr_result)
+		res = SCSI_SCAN_NO_RESPONSE;
+	else {
+		/*
+		 * scsi_result contains valid SCSI INQUIRY data.
+		 */
+		if ((scsi_result[0] >> 5) == 3) {
+			/*
+			 * For a Peripheral qualifier 3 (011b), the SCSI
+			 * spec says: The device server is not capable of
+			 * supporting a physical device on this logical
+			 * unit.
+			 *
+			 * For disks, this implies that there is no
+			 * logical disk configured at sdev->lun, but there
+			 * is a target id responding.
+			 */
+			SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO
+					"scsi scan: peripheral qualifier of 3,"
+					" no device added\n"));
+			res = SCSI_SCAN_TARGET_PRESENT;
+		} else {
+			res = scsi_add_lun(sdevscan, &sdev, sreq, scsi_result,
+					   &bflags);
+			if (res == SCSI_SCAN_LUN_PRESENT) {
+				BUG_ON(sdev == NULL);
+				if ((bflags & BLIST_KEY) != 0) {
+					sdev->lockable = 0;
+					scsi_unlock_floptical(sreq,
+							      scsi_result);
+					/*
+					 * scsi_result no longer contains
+					 * the INQUIRY data.
+					 */
+				}
+				/*
+				 * "hardcoded" scans of a single LUN need
+				 * to know the sdev just allocated.
+				 */
+				if (sdevnew != NULL)
+					*sdevnew = sdev;
+				if (bflagsp != NULL)
+					*bflagsp = bflags;
+			}
+		}
+	}
+	kfree(scsi_result);
+	scsi_release_request(sreq);
+	scsi_release_commandblocks(sdevscan);
+	return res;
+
+alloc_failed:
+	printk(ALLOC_FAILURE_MSG, __FUNCTION__);
+	if (scsi_result != NULL)
+		kfree(scsi_result);
+	if (sreq != NULL)
+		scsi_release_request(sreq);
+	if (sdevscan->has_cmdblocks != 0)
+		scsi_release_commandblocks(sdevscan);
+	return SCSI_SCAN_NO_RESPONSE;
+}
+
+/**
+ * scsi_sequential_lun_scan - sequentially scan a SCSI target
+ * @sdevscan:	scan the host, channel, and id of this Scsi_Device
+ * @bflags:	flags from device_list for LUN 0
+ * @lun0_res:	result of scanning LUN 0
  *
- * Lock status: None
+ * Description:
+ *     Generally, scan from LUN 1 (LUN 0 is assumed to already have been
+ *     scanned) to some maximum lun until a LUN is found with no device
+ *     attached. Use the bflags to figure out any oddities.
  *
- * Returns:     If the LUNs for device at shpnt/channel/dev are scanned,
- * 		return 0, else return 1.
+ *     Modifies sdevscan->lun.
+ **/
+static void scsi_sequential_lun_scan(Scsi_Device *sdevscan, int bflags,
+				     int lun0_res)
+{
+	struct Scsi_Host *shost = sdevscan->host;
+	unsigned int sparse_lun;
+	unsigned int max_dev_lun;
+
+	SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO "scsi scan: Sequential scan of"
+			" host %d channel %d id %d\n", sdevscan->host->host_no,
+			sdevscan->channel, sdevscan->id));
+
+	max_dev_lun = min(max_scsi_luns, shost->max_lun);
+	/*
+	 * If this device is known to support sparse multiple units,
+	 * override the other settings, and scan all of them. Normally,
+	 * SCSI-3 devices should be scanned via the REPORT LUNS.
+	 */
+	if (bflags & BLIST_SPARSELUN) {
+		max_dev_lun = shost->max_lun;
+		sparse_lun = 1;
+	} else
+		sparse_lun = 0;
+
+	/*
+	 * If not sparse lun and no device attached at LUN 0 do not scan
+	 * any further.
+	 */
+	if (!sparse_lun && (lun0_res != SCSI_SCAN_LUN_PRESENT))
+		return;
+
+	/*
+	 * If less than SCSI_1_CSS, and no special lun scaning, stop
+	 * scanning; this matches 2.4 behaviour, but could just be a bug
+	 * (to continue scanning a SCSI_1_CSS device).
+	 */
+	if ((sdevscan->scsi_level < SCSI_1_CCS) &&
+	    ((bflags & (BLIST_FORCELUN | BLIST_SPARSELUN | BLIST_MAX5LUN))
+	     == 0))
+		return;
+	/*
+	 * If this device is known to support multiple units, override
+	 * the other settings, and scan all of them.
+	 */
+	if (bflags & BLIST_FORCELUN)
+		max_dev_lun = shost->max_lun;
+	/*
+	 * REGAL CDC-4X: avoid hang after LUN 4
+	 */
+	if (bflags & BLIST_MAX5LUN)
+		max_dev_lun = min(5U, max_dev_lun);
+	/*
+	 * Do not scan SCSI-2 or lower device past LUN 7, unless
+	 * BLIST_LARGELUN.
+	 */
+	if ((sdevscan->scsi_level < SCSI_3) && !(bflags & BLIST_LARGELUN))
+		max_dev_lun = min(8U, max_dev_lun);
+
+	/*
+	 * We have already scanned LUN 0, so start at LUN 1. Keep scanning
+	 * until we reach the max, or no LUN is found and we are not
+	 * sparse_lun.
+	 */
+	for (sdevscan->lun = 1; sdevscan->lun < max_dev_lun; ++sdevscan->lun)
+		if ((scsi_probe_and_add_lun(sdevscan, NULL, NULL)
+		     != SCSI_SCAN_LUN_PRESENT) && !sparse_lun)
+			return;
+}
+
+#ifdef CONFIG_SCSI_REPORT_LUNS
+/**
+ * scsilun_to_int: convert a ScsiLun to an int
+ * @scsilun:	ScsiLun to be converted.
  *
- * Notes:       This code copies and truncates the 8 byte LUN into the
- * 		current 4 byte (int) lun.
- */
-static int scsi_report_lun_scan(Scsi_Device *SDlun0_pnt, unsigned
-		int channel, unsigned int dev, Scsi_Device **SDpnt2,
-		struct Scsi_Host *shpnt, char *scsi_result)
+ * Description:
+ *     Convert @scsilun from a ScsiLun to a four byte host byte-ordered
+ *     integer, and return the result. The caller must check for
+ *     truncation before using this function.
+ *
+ * Notes:
+ *     The ScsiLun is assumed to be four levels, with each level
+ *     effectively containing a SCSI byte-ordered (big endian) short; the
+ *     addressing bits of each level are ignored (the highest two bits).
+ *     For a description of the LUN format, post SCSI-3 see the SCSI
+ *     Architecture Model, for SCSI-3 see the SCSI Controller Commands.
+ *
+ *     Given a ScsiLun of: 0a 04 0b 03 00 00 00 00, this function returns
+ *     the integer: 0x0b030a04
+ **/
+static int scsilun_to_int(ScsiLun *scsilun)
+{
+	int i;
+	unsigned int lun;
+
+	lun = 0;
+	for (i = 0; i < sizeof(lun); i += 2)
+		lun = lun | (((scsilun->scsi_lun[i] << 8) |
+			      scsilun->scsi_lun[i + 1]) << (i * 8));
+	return lun;
+}
+#endif
+
+/**
+ * scsi_report_lun_scan - Scan using SCSI REPORT LUN results
+ * @sdevscan:	scan the host, channel, and id of this Scsi_Device
+ *
+ * Description:
+ *     If @sdevscan is for a SCSI-3 or up device, send a REPORT LUN
+ *     command, and scan the resulting list of LUNs by calling
+ *     scsi_probe_and_add_lun.
+ *
+ *     Modifies sdevscan->lun.
+ *
+ * Return:
+ *     0: scan completed (or no memory, so further scanning is futile)
+ *     1: no report lun scan, or not configured
+ **/
+static int scsi_report_lun_scan(Scsi_Device *sdevscan)
 {
 #ifdef CONFIG_SCSI_REPORT_LUNS
 
@@ -991,53 +1728,50 @@ static int scsi_report_lun_scan(Scsi_Device *SDlun0_pnt, unsigned
 	unsigned int lun;
 	unsigned int num_luns;
 	unsigned int retries;
-	ScsiLun *fcp_cur_lun_pnt, *lun_data_pnt;
-	Scsi_Request *SRpnt;
-	int scsi_level;
-	char *byte_pnt;
-	int got_command_blocks = 0;
+	ScsiLun *fcp_cur_lun, *lun_data;
+	Scsi_Request *sreq;
+	char *data;
 
 	/*
 	 * Only support SCSI-3 and up devices.
 	 */
-	if (SDlun0_pnt->scsi_level < SCSI_3)
+	if (sdevscan->scsi_level < SCSI_3)
 		return 1;
 
-	/*
-	 * Note SDlun0_pnt might be invalid after scan_scsis_single is called.
-	 */
-
-	/*
-	 * Command blocks might be built depending on whether LUN 0 was
-	 * configured or not. Checking has_cmdblocks here is ugly.
-	 */
-	if (SDlun0_pnt->has_cmdblocks == 0) {
-		got_command_blocks = 1;
-		scsi_build_commandblocks(SDlun0_pnt);
+	sdevscan->queue_depth = 1;
+	scsi_build_commandblocks(sdevscan);
+	if (sdevscan->has_cmdblocks == 0) {
+		printk(ALLOC_FAILURE_MSG, __FUNCTION__);
+		/*
+		 * We are out of memory, don't try scanning any further.
+		 */
+		return 0;
 	}
-	SRpnt = scsi_allocate_request(SDlun0_pnt);
+	sreq = scsi_allocate_request(sdevscan);
 
-	sprintf (devname, "host %d channel %d id %d",
-		 SDlun0_pnt->host->host_no, SDlun0_pnt->channel,
-		 SDlun0_pnt->id);
+	sprintf(devname, "host %d channel %d id %d", sdevscan->host->host_no,
+		sdevscan->channel, sdevscan->id);
 	/*
 	 * Allocate enough to hold the header (the same size as one ScsiLun)
 	 * plus the max number of luns we are requesting.
 	 *
-	 * XXX: Maybe allocate this once, like scsi_result, and pass it down.
-	 * scsi_result can't be used, as it is needed for the scan INQUIRY
-	 * data. In addition, reallocating and trying again (with the exact
-	 * amount we need) would be nice, but then we need to somehow limit the
-	 * size allocated based on the available memory (and limits of kmalloc).
+	 * Reallocating and trying again (with the exact amount we need)
+	 * would be nice, but then we need to somehow limit the size
+	 * allocated based on the available memory and the limits of
+	 * kmalloc - we don't want a kmalloc() failure of a huge value to
+	 * prevent us from finding any LUNs on this target.
 	 */
 	length = (max_scsi_report_luns + 1) * sizeof(ScsiLun);
-	lun_data_pnt = (ScsiLun *) kmalloc(length,
-			(shpnt->unchecked_isa_dma ?  GFP_DMA : GFP_ATOMIC));
-	if (lun_data_pnt == NULL) {
-		printk("scsi: scsi_report_lun_scan: Cannot malloc\n");
-		if (got_command_blocks)
-			scsi_release_commandblocks(SDlun0_pnt);
-		return 1;
+	lun_data = (ScsiLun *) kmalloc(length, GFP_ATOMIC |
+					   (sdevscan->host->unchecked_isa_dma ?
+					    GFP_DMA : 0));
+	if (lun_data == NULL) {
+		printk(ALLOC_FAILURE_MSG, __FUNCTION__);
+		scsi_release_commandblocks(sdevscan);
+		/*
+		 * We are out of memory, don't try scanning any further.
+		 */
+		return 0;
 	}
 
 	scsi_cmd[0] = REPORT_LUNS;
@@ -1053,83 +1787,78 @@ static int scsi_report_lun_scan(Scsi_Device *SDlun0_pnt, unsigned
 	scsi_cmd[8] = (unsigned char) (length >> 8) & 0xff;
 	scsi_cmd[9] = (unsigned char) length & 0xff;
 
-	scsi_cmd[10] = 0; /* reserved */
-	scsi_cmd[11] = 0; /* control */
-	SRpnt->sr_cmd_len = 0;
-	SRpnt->sr_data_direction = SCSI_DATA_READ;
+	scsi_cmd[10] = 0;	/* reserved */
+	scsi_cmd[11] = 0;	/* control */
+	sreq->sr_cmd_len = 0;
+	sreq->sr_data_direction = SCSI_DATA_READ;
 
 	/*
-	 * We can get a UNIT ATTENTION, for example a power on/reset, so retry
-	 * a few times (like sd.c does for TEST UNIT READY). Experience shows
-	 * some combinations of adapter/devices get at least two power
-	 * on/resets.
+	 * We can get a UNIT ATTENTION, for example a power on/reset, so
+	 * retry a few times (like sd.c does for TEST UNIT READY).
+	 * Experience shows some combinations of adapter/devices get at
+	 * least two power on/resets.
 	 *
 	 * Illegal requests (for devices that do not support REPORT LUNS)
-	 * should come through as a check condition, and will not generate a
-	 * retry.
+	 * should come through as a check condition, and will not generate
+	 * a retry.
 	 */
 	retries = 0;
 	while (retries++ < 3) {
-		SCSI_LOG_SCAN_BUS(3,
-			printk("scsi: Sending REPORT LUNS to %s (try %d)\n",
-				devname, retries));
-
-		scsi_wait_req (SRpnt, (void *) scsi_cmd, (void *) lun_data_pnt,
-			  length, SCSI_TIMEOUT+4*HZ, 3);
-
-		SCSI_LOG_SCAN_BUS(3,
-			printk("scsi: REPORT LUNS %s (try %d) result 0x%x\n",
-			SRpnt->sr_result ? "failed" : "successful", retries,
-			SRpnt->sr_result));
-
-		if (SRpnt->sr_result == 0
-		    || SRpnt->sr_sense_buffer[2] != UNIT_ATTENTION)
+		SCSI_LOG_SCAN_BUS(3, printk (KERN_INFO "scsi scan: Sending"
+				" REPORT LUNS to %s (try %d)\n", devname,
+				retries));
+		scsi_wait_req(sreq, (void *) scsi_cmd, (void *) lun_data,
+			      length, SCSI_TIMEOUT + 4 * HZ, 3);
+		SCSI_LOG_SCAN_BUS(3, printk (KERN_INFO "scsi scan: REPORT LUNS"
+				" %s (try %d) result 0x%x\n", sreq->sr_result
+				?  "failed" : "successful", retries,
+				sreq->sr_result));
+		if (sreq->sr_result == 0
+		    || sreq->sr_sense_buffer[2] != UNIT_ATTENTION)
 			break;
 	}
+	scsi_release_commandblocks(sdevscan);
 
-	scsi_release_request(SRpnt);
-	if (got_command_blocks)
-		scsi_release_commandblocks(SDlun0_pnt);
-
-	if (SRpnt->sr_result) {
-		kfree((char *) lun_data_pnt);
+	if (sreq->sr_result) {
+		/*
+		 * The device probably does not support a REPORT LUN command
+		 */
+		kfree((char *) lun_data);
+		scsi_release_request(sreq);
 		return 1;
 	}
+	scsi_release_request(sreq);
 
 	/*
-	 * Get the length from the first four bytes of lun_data_pnt.
+	 * Get the length from the first four bytes of lun_data.
 	 */
-	byte_pnt = (char*) lun_data_pnt->scsi_lun;
-	length = ((byte_pnt[0] << 24) | (byte_pnt[1] << 16) |
-			 (byte_pnt[2] << 8) | (byte_pnt[3] << 0));
+	data = (char *) lun_data->scsi_lun;
+	length = ((data[0] << 24) | (data[1] << 16) |
+		  (data[2] << 8) | (data[3] << 0));
 	if ((length / sizeof(ScsiLun)) > max_scsi_report_luns) {
-		printk("scsi: On %s only %d (max_scsi_report_luns) of %d luns"
-			" reported, try increasing max_scsi_report_luns.\n",
-			devname, max_scsi_report_luns,
-			length / sizeof(ScsiLun));
+		printk(KERN_WARNING "scsi: On %s only %d (max_scsi_report_luns)"
+		       " of %d luns reported, try increasing"
+		       " max_scsi_report_luns.\n", devname,
+		       max_scsi_report_luns, length / sizeof(ScsiLun));
 		num_luns = max_scsi_report_luns;
 	} else
 		num_luns = (length / sizeof(ScsiLun));
 
-	scsi_level = SDlun0_pnt->scsi_level;
-
-	SCSI_LOG_SCAN_BUS(3,
-		printk("scsi: REPORT LUN scan of host %d channel %d id %d\n",
-		 SDlun0_pnt->host->host_no, SDlun0_pnt->channel,
-		 SDlun0_pnt->id));
+	SCSI_LOG_SCAN_BUS(3, printk (KERN_INFO "scsi scan: REPORT LUN scan of"
+			" host %d channel %d id %d\n", sdevscan->host->host_no,
+			sdevscan->channel, sdevscan->id));
 	/*
-	 * Scan the luns in lun_data_pnt. The entry at offset 0 is really
+	 * Scan the luns in lun_data. The entry at offset 0 is really
 	 * the header, so start at 1 and go up to and including num_luns.
 	 */
-	for (fcp_cur_lun_pnt = &lun_data_pnt[1];
-	     fcp_cur_lun_pnt <= &lun_data_pnt[num_luns];
-	     fcp_cur_lun_pnt++) {
-		lun = scsilun_to_int(fcp_cur_lun_pnt);
+	for (fcp_cur_lun = &lun_data[1];
+	     fcp_cur_lun <= &lun_data[num_luns]; fcp_cur_lun++) {
+		lun = scsilun_to_int(fcp_cur_lun);
 		/*
-		 * Check if the unused part of fcp_cur_lun_pnt is non-zero,
+		 * Check if the unused part of fcp_cur_lun is non-zero,
 		 * and so does not fit in lun.
 		 */
-		if (memcmp(&fcp_cur_lun_pnt->scsi_lun[sizeof(lun)],
+		if (memcmp(&fcp_cur_lun->scsi_lun[sizeof(lun)],
 			   "\0\0\0\0", 4) != 0) {
 			int i;
 
@@ -1138,40 +1867,37 @@ static int scsi_report_lun_scan(Scsi_Device *SDlun0_pnt, unsigned
 			 * this differs from what linux would print for the
 			 * integer LUN value.
 			 */
-			printk("scsi: %s lun 0x", devname);
-			byte_pnt = (char*) fcp_cur_lun_pnt->scsi_lun;
+			printk(KERN_WARNING "scsi: %s lun 0x", devname);
+			data = (char *) fcp_cur_lun->scsi_lun;
 			for (i = 0; i < sizeof(ScsiLun); i++)
-				printk("%02x", byte_pnt[i]);
-			printk(" has a LUN larger than that supported by"
-				" the kernel\n");
+				printk("%02x", data[i]);
+			printk(" has a LUN larger than currently supported.\n");
 		} else if (lun == 0) {
 			/*
 			 * LUN 0 has already been scanned.
 			 */
-		} else if (lun > shpnt->max_lun) {
-			printk("scsi: %s lun %d has a LUN larger than allowed"
-				" by the host adapter\n", devname, lun);
+		} else if (lun > sdevscan->host->max_lun) {
+			printk(KERN_WARNING "scsi: %s lun%d has a LUN larger"
+			       " than allowed by the host adapter\n",
+			       devname, lun);
 		} else {
-			/*
-			 * Don't use SDlun0_pnt after this call - it can be
-			 * overwritten via SDpnt2 if there was no real device
-			 * at LUN 0.
-			 */
-			if (scan_scsis_single(channel, dev, lun,
-			    scsi_level, SDpnt2, shpnt, scsi_result)
-				== SCSI_SCAN_NO_RESPONSE) {
+			int res;
+
+			sdevscan->lun = lun;
+			res = scsi_probe_and_add_lun(sdevscan, NULL, NULL);
+			if (res == SCSI_SCAN_NO_RESPONSE) {
 				/*
 				 * Got some results, but now none, abort.
 				 */
-				printk("scsi: no response from %s lun %d while"
-				       " scanning, scan aborted\n", devname, 
-				       lun);
+				printk(KERN_ERR "scsi: Unexpected response"
+				       " from %s lun %d while scanning, scan"
+				       " aborted\n", devname, sdevscan->lun);
 				break;
 			}
 		}
 	}
 
-	kfree((char *) lun_data_pnt);
+	kfree((char *) lun_data);
 	return 0;
 
 #else
@@ -1180,537 +1906,209 @@ static int scsi_report_lun_scan(Scsi_Device *SDlun0_pnt, unsigned
 
 }
 
-/*
- * Function:    scan_scsis_target
+/**
+ * scsi_scan_target - scan a target id, possibly including all LUNs on the
+ *     target.
+ * @sdevsca:	Scsi_Device handle for scanning
+ * @shost:	host to scan
+ * @channel:	channel to scan
+ * @id:		target id to scan
  *
- * Purpose:     Scan the given scsi target dev, and as needed all LUNs
- * 		on the target dev.
+ * Description:
+ *     Scan the target id on @shost, @channel, and @id. Scan at least LUN
+ *     0, and possibly all LUNs on the target id.
  *
- * Arguments:   channel    - the host's channel
- * 		dev        - target dev (target id)
- * 		SDpnt2     - pointer to pointer of a preallocated Scsi_Device
- * 		shpnt      - host device to use
- * 		scsi_result - preallocated buffer for the SCSI command result
+ *     Use the pre-allocated @sdevscan as a handle for the scanning. This
+ *     function sets sdevscan->host, sdevscan->id and sdevscan->lun; the
+ *     scanning functions modify sdevscan->lun.
  *
- * Lock status: None
- *
- * Returns:     void
- *
- * Notes:       This tries to be compatible with linux 2.4.x. This function
- * 		relies on scan_scsis_single to setup SDlun0_pnt. 
- *
- * 		It would be better if the Scsi_Device allocation and freeing
- * 		was done here, rather than oddly embedded in scan_scsis_single
- * 		and scan_scsis.
- */
-static void scan_scsis_target(unsigned int channel, unsigned int dev,
-		Scsi_Device **SDpnt2, struct Scsi_Host *shpnt,
-		char *scsi_result)
+ *     First try a REPORT LUN scan, if that does not scan the target, do a
+ *     sequential scan of LUNs on the target id.
+ **/
+static void scsi_scan_target(Scsi_Device *sdevscan, struct Scsi_Host *shost,
+			     unsigned int channel, unsigned int id)
 {
-	int bflags, scsi_level;
-	Scsi_Device *SDlun0_pnt;
-	unsigned int sparse_lun = 0;
-	unsigned int max_dev_lun, lun;
-	unsigned int sdlun0_res;
+	int bflags;
+	int res;
 
-	/*
-	 * Scan lun 0, use the results to determine whether to scan further.
-	 * Ideally, we would not configure LUN 0 until we scan.
-	 */
-	SDlun0_pnt = *SDpnt2;
-	sdlun0_res = scan_scsis_single(channel, dev, 0 /* LUN 0 */, SCSI_2,
-		SDpnt2, shpnt, scsi_result);
-	if (sdlun0_res == SCSI_SCAN_NO_RESPONSE)
-		return;
-
-	/*
-	 * If no new SDpnt was allocated (SCSI_SCAN_DEVICE_PRESENT), SDlun0_pnt
-	 * can later be modified. It is unlikely the lun level would change,
-	 * but save it just in case.
-	 */
-	scsi_level = SDlun0_pnt->scsi_level;
-
-	/*
-	 * We could probably use and save the bflags from lun 0 for all luns
-	 * on a target, but be safe and match current behaviour. (LUN 0
-	 * bflags controls the target settings checked within this function.)
-	 */
-	bflags = get_device_flags (SDlun0_pnt->vendor,  SDlun0_pnt->model);
-
-	/*
-	 * Some scsi devices cannot be polled for lun != 0 due to firmware bugs
-	 */
-	if (bflags & BLIST_NOLUN)
-		return;
-
-	/*
-	 * Ending the scan here if max_scsi_luns == 1 breaks scanning of
-	 * SPARSE, FORCE, MAX5 LUN devices, and the report lun scans.
-	 */
-
-	if (scsi_report_lun_scan(SDlun0_pnt, channel, dev, SDpnt2, shpnt,
-	    scsi_result) == 0)
-		return;
-
-	SCSI_LOG_SCAN_BUS(3,
-		printk("scsi: Sequential scan of host %d channel %d id %d\n",
-		 SDlun0_pnt->host->host_no, SDlun0_pnt->channel,
-		 SDlun0_pnt->id));
-
-	max_dev_lun = (max_scsi_luns < shpnt->max_lun ?
-			max_scsi_luns : shpnt->max_lun);
-	/*
-	 * If this device is known to support sparse multiple units,
-	 * override the other settings, and scan all of them.
-	 */
-	if (bflags & BLIST_SPARSELUN) {
-		max_dev_lun = shpnt->max_lun;
-		sparse_lun = 1;
-	} else if (sdlun0_res == SCSI_SCAN_DEVICE_PRESENT) {
+	if (shost->this_id == id)
 		/*
-		 * LUN 0 responded, but no LUN 0 was added, don't scan any
-		 * further. This matches linux 2.4.x behaviour.
+		 * Don't scan the host adapter
 		 */
 		return;
-	}
-	/*
-	 * If less than SCSI_1_CSS, and not a forced lun scan, stop
-	 * scanning, this matches 2.4 behaviour, but it could be a bug
-	 * to scan SCSI_1_CSS devices past LUN 0.
-	 */
-	if ((scsi_level < SCSI_1_CCS) && ((bflags &
-	     (BLIST_FORCELUN | BLIST_SPARSELUN | BLIST_MAX5LUN)) == 0))
-		return;
-	/*
-	 * If this device is known to support multiple units, override
-	 * the other settings, and scan all of them.
-	 */
-	if (bflags & BLIST_FORCELUN)
-		max_dev_lun = shpnt->max_lun;
-	/*
-	 * REGAL CDC-4X: avoid hang after LUN 4
-	 */
-	if (bflags & BLIST_MAX5LUN)
-		max_dev_lun = min(5U, max_dev_lun);
-	/*
-	 * Do not scan past LUN 7.
-	 */
-	if (scsi_level < SCSI_3)
-		max_dev_lun = min(8U, max_dev_lun);
 
+	sdevscan->host = shost;
+	sdevscan->id = id;
 	/*
-	 * We have already scanned lun 0.
+	 * Scan LUN 0, if there is some response, scan further. Ideally, we
+	 * would not configure LUN 0 until all LUNs are scanned.
+	 *
+	 * The scsi_level is set (in scsi_probe_lun) if a target responds.
 	 */
-	for (lun = 1; lun < max_dev_lun; ++lun) {
-		int res;
+	sdevscan->lun = 0;
+	res = scsi_probe_and_add_lun(sdevscan, NULL, &bflags);
+	if (res != SCSI_SCAN_NO_RESPONSE) {
 		/*
-		 * Scan until scan_scsis_single says stop,
-		 * unless sparse_lun is set.
+		 * Some scsi devices cannot properly handle a lun != 0.
+		 * BLIST_NOLUN also prevents a REPORT LUN from being sent.
+		 * Any multi-lun SCSI-3 device that hangs because of a
+		 * REPORT LUN command is seriously broken.
 		 */
-		res = scan_scsis_single(channel, dev, lun,
-		     scsi_level, SDpnt2, shpnt, scsi_result);
-		if (res == SCSI_SCAN_NO_RESPONSE) {
+		if (!(bflags & BLIST_NOLUN))
 			/*
-			 * Got a response on LUN 0, but now no response.
+			 * Ending the scan here if max_scsi_luns == 1
+			 * breaks scanning of SPARSE, FORCE, MAX5 LUN
+			 * devices, and the report lun scan.
 			 */
-			printk("scsi: no response from device"
-				" host%d/bus%d/target%d/lun%d"
-				" while scanning, scan aborted\n",
-				shpnt->host_no, channel, dev, lun);
-			return;
-		} else if ((res == SCSI_SCAN_DEVICE_PRESENT)
-			    && !sparse_lun)
-			return;
+			if (scsi_report_lun_scan(sdevscan) != 0)
+				/*
+				 * The REPORT LUN did not scan the target,
+				 * do a sequential scan.
+				 */
+				scsi_sequential_lun_scan(sdevscan, bflags, res);
 	}
 }
 
-/*
- * Returns the scsi_level of lun0 on this host, channel and dev (if already
- * known), otherwise returns SCSI_2.
- */
-static int find_lun0_scsi_level(unsigned int channel, unsigned int dev,
-				struct Scsi_Host *shpnt)
+/**
+ * scsi_scan_selected_lun - probe and add one LUN
+ *
+ * Description:
+ *     Probe a single LUN on @shost, @channel, @id and @lun. If the LUN is
+ *     found, set the queue depth, allocate command blocks, and call
+ *     init/attach/finish of the upper level (sd, sg, etc.) drivers.
+ **/
+static void scsi_scan_selected_lun(struct Scsi_Host *shost, uint channel,
+				   uint id, uint lun)
 {
-	int res = SCSI_2;
-	Scsi_Device *SDpnt;
+	Scsi_Device *sdevscan, *sdev = NULL;
+	struct Scsi_Device_Template *sdt;
+	int res;
 
-	for (SDpnt = shpnt->host_queue; SDpnt; SDpnt = SDpnt->next)
-	{
-		if ((0 == SDpnt->lun) && (dev == SDpnt->id) &&
-		    (channel == SDpnt->channel))
-			return (int)SDpnt->scsi_level;
-	}
-	/* haven't found lun0, should send INQUIRY but take easy route */
-	return res;
-}
+	if ((channel > shost->max_channel) || (id >= shost->max_id) ||
+	    (lun >= shost->max_lun))
+		return;
 
-#define SCSI_UID_DEV_ID  'U'
-#define SCSI_UID_SER_NUM 'S'
-#define SCSI_UID_UNKNOWN 'Z'
+	sdevscan = scsi_alloc_sdev(shost, channel, id, lun);
+	if (sdevscan == NULL)
+		return;
 
-unsigned char *scsi_get_evpd_page(Scsi_Device *SDpnt, Scsi_Request * SRpnt)
-{
-	unsigned char *evpd_page = NULL;
-	unsigned char *scsi_cmd = NULL;
-	int lun = SDpnt->lun;
-	int scsi_level = SDpnt->scsi_level;
+	sdevscan->scsi_level = scsi_find_scsi_level(channel, id, shost);
+	res = scsi_probe_and_add_lun(sdevscan, &sdev, NULL);
+	scsi_free_sdev(sdevscan);
+	if (res == SCSI_SCAN_LUN_PRESENT) {
+		BUG_ON(sdev == NULL);
+		/*
+		 * FIXME calling select_queue_depths is wrong for adapters
+		 * that modify queue depths of all scsi devices - the
+		 * adapter might change a queue depth (not for this sdev),
+		 * but the mid-layer will not change the queue depth. This
+		 * does not cause an oops, but queue_depth will not match
+		 * the actual queue depth used.
+		 *
+		 * Perhaps use a default queue depth, and allow them to be
+		 * modified at boot/insmod time, and/or via sysctl/ioctl/proc;
+		 * plus have dynamic queue depth adjustment like the
+		 * aic7xxx driver.
+		 */
+		if (shost->select_queue_depths != NULL)
+			(shost->select_queue_depths) (shost, shost->host_queue);
 
-	evpd_page = kmalloc(255, 
-		(SDpnt->host->unchecked_isa_dma ? GFP_DMA : GFP_ATOMIC));
-	if (!evpd_page)
-		return NULL;
+		for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
+			if (sdt->init && sdt->dev_noticed)
+				(*sdt->init) ();
 
-	scsi_cmd = kmalloc(MAX_COMMAND_SIZE, GFP_ATOMIC);
-	if (!scsi_cmd) {
-		kfree(evpd_page);
-		return NULL;
-	}
-
-	/* Use vital product pages to determine serial number */
-	/* Try Supported vital product data pages 0x00 first */
-	scsi_cmd[0] = INQUIRY;
-	if ((lun > 0) && (scsi_level <= SCSI_2))
-		scsi_cmd[1] = ((lun << 5) & 0xe0) | 0x01;
-	else
-		scsi_cmd[1] = 0x01;	/* SCSI_3 and higher, don't touch */
-	scsi_cmd[2] = 0x00;
-	scsi_cmd[3] = 0;
-	scsi_cmd[4] = 255;
-	scsi_cmd[5] = 0;
-	SRpnt->sr_cmd_len = 0;
-	SRpnt->sr_sense_buffer[0] = 0;
-	SRpnt->sr_sense_buffer[2] = 0;
-	SRpnt->sr_data_direction = SCSI_DATA_READ;
-	scsi_wait_req(SRpnt, (void *) scsi_cmd, (void *) evpd_page,
-			255, SCSI_TIMEOUT+4*HZ, 3);
-
-	if (SRpnt->sr_result) {
-		kfree(scsi_cmd);
-		kfree(evpd_page);
-		return NULL;
-	}
-
-	/* check to see if response was truncated */
-	if (evpd_page[3] > 255) {
-		int max_lgth = evpd_page[3] + 4;
-
-		kfree(evpd_page);
-		evpd_page = kmalloc(max_lgth, (SDpnt->host->unchecked_isa_dma ? 
-			GFP_DMA : GFP_ATOMIC));
-		if (!evpd_page) {
-			kfree(scsi_cmd);
-			return NULL;
-		}
-		memset(scsi_cmd, 0, MAX_COMMAND_SIZE);
-		scsi_cmd[0] = INQUIRY;
-		if ((lun > 0) && (scsi_level <= SCSI_2))
-			scsi_cmd[1] = ((lun << 5) & 0xe0) | 0x01;
-		else
-			scsi_cmd[1] = 0x01; /* SCSI_3 and higher, don't touch */
-		scsi_cmd[2] = 0x00;
-		scsi_cmd[3] = 0;
-		scsi_cmd[4] = max_lgth;
-		scsi_cmd[5] = 0;
-		SRpnt->sr_cmd_len = 0;
-		SRpnt->sr_sense_buffer[0] = 0;
-		SRpnt->sr_sense_buffer[2] = 0;
-		SRpnt->sr_data_direction = SCSI_DATA_READ;
-		scsi_wait_req(SRpnt, (void *) scsi_cmd, (void *) evpd_page,
-			max_lgth, SCSI_TIMEOUT+4*HZ, 3);
-		if (SRpnt->sr_result) {
-			kfree(scsi_cmd);
-			kfree(evpd_page);
-			return NULL;
-		}
-	}
-	kfree(scsi_cmd);
-	/* some ill behaved devices return the std inquiry here rather than
-		the evpd data. snoop the data to verify */
-	if (evpd_page[3] > 16) {
-		/* if vend id appears in the evpd page assume evpd is invalid */
-		if (!strncmp(&evpd_page[8], SDpnt->vendor, 8)) {
-			kfree(evpd_page);
-			return NULL;
-		}
-	}
-	return evpd_page;
-}
-
-int scsi_get_deviceid(Scsi_Device *SDpnt,Scsi_Request * SRpnt)
-{
-	unsigned char *id_page = NULL;
-	unsigned char *scsi_cmd = NULL;
-	int scnt, i, j, idtype;
-	char * id = SDpnt->sdev_driverfs_dev.name;
-	int lun = SDpnt->lun;
-	int scsi_level = SDpnt->scsi_level;
-
-	id_page = kmalloc(255, 
-		(SDpnt->host->unchecked_isa_dma ? GFP_DMA : GFP_ATOMIC)); 
-	if (!id_page)
-		return 0;
-
-	scsi_cmd = kmalloc(MAX_COMMAND_SIZE, GFP_ATOMIC);
-	if (!scsi_cmd)
-		goto leave;
-
-	/* Use vital product pages to determine serial number */
-	/* Try Supported vital product data pages 0x00 first */
-	scsi_cmd[0] = INQUIRY;
-	if ((lun > 0) && (scsi_level <= SCSI_2))
-		scsi_cmd[1] = ((lun << 5) & 0xe0) | 0x01;
-	else
-		scsi_cmd[1] = 0x01;	/* SCSI_3 and higher, don't touch */
-	scsi_cmd[2] = 0x83;
-	scsi_cmd[3] = 0;
-	scsi_cmd[4] = 255;
-	scsi_cmd[5] = 0;
-	SRpnt->sr_cmd_len = 0;
-	SRpnt->sr_sense_buffer[0] = 0;
-	SRpnt->sr_sense_buffer[2] = 0;
-	SRpnt->sr_data_direction = SCSI_DATA_READ;
-	scsi_wait_req(SRpnt, (void *) scsi_cmd, (void *) id_page,
-			255, SCSI_TIMEOUT+4*HZ, 3);
-	if (SRpnt->sr_result) {
-		kfree(scsi_cmd);
-		goto leave;
-	}
-
-	/* check to see if response was truncated */
-	if (id_page[3] > 255) {
-		int max_lgth = id_page[3] + 4;
-
-		kfree(id_page);
-		id_page = kmalloc(max_lgth,
-			(SDpnt->host->unchecked_isa_dma ? 
-			GFP_DMA : GFP_ATOMIC)); 
-		if (!id_page) {
-			kfree(scsi_cmd);
-			return 0;
-		}
-		memset(scsi_cmd, 0, MAX_COMMAND_SIZE);
-		scsi_cmd[0] = INQUIRY;
-		if ((lun > 0) && (scsi_level <= SCSI_2))
-			scsi_cmd[1] = ((lun << 5) & 0xe0) | 0x01;
-		else
-			scsi_cmd[1] = 0x01; /* SCSI_3 and higher, don't touch */
-		scsi_cmd[2] = 0x83;
-		scsi_cmd[3] = 0;
-		scsi_cmd[4] = max_lgth;
-		scsi_cmd[5] = 0;
-		SRpnt->sr_cmd_len = 0;
-		SRpnt->sr_sense_buffer[0] = 0;
-		SRpnt->sr_sense_buffer[2] = 0;
-		SRpnt->sr_data_direction = SCSI_DATA_READ;
-		scsi_wait_req(SRpnt, (void *) scsi_cmd, (void *) id_page,
-				max_lgth, SCSI_TIMEOUT+4*HZ, 3);
-		if (SRpnt->sr_result) {
-			kfree(scsi_cmd);
-			goto leave;
-		}
-	}
-	kfree(scsi_cmd);
-
-	idtype = 3;
-	while (idtype > 0) {
-		for(scnt = 4; scnt <= id_page[3] + 3; 
-		    scnt += id_page[scnt + 3] + 4) {
-			if ((id_page[scnt + 1] & 0x0f) != idtype) {
-				continue;
-			}
-			if ((id_page[scnt] & 0x0f) == 2) {  
-				for(i = scnt + 4, j = 1;
-				    i < scnt + 4 + id_page[scnt + 3]; 
-				    i++) {
-					if (id_page[i] > 0x20) {
-						if (j == DEVICE_NAME_SIZE) {
-							memset(id, 0, 
-							    DEVICE_NAME_SIZE);
-							break;
-						}
-						id[j++] = id_page[i];
-					}
-				}
-			} else if ((id_page[scnt] & 0x0f) == 1) {
-				static const char hex_str[]="0123456789abcdef";
-				for(i = scnt + 4, j = 1;
-				    i < scnt + 4 + id_page[scnt + 3]; 
-				    i++) {
-					if ((j + 1) == DEVICE_NAME_SIZE) {
-						memset(id, 0, DEVICE_NAME_SIZE);
-						break;
-					}
-					id[j++] = hex_str[(id_page[i] & 0xf0) >>
-								4];
-					id[j++] = hex_str[id_page[i] & 0x0f];
+		for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
+			if (sdt->attach) {
+				(*sdt->attach) (sdev);
+				if (sdev->attached) {
+					scsi_build_commandblocks(sdev);
+					if (sdev->has_cmdblocks == 0)
+						printk(ALLOC_FAILURE_MSG,
+						       __FUNCTION__);
 				}
 			}
-			if (id[1] != 0) goto leave;
-		}
-		idtype--;
+
+		for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
+			if (sdt->finish && sdt->nr_dev)
+				(*sdt->finish) ();
+
 	}
- leave:
-	kfree(id_page);
-	if (id[1] != 0) {
-		id[0] = SCSI_UID_DEV_ID;
-		return 1;
-	}
-	return 0;
 }
 
-int scsi_get_serialnumber(Scsi_Device *SDpnt, Scsi_Request * SRpnt)
+/**
+ * scan_scsis - scan the given adapter, or scan a single LUN
+ * @shost:	adapter to scan
+ * @hardcoded:	1 if a single channel/id/lun should be scanned, else 0
+ * @hchannel:	channel to scan for hardcoded case
+ * @hid:	target id to scan for hardcoded case
+ * @hlun:	lun to scan for hardcoded case
+ *
+ * Description:
+ *     If @hardcoded is 1, call scsi_scan_selected_lun to scan a single
+ *     LUN; else, iterate and call scsi_scan_target to scan all possible
+ *     target id's on all possible channels.
+ **/
+void scan_scsis(struct Scsi_Host *shost, uint hardcoded, uint hchannel,
+		uint hid, uint hlun)
 {
-	unsigned char *serialnumber_page = NULL;
-	unsigned char *scsi_cmd = NULL;
-	int lun = SDpnt->lun;
-	int scsi_level = SDpnt->scsi_level;
-	int i, j;
+	if (hardcoded == 1) {
+		/*
+		 * XXX Overload hchannel/hid/hlun to figure out what to
+		 * scan, and use the standard scanning code rather than
+		 * this function - that way, an entire bus (or fabric), or
+		 * target id can be scanned. There are problems with queue
+		 * depth and the init/attach/finish that must be resolved
+		 * before (re-)scanning can handle finding more than one new
+		 * LUN.
+		 *
+		 * For example, set hchannel 0 and hid to 5, and hlun to -1
+		 * in order to scan all LUNs on channel 0, target id 5.
+		 */
+		scsi_scan_selected_lun(shost, hchannel, hid, hlun);
+	} else {
+		Scsi_Device *sdevscan;
+		uint channel;
+		unsigned int id, order_id;
 
-	serialnumber_page = kmalloc(255, (SDpnt->host->unchecked_isa_dma ? 
-			GFP_DMA : GFP_ATOMIC));
-	if (!serialnumber_page)
-		return 0;
-
-	scsi_cmd = kmalloc(MAX_COMMAND_SIZE, GFP_ATOMIC);
-	if (!scsi_cmd)
-		goto leave;
-
-	/* Use vital product pages to determine serial number */
-	/* Try Supported vital product data pages 0x00 first */
-	scsi_cmd[0] = INQUIRY;
-	if ((lun > 0) && (scsi_level <= SCSI_2))
-		scsi_cmd[1] = ((lun << 5) & 0xe0) | 0x01;
-	else	
-		scsi_cmd[1] = 0x01;	/* SCSI_3 and higher, don't touch */
-	scsi_cmd[2] = 0x80;
-	scsi_cmd[3] = 0;
-	scsi_cmd[4] = 255;
-	scsi_cmd[5] = 0;
-	SRpnt->sr_cmd_len = 0;
-	SRpnt->sr_sense_buffer[0] = 0;
-	SRpnt->sr_sense_buffer[2] = 0;
-	SRpnt->sr_data_direction = SCSI_DATA_READ;
-	scsi_wait_req(SRpnt, (void *) scsi_cmd, (void *) serialnumber_page,
-			255, SCSI_TIMEOUT+4*HZ, 3);
-
-	if (SRpnt->sr_result) {
-		kfree(scsi_cmd);
-		goto leave;
-	}
-	/* check to see if response was truncated */
-	if (serialnumber_page[3] > 255) {
-		int max_lgth = serialnumber_page[3] + 4;
-
-		kfree(serialnumber_page);
-		serialnumber_page = kmalloc(max_lgth, 
-			(SDpnt->host->unchecked_isa_dma ? 
-			GFP_DMA : GFP_ATOMIC));
-		if (!serialnumber_page) {
-			kfree(scsi_cmd);
-			return 0;
+		/*
+		 * The blk layer queue allocation is a bit expensive to
+		 * repeat for each channel and id - for FCP max_id is near
+		 * 255: each call to scsi_alloc_sdev() implies a call to
+		 * blk_init_queue, and then blk_init_free_list, where 2 *
+		 * queue_nr_requests requests are allocated. Don't do so
+		 * here for scsi_scan_selected_lun, since we end up
+		 * calling select_queue_depths with an extra Scsi_Device
+		 * on the host_queue list.
+		 */
+		sdevscan = scsi_alloc_sdev(shost, 0, 0, 0);
+		if (sdevscan == NULL)
+			return;
+		/*
+		 * The sdevscan host, channel, id and lun are filled in as
+		 * needed to scan.
+		 */
+		for (channel = 0; channel <= shost->max_channel; channel++) {
+			/*
+			 * XXX adapter drivers when possible (FCP, iSCSI)
+			 * could modify max_id to match the current max,
+			 * not the absolute max.
+			 *
+			 * XXX add a shost id iterator, so for example,
+			 * the FC ID can be the same as a target id
+			 * without a huge overhead of sparse id's.
+			 */
+			for (id = 0; id < shost->max_id; ++id) {
+				if (shost->reverse_ordering)
+					/*
+					 * Scan from high to low id.
+					 */
+					order_id = shost->max_id - id - 1;
+				else
+					order_id = id;
+				scsi_scan_target(sdevscan, shost, channel,
+						 order_id);
+			}
 		}
-		memset(scsi_cmd, 0, MAX_COMMAND_SIZE);
-		scsi_cmd[0] = INQUIRY;
-		if ((lun > 0) && (scsi_level <= SCSI_2))
-			scsi_cmd[1] = ((lun << 5) & 0xe0) | 0x01;
-		else
-			scsi_cmd[1] = 0x01; /* SCSI_3 and higher, don't touch */
-		scsi_cmd[2] = 0x80;
-		scsi_cmd[3] = 0;
-		scsi_cmd[4] = max_lgth;
-		scsi_cmd[5] = 0;
-		SRpnt->sr_cmd_len = 0;
-		SRpnt->sr_sense_buffer[0] = 0;
-		SRpnt->sr_sense_buffer[2] = 0;
-		SRpnt->sr_data_direction = SCSI_DATA_READ;
-		scsi_wait_req(SRpnt, (void *) scsi_cmd, 
-				(void *) serialnumber_page,
-				max_lgth, SCSI_TIMEOUT+4*HZ, 3);
-		if (SRpnt->sr_result) {
-			kfree(scsi_cmd);
-			goto leave;
-		}
+		scsi_free_sdev(sdevscan);
 	}
-	kfree(scsi_cmd);
-
-	SDpnt->sdev_driverfs_dev.name[0] = SCSI_UID_SER_NUM;
-	for(i = 0, j = 1; i < serialnumber_page[3]; i++) {
-		if (serialnumber_page[4 + i] > 0x20)
-			SDpnt->sdev_driverfs_dev.name[j++] = 
-				serialnumber_page[4 + i];
-	}
-	for(i = 0, j = strlen(SDpnt->sdev_driverfs_dev.name); i < 8; i++) {
-		if (SDpnt->vendor[i] > 0x20) {
-			SDpnt->sdev_driverfs_dev.name[j++] = SDpnt->vendor[i];
-		}
-	}
-	kfree(serialnumber_page);
-	return 1;
- leave:
-	memset(SDpnt->sdev_driverfs_dev.name, 0, DEVICE_NAME_SIZE);
-	kfree(serialnumber_page);
-	return 0;
-}
-
-int scsi_get_default_name(Scsi_Device *SDpnt)
-{
-	int i, j;
-
-	SDpnt->sdev_driverfs_dev.name[0] = SCSI_UID_UNKNOWN;
-	for(i = 0, j = 1; i < 8; i++) {
-		if (SDpnt->vendor[i] > 0x20) {
-			SDpnt->sdev_driverfs_dev.name[j++] = 
-				SDpnt->vendor[i];
-		}
-	}
-	for(i = 0, j = strlen(SDpnt->sdev_driverfs_dev.name); 
-	    i < 16; i++) {
-		if (SDpnt->model[i] > 0x20) {
-			SDpnt->sdev_driverfs_dev.name[j++] = 
-				SDpnt->model[i];
-		}
-	}
-	for(i = 0, j = strlen(SDpnt->sdev_driverfs_dev.name); i < 4; i++) {
-		if (SDpnt->rev[i] > 0x20) {
-			SDpnt->sdev_driverfs_dev.name[j++] = SDpnt->rev[i];
-		}
-	}	
-	return 1;
-}
-
-
-static void scsi_load_identifier(Scsi_Device *SDpnt, Scsi_Request * SRpnt)
-{
-	unsigned char *evpd_page = NULL;
-	int cnt;
-
-	memset(SDpnt->sdev_driverfs_dev.name, 0, DEVICE_NAME_SIZE);
-	evpd_page = scsi_get_evpd_page(SDpnt, SRpnt);
-	if (!evpd_page) {
-		/* try to obtain serial number anyway */
-		if (!scsi_get_serialnumber(SDpnt, SRpnt))
-			goto leave;
-		goto leave;
-	}
-
-	for(cnt = 4; cnt <= evpd_page[3] + 3; cnt++) {
-		if (evpd_page[cnt] == 0x83) {
-			if (scsi_get_deviceid(SDpnt, SRpnt))
-				goto leave;
-		}
-	}
-
-	for(cnt = 4; cnt <= evpd_page[3] + 3; cnt++) {
-		if (evpd_page[cnt] == 0x80) {
-			if (scsi_get_serialnumber(SDpnt, SRpnt))
-				goto leave;
-		}
-	}
-
-leave:
-	if (SDpnt->sdev_driverfs_dev.name[0] == 0)
-		scsi_get_default_name(SDpnt);
-
-	if (evpd_page) kfree(evpd_page);
-	return;
 }
