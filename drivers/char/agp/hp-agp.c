@@ -59,8 +59,8 @@ static struct gatt_mask hp_zx1_masks[] =
 };
 
 static struct _hp_private {
-	volatile u8 *ioc_regs;
-	volatile u8 *lba_regs;
+	volatile u8 __iomem *ioc_regs;
+	volatile u8 __iomem *lba_regs;
 	int lba_cap_offset;
 	u64 *io_pdir;		// PDIR for entire IOVA
 	u64 *gatt;		// PDIR just for GART (subset of above)
@@ -183,7 +183,7 @@ hp_zx1_ioc_init (u64 hpa)
 }
 
 static int
-hp_zx1_lba_find_capability (volatile u8 *hpa, int cap)
+hp_zx1_lba_find_capability (volatile u8 __iomem *hpa, int cap)
 {
 	u16 status;
 	u8 pos, id;
@@ -267,10 +267,10 @@ hp_zx1_cleanup (void)
 	if (hp->ioc_regs) {
 		if (hp->io_pdir_owner)
 			OUTREG64(hp->ioc_regs, HP_ZX1_IBASE, 0);
-		iounmap((void *) hp->ioc_regs);
+		iounmap(hp->ioc_regs);
 	}
 	if (hp->lba_regs)
-		iounmap((void *) hp->lba_regs);
+		iounmap(hp->lba_regs);
 }
 
 static void
