@@ -719,9 +719,6 @@ extern void pci_remove_bus_device(struct pci_dev *dev);
 
 struct pci_dev *pci_find_device (unsigned int vendor, unsigned int device, const struct pci_dev *from);
 struct pci_dev *pci_find_device_reverse (unsigned int vendor, unsigned int device, const struct pci_dev *from);
-struct pci_dev *pci_find_subsys (unsigned int vendor, unsigned int device,
-				 unsigned int ss_vendor, unsigned int ss_device,
-				 const struct pci_dev *from);
 struct pci_dev *pci_find_class (unsigned int class, const struct pci_dev *from);
 struct pci_dev *pci_find_slot (unsigned int bus, unsigned int devfn);
 int pci_find_capability (struct pci_dev *dev, int cap);
@@ -886,10 +883,6 @@ static inline struct pci_dev *pci_find_class(unsigned int class, const struct pc
 { return NULL; }
 
 static inline struct pci_dev *pci_find_slot(unsigned int bus, unsigned int devfn)
-{ return NULL; }
-
-static inline struct pci_dev *pci_find_subsys(unsigned int vendor, unsigned int device,
-unsigned int ss_vendor, unsigned int ss_device, const struct pci_dev *from)
 { return NULL; }
 
 static inline struct pci_dev *pci_get_device (unsigned int vendor, unsigned int device, struct pci_dev *from)

@@ -156,10 +156,11 @@ struct pci_dev * pci_get_slot(struct pci_bus *bus, unsigned int devfn)
  * the pci device returned by this function can disappear at any moment in
  * time.
  */
-struct pci_dev *
-pci_find_subsys(unsigned int vendor, unsigned int device,
-		unsigned int ss_vendor, unsigned int ss_device,
-		const struct pci_dev *from)
+static struct pci_dev * pci_find_subsys(unsigned int vendor,
+				        unsigned int device,
+					unsigned int ss_vendor,
+					unsigned int ss_device,
+					const struct pci_dev *from)
 {
 	struct list_head *n;
 	struct pci_dev *dev;
@@ -351,7 +352,6 @@ EXPORT_SYMBOL(pci_find_class);
 EXPORT_SYMBOL(pci_find_device);
 EXPORT_SYMBOL(pci_find_device_reverse);
 EXPORT_SYMBOL(pci_find_slot);
-EXPORT_SYMBOL(pci_find_subsys);
 EXPORT_SYMBOL(pci_get_device);
 EXPORT_SYMBOL(pci_get_subsys);
 EXPORT_SYMBOL(pci_get_slot);
