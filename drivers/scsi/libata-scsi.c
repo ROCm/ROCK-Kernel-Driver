@@ -885,53 +885,20 @@ void ata_scsi_badcmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *), u8
 }
 
 /**
- *	atapi_scsi_queuecmd - Send CDB to ATAPI device
- *	@ap: Port to which ATAPI device is attached.
- *	@dev: Target device for CDB.
- *	@cmd: SCSI command being sent to device.
- *	@done: SCSI command completion function.
- *
- *	Sends CDB to ATAPI device.  If the Linux SCSI layer sends a
- *	non-data command, then this function handles the command
- *	directly, via polling.  Otherwise, the bmdma engine is started.
+ *	atapi_xlat - Initialize PACKET taskfile
+ *	@qc: command structure to be initialized
+ *	@scsicmd: SCSI CDB associated with this PACKET command
  *
  *	LOCKING:
  *	spin_lock_irqsave(host_set lock)
+ *
+ *	RETURNS:
+ *	Zero on success, non-zero on failure.
  */
 
-static void atapi_scsi_queuecmd(struct ata_port *ap, struct ata_device *dev,
-			       struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
+static unsigned int atapi_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 {
-	struct ata_queued_cmd *qc;
-	u8 *scsicmd = cmd->cmnd;
-
-	VPRINTK("ENTER, drv_stat = 0x%x\n", ata_chk_status(ap));
-
-	if (cmd->sc_data_direction == SCSI_DATA_UNKNOWN) {
-		DPRINTK("unknown data, scsicmd 0x%x\n", scsicmd[0]);
-		ata_bad_cdb(cmd, done);
-		return;
-	}
-
-	switch(scsicmd[0]) {
-	case READ_6:
-	case WRITE_6:
-	case MODE_SELECT:
-	case MODE_SENSE:
-		DPRINTK("read6/write6/modesel/modesense trap\n");
-		ata_bad_scsiop(cmd, done);
-		return;
-
-	default:
-		/* do nothing */
-		break;
-	}
-
-	qc = ata_scsi_qc_new(ap, dev, cmd, done);
-	if (!qc) {
-		printk(KERN_ERR "ata%u: command queue empty\n", ap->id);
-		return;
-	}
+	struct scsi_cmnd *cmd = qc->scsicmd;
 
 	qc->flags |= ATA_QCFLAG_ATAPI;
 
@@ -943,17 +910,19 @@ static void atapi_scsi_queuecmd(struct ata_port *ap, struct ata_device *dev,
 
 	qc->tf.command = ATA_CMD_PACKET;
 
-	if (cmd->sc_data_direction == SCSI_DATA_NONE) {
+	if ((cmd->sc_data_direction == SCSI_DATA_NONE) ||
+	    ((qc->flags & ATA_QCFLAG_DMA) == 0)) {
+		ata_qc_set_polling(qc);
 		qc->tf.protocol = ATA_PROT_ATAPI;
-		qc->flags |= ATA_QCFLAG_POLL;
-		qc->tf.ctl |= ATA_NIEN;	/* disable interrupts */
+		qc->tf.lbam = (8 * 1024) & 0xff;
+		qc->tf.lbah = (8 * 1024) >> 8;
 	} else {
-		qc->tf.protocol = ATA_PROT_ATAPI_DMA;
 		qc->flags |= ATA_QCFLAG_SG; /* data is present; dma-map it */
+		qc->tf.protocol = ATA_PROT_ATAPI_DMA;
 		qc->tf.feature |= ATAPI_PKT_DMA;
 	}
 
-	atapi_start(qc);
+	return 0;
 }
 
 /**
@@ -1092,7 +1061,7 @@ int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 		else
 			ata_scsi_simulate(ap, dev, cmd, done);
 	} else
-		atapi_scsi_queuecmd(ap, dev, cmd, done);
+		ata_scsi_translate(ap, dev, cmd, done, atapi_xlat);
 
 out_unlock:
 	return 0;

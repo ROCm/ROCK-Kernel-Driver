@@ -129,6 +129,7 @@ static struct ata_port_operations sil_ops = {
 	.exec_command		= ata_exec_command_mmio,
 	.phy_reset		= sata_phy_reset,
 	.post_set_mode		= sil_post_set_mode,
+	.bmdma_setup            = ata_bmdma_setup_mmio,
 	.bmdma_start            = ata_bmdma_start_mmio,
 	.fill_sg		= ata_fill_sg,
 	.eng_timeout		= ata_eng_timeout,

@@ -74,6 +74,7 @@ struct pdc_port_priv {
 static u32 pdc_sata_scr_read (struct ata_port *ap, unsigned int sc_reg);
 static void pdc_sata_scr_write (struct ata_port *ap, unsigned int sc_reg, u32 val);
 static int pdc_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *ent);
+static void pdc_dma_setup(struct ata_queued_cmd *qc);
 static void pdc_dma_start(struct ata_queued_cmd *qc);
 static irqreturn_t pdc_interrupt (int irq, void *dev_instance, struct pt_regs *regs);
 static void pdc_eng_timeout(struct ata_port *ap);
@@ -111,6 +112,7 @@ static struct ata_port_operations pdc_sata_ops = {
 	.check_status		= ata_check_status_mmio,
 	.exec_command		= pdc_exec_command_mmio,
 	.phy_reset		= pdc_phy_reset,
+	.bmdma_setup            = pdc_dma_setup,
 	.bmdma_start            = pdc_dma_start,
 	.fill_sg		= pdc_fill_sg,
 	.eng_timeout		= pdc_eng_timeout,
@@ -285,8 +287,7 @@ static inline void pdc_dma_complete (struct ata_port *ap,
 	u8 err_bit = have_err ? ATA_ERR : 0;
 
 	/* get drive status; clear intr; complete txn */
-	ata_qc_complete(ata_qc_from_tag(ap, ap->active_tag),
-			ata_wait_idle(ap) | err_bit, 0);
+	ata_qc_complete(qc, ata_wait_idle(ap) | err_bit);
 }
 
 static void pdc_eng_timeout(struct ata_port *ap)
@@ -314,8 +315,7 @@ static void pdc_eng_timeout(struct ata_port *ap)
 	switch (qc->tf.protocol) {
 	case ATA_PROT_DMA:
 		printk(KERN_ERR "ata%u: DMA timeout\n", ap->id);
-		ata_qc_complete(ata_qc_from_tag(ap, ap->active_tag),
-			        ata_wait_idle(ap) | ATA_ERR, 0);
+		ata_qc_complete(qc, ata_wait_idle(ap) | ATA_ERR);
 		break;
 
 	case ATA_PROT_NODATA:
@@ -324,7 +324,7 @@ static void pdc_eng_timeout(struct ata_port *ap)
 		printk(KERN_ERR "ata%u: command 0x%x timeout, stat 0x%x\n",
 		       ap->id, qc->tf.command, drv_stat);
 
-		ata_qc_complete(qc, drv_stat, 1);
+		ata_qc_complete(qc, drv_stat);
 		break;
 
 	default:
@@ -333,7 +333,7 @@ static void pdc_eng_timeout(struct ata_port *ap)
 		printk(KERN_ERR "ata%u: unknown timeout, cmd 0x%x stat 0x%x\n",
 		       ap->id, qc->tf.command, drv_stat);
 
-		ata_qc_complete(qc, drv_stat, 1);
+		ata_qc_complete(qc, drv_stat);
 		break;
 	}
 
@@ -366,7 +366,7 @@ static inline unsigned int pdc_host_intr( struct ata_port *ap,
 		DPRINTK("BUS_NODATA (drv_stat 0x%X)\n", status);
 		if (have_err)
 			status |= ATA_ERR;
-		ata_qc_complete(qc, status, 0);
+		ata_qc_complete(qc, status);
 		handled = 1;
 		break;
 
@@ -419,7 +419,7 @@ static irqreturn_t pdc_interrupt (int irq, void *dev_instance, struct pt_regs *r
 			struct ata_queued_cmd *qc;
 
 			qc = ata_qc_from_tag(ap, ap->active_tag);
-			if (qc && ((qc->flags & ATA_QCFLAG_POLL) == 0))
+			if (qc && (!(qc->tf.ctl & ATA_NIEN)))
 				handled += pdc_host_intr(ap, qc);
 		}
 	}
@@ -429,6 +429,12 @@ static irqreturn_t pdc_interrupt (int irq, void *dev_instance, struct pt_regs *r
 	VPRINTK("EXIT\n");
 
 	return IRQ_RETVAL(handled);
+}
+
+static void pdc_dma_setup(struct ata_queued_cmd *qc)
+{
+	/* nothing for now.  later, we will call standard
+	 * code in libata-core for ATAPI here */
 }
 
 static void pdc_dma_start(struct ata_queued_cmd *qc)
