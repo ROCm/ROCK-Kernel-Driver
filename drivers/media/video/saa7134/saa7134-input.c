@@ -100,42 +100,42 @@ static IR_KEYTAB_TYPE cinergy_codes[IR_KEYTAB_SIZE] = {
 	[ 0x23 ] = KEY_STOP,
 };
 
-/* Alfons Geser <a.geser@cox.net> */
+/* Alfons Geser <a.geser@cox.net>
+ * updates from Job D. R. Borges <jobdrb@ig.com.br> */
 static IR_KEYTAB_TYPE eztv_codes[IR_KEYTAB_SIZE] = {
         [ 18 ] = KEY_POWER,
         [  1 ] = KEY_TV,             // DVR
-        [ 21 ] = KEY_VIDEO,          // DVD
+        [ 21 ] = KEY_DVD,            // DVD
         [ 23 ] = KEY_AUDIO,          // music
-
                                      // DVR mode / DVD mode / music mode
 
         [ 27 ] = KEY_MUTE,           // mute
-        [  2 ] = KEY_RESERVED,       // MTS/SAP / audio /autoseek
-        [ 30 ] = KEY_RESERVED,       // closed captioning / subtitle / seek
+        [  2 ] = KEY_LANGUAGE,       // MTS/SAP / audio / autoseek
+        [ 30 ] = KEY_SUBTITLE,       // closed captioning / subtitle / seek
         [ 22 ] = KEY_ZOOM,           // full screen
-        [ 28 ] = KEY_RESERVED,       // video source / eject /delall
-        [ 29 ] = KEY_RESERVED,       // playback / angle /del
+        [ 28 ] = KEY_VIDEO,          // video source / eject / delall
+        [ 29 ] = KEY_RESTART,        // playback / angle / del
         [ 47 ] = KEY_SEARCH,         // scan / menu / playlist
-        [ 48 ] = KEY_RESERVED,       // CH surfing / bookmark / memo
+        [ 48 ] = KEY_CHANNEL,        // CH surfing / bookmark / memo
 
         [ 49 ] = KEY_HELP,           // help
-        [ 50 ] = KEY_RESERVED,       // num/memo
+        [ 50 ] = KEY_MODE,           // num/memo
         [ 51 ] = KEY_ESC,            // cancel
 
 	[ 12 ] = KEY_UP,             // up
 	[ 16 ] = KEY_DOWN,           // down
 	[  8 ] = KEY_LEFT,           // left
 	[  4 ] = KEY_RIGHT,          // right
-	[  3 ] = KEY_ENTER,          // select
+	[  3 ] = KEY_SELECT,         // select
 
 	[ 31 ] = KEY_REWIND,         // rewind
 	[ 32 ] = KEY_PLAYPAUSE,      // play/pause
 	[ 41 ] = KEY_FORWARD,        // forward
-	[ 20 ] = KEY_RESERVED,       // repeat
+	[ 20 ] = KEY_AGAIN,          // repeat
 	[ 43 ] = KEY_RECORD,         // recording
 	[ 44 ] = KEY_STOP,           // stop
 	[ 45 ] = KEY_PLAY,           // play
-	[ 46 ] = KEY_RESERVED,       // snapshot
+	[ 46 ] = KEY_SHUFFLE,        // snapshot / shuffle
 
         [  0 ] = KEY_KP0,
         [  5 ] = KEY_KP1,

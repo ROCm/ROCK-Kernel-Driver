@@ -2,7 +2,7 @@
  * device driver for philips saa7134 based TV cards
  * card-specific stuff.
  *
- * (c) 2001-03 Gerd Knorr <kraxel@bytesex.org> [SuSE Labs]
+ * (c) 2001-04 Gerd Knorr <kraxel@bytesex.org> [SuSE Labs]
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -732,7 +732,9 @@ struct saa7134_board saa7134_boards[] = {
         [SAA7134_BOARD_ASUSTEK_TVFM7133] = {
                 .name           = "ASUS TV-FM 7133",
                 .audio_clock    = 0x00187de7,
-                .tuner_type     = TUNER_PHILIPS_FM1236_MK3,
+		// probably wrong, the 7133 one is the NTSC version ...
+		// .tuner_type     = TUNER_PHILIPS_FM1236_MK3
+                .tuner_type     = TUNER_LG_NTSC_NEW_TAPC,
                 .need_tda9887   = 1,
                 .inputs         = {{
                         .name = name_tv,

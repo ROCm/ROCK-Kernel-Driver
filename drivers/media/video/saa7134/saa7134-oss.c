@@ -64,7 +64,7 @@ static int dsp_buffer_conf(struct saa7134_dev *dev, int blksize, int blocks)
 	dev->oss.bufsize = blksize * blocks;
 
 	dprintk("buffer config: %d blocks / %d bytes, %d kB total\n",
-		blocks,blksize,blksize * blocks / 1024);
+ 		blocks,blksize,blksize * blocks / 1024);
 	return 0;
 }
 
@@ -74,6 +74,7 @@ static int dsp_buffer_init(struct saa7134_dev *dev)
 
 	if (!dev->oss.bufsize)
 		BUG();
+	videobuf_dma_init(&dev->oss.dma);
 	err = videobuf_dma_init_kernel(&dev->oss.dma, PCI_DMA_FROMDEVICE,
 				       dev->oss.bufsize >> PAGE_SHIFT);
 	if (0 != err)
@@ -90,6 +91,20 @@ static int dsp_buffer_free(struct saa7134_dev *dev)
 	dev->oss.blksize = 0;
 	dev->oss.bufsize = 0;
 	return 0;
+}
+
+static void dsp_dma_start(struct saa7134_dev *dev)
+{
+	dev->oss.dma_blk     = 0;
+	dev->oss.dma_running = 1;
+	saa7134_set_dmabits(dev);
+}
+
+static void dsp_dma_stop(struct saa7134_dev *dev)
+{
+	dev->oss.dma_blk     = -1;
+	dev->oss.dma_running = 0;
+	saa7134_set_dmabits(dev);
 }
 
 static int dsp_rec_start(struct saa7134_dev *dev)
@@ -178,10 +193,9 @@ static int dsp_rec_start(struct saa7134_dev *dev)
 	saa_writel(SAA7134_RS_CONTROL(6),control);
 	
 	/* start dma */
+	dev->oss.recording_on = 1;
 	spin_lock_irqsave(&dev->slock,flags);
-	dev->oss.recording = 1;
-	dev->oss.dma_blk   = 0;
-	saa7134_set_dmabits(dev);
+	dsp_dma_start(dev);
 	spin_unlock_irqrestore(&dev->slock,flags);
 	return 0;
 
@@ -199,10 +213,9 @@ static int dsp_rec_stop(struct saa7134_dev *dev)
 	dprintk("rec_stop dma_blk=%d\n",dev->oss.dma_blk);
 
 	/* stop dma */
+	dev->oss.recording_on = 0;
 	spin_lock_irqsave(&dev->slock,flags);
-	dev->oss.dma_blk   = -1;
-	dev->oss.recording = 0;
-	saa7134_set_dmabits(dev);
+	dsp_dma_stop(dev);
 	spin_unlock_irqrestore(&dev->slock,flags);
 
 	/* unlock buffer */
@@ -259,7 +272,7 @@ static int dsp_release(struct inode *inode, struct file *file)
 	struct saa7134_dev *dev = file->private_data;
 
 	down(&dev->oss.lock);
-	if (dev->oss.recording)
+	if (dev->oss.recording_on)
 		dsp_rec_stop(dev);
 	dsp_buffer_free(dev);
 	dev->oss.users_dsp--;
@@ -274,6 +287,7 @@ static ssize_t dsp_read(struct file *file, char *buffer,
 	struct saa7134_dev *dev = file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned int bytes;
+	unsigned long flags;
 	int err,ret = 0;
 
 	add_wait_queue(&dev->oss.wq, &wait);
@@ -281,13 +295,20 @@ static ssize_t dsp_read(struct file *file, char *buffer,
 	while (count > 0) {
 		/* wait for data if needed */
 		if (0 == dev->oss.read_count) {
-			if (!dev->oss.recording) {
+			if (!dev->oss.recording_on) {
 				err = dsp_rec_start(dev);
 				if (err < 0) {
 					if (0 == ret)
 						ret = err;
 					break;
 				}
+			}
+			if (dev->oss.recording_on &&
+			    !dev->oss.dma_running) {
+				/* recover from overruns */
+				spin_lock_irqsave(&dev->slock,flags);
+				dsp_dma_start(dev);
+				spin_unlock_irqrestore(&dev->slock,flags);
 			}
 			if (file->f_flags & O_NONBLOCK) {
 				if (0 == ret)
@@ -365,7 +386,7 @@ static int dsp_ioctl(struct inode *inode, struct file *file,
 			return -EFAULT;
 		down(&dev->oss.lock);
 		dev->oss.channels = val ? 2 : 1;
-		if (dev->oss.recording) {
+		if (dev->oss.recording_on) {
 			dsp_rec_stop(dev);
 			dsp_rec_start(dev);
 		}
@@ -379,7 +400,7 @@ static int dsp_ioctl(struct inode *inode, struct file *file,
 			return -EINVAL;
 		down(&dev->oss.lock);
 		dev->oss.channels = val;
-		if (dev->oss.recording) {
+		if (dev->oss.recording_on) {
 			dsp_rec_stop(dev);
 			dsp_rec_start(dev);
 		}
@@ -408,7 +429,7 @@ static int dsp_ioctl(struct inode *inode, struct file *file,
 		case AFMT_S16_BE:
 			down(&dev->oss.lock);
 			dev->oss.afmt = val;
-			if (dev->oss.recording) {
+			if (dev->oss.recording_on) {
 				dsp_rec_stop(dev);
 				dsp_rec_start(dev);
 			}
@@ -438,7 +459,7 @@ static int dsp_ioctl(struct inode *inode, struct file *file,
 
         case SNDCTL_DSP_RESET:
 		down(&dev->oss.lock);
-		if (dev->oss.recording)
+		if (dev->oss.recording_on)
 			dsp_rec_stop(dev);
 		up(&dev->oss.lock);
 		return 0;
@@ -448,7 +469,7 @@ static int dsp_ioctl(struct inode *inode, struct file *file,
         case SNDCTL_DSP_SETFRAGMENT:
 		if (get_user(val, (int*)arg))
 			return -EFAULT;
-		if (dev->oss.recording)
+		if (dev->oss.recording_on)
 			return -EBUSY;
 		dsp_buffer_free(dev);
 		dsp_buffer_conf(dev,1 << (val & 0xffff), (arg >> 16) & 0xffff);
@@ -484,7 +505,7 @@ static unsigned int dsp_poll(struct file *file, struct poll_table_struct *wait)
 
 	if (0 == dev->oss.read_count) {
 		down(&dev->oss.lock);
-		if (!dev->oss.recording)
+		if (!dev->oss.recording_on)
 			dsp_rec_start(dev);
 		up(&dev->oss.lock);
 	} else
@@ -800,7 +821,7 @@ void saa7134_irq_oss_done(struct saa7134_dev *dev, unsigned long status)
 	if (dev->oss.read_count >= dev->oss.blksize * (dev->oss.blocks-2)) {
 		dprintk("irq: overrun [full=%d/%d]\n",dev->oss.read_count,
 			dev->oss.bufsize);
-		dsp_rec_stop(dev);
+		dsp_dma_stop(dev);
 		goto done;
 	}
 
