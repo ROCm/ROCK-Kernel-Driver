@@ -268,7 +268,7 @@ extern void show_regs(struct pt_regs *);
 #define PTRACE_SETFPAREGS         21
 
 /* There are for debugging 64-bit processes, either from a 32 or 64 bit
- * parent.  Thus their compliments are for debugging 32-bit processes only.
+ * parent.  Thus their complements are for debugging 32-bit processes only.
  */
 
 #define PTRACE_GETREGS64	  22

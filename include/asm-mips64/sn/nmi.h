@@ -42,7 +42,7 @@
  * The NMI routine is called only if the complement address is
  * correct.
  *
- * Before control is transferred to a routine, the compliment address
+ * Before control is transferred to a routine, the complement address
  * is zeroed (invalidated) to prevent an accidental call from a spurious
  * interrupt.
  *
