@@ -169,9 +169,6 @@ struct winsize {
 	0; \
 })
 
-#define MODULE_ALIAS_LDISC(ldisc) \
-	MODULE_ALIAS("tty-ldisc-" __stringify(ldisc))
-
 #endif	/* __KERNEL__ */
 
 #endif /* _SPARC_TERMIOS_H */
