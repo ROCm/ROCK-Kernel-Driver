@@ -607,14 +607,14 @@ struct sctp6_sock {
 
 /* Is a socket of this style? */
 #define sctp_style(sk, style) __sctp_style((sk), (SCTP_SOCKET_##style))
-int static inline __sctp_style(const struct sock *sk, sctp_socket_type_t style)
+static inline int __sctp_style(const struct sock *sk, sctp_socket_type_t style)
 {
 	return sctp_sk(sk)->type == style;
 }
 
 /* Is the association in this state? */
 #define sctp_state(asoc, state) __sctp_state((asoc), (SCTP_STATE_##state))
-int static inline __sctp_state(const struct sctp_association *asoc,
+static inline int __sctp_state(const struct sctp_association *asoc,
 			       sctp_state_t state)
 {
 	return asoc->state == state;
@@ -622,7 +622,7 @@ int static inline __sctp_state(const struct sctp_association *asoc,
 
 /* Is the socket in this state? */
 #define sctp_sstate(sk, state) __sctp_sstate((sk), (SCTP_SS_##state))
-int static inline __sctp_sstate(const struct sock *sk, sctp_sock_state_t state)
+static inline int __sctp_sstate(const struct sock *sk, sctp_sock_state_t state)
 {
 	return sk->sk_state == state;
 }
