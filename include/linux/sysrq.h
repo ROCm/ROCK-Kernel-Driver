@@ -14,12 +14,10 @@
 #include <linux/config.h>
 
 struct pt_regs;
-struct kbd_struct;
 struct tty_struct;
 
 struct sysrq_key_op {
-	void (*handler)(int, struct pt_regs *,
-			struct kbd_struct *, struct tty_struct *);
+	void (*handler)(int, struct pt_regs *, struct tty_struct *);
 	char *help_msg;
 	char *action_msg;
 };
@@ -31,19 +29,14 @@ struct sysrq_key_op {
  * are available -- else NULL's).
  */
 
-void handle_sysrq(int, struct pt_regs *,
-		struct kbd_struct *, struct tty_struct *);
-
+void handle_sysrq(int, struct pt_regs *, struct tty_struct *);
 
 /* 
  * Nonlocking version of handle sysrq, used by sysrq handlers that need to
  * call sysrq handlers
  */
 
-void __handle_sysrq_nolock(int, struct pt_regs *,
-                struct kbd_struct *, struct tty_struct *);
-
-
+void __handle_sysrq_nolock(int, struct pt_regs *, struct tty_struct *);
 
 /*
  * Sysrq registration manipulation functions

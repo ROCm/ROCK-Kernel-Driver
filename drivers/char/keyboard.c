@@ -245,7 +245,7 @@ void handle_scancode(unsigned char scancode, int down)
 		goto out;
 	} else if (sysrq_pressed) {
 		if (!up_flag) {
-			handle_sysrq(kbd_sysrq_xlate[keycode], kbd_pt_regs, kbd, tty);
+			handle_sysrq(kbd_sysrq_xlate[keycode], kbd_pt_regs, tty);
 			goto out;
 		}
 	}
