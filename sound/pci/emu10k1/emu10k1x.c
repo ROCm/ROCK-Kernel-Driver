@@ -575,15 +575,15 @@ static int snd_emu10k1x_pcm_open_capture(snd_pcm_substream_t *substream)
                 return err;
 
 	epcm = kcalloc(1, sizeof(*epcm), GFP_KERNEL);
-	if (epcm == NULL) {
+	if (epcm == NULL)
 		return -ENOMEM;
-	}
+
 	epcm->emu = chip;
 	epcm->substream = substream;
-  
+
 	runtime->private_data = epcm;
 	runtime->private_free = snd_emu10k1x_pcm_free_substream;
-  
+
 	runtime->hw = snd_emu10k1x_capture_hw;
 
 	return 0;
@@ -604,7 +604,7 @@ static int snd_emu10k1x_pcm_hw_params_capture(snd_pcm_substream_t *substream,
 
 	if (! epcm->voice) {
 		if (epcm->emu->capture_voice.use)
-			return -1;
+			return -EBUSY;
 		epcm->voice = &epcm->emu->capture_voice;
 		epcm->voice->epcm = epcm;
 		epcm->voice->use = 1;
@@ -889,20 +889,7 @@ static int __devinit snd_emu10k1x_pcm(emu10k1x_t *emu, int device, snd_pcm_t **r
 	}
 	emu->pcm = pcm;
 
-	for(substream = pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream; 
-	    substream; 
-	    substream = substream->next)
-		if ((err = snd_pcm_lib_preallocate_pages(substream, 
-							 SNDRV_DMA_TYPE_DEV, 
-							 snd_dma_pci_data(emu->pci), 
-							 32*1024, 32*1024)) < 0)
-			return err;
-
-	for (substream = pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream; 
-	     substream; 
-	     substream = substream->next)
-		snd_pcm_lib_preallocate_pages(substream, 
-					      SNDRV_DMA_TYPE_DEV, 
+	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
 					      snd_dma_pci_data(emu->pci), 
 					      32*1024, 32*1024);
   
