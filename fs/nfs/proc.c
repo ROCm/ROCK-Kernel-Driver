@@ -490,7 +490,7 @@ nfs_proc_fsinfo(struct nfs_server *server, struct nfs_fh *fhandle,
 
 	dprintk("NFS call  fsinfo\n");
 	info->fattr->valid = 0;
-	status = rpc_call(server->client, NFSPROC_STATFS, fhandle, &info, 0);
+	status = rpc_call(server->client, NFSPROC_STATFS, fhandle, &fsinfo, 0);
 	dprintk("NFS reply fsinfo: %d\n", status);
 	if (status)
 		goto out;
