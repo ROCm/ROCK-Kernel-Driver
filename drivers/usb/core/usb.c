@@ -1066,6 +1066,37 @@ static inline void usb_show_string(struct usb_device *dev, char *id, int index)
 	kfree(buf);
 }
 
+static int usb_choose_configuration(struct usb_device *dev)
+{
+	int c, i;
+
+	c = dev->config[0].desc.bConfigurationValue;
+	if (dev->descriptor.bNumConfigurations != 1) {
+		for (i = 0; i < dev->descriptor.bNumConfigurations; i++) {
+			struct usb_interface_descriptor	*desc;
+
+			/* heuristic:  Linux is more likely to have class
+			 * drivers, so avoid vendor-specific interfaces.
+			 */
+			desc = &dev->config[i].intf_cache[0]
+					->altsetting->desc;
+			if (desc->bInterfaceClass == USB_CLASS_VENDOR_SPEC)
+				continue;
+			/* COMM/2/all is CDC ACM, except 0xff is MSFT RNDIS */
+			if (desc->bInterfaceClass == USB_CLASS_COMM
+					&& desc->bInterfaceSubClass == 2
+					&& desc->bInterfaceProtocol == 0xff)
+				continue;
+			c = dev->config[i].desc.bConfigurationValue;
+			break;
+		}
+		dev_info(&dev->dev,
+			"configuration #%d chosen from %d choices\n",
+			c, dev->descriptor.bNumConfigurations);
+	}
+	return c;
+}
+
 /*
  * usb_new_device - perform initial device setup (usbcore-internal)
  * @dev: newly addressed device (in ADDRESS state)
@@ -1087,8 +1118,7 @@ static inline void usb_show_string(struct usb_device *dev, char *id, int index)
 int usb_new_device(struct usb_device *dev)
 {
 	int err;
-	int i;
-	int config;
+	int c;
 
 	err = usb_get_configuration(dev);
 	if (err < 0) {
@@ -1122,35 +1152,10 @@ int usb_new_device(struct usb_device *dev)
 	 * with the driver core, and lets usb device drivers bind to them.
 	 * NOTE:  should interact with hub power budgeting.
 	 */
-	config = dev->config[0].desc.bConfigurationValue;
-	if (dev->descriptor.bNumConfigurations != 1) {
-		for (i = 0; i < dev->descriptor.bNumConfigurations; i++) {
-			struct usb_interface_descriptor	*desc;
-
-			/* heuristic:  Linux is more likely to have class
-			 * drivers, so avoid vendor-specific interfaces.
-			 */
-			desc = &dev->config[i].intf_cache[0]
-					->altsetting->desc;
-			if (desc->bInterfaceClass == USB_CLASS_VENDOR_SPEC)
-				continue;
-			/* COMM/2/all is CDC ACM, except 0xff is MSFT RNDIS */
-			if (desc->bInterfaceClass == USB_CLASS_COMM
-					&& desc->bInterfaceSubClass == 2
-					&& desc->bInterfaceProtocol == 0xff)
-				continue;
-			config = dev->config[i].desc.bConfigurationValue;
-			break;
-		}
-		dev_info(&dev->dev,
-			"configuration #%d chosen from %d choices\n",
-			config,
-			dev->descriptor.bNumConfigurations);
-	}
-	err = usb_set_configuration(dev, config);
+	c = usb_choose_configuration(dev);
+	err = usb_set_configuration(dev, c);
 	if (err) {
-		dev_err(&dev->dev, "can't set config #%d, error %d\n",
-			config, err);
+		dev_err(&dev->dev, "can't set config #%d, error %d\n", c, err);
 		device_del(&dev->dev);
 		goto fail;
 	}
