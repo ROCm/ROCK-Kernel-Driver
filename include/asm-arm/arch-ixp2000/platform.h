@@ -16,7 +16,7 @@
 #ifndef __ASSEMBLY__
 
 /*
- * The IXP2400B0 silicon contains an errata that causes writes to 
+ * The IXP2400 B0 silicon contains an errata that causes writes to 
  * on-chip I/O register to not complete fully. What this means is
  * that if you have a write to on-chip I/O followed by a back-to-back
  * read or write, the first write will happend twice. OR...if it's
@@ -38,7 +38,7 @@ static inline void ixp2000_reg_write(volatile unsigned long *reg, unsigned long 
 
 	local_irq_save(flags);
 	*reg = val;
-	__asm__ __volatile__("":::"memory");
+	barrier();
 	dummy = *reg;
 	local_irq_restore(flags);
 }

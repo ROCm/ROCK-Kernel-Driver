@@ -50,10 +50,4 @@
 
 #define	IXDP2X01_UART_CLK		1843200
 
-#ifndef __ASSEMBLY__
-#include <asm/mach-types.h>
-#define	machine_is_ixdp2x01() 		(machine_is_ixdp2401() || \
-					 machine_is_ixdp2801())
-#endif
-
 #endif /* __IXDP2x01_H__ */
