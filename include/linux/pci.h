@@ -606,8 +606,6 @@ static inline int pci_write_config_dword(struct pci_dev *dev, int where, u32 val
 	return pci_bus_write_config_dword (dev->bus, dev->devfn, where, val);
 }
 
-extern spinlock_t pci_lock;
-
 int pci_enable_device(struct pci_dev *dev);
 int pci_enable_device_bars(struct pci_dev *dev, int mask);
 void pci_disable_device(struct pci_dev *dev);
