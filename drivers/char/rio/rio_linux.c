@@ -60,6 +60,7 @@
 #include <linux/init.h>
 
 #include <linux/generic_serial.h>
+#include <asm/uaccess.h>
 
 #if BITS_PER_LONG != 32
 #  error FIXME: this driver only works on 32-bit platforms
