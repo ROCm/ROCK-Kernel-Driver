@@ -14,17 +14,14 @@
  *     20-Aug-2004 BJD  Added s3c2410_board struct
  *     04-Sep-2004 BJD  Added s3c2410_init_uarts() call
  *     17-Oct-2004 BJD  Moved board out to cpu
+ *     04-Jan-2005 BJD  Changed uart init
 */
 
-struct s3c2410_uartcfg;
-
 extern void s3c2410_map_io(struct map_desc *, int count);
-
-extern void s3c2410_init_uarts(struct s3c2410_uartcfg *, int no);
 
 extern void s3c2410_init_irq(void);
 
 struct sys_timer;
 extern struct sys_timer s3c2410_timer;
 
-extern void s3c2410_init_uarts(struct s3c2410_uartcfg *cfg, int no);
+
