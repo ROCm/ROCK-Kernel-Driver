@@ -148,15 +148,11 @@ static inline void clear_page_anon(struct page *page)
 		free_anonmm(anonmm);
 }
 
-/**
- ** VM stuff below this comment
- **/
-
 /*
  * At what user virtual address is pgoff expected in file-backed vma?
  */
-static inline
-unsigned long vma_address(struct vm_area_struct *vma, pgoff_t pgoff)
+static inline unsigned long
+vma_address(struct vm_area_struct *vma, pgoff_t pgoff)
 {
 	unsigned long address;
 
@@ -165,11 +161,10 @@ unsigned long vma_address(struct vm_area_struct *vma, pgoff_t pgoff)
 	return address;
 }
 
-/**
- ** Subfunctions of page_referenced: page_referenced_one called
- ** repeatedly from either page_referenced_anon or page_referenced_file.
- **/
-
+/*
+ * Subfunctions of page_referenced: page_referenced_one called
+ * repeatedly from either page_referenced_anon or page_referenced_file.
+ */
 static int page_referenced_one(struct page *page,
 	struct mm_struct *mm, unsigned long address,
 	unsigned int *mapcount, int *failed)
@@ -265,9 +260,9 @@ static inline int page_referenced_anon(struct page *page)
 
 	/*
 	 * The warning below may appear if page_referenced catches the
-	 * page in between page_add_rmap and its replacement demanded
-	 * by mremap_moved_anon_page: so remove the warning once we're
-	 * convinced that anonmm rmap really is finding its pages.
+	 * page in between page_add_{anon,file}_rmap and its replacement
+	 * demanded by mremap_moved_anon_page: so remove the warning once
+	 * we're convinced that anonmm rmap really is finding its pages.
 	 */
 	WARN_ON(!failed);
 out:
@@ -300,7 +295,7 @@ migrate:
  *
  * This function is only called from page_referenced for object-based pages.
  *
- * The semaphore address_space->i_mmap_lock is tried.  If it can't be gotten,
+ * The spinlock address_space->i_mmap_lock is tried.  If it can't be gotten,
  * assume a reference count of 0, so try_to_unmap will then have a go.
  */
 static inline int page_referenced_file(struct page *page)
@@ -478,11 +473,10 @@ int fastcall mremap_move_anon_rmap(struct page *page, unsigned long address)
 	return move;
 }
 
-/**
- ** Subfunctions of try_to_unmap: try_to_unmap_one called
- ** repeatedly from either try_to_unmap_anon or try_to_unmap_file.
- **/
-
+/*
+ * Subfunctions of try_to_unmap: try_to_unmap_one called
+ * repeatedly from either try_to_unmap_anon or try_to_unmap_file.
+ */
 static int try_to_unmap_one(struct page *page,
 	struct mm_struct *mm, unsigned long address,
 	unsigned int *mapcount, struct vm_area_struct *vma)
@@ -721,7 +715,7 @@ out:
  *
  * This function is only called from try_to_unmap for object-based pages.
  *
- * The semaphore address_space->i_mmap_lock is tried.  If it can't be gotten,
+ * The spinlock address_space->i_mmap_lock is tried.  If it can't be gotten,
  * return a temporary error.
  */
 static inline int try_to_unmap_file(struct page *page)
