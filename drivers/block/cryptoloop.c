@@ -79,20 +79,70 @@ cryptoloop_init(struct loop_device *lo, const struct loop_info64 *info)
 	return err;
 }
 
-typedef int (*encdec_t)(struct crypto_tfm *tfm,
+
+typedef int (*encdec_ecb_t)(struct crypto_tfm *tfm,
 			struct scatterlist *sg_out,
 			struct scatterlist *sg_in,
-			unsigned int nsg, u8 *iv);
+			unsigned int nsg);
+
 
 static int
-cryptoloop_transfer(struct loop_device *lo, int cmd, char *raw_buf,
+cryptoloop_transfer_ecb(struct loop_device *lo, int cmd, char *raw_buf,
 		     char *loop_buf, int size, sector_t IV)
 {
 	struct crypto_tfm *tfm = (struct crypto_tfm *) lo->key_data;
 	struct scatterlist sg_out = { 0, };
 	struct scatterlist sg_in = { 0, };
 
-	encdec_t encdecfunc;
+	encdec_ecb_t encdecfunc;
+	char const *in;
+	char *out;
+
+	if (cmd == READ) {
+		in = raw_buf;
+		out = loop_buf;
+		encdecfunc = tfm->crt_u.cipher.cit_decrypt;
+	} else {
+		in = loop_buf;
+		out = raw_buf;
+		encdecfunc = tfm->crt_u.cipher.cit_encrypt;
+	}
+
+	while (size > 0) {
+		const int sz = min(size, LOOP_IV_SECTOR_SIZE);
+
+		sg_in.page = virt_to_page(in);
+		sg_in.offset = (unsigned long)in & ~PAGE_MASK;
+		sg_in.length = sz;
+
+		sg_out.page = virt_to_page(out);
+		sg_out.offset = (unsigned long)out & ~PAGE_MASK;
+		sg_out.length = sz;
+
+		encdecfunc(tfm, &sg_out, &sg_in, sz);
+
+		size -= sz;
+		in += sz;
+		out += sz;
+	}
+
+	return 0;
+}
+
+typedef int (*encdec_cbc_t)(struct crypto_tfm *tfm,
+			struct scatterlist *sg_out,
+			struct scatterlist *sg_in,
+			unsigned int nsg, u8 *iv);
+
+static int
+cryptoloop_transfer_cbc(struct loop_device *lo, int cmd, char *raw_buf,
+		     char *loop_buf, int size, sector_t IV)
+{
+	struct crypto_tfm *tfm = (struct crypto_tfm *) lo->key_data;
+	struct scatterlist sg_out = { 0, };
+	struct scatterlist sg_in = { 0, };
+
+	encdec_cbc_t encdecfunc;
 	char const *in;
 	char *out;
 
@@ -130,6 +180,27 @@ cryptoloop_transfer(struct loop_device *lo, int cmd, char *raw_buf,
 	return 0;
 }
 
+static int
+cryptoloop_transfer(struct loop_device *lo, int cmd, char *raw_buf,
+		     char *loop_buf, int size, sector_t IV)
+{
+	struct crypto_tfm *tfm = (struct crypto_tfm *) lo->key_data;
+	if(tfm->crt_cipher.cit_mode == CRYPTO_TFM_MODE_ECB)
+	{
+		lo->transfer = cryptoloop_transfer_ecb;
+		return cryptoloop_transfer_ecb(lo, cmd, raw_buf, loop_buf, size, IV);
+	}	
+	if(tfm->crt_cipher.cit_mode == CRYPTO_TFM_MODE_CBC)
+	{	
+		lo->transfer = cryptoloop_transfer_cbc;
+		return cryptoloop_transfer_cbc(lo, cmd, raw_buf, loop_buf, size, IV);
+	}
+	
+	/*  This is not supposed to happen */
+
+	printk( KERN_ERR "cryptoloop: unsupported cipher mode in cryptoloop_transfer!\n");
+	return -EINVAL;
+}
 
 static int
 cryptoloop_ioctl(struct loop_device *lo, int cmd, unsigned long arg)
