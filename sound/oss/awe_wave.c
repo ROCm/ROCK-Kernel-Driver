@@ -757,7 +757,7 @@ err_out:
 	return 0;
 }
 
-static void __exit
+static void
 awe_release_region(void)
 {
 	if (! port_setuped) return;
