@@ -14,44 +14,50 @@
  *  14-May-2003 BJD  Removed idle to aid debugging
  *  12-Jun-2003 BJD  Added reset via watchdog
  *  04-Sep-2003 BJD  Moved to v2.6
+ *  28-Oct-2004 BJD  Added over-ride for idle, and fixed reset panic()
  */
 
 #include <asm/hardware.h>
 #include <asm/io.h>
 
 #include <asm/arch/map.h>
+#include <asm/arch/idle.h>
 
 #include <asm/arch/regs-watchdog.h>
 #include <asm/arch/regs-clock.h>
 
-extern void printascii(const char *);
+void (*s3c24xx_idle)(void);
 
-void
-arch_idle(void)
+void s3c24xx_default_idle(void)
 {
-	//unsigned long reg = S3C2410_CLKCON;
-
-	//printascii("arch_idle:\n");
+	unsigned long reg = S3C2410_CLKCON;
+	unsigned long tmp;
+	int i;
 
 	/* idle the system by using the idle mode which will wait for an
 	 * interrupt to happen before restarting the system.
 	 */
 
-	/* going into idle state upsets the jtag, so don't do it
-	 * at the moment */
+	/* Warning: going into idle state upsets jtag scanning */
 
-#if 0
 	__raw_writel(__raw_readl(reg) | (1<<2), reg);
 
 	/* the samsung port seems to do a loop and then unset idle.. */
 	for (i = 0; i < 50; i++) {
-		tmp = __raw_readl(reg); /* ensure loop not optimised out */
+		tmp += __raw_readl(reg); /* ensure loop not optimised out */
 	}
 
-	//printascii("arch_idle: done\n");
+	/* this bit is not cleared on re-start... */
 
 	__raw_writel(__raw_readl(reg) & ~(1<<2), reg);
-#endif
+}
+
+static void arch_idle(void)
+{
+	if (s3c24xx_idle != NULL)
+		(s3c24xx_idle)();
+	else
+		s3c24xx_default_idle();
 }
 
 
@@ -77,7 +83,7 @@ arch_reset(char mode)
 	/* wait for reset to assert... */
 	mdelay(5000);
 
-	panic("Watchdog reset failed to assert reset\n");
+	printk(KERN_ERR "Watchdog reset failed to assert reset\n");
 
 	/* we'll take a jump through zero as a poor second */
 	cpu_reset(0);
