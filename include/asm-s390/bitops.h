@@ -560,7 +560,7 @@ find_first_zero_bit(unsigned long * addr, unsigned int size)
                 "   alr  %0,%2\n"
                 "4:"
                 : "=&a" (res), "=&d" (cmp), "=&a" (count)
-                : "a" (size), "a" (addr), "a" (&_zb_findmap) : "cc" );
+                : "a" (size), "a" (addr), "a" (&_zb_findmap), "m" (*addr) : "cc" );
         return (res < size) ? res : size;
 }
 
@@ -599,7 +599,7 @@ find_first_bit(unsigned long * addr, unsigned int size)
                 "   alr  %0,%2\n"
                 "4:"
                 : "=&a" (res), "=&d" (cmp), "=&a" (count)
-                : "a" (size), "a" (addr), "a" (&_sb_findmap) : "cc" );
+                : "a" (size), "a" (addr), "a" (&_sb_findmap), "m" (*addr) : "cc" );
         return (res < size) ? res : size;
 }
 
@@ -777,7 +777,8 @@ find_first_zero_bit(unsigned long * addr, unsigned long size)
                 "   algr  %0,%2\n"
                 "5:"
                 : "=&a" (res), "=&d" (cmp), "=&a" (count)
-		: "a" (size), "a" (addr), "a" (&_zb_findmap) : "cc" );
+		: "a" (size), "a" (addr), "a" (&_zb_findmap), "m" (*addr) 
+		: "cc" );
         return (res < size) ? res : size;
 }
 
@@ -819,7 +820,8 @@ find_first_bit(unsigned long * addr, unsigned long size)
                 "   algr  %0,%2\n"
                 "5:"
                 : "=&a" (res), "=&d" (cmp), "=&a" (count)
-		: "a" (size), "a" (addr), "a" (&_sb_findmap) : "cc" );
+		: "a" (size), "a" (addr), "a" (&_sb_findmap), "m" (*addr) 
+		: "cc" );
         return (res < size) ? res : size;
 }
 
@@ -1098,6 +1100,7 @@ static inline int
 ext2_find_first_zero_bit(void *vaddr, unsigned int size)
 {
 	unsigned long cmp, count;
+	unsigned long *addr = vaddr;
         unsigned int res;
 
         if (!size)
@@ -1130,7 +1133,8 @@ ext2_find_first_zero_bit(void *vaddr, unsigned int size)
                 "   alr  %0,%2\n"
                 "4:"
                 : "=&a" (res), "=&d" (cmp), "=&a" (count)
-                : "a" (size), "a" (vaddr), "a" (&_zb_findmap) : "cc" );
+                : "a" (size), "a" (addr), "a" (&_zb_findmap), "m" (*addr) 
+		: "cc" );
         return (res < size) ? res : size;
 }
 
@@ -1150,7 +1154,7 @@ ext2_find_next_zero_bit(void *vaddr, unsigned int size, unsigned offset)
                         "   icm  %0,2,1(%1)\n"
                         "   icm  %0,4,2(%1)\n"
                         "   icm  %0,8,3(%1)"
-                        : "=&a" (word) : "a" (p) : "cc" );
+                        : "=&a" (word) : "a" (p), "m" (*p) : "cc" );
 		word >>= bit;
                 res = bit;
                 /* Look for zero in first longword */
@@ -1183,6 +1187,7 @@ static inline unsigned long
 ext2_find_first_zero_bit(void *vaddr, unsigned long size)
 {
         unsigned long res, cmp, count;
+	unsigned long *addr = vaddr;
 
         if (!size)
                 return 0;
@@ -1217,7 +1222,8 @@ ext2_find_first_zero_bit(void *vaddr, unsigned long size)
                 "   algr  %0,%2\n"
                 "5:"
                 : "=&a" (res), "=&d" (cmp), "=&a" (count)
-		: "a" (size), "a" (vaddr), "a" (&_zb_findmap) : "cc" );
+		: "a" (size), "a" (addr), "a" (&_zb_findmap), "m" (*addr) 
+		: "cc" );
         return (res < size) ? res : size;
 }
 

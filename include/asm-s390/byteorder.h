@@ -50,7 +50,7 @@ static __inline__ __u32 ___arch__swab32p(__u32 *x)
 		"        icm   %0,4,2(%1)\n"
 		"        icm   %0,2,1(%1)\n"
 		"        ic    %0,0(%1)"
-		: "=&d" (result) : "a" (x) : "cc" );
+		: "=&d" (result) : "a" (x) , "m" (*x) : "cc" );
 #else /* __s390x__ */
 		"   lrv  %0,%1"
 		: "=d" (result) : "m" (*x) );
@@ -85,7 +85,7 @@ static __inline__ __u16 ___arch__swab16p(__u16 *x)
 #ifndef __s390x__
 		"        icm   %0,2,1(%1)\n"
 		"        ic    %0,0(%1)\n"
-		: "=&d" (result) : "a" (x) : "cc" );
+		: "=&d" (result) : "a" (x), "m" (*x) : "cc" );
 #else /* __s390x__ */
 		"   lrvh %0,%1"
 		: "=d" (result) : "m" (*x) );
