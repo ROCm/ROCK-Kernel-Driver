@@ -736,7 +736,7 @@ static struct sock *raw_get_idx(struct seq_file *seq, loff_t pos)
 static void *raw_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock(&raw_v4_lock);
-	return *pos ? raw_get_idx(seq, *pos) : SEQ_START_TOKEN;
+	return *pos ? raw_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
 }
 
 static void *raw_seq_next(struct seq_file *seq, void *v, loff_t *pos)

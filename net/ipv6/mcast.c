@@ -2278,7 +2278,7 @@ static struct ip6_sf_list *igmp6_mcf_get_idx(struct seq_file *seq, loff_t pos)
 static void *igmp6_mcf_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock(&dev_base_lock);
-	return *pos ? igmp6_mcf_get_idx(seq, *pos) : SEQ_START_TOKEN;
+	return *pos ? igmp6_mcf_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
 }
 
 static void *igmp6_mcf_seq_next(struct seq_file *seq, void *v, loff_t *pos)
