@@ -324,7 +324,7 @@ static void auerchain_complete (struct urb * urb, struct pt_regs *regs)
                 urb    = acep->urbp;
                 dbg ("auerchain_complete: submitting next urb from chain");
 		urb->status = 0;	/* needed! */
-		result = usb_submit_urb(urb, GFP_KERNEL);
+		result = usb_submit_urb(urb, GFP_ATOMIC);
 
                 /* check for submit errors */
                 if (result) {
@@ -402,7 +402,7 @@ static int auerchain_submit_urb_list (pauerchain_t acp, struct urb * urb, int ea
         if (acep) {
                 dbg("submitting urb immediate");
 		urb->status = 0;	/* needed! */
-                result = usb_submit_urb(urb, GFP_KERNEL);
+                result = usb_submit_urb(urb, GFP_ATOMIC);
                 /* check for submit errors */
                 if (result) {
                         urb->status = result;

@@ -138,6 +138,7 @@ enum
 #define RTPROT_ZEBRA	11	/* Zebra */
 #define RTPROT_BIRD	12	/* BIRD */
 #define RTPROT_DNROUTED	13	/* DECnet routing daemon */
+#define RTPROT_XORP	14	/* XORP */
 
 /* rtm_scope
 

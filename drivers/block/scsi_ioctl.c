@@ -432,12 +432,23 @@ int scsi_cmd_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long ar
 			break;
 		case SG_IO: {
 			struct sg_io_hdr hdr;
+			unsigned char cdb[BLK_MAX_CDB], *old_cdb;
 
-			if (copy_from_user(&hdr, (struct sg_io_hdr *) arg, sizeof(hdr))) {
-				err = -EFAULT;
+			err = -EFAULT;
+			if (copy_from_user(&hdr, (struct sg_io_hdr *) arg, sizeof(hdr)))
 				break;
-			}
+			err = -EINVAL;
+			if (hdr.cmd_len > sizeof(rq->cmd))
+				break;
+			err = -EFAULT;
+			if (copy_from_user(cdb, hdr.cmdp, hdr.cmd_len))
+				break;
+
+			old_cdb = hdr.cmdp;
+			hdr.cmdp = cdb;
 			err = sg_io(q, bdev, &hdr);
+
+			hdr.cmdp = old_cdb;
 			if (copy_to_user((struct sg_io_hdr *) arg, &hdr, sizeof(hdr)))
 				err = -EFAULT;
 			break;

@@ -1120,6 +1120,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	if (err) {
 		dev_err(&dev->dev, "can't set config #%d, error %d\n",
 			dev->config[0].desc.bConfigurationValue, err);
+		device_del(&dev->dev);
 		goto fail;
 	}
 

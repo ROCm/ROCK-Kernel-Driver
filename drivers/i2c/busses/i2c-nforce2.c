@@ -147,7 +147,7 @@ static s32 nforce2_access(struct i2c_adapter * adap, u16 addr,
 
 		case I2C_SMBUS_BYTE:
 			if (read_write == I2C_SMBUS_WRITE)
-				outb_p(data->byte, NVIDIA_SMB_DATA);
+				outb_p(command, NVIDIA_SMB_CMD);
 			protocol |= NVIDIA_SMB_PRTCL_BYTE;
 			break;
 
