@@ -10,11 +10,11 @@ ELFTOAOUT	:= elftoaout
 host-progs	:= piggyback
 targets		:= image tftpboot.img vmlinux.aout
 
-quiet_cmd_elftoaout = ELT2AOUT $@
+quiet_cmd_elftoaout = ELF2AOUT $@
       cmd_elftoaout = $(ELFTOAOUT) vmlinux -o $@
-quiet_cmd_piggy     = PIGGY    $@
+quiet_cmd_piggy     = PIGGY   $@
       cmd_piggy     = $(obj)/piggyback $@ System.map $(ROOT_IMG)
-quiet_cmd_strip     = STRIP $@
+quiet_cmd_strip     = STRIP   $@
       cmd_strip     = $(STRIP) -R .comment -R .note -K sun4u_init -K _end -K _start vmlinux -o $@
 
 
