@@ -527,10 +527,10 @@ static void fib_hash_move(struct hlist_head *new_info_hash,
 
 	for (i = 0; i < old_size; i++) {
 		struct hlist_head *head = &fib_info_hash[i];
-		struct hlist_node *node;
+		struct hlist_node *node, *n;
 		struct fib_info *fi;
 
-		hlist_for_each_entry(fi, node, head, fib_hash) {
+		hlist_for_each_entry_safe(fi, node, n, head, fib_hash) {
 			struct hlist_head *dest;
 			unsigned int new_hash;
 
@@ -545,10 +545,10 @@ static void fib_hash_move(struct hlist_head *new_info_hash,
 
 	for (i = 0; i < old_size; i++) {
 		struct hlist_head *lhead = &fib_info_laddrhash[i];
-		struct hlist_node *node;
+		struct hlist_node *node, *n;
 		struct fib_info *fi;
 
-		hlist_for_each_entry(fi, node, lhead, fib_lhash) {
+		hlist_for_each_entry_safe(fi, node, n, lhead, fib_lhash) {
 			struct hlist_head *ldest;
 			unsigned int new_hash;
 
