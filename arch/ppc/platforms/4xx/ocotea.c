@@ -1,11 +1,11 @@
 /*
- * arch/ppc/platforms/ocotea.c
+ * arch/ppc/platforms/4xx/ocotea.c
  *
  * Ocotea board specific routines
  *
- * Matt Porter <mporter@mvista.com>
+ * Matt Porter <mporter@kernel.crashing.org>
  *
- * Copyright 2003 MontaVista Software Inc.
+ * Copyright 2003-2004 MontaVista Software Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -49,6 +49,7 @@
 #include <asm/ppc4xx_pic.h>
 #include <asm/ppcboot.h>
 
+#include <syslib/gen550.h>
 #include <syslib/ibm440gx_common.h>
 
 /*
@@ -263,6 +264,11 @@ ocotea_early_serial_map(void)
 		printk("Early serial init of port 0 failed\n");
 	}
 
+#if defined(CONFIG_SERIAL_TEXT_DEBUG) || defined(CONFIG_KGDB)
+	/* Configure debug serial access */
+	gen550_init(0, &port);
+#endif
+
 	port.membase = ioremap64(PPC440GX_UART1_ADDR, 8);
 	port.irq = UART1_INT;
 	port.uartclk = clocks.uart1;
@@ -271,6 +277,11 @@ ocotea_early_serial_map(void)
 	if (early_serial_setup(&port) != 0) {
 		printk("Early serial init of port 1 failed\n");
 	}
+
+#if defined(CONFIG_SERIAL_TEXT_DEBUG) || defined(CONFIG_KGDB)
+	/* Configure debug serial access */
+	gen550_init(1, &port);
+#endif
 }
 
 static void __init
@@ -355,7 +366,6 @@ void __init platform_init(unsigned long r3, unsigned long r4,
 
 	ppc_md.nvram_read_val = todc_direct_read_val;
 	ppc_md.nvram_write_val = todc_direct_write_val;
-
 #ifdef CONFIG_KGDB
 	ppc_md.early_serial_map = ocotea_early_serial_map;
 #endif

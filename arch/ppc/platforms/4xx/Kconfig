@@ -199,6 +199,11 @@ config PPC4xx_EDMA
 	depends on !STB03xxx && PPC4xx_DMA
 	default y
 
+config PPC_GEN550
+	bool
+	depends on 44x
+	default y
+
 config PM
 	bool "Power Management support (EXPERIMENTAL)"
 	depends on 4xx && EXPERIMENTAL

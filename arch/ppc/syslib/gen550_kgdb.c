@@ -9,9 +9,9 @@
  *
  * Adapted from ppc4xx_kgdb.c.
  *
- * Author: Matt Porter <mporter@mvista.com>
+ * Author: Matt Porter <mporter@kernel.crashing.org>
  *
- * 2002-2003 (c) MontaVista Software, Inc.  This file is licensed under
+ * 2002-2004 (c) MontaVista Software, Inc.  This file is licensed under
  * the terms of the GNU General Public License version 2.  This program
  * is licensed "as is" without any warranty of any kind, whether express
  * or implied.
@@ -80,5 +80,7 @@ void
 gen550_kgdb_map_scc(void)
 {
 	printk(KERN_DEBUG "kgdb init\n");
+	if (ppc_md.early_serial_map)
+		ppc_md.early_serial_map();
 	kgdb_debugport = serial_init(KGDB_PORT, NULL);
 }
