@@ -315,15 +315,6 @@ static struct file_operations ipx_seq_socket_fops = {
 	.release        = seq_release,
 };
 
-static int ipx_proc_perms(struct inode* inode, int op)
-{
-	return 0;
-}
-
-static struct inode_operations ipx_seq_inode = {
-	.permission     = ipx_proc_perms,
-};
-
 static struct proc_dir_entry *ipx_proc_dir;
 
 int __init ipx_proc_init(void)
@@ -335,24 +326,21 @@ int __init ipx_proc_init(void)
 
 	if (!ipx_proc_dir)
 		goto out;
-	p = create_proc_entry("interface", 0, ipx_proc_dir);
+	p = create_proc_entry("interface", S_IRUGO, ipx_proc_dir);
 	if (!p)
 		goto out_interface;
 
 	p->proc_fops = &ipx_seq_interface_fops;
-	p->proc_iops = &ipx_seq_inode;
-	p = create_proc_entry("route", 0, ipx_proc_dir);
+	p = create_proc_entry("route", S_IRUGO, ipx_proc_dir);
 	if (!p)
 		goto out_route;
 
 	p->proc_fops = &ipx_seq_route_fops;
-	p->proc_iops = &ipx_seq_inode;
-	p = create_proc_entry("socket", 0, ipx_proc_dir);
+	p = create_proc_entry("socket", S_IRUGO, ipx_proc_dir);
 	if (!p)
 		goto out_socket;
 
 	p->proc_fops = &ipx_seq_socket_fops;
-	p->proc_iops = &ipx_seq_inode;
 
 	rc = 0;
 out:

@@ -73,10 +73,8 @@ extern int  aarp_proxy_probe_network(struct atalk_iface *atif,
 				     struct atalk_addr *sa);
 extern void aarp_proxy_remove(struct net_device *dev, struct atalk_addr *sa);
 
-#ifdef CONFIG_SYSCTL
-extern inline void atalk_register_sysctl(void);
-extern inline void atalk_unregister_sysctl(void);
-#endif /* CONFIG_SYSCTL */
+extern void atalk_register_sysctl(void);
+extern void atalk_unregister_sysctl(void);
 
 struct datalink_proto *ddp_dl, *aarp_dl;
 static struct proto_ops atalk_dgram_ops;
@@ -88,29 +86,29 @@ static struct proto_ops atalk_dgram_ops;
 \**************************************************************************/
 
 struct sock *atalk_sockets;
-spinlock_t atalk_sockets_lock = SPIN_LOCK_UNLOCKED;
+rwlock_t atalk_sockets_lock = RW_LOCK_UNLOCKED;
 
 extern inline void atalk_insert_socket(struct sock *sk)
 {
-	spin_lock_bh(&atalk_sockets_lock);
+	write_lock_bh(&atalk_sockets_lock);
 	sk->next = atalk_sockets;
 	if (sk->next)
 		atalk_sockets->pprev = &sk->next;
 	atalk_sockets = sk;
 	sk->pprev = &atalk_sockets;
-	spin_unlock_bh(&atalk_sockets_lock);
+	write_unlock_bh(&atalk_sockets_lock);
 }
 
 extern inline void atalk_remove_socket(struct sock *sk)
 {
-	spin_lock_bh(&atalk_sockets_lock);
+	write_lock_bh(&atalk_sockets_lock);
 	if (sk->pprev) {
 		if (sk->next)
 			sk->next->pprev = sk->pprev;
 		*sk->pprev = sk->next;
 		sk->pprev = NULL;
 	}
-	spin_unlock_bh(&atalk_sockets_lock);
+	write_unlock_bh(&atalk_sockets_lock);
 }
 
 static struct sock *atalk_search_socket(struct sockaddr_at *to,
@@ -118,7 +116,7 @@ static struct sock *atalk_search_socket(struct sockaddr_at *to,
 {
 	struct sock *s;
 
-	spin_lock_bh(&atalk_sockets_lock);
+	read_lock_bh(&atalk_sockets_lock);
 	for (s = atalk_sockets; s; s = s->next) {
 		struct atalk_sock *at = at_sk(s);
 
@@ -145,7 +143,7 @@ static struct sock *atalk_search_socket(struct sockaddr_at *to,
 			break; 
 		}
 	}
-	spin_unlock_bh(&atalk_sockets_lock);
+	read_unlock_bh(&atalk_sockets_lock);
 	return s;
 }
 
@@ -164,7 +162,7 @@ static struct sock *atalk_find_or_insert_socket(struct sock *sk,
 {
 	struct sock *s;
 
-	spin_lock_bh(&atalk_sockets_lock);
+	write_lock_bh(&atalk_sockets_lock);
 	for (s = atalk_sockets; s; s = s->next) {
 		struct atalk_sock *at = at_sk(s);
 
@@ -183,7 +181,7 @@ static struct sock *atalk_find_or_insert_socket(struct sock *sk,
 		sk->pprev = &atalk_sockets;
 	}
 
-	spin_unlock_bh(&atalk_sockets_lock);
+	write_unlock_bh(&atalk_sockets_lock);
 	return s;
 }
 
@@ -225,12 +223,12 @@ extern inline void atalk_destroy_socket(struct sock *sk)
 *                                                                          *
 \**************************************************************************/
 
-/* Anti-deadlock ordering is router_lock --> iface_lock -DaveM */
+/* Anti-deadlock ordering is atalk_routes_lock --> iface_lock -DaveM */
 struct atalk_route *atalk_routes;
 rwlock_t atalk_routes_lock = RW_LOCK_UNLOCKED;
 
 struct atalk_iface *atalk_interfaces;
-spinlock_t atalk_interfaces_lock = SPIN_LOCK_UNLOCKED;
+rwlock_t atalk_interfaces_lock = RW_LOCK_UNLOCKED;
 
 /* For probing devices or in a routerless network */
 struct atalk_route atrtr_default;
@@ -245,7 +243,7 @@ static void atif_drop_device(struct net_device *dev)
 	struct atalk_iface **iface = &atalk_interfaces;
 	struct atalk_iface *tmp;
 
-	spin_lock_bh(&atalk_interfaces_lock);
+	write_lock_bh(&atalk_interfaces_lock);
 	while ((tmp = *iface) != NULL) {
 		if (tmp->dev == dev) {
 			*iface = tmp->next;
@@ -255,7 +253,7 @@ static void atif_drop_device(struct net_device *dev)
 		} else
 			iface = &tmp->next;
 	}
-	spin_unlock_bh(&atalk_interfaces_lock);
+	write_unlock_bh(&atalk_interfaces_lock);
 }
 
 static struct atalk_iface *atif_add_device(struct net_device *dev,
@@ -274,10 +272,10 @@ static struct atalk_iface *atif_add_device(struct net_device *dev,
 	iface->address = *sa;
 	iface->status = 0;
 
-	spin_lock_bh(&atalk_interfaces_lock);
+	write_lock_bh(&atalk_interfaces_lock);
 	iface->next = atalk_interfaces;
 	atalk_interfaces = iface;
-	spin_unlock_bh(&atalk_interfaces_lock);
+	write_unlock_bh(&atalk_interfaces_lock);
 out:
 	return iface;
 out_mem:
@@ -394,7 +392,7 @@ static struct atalk_addr *atalk_find_primary(void)
 	 * Return a point-to-point interface only if
 	 * there is no non-ptp interface available.
 	 */
-	spin_lock_bh(&atalk_interfaces_lock);
+	read_lock_bh(&atalk_interfaces_lock);
 	for (iface = atalk_interfaces; iface; iface = iface->next) {
 		if (!fiface && !(iface->dev->flags & IFF_LOOPBACK))
 			fiface = iface;
@@ -411,7 +409,7 @@ static struct atalk_addr *atalk_find_primary(void)
 	else
 		retval = NULL;
 out:
-	spin_unlock_bh(&atalk_interfaces_lock);
+	read_unlock_bh(&atalk_interfaces_lock);
 	return retval;
 }
 
@@ -442,7 +440,7 @@ static struct atalk_iface *atalk_find_interface(int net, int node)
 {
 	struct atalk_iface *iface;
 
-	spin_lock_bh(&atalk_interfaces_lock);
+	read_lock_bh(&atalk_interfaces_lock);
 	for (iface = atalk_interfaces; iface; iface = iface->next) {
 		if ((node == ATADDR_BCAST ||
 		     node == ATADDR_ANYNODE ||
@@ -457,7 +455,7 @@ static struct atalk_iface *atalk_find_interface(int net, int node)
 		    ntohs(net) <= ntohs(iface->nets.nr_lastnet))
 		        break;
 	}
-	spin_unlock_bh(&atalk_interfaces_lock);
+	read_unlock_bh(&atalk_interfaces_lock);
 	return iface;
 }
 
@@ -574,7 +572,7 @@ static int atrtr_create(struct rtentry *r, struct net_device *devhint)
 	if (!devhint) {
 		riface = NULL;
 
-		spin_lock_bh(&atalk_interfaces_lock);
+		read_lock_bh(&atalk_interfaces_lock);
 		for (iface = atalk_interfaces; iface; iface = iface->next) {
 			if (!riface &&
 			    ntohs(ga->sat_addr.s_net) >=
@@ -587,7 +585,7 @@ static int atrtr_create(struct rtentry *r, struct net_device *devhint)
 			    ga->sat_addr.s_node == iface->address.s_node)
 				riface = iface;
 		}		
-		spin_unlock_bh(&atalk_interfaces_lock);
+		read_unlock_bh(&atalk_interfaces_lock);
 
 		retval = -ENETUNREACH;
 		if (!riface)
@@ -1042,7 +1040,7 @@ static int atalk_pick_and_bind_port(struct sock *sk, struct sockaddr_at *sat)
 	struct sock *s;
 	int retval;
 
-	spin_lock_bh(&atalk_sockets_lock);
+	write_lock_bh(&atalk_sockets_lock);
 
 	for (sat->sat_port = ATPORT_RESERVED;
 	     sat->sat_port < ATPORT_LAST;
@@ -1071,7 +1069,7 @@ try_next_port:;
 
 	retval = -EBUSY;
 out:
-	spin_unlock_bh(&atalk_sockets_lock);
+	write_unlock_bh(&atalk_sockets_lock);
 	return retval;
 }
 
@@ -1831,13 +1829,18 @@ EXPORT_SYMBOL(aarp_send_ddp);
 EXPORT_SYMBOL(atrtr_get_dev);
 EXPORT_SYMBOL(atalk_find_dev_addr);
 
+static char atalk_banner[] __initdata =
+	KERN_INFO "NET4: AppleTalk 0.20 for Linux NET4.0\n";
+static char atalk_err_snap[] __initdata =
+	KERN_CRIT "Unable to register DDP with SNAP.\n";
+
 /* Called by proto.c on kernel start up */
 static int __init atalk_init(void)
 {
 	(void)sock_register(&atalk_family_ops);
 	ddp_dl = register_snap_client(ddp_snap_id, atalk_rcv);
 	if (!ddp_dl)
-		printk(KERN_CRIT "Unable to register DDP with SNAP.\n");
+		printk(atalk_err_snap);
 
 	dev_add_pack(&ltalk_packet_type);
 	dev_add_pack(&ppptalk_packet_type);
@@ -1848,15 +1851,12 @@ static int __init atalk_init(void)
 #ifdef CONFIG_PROC_FS
 	aarp_register_proc_fs();
 #endif /* CONFIG_PROC_FS */
-#ifdef CONFIG_SYSCTL
 	atalk_register_sysctl();
-#endif /* CONFIG_SYSCTL */
-	printk(KERN_INFO "NET4: AppleTalk 0.20 for Linux NET4.0\n");
+	printk(atalk_banner);
 	return 0;
 }
 module_init(atalk_init);
 
-#ifdef MODULE
 /*
  * Note on MOD_{INC,DEC}_USE_COUNT:
  *
@@ -1886,7 +1886,6 @@ static void __exit atalk_exit(void)
 	sock_unregister(PF_APPLETALK);
 }
 module_exit(atalk_exit);
-#endif  /* MODULE */
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Alan Cox <Alan.Cox@linux.org>");
