@@ -29,14 +29,35 @@
  */
 #define DIO_PAGES	64
 
+/*
+ * This code generally works in units of "dio_blocks".  A dio_block is
+ * somewhere between the hard sector size and the filesystem block size.  it
+ * is determined on a per-invokation basis.   When talking to the filesystem
+ * we need to convert dio_blocks to fs_blocks by scaling the dio_block quantity
+ * down by dio->blkfactor.  Similarly, fs-blocksize quantities are converted
+ * to bio_block quantities by shifting left by blkfactor.
+ *
+ * If blkfactor is zero then the user's request was aligned to the filesystem's
+ * blocksize.
+ */
+
 struct dio {
 	/* BIO submission state */
 	struct bio *bio;		/* bio under assembly */
 	struct inode *inode;
 	int rw;
 	unsigned blkbits;		/* doesn't change */
+	unsigned blkfactor;		/* When we're using an aligment which
+					   is finer than the filesystem's soft
+					   blocksize, this specifies how much
+					   finer.  blkfactor=2 means 1/4-block
+					   alignment.  Does not change */
+	unsigned start_zero_done;	/* flag: sub-blocksize zeroing has
+					   been performed at the start of a
+					   write */
 	int pages_in_io;		/* approximate total IO pages */
-	sector_t block_in_file;		/* changes */
+	sector_t block_in_file;		/* Current offset into the underlying
+					   file in dio_block units. */
 	unsigned blocks_available;	/* At block_in_file.  changes */
 	sector_t final_block_in_request;/* doesn't change */
 	unsigned first_block_in_page;	/* doesn't change, Used only once */
@@ -44,7 +65,8 @@ struct dio {
 	int reap_counter;		/* rate limit reaping */
 	get_blocks_t *get_blocks;	/* block mapping function */
 	sector_t final_block_in_bio;	/* current final block in bio + 1 */
-	sector_t next_block_for_io;	/* next block to be put under IO */
+	sector_t next_block_for_io;	/* next block to be put under IO,
+					   in dio_blocks units */
 	struct buffer_head map_bh;	/* last get_blocks() result */
 
 	/*
@@ -340,6 +362,10 @@ static int get_more_blocks(struct dio *dio)
 {
 	int ret;
 	struct buffer_head *map_bh = &dio->map_bh;
+	sector_t fs_startblk;	/* Into file, in filesystem-sized blocks */
+	unsigned long fs_count;	/* Number of filesystem-sized blocks */
+	unsigned long dio_count;/* Number of dio_block-sized blocks */
+	unsigned long blkmask;
 
 	/*
 	 * If there was a memory error and we've overwritten all the
@@ -350,8 +376,14 @@ static int get_more_blocks(struct dio *dio)
 		map_bh->b_state = 0;
 		map_bh->b_size = 0;
 		BUG_ON(dio->block_in_file >= dio->final_block_in_request);
-		ret = (*dio->get_blocks)(dio->inode, dio->block_in_file,
-				dio->final_block_in_request-dio->block_in_file,
+		fs_startblk = dio->block_in_file >> dio->blkfactor;
+		dio_count = dio->final_block_in_request - dio->block_in_file;
+		fs_count = dio_count >> dio->blkfactor;
+		blkmask = (1 << dio->blkfactor) - 1;
+		if (dio_count & blkmask)	
+			fs_count++;
+
+		ret = (*dio->get_blocks)(dio->inode, fs_startblk, fs_count,
 				map_bh, dio->rw == WRITE);
 	}
 	return ret;
@@ -524,6 +556,49 @@ static void clean_blockdev_aliases(struct dio *dio)
 }
 
 /*
+ * If we are not writing the entire block and get_block() allocated
+ * the block for us, we need to fill-in the unused portion of the
+ * block with zeros. This happens only if user-buffer, fileoffset or
+ * io length is not filesystem block-size multiple.
+ *
+ * `end' is zero if we're doing the start of the IO, 1 at the end of the
+ * IO.
+ */
+static void dio_zero_block(struct dio *dio, int end)
+{
+	unsigned dio_blocks_per_fs_block;
+	unsigned this_chunk_blocks;	/* In dio_blocks */
+	unsigned this_chunk_bytes;
+	struct page *page;
+
+	dio->start_zero_done = 1;
+	if (!dio->blkfactor || !buffer_new(&dio->map_bh))
+		return;
+
+	dio_blocks_per_fs_block = 1 << dio->blkfactor;
+	this_chunk_blocks = dio->block_in_file & (dio_blocks_per_fs_block - 1);
+
+	if (!this_chunk_blocks)
+		return;
+
+	/*
+	 * We need to zero out part of an fs block.  It is either at the
+	 * beginning or the end of the fs block.
+	 */
+	if (end) 
+		this_chunk_blocks = dio_blocks_per_fs_block - this_chunk_blocks;
+
+	this_chunk_bytes = this_chunk_blocks << dio->blkbits;
+
+	page = ZERO_PAGE(dio->cur_user_address);
+	if (submit_page_section(dio, page, 0, this_chunk_bytes, 
+				dio->next_block_for_io))
+		return;
+
+	dio->next_block_for_io += this_chunk_blocks;
+}
+
+/*
  * Walk the user pages, and the file, mapping blocks to disk and generating
  * a sequence of (page,offset,len,block) mappings.  These mappings are injected
  * into submit_page_section(), which takes care of the next stage of submission
@@ -565,21 +640,49 @@ static int do_direct_IO(struct dio *dio)
 			unsigned u;
 
 			if (dio->blocks_available == 0) {
+				/*
+				 * Need to go and map some more disk
+				 */
+				unsigned long blkmask;
+				unsigned long dio_remainder;
+
 				ret = get_more_blocks(dio);
 				if (ret) {
 					page_cache_release(page);
 					goto out;
 				}
-				if (buffer_mapped(map_bh)) {
-					dio->blocks_available =
-						map_bh->b_size >> dio->blkbits;
-					dio->next_block_for_io =
-						map_bh->b_blocknr;
-					if (buffer_new(map_bh))
-						clean_blockdev_aliases(dio);
-				}
-			}
+				if (!buffer_mapped(map_bh))
+					goto do_holes;
 
+				dio->blocks_available =
+						map_bh->b_size >> dio->blkbits;
+				dio->next_block_for_io =
+					map_bh->b_blocknr << dio->blkfactor;
+				if (buffer_new(map_bh))
+					clean_blockdev_aliases(dio);
+
+				if (!dio->blkfactor)
+					goto do_holes;
+
+				blkmask = (1 << dio->blkfactor) - 1;
+				dio_remainder = (dio->block_in_file & blkmask);
+
+				/*
+				 * If we are at the start of IO and that IO
+				 * starts partway into a fs-block,
+				 * dio_remainder will be non-zero.  If the IO
+				 * is a read then we can simply advance the IO
+				 * cursor to the first block which is to be
+				 * read.  But if the IO is a write and the
+				 * block was newly allocated we cannot do that;
+				 * the start of the fs block must be zeroed out
+				 * on-disk
+				 */
+				if (!buffer_new(map_bh))
+					dio->next_block_for_io += dio_remainder;
+				dio->blocks_available -= dio_remainder;
+			}
+do_holes:
 			/* Handle holes */
 			if (!buffer_mapped(map_bh)) {
 				char *kaddr = kmap_atomic(page, KM_USER0);
@@ -591,6 +694,14 @@ static int do_direct_IO(struct dio *dio)
 				block_in_page++;
 				goto next_block;
 			}
+
+			/*
+			 * If we're performing IO which has an alignment which
+			 * is finer than the underlying fs, go check to see if
+			 * we must zero out the start of this block.
+			 */
+			if (unlikely(dio->blkfactor && !dio->start_zero_done))
+				dio_zero_block(dio, 0);
 
 			/*
 			 * Work out, in this_chunk_blocks, how much disk we
@@ -635,9 +746,9 @@ out:
 
 static int
 direct_io_worker(int rw, struct inode *inode, const struct iovec *iov, 
-	loff_t offset, unsigned long nr_segs, get_blocks_t get_blocks)
+	loff_t offset, unsigned long nr_segs, unsigned blkbits,
+	get_blocks_t get_blocks)
 {
-	const unsigned blkbits = inode->i_blkbits;
 	unsigned long user_addr; 
 	int seg, ret2, ret = 0;
 	struct dio dio;
@@ -647,6 +758,8 @@ direct_io_worker(int rw, struct inode *inode, const struct iovec *iov,
 	dio.inode = inode;
 	dio.rw = rw;
 	dio.blkbits = blkbits;
+	dio.blkfactor = inode->i_blkbits - blkbits;
+	dio.start_zero_done = 0;
 	dio.block_in_file = offset >> blkbits;
 	dio.blocks_available = 0;
 
@@ -702,6 +815,12 @@ direct_io_worker(int rw, struct inode *inode, const struct iovec *iov,
 
 	} /* end iovec loop */
 
+	/*
+	 * There may be some unwritten disk at the end of a part-written
+	 * fs-block-sized block.  Go zero that now.
+	 */
+	dio_zero_block(&dio, 1);
+
 	if (dio.cur_page) {
 		ret2 = dio_send_cur_page(&dio);
 		page_cache_release(dio.cur_page);
@@ -723,27 +842,44 @@ direct_io_worker(int rw, struct inode *inode, const struct iovec *iov,
  * This is a library function for use by filesystem drivers.
  */
 int
-generic_direct_IO(int rw, struct inode *inode, const struct iovec *iov, 
-	loff_t offset, unsigned long nr_segs, get_blocks_t get_blocks)
+generic_direct_IO(int rw, struct inode *inode, struct block_device *bdev, 
+	const struct iovec *iov, loff_t offset, unsigned long nr_segs, 
+	get_blocks_t get_blocks)
 {
 	int seg;
 	size_t size;
 	unsigned long addr;
-	unsigned blocksize_mask = (1 << inode->i_blkbits) - 1;
+	unsigned blkbits = inode->i_blkbits;
+	unsigned bdev_blkbits = 0;
+	unsigned blocksize_mask = (1 << blkbits) - 1;
 	ssize_t retval = -EINVAL;
 
-	if (offset & blocksize_mask)
-		goto out;
+	if (bdev)
+		bdev_blkbits = blksize_bits(bdev_hardsect_size(bdev));
+
+	if (offset & blocksize_mask) {
+		if (bdev)
+			 blkbits = bdev_blkbits;
+		blocksize_mask = (1 << blkbits) - 1;
+		if (offset & blocksize_mask)
+			goto out;
+	}
 
 	/* Check the memory alignment.  Blocks cannot straddle pages */
 	for (seg = 0; seg < nr_segs; seg++) {
 		addr = (unsigned long)iov[seg].iov_base;
 		size = iov[seg].iov_len;
-		if ((addr & blocksize_mask) || (size & blocksize_mask)) 
-			goto out;	
+		if ((addr & blocksize_mask) || (size & blocksize_mask))  {
+			if (bdev)
+				 blkbits = bdev_blkbits;
+			blocksize_mask = (1 << blkbits) - 1;
+			if ((addr & blocksize_mask) || (size & blocksize_mask))  
+				goto out;
+		}
 	}
 
-	retval = direct_io_worker(rw, inode, iov, offset, nr_segs, get_blocks);
+	retval = direct_io_worker(rw, inode, iov, offset, 
+				nr_segs, blkbits, get_blocks);
 out:
 	return retval;
 }

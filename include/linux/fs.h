@@ -1252,8 +1252,8 @@ extern void do_generic_mapping_read(struct address_space *, struct file_ra_state
 				    loff_t *, read_descriptor_t *, read_actor_t);
 extern ssize_t generic_file_direct_IO(int rw, struct file *file,
 	const struct iovec *iov, loff_t offset, unsigned long nr_segs);
-extern int generic_direct_IO(int rw, struct inode *inode, const struct iovec 
-	*iov, loff_t offset, unsigned long nr_segs, get_blocks_t *get_blocks);
+extern int generic_direct_IO(int rw, struct inode *inode, struct block_device *bdev,
+	const struct iovec *iov, loff_t offset, unsigned long nr_segs, get_blocks_t *get_blocks);
 extern ssize_t generic_file_readv(struct file *filp, const struct iovec *iov, 
 	unsigned long nr_segs, loff_t *ppos);
 ssize_t generic_file_writev(struct file *filp, const struct iovec *iov, 

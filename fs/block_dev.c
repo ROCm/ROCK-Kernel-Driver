@@ -120,7 +120,7 @@ blkdev_direct_IO(int rw, struct file *file, const struct iovec *iov,
 {
 	struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
 
-	return generic_direct_IO(rw, inode, iov, offset,
+	return generic_direct_IO(rw, inode, inode->i_bdev, iov, offset,
 				nr_segs, blkdev_get_blocks);
 }
 
