@@ -202,7 +202,7 @@ int setkeycode(unsigned int scancode, unsigned int keycode)
 		return -EINVAL;
 
 	oldkey = INPUT_KEYCODE(dev, scancode);
-	SET_INPUT_KEYCODE(dev, scancode, oldkey);
+	SET_INPUT_KEYCODE(dev, scancode, keycode);
 
 	clear_bit(oldkey, dev->keybit);
 	set_bit(keycode, dev->keybit);
