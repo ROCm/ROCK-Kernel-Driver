@@ -173,15 +173,21 @@ static inline int snd_pcm_update_hw_ptr_interrupt(snd_pcm_substream_t *substream
 	snd_pcm_sframes_t delta;
 
 	pos = snd_pcm_update_hw_ptr_pos(substream, runtime);
+	if (runtime->period_size == runtime->buffer_size)
+		goto __next_buf;
 	new_hw_ptr = runtime->hw_ptr_base + pos;
 	hw_ptr_interrupt = runtime->hw_ptr_interrupt + runtime->period_size;
 
 	delta = hw_ptr_interrupt - new_hw_ptr;
 	if (delta > 0) {
 		if ((snd_pcm_uframes_t)delta < runtime->buffer_size / 2) {
-			snd_printd(KERN_ERR "Unexpected hw_pointer value (stream = %i, delta: -%ld, max jitter = %ld): wrong interrupt acknowledge?\n", substream->stream, (long) delta, runtime->buffer_size / 2);
+#ifdef CONFIG_SND_DEBUG
+			if (runtime->periods > 1)
+				snd_printd(KERN_ERR "Unexpected hw_pointer value [1] (stream = %i, delta: -%ld, max jitter = %ld): wrong interrupt acknowledge?\n", substream->stream, (long) delta, runtime->buffer_size / 2);
+#endif
 			return 0;
 		}
+	      __next_buf:
 		runtime->hw_ptr_base += runtime->buffer_size;
 		if (runtime->hw_ptr_base == runtime->boundary)
 			runtime->hw_ptr_base = 0;
@@ -213,7 +219,10 @@ int snd_pcm_update_hw_ptr(snd_pcm_substream_t *substream)
 	delta = old_hw_ptr - new_hw_ptr;
 	if (delta > 0) {
 		if ((snd_pcm_uframes_t)delta < runtime->buffer_size / 2) {
-			snd_printd(KERN_ERR "Unexpected hw_pointer value (stream = %i, delta: -%ld, max jitter = %ld): wrong interrupt acknowledge?\n", substream->stream, (long) delta, runtime->buffer_size / 2);
+#ifdef CONFIG_SND_DEBUG
+			if (runtime->periods > 2)
+				snd_printd(KERN_ERR "Unexpected hw_pointer value [2] (stream = %i, delta: -%ld, max jitter = %ld): wrong interrupt acknowledge?\n", substream->stream, (long) delta, runtime->buffer_size / 2);
+#endif
 			return 0;
 		}
 		runtime->hw_ptr_base += runtime->buffer_size;
