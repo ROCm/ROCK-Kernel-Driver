@@ -584,9 +584,10 @@ CONFIG_NTFS_FS
   This file system is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
   The module will be called ntfs.o. If you want to compile it as a
-  module, say M here and read <file:Documentation/modules.txt>. If you
-  are not using Windows NT/2000/XP in addition to Linux on your computer
-  it is safe to say N.
+  module, say M here and read <file:Documentation/modules.txt>.
+
+  If you are not using Windows NT/2000/XP in addition to Linux on your
+  computer it is safe to say N.
 
 CONFIG_NTFS_DEBUG
   If you are experiencing any problems with the NTFS file system, say
@@ -600,7 +601,7 @@ CONFIG_NTFS_DEBUG
     echo 1 > /proc/sys/fs/ntfs-debug
   Replacing the "1" with "0" would disable debug messages.
 
-  If you leave debugging messages disable, this results in little
+  If you leave debugging messages disabled, this results in little
   overhead, but enabling debug messages results in very significant
   slowdown of the system.
 

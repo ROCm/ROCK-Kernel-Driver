@@ -43,11 +43,17 @@ errors=opt		What to do when critical file system errors are found.
 			Following values can be used for "opt":
 			  continue: DEFAULT, try to clean-up as much as
 				    possible, e.g. marking a corrupt inode as
-				    bad so it is no longer accessed.
+				    bad so it is no longer accessed, and then
+				    continue.
 			  recover:  At present only supported is recovery of
 				    the boot sector from the backup copy. If a
 				    read-only mount, the recovery is done in
 				    memory only and not written to disk.
+			Note that the options are additive, i.e. specifying:
+			   errors=continue,errors=recover
+			This means the driver will attempt to recover and if
+			that fails it will clean-up as much as possible and
+			continue.
 
 show_inodes=opt		Allows choice of which types of inode names readdir()
 			returns, i.e. this affects what "ls" shows. Following
