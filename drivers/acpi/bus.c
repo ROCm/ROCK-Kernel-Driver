@@ -1,5 +1,5 @@
 /*
- *  acpi_bus.c - ACPI Bus Driver ($Revision: 79 $)
+ *  acpi_bus.c - ACPI Bus Driver ($Revision: 80 $)
  *
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
  *
@@ -97,10 +97,10 @@ static int acpi_device_suspend(struct device *dev, u32 state, u32 stage);
 static int acpi_device_resume(struct device *dev, u32 stage);
 
 static struct device_driver acpi_bus_driver = {
-	probe: acpi_device_probe,
-	remove: acpi_device_remove,	
-	suspend: acpi_device_suspend,
-	resume: acpi_device_resume,
+	.probe = acpi_device_probe,
+	.remove = acpi_device_remove,	
+	.suspend = acpi_device_suspend,
+	.resume = acpi_device_resume,
 };
 
 

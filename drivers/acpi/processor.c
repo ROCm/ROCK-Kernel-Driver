@@ -1,5 +1,5 @@
 /*
- * acpi_processor.c - ACPI Processor Driver ($Revision: 69 $)
+ * acpi_processor.c - ACPI Processor Driver ($Revision: 71 $)
  *
  *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
@@ -78,13 +78,13 @@ static int acpi_processor_add (struct acpi_device *device);
 static int acpi_processor_remove (struct acpi_device *device, int type);
 
 static struct acpi_driver acpi_processor_driver = {
-	name:			ACPI_PROCESSOR_DRIVER_NAME,
-	class:			ACPI_PROCESSOR_CLASS,
-	ids:			ACPI_PROCESSOR_HID,
-	ops:			{
-					add:	acpi_processor_add,
-					remove:	acpi_processor_remove,
-				},
+	.name =		ACPI_PROCESSOR_DRIVER_NAME,
+	.class =	ACPI_PROCESSOR_CLASS,
+	.ids =		ACPI_PROCESSOR_HID,
+	.ops =		{
+				.add =		acpi_processor_add,
+				.remove =	acpi_processor_remove,
+			},
 };
 
 /* Power Management */
