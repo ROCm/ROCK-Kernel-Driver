@@ -128,7 +128,7 @@ ia64_init_addr_space (void)
 		vma->vm_start = current->thread.rbs_bot & PAGE_MASK;
 		vma->vm_end = vma->vm_start + PAGE_SIZE;
 		vma->vm_page_prot = protection_map[VM_DATA_DEFAULT_FLAGS & 0x7];
-		vma->vm_flags = VM_READ|VM_WRITE|VM_MAYREAD|VM_MAYWRITE|VM_GROWSUP;
+		vma->vm_flags = VM_DATA_DEFAULT_FLAGS | VM_GROWSUP;
 		insert_vm_struct(current->mm, vma);
 	}
 
