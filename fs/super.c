@@ -732,7 +732,7 @@ void kill_block_super(struct super_block *sb)
 
 	bdev_uevent(bdev, KOBJ_UMOUNT);
 	generic_shutdown_super(sb);
-	set_blocksize(bdev, sb->s_old_blocksize);
+	sync_blockdev (bdev);
 	close_bdev_excl(bdev);
 }
 
