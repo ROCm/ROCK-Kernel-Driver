@@ -377,7 +377,7 @@ extern int snia_pcibr_rrb_alloc(struct pci_dev *pci_dev,
 #endif
 
 #ifdef QLA_64BIT_PTR
-#define pci_dma_hi32(a)			(a >> 32)
+#define pci_dma_hi32(a)			((a >> 16) >> 16)
 #else
 #define pci_dma_hi32(a)			0
 #endif
@@ -1013,11 +1013,6 @@ qla1280_detect(Scsi_Host_Template * template)
 	if (qla1280)
 		qla1280_setup(qla1280);
 #endif
-
-	if (!pci_present()) {
-		printk(KERN_INFO "scsi: PCI not present\n");
-		return 0;
-	}
 
 	bdp = &ql1280_board_tbl[0];
 	qla1280_hostlist = NULL;
