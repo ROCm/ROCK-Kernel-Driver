@@ -188,8 +188,8 @@ signed char budtab[256] = {
  *
  * RETURN VALUES:
  *      0	- success
- *      ENOMEM	- insufficient memory
- *      EIO	- i/o error
+ *      -ENOMEM	- insufficient memory
+ *      -EIO	- i/o error
  */
 int dbMount(struct inode *ipbmap)
 {
@@ -204,7 +204,7 @@ int dbMount(struct inode *ipbmap)
 	/* allocate memory for the in-memory bmap descriptor */
 	bmp = kmalloc(sizeof(struct bmap), GFP_KERNEL);
 	if (bmp == NULL)
-		return (ENOMEM);
+		return -ENOMEM;
 
 	/* read the on-disk bmap descriptor. */
 	mp = read_metapage(ipbmap,
@@ -212,7 +212,7 @@ int dbMount(struct inode *ipbmap)
 			   PSIZE, 0);
 	if (mp == NULL) {
 		kfree(bmp);
-		return (EIO);
+		return -EIO;
 	}
 
 	/* copy the on-disk bmap descriptor to its in-memory version. */
@@ -267,7 +267,7 @@ int dbMount(struct inode *ipbmap)
  *
  * RETURN VALUES:
  *      0	- success
- *      EIO	- i/o error
+ *      -EIO	- i/o error
  */
 int dbUnmount(struct inode *ipbmap, int mounterror)
 {
@@ -315,7 +315,7 @@ int dbSync(struct inode *ipbmap)
 			   PSIZE, 0);
 	if (mp == NULL) {
 		jfs_err("dbSync: read_metapage failed!");
-		return (EIO);
+		return -EIO;
 	}
 	/* copy the in-memory version of the bmap to the on-disk version */
 	dbmp_le = (struct dbmap *) mp->data;
@@ -368,7 +368,7 @@ int dbSync(struct inode *ipbmap)
  *
  * RETURN VALUES:
  *      0	- success
- *      EIO	- i/o error
+ *      -EIO	- i/o error
  */
 int dbFree(struct inode *ip, s64 blkno, s64 nblocks)
 {
@@ -399,7 +399,7 @@ int dbFree(struct inode *ip, s64 blkno, s64 nblocks)
 		mp = read_metapage(ipbmap, lblkno, PSIZE, 0);
 		if (mp == NULL) {
 			IREAD_UNLOCK(ipbmap);
-			return (EIO);
+			return -EIO;
 		}
 		dp = (struct dmap *) mp->data;
 
@@ -448,7 +448,7 @@ int dbFree(struct inode *ip, s64 blkno, s64 nblocks)
  *
  * RETURN VALUES:
  *      0	- success
- *      EIO	- i/o error
+ *      -EIO	- i/o error
  */
 int
 dbUpdatePMap(struct inode *ipbmap,
@@ -488,7 +488,7 @@ dbUpdatePMap(struct inode *ipbmap,
 			mp = read_metapage(bmp->db_ipbmap, lblkno, PSIZE,
 					   0);
 			if (mp == NULL)
-				return (EIO);
+				return -EIO;
 		}
 		dp = (struct dmap *) mp->data;
 
@@ -721,8 +721,8 @@ unlock:
  *
  * RETURN VALUES:
  *      0	- success
- *      ENOSPC	- insufficient disk resources
- *      EIO	- i/o error
+ *      -ENOSPC	- insufficient disk resources
+ *      -EIO	- i/o error
  */
 int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 {
@@ -742,7 +742,7 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 #ifdef _STILL_TO_PORT
 	/* DASD limit check                                     F226941 */
 	if (OVER_LIMIT(ip, nblocks))
-		return ENOSPC;
+		return -ENOSPC;
 #endif				/* _STILL_TO_PORT */
 
 	/* get the log2 number of blocks to be allocated.
@@ -812,7 +812,7 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 
 		/* get the buffer for the dmap containing the hint.
 		 */
-		rc = EIO;
+		rc = -EIO;
 		lblkno = BLKTODMAP(blkno, bmp->db_l2nbperpage);
 		mp = read_metapage(ipbmap, lblkno, PSIZE, 0);
 		if (mp == NULL)
@@ -824,7 +824,7 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 		 * blocks beginning at the hint.
 		 */
 		if ((rc = dbAllocNext(bmp, dp, blkno, (int) nblocks))
-		    != ENOSPC) {
+		    != -ENOSPC) {
 			if (rc == 0) {
 				*results = blkno;
 				DBALLOC(bmp->db_DBmap, bmp->db_mapsize,
@@ -853,7 +853,7 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 		 */
 		if ((rc =
 		     dbAllocNear(bmp, dp, blkno, (int) nblocks, l2nb, results))
-		    != ENOSPC) {
+		    != -ENOSPC) {
 			if (rc == 0) {
 				DBALLOC(bmp->db_DBmap, bmp->db_mapsize,
 					*results, nblocks);
@@ -868,7 +868,7 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 		 * the same dmap as the hint.
 		 */
 		if ((rc = dbAllocDmapLev(bmp, dp, (int) nblocks, l2nb, results))
-		    != ENOSPC) {
+		    != -ENOSPC) {
 			if (rc == 0) {
 				DBALLOC(bmp->db_DBmap, bmp->db_mapsize,
 					*results, nblocks);
@@ -888,7 +888,7 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 	 */
 	IWRITE_LOCK(ipbmap);
 	if ((rc = dbAllocAG(bmp, agno, nblocks, l2nb, results))
-	    != ENOSPC) {
+	    != -ENOSPC) {
 		if (rc == 0)
 			DBALLOC(bmp->db_DBmap, bmp->db_mapsize,
 				*results, nblocks);
@@ -907,7 +907,7 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 	/* Try to allocate within this allocation group.  if that fails, try to
 	 * allocate anywhere in the map.
 	 */
-	if ((rc = dbAllocAG(bmp, agno, nblocks, l2nb, results)) == ENOSPC)
+	if ((rc = dbAllocAG(bmp, agno, nblocks, l2nb, results)) == -ENOSPC)
 		rc = dbAllocAny(bmp, nblocks, l2nb, results);
 	if (rc == 0) {
 		DBALLOC(bmp->db_DBmap, bmp->db_mapsize, *results, nblocks);
@@ -937,8 +937,8 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
  *
  * RETURN VALUES:
  *      0	- success
- *      ENOSPC	- insufficient disk resources
- *      EIO	- i/o error
+ *      -ENOSPC	- insufficient disk resources
+ *      -EIO	- i/o error
  */
 int dbAllocExact(struct inode *ip, s64 blkno, int nblocks)
 {
@@ -960,13 +960,13 @@ int dbAllocExact(struct inode *ip, s64 blkno, int nblocks)
 	 */
 	if (nblocks <= 0 || nblocks > BPERDMAP || blkno >= bmp->db_mapsize) {
 		IREAD_UNLOCK(ipbmap);
-		return EINVAL;
+		return -EINVAL;
 	}
 
 	if (nblocks > ((s64) 1 << bmp->db_maxfreebud)) {
 		/* the free space is no longer available */
 		IREAD_UNLOCK(ipbmap);
-		return ENOSPC;
+		return -ENOSPC;
 	}
 
 	/* read in the dmap covering the extent */
@@ -974,7 +974,7 @@ int dbAllocExact(struct inode *ip, s64 blkno, int nblocks)
 	mp = read_metapage(ipbmap, lblkno, PSIZE, 0);
 	if (mp == NULL) {
 		IREAD_UNLOCK(ipbmap);
-		return (EIO);
+		return -EIO;
 	}
 	dp = (struct dmap *) mp->data;
 
@@ -1022,8 +1022,8 @@ int dbAllocExact(struct inode *ip, s64 blkno, int nblocks)
  *
  * RETURN VALUES:
  *      0	- success
- *      ENOSPC	- insufficient disk resources
- *      EIO	- i/o error
+ *      -ENOSPC	- insufficient disk resources
+ *      -EIO	- i/o error
  */
 int
 dbReAlloc(struct inode *ip,
@@ -1037,7 +1037,7 @@ dbReAlloc(struct inode *ip,
 		*results = blkno;
 		return (0);
 	} else {
-		if (rc != ENOSPC)
+		if (rc != -ENOSPC)
 			return (rc);
 	}
 
@@ -1071,8 +1071,8 @@ dbReAlloc(struct inode *ip,
  *
  * RETURN VALUES:
  *      0	- success
- *      ENOSPC	- insufficient disk resources
- *      EIO	- i/o error
+ *      -ENOSPC	- insufficient disk resources
+ *      -EIO	- i/o error
  */
 int dbExtend(struct inode *ip, s64 blkno, s64 nblocks, s64 addnblocks)
 {
@@ -1090,7 +1090,7 @@ int dbExtend(struct inode *ip, s64 blkno, s64 nblocks, s64 addnblocks)
 	 */
 	if (((rel_block = blkno & (sbi->nbperpage - 1))) &&
 	    (rel_block + nblocks + addnblocks > sbi->nbperpage))
-		return (ENOSPC);
+		return -ENOSPC;
 
 	/* get the last block of the current allocation */
 	lastblkno = blkno + nblocks - 1;
@@ -1117,7 +1117,7 @@ int dbExtend(struct inode *ip, s64 blkno, s64 nblocks, s64 addnblocks)
 	if (addnblocks > BPERDMAP || extblkno >= bmp->db_mapsize ||
 	    (extblkno & (bmp->db_agsize - 1)) == 0) {
 		IREAD_UNLOCK(ipbmap);
-		return (ENOSPC);
+		return -ENOSPC;
 	}
 
 	/* get the buffer for the dmap containing the first block
@@ -1127,7 +1127,7 @@ int dbExtend(struct inode *ip, s64 blkno, s64 nblocks, s64 addnblocks)
 	mp = read_metapage(ipbmap, lblkno, PSIZE, 0);
 	if (mp == NULL) {
 		IREAD_UNLOCK(ipbmap);
-		return (EIO);
+		return -EIO;
 	}
 
 	DBALLOCCK(bmp->db_DBmap, bmp->db_mapsize, blkno, nblocks);
@@ -1148,7 +1148,7 @@ int dbExtend(struct inode *ip, s64 blkno, s64 nblocks, s64 addnblocks)
 	} else {
 		/* we were not successful */
 		release_metapage(mp);
-		assert(rc == ENOSPC || rc == EIO);
+		assert(rc == -ENOSPC || rc == -EIO);
 	}
 
 	return (rc);
@@ -1169,8 +1169,8 @@ int dbExtend(struct inode *ip, s64 blkno, s64 nblocks, s64 addnblocks)
  *
  * RETURN VALUES:
  *      0	- success
- *      ENOSPC	- insufficient disk resources
- *      EIO	- i/o error
+ *      -ENOSPC	- insufficient disk resources
+ *      -EIO	- i/o error
  *
  * serialization: IREAD_LOCK(ipbmap) held on entry/exit;
  */
@@ -1196,13 +1196,13 @@ static int dbAllocNext(struct bmap * bmp, struct dmap * dp, s64 blkno,
 	 * this dmap.
 	 */
 	if (dbitno + nblocks > BPERDMAP)
-		return (ENOSPC);
+		return -ENOSPC;
 
 	/* check if the starting leaf indicates that anything
 	 * is free.
 	 */
 	if (leaf[word] == NOFREE)
-		return (ENOSPC);
+		return -ENOSPC;
 
 	/* check the dmaps words corresponding to block range to see
 	 * if the block range is free.  not all bits of the first and
@@ -1231,7 +1231,7 @@ static int dbAllocNext(struct bmap * bmp, struct dmap * dp, s64 blkno,
 			 */
 			mask = (ONES << (DBWORD - nb) >> wbitno);
 			if ((mask & ~le32_to_cpu(dp->wmap[word])) != mask)
-				return (ENOSPC);
+				return -ENOSPC;
 
 			word += 1;
 		} else {
@@ -1249,7 +1249,7 @@ static int dbAllocNext(struct bmap * bmp, struct dmap * dp, s64 blkno,
 				/* does the leaf describe any free space ?
 				 */
 				if (leaf[word] < BUDMIN)
-					return (ENOSPC);
+					return -ENOSPC;
 
 				/* determine the l2 number of bits provided
 				 * by this leaf.
@@ -1295,8 +1295,8 @@ static int dbAllocNext(struct bmap * bmp, struct dmap * dp, s64 blkno,
  *
  * RETURN VALUES:
  *      0	- success
- *      ENOSPC	- insufficient disk resources
- *      EIO	- i/o error
+ *      -ENOSPC	- insufficient disk resources
+ *      -EIO	- i/o error
  *
  * serialization: IREAD_LOCK(ipbmap) held on entry/exit;
  */
@@ -1344,7 +1344,7 @@ dbAllocNear(struct bmap * bmp,
 		return (rc);
 	}
 
-	return (ENOSPC);
+	return -ENOSPC;
 }
 
 
@@ -1397,8 +1397,8 @@ dbAllocNear(struct bmap * bmp,
  *
  * RETURN VALUES:
  *      0	- success
- *      ENOSPC	- insufficient disk resources
- *      EIO	- i/o error
+ *      -ENOSPC	- insufficient disk resources
+ *      -EIO	- i/o error
  *
  * note: IWRITE_LOCK(ipmap) held on entry/exit;
  */
@@ -1441,8 +1441,8 @@ dbAllocAG(struct bmap * bmp, int agno, s64 nblocks, int l2nb, s64 * results)
 	if (bmp->db_agsize == BPERDMAP
 	    || bmp->db_agfree[agno] == bmp->db_agsize) {
 		rc = dbAllocCtl(bmp, nblocks, l2nb, blkno, results);
-		/* assert(!(rc == ENOSPC && bmp->db_agfree[agno] == bmp->db_agsize)); */
-		if ((rc == ENOSPC) &&
+		/* assert(!(rc == -ENOSPC && bmp->db_agfree[agno] == bmp->db_agsize)); */
+		if ((rc == -ENOSPC) &&
 		    (bmp->db_agfree[agno] == bmp->db_agsize)) {
 			jfs_err("dbAllocAG: removed assert, but still need to "
 				"debug here\nblkno = 0x%Lx, nblocks = 0x%Lx",
@@ -1458,7 +1458,7 @@ dbAllocAG(struct bmap * bmp, int agno, s64 nblocks, int l2nb, s64 * results)
 	lblkno = BLKTOCTL(blkno, bmp->db_l2nbperpage, bmp->db_aglevel);
 	mp = read_metapage(bmp->db_ipbmap, lblkno, PSIZE, 0);
 	if (mp == NULL)
-		return (EIO);
+		return -EIO;
 	dcp = (struct dmapctl *) mp->data;
 	budmin = dcp->budmin;
 
@@ -1531,7 +1531,7 @@ dbAllocAG(struct bmap * bmp, int agno, s64 nblocks, int l2nb, s64 * results)
 			if ((rc =
 			     dbFindCtl(bmp, l2nb, bmp->db_aglevel - 1,
 				       &blkno))) {
-				assert(rc != ENOSPC);
+				assert(rc != -ENOSPC);
 				return (rc);
 			}
 		}
@@ -1539,16 +1539,16 @@ dbAllocAG(struct bmap * bmp, int agno, s64 nblocks, int l2nb, s64 * results)
 		/* allocate the blocks.
 		 */
 		rc = dbAllocCtl(bmp, nblocks, l2nb, blkno, results);
-		assert(rc != ENOSPC);
+		assert(rc != -ENOSPC);
 		return (rc);
 	}
 
 	/* no space in the allocation group.  release the buffer and
-	 * return ENOSPC.
+	 * return -ENOSPC.
 	 */
 	release_metapage(mp);
 
-	return (ENOSPC);
+	return -ENOSPC;
 }
 
 
@@ -1573,8 +1573,8 @@ dbAllocAG(struct bmap * bmp, int agno, s64 nblocks, int l2nb, s64 * results)
  *
  * RETURN VALUES:
  *      0	- success
- *      ENOSPC	- insufficient disk resources
- *      EIO	- i/o error
+ *      -ENOSPC	- insufficient disk resources
+ *      -EIO	- i/o error
  *
  * serialization: IWRITE_LOCK(ipbmap) held on entry/exit;
  */
@@ -1595,7 +1595,7 @@ static int dbAllocAny(struct bmap * bmp, s64 nblocks, int l2nb, s64 * results)
 	/* allocate the blocks.
 	 */
 	rc = dbAllocCtl(bmp, nblocks, l2nb, blkno, results);
-	assert(rc != ENOSPC);
+	assert(rc != -ENOSPC);
 	return (rc);
 }
 
@@ -1623,8 +1623,8 @@ static int dbAllocAny(struct bmap * bmp, s64 nblocks, int l2nb, s64 * results)
  *
  * RETURN VALUES:
  *      0	- success
- *      ENOSPC	- insufficient disk resources
- *      EIO	- i/o error
+ *      -ENOSPC	- insufficient disk resources
+ *      -EIO	- i/o error
  *
  * serialization: IWRITE_LOCK(ipbmap) held on entry/exit;
  */
@@ -1648,7 +1648,7 @@ static int dbFindCtl(struct bmap * bmp, int l2nb, int level, s64 * blkno)
 		lblkno = BLKTOCTL(b, bmp->db_l2nbperpage, lev);
 		mp = read_metapage(bmp->db_ipbmap, lblkno, PSIZE, 0);
 		if (mp == NULL)
-			return (EIO);
+			return -EIO;
 		dcp = (struct dmapctl *) mp->data;
 		budmin = dcp->budmin;
 
@@ -1667,7 +1667,7 @@ static int dbFindCtl(struct bmap * bmp, int l2nb, int level, s64 * blkno)
 		 */
 		if (rc) {
 			assert(lev == level);
-			return (ENOSPC);
+			return -ENOSPC;
 		}
 
 		/* adjust the block number to reflect the location within
@@ -1730,8 +1730,8 @@ static int dbFindCtl(struct bmap * bmp, int l2nb, int level, s64 * blkno)
  *
  * RETURN VALUES:
  *      0	- success
- *      ENOSPC	- insufficient disk resources
- *      EIO	- i/o error
+ *      -ENOSPC	- insufficient disk resources
+ *      -EIO	- i/o error
  *
  * serialization: IWRITE_LOCK(ipbmap) held on entry/exit;
  */
@@ -1751,7 +1751,7 @@ dbAllocCtl(struct bmap * bmp, s64 nblocks, int l2nb, s64 blkno, s64 * results)
 		lblkno = BLKTODMAP(blkno, bmp->db_l2nbperpage);
 		mp = read_metapage(bmp->db_ipbmap, lblkno, PSIZE, 0);
 		if (mp == NULL)
-			return (EIO);
+			return -EIO;
 		dp = (struct dmap *) mp->data;
 
 		/* try to allocate the blocks.
@@ -1778,7 +1778,7 @@ dbAllocCtl(struct bmap * bmp, s64 nblocks, int l2nb, s64 blkno, s64 * results)
 		lblkno = BLKTODMAP(b, bmp->db_l2nbperpage);
 		mp = read_metapage(bmp->db_ipbmap, lblkno, PSIZE, 0);
 		if (mp == NULL) {
-			rc = EIO;
+			rc = -EIO;
 			goto backout;
 		}
 		dp = (struct dmap *) mp->data;
@@ -1875,8 +1875,8 @@ dbAllocCtl(struct bmap * bmp, s64 nblocks, int l2nb, s64 blkno, s64 * results)
  *
  * RETURN VALUES:
  *      0	- success
- *      ENOSPC	- insufficient disk resources
- *      EIO	- i/o error
+ *      -ENOSPC	- insufficient disk resources
+ *      -EIO	- i/o error
  *
  * serialization: IREAD_LOCK(ipbmap), e.g., from dbAlloc(), or 
  *	IWRITE_LOCK(ipbmap), e.g., dbAllocCtl(), held on entry/exit;
@@ -1896,7 +1896,7 @@ dbAllocDmapLev(struct bmap * bmp,
 	 * returns the index of the leaf at which free space was found.
 	 */
 	if (dbFindLeaf((dmtree_t *) & dp->tree, l2nb, &leafidx))
-		return (ENOSPC);
+		return -ENOSPC;
 
 	/* determine the block number within the file system corresponding
 	 * to the leaf at which free space was found.
@@ -1941,7 +1941,7 @@ dbAllocDmapLev(struct bmap * bmp,
  *
  * RETURN VALUES:
  *      0	- success
- *      EIO	- i/o error
+ *      -EIO	- i/o error
  *
  * serialization: IREAD_LOCK(ipbmap) or IWRITE_LOCK(ipbmap) held on entry/exit;
  */
@@ -1996,7 +1996,7 @@ static int dbAllocDmap(struct bmap * bmp, struct dmap * dp, s64 blkno,
  *
  * RETURN VALUES:
  *      0	- success
- *      EIO	- i/o error
+ *      -EIO	- i/o error
  *
  * serialization: IREAD_LOCK(ipbmap) or IWRITE_LOCK(ipbmap) held on entry/exit;
  */
@@ -2376,7 +2376,7 @@ static void dbFreeBits(struct bmap * bmp, struct dmap * dp, s64 blkno,
  *
  * RETURN VALUES:
  *      0	- success
- *      EIO	- i/o error
+ *      -EIO	- i/o error
  *
  * serialization: IREAD_LOCK(ipbmap) or IWRITE_LOCK(ipbmap) held on entry/exit;
  */
@@ -2396,7 +2396,7 @@ dbAdjCtl(struct bmap * bmp, s64 blkno, int newval, int alloc, int level)
 	lblkno = BLKTOCTL(blkno, bmp->db_l2nbperpage, level);
 	mp = read_metapage(bmp->db_ipbmap, lblkno, PSIZE, 0);
 	if (mp == NULL)
-		return (EIO);
+		return -EIO;
 	dcp = (struct dmapctl *) mp->data;
 
 	/* determine the leaf number corresponding to the block and
@@ -2819,7 +2819,7 @@ static void dbAdjTree(dmtree_t * tp, int leafno, int newval)
  *
  * RETURN VALUES:
  *      0	- success
- *      ENOSPC	- insufficient free blocks. 
+ *      -ENOSPC	- insufficient free blocks. 
  */
 static int dbFindLeaf(dmtree_t * tp, int l2nb, int *leafidx)
 {
@@ -2829,7 +2829,7 @@ static int dbFindLeaf(dmtree_t * tp, int l2nb, int *leafidx)
 	 * sufficient free space.
 	 */
 	if (l2nb > tp->dmt_stree[ROOT])
-		return (ENOSPC);
+		return -ENOSPC;
 
 	/* sufficient free space available. now search down the tree
 	 * starting at the next level for the leftmost leaf that
@@ -3073,7 +3073,7 @@ void fsDirty(void)
  *
  * RETURN VALUES:
  *      0	- success
- *      EIO	- i/o error
+ *      -EIO	- i/o error
  */
 int dbAllocBottomUp(struct inode *ip, s64 blkno, s64 nblocks)
 {
@@ -3104,7 +3104,7 @@ int dbAllocBottomUp(struct inode *ip, s64 blkno, s64 nblocks)
 		mp = read_metapage(ipbmap, lblkno, PSIZE, 0);
 		if (mp == NULL) {
 			IREAD_UNLOCK(ipbmap);
-			return (EIO);
+			return -EIO;
 		}
 		dp = (struct dmap *) mp->data;
 
@@ -3514,7 +3514,7 @@ int dbExtendFS(struct inode *ipbmap, s64 blkno,	s64 nblocks)
 	return 0;
 
       errout:
-	return EIO;
+	return -EIO;
 }
 
 

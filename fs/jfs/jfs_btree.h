@@ -81,7 +81,7 @@ struct btpage {
 		} else {\
 			P = NULL;\
 			jfs_err("bread failed!");\
-			RC = EIO;\
+			RC = -EIO;\
 		}\
 	}\
 }
