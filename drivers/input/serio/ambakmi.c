@@ -31,7 +31,7 @@
 struct amba_kmi_port {
 	struct serio		*io;
 	struct clk		*clk;
-	unsigned char		*base;
+	void __iomem		*base;
 	unsigned int		irq;
 	unsigned int		divisor;
 	unsigned int		open;

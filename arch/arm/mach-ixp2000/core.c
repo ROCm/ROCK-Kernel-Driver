@@ -160,6 +160,9 @@ void __init ixp2000_map_io(void)
 	iotable_init(ixp2000_small_io_desc, ARRAY_SIZE(ixp2000_small_io_desc));
 	iotable_init(ixp2000_large_io_desc, ARRAY_SIZE(ixp2000_large_io_desc));
 	early_serial_setup(&ixp2000_serial_port);
+
+	/* Set slowport to 8-bit mode.  */
+	ixp2000_reg_write(IXP2000_SLOWPORT_FRM, 1);
 }
 
 /*************************************************************************

@@ -20,23 +20,13 @@ extern int printk(const char * fmt, ...)
 #define RW_LOCK_BIAS		 0x01000000
 #define RW_LOCK_BIAS_STR	"0x01000000"
 
-/* It seems that people are forgetting to
- * initialize their spinlocks properly, tsk tsk.
- * Remember to turn this off in 2.4. -ben
- */
-#if defined(CONFIG_DEBUG_SPINLOCK)
-#define SPINLOCK_DEBUG	1
-#else
-#define SPINLOCK_DEBUG	0
-#endif
-
 /*
  * Your basic SMP spinlocks, allowing only a single CPU anywhere
  */
 
 typedef struct {
-	volatile int lock;
-#if SPINLOCK_DEBUG
+	volatile int slock;
+#ifdef CONFIG_DEBUG_SPINLOCK
 	unsigned magic;
 #endif
 #ifdef CONFIG_PREEMPT
@@ -46,7 +36,7 @@ typedef struct {
 
 #define SPINLOCK_MAGIC	0xdead4ead
 
-#if SPINLOCK_DEBUG
+#ifdef CONFIG_DEBUG_SPINLOCK
 #define SPINLOCK_MAGIC_INIT	, SPINLOCK_MAGIC
 #else
 #define SPINLOCK_MAGIC_INIT	/* */
@@ -63,7 +53,7 @@ typedef struct {
  * We make no fairness assumptions. They have a cost.
  */
 
-#define spin_is_locked(x)	(*(volatile int *)(&(x)->lock) <= 0)
+#define spin_is_locked(x)	(*(volatile int *)(&(x)->slock) <= 0)
 #define spin_unlock_wait(x)	do { barrier(); } while(spin_is_locked(x))
 #define _raw_spin_lock_flags(lock, flags) _raw_spin_lock(lock)
 
@@ -80,11 +70,11 @@ static inline int _raw_spin_trylock(spinlock_t *lock)
 	unsigned long tmp1, tmp2;
 
 	/*
-	 * lock->lock :  =1 : unlock
-	 *            : <=0 : lock
+	 * lock->slock :  =1 : unlock
+	 *             : <=0 : lock
 	 * {
-	 *   oldval = lock->lock; <--+ need atomic operation
-	 *   lock->lock = 0;      <--+
+	 *   oldval = lock->slock; <--+ need atomic operation
+	 *   lock->slock = 0;      <--+
 	 * }
 	 */
 	__asm__ __volatile__ (
@@ -97,7 +87,7 @@ static inline int _raw_spin_trylock(spinlock_t *lock)
 		"unlock	%1, @%3;		\n\t"
 		"mvtc	%2, psw;		\n\t"
 		: "=&r" (oldval), "=&r" (tmp1), "=&r" (tmp2)
-		: "r" (&lock->lock)
+		: "r" (&lock->slock)
 		: "memory"
 #ifdef CONFIG_CHIP_M32700_TS1
 		, "r6"
@@ -111,22 +101,22 @@ static inline void _raw_spin_lock(spinlock_t *lock)
 {
 	unsigned long tmp0, tmp1;
 
-#if SPINLOCK_DEBUG
+#ifdef CONFIG_DEBUG_SPINLOCK
 	__label__ here;
 here:
 	if (lock->magic != SPINLOCK_MAGIC) {
-		printk("eip: %p\n", &&here);
+		printk("pc: %p\n", &&here);
 		BUG();
 	}
 #endif
 	/*
-	 * lock->lock :  =1 : unlock
-	 *            : <=0 : lock
+	 * lock->slock :  =1 : unlock
+	 *             : <=0 : lock
 	 *
 	 * for ( ; ; ) {
-	 *   lock->lock -= 1;  <-- need atomic operation
-	 *   if (lock->lock == 0) break;
-	 *   for ( ; lock->lock <= 0 ; );
+	 *   lock->slock -= 1;  <-- need atomic operation
+	 *   if (lock->slock == 0) break;
+	 *   for ( ; lock->slock <= 0 ; );
 	 * }
 	 */
 	__asm__ __volatile__ (
@@ -149,7 +139,7 @@ here:
 		"bra	2b;			\n\t"
 		LOCK_SECTION_END
 		: "=&r" (tmp0), "=&r" (tmp1)
-		: "r" (&lock->lock)
+		: "r" (&lock->slock)
 		: "memory"
 #ifdef CONFIG_CHIP_M32700_TS1
 		, "r6"
@@ -159,12 +149,12 @@ here:
 
 static inline void _raw_spin_unlock(spinlock_t *lock)
 {
-#if SPINLOCK_DEBUG
+#ifdef CONFIG_DEBUG_SPINLOCK
 	BUG_ON(lock->magic != SPINLOCK_MAGIC);
 	BUG_ON(!spin_is_locked(lock));
 #endif
 	mb();
-	lock->lock = 1;
+	lock->slock = 1;
 }
 
 /*
@@ -179,7 +169,7 @@ static inline void _raw_spin_unlock(spinlock_t *lock)
  */
 typedef struct {
 	volatile int lock;
-#if SPINLOCK_DEBUG
+#ifdef CONFIG_DEBUG_SPINLOCK
 	unsigned magic;
 #endif
 #ifdef CONFIG_PREEMPT
@@ -189,7 +179,7 @@ typedef struct {
 
 #define RWLOCK_MAGIC	0xdeaf1eed
 
-#if SPINLOCK_DEBUG
+#ifdef CONFIG_DEBUG_SPINLOCK
 #define RWLOCK_MAGIC_INIT	, RWLOCK_MAGIC
 #else
 #define RWLOCK_MAGIC_INIT	/* */
@@ -198,6 +188,18 @@ typedef struct {
 #define RW_LOCK_UNLOCKED (rwlock_t) { RW_LOCK_BIAS RWLOCK_MAGIC_INIT }
 
 #define rwlock_init(x)	do { *(x) = RW_LOCK_UNLOCKED; } while(0)
+
+/**
+ * read_can_lock - would read_trylock() succeed?
+ * @lock: the rwlock in question.
+ */
+#define read_can_lock(x) ((int)(x)->lock > 0)
+
+/**
+ * write_can_lock - would write_trylock() succeed?
+ * @lock: the rwlock in question.
+ */
+#define write_can_lock(x) ((x)->lock == RW_LOCK_BIAS)
 
 /*
  * On x86, we implement read-write locks as a 32-bit counter
@@ -214,7 +216,7 @@ static inline void _raw_read_lock(rwlock_t *rw)
 {
 	unsigned long tmp0, tmp1;
 
-#if SPINLOCK_DEBUG
+#ifdef CONFIG_DEBUG_SPINLOCK
 	BUG_ON(rw->magic != RWLOCK_MAGIC);
 #endif
 	/*
@@ -268,7 +270,7 @@ static inline void _raw_write_lock(rwlock_t *rw)
 {
 	unsigned long tmp0, tmp1, tmp2;
 
-#if SPINLOCK_DEBUG
+#ifdef CONFIG_DEBUG_SPINLOCK
 	BUG_ON(rw->magic != RWLOCK_MAGIC);
 #endif
 	/*

@@ -53,7 +53,7 @@ struct soc_pcmcia_socket {
 	struct resource		res_io;
 	struct resource		res_mem;
 	struct resource		res_attr;
-	void			*virt_io;
+	void __iomem		*virt_io;
 
 	unsigned int		irq_state;
 

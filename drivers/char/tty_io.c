@@ -1047,8 +1047,13 @@ static inline ssize_t do_tty_write(
 	 *
 	 * But if TTY_NO_WRITE_SPLIT is set, we should use a
 	 * big chunk-size..
+	 *
+	 * The default chunk-size is 2kB, because the NTTY
+	 * layer has problems with bigger chunks. It will
+	 * claim to be able to handle more characters than
+	 * it actually does.
 	 */
-	chunk = 4096;
+	chunk = 2048;
 	if (test_bit(TTY_NO_WRITE_SPLIT, &tty->flags))
 		chunk = 65536;
 	if (count < chunk)

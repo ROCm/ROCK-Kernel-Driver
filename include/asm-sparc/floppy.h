@@ -312,8 +312,8 @@ static int sun_floppy_init(void)
 	}
 
 	/* The sun4m lets us know if the controller is actually usable. */
-	if(sparc_cpu_model == sun4m) {
-		prom_getproperty(fd_node, "status", state, sizeof(state));
+	if(sparc_cpu_model == sun4m &&
+	   prom_getproperty(fd_node, "status", state, sizeof(state)) != -1) {
 		if(!strcmp(state, "disabled")) {
 			goto no_sun_fdc;
 		}

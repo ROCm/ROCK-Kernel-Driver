@@ -219,6 +219,7 @@ static int udpv6_recvmsg(struct kiocb *iocb, struct sock *sk,
 		  int noblock, int flags, int *addr_len)
 {
 	struct ipv6_pinfo *np = inet6_sk(sk);
+	struct inet_sock *inet = inet_sk(sk);
   	struct sk_buff *skb;
 	size_t copied;
   	int err;
@@ -268,21 +269,22 @@ try_again:
 		sin6->sin6_flowinfo = 0;
 		sin6->sin6_scope_id = 0;
 
-		if (skb->protocol == htons(ETH_P_IP)) {
-			struct inet_sock *inet = inet_sk(sk);
-
+		if (skb->protocol == htons(ETH_P_IP))
 			ipv6_addr_set(&sin6->sin6_addr, 0, 0,
 				      htonl(0xffff), skb->nh.iph->saddr);
-			if (inet->cmsg_flags)
-				ip_cmsg_recv(msg, skb);
-		} else {
+		else {
 			ipv6_addr_copy(&sin6->sin6_addr, &skb->nh.ipv6h->saddr);
-
-			if (np->rxopt.all)
-				datagram_recv_ctl(sk, msg, skb);
 			if (ipv6_addr_type(&sin6->sin6_addr) & IPV6_ADDR_LINKLOCAL)
 				sin6->sin6_scope_id = IP6CB(skb)->iif;
 		}
+
+	}
+	if (skb->protocol == htons(ETH_P_IP)) {
+		if (inet->cmsg_flags)
+			ip_cmsg_recv(msg, skb);
+	} else {
+		if (np->rxopt.all)
+			datagram_recv_ctl(sk, msg, skb);
   	}
 
 	err = copied;

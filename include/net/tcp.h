@@ -505,9 +505,8 @@ static __inline__ int tcp_sk_listen_hashfn(struct sock *sk)
 # define TCP_TW_RECYCLE_TICK (12+2-TCP_TW_RECYCLE_SLOTS_LOG)
 #endif
 
-#define BICTCP_1_OVER_BETA	8	/*
-					 * Fast recovery
-					 * multiplicative decrease factor
+#define BICTCP_BETA_SCALE    1024	/* Scale factor beta calculation
+					 * max_cwnd = snd_cwnd * beta
 					 */
 #define BICTCP_MAX_INCREMENT 32		/*
 					 * Limit on the amount of
@@ -606,6 +605,7 @@ extern int sysctl_tcp_nometrics_save;
 extern int sysctl_tcp_bic;
 extern int sysctl_tcp_bic_fast_convergence;
 extern int sysctl_tcp_bic_low_window;
+extern int sysctl_tcp_bic_beta;
 extern int sysctl_tcp_moderate_rcvbuf;
 extern int sysctl_tcp_tso_win_divisor;
 
@@ -832,9 +832,9 @@ static __inline__ void tcp_delack_init(struct tcp_sock *tp)
 	memset(&tp->ack, 0, sizeof(tp->ack));
 }
 
-static inline void tcp_clear_options(struct tcp_sock *tp)
+static inline void tcp_clear_options(struct tcp_options_received *rx_opt)
 {
- 	tp->tstamp_ok = tp->sack_ok = tp->wscale_ok = tp->snd_wscale = 0;
+ 	rx_opt->tstamp_ok = rx_opt->sack_ok = rx_opt->wscale_ok = rx_opt->snd_wscale = 0;
 }
 
 enum tcp_tw_status
@@ -883,7 +883,7 @@ extern int			tcp_recvmsg(struct kiocb *iocb, struct sock *sk,
 extern int			tcp_listen_start(struct sock *sk);
 
 extern void			tcp_parse_options(struct sk_buff *skb,
-						  struct tcp_sock *tp,
+						  struct tcp_options_received *opt_rx,
 						  int estab);
 
 /*
@@ -1071,7 +1071,7 @@ static __inline__ void __tcp_fast_path_on(struct tcp_sock *tp, u32 snd_wnd)
 
 static __inline__ void tcp_fast_path_on(struct tcp_sock *tp)
 {
-	__tcp_fast_path_on(tp, tp->snd_wnd>>tp->snd_wscale);
+	__tcp_fast_path_on(tp, tp->snd_wnd >> tp->rx_opt.snd_wscale);
 }
 
 static inline void tcp_fast_path_check(struct sock *sk, struct tcp_sock *tp)
@@ -1244,15 +1244,16 @@ static inline __u32 tcp_recalc_ssthresh(struct tcp_sock *tp)
 	if (tcp_is_bic(tp)) {
 		if (sysctl_tcp_bic_fast_convergence &&
 		    tp->snd_cwnd < tp->bictcp.last_max_cwnd)
-			tp->bictcp.last_max_cwnd
-				= (tp->snd_cwnd * (2*BICTCP_1_OVER_BETA-1))
-				/ (BICTCP_1_OVER_BETA/2);
+			tp->bictcp.last_max_cwnd = (tp->snd_cwnd * 
+						    (BICTCP_BETA_SCALE
+						     + sysctl_tcp_bic_beta))
+				/ (2 * BICTCP_BETA_SCALE);
 		else
 			tp->bictcp.last_max_cwnd = tp->snd_cwnd;
 
 		if (tp->snd_cwnd > sysctl_tcp_bic_low_window)
-			return max(tp->snd_cwnd - (tp->snd_cwnd/BICTCP_1_OVER_BETA),
-				   2U);
+			return max((tp->snd_cwnd * sysctl_tcp_bic_beta)
+				   / BICTCP_BETA_SCALE, 2U);
 	}
 
 	return max(tp->snd_cwnd >> 1U, 2U);
@@ -1322,7 +1323,7 @@ static inline __u32 tcp_current_ssthresh(struct tcp_sock *tp)
 
 static inline void tcp_sync_left_out(struct tcp_sock *tp)
 {
-	if (tp->sack_ok &&
+	if (tp->rx_opt.sack_ok &&
 	    (tp->sacked_out >= tp->packets_out - tp->lost_out))
 		tp->sacked_out = tp->packets_out - tp->lost_out;
 	tp->left_out = tp->sacked_out + tp->lost_out;
@@ -1648,39 +1649,39 @@ static __inline__ void tcp_done(struct sock *sk)
 		tcp_destroy_sock(sk);
 }
 
-static __inline__ void tcp_sack_reset(struct tcp_sock *tp)
+static __inline__ void tcp_sack_reset(struct tcp_options_received *rx_opt)
 {
-	tp->dsack = 0;
-	tp->eff_sacks = 0;
-	tp->num_sacks = 0;
+	rx_opt->dsack = 0;
+	rx_opt->eff_sacks = 0;
+	rx_opt->num_sacks = 0;
 }
 
 static __inline__ void tcp_build_and_update_options(__u32 *ptr, struct tcp_sock *tp, __u32 tstamp)
 {
-	if (tp->tstamp_ok) {
+	if (tp->rx_opt.tstamp_ok) {
 		*ptr++ = __constant_htonl((TCPOPT_NOP << 24) |
 					  (TCPOPT_NOP << 16) |
 					  (TCPOPT_TIMESTAMP << 8) |
 					  TCPOLEN_TIMESTAMP);
 		*ptr++ = htonl(tstamp);
-		*ptr++ = htonl(tp->ts_recent);
+		*ptr++ = htonl(tp->rx_opt.ts_recent);
 	}
-	if (tp->eff_sacks) {
-		struct tcp_sack_block *sp = tp->dsack ? tp->duplicate_sack : tp->selective_acks;
+	if (tp->rx_opt.eff_sacks) {
+		struct tcp_sack_block *sp = tp->rx_opt.dsack ? tp->duplicate_sack : tp->selective_acks;
 		int this_sack;
 
 		*ptr++ = __constant_htonl((TCPOPT_NOP << 24) |
 					  (TCPOPT_NOP << 16) |
 					  (TCPOPT_SACK << 8) |
 					  (TCPOLEN_SACK_BASE +
-					   (tp->eff_sacks * TCPOLEN_SACK_PERBLOCK)));
-		for(this_sack = 0; this_sack < tp->eff_sacks; this_sack++) {
+					   (tp->rx_opt.eff_sacks * TCPOLEN_SACK_PERBLOCK)));
+		for(this_sack = 0; this_sack < tp->rx_opt.eff_sacks; this_sack++) {
 			*ptr++ = htonl(sp[this_sack].start_seq);
 			*ptr++ = htonl(sp[this_sack].end_seq);
 		}
-		if (tp->dsack) {
-			tp->dsack = 0;
-			tp->eff_sacks--;
+		if (tp->rx_opt.dsack) {
+			tp->rx_opt.dsack = 0;
+			tp->rx_opt.eff_sacks--;
 		}
 	}
 }
@@ -1826,17 +1827,17 @@ static inline void tcp_synq_drop(struct sock *sk, struct open_request *req,
 }
 
 static __inline__ void tcp_openreq_init(struct open_request *req,
-					struct tcp_sock *tp,
+					struct tcp_options_received *rx_opt,
 					struct sk_buff *skb)
 {
 	req->rcv_wnd = 0;		/* So that tcp_send_synack() knows! */
 	req->rcv_isn = TCP_SKB_CB(skb)->seq;
-	req->mss = tp->mss_clamp;
-	req->ts_recent = tp->saw_tstamp ? tp->rcv_tsval : 0;
-	req->tstamp_ok = tp->tstamp_ok;
-	req->sack_ok = tp->sack_ok;
-	req->snd_wscale = tp->snd_wscale;
-	req->wscale_ok = tp->wscale_ok;
+	req->mss = rx_opt->mss_clamp;
+	req->ts_recent = rx_opt->saw_tstamp ? rx_opt->rcv_tsval : 0;
+	req->tstamp_ok = rx_opt->tstamp_ok;
+	req->sack_ok = rx_opt->sack_ok;
+	req->snd_wscale = rx_opt->snd_wscale;
+	req->wscale_ok = rx_opt->wscale_ok;
 	req->acked = 0;
 	req->ecn_ok = 0;
 	req->rmt_port = skb->h.th->source;
@@ -1885,11 +1886,11 @@ static inline int tcp_fin_time(const struct tcp_sock *tp)
 	return fin_timeout;
 }
 
-static inline int tcp_paws_check(const struct tcp_sock *tp, int rst)
+static inline int tcp_paws_check(const struct tcp_options_received *rx_opt, int rst)
 {
-	if ((s32)(tp->rcv_tsval - tp->ts_recent) >= 0)
+	if ((s32)(rx_opt->rcv_tsval - rx_opt->ts_recent) >= 0)
 		return 0;
-	if (xtime.tv_sec >= tp->ts_recent_stamp + TCP_PAWS_24DAYS)
+	if (xtime.tv_sec >= rx_opt->ts_recent_stamp + TCP_PAWS_24DAYS)
 		return 0;
 
 	/* RST segments are not recommended to carry timestamp,
@@ -1904,7 +1905,7 @@ static inline int tcp_paws_check(const struct tcp_sock *tp, int rst)
 
 	   However, we can relax time bounds for RST segments to MSL.
 	 */
-	if (rst && xtime.tv_sec >= tp->ts_recent_stamp + TCP_PAWS_MSL)
+	if (rst && xtime.tv_sec >= rx_opt->ts_recent_stamp + TCP_PAWS_MSL)
 		return 0;
 	return 1;
 }

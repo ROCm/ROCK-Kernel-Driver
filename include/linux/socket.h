@@ -120,7 +120,7 @@ struct cmsghdr {
  *	Now it always returns valid, not truncated ancillary object
  *	HEADER. But caller still MUST check, that cmsg->cmsg_len is
  *	inside range, given by msg->msg_controllen before using
- *	ansillary object DATA.				--ANK (980731)
+ *	ancillary object DATA.				--ANK (980731)
  */
  
 __KINLINE struct cmsghdr * __cmsg_nxthdr(void *__ctl, __kernel_size_t __size,

@@ -1829,8 +1829,8 @@ int tcp_disconnect(struct sock *sk, int flags)
 	tcp_clear_retrans(tp);
 	tcp_delack_init(tp);
 	sk->sk_send_head = NULL;
-	tp->saw_tstamp = 0;
-	tcp_sack_reset(tp);
+	tp->rx_opt.saw_tstamp = 0;
+	tcp_sack_reset(&tp->rx_opt);
 	__sk_dst_reset(sk);
 
 	BUG_TRAP(!inet->num || tp->bind_hash);
@@ -1969,7 +1969,7 @@ int tcp_setsockopt(struct sock *sk, int level, int optname, char __user *optval,
 			err = -EINVAL;
 			break;
 		}
-		tp->user_mss = val;
+		tp->rx_opt.user_mss = val;
 		break;
 
 	case TCP_NODELAY:
@@ -2119,14 +2119,14 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 	info->tcpi_probes = tp->probes_out;
 	info->tcpi_backoff = tp->backoff;
 
-	if (tp->tstamp_ok)
+	if (tp->rx_opt.tstamp_ok)
 		info->tcpi_options |= TCPI_OPT_TIMESTAMPS;
-	if (tp->sack_ok)
+	if (tp->rx_opt.sack_ok)
 		info->tcpi_options |= TCPI_OPT_SACK;
-	if (tp->wscale_ok) {
+	if (tp->rx_opt.wscale_ok) {
 		info->tcpi_options |= TCPI_OPT_WSCALE;
-		info->tcpi_snd_wscale = tp->snd_wscale;
-		info->tcpi_rcv_wscale = tp->rcv_wscale;
+		info->tcpi_snd_wscale = tp->rx_opt.snd_wscale;
+		info->tcpi_rcv_wscale = tp->rx_opt.rcv_wscale;
 	} 
 
 	if (tp->ecn_flags&TCP_ECN_OK)
@@ -2186,7 +2186,7 @@ int tcp_getsockopt(struct sock *sk, int level, int optname, char __user *optval,
 	case TCP_MAXSEG:
 		val = tp->mss_cache_std;
 		if (!val && ((1 << sk->sk_state) & (TCPF_CLOSE | TCPF_LISTEN)))
-			val = tp->user_mss;
+			val = tp->rx_opt.user_mss;
 		break;
 	case TCP_NODELAY:
 		val = !!(tp->nonagle&TCP_NAGLE_OFF);

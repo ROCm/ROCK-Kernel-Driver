@@ -81,6 +81,8 @@
 #define ACPI_USE_NATIVE_DIVIDE
 #endif
 
+#define __cdecl
+#define ACPI_FLUSH_CPU_CACHE()
 #endif /* __KERNEL__ */
 
 /* Linux uses GCC */

@@ -485,8 +485,10 @@ static int __devinit workqueue_cpu_callback(struct notifier_block *nfb,
 
 	case CPU_ONLINE:
 		/* Kick off worker threads. */
-		list_for_each_entry(wq, &workqueues, list)
+		list_for_each_entry(wq, &workqueues, list) {
+			kthread_bind(wq->cpu_wq[hotcpu].thread, hotcpu);
 			wake_up_process(wq->cpu_wq[hotcpu].thread);
+		}
 		break;
 
 	case CPU_UP_CANCELED:

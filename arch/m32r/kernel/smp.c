@@ -953,7 +953,7 @@ unsigned long send_IPI_mask_phys(cpumask_t physid_mask, int ipi_num,
 		"ldi	r4, #1			\n\t"
 		"st	r4, @%2			\n\t"
 		: "=&r"(ipicr_val)
-		: "r"(flags), "r"(&ipilock->lock), "r"(ipicr_addr),
+		: "r"(flags), "r"(&ipilock->slock), "r"(ipicr_addr),
 		  "r"(mask), "r"(try), "r"(my_physid_mask)
 		: "memory", "r4"
 #ifdef CONFIG_CHIP_M32700_TS1

@@ -46,7 +46,7 @@
 
 int nr_rx_ip(struct sk_buff *skb, struct net_device *dev)
 {
-	struct net_device_stats *stats = (struct net_device_stats *)dev->priv;
+	struct net_device_stats *stats = netdev_priv(dev);
 
 	if (!netif_running(dev)) {
 		stats->rx_errors++;
@@ -73,7 +73,7 @@ int nr_rx_ip(struct sk_buff *skb, struct net_device *dev)
 static int nr_rebuild_header(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dev;
-	struct net_device_stats *stats = (struct net_device_stats *)dev->priv;
+	struct net_device_stats *stats = netdev_priv(dev);
 	struct sk_buff *skbn;
 	unsigned char *bp = skb->data;
 	int len;
@@ -186,7 +186,7 @@ static int nr_close(struct net_device *dev)
 
 static int nr_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct net_device_stats *stats = (struct net_device_stats *)dev->priv;
+	struct net_device_stats *stats = netdev_priv(dev);
 	dev_kfree_skb(skb);
 	stats->tx_errors++;
 	return 0;
@@ -194,7 +194,7 @@ static int nr_xmit(struct sk_buff *skb, struct net_device *dev)
 
 static struct net_device_stats *nr_get_stats(struct net_device *dev)
 {
-	return (struct net_device_stats *)dev->priv;
+	return netdev_priv(dev);
 }
 
 void nr_setup(struct net_device *dev)

@@ -757,7 +757,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	/* Do this immediately, since STACK_TOP as used in setup_arg_pages
 	   may depend on the personality.  */
 	SET_PERSONALITY(loc->elf_ex, ibcs2_interpreter);
-	if (elf_read_implies_exec(loc->elf_ex, have_pt_gnu_stack))
+	if (elf_read_implies_exec(loc->elf_ex, executable_stack))
 		current->personality |= READ_IMPLIES_EXEC;
 
 	arch_pick_mmap_layout(current->mm);

@@ -348,6 +348,12 @@ linvfs_write_inode(
 		if (sync)
 			flags |= FLUSH_SYNC;
 		VOP_IFLUSH(vp, flags, error);
+		if (error == EAGAIN) {
+			if (sync)
+				VOP_IFLUSH(vp, flags | FLUSH_LOG, error);
+			else
+				error = 0;
+		}
 	}
 
 	return -error;
