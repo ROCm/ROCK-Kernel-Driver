@@ -825,6 +825,7 @@ static inline struct hlist_head * d_hash(struct dentry * parent, unsigned long h
 
 struct dentry * d_alloc_anon(struct inode *inode)
 {
+	static const struct qstr anonstring = { "", 0, 0};
 	struct dentry *tmp;
 	struct dentry *res;
 
@@ -833,7 +834,7 @@ struct dentry * d_alloc_anon(struct inode *inode)
 		return res;
 	}
 
-	tmp = d_alloc(NULL, &(const struct qstr) {"",0,0});
+	tmp = d_alloc(NULL, &anonstring);
 	if (!tmp)
 		return NULL;
 
