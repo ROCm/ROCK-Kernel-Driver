@@ -41,9 +41,6 @@
 #include <asm/backlight.h>
 #endif
 
-extern int fix_alignment(struct pt_regs *);
-extern void bad_page_fault(struct pt_regs *, unsigned long, int sig);
-
 #ifdef CONFIG_XMON
 void (*debugger)(struct pt_regs *regs) = xmon;
 int (*debugger_bpt)(struct pt_regs *regs) = xmon_bpt;
