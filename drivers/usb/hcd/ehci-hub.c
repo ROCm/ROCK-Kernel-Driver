@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001 by David Brownell
+ * Copyright (c) 2001-2002 by David Brownell
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -68,8 +68,7 @@ ehci_hub_status_data (struct usb_hcd *hcd, char *buf)
 
 	/* init status to no-changes */
 	buf [0] = 0;
-	temp = readl (&ehci->caps->hcs_params);
-	ports = HCS_N_PORTS (temp);
+	ports = HCS_N_PORTS (ehci->hcs_params);
 	if (ports > 7) {
 		buf [1] = 0;
 		retval++;
@@ -107,8 +106,7 @@ ehci_hub_descriptor (
 	struct ehci_hcd			*ehci,
 	struct usb_hub_descriptor	*desc
 ) {
-	u32		params = readl (&ehci->caps->hcs_params);
-	int		ports = HCS_N_PORTS (params);
+	int		ports = HCS_N_PORTS (ehci->hcs_params);
 	u16		temp;
 
 	desc->bDescriptorType = 0x29;
@@ -124,10 +122,10 @@ ehci_hub_descriptor (
 	memset (&desc->bitmap [temp], 0xff, temp);
 
 	temp = 0x0008;			/* per-port overcurrent reporting */
-	if (HCS_PPC (params))		/* per-port power control */
-	    temp |= 0x0001;
-	if (HCS_INDICATOR (params))	/* per-port indicators (LEDs) */
-	    temp |= 0x0080;
+	if (HCS_PPC (ehci->hcs_params))
+		temp |= 0x0001;		/* per-port power control */
+	if (HCS_INDICATOR (ehci->hcs_params))
+		temp |= 0x0080;		/* per-port indicators (LEDs) */
 	desc->wHubCharacteristics = cpu_to_le16 (temp);
 }
 
@@ -142,8 +140,7 @@ static int ehci_hub_control (
 	u16		wLength
 ) {
 	struct ehci_hcd	*ehci = hcd_to_ehci (hcd);
-	u32		params = readl (&ehci->caps->hcs_params);
-	int		ports = HCS_N_PORTS (params);
+	int		ports = HCS_N_PORTS (ehci->hcs_params);
 	u32		temp;
 	unsigned long	flags;
 	int		retval = 0;
@@ -189,7 +186,7 @@ static int ehci_hub_control (
 			/* ? */
 			break;
 		case USB_PORT_FEAT_POWER:
-			if (HCS_PPC (params))
+			if (HCS_PPC (ehci->hcs_params))
 				writel (temp & ~PORT_POWER,
 					&ehci->regs->port_status [wIndex]);
 			break;
@@ -300,7 +297,7 @@ static int ehci_hub_control (
 				&ehci->regs->port_status [wIndex]);
 			break;
 		case USB_PORT_FEAT_POWER:
-			if (HCS_PPC (params))
+			if (HCS_PPC (ehci->hcs_params))
 				writel (temp | PORT_POWER,
 					&ehci->regs->port_status [wIndex]);
 			break;
@@ -312,6 +309,13 @@ static int ehci_hub_control (
 					hcd->bus_name, wIndex + 1);
 				temp |= PORT_OWNER;
 			} else {
+				/* Philips 1562 wants CMD_RUN to reset */
+				if (!HCD_IS_RUNNING(ehci->hcd.state)) {
+					u32 cmd = readl (&ehci->regs->command);
+					cmd |= CMD_RUN;
+					writel (cmd, &ehci->regs->command);	
+					ehci->hcd.state = USB_STATE_RUNNING;
+				}
 				vdbg ("%s port %d reset",
 					hcd->bus_name, wIndex + 1);
 				temp |= PORT_RESET;
