@@ -32,6 +32,7 @@
 #include <linux/errno.h>
 #include <linux/list.h>
 #include <linux/kallsyms.h>
+#include <linux/proc_fs.h>
 
 #include <asm/irq.h>
 #include <asm/system.h>
@@ -349,7 +350,7 @@ void
 do_simple_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 {
 	struct irqaction *action;
-	const int cpu = smp_processor_id();
+	const unsigned int cpu = smp_processor_id();
 
 	desc->triggered = 1;
 
@@ -374,7 +375,7 @@ do_simple_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 void
 do_edge_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 {
-	const int cpu = smp_processor_id();
+	const unsigned int cpu = smp_processor_id();
 
 	desc->triggered = 1;
 
@@ -438,7 +439,7 @@ void
 do_level_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 {
 	struct irqaction *action;
-	const int cpu = smp_processor_id();
+	const unsigned int cpu = smp_processor_id();
 
 	desc->triggered = 1;
 
@@ -906,8 +907,97 @@ out:
 
 EXPORT_SYMBOL(probe_irq_off);
 
+#ifdef CONFIG_SMP
+static void route_irq(struct irqdesc *desc, unsigned int irq, unsigned int cpu)
+{
+	pr_debug("IRQ%u: moving from cpu%u to cpu%u\n", irq, desc->cpu, cpu);
+
+	spin_lock_irq(&irq_controller_lock);
+	desc->cpu = cpu;
+	desc->chip->set_cpu(desc, irq, cpu);
+	spin_unlock_irq(&irq_controller_lock);
+}
+
+#ifdef CONFIG_PROC_FS
+static int
+irq_affinity_read_proc(char *page, char **start, off_t off, int count,
+		       int *eof, void *data)
+{
+	struct irqdesc *desc = irq_desc + ((int)data);
+	int len = cpumask_scnprintf(page, count, desc->affinity);
+
+	if (count - len < 2)
+		return -EINVAL;
+	page[len++] = '\n';
+	page[len] = '\0';
+
+	return len;
+}
+
+static int
+irq_affinity_write_proc(struct file *file, const char __user *buffer,
+			unsigned long count, void *data)
+{
+	unsigned int irq = (unsigned int)data;
+	struct irqdesc *desc = irq_desc + irq;
+	cpumask_t affinity, tmp;
+	int ret = -EIO;
+
+	if (!desc->chip->set_cpu)
+		goto out;
+
+	ret = cpumask_parse(buffer, count, affinity);
+	if (ret)
+		goto out;
+
+	cpus_and(tmp, affinity, cpu_online_map);
+	if (cpus_empty(tmp)) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	desc->affinity = affinity;
+	route_irq(desc, irq, first_cpu(tmp));
+	ret = count;
+
+ out:
+	return ret;
+}
+#endif
+#endif
+
 void __init init_irq_proc(void)
 {
+#if defined(CONFIG_SMP) && defined(CONFIG_PROC_FS)
+	struct proc_dir_entry *dir;
+	int irq;
+
+	dir = proc_mkdir("irq", 0);
+	if (!dir)
+		return;
+
+	for (irq = 0; irq < NR_IRQS; irq++) {
+		struct proc_dir_entry *entry;
+		struct irqdesc *desc;
+		char name[16];
+
+		desc = irq_desc + irq;
+		memset(name, 0, sizeof(name));
+		snprintf(name, sizeof(name) - 1, "%u", irq);
+
+		desc->procdir = proc_mkdir(name, dir);
+		if (!desc->procdir)
+			continue;
+
+		entry = create_proc_entry("smp_affinity", 0600, desc->procdir);
+		if (entry) {
+			entry->nlink = 1;
+			entry->data = (void *)irq;
+			entry->read_proc = irq_affinity_read_proc;
+			entry->write_proc = irq_affinity_write_proc;
+		}
+	}
+#endif
 }
 
 void __init init_IRQ(void)
@@ -915,6 +1005,11 @@ void __init init_IRQ(void)
 	struct irqdesc *desc;
 	extern void init_dma(void);
 	int irq;
+
+#ifdef CONFIG_SMP
+	bad_irq_desc.affinity = CPU_MASK_ALL;
+	bad_irq_desc.cpu = smp_processor_id();
+#endif
 
 	for (irq = 0, desc = irq_desc; irq < NR_IRQS; irq++, desc++) {
 		*desc = bad_irq_desc;
