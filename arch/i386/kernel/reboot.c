@@ -9,6 +9,7 @@
 #include <linux/interrupt.h>
 #include <linux/mc146818rtc.h>
 #include <linux/efi.h>
+#include <linux/dmi.h>
 #include <asm/uaccess.h>
 #include <asm/apic.h>
 #include "mach_reboot.h"
@@ -66,6 +67,83 @@ static int __init reboot_setup(char *str)
 }
 
 __setup("reboot=", reboot_setup);
+
+/*
+ * Reboot options and system auto-detection code provided by
+ * Dell Inc. so their systems "just work". :-)
+ */
+
+/*
+ * Some machines require the "reboot=b"  commandline option, this quirk makes that automatic.
+ */
+static int __init set_bios_reboot(struct dmi_system_id *d)
+{
+	if (!reboot_thru_bios) {
+		reboot_thru_bios = 1;
+		printk(KERN_INFO "%s series board detected. Selecting BIOS-method for reboots.\n", d->ident);
+	}
+	return 0;
+}
+
+/*
+ * Some machines require the "reboot=s"  commandline option, this quirk makes that automatic.
+ */
+static int __init set_smp_reboot(struct dmi_system_id *d)
+{
+#ifdef CONFIG_SMP
+	if (!reboot_smp) {
+		reboot_smp = 1;
+		printk(KERN_INFO "%s series board detected. Selecting SMP-method for reboots.\n", d->ident);
+	}
+#endif
+	return 0;
+}
+
+/*
+ * Some machines require the "reboot=b,s"  commandline option, this quirk makes that automatic.
+ */
+static int __init set_smp_bios_reboot(struct dmi_system_id *d)
+{
+	set_smp_reboot(d);
+	set_bios_reboot(d);
+	return 0;
+}
+
+static struct dmi_system_id __initdata reboot_dmi_table[] = {
+	{	/* Handle problems with rebooting on Dell 1300's */
+		.callback = set_smp_bios_reboot,
+		.ident = "Dell PowerEdge 1300",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "PowerEdge 1300/"),
+		},
+	},
+	{	/* Handle problems with rebooting on Dell 300's */
+		.callback = set_bios_reboot,
+		.ident = "Dell PowerEdge 300",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "PowerEdge 300/"),
+		},
+	},
+	{	/* Handle problems with rebooting on Dell 2400's */
+		.callback = set_bios_reboot,
+		.ident = "Dell PowerEdge 2400",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "PowerEdge 2400"),
+		},
+	},
+	{ }
+};
+
+static int reboot_init(void)
+{
+	dmi_check_system(reboot_dmi_table);
+	return 0;
+}
+
+core_initcall(reboot_init);
 
 /* The following code and data reboots the machine by switching to real
    mode and jumping to the BIOS reset entry point, as if the CPU has
