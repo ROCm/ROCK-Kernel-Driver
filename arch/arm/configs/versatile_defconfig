@@ -150,8 +150,8 @@ CONFIG_ZBOOT_ROM_BSS=0x0
 #
 # At least one math emulation must be selected
 #
-# CONFIG_FPE_NWFPE is not set
-CONFIG_FPE_FASTFPE=y
+CONFIG_FPE_NWFPE=y
+# CONFIG_FPE_NWFPE_XP is not set
 CONFIG_BINFMT_ELF=y
 # CONFIG_BINFMT_AOUT is not set
 # CONFIG_BINFMT_MISC is not set
