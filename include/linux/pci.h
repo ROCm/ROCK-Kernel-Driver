@@ -468,10 +468,12 @@ struct pci_bus {
 
 	char		name[48];
 
-	struct	device	* dev;
+	struct device		*bridge;
+	struct class_device	class_dev;
 };
 
-#define pci_bus_b(n) list_entry(n, struct pci_bus, node)
+#define pci_bus_b(n)	list_entry(n, struct pci_bus, node)
+#define to_pci_bus(n)	container_of(n, struct pci_bus, class_dev)
 
 /*
  * Error values that may be returned by PCI functions.
@@ -607,6 +609,8 @@ struct pci_dev *pci_get_device (unsigned int vendor, unsigned int device, struct
 struct pci_dev *pci_get_subsys (unsigned int vendor, unsigned int device,
 				unsigned int ss_vendor, unsigned int ss_device,
 				struct pci_dev *from);
+struct pci_dev *pci_get_slot (struct pci_bus *bus, unsigned int devfn);
+
 int pci_bus_read_config_byte (struct pci_bus *bus, unsigned int devfn, int where, u8 *val);
 int pci_bus_read_config_word (struct pci_bus *bus, unsigned int devfn, int where, u16 *val);
 int pci_bus_read_config_dword (struct pci_bus *bus, unsigned int devfn, int where, u32 *val);

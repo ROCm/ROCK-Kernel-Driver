@@ -370,10 +370,10 @@ static int init_slots (void)
 		 * Initilize the slot info structure with some known
 		 * good values.
 		 */
-		info->power_status = get_skel_power_status(slot);
-		info->attention_status = get_skel_attention_status(slot);
-		info->latch_status = get_skel_latch_status(slot);
-		info->adapter_status = get_skel_adapter_status(slot);
+		info->power_status = get_power_status(slot);
+		info->attention_status = get_attention_status(slot);
+		info->latch_status = get_latch_status(slot);
+		info->adapter_status = get_adapter_status(slot);
 		
 		dbg ("registering slot %d\n", i);
 		retval = pci_hp_register (slot->hotplug_slot);

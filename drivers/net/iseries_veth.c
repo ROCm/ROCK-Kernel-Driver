@@ -641,7 +641,6 @@ veth_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 static void veth_set_multicast_list(struct net_device *dev)
 {
-	char *addrs;
 	struct veth_port *port = (struct veth_port *) dev->priv;
 	unsigned long flags;
 
@@ -663,7 +662,7 @@ static void veth_set_multicast_list(struct net_device *dev)
 			u8 *addr = dmi->dmi_addr;
 			u64 xaddr = 0;
 
-			if (addrs[0] & 0x01) {/* multicast address? */
+			if (addr[0] & 0x01) {/* multicast address? */
 				memcpy(&xaddr, addr, 6);
 				port->mcast_addr[port->num_mcast] = xaddr;
 				port->num_mcast++;
@@ -883,7 +882,7 @@ static void veth_finish_open_connection(void *parm)
 		HvCallEvent_ackLpEvent((struct HvLpEvent *)&cnx->cap_event);
 
 		veth_failMe(cnx);
-		return;
+		goto out;
 	}
 
 	numAcks = (remoteCap->mNumberBuffers / remoteCap->mThreshold) + 1;
@@ -917,7 +916,7 @@ static void veth_finish_open_connection(void *parm)
 		HvCallEvent_ackLpEvent((struct HvLpEvent *)&cnx->cap_event);
 
 		veth_failMe(cnx);
-		return;
+		goto out;
 	}
 
 	rc = HvCallEvent_ackLpEvent((struct HvLpEvent *)&cnx->cap_event);
@@ -925,15 +924,14 @@ static void veth_finish_open_connection(void *parm)
 		veth_error("Failed to ack remote cap for lpar %d with rc %x\n",
 			   cnx->remote_lp, (int) rc);
 		veth_failMe(cnx);
-		return;
-
+		goto out;
 	}
 
 	if (cnx->cap_ack_event.mBaseEvent.xRc != HvLpEvent_Rc_Good) {
 		veth_printk(KERN_ERR, "Bad rc(%d) from lpar %d on capabilities\n",
 			    cnx->cap_ack_event.mBaseEvent.xRc, cnx->remote_lp);
 		veth_failMe(cnx);
-		return;
+		goto out;
 	}
 
 	/* Send the monitor */
@@ -946,7 +944,7 @@ static void veth_finish_open_connection(void *parm)
 		veth_error("Monitor send to lpar %d failed with rc %x\n",
 				  cnx->remote_lp, (int) rc);
 		veth_failMe(cnx);
-		return;
+		goto out;
 	}
 
 	cnx->status.ready = 1;
@@ -955,6 +953,7 @@ static void veth_finish_open_connection(void *parm)
 	cnx->ack_timer.expires = jiffies + cnx->ack_timeout;
 	add_timer(&cnx->ack_timer);
 
+ out:
 	spin_unlock_irq(&cnx->status_gate);
 }
 

@@ -3,8 +3,8 @@
 /* Change Activity: */
 /* End Change Activity */
 
-#ifndef _VETH_H
-#define _VETH_H
+#ifndef _ISERIES_VETH_H
+#define _ISERIES_VETH_H
 
 #include <asm/iSeries/HvTypes.h>
 #include <asm/iSeries/HvLpEvent.h>
@@ -15,10 +15,11 @@
 #define VethEventTypeMonitor (2)
 #define VethEventTypeFramesAck (3)
 
-#define VethMaxFramesMsgsAcked (20)
-#define VethMaxFramesMsgs (0xFFFF)
-#define VethMaxFramesPerMsg (6)
-#define VethAckTimeoutUsec (1000000)
+#define VETH_MAX_ACKS_PER_MSG	(20)
+#define VETH_MAXFRAMESPERMSG	(6)
+#define VETH_ACKTIMEOUT 	(1000000) /* microseconds */
+#define HVMAXARCHITECTEDVIRTUALLANS 16
+#define VETH_MAX_MCAST	12
 
 #define VETHSTACK(T) \
 	struct VethStack##T \
@@ -26,8 +27,6 @@
 		struct T *head; \
 		spinlock_t lock; \
 	}
-#define VETHSTACKCTOR(s) \
-	do { (s)->head = NULL; spin_lock_init(&(s)->lock); } while(0)
 #define VETHSTACKPUSH(s, p) \
 	do { \
 		unsigned long flags; \
@@ -49,14 +48,14 @@
 	} while(0)
 
 struct VethFramesData {
-	u32 mAddress[6];
-	u16 mLength[6];
-	u32 mEofMask:6;
+	u32 addr[6];
+	u16 len[6];
+	u32 eof:6;
 	u32 mReserved:26;
 };
 
 struct VethFramesAckData {
-	u16 mToken[VethMaxFramesMsgsAcked];
+	u16 mToken[VETH_MAX_ACKS_PER_MSG];
 };
 
 struct VethCapData {
@@ -72,94 +71,70 @@ struct VethCapData {
 	u64 mReserved6;
 };
 
-struct VethFastPathData {
-	u64 mData1;
-	u64 mData2;
-	u64 mData3;
-	u64 mData4;
-	u64 mData5;
-};
-
 struct VethLpEvent {
 	struct HvLpEvent mBaseEvent;
 	union {
 		struct VethFramesData mSendData;
 		struct VethCapData mCapabilitiesData;
 		struct VethFramesAckData mFramesAckData;
-		struct VethFastPathData mFastPathData;
-	} mDerivedData;
+	} u;
 
 };
 
 struct VethMsg {
 	struct VethMsg *next;
-	union {
-		struct VethFramesData mSendData;
-		u64 raw[5];
-	} mEvent;
+	struct VethFramesData mSendData;
 	int mIndex;
 	unsigned long mInUse;
 	struct sk_buff *skb;
 };
 
 struct VethLpConnection {
-	u64 mEyecatcher;
 	HvLpIndex remote_lp;
-	HvLpInstanceId src_inst;
-	HvLpInstanceId dst_inst;
+	struct work_struct finish_open_wq;
+	struct work_struct monitor_ack_wq;
+	struct timer_list ack_timer;
 	u32 mNumMsgs;
 	struct VethMsg *mMsgs;
-	int mNumberRcvMsgs;
-	int mNumberLpAcksAlloced;
-	union {
-		struct VethFramesAckData mAckData;
-		u64 raw[5];
-	} mEventData;
-	spinlock_t ack_gate;
-	u32 mNumAcks;
+
+	HvLpInstanceId src_inst;
+	HvLpInstanceId dst_inst;
+
 	spinlock_t status_gate;
 	struct {
 		u64 mOpen:1;
-		u64 mCapMonAlloced:1;
-		u64 mBaseMsgsAlloced:1;
-		u64 mSentCap:1;
-		u64 mCapAcked:1;
-		u64 mGotCap:1;
-		u64 mGotCapAcked:1;
-		u64 mSentMonitor:1;
-		u64 mPopulatedRings:1;
-		u64 mReserved:54;
-		u64 mFailed:1;
+		u64 ready;
+		u64 sent_caps:1;
+		u64 got_cap:1;
+		u64 got_cap_ack:1;
+		u64 monitor_ack_pending:1;
 	} status;
+	struct VethLpEvent cap_event, cap_ack_event;
+
+	spinlock_t ack_gate;
+	u16 pending_acks[VETH_MAX_ACKS_PER_MSG];
+	u32 num_pending_acks;
+
+	int mNumberRcvMsgs;
+	int mNumberLpAcksAlloced;
 	struct VethCapData mMyCap;
 	struct VethCapData mRemoteCap;
-	unsigned long mCapAckTaskPending;
-	struct work_struct mCapAckTaskTq;
-	struct VethLpEvent mCapAckEvent;
-	unsigned long mCapTaskPending;
-	struct work_struct mCapTaskTq;
-	struct VethLpEvent mCapEvent;
-	unsigned long mMonitorAckTaskPending;
-	struct work_struct mMonitorAckTaskTq;
-	struct VethLpEvent mMonitorAckEvent;
 	unsigned long mAllocTaskPending;
-	struct work_struct mAllocTaskTq;
 	int mNumberAllocated;
-	struct timer_list ack_timer;
-	u32 mTimeout;
+	u32 ack_timeout;
 	VETHSTACK(VethMsg) mMsgStack;
 };
 
-#define HVMAXARCHITECTEDVIRTUALLANS 16
 struct veth_port {
 	struct net_device *mDev;
 	struct net_device_stats stats;
 	u64 mMyAddress;
-	int mPromiscuous;
-	int all_mcast;
+
 	rwlock_t mcast_gate;
-	int mNumAddrs;
-	u64 mMcasts[12];
+	int promiscuous;
+	int all_mcast;
+	int num_mcast;
+	u64 mcast_addr[VETH_MAX_MCAST];
 };
 
 struct VethFabricMgr {
@@ -169,4 +144,4 @@ struct VethFabricMgr {
 	struct veth_port *mPorts[HVMAXARCHITECTEDVIRTUALLANS];
 };
 
-#endif	/* _VETH_H */
+#endif	/* _ISERIES_VETH_H */

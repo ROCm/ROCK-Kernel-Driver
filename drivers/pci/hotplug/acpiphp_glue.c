@@ -974,6 +974,21 @@ static void handle_hotplug_event_bridge (acpi_handle handle, u32 type, void *con
 		dbg("%s: Device eject notify on %s\n", __FUNCTION__, objname);
 		break;
 
+	case ACPI_NOTIFY_FREQUENCY_MISMATCH:
+		printk(KERN_ERR "Device %s cannot be configured due"
+				" to a frequency mismatch\n", objname);
+		break;
+
+	case ACPI_NOTIFY_BUS_MODE_MISMATCH:
+		printk(KERN_ERR "Device %s cannot be configured due"
+				" to a bus mode mismatch\n", objname);
+		break;
+
+	case ACPI_NOTIFY_POWER_FAULT:
+		printk(KERN_ERR "Device %s has suffered a power fault\n",
+				objname);
+		break;
+
 	default:
 		warn("notify_handler: unknown event type 0x%x for %s\n", type, objname);
 		break;

@@ -116,6 +116,8 @@ void __devinit pci_bus_add_devices(struct pci_bus *bus)
 			list_add_tail(&dev->subordinate->node, &dev->bus->children);
 			spin_unlock(&pci_bus_lock);
 			pci_bus_add_devices(dev->subordinate);
+
+			sysfs_create_link(&dev->subordinate->class_dev.kobj, &dev->dev.kobj, "bridge");
 		}
 	}
 }

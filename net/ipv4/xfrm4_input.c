@@ -93,6 +93,19 @@ int xfrm4_rcv_encap(struct sk_buff *skb, __u16 encap_type)
 		iph = skb->nh.iph;
 
 		if (x->props.mode) {
+			if (iph->protocol == 0xfe) {
+				skb_push(skb, skb->data - skb->nh.raw);
+				if (!(skb->dev->flags&IFF_LOOPBACK)){
+					dst_release(skb->dst);
+					skb->dst = NULL;
+				}
+				if (skb->sp) {
+					secpath_put(skb->sp);
+					skb->sp = NULL;
+				}
+			netif_rx(skb);
+			return 0;
+			}
 			if (iph->protocol != IPPROTO_IPIP)
 				goto drop;
 			skb->nh.raw = skb->data;
