@@ -1901,7 +1901,7 @@ int blk_execute_rq(request_queue_t *q, struct gendisk *bd_disk,
 {
 	DECLARE_COMPLETION(wait);
 	char sense[SCSI_SENSE_BUFFERSIZE];
-	int err = 0, clear = 0;
+	int err = 0;
 
 	rq->rq_disk = bd_disk;
 
@@ -1918,18 +1918,11 @@ int blk_execute_rq(request_queue_t *q, struct gendisk *bd_disk,
 	}
 
 	rq->flags |= REQ_NOMERGE;
-	if (!rq->waiting) {
-		rq->waiting = &wait;
-		clear = 1;
-	}
+	rq->waiting = &wait;
 	elv_add_request(q, rq, ELEVATOR_INSERT_BACK, 1);
 	generic_unplug_device(q);
-
-	if (rq->waiting) {
-		wait_for_completion(rq->waiting);
-		if (clear)
-			rq->waiting = NULL;
-	}
+	wait_for_completion(&wait);
+	rq->waiting = NULL;
 
 	if (rq->errors)
 		err = -EIO;
