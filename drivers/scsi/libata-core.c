@@ -1750,26 +1750,24 @@ static void ata_dev_set_pio(struct ata_port *ap, unsigned int device)
 static void ata_sg_clean(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
-	struct scsi_cmnd *cmd = qc->scsicmd;
 	struct scatterlist *sg = qc->sg;
-	int dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
+	int dir = qc->pci_dma_dir;
 
-	assert(dir == SCSI_DATA_READ || dir == SCSI_DATA_WRITE);
-	assert(qc->flags & ATA_QCFLAG_SG);
+	assert(qc->flags & ATA_QCFLAG_DMAMAP);
 	assert(sg != NULL);
 
-	if (!cmd->use_sg)
+	if (qc->flags & ATA_QCFLAG_SINGLE)
 		assert(qc->n_elem == 1);
 
 	DPRINTK("unmapping %u sg elements\n", qc->n_elem);
 
-	if (cmd->use_sg)
+	if (qc->flags & ATA_QCFLAG_SG)
 		pci_unmap_sg(ap->host_set->pdev, sg, qc->n_elem, dir);
 	else
 		pci_unmap_single(ap->host_set->pdev, sg_dma_address(&sg[0]),
 				 sg_dma_len(&sg[0]), dir);
 
-	qc->flags &= ~ATA_QCFLAG_SG;
+	qc->flags &= ~ATA_QCFLAG_DMAMAP;
 	qc->sg = NULL;
 }
 
@@ -1830,7 +1828,7 @@ static void ata_fill_sg(struct ata_queued_cmd *qc)
  */
 void ata_qc_prep(struct ata_queued_cmd *qc)
 {
-	if (!(qc->flags & ATA_QCFLAG_SG))
+	if (!(qc->flags & ATA_QCFLAG_DMAMAP))
 		return;
 
 	ata_fill_sg(qc);
@@ -1851,7 +1849,7 @@ static int ata_sg_setup_one(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
 	struct scsi_cmnd *cmd = qc->scsicmd;
-	int dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
+	int dir = qc->pci_dma_dir;
 	struct scatterlist *sg = qc->sg;
 	dma_addr_t dma_address;
 
@@ -1893,11 +1891,11 @@ static int ata_sg_setup(struct ata_queued_cmd *qc)
 	struct scatterlist *sg;
 	int n_elem, dir;
 
-	VPRINTK("ENTER, ata%u, use_sg %d\n", ap->id, cmd->use_sg);
-	assert(cmd->use_sg > 0);
+	VPRINTK("ENTER, ata%u\n", ap->id);
+	assert(qc->flags & ATA_QCFLAG_SG);
 
 	sg = (struct scatterlist *)cmd->request_buffer;
-	dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
+	dir = qc->pci_dma_dir;
 	n_elem = pci_map_sg(ap->host_set->pdev, sg, cmd->use_sg, dir);
 	if (n_elem < 1)
 		return -1;
@@ -2058,7 +2056,7 @@ static void ata_pio_sector(struct ata_port *ap)
 	qc->cursect++;
 	qc->cursg_ofs++;
 
-	if (cmd->use_sg)
+	if (qc->flags & ATA_QCFLAG_SG)
 		if ((qc->cursg_ofs * ATA_SECT_SIZE) == sg_dma_len(&sg[qc->cursg])) {
 			qc->cursg++;
 			qc->cursg_ofs = 0;
@@ -2299,7 +2297,7 @@ void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
 	assert(qc != NULL);	/* ata_qc_from_tag _might_ return NULL */
 	assert(qc->flags & ATA_QCFLAG_ACTIVE);
 
-	if (likely(qc->flags & ATA_QCFLAG_SG))
+	if (likely(qc->flags & ATA_QCFLAG_DMAMAP))
 		ata_sg_clean(qc);
 
 	/* call completion callback */
@@ -2346,17 +2344,13 @@ void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
 int ata_qc_issue(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
-	struct scsi_cmnd *cmd = qc->scsicmd;
 
 	if (qc->flags & ATA_QCFLAG_SG) {
-		/* set up SG table */
-		if (cmd->use_sg) {
-			if (ata_sg_setup(qc))
-				goto err_out;
-		} else {
-			if (ata_sg_setup_one(qc))
-				goto err_out;
-		}
+		if (ata_sg_setup(qc))
+			goto err_out;
+	} else if (qc->flags & ATA_QCFLAG_SINGLE) {
+		if (ata_sg_setup_one(qc))
+			goto err_out;
 	}
 
 	ap->ops->qc_prep(qc);

@@ -386,6 +386,7 @@ static void ata_scsi_translate(struct ata_port *ap, struct ata_device *dev,
 	if (!qc)
 		return;
 
+	/* data is present; dma-map it */
 	if (cmd->sc_data_direction == SCSI_DATA_READ ||
 	    cmd->sc_data_direction == SCSI_DATA_WRITE) {
 		if (unlikely(cmd->request_bufflen < 1)) {
@@ -394,7 +395,12 @@ static void ata_scsi_translate(struct ata_port *ap, struct ata_device *dev,
 			goto err_out;
 		}
 
-		qc->flags |= ATA_QCFLAG_SG; /* data is present; dma-map it */
+		if (cmd->use_sg)
+			qc->flags |= ATA_QCFLAG_SG;
+		else
+			qc->flags |= ATA_QCFLAG_SINGLE;
+
+		qc->pci_dma_dir = scsi_to_pci_dma_dir(cmd->sc_data_direction);
 	}
 
 	qc->complete_fn = ata_scsi_qc_complete;

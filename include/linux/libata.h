@@ -112,7 +112,9 @@ enum {
 
 	ATA_QCFLAG_ACTIVE	= (1 << 1), /* cmd not yet ack'd to scsi lyer */
 	ATA_QCFLAG_DMA		= (1 << 2), /* data delivered via DMA */
-	ATA_QCFLAG_SG		= (1 << 4), /* have s/g table? */
+	ATA_QCFLAG_SG		= (1 << 3), /* have s/g table? */
+	ATA_QCFLAG_SINGLE	= (1 << 4), /* no s/g, just a single buffer */
+	ATA_QCFLAG_DMAMAP	= ATA_QCFLAG_SG | ATA_QCFLAG_SINGLE,
 
 	/* various lengths of time */
 	ATA_TMOUT_EDD		= 5 * HZ,	/* hueristic */
@@ -216,10 +218,14 @@ struct ata_queued_cmd {
 	unsigned long		flags;		/* ATA_QCFLAG_xxx */
 	unsigned int		tag;
 	unsigned int		n_elem;
+
+	int			pci_dma_dir;
+
 	unsigned int		nsect;
 	unsigned int		cursect;
 	unsigned int		cursg;
 	unsigned int		cursg_ofs;
+
 	struct ata_taskfile	tf;
 	struct scatterlist	sgent;
 
