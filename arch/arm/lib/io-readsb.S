@@ -37,31 +37,31 @@ ENTRY(__raw_readsb)
 
 .insb_16_lp:	ldrb	r3, [r0]
 		ldrb	r4, [r0]
+		ldrb	r5, [r0]
+		ldrb	r6, [r0]
 		orr	r3, r3, r4, lsl #8
-		ldrb	r4, [r0]
-		orr	r3, r3, r4, lsl #16
-		ldrb	r4, [r0]
-		orr	r3, r3, r4, lsl #24
+		orr	r3, r3, r5, lsl #16
+		orr	r3, r3, r6, lsl #24
 		ldrb	r4, [r0]
 		ldrb	r5, [r0]
-		orr	r4, r4, r5, lsl #8
-		ldrb	r5, [r0]
-		orr	r4, r4, r5, lsl #16
-		ldrb	r5, [r0]
-		orr	r4, r4, r5, lsl #24
-		ldrb	r5, [r0]
-		ldrb	r6, [r0]
-		orr	r5, r5, r6, lsl #8
-		ldrb	r6, [r0]
-		orr	r5, r5, r6, lsl #16
-		ldrb	r6, [r0]
-		orr	r5, r5, r6, lsl #24
 		ldrb	r6, [r0]
 		ldrb	ip, [r0]
+		orr	r4, r4, r5, lsl #8
+		orr	r4, r4, r6, lsl #16
+		orr	r4, r4, ip, lsl #24
+		ldrb	r5, [r0]
+		ldrb	r6, [r0]
+		ldrb	ip, [r0]
+		ldrb	lr, [r0]
+		orr	r5, r5, r6, lsl #8
+		orr	r5, r5, ip, lsl #16
+		orr	r5, r5, lr, lsl #24
+		ldrb	r6, [r0]
+		ldrb	ip, [r0]
+		ldrb	lr, [r0]
 		orr	r6, r6, ip, lsl #8
 		ldrb	ip, [r0]
-		orr	r6, r6, ip, lsl #16
-		ldrb	ip, [r0]
+		orr	r6, r6, lr, lsl #16
 		orr	r6, r6, ip, lsl #24
 		stmia	r1!, {r3 - r6}
 
@@ -76,18 +76,18 @@ ENTRY(__raw_readsb)
 
 		ldrb	r3, [r0]
 		ldrb	r4, [r0]
+		ldrb	r5, [r0]
+		ldrb	r6, [r0]
 		orr	r3, r3, r4, lsl #8
-		ldrb	r4, [r0]
-		orr	r3, r3, r4, lsl #16
-		ldrb	r4, [r0]
-		orr	r3, r3, r4, lsl #24
+		orr	r3, r3, r5, lsl #16
+		orr	r3, r3, r6, lsl #24
 		ldrb	r4, [r0]
 		ldrb	r5, [r0]
+		ldrb	r6, [r0]
+		ldrb	ip, [r0]
 		orr	r4, r4, r5, lsl #8
-		ldrb	r5, [r0]
-		orr	r4, r4, r5, lsl #16
-		ldrb	r5, [r0]
-		orr	r4, r4, r5, lsl #24
+		orr	r4, r4, r6, lsl #16
+		orr	r4, r4, ip, lsl #24
 		stmia	r1!, {r3, r4}
 
 .insb_no_8:	tst	r2, #4
@@ -95,11 +95,11 @@ ENTRY(__raw_readsb)
 
 		ldrb	r3, [r0]
 		ldrb	r4, [r0]
+		ldrb	r5, [r0]
+		ldrb	r6, [r0]
 		orr	r3, r3, r4, lsl #8
-		ldrb	r4, [r0]
-		orr	r3, r3, r4, lsl #16
-		ldrb	r4, [r0]
-		orr	r3, r3, r4, lsl #24
+		orr	r3, r3, r5, lsl #16
+		orr	r3, r3, r6, lsl #24
 		str	r3, [r1], #4
 
 .insb_no_4:	ands	r2, r2, #3
