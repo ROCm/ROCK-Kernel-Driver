@@ -235,11 +235,11 @@ xfs_start_flags(
 	}
 
 	if (ap->logbufs != 0 && ap->logbufs != -1 &&
-	    (ap->logbufs < XLOG_NUM_ICLOGS ||
+	    (ap->logbufs < XLOG_MIN_ICLOGS ||
 	     ap->logbufs > XLOG_MAX_ICLOGS)) {
 		cmn_err(CE_WARN,
 			"XFS: invalid logbufs value: %d [not %d-%d]",
-			ap->logbufs, XLOG_NUM_ICLOGS, XLOG_MAX_ICLOGS);
+			ap->logbufs, XLOG_MIN_ICLOGS, XLOG_MAX_ICLOGS);
 		return XFS_ERROR(EINVAL);
 	}
 	mp->m_logbufs = ap->logbufs;

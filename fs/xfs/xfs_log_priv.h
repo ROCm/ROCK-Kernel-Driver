@@ -50,7 +50,8 @@ struct xfs_mount;
  * Macros, structures, prototypes for internal log manager use.
  */
 
-#define XLOG_NUM_ICLOGS		2
+#define XLOG_MIN_ICLOGS		2
+#define XLOG_MED_ICLOGS		4
 #define XLOG_MAX_ICLOGS		8
 #define XLOG_CALLBACK_SIZE	10
 #define XLOG_HEADER_MAGIC_NUM	0xFEEDbabe	/* Illegal cycle number */
