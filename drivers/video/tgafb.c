@@ -1,31 +1,15 @@
 /*
  *  linux/drivers/video/tgafb.c -- DEC 21030 TGA frame buffer device
  *
- *	Copyright (C) 1999,2000 Martin Lucina, Tom Zerucha
- *
- *  $Id: tgafb.c,v 1.12.2.3 2000/04/04 06:44:56 mato Exp $
- *
- *  This driver is partly based on the original TGA framebuffer device, which
- *  was partly based on the original TGA console driver, which are
- *
- *	Copyright (C) 1997 Geert Uytterhoeven
  *	Copyright (C) 1995 Jay Estabrook
+ *	Copyright (C) 1997 Geert Uytterhoeven
+ *	Copyright (C) 1999,2000 Martin Lucina, Tom Zerucha
+ *	Copyright (C) 2002 Richard Henderson
  *
  *  This file is subject to the terms and conditions of the GNU General Public
  *  License. See the file COPYING in the main directory of this archive for
  *  more details.
  */
-
-/* KNOWN PROBLEMS/TO DO ===================================================== *
- *
- *	- How to set a single color register on 24-plane cards?
- *
- *	- Hardware cursor/other text acceleration methods
- *
- *	- Some redraws can stall kernel for several seconds
- *	  [This should now be solved by the fast memmove() patch in 2.3.6]
- *
- * KNOWN PROBLEMS/TO DO ==================================================== */
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -76,6 +60,7 @@ static struct fb_ops tgafb_ops = {
 	.fb_fillrect		= cfb_fillrect,
 	.fb_copyarea		= cfb_copyarea,
 	.fb_imageblit		= cfb_imageblit,
+	.fb_cursor		= soft_cursor,
 };
 
 
@@ -446,8 +431,10 @@ tgafb_setcolreg(unsigned regno, unsigned red, unsigned green, unsigned blue,
 		TGA_WRITE_REG(par, red|(BT485_DATA_PAL<<8),TGA_RAMDAC_REG);
 		TGA_WRITE_REG(par, green|(BT485_DATA_PAL<<8),TGA_RAMDAC_REG);
 		TGA_WRITE_REG(par, blue|(BT485_DATA_PAL<<8),TGA_RAMDAC_REG);
+	} else if (regno < 16) {
+		u32 value = (red << 16) | (green << 8) | blue;
+		((u32 *)info->pseudo_palette)[regno] = value;
 	}
-	/* How to set a single color register on 24-plane cards?? */
 
 	return 0;
 }
@@ -594,6 +581,7 @@ tgafb_pci_register(struct pci_dev *pdev, const struct pci_device_id *ent)
 		return -ENOMEM;
 	}
 	memset(all, 0, sizeof(*all));
+	pci_set_drvdata(pdev, all);
 
 	/* Request the mem regions.  */
 	bar0_start = pci_resource_start(pdev, 0);
@@ -620,12 +608,11 @@ tgafb_pci_register(struct pci_dev *pdev, const struct pci_device_id *ent)
 	all->par.tga_type = tga_type;
 	pci_read_config_byte(pdev, PCI_REVISION_ID, &all->par.tga_chip_rev);
 
-	pci_set_drvdata(pdev, &all->info);
-
 	/* Setup framebuffer.  */
 	all->info.node = NODEV;
 	all->info.flags = FBINFO_FLAG_DEFAULT;
 	all->info.fbops = &tgafb_ops;
+	all->info.screen_base = (char *) all->par.tga_fb_base;
 	all->info.currcon = -1;
 	all->info.par = &all->par;
 	all->info.pseudo_palette = all->pseudo_palette;
