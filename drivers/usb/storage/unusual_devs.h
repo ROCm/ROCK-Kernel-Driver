@@ -45,6 +45,13 @@
  *
  */
 
+/* Patch submitted by Martin Berentsen <berentsen at sent5 dot uni-duisburg dot de> */
+#define US_FL_START_STOP  0x00000004   /* ignore START_STOP commands     */
+UNUSUAL_DEV(  0x0686, 0x4014, 0x0001, 0x0001, 
+		"Minolta",
+		"Dimage S414",
+		US_SC_SCSI, US_PR_BULK, NULL, US_FL_START_STOP), 
+
 UNUSUAL_DEV(  0x03ee, 0x0000, 0x0000, 0x0245, 
 		"Mitsumi",
 		"CD-R/RW Drive",
