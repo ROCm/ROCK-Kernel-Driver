@@ -37,7 +37,7 @@
 #include <linux/timer.h>
 #include <linux/list.h>
 #include <linux/interrupt.h>
-
+#include <linux/reboot.h>
 #include <linux/usb.h>
 
 #include <linux/version.h>
@@ -306,6 +306,19 @@ static int bios_handoff (struct ehci_hcd *ehci, int where, u32 cap)
 	return 0;
 }
 
+static int
+ehci_reboot (struct notifier_block *self, unsigned long code, void *null)
+{
+	struct ehci_hcd		*ehci;
+
+	ehci = container_of (self, struct ehci_hcd, reboot_notifier);
+
+	/* make BIOS/etc use companion controller during reboot */
+	writel (0, &ehci->regs->configured_flag);
+	return 0;
+}
+
+
 /* called by khubd or root hub init threads */
 
 static int ehci_start (struct usb_hcd *hcd)
@@ -464,6 +477,9 @@ done2:
 	 * are explicitly handed to companion controller(s), so no TT is
 	 * involved with the root hub.
 	 */
+	ehci->reboot_notifier.notifier_call = ehci_reboot;
+	register_reboot_notifier (&ehci->reboot_notifier);
+
 	ehci->hcd.state = USB_STATE_READY;
 	writel (FLAG_CF, &ehci->regs->configured_flag);
 	readl (&ehci->regs->command);	/* unblock posted write */
@@ -520,6 +536,7 @@ static void ehci_stop (struct usb_hcd *hcd)
 
 	/* let companion controllers work when we aren't */
 	writel (0, &ehci->regs->configured_flag);
+	unregister_reboot_notifier (&ehci->reboot_notifier);
 
 	remove_debug_files (ehci);
 
