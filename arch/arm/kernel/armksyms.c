@@ -187,6 +187,7 @@ EXPORT_SYMBOL(__arch_copy_from_user);
 EXPORT_SYMBOL(__arch_copy_to_user);
 EXPORT_SYMBOL(__arch_clear_user);
 EXPORT_SYMBOL(__arch_strnlen_user);
+EXPORT_SYMBOL(__arch_strncpy_from_user);
 
 	/* consistent area handling */
 EXPORT_SYMBOL(consistent_alloc);
