@@ -304,35 +304,16 @@ static void tune_ht6560b (ide_drive_t *drive, u8 pio)
 #endif
 }
 
-void ht6560b_release (void)
+/* Can be called directly from ide.c. */
+int __init ht6560b_init(void)
 {
-	if (ide_hwifs[0].chipset != ide_ht6560b &&
-	    ide_hwifs[1].chipset != ide_ht6560b)
-                return;
-
-	ide_hwifs[0].chipset = ide_unknown;
-	ide_hwifs[1].chipset = ide_unknown;
-	ide_hwifs[0].tuneproc = NULL;
-	ide_hwifs[1].tuneproc = NULL;
-	ide_hwifs[0].selectproc = NULL;
-	ide_hwifs[1].selectproc = NULL;
-	ide_hwifs[0].serialized = 0;
-	ide_hwifs[1].serialized = 0;
-	ide_hwifs[0].mate = NULL;
-	ide_hwifs[1].mate = NULL;
-
-	ide_hwifs[0].drives[0].drive_data = 0;
-	ide_hwifs[0].drives[1].drive_data = 0;
-	ide_hwifs[1].drives[0].drive_data = 0;
-	ide_hwifs[1].drives[1].drive_data = 0;
-	release_region(HT_CONFIG_PORT, 1);
-}
-
-static int __init ht6560b_mod_init(void)
-{
+	ide_hwif_t *hwif, *mate;
 	int t;
 
-	if (!request_region(HT_CONFIG_PORT, 1, ide_hwifs[0].name)) {
+	hwif = &ide_hwifs[0];
+	mate = &ide_hwifs[1];
+
+	if (!request_region(HT_CONFIG_PORT, 1, hwif->name)) {
 		printk(KERN_NOTICE "%s: HT_CONFIG_PORT not found\n",
 			__FUNCTION__);
 		return -ENODEV;
@@ -343,39 +324,33 @@ static int __init ht6560b_mod_init(void)
 		goto release_region;
 	}
 
-	ide_hwifs[0].chipset = ide_ht6560b;
-	ide_hwifs[1].chipset = ide_ht6560b;
-	ide_hwifs[0].selectproc = &ht6560b_selectproc;
-	ide_hwifs[1].selectproc = &ht6560b_selectproc;
-	ide_hwifs[0].tuneproc = &tune_ht6560b;
-	ide_hwifs[1].tuneproc = &tune_ht6560b;
-	ide_hwifs[0].serialized = 1;  /* is this needed? */
-	ide_hwifs[1].serialized = 1;  /* is this needed? */
-	ide_hwifs[0].mate = &ide_hwifs[1];
-	ide_hwifs[1].mate = &ide_hwifs[0];
-	ide_hwifs[1].channel = 1;
+	hwif->chipset = ide_ht6560b;
+	hwif->selectproc = &ht6560b_selectproc;
+	hwif->tuneproc = &tune_ht6560b;
+	hwif->serialized = 1;	/* is this needed? */
+	hwif->mate = mate;
+
+	mate->chipset = ide_ht6560b;
+	mate->selectproc = &ht6560b_selectproc;
+	mate->tuneproc = &tune_ht6560b;
+	mate->serialized = 1;	/* is this needed? */
+	mate->mate = hwif;
+	mate->channel = 1;
 
 	/*
 	 * Setting default configurations for drives
 	 */
 	t = (HT_CONFIG_DEFAULT << 8);
 	t |= HT_TIMING_DEFAULT;
-	ide_hwifs[0].drives[0].drive_data = t;
-	ide_hwifs[0].drives[1].drive_data = t;
+	hwif->drives[0].drive_data = t;
+	hwif->drives[1].drive_data = t;
+
 	t |= (HT_SECONDARY_IF << 8);
-	ide_hwifs[1].drives[0].drive_data = t;
-	ide_hwifs[1].drives[1].drive_data = t;
+	mate->drives[0].drive_data = t;
+	mate->drives[1].drive_data = t;
 
-	probe_hwif_init(&ide_hwifs[0]);
-	probe_hwif_init(&ide_hwifs[1]);
-
-#ifdef MODULE
-	if (ide_hwifs[0].chipset != ide_ht6560b &&
-	    ide_hwifs[1].chipset != ide_ht6560b) {
-		ht6560b_release();
-		return -ENODEV;
-	}
-#endif
+	probe_hwif_init(hwif);
+	probe_hwif_init(mate);
 
 	return 0;
 
@@ -384,24 +359,34 @@ release_region:
 	return -ENODEV;
 }
 
+#ifdef MODULE
+static void __exit ht6560b_release_hwif(ide_hwif_t *hwif)
+{
+	if (hwif->chipset != ide_ht6560b)
+		return;
+
+	hwif->chipset = ide_unknown;
+	hwif->tuneproc = NULL;
+	hwif->selectproc = NULL;
+	hwif->serialized = 0;
+	hwif->mate = NULL;
+	hwif->channel = 0;
+
+	hwif->drives[0].drive_data = 0;
+	hwif->drives[1].drive_data = 0;
+}
+
+static void __exit ht6560b_exit(void)
+{
+	ht6560b_release_hwif(&ide_hwifs[0]);
+	ht6560b_release_hwif(&ide_hwifs[1]);
+	release_region(HT_CONFIG_PORT, 1);
+}
+
+module_init(ht6560b_init);
+module_exit(ht6560b_exit);
+#endif
+
 MODULE_AUTHOR("See Local File");
 MODULE_DESCRIPTION("HT-6560B EIDE-controller support");
 MODULE_LICENSE("GPL");
-
-#ifdef MODULE
-static void __exit ht6560b_mod_exit(void)
-{
-        ht6560b_release();
-}
-
-module_init(ht6560b_mod_init);
-module_exit(ht6560b_mod_exit);
-#else
-/*
- * called by ide.c when parsing command line
- */
-void __init init_ht6560b (void)
-{
-	ht6560b_mod_init();	/* ignore return value */
-}
-#endif
