@@ -62,6 +62,7 @@ static inline void ehci_qtd_init (struct ehci_qtd *qtd, dma_addr_t dma)
 {
 	memset (qtd, 0, sizeof *qtd);
 	qtd->qtd_dma = dma;
+	qtd->hw_token = cpu_to_le32 (QTD_STS_HALT);
 	qtd->hw_next = EHCI_LIST_END;
 	qtd->hw_alt_next = EHCI_LIST_END;
 	INIT_LIST_HEAD (&qtd->qtd_list);

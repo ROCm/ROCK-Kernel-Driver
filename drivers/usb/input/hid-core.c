@@ -1664,6 +1664,9 @@ static struct usb_driver hid_driver = {
 	.probe =	hid_probe,
 	.disconnect =	hid_disconnect,
 	.id_table =	hid_usb_ids,
+	.driver	= {
+		.devclass = &input_devclass,
+	},
 };
 
 static int __init hid_init(void)

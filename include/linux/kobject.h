@@ -57,12 +57,24 @@ struct kobj_type {
  *	of object; multiple ksets can belong to one subsystem. All 
  *	ksets of a subsystem share the subsystem's lock.
  *
+ *      Each kset can support hotplugging; if it does, it will be given
+ *      the opportunity to filter out specific kobjects from being
+ *      reported, as well as to add its own "data" elements to the
+ *      environment being passed to the hotplug helper.
  */
+struct kset_hotplug_ops {
+	int (*filter)(struct kset *kset, struct kobject *kobj);
+	char *(*name)(struct kset *kset, struct kobject *kobj);
+	int (*hotplug)(struct kset *kset, struct kobject *kobj, char **envp,
+			int num_envp, char *buffer, int buffer_size);
+};
+
 struct kset {
 	struct subsystem	* subsys;
 	struct kobj_type	* ktype;
 	struct list_head	list;
 	struct kobject		kobj;
+	struct kset_hotplug_ops	* hotplug_ops;
 };
 
 
@@ -86,6 +98,13 @@ static inline void kset_put(struct kset * k)
 	kobject_put(&k->kobj);
 }
 
+static inline struct kobj_type * get_ktype(struct kobject * k)
+{
+	if (k->kset && k->kset->ktype)
+		return k->kset->ktype;
+	else 
+		return k->ktype;
+}
 
 extern struct kobject * kset_find_obj(struct kset *, const char *);
 
@@ -95,11 +114,12 @@ struct subsystem {
 	struct rw_semaphore	rwsem;
 };
 
-#define decl_subsys(_name,_type) \
+#define decl_subsys(_name,_type,_hotplug_ops) \
 struct subsystem _name##_subsys = { \
 	.kset = { \
 		.kobj = { .name = __stringify(_name) }, \
 		.ktype = _type, \
+		.hotplug_ops =_hotplug_ops, \
 	} \
 }
 

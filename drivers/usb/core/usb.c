@@ -89,11 +89,6 @@ int usb_device_probe(struct device *dev)
 	if (!driver->probe)
 		return error;
 
-	if (!try_module_get(driver->owner)) {
-		dev_err (dev, "Can't get a module reference for %s\n", driver->name);
-		return error;
-	}
-
 	id = usb_match_id (intf, driver->id_table);
 	if (id) {
 		dev_dbg (dev, "%s - got id\n", __FUNCTION__);
@@ -103,8 +98,6 @@ int usb_device_probe(struct device *dev)
 	}
 	if (!error)
 		intf->driver = driver;
-
-	module_put(driver->owner);
 
 	return error;
 }
@@ -117,22 +110,6 @@ int usb_device_remove(struct device *dev)
 	intf = list_entry(dev,struct usb_interface,dev);
 	driver = to_usb_driver(dev->driver);
 
-	if (!driver) {
-		dev_err(dev, "%s does not have a valid driver to work with!",
-		    __FUNCTION__);
-		return -ENODEV;
-	}
-
-	if (!try_module_get(driver->owner)) {
-		// FIXME this happens even when we just rmmod
-		// drivers that aren't in active use...
-		dev_err(dev, "Dieing driver still bound to device.\n");
-		return -EIO;
-	}
-
-	/* if we sleep here on an umanaged driver 
-	 * the holder of the lock guards against 
-	 * module unload */
 	down(&driver->serialize);
 
 	if (intf->driver && intf->driver->disconnect)
@@ -143,7 +120,6 @@ int usb_device_remove(struct device *dev)
 		usb_driver_release_interface(driver, intf);
 
 	up(&driver->serialize);
-	module_put(driver->owner);
 
 	return 0;
 }
@@ -498,9 +474,6 @@ struct usb_interface *usb_find_interface(struct usb_driver *drv, kdev_t kdev)
 			continue;
 
 		intf = to_usb_interface(dev);
-		if (!intf)
-			continue;
-
 		if (kdev_same(intf->kdev,kdev)) {
 			return intf;
 		}
@@ -566,12 +539,7 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 		return 0;
 
 	intf = to_usb_interface(dev);
-	if (!intf)
-		return -ENODEV;
-
 	usb_dev = interface_to_usbdev (intf);
-	if (!usb_dev)
-		return -ENODEV;
 	
 	if (usb_dev->devnum < 0) {
 		dbg ("device already deleted ??");
@@ -748,8 +716,6 @@ static void usb_release_dev(struct device *dev)
 	struct usb_device *udev;
 
 	udev = to_usb_device(dev);
-	if (!udev)
-		return;
 
 	if (udev->bus && udev->bus->op && udev->bus->op->deallocate)
 		udev->bus->op->deallocate(udev);

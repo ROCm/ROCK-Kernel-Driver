@@ -930,6 +930,8 @@ int usb_set_configuration(struct usb_device *dev, int configuration)
 	/* reset more hc/hcd endpoint state */
 	dev->toggle[0] = 0;
 	dev->toggle[1] = 0;
+	dev->halted[0] = 0;
+	dev->halted[1] = 0;
 	usb_set_maxpacket(dev);
 
 	return 0;

@@ -248,7 +248,7 @@ static struct attribute * default_attrs[] = {
 
 extern struct subsystem block_subsys;
 
-static struct kobj_type ktype_part = {
+struct kobj_type ktype_part = {
 	.default_attrs	= default_attrs,
 	.sysfs_ops	= &part_sysfs_ops,
 };
