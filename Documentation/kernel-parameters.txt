@@ -1060,8 +1060,6 @@ running once the system is up.
 
 	scsi_logging=	[SCSI]
 
-	scsihosts=	[SCSI]
-
 	serialnumber	[BUGS=IA-32]
 
 	sf16fm=		[HW] SF16FMI radio driver for Linux
