@@ -119,16 +119,6 @@ BUFFER_FNS(Boundary, boundary)
 		((struct buffer_head *)(page)->private);	\
 	})
 #define page_has_buffers(page)	PagePrivate(page)
-#define set_page_buffers(page, buffers)				\
-	do {							\
-		SetPagePrivate(page);				\
-		page->private = (unsigned long)buffers;		\
-	} while (0)
-#define clear_page_buffers(page)				\
-	do {							\
-		ClearPagePrivate(page);				\
-		page->private = 0;				\
-	} while (0)
 
 #define invalidate_buffers(dev)	__invalidate_buffers((dev), 0)
 #define destroy_buffers(dev)	__invalidate_buffers((dev), 1)

@@ -152,14 +152,16 @@ __set_page_buffers(struct page *page, struct buffer_head *head)
 {
 	if (page_has_buffers(page))
 		buffer_error();
-	set_page_buffers(page, head);
 	page_cache_get(page);
+	SetPagePrivate(page);
+	page->private = (unsigned long)head;
 }
 
 static inline void
 __clear_page_buffers(struct page *page)
 {
-	clear_page_buffers(page);
+	ClearPagePrivate(page);
+	page->private = 0;
 	page_cache_release(page);
 }
 
