@@ -43,13 +43,11 @@ static struct list_head lapb_list = LIST_HEAD_INIT(lapb_list);
 static rwlock_t lapb_list_lock = RW_LOCK_UNLOCKED;
 
 /*
- *	Free an allocated lapb control block. This is done to centralise
- *	the MOD count code.
+ *	Free an allocated lapb control block. 
  */
 static void lapb_free_cb(struct lapb_cb *lapb)
 {
 	kfree(lapb);
-	MOD_DEC_USE_COUNT;
 }
 
 static __inline__ void lapb_hold(struct lapb_cb *lapb)
@@ -126,8 +124,6 @@ static struct lapb_cb *lapb_create_cb(void)
 
 	if (!lapb)
 		goto out;
-
-	MOD_INC_USE_COUNT;
 
 	memset(lapb, 0x00, sizeof(*lapb));
 
