@@ -330,20 +330,20 @@ static struct {
 	char *firmware;
 	char *name;
 } card_table[] = {
-	{ 0, 0, "WLAN/802.11b PC CARD", "atmel_at76c502d.bin", "Actiontec 802CAT1" },  
-	{ 0, 0, "ATMEL/AT76C502AR", "atmel_at76c502.bin", "NoName-RFMD" }, 
-	{ 0, 0, "ATMEL/AT76C502AR_D", "atmel_at76c502d.bin", "NoName-revD" }, 
-	{ 0, 0, "ATMEL/AT76C502AR_E", "atmel_at76c502e.bin", "NoName-revE" },
-	{ 0, 0, "ATMEL/AT76C504", "atmel_at76c504.bin", "NoName-504" },
-	{ MANFID_3COM, 0x0620, NULL, "atmel_at76c502_3com.bin", "3com 3CRWE62092B" }, 
-	{ MANFID_3COM, 0x0696, NULL, "atmel_at76c502_3com.bin", "3com 3CRSHPW_96" }, 
-	{ 0, 0, "SMC/2632W-V2", "atmel_at76c502.bin", "SMC 2632W-V2" },
-        { 0, 0, "SMC/2632W", "atmel_at76c502d.bin", "SMC 2632W-V3" },
-	{ 0xd601, 0x0007, NULL, "atmel_at76c502.bin", "Sitecom WLAN-011"}, /* suspect - from a usenet posting. */
-	{ 0x01bf, 0x3302, NULL, "atmel_at76c502d.bin", "Belkin F5D6060u"},  /*    "        "  "    "      "     */
-	{ 0, 0, "BT/Voyager 1020 Laptop Adapter", "atmel_at76c502.bin", "BT Voyager 1020"},
-        { 0, 0, "IEEE 802.11b/Wireless LAN PC Card", "atmel_at76c502.bin", "Siemens Gigaset PC Card II" },
-	{ 0, 0, "CNet/CNWLC 11Mbps Wireless PC Card V-5", "atmel_at76c502e.bin", "CNet CNWLC-811ARL" }
+	{ 0, 0, "WLAN/802.11b PC CARD", "atmel_at76c502d%s.bin", "Actiontec 802CAT1" },  
+	{ 0, 0, "ATMEL/AT76C502AR", "atmel_at76c502%s.bin", "NoName-RFMD" }, 
+	{ 0, 0, "ATMEL/AT76C502AR_D", "atmel_at76c502d%s.bin", "NoName-revD" }, 
+	{ 0, 0, "ATMEL/AT76C502AR_E", "atmel_at76c502e%s.bin", "NoName-revE" },
+	{ 0, 0, "ATMEL/AT76C504", "atmel_at76c504%s.bin", "NoName-504" },
+	{ MANFID_3COM, 0x0620, NULL, "atmel_at76c502_3com%s.bin", "3com 3CRWE62092B" }, 
+	{ MANFID_3COM, 0x0696, NULL, "atmel_at76c502_3com%s.bin", "3com 3CRSHPW_96" }, 
+	{ 0, 0, "SMC/2632W-V2", "atmel_at76c502%s.bin", "SMC 2632W-V2" },
+        { 0, 0, "SMC/2632W", "atmel_at76c502d%s.bin", "SMC 2632W-V3" },
+	{ 0xd601, 0x0007, NULL, "atmel_at76c502%s.bin", "Sitecom WLAN-011"}, /* suspect - from a usenet posting. */
+	{ 0x01bf, 0x3302, NULL, "atmel_at76c502d%s.bin", "Belkin F5D6060u"},  /*    "        "  "    "      "     */
+	{ 0, 0, "BT/Voyager 1020 Laptop Adapter", "atmel_at76c502%s.bin", "BT Voyager 1020"},
+        { 0, 0, "IEEE 802.11b/Wireless LAN PC Card", "atmel_at76c502%s.bin", "Siemens Gigaset PC Card II" },
+	{ 0, 0, "CNet/CNWLC 11Mbps Wireless PC Card V-5", "atmel_at76c502e%s.bin", "CNet CNWLC-811ARL" }
 };
 
 /* This is strictly temporary, until PCMCIA devices get integrated into the device model. */
