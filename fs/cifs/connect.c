@@ -148,6 +148,7 @@ cifs_reconnect(struct TCP_Server_Info *server)
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(3 * HZ);
 		} else {
+			atomic_inc(&tcpSesReconnectCount);
 			server->tcpStatus = CifsGood;
 			wake_up(&server->response_q);
 		}
@@ -321,6 +322,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 					wake_up_process(task_to_wake);
 				} else if (is_valid_oplock_break(smb_buffer) == FALSE) {                          
 					cERROR(1, ("No task to wake, unknown frame rcvd!"));
+					cifs_dump_mem("Received Data is: ",temp,sizeof(struct smb_hdr));
 				}
 			}
 		} else {

@@ -511,7 +511,7 @@ cifs_write(struct file * file, const char *write_data,
 
 
 	if (*poffset > file->f_dentry->d_inode->i_size)
-		long_op = 2;	/* writes past end of file can take a long time */
+		long_op = 2;  /* writes past end of file can take a long time */
 	else
 		long_op = 1;
 
@@ -542,7 +542,8 @@ cifs_write(struct file * file, const char *write_data,
 			*poffset += bytes_written;
 		long_op = FALSE; /* subsequent writes fast - 15 seconds is plenty */
 	}
-	file->f_dentry->d_inode->i_ctime = file->f_dentry->d_inode->i_mtime = CURRENT_TIME;
+	file->f_dentry->d_inode->i_ctime = file->f_dentry->d_inode->i_mtime =
+		CURRENT_TIME;
 	if (bytes_written > 0) {
 		if (*poffset > file->f_dentry->d_inode->i_size)
 			file->f_dentry->d_inode->i_size = *poffset;
@@ -709,9 +710,14 @@ cifs_commit_write(struct file *file, struct page *page, unsigned offset,
 					if(rc != 0)
 						break;
 				}
-				rc = CIFSSMBSetFileSize(xid, cifs_sb->tcon, 
+                if(!open_file->closePend)
+				    rc = CIFSSMBSetFileSize(xid, cifs_sb->tcon, 
 						position, open_file->netfid,
 						open_file->pid,FALSE);
+                else {
+                    rc = -EBADF;
+                    break;
+                }
 			}
 			cFYI(1,(" SetEOF (commit write) rc = %d",rc));
 		}
@@ -836,15 +842,16 @@ cifs_read(struct file * file, char *read_data, size_t read_size,
 				 open_file->netfid,
 				 current_read_size, *poffset,
 				 &bytes_read, &current_offset);
-			if (rc || (bytes_read == 0)) {
-				if (total_read) {
-					break;
-				} else {
-					FreeXid(xid);
-					return rc;
-				}
-			} else
-				*poffset += bytes_read;
+		}
+		if (rc || (bytes_read == 0)) {
+			if (total_read) {
+				break;
+			} else {
+				FreeXid(xid);
+				return rc;
+			}
+		} else {
+			*poffset += bytes_read;
 		}
 	}
 

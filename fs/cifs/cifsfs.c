@@ -583,7 +583,7 @@ static int cifs_oplock_thread(void * dummyarg)
 	do {
 		set_current_state(TASK_INTERRUPTIBLE);
 		
-		schedule_timeout(1);  
+		schedule_timeout(1*HZ);  
 		spin_lock(&GlobalMid_Lock);
 		if(list_empty(&GlobalOplock_Q)) {
 			spin_unlock(&GlobalMid_Lock);
@@ -604,11 +604,20 @@ static int cifs_oplock_thread(void * dummyarg)
 				if (rc)
 					CIFS_I(inode)->write_behind_rc = rc;
 				cFYI(1,("Oplock flush inode %p rc %d",inode,rc));
-				rc = CIFSSMBLock(0, pTcon, netfid,
-					0 /* len */ , 0 /* offset */, 0, 
-					0, LOCKING_ANDX_OPLOCK_RELEASE,
-					0 /* wait flag */);
-				cFYI(1,("Oplock release rc = %d ",rc));
+
+				/* releasing a stale oplock after recent reconnection 
+				of smb session using a now incorrect file 
+				handle is not a data integrity issue but do  
+				not bother sending an oplock release if session 
+				to server still is disconnected since oplock 
+				already released by the server in that case */
+				if(pTcon->tidStatus != CifsNeedReconnect) {
+				    rc = CIFSSMBLock(0, pTcon, netfid,
+					    0 /* len */ , 0 /* offset */, 0, 
+					    0, LOCKING_ANDX_OPLOCK_RELEASE,
+					    0 /* wait flag */);
+					cFYI(1,("Oplock release rc = %d ",rc));
+				}
 			} else
 				spin_unlock(&GlobalMid_Lock);
 		}
@@ -632,6 +641,9 @@ init_cifs(void)
  */
 	atomic_set(&sesInfoAllocCount, 0);
 	atomic_set(&tconInfoAllocCount, 0);
+	atomic_set(&tcpSesReconnectCount, 0);
+	atomic_set(&tconInfoReconnectCount, 0);
+
 	atomic_set(&bufAllocCount, 0);
 	atomic_set(&midCount, 0);
 	GlobalCurrentXid = 0;

@@ -98,10 +98,27 @@ smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 				rc = CIFSTCon(0, tcon->ses, tcon->treeName, tcon,
 					nls_codepage);
 				up(&tcon->ses->sesSem);
+				if(rc == 0)
+					atomic_inc(&tconInfoReconnectCount);
+
 				cFYI(1, ("reconnect tcon rc = %d", rc));
 				/* Removed call to reopen open files here - 
 					it is safer (and faster) to reopen files
 					one at a time as needed in read and write */
+
+				/* Check if handle based operation so we 
+					know whether we can continue or not without
+					returning to caller to reset file handle */
+				switch(smb_command) {
+					case SMB_COM_READ_ANDX:
+					case SMB_COM_WRITE_ANDX:
+					case SMB_COM_CLOSE:
+					case SMB_COM_FIND_CLOSE2:
+					case SMB_COM_LOCKING_ANDX: {
+						unload_nls(nls_codepage);
+						return -EAGAIN;
+					}
+				}
 			} else {
 				up(&tcon->ses->sesSem);
 			}
@@ -775,6 +792,8 @@ CIFSSMBClose(const int xid, struct cifsTconInfo *tcon, int smb_file_id)
 /* do not retry on dead session on close */
 	rc = smb_init(SMB_COM_CLOSE, 3, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
+	if(rc == -EAGAIN)
+		return 0;
 	if (rc)
 		return rc;
 
@@ -1843,6 +1862,10 @@ CIFSFindClose(const int xid, struct cifsTconInfo *tcon, const __u16 searchHandle
 	cFYI(1, ("In CIFSSMBFindClose"));
 	rc = smb_init(SMB_COM_FIND_CLOSE2, 1, tcon, (void **) &pSMB,
 		      (void **) &pSMBr);
+	/* no sense returning error if session restarted
+		file handle has been closed */
+	if(rc == -EAGAIN)
+		return 0;
 	if (rc)
 		return rc;
 

@@ -655,7 +655,7 @@ cifs_truncate_file(struct inode *inode)
 	list_for_each(tmp, &cifsInode->openFileList) {            
 		open_file = list_entry(tmp,struct cifsFileInfo, flist);
 		/* We check if file is open for writing first */
-		if((open_file->pfile) && 
+		if((open_file->pfile) && (!open_file->invalidHandle) &&
 		   ((open_file->pfile->f_flags & O_RDWR) || 
 			(open_file->pfile->f_flags & O_WRONLY))) {
 			read_unlock(&GlobalSMBSeslock);
@@ -769,7 +769,7 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 		list_for_each(tmp, &cifsInode->openFileList) {            
 			open_file = list_entry(tmp,struct cifsFileInfo, flist);
 			/* We check if file is open for writing first */
-			if((open_file->pfile) && 
+			if((open_file->pfile) &&
 				((open_file->pfile->f_flags & O_RDWR) || 
 				 (open_file->pfile->f_flags & O_WRONLY))) {
 				if(open_file->invalidHandle == FALSE) {

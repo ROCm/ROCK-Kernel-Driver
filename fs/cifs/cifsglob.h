@@ -359,6 +359,9 @@ GLOBAL_EXTERN char Local_System_Name[15];
 GLOBAL_EXTERN atomic_t sesInfoAllocCount;
 GLOBAL_EXTERN atomic_t tconInfoAllocCount;
 
+GLOBAL_EXTERN atomic_t tcpSesReconnectCount;
+GLOBAL_EXTERN atomic_t tconInfoReconnectCount;
+
 /* Various Debug counters to remove someday (BB) */
 GLOBAL_EXTERN atomic_t bufAllocCount;
 GLOBAL_EXTERN atomic_t midCount;

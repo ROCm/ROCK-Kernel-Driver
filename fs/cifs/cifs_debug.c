@@ -88,9 +88,26 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 				i, ses->serverName, ses->serverDomain, atomic_read(&ses->inUse),
 				ses->serverOS, ses->serverNOS, ses->capabilities,ses->status,ses->server->tcpStatus);
 		buf += length;
-		if(ses->server)
+		if(ses->server) {
 			buf += sprintf(buf, "\n\tLocal Users To Same Server: %d SecMode: 0x%x",
 				atomic_read(&ses->server->socketUseCount),ses->server->secMode);
+			
+			/* length = sprintf(buf, "\nMIDs: \n");
+			buf += length;
+
+			spin_lock(&GlobalMid_Lock);
+			list_for_each(tmp1, &ses->server->pending_mid_q) {
+				mid_entry = list_entry(tmp1, struct
+					mid_q_entry,
+					qhead);
+				if(mid_entry) {
+					length = sprintf(buf,"State: %d com: %d pid: %d tsk: %p\n",mid_entry->midState,mid_entry->command,mid_entry->pid,mid_entry->tsk);
+					buf += length;
+				}
+			}
+			spin_unlock(&GlobalMid_Lock); */
+		}
+
 	}
 	read_unlock(&GlobalSMBSeslock);
 	sprintf(buf, "\n");
@@ -127,8 +144,10 @@ cifs_debug_data_read(char *buf, char **beginBuffer, off_t offset,
 			buf += sprintf(buf, "\tDISCONNECTED ");
 	}
 	read_unlock(&GlobalSMBSeslock);
+
 	length = sprintf(buf, "\n");
 	buf += length;
+
 	*eof = 1;
 	/* BB add code to dump additional info such as TCP session info now */
 	/*
@@ -176,6 +195,9 @@ cifs_stats_read(char *buf, char **beginBuffer, off_t offset,
 	buf += item_length;      
 	item_length = 
 		sprintf(buf,"Active Operations (MIDs in use): %d\n",midCount.counter);
+	length += item_length;
+	buf += item_length;
+	item_length = sprintf(buf,"%d sessions and %d shares reconnected after failure\n",tcpSesReconnectCount.counter,tconInfoReconnectCount.counter);
 	length += item_length;
 
 	return length;
