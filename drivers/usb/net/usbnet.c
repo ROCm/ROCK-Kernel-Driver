@@ -302,24 +302,20 @@ MODULE_PARM_DESC (msg_level, "Initial message level (default = 1)");
 			: (in_interrupt () ? "in_interrupt" : "can sleep"))
 
 #ifdef DEBUG
-#define devdbg(usbnet, fmt, arg...)				\
-	do {							\
-		printk(KERN_DEBUG "%s:", (usbnet)->net.name);	\
-		printk(fmt, ## arg);				\
-		printk("\n");					\
-	} while (0)
+#define devdbg(usbnet, fmt, arg...) \
+	printk(KERN_DEBUG "%s: " fmt "\n" , (usbnet)->net.name , ## arg)
 #else
 #define devdbg(usbnet, fmt, arg...) do {} while(0)
 #endif
 
 #define deverr(usbnet, fmt, arg...) \
-	printk(KERN_ERR "%s: " fmt "\n" , (usbnet)->net.name, ## arg)
+	printk(KERN_ERR "%s: " fmt "\n" , (usbnet)->net.name , ## arg)
 #define devwarn(usbnet, fmt, arg...) \
-	printk(KERN_WARNING "%s: " fmt "\n" , (usbnet)->net.name, ## arg)
+	printk(KERN_WARNING "%s: " fmt "\n" , (usbnet)->net.name , ## arg)
 
 #define devinfo(usbnet, fmt, arg...) \
 	do { if ((usbnet)->msg_level >= 1) \
-	printk(KERN_INFO "%s: " fmt "\n" , (usbnet)->net.name, ## arg); \
+	printk(KERN_INFO "%s: " fmt "\n" , (usbnet)->net.name , ## arg); \
 	} while (0)
 
 /*-------------------------------------------------------------------------*/
