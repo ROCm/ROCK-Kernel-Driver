@@ -608,6 +608,7 @@ static void fbcon_init(struct vc_data *vc, int init)
 		fb_display[unit].scrollmode = SCROLL_YNOMOVE;
 	else
 		fb_display[unit].scrollmode = SCROLL_YREDRAW;
+	con_set_default_unimap(unit);
 	fbcon_set_display(vc, init, !init);
 }
 
