@@ -259,8 +259,9 @@
 /*
  * Number 263 is reserved for vserver
  */
+#define __NR_fadvise64_64	264
 
-#define NR_syscalls 264
+#define NR_syscalls 265
 
 /* 
  * There are some system calls that are not present on 64 bit, some

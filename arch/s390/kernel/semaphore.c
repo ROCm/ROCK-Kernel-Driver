@@ -71,7 +71,7 @@ void __down(struct semaphore * sem)
 		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
 	}
 	remove_wait_queue(&sem->wait, &wait);
-	set_task_state(tsk, TASK_RUNNING);
+	__set_task_state(tsk, TASK_RUNNING);
 	wake_up(&sem->wait);
 }
 
@@ -99,7 +99,7 @@ int __down_interruptible(struct semaphore * sem)
 		set_task_state(tsk, TASK_INTERRUPTIBLE);
 	}
 	remove_wait_queue(&sem->wait, &wait);
-	set_task_state(tsk, TASK_RUNNING);
+	__set_task_state(tsk, TASK_RUNNING);
 	wake_up(&sem->wait);
 	return retval;
 }

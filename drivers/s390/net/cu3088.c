@@ -1,5 +1,5 @@
 /*
- * $Id: cu3088.c,v 1.31 2003/09/29 15:24:27 cohuck Exp $
+ * $Id: cu3088.c,v 1.33 2003/10/14 12:10:19 cohuck Exp $
  *
  * CTC / LCS ccw_device driver
  *
@@ -25,6 +25,7 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/err.h>
 
 #include <asm/ccwdev.h>
 #include <asm/ccwgroup.h>
@@ -55,15 +56,7 @@ static struct ccw_device_id cu3088_ids[] = {
 
 static struct ccw_driver cu3088_driver;
 
-static void
-cu3088_root_dev_release (struct device *dev)
-{
-}
-
-struct device cu3088_root_dev = {
-	.bus_id = "cu3088",
-	.release = cu3088_root_dev_release,
-};
+struct device *cu3088_root_dev;
 
 static ssize_t
 group_write(struct device_driver *drv, const char *buf, size_t count)
@@ -90,7 +83,7 @@ group_write(struct device_driver *drv, const char *buf, size_t count)
 		start = end + 1;
 	}
 
-	ret = ccwgroup_create(&cu3088_root_dev, cdrv->driver_id,
+	ret = ccwgroup_create(cu3088_root_dev, cdrv->driver_id,
 			      &cu3088_driver, 2, argv);
 
 	return (ret == 0) ? count : ret;
@@ -144,12 +137,12 @@ cu3088_init (void)
 {
 	int rc;
 	
-	rc = device_register(&cu3088_root_dev);
-	if (rc)
-		return rc;
+	cu3088_root_dev = s390_root_dev_register("cu3088");
+	if (IS_ERR(cu3088_root_dev))
+		return PTR_ERR(cu3088_root_dev);
 	rc = ccw_driver_register(&cu3088_driver);
 	if (rc)
-		device_unregister(&cu3088_root_dev);
+		s390_root_dev_unregister(cu3088_root_dev);
 
 	return rc;
 }
@@ -158,7 +151,7 @@ static void __exit
 cu3088_exit (void)
 {
 	ccw_driver_unregister(&cu3088_driver);
-	device_unregister(&cu3088_root_dev);
+	s390_root_dev_unregister(cu3088_root_dev);
 }
 
 MODULE_DEVICE_TABLE(ccw,cu3088_ids);

@@ -108,12 +108,11 @@ struct css_driver {
 extern struct bus_type css_bus_type;
 
 int css_probe_device(int irq);
-
+extern struct subchannel * get_subchannel_by_schid(int irq);
 extern unsigned int highest_subchannel;
 extern int css_init_done;
 
 #define __MAX_SUBCHANNELS 65536
-extern struct subchannel *ioinfo[__MAX_SUBCHANNELS];
 
 extern struct bus_type css_bus_type;
 extern struct device css_bus_device;

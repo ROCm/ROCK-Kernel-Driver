@@ -325,3 +325,39 @@ asmlinkage int s390x_personality(unsigned long personality)
 	return ret;
 }
 #endif /* CONFIG_ARCH_S390X */
+
+/*
+ * Wrapper function for sys_fadvise64/fadvise64_64
+ */
+#ifndef CONFIG_ARCH_S390X
+
+extern asmlinkage long sys_fadvise64(int, loff_t, size_t, int);
+
+asmlinkage long
+s390_fadvise64(int fd, u32 offset_high, u32 offset_low, size_t len, int advice)
+{
+	return sys_fadvise64(fd, (u64) offset_high << 32 | offset_low,
+			len, advice);
+}
+
+#endif
+
+extern asmlinkage long sys_fadvise64_64(int, loff_t, loff_t, int);
+
+struct fadvise64_64_args {
+	int fd;
+	long long offset;
+	long long len;
+	int advice;
+};
+
+asmlinkage long
+s390_fadvise64_64(struct fadvise64_64_args *args)
+{
+	struct fadvise64_64_args a;
+
+	if ( copy_from_user(&a, args, sizeof(a)) )
+		return -EFAULT;
+	return sys_fadvise64_64(a.fd, a.offset, a.len, a.advice);
+}
+

@@ -1,5 +1,5 @@
 /**
- * $Id: fsm.c,v 1.4 2003/03/28 08:54:40 mschwide Exp $
+ * $Id: fsm.c,v 1.6 2003/10/15 11:37:29 mschwide Exp $
  *
  * A generic FSM based on fsm used in isdn4linux
  *
@@ -9,6 +9,10 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/timer.h>
+
+MODULE_AUTHOR("(C) 2000 IBM Corp. by Fritz Elfert (felfert@millenux.com)");
+MODULE_DESCRIPTION("Finite state machine helper functions");
+MODULE_LICENSE("GPL");
 
 fsm_instance *
 init_fsm(char *name, const char **state_names, const char **event_names, int nr_states,

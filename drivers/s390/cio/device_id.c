@@ -22,6 +22,7 @@
 #include "cio_debug.h"
 #include "css.h"
 #include "device.h"
+#include "ioasm.h"
 
 /*
  * diag210 is used under VM to get information about a virtual device
@@ -201,7 +202,9 @@ __ccw_device_sense_id_start(struct ccw_device *cdev)
 					 0x00E2C9C4, cdev->private->imask);
 			/* ret is 0, -EBUSY, -EACCES or -ENODEV */
 			if (ret == -EBUSY) {
-				udelay(100);
+				struct irb irb;
+				if (tsch(sch->irq, &irb))
+					udelay(100);
 				continue;
 			}
 			if (ret != -EACCES)
@@ -255,16 +258,16 @@ ccw_device_check_sense_id(struct ccw_device *cdev)
 		 * if the device doesn't support the SenseID
 		 *  command further retries wouldn't help ...
 		 */
-		CIO_MSG_EVENT(2, "SenseID : device %04X on Subchannel %04X "
+		CIO_MSG_EVENT(2, "SenseID : device %s on Subchannel %s "
 			      "reports cmd reject or intervention required\n",
-			      sch->schib.pmcw.dev, sch->irq);
+			      cdev->dev.bus_id, sch->dev.bus_id);
 		return -EOPNOTSUPP;
 	}
 	if (irb->esw.esw0.erw.cons) {
-		CIO_MSG_EVENT(2, "SenseID : UC on dev %04X, "
+		CIO_MSG_EVENT(2, "SenseID : UC on dev %s, "
 			      "lpum %02X, cnt %02d, sns :"
 			      " %02X%02X%02X%02X %02X%02X%02X%02X ...\n",
-			      sch->schib.pmcw.dev,
+			      cdev->dev.bus_id,
 			      irb->esw.esw0.sublog.lpum,
 			      irb->esw.esw0.erw.scnt,
 			      irb->ecw[0], irb->ecw[1],
@@ -274,15 +277,15 @@ ccw_device_check_sense_id(struct ccw_device *cdev)
 		return -EAGAIN;
 	}
 	if (irb->scsw.cc == 3) {
-		CIO_MSG_EVENT(2, "SenseID : path %02X for device %04X on "
-			      "subchannel %04X is 'not operational'\n",
-			      sch->orb.lpm, sch->schib.pmcw.dev, sch->irq);
+		CIO_MSG_EVENT(2, "SenseID : path %02X for device %s on "
+			      "subchannel %s is 'not operational'\n",
+			      sch->orb.lpm, cdev->dev.bus_id, sch->dev.bus_id);
 		return -EACCES;
 	}
 	/* Hmm, whatever happened, try again. */
-	CIO_MSG_EVENT(2, "SenseID : start_IO() for device %04X on "
-		      "subchannel %04X returns status %02X%02X\n",
-		      sch->schib.pmcw.dev, sch->irq,
+	CIO_MSG_EVENT(2, "SenseID : start_IO() for device %s on "
+		      "subchannel %s returns status %02X%02X\n",
+		      cdev->dev.bus_id, sch->dev.bus_id,
 		      irb->scsw.dstat, irb->scsw.cstat);
 	return -EAGAIN;
 }

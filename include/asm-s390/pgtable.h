@@ -29,6 +29,7 @@
  * the S390 page table tree.
  */
 #ifndef __ASSEMBLY__
+#include <asm/bug.h>
 #include <asm/processor.h>
 #include <linux/threads.h>
 
@@ -465,7 +466,9 @@ extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 
 extern inline pte_t pte_wrprotect(pte_t pte)
 {
-	pte_val(pte) |= _PAGE_RO;
+	/* Do not clobber _PAGE_INVALID_NONE pages!  */
+	if (!(pte_val(pte) & _PAGE_INVALID))
+		pte_val(pte) |= _PAGE_RO;
 	return pte;
 }
 
@@ -682,9 +685,9 @@ extern inline pte_t mk_swap_pte(unsigned long type, unsigned long offset)
 	pte_t pte;
 	pte_val(pte) = (type << 1) | (offset << 12) | _PAGE_INVALID_SWAP;
 #ifndef __s390x__
-	pte_val(pte) &= 0x7ffff6fe;  /* better to be paranoid */
+	BUG_ON((pte_val(pte) & 0x80000901) != 0);
 #else /* __s390x__ */
-	pte_val(pte) &= 0xfffffffffffff6fe;  /* better to be paranoid */
+	BUG_ON((pte_val(pte) & 0x901) != 0);
 #endif /* __s390x__ */
 	return pte;
 }

@@ -10,7 +10,7 @@
 #ifndef __QETH_MPC_H__
 #define __QETH_MPC_H__
 
-#define VERSION_QETH_MPC_H "$Revision: 1.16 $"
+#define VERSION_QETH_MPC_H "$Revision: 1.17 $"
 
 #define QETH_IPA_TIMEOUT (card->ipa_timeout)
 #define QETH_MPC_TIMEOUT 2000
@@ -143,6 +143,7 @@ extern unsigned char DM_ACT[];
 #define IPA_PASSTHRU 0x00001000L
 #define IPA_FULL_VLAN 0x00004000L
 #define IPA_SOURCE_MAC_AVAIL 0x00010000L
+#define IPA_OSA_MC_ROUTER_AVAIL 0x00020000L
 
 #define IPA_SETADP_QUERY_COMMANDS_SUPPORTED 0x01
 #define IPA_SETADP_ALTER_MAC_ADDRESS 0x02

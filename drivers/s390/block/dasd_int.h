@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.48 $
+ * $Revision: 1.50 $
  */
 
 #ifndef DASD_INT_H
@@ -458,7 +458,7 @@ void dasd_set_timer(struct dasd_device *, int);
 void dasd_clear_timer(struct dasd_device *);
 int  dasd_cancel_req(struct dasd_ccw_req *);
 int dasd_generic_probe (struct ccw_device *, struct dasd_discipline *);
-int dasd_generic_remove (struct ccw_device *cdev);
+void dasd_generic_remove (struct ccw_device *cdev);
 int dasd_generic_set_online(struct ccw_device *, struct dasd_discipline *);
 int dasd_generic_set_offline (struct ccw_device *cdev);
 void dasd_generic_auto_online (struct ccw_driver *);
@@ -474,10 +474,11 @@ void dasd_devmap_exit(void);
 struct dasd_device *dasd_create_device(struct ccw_device *);
 void dasd_delete_device(struct dasd_device *);
 
+int dasd_add_sysfs_files(struct ccw_device *);
+struct dasd_device *dasd_device_from_cdev(struct ccw_device *);
 struct dasd_device *dasd_device_from_devindex(int);
 
 int dasd_parse(void);
-int dasd_add_busid(char *, int);
 int dasd_busid_known(char *);
 
 /* externals in dasd_gendisk.c */

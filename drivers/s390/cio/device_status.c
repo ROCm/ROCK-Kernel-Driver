@@ -62,8 +62,8 @@ ccw_device_path_notoper(struct ccw_device *cdev)
 	sch = to_subchannel(cdev->dev.parent);
 	stsch (sch->irq, &sch->schib);
 
-	CIO_MSG_EVENT(0, "%s(%04X) - path(s) %02x are "
-		      "not operational \n", __FUNCTION__, sch->irq,
+	CIO_MSG_EVENT(0, "%s(%s) - path(s) %02x are "
+		      "not operational \n", __FUNCTION__, sch->dev.bus_id,
 		      sch->schib.pmcw.pnom);
 
 	sch->lpm &= ~sch->schib.pmcw.pnom;

@@ -169,9 +169,10 @@ system_call:
         slag    %r7,%r7,2         # *4 and test for svc 0
 	jnz	sysc_do_restart
 	# svc 0: system call number in %r1
-	clg	%r1,.Lnr_syscalls-.Lconst(%r14)
+	cl	%r1,.Lnr_syscalls-.Lconst(%r14)
 	jnl	sysc_do_restart
-	slag    %r7,%r1,2         # svc 0: system call number in %r1
+	lgfr	%r7,%r1           # clear high word in r1
+	slag    %r7,%r7,2         # svc 0: system call number in %r1
 sysc_do_restart:
 	larl    %r10,sys_call_table
 #ifdef CONFIG_S390_SUPPORT
@@ -235,16 +236,18 @@ sysc_sigpending:
         sgr     %r3,%r3           # clear *oldset
 	brasl	%r14,do_signal    # call do_signal
 	stnsm   48(%r15),0xfc     # disable I/O and ext. interrupts
+	tm	__TI_flags+7(%r9),_TIF_RESTART_SVC
+	jo	sysc_restart
 	j	sysc_leave        # out of here, do NOT recheck
 
 #
 # _TIF_RESTART_SVC is set, set up registers and restart svc
 #
 sysc_restart:
-	ni	__TI_flags+3(%r9),255-_TIF_RESTART_SVC # clear TIF_RESTART_SVC
+	ni	__TI_flags+7(%r9),255-_TIF_RESTART_SVC # clear TIF_RESTART_SVC
 	stosm	48(%r15),0x03          # reenable interrupts
 	lg	%r7,SP_R2(%r15)        # load new svc number
-        slag    %r7,%r7,3              # *8
+        slag    %r7,%r7,2              # *4
 	mvc	SP_R2(8,%r15),SP_ORIG_R2(%r15) # restore first argument
 	lmg	%r2,%r6,SP_R2(%r15)    # load svc arguments
 	j	sysc_do_restart        # restart svc
@@ -503,7 +506,7 @@ pgm_svcstd:
 	larl    %r10,sys_call_table_emu # use 31 bit emulation system calls
 pgm_svcper_noemu:
 #endif
-	tm	__TI_flags+3(%r9),_TIF_SYSCALL_TRACE
+	tm	__TI_flags+7(%r9),_TIF_SYSCALL_TRACE
         lgf     %r8,0(%r7,%r10)   # load address of system call routine
         jo      pgm_tracesys
         basr    %r14,%r8          # call sys_xxxx
@@ -512,7 +515,7 @@ pgm_svcper_noemu:
                                   # changing anything here !!
 
 pgm_svcret:
-	tm	__TI_flags+3(%r9),_TIF_SIGPENDING
+	tm	__TI_flags+7(%r9),_TIF_SIGPENDING
 	jo	pgm_svcper_nosig
         la      %r2,SP_PTREGS(%r15) # load pt_regs
         sgr     %r3,%r3             # clear *oldset

@@ -110,8 +110,8 @@ ccw_device_recog_done(struct ccw_device *cdev, int state)
 	switch (state) {
 	case DEV_STATE_NOT_OPER:
 		CIO_DEBUG(KERN_WARNING, 2,
-			  "SenseID : unknown device %04X on subchannel %04X\n",
-			  sch->schib.pmcw.dev, sch->irq);
+			  "SenseID : unknown device %s on subchannel %s\n",
+			  cdev->dev.bus_id, sch->dev.bus_id);
 		break;
 	case DEV_STATE_OFFLINE:
 		/* fill out sense information */
@@ -122,16 +122,16 @@ ccw_device_recog_done(struct ccw_device *cdev, int state)
 			.dev_model = cdev->private->senseid.dev_model,
 		};
 		/* Issue device info message. */
-		CIO_DEBUG(KERN_INFO, 2, "SenseID : device %04X reports: "
+		CIO_DEBUG(KERN_INFO, 2, "SenseID : device %s reports: "
 			  "CU  Type/Mod = %04X/%02X, Dev Type/Mod = "
-			  "%04X/%02X\n", sch->schib.pmcw.dev,
+			  "%04X/%02X\n", cdev->dev.bus_id,
 			  cdev->id.cu_type, cdev->id.cu_model,
 			  cdev->id.dev_type, cdev->id.dev_model);
 		break;
 	case DEV_STATE_BOXED:
 		CIO_DEBUG(KERN_WARNING, 2,
-			  "SenseID : boxed device %04X on subchannel %04X\n",
-			  sch->schib.pmcw.dev, sch->irq);
+			  "SenseID : boxed device %s on subchannel %s\n",
+			  cdev->dev.bus_id, sch->dev.bus_id);
 		break;
 	}
 	io_subchannel_recog_done(cdev);
@@ -179,8 +179,8 @@ ccw_device_done(struct ccw_device *cdev, int state)
 
 	if (state == DEV_STATE_BOXED) {
 		CIO_DEBUG(KERN_WARNING, 2,
-			  "Boxed device %04X on subchannel %04X\n",
-			  sch->schib.pmcw.dev, sch->irq);
+			  "Boxed device %s on subchannel %s\n",
+			  cdev->dev.bus_id, sch->dev.bus_id);
 		INIT_WORK(&cdev->private->kick_work,
 			  ccw_device_add_stlck, (void *) cdev);
 		queue_work(ccw_device_work, &cdev->private->kick_work);
@@ -586,6 +586,19 @@ out_wakeup:
 	wake_up(&cdev->private->wait_q);
 }
 
+static void
+ccw_device_offline_irq(struct ccw_device *cdev, enum dev_event dev_event)
+{
+	struct subchannel *sch;
+
+	sch = to_subchannel(cdev->dev.parent);
+	/*
+	 * An interrupt in state offline means a previous disable was not
+	 * successful. Try again.
+	 */
+	cio_disable_subchannel(sch);
+}
+
 /*
  * No operation action. This is used e.g. to ignore a timeout event in
  * state offline.
@@ -630,7 +643,7 @@ fsm_func_t *dev_jumptable[NR_DEV_STATES][NR_DEV_EVENTS] = {
 	},
 	[DEV_STATE_OFFLINE] {
 		[DEV_EVENT_NOTOPER]	ccw_device_offline_notoper,
-		[DEV_EVENT_INTERRUPT]	ccw_device_bug,
+		[DEV_EVENT_INTERRUPT]	ccw_device_offline_irq,
 		[DEV_EVENT_TIMEOUT]	ccw_device_nop,
 		[DEV_EVENT_VERIFY]	ccw_device_nop,
 	},
@@ -686,13 +699,12 @@ fsm_func_t *dev_jumptable[NR_DEV_STATES][NR_DEV_EVENTS] = {
 void
 io_subchannel_irq (struct device *pdev)
 {
-	char dbf_txt[15];
 	struct ccw_device *cdev;
 
 	cdev = to_subchannel(pdev)->dev.driver_data;
 
-	sprintf (dbf_txt, "IRQ%04x", cdev->private->irq);
-	CIO_TRACE_EVENT (3, dbf_txt);
+	CIO_TRACE_EVENT (3, "IRQ");
+	CIO_TRACE_EVENT (3, pdev->bus_id);
 
 	dev_fsm_event(cdev, DEV_EVENT_INTERRUPT);
 }

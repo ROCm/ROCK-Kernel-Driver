@@ -158,8 +158,10 @@ static int __init condev_setup(char *str)
 	int vdev;
 
 	vdev = simple_strtoul(str, &str, 0);
-	if (vdev >= 0 && vdev < 65536)
+	if (vdev >= 0 && vdev < 65536) {
 		console_device = vdev;
+		console_irq = -1;
+	}
 	return 1;
 }
 
@@ -287,6 +289,7 @@ void (*_machine_power_off)(void) = do_machine_power_off_nonsmp;
 
 void machine_restart(char *command)
 {
+	console_unblank();
 	_machine_restart(command);
 }
 
@@ -294,6 +297,7 @@ EXPORT_SYMBOL(machine_restart);
 
 void machine_halt(void)
 {
+	console_unblank();
 	_machine_halt();
 }
 
@@ -301,6 +305,7 @@ EXPORT_SYMBOL(machine_halt);
 
 void machine_power_off(void)
 {
+	console_unblank();
 	_machine_power_off();
 }
 

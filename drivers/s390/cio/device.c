@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.70 $
+ *   $Revision: 1.78 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -115,6 +115,7 @@ struct bus_type ccw_bus_type = {
 };
 
 static int io_subchannel_probe (struct device *);
+static int io_subchannel_remove (struct device *);
 void io_subchannel_irq (struct device *);
 
 static struct css_driver io_subchannel_driver = {
@@ -123,6 +124,7 @@ static struct css_driver io_subchannel_driver = {
 		.name = "io_subchannel",
 		.bus  = &css_bus_type,
 		.probe = &io_subchannel_probe,
+		.remove = &io_subchannel_remove,
 	},
 	.irq = io_subchannel_irq,
 };
@@ -389,6 +391,12 @@ subchannel_add_files (struct device *dev)
 	return sysfs_create_group(&dev->kobj, &subch_attr_group);
 }
 
+static inline void
+subchannel_remove_files(struct device *dev)
+{
+	sysfs_remove_group(&dev->kobj, &subch_attr_group);
+}
+
 static struct attribute * ccwdev_attrs[] = {
 	&dev_attr_devtype.attr,
 	&dev_attr_cutype.attr,
@@ -495,8 +503,8 @@ io_subchannel_register(void *data)
 
 	ret = subchannel_add_files(cdev->dev.parent);
 	if (ret)
-		printk(KERN_WARNING "%s: could not add attributes to %04x\n",
-		       __func__, sch->irq);
+		printk(KERN_WARNING "%s: could not add attributes to %s\n",
+		       __func__, sch->dev.bus_id);
 	if (cdev->private->state == DEV_STATE_BOXED)
 		device_create_file(&cdev->dev, &dev_attr_steal_lock);
 out:
@@ -562,9 +570,9 @@ io_subchannel_recog(struct ccw_device *cdev, struct subchannel *sch)
 	atomic_inc(&ccw_device_init_count);
 
 	/* Start async. device sensing. */
-	spin_lock_irq(cdev->ccwlock);
+	spin_lock_irq(&sch->lock);
 	rc = ccw_device_recognition(cdev);
-	spin_unlock_irq(cdev->ccwlock);
+	spin_unlock_irq(&sch->lock);
 	if (rc) {
 		if (atomic_dec_and_test(&ccw_device_init_count))
 			wake_up(&ccw_device_init_wq);
@@ -637,6 +645,22 @@ io_subchannel_probe (struct device *pdev)
 	return 0;
 }
 
+static int
+io_subchannel_remove (struct device *dev)
+{
+	struct ccw_device *cdev;
+
+	if (!dev->driver_data)
+		return 0;
+	cdev = dev->driver_data;
+	/* Set ccw device to not operational and drop reference. */
+	dev_fsm_event(cdev, DEV_EVENT_NOTOPER);
+	put_device(&cdev->dev);
+	dev->driver_data = NULL;
+	subchannel_remove_files(dev);
+	return 0;
+}
+
 #ifdef CONFIG_CCW_CONSOLE
 static struct ccw_device console_cdev;
 static struct ccw_device_private console_private;
@@ -652,25 +676,28 @@ ccw_device_console_enable (struct ccw_device *cdev, struct subchannel *sch)
 		.parent = &sch->dev,
 	};
 	/* Initialize the subchannel structure */
-	sch->dev = (struct device) {
-		.parent = &css_bus_device,
-		.bus	= &css_bus_type,
-	};
+	sch->dev.parent = &css_bus_device;
+	sch->dev.bus = &css_bus_type;
 
 	rc = io_subchannel_recog(cdev, sch);
 	if (rc)
 		return rc;
 
 	/* Now wait for the async. recognition to come to an end. */
+	spin_lock_irq(cdev->ccwlock);
 	while (!dev_fsm_final_state(cdev))
 		wait_cons_dev();
+	rc = -EIO;
 	if (cdev->private->state != DEV_STATE_OFFLINE)
-		return -EIO;
+		goto out_unlock;
 	ccw_device_online(cdev);
 	while (!dev_fsm_final_state(cdev))
 		wait_cons_dev();
 	if (cdev->private->state != DEV_STATE_ONLINE)
-		return -EIO;
+		goto out_unlock;
+	rc = 0;
+out_unlock:
+	spin_unlock_irq(cdev->ccwlock);
 	return 0;
 }
 
@@ -767,18 +794,28 @@ ccw_device_remove (struct device *dev)
 {
 	struct ccw_device *cdev = to_ccwdev(dev);
 	struct ccw_driver *cdrv = cdev->drv;
+	int ret;
 
-	/*
-	 * Set device offline, so device drivers don't end up with
-	 * doubled code.
-	 * This is safe because of the checks in ccw_device_set_offline.
-	 */
 	pr_debug("removing device %s, sch %d, devno %x\n",
 		 cdev->dev.name,
 		 cdev->private->irq,
 		 cdev->private->devno);
-	ccw_device_set_offline(cdev);
-	return cdrv->remove ? cdrv->remove(cdev) : 0;
+	if (cdrv->remove)
+		cdrv->remove(cdev);
+	if (cdev->online) {
+		cdev->online = 0;
+		spin_lock_irq(cdev->ccwlock);
+		ret = ccw_device_offline(cdev);
+		spin_unlock_irq(cdev->ccwlock);
+		if (ret == 0)
+			wait_event(cdev->private->wait_q,
+				   dev_fsm_final_state(cdev));
+		else
+			//FIXME: we can't fail!
+			pr_debug("ccw_device_offline returned %d, device %s\n",
+				 ret, cdev->dev.bus_id);
+	}
+	return 0;
 }
 
 int

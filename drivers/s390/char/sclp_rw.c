@@ -175,11 +175,9 @@ sclp_finalize_mto(struct sclp_buffer *buffer)
  *  is not busy)
  */
 int
-sclp_write(struct sclp_buffer *buffer,
-	   const unsigned char *msg, int count, int from_user)
+sclp_write(struct sclp_buffer *buffer, const unsigned char *msg, int count)
 {
 	int spaces, i_msg;
-	char ch;
 	int rc;
 
 	/*
@@ -206,13 +204,7 @@ sclp_write(struct sclp_buffer *buffer,
 	 * This is in order to a slim and quick implementation.
 	 */
 	for (i_msg = 0; i_msg < count; i_msg++) {
-		if (from_user) {
-			if (get_user(ch, msg + i_msg) != 0)
-				return -EFAULT;
-		} else
-			ch = msg[i_msg];
-
-		switch (ch) {
+		switch (msg[i_msg]) {
 		case '\n':	/* new line, line feed (ASCII)	*/
 			/* check if new mto needs to be created */
 			if (buffer->current_line == NULL) {
@@ -286,7 +278,7 @@ sclp_write(struct sclp_buffer *buffer,
 			break;
 		default:	/* no escape character	*/
 			/* do not output unprintable characters */
-			if (!isprint(ch))
+			if (!isprint(msg[i_msg]))
 				break;
 			/* check if new mto needs to be created */
 			if (buffer->current_line == NULL) {
@@ -295,7 +287,7 @@ sclp_write(struct sclp_buffer *buffer,
 				if (rc)
 					return i_msg;
 			}
-			*buffer->current_line++ = sclp_ascebc(ch);
+			*buffer->current_line++ = sclp_ascebc(msg[i_msg]);
 			buffer->current_length++;
 			break;
 		}

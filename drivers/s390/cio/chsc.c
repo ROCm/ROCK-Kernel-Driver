@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/chsc.c
  *   S/390 common I/O routines -- channel subsystem call
- *   $Revision: 1.78 $
+ *   $Revision: 1.85 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -73,7 +73,7 @@ chsc_validate_chpids(struct subchannel *sch)
 /* FIXME: this is _always_ called for every subchannel. shouldn't we
  *	  process more than one at a time? */
 static int
-chsc_get_sch_desc_irq(int irq, void *page)
+chsc_get_sch_desc_irq(struct subchannel *sch, void *page)
 {
 	int ccode, chpid, j;
 
@@ -106,8 +106,8 @@ chsc_get_sch_desc_irq(int irq, void *page)
 		.code   = 0x0004,
 	};
 
-	ssd_area->f_sch = irq;
-	ssd_area->l_sch = irq;
+	ssd_area->f_sch = sch->irq;
+	ssd_area->l_sch = sch->irq;
 
 	ccode = chsc(ssd_area);
 	if (ccode > 0) {
@@ -151,7 +151,7 @@ chsc_get_sch_desc_irq(int irq, void *page)
 	 */
 	if (ssd_area->st > 3) { /* uhm, that looks strange... */
 		CIO_CRW_EVENT(0, "Strange subchannel type %d"
-			      " for sch %x\n", ssd_area->st, irq);
+			      " for sch %s\n", ssd_area->st, sch->dev.bus_id);
 		/*
 		 * There may have been a new subchannel type defined in the
 		 * time since this code was written; since we don't know which
@@ -160,14 +160,11 @@ chsc_get_sch_desc_irq(int irq, void *page)
 		return 0;
 	} else {
 		const char *type[4] = {"I/O", "chsc", "message", "ADM"};
-		CIO_CRW_EVENT(6, "ssd: sch %x is %s subchannel\n",
-			      irq, type[ssd_area->st]);
-		if (ioinfo[irq] == NULL)
-			/* FIXME: we should do device rec. here... */
-			return 0;
+		CIO_CRW_EVENT(6, "ssd: sch %s is %s subchannel\n",
+			      sch->dev.bus_id, type[ssd_area->st]);
 
-		ioinfo[irq]->ssd_info.valid = 1;
-		ioinfo[irq]->ssd_info.type = ssd_area->st;
+		sch->ssd_info.valid = 1;
+		sch->ssd_info.type = ssd_area->st;
 	}
 
 	if (ssd_area->st == 0 || ssd_area->st == 2) {
@@ -181,18 +178,60 @@ chsc_get_sch_desc_irq(int irq, void *page)
 			    && (test_bit (chpid, chpids_logical)))
 				set_bit	 (chpid, chpids);
 
-			ioinfo[irq]->ssd_info.chpid[j] = chpid;
-			ioinfo[irq]->ssd_info.fla[j]   = ssd_area->fla[j];
+			sch->ssd_info.chpid[j] = chpid;
+			sch->ssd_info.fla[j]   = ssd_area->fla[j];
 		}
 	}
-
 	return 0;
 }
+
+int
+css_get_ssd_info(struct subchannel *sch)
+{
+	int ret;
+	void *page;
+
+	page = (void *)get_zeroed_page(GFP_KERNEL | GFP_DMA);
+	if (!page)
+		return -ENOMEM;
+	spin_lock_irq(&sch->lock);
+	ret = chsc_get_sch_desc_irq(sch, page);
+	spin_unlock_irq(&sch->lock);
+	free_page((unsigned long)page);
+	return ret;
+}
+
+static int
+__chsc_get_sch_desc(struct device *dev, void *page)
+{
+	struct subchannel *sch;
+	unsigned long flags;
+	int err;
+
+	sch = to_subchannel(dev);
+	spin_lock_irqsave(&sch->lock, flags);
+	err = chsc_get_sch_desc_irq(sch, page);
+	if (err) {
+		static int cio_chsc_err_msg;
+		
+		if (!cio_chsc_err_msg) {
+			printk(KERN_ERR
+			       "chsc_get_sch_descriptions:"
+			       " Error %d while doing chsc; "
+			       "processing some machine checks may "
+			       "not work\n", err);
+			cio_chsc_err_msg = 1;
+		}
+	}
+	clear_page(page);
+	spin_unlock_irqrestore(&sch->lock, flags);
+	return err;
+}
+
 
 static int
 chsc_get_sch_descriptions(void)
 {
-	int irq;
 	int err;
 	void *page;
 
@@ -205,30 +244,11 @@ chsc_get_sch_descriptions(void)
 	page = (void *)get_zeroed_page(GFP_KERNEL | GFP_DMA);
 	if (!page)
 		return -ENOMEM;
-
-	err = 0;
-	for (irq = 0; irq <= highest_subchannel; irq++) {
-		/*
-		 * retrieve information for each sch
-		 */
-		err = chsc_get_sch_desc_irq(irq, page);
-		if (err) {
-			static int cio_chsc_err_msg;
-
-			if (!cio_chsc_err_msg) {
-				printk(KERN_ERR
-				       "chsc_get_sch_descriptions:"
-				       " Error %d while doing chsc; "
-				       "processing some machine checks may "
-				       "not work\n", err);
-				cio_chsc_err_msg = 1;
-			}
-			goto out;
-		}
-		clear_page(page);
-	}
+	/*
+	 * Retrieve information for each sch that is registered.
+	 */
+	err = bus_for_each_dev(&css_bus_type, NULL, page, __chsc_get_sch_desc);
 	cio_chsc_desc_avail = 1;
-out:
 	free_page((unsigned long)page);
 	return err;
 }
@@ -236,17 +256,21 @@ out:
 __initcall(chsc_get_sch_descriptions);
 
 
-static inline void
-s390_subchannel_remove_chpid(struct subchannel *sch, __u8 chpid)
+static int
+s390_subchannel_remove_chpid(struct device *dev, void *data)
 {
 	int j;
 	int mask;
+	struct subchannel *sch;
+	__u8 *chpid;
 
+	sch = to_subchannel(dev);
+	chpid = data;
 	for (j = 0; j < 8; j++)
-		if (sch->schib.pmcw.chpid[j] == chpid)
+		if (sch->schib.pmcw.chpid[j] == *chpid)
 			break;
 	if (j >= 8)
-		return;
+		return 0;
 
 	mask = 0x80 >> j;
 	spin_lock(&sch->lock);
@@ -254,10 +278,9 @@ s390_subchannel_remove_chpid(struct subchannel *sch, __u8 chpid)
 	chsc_validate_chpids(sch);
 
 	stsch(sch->irq, &sch->schib);
-	if (sch->vpm == mask) {
-		dev_fsm_event(sch->dev.driver_data, DEV_EVENT_NOTOPER);
-		goto out_unlock;
-	}
+	if (sch->vpm == mask)
+		goto out_unreg;
+
 	if ((sch->schib.scsw.actl & (SCSW_ACTL_CLEAR_PEND |
 				     SCSW_ACTL_HALT_PEND |
 				     SCSW_ACTL_START_PEND |
@@ -265,20 +288,15 @@ s390_subchannel_remove_chpid(struct subchannel *sch, __u8 chpid)
 	    (sch->schib.pmcw.lpum == mask)) {
 		int cc = cio_cancel(sch);
 		
-		if (cc == -ENODEV) {
-			dev_fsm_event(sch->dev.driver_data, DEV_EVENT_NOTOPER);
-			goto out_unlock;
-		}
+		if (cc == -ENODEV)
+			goto out_unreg;
 
 		if (cc == -EINVAL) {
 			struct ccw_device *cdev;
 
 			cc = cio_clear(sch);
-			if (cc == -ENODEV) {
-				dev_fsm_event(sch->dev.driver_data,
-					      DEV_EVENT_NOTOPER);
-				goto out_unlock;
-			}
+			if (cc == -ENODEV)
+				goto out_unreg;
 			/* Call handler. */
 			cdev = sch->dev.driver_data;
 			cdev->private->state = DEV_STATE_CLEAR_VERIFY;
@@ -294,10 +312,8 @@ s390_subchannel_remove_chpid(struct subchannel *sch, __u8 chpid)
 		int cc;
 
 		cc = cio_clear(sch);
-		if (cc == -ENODEV) {
-			dev_fsm_event(sch->dev.driver_data, DEV_EVENT_NOTOPER);
-			goto out_unlock;
-		}
+		if (cc == -ENODEV)
+			goto out_unreg;
 		/* Call handler. */
 		cdev = sch->dev.driver_data;
 		cdev->private->state = DEV_STATE_CLEAR_VERIFY;
@@ -311,15 +327,19 @@ s390_subchannel_remove_chpid(struct subchannel *sch, __u8 chpid)
 	dev_fsm_event(sch->dev.driver_data, DEV_EVENT_VERIFY);
 out_unlock:
 	spin_unlock(&sch->lock);
+	return 0;
+out_unreg:
+	spin_unlock(&sch->lock);
+	device_unregister(&sch->dev);
+	sch->schib.pmcw.intparm = 0;
+	cio_modify(sch);
+	return 0;
 }
 
-/* FIXME: don't iterate all subchannels but use driver_for_each_dev */
 static inline void
 s390_set_chpid_offline( __u8 chpid)
 {
 	char dbf_txt[15];
-	struct subchannel *sch;
-	int irq;
 
 	sprintf(dbf_txt, "chpr%x", chpid);
 	CIO_TRACE_EVENT(2, dbf_txt);
@@ -330,18 +350,8 @@ s390_set_chpid_offline( __u8 chpid)
 
 	set_chp_status(chpid, CHP_OFFLINE);
 
-#if 0
-	driver_for_each_dev(io_subchannel_driver, chpid, s390_subchannel_remove_chpid);
-#else
-
-	for (irq = 0; irq <= highest_subchannel; irq++) {
-		sch = ioinfo[irq];
-		if (sch == NULL)
-			continue;  /* we don't know the device anyway */
-
-		s390_subchannel_remove_chpid(sch, chpid);
-	}
-#endif
+	bus_for_each_dev(&css_bus_type, NULL, &chpid,
+			 s390_subchannel_remove_chpid);
 }
 
 static int
@@ -353,7 +363,7 @@ s390_process_res_acc_sch(u8 chpid, __u16 fla, u32 fla_mask,
 	int ccode;
 	
 	/* Update our ssd_info */
-	if (chsc_get_sch_desc_irq(sch->irq, page))
+	if (chsc_get_sch_desc_irq(sch, page))
 		return 0;
 	
 	found = 0;
@@ -417,7 +427,7 @@ s390_process_res_acc (u8 chpid, __u16 fla, u32 fla_mask)
 	for (irq = 0; irq < __MAX_SUBCHANNELS; irq++) {
 		int chp_mask;
 
-		sch = ioinfo[irq];
+		sch = get_subchannel_by_schid(irq);
 		if (!sch) {
 			/*
 			 * We don't know the device yet, but since a path
@@ -460,7 +470,7 @@ s390_process_res_acc (u8 chpid, __u16 fla, u32 fla_mask)
 		dev_fsm_event(sch->dev.driver_data, DEV_EVENT_VERIFY);
 
 		spin_unlock_irq(&sch->lock);
-
+		put_device(&sch->dev);
 		if (fla_mask != 0)
 			break;
 	}
@@ -663,7 +673,7 @@ chp_add(int chpid)
 	for (irq = 0; irq < __MAX_SUBCHANNELS; irq++) {
 		int i;
 
-		sch = ioinfo[irq];
+		sch = get_subchannel_by_schid(irq);
 		if (!sch) {
 			ret = css_probe_device(irq);
 			if (ret == -ENXIO)
@@ -696,6 +706,7 @@ chp_add(int chpid)
 		dev_fsm_event(sch->dev.driver_data, DEV_EVENT_VERIFY);
 
 		spin_unlock(&sch->lock);
+		put_device(&sch->dev);
 	}
 }
 
@@ -722,6 +733,57 @@ chp_process_crw(int chpid, int on)
 	}
 }
 
+static inline void
+__s390_subchannel_vary_chpid(struct subchannel *sch, __u8 chpid, int on)
+{
+	int chp;
+
+	/*
+	 * We don't need to adjust the lpm, as this will be done in
+	 * DevicePathVerification...
+	 */
+	if (!sch->ssd_info.valid)
+		return;
+	
+	for (chp = 0; chp < 8; chp++) {
+		if (sch->ssd_info.chpid[chp] == chpid) {
+			if (on)
+				sch->lpm |= (0x80 >> chp);
+			else
+				sch->lpm &= ~(0x80 >> chp);
+			dev_fsm_event(sch->dev.driver_data,
+				      DEV_EVENT_VERIFY);
+			break;
+		}
+	}
+}
+
+static int
+s390_subchannel_vary_chpid_off(struct device *dev, void *data)
+{
+	struct subchannel *sch;
+	__u8 *chpid;
+
+	sch = to_subchannel(dev);
+	chpid = data;
+
+	__s390_subchannel_vary_chpid(sch, *chpid, 0);
+	return 0;
+}
+
+static int
+s390_subchannel_vary_chpid_on(struct device *dev, void *data)
+{
+	struct subchannel *sch;
+	__u8 *chpid;
+
+	sch = to_subchannel(dev);
+	chpid = data;
+
+	__s390_subchannel_vary_chpid(sch, *chpid, 1);
+	return 0;
+}
+
 /*
  * Function: s390_vary_chpid
  * Varies the specified chpid online or offline
@@ -730,8 +792,6 @@ static int
 s390_vary_chpid( __u8 chpid, int on)
 {
 	char dbf_text[15];
-	struct subchannel *sch;
-	int irq;
 
 	sprintf(dbf_text, on?"varyon%x":"varyoff%x", chpid);
 	CIO_TRACE_EVENT( 2, dbf_text);
@@ -768,28 +828,9 @@ s390_vary_chpid( __u8 chpid, int on)
 	 * Redo PathVerification on the devices the chpid connects to
 	 */
 
-	for (irq = 0; irq <= highest_subchannel; irq++) {
-		int chp;
-		/*
-		 * We don't need to adjust the lpm, as this will be done in
-		 * DevicePathVerification...
-		 */
-		sch = ioinfo[irq];
-		if (sch == NULL || sch->st || !sch->ssd_info.valid)
-			continue;
-
-		for (chp = 0; chp < 8; chp++) {
-			if (sch->ssd_info.chpid[chp] == chpid) {
-				if (on)
-					sch->lpm |= (0x80 >> chp);
-				else
-					sch->lpm &= ~(0x80 >> chp);
-				dev_fsm_event(sch->dev.driver_data,
-					      DEV_EVENT_VERIFY);
-				break;
-			}
-		}
-	}
+	bus_for_each_dev(&css_bus_type, NULL, &chpid, on ?
+			 s390_subchannel_vary_chpid_on :
+			 s390_subchannel_vary_chpid_off);
 	return 0;
 }
 
@@ -847,6 +888,10 @@ static DEVICE_ATTR(status, 0644, chp_status_show, chp_status_write);
 static void
 chp_release(struct device *dev)
 {
+	struct channel_path *cp;
+	
+	cp = container_of(dev, struct channel_path, dev);
+	kfree(cp);
 }
 
 /*

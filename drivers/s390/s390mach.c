@@ -19,9 +19,12 @@
 #define DBG printk
 // #define DBG(args,...) do {} while (0);
 
+static struct semaphore s_sem;
+
 extern void css_process_crw(int);
 extern void chsc_process_crw(void);
 extern void chp_process_crw(int, int);
+extern void css_reiterate_subchannels(void);
 
 static void
 s390_handle_damage(char *msg)
@@ -38,12 +41,19 @@ s390_handle_damage(char *msg)
  *
  * Note : we currently process CRWs for io and chsc subchannels only
  */
-static void
-s390_collect_crw_info(void)
+static int
+s390_collect_crw_info(void *param)
 {
 	struct crw crw;
 	int ccode;
+	struct semaphore *sem;
 
+	sem = (struct semaphore *)param;
+	/* Set a nice name. */
+	daemonize("kmcheck");
+
+repeat:
+	down_interruptible(sem);
 	while (1) {
 		ccode = stcrw(&crw);
 		if (ccode != 0)
@@ -52,6 +62,12 @@ s390_collect_crw_info(void)
 		    "chn=%d, rsc=%X, anc=%d, erc=%X, rsid=%X\n",
 		    crw.slct, crw.oflw, crw.chn, crw.rsc, crw.anc,
 		    crw.erc, crw.rsid);
+		/* Check for overflows. */
+		if (crw.oflw) {
+			pr_debug("%s: crw overflow detected!\n", __FUNCTION__);
+			css_reiterate_subchannels();
+			continue;
+		}
 		switch (crw.rsc) {
 		case CRW_RSC_SCH:
 			pr_debug("source is subchannel %04X\n", crw.rsid);
@@ -86,6 +102,8 @@ s390_collect_crw_info(void)
 			break;
 		}
 	}
+	goto repeat;
+	return 0;
 }
 
 /*
@@ -122,7 +140,7 @@ s390_do_machine_check(void)
 				   "check\n");
 
 	if (mci->cp)		/* channel report word pending */
-		s390_collect_crw_info();
+		up(&s_sem);
 
 #ifdef CONFIG_MACHCHK_WARNING
 /*
@@ -154,6 +172,7 @@ s390_do_machine_check(void)
 static int
 machine_check_init(void)
 {
+	init_MUTEX_LOCKED( &s_sem );
 	ctl_clear_bit(14, 25);	/* disable damage MCH */
 	ctl_set_bit(14, 26);	/* enable degradation MCH */
 	ctl_set_bit(14, 27);	/* enable system recovery MCH */
@@ -176,6 +195,7 @@ arch_initcall(machine_check_init);
 static int __init
 machine_check_crw_init (void)
 {
+	kernel_thread(s390_collect_crw_info, &s_sem, CLONE_FS|CLONE_FILES);
 	ctl_set_bit(14, 28);	/* enable channel report MCH */
 	return 0;
 }

@@ -203,7 +203,7 @@ typedef struct {
 } iucv_array_t __attribute__ ((aligned (8)));
 
 extern struct bus_type iucv_bus;
-extern struct device iucv_root;
+extern struct device *iucv_root;
 
 /*   -prototypes-    */
 /*                                                                

@@ -89,7 +89,7 @@ struct ccw_driver {
 	struct module *owner;		/* for automatic MOD_INC_USE_COUNT   */
 	struct ccw_device_id *ids;	/* probe driver with these devs      */
 	int (*probe) (struct ccw_device *); /* ask driver to probe dev 	     */
-	int (*remove) (struct ccw_device *);
+	void (*remove) (struct ccw_device *);
 					/* device is no longer available     */
 	int (*set_online) (struct ccw_device *);
 	int (*set_offline) (struct ccw_device *);
@@ -166,5 +166,8 @@ extern struct ccw_device *ccw_device_probe_console(void);
 // FIXME: these have to go
 extern int _ccw_device_get_device_number(struct ccw_device *);
 extern int _ccw_device_get_subchannel_number(struct ccw_device *);
+
+extern struct device *s390_root_dev_register(const char *);
+extern void s390_root_dev_unregister(struct device *);
 
 #endif /* _S390_CCWDEV_H_ */

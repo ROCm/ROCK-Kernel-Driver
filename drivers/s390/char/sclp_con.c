@@ -134,8 +134,8 @@ sclp_console_write(struct console *console, const char *message,
 		}
 		/* try to write the string to the current output buffer */
 		written = sclp_write(sclp_conbuf, (const unsigned char *)
-				     message, count, 0);
-		if (written == -EFAULT || written == count)
+				     message, count);
+		if (written == count)
 			break;
 		/*
 		 * Not all characters could be written to the current

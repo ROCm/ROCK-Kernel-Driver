@@ -8,7 +8,7 @@
  * any future changes wrt the API will result in a change of the APIVERSION reported
  * to userspace by the DASDAPIVER-ioctl
  *
- * $Revision: 1.4 $
+ * $Revision: 1.5 $
  *
  */
 
@@ -69,9 +69,11 @@ typedef struct dasd_information2_t {
  * values to be used for dasd_information_t.features
  * 0x00: default features
  * 0x01: readonly (ro)
+ * 0x02: use diag discipline (diag)
  */
 #define DASD_FEATURE_DEFAULT  0
 #define DASD_FEATURE_READONLY 1
+#define DASD_FEATURE_USEDIAG  2
 
 #define DASD_PARTN_BITS 2
 

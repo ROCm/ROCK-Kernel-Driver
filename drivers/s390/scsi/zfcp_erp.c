@@ -30,7 +30,7 @@
 #define ZFCP_LOG_AREA			ZFCP_LOG_AREA_ERP
 #define ZFCP_LOG_AREA_PREFIX		ZFCP_LOG_AREA_PREFIX_ERP
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_ERP_REVISION "$Revision: 1.33 $"
+#define ZFCP_ERP_REVISION "$Revision: 1.34 $"
 
 #include "zfcp_ext.h"
 
@@ -1773,9 +1773,8 @@ zfcp_erp_port_reopen_all_internal(struct zfcp_adapter *adapter, int clear_mask)
 	struct zfcp_port *port;
 
 	list_for_each_entry(port, &adapter->port_list_head, list)
-	    if (atomic_test_mask(ZFCP_STATUS_PORT_NAMESERVER, &port->status)
-		!= ZFCP_STATUS_PORT_NAMESERVER)
-		zfcp_erp_port_reopen_internal(port, clear_mask);
+		if (!atomic_test_mask(ZFCP_STATUS_PORT_NAMESERVER, &port->status))
+			zfcp_erp_port_reopen_internal(port, clear_mask);
 
 	return retval;
 }
@@ -2333,8 +2332,8 @@ zfcp_erp_port_forced_strategy(struct zfcp_erp_action *erp_action)
 		 * open flag is unset - however, this is for readabilty ...
 		 */
 		if (atomic_test_mask((ZFCP_STATUS_PORT_PHYS_OPEN |
-				      ZFCP_STATUS_COMMON_OPEN), &port->status)
-		    == (ZFCP_STATUS_PORT_PHYS_OPEN | ZFCP_STATUS_COMMON_OPEN)) {
+				      ZFCP_STATUS_COMMON_OPEN),
+			             &port->status)) {
 			ZFCP_LOG_DEBUG("Port wwpn=0x%Lx is open -> trying "
 				       " close physical\n",
 				       port->wwpn);
@@ -2433,8 +2432,7 @@ zfcp_erp_port_strategy_open(struct zfcp_erp_action *erp_action)
 	int retval;
 
 	if (atomic_test_mask(ZFCP_STATUS_PORT_NAMESERVER,
-			     &erp_action->port->status)
-	    == ZFCP_STATUS_PORT_NAMESERVER)
+			     &erp_action->port->status))
 		retval = zfcp_erp_port_strategy_open_nameserver(erp_action);
 	else
 		retval = zfcp_erp_port_strategy_open_common(erp_action);

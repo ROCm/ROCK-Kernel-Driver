@@ -302,7 +302,6 @@ int
 read_dev_chars (struct ccw_device *cdev, void **buffer, int length)
 {
 	void (*handler)(struct ccw_device *, unsigned long, struct irb *);
-	char dbf_txt[15];
 	struct subchannel *sch;
 	int ret;
 	struct ccw1 *rdc_ccw;
@@ -313,8 +312,8 @@ read_dev_chars (struct ccw_device *cdev, void **buffer, int length)
 		return -EINVAL;
 	sch = to_subchannel(cdev->dev.parent);
 
-	sprintf (dbf_txt, "rddevch%x", sch->irq);
-	CIO_TRACE_EVENT (4, dbf_txt);
+	CIO_TRACE_EVENT (4, "rddevch");
+	CIO_TRACE_EVENT (4, sch->dev.bus_id);
 
 	rdc_ccw = kmalloc(sizeof(struct ccw1), GFP_KERNEL | GFP_DMA);
 	if (!rdc_ccw)
@@ -359,7 +358,6 @@ int
 read_conf_data (struct ccw_device *cdev, void **buffer, int *length)
 {
 	void (*handler)(struct ccw_device *, unsigned long, struct irb *);
-	char dbf_txt[15];
 	struct subchannel *sch;
 	struct ciw *ciw;
 	char *rcd_buf;
@@ -372,8 +370,8 @@ read_conf_data (struct ccw_device *cdev, void **buffer, int *length)
 		return -EINVAL;
 	sch = to_subchannel(cdev->dev.parent);
 
-	sprintf (dbf_txt, "rdconf%x", sch->irq);
-	CIO_TRACE_EVENT (4, dbf_txt);
+	CIO_TRACE_EVENT (4, "rdconf");
+	CIO_TRACE_EVENT (4, sch->dev.bus_id);
 
 	/*
 	 * scan for RCD command in extended SenseID data

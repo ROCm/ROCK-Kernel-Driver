@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth.c ($Revision: 1.160 $)
+ * linux/drivers/s390/net/qeth.c ($Revision: 1.171 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  *
@@ -165,7 +165,7 @@ MODULE_PARM_DESC(qeth_sparebufs, "the number of pre-allocated spare buffers "
 		 "reserved for low memory situations");
 
 /****************** MODULE STUFF **********************************/
-#define VERSION_QETH_C "$Revision: 1.160 $"
+#define VERSION_QETH_C "$Revision: 1.171 $"
 static const char *version = "qeth S/390 OSA-Express driver ("
     VERSION_QETH_C "/" VERSION_QETH_H "/" VERSION_QETH_MPC_H
     QETH_VERSION_IPV6 QETH_VERSION_VLAN ")";
@@ -612,6 +612,10 @@ static int
 qeth_is_multicast_skb_at_all(struct sk_buff *skb, int version)
 {
 	int i;
+	struct qeth_card *card;
+
+	i = RTN_UNSPEC;
+	card = (struct qeth_card *)skb->dev->priv;
 	if (skb->dst && skb->dst->neighbour) {
 		i = skb->dst->neighbour->type;
 		return ((i == RTN_BROADCAST) ||
@@ -622,20 +626,38 @@ qeth_is_multicast_skb_at_all(struct sk_buff *skb, int version)
 		return ((skb->nh.raw[16] & 0xf0) == 0xe0) ? RTN_MULTICAST : 0;
 	} else if (version == 6) {
 		return (skb->nh.raw[24] == 0xff) ? RTN_MULTICAST : 0;
-	} else {
-		PRINT_STUPID("QETH_IP_VERSION is %x\n", version);
-		PRINT_STUPID("skb->protocol=x%x=%i\n",
-			     skb->protocol, skb->protocol);
-		HEXDUMP16(STUPID, "skb:", skb->data);
 	}
-	return 0;
+	if (!memcmp(skb->nh.raw, skb->dev->broadcast, 6)) {
+		i = RTN_BROADCAST;
+	} else {
+		__u16 hdr_mac;
+
+	        hdr_mac = *((__u16*)skb->nh.raw);
+	        /* tr multicast? */
+	        switch (card->link_type) {
+	        case QETH_MPC_LINK_TYPE_HSTR:
+	        case QETH_MPC_LINK_TYPE_LANE_TR:
+	        	if ((hdr_mac == QETH_TR_MAC_NC) ||
+			    (hdr_mac == QETH_TR_MAC_C))
+				i = RTN_MULTICAST;
+			break;
+	        /* eth or so multicast? */
+                default:
+                      	if ((hdr_mac == QETH_ETH_MAC_V4) ||
+			    (hdr_mac == QETH_ETH_MAC_V6))
+			        i = RTN_MULTICAST;
+	        }
+        }
+	return ((i == RTN_BROADCAST)||
+	        (i == RTN_MULTICAST)||
+	        (i == RTN_ANYCAST)) ? i : 0;
 }
 
 static int
 qeth_get_prioqueue(struct qeth_card *card, struct sk_buff *skb,
 		   int multicast, int version)
 {
-	if (!version)
+	if (!version && (card->type == QETH_CARD_TYPE_OSAE))
 		return QETH_DEFAULT_QUEUE;
 	switch (card->no_queues) {
 	case 1:
@@ -1327,7 +1349,7 @@ __qeth_rebuild_skb_fake_ll(struct qeth_card *card, struct sk_buff *skb,
 		       QETH_FAKE_LL_ADDR_LEN);
 	} else {
 		/* clear source MAC for security reasons */
-		memset(skb->mac.raw + QETH_FAKE_LL_DEST_MAC_POS,
+		memset(skb->mac.raw + QETH_FAKE_LL_SRC_MAC_POS,
 		       0, QETH_FAKE_LL_ADDR_LEN);
 	}
 	memcpy(skb->mac.raw + QETH_FAKE_LL_PROT_POS,
@@ -1947,7 +1969,6 @@ qeth_free_buffer(struct qeth_card *card, int queue, int bufno,
 			case ERROR_LINK_FAILURE:
 			case ERROR_KICK_THAT_PUPPY:
 				QETH_DBF_TEXT4(0, trace, "endeglnd");
-				dst_link_failure(skb);
 				atomic_dec(&skb->users);
 				dev_kfree_skb_irq(skb);
 				break;
@@ -2425,7 +2446,6 @@ qeth_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	if (!card) {
 		QETH_DBF_TEXT2(0, trace, "XMNSNOCD");
-		dst_link_failure(skb);
 		dev_kfree_skb_irq(skb);
 		return 0;
 	}
@@ -2436,7 +2456,6 @@ qeth_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (!atomic_read(&card->is_startlaned)) {
 		card->stats->tx_carrier_errors++;
 		QETH_DBF_CARD2(0, trace, "XMNS", card);
-		dst_link_failure(skb);
 		dev_kfree_skb_irq(skb);
 		return 0;
 	}
@@ -2634,6 +2653,8 @@ again:
 		QETH_DBF_TEXT2(0, trace, "scd:doio");
 		sprintf(dbf_text, "%4x", (__s16) result);
 		QETH_DBF_TEXT2(0, trace, dbf_text);
+		/* re-enable qeth_send_control_data again */
+		atomic_set(&card->write_busy,0);
 		return NULL;
 	}
 
@@ -2644,7 +2665,7 @@ again:
 			atomic_set(&card->write_busy, 0);
 			return NULL;
 		}
-		rec_buf = card->ipa_buf;
+		rec_buf = card->dma_stuff->recbuf;
 		QETH_DBF_CARD2(0, trace, "scro", card);
 	} else {
 		if (qeth_sleepon(card, (setip) ? QETH_IPA_TIMEOUT :
@@ -3350,6 +3371,11 @@ qeth_send_setdelipm(struct qeth_card *card, __u8 * ip, __u8 * mac,
 			  (result==0xe00e)?"unsupported arp assist cmd": \
 			  (result==0xe00f)?"arp assist not enabled": \
 			  (result==0xe080)?"startlan disabled": \
+			  (result==0xf012)?"unicast IP address invalid": \
+			  (result==0xf013)?"multicast router limit reached": \
+			  (result==0xf014)?"stop assist not supported": \
+			  (result==0xf015)?"multicast assist not set": \
+			  (result==0xf080)?"VM: startlan disabled": \
 			  (result==-1)?"IPA communication timeout": \
 			  "unknown return code")
 
@@ -3392,7 +3418,8 @@ retry:
 		QETH_DBF_TEXT2(0, trace, dbf_text);
 	}
 
-	if (((result == -1) || (result == 0xe080)) && (retries--)) {
+	if (((result == -1) || (result == 0xe080) ||(result==0xf080)) &&
+	    (retries--)) {
 		QETH_DBF_CARD2(0, trace, "sipr", card);
 		if (ip_vers == 4) {
 			*((__u32 *) (&dbf_text[0])) = *((__u32 *) ip);
@@ -3557,8 +3584,8 @@ qeth_set_vipas(struct qeth_card *card, int set_only)
 							   le is last entry */
 	char dbf_text[15];
 	int result;
-	__u8 netmask[16] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+	__u8 netmask[16] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 	};
 	struct qeth_vipa_entry *priv_add_list = NULL;
 	struct qeth_vipa_entry *priv_del_list = NULL;
@@ -3579,6 +3606,7 @@ qeth_set_vipas(struct qeth_card *card, int set_only)
 				    GFP_KERNEL);
 			if (ne) {
 				ne->version = e->version;
+				ne->flag = e->flag;
 				memcpy(ne->ip, e->ip, 16);
 				ne->next = priv_add_list;
 				priv_add_list = ne;
@@ -3613,6 +3641,7 @@ qeth_set_vipas(struct qeth_card *card, int set_only)
 				    GFP_KERNEL);
 			if (ne) {
 				ne->version = e->version;
+				ne->flag = e->flag;
 				memcpy(ne->ip, e->ip, 16);
 				ne->next = priv_del_list;
 				priv_del_list = ne;
@@ -3645,7 +3674,7 @@ qeth_set_vipas(struct qeth_card *card, int set_only)
 			sprintf(dbf_text, "%4x", result);
 			QETH_DBF_TEXT2(0, trace, dbf_text);
 			if (priv_add_list->version == 4) {
-				PRINT_ERR("going to leave vipa/rxip %08x"
+				PRINT_ERR("going to leave vipa/rxip x%08x"
 					  "unset...\n",
 					  *((__u32 *) & priv_add_list->ip[0]));
 				sprintf(dbf_text, "%08x",
@@ -5212,7 +5241,7 @@ __qeth_softsetup_enable_ipv6(struct qeth_card *card, int do_a_startlan6)
 			QETH_DBF_TEXT2(0, trace, dbf_text);
 			atomic_set(&card->is_softsetup, 0);
 			/* do not return an error */
-			if (result == 0xe080)
+			if ((result == 0xe080) || (result == 0xf080))
 				result = 0;
 			return result;
 		}
@@ -5300,13 +5329,17 @@ __qeth_softsetup_start_assists(struct qeth_card *card)
 				   "failure -- please check the "
 				   "network, plug in the cable or "
 				   "enable the OSA port" :
+				   (result==0xf080) ?
+				   "startlan disabled (VM: LAN " \
+				   "is offline for functions " \
+				   "requiring LAN access.":
 				   "unknown return code");
 			sprintf(dbf_text, "stln%4x", result);
 			QETH_DBF_TEXT2(0, trace, dbf_text);
 			atomic_set(&card->is_softsetup, 0);
 			atomic_set(&card->is_startlaned, 0);
 			/* do not return an error */
-			if (result == 0xe080) {
+			if ((result == 0xe080) || (result == 0xf080)) {
 				result = 0;
 			}
 			return result;
@@ -5527,7 +5560,10 @@ __qeth_softsetup_routingv6(struct qeth_card *card)
 	if (!atomic_read(&card->enable_routing_attempts6))
 		return;
 
-	if (!card->options.routing_type6) {
+	if (!card->options.routing_type6 ||
+	    ((card->type == QETH_CARD_TYPE_OSAE) &&
+	    ((card->options.routing_type6&ROUTER_MASK) == MULTICAST_ROUTER) &&
+	    !qeth_is_supported6(IPA_OSA_MC_ROUTER_AVAIL))) {
 		atomic_set(&card->enable_routing_attempts6, 0);
 		atomic_set(&card->rt6fld, 0);
 		return;
@@ -8571,7 +8607,8 @@ __qeth_correct_routing_status_v4(struct qeth_card *card)
 		card->options.do_prio_queueing = NO_PRIO_QUEUEING;
 	} else {
 		/* if it's a mc router, it's no router */
-		if ((card->options.routing_type4 == MULTICAST_ROUTER) ||
+		if ((!qeth_is_supported(IPA_OSA_MC_ROUTER_AVAIL) &&
+		     (card->options.routing_type4 == MULTICAST_ROUTER)) ||
 		    (card->options.routing_type4 == PRIMARY_CONNECTOR) ||
 		    (card->options.routing_type4 == SECONDARY_CONNECTOR)) {
 			PRINT_WARN("routing not applicable, reset "
@@ -8599,7 +8636,8 @@ __qeth_correct_routing_status_v6(struct qeth_card *card)
 		card->options.do_prio_queueing = NO_PRIO_QUEUEING;
 	} else {
 		/* if it's a mc router, it's no router */
-		if ((card->options.routing_type6 == MULTICAST_ROUTER) ||
+		if ((!qeth_is_supported(IPA_OSA_MC_ROUTER_AVAIL) &&
+		     (card->options.routing_type6 == MULTICAST_ROUTER)) ||
 		    (card->options.routing_type6 == PRIMARY_CONNECTOR) ||
 		    (card->options.routing_type6 == SECONDARY_CONNECTOR)) {
 			PRINT_WARN("routing not applicable, reset "
@@ -9779,15 +9817,7 @@ static struct ccw_driver qeth_ccw_driver = {
 	.remove = ccwgroup_remove_ccwdev,
 };
 
-static void
-qeth_root_dev_release (struct device *dev)
-{
-}
-
-static struct device qeth_root_dev = {
-	.bus_id = "qeth",
-	.release = qeth_root_dev_release,
-};
+static struct device *qeth_root_dev;
 
 static struct ccwgroup_driver qeth_ccwgroup_driver;
 static ssize_t
@@ -9813,7 +9843,7 @@ qeth_group_store(struct device_driver *drv, const char *buf, size_t count)
 	}
 	pr_debug("creating qeth group device from '%s', '%s' and '%s'\n",
 		 bus_ids[0], bus_ids[1], bus_ids[2]);
-	ccwgroup_create(&qeth_root_dev, qeth_ccwgroup_driver.driver_id,
+	ccwgroup_create(qeth_root_dev, qeth_ccwgroup_driver.driver_id,
 			&qeth_ccw_driver, 3, argv);
 	return count;
 }
@@ -10674,7 +10704,7 @@ out:
 	return -ENODEV;
 }
 
-static int
+static void
 qeth_remove_device(struct ccwgroup_device *gdev)
 {
 	struct qeth_card *card = gdev->dev.driver_data;
@@ -10684,7 +10714,6 @@ qeth_remove_device(struct ccwgroup_device *gdev)
 	if (card)
 		qeth_free_card(card);
 	put_device(&gdev->dev);
-	return 0;
 }
 
 static int
@@ -10773,10 +10802,11 @@ qeth_init(void)
 	if (result)
 		goto out_cdrv;
 
-	result = device_register(&qeth_root_dev);
-	if (result)
+	qeth_root_dev = s390_root_dev_register("qeth");
+	if (IS_ERR(qeth_root_dev)) {
+		result = PTR_ERR(qeth_root_dev);
 		goto out_file;
-
+	}
 	qeth_register_notifiers();
 	qeth_add_procfs_entries();
 
@@ -10815,7 +10845,7 @@ qeth_exit(void)
 	driver_remove_file(&qeth_ccwgroup_driver.driver, &driver_attr_group);
 	ccw_driver_unregister(&qeth_ccw_driver);
 	ccwgroup_driver_unregister(&qeth_ccwgroup_driver);
-	device_unregister(&qeth_root_dev);
+	s390_root_dev_unregister(qeth_root_dev);
 
 	while (firstcard) {
 		struct qeth_card *card = firstcard;

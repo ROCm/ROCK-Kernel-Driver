@@ -19,7 +19,7 @@
 
 #include "tape.h"
 
-#define PRINTK_HEADER "TBLOCK:"
+#define PRINTK_HEADER "TAPE_BLOCK: "
 
 #define TAPEBLOCK_MAX_SEC	100
 #define TAPEBLOCK_MIN_REQUEUE	3
@@ -214,7 +214,8 @@ tapeblock_setup_device(struct tape_device * device)
 	if (!disk)
 		return -ENOMEM;
 
-	tasklet_init(&d->tasklet, tapeblock_tasklet, (unsigned long)device);
+	tasklet_init(&d->tasklet, tapeblock_tasklet,
+		(unsigned long) tape_get_device_reference(device));
 
 	spin_lock_init(&d->request_queue_lock);
 	q = blk_init_queue(tapeblock_request_fn, &d->request_queue_lock);
@@ -239,7 +240,7 @@ tapeblock_setup_device(struct tape_device * device)
 	disk->major = tapeblock_major;
 	disk->first_minor = device->first_minor;
 	disk->fops = &tapeblock_fops;
-	disk->private_data = device;
+	disk->private_data = tape_get_device_reference(device);
 	disk->queue = q;
 	//set_capacity(disk, size);
 
@@ -247,6 +248,9 @@ tapeblock_setup_device(struct tape_device * device)
 
 	add_disk(disk);
 	d->disk = disk;
+
+	tape_hotplug_event(device, tapeblock_major, TAPE_HOTPLUG_BLOCK_ADD);
+
 	return 0;
 
  cleanup_queue:
@@ -261,11 +265,15 @@ tapeblock_cleanup_device(struct tape_device *device)
 {
 	struct tape_blk_data *d = &device->blk_data;
 
+	tape_hotplug_event(device, tapeblock_major, TAPE_HOTPLUG_BLOCK_REMOVE);
+
 	del_gendisk(d->disk);
+	d->disk->private_data = tape_put_device(d->disk->private_data);
 	put_disk(d->disk);
 	blk_cleanup_queue(d->request_queue);
 
 	tasklet_kill(&d->tasklet);
+	tape_put_device(device);
 }
 
 /*
@@ -301,9 +309,9 @@ static int tapeblock_mediumdetect(struct tape_device *device)
 static int
 tapeblock_open(struct inode *inode, struct file *filp)
 {
-	struct gendisk *disk = inode->i_bdev->bd_disk;
-	struct tape_device *device = disk->private_data;
-	int rc;
+	struct gendisk *	disk;
+	struct tape_device *	device;
+	int			rc;
 
 	/*
 	 * FIXME: this new tapeblock_open function is from 2.5.69.
@@ -311,20 +319,27 @@ tapeblock_open(struct inode *inode, struct file *filp)
 	 * pointer from disk->private_data. It is stored in 
 	 * tapeblock_setup_device but WITHOUT proper ref-counting.
 	 */
+	disk   = inode->i_bdev->bd_disk;
+	device = tape_get_device_reference(disk->private_data);
+
+	if (device->required_tapemarks) {
+		DBF_EVENT(2, "TBLOCK: missing tapemarks\n");
+		PRINT_ERR("TBLOCK: Refusing to open tape with missing"
+			" end of file marks.\n");
+		rc = -EPERM;
+		goto put_device;
+	}
+
 	rc = tape_open(device);
 	if (rc)
 		goto put_device;
-	rc = tape_assign(device);
-	if (rc)
-		goto release;
 	device->blk_data.block_position = -1;
 	rc = tapeblock_mediumdetect(device);
 	if (rc)
-		goto unassign;
+		goto release;
+
 	return 0;
 
- unassign:
-	tape_unassign(device);
  release:
 	tape_release(device);
  put_device:
@@ -342,7 +357,6 @@ tapeblock_release(struct inode *inode, struct file *filp)
 	struct tape_device *device = disk->private_data;
 
 	tape_release(device);
-	tape_unassign(device);
 	tape_put_device(device);
 
 	return 0;
