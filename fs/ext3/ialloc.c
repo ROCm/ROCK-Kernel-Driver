@@ -417,7 +417,7 @@ struct inode *ext3_new_inode(handle_t *handle, struct inode * dir, int mode)
 	struct buffer_head *bitmap_bh = NULL;
 	struct buffer_head *bh2;
 	int group;
-	ino_t ino;
+	unsigned long ino;
 	struct inode * inode;
 	struct ext3_group_desc * gdp;
 	struct ext3_super_block * es;
@@ -463,7 +463,7 @@ repeat:
 		BUFFER_TRACE(bitmap_bh, "get_write_access");
 		err = ext3_journal_get_write_access(handle, bitmap_bh);
 		if (err) goto fail;
-		
+
 		if (ext3_set_bit(ino, bitmap_bh->b_data)) {
 			ext3_error (sb, "ext3_new_inode",
 				      "bit already set for inode %lu", ino);
@@ -619,19 +619,18 @@ fail2:
 }
 
 /* Verify that we are loading a valid orphan from disk */
-struct inode *ext3_orphan_get (struct super_block * sb, ino_t ino)
+struct inode *ext3_orphan_get(struct super_block *sb, unsigned long ino)
 {
-	ino_t max_ino = le32_to_cpu(EXT3_SB(sb)->s_es->s_inodes_count);
+	unsigned long max_ino = le32_to_cpu(EXT3_SB(sb)->s_es->s_inodes_count);
 	unsigned long block_group;
 	int bit;
 	struct buffer_head *bitmap_bh = NULL;
 	struct inode *inode = NULL;
-	
+
 	/* Error cases - e2fsck has already cleaned up for us */
 	if (ino > max_ino) {
 		ext3_warning(sb, __FUNCTION__,
-			     "bad orphan ino %lu!  e2fsck was run?\n",
-			     (unsigned long) ino);
+			     "bad orphan ino %lu!  e2fsck was run?\n", ino);
 		goto out;
 	}
 
@@ -640,8 +639,7 @@ struct inode *ext3_orphan_get (struct super_block * sb, ino_t ino)
 	bitmap_bh = read_inode_bitmap(sb, block_group);
 	if (!bitmap_bh) {
 		ext3_warning(sb, __FUNCTION__,
-			     "inode bitmap error for orphan %lu\n",
-			     (unsigned long) ino);
+			     "inode bitmap error for orphan %lu\n", ino);
 		goto out;
 	}
 
@@ -653,19 +651,17 @@ struct inode *ext3_orphan_get (struct super_block * sb, ino_t ino)
 			!(inode = iget(sb, ino)) || is_bad_inode(inode) ||
 			NEXT_ORPHAN(inode) > max_ino) {
 		ext3_warning(sb, __FUNCTION__,
-			     "bad orphan inode %lu!  e2fsck was run?\n", (unsigned long)ino);
+			     "bad orphan inode %lu!  e2fsck was run?\n", ino);
 		printk(KERN_NOTICE "ext3_test_bit(bit=%d, block=%llu) = %d\n",
-		       bit, 
-			(unsigned long long)bitmap_bh->b_blocknr, 
-			ext3_test_bit(bit, bitmap_bh->b_data));
+		       bit, (unsigned long long)bitmap_bh->b_blocknr,
+		       ext3_test_bit(bit, bitmap_bh->b_data));
 		printk(KERN_NOTICE "inode=%p\n", inode);
 		if (inode) {
 			printk(KERN_NOTICE "is_bad_inode(inode)=%d\n",
 			       is_bad_inode(inode));
-			printk(KERN_NOTICE "NEXT_ORPHAN(inode)=%d\n",
+			printk(KERN_NOTICE "NEXT_ORPHAN(inode)=%u\n",
 			       NEXT_ORPHAN(inode));
-			printk(KERN_NOTICE "max_ino=%lu\n",
-			       (unsigned long) max_ino);
+			printk(KERN_NOTICE "max_ino=%lu\n", max_ino);
 		}
 		/* Avoid freeing blocks if we got a bad deleted inode */
 		if (inode && inode->i_nlink == 0)
