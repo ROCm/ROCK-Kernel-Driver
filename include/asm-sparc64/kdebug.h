@@ -22,15 +22,16 @@ struct die_args {
 int register_die_notifier(struct notifier_block *nb);
 extern struct notifier_block *sparc64die_chain;
 
+extern void bad_trap(struct pt_regs *, long);
+
 /* Grossly misnamed. */
 enum die_val {
 	DIE_OOPS = 1,
-	DIE_DEBUG,
-	DIE_PANIC,
-	DIE_NMI,
+	DIE_DEBUG,	/* ta 0x70 */
+	DIE_DEBUG_2,	/* ta 0x71 */
 	DIE_DIE,
-	DIE_KERNELDEBUG,
 	DIE_TRAP,
+	DIE_TRAP_TL1,
 	DIE_GPF,
 	DIE_CALL,
 	DIE_PAGE_FAULT,

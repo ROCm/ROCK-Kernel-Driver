@@ -176,6 +176,12 @@
 	ba,pt	%xcc, rtrap_clr_l6;					\
 	 stx	%l2, [%sp + PTREGS_OFF + PT_V9_TNPC];
 	        
+#ifdef CONFIG_KPROBES
+#define KPROBES_TRAP(lvl) TRAP_IRQ(kprobe_trap, lvl)
+#else
+#define KPROBES_TRAP(lvl) TRAP_ARG(bad_trap, lvl)
+#endif
+
 /* Before touching these macros, you owe it to yourself to go and
  * see how arch/sparc64/kernel/winfixup.S works... -DaveM
  *
