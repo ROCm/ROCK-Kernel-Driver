@@ -218,9 +218,9 @@ static void usb_console_write(struct console *co, const char *buf, unsigned coun
 
 	/* pass on to the driver specific version of this function if it is available */
 	if (serial->type->write)
-		retval = serial->type->write(port, 0, buf, count);
+		retval = serial->type->write(port, buf, count);
 	else
-		retval = usb_serial_generic_write(port, 0, buf, count);
+		retval = usb_serial_generic_write(port, buf, count);
 
 exit:
 	dbg("%s - return value (if we had one): %d", __FUNCTION__, retval);
