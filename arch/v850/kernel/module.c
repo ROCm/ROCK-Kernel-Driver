@@ -1,9 +1,9 @@
 /*
  * arch/v850/kernel/module.c -- Architecture-specific module functions
  *
- *  Copyright (C) 2002  NEC Corporation
- *  Copyright (C) 2002  Miles Bader <miles@gnu.org>
- *  Copyright (C) 2001  Rusty Russell
+ *  Copyright (C) 2002,03  NEC Electronics Corporation
+ *  Copyright (C) 2002,03  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,03  Rusty Russell
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -100,18 +100,31 @@ static unsigned long get_plt_size(const Elf32_Ehdr *hdr,
 	return ret;
 }
 
-long module_core_size (const Elf32_Ehdr *hdr, const Elf32_Shdr *sechdrs,
-		       const char *secstrings, struct module *mod)
+int module_frob_arch_sections(Elf32_Ehdr *hdr,
+			      Elf32_Shdr *sechdrs,
+			      char *secstrings,
+			      struct module *me)
 {
-	mod->arch.core_plt_offset = (mod->core_size + 3) & ~3;
-	return mod->core_size + get_plt_size (hdr, sechdrs, secstrings, 1);
-}
+	unsigned int i;
 
-long module_init_size (const Elf32_Ehdr *hdr, const Elf32_Shdr *sechdrs,
-		       const char *secstrings, struct module *mod)
-{
-	mod->arch.init_plt_offset = (mod->init_size + 3) & ~3;
-	return mod->init_size + get_plt_size (hdr, sechdrs, secstrings, 1);
+	/* Find .plt and .pltinit sections */
+	for (i = 0; i < hdr->e_shnum; i++) {
+		if (strcmp(secstrings + sechdrs[i].sh_name, ".init.plt") == 0)
+			me->arch.init_plt_section = i;
+		else if (strcmp(secstrings + sechdrs[i].sh_name, ".plt") == 0)
+			me->arch.core_plt_section = i;
+	}
+	if (!me->arch.core_plt_section || !me->arch.init_plt_section) {
+		printk("Module doesn't contain .plt or .plt.init sections.\n");
+		return -ENOEXEC;
+	}
+
+	/* Override their sizes */
+	sechdrs[me->arch.core_plt_section].sh_size
+		= get_plt_size(hdr, sechdrs, secstrings, 0);
+	sechdrs[me->arch.init_plt_section].sh_size
+		= get_plt_size(hdr, sechdrs, secstrings, 1);
+	return 0;
 }
 
 int apply_relocate (Elf32_Shdr *sechdrs, const char *strtab,
@@ -123,7 +136,8 @@ int apply_relocate (Elf32_Shdr *sechdrs, const char *strtab,
 }
 
 /* Set up a trampoline in the PLT to bounce us to the distant function */
-static uint32_t do_plt_call(void *location, Elf32_Addr val, struct module *mod)
+static uint32_t do_plt_call (void *location, Elf32_Addr val,
+			     Elf32_Shdr *sechdrs, struct module *mod)
 {
 	struct v850_plt_entry *entry;
 	/* Instructions used to do the indirect jump.  */
@@ -137,10 +151,10 @@ static uint32_t do_plt_call(void *location, Elf32_Addr val, struct module *mod)
 
 	/* Init, or core PLT? */
 	if (location >= mod->module_core
-	    && location < mod->module_core + mod->arch.core_plt_offset)
-		entry = mod->module_core + mod->arch.core_plt_offset;
+	    && location < mod->module_core + mod->core_size)
+		entry = (void *)sechdrs[mod->arch.core_plt_section].sh_addr;
 	else
-		entry = mod->module_init + mod->arch.init_plt_offset;
+		entry = (void *)sechdrs[mod->arch.init_plt_section].sh_addr;
 
 	/* Find this entry, or if that fails, the next avail. entry */
 	while (entry->tramp[0])
@@ -199,7 +213,7 @@ int apply_relocate_add (Elf32_Shdr *sechdrs, const char *strtab,
 			/* Maybe jump indirectly via a PLT table entry.  */
 			if ((int32_t)(val - (uint32_t)loc) > 0x1fffff
 			    || (int32_t)(val - (uint32_t)loc) < -0x200000)
-				val = do_plt_call (loc, val, mod);
+				val = do_plt_call (loc, val, sechdrs, mod);
 
 			val -= (uint32_t)loc;
 
