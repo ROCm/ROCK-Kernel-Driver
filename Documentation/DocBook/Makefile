@@ -107,7 +107,8 @@ APISOURCES :=	$(TOPDIR)/drivers/media/video/videodev.c \
 		$(TOPDIR)/kernel/printk.c \
 		$(TOPDIR)/drivers/net/net_init.c \
 		$(TOPDIR)/drivers/net/8390.c \
-		$(TOPDIR)/drivers/char/serial.c \
+		$(TOPDIR)/drivers/serial/core.c \
+		$(TOPDIR)/drivers/serial/8250.c \
 		$(TOPDIR)/drivers/pci/pci.c \
 		$(TOPDIR)/drivers/hotplug/pci_hotplug_core.c \
 		$(TOPDIR)/drivers/hotplug/pci_hotplug_util.c \
