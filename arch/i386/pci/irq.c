@@ -452,15 +452,12 @@ static int pirq_bios_set(struct pci_dev *router, struct pci_dev *dev, int pirq, 
 
 static __init int intel_router_probe(struct irq_router *r, struct pci_dev *router, u16 device)
 {
-#if 0 /* Let's see what chip this is supposed to be ... */
-	/* We must not touch 440GX even if we have tables. 440GX has
-	   different IRQ routing weirdness */
+	/* 440GX has a proprietary PIRQ router -- don't use it */
 	if (	pci_find_device(PCI_VENDOR_ID_INTEL,
 				PCI_DEVICE_ID_INTEL_82443GX_0, NULL) ||
 		pci_find_device(PCI_VENDOR_ID_INTEL,
 				PCI_DEVICE_ID_INTEL_82443GX_2, NULL))
 		return 0;
-#endif
 
 	switch(device)
 	{
