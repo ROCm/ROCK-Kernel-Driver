@@ -355,7 +355,7 @@ static __devinit int cache_nbs (struct pci_dev *pdev, u32 cap_ptr)
 	int i = 0;
 
 	/* cache pci_devs of northbridges. */
-	while ((loop_dev = pci_find_device(PCI_VENDOR_ID_AMD, 0x1103, loop_dev))
+	while ((loop_dev = pci_get_device(PCI_VENDOR_ID_AMD, 0x1103, loop_dev))
 			!= NULL) {
 		if (i == MAX_HAMMER_GARTS) {
 			printk(KERN_ERR PFX "Too many northbridges for AGP\n");
@@ -625,6 +625,11 @@ static struct pci_driver agp_amd64_pci_driver = {
 int __init agp_amd64_init(void)
 {
 	int err = 0;
+	static struct pci_device_id amd64nb[] = {
+		{ PCI_DEVICE(PCI_VENDOR_ID_AMD, 0x1103) },
+		{ },
+	};
+
 	if (agp_off)
 		return -EINVAL;
 	if (pci_module_init(&agp_amd64_pci_driver) > 0) {
@@ -640,13 +645,13 @@ int __init agp_amd64_init(void)
 		}
 
 		/* First check that we have at least one AMD64 NB */
-		if (!pci_find_device(PCI_VENDOR_ID_AMD, 0x1103, NULL))
+		if (!pci_dev_present(amd64nb))
 			return -ENODEV;
 
 		/* Look for any AGP bridge */
 		dev = NULL;
 		err = -ENODEV;
-		while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev))) {
+		for_each_pci_dev(dev) {
 			if (!pci_find_capability(dev, PCI_CAP_ID_AGP))
 				continue;
 			/* Only one bridge supported right now */
