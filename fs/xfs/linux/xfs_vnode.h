@@ -175,9 +175,11 @@ struct page_buf_bmap_s;
 struct attrlist_cursor_kern;
 
 typedef int	(*vop_open_t)(bhv_desc_t *, struct cred *);
-typedef ssize_t (*vop_read_t)(bhv_desc_t *, struct file *, char *, size_t,
+typedef ssize_t (*vop_read_t)(bhv_desc_t *, struct file *,
+				const struct iovec *, unsigned long,
 				loff_t *, struct cred *);
-typedef ssize_t (*vop_write_t)(bhv_desc_t *, struct file *, const char *, size_t,
+typedef ssize_t (*vop_write_t)(bhv_desc_t *, struct file *,
+				const struct iovec *, unsigned long,
 				loff_t *, struct cred *);
 typedef int	(*vop_ioctl_t)(bhv_desc_t *, struct inode *, struct file *, unsigned int, unsigned long);
 typedef int	(*vop_getattr_t)(bhv_desc_t *, struct vattr *, int,
@@ -272,16 +274,16 @@ typedef struct vnodeops {
  */
 #define _VOP_(op, vp)	(*((vnodeops_t *)(vp)->v_fops)->op)
 
-#define VOP_READ(vp,file,buf,size,offset,cr,rv)				\
+#define VOP_READ(vp,file,iov,segs,offset,cr,rv)				\
 {									\
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
-	rv = _VOP_(vop_read, vp)((vp)->v_fbhv,file,buf,size,offset,cr); \
+	rv = _VOP_(vop_read, vp)((vp)->v_fbhv,file,iov,segs,offset,cr); \
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
-#define VOP_WRITE(vp,file,buf,size,offset,cr,rv)			\
+#define VOP_WRITE(vp,file,iov,segs,offset,cr,rv)			\
 {									\
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
-	rv = _VOP_(vop_write, vp)((vp)->v_fbhv,file,buf,size,offset,cr);\
+	rv = _VOP_(vop_write, vp)((vp)->v_fbhv,file,iov,segs,offset,cr);\
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_BMAP(vp,of,sz,rw,cr,b,n,rv)					\

@@ -124,36 +124,64 @@ unlock:
 
 ssize_t			/* bytes read, or (-)  error */
 xfs_read(
-	bhv_desc_t	*bdp,
-	struct file	*file,
-	char		*buf,
-	size_t		size,
-	loff_t		*offset,
-	cred_t		*credp)
+	bhv_desc_t		*bdp,
+	struct file		*filp,
+	const struct iovec	*iovp,
+	unsigned long		segs,
+	loff_t			*offp,
+	cred_t			*credp)
 {
-	ssize_t		ret;
-	xfs_fsize_t	n;
-	xfs_inode_t	*ip;
-	xfs_mount_t	*mp;
+	size_t			size = 0;
+	ssize_t			ret;
+	xfs_fsize_t		n;
+	xfs_inode_t		*ip;
+	xfs_mount_t		*mp;
+	unsigned long		seg;
+	int			direct = filp->f_flags & O_DIRECT;
 
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
 
 	XFS_STATS_INC(xfsstats.xs_read_calls);
 
-	if (file->f_flags & O_DIRECT) {
-		if (((__psint_t)buf & BBMASK) ||
-		    (*offset & mp->m_blockmask) ||
+	/* START copy & waste from filemap.c */
+	for (seg = 0; seg < segs; seg++) {
+		const struct iovec *iv = &iovp[seg];
+
+		/*
+		 * If any segment has a negative length, or the cumulative
+		 * length ever wraps negative then return -EINVAL.
+		 */
+		size += iv->iov_len;
+		if (unlikely((ssize_t)(size|iv->iov_len) < 0))
+			return XFS_ERROR(-EINVAL);
+		if (direct) {	/* XFS specific check */
+			if ((__psint_t)iv->iov_base & BBMASK) {
+				if (*offp == ip->i_d.di_size)
+					return 0;
+				return XFS_ERROR(-EINVAL);
+			}
+		}
+		if (access_ok(VERIFY_WRITE, iv->iov_base, iv->iov_len))
+			continue;
+		if (seg == 0)
+			return XFS_ERROR(-EFAULT);
+		segs = seg;
+		break;
+	}
+	/* END copy & waste from filemap.c */
+
+	if (direct) {
+		if ((*offp & mp->m_blockmask) ||
 		    (size & mp->m_blockmask)) {
-			if (*offset == ip->i_d.di_size) {
+			if (*offp == ip->i_d.di_size) {
 				return (0);
 			}
 			return -XFS_ERROR(EINVAL);
 		}
 	}
 
-
-	n = XFS_MAX_FILE_OFFSET - *offset;
+	n = XFS_MAX_FILE_OFFSET - *offp;
 	if ((n <= 0) || (size == 0))
 		return 0;
 
@@ -167,26 +195,24 @@ xfs_read(
 	xfs_ilock(ip, XFS_IOLOCK_SHARED);
 
 	if (DM_EVENT_ENABLED(BHV_TO_VNODE(bdp)->v_vfsp, ip, DM_EVENT_READ) &&
-	    !(file->f_mode & FINVIS)) {
+	    !(filp->f_mode & FINVIS)) {
 		int error;
 		vrwlock_t locktype = VRWLOCK_READ;
 
-		error = xfs_dm_send_data_event(DM_EVENT_READ, bdp,
-					     *offset, size,
-					     FILP_DELAY_FLAG(file),
-					     &locktype);
+		error = xfs_dm_send_data_event(DM_EVENT_READ, bdp, *offp,
+				size, FILP_DELAY_FLAG(filp), &locktype);
 		if (error) {
 			xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 			return -error;
 		}
 	}
 
-	ret = generic_file_read(file, buf, size, offset);
+	ret = generic_file_readv(filp, iovp, segs, offp);
 	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
 	XFS_STATS_ADD(xfsstats.xs_read_bytes, ret);
 
-	if (!(file->f_mode & FINVIS))
+	if (!(filp->f_mode & FINVIS))
 		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
 
 	return ret;
@@ -418,31 +444,56 @@ out_lock:
 
 ssize_t				/* bytes written, or (-) error */
 xfs_write(
-	bhv_desc_t	*bdp,
-	struct file	*file,
-	const char	*buf,
-	size_t		size,
-	loff_t		*offset,
-	cred_t		*credp)
+	bhv_desc_t		*bdp,
+	struct file		*file,
+	const struct iovec	*iovp,
+	unsigned long		segs,
+	loff_t			*offset,
+	cred_t			*credp)
 {
-	xfs_inode_t	*xip;
-	xfs_mount_t	*mp;
-	ssize_t		ret;
-	int		error = 0;
-	xfs_fsize_t	isize, new_size;
-	xfs_fsize_t	n, limit = XFS_MAX_FILE_OFFSET;
-	xfs_iocore_t	*io;
-	vnode_t		*vp;
-	struct iovec	iov;
-	int		iolock;
-	int		direct = file->f_flags & O_DIRECT;
-	int		eventsent = 0;
-	vrwlock_t	locktype;
+	size_t			size = 0;
+	xfs_inode_t		*xip;
+	xfs_mount_t		*mp;
+	ssize_t			ret;
+	int			error = 0;
+	xfs_fsize_t		isize, new_size;
+	xfs_fsize_t		n, limit = XFS_MAX_FILE_OFFSET;
+	xfs_iocore_t		*io;
+	vnode_t			*vp;
+	unsigned long		seg;
+	int			iolock;
+	int			direct = file->f_flags & O_DIRECT;
+	int			eventsent = 0;
+	vrwlock_t		locktype;
 
 	XFS_STATS_INC(xfsstats.xs_write_calls);
 
 	vp = BHV_TO_VNODE(bdp);
 	xip = XFS_BHVTOI(bdp);
+
+	/* START copy & waste from filemap.c */
+	for (seg = 0; seg < segs; seg++) {
+		const struct iovec *iv = &iovp[seg];
+
+		/*
+		 * If any segment has a negative length, or the cumulative
+		 * length ever wraps negative then return -EINVAL.
+		 */
+		size += iv->iov_len;
+		if (unlikely((ssize_t)(size|iv->iov_len) < 0))
+			return XFS_ERROR(-EINVAL);
+		if (direct) {	/* XFS specific check */
+			if ((__psint_t)iv->iov_base & BBMASK)
+				return XFS_ERROR(-EINVAL);
+		}
+		if (access_ok(VERIFY_READ, iv->iov_base, iv->iov_len))
+			continue;
+		if (seg == 0)
+			return XFS_ERROR(-EFAULT);
+		segs = seg;
+		break;
+	}
+	/* END copy & waste from filemap.c */
 
 	if (size == 0)
 		return 0;
@@ -457,9 +508,8 @@ xfs_write(
 	}
 
 	if (direct) {
-		if (((__psint_t)buf & BBMASK) ||
-		    (*offset & mp->m_blockmask) ||
-		    (size  & mp->m_blockmask)) {
+		if ((*offset & mp->m_blockmask) ||
+		    (size & mp->m_blockmask)) {
 			return XFS_ERROR(-EINVAL);
 		}
 		iolock = XFS_IOLOCK_SHARED;
@@ -481,6 +531,7 @@ start:
 		xfs_iunlock(xip, XFS_ILOCK_EXCL|iolock);
 		return -EFBIG;
 	}
+
 	if (n < size)
 		size = n;
 
@@ -572,10 +623,7 @@ retry:
 		xfs_inval_cached_pages(vp, &xip->i_iocore, *offset, 1, 1);
 	}
 
-	iov.iov_base = (void *)buf;
-	iov.iov_len = size;
-
-	ret = generic_file_write_nolock(file, &iov, 1, offset);
+	ret = generic_file_write_nolock(file, iovp, segs, offset);
 
 	if ((ret == -ENOSPC) &&
 	    DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_NOSPACE) &&
