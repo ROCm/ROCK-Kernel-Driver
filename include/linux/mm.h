@@ -816,10 +816,14 @@ kernel_map_pages(struct page *page, int numpages, int enable)
 }
 #endif
 
-#ifndef CONFIG_ARCH_GATE_AREA
 extern struct vm_area_struct *get_gate_vma(struct task_struct *tsk);
+#ifdef	__HAVE_ARCH_GATE_AREA
+int in_gate_area_no_task(unsigned long addr);
 int in_gate_area(struct task_struct *task, unsigned long addr);
-#endif
+#else
+int in_gate_area_no_task(unsigned long addr);
+#define in_gate_area(task, addr) ({(void)task; in_gate_area_no_task(addr);})
+#endif	/* __HAVE_ARCH_GATE_AREA */
 
 #endif /* __KERNEL__ */
 #endif /* _LINUX_MM_H */
