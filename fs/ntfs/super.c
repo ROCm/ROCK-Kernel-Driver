@@ -1,8 +1,8 @@
 /*
  * super.c - NTFS kernel super block handling. Part of the Linux-NTFS project.
  *
- * Copyright (c) 2001,2002 Anton Altaparmakov.
- * Copyright (c) 2001,2002 Richard Russon.
+ * Copyright (c) 2001-2003 Anton Altaparmakov
+ * Copyright (c) 2001,2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published
@@ -619,9 +619,8 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 	 * the same as it is much faster on 32-bit CPUs.
 	 */
 	ll = sle64_to_cpu(b->number_of_sectors) >> sectors_per_cluster_bits;
-	if ((u64)ll >= 1ULL << (sizeof(unsigned long) * 8)) {
-		ntfs_error(vol->sb, "Cannot handle %i-bit clusters. Sorry.",
-				sizeof(unsigned long) * 4);
+	if ((u64)ll >= 1ULL << 32)) {
+		ntfs_error(vol->sb, "Cannot handle 64-bit clusters. Sorry.");
 		return FALSE;
 	}
 	vol->nr_clusters = ll;
@@ -1060,78 +1059,93 @@ static void ntfs_put_super(struct super_block *vfs_sb)
  * get_nr_free_clusters - return the number of free clusters on a volume
  * @vol:	ntfs volume for which to obtain free cluster count
  *
- * Calculate the number of free clusters on the mounted NTFS volume @vol.
+ * Calculate the number of free clusters on the mounted NTFS volume @vol. We
+ * actually calculate the number of clusters in use instead because this
+ * allows us to not care about partial pages as these will be just zero filled
+ * and hence not be counted as allocated clusters.
  *
- * Errors are ignored and we just return the number of free clusters we have
- * found. This means we return an underestimate on error.
+ * The only particularity is that clusters beyond the end of the logical ntfs
+ * volume will be marked as allocated to prevent errors which means we have to
+ * discount those at the end. This is important as the cluster bitmap always
+ * has a size in multiples of 8 bytes, i.e. up to 63 clusters could be outside
+ * the logical volume and marked in use when they are not as they do not exist.
+ *
+ * If any pages cannot be read we assume all clusters in the erroring pages are
+ * in use. This means we return an underestimate on errors which is better than
+ * an overestimate.
  */
 static s64 get_nr_free_clusters(ntfs_volume *vol)
 {
+	s64 nr_free = vol->nr_clusters;
+	u32 *kaddr;
 	struct address_space *mapping = vol->lcnbmp_ino->i_mapping;
 	filler_t *readpage = (filler_t*)mapping->a_ops->readpage;
 	struct page *page;
 	unsigned long index, max_index;
-	unsigned int max_size, i;
-	s64 nr_free = 0LL;
-	u32 *b;
+	unsigned int max_size;
 
 	ntfs_debug("Entering.");
 	/* Serialize accesses to the cluster bitmap. */
 	down_read(&vol->lcnbmp_lock);
 	/*
 	 * Convert the number of bits into bytes rounded up, then convert into
-	 * multiples of PAGE_CACHE_SIZE.
+	 * multiples of PAGE_CACHE_SIZE, rounding up so that if we have one
+	 * full and one partial page max_index = 2.
 	 */
-	max_index = (vol->nr_clusters + 7) >> (3 + PAGE_CACHE_SHIFT);
+	max_index = (((vol->nr_clusters + 7) >> 3) + PAGE_CACHE_SIZE - 1) >>
+			PAGE_CACHE_SHIFT;
 	/* Use multiples of 4 bytes. */
 	max_size = PAGE_CACHE_SIZE >> 2;
-	ntfs_debug("Reading $BITMAP, max_index = 0x%lx, max_size = 0x%x.",
+	ntfs_debug("Reading $Bitmap, max_index = 0x%lx, max_size = 0x%x.",
 			max_index, max_size);
-	for (index = 0UL; index < max_index;) {
-handle_partial_page:
+	for (index = 0UL; index < max_index; index++) {
+		unsigned int i;
 		/*
 		 * Read the page from page cache, getting it from backing store
 		 * if necessary, and increment the use count.
 		 */
-		page = read_cache_page(mapping, index++, (filler_t*)readpage,
+		page = read_cache_page(mapping, index, (filler_t*)readpage,
 				NULL);
 		/* Ignore pages which errored synchronously. */
 		if (IS_ERR(page)) {
 			ntfs_debug("Sync read_cache_page() error. Skipping "
-					"page (index 0x%lx).", index - 1);
+					"page (index 0x%lx).", index);
+			nr_free -= PAGE_CACHE_SIZE * 8;
 			continue;
 		}
 		wait_on_page_locked(page);
+		/* Ignore pages which errored asynchronously. */
 		if (!PageUptodate(page)) {
 			ntfs_debug("Async read_cache_page() error. Skipping "
-					"page (index 0x%lx).", index - 1);
-			/* Ignore pages which errored asynchronously. */
+					"page (index 0x%lx).", index);
 			page_cache_release(page);
+			nr_free -= PAGE_CACHE_SIZE * 8;
 			continue;
 		}
-		b = (u32*)kmap(page);
-		/* For each 4 bytes, add up the number zero bits. */
+		kaddr = (u32*)kmap_atomic(page, KM_USER0);
+		/*
+		 * For each 4 bytes, subtract the number of set bits. If this
+		 * is the last page and it is partial we don't really care as
+		 * it just means we do a little extra work but it won't affect
+		 * the result as all out of range bytes are set to zero by
+		 * ntfs_readpage().
+		 */
 	  	for (i = 0; i < max_size; i++)
-			nr_free += (s64)(32 - hweight32(b[i]));
-		kunmap(page);
+			nr_free -= (s64)hweight32(kaddr[i]);
+		kunmap_atomic(kaddr, KM_USER0);
 		page_cache_release(page);
 	}
-	if (max_size == PAGE_CACHE_SIZE >> 2) {
-		/*
-		 * Get the multiples of 4 bytes in use in the final partial
-		 * page.
-		 */
-		max_size = ((((vol->nr_clusters + 7) >> 3) & ~PAGE_CACHE_MASK)
-				+ 3) >> 2;
-		/* If there is a partial page go back and do it. */
-		if (max_size) {
-			ntfs_debug("Handling partial page, max_size = 0x%x.",
-					max_size);
-			goto handle_partial_page;
-		}
-	}
-	ntfs_debug("Finished reading $BITMAP, last index = 0x%lx", index - 1);
+	ntfs_debug("Finished reading $Bitmap, last index = 0x%lx.", index - 1);
+	/*
+	 * Fixup for eventual bits outside logical ntfs volume (see function
+	 * description above).
+	 */
+	if (vol->nr_clusters & 63)
+		nr_free += 64 - (vol->nr_clusters & 63);
 	up_read(&vol->lcnbmp_lock);
+	/* If errors occured we may well have gone below zero, fix this. */
+	if (nr_free < 0)
+		nr_free = 0;
 	ntfs_debug("Exiting.");
 	return nr_free;
 }
@@ -1141,64 +1155,81 @@ handle_partial_page:
  * @vol:	ntfs volume for which to obtain free inode count
  *
  * Calculate the number of free mft records (inodes) on the mounted NTFS
- * volume @vol.
+ * volume @vol. We actually calculate the number of mft records in use instead
+ * because this allows us to not care about partial pages as these will be just
+ * zero filled and hence not be counted as allocated mft record.
  *
- * Errors are ignored and we just return the number of free inodes we have
- * found. This means we return an underestimate on error.
+ * If any pages cannot be read we assume all mft records in the erroring pages
+ * are in use. This means we return an underestimate on errors which is better
+ * than an overestimate.
  *
  * NOTE: Caller must hold mftbmp_lock rw_semaphore for reading or writing.
  */
 static unsigned long __get_nr_free_mft_records(ntfs_volume *vol)
 {
-	struct address_space *mapping;
+	s64 nr_free = vol->nr_mft_records;
+	u32 *kaddr;
+	struct address_space *mapping = vol->mftbmp_ino->i_mapping;
+	filler_t *readpage = (filler_t*)mapping->a_ops->readpage;
 	struct page *page;
-	unsigned long index, max_index, nr_free = 0;
-	unsigned int max_size, i;
-	u32 *b;
+	unsigned long index, max_index;
+	unsigned int max_size;
 
-	mapping = vol->mftbmp_ino->i_mapping;
+	ntfs_debug("Entering.");
 	/*
-	 * Convert the number of bits into bytes rounded up to a multiple of 8
-	 * bytes, then convert into multiples of PAGE_CACHE_SIZE.
+	 * Convert the number of bits into bytes rounded up, then convert into
+	 * multiples of PAGE_CACHE_SIZE, rounding up so that if we have one
+	 * full and one partial page max_index = 2.
 	 */
-	max_index = (((vol->nr_mft_records + 7) >> 3) + 7) >> PAGE_CACHE_SHIFT;
+	max_index = (((vol->nr_mft_records + 7) >> 3) + PAGE_CACHE_SIZE - 1) >>
+			PAGE_CACHE_SHIFT;
 	/* Use multiples of 4 bytes. */
 	max_size = PAGE_CACHE_SIZE >> 2;
 	ntfs_debug("Reading $MFT/$BITMAP, max_index = 0x%lx, max_size = "
 			"0x%x.", max_index, max_size);
-	for (index = 0UL; index < max_index;) {
-handle_partial_page:
-		page = ntfs_map_page(mapping, index++);
+	for (index = 0UL; index < max_index; index++) {
+		unsigned int i;
+		/*
+		 * Read the page from page cache, getting it from backing store
+		 * if necessary, and increment the use count.
+		 */
+		page = read_cache_page(mapping, index, (filler_t*)readpage,
+				NULL);
+		/* Ignore pages which errored synchronously. */
 		if (IS_ERR(page)) {
-			ntfs_debug("ntfs_map_page() error. Skipping page "
-					"(index 0x%lx).", index - 1);
+			ntfs_debug("Sync read_cache_page() error. Skipping "
+					"page (index 0x%lx).", index);
+			nr_free -= PAGE_CACHE_SIZE * 8;
 			continue;
 		}
-		b = (u32*)page_address(page);
-		/* For each 4 bytes, add up the number of zero bits. */
-		for (i = 0; i < max_size; i++)
-			nr_free += 32 - hweight32(b[i]);
-		ntfs_unmap_page(page);
-	}
-	if (index == max_index) {
-		/*
-		 * Get the multiples of 4 bytes in use in the final partial
-		 * page.
-		 */
-		max_size = ((((((vol->nr_mft_records + 7) >> 3) + 7) & ~7) &
-				~PAGE_CACHE_MASK) + 3) >> 2;
-		/* If there is a partial page go back and do it. */
-		if (max_size) {
-			/* Compensate for out of bounds zero bits. */
-			if ((i = vol->nr_mft_records & 31))
-				nr_free -= 32 - i;
-			ntfs_debug("Handling partial page, max_size = 0x%x",
-					max_size);
-			goto handle_partial_page;
+		wait_on_page_locked(page);
+		/* Ignore pages which errored asynchronously. */
+		if (!PageUptodate(page)) {
+			ntfs_debug("Async read_cache_page() error. Skipping "
+					"page (index 0x%lx).", index);
+			page_cache_release(page);
+			nr_free -= PAGE_CACHE_SIZE * 8;
+			continue;
 		}
+		kaddr = (u32*)kmap_atomic(page, KM_USER0);
+		/*
+		 * For each 4 bytes, subtract the number of set bits. If this
+		 * is the last page and it is partial we don't really care as
+		 * it just means we do a little extra work but it won't affect
+		 * the result as all out of range bytes are set to zero by
+		 * ntfs_readpage().
+		 */
+	  	for (i = 0; i < max_size; i++)
+			nr_free -= (s64)hweight32(kaddr[i]);
+		kunmap_atomic(kaddr, KM_USER0);
+		page_cache_release(page);
 	}
-	ntfs_debug("Finished reading $MFT/$BITMAP, last index = 0x%lx",
+	ntfs_debug("Finished reading $MFT/$BITMAP, last index = 0x%lx.",
 			index - 1);
+	/* If errors occured we may well have gone below zero, fix this. */
+	if (nr_free < 0)
+		nr_free = 0;
+	ntfs_debug("Exiting.");
 	return nr_free;
 }
 
@@ -1761,7 +1792,7 @@ static void __exit exit_ntfs_fs(void)
 }
 
 MODULE_AUTHOR("Anton Altaparmakov <aia21@cantab.net>");
-MODULE_DESCRIPTION("NTFS 1.2/3.x driver - Copyright (c) 2001-2002 Anton Altaparmakov");
+MODULE_DESCRIPTION("NTFS 1.2/3.x driver - Copyright (c) 2001-2003 Anton Altaparmakov");
 MODULE_LICENSE("GPL");
 #ifdef DEBUG
 MODULE_PARM(debug_msgs, "i");
