@@ -4222,6 +4222,7 @@ ips_send_cmd(ips_ha_t *ha, ips_scb_t *scb) {
    char     *sp;
    int       device_error;
    IPS_DCDB_TABLE_TAPE *tapeDCDB;
+   int       TimeOut;
 
    METHOD_TRACE("ips_send_cmd", 1);
 
@@ -4460,11 +4461,13 @@ ips_send_cmd(ips_ha_t *ha, ips_scb_t *scb) {
       ha->dcdb_active[scb->bus-1] |= (1 << scb->target_id);
       scb->cmd.dcdb.command_id = IPS_COMMAND_ID(ha, scb);
       scb->cmd.dcdb.dcdb_address = cpu_to_le32(scb->scb_busaddr +
-                                          (unsigned long)&scb->dcdb -
-                                          (unsigned long)scb);
+                                               (unsigned long)&scb->dcdb -
+                                               (unsigned long)scb);
       scb->cmd.dcdb.reserved = 0;
       scb->cmd.dcdb.reserved2 = 0;
-      scb->cmd.dcdb.reserved3 = 0;
+      scb->cmd.dcdb.reserved3 = 0;   
+
+      TimeOut = scb->scsi_cmd->timeout_per_command;
 
       if (ha->subsys->param[4] & 0x00100000) {          /* If NEW Tape DCDB is Supported */
          if (!scb->sg_len)
@@ -4475,47 +4478,52 @@ ips_send_cmd(ips_ha_t *ha, ips_scb_t *scb) {
          tapeDCDB = (IPS_DCDB_TABLE_TAPE *) &scb->dcdb; /* Use Same Data Area as Old DCDB Struct */
          tapeDCDB->device_address = ((scb->bus - 1) << 4) | scb->target_id;
          tapeDCDB->cmd_attribute |= IPS_DISCONNECT_ALLOWED;
+         tapeDCDB->cmd_attribute &= ~IPS_TRANSFER64K;   /* Always Turn OFF 64K Size Flag */
 
-         if (scb->timeout) {
-           if (scb->timeout <= 10)
-               tapeDCDB->cmd_attribute |= IPS_TIMEOUT10;
-            else if (scb->timeout <= 60)
-               tapeDCDB->cmd_attribute |= IPS_TIMEOUT60;
-            else
-               tapeDCDB->cmd_attribute |= IPS_TIMEOUT20M;
+         if (TimeOut) {
+            if (TimeOut < ( 10 * HZ ))                  
+                tapeDCDB->cmd_attribute |= IPS_TIMEOUT10;     /* TimeOut is 10 Seconds */
+            else if (TimeOut < (60 * HZ)) 
+                tapeDCDB->cmd_attribute |= IPS_TIMEOUT60;     /* TimeOut is 60 Seconds */
+            else if (TimeOut < (1200 * HZ)) 
+                tapeDCDB->cmd_attribute |= IPS_TIMEOUT20M;    /* TimeOut is 20 Minutes */
          }
 
-         if (!(tapeDCDB->cmd_attribute & IPS_TIMEOUT20M))
-            tapeDCDB->cmd_attribute |= IPS_TIMEOUT20M;
-
-         tapeDCDB->sense_length = sizeof(tapeDCDB->sense_info);
+         tapeDCDB->cdb_length = scb->scsi_cmd->cmd_len;
+         tapeDCDB->reserved_for_LUN = 0;
          tapeDCDB->transfer_length = scb->data_len;
          tapeDCDB->buffer_pointer = cpu_to_le32(scb->data_busaddr);
          tapeDCDB->sg_count = scb->sg_len;
-         tapeDCDB->cdb_length = scb->scsi_cmd->cmd_len;
+         tapeDCDB->sense_length = sizeof(tapeDCDB->sense_info);
+         tapeDCDB->scsi_status = 0;
+         tapeDCDB->reserved = 0;
          memcpy(tapeDCDB->scsi_cdb, scb->scsi_cmd->cmnd, scb->scsi_cmd->cmd_len);
       } else {
          scb->dcdb.device_address = ((scb->bus - 1) << 4) | scb->target_id;
          scb->dcdb.cmd_attribute |= IPS_DISCONNECT_ALLOWED;
 
-         if (scb->timeout) {
-           if (scb->timeout <= 10)
-               scb->dcdb.cmd_attribute |= IPS_TIMEOUT10;
-            else if (scb->timeout <= 60)
-               scb->dcdb.cmd_attribute |= IPS_TIMEOUT60;
-            else
-               scb->dcdb.cmd_attribute |= IPS_TIMEOUT20M;
+         if (TimeOut) {
+            if (TimeOut < (10 * HZ))                  
+                scb->dcdb.cmd_attribute |= IPS_TIMEOUT10;     /* TimeOut is 10 Seconds */
+            else if (TimeOut < (60 * HZ)) 
+                scb->dcdb.cmd_attribute |= IPS_TIMEOUT60;     /* TimeOut is 60 Seconds */
+            else if (TimeOut < (1200 * HZ)) 
+                scb->dcdb.cmd_attribute |= IPS_TIMEOUT20M;    /* TimeOut is 20 Minutes */
          }
-
-         if (!(scb->dcdb.cmd_attribute & IPS_TIMEOUT20M))
-            scb->dcdb.cmd_attribute |= IPS_TIMEOUT20M;
-
-         scb->dcdb.sense_length = sizeof(scb->dcdb.sense_info);
+         
          scb->dcdb.transfer_length = scb->data_len;
+         if ( scb->dcdb.cmd_attribute & IPS_TRANSFER64K ) 
+             scb->dcdb.transfer_length = 0;
          scb->dcdb.buffer_pointer = cpu_to_le32(scb->data_busaddr);
-         scb->dcdb.sg_count = scb->sg_len;
          scb->dcdb.cdb_length = scb->scsi_cmd->cmd_len;
+         scb->dcdb.sense_length = sizeof(scb->dcdb.sense_info);
+         scb->dcdb.sg_count = scb->sg_len;
+         scb->dcdb.reserved = 0;
          memcpy(scb->dcdb.scsi_cdb, scb->scsi_cmd->cmnd, scb->scsi_cmd->cmd_len);
+         scb->dcdb.scsi_status = 0;
+         scb->dcdb.reserved2[0] = 0;
+         scb->dcdb.reserved2[1] = 0;
+         scb->dcdb.reserved2[2] = 0;
       }
    }
 
