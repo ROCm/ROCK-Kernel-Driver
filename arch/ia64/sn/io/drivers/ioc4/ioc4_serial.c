@@ -3954,11 +3954,7 @@ static int ioc4_serial_open(struct tty_struct *tty, struct file *filp)
 	if (info->state->count == 1)
 		ioc4_ss_change_speed(info, (struct termios *)0);
 
-#if defined(HAS_TTY_STRUCT_IN_SIGNAL_STRUCT)
 	tty->session = current->signal->session;
-#else
-	tty->session = current->session;
-#endif
 	tty->pgrp = process_group(current);
 
 	/* start timer if we are polling */
