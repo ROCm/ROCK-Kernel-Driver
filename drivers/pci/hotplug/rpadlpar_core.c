@@ -47,15 +47,13 @@ static struct device_node *find_php_slot_vio_node(char *drc_name)
 {
 	struct device_node *child;
 	struct device_node *parent = of_find_node_by_name(NULL, "vdevice");
+	char *loc_code;
 
 	if (!parent)
 		return NULL;
 
-	for (child = of_get_next_child(parent, NULL);	
+	for (child = of_get_next_child(parent, NULL);
 	     child; child = of_get_next_child(parent, child)) {
-	
-		char *loc_code;
-	
 		loc_code = get_property(child, "ibm,loc-code", NULL);
 		if (loc_code && !strcmp(loc_code, drc_name))
 			return child;
@@ -309,11 +307,7 @@ int dlpar_remove_vio_slot(struct slot *slot, char *drc_name)
  */
 int dlpar_remove_pci_slot(struct slot *slot, char *drc_name)
 {
-	struct device_node *dn = find_php_slot_pci_node(drc_name);
 	struct pci_dev *bridge_dev;
-
-	if (!dn)
-		return -ENODEV;
 
 	bridge_dev = slot->bridge;
 	if (!bridge_dev) {
@@ -358,13 +352,19 @@ int dlpar_remove_slot(char *drc_name)
 
 	if (down_interruptible(&rpadlpar_sem))
 		return -ERESTARTSYS;
-	
+
+	if (!find_php_slot_vio_node(drc_name) &&
+	    !find_php_slot_pci_node(drc_name)) {
+		rc = -ENODEV;
+		goto exit;
+	}
+
 	slot = find_slot(drc_name);
 	if (!slot) {
 		rc = -EINVAL;
 		goto exit;
 	}
-	
+
 	switch (slot->dev_type) {
 		case PCI_DEV:
 			rc = dlpar_remove_pci_slot(slot, drc_name);
