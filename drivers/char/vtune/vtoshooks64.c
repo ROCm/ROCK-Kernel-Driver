@@ -394,16 +394,16 @@ vt_sys_create_module(unsigned long ret)
     //    atomic_inc(&hook_in_progress);
 
     if (track_module_loads && !IS_ERR((void *) ret)) {
-        int size = 0;
         struct module *mod = (struct module *) ret;
+	int msize;
 #ifdef KERNEL_26X
-        size = mod->init_size + mod->core_size;
+	msize = mod->init_size + mod->core_size;
 #else
-        size = mod->size;
+	msize = mod->size;
 #endif
         VDK_PRINT_DEBUG("create_module: %s, %d, %lx, %lx \n",
-			mod->name, current->pid, ret, size);
-        samp_load_image_notify_routine((char *) mod->name, ret, size,
+			mod->name, current->pid, ret, msize);
+        samp_load_image_notify_routine((char *) mod->name, ret, msize,
                        0, LOPTS_GLOBAL_MODULE,
                        (PMGID_INFO) 0, get_exec_mode(current));
     }
@@ -465,8 +465,8 @@ install_OS_hooks(void)
 
     memset(clone_tbl, sizeof(clone_tbl), 0);
 
-#ifndef EXPORTED_SYS_CALL_TABLE
-    sys_call_table = find_sys_call_table_symbol();
+#if !defined(EXPORTED_SYS_CALL_TABLE)
+    sys_call_table = find_sys_call_table_symbol(1);
 #endif
 
     if (sys_call_table) {
@@ -526,8 +526,8 @@ un_install_OS_hooks(void)
    *
    */
 
-#ifndef EXPORTED_SYS_CALL_TABLE
-    sys_call_table = find_sys_call_table_symbol();
+#if !defined(EXPORTED_SYS_CALL_TABLE)
+    sys_call_table = find_sys_call_table_symbol(0);
 #endif
 
     if (sys_call_table) {

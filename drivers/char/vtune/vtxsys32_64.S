@@ -272,7 +272,7 @@ vt_fork32_epilogue_done:
 # ----------------------------------------------------------------------------
 # name:         vt_vfork32_prologue
 #
-# description:  Entry point for VTune intercept of 32-bit vfork system call.
+# description:  Entry point for intercepting 32-bit vfork system call.
 #
 # Input:        partial stack frame expected by vfork system call
 #

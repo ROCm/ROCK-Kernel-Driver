@@ -60,7 +60,6 @@ void *use_sys_call_table_address(void)
   void *sys_call_table = 0;
   unsigned long address = USE_SYSCALLTABLE_ADDRESS;
 
-  VDK_PRINT("using use_sys_call_table_address() to find sys_call_table symbol\n");
   if (address>0x1)
     sys_call_table = (void *)address;
 
@@ -73,7 +72,7 @@ void *use_sys_call_table_address(void)
  *                                symbol and returns pointer to it if found
  *                                (NULL otherwise)
  */
-void *find_sys_call_table_symbol(void)
+void *find_sys_call_table_symbol(int verbose)
 {
   void *sys_call_table = 0;
 
@@ -84,11 +83,13 @@ void *find_sys_call_table_symbol(void)
 
   if (sys_call_table) 
   {
-    VDK_PRINT("sys_call_table symbol found at address 0x%lx\n",(long)sys_call_table);
+    if (verbose)
+      VDK_PRINT("sys_call_table symbol found at address 0x%lx\n",(long)sys_call_table);
   }
   else
   {
-    VDK_PRINT("failed to find address of sys_call_table!\n");
+    if (verbose)
+      VDK_PRINT_WARNING("failed to find address of sys_call_table!\n");
   }
 
   return (sys_call_table);

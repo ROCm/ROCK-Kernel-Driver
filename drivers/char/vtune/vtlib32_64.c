@@ -347,7 +347,7 @@ samp_build_csip_sample(PINT_FRAME int_frame, P_sample_record_PC p_sample)
     }
 #endif    
 
-    VDK_PRINT_DEBUG("returning sample iip: %p, eflags %p, ia64: %d, seg: %x\n",
+    VDK_PRINT_DEBUG("returning sample iip: %p, eflags %p, itp_pc: %d, cs: %x\n",
                 (void *) p_sample->iip.quad_part,
                 (void *) p_sample->ipsr.quad_part,
                 p_sample->itp_pc,
@@ -463,8 +463,8 @@ samp_start_ints(void)
                 // CSS: Think this is DONE now unless we want to make it
                 // a single routine instead of three calls...
                 //
-                get_idt_func(g_EBS_vector,&eachCPU[cpu].original_EBS_idt_entry);
-                set_idt_func(g_EBS_vector, eachCPU[cpu].samp_EBS_idt_routine);
+                get_idt_func(PERF_MON_VECTOR,&eachCPU[cpu].original_EBS_idt_entry);
+                set_idt_func(PERF_MON_VECTOR, eachCPU[cpu].samp_EBS_idt_routine);
                 eachCPU[cpu].original_apic_perf_local_vector = SetApicPerfLevel(apic_perf_lvt);
 
                 //
@@ -556,7 +556,7 @@ samp_restore_cpu_vectors(void)
         // and we write the routine to insert that handler in the IDT
         // then we can worry about writing this routine to clean up...
         //
-        set_idt_func(g_EBS_vector, eachCPU[i].original_EBS_idt_entry);
+        set_idt_func(PERF_MON_VECTOR, eachCPU[i].original_EBS_idt_entry);
         eachCPU[i].original_EBS_idt_entry = 0;
     }
 

@@ -47,6 +47,11 @@
 #include "vtproto.h"
 #include "vtextern.h"
 #include <asm/io.h>
+#ifdef KERNEL_26X
+#include <linux/sched.h>
+#include <asm/current.h>
+#include <linux/pid.h>
+#endif
 #include <asm/msr.h>
 #include <asm/desc.h>
 #include <asm/segment.h>
@@ -176,6 +181,12 @@ samp_build_csip_sample(PINT_FRAME int_frame, P_sample_record_PC p_sample)
     __u32 csdlo;        // low  half code seg descriptor
     __u32 csdhi;        // high half code seg descriptor
     __u32 seg_cs;       // code seg selector
+
+#ifdef USE_NMI
+    // temporarily disable if event is precise
+    if (pebs_option)
+      return;
+#endif
 
     p_sample->cs = (__u16) int_frame->seg_cs;
     p_sample->eip = int_frame->eip;
@@ -359,15 +370,22 @@ samp_start_ints(void)
     ULARGE_INTEGER val;
     PDTS_BUFFER our_DTES_buf;
 
+#ifdef USE_NMI
+    // temporarily disable if event is precise
+    if (pebs_option)
+      return;
+#endif
+
     if (sample_method & METHOD_EBS) {
         cpu = smp_processor_id();
         if (cpu < MAX_PROCESSORS) {
             // InterlockedIncrement(&processor_EBS_status[cpu]);
             interlocked_exchange(&eachCPU[cpu].processor_EBS_status, 1);
             if (eachCPU[cpu].original_EBS_idt_entry == 0) {
-                samp_get_set_idt_entry(g_EBS_vector, (__u32)
+#ifndef USE_NMI
+                samp_get_set_idt_entry(PERF_MON_VECTOR, (__u32)
                                eachCPU[cpu].samp_EBS_idt_routine, &eachCPU[cpu].original_EBS_idt_entry);
-                //eachCPU[cpu].original_apic_perf_local_vector = SAMP_Set_apic_perf_lvt(apic_perf_lvt);
+#endif
                 eachCPU[cpu].original_apic_perf_local_vector = SetApicPerfLevel(apic_perf_lvt); 
 
                 //
@@ -446,7 +464,7 @@ samp_restore_cpu_vectors(void)
     //  restore IDT vector for current cpu
     //
     if (eachCPU[i].original_EBS_idt_entry) {
-        samp_restore_idt_entry(g_EBS_vector, &eachCPU[i].original_EBS_idt_entry);
+        samp_restore_idt_entry(PERF_MON_VECTOR, &eachCPU[i].original_EBS_idt_entry);
         eachCPU[i].original_EBS_idt_entry = 0;
     }
 

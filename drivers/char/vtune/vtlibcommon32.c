@@ -733,14 +733,17 @@ init_driver(void)
     pdsa->method_EBS = TRUE;    // NEED TO FIX!! EBS should be set based on cpu features and EBS test
     pdsa->module_tracking = TRUE;   // driver can do module tracking
 
-#if 0
+#ifdef USE_NMI
     //
     // Use nmi for counter overflow interrupt
     //
-    apic_perf_lvt = 0x02402;    //  apic perf lvt... PMI delivered as NMI
-    EBS_vector = 2;             //  ..
-#endif 
-    apic_perf_lvt = PERF_MON_VECTOR;
+    //  apic perf lvt... PMI delivered as NMI
+    //
+    apic_perf_lvt = 0x400; // mode 100 : see page 8-16 in Intel(R) Pentium 4 Processor Manual Vol 3
+    VDK_PRINT("using NMI with apic_perf_lvt=0x%x\n",apic_perf_lvt);
+#else
+    apic_perf_lvt = APIC_PERFLVT_FIXED_ENA | PERF_MON_VECTOR;
+#endif
 
     DoApicInit ();
 
@@ -1213,6 +1216,12 @@ samp_stop_emon_IA32_familyF(void)
     ULARGE_INTEGER val;
 #endif
 
+#ifdef USE_NMI
+    // temporarily disable if event is precise
+    if (pebs_option)
+      return;
+#endif
+
     if (get_APICID() & (1 << 24)) {
         p_reg_set = reg_set1;
     } else {
@@ -1400,6 +1409,12 @@ samp_start_emon_IA32_familyF(u32 do_stop)
 #endif
     REG_SET *p_reg_set, *p_regs;
     BOOLEAN start_all_counters = FALSE;
+
+#ifdef USE_NMI
+    // temporarily disable if event is precise
+    if (pebs_option)
+      return;
+#endif
 
     if (do_stop) {
         samp_stop_emon_IA32_familyF();
@@ -1607,6 +1622,10 @@ validate_emon_regs(void)
     //
     val.quad_part = 0;
     for (i = 0, reg = ESCR_FIRST; reg <= ESCR_LAST; reg++) {
+    //MSRs 0x3BA and 0x3BB have been removed in model 3
+        if ((g_CPU_model == 3) && ((reg == 0x3BA) || (reg == 0x3BB))){
+                continue;
+        }
         if (validate_reg_RW(reg, val)) {
             p_emon_regs[i] = reg;
             i++;
@@ -1823,6 +1842,12 @@ samp_stop_profile_interrupt(void *info)
     __u32 cpu;
     ULARGE_INTEGER val;
 
+#ifdef USE_NMI
+    // temporarily disable if event is precise
+    if (pebs_option)
+      return;
+#endif
+
     cpu = smp_processor_id();
 
     if (cpu < MAX_PROCESSORS) {
@@ -1876,7 +1901,7 @@ samp_stop_ints(void)
  *  Function: set_IA32_family_F_emon_defaults 
  *
  *  description: 
- *  Set Emon Defaults for IA32 Family F... Williamette.
+ *  Set Emon Defaults for IA32 Family F
  *
  *  Parms:
  *      entry:      None

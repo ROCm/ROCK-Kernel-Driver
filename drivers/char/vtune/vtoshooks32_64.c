@@ -367,7 +367,6 @@ asmlinkage long
 vt_sys_create_module(char *name, long size)
 {
 	long ret = -EINVAL;
-	struct module *mod;
 
 	VDK_PRINT_DEBUG("vt_sys_module() entered pid %d\n", current->pid);
 
@@ -376,10 +375,16 @@ vt_sys_create_module(char *name, long size)
 	ret = original_sys_create_module(name, size);
 
 	if (track_module_loads && !IS_ERR((void *) ret)) {
-		mod = (struct module *) ret;
+		struct module *mod = (struct module *) ret;
+		int msize;
+#ifdef KERNEL_26X
+		msize = mod->init_size + mod->core_size;
+#else
+		msize = mod->size;
+#endif
                 VDK_PRINT_DEBUG("create_module: %s, %d, %x, %x \n",
-			     mod->name, current->pid, ret, mod->size);
-		samp_load_image_notify_routine((char *) mod->name, ret, mod->size,
+			     mod->name, current->pid, ret, msize);
+		samp_load_image_notify_routine((char *) mod->name, ret, msize,
 					   0, LOPTS_GLOBAL_MODULE,
 					   (PMGID_INFO) 0, get_exec_mode(current));
 	}
@@ -616,7 +621,7 @@ install_OS_hooks(void)
 {
 
 #ifndef EXPORTED_SYS_CALL_TABLE
-  sys_call_table = find_sys_call_table_symbol();
+  sys_call_table = find_sys_call_table_symbol(1);
 #endif
 
   if (sys_call_table)
@@ -639,7 +644,7 @@ install_OS_hooks(void)
   else
     VDK_PRINT_WARNING("64-bit process creates and image loads will not be tracked during sampling session\n");
 
-  if (ia32_sys_call_table)
+  if (FALSE && ia32_sys_call_table)
   {
 	// handle 32-bit entry points
 	original_ia32_sys_mmap2 =
@@ -678,7 +683,7 @@ un_install_OS_hooks(void)
    */
 
 #ifndef EXPORTED_SYS_CALL_TABLE
-  sys_call_table = find_sys_call_table_symbol();
+  sys_call_table = find_sys_call_table_symbol(0);
 #endif
 
   if (sys_call_table)
@@ -704,7 +709,7 @@ un_install_OS_hooks(void)
 	}
   }
 
-  if (ia32_sys_call_table)
+  if (FALSE && ia32_sys_call_table)
   {
 	// restore 32-bit entry points
 	if ((org_fn = xchg(&original_ia32_sys_mmap2, 0))) {

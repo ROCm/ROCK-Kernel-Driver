@@ -646,7 +646,7 @@ typedef struct _IA32EM64T_PEBS_RECORD {
 // information in an array that is generated as needed.  So, use base
 // base and counts instead of the full list spelled out.
 //
-// LBR msr's for IA32 EM64T. NOT ARCHITECTURAL so they can change!
+// LBR msr's for IA-32 processors.  NOT ARCHITECTURAL so they can change!
 //
 #define MSR_LBR_PSC_TOS             474
 

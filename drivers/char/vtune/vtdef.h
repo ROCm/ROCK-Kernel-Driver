@@ -48,9 +48,12 @@
 #else
 #include "familyf_msr.h"
 #endif
+#ifdef KERNEL_26X
+#include <linux/timer.h>
+#endif
 
 #define SYS_VERSION_MAJOR               0
-#define SYS_VERSION_MINOR               921001
+#define SYS_VERSION_MINOR               921002
 
 #define  PCMINOR                        0   /* /dev/vtune minor number */
 #define  MDMINOR                        1   /* /dev/vtune_m */
@@ -70,6 +73,7 @@
 #endif
 
 #define CPUFAMILY                       0xF00
+#define CPUMODEL                        0xF0
 
 #define emask_t unsigned long
 
@@ -80,8 +84,6 @@
 
 #define APIC_BASE_MSR        0x1B   // apic base msr
 #define APIC_BASE_MSR_ENABLE 0x800  // apic enable/disable bit
-
-//#define EBS_CONFIG_SMP                    1
 
 /*---------------------------------------------------------------*/
 /*
@@ -160,7 +162,6 @@ ia64_set_dcr (__u64 val)
 	ia64_srlz_d();
 }
 #endif
-
 #define itp_get_dcr()           ia64_get_dcr()
 #define itp_set_dcr(a)          ia64_set_dcr(a)
 
@@ -322,6 +323,7 @@ typedef struct {
 } samp_user_config_stat_t;
 
 #define ITP_CPUID_REG3_FAMILY   0xFF000000
+#define ITP_CPUID_REG3_MODEL   0xFF0000
 #define ITP_CPU_FAMILY_ITANIUM  7
 #define ITP_CPU_FAMILY_ITANIUM2 0x1F
 

@@ -49,6 +49,9 @@
 #ifdef DSA_SUPPORT_MMAP
 #include <linux/mm.h>
 #endif
+#ifdef linux32_64
+#include <asm/thread_info.h>
+#endif
 #endif
 #include <asm/uaccess.h>
 #ifdef ENFORCE_ROOT_ONLY_ACCESS
@@ -221,6 +224,44 @@ PER_CPU eachCPU[MAX_PROCESSORS];
 #if defined(linux32) || defined(linux32_64)
 __u32 package_status[MAX_PROCESSORS + 1];
 #endif
+
+#ifdef USE_NMI
+
+#include <asm/nmi.h>
+
+int nmi_interrupts;
+
+static nmi_callback_t
+ebs_nmi_callback(struct pt_regs * regs, int cpu)
+{
+  ebs_intr(regs);
+
+  nmi_interrupts++;
+
+  return (1);
+}
+
+static int
+register_nmi_callback(void)
+{
+    nmi_interrupts = 0;
+
+    set_nmi_callback((nmi_callback_t)ebs_nmi_callback);
+
+    return (0);
+}
+
+static int
+unregister_nmi_callback(void)
+{
+    unset_nmi_callback();
+
+    VDK_PRINT_DEBUG("number of NMI interrupts generated: %d\n",nmi_interrupts);
+
+    return (0);
+}
+
+#endif // USE_NMI
 
 #ifdef linux32
 void
@@ -533,7 +574,11 @@ int samp_read_cpu_perf_counters(RDPMC_BUF *pr_buf)
 #endif
     read_cpu_perf_counters_for_current_cpu((void *) pr_buf_r0);  
 
+#ifdef USE_NMI
+    copy_to_user(pr_buf,pr_buf_r0,sizeof(RDPMC_BUF));
+#else
     memcpy((void *) pr_buf, (void*) pr_buf_r0, sizeof(RDPMC_BUF));
+#endif
 
     vfree(pr_buf_r0);
 
@@ -752,6 +797,11 @@ init_module(void)
     /* Send load message to system log file */
     VDK_PRINT_BANNER("loaded");
 
+#ifdef USE_NMI
+    VDK_PRINT_WARNING("Event calibration is disabled for this kernel.\n");
+    VDK_PRINT_WARNING("Sampling with precise events is disabled for this kernel.\n");
+#endif
+
     memset(eachCPU, 0, sizeof(eachCPU)); // see also init_driver() in vtlib*.c
 
     return (0);
@@ -860,6 +910,11 @@ samp_cleanup(void)
         pdsa->pause_count = 0;
         pdsa->running = 0;
     }
+
+#ifdef USE_NMI
+      unregister_nmi_callback();
+      return;
+#endif
 
 #ifdef linux64
     uninstall_perf_isr();
@@ -990,12 +1045,16 @@ int
 vtune_ioctl(struct inode *inode, struct file *filp,
 	    unsigned int cmd, unsigned long arg)
 {
-    int status, sp_offset, sp_length;
-
-    samp_parm_ex *spx = NULL;
+#ifdef USE_NMI
+    samp_parm_ex spx;
+#else
+    samp_parm_ex *spx;
+#endif
     samp_parm6   *sp6 = NULL;
+    int sp_offset = 0;
+    int sp_length = 0;
 
-    status = sp_length = 0;
+    int status = 0;
 
 #ifdef ENFORCE_ROOT_ONLY_ACCESS
     if (!capable(CAP_SYS_PTRACE))
@@ -1014,9 +1073,17 @@ vtune_ioctl(struct inode *inode, struct file *filp,
             break;
         }
 
+#ifdef USE_NMI
+	memset(&spx,0,sizeof(samp_parm_ex));
+	copy_from_user(&spx, (samp_parm_ex *)arg, sizeof(samp_parm_ex));
+        sp_offset = spx.hdr.sp_offset;
+        sp_length = spx.hdr.sp_length;
+#else
         spx = (samp_parm_ex *) arg;
         sp_offset = spx->hdr.sp_offset;
         sp_length = spx->hdr.sp_length;
+#endif
+	VDK_PRINT_DEBUG("vtune_ioctl(): sp_offset=0x%x, sp_length=0x%x\n",sp_offset,sp_length);
 
         if (sp_offset < sizeof(samp_parm_header)) {
             status = -EINVAL;
@@ -1031,18 +1098,37 @@ vtune_ioctl(struct inode *inode, struct file *filp,
             break;
         }
 
+#ifdef USE_NMI
+        switch (spx.hdr.sp_version) {
+#else
         switch (spx->hdr.sp_version) {
+#endif
         case 6:
             //
             // Configure or start sampling
             //
+#ifdef USE_NMI
+            sp6 = kmalloc(sp_length, GFP_ATOMIC);
+	    if (sp6==NULL) {
+	      status = -ENOMEM;
+	      break;
+	    }
+	    copy_from_user(sp6, (samp_parm6 *)(arg + sp_offset), sp_length);
+#else
             sp6 = (void *) spx + sp_offset;
+#endif
             if (cmd == VTUNE_CONFIG_EX) {
                 status = samp_configure6(sp6, sp_length);
             }
             else {
+#ifdef USE_NMI
+	      if (! sp6->calibration) // temporarily disable calibration for hugemem
+#endif
                 status = start_sampling6(sp6, sp_length);
             }
+#ifdef USE_NMI
+	    kfree(sp6);
+#endif
             break;
         default:
             status = -EINVAL;
@@ -1197,7 +1283,8 @@ samp_write_pc_file(struct file * filp, char *buf, size_t count, loff_t * ppos)
             break;
         }
         VDK_PRINT_DEBUG("samp_write_pc_file: pid 0x%x entering sleep \n", current->pid);
-        wait_event_interruptible(pc_write, (!samp_info.sampling_active));
+	//        wait_event_interruptible(pc_write, (!samp_info.sampling_active));
+	interruptible_sleep_on(&pc_write);  // fixes Ctrl-C problem during collection
     }
 
     return (buf_len);
@@ -1432,10 +1519,12 @@ vdrvgetsysinfo(void)
     g_this_CPUID = cpuid_eax(1);
     g_this_CPU_features = cpuid_edx(1);
     g_CPU_family = (char) ((g_this_CPUID & CPUFAMILY) >> 8);
+    g_CPU_model = (char) ((g_this_CPUID & CPUMODEL) >> 4);
 #elif defined(linux64)
     g_this_CPUID = itp_get_cpuid(3);   // Itanium(R) processor cpuid reg 3 - version information 39:32 arch rev, 31:24 family, 23:16 model, 15:8 rev, 7:0 largest cpuid index
     g_this_CPU_features = itp_get_cpuid(4);    //
     g_CPU_family = (__u32) ((g_this_CPUID & ITP_CPUID_REG3_FAMILY) >> 24);
+    g_CPU_model = (__u32) ((g_this_CPUID & ITP_CPUID_REG3_MODEL) >> 16);
 #else
 #error Unknown processor
 #endif
@@ -1650,7 +1739,7 @@ start_sampling6(samp_parm6 * sp6, int sp6_len)
 
     /* Check for allocation success */
     if (!buf_start) {
-	VDK_PRINT("start_sampling6: unable to allocate memory\n");
+        VDK_PRINT_ERROR("Unable to allocate buffer space for sampling!\n");
         return (-ENOMEM);
     }
 
@@ -1752,17 +1841,20 @@ start_sampling6(samp_parm6 * sp6, int sp6_len)
         set_PP_SW();
         errCode = install_perf_isr();
 	if (errCode != 0) {
-	  VDK_PRINT("start_sampling6: unable to install_perf_isr() (error=%d)\n",errCode);
+	  VDK_PRINT_ERROR("Unable to install interrupt handler (error=%d)!\n",errCode);
 	  stop_sampling(TRUE);
 	  samp_cleanup();
 	  return (errCode);
 	}
 #elif defined(linux32) || defined(linux32_64)
-        vdrv_init_emon_regs();
+	vdrv_init_emon_regs();
+#ifdef USE_NMI
+	register_nmi_callback();
+#endif
 #else
 #error Unkown Architecture
 #endif
-        vdrv_start_EBS();
+	vdrv_start_EBS(); // causes unexpected IRQ trap at vector 20 when NMI is enabled
     }
 
     return (0);
@@ -1920,7 +2012,10 @@ ebs_intr(int irq, void *arg, struct pt_regs *regs)
     //
     if ((((char *) regs) != (((char *) &regs) + 8)) &&
     	(((char *) regs) != (((char *) &regs) + 16))) {
+#ifndef USE_NMI
+	// using printk's during NMI interrupt handling can cause problems
 	VDK_PRINT_ERROR("interrupt stack appears wrong. regs is 0x%p, &regs is 0x%p\n", regs, &regs);
+#endif
     }
 #endif
 
@@ -1936,7 +2031,7 @@ ebs_intr(int irq, void *arg, struct pt_regs *regs)
         unsigned long eflag, csd;
 
         asm("mov %0=ar.eflag;"  // get IA32 eflags
-            "mov %1=ar.csd;"    // get IAA32 unscrambled code segment descriptor
+            "mov %1=ar.csd;"    // get IA32 unscrambled code segment descriptor
           :    "=r"(eflag), "=r"(csd));
         int_frame.E_flags = (__u32) eflag;
         int_frame.csd = csd;
@@ -2656,7 +2751,11 @@ get_exec_mode(struct task_struct *p)
 #elif defined(linux32_64)
 	if (!p)
 		return (MODE_UNKNOWN);
+#ifdef KERNEL_26X
+	if (p->thread_info->flags & TIF_IA32)
+#else
 	if (p->thread.flags & THREAD_IA32)
+#endif
 		return ((unsigned short) MODE_32BIT);
 	else
 		return ((unsigned short) MODE_64BIT);
@@ -2737,8 +2836,11 @@ __u32 pid, __u32 options, PMGID_INFO pmgid_info, unsigned short  mode)
 	// 0x0000000000400000 = 4MB  RH EL 3 64-bit
 	// 0x08048000 = ?  RH EL 3 32-bit
 	if (mode==MODE_64BIT)
-	  if ((mra->load_addr64.quad_part >= 0x0000000000400000) &&
-	      (mra->load_addr64.quad_part <  0x0000000000400000 + 0x00000000002FFFFF))
+	  if ( ((mra->load_addr64.quad_part >= 0x0000000000400000) &&
+		(mra->load_addr64.quad_part <  0x0000000000400000 + 0x00000000002FFFFF))
+	       ||
+	       ((mra->load_addr64.quad_part >= 0x0000000040000000) &&
+		(mra->load_addr64.quad_part <  0x0000000040000000 + 0x00000000002FFFFF)) )
 	    mra->exe = 1;
 	  else
 	    mra->exe = 0;

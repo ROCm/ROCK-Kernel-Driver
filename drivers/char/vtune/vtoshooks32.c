@@ -322,15 +322,20 @@ asmlinkage long
 vt_sys_create_module(char *name, long size)
 {
 	long ret = -EINVAL;
-	struct module *mod;
 
 	//	atomic_inc(&hook_in_progress);
 
 	ret = original_sys_create_module(name, size);
 
 	if (track_module_loads && !IS_ERR((void *) ret)) {
-		mod = (struct module *) ret;
-		samp_load_image_notify_routine((char *) mod->name, ret, mod->size,
+		struct module *mod = (struct module *) ret;
+		int msize;
+#ifdef KERNEL_26X
+		msize = mod->init_size + mod->core_size;
+#else
+		msize = mod->size;
+#endif
+		samp_load_image_notify_routine((char *) mod->name, ret, msize,
 					   0, LOPTS_GLOBAL_MODULE,
 					   (PMGID_INFO) 0, get_exec_mode(current));
 	}
@@ -358,8 +363,8 @@ void
 install_OS_hooks(void)
 {
 
-#ifndef EXPORTED_SYS_CALL_TABLE
-  sys_call_table = find_sys_call_table_symbol();
+#if !defined(EXPORTED_SYS_CALL_TABLE) && !defined(KERNEL_26X)
+  sys_call_table = find_sys_call_table_symbol(1);
 #endif
 
   if (sys_call_table)
@@ -402,8 +407,8 @@ un_install_OS_hooks(void)
    *
    */
 
-#ifndef EXPORTED_SYS_CALL_TABLE
-  sys_call_table = find_sys_call_table_symbol();
+#if !defined(EXPORTED_SYS_CALL_TABLE) && !defined(KERNEL_26X)
+  sys_call_table = find_sys_call_table_symbol(0);
 #endif
 
   if (sys_call_table)

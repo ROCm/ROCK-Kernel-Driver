@@ -119,7 +119,7 @@
 
 #define PS_VM                 0x00020000  // virtual 86 mode flag
 
-#define MAXNAMELEN            2048  // BUG: should not be fixed value (Windows* limit is 256)
+#define MAXNAMELEN            1024  // BUG: should not be fixed value (Windows* limit is 256) (and 2048 is too large for some kernels)
 
 /*
  *  Sample information structure... maintained by Linux* driver

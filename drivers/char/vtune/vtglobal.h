@@ -73,12 +73,6 @@ __u32_PTR app_base_high;        // ..
 short my_cs, my_ds;
 unsigned long *my_idt;
 
-#ifndef PERF_MON_VECTOR
-#define PERF_MON_VECTOR 0xF0
-#endif
-
-unsigned long g_EBS_vector = PERF_MON_VECTOR;
-
 int p6_def_pesr = 0x530000;
 int local_timer_icount = 0x50d4f;
 
@@ -86,6 +80,7 @@ char intelid[] = "Genuineintel";    /* intel processor ID */
 unsigned long g_this_CPUID = 0;
 unsigned long g_this_CPU_features = 0;
 __u32 g_CPU_family = 0;
+__u32 g_CPU_model = 0;
 
 #ifdef USE_TYPE_WAIT_QUEUE_OLD
 struct wait_queue *pc_write;        /* pc buffer full write event */

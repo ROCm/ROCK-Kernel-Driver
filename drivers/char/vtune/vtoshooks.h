@@ -69,7 +69,7 @@ unsigned short get_exec_mode(struct task_struct *p);
 void samp_create_process_notify_routine(__u32 parent_id, __u32 process_id, __u32 create);
 
 #ifndef EXPORTED_SYS_CALL_TABLE
-void *find_sys_call_table_symbol(void);
+void *find_sys_call_table_symbol(int verbose);
 #endif
 
 #ifdef EXPORTED_FOR_EACH_PROCESS

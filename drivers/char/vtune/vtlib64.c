@@ -47,8 +47,6 @@
 #include "vtproto.h"
 #include "vtextern.h"
 
-#ifdef linux64
-
 void samp_start_ints(BOOLEAN startall);
 
 void samp_stop_ints(void);
@@ -119,8 +117,6 @@ __u32 max_config_pmc = 15;  // maximum pmc which can be written for PMU configur
 
 #define MAX_OS_EVENTS 32
 __s32 OS_events[MAX_OS_EVENTS]; //
-
-#endif
 
 void samp_save_set_cpu_vectors(void);
 
@@ -665,8 +661,6 @@ init_driver(void)
     pdsa->num_event_counters = 4;   // four counters on Itanium(R) processor   08-06-00
     pdsa->method_EBS = TRUE;
     pdsa->module_tracking = TRUE;   // driver can do module tracking
-
-    // apic_perf_lvt = APIC_PERFLVT_FIXED_ENA | g_EBS_vector;
 
     return (STATUS_SUCCESS);
 }

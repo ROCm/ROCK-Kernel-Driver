@@ -44,13 +44,12 @@ extern BOOLEAN DTES_supported;
 extern sys_samp_info vtune_sys_info;
 extern samp_parm6 samp_parms;
 extern sampinfo_t samp_info;
-extern __u32 g_EBS_vector;
 extern __u32 apic_perf_lvt;
 
 extern driver_shared_area *pdsa;    /* DSA ptr */
 #ifdef DSA_SUPPORT_MMAP
 extern driver_shared_area *create_dsa(void);
-extern int destroy_dsa();
+extern int destroy_dsa(void);
 #endif
 
 /* PC Sample record buf */
@@ -94,6 +93,7 @@ extern BOOLEAN pebs_option;
 extern __u32 reset_and_power_on_pubs;   
 extern ULARGE_INTEGER max_counter;
 extern __u32 g_CPU_family;
+extern __u32 g_CPU_model;
 
 extern REG_SET reg_set[MAX_REG_SET_ENTRIES];
 extern REG_SET reg_set0[MAX_REG_SET_ENTRIES];
