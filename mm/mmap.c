@@ -1504,6 +1504,7 @@ struct vm_area_struct *copy_vma(struct vm_area_struct **vmap,
 	struct mm_struct *mm = vma->vm_mm;
 	struct vm_area_struct *new_vma, *prev;
 	struct rb_node **rb_link, *rb_parent;
+	struct mempolicy *pol;
 
 	find_vma_prepare(mm, addr, &prev, &rb_link, &rb_parent);
 	new_vma = vma_merge(mm, prev, rb_parent, addr, addr + len,
@@ -1519,6 +1520,12 @@ struct vm_area_struct *copy_vma(struct vm_area_struct **vmap,
 		new_vma = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
 		if (new_vma) {
 			*new_vma = *vma;
+			pol = mpol_copy(vma_policy(vma));
+			if (IS_ERR(pol)) {
+				kmem_cache_free(vm_area_cachep, new_vma);
+				return NULL;
+			}
+			vma_set_policy(new_vma, pol);
 			INIT_LIST_HEAD(&new_vma->shared);
 			new_vma->vm_start = addr;
 			new_vma->vm_end = addr + len;
