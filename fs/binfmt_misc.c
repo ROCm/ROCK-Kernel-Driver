@@ -52,7 +52,7 @@ typedef struct {
 	struct dentry *dentry;
 } Node;
 
-static rwlock_t entries_lock __attribute__((unused)) = RW_LOCK_UNLOCKED;
+static rwlock_t entries_lock = RW_LOCK_UNLOCKED;
 static struct vfsmount *bm_mnt;
 static int entry_count;
 
