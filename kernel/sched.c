@@ -1659,7 +1659,7 @@ repeat:
 
 void __init migration_init(void)
 {
-	unsigned long tmp;
+	unsigned long tmp, orig_cache_decay_ticks;
 	int cpu;
 
 	tmp = 0;
@@ -1672,6 +1672,9 @@ void __init migration_init(void)
 
 	migration_mask = tmp;
 
+	orig_cache_decay_ticks = cache_decay_ticks;
+	cache_decay_ticks = 0;
+
 	for (cpu = 0; cpu < smp_num_cpus; cpu++) {
 		int logical = cpu_logical_map(cpu);
 
@@ -1680,5 +1683,7 @@ void __init migration_init(void)
 	}
 	if (migration_mask)
 		BUG();
+
+	cache_decay_ticks = orig_cache_decay_ticks;
 }
 #endif
