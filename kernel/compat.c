@@ -412,92 +412,54 @@ compat_sys_wait4(compat_pid_t pid, compat_uint_t __user *stat_addr, int options,
 	}
 }
 
-/*
- * for maximum compatability, we allow programs to use a single (compat)
- * unsigned long bitmask if all cpus will fit. If not, you have to have
- * at least the kernel size available.
- */
-#define USE_COMPAT_ULONG_CPUMASK (NR_CPUS <= BITS_PER_COMPAT_LONG)
+static int compat_get_user_cpu_mask(compat_ulong_t __user *user_mask_ptr,
+				    unsigned len, cpumask_t *new_mask)
+{
+	unsigned long *k;
 
-asmlinkage long compat_sys_sched_setaffinity(compat_pid_t pid, 
+	if (len < sizeof(cpumask_t))
+		memset(new_mask, 0, sizeof(cpumask_t));
+	else if (len > sizeof(cpumask_t))
+		len = sizeof(cpumask_t);
+
+	k = cpus_addr(*new_mask);
+	return compat_get_bitmap(k, user_mask_ptr, len * 8);
+}
+
+asmlinkage long compat_sys_sched_setaffinity(compat_pid_t pid,
 					     unsigned int len,
 					     compat_ulong_t __user *user_mask_ptr)
 {
-	cpumask_t kern_mask;
-	mm_segment_t old_fs;
-	int ret;
+	cpumask_t new_mask;
+	int retval;
 
-	if (USE_COMPAT_ULONG_CPUMASK) {
-		compat_ulong_t user_mask;
+	retval = compat_get_user_cpu_mask(user_mask_ptr, len, &new_mask);
+	if (retval)
+		return retval;
 
-		if (len < sizeof(user_mask))
-			return -EINVAL;
-
-		if (get_user(user_mask, user_mask_ptr))
-			return -EFAULT;
-
-		cpus_addr(kern_mask)[0] = user_mask;
-	} else {
-		unsigned long *k;
-
-		if (len < sizeof(kern_mask))
-			return -EINVAL;
-
-		k = cpus_addr(kern_mask);
-		ret = compat_get_bitmap(k, user_mask_ptr,
-					sizeof(kern_mask) * BITS_PER_LONG);
-		if (ret)
-			return ret;
-	}
-
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	ret = sys_sched_setaffinity(pid,
-				    sizeof(kern_mask),
-				    (unsigned long __user *) &kern_mask);
-	set_fs(old_fs);
-
-	return ret;
+	return sched_setaffinity(pid, new_mask);
 }
 
 asmlinkage long compat_sys_sched_getaffinity(compat_pid_t pid, unsigned int len,
 					     compat_ulong_t __user *user_mask_ptr)
 {
-	cpumask_t kern_mask;
-	mm_segment_t old_fs;
 	int ret;
+	cpumask_t mask;
+	unsigned long *k;
 
-	if (len < (USE_COMPAT_ULONG_CPUMASK ? sizeof(compat_ulong_t)
-				: sizeof(kern_mask)))
+	if (len < sizeof(cpumask_t))
 		return -EINVAL;
 
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-	ret = sys_sched_getaffinity(pid,
-				    sizeof(kern_mask),
-				    (unsigned long __user *) &kern_mask);
-	set_fs(old_fs);
-
+	ret = sched_getaffinity(pid, &mask);
 	if (ret < 0)
 		return ret;
 
-	if (USE_COMPAT_ULONG_CPUMASK) {
-		if (put_user(&cpus_addr(kern_mask)[0], user_mask_ptr))
-			return -EFAULT;
-		ret = sizeof(compat_ulong_t);
-	} else {
-		unsigned long *k;
+	k = cpus_addr(mask);
+	ret = compat_put_bitmap(user_mask_ptr, k, sizeof(cpumask_t) * 8);
+	if (ret)
+		return ret;
 
-		k = cpus_addr(kern_mask);
-		ret = compat_put_bitmap(user_mask_ptr, k,
-					sizeof(kern_mask) * BITS_PER_LONG);
-		if (ret)
-			return ret;
-
-		ret = sizeof(kern_mask);
-	}
-
-	return ret;
+	return sizeof(cpumask_t);
 }
 
 static int get_compat_itimerspec(struct itimerspec *dst, 
