@@ -187,8 +187,9 @@ ia32_setup_arg_pages (struct linux_binprm *bprm, int executable_stack)
 			mpnt->vm_flags = VM_STACK_FLAGS & ~VM_EXEC;
 		else
 			mpnt->vm_flags = VM_STACK_FLAGS;
+		/* ia64 does not seem to know PAGE_COPY_EXEC */
 		mpnt->vm_page_prot = (mpnt->vm_flags & VM_EXEC)?
-					PAGE_COPY_EXEC: PAGE_COPY;
+					PAGE_COPY/*_EXEC*/: PAGE_COPY;
 		mpnt->vm_ops = NULL;
 		mpnt->vm_pgoff = mpnt->vm_start >> PAGE_SHIFT;
 		mpnt->vm_file = NULL;
